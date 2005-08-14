@@ -1,7 +1,7 @@
 #ifndef MANU_H_
 #define MANU_H_
 
-#ifdef __cplusplus
+#ifdef	__cplusplus
 #include <cassert>
 extern "C" {
 #endif
@@ -154,7 +154,7 @@ extern "C" {
 #define iceildiv(x,y)	(((x)+(y)-1)/(y))
 
 
-#ifdef __cplusplus
+#ifdef	__cplusplus
 }
 #endif
 
