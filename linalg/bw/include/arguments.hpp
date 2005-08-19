@@ -45,7 +45,14 @@ class situation {
 	bool operator==(std::string & x) const { return x == p[0]; }
 	bool operator!=(const char *x) const { return !operator==(x); }
 	bool operator!=(std::string & x) const { return !operator==(x); }
-	bool operator()(const char * opt, const char * & var) {
+	template<typename T>
+	bool operator()(const char * opt, T & var) {
+		if (!check(opt, 1)) return false;
+		std::istringstream s(p[0]);
+		s >> var;
+		return s.eof() && !s.fail();
+	}
+	bool operator()(const char * opt, char const * & var) {
 		if (!check(opt, 1)) return false;
 		var = p[0];
 		return true;
@@ -53,38 +60,6 @@ class situation {
 	bool operator()(const char * opt, std::string & var) {
 		if (!check(opt, 1)) return false;
 		var = p[0];
-		return true;
-	}
-	bool operator()(const char * opt, int & var) {
-		if (!check(opt, 1)) return false;
-		std::istringstream s(p[0]);
-		s >> var;
-		return s.eof() && !s.fail();
-	}
-	bool operator()(const char * opt, long & var) {
-		if (!check(opt, 1)) return false;
-		std::istringstream s(p[0]);
-		s >> var;
-		return s.eof() && !s.fail();
-	}
-	bool operator()(const char * opt, unsigned int & var) {
-		if (!check(opt, 1)) return false;
-		std::istringstream s(p[0]);
-		s >> var;
-		return s.eof() && !s.fail();
-	}
-	bool operator()(const char * opt, unsigned long & var) {
-		if (!check(opt, 1)) return false;
-		std::istringstream s(p[0]);
-		s >> var;
-		return s.eof() && !s.fail();
-	}
-	bool operator()(const char * opt,
-			const char * & var1, const char * & var2)
-	{
-		if (!check(opt, 2)) return false;
-		var1 = p[0];
-		var2 = p[1];
 		return true;
 	}
 	bool operator()(const char * opt, bool & var) {
