@@ -14,7 +14,8 @@ extern "C" {
  */
 #if defined(FORCE_CROAK_ON_CERR) && defined(__cplusplus)
 #define manu_croaks(x,y)					\
-	std::cerr	<< (x) << " in " << __func__ 			\
+	std::cout << flush;					\
+	std::cerr	<< (x) << " in " << __func__ 		\
 		<< " at " << __FILE__ << ':' << __LINE__	\
 		<< " -- " << (y) << endl;
 
