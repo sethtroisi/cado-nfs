@@ -56,6 +56,9 @@ extern "C" {
 #ifdef BASH_USER
 #undef BASH_USER
 #endif
+#ifdef DIE
+#undef DIE
+#endif
 
 #define ASSERT(x)	assert(x)
 #define BUG()	BEGIN_BLOCK				\
@@ -104,6 +107,11 @@ extern "C" {
 		manu_croaks("impolite user", (x));	\
 		BUG();					\
 	END_BLOCK
+#define	DIE(x)						\
+	BEGIN_BLOCK					\
+		manu_croaks("die", (x));		\
+		BUG();					\
+	END_BLOCK
 
 /**********************************************************************/
 #ifndef TRUE
@@ -127,18 +135,31 @@ extern "C" {
 #endif
 
 /**********************************************************************/
-#if defined(__GNUC__) && !defined(__cplusplus)
+#if defined(__GNUC__)
+	/* && !defined(__cplusplus) */
 #define try_inline __inline__
+#ifndef	UNUSED_VARIABLE
 #define UNUSED_VARIABLE __attribute__ ((unused))
+#endif
+#ifndef EXPECT
 #define EXPECT(x,val)	__builtin_expect(x,val)
+#endif
 #else
 #define try_inline
+#ifndef	UNUSED_VARIABLE
 #define UNUSED_VARIABLE
+#endif
+#ifndef EXPECT
 #define	EXPECT(x,val)	(x)
 #endif
+#endif
 
+#ifndef	EXPECT_TRUE
 #define EXPECT_TRUE(x)	EXPECT(x,1)
+#endif
+#ifndef	EXPECT_FALSE
 #define EXPECT_FALSE(x)	EXPECT(x,0)
+#endif
 
 /**********************************************************************/
 #ifndef DISABLE_ALLOCA
