@@ -11,6 +11,8 @@
 #include <iostream>	/* for cerr in process_arguments */
 #include <cstdlib>	/* for exit() in process_arguments */
 
+#include "manu.h"	/* for UNUSED_VARIABLE */
+
 namespace argparser {
 class situation {
 	public:
@@ -77,13 +79,13 @@ class situation {
 }	/* namespace argparser */
 
 struct no_arguments {
-	bool parse(argparser::situation& s) { return false; }
+	bool parse(argparser::situation& s UNUSED_VARIABLE) { return false; }
 	void doc(std::ostream& o) const {
 		o
 		<< "Accepted options:\n"
 		<< "--help\t\tshow this help\n";
 	}
-	bool check(std::ostream& o) { return true; }
+	bool check(std::ostream& o UNUSED_VARIABLE) { return true; }
 	void trigger() const {}
 };
 
