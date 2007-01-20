@@ -1,0 +1,24 @@
+See ../../test/inputs/README for the input format used for polyselect.
+
+The output format is that of ggnfs (any line starting with # is a comment,
+sss is a string, nnn a non-negative integer, zzz a signed integer, ddd a
+floating-point number):
+
+name: sss # optional
+n: nnn    # number to factor
+skew: ddd # skewness
+c5: zzz   # coefficient of degree 5 (algebraic side)
+...
+c0: zzz   # coefficient of degree 0 (algebraic side)
+Y1: zzz   # coefficient of degree 1 (rational side)
+Y0: zzz   # coefficient of degree 0 (rational side)
+type: gnfs
+rlim: nnn # rational factor base bound
+alim: nnn # algebraic factor base bound
+lpbr: nnn # rational large prime bound is 2^nnn
+lpba: nnn # algebraic large prime bound is 2^nnn
+mfbr: nnn # only residuals below 2^nnn are factored on the rational side
+mfba: nnn # only residuals below 2^nnn are factored on the algebraic side
+rlambda: ddd # lambda sieve parameter on the rational side
+alambda: ddd # lambda sieve parameter on the algebraic side
+qintsize: nnn # after nnn special q (lattice sieve), stop and count relations
