@@ -325,7 +325,10 @@ generate_poly (cado_poly out)
 {
   int i, d = out->degree;
 
-  mpz_root (out->g[0], out->n, d + 1);
+  /* in base m, coefficients are bounded by m/2, thus we want the leading
+     coefficient to be at most m/2 too */
+  mpz_mul_2exp (out->g[0], out->n, 1);
+  mpz_root (out->g[0], out->g[0], d + 1);
   mpz_ndiv_qr (out->f[1], out->f[0], out->n, out->g[0]);
   for (i = 1; i < d; i++)
     mpz_ndiv_qr (out->f[i+1], out->f[i], out->f[i], out->g[0]);
