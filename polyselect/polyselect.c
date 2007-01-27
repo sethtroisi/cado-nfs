@@ -509,6 +509,22 @@ print_poly (FILE *fp, cado_poly p)
   fprintf (fp, "qintsize: %d\n", p->qintsize);
 }
 
+/* return L_{1/3}(n,c) = exp(c log(n)^{1/3} log(log(n))^{2/3})
+   with c = (64/9)^{1/3} ~ 1.922999
+*/
+double
+L (mpz_t n)
+{
+  double logn, e;
+  double c = 1.9229994270765444764;
+  
+  logn = log (mpz_get_d (n));
+  e = log (logn);
+  e = logn * (e * e);
+  e = c * pow (e, 0.33333333333333333333);
+  return exp (e);
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -544,6 +560,8 @@ main (int argc, char *argv[])
 
   init (in);
   parse_input (in);
+  if (verbose)
+    fprintf (stderr, "L[1/3,(64/9)^(1/3)](n)=%1.3e\n", L (in->n));
   init_poly (out, in);
   clear (in);
 
