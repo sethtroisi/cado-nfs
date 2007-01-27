@@ -7,9 +7,9 @@
 #define DEFAULT_DEGREES_LENGTH 3
 
 /* default rational/algebraic factor base bounds */
-#define DEFAULT_RLIM {{70, 200000}, {90, 400000}, {ULONG_MAX, 4294967295UL}}
+#define DEFAULT_RLIM {{70, 200000}, {80, 350000}, {ULONG_MAX, 4294967295UL}}
 #define DEFAULT_RLIM_LENGTH 4
-#define DEFAULT_ALIM DEFAULT_RLIM
+#define DEFAULT_ALIM {{70, 200000}, {80, 500000}, {ULONG_MAX, 4294967295UL}}
 #define DEFAULT_ALIM_LENGTH DEFAULT_RLIM_LENGTH
 
 /* default large prime bounds */
