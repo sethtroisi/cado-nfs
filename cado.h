@@ -50,6 +50,7 @@ typedef struct
   int degree;     /* (algebraic) degree */
   mpz_t *f;       /* algebraic coefficients */
   mpz_t *g;       /* rational coefficients */
+  mpz_t m;        /* common root of f and g mod n */
   char type[256]; /* type (gnfs or snfs) */
   unsigned long rlim; /* rational  factor base bound */
   unsigned long alim; /* algebraic factor base bound */

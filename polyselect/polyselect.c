@@ -1,6 +1,14 @@
 /* polyselect1 - polynomial selection (naive implementation)
 
    Usage: polyselect < c80 > c80.poly
+
+   References:
+
+   [1] "On polynomial selection for the general number field sieve",
+       Thorsten Kleinjung, Mathematics of Computation 75 (2006), p. 2037-2047.
+   [2] "Integer factorization, part 4: polynomial selection", Dan Bernstein,
+       invited lecture, Arizona Winter School, University of Arizona, Tucson,
+       Arizona, 14 March 2006.
 */
 
 #include <stdio.h>
@@ -14,9 +22,11 @@
 static void
 usage ()
 {
-  fprintf (stderr, "Usage: polyselect < in > out\n\n");
-  fprintf (stderr, "       in  - input file (number to factor)\n");
-  fprintf (stderr, "       out - output file (polynomials)\n");
+  fprintf (stderr, "Usage: polyselect [-v] [-e nnn] < in > out\n\n");
+  fprintf (stderr, "       -v     - verbose\n");
+  fprintf (stderr, "       -e nnn - use effort nnn\n");
+  fprintf (stderr, "       in     - input file (number to factor)\n");
+  fprintf (stderr, "       out    - output file (polynomials)\n");
   exit (1);
 }
 
@@ -185,6 +195,7 @@ init_poly (cado_poly p, cado_input in)
   p->g = (mpz_t*) malloc (2 * sizeof (mpz_t));
   mpz_init (p->g[0]);
   mpz_init (p->g[1]);
+  mpz_init (p->m);
   strcpy (p->type, "gnfs");
 }
 
@@ -200,7 +211,7 @@ clear_poly (cado_poly p)
   mpz_clear (p->g[0]);
   mpz_clear (p->g[1]);
   free (p->g);
-  strcpy (p->type, "gnfs");
+  mpz_clear (p->m);
 }
 
 static void
@@ -321,7 +332,7 @@ mpz_ndiv_qr (mpz_t q, mpz_t r, mpz_t n, mpz_t d)
     }
 }
 
-/* L-Inf skewness, using Definition 3.1 from Kleinjung's paper:
+/* L-Inf skewness, using Definition 3.1 from reference [1]:
    S = min_{s > 0} max_{i} |a_i s^{i-d/2}|
 */
 double
@@ -354,22 +365,41 @@ skewness (mpz_t *p, unsigned long degree)
   return exp (-smin);
 }
 
-/* very naive method, just to check the interface with other modules */
-void
-generate_poly (cado_poly out)
+/* mu(m,S), as defined in reference [2]:
+   
+   mu(m,S) = (m/S+S)*(|a_d S^d| + ... + |a_0 S^{-d}|)
+*/
+double
+get_mu (mpz_t *p, unsigned long degree, mpz_t m, double S)
 {
-  int i, d = out->degree;
+  double mu = 0.0;
+  double S2 = S * S;
+  unsigned long i;
 
-  /* in base m, coefficients are bounded by m/2, thus we want the leading
-     coefficient to be at most m/2 too */
-  mpz_mul_2exp (out->g[0], out->n, 1);
-  mpz_root (out->g[0], out->g[0], d + 1);
-  mpz_ndiv_qr (out->f[1], out->f[0], out->n, out->g[0]);
-  for (i = 1; i < d; i++)
-    mpz_ndiv_qr (out->f[i+1], out->f[i], out->f[i], out->g[0]);
-  mpz_neg (out->g[0], out->g[0]);
-  mpz_set_ui (out->g[1], 1);
-  out->skew = skewness (out->f, out->degree);
+  for (i = 0; i <= degree; i++)
+    mu = mu * S2 + fabs (mpz_get_d (p[i]));
+  for (i = 0; i <= degree; i++)
+    mu /= S;
+  return (mpz_get_d (m) / S + S) * mu;
+}
+
+void
+generate_base_m (cado_poly p, mpz_t m)
+{
+  unsigned long i;
+
+  mpz_ndiv_qr (p->f[1], p->f[0], p->n, m);
+  for (i = 1; i < p->degree; i++)
+    mpz_ndiv_qr (p->f[i+1], p->f[i], p->f[i], m);
+  mpz_neg (p->g[0], m);
+  mpz_set_ui (p->g[1], 1);
+  mpz_set (p->m, m);
+  p->skew = skewness (p->f, p->degree);
+}
+
+void
+generate_sieving_parameters (cado_poly out)
+{
   out->rlim = default_rlim (out->n);
   out->alim = default_alim (out->n);
   out->lpbr = default_lpbr (out->n);
@@ -381,17 +411,77 @@ generate_poly (cado_poly out)
   out->qintsize = default_qint (out->n);
 }
 
+/* very naive method, just to check the interface with other modules */
+void
+generate_poly_0 (cado_poly out)
+{
+  unsigned long d = out->degree;
+
+  /* in base m, coefficients are bounded by m/2, thus we want the leading
+     coefficient to be at most m/2 too */
+  mpz_mul_2exp (out->m, out->n, 1);
+  mpz_root (out->m, out->m, d + 1);
+  generate_base_m (out, out->m);
+  generate_sieving_parameters (out);
+}
+
+/* first method described by Bernstein in reference [2], slide 6:
+   Take m \approx B^{1/(d-1)} n^{1/(d+1)}
+   Then f_d \approx B^{-d/(d-1)} n^{1/(d+1)}
+   and f_0...f_{d-1} are \approx B^{1/(d-1)} n^{1/(d+1)} by default.
+   We can hope f_0...f_{d-1} \approx B^{-d/(d-1)} n^{1/(d+1)}
+   after B^{d(d+1)/(d-1)} tries.
+   Then mu is decreased by a factor B.
+
+   T is the number of tries, thus B = T^{(d-1)/d/(d+1)}.
+*/
+void
+generate_poly (cado_poly out, unsigned long T, int verbose)
+{
+  unsigned long d = out->degree;
+  double B, mu, best_mu = DBL_MAX;
+  mpz_t best_m;
+
+  mpz_init (best_m);
+  B = pow ((double) T, 1.0 / (double) d / (double) (d + 1));
+  mpz_root (out->m, out->n, d + 1);
+  B *= mpz_get_d (out->m);
+  mpz_set_d (out->m, B);
+  while (T-- > 0)
+    {
+      generate_base_m (out, out->m);
+      mu = get_mu (out->f, out->degree, out->m, out->skew);
+      if (mu < best_mu)
+	{
+	  best_mu = mu;
+	  if (verbose)
+	    {
+	      fprintf (stderr, "m=");
+	      mpz_out_str (stderr, 10, out->m);
+	      fprintf (stderr, " mu=%1.3e\n", mu);
+	    }
+	  mpz_set (best_m, out->m);
+	}
+      mpz_add_ui (out->m, out->m, 1);
+    }
+  generate_base_m (out, best_m);
+  generate_sieving_parameters (out);
+  mpz_clear (best_m);
+}
+
 void
 print_poly (FILE *fp, cado_poly p)
 {
   int i;
+  double S;
 
   if (strlen (p->name) != 0)
     fprintf (fp, "name: %s\n", p->name);
   fprintf (fp, "n: ");
   mpz_out_str (fp, 10, p->n);
   fprintf (fp, "\n");
-  fprintf (fp, "skew: %1.3f\n", p->skew);
+  fprintf (fp, "skew: %1.3f\n", S = p->skew);
+  fprintf (fp, "# mu(m,S): %1.3e\n", get_mu (p->f, p->degree, p->m, S));
   for (i = p->degree; i >= 0; i--)
     {
       fprintf (fp, "c%d: ", i);
@@ -403,6 +493,9 @@ print_poly (FILE *fp, cado_poly p)
   fprintf (fp, "\n");
   fprintf (fp, "Y0: ");
   mpz_out_str (fp, 10, p->g[0]);
+  fprintf (fp, "\n");
+  fprintf (fp, "# m: ");
+  mpz_out_str (fp, 10, p->m);
   fprintf (fp, "\n");
   fprintf (fp, "type: %s\n", p->type);
   fprintf (fp, "rlim: %lu\n", p->rlim);
@@ -421,6 +514,30 @@ main (int argc, char *argv[])
 {
   cado_input in;
   cado_poly out;
+  int verbose = 0;
+  unsigned long effort = 1000000;
+
+  /* parse options */
+  while (argc > 1 && argv[1][0] == '-')
+    {
+      if (strcmp (argv[1], "-v") == 0)
+	{
+	  verbose = 1;
+	  argv ++;
+	  argc --;
+	}
+      else if (argc > 2 && strcmp (argv[1], "-e") == 0)
+	{
+	  effort = atoi (argv[2]);
+	  argv += 2;
+	  argc -= 2;
+	}
+      else
+	{
+	  fprintf (stderr, "Unknown option: %s\n", argv[1]);
+	  usage ();
+	}
+    }
 
   if (argc != 1)
     usage ();
@@ -430,7 +547,8 @@ main (int argc, char *argv[])
   init_poly (out, in);
   clear (in);
 
-  generate_poly (out);
+  /* generate_poly_0 (out); */
+  generate_poly (out, effort, verbose);
   print_poly (stdout, out);
   clear_poly (out);
 
