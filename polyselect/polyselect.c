@@ -7,6 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h> /* for ULONG_MAX */
+#include <values.h> /* for DBL_MAX */
+#include <math.h>   /* for log, fabs */
 #include "cado.h"
 
 static void
@@ -319,6 +321,39 @@ mpz_ndiv_qr (mpz_t q, mpz_t r, mpz_t n, mpz_t d)
     }
 }
 
+/* L-Inf skewness, using Definition 3.1 from Kleinjung's paper:
+   S = min_{s > 0} max_{i} |a_i s^{i-d/2}|
+*/
+double
+skewness (mpz_t *p, unsigned long degree)
+{
+  unsigned long i, j, k;
+  double s, smin, S, *loga;
+
+  loga = (double*) malloc ((degree + 1) * sizeof (double));
+  for (i = 0; i <= degree; i++)
+    loga[i] = log (fabs (mpz_get_d (p[i])));
+  smin = DBL_MAX;
+  for (i = 0; i < degree; i++)
+    for (j = i + 1; j <= degree; j++)
+      {
+	/* compute line going through log(ai) and log(aj),
+	   and check it goes over the other points */
+	s = (loga[j] - loga[i]) / (double) (j - i);
+	/* tentative convex line is log(ai) + s*(x-i) */
+	for (k = 0; k <= degree; k++)
+	  if (k != i && k != j && loga[k] > loga[i] + s * (double) (k - i))
+	    break;
+	if (k > degree && s < smin)
+	  {
+	    smin = s;
+	    S = exp (loga[i] + s * (double) (i - (double) degree / 2.0));
+	  }
+      }
+  free (loga);
+  return exp (-smin);
+}
+
 /* very naive method, just to check the interface with other modules */
 void
 generate_poly (cado_poly out)
@@ -334,7 +369,7 @@ generate_poly (cado_poly out)
     mpz_ndiv_qr (out->f[i+1], out->f[i], out->f[i], out->g[0]);
   mpz_neg (out->g[0], out->g[0]);
   mpz_set_ui (out->g[1], 1);
-  out->skew = 1.0;
+  out->skew = skewness (out->f, out->degree);
   out->rlim = default_rlim (out->n);
   out->alim = default_alim (out->n);
   out->lpbr = default_lpbr (out->n);
