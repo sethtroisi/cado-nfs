@@ -22,3 +22,4 @@ mfba: nnn # only residuals below 2^nnn are factored on the algebraic side
 rlambda: ddd # lambda sieve parameter on the rational side
 alambda: ddd # lambda sieve parameter on the algebraic side
 qintsize: nnn # after nnn special q (lattice sieve), stop and count relations
+q0:   nnn # special-q must be >= q0

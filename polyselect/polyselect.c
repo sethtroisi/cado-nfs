@@ -507,6 +507,7 @@ print_poly (FILE *fp, cado_poly p)
   fprintf (fp, "rlambda: %1.1f\n", p->rlambda);
   fprintf (fp, "alambda: %1.1f\n", p->alambda);
   fprintf (fp, "qintsize: %d\n", p->qintsize);
+  fprintf (fp, "q0: %d\n", p->alim + 1);
 }
 
 /* return L_{1/3}(n,c) = exp(c log(n)^{1/3} log(log(n))^{2/3})
