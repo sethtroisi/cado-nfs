@@ -1,24 +1,38 @@
 ecmtorsion12(n,p) = {
   local (t2, a, A, B);
 
-  /* We want a rational u so that u^3-12u is a rational square v^2. 
-     u=4, v=4 satisfies this, and we get more such pairs as multiples
-     of this point on the curve v^2=u^3-12u. */
-/* Disabled atm.
-  c = ellinit([Mod(0,p),Mod(0,p),Mod(0,p),Mod(-12,p),Mod(0,p)]);
-  u = ellpow (c, [Mod(4,p),Mod(4,p)], n)[1];
-*/
-  u = Mod(n,p);
+  /* If the n parameter is a negative rational, use that as the u value */
+  if (n < 0,
+    u = Mod(-n,p);
+  ,
+    /* We want a rational u so that u^3-12u is a rational square v^2. 
+       u=4, v=4 satisfies this, and we get more such pairs as multiples
+       of this point on the curve v^2=u^3-12*u. */
+    c = ellinit([Mod(0,p),Mod(0,p),Mod(0,p),Mod(-12,p),Mod(0,p)]);
+    u = ellpow (c, [Mod(4,p),Mod(4,p)], n)[1];
+  );
 
-  if (u == Mod(0, p), return(0));
+  if (u == Mod(0, p), 
+    print ("u = ", u);
+    return(0);
+  );
   t2 = (u^2 - Mod(12,p))/(4*u);
-  if (t2 == Mod (-3, p), return(0));
+  if (t2 == Mod (-3, p) || t2 == Mod(1,p) || t2 == Mod(-1,p),
+     print("t2 = ", t2);
+     return(0);
+  );
   a = (t2 - Mod(1,p))/(t2 + Mod(3,p));
   if (a == Mod (0, p), return(0));
   A = (-3*a^4 - 6*a^2 + Mod(1,p))/(4*a^3);
+  if (A == Mod(2, p) || A == Mod(-2, p), 
+    print ("A = ", A);
+    return(0);
+  );
   B = (a^2 - Mod(1,p))^2/(4*a^3);
-  if (B == Mod(0, p), return(0));
-  if (A == Mod(2, p) || A == Mod(-2, p), return(0));
+  if (B == Mod(0, p), 
+    print ("B = ", B);
+    return(0);
+  );
 /* print("u = ", u, ", t^2 = ", t2, ", a = ", a, ", A = ", A, ", B = ", B); */
   E = ellinit ([0, B*A, 0, B^2, 0]);
 }
@@ -39,8 +53,8 @@ ecmsigma(s, p)={
     return(0);
   );
 */
-  if (A == Mod(2, p) || A == Mod(-2,p), 
-/*    print("Skipped singular curve sigma = ",s,", A = ",A); */
+  if (A == Mod(2, p) || A == Mod(-2, p), 
+/*    print("Skipped singular curve, sigma = ", s,", A = ", A); */
     return(0);
   );
 
@@ -74,27 +88,33 @@ primeexp(p, n) = {
 }
 
 ecm_avg_exp(s,pmin,pmax,r,m) = {
-  local(n, p2, p3, p5, p7, c);
-  n = 0; p2 = 0; p3 = 0; p5 = 0; p7 = 0;
+  local(n, p2, p3, p5, p7, c, singular);
+  n = 0; singular = 0;
+  p2 = listcreate(10); for(i=1,10,listput(p2, 0));
+  p3 = listcreate(10); for(i=1,10,listput(p3, 0));
+  p5 = listcreate(10); for(i=1,10,listput(p5, 0));
+  p7 = listcreate(10); for(i=1,10,listput(p7, 0));
   forprime (p = pmin, pmax,
     if (p % m == r,
       c = ecmsigma (s, p);
       if (c != 0,
         n++;
         o = ellsea(c,p); 
-        p2 += primeexp(2,o); 
-        p3 += primeexp(3,o); 
-        p5 += primeexp(5,o); 
-        p7 += primeexp(7,o);
-      );
+        p2[min (primeexp(2,o)+1, 10)]++; 
+        p3[min (primeexp(3,o)+1, 10)]++; 
+        p5[min (primeexp(5,o)+1, 10)]++; 
+        p7[min (primeexp(7,o)+1, 10)]++;
+      , singular++);
     );
   );
-  printp("2: ",precision(1.*p2/n,9),", 3: ",precision(1.*p3/n,9),", 5: ",precision(1.*p5/n,9),", 7: ",precision(1.*p7/n,9));
+/*  printp("2: ",precision(1.*p2/n,9),", 3: ",precision(1.*p3/n,9), \
+           ", 5: ",precision(1.*p5/n,9),", 7: ",precision(1.*p7/n,9)); */
+  return([Vec(p2),Vec(p3),Vec(p5),Vec(p7),Vec([n,singular])]);
 }
 
 ecm_avg_exp_t12(s,pmin,pmax,r,m) = {
-  local(n, p2, p3, p5, p7, c);
-  n = 0; 
+  local(n, p2, p3, p5, p7, c, singular);
+  n = 0; singular = 0;
   p2 = listcreate(10); for(i=1,10,listput(p2, 0));
   p3 = listcreate(10); for(i=1,10,listput(p3, 0));
   p5 = listcreate(10); for(i=1,10,listput(p5, 0));
@@ -109,14 +129,10 @@ ecm_avg_exp_t12(s,pmin,pmax,r,m) = {
         p3[min (primeexp(3,o)+1, 10)]++; 
         p5[min (primeexp(5,o)+1, 10)]++; 
         p7[min (primeexp(7,o)+1, 10)]++;
-      );
+      , singular++);
     );
   );
-/*  print ("2: ", Vec(p2));
-  print ("3: ", Vec(p3));
-  print ("5: ", Vec(p5));
-  print ("7: ", Vec(p7)); */
-/*  printp("2: ",(1.*p2/n,9),", 3: ",precision(1.*p3/n,9),", 5: ",precision(1.*p5/n,9),", 7: ",precision(1.*p7/n,9)); */
-  return([Vec(p2),Vec(p3),Vec(p5),Vec(p7)]);
+/*  printp("2: ",(1.*p2/n,9),", 3: ",precision(1.*p3/n,9), \
+           ", 5: ",precision(1.*p5/n,9),", 7: ",precision(1.*p7/n,9)); */
+  return([Vec(p2),Vec(p3),Vec(p5),Vec(p7),Vec([n,singular])]);
 }
-
