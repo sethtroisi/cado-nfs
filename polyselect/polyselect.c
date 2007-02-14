@@ -1,5 +1,8 @@
 /* polyselect1 - polynomial selection (naive implementation)
 
+   Copyright 2007 INRIA.
+   Contributed by Paul Zimmermann.
+
    Usage: polyselect < c80 > c80.poly
 
    References:
