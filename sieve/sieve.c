@@ -24,16 +24,56 @@ typedef struct {
   fbprime_t p;            /* A prime or a prime power */
   unsigned char plog;     /* logarithm (to some suitable base) of this prime */
   unsigned char nr_roots; /* how many roots there are for this prime */
-  unsigned char dummy[2]; /* For dword aligning the roots */
+  unsigned char size;     /* The length of the struct in bytes */
+  unsigned char dummy[1]; /* For dword aligning the roots */
   fbroot_t roots[0];      /* the actual length of this array is determined
                              by nr_roots */
 } factorbase32_t;
 
 
+/* Returns 0 if n is prime, otherwise the smallest prime factor of n */
+static fbprime_t
+isprime (const fbprime_t n)
+{
+  fbprime_t i, i2;
+
+  if (n % 2 == 0)
+    return (n == 2) ? 0 : 2;
+
+  /* (i + 2)^2 = i^2 + 4*i + 4 */
+  for (i = 3, i2 = 9; i2 <= n; i2 += (i+1) * 4, i += 2)
+    if (n % i == 0)
+	return i;
+
+  return 0;
+}
+
+static unsigned long
+gcd (unsigned long a, unsigned long b)
+{
+  unsigned long t;
+
+  if (a == 0)
+    return b;
+
+  if (a >= b)
+    a %= b;
+
+  while (a > 0)
+    {
+      t = b % a;
+      b = a;
+      a = t;
+    }
+
+  return b;
+}
+
+
 /* Hack to get around C's automatic multiplying constants to be added to 
    pointers by the pointer's base data type's size */
 static inline factorbase32_t *
-fb_skip (factorbase32_t *fb, size_t s)
+fb_skip (const factorbase32_t *fb, const size_t s)
 {
   return (factorbase32_t *)((void *)fb + s);
 }
@@ -42,6 +82,18 @@ static size_t
 fb_entrysize (const factorbase32_t *fb)
 {
   return (sizeof (factorbase32_t) + fb->nr_roots * sizeof (fbroot_t));
+}
+
+static factorbase32_t *
+fb_find_p (factorbase32_t *fb, const fbprime_t p)
+{
+  while (fb->p > 0 && fb->p < p) /* Assumes fb is sorted in asc. order */
+    fb = fb_skip (fb, fb->size);
+
+  if (fb->p == p)
+    return fb;
+
+  return NULL;
 }
 
 
@@ -60,9 +112,12 @@ mulmod (const unsigned long a, const unsigned long b, const unsigned long m)
 }
 
 
+/* sievearray must be long enough to hold amax-amin+1 chars.
+   proj_roots is the rounded log of the projective roots */
+
 void 
 sieve (unsigned char *sievearray, factorbase32_t *fb, 
-       long amin, long amax, unsigned long b)
+       long amin, long amax, unsigned long b, unsigned char proj_roots)
 {
   uint32_t i, amin_p, a, p, d;
   unsigned char plog;
@@ -72,12 +127,13 @@ sieve (unsigned char *sievearray, factorbase32_t *fb,
 
   /* Init the array. */
   
-  memset (sievearray, 0, l);
+  memset (sievearray, proj_roots, l);
 
   /* Do the sieving */
 
   while (fb->p > 0)
     {
+      ASSERT (fb->size <= fb_entrysize(*fb))
       p = fb->p;
       plog = fb->plog;
 
@@ -110,7 +166,7 @@ sieve (unsigned char *sievearray, factorbase32_t *fb,
         }
       
       /* Move on to the next factor base prime */
-      fb = fb_skip (fb, fb_entrysize (fb));
+      fb = fb_skip (fb, fb->size);
     }
 }
 
@@ -126,7 +182,8 @@ print_fb_entry (factorbase32_t *fb)
 }
 
 
-/* Add fb_add to (void *)fb + fb_size. If a realloc failed, returns NULL. */
+/* Add fb_add to (void *)fb + fb_size. If a realloc failed, returns NULL.
+   fb_add->size need not be set by caller, this function does it */
 
 void *
 add_to_fb (factorbase32_t *fb, size_t *fbsize, size_t *fballoc,
@@ -151,7 +208,9 @@ add_to_fb (factorbase32_t *fb, size_t *fbsize, size_t *fballoc,
 	  return NULL;
 	}
     }
-  memcpy ((void *)newfb + *fbsize, fb_add, fb_addsize);
+  memcpy (fb_skip(newfb, *fbsize), fb_add, fb_addsize);
+  fb_skip(newfb, *fbsize)->size = fb_addsize;
+  
   *fbsize += fb_addsize;
 
   return newfb;
@@ -172,6 +231,7 @@ read_fb (const char *filename, const double log_scale)
   int ok;
   unsigned long linenr = 0;
   const size_t allocblocksize = 1<<20; /* Allocate in MB chunks */
+  fbprime_t p;
 
   fbfile = fopen (filename, "r");
   if (fbfile == NULL)
@@ -218,8 +278,19 @@ read_fb (const char *filename, const double log_scale)
       if (!ok)
 	continue;
 
-      /* FIXME: If this is a prime power, compute log(p^k)-log(p^(k-1)) */
-      fb_cur->plog = round (log ((double) fb_cur->p) * log_scale);
+      p = isprime (fb_cur->p);
+      if (p == 0) /* It's a prime, do a normal log */
+	fb_cur->plog = round (log ((double) fb_cur->p) * log_scale);
+      else
+	{
+	  /* Take into account the logs of the smaller powers of p that
+	     have been added already. We should not just use 
+	     fb_cur->plog = log(p) as that would allow rounding errors to 
+	     accumulate. */
+	  double oldlog;
+	  oldlog = round (log ((double) (fb_cur->p / p)) * log_scale);
+	  fb_cur->plog = round (log ((double) fb_cur->p) * log_scale - oldlog);
+	}
 
       lineptr++; /* Skip colon */
       ok = 1;
@@ -257,22 +328,44 @@ read_fb (const char *filename, const double log_scale)
   return fb;
 }
 
+
 int
 main (int argc, char **argv)
 {
   factorbase32_t *fb;
-  size_t s;
+  char *fbfilename = NULL;
   long amin, amax, i;
-  unsigned long b;
+  unsigned long bmin, bmax, b;
   unsigned char *sievearray;
   const double log_scale = 1. / log (2.); /* Lets use log_2() for a start */
   int threshold = 10;
+  int verbose;
+  unsigned long leading_coeff = 1;
+  char proj_roots = 0;
 
   while (argc > 1 && argv[1][0] == '-')
     {
-      if (argc > 2 && strcmp (argv[1], "-thres") == 0)
+      if (argc > 1 && strcmp (argv[1], "-v") == 0)
+	{
+	  verbose++;
+	  argc--;
+	  argv++;
+	}
+      else if (argc > 2 && strcmp (argv[1], "-thres") == 0)
 	{
 	  threshold = atoi (argv[2]);
+	  argc -= 2;
+	  argv += 2;
+	}
+      else if (argc > 2 && strcmp (argv[1], "-fb") == 0)
+	{
+	  fbfilename = argv[2];
+	  argc -= 2;
+	  argv += 2;
+	}
+      else if (argc > 2 && strcmp (argv[1], "-leading") == 0)
+	{
+	  leading_coeff = strtoul(argv[2], NULL, 10);;
 	  argc -= 2;
 	  argv += 2;
 	}
@@ -280,10 +373,37 @@ main (int argc, char **argv)
 	break;
     }
 
-  if (argc < 2)
-    exit (EXIT_FAILURE);
+  if (argc < 5)
+    {
+      fprintf (stderr, "Please specify amin amax bmin bmax\n");
+      exit (EXIT_FAILURE);
+    }
 
-  fb = read_fb (argv[1], log_scale);
+  amin = atol (argv[1]);
+  amax = atol (argv[2]);
+  bmin = strtoul (argv[3], NULL, 10);
+  bmax = strtoul (argv[4], NULL, 10);
+
+  if (amin >= amax)
+    {
+      fprintf (stderr, "amin must be less than amax\n");
+      exit (EXIT_FAILURE);
+    }
+
+  if (bmin > bmax)
+    {
+      fprintf (stderr, "bmin must be less than or equal to bmax\n");
+      exit (EXIT_FAILURE);
+    }
+
+  if (fbfilename == NULL)
+    {
+      fprintf (stderr, 
+	       "Please specify a factor base file with the -fb option\n");
+      exit (EXIT_FAILURE);
+    }
+
+  fb = read_fb (fbfilename, log_scale);
 
   if (fb == NULL)
     {
@@ -291,21 +411,81 @@ main (int argc, char **argv)
       exit (EXIT_FAILURE);
     }
 
-  for (s = 0; fb_skip(fb, s)->p != 0; s += fb_entrysize (fb_skip (fb, s)))
-    print_fb_entry (fb_skip(fb, s));
-
-  amin = -1000;
-  amax = 1000;
-  b = 100;
+#if 0
+  if (verbose)
+    for (s = 0; fb_skip(fb, s)->p != 0; s += fb_entrysize (fb_skip (fb, s)))
+      print_fb_entry (fb_skip(fb, s));
+#endif
 
   sievearray = malloc ((amax - amin + 1) * sizeof (char));
-  
-  sieve (sievearray, fb, amin, amax, b);
 
-  for (i = amin; i <= amax; i++)
-    if ((int) sievearray[i - amin] > threshold)
-      printf ("%ld: %d  ", i, (int) sievearray[i - amin]);
+  for (b = bmin; b <= bmax; b++)
+    {
+      unsigned long t;
+      double proj_log;
+      t = gcd (b, leading_coeff);
+      proj_log = log (t) * log_scale;
+      proj_roots = round(proj_log);
+      if (verbose)
+	printf ("Projective roots for b = %lu are %lu, rounded log is round(%f) = %d\n", 
+		b, t, proj_log, (int) proj_roots);
 
+      /* Remove the roots of primes that divide b, and of the powers of those 
+	 primes, from factor base */
+      t = b;
+      while (t > 1)
+	{
+	  factorbase32_t *fb_del;
+	  unsigned long p, ppow;
+	  p = isprime (t);
+	  if (p == 0)
+	    p = t;
+	  t /= p;
+	  ppow = p;
+	  while ((fb_del = fb_find_p (fb, ppow)) != NULL)
+	    {
+	      if (verbose)
+		{
+		  printf ("Temporarily removing from factor base ");
+		  print_fb_entry (fb_del);
+		}
+	      fb_del->nr_roots = 0;
+	      ppow *= p;
+	    }
+	}
+
+      sieve (sievearray, fb, amin, amax, b, proj_roots);
+      
+      /* Put the roots back in */
+      t = b;
+      while (t > 1)
+	{
+	  factorbase32_t *fb_restore;
+	  unsigned long p, ppow;
+	  p = isprime (t);
+	  if (p == 0)
+	    p = t;
+	  t /= p;
+	  ppow = p;
+	  while ((fb_restore = fb_find_p (fb, ppow)) != NULL)
+	    {
+	      fb_restore->nr_roots = 
+		(fb_restore->size - sizeof (factorbase32_t)) 
+		/ sizeof (fbroot_t);
+	      if (verbose)
+		{
+		  printf ("Restored to factor base ");
+		  print_fb_entry (fb_restore);
+		}
+	      ppow *= p;
+	    }
+	}
+      
+      for (i = amin; i <= amax; i++)
+	if ((int) sievearray[i - amin] > threshold && gcd(labs(i), b) == 1)
+	  printf ("%ld, %lu: %d\n", 
+		  i, b, (int) sievearray[i - amin]);
+    }
 
 
   free (fb);
