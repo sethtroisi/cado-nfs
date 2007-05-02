@@ -19,6 +19,7 @@
 
 typedef uint32_t fbprime_t;
 typedef fbprime_t fbroot_t;
+typedef unsigned long largeprime_t;
 
 typedef struct {
   fbprime_t p;            /* A prime or a prime power */
@@ -31,9 +32,116 @@ typedef struct {
 } factorbase32_t;
 
 
+/* Evaluate poly */
+
+double 
+calc_poly_eval (const double *poly, const int deg, const double x)
+{
+    double r;
+    int i;
+
+    ASSERT (deg <= MAXDEG);
+    r = poly[deg];
+    for (i = deg - 1; i >= 0; i--)
+	r = r * x + poly[i];
+
+    return r;
+}
+
+/* deriv == poly is ok */
+void
+calc_deriv (double *deriv, const double *poly, const int deg)
+{
+    int i;
+    ASSERT (deg <= MAXDEG);
+    for (i = 1; i <= deg; i++)
+	deriv[i - 1] = (double) i * poly[i];
+}
+
+/* Newton root finding */
+double
+calc_newton_root (const double *poly, const int deg, const double start)
+{
+    double x, lastx, deriv[MAXDEGREE + 1];
+
+    ASSERT (deg <= MAXDEG);
+    calc_deriv (deriv, poly, deg);
+
+    x = start;
+    lastx = x + 1.;
+    while (abs (x - lastx) > 1.e-5) /* 1.e-5 should not take too long,
+				       even for repeated roots */
+    {
+	lastx = x;
+	x -= calc_poly_eval(poly, deg, x) / calc_poly_eval(deriv, deg - 1, x);
+    }
+
+    /* Two more, with quadratic convergence that should give error < 1.e-20
+       which is good enough even for long double. For repeated roots: FIXME.*/
+    x -= calc_poly_eval(poly, deg, x) / calc_poly_eval(deriv, deg - 1, x);
+    x -= calc_poly_eval(poly, deg, x) / calc_poly_eval(deriv, deg - 1, x);
+
+    return x;
+}
+
+/* Divide a polynomial by (x - root). Returns the remainder, which should
+   be small if root was indeed a root */
+double
+calc_divide_root (double *quotient, const double *poly, const int deg, 
+		  const double root)
+{
+    double a, b;
+    int i;
+
+    a = poly[deg];
+    for (i = deg; i > 0; i--)
+    {
+	b = a;
+	a = poly[i - 1] + a * root;
+	quotient[i - 1] = b;
+    }
+    
+    return a;
+}
+
+int
+calc_find_extrema (double *extrema, const double *poly, const int deg)
+{
+    double deriv[MAXDEGREE + 1];
+    double root;
+    double *derivptr = deriv;
+    int i, j = 0;
+    
+    ASSERT(deg <= MAXDEG);
+    ASSERT(poly[deg] != 0.);
+    /* Constant polys have no extrema and would mess up code below */
+    if (deg == 0)
+	return 0;
+    calc_deriv (deriv, poly, deg);
+    /* Deal with multiple roots at 0 which may be plenty in SNFS polys */
+    if (*derivptr == 0.)
+    {
+	extrema[j++] = 0.;
+	while (*derivptr == 0.)
+	    derivptr++; 
+    }
+    /* Find number of real roots. TBD. */
+    /* FIXME for repeated roots */
+    for (i = deg - 1; i > 0; i--)
+    {
+	root = calc_newton_root (deriv, i, 0.);
+	extrema[j++] = root;
+	printf ("calc_find_extrema: f´(%f) = %f\n", 
+		root, calc_poly_eval(deriv, i, root));
+	calc_divide_root (deriv, deriv, i, root);
+    }
+    return j;
+}
+
+
 /* Returns 0 if n is prime, otherwise the smallest prime factor of n */
 static fbprime_t
-isprime (const fbprime_t n)
+iscomposite (const fbprime_t n)
 {
   fbprime_t i, i2;
 
@@ -97,7 +205,7 @@ fb_find_p (factorbase32_t *fb, const fbprime_t p)
 }
 
 
-unsigned long
+static unsigned long
 mulmod (const unsigned long a, const unsigned long b, const unsigned long m)
 {
   unsigned long _r, _a = a;
@@ -111,23 +219,52 @@ mulmod (const unsigned long a, const unsigned long b, const unsigned long m)
   return _r;
 }
 
+/* Very slow but thorough way of computing norms */
+
+void
+compute_norms (unsigned char *sievearray, const long amin, const long amax, 
+	       const unsigned long b, const double *poly, const int deg, 
+	       const double proj_roots, const double log_scale)
+{
+    double f[MAXDEGREE + 1]; /* Poly in a for a given fixed b */
+    double bpow, r;
+    const double log_proj_roots = log(proj_roots) * log_scale;
+    long a;
+    int i;
+
+    bpow = 1.;
+    for (i = deg; i >= 0; i--)
+    {
+	f[i] = poly[i] * bpow;
+	bpow *= (double) b;
+    }
+
+    for (a = amin; a <= amax; a++)
+    {
+	unsigned char n;
+	r = f[deg];
+	for (i = deg - 1; i >= 0; i--)
+	    r = r * (double) a + f[i];
+	n = round (log(fabs(r)) * log_scale - log_proj_roots);
+	sievearray[a - amin] = n;
+	if (0)
+	    printf ("Norm at (%ld, %lu) = %f, rounded log = %d\n", 
+		    a, b, r, (int) n);
+    }
+}
 
 /* sievearray must be long enough to hold amax-amin+1 chars.
    proj_roots is the rounded log of the projective roots */
 
 void 
 sieve (unsigned char *sievearray, factorbase32_t *fb, 
-       long amin, long amax, unsigned long b, unsigned char proj_roots)
+       const long amin, const long amax, const unsigned long b)
 {
   uint32_t i, amin_p, a, p, d;
   unsigned char plog;
-  const unsigned long l = amax - amin;
+  const unsigned long l = amax - amin + 1;
 
   ASSERT (amax > amin);
-
-  /* Init the array. */
-  
-  memset (sievearray, proj_roots, l);
 
   /* Do the sieving */
 
@@ -162,7 +299,7 @@ sieve (unsigned char *sievearray, factorbase32_t *fb,
           /* Now update the sieve array. There is no partitioning, blocking, 
              bucket sieving or anything atm. */
           for (; d < l; d += p)
-            sievearray[d] += plog;
+            sievearray[d] -= plog;
         }
       
       /* Move on to the next factor base prime */
@@ -204,7 +341,7 @@ add_to_fb (factorbase32_t *fb, size_t *fbsize, size_t *fballoc,
 	{
 	  fprintf (stderr, 
 		   "Could not reallocate factor base to %lu bytes\n",
-		   *fballoc);
+		   (unsigned long) *fballoc);
 	  return NULL;
 	}
     }
@@ -278,7 +415,7 @@ read_fb (const char *filename, const double log_scale)
       if (!ok)
 	continue;
 
-      p = isprime (fb_cur->p);
+      p = iscomposite (fb_cur->p);
       if (p == 0) /* It's a prime, do a normal log */
 	fb_cur->plog = round (log ((double) fb_cur->p) * log_scale);
       else
@@ -296,7 +433,7 @@ read_fb (const char *filename, const double log_scale)
       ok = 1;
       fb_cur->nr_roots = 0;
       /* Read roots */
-      while (ok && *lineptr != '\0' && fb_cur->nr_roots < MAXDEGREE)
+      while (ok && *lineptr != '\0' && fb_cur->nr_roots <= MAXDEGREE)
 	{
 	  fb_cur->roots[fb_cur->nr_roots++] = strtoul (lineptr, &lineptr, 10);
 	  if (*lineptr != '\0' && *lineptr != ',')
@@ -339,9 +476,11 @@ main (int argc, char **argv)
   unsigned char *sievearray;
   const double log_scale = 1. / log (2.); /* Lets use log_2() for a start */
   int threshold = 10;
-  int verbose;
+  int verbose = 0;
   unsigned long leading_coeff = 1;
-  char proj_roots = 0;
+  unsigned long proj_roots; /* = gcd (b, leading coefficient) */
+  double poly[MAXDEGREE] = {-3., 0., 0., 0., 0., 0., 1., 0., 0., 0.};
+  int deg = 6;
 
   while (argc > 1 && argv[1][0] == '-')
     {
@@ -422,13 +561,11 @@ main (int argc, char **argv)
   for (b = bmin; b <= bmax; b++)
     {
       unsigned long t;
-      double proj_log;
-      t = gcd (b, leading_coeff);
-      proj_log = log (t) * log_scale;
-      proj_roots = round(proj_log);
+
+      /* See what projective roots we have */
+      proj_roots = gcd (b, leading_coeff);
       if (verbose)
-	printf ("Projective roots for b = %lu are %lu, rounded log is round(%f) = %d\n", 
-		b, t, proj_log, (int) proj_roots);
+	printf ("Projective roots for b = %lu are %lu\n", b, proj_roots);
 
       /* Remove the roots of primes that divide b, and of the powers of those 
 	 primes, from factor base */
@@ -437,10 +574,10 @@ main (int argc, char **argv)
 	{
 	  factorbase32_t *fb_del;
 	  unsigned long p, ppow;
-	  p = isprime (t);
+	  p = iscomposite (t);
 	  if (p == 0)
 	    p = t;
-	  t /= p;
+	  do t /= p; while (t % p == 0);
 	  ppow = p;
 	  while ((fb_del = fb_find_p (fb, ppow)) != NULL)
 	    {
@@ -454,7 +591,9 @@ main (int argc, char **argv)
 	    }
 	}
 
-      sieve (sievearray, fb, amin, amax, b, proj_roots);
+      compute_norms (sievearray, amin, amax, b, poly, deg, proj_roots, 
+		     log_scale);
+      sieve (sievearray, fb, amin, amax, b);
       
       /* Put the roots back in */
       t = b;
@@ -462,7 +601,7 @@ main (int argc, char **argv)
 	{
 	  factorbase32_t *fb_restore;
 	  unsigned long p, ppow;
-	  p = isprime (t);
+	  p = iscomposite (t);
 	  if (p == 0)
 	    p = t;
 	  t /= p;
@@ -482,9 +621,10 @@ main (int argc, char **argv)
 	}
       
       for (i = amin; i <= amax; i++)
-	if ((int) sievearray[i - amin] > threshold && gcd(labs(i), b) == 1)
-	  printf ("%ld, %lu: %d\n", 
-		  i, b, (int) sievearray[i - amin]);
+	  if ( ((int) (sievearray[i - amin] + (unsigned char) 10) - 10)
+	       <= threshold && gcd(labs(i), b) == 1)
+	      printf ("%ld, %lu: %d\n", 
+		      i, b, (int) sievearray[i - amin]);
     }
 
 
