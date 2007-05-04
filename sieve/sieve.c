@@ -8,8 +8,9 @@
 #include <stdint.h>
 #include <string.h>
 #include <math.h>
-#include <gmp.h>
+#include <ctype.h>
 #include <asm/msr.h>
+#include "cado.h"
 #define MAXDEGREE 10
 #ifdef WANT_ASSERT
   #include <assert.h>
@@ -17,24 +18,6 @@
 #else
   #define ASSERT(x)
 #endif
-
-
-typedef uint32_t fbprime_t;
-#define FBPRIME_FORMAT "%u"
-typedef fbprime_t fbroot_t;
-#define FBROOT_FORMAT "%u"
-typedef unsigned long largeprime_t;
-const char *largeprime_format = "%lu";
-
-typedef struct {
-  fbprime_t p;            /* A prime or a prime power */
-  unsigned char plog;     /* logarithm (to some suitable base) of this prime */
-  unsigned char nr_roots; /* how many roots there are for this prime */
-  unsigned char size;     /* The length of the struct in bytes */
-  unsigned char dummy[1]; /* For dword aligning the roots */
-  fbroot_t roots[0];      /* the actual length of this array is determined
-                             by nr_roots */
-} factorbase32_t;
 
 
 /*****************************************************************
@@ -188,6 +171,11 @@ mp_poly_scale (mpz_t *r, mpz_t *poly, const int deg, const long c,
 }
 
 
+/*****************************************************************
+ *           Simple functions for (modular) arithmetic           *
+ *****************************************************************/
+
+
 /* Returns 0 if n is prime, otherwise the smallest prime factor of n */
 static fbprime_t
 iscomposite (const fbprime_t n)
@@ -248,32 +236,33 @@ mulmod (const unsigned long a, const unsigned long b, const unsigned long m)
 
 /* Hack to get around C's automatic multiplying constants to be added to 
    pointers by the pointer's base data type size */
-static inline factorbase32_t *
-fb_skip (const factorbase32_t *fb, const size_t s)
+
+static inline factorbase_t *
+fb_skip (const factorbase_t *fb, const size_t s)
 {
-  return (factorbase32_t *)((char *)fb + s);
+  return (factorbase_t *)((char *)fb + s);
 }
 
-static inline factorbase32_t *
-fb_next (const factorbase32_t *fb)
+static inline factorbase_t *
+fb_next (const factorbase_t *fb)
 {
-  return (factorbase32_t *)((char *)fb + fb->size);
+  return (factorbase_t *)((char *)fb + fb->size);
 }
 
 
 static size_t
-fb_entrysize (const factorbase32_t *fb)
+fb_entrysize (const factorbase_t *fb)
 {
-  return (sizeof (factorbase32_t) + fb->nr_roots * sizeof (fbroot_t));
+  return (sizeof (factorbase_t) + fb->nr_roots * sizeof (fbroot_t));
 }
 
 void 
-print_fb_entry (factorbase32_t *fb)
+print_fb_entry (factorbase_t *fb)
 {
   int i;
-  printf (FBPRIME_FORMAT ": ", fb->p);
+  printf ("Prime " FBPRIME_FORMAT " with roots ", fb->p);
   for (i = 0; i + 1 < fb->nr_roots; i++)
-    printf (FBROOT_FORMAT ",", fb->roots[i]);
+    printf (FBROOT_FORMAT ", ", fb->roots[i]);
   printf (FBROOT_FORMAT "\n", fb->roots[i]);
 }
 
@@ -281,12 +270,12 @@ print_fb_entry (factorbase32_t *fb)
 /* Add fb_add to (void *)fb + fbsize. If a realloc failed, returns NULL.
    fb_add->size need not be set by caller, this function does it */
 
-factorbase32_t *
-add_to_fb (factorbase32_t *fb, size_t *fbsize, size_t *fballoc,
-	   const size_t allocblocksize, factorbase32_t *fb_add)
+factorbase_t *
+add_to_fb (factorbase_t *fb, size_t *fbsize, size_t *fballoc,
+	   const size_t allocblocksize, factorbase_t *fb_add)
 {
   const size_t fb_addsize  = fb_entrysize (fb_add); 
-  factorbase32_t *newfb = fb;
+  factorbase_t *newfb = fb;
 
   ASSERT(fb_addsize <= allocblocksize); /* Otherwise we still might not have
 					   enough mem after the realloc */
@@ -295,7 +284,7 @@ add_to_fb (factorbase32_t *fb, size_t *fbsize, size_t *fballoc,
   if (*fballoc < *fbsize + fb_addsize)
     {
       *fballoc += allocblocksize;
-      newfb = (factorbase32_t *) realloc (fb, *fballoc);
+      newfb = (factorbase_t *) realloc (fb, *fballoc);
       if (newfb == NULL)
 	{
 	  fprintf (stderr, 
@@ -312,8 +301,8 @@ add_to_fb (factorbase32_t *fb, size_t *fbsize, size_t *fballoc,
   return newfb;
 }
 
-static factorbase32_t *
-fb_find_p (factorbase32_t *fb, const fbprime_t p)
+static factorbase_t *
+fb_find_p (factorbase_t *fb, const fbprime_t p)
 {
   while (fb->p > 0 && fb->p < p) /* Assumes fb is sorted in asc. order */
     fb = fb_next (fb);
@@ -324,10 +313,10 @@ fb_find_p (factorbase32_t *fb, const fbprime_t p)
   return NULL;
 }
 
-factorbase32_t *
+factorbase_t *
 read_fb (const char *filename, const double log_scale)
 {
-  factorbase32_t *fb = NULL, *fb_cur, *fb_new;
+  factorbase_t *fb = NULL, *fb_cur, *fb_new;
   FILE *fbfile;
   size_t fbsize = 0, fballoc = 0;
   const size_t linesize = 255;
@@ -347,7 +336,7 @@ read_fb (const char *filename, const double log_scale)
       return NULL;
     }
 
-  fb_cur = (factorbase32_t *) malloc (sizeof (factorbase32_t) + 
+  fb_cur = (factorbase_t *) malloc (sizeof (factorbase_t) + 
 				      MAXDEGREE * sizeof(fbroot_t));
   if (fb_cur == NULL)
     {
@@ -518,7 +507,7 @@ compute_norms (unsigned char *sievearray, const long amin, const long amax,
    proj_roots is the rounded log of the projective roots */
 
 void 
-sieve (unsigned char *sievearray, factorbase32_t *fb, 
+sieve (unsigned char *sievearray, factorbase_t *fb, 
        const long amin, const long amax, const unsigned long b, 
        const unsigned char threshold, fbprime_t *useful_primes,
        const fbprime_t useful_threshold)
@@ -577,7 +566,169 @@ sieve (unsigned char *sievearray, factorbase32_t *fb,
   *useful_primes++ = 0;
 }
 
+#define TYPE_STRING 0
+#define TYPE_MPZ 1
+#define TYPE_INT 2
+#define TYPE_ULONG 3
+#define TYPE_DOUBLE 4
+#define PARSE_MATCH -1
+#define PARSE_ERROR 0
+#define PARSE_NOMATCH 1
 
+/* Return value: 1: tag does not match, 0: error occurred, -1 tag did match */
+
+static int
+parse_line (void *target, char *line, const char *tag, int *have, 
+	    const int type)
+{
+  char *lineptr = line;
+
+  if (strncmp (lineptr, tag, strlen (tag)) != 0)
+    return PARSE_NOMATCH;
+
+  if (have != NULL && *have != 0)
+    {
+      fprintf (stderr, "parse_line: %s appears twice\n", tag);
+      return PARSE_ERROR;
+    }
+  if (have != NULL)
+    *have = 1;
+  
+  lineptr += strlen (tag);
+  if (type == TYPE_STRING) /* character string of length up to 256 */
+    {
+      strncpy ((char *)target, lineptr, 256);
+      ((char *)target)[255] = '0';
+    }
+  else if (type == TYPE_MPZ)
+    {
+      mpz_init (*(mpz_t *)target);
+      mpz_set_str (*(mpz_t *)target, lineptr, 0);
+    }
+  else if (type == TYPE_INT)
+    *(int *)target = atoi (lineptr);
+  else if (type == TYPE_ULONG)
+    *(unsigned long *)target = strtoul (lineptr, NULL, 10);
+  else if (type == TYPE_DOUBLE)
+    *(double *)target = atof (lineptr);
+  else return PARSE_ERROR;
+  
+  return PARSE_MATCH;
+}
+
+cado_poly *
+read_polynomial (char *filename)
+{
+  FILE *file;
+  const int linelen = 512;
+  char line[linelen];
+  cado_poly *poly;
+  int have_name = 0, have_n = 0, have_Y0 = 0, have_Y1 = 0;
+  int i, ok;
+
+  file = fopen (filename, "r");
+  if (file == NULL)
+    {
+      fprintf (stderr, "read_polynomial: could not open %s\n", filename);
+      return NULL;
+    }
+
+  poly = (cado_poly *) malloc (sizeof(cado_poly));
+  (*poly)->f = (mpz_t *) malloc (MAXDEGREE * sizeof (mpz_t));
+  (*poly)->g = (mpz_t *) malloc (2 * sizeof (mpz_t));
+
+  (*poly)->name[0] = '\0';
+  (*poly)->degree = -1;
+  (*poly)->type[0] = '\0';
+
+  while (!feof (file))
+    {
+      ok = 1;
+      if (fgets (line, linelen, file) == NULL)
+	break;
+      if (line[0] == '#')
+	continue;
+
+      ok *= parse_line (&((*poly)->name), line, "name: ", &have_name, TYPE_STRING);
+      ok *= parse_line (&((*poly)->n), line, "n: ", &have_n, TYPE_MPZ);
+      ok *= parse_line (&((*poly)->skew), line, "skew: ", NULL, TYPE_DOUBLE);
+      ok *= parse_line (&((*poly)->g[0]), line, "Y0: ", &have_Y0, TYPE_MPZ);
+      ok *= parse_line (&((*poly)->g[1]), line, "Y1: ", &have_Y1, TYPE_MPZ);
+      ok *= parse_line (&((*poly)->type), line, "type: ", NULL, TYPE_STRING);
+      ok *= parse_line (&((*poly)->rlim), line, "rlim: ", NULL, TYPE_ULONG);
+      ok *= parse_line (&((*poly)->alim), line, "alim: ", NULL, TYPE_ULONG);
+      ok *= parse_line (&((*poly)->lpbr), line, "lpbr: ", NULL, TYPE_INT);
+      ok *= parse_line (&((*poly)->lpba), line, "lpba: ", NULL, TYPE_INT);
+      ok *= parse_line (&((*poly)->mfbr), line, "mfbr: ", NULL, TYPE_INT);
+      ok *= parse_line (&((*poly)->mfba), line, "mfba: ", NULL, TYPE_INT);
+      ok *= parse_line (&((*poly)->rlambda), line, "rlambda: ", NULL, TYPE_DOUBLE);
+      ok *= parse_line (&((*poly)->alambda), line, "alambda: ", NULL, TYPE_DOUBLE);
+      ok *= parse_line (&((*poly)->qintsize), line, "qintsize: ", NULL, TYPE_INT);
+
+
+      if (ok == 1 && line[0] == 'c' && isdigit (line[1]) && line[2] == ':' &&
+	       line[3] == ' ')
+	{
+	  int index = line[1] - '0', i;
+	  for (i = (*poly)->degree + 1; i <= index; i++)
+	    mpz_init ((*poly)->f[i]);
+	  if (index > (*poly)->degree)
+	    (*poly)->degree = index;
+	  mpz_set_str ((*poly)->f[index], line + 4, 0);
+	  ok = -1;
+	}
+
+      if (ok == PARSE_NOMATCH)
+	{
+	  fprintf (stderr, 
+		   "read_polynomial: Cannot parse line %s\nIgnoring.\n", 
+		   line);
+	  continue;
+	}
+      
+      if (ok == PARSE_ERROR)
+	break;
+    }
+  
+  if (ok != PARSE_ERROR)
+    {
+      if (have_n == 0)
+	{
+	  fprintf (stderr, "n ");
+	  ok = PARSE_ERROR;
+	}
+      if (have_Y0 == 0)
+	{
+	  fprintf (stderr, "Y0 ");
+	  ok = PARSE_ERROR;
+	}
+      if (have_Y1 == 0)
+	{
+	  fprintf (stderr, "Y1 ");
+	  ok = PARSE_ERROR;
+	}
+      if (ok == PARSE_ERROR)
+	fprintf (stderr, "are missing in polynomial file\n");
+    }
+
+  if (ok == PARSE_ERROR)
+    {
+      for (i = 0; i <= (*poly)->degree; i++)
+	mpz_clear ((*poly)->f[i]);
+      if (have_n)
+	mpz_clear ((*poly)->n);
+      if (have_Y0)
+	mpz_clear ((*poly)->g[0]);
+      if (have_Y1)
+	mpz_clear ((*poly)->g[1]);
+      free ((*poly)->f);
+      free ((*poly)->g);
+      free (poly);
+      poly = NULL;
+    }
+  
+  return poly;
+}
 
 int
 main (int argc, char **argv)
@@ -587,8 +738,8 @@ main (int argc, char **argv)
   unsigned long bmin, bmax, b;
   long long tsc1, tsc2;
   fbprime_t *useful_primes;
-  factorbase32_t *fb;
-  char *fbfilename = NULL;
+  factorbase_t *fb;
+  char *fbfilename = NULL, *polyfilename = NULL;
   unsigned char *sievearray;
   int threshold = 10;
   int verbose = 0;
@@ -597,6 +748,7 @@ main (int argc, char **argv)
   double dpoly[MAXDEGREE];
   const double log_scale = 1. / log (2.); /* Lets use log_2() for a start */
   mpz_t poly[MAXDEGREE], scaled_poly[MAXDEGREE], Fab;
+  cado_poly *cpoly;
 
 
   while (argc > 1 && argv[1][0] == '-')
@@ -619,6 +771,12 @@ main (int argc, char **argv)
 	  argc -= 2;
 	  argv += 2;
 	}
+      else if (argc > 2 && strcmp (argv[1], "-poly") == 0)
+	{
+	  polyfilename = argv[2];
+	  argc -= 2;
+	  argv += 2;
+	}
 
       else 
 	break;
@@ -627,6 +785,19 @@ main (int argc, char **argv)
   if (argc < 5)
     {
       fprintf (stderr, "Please specify amin amax bmin bmax\n");
+      exit (EXIT_FAILURE);
+    }
+
+  if (polyfilename == NULL)
+    {
+      fprintf (stderr, "Please specify a polynomial file with -poly\n");
+      exit (EXIT_FAILURE);
+    }
+
+  cpoly = read_polynomial (polyfilename);
+  if (cpoly == NULL)
+    {
+      fprintf (stderr, "Error reading polynomial file\n");
       exit (EXIT_FAILURE);
     }
 
@@ -662,22 +833,15 @@ main (int argc, char **argv)
       exit (EXIT_FAILURE);
     }
 
-  deg = 5;
-  /* FIXME: Read poly from command line or file */
+  deg = (*cpoly)->degree;
   for (i = 0; i <= deg; i++)
     {
       mpz_init (poly[i]);
+      mpz_set (poly[i], (*cpoly)->f[i]);
+      dpoly[i] = mpz_get_d (poly[i]);
       mpz_init (scaled_poly[i]);
     }
   mpz_init (Fab);
-  mpz_set_si (poly[4], 5017309194362523L);
-  mpz_set_si (poly[3], -1406293661386525L);
-  mpz_set_si (poly[2], -1131155401311965L);
-  mpz_set_si (poly[1], 4737694118287353L);
-  mpz_set_si (poly[0], -3415040824020545L);
-  for (i = 0; i <= deg; i++)
-    dpoly[i] = mpz_get_d (poly[i]);
-
 
 #if 0
   if (verbose)
@@ -703,7 +867,7 @@ main (int argc, char **argv)
       t = b;
       while (t > 1)
 	{
-	  factorbase32_t *fb_del;
+	  factorbase_t *fb_del;
 	  unsigned long p, ppow;
 	  p = iscomposite (t);
 	  if (p == 0)
@@ -744,7 +908,7 @@ main (int argc, char **argv)
       t = b;
       while (t > 1)
 	{
-	  factorbase32_t *fb_restore;
+	  factorbase_t *fb_restore;
 	  unsigned long p, ppow;
 	  p = iscomposite (t);
 	  if (p == 0)
@@ -754,7 +918,7 @@ main (int argc, char **argv)
 	  while ((fb_restore = fb_find_p (fb, ppow)) != NULL)
 	    {
 	      fb_restore->nr_roots = 
-		(fb_restore->size - sizeof (factorbase32_t)) 
+		(fb_restore->size - sizeof (factorbase_t)) 
 		/ sizeof (fbroot_t);
 	      if (verbose)
 		{
@@ -792,7 +956,7 @@ main (int argc, char **argv)
 	  if ((unsigned char) (sievearray[a - amin] + 10) <= threshold + 10 && 
 	      gcd(labs(a), b) == 1)
 	    {
-	      factorbase32_t *nextfb;
+	      factorbase_t *nextfb;
 	      fbprime_t *nextuseful;
 	      int first_print = 1;
 
