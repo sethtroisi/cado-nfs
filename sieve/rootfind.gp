@@ -17,15 +17,23 @@ forprime(p = 2, n,
     i = 1;
     while (powers[i] != nextpow, i++);
     q = round (sqrtn (nextpow, i + 1));
-    r = List (lift (polrootspadic (f, q, i+1)));
+    r = lift (polrootspadic (f, q, i+1)~);
+    l = length (List(r));
 
-    l = length (r);
+    /* If p divides leading coefficient, we may get strange extra roots
+       which are rational. Discard them */
+    while (l > 0 && type(r[1]) == "t_FRAC",
+      /* print ("# Discarding ", r[1], " from ", r); */
+      r = vecextract (r, "2..");
+      l--;
+    );
+
     if (l > 0, 
       print1 (nextpow, ": ");
       for (i = 1, l-1, 
-        print1 (r[i], ",")
+        print1 (r[i] % (q^(i+1)), ",")
       );
-      print (r[l], " # Prime power ", q, "^", i+1);
+      print (r[l] % (q^(i+1)), " # Prime power ", q, "^", i+1);
     );
 
     q = nextprime (q + 1);
