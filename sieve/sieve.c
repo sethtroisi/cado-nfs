@@ -11,6 +11,7 @@
 #include <ctype.h>
 #include <asm/msr.h>
 #include "cado.h"
+#include "mod_ul.c"
 #define MAXDEGREE 10
 #ifdef WANT_ASSERT
   #include <assert.h>
@@ -32,7 +33,7 @@ calc_poly_eval (const double *poly, const int deg, const double x)
     double r;
     int i;
 
-    ASSERT (deg <= MAXDEG);
+    ASSERT (deg <= MAXDEGREE);
     r = poly[deg];
     for (i = deg - 1; i >= 0; i--)
 	r = r * x + poly[i];
@@ -45,7 +46,7 @@ void
 calc_deriv (double *deriv, const double *poly, const int deg)
 {
     int i;
-    ASSERT (deg <= MAXDEG);
+    ASSERT (deg <= MAXDEGREE);
     for (i = 1; i <= deg; i++)
 	deriv[i - 1] = (double) i * poly[i];
 }
@@ -56,7 +57,7 @@ calc_newton_root (const double *poly, const int deg, const double start)
 {
     double x, lastx, deriv[MAXDEGREE + 1];
 
-    ASSERT (deg <= MAXDEG);
+    ASSERT (deg <= MAXDEGREE);
     calc_deriv (deriv, poly, deg);
 
     x = start;
@@ -104,7 +105,7 @@ calc_find_extrema (double *extrema, const double *poly, const int deg)
     double *derivptr = deriv;
     int i, j = 0;
     
-    ASSERT(deg <= MAXDEG);
+    ASSERT(deg <= MAXDEGREE);
     ASSERT(poly[deg] != 0.);
     /* Constant polys have no extrema and would mess up code below */
     if (deg == 0)
@@ -150,7 +151,7 @@ mp_poly_eval (mpz_t r, mpz_t *poly, int deg, long a)
 
 /* Scale coefficient f_i by a^i (inv == 1) or by c^(deg-i) (inv == -1) */
 void
-mp_poly_scale (mpz_t *r, mpz_t *poly, const int deg, const long c, 
+mp_poly_scale (mpz_t *r, const mpz_t *poly, const int deg, const long c, 
 	       const int inv)
 {
   int i;
@@ -215,21 +216,6 @@ gcd (unsigned long a, unsigned long b)
 }
 
 
-static unsigned long
-mulmod (const unsigned long a, const unsigned long b, const unsigned long m)
-{
-  unsigned long _r, _a = a;
-
-  __asm__ ( "mulq %2\n\t"
-            "divq %3"
-            : "=&d" (_r), "+a" (_a)
-            : "rm" (b), "rm" (m)
-            : "cc");
-
-  return _r;
-}
-
-
 /*****************************************************************
  *                Functions for the factor base                  *
  *****************************************************************/
@@ -256,8 +242,14 @@ fb_entrysize (const factorbase_t *fb)
   return (sizeof (factorbase_t) + fb->nr_roots * sizeof (fbroot_t));
 }
 
+static size_t
+fb_entrysize_uc (const unsigned char n)
+{
+  return (sizeof (factorbase_t) + n * sizeof (fbroot_t));
+}
+
 void 
-print_fb_entry (factorbase_t *fb)
+fb_print_entry (factorbase_t *fb)
 {
   int i;
   printf ("Prime " FBPRIME_FORMAT " with roots ", fb->p);
@@ -271,7 +263,7 @@ print_fb_entry (factorbase_t *fb)
    fb_add->size need not be set by caller, this function does it */
 
 factorbase_t *
-add_to_fb (factorbase_t *fb, size_t *fbsize, size_t *fballoc,
+fb_add_to (factorbase_t *fb, size_t *fbsize, size_t *fballoc,
 	   const size_t allocblocksize, factorbase_t *fb_add)
 {
   const size_t fb_addsize  = fb_entrysize (fb_add); 
@@ -313,8 +305,88 @@ fb_find_p (factorbase_t *fb, const fbprime_t p)
   return NULL;
 }
 
+static unsigned char
+fb_log (double n, double log_scale, double offset)
+{
+  return (unsigned char) floor (log (n) * log_scale + offset + 0.5);
+}
+
+/* Generate a factor base with primes <= bound for a linear polynomial */
+
 factorbase_t *
-read_fb (const char *filename, const double log_scale)
+fb_make_linear (mpz_t *poly, fbprime_t bound, double log_scale)
+{
+  fbprime_t p;
+  factorbase_t *fb = NULL, *fb_cur, *fb_new;
+  size_t fbsize = 0, fballoc = 0;
+  const size_t allocblocksize = 1<<20;
+
+  fb_cur = (factorbase_t *) malloc (fb_entrysize_uc (1));
+  ASSERT (fb_cur != NULL);
+
+  fb_cur->nr_roots = 1;
+  fb_cur->size = fb_entrysize_uc (1);
+
+  p = 2;
+  while (p <= bound)
+    {
+      modulus m;
+      residue r1, r2;
+
+      fb_cur->p = p;
+      fb_cur->plog = fb_log (fb_cur->p, log_scale, 0.);
+
+      mod_initmod_ul (m, p);
+      mod_init (r1, m);
+      mod_init (r2, m);
+      
+      mod_set_ul_reduced (r1, mpz_tdiv_ui (poly[1], p), m);
+      mod_set_ul_reduced (r2, mpz_tdiv_ui (poly[2], p), m);
+
+      /* We want a*f_1 + b*f_0 == 0 <=> a/b == -f0/f1 */
+      mod_inv (r1, r1, m);
+
+      mod_mul (r1, r1, r2, m);
+      mod_neg (r1, r1, m);
+
+      fb_cur->roots[0] = mod_get_ul (r1, m);
+
+      mod_clear (r1, m);
+      mod_clear (r2, m);
+      mod_clearmod (m);
+
+      fb_new = fb_add_to (fb, &fbsize, &fballoc, allocblocksize, fb_cur);
+      if (fb_new == NULL)
+	{
+	  free (fb);
+	  fb = NULL;
+	  break;
+	}
+      /* fb_print_entry (fb_cur); */
+      fb = fb_new;
+      
+      /* FIXME: handle prime powers */
+
+      /* Skip to next prime. FIXME: use a sieve */
+      do {p++;} while (iscomposite (p));
+    }
+
+  if (fb != NULL) /* If nothing went wrong so far, put the end-of-fb mark */
+    {
+      fb_cur->p = 0;
+      fb_cur->nr_roots = 0;
+      fb_new = fb_add_to (fb, &fbsize, &fballoc, allocblocksize, fb_cur);
+      if (fb_new == NULL)
+	free (fb);
+      fb = fb_new;
+    }
+  
+  return fb;
+}
+
+
+factorbase_t *
+fb_read (const char *filename, const double log_scale)
 {
   factorbase_t *fb = NULL, *fb_cur, *fb_new;
   FILE *fbfile;
@@ -328,6 +400,8 @@ read_fb (const char *filename, const double log_scale)
   unsigned long linenr = 0;
   const size_t allocblocksize = 1<<20; /* Allocate in MB chunks */
   fbprime_t p;
+  fbprime_t maxprime = 0;
+  unsigned long nr_primes = 0;
 
   fbfile = fopen (filename, "r");
   if (fbfile == NULL)
@@ -340,6 +414,7 @@ read_fb (const char *filename, const double log_scale)
 				      MAXDEGREE * sizeof(fbroot_t));
   if (fb_cur == NULL)
     {
+      fprintf (stderr, "Could not allocate memory for factor base\n");
       fclose (fbfile);
       return NULL;
     }
@@ -356,6 +431,8 @@ read_fb (const char *filename, const double log_scale)
 	if (line[i] == '#')
 	  break;
       linelen = i;
+      while (linelen > 0 && isspace (line[i - 1]))
+	linelen--; /* Skip whitespace at end of line */
       if (linelen == 0) /* Skip empty/comment lines */
 	continue;
       line[linelen] = '\0';
@@ -365,20 +442,28 @@ read_fb (const char *filename, const double log_scale)
       fb_cur->p = strtoul (lineptr, &lineptr, 10);
       ok = 0;
       if (fb_cur->p == 0)
-	fprintf (stderr, "read_fb: prime is not an integer on line %lu\n", 
+	fprintf (stderr, "fb_read: prime is not an integer on line %lu\n", 
 		 linenr);
       else if (*lineptr != ':')
-	fprintf (stderr, "read_fb: prime is not followed by colon on line %lu",
+	fprintf (stderr, "fb_read: prime is not followed by colon on line %lu",
 		 linenr);
       else
 	ok = 1;
       if (!ok)
 	continue;
 
+      if (fb_cur->p <= maxprime)
+	{
+	  fprintf (stderr, "Error, primes in factor base file are "
+		   "not in increasing order\n");
+	  free (fb);
+	  fb = NULL;
+	  break;
+	}
+
       p = iscomposite (fb_cur->p);
       if (p == 0) /* It's a prime, do a normal log */
-	fb_cur->plog = (unsigned char) floor (log ((double) fb_cur->p) * 
-					      log_scale + 0.5);
+	fb_cur->plog = fb_log (fb_cur->p, log_scale, 0.);
       else
 	{
 	  /* Take into account the logs of the smaller powers of p that
@@ -386,9 +471,8 @@ read_fb (const char *filename, const double log_scale)
 	     fb_cur->plog = log(p) as that would allow rounding errors to 
 	     accumulate. */
 	  double oldlog;
-	  oldlog = floor (log ((double) (fb_cur->p / p)) * log_scale + 0.5);
-	  fb_cur->plog = (unsigned char) floor (log ((double) fb_cur->p) * 
-						log_scale - oldlog + 0.5);
+	  oldlog = fb_log (fb_cur->p / p, log_scale, 0.);
+	  fb_cur->plog = fb_log (fb_cur->p, log_scale, - oldlog);
 	}
 
       lineptr++; /* Skip colon */
@@ -397,34 +481,133 @@ read_fb (const char *filename, const double log_scale)
       /* Read roots */
       while (ok && *lineptr != '\0' && fb_cur->nr_roots <= MAXDEGREE)
 	{
-	  fb_cur->roots[fb_cur->nr_roots++] = strtoul (lineptr, &lineptr, 10);
+	  fbroot_t r = strtoul (lineptr, &lineptr, 10);
+	  fb_cur->roots[fb_cur->nr_roots++] = r;
+	  if (r >= fb_cur->p) /* Check if root is properly reduced */
+	    ok = 0;
 	  if (*lineptr != '\0' && *lineptr != ',')
 	    ok = 0;
 	  if (*lineptr == ',')
 	    lineptr++;
 	}
+
+      if (!ok)
+	{
+	  fprintf (stderr, "Incorrect format in factor base file line %lu\n",
+		   linenr);
+	  continue;
+	}
+
+      if (fb_cur->nr_roots > MAXDEGREE)
+	{
+	  printf ("Error, too many roots for prime " FBPRIME_FORMAT 
+		  "in factor base line %lu\n", p, linenr);
+	  continue;
+	}
       
-      fb_new = add_to_fb (fb, &fbsize, &fballoc, allocblocksize, fb_cur);
+      fb_new = fb_add_to (fb, &fbsize, &fballoc, allocblocksize, fb_cur);
       if (fb_new == NULL)
 	{
 	  free (fb);
 	  fb = NULL;
 	  break;
 	}
+      /* fb_print_entry (fb_cur); */
       fb = fb_new;
+      maxprime = fb_cur->p;
+      nr_primes++;
     }      
 
-  fb_cur->p = 0;
-  fb->nr_roots = 0;
-  
-  fb_new = add_to_fb (fb, &fbsize, &fballoc, allocblocksize, fb_cur);
-  if (fb_new == NULL)
-    free (fb);
-  fb = fb_new;
+  if (fb != NULL) /* If nothing went wrong so far, put the end-of-fb mark */
+    {
+      fb_cur->p = 0;
+      fb_cur->nr_roots = 0;
+      fb_new = fb_add_to (fb, &fbsize, &fballoc, allocblocksize, fb_cur);
+      if (fb_new == NULL)
+	free (fb);
+      fb = fb_new;
+    }
+
+  if (fb != NULL)
+    {
+      printf ("Factor base sucessfully read, %lu primes, largest was "
+	      FBPRIME_FORMAT "\n", nr_primes, maxprime);
+    }
   
   fclose (fbfile);
   free (fb_cur);
   return fb;
+}
+
+void
+fb_disable_roots (factorbase_t *fb, const unsigned long b, const int verbose)
+{
+  long long tsc1, tsc2;
+  unsigned long t;
+  
+  /* Remove the roots of primes that divide b, and of the powers of those 
+     primes, from factor base */
+  rdtscll (tsc1);
+  t = b;
+  while (t > 1)
+    {
+      factorbase_t *fb_del;
+      unsigned long p, ppow;
+      p = iscomposite (t);
+      if (p == 0)
+	p = t;
+      do t /= p; while (t % p == 0);
+      ppow = p;
+      while ((fb_del = fb_find_p (fb, ppow)) != NULL)
+	{
+	  if (verbose)
+	    {
+	      printf ("# Temporarily removing from factor base ");
+	      fb_print_entry (fb_del);
+	    }
+	  fb_del->nr_roots = 0;
+	  ppow *= p;
+	}
+    }
+  rdtscll (tsc2);
+  if (verbose)
+    printf ("# Removing primes from fb took %lld clocks\n", tsc2 - tsc1);
+}
+
+void
+fb_restore_roots (factorbase_t *fb, const unsigned long b, int verbose)
+{
+  long long tsc1, tsc2;
+  unsigned long t;
+
+  /* Put the roots back in */
+  rdtscll (tsc1);
+  t = b;
+  while (t > 1)
+    {
+      factorbase_t *fb_restore;
+      unsigned long p, ppow;
+      p = iscomposite (t);
+      if (p == 0)
+	p = t;
+      t /= p;
+      ppow = p;
+      while ((fb_restore = fb_find_p (fb, ppow)) != NULL)
+	{
+	  fb_restore->nr_roots = 
+	    (fb_restore->size - sizeof (factorbase_t)) 
+	    / sizeof (fbroot_t);
+	  if (verbose)
+	    {
+	      printf ("# Restored to factor base ");
+	      fb_print_entry (fb_restore);
+	    }
+	  ppow *= p;
+	}
+    }
+  rdtscll (tsc2);
+  if (verbose)
+    printf ("# Restoring primes to fb took %lld clocks\n", tsc2 - tsc1);
 }
 
 static unsigned char
@@ -439,27 +622,31 @@ log_norm (const double *f, const int deg, const double x,
   for (i = deg - 1; i >= 0; i--)
     r = r * x + f[i];
 
-  n = (unsigned char) floor (log (fabs (r)) * log_scale 
-			     - log_proj_roots + 0.5);
+  n = fb_log (fabs (r), log_scale, - log_proj_roots);
   /* printf ("Norm at x = %.0f is %.0f, rounded log is %d\n", x, r, (int) n); */
   return n;
 }
 
 
-/* Very slow but thorough way of computing norms */
+/* Very slow but thorough way of computing norms. Returns the maximum rounded
+   log norm in sievearray. */
 
-void
+unsigned char
 compute_norms (unsigned char *sievearray, const long amin, const long amax, 
 	       const unsigned long b, const double *poly, const int deg, 
-	       const double proj_roots, const double log_scale)
+	       const double proj_roots, const double log_scale, 
+	       const int verbose)
 {
     double f[MAXDEGREE + 1]; /* Poly in a for a given fixed b */
     double bpow;
     const double log_proj_roots = log(proj_roots) * log_scale;
+    unsigned long long tsc1, tsc2;
     long a, a2;
     int i;
-    unsigned char n1, n2;
+    unsigned char n1, n2, nmax;
     const int stride = 256;
+
+    rdtscll (tsc1);
 
     bpow = 1.;
     for (i = deg; i >= 0; i--)
@@ -469,7 +656,8 @@ compute_norms (unsigned char *sievearray, const long amin, const long amax,
     }
 
     n1 = log_norm (f, deg, (double) amin, log_scale, log_proj_roots);
-    
+    nmax = n1;
+
     a2 = amin;
     for (a = amin; a <= amax;)
     {
@@ -495,12 +683,27 @@ compute_norms (unsigned char *sievearray, const long amin, const long amax,
 	     a, b, n1, a2, b, n2); */
 	  sievearray[a - amin] = n1;
 	  for ( ; a < a2; a++)
-	    sievearray[a - amin] = log_norm (f, deg, (double) a, log_scale, 
-					     log_proj_roots);
+	    {
+	      unsigned char n = log_norm (f, deg, (double) a, log_scale, 
+					       log_proj_roots);
+	      sievearray[a - amin] = n;
+	      if (n > nmax)
+		nmax = n;
+	    }
+
 	}
       a = a2;
       n1 = n2;
     }
+
+    rdtscll (tsc2);
+    if (verbose)
+      {
+	printf ("# Computing norms took %lld clocks\n", tsc2 - tsc1);
+	printf ("# Maximum rounded log norm is %u\n", (unsigned int) nmax);
+      }
+
+    return nmax;
 }
 
 /* sievearray must be long enough to hold amax-amin+1 chars.
@@ -510,9 +713,9 @@ void
 sieve (unsigned char *sievearray, factorbase_t *fb, 
        const long amin, const long amax, const unsigned long b, 
        const unsigned char threshold, fbprime_t *useful_primes,
-       const fbprime_t useful_threshold)
+       const fbprime_t useful_threshold, unsigned int useful_length)
 {
-  uint32_t i, amin_p, a, p, d;
+  uint32_t i, amin_p, p, d;
   unsigned char plog;
   const unsigned long l = amax - amin + 1;
 
@@ -522,30 +725,46 @@ sieve (unsigned char *sievearray, factorbase_t *fb,
 
   while (fb->p > 0)
     {
-      ASSERT (fb->size <= fb_entrysize(*fb))
+      ASSERT (fb_entrysize(fb) <= fb->size);
       p = fb->p;
       plog = fb->plog;
+      useful_length--; /* Make sure we have space for a 0 mark at the end */
 
       /* This modular reduction should be simplified somehow. Do it once
          and store it in fb? */
       if (amin < 0)
-        amin_p = p - ((unsigned long)(-amin) % p);
+	{
+	  amin_p = p - ((unsigned long)(-amin) % p);
+	  if (amin_p == p)
+	    amin_p = 0; /* FIXME ugly */
+	}
       else
         amin_p = (unsigned long) amin % p;
 
       for (i = 0; i < fb->nr_roots; i++)
         {
+	  modulus m;
+	  residue r1, r2;
+
           /* Find first index in sievearray where p on this root divides.
              So we want a/b == r (mod p) <=> a == br (mod p). Then we want
              d so that amin + d == a (mod p) <=> d == a - amin (mod p)
           */
 
-          a = mulmod (b, fb->roots[i], p); /* We have r_i < p, hence b*r_i/p 
-	  its in register and there is no division overflow. If we keep r_i
-          in Montgomery representation, a single mul/REDC will compute the
-          product, reduce it mod p and return it as an integer. TBD. */
-
-          d = (a >= amin_p) ? a - amin_p : a + p - amin_p; 
+	  mod_initmod_ul (m, p); /* Most of the mod_*() calls are no-ops */
+	  mod_init (r1, m);
+	  mod_init (r2, m);
+	  mod_set_ul (r1, b, m); /* Modular reduction */
+	  mod_set_ul_reduced (r2, fb->roots[i], m);
+          mod_mul (r1, r1, r2, m); /* Multiply and mod reduction. If we keep 
+	    r_i in Montgomery representation, a single mul/REDC will compute 
+	    the product, reduce it mod p and return it as an integer. TBD. */
+	  mod_sub_ul (r1, r1, amin_p, m);
+          d = mod_get_ul (r1, m); 
+	  mod_clear (r1, m);
+	  mod_clear (r2, m);
+	  mod_clearmod (m);
+	  
 	  /* Now d is the first index into sievearray where p divides. */
 
           /* Now update the sieve array. There is no partitioning, blocking, 
@@ -555,15 +774,18 @@ sieve (unsigned char *sievearray, factorbase_t *fb,
 	      unsigned char k;
 	      k = sievearray[d] - plog;
 	      sievearray[d] = k;
-	      if (p >= useful_threshold && k <= threshold)
-		*useful_primes++ = p;
+	      if (p >= useful_threshold && k <= threshold && useful_length > 0)
+		{
+		  *useful_primes++ = p;
+		  useful_length--;
+		}
 	    }
         }
       
       /* Move on to the next factor base prime */
       fb = fb_next (fb);
     }
-  *useful_primes++ = 0;
+    *useful_primes++ = 0;
 }
 
 #define TYPE_STRING 0
@@ -730,24 +952,192 @@ read_polynomial (char *filename)
   return poly;
 }
 
+void
+print_useful (const fbprime_t *useful_primes, 
+	      const unsigned int useful_length)
+{
+  unsigned int useful_count = 0;
+
+  if (useful_primes == NULL)
+    return;
+
+  if (*useful_primes == 0)
+    {
+      printf ("# There were no useful primes\n");
+      return;
+    }
+
+  printf ("# Useful primes were: ");
+  while (*useful_primes != 0)
+    {
+      useful_count ++;
+      printf (FBPRIME_FORMAT " ", *useful_primes++);
+    }
+  printf ("\n");
+  if (useful_count == useful_length - 1)
+    printf ("#Storage for useful primes is full, "
+	    "consider increasing useful_length\n");
+}
+
+
+unsigned long
+sieve_one_side (unsigned char *sievearray, factorbase_t *fb,
+		long *reports, const unsigned int reports_len, 
+		const unsigned char reports_threshold,
+		fbprime_t *useful_primes, const fbprime_t useful_threshold, 
+		const unsigned int useful_length,
+		const long amin, const long amax, const unsigned long b,
+		const unsigned long proj_roots, const double log_scale,
+		const double *dpoly, const unsigned int deg, 
+		const int verbose)
+{
+  long long tsc1, tsc2;
+  long a;
+  unsigned long reports_nr;
+
+  fb_disable_roots (fb, b, verbose);
+  
+  compute_norms (sievearray, amin, amax, b, dpoly, deg, proj_roots, 
+		 log_scale, verbose);
+  
+  rdtscll (tsc1);
+  sieve (sievearray, fb, amin, amax, b, reports_threshold, useful_primes, 
+	 useful_threshold, useful_length);
+  rdtscll (tsc2);
+  if (verbose)
+    printf ("# Sieving took %lld clocks\n", tsc2 - tsc1);
+  
+  fb_restore_roots (fb, b, verbose);
+  
+  if (verbose)
+    print_useful (useful_primes, useful_length);
+  
+  /* Store the sieve reports */
+  rdtscll (tsc1);
+  reports_nr = 0;
+  for (a = amin; reports_nr < reports_len && a <= amax; a++)
+    {
+      /* The + 10 is to deal with accumulated rounding that might have
+	 cause the sieve value to drop below 0 and wrap around */
+      if ((unsigned char) (sievearray[a - amin] + 10) <= reports_threshold + 10
+	  && gcd(labs(a), b) == 1)
+	reports[reports_nr++] = a;
+    }
+  rdtscll (tsc2);
+  if (verbose)
+    {
+      printf ("# There were %lu sieve reports\n", reports_nr);
+      printf ("# Finding sieve reports took %lld clocks\n", tsc2 - tsc1);
+    }
+
+  return reports_nr;
+}
+
+static void
+trialdiv_and_print (const mpz_t *poly, const unsigned int deg, 
+		    const unsigned long b, const long *reports_a, 
+		    const unsigned int reports_a_nr, 
+		    fbprime_t *useful_primes, factorbase_t *fb, 
+		    const int verbose)
+{
+  unsigned long long tsc1, tsc2;
+  unsigned int i, j;
+  mpz_t Fab, scaled_poly[MAXDEGREE];
+
+  mpz_init (Fab);
+  for (i = 0; i <= deg; i++)
+    mpz_init (scaled_poly[i]);
+
+  /* Multiply f_i by b^(deg-i) and put in scaled_poly */
+  mp_poly_scale (scaled_poly, poly, deg, b, -1); 
+
+  rdtscll (tsc1);
+  for (i = 0; i < reports_a_nr; i++)
+    {
+      long a;
+      factorbase_t *nextfb;
+      int first_print = 1;
+      
+      a = reports_a[i];
+      mp_poly_eval (Fab, scaled_poly, deg, a);
+      mpz_abs (Fab, Fab);
+      
+      printf ("%ld %lu: ", a, b);
+      
+      /* See if any of the "useful primes" divide this norm */
+      for (j = 0; useful_primes[j] != 0; j++)
+	{
+	  const fbprime_t q = useful_primes[j];
+	  if (mpz_tdiv_ui(Fab, q) == 0)
+	    {
+	      printf ("%s" FBPRIME_FORMAT, first_print ? "" : ", ", q);
+	      mpz_tdiv_q_ui (Fab, Fab, q);
+	      first_print = 0;
+	    }
+	}
+      
+      /* Go through the entire factor base */
+      for (nextfb = fb; nextfb->p != 0; nextfb = fb_next (nextfb))
+	{
+	  if (mpz_divisible_ui_p (Fab, nextfb->p))
+	    {
+	      while (mpz_divisible_ui_p (Fab, nextfb->p))
+		{
+		  printf ("%s" FBPRIME_FORMAT, 
+			  first_print ? "" : ", ", nextfb->p);
+		  mpz_tdiv_q_ui(Fab, Fab, nextfb->p);
+		  first_print = 0;
+		}
+	      if (mpz_cmp_ui (Fab, 1) == 0 || 
+		  mpz_probab_prime_p (Fab, 1))
+		break;
+	    }
+	}
+      
+      if (mpz_cmp_ui (Fab, 1) == 0)
+	{
+	  printf (";\n");
+	}
+      else if (mpz_probab_prime_p (Fab, 1))
+	{
+	  gmp_printf ("%s%Zd;\n", 
+		      first_print ? "" : ", ", Fab);
+	}
+      else
+	{
+	  /* FIXME: Factor into large primes */
+	  gmp_printf ("; # cof. = %Zd\n", Fab);
+	}
+    }
+  
+  for (i = 0; i <= deg; i++)
+    mpz_clear (scaled_poly[i]);
+  mpz_clear (Fab);
+  
+  rdtscll (tsc2);
+  if (verbose)
+    printf ("# Trial factoring/printing took %lld clocks\n", tsc2 - tsc1);
+}
+
+
 int
 main (int argc, char **argv)
 {
-  long amin, amax, a;
-  unsigned long proj_roots; /* = gcd (b, leading coefficient) */
+  long amin, amax;
   unsigned long bmin, bmax, b;
-  long long tsc1, tsc2;
-  fbprime_t *useful_primes;
-  factorbase_t *fb;
+  fbprime_t *useful_primes, useful_threshold;
+  factorbase_t *fba, *fbr;
+  long *reports_a;
   char *fbfilename = NULL, *polyfilename = NULL;
   unsigned char *sievearray;
-  int threshold = 10;
+  unsigned int useful_length, reports_a_len, reports_a_nr;
+  int reports_a_threshold = 10;
   int verbose = 0;
-  int deg;
-  int i;
+  unsigned int deg;
+  unsigned int i;
   double dpoly[MAXDEGREE];
   const double log_scale = 1. / log (2.); /* Lets use log_2() for a start */
-  mpz_t poly[MAXDEGREE], scaled_poly[MAXDEGREE], Fab;
+  mpz_t poly[MAXDEGREE];
   cado_poly *cpoly;
 
 
@@ -761,7 +1151,7 @@ main (int argc, char **argv)
 	}
       else if (argc > 2 && strcmp (argv[1], "-thres") == 0)
 	{
-	  threshold = atoi (argv[2]);
+	  reports_a_threshold = atoi (argv[2]);
 	  argc -= 2;
 	  argv += 2;
 	}
@@ -788,23 +1178,12 @@ main (int argc, char **argv)
       exit (EXIT_FAILURE);
     }
 
-  if (polyfilename == NULL)
-    {
-      fprintf (stderr, "Please specify a polynomial file with -poly\n");
-      exit (EXIT_FAILURE);
-    }
-
-  cpoly = read_polynomial (polyfilename);
-  if (cpoly == NULL)
-    {
-      fprintf (stderr, "Error reading polynomial file\n");
-      exit (EXIT_FAILURE);
-    }
-
   amin = atol (argv[1]);
   amax = atol (argv[2]);
   bmin = strtoul (argv[3], NULL, 10);
   bmax = strtoul (argv[4], NULL, 10);
+
+  /* Check command line parameters for sanity */
 
   if (amin >= amax)
     {
@@ -818,6 +1197,12 @@ main (int argc, char **argv)
       exit (EXIT_FAILURE);
     }
 
+  if (polyfilename == NULL)
+    {
+      fprintf (stderr, "Please specify a polynomial file with -poly\n");
+      exit (EXIT_FAILURE);
+    }
+
   if (fbfilename == NULL)
     {
       fprintf (stderr, 
@@ -825,11 +1210,25 @@ main (int argc, char **argv)
       exit (EXIT_FAILURE);
     }
 
-  fb = read_fb (fbfilename, log_scale);
+  cpoly = read_polynomial (polyfilename);
+  if (cpoly == NULL)
+    {
+      fprintf (stderr, "Error reading polynomial file\n");
+      exit (EXIT_FAILURE);
+    }
 
-  if (fb == NULL)
+  fba = fb_read (fbfilename, log_scale);
+  if (fba == NULL)
     {
       fprintf (stderr, "Could not read factor base\n");
+      exit (EXIT_FAILURE);
+    }
+
+  fbr = fb_make_linear ((*cpoly)->f, (fbprime_t) (*cpoly)->rlim, log_scale);
+  if (fbr == NULL)
+    {
+      fprintf (stderr, 
+	       "Could not generate factor base for linear polynomial\n");
       exit (EXIT_FAILURE);
     }
 
@@ -839,183 +1238,54 @@ main (int argc, char **argv)
       mpz_init (poly[i]);
       mpz_set (poly[i], (*cpoly)->f[i]);
       dpoly[i] = mpz_get_d (poly[i]);
-      mpz_init (scaled_poly[i]);
     }
-  mpz_init (Fab);
 
 #if 0
   if (verbose)
     for (s = 0; fb_skip(fb, s)->p != 0; s += fb_entrysize (fb_skip (fb, s)))
-      print_fb_entry (fb_skip(fb, s));
+      fb_print_entry (fb_skip(fb, s));
 #endif
 
   sievearray = (unsigned char *) malloc ((amax - amin + 1) * sizeof (char));
-  useful_primes = (fbprime_t *) malloc ((amax - amin + 1) * sizeof (fbprime_t));
+  useful_length = ((amax - amin + 1)) / 1000 + 1000;
+  useful_primes = (fbprime_t *) malloc (useful_length * sizeof (fbprime_t));
+  ASSERT (useful_primes != NULL);
+  {
+    factorbase_t *fbptr = fba;
+    while (fbptr->p != 0)
+      {
+	useful_threshold = fbptr->p;
+	fbptr = fb_next (fbptr);
+      }
+    useful_threshold /= 10;
+    printf ("# Threshold for useful primes is " FBPRIME_FORMAT "\n", 
+	    useful_threshold);
+  }
+  reports_a_len = useful_length;
+  reports_a = (long *) malloc (reports_a_len * sizeof (long));
+  ASSERT (reports_a != NULL);
 
   for (b = bmin; b <= bmax; b++)
     {
-      unsigned long t;
-
-      /* See what projective roots we have */
+      unsigned long proj_roots; /* = gcd (b, leading coefficient) */
+      
       proj_roots = mpz_gcd_ui (NULL, poly[deg], b);
       if (verbose)
 	printf ("# Projective roots for b = %lu are %lu\n", b, proj_roots);
 
-      /* Remove the roots of primes that divide b, and of the powers of those 
-	 primes, from factor base */
-      rdtscll (tsc1);
-      t = b;
-      while (t > 1)
-	{
-	  factorbase_t *fb_del;
-	  unsigned long p, ppow;
-	  p = iscomposite (t);
-	  if (p == 0)
-	    p = t;
-	  do t /= p; while (t % p == 0);
-	  ppow = p;
-	  while ((fb_del = fb_find_p (fb, ppow)) != NULL)
-	    {
-	      if (verbose)
-		{
-		  printf ("# Temporarily removing from factor base ");
-		  print_fb_entry (fb_del);
-		}
-	      fb_del->nr_roots = 0;
-	      ppow *= p;
-	    }
-	}
-      rdtscll (tsc2);
-      if (verbose)
-	printf ("# Removing primes from fb took %lld clocks\n", tsc2 - tsc1);
-
-      rdtscll (tsc1);
-      compute_norms (sievearray, amin, amax, b, dpoly, deg, proj_roots, 
-		     log_scale);
-      rdtscll (tsc2);
-      if (verbose)
-	printf ("# Computing norms took %lld clocks\n", tsc2 - tsc1);
-
-      rdtscll (tsc1);
-      sieve (sievearray, fb, amin, amax, b, threshold, useful_primes, 500);
-      rdtscll (tsc2);
-      if (verbose)
-	printf ("# Sieving took %lld clocks\n", tsc2 - tsc1);
-      
-      
-      /* Put the roots back in */
-      rdtscll (tsc1);
-      t = b;
-      while (t > 1)
-	{
-	  factorbase_t *fb_restore;
-	  unsigned long p, ppow;
-	  p = iscomposite (t);
-	  if (p == 0)
-	    p = t;
-	  t /= p;
-	  ppow = p;
-	  while ((fb_restore = fb_find_p (fb, ppow)) != NULL)
-	    {
-	      fb_restore->nr_roots = 
-		(fb_restore->size - sizeof (factorbase_t)) 
-		/ sizeof (fbroot_t);
-	      if (verbose)
-		{
-		  printf ("# Restored to factor base ");
-		  print_fb_entry (fb_restore);
-		}
-	      ppow *= p;
-	    }
-	}
-      rdtscll (tsc2);
-      if (verbose)
-	printf ("# Restoring primes to fb took %lld clocks\n", tsc2 - tsc1);
-      
-      if (verbose && *useful_primes != 0)
-	{
-	  printf ("# Useful primes were: ");
-	  while (*useful_primes != 0)
-	    printf (FBPRIME_FORMAT " ", *useful_primes++);
-	  printf ("\n");
-	}
-
+      reports_a_nr = 
+	sieve_one_side (sievearray, fba, reports_a, reports_a_len, 
+			reports_a_threshold, useful_primes, useful_threshold, 
+			useful_length, amin, amax, b, proj_roots, log_scale, 
+			dpoly, deg, verbose);
 
       /* Not trial factor the candidate relations */
-
-      /* Multiply f_i by b^(deg-i) and put in scaled_poly */
-      mp_poly_scale (scaled_poly, poly, deg, b, -1); 
-      /* The &poly[0] is ugly, but otherwise gcc complains about not being 
-	 able to convert pointer type. FIXME: find out what exactly irks gcc */
-
-      rdtscll (tsc1);
-      for (a = amin; a <= amax; a++)
-	{
-	  /* The + 10 is to deal with accumulated rounding that might have
-	     cause the sieve value to drop below 0 and wrap around */
-	  if ((unsigned char) (sievearray[a - amin] + 10) <= threshold + 10 && 
-	      gcd(labs(a), b) == 1)
-	    {
-	      factorbase_t *nextfb;
-	      fbprime_t *nextuseful;
-	      int first_print = 1;
-
-	      mp_poly_eval (Fab, scaled_poly, deg, a);
-	      mpz_abs (Fab, Fab);
-
-	      printf ("%ld %lu: ", a, b);
-
-	      /* See if any of the "useful primes" divide this norm */
-	      for (nextuseful = useful_primes; *nextuseful != 0; nextuseful++)
-		{
-		  if (mpz_tdiv_ui(Fab, *nextuseful) == 0)
-		    {
-		      printf ("%s" FBPRIME_FORMAT, first_print ? "" : ", ",
-			      *nextuseful);
-		      mpz_tdiv_q_ui (Fab, Fab, *nextuseful);
-		      first_print = 0;
-		    }
-		}
-
-	      /* Go through the entire factor base */
-	      for (nextfb = fb; nextfb->p != 0; 
-		   nextfb = fb_next (nextfb))
-		{
-		  if (mpz_divisible_ui_p (Fab, nextfb->p))
-		    {
-		      while (mpz_divisible_ui_p (Fab, nextfb->p))
-			{
-			  printf ("%s" FBPRIME_FORMAT, 
-				  first_print ? "" : ", ", nextfb->p);
-			  mpz_tdiv_q_ui(Fab, Fab, nextfb->p);
-			  first_print = 0;
-			}
-		      if (mpz_cmp_ui (Fab, 1) == 0 || 
-			  mpz_probab_prime_p (Fab, 1))
-			break;
-		    }
-		}
-	      if (mpz_cmp_ui (Fab, 1) == 0)
-		gmp_printf ("; #log res = %d\n", (int) sievearray[a - amin]);
-	      else if (mpz_probab_prime_p (Fab, 1))
-		gmp_printf ("%s%Zd; #log res = %d\n", 
-			    first_print ? "" : ", ", Fab, 
-			    (int) sievearray[a - amin]);
-	      else
-		{
-		  /* FIXME: Factor into large primes */
-		  gmp_printf ("; # cof. = %Zd, log res = %d\n", 
-			      Fab, (int) sievearray[a - amin]);
-		}
-	    }
-	}
-      rdtscll (tsc2);
-      if (verbose)
-	printf ("# Trial factoring/printing took %lld clocks\n", tsc2 - tsc1);
+      trialdiv_and_print ((const mpz_t *) poly, deg, b, reports_a, 
+			  reports_a_nr, useful_primes, fba, verbose);
     }
 
 
-  free (fb);
+  free (fba);
   free (sievearray);
 
   return 0;
