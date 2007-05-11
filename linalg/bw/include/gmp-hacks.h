@@ -25,6 +25,10 @@
   } while (0)
 #endif
 
+#ifndef	MPN_COPY
+#define	MPN_COPY(dst, src, n)	memcpy((dst), (src), (n) * sizeof(mp_limb_t))
+#endif
+
 /* Note : A better construction is provided by gcc : ({ ... }) ; */
 	
 #define BEGIN_BLOCK	do {
