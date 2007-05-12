@@ -87,3 +87,22 @@ typedef struct
 
 typedef __cado_poly_struct cado_poly[1];
 
+/* Data types */
+
+typedef unsigned int fbprime_t; /* 32 bits should be enough for everyone */
+#define FBPRIME_FORMAT "%u"
+typedef fbprime_t fbroot_t;
+#define FBROOT_FORMAT "%u"
+typedef unsigned long largeprime_t; /* On IA32 they'll only get 32 bit 
+                                       large primes */
+#define LARGEPRIME_FORMAT "%lu"
+
+typedef struct {
+  fbprime_t p;            /* A prime or a prime power */
+  unsigned char plog;     /* logarithm (to some suitable base) of this prime */
+  unsigned char nr_roots; /* how many roots there are for this prime */
+  unsigned char size;     /* The length of the struct in bytes */
+  unsigned char dummy[1]; /* For dword aligning the roots */
+  fbroot_t roots[0];      /* the actual length of this array is determined
+                             by nr_roots */
+} factorbase_t;
