@@ -21,6 +21,8 @@
 #endif
 
 
+#define REFAC_PRP_THRES 1000
+
 /*****************************************************************
  *                      Functions for calculus                   *
  *****************************************************************/
@@ -151,7 +153,7 @@ mp_poly_eval (mpz_t r, mpz_t *poly, int deg, long a)
 
 /* Scale coefficient f_i by a^i (inv == 1) or by c^(deg-i) (inv == -1) */
 void
-mp_poly_scale (mpz_t *r, const mpz_t *poly, const int deg, const long c, 
+mp_poly_scale (mpz_t *r, mpz_t *poly, const int deg, const long c, 
 	       const int inv)
 {
   int i;
@@ -610,6 +612,22 @@ fb_restore_roots (factorbase_t *fb, const unsigned long b, int verbose)
     printf ("# Restoring primes to fb took %lld clocks\n", tsc2 - tsc1);
 }
 
+fbprime_t
+fb_maxprime (factorbase_t *fb)
+{
+    fbprime_t maxp;
+    factorbase_t *fbptr = fb;
+    while (fbptr->p != 0)
+    {
+	ASSERT (maxp <= fbptr->p);
+	maxp = fbptr->p;
+	fbptr = fb_next (fbptr);
+    }
+    
+    return maxp;
+}
+
+
 static unsigned char
 log_norm (const double *f, const int deg, const double x, 
 	  const double log_scale, const double log_proj_roots)
@@ -1033,85 +1051,142 @@ sieve_one_side (unsigned char *sievearray, factorbase_t *fb,
   return reports_nr;
 }
 
+
+/* Divides the prime q and its powers out of C, appends each q divided out
+   to primes_a. If anything was divided out, returns 1 if cofactor is 1 or
+   a probable prime. Otherwise returns 0. */
+
+static int
+trialdiv_one_prime (const fbprime_t q, mpz_t C, unsigned int *nr_primes_a,
+                    fbprime_t *primes_a, const unsigned int max_nr_primes)
+{
+  int is_prp = 0;
+
+  if (mpz_divisible_ui_p (C, q))
+    {
+      do
+	{
+	  if (*nr_primes_a < max_nr_primes)
+	    primes_a[*nr_primes_a++] = q;
+	  mpz_tdiv_q_ui(C, C, q);
+	} while (mpz_divisible_ui_p (C, q));
+
+      if (mpz_cmp_ui (C, 1) == 0 || 
+	  (q > REFAC_PRP_THRES && mpz_probab_prime_p (C, 1)))
+        {
+          is_prp = 1;
+        }
+    }
+  return is_prp;
+}
+
 static void
-trialdiv_and_print (const mpz_t *poly, const unsigned int deg, 
-		    const unsigned long b, const long *reports_a, 
-		    const unsigned int reports_a_nr, 
-		    fbprime_t *useful_primes, factorbase_t *fb, 
-		    const int verbose)
+trialdiv_and_print (cado_poly *poly, const unsigned long b, 
+                    const long *reports_a, const unsigned int reports_a_nr, 
+		    fbprime_t *useful_primes_a, const long *reports_r, 
+		    const unsigned int reports_r_nr, 
+		    fbprime_t *useful_primes_r, 
+		    factorbase_t *fba, const int verbose)
 {
   unsigned long long tsc1, tsc2;
-  unsigned int i, j;
-  mpz_t Fab, scaled_poly[MAXDEGREE];
+  unsigned int i, j, k;
+  const unsigned int max_nr_primes = 128;
+  mpz_t Fab, Gab, scaled_poly_a[MAXDEGREE], scaled_poly_r[2];
+  fbprime_t primes_a[max_nr_primes], primes_r[max_nr_primes];
+  fbprime_t q, incrq;
+  unsigned int nr_primes_a, nr_primes_r;
 
   mpz_init (Fab);
-  for (i = 0; i <= deg; i++)
-    mpz_init (scaled_poly[i]);
+  for (i = 0; i <= (unsigned) (*poly)->degree; i++)
+    mpz_init (scaled_poly_a[i]);
+  mpz_init (scaled_poly_r[0]);
+  mpz_init (scaled_poly_r[1]);
 
   /* Multiply f_i by b^(deg-i) and put in scaled_poly */
-  mp_poly_scale (scaled_poly, poly, deg, b, -1); 
+  mp_poly_scale (scaled_poly_a, (*poly)->f, (*poly)->degree, b, -1); 
+  mp_poly_scale (scaled_poly_r, (*poly)->g, 2, b, -1); 
 
   rdtscll (tsc1);
-  for (i = 0; i < reports_a_nr; i++)
+  for (i = 0, j = 0; i < reports_a_nr && j < reports_r_nr;)
     {
-      long a;
-      factorbase_t *nextfb;
-      int first_print = 1;
+      if (reports_a[i] == reports_r[j])
+      {
+          const long a = reports_a[i];
+          factorbase_t *nextfb;
       
-      a = reports_a[i];
-      mp_poly_eval (Fab, scaled_poly, deg, a);
-      mpz_abs (Fab, Fab);
-      
-      printf ("%ld %lu: ", a, b);
-      
-      /* See if any of the "useful primes" divide this norm */
-      for (j = 0; useful_primes[j] != 0; j++)
-	{
-	  const fbprime_t q = useful_primes[j];
-	  if (mpz_tdiv_ui(Fab, q) == 0)
+	  mp_poly_eval (Fab, scaled_poly_a, (*poly)->degree, a);
+	  mpz_abs (Fab, Fab);
+	  mp_poly_eval (Gab, scaled_poly_r, 2, a);
+	  mpz_abs (Gab, Gab);
+	  
+          nr_primes_a = nr_primes_r = 0;
+
+          /* Do the algebraic side */
+	  /* See if any of the "useful primes" divide this norm */
+	  for (k = 0; useful_primes_a[k] != 0; k++)
+	  {
+	      const fbprime_t q = useful_primes_a[k];
+	      if (mpz_tdiv_ui(Fab, q) == 0)
+	        {
+	          if (nr_primes_a < max_nr_primes)
+	            primes_a[nr_primes_a++] = q;
+		  mpz_tdiv_q_ui (Fab, Fab, q);
+	        }
+	  }
+	  
+	  /* Go through the entire factor base */ 
+	  for (nextfb = fba; nextfb->p != 0; nextfb = fb_next (nextfb))
+            if (trialdiv_one_prime (nextfb->p, Fab, &nr_primes_a, primes_a,
+                                    max_nr_primes))
+	      break;
+	  
+	  /* Do the rational side */
+	  for (k = 0; useful_primes_r[k] != 0; k++)
+	  {
+	      const fbprime_t q = useful_primes_r[k];
+	      while (mpz_tdiv_ui(Gab, q) == 0)
+	        {
+	          if (nr_primes_r < max_nr_primes)
+	            primes_r[nr_primes_r++] = q;
+		  mpz_tdiv_q_ui (Gab, Gab, q);
+	        } 
+	  }
+	  
+	  while (mpz_even_p (Gab))
 	    {
-	      printf ("%s" FBPRIME_FORMAT, first_print ? "" : ", ", q);
-	      mpz_tdiv_q_ui (Fab, Fab, q);
-	      first_print = 0;
+	      if (nr_primes_r < max_nr_primes)
+	        primes_r[nr_primes_r++] = 2;
+              mpz_div_2exp (Gab, Gab, 1);
 	    }
-	}
-      
-      /* Go through the entire factor base */
-      for (nextfb = fb; nextfb->p != 0; nextfb = fb_next (nextfb))
-	{
-	  if (mpz_divisible_ui_p (Fab, nextfb->p))
-	    {
-	      while (mpz_divisible_ui_p (Fab, nextfb->p))
-		{
-		  printf ("%s" FBPRIME_FORMAT, 
-			  first_print ? "" : ", ", nextfb->p);
-		  mpz_tdiv_q_ui(Fab, Fab, nextfb->p);
-		  first_print = 0;
-		}
-	      if (mpz_cmp_ui (Fab, 1) == 0 || 
-		  mpz_probab_prime_p (Fab, 1))
-		break;
-	    }
-	}
-      
-      if (mpz_cmp_ui (Fab, 1) == 0)
-	{
-	  printf (";\n");
-	}
-      else if (mpz_probab_prime_p (Fab, 1))
-	{
-	  gmp_printf ("%s%Zd;\n", 
-		      first_print ? "" : ", ", Fab);
-	}
-      else
-	{
-	  /* FIXME: Factor into large primes */
-	  gmp_printf ("; # cof. = %Zd\n", Fab);
-	}
+
+          trialdiv_one_prime (3, Gab, &nr_primes_r, primes_r, max_nr_primes);
+          
+          for (q = 5, incrq = 2; q <= (*poly)->rlim; 
+               q += incrq, incrq = 4 - incrq)
+            if (trialdiv_one_prime (q, Gab, &nr_primes_r, primes_r,
+                                    max_nr_primes))
+	      break;
+
+	  /* Now print the relations */
+	  printf ("%ld,%lu:", a, b);
+	  for (k = 0; k < nr_primes_r; k++)
+	    printf ("%x%s", primes_r[k], k+1==nr_primes_r?",":":");
+	  for (k = 0; k < nr_primes_a; k++)
+	    printf ("%x%s", primes_a[k], k+1==nr_primes_r?",":"\n");
+        }
+        
+        /* Assumes values in reports_a, reports_r are sorted and unique */
+        if (reports_a[i] < reports_r[j])
+          i++;
+        else
+          j++;
     }
   
-  for (i = 0; i <= deg; i++)
-    mpz_clear (scaled_poly[i]);
+  for (i = 0; i <= (unsigned)(*poly)->degree; i++)
+    mpz_clear (scaled_poly_a[i]);
+  mpz_clear (scaled_poly_r[0]);
+  mpz_clear (scaled_poly_r[1]);
+      
   mpz_clear (Fab);
   
   rdtscll (tsc2);
@@ -1125,19 +1200,19 @@ main (int argc, char **argv)
 {
   long amin, amax;
   unsigned long bmin, bmax, b;
-  fbprime_t *useful_primes, useful_threshold;
+  fbprime_t *useful_primes_a, *useful_primes_r, useful_threshold;
   factorbase_t *fba, *fbr;
-  long *reports_a;
+  long *reports_a, *reports_r;
   char *fbfilename = NULL, *polyfilename = NULL;
   unsigned char *sievearray;
-  unsigned int useful_length, reports_a_len, reports_a_nr;
-  int reports_a_threshold = 10;
+  unsigned int useful_length_a, useful_length_r, reports_a_len, reports_a_nr, 
+      reports_r_len, reports_r_nr;
+  int reports_a_threshold = 10, reports_r_threshold = 10;
   int verbose = 0;
   unsigned int deg;
   unsigned int i;
-  double dpoly[MAXDEGREE];
+  double dpoly_a[MAXDEGREE], dpoly_r[2];
   const double log_scale = 1. / log (2.); /* Lets use log_2() for a start */
-  mpz_t poly[MAXDEGREE];
   cado_poly *cpoly;
 
 
@@ -1234,11 +1309,10 @@ main (int argc, char **argv)
 
   deg = (*cpoly)->degree;
   for (i = 0; i <= deg; i++)
-    {
-      mpz_init (poly[i]);
-      mpz_set (poly[i], (*cpoly)->f[i]);
-      dpoly[i] = mpz_get_d (poly[i]);
-    }
+      dpoly_a[i] = mpz_get_d ((*cpoly)->f[i]);
+  dpoly_r[0] = mpz_get_d ((*cpoly)->g[0]);
+  dpoly_r[1] = mpz_get_d ((*cpoly)->g[1]);
+
 
 #if 0
   if (verbose)
@@ -1247,45 +1321,55 @@ main (int argc, char **argv)
 #endif
 
   sievearray = (unsigned char *) malloc ((amax - amin + 1) * sizeof (char));
-  useful_length = ((amax - amin + 1)) / 1000 + 1000;
-  useful_primes = (fbprime_t *) malloc (useful_length * sizeof (fbprime_t));
-  ASSERT (useful_primes != NULL);
-  {
-    factorbase_t *fbptr = fba;
-    while (fbptr->p != 0)
-      {
-	useful_threshold = fbptr->p;
-	fbptr = fb_next (fbptr);
-      }
-    useful_threshold /= 10;
-    printf ("# Threshold for useful primes is " FBPRIME_FORMAT "\n", 
+  useful_length_a = ((amax - amin + 1)) / 1000 + 1000;
+  useful_length_r = ((amax - amin + 1)) / 1000 + 1000;
+  useful_primes_a = (fbprime_t *) malloc (useful_length_a* sizeof (fbprime_t));
+  useful_primes_r = (fbprime_t *) malloc (useful_length_r* sizeof (fbprime_t));
+  ASSERT (useful_primes_a != NULL && useful_primes_r != NULL);
+
+  useful_threshold = fb_maxprime (fba) / 10;
+  printf ("# Threshold for useful primes is " FBPRIME_FORMAT "\n", 
 	    useful_threshold);
-  }
-  reports_a_len = useful_length;
+
+  reports_a_len = useful_length_a;
   reports_a = (long *) malloc (reports_a_len * sizeof (long));
   ASSERT (reports_a != NULL);
+  reports_r_len = useful_length_r;
+  reports_r = (long *) malloc (reports_r_len * sizeof (long));
+  ASSERT (reports_r != NULL);
 
   for (b = bmin; b <= bmax; b++)
     {
       unsigned long proj_roots; /* = gcd (b, leading coefficient) */
       
-      proj_roots = mpz_gcd_ui (NULL, poly[deg], b);
+      proj_roots = mpz_gcd_ui (NULL, (*cpoly)->f[deg], b);
       if (verbose)
 	printf ("# Projective roots for b = %lu are %lu\n", b, proj_roots);
 
       reports_a_nr = 
 	sieve_one_side (sievearray, fba, reports_a, reports_a_len, 
-			reports_a_threshold, useful_primes, useful_threshold, 
-			useful_length, amin, amax, b, proj_roots, log_scale, 
-			dpoly, deg, verbose);
+			reports_a_threshold, useful_primes_a, useful_threshold,
+			useful_length_a, amin, amax, b, proj_roots, log_scale, 
+			dpoly_a, deg, verbose);
+      reports_r_nr = 
+	sieve_one_side (sievearray, fbr, reports_r, reports_r_len, 
+			reports_r_threshold, useful_primes_r, useful_threshold,
+			useful_length_r, amin, amax, b, proj_roots, log_scale, 
+			dpoly_r, deg, verbose);
 
       /* Not trial factor the candidate relations */
-      trialdiv_and_print ((const mpz_t *) poly, deg, b, reports_a, 
-			  reports_a_nr, useful_primes, fba, verbose);
+      trialdiv_and_print (cpoly, b, 
+			  reports_a, reports_a_nr, useful_primes_a, 
+			  reports_r, reports_r_nr, useful_primes_r, 
+			  fba, verbose);
     }
 
 
   free (fba);
+  free (useful_primes_a);
+  free (useful_primes_r);
+  free (reports_a);
+  free (reports_r);
   free (sievearray);
 
   return 0;
