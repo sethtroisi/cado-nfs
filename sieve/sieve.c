@@ -22,6 +22,7 @@
 
 
 #define REFAC_PRP_THRES 1000
+#define SIEVE_PERMISSIBLE_ERROR 5
 
 /*****************************************************************
  *                      Functions for calculus                   *
@@ -254,7 +255,8 @@ void
 fb_print_entry (factorbase_t *fb)
 {
   int i;
-  printf ("Prime " FBPRIME_FORMAT " with roots ", fb->p);
+  printf ("Prime " FBPRIME_FORMAT " with rounded log %d and roots ", 
+	  fb->p, (int) fb->plog);
   for (i = 0; i + 1 < fb->nr_roots; i++)
     printf (FBROOT_FORMAT ", ", fb->roots[i]);
   printf (FBROOT_FORMAT "\n", fb->roots[i]);
@@ -316,13 +318,16 @@ fb_log (double n, double log_scale, double offset)
 /* Generate a factor base with primes <= bound for a linear polynomial */
 
 factorbase_t *
-fb_make_linear (mpz_t *poly, fbprime_t bound, double log_scale)
+fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale, 
+		const int verbose)
 {
+  long long tsc1, tsc2;
   fbprime_t p;
   factorbase_t *fb = NULL, *fb_cur, *fb_new;
   size_t fbsize = 0, fballoc = 0;
   const size_t allocblocksize = 1<<20;
 
+  rdtscll (tsc1);
   fb_cur = (factorbase_t *) malloc (fb_entrysize_uc (1));
   ASSERT (fb_cur != NULL);
 
@@ -342,8 +347,8 @@ fb_make_linear (mpz_t *poly, fbprime_t bound, double log_scale)
       mod_init (r1, m);
       mod_init (r2, m);
       
-      mod_set_ul_reduced (r1, mpz_tdiv_ui (poly[1], p), m);
-      mod_set_ul_reduced (r2, mpz_tdiv_ui (poly[2], p), m);
+      mod_set_ul_reduced (r1, mpz_tdiv_ui (poly[0], p), m);
+      mod_set_ul_reduced (r2, mpz_tdiv_ui (poly[1], p), m);
 
       /* We want a*f_1 + b*f_0 == 0 <=> a/b == -f0/f1 */
       mod_inv (r1, r1, m);
@@ -382,7 +387,12 @@ fb_make_linear (mpz_t *poly, fbprime_t bound, double log_scale)
 	free (fb);
       fb = fb_new;
     }
-  
+
+  rdtscll (tsc2);
+  if (verbose)
+    printf ("# Generating rational factor base took %lld clocks\n", 
+	    tsc2 - tsc1);  
+
   return fb;
 }
 
@@ -1067,7 +1077,7 @@ trialdiv_one_prime (const fbprime_t q, mpz_t C, unsigned int *nr_primes_a,
       do
 	{
 	  if (*nr_primes_a < max_nr_primes)
-	    primes_a[*nr_primes_a++] = q;
+	    primes_a[(*nr_primes_a)++] = q;
 	  mpz_tdiv_q_ui(C, C, q);
 	} while (mpz_divisible_ui_p (C, q));
 
@@ -1097,6 +1107,7 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
   unsigned int nr_primes_a, nr_primes_r;
 
   mpz_init (Fab);
+  mpz_init (Gab);
   for (i = 0; i <= (unsigned) (*poly)->degree; i++)
     mpz_init (scaled_poly_a[i]);
   mpz_init (scaled_poly_r[0]);
@@ -1104,7 +1115,7 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
 
   /* Multiply f_i by b^(deg-i) and put in scaled_poly */
   mp_poly_scale (scaled_poly_a, (*poly)->f, (*poly)->degree, b, -1); 
-  mp_poly_scale (scaled_poly_r, (*poly)->g, 2, b, -1); 
+  mp_poly_scale (scaled_poly_r, (*poly)->g, 1, b, -1); 
 
   rdtscll (tsc1);
   for (i = 0, j = 0; i < reports_a_nr && j < reports_r_nr;)
@@ -1116,7 +1127,7 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
       
 	  mp_poly_eval (Fab, scaled_poly_a, (*poly)->degree, a);
 	  mpz_abs (Fab, Fab);
-	  mp_poly_eval (Gab, scaled_poly_r, 2, a);
+	  mp_poly_eval (Gab, scaled_poly_r, 1, a);
 	  mpz_abs (Gab, Gab);
 	  
           nr_primes_a = nr_primes_r = 0;
@@ -1126,7 +1137,7 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
 	  for (k = 0; useful_primes_a[k] != 0; k++)
 	  {
 	      const fbprime_t q = useful_primes_a[k];
-	      if (mpz_tdiv_ui(Fab, q) == 0)
+	      if (mpz_divisible_ui_p (Fab, q))
 	        {
 	          if (nr_primes_a < max_nr_primes)
 	            primes_a[nr_primes_a++] = q;
@@ -1141,17 +1152,7 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
 	      break;
 	  
 	  /* Do the rational side */
-	  for (k = 0; useful_primes_r[k] != 0; k++)
-	  {
-	      const fbprime_t q = useful_primes_r[k];
-	      while (mpz_tdiv_ui(Gab, q) == 0)
-	        {
-	          if (nr_primes_r < max_nr_primes)
-	            primes_r[nr_primes_r++] = q;
-		  mpz_tdiv_q_ui (Gab, Gab, q);
-	        } 
-	  }
-	  
+
 	  while (mpz_even_p (Gab))
 	    {
 	      if (nr_primes_r < max_nr_primes)
@@ -1159,6 +1160,17 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
               mpz_div_2exp (Gab, Gab, 1);
 	    }
 
+	  for (k = 0; useful_primes_r[k] != 0; k++)
+	  {
+	      const fbprime_t q = useful_primes_r[k];
+	      if (mpz_divisible_ui_p (Gab, q))
+	        {
+	          if (nr_primes_r < max_nr_primes)
+	            primes_r[nr_primes_r++] = q;
+		  mpz_tdiv_q_ui (Gab, Gab, q);
+	        }
+	  }
+	  
           trialdiv_one_prime (3, Gab, &nr_primes_r, primes_r, max_nr_primes);
           
           for (q = 5, incrq = 2; q <= (*poly)->rlim; 
@@ -1167,15 +1179,36 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
                                     max_nr_primes))
 	      break;
 
-	  /* Now print the relations */
-	  printf ("%ld,%lu:", a, b);
-	  for (k = 0; k < nr_primes_r; k++)
-	    printf ("%x%s", primes_r[k], k+1==nr_primes_r?",":":");
-	  for (k = 0; k < nr_primes_a; k++)
-	    printf ("%x%s", primes_a[k], k+1==nr_primes_r?",":"\n");
+	  /* Test if the cofactor after trial division is small */
+	  if ((double) mpz_sizeinbase (Fab, 2) > 
+	      (*poly)->lpba * (*poly)->alambda + SIEVE_PERMISSIBLE_ERROR)
+	  {
+	      gmp_fprintf (stderr, 
+			   "Sieve report %ld, %lu is not smooth on "
+			   "algebraic side, cofactor is %Zd with %d bits\n", 
+			   a, b, Fab, mpz_sizeinbase (Fab, 2));
+	  }
+
+	  else if ((double) mpz_sizeinbase (Gab, 2) > 
+	      (*poly)->lpbr * (*poly)->rlambda + SIEVE_PERMISSIBLE_ERROR)
+	  {
+	      gmp_fprintf (stderr, 
+			   "Sieve report %ld, %lu is not smooth on "
+			   "rational side, cofactor is %Zd with %d bits\n", 
+			   a, b, Gab, mpz_sizeinbase (Gab, 2));
+	  } else {
+
+	      /* Now print the relations */
+	      printf ("%ld,%lu:", a, b);
+	      for (k = 0; k < nr_primes_r; k++)
+		  printf ("%x%s", primes_r[k], k+1==nr_primes_r?":":",");
+	      for (k = 0; k < nr_primes_a; k++)
+		  printf ("%x%s", primes_a[k], k+1==nr_primes_a?"\n":",");
+	  }
         }
         
-        /* Assumes values in reports_a, reports_r are sorted and unique */
+        /* Assumes values in reports_a are sorted and unique, 
+	   same for reports_r  */
         if (reports_a[i] < reports_r[j])
           i++;
         else
@@ -1188,6 +1221,7 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
   mpz_clear (scaled_poly_r[1]);
       
   mpz_clear (Fab);
+  mpz_clear (Gab);
   
   rdtscll (tsc2);
   if (verbose)
@@ -1207,13 +1241,13 @@ main (int argc, char **argv)
   unsigned char *sievearray;
   unsigned int useful_length_a, useful_length_r, reports_a_len, reports_a_nr, 
       reports_r_len, reports_r_nr;
-  int reports_a_threshold = 10, reports_r_threshold = 10;
   int verbose = 0;
   unsigned int deg;
   unsigned int i;
-  double dpoly_a[MAXDEGREE], dpoly_r[2];
+  double dpoly_a[MAXDEGREE], dpoly_r[1];
   const double log_scale = 1. / log (2.); /* Lets use log_2() for a start */
   cado_poly *cpoly;
+  char report_a_threshold, report_r_threshold;
 
 
   while (argc > 1 && argv[1][0] == '-')
@@ -1223,12 +1257,6 @@ main (int argc, char **argv)
 	  verbose++;
 	  argc--;
 	  argv++;
-	}
-      else if (argc > 2 && strcmp (argv[1], "-thres") == 0)
-	{
-	  reports_a_threshold = atoi (argv[2]);
-	  argc -= 2;
-	  argv += 2;
 	}
       else if (argc > 2 && strcmp (argv[1], "-fb") == 0)
 	{
@@ -1299,20 +1327,31 @@ main (int argc, char **argv)
       exit (EXIT_FAILURE);
     }
 
-  fbr = fb_make_linear ((*cpoly)->f, (fbprime_t) (*cpoly)->rlim, log_scale);
+  fbr = fb_make_linear ((*cpoly)->f, (fbprime_t) (*cpoly)->rlim, log_scale,
+			verbose);
   if (fbr == NULL)
     {
       fprintf (stderr, 
 	       "Could not generate factor base for linear polynomial\n");
       exit (EXIT_FAILURE);
     }
+  
+  if (0)
+  {
+      factorbase_t *fbptr;
+      for (fbptr = fbr; fbptr->p != 0; fbptr = fb_next (fbptr))
+	  fb_print_entry(fbptr);
+  }
 
   deg = (*cpoly)->degree;
   for (i = 0; i <= deg; i++)
       dpoly_a[i] = mpz_get_d ((*cpoly)->f[i]);
   dpoly_r[0] = mpz_get_d ((*cpoly)->g[0]);
   dpoly_r[1] = mpz_get_d ((*cpoly)->g[1]);
-
+  report_a_threshold = (double)((*cpoly)->lpba) * log(2.0) * 
+      (*cpoly)->alambda * log_scale + 0.5;
+  report_r_threshold = (double)((*cpoly)->lpbr) * log(2.0) * 
+      (*cpoly)->rlambda * log_scale + 0.5;
 
 #if 0
   if (verbose)
@@ -1321,8 +1360,8 @@ main (int argc, char **argv)
 #endif
 
   sievearray = (unsigned char *) malloc ((amax - amin + 1) * sizeof (char));
-  useful_length_a = ((amax - amin + 1)) / 1000 + 1000;
-  useful_length_r = ((amax - amin + 1)) / 1000 + 1000;
+  useful_length_a = ((amax - amin + 1)) / 100 + 1000;
+  useful_length_r = ((amax - amin + 1)) / 100 + 1000;
   useful_primes_a = (fbprime_t *) malloc (useful_length_a* sizeof (fbprime_t));
   useful_primes_r = (fbprime_t *) malloc (useful_length_r* sizeof (fbprime_t));
   ASSERT (useful_primes_a != NULL && useful_primes_r != NULL);
@@ -1344,18 +1383,39 @@ main (int argc, char **argv)
       
       proj_roots = mpz_gcd_ui (NULL, (*cpoly)->f[deg], b);
       if (verbose)
-	printf ("# Projective roots for b = %lu are %lu\n", b, proj_roots);
+	printf ("# Projective roots for b = %lu on algebtaic side are %lu\n", 
+	        b, proj_roots);
+
+      if (verbose)
+	  printf ("#Sieving algebraic side\n");
 
       reports_a_nr = 
 	sieve_one_side (sievearray, fba, reports_a, reports_a_len, 
-			reports_a_threshold, useful_primes_a, useful_threshold,
+			report_a_threshold, useful_primes_a, useful_threshold,
 			useful_length_a, amin, amax, b, proj_roots, log_scale, 
 			dpoly_a, deg, verbose);
+
+      proj_roots = mpz_gcd_ui (NULL, (*cpoly)->f[deg], b);
+      if (verbose)
+	printf ("# Projective roots for b = %lu on rational side are %lu\n", 
+	        b, proj_roots);
+
+      if (verbose)
+	  printf ("#Sieving rational side\n");
+
       reports_r_nr = 
 	sieve_one_side (sievearray, fbr, reports_r, reports_r_len, 
-			reports_r_threshold, useful_primes_r, useful_threshold,
+			report_r_threshold, useful_primes_r, useful_threshold,
 			useful_length_r, amin, amax, b, proj_roots, log_scale, 
-			dpoly_r, deg, verbose);
+			dpoly_r, 1, verbose);
+
+      if (reports_a_len == reports_a_nr)
+	  fprintf (stderr, "Warning: sieve reports list on algebraic side "
+		   "full with %u entries for b=%lu\n", reports_a_len, b);
+
+      if (reports_r_len == reports_r_nr)
+	  fprintf (stderr, "Warning: sieve reports list on rational side "
+		   "full with %u entries for b=%lu\n", reports_r_len, b);
 
       /* Not trial factor the candidate relations */
       trialdiv_and_print (cpoly, b, 
