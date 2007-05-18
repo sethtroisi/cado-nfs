@@ -1,9 +1,14 @@
 Compile with
 
-gcc -DWANT_ASSERT -I ../ -O0 -g -o sieve -Wall -Wextra sieve.c -lm -lgmp
+gcc -DHAVE_MSRH -DWANT_ASSERT -I ../ -O0 -g -o sieve -Wall -Wextra sieve.c -lm -lgmp
 
 (Note: linking GMP statically with /usr/lib/libgmp.a for example may yield a
 speedup up to 7%.)
+
+or, if you're like me and have compiled a static GMP with full frame pointer 
+support for debugging, use i.e.
+
+gcc -DHAVE_MSRH -DWANT_ASSERT -I ../ -O0 -g -o sieve -Wall -Wextra sieve.c -lm /usr/local/lib/libgmp_fp.a
 
 Make a factor base with, for example,
 

@@ -183,13 +183,17 @@ void
 mp_poly_print (mpz_t *poly, int deg, const char *name)
 {
   int i;
-  printf ("%s = ", name);
-  for (i = deg; i >= 0; i--)
+  printf ("%s", name);
+  for (i = deg; i >= 2; i--)
     {
       if (mpz_sgn (poly[i]) != 0)
 	gmp_printf ("%s%Zd * x^%d ", 
 		    mpz_sgn(poly[i]) > 0 ? "+" : "", poly[i], i);
     }
+  if (deg >= 1 && mpz_sgn (poly[1]) != 0)
+      gmp_printf ("%s%Zd * x ", mpz_sgn(poly[1]) > 0 ? "+" : "", poly[1]);
+  if (deg >= 0 && mpz_sgn (poly[0]) != 0)
+      gmp_printf ("%s%Zd", mpz_sgn(poly[0]) > 0 ? "+" : "", poly[0]);
   printf ("\n");
 }
 
@@ -354,7 +358,7 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
 
   if (verbose)
     {
-      printf ("# Making factor base for polynomial g(x)");
+      printf ("# Making factor base for polynomial g(x) = ");
       mp_poly_print (poly, 1, "");
     }
 
@@ -735,8 +739,8 @@ compute_norms (unsigned char *sievearray, const long amin, const long amax,
     a2 = amin;
     for (a = amin; a <= amax;)
     {
-      ASSERT (a = a2);
-      ASSERT (n1 = log_norm (f, deg, (double) a, log_scale, log_proj_roots));
+      ASSERT (a == a2);
+      ASSERT (n1 == log_norm (f, deg, (double) a, log_scale, log_proj_roots));
       /* We'll cover [a ... a2 - 1] now */
       a2 = (a + stride <= amax + 1) ? a + stride : amax + 1;
 
@@ -1060,6 +1064,7 @@ print_useful (const fbprime_t *useful_primes,
   if (useful_count == useful_length - 1)
     printf ("#Storage for useful primes is full, "
 	    "consider increasing useful_length\n");
+  fflush (stdout);
 }
 
 
@@ -1094,7 +1099,7 @@ sieve_one_side (unsigned char *sievearray, factorbase_t *fb,
   
   fb_restore_roots (fb, b, verbose);
   
-  if (verbose)
+  if (verbose >= 2)
     print_useful (useful_primes, useful_length);
   
   /* Store the sieve reports */
@@ -1164,6 +1169,8 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
   fbprime_t primes_a[max_nr_primes], primes_r[max_nr_primes];
   fbprime_t q, incrq;
   unsigned int nr_primes_a, nr_primes_r;
+  int cof_a_prp, cof_r_prp;
+  unsigned int lp_a_toolarge = 0, lp_r_toolarge = 0;
 
   mpz_init (Fab);
   mpz_init (Gab);
@@ -1190,6 +1197,7 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
 	  mpz_abs (Gab, Gab);
 	  
           nr_primes_a = nr_primes_r = 0;
+	  cof_a_prp = cof_r_prp = 0;
 
           /* Do the algebraic side */
 	  /* See if any of the "useful primes" divide this norm */
@@ -1208,7 +1216,11 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
 	  for (nextfb = fba; nextfb->p != 0; nextfb = fb_next (nextfb))
             if (trialdiv_one_prime (nextfb->p, Fab, &nr_primes_a, primes_a,
                                     max_nr_primes))
-	      break;
+	    {
+		if (mpz_cmp_ui (Fab, 1) > 0)
+		    cof_a_prp = 1;
+		break;
+	    }
 	  
 	  /* Do the rational side */
 
@@ -1236,7 +1248,11 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
                q += incrq, incrq = 4 - incrq)
             if (trialdiv_one_prime (q, Gab, &nr_primes_r, primes_r,
                                     max_nr_primes))
-	      break;
+	    {
+		if (mpz_cmp_ui (Gab, 1) > 0)
+		    cof_r_prp = 1;
+		break;
+	    }
 
 	  /* Test if the cofactor after trial division is small */
 	  if ((double) mpz_sizeinbase (Fab, 2) > 
@@ -1255,8 +1271,15 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
 			   "Sieve report %ld, %lu is not smooth on "
 			   "rational side, cofactor is %Zd with %d bits\n", 
 			   a, b, Gab, mpz_sizeinbase (Gab, 2));
+	  } else if (cof_a_prp && 
+		     mpz_sizeinbase (Fab, 2) > (unsigned)(*poly)->lpba)
+	  {
+	      lp_a_toolarge++;
+	  } else if (cof_r_prp && 
+		     mpz_sizeinbase (Gab, 2) > (unsigned)(*poly)->lpbr)
+	  {
+	      lp_r_toolarge++;
 	  } else {
-
 	      /* Now print the relations */
 	      printf ("%ld,%lu:", a, b);
 	      for (k = 0; k < nr_primes_r; k++)
@@ -1264,7 +1287,7 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
 	      for (k = 0; k < nr_primes_a; k++)
 		  printf ("%x%s", primes_a[k], k+1==nr_primes_a?"\n":",");
 	  }
-        }
+      }
         
         /* Assumes values in reports_a are sorted and unique, 
 	   same for reports_r  */
@@ -1285,7 +1308,11 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
   rdtscll (tsc2);
 #ifdef HAVE_MSRH
   if (verbose)
+  {
     printf ("# Trial factoring/printing took %lld clocks\n", tsc2 - tsc1);
+    printf ("# Too large prp cofactors: alg %d, rat %d\n",
+	    lp_a_toolarge, lp_r_toolarge);
+  }
 #endif
 }
 
@@ -1305,7 +1332,7 @@ main (int argc, char **argv)
   int verbose = 0;
   unsigned int deg;
   unsigned int i;
-  double dpoly_a[MAXDEGREE], dpoly_r[1];
+  double dpoly_a[MAXDEGREE], dpoly_r[2];
   const double log_scale = 1. / log (2.); /* Lets use log_2() for a start */
   cado_poly *cpoly;
   char report_a_threshold, report_r_threshold;
@@ -1380,6 +1407,15 @@ main (int argc, char **argv)
       fprintf (stderr, "Error reading polynomial file\n");
       exit (EXIT_FAILURE);
     }
+  if (verbose)
+  {
+      printf ("Read polynomial file %s\n", polyfilename);
+      printf ("Polynomials are:\n");
+      mp_poly_print ((*cpoly)->f, (*cpoly)->degree, "f(x) =");
+      printf ("\n");
+      mp_poly_print ((*cpoly)->g, 1, "g(x) =");
+      printf ("\n");
+  }
 
   fba = fb_read (fbfilename, log_scale, verbose);
   if (fba == NULL)
@@ -1443,6 +1479,8 @@ main (int argc, char **argv)
     {
       unsigned long proj_roots; /* = gcd (b, leading coefficient) */
       
+      printf ("# Sieving line b = %lu\n", b);
+
       proj_roots = mpz_gcd_ui (NULL, (*cpoly)->f[deg], b);
       if (verbose)
 	printf ("# Projective roots for b = %lu on algebtaic side are: %lu\n", 
@@ -1457,7 +1495,7 @@ main (int argc, char **argv)
 			useful_length_a, amin, amax, b, proj_roots, log_scale, 
 			dpoly_a, deg, verbose);
 
-      proj_roots = mpz_gcd_ui (NULL, (*cpoly)->f[deg], b);
+      proj_roots = mpz_gcd_ui (NULL, (*cpoly)->g[1], b);
       if (verbose)
 	printf ("# Projective roots for b = %lu on rational side are: %lu\n", 
 	        b, proj_roots);
