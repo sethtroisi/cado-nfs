@@ -9,7 +9,11 @@
 #include <string.h>
 #include <math.h>
 #include <ctype.h>
+#ifdef HAVE_MSRH
 #include <asm/msr.h>
+#else
+#define rdtscll(x)
+#endif
 #include "cado.h"
 #include "mod_ul.c"
 #define MAXDEGREE 10
@@ -425,9 +429,11 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
     }
 
   rdtscll (tsc2);
+#ifdef HAVE_MSRH
   if (verbose)
     printf ("# Generating rational factor base took %lld clocks\n", 
-	    tsc2 - tsc1);  
+	    tsc2 - tsc1);
+#endif
 
   return fb;
 }
@@ -618,8 +624,10 @@ fb_disable_roots (factorbase_t *fb, const unsigned long b, const int verbose)
 	}
     }
   rdtscll (tsc2);
+#ifdef HAVE_MSRH
   if (verbose)
     printf ("# Removing primes from fb took %lld clocks\n", tsc2 - tsc1);
+#endif
 }
 
 void
@@ -654,8 +662,10 @@ fb_restore_roots (factorbase_t *fb, const unsigned long b, int verbose)
 	}
     }
   rdtscll (tsc2);
+#ifdef HAVE_MSRH
   if (verbose)
     printf ("# Restoring primes to fb took %lld clocks\n", tsc2 - tsc1);
+#endif
 }
 
 fbprime_t
@@ -761,11 +771,13 @@ compute_norms (unsigned char *sievearray, const long amin, const long amax,
     }
 
     rdtscll (tsc2);
+#ifdef HAVE_MSRH
     if (verbose)
       {
 	printf ("# Computing norms took %lld clocks\n", tsc2 - tsc1);
 	printf ("# Maximum rounded log norm is %u\n", (unsigned int) nmax);
       }
+#endif
 
     return nmax;
 }
@@ -1075,8 +1087,10 @@ sieve_one_side (unsigned char *sievearray, factorbase_t *fb,
   sieve (sievearray, fb, amin, amax, b, reports_threshold, useful_primes, 
 	 useful_threshold, useful_length);
   rdtscll (tsc2);
+#ifdef HAVE_MSRH
   if (verbose)
     printf ("# Sieving took %lld clocks\n", tsc2 - tsc1);
+#endif
   
   fb_restore_roots (fb, b, verbose);
   
@@ -1095,11 +1109,13 @@ sieve_one_side (unsigned char *sievearray, factorbase_t *fb,
 	reports[reports_nr++] = a;
     }
   rdtscll (tsc2);
+#ifdef HAVE_MSRH
   if (verbose)
     {
       printf ("# There were %lu sieve reports\n", reports_nr);
       printf ("# Finding sieve reports took %lld clocks\n", tsc2 - tsc1);
     }
+#endif
 
   return reports_nr;
 }
@@ -1267,8 +1283,10 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
   mpz_clear (Gab);
   
   rdtscll (tsc2);
+#ifdef HAVE_MSRH
   if (verbose)
     printf ("# Trial factoring/printing took %lld clocks\n", tsc2 - tsc1);
+#endif
 }
 
 
