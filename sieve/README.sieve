@@ -1,6 +1,6 @@
 Compile with
 
-gcc -DWANT_ASSERT -I ../ -O0 -g -o sieve -Wall -Wextra -Werror sieve.c -lm -lgmp
+gcc -DWANT_ASSERT -I ../ -O0 -g -o sieve -Wall -Wextra sieve.c -lm -lgmp
 
 Make a factor base with, for example,
 

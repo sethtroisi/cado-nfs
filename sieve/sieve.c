@@ -671,7 +671,7 @@ fb_restore_roots (factorbase_t *fb, const unsigned long b, int verbose)
 fbprime_t
 fb_maxprime (factorbase_t *fb)
 {
-    fbprime_t maxp;
+    fbprime_t maxp = 0;
     factorbase_t *fbptr = fb;
     while (fbptr->p != 0)
     {
