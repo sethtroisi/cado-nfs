@@ -2,6 +2,8 @@ Compile with
 
 gcc -DHAVE_MSRH -DWANT_ASSERT -I ../ -O0 -g -o sieve -Wall -Wextra sieve.c -lm -lgmp
 
+If the compilation fails because asm/msr.h is not found, remove -DHAVE_MSRH.
+
 (Note: linking GMP statically with /usr/lib/libgmp.a for example may yield a
 speedup up to 7%.)
 

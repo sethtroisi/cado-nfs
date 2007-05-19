@@ -1,0 +1,46 @@
+The checknorms program checks the relations output by the siever.
+- it checks the given factor base primes divide the corresponding norm
+- it factors the corresponding residues, and outputs the relation with all
+  factors only if there are at most two large primes smaller than the
+  corresponding bound
+- a warning is issued if some residue exceeds the corresponding bound 2^mfbr
+	or 2^mfba
+- a warning is issued if some prime factor of the residue is smaller than the
+	factor base bound
+
+To compile it:
+$ gcc -I$ECM/include -I.. -O2 -g -o checknorms checknorms.c \
+        $ECM/lib/libecm.a $GMP/lib/libgmp.a -lm
+
+To use it: assume we have output some relations with:
+
+$ ./sieve -poly c80.poly -fb c80.roots.txt -1000000 1000000 2000 2101 > rels
+
+This gives a file with 2360 relations:
+
+$ grep -v '#' rels | wc -l 
+2360
+
+Then do:
+
+$ ./checknorms -poly c80.poly rels > rels1
+Warning, prime 53453 smaller than factor base bound 100000
+Warning, alg. residue 2792545380389267 exceeds bound for a=-540941, b=2000
+...
+File rels: output 550 out of 2360 relations
+All input files: output 550 relations
+
+$ grep -v '#' rels1 | wc -l 
+550
+
+You can run again checknorms on its output, and you should get the same file:
+
+$ ./checknorms -poly c80.poly rels1 > rels2
+File rels1: output 550 out of 550 relations
+All input files: output 550 relations
+$ diff rels1 rels2
+$
+
+
+
+
