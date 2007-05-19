@@ -12,8 +12,10 @@ powers = vector (powlen, i, 2^(i+1));
 nextpow = vecmin (powers[1]); /* = 4, but lets do it the generic way */
 
 forprime(p = 2, n, 
-  while (p > nextpow, /* Between the last p and this one, 
+  while (0 && p > nextpow, /* Between the last p and this one, 
                          there was a (or another) prime power */
+    /* Roots mod p^k with polrootspadic simply does not work the way I
+       thought it would. Currently disabled. */
     i = 1;
     while (powers[i] != nextpow, i++);
     q = round (sqrtn (nextpow, i + 1));
