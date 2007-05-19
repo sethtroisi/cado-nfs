@@ -21,9 +21,9 @@ This gives a file with 2360 relations:
 $ grep -v '#' rels | wc -l 
 2360
 
-Then do:
+Then do (-mfba 48 overrides the bound of 2^37 from c80.poly):
 
-$ ./checknorms -poly c80.poly rels > rels1
+$ ./checknorms -poly c80.poly -mfba 48 rels > rels1
 Warning, prime 53453 smaller than factor base bound 100000
 Warning, alg. residue 2792545380389267 exceeds bound for a=-540941, b=2000
 ...

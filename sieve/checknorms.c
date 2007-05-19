@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <math.h>
 #include "cado.h"
 #include "ecm.h"
 
@@ -223,7 +224,7 @@ check_prime (mpz_t p, unsigned long sb)
       or if one prime factor is >= 2^lp, return 3.
 */
 unsigned long
-factor (mpz_t p1, mpz_t p2, mpz_t norm, size_t lp)
+factor (mpz_t p1, mpz_t p2, mpz_t norm, size_t lp, int verbose)
 {
   if (mpz_cmp_ui (norm, 1) == 0)
     return 0;
@@ -236,13 +237,27 @@ factor (mpz_t p1, mpz_t p2, mpz_t norm, size_t lp)
     }
   else /* two or more factors */
     {
+      static unsigned long maxtries = 0, tottries = 0, nb = 0;
+      unsigned long tries = 0;
       int res;
-      double B1 = 8.0 * (double) mpz_sizeinbase (norm, 2);
+      /* the following seems to work well for a large prime bound of 2^24,
+	 i.e., residues less than 2^48 */
+      double B1 = 4.0 * (double) mpz_sizeinbase (norm, 2);
       do
 	{
+	  tries ++;
 	  res = ecm_factor (p1, norm, B1, NULL);
+	  B1 += sqrt (B1);
 	}
       while (res == 0 || mpz_cmp (p1, norm) == 0);
+      nb ++;
+      tottries += tries;
+      if (tries > maxtries)
+	{
+	  maxtries = tries;
+	  if (verbose)
+	    gmp_fprintf (stderr, "Used %lu ECM curves to factor %Zd (average %1.2f)\n", tries, norm, (double) tottries / (double) nb);
+	}
       /* we want p1 < 2^lp */
       if (mpz_sizeinbase (p1, 2) > lp)
 	return 3;
@@ -263,7 +278,7 @@ factor (mpz_t p1, mpz_t p2, mpz_t norm, size_t lp)
 #define MAXREL_LENGTH 200 /* max length in characters of a relation */
 
 unsigned long
-checkrels (char *f, cado_poly cpoly, int verbose)
+checkrels (char *f, cado_poly cpoly, int verbose, size_t mfbr, size_t mfba)
 {
   FILE *fp;
   unsigned long b, nb, mfba_reports = 0, mfbr_reports = 0;
@@ -322,13 +337,14 @@ checkrels (char *f, cado_poly cpoly, int verbose)
 	  len += sprintf (s + len, "%c", c);
 	}
       /* check the residue is smaller than 2^mfbr */
-      if (mpz_sizeinbase (norm, 2) > (unsigned) cpoly->mfbr)
+      if (mpz_sizeinbase (norm, 2) > mfbr)
 	{
 	  if (++mfbr_reports <= 10)
 	    gmp_fprintf (stderr, "Warning, rat. residue %Zd exceeds bound for a=%ld, b=%lu\n", norm, a, b);
+	  nb = 3; /* discard relation */
 	}
-      /* factor residue on rational side */
-      nb = factor (p1, p2, norm, cpoly->lpbr);
+      else /* factor residue on rational side */
+	nb = factor (p1, p2, norm, cpoly->lpbr, verbose);
       /* write additional primes */
       if (nb <= 2)
 	{
@@ -364,13 +380,16 @@ checkrels (char *f, cado_poly cpoly, int verbose)
           len += sprintf (s + len, "%c", c);
 	}
       /* check the residue is smaller than 2^mfba */
-      if (mpz_sizeinbase (norm, 2) > (unsigned) cpoly->mfba)
+      if (nb == 3)
+	nb = 3; /* relations already discarded by rational side */
+      else if (mpz_sizeinbase (norm, 2) > (unsigned) mfba)
 	{
 	  if (++mfba_reports <= 10)
 	    gmp_fprintf (stderr, "Warning, alg. residue %Zd exceeds bound for a=%ld, b=%lu\n", norm, a, b);
+	  nb = 3; /* discard relation */
 	}
-      /* factor residue on algebraic side */
-      nb = factor (p1, p2, norm, cpoly->lpba);
+      else /* factor residue on algebraic side */
+	nb = factor (p1, p2, norm, cpoly->lpba, verbose);
       /* write additional primes */
       if (nb <= 2)
 	{
@@ -417,6 +436,7 @@ main (int argc, char *argv[])
   char *polyfilename = NULL;
   cado_poly *cpoly;
   unsigned long tot_rels = 0;
+  int mfbr = 0, mfba = 0;
 
   while (argc > 1 && argv[1][0] == '-')
     {
@@ -432,9 +452,23 @@ main (int argc, char *argv[])
 	  argc -= 2;
 	  argv += 2;
 	}
-
+      else if (argc > 2 && strcmp (argv[1], "-mfbr") == 0)
+	{
+	  mfbr = atoi (argv[2]);
+	  argc -= 2;
+	  argv += 2;
+	}
+      else if (argc > 2 && strcmp (argv[1], "-mfba") == 0)
+	{
+	  mfba = atoi (argv[2]);
+	  argc -= 2;
+	  argv += 2;
+	}
       else 
-	break;
+	{
+	  fprintf (stderr, "Usage: %s [-v] [-mfbr <n>] -poly <file> rels1 ... relsn\n");
+	  exit (EXIT_FAILURE);
+	}
     }
 
   if (polyfilename == NULL)
@@ -449,10 +483,17 @@ main (int argc, char *argv[])
       fprintf (stderr, "Error reading polynomial file\n");
       exit (EXIT_FAILURE);
     }
+
+  /* default residue bounds are those from file, if not overridden by
+     command line parameters */
+  if (mfbr == 0)
+    mfbr = cpoly[0]->mfbr;
+  if (mfba == 0)
+    mfba = cpoly[0]->mfba;
   
   while (argc > 1)
     {
-      tot_rels += checkrels (argv[1], cpoly[0], verbose);
+      tot_rels += checkrels (argv[1], cpoly[0], verbose, mfbr, mfba);
       argc --;
       argv ++;
     }
