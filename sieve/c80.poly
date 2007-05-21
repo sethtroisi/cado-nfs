@@ -14,6 +14,6 @@ lpbr: 24
 lpba: 24
 mfbr: 37
 mfba: 37
-rlambda: 1.1
+rlambda: 1.2
 alambda: 2.2
 qintsize: 10000

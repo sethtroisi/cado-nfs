@@ -24,8 +24,8 @@
   #define ASSERT(x)
 #endif
 
-
-#define REFAC_PRP_THRES 1000
+#define REFAC_PRP_SIZE_THRES 50
+#define REFAC_PRP_THRES 500
 #define SIEVE_PERMISSIBLE_ERROR 5
 
 /*****************************************************************
@@ -223,23 +223,39 @@ static unsigned long
 gcd (unsigned long a, unsigned long b)
 {
   unsigned long t;
+  uint32_t a32, b32, t32;
 
-  if (a == 0)
-    return b;
-
+  ASSERT (b > 0);
+  
   if (a >= b)
     a %= b;
 
-  while (a > 0)
+  while (a > UINT32_MAX)
     {
-      t = b % a;
+      if (b - a < a)
+	t = b - a;
+      else
+	t = b % a;
       b = a;
       a = t;
     }
 
-  return b;
-}
+  if (a == 0)
+    return b;
 
+  a32 = a;
+  b32 = b;
+  t32 = t;
+
+  while (a32 > 0)
+    {
+      t32 = b32 % a32; /* The 32 bit DIV is much faster */
+      b32 = a32;
+      a32 = t32;
+    }
+
+  return b32;
+}
 
 /*****************************************************************
  *                Functions for the factor base                  *
@@ -712,8 +728,7 @@ log_norm (const double *f, const int deg, const double x,
 unsigned char
 compute_norms (unsigned char *sievearray, const long amin, const long amax, 
 	       const unsigned long b, const double *poly, const int deg, 
-	       const double proj_roots, const double log_scale, 
-	       const int verbose)
+	       const double proj_roots, const double log_scale, int verbose)
 {
     double f[MAXDEGREE + 1]; /* Poly in a for a given fixed b */
     double bpow;
@@ -933,7 +948,7 @@ read_polynomial (char *filename)
   char line[linelen];
   cado_poly *poly;
   int have_name = 0, have_n = 0, have_Y0 = 0, have_Y1 = 0;
-  int i, ok;
+  int i, ok = PARSE_ERROR;
 
   file = fopen (filename, "r");
   if (file == NULL)
@@ -1080,8 +1095,8 @@ sieve_one_side (unsigned char *sievearray, factorbase_t *fb,
 		const int verbose)
 {
   long long tsc1, tsc2;
-  long a;
-  unsigned long reports_nr;
+  long a, stride;
+  unsigned long reports_nr, odd_b;
 
   fb_disable_roots (fb, b, verbose);
   
@@ -1105,12 +1120,15 @@ sieve_one_side (unsigned char *sievearray, factorbase_t *fb,
   /* Store the sieve reports */
   rdtscll (tsc1);
   reports_nr = 0;
-  for (a = amin; reports_nr < reports_len && a <= amax; a++)
+  stride = (b % 2 == 0) ? 2 : 1;
+  a = amin + (b % 2 == 0 && amin % 2 == 0) ? 1 : 0;
+  for (odd_b = b; odd_b % 2 == 0; odd_b >>= 1);
+  for (a = amin; reports_nr < reports_len && a <= amax; a += stride)
     {
       /* The + 10 is to deal with accumulated rounding that might have
 	 cause the sieve value to drop below 0 and wrap around */
       if ((unsigned char) (sievearray[a - amin] + 10) <= reports_threshold + 10
-	  && gcd(labs(a), b) == 1)
+	  && gcd(labs(a), odd_b) == 1)
 	reports[reports_nr++] = a;
     }
   rdtscll (tsc2);
@@ -1146,7 +1164,13 @@ trialdiv_one_prime (const fbprime_t q, mpz_t C, unsigned int *nr_primes_a,
 	} while (mpz_divisible_ui_p (C, q));
 
       if (mpz_cmp_ui (C, 1) == 0 || 
-	  (q > REFAC_PRP_THRES && mpz_probab_prime_p (C, 1)))
+	  (
+#if 1
+	   q > REFAC_PRP_THRES
+#else
+	   mpz_sizeinbase (C, 2) <= REFAC_PRP_SIZE_THRES
+#endif
+	   && mpz_probab_prime_p (C, 1)))
         {
           is_prp = 1;
         }
@@ -1163,6 +1187,7 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
 		    factorbase_t *fba, const int verbose)
 {
   unsigned long long tsc1, tsc2;
+  unsigned long proj_primes;
   unsigned int i, j, k;
   const unsigned int max_nr_primes = 128;
   mpz_t Fab, Gab, scaled_poly_a[MAXDEGREE], scaled_poly_r[2];
@@ -1170,7 +1195,9 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
   fbprime_t q, incrq;
   unsigned int nr_primes_a, nr_primes_r;
   int cof_a_prp, cof_r_prp;
-  unsigned int lp_a_toolarge = 0, lp_r_toolarge = 0;
+  unsigned int lp_a_toolarge = 0, lp_r_toolarge = 0, 
+    cof_a_toolarge = 0, cof_r_toolarge = 0;
+  int log2size;
 
   mpz_init (Fab);
   mpz_init (Gab);
@@ -1182,6 +1209,8 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
   /* Multiply f_i by b^(deg-i) and put in scaled_poly */
   mp_poly_scale (scaled_poly_a, (*poly)->f, (*poly)->degree, b, -1); 
   mp_poly_scale (scaled_poly_r, (*poly)->g, 1, b, -1); 
+
+  proj_primes = mpz_gcd_ui (NULL, (*poly)->f[(*poly)->degree], b);
 
   rdtscll (tsc1);
   for (i = 0, j = 0; i < reports_a_nr && j < reports_r_nr;)
@@ -1200,6 +1229,24 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
 	  cof_a_prp = cof_r_prp = 0;
 
           /* Do the algebraic side */
+
+	  /* Divide out the primes with projective roots */
+	  if (proj_primes > 1)
+	    {
+	      ASSERT (mpz_tdiv_ui (Fab, proj_primes) == 0);
+	      mpz_tdiv_q_ui (Fab, Fab, proj_primes);
+	      
+	      do 
+		{
+		  q = iscomposite (proj_primes);
+		  if (q == 0)
+		    q = proj_primes;
+		  proj_primes /= q;
+		  if (nr_primes_a < max_nr_primes)
+		    primes_a[nr_primes_a++] = q;
+		} while (proj_primes > 1);
+	    }
+
 	  /* See if any of the "useful primes" divide this norm */
 	  for (k = 0; useful_primes_a[k] != 0; k++)
 	  {
@@ -1222,6 +1269,30 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
 		break;
 	    }
 	  
+	  /* Test if the cofactor after trial division is small enough */
+	  log2size = mpz_sizeinbase (Fab, 2);
+	  if ((double) log2size > 
+	      (*poly)->lpba * (*poly)->alambda + SIEVE_PERMISSIBLE_ERROR)
+	  {
+	      gmp_fprintf (stderr, 
+			   "Sieve report %ld, %lu is not smooth on "
+			   "algebraic side, cofactor is %Zd with %d bits\n", 
+			   a, b, Fab, mpz_sizeinbase (Fab, 2));
+	      goto nextreport;
+	  }
+
+	  if (cof_a_prp && log2size > (*poly)->lpba)
+	  {
+	      lp_a_toolarge++;
+	      goto nextreport;
+	  }
+
+	  if (!cof_a_prp && log2size > (*poly)->mfba)
+	  {
+	      cof_a_toolarge++;
+	      goto nextreport;
+	  }
+
 	  /* Do the rational side */
 
 	  while (mpz_even_p (Gab))
@@ -1230,6 +1301,8 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
 	        primes_r[nr_primes_r++] = 2;
               mpz_div_2exp (Gab, Gab, 1);
 	    }
+	  
+          trialdiv_one_prime (3, Gab, &nr_primes_r, primes_r, max_nr_primes);
 
 	  for (k = 0; useful_primes_r[k] != 0; k++)
 	  {
@@ -1242,8 +1315,6 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
 	        }
 	  }
 	  
-          trialdiv_one_prime (3, Gab, &nr_primes_r, primes_r, max_nr_primes);
-          
           for (q = 5, incrq = 2; q <= (*poly)->rlim; 
                q += incrq, incrq = 4 - incrq)
             if (trialdiv_one_prime (q, Gab, &nr_primes_r, primes_r,
@@ -1254,31 +1325,21 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
 		break;
 	    }
 
-	  /* Test if the cofactor after trial division is small */
-	  if ((double) mpz_sizeinbase (Fab, 2) > 
-	      (*poly)->lpba * (*poly)->alambda + SIEVE_PERMISSIBLE_ERROR)
-	  {
-	      gmp_fprintf (stderr, 
-			   "Sieve report %ld, %lu is not smooth on "
-			   "algebraic side, cofactor is %Zd with %d bits\n", 
-			   a, b, Fab, mpz_sizeinbase (Fab, 2));
-	  }
-
-	  else if ((double) mpz_sizeinbase (Gab, 2) > 
+	  if ((double) mpz_sizeinbase (Gab, 2) > 
 	      (*poly)->lpbr * (*poly)->rlambda + SIEVE_PERMISSIBLE_ERROR)
 	  {
 	      gmp_fprintf (stderr, 
 			   "Sieve report %ld, %lu is not smooth on "
 			   "rational side, cofactor is %Zd with %d bits\n", 
 			   a, b, Gab, mpz_sizeinbase (Gab, 2));
-	  } else if (cof_a_prp && 
-		     mpz_sizeinbase (Fab, 2) > (unsigned)(*poly)->lpba)
-	  {
-	      lp_a_toolarge++;
 	  } else if (cof_r_prp && 
 		     mpz_sizeinbase (Gab, 2) > (unsigned)(*poly)->lpbr)
 	  {
 	      lp_r_toolarge++;
+	  } else if (!cof_r_prp && 
+		     mpz_sizeinbase (Gab, 2) > (unsigned)(*poly)->mfbr)
+	  {
+	      cof_r_toolarge++;
 	  } else {
 	      /* Now print the relations */
 	      printf ("%ld,%lu:", a, b);
@@ -1288,13 +1349,14 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
 		  printf ("%x%s", primes_a[k], k+1==nr_primes_a?"\n":",");
 	  }
       }
-        
-        /* Assumes values in reports_a are sorted and unique, 
-	   same for reports_r  */
-        if (reports_a[i] < reports_r[j])
-          i++;
-        else
-          j++;
+
+    nextreport:        
+      /* Assumes values in reports_a are sorted and unique, 
+	 same for reports_r  */
+      if (reports_a[i] < reports_r[j])
+	i++;
+      else
+	j++;
     }
   
   for (i = 0; i <= (unsigned)(*poly)->degree; i++)
@@ -1310,8 +1372,9 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
   if (verbose)
   {
     printf ("# Trial factoring/printing took %lld clocks\n", tsc2 - tsc1);
-    printf ("# Too large prp cofactors: alg %d, rat %d\n",
-	    lp_a_toolarge, lp_r_toolarge);
+    printf ("# Too large cofactors (discarded in this order): "
+	    "alg prp %d, alg composite %d, rat prp %d, rat composite %d\n", 
+	    lp_a_toolarge, cof_a_toolarge, lp_r_toolarge, cof_r_toolarge);
   }
 #endif
 }
