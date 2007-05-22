@@ -21,7 +21,7 @@
 #define MOD_UL_ASSERT
 #endif
 
-#ifndef GNUC_ATTRIBUTE_UNUSED
+#ifndef __GNUC_ATTRIBUTE_UNUSED__
 #define __GNUC_ATTRIBUTE_UNUSED__ __attribute__ ((unused))
 #define MOD_UL_GNUC_ATTRIBUTE_UNUSED
 #endif
@@ -54,6 +54,7 @@ typedef unsigned long modulusul[1];
 typedef residueul residue;
 typedef modulusul modulus;
 
+__GNUC_ATTRIBUTE_UNUSED__
 static inline void
 modul_init (residueul r __GNUC_ATTRIBUTE_UNUSED__, 
             modulusul m __GNUC_ATTRIBUTE_UNUSED__)
@@ -61,6 +62,7 @@ modul_init (residueul r __GNUC_ATTRIBUTE_UNUSED__,
   return;
 }
 
+__GNUC_ATTRIBUTE_UNUSED__
 static inline void
 modul_init_set0 (residueul r, modulusul m __GNUC_ATTRIBUTE_UNUSED__)
 {
@@ -68,6 +70,7 @@ modul_init_set0 (residueul r, modulusul m __GNUC_ATTRIBUTE_UNUSED__)
   return;
 }
 
+__GNUC_ATTRIBUTE_UNUSED__
 static inline void
 modul_clear (residueul r __GNUC_ATTRIBUTE_UNUSED__,
               modulusul m __GNUC_ATTRIBUTE_UNUSED__)
@@ -75,12 +78,14 @@ modul_clear (residueul r __GNUC_ATTRIBUTE_UNUSED__,
   return;
 }
 
+__GNUC_ATTRIBUTE_UNUSED__
 static inline void
 modul_set (residueul r, residueul s, modulusul m __GNUC_ATTRIBUTE_UNUSED__)
 {
   r[0] = s[0];
 }
 
+__GNUC_ATTRIBUTE_UNUSED__
 static inline void
 modul_set_ul (residueul r, unsigned long s, modulusul m)
 {
@@ -90,6 +95,7 @@ modul_set_ul (residueul r, unsigned long s, modulusul m)
 /* Sets the residue to the class represented by the integer s. Assumes that
    s is reduced (mod m), i.e. 0 <= s < m */
 
+__GNUC_ATTRIBUTE_UNUSED__
 static inline void
 modul_set_ul_reduced (residueul r, unsigned long s, 
                       modulusul m __GNUC_ATTRIBUTE_UNUSED__)
@@ -98,36 +104,42 @@ modul_set_ul_reduced (residueul r, unsigned long s,
   r[0] = s;
 }
 
+__GNUC_ATTRIBUTE_UNUSED__
 static inline void
 modul_initmod_ul (modulusul r, unsigned long s)
 {
   r[0] = s;
 }
 
+__GNUC_ATTRIBUTE_UNUSED__
 static inline void
 modul_clearmod (modulusul m __GNUC_ATTRIBUTE_UNUSED__)
 {
   return;
 }
 
+__GNUC_ATTRIBUTE_UNUSED__
 static inline unsigned long
 modul_get_ul (residueul s, modulusul m __GNUC_ATTRIBUTE_UNUSED__)
 {
   return s[0];
 }
 
+__GNUC_ATTRIBUTE_UNUSED__
 static inline int
 modul_cmp (residueul a, residueul b, modulusul m __GNUC_ATTRIBUTE_UNUSED__)
 {
   return (a[0] < b[0]) ? -1 : ((a[0] == b[0]) ? 0 : 1);
 }
 
+__GNUC_ATTRIBUTE_UNUSED__
 static inline int
 modul_is0 (residueul a, modulusul m __GNUC_ATTRIBUTE_UNUSED__)
 {
   return (a[0] == 0UL);
 }
 
+__GNUC_ATTRIBUTE_UNUSED__
 static inline void
 modul_add (residueul r, residueul a, residueul b, modulusul m)
 {
@@ -141,6 +153,7 @@ modul_add (residueul r, residueul a, residueul b, modulusul m)
 #endif
 }
 
+__GNUC_ATTRIBUTE_UNUSED__
 static inline void
 modul_add_ul (residueul r, residueul a, unsigned long b, modulusul m)
 {
@@ -154,6 +167,7 @@ modul_add_ul (residueul r, residueul a, unsigned long b, modulusul m)
 #endif
 }
 
+__GNUC_ATTRIBUTE_UNUSED__
 static inline void
 modul_sub_ul (residueul r, residueul a, unsigned long b, modulusul m)
 {
@@ -167,6 +181,7 @@ modul_sub_ul (residueul r, residueul a, unsigned long b, modulusul m)
 #endif
 }
 
+__GNUC_ATTRIBUTE_UNUSED__
 static inline void
 modul_neg (residueul r, residueul a, modulusul m)
 {
@@ -176,6 +191,7 @@ modul_neg (residueul r, residueul a, modulusul m)
     r[0] = m[0] - a[0];
 }
 
+__GNUC_ATTRIBUTE_UNUSED__
 static inline void
 modul_sub (residueul r, residueul a, residueul b, modulusul m)
 {
@@ -189,6 +205,7 @@ modul_sub (residueul r, residueul a, residueul b, modulusul m)
 #endif
 }
 
+__GNUC_ATTRIBUTE_UNUSED__
 static inline void
 modul_mul (residueul r, const residueul a, const residueul b, 
            const modulusul m)
@@ -228,6 +245,7 @@ modul_mul (residueul r, const residueul a, const residueul b,
   r[0] = _r;
 }
 
+__GNUC_ATTRIBUTE_UNUSED__
 static inline void
 modul_div2 (residueul r, residueul a, modulusul m)
 {
@@ -235,7 +253,8 @@ modul_div2 (residueul r, residueul a, modulusul m)
   r[0] = (a[0] % 2 == 0) ? (a[0] / 2) : (a[0] / 2 + m[0] / 2 + 1);
 }
 
-void
+__GNUC_ATTRIBUTE_UNUSED__
+static void
 modul_div3 (residueul r, residueul a, modulusul m)
 {
   const unsigned long a3 = a[0] % 3;
@@ -261,6 +280,7 @@ modul_div3 (residueul r, residueul a, modulusul m)
 
 /* Put 1/s (mod t) in r and return 1 if s is invertible, 
    or return 0 if s is not invertible */
+__GNUC_ATTRIBUTE_UNUSED__
 static int
 modul_inv (residueul r, residueul s, modulusul t)
 {
@@ -379,4 +399,5 @@ modul_jacobi (residueul a_par, modulusul m_par)
 #endif
 #ifdef MOD_UL_GNUC_ATTRIBUTE_UNUSED
 #undef __GNUC_ATTRIBUTE_UNUSED__
+#undef MOD_UL_GNUC_ATTRIBUTE_UNUSED
 #endif

@@ -22,8 +22,14 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 */
 
+#ifndef _CADO_H
+#define _CADO_H
+
 #include "gmp.h"
 
+/* The maximum degree of polynomials supported. Used for statically 
+   allocating storage (i.e. "mpz_t poly[MAXDEGREE]") */
+#define MAXDEGREE 10
 /* default degrees for polynomial selection, entries are in digits */
 #define DEFAULT_DEGREES {{70, 3}, {90, 4}, {ULONG_MAX, 5}}
 #define DEFAULT_DEGREES_LENGTH 3
@@ -106,3 +112,5 @@ typedef struct {
   fbroot_t roots[0];      /* the actual length of this array is determined
                              by nr_roots */
 } factorbase_t;
+
+#endif
