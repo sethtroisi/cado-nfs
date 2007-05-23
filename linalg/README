@@ -1,0 +1,12 @@
+2007-05-22: PG: I have included some implementation of Kernel computation
+using Gaussian elimination. This code is not so bad, but is NOT
+reentrant, since some global variables are used (beurk...)
+
+2007-05-23: PG: procrels.c 
+This is a basic filtering tool. For the moment it only removes
+singletons. Problems for the future:
+  1) for the moment it makes two passes on the file, stores a lot in
+  memory, and so on, so this does not scale to huge computations.
+  2) there are still bad complexities parts here and there (possibly
+  quadratic)
+
