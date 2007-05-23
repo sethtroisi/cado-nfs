@@ -535,13 +535,12 @@ int main(int argc, char **argv) {
 
   fprintf(stderr, "nb of rational primes = %d\n", rat_table.length);
   fprintf(stderr, "nb of algebraic primes = %d\n", alg_table.length);
-
+  fprintf(stderr, "Total number of primes = %d\n",
+          rat_table.length + alg_table.length);
 
   for (i = 0; i < nb_rel; ++i) {
     fprint_relation(stdout, rel_table[i]);
   }
-
-
 
   return 0;
 }
