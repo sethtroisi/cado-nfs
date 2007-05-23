@@ -113,4 +113,14 @@ typedef struct {
                              by nr_roots */
 } factorbase_t;
 
+typedef struct {
+  long a;		/* only a is allowed to be negative */
+  unsigned long b;
+  int nb_rp;		/* number of rational primes */
+  int nb_ap;		/* number of algebraic primes */
+  unsigned long * rp;	/* array of rational primes */
+  unsigned long * ap;	/* array of algebraic primes */
+  unsigned long * ar;	/* array of corresponding root (optional, this can
+			   be garbage) */
+} relation_t;
 #endif
