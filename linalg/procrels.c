@@ -367,7 +367,7 @@ void onepass_singleton_removal(relation_t *rel_table, int *nb_rel,
     j = 0;
     for (i = 0; i < l_rat; ++i) {
       if ((ab_single.tab[i].a == 0) && (ab_single.tab[i].b == 0)) {
-	fprintf(stderr, "warning: this p is untouched ! %ld\n", i);
+//	fprintf(stderr, "warning: this p is untouched ! %ld\n", i);
 	continue;
       }
       if ((ab_single.tab[i].a != 1) || (ab_single.tab[i].b != 1)) {
@@ -387,7 +387,7 @@ void onepass_singleton_removal(relation_t *rel_table, int *nb_rel,
     j = 0;
     for (i = 0; i < l_alg; ++i) {
       if ((ab_single.tab[l_rat+i].a == 0) && (ab_single.tab[l_rat+i].b == 0)) {
-        fprintf(stderr, "warning: this p is untouched ! %ld\n", i);
+  //      fprintf(stderr, "warning: this p is untouched ! %ld\n", i);
 	continue;
       }
       if ((ab_single.tab[l_rat+i].a != 1) || (ab_single.tab[l_rat+i].b != 1)) {
@@ -462,6 +462,79 @@ detect_singleton(FILE *file, tab_rootprime_t * alg_table, tab_prime_t * rat_tabl
   return rel_table;
 }
 
+static int 
+isBadPrime(unsigned long p, tab_prime_t bad_primes) {
+  int i;
+  for (i = 0; i < bad_primes.length; ++i) {
+    if (p == bad_primes.tab[i])
+      return 1;
+  }
+  return 0;
+}
+
+
+void 
+fprint_rel_row(FILE *file, relation_t rel, tab_prime_t rat_table, tab_rootprime_t alg_table, tab_prime_t bad_primes) {
+  int i;
+  int *table_ind;
+  int nb_coeff;
+  int index, old_index;
+  int parity;
+
+  fprintf(file, "%ld %lu ", rel.a, rel.b);
+  table_ind = (int*) malloc((rel.nb_rp + rel.nb_ap)*sizeof(int));
+  
+  nb_coeff = 0;
+  index = getindex_rat(rat_table, rel.rp[0]);
+  old_index = index;
+  parity = 1;
+  for (i = 1; i < rel.nb_rp; ++i) {
+    index = getindex_rat(rat_table, rel.rp[i]);
+    if (index == old_index) {
+      parity = 1 - parity;
+    } else {
+      if (parity == 1) {
+	table_ind[nb_coeff++] = old_index;
+      }
+      old_index = index;
+      parity = 1;
+    }
+  }
+  if (parity == 1)
+    table_ind[nb_coeff++] = index;
+
+  i = 0;
+  while (isBadPrime(rel.ap[i], bad_primes))
+    i++;
+  index = getindex_alg(alg_table, rel.ap[i], rel.ar[i]);
+  old_index = index;
+  parity = 1;
+  for (;i < rel.nb_ap; ++i) {
+    if (isBadPrime(rel.ap[i], bad_primes))
+      continue;
+    index = getindex_alg(alg_table, rel.ap[i], rel.ar[i]);
+    if (index == old_index) {
+      parity = 1 - parity;
+    } else {
+      if (parity == 1) {
+	table_ind[nb_coeff++] = old_index;
+      }
+      old_index = index;
+      parity = 1;
+    }
+  }
+  if (parity == 1)
+    table_ind[nb_coeff++] = index;
+
+  fprintf(file, "%lu ", nb_coeff);
+  for (i = 0; i < nb_coeff; ++i) {
+    assert (table_ind[i] != -1);
+    fprintf(file, "%lu ", table_ind[i]);
+  }
+
+  fprintf(file, "\n");
+  free(table_ind);
+}
 
 
 int main(int argc, char **argv) {
@@ -474,19 +547,21 @@ int main(int argc, char **argv) {
   int nb_rel;
   int i;
 
-  if (argc == 1) 
+  if (argc == 1) {
     file = stdin;
-  else {
-    if (argc != 2) {
-      fprintf(stderr, "usage: %s [filename]\n", argv[0]);
-      fprintf(stderr, "  if no filename is given, takes input on stdin\n");
-      exit(1);
-    }
-    file = fopen(argv[1], "r");
-    if (file == NULL) {
-      fprintf(stderr, "problem opening file %s for reading\n", argv[1]);
-      exit(1);
-    }
+    fprintf(stderr, "usage: %s [filename]\n", argv[0]);
+    fprintf(stderr, "  stdin input is not yet available, sorry.\n");
+    exit(1);
+  } 
+  if (argc != 2) {
+    fprintf(stderr, "usage: %s [filename]\n", argv[0]);
+    fprintf(stderr, "  if no filename is given, takes input on stdin\n");
+    exit(1);
+  }
+  file = fopen(argv[1], "r");
+  if (file == NULL) {
+    fprintf(stderr, "problem opening file %s for reading\n", argv[1]);
+    exit(1);
   }
 
   alg_table.allocated = 100;
@@ -538,8 +613,19 @@ int main(int argc, char **argv) {
   fprintf(stderr, "Total number of primes = %d\n",
           rat_table.length + alg_table.length);
 
+  printf("### Column labels:\n");
+  for (i = 0; i < rat_table.length; ++i)
+    printf("%d %lx\n", i, rat_table.tab[i]);
+  for (i = 0; i < alg_table.length; ++i)
+    printf("%d %lx %lx\n", i+rat_table.length, alg_table.tab[i].prime, alg_table.tab[i].root);
+
+  printf("### Matrix:\n");
+  printf("### (format: a b nb_coeff c0 c1 c2 ...)\n");
+  printf("### first line gives nrows, ncols\n");
+  printf("%d %d\n", nb_rel, rat_table.length + alg_table.length);
   for (i = 0; i < nb_rel; ++i) {
-    fprint_relation(stdout, rel_table[i]);
+    //    fprint_relation(stdout, rel_table[i]);
+    fprint_rel_row(stdout, rel_table[i], rat_table, alg_table, bad_primes);
   }
 
   return 0;
