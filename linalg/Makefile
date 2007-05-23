@@ -1,2 +1,8 @@
+CFLAGS=-O2 -g
+LDFLAGS=/usr/lib64/libgmp.a
+
 procrels: procrels.c
-	gcc -I.. -g procrels.c -lgmp
+	gcc $(CFLAGS) -I.. $< $(LDFLAGS) -o $@
+
+clean:
+	\rm procrels
