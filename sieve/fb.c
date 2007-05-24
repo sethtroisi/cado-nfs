@@ -2,6 +2,7 @@
  *                Functions for the factor base                  *
  *****************************************************************/
 
+#include "config.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>

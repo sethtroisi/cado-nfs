@@ -3,6 +3,7 @@
 /* Inputs: amin, amax, b the $a$ range and the line $b$ to sieve */
 /* factorbase, polynomial */
 
+#include "config.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>

@@ -1,16 +1,19 @@
+Create a config.h file with contents like
+
+#define HAVE_MSRH 1
+#define WANT_ASSERT 1
+
 Compile with
 
-gcc -DHAVE_MSRH -DWANT_ASSERT -I ../ -O0 -g -o sieve -Wall -Wextra sieve.c -lm -lgmp
-
-If the compilation fails because asm/msr.h is not found, remove -DHAVE_MSRH.
+gcc -I ../ -O0 -g -o sieve -Wall -Wextra sieve.c fb.c -lm -lgmp
 
 (Note: linking GMP statically with /usr/lib/libgmp.a for example may yield a
 speedup up to 7%.)
 
 or, if you're like me and have compiled a static GMP with full frame pointer 
-support for debugging, use i.e.
+support for debugging on 32 bit machines, use i.e.
 
-gcc -DHAVE_MSRH -DWANT_ASSERT -I ../ -O0 -g -o sieve -Wall -Wextra sieve.c -lm /usr/local/lib/libgmp_fp.a
+gcc -I ../ -O0 -g -o sieve -Wall -Wextra sieve.c -lm /usr/local/lib/libgmp_fp.a
 
 Make a factor base with, for example,
 
@@ -20,4 +23,4 @@ Run the siever with
 
 ./sieve -poly c80.poly -fb c80.roots.txt -1000000 1000000 2001 2101
 
-where c80.poly is the polynomial.
+where c80.poly is the polynomial file.
