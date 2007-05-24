@@ -115,6 +115,7 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
     {
       printf ("# Making factor base for polynomial g(x) = ");
       mp_poly_print (poly, 1, "");
+      printf ("\n");
     }
 
   p = 2;

@@ -222,6 +222,8 @@ iscomposite (const fbprime_t n)
   return 0;
 }
 
+#if 0
+/* Buggy ? */
 static unsigned long
 gcd (unsigned long a, unsigned long b)
 {
@@ -259,6 +261,28 @@ gcd (unsigned long a, unsigned long b)
 
   return b32;
 }
+#else
+static unsigned long
+gcd (unsigned long a, unsigned long b)
+{
+  unsigned long t;
+
+  ASSERT (b > 0);
+  
+  if (a >= b)
+    a %= b;
+
+  while (a > 0)
+    {
+      /* Here 0 < a < b */
+      t = b % a;
+      b = a;
+      a = t;
+    }
+
+  return b;
+}
+#endif
 
 static unsigned char
 log_norm (const double *f, const int deg, const double x, 
@@ -291,15 +315,15 @@ compute_norms (unsigned char *sievearray, const long amin, const long amax,
   double bpow;
   unsigned long long tsc1, tsc2;
   const double log_proj_roots = log(proj_roots) * log_scale;
-  const long eff_amin = amin + ((odd && amin % 2 == 0) ? 1L : 0L);
-  const long eff_amax = amax - ((odd && amax % 2 == 0) ? 1L : 0L);
   long a, a2;
   int i;
   unsigned char n1, n2, nmax;
   const int stride = 128;
   
-  ASSERT_ALWAYS (odd == 0 || odd == 1);
-  ASSERT_ALWAYS (amin < amax);
+  ASSERT (odd == 0 || odd == 1);
+  ASSERT (!odd || (amin & 1) == 1);
+  ASSERT (!odd || (amax & 1) == 1);
+  ASSERT (amin <= amax);
 
   rdtscll (tsc1);
   
@@ -310,19 +334,19 @@ compute_norms (unsigned char *sievearray, const long amin, const long amax,
       bpow *= (double) b;
     }
   
-  n1 = log_norm (f, deg, (double) eff_amin, log_scale, log_proj_roots);
+  n1 = log_norm (f, deg, (double) amin, log_scale, log_proj_roots);
   nmax = n1;
 
-  a = eff_amin;
-  a2 = eff_amin;
-  /* a == eff_amin + (d << odd), d = (a - eff_amin) >> odd */
+  a = amin;
+  a2 = amin;
+  /* a == amin + (d << odd), d = (a - amin) >> odd */
 
-  while (a <= eff_amax)
+  while (a <= amax)
     {
       /* We'll cover [a ... a2[ now */
       ASSERT (a == a2);
       ASSERT (n1 == log_norm (f, deg, (double) a, log_scale, log_proj_roots));
-      a2 = MIN(a + stride, eff_amax + (1 << odd));
+      a2 = MIN(a + stride, amax + (1 << odd));
       ASSERT (!odd || (a2 - a) % 2 == 0);
       
       n2 = log_norm (f, deg, (double) a2, log_scale, log_proj_roots);
@@ -330,7 +354,7 @@ compute_norms (unsigned char *sievearray, const long amin, const long amax,
       if (n1 == n2) 
 	{
 	  /* Let's assume the log norm is n1 everywhere in this interval */
-	  memset (sievearray + ((a - eff_amin) >> odd), n1, (a2 - a) >> odd);
+	  memset (sievearray + ((a - amin) >> odd), n1, (a2 - a) >> odd);
 	}
       else
 	{
@@ -338,13 +362,13 @@ compute_norms (unsigned char *sievearray, const long amin, const long amax,
 	     individually */
 	  /* printf ("log_c(F(%ld, %lu)) == %d != log_c(F(%ld, %lu)) == %d\n",
 	     a, b, n1, a2, b, n2); */
-	  sievearray[(a - eff_amin) >> odd] = n1;
+	  sievearray[(a - amin) >> odd] = n1;
 	  a += 1 << odd;
 	  for ( ; a < a2; a += 1 << odd)
 	    {
 	      unsigned char n = log_norm (f, deg, (double) a, log_scale, 
 					  log_proj_roots);
-	      sievearray[(a - eff_amin) >> odd] = n;
+	      sievearray[(a - amin) >> odd] = n;
 	      if (n > nmax)
 		nmax = n;
 	    }
@@ -364,11 +388,11 @@ compute_norms (unsigned char *sievearray, const long amin, const long amax,
 #endif
   
 #ifdef PARI
-  for (a = eff_amin; a <= eff_amax; a += 1 << odd)
+  for (a = amin; a <= amax; a += 1 << odd)
     printf ("if(log_c(%c(%ld, %lu), %f) != %d,"
 	    "print (\"log_c(%c(\", %ld,\", \", %lu\"), %f) \", %d)) /* PARI */\n", 
-	    deg > 1 ? 'F' : 'G', a, b, log_proj_roots, sievearray[(a - eff_amin) >> odd],
-	    deg > 1 ? 'F' : 'G', a, b, log_proj_roots, sievearray[(a - eff_amin) >> odd]); 
+	    deg > 1 ? 'F' : 'G', a, b, log_proj_roots, sievearray[(a - amin) >> odd],
+	    deg > 1 ? 'F' : 'G', a, b, log_proj_roots, sievearray[(a - amin) >> odd]); 
 #endif
 
   return nmax;
@@ -387,17 +411,18 @@ sieve (unsigned char *sievearray, factorbase_t *fb,
        const fbprime_t useful_threshold, const unsigned int useful_length_par,
        const int odd)
 {
-  /* The sievearray[0] entry corresponds to (eff_amin, b), and
-     sievearray[d] to (eff_amin + d * (1 + odd), b) */
-  const long eff_amin = amin + ((odd && amin % 2 == 0) ? 1L : 0L);
-  const long eff_amax = amax - ((odd && amax % 2 == 0) ? 1L : 0L);
+  /* The sievearray[0] entry corresponds to (amin, b), and
+     sievearray[d] to (amin + d * (1 + odd), b) */
   fbprime_t *useful_primes = useful_primes_par;
-  const uint32_t l = eff_amax - eff_amin + 1;
+  const uint32_t l = (amax - amin) / (1 + odd) + 1;
   uint32_t i, amin_p, p, d;
   unsigned int useful_length = useful_length_par;
   unsigned char plog;
 
-  ASSERT_ALWAYS (amax > amin);
+  ASSERT (odd == 0 || odd == 1);
+  ASSERT (!odd || (amin & 1) == 1);
+  ASSERT (!odd || (amax & 1) == 1);
+  ASSERT (amin <= amax);
 
   if (useful_length > 0)
     useful_length--; /* Make sure we have space for a 0 mark at the end */
@@ -414,14 +439,14 @@ sieve (unsigned char *sievearray, factorbase_t *fb,
 	 sievearray[0] */
       /* FIXME This modular reduction should be simplified somehow. Do it 
 	 once and store it in fb? */
-      if (eff_amin < 0)
+      if (amin < 0)
 	{
-	  amin_p = p - ((unsigned long)(-eff_amin) % p);
+	  amin_p = p - ((unsigned long)(-amin) % p);
 	  if (amin_p == p)
 	    amin_p = 0; /* FIXME ugly */
 	}
       else
-        amin_p = (unsigned long) eff_amin % p;
+        amin_p = (unsigned long) amin % p;
 
       for (i = 0; i < fb->nr_roots; i++)
         {
@@ -430,8 +455,8 @@ sieve (unsigned char *sievearray, factorbase_t *fb,
 
           /* Find first index in sievearray where p on this root divides.
              So we want a/b == r (mod p) <=> a == br (mod p). Then we want
-             d so that eff_amin + d * (1 + odd) == a (mod p) 
-	     <=> d == (a - eff_amin) / (1 + odd) (mod p) */
+             d so that amin + d * (1 + odd) == a (mod p) 
+	     <=> d == (a - amin) / (1 + odd) (mod p) */
 	  ASSERT (fb->roots[i] < p);
 	  ASSERT (b % p != 0);
 	  mod_initmod_ul (m, p); /* Most of the mod_*() calls are no-ops */
@@ -676,26 +701,27 @@ find_sieve_reports (const unsigned char *sievearray, long *reports,
                     const int odd, const int verbose)
 {
   long long tsc1, tsc2;
-  const long eff_amin = amin + ((odd && amin % 2 == 0) ? 1 : 0);
-  const long eff_amax = amax + ((odd && amax % 2 == 0) ? 1 : 0);
   long a;
   unsigned long reports_nr, odd_b = b, d;
   
   ASSERT (odd == 0 || odd == 1);
+  ASSERT (!odd || (amin & 1) == 1);
+  ASSERT (!odd || (amax & 1) == 1);
+  ASSERT (amin <= amax);
 
   rdtscll (tsc1);
   reports_nr = 0;
   if (odd) /* If all $a$ are odd, we can divide 2's out of $b$ for the gcd */
     for (odd_b = b; odd_b % 2 == 0; odd_b >>= 1);
 
-  for (a = eff_amin, d = 0; reports_nr < reports_len && a <= eff_amax; 
+  for (a = amin, d = 0; reports_nr < reports_len && a <= amax; 
        a += 1 << odd, d++)
     {
       /* The + 10 is to deal with accumulated rounding that might have
 	 cause the sieve value to drop below 0 and wrap around */
       if ((unsigned char) (sievearray[d] + 10) <= reports_threshold + 10)
         {
-	  ASSERT (a = eff_amin + (d << odd));
+	  ASSERT (a = amin + (d << odd));
           if (gcd(labs(a), odd_b) == 1)
 	    reports[reports_nr++] = a;
         }
@@ -725,16 +751,18 @@ sieve_one_side (unsigned char *sievearray, factorbase_t *fb,
 {
   long long tsc1, tsc2;
   unsigned long reports_nr;
-  int odd = (b % 2 == 0) ? 1 : 0; /* If odd = 1, only odd $a$ are sieved */
+  const int odd = 1 - (b & 1); /* If odd=1, only odd $a$ are sieved */
+  const long eff_amin = amin + ((odd && (amin & 1) == 0) ? 1 : 0);
+  const long eff_amax = amax - ((odd && (amax & 1) == 0) ? 1 : 0);
 
   fb_disable_roots (fb, b, verbose);
   
-  compute_norms (sievearray, amin, amax, b, dpoly, deg, proj_roots, 
+  compute_norms (sievearray, eff_amin, eff_amax, b, dpoly, deg, proj_roots, 
 		 log_scale, odd, verbose);
   
   rdtscll (tsc1);
-  sieve (sievearray, fb, amin, amax, b, reports_threshold, useful_primes, 
-	 useful_threshold, useful_length, odd);
+  sieve (sievearray, fb, eff_amin, eff_amax, b, reports_threshold, 
+	 useful_primes, useful_threshold, useful_length, odd);
   rdtscll (tsc2);
 #ifdef HAVE_MSRH
   if (verbose)
@@ -748,8 +776,8 @@ sieve_one_side (unsigned char *sievearray, factorbase_t *fb,
   
   /* Store the sieve reports */
   reports_nr = find_sieve_reports (sievearray, reports, reports_len, 
-				   reports_threshold, amin, amax, b, odd, 
-				   verbose);
+				   reports_threshold, eff_amin, eff_amax, b, 
+				   odd, verbose);
 
   return reports_nr;
 }
