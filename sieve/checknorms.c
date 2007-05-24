@@ -13,6 +13,11 @@
 /* FIXME: should be shared with sieve.c */
 #define MAXDEGREE 10
 
+/* number of Miller-Rabin tests in mpz_probab_prime_p */
+#define REPS 10
+
+#define MAXREL_LENGTH 1024 /* max length in characters of a relation */
+
 /* FIXME: should be shared with sieve.c */
 #define TYPE_STRING 0
 #define TYPE_MPZ 1
@@ -206,13 +211,13 @@ eval_algebraic (mpz_t norm, mpz_t *f, int d, long a, unsigned long b)
 
 /* check sb < p */
 void
-check_prime (mpz_t p, unsigned long sb)
+check_prime (mpz_t p, unsigned long sb, long a, unsigned long b)
 {
   static unsigned long reports = 0;
   if (mpz_cmp_ui (p, sb) <= 0)
     {
       if (++reports <= 10)
-	gmp_fprintf (stderr, "Warning, prime %Zd smaller than factor base bound %lu\n", p, sb);
+	gmp_fprintf (stderr, "Warning, (a=%ld,b=%lu): prime %Zd smaller than factor base bound %lu\n", a, b, p, sb);
     }
 }
 
@@ -228,7 +233,7 @@ factor (mpz_t p1, mpz_t p2, mpz_t norm, size_t lp, int verbose)
 {
   if (mpz_cmp_ui (norm, 1) == 0)
     return 0;
-  else if (mpz_probab_prime_p (norm, 1))
+  else if (mpz_probab_prime_p (norm, REPS))
     {
       if (mpz_sizeinbase (norm, 2) > lp)
 	return 3;
@@ -265,7 +270,7 @@ factor (mpz_t p1, mpz_t p2, mpz_t norm, size_t lp, int verbose)
       /* we also want p2 < 2^lp */
       if (mpz_sizeinbase (p2, 2) > lp)
         return 3;
-      if (mpz_probab_prime_p (p1, 1) && mpz_probab_prime_p (p2, 1))
+      if (mpz_probab_prime_p (p1, REPS) && mpz_probab_prime_p (p2, REPS))
 	return 2;
       else
 	{
@@ -275,7 +280,14 @@ factor (mpz_t p1, mpz_t p2, mpz_t norm, size_t lp, int verbose)
     }
 }
 
-#define MAXREL_LENGTH 200 /* max length in characters of a relation */
+int
+coprime (long a, unsigned long b, mpz_t t, mpz_t u)
+{
+  mpz_set_si (t, a);
+  mpz_set_ui (u, b);
+  mpz_gcd (t, t, u);
+  return mpz_cmp_ui (t, 1) == 0;
+}
 
 unsigned long
 checkrels (char *f, cado_poly cpoly, int verbose, size_t mfbr, size_t mfba)
@@ -316,8 +328,19 @@ checkrels (char *f, cado_poly cpoly, int verbose, size_t mfbr, size_t mfba)
       c = fscanf (fp, "%ld,%lu:", &a, &b);
       if (c == 0 || c == EOF)
 	break;
+
       ok = 1;
       len += sprintf (s, "%ld,%lu:", a, b);
+
+      /* check a and b are coprime */
+      if (coprime (a, b, p1, p2) == 0)
+        {
+          static unsigned long report = 0;
+          if (report ++ < 10)
+            fprintf (stderr, "Warning, discard relation (%ld,%lu) since a,b are not coprime\n", a, b);
+          //          exit (EXIT_FAILURE);
+          goto end;
+        }
 
       /* evaluate norm on rational side */
       eval_rational (norm, cpoly->g, a, b);
@@ -351,12 +374,12 @@ checkrels (char *f, cado_poly cpoly, int verbose, size_t mfbr, size_t mfba)
 	  ok ++;
 	  if (nb >= 1)
 	    {
-	      check_prime (p1, cpoly->rlim);
+	      check_prime (p1, cpoly->rlim, a, b);
 	      len += gmp_sprintf (s + len, ",%Zx", p1);
 	    }
 	  if (nb == 2)
 	    {
-	      check_prime (p2, cpoly->rlim);
+	      check_prime (p2, cpoly->rlim, a, b);
 	      len += gmp_sprintf (s + len, ",%Zx", p2);
 	    }
 	}
@@ -396,12 +419,12 @@ checkrels (char *f, cado_poly cpoly, int verbose, size_t mfbr, size_t mfba)
 	  ok ++;
 	  if (nb >= 1)
 	    {
-	      check_prime (p1, cpoly->alim);
+	      check_prime (p1, cpoly->alim, a, b);
 	      len += gmp_sprintf (s + len, ",%Zx", p1);
 	    }
 	  if (nb == 2)
 	    {
-	      check_prime (p2, cpoly->alim);
+	      check_prime (p2, cpoly->alim, a, b);
 	      len += gmp_sprintf (s + len, ",%Zx", p2);
 	    }
 	}
