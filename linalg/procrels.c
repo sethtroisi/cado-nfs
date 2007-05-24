@@ -7,6 +7,7 @@
 #include "relation.h"
 
 
+// Data structure for one algebraic prime and for a table of those.
 typedef struct {
   unsigned long prime;
   unsigned long root;
@@ -18,12 +19,14 @@ typedef struct {
   unsigned long length;
 } tab_rootprime_t;
 
+// Data structure for a table of rational primes.
 typedef struct {
   unsigned long *tab;
   unsigned long allocated;
   unsigned long length;
 } tab_prime_t;
 
+// Data strucutre for an (a,b) pair and for a table of those
 typedef struct {
   long a;
   unsigned long b;
@@ -35,46 +38,20 @@ typedef struct {
   unsigned long length;
 } tab_abpair_t;
 
+// Table of relations.
+typedef struct {
+  relation_t *tab;
+  unsigned long allocated;
+  unsigned long length;
+} tab_relation_t;
 
 
-// TODO: share this with sieve.c
-static unsigned long
-iscomposite (const unsigned long n)
-{
-  unsigned long i, i2;
 
-  if (n % 2 == 0)
-    return (n == 2) ? 0 : 2;
-
-  /* (i + 2)^2 = i^2 + 4*i + 4 */
-  for (i = 3, i2 = 9; i2 <= n; i2 += (i+1) * 4, i += 2)
-    if (n % i == 0)
-        return i;
-
-  return 0;
-}
-
+// Append an algebraic prime to a table.
 void
 add_alg_rootprime(tab_rootprime_t *table, tab_prime_t *bad_primes,
-    unsigned long p, long a, unsigned long b) {
-  unsigned long r, t;
-  unsigned long pa;
-  int sig, inv;
-
-  if (a >= 0) {
-    pa = (unsigned long)a;
-    sig = 1;
-  } else {
-    pa = (unsigned long)(-a);
-    sig = -1;
-  }
-
-  inv = modul_inv(&t, &b, &p);
-  if (inv) {
-    modul_mul(&r, &t, &pa, &p);
-    if (sig == -1)
-      modul_neg(&r, &r, &p);
-
+    unsigned long p,  unsigned long r) {
+  if (r != -1) {
     if (table->allocated == table->length) {
       table->allocated += 100;
       table->tab = (rootprime_t *)realloc((void *)table->tab, (table->allocated)*sizeof(rootprime_t));
@@ -94,6 +71,7 @@ add_alg_rootprime(tab_rootprime_t *table, tab_prime_t *bad_primes,
   }
 }
 
+// Append a rational prime to a table.
 void 
 add_rat_prime(tab_prime_t *table, unsigned long p) {
   if (table->allocated == table->length) {
@@ -105,68 +83,29 @@ add_rat_prime(tab_prime_t *table, unsigned long p) {
   table->length++;
 }
 
-// When entering this function, the first colon has been read.
-void 
-update_one_line(FILE *file, tab_rootprime_t *alg_table, tab_prime_t *rat_table,
-    tab_prime_t * bad_primes, long a, unsigned long b) {
-  char c;
-  unsigned long p;
 
-  do {
-    c = fgetc(file);
-    if (c == ':') 
-      break;
-    if (c != ',')
-      ungetc(c, file);
-    fscanf(file, "%lx", &p);
-    add_rat_prime(rat_table, p);
-  } while (1);
-
-  do {
-    c = fgetc(file);
-    if (c == '\n') 
-      break;
-    if (c != ',')
-      ungetc(c, file);
-    fscanf(file, "%lx", &p);
-    add_alg_rootprime(alg_table, bad_primes, p, a, b);
-  } while (1);
-}
-
+// Create tables with primes that occur in relations.
+// one structure for rational side, one for algebraic side, and one for
+// bad primes (i.e. those that divide leading coefficient of polynomial).
 void
-update_tables(FILE *file, tab_rootprime_t *alg_table, tab_prime_t *rat_table,
+update_tables(tab_relation_t *rel_table, tab_rootprime_t *alg_table, tab_prime_t *rat_table,
     tab_prime_t *bad_primes) {
   long a;
   unsigned long b;
-  int c;
-  int sig;
-  int cpt = 0;
+  int i, j;
+  relation_t *rel;
 
-  do {
-    c = fgetc(file);
-    if (c == EOF) 
-      break;
-    if (c == '#') {
-      do {
-	c = fgetc(file);
-      } while (c != '\n');
-      continue;
-    }
-    if (c == '-')
-      sig = -1;
-    else {
-      sig = 1;
-      ungetc(c, file);
-    }
-    fscanf(file, "%lu,%lu:", &a, &b);
-    a *= sig;
-    cpt++;
-    update_one_line(file, alg_table, rat_table, bad_primes, a, b);
-    if ((cpt % 1000) == 0)
-      fprintf(stderr, "have read %d rels\n", cpt);
-  } while (1);
+  for (i = 0; i < rel_table->length; ++i) {
+    rel = &rel_table->tab[i];
+    for (j = 0; j < rel->nb_rp; ++j)
+      add_rat_prime(rat_table, rel->rp[j]);
+    for (j = 0; j < rel->nb_ap; ++j)
+      add_alg_rootprime(alg_table, bad_primes, rel->ap[j], rel->ar[j]);
+  }
 }
 
+// Some utilities (for searching, sorting, etc) on algebraic and rational
+// primes.
 static int
 cmpprimes(const void *p, const void *q) {
   unsigned long pp, qq;
@@ -313,7 +252,12 @@ getindex_alg(tab_rootprime_t alg_table, unsigned long p, unsigned long r) {
   return -1;
 }
 
-void onepass_singleton_removal(relation_t *rel_table, int *nb_rel, 
+
+// This function does one pass of singleton removal.
+// After having detected which primes occur only once (and the
+// corresponding (a,b) pairs), those primes are deleted of the tables and
+// the corresponding relations are removed from the table of relation.
+void onepass_singleton_removal(tab_relation_t *rel_table, 
     tab_rootprime_t * alg_table, tab_prime_t * rat_table) {
   long l_rat, l_alg;
   int i, j;
@@ -330,31 +274,32 @@ void onepass_singleton_removal(relation_t *rel_table, int *nb_rel,
     ab_single.tab[i].b = 0;
   }
 
-  for (i = 0; i < *nb_rel; ++i) {
+  for (i = 0; i < rel_table->length; ++i) {
     int j;
-    for (j = 0; j < rel_table[i].nb_rp; ++j) {
+    relation_t *rel = &(rel_table->tab[i]);
+    for (j = 0; j < rel->nb_rp; ++j) {
       int index;
-      index = getindex_rat(*rat_table, rel_table[i].rp[j]);
+      index = getindex_rat(*rat_table, rel->rp[j]);
       if (index == -1)
 	continue;
       if ((ab_single.tab[index].a == 0) && (ab_single.tab[index].b == 0)) {
-	ab_single.tab[index].a = rel_table[i].a;
-	ab_single.tab[index].b = rel_table[i].b;
-      } else if ((ab_single.tab[index].a != rel_table[i].a) || (ab_single.tab[index].b != rel_table[i].b)) {
+	ab_single.tab[index].a = rel->a;
+	ab_single.tab[index].b = rel->b;
+      } else if ((ab_single.tab[index].a != rel->a) || (ab_single.tab[index].b != rel->b)) {
 	ab_single.tab[index].a = 1;
 	ab_single.tab[index].b = 1;
       }
     }
-    for (j = 0; j < rel_table[i].nb_ap; ++j) {
+    for (j = 0; j < rel->nb_ap; ++j) {
       int index;
-      index = getindex_alg(*alg_table, rel_table[i].ap[j], rel_table[i].ar[j]);
+      index = getindex_alg(*alg_table, rel->ap[j], rel->ar[j]);
       if (index == -1)
 	continue;
       index += l_rat;
       if ((ab_single.tab[index].a == 0) && (ab_single.tab[index].b == 0)) {
-	ab_single.tab[index].a = rel_table[i].a;
-	ab_single.tab[index].b = rel_table[i].b;
-      } else if ((ab_single.tab[index].a != rel_table[i].a) || (ab_single.tab[index].b != rel_table[i].b)) {
+	ab_single.tab[index].a = rel->a;
+	ab_single.tab[index].b = rel->b;
+      } else if ((ab_single.tab[index].a != rel->a) || (ab_single.tab[index].b != rel->b)) {
 	ab_single.tab[index].a = 1;
 	ab_single.tab[index].b = 1;
       }
@@ -406,60 +351,29 @@ void onepass_singleton_removal(relation_t *rel_table, int *nb_rel,
   // through all relations).
   qsort(ab_single.tab, l_alg+l_rat, sizeof(abpair_t), cmpabpairs);
   {
-    relation_t * ptab = rel_table;
+    relation_t * ptab = rel_table->tab;
     j = 0;
-    for (i = 0; i < *nb_rel; ++i) {
-      if (getindex_abpair(ab_single, rel_table[i].a, rel_table[i].b) == -1) {
-	copy_rel(&(ptab[j]), rel_table[i]);
+    for (i = 0; i < rel_table->length; ++i) {
+      if (getindex_abpair(ab_single, rel_table->tab[i].a, rel_table->tab[i].b) == -1) {
+	copy_rel(&(ptab[j]), rel_table->tab[i]);
 	j++;
       }
     }
-    *nb_rel = j;
+    rel_table->length = j;
   }
-  fprintf(stderr, "%d relations remain\n", *nb_rel);
+  fprintf(stderr, "%d relations remain\n", rel_table->length);
+  free(ab_single.tab);
 }
 
-
-
-
-
-
-relation_t *
-detect_singleton(FILE *file, tab_rootprime_t * alg_table, tab_prime_t * rat_table, int *nb_rel) {
-  long l_rat, l_alg;
-  relation_t *rel_table;
-  relation_t rel;
-  int alloced = 100;
-  int ret, i;
-
-  rel_table = (relation_t *) malloc(alloced*sizeof(relation_t));
- 
-  *nb_rel = 0;
+void
+remove_singletons(tab_relation_t *rel_table, tab_rootprime_t * alg_table,
+    tab_prime_t * rat_table) {
+  int old_nb;
   do {
-    if (*nb_rel == (alloced - 1)) {
-      alloced += 100;
-      rel_table = (relation_t *) realloc(rel_table, alloced*sizeof(relation_t));
-    }
-    ret = fread_relation(file, &(rel_table[*nb_rel]));
-    if (ret == 1)
-      (*nb_rel)++;
-  } while (ret == 1);
-
-  fprintf(stderr, "loaded %d relations\n", *nb_rel);
-
-  for (i = 0; i < *nb_rel; ++i) 
-    computeroots(&(rel_table[i]));
-
-  {
-    int old_nb;
-    do {
-      old_nb = *nb_rel;
-      fprintf(stderr, "** Do one pass of singleton removal...\n");
-      onepass_singleton_removal(rel_table, nb_rel, alg_table, rat_table);
-    } while (*nb_rel != old_nb);
-  }
-
-  return rel_table;
+    old_nb = rel_table->length;
+    fprintf(stderr, "** Do one pass of singleton removal...\n");
+    onepass_singleton_removal(rel_table, alg_table, rat_table);
+  } while (rel_table->length != old_nb);
 }
 
 static int 
@@ -473,6 +387,8 @@ isBadPrime(unsigned long p, tab_prime_t bad_primes) {
 }
 
 
+// Print relations in a matrix format:
+// don't take into account bad primes and even powers of primes.
 void 
 fprint_rel_row(FILE *file, relation_t rel, tab_prime_t rat_table, tab_rootprime_t alg_table, tab_prime_t bad_primes) {
   int i;
@@ -536,15 +452,50 @@ fprint_rel_row(FILE *file, relation_t rel, tab_prime_t rat_table, tab_rootprime_
   free(table_ind);
 }
 
+// Read all relations from file.
+// NB: the NULL assignments to pointers are to help freeing.
+int
+fread_relations(FILE *file, tab_relation_t *rel_table) {
+  int ret, i;
+  rel_table->allocated = 100;
+  rel_table->tab = (relation_t *) malloc(rel_table->allocated*sizeof(relation_t));
+  rel_table->length = 0;
+ 
+  do {
+    if (rel_table->length == (rel_table->allocated - 1)) {
+      rel_table->allocated += 100;
+      rel_table->tab = (relation_t *) realloc(rel_table->tab, rel_table->allocated*sizeof(relation_t));
+      for (i = rel_table->allocated-100; i < rel_table->allocated; ++i) {
+	rel_table->tab[i].rp = NULL;
+	rel_table->tab[i].ap = NULL;
+	rel_table->tab[i].ar = NULL;
+      }
+    }
+    ret = fread_relation(file, &(rel_table->tab[rel_table->length]));
+    if (ret == 1)
+      (rel_table->length)++;
+  } while (ret == 1);
+
+  if (ret == 0) {
+    fprintf(stderr, "Warning: error when reading relation nb %d\n", rel_table->length);
+  }
+
+  fprintf(stderr, "loaded %d relations\n", rel_table->length);
+
+  for (i = 0; i < rel_table->length; ++i) 
+    computeroots(&(rel_table->tab[i]));
+  
+  return (ret == -1);
+}
+
 
 int main(int argc, char **argv) {
-  char filename[] = "rels";
   tab_rootprime_t alg_table;
   tab_prime_t rat_table, bad_primes;
   tab_abpair_t ab_single;
   FILE *file;
-  relation_t * rel_table;
-  int nb_rel;
+  tab_relation_t rel_table;
+  int ret;
   int i;
 
   if (argc == 1) {
@@ -576,7 +527,12 @@ int main(int argc, char **argv) {
   bad_primes.length = 0;
   bad_primes.tab = (unsigned long *)malloc(bad_primes.allocated*sizeof(unsigned long));
 
-  update_tables(file, &alg_table, &rat_table, &bad_primes);
+  fprintf(stderr, "reading file of relations...\n");
+  ret = fread_relations(file, &rel_table);
+  assert (ret);
+
+  fprintf(stderr, "creating tables of primes...\n");
+  update_tables(&rel_table, &alg_table, &rat_table, &bad_primes);
   
   fprintf(stderr, "sorting...\n");
   qsort((void *)rat_table.tab, rat_table.length, sizeof(unsigned long), cmpprimes);
@@ -588,21 +544,9 @@ int main(int argc, char **argv) {
   qsort((void *)alg_table.tab, alg_table.length, sizeof(rootprime_t), cmprootprimes);
   uniqrootprimes(&alg_table);
 
-  rewind(file);
+  fprintf(stderr, "starting singleton removal...\n");
+  remove_singletons(&rel_table, &alg_table, &rat_table);
 
-
-  rel_table = detect_singleton(file, &alg_table, &rat_table, &nb_rel);
-
-  fclose(file);
-
-#if 0
-  printf("primes = \n");
-  for (i = 0; i < rat_table.length; ++i)
-    printf("%lx ", rat_table.tab[i]);
-  printf("\nrootprimes = \n");
-  for (i = 0; i < alg_table.length; ++i)
-    printf("(%lx,%lx) ", alg_table.tab[i].prime, alg_table.tab[i].root);
-#endif
   fprintf(stderr, "\nbadprimes = \n");
   for (i = 0; i < bad_primes.length; ++i)
     fprintf(stderr, "%lu ", bad_primes.tab[i]);
@@ -613,22 +557,23 @@ int main(int argc, char **argv) {
   fprintf(stderr, "Total number of primes = %d\n",
           rat_table.length + alg_table.length);
 
-#if 0
-  printf("### Column labels:\n");
-  for (i = 0; i < rat_table.length; ++i)
-    printf("%d %lx\n", i, rat_table.tab[i]);
-  for (i = 0; i < alg_table.length; ++i)
-    printf("%d %lx %lx\n", i+rat_table.length, alg_table.tab[i].prime, alg_table.tab[i].root);
-
-  printf("### Matrix:\n");
-  printf("### (format: a b nb_coeff c0 c1 c2 ...)\n");
-  printf("### first line gives nrows, ncols\n");
-#endif
-  printf("%d %d\n", nb_rel, rat_table.length + alg_table.length);
-  for (i = 0; i < nb_rel; ++i) {
-    //    fprint_relation(stdout, rel_table[i]);
-    fprint_rel_row(stdout, rel_table[i], rat_table, alg_table, bad_primes);
+  printf("%d %d\n", rel_table.length, rat_table.length + alg_table.length);
+  for (i = 0; i < rel_table.length; ++i) {
+    fprint_rel_row(stdout, rel_table.tab[i], rat_table, alg_table, bad_primes);
   }
+
+  for (i = 0; i < rel_table.allocated; ++i) {
+    if (rel_table.tab[i].rp != NULL)
+      free(rel_table.tab[i].rp);
+    if (rel_table.tab[i].ap != NULL)
+      free(rel_table.tab[i].ap);
+    if (rel_table.tab[i].ar != NULL)
+      free(rel_table.tab[i].ar);
+  }
+  free(rel_table.tab);
+  free(bad_primes.tab);
+  free(rat_table.tab);
+  free(alg_table.tab);
 
   return 0;
 }
