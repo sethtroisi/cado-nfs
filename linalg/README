@@ -1,12 +1,25 @@
-2007-05-22: PG: I have included some implementation of Kernel computation
-using Gaussian elimination. This code is not so bad, but is NOT
-reentrant, since some global variables are used (beurk...)
+Two binaries in this subdir:
+  procrels
+  linalg
 
-2007-05-23: PG: procrels.c 
-This is a basic filtering tool. For the moment it only removes
-singletons. Problems for the future:
-  1) for the moment it makes two passes on the file, stores a lot in
-  memory, and so on, so this does not scale to huge computations.
-  2) there are still bad complexities parts here and there (possibly
-  quadratic)
+Makefile should do the compilation (nothing problematic, here).
+
+Assume that the output of checknorms is in a file called rels.
+Then you can type:
+$ ./procrels rels > mat
+
+On stderr, there is some diagnostic messages. In particular you'll get
+the number of relations after singleton removal and the number of primes
+on each side. If you want to be sure to have a non-trivial kernel, you
+should check that there are more relations than the sum of the two number
+of primes.
+
+On stdin (redirected to file mat in the example), procrels will create
+data describing the matrix. This include the labels (a,b) for each row.
+
+Now you can type:
+$ ./linalg mat > ker
+
+This will compute the kernel of the matrix and print it to ker. For the
+moment the output format is not fixed.
 
