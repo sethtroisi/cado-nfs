@@ -32,7 +32,7 @@
 #define REFAC_PRP_SIZE_THRES 50
 #define REFAC_PRP_THRES 500
 #define SIEVE_PERMISSIBLE_ERROR 5
-#define REPS 10 /* number of tests in mpz_probab_prime_p */
+#define REPS 1 /* number of tests in mpz_probab_prime_p */
 
 /*****************************************************************
  *                      Functions for calculus                   *
@@ -991,6 +991,7 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
 		  printf ("%x%s", primes_r[k], k+1==nr_primes_r?":":",");
 	      for (k = 0; k < nr_primes_a; k++)
 		  printf ("%x%s", primes_a[k], k+1==nr_primes_a?"\n":",");
+              fflush (stdout);
 	  }
       }
 
