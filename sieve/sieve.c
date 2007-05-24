@@ -32,6 +32,7 @@
 #define REFAC_PRP_SIZE_THRES 50
 #define REFAC_PRP_THRES 500
 #define SIEVE_PERMISSIBLE_ERROR 5
+#define REPS 10 /* number of tests in mpz_probab_prime_p */
 
 /*****************************************************************
  *                      Functions for calculus                   *
@@ -810,7 +811,7 @@ trialdiv_one_prime (const fbprime_t q, mpz_t C, unsigned int *nr_primes_a,
 #else
 	   mpz_sizeinbase (C, 2) <= REFAC_PRP_SIZE_THRES
 #endif
-	   && mpz_probab_prime_p (C, 1)))
+	   && mpz_probab_prime_p (C, REPS)))
         {
           is_prp = 1;
         }
