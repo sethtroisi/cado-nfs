@@ -28,7 +28,7 @@ void
 readmat(FILE *file, sparse_mat_t *mat) {
   int ret;
   int alloced;
-  int used;
+  int used=0;
   int i, j;
   double wt = 0;
   ret = fscanf(file, "%d %d", &(mat->nrows), &(mat->ncols));
@@ -95,12 +95,36 @@ sparse2densetranspose(dense_mat_t *Dmat, sparse_mat_t *Smat) {
   }
 }
 
+void
+sparse2dense(dense_mat_t *Dmat, sparse_mat_t *Smat) {
+  int i, j;
+  unsigned int *ptr;
+  Dmat->nrows = Smat->nrows;
+  Dmat->ncols = Smat->ncols;
+  Dmat->limbs_per_row = (Dmat->ncols / GMP_NUMB_BITS) + 1;
+  Dmat->limbs_per_col = (Dmat->nrows / GMP_NUMB_BITS) + 1;
+  
+  Dmat->data = (mp_limb_t *)malloc(Dmat->limbs_per_row*Dmat->nrows*sizeof(mp_limb_t));
+  for (i = 0; i < Dmat->limbs_per_row*Dmat->nrows; ++i)
+    Dmat->data[i] = 0UL;
+
+  ptr = Smat->data;
+  for (i = 0; i < Smat->nrows; ++i) {
+    unsigned int nc = *ptr++;
+    for (j = 0; j < nc; ++j) {
+      unsigned int coeff = *ptr++;
+      setcoeff(Dmat, i, coeff);
+    }
+  }
+}
+
+
 int main(int argc, char **argv) {
   FILE *file;
   sparse_mat_t mat;
   dense_mat_t dmat;
   mp_limb_t **ker;
-  int dim;
+  int dim, i, j;
 
   if (argc == 1) {
     file = stdin;
@@ -116,12 +140,25 @@ int main(int argc, char **argv) {
   fprintf(stderr, "have read matrix: nrows = %d, ncols = %d\n", mat.nrows, mat.ncols);
   fprintf(stderr, "average wt of rows is %f\n", mat.avg_wt);
 
-  sparse2densetranspose(&dmat, &mat);
+  sparse2dense(&dmat, &mat);
 
-  dim = kernel(dmat.data, NULL, dmat.nrows, dmat.ncols,
+  ker = (mp_limb_t **)malloc(dmat.nrows*sizeof(mp_limb_t *));
+  for (i = 0; i < dmat.nrows; ++i)
+    ker[i] = (mp_limb_t *)malloc(dmat.limbs_per_col*sizeof(mp_limb_t));
+
+  dim = kernel(dmat.data, ker, dmat.nrows, dmat.ncols,
       dmat.limbs_per_row, dmat.limbs_per_col);
 
   fprintf(stderr, "dim of kernel is %d\n", dim);
+
+  fprintf(stderr, "printing a few lines of kernel...\n");
+
+  for (i = 0; i < 20; ++i) {
+    for (j = 0; j < dmat.limbs_per_col; j++) {
+      printf("%lx ", ker[i][j]);
+    }
+    printf("\n");
+  }
 
   free(mat.data);
   fclose(file);
