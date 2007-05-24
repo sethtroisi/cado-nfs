@@ -613,6 +613,7 @@ int main(int argc, char **argv) {
   fprintf(stderr, "Total number of primes = %d\n",
           rat_table.length + alg_table.length);
 
+#if 0
   printf("### Column labels:\n");
   for (i = 0; i < rat_table.length; ++i)
     printf("%d %lx\n", i, rat_table.tab[i]);
@@ -622,6 +623,7 @@ int main(int argc, char **argv) {
   printf("### Matrix:\n");
   printf("### (format: a b nb_coeff c0 c1 c2 ...)\n");
   printf("### first line gives nrows, ncols\n");
+#endif
   printf("%d %d\n", nb_rel, rat_table.length + alg_table.length);
   for (i = 0; i < nb_rel; ++i) {
     //    fprint_relation(stdout, rel_table[i]);
