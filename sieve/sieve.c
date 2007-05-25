@@ -33,6 +33,7 @@
 #define REFAC_PRP_THRES 500
 #define SIEVE_PERMISSIBLE_ERROR 5
 #define REPS 1 /* number of tests in mpz_probab_prime_p */
+#define EXTRA 2 /* dynamic arrays are enlarged by alloc/EXTRA */
 
 /*****************************************************************
  *                      Functions for calculus                   *
@@ -409,16 +410,16 @@ compute_norms (unsigned char *sievearray, const long amin, const long amax,
 void 
 sieve (unsigned char *sievearray, factorbase_t *fb, 
        const long amin, const long amax, const unsigned long b, 
-       const unsigned char threshold, fbprime_t *useful_primes_par,
-       const fbprime_t useful_threshold, const unsigned int useful_length_par,
+       const unsigned char threshold, fbprime_t **useful_primes_par,
+       const fbprime_t useful_threshold, unsigned int *useful_length_par,
        const int odd)
 {
   /* The sievearray[0] entry corresponds to (amin, b), and
      sievearray[d] to (amin + d * (1 + odd), b) */
-  fbprime_t *useful_primes = useful_primes_par;
+  fbprime_t *useful_primes = *useful_primes_par;
   const uint32_t l = (amax - amin) / (1 + odd) + 1;
   uint32_t i, amin_p, p, d;
-  unsigned int useful_length = useful_length_par;
+  unsigned int useful_length = *useful_length_par;
   unsigned char plog;
 
   ASSERT (odd == 0 || odd == 1);
@@ -488,18 +489,31 @@ sieve (unsigned char *sievearray, factorbase_t *fb,
 	      k = sievearray[d] - plog;
 	      sievearray[d] = k;
 	      if (k <= threshold)
-		if (p >= useful_threshold && useful_length > 0)
-		  {
-		    *useful_primes++ = p;
-		    useful_length--;
-		  }
+		if (p >= useful_threshold)
+                  {
+                    if (useful_length == 0)
+                       {
+                         unsigned int extra = *useful_length_par / EXTRA;
+                         unsigned int used = useful_primes - *useful_primes_par;
+                          *useful_length_par += extra;
+                          *useful_primes_par = (fbprime_t*) realloc (
+                                 *useful_primes_par,
+                                 *useful_length_par * sizeof (fbprime_t));
+                          useful_length += extra;
+                          useful_primes = (*useful_primes_par) + used;
+                          
+                       }
+                    /* useful_length should be > 0 here */
+                    *useful_primes++ = p;
+                    useful_length--;
+                  }
 	    }
         }
       
       /* Move on to the next factor base prime */
       fb = fb_next (fb);
     }
-  if (useful_length_par > 0)
+  if (*useful_length_par > 0)
     *useful_primes++ = 0;
 }
 
@@ -696,8 +710,8 @@ print_useful (const fbprime_t *useful_primes,
 }
 
 static unsigned long
-find_sieve_reports (const unsigned char *sievearray, long *reports, 
-                    const unsigned int reports_len, 
+find_sieve_reports (const unsigned char *sievearray, long **reports,
+                    unsigned int *reports_len, 
                     const unsigned char reports_threshold, 
                     const long amin, const long amax, const unsigned long b,
                     const int odd, const int verbose)
@@ -716,8 +730,7 @@ find_sieve_reports (const unsigned char *sievearray, long *reports,
   if (odd) /* If all $a$ are odd, we can divide 2's out of $b$ for the gcd */
     for (odd_b = b; odd_b % 2 == 0; odd_b >>= 1);
 
-  for (a = amin, d = 0; reports_nr < reports_len && a <= amax; 
-       a += 1 << odd, d++)
+  for (a = amin, d = 0; a <= amax; a += 1 << odd, d++)
     {
       /* The + 10 is to deal with accumulated rounding that might have
 	 cause the sieve value to drop below 0 and wrap around */
@@ -725,7 +738,15 @@ find_sieve_reports (const unsigned char *sievearray, long *reports,
         {
 	  ASSERT (a == amin + (long) (d << odd));
           if (gcd(labs(a), odd_b) == 1)
-	    reports[reports_nr++] = a;
+            {
+              (*reports)[reports_nr++] = a;
+              if (reports_nr == *reports_len)
+                {
+                  *reports_len += *reports_len / EXTRA;
+                  *reports = (long*) realloc (*reports, *reports_len *
+                                              sizeof(long));
+                }
+            }
         }
     }
   rdtscll (tsc2);
@@ -742,10 +763,10 @@ find_sieve_reports (const unsigned char *sievearray, long *reports,
 
 unsigned long
 sieve_one_side (unsigned char *sievearray, factorbase_t *fb,
-		long *reports, const unsigned int reports_len, 
+		long **reports, unsigned int *reports_len,
 		const unsigned char reports_threshold,
-		fbprime_t *useful_primes, const fbprime_t useful_threshold, 
-		const unsigned int useful_length,
+		fbprime_t **useful_primes, const fbprime_t useful_threshold, 
+		unsigned int *useful_length,
 		const long amin, const long amax, const unsigned long b,
 		const unsigned long proj_roots, const double log_scale,
 		const double *dpoly, const unsigned int deg, 
@@ -774,10 +795,10 @@ sieve_one_side (unsigned char *sievearray, factorbase_t *fb,
   fb_restore_roots (fb, b, verbose);
   
   if (verbose >= 2)
-    print_useful (useful_primes, useful_length);
-  
+    print_useful (*useful_primes, *useful_length);
+
   /* Store the sieve reports */
-  reports_nr = find_sieve_reports (sievearray, reports, reports_len, 
+  reports_nr = find_sieve_reports (sievearray, reports, reports_len,
 				   reports_threshold, eff_amin, eff_amax, b, 
 				   odd, verbose);
 
@@ -1208,9 +1229,9 @@ main (int argc, char **argv)
 	  printf ("#Sieving algebraic side\n");
 
       reports_a_nr = 
-	sieve_one_side (sievearray, fba, reports_a, reports_a_len, 
-			report_a_threshold, useful_primes_a, useful_threshold,
-			useful_length_a, amin, amax, b, proj_roots, log_scale, 
+	sieve_one_side (sievearray, fba, &reports_a, &reports_a_len, 
+			report_a_threshold, &useful_primes_a, useful_threshold,
+			&useful_length_a, amin, amax, b, proj_roots, log_scale,
 			dpoly_a, deg, verbose);
 
       proj_roots = mpz_gcd_ui (NULL, (*cpoly)->g[1], b);
@@ -1222,9 +1243,9 @@ main (int argc, char **argv)
 	  printf ("#Sieving rational side\n");
 
       reports_r_nr = 
-	sieve_one_side (sievearray, fbr, reports_r, reports_r_len, 
-			report_r_threshold, useful_primes_r, useful_threshold,
-			useful_length_r, amin, amax, b, proj_roots, log_scale, 
+	sieve_one_side (sievearray, fbr, &reports_r, &reports_r_len, 
+			report_r_threshold, &useful_primes_r, useful_threshold,
+			&useful_length_r, amin, amax, b, proj_roots, log_scale,
 			dpoly_r, 1, verbose);
 
       if (reports_a_len == reports_a_nr)
