@@ -723,7 +723,7 @@ find_sieve_reports (const unsigned char *sievearray, long *reports,
 	 cause the sieve value to drop below 0 and wrap around */
       if ((unsigned char) (sievearray[d] + 10) <= reports_threshold + 10)
         {
-	  ASSERT (a = amin + (d << odd));
+	  ASSERT (a == amin + (long) (d << odd));
           if (gcd(labs(a), odd_b) == 1)
 	    reports[reports_nr++] = a;
         }
