@@ -216,9 +216,9 @@ read_relations (FILE *fp, int32 *rfb, int32 *afb, mpz_t *f, int degf,
 	    {
 	      if (!mpz_divisible_ui_p (norm, p))
 		{
-		  fprintf (stderr, "Error, f(%d,%d) not divisible by factor base prime %d\n",
-			   rel->a, rel->b, p);
-		  exit (1);
+		  static count = 0;
+		  if (count++ < 10)
+		    fprintf (stderr, "Warning, f(%d,%d) not divisible by factor base prime %d\n", p);
 		}
 	      mpz_divexact_ui (norm, norm, p);
 	    }
