@@ -175,9 +175,10 @@ eval_algebraic (mpz_t norm, mpz_t *f, int d, long a, unsigned long b)
    Then prints relations with given format.
 */
 unsigned long
-read_relations (FILE *fp, int32 *rfb, int32 *afb, mpz_t *f, int degf,
+read_relations (char *rels, int32 *rfb, int32 *afb, mpz_t *f, int degf,
 		int format, int verbose)
 {
+  FILE *fp;
   uint32 size_field; /* 32 bits */
   relation_t rel[1];
   int32 relsInFile;
@@ -185,13 +186,20 @@ read_relations (FILE *fp, int32 *rfb, int32 *afb, mpz_t *f, int degf,
   mpz_t norm;
   int32 p;
 
+  fp = fopen (rels, "rb");
+  if (fp == NULL)
+    {
+      fprintf (stderr, "Error, unable to open relation file %s\n", rels);
+      exit (1);
+    }
+
   mpz_init (norm);
 
   /* the first 4 bytes give the number of relations in the file */
   rewind (fp);
   fread (&relsInFile, sizeof (int32), 1, fp);
   if (verbose)
-    fprintf (stderr, "Header says %d relations\n", relsInFile);
+    fprintf (stderr, "File %s: header says %d relations.\n", rels, relsInFile);
 
   /* see function dataConvertToRel() from GGNFS, file rels.c */
   for (j = 0; j < relsInFile; j++)
@@ -305,6 +313,8 @@ read_relations (FILE *fp, int32 *rfb, int32 *afb, mpz_t *f, int degf,
   rel->sp_entries = i;
 
   mpz_clear (norm);
+
+  fclose (fp);
 
   return relsInFile;
 }
@@ -427,7 +437,7 @@ int
 main (int argc, char *argv[])
 {
   FILE *fp;
-  unsigned long num_rels;
+  unsigned long num_rels = 0;
   int32 *rfb = NULL, *afb = NULL;
   int32 rfb_size, afb_size;
   int verbose = 0, i, degf;
@@ -487,20 +497,13 @@ main (int argc, char *argv[])
       RELS = argv[1];
       argv ++;
       argc --;
-      fp = fopen (RELS, "rb");
-      if (fp == NULL)
-	{
-	  fprintf (stderr, "Error, unable to open relation file %s\n", RELS);
-	  exit (1);
-	}
       if (format == OUTPUT_FK && num_files == 0)
 	printf ("F 0 X %d 1\n", degf);
       num_files ++;
-      num_rels = read_relations (fp, rfb, afb, f, degf, format, verbose);
-      fclose (fp);
+      num_rels += read_relations (RELS, rfb, afb, f, degf, format, verbose);
     }
 
-  fprintf (stderr, "Output %lu relations from %d file(s)\n", num_rels,
+  fprintf (stderr, "Output %lu relations from %d file(s).\n", num_rels,
 	   num_files);
 
   free (rfb);
