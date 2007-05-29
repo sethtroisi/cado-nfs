@@ -15,23 +15,22 @@ ecmtorsion12(n,p) = {
     pnt = ellpow (c, [Mod(-2,p), Mod(4,p)], (n - nmod2) / 2);
     if (nmod2, pnt = elladd (c, pnt, [0, 0]));
     u = pnt[1];
-    print ("ecmtorsion12: u = ", u);
   );
 
   if (u == Mod(0, p), 
-    /* print ("u = ", u); */
+    print ("u = ", u);
     return(0);
   );
   t2 = (u^2 - Mod(12,p))/(4*u);
   if (t2 == Mod (-3, p) || t2 == Mod(1,p) || t2 == Mod(-1,p),
-     /* print("t2 = ", t2); */
+     print("t2 = ", t2);
      return(0);
   );
   a = (t2 - Mod(1,p))/(t2 + Mod(3,p));
   if (a == Mod (0, p), return(0));
   A = (-3*a^4 - 6*a^2 + Mod(1,p))/(4*a^3);
   if (A == Mod(2, p) || A == Mod(-2, p), 
-    /* print ("A = ", A); */
+    print ("A = ", A);
     return(0);
   );
   B = (a^2 - Mod(1,p))^2/(4*a^3);
@@ -94,25 +93,27 @@ primeexp(p, n) = {
 }
 
 ecm_dist_exp(s,pmin,pmax,r,m) = {
-  local(n, p2, p3, p5, p7, p11, c, singular, len);
-  n = 0; singular = 0; len = 15;
+  local(n, p2, p3, p5, p7, p11, c, singular, len, i);
+  n = 0; singular = 0; len = 15; svec = Vec(s);
   p2 = listcreate(len); for(i=1,len,listput(p2, 0));
   p3 = listcreate(len); for(i=1,len,listput(p3, 0));
   p5 = listcreate(len); for(i=1,len,listput(p5, 0));
   p7 = listcreate(len); for(i=1,len,listput(p7, 0));
   p11 = listcreate(len); for(i=1,len,listput(p11, 0));
-  forprime (p = pmin, pmax,
-    if (p % m == r,
-      c = ecmsigma (s, p);
-      if (c != 0,
-        n++;
-        o = ellsea(c,p); 
-        p2[min (primeexp(2,o)+1, len)]++; 
-        p3[min (primeexp(3,o)+1, len)]++; 
-        p5[min (primeexp(5,o)+1, len)]++; 
-        p7[min (primeexp(7,o)+1, len)]++;
-        p11[min (primeexp(11,o)+1, len)]++;
-      , singular++);
+  for (i = 1, length(svec),  
+    forprime (p = pmin, pmax,
+      if (p % m == r,
+        c = ecmsigma (svec[i], p);
+        if (c != 0,
+          n++;
+          o = ellsea(c,p); 
+          p2[min (primeexp(2,o)+1, len)]++; 
+          p3[min (primeexp(3,o)+1, len)]++; 
+          p5[min (primeexp(5,o)+1, len)]++; 
+          p7[min (primeexp(7,o)+1, len)]++;
+          p11[min (primeexp(11,o)+1, len)]++;
+        , singular++);
+      );
     );
   );
 /*  printp("2: ",precision(1.*p2/n,9),", 3: ",precision(1.*p3/n,9), \
