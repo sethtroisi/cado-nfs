@@ -4,8 +4,10 @@
 GMP=
 ECM=
 
-CFLAGS=-O2 -g
+CFLAGS=-O2 -g -Wall -W
 LDFLAGS=-lm $(GMP)/lib/libgmp.a
+
+all: sieve checknorms
 
 sieve: sieve.c fb.c config.h
 	gcc -I.. $(CFLAGS) -o $@ -Wall -Wextra sieve.c fb.c $(LDFLAGS)
@@ -16,8 +18,7 @@ checknorms: checknorms.c
 config.h:
 	echo '#define HAVE_MSRH 1'   >  $@
 	echo '#define WANT_ASSERT 1' >> $@
+	echo '#define L1SIZE 32768' >>  $@
 
 clean:
-	\rm sieve checknorms
-
-
+	rm -f sieve checknorms

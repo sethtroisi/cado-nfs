@@ -850,6 +850,7 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
 		  printf ("%x%s", primes_r[k], k+1==nr_primes_r?":":",");
 	      for (k = 0; k < nr_primes_a; k++)
 		  printf ("%x%s", primes_a[k], k+1==nr_primes_a?"\n":",");
+              fflush (stdout);
 	  }
       }
 

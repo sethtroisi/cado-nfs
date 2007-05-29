@@ -4,8 +4,8 @@
 #include "cado.h"
 
 static inline fbroot_t
-first_sieve_loc (const fbprime_t p, const fbroot_t r, const long amin_p, 
-		 const unsigned long b, const int odd)
+first_sieve_loc (const fbprime_t p, const fbroot_t r, const fbroot_t amin_p, 
+                 const unsigned long b, const int odd)
 {
   modulus m;
   residue r1, r2;

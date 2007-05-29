@@ -138,7 +138,7 @@ typedef struct {
    location where this prime divides  */
 typedef struct {
   fbprime_t p;            /* A prime or a prime power < 2^24 */
-  uint32_t loc_and_log;   /* Next location in sieve array where this prime
+  fbprime_t loc_and_log;  /* Next location in sieve array where this prime
 			     will divide (low 24 bits) and approxomate log
 			     (upper 8 bits) */
 } factorbase_small_inited_t;
