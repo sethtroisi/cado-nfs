@@ -21,16 +21,17 @@
 #else
   #define rdtscll(x)
 #endif
+#include "basicnt.h"
 #include "fb.h"
 #include "mod_ul.c"
+#include "sieve_aux.h"
 
 /* Some prototypes for functions scattered in various files with no 
    corresponding header files. FIXME: clean this up!*/
-fbprime_t iscomposite (const fbprime_t);
 void mp_poly_print (mpz_t *, int, const char *);
 
 void 
-fb_print_entry (factorbase_t *fb)
+fb_print_entry (factorbase_degn_t *fb)
 {
   int i;
   printf ("Prime " FBPRIME_FORMAT " with rounded log %d and roots ", 
@@ -44,12 +45,12 @@ fb_print_entry (factorbase_t *fb)
 /* Add fb_add to (void *)fb + fbsize. If a realloc failed, returns NULL.
    fb_add->size need not be set by caller, this function does it */
 
-factorbase_t *
-fb_add_to (factorbase_t *fb, size_t *fbsize, size_t *fballoc,
-	   const size_t allocblocksize, factorbase_t *fb_add)
+factorbase_degn_t *
+fb_add_to (factorbase_degn_t *fb, size_t *fbsize, size_t *fballoc,
+	   const size_t allocblocksize, factorbase_degn_t *fb_add)
 {
   const size_t fb_addsize  = fb_entrysize (fb_add); 
-  factorbase_t *newfb = fb;
+  factorbase_degn_t *newfb = fb;
 
   ASSERT(fb_addsize <= allocblocksize); /* Otherwise we still might not have
 					   enough mem after the realloc */
@@ -58,7 +59,7 @@ fb_add_to (factorbase_t *fb, size_t *fbsize, size_t *fballoc,
   if (*fballoc < *fbsize + fb_addsize)
     {
       *fballoc += allocblocksize;
-      newfb = (factorbase_t *) realloc (fb, *fballoc);
+      newfb = (factorbase_degn_t *) realloc (fb, *fballoc);
       if (newfb == NULL)
 	{
 	  fprintf (stderr, 
@@ -75,11 +76,14 @@ fb_add_to (factorbase_t *fb, size_t *fbsize, size_t *fballoc,
   return newfb;
 }
 
-factorbase_t *
-fb_find_p (factorbase_t *fb, const fbprime_t p)
+factorbase_degn_t *
+fb_find_p (factorbase_degn_t *fb, const fbprime_t p)
 {
   while (fb->p > 0 && fb->p < p) /* Assumes fb is sorted in asc. order */
-    fb = fb_next (fb);
+    {
+      ASSERT (fb->p < fb_next (fb)->p || fb_next (fb)->p == 0);
+      fb = fb_next (fb);
+    }
 
   if (fb->p == p)
     return fb;
@@ -95,18 +99,18 @@ fb_log (double n, double log_scale, double offset)
 
 /* Generate a factor base with primes <= bound for a linear polynomial */
 
-factorbase_t *
+factorbase_degn_t *
 fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale, 
 		const int verbose)
 {
   long long tsc1, tsc2;
   fbprime_t p;
-  factorbase_t *fb = NULL, *fb_cur, *fb_new;
+  factorbase_degn_t *fb = NULL, *fb_cur, *fb_new;
   size_t fbsize = 0, fballoc = 0;
   const size_t allocblocksize = 1<<20;
 
   rdtscll (tsc1);
-  fb_cur = (factorbase_t *) malloc (fb_entrysize_uc (1));
+  fb_cur = (factorbase_degn_t *) malloc (fb_entrysize_uc (1));
   ASSERT (fb_cur != NULL);
 
   fb_cur->nr_roots = 1;
@@ -200,10 +204,10 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
 }
 
 
-factorbase_t *
+factorbase_degn_t *
 fb_read (const char *filename, const double log_scale, const int verbose)
 {
-  factorbase_t *fb = NULL, *fb_cur, *fb_new;
+  factorbase_degn_t *fb = NULL, *fb_cur, *fb_new;
   FILE *fbfile;
   size_t fbsize = 0, fballoc = 0;
   const size_t linesize = 255;
@@ -225,7 +229,7 @@ fb_read (const char *filename, const double log_scale, const int verbose)
       return NULL;
     }
 
-  fb_cur = (factorbase_t *) malloc (sizeof (factorbase_t) + 
+  fb_cur = (factorbase_degn_t *) malloc (sizeof (factorbase_degn_t) + 
 				      MAXDEGREE * sizeof(fbroot_t));
   if (fb_cur == NULL)
     {
@@ -357,7 +361,7 @@ fb_read (const char *filename, const double log_scale, const int verbose)
 /* For all primes p that divide b, disable p and powers of p in fb */
 
 void
-fb_disable_roots (factorbase_t *fb, const unsigned long b, const int verbose)
+fb_disable_roots (factorbase_degn_t *fb, const unsigned long b, const int verbose)
 {
   long long tsc1, tsc2;
   unsigned long t;
@@ -368,7 +372,7 @@ fb_disable_roots (factorbase_t *fb, const unsigned long b, const int verbose)
   t = b;
   while (t > 1)
     {
-      factorbase_t *fb_del;
+      factorbase_degn_t *fb_del;
       unsigned long p, ppow;
       p = iscomposite (t);
       if (p == 0)
@@ -396,7 +400,7 @@ fb_disable_roots (factorbase_t *fb, const unsigned long b, const int verbose)
 /* For all primes p that divide b, re-enable p and powers of p in fb */
 
 void
-fb_restore_roots (factorbase_t *fb, const unsigned long b, const int verbose)
+fb_restore_roots (factorbase_degn_t *fb, const unsigned long b, const int verbose)
 {
   long long tsc1, tsc2;
   unsigned long t;
@@ -406,7 +410,7 @@ fb_restore_roots (factorbase_t *fb, const unsigned long b, const int verbose)
   t = b;
   while (t > 1)
     {
-      factorbase_t *fb_restore;
+      factorbase_degn_t *fb_restore;
       unsigned long p, ppow;
       p = iscomposite (t);
       if (p == 0)
@@ -416,7 +420,7 @@ fb_restore_roots (factorbase_t *fb, const unsigned long b, const int verbose)
       while ((fb_restore = fb_find_p (fb, ppow)) != NULL)
 	{
 	  fb_restore->nr_roots = 
-	    (fb_restore->size - sizeof (factorbase_t)) 
+	    (fb_restore->size - sizeof (factorbase_degn_t)) 
 	    / sizeof (fbroot_t);
 	  if (verbose)
 	    {
@@ -434,10 +438,10 @@ fb_restore_roots (factorbase_t *fb, const unsigned long b, const int verbose)
 }
 
 fbprime_t
-fb_maxprime (factorbase_t *fb)
+fb_maxprime (factorbase_degn_t *fb)
 {
     fbprime_t maxp = 0;
-    factorbase_t *fbptr = fb;
+    factorbase_degn_t *fbptr = fb;
     while (fbptr->p != 0)
     {
 	ASSERT (maxp <= fbptr->p);
@@ -446,5 +450,105 @@ fb_maxprime (factorbase_t *fb)
     }
     
     return maxp;
+}
+
+/* Extracts only L1 primes at the moment */
+
+void
+fb_extract_small (factorbase_t fb, const unsigned int L1bound, 
+		  const int verbose)
+{
+  factorbase_degn_t *fbptr;
+  unsigned int i, j;
+
+  /* Count how many roots there are among the primes <= L1bound, i.e. how
+     many entries the small fb will need */
+  i = 0;
+  for (fbptr = fb->fblarge; fbptr->p <= L1bound && fbptr->p > 0; 
+       fbptr = fb_next (fbptr))
+    i += fbptr->nr_roots;
+
+  /* Add one entry for the stop marker */
+  fb->fbL1size = i + 1;
+
+  fb->fbL1bound = L1bound;
+
+  /* Allocate memory for the small prime factor base and the small prime
+     sieve-ready factor base (which may have fewer primes, if some are not 
+     coprime to b!) */
+  fb->fbL1 = (factorbase_small_t *) malloc (fb->fbL1size * 
+					    sizeof (factorbase_small_t));
+  fb->fbL1init = (factorbase_small_inited_t *) malloc (fb->fbL1size * 
+						sizeof (factorbase_small_t));
+
+  ASSERT_ALWAYS (fb->fbL1 != NULL);
+  ASSERT_ALWAYS (fb->fbL1init != NULL);
+  
+  /* Copy info into the small prime factor base */
+  j = 0;
+  for (fbptr = fb->fblarge; 
+       fbptr->p < L1bound && fbptr->p > 0; 
+       fbptr = fb_next (fbptr))
+    {
+      for (i = 0; i < fbptr->nr_roots; i++, j++)
+	{
+	  fb->fbL1[j].p = fbptr->p;
+	  fb->fbL1[j].root_and_log = fbptr->roots[i] + 
+	    (fbptr->plog << 24);
+	}
+    }
+
+  /* Put end marker */
+  fb->fbL1[j].p = 0;
+  fb->fbL1[j].root_and_log = 0;
+  j++;
+
+  /* Update the pointer to the large prime factor base */
+  
+  fb->fblarge = fbptr;
+
+  ASSERT (j == fb->fbL1size);
+
+  if (verbose)
+    printf ("# There are %u entries in the small factor base\n", j);
+}
+
+void
+fb_initloc_small (factorbase_small_inited_t *initfb,
+		  factorbase_small_t *smallfb, 
+		  const long amin, const unsigned long b, const int odd)
+{
+  uint32_t amin_p;
+  fbprime_t p; 
+  fbroot_t root;
+  uint32_t d;
+  unsigned char plog;
+  
+  for ( ; smallfb->p > 0; smallfb++)
+    {
+      p = smallfb->p;
+      ASSERT (p < 0xffffff);
+      root = smallfb->root_and_log & 0xffffff;
+      plog = smallfb->root_and_log >> 24;
+
+      if (gcd(p, b) == 1) /* FIXME: Speed up this gcd */
+	{
+	  amin_p = signed_mod_longto32 (amin, p);
+	  /* Replace low 24 bits by first sieve location */
+	  d = first_sieve_loc (p, root, amin_p, b, odd);
+	  initfb->p = p;
+	  initfb->loc_and_log = (plog << 24) | d;
+#if 0
+	  printf ("F(%ld, %lu) %% %d == 0 /* PARI fb_initloc_small */\n",
+		  amin + ((fb_inited->loc_and_log & 0xffffff) << odd), b, 
+		  fb_inited->p);
+#endif
+	  initfb ++;
+	}
+    }
+
+  /* Place stop marker */
+  initfb->p = 0;
+  initfb->loc_and_log = 0;
 }
 

@@ -2,21 +2,26 @@
 *                Functions for the factor base                  *
 *****************************************************************/
 
+#include "config.h"
 #include "cado.h"
 
-void		fb_print_entry (factorbase_t *);
-factorbase_t *	fb_add_to (factorbase_t *, size_t *, size_t *, const size_t, 
-                           factorbase_t *);
-factorbase_t *	fb_find_p (factorbase_t *, const fbprime_t);
+void		fb_print_entry (factorbase_degn_t *);
+factorbase_degn_t *fb_add_to (factorbase_degn_t *, size_t *, size_t *, 
+                           const size_t, factorbase_degn_t *);
+factorbase_degn_t *	fb_find_p (factorbase_degn_t *, const fbprime_t);
 unsigned char	fb_log (double, double, double);
-factorbase_t * 	fb_make_linear (mpz_t *, const fbprime_t, const double, 
+factorbase_degn_t * 	fb_make_linear (mpz_t *, const fbprime_t, const double, 
                                 const int);
-factorbase_t *	fb_read (const char *, const double, const int);
-void		fb_disable_roots (factorbase_t *, const unsigned long, 
+factorbase_degn_t *	fb_read (const char *, const double, const int);
+void		fb_disable_roots (factorbase_degn_t *, const unsigned long, 
                                   const int);
-void		fb_restore_roots (factorbase_t *, const unsigned long, 
+void		fb_restore_roots (factorbase_degn_t *, const unsigned long, 
                                   const int);
-fbprime_t       fb_maxprime (factorbase_t *);
+fbprime_t       fb_maxprime (factorbase_degn_t *);
+void 		fb_extract_small (factorbase_t, const unsigned int, const int);
+void		fb_initloc_small (factorbase_small_inited_t *,
+                                  factorbase_small_t *, const long, 
+                                  const unsigned long, const int);
 
 /* Some inlined functions which need to be fast */
   
@@ -24,29 +29,29 @@ fbprime_t       fb_maxprime (factorbase_t *);
    pointers by the pointer's base data type size */
 
 __attribute__ ((unused))
-static inline factorbase_t *
-fb_skip (const factorbase_t *fb, const size_t s)
+static inline factorbase_degn_t *
+fb_skip (const factorbase_degn_t *fb, const size_t s)
 {
-  return (factorbase_t *)((char *)fb + s);
+  return (factorbase_degn_t *)((char *)fb + s);
 }
   
 __attribute__ ((unused))
-static inline factorbase_t *
-fb_next (const factorbase_t *fb)
+static inline factorbase_degn_t *
+fb_next (const factorbase_degn_t *fb)
 {
-  return (factorbase_t *)((char *)fb + fb->size);
+  return (factorbase_degn_t *)((char *)fb + fb->size);
 }
 
 __attribute__ ((unused))
 static size_t
-fb_entrysize (const factorbase_t *fb)
+fb_entrysize (const factorbase_degn_t *fb)
 {
-  return (sizeof (factorbase_t) + fb->nr_roots * sizeof (fbroot_t));
+  return (sizeof (factorbase_degn_t) + fb->nr_roots * sizeof (fbroot_t));
 }
 
 __attribute__ ((unused))
 static size_t
 fb_entrysize_uc (const unsigned char n)
 {
-  return (sizeof (factorbase_t) + n * sizeof (fbroot_t));
+  return (sizeof (factorbase_degn_t) + n * sizeof (fbroot_t));
 }
