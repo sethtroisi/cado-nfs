@@ -27,6 +27,20 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "gmp.h"
 
+/* Common asserting/debugging defines */
+#include <assert.h>
+#define ASSERT_ALWAYS(x) assert(x)
+#ifdef WANT_ASSERT
+  #define ASSERT(x) assert(x)
+#else
+  #define ASSERT(x)
+#endif
+#ifdef WANT_ASSERT_EXPENSIVE
+  #define ASSERT_EXPENSIVE(x) assert(x)
+#else
+  #define ASSERT_EXPENSIVE(x)
+#endif
+
 /* The maximum degree of polynomials supported. Used for statically 
    allocating storage (i.e. "mpz_t poly[MAXDEGREE]") */
 #define MAXDEGREE 10
@@ -103,6 +117,7 @@ typedef unsigned long largeprime_t; /* On IA32 they'll only get 32 bit
                                        large primes */
 #define LARGEPRIME_FORMAT "%lu"
 
+/* Factor base entry with (possibly) several roots */
 typedef struct {
   fbprime_t p;            /* A prime or a prime power */
   unsigned char plog;     /* logarithm (to some suitable base) of this prime */
@@ -111,7 +126,35 @@ typedef struct {
   unsigned char dummy[1]; /* For dword aligning the roots */
   fbroot_t roots[0];      /* the actual length of this array is determined
                              by nr_roots */
-} factorbase_t;
+} factorbase_degn_t;
+
+/* Factorbase entry with prime < 2^24 and exactly 1 root */
+typedef struct {
+  fbprime_t p;            /* A prime or a prime power < 2^24 */
+  fbroot_t root_and_log;  /* The root and approxomate log (upper 8 bits) */
+} factorbase_small_t;
+
+/* Factorbase entry with prime < 2^24 and index to next sieve array
+   location where this prime divides  */
+typedef struct {
+  fbprime_t p;            /* A prime or a prime power < 2^24 */
+  uint32_t loc_and_log;   /* Next location in sieve array where this prime
+			     will divide (low 24 bits) and approxomate log
+			     (upper 8 bits) */
+} factorbase_small_inited_t;
+
+
+typedef struct {
+  factorbase_degn_t *fullfb; /* The complete factor base */
+  factorbase_small_t *fbL1, *fbL2;
+  factorbase_small_inited_t *fbL1init, *fbL2init;
+  factorbase_degn_t *fblarge; /* Pointer to the entries in fullfb with primes
+  				 > fbL2bound */
+  unsigned int fbL1size;  /* Number of entries in fbL1, incl. stop marker */
+  unsigned int fbL1bound; /* Upper bound on primes in fbL1 */
+  unsigned int fbL2size;  /* Number of entries in fbL2 */
+  unsigned int fbL2bound; /* Upper bound on primes in fbL2 */
+} factorbase_t[1];
 
 typedef struct {
   long a;		/* only a is allowed to be negative */
