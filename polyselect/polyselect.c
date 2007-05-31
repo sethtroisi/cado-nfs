@@ -31,7 +31,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
        Arizona, 14 March 2006.
 */
 
-#define VERSION 124 /* try to match the svn version */
+#define VERSION 131 /* try to match the svn version */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -41,6 +41,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <values.h> /* for DBL_MAX */
 #include <math.h>   /* for log, fabs */
 #include "cado.h"
+
+#define REPS 1 /* number of Miller-Rabin tests in isprime */
 
 static void
 usage ()
@@ -52,6 +54,220 @@ usage ()
   fprintf (stderr, "       out    - output file (polynomials)\n");
   exit (1);
 }
+
+/*************************** root properties *********************************/
+
+#define DEBUG
+#ifdef DEBUG
+void
+print_polynomial (mpz_t *f, const int d)
+{
+  int i;
+  for (i = 0; i <= d; i++)
+    if (mpz_cmp_ui (f[i], 0) > 0)
+      gmp_printf ("+%Zd*x^%d", f[i], i);
+    else if (mpz_cmp_ui (f[i], 0) < 0)
+      gmp_printf ("%Zd*x^%d", f[i], i);
+  printf (";\n");
+}
+#endif
+
+/* Returns the number of roots of f(x) mod p, where f has degree d.
+   Assumes p does not divide lc(f). */
+int
+roots_mod (mpz_t *f, const int d, const unsigned long p)
+{
+  mpz_t *fp, *g, *h;
+  int i, j, k, df = d, dg, dh;
+
+  if (mpz_divisible_ui_p (f[d], p))
+    {
+      fprintf (stderr, "Error in roots_mod: lc(f) divisible by %lu\n", p);
+      exit (1);
+    }
+  /* the number of roots is the degree of gcd(x^p-x,f) */
+
+  /* we first compute fp = f/lc(f) mod p */
+  fp = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
+  for (i = 0; i <= d; i++)
+    mpz_init (fp[i]);
+  mpz_set_ui (fp[d], p);
+  mpz_invert (fp[d], f[d], fp[d]); /* 1/f[d] mod p */
+  for (i = 0; i < d; i++)
+    {
+      mpz_mul (fp[i], f[i], fp[d]);
+      mpz_mod_ui (fp[i], fp[i], p);
+    }
+  mpz_set_ui (fp[d], 1); /* useless? */
+
+  /* we first compute x^p mod fp; since fp has degree d, all operations can
+     be done with polynomials of degree < 2d */
+  g = (mpz_t*) malloc (2 * d * sizeof (mpz_t));
+  h = (mpz_t*) malloc (2 * d * sizeof (mpz_t));
+  for (i = 0; i < 2 * d; i++)
+    {
+      mpz_init (g[i]); /* initialize to 0 */
+      mpz_init (h[i]);
+    }
+
+  /* initialize g to x */
+  mpz_set_ui (g[1], 1);
+  dg = 1;
+
+  mpz_set_ui (g[2], p);
+  k = mpz_sizeinbase (g[2], 2); /* number of bits of p: bit 0 to k-1 */
+
+  for (k -= 2; k >= 0; k--)
+    {
+      /* square g into h: g has degree dg -> h has degree 2*dg */
+      for (i = 0; i <= dg; i++)
+	for (j = i + 1; j <= dg; j++)
+	  if (i == 0 || j == dg)
+	    mpz_mul (h[i + j], g[i], g[j]);
+	  else
+	    mpz_addmul (h[i + j], g[i], g[j]);
+      for (i = 1; i < 2 * dg; i++)
+	mpz_mul_2exp (h[i], h[i], 1);
+      mpz_mul (h[0], g[0], g[0]);
+      mpz_mul (h[2 * dg], g[dg], g[dg]);
+      for (i = 1; i < dg; i++)
+	mpz_addmul (h[2 * i], g[i], g[i]);
+      dh = 2 * dg;
+
+      /* reduce mod p */
+      assert (dh < 2 * d);
+      for (i = 0; i <= dh; i++)
+	mpz_mod_ui (h[i], h[i], p);
+      
+      /* multiply h by x if bit k of p is set */
+      if (p & (1 << k))
+	{
+	  for (i = dh; i >= 0; i--)
+	    mpz_swap (h[i+1], h[i]);
+	  mpz_set_ui (h[0], 0);
+	  dh ++;
+	  assert (dh < 2 * d);
+	}
+
+      /* reduce mod fp */
+      while (dh >= d)
+	{
+	  /* subtract h[dh]*fp*x^(dh-d) from h */
+	  mpz_mod_ui (h[dh], h[dh], p);
+	  for (i = 0; i < d; i++)
+	    mpz_submul (h[dh - d + i], h[dh], fp[i]);
+	  /* it is not necessary to reduce h[j] for j < dh */
+	  dh --;
+          assert (dh < 2 * d);
+	}
+
+      /* reduce h mod p and copy to g */
+      for (i = 0; i <= dh; i++)
+	mpz_mod_ui (g[i], h[i], p);
+      dg = dh;
+      assert (dg < 2 * d);
+    }
+
+  /* subtract x */
+  mpz_sub_ui (g[1], g[1], 1);
+  mpz_mod_ui (g[1], g[1], p);
+
+  while (dg >= 0 && mpz_cmp_ui (g[dg], 0) == 0)
+    dg --;
+
+  /* take the gcd with fp */
+  while (dg > 0)
+    {
+      while (df >= dg)
+	{
+	  /* divide f by g */
+	  mpz_set_ui (h[0], p);
+	  mpz_invert (h[0], g[dg], h[0]); /* 1/g[dg] mod p */
+	  mpz_mul (h[0], h[0], fp[df]);
+	  mpz_mod_ui (h[0], h[0], p); /* fp[df]/g[dg] mod p */
+	  for (i = 0; i < dg; i++)
+	    {
+	      mpz_submul (fp[df - dg + i], h[0], g[i]);
+	      mpz_mod_ui (fp[df - dg + i], fp[df - dg + i], p);
+	    }
+	  df --;
+	  while (df >= 0 && mpz_cmp_ui (fp[df], 0) == 0)
+	    df --;
+	}
+      /* now d < dg: swap f and g */
+      for (i = 0; i <= dg; i++)
+	mpz_swap (fp[i], g[i]);
+      i = df;
+      df = dg;
+      dg = i;
+    }
+
+  /* if g=0 now, gcd is f, otherwise if g<>0, gcd is 1 */
+  if (mpz_cmp_ui (g[0], 0) != 0)
+    df = 0;
+
+  for (i = 0; i < 2 * d; i++)
+    {
+      mpz_clear (g[i]);
+      mpz_clear (h[i]);
+    }
+  free (g);
+  free (h);
+  for (i = 0; i <= d; i++)
+    mpz_clear (fp[i]);
+  free (fp);
+
+  return df;
+}
+
+int
+isprime (unsigned long p)
+{
+  mpz_t P;
+  int res;
+  
+  mpz_init_set_ui (P, p);
+  res = mpz_probab_prime_p (P, REPS);
+  mpz_clear (P);
+  return res;
+}
+
+/* Compute the value alpha(F) from Murphy's thesis, page 49:
+   alpha(F) = sum(prime p <= B, (1 - q_p*p/(p+1)) log(p)/(p-1))
+   where q_p is the number of roots of F mod p.
+
+   alpha(F) is an estimate of the average logarithm of the part removed
+   from sieving, compared to a random integer.
+
+   We want alpha as small as possible, i.e., alpha negative with a large
+   absolute value. Typical good values are alpha=-4, -5, ...
+*/
+double
+get_alpha (mpz_t *f, const int d, unsigned long B)
+{
+  double alpha = 0.0;
+  unsigned long p, q;
+
+  if (mpz_divisible_ui_p (f[d], 2) == 0)
+    {
+      q = roots_mod (f, d, 2);
+      assert (q <= 2);
+      alpha = (1.0 - 2.0 * (double) q / 3.0) * log (2.0);
+    }
+  for (p = 3; p <= B; p+=2)
+    {
+      if ((mpz_divisible_ui_p (f[d], p) == 0) && isprime (p))
+        {
+          q = roots_mod (f, d, p);
+          assert (q <= p);
+          alpha += (1.0 - (double) q * (double) p / (double) (p + 1)) *
+            log ((double) p) / (double) (p - 1);
+        }
+    }
+  return alpha;
+}
+
+/***************************** input/output **********************************/
 
 static void
 init (cado_input in)
@@ -391,6 +607,11 @@ skewness (mpz_t *p, unsigned long degree)
 /* mu(m,S), as defined in reference [2]:
    
    mu(m,S) = (m/S+S)*(|a_d S^d| + ... + |a_0 S^{-d}|)
+
+   It gives an estimate of *value* of the numbers to be sieved (to be
+   multiplied by the sieving region).
+
+   We want mu(m,S) as small as possible.
 */
 double
 get_mu (mpz_t *p, unsigned long degree, mpz_t m, double S)
@@ -447,8 +668,8 @@ generate_sieving_parameters (cado_poly out)
 void
 generate_poly (cado_poly out, unsigned long T, int verbose)
 {
-  unsigned long d = out->degree;
-  double B, mu, best_mu = DBL_MAX;
+  unsigned long d = out->degree, alim;
+  double B, mu, best_mu = DBL_MAX, alpha;
   mpz_t best_m;
 
   mpz_init (best_m);
@@ -456,6 +677,7 @@ generate_poly (cado_poly out, unsigned long T, int verbose)
   mpz_root (out->m, out->n, d + 1);
   B *= mpz_get_d (out->m);
   mpz_set_d (out->m, B);
+  alim = default_alim (out->n); /* needed for alpha */
   while (T-- > 0)
     {
       generate_base_m (out, out->m);
@@ -465,9 +687,10 @@ generate_poly (cado_poly out, unsigned long T, int verbose)
 	  best_mu = mu;
 	  if (verbose)
 	    {
+              alpha = get_alpha (out->f, out->degree, alim);
 	      fprintf (stderr, "m=");
 	      mpz_out_str (stderr, 10, out->m);
-	      fprintf (stderr, " mu=%1.3e\n", mu);
+	      fprintf (stderr, " mu=%1.3e alpha=%1.2f\n", mu, alpha);
 	    }
 	  mpz_set (best_m, out->m);
 	}
@@ -482,7 +705,7 @@ void
 print_poly (FILE *fp, cado_poly p, int argc, char *argv[])
 {
   int i;
-  double S;
+  double S, mu, alpha;
 
   if (strlen (p->name) != 0)
     fprintf (fp, "name: %s\n", p->name);
@@ -490,7 +713,9 @@ print_poly (FILE *fp, cado_poly p, int argc, char *argv[])
   mpz_out_str (fp, 10, p->n);
   fprintf (fp, "\n");
   fprintf (fp, "skew: %1.3f\n", S = p->skew);
-  fprintf (fp, "# mu(m,S): %1.3e\n", get_mu (p->f, p->degree, p->m, S));
+  mu = get_mu (p->f, p->degree, p->m, S);
+  alpha = get_alpha (p->f, p->degree, p->alim);
+  fprintf (fp, "# mu: %1.3e, alpha: %1.2f\n", mu, alpha);
   for (i = p->degree; i >= 0; i--)
     {
       fprintf (fp, "c%d: ", i);
@@ -538,171 +763,7 @@ L (mpz_t n)
   return exp (e);
 }
 
-/*************************** root properties **********************************/
-
-#ifdef DEBUG
-void
-print_polynomial (mpz_t *f, const int d)
-{
-  int i;
-  for (i = 0; i <= d; i++)
-    if (mpz_cmp_ui (f[i], 0) > 0)
-      gmp_printf ("+%Zd*x^%d", f[i], i);
-    else if (mpz_cmp_ui (f[i], 0) < 0)
-      gmp_printf ("%Zd*x^%d", f[i], i);
-  printf (";\n");
-}
-#endif
-
-/* Returns the number of roots of f(x) mod p, where f has degree d.
-   Assumes p does not divide lc(f). */
-int
-roots_mod (mpz_t *f, const int d, const unsigned long p)
-{
-  mpz_t *fp, *g, *h;
-  int i, j, k, df = d, dg, dh;
-
-  if (mpz_divisible_ui_p (f[d], p))
-    {
-      fprintf (stderr, "Error in roots_mod: lc(f) divisible by %lu\n", p);
-      exit (1);
-    }
-  /* the number of roots is the degree of gcd(x^p-x,f) */
-
-  /* we first compute fp = f/lc(f) mod p */
-  fp = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
-  for (i = 0; i <= d; i++)
-    mpz_init (fp[i]);
-  mpz_set_ui (fp[d], p);
-  mpz_invert (fp[d], f[d], fp[d]); /* 1/f[d] mod p */
-  for (i = 0; i < d; i++)
-    {
-      mpz_mul (fp[i], f[i], fp[d]);
-      mpz_mod_ui (fp[i], fp[i], p);
-    }
-  mpz_set_ui (fp[d], 1); /* useless? */
-
-  /* we first compute x^p mod fp; since fp has degree d, all operations can
-     be done with polynomials of degree < 2d */
-  g = (mpz_t*) malloc (2 * d * sizeof (mpz_t));
-  h = (mpz_t*) malloc (2 * d * sizeof (mpz_t));
-  for (i = 0; i < 2 * d; i++)
-    {
-      mpz_init (g[i]); /* initialize to 0 */
-      mpz_init (h[i]);
-    }
-
-  /* initialize g to x */
-  mpz_set_ui (g[1], 1);
-  dg = 1;
-
-  mpz_set_ui (g[2], p);
-  k = mpz_sizeinbase (g[2], 2); /* number of bits of p: bit 0 to k-1 */
-
-  for (k -= 2; k >= 0; k--)
-    {
-      /* square g into h: g has degree dg -> h has degree 2*dg */
-      for (i = 0; i <= dg; i++)
-	for (j = i + 1; j <= dg; j++)
-	  if (i == 0 || j == dg)
-	    mpz_mul (h[i + j], g[i], g[j]);
-	  else
-	    mpz_addmul (h[i + j], g[i], g[j]);
-      for (i = 1; i < 2 * dg; i++)
-	mpz_mul_2exp (h[i], h[i], 1);
-      mpz_mul (h[0], g[0], g[0]);
-      mpz_mul (h[2 * dg], g[dg], g[dg]);
-      for (i = 1; i < dg; i++)
-	mpz_addmul (h[2 * i], g[i], g[i]);
-      dh = 2 * dg;
-
-      /* reduce mod p */
-      assert (dh < 2 * d);
-      for (i = 0; i <= dh; i++)
-	mpz_mod_ui (h[i], h[i], p);
-      
-      /* multiply h by x if bit k of p is set */
-      if (p & (1 << k))
-	{
-	  for (i = dh; i >= 0; i--)
-	    mpz_swap (h[i+1], h[i]);
-	  mpz_set_ui (h[0], 0);
-	  dh ++;
-	  assert (dh < 2 * d);
-	}
-
-      /* reduce mod fp */
-      while (dh >= d)
-	{
-	  /* subtract h[dh]*fp*x^(dh-d) from h */
-	  mpz_mod_ui (h[dh], h[dh], p);
-	  for (i = 0; i < d; i++)
-	    mpz_submul (h[dh - d + i], h[dh], fp[i]);
-	  /* it is not necessary to reduce h[j] for j < dh */
-	  dh --;
-          assert (dh < 2 * d);
-	}
-
-      /* reduce h mod p and copy to g */
-      for (i = 0; i <= dh; i++)
-	mpz_mod_ui (g[i], h[i], p);
-      dg = dh;
-      assert (dg < 2 * d);
-    }
-
-  /* subtract x */
-  mpz_sub_ui (g[1], g[1], 1);
-  mpz_mod_ui (g[1], g[1], p);
-
-  while (dg >= 0 && mpz_cmp_ui (g[dg], 0) == 0)
-    dg --;
-
-  /* take the gcd with fp */
-  while (dg > 0)
-    {
-      while (df >= dg)
-	{
-	  /* divide f by g */
-	  mpz_set_ui (h[0], p);
-	  mpz_invert (h[0], g[dg], h[0]); /* 1/g[dg] mod p */
-	  mpz_mul (h[0], h[0], f[df]);
-	  mpz_mod_ui (h[0], h[0], p); /* f[df]/g[dg] mod p */
-	  for (i = 0; i < dg; i++)
-	    {
-	      mpz_submul (f[df - dg + i], h[0], g[i]);
-	      mpz_mod_ui (f[df - dg + i], f[df - dg + i], p);
-	    }
-	  df --;
-	  while (df >= 0 && mpz_cmp_ui (f[df], 0) == 0)
-	    df --;
-	}
-      /* now d < dg: swap f and g */
-      for (i = 0; i <= dg; i++)
-	mpz_swap (f[i], g[i]);
-      i = df;
-      df = dg;
-      dg = i;
-    }
-
-  /* if g=0 now, gcd is f, otherwise if g<>0, gcd is 1 */
-  if (mpz_cmp_ui (g[0], 0) != 0)
-    df = 0;
-
-  for (i = 0; i < 2 * d; i++)
-    {
-      mpz_clear (g[i]);
-      mpz_clear (h[i]);
-    }
-  free (g);
-  free (h);
-  for (i = 0; i <= d; i++)
-    mpz_clear (fp[i]);
-  free (fp);
-
-  return df;
-}
-
-/***************************** main program ***********************************/
+/***************************** main program **********************************/
 
 int
 main (int argc, char *argv[])
