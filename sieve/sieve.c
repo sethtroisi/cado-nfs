@@ -537,27 +537,28 @@ find_sieve_reports (const unsigned char *sievearray, long *reports,
 {
   long long tsc1, tsc2;
   long a;
-  unsigned long reports_nr, odd_b = b, d;
+  unsigned long reports_nr, d;
+  const int b3 = (b % 3 == 0); /* We skip over $a$, $3|a$ if $3|b$ to save some
+				  space in the reports list */
   
   ASSERT (odd == 0 || odd == 1);
   ASSERT (!odd || (amin & 1) == 1);
   ASSERT (!odd || (amax & 1) == 1);
   ASSERT (amin <= amax);
+  ASSERT (b > 0);
 
   rdtscll (tsc1);
   reports_nr = 0;
-  if (odd) /* If all $a$ are odd, we can divide 2's out of $b$ for the gcd */
-    for (odd_b = b; odd_b % 2 == 0; odd_b >>= 1);
 
   for (a = amin, d = 0; reports_nr < reports_len && a <= amax; 
        a += 1 << odd, d++)
     {
-      /* The + 10 is to deal with accumulated rounding that might have
+      /* The + 10 is to deal with accumulated rounding error that might have
 	 cause the sieve value to drop below 0 and wrap around */
       if ((unsigned char) (sievearray[d] + 10) <= reports_threshold + 10)
         {
 	  ASSERT (a == amin + (long) (d << odd));
-          if (gcd(labs(a), odd_b) == 1)
+	  if (!b3 || (a % 3) != 0)
 	    reports[reports_nr++] = a;
         }
     }
@@ -565,7 +566,8 @@ find_sieve_reports (const unsigned char *sievearray, long *reports,
 #ifdef HAVE_MSRH
   if (verbose)
     {
-      printf ("# There were %lu sieve reports\n", reports_nr);
+      printf ("# There were %lu sieve reports (a,b not necessarily coprime)\n",
+	      reports_nr);
       printf ("# Finding sieve reports took %lld clocks\n", tsc2 - tsc1);
     }
 #endif
@@ -715,10 +717,7 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
   rdtscll (tsc1);
   for (i = 0, j = 0; i < reports_a_nr && j < reports_r_nr;)
     {
-      ASSERT (gcd(labs(reports_a[i]), b) == 1);
-      ASSERT (gcd(labs(reports_r[j]), b) == 1);
-
-      if (reports_a[i] == reports_r[j])
+      if (reports_a[i] == reports_r[j] && gcd(labs(reports_a[i]), b) == 1)
 	{
           const long a = reports_a[i];
           factorbase_degn_t *nextfb;
