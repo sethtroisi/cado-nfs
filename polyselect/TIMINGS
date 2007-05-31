@@ -8,6 +8,16 @@ polyselect-r24 15154.928s (qintsize=10000)
 polyselect-r124 -e 200000000 6560s (+395s for polyselect)
 polyselect-r124 -e 500000000 8748s (+994s for polyselect)
 
-Timings obtained on a 800Mhz Pentium:
+Timings obtained on a 800Mhz Pentium M at the end of first sieve block
+with ggnfs-0.77.0 (with default ggnfs sieve parameters):
 
-r46: 0.03109 sec/rel
+c80 (q=250000 to 260000):
+ggnfs-0.77.0: total yield: 40898, q=259943 (0.01336 sec/rel)
+              total yield: 44767, q=259943 (0.01219 sec/rel) [skew=4150]
+r24: total yield: 8980, q=259993 (0.05526 sec/rel)
+r45: total yield: 8976, q=259993 (0.05588 sec/rel)
+r46: total yield: 16457, q=259949 (0.02782 sec/rel) [-e 1000000]
+
+c98 (q=900000 to 1000000):
+ggnfs-0.77.0: total yield: 43850, q=909977 (0.01807 sec/rel) [at 910000]
+msieve-1.16:  total yield: 540180, q=999953 (0.02117 sec/rel)

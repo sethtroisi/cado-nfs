@@ -31,7 +31,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
        Arizona, 14 March 2006.
 */
 
-#define VERSION 131 /* try to match the svn version */
+#define VERSION 134 /* try to match the svn version */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -43,6 +43,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include "cado.h"
 
 #define REPS 1 /* number of Miller-Rabin tests in isprime */
+#define NUM_EST 1000 /* number of iterations to estimate average valuations
+			for ``bad-behaved'' primes */
 
 static void
 usage ()
@@ -55,10 +57,52 @@ usage ()
   exit (1);
 }
 
-/*************************** root properties *********************************/
+/************************** polynomial arithmetic ****************************/
 
-#define DEBUG
-#ifdef DEBUG
+/* allocate a polynomial of degree d, and initialize it */
+mpz_t*
+alloc_poly (int d)
+{
+  mpz_t *f;
+  int i;
+
+  f = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
+  for (i = 0; i <= d; i++)
+    mpz_init (f[i]);
+  return f;
+}
+
+/* free a polynomial of degree d */
+void
+poly_clear (mpz_t *f, int d)
+{
+  int i;
+  
+  for (i = 0; i <= d; i++)
+    mpz_clear (f[i]);
+  free (f);
+}
+
+/* f <- g */
+void
+copy_poly (mpz_t *f, mpz_t *g, int d)
+{
+  int i;
+
+  for (i = 0; i <= d; i++)
+    mpz_set (f[i], g[i]);
+}
+
+/* f <- diff(g,x) */
+void
+diff_poly (mpz_t *f, mpz_t *g, int d)
+{
+  int i;
+
+  for (i = 0; i < d; i++)
+    mpz_mul_ui (f[i], g[i + 1], i + 1);
+}
+
 void
 print_polynomial (mpz_t *f, const int d)
 {
@@ -70,27 +114,119 @@ print_polynomial (mpz_t *f, const int d)
       gmp_printf ("%Zd*x^%d", f[i], i);
   printf (";\n");
 }
-#endif
+
+/* D <- |discriminant (f)| = |resultant(f,diff(f,x))/lc(f)| */
+void
+discriminant (mpz_t D, mpz_t *f0, const int d)
+{
+  mpz_t *f, *g, num, den;
+  int df, dg, i, s;
+
+  f = alloc_poly (d);
+  g = alloc_poly (d - 1);
+  copy_poly (f, f0, d);
+  df = d;
+  diff_poly (g, f0, d);
+  dg = d - 1;
+  mpz_init_set_ui (num, 1);
+  mpz_init_set_ui (den, 1);
+  while (dg > 0)
+    {
+      s = df;
+      while (df >= dg)
+	{
+	  /* f <- f * lc(g), except f[df] since we'll divide it afterwards */
+	  for (i = 0; i < df; i++)
+	    mpz_mul (f[i], f[i], g[dg]);
+	  s -= dg;
+	  for (i = 0; i < dg; i++)
+	    mpz_submul (f[i + df - dg], g[i], f[df]);
+	  df --;
+	  /* normalize f */
+	  while (df > 0 && mpz_cmp_ui (f[df], 0) == 0)
+	    df --;
+	}
+      /* den <- den * lc(g)^deg(f) */
+      s -= df;
+      if (s > 0)
+	for (i = 0; i < s; i++)
+	  mpz_mul (num, num, g[dg]);
+      else
+	for (i = 0; i < -s; i++)
+	  mpz_mul (den, den, g[dg]);
+      /* swap f and g */
+      for (i = 0; i <= dg; i++)
+	mpz_swap (f[i], g[i]);
+      i = df;
+      df = dg;
+      dg = i;
+    }
+  /* num/den*g^deg(f) */
+  mpz_pow_ui (g[0], g[0], df);
+  mpz_mul (g[0], g[0], num);
+  mpz_divexact (g[0], g[0], den);
+  /* divide by lc(f0) to get the discriminant */
+  mpz_divexact (D, g[0], f0[d]);
+  mpz_clear (num);
+  mpz_clear (den);
+  poly_clear (f, d);
+  poly_clear (g, d - 1);
+}
+
+/*************************** root properties *********************************/
+
+/* v <- f(x) */
+void
+eval_poly (mpz_t v, mpz_t *f, int d, unsigned long x)
+{
+  int i;
+
+  mpz_set (v, f[d]);
+  for (i = d - 1; i >= 0; i--)
+    {
+      mpz_mul_ui (v, v, x);
+      mpz_add (v, v, f[i]);
+    }
+}
+
+/* estimate the average valuation of p in f(x) for 0 <= x < X */
+double
+estimate_valuation (mpz_t *f, int d, unsigned long X, unsigned long p)
+{
+  double s = 0.0;
+  unsigned long x;
+  mpz_t v;
+
+  mpz_init (v);
+  for (x = 0; x < X; x++)
+    {
+      eval_poly (v, f, d, x);
+      while (mpz_divisible_ui_p (v, p))
+	{
+	  s ++;
+	  mpz_divexact_ui (v, v, p);
+	}
+    }
+  mpz_clear (v);
+  return s / (double) X;
+}
 
 /* Returns the number of roots of f(x) mod p, where f has degree d.
-   Assumes p does not divide lc(f). */
+   Assumes p does not divide disc(f). */
 int
-roots_mod (mpz_t *f, const int d, const unsigned long p)
+roots_mod (mpz_t *f, int d, const unsigned long p)
 {
   mpz_t *fp, *g, *h;
-  int i, j, k, df = d, dg, dh;
+  int i, j, k, df, dg, dh;
 
-  if (mpz_divisible_ui_p (f[d], p))
-    {
-      fprintf (stderr, "Error in roots_mod: lc(f) divisible by %lu\n", p);
-      exit (1);
-    }
   /* the number of roots is the degree of gcd(x^p-x,f) */
 
   /* we first compute fp = f/lc(f) mod p */
-  fp = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
-  for (i = 0; i <= d; i++)
-    mpz_init (fp[i]);
+  while (d >= 0 && mpz_divisible_ui_p (f[d], p))
+    d --;
+  assert (d >= 0); /* f is 0 mod p: should not happen since otherwise p would
+		      divide N, because f(m)=N */
+  fp = alloc_poly (d);
   mpz_set_ui (fp[d], p);
   mpz_invert (fp[d], f[d], fp[d]); /* 1/f[d] mod p */
   for (i = 0; i < d; i++)
@@ -99,16 +235,12 @@ roots_mod (mpz_t *f, const int d, const unsigned long p)
       mpz_mod_ui (fp[i], fp[i], p);
     }
   mpz_set_ui (fp[d], 1); /* useless? */
+  df = d;
 
   /* we first compute x^p mod fp; since fp has degree d, all operations can
      be done with polynomials of degree < 2d */
-  g = (mpz_t*) malloc (2 * d * sizeof (mpz_t));
-  h = (mpz_t*) malloc (2 * d * sizeof (mpz_t));
-  for (i = 0; i < 2 * d; i++)
-    {
-      mpz_init (g[i]); /* initialize to 0 */
-      mpz_init (h[i]);
-    }
+  g = alloc_poly (2 * d - 1);
+  h = alloc_poly (2 * d - 1);
 
   /* initialize g to x */
   mpz_set_ui (g[1], 1);
@@ -206,16 +338,9 @@ roots_mod (mpz_t *f, const int d, const unsigned long p)
   if (mpz_cmp_ui (g[0], 0) != 0)
     df = 0;
 
-  for (i = 0; i < 2 * d; i++)
-    {
-      mpz_clear (g[i]);
-      mpz_clear (h[i]);
-    }
-  free (g);
-  free (h);
-  for (i = 0; i <= d; i++)
-    mpz_clear (fp[i]);
-  free (fp);
+  poly_clear (g, 2 * d - 1);
+  poly_clear (h, 2 * d - 1);
+  poly_clear (fp, d);
 
   return df;
 }
@@ -243,27 +368,48 @@ isprime (unsigned long p)
    absolute value. Typical good values are alpha=-4, -5, ...
 */
 double
-get_alpha (mpz_t *f, const int d, unsigned long B)
+get_alpha (mpz_t *f, const int d, unsigned long B, int verbose)
 {
-  double alpha = 0.0;
+  double alpha = 0.0, e;
   unsigned long p, q;
+  mpz_t disc;
 
-  if (mpz_divisible_ui_p (f[d], 2) == 0)
+  mpz_init (disc);
+  discriminant (disc, f, d);
+  if (mpz_divisible_ui_p (disc, 2) == 0)
     {
       q = roots_mod (f, d, 2);
       assert (q <= 2);
       alpha = (1.0 - 2.0 * (double) q / 3.0) * log (2.0);
     }
-  for (p = 3; p <= B; p+=2)
+  else
     {
-      if ((mpz_divisible_ui_p (f[d], p) == 0) && isprime (p))
-        {
-          q = roots_mod (f, d, p);
-          assert (q <= p);
-          alpha += (1.0 - (double) q * (double) p / (double) (p + 1)) *
-            log ((double) p) / (double) (p - 1);
-        }
+      e = estimate_valuation (f, d, NUM_EST, 2);
+      if (verbose >= 2)
+	fprintf (stderr, "2 divides disc(f): %1.2f\n", e);
+      alpha = (1.0 - e) * log (2.0);
     }
+  for (p = 3; p <= B; p += 2)
+    {
+      if (isprime (p))
+	{
+	  if (mpz_divisible_ui_p (disc, p))
+	    {
+	      e = estimate_valuation (f, d, 1000, p);
+	      if (verbose >= 2)
+		fprintf (stderr, "%lu divides disc(f): %1.2f\n", p, e);
+	      alpha += (1.0 / (double) (p - 1) - e) * log ((double) p);
+	    }
+	  else
+	    {
+	      q = roots_mod (f, d, p);
+	      assert (q <= p);
+	      alpha += (1.0 - (double) q * (double) p / (double) (p + 1)) *
+		log ((double) p) / (double) (p - 1);
+	    }
+	}
+    }
+  mpz_clear (disc);
   return alpha;
 }
 
@@ -428,12 +574,8 @@ init_poly (cado_poly p, cado_input in)
   p->degree = in->degree;
   if (p->degree == 0)
     p->degree = default_degree (p->n);
-  p->f = (mpz_t*) malloc ((p->degree + 1) * sizeof (mpz_t));
-  for (i = 0; i <= p->degree; i++)
-    mpz_init (p->f[i]);
-  p->g = (mpz_t*) malloc (2 * sizeof (mpz_t));
-  mpz_init (p->g[0]);
-  mpz_init (p->g[1]);
+  p->f = alloc_poly (p->degree);
+  p->g = alloc_poly (2);
   mpz_init (p->m);
   strcpy (p->type, "gnfs");
 }
@@ -669,7 +811,7 @@ void
 generate_poly (cado_poly out, unsigned long T, int verbose)
 {
   unsigned long d = out->degree, alim;
-  double B, mu, best_mu = DBL_MAX, alpha;
+  double B, mu, logmu, best_logmu = DBL_MAX, best_E = DBL_MAX, alpha, E;
   mpz_t best_m;
 
   mpz_init (best_m);
@@ -682,17 +824,27 @@ generate_poly (cado_poly out, unsigned long T, int verbose)
     {
       generate_base_m (out, out->m);
       mu = get_mu (out->f, out->degree, out->m, out->skew);
-      if (mu < best_mu)
+      logmu = log (mu);
+      /* we keep only the values of mu near optimal, since computing alpha
+	 is much more expensive */
+      if (logmu < best_logmu + 0.0)
 	{
-	  best_mu = mu;
-	  if (verbose)
+	  if (logmu < best_logmu)
+	    best_logmu = logmu;
+	  alpha = get_alpha (out->f, out->degree, alim, verbose);
+	  E = logmu + alpha;
+	  if (E < best_E)
 	    {
-              alpha = get_alpha (out->f, out->degree, alim);
-	      fprintf (stderr, "m=");
-	      mpz_out_str (stderr, 10, out->m);
-	      fprintf (stderr, " mu=%1.3e alpha=%1.2f\n", mu, alpha);
+	      best_E = E;
+	      if (verbose)
+		{
+		  fprintf (stderr, "m=");
+		  mpz_out_str (stderr, 10, out->m);
+		  fprintf (stderr, " logmu=%1.2e alpha=%1.2f E=%1.2f\n",
+			   logmu, alpha, E);
+		}
+	      mpz_set (best_m, out->m);
 	    }
-	  mpz_set (best_m, out->m);
 	}
       mpz_add_ui (out->m, out->m, 1);
     }
@@ -714,8 +866,9 @@ print_poly (FILE *fp, cado_poly p, int argc, char *argv[])
   fprintf (fp, "\n");
   fprintf (fp, "skew: %1.3f\n", S = p->skew);
   mu = get_mu (p->f, p->degree, p->m, S);
-  alpha = get_alpha (p->f, p->degree, p->alim);
-  fprintf (fp, "# mu: %1.3e, alpha: %1.2f\n", mu, alpha);
+  alpha = get_alpha (p->f, p->degree, p->alim, 0);
+  fprintf (fp, "# mu: %1.2e, alpha: %1.2f log(mu)+alpha=%1.2f\n", mu, alpha,
+	   log (mu) + alpha);
   for (i = p->degree; i >= 0; i--)
     {
       fprintf (fp, "c%d: ", i);
@@ -780,7 +933,7 @@ main (int argc, char *argv[])
     {
       if (strcmp (argv[1], "-v") == 0)
 	{
-	  verbose = 1;
+	  verbose ++;
 	  argv ++;
 	  argc --;
 	}
@@ -803,7 +956,7 @@ main (int argc, char *argv[])
   init (in);
   parse_input (in);
   if (verbose)
-    fprintf (stderr, "L[1/3,(64/9)^(1/3)](n)=%1.3e\n", L (in->n));
+    fprintf (stderr, "L[1/3,(64/9)^(1/3)](n)=%1.2e\n", L (in->n));
   init_poly (out, in);
   clear (in);
 
