@@ -1,3 +1,18 @@
+skew := proc(f, x, s0) local absf, g, i, S;
+   absf := add(abs(coeff(f,x,i))*x^i, i=0..degree(f,x));
+   g := expand(subs(x=S^2, absf)/S^degree(f));
+   g := diff(g,S);
+   fsolve(g, S=s0);
+end:
+
+# takes also into account the linear polynomial x-m
+skew2 := proc(f, x, m, s0) local absf, g, i, S;
+   absf := add(abs(coeff(f,x,i))*x^i, i=0..degree(f,x));
+   g := expand(subs(x=S^2, absf)/S^degree(f))*(m/S+S);
+   g := diff(g,S);
+   fsolve(g, S=s0);
+end:
+
 get_alpha := proc(f, B) local s, p, e, q, disc;
    s := 0;
    p := 2;
@@ -17,6 +32,17 @@ get_alpha := proc(f, B) local s, p, e, q, disc;
       p := nextprime(p);
    od;
    s;
+end:
+
+# returns the smallest value of alpha for p1 <= p <= p2
+min_alpha := proc(p1,p2) local p, s;
+   s := 0;
+   p := nextprime(p1-1);
+   while p <= p2 do
+      s := s + evalf((1-p^2/(p+1))*log(p)/(p-1));
+      p := nextprime(p);
+   od;
+   s
 end:
 
 # p-valuation of integer N
