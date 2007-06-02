@@ -34,12 +34,13 @@ get_alpha := proc(f, B) local s, p, e, q, disc;
    s;
 end:
 
-# returns the smallest value of alpha for p1 <= p <= p2
-min_alpha := proc(p1,p2) local p, s;
+# returns the smallest value of alpha for p1 <= p <= p2,
+# with a degree-d polynomial
+min_alpha := proc(d,p1,p2) local p, s;
    s := 0;
    p := nextprime(p1-1);
    while p <= p2 do
-      s := s + evalf((1-p^2/(p+1))*log(p)/(p-1));
+      s := s + evalf((1-min(d,p)*p/(p+1))*log(p)/(p-1));
       p := nextprime(p);
    od;
    s
