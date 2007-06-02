@@ -49,32 +49,38 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #define DEFAULT_DEGREES_LENGTH 3
 
 /* default rational/algebraic factor base bounds */
-#define DEFAULT_RLIM {{70, 200000}, {80, 350000}, {ULONG_MAX, 4294967295UL}}
-#define DEFAULT_RLIM_LENGTH 4
-#define DEFAULT_ALIM {{70, 200000}, {80, 500000}, {ULONG_MAX, 4294967295UL}}
+#define DEFAULT_RLIM {{70, 200000}, {80, 350000}, {100, 1800000}, \
+                      {130, 3497867}, {ULONG_MAX, 4294967295UL}}
+#define DEFAULT_RLIM_LENGTH 5
+#define DEFAULT_ALIM {{70, 200000}, {80, 500000}, {100, 1800000}, \
+                      {130, 11380951}, {ULONG_MAX, 4294967295UL}}
 #define DEFAULT_ALIM_LENGTH DEFAULT_RLIM_LENGTH
 
 /* default large prime bounds */
-#define DEFAULT_LPBR {{70, 23}, {90, 24}, {ULONG_MAX, 25}}
-#define DEFAULT_LPBR_LENGTH 3
+#define DEFAULT_LPBR {{70, 23}, {90, 24}, {100, 26}, {130, 28}, \
+		      {ULONG_MAX, 25}}
+#define DEFAULT_LPBR_LENGTH 5
 #define DEFAULT_LPBA DEFAULT_LPBR
 #define DEFAULT_LPBA_LENGTH DEFAULT_LPBR_LENGTH
 
 /* default factor-residual bounds */
-#define DEFAULT_MFBR {{70, 35}, {90, 37}, {ULONG_MAX, 39}}
-#define DEFAULT_MFBR_LENGTH 3
+#define DEFAULT_MFBR {{70, 35}, {90, 37}, {100, 48}, {130, 56}, \
+		      {ULONG_MAX, 39}}
+#define DEFAULT_MFBR_LENGTH 5
 #define DEFAULT_MFBA DEFAULT_MFBR
 #define DEFAULT_MFBA_LENGTH DEFAULT_MFBR_LENGTH
 
 /* default lambda values */
-#define DEFAULT_RLAMBDA {{70, 1.5}, {90, 1.7}, {ULONG_MAX, 1.9}}
-#define DEFAULT_RLAMBDA_LENGTH 3
+#define DEFAULT_RLAMBDA {{70, 1.5}, {90, 1.7}, {100, 2.5}, {130, 2.7}, \
+                         {ULONG_MAX, 2.7}}
+#define DEFAULT_RLAMBDA_LENGTH 5
 #define DEFAULT_ALAMBDA DEFAULT_RLAMBDA
 #define DEFAULT_ALAMBDA_LENGTH DEFAULT_RLAMBDA_LENGTH
 
 /* default sieving block lengths */
-#define DEFAULT_QINT {{70, 5000}, {90, 10000}, {ULONG_MAX, 20000}}
-#define DEFAULT_QINT_LENGTH 3
+#define DEFAULT_QINT {{70, 5000}, {90, 10000}, {100, 100000}, {130, 100000}, \
+                      {ULONG_MAX, 1000000}}
+#define DEFAULT_QINT_LENGTH 5
 
 typedef struct
 {
