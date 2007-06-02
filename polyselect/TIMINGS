@@ -12,12 +12,25 @@ Timings obtained on a 800Mhz Pentium M at the end of first sieve block
 with ggnfs-0.77.0 (with default ggnfs sieve parameters):
 
 c80 (q=250000 to 260000):
-ggnfs-0.77.0: total yield: 40898, q=259943 (0.01336 sec/rel)
+ggnfs-0.77.0: total yield: 40898, q=259943 (0.01336 s/r)     [skew0=1379.250]
               total yield: 44767, q=259943 (0.01219 sec/rel) [skew=4150]
-r24: total yield: 8980, q=259993 (0.05526 sec/rel)
-r45: total yield: 8976, q=259993 (0.05588 sec/rel)
-r46: total yield: 16457, q=259949 (0.02782 sec/rel) [-e 1000000]
+r135a: total yield: 24362, q=259991 (0.02032 sec/rel) [-e 1000000]
+r135b: total yield: 44743, q=259937 (0.01141 sec/rel) [-e 2000000]
+r135c: total yield: 45435, q=259907 (0.01130 sec/rel) [-e 20000000]
 
 c98 (q=900000 to 1000000):
 ggnfs-0.77.0: total yield: 43850, q=909977 (0.01807 sec/rel) [at 910000]
 msieve-1.16:  total yield: 540180, q=999953 (0.02117 sec/rel)
+r135a: total yield: 4305, q=901447 (0.02489 sec/rel) [-e 1000000]
+r135b: total yield: 2085, q=900577 (0.02270 sec/rel) [-e 2000000]
+r135c: total yield: 4382, q=901067 (0.02127 sec/rel) [-e 5000000]
+r135d: total yield: 3529, q=901009 (0.02031 sec/rel) [-e 10000000]
+r135e: total yield: 40444, q=910103 (0.01955 sec/rel) [-e 30000000]
+r135f: total yield: 14286, q=903871 (0.02061 sec/rel)
+r135g: total yield: 4093, q=901013 (0.02035 sec/rel)
+
+rsa130:
+poly1: total yield: 1727, q=5692061 (0.28462 sec/rel)
+r135a: total yield: 1210, q=5692067 (0.31564 sec/rel) [-e 1000000]
+r135b: total yield: 1798, q=5692103 (0.21737 sec/rel) [-e 5000000]
+
