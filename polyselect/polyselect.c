@@ -33,7 +33,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
        Algorithm", Brian Antony Murphy, Australian National University, 1999.
 */
 
-#define VERSION 142 /* try to match the svn version */
+#define VERSION 145 /* try to match the svn version */
 
 #define METHOD 3 /* algorithm used for polynomial selection:
 		    1: basic method in B^{d(d+1)/(d-1)} to save a factor B
@@ -53,14 +53,15 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <sys/resource.h>
 
 #define REPS 1 /* number of Miller-Rabin tests in isprime */
-#define NUM_EST 1000 /* number of iterations to estimate average valuations
+#define NUM_EST 32 /* number of iterations to estimate average valuations
 			for ``bad-behaved'' primes */
 
 static void
 usage ()
 {
-  fprintf (stderr, "Usage: polyselect [-v] [-e nnn] < in > out\n\n");
+  fprintf (stderr, "Usage: polyselect [-v] [-raw] [-e nnn] < in > out\n\n");
   fprintf (stderr, "       -v     - verbose\n");
+  fprintf (stderr, "       -raw   - does not output factor base parameters\n");
   fprintf (stderr, "       -e nnn - use effort nnn\n");
   fprintf (stderr, "       in     - input file (number to factor)\n");
   fprintf (stderr, "       out    - output file (polynomials)\n");
@@ -134,7 +135,7 @@ fprint_polynomial (FILE *fp, mpz_t *f, const int d)
   fprintf (fp, ";\n");
 }
 
-#define print_polynomial(f,d) fprint_polynomial(stdin,f,d)
+#define print_polynomial(f,d) fprint_polynomial(stdout,f,d)
 
 /* D <- |discriminant (f)| = |resultant(f,diff(f,x))/lc(f)| */
 void
@@ -196,40 +197,49 @@ discriminant (mpz_t D, mpz_t *f0, const int d)
 
 /*************************** root properties *********************************/
 
-/* v <- f(x) */
+/* v <- f(x,y) */
 void
-eval_poly (mpz_t v, mpz_t *f, int d, unsigned long x)
+eval_poly (mpz_t v, mpz_t *f, int d, unsigned long x, unsigned long y)
 {
   int i;
+  mpz_t Y;
 
+  mpz_init_set_ui (Y, 1);
   mpz_set (v, f[d]);
   for (i = d - 1; i >= 0; i--)
     {
       mpz_mul_ui (v, v, x);
-      mpz_add (v, v, f[i]);
+      mpz_mul_ui (Y, Y, y); /* invariant: Y = y^(d-i) */
+      mpz_addmul (v, f[i], Y);
     }
+  mpz_clear (Y);
 }
 
-/* estimate the average valuation of p in f(x) for 0 <= x < X */
+/* estimate the average valuation of p in f(x) for 0 <= x, y < X */
 double
 estimate_valuation (mpz_t *f, int d, unsigned long X, unsigned long p)
 {
-  double s = 0.0;
-  unsigned long x;
+  double s = 0.0, t = 0.0;
+  unsigned long x, y;
   mpz_t v;
 
   mpz_init (v);
-  for (x = 0; x < X; x++)
-    {
-      eval_poly (v, f, d, x);
-      while (mpz_divisible_ui_p (v, p))
-	{
-	  s ++;
-	  mpz_divexact_ui (v, v, p);
-	}
-    }
+  for (x = 0; x <= X; x++)
+    for (y = 0; y <= X; y++)
+      {
+	eval_poly (v, f, d, x, y);
+	if (mpz_cmp_ui (v, 0) != 0)
+	  {
+	    t ++;
+	    while (mpz_divisible_ui_p (v, p))
+	      {
+		s ++;
+		mpz_divexact_ui (v, v, p);
+	      }
+	  }
+      }
   mpz_clear (v);
-  return s / (double) X;
+  return s / t;
 }
 
 /* Returns the number of roots of f(x) mod p, where f has degree d.
@@ -416,7 +426,7 @@ get_alpha (mpz_t *f, const int d, unsigned long B, int verbose)
 	{
 	  if (mpz_divisible_ui_p (disc, p))
 	    {
-	      e = estimate_valuation (f, d, 1000, p);
+	      e = estimate_valuation (f, d, NUM_EST, p);
 	      if (verbose >= 2)
 		fprintf (stderr, "%lu divides disc(f): %1.2f\n", p, e);
 	      alpha += (1.0 / (double) (p - 1) - e) * log ((double) p);
@@ -736,49 +746,6 @@ mpz_ndiv_qr (mpz_t q, mpz_t r, mpz_t n, mpz_t d)
     }
 }
 
-#if 0
-/* L-Inf skewness, using Definition 3.1 from reference [1]:
-   S = min_{s > 0} max_{i} |a_i s^{i-d/2}|
-*/
-double
-skewness (mpz_t *p, unsigned long degree)
-{
-  unsigned long i, j, k;
-  double s, smin, S, *loga;
-
-  loga = (double*) malloc ((degree + 1) * sizeof (double));
-  for (i = 0; i <= degree; i++)
-    loga[i] = log (fabs (mpz_get_d (p[i])));
-  smin = DBL_MAX;
-  for (i = 0; i < degree; i++)
-    for (j = i + 1; j <= degree; j++)
-      {
-	/* compute line going through log(ai) and log(aj),
-	   and check it goes over the other points */
-	s = (loga[j] - loga[i]) / (double) (j - i);
-	/* tentative convex line is log(ai) + s*(x-i) */
-	for (k = 0; k <= degree; k++)
-	  if (k != i && k != j && loga[k] > loga[i] + s * (double) (k - i))
-	    break;
-	if (k > degree && s < smin)
-	  {
-	    smin = s;
-	    S = exp (loga[i] + s * (double) (i - (double) degree / 2.0));
-	  }
-      }
-  free (loga);
-  s = exp (-smin);
-  printf ("s=%e\n", s);
-  exit (1);
-  return s;
-}
-#else
-/* we want to find the mininum of f(S) = |p[d]|*S^d + ... + |p[0]|*S^{-d},
-   i.e., a zero of g(S) = d |p[d]| S^{d-1} + ... - d |p[0]| S^{-d-1}.
-   Since there is only one sign change in the coefficients of g, it has
-   exactly one root on [0, +Inf[. We search it by dichotomy.
-*/
-
 /* return sum(g[i]*s^i, i=0..d) */
 double
 eval_double_poly (double *g, int d, double s)
@@ -792,6 +759,11 @@ eval_double_poly (double *g, int d, double s)
   return v;
 }
 
+/* we want to find the mininum of f(S) = |p[d]|*S^d + ... + |p[0]|*S^{-d},
+   i.e., a zero of g(S) = d |p[d]| S^{d-1} + ... - d |p[0]| S^{-d-1}.
+   Since there is only one sign change in the coefficients of g, it has
+   exactly one root on [0, +Inf[. We search it by dichotomy.
+*/
 double
 skewness (mpz_t *p, int d)
 {
@@ -826,7 +798,6 @@ skewness (mpz_t *p, int d)
   s = sqrt((sa + sb) / 2.0);
   return s;
 }
-#endif
 
 /* mu(m,S), as defined in reference [2]:
    
@@ -939,12 +910,10 @@ generate_poly (cado_poly out, unsigned long T, int verbose)
 	  if (E < best_E)
 	    {
 	      best_E = E;
-	      if (verbose)
-		{
-		  fprintf (stderr, "m=");
-		  mpz_out_str (stderr, 10, out->m);
-		  fprintf (stderr, " skew=%1.2f logmu=%1.2f alpha~%1.2f E=%1.2f\n", out->skew, logmu, alpha, E);
-		}
+	      fprintf (stderr, "m=");
+	      mpz_out_str (stderr, 10, out->m);
+	      fprintf (stderr, " skew=%1.2f logmu=%1.2f alpha~%1.2f E=%1.2f\n",
+		       out->skew, logmu, alpha, E);
 	      mpz_set (best_m, out->m);
 	    }
 	}
@@ -1021,13 +990,10 @@ generate_poly (cado_poly out, unsigned long T, int verbose)
 	  if (E < best_E)
 	    {
 	      best_E = E;
-	      if (verbose)
-		{
-		  fprintf (stderr, "m=");
-		  mpz_out_str (stderr, 10, out->m);
-		  fprintf (stderr, " skew=%1.2f logmu=%1.2f alpha~%1.2f E=%1.2f\n",
-			   out->skew, logmu, alpha, E);
-		}
+	      fprintf (stderr, "m=");
+	      mpz_out_str (stderr, 10, out->m);
+	      fprintf (stderr, " skew=%1.2f logmu=%1.2f alpha~%1.2f E=%1.2f\n",
+		       out->skew, logmu, alpha, E);
 	      mpz_set (best_m, out->m);
 	    }
 	}
@@ -1106,13 +1072,10 @@ generate_poly (cado_poly out, unsigned long T, int verbose)
 	  if (E < best_E)
 	    {
 	      best_E = E;
-	      if (verbose)
-		{
-		  fprintf (stderr, "m=");
-		  mpz_out_str (stderr, 10, out->m);
-		  fprintf (stderr, " skew=%1.2f logmu=%1.2f alpha~%1.2f E=%1.2f\n",
-			   out->skew, logmu, alpha, E);
-		}
+	      fprintf (stderr, "m=");
+	      mpz_out_str (stderr, 10, out->m);
+	      fprintf (stderr, " skew=%1.2f logmu=%1.2f alpha~%1.2f E=%1.2f\n",
+		       out->skew, logmu, alpha, E);
 	      mpz_set (best_m, out->m);
 	    }
 	}
@@ -1131,7 +1094,7 @@ generate_poly (cado_poly out, unsigned long T, int verbose)
 
 /* st is the initial value cputime() at the start of the program */
 void
-print_poly (FILE *fp, cado_poly p, int argc, char *argv[], int st)
+print_poly (FILE *fp, cado_poly p, int argc, char *argv[], int st, int raw)
 {
   int i;
   double S, mu, alpha, logmu;
@@ -1167,15 +1130,18 @@ print_poly (FILE *fp, cado_poly p, int argc, char *argv[], int st)
   mpz_out_str (fp, 10, p->m);
   fprintf (fp, "\n");
   fprintf (fp, "type: %s\n", p->type);
-  fprintf (fp, "rlim: %lu\n", p->rlim);
-  fprintf (fp, "alim: %lu\n", p->alim);
-  fprintf (fp, "lpbr: %d\n", p->lpbr);
-  fprintf (fp, "lpba: %d\n", p->lpba);
-  fprintf (fp, "mfbr: %d\n", p->mfbr);
-  fprintf (fp, "mfba: %d\n", p->mfba);
-  fprintf (fp, "rlambda: %1.1f\n", p->rlambda);
-  fprintf (fp, "alambda: %1.1f\n", p->alambda);
-  fprintf (fp, "qintsize: %d\n", p->qintsize);
+  if (raw == 0)
+    {
+      fprintf (fp, "rlim: %lu\n", p->rlim);
+      fprintf (fp, "alim: %lu\n", p->alim);
+      fprintf (fp, "lpbr: %d\n", p->lpbr);
+      fprintf (fp, "lpba: %d\n", p->lpba);
+      fprintf (fp, "mfbr: %d\n", p->mfbr);
+      fprintf (fp, "mfba: %d\n", p->mfba);
+      fprintf (fp, "rlambda: %1.1f\n", p->rlambda);
+      fprintf (fp, "alambda: %1.1f\n", p->alambda);
+      fprintf (fp, "qintsize: %d\n", p->qintsize);
+    }
   fprintf (fp, "# generated by polyselect.r%d", VERSION);
   for (i = 1; i < argc; i++)
     fprintf (fp, " %s", argv[i]);
@@ -1205,7 +1171,7 @@ main (int argc, char *argv[])
 {
   cado_input in;
   cado_poly out;
-  int verbose = 0;
+  int verbose = 0, raw = 0;
   unsigned long effort = 1000000;
   char **argv0 = argv;
   int argc0 = argc;
@@ -1217,6 +1183,12 @@ main (int argc, char *argv[])
       if (strcmp (argv[1], "-v") == 0)
 	{
 	  verbose ++;
+	  argv ++;
+	  argc --;
+	}
+      else if (strcmp (argv[1], "-raw") == 0)
+	{
+	  raw = 1;
 	  argv ++;
 	  argc --;
 	}
@@ -1247,7 +1219,7 @@ main (int argc, char *argv[])
   clear (in);
 
   generate_poly (out, effort, verbose);
-  print_poly (stdout, out, argc0, argv0, st);
+  print_poly (stdout, out, argc0, argv0, st, raw);
   clear_poly (out);
 
   return 0;
