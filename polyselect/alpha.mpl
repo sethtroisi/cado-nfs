@@ -20,12 +20,12 @@ get_alpha := proc(f, B) local s, p, e, q, disc;
    while p <= B do
       if disc mod p = 0 then
          lprint(p," divides disc(f)");
-         e := est_valuation (f, p, 0, 999);
+         e := est_valuation (f, p, 1, 99, 1, 99);
          s := s + evalf((1/(p-1)-e)*log(p));
       else
          q := 0;
          for e in Roots(f) mod p do
-            q:=q+1;
+            q:=q+1
          od;
          s := s + evalf((1-q*p/(p+1))*log(p)/(p-1))
       fi;
@@ -54,10 +54,12 @@ valuation := proc(N, p) local v;
 end:
 
 # estimate average p-valuation of polynomial f in x, from x0 to x1
-est_valuation := proc(f, p, x0, x1) local s, v;
+est_valuation := proc(f0, p, x0, x1, y0, y1) local s, v, w, f;
+   f := expand(subs(x=x/y,f0)*y^degree(f0));
    s := 0;
-   for v from x0 to x1 do s:=s+valuation(subs(x=v,f),p) od;
-   1.0*s/(x1+1-x0)
+   for v from x0 to x1 do for w from y0 to y1 do
+      s:=s+valuation(subs(x=v,y=w,f),p) od od;
+   1.0*s/(x1+1-x0)/(y1+1-y0)
 end:
 
 # resultant(P,Q,x), with computations with rationals

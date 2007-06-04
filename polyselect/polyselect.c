@@ -33,7 +33,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
        Algorithm", Brian Antony Murphy, Australian National University, 1999.
 */
 
-#define VERSION 145 /* try to match the svn version */
+#define VERSION 147 /* try to match the svn version */
 
 #define METHOD 3 /* algorithm used for polynomial selection:
 		    1: basic method in B^{d(d+1)/(d-1)} to save a factor B
@@ -1064,13 +1064,14 @@ generate_poly (cado_poly out, unsigned long T, int verbose)
 	 is much more expensive */
       if (logmu < best_logmu + MARGIN)
 	{
-	  if (logmu < best_logmu)
-	    best_logmu = logmu;
 	  alpha = get_alpha (out->f, d, alim, verbose);
 	  calls_alpha ++;
 	  E = logmu + alpha;
 	  if (E < best_E)
 	    {
+	      /* compute best_logmu only for the champions */
+	      if (logmu < best_logmu)
+		best_logmu = logmu;
 	      best_E = E;
 	      fprintf (stderr, "m=");
 	      mpz_out_str (stderr, 10, out->m);

@@ -14,23 +14,54 @@ with ggnfs-0.77.0 (with default ggnfs sieve parameters):
 c80 (q=250000 to 260000):
 ggnfs-0.77.0: total yield: 40898, q=259943 (0.01336 s/r)     [skew0=1379.250]
               total yield: 44767, q=259943 (0.01219 sec/rel) [skew=4150]
-r135a: total yield: 24362, q=259991 (0.02032 sec/rel) [-e 1000000]
+r145a: total yield: 10171, q=253531 (0.01645 sec/rel) [-e 1000000]
 r135b: total yield: 44743, q=259937 (0.01141 sec/rel) [-e 2000000]
+r145b: total yield: 10043, q=253801 (0.01717 sec/rel) [-e 2000000]
+-> regression wrt r135b: m=679661031041255076 was better
+r145c: total yield: 10047, q=252827 (0.01298 sec/rel) [-e 5000000]
 r135c: total yield: 45435, q=259907 (0.01130 sec/rel) [-e 20000000]
+r145d: total yield: 10155, q=252607 (0.01165 sec/rel) [-e 20000000]
 
 c98 (q=900000 to 1000000):
 ggnfs-0.77.0: total yield: 43850, q=909977 (0.01807 sec/rel) [at 910000]
 msieve-1.16:  total yield: 540180, q=999953 (0.02117 sec/rel)
 r135a: total yield: 4305, q=901447 (0.02489 sec/rel) [-e 1000000]
+r145a: total yield: 4518, q=901211 (0.02209 sec/rel) [-e 1000000]
 r135b: total yield: 2085, q=900577 (0.02270 sec/rel) [-e 2000000]
+r145b: total yield: 3584, q=901133 (0.01810 sec/rel) [-e 2000000]
 r135c: total yield: 4382, q=901067 (0.02127 sec/rel) [-e 5000000]
 r135d: total yield: 3529, q=901009 (0.02031 sec/rel) [-e 10000000]
 r135e: total yield: 40444, q=910103 (0.01955 sec/rel) [-e 30000000]
-r135f: total yield: 14286, q=903871 (0.02061 sec/rel)
-r135g: total yield: 4093, q=901013 (0.02035 sec/rel)
+r135f: total yield: 14286, q=903871 (0.02061 sec/rel) [-e 40000000]
+r135g: total yield: 4093, q=901013 (0.02035 sec/rel)  [-e 50000000]
+
+rsa100 (q0=900000):
+aoki: total yield: 10100, q=902087 (0.01760 sec/rel)
+r142a: total yield: 12500, q=904489 (0.02727 sec/rel) [-e 1000000]
+r142b: total yield: 10178, q=903079 (0.02271 sec/rel) [-e 2000000]
+r142c: total yield: 10428, q=901909 (0.01549 sec/rel) [-e 50000000]
+
+rsa110 (q0=1600000):
+aoki: total yield: 6241, q=1601023 (0.03677 sec/rel)
+r142a: total yield: 3245, q=1601023 (0.06479 sec/rel) [-e 1000000]
+r142b: total yield: 4770, q=1601051 (0.05681 sec/rel) [-e 2000000]
+r145c: total yield: 4678, q=1601023 (0.05770 sec/rel) [-e 20000000]
 
 rsa130:
 poly1: total yield: 1727, q=5692061 (0.28462 sec/rel)
 r135a: total yield: 1210, q=5692067 (0.31564 sec/rel) [-e 1000000]
 r135b: total yield: 1798, q=5692103 (0.21737 sec/rel) [-e 5000000]
+r135c: total yield: 1138, q=5691001 (0.20476 sec/rel) [-e 50000000]
+r135e: total yield: 1463, q=5691043 (0.15822 sec/rel) [-e 200000000]
+
+rsa140:
+poly1: total yield: 7626, q=8390021 (0.17754 sec/rel)
+poly.murphy1: total yield: 1572, q=8389081 (0.30352 sec/rel)
+r142a: total yield: 1934, q=8389441 (0.42711 sec/rel) [-e 1000000]
+r142b: total yield: 804, q=8389001 (0.36377 sec/rel)  [-e 5000000]
+
+rsa155:
+poly1: total yield: 3603, q=8390513 (0.51875 sec/rel)
+poly2: total yield: 677, q=8389039 (0.40096 sec/rel)
+r142a: total yield: 540, q=8389727 (1.69583 sec/rel) [-e 1000000]
 
