@@ -347,6 +347,11 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
       for (i = 0; i < NROWS; ++i)
 	ptr_current[i]++;
     }      
+
+    /* some verbosity... */
+    if ((col_current % 128) == 0) 
+      fprintf(stderr, "done %d pivots\n", col_current);
+
   } /* end while */
 
 #if VERBOSE

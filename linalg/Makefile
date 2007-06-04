@@ -10,6 +10,8 @@ linalg: linalg.c gauss.o
 gauss.o: gauss.c
 	gcc -c -O4 -DNDEBUG -funroll-loops -DMULTI_ROW=1 -DNO_MAIN $< -o $@
 
+ratsqrt: ratsqrt.c
+	gcc $(CFLAGS) $< $(LDFLAGS) -o $@
 
 clean:
 	\rm procrels gauss
