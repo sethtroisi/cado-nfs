@@ -11,7 +11,10 @@ polyselect-r124 -e 500000000 8748s (+994s for polyselect)
 polyselect-r145 -e 4000000   (selection 16s, sieving 0.63h, procrels 0.02h)
 
 c98:
-polyselect-r145 -e 40000000 (selection 118s)
+ggnfs-0.77.0   total 10.28h (selection 0.56h, sieving 8.86h, procrels 0.17h,
+                             matrix 0.58h, sqrt 0.11h)
+polyselect-r145 -e 40000000 11.35h (sel. 118s, sieving 10.58h, procrels 0.18h,
+                             matrix 0.50h, sqrt 0.09h)
 
 Timings obtained on a 800Mhz Pentium M at the end of first sieve block
 with ggnfs-0.77.0 (with default ggnfs sieve parameters):
