@@ -54,12 +54,17 @@ valuation := proc(N, p) local v;
 end:
 
 # estimate average p-valuation of polynomial f in x, from x0 to x1
-est_valuation := proc(f0, p, x0, x1, y0, y1) local s, v, w, f;
+est_valuation := proc(f0, p, x0, x1, y0, y1) local s, v, w, f, n;
    f := expand(subs(x=x/y,f0)*y^degree(f0));
    s := 0;
+   n := 0;
    for v from x0 to x1 do for w from y0 to y1 do
-      s:=s+valuation(subs(x=v,y=w,f),p) od od;
-   1.0*s/(x1+1-x0)/(y1+1-y0)
+      if igcd(v,w)=1 then
+         s:=s+valuation(subs(x=v,y=w,f),p);
+         n:=n+1;
+      fi
+   od od;
+   1.0*s/n
 end:
 
 # resultant(P,Q,x), with computations with rationals

@@ -16,6 +16,15 @@ ggnfs-0.77.0   total 10.28h (selection 0.56h, sieving 8.86h, procrels 0.17h,
 polyselect-r145 -e 40000000 11.35h (sel. 118s, sieving 10.58h, procrels 0.18h,
                              matrix 0.50h, sqrt 0.09h)
 
+rsa100 (q0=900000):
+ggnfs-0.77.0                 total yield: 42802, q=905059 (0.00706 sec/rel)
+polyselect-r150 -e 50000000: total yield: 10085, q=901819 (0.01036 sec/rel)
+
+rsa120:
+polyselect-r150 -e 20000000: total yield: 1117, q=2251981 (0.09493 sec/rel)
+
+##############################################################################
+
 Timings obtained on a 800Mhz Pentium M at the end of first sieve block
 with ggnfs-0.77.0 (with default ggnfs sieve parameters):
 

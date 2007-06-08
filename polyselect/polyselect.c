@@ -33,7 +33,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
        Algorithm", Brian Antony Murphy, Australian National University, 1999.
 */
 
-#define VERSION 150 /* try to match the svn version */
+#define VERSION 153 /* try to match the svn version */
 
 #define METHOD 3 /* algorithm used for polynomial selection:
 		    1: basic method in B^{d(d+1)/(d-1)} to save a factor B
@@ -54,15 +54,16 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define REPS 1 /* number of Miller-Rabin tests in isprime */
 #define NUM_EST 32 /* number of iterations to estimate average valuations
-			for ``bad-behaved'' primes */
+                      for ``bad-behaved'' primes */
 
 static void
 usage ()
 {
-  fprintf (stderr, "Usage: polyselect [-v] [-raw] [-e nnn] < in > out\n\n");
+  fprintf (stderr, "Usage: polyselect [-v] [-raw] [-e nnn] [-m xxx]< in > out\n\n");
   fprintf (stderr, "       -v     - verbose\n");
   fprintf (stderr, "       -raw   - does not output factor base parameters\n");
   fprintf (stderr, "       -e nnn - use effort nnn\n");
+  fprintf (stderr, "       -m xxx - use decomposition in base xxx\n");
   fprintf (stderr, "       in     - input file (number to factor)\n");
   fprintf (stderr, "       out    - output file (polynomials)\n");
   exit (1);
@@ -215,6 +216,20 @@ eval_poly (mpz_t v, mpz_t *f, int d, unsigned long x, unsigned long y)
   mpz_clear (Y);
 }
 
+unsigned long
+igcd (unsigned long a, unsigned long b)
+{
+  unsigned long c;
+
+  while (b != 0)
+    {
+      c = a % b;
+      a = b;
+      b = c;
+    }
+  return a;
+}
+
 /* estimate the average valuation of p in f(x) for 0 <= x, y < X */
 double
 estimate_valuation (mpz_t *f, int d, unsigned long X, unsigned long p)
@@ -224,20 +239,21 @@ estimate_valuation (mpz_t *f, int d, unsigned long X, unsigned long p)
   mpz_t v;
 
   mpz_init (v);
-  for (x = 0; x <= X; x++)
-    for (y = 0; y <= X; y++)
-      {
-	eval_poly (v, f, d, x, y);
-	if (mpz_cmp_ui (v, 0) != 0)
-	  {
-	    t ++;
-	    while (mpz_divisible_ui_p (v, p))
-	      {
-		s ++;
-		mpz_divexact_ui (v, v, p);
-	      }
-	  }
-      }
+  for (x = 1; x <= X; x++)
+    for (y = 1; y <= X; y++)
+      if (igcd (x, y) == 1)
+        {
+          eval_poly (v, f, d, x, y);
+          if (mpz_cmp_ui (v, 0) != 0)
+            {
+              t ++;
+              while (mpz_divisible_ui_p (v, p))
+                {
+                  s ++;
+                  mpz_divexact_ui (v, v, p);
+                }
+            }
+        }
   mpz_clear (v);
   return s / t;
 }
@@ -823,22 +839,16 @@ get_mu (mpz_t *p, unsigned long degree, mpz_t m, double S)
   return (mpz_get_d (m) / S + S) * mu;
 }
 
-/* Decompose p->n in base m.
-   If rnd=0, round f[d] to nearest, thus -m/2 <= f[d-1] <= m/2.
-   Otherwise, round f[d] to -inf, thus 0 <= f[d-1] < m. */
+/* Decompose p->n in base m, rounding to nearest. */
 void
-generate_base_m (cado_poly p, mpz_t m, int rnd)
+generate_base_m (cado_poly p, mpz_t m)
 {
   unsigned long i;
   int d = p->degree;
 
   mpz_ndiv_qr (p->f[1], p->f[0], p->n, m);
-  for (i = 1; i < d - 1; i++)
+  for (i = 1; i < d; i++)
     mpz_ndiv_qr (p->f[i+1], p->f[i], p->f[i], m);
-  if (rnd == 0)
-    mpz_ndiv_qr (p->f[d], p->f[d - 1], p->f[d - 1], m);
-  else
-    mpz_fdiv_qr (p->f[d], p->f[d - 1], p->f[d - 1], m);
   mpz_neg (p->g[0], m);
   mpz_set_ui (p->g[1], 1);
   mpz_set (p->m, m);
@@ -868,145 +878,7 @@ get_alpha_bound (cado_poly out)
   return (unsigned long) sqrt ((double) default_alim (out->n));
 }
 
-#if (METHOD == 1)
-/* first method described by Bernstein in reference [2], slide 6
-   (Bernstein considered degree d=5, here we generalize to arbitrary d):
-   Take m \approx B^{1/(d-1)} n^{1/(d+1)}
-   Then f_d \approx B^{-d/(d-1)} n^{1/(d+1)}
-   and f_0...f_{d-1} are \approx B^{1/(d-1)} n^{1/(d+1)} by default.
-   We can hope f_0...f_{d-1} \approx B^{-d/(d-1)} n^{1/(d+1)}
-   after B^{d(d+1)/(d-1)} tries.
-   Then mu is decreased by a factor B.
-
-   T is the number of tries, thus B = T^{(d-1)/d/(d+1)}.
-   For d=5, T = B^{7.5+o(1)}; for d=4, T = B^{6.66+o(1)}.
-*/
-void
-generate_poly (cado_poly out, unsigned long T, int verbose)
-{
-  unsigned long d = out->degree, alim;
-  double B, mu, logmu, best_logmu = DBL_MAX, best_E = DBL_MAX, alpha, E;
-  mpz_t best_m;
-
-  mpz_init (best_m);
-  B = pow ((double) T, 1.0 / (double) d / (double) (d + 1));
-  mpz_root (out->m, out->n, d + 1);
-  B *= mpz_get_d (out->m);
-  mpz_set_d (out->m, B);
-  alim = get_alpha_bound (out); /* needed for alpha */
-  while (T-- > 0)
-    {
-      generate_base_m (out, out->m, 0);
-      mu = get_mu (out->f, out->degree, out->m, out->skew);
-      logmu = log (mu);
-      /* we keep only the values of mu near optimal, since computing alpha
-	 is much more expensive */
-      if (logmu < best_logmu + MARGIN)
-	{
-	  if (logmu < best_logmu)
-	    best_logmu = logmu;
-	  alpha = get_alpha (out->f, out->degree, alim, verbose);
-	  E = logmu + alpha;
-	  if (E < best_E)
-	    {
-	      best_E = E;
-	      fprintf (stderr, "m=");
-	      mpz_out_str (stderr, 10, out->m);
-	      fprintf (stderr, " skew=%1.2f logmu=%1.2f alpha~%1.2f E=%1.2f\n",
-		       out->skew, logmu, alpha, E);
-	      mpz_set (best_m, out->m);
-	    }
-	}
-      mpz_add_ui (out->m, out->m, 1);
-    }
-  generate_base_m (out, best_m, 0);
-  generate_sieving_parameters (out);
-  mpz_clear (best_m);
-}
-#elif (METHOD == 2)
-/* Method described in [3], page 80 (see also in reference [2], slide 7).
-   (Bernstein considered degree d=5, here we generalize to arbitrary d):
-   Take m \approx B^{1/(d-1)} n^{1/(d+1)}
-   Then f_d \approx B^{-d/(d-1)} n^{1/(d+1)} [so far idem as slide 6].
-   Decompose n in base m.
-   Now choose integer k = round(f_{d-1}/(d f_d)). We have 
-   |f_{d-1} - k d f_d| <= d/2 f_d, thus:
-   f_d (m+k)^d + (f_{d-1} - d k f_d) (m+k)^{d-1}
-   = f_d (m+k)^d + O(f_d)  (m+k)^{d-1}.
-   We have f_0...f_{d-2} are \approx B^{1/(d-1)} n^{1/(d+1)} by default.
-   We can hope f_0...f_{d-1} \approx B^{-d/(d-1)} n^{1/(d+1)}
-   after B^{d+1} tries.    Then mu is decreased by a factor B.
-
-   The number of tries T is related to the decrease B by:
-   T = B^{d+1}, or B = T^{1/(d+1)}.
-   For d=5, T = B^6; for d=4, T = B^5.
-*/
-void
-generate_poly (cado_poly out, unsigned long T, int verbose)
-{
-  unsigned long d = out->degree, alim;
-  double B, mu, logmu, best_logmu = DBL_MAX, best_E = DBL_MAX, alpha, E;
-  double mB;
-  mpz_t best_m, k, t, r;
-  int kpos;
-
-  mpz_init (best_m);
-  mpz_init (k);
-  mpz_init (t);
-  mpz_init (r);
-  B = pow ((double) T, 1.0 / (double) (d + 1)); /* B = T^{1/(d+1)} */
-  mB = pow (B, 1.0 / (double) (d - 1)); /* B^{1/(d-1)} */
-  mpz_root (out->m, out->n, d + 1); /* n^{1/(d+1)} */
-  mB *= mpz_get_d (out->m);
-  mpz_set_d (out->m, mB); /* B^{1/(d-1)} n^{1/(d+1)} */
-  alim = get_alpha_bound (out); /* needed for alpha */
-  while (T-- > 0)
-    {
-      /* third argument 1 of generate_base_m rounds f[d] to -Inf, to
-	 ensure f[d-1] >= 0. Indeed, we want m to increase, to avoid looping
-	 around the same values of m, thus we require k, i.e., f[d-1], 
-	 to be positive. */
-      /* the following way to compute k is faster (about 27% for d=4)
-	 than calling generate_base_m with rounding f[d] downwards */
-      mpz_pow_ui (t, out->m, d - 1);
-      mpz_ndiv_qr (t, r, out->n, t);
-      mpz_fdiv_qr (out->f[d], out->f[d - 1], t, out->m);
-      mpz_mul_ui (t, out->f[d], d);
-      mpz_ndiv_qr (k, r, out->f[d - 1], t);
-      kpos = mpz_cmp_ui (k, 0);
-      assert (kpos >= 0);
-      mpz_add (out->m, out->m, k);
-      generate_base_m (out, out->m, 0);
-      mu = get_mu (out->f, d, out->m, out->skew);
-      logmu = log (mu);
-      /* we keep only the values of mu near optimal, since computing alpha
-	 is much more expensive */
-      if (logmu < best_logmu + MARGIN)
-	{
-	  if (logmu < best_logmu)
-	    best_logmu = logmu;
-	  alpha = get_alpha (out->f, d, alim, verbose);
-	  E = logmu + alpha;
-	  if (E < best_E)
-	    {
-	      best_E = E;
-	      fprintf (stderr, "m=");
-	      mpz_out_str (stderr, 10, out->m);
-	      fprintf (stderr, " skew=%1.2f logmu=%1.2f alpha~%1.2f E=%1.2f\n",
-		       out->skew, logmu, alpha, E);
-	      mpz_set (best_m, out->m);
-	    }
-	}
-      mpz_add_ui (out->m, out->m, 1);
-    }
-  generate_base_m (out, best_m, 0);
-  generate_sieving_parameters (out);
-  mpz_clear (best_m);
-  mpz_clear (k);
-  mpz_clear (t);
-  mpz_clear (r);
-}
-#elif (METHOD == 3)
+#if (METHOD == 3)
 /* Method described in reference [2], slide 8
    (Bernstein considered degree d=5, here we generalize to arbitrary d):
    Take m \approx B n^{1/(d+1)}
@@ -1027,6 +899,7 @@ generate_poly (cado_poly out, unsigned long T, int verbose)
   /* value of T = B^eff[d] for d <= 7 */
   static double eff[] = {0.0, 0.0, 3.0, 3.0, 3.333, 4.5, 6.6, 9.0};
   unsigned long calls_alpha = 0;
+  int given_m;
 
   mpz_init (best_m);
   mpz_init (k);
@@ -1038,26 +911,33 @@ generate_poly (cado_poly out, unsigned long T, int verbose)
       exit (1);
     }
   B = pow ((double) T, 1.0 / eff[d]); /* B = T^{1/eff[d]} */
-  mpz_root (out->m, out->n, d + 1); /* n^{1/(d+1)} */
-  mB = B * mpz_get_d (out->m);
-  mpz_set_d (out->m, mB); /* B^{1/(d-1)} n^{1/(d+1)} */
+  given_m = mpz_cmp_ui (out->m, 0) != 0;
+  if (given_m == 0) /* else use given value of m */
+    {
+      mpz_root (out->m, out->n, d + 1); /* n^{1/(d+1)} */
+      mB = B * mpz_get_d (out->m);
+      mpz_set_d (out->m, mB); /* B^{1/(d-1)} n^{1/(d+1)} */
+    }
   alim = get_alpha_bound (out); /* needed for alpha */
   while (T-- > 0)
     {
-      mpz_pow_ui (t, out->m, d - 1);
-      mpz_ndiv_qr (t, r, out->n, t);
-      mpz_fdiv_qr (out->f[d], out->f[d - 1], t, out->m);
-      if (mpz_cmp_ui (out->f[d], 0) == 0)
-	{
-	  gmp_fprintf (stderr, "Stopping selection at m=%Zd since leading coefficient is zero\n", out->m);
-	  break;
-	}
-      mpz_mul_ui (t, out->f[d], d);
-      mpz_ndiv_qr (k, r, out->f[d - 1], t);
-      kpos = mpz_cmp_ui (k, 0);
-      assert (kpos >= 0);
-      mpz_add (out->m, out->m, k);
-      generate_base_m (out, out->m, 0);
+      if (given_m == 0)
+        {
+          mpz_pow_ui (t, out->m, d - 1);
+          mpz_ndiv_qr (t, r, out->n, t);
+          mpz_fdiv_qr (out->f[d], out->f[d - 1], t, out->m);
+          if (mpz_cmp_ui (out->f[d], 0) == 0)
+            {
+              gmp_fprintf (stderr, "Stopping selection at m=%Zd since leading coefficient is zero\n", out->m);
+              break;
+            }
+          mpz_mul_ui (t, out->f[d], d);
+          mpz_ndiv_qr (k, r, out->f[d - 1], t);
+          kpos = mpz_cmp_ui (k, 0);
+          assert (kpos >= 0);
+          mpz_add (out->m, out->m, k);
+        }
+      generate_base_m (out, out->m);
       mu = get_mu (out->f, d, out->m, out->skew);
       logmu = log (mu);
       /* we keep only the values of mu near optimal, since computing alpha
@@ -1083,7 +963,7 @@ generate_poly (cado_poly out, unsigned long T, int verbose)
     }
   if (verbose)
     fprintf (stderr, "calls to get_alpha: %lu\n", calls_alpha);
-  generate_base_m (out, best_m, 0);
+  generate_base_m (out, best_m);
   generate_sieving_parameters (out);
   mpz_clear (best_m);
   mpz_clear (k);
@@ -1105,7 +985,6 @@ print_poly (FILE *fp, cado_poly p, int argc, char *argv[], int st, int raw)
   mpz_out_str (fp, 10, p->n);
   fprintf (fp, "\n");
   S = p->skew;
-  fprintf (fp, "# skewness is squared (for ggnfs)\n");
   fprintf (fp, "skew: %1.3f\n", S * S);
   mu = get_mu (p->f, p->degree, p->m, S);
   alpha = get_alpha (p->f, p->degree, (p->alim > 1000) ? 1000 : p->alim, 0);
@@ -1172,10 +1051,13 @@ main (int argc, char *argv[])
   cado_input in;
   cado_poly out;
   int verbose = 0, raw = 0;
-  unsigned long effort = 1000000;
+  unsigned long effort = 1;
   char **argv0 = argv;
   int argc0 = argc;
   int st = cputime ();
+  mpz_t m;
+
+  mpz_init (m);
 
   /* parse options */
   while (argc > 1 && argv[1][0] == '-')
@@ -1198,6 +1080,12 @@ main (int argc, char *argv[])
 	  argv += 2;
 	  argc -= 2;
 	}
+      else if (argc > 2 && strcmp (argv[1], "-m") == 0)
+	{
+          mpz_set_str (m, argv[2], 0);
+	  argv += 2;
+	  argc -= 2;
+	}
       else
 	{
 	  fprintf (stderr, "Unknown option: %s\n", argv[1]);
@@ -1208,6 +1096,12 @@ main (int argc, char *argv[])
   if (argc != 1)
     usage ();
 
+  if (mpz_cmp_ui (m, 0) != 0 && effort != 1)
+    {
+      fprintf (stderr, "Warning: option -m xxx implies -e 1\n");
+      effort = 1;
+    }
+
   init (in);
   parse_input (in);
   if (verbose)
@@ -1216,11 +1110,14 @@ main (int argc, char *argv[])
       fprintf (stderr, "L[1/3,(64/9)^(1/3)](n)=%1.2e\n", L (in->n));
     }
   init_poly (out, in);
+  mpz_set (out->m, m); /* if non zero, use given value of m */
   clear (in);
 
   generate_poly (out, effort, verbose);
   print_poly (stdout, out, argc0, argv0, st, raw);
   clear_poly (out);
+
+  mpz_clear (m);
 
   return 0;
 }
