@@ -33,7 +33,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
        Algorithm", Brian Antony Murphy, Australian National University, 1999.
 */
 
-#define VERSION 153 /* try to match the svn version */
+#define VERSION 155 /* try to match the svn version */
 
 #define METHOD 3 /* algorithm used for polynomial selection:
 		    1: basic method in B^{d(d+1)/(d-1)} to save a factor B
@@ -55,6 +55,13 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #define REPS 1 /* number of Miller-Rabin tests in isprime */
 #define NUM_EST 32 /* number of iterations to estimate average valuations
                       for ``bad-behaved'' primes */
+#define SQR(x) (x) * (x)
+
+#ifdef DEBUG
+#define ASSERT(x) assert(x)
+#else
+#define ASSERT(x)
+#endif
 
 static void
 usage ()
@@ -271,7 +278,7 @@ roots_mod (mpz_t *f, int d, const unsigned long p)
   /* we first compute fp = f/lc(f) mod p */
   while (d >= 0 && mpz_divisible_ui_p (f[d], p))
     d --;
-  assert (d >= 0); /* f is 0 mod p: should not happen since otherwise p would
+  ASSERT (d >= 0); /* f is 0 mod p: should not happen since otherwise p would
 		      divide N, because f(m)=N */
   fp = alloc_poly (d);
   mpz_set_ui (fp[d], p);
@@ -314,7 +321,7 @@ roots_mod (mpz_t *f, int d, const unsigned long p)
       dh = 2 * dg;
 
       /* reduce mod p */
-      assert (dh < 2 * d);
+      ASSERT (dh < 2 * d);
       for (i = 0; i <= dh; i++)
 	mpz_mod_ui (h[i], h[i], p);
       
@@ -325,7 +332,7 @@ roots_mod (mpz_t *f, int d, const unsigned long p)
 	    mpz_swap (h[i+1], h[i]);
 	  mpz_set_ui (h[0], 0);
 	  dh ++;
-	  assert (dh < 2 * d);
+	  ASSERT (dh < 2 * d);
 	}
 
       /* reduce mod fp */
@@ -337,14 +344,14 @@ roots_mod (mpz_t *f, int d, const unsigned long p)
 	    mpz_submul (h[dh - d + i], h[dh], fp[i]);
 	  /* it is not necessary to reduce h[j] for j < dh */
 	  dh --;
-          assert (dh < 2 * d);
+          ASSERT (dh < 2 * d);
 	}
 
       /* reduce h mod p and copy to g */
       for (i = 0; i <= dh; i++)
 	mpz_mod_ui (g[i], h[i], p);
       dg = dh;
-      assert (dg < 2 * d);
+      ASSERT (dg < 2 * d);
     }
 
   /* subtract x */
@@ -426,7 +433,7 @@ get_alpha (mpz_t *f, const int d, unsigned long B, int verbose)
   if (mpz_divisible_ui_p (disc, 2) == 0)
     {
       q = roots_mod (f, d, 2);
-      assert (q <= 2);
+      ASSERT (q <= 2);
       alpha = (1.0 - 2.0 * (double) q / 3.0) * log (2.0);
     }
   else
@@ -450,7 +457,7 @@ get_alpha (mpz_t *f, const int d, unsigned long B, int verbose)
 	  else
 	    {
 	      q = roots_mod (f, d, p);
-	      assert (q <= p);
+	      ASSERT (q <= p);
 	      alpha += (1.0 - (double) q * (double) p / (double) (p + 1)) *
 		log ((double) p) / (double) (p - 1);
 	    }
@@ -750,7 +757,7 @@ mpz_ndiv_qr (mpz_t q, mpz_t r, mpz_t n, mpz_t d)
 {
   int s;
 
-  assert (mpz_cmp_ui (d, 0) != 0);
+  ASSERT (mpz_cmp_ui (d, 0) != 0);
   mpz_fdiv_qr (q, r, n, d); /* round towards -inf */
   mpz_mul_2exp (r, r, 1);
   s = mpz_cmp (r, d);
@@ -762,33 +769,43 @@ mpz_ndiv_qr (mpz_t q, mpz_t r, mpz_t n, mpz_t d)
     }
 }
 
-/* return sum(g[i]*s^i, i=0..d) */
+/* return a value with the sign of sum(g[i]*s^(2i-d-1), i=0..d) */
 double
 eval_double_poly (double *g, int d, double s)
 {
   double v;
   int i;
 
-  /* sum(g[i]*s^(2*i-d-1), i=0..d) = sum(g[i]*s^(2i), i=0..d)/s^(d+1) */
+  /* sum(g[i]*s^(2*i-d-1), i=0..d) = sum(g[i]*s^(2i), i=0..d)/s^(d+1).
+     Since we only need the sign, no need to divide by s^(d+1). */
   for (v = g[d], i = d - 1; i >= 0; i--)
     v = s * v + g[i];
   return v;
 }
 
-/* we want to find the mininum of f(S) = |p[d]|*S^d + ... + |p[0]|*S^{-d},
-   i.e., a zero of g(S) = d |p[d]| S^{d-1} + ... - d |p[0]| S^{-d-1}.
+/* Find the argmin of 
+   [|p[d]|*S^d + ... + |p[0]|*S^{-d}] * [m/S + S],
+   i.e., a zero of g(S) = (d+1) |p[d]| S^d + ... - (d-1) |p[0]| S^{-d}
+   + (d-1) m |p[d]| S^{d-2} + ... - (d+1) m |p[0]| S^{-d-2}.
    Since there is only one sign change in the coefficients of g, it has
    exactly one root on [0, +Inf[. We search it by dichotomy.
 */
 double
-skewness (mpz_t *p, int d)
+skewness (mpz_t *p, int d, double m)
 {
   double *g, sa, sb, s;
   int i;
 
-  g = (double*) malloc ((d + 1) * sizeof (double));
+  g = (double*) malloc ((d + 2) * sizeof (double));
+  /* g[0] stores the coefficient of degree -d-2, ..., 
+     g[d+1] that of degree d */
+  g[0] = 0.0;
   for (i = 0; i <= d; i++)
-    g[i] = (double) (2 * i - d) * fabs (mpz_get_d (p[i]));
+    {
+      s = fabs (mpz_get_d (p[i]));
+      g[i + 1] = (double) (2 * i - d + 1) * s;
+      g[i] += (double) (2 * i - d - 1) * (double) m * s;
+    }
   if (eval_double_poly (g, d, 1.0) > 0) /* g(1.0) > 0 */
     {
       /* search sa < 1 such that g(sa) <= 0 */
@@ -811,8 +828,7 @@ skewness (mpz_t *p, int d)
 	sb = s;
     }
   free (g);
-  s = sqrt((sa + sb) / 2.0);
-  return s;
+  return sqrt ((sa + sb) / 2.0);
 }
 
 /* mu(m,S), as defined in reference [2]:
@@ -828,7 +844,7 @@ double
 get_mu (mpz_t *p, unsigned long degree, mpz_t m, double S)
 {
   double mu;
-  double S2 = S * S;
+  double S2 = SQR(S);
   int i;
 
   mu = fabs (mpz_get_d (p[degree]));
@@ -852,7 +868,7 @@ generate_base_m (cado_poly p, mpz_t m)
   mpz_neg (p->g[0], m);
   mpz_set_ui (p->g[1], 1);
   mpz_set (p->m, m);
-  p->skew = skewness (p->f, d);
+  p->skew = skewness (p->f, d, mpz_get_d (m));
 }
 
 void
@@ -895,7 +911,6 @@ generate_poly (cado_poly out, unsigned long T, int verbose)
   double B, mu, logmu, best_logmu = DBL_MAX, best_E = DBL_MAX, alpha, E;
   double mB;
   mpz_t best_m, k, t, r;
-  int kpos;
   /* value of T = B^eff[d] for d <= 7 */
   static double eff[] = {0.0, 0.0, 3.0, 3.0, 3.333, 4.5, 6.6, 9.0};
   unsigned long calls_alpha = 0;
@@ -919,13 +934,14 @@ generate_poly (cado_poly out, unsigned long T, int verbose)
       mpz_set_d (out->m, mB); /* B^{1/(d-1)} n^{1/(d+1)} */
     }
   alim = get_alpha_bound (out); /* needed for alpha */
+  /* when going from m to m+k, f[d-1] goes to f[d-1] - k d f[d] */
   while (T-- > 0)
     {
       if (given_m == 0)
         {
-          mpz_pow_ui (t, out->m, d - 1);
-          mpz_ndiv_qr (t, r, out->n, t);
-          mpz_fdiv_qr (out->f[d], out->f[d - 1], t, out->m);
+          mpz_pow_ui (t, out->m, d - 1); /* m^(d-1) */
+          mpz_ndiv_qr (t, r, out->n, t); /* t = round(N / m^(d-1) */
+          mpz_fdiv_qr (out->f[d], out->f[d - 1], t, out->m); /* f[d]*m+f[d-1]*/
           if (mpz_cmp_ui (out->f[d], 0) == 0)
             {
               gmp_fprintf (stderr, "Stopping selection at m=%Zd since leading coefficient is zero\n", out->m);
@@ -933,8 +949,7 @@ generate_poly (cado_poly out, unsigned long T, int verbose)
             }
           mpz_mul_ui (t, out->f[d], d);
           mpz_ndiv_qr (k, r, out->f[d - 1], t);
-          kpos = mpz_cmp_ui (k, 0);
-          assert (kpos >= 0);
+          ASSERT (mpz_cmp_ui (k, 0) >= 0);
           mpz_add (out->m, out->m, k);
         }
       generate_base_m (out, out->m);
@@ -955,7 +970,7 @@ generate_poly (cado_poly out, unsigned long T, int verbose)
 	      fprintf (stderr, "m=");
 	      mpz_out_str (stderr, 10, out->m);
 	      fprintf (stderr, " skew=%1.2f logmu=%1.2f alpha~%1.2f E=%1.2f\n",
-		       out->skew, logmu, alpha, E);
+		       SQR(out->skew), logmu, alpha, E);
 	      mpz_set (best_m, out->m);
 	    }
 	}
@@ -985,7 +1000,7 @@ print_poly (FILE *fp, cado_poly p, int argc, char *argv[], int st, int raw)
   mpz_out_str (fp, 10, p->n);
   fprintf (fp, "\n");
   S = p->skew;
-  fprintf (fp, "skew: %1.3f\n", S * S);
+  fprintf (fp, "skew: %1.3f\n", SQR(S));
   mu = get_mu (p->f, p->degree, p->m, S);
   alpha = get_alpha (p->f, p->degree, (p->alim > 1000) ? 1000 : p->alim, 0);
   logmu = log (mu);
@@ -1038,7 +1053,7 @@ L (mpz_t n)
   
   logn = log (mpz_get_d (n));
   e = log (logn);
-  e = logn * (e * e);
+  e = logn * SQR(e);
   e = c * pow (e, 0.33333333333333333333);
   return exp (e);
 }
