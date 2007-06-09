@@ -1,16 +1,16 @@
 skew := proc(f, x, s0) local absf, g, i, S;
    absf := add(abs(coeff(f,x,i))*x^i, i=0..degree(f,x));
-   g := expand(subs(x=S^2, absf)/S^degree(f));
+   g := expand(subs(x=S, absf)/S^(degree(f)/2));
    g := diff(g,S);
-   fsolve(g, S=s0);
+   fsolve(g, S=s0)
 end:
 
 # takes also into account the linear polynomial x-m
 skew2 := proc(f, x, m, s0) local absf, g, i, S;
    absf := add(abs(coeff(f,x,i))*x^i, i=0..degree(f,x));
-   g := expand(subs(x=S^2, absf)/S^degree(f))*(m/S+S);
+   g := expand(subs(x=S, absf)/S^(degree(f)/2))*(m/sqrt(S)+sqrt(S));
    g := diff(g,S);
-   fsolve(g, S=s0);
+   fsolve(g, S=s0)
 end:
 
 get_alpha := proc(f, B) local s, p, e, q, disc;
@@ -100,4 +100,23 @@ res2 := proc(P0,Q0,x) local P, Q, q, m, d, s;
    fi;
 end:
 
+# the following is from Guillaume Hanrot
+# determines average valuation for a prime dividing disc(P)
+val := proc(P,p)
+   (val0(P, p) * p + val0(expand(subs(x=1/(p*x),P)*(p*x)^degree(P)), p))/(p+1)
+end:
+
+val0 := proc(P0,p) local v, r, P, Q, P2;
+   v := valuation (icontent(P0), p);
+   P := P0/p^v;
+   Q := diff(P,x);
+   for r in Roots(P) mod p do
+      if subs(x=r[1],Q) mod p <> 0 then v := v + 1/(p-1)
+      else
+         P2 := expand(subs(x=p*x+r[1], P));
+         v := v + procname(P2, p)/p
+      fi
+   od;
+   v
+end:
 
