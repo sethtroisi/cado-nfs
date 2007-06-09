@@ -33,12 +33,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
        Algorithm", Brian Antony Murphy, Australian National University, 1999.
 */
 
-#define VERSION 155 /* try to match the svn version */
+#define VERSION 156 /* try to match the svn version */
 
-#define METHOD 3 /* algorithm used for polynomial selection:
-		    1: basic method in B^{d(d+1)/(d-1)} to save a factor B
-		    2: Murphy's algorithm in B^{d+1}
-		    3: skew polynomials */
 #define MARGIN 2.0 /* margin for mu: keep only logmu <= best_logmu + MARGIN */
 
 #include <stdio.h>
@@ -53,9 +49,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <sys/resource.h>
 
 #define REPS 1 /* number of Miller-Rabin tests in isprime */
-#define NUM_EST 32 /* number of iterations to estimate average valuations
-                      for ``bad-behaved'' primes */
-#define SQR(x) (x) * (x)
+#define NUM_EST 0.01 /* wanted accurary in the contribution to alpha(F)
+			for ``bad-behaved'' primes */
 
 #ifdef DEBUG
 #define ASSERT(x) assert(x)
@@ -237,13 +232,21 @@ igcd (unsigned long a, unsigned long b)
   return a;
 }
 
-/* estimate the average valuation of p in f(x) for 0 <= x, y < X */
+/* Estimate the average valuation of p in f(x) for 0 <= x, y < X,
+   with a target accurary of eps. Since the returned value is multiplied
+   by log(p), we need an accurary of eps/log(p) here, i.e., consider about
+   Pi^2/6*log(p)/eps pairs (x,y), since the proportion of coprime (x,y) is
+   6/Pi^2.
+*/
 double
-estimate_valuation (mpz_t *f, int d, unsigned long X, unsigned long p)
+estimate_valuation (mpz_t *f, int d, double eps, unsigned long p)
 {
   double s = 0.0, t = 0.0;
-  unsigned long x, y;
+  unsigned long x, y, X;
   mpz_t v;
+
+  /* 1.645 is an upper approximation of Pi^2/6 */
+  X = (unsigned long) (sqrt (1.645 * log ((double) p) / eps) + 1.0);
 
   mpz_init (v);
   for (x = 1; x <= X; x++)
@@ -420,9 +423,11 @@ isprime (unsigned long p)
 
    We want alpha as small as possible, i.e., alpha negative with a large
    absolute value. Typical good values are alpha=-4, -5, ...
+
+   eps is the target accuracy for the "bad-behaved primes".
 */
 double
-get_alpha (mpz_t *f, const int d, unsigned long B, int verbose)
+get_alpha (mpz_t *f, const int d, unsigned long B, int verbose, double eps)
 {
   double alpha, e;
   unsigned long p, q;
@@ -438,9 +443,9 @@ get_alpha (mpz_t *f, const int d, unsigned long B, int verbose)
     }
   else
     {
-      e = estimate_valuation (f, d, NUM_EST, 2);
+      e = estimate_valuation (f, d, eps, 2);
       if (verbose >= 2)
-	fprintf (stderr, "2 divides disc(f): %1.2f\n", e);
+	fprintf (stderr, "2 divides disc(f): %1.6f\n", e);
       alpha = (1.0 - e) * log (2.0);
     }
   for (p = 3; p <= B; p += 2)
@@ -449,9 +454,9 @@ get_alpha (mpz_t *f, const int d, unsigned long B, int verbose)
 	{
 	  if (mpz_divisible_ui_p (disc, p))
 	    {
-	      e = estimate_valuation (f, d, NUM_EST, p);
+	      e = estimate_valuation (f, d, eps, p);
 	      if (verbose >= 2)
-		fprintf (stderr, "%lu divides disc(f): %1.2f\n", p, e);
+		fprintf (stderr, "%lu divides disc(f): %1.6f\n", p, e);
 	      alpha += (1.0 / (double) (p - 1) - e) * log ((double) p);
 	    }
 	  else
@@ -783,12 +788,19 @@ eval_double_poly (double *g, int d, double s)
   return v;
 }
 
-/* Find the argmin of 
+/* Return the square of the value of S that minimizes the expression:
    [|p[d]|*S^d + ... + |p[0]|*S^{-d}] * [m/S + S],
    i.e., a zero of g(S) = (d+1) |p[d]| S^d + ... - (d-1) |p[0]| S^{-d}
    + (d-1) m |p[d]| S^{d-2} + ... - (d+1) m |p[0]| S^{-d-2}.
+   This correspond to a sieving region |a| <= S^{1/2} R, and |b| <= R/S^{1/2}.
+   Note: Bernstein in [2] defines the 'skewness' as the square of that value,
+   with |a| <= SR and |b| <= R/S. We follow here the convention from [1].
+
    Since there is only one sign change in the coefficients of g, it has
    exactly one root on [0, +Inf[. We search it by dichotomy.
+   There are two differences with respect to Definition 3.1 in [1]:
+   (a) we consider the L1 norm instead of the Linf norm;
+   (b) we also take into account the linear polynomial.
 */
 double
 skewness (mpz_t *p, int d, double m)
@@ -818,7 +830,9 @@ skewness (mpz_t *p, int d, double m)
       for (sb = 2.0; eval_double_poly (g, d, sb) < 0; sb *= 2.0);
       sa = 0.5 * sb;
     }
-  /* now g(sa) < 0, g(sb) > 0, and sb = 2*sa */
+  /* now g(sa) < 0, g(sb) > 0, and sb = 2*sa.
+     We use 10 iterations only, which gives a relative precision of
+     2^(-10) ~ 0.001, which is enough for our needs. */
   for (i = 0; i < 10; i++)
     {
       s = (sa + sb) / 2.0;
@@ -828,10 +842,10 @@ skewness (mpz_t *p, int d, double m)
 	sb = s;
     }
   free (g);
-  return sqrt ((sa + sb) / 2.0);
+  return (sa + sb) / 2.0;
 }
 
-/* mu(m,S), as defined in reference [2]:
+/* Returns log(mu(m,S)), with mu(m,S) as defined in reference [2]:
    
    mu(m,S) = (m/S+S)*(|a_d S^d| + ... + |a_0 S^{-d}|)
 
@@ -839,20 +853,25 @@ skewness (mpz_t *p, int d, double m)
    multiplied by the sieving region).
 
    We want mu(m,S) as small as possible.
+   
+   Note: since we follow the convention from [1] for the definition of the
+   'skewness', the argument S2 is the square of what is denoted S in [1].
 */
 double
-get_mu (mpz_t *p, unsigned long degree, mpz_t m, double S)
+get_logmu (mpz_t *p, unsigned long degree, mpz_t m, double S2)
 {
   double mu;
-  double S2 = SQR(S);
+  double S = sqrt (S2);
   int i;
 
   mu = fabs (mpz_get_d (p[degree]));
   for (i = degree - 1; i >= 0; i--)
     mu = mu * S2 + fabs (mpz_get_d (p[i]));
-  for (i = 0; i < degree; i++)
+  for (i = 0; i < degree; i += 2)
+    mu /= S2;
+  if (i < degree)
     mu /= S;
-  return (mpz_get_d (m) / S + S) * mu;
+  return log((mpz_get_d (m) / S + S) * mu);
 }
 
 /* Decompose p->n in base m, rounding to nearest. */
@@ -894,7 +913,6 @@ get_alpha_bound (cado_poly out)
   return (unsigned long) sqrt ((double) default_alim (out->n));
 }
 
-#if (METHOD == 3)
 /* Method described in reference [2], slide 8
    (Bernstein considered degree d=5, here we generalize to arbitrary d):
    Take m \approx B n^{1/(d+1)}
@@ -908,7 +926,7 @@ void
 generate_poly (cado_poly out, unsigned long T, int verbose)
 {
   unsigned long d = out->degree, alim;
-  double B, mu, logmu, best_logmu = DBL_MAX, best_E = DBL_MAX, alpha, E;
+  double B, logmu, best_logmu = DBL_MAX, best_E = DBL_MAX, alpha, E;
   double mB;
   mpz_t best_m, k, t, r;
   /* value of T = B^eff[d] for d <= 7 */
@@ -953,15 +971,14 @@ generate_poly (cado_poly out, unsigned long T, int verbose)
           mpz_add (out->m, out->m, k);
         }
       generate_base_m (out, out->m);
-      mu = get_mu (out->f, d, out->m, out->skew);
-      logmu = log (mu);
+      logmu = get_logmu (out->f, d, out->m, out->skew);
       /* we keep only the values of mu near optimal, since computing alpha
 	 is much more expensive */
       if (logmu < best_logmu + MARGIN)
 	{
           if (logmu < best_logmu)
             best_logmu = logmu;
-	  alpha = get_alpha (out->f, d, alim, verbose);
+	  alpha = get_alpha (out->f, d, alim, verbose, NUM_EST);
 	  calls_alpha ++;
 	  E = logmu + alpha;
 	  if (E < best_E)
@@ -970,7 +987,7 @@ generate_poly (cado_poly out, unsigned long T, int verbose)
 	      fprintf (stderr, "m=");
 	      mpz_out_str (stderr, 10, out->m);
 	      fprintf (stderr, " skew=%1.2f logmu=%1.2f alpha~%1.2f E=%1.2f\n",
-		       SQR(out->skew), logmu, alpha, E);
+		       out->skew, logmu, alpha, E);
 	      mpz_set (best_m, out->m);
 	    }
 	}
@@ -985,25 +1002,23 @@ generate_poly (cado_poly out, unsigned long T, int verbose)
   mpz_clear (t);
   mpz_clear (r);
 }
-#endif
 
 /* st is the initial value cputime() at the start of the program */
 void
 print_poly (FILE *fp, cado_poly p, int argc, char *argv[], int st, int raw)
 {
   int i;
-  double S, mu, alpha, logmu;
+  double alpha, logmu;
 
   if (strlen (p->name) != 0)
     fprintf (fp, "name: %s\n", p->name);
   fprintf (fp, "n: ");
   mpz_out_str (fp, 10, p->n);
   fprintf (fp, "\n");
-  S = p->skew;
-  fprintf (fp, "skew: %1.3f\n", SQR(S));
-  mu = get_mu (p->f, p->degree, p->m, S);
-  alpha = get_alpha (p->f, p->degree, (p->alim > 1000) ? 1000 : p->alim, 0);
-  logmu = log (mu);
+  fprintf (fp, "skew: %1.3f\n", p->skew);
+  logmu = get_logmu (p->f, p->degree, p->m, p->skew);
+  alpha = get_alpha (p->f, p->degree, (p->alim > 1000) ? 1000 : p->alim, 0,
+		     NUM_EST);
   fprintf (fp, "# logmu: %1.2f, alpha: %1.2f logmu+alpha=%1.2f\n", logmu,
 	   alpha, logmu + alpha);
   for (i = p->degree; i >= 0; i--)
@@ -1053,7 +1068,7 @@ L (mpz_t n)
   
   logn = log (mpz_get_d (n));
   e = log (logn);
-  e = logn * SQR(e);
+  e = logn * (e * e);
   e = c * pow (e, 0.33333333333333333333);
   return exp (e);
 }
@@ -1120,10 +1135,7 @@ main (int argc, char *argv[])
   init (in);
   parse_input (in);
   if (verbose)
-    {
-      fprintf (stderr, "Using method %d\n", METHOD);
-      fprintf (stderr, "L[1/3,(64/9)^(1/3)](n)=%1.2e\n", L (in->n));
-    }
+    fprintf (stderr, "L[1/3,(64/9)^(1/3)](n)=%1.2e\n", L (in->n));
   init_poly (out, in);
   mpz_set (out->m, m); /* if non zero, use given value of m */
   clear (in);
