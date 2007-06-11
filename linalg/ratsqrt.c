@@ -33,6 +33,7 @@ int main(int argc, char **argv) {
     int nrows, ncols;
     ret = fscanf(matfile, "%d %d", &nrows, &ncols);
     assert (ret == 2);
+    fgets(str, 1024, matfile); // read end of first line
     nlimbs = (nrows / GMP_NUMB_BITS) + 1;
   }
 
@@ -54,27 +55,13 @@ int main(int argc, char **argv) {
   }
 
   printf("size of prd = %d bits\n", mpz_sizeinbase(prd, 2));
-  mpz_t q, r;
-  mpz_init(q);
-  mpz_init(r);
-  for(;;) {
-    long p;
-    int val;
-    ret = scanf("%ld", &p);
-    if (ret != 1) 
-      break;
-    val = 0;
-    while (mpz_divisible_ui_p(prd, p)) {
-      val++;
-      mpz_divexact_ui(prd, prd, p);
-    }
-    printf("%d\n", val);
-  }
 
+  mpz_sqrtrem(prd, a, prd);
+  gmp_printf("remainder = %Zd\n", a);
 
+  mpz_mod(prd, prd, m);
+  gmp_printf("rational square root is %Zd\n", prd);
 
- // mpz_sqrtrem(prd, a, prd);
- // gmp_printf("remainder = %Zd\n", a);
 
   return 0;
 }

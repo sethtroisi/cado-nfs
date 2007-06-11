@@ -13,5 +13,9 @@ gauss.o: gauss.c
 ratsqrt: ratsqrt.c
 	gcc $(CFLAGS) $< $(LDFLAGS) -o $@
 
+characters: characters.c
+	gcc $(CFLAGS) -I.. $< $(LDFLAGS) -o $@
+
+
 clean:
 	\rm procrels gauss
