@@ -554,8 +554,9 @@ int main(int argc, char **argv) {
 
   fprintf(stderr, "nb of rational primes = %d\n", rat_table.length);
   fprintf(stderr, "nb of algebraic primes = %d\n", alg_table.length);
-  fprintf(stderr, "Total number of primes = %d\n",
-          rat_table.length + alg_table.length);
+  fprintf(stderr, "Total number of primes = %d (excess %d)\n",
+          rat_table.length + alg_table.length,
+          rel_table.length - (rat_table.length + alg_table.length));
 
   printf("%d %d\n", rel_table.length, rat_table.length + alg_table.length);
   for (i = 0; i < rel_table.length; ++i) {
