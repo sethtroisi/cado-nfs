@@ -433,14 +433,14 @@ fprint_rel_row(FILE *file, relation_t rel, tab_prime_t rat_table, tab_rootprime_
       parity = 1 - parity;
     } else {
       if (parity == 1) {
-	table_ind[nb_coeff++] = old_index;
+	table_ind[nb_coeff++] = old_index + rat_table.length;
       }
       old_index = index;
       parity = 1;
     }
   }
   if (parity == 1)
-    table_ind[nb_coeff++] = index;
+    table_ind[nb_coeff++] = index + rat_table.length;
 
   fprintf(file, "%lu ", nb_coeff);
   for (i = 0; i < nb_coeff; ++i) {

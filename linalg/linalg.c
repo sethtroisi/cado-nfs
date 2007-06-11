@@ -151,9 +151,9 @@ int main(int argc, char **argv) {
 
   fprintf(stderr, "dim of kernel is %d\n", dim);
 
-  fprintf(stderr, "printing a few lines of kernel...\n");
+  fprintf(stderr, "printing a 128 first lines of kernel...\n");
 
-  for (i = 0; i < 20; ++i) {
+  for (i = 0; i < 128; ++i) {
     for (j = 0; j < dmat.limbs_per_col; j++) {
       printf("%lx ", ker[i][j]);
     }
