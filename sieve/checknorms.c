@@ -77,7 +77,7 @@ read_polynomial (char *filename)
   char line[linelen];
   cado_poly *poly;
   int have_name = 0, have_n = 0, have_Y0 = 0, have_Y1 = 0;
-  int i, ok;
+  int i, ok = 1;
 
   file = fopen (filename, "r");
   if (file == NULL)
@@ -229,7 +229,7 @@ check_prime (mpz_t p, unsigned long sb, long a, unsigned long b)
       or if one prime factor is >= 2^lp, return 3.
 */
 unsigned long
-factor (mpz_t p1, mpz_t p2, mpz_t norm, size_t lp, int verbose)
+factor (mpz_t p1, mpz_t p2, mpz_t norm, size_t lp)
 {
   if (mpz_cmp_ui (norm, 1) == 0)
     return 0;
@@ -264,14 +264,18 @@ factor (mpz_t p1, mpz_t p2, mpz_t norm, size_t lp, int verbose)
       /* we also want p2 < 2^lp */
       if (mpz_sizeinbase (p2, 2) > lp)
         {
-          gmp_fprintf (stderr, "Warning, composite norm %Zd has too large factor %Zd\n", norm, p2);
+          static unsigned long count = 0;
+          if (count++ < 10)
+            gmp_fprintf (stderr, "Warning, composite norm %Zd has too large factor %Zd\n", norm, p2);
           return 3;
         }
       if (mpz_probab_prime_p (p1, REPS) && mpz_probab_prime_p (p2, REPS))
 	return 2;
       else
 	{
-	  gmp_fprintf (stderr, "Warning, norm with 3 primes or more: %Zd\n", norm);
+          static unsigned long count = 0;
+          if (count++ < 10)
+            gmp_fprintf (stderr, "Warning, norm with 3 primes or more: %Zd\n", norm);
 	  return 3;
 	}
     }
@@ -364,7 +368,7 @@ checkrels (char *f, cado_poly cpoly, int verbose, size_t mfbr, size_t mfba)
 	  nb = 3; /* discard relation */
 	}
       else /* factor residue on rational side */
-	nb = factor (p1, p2, norm, cpoly->lpbr, verbose);
+	nb = factor (p1, p2, norm, cpoly->lpbr);
       /* write additional primes */
       if (nb <= 2)
 	{
@@ -409,7 +413,7 @@ checkrels (char *f, cado_poly cpoly, int verbose, size_t mfbr, size_t mfba)
 	  nb = 3; /* discard relation */
 	}
       else /* factor residue on algebraic side */
-	nb = factor (p1, p2, norm, cpoly->lpba, verbose);
+	nb = factor (p1, p2, norm, cpoly->lpba);
       /* write additional primes */
       if (nb <= 2)
 	{
@@ -486,7 +490,7 @@ main (int argc, char *argv[])
 	}
       else 
 	{
-	  fprintf (stderr, "Usage: %s [-v] [-mfbr <n>] -poly <file> rels1 ... relsn\n");
+	  fprintf (stderr, "Usage: %s [-v] [-mfbr <n>] -poly <file> rels1 ... relsn\n", argv[0]);
 	  exit (EXIT_FAILURE);
 	}
     }
