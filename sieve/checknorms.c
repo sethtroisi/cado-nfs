@@ -320,6 +320,7 @@ checkrels (char *f, cado_poly cpoly, int verbose, size_t mfbr, size_t mfba)
       len = 0;
       ok = 0; /* ok=0 for a comment line, ok>=1 for a relation,
 		 ok>=3 for a valid relation */
+      nb = 0;
       /* skip comment lines */
       c = getc (fp);
       if (c == '#') /* read entire line */
@@ -354,6 +355,12 @@ checkrels (char *f, cado_poly cpoly, int verbose, size_t mfbr, size_t mfba)
 	      fprintf (stderr, "Error, prime %x=%u does not divide norm on rational side for a=%ld, b=%lu\n", p, p, a, b);
 	      exit (EXIT_FAILURE);
 	    }
+          /* check p is smaller than the large prime bound */
+          if (p > 1UL << cpoly->lpbr)
+            {
+              fprintf (stderr, "Warning, rational prime %x exceeds large prime bound 2^%d\n", p, cpoly->lpbr);
+              nb = 3; /* discard relation */
+            }
 	  len += sprintf (s + len, "%x", p);
 	  c = getc (fp);
 	  if (c == ':')
@@ -367,7 +374,7 @@ checkrels (char *f, cado_poly cpoly, int verbose, size_t mfbr, size_t mfba)
 	    gmp_fprintf (stderr, "Warning, rat. residue %Zd exceeds bound for a=%ld, b=%lu\n", norm, a, b);
 	  nb = 3; /* discard relation */
 	}
-      else /* factor residue on rational side */
+      else if (nb != 3) /* factor residue on rational side */
 	nb = factor (p1, p2, norm, cpoly->lpbr);
       /* write additional primes */
       if (nb <= 2)
@@ -397,6 +404,12 @@ checkrels (char *f, cado_poly cpoly, int verbose, size_t mfbr, size_t mfba)
 	      fprintf (stderr, "Error, prime %x=%u does not divide norm on algebraic side for a=%ld, b=%lu\n", p, p, a, b);
 	      exit (EXIT_FAILURE);
 	    }
+          /* check p is smaller than the large prime bound */
+          if (p > 1UL << cpoly->lpba)
+            {
+              fprintf (stderr, "Warning, algebraic prime %x exceeds large prime bound 2^%d\n", p, cpoly->lpba);
+              nb = 3; /* discard relation */
+            }
 	  len += sprintf (s + len, "%x", p);
 	  c = getc (fp);
 	  if (c != ',')
