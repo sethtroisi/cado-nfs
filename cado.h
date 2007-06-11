@@ -119,6 +119,8 @@ typedef __cado_poly_struct cado_poly[1];
 
 typedef unsigned int fbprime_t; /* 32 bits should be enough for everyone */
 #define FBPRIME_FORMAT "%u"
+#define FBPRIME_MAX 4294967295U
+#define FBPRIME_BITS 32
 typedef fbprime_t fbroot_t;
 #define FBROOT_FORMAT "%u"
 typedef unsigned long largeprime_t; /* On IA32 they'll only get 32 bit 
@@ -174,4 +176,17 @@ typedef struct {
   unsigned long * ar;	/* array of corresponding root (optional, this can
 			   be garbage) */
 } relation_t;
+
+/* A sieve report, filled in when sieving large factor base primes and
+   the new approximate log is below the threshold. The field a gets the
+   a value of the report, p gets the prime that was sieved and l the new
+   approximate log. */
+   
+typedef struct {
+  long a;
+  fbprime_t p;
+  unsigned char l;
+  unsigned char dummy[3];
+} sieve_report_t;
+
 #endif
