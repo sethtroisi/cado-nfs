@@ -2,6 +2,8 @@ Create a config.h file with contents like
 
 #define HAVE_MSRH 1
 #define WANT_ASSERT 1
+#define WANT_ASSERT_EXPENSIVE 0
+#define L1SIZE 32768
 
 Compile with
 

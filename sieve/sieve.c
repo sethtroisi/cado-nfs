@@ -18,10 +18,12 @@
 
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #define MAX(a,b) ((a)>(b)?(a):(b))
+#define LOG2 0.69314718055994530941723212145817656808
+#define INVLOG2 1.4426950408889634073599246810018921374
 
 #define REFAC_PRP_SIZE_THRES 50
 #define REFAC_PRP_THRES 500
-#define SIEVE_PERMISSIBLE_ERROR 5
+#define SIEVE_PERMISSIBLE_ERROR ((unsigned char) 7)
 #define PRP_REPS 1 /* number of tests in mpz_probab_prime_p */
 
 /* Some multiple precision functions we'll need */
@@ -266,26 +268,22 @@ sieve_small_slow (unsigned char *sievearray, factorbase_small_inited_t *fb,
 void 
 sieve (unsigned char *sievearray, factorbase_degn_t *fb, 
        const long amin, const long amax, const unsigned long b, 
-       const unsigned char threshold, fbprime_t *useful_primes_par,
-       const unsigned int useful_length_par,
-       const int odd)
+       const unsigned char threshold, sieve_report_t *reports,
+       unsigned int reports_length, const int odd)
 {
   /* The sievearray[0] entry corresponds to (amin, b), and
      sievearray[d] to (amin + d * (1 + odd), b) */
-  fbprime_t *useful_primes = useful_primes_par;
   const uint32_t l = (amax - amin) / (1 + odd) + 1;
   uint32_t i, amin_p, p, d;
-  unsigned int useful_length = useful_length_par;
   unsigned char plog;
+  const unsigned char threshold_with_error = threshold + 
+    SIEVE_PERMISSIBLE_ERROR;
 
   ASSERT (odd == 0 || odd == 1);
   ASSERT (!odd || (amin & 1) == 1);
   ASSERT (!odd || (amax & 1) == 1);
   ASSERT (!odd || (b & 1) == 0);
   ASSERT (amin <= amax);
-
-  if (useful_length > 0)
-    useful_length--; /* Make sure we have space for a 0 mark at the end */
 
   /* Do the sieving */
 
@@ -315,19 +313,24 @@ sieve (unsigned char *sievearray, factorbase_degn_t *fb,
 	      unsigned char k;
 	      k = sievearray[d] - plog;
 	      sievearray[d] = k;
-	      if (k <= threshold && useful_length > 0)
-		  {
-		    *useful_primes++ = p;
-		    useful_length--;
-		  }
+	      if (k + SIEVE_PERMISSIBLE_ERROR <= threshold_with_error && 
+		  reports_length > 0)
+		{
+		  reports->a = amin + (d << odd);
+		  reports->p = p;
+		  reports->l = k;
+		  reports++;
+		  reports_length--;
+		}
 	    }
         }
       
       /* Move on to the next factor base prime */
       fb = fb_next (fb);
     }
-  if (useful_length_par > 0)
-    *useful_primes++ = 0;
+
+  if (reports_length > 0)
+    reports->p = 0; /* Put end marker */
 }
 
 #define TYPE_STRING 0
@@ -523,68 +526,180 @@ print_useful (const fbprime_t *useful_primes,
 }
 
 static unsigned long
-find_sieve_reports (const unsigned char *sievearray, long *reports, 
+find_sieve_reports (const unsigned char *sievearray, sieve_report_t *reports, 
                     const unsigned int reports_len, 
                     const unsigned char reports_threshold, 
-                    const long amin, const long amax, const unsigned long b,
-                    const int odd, const int verbose)
+                    const long amin, const unsigned long l, 
+		    const unsigned long b, const int odd)
 {
-  long long tsc1, tsc2;
-  long a;
   unsigned long reports_nr, d;
   const int b3 = (b % 3 == 0); /* We skip over $a$, $3|a$ if $3|b$ to save some
 				  space in the reports list */
+  unsigned int a3;
   
   ASSERT (odd == 0 || odd == 1);
   ASSERT (!odd || (amin & 1) == 1);
-  ASSERT (!odd || (amax & 1) == 1);
-  ASSERT (amin <= amax);
   ASSERT (b > 0);
 
-  rdtscll (tsc1);
   reports_nr = 0;
 
-  for (a = amin, d = 0; reports_nr < reports_len && a <= amax; 
-       a += 1 << odd, d++)
+  /* a % 3 == 0  <=>
+     amin + (d << odd) == 0 (mod 3) <=>
+     (d << odd) == -amin (mod 3)  <=>
+     d == -amin / (odd + 1) (mod 3) */
+  a3 = signed_mod_longto32 (-amin, 3);
+  if (odd)
     {
-      /* The + 10 is to deal with accumulated rounding error that might have
-	 cause the sieve value to drop below 0 and wrap around */
-      if ((unsigned char) (sievearray[d] + 10) <= reports_threshold + 10)
+      if (a3 % 2 == 0)
+	a3 >>= 1;
+      else
+	a3 = (a3 + 3) >> 1;
+    }
+
+  for (d = 0; d < l; d++)
+    {
+      /* The + SIEVE_PERMISSIBLE_ERROR is to deal with accumulated rounding 
+	 error that might have cause the sieve value to drop below 0 and 
+	 wrap around */
+      if (sievearray[d] + SIEVE_PERMISSIBLE_ERROR <= 
+	  reports_threshold + SIEVE_PERMISSIBLE_ERROR)
         {
-	  ASSERT (a == amin + (long) (d << odd));
-	  if (!b3 || (a % 3) != 0) /* FIXME: have 2 separate loops */
-	    reports[reports_nr++] = a;
+	  if (!b3 || (d % 3) != a3) 
+	    /* FIXME: have 2 separate loops */
+	    {
+	      if (reports_nr < reports_len)
+		{
+		  reports[reports_nr].a = amin + (long) (d << odd);
+		  reports[reports_nr].p = 1;
+		  reports[reports_nr].l = sievearray[d];
+		  reports_nr++;
+		}
+	      
+	    }
         }
     }
-  rdtscll (tsc2);
-#ifdef HAVE_MSRH
-  if (verbose)
-    {
-      printf ("# There were %lu sieve reports (a,b not necessarily coprime)\n",
-	      reports_nr);
-      printf ("# Finding sieve reports took %lld clocks\n", tsc2 - tsc1);
-    }
-#endif
 
   return reports_nr;
 }
 
-unsigned long
+
+static inline void
+swap_reports (sieve_report_t *r1, sieve_report_t *r2)
+{
+  sieve_report_t t;
+
+  t.a = r1->a;
+  t.p = r1->p;
+  t.l = r1->l;
+  r1->a = r2->a;
+  r1->p = r2->p;
+  r1->l = r2->l;
+  r2->a = t.a;
+  r2->p = t.p;
+  r2->l = t.l;
+}
+
+/* Sort sieve reports by increasing a value */
+
+static void 
+sort_sieve_reports (sieve_report_t *r, const unsigned long l)
+{
+  long p; /* pivot element */
+  unsigned long b, h;
+  const unsigned long m = (l - 1) / 2; /* The midpoint */
+
+  if (l < 2)
+    return;
+
+  if (l == 2)
+    {
+      if (r[0].a > r[1].a)
+	swap_reports (r, r + 1);
+      return;
+    }
+
+  if (r[0].a > r[m].a)
+    swap_reports (r, r + m);
+  if (r[m].a > r[l - 1].a)
+    swap_reports (r + m, r + (l - 1));
+  if (r[0].a > r[m].a)
+    swap_reports (r, r + m);
+  /* Now r[0], r[m] and  r[l-1] are sorted in ascending order */
+
+  if (l == 3)
+    return;
+
+  p = r[m].a;
+  b = 1; 
+  h = l - 1;
+  
+  /* Here r[0].a <= p, r[m].a == p, r[l-1] >= p */
+
+  while (b < h)
+    {
+      while (r[b].a <= p && b <= h)
+	b++;  /* r[i].a <= p for all 0 <= i < b */
+      while (r[h].a > p)
+	h--;
+      if (b < h)
+	swap_reports (r + b, r + h);
+    }
+
+  h = b;
+  while (b > 0 && r[b - 1].a == p)
+    b--;
+
+  /* Here, r[i].a <= p for 0 <= i < b, r[i].a == p for b <= i < h,
+     r[i].a > p for h <= i < l */
+
+#ifdef WANT_ASSERT
+  {
+    unsigned long i;
+    for (i = 0; i < b; i++)
+      {
+	ASSERT (r[i].a <= p);
+      }
+    for (i = b; i < h; i++)
+      {
+	ASSERT (r[i].a == p);
+      }
+    for (i = h; i < l; i++)
+      {
+	ASSERT (r[i].a > p);
+      }
+  }
+#endif
+
+  sort_sieve_reports (r, b);
+  sort_sieve_reports (r + h, l - h);
+
+#ifdef WANT_ASSERT
+  {
+    unsigned long i;
+    for (i = 0; i < l - 1; i++)
+      {
+	ASSERT (r[i].a <= r[i + 1].a);
+      }
+  }
+#endif
+}
+
+static unsigned long
 sieve_one_side (unsigned char *sievearray, factorbase_t fb,
-		long *reports, const unsigned int reports_len, 
+		sieve_report_t *reports, const unsigned int reports_length,
 		const unsigned char reports_threshold,
-		fbprime_t *useful_primes, const unsigned int useful_length,
 		const long amin, const long amax, const unsigned long b,
 		const unsigned long proj_roots, const double log_scale,
 		const double *dpoly, const unsigned int deg, 
 		const int verbose)
 {
   long long tsc1, tsc2;
-  unsigned long reports_nr;
+  unsigned long reports_nr = 0;
   const int odd = 1 - (b & 1); /* If odd=1, only odd $a$ are sieved */
   const long eff_amin = amin + ((odd && (amin & 1) == 0) ? 1 : 0);
   const long eff_amax = amax - ((odd && (amax & 1) == 0) ? 1 : 0);
-  const unsigned long l = ((amax - amin) >> odd) + 1;
+  const unsigned long l = ((eff_amax - eff_amin) >> odd) + 1;
+  const int find_L2_reports = 1;
 
   fb_disable_roots (fb->fblarge, b, verbose);
   /* FIXME: need to disable entries in L1fb as well */
@@ -602,23 +717,35 @@ sieve_one_side (unsigned char *sievearray, factorbase_t fb,
       rdtscll (tsc1);
       for (blockstart = 0; blockstart < l; blockstart += fb->fbL1bound)
 	{
-	  if (fb->fbL1bound <= l - blockstart)
-	    sieve_small_slow (sievearray + blockstart, fb->fbL1init, 
-			      fb->fbL1bound);
-	  else
-	    sieve_small_slow (sievearray + blockstart, fb->fbL1init, 
-			      l - blockstart);
+	  const unsigned long blocklen = MIN(fb->fbL1bound, l - blockstart);
+	  sieve_small_slow (sievearray + blockstart, fb->fbL1init, blocklen);
+
+	  /* If the factor base limit is very small compared to the block 
+	     length L2, we may get many relations that are L2-smooth and will
+	     not produce sieve reports during sieving the large fb primes.
+	     Those reports are found here instead. */
+	  if (find_L2_reports)
+	    reports_nr +=
+	      find_sieve_reports (sievearray + blockstart, 
+				  reports + reports_nr, 
+				  reports_length - reports_nr, 
+				  reports_threshold, 
+				  eff_amin + (blockstart << odd), 
+				  blocklen, b, odd);
 	}
       rdtscll (tsc2);
 #ifdef HAVE_MSRH
       if (verbose)
 	printf ("# Sieving L1 primes took %lld clocks\n", tsc2 - tsc1);
+      if (verbose && find_L2_reports)
+	printf ("# There were %lu sieve reports after sieving L2 primes\n",
+		reports_nr);
 #endif
     }
 
   rdtscll (tsc1);
   sieve (sievearray, fb->fblarge, eff_amin, eff_amax, b, reports_threshold, 
-	 useful_primes, useful_length, odd);
+	 reports + reports_nr, reports_length - reports_nr, odd);
   rdtscll (tsc2);
 #ifdef HAVE_MSRH
   if (verbose)
@@ -627,14 +754,15 @@ sieve_one_side (unsigned char *sievearray, factorbase_t fb,
   
   fb_restore_roots (fb->fblarge, b, verbose);
   
-  if (verbose >= 2)
-    print_useful (useful_primes, useful_length);
-  
-  /* Store the sieve reports */
-  reports_nr = find_sieve_reports (sievearray, reports, reports_len, 
-				   reports_threshold, eff_amin, eff_amax, b, 
-				   odd, verbose);
+  /* Count the sieve reports and sort by increasing a */
+  for (reports_nr = 0; reports_nr < reports_length; reports_nr++)
+    {
+      if (reports[reports_nr].p == 0)
+	break;
+    }
 
+  sort_sieve_reports (reports, reports_nr);
+  
   return reports_nr;
 }
 
@@ -656,11 +784,13 @@ trialdiv_one_prime (const fbprime_t q, mpz_t C, unsigned int *nr_primes,
 {
   int nr_divide = 0;
 
-  while (mpz_divisible_ui_p (C, q))
+  while (mpz_divisible_ui_p (C, (unsigned long) q))
     {
+      unsigned long r;
       nr_divide++;
       add_fbprime_to_list (primes, nr_primes, max_nr_primes, q);
-      mpz_tdiv_q_ui(C, C, q);
+      r = mpz_tdiv_q_ui (C, C, (unsigned long) q);
+      ASSERT (r == 0);
     }
   return nr_divide;
 }
@@ -685,30 +815,46 @@ trialdiv_slow (unsigned long C, fbprime_t *primes, unsigned int *nr_primes,
     }
 }
 
+/* 1. Compute the norm
+   2. Divide out primes with projective roots
+   3. Divide out the report prime(s), remembering the smallest one and remember
+      the smallest approximate log from the reports
+   4. Trial divide up to the smallest report prime (or up to the factor base 
+      limit if there was no report prime)
+   5. Check if the cofactor is small enough
+   6. Check if the cofactor is < lpb, if yes report relation, assuming that 
+      the cofactor is a prime
+   7. Check if the cofactor is a prp, if yes skip to next report
+   
+   Factoring composite cofactors into large primes is left to the 
+   next step in the tool chain.
+*/
+
 static int
-trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, const long a, 
-		   const unsigned long b, int degree, 
+trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree, 
+		   const long a, const unsigned long b, 
 		   fbprime_t *primes, unsigned int *nr_primes, 
 		   const unsigned int max_nr_primes,
 		   const unsigned long proj_divisor, 
 		   const unsigned int nr_proj_primes, 
 		   const fbprime_t *proj_primes,
-		   const fbprime_t *useful_primes,
 		   factorbase_degn_t *fullfb,
+		   const sieve_report_t *reports,
 		   unsigned int *cof_toolarge,
 		   unsigned int *lp_toolarge,
-		   const int lpb, const int mfb, const double lambda)
+		   const int lpb, const int mfb, const double lambda,
+		   const double log_scale)
 {
   unsigned int k;
-  fbprime_t largest_useful;
   factorbase_degn_t *fbptr;
   size_t log2size;
+  fbprime_t maxp;
+  unsigned char reportlog;
+  double c_lower, maxp_d, inv_c_lower;
 
   /* 1. Compute norm */
   mp_poly_eval (norm, scaled_poly, degree, a);
   mpz_abs (norm, norm);
-  
-  *nr_primes = 0;
   
   /* 2. Divide out the primes with projective roots */
   if (proj_divisor > 1)
@@ -719,44 +865,112 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, const long a,
       ASSERT_ALWAYS (r == 0);
       
       for (k = 0; k < nr_proj_primes; k++)
-	add_fbprime_to_list (primes, nr_primes, max_nr_primes, proj_primes[k]);
-    }
-  
-  /* 3. See if any of the "useful primes" divide this norm */
-  largest_useful = 0;
-  for (k = 0; useful_primes[k] > 0; k++)
-    {
-      if (trialdiv_one_prime (useful_primes[k], norm, nr_primes, 
-			      primes, max_nr_primes))
 	{
-	  if (largest_useful == 0 || largest_useful < useful_primes[k])
-	    largest_useful = useful_primes[k];
+	  ASSERT (proj_divisor % proj_primes[k] == 0);
+	  add_fbprime_to_list (primes, nr_primes, max_nr_primes, 
+			       proj_primes[k]);
 	}
     }
-  if (0 && largest_useful == 0)
+  
+  /* 3. Divide the report primes out of this norm and find the smallest 
+     approximate log */
+  reportlog = 255;
+  ASSERT_ALWAYS (reports->a == a); /* There must be at least one */
+  while (reports->a == a && reports->p != 0)
     {
-      fprintf (stderr, "Warning: norm of degree %d polynomial for report "
-	       "%lu, %lu had no useful prime\n", degree, a, b);
-      gmp_fprintf (stderr, "Norm is %Zd\n", norm);
+      /* We may want to allow reports without a report prime. In that case
+	 the sieve_report_t may contain p == 1. */
+      if (reports->p != 1)
+	{
+	  int r;
+	  r = trialdiv_one_prime (reports->p, norm, nr_primes, 
+				  primes, max_nr_primes);
+	  ASSERT_ALWAYS (r > 0); /* If a report prime is listed but does not
+				    divide the norm, there is a serious bug
+				    in the sieve code */
+	}
+      /* Find the smallest approximate log. Since -SIEVE_PERMISSIBLE_ERROR <= 
+	 reports->l - log_b(c) <= SIEVE_PERMISSIBLE_ERROR and log_b(c) >= 0, 
+	 we add SIEVE_PERMISSIBLE_ERROR here to get positive values.*/
+      if (reports->l + SIEVE_PERMISSIBLE_ERROR < SIEVE_PERMISSIBLE_ERROR)
+	reportlog = 0;
+      else if (reports->l < reportlog)
+	reportlog = reports->l;
+      reports++;
     }
   
-  /* 4. Go through the factor base until the fb prime is equal to the 
-     largest "useful" prime we've seen (all larger fb primes that
-     divide the norm must also have been useful), or until the 
-     end of the factor base. */ 
-  for (fbptr = fullfb; 
-       fbptr->p != largest_useful; /* This is a trick. If there was a  useful prime, we'll hit that eventually and stop there. If there wasn't, largest_useful equals 0, which is also the end-of-factorbase-marker, so we'll stop at the end. */
+  /* Let c be the cofactor of the norm after dividing out all the factor
+     base primes. 
+     We know that log_b(c) = reportlog + e, |e| <= SIEVE_PERMISSIBLE_ERROR
+     c = b^(reportlog + e), thus 
+     c <= b^(reportlog + SIEVE_PERMISSIBLE_ERROR) and
+     c >= b^(reportlog - SIEVE_PERMISSIBLE_ERROR) and of course
+     c >= 1.
+     So once c < b^(reportlog + SIEVE_PERMISSIBLE_ERROR), we can start 
+     checking if dividing out another fb prime p would cause
+     c/p < b^(reportlog - SIEVE_PERMISSIBLE_ERROR) and if yes, stop.
+
+     We don't actually use c_upper at the moment, but we might some day.
+     c_upper = exp((reportlog + SIEVE_PERMISSIBLE_ERROR) / log_scale);
+  */
+
+  if (reportlog > SIEVE_PERMISSIBLE_ERROR)
+    c_lower = exp((reportlog - SIEVE_PERMISSIBLE_ERROR) / log_scale);
+  else
+    c_lower = 1.;
+  inv_c_lower = 1. / c_lower;
+
+  maxp_d = mpz_get_d (norm) * inv_c_lower;
+  if (maxp_d > (double) FBPRIME_MAX)
+    maxp = FBPRIME_MAX;
+  else
+    maxp = (int) ceil(maxp_d);
+ 
+  /* 4. Go through the factor base until the cofactor c is small enough that
+        no more fb primes could possibly divide it. This is the case when 
+	norm / p < c_lower ==> p > norm / c_lower */
+
+  for (fbptr = fullfb; fbptr->p != 0 && fbptr->p <= maxp; 
        fbptr = fb_next (fbptr))
-    trialdiv_one_prime (fbptr->p, norm, nr_primes, primes,
-			max_nr_primes);
+    {
+      if (trialdiv_one_prime (fbptr->p, norm, nr_primes, primes, 
+			      max_nr_primes) > 0)
+	{
+	  maxp_d = mpz_get_d (norm) * inv_c_lower;
+	  if (maxp_d > (double) FBPRIME_MAX)
+	    maxp = FBPRIME_MAX;
+	  else
+	    maxp = (int) ceil(maxp_d);
+	}
+    }
   
+  /* FIXME: Ugly hack! If the cofactor is still too large, trial factor some
+     more */
+  log2size = mpz_sizeinbase (norm, 2) - 1;
+  if ((double) log2size > lpb * lambda + SIEVE_PERMISSIBLE_ERROR)
+    {
+      fprintf (stderr, "Warning: doing some extra refactoring for %ld, %lu\n",
+	       a, b);
+      for (; fbptr->p != 0; fbptr = fb_next (fbptr))
+	{
+	  if (trialdiv_one_prime (fbptr->p, norm, nr_primes, primes, 
+				  max_nr_primes) > 0)
+	    {
+	      log2size = mpz_sizeinbase (norm, 2) - 1;
+	      if (log2size <= lpb * lambda + SIEVE_PERMISSIBLE_ERROR)
+		break;
+	    }
+	}
+    }
+
+
   /* 5. Check if the cofactor is small enough */
   log2size = mpz_sizeinbase (norm, 2) - 1;
   if ((double) log2size > 
       lpb * lambda + SIEVE_PERMISSIBLE_ERROR)
     {
       gmp_fprintf (stderr, 
-		   "Sieve report %ld, %lu is not smooth for degree %d poly, "
+		   "Sieve report (%ld, %lu) is not smooth for degree %d poly, "
 		   "cofactor is %Zd with %d bits\n", 
 		   a, b, degree, norm, mpz_sizeinbase (norm, 2));
       return 0;
@@ -800,11 +1014,12 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, const long a,
 
 static void
 trialdiv_and_print (cado_poly *poly, const unsigned long b, 
-                    const long *reports_a, const unsigned int reports_a_nr, 
-		    fbprime_t *useful_primes_a, const long *reports_r, 
+                    const sieve_report_t *reports_a, 
+		    const unsigned int reports_a_nr, 
+		    const sieve_report_t *reports_r, 
 		    const unsigned int reports_r_nr, 
-		    fbprime_t *useful_primes_r, 
-		    factorbase_t fba, factorbase_t fbr, const int verbose)
+		    factorbase_t fba, factorbase_t fbr, 
+		    const double log_scale, const int verbose)
 {
   unsigned long long tsc1, tsc2;
   unsigned long proj_divisor_a, proj_divisor_r;
@@ -847,46 +1062,35 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
 
   for (i = 0, j = 0; i < reports_a_nr && j < reports_r_nr;)
     {
-      if (reports_a[i] == reports_r[j] && gcd(labs(reports_a[i]), b) == 1)
+      if (reports_a[i].a == reports_r[j].a && 
+	  gcd(labs(reports_a[i].a), b) == 1)
 	{
-          const long a = reports_a[i];
+          const long a = reports_a[i].a;
       
-	  /* For the algebraic side, then for the rational side, we
-	     1. Compute the norm
-	     2. Divide out primes with projective roots
-	     3. Divide out the useful prime(s), remembering the smallest one
-	     4. Trial divide up to the smallest useful prime (or up to the
-	        factor base limit if there was no useful prime)
-	     5. Check if the cofactor is small enough
-	     6. Check if the cofactor is < lpb, if yes report relation
-	     7. Check if the cofactor is a prp, if yes skip to next report
-
-	     Factoring composite cofactors into large primes is left to the 
-	     next step in the tool chain.
-	  */
-
           /* Do the algebraic side */
-
-	  ok = trialdiv_one_side (Fab, scaled_poly_a, a, b, (*poly)->degree, 
+	  nr_primes_a = 0;
+	  ok = trialdiv_one_side (Fab, scaled_poly_a, (*poly)->degree, a, b, 
 				  primes_a, &nr_primes_a, max_nr_primes,
 				  proj_divisor_a, nr_proj_primes_a, 
-				  proj_primes_a, useful_primes_a, fba->fullfb, 
+				  proj_primes_a, fba->fullfb, 
+				  reports_a + i,
 				  &cof_a_toolarge, &lp_a_toolarge, 
 				  (*poly)->lpba, (*poly)->mfba, 
-				  (*poly)->alambda);
+				  (*poly)->alambda, log_scale);
 
 	  if (!ok) 
 	    goto nextreport;
 
           /* Now the rational side */
-	  
-	  ok = trialdiv_one_side (Gab, scaled_poly_r, a, b, 1, 
+	  nr_primes_r = 0;
+	  ok = trialdiv_one_side (Gab, scaled_poly_r, 1, a, b, 
 				  primes_r, &nr_primes_r, max_nr_primes,
 				  proj_divisor_r, nr_proj_primes_r, 
-				  proj_primes_r, useful_primes_r, fbr->fullfb, 
+				  proj_primes_r, fbr->fullfb, 
+				  reports_r + j,
 				  &cof_r_toolarge, &lp_r_toolarge, 
 				  (*poly)->lpbr, (*poly)->mfbr, 
-				  (*poly)->rlambda);
+				  (*poly)->rlambda, log_scale);
 
 	  if (!ok) 
 	    goto nextreport;
@@ -898,13 +1102,18 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
 	  for (k = 0; k < nr_primes_a; k++)
 	    printf ("%x%s", primes_a[k], k+1==nr_primes_a?"\n":",");
 	  fflush (stdout);
+
+	  /* Skip over duplicates that might cause relations to be
+	     output repeatedly */
+	  while (i < reports_a_nr && reports_a[i].a == reports_a[i + 1].a)
+	    i++;
+	  while (j < reports_r_nr && reports_r[j].a == reports_r[j + 1].a)
+	    j++;
 	}
 
-
     nextreport:
-      /* Assumes values in reports_a are sorted and unique, 
-	 same for reports_r  */
-      if (reports_a[i] < reports_r[j])
+      /* Assumes values in reports_a are sorted, same for reports_r  */
+      if (reports_a[i].a < reports_r[j].a)
 	i++;
       else
 	j++;
@@ -924,8 +1133,8 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
   {
     printf ("# Trial factoring/printing took %lld clocks\n", tsc2 - tsc1);
     printf ("# Too large cofactors (discarded in this order): "
-	    "alg composite > mfba: %d, alg prp > lpba: %d, "
-	    "rat composite > mfbr: %d, rat prp > lpbr: %d\n", 
+	    "alg > mfba: %d, alg prp > lpba: %d, "
+	    "rat > mfbr: %d, rat prp > lpbr: %d\n", 
 	    cof_a_toolarge, lp_a_toolarge, cof_r_toolarge, lp_r_toolarge);
   }
 #endif
@@ -937,13 +1146,11 @@ main (int argc, char **argv)
 {
   long amin, amax;
   unsigned long bmin, bmax, b;
-  fbprime_t *useful_primes_a, *useful_primes_r;
+  sieve_report_t *reports_a, *reports_r;
   factorbase_t fba, fbr;
-  long *reports_a, *reports_r;
   char *fbfilename = NULL, *polyfilename = NULL;
   unsigned char *sievearray;
-  unsigned int useful_length_a, useful_length_r, reports_a_len, reports_a_nr, 
-    reports_r_len, reports_r_nr;
+  unsigned int reports_a_len, reports_a_nr, reports_r_len, reports_r_nr;
   int verbose = 0;
   unsigned int deg;
   unsigned int i;
@@ -1090,17 +1297,14 @@ main (int argc, char **argv)
 #endif
 
   sievearray = (unsigned char *) malloc ((amax - amin + 1) * sizeof (char));
-  useful_length_a = ((amax - amin + 1)) / 100 + 1000;
-  useful_length_r = ((amax - amin + 1)) / 10 + 1000;
-  useful_primes_a = (fbprime_t *) malloc (useful_length_a* sizeof (fbprime_t));
-  useful_primes_r = (fbprime_t *) malloc (useful_length_r* sizeof (fbprime_t));
-  ASSERT (useful_primes_a != NULL && useful_primes_r != NULL);
+  reports_a_len = ((amax - amin + 1)) / 10 + 1000;
+  reports_r_len = ((amax - amin + 1)) / 2 + 1000;
 
-  reports_a_len = useful_length_a;
-  reports_a = (long *) malloc (reports_a_len * sizeof (long));
+  reports_a = (sieve_report_t *) malloc (reports_a_len * 
+					 sizeof (sieve_report_t));
   ASSERT (reports_a != NULL);
-  reports_r_len = useful_length_r;
-  reports_r = (long *) malloc (reports_r_len * sizeof (long));
+  reports_r = (sieve_report_t *) malloc (reports_r_len * 
+					 sizeof (sieve_report_t));
   ASSERT (reports_r != NULL);
 
   for (b = bmin; b <= bmax; b++)
@@ -1126,9 +1330,12 @@ main (int argc, char **argv)
       reports_a_nr = 
 	sieve_one_side (sievearray, fba,  
 			reports_a, reports_a_len, report_a_threshold, 
-			useful_primes_a, useful_length_a, 
 			amin, amax, b, proj_roots, log_scale, 
 			dpoly_a, deg, verbose);
+
+      if (verbose)
+	printf ("# There were sieve %d reports on the algebraic side\n",
+		reports_a_nr);
 
       proj_roots = mpz_gcd_ui (NULL, (*cpoly)->g[1], b);
       if (verbose)
@@ -1145,10 +1352,12 @@ main (int argc, char **argv)
 
       reports_r_nr = 
 	sieve_one_side (sievearray, fbr, 
-			reports_r, reports_r_len, 
-			report_r_threshold, useful_primes_r, 
-			useful_length_r, amin, amax, b, proj_roots, log_scale, 
+			reports_r, reports_r_len, report_r_threshold, 
+			amin, amax, b, proj_roots, log_scale, 
 			dpoly_r, 1, verbose);
+      if (verbose)
+	printf ("# There were sieve %d reports on the rational side\n",
+		reports_r_nr);
 
       if (reports_a_len == reports_a_nr)
 	  fprintf (stderr, "Warning: sieve reports list on algebraic side "
@@ -1159,10 +1368,8 @@ main (int argc, char **argv)
 		   "full with %u entries for b=%lu\n", reports_r_len, b);
 
       /* Not trial factor the candidate relations */
-      trialdiv_and_print (cpoly, b, 
-			  reports_a, reports_a_nr, useful_primes_a, 
-			  reports_r, reports_r_nr, useful_primes_r, 
-			  fba, fbr, verbose);
+      trialdiv_and_print (cpoly, b, reports_a, reports_a_nr, reports_r, 
+			  reports_r_nr, fba, fbr, log_scale, verbose);
     }
 
 #if 0
@@ -1170,8 +1377,6 @@ main (int argc, char **argv)
   fb_clear (fba);
   fb_clear (fbr);
 #endif
-  free (useful_primes_a);
-  free (useful_primes_r);
   free (reports_a);
   free (reports_r);
   free (sievearray);
