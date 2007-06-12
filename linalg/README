@@ -27,7 +27,7 @@ moment the output format is not fixed and 128 vectors are printed.
 
 For the sequel, two more binaries: ratsqrt and characters.
 
-$ ./characters mat ker poly 40 60
+$ ./characters mat ker poly 40 60 > ker2
 
 where 40 is the number of vectors of ker you want to analyze, and 60 is
 the number of characters that should be used (use at least 20 more, I
@@ -35,12 +35,11 @@ think).
 
 TODO:
   - add a character for the sign of the rational side
-  - do the linear algebra and print new vectors.
 
 For the moment this prints the matrix of characters for the vectors. This
 shows which vectors should be combined to create genuine relations.
 
-$ ./ratsqrt [-depnum nnn] mat ker m
+$ ./ratsqrt [-depnum nnn] mat ker2 m
 
 This solve the square root problem on the rational side (with a naive
 algorithm). 

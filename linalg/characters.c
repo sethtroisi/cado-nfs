@@ -6,6 +6,8 @@
 #include "mod_ul.c"
 #include "cado.h"
 
+int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
+    int limbs_per_row, int limbs_per_col);
 
 #define TYPE_STRING 0
 #define TYPE_MPZ 1
@@ -507,6 +509,85 @@ void create_characters(rootprime_t * tabchar, int k, cado_poly pol) {
   mpz_clear(pp);
 }
 
+void
+readOneKer(mp_limb_t *vec, FILE *file, int nlimbs) {
+  unsigned long w;
+  int ret, i;
+  for (i = 0; i < nlimbs; ++i) {
+    ret = fscanf(file, "%lx", &w);
+    assert (ret == 1);
+    *vec = w;
+    vec++;
+  }
+}
+
+typedef struct {
+  unsigned int nrows;
+  unsigned int ncols;
+  mp_limb_t *data;
+  unsigned int limbs_per_row;
+  unsigned int limbs_per_col;
+} dense_mat_t;
+
+void
+handleKer(dense_mat_t *mat, rootprime_t * tabchar, FILE * matfile, mp_limb_t ** ker, int nlimbs, cado_poly pol)
+{  
+  int i, j, ii, jj, k, n;
+  int ret;
+  unsigned long w;
+  long a;
+  unsigned long b;
+  char str[1024];
+  mpz_t prd, z;
+  int **charval;
+
+  n = mat->nrows;
+  k = mat->ncols;
+  charval = (int **) malloc(n*sizeof(int *));
+  assert (charval != NULL);
+  for (i = 0; i < n; ++i) {
+    charval[i] = (int *) malloc(k*sizeof(int));
+    assert (charval[i] != NULL);
+    for (j = 0; j < k; ++j)
+      charval[i][j] = 1;
+  }
+
+  mpz_init_set_ui(prd, 1);
+  mpz_init(z);
+
+  rewind(matfile);
+  fgets(str, 1024, matfile); // skip first line
+
+  for (i = 0; i < nlimbs; ++i) {
+//    fprintf (stderr, "i = %d\n", i);
+    for (j = 0; j < GMP_NUMB_BITS; ++j) {
+      if (fgets(str, 1024, matfile)) {
+	ret = gmp_sscanf(str, "%ld %lu", &a, &b);
+	assert (ret == 2);
+	for (jj = 0; jj < n; ++jj) { // for each vector in ker...
+	  if ((ker[jj][i]>>j) & 1UL) {
+	    for (ii = 0; ii < k; ++ii) { // for each character...
+	      charval[jj][ii] *= eval_char(a, b, tabchar[ii]);
+	    }
+	  }
+	}
+      }
+    }
+  }
+
+  for (i = 0; i < n; ++i)
+    for (j = 0; j < mat->limbs_per_row; ++j)
+      mat->data[i*mat->limbs_per_row+j] = 0UL;
+
+  for (i = 0; i < n; ++i)
+    for (j = 0; j < k; ++j) {
+      int j0 = j/GMP_NUMB_BITS;
+      int j1 = j - j0*GMP_NUMB_BITS;
+      if (charval[i][j] == -1)
+	mat->data[i*mat->limbs_per_row+j0] |= (1UL<<j1);
+    }
+}
+
 
 int main(int argc, char **argv) {
   FILE * matfile, *kerfile, *polyfile;
@@ -519,6 +600,11 @@ int main(int argc, char **argv) {
   unsigned long b, ua;
   long a;
   cado_poly *pol;
+  mp_limb_t **ker;
+  mp_limb_t *newker;
+  dense_mat_t mymat;
+  mp_limb_t **myker;
+  int dim;
 
   if (argc != 6) {
     fprintf(stderr, "usage: %s matfile kerfile polyfile n k\n", argv[0]);
@@ -547,9 +633,9 @@ int main(int argc, char **argv) {
 
   create_characters(tabchar, k, *pol);
 
-  fprintf(stderr, "using characters (p,r):\n");
-  for (i = 0; i < k; ++i)
-    fprintf(stderr, "\t%lu %lu\n", tabchar[i].prime, tabchar[i].root);
+  //fprintf(stderr, "using characters (p,r):\n");
+  //for (i = 0; i < k; ++i)
+  //  fprintf(stderr, "\t%lu %lu\n", tabchar[i].prime, tabchar[i].root);
 
 
   {
@@ -559,23 +645,57 @@ int main(int argc, char **argv) {
     nlimbs = (nrows / GMP_NUMB_BITS) + 1;
   }
 
+  ker = (mp_limb_t **)malloc(n*sizeof(mp_limb_t *));
+  assert (ker != NULL);
   for (j = 0; j < n; ++j) {
-    handleOneKer(charval, k, tabchar, matfile, kerfile, nlimbs, *pol);
+    ker[j] = (mp_limb_t *) malloc (nlimbs*sizeof(mp_limb_t));
+    assert (ker[j] != NULL);
+    readOneKer(ker[j], kerfile, nlimbs);
+  }
+  fprintf(stderr, "finished reading kernel file\n");
 
-#if 0
-    printf("\n");
-    for (i = 0; i < k; ++i) {
-      printf("%d ", charval[i]);
-    }
-    printf("\n");
-#endif
-    fprintf(stderr, "[");
-    for (i = 0; i < k-1; ++i) {
-      fprintf(stderr, "%d, ", (charval[i]==1)?0:1);
-    }
-    fprintf(stderr, "%d], ", (charval[k-1]==1)?0:1);
-    fprintf(stderr, "\n");
+  mymat.nrows = n;
+  mymat.ncols = k;
+  mymat.limbs_per_row =  ((mymat.ncols-1) / GMP_NUMB_BITS) + 1;
+  mymat.limbs_per_col =  ((mymat.nrows-1) / GMP_NUMB_BITS) + 1;
 
+  mymat.data = (mp_limb_t *) malloc(mymat.limbs_per_row*mymat.nrows*sizeof(mp_limb_t));
+  assert (mymat.data != NULL);
+
+  fprintf(stderr, "start computing characters...\n");
+
+  handleKer(&mymat, tabchar, matfile, ker, nlimbs, *pol);
+
+  myker = (mp_limb_t **)malloc(mymat.nrows*sizeof(mp_limb_t *));
+  assert (myker != NULL);
+  for (i = 0; i < mymat.nrows; ++i) {
+    myker[i] = (mp_limb_t *)malloc(mymat.limbs_per_col*sizeof(mp_limb_t));
+    assert (myker[i] != NULL);
+    for (j = 0; j < mymat.limbs_per_col; ++j) 
+      myker[i][j] = 0UL;
+  }
+  dim = kernel(mymat.data, myker, mymat.nrows, mymat.ncols, mymat.limbs_per_row, mymat.limbs_per_col);
+  fprintf(stderr, "dim of ker = %d\n", dim);
+    
+  newker = (mp_limb_t *) malloc (nlimbs*sizeof(mp_limb_t));
+  assert (newker != NULL);
+  for (i = 0; i < dim; ++i) {
+    for (j = 0; j < nlimbs; ++j)
+      newker[j] = 0;
+    for (j = 0; j < mymat.limbs_per_col; ++j) {
+      int jj, kk;
+      unsigned long w = myker[i][j];
+      for (jj = 0; jj < GMP_NUMB_BITS; ++jj) {
+	if (w & 1UL) {
+	  for (kk = 0; kk < nlimbs; ++kk)
+	    newker[kk] ^= ker[j*GMP_NUMB_BITS+jj][kk];
+	}
+	w >>= 1;
+      }
+    }
+    for (j = 0; j < nlimbs; ++j)
+      printf("%lx ", newker[j]);
+    printf("\n");
   }
 
   free(pol);

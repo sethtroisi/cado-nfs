@@ -1,4 +1,4 @@
-CFLAGS=-O2 -g
+CFLAGS=-g
 LDFLAGS=/usr/lib64/libgmp.a
 
 procrels: procrels.c
@@ -8,13 +8,13 @@ linalg: linalg.c gauss.o
 	gcc $(CFLAGS) gauss.o -I.. $< $(LDFLAGS) -o $@
 
 gauss.o: gauss.c
-	gcc -c -O4 -DNDEBUG -funroll-loops -DMULTI_ROW=1 -DNO_MAIN $< -o $@
+	gcc -c -g -DMULTI_ROW=1 -DNO_MAIN $< -o $@
 
 ratsqrt: ratsqrt.c
 	gcc $(CFLAGS) $< $(LDFLAGS) -o $@
 
-characters: characters.c
-	gcc $(CFLAGS) -I.. $< $(LDFLAGS) -o $@
+characters: characters.c gauss.o
+	gcc $(CFLAGS) -I.. $< gauss.o $(LDFLAGS) -o $@
 
 all: procrels linalg ratsqrt characters
 
