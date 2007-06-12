@@ -393,10 +393,13 @@ checkrels (char *f, cado_poly cpoly, int verbose, size_t mfbr, size_t mfba)
 	}
       len += sprintf (s + len, ":");
 
+      /* warning: there might be no prime on the algebraic side */
+      c = getc (fp);
+
       /* evaluate norm on algebraic side */
       eval_algebraic (norm, cpoly->f, cpoly->degree, a, b);
       /* read primes on algebraic side */
-      while (fscanf (fp, "%x", &p) != 0)
+      while (c != '\n' && fscanf (fp, "%x", &p) != 0)
 	{
 	  /* check p divides the norm */
 	  if (mpz_fdiv_q_ui (norm, norm, p) != 0)
