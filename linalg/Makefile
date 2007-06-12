@@ -16,6 +16,7 @@ ratsqrt: ratsqrt.c
 characters: characters.c
 	gcc $(CFLAGS) -I.. $< $(LDFLAGS) -o $@
 
+all: procrels linalg ratsqrt characters
 
 clean:
-	\rm procrels gauss
+	\rm procrels gauss.o linalg ratsqrt characters
