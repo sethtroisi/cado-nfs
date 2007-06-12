@@ -33,7 +33,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
        Algorithm", Brian Antony Murphy, Australian National University, 1999.
 */
 
-#define VERSION 175 /* try to match the svn version */
+#define VERSION 176 /* try to match the svn version */
 
 #define MARGIN 2.0 /* margin for mu: keep only logmu <= best_logmu + MARGIN */
 
@@ -53,7 +53,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 /* if WANT_EXACT_VALUATION is defined, use exact algorithm to determine
    average valuation of F(a,b) for special primes, otherwise estimate if by
    computation on some square grid */
-/* #define WANT_EXACT_VALUATION */
+#define WANT_EXACT_VALUATION
 
 #ifdef WANT_EXACT_VALUATION
 #define GET_VALUATION special_valuation
