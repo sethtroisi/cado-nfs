@@ -780,7 +780,8 @@ add_fbprime_to_list (fbprime_t *list, unsigned int *cursize,
 
 static inline int
 trialdiv_one_prime (const fbprime_t q, mpz_t C, unsigned int *nr_primes,
-                    fbprime_t *primes, const unsigned int max_nr_primes)
+                    fbprime_t *primes, const unsigned int max_nr_primes,
+		    const int do_powers)
 {
   int nr_divide = 0;
 
@@ -791,6 +792,8 @@ trialdiv_one_prime (const fbprime_t q, mpz_t C, unsigned int *nr_primes,
       add_fbprime_to_list (primes, nr_primes, max_nr_primes, q);
       r = mpz_tdiv_q_ui (C, C, (unsigned long) q);
       ASSERT (r == 0);
+      if (!do_powers)
+	break;
     }
   return nr_divide;
 }
@@ -884,7 +887,7 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 	{
 	  int r;
 	  r = trialdiv_one_prime (reports->p, norm, nr_primes, 
-				  primes, max_nr_primes);
+				  primes, max_nr_primes, 0);
 	  ASSERT_ALWAYS (r > 0); /* If a report prime is listed but does not
 				    divide the norm, there is a serious bug
 				    in the sieve code */
@@ -934,7 +937,7 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
        fbptr = fb_next (fbptr))
     {
       if (trialdiv_one_prime (fbptr->p, norm, nr_primes, primes, 
-			      max_nr_primes) > 0)
+			      max_nr_primes, 0) > 0)
 	{
 	  maxp_d = mpz_get_d (norm) * inv_c_lower;
 	  if (maxp_d > (double) FBPRIME_MAX)
@@ -944,28 +947,17 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 	}
     }
   
-  /* FIXME: Ugly hack! If the cofactor is still too large, trial factor some
-     more */
-  log2size = mpz_sizeinbase (norm, 2) - 1;
-  if ((double) log2size > lpb * lambda + SIEVE_PERMISSIBLE_ERROR)
+  /* We divided out each prime only once so far, because that's what the
+     sieving code did and we wanted identical size of the cofactor.
+     Now see if any of the primes so far divide in a power greater than one */
+  for (k = 0; k < *nr_primes; k++)
     {
-      fprintf (stderr, "Warning: doing some extra refactoring for %ld, %lu\n",
-	       a, b);
-      for (; fbptr->p != 0; fbptr = fb_next (fbptr))
-	{
-	  if (trialdiv_one_prime (fbptr->p, norm, nr_primes, primes, 
-				  max_nr_primes) > 0)
-	    {
-	      log2size = mpz_sizeinbase (norm, 2) - 1;
-	      if (log2size <= lpb * lambda + SIEVE_PERMISSIBLE_ERROR)
-		break;
-	    }
-	}
+      trialdiv_one_prime (primes[k], norm, nr_primes, primes, max_nr_primes, 
+			  1);
     }
 
-
   /* 5. Check if the cofactor is small enough */
-  log2size = mpz_sizeinbase (norm, 2) - 1;
+  log2size = mpz_sizeinbase (norm, 2);
   if ((double) log2size > 
       lpb * lambda + SIEVE_PERMISSIBLE_ERROR)
     {
@@ -986,15 +978,23 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
     {
       fbprime_t q;
 
-      /* We assume that this implies that the cofactor is 1 or prime,
-	 i.e. that 2^lbp < rlima^2 */
-
       if (mpz_cmp_ui (norm, 1UL) > 0)
 	{
-	  ASSERT (mpz_probab_prime_p (norm, PRP_REPS));
-	  q = (fbprime_t) mpz_get_ui (norm);
-	  add_fbprime_to_list (primes, nr_primes, max_nr_primes, q);
-	  mpz_set_ui (norm, 1UL);
+	  if (mpz_probab_prime_p (norm, PRP_REPS))
+	    {
+	      /* If this cofactor is a prp, add it to the primes */
+	      q = (fbprime_t) mpz_get_ui (norm);
+	      add_fbprime_to_list (primes, nr_primes, max_nr_primes, q);
+	      mpz_set_ui (norm, 1UL);
+	    }
+	  else
+	    {
+	      /* otherwise just ignore it, print the relation and let the 
+		 next program in the tool chain figure out the prime factors 
+		 of this composite */
+	      gmp_fprintf (stderr, "Warning: cofactor %Zd <lpb, but not "
+			   "prime for (%ld, %lu)\n", norm, a, b);
+	    }
 	}
       return 1;
     }
