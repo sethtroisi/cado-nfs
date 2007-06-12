@@ -33,7 +33,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
        Algorithm", Brian Antony Murphy, Australian National University, 1999.
 */
 
-#define VERSION 156 /* try to match the svn version */
+#define VERSION 175 /* try to match the svn version */
 
 #define MARGIN 2.0 /* margin for mu: keep only logmu <= best_logmu + MARGIN */
 
@@ -49,8 +49,20 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <sys/resource.h>
 
 #define REPS 1 /* number of Miller-Rabin tests in isprime */
-#define NUM_EST 0.01 /* wanted accurary in the contribution to alpha(F)
-			for ``bad-behaved'' primes */
+
+/* if WANT_EXACT_VALUATION is defined, use exact algorithm to determine
+   average valuation of F(a,b) for special primes, otherwise estimate if by
+   computation on some square grid */
+/* #define WANT_EXACT_VALUATION */
+
+#ifdef WANT_EXACT_VALUATION
+#define GET_VALUATION special_valuation
+#else
+#define NUM_EST 0.001 /* wanted accurary in the contribution to alpha(F)
+                         for ``bad-behaved'' primes */
+#define GET_VALUATION(f,d,p,disc) estimate_valuation(f,d,NUM_EST,p)
+#endif
+
 
 #ifdef DEBUG
 #define ASSERT(x) assert(x)
@@ -138,7 +150,65 @@ fprint_polynomial (FILE *fp, mpz_t *f, const int d)
   fprintf (fp, ";\n");
 }
 
-#define print_polynomial(f,d) fprint_polynomial(stdout,f,d)
+/* g <- content(f) where deg(f)=d */
+void
+content_poly (mpz_t g, mpz_t *f, int d)
+{
+  int i;
+
+  ASSERT(d >= 1);
+
+  mpz_gcd (g, f[0], f[1]);
+  for (i = 2; i <= d; i++)
+    mpz_gcd (g, g, f[i]);
+}
+
+/* v <- f(r), where f is of degree d */
+void
+eval_poly_ui (mpz_t v, mpz_t *f, int d, unsigned long r)
+{
+  int i;
+
+  mpz_set (v, f[d]);
+  for (i = d - 1; i >= 0; i--)
+    {
+      mpz_mul_ui (v, v, r);
+      mpz_add (v, v, f[i]);
+    }
+}
+
+/* v <- f'(r), where f is of degree d */
+void
+eval_poly_diff_ui (mpz_t v, mpz_t *f, int d, unsigned long r)
+{
+  int i;
+
+  mpz_mul_ui (v, f[d], d);
+  for (i = d - 1; i >= 1; i--)
+    {
+      mpz_mul_ui (v, v, r);
+      mpz_addmul_ui (v, f[i], i); /* v <- v + i*f[i] */
+    }
+}
+
+/* h(x) <- h(x + r/p), where the coefficients of h(x + r/p) are known to
+   be integers */
+void
+poly_shift_divp (mpz_t *h, int d, unsigned long r, unsigned long p)
+{
+  int i, k;
+  mpz_t t;
+
+  mpz_init (t);
+  for (i = 1; i <= d; i++)
+    for (k = d - i; k < d; k++)
+      { /* h[k] <- h[k] + r/p h[k+1] */
+        assert (mpz_divisible_ui_p (h[k+1], p) != 0);
+        mpz_divexact_ui (t, h[k+1], p);
+        mpz_addmul_ui (h[k], t, r);
+      }
+  mpz_clear (t);
+}
 
 /* D <- |discriminant (f)| = |resultant(f,diff(f,x))/lc(f)| */
 void
@@ -230,6 +300,142 @@ igcd (unsigned long a, unsigned long b)
       b = c;
     }
   return a;
+}
+
+/* auxiliary routine for special_valuation(), see below */
+double
+special_val0 (mpz_t *f, int d, unsigned long p)
+{
+  double v;
+  mpz_t c, *g, *h;
+  int alloc, i, r, r0;
+
+  mpz_init (c);
+  content_poly (c, f, d);
+  for (v = 0.0; mpz_divisible_ui_p (c, p); v++, mpz_divexact_ui (c, c, p));
+  alloc = v != 0.0;
+
+  /* g <- f/p^v */
+  if (alloc != 0)
+    {
+      g = alloc_poly (d);
+      mpz_ui_pow_ui (c, p, (unsigned long) v); /* p^v */
+      for (i = 0; i <= d; i++)
+        mpz_divexact (g[i], f[i], c);
+    }
+  else
+    g = f;
+
+  h = alloc_poly (d);
+  /* first compute h(x) = g(px) */
+  mpz_set_ui (c, 1);
+  for (i = 0; i <= d; i++)
+    {
+      mpz_mul (h[i], g[i], c);
+      mpz_mul_ui (c, c, p);
+    }
+  /* naive loop to search for roots of g mod p */
+  for (r0 = r = 0; r < p; r++)
+    {
+      eval_poly_ui (c, g, d, r);
+      if (mpz_divisible_ui_p (c, p)) /* g(r) = 0 mod p */
+        {
+          eval_poly_diff_ui (c, g, d, r);
+          if (mpz_divisible_ui_p (c, p) == 0) /* g'(r) <> 0 mod p */
+            v += 1.0 / (double) (p - 1);
+          else /* hard case */
+            {
+              /* g(px+r) = h(x + r/p), thus we can go from h0(x)=g(px+r0)
+                 to h1(x)=g(px+r1) by computing h0(x + (r1-r0)/p) */
+              poly_shift_divp (h, d, r - r0, p);
+              v += special_val0 (h, d, p) / (double) p;
+            }
+        }
+    }
+  poly_clear (h, d);
+
+  if (alloc != 0)
+    poly_clear (g, d);
+  mpz_clear (c);
+
+  return v;
+}
+
+/* Compute the average valuation of F(a,b) for gcd(a,b)=1, for a prime p
+   dividing the discriminant of f, using the following algorithm from 
+   Guillaume Hanrot (which is some kind of p-adic variant of Uspensky's
+   algorithm):
+
+   val(f, p)
+     return val0(f, p) * p / (p+1) + val0(f(1/(p*x))*(p*x)^d, p) * 1/(p+1)
+
+   val0(f, p). 
+     v <- valuation (content(f), p); 
+     f <- f/p^v  
+
+     r <- roots mod p(f, p)
+
+     for r_i in r do
+         if f'(r_i) <> 0 mod p then v +=  1/(p-1). 
+         else
+              f2 <- f(p*x + r_i)
+              v += val0(f2, p) / p. 
+         endif
+     endfor
+     Return v. 
+
+A special case when:
+(a) p^2 does not divide disc(f),
+(b) p does not divide lc(f),
+then the average valuation is (p q_p - 1)/(p^2 - 1), where q_p is the number
+of roots of f mod p. When q_p=1, we get 1/(p+1).
+
+Note: when p does not divide lc(f), the val0(f(1/(p*x))*(p*x)^d, p) call
+always returns 0 in val(f,p).
+
+Assumes p divides disc = disc(f), d is the degree of f.
+*/
+double
+special_valuation (mpz_t *f, int d, unsigned long p, mpz_t disc)
+{
+  mpz_t t;
+  double v;
+  int p_divides_lc;
+
+  ASSERT (mpz_divisible_ui_p (disc, p));
+  mpz_init (t);
+  /* first try special case where p^2 does not divide disc and p does not
+     divide lc(f) */
+  mpz_divexact_ui (t, disc, p);
+  p_divides_lc = mpz_divisible_ui_p (f[d], p);
+  if ((mpz_divisible_ui_p (t, p) == 0) && (p_divides_lc == 0))
+    {
+      v = (double) p;
+      v = (v * (double) roots_mod (f, d, p) - 1.0) / (v * v - 1.0);
+    }
+  else
+    {
+      v = special_val0 (f, d, p) * (double) p;
+      if (p_divides_lc != 0)
+        {
+          /* compute g(x) = f(1/(px))*(px)^d, i.e., g[i] = f[d-i]*p^i */
+          mpz_t *g;
+          int i;
+
+          g = alloc_poly (d);
+          mpz_set_ui (t, 1); /* will contains p^i */
+          for (i = 0; i <= d; i++)
+            {
+              mpz_mul (g[i], f[d - i], t);
+              mpz_mul_ui (t, t, p);
+            }
+          v += special_val0 (g, d, p);
+          poly_clear (g, d);
+        }
+      v /= (double) (p + 1);
+    }
+  mpz_clear (t);
+  return v;
 }
 
 /* Estimate the average valuation of p in f(x) for 0 <= x, y < X,
@@ -427,7 +633,7 @@ isprime (unsigned long p)
    eps is the target accuracy for the "bad-behaved primes".
 */
 double
-get_alpha (mpz_t *f, const int d, unsigned long B, int verbose, double eps)
+get_alpha (mpz_t *f, const int d, unsigned long B, int verbose)
 {
   double alpha, e;
   unsigned long p, q;
@@ -443,7 +649,7 @@ get_alpha (mpz_t *f, const int d, unsigned long B, int verbose, double eps)
     }
   else
     {
-      e = estimate_valuation (f, d, eps, 2);
+      e = GET_VALUATION (f, d, 2, disc);
       if (verbose >= 2)
 	fprintf (stderr, "2 divides disc(f): %1.6f\n", e);
       alpha = (1.0 - e) * log (2.0);
@@ -454,7 +660,7 @@ get_alpha (mpz_t *f, const int d, unsigned long B, int verbose, double eps)
 	{
 	  if (mpz_divisible_ui_p (disc, p))
 	    {
-	      e = estimate_valuation (f, d, eps, p);
+              e = GET_VALUATION (f, d, p, disc);
 	      if (verbose >= 2)
 		fprintf (stderr, "%lu divides disc(f): %1.6f\n", p, e);
 	      alpha += (1.0 / (double) (p - 1) - e) * log ((double) p);
@@ -978,7 +1184,7 @@ generate_poly (cado_poly out, unsigned long T, int verbose)
 	{
           if (logmu < best_logmu)
             best_logmu = logmu;
-	  alpha = get_alpha (out->f, d, alim, verbose, NUM_EST);
+	  alpha = get_alpha (out->f, d, alim, verbose);
 	  calls_alpha ++;
 	  E = logmu + alpha;
 	  if (E < best_E)
@@ -1017,8 +1223,7 @@ print_poly (FILE *fp, cado_poly p, int argc, char *argv[], int st, int raw)
   fprintf (fp, "\n");
   fprintf (fp, "skew: %1.3f\n", p->skew);
   logmu = get_logmu (p->f, p->degree, p->m, p->skew);
-  alpha = get_alpha (p->f, p->degree, (p->alim > 1000) ? 1000 : p->alim, 0,
-		     NUM_EST);
+  alpha = get_alpha (p->f, p->degree, (p->alim > 1000) ? 1000 : p->alim, 0);
   fprintf (fp, "# logmu: %1.2f, alpha: %1.2f logmu+alpha=%1.2f\n", logmu,
 	   alpha, logmu + alpha);
   for (i = p->degree; i >= 0; i--)
