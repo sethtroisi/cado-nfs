@@ -425,6 +425,7 @@ fprint_rel_row(FILE *file, relation_t rel, tab_prime_t rat_table, tab_rootprime_
   index = getindex_alg(alg_table, rel.ap[i], rel.ar[i]);
   old_index = index;
   parity = 1;
+  i++;
   for (;i < rel.nb_ap; ++i) {
     if (isBadPrime(rel.ap[i], bad_primes))
       continue;
@@ -444,7 +445,6 @@ fprint_rel_row(FILE *file, relation_t rel, tab_prime_t rat_table, tab_rootprime_
 
   fprintf(file, "%lu ", nb_coeff);
   for (i = 0; i < nb_coeff; ++i) {
-    assert (table_ind[i] != -1);
     fprintf(file, "%lu ", table_ind[i]);
   }
 
@@ -559,9 +559,16 @@ int main(int argc, char **argv) {
           rel_table.length - (rat_table.length + alg_table.length));
 
   printf("%d %d\n", rel_table.length, rat_table.length + alg_table.length);
+
   for (i = 0; i < rel_table.length; ++i) {
     fprint_rel_row(stdout, rel_table.tab[i], rat_table, alg_table, bad_primes);
   }
+
+  for (i = 0; i < rat_table.length; ++i)
+    fprintf(stderr, "%d %lu\n", i, rat_table.tab[i]);
+
+  for (i = 0; i < alg_table.length; ++i)
+    fprintf(stderr, "%d %lu %lu\n", i+rat_table.length, alg_table.tab[i].prime, alg_table.tab[i].root);
 
   for (i = 0; i < rel_table.allocated; ++i) {
     if (rel_table.tab[i].rp != NULL)
