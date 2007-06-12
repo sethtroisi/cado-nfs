@@ -564,11 +564,13 @@ int main(int argc, char **argv) {
     fprint_rel_row(stdout, rel_table.tab[i], rat_table, alg_table, bad_primes);
   }
 
+#if 0
   for (i = 0; i < rat_table.length; ++i)
     fprintf(stderr, "%d %lu\n", i, rat_table.tab[i]);
 
   for (i = 0; i < alg_table.length; ++i)
     fprintf(stderr, "%d %lu %lu\n", i+rat_table.length, alg_table.tab[i].prime, alg_table.tab[i].root);
+#endif
 
   for (i = 0; i < rel_table.allocated; ++i) {
     if (rel_table.tab[i].rp != NULL)
