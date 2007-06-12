@@ -3,9 +3,54 @@
 #include <gmp.h>
 #include <assert.h>
 
+#define FAST /* uses product tree instead of naive accumulation */
+
+#define THRESHOLD 2 /* must be >= 2 */
+
+/* accumulate up to THRESHOLD products in prd[0], 2^i*THRESHOLD in prd[i].
+   nprd is the number of already accumulated values: if nprd = n0 + 
+   n1 * THRESHOLD + n2 * THRESHOLD^2 + ..., then prd[0] has n0 entries,
+   prd[1] has n1*THRESHOLD entries, and so on.
+*/
+mpz_t*
+accumulate_fast (mpz_t *prd, mpz_t a, unsigned long *lprd, unsigned long nprd)
+{
+  unsigned long i;
+
+  mpz_mul (prd[0], prd[0], a);
+  nprd ++;
+
+  for (i = 0; nprd % THRESHOLD == 0; i++, nprd /= THRESHOLD)
+    {
+      /* need to access prd[i + 1], thus i+2 entries */
+      if (i + 2 > *lprd)
+        {
+          lprd[0] ++;
+          prd = (mpz_t*) realloc (prd, *lprd * sizeof (mpz_t));
+          mpz_init_set_ui (prd[i + 1], 1);
+        }
+      mpz_mul (prd[i + 1], prd[i + 1], prd[i]);
+      mpz_set_ui (prd[i], 1);
+    }
+
+  return prd;
+}
+
+/* prd[0] <- prd[0] * prd[1] * ... * prd[lprd-1] */
+void
+accumulate_fast_end (mpz_t *prd, unsigned long lprd)
+{
+  unsigned long i;
+
+  for (i = 1; i < lprd; i++)
+    mpz_mul (prd[0], prd[0], prd[i]);
+}
+
 int main(int argc, char **argv) {
   FILE * matfile, *kerfile;
-  mpz_t m, a, b, prd;
+  mpz_t m, a, b, *prd;
+  unsigned long lprd; /* number of elements in prd[] */
+  unsigned long nprd; /* number of accumulated products in prd[] */
   int ret;
   unsigned long w;
   int i, j, nlimbs;
@@ -33,7 +78,10 @@ int main(int argc, char **argv) {
   ret = gmp_sscanf(argv[3], "%Zd", m);
   assert (ret == 1);
 
-  mpz_init_set_ui(prd, 1);
+  lprd = 1;
+  nprd = 0;
+  prd = (mpz_t*) malloc (lprd * sizeof (mpz_t));
+  mpz_init_set_ui(prd[0], 1);
   mpz_init(a);
   mpz_init(b);
 
@@ -72,29 +120,40 @@ int main(int argc, char **argv) {
 	  assert (ret == 2);
 	  mpz_mul(b, b, m);
 	  mpz_sub(a, a, b);
-	  mpz_mul(prd, prd, a);
+#ifndef FAST
+          mpz_mul (prd[0], prd[0], a);
+#else
+          prd = accumulate_fast (prd, a, &lprd, nprd++);
+#endif
 	}
       }
       w >>= 1;
     }
   }
 
-  printf("size of prd = %d bits\n", mpz_sizeinbase(prd, 2));
+#ifdef FAST
+  accumulate_fast_end (prd, lprd);
+#endif
 
-  if (mpz_sgn (prd) < 0)
+  printf("size of prd = %d bits\n", mpz_sizeinbase(prd[0], 2));
+
+  if (mpz_sgn (prd[0]) < 0)
     {
       fprintf (stderr, "Error, product is negative: try another dependency\n");
       exit (1);
     }
 
-  mpz_sqrtrem(prd, a, prd);
+  mpz_sqrtrem(prd[0], a, prd[0]);
   gmp_printf("remainder = %Zd\n", a);
 
-  mpz_mod(prd, prd, m);
-  gmp_printf("rational square root is %Zd\n", prd);
+  mpz_mod(prd[0], prd[0], m);
+  gmp_printf("rational square root is %Zd\n", prd[0]);
 
+  for (i = 0; i < lprd; i++)
+    mpz_clear (prd[i]);
+  mpz_clear (a);
+  mpz_clear (b);
+  free (prd);
 
   return 0;
 }
-
-

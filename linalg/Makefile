@@ -1,4 +1,4 @@
-CFLAGS=-g
+CFLAGS=-O2 -g
 LDFLAGS=/usr/lib64/libgmp.a
 
 procrels: procrels.c
