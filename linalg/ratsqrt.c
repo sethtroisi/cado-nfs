@@ -10,9 +10,17 @@ int main(int argc, char **argv) {
   unsigned long w;
   int i, j, nlimbs;
   char str[1024];
+  int depnum = 0;
+
+  if (argc > 2 && strcmp (argv[1], "-depnum") == 0)
+    {
+      depnum = atoi (argv[2]);
+      argc -= 2;
+      argv += 2;
+    }
 
   if (argc != 4) {
-    fprintf(stderr, "usage: %s matfile kerfile m\n", argv[0]);
+    fprintf(stderr, "usage: %s [-depnum nnn] matfile kerfile m\n", argv[0]);
     exit(1);
   }
 
@@ -37,6 +45,23 @@ int main(int argc, char **argv) {
     nlimbs = (nrows / GMP_NUMB_BITS) + 1;
   }
 
+  /* go to dependency depnum */
+  while (depnum > 0)
+    {
+      int c;
+      /* read one line */
+      while ((c = fgetc (kerfile)) != '\n')
+        if (c == EOF)
+          break;
+      depnum --;
+    }
+
+  if (depnum > 0)
+    {
+      fprintf (stderr, "Error, not enough dependencies\n");
+      exit (1);
+    }
+
   for (i = 0; i < nlimbs; ++i) {
     ret = fscanf(kerfile, "%lx", &w);
     assert (ret == 1);
@@ -55,6 +80,12 @@ int main(int argc, char **argv) {
   }
 
   printf("size of prd = %d bits\n", mpz_sizeinbase(prd, 2));
+
+  if (mpz_sgn (prd) < 0)
+    {
+      fprintf (stderr, "Error, product is negative: try another dependency\n");
+      exit (1);
+    }
 
   mpz_sqrtrem(prd, a, prd);
   gmp_printf("remainder = %Zd\n", a);
