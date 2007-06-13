@@ -9,6 +9,14 @@ include Makefile.local
 CFLAGS=-O2 -g -Wall -W
 LDFLAGS=
 
+# Set default filenames/paths if not already set.
+ECM ?= /usr/local/
+GMP ?= /usr/local/
+ECMLIB ?= $(ECM)/lib/libecm.a
+ECMINCLUDE ?= $(ECM)/include/
+GMPLIB ?= $(GMP)/lib/libgmp.a
+GMPINCLUDE ?= $(GMP)/include/
+
 all: sieve checknorms
 
 Makefile.local:
@@ -18,10 +26,10 @@ Makefile.local:
 	touch Makefile.local
 
 sieve: sieve.c fb.c ../polyfile.c config.h
-	gcc -I. -I.. $(CFLAGS) -o $@ -Wall -Wextra sieve.c fb.c ../polyfile.c $(GMPLIB) -lm
+	gcc -I. -I.. -I$(GMPINCLUDE) $(CFLAGS) -o $@ -Wall -Wextra sieve.c fb.c ../polyfile.c $(GMPLIB) -lm
 
 checknorms: checknorms.c
-	gcc -I.. -I$(ECM)/include $(CFLAGS) -o $@ $< $(ECMLIB) $(GMPLIB) -lm
+	gcc -I.. -I$(ECMINCLUDE) $(CFLAGS) -o $@ $< $(ECMLIB) $(GMPLIB) -lm
 
 config.h:
 	echo '#define HAVE_MSRH 1'   >  $@
