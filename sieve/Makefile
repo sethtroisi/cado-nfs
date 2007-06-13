@@ -11,6 +11,12 @@ LDFLAGS=
 
 all: sieve checknorms
 
+Makefile.local:
+	echo "Makefile.local does not exist. It can be used to store paths \
+	to libraries etc.  Making an empty file to avoid warnings in \
+	future invocations of make."
+	touch Makefile.local
+
 sieve: sieve.c fb.c ../polyfile.c config.h
 	gcc -I. -I.. $(CFLAGS) -o $@ -Wall -Wextra sieve.c fb.c ../polyfile.c $(GMPLIB) -lm
 
