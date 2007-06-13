@@ -1,19 +1,21 @@
-# Usage: make <target> GMP=$GMP ECM=$ECM where $GMP and $ECM are the
-# installation directories of GMP and GMP-ECM
+# Usage: make <target> 
 
-GMP=
-ECM=
+# Paths and anything specific to a host go in Makefile.local
+# It must define ECMLIB which is the full path to and filename of the
+# libecm.a library, and GMPLIB which is full path/name or just "-lgmp"
+
+include Makefile.local
 
 CFLAGS=-O2 -g -Wall -W
-LDFLAGS=-lm $(GMP)/lib/libgmp.a
+LDFLAGS=
 
 all: sieve checknorms
 
-sieve: sieve.c fb.c config.h
-	gcc -I.. $(CFLAGS) -o $@ -Wall -Wextra sieve.c fb.c $(LDFLAGS)
+sieve: sieve.c fb.c ../polyfile.c config.h
+	gcc -I. -I.. $(CFLAGS) -o $@ -Wall -Wextra sieve.c fb.c ../polyfile.c $(GMPLIB) -lm
 
 checknorms: checknorms.c
-	gcc -I.. -I$(ECM)/include $(CFLAGS) -o $@ $< $(ECM)/lib/libecm.a $(LDFLAGS)
+	gcc -I.. -I$(ECM)/include $(CFLAGS) -o $@ $< $(ECMLIB) $(GMPLIB) -lm
 
 config.h:
 	echo '#define HAVE_MSRH 1'   >  $@
