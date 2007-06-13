@@ -33,9 +33,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
        Algorithm", Brian Antony Murphy, Australian National University, 1999.
 */
 
-#define VERSION 176 /* try to match the svn version */
+#define VERSION 179 /* try to match the svn version */
 
-#define MARGIN 2.0 /* margin for mu: keep only logmu <= best_logmu + MARGIN */
+/* if WANT_MONIC is defined, allow only monic linear polynomial x-m */
+#define WANT_MONIC
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,8 +46,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <values.h> /* for DBL_MAX */
 #include <math.h>   /* for log, fabs */
 #include "cado.h"
-#include <sys/types.h>
-#include <sys/resource.h>
+
+#define MARGIN 1.5 /* margin for mu: keep only logmu <= best_logmu + MARGIN */
 
 #define REPS 1 /* number of Miller-Rabin tests in isprime */
 
@@ -63,12 +64,20 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #define GET_VALUATION(f,d,p,disc) estimate_valuation(f,d,NUM_EST,p)
 #endif
 
-
 #ifdef DEBUG
 #define ASSERT(x) assert(x)
 #else
 #define ASSERT(x)
 #endif
+
+#define mpz_add_si(a,b,c)                       \
+  if (c >= 0) mpz_add_ui (a, b, c);             \
+  else mpz_sub_ui (a, b, -c)
+
+#define mpz_submul_si(a,b,c)                    \
+  if (c >= 0) mpz_submul_ui (a, b, c);          \
+  else mpz_addmul_ui (a, b, -c)
+  
 
 static void
 usage ()
@@ -81,15 +90,6 @@ usage ()
   fprintf (stderr, "       in     - input file (number to factor)\n");
   fprintf (stderr, "       out    - output file (polynomials)\n");
   exit (1);
-}
-
-int
-cputime ()
-{
-  struct rusage rus;
-
-  getrusage (0, &rus);
-  return rus.ru_utime.tv_sec * 1000 + rus.ru_utime.tv_usec / 1000;
 }
 
 /************************** polynomial arithmetic ****************************/
@@ -1084,14 +1084,46 @@ get_logmu (mpz_t *p, unsigned long degree, mpz_t m, double S2)
 void
 generate_base_m (cado_poly p, mpz_t m)
 {
-  unsigned long i;
+  unsigned long i, g = 1, mg;
+  long k, im;
   int d = p->degree;
+  mpz_t powm;
 
+#ifdef WANT_MONIC
   mpz_ndiv_qr (p->f[1], p->f[0], p->n, m);
   for (i = 1; i < d; i++)
     mpz_ndiv_qr (p->f[i+1], p->f[i], p->f[i], m);
+#else
+  mpz_init (powm);
+  mpz_pow_ui (powm, m, d);
+  mpz_ndiv_qr (p->f[d], p->f[d - 1], p->n, powm);
+  /* N = f[d] * m^d + f[d-1] */
+  g = mpz_gcd_ui (NULL, p->f[d - 1], 232792560);
+  mpz_set_ui (p->f[0], g);
+  mpz_invert (p->f[0], powm, p->f[0]);
+  im = mpz_get_ui (p->f[0]); /* 1/m^d mod g */
+  mg = mpz_fdiv_ui (m, g); /* m mod g */
+  mpz_divexact_ui (p->f[d - 1], p->f[d - 1], g);
+  for (i = d - 1; i >= 1; i--)
+    {
+      /* p->f[i] is the current remainder */
+      mpz_divexact (powm, powm, m); /* m^i */
+      mpz_ndiv_qr (p->f[i], p->f[i - 1], p->f[i], powm);
+      /* f[i] = q * m^i + r: we want to write f[i] = (q+k) * m^i + (r-k*m^i)
+         with r-k*m^i divisible by g, i.e., k = r/m^i mod g */
+      k = mpz_fdiv_ui (p->f[i - 1], g); /* r mod g */
+      im = (im * mg) % g; /* 1/m^i mod g */
+      k = (k * im) % g; /* r/m^i mod g */
+      if (2 * k > g)
+        k -= g;
+      mpz_add_si (p->f[i], p->f[i], k);
+      mpz_submul_si (p->f[i - 1], powm, k);
+      mpz_divexact_ui (p->f[i - 1], p->f[i - 1], g);
+    }
+  mpz_clear (powm);
+#endif
   mpz_neg (p->g[0], m);
-  mpz_set_ui (p->g[1], 1);
+  mpz_set_ui (p->g[1], g);
   mpz_set (p->m, m);
   p->skew = skewness (p->f, d, mpz_get_d (m));
 }
@@ -1182,13 +1214,12 @@ generate_poly (cado_poly out, unsigned long T, int verbose)
 	 is much more expensive */
       if (logmu < best_logmu + MARGIN)
 	{
-          if (logmu < best_logmu)
-            best_logmu = logmu;
 	  alpha = get_alpha (out->f, d, alim, verbose);
 	  calls_alpha ++;
 	  E = logmu + alpha;
 	  if (E < best_E)
 	    {
+              best_logmu = logmu;
 	      best_E = E;
 	      fprintf (stderr, "m=");
 	      mpz_out_str (stderr, 10, out->m);

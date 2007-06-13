@@ -1,4 +1,4 @@
-CFLAGS=-g
+CFLAGS=-O2 -g
 LDFLAGS=/usr/lib64/libgmp.a
 
 procrels: procrels.c
@@ -8,7 +8,7 @@ linalg: linalg.c gauss.o
 	gcc $(CFLAGS) gauss.o -I.. $< $(LDFLAGS) -o $@
 
 gauss.o: gauss.c
-	gcc -c -g -DMULTI_ROW=1 -DNO_MAIN $< -o $@
+	gcc -c -g -DMULTI_ROW=1 -DNO_MAIN -I.. $< -o $@
 
 ratsqrt: ratsqrt.c
 	gcc $(CFLAGS) $< $(LDFLAGS) -o $@

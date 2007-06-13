@@ -25,7 +25,25 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef _CADO_H
 #define _CADO_H
 
+#include <sys/types.h>    /* for cputime */
+#include <sys/resource.h> /* for cputime */
 #include "gmp.h"
+
+/* Common timing function: return user time since beginning of session
+   in milliseconds. Example:
+
+   int st = cputime ();
+   foo (...);
+   printf ("foo took %dms\", cputime () - st);
+*/
+static int
+cputime ()
+{
+  struct rusage rus;
+
+  getrusage (0, &rus);
+  return rus.ru_utime.tv_sec * 1000 + rus.ru_utime.tv_usec / 1000;
+}
 
 /* Common asserting/debugging defines */
 #include <assert.h>

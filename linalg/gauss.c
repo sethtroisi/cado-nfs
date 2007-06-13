@@ -41,6 +41,7 @@ If just the dimension of kernel is wanted, set ker=NULL.
 #include <stdlib.h>
 #include <assert.h>
 #include "gmp.h"   /* only used for setting a random matrix */
+#include "cado.h"  /* for cputime() */
 
 #ifndef VERBOSE
 #define VERBOSE 0
@@ -229,7 +230,7 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
   int *set_used;
   int j_current, col_current;
   mp_limb_t mask1, mask2;
-
+  int st0 = cputime (), st;
 
   /* store the data in the global variables */
   matrix = mat;
@@ -349,8 +350,12 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
     }      
 
     /* some verbosity... */
-    if ((col_current % 128) == 0) 
-      fprintf(stderr, "done %d pivots\n", col_current);
+    if ((col_current % 128) == 0)
+      {
+        st = (cputime () - st0) / 1000; /* time in seconds */
+        fprintf (stderr, "done %d pivots in %ds (est. %1.0fs)\n", col_current,
+                 st, (double) NROWS * (double) st / (double) col_current);
+      }
 
   } /* end while */
 

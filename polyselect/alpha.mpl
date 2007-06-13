@@ -19,8 +19,9 @@ get_alpha := proc(f, B) local s, p, e, q, disc;
    disc := discrim(f,x);
    while p <= B do
       if disc mod p = 0 then
-         lprint(p," divides disc(f)");
-         e := est_valuation (f, p, 1, 99, 1, 99);
+         # e := est_valuation (f, p, 1, 99, 1, 99);
+         e := val (f, p);
+#         lprint(p," divides disc(f)", evalf(e,3));
          s := s + evalf((1/(p-1)-e)*log(p));
       else
          q := 0;
