@@ -354,7 +354,7 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
       {
         st = (cputime () - st0) / 1000; /* time in seconds */
         fprintf (stderr, "done %d pivots in %ds (est. %1.0fs)\n", col_current,
-                 st, (double) NROWS * (double) st / (double) col_current);
+                 st, (double) NCOLS * (double) st / (double) col_current);
       }
 
   } /* end while */
