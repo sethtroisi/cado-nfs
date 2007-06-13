@@ -33,7 +33,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
        Algorithm", Brian Antony Murphy, Australian National University, 1999.
 */
 
-#define VERSION 179 /* try to match the svn version */
+#define VERSION 185 /* try to match the svn version */
 
 /* if WANT_MONIC is defined, allow only monic linear polynomial x-m */
 #define WANT_MONIC
@@ -47,9 +47,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <math.h>   /* for log, fabs */
 #include "cado.h"
 
-#define MARGIN 1.5 /* margin for mu: keep only logmu <= best_logmu + MARGIN */
-
 #define REPS 1 /* number of Miller-Rabin tests in isprime */
+
+#define MAX_ROTATE 16 /* try rotation by k*(x-m) for |k| <= MAX_ROTATE */
 
 /* if WANT_EXACT_VALUATION is defined, use exact algorithm to determine
    average valuation of F(a,b) for special primes, otherwise estimate if by
@@ -82,9 +82,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 static void
 usage ()
 {
-  fprintf (stderr, "Usage: polyselect [-v] [-raw] [-e nnn] [-m xxx]< in > out\n\n");
+  fprintf (stderr, "Usage: polyselect [-v] [-full] [-e nnn] [-m xxx]< in > out\n\n");
   fprintf (stderr, "       -v     - verbose\n");
-  fprintf (stderr, "       -raw   - does not output factor base parameters\n");
+  fprintf (stderr, "       -full  - also output factor base parameters\n");
   fprintf (stderr, "       -e nnn - use effort nnn\n");
   fprintf (stderr, "       -m xxx - use decomposition in base xxx\n");
   fprintf (stderr, "       in     - input file (number to factor)\n");
@@ -698,6 +698,76 @@ struct sd {
   unsigned long d;
 };
 
+/********************* data structures for first phase ***********************/
+
+typedef struct {
+  mpz_t m;
+  double logmu;
+} m_logmu_t;
+
+m_logmu_t*
+m_logmu_init (unsigned long Malloc)
+{
+  unsigned long i;
+  m_logmu_t* M;
+
+  M = (m_logmu_t*) malloc (Malloc * sizeof (m_logmu_t));
+  for (i = 0; i < Malloc; i++)
+    mpz_init (M[i].m);
+  return M;
+}
+
+void
+m_logmu_clear (m_logmu_t* M, unsigned long Malloc)
+{
+  unsigned long i;
+
+  for (i = 0; i < Malloc; i++)
+    mpz_clear (M[i].m);
+  free (M);
+}
+
+/* Insert (m, logmu) in the M database. Current implementation of M is
+   a sorted list, with increasing values of logmu.
+   alloc: number of allocated entries in M.
+   size:  number of stored entries in M (size <= alloc).
+   Returns the new size = min (size + 1, alloc).
+*/
+unsigned long
+m_logmu_insert (m_logmu_t* M, unsigned long alloc, unsigned long size,
+                mpz_t m, double logmu)
+{
+  ASSERT(size <= alloc);
+
+  if (size < alloc)
+    {
+      mpz_set (M[size].m, m);
+      M[size].logmu = logmu;
+      return size + 1;
+    }
+  else /* size=alloc: database is full, remove entry with smallest logmu */
+    {
+      if (logmu < M[alloc - 1].logmu)
+        {
+          size --;
+          while (size > 0 && logmu < M[size - 1].logmu)
+            {
+              mpz_swap (M[size - 1].m, M[size].m);
+              M[size].logmu = M[size - 1].logmu;
+              size --;
+            }
+          /* now either size = 0 or M[size - 1].logmu <= logmu */
+          mpz_set (M[size].m, m);
+          M[size].logmu = logmu;
+          if (size == 0)
+            gmp_fprintf (stderr, "m=%Zd logmu=%1.2f\n", m, logmu);
+        }
+      return alloc;
+    }
+}
+
+/*****************************************************************************/
+
 static struct sd default_degrees[DEFAULT_DEGREES_LENGTH] = DEFAULT_DEGREES;
 
 /* default degree, when not given by user */
@@ -1142,13 +1212,30 @@ generate_sieving_parameters (cado_poly out)
   out->qintsize = default_qint (out->n);
 }
 
-/* Returns a bound to compute alpha(F). In principle we should use the
-   algebraic factor base bound alim, but since it is too expensive,
-   we use the heuristic of using sqrt(alim). */
-unsigned long
-get_alpha_bound (cado_poly out)
+/* Return the smallest value of alpha(f + k*(x-m)) for |k| <= K. */
+double
+rotate (mpz_t *f, int d, unsigned long alim, long K, mpz_t m, long *bestk)
 {
-  return (unsigned long) sqrt ((double) default_alim (out->n));
+  long k;
+  double alpha, best_alpha = 9.0;
+
+  /* compute f - K*(x-m) */
+  mpz_sub_ui (f[1], f[1], K);
+  mpz_addmul_ui (f[0], m, K);
+  for (k = -K; k <= K; k++)
+    {
+      alpha = get_alpha (f, d, alim, 0);
+      if (alpha < best_alpha)
+        {
+          best_alpha = alpha;
+          *bestk = k;
+        }
+      /* f <- f + (x-m) */
+      mpz_add_ui (f[1], f[1], 1);
+      mpz_sub (f[0], f[0], m);
+    }
+  /* now we have f + K*(x-m), and we want f + k*(x-m) */
+  return best_alpha;
 }
 
 /* Method described in reference [2], slide 8
@@ -1161,83 +1248,138 @@ get_alpha_bound (cado_poly out)
    For d=5, T = B^4.5; for d=4, T = B^3.3.
 */
 void
-generate_poly (cado_poly out, unsigned long T, int verbose)
+generate_poly (cado_poly out, double T, int verbose)
 {
   unsigned long d = out->degree, alim;
-  double B, logmu, best_logmu = DBL_MAX, best_E = DBL_MAX, alpha, E;
-  double mB;
+  double B, logmu, best_E = DBL_MAX, alpha, E, mB;
   mpz_t best_m, k, t, r;
   /* value of T = B^eff[d] for d <= 7 */
   static double eff[] = {0.0, 0.0, 3.0, 3.0, 3.333, 4.5, 6.6, 9.0};
-  unsigned long calls_alpha = 0;
   int given_m;
+  m_logmu_t *M; /* stores values of m and log(mu) found in 1st phase */
+  unsigned long Malloc; /* number of allocated entries in M */
+  unsigned long Msize;  /* number of stored entries in M */
+  unsigned long Malloc2;
+  unsigned long Msize2, i;
+  int st;
+  long k0, bestk;
+
+  assert (T <= 9007199254740992.0); /* if T > 2^53, T-- will loop */
 
   mpz_init (best_m);
+
+  given_m = mpz_cmp_ui (out->m, 0) != 0;
+  if (given_m) /* use given value of m */
+    {
+      mpz_set (best_m, out->m);
+      goto end;
+    }
+  
+  Malloc = (unsigned long) sqrt (T);
+  M = m_logmu_init (Malloc);
   mpz_init (k);
   mpz_init (t);
   mpz_init (r);
+
   if (d > 7)
     {
       fprintf (stderr, "Error, too large degree in generate_poly\n");
       exit (1);
     }
-  B = pow ((double) T, 1.0 / eff[d]); /* B = T^{1/eff[d]} */
-  given_m = mpz_cmp_ui (out->m, 0) != 0;
-  if (given_m == 0) /* else use given value of m */
-    {
-      mpz_root (out->m, out->n, d + 1); /* n^{1/(d+1)} */
-      mB = B * mpz_get_d (out->m);
-      mpz_set_d (out->m, mB); /* B^{1/(d-1)} n^{1/(d+1)} */
-    }
-  alim = get_alpha_bound (out); /* needed for alpha */
-  /* when going from m to m+k, f[d-1] goes to f[d-1] - k d f[d] */
+  B = pow (T, 1.0 / eff[d]); /* B = T^{1/eff[d]} */
+  mpz_root (out->m, out->n, d + 1); /* n^{1/(d+1)} */
+  mB = B * mpz_get_d (out->m);
+  mpz_set_d (out->m, mB); /* B^{1/(d-1)} n^{1/(d+1)} */
+
+  /* First phase: search for m which give a base-m decomposition with a small
+     norm. When going from m to m+k, f[d-1] goes to f[d-1] - k d f[d] */
+  st = cputime ();
+  Msize = 0;
   while (T-- > 0)
     {
-      if (given_m == 0)
+      mpz_pow_ui (t, out->m, d - 1); /* m^(d-1) */
+      mpz_ndiv_qr (t, r, out->n, t); /* t = round (N / m^(d-1)) */
+      /* we use mpz_fdiv_qr here (round towards -infinity) to ensure
+         f[d-1] >= 0, which in turn ensures f[d-1]/(d f[d]) >= 0 */
+      mpz_fdiv_qr (out->f[d], out->f[d - 1], t, out->m); /* f[d]*m+f[d-1]*/
+      if (mpz_cmp_ui (out->f[d], 0) == 0)
         {
-          mpz_pow_ui (t, out->m, d - 1); /* m^(d-1) */
-          mpz_ndiv_qr (t, r, out->n, t); /* t = round(N / m^(d-1) */
-          mpz_fdiv_qr (out->f[d], out->f[d - 1], t, out->m); /* f[d]*m+f[d-1]*/
-          if (mpz_cmp_ui (out->f[d], 0) == 0)
-            {
-              gmp_fprintf (stderr, "Stopping selection at m=%Zd since leading coefficient is zero\n", out->m);
-              break;
-            }
-          mpz_mul_ui (t, out->f[d], d);
-          mpz_ndiv_qr (k, r, out->f[d - 1], t);
-          ASSERT (mpz_cmp_ui (k, 0) >= 0);
-          mpz_add (out->m, out->m, k);
+          gmp_fprintf (stderr, "Stopping selection at m=%Zd since leading coefficient is zero\n", out->m);
+          break;
         }
+      mpz_mul_ui (t, out->f[d], d);
+      mpz_fdiv_q (k, out->f[d - 1], t);
+      mpz_add (out->m, out->m, k);
       generate_base_m (out, out->m);
       logmu = get_logmu (out->f, d, out->m, out->skew);
-      /* we keep only the values of mu near optimal, since computing alpha
-	 is much more expensive */
-      if (logmu < best_logmu + MARGIN)
-	{
-	  alpha = get_alpha (out->f, d, alim, verbose);
-	  calls_alpha ++;
-	  E = logmu + alpha;
-	  if (E < best_E)
-	    {
-              best_logmu = logmu;
-	      best_E = E;
-	      fprintf (stderr, "m=");
-	      mpz_out_str (stderr, 10, out->m);
-	      fprintf (stderr, " skew=%1.2f logmu=%1.2f alpha~%1.2f E=%1.2f\n",
-		       out->skew, logmu, alpha, E);
-	      mpz_set (best_m, out->m);
-	    }
-	}
+      Msize = m_logmu_insert (M, Malloc, Msize, out->m, logmu);
+      if (T > 0 && mpz_sgn (out->f[d - 1]) > 0)
+        { /* try another small f[d-1], avoiding a mpz_pow_ui call */
+          mpz_add_ui (out->m, out->m, 1);
+          generate_base_m (out, out->m);
+          T --;
+          logmu = get_logmu (out->f, d, out->m, out->skew);
+          Msize = m_logmu_insert (M, Malloc, Msize, out->m, logmu);
+        }
       mpz_add_ui (out->m, out->m, 1);
     }
-  if (verbose)
-    fprintf (stderr, "calls to get_alpha: %lu\n", calls_alpha);
-  generate_base_m (out, best_m);
-  generate_sieving_parameters (out);
-  mpz_clear (best_m);
+  fprintf (stderr, "First phase took %ds and kept %lu candidates\n",
+           (cputime () - st) / 1000, Msize);
+
+  /* Second phase: loop over entries in M database. We do this in two
+     subphases: first compute an estimate of alpha(F) up to alim^(1/3),
+     and keep only the Malloc^(1/2) best values, then compute a more
+     accurate estimate of alpha(F) on the remaining candidates. */
+  Malloc2 = (unsigned long) sqrt ((double) Malloc);
+  Msize2 = 0;
+  st = cputime ();
+  alim = (unsigned long) cbrt ((double) default_alim (out->n));
+  for (i = 0; i < Msize; i++)
+    {
+      logmu = M[i].logmu;
+      generate_base_m (out, M[i].m);
+      alpha = get_alpha (out->f, d, alim, verbose);
+      E = logmu + alpha;
+      /* the following overwrites the M database */
+      Msize2 = m_logmu_insert (M, Malloc2, Msize2, out->m, E);
+    }
+  /* In principle we should compute the contribution to alpha(F) for primes
+     up to the algebraic factor base bound alim, but since it is too expensive,
+     we use the heuristic of using sqrt(alim). */
+  alim = (unsigned long) sqrt ((double) default_alim (out->n));
+  for (i = 0; i < Msize2; i++)
+    {
+      generate_base_m (out, M[i].m);
+      logmu = get_logmu (out->f, d, out->m, out->skew);
+      alpha = rotate (out->f, d, alim, MAX_ROTATE, out->m, &k0);
+      E = logmu + alpha;
+      if (E < best_E)
+        {
+          best_E = E;
+          bestk = k0;
+          gmp_fprintf (stderr, "m=%Zd rot(%ld) skew=%1.2f logmu=%1.2f alpha~%1.2f E=%1.2f\n",
+                       out->m, k0, out->skew, logmu, alpha, E);
+          mpz_set (best_m, out->m);
+        }
+    }
+  fprintf (stderr, "Second phase took %ds for %lu candidates\n",
+           (cputime () - st) / 1000, Msize);
+
   mpz_clear (k);
   mpz_clear (t);
   mpz_clear (r);
+  m_logmu_clear (M, Malloc);
+
+ end:
+  generate_base_m (out, best_m);
+  /* rotate */
+  if (bestk != 0)
+    {
+      mpz_add_si (out->f[1], out->f[1], bestk);
+      mpz_submul_si (out->f[0], out->m, bestk);
+    }
+  generate_sieving_parameters (out);
+  mpz_clear (best_m);
 }
 
 /* st is the initial value cputime() at the start of the program */
@@ -1316,8 +1458,8 @@ main (int argc, char *argv[])
 {
   cado_input in;
   cado_poly out;
-  int verbose = 0, raw = 0;
-  unsigned long effort = 1;
+  int verbose = 0, raw = 1;
+  double effort = 1.0;
   char **argv0 = argv;
   int argc0 = argc;
   int st = cputime ();
@@ -1334,15 +1476,15 @@ main (int argc, char *argv[])
 	  argv ++;
 	  argc --;
 	}
-      else if (strcmp (argv[1], "-raw") == 0)
+      else if (strcmp (argv[1], "-full") == 0)
 	{
-	  raw = 1;
+	  raw = 0;
 	  argv ++;
 	  argc --;
 	}
       else if (argc > 2 && strcmp (argv[1], "-e") == 0)
 	{
-	  effort = atoi (argv[2]);
+	  effort = atof (argv[2]);
 	  argv += 2;
 	  argc -= 2;
 	}
@@ -1362,10 +1504,10 @@ main (int argc, char *argv[])
   if (argc != 1)
     usage ();
 
-  if (mpz_cmp_ui (m, 0) != 0 && effort != 1)
+  if (mpz_cmp_ui (m, 0) != 0 && effort != 1.0)
     {
       fprintf (stderr, "Warning: option -m xxx implies -e 1\n");
-      effort = 1;
+      effort = 1.0;
     }
 
   init (in);
