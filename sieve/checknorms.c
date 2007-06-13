@@ -395,6 +395,8 @@ checkrels (char *f, cado_poly cpoly, int verbose, size_t mfbr, size_t mfba)
 
       /* warning: there might be no prime on the algebraic side */
       c = getc (fp);
+      if (c != '\n')
+        ungetc (c, fp);
 
       /* evaluate norm on algebraic side */
       eval_algebraic (norm, cpoly->f, cpoly->degree, a, b);
