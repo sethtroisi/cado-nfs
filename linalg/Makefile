@@ -8,7 +8,7 @@ linalg: linalg.c gauss.o
 	gcc $(CFLAGS) gauss.o -I.. $< $(LDFLAGS) -o $@
 
 gauss.o: gauss.c
-	gcc -c -g -DMULTI_ROW=1 -DNO_MAIN -I.. $< -o $@
+	gcc -c $(CFLAGS) -DMULTI_ROW=3 -DNO_MAIN -I.. $< -o $@
 
 ratsqrt: ratsqrt.c
 	gcc $(CFLAGS) $< $(LDFLAGS) -o $@
