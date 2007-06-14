@@ -1,0 +1,16 @@
+
+This code is here only for reference and example. It computes an
+arbitrary e-th root in a number field given the factorization in ideals
+of contributing elements.
+
+It's not working with the tools from cado-nfs at the moment.
+
+It requires several files as for example in the medium38/ directory.
+
+the main file is sol.m ;
+
+load "sol.m" ; suffices to show the thing in actions. It prints a set of
+(r+1) numbers in the end. If everything went well, the first of them
+must equal some of the other ones.
+
+Emmanuel, 20070614.
