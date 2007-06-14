@@ -386,11 +386,50 @@ isBadPrime(unsigned long p, tab_prime_t bad_primes) {
   return 0;
 }
 
+/* sort primes in rel (both on rational and algebraic side) by ascending
+   order */
+void
+sort_rel (relation_t rel)
+{
+  int i, j;
+  unsigned long p, r;
 
-// Print relations in a matrix format:
-// don't take into account bad primes and even powers of primes.
+  /* sort primes on rational side, using insertion sort */
+  for (i = 1; i < rel.nb_rp; i++)
+    {
+      p = rel.rp[i];
+      /* primes of index 0..i-1 are sorted */
+      for (j = i; (j > 0) && (rel.rp[j - 1] > p); j--)
+        rel.rp[j] = rel.rp[j - 1];
+      rel.rp[j] = p;
+    }
+
+  /* sort primes on algebraic side, taking into account the ar[] array too */
+  for (i = 1; i < rel.nb_ap; i++)
+    {
+      p = rel.ap[i];
+      r = rel.ar[i];
+      /* primes of index 0..i-1 are sorted */
+      for (j = i; (j > 0) && ((rel.ap[j - 1] > p) || ((rel.ap[j - 1] == p) &&
+                                                      (rel.ar[j - 1] > r)));
+           j--)
+        {
+          rel.ap[j] = rel.ap[j - 1];
+          rel.ar[j] = rel.ar[j - 1];
+        }
+      rel.ap[j] = p;
+      rel.ar[j] = r;
+    }
+}
+
+/* Print relations in a matrix format:
+   don't take into account bad primes and even powers of primes.
+   WARNING: the primes in the input relation are not necessarily sorted.
+*/
 void 
-fprint_rel_row(FILE *file, relation_t rel, tab_prime_t rat_table, tab_rootprime_t alg_table, tab_prime_t bad_primes) {
+fprint_rel_row (FILE *file, relation_t rel, tab_prime_t rat_table,
+                tab_rootprime_t alg_table, tab_prime_t bad_primes)
+{
   int i;
   int *table_ind;
   int nb_coeff;
@@ -399,6 +438,9 @@ fprint_rel_row(FILE *file, relation_t rel, tab_prime_t rat_table, tab_rootprime_
 
   fprintf(file, "%ld %lu ", rel.a, rel.b);
   table_ind = (int*) malloc((rel.nb_rp + rel.nb_ap)*sizeof(int));
+
+  sort_rel (rel); /* needed because the code below assumes a given prime
+                     appears at adjacent places */
   
   nb_coeff = 0;
   index = getindex_rat(rat_table, rel.rp[0]);
@@ -489,7 +531,9 @@ fread_relations(FILE *file, tab_relation_t *rel_table) {
 }
 
 
-int main(int argc, char **argv) {
+int
+main (int argc, char **argv)
+{
   tab_rootprime_t alg_table;
   tab_prime_t rat_table, bad_primes;
   tab_abpair_t ab_single;
@@ -497,6 +541,8 @@ int main(int argc, char **argv) {
   tab_relation_t rel_table;
   int ret;
   int i;
+  
+  fprintf (stderr, "%s revision %s\n", argv[0], REV);
 
   if (argc == 1) {
     file = stdin;

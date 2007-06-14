@@ -1,5 +1,5 @@
-CFLAGS=-O2 -g
-LDFLAGS=/usr/lib64/libgmp.a
+CFLAGS=-O2 -g -DREV=\"`svnversion`\"
+LDFLAGS=$(GMP)/lib/libgmp.a
 
 procrels: procrels.c
 	gcc $(CFLAGS) -I.. $< $(LDFLAGS) -o $@

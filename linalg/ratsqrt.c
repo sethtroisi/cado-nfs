@@ -3,6 +3,12 @@
 #include <gmp.h>
 #include <assert.h>
 
+/* #define DEBUG */
+
+#ifdef DEBUG /* compute exponent of given prime */
+#define DEBUG_PRIME 101921
+#endif
+
 #define FAST /* uses product tree instead of naive accumulation */
 
 #define THRESHOLD 2 /* must be >= 2 */
@@ -46,9 +52,11 @@ accumulate_fast_end (mpz_t *prd, unsigned long lprd)
     mpz_mul (prd[0], prd[0], prd[i]);
 }
 
-int main(int argc, char **argv) {
+int
+main (int argc, char **argv)
+{
   FILE * matfile, *kerfile;
-  mpz_t m, a, b, *prd;
+  mpz_t m, a, b, c, *prd;
   unsigned long lprd; /* number of elements in prd[] */
   unsigned long nprd; /* number of accumulated products in prd[] */
   int ret;
@@ -56,6 +64,11 @@ int main(int argc, char **argv) {
   int i, j, nlimbs;
   char str[1024];
   int depnum = 0;
+#ifdef DEBUG
+  unsigned long debug_exponent = 0;
+#endif
+
+  fprintf (stderr, "%s revision %s\n", argv[0], REV);
 
   if (argc > 2 && strcmp (argv[1], "-depnum") == 0)
     {
@@ -84,6 +97,7 @@ int main(int argc, char **argv) {
   mpz_init_set_ui(prd[0], 1);
   mpz_init(a);
   mpz_init(b);
+  mpz_init(c);
 
   {
     int nrows, ncols;
@@ -118,18 +132,32 @@ int main(int argc, char **argv) {
 	if (w & 1UL) {
 	  ret = gmp_sscanf(str, "%Zd %Zd", a, b);
 	  assert (ret == 2);
-	  mpz_mul(b, b, m);
-	  mpz_sub(a, a, b);
+	  mpz_mul (c, b, m);
+	  mpz_sub (c, a, c);
 #ifndef FAST
-          mpz_mul (prd[0], prd[0], a);
+          mpz_mul (prd[0], prd[0], c);
 #else
-          prd = accumulate_fast (prd, a, &lprd, nprd++);
+          prd = accumulate_fast (prd, c, &lprd, nprd++);
 #endif
+#ifdef DEBUG
+          if (mpz_divisible_ui_p (c, DEBUG_PRIME))
+            gmp_printf ("prime %lu appears in relation (%Zd,%Zd)\n",
+                        DEBUG_PRIME, a, b);
+          while (mpz_divisible_ui_p (c, DEBUG_PRIME))
+            {
+              mpz_divexact_ui (c, c, DEBUG_PRIME);
+              debug_exponent ++;
+            }
+#endif          
 	}
       }
       w >>= 1;
     }
   }
+
+#ifdef DEBUG
+  printf ("exponent of %lu is %lu\n", DEBUG_PRIME, debug_exponent);
+#endif
 
 #ifdef FAST
   accumulate_fast_end (prd, lprd);
@@ -143,8 +171,33 @@ int main(int argc, char **argv) {
       exit (1);
     }
 
-  mpz_sqrtrem(prd[0], a, prd[0]);
-  gmp_printf("remainder = %Zd\n", a);
+#ifdef DEBUG2 /* print all primes with odd exponent */
+  {
+    unsigned long p, e;
+    for (p = 2; mpz_cmp_ui (prd[0], 1) > 0; p += 1 + (p > 2))
+      {
+        e = 0;
+        while (mpz_divisible_ui_p (prd[0], p))
+          {
+            e ++;
+            mpz_divexact_ui (prd[0], prd[0], p);
+          }
+        if (e % 2)
+          {
+            printf ("exponent of %lu is odd: %lu, remains %lu bits\n",
+                    p, e, mpz_sizeinbase (prd[0], 2));
+          }
+      }
+  }
+#endif
+  mpz_sqrtrem (prd[0], a, prd[0]);
+  {
+    size_t la = mpz_sizeinbase (a, 2);
+    if (la <= 100)
+      gmp_printf ("remainder is %Zd\n", a);
+    else
+      printf ("remainder has %d bits\n", la);
+  }
 
   mpz_mod(prd[0], prd[0], m);
   gmp_printf("rational square root is %Zd\n", prd[0]);
@@ -153,6 +206,7 @@ int main(int argc, char **argv) {
     mpz_clear (prd[i]);
   mpz_clear (a);
   mpz_clear (b);
+  mpz_clear (c);
   free (prd);
 
   return 0;
