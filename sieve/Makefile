@@ -8,7 +8,7 @@
 
 include Makefile.local
 
-CFLAGS=-O0 -g -Wall -W
+CFLAGS=-O2 -g -Wall -W -DREV=\"`svnversion`\"
 LDFLAGS=
 
 # Set default filenames/paths if not already set.
@@ -31,7 +31,7 @@ sieve: sieve.c fb.c ../polyfile.c config.h sieve_aux.h
 	gcc -I. -I.. -I$(GMPINCLUDE) $(CFLAGS) -o $@ -Wall -Wextra sieve.c fb.c ../polyfile.c $(GMPLIB) -lm
 
 checknorms: checknorms.c
-	gcc -I.. -I$(ECMINCLUDE) $(CFLAGS) -o $@ $< $(ECMLIB) $(GMPLIB) -lm
+	gcc -I. -I.. -I$(ECMINCLUDE) $(CFLAGS) -o $@ $< $(ECMLIB) $(GMPLIB) -lm
 
 config.h:
 	echo '#define HAVE_MSRH 1'   >  $@
