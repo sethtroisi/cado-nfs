@@ -174,14 +174,14 @@ typedef struct {
 
 typedef struct {
   factorbase_degn_t *fullfb; /* The complete factor base */
-  factorbase_small_t *fbL1, *fbL2;
-  factorbase_small_inited_t *fbL1init, *fbL2init;
   factorbase_degn_t *fblarge; /* Pointer to the entries in fullfb with primes
   				 > fbL2bound */
-  unsigned int fbL1size;  /* Number of entries in fbL1, incl. stop marker */
-  unsigned int fbL1bound; /* Upper bound on primes in fbL1 */
-  unsigned int fbL2size;  /* Number of entries in fbL2 */
-  unsigned int fbL2bound; /* Upper bound on primes in fbL2 */
+  factorbase_small_t *fbsmall[SIEVE_BLOCKING];
+  factorbase_small_inited_t *fbinit[SIEVE_BLOCKING];
+  unsigned int fbsmallsize[SIEVE_BLOCKING];  /* Number of entries in small fb, 
+                                                incl. stop marker */
+  unsigned int fbsmallbound[SIEVE_BLOCKING]; /* Upper bound on primes in 
+                                                small fb */
 } factorbase_t[1];
 
 typedef struct {
@@ -196,9 +196,18 @@ typedef struct {
 } relation_t;
 
 /* A sieve report, filled in when sieving large factor base primes and
-   the new approximate log is below the threshold. The field a gets the
-   a value of the report, p gets the prime that was sieved and l the new
-   approximate log. */
+   the new approximate log is below the threshold, or after sieving L1/L2
+   primes and scanning the sieve array for reports. 
+   The field "a" gets the "a" value of the report, "p" gets the prime that 
+   was sieved (or 1 if the report was not filled during sieving) and "l" the 
+   approximate log of the remaining cofactor. 
+   Let the norm be n = p1 * p2 * ... * pk * P1 * ... * Pn, where p1 ... pk 
+   are factor base primes and P1, ..., Pn are large primes. 
+   Let c = P1 * ... * Pn. Then the smallest "l" in the sieve reports for a 
+   particular "a" value (there can be several reports for one "a"!) satisfies
+   |l - log_b(c)| <= SIEVE_PERMISSIBLE_ERROR.
+   
+   An entry with p == 0 marks the end of the reports array. */
    
 typedef struct {
   long a;

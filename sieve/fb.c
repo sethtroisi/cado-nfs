@@ -452,65 +452,68 @@ fb_maxprime (factorbase_degn_t *fb)
     return maxp;
 }
 
-/* Extracts only L1 primes at the moment */
+/* Extracts primes < bound from fb->fblarge and store them in
+   factorbase_small_t format. fb->fblarge gets updated to point
+   at smallest prime not extracted. */
 
 void
-fb_extract_small (factorbase_t fb, const unsigned int L1bound, 
-		  const int verbose)
+fb_extract_small (factorbase_t fb, const unsigned int bound, 
+		  const int lvl, const int verbose)
 {
   factorbase_degn_t *fbptr;
-  unsigned int i, j;
+  unsigned int i, j, size;
 
-  /* Count how many roots there are among the primes <= L1bound, i.e. how
+  ASSERT_ALWAYS (lvl >= 0 && lvl <= SIEVE_BLOCKING);
+
+  /* Count how many roots there are among the primes <= bound, i.e. how
      many entries the small fb will need */
-  i = 0;
-  for (fbptr = fb->fblarge; fbptr->p <= L1bound && fbptr->p > 0; 
+  size = 0;
+  for (fbptr = fb->fblarge; fbptr->p <= bound && fbptr->p > 0; 
        fbptr = fb_next (fbptr))
-    i += fbptr->nr_roots;
+    size += fbptr->nr_roots;
 
   /* Add one entry for the stop marker */
-  fb->fbL1size = i + 1;
-
-  fb->fbL1bound = L1bound;
+  size++;
 
   /* Allocate memory for the small prime factor base and the small prime
      sieve-ready factor base (which may have fewer primes, if some are not 
-     coprime to b!) */
-  fb->fbL1 = (factorbase_small_t *) malloc (fb->fbL1size * 
-					    sizeof (factorbase_small_t));
-  fb->fbL1init = (factorbase_small_inited_t *) malloc (fb->fbL1size * 
-						sizeof (factorbase_small_t));
-
-  ASSERT_ALWAYS (fb->fbL1 != NULL);
-  ASSERT_ALWAYS (fb->fbL1init != NULL);
+     coprime to b) */
+  fb->fbsmall[lvl] = (factorbase_small_t *) 
+                       malloc (size * sizeof (factorbase_small_t));
+  fb->fbinit[lvl] = (factorbase_small_inited_t *) 
+                        malloc (size * sizeof (factorbase_small_t));
+  ASSERT_ALWAYS (fb->fbsmall[lvl] != NULL);
+  ASSERT_ALWAYS (fb->fbinit[lvl] != NULL);
+  fb->fbsmallsize[lvl] = size;
+  fb->fbsmallbound[lvl] = bound;
   
   /* Copy info into the small prime factor base */
   j = 0;
-  for (fbptr = fb->fblarge; 
-       fbptr->p < L1bound && fbptr->p > 0; 
+  for (fbptr = fb->fblarge; fbptr->p < bound && fbptr->p > 0; 
        fbptr = fb_next (fbptr))
     {
       for (i = 0; i < fbptr->nr_roots; i++, j++)
 	{
-	  fb->fbL1[j].p = fbptr->p;
-	  fb->fbL1[j].root_and_log = fbptr->roots[i] + 
+	  fb->fbsmall[lvl][j].p = fbptr->p;
+	  fb->fbsmall[lvl][j].root_and_log = fbptr->roots[i] + 
 	    (fbptr->plog << 24);
 	}
     }
 
   /* Put end marker */
-  fb->fbL1[j].p = 0;
-  fb->fbL1[j].root_and_log = 0;
+  fb->fbsmall[lvl][j].p = 0;
+  fb->fbsmall[lvl][j].root_and_log = 0;
   j++;
 
   /* Update the pointer to the large prime factor base */
   
   fb->fblarge = fbptr;
 
-  ASSERT (j == fb->fbL1size);
+  ASSERT (j == size);
 
   if (verbose)
-    printf ("# There are %u entries in the small factor base\n", j);
+    printf ("# There are %u entries in the level %d small factor base\n", 
+            j, lvl + 1);
 }
 
 void
@@ -529,6 +532,7 @@ fb_initloc_small (factorbase_small_inited_t *initfb,
       p = smallfb->p;
       ASSERT (p < 0xffffff);
       root = smallfb->root_and_log & 0xffffff;
+      ASSERT (root < p);
       plog = smallfb->root_and_log >> 24;
 
       if (gcd(p, b) == 1) /* FIXME: Speed up this gcd */

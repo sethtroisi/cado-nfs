@@ -41,5 +41,11 @@ first_sieve_loc (const fbprime_t p, const fbroot_t r, const fbroot_t amin_p,
   mod_clear (r2, m);
   mod_clearmod (m);
 
+#ifdef PARI
+  printf ("(" FBROOT_FORMAT " + " FBROOT_FORMAT " * (1 + %d)) %% " FBPRIME_FORMAT
+          " == (%lu * " FBROOT_FORMAT ") %% " FBPRIME_FORMAT " /* PARI */\n",
+          amin_p, d, odd, p, b, r, p);
+#endif
+
   return d;
 }

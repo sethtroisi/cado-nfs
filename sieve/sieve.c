@@ -110,6 +110,12 @@ mp_poly_print (mpz_t *poly, int deg, const char *name, int homogeneous)
 }
 
 
+static inline unsigned char 
+add_error (unsigned char n)
+{
+  return (unsigned char) (n + SIEVE_PERMISSIBLE_ERROR);
+}
+
 /* Used only in compute_norms() */
 static unsigned char
 log_norm (const double *f, const int deg, const double x, 
@@ -279,8 +285,7 @@ sieve (unsigned char *sievearray, factorbase_degn_t *fb,
   const uint32_t l = (amax - amin) / (1 + odd) + 1;
   uint32_t i, amin_p, p, d;
   unsigned char plog;
-  const unsigned char threshold_with_error = threshold + 
-    SIEVE_PERMISSIBLE_ERROR;
+  const unsigned char threshold_with_error = add_error (threshold);
 
   ASSERT (odd == 0 || odd == 1);
   ASSERT (!odd || (amin & 1) == 1);
@@ -316,8 +321,7 @@ sieve (unsigned char *sievearray, factorbase_degn_t *fb,
 	      unsigned char k;
 	      k = sievearray[d] - plog;
 	      sievearray[d] = k;
-	      if (k + SIEVE_PERMISSIBLE_ERROR <= threshold_with_error && 
-		  reports_length > 0)
+	      if (add_error (k) <= threshold_with_error && reports_length > 0)
 		{
 		  reports->a = amin + (d << odd);
 		  reports->p = p;
@@ -367,13 +371,14 @@ print_useful (const fbprime_t *useful_primes,
 static unsigned long
 find_sieve_reports (const unsigned char *sievearray, sieve_report_t *reports, 
                     const unsigned int reports_len, 
-                    const unsigned char reports_threshold, 
+                    const unsigned char threshold, 
                     const long amin, const unsigned long l, 
 		    const unsigned long b, const int odd)
 {
   unsigned long reports_nr, d;
   const int b3 = (b % 3 == 0); /* We skip over $a$, $3|a$ if $3|b$ to save some
 				  space in the reports list */
+  const unsigned char threshold_with_error = add_error (threshold);
   unsigned int a3;
   
   ASSERT (odd == 0 || odd == 1);
@@ -395,29 +400,37 @@ find_sieve_reports (const unsigned char *sievearray, sieve_report_t *reports,
 	a3 = (a3 + 3) >> 1;
     }
 
-  for (d = 0; d < l; d++)
-    {
-      /* The + SIEVE_PERMISSIBLE_ERROR is to deal with accumulated rounding 
-	 error that might have cause the sieve value to drop below 0 and 
-	 wrap around */
-      if (sievearray[d] + SIEVE_PERMISSIBLE_ERROR <= 
-	  reports_threshold + SIEVE_PERMISSIBLE_ERROR)
-        {
-	  if (!b3 || (d % 3) != a3) 
-	    /* FIXME: have 2 separate loops */
-	    {
-	      if (reports_nr < reports_len)
-		{
-		  reports[reports_nr].a = amin + (long) (d << odd);
-		  reports[reports_nr].p = 1;
-		  reports[reports_nr].l = sievearray[d];
-		  reports_nr++;
-		}
-	      
-	    }
-        }
-    }
-
+  if (b3)
+    for (d = 0; d < l; d++)
+      {
+	if (add_error(sievearray[d]) <= threshold_with_error && 
+	    reports_nr < reports_len)
+	  {
+	    if ((d % 3) != a3)
+	      {
+		reports[reports_nr].a = amin + (long) (d << odd);
+		reports[reports_nr].p = 1;
+		reports[reports_nr].l = sievearray[d];
+		reports_nr++;
+	      }
+	  }
+      }
+  else
+    for (d = 0; d < l; d++)
+      {
+	/* The + SIEVE_PERMISSIBLE_ERROR is to deal with accumulated rounding 
+	   error that might have cause the sieve value to drop below 0 and 
+	   wrap around */
+	if (add_error (sievearray[d]) <= threshold_with_error && 
+	    reports_nr < reports_len)
+	  {
+	    reports[reports_nr].a = amin + (long) (d << odd);
+	    reports[reports_nr].p = 1;
+	    reports[reports_nr].l = sievearray[d];
+	    reports_nr++;
+	  }
+      }
+  
   return reports_nr;
 }
 
@@ -523,6 +536,32 @@ sort_sieve_reports (sieve_report_t *r, const unsigned long l)
 #endif
 }
 
+
+static void
+sieve_block (const int lvl, unsigned char *sievearray, 
+	     const unsigned long arraylen, factorbase_t fb, 
+	     long long *times)
+{
+  long long tsc1, tsc2;
+  unsigned long blockstart;
+  const unsigned long b = fb->fbsmallbound[lvl];
+
+  for (blockstart = 0; blockstart < arraylen; blockstart += b)
+    {
+      const unsigned long blocklen = MIN(b, arraylen - blockstart);
+
+      /* Sieve smaller blocks */
+      if (lvl > 0)
+	sieve_block (lvl - 1, sievearray + blockstart, blocklen, fb, times);
+
+      rdtscll (tsc1);
+      sieve_small_slow (sievearray + blockstart, fb->fbinit[lvl], blocklen);
+      rdtscll (tsc2);
+      times[lvl] += tsc2 - tsc1;
+    }
+}
+
+
 static unsigned long
 sieve_one_side (unsigned char *sievearray, factorbase_t fb,
 		sieve_report_t *reports, const unsigned int reports_length,
@@ -533,55 +572,58 @@ sieve_one_side (unsigned char *sievearray, factorbase_t fb,
 		const int verbose)
 {
   long long tsc1, tsc2;
+  long long times[SIEVE_BLOCKING];
   unsigned long reports_nr = 0;
+  int lvl;
   const int odd = 1 - (b & 1); /* If odd=1, only odd $a$ are sieved */
   const long eff_amin = amin + ((odd && (amin & 1) == 0) ? 1 : 0);
   const long eff_amax = amax - ((odd && (amax & 1) == 0) ? 1 : 0);
   const unsigned long l = ((eff_amax - eff_amin) >> odd) + 1;
-  const int find_L2_reports = 1;
+  const int find_smallprime_reports = 1;
 
   fb_disable_roots (fb->fblarge, b, verbose);
-  /* FIXME: need to disable entries in L1fb as well */
   
   compute_norms (sievearray, eff_amin, eff_amax, b, dpoly, deg, proj_roots, 
 		 log_scale, odd, verbose);
 
-  /* Sieve L1 primes */
-  if (fb->fbL1 != NULL)
-    {
-      unsigned long blockstart;
-      
-      fb_initloc_small (fb->fbL1init, fb->fbL1, eff_amin, b, odd);
-      
-      rdtscll (tsc1);
-      for (blockstart = 0; blockstart < l; blockstart += fb->fbL1bound)
-	{
-	  const unsigned long blocklen = MIN(fb->fbL1bound, l - blockstart);
-	  sieve_small_slow (sievearray + blockstart, fb->fbL1init, blocklen);
+  /* Init small primes for sieving this line */
+  for (lvl = 0; lvl < SIEVE_BLOCKING; lvl++)
+    fb_initloc_small (fb->fbinit[lvl], fb->fbsmall[lvl], eff_amin, b, odd);
 
-	  /* If the factor base limit is very small compared to the block 
-	     length L2, we may get many relations that are L2-smooth and will
-	     not produce sieve reports during sieving the large fb primes.
-	     Those reports are found here instead. */
-	  if (find_L2_reports)
-	    reports_nr +=
-	      find_sieve_reports (sievearray + blockstart, 
-				  reports + reports_nr, 
-				  reports_length - reports_nr, 
-				  reports_threshold, 
-				  eff_amin + (blockstart << odd), 
-				  blocklen, b, odd);
-	}
-      rdtscll (tsc2);
-#ifdef HAVE_MSRH
-      if (verbose)
-	printf ("# Sieving L1 primes took %lld clocks\n", tsc2 - tsc1);
-      if (verbose && find_L2_reports)
-	printf ("# There were %lu sieve reports after sieving L2 primes\n",
-		reports_nr);
-#endif
+  /* Sieve small primes with multi-level blocking */
+  sieve_block (SIEVE_BLOCKING - 1, sievearray, l, fb, times);
+  
+  if (verbose)
+    {
+      printf ("# Sieving small prime blocks took: ");
+      for (lvl = 0; lvl < SIEVE_BLOCKING; lvl++)
+	printf ("level %d, %lld clocks;", lvl + 1, times[lvl]);
+      printf ("\n");
     }
 
+  /* If the factor base limit is very small compared to the 
+     largest block length, we may get many relations that are 
+     smooth over the small fb primes and will not produce sieve 
+     reports during sieving the large fb primes.
+     Those reports are found here instead. */
+  if (find_smallprime_reports)
+    {
+      rdtscll (tsc1);
+      reports_nr +=
+	find_sieve_reports (sievearray, 
+			    reports + reports_nr, 
+			    reports_length - reports_nr, 
+			    reports_threshold, 
+			    eff_amin, l, b, odd);
+      rdtscll (tsc2);
+      if (verbose)
+	{
+	  printf ("# Finding sieve reports took %lld clocks\n", tsc2 - tsc1);
+	  printf ("# There were %lu sieve reports after sieving small "
+		  "primes\n", reports_nr);
+	}
+    }
+  
   rdtscll (tsc1);
   sieve (sievearray, fb->fblarge, eff_amin, eff_amax, b, reports_threshold, 
 	 reports + reports_nr, reports_length - reports_nr, odd);
@@ -734,7 +776,7 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
       /* Find the smallest approximate log. Since -SIEVE_PERMISSIBLE_ERROR <= 
 	 reports->l - log_b(c) <= SIEVE_PERMISSIBLE_ERROR and log_b(c) >= 0, 
 	 we add SIEVE_PERMISSIBLE_ERROR here to get positive values.*/
-      if (reports->l + SIEVE_PERMISSIBLE_ERROR < SIEVE_PERMISSIBLE_ERROR)
+      if (add_error (reports->l) < SIEVE_PERMISSIBLE_ERROR)
 	reportlog = 0;
       else if (reports->l < reportlog)
 	reportlog = reports->l;
@@ -863,6 +905,28 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 
 
 static void
+sort_fbprimes (fbprime_t *primes, const unsigned int n)
+{
+  unsigned int k, l, m;
+  fbprime_t t;
+
+  for (l = n; l > 1; l = m)
+    for (k = m = 0; k < l - 1; k++)
+      if (primes[k] > primes[k + 1])
+	{
+	  t = primes[k];
+	  primes[k] = primes[k + 1];
+	  primes[k + 1] = t;
+	  m = k + 1;
+	}
+#ifdef WANT_ASSERT
+  for (k = 0; k < n - 1; k++)
+    ASSERT(primes[k] <= primes[k + 1]);
+#endif
+}
+
+
+static void
 trialdiv_and_print (cado_poly *poly, const unsigned long b, 
                     const sieve_report_t *reports_a, 
 		    const unsigned int reports_a_nr, 
@@ -948,6 +1012,9 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
 	    goto nextreport;
 
 	  /* Now print the relations */
+	  sort_fbprimes (primes_r, nr_primes_r);
+	  sort_fbprimes (primes_a, nr_primes_a);
+
 	  printf ("%ld,%lu:", a, b);
 	  for (k = 0; k < nr_primes_r; k++)
 	    printf ("%x%s", primes_r[k], k+1==nr_primes_r?"":",");
@@ -1117,11 +1184,10 @@ main (int argc, char **argv)
       exit (EXIT_FAILURE);
     }
   fba->fblarge = fba->fullfb;
-  /* Extract the primes < L1SIZE into their small prime array */
-  if (1)
-    fb_extract_small (fba, L1SIZE, verbose);
-  else
-    fba->fbL1 = NULL;
+  /* Extract the small primes into their small prime arrays */
+  for (i = 0; i < SIEVE_BLOCKING; i++)
+    fb_extract_small (fba, CACHESIZES[i], i, verbose);
+
 
   /* Generate rational fb */
   fbr->fullfb = fb_make_linear ((*cpoly)->g, (fbprime_t) (*cpoly)->rlim, 
@@ -1133,10 +1199,9 @@ main (int argc, char **argv)
       exit (EXIT_FAILURE);
     }
   fbr->fblarge = fbr->fullfb;
-  if (1)
-    fb_extract_small (fbr, L1SIZE, verbose);
-  else
-    fbr->fbL1 = NULL;
+  /* Extract the small primes into their small prime arrays */
+  for (i = 0; i < SIEVE_BLOCKING; i++)
+    fb_extract_small (fbr, CACHESIZES[i], i, verbose);
   
   deg = (*cpoly)->degree;
   for (i = 0; i <= deg; i++)

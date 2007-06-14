@@ -1,12 +1,14 @@
 # Usage: make <target> 
 
-# Paths and anything specific to a host go in Makefile.local
-# It must define ECMLIB which is the full path to and filename of the
-# libecm.a library, and GMPLIB which is full path/name or just "-lgmp"
+# Paths and anything specific to a host go in Makefile.local. It can specify
+# the full path/filename to the ECM libarary in ECMLIB, and full path to ECM 
+# header file in ECMINCLUDE. If not specified, defaults are derived by the
+# variable assignments below.
+# Same thing for GMPLIB and GMPINCLUDE for the GMP library.
 
 include Makefile.local
 
-CFLAGS=-O2 -g -Wall -W
+CFLAGS=-O0 -g -Wall -W
 LDFLAGS=
 
 # Set default filenames/paths if not already set.
@@ -25,7 +27,7 @@ Makefile.local:
 	future invocations of make."
 	touch Makefile.local
 
-sieve: sieve.c fb.c ../polyfile.c config.h
+sieve: sieve.c fb.c ../polyfile.c config.h sieve_aux.h
 	gcc -I. -I.. -I$(GMPINCLUDE) $(CFLAGS) -o $@ -Wall -Wextra sieve.c fb.c ../polyfile.c $(GMPLIB) -lm
 
 checknorms: checknorms.c

@@ -18,7 +18,8 @@ void		fb_disable_roots (factorbase_degn_t *, const unsigned long,
 void		fb_restore_roots (factorbase_degn_t *, const unsigned long, 
                                   const int);
 fbprime_t       fb_maxprime (factorbase_degn_t *);
-void 		fb_extract_small (factorbase_t, const unsigned int, const int);
+void 		fb_extract_small (factorbase_t, const unsigned int, const int,
+                                  const int);
 void		fb_initloc_small (factorbase_small_inited_t *,
                                   factorbase_small_t *, const long, 
                                   const unsigned long, const int);
