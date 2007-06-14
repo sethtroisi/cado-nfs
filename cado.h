@@ -102,6 +102,8 @@ cputime ()
                       {140, 100000}, {155, 200000}, {ULONG_MAX, 1000000}}
 #define DEFAULT_QINT_LENGTH 7
 
+#define SIEVE_BLOCKING_MAX 5
+
 typedef struct
 {
   mpz_t n;    /* number to factor */
@@ -176,12 +178,12 @@ typedef struct {
   factorbase_degn_t *fullfb; /* The complete factor base */
   factorbase_degn_t *fblarge; /* Pointer to the entries in fullfb with primes
   				 > fbL2bound */
-  factorbase_small_t *fbsmall[SIEVE_BLOCKING];
-  factorbase_small_inited_t *fbinit[SIEVE_BLOCKING];
-  unsigned int fbsmallsize[SIEVE_BLOCKING];  /* Number of entries in small fb, 
-                                                incl. stop marker */
-  unsigned int fbsmallbound[SIEVE_BLOCKING]; /* Upper bound on primes in 
-                                                small fb */
+  factorbase_small_t *fbsmall[SIEVE_BLOCKING_MAX];
+  factorbase_small_inited_t *fbinit[SIEVE_BLOCKING_MAX];
+  unsigned int fbsmallsize[SIEVE_BLOCKING_MAX];  /* Number of entries in small
+                                                    fb, incl. stop marker */
+  unsigned int fbsmallbound[SIEVE_BLOCKING_MAX]; /* Upper bound on primes in 
+                                                    small fb */
 } factorbase_t[1];
 
 typedef struct {
