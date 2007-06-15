@@ -1,6 +1,6 @@
 CFLAGS=-g -O2
 
-names:=polyfile relation
+names:=polyfile relation cputime
 src:=$(patsubst %,%.c,$(names))
 obj:=$(patsubst %,%.o,$(names))
 
