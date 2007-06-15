@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <gmp.h>
 #include <assert.h>
+#include "cado.h"
+#include "polyfile.h"
 
 /* #define DEBUG */
 
@@ -64,6 +66,7 @@ main (int argc, char **argv)
   int i, j, nlimbs;
   char str[1024];
   int depnum = 0;
+  cado_poly *pol;
 #ifdef DEBUG
   unsigned long debug_exponent = 0;
 #endif
@@ -78,7 +81,7 @@ main (int argc, char **argv)
     }
 
   if (argc != 4) {
-    fprintf(stderr, "usage: %s [-depnum nnn] matfile kerfile m\n", argv[0]);
+    fprintf(stderr, "usage: %s [-depnum nnn] matfile kerfile polyfile\n", argv[0]);
     exit(1);
   }
 
@@ -87,9 +90,11 @@ main (int argc, char **argv)
   kerfile = fopen(argv[2], "r");
   assert (kerfile != NULL);
 
+  pol = read_polynomial(argv[3]);
   mpz_init(m);
-  ret = gmp_sscanf(argv[3], "%Zd", m);
-  assert (ret == 1);
+  mpz_neg(m, (*pol)->g[0]);
+
+  gmp_fprintf(stderr, "m = %Zd\n", m);
 
   lprd = 1;
   nprd = 0;
@@ -199,7 +204,7 @@ main (int argc, char **argv)
       printf ("remainder has %d bits\n", la);
   }
 
-  mpz_mod(prd[0], prd[0], m);
+  mpz_mod(prd[0], prd[0], (*pol)->n);
   gmp_printf("rational square root is %Zd\n", prd[0]);
 
   for (i = 0; i < lprd; i++)
