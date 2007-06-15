@@ -8,8 +8,8 @@
    foo (...);
    printf ("foo took %dms\", cputime () - st);
 */
-static int
-cputime ()
+int
+cputime (void)
 {
   struct rusage rus;
 

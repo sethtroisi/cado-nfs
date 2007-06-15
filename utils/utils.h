@@ -13,4 +13,7 @@ unsigned long findroot(long a, unsigned long b, unsigned long p);
 void computeroots(relation_t * rel);
 void fprint_relation(FILE *file, relation_t rel);
 
+/* cputime */
+int cputime (void);
+
 

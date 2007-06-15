@@ -44,6 +44,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <values.h> /* for DBL_MAX */
 #include <math.h>   /* for log, fabs */
 #include "cado.h"
+#include "utils/utils.h" /* for cputime() */
 
 #define REPS 1 /* number of Miller-Rabin tests in isprime */
 

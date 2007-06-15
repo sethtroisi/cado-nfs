@@ -7,7 +7,7 @@ GMPINCLUDE ?= $(GMP)/include/
 
 
 CFLAGS=-O2 -g -I$(GMPINCLUDE) -DREV=\"`svnversion`\"
-LDFLAGS=$(GMPLIB) -lm
+LDFLAGS=../utils/libutils.a $(GMPLIB) -lm
 
 polyselect: polyselect.c ../cado.h
 	gcc $(CFLAGS) -I.. $< $(LDFLAGS) -o $@
