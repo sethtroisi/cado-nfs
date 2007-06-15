@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "../mod_ul.c"
+
 /*
   Convention for I/O of rels:
     a and b are printed in decimal
@@ -10,7 +12,7 @@
 
 
 
-static void
+void
 copy_rel(relation_t *Rel, relation_t rel) {
   int i;
   Rel->a = rel.a;
@@ -35,7 +37,7 @@ copy_rel(relation_t *Rel, relation_t rel) {
 // return 0 on failure.
 // The input should be a single line of the form
 //   a,b:p1,p2,...:q1,q2,...
-static int read_relation(relation_t *rel, const char *str) {
+int read_relation(relation_t *rel, const char *str) {
   int i, ret;
   
   ret = sscanf(str, "%ld,%lu:", &(rel->a), &(rel->b));
@@ -109,7 +111,7 @@ static int read_relation(relation_t *rel, const char *str) {
 //        -1 if EOF
 // This reads the next valid (non blank, non commented) line and fill in
 // the relation. 
-static int fread_relation(FILE *file, relation_t *rel) {
+int fread_relation(FILE *file, relation_t *rel) {
   int c, i;
   char str[1024];
 
@@ -152,7 +154,7 @@ static int fread_relation(FILE *file, relation_t *rel) {
   return read_relation(rel, str);
 }
 
-static unsigned long
+unsigned long
 findroot(long a, unsigned long b, unsigned long p) {
   unsigned long r, t;
   unsigned long pa;
@@ -177,8 +179,8 @@ findroot(long a, unsigned long b, unsigned long p) {
   }
 }
 
-// root = -1 if we don;t know the result (p divides leading coeff)
-static void
+// root = -1 if we don't know the result (p divides leading coeff)
+void
 computeroots(relation_t * rel) {
   unsigned long r;
   int i;
@@ -191,7 +193,7 @@ computeroots(relation_t * rel) {
   }
 }
 
-static void
+void
 fprint_relation(FILE *file, relation_t rel) {
   int i;
   fprintf(file, "%ld,%lu:", rel.a, rel.b);
