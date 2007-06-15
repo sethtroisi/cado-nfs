@@ -1,4 +1,4 @@
-CFLAGS=-g
+CFLAGS=-g -O2
 
 names:=polyfile relation
 src:=$(patsubst %,%.c,$(names))

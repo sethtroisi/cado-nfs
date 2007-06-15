@@ -13,23 +13,27 @@
 
 
 void
-copy_rel(relation_t *Rel, relation_t rel) {
+copy_rel (relation_t *Rel, relation_t rel)
+{
   int i;
+
   Rel->a = rel.a;
   Rel->b = rel.b;
   Rel->nb_rp = rel.nb_rp;
   Rel->nb_ap = rel.nb_ap;
-  Rel->rp = (unsigned long *)realloc(Rel->rp, Rel->nb_rp*sizeof(unsigned long));
-  Rel->ap = (unsigned long *)realloc(Rel->ap, Rel->nb_ap*sizeof(unsigned long));
+  Rel->rp = (rat_prime_t*) realloc (Rel->rp, Rel->nb_rp * sizeof(rat_prime_t));
+  Rel->ap = (alg_prime_t*) realloc (Rel->ap, Rel->nb_ap * sizeof(alg_prime_t));
   for (i = 0; i < Rel->nb_rp; ++i)
-    Rel->rp[i] = rel.rp[i];
+    {
+      Rel->rp[i].p = rel.rp[i].p;
+      Rel->rp[i].e = rel.rp[i].e;
+    }
   for (i = 0; i < Rel->nb_ap; ++i)
-    Rel->ap[i] = rel.ap[i];
-  if (rel.ar != NULL) {
-    Rel->ar = (unsigned long *)realloc(Rel->ar, Rel->nb_ap*sizeof(unsigned long));
-    for (i = 0; i < Rel->nb_ap; ++i)
-      Rel->ar[i] = rel.ar[i];
-  }
+    {
+      Rel->ap[i].p = rel.ap[i].p;
+      Rel->ap[i].r = rel.ap[i].r;
+      Rel->ap[i].e = rel.ap[i].e;
+    }
 }
 
 
@@ -37,14 +41,21 @@ copy_rel(relation_t *Rel, relation_t rel) {
 // return 0 on failure.
 // The input should be a single line of the form
 //   a,b:p1,p2,...:q1,q2,...
-int read_relation(relation_t *rel, const char *str) {
-  int i, ret;
+// Stores the primes into the relation, by collecting identical primes
+// and setting the corresponding exponents. Thus a given prime will
+// appear only once in rel (but it can appear with an even exponent).
+int
+read_relation (relation_t *rel, const char *str)
+{
+  int i, j, k, ret;
+  unsigned long p;
   
-  ret = sscanf(str, "%ld,%lu:", &(rel->a), &(rel->b));
-  if (ret!=2) {
-    fprintf(stderr, "warning: failed reading a,b\n");
-    return 0;
-  }
+  ret = sscanf (str, "%ld,%lu:", &(rel->a), &(rel->b));
+  if (ret != 2)
+    {
+      fprintf (stderr, "warning: failed reading a,b\n");
+      return 0;
+    }
   while (str[0] != ':')
     str++;
   str++;
@@ -63,17 +74,31 @@ int read_relation(relation_t *rel, const char *str) {
   }
 
   // read rp
-  rel->rp = (unsigned long *) malloc (rel->nb_rp*sizeof(unsigned long));
-  for (i = 0; i < rel->nb_rp; ++i) {
-    ret = sscanf(str, "%lx", &(rel->rp[i]));
-    if (ret!=1) {
-      fprintf(stderr, "warning: failed reading rat prime %d\n", i);
-      return 0;
-    }
-    while (isxdigit(str[0]))
+  rel->rp = (rat_prime_t*) malloc (rel->nb_rp * sizeof (rat_prime_t));
+  for (i = j = 0; i < rel->nb_rp; ++i)
+    {
+      ret = sscanf (str, "%lx", &p);
+      if (ret!=1)
+        {
+          fprintf (stderr, "warning: failed reading rat prime %d\n", i);
+          return 0;
+        }
+      /* j is the number of (p,e) pairs already stored in rel */
+      for (k = 0; k < j && rel->rp[k].p != p; k++);
+      if (k < j) /* prime already appeared */
+        rel->rp[k].e ++;
+      else /* new prime */
+        {
+          rel->rp[j].p = p;
+          rel->rp[j].e = 1;
+          j ++;
+        }
+      while (isxdigit(str[0]))
+        str++;
       str++;
-    str++;
-  }
+    }
+  rel->nb_rp = j;
+  rel->rp = (rat_prime_t*) realloc (rel->rp, j * sizeof (rat_prime_t));
 
   // count nb of ap by counting commas (have to add one)
   {
@@ -89,18 +114,32 @@ int read_relation(relation_t *rel, const char *str) {
   }
 
   // read ap
-  rel->ap = (unsigned long *) malloc (rel->nb_ap*sizeof(unsigned long));
-  for (i = 0; i < rel->nb_ap; ++i) {
-    ret = sscanf(str, "%lx", &(rel->ap[i]));
-    if (ret!=1) {
-      fprintf(stderr, "warning: failed reading alg prime %d\n", i);
-      return 0;
-    }
-    while (isxdigit(str[0]))
+  rel->ap = (alg_prime_t*) malloc (rel->nb_ap * sizeof (alg_prime_t));
+  for (i = j = 0; i < rel->nb_ap; ++i)
+    {
+      ret = sscanf(str, "%lx", &p);
+      /* corresponding root must be computed by the caller */
+      if (ret != 1)
+        {
+          fprintf (stderr, "warning: failed reading alg prime %d\n", i);
+          return 0;
+        }
+      /* j is the number of (p,e) pairs already stored in rel */
+      for (k = 0; k < j && rel->ap[k].p != p; k++);
+      if (k < j) /* prime already appeared */
+        rel->ap[k].e ++;
+      else /* new prime */
+        {
+          rel->ap[j].p = p;
+          rel->ap[j].e = 1;
+          j ++;
+        }
+      while (isxdigit(str[0]))
+        str++;
       str++;
-    str++;
-  }
-  rel->ar = NULL;
+    }
+  rel->nb_ap = j;
+  rel->ap = (alg_prime_t*) realloc (rel->ap, j * sizeof (alg_prime_t));
 
   return 1;
 }
@@ -111,7 +150,8 @@ int read_relation(relation_t *rel, const char *str) {
 //        -1 if EOF
 // This reads the next valid (non blank, non commented) line and fill in
 // the relation. 
-int fread_relation(FILE *file, relation_t *rel) {
+int fread_relation (FILE *file, relation_t *rel)
+{
   int c, i;
   char str[1024];
 
@@ -151,7 +191,7 @@ int fread_relation(FILE *file, relation_t *rel) {
 
   str[i] = '\0';
 
-  return read_relation(rel, str);
+  return read_relation (rel, str);
 }
 
 unsigned long
@@ -181,15 +221,15 @@ findroot(long a, unsigned long b, unsigned long p) {
 
 // root = -1 if we don't know the result (p divides leading coeff)
 void
-computeroots(relation_t * rel) {
+computeroots (relation_t *rel)
+{
   unsigned long r;
   int i;
 
-  rel->ar = (unsigned long *) realloc (rel->ar, rel->nb_ap*sizeof(unsigned long));
-
-  for (i = 0; i < rel->nb_ap; ++i) {
-    r = findroot(rel->a, rel->b, rel->ap[i]);
-    rel->ar[i] = r;
+  for (i = 0; i < rel->nb_ap; ++i)
+    {
+      r = findroot (rel->a, rel->b, rel->ap[i].p);
+      rel->ap[i].r = r;
   }
 }
 

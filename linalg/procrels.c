@@ -45,12 +45,14 @@ typedef struct {
   unsigned long length;
 } tab_relation_t;
 
-
-
 // Append an algebraic prime to a table.
 void
-add_alg_rootprime(tab_rootprime_t *table, tab_prime_t *bad_primes,
-    unsigned long p,  unsigned long r) {
+add_alg_rootprime (tab_rootprime_t *table, tab_prime_t *bad_primes,
+                   alg_prime_t pr)
+{
+  unsigned long p = pr.p;
+  unsigned long r = pr.r;
+
   if (r != -1) {
     if (table->allocated == table->length) {
       table->allocated += 100;
@@ -73,13 +75,14 @@ add_alg_rootprime(tab_rootprime_t *table, tab_prime_t *bad_primes,
 
 // Append a rational prime to a table.
 void 
-add_rat_prime(tab_prime_t *table, unsigned long p) {
+add_rat_prime (tab_prime_t *table, rat_prime_t p) {
   if (table->allocated == table->length) {
     table->allocated += 100;
     table->tab = (unsigned long *)realloc(table->tab, (table->allocated)*sizeof(unsigned long));
     assert (table->tab != NULL);
   }
-  table->tab[table->length] = p;
+  table->tab[table->length] = p.p;
+  assert (p.e == 1);
   table->length++;
 }
 
@@ -88,8 +91,9 @@ add_rat_prime(tab_prime_t *table, unsigned long p) {
 // one structure for rational side, one for algebraic side, and one for
 // bad primes (i.e. those that divide leading coefficient of polynomial).
 void
-update_tables(tab_relation_t *rel_table, tab_rootprime_t *alg_table, tab_prime_t *rat_table,
-    tab_prime_t *bad_primes) {
+update_tables (tab_relation_t *rel_table, tab_rootprime_t *alg_table,
+               tab_prime_t *rat_table, tab_prime_t *bad_primes)
+{
   long a;
   unsigned long b;
   int i, j;
@@ -98,9 +102,9 @@ update_tables(tab_relation_t *rel_table, tab_rootprime_t *alg_table, tab_prime_t
   for (i = 0; i < rel_table->length; ++i) {
     rel = &rel_table->tab[i];
     for (j = 0; j < rel->nb_rp; ++j)
-      add_rat_prime(rat_table, rel->rp[j]);
+      add_rat_prime (rat_table, rel->rp[j]);
     for (j = 0; j < rel->nb_ap; ++j)
-      add_alg_rootprime(alg_table, bad_primes, rel->ap[j], rel->ar[j]);
+      add_alg_rootprime (alg_table, bad_primes, rel->ap[j]);
   }
 }
 
@@ -188,9 +192,10 @@ cmpabpairs(const void *p, const void *q) {
 
 
 static int
-getindex_rat(tab_prime_t rat_table, unsigned long p) {
+getindex_rat (tab_prime_t rat_table, rat_prime_t pe) {
   int i, j;
   int found = 0;
+  unsigned long p = pe.p;
 
   i = 0; j = rat_table.length-1;
   while ((i<j-1) && (rat_table.tab[i] != p) && (rat_table.tab[j] != p)) {
@@ -231,8 +236,11 @@ getindex_abpair(tab_abpair_t table, long a, unsigned long b) {
 
 
 static int
-getindex_alg(tab_rootprime_t alg_table, unsigned long p, unsigned long r) {
+getindex_alg (tab_rootprime_t alg_table, alg_prime_t pre)
+{
   int i, j;
+  unsigned long p = pre.p;
+  unsigned long r = pre.r;
 
   i = 0; j = alg_table.length-1;
   while ((i<j-1) &&
@@ -279,7 +287,7 @@ void onepass_singleton_removal(tab_relation_t *rel_table,
     relation_t *rel = &(rel_table->tab[i]);
     for (j = 0; j < rel->nb_rp; ++j) {
       int index;
-      index = getindex_rat(*rat_table, rel->rp[j]);
+      index = getindex_rat (*rat_table, rel->rp[j]);
       if (index == -1)
 	continue;
       if ((ab_single.tab[index].a == 0) && (ab_single.tab[index].b == 0)) {
@@ -292,7 +300,7 @@ void onepass_singleton_removal(tab_relation_t *rel_table,
     }
     for (j = 0; j < rel->nb_ap; ++j) {
       int index;
-      index = getindex_alg(*alg_table, rel->ap[j], rel->ar[j]);
+      index = getindex_alg (*alg_table, rel->ap[j]);
       if (index == -1)
 	continue;
       index += l_rat;
@@ -386,42 +394,6 @@ isBadPrime(unsigned long p, tab_prime_t bad_primes) {
   return 0;
 }
 
-/* sort primes in rel (both on rational and algebraic side) by ascending
-   order */
-void
-sort_rel (relation_t rel)
-{
-  int i, j;
-  unsigned long p, r;
-
-  /* sort primes on rational side, using insertion sort */
-  for (i = 1; i < rel.nb_rp; i++)
-    {
-      p = rel.rp[i];
-      /* primes of index 0..i-1 are sorted */
-      for (j = i; (j > 0) && (rel.rp[j - 1] > p); j--)
-        rel.rp[j] = rel.rp[j - 1];
-      rel.rp[j] = p;
-    }
-
-  /* sort primes on algebraic side, taking into account the ar[] array too */
-  for (i = 1; i < rel.nb_ap; i++)
-    {
-      p = rel.ap[i];
-      r = rel.ar[i];
-      /* primes of index 0..i-1 are sorted */
-      for (j = i; (j > 0) && ((rel.ap[j - 1] > p) || ((rel.ap[j - 1] == p) &&
-                                                      (rel.ar[j - 1] > r)));
-           j--)
-        {
-          rel.ap[j] = rel.ap[j - 1];
-          rel.ar[j] = rel.ar[j - 1];
-        }
-      rel.ap[j] = p;
-      rel.ar[j] = r;
-    }
-}
-
 /* Print relations in a matrix format:
    don't take into account bad primes and even powers of primes.
    WARNING: the primes in the input relation are not necessarily sorted.
@@ -439,9 +411,6 @@ fprint_rel_row (FILE *file, relation_t rel, tab_prime_t rat_table,
   fprintf(file, "%ld %lu ", rel.a, rel.b);
   table_ind = (int*) malloc((rel.nb_rp + rel.nb_ap)*sizeof(int));
 
-  sort_rel (rel); /* needed because the code below assumes a given prime
-                     appears at adjacent places */
-  
   nb_coeff = 0;
   index = getindex_rat(rat_table, rel.rp[0]);
   old_index = index;
@@ -462,16 +431,16 @@ fprint_rel_row (FILE *file, relation_t rel, tab_prime_t rat_table,
     table_ind[nb_coeff++] = index;
 
   i = 0;
-  while (isBadPrime(rel.ap[i], bad_primes))
+  while (isBadPrime(rel.ap[i].p, bad_primes))
     i++;
-  index = getindex_alg(alg_table, rel.ap[i], rel.ar[i]);
+  index = getindex_alg (alg_table, rel.ap[i]);
   old_index = index;
   parity = 1;
   i++;
   for (;i < rel.nb_ap; ++i) {
-    if (isBadPrime(rel.ap[i], bad_primes))
+    if (isBadPrime(rel.ap[i].p, bad_primes))
       continue;
-    index = getindex_alg(alg_table, rel.ap[i], rel.ar[i]);
+    index = getindex_alg (alg_table, rel.ap[i]);
     if (index == old_index) {
       parity = 1 - parity;
     } else {
@@ -494,6 +463,56 @@ fprint_rel_row (FILE *file, relation_t rel, tab_prime_t rat_table,
   free(table_ind);
 }
 
+/* reduces exponents mod 2, and discards primes with even exponent */
+void
+reduce_exponents_mod2 (relation_t *rel)
+{
+  int i, j;
+
+  for (i = j = 0; i < rel->nb_rp; i++)
+    {
+      rel->rp[i].e &= 1;
+      if (rel->rp[i].e != 0)
+        {
+          rel->rp[j].p = rel->rp[i].p;
+          rel->rp[j].e = 1;
+          j ++;
+        }
+    }
+  rel->rp = (rat_prime_t*) realloc (rel->rp, j * sizeof (rat_prime_t));
+  rel->nb_rp = j;
+
+  for (i = j = 0; i < rel->nb_ap; i++)
+    {
+      rel->ap[i].e &= 1;
+      if (rel->ap[i].e != 0)
+        {
+          rel->ap[j].p = rel->ap[i].p;
+          rel->ap[j].e = 1;
+          j ++;
+        }
+    }
+  rel->ap = (alg_prime_t*) realloc (rel->ap, j * sizeof (alg_prime_t));
+  rel->nb_ap = j;
+}
+
+/* remove bad primes from algebraic table (otherwise the matrix will have
+   columns with only zeros) */
+void
+purge_badprimes (tab_rootprime_t *t, tab_prime_t bad_primes)
+{
+  int i, j;
+
+  for (i = j = 0; i < t->length; i++)
+    if (isBadPrime (t->tab[i].prime, bad_primes) == 0)
+      {
+        t->tab[j].prime = t->tab[i].prime;
+        t->tab[j].root = t->tab[i].root;
+        j ++;
+      }
+  t->length = j;
+}
+
 // Read all relations from file.
 // NB: the NULL assignments to pointers are to help freeing.
 int
@@ -510,10 +529,9 @@ fread_relations(FILE *file, tab_relation_t *rel_table) {
       for (i = rel_table->allocated-100; i < rel_table->allocated; ++i) {
 	rel_table->tab[i].rp = NULL;
 	rel_table->tab[i].ap = NULL;
-	rel_table->tab[i].ar = NULL;
       }
     }
-    ret = fread_relation(file, &(rel_table->tab[rel_table->length]));
+    ret = fread_relation (file, &(rel_table->tab[rel_table->length]));
     if (ret == 1)
       (rel_table->length)++;
   } while (ret == 1);
@@ -524,8 +542,11 @@ fread_relations(FILE *file, tab_relation_t *rel_table) {
 
   fprintf(stderr, "loaded %d relations\n", rel_table->length);
 
-  for (i = 0; i < rel_table->length; ++i) 
-    computeroots(&(rel_table->tab[i]));
+  for (i = 0; i < rel_table->length; ++i)
+    {
+      reduce_exponents_mod2 (&(rel_table->tab[i]));
+      computeroots (&(rel_table->tab[i]));
+    }
   
   return (ret == -1);
 }
@@ -598,6 +619,8 @@ main (int argc, char **argv)
     fprintf(stderr, "%lu ", bad_primes.tab[i]);
   fprintf(stderr, "\n");
 
+  purge_badprimes (&alg_table, bad_primes);
+
   fprintf(stderr, "nb of rational primes = %d\n", rat_table.length);
   fprintf(stderr, "nb of algebraic primes = %d\n", alg_table.length);
   fprintf(stderr, "Total number of primes = %d (excess %d)\n",
@@ -606,9 +629,8 @@ main (int argc, char **argv)
 
   printf("%d %d\n", rel_table.length, rat_table.length + alg_table.length);
 
-  for (i = 0; i < rel_table.length; ++i) {
-    fprint_rel_row(stdout, rel_table.tab[i], rat_table, alg_table, bad_primes);
-  }
+  for (i = 0; i < rel_table.length; ++i)
+    fprint_rel_row (stdout, rel_table.tab[i], rat_table, alg_table, bad_primes);
 
 #if 0
   for (i = 0; i < rat_table.length; ++i)
@@ -623,8 +645,6 @@ main (int argc, char **argv)
       free(rel_table.tab[i].rp);
     if (rel_table.tab[i].ap != NULL)
       free(rel_table.tab[i].ap);
-    if (rel_table.tab[i].ar != NULL)
-      free(rel_table.tab[i].ar);
   }
   free(rel_table.tab);
   free(bad_primes.tab);

@@ -187,14 +187,23 @@ typedef struct {
 } factorbase_t[1];
 
 typedef struct {
+  unsigned long p;      /* rational prime */
+  int e;                /* exponent (may want negative exponent in sqrt) */
+} rat_prime_t;
+
+typedef struct {
+  unsigned long p;      /* algebraic prime */
+  unsigned long r;      /* corresponding root: r = a/b mod p */
+  int e;                /* exponent (may want negative exponent in sqrt) */
+} alg_prime_t;
+
+typedef struct {
   long a;		/* only a is allowed to be negative */
   unsigned long b;
   int nb_rp;		/* number of rational primes */
   int nb_ap;		/* number of algebraic primes */
-  unsigned long * rp;	/* array of rational primes */
-  unsigned long * ap;	/* array of algebraic primes */
-  unsigned long * ar;	/* array of corresponding root (optional, this can
-			   be garbage) */
+  rat_prime_t *rp;	/* array of rational primes */
+  alg_prime_t *ap;	/* array of algebraic primes */
 } relation_t;
 
 /* A sieve report, filled in when sieving large factor base primes and
