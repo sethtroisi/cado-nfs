@@ -9,7 +9,7 @@ CFLAGS=-O2 -g -DREV=\"`svnversion`\"
 LDFLAGS=../utils/libutils.a $(GMPLIB)
 INC=-I $(GMPINCLUDE) -I..
 
-all: procrels linalg characters
+all: procrels linalg characters matsort
 
 Makefile.local:
 	echo "Makefile.local does not exist. It can be used to store paths \
@@ -29,5 +29,8 @@ gauss.o: gauss.c
 characters: characters.c gauss.o
 	gcc $(CFLAGS) $(INC) $< gauss.o $(LDFLAGS) -o $@
 
+matsort: matsort.c gauss.o
+	gcc $(CFLAGS) $(INC) $< gauss.o $(LDFLAGS) -o $@
+
 clean:
-	\rm procrels gauss.o linalg characters
+	\rm procrels gauss.o linalg characters matsort
