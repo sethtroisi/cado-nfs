@@ -19,13 +19,17 @@ polyselect-r145 -e 40000000 11.35h (sel. 118s, sieving 10.58h, procrels 0.18h,
 rsa100 (q0=900000):
 ggnfs-0.77.0                 total yield: 10813, q=901207 (0.00362 sec/rel)
 polyselect-r176 -e 50000000: total yield: 10758, q=901937 (0.00506 sec/rel)
+polyselect-r205 -e 5e7       total yield: 10771, q=901937 (0.00499 sec/rel)
 
 rsa110 (q0=1600000):
 ggnfs-0.77.0                 total yield: 10665, q=1600901 (0.00873 sec/rel)
 polyselect-r176 -e 20000000  total yield: 10121, q=1602091 (0.01804 sec/rel)
+polyselect-r205 -e 2e7       total yield: 10351, q=1601797 (0.01516 sec/rel)
 
 rsa120:
-polyselect-r150 -e 20000000: total yield: 1117, q=2251981 (0.09493 sec/rel)
+ggnfs-0.77.0                 total yield: 10067, q=2252953 (0.02161 sec/rel)
+polyselect-r150 -e 20000000  total yield: 1117, q=2251981 (0.09493 sec/rel)
+polyselect-r205 -e 2e7       total yield: 2119, q=2251649 (0.05811 sec/rel)
 
 ##############################################################################
 

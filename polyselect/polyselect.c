@@ -1464,6 +1464,8 @@ main (int argc, char *argv[])
   int st = cputime ();
   mpz_t m;
 
+  fprintf (stderr, "%s rev. %s\n", argv[0], REV);
+
   mpz_init (m);
 
   /* parse options */
