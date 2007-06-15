@@ -38,20 +38,26 @@ polyselect/polyselect -full -e 1000000 < /tmp/c59 > /tmp/c59.poly
 
 cd sieve
 ## this has to be done by hand, sorry!
+## and it depends on the polynomial found by polyselect (also the b-bound 1300
+## below might be too small with different polynomials)
 echo "rootfind(-403598071832395153*x^0-6927763164081*x^1+285105030*x^2+517165560*x^3, 200000)" | gp -q -p 200000 rootfind.gp >/tmp/c59.roots
 ## SIEVING_STEP
 ./sieve -poly /tmp/c59.poly -fb /tmp/c59.roots -1000000 1000000 1 1300 > /tmp/c59.rels_raw
+# checking norms and splitting large cofactors
 ./checknorms -poly /tmp/c59.poly /tmp/c59.rels_raw > /tmp/c59.rels
 cd ..
 
-
-linalg/procrels /tmp/c59.rels > /tmp/c59.mat
+# create matrix
+linalg/procrels /tmp/c59.rels > /tmp/c59.mat_raw
 ## If excess is not positive, goto SIEVING_STEP with larger value
+## for example ./sieve ... -1000000 1000000 1301 1400 >> /tmp/c59.rels_raw
+# sort matrix columns (not mandatory, but speeds up the linear algebra)
+linalg/matsort /tmp/c59.mat_raw > /tmp/c59.mat
 linalg/linalg /tmp/c59.mat > /tmp/c59.ker_raw
 linalg/characters /tmp/c59.mat /tmp/c59.ker_raw /tmp/c59.poly 20 40 > /tmp/c59.ker
 
 
 cd sqrt/naive
 ./tryonedep.sh -depnum 0 /tmp/c59.mat /tmp/c59.ker /tmp/c59.poly
-## If gcd is trivial, try over dependency
+## If gcd is trivial, try another dependency (-depnum 1, -depnum 2, ...)
 
