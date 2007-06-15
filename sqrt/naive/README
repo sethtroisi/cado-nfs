@@ -1,0 +1,8 @@
+usage:
+
+./tryonedep.sh -depnum 0 matfile kerfile polyfile
+
+This creates temp files in /tmp with fixed names (sorry...) If they
+already exist and you cannot overwrite them, this won't work.
+
+
