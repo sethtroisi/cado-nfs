@@ -67,10 +67,14 @@ K := NumberField(f);
 F := Split(Read("/tmp/algside"));
 
 v := StringToInteger(F[#F]);
-assert IsEven(v);
 Prune(~F);
 
-ff := [StringToInteger(x, 16) :  x in F];
+if IsOdd(v) then
+  ff := [fd*StringToInteger(x, 16) :  x in F];
+  v +:= 1;
+else 
+  ff := [StringToInteger(x, 16) :  x in F];
+end if;
 
 a := K!ff;
 assert MyIsSqrt(a);
