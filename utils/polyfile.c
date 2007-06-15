@@ -1,9 +1,8 @@
-#include "config.h"
-#include "polyfile.h"
-#include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
-#include <ctype.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include "cado.h"
+
 
 #define TYPE_STRING 0
 #define TYPE_MPZ 1
@@ -55,13 +54,13 @@ parse_line (void *target, char *line, const char *tag, int *have,
   return PARSE_MATCH;
 }
 
-cado_poly *
-read_polynomial (char *filename)
+// return 0 on failure, 1 if success.
+int  
+read_polynomial (cado_poly poly, char *filename)
 {
   FILE *file;
   const int linelen = 512;
   char line[linelen];
-  cado_poly *poly;
   int have_name = 0, have_n = 0, have_Y0 = 0, have_Y1 = 0;
   int i, ok = PARSE_ERROR;
 
@@ -69,16 +68,15 @@ read_polynomial (char *filename)
   if (file == NULL)
     {
       fprintf (stderr, "read_polynomial: could not open %s\n", filename);
-      return NULL;
+      return 0;
     }
 
-  poly = (cado_poly *) malloc (sizeof(cado_poly));
-  (*poly)->f = (mpz_t *) malloc (MAXDEGREE * sizeof (mpz_t));
-  (*poly)->g = (mpz_t *) malloc (2 * sizeof (mpz_t));
+  poly->f = (mpz_t *) malloc (MAXDEGREE * sizeof (mpz_t));
+  poly->g = (mpz_t *) malloc (2 * sizeof (mpz_t));
 
-  (*poly)->name[0] = '\0';
-  (*poly)->degree = -1;
-  (*poly)->type[0] = '\0';
+  poly->name[0] = '\0';
+  poly->degree = -1;
+  poly->type[0] = '\0';
 
   while (!feof (file))
     {
@@ -88,32 +86,32 @@ read_polynomial (char *filename)
       if (line[0] == '#')
 	continue;
 
-      ok *= parse_line (&((*poly)->name), line, "name: ", &have_name, TYPE_STRING);
-      ok *= parse_line (&((*poly)->n), line, "n: ", &have_n, TYPE_MPZ);
-      ok *= parse_line (&((*poly)->skew), line, "skew: ", NULL, TYPE_DOUBLE);
-      ok *= parse_line (&((*poly)->g[0]), line, "Y0: ", &have_Y0, TYPE_MPZ);
-      ok *= parse_line (&((*poly)->g[1]), line, "Y1: ", &have_Y1, TYPE_MPZ);
-      ok *= parse_line (&((*poly)->type), line, "type: ", NULL, TYPE_STRING);
-      ok *= parse_line (&((*poly)->rlim), line, "rlim: ", NULL, TYPE_ULONG);
-      ok *= parse_line (&((*poly)->alim), line, "alim: ", NULL, TYPE_ULONG);
-      ok *= parse_line (&((*poly)->lpbr), line, "lpbr: ", NULL, TYPE_INT);
-      ok *= parse_line (&((*poly)->lpba), line, "lpba: ", NULL, TYPE_INT);
-      ok *= parse_line (&((*poly)->mfbr), line, "mfbr: ", NULL, TYPE_INT);
-      ok *= parse_line (&((*poly)->mfba), line, "mfba: ", NULL, TYPE_INT);
-      ok *= parse_line (&((*poly)->rlambda), line, "rlambda: ", NULL, TYPE_DOUBLE);
-      ok *= parse_line (&((*poly)->alambda), line, "alambda: ", NULL, TYPE_DOUBLE);
-      ok *= parse_line (&((*poly)->qintsize), line, "qintsize: ", NULL, TYPE_INT);
+      ok *= parse_line (&(poly->name), line, "name: ", &have_name, TYPE_STRING);
+      ok *= parse_line (&(poly->n), line, "n: ", &have_n, TYPE_MPZ);
+      ok *= parse_line (&(poly->skew), line, "skew: ", NULL, TYPE_DOUBLE);
+      ok *= parse_line (&(poly->g[0]), line, "Y0: ", &have_Y0, TYPE_MPZ);
+      ok *= parse_line (&(poly->g[1]), line, "Y1: ", &have_Y1, TYPE_MPZ);
+      ok *= parse_line (&(poly->type), line, "type: ", NULL, TYPE_STRING);
+      ok *= parse_line (&(poly->rlim), line, "rlim: ", NULL, TYPE_ULONG);
+      ok *= parse_line (&(poly->alim), line, "alim: ", NULL, TYPE_ULONG);
+      ok *= parse_line (&(poly->lpbr), line, "lpbr: ", NULL, TYPE_INT);
+      ok *= parse_line (&(poly->lpba), line, "lpba: ", NULL, TYPE_INT);
+      ok *= parse_line (&(poly->mfbr), line, "mfbr: ", NULL, TYPE_INT);
+      ok *= parse_line (&(poly->mfba), line, "mfba: ", NULL, TYPE_INT);
+      ok *= parse_line (&(poly->rlambda), line, "rlambda: ", NULL, TYPE_DOUBLE);
+      ok *= parse_line (&(poly->alambda), line, "alambda: ", NULL, TYPE_DOUBLE);
+      ok *= parse_line (&(poly->qintsize), line, "qintsize: ", NULL, TYPE_INT);
 
 
       if (ok == 1 && line[0] == 'c' && isdigit (line[1]) && line[2] == ':' &&
 	       line[3] == ' ')
 	{
 	  int index = line[1] - '0', i;
-	  for (i = (*poly)->degree + 1; i <= index; i++)
-	    mpz_init ((*poly)->f[i]);
-	  if (index > (*poly)->degree)
-	    (*poly)->degree = index;
-	  mpz_set_str ((*poly)->f[index], line + 4, 0);
+	  for (i = poly->degree + 1; i <= index; i++)
+	    mpz_init (poly->f[i]);
+	  if (index > poly->degree)
+	    poly->degree = index;
+	  mpz_set_str (poly->f[index], line + 4, 0);
 	  ok = -1;
 	}
 
@@ -152,19 +150,28 @@ read_polynomial (char *filename)
 
   if (ok == PARSE_ERROR)
     {
-      for (i = 0; i <= (*poly)->degree; i++)
-	mpz_clear ((*poly)->f[i]);
+      for (i = 0; i <= poly->degree; i++)
+	mpz_clear (poly->f[i]);
       if (have_n)
-	mpz_clear ((*poly)->n);
+	mpz_clear (poly->n);
       if (have_Y0)
-	mpz_clear ((*poly)->g[0]);
+	mpz_clear (poly->g[0]);
       if (have_Y1)
-	mpz_clear ((*poly)->g[1]);
-      free ((*poly)->f);
-      free ((*poly)->g);
-      free (poly);
-      poly = NULL;
+	mpz_clear (poly->g[1]);
+      free (poly->f);
+      free (poly->g);
+      return 0;
     }
-  
-  return poly;
+  return 1;
 }
+
+#undef TYPE_STRING 
+#undef TYPE_MPZ 
+#undef TYPE_INT 
+#undef TYPE_ULONG 
+#undef TYPE_DOUBLE 
+#undef PARSE_MATCH 
+#undef PARSE_ERROR 
+#undef PARSE_NOMATCH 
+
+

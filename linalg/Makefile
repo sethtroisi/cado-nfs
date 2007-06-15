@@ -1,20 +1,29 @@
+include Makefile.local
+
+# Set default filenames/paths if not already set.
+GMP ?= /usr/local/
+GMPLIB ?= $(GMP)/lib/libgmp.a
+GMPINCLUDE ?= $(GMP)/include/
+
 CFLAGS=-O2 -g -DREV=\"`svnversion`\"
-LDFLAGS=$(GMP)/lib/libgmp.a
+LDFLAGS=../utils/libutils.a $(GMPLIB)
+INC=-I $(GMPINCLUDE) -I..
+
 
 procrels: procrels.c
-	gcc $(CFLAGS) -I.. $< $(LDFLAGS) -o $@
+	gcc $(CFLAGS) $(INC) $< $(LDFLAGS) -o $@
 
 linalg: linalg.c gauss.o
-	gcc $(CFLAGS) gauss.o -I.. $< $(LDFLAGS) -o $@
+	gcc $(CFLAGS) gauss.o $(INC) $< $(LDFLAGS) -o $@
 
 gauss.o: gauss.c
-	gcc -c $(CFLAGS) -DMULTI_ROW=3 -DNO_MAIN -I.. $< -o $@
+	gcc -c $(CFLAGS) -DMULTI_ROW=3 -DNO_MAIN $(INC) $< -o $@
 
 ratsqrt: ratsqrt.c
-	gcc $(CFLAGS) $< $(LDFLAGS) -o $@
+	gcc $(INC) $(CFLAGS) $< $(LDFLAGS) -o $@
 
 characters: characters.c gauss.o
-	gcc $(CFLAGS) -I.. $< gauss.o $(LDFLAGS) -o $@
+	gcc $(CFLAGS) $(INC) $< gauss.o $(LDFLAGS) -o $@
 
 all: procrels linalg ratsqrt characters
 

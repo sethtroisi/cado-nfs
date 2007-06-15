@@ -1,0 +1,87 @@
+function MyIsSqrt(x)
+  K := Parent(x);
+  f := DefiningPolynomial(K);
+  p := NextPrime(Random(2^50));
+  for i := 1 to 100 do
+    repeat
+      repeat 
+	p := NextPrime(p);
+	test1, fp := IsCoercible(PolynomialRing(GF(p)), f);
+	test2, xp := IsCoercible(PolynomialRing(GF(p)), Eltseq(x));
+      until test1 and test2;
+      test3, rp := HasRoot(fp);
+    until test3;
+    xx := Evaluate(xp, rp);
+    if not IsSquare(xx) then return false; end if;
+    print ".";
+  end for;
+  return true;
+end function;
+
+function TrySqrt(x, p, prec)
+  K := Parent(x);
+  f := DefiningPolynomial(K);
+  Qp := pAdicField(p,prec);
+  Qq := UnramifiedExtension(Qp, f);
+  xx := Qq!ChangeUniverse(Eltseq(x), Qp);
+  test, x := IsSquare(xx);
+  if not test then
+    error "not a square\n";
+  end if;
+  x := [ Integers(p^prec)!Integers()!t : t in Eltseq(x) ];
+  X := [];
+  for t in x do
+    test, y := RationalReconstruction(t);
+    if not test then return false, K!0; end if;
+    Append(~X, y);
+  end for;
+
+  return true, K!X;
+end function;
+
+function FindSuitableP(a);
+  K := Parent(a);
+  f := DefiningPolynomial(K);
+  p := 2;
+  repeat 
+    repeat
+      p := NextPrime(p);
+      test1, fp := IsCoercible(PolynomialRing(GF(p)), f);
+      test2, ap := IsCoercible(PolynomialRing(GF(p)), Eltseq(a));
+    until test1 and test2;
+  until IsIrreducible(fp);
+  return p;
+end function;
+
+
+PP<x> := PolynomialRing(Rationals());
+f := -3229755921225369*x^0-48676961965686*x^1-391249724*x^2+516873524*x^3;
+m := 51751964056271939;
+N := 71641520761751435455133616475667090434063332228247871795429;
+
+fd := LeadingCoefficient(f);
+K := NumberField(f);
+F := Read("/tmp/truc");
+ff := StringToIntegerSequence(F);
+
+v := ff[#ff];
+assert IsEven(v);
+Prune(~ff);
+
+a := K!ff;
+assert MyIsSqrt(a);
+
+p := FindSuitableP(a);
+prec := 1000;
+repeat 
+  printf "Trying sqrt with lifting at precision: %o bits\n", Log(2, p^prec);
+  test, b := TrySqrt(a, p, prec);
+
+assert (b^2 eq a);
+
+gra := Integers(N)!Evaluate(PP!Eltseq(b), m) * (Integers(N)!1/fd)^(v div 2);
+grr := Integers(N)!43616328120788494875715024148994093779088870876237256701377;
+GCD(Integers()!(gra-grr), N);
+GCD(Integers()!(gra+grr), N);
+
+

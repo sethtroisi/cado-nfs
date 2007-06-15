@@ -28,7 +28,7 @@ Makefile.local:
 	touch Makefile.local
 
 sieve: sieve.c fb.c ../polyfile.c config.h sieve_aux.h
-	gcc -I. -I.. -I$(GMPINCLUDE) $(CFLAGS) -o $@ -Wall -Wextra sieve.c fb.c ../polyfile.c $(GMPLIB) -lm
+	gcc -I. -I.. -I$(GMPINCLUDE) $(CFLAGS) -o $@ -Wall -Wextra sieve.c fb.c ../utils/libutils.a $(GMPLIB) -lm
 
 checknorms: checknorms.c
 	gcc -I. -I.. -I$(ECMINCLUDE) $(CFLAGS) -o $@ $< $(ECMLIB) $(GMPLIB) -lm

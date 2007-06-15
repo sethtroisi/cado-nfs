@@ -15,7 +15,7 @@
 #include "mod_ul.c"
 #include "sieve_aux.h"
 #include "basicnt.h"
-#include "polyfile.h"
+#include "../utils/utils.h"
 
 #define MIN(a,b) ((a)<(b)?(a):(b))
 #define MAX(a,b) ((a)>(b)?(a):(b))
@@ -927,7 +927,7 @@ sort_fbprimes (fbprime_t *primes, const unsigned int n)
 
 
 static void
-trialdiv_and_print (cado_poly *poly, const unsigned long b, 
+trialdiv_and_print (cado_poly poly, const unsigned long b, 
                     const sieve_report_t *reports_a, 
 		    const unsigned int reports_a_nr, 
 		    const sieve_report_t *reports_r, 
@@ -949,7 +949,7 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
 
   mpz_init (Fab);
   mpz_init (Gab);
-  for (i = 0; i <= (unsigned) (*poly)->degree; i++)
+  for (i = 0; i <= (unsigned) poly->degree; i++)
     mpz_init (scaled_poly_a[i]);
   mpz_init (scaled_poly_r[0]);
   mpz_init (scaled_poly_r[1]);
@@ -957,20 +957,20 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
   rdtscll (tsc1);
 
   /* Multiply f_i (and g_i resp.) by b^(deg-i) and put in scaled_poly */
-  mp_poly_scale (scaled_poly_a, (*poly)->f, (*poly)->degree, b, -1); 
-  mp_poly_scale (scaled_poly_r, (*poly)->g, 1, b, -1); 
+  mp_poly_scale (scaled_poly_a, poly->f, poly->degree, b, -1); 
+  mp_poly_scale (scaled_poly_r, poly->g, 1, b, -1); 
 
   /* Factor primes with projective roots on algebraic side. Prime factors
      go in the proj_primes_a[] list, the number of prime factors in 
      nr_proj_primes_a, the product is kept in proj_divisor_a. */
   nr_proj_primes_a = 0;
-  proj_divisor_a = mpz_gcd_ui (NULL, (*poly)->f[(*poly)->degree], b);
+  proj_divisor_a = mpz_gcd_ui (NULL, poly->f[poly->degree], b);
   trialdiv_slow (proj_divisor_a, proj_primes_a, &nr_proj_primes_a, 
 		 max_nr_proj_primes);
 
   /* Same for rational side */
   nr_proj_primes_r = 0;
-  proj_divisor_r = mpz_gcd_ui (NULL, (*poly)->g[1], b);
+  proj_divisor_r = mpz_gcd_ui (NULL, poly->g[1], b);
   trialdiv_slow (proj_divisor_r, proj_primes_r, &nr_proj_primes_r, 
 		 max_nr_proj_primes);
 
@@ -985,14 +985,14 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
       
           /* Do the algebraic side */
 	  nr_primes_a = 0;
-	  ok = trialdiv_one_side (Fab, scaled_poly_a, (*poly)->degree, a, b, 
+	  ok = trialdiv_one_side (Fab, scaled_poly_a, poly->degree, a, b, 
 				  primes_a, &nr_primes_a, max_nr_primes,
 				  proj_divisor_a, nr_proj_primes_a, 
 				  proj_primes_a, fba->fullfb, 
 				  reports_a + i,
 				  &cof_a_toolarge, &lp_a_toolarge, 
-				  (*poly)->lpba, (*poly)->mfba, 
-				  (*poly)->alambda, log_scale);
+				  poly->lpba, poly->mfba, 
+				  poly->alambda, log_scale);
 
 	  if (!ok) 
 	    goto nextreport;
@@ -1005,8 +1005,8 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
 				  proj_primes_r, fbr->fullfb, 
 				  reports_r + j,
 				  &cof_r_toolarge, &lp_r_toolarge, 
-				  (*poly)->lpbr, (*poly)->mfbr, 
-				  (*poly)->rlambda, log_scale);
+				  poly->lpbr, poly->mfbr, 
+				  poly->rlambda, log_scale);
 
 	  if (!ok) 
 	    goto nextreport;
@@ -1044,7 +1044,7 @@ trialdiv_and_print (cado_poly *poly, const unsigned long b,
     printf ("# Sum and number of maxp: %lu, %lu, avg: %.0f\n",
 	    sumprimes, nrprimes, (double)sumprimes / (double)nrprimes);
   
-  for (i = 0; i <= (unsigned)(*poly)->degree; i++)
+  for (i = 0; i <= (unsigned)poly->degree; i++)
     mpz_clear (scaled_poly_a[i]);
   mpz_clear (scaled_poly_r[0]);
   mpz_clear (scaled_poly_r[1]);
@@ -1081,7 +1081,7 @@ main (int argc, char **argv)
   unsigned int i;
   double dpoly_a[MAXDEGREE], dpoly_r[2];
   const double log_scale = 1. / log (2.); /* Lets use log_2() for a start */
-  cado_poly *cpoly;
+  cado_poly cpoly;
   char report_a_threshold, report_r_threshold;
 
 
@@ -1148,8 +1148,7 @@ main (int argc, char **argv)
       exit (EXIT_FAILURE);
     }
 
-  cpoly = read_polynomial (polyfilename);
-  if (cpoly == NULL)
+  if(!read_polynomial (cpoly, polyfilename))
     {
       fprintf (stderr, "Error reading polynomial file\n");
       exit (EXIT_FAILURE);
@@ -1158,17 +1157,17 @@ main (int argc, char **argv)
   {
       printf ("Read polynomial file %s\n", polyfilename);
       printf ("Polynomials are:\n");
-      mp_poly_print ((*cpoly)->f, (*cpoly)->degree, "f(x) =", 0);
+      mp_poly_print (cpoly->f, cpoly->degree, "f(x) =", 0);
       printf ("\n");
-      mp_poly_print ((*cpoly)->g, 1, "g(x) =", 0);
+      mp_poly_print (cpoly->g, 1, "g(x) =", 0);
       printf ("\n");
   }
 
 #ifdef PARI
-  mp_poly_print ((*cpoly)->f, (*cpoly)->degree, "f(x) =");
+  mp_poly_print (cpoly->f, cpoly->degree, "f(x) =");
   printf (" /* PARI */\n");
-  printf ("F(a,b) = f(a/b)*b^%d /* PARI */\n", (*cpoly)->degree);
-  mp_poly_print ((*cpoly)->g, 1, "g(x) =");
+  printf ("F(a,b) = f(a/b)*b^%d /* PARI */\n", cpoly->degree);
+  mp_poly_print (cpoly->g, 1, "g(x) =");
   printf (" /* PARI */\n");
   printf ("G(a,b) = g(a/b)*b /* PARI */\n");
 #endif
@@ -1190,7 +1189,7 @@ main (int argc, char **argv)
 
 
   /* Generate rational fb */
-  fbr->fullfb = fb_make_linear ((*cpoly)->g, (fbprime_t) (*cpoly)->rlim, 
+  fbr->fullfb = fb_make_linear (cpoly->g, (fbprime_t) cpoly->rlim, 
 				log_scale, verbose);
   if (fbr == NULL)
     {
@@ -1203,15 +1202,15 @@ main (int argc, char **argv)
   for (i = 0; i < SIEVE_BLOCKING; i++)
     fb_extract_small (fbr, CACHESIZES[i], i, verbose);
   
-  deg = (*cpoly)->degree;
+  deg = cpoly->degree;
   for (i = 0; i <= deg; i++)
-      dpoly_a[i] = mpz_get_d ((*cpoly)->f[i]);
-  dpoly_r[0] = mpz_get_d ((*cpoly)->g[0]);
-  dpoly_r[1] = mpz_get_d ((*cpoly)->g[1]);
-  report_a_threshold = (unsigned char) ((double)((*cpoly)->lpba) * log(2.0) * 
-					(*cpoly)->alambda * log_scale + 0.5);
-  report_r_threshold = (unsigned char) ((double)((*cpoly)->lpbr) * log(2.0) * 
-					(*cpoly)->rlambda * log_scale + 0.5);
+      dpoly_a[i] = mpz_get_d (cpoly->f[i]);
+  dpoly_r[0] = mpz_get_d (cpoly->g[0]);
+  dpoly_r[1] = mpz_get_d (cpoly->g[1]);
+  report_a_threshold = (unsigned char) ((double)(cpoly->lpba) * log(2.0) * 
+					cpoly->alambda * log_scale + 0.5);
+  report_r_threshold = (unsigned char) ((double)(cpoly->lpbr) * log(2.0) * 
+					cpoly->rlambda * log_scale + 0.5);
 
 #if 0
   if (verbose)
@@ -1237,7 +1236,7 @@ main (int argc, char **argv)
       if (verbose)
 	printf ("# Sieving line b = %lu\n", b);
 
-      proj_roots = mpz_gcd_ui (NULL, (*cpoly)->f[deg], b);
+      proj_roots = mpz_gcd_ui (NULL, cpoly->f[deg], b);
       if (verbose)
 	printf ("# Projective roots for b = %lu on algebtaic side are: %lu\n", 
 	        b, proj_roots);
@@ -1246,7 +1245,7 @@ main (int argc, char **argv)
 	  printf ("# Sieving algebraic side\n");
 
 #ifdef PARI
-      mp_poly_print ((*cpoly)->f, (*cpoly)->degree, "P(a,b) = ", 1);
+      mp_poly_print (cpoly->f, cpoly->degree, "P(a,b) = ", 1);
       printf (" /* PARI */\n");
 #endif
 
@@ -1260,7 +1259,7 @@ main (int argc, char **argv)
 	printf ("# There were sieve %d reports on the algebraic side\n",
 		reports_a_nr);
 
-      proj_roots = mpz_gcd_ui (NULL, (*cpoly)->g[1], b);
+      proj_roots = mpz_gcd_ui (NULL, cpoly->g[1], b);
       if (verbose)
 	printf ("# Projective roots for b = %lu on rational side are: %lu\n", 
 	        b, proj_roots);
@@ -1269,7 +1268,7 @@ main (int argc, char **argv)
 	  printf ("#Sieving rational side\n");
 
 #ifdef PARI
-      mp_poly_print ((*cpoly)->g, 1, "P(a,b) = ", 1);
+      mp_poly_print (cpoly->g, 1, "P(a,b) = ", 1);
       printf (" /* PARI */\n");
 #endif
 

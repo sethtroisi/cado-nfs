@@ -3,7 +3,7 @@
 #include <gmp.h>
 #include <assert.h>
 #include "cado.h"
-#include "polyfile.h"
+#include "utils/utils.h"
 
 /* #define DEBUG */
 
@@ -66,7 +66,7 @@ main (int argc, char **argv)
   int i, j, nlimbs;
   char str[1024];
   int depnum = 0;
-  cado_poly *pol;
+  cado_poly pol;
 #ifdef DEBUG
   unsigned long debug_exponent = 0;
 #endif
@@ -90,9 +90,10 @@ main (int argc, char **argv)
   kerfile = fopen(argv[2], "r");
   assert (kerfile != NULL);
 
-  pol = read_polynomial(argv[3]);
+  ret = read_polynomial(pol, argv[3]);
+  assert (ret);
   mpz_init(m);
-  mpz_neg(m, (*pol)->g[0]);
+  mpz_neg(m, pol->g[0]);
 
   gmp_fprintf(stderr, "m = %Zd\n", m);
 
@@ -204,7 +205,7 @@ main (int argc, char **argv)
       printf ("remainder has %d bits\n", la);
   }
 
-  mpz_mod(prd[0], prd[0], (*pol)->n);
+  mpz_mod(prd[0], prd[0], pol->n);
   gmp_printf("rational square root is %Zd\n", prd[0]);
 
   for (i = 0; i < lprd; i++)

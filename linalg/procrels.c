@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
-#include "relation.h"
+#include "utils/utils.h"
 
 
 // Data structure for one algebraic prime and for a table of those.
