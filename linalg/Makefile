@@ -9,6 +9,15 @@ CFLAGS=-O2 -g -DREV=\"`svnversion`\"
 LDFLAGS=../utils/libutils.a $(GMPLIB)
 INC=-I $(GMPINCLUDE) -I..
 
+all: procrels linalg characters
+
+
+Makefile.local:
+	echo "Makefile.local does not exist. It can be used to store paths \
+	to libraries etc.  Making an empty file to avoid warnings in \
+	future invocations of make."
+	touch Makefile.local
+
 
 procrels: procrels.c
 	gcc $(CFLAGS) $(INC) $< $(LDFLAGS) -o $@
@@ -19,13 +28,9 @@ linalg: linalg.c gauss.o
 gauss.o: gauss.c
 	gcc -c $(CFLAGS) -DMULTI_ROW=3 -DNO_MAIN $(INC) $< -o $@
 
-ratsqrt: ratsqrt.c
-	gcc $(INC) $(CFLAGS) $< $(LDFLAGS) -o $@
-
 characters: characters.c gauss.o
 	gcc $(CFLAGS) $(INC) $< gauss.o $(LDFLAGS) -o $@
 
-all: procrels linalg ratsqrt characters
 
 clean:
-	\rm procrels gauss.o linalg ratsqrt characters
+	\rm procrels gauss.o linalg characters

@@ -169,7 +169,7 @@ main (int argc, char **argv)
   accumulate_fast_end (prd, lprd);
 #endif
 
-  printf("size of prd = %d bits\n", mpz_sizeinbase(prd[0], 2));
+  fprintf(stderr, "size of prd = %d bits\n", mpz_sizeinbase(prd[0], 2));
 
   if (mpz_sgn (prd[0]) < 0)
     {
@@ -200,13 +200,14 @@ main (int argc, char **argv)
   {
     size_t la = mpz_sizeinbase (a, 2);
     if (la <= 100)
-      gmp_printf ("remainder is %Zd\n", a);
+      gmp_fprintf (stderr, "remainder is %Zd\n", a);
     else
-      printf ("remainder has %d bits\n", la);
+      fprintf (stderr, "remainder has %d bits\n", la);
   }
 
   mpz_mod(prd[0], prd[0], pol->n);
-  gmp_printf("rational square root is %Zd\n", prd[0]);
+  gmp_fprintf(stderr, "rational square root is %Zd\n", prd[0]);
+  gmp_printf("%Zd\n", prd[0]);
 
   for (i = 0; i < lprd; i++)
     mpz_clear (prd[i]);

@@ -182,8 +182,28 @@ int main(int argc, char **argv) {
   fprintf(stderr, "sizeinbit of leading term = %d\n", mpz_sizeinbase(prd->p->coeff[pol->degree-1], 2));
 
   for (i = 0; i < pol->degree; ++i) 
-    gmp_printf("%Zd\n", prd->p->coeff[i]);
+    gmp_printf("%Zx\n", prd->p->coeff[i]);
   printf("%d\n", prd->v);
+
+  {
+    FILE * formagma;
+    mpz_t m;
+
+    formagma = fopen("/tmp/formagma", "w");
+    if (formagma == NULL) {
+      fprintf(stderr, "can not create /tmp/formagma\n");
+      return 1;
+    }
+    fprintf(formagma, "f := ");
+    for (i = 0; i <= pol->degree; ++i)
+      gmp_fprintf(formagma, "%+Zd*x^%d", pol->f[i], i);
+    fprintf(formagma, ";\nm := ");
+    mpz_init(m);
+    mpz_neg(m, pol->g[0]);
+    gmp_fprintf(formagma, "%Zd;\nN := %Zd;\n", m, pol->n);
+    mpz_clear(m);
+    fclose(formagma);
+  }
 
   poly_free(F);
   poly_free(prd->p);

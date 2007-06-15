@@ -1,8 +1,21 @@
-#libgmp=$(GMP)/lib/libgmp.a
-libgmp=-lgmp
+include Makefile.local
 
-CFLAGS=-g
-LDFLAGS=../../utils/libutils.a $(libgmp)
+# Set default filenames/paths if not already set.
+GMP ?= /usr/local/
+GMPLIB ?= $(GMP)/lib/libgmp.a
+GMPINCLUDE ?= $(GMP)/include/
+
+
+CFLAGS=-g -I $(GMPINCLUDE) -DREV=\"`svnversion`\"
+LDFLAGS=../../utils/libutils.a $(GMPLIB)
+
+all: algsqrt ratsqrt
+
+Makefile.local:
+	echo "Makefile.local does not exist. It can be used to store paths \
+	to libraries etc.  Making an empty file to avoid warnings in \
+	future invocations of make."
+	touch Makefile.local
 
 algsqrt: algsqrt.c poly.o
 	gcc $(CFLAGS) -I../.. -o $@ $< poly.o $(LDFLAGS) 
@@ -10,6 +23,10 @@ algsqrt: algsqrt.c poly.o
 poly.o: poly.c
 	gcc $(CLFAGS) -c $< -o $@
 
+ratsqrt: ratsqrt.c
+	gcc $(CFLAGS) -I../.. -o $@ $< $(LDFLAGS)
+
+
 clean:
-	rm -f poly.o algsqrt
+	rm -f poly.o algsqrt ratsqrt
 

@@ -13,7 +13,6 @@ function MyIsSqrt(x)
     until test3;
     xx := Evaluate(xp, rp);
     if not IsSquare(xx) then return false; end if;
-    print ".";
   end for;
   return true;
 end function;
@@ -55,33 +54,44 @@ end function;
 
 
 PP<x> := PolynomialRing(Rationals());
+
+load "/tmp/formagma";
+/*
 f := -3229755921225369*x^0-48676961965686*x^1-391249724*x^2+516873524*x^3;
 m := 51751964056271939;
 N := 71641520761751435455133616475667090434063332228247871795429;
+*/
 
 fd := LeadingCoefficient(f);
 K := NumberField(f);
-F := Read("/tmp/truc");
-ff := StringToIntegerSequence(F);
+F := Split(Read("/tmp/algside"));
 
-v := ff[#ff];
+v := StringToInteger(F[#F]);
 assert IsEven(v);
-Prune(~ff);
+Prune(~F);
+
+ff := [StringToInteger(x, 16) :  x in F];
 
 a := K!ff;
 assert MyIsSqrt(a);
 
 p := FindSuitableP(a);
-prec := 1000;
+prec := Ceiling(1.2*Log(p, ff[1]));
 repeat 
   printf "Trying sqrt with lifting at precision: %o bits\n", Log(2, p^prec);
   test, b := TrySqrt(a, p, prec);
+  if test then
+    test := b^2 eq a;
+  end if;
+  prec *:= 2;
+until test;
 
-assert (b^2 eq a);
+gra := Integers(N)!Evaluate(PP!Eltseq(b), m) * (Integers(N)!(1/fd))^(v div 2);
 
-gra := Integers(N)!Evaluate(PP!Eltseq(b), m) * (Integers(N)!1/fd)^(v div 2);
-grr := Integers(N)!43616328120788494875715024148994093779088870876237256701377;
-GCD(Integers()!(gra-grr), N);
-GCD(Integers()!(gra+grr), N);
+F := StringToInteger(Read("/tmp/ratside"));
+grr := Integers(N)!F;
+g1 := GCD(Integers()!(gra-grr), N);
+g2 := GCD(Integers()!(gra+grr), N);
 
+g1, g2;
 
