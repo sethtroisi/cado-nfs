@@ -80,7 +80,7 @@ a := K!ff;
 assert MyIsSqrt(a);
 
 p := FindSuitableP(a);
-prec := Ceiling(1.2*Log(p, ff[1]));
+prec := Ceiling(1.2*Log(p, AbsoluteValue(ff[1])));
 repeat 
   printf "Trying sqrt with lifting at precision: %o bits\n", Log(2, p^prec);
   test, b := TrySqrt(a, p, prec);
