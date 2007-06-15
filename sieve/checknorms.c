@@ -9,7 +9,7 @@
 #include <math.h>
 #include "cado.h"
 #include "ecm.h"
-#include "polyfile.c"
+#include "utils/utils.h"
 
 /* number of Miller-Rabin tests in mpz_probab_prime_p */
 #define REPS 1
@@ -309,7 +309,7 @@ main (int argc, char *argv[])
 {
   int verbose = 0;
   char *polyfilename = NULL;
-  cado_poly *cpoly;
+  cado_poly cpoly;
   unsigned long tot_rels = 0;
   int mfbr = 0, mfba = 0, nb_files, i;
 
@@ -357,8 +357,7 @@ main (int argc, char *argv[])
       exit (EXIT_FAILURE);
     }
 
-  cpoly = read_polynomial (polyfilename);
-  if (cpoly == NULL)
+  if (!read_polynomial (cpoly, polyfilename))
     {
       fprintf (stderr, "Error reading polynomial file\n");
       exit (EXIT_FAILURE);
@@ -367,14 +366,14 @@ main (int argc, char *argv[])
   /* default residue bounds are those from file, if not overridden by
      command line parameters */
   if (mfbr == 0)
-    mfbr = cpoly[0]->mfbr;
+    mfbr = cpoly->mfbr;
   if (mfba == 0)
-    mfba = cpoly[0]->mfba;
+    mfba = cpoly->mfba;
 
   nb_files = argc - 1;
   while (argc > 1)
     {
-      tot_rels += checkrels (argv[1], cpoly[0], verbose, mfbr, mfba);
+      tot_rels += checkrels (argv[1], cpoly, verbose, mfbr, mfba);
       argc --;
       argv ++;
     }

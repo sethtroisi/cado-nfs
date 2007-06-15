@@ -27,11 +27,11 @@ Makefile.local:
 	future invocations of make."
 	touch Makefile.local
 
-sieve: sieve.c fb.c ../polyfile.c config.h sieve_aux.h
+sieve: sieve.c fb.c ../utils/libutils.a config.h sieve_aux.h
 	gcc -I. -I.. -I$(GMPINCLUDE) $(CFLAGS) -o $@ -Wall -Wextra sieve.c fb.c ../utils/libutils.a $(GMPLIB) -lm
 
 checknorms: checknorms.c
-	gcc -I. -I.. -I$(ECMINCLUDE) $(CFLAGS) -o $@ $< $(ECMLIB) $(GMPLIB) -lm
+	gcc -I. -I.. -I$(ECMINCLUDE) $(CFLAGS) -o $@ $< ../utils/libutils.a $(ECMLIB) $(GMPLIB) -lm
 
 config.h:
 	echo '#define HAVE_MSRH 1'   >  $@
