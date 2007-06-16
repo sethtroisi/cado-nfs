@@ -20,7 +20,6 @@ typedef struct {
   unsigned int nrows;
   unsigned int ncols;
   int *data;
-  double avg_wt;  // average nb of coeff per row.
 } sparse_mat_t;
 
 /* the following is adapted from linalg.c */
@@ -31,7 +30,6 @@ readmat (FILE *file, sparse_mat_t *mat)
   int alloced;
   int used = 0;
   int i, j;
-  double wt = 0;
 
   ret = fscanf (file, "%d %d", &(mat->nrows), &(mat->ncols));
   assert (ret == 2);
@@ -47,7 +45,6 @@ readmat (FILE *file, sparse_mat_t *mat)
     mat->data[used++] = b;
     ret = fscanf (file, "%d", &nc);
     assert (ret == 1);
-    wt += nc;
     if (used + nc + 3 >= alloced)
       {
         alloced += 1000;
@@ -64,8 +61,6 @@ readmat (FILE *file, sparse_mat_t *mat)
         assert (0 <= x && x < mat->ncols);
       }
   }
-  mat->avg_wt = wt / mat->nrows;
-  /* sort columns by increasing weight */
 }
 
 typedef struct
@@ -171,7 +166,6 @@ main (int argc, char *argv[])
   readmat (file, &mat);
   fprintf (stderr, "have read matrix: nrows = %d, ncols = %d\n",
            mat.nrows, mat.ncols);
-  fprintf (stderr, "average wt of rows is %f\n", mat.avg_wt);
 
   C = (column_t*) malloc (mat.ncols * sizeof (column_t));
 

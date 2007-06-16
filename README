@@ -51,6 +51,11 @@ cd ..
 linalg/procrels /tmp/c59.rels > /tmp/c59.mat_raw
 ## If excess is not positive, goto SIEVING_STEP with larger value
 ## for example ./sieve ... -1000000 1000000 1301 1400 >> /tmp/c59.rels_raw
+
+# reduce excess of relations (optional)
+linalg/matprune -keep 128 /tmp/c59.mat_raw > /tmp/c59.mat_raw2
+mv /tmp/c59.mat_raw2 /tmp/c59.mat_raw
+
 # sort matrix columns (not mandatory, but speeds up the linear algebra)
 linalg/matsort /tmp/c59.mat_raw > /tmp/c59.mat
 linalg/linalg /tmp/c59.mat > /tmp/c59.ker_raw

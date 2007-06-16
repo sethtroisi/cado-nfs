@@ -64,6 +64,8 @@ check_prime (mpz_t p, unsigned long sb, long a, unsigned long b)
 unsigned long
 factor (mpz_t p1, mpz_t p2, mpz_t norm, size_t lp)
 {
+  static unsigned long count_too_large_factor = 0;
+
   if (mpz_cmp_ui (norm, 1) == 0)
     return 0;
   else if (mpz_probab_prime_p (norm, REPS))
@@ -90,15 +92,15 @@ factor (mpz_t p1, mpz_t p2, mpz_t norm, size_t lp)
       /* we want p1 < 2^lp */
       if (mpz_sizeinbase (p1, 2) > lp) /* this should be rare */
         {
-          gmp_fprintf (stderr, "Warning, composite norm %Zd has too large prime factor %Zd\n", norm, p1);
+          if (count_too_large_factor++ < 10)
+            gmp_fprintf (stderr, "Warning, composite norm %Zd has too large prime factor %Zd\n", norm, p1);
           return 3;
         }
       mpz_divexact (p2, norm, p1);
       /* we also want p2 < 2^lp */
       if (mpz_sizeinbase (p2, 2) > lp)
         {
-          static unsigned long count = 0;
-          if (count++ < 10)
+          if (count_too_large_factor++ < 10)
             gmp_fprintf (stderr, "Warning, composite norm %Zd has too large factor %Zd\n", norm, p2);
           return 3;
         }
