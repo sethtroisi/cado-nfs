@@ -1,7 +1,7 @@
 
 // clear;
 
-idl_file := stem cat "/" cat stem cat ".ur_idl";
+idl_file := subdir cat "/" cat subdir cat ".ur_idl";
 
 
 

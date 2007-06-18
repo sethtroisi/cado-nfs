@@ -1,6 +1,6 @@
 
 // read the full matrix.
-CLF:=Open(Sprintf("%o/complete",stem),"r");
+CLF:=Open(Sprintf("%o/complete",subdir),"r");
 nerr:=0;
 lv:=[RSpace(Integers(),#ideals)|];
 lg:=[];

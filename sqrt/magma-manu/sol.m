@@ -1,13 +1,34 @@
 load "common.m";
 
-load "load_medium38.m";
+
+subdir:="medium38";
+pol:=x^3 - 344*x^2 + 1803946651167*x + 69891465304447036442357;
+N:=136199959553086505467611349916841014293;
+P:=100000000000000000000000000000000000000;
+fbsize:=3512;
 e:=23;
 block:=8;
 real_precision:=1000;
 
+/*
+ * subdir : all data files are loaded from this sub directory.
+ * pol : the polynomial (in x of X) defining the number field.
+ * N,P : the modulus we're working with, together with a root P of pol mod
+   N -- note that N and P are used in a way which seems odd for NFS, as
+   indeed we worked with another algorithm for the nfsforge project.
+ * fbsize : the number of rational primes that are considered. The
+   algebraic factor base is made of prime ideals up to Nthprime(fbsize).
+ * e (we're computing e-th roots), which must match the modulus of the
+   linear algebra computation that has been performed. 
+ * block -- the number of simultaneous kernel elements that have been
+   computed by the linear algebra step.
+ * real_precision (in bits). Precision used for the computation of the
+   logarithmic embeddings.
+*/
+
 load "setup.m";
 load "sol0.m";
-load "icheck.m";
+// load "icheck.m";
 load "sol_init.m";
 load "onestep.m";
 load "lifting.m";
@@ -131,6 +152,9 @@ for v in tg do
 	u:=mtg(v);
 	print mapN(u)*rootmodN^e;
 end for;
+
+
+print "modular algebraic root", rootmodN;
 
 
 procedure ucheck(c,root_in_NF)

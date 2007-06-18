@@ -4,7 +4,7 @@
 
 
 gens:=[];
-genfile:=stem cat "/clink.txt";
+genfile:=subdir cat "/clink.txt";
 FP:=Open(genfile,"r");
 while true do
 	s:=Gets(FP);
@@ -16,7 +16,9 @@ while true do
 	q:=u[1];
 	r:=u[2];
 	x:=u[3];
-	Append(~gens, r+q*x-X);
+	b:=1;
+	if #u eq 4 then b:=u[4]; end if;
+	Append(~gens, r+q*x-b*X);
 end while;
 delete FP;
 printf "Read %o generating elements from %o\n", #gens, genfile;
@@ -25,7 +27,7 @@ nrel:=#gens;
 
 W:=[];
 for i in [0..block-1] do
-	wfile:=Sprintf("%o/W0%o", stem, i);
+	wfile:=Sprintf("%o/W0%o", subdir, i);
 	printf "Reading %o\n", wfile;
 	SP:=Open(wfile, "r");
 	g:=[];
@@ -41,7 +43,7 @@ end for;
 /* also recover the result of M*W's */
 MW:=[];
 for i in [0..block-1] do
-	wfile:=Sprintf("%o/W0%o.mul", stem, i);
+	wfile:=Sprintf("%o/W0%o.mul", subdir, i);
 	printf "Reading %o\n", wfile;
 	SP:=Open(wfile, "r");
 	g:=[];
@@ -84,7 +86,7 @@ end for;
 
 print "Computing characters";
 
-cfilename := stem cat "/" cat stem cat ".characters";
+cfilename := subdir cat "/" cat subdir cat ".characters";
 
 /* First decide which characters are usable */
 
@@ -131,14 +133,14 @@ function charfile()
 	catch err
 		printf "Character file %o does not exist\n", cfilename;
 		print "Generating";
-		polyfilename:=stem cat "/" cat stem cat ".poly";
+		polyfilename:=subdir cat "/" cat subdir cat ".poly";
 		cmd:="make " cat polyfilename;
-		print cmd; System(cmd);
+		print cmd; Sysubdir(cmd);
 		flm:=Lcm([Degree(i[1]):i in Factorization(ideal<OK|e>)]);
 		cmd:=Sprintf("core2/characters %o/clink.txt %o %o < %o > %o",
-			stem, e, flm, polyfilename, cfilename);
-		print cmd; System(cmd);
-		System("sleep 1");
+			subdir, e, flm, polyfilename, cfilename);
+		print cmd; Sysubdir(cmd);
+		Sysubdir("sleep 1");
 	end try;
 	print "Hello, world";
 	CF:=Open(cfilename,"r");
@@ -148,18 +150,18 @@ end function;
 CF:=charfile();
 */
 
-if System("[ `hostname` = 'profiterolle' ]") eq 0 then
+if Sysubdir("[ `hostname` = 'profiterolle' ]") eq 0 then
 	machinename:="pentium3";
 else
 	machinename:="core2";
 end if;
 
-polyfilename:=stem cat "/" cat stem cat ".poly";
+polyfilename:=subdir cat "/" cat subdir cat ".poly";
 cmd:="make " cat polyfilename;
-print cmd; System(cmd);
+print cmd; Sysubdir(cmd);
 cmd:=Sprintf("if [ ! -f %o ] ; then %o/characters %o/clink.txt %o %o < %o > %o ; fi",
-	cfilename, machinename, stem, e, charstring, polyfilename, cfilename);
-print cmd; System(cmd);
+	cfilename, machinename, subdir, e, charstring, polyfilename, cfilename);
+print cmd; Sysubdir(cmd);
 
 CF:=Open(cfilename,"r");
 print "Reading characters file";

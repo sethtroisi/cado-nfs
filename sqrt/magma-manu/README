@@ -13,4 +13,6 @@ load "sol.m" ; suffices to show the thing in actions. It prints a set of
 (r+1) numbers in the end. If everything went well, the first of them
 must equal some of the other ones.
 
+see README.input for the required input format.
+
 Emmanuel, 20070614.

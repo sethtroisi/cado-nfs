@@ -7,8 +7,8 @@ else
 	relbatch cat:= ".";
 end if;
 
-outfn:=stem cat "/" cat relbatch cat "complete";
-relfn:=stem cat "/" cat relbatch cat "rel_idx";
+outfn:=subdir cat "/" cat relbatch cat "complete";
+relfn:=subdir cat "/" cat relbatch cat "rel_idx";
 
 /*
 procedure handle_one(q,r,x,~rr)

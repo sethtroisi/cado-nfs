@@ -2,7 +2,7 @@
 /* It seems somewhat necessary to verify integrity of ideal ordering. */
 
 print "Checking ideal ordering";
-CLF:=Open(Sprintf("%o/complete",stem),"r");
+CLF:=Open(Sprintf("%o/complete",subdir),"r");
 nerr:=0;
 for i in [1..200] do
 	s:=Gets(CLF);
