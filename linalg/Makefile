@@ -36,4 +36,4 @@ matprune: matprune.c
 	gcc $(CFLAGS) $(INC) $< $(LDFLAGS) -o $@
 
 clean:
-	\rm procrels gauss.o linalg characters matsort
+	\rm procrels gauss.o linalg characters matsort matprune
