@@ -28,41 +28,50 @@ Compile:
 Run an example:
 ===============
 
-cat <<EOF > /tmp/c59
+tmp=/tmp
+name=c59
+
+# (for csh addicts:)
+# setenv tmp /tmp
+# setenv name c59
+
+
+cat <<EOF > $tmp/$name
 n:71641520761751435455133616475667090434063332228247871795429
 EOF
 
 
-polyselect/polyselect -full -e 1000000 < /tmp/c59 > /tmp/c59.poly
+polyselect/polyselect -full -e 1000000 < $tmp/$name > $tmp/$name.poly
 
 
 cd sieve
 ## this has to be done by hand, sorry!
 ## and it depends on the polynomial found by polyselect (also the b-bound 1300
 ## below might be too small with different polynomials)
-echo "rootfind(-403598071832395153*x^0-6927763164081*x^1+285105030*x^2+517165560*x^3, 200000)" | gp -q -p 200000 rootfind.gp >/tmp/c59.roots
+
+./mkroots.sh $tmp/$name.poly > $tmp/$name.roots
 ## SIEVING_STEP
-./sieve -poly /tmp/c59.poly -fb /tmp/c59.roots -1000000 1000000 1 1300 > /tmp/c59.rels_raw
+./sieve -poly $tmp/$name.poly -fb $tmp/$name.roots -1000000 1000000 1 1300 > $tmp/$name.rels_raw
 # checking norms and splitting large cofactors
-./checknorms -poly /tmp/c59.poly /tmp/c59.rels_raw > /tmp/c59.rels
+./checknorms -poly $tmp/$name.poly $tmp/$name.rels_raw > $tmp/$name.rels
 cd ..
 
 # create matrix
-linalg/procrels /tmp/c59.rels > /tmp/c59.mat_raw
+linalg/procrels $tmp/$name.rels > $tmp/$name.mat_raw
 ## If excess is not positive, goto SIEVING_STEP with larger value
-## for example ./sieve ... -1000000 1000000 1301 1400 >> /tmp/c59.rels_raw
+## for example ./sieve ... -1000000 1000000 1301 1400 >> $tmp/$name.rels_raw
 
 # reduce excess of relations (optional)
-linalg/matprune -keep 128 /tmp/c59.mat_raw > /tmp/c59.mat_raw2
-mv /tmp/c59.mat_raw2 /tmp/c59.mat_raw
+linalg/matprune -keep 128 $tmp/$name.mat_raw > $tmp/$name.mat_raw2
+mv $tmp/$name.mat_raw2 $tmp/$name.mat_raw
 
 # sort matrix columns (not mandatory, but speeds up the linear algebra)
-linalg/matsort /tmp/c59.mat_raw > /tmp/c59.mat
-linalg/linalg /tmp/c59.mat > /tmp/c59.ker_raw
-linalg/characters /tmp/c59.mat /tmp/c59.ker_raw /tmp/c59.poly 20 40 > /tmp/c59.ker
+linalg/matsort $tmp/$name.mat_raw > $tmp/$name.mat
+linalg/linalg $tmp/$name.mat > $tmp/$name.ker_raw
+linalg/characters $tmp/$name.mat $tmp/$name.ker_raw $tmp/$name.poly 20 40 > $tmp/$name.ker
 
 
 cd sqrt/naive
-./tryonedep.sh -depnum 0 /tmp/c59.mat /tmp/c59.ker /tmp/c59.poly
+./tryonedep.sh -depnum 0 $tmp/$name.mat $tmp/$name.ker $tmp/$name.poly
 ## If gcd is trivial, try another dependency (-depnum 1, -depnum 2, ...)
 
