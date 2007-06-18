@@ -131,7 +131,10 @@ visit (int i, sparse_mat_t *mat)
     }
 }
 
-/* delete relations and primes in component of i */
+/* Delete relations and primes in component of i.
+   FIXME: if some wt[j] becomes 2, we should join the connected components
+   of the two remaining relations containing j.
+*/
 void
 delete (int i, sparse_mat_t *mat)
 {
@@ -148,7 +151,6 @@ delete (int i, sparse_mat_t *mat)
         {
           mat->rem_ncols --;
           k = mat->ad[j];
-          /* fprintf (stderr, "new discarded prime %d discards row %d\n", j, k); */
           if (mat->nodes[k] >= 0)
             delete (k, mat);
         }
@@ -170,6 +172,41 @@ compare (const void *v1, const void *v2)
     return c1->dif - c2->dif;
   else
     return c1->edg - c2->edg;
+}
+
+/* Compute connected components. Assume mat->nodes and mat->edges have
+   already been allocated, with mat->nrows entries each. */
+void
+compute_components (sparse_mat_t *mat)
+{
+  int i;
+
+  for (i = 0; i < mat->nrows; i++)
+    if (mat->nodes[i] >= 0)
+      mat->nodes[i] = 0;
+  /* we use nodes[i] for visited[i], since nodes[i] >= 1 */
+  mat->ncomps = 0;
+  for (i = 0; i < mat->nrows; i++)
+    if (mat->nodes[i] == 0)
+      {
+        visit (i, mat);
+        assert ((mat->edges[i] & 1) == 0);
+        mat->edges[i] >>= 1;
+        if (mat->ncomps >= mat->alloc)
+          {
+            mat->alloc += mat->alloc / 10 + 1;
+            mat->comps = (component_t*) realloc (mat->comps,
+                                            mat->alloc * sizeof (component_t));
+          }
+        mat->comps[mat->ncomps].ind = i;
+        mat->comps[mat->ncomps].dif = mat->edges[i] - mat->nodes[i];
+        mat->comps[mat->ncomps].edg = mat->edges[i];
+        mat->ncomps ++;
+      }
+  qsort (mat->comps, mat->ncomps, sizeof (component_t), compare);
+#ifdef DEBUG
+  fprintf (stderr, "Found %d connected components\n", mat->ncomps);
+#endif
 }
 
 /* We consider the graph whose vertices are rows of the matrix
@@ -211,39 +248,23 @@ compare (const void *v1, const void *v2)
 void
 prune (sparse_mat_t *mat, int keep)
 {
-  int i, t, excess;
+  int i, t, excess, old_nrows, old_ncols, mid;
   component_t *c;
 
   mat->nodes = (int*) malloc (mat->nrows * sizeof (int));
   mat->edges = (int*) malloc (mat->nrows * sizeof (int));
+
   for (i = 0; i < mat->nrows; i++)
     mat->nodes[i] = 0;
-  /* we use nodes[i] for visited[i], since nodes[i] >= 1 */
-  mat->ncomps = 0;
-  mat->alloc = mat->nrows / 10;
-  mat->comps = (component_t*) malloc (mat->alloc * sizeof (component_t));
-  for (i = 0; i < mat->nrows; i++)
-    if (mat->nodes[i] == 0)
-      {
-        visit (i, mat);
-        assert ((mat->edges[i] & 1) == 0);
-        mat->edges[i] >>= 1;
-        if (mat->ncomps >= mat->alloc)
-          {
-            mat->alloc += mat->alloc / 10 + 1;
-            mat->comps = (component_t*) realloc (mat->comps,
-                                            mat->alloc * sizeof (component_t));
-          }
-        mat->comps[mat->ncomps].ind = i;
-        mat->comps[mat->ncomps].dif = mat->edges[i] - mat->nodes[i];
-        mat->comps[mat->ncomps].edg = mat->edges[i];
-        mat->ncomps ++;
-      }
-  qsort (mat->comps, mat->ncomps, sizeof (component_t), compare);
-  fprintf (stderr, "Found %d connected components\n", mat->ncomps);
-  
+
+  mat->alloc = 0;
+  mat->comps = NULL;
+
+  compute_components (mat);
+
   excess = mat->nrows - mat->ncols;
-  while (mat->ncomps >0 && excess + mat->comps[mat->ncomps - 1].dif >= keep)
+  mid = (excess + keep) / 2;
+  while (mat->ncomps > 0 && excess + mat->comps[mat->ncomps - 1].dif >= keep)
     {
       t = mat->ncomps - 1;
       c = mat->comps + t;
@@ -251,12 +272,23 @@ prune (sparse_mat_t *mat, int keep)
       /* Warning: this component might already have been deleted */
       if (mat->nodes[i] >= 0) /* it was not deleted */
         {
-          fprintf (stderr, "Removing component %d with %d nodes and %d edges\n",
-                   i, c->edg - c->dif, c->edg);
+          old_nrows = mat->rem_nrows;
+          old_ncols = mat->rem_ncols;
           delete (i, mat);
-          excess += c->dif;
+#ifdef DEBUG
+          fprintf (stderr, "Removed component %d with %d nodes and %d edges\n",
+                   i, old_nrows - mat->rem_nrows, old_ncols - mat->rem_ncols);
           fprintf (stderr, "Remains %d relations and %d primes (excess %d)\n",
               mat->rem_nrows, mat->rem_ncols, mat->rem_nrows - mat->rem_ncols);
+#endif
+          excess += c->dif;
+          if (excess <= mid)
+            {
+              fprintf (stderr, "Remains %d relations and %d primes (excess %d)\n",
+              mat->rem_nrows, mat->rem_ncols, mat->rem_nrows - mat->rem_ncols);
+              compute_components (mat);
+              mid = (excess + keep) / 2;
+            }
         }
       mat->ncomps = t;
     }
