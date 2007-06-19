@@ -1075,7 +1075,7 @@ main (int argc, char **argv)
   factorbase_t fba, fbr;
   char *fbfilename = NULL, *polyfilename = NULL;
   unsigned char *sievearray;
-  unsigned int reports_a_len, reports_a_nr, reports_r_len, reports_r_nr;
+  unsigned int reports_a_len, reports_a_nr, reports_r_len = 0, reports_r_nr;
   int verbose = 0;
   unsigned int deg;
   unsigned int i;
@@ -1102,6 +1102,12 @@ main (int argc, char **argv)
       else if (argc > 2 && strcmp (argv[1], "-poly") == 0)
 	{
 	  polyfilename = argv[2];
+	  argc -= 2;
+	  argv += 2;
+	}
+      else if (argc > 2 && strcmp (argv[1], "-reports_r_len") == 0)
+	{
+	  reports_r_len = atoi (argv[2]);
 	  argc -= 2;
 	  argv += 2;
 	}
@@ -1220,7 +1226,8 @@ main (int argc, char **argv)
 
   sievearray = (unsigned char *) malloc ((amax - amin + 1) * sizeof (char));
   reports_a_len = ((amax - amin + 1)) / 5 + 1000;
-  reports_r_len = ((amax - amin + 1)) / 2 + 1000;
+  if (reports_r_len == 0) /* if not given on command line */
+    reports_r_len = ((amax - amin + 1)) / 2 + 1000;
 
   reports_a = (sieve_report_t *) malloc (reports_a_len * 
 					 sizeof (sieve_report_t));
