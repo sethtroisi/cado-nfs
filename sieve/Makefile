@@ -8,7 +8,8 @@
 
 include Makefile.local
 
-CFLAGS=-O2 -g -Wall -W -DREV=\"`svnversion`\"
+OPTFLAGS ?= -O2
+CFLAGS=$(OPTFLAGS) -g -Wall -W -DREV=\"`svnversion`\"
 LDFLAGS=
 
 # Set default filenames/paths if not already set.
@@ -27,7 +28,7 @@ Makefile.local:
 	future invocations of make."
 	touch Makefile.local
 
-sieve: sieve.c fb.c ../utils/libutils.a config.h sieve_aux.h
+sieve: sieve.c fb.c ../utils/libutils.a ../mod_ul.c config.h sieve_aux.h
 	gcc -I. -I.. -I$(GMPINCLUDE) $(CFLAGS) -o $@ -Wall -Wextra sieve.c fb.c ../utils/libutils.a $(GMPLIB) -lm
 
 checknorms: checknorms.c
