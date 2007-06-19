@@ -125,8 +125,10 @@ coprime (long a, unsigned long b, mpz_t t, mpz_t u)
   return mpz_cmp_ui (t, 1) == 0;
 }
 
+/* primes[0]..primes[nprimes-1] are the small primes omitted in relations */
 unsigned long
-checkrels (char *f, cado_poly cpoly, int verbose, size_t mfbr, size_t mfba)
+checkrels (char *f, cado_poly cpoly, int verbose, size_t mfbr, size_t mfba,
+           unsigned long *primes, unsigned long nprimes)
 {
   FILE *fp;
   unsigned long b, nb, mfba_reports = 0, mfbr_reports = 0;
@@ -138,6 +140,7 @@ checkrels (char *f, cado_poly cpoly, int verbose, size_t mfbr, size_t mfba)
   long a;
   int c, ok;
   mpz_t norm, p1, p2;
+  unsigned long i;
 
   mpz_init (norm);
   mpz_init (p1);
@@ -202,6 +205,13 @@ checkrels (char *f, cado_poly cpoly, int verbose, size_t mfbr, size_t mfba)
 	    break;
 	  len += sprintf (s + len, "%c", c);
 	}
+      /* divide by small primes */
+      for (i = 0; i < nprimes; i++)
+        while (mpz_divisible_ui_p (norm, primes[i]))
+          {
+            len += sprintf (s + len, ",%lx", primes[i]);
+            mpz_divexact_ui (norm, norm, primes[i]);
+          }
       /* check the residue is smaller than 2^mfbr */
       if (mpz_sizeinbase (norm, 2) > mfbr)
 	{
@@ -256,6 +266,13 @@ checkrels (char *f, cado_poly cpoly, int verbose, size_t mfbr, size_t mfba)
 	    break;
           len += sprintf (s + len, "%c", c);
 	}
+      /* divide by small primes */
+      for (i = 0; i < nprimes; i++)
+        while (mpz_divisible_ui_p (norm, primes[i]))
+          {
+            len += sprintf (s + len, ",%lx", primes[i]);
+            mpz_divexact_ui (norm, norm, primes[i]);
+          }
       /* check the residue is smaller than 2^mfba */
       if (nb == 3)
 	nb = 3; /* relations already discarded by rational side */
@@ -314,6 +331,10 @@ main (int argc, char *argv[])
   cado_poly cpoly;
   unsigned long tot_rels = 0;
   int mfbr = 0, mfba = 0, nb_files, i;
+  unsigned long tdmax = 1; /* bound for trial division */
+  unsigned long *primes; /* small primes omitted in relations */
+  int nprimes;
+  unsigned long p;
 
   fprintf (stderr, "%s.r%s", argv[0], REV);
   for (i = 1; i < argc; i++)
@@ -346,9 +367,15 @@ main (int argc, char *argv[])
 	  argc -= 2;
 	  argv += 2;
 	}
+      else if (argc > 2 && strcmp (argv[1], "-t") == 0)
+	{
+	  tdmax = atoi (argv[2]);
+	  argc -= 2;
+	  argv += 2;
+	}
       else 
 	{
-	  fprintf (stderr, "Usage: %s [-v] [-mfbr <n>] -poly <file> rels1 ... relsn\n", argv[0]);
+	  fprintf (stderr, "Usage: %s [-v] [-mfbr <n>] [-mfba <n>] [-t <n>] -poly <file> rels1 ... relsn\n", argv[0]);
 	  exit (EXIT_FAILURE);
 	}
     }
@@ -372,13 +399,32 @@ main (int argc, char *argv[])
   if (mfba == 0)
     mfba = cpoly->mfba;
 
+  /* compute small primes */
+  primes = (unsigned long*) malloc (tdmax * sizeof(unsigned long));
+  nprimes = 0;
+  for (p = 2; p < tdmax; p += 1 + (p & 1))
+    {
+      for (i = 0; (i < nprimes) && (primes[i] * primes[i] <= p); i++)
+        if (p % primes[i] == 0)
+          {
+            i = nprimes;
+            break;
+          }
+      if (nprimes == 0 || i < nprimes)
+        primes[nprimes++] = p;
+    }
+  primes = realloc (primes, nprimes * sizeof(unsigned long));
+
   nb_files = argc - 1;
   while (argc > 1)
     {
-      tot_rels += checkrels (argv[1], cpoly, verbose, mfbr, mfba);
+      tot_rels += checkrels (argv[1], cpoly, verbose, mfbr, mfba, primes,
+                             nprimes);
       argc --;
       argv ++;
     }
+
+  free (primes);
 
   if (nb_files > 1)
     fprintf (stderr, "All input files: output %lu relations\n", tot_rels);
