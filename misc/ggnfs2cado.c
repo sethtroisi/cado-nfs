@@ -474,6 +474,9 @@ main (int argc, char *argv[])
 	}
     }
 
+  fprintf (stderr, "Print relations from ggnfs format to %s format\n",
+           (format == OUTPUT_CADO) ? "cado" : "Franke-Kleinjung");
+
   if (FB == NULL || argc <= 1)
     {
       fprintf (stderr, "Usage: %s [-fk] [-v] -fb <file> rels.bin.0 rels.bin.1 ...\n", argv[0]);
