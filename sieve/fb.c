@@ -36,9 +36,26 @@ fb_print_entry (factorbase_degn_t *fb)
   int i;
   printf ("Prime " FBPRIME_FORMAT " with rounded log %d and roots ", 
 	  fb->p, (int) fb->plog);
-  for (i = 0; i + 1 < fb->nr_roots; i++)
-    printf (FBROOT_FORMAT ", ", fb->roots[i]);
-  printf (FBROOT_FORMAT "\n", fb->roots[i]);
+  for (i = 0; i < fb->nr_roots; i++)
+    {
+#ifdef REDC_ROOTS
+      modulus m;
+      residue r;
+
+      mod_initmod_ul (m, fb->p);
+      mod_init (r, m);
+      mod_set_ul (r, (unsigned long) (fb->roots[i]), m);
+      mod_frommontgomery (r, r, fb->invp , m);
+      printf ("%lu", mod_get_ul (r, m));
+      mod_clear (r, m);
+      mod_clearmod (m);
+#else
+      printf (FBROOT_FORMAT, fb->roots[i]);
+#endif
+      if (i + 1 < fb->nr_roots)
+	printf (", ");
+    }
+  printf ("\n");
 }
 
 
@@ -149,8 +166,6 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
       mod_mul (r2, r1, r2, m); /* r2 = g0 / g1 */
       mod_neg (r2, r2, m); /* r2 = - g0 / g1 */
 
-      fb_cur->roots[0] = mod_get_ul (r2, m);
-
 #ifdef WANT_ASSERT
       {
 	residue r3;
@@ -162,6 +177,15 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
 	mod_clear (r3, m);
       }
 #endif
+
+#ifdef REDC_ROOTS
+      if (p % 2 != 0)
+	{
+	  fb_cur->invp = - mod_invmodlong (m);
+	  mod_tomontgomery (r2, r2, m);
+	}
+#endif
+      fb_cur->roots[0] = mod_get_ul (r2, m);
 
       mod_clear (r1, m);
       mod_clear (r2, m);
@@ -300,9 +324,29 @@ fb_read (const char *filename, const double log_scale, const int verbose)
       /* Read roots */
       while (ok && *lineptr != '\0' && fb_cur->nr_roots <= MAXDEGREE)
 	{
-	  fbroot_t r = strtoul (lineptr, &lineptr, 10);
-	  fb_cur->roots[fb_cur->nr_roots++] = r;
-	  if (r >= fb_cur->p) /* Check if root is properly reduced */
+	  fbroot_t root = strtoul (lineptr, &lineptr, 10);
+#ifdef REDC_ROOTS
+	  if (p % 2 != 0)
+	    {
+	      modulus m;
+	      residue r;
+	      mod_initmod_ul (m, fb_cur->p);
+	      mod_init (r, m);
+	      mod_set_ul (r, root, m);
+	      
+	      fb_cur->invp = - mod_invmodlong (m);
+	      mod_tomontgomery (r, r, m);
+	      fb_cur->roots[fb_cur->nr_roots++] = mod_get_ul (r, m);
+
+	      mod_clear (r, m);
+	      mod_clearmod (m);
+	    }
+	  else
+	    fb_cur->roots[fb_cur->nr_roots++] = root;
+#else
+	  fb_cur->roots[fb_cur->nr_roots++] = root;
+#endif
+	  if (root >= fb_cur->p) /* Check if root is properly reduced */
 	    ok = 0;
 	  if (*lineptr != '\0' && *lineptr != ',')
 	    ok = 0;
@@ -324,6 +368,18 @@ fb_read (const char *filename, const double log_scale, const int verbose)
 	  continue;
 	}
       
+#ifdef REDC_ROOTS
+      /* Compute invp */
+      if (p % 2 != 0)
+	{
+	  modulus m;
+	  
+	  mod_initmod_ul (m, p);
+	  fb_cur->invp = - mod_invmodlong (m);
+	  mod_clearmod (m);
+	}
+#endif
+
       fb_new = fb_add_to (fb, &fbsize, &fballoc, allocblocksize, fb_cur);
       if (fb_new == NULL)
 	{

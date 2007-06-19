@@ -12,7 +12,7 @@ Create a config.h file with contents like
 /* Number of blocking levels for small factor base primes, should
    correspond to cache levels. Sieving will be done in SIEVE_BLOCKING + 1
    passes: SIEVE_BLOCKING passes updating directly, and one pass with
-   bucket sorting. */
+   bucket sorting. Bucket sorting not implementest atm. */
 #define SIEVE_BLOCKING 1
 static const unsigned long CACHESIZES[SIEVE_BLOCKING] = {16384};
 

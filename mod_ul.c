@@ -44,8 +44,13 @@
 #define mod_sub_ul           modul_sub_ul
 #define mod_neg              modul_neg
 #define mod_mul              modul_mul
+#define mod_tomontgomery     modul_tomontgomery
+#define mod_frommontgomery   modul_frommontgomery
+#define mod_mulredc          modul_mulredc
+#define mod_mulredc_ul       modul_mulredc_ul
 #define mod_div2             modul_div2
 #define mod_div3             modul_div3
+#define mod_invmodlong       modul_invmodlong
 #define mod_inv              modul_inv
 #define mod_jacobi           modul_jacobi
 
@@ -205,45 +210,155 @@ modul_sub (residueul r, residueul a, residueul b, modulusul m)
 #endif
 }
 
+static inline void
+mul_ul_ul_2ul (unsigned long *r1, unsigned long *r2, const unsigned long a,
+               const unsigned long b)
+{
+#if defined(__x86_64__) && defined(__GNUC__)
+  __asm__ ( "mulq %3"
+	    : "=a" (*r1), "=d" (*r2)
+	    : "%0" (a), "rm" (b)
+	    : "cc");
+#elif defined(__i386__) && defined(__GNUC__)
+  __asm__ ( "mull %3"
+	    : "=a" (*r1), "=d" (*r2)
+	    : "%0" (a), "rm" (b)
+	    : "cc");
+#else
+  abort ();
+#endif
+}
+
+/* Integer division of a two longint value by a longint divisor. Returns
+   quotient and remainder. */
+
+static inline void
+div_2ul_ul_ul (unsigned long *q, unsigned long *r, const unsigned long a1,
+               const unsigned long a2, const unsigned long b)
+{
+#if defined(__x86_64__) && defined(__GNUC__)
+  __asm__ ( "divq %4"
+            : "=a" (*q), "=d" (*r)
+            : "0" (a1), "1" (a2), "rm" (b)
+            : "cc");
+#elif defined(__i386__) && defined(__GNUC__)
+  __asm__ ( "divl %4"
+            : "=a" (*q), "=d" (*r)
+            : "0" (a1), "1" (a2), "rm" (b)
+            : "cc");
+#else
+  abort ();
+#endif
+}
+
+/* Integer division of a two longint value by a longint divisor. Returns
+   only remainder. */
+
+static inline void
+div_2ul_ul_ul_r (unsigned long *r, unsigned long a1,
+                 const unsigned long a2, const unsigned long b)
+{
+#if defined(__x86_64__) && defined(__GNUC__)
+  __asm__ ( "divq %3"
+            : "+a" (a1), "=d" (*r)
+            : "1" (a2), "rm" (b)
+            : "cc");
+#elif defined(__i386__) && defined(__GNUC__)
+  __asm__ ( "divl %3"
+            : "+a" (a1), "=d" (*r)
+            : "1" (a2), "rm" (b)
+            : "cc");
+#else
+  abort ();
+#endif
+}
+
 __GNUC_ATTRIBUTE_UNUSED__
 static inline void
 modul_mul (residueul r, const residueul a, const residueul b, 
            const modulusul m)
 {
-  unsigned long _a = a[0], _r;
+  unsigned long t1, t2, dummy;
 #if defined(MODTRACE)
   printf ("mulmod_ul: a = %lu, b = %lu", a[0], b[0]);
 #endif
-#if defined(__x86_64__) && defined(__GNUC__)
-  __asm__ ( "mulq %2\n\t"
-	    "divq %3"
-	    : "=&d" (_r), "+a" (_a)
-	    : "rm" (b[0]), "rm" (m[0])
-	    : "cc");
-#elif defined(__i386__) && defined(__GNUC__)
-  __asm__ ( "mull %2\n\t"
-	    "divl %3"
-	    : "=&d" (_r), "+a" (_a)
-	    : "rm" (b[0]), "rm" (m[0])
-	    : "cc");
-#else
-  if (sizeof (unsigned long long) >= 2 * sizeof (unsigned long))
-    {
-      unsigned long long t;
-      t = (unsigned long long) a[0] * (unsigned long long) b[0];
-      _r = t % (unsigned long long) m[0];
-    }
-  else
-    {
-      /* Write a long product in four multiplies. TBD. */
-      abort();
-    }
-#endif
+  
+  mul_ul_ul_2ul (&t1, &t2, a[0], b[0]);
+  div_2ul_ul_ul (&dummy, r, t1, t2, m[0]);
+  
 #if defined(MODTRACE)
   printf (", r = %lu\n", _r);
 #endif
-  r[0] = _r;
 }
+
+__GNUC_ATTRIBUTE_UNUSED__
+static inline void
+modul_tomontgomery (residueul r, const residueul a, const modulusul m)
+{
+  div_2ul_ul_ul_r (r, 0UL, a[0], m[0]);
+}
+
+__GNUC_ATTRIBUTE_UNUSED__
+static inline void
+modul_frommontgomery (residueul r, const residueul a, const unsigned long invm,
+                      const modulusul m)
+{
+  unsigned long tlow, thigh;
+  mul_ul_ul_2ul (&tlow, &thigh, a[0], invm);
+  mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
+  r[0] = thigh + (a != 0);
+}
+
+__GNUC_ATTRIBUTE_UNUSED__
+static inline void
+modul_mulredc (residueul r, const residueul a, const residueul b,
+               const unsigned long invm, const modulusul m)
+{
+  unsigned long plow, phigh, tlow, thigh;
+#if 1 || defined(MODTRACE)
+  printf ("(%lu * %lu / 2^%ld)", 
+          a[0], b[0], 8 * sizeof(unsigned long));
+#endif
+  
+  mul_ul_ul_2ul (&plow, &phigh, a[0], b[0]);
+  mul_ul_ul_2ul (&tlow, &thigh, plow, invm);
+  mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
+  /* Let b = 2^wordsize. We know (phigh * b + plow) + (thigh * b + tlow) 
+     == 0 (mod b) so either plow == tlow == 0, or plow !=0 and tlow != 0. 
+     In the former case we want phigh + thigh + 1, in the latter 
+     phigh + thigh */
+  /* Since a <= p-1 and b <= p-1, and p <= b-1, a*b <= b^2 - 4*b + 4, so
+     adding 1 to phigh is safe */
+  phigh += (plow != 0);
+  r[0] = (phigh >= m[0] - thigh) ? (phigh - (m[0] - thigh)) : (phigh + thigh);
+  
+#if 1 || defined(MODTRACE)
+  printf (" == %lu /* PARI */ \n", r[0]);
+#endif
+}
+                         
+__GNUC_ATTRIBUTE_UNUSED__
+static inline void
+modul_mulredc_ul (residueul r, const residueul a, const unsigned long b,
+                  const unsigned long invm, const modulusul m)
+{
+  unsigned long plow, phigh, tlow, thigh;
+#if 1 || defined(MODTRACE)
+  printf ("(%lu * %lu / 2^%ld)", 
+          a[0], b, 8 * sizeof(unsigned long));
+#endif
+  
+  mul_ul_ul_2ul (&plow, &phigh, a[0], b);
+  mul_ul_ul_2ul (&tlow, &thigh, plow, invm);
+  mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
+  phigh += (plow != 0);
+  r[0] = (phigh >= m[0] - thigh) ? (phigh - (m[0] - thigh)) : (phigh + thigh);
+  
+#if 1 || defined(MODTRACE)
+  printf (" == %lu /* PARI */ \n", r[0]);
+#endif
+}
+                         
 
 __GNUC_ATTRIBUTE_UNUSED__
 static inline void
@@ -277,6 +392,31 @@ modul_div3 (residueul r, residueul a, modulusul m)
   assert (t[0] == a[0]);
 #endif
 }
+
+
+/* Compute 1/t (mod 2^wordsize) */
+/* FIXME: not optimised yet */
+__GNUC_ATTRIBUTE_UNUSED__
+static unsigned long
+modul_invmodlong (modulusul m)
+{
+  unsigned long p, r; 
+  int i;
+
+  ASSERT (m[0] % 2 != 0);
+  
+  r = 1UL; p = m[0];
+  for (i = 1; p != 1UL; i++) /* Invariant: r * t == p (mod 2^wordsize) */
+    if ((1UL << i) & p)
+      {
+        r += 1UL << i;
+        p += m[0] << i;
+      }
+
+  ASSERT (r * m[0] == 1UL);
+  return r;
+}
+
 
 /* Put 1/s (mod t) in r and return 1 if s is invertible, 
    or return 0 if s is not invertible */

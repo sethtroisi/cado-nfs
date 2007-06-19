@@ -4,8 +4,11 @@
 #include "cado.h"
 
 static inline fbroot_t
-first_sieve_loc (const fbprime_t p, const fbroot_t r, const fbroot_t amin_p, 
-                 const unsigned long b, const int odd)
+first_sieve_loc (const fbprime_t p, const fbroot_t r, 
+#ifdef REDC_ROOTS
+                 const unsigned long invm,
+#endif
+                 const fbroot_t amin_p, const unsigned long b, const int odd)
 {
   modulus m;
   residue r1, r2;
@@ -26,12 +29,13 @@ first_sieve_loc (const fbprime_t p, const fbroot_t r, const fbroot_t amin_p,
   mod_initmod_ul (m, p); /* Most of the mod_*() calls are no-ops */
   mod_init (r1, m);
   mod_init (r2, m);
-  mod_set_ul (r1, b, m); /* Modular reduction */
   mod_set_ul_reduced (r2, r, m);
-  mod_mul (r1, r1, r2, m); /* Multiply and mod reduction. If we keep 
-    r_i in Montgomery representation, a single mul/REDC will compute 
-    the product, reduce it mod p and return it as an integer. However,
-    this requires storing p^{-1} (mod 2^32) in the factor base. */
+#ifdef REDC_ROOTS
+  modul_mulredc_ul (r1, r2, b, invm, m);
+#else
+  mod_set_ul (r1, b, m); /* Modular reduction */
+  mod_mul (r1, r1, r2, m); /* Multiply and mod reduction. */
+#endif
   mod_sub_ul (r1, r1, amin_p, m);
   if (odd)
     mod_div2 (r1, r1, m);
