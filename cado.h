@@ -72,10 +72,12 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
                       {155, 60}, {ULONG_MAX, 80}}
 #define DEFAULT_MFBA_LENGTH DEFAULT_MFBR_LENGTH
 
-/* default lambda values */
-#define DEFAULT_RLAMBDA {{70, 1.5}, {90, 1.7}, {100, 2.5}, {130, 2.7}, \
-                         {ULONG_MAX, 2.7}}
-#define DEFAULT_RLAMBDA_LENGTH 5
+/* default lambda values: after subtracting the approximate logarithms of
+   factor base primes, we keep the sieve reports whose base-2 logarithm is
+   less than [ra]lambda * lpb[ra]. */
+#define DEFAULT_RLAMBDA {{70, 1.0}, {80, 1.1}, {90, 1.3}, {100, 1.8}, \
+                         {110, 2.1}, {120, 2.4}, {ULONG_MAX, 2.7}}
+#define DEFAULT_RLAMBDA_LENGTH 7
 #define DEFAULT_ALAMBDA DEFAULT_RLAMBDA
 #define DEFAULT_ALAMBDA_LENGTH DEFAULT_RLAMBDA_LENGTH
 

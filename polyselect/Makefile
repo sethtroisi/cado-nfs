@@ -6,7 +6,7 @@ GMPLIB ?= $(GMP)/lib/libgmp.a
 GMPINCLUDE ?= $(GMP)/include/
 
 
-CFLAGS=-O2 -g -I$(GMPINCLUDE) -DREV=\"`svnversion`\"
+CFLAGS=-O2 -g -I$(GMPINCLUDE) -DREV=\"`svnversion .`\"
 LDFLAGS=../utils/libutils.a $(GMPLIB) -lm
 
 polyselect: polyselect.c ../cado.h
