@@ -23,6 +23,8 @@ void 		fb_extract_small (factorbase_t, const unsigned int, const int,
 void		fb_initloc_small (factorbase_small_inited_t *,
                                   factorbase_small_t *, const long, 
                                   const unsigned long, const int);
+int             fb_check (factorbase_t, cado_poly, int);
+
 
 /* Some inlined functions which need to be fast */
   

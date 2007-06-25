@@ -38,20 +38,7 @@ fb_print_entry (factorbase_degn_t *fb)
 	  fb->p, (int) fb->plog);
   for (i = 0; i < fb->nr_roots; i++)
     {
-#ifdef REDC_ROOTS
-      modulus m;
-      residue r;
-
-      mod_initmod_ul (m, fb->p);
-      mod_init (r, m);
-      mod_set_ul (r, (unsigned long) (fb->roots[i]), m);
-      mod_frommontgomery (r, r, fb->invp , m);
-      printf ("%lu", mod_get_ul (r, m));
-      mod_clear (r, m);
-      mod_clearmod (m);
-#else
       printf (FBROOT_FORMAT, fb->roots[i]);
-#endif
       if (i + 1 < fb->nr_roots)
 	printf (", ");
     }
@@ -180,10 +167,7 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
 
 #ifdef REDC_ROOTS
       if (p % 2 != 0)
-	{
-	  fb_cur->invp = - mod_invmodlong (m);
-	  mod_tomontgomery (r2, r2, m);
-	}
+	fb_cur->invp = - mod_invmodlong (m);
 #endif
       fb_cur->roots[0] = mod_get_ul (r2, m);
 
@@ -325,27 +309,7 @@ fb_read (const char *filename, const double log_scale, const int verbose)
       while (ok && *lineptr != '\0' && fb_cur->nr_roots <= MAXDEGREE)
 	{
 	  fbroot_t root = strtoul (lineptr, &lineptr, 10);
-#ifdef REDC_ROOTS
-	  if (p % 2 != 0)
-	    {
-	      modulus m;
-	      residue r;
-	      mod_initmod_ul (m, fb_cur->p);
-	      mod_init (r, m);
-	      mod_set_ul (r, root, m);
-	      
-	      fb_cur->invp = - mod_invmodlong (m);
-	      mod_tomontgomery (r, r, m);
-	      fb_cur->roots[fb_cur->nr_roots++] = mod_get_ul (r, m);
-
-	      mod_clear (r, m);
-	      mod_clearmod (m);
-	    }
-	  else
-	    fb_cur->roots[fb_cur->nr_roots++] = root;
-#else
 	  fb_cur->roots[fb_cur->nr_roots++] = root;
-#endif
 	  if (root >= fb_cur->p) /* Check if root is properly reduced */
 	    ok = 0;
 	  if (*lineptr != '\0' && *lineptr != ',')
@@ -370,11 +334,11 @@ fb_read (const char *filename, const double log_scale, const int verbose)
       
 #ifdef REDC_ROOTS
       /* Compute invp */
-      if (p % 2 != 0)
+      if (fb_cur->p % 2 != 0)
 	{
 	  modulus m;
 	  
-	  mod_initmod_ul (m, p);
+	  mod_initmod_ul (m, fb_cur->p);
 	  fb_cur->invp = - mod_invmodlong (m);
 	  mod_clearmod (m);
 	}
@@ -405,7 +369,7 @@ fb_read (const char *filename, const double log_scale, const int verbose)
 
   if (fb != NULL && verbose)
     {
-      printf ("Factor base sucessfully read, %lu primes, largest was "
+      printf ("# Factor base sucessfully read, %lu primes, largest was "
 	      FBPRIME_FORMAT "\n", nr_primes, maxprime);
     }
   
@@ -595,7 +559,7 @@ fb_initloc_small (factorbase_small_inited_t *initfb,
 	{
 	  amin_p = signed_mod_longto32 (amin, p);
 	  /* Replace low 24 bits by first sieve location */
-	  d = first_sieve_loc (p, root, amin_p, b, odd);
+          d = first_sieve_loc (p, root, amin_p, b, odd);
 	  initfb->p = p;
 	  initfb->loc_and_log = (plog << 24) | d;
 #if 0
@@ -612,3 +576,110 @@ fb_initloc_small (factorbase_small_inited_t *initfb,
   initfb->loc_and_log = 0;
 }
 
+/* Test if the data in factorbase is correct. If side == 0, checks the roots
+   for the algebraic polynomial; otherwise for the rational one */
+
+int
+fb_check (factorbase_t fb, cado_poly poly, int side)
+{
+  factorbase_degn_t *fbptr;
+  fbprime_t p, lastp;
+  unsigned long q;
+  unsigned char i;
+
+  lastp = 1;
+  for (fbptr = fb->fullfb; fbptr->p != 0; fbptr = fb_next (fbptr))
+    {
+      p = fbptr->p;
+
+      if (p <= lastp)
+	{
+	  fprintf (stderr, "Prime " FBPRIME_FORMAT " in factorbase is not "
+		   "greater than previous prime " FBPRIME_FORMAT " \n", 
+		   p, lastp);
+	  return 0;
+	}
+
+      if ((q = iscomposite (p)) != 0)
+	{
+	  fbprime_t cofac = p;
+	  while (cofac > 1 && cofac % (fbprime_t) q == 0)
+	    cofac /= (fbprime_t) q;
+	  if (cofac != 1)
+	    {
+	      fprintf (stderr, "Prime " FBPRIME_FORMAT " in factorbase is not "
+		       "a prime or prime power\n", p);
+	      return 1;
+	    }
+	}
+
+#ifdef REDC_ROOTS
+      if (p % 2 != 0 && fbptr->invp * (unsigned long)p != ~(0UL))
+	{
+	  fprintf (stderr, "For prime " FBPRIME_FORMAT " in factorbase, "
+		   "invp %lu is not -1/p (mod 2^wordsize)\n", p, fbptr->invp);
+	  return 1;
+	}
+#endif
+
+      if (fb_entrysize (fbptr) != fbptr->size)
+	{
+	  fprintf (stderr, "For prime " FBPRIME_FORMAT " in factorbase, size "
+		   "entry is %d instead of %d\n", 
+		   p, (int) fbptr->size, (int) fb_entrysize (fbptr));
+	  return 1;
+	}
+
+      for (i = 0; i < fbptr->nr_roots; i++)
+	{
+	  modulus m;
+	  residue val, r, c;
+	  unsigned long res;
+
+	  mod_initmod_ul (m, p);
+	  mod_init (r, m);
+	  mod_init (c, m);
+	  mod_init_set0 (val, m);
+	  mod_set_ul (r, fbptr->roots[i], m);
+
+	  if (side == 0)
+	    {
+	      int j;
+	      mod_set_ul_reduced (val, mpz_fdiv_ui (poly->f[poly->degree], p), 
+				  m);
+	      for (j = 1; j <= poly->degree; j++)
+		{
+		  mod_mul (val, val, r, m);
+		  mod_set_ul_reduced 
+		    (c, mpz_fdiv_ui (poly->f[poly->degree - j], p), m);
+		  mod_add (val, val, c, m);
+		}
+	    }
+	  else
+	    {
+	      mod_set_ul (val, mpz_fdiv_ui (poly->g[1], p), m);
+	      mod_mul (val, val, r, m);
+	      mod_set_ul_reduced (c, mpz_fdiv_ui (poly->g[0], p), m);
+	      mod_add (val, val, c, m);
+	    }
+
+	  res = mod_get_ul (val, m);
+
+	  mod_clear (c, m);
+	  mod_clear (r, m);
+	  mod_clear (r, m);
+	  mod_clearmod (m);
+
+	  if (res != 0)
+	    {
+	      fprintf (stderr, "False root in factor base: %c(" FBROOT_FORMAT 
+		       ") = %lu (mod " FBPRIME_FORMAT ")\n", 
+		       (side == 0 ? 'f' : 'g'), fbptr->roots[i], res, p);
+	      return 1;
+	    }
+	}
+
+      /* FIXME: add the tests for the small factor bases */
+    }
+  return 0;
+}

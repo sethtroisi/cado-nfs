@@ -11,6 +11,10 @@
   different modulus sizes can be used simply by #including different mod_*.c
   files, but without changing anything else in the source code. */
 
+#ifndef __MOD_UL_H__
+
+#define __MOD_UL_H__
+
 #ifndef ASSERT
  #ifdef WANT_ASSERT
   #include <assert.h>
@@ -48,6 +52,7 @@
 #define mod_frommontgomery   modul_frommontgomery
 #define mod_mulredc          modul_mulredc
 #define mod_mulredc_ul       modul_mulredc_ul
+#define mod_muladdredc_ul    modul_muladdredc_ul
 #define mod_div2             modul_div2
 #define mod_div3             modul_div3
 #define mod_invmodlong       modul_invmodlong
@@ -211,6 +216,26 @@ modul_sub (residueul r, residueul a, residueul b, modulusul m)
 }
 
 static inline void
+modul_add_ul_2ul (unsigned long *r1, unsigned long *r2, const unsigned long a)
+{
+#if defined(__x86_64__) && defined(__GNUC__)
+  __asm__ ( "addq %2, %0\n\t"
+            "adcq $0, %1\n"
+            : "+&r" (*r1), "+r" (*r2)
+            : "rm" (a)
+            : "cc");
+#elif defined(__i386__) && defined(__GNUC__)
+  __asm__ ( "addl %2, %0\n\t"
+            "adcl $0, %1\n"
+            : "+r" (*r1), "+r" (*r2)
+            : "+rm" (a):
+            : "cc");
+#else
+  abort ();
+#endif
+}
+
+static inline void
 mul_ul_ul_2ul (unsigned long *r1, unsigned long *r2, const unsigned long a,
                const unsigned long b)
 {
@@ -298,6 +323,8 @@ modul_tomontgomery (residueul r, const residueul a, const modulusul m)
   div_2ul_ul_ul_r (r, 0UL, a[0], m[0]);
 }
 
+
+/* Computes (a / 2^wordsize) % m */
 __GNUC_ATTRIBUTE_UNUSED__
 static inline void
 modul_frommontgomery (residueul r, const residueul a, const unsigned long invm,
@@ -306,8 +333,38 @@ modul_frommontgomery (residueul r, const residueul a, const unsigned long invm,
   unsigned long tlow, thigh;
   mul_ul_ul_2ul (&tlow, &thigh, a[0], invm);
   mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
-  r[0] = thigh + (a != 0);
+  r[0] = thigh + (a[0] != 0);
 }
+
+
+/* Computes ((a + b) / 2^wordsize) % m */
+__GNUC_ATTRIBUTE_UNUSED__
+static inline void
+modul_addredc_ul (residueul r, const residueul a, const unsigned long b, 
+                  const unsigned long invm, const modulusul m)
+{
+  unsigned long slow, shigh, tlow, thigh;
+  
+  slow = b;
+  shigh = 0;
+  modul_add_ul_2ul (&slow, &shigh, a[0]);
+  
+  mul_ul_ul_2ul (&tlow, &thigh, slow, invm);
+  mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
+  ASSERT (slow + tlow == 0UL);
+  r[0] = thigh + shigh + (slow != 0);
+  
+  /* r = ((a+b) + (((a+b)%2^w * invp) % 2^w) * p) / 2^w
+     r <= ((a+b) + (2^w - 1) * p) / 2^w
+     r <= (p-1 + 2^w-1 + p2^w - p) / 2^w
+     r <= (2^w -2 + p2^w) / 2^w
+     r <= p + 1 - 2/2^w
+     r <= p
+  */
+  if (r[0] == m[0])
+    r[0] = 0;
+}
+
 
 __GNUC_ATTRIBUTE_UNUSED__
 static inline void
@@ -315,9 +372,11 @@ modul_mulredc (residueul r, const residueul a, const residueul b,
                const unsigned long invm, const modulusul m)
 {
   unsigned long plow, phigh, tlow, thigh;
-#if 1 || defined(MODTRACE)
-  printf ("(%lu * %lu / 2^%ld)", 
-          a[0], b[0], 8 * sizeof(unsigned long));
+
+  ASSERT(m[0] % 2 != 0);
+#if defined(MODTRACE)
+  printf ("(%lu * %lu / 2^%ld) %% %lu", 
+          a[0], b[0], 8 * sizeof(unsigned long), m[0]);
 #endif
   
   mul_ul_ul_2ul (&plow, &phigh, a[0], b[0]);
@@ -332,7 +391,7 @@ modul_mulredc (residueul r, const residueul a, const residueul b,
   phigh += (plow != 0);
   r[0] = (phigh >= m[0] - thigh) ? (phigh - (m[0] - thigh)) : (phigh + thigh);
   
-#if 1 || defined(MODTRACE)
+#if defined(MODTRACE)
   printf (" == %lu /* PARI */ \n", r[0]);
 #endif
 }
@@ -343,9 +402,10 @@ modul_mulredc_ul (residueul r, const residueul a, const unsigned long b,
                   const unsigned long invm, const modulusul m)
 {
   unsigned long plow, phigh, tlow, thigh;
-#if 1 || defined(MODTRACE)
-  printf ("(%lu * %lu / 2^%ld)", 
-          a[0], b, 8 * sizeof(unsigned long));
+  ASSERT(m[0] % 2 != 0);
+#if defined(MODTRACE)
+  printf ("(%lu * %lu / 2^%ld) %% %lu", 
+          a[0], b, 8 * sizeof(unsigned long), m[0]);
 #endif
   
   mul_ul_ul_2ul (&plow, &phigh, a[0], b);
@@ -354,7 +414,36 @@ modul_mulredc_ul (residueul r, const residueul a, const unsigned long b,
   phigh += (plow != 0);
   r[0] = (phigh >= m[0] - thigh) ? (phigh - (m[0] - thigh)) : (phigh + thigh);
   
-#if 1 || defined(MODTRACE)
+#if defined(MODTRACE)
+  printf (" == %lu /* PARI */ \n", r[0]);
+#endif
+}
+                         
+
+/* Computes (a * b + c)/ 2^wordsize % m. Requires that 
+   a * b + c < 2^wordsize * m */
+
+__GNUC_ATTRIBUTE_UNUSED__
+static inline void
+modul_muladdredc_ul (residueul r, const residueul a, const unsigned long b,
+                     const unsigned long c, const unsigned long invm, 
+                     const modulusul m)
+{
+  unsigned long plow, phigh, tlow, thigh;
+  ASSERT(m[0] % 2 != 0);
+#if defined(MODTRACE)
+  printf ("(%lu * %lu / 2^%ld) %% %lu", 
+          a[0], b, 8 * sizeof(unsigned long), m[0]);
+#endif
+  
+  mul_ul_ul_2ul (&plow, &phigh, a[0], b);
+  modul_add_ul_2ul (&plow, &phigh, c);
+  mul_ul_ul_2ul (&tlow, &thigh, plow, invm);
+  mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
+  phigh += (plow != 0);
+  r[0] = (phigh >= m[0] - thigh) ? (phigh - (m[0] - thigh)) : (phigh + thigh);
+  
+#if defined(MODTRACE)
   printf (" == %lu /* PARI */ \n", r[0]);
 #endif
 }
@@ -540,4 +629,6 @@ modul_jacobi (residueul a_par, modulusul m_par)
 #ifdef MOD_UL_GNUC_ATTRIBUTE_UNUSED
 #undef __GNUC_ATTRIBUTE_UNUSED__
 #undef MOD_UL_GNUC_ATTRIBUTE_UNUSED
+#endif
+
 #endif

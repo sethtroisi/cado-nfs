@@ -5,9 +5,6 @@
 
 static inline fbroot_t
 first_sieve_loc (const fbprime_t p, const fbroot_t r, 
-#ifdef REDC_ROOTS
-                 const unsigned long invm,
-#endif
                  const fbroot_t amin_p, const unsigned long b, const int odd)
 {
   modulus m;
@@ -30,12 +27,8 @@ first_sieve_loc (const fbprime_t p, const fbroot_t r,
   mod_init (r1, m);
   mod_init (r2, m);
   mod_set_ul_reduced (r2, r, m);
-#ifdef REDC_ROOTS
-  modul_mulredc_ul (r1, r2, b, invm, m);
-#else
   mod_set_ul (r1, b, m); /* Modular reduction */
   mod_mul (r1, r1, r2, m); /* Multiply and mod reduction. */
-#endif
   mod_sub_ul (r1, r1, amin_p, m);
   if (odd)
     mod_div2 (r1, r1, m);

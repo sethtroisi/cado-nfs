@@ -320,11 +320,7 @@ sieve (unsigned char *sievearray, factorbase_degn_t *fb,
       
       for (i = 0; i < fb->nr_roots; i++)
         {
-#ifdef REDC_ROOTS
-	  d = first_sieve_loc (p, fb->roots[i], fb->invp, amin_p, b, odd);
-#else
 	  d = first_sieve_loc (p, fb->roots[i], amin_p, b, odd);
-#endif
 	  
 	  /* Now d is the first index into sievearray where p divides. */
 
@@ -625,8 +621,15 @@ sieve_one_side (unsigned char *sievearray, factorbase_t fb,
 		 log_scale, odd, verbose);
 
   /* Init small primes for sieving this line */
+  rdtscll (tsc1);
   for (lvl = 0; lvl < SIEVE_BLOCKING; lvl++)
-    fb_initloc_small (fb->fbinit[lvl], fb->fbsmall[lvl], eff_amin, b, odd);
+      fb_initloc_small (fb->fbinit[lvl], fb->fbsmall[lvl], eff_amin, b, odd);
+  rdtscll (tsc2);
+  if (verbose)
+    printf ("# Initing small primes fb took %lld clocks\n", tsc2 - tsc1);
+
+  for (lvl = 0; lvl < SIEVE_BLOCKING; lvl++)
+    times[lvl] = 0;
 
   /* Sieve small primes with multi-level blocking */
   sieve_block (SIEVE_BLOCKING - 1, sievearray, l, fb, times);
@@ -715,7 +718,8 @@ trialdiv_one_prime (const fbprime_t q, mpz_t C, unsigned int *nr_primes,
     {
       unsigned long r;
       nr_divide++;
-      add_fbprime_to_list (primes, nr_primes, max_nr_primes, q);
+      if (primes != NULL)
+	add_fbprime_to_list (primes, nr_primes, max_nr_primes, q);
       r = mpz_tdiv_q_ui (C, C, (unsigned long) q);
       ASSERT (r == 0);
       if (!do_powers)
@@ -726,7 +730,7 @@ trialdiv_one_prime (const fbprime_t q, mpz_t C, unsigned int *nr_primes,
 
 /* Factor an unsigned long into fb primes, adds primes to list. Not fast. */
 static inline void 
-trialdiv_slow (unsigned long C, fbprime_t *primes, unsigned int *nr_primes, 
+trialdiv_slow (unsigned long C, unsigned int *nr_primes, fbprime_t *primes, 
 	       const unsigned int max_nr_primes)
 {
   fbprime_t q;
@@ -740,9 +744,72 @@ trialdiv_slow (unsigned long C, fbprime_t *primes, unsigned int *nr_primes,
 	  ASSERT ((unsigned long) q == C); /* Check for truncation */
 	}
       C /= (unsigned long) q;
-      add_fbprime_to_list (primes, nr_primes, max_nr_primes, q);
+      if (primes != NULL)
+	add_fbprime_to_list (primes, nr_primes, max_nr_primes, q);
     }
 }
+
+#ifdef REDC_ROOTS
+int
+trialdiv_with_root (factorbase_degn_t *fbptr, const long a, 
+		    const unsigned long b)
+{
+  int i;
+  modulus m;
+  residue r;
+  unsigned long absa;
+
+  mod_initmod_ul (m, fbptr->p);
+  mod_init (r, m);
+
+  absa = labs(a);
+
+  for (i = 0; i < fbptr->nr_roots ; i++)
+    {
+      if (a <= 0) /* We compute rb - a */
+	mod_set_ul_reduced (r, fbptr->roots[i], m);
+      else /* We compute (-r)b + a */
+	mod_set_ul_reduced (r, fbptr->p - fbptr->roots[i], m);
+
+      mod_muladdredc_ul (r, r, b, absa, fbptr->invp, m);
+      
+      if (mod_get_ul (r, m) == 0)
+	{
+	  mod_clear (r, m);
+	  mod_clearmod (m);
+	  return 1;
+	}
+    }
+
+  mod_clear (r, m);
+  mod_clearmod (m);
+  return 0;
+}
+
+int
+trialdiv_with_norm (factorbase_degn_t *fbptr, const mpz_t norm)
+{
+  modulus m;
+  residue r;
+  int i;
+
+  mod_initmod_ul (m, fbptr->p);
+  mod_init_set0 (r, m);
+
+  for (i = 0; i < norm->_mp_size; i++)
+    {
+      modul_addredc_ul (r, r, (norm[0])._mp_d[i], 
+			fbptr->invp, m);
+    }
+
+  i = (mod_get_ul (r, m) == 0);
+
+  mod_clear (r, m);
+  mod_clearmod (m);
+  return i;
+}
+#endif
+
 
 /* 1. Compute the norm
    2. Divide out primes with projective roots
@@ -867,6 +934,23 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
     c_lower = 1.;
   inv_c_lower = 1. / c_lower;
 
+  /* Treat factor base prime p == 2 separately */
+  fbptr = fullfb;
+  if (fbptr->p == 2)
+    {
+      if (mpz_even_p (norm))
+	{
+	  mpz_tdiv_q_2exp (norm, norm, 1);
+	  add_fbprime_to_list (primes, nr_primes, max_nr_primes, 2);
+	  maxp_d = mpz_get_d (norm) * inv_c_lower;
+	  if (maxp_d > (double) FBPRIME_MAX)
+	    maxp = FBPRIME_MAX;
+	  else
+	    maxp = (int) ceil(maxp_d);
+	}
+      fbptr = fb_next (fbptr);
+    }
+
   maxp_d = mpz_get_d (norm) * inv_c_lower;
   if (maxp_d > (double) FBPRIME_MAX)
     maxp = FBPRIME_MAX;
@@ -877,12 +961,21 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
         no more fb primes could possibly divide it. This is the case when 
 	norm / p < c_lower ==> p > norm / c_lower */
 
-  for (fbptr = fullfb; fbptr->p != 0 && fbptr->p <= maxp; 
+  for (; fbptr->p != 0 && fbptr->p <= maxp; 
        fbptr = fb_next (fbptr))
     {
-      if (trialdiv_one_prime (fbptr->p, norm, nr_primes, primes, 
-			      max_nr_primes, 0) > 0)
+#ifdef REDC_ROOTS
+      /* if (trialdiv_with_root (fbptr, a, b)) */
+      if (trialdiv_with_norm (fbptr, norm))
 	{
+	  ASSERT (mpz_divisible_ui_p (norm, fbptr->p));
+	  trialdiv_one_prime (fbptr->p, norm, nr_primes, primes,
+			      max_nr_primes, 0);
+#else
+      if (trialdiv_one_prime (fbptr->p, norm, nr_primes, primes,
+				max_nr_primes, 0) > 0)
+	{
+#endif
 	  maxp_d = mpz_get_d (norm) * inv_c_lower;
 	  if (maxp_d > (double) FBPRIME_MAX)
 	    maxp = FBPRIME_MAX;
@@ -999,7 +1092,8 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 	  /* It is a bit odd though to have a composite factor <lpb.
 	     Print a warning about it. */
 	  gmp_fprintf (stderr, "Warning: cofactor %Zd <lpb, but not "
-		       "prime for (%ld, %lu)\n", norm, a, b);
+		       "prime for (%ld, %lu), degree %d polynomial\n", 
+		       norm, a, b, degree);
 	  return 1;
 	}
     }
@@ -1071,6 +1165,7 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
   fbprime_t primes_a[max_nr_primes], primes_r[max_nr_primes];
   fbprime_t proj_primes_a[max_nr_primes], proj_primes_r[max_nr_primes];
   unsigned int nr_primes_a, nr_primes_r, nr_proj_primes_a, nr_proj_primes_r;
+  unsigned int matching_reports = 0, relations_found = 0;
   unsigned int lp_a_toolarge = 0, lp_r_toolarge = 0, 
     cof_a_toolarge = 0, cof_r_toolarge = 0;
   int ok;
@@ -1093,13 +1188,13 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
      nr_proj_primes_a, the product is kept in proj_divisor_a. */
   nr_proj_primes_a = 0;
   proj_divisor_a = mpz_gcd_ui (NULL, poly->f[poly->degree], b);
-  trialdiv_slow (proj_divisor_a, proj_primes_a, &nr_proj_primes_a, 
+  trialdiv_slow (proj_divisor_a, &nr_proj_primes_a, proj_primes_a, 
 		 max_nr_proj_primes);
 
   /* Same for rational side */
   nr_proj_primes_r = 0;
   proj_divisor_r = mpz_gcd_ui (NULL, poly->g[1], b);
-  trialdiv_slow (proj_divisor_r, proj_primes_r, &nr_proj_primes_r, 
+  trialdiv_slow (proj_divisor_r, &nr_proj_primes_r, proj_primes_r, 
 		 max_nr_proj_primes);
 
   sumprimes = nrprimes = 0;
@@ -1110,6 +1205,8 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 	  gcd(labs(reports_a[i].a), b) == 1)
 	{
           const long a = reports_a[i].a;
+
+	  matching_reports++;
       
           /* Do the algebraic side */
 	  nr_primes_a = 0;
@@ -1140,6 +1237,7 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 	    goto nextreport;
 
 	  /* Now print the relations */
+	  relations_found++;
 	  sort_fbprimes (primes_r, nr_primes_r);
 	  sort_fbprimes (primes_a, nr_primes_a);
 
@@ -1169,8 +1267,12 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
     }
 
   if (verbose)
-    printf ("# Sum and number of maxp: %lu, %lu, avg: %.0f\n",
-	    sumprimes, nrprimes, (double)sumprimes / (double)nrprimes);
+    {
+      printf ("# Number of matching reports: %u\n", matching_reports);
+      printf ("# Number of relations found: %u\n", relations_found);
+      printf ("# Sum and number of maxp: %lu, %lu, avg: %.0f\n",
+	      sumprimes, nrprimes, (double)sumprimes / (double)nrprimes);
+    }
   
   for (i = 0; i <= (unsigned)poly->degree; i++)
     mpz_clear (scaled_poly_a[i]);
@@ -1184,7 +1286,13 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 #ifdef HAVE_MSRH
   if (verbose)
   {
-    printf ("# Trial factoring/printing took %lld clocks\n", tsc2 - tsc1);
+    printf ("# Trial factoring/printing%s took %lld clocks\n", 
+#ifdef REDC_ROOTS
+	    " (with    REDC)",
+#else
+	    " (without REDC)",
+#endif
+	    tsc2 - tsc1);
     printf ("# Too large cofactors (discarded in this order): "
 	    "alg > mfba: %d, alg prp > lpba: %d, "
 	    "rat > mfbr: %d, rat prp > lpbr: %d\n", 
@@ -1289,11 +1397,11 @@ main (int argc, char **argv)
     }
   if (verbose)
   {
-      printf ("Read polynomial file %s\n", polyfilename);
-      printf ("Polynomials are:\n");
-      mp_poly_print (cpoly->f, cpoly->degree, "f(x) =", 0);
+      printf ("# Read polynomial file %s\n", polyfilename);
+      printf ("# Polynomials are:\n");
+      mp_poly_print (cpoly->f, cpoly->degree, "# f(x) =", 0);
       printf ("\n");
-      mp_poly_print (cpoly->g, 1, "g(x) =", 0);
+      mp_poly_print (cpoly->g, 1, "# g(x) =", 0);
       printf ("\n");
   }
 
@@ -1336,6 +1444,25 @@ main (int argc, char **argv)
   for (i = 0; i < SIEVE_BLOCKING; i++)
     fb_extract_small (fbr, CACHESIZES[i], i, verbose);
   
+  /* Check the factor bases for correctness */
+  
+  if (fb_check (fba, cpoly, 0) != 0)
+    {
+      fprintf (stderr, "Error in algebraic factor base\n");
+      exit (EXIT_FAILURE);
+    }
+  else if (verbose)
+    printf ("# Algebraic factor base test passed\n");
+
+  if (fb_check (fbr, cpoly, 1) != 0)
+    {
+      fprintf (stderr, "Error in ratinal factor base\n");
+      exit (EXIT_FAILURE);
+    }
+  else if (verbose)
+    printf ("# Rational factor base test passed\n");
+
+
   deg = cpoly->degree;
   for (i = 0; i <= deg; i++)
       dpoly_a[i] = mpz_get_d (cpoly->f[i]);
