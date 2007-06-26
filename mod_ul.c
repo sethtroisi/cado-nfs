@@ -228,7 +228,7 @@ modul_add_ul_2ul (unsigned long *r1, unsigned long *r2, const unsigned long a)
   __asm__ ( "addl %2, %0\n\t"
             "adcl $0, %1\n"
             : "+r" (*r1), "+r" (*r2)
-            : "+rm" (a):
+            : "rm" (a)
             : "cc");
 #else
   abort ();
