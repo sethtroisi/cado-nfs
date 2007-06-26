@@ -227,7 +227,7 @@ modul_add_ul_2ul (unsigned long *r1, unsigned long *r2, const unsigned long a)
 #elif defined(__i386__) && defined(__GNUC__)
   __asm__ ( "addl %2, %0\n\t"
             "adcl $0, %1\n"
-            : "+r" (*r1), "+r" (*r2)
+            : "+&r" (*r1), "+r" (*r2)
             : "rm" (a)
             : "cc");
 #else
