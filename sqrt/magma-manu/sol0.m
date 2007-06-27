@@ -135,12 +135,12 @@ function charfile()
 		print "Generating";
 		polyfilename:=subdir cat "/" cat subdir cat ".poly";
 		cmd:="make " cat polyfilename;
-		print cmd; Sysubdir(cmd);
+		print cmd; System(cmd);
 		flm:=Lcm([Degree(i[1]):i in Factorization(ideal<OK|e>)]);
 		cmd:=Sprintf("core2/characters %o/clink.txt %o %o < %o > %o",
 			subdir, e, flm, polyfilename, cfilename);
-		print cmd; Sysubdir(cmd);
-		Sysubdir("sleep 1");
+		print cmd; System(cmd);
+		System("sleep 1");
 	end try;
 	print "Hello, world";
 	CF:=Open(cfilename,"r");
@@ -150,7 +150,7 @@ end function;
 CF:=charfile();
 */
 
-if Sysubdir("[ `hostname` = 'profiterolle' ]") eq 0 then
+if System("[ `hostname` = 'profiterolle' ]") eq 0 then
 	machinename:="pentium3";
 else
 	machinename:="core2";
@@ -158,10 +158,10 @@ end if;
 
 polyfilename:=subdir cat "/" cat subdir cat ".poly";
 cmd:="make " cat polyfilename;
-print cmd; Sysubdir(cmd);
+print cmd; System(cmd);
 cmd:=Sprintf("if [ ! -f %o ] ; then %o/characters %o/clink.txt %o %o < %o > %o ; fi",
 	cfilename, machinename, subdir, e, charstring, polyfilename, cfilename);
-print cmd; Sysubdir(cmd);
+print cmd; System(cmd);
 
 CF:=Open(cfilename,"r");
 print "Reading characters file";
