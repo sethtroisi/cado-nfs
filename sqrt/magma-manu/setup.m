@@ -1,7 +1,10 @@
 
 // clear;
 
-idl_file := subdir cat "/" cat subdir cat ".ur_idl";
+x:=Split(subdir,"/");
+subdir_base:=x[#x];
+
+idl_file := subdir cat "/" cat subdir_base cat ".ur_idl";
 
 
 

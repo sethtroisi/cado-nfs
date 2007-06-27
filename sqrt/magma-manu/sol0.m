@@ -86,7 +86,7 @@ end for;
 
 print "Computing characters";
 
-cfilename := subdir cat "/" cat subdir cat ".characters";
+cfilename := subdir cat "/" cat subdir_base cat ".characters";
 
 /* First decide which characters are usable */
 
@@ -133,12 +133,12 @@ function charfile()
 	catch err
 		printf "Character file %o does not exist\n", cfilename;
 		print "Generating";
-		polyfilename:=subdir cat "/" cat subdir cat ".poly";
+		polyfilename:=subdir cat "/" cat subdir_base cat ".poly";
 		cmd:="make " cat polyfilename;
 		print cmd; System(cmd);
 		flm:=Lcm([Degree(i[1]):i in Factorization(ideal<OK|e>)]);
 		cmd:=Sprintf("core2/characters %o/clink.txt %o %o < %o > %o",
-			subdir, e, flm, polyfilename, cfilename);
+			subdir_base, e, flm, polyfilename, cfilename);
 		print cmd; System(cmd);
 		System("sleep 1");
 	end try;
@@ -156,7 +156,7 @@ else
 	machinename:="core2";
 end if;
 
-polyfilename:=subdir cat "/" cat subdir cat ".poly";
+polyfilename:=subdir cat "/" cat subdir_base cat ".poly";
 cmd:="make " cat polyfilename;
 print cmd; System(cmd);
 cmd:=Sprintf("if [ ! -f %o ] ; then %o/characters %o/clink.txt %o %o < %o > %o ; fi",
