@@ -395,75 +395,63 @@ find_sieve_reports (const unsigned char *sievearray, sieve_report_t *reports,
                     const unsigned int reports_len, 
                     const unsigned char threshold, 
                     const long amin, const unsigned long l, 
-		    const unsigned long b, const int odd)
+		    const unsigned long b, const int odd,
+		    sieve_report_t *other_reports)
 {
   unsigned long reports_nr, d;
-  const int b3 = (b % 3 == 0); /* We skip over $a$, $3|a$ if $3|b$ to save some
-				  space in the reports list */
   const unsigned char threshold_with_error = add_error (threshold);
-  unsigned int a3;
   
   ASSERT (odd == 0 || odd == 1);
   ASSERT (!odd || (amin & 1) == 1);
   ASSERT (b > 0);
 
   reports_nr = 0;
+  if (reports_nr == reports_len)
+    return reports_nr;
 
-  /* a % 3 == 0  <=>
-     amin + (d << odd) == 0 (mod 3) <=>
-     (d << odd) == -amin (mod 3)  <=>
-     d == -amin / (odd + 1) (mod 3) */
-  a3 = signed_mod_longto32 (-amin, 3);
-  if (odd)
+  for (d = 0; d < l; d++)
     {
-      if (a3 % 2 == 0)
-	a3 >>= 1;
-      else
-	a3 = (a3 + 3) >> 1;
-    }
+      if (add_error(sievearray[d]) <= threshold_with_error)
+	{
+	  const long a = amin + ((long)d << odd);
+	  
+	  if (a % 3 == 0 && b % 3 == 0)
+	    continue;
 
-  if (b3)
-    for (d = 0; d < l; d++)
-      {
-	if (add_error(sievearray[d]) <= threshold_with_error && 
-	    reports_nr < reports_len)
-	  {
-	    if ((d % 3) != a3)
-	      {
+	  if (other_reports != NULL)
+	    {
+	      while (other_reports->p != 0 && other_reports->a < a)
+		other_reports++;
+	      if (other_reports->a != a)
+		{
 #ifdef TRACE_RELATION_A
-		if ((amin + ((long) d << odd)) == TRACE_RELATION_A)
-		  printf ("# TRACE RELATION in find_sieve_reports: report "
-			  "for a = %ld, p = 1, l = %d\n", 
-			  TRACE_RELATION_A, (int) sievearray[d]);
+		  if (a == TRACE_RELATION_A)
+		    printf ("# TRACE RELATION in find_sieve_reports: "
+			    "no matching report for a = %ld in "
+			    "other_reports\n", TRACE_RELATION_A);
 #endif
-		reports[reports_nr].a = amin + ((long)d << odd);
-		reports[reports_nr].p = 1;
-		reports[reports_nr].l = sievearray[d];
-		reports_nr++;
-	      }
-	  }
-      }
-  else
-    for (d = 0; d < l; d++)
-      {
-	/* The + SIEVE_PERMISSIBLE_ERROR is to deal with accumulated rounding 
-	   error that might have cause the sieve value to drop below 0 and 
-	   wrap around */
-	if (add_error (sievearray[d]) <= threshold_with_error && 
-	    reports_nr < reports_len)
-	  {
+		  continue;
+		}
+	    }
+
+	  reports[reports_nr].a = a;
+	  reports[reports_nr].p = 1;
+	  reports[reports_nr].l = sievearray[d];
+	  reports_nr++;
 #ifdef TRACE_RELATION_A
-	    if ((amin + ((long)d << odd)) == TRACE_RELATION_A)
-	      printf ("# TRACE RELATION in find_sieve_reports: report "
-		      "for a = %ld, p = 1, l = %d\n", 
-		      TRACE_RELATION_A, (int) sievearray[d]);
+	  if (a == TRACE_RELATION_A)
+	    printf ("# TRACE RELATION in find_sieve_reports: report "
+		    "for a = %ld, p = 1, l = %d added to list\n", 
+		    TRACE_RELATION_A, (int) sievearray[d]);
 #endif
-	    reports[reports_nr].a = amin + ((long)d << odd);
-	    reports[reports_nr].p = 1;
-	    reports[reports_nr].l = sievearray[d];
-	    reports_nr++;
-	  }
-      }
+	  if (reports_nr == reports_len)
+	    {
+	      fprintf (stderr, "Warning: find_sieve_reports: reports list "
+		       "full at a = %ld\n", a);
+	      return reports_nr;
+	    }
+	}
+    }
   
   return reports_nr;
 }
@@ -603,7 +591,7 @@ sieve_one_side (unsigned char *sievearray, factorbase_t fb,
 		const long amin, const long amax, const unsigned long b,
 		const unsigned long proj_roots, const double log_scale,
 		const double *dpoly, const unsigned int deg, 
-		const int verbose)
+		sieve_report_t *other_reports, const int verbose)
 {
   long long tsc1, tsc2;
   long long times[SIEVE_BLOCKING];
@@ -662,7 +650,7 @@ sieve_one_side (unsigned char *sievearray, factorbase_t fb,
 			    reports + reports_nr, 
 			    reports_length - reports_nr, 
 			    reports_threshold, 
-			    eff_amin, l, b, odd);
+			    eff_amin, l, b, odd, other_reports);
       rdtscll (tsc2);
       if (verbose)
 	{
@@ -1520,10 +1508,10 @@ main (int argc, char **argv)
 	sieve_one_side (sievearray, fba,  
 			reports_a, reports_a_len, report_a_threshold, 
 			amin, amax, b, proj_roots, log_scale, 
-			dpoly_a, deg, verbose);
+			dpoly_a, deg, NULL, verbose);
 
       if (verbose)
-	printf ("# There were sieve %d reports on the algebraic side\n",
+	printf ("# There were %d sieve reports on the algebraic side\n",
 		reports_a_nr);
 
       proj_roots = mpz_gcd_ui (NULL, cpoly->g[1], b);
@@ -1543,9 +1531,9 @@ main (int argc, char **argv)
 	sieve_one_side (sievearray, fbr, 
 			reports_r, reports_r_len, report_r_threshold, 
 			amin, amax, b, proj_roots, log_scale, 
-			dpoly_r, 1, verbose);
+			dpoly_r, 1, reports_a, verbose);
       if (verbose)
-	printf ("# There were sieve %d reports on the rational side\n",
+	printf ("# There were %d sieve reports on the rational side\n",
 		reports_r_nr);
 
       if (reports_a_len == reports_a_nr)
