@@ -37,10 +37,8 @@ checknorms: checknorms.c
 makefb: makefb.c
 	gcc -I. -I.. $(CFLAGS) -o $@ $< ../utils/libutils.a $(GMPLIB) -lm
 
-config.h:
-	echo '#define HAVE_MSRH 1'   >  $@
-	echo '#define WANT_ASSERT 1' >> $@
-	echo '#define L1SIZE 32768' >>  $@
+config.h: config_h.in
+	cp config_h.in config.h
 
 clean:
 	rm -f sieve checknorms makefb
