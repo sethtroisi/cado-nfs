@@ -50,19 +50,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 #define MAX_ROTATE 16 /* try rotation by k*(x-m) for |k| <= MAX_ROTATE */
 
-/* if WANT_EXACT_VALUATION is defined, use exact algorithm to determine
-   average valuation of F(a,b) for special primes, otherwise estimate if by
-   computation on some square grid */
-#define WANT_EXACT_VALUATION
-
-#ifdef WANT_EXACT_VALUATION
-#define GET_VALUATION special_valuation
-#else
-#define NUM_EST 0.001 /* wanted accurary in the contribution to alpha(F)
-                         for ``bad-behaved'' primes */
-#define GET_VALUATION(f,d,p,disc) estimate_valuation(f,d,NUM_EST,p)
-#endif
-
 #ifdef DEBUG
 #define ASSERT(x) assert(x)
 #else
@@ -81,27 +68,40 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 static void
 usage ()
 {
-  fprintf (stderr, "Usage: polyselect [-v] [-full] [-e nnn] [-m xxx]< in > out\n\n");
-  fprintf (stderr, "       -v     - verbose\n");
-  fprintf (stderr, "       -full  - also output factor base parameters\n");
-  fprintf (stderr, "       -e nnn - use effort nnn\n");
-  fprintf (stderr, "       -m xxx - use decomposition in base xxx\n");
-  fprintf (stderr, "       in     - input file (number to factor)\n");
-  fprintf (stderr, "       out    - output file (polynomials)\n");
+  fprintf (stderr, "Usage: polyselect [-v] [-full] [-degree d] [-e nnn] [-m xxx]< in > out\n\n");
+  fprintf (stderr, "       -v        - verbose\n");
+  fprintf (stderr, "       -full     - also output factor base parameters\n");
+  fprintf (stderr, "       -degree d - use algebraic polynomial of degree d\n");
+  fprintf (stderr, "       -e nnn    - use effort nnn\n");
+  fprintf (stderr, "       -m xxx    - use decomposition in base xxx\n");
+  fprintf (stderr, "       in        - input file (number to factor)\n");
+  fprintf (stderr, "       out       - output file (polynomials)\n");
   exit (1);
 }
 
 /************************** polynomial arithmetic ****************************/
 
-/* allocate a polynomial of degree d, and initialize it */
+/* allocate an array of d coefficients, and initialize it */
 mpz_t*
-alloc_poly (int d)
+alloc_mpz_array (int d)
 {
   mpz_t *f;
   int i;
 
-  f = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
-  for (i = 0; i <= d; i++)
+  f = (mpz_t*) malloc (d * sizeof (mpz_t));
+  for (i = 0; i < d; i++)
+    mpz_init (f[i]);
+  return f;
+}
+
+/* reallocate an array having d0 coefficients to d > d0 coefficients */
+mpz_t*
+realloc_mpz_array (mpz_t *f, int d0, int d)
+{
+  int i;
+
+  f = (mpz_t*) realloc (f, d * sizeof (mpz_t));
+  for (i = d0; i < d; i++)
     mpz_init (f[i]);
   return f;
 }
@@ -193,7 +193,7 @@ eval_poly_diff_ui (mpz_t v, mpz_t *f, int d, unsigned long r)
 /* h(x) <- h(x + r/p), where the coefficients of h(x + r/p) are known to
    be integers */
 void
-poly_shift_divp (mpz_t *h, int d, unsigned long r, unsigned long p)
+poly_shift_divp (mpz_t *h, int d, long r, unsigned long p)
 {
   int i, k;
   mpz_t t;
@@ -204,7 +204,10 @@ poly_shift_divp (mpz_t *h, int d, unsigned long r, unsigned long p)
       { /* h[k] <- h[k] + r/p h[k+1] */
         assert (mpz_divisible_ui_p (h[k+1], p) != 0);
         mpz_divexact_ui (t, h[k+1], p);
-        mpz_addmul_ui (h[k], t, r);
+	if (r >= 0)
+	  mpz_addmul_ui (h[k], t, r);
+	else
+	  mpz_submul_ui (h[k], t, -r);
       }
   mpz_clear (t);
 }
@@ -216,8 +219,8 @@ discriminant (mpz_t D, mpz_t *f0, const int d)
   mpz_t *f, *g, num, den;
   int df, dg, i, s;
 
-  f = alloc_poly (d);
-  g = alloc_poly (d - 1);
+  f = alloc_mpz_array (d + 1);
+  g = alloc_mpz_array (d);
   copy_poly (f, f0, d);
   df = d;
   diff_poly (g, f0, d);
@@ -301,13 +304,89 @@ igcd (unsigned long a, unsigned long b)
   return a;
 }
 
+/* For p <= ROOTS_MOD_THRESHOLD, determine the number of roots of f mod p
+   by evaluating f on 0, 1, ..., p-1. In theory, this threshold should 
+   depend on the degree of f. The following value seems to be optimal
+   on a Pentium M. We must have ROOTS_MOD_THRESHOLD2 >= 2.
+*/
+#define ROOTS_MOD_THRESHOLD  43 /* if only the number of roots is needed */
+#define ROOTS_MOD_THRESHOLD2 67 /* if the roots are needed too */
+
+/* Same as roots_mod, but uses long's instead of mpz_t's for computations.
+   If r <> NULL, put in r[0], r[1], ... the roots of f mod p.
+*/
+int
+roots_mod2 (long *r, mpz_t *f, int d, const long p)
+{
+  long_poly_t fp, g, h;
+  int df, n;
+
+  //  printf ("enter roots_mod2, p=%d, d=%d, f=", p, d);
+  //  fprint_polynomial (stdout, f, d);
+
+  /* the number of roots is the degree of gcd(x^p-x,f) */
+
+  long_poly_init (fp, d);
+  d = long_poly_set_mod (fp, f, d, p);
+
+  if (d == 0)
+    {
+      df = 0;
+      goto clear_fp;
+    }
+
+  assert (d > 0);
+
+  if ((r == NULL && p <= ROOTS_MOD_THRESHOLD) ||
+      (r != NULL && p <= ROOTS_MOD_THRESHOLD2))
+    {
+      df = long_poly_roots_mod (r, fp, p);
+      goto clear_fp;
+    }
+
+  long_poly_init (g, 2 * d - 1);
+  long_poly_init (h, 2 * d - 1);
+
+  /* we first compute x^p mod fp; since fp has degree d, all operations can
+     be done with polynomials of degree < 2d: a square give at most degree
+     2d-2, and multiplication by x gives 2d-1. */
+
+  /* g <- x^p mod fp */
+  long_poly_powmod_ui (g, fp, h, 0, p, p);
+
+  /* subtract x */
+  long_poly_sub_x (g, g, p);
+
+  /* fp <- gcd (fp, g) */
+  long_poly_gcd (fp, g, p);
+
+  /* now fp contains gcd(x^p-x, f) */
+
+  df = fp->degree;
+  
+  if (r != NULL && df > 0)
+    {
+      n = long_poly_cantor_zassenhaus (r, fp, p, 0);
+      assert (n == df);
+    }
+
+  long_poly_clear (g);
+  long_poly_clear (h);
+
+ clear_fp:
+  long_poly_clear (fp);
+
+  return df;
+}
+
 /* auxiliary routine for special_valuation(), see below */
 double
 special_val0 (mpz_t *f, int d, unsigned long p)
 {
   double v;
   mpz_t c, *g, *h;
-  int alloc, i, r, r0;
+  int alloc, i, r, r0, nroots;
+  long *roots;
 
   mpz_init (c);
   content_poly (c, f, d);
@@ -317,7 +396,7 @@ special_val0 (mpz_t *f, int d, unsigned long p)
   /* g <- f/p^v */
   if (alloc != 0)
     {
-      g = alloc_poly (d);
+      g = alloc_mpz_array (d + 1);
       mpz_ui_pow_ui (c, p, (unsigned long) v); /* p^v */
       for (i = 0; i <= d; i++)
         mpz_divexact (g[i], f[i], c);
@@ -325,7 +404,7 @@ special_val0 (mpz_t *f, int d, unsigned long p)
   else
     g = f;
 
-  h = alloc_poly (d);
+  h = alloc_mpz_array (d + 1);
   /* first compute h(x) = g(px) */
   mpz_set_ui (c, 1);
   for (i = 0; i <= d; i++)
@@ -333,7 +412,29 @@ special_val0 (mpz_t *f, int d, unsigned long p)
       mpz_mul (h[i], g[i], c);
       mpz_mul_ui (c, c, p);
     }
-  /* naive loop to search for roots of g mod p */
+  /* naive loop to search for roots of g mod p.
+     FIXME: replace by a faster algorithm, by implementing Cantor-Zassenhaus */
+#if 1
+  assert (d > 0);
+  roots = (long*) malloc (d * sizeof (long));
+  nroots = roots_mod2 (roots, g, d, p);
+  for (r0 = 0, i = 0; i < nroots; i++)
+    {
+      r = roots[i];
+      eval_poly_diff_ui (c, g, d, r);
+      if (mpz_divisible_ui_p (c, p) == 0) /* g'(r) <> 0 mod p */
+	v += 1.0 / (double) (p - 1);
+      else /* hard case */
+	{
+	  /* g(px+r) = h(x + r/p), thus we can go from h0(x)=g(px+r0)
+	     to h1(x)=g(px+r1) by computing h0(x + (r1-r0)/p) */
+	  poly_shift_divp (h, d, r - r0, p);
+	  r0 = r;
+	  v += special_val0 (h, d, p) / (double) p;
+	}
+    }
+  free (roots);
+#else
   for (r0 = r = 0; r < p; r++)
     {
       eval_poly_ui (c, g, d, r);
@@ -347,10 +448,12 @@ special_val0 (mpz_t *f, int d, unsigned long p)
               /* g(px+r) = h(x + r/p), thus we can go from h0(x)=g(px+r0)
                  to h1(x)=g(px+r1) by computing h0(x + (r1-r0)/p) */
               poly_shift_divp (h, d, r - r0, p);
+	      r0 = r;
               v += special_val0 (h, d, p) / (double) p;
             }
         }
     }
+#endif
   poly_clear (h, d);
 
   if (alloc != 0)
@@ -395,13 +498,13 @@ always returns 0 in val(f,p).
 Assumes p divides disc = disc(f), d is the degree of f.
 */
 double
-special_valuation (mpz_t *f, int d, unsigned long p, mpz_t disc)
+special_valuation (long *r, mpz_t *f, int d, unsigned long p, mpz_t disc)
 {
   mpz_t t;
   double v;
   int p_divides_lc;
 
-  ASSERT (mpz_divisible_ui_p (disc, p));
+  /*  ASSERT (mpz_divisible_ui_p (disc, p)); */
   mpz_init (t);
   /* first try special case where p^2 does not divide disc and p does not
      divide lc(f) */
@@ -409,8 +512,10 @@ special_valuation (mpz_t *f, int d, unsigned long p, mpz_t disc)
   p_divides_lc = mpz_divisible_ui_p (f[d], p);
   if ((mpz_divisible_ui_p (t, p) == 0) && (p_divides_lc == 0))
     {
+      int e, i;
       v = (double) p;
-      v = (v * (double) roots_mod (f, d, p) - 1.0) / (v * v - 1.0);
+      e = roots_mod2 (NULL, f, d, p);
+      v = (v * (double) e - 1.0) / (v * v - 1.0);
     }
   else
     {
@@ -421,7 +526,7 @@ special_valuation (mpz_t *f, int d, unsigned long p, mpz_t disc)
           mpz_t *g;
           int i;
 
-          g = alloc_poly (d);
+          g = alloc_mpz_array (d + 1);
           mpz_set_ui (t, 1); /* will contains p^i */
           for (i = 0; i <= d; i++)
             {
@@ -437,6 +542,7 @@ special_valuation (mpz_t *f, int d, unsigned long p, mpz_t disc)
   return v;
 }
 
+#if 0
 /* Estimate the average valuation of p in f(x) for 0 <= x, y < X,
    with a target accurary of eps. Since the returned value is multiplied
    by log(p), we need an accurary of eps/log(p) here, i.e., consider about
@@ -472,137 +578,289 @@ estimate_valuation (mpz_t *f, int d, double eps, unsigned long p)
   mpz_clear (v);
   return s / t;
 }
+#endif
 
-/* Returns the number of roots of f(x) mod p, where f has degree d.
-   Assumes p does not divide disc(f). */
-int
-roots_mod (mpz_t *f, int d, const unsigned long p)
+/*****************************************************************************/
+
+typedef struct {
+  int alloc;    /* number of allocated coefficients */
+  int degree;   /* degree < alloc */
+  mpz_t *coeff; /* coefficient list */
+} __mpz_poly_struct;
+typedef __mpz_poly_struct mpz_poly_t[1];
+
+/* initialize a polynomial with maximal degree d */
+void
+mpz_poly_init (mpz_poly_t f, int d)
 {
-  mpz_t *fp, *g, *h;
-  int i, j, k, df, dg, dh;
+  f->alloc = d + 1;
+  f->degree = -1; /* initialize to 0 */
+  f->coeff = alloc_mpz_array (d + 1);
+}
 
-  /* the number of roots is the degree of gcd(x^p-x,f) */
+/* clear a polynomial */
+void
+mpz_poly_clear (mpz_poly_t f)
+{
+  poly_clear (f->coeff, f->degree);
+}
 
-  /* we first compute fp = f/lc(f) mod p */
+void
+mpz_poly_out (FILE *fp, mpz_poly_t f)
+{
+  if (f->degree < 0)
+    fprintf (fp, "0\n");
+  else
+    fprint_polynomial (fp, f->coeff, f->degree);
+}
+
+/* fp <- f/lc(f) mod p. Return degree of fp (-1 if fp=0). */
+int
+mpz_poly_set_mod (mpz_poly_t fp, mpz_t *f, int d, unsigned long p)
+{
+  int i;
+
   while (d >= 0 && mpz_divisible_ui_p (f[d], p))
     d --;
   ASSERT (d >= 0); /* f is 0 mod p: should not happen since otherwise p would
 		      divide N, because f(m)=N */
-  fp = alloc_poly (d);
-  mpz_set_ui (fp[d], p);
-  mpz_invert (fp[d], f[d], fp[d]); /* 1/f[d] mod p */
+  mpz_set_ui (fp->coeff[d], p);
+  mpz_invert (fp->coeff[d], f[d], fp->coeff[d]); /* 1/f[d] mod p */
   for (i = 0; i < d; i++)
     {
-      mpz_mul (fp[i], f[i], fp[d]);
-      mpz_mod_ui (fp[i], fp[i], p);
+      mpz_mul (fp->coeff[i], f[i], fp->coeff[d]);
+      mpz_mod_ui (fp->coeff[i], fp->coeff[i], p);
     }
-  mpz_set_ui (fp[d], 1); /* useless? */
-  df = d;
+  mpz_set_ui (fp->coeff[d], 1); /* useless? */
+  fp->degree = d;
+
+  return d;
+}
+
+/* realloc f to n coefficients */
+void
+mpz_poly_realloc (mpz_poly_t f, int n)
+{
+  if (f->alloc < n)
+    {
+      f->coeff = realloc_mpz_array (f->coeff, f->alloc, n);
+      f->alloc = n;
+    }
+}
+
+/* f <- x */
+void
+mpz_poly_set_x (mpz_poly_t f)
+{
+  mpz_poly_realloc (f, 2);
+  f->degree = 1;
+  mpz_set_ui (f->coeff[0], 0);
+  mpz_set_ui (f->coeff[1], 1);
+}
+
+/* swap f and g */
+void
+mpz_poly_swap (mpz_poly_t f, mpz_poly_t g)
+{
+  int i;
+  mpz_t *t;
+
+  i = f->alloc;
+  f->alloc = g->alloc;
+  g->alloc = i;
+  i = f->degree;
+  f->degree = g->degree;
+  g->degree = i;
+  t = f->coeff;
+  f->coeff = g->coeff;
+  g->coeff = t;
+}
+
+/* h <- g^2, g and h must differ */
+void
+mpz_poly_sqr (mpz_poly_t h, mpz_poly_t g)
+{
+  int i, j, dg = g->degree;
+  mpz_t *gc = g->coeff, *hc = h->coeff;
+
+  for (i = 0; i <= dg; i++)
+    for (j = i + 1; j <= dg; j++)
+      if (i == 0 || j == dg)
+	mpz_mul (hc[i + j], gc[i], gc[j]);
+      else
+	mpz_addmul (hc[i + j], gc[i], gc[j]);
+  for (i = 1; i < 2 * dg; i++)
+    mpz_mul_2exp (hc[i], hc[i], 1);
+  mpz_mul (hc[0], gc[0], gc[0]);
+  mpz_mul (hc[2 * dg], gc[dg], gc[dg]);
+  for (i = 1; i < dg; i++)
+    mpz_addmul (hc[2 * i], gc[i], gc[i]);
+  h->degree = 2 * dg;
+}
+
+/* normalize h so that h->coeff[deg(h)] <> 0 */
+void
+mpz_poly_normalize (mpz_poly_t h)
+{
+  int dh = h->degree;
+
+  while (dh >= 0 && mpz_cmp_ui (h->coeff[dh], 0) == 0)
+    dh --;
+  h->degree = dh;
+}
+
+/* g <- h mod p */
+void
+mpz_poly_mod_ui (mpz_poly_t g, mpz_poly_t h, unsigned long p)
+{
+  int i;
+
+  mpz_poly_realloc (g, h->degree + 1);
+  for (i = 0; i <= h->degree; i++)
+    mpz_mod_ui (g->coeff[i], h->coeff[i], p);
+  g->degree = h->degree;
+  mpz_poly_normalize (h);
+}
+
+/* h <- x*h */
+void
+mpz_poly_mul_x (mpz_poly_t h)
+{
+  int i;
+
+  mpz_poly_realloc (h, h->degree + 2);
+  for (i = h->degree; i >= 0; i--)
+    mpz_swap (h->coeff[i+1], h->coeff[i]);
+  mpz_set_ui (h->coeff[0], 0);
+  h->degree ++;
+}
+
+/* h <- h - x mod p */
+void
+mpz_poly_sub_x (mpz_poly_t g, unsigned long p)
+{
+  mpz_poly_realloc (g, 2);
+  while (g->degree < 1)
+    mpz_set_ui (g->coeff[++(g->degree)], 0);
+  mpz_sub_ui (g->coeff[1], g->coeff[1], 1);
+  mpz_mod_ui (g->coeff[1], g->coeff[1], p);
+  mpz_poly_normalize (g);
+}
+
+/* h <- rem(h, f) mod p, f not necessarily monic */
+void
+mpz_poly_div_r (mpz_poly_t h, mpz_poly_t f, unsigned long p)
+{
+  int i, d = f->degree, dh = h->degree, monic;
+  mpz_t *hc = h->coeff, t;
+
+  mpz_init (t);
+  monic = mpz_cmp_ui (f->coeff[d], 1) == 0;
+  if (!monic)
+    {
+      mpz_set_ui (t, p);
+      mpz_invert (t, f->coeff[d], t); /* 1/f[d] mod p */
+    }
+  while (dh >= d)
+    {
+      /* subtract h[dh]/f[d]*x^(dh-d)*f from h */
+      if (!monic)
+	{
+	  mpz_mul (hc[dh], hc[dh], t);
+	  mpz_mod_ui (hc[dh], hc[dh], p);
+	}
+      for (i = 0; i < d; i++)
+	mpz_submul (hc[dh - d + i], hc[dh], f->coeff[i]);
+      /* it is not necessary to reduce h[j] mod p here for j < dh */
+      do
+	{
+	  dh --;
+	  if (dh >= 0)
+	    mpz_mod_ui (hc[dh], hc[dh], p);
+	}
+      while (dh >= 0 && mpz_cmp_ui (hc[dh], 0) == 0);
+    }
+  h->degree = dh;
+  /* reduce mod p */
+  mpz_poly_mod_ui (h, h, p);
+  mpz_clear (t);
+}
+
+/* fp <- gcd (fp, g) */
+void
+mpz_poly_gcd (mpz_poly_t fp, mpz_poly_t g, unsigned long p)
+{
+  while (g->degree >= 0)
+    {
+      mpz_poly_div_r (fp, g, p);
+      mpz_poly_mod_ui (fp, fp, p);
+      /* now deg(fp) < deg(g): swap f and g */
+      mpz_poly_swap (fp, g);
+    }
+}
+
+int
+nbits (unsigned long p)
+{
+  int k;
+
+  for (k = 0; p != 0; p >>= 1, k ++);
+  return k;
+}
+
+/* Return the number of roots of f(x) mod p, where f has degree d.
+   If r is not NULL, put the n roots of f(x) mod p in r[0]...r[n-1].
+*/
+int
+roots_mod (long *r, mpz_t *f, int d, const long p)
+{
+  mpz_poly_t fp, g, h;
+  int i, j, k, df, dg;
+
+  //  printf ("enter roots_mod, p=%d, f=", p); fprint_polynomial (stdout, f, d);
+
+  /* the number of roots is the degree of gcd(x^p-x,f) */
+
+  mpz_poly_init (fp, d);
+  mpz_poly_init (g, 2 * d - 1);
+  mpz_poly_init (h, 2 * d - 1);
+
+  d = mpz_poly_set_mod (fp, f, d, p);
 
   /* we first compute x^p mod fp; since fp has degree d, all operations can
-     be done with polynomials of degree < 2d */
-  g = alloc_poly (2 * d - 1);
-  h = alloc_poly (2 * d - 1);
+     be done with polynomials of degree < 2d: a square give at most degree
+     2d-2, and multiplication by x gives 2d-1. */
 
   /* initialize g to x */
-  mpz_set_ui (g[1], 1);
-  dg = 1;
+  mpz_poly_set_x (g);
 
-  mpz_set_ui (g[2], p);
-  k = mpz_sizeinbase (g[2], 2); /* number of bits of p: bit 0 to k-1 */
+  k = nbits (p);
 
   for (k -= 2; k >= 0; k--)
     {
-      /* square g into h: g has degree dg -> h has degree 2*dg */
-      for (i = 0; i <= dg; i++)
-	for (j = i + 1; j <= dg; j++)
-	  if (i == 0 || j == dg)
-	    mpz_mul (h[i + j], g[i], g[j]);
-	  else
-	    mpz_addmul (h[i + j], g[i], g[j]);
-      for (i = 1; i < 2 * dg; i++)
-	mpz_mul_2exp (h[i], h[i], 1);
-      mpz_mul (h[0], g[0], g[0]);
-      mpz_mul (h[2 * dg], g[dg], g[dg]);
-      for (i = 1; i < dg; i++)
-	mpz_addmul (h[2 * i], g[i], g[i]);
-      dh = 2 * dg;
-
-      /* reduce mod p */
-      ASSERT (dh < 2 * d);
-      for (i = 0; i <= dh; i++)
-	mpz_mod_ui (h[i], h[i], p);
-      
-      /* multiply h by x if bit k of p is set */
+      mpz_poly_sqr (h, g);             /* h <- g^2 */
       if (p & (1 << k))
-	{
-	  for (i = dh; i >= 0; i--)
-	    mpz_swap (h[i+1], h[i]);
-	  mpz_set_ui (h[0], 0);
-	  dh ++;
-	  ASSERT (dh < 2 * d);
-	}
+	mpz_poly_mul_x (h);            /* h <- x*h */
 
-      /* reduce mod fp */
-      while (dh >= d)
-	{
-	  /* subtract h[dh]*fp*x^(dh-d) from h */
-	  mpz_mod_ui (h[dh], h[dh], p);
-	  for (i = 0; i < d; i++)
-	    mpz_submul (h[dh - d + i], h[dh], fp[i]);
-	  /* it is not necessary to reduce h[j] for j < dh */
-	  dh --;
-          ASSERT (dh < 2 * d);
-	}
-
-      /* reduce h mod p and copy to g */
-      for (i = 0; i <= dh; i++)
-	mpz_mod_ui (g[i], h[i], p);
-      dg = dh;
-      ASSERT (dg < 2 * d);
+      mpz_poly_div_r (h, fp, p);       /* h -> rem(h, fp) */
+      mpz_poly_mod_ui (g, h, p);       /* g <- h mod p */
     }
 
   /* subtract x */
-  mpz_sub_ui (g[1], g[1], 1);
-  mpz_mod_ui (g[1], g[1], p);
+  mpz_poly_sub_x (g, p);
 
-  while (dg >= 0 && mpz_cmp_ui (g[dg], 0) == 0)
-    dg --;
+  /* fp <- gcd (fp, g) */
+  mpz_poly_gcd (fp, g, p);
 
-  /* take the gcd with fp */
-  while (dg > 0)
-    {
-      while (df >= dg)
-	{
-	  /* divide f by g */
-	  mpz_set_ui (h[0], p);
-	  mpz_invert (h[0], g[dg], h[0]); /* 1/g[dg] mod p */
-	  mpz_mul (h[0], h[0], fp[df]);
-	  mpz_mod_ui (h[0], h[0], p); /* fp[df]/g[dg] mod p */
-	  for (i = 0; i < dg; i++)
-	    {
-	      mpz_submul (fp[df - dg + i], h[0], g[i]);
-	      mpz_mod_ui (fp[df - dg + i], fp[df - dg + i], p);
-	    }
-	  df --;
-	  while (df >= 0 && mpz_cmp_ui (fp[df], 0) == 0)
-	    df --;
-	}
-      /* now d < dg: swap f and g */
-      for (i = 0; i <= dg; i++)
-	mpz_swap (fp[i], g[i]);
-      i = df;
-      df = dg;
-      dg = i;
-    }
+  /* now fp contains gcd(x^p-x, f) */
 
-  /* if g=0 now, gcd is f, otherwise if g<>0, gcd is 1 */
-  if (mpz_cmp_ui (g[0], 0) != 0)
-    df = 0;
+  df = fp->degree;
 
-  poly_clear (g, 2 * d - 1);
-  poly_clear (h, 2 * d - 1);
-  poly_clear (fp, d);
+  mpz_poly_clear (fp);
+  mpz_poly_clear (g);
+  mpz_poly_clear (h);
+
+  printf ("p=%d:%d\n", p, df);
 
   return df;
 }
@@ -637,43 +895,26 @@ get_alpha (mpz_t *f, const int d, unsigned long B, int verbose)
   double alpha, e;
   unsigned long p, q;
   mpz_t disc;
+  long *roots;
 
   mpz_init (disc);
   discriminant (disc, f, d);
-  if (mpz_divisible_ui_p (disc, 2) == 0)
-    {
-      q = roots_mod (f, d, 2);
-      ASSERT (q <= 2);
-      alpha = (1.0 - 2.0 * (double) q / 3.0) * log (2.0);
-    }
-  else
-    {
-      e = GET_VALUATION (f, d, 2, disc);
-      if (verbose >= 2)
-	fprintf (stderr, "2 divides disc(f): %1.6f\n", e);
-      alpha = (1.0 - e) * log (2.0);
-    }
+
+  roots = (long*) malloc (d * sizeof (long));
+
+  /* prime p=2 */
+  e = special_valuation (roots, f, d, 2, disc);
+  alpha = (1.0 - e) * log (2.0);
+
+  /* FIXME: generate all primes up to B and pass them to get_alpha */
   for (p = 3; p <= B; p += 2)
-    {
-      if (isprime (p))
-	{
-	  if (mpz_divisible_ui_p (disc, p))
-	    {
-              e = GET_VALUATION (f, d, p, disc);
-	      if (verbose >= 2)
-		fprintf (stderr, "%lu divides disc(f): %1.6f\n", p, e);
-	      alpha += (1.0 / (double) (p - 1) - e) * log ((double) p);
-	    }
-	  else
-	    {
-	      q = roots_mod (f, d, p);
-	      ASSERT (q <= p);
-	      alpha += (1.0 - (double) q * (double) p / (double) (p + 1)) *
-		log ((double) p) / (double) (p - 1);
-	    }
-	}
-    }
+    if (isprime (p))
+      {
+	e = special_valuation (roots, f, d, p, disc);
+	alpha += (1.0 / (double) (p - 1) - e) * log ((double) p);
+      }
   mpz_clear (disc);
+  free (roots);
   return alpha;
 }
 
@@ -908,8 +1149,8 @@ init_poly (cado_poly p, cado_input in)
   p->degree = in->degree;
   if (p->degree == 0)
     p->degree = default_degree (p->n);
-  p->f = alloc_poly (p->degree);
-  p->g = alloc_poly (2);
+  p->f = alloc_mpz_array (p->degree + 1);
+  p->g = alloc_mpz_array (3);
   mpz_init (p->m);
   strcpy (p->type, "gnfs");
 }
@@ -1280,6 +1521,7 @@ generate_poly (cado_poly out, double T, int verbose)
   mpz_init (t);
   mpz_init (r);
 
+#if 0
   if (d > 7)
     {
       fprintf (stderr, "Error, too large degree in generate_poly\n");
@@ -1287,8 +1529,15 @@ generate_poly (cado_poly out, double T, int verbose)
     }
   B = pow (T, 1.0 / eff[d]); /* B = T^{1/eff[d]} */
   mpz_root (out->m, out->n, d + 1); /* n^{1/(d+1)} */
-  mB = B * mpz_get_d (out->m);
-  mpz_set_d (out->m, mB); /* B^{1/(d-1)} n^{1/(d+1)} */
+  mB = B * mpz_get_d (out->m); /* B^{1/(d-1)} n^{1/(d+1)} */
+#else
+  {
+    double dd = (double) d;
+    mB = pow (mpz_get_d (out->n), 1.0 / (dd + 1.0)) *
+      pow (T, 2.0 * dd / ((dd - 2.0) * (dd - 1.0) * (dd + 1.0)));
+  }
+#endif
+  mpz_set_d (out->m, mB);
 
   /* First phase: search for m which give a base-m decomposition with a small
      norm. When going from m to m+k, f[d-1] goes to f[d-1] - k d f[d] */
@@ -1463,6 +1712,7 @@ main (int argc, char *argv[])
   int argc0 = argc;
   int st = cputime ();
   mpz_t m;
+  int degree = 0; /* if 0, use default values */
 
   fprintf (stderr, "%s rev. %s\n", argv[0], REV);
 
@@ -1495,6 +1745,12 @@ main (int argc, char *argv[])
 	  argv += 2;
 	  argc -= 2;
 	}
+      else if (argc > 2 && strcmp (argv[1], "-degree") == 0)
+	{
+          degree = atoi (argv[2]);
+	  argv += 2;
+	  argc -= 2;
+	}
       else
 	{
 	  fprintf (stderr, "Unknown option: %s\n", argv[1]);
@@ -1515,6 +1771,8 @@ main (int argc, char *argv[])
   parse_input (in);
   if (verbose)
     fprintf (stderr, "L[1/3,(64/9)^(1/3)](n)=%1.2e\n", L (in->n));
+  if (degree != 0)
+    in->degree = degree;
   init_poly (out, in);
   mpz_set (out->m, m); /* if non zero, use given value of m */
   clear (in);
