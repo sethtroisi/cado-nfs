@@ -16,4 +16,11 @@ void fprint_relation(FILE *file, relation_t rel);
 /* cputime */
 int cputime (void);
 
+/* long_poly arithmetic */
+typedef struct {
+  int alloc;    /* number of allocated coefficients */
+  int degree;   /* degree < alloc */
+  long *coeff; /* coefficient list */
+} __long_poly_struct;
+typedef __long_poly_struct long_poly_t[1];
 
