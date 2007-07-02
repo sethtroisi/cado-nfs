@@ -1,6 +1,6 @@
 CFLAGS=-g -O2
 
-names:=polyfile relation cputime long_poly
+names:=polyfile relation cputime long_poly getprime
 src:=$(patsubst %,%.c,$(names))
 obj:=$(patsubst %,%.o,$(names))
 

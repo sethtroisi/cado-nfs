@@ -148,9 +148,9 @@ long_poly_swap (long_poly_t f, long_poly_t g)
   g->coeff = t;
 }
 
-/* h <- g^2, g and h must differ */
+/* h <- g^2 mod p, g and h must differ */
 void
-long_poly_sqr (long_poly_t h, const long_poly_t g)
+long_poly_sqr (long_poly_t h, const long_poly_t g, long p)
 {
   int i, j, dg = g->degree;
   long *gc = g->coeff, *hc = h->coeff;
@@ -168,6 +168,9 @@ long_poly_sqr (long_poly_t h, const long_poly_t g)
   hc[2 * dg] = gc[dg] * gc[dg];
   for (i = 1; i < dg; i++)
     hc[2 * i] += gc[i] * gc[i];
+  /* reduce mod p */
+  for (i = 0; i <= 2 * dg; i++)
+    hc[i] %= p;
   h->degree = 2 * dg;
 }
 
@@ -221,7 +224,7 @@ long_poly_sub_x (long_poly_t h, const long_poly_t g, long p)
   for (i = d + 1; i <= 1; i++)
     h->coeff[i] = 0;
   h->coeff[1] = (h->coeff[1] - 1) % p;
-  h->degree = (d < 2) ? 2 : d;
+  h->degree = (d < 1) ? 1 : d;
   long_poly_normalize (h);
 }
 
@@ -237,7 +240,7 @@ long_poly_sub_1 (long_poly_t h, const long_poly_t g, long p)
   for (i = d + 1; i <= 0; i++)
     h->coeff[i] = 0;
   h->coeff[0] = (h->coeff[0] - 1) % p;
-  h->degree = (d < 1) ? 1 : d;
+  h->degree = (d < 0) ? 0 : d;
   long_poly_normalize (h);
 }
 
@@ -370,6 +373,16 @@ long_poly_roots_mod (long *r, long_poly_t f, const long p)
   return n;
 }
 
+/* return the number of bits of p */
+int
+nbits (unsigned long p)
+{
+  int k;
+
+  for (k = 0; p != 0; p >>= 1, k ++);
+  return k;
+}
+
 /* g <- (x+a)^e mod (fp, e), using auxiliary polynomial h */
 void
 long_poly_powmod_ui (long_poly_t g, long_poly_t fp, long_poly_t h, long a,
@@ -383,7 +396,7 @@ long_poly_powmod_ui (long_poly_t g, long_poly_t fp, long_poly_t h, long a,
   assert (e > 0);
   for (k -= 2; k >= 0; k--)
     {
-      long_poly_sqr (h, g);             /* h <- g^2 */
+      long_poly_sqr (h, g, p);             /* h <- g^2 */
       if (e & (1 << k))
 	long_poly_mul_x (h, a, p);            /* h <- x*h */
 
@@ -419,9 +432,9 @@ long_poly_cantor_zassenhaus (long *r, long_poly_t f, long p, int depth)
   long_poly_init (q, 2 * d - 1);
   long_poly_init (h, 2 * d - 1);
   long_poly_init (ff, d);
-  for (a = 0; a < p; a++)
+  a = lrand48 () % p;
+  for (;;)
     {
-      long_poly_set_linear (q, 1, a);
       long_poly_powmod_ui (q, f, h, a, (p - 1) / 2, p);
       long_poly_sub_1 (q, q, p);
       long_poly_set (h, f);
@@ -436,12 +449,87 @@ long_poly_cantor_zassenhaus (long *r, long_poly_t f, long p, int depth)
 	  m = long_poly_cantor_zassenhaus (r + n, h, p, depth + 1);
 	  assert (m == h->degree);
 	  n += m;
-	  break;
+          break;
 	}
+      if (++a >= p)
+        a -= p;
     }
-  assert (a != p);
   long_poly_clear (q);
   long_poly_clear (h);
   long_poly_clear (ff);
   return n;
 }
+
+#define ROOTS_MOD_THRESHOLD  43 /* if only the number of roots is needed */
+#define ROOTS_MOD_THRESHOLD2 67 /* if the roots are needed too */
+
+/* The following function returns the number of roots of f(x) mod p,
+   where f has degree d.
+   If r is not NULL, put the n roots of f(x) mod p in r[0]...r[n-1].
+
+   For p <= ROOTS_MOD_THRESHOLD, determine the number of roots of f mod p
+   by evaluating f on 0, 1, ..., p-1. In theory, this threshold should 
+   depend on the degree of f. The above thresholds seem to be optimal
+   on a Pentium M. We must have ROOTS_MOD_THRESHOLD2 >= 2.
+*/
+int
+roots_mod_long (long *r, mpz_t *f, int d, const long p)
+{
+  long_poly_t fp, g, h;
+  int df, n;
+
+  /* the number of roots is the degree of gcd(x^p-x,f) */
+
+  long_poly_init (fp, d);
+  d = long_poly_set_mod (fp, f, d, p);
+
+  if (d == 0)
+    {
+      df = 0;
+      goto clear_fp;
+    }
+
+  assert (d > 0);
+
+  if ((r == NULL && p <= ROOTS_MOD_THRESHOLD) ||
+      (r != NULL && p <= ROOTS_MOD_THRESHOLD2))
+    {
+      df = long_poly_roots_mod (r, fp, p);
+      goto clear_fp;
+    }
+
+  long_poly_init (g, 2 * d - 1);
+  long_poly_init (h, 2 * d - 1);
+
+  /* we first compute x^p mod fp; since fp has degree d, all operations can
+     be done with polynomials of degree < 2d: a square give at most degree
+     2d-2, and multiplication by x gives 2d-1. */
+
+  /* g <- x^p mod fp */
+  long_poly_powmod_ui (g, fp, h, 0, p, p);
+
+  /* subtract x */
+  long_poly_sub_x (g, g, p);
+
+  /* fp <- gcd (fp, g) */
+  long_poly_gcd (fp, g, p);
+
+  /* now fp contains gcd(x^p-x, f) */
+
+  df = fp->degree;
+  
+  if (r != NULL && df > 0)
+    {
+      n = long_poly_cantor_zassenhaus (r, fp, p, 0);
+      assert (n == df);
+    }
+
+  long_poly_clear (g);
+  long_poly_clear (h);
+
+ clear_fp:
+  long_poly_clear (fp);
+
+  return df;
+}
+

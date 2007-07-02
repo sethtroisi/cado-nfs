@@ -165,6 +165,40 @@ read_polynomial (cado_poly poly, char *filename)
   return 1;
 }
 
+void
+fprint_polynomial (FILE *fp, mpz_t *f, const int d)
+{
+  int i, s, first = 1;
+  mpz_t c;
+
+  mpz_init (c);
+  for (i = d; i >= 0; i--)
+    {
+      s = mpz_cmp_ui (f[i], 0);
+      if (s != 0)
+        {
+          if (s > 0)
+            {
+              if (first == 0)
+                gmp_fprintf (fp, " + ");
+              gmp_fprintf (fp, "%Zd", f[i]);
+            }
+          else if (s < 0)
+            {
+              mpz_abs (c, f[i]);
+              gmp_fprintf (fp, " - %Zd", c);
+            }
+          first = 0;
+          if (i >= 2)
+            gmp_fprintf (fp, "*x^%d", i);
+          else if (i == 1)
+            gmp_fprintf (fp, "*x");
+        }
+    }
+  mpz_clear (c);
+  fprintf (fp, "\n");
+}
+
 #undef TYPE_STRING 
 #undef TYPE_MPZ 
 #undef TYPE_INT 

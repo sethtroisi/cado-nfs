@@ -20,7 +20,7 @@ ECMINCLUDE ?= $(ECM)/include/
 GMPLIB ?= $(GMP)/lib/libgmp.a
 GMPINCLUDE ?= $(GMP)/include/
 
-all: sieve checknorms
+all: sieve checknorms makefb
 
 Makefile.local:
 	echo "Makefile.local does not exist. It can be used to store paths" \
@@ -34,10 +34,13 @@ sieve: sieve.c fb.c ../utils/libutils.a ../mod_ul.c config.h sieve_aux.h ../cado
 checknorms: checknorms.c
 	gcc -I. -I.. -I$(ECMINCLUDE) $(CFLAGS) -o $@ $< ../utils/libutils.a $(ECMLIB) $(GMPLIB) -lm
 
+makefb: makefb.c
+	gcc -I. -I.. $(CFLAGS) -o $@ $< ../utils/libutils.a $(GMPLIB) -lm
+
 config.h:
 	echo '#define HAVE_MSRH 1'   >  $@
 	echo '#define WANT_ASSERT 1' >> $@
 	echo '#define L1SIZE 32768' >>  $@
 
 clean:
-	rm -f sieve checknorms
+	rm -f sieve checknorms makefb

@@ -31,6 +31,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
        Arizona, 14 March 2006.
    [3] "Polynomial Selection for the Number Field Sieve Integer Factorisation
        Algorithm", Brian Antony Murphy, Australian National University, 1999.
+   [4] http://www.crypto-world.com/code/Murphy, Magma code from Scott Contini,
+       May 2000.
 */
 
 /* if WANT_MONIC is defined, allow only monic linear polynomial x-m */
@@ -135,18 +137,6 @@ diff_poly (mpz_t *f, mpz_t *g, int d)
 
   for (i = 0; i < d; i++)
     mpz_mul_ui (f[i], g[i + 1], i + 1);
-}
-
-void
-fprint_polynomial (FILE *fp, mpz_t *f, const int d)
-{
-  int i;
-  for (i = 0; i <= d; i++)
-    if (mpz_cmp_ui (f[i], 0) > 0)
-      gmp_fprintf (fp, "+%Zd*x^%d", f[i], i);
-    else if (mpz_cmp_ui (f[i], 0) < 0)
-      gmp_fprintf (fp, "%Zd*x^%d", f[i], i);
-  fprintf (fp, ";\n");
 }
 
 /* g <- content(f) where deg(f)=d */
@@ -304,81 +294,6 @@ igcd (unsigned long a, unsigned long b)
   return a;
 }
 
-/* For p <= ROOTS_MOD_THRESHOLD, determine the number of roots of f mod p
-   by evaluating f on 0, 1, ..., p-1. In theory, this threshold should 
-   depend on the degree of f. The following value seems to be optimal
-   on a Pentium M. We must have ROOTS_MOD_THRESHOLD2 >= 2.
-*/
-#define ROOTS_MOD_THRESHOLD  43 /* if only the number of roots is needed */
-#define ROOTS_MOD_THRESHOLD2 67 /* if the roots are needed too */
-
-/* Same as roots_mod, but uses long's instead of mpz_t's for computations.
-   If r <> NULL, put in r[0], r[1], ... the roots of f mod p.
-*/
-int
-roots_mod2 (long *r, mpz_t *f, int d, const long p)
-{
-  long_poly_t fp, g, h;
-  int df, n;
-
-  //  printf ("enter roots_mod2, p=%d, d=%d, f=", p, d);
-  //  fprint_polynomial (stdout, f, d);
-
-  /* the number of roots is the degree of gcd(x^p-x,f) */
-
-  long_poly_init (fp, d);
-  d = long_poly_set_mod (fp, f, d, p);
-
-  if (d == 0)
-    {
-      df = 0;
-      goto clear_fp;
-    }
-
-  assert (d > 0);
-
-  if ((r == NULL && p <= ROOTS_MOD_THRESHOLD) ||
-      (r != NULL && p <= ROOTS_MOD_THRESHOLD2))
-    {
-      df = long_poly_roots_mod (r, fp, p);
-      goto clear_fp;
-    }
-
-  long_poly_init (g, 2 * d - 1);
-  long_poly_init (h, 2 * d - 1);
-
-  /* we first compute x^p mod fp; since fp has degree d, all operations can
-     be done with polynomials of degree < 2d: a square give at most degree
-     2d-2, and multiplication by x gives 2d-1. */
-
-  /* g <- x^p mod fp */
-  long_poly_powmod_ui (g, fp, h, 0, p, p);
-
-  /* subtract x */
-  long_poly_sub_x (g, g, p);
-
-  /* fp <- gcd (fp, g) */
-  long_poly_gcd (fp, g, p);
-
-  /* now fp contains gcd(x^p-x, f) */
-
-  df = fp->degree;
-  
-  if (r != NULL && df > 0)
-    {
-      n = long_poly_cantor_zassenhaus (r, fp, p, 0);
-      assert (n == df);
-    }
-
-  long_poly_clear (g);
-  long_poly_clear (h);
-
- clear_fp:
-  long_poly_clear (fp);
-
-  return df;
-}
-
 /* auxiliary routine for special_valuation(), see below */
 double
 special_val0 (mpz_t *f, int d, unsigned long p)
@@ -417,7 +332,7 @@ special_val0 (mpz_t *f, int d, unsigned long p)
 #if 1
   assert (d > 0);
   roots = (long*) malloc (d * sizeof (long));
-  nroots = roots_mod2 (roots, g, d, p);
+  nroots = roots_mod_long (roots, g, d, p);
   for (r0 = 0, i = 0; i < nroots; i++)
     {
       r = roots[i];
@@ -514,7 +429,7 @@ special_valuation (long *r, mpz_t *f, int d, unsigned long p, mpz_t disc)
     {
       int e, i;
       v = (double) p;
-      e = roots_mod2 (NULL, f, d, p);
+      e = roots_mod_long (NULL, f, d, p);
       v = (v * (double) e - 1.0) / (v * v - 1.0);
     }
   else
@@ -797,15 +712,6 @@ mpz_poly_gcd (mpz_poly_t fp, mpz_poly_t g, unsigned long p)
       /* now deg(fp) < deg(g): swap f and g */
       mpz_poly_swap (fp, g);
     }
-}
-
-int
-nbits (unsigned long p)
-{
-  int k;
-
-  for (k = 0; p != 0; p >>= 1, k ++);
-  return k;
 }
 
 /* Return the number of roots of f(x) mod p, where f has degree d.

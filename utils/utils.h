@@ -4,6 +4,7 @@
 // accordingly. Return 1 if success, 0 if failure (and diagnostic on
 // stderr)
 int read_polynomial (cado_poly, char *filename);
+void fprint_polynomial (FILE *, mpz_t *, const int);
 
 // Relation I/O
 void copy_rel(relation_t *Rel, relation_t rel);
@@ -23,4 +24,7 @@ typedef struct {
   long *coeff; /* coefficient list */
 } __long_poly_struct;
 typedef __long_poly_struct long_poly_t[1];
+int roots_mod_long (long*, mpz_t*, int, const long);
 
+/* getprime */
+unsigned long getprime (unsigned long);
