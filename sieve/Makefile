@@ -9,7 +9,7 @@
 include Makefile.local
 
 OPTFLAGS ?= -O2
-CFLAGS=$(OPTFLAGS) -g -fkeep-inline-functions -Wall -W -DREV=\"`svnversion`\"
+CFLAGS=$(OPTFLAGS) -g -fkeep-inline-functions -Wall -W -DREV=\"`svnversion .`\"
 LDFLAGS=
 
 # Set default filenames/paths if not already set.
