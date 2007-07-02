@@ -1,0 +1,9 @@
+
+Author(s) of the TIFA library:
+------------------------------
+
+- MILAN Jerome : <milanj@lix.polytechnique.fr>
+
+    - Version 0.1
+    - Version 0.2 (still in development...)
+

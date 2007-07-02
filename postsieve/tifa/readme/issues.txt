@@ -1,0 +1,20 @@
+
+ More bugs and issues are likely to be found once the library will be more
+ widely distributed.
+
+ Got a bug or an issue to report? Write to <milanj@lix.polytechnique.fr>.
+
+ TIFA: Bugs and outstanding issues
+ ------------------------------------------------------------------------------
+
+     - INSTABLE VERSION WARNING:
+
+           The library just went through a huge refactoring! As a result,
+           things may (or rather, will) crash, and/or, fry your computer, burn
+           your house, destroy the ozone layer (or what's left of it) and,
+           incidentally, give wrong results.
+
+     - The QS and SIQS implementations need to be optimized and fine-tuned.
+       Right now, they _are_ definitely sub par performance-wise even if they
+       somewhat improved recently.
+

@@ -1,0 +1,98 @@
+//
+// Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
+// Computer Science and Control)
+//
+// This library is free software; you can redistribute it and/or modify it under
+// the terms of the GNU Lesser General Public License as published by the Free
+// Software Foundation; either version 2.1 of the License, or (at your option)
+// any later version.
+//
+// This library is distributed in the hope that it will be useful, but WITHOUT
+// ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+// FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
+// details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with this library; if not, write to the Free Software Foundation, Inc.,
+// 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
+//
+
+#if !defined(_TIFA_CONFIG_H_)
+#define _TIFA_CONFIG_H_
+
+/* Name of package */
+#define TIFA_SHORTNAME "%SHORTNAME%"
+
+/* Define to the address where bug reports for this package should be sent. */
+#define TIFA_BUGREPORT "%BUGREPORT%"
+
+/* Define to the full name of this package. */
+#define TIFA_FULLNAME "%FULLNAME%"
+
+/* Define to the name and version of this package. */
+#define TIFA_STRING "%STRING%"
+
+/* Define to the one symbol short name of this package. */
+#define TIFA_TARNAME "%TARNAME%"
+
+/* Version number of package */
+#define TIFA_VERSION "%VERSION%"
+
+/* Major version number of package */
+#define TIFA_VERSION_MAJOR %VERSION_MAJOR%
+
+/* Minor version number of package */
+#define TIFA_VERSION_MINOR %VERSION_MINOR%
+
+/* Patch version number of package */
+#define TIFA_VERSION_PATCH %VERSION_PATCH%
+
+/* Set to 1 to allow use of some GMP's internal functions */
+#define TIFA_USE_GMP_INTERNAL_FUNCS %USE_GMP_INTERNAL_FUNCS%
+
+/* Set to 1 to use calloc/memset for integer array initialization */
+#define TIFA_USE_CALLOC_MEMSET %USE_CALLOC_MEMSET%
+
+/* Native type used to represent a string of bits */
+#define TIFA_BITSTRING_T %BITSTRING_T%
+
+/* Size of type (in sizeof units) used to represent a string of bits */
+#define TIFA_SIZEOF_BITSTRING_T %SIZEOF_BITSTRING_T%
+
+/* Size of type (in bits) used to represent a string of bits */
+#define TIFA_BITSTRING_T_BITSIZE %BITSTRING_T_BITSIZE%
+
+/* Define to 1 to print critical error messages on stderr */
+#define TIFA_PRINT_ERROR %PRINT_ERROR%
+
+/* Define to 1 to turn on output messages for the cfrac function */
+#define TIFA_VERBOSE_CFRAC %VERBOSE_CFRAC%
+
+/* Define to 1 to turn on output messages for the qs function */
+#define TIFA_VERBOSE_QS %VERBOSE_QS%
+
+/* Define to 1 to turn on output messages for the siqs function */
+#define TIFA_VERBOSE_SIQS %VERBOSE_SIQS%
+
+/* Define to 1 to turn on output messages for the squfof function */
+#define TIFA_VERBOSE_SQUFOF %VERBOSE_SQUFOF%
+
+/* Define to 1 to turn on output messages for the tdiv function */
+#define TIFA_VERBOSE_TDIV %VERBOSE_TDIV%
+
+/* Define to 1 to turn on timing messages for the cfrac function */
+#define TIFA_TIMING_CFRAC %TIMING_CFRAC%
+
+/* Define to 1 to turn on timing messages for the qs function */
+#define TIFA_TIMING_QS %TIMING_QS%
+
+/* Define to 1 to turn on timing messages for the siqs function */
+#define TIFA_TIMING_SIQS %TIMING_SIQS%
+
+/* Define to 1 to turn on timing messages for the squfof function */
+#define TIFA_TIMING_SQUFOF %TIMING_SQUFOF%
+
+/* Define to 1 to turn on timing messages for the tdiv function */
+#define TIFA_TIMING_TDIV %TIMING_TDIV%
+
+#endif

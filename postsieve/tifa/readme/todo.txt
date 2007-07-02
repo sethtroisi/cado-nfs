@@ -1,0 +1,14 @@
+
+Here are some short term objectives (as of June 2007):
+
+  - Fallback strategies for all factorization functions (find more relations,
+    change multiplier, etc.) to make them more robust. This is currently done
+    for CFRAC only and needs to be extended to QS and SIQS.
+
+  - Implement a multi-step early abort strategy (as described by Carl Pomerance
+    in "Analysis and Comparison of Some Integer Factoring Algorithms").
+
+  - Tune QS and SIQS implementations (right now far below par performance-wise).
+    This is still a work in progress, even if these implementations somewhat
+    improved recently.
+

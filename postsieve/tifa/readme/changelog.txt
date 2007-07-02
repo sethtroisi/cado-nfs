@@ -1,0 +1,66 @@
+ TIFA v0.2.0:
+ ------------
+
+ - June 2007:
+       - Misc fixes.
+       - Added clone_binary_matrix function.
+       - Fixed CFRAC bug in linalg phase after a context update.
+       - Changes behavior of SQUFOF: no more user parameters. Now performs
+         a multiplier race if and only if it failed without using a multiplier.
+
+ - Late May 2007:
+       - More optimizations on SIQS. Need more testing though...
+       - Fixed bug in SQUFOF: Was limited to factorization of single precision
+         integers. Can now factor up to (roughly) double precision integers.
+         Now uses optional multiplier race.
+
+ - Late April 2007->Mid May 2007:
+       - Cleaned QS and SIQS + some optimizations.
+       - Custom Doxygen style sheet for documentation.
+
+ - March->Mid-April 2007:
+       - Completely refactored the factoring algorithms (now use the same
+         underlying factoring engine with switches for different behaviours).
+       - Also refactored the factoring programs to reduce code duplication.
+       - WARNING: Some API changed as a result, plus, some functions/files were
+         renamed.
+       - Added archive.pl script for maintainers.
+
+ - Feb 9->Feb 23 2007:
+       - Added build options to build the library into platform specific
+         subdirectories (e.g. ./build/i686/linux/ or ./build/powerpc/darwin/).
+       - Some SQUFOF fixes (e.g. added a real square detection test)
+       - Added the simple extractres.pl, mergeres.pl and gencomposites.pl
+         Perl scripts.
+       - Added a binary gcd for unsigned long integers (gcd_ulint).
+
+ - Feb 2->Feb 9 2007:
+       - Refactored benchmarker.pl and modified plotmaker.pl. All Perl
+         script have now been refactored and are much more extensible. Some
+         new Perl modules appeared: Rotor, Bencher, Program and
+         ProgramRepository.
+       - SQUFOF can now be benchmarked.
+
+ - Jan 29->Feb 2 2007:
+       - SimpleConfigReader now understands hashtables in configuration files
+       - Refactored and cleaned factorize.pl to ease addition of new algorithms
+
+ - Jan 22->26 2007:
+       - Fixed configuration bug wrt BITSTRING_T type
+       - Added build option to use GMP internal headers. As a result,
+         config.h renamed as tifa_config.h to avoid possible clash. Also
+         added MPN-based trial division.
+       - Added rough SQUFOF implementation and updated factorize.pl.
+
+ - Fall 2006 & Jan 2007:
+       - Performance enhancements of some of Bernstein's algorithms
+       - CFRAC: generation of residues now depends on size of numbers
+                and uses MPN layer (if needed)
+       - Several fixes and other optimizations in the base library
+       - prod_tree and similar functions now use MPN layer
+       - rem_tree and similar functions now use MPN layer
+       - Rewrote Perl scripts: now use distinct Perl modules
+       - Moved function first_row_with_one_on_col(...) from gaussian_elim.c to
+         matrix.c and added prototype in matrix.h
+       - Collected all useful macros in header macros.h
+       - Added QS and SIQS algorithm. Implementations are still untuned.
