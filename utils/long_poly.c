@@ -100,6 +100,22 @@ long_poly_set (long_poly_t f, const long_poly_t g)
     f->coeff[i] = g->coeff[i];
 }
 
+/* f <- f/lc(f) mod p */
+void
+long_poly_make_monic (long_poly_t f, long p)
+{
+  int d = f->degree, i;
+  long ilc;
+
+  if (f->coeff[d] == 1)
+    return;
+
+  ilc = invert_si (f->coeff[d], p);
+  for (i = 0; i < d; i++)
+    f->coeff[i] = (f->coeff[i] * ilc) % p;
+  f->coeff[d] = 1;
+}
+
 /* fp <- f/lc(f) mod p. Return degree of fp (-1 if fp=0). */
 int
 long_poly_set_mod (long_poly_t fp, mpz_t *f, int d, long p)
@@ -111,11 +127,10 @@ long_poly_set_mod (long_poly_t fp, mpz_t *f, int d, long p)
     d --;
   ASSERT (d >= 0); /* f is 0 mod p: should not happen since otherwise p would
 		      divide N, because f(m)=N */
-  ifd = invert_si (mpz_fdiv_ui (f[d], p), p);
-  for (i = 0; i < d; i++)
-    fp->coeff[i] = (mpz_fdiv_ui (f[i], p) * ifd) % p;
-  fp->coeff[d] = 1;
   fp->degree = d;
+  for (i = 0; i <= d; i++)
+    fp->coeff[i] = mpz_fdiv_ui (f[i], p);
+  long_poly_make_monic (fp, p);
 
   return d;
 }
@@ -390,6 +405,8 @@ long_poly_powmod_ui (long_poly_t g, long_poly_t fp, long_poly_t h, long a,
 {
   int k = nbits (e);
 
+  long_poly_make_monic (fp, p);
+
   /* initialize g to x */
   long_poly_set_linear (g, 1, a);
 
@@ -398,7 +415,7 @@ long_poly_powmod_ui (long_poly_t g, long_poly_t fp, long_poly_t h, long a,
     {
       long_poly_sqr (h, g, p);             /* h <- g^2 */
       if (e & (1 << k))
-	long_poly_mul_x (h, a, p);            /* h <- x*h */
+        long_poly_mul_x (h, a, p);            /* h <- x*h */
 
       long_poly_div_r (h, fp, p);       /* h -> rem(h, fp) */
       long_poly_mod_ui (g, h, p);       /* g <- h mod p */
