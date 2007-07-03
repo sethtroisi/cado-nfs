@@ -71,7 +71,14 @@ procedure onestep(s, ~c)
  	end for;
  
  	ndet:=Determinant(Submatrix(M2,1,d+1,d,d));
+
+	/* ndet is an integer because c has been chosen as (an
+	 * integer)*(irrational factors that appear).
+	 *
+	 * If this property fails, then precision should probably be raised.
+	 */
  	assert AbsoluteValue(ndet-Round(ndet)) lt 0.1;
+
  	if AbsoluteValue(ndet/Lbound) gt 2 then
  		printf "Uh, det=%o * Lbound\n", ndet/Lbound;
  		assert false;

@@ -19,7 +19,7 @@ input/output format for the magma sqrt code.
     logarithmic embeddings.
 
 
-- The file subdir/subdir.ur_idl contains information about the easy
+- The file subdir/ur_idl contains information about the easy
   ideals : ideals above p which are unramified and not dividing lc(pol).
   (the other ideals are recovered directly from magma).
   The file contains 3 integers per line, named p, r, and x. Such a triple
@@ -28,13 +28,18 @@ input/output format for the magma sqrt code.
   In the example, r is given to higher precision, such that r is a root
   of pol mod p^x ; however it's not used for the sqrt.
 
-  subdir/subdir.ur_idl is read from setup.m
+  subdir/ur_idl is read from setup.m
 
 - The ordering of the factor base ideals matters. ``special'' ideals are
   computed by the magma code, ordered by magma hash value, and we
   eventually consider the factor base formed by these special ideals in
   order, + the ideals from ur_idl in reading order. The matrix step must
   reflect this ordering.
+
+  In particular, ideals that never appear must at least still appear in a
+  pre-pruning version of the matrix, say matrix.txt.ur . In this way, we
+  can reproduce the ideal valuation vectors corresponding to the magma
+  ordering.
 
 - The file subdir/clink.txt contains the (a,b) information for the relations
   involved in the linear algebra computation. For reasons pertaining to
@@ -52,26 +57,29 @@ input/output format for the magma sqrt code.
   subdir/W00 and so on are read from sol0.m
 
 - The files subdir/W00.mul to subdir/W0$XX.mul contain the result of the
-  multiplication of the *unreduced* matrix (with coefficients in Z) by
-  the kernel elements. These vectors must have as many coordinates as
-  factor base elements, and will give the valuation of the combined
-  product at each ideal in the factor base. By construction, the
-  coordinates of these vectors must be divisible by e.
+  multiplication of the *unreduced* matrix by the kernel elements. The
+  unreduced matrix has coefficients in Z, and has all factor base ideals
+  appearing in rows, in the exact order magma expects them. The reduced
+  matrix might discard these rows, but the W0X.mul files must have them
+  The W0X.mul vectors must have as many coordinates as factor base
+  elements, and will give the valuation of the combined product at each
+  ideal in the factor base. By construction, the coordinates of these
+  vectors must be divisible by e.
 
   subdir/W00.mul and so on are read from sol0.m
 
-- subdir/subdir.characters contains character values for each of the
+- subdir/characters contains character values for each of the
   algebraic integers in subdir/clink.txt ; we don't care which kind of
   characters are used, nor how many of them are used.
-  subdir/subdir.characters must contain exactly as many lines as
+  subdir/characters must contain exactly as many lines as
   subdir/clink.txt, and each line must have the same number of integers
   modulo e, corresponding to the computed characters.
 
-  subdir/subdir.characters is read from sol0.m
+  subdir/characters is read from sol0.m
 
 - [unused] subdir/complete contains information about the raw relation
   factorizations, which are used to check if the ideal ordering is right.
-  Its use in icheck.m is commented out as it would be cumbersome to
+  It is used in icheck.m is commented out as it would be cumbersome to
   handle here.
 
 

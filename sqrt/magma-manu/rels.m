@@ -1,7 +1,7 @@
 /**************************************************************************/
 /* building relations */
 
-if not assigned(relbatch) then
+if not assigned(relbatch) or relbatch eq "" then
 	relbatch:="";
 else
 	relbatch cat:= ".";

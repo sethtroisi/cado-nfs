@@ -1,9 +1,19 @@
 
 /* It seems somewhat necessary to verify integrity of ideal ordering. */
 
+// The problem here has become increasingly acute over time, since the
+// preprocessing step now prunes ideals not encountered. Hence there may be
+// gaps here and there.
+
+// the right way (tm) would be to have the preprocessing program output the
+// list of indices corresponding to ideals that appear in the matrix. It does
+// not do that at the moment, and we have to rely on the matrix.txt.ur file.
+// Not so big a deal anyway.
+
 print "Checking ideal ordering";
 CLF:=Open(Sprintf("%o/complete",subdir),"r");
 nerr:=0;
+
 for i in [1..200] do
 	s:=Gets(CLF);
 	if IsEof(s) then break; end if;

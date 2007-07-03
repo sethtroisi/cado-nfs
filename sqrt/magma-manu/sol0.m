@@ -21,6 +21,7 @@ while true do
 	Append(~gens, r+q*x-b*X);
 end while;
 delete FP;
+
 printf "Read %o generating elements from %o\n", #gens, genfile;
 nrel:=#gens;
 
@@ -86,7 +87,7 @@ end for;
 
 print "Computing characters";
 
-cfilename := subdir cat "/" cat subdir_base cat ".characters";
+cfilename := subdir cat "/characters";
 
 /* First decide which characters are usable */
 
@@ -133,7 +134,7 @@ function charfile()
 	catch err
 		printf "Character file %o does not exist\n", cfilename;
 		print "Generating";
-		polyfilename:=subdir cat "/" cat subdir_base cat ".poly";
+		polyfilename:=subdir cat "/poly";
 		cmd:="make " cat polyfilename;
 		print cmd; System(cmd);
 		flm:=Lcm([Degree(i[1]):i in Factorization(ideal<OK|e>)]);
@@ -150,17 +151,11 @@ end function;
 CF:=charfile();
 */
 
-if System("[ `hostname` = 'profiterolle' ]") eq 0 then
-	machinename:="pentium3";
-else
-	machinename:="core2";
-end if;
-
-polyfilename:=subdir cat "/" cat subdir_base cat ".poly";
+polyfilename:=subdir cat "/poly";
 cmd:="make " cat polyfilename;
 print cmd; System(cmd);
-cmd:=Sprintf("if [ ! -f %o ] ; then %o/characters %o/clink.txt %o %o < %o > %o ; fi",
-	cfilename, machinename, subdir, e, charstring, polyfilename, cfilename);
+cmd:=Sprintf("if [ ! -f %o ] ; then %ocharacters %o/clink.txt %o %o < %o > %o ; fi",
+	cfilename, binpath, subdir, e, charstring, polyfilename, cfilename);
 print cmd; System(cmd);
 
 CF:=Open(cfilename,"r");
@@ -202,8 +197,9 @@ print "Dependencies", xdeps;
 
 depnum:=0;
 decomp:=[];
-while #[u:u in decomp|u[2] ne 0] eq 0 do
+while #[u:u in decomp|GF(e)!u[2] ne 0] eq 0 do
 	depnum +:=1;
+	printf "Trying dependency #%o\n", depnum;
 	if depnum gt #xdeps then break; end if;
 	chosen_chardep:=xdeps[depnum];
 	decomp:=[<gens[i],&+[m[j]*W[j][i] : j in [1..#W]]> : i in [1..nrel]]
@@ -351,6 +347,14 @@ vals0:=[[v gt 0 select v else 0:v in vals],[v lt 0 select -v else 0:v in vals]];
 
 for i in ideals do assert(Norm(i) gt 1); end for;
 lognorms0:=[&+[w[i]*Log(RR!Norm(ideals[i])): i in [1..#ideals]]:w in vals0];
+
+
+/* This should not fail, of course. I'm tracking a bug here (medium38bis)
+ * contender #1 for a bug here is ideal ordering failure (!).
+ * An indirect cause might be improper multiplication by the reduced matrix
+ * instead of the unreduced one in the bw-mul phase.
+ */
+assert 0 eq 1.0-Exp (lognorms0[1]-lognorms0[2]-&+[embs0[i] : i in [1..d]]);   
 
 /*
 lognorm_numer:=&+[RR| x[2]*Log(AbsoluteValue(Norm(Evaluate(x[1],a)))):x in decomp|x[2] gt 0];
