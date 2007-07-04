@@ -488,6 +488,17 @@ long_poly_cantor_zassenhaus (long *r, long_poly_t f, long p, int depth)
    by evaluating f on 0, 1, ..., p-1. In theory, this threshold should 
    depend on the degree of f. The above thresholds seem to be optimal
    on a Pentium M. We must have ROOTS_MOD_THRESHOLD2 >= 2.
+
+   The following ideas are from Emmanuel Thome:
+   FIXME1: instead of first computing f1 = gcd(x^p-x, f) which is the
+   product of linear factors, and then splitting f1, we can directly
+   compute f1 = gcd(x^((p-1)/2)-1, f) and f2 = gcd(x^((p-1)/2)+1, f),
+   assuming the roots 0 has been taken out.
+   FIXME2: in the EDF, instead of dividing out f by gcd((x+a)^((p-1)/2)-1, f),
+   we can simply compute gcd((x+a)^((p-1)/2)+1, f).
+   FIXME3: instead of computing (x+a)^((p-1)/2), we can translate f by -a,
+   and keep x^((p-1)/2) unchanged. [But then why not translate x^((p-1)/2),
+   which has lower degree? Warning: if f has root -a, we might miss it.]
 */
 int
 roots_mod_long (long *r, mpz_t *f, int d, const long p)
