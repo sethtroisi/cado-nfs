@@ -56,6 +56,7 @@
 #define mod_div2             modul_div2
 #define mod_div3             modul_div3
 #define mod_invmodlong       modul_invmodlong
+#define mod_gcd              modul_gcd
 #define mod_inv              modul_inv
 #define mod_jacobi           modul_jacobi
 
@@ -480,6 +481,28 @@ modul_div3 (residueul r, residueul a, modulusul m)
   modul_add (t, t, r, m);
   assert (t[0] == a[0]);
 #endif
+}
+
+__GNUC_ATTRIBUTE_UNUSED__
+static unsigned long
+modul_gcd (residueul r, modulusul m)
+{
+  unsigned long a = r[0], b = m[0], t;
+
+  ASSERT (b > 0);
+  
+  if (a >= b)
+    a %= b;
+
+  while (a > 0)
+    {
+      /* Here 0 < a < b */
+      t = b % a;
+      b = a;
+      a = t;
+    }
+
+  return b;
 }
 
 

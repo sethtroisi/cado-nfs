@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdarg.h>
 #include <string.h>
 #include <math.h>
 #include <ctype.h>
@@ -27,7 +28,42 @@
 #define SIEVE_PERMISSIBLE_ERROR ((unsigned char) 7)
 #define PRP_REPS 1 /* number of tests in mpz_probab_prime_p */
 
-unsigned long sumprimes, nrprimes;
+#ifndef TRIALDIV_SKIPFORWARD
+#error "Please define TRIALDIV_SKIPFORWARD as 0 or 1 in config.h. It controls\
+  whether we skip forward in the factor base to find the last missing factor\
+  base prime during refactoring."
+#endif
+
+unsigned long sumprimes, nrprimes; /* For largest non-report fb primes */
+unsigned long sumprimes2, nrprimes2;  /* For 2nd largest non-report fb prim. */
+unsigned long rho_called = 0, rho_toolarge = 0;
+
+#ifdef TRACE_RELATION_A
+static void 
+TRACE_A (long a, const char *fn, const char *s, ...)
+{
+  va_list ap;
+
+  va_start (ap, s);
+
+  if (a == TRACE_RELATION_A)
+    {
+      printf ("# TRACE RELATION a = %ld in %s: ", a, fn);
+      gmp_vprintf (s, ap);
+      fflush (stdout);
+    }
+
+  va_end (ap);
+}
+#else
+static void
+TRACE_A (__attribute__ ((unused)) long a, 
+	 __attribute__ ((unused)) const char *fn, 
+	 __attribute__ ((unused)) const char *s, ...)
+{
+}
+#endif
+
 
 /* Some multiple precision functions we'll need */
 
@@ -109,11 +145,69 @@ mp_poly_print (mpz_t *poly, int deg, const char *name, int homogeneous)
     }
 }
 
+static inline unsigned char
+uc_add (unsigned char a, unsigned char b)
+{
+  return (unsigned char) (a + b);
+}
+
+static inline unsigned char
+uc_sub (unsigned char a, unsigned char b)
+{
+  return (unsigned char) (a - b);
+}
 
 static inline unsigned char 
 add_error (unsigned char n)
 {
-  return (unsigned char) (n + SIEVE_PERMISSIBLE_ERROR);
+  return uc_add (n, SIEVE_PERMISSIBLE_ERROR);
+}
+
+/* Evaluate the poynomial f of degree deg at point x */
+static double
+fpoly_eval (const double *f, const int deg, const double x)
+{
+  double r;
+  int i;
+
+  r = f[deg];
+  for (i = deg - 1; i >= 0; i--)
+    r = r * x + f[i];
+  
+  return r;
+}
+
+/* Print polynomial with floating point coefficients. Assumes f[deg] != 0
+   if deg > 0. */
+static void 
+fpoly_print (const double *f, const int deg, char *name)
+{
+  int i;
+
+  printf (name);
+
+  if (deg == 0)
+    printf ("%f", f[0]);
+
+  if (deg == 1)
+    printf ("%f*x", f[1]);
+
+  if (deg > 1)
+    printf ("%f*x^%d", f[deg], deg);
+
+  for (i = deg - 1; i >= 0; i--)
+    {
+      if (f[i] == 0.)
+	continue;
+      if (i == 0)
+	printf (" %s %f", (f[i] > 0) ? "+" : "-", fabs(f[i]));
+      else if (i == 1)
+	printf (" %s %f*x", (f[i] > 0) ? "+" : "-", fabs(f[i]));
+      else 
+	printf (" %s %f*x^%d", (f[i] > 0) ? "+" : "-", fabs(f[i]), i);
+    }
+
+  printf ("\n");
 }
 
 /* Used only in compute_norms() */
@@ -122,15 +216,11 @@ log_norm (const double *f, const int deg, const double x,
 	  const double log_scale, const double log_proj_roots)
 {
   double r;
-  int i;
   unsigned char n;
 
-  r = f[deg];
-  for (i = deg - 1; i >= 0; i--)
-    r = r * x + f[i];
-
+  r = fpoly_eval (f, deg, x);
   n = fb_log (fabs (r), log_scale, - log_proj_roots);
-  /* printf ("Norm at x = %.0f is %.0f, rounded log is %d\n", x, r, (int) n); */
+  /* printf ("Norm at x = %.0f is %.0f, rounded log is %hhd\n", x, r, n); */
   return n;
 }
 
@@ -145,11 +235,12 @@ compute_norms (unsigned char *sievearray, const long amin, const long amax,
 	       const int verbose)
 {
   double f[MAXDEGREE + 1]; /* Polynomial in $a$ for a given fixed $b$ */
+  double df[MAXDEGREE]; /* The derivative of f(x) */
   double bpow;
   unsigned long long tsc1, tsc2;
   const double log_proj_roots = log(proj_roots) * log_scale;
   long a, a2;
-  int i;
+  int i, fsign1, fsign2, dfsign1, dfsign2;
   unsigned char n1, n2, nmax;
   const int stride = 128;
   
@@ -166,8 +257,16 @@ compute_norms (unsigned char *sievearray, const long amin, const long amax,
       f[i] = poly[i] * bpow;
       bpow *= (double) b;
     }
+  /* fpoly_print (f, deg, "# compute_norms: f(x) = "); */
+
+  for (i = 1; i <= deg; i++)
+    df[i - 1] = f[i] * (double) i;
+  /* fpoly_print (df, deg - 1, "# compute_norms: df(x) = "); */
   
   n1 = log_norm (f, deg, (double) amin, log_scale, log_proj_roots);
+  fsign1 = (fpoly_eval (f, deg, (double) amin) < 0) ? -1 : 1;
+  dfsign1 = (fpoly_eval (df, deg - 1, (double) amin) < 0) ? -1 : 1;
+
   nmax = n1;
 
   a = amin;
@@ -183,21 +282,24 @@ compute_norms (unsigned char *sievearray, const long amin, const long amax,
       ASSERT (!odd || (a2 - a) % 2 == 0);
       
       n2 = log_norm (f, deg, (double) a2, log_scale, log_proj_roots);
+      fsign2 = (fpoly_eval (f, deg, (double) a2) < 0) ? -1 : 1;
+      dfsign2 = (fpoly_eval (df, deg - 1, (double) a2) < 0) ? -1 : 1;
 
-      if (n1 == n2) 
+      if (n1 == n2 && fsign1 == fsign2 && dfsign1 == dfsign2)
 	{
 	  /* Let's assume the log norm is n1 everywhere in this interval */
 #ifdef TRACE_RELATION_A
 	  if (a <= TRACE_RELATION_A && TRACE_RELATION_A < a2)
-	    printf ("# TRACE RELATION in compute_norms: log norm for a = %ld, "
-		    "degree %d is %d\n", TRACE_RELATION_A, deg, (int) n1);
+	    printf ("# TRACE RELATION a = %ld in compute_norms: log norm "
+		    "(range computed) for degree %d is %d\n", 
+		    TRACE_RELATION_A, deg, (int) n1);
 #endif
 	  memset (sievearray + ((a - amin) >> odd), n1, (a2 - a) >> odd);
 	}
       else
 	{
-	  /* n1 and n2 are different. Do each a up to (exclusive) a2 
-	     individually */
+	  /* n1 and n2 or the sign of the derivatives are different. Do each 
+	     a up to (exclusive) a2 individually */
 	  /* printf ("log_c(F(%ld, %lu)) == %d != log_c(F(%ld, %lu)) == %d\n",
 	     a, b, n1, a2, b, n2); */
 	  sievearray[(a - amin) >> odd] = n1;
@@ -206,11 +308,10 @@ compute_norms (unsigned char *sievearray, const long amin, const long amax,
 	    {
 	      unsigned char n = log_norm (f, deg, (double) a, log_scale, 
 					  log_proj_roots);
-#ifdef TRACE_RELATION_A
-	      if (a == TRACE_RELATION_A)
-		printf ("# TRACE RELATION in compute_norms: norm for a = %ld "
-			"is %d\n", a, (int) n);
-#endif
+
+	      TRACE_A (a, __func__, "log norm (individually computed) for "
+		       "degree %d is %d\n", deg, (int) n);
+
 	      sievearray[(a - amin) >> odd] = n;
 	      if (n > nmax)
 		nmax = n;
@@ -219,6 +320,8 @@ compute_norms (unsigned char *sievearray, const long amin, const long amax,
 	}
       a = a2;
       n1 = n2;
+      fsign1 = fsign2;
+      dfsign1 = dfsign2;
     }
   
   rdtscll (tsc2);
@@ -330,22 +433,19 @@ sieve (unsigned char *sievearray, factorbase_degn_t *fb,
 	    {
 	      unsigned char k;
 	      k = sievearray[d] - plog;
-#ifdef TRACE_RELATION_A
-	      if ((amin + ((long)d << odd)) == TRACE_RELATION_A)
-		printf ("# TRACE RELATION in sieve: new approx norm for a = "
-			"%ld after sieving out " FBPRIME_FORMAT " is %d\n", 
-			TRACE_RELATION_A, p, (int) k);
-#endif
+
+	      TRACE_A (amin + ((long)d << odd), __func__, "new approx norm "
+		       "after sieving out " FBPRIME_FORMAT " is %d\n",
+		       p, (int) k);
+
 	      sievearray[d] = k;
 	      if (add_error (k) <= threshold_with_error && reports_length > 0)
 		{
-#ifdef TRACE_RELATION_A
-		  if ((amin + ((long)d << odd)) == TRACE_RELATION_A)
-		    printf ("# TRACE RELATION in sieve: writing sieve report "
-			    "a = %ld, p = %u, l = %d\n",
-			    TRACE_RELATION_A, p, (int) k);
-#endif
-	      reports->a = amin + ((long)d << odd);
+		  TRACE_A ((amin + ((long)d << odd)), __func__, 
+			   "writing sieve report a = %ld, p = %u, l = %d\n",
+			   (amin + ((long)d << odd)), p, (int) k);
+
+		  reports->a = amin + ((long)d << odd);
 		  reports->p = p;
 		  reports->l = k;
 		  reports++;
@@ -424,12 +524,9 @@ find_sieve_reports (const unsigned char *sievearray, sieve_report_t *reports,
 		other_reports++;
 	      if (other_reports->a != a)
 		{
-#ifdef TRACE_RELATION_A
-		  if (a == TRACE_RELATION_A)
-		    printf ("# TRACE RELATION in find_sieve_reports: "
-			    "no matching report for a = %ld in "
-			    "other_reports\n", TRACE_RELATION_A);
-#endif
+		  TRACE_A (a, __func__, 
+			   "no matching report in other_reports\n");
+		  
 		  continue;
 		}
 	    }
@@ -438,12 +535,9 @@ find_sieve_reports (const unsigned char *sievearray, sieve_report_t *reports,
 	  reports[reports_nr].p = 1;
 	  reports[reports_nr].l = sievearray[d];
 	  reports_nr++;
-#ifdef TRACE_RELATION_A
-	  if (a == TRACE_RELATION_A)
-	    printf ("# TRACE RELATION in find_sieve_reports: report "
-		    "for a = %ld, p = 1, l = %d added to list\n", 
-		    TRACE_RELATION_A, (int) sievearray[d]);
-#endif
+	  TRACE_A (a, __func__, "sieve report a = %ld, p = 1, l = %d added to "
+		   "list\n", a, (int) sievearray[d]);
+
 	  if (reports_nr == reports_len)
 	    {
 	      fprintf (stderr, "Warning: find_sieve_reports: reports list "
@@ -613,16 +707,17 @@ sieve_one_side (unsigned char *sievearray, factorbase_t fb,
   for (lvl = 0; lvl < SIEVE_BLOCKING; lvl++)
       fb_initloc_small (fb->fbinit[lvl], fb->fbsmall[lvl], eff_amin, b, odd);
   rdtscll (tsc2);
-  if (verbose)
+  if (SIEVE_BLOCKING > 0 && verbose)
     printf ("# Initing small primes fb took %lld clocks\n", tsc2 - tsc1);
 
   for (lvl = 0; lvl < SIEVE_BLOCKING; lvl++)
     times[lvl] = 0;
 
   /* Sieve small primes with multi-level blocking */
-  sieve_block (SIEVE_BLOCKING - 1, sievearray, l, fb, times);
+  if (SIEVE_BLOCKING > 0)
+    sieve_block (SIEVE_BLOCKING - 1, sievearray, l, fb, times);
   
-  if (verbose)
+  if (SIEVE_BLOCKING > 0 && verbose)
     {
       printf ("# Sieving small prime blocks took: ");
       for (lvl = 0; lvl < SIEVE_BLOCKING; lvl++)
@@ -632,8 +727,8 @@ sieve_one_side (unsigned char *sievearray, factorbase_t fb,
 
 #ifdef TRACE_RELATION_A
   if (eff_amin <= TRACE_RELATION_A && TRACE_RELATION_A <= eff_amax)
-    printf ("# TRACE RELATION in sieve_one_side: approx norm after sieving "
-	    "small primes for a = %ld is %d\n", TRACE_RELATION_A, 
+    printf ("# TRACE RELATION a = %ld in sieve_one_side: approx norm after "
+	    "sieving small primes is %d\n", TRACE_RELATION_A, 
 	    sievearray[(TRACE_RELATION_A - eff_amin) >> odd]);
 #endif
 
@@ -738,7 +833,7 @@ trialdiv_slow (unsigned long C, unsigned int *nr_primes, fbprime_t *primes,
 }
 
 #ifdef REDC_ROOTS
-int
+static inline int
 trialdiv_with_root (factorbase_degn_t *fbptr, const long a, 
 		    const unsigned long b)
 {
@@ -774,7 +869,7 @@ trialdiv_with_root (factorbase_degn_t *fbptr, const long a,
   return 0;
 }
 
-int
+static inline int
 trialdiv_with_norm (factorbase_degn_t *fbptr, const mpz_t norm)
 {
   modulus m;
@@ -796,6 +891,61 @@ trialdiv_with_norm (factorbase_degn_t *fbptr, const mpz_t norm)
   mod_clearmod (m);
   return i;
 }
+
+static unsigned long
+ul_rho (const unsigned long N)
+{
+  modulusul m;
+  residueul r1, r2, c, diff, accu;
+  unsigned long invm, g;
+  int i;
+  unsigned int iterations = 0;
+  const int iterations_between_gcd = 32;
+
+  /* printf ("ul_rho: factoring %lu\n", N); */
+
+  modul_initmod_ul (m, N);
+  modul_init (r1, m);
+  modul_init (r2, m);
+  modul_init (c, m);
+  modul_init (accu, m);
+  modul_init (diff, m);
+  invm = -modul_invmodlong (m);
+  modul_set_ul_reduced (c, 3, m); /* We set c to 1 and use that as the 
+				     Montgomery representation of 3*2^w % m */
+  modul_set_ul_reduced (r1, 5, m); /* Some starting value 5*2^w % m */
+  modul_set (r2, r1, m);
+  modul_set (accu, r1, m);
+
+  do {
+    for (i = 0; i < iterations_between_gcd; i++)
+      {
+	modul_mulredc (r1, r1, r1, invm, m);
+	modul_add (r1, r1, c, m);
+
+	modul_mulredc (r2, r2, r2, invm, m);
+	modul_add (r2, r2, c, m);
+	modul_mulredc (r2, r2, r2, invm, m);
+	modul_add (r2, r2, c, m);
+
+	modul_sub (diff, r1, r2, m);
+	modul_mulredc (accu, accu, diff, invm, m);
+	iterations++;
+      }
+  } while ((g = modul_gcd (accu, m)) == 1);
+
+  modul_clearmod (m);
+  modul_clear (r1, m);
+  modul_clear (r2, m);
+  modul_clear (c, m);
+  modul_clear (accu, m);
+  modul_clear (diff, m);
+
+  /* printf ("ul_rho: took %u iterations to find %lu\n", iterations, g); */
+
+  return g;
+}
+
 #endif
 
 
@@ -832,20 +982,24 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
   unsigned int k;
   factorbase_degn_t *fbptr;
   size_t log2size;
-  fbprime_t maxp;
-  unsigned char reportlog;
-  double c_lower, maxp_d, inv_c_lower;
+  unsigned char reportlog, normlog;
+  const double log_proj_divisor = log ((double) proj_divisor) * log_scale;
+  double dpoly[MAXDEGREE + 1];
+  int nr_report_primes;
+
+  for (k = 0; (int) k <= degree; k++)
+    dpoly[k] = mpz_get_d (scaled_poly[k]);
 
   /* 1. Compute norm */
   mp_poly_eval (norm, scaled_poly, degree, a);
   mpz_abs (norm, norm);
-#ifdef TRACE_RELATION_A
-      if (a == TRACE_RELATION_A)
-	gmp_printf ("# TRACE RELATION in trialdiv_one_side: norm for a = %ld,"
-		    " degree %d is %Zd\n", 
-		    TRACE_RELATION_A, degree, norm);
-#endif
+  TRACE_A (a, __func__, "norm for degree %d is %Zd\n", degree, norm);
   
+  /* Compute approx. log of norm */
+  normlog = log_norm (dpoly, degree, (double) a, log_scale, 
+		      log_proj_divisor);
+  TRACE_A (a, __func__, "normlog = %hhu\n", normlog);
+
   /* 2. Divide out the primes with projective roots */
   if (proj_divisor > 1)
     {
@@ -854,103 +1008,88 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
       r = mpz_tdiv_q_ui (norm, norm, proj_divisor);
       ASSERT_ALWAYS (r == 0);
       
-#ifdef TRACE_RELATION_A
-      if (a == TRACE_RELATION_A)
-	printf ("# TRACE RELATION in trialdiv_one_side: dividing out proj."
-		"divisor %lu for a = %ld\n", proj_divisor, TRACE_RELATION_A);
-#endif
+      TRACE_A (a, __func__, "dividing out proj. divisor %lu. New norm is "
+	       "%Zd.\n", proj_divisor, norm);
 
       for (k = 0; k < nr_proj_primes; k++)
 	{
 	  ASSERT (proj_divisor % proj_primes[k] == 0);
 	  add_fbprime_to_list (primes, nr_primes, max_nr_primes, 
 			       proj_primes[k]);
+	  while (mpz_divisible_ui_p (norm, proj_primes[k]))
+	    {
+	      mpz_tdiv_q_ui (norm, norm, proj_primes[k]);
+	      add_fbprime_to_list (primes, nr_primes, max_nr_primes, 
+				   proj_primes[k]);
+	      TRACE_A (a, __func__, "dividing out extra power of proj. "
+		       "prime %lu. New norm = %Zd\n", proj_primes[k], norm);
+	    }
 	}
     }
+
   
   /* 3. Divide the report primes out of this norm and find the smallest 
      approximate log */
-  reportlog = 255;
-  ASSERT_ALWAYS (reports->a == a); /* There must be at least one */
+   /* There must be at least one valid report */
+  ASSERT_ALWAYS (reports->a == a && reports->p != 0);
+  reportlog = reports->l;
+  nr_report_primes = 0;
   while (reports->a == a && reports->p != 0)
     {
-      /* We may want to allow reports without a report prime. In that case
-	 the sieve_report_t may contain p == 1. */
+      /* We allow reports without a report prime. In that case the 
+	 sieve_report_t may contain p == 1. */
       if (reports->p != 1)
 	{
 	  int r;
-#ifdef TRACE_RELATION_A
-	  if (a == TRACE_RELATION_A)
-	    printf ("# TRACE RELATION in trialdiv_one_side: dividing out "
-		    "report prime " FBPRIME_FORMAT " for a = %ld\n", 
-		    reports->p, TRACE_RELATION_A);
-#endif
+
 	  r = trialdiv_one_prime (reports->p, norm, nr_primes, 
 				  primes, max_nr_primes, 0);
 	  ASSERT_ALWAYS (r > 0); /* If a report prime is listed but does not
 				    divide the norm, there is a serious bug
 				    in the sieve code */
+	  normlog -= fb_log ((double) reports->p, log_scale, 0.);
+	  nr_report_primes++;
+
+	  TRACE_A (a, __func__, "dividing out report prime " FBPRIME_FORMAT 
+		   ". New new norm = %Zd, normlog = %hhd\n", 
+		   reports->p, norm, normlog);
 	}
-      /* Find the smallest approximate log. Since -SIEVE_PERMISSIBLE_ERROR <= 
-	 reports->l - log_b(c) <= SIEVE_PERMISSIBLE_ERROR and log_b(c) >= 0, 
-	 we add SIEVE_PERMISSIBLE_ERROR here to get positive values.*/
-      if (add_error (reports->l) < SIEVE_PERMISSIBLE_ERROR)
-	reportlog = 0;
-      else if (reports->l < reportlog)
+
+      /* Find the smallest approximate log. */
+      if (add_error (reports->l) < add_error (reportlog))
 	reportlog = reports->l;
+
       reports++;
     }
-  
-  /* Let c be the cofactor of the norm after dividing out all the factor
-     base primes. 
-     We know that log_b(c) = reportlog + e, |e| <= SIEVE_PERMISSIBLE_ERROR
-     c = b^(reportlog + e), thus 
-     c <= b^(reportlog + SIEVE_PERMISSIBLE_ERROR) and
-     c >= b^(reportlog - SIEVE_PERMISSIBLE_ERROR) and of course
-     c >= 1.
-     So once c < b^(reportlog + SIEVE_PERMISSIBLE_ERROR), we can start 
-     checking if dividing out another fb prime p would cause
-     c/p < b^(reportlog - SIEVE_PERMISSIBLE_ERROR) and if yes, stop.
+  TRACE_A (a, __func__, "reportlog is %hhd\n", reportlog);
 
-     We don't actually use c_upper at the moment, but we might some day.
-     c_upper = exp((reportlog + SIEVE_PERMISSIBLE_ERROR) / log_scale);
+  /* 
+     When we divide out a prime, we subtract log(p) from normlog. When 
+     reportlog == normlog, we know we are done. When 
+     normlog - reportlog < 2*log(p), we know that exactly one more 
+     prime divides.
   */
-
-  if (reportlog > SIEVE_PERMISSIBLE_ERROR)
-    c_lower = exp((reportlog - SIEVE_PERMISSIBLE_ERROR) / log_scale);
-  else
-    c_lower = 1.;
-  inv_c_lower = 1. / c_lower;
 
   /* Treat factor base prime p == 2 separately */
   fbptr = fullfb;
+  TRACE_A (a, __func__, "first fb prime is " FBPRIME_FORMAT "\n", fbptr->p);
   if (fbptr->p == 2)
     {
       if (mpz_even_p (norm))
 	{
 	  mpz_tdiv_q_2exp (norm, norm, 1);
 	  add_fbprime_to_list (primes, nr_primes, max_nr_primes, 2);
-	  maxp_d = mpz_get_d (norm) * inv_c_lower;
-	  if (maxp_d > (double) FBPRIME_MAX)
-	    maxp = FBPRIME_MAX;
-	  else
-	    maxp = (int) ceil(maxp_d);
+	  normlog -= fbptr->plog;
+	  TRACE_A (a, __func__, "dividing out fb prime 2. New norm = %Zd, "
+		   "new normlog = %hhd\n", norm, normlog);
 	}
       fbptr = fb_next (fbptr);
     }
 
-  maxp_d = mpz_get_d (norm) * inv_c_lower;
-  if (maxp_d > (double) FBPRIME_MAX)
-    maxp = FBPRIME_MAX;
-  else
-    maxp = (int) ceil(maxp_d);
- 
-  /* 4. Go through the factor base until the cofactor c is small enough that
-        no more fb primes could possibly divide it. This is the case when 
-	norm / p < c_lower ==> p > norm / c_lower */
+  /* 4. Go through the factor base until normlog == reportlog */
 
-  for (; fbptr->p != 0 && fbptr->p <= maxp; 
-       fbptr = fb_next (fbptr))
+  if (reportlog != normlog)
+  for (; fbptr->p != 0; fbptr = fb_next (fbptr))
     {
 #ifdef REDC_ROOTS
       /* if (trialdiv_with_root (fbptr, a, b)) */
@@ -964,27 +1103,70 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 				max_nr_primes, 0) > 0)
 	{
 #endif
-	  maxp_d = mpz_get_d (norm) * inv_c_lower;
-	  if (maxp_d > (double) FBPRIME_MAX)
-	    maxp = FBPRIME_MAX;
-	  else
-	    maxp = (int) ceil(maxp_d);
+	  normlog -= fbptr->plog;
+	  ASSERT (add_error(reportlog) <= add_error(normlog));
 
-#ifdef TRACE_RELATION_A
-	  if (a == TRACE_RELATION_A)
-	    printf ("# TRACE RELATION in trialdiv_one_side: dividing out "
-		    "fb prime " FBPRIME_FORMAT " for a = %ld. New maxp = "
-		    FBPRIME_FORMAT "\n", 
-		    fbptr->p, TRACE_RELATION_A, maxp);
-#endif
+	  /* If we aren't done yet, there must be at least one fb prime
+	     greater than the one we just processed left. Check that the
+	     difference of approximate logs allows for that prime. */
+	  if (! (reportlog == normlog || 
+		 add_error(normlog) - add_error(reportlog) >= fbptr->plog))
+	    {
+	      gmp_fprintf (stderr, "Error, a = %ld, b = %lu, reportlog = %d, "
+			   "normlog = %d, p = " FBPRIME_FORMAT ", plog = %d. "
+			   "Remaining norm = %Zd\n", 
+			   a, b, reportlog, normlog, fbptr->p, 
+			   (int) fbptr->plog, norm);
+	    }
 
-	  if (fbptr->p > maxp)
+	  TRACE_A (a, __func__, "dividing out fb prime " FBPRIME_FORMAT
+		   ". New norm = %Zd, normlog = %hhd\n", 
+		   fbptr->p, norm, normlog);
+
+	  if (reportlog == normlog)
 	    break;
+
+	  {
+	    int missinglog = uc_sub (normlog, reportlog);
+	    if (missinglog < 2 * fbptr->plog)
+	      {
+		/* We know there's exactly one prime missing, and we know its
+		   approximate size. We could choose a more efficient algorithm
+		   here to find it. */
+
+		nrprimes2++;
+		sumprimes2 += (unsigned long) fbptr->p;
+		
+		if (missinglog > fbptr->plog + 1)
+		  {
+		    if (mpz_fits_ulong_p (norm))
+		      break;
+		    else
+		      rho_toolarge++;
+		  }
+		
+		/* For now let's try skipping forward in the factor base
+		   to those primes that have the correct rounded log.
+		   Keep in mind that the for() loop advances fbptr once! */
+		if (TRIALDIV_SKIPFORWARD)
+		  while (fb_next (fbptr)->p != 0 && 
+			 fb_next (fbptr)->plog < missinglog)
+		    fbptr = fb_next (fbptr);
+	      }
+	  }
 	}
+#if 0
+	} /* Emacs paranthesis matching gets confused */
+#endif
     }
 
   if (fbptr->p == 0)
-    fprintf (stderr, "Warning, did not reach maxp for (%ld, %lu)\n", a, b);
+    {
+      fprintf (stderr, "Warning, reached end of fb for (%ld, %lu). "
+	       "reached normlog = %d, report log = %d\n", 
+	       a, b, (int) normlog, (int) reportlog);
+      gmp_fprintf (stderr, "Remaining norm = %Zd\n", norm);
+    }
   
   if (fbptr->p != 0)
     {
@@ -1000,22 +1182,28 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
       if (trialdiv_one_prime (primes[k], norm, nr_primes, primes, 
 			      max_nr_primes, 1))
 	{
-#ifdef TRACE_RELATION_A
-	  if (a == TRACE_RELATION_A)
-	    printf ("# TRACE RELATION in trialdiv_one_side: dividing out "
-		    "repeated fb prime " FBPRIME_FORMAT " for a = %ld.\n", 
-		    primes[k], TRACE_RELATION_A);
-#endif
+	  TRACE_A (a, __func__, "dividing out repeated fb prime " 
+		   FBPRIME_FORMAT "\n", primes[k]);
 	}
+    }
+
+  if (normlog != reportlog)
+    {
+      unsigned long q, r;
+      /* There is one more fb prime missing */
+      ASSERT_ALWAYS (uc_sub (normlog, reportlog) >= fbptr->plog &&
+		     uc_sub (normlog, reportlog) < 2 * fbptr->plog);
+      q = ul_rho (mpz_get_ui (norm));
+      rho_called++;
+      r = mpz_tdiv_q_ui (norm, norm, q);
+      ASSERT_ALWAYS (r == 0);
+      add_fbprime_to_list (primes, nr_primes, max_nr_primes, q);
     }
 
   /* 5. Check if the cofactor is small enough */
   log2size = mpz_sizeinbase (norm, 2);
-#ifdef TRACE_RELATION_A
-  if (a == TRACE_RELATION_A)
-    gmp_printf ("# TRACE RELATION in trialdiv_one_side: log2size of cofactor "
-		"%Zd is %d\n", norm, log2size);
-#endif
+  TRACE_A (a, __func__, "log2size of cofactor %Zd is %d\n", norm, log2size);
+
   if ((double) log2size > 
       lpb * lambda + SIEVE_PERMISSIBLE_ERROR)
     {
@@ -1028,22 +1216,15 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
   if ((int) log2size > mfb)
     {
       (*cof_toolarge)++;
-#ifdef TRACE_RELATION_A
-  if (a == TRACE_RELATION_A)
-    printf ("# TRACE RELATION in trialdiv_one_side: log2size %d > mfb %d, "
-	    "discarding relation\n", (int) log2size, (int) mfb);
-#endif
+      TRACE_A (a, __func__, "log2size %d > mfb %d, discarding relation\n",
+	       (int) log2size, (int) mfb);
       return 0;
     }
   
   /* 6. Check if the cofactor is < lpb */
   if (mpz_cmp_ui (norm, 1UL) == 0)
     {
-#ifdef TRACE_RELATION_A
-      if (a == TRACE_RELATION_A)
-	printf ("# TRACE RELATION in trialdiv_one_side: cofactor is 1."
-		"This side is smooth.\n");
-#endif
+      TRACE_A (a, __func__, "Cofactor is 1. This side is smooth.\n");
       return 1;    
     }
 
@@ -1057,12 +1238,8 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 	  /* If this cofactor is a prp, add it to the list of primes */
 	  q = (fbprime_t) mpz_get_ui (norm);
 	  add_fbprime_to_list (primes, nr_primes, max_nr_primes, q);
-#ifdef TRACE_RELATION_A
-	  if (a == TRACE_RELATION_A)
-	    printf ("# TRACE RELATION in trialdiv_one_side: cofactor "
-		    FBPRIME_FORMAT " is <= 2^lpb and prp. This side is "
-		    "smooth.\n", q);
-#endif
+	  TRACE_A (a, __func__, "cofactor" FBPRIME_FORMAT "is <= 2^lpb and "
+		   "prp. This side is smooth.\n", q);
 	  mpz_set_ui (norm, 1UL);
 	  return 1;
 	}
@@ -1071,12 +1248,9 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 	  /* If not prp, just ignore it, print the relation and let the 
 	     next program in the tool chain figure out the prime factors 
 	     of this composite */
-#ifdef TRACE_RELATION_A
-	  if (a == TRACE_RELATION_A)
-	    gmp_printf ("# TRACE RELATION in trialdiv_one_side: cofactor "
-			"%Zd is <= 2^lpb and composite. "
-			"This side is smooth.\n", norm);
-#endif
+	  TRACE_A (a, __func__, "cofactor %Zd is <= 2^lpb and composite. "
+		   "This side is smooth.\n", norm);
+
 	  /* It is a bit odd though to have a composite factor <lpb.
 	     Print a warning about it. */
 	  gmp_fprintf (stderr, "Warning: cofactor %Zd <lpb, but not "
@@ -1091,23 +1265,15 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 	 skip this report */
       if (mpz_probab_prime_p (norm, PRP_REPS))
 	{
-#ifdef TRACE_RELATION_A
-	  if (a == TRACE_RELATION_A)
-	    gmp_printf ("# TRACE RELATION in trialdiv_one_side: cofactor "
-			"%Zd is > 2^lpb and prp. Discarding relation.\n", 
-			norm);
-#endif
+	  TRACE_A (a, __func__, "cofactor %Zd is > 2^lpb and prp. "
+		   "Discarding relation.\n", norm);
 	  (*lp_toolarge)++;
 	  return 0;
 	}
       else
 	{
-#ifdef TRACE_RELATION_A
-	  if (a == TRACE_RELATION_A)
-	    gmp_printf ("# TRACE RELATION in trialdiv_one_side: cofactor %Zd "
-			"is > 2^lpb and composite. This side may be smooth.\n",
-			norm);
-#endif
+	  TRACE_A (a, __func__, "cofactor %Zd is > 2^lpb and composite. "
+		   "This side may be smooth.\n", norm);
 	  return 1;
 	}
     }
@@ -1186,6 +1352,7 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 		 max_nr_proj_primes);
 
   sumprimes = nrprimes = 0;
+  sumprimes2 = nrprimes2 = 0;
 
   for (i = 0, j = 0; i < reports_a_nr && j < reports_r_nr;)
     {
@@ -1258,8 +1425,13 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
     {
       printf ("# Number of matching reports: %u\n", matching_reports);
       printf ("# Number of relations found: %u\n", relations_found);
-      printf ("# Sum and number of maxp: %lu, %lu, avg: %.0f\n",
+      printf ("# Sum and number of largest non-report fb primes: %lu, %lu, avg: %.0f\n",
 	      sumprimes, nrprimes, (double)sumprimes / (double)nrprimes);
+      printf ("# Sum and number of 2nd largest non-report fb primes: %lu, %lu, avg: %.0f\n",
+	      sumprimes2, nrprimes2, (double)sumprimes2 / (double)nrprimes2);
+      printf ("# Called rho %lu times, number was too large %lu times\n",
+	      rho_called, rho_toolarge);
+
     }
   
   for (i = 0; i <= (unsigned)poly->degree; i++)
@@ -1520,7 +1692,7 @@ main (int argc, char **argv)
 	        b, proj_roots);
 
       if (verbose)
-	  printf ("#Sieving rational side\n");
+	printf ("# Sieving rational side\n");
 
 #ifdef PARI
       mp_poly_print (cpoly->g, 1, "P(a,b) = ", 1);
