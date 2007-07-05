@@ -16,21 +16,18 @@ Create a config.h file with contents like
 #define SIEVE_BLOCKING 1
 static const unsigned long CACHESIZES[SIEVE_BLOCKING] = {16384};
 
+/* Controls whether the code is allowed to skip forward in the factor
+   base during trial division. Mostly meant for speed tests/debugging */
+#define TRIALDIV_SKIPFORWARD 1
+
+/* Define this to the a value of the relation you want to trace */
+/* #define TRACE_RELATION_A -1234L */
+
 #endif
 /*************************************************/
 
 
-Compile with
-
-gcc -I ../ -O0 -g -o sieve -Wall -Wextra sieve.c fb.c -lm -lgmp
-
-(Note: linking GMP statically with /usr/lib/libgmp.a for example may yield a
-speedup up to 7%.)
-
-or, if you're like me and have compiled a static GMP with full frame pointer 
-support for debugging on 32 bit machines, use i.e.
-
-gcc -I ../ -O0 -g -o sieve -Wall -Wextra sieve.c -lm /usr/local/lib/libgmp_fp.a
+Compile with "make".
 
 Make a factor base with, for example,
 
@@ -41,3 +38,10 @@ Run the siever with
 ./sieve -poly c80.poly -fb c80.roots.txt -1000000 1000000 2001 2101
 
 where c80.poly is the polynomial file.
+
+Parameters for the siever are
+-v : verbose output, including timing info
+-reports_a_len : how many entries to allocate for reports list on 
+                 algebraic side
+-reports_r_len : how many entries to allocate for reports list on 
+                 rational side

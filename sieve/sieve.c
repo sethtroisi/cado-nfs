@@ -23,15 +23,12 @@
 #define LOG2 0.69314718055994530941723212145817656808
 #define INVLOG2 1.4426950408889634073599246810018921374
 
-#define REFAC_PRP_SIZE_THRES 50
-#define REFAC_PRP_THRES 500
 #define SIEVE_PERMISSIBLE_ERROR ((unsigned char) 7)
 #define PRP_REPS 1 /* number of tests in mpz_probab_prime_p */
 
 #ifndef TRIALDIV_SKIPFORWARD
-#error "Please define TRIALDIV_SKIPFORWARD as 0 or 1 in config.h. It controls\
-  whether we skip forward in the factor base to find the last missing factor\
-  base prime during refactoring."
+#define TRIALDIV_SKIPFORWARD 1
+#define TRIALDIV_SKIPFORWARD_DEFAULT
 #endif
 
 unsigned long sumprimes, nrprimes; /* For largest non-report fb primes */
@@ -832,7 +829,9 @@ trialdiv_slow (unsigned long C, unsigned int *nr_primes, fbprime_t *primes,
     }
 }
 
-#ifdef REDC_ROOTS
+
+/* Functions for finding prime factor of the norm during refactoring */
+
 static inline int
 trialdiv_with_root (factorbase_degn_t *fbptr, const long a, 
 		    const unsigned long b)
@@ -893,7 +892,7 @@ trialdiv_with_norm (factorbase_degn_t *fbptr, const mpz_t norm)
 }
 
 static unsigned long
-ul_rho (const unsigned long N)
+ul_rho (const unsigned long N, unsigned long startval)
 {
   modulusul m;
   residueul r1, r2, c, diff, accu;
@@ -901,6 +900,8 @@ ul_rho (const unsigned long N)
   int i;
   unsigned int iterations = 0;
   const int iterations_between_gcd = 32;
+
+  ASSERT (startval < N);
 
   /* printf ("ul_rho: factoring %lu\n", N); */
 
@@ -913,7 +914,7 @@ ul_rho (const unsigned long N)
   invm = -modul_invmodlong (m);
   modul_set_ul_reduced (c, 3, m); /* We set c to 1 and use that as the 
 				     Montgomery representation of 3*2^w % m */
-  modul_set_ul_reduced (r1, 5, m); /* Some starting value 5*2^w % m */
+  modul_set_ul_reduced (r1, startval, m);
   modul_set (r2, r1, m);
   modul_set (accu, r1, m);
 
@@ -930,23 +931,22 @@ ul_rho (const unsigned long N)
 
 	modul_sub (diff, r1, r2, m);
 	modul_mulredc (accu, accu, diff, invm, m);
-	iterations++;
       }
+    iterations += iterations_between_gcd;
   } while ((g = modul_gcd (accu, m)) == 1);
 
-  modul_clearmod (m);
   modul_clear (r1, m);
   modul_clear (r2, m);
   modul_clear (c, m);
   modul_clear (accu, m);
   modul_clear (diff, m);
+  modul_clearmod (m);
 
   /* printf ("ul_rho: took %u iterations to find %lu\n", iterations, g); */
 
   return g;
 }
 
-#endif
 
 
 /* 1. Compute the norm
@@ -1117,6 +1117,7 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 			   "Remaining norm = %Zd\n", 
 			   a, b, reportlog, normlog, fbptr->p, 
 			   (int) fbptr->plog, norm);
+	      abort ();
 	    }
 
 	  TRACE_A (a, __func__, "dividing out fb prime " FBPRIME_FORMAT
@@ -1148,10 +1149,11 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 		/* For now let's try skipping forward in the factor base
 		   to those primes that have the correct rounded log.
 		   Keep in mind that the for() loop advances fbptr once! */
-		if (TRIALDIV_SKIPFORWARD)
-		  while (fb_next (fbptr)->p != 0 && 
-			 fb_next (fbptr)->plog < missinglog)
-		    fbptr = fb_next (fbptr);
+#if TRIALDIV_SKIPFORWARD
+		while (fb_next (fbptr)->p != 0 && 
+		       fb_next (fbptr)->plog < missinglog)
+		  fbptr = fb_next (fbptr);
+#endif
 	      }
 	  }
 	}
@@ -1193,7 +1195,7 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
       /* There is one more fb prime missing */
       ASSERT_ALWAYS (uc_sub (normlog, reportlog) >= fbptr->plog &&
 		     uc_sub (normlog, reportlog) < 2 * fbptr->plog);
-      q = ul_rho (mpz_get_ui (norm));
+      q = ul_rho (mpz_get_ui (norm), 5UL);
       rho_called++;
       r = mpz_tdiv_q_ui (norm, norm, q);
       ASSERT_ALWAYS (r == 0);
@@ -1277,28 +1279,6 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 	  return 1;
 	}
     }
-}
-
-
-static void
-sort_fbprimes (fbprime_t *primes, const unsigned int n)
-{
-  unsigned int k, l, m;
-  fbprime_t t;
-
-  for (l = n; l > 1; l = m)
-    for (k = m = 0; k < l - 1; k++)
-      if (primes[k] > primes[k + 1])
-	{
-	  t = primes[k];
-	  primes[k] = primes[k + 1];
-	  primes[k + 1] = t;
-	  m = k + 1;
-	}
-#ifdef WANT_ASSERT
-  for (k = 0; k < n - 1; k++)
-    ASSERT(primes[k] <= primes[k + 1]);
-#endif
 }
 
 
@@ -1393,8 +1373,8 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 
 	  /* Now print the relations */
 	  relations_found++;
-	  sort_fbprimes (primes_r, nr_primes_r);
-	  sort_fbprimes (primes_a, nr_primes_a);
+	  fb_sortprimes (primes_r, nr_primes_r);
+	  fb_sortprimes (primes_a, nr_primes_a);
 
 	  printf ("%ld,%lu:", a, b);
 	  for (k = 0; k < nr_primes_r; k++)
@@ -1471,7 +1451,8 @@ main (int argc, char **argv)
   factorbase_t fba, fbr;
   char *fbfilename = NULL, *polyfilename = NULL;
   unsigned char *sievearray;
-  unsigned int reports_a_len, reports_a_nr, reports_r_len = 0, reports_r_nr;
+  unsigned int reports_a_len = 0, reports_r_len = 0;
+  unsigned int reports_a_nr, reports_r_nr;
   int verbose = 0;
   unsigned int deg;
   unsigned int i;
@@ -1498,6 +1479,12 @@ main (int argc, char **argv)
       else if (argc > 2 && strcmp (argv[1], "-poly") == 0)
 	{
 	  polyfilename = argv[2];
+	  argc -= 2;
+	  argv += 2;
+	}
+      else if (argc > 2 && strcmp (argv[1], "-reports_a_len") == 0)
+	{
+	  reports_a_len = atoi (argv[2]);
 	  argc -= 2;
 	  argv += 2;
 	}
@@ -1550,6 +1537,54 @@ main (int argc, char **argv)
       exit (EXIT_FAILURE);
     }
 
+  /* Print info about program and parameters */
+  if (verbose)
+    {
+      printf ("# CADO line siever " REV "\n");
+      printf ("# Compiled in parameters:\n");
+#ifdef WANT_ASSERT
+      printf ("# Assertions enabled\n");
+#else
+      printf ("# Assertions disabled\n");
+#endif
+
+#ifdef WANT_ASSERT_EXPENSIVE
+      printf ("# Expensive assertions enabled\n");
+#else
+      printf ("# Expensive assertions disabled\n");
+#endif
+
+#if SIEVE_BLOCKING > 0
+      printf ("# Sieving small factor base primes in blocks of size%s ",
+	      (SIEVE_BLOCKING > 1) ? "s" : "");
+      printf ("%lu", CACHESIZES[0]);
+      for (i = 1; i < SIEVE_BLOCKING; i++)
+	printf (", %lu", CACHESIZES[i]);
+      printf (".\n");
+#else
+      printf ("# No block sieving of small factor basee primes.\n");
+#endif
+
+#if TRIALDIV_SKIPFORWARD
+      printf ("# Can skip forward in factor base during refactoring");
+#else
+      printf ("# Cannot skip forward in factor base during refactoring");
+#endif
+#ifdef TRIALDIV_SKIPFORWARD_DEFAULT
+      printf (" (using default setting).\n");
+#else
+      printf (".\n");
+#endif
+
+#ifdef TRACE_RELATION_A
+      printf ("# Tracing the fate of relation %ld.\n", TRACE_RELATION_A);
+#else
+      printf ("# Relation tracing disabled.\n");
+#endif
+
+    }
+
+  /* Read polynomial from file */
   if(!read_polynomial (cpoly, polyfilename))
     {
       fprintf (stderr, "Error reading polynomial file\n");
@@ -1577,7 +1612,7 @@ main (int argc, char **argv)
 
   /* Read/generate and split the factor bases */
 
-  /* Read algebraic fb */
+  /* Read the factor base for the algebraic side from file */
   fba->fullfb = fb_read (fbfilename, log_scale, verbose);
   if (fba->fullfb == NULL)
     {
@@ -1644,14 +1679,33 @@ main (int argc, char **argv)
       fb_print_entry (fb_skip(fb, s));
 #endif
 
+  if (verbose)
+    {
+      printf ("# Allocating %ld bytes for sievearray\n",
+	      (amax - amin + 1) * (long int) sizeof (char));
+      fflush(stdout);
+    }
   sievearray = (unsigned char *) malloc ((amax - amin + 1) * sizeof (char));
-  reports_a_len = ((amax - amin + 1)) / 5 + 1000;
+  if (reports_a_len == 0) /* if not given on command line */
+    reports_a_len = ((amax - amin + 1)) / 5 + 1000;
   if (reports_r_len == 0) /* if not given on command line */
-    reports_r_len = ((amax - amin + 1)) / 2 + 1000;
+    reports_r_len = ((amax - amin + 1)) / 5 + 1000;
 
+  if (verbose)
+    {
+      printf ("# Allocating %ld bytes for reports_a\n",
+	      reports_a_len * (long int) sizeof (sieve_report_t));
+      fflush(stdout);
+    }
   reports_a = (sieve_report_t *) malloc (reports_a_len * 
 					 sizeof (sieve_report_t));
   ASSERT (reports_a != NULL);
+  if (verbose)
+    {
+      printf ("# Allocating %ld bytes for reports_r\n",
+	      reports_r_len * (long int) sizeof (sieve_report_t));
+      fflush(stdout);
+    }
   reports_r = (sieve_report_t *) malloc (reports_r_len * 
 					 sizeof (sieve_report_t));
   ASSERT (reports_r != NULL);

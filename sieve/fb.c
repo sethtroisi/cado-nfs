@@ -95,6 +95,31 @@ fb_find_p (factorbase_degn_t *fb, const fbprime_t p)
   return NULL;
 }
 
+
+/* Sort n primes in array *primes into ascending order */
+
+void
+fb_sortprimes (fbprime_t *primes, const unsigned int n)
+{
+  unsigned int k, l, m;
+  fbprime_t t;
+
+  for (l = n; l > 1; l = m)
+    for (k = m = 0; k < l - 1; k++)
+      if (primes[k] > primes[k + 1])
+	{
+	  t = primes[k];
+	  primes[k] = primes[k + 1];
+	  primes[k + 1] = t;
+	  m = k + 1;
+	}
+#ifdef WANT_ASSERT
+  for (k = 0; k < n - 1; k++)
+    ASSERT(primes[k] <= primes[k + 1]);
+#endif
+}
+
+
 unsigned char
 fb_log (double n, double log_scale, double offset)
 {
@@ -222,8 +247,8 @@ fb_read (const char *filename, const double log_scale, const int verbose)
   size_t linelen;
   char line[linesize];
   char *lineptr;
-  unsigned int i;
   int ok;
+  unsigned int i;
   unsigned long linenr = 0;
   const size_t allocblocksize = 1<<20; /* Allocate in MB chunks */
   fbprime_t p;
@@ -255,11 +280,10 @@ fb_read (const char *filename, const double log_scale, const int verbose)
       if (linelen > 0 && line[linelen - 1] == '\n')
 	linelen--; /* Remove newline */
       for (i = 0; i < linelen; i++) /* Skip comments */
-	if (line[i] == '#')
-	  break;
-      linelen = i;
-      while (linelen > 0 && isspace (line[i - 1]))
-	linelen--; /* Skip whitespace at end of line */
+        if (line[i] == '#')
+          linelen = i;
+      while (linelen > 0 && isspace (line[linelen - 1]))
+        linelen--; /* Skip whitespace at end of line */
       if (linelen == 0) /* Skip empty/comment lines */
 	continue;
       line[linelen] = '\0';
@@ -289,6 +313,19 @@ fb_read (const char *filename, const double log_scale, const int verbose)
 	}
 
       p = iscomposite (fb_cur->p);
+      if (p != 0)
+        {
+          fbprime_t q = fb_cur->p;
+          while (q % p == 0)
+            q /= p;
+          if (q != 1)
+            {
+              fprintf (stderr, "Error, " FBPRIME_FORMAT " on line %lu in "
+                       "factor base is not a prime or prime power\n",
+                       fb_cur->p, linenr);
+              break;                       
+            }
+        }
       if (p == 0) /* It's a prime, do a normal log */
 	fb_cur->plog = fb_log (fb_cur->p, log_scale, 0.);
       else
@@ -331,6 +368,27 @@ fb_read (const char *filename, const double log_scale, const int verbose)
 		  "in factor base line %lu\n", p, linenr);
 	  continue;
 	}
+
+      /* Sort the roots into ascending order. We assume that fbprime_t and 
+         fbroot_t are typecaste compatible. This is ugly. */
+      ASSERT_ALWAYS (sizeof (fbprime_t) == sizeof (fbroot_t));
+      fb_sortprimes ((fbprime_t *) fb_cur->roots, fb_cur->nr_roots);
+      /* Eliminate duplicate roots. Pari's polrootsmod() can produce them */
+      {
+        unsigned int i = 0, j;
+        for (j = 1; j < (unsigned int) fb_cur->nr_roots; j++)
+          {
+            if (fb_cur->roots[i] == fb_cur->roots[j])
+              {
+                fprintf (stderr, "Warning, factor base has repeated root " 
+                         FBROOT_FORMAT " for prime " FBPRIME_FORMAT ". "
+                         "Keeping only one.\n", fb_cur->roots[i], fb_cur->p);
+              }
+            else
+              fb_cur->roots[++i] = fb_cur->roots[j];
+          }
+          fb_cur->nr_roots = i + 1;
+      }
       
 #ifdef REDC_ROOTS
       /* Compute invp */
