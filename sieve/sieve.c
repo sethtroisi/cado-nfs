@@ -33,7 +33,7 @@
 
 unsigned long sumprimes, nrprimes; /* For largest non-report fb primes */
 unsigned long sumprimes2, nrprimes2;  /* For 2nd largest non-report fb prim. */
-unsigned long rho_called = 0, rho_toolarge = 0;
+unsigned long rho_called = 0, rho_called1 = 0, rho_toolarge = 0;
 
 #ifdef TRACE_RELATION_A
 static void 
@@ -892,7 +892,7 @@ trialdiv_with_norm (factorbase_degn_t *fbptr, const mpz_t norm)
 }
 
 static unsigned long
-ul_rho (const unsigned long N, unsigned long startval)
+ul_rho (const unsigned long N, unsigned long cparm)
 {
   modulusul m;
   residueul r1, r2, c, diff, accu;
@@ -901,7 +901,7 @@ ul_rho (const unsigned long N, unsigned long startval)
   unsigned int iterations = 0;
   const int iterations_between_gcd = 32;
 
-  ASSERT (startval < N);
+  ASSERT (cparm < N);
 
   /* printf ("ul_rho: factoring %lu\n", N); */
 
@@ -912,9 +912,10 @@ ul_rho (const unsigned long N, unsigned long startval)
   modul_init (accu, m);
   modul_init (diff, m);
   invm = -modul_invmodlong (m);
-  modul_set_ul_reduced (c, 3, m); /* We set c to 1 and use that as the 
-				     Montgomery representation of 3*2^w % m */
-  modul_set_ul_reduced (r1, startval, m);
+  modul_set_ul_reduced (c, cparm, m); /* We set c to cparm and use that as 
+					 the Montgomery representation of 
+					 cparm*2^w % m */
+  modul_set_ul_reduced (r1, 2, m);
   modul_set (r2, r1, m);
   modul_set (accu, r1, m);
 
@@ -947,7 +948,96 @@ ul_rho (const unsigned long N, unsigned long startval)
   return g;
 }
 
+/* Returns 1 if n is a strong probable prime wrt base b, 0 otherwise */
+int
+ul_prp (const unsigned long n, const unsigned long b)
+{
+  modulusul m;
+  residueul r1, b1;
+  int i, po2 = 1;
+  unsigned long mask;
+  unsigned long nm1 = (n - 1UL) >> 1;
 
+  ASSERT (b < n);
+  ASSERT (n > 2UL);
+  ASSERT (n % 2 != 0);
+
+  while (nm1 % 2 == 0)
+    {
+      po2++;
+      nm1 >>= 1;
+    }
+
+  modul_initmod_ul (m, n);
+  modul_init (r1, m);
+  modul_init (b1, m);
+  modul_set_ul_reduced (r1, b, m);
+  modul_set_ul_reduced (b1, b, m);
+
+  mask = ~0UL; /* All bits set */
+  mask -= mask >> 1; /* Now only high bit is set */
+
+  /* Find highest set bit in nm1 and skip to the
+     bit one less significant */
+  while ((nm1 & mask) == 0UL)
+    mask >>= 1;
+  mask >>= 1;
+  modul_mul (r1, r1, r1, m);
+  
+  while (mask > 1UL)
+    {
+      if (nm1 & mask)
+	modul_mul (r1, r1, b1, m);
+      modul_mul (r1, r1, r1, m);
+      mask >>= 1;
+    }
+  /* We know that the least significant bit of nm1 is set */
+  modul_mul (r1, r1, b1, m);
+
+#ifdef PARI
+  printf ("(%lu ^ %lu) %% %lu == %lu /* PARI */\n", 
+	  b, nm1, n, modul_get_ul (r1, m)); */
+#endif
+
+  if (modul_get_ul (r1, m) == 1UL)
+    i = 1;
+  else
+    {
+      /* One of the r, r^2, r^(2^2), ..., r^(2^(po2 - 1)) must be == -1 */
+      while (po2-- > 1)
+	if (modul_get_ul (r1, m) == n - 1UL)
+	  break;
+	else
+	  modul_mul (r1, r1, r1, m);
+      i = (modul_get_ul (r1, m) == n - 1UL);
+    }
+
+  modul_clear (r1, m);
+  modul_clearmod (m);
+#ifdef PARI
+  printf ("isprime(%lu) == %d\n /* PARI */\n", n, i);
+#endif
+  return i;
+}
+
+
+/* If n <= 4759123141 then this function proves primality/compositeness
+   if n. */
+int
+ul_proven_prime (unsigned long n)
+{
+
+  if (n < 2)
+    return 0;
+
+  if (n % 2 == 0)
+    return (n == 2);
+
+  if (ul_prp (n, 2) && ul_prp (n, 7) && ul_prp (n, 61))
+    return (n != 4759123141UL);
+
+  return 0;
+}
 
 /* 1. Compute the norm
    2. Divide out primes with projective roots
@@ -976,8 +1066,8 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 		   const sieve_report_t *reports,
 		   unsigned int *cof_toolarge,
 		   unsigned int *lp_toolarge,
-		   const int lpb, const int mfb, const double lambda,
-		   const double log_scale)
+		   const unsigned long fbb, const int lpb, const int mfb, 
+		   const double lambda, const double log_scale)
 {
   unsigned int k;
   factorbase_degn_t *fbptr;
@@ -1131,14 +1221,14 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 	    int missinglog = uc_sub (normlog, reportlog);
 	    if (missinglog < 2 * fbptr->plog)
 	      {
-		/* We know there's exactly one prime missing, and we know its
-		   approximate size. We could choose a more efficient algorithm
-		   here to find it. */
+		/* We know there's exactly one prime (possibly repeated) 
+		   missing, and we know its approximate size. We could choose 
+		   a more efficient algorithm here to find it. */
 
 		nrprimes2++;
 		sumprimes2 += (unsigned long) fbptr->p;
 		
-		if (missinglog > fbptr->plog + 1)
+		if (missinglog > 10 && missinglog > fbptr->plog + 1)
 		  {
 		    if (mpz_fits_ulong_p (norm))
 		      break;
@@ -1191,15 +1281,125 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 
   if (normlog != reportlog)
     {
-      unsigned long q, r;
-      /* There is one more fb prime missing */
+      /* There is one more factor base prime (possibly in a power) that we 
+	 want to find with a more efficient algorithm */
+
+      unsigned long q, r, s = 5, n;
+
       ASSERT_ALWAYS (uc_sub (normlog, reportlog) >= fbptr->plog &&
 		     uc_sub (normlog, reportlog) < 2 * fbptr->plog);
-      q = ul_rho (mpz_get_ui (norm), 5UL);
-      rho_called++;
-      r = mpz_tdiv_q_ui (norm, norm, q);
-      ASSERT_ALWAYS (r == 0);
-      add_fbprime_to_list (primes, nr_primes, max_nr_primes, q);
+
+      /* Right now we assume that norm fits in a ulong. This will change
+	 when rho with multiple precision arithmetic is written */
+      ASSERT_ALWAYS (mpz_fits_ulong_p (norm));
+      
+
+      /* While in this loop, norm contains a factor base prime whose
+	 log norm = uc_sub (normlog, reportlog). That is also
+         the smallest prime factor in norm. */
+      do
+	{
+	  ASSERT_ALWAYS (mpz_cmp_ui (norm, 1) > 0);
+	  n = mpz_get_ui (norm);
+	  
+	  /* Check if norm is itself a prime (power), i.e. if there are no 
+	     large primes present. */
+	  if (mpz_perfect_power_p (norm))
+	    {
+	      /* Will rarely happen, need not be that fast */
+	      q = iscomposite (n);
+#ifdef RHODEBUG	    
+	      printf ("# %lu is power of %lu for a = %ld, b = %lu, no "
+		      "rho necessary\n", n, q, a, b);
+	      fflush (stdout);
+#endif
+	      ASSERT_ALWAYS (q != 0);
+	      trialdiv_one_prime (q, norm, nr_primes, primes, max_nr_primes, 
+				  1);
+	      break;
+	    }
+	  else if (mpz_cmp_ui (norm, fbb) <= 0)
+	    {
+	      /* Smaller than factor base bound, so it should be prime. */
+#ifdef RHODEBUG
+	      printf ("# %lu is prime for a = %ld, b = %lu, no rho "
+		      "necessary\n", n, a, b);
+	      fflush (stdout);
+#endif
+	      q = n;
+	      ASSERT (ul_proven_prime (n));
+	      trialdiv_one_prime (q, norm, nr_primes, primes, max_nr_primes, 
+				  1);
+	      break;
+	    }
+	  else
+	    {
+	      /* Not <fbb or prime power. Since we know there is a fb prime
+		 in norm, nor being < fbb implies being composite. 
+		 Try to factor it */
+	      rho_called1++;
+	      do {
+		q = ul_rho (n, s++);
+		rho_called++;
+	      } while (q == n);
+	      ASSERT (n % q == 0);
+	      n /= q;
+	      if (q > n)
+	        {
+		  unsigned long t = q;
+		  q = n;
+		  n = t;
+		}
+
+	      /* So we have two divisors of norm, q and n, q <= n. If any of 
+		 them are prime, we test them for size and add them to the 
+		 list or discard the relation */
+
+	      if (q < fbb) /* It must be the missing factor base prime */
+		{
+		  add_fbprime_to_list (primes, nr_primes, max_nr_primes, q);
+		  r = mpz_tdiv_q_ui (norm, norm, q);
+		  ASSERT_ALWAYS (r == 0);
+		  /* Maybe a power of it divides norm */
+		  trialdiv_one_prime (q, norm, nr_primes, primes, 
+				      max_nr_primes, 1);
+		  break;
+		}
+
+	      if (ul_proven_prime (q))
+		{
+		  if (q > (1UL << lpb))
+		    return 0;
+
+		  add_fbprime_to_list (primes, nr_primes, max_nr_primes, q);
+		  r = mpz_tdiv_q_ui (norm, norm, q);
+		  ASSERT_ALWAYS (r == 0);
+		}
+	      
+	      if (ul_proven_prime (n))
+		{
+		  if (n > (1UL << lpb))
+		    return 0;
+
+		  /* There should be exactly one fb prime left, and that 
+		     would have to be the smallest prime in norm. Therefore,
+		     n being prime, below fbb and not the smallest factor 
+		     should be impossible */
+		  ASSERT_ALWAYS (q > fbb);
+		  
+		  add_fbprime_to_list (primes, nr_primes, max_nr_primes, q);
+		  r = mpz_tdiv_q_ui (norm, norm, q);
+		  ASSERT_ALWAYS (r == 0);
+		}
+	    }
+	} while (1);
+
+      if (fb_log (q, log_scale, 0.) != uc_sub (normlog, reportlog))
+	{
+	  /* q was not the missing factor base prime ? */
+	  fprintf (stderr, "Warning, expected to find a fb prime of log size "
+		   "%hhu, but found %lu\n", uc_sub (normlog, reportlog), q);
+	}
     }
 
   /* 5. Check if the cofactor is small enough */
@@ -1351,7 +1551,7 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 				  proj_primes_a, fba->fullfb, 
 				  reports_a + i,
 				  &cof_a_toolarge, &lp_a_toolarge, 
-				  poly->lpba, poly->mfba, 
+				  poly->alim, poly->lpba, poly->mfba, 
 				  poly->alambda, log_scale);
 
 	  if (!ok) 
@@ -1365,7 +1565,7 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 				  proj_primes_r, fbr->fullfb, 
 				  reports_r + j,
 				  &cof_r_toolarge, &lp_r_toolarge, 
-				  poly->lpbr, poly->mfbr, 
+				  poly->rlim, poly->lpbr, poly->mfbr, 
 				  poly->rlambda, log_scale);
 
 	  if (!ok) 
@@ -1409,8 +1609,9 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 	      sumprimes, nrprimes, (double)sumprimes / (double)nrprimes);
       printf ("# Sum and number of 2nd largest non-report fb primes: %lu, %lu, avg: %.0f\n",
 	      sumprimes2, nrprimes2, (double)sumprimes2 / (double)nrprimes2);
-      printf ("# Called rho %lu times, number was too large %lu times\n",
-	      rho_called, rho_toolarge);
+      printf ("# Called rho %lu times, %lu repeats, number was too large "
+	      "%lu times\n",
+	      rho_called, rho_called - rho_called1, rho_toolarge);
 
     }
   
