@@ -98,7 +98,7 @@ struct struct_cont_frac_state_t {
         */
     mpz_t p;
        /**
-        * One has: \c (-1)^(nb_step_performed) q = <tt>a*a - b*b*n</tt>
+        * One has: \c (-1)^(nsteps_performed) q = <tt>a*a - b*b*n</tt>
         */
     mpz_t q;
        /**
@@ -119,7 +119,7 @@ struct struct_cont_frac_state_t {
         * The number of non trivial terms of the continued fraction already
         * computed.
         */
-    uint32_t nb_step_performed;
+    uint32_t nsteps_performed;
         //
         // "Private" temporary variables.
         // These are declared in the structure just to avoid redundant
@@ -131,6 +131,12 @@ struct struct_cont_frac_state_t {
         * initializations and deallocations).
         */
     mpz_t _ztmp_q_;
+       /**
+        * \internal
+        * (Temporary variable declared in the structure just to avoid redundant
+        * initializations and deallocations).
+        */
+    mpz_t _ztmp_;
        /**
         * \internal
         * (Used in the computation of <tt>a</tt>).

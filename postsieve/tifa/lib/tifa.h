@@ -66,7 +66,6 @@
 #include "hashtable.h"
 #include "lindep.h"
 #include "linked_list.h"
-#include "macros.h"
 #include "matrix.h"
 #include "messages.h"
 #include "print_error.h"

@@ -883,12 +883,12 @@ static void generate_xi_yi_pairs(
         // Now, (-1)^m * cfstate.q = cfstate.a^2 - k*N*cfstate.b^2
         // i.e. cfstate.a^2 = (-1)^m cfstate.q (mod N)
         //
-        // with m = 1 if (cfstate.nb_step_performed) is odd
+        // with m = 1 if (cfstate.nsteps_performed) is odd
         //          0 otherwise
         //
         if (mpz_cmpabs_ui(cfstate->q, first_primes[0]) >= 0) {
 
-        	if (IS_ODD(cfstate->nb_step_performed)) {
+        	if (IS_ODD(cfstate->nsteps_performed)) {
         	    mpz_neg(yi_array->data[i], cfstate->q);
             } else {
                 mpz_set(yi_array->data[i], cfstate->q);

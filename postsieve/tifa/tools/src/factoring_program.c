@@ -39,10 +39,6 @@
 #include "funcs.h"
 #include "common_funcs.h"
 
-
-#define __TIMING__ 1
-#include "../../lib/utils/include/timer.h"
-
 //------------------------------------------------------------------------------
 ecode_t run_program(factoring_program_t* const program) {
     //
@@ -147,37 +143,13 @@ ecode_t run_program(factoring_program_t* const program) {
             //
             // Proceed with the factoring algorithm.
             //
-            INIT_NAMED_TIMER(program);
-            
-            const unsigned int MAX_NITERS = 1;
-            
-            for (uint32_t i=1; i<=MAX_NITERS; i++) {
-            
-                START_NAMED_TIMER(program);
-            
-                ecode = program->factoring_algo_func(
-                            progfactors,
-                            progmultis,
-                            n_atd,
-                            program->params,
-                            program->mode
-                        );
-                
-                STOP_NAMED_TIMER(program);
-                
-                if (i != MAX_NITERS) {
-                
-                    for (uint32_t j=0; j<progfactors->length; j++) {
-                        mpz_clear(progfactors->data[j]);
-                    }
-                    progfactors->length = 0;
-                    progmultis->length = 0;
-                }
-            }
-            
-            double elapsed = GET_NAMED_TIMING(program);
-
-            printf("\n\nTOTAL TIME: %.4f seconds\n\n", elapsed/MAX_NITERS);
+            ecode = program->factoring_algo_func(
+                        progfactors,
+                        progmultis,
+                        n_atd,
+                        program->params,
+                        program->mode
+                    );
 
             if (program->mode != FIND_COMPLETE_FACTORIZATION) {
                 //
