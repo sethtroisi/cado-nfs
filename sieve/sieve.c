@@ -1387,8 +1387,8 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 		     should be impossible */
 		  ASSERT_ALWAYS (q > fbb);
 		  
-		  add_fbprime_to_list (primes, nr_primes, max_nr_primes, q);
-		  r = mpz_tdiv_q_ui (norm, norm, q);
+		  add_fbprime_to_list (primes, nr_primes, max_nr_primes, n);
+		  r = mpz_tdiv_q_ui (norm, norm, n);
 		  ASSERT_ALWAYS (r == 0);
 		}
 	    }
