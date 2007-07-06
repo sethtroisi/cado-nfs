@@ -114,8 +114,8 @@ fb_sortprimes (fbprime_t *primes, const unsigned int n)
 	  m = k + 1;
 	}
 #ifdef WANT_ASSERT
-  for (k = 0; k < n - 1; k++)
-    ASSERT(primes[k] <= primes[k + 1]);
+  for (k = 1; k < n; k++)
+    ASSERT(primes[k - 1] <= primes[k]);
 #endif
 }
 
