@@ -24,8 +24,8 @@ first_sieve_loc (const fbprime_t p, const fbroot_t r,
   ASSERT_EXPENSIVE (b % p != 0);
 
   mod_initmod_ul (m, p); /* Most of the mod_*() calls are no-ops */
-  mod_init (r1, m);
-  mod_init (r2, m);
+  mod_init_noset0 (r1, m);
+  mod_init_noset0 (r2, m);
   mod_set_ul_reduced (r2, r, m);
   mod_set_ul (r1, b, m); /* Modular reduction */
   mod_mul (r1, r1, r2, m); /* Multiply and mod reduction. */

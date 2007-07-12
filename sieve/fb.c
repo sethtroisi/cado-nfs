@@ -162,8 +162,8 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
       fb_cur->plog = fb_log (fb_cur->p, log_scale, 0.);
 
       mod_initmod_ul (m, p);
-      mod_init (r1, m);
-      mod_init (r2, m);
+      mod_init_noset0 (r1, m);
+      mod_init_noset0 (r2, m);
       
       mod_set_ul_reduced (r2, mpz_fdiv_ui (poly[1], p), m);
       /* If p | g1 and !(p | g0), p|G(a,b) <=> p|b and that will be handeled
@@ -181,7 +181,7 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
 #ifdef WANT_ASSERT
       {
 	residue r3;
-	mod_init (r3, m);
+	mod_init_noset0 (r3, m);
 	mod_set_ul_reduced (r3, mpz_fdiv_ui (poly[1], p), m);
 	mod_mul (r3, r3, r2, m); /* g1 * (- g0 / g1) */
 	mod_add (r3, r3, r1, m); /* g1 * (- g0 / g1) + g0 */
@@ -695,9 +695,9 @@ fb_check (factorbase_t fb, cado_poly poly, int side)
 	  unsigned long res;
 
 	  mod_initmod_ul (m, p);
-	  mod_init (r, m);
-	  mod_init (c, m);
-	  mod_init_set0 (val, m);
+	  mod_init_noset0 (r, m);
+	  mod_init_noset0 (c, m);
+	  mod_init (val, m);
 	  mod_set_ul (r, fbptr->roots[i], m);
 
 	  if (side == 0)

@@ -12,8 +12,8 @@ rlim: 350000
 alim: 500000
 lpbr: 24
 lpba: 24
-mfbr: 37
-mfba: 37
-rlambda: 1.1
-alambda: 1.1
+mfbr: 24
+mfba: 24
+rlambda: 1.8
+alambda: 1.8
 qintsize: 10000

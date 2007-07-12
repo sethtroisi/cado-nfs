@@ -32,7 +32,7 @@
 
 /* Define the default names and types for arithmetic with these functions */
 #define mod_init             modul_init
-#define mod_init_set0        modul_init_set0
+#define mod_init_noset0      modul_init_noset0
 #define mod_clear            modul_clear
 #define mod_set              modul_set
 #define mod_set_ul           modul_set_ul
@@ -56,6 +56,7 @@
 #define mod_div2             modul_div2
 #define mod_div3             modul_div3
 #define mod_invmodlong       modul_invmodlong
+#define mod_powredc_ul       modul_powredc_ul
 #define mod_gcd              modul_gcd
 #define mod_inv              modul_inv
 #define mod_jacobi           modul_jacobi
@@ -65,29 +66,35 @@ typedef unsigned long modulusul[1];
 typedef residueul residue;
 typedef modulusul modulus;
 
+/* Initialises a residue type and sets it to zero */
 __GNUC_ATTRIBUTE_UNUSED__
 static inline void
-modul_init (residueul r __GNUC_ATTRIBUTE_UNUSED__, 
-            modulusul m __GNUC_ATTRIBUTE_UNUSED__)
-{
-  return;
-}
-
-__GNUC_ATTRIBUTE_UNUSED__
-static inline void
-modul_init_set0 (residueul r, modulusul m __GNUC_ATTRIBUTE_UNUSED__)
+modul_init (residueul r, modulusul m __GNUC_ATTRIBUTE_UNUSED__)
 {
   r[0] = 0UL;
   return;
 }
 
+
+/* Initialises a residue type, but does not set it to zero. For fixed length
+   residue types, that leaves nothing to do at all. */
 __GNUC_ATTRIBUTE_UNUSED__
 static inline void
-modul_clear (residueul r __GNUC_ATTRIBUTE_UNUSED__,
-              modulusul m __GNUC_ATTRIBUTE_UNUSED__)
+modul_init_noset0 (residueul r __GNUC_ATTRIBUTE_UNUSED__, 
+                   modulusul m __GNUC_ATTRIBUTE_UNUSED__)
 {
   return;
 }
+
+
+__GNUC_ATTRIBUTE_UNUSED__
+static inline void
+modul_clear (residueul r __GNUC_ATTRIBUTE_UNUSED__, 
+             modulusul m __GNUC_ATTRIBUTE_UNUSED__)
+{
+  return;
+}
+
 
 __GNUC_ATTRIBUTE_UNUSED__
 static inline void
@@ -95,6 +102,7 @@ modul_set (residueul r, residueul s, modulusul m __GNUC_ATTRIBUTE_UNUSED__)
 {
   r[0] = s[0];
 }
+
 
 __GNUC_ATTRIBUTE_UNUSED__
 static inline void
@@ -156,7 +164,7 @@ modul_add (residueul r, residueul a, residueul b, modulusul m)
 {
   ASSERT(a[0] < m[0] && b[0] < m[0]);
 #ifdef MODTRACE
-  printf ("addmodul: a = %lu, b = %lu", a[0], b[0]);
+  printf ("modul_add: a = %lu, b = %lu", a[0], b[0]);
 #endif
   r[0] = (a[0] >= m[0] - b[0]) ? (a[0] - (m[0] - b[0])) : (a[0] + b[0]);
 #ifdef MODTRACE
@@ -170,7 +178,7 @@ modul_add_ul (residueul r, residueul a, unsigned long b, modulusul m)
 {
   ASSERT(a[0] < m[0] && b < m[0]);
 #ifdef MODTRACE
-  printf ("addmodul_ul: a = %lu, b = %lu", a[0], b);
+  printf ("modul_add_ul: a = %lu, b = %lu", a[0], b);
 #endif
   r[0] = (a[0] >= m[0] - b) ? (a[0] - (m[0] - b)) : (a[0] + b);
 #ifdef MODTRACE
@@ -184,7 +192,7 @@ modul_sub_ul (residueul r, residueul a, unsigned long b, modulusul m)
 {
   ASSERT(a[0] < m[0] && b < m[0]);
 #ifdef MODTRACE
-  printf ("submodul_ul: a = %lu, b = %lu", a[0], b);
+  printf ("modul_sub_ul: a = %lu, b = %lu", a[0], b);
 #endif
   r[0] = (a[0] >= b) ? (a[0] - b) : (a[0] + (m[0] - b));
 #ifdef MODTRACE
@@ -196,7 +204,7 @@ __GNUC_ATTRIBUTE_UNUSED__
 static inline void
 modul_neg (residueul r, residueul a, modulusul m)
 {
-  if (a[0] == 0)
+  if (a[0] == 0UL)
     r[0] = a[0];
   else
     r[0] = m[0] - a[0];
@@ -215,6 +223,10 @@ modul_sub (residueul r, residueul a, residueul b, modulusul m)
   printf (", r = %lu\n", r[0]);
 #endif
 }
+
+
+/* Add an unsigned long to two unsigned longs with carry propagation from 
+   low word to high word. Any carry out from high word is lost. */
 
 static inline void
 modul_add_ul_2ul (unsigned long *r1, unsigned long *r2, const unsigned long a)
@@ -255,7 +267,7 @@ mul_ul_ul_2ul (unsigned long *r1, unsigned long *r2, const unsigned long a,
 #endif
 }
 
-/* Integer division of a two longint value by a longint divisor. Returns
+/* Integer division of a two ulong value by a ulong divisor. Returns
    quotient and remainder. */
 
 static inline void
@@ -334,7 +346,7 @@ modul_frommontgomery (residueul r, const residueul a, const unsigned long invm,
   unsigned long tlow, thigh;
   mul_ul_ul_2ul (&tlow, &thigh, a[0], invm);
   mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
-  r[0] = thigh + (a[0] != 0);
+  r[0] = thigh + (a[0] != 0UL);
 }
 
 
@@ -347,13 +359,13 @@ modul_addredc_ul (residueul r, const residueul a, const unsigned long b,
   unsigned long slow, shigh, tlow, thigh;
   
   slow = b;
-  shigh = 0;
+  shigh = 0UL;
   modul_add_ul_2ul (&slow, &shigh, a[0]);
   
   mul_ul_ul_2ul (&tlow, &thigh, slow, invm);
   mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
   ASSERT (slow + tlow == 0UL);
-  r[0] = thigh + shigh + (slow != 0);
+  r[0] = thigh + shigh + (slow != 0UL);
   
   /* r = ((a+b) + (((a+b)%2^w * invp) % 2^w) * p) / 2^w
      r <= ((a+b) + (2^w - 1) * p) / 2^w
@@ -363,7 +375,7 @@ modul_addredc_ul (residueul r, const residueul a, const unsigned long b,
      r <= p
   */
   if (r[0] == m[0])
-    r[0] = 0;
+    r[0] = 0UL;
 }
 
 
@@ -389,7 +401,7 @@ modul_mulredc (residueul r, const residueul a, const residueul b,
      phigh + thigh */
   /* Since a <= p-1 and b <= p-1, and p <= b-1, a*b <= b^2 - 4*b + 4, so
      adding 1 to phigh is safe */
-  phigh += (plow != 0);
+  phigh += (plow != 0UL);
   r[0] = (phigh >= m[0] - thigh) ? (phigh - (m[0] - thigh)) : (phigh + thigh);
   
 #if defined(MODTRACE)
@@ -412,7 +424,7 @@ modul_mulredc_ul (residueul r, const residueul a, const unsigned long b,
   mul_ul_ul_2ul (&plow, &phigh, a[0], b);
   mul_ul_ul_2ul (&tlow, &thigh, plow, invm);
   mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
-  phigh += (plow != 0);
+  phigh += (plow != 0UL);
   r[0] = (phigh >= m[0] - thigh) ? (phigh - (m[0] - thigh)) : (phigh + thigh);
   
 #if defined(MODTRACE)
@@ -441,7 +453,7 @@ modul_muladdredc_ul (residueul r, const residueul a, const unsigned long b,
   modul_add_ul_2ul (&plow, &phigh, c);
   mul_ul_ul_2ul (&tlow, &thigh, plow, invm);
   mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
-  phigh += (plow != 0);
+  phigh += (plow != 0UL);
   r[0] = (phigh >= m[0] - thigh) ? (phigh - (m[0] - thigh)) : (phigh + thigh);
   
 #if defined(MODTRACE)
@@ -455,7 +467,7 @@ static inline void
 modul_div2 (residueul r, residueul a, modulusul m)
 {
   ASSERT(m[0] % 2 != 0);
-  r[0] = (a[0] % 2 == 0) ? (a[0] / 2) : (a[0] / 2 + m[0] / 2 + 1);
+  r[0] = (a[0] % 2 == 0) ? (a[0] / 2) : (a[0] / 2 + m[0] / 2 + 1UL);
 }
 
 __GNUC_ATTRIBUTE_UNUSED__
@@ -468,13 +480,13 @@ modul_div3 (residueul r, residueul a, modulusul m)
   residueul t;
 #endif
 
-  ASSERT(m3 != 0);
-  if (a3 == 0)
-    r[0] = a[0] / 3;
-  else if (a3 + m3 == 3) /* Hence a3 == 1, m3 == 2 or a3 == 3, m3 == 1 */
-    r[0] = a[0] / 3 + m[0] / 3 + 1;
+  ASSERT(m3 != 0UL);
+  if (a3 == 0UL)
+    r[0] = a[0] / 3UL;
+  else if (a3 + m3 == 3UL) /* Hence a3 == 1, m3 == 2 or a3 == 3, m3 == 1 */
+    r[0] = a[0] / 3UL + m[0] / 3UL + 1UL;
   else /* a3 == 1, m3 == 1 or a3 == 2, m3 == 2 */
-    r[0] = m[0] - (m[0] - a[0]) / 3;
+    r[0] = m[0] - (m[0] - a[0]) / 3UL;
 
 #ifdef WANT_ASSERT
   modul_add (t, r, r, m);
@@ -489,12 +501,12 @@ modul_gcd (residueul r, modulusul m)
 {
   unsigned long a = r[0], b = m[0], t;
 
-  ASSERT (b > 0);
+  ASSERT (b > 0UL);
   
   if (a >= b)
     a %= b;
 
-  while (a > 0)
+  while (a > 0UL)
     {
       /* Here 0 < a < b */
       t = b % a;
@@ -529,9 +541,54 @@ modul_invmodlong (modulusul m)
   return r;
 }
 
+/* Compute r = b^e, with r and a in Montgomery representation */
+__GNUC_ATTRIBUTE_UNUSED__
+static void
+modul_powredc_ul (residueul r, residueul b, unsigned long e, 
+                  unsigned long invm, modulusul m)
+{
+  unsigned long mask = ~0UL - (~0UL >> 1); /* Only MSB set */
+
+  if (e == 0UL)
+    {
+      r[0] = 1UL;
+      return;
+    }
+
+  /* Assume r = 1 here for the invariant.
+     r^mask * b^e is invariant, and is the result we want */
+
+  /* Find highest set bit in e. */
+  while ((e & mask) == 0UL)
+    mask >>= 1; /* r = 1, so r^(mask/2) * b^e = r^mask * b^e  */
+
+  /* Exponentiate */
+
+  modul_set (r, b, m);       /* e -= mask; */
+#ifdef WANT_ASSERT
+  e -= mask;                 /* (r*b)^mask * b^(e-mask) = r^mask * b^e */
+#endif
+
+  while (mask > 1UL)
+    {
+      modul_mulredc (r, r, r, invm, m);
+      mask >>= 1;            /* (r^2)^(mask/2) * b^e = r^mask * b^e */
+      if (e & mask)
+        {
+	  modul_mulredc (r, r, b, invm, m);
+#ifdef WANT_ASSERT
+          e -= mask;         /* e -= mask; As above */
+#endif
+        }
+    }
+  ASSERT (e == 0 && mask == 1);
+  /* Now e = 0, mask = 1, and r^mask * b^0 = r^mask is the result we want */
+}
+
 
 /* Put 1/s (mod t) in r and return 1 if s is invertible, 
    or return 0 if s is not invertible */
+
 __GNUC_ATTRIBUTE_UNUSED__
 static int
 modul_inv (residueul r, residueul s, modulusul t)
@@ -539,24 +596,24 @@ modul_inv (residueul r, residueul s, modulusul t)
   long u1, v1;
   unsigned long q, u2, v2;
 
-  ASSERT (t[0] > 0);
+  ASSERT (t[0] > 0UL);
   ASSERT (s[0] < t[0]);
 
-  if (s[0] == 0)
+  if (s[0] == 0UL)
     {
-      r[0] = 0; /* Not invertible */
+      r[0] = 0UL; /* Not invertible */
       return 0;
     }
 
-  if (s[0] == 1)
+  if (s[0] == 1UL)
     {
-      r[0] = 1;
+      r[0] = 1UL;
       return 1;
     }
 
 #if 0
-  u1 = 1;
-  v1 = 0;
+  u1 = 1L;
+  v1 = 0L;
   u2 = s;
   v2 = t;
 
@@ -569,19 +626,19 @@ modul_inv (residueul r, residueul s, modulusul t)
   v2 = v2 - q * u2; /* == v2 - q * s == t - q * s == t % s */
 #endif
 
-  u1 = 1UL;
+  u1 = 1L;
   u2 = s[0];
   v1 = - (t[0] / s[0]); /* No overflow, since s >= 2 */
   v2 = t[0] % s[0];
 
-  while (v2 != 0)
+  while (v2 != 0UL)
     {
       /* unroll twice and swap u/v */
       q = u2 / v2;
       u1 = u1 - (long) q * v1;
       u2 = u2 - q * v2;
 
-      if (u2 == 0)
+      if (u2 == 0UL)
         {
           u1 = v1;
           u2 = v2;
@@ -593,19 +650,19 @@ modul_inv (residueul r, residueul s, modulusul t)
       v2 = v2 - q * u2;
     }
 
-  if (u2 != 1)
+  if (u2 != 1UL)
     {
       /* printf ("s=%lu t=%lu found %lu\n", s[0], t[0], u2); */
-      r[0] = 0; /* non trivial gcd */
+      r[0] = 0UL; /* non-trivial gcd */
       return 0;
     }
 
-  if (u1 < 0)
-    u1 = u1 - t[0] * (-u1 / t[0] - 1);
+  if (u1 < 0L)
+    u1 = u1 - t[0] * (-u1 / t[0] - 1L);
 
 #ifdef WANT_ASSERT
   modul_mul (&u2, (unsigned long *)&u1, s, t);
-  ASSERT(u2 == 1);
+  ASSERT(u2 == 1UL);
 #endif
 
   r[0] = (unsigned long) u1;
@@ -622,11 +679,11 @@ modul_jacobi (residueul a_par, modulusul m_par)
   a = a_par[0];
   m = m_par[0];
   
-  while (a != 0)
+  while (a != 0UL)
   {
     while (a % 2 == 0)
     {
-      a /= 2;
+      a /= 2UL;
       if (m % 8 == 3 || m % 8 == 5)
         t = -t;
     }
@@ -635,7 +692,7 @@ modul_jacobi (residueul a_par, modulusul m_par)
       t = -t;
     a %= m;
   }
-  if (m != 1)
+  if (m != 1UL)
     t = 0;
   
 #ifdef MODTRACE

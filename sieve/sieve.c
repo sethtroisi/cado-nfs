@@ -33,7 +33,8 @@
 
 unsigned long sumprimes, nrprimes; /* For largest non-report fb primes */
 unsigned long sumprimes2, nrprimes2;  /* For 2nd largest non-report fb prim. */
-unsigned long rho_called = 0, rho_called1 = 0, rho_toolarge = 0;
+unsigned long ul_rho_called = 0, ul_rho_called1 = 0, 
+  mpz_rho_called = 0, mpz_rho_called1 = 0;
 
 #ifdef TRACE_RELATION_A
 static void 
@@ -842,7 +843,7 @@ trialdiv_with_root (factorbase_degn_t *fbptr, const long a,
   unsigned long absa;
 
   mod_initmod_ul (m, fbptr->p);
-  mod_init (r, m);
+  mod_init_noset0 (r, m);
 
   absa = labs(a);
 
@@ -876,7 +877,7 @@ trialdiv_with_norm (factorbase_degn_t *fbptr, const mpz_t norm)
   int i;
 
   mod_initmod_ul (m, fbptr->p);
-  mod_init_set0 (r, m);
+  mod_init (r, m);
 
   for (i = 0; i < norm->_mp_size; i++)
     {
@@ -891,8 +892,52 @@ trialdiv_with_norm (factorbase_degn_t *fbptr, const mpz_t norm)
   return i;
 }
 
+
+/* Square root. Returns the largest integer x so that x^2 <= n.
+   If e != NULL, stores n - x^2 in *e. Should be compiled with 
+   -funroll-loops for best performance. */
+
+static inline unsigned long  
+ul_sqrtint (const unsigned long n, unsigned long *e)
+{
+  int i;   
+  unsigned long xs, c, d, s2;
+
+  d = n; /* d = n - x^2 */
+  xs = 0UL;
+  s2 = 1UL << (sizeof (unsigned long) * 8 - 2);
+
+  for (i = sizeof (unsigned long) * 4 - 1; i != 0; i--)
+    {
+      /* Here, s2 = 1 << (2*i) */
+      /* xs = x << (i + 1), the value of x shifted left i+1 bits */
+
+      c = xs + s2; /* c = (x + 2^i) ^ 2 - x^2 = 2^(i+1) * x + 2^(2*i) */
+      xs >>= 1; /* Now xs is shifted only i positions */
+      if (d >= c)
+        {
+          d -= c;
+          xs |= s2; /* x |= 1UL << i <=> xs |= 1UL << (2*i) */
+        }
+      s2 >>= 2;
+    }
+
+  c = xs + s2; 
+  xs >>= 1;
+  if (d >= c)
+    {
+      d -= c;   
+      xs |= s2;
+    }
+ 
+  if (e != NULL)
+    *e = d;
+  return xs;
+}
+
+
 static unsigned long
-ul_rho (const unsigned long N, unsigned long cparm)
+ul_rho (const unsigned long N, const unsigned long cparm)
 {
   modulusul m;
   residueul r1, r2, c, diff, accu;
@@ -906,15 +951,15 @@ ul_rho (const unsigned long N, unsigned long cparm)
   /* printf ("ul_rho: factoring %lu\n", N); */
 
   modul_initmod_ul (m, N);
-  modul_init (r1, m);
-  modul_init (r2, m);
-  modul_init (c, m);
-  modul_init (accu, m);
-  modul_init (diff, m);
+  modul_init_noset0 (r1, m);
+  modul_init_noset0 (r2, m);
+  modul_init_noset0 (c, m);
+  modul_init_noset0 (accu, m);
+  modul_init_noset0 (diff, m);
   invm = -modul_invmodlong (m);
   modul_set_ul_reduced (c, cparm, m); /* We set c to cparm and use that as 
 					 the Montgomery representation of 
-					 cparm*2^w % m */
+					 cparm*2^-w % m */
   modul_set_ul_reduced (r1, 2, m);
   modul_set (r2, r1, m);
   modul_set (accu, r1, m);
@@ -924,8 +969,10 @@ ul_rho (const unsigned long N, unsigned long cparm)
       {
 	modul_mulredc (r1, r1, r1, invm, m);
 	modul_add (r1, r1, c, m);
+	/* FIXME: use modul_muladdredc_ul()? How does that change the 
+	   arithmetic? */
 
-	modul_mulredc (r2, r2, r2, invm, m);
+      	modul_mulredc (r2, r2, r2, invm, m);
 	modul_add (r2, r2, c, m);
 	modul_mulredc (r2, r2, r2, invm, m);
 	modul_add (r2, r2, c, m);
@@ -948,14 +995,84 @@ ul_rho (const unsigned long N, unsigned long cparm)
   return g;
 }
 
-/* Returns 1 if n is a strong probable prime wrt base b, 0 otherwise */
+
+static unsigned long
+mpz_rho (const mpz_t N, const unsigned long c)
+{
+  mpz_t m, r1, r2, t, accu;
+  int i;
+  unsigned int iterations = 0;
+  const int iterations_between_gcd = 32;
+  unsigned long f;
+
+  ASSERT (mpz_cmp_ui(N, c) > 0);
+
+#if 0 || defined(RHODEBUG)
+  gmp_printf ("mpz_rho: factoring %Zd\n", N);
+#endif
+
+  mpz_init (m);
+  mpz_init (r1);
+  mpz_init (r2);
+  mpz_init (t);
+  mpz_init (accu);
+
+  mpz_set (m, N);
+  mpz_set_ui (r1, 2);
+  mpz_set_ui (r2, 2);
+  mpz_set_ui (accu, 2);
+
+  do {
+    for (i = 0; i < iterations_between_gcd; i++)
+      {
+	mpz_mul (t, r1, r1);
+	mpz_add_ui (t, t, c);
+	mpz_mod (r1, t, m);
+
+	mpz_mul (t, r2, r2);
+	mpz_add_ui (t, t, c);
+	mpz_mod (r2, t, m);
+	mpz_mul (t, r2, r2);
+	mpz_add_ui (t, t, c);
+	mpz_mod (r2, t, m);
+
+	mpz_sub (t, r1, r2);
+	mpz_mul (t, t, accu);
+	mpz_mod (accu, t, m);
+      }
+    iterations += iterations_between_gcd;
+    mpz_gcd (t, accu, m);
+  } while (mpz_cmp_ui (t, 1) == 0);
+
+  /* FIXME: deal with too large factors better than this! */
+  if (!mpz_fits_ulong_p (t))
+    f = 1;
+  else
+    f = mpz_get_ui (t);
+
+
+  mpz_clear (accu);
+  mpz_clear (t);
+  mpz_clear (r2);
+  mpz_clear (r1);
+  mpz_clear (m);
+
+#if 0 || defined(RHODEBUG)
+  printf ("mpz_rho: took %u iterations to find %lu\n", iterations, f);
+#endif
+
+  return f;
+}
+
+
+/* Returns 1 if n is a strong probable prime wrt base b, 0 otherwise.
+   invn must be passed so that n * invn  == -1 (mod 2^wordsize) */
 int
-ul_prp (const unsigned long n, const unsigned long b)
+ul_prp (const unsigned long n, const unsigned long invn, const unsigned long b)
 {
   modulusul m;
-  residueul r1, b1;
+  residueul b1, r1, t;
   int i, po2 = 1;
-  unsigned long mask;
   unsigned long nm1 = (n - 1UL) >> 1;
 
   ASSERT (b < n);
@@ -969,73 +1086,84 @@ ul_prp (const unsigned long n, const unsigned long b)
     }
 
   modul_initmod_ul (m, n);
-  modul_init (r1, m);
-  modul_init (b1, m);
-  modul_set_ul_reduced (r1, b, m);
+  modul_init_noset0 (b1, m);
+  modul_init_noset0 (r1, m);
+  modul_init_noset0 (t, m);
   modul_set_ul_reduced (b1, b, m);
+  mod_tomontgomery (b1, b1, m);
 
-  mask = ~0UL; /* All bits set */
-  mask -= mask >> 1; /* Now only high bit is set */
+  /* Exponentiate */
+  modul_powredc_ul (r1, b1, nm1, invn, m);
 
-  /* Find highest set bit in nm1 and skip to the
-     bit one less significant */
-  while ((nm1 & mask) == 0UL)
-    mask >>= 1;
-  mask >>= 1;
-  modul_mul (r1, r1, r1, m);
-  
-  while (mask > 1UL)
-    {
-      if (nm1 & mask)
-	modul_mul (r1, r1, b1, m);
-      modul_mul (r1, r1, r1, m);
-      mask >>= 1;
-    }
-  /* We know that the least significant bit of nm1 is set */
-  modul_mul (r1, r1, b1, m);
-
-#ifdef PARI
-  printf ("(%lu ^ %lu) %% %lu == %lu /* PARI */\n", 
-	  b, nm1, n, modul_get_ul (r1, m)); */
+  modul_frommontgomery (t, r1, invn, m);
+#if defined(PARI)
+  printf ("(Mod(%lu,%lu) ^ %lu) == %lu /* PARI */\n", 
+	  b, n, nm1, modul_get_ul (t, m));
 #endif
-
-  if (modul_get_ul (r1, m) == 1UL)
+    
+  if (modul_get_ul (t, m) == 1UL)
     i = 1;
   else
     {
       /* One of the r, r^2, r^(2^2), ..., r^(2^(po2 - 1)) must be == -1 */
-      while (po2-- > 1)
-	if (modul_get_ul (r1, m) == n - 1UL)
-	  break;
-	else
-	  modul_mul (r1, r1, r1, m);
-      i = (modul_get_ul (r1, m) == n - 1UL);
+      for ( ; po2 > 1; po2--)
+	{
+	  modul_frommontgomery (t, r1, invn, m);
+	  if (modul_get_ul (t, m) == n - 1UL)
+	    break;
+	  modul_mulredc (r1, r1, r1, invn, m);
+	}
+      if (po2 > 1)
+	i = 1;
+      else
+	{
+	  modul_frommontgomery (t, r1, invn, m);
+	  i = (modul_get_ul (t, m) == n - 1UL);
+	}
     }
 
   modul_clear (r1, m);
   modul_clearmod (m);
-#ifdef PARI
-  printf ("isprime(%lu) == %d\n /* PARI */\n", n, i);
-#endif
   return i;
 }
 
 
-/* If n <= 4759123141 then this function proves primality/compositeness
-   if n. */
+/* If n <= 10^10 then this function proves primality/compositeness
+   of n. */
 int
 ul_proven_prime (unsigned long n)
 {
+  modulusul m;
+  unsigned long invn;
+  
+  if (n % 2UL == 0UL)
+    return (n == 2UL);
 
-  if (n < 2)
-    return 0;
+  if (n <= 61UL) /* Want modulus > 61 for tests below */
+    {
+      if (n % 3UL == 0UL)
+	return (n == 3UL);
+      if (n % 5UL == 0UL)
+	return (n == 5UL);
+      return (n != 49UL);
+    }
 
-  if (n % 2 == 0)
-    return (n == 2);
+  modul_initmod_ul (m, n);
+  invn = -mod_invmodlong (m);
+  modul_clearmod (m);
 
-  if (ul_prp (n, 2) && ul_prp (n, 7) && ul_prp (n, 61))
-    return (n != 4759123141UL);
+  if (ul_prp (n, invn, 2UL) && ul_prp (n, invn, 7UL) && ul_prp (n, invn, 61UL) 
+      && n != 4759123141UL && n != 8411807377UL)
+    {
+#if defined(PARI)
+      printf ("isprime(%lu) == 1 /* PARI */\n", n);
+#endif
+      return 1;
+    }
 
+#if defined(PARI)
+  printf ("isprime(%lu) == 0 /* PARI */\n", n);
+#endif
   return 0;
 }
 
@@ -1228,17 +1356,24 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 		nrprimes2++;
 		sumprimes2 += (unsigned long) fbptr->p;
 		
-		if (missinglog > 10 && missinglog > fbptr->plog + 1)
+		if (mpz_fits_ulong_p (norm))
 		  {
-		    if (mpz_fits_ulong_p (norm))
+		    /* We can use the fast ul_rho() function */
+		    if (missinglog > 10 && missinglog > fbptr->plog + 1)
 		      break;
-		    else
-		      rho_toolarge++;
 		  }
+		else
+		  {
+		    /* We need to use the slower mpz_rho() function */
+		    if (missinglog > 20 && missinglog > fbptr->plog + 2)
+		      break;
+		  }
+
 		
-		/* For now let's try skipping forward in the factor base
-		   to those primes that have the correct rounded log.
-		   Keep in mind that the for() loop advances fbptr once! */
+		/* If we can't use Pollard rho, let's try skipping forward in 
+		   the factor base to those primes that have the correct 
+		   rounded log. Keep in mind that the for() loop advances 
+		   fbptr once after this while loop exits! */
 #if TRIALDIV_SKIPFORWARD
 		while (fb_next (fbptr)->p != 0 && 
 		       fb_next (fbptr)->plog < missinglog)
@@ -1282,52 +1417,71 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
   if (normlog != reportlog)
     {
       /* There is one more factor base prime (possibly in a power) that we 
-	 want to find with a more efficient algorithm */
+	 want to find with a more efficient algorithm. */
 
-      unsigned long q, r, s = 5, n;
+      unsigned long q, r, s = 5;
 
       ASSERT_ALWAYS (uc_sub (normlog, reportlog) >= fbptr->plog &&
 		     uc_sub (normlog, reportlog) < 2 * fbptr->plog);
 
-      /* Right now we assume that norm fits in a ulong. This will change
-	 when rho with multiple precision arithmetic is written */
-      ASSERT_ALWAYS (mpz_fits_ulong_p (norm));
-      
 
-      /* While in this loop, norm contains a factor base prime whose
-	 log norm = uc_sub (normlog, reportlog). That is also
-         the smallest prime factor in norm. */
+      /* While in this loop, norm contains a factor base prime (possibly
+	 in a power > 1) whose log norm = uc_sub (normlog, reportlog). 
+	 That is also the smallest prime factor in norm. */
       do
 	{
 	  ASSERT_ALWAYS (mpz_cmp_ui (norm, 1) > 0);
-	  n = mpz_get_ui (norm);
 	  
 	  /* Check if norm is itself a prime (power), i.e. if there are no 
 	     large primes present. */
 	  if (mpz_perfect_power_p (norm))
 	    {
 	      /* Will rarely happen, need not be that fast */
-	      q = iscomposite (n);
-#ifdef RHODEBUG	    
-	      printf ("# %lu is power of %lu for a = %ld, b = %lu, no "
-		      "rho necessary\n", n, q, a, b);
+	      mpz_t t;
+	      unsigned long i;
+
+	      mpz_init (t);
+	      for (i = 2UL; !mpz_root (t, norm, i); i++);
+	      ASSERT_ALWAYS (mpz_fits_ulong_p (t));
+	      q = mpz_get_ui (t);
+	      mpz_clear (t);
+	      
+#ifdef RHODEBUG
+	      gmp_printf ("# %Zd is an %lu-th power of %lu for a = %ld, "
+			  "b = %lu, no rho necessary\n", norm, i, q, a, b);
 	      fflush (stdout);
 #endif
+
+	      /* norm may be a power of a composite value! I.e. if the large
+		 prime also appears in the same power. If q is composite, 
+		 find the smallest prime dividing it. This will happen very 
+		 rarely. */
+	      if (!ul_proven_prime (q))
+		q = iscomposite (q);
+
+	      TRACE_A (a, __func__, "norm %Zd is a power, %lu divides it\n", 
+		       norm, q);
 	      ASSERT_ALWAYS (q != 0);
 	      trialdiv_one_prime (q, norm, nr_primes, primes, max_nr_primes, 
 				  1);
-	      break;
+	      /* q may not have been the only prime that divides norm.
+	         If it isn't, we simply loop again */
+	      if (mpz_cmp_ui (norm, 1UL) == 0)
+		break;
 	    }
 	  else if (mpz_cmp_ui (norm, fbb) <= 0)
 	    {
-	      /* Smaller than factor base bound, so it should be prime. */
+	      /* Smaller than factor base bound and not a prime power, 
+		 so it should be prime. */
 #ifdef RHODEBUG
-	      printf ("# %lu is prime for a = %ld, b = %lu, no rho "
-		      "necessary\n", n, a, b);
+	      gmp_printf ("# %Zd is prime for a = %ld, b = %lu, no rho "
+			  "necessary\n", norm, a, b);
 	      fflush (stdout);
 #endif
-	      q = n;
-	      ASSERT (ul_proven_prime (n));
+	      TRACE_A (a, __func__, "norm %Zd is < fbb %lu, assuming it is "
+		       "prime and adding to list of primes\n", norm, fbb);
+	      q = mpz_get_ui (norm);
+	      ASSERT (ul_proven_prime (q));
 	      trialdiv_one_prime (q, norm, nr_primes, primes, max_nr_primes, 
 				  1);
 	      break;
@@ -1335,28 +1489,48 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 	  else
 	    {
 	      /* Not <fbb or prime power. Since we know there is a fb prime
-		 in norm, nor being < fbb implies being composite. 
+		 in norm, not being < fbb implies being composite. 
 		 Try to factor it */
-	      rho_called1++;
-	      do {
-		q = ul_rho (n, s++);
-		rho_called++;
-	      } while (q == n);
-	      ASSERT (n % q == 0);
-	      n /= q;
-	      if (q > n)
-	        {
-		  unsigned long t = q;
-		  q = n;
-		  n = t;
-		}
-
-	      /* So we have two divisors of norm, q and n, q <= n. If any of 
-		 them are prime, we test them for size and add them to the 
-		 list or discard the relation */
-
-	      if (q < fbb) /* It must be the missing factor base prime */
+	      TRACE_A (a, __func__, "Trying Pollard rho on norm %Zd\n", norm);
+	      if (mpz_fits_ulong_p (norm))
 		{
+		  unsigned long n;
+		  n = mpz_get_ui (norm);
+		  ul_rho_called1++;
+		  do {
+		    q = ul_rho (n, s++);
+		    ul_rho_called++;
+		  } while (q == n);
+		  ASSERT (n % q == 0);
+		}
+	      else
+		{
+		  mpz_rho_called1++;
+		  do {
+		    q = mpz_rho (norm, s++);
+		    mpz_rho_called++;
+		  } while (q == 1);
+		  ASSERT (mpz_divisible_ui_p (norm, q));
+		}
+	      TRACE_A (a, __func__, "Pollard rho found %lu\n", q);
+
+	      /* Pollard rho has a way of discovering powers of primes if
+		 they divide the input number. Let's at least check for a
+		 square here. */
+	      {
+		unsigned long e, t;
+		t = ul_sqrtint (q, &e);
+		if (e == 0)
+		  q = t;
+	      }
+
+	      /* So we have a divisor of norm, q. See if it is the factor
+	         base prime we were looking for. */
+
+	      if (q < fbb) /* It must be the missing factor base prime,
+			      maybe a power of it divides norm */
+		{
+		  ASSERT (ul_proven_prime (q));
 		  add_fbprime_to_list (primes, nr_primes, max_nr_primes, q);
 		  r = mpz_tdiv_q_ui (norm, norm, q);
 		  ASSERT_ALWAYS (r == 0);
@@ -1366,6 +1540,8 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 		  break;
 		}
 
+	      /* So it's not the factor base prime, but possibly a large 
+		 prime. If it is, divide it out and try again */
 	      if (ul_proven_prime (q))
 		{
 		  if (q > (1UL << lpb))
@@ -1375,21 +1551,19 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 		  r = mpz_tdiv_q_ui (norm, norm, q);
 		  ASSERT_ALWAYS (r == 0);
 		}
-	      
-	      if (ul_proven_prime (n))
+	      else
 		{
-		  if (n > (1UL << lpb))
-		    return 0;
-
-		  /* There should be exactly one fb prime left, and that 
-		     would have to be the smallest prime in norm. Therefore,
-		     n being prime, below fbb and not the smallest factor 
-		     should be impossible */
-		  ASSERT_ALWAYS (q > fbb);
-		  
-		  add_fbprime_to_list (primes, nr_primes, max_nr_primes, n);
-		  r = mpz_tdiv_q_ui (norm, norm, n);
-		  ASSERT_ALWAYS (r == 0);
+		  /* Composite factor that is not a power of the factor 
+		     base prime. Let's do it the hard way, should happen 
+		     rarely enough. */
+		  fprintf (stderr, 
+			   "%lu was found by rho, factoring it slowly\n", q);
+		  q = iscomposite (q);
+		  ASSERT_ALWAYS (q != 0);
+		  trialdiv_one_prime (q, norm, nr_primes, primes, 
+				      max_nr_primes, 1);
+		  if (q < fbb)
+		    break;
 		}
 	    }
 	} while (1);
@@ -1397,8 +1571,9 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
       if (fb_log (q, log_scale, 0.) != uc_sub (normlog, reportlog))
 	{
 	  /* q was not the missing factor base prime ? */
-	  fprintf (stderr, "Warning, expected to find a fb prime of log size "
-		   "%hhu, but found %lu\n", uc_sub (normlog, reportlog), q);
+	  fprintf (stderr, "Warning, expected to find fb prime of log size "
+		   "%hhu, but found %lu. a = %ld, b = %lu\n", 
+		   uc_sub (normlog, reportlog), q, a, b);
 	}
     }
 
@@ -1609,9 +1784,10 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 	      sumprimes, nrprimes, (double)sumprimes / (double)nrprimes);
       printf ("# Sum and number of 2nd largest non-report fb primes: %lu, %lu, avg: %.0f\n",
 	      sumprimes2, nrprimes2, (double)sumprimes2 / (double)nrprimes2);
-      printf ("# Called rho %lu times, %lu repeats, number was too large "
-	      "%lu times\n",
-	      rho_called, rho_called - rho_called1, rho_toolarge);
+      printf ("# Called ul_rho %lu times with %lu repeats, mpz_rho %lu times "
+	      "with %lu repeats\n",
+	      ul_rho_called, ul_rho_called - ul_rho_called1, 
+	      mpz_rho_called, mpz_rho_called - mpz_rho_called1);
 
     }
   
@@ -1643,6 +1819,35 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 }
 
 
+void rho_timing()
+{
+  mpz_t m;
+  unsigned long n, q;
+  unsigned long long tsc1, tsc2;
+  unsigned int i;
+  const unsigned int iterations = 10000;
+
+  n = 404428732271UL;
+  mpz_init (m);
+  mpz_set_ui (m, n);
+
+  rdtscll (tsc1);
+  for (i = 0; i < 10000; i++)
+    q = ul_rho (n, 2UL);
+  rdtscll (tsc2);
+  printf ("%u iteratios of ul_rho took %lld clocks\n", 
+	  iterations, tsc2 - tsc1);
+
+  rdtscll (tsc1);
+  for (i = 0; i < 10000; i++)
+    q = mpz_rho (m, 2UL);
+  rdtscll (tsc2);
+  printf ("%u iteratios of mpz_rho took %lld clocks\n", 
+	  iterations, tsc2 - tsc1);
+  fflush (stdout);
+  mpz_clear (m);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -1662,6 +1867,7 @@ main (int argc, char **argv)
   cado_poly cpoly;
   char report_a_threshold, report_r_threshold;
 
+  rho_timing();
 
   while (argc > 1 && argv[1][0] == '-')
     {
@@ -1705,6 +1911,7 @@ main (int argc, char **argv)
       fprintf (stderr, "Please specify amin amax bmin bmax\n");
       exit (EXIT_FAILURE);
     }
+
 
   amin = atol (argv[1]);
   amax = atol (argv[2]);
@@ -1840,6 +2047,7 @@ main (int argc, char **argv)
   for (i = 0; i < SIEVE_BLOCKING; i++)
     fb_extract_small (fbr, CACHESIZES[i], i, verbose);
   
+#ifdef WANT_ASSERT
   /* Check the factor bases for correctness */
   
   if (fb_check (fba, cpoly, 0) != 0)
@@ -1857,7 +2065,7 @@ main (int argc, char **argv)
     }
   else if (verbose)
     printf ("# Rational factor base test passed\n");
-
+#endif
 
   deg = cpoly->degree;
   for (i = 0; i <= deg; i++)
