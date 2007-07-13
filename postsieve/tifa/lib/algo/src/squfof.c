@@ -41,7 +41,7 @@
 #if SQUFOF_DEBUG
   #define SQUFOF_PRINT(...) printf(__VA_ARGS__)
 #else
-  #define SQUFOF_PRINT(...) /* left empty */
+  #define SQUFOF_PRINT(...) /* intentionally left empty */
 #endif
 
   //------------------------------------------------------------------------
@@ -84,6 +84,102 @@
 // Number of forward cycle iterations to perform in a row for each racer.
 //
 #define NSTEP_CYCLE_FWD  2000
+//
+// A really quick and dirty trick to (hopefully) speed up divisions if
+// we know with a relatively high probability that the result will be one or 
+// two _and_ that the result won't be zero. In our case, the quotient 
+// distribution has been experimentally determined to be roughly:
+//
+//      Quotient Percentage
+//          1      41.50 %
+//          2      17.00 %
+//          3       9.30 %
+//          4       5.88 %
+//          5       4.06 %
+//          6       2.97 %
+//          7       2.27 %
+//          8       1.79 %
+//          9       1.44 %
+//         10       1.19 %
+//
+// First, a macro to declare needed local variables...
+//
+#define INIT_DIVIDE_TRICK_VARS      \
+    unsigned long int __D__ = 0;    \
+    unsigned long int __N__ = 0
+//
+// Then the division macro strictly speaking...
+//
+#define DIVIDE_TRICK(Q, N, D)                                   \
+    __D__ = (D) << 1;                                           \
+    __N__ = (N);                                                \
+    if (__N__ < __D__) {                                        \
+        Q = 1;                                                  \
+    } else {                                                    \
+        __D__ += (D);                                           \
+        if (__N__ < __D__) {                                    \
+            Q = 2;                                              \
+        } else {                                                \
+            __D__ += (D);                                       \
+            if (__N__ < __D__) {                                \
+                Q = 3;                                          \
+            } else {                                            \
+                __D__ += (D);                                   \
+                if (__N__ < __D__) {                            \
+                    Q = 4;                                      \
+                } else {                                        \
+                    __D__ += (D);                               \
+                    if (__N__ < __D__) {                        \
+                        Q = 5;                                  \
+                    } else {                                    \
+                        __D__ += (D);                           \
+                        if (__N__ < __D__) {                    \
+                            Q = 6;                              \
+                        } else {                                \
+                            __D__ += (D);                       \
+                            if (__N__ < __D__) {                \
+                                Q = 7;                          \
+                            } else {                            \
+                                __D__ += (D);                   \
+                                if (__N__ < __D__) {            \
+                                    Q = 8;                      \
+                                } else {                        \
+                                    __D__ += (D);               \
+                                    if (__N__ < __D__) {        \
+                                        Q = 9;                  \
+                                    } else {                    \
+                                        __D__ += (D);           \
+                                        if (__N__ < __D__) {    \
+                                            Q = 10;             \
+                                        } else {                \
+                                            Q = __N__ / (D);    \
+                                        }                       \
+                                    }                           \
+                                }                               \
+                            }                                   \
+                        }                                       \
+                    }                                           \
+                }                                               \
+            }                                                   \
+        }                                                       \
+    }
+    
+//
+// Finally a switch toggling this cheap trick on and off
+//
+#define USE_DIVISION_TRICK 1
+//
+// Switch from the standard division to our cheap trick here, to avoid
+// disseminating #if's in the code...
+//
+#if USE_DIVISION_TRICK
+    #define DIVIDE(Q, N, D) DIVIDE_TRICK(Q, N, D)
+    #define INIT_DIVIDE_VARS INIT_DIVIDE_TRICK_VARS
+#else
+    #define DIVIDE(Q, N, D) Q = ((N) / (D))
+    #define INIT_DIVIDE_VARS /* intentionally left empty */
+#endif
+   
 //-----------------------------------------------------------------------------
 
 //-----------------------------------------------------------------------------
@@ -424,7 +520,7 @@ static ecode_t perform_squfof(factoring_machine_t* const machine) {
     // Begin by performing SQUFOF without multiplier. This will fail to find
     // a factor approximately 5% of the time. Should it fail and if the 
     // factoring mode on the machine is different from SINGLE_RUN, continue
-    // the factorization attempt by using a multiplier race with all
+    // the factorization attempt by using a multiplier race.
     //
     if (!context->updated) {
         return perform_squfof_no_race(machine);
@@ -467,6 +563,14 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
         context->integer_too_large = true;
         return INTEGER_TOO_LARGE;
     }
+    unsigned long int S = mpf_get_ui(sqrtD);
+    
+    if (S > TIFA_ULONG_MAX_DIVIDED_BY_3) {
+        mpz_clear(D);
+        mpf_clear(sqrtD);
+        context->integer_too_large = true;
+        return INTEGER_TOO_LARGE;
+    }
     
     //
     // Set up the linked list used as a queue...
@@ -493,7 +597,6 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
     queue.tail   = queue.head;
     queue.length = 0;
 
-    unsigned long int S  = mpf_get_ui(sqrtD);
     unsigned long int QQ = 1;
     unsigned long int P  = S;
 
@@ -514,7 +617,8 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
     //
     // The use of floating point operation is made necessary to properly compute
     // L = floor(2*sqrt(2*sqrt(D))) without introducing approximations that
-    // would lead to L = 2*floor(sqrt(2*floor(sqrt(D)))).
+    // would lead to L = 2*floor(sqrt(2*floor(sqrt(D)))). However, such an
+    // approximation would probably have no impact whatsoever...
     //
     unsigned long int L  = mpf_get_ui(sqrtD);
     unsigned long int B  = L << 1;
@@ -533,6 +637,8 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
     unsigned long int inode = 0;
 
     ulint_pair_t* current_pair = NULL;
+
+    INIT_DIVIDE_VARS;
 
     PRINT_FWD_CYCL_MSG;
     START_TIMER;
@@ -556,9 +662,8 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
         //
         // Compute q  = (S + P)/Q;
         //
-        q  = S;
-        q += P;
-        q /= Q;
+        DIVIDE(q, S + P, Q);
+        
         //
         // Compute PP = q*Q - P;
         //
@@ -567,14 +672,15 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
         PP -= P;
 
         SQUFOF_PRINT("step 2a):\n");
-        SQUFOF_PRINT("        S  = %lu\n", S);
-        SQUFOF_PRINT("        Q  = %lu\n", Q);
-        SQUFOF_PRINT("        P  = %lu\n", P);
-        SQUFOF_PRINT("        QQ = %lu\n", QQ);
-        SQUFOF_PRINT("        PP = %lu\n", PP);
-        SQUFOF_PRINT("        t  = %lu\n", t);
-        SQUFOF_PRINT("        q  = %lu\n", q);
-
+        SQUFOF_PRINT("-----------------------------------\n");
+        SQUFOF_PRINT("2a)     S  = %lu\n", S);
+        SQUFOF_PRINT("2a)     Q  = %lu\n", Q);
+        SQUFOF_PRINT("2a)     P  = %lu\n", P);
+        SQUFOF_PRINT("2a)     QQ = %lu\n", QQ);
+        SQUFOF_PRINT("2a)     PP = %lu\n", PP);
+        SQUFOF_PRINT("2a)     t  = %lu\n", t);
+        SQUFOF_PRINT("2a)     q  = %lu\n", q);
+        
         //
         // Step 2 b)
         //
@@ -613,12 +719,13 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
         P  = PP;
 
         SQUFOF_PRINT("step 2c):\n");
-        SQUFOF_PRINT("        Q  = %lu\n", Q);
-        SQUFOF_PRINT("        P  = %lu\n", P);
-        SQUFOF_PRINT("        QQ = %lu\n", QQ);
-        SQUFOF_PRINT("        PP = %lu\n", PP);
-        SQUFOF_PRINT("        t  = %lu\n", t);
-        SQUFOF_PRINT("        q  = %lu\n", q);
+        SQUFOF_PRINT("-----------------------------------\n");
+        SQUFOF_PRINT("2c)     Q  = %lu\n", Q);
+        SQUFOF_PRINT("2c)     P  = %lu\n", P);
+        SQUFOF_PRINT("2c)     QQ = %lu\n", QQ);
+        SQUFOF_PRINT("2c)     PP = %lu\n", PP);
+        SQUFOF_PRINT("2c)     t  = %lu\n", t);
+        SQUFOF_PRINT("2c)     q  = %lu\n", q);
 
         //
         // Step 2 d)
@@ -699,13 +806,24 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
     Q  = mpz_get_ui(D_minus_P2);
 
     SQUFOF_PRINT("after step 3):\n");
-    SQUFOF_PRINT("        Q  = %lu\n", Q);
-    SQUFOF_PRINT("        P  = %lu\n", P);
-    SQUFOF_PRINT("        QQ = %lu\n", QQ);
-    SQUFOF_PRINT("        PP = %lu\n", PP);
-    SQUFOF_PRINT("        S  = %lu\n", S);
-    SQUFOF_PRINT("        t  = %lu\n", t);
-    SQUFOF_PRINT("        q  = %lu\n", q);
+    SQUFOF_PRINT("-----------------------------------\n");
+    SQUFOF_PRINT("3)      Q  = %lu\n", Q);
+    SQUFOF_PRINT("3)      P  = %lu\n", P);
+    SQUFOF_PRINT("3)      QQ = %lu\n", QQ);
+    SQUFOF_PRINT("3)      PP = %lu\n", PP);
+    SQUFOF_PRINT("3)      S  = %lu\n", S);
+    SQUFOF_PRINT("3)      t  = %lu\n", t);
+    SQUFOF_PRINT("3)      q  = %lu\n", q);
+
+    printf("after step 3):\n");
+    printf("-----------------------------------\n");
+    printf("3)      Q  = %lu\n", Q);
+    printf("3)      P  = %lu\n", P);
+    printf("3)      QQ = %lu\n", QQ);
+    printf("3)      PP = %lu\n", PP);
+    printf("3)      S  = %lu\n", S);
+    printf("3)      t  = %lu\n", t);
+    printf("3)      q  = %lu\n", q);
 
     STOP_TIMER;
     PRINT_TIMING;
@@ -717,9 +835,8 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
     // Step 4: Cycle in the reverse direction to find a factor of N
     //
     while (true) {
-        q   = S;
-        q  += P;
-        q  /= Q;
+        DIVIDE(q, S + P, Q);
+        
         PP  = q;
         PP *= Q;
         PP -= P;
@@ -735,11 +852,12 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
         P  = PP;
 
         SQUFOF_PRINT("after iteration of step 4):\n");
-        SQUFOF_PRINT("        Q  = %lu\n", Q);
-        SQUFOF_PRINT("        P  = %lu\n", P);
-        SQUFOF_PRINT("        QQ = %lu\n", QQ);
-        SQUFOF_PRINT("        PP = %lu\n", PP);
-        SQUFOF_PRINT("        t  = %lu\n", t);
+        SQUFOF_PRINT("-----------------------------------\n");
+        SQUFOF_PRINT("4)      Q  = %lu\n", Q);
+        SQUFOF_PRINT("4)      P  = %lu\n", P);
+        SQUFOF_PRINT("4)      QQ = %lu\n", QQ);
+        SQUFOF_PRINT("4)      PP = %lu\n", PP);
+        SQUFOF_PRINT("4)      t  = %lu\n", t);
     }
 
     STOP_TIMER;
@@ -780,6 +898,8 @@ static ecode_t perform_squfof_race(factoring_machine_t* const machine) {
     squfof_racer_t *winner = NULL;
 
     ecode_t rcode = 0;
+
+    INIT_DIVIDE_VARS;
 
     PRINT_FWD_CYCL_MSG;
     START_TIMER;
@@ -876,10 +996,9 @@ static ecode_t perform_squfof_race(factoring_machine_t* const machine) {
     //
     // Step 4: Cycle in the reverse direction to find a factor of N
     //
-    while (true) {
-        winner->q   = winner->S;
-        winner->q  += winner->P;
-        winner->q  /= winner->Q;
+    while (true) {    
+        DIVIDE(winner->q, winner->S + winner->P, winner->Q);
+        
         winner->PP  = winner->q;
         winner->PP *= winner->Q;
         winner->PP -= winner->P;
@@ -939,7 +1058,7 @@ static ecode_t cycle_forward(squfof_racer_t* const racer) {
         return FAILURE;
     }
     racer->istep = 0;
-
+    INIT_DIVIDE_VARS;
     while (true) {
         racer->istep++;
         //
@@ -947,9 +1066,7 @@ static ecode_t cycle_forward(squfof_racer_t* const racer) {
         //
         // Compute q  = (S + P)/Q;
         //
-        racer->q  = racer->S;
-        racer->q += racer->P;
-        racer->q /= racer->Q;
+        DIVIDE(racer->q, racer->S + racer->P, racer->Q);
         //
         // Compute PP = q*Q - P;
         //
@@ -1093,11 +1210,17 @@ static ecode_t init_squfof_racer(squfof_racer_t* const racer, const mpz_t n,
         racer->number_is_too_large = true;
         return SUCCESS;
     }
+    racer->S = mpf_get_ui(racer->sqrtD);
+    
+    if (racer->S > TIFA_ULONG_MAX_DIVIDED_BY_3) {
+        racer->status = STOPPED;
+        racer->number_is_too_large = true;
+        return SUCCESS;
+    }
 
     racer->status = RUNNING;
     racer->number_is_too_large = false;
 
-    racer->S  = mpf_get_ui(racer->sqrtD);
     racer->QQ = 1;
     racer->P  = racer->S;
 

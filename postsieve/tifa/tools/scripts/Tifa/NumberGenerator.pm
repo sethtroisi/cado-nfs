@@ -158,7 +158,7 @@ sub generate_composite {
         # a square.
         #
         while ((sizeinbase($result, 2) != $size) || perfect_square_p($result)) {
-            $result = $composite * $self->generate_prime($lastfaclength);
+            $result = $self->generate_composite($size, $nb_factors);
         }
     } else {
         #
