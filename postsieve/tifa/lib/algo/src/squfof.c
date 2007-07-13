@@ -815,16 +815,6 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
     SQUFOF_PRINT("3)      t  = %lu\n", t);
     SQUFOF_PRINT("3)      q  = %lu\n", q);
 
-    printf("after step 3):\n");
-    printf("-----------------------------------\n");
-    printf("3)      Q  = %lu\n", Q);
-    printf("3)      P  = %lu\n", P);
-    printf("3)      QQ = %lu\n", QQ);
-    printf("3)      PP = %lu\n", PP);
-    printf("3)      S  = %lu\n", S);
-    printf("3)      t  = %lu\n", t);
-    printf("3)      q  = %lu\n", q);
-
     STOP_TIMER;
     PRINT_TIMING;
     PRINT_REV_CYCL_MSG;

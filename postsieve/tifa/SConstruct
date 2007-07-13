@@ -512,12 +512,36 @@ int main() {
     return ret[1]
 
 #------------------------------------------------------------------------------
+def checkUlongMax(context):
+    context.Message( 'Getting ULONG_MAX... ' )
+    program = """
+#include <stdlib.h>
+#include <stdio.h>
+#include <limits.h>
+int main() {
+    printf("%lu", (unsigned long int)ULONG_MAX);
+    return 0;
+}
+"""
+    ret = context.TryCompile(program, '.c')
+    if ret == 0:
+        print "test failed!\n"
+        print "Error: cannot run the following test program:"
+        print program
+        print "Please check your compiler flags."
+        Exit(1)
+    ret = context.TryRun(program, '.c')
+    context.Result(ret[1])
+    return ret[1]
+
+#------------------------------------------------------------------------------
 
 conf = Configure(
            env,
            custom_tests = {
-               'checkSizeOf'  : checkSizeOf,
-               'checkCharBit' : checkCharBit
+               'checkSizeOf'   : checkSizeOf,
+               'checkCharBit'  : checkCharBit,
+               'checkUlongMax' : checkUlongMax
            }
        )
 
@@ -556,11 +580,15 @@ if (env['USE_GMP_INTERNAL_FUNCS'] != 0):
 #
 conf.env['SIZEOF_BITSTRING_T'] = conf.checkSizeOf(env['BITSTRING_T'])
 conf.env['CHAR_BIT']           = conf.checkCharBit()
+conf.env['ULONG_MAX']          = conf.checkUlongMax()
 
 env = conf.Finish()
 
 env['BITSTRING_T_BITSIZE'] =   int(env['SIZEOF_BITSTRING_T']) \
                              * int(env['CHAR_BIT'])
+env['ULONG_MAX_DIVIDED_BY_2'] = int(env['ULONG_MAX']) / 2
+env['ULONG_MAX_DIVIDED_BY_3'] = int(env['ULONG_MAX']) / 3
+env['ULONG_MAX_DIVIDED_BY_4'] = int(env['ULONG_MAX']) / 4
 
 #-------------------------------------------------------------------------------
 # Directories definitions
@@ -639,6 +667,11 @@ subst_dict['%USE_CALLOC_MEMSET%']   = str(int(env['USE_CALLOC_MEMSET']))
 subst_dict['%BITSTRING_T%']         = env['BITSTRING_T']
 subst_dict['%SIZEOF_BITSTRING_T%']  = str(env['SIZEOF_BITSTRING_T'])
 subst_dict['%BITSTRING_T_BITSIZE%'] = str(env['BITSTRING_T_BITSIZE'])
+
+subst_dict['%ULONG_MAX%']              = env['ULONG_MAX']
+subst_dict['%ULONG_MAX_DIVIDED_BY_2%'] = str(env['ULONG_MAX_DIVIDED_BY_2'])
+subst_dict['%ULONG_MAX_DIVIDED_BY_3%'] = str(env['ULONG_MAX_DIVIDED_BY_3'])
+subst_dict['%ULONG_MAX_DIVIDED_BY_4%'] = str(env['ULONG_MAX_DIVIDED_BY_4'])
 
 subst_dict['%PRINT_ERROR%']    = str(int(env['PRINT_ERROR']))
 subst_dict['%VERBOSE_CFRAC%']  = str(int(env['VERBOSE_CFRAC']))

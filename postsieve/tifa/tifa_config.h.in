@@ -62,6 +62,12 @@
 /* Size of type (in bits) used to represent a string of bits */
 #define TIFA_BITSTRING_T_BITSIZE %BITSTRING_T_BITSIZE%
 
+/* Max value for unsigned long integers and some useful fractions */
+#define TIFA_ULONG_MAX %ULONG_MAX%
+#define TIFA_ULONG_MAX_DIVIDED_BY_2 %ULONG_MAX_DIVIDED_BY_2%
+#define TIFA_ULONG_MAX_DIVIDED_BY_3 %ULONG_MAX_DIVIDED_BY_3%
+#define TIFA_ULONG_MAX_DIVIDED_BY_4 %ULONG_MAX_DIVIDED_BY_4%
+
 /* Define to 1 to print critical error messages on stderr */
 #define TIFA_PRINT_ERROR %PRINT_ERROR%
 
