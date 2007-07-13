@@ -31,10 +31,26 @@
 #define TRIALDIV_SKIPFORWARD_DEFAULT
 #endif
 
+/* We'll use ul_rho() instead of trial division if the size in bits 
+   of the missing factor base prime is > UL_RHO_LOGTHRES */
+#ifndef UL_RHO_LOGTHRES
+#define UL_RHO_LOGTHRES 12
+#define UL_RHO_LOGTHRES_DEFAULT
+#endif
+
+/* We'll use mpz_rho() instead of trial division if the size in bits 
+   of the missing factor base prime is > UL_RHO_LOGTHRES */
+#ifndef MPZ_RHO_LOGTHRES
+#define MPZ_RHO_LOGTHRES 20
+#define MPZ_RHO_LOGTHRES_DEFAULT
+#endif
+
+
 unsigned long sumprimes, nrprimes; /* For largest non-report fb primes */
 unsigned long sumprimes2, nrprimes2;  /* For 2nd largest non-report fb prim. */
 unsigned long ul_rho_called = 0, ul_rho_called1 = 0, 
   mpz_rho_called = 0, mpz_rho_called1 = 0;
+long long ul_rho_time;
 
 #ifdef TRACE_RELATION_A
 static void 
@@ -945,8 +961,11 @@ ul_rho (const unsigned long N, const unsigned long cparm)
   int i;
   unsigned int iterations = 0;
   const int iterations_between_gcd = 32;
+  long long tsc1, tsc2;
 
   ASSERT (cparm < N);
+
+  rdtscll (tsc1);
 
   /* printf ("ul_rho: factoring %lu\n", N); */
 
@@ -967,10 +986,10 @@ ul_rho (const unsigned long N, const unsigned long cparm)
   do {
     for (i = 0; i < iterations_between_gcd; i++)
       {
-	modul_mulredc (r1, r1, r1, invm, m);
-	modul_add (r1, r1, c, m);
 	/* FIXME: use modul_muladdredc_ul()? How does that change the 
 	   arithmetic? */
+	modul_mulredc (r1, r1, r1, invm, m);
+	modul_add (r1, r1, c, m);
 
       	modul_mulredc (r2, r2, r2, invm, m);
 	modul_add (r2, r2, c, m);
@@ -989,6 +1008,9 @@ ul_rho (const unsigned long N, const unsigned long cparm)
   modul_clear (accu, m);
   modul_clear (diff, m);
   modul_clearmod (m);
+
+  rdtscll (tsc2);
+  ul_rho_time += tsc2 - tsc1;
 
   /* printf ("ul_rho: took %u iterations to find %lu\n", iterations, g); */
 
@@ -1058,7 +1080,16 @@ mpz_rho (const mpz_t N, const unsigned long c)
   mpz_clear (m);
 
 #if 0 || defined(RHODEBUG)
-  printf ("mpz_rho: took %u iterations to find %lu\n", iterations, f);
+  {
+    static double ratio = 0., nr = 0.;
+    double r = (double)iterations/sqrt((double)f);
+    ratio += r;
+    nr += 1.;
+    printf ("mpz_rho: took %u iterations to find %lu, i/sqrt(p) = %.3f, "
+	    "avg = %.3f\n", 
+	    iterations, f, r, ratio/nr);
+    /* Interestingly, the average comes out as almost exactly 1! */
+  }
 #endif
 
   return f;
@@ -1359,13 +1390,13 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 		if (mpz_fits_ulong_p (norm))
 		  {
 		    /* We can use the fast ul_rho() function */
-		    if (missinglog > 10 && missinglog > fbptr->plog + 1)
+		    if (missinglog > UL_RHO_LOGTHRES)
 		      break;
 		  }
 		else
 		  {
 		    /* We need to use the slower mpz_rho() function */
-		    if (missinglog > 20 && missinglog > fbptr->plog + 2)
+		    if (missinglog > MPZ_RHO_LOGTHRES)
 		      break;
 		  }
 
@@ -1556,8 +1587,11 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 		  /* Composite factor that is not a power of the factor 
 		     base prime. Let's do it the hard way, should happen 
 		     rarely enough. */
-		  fprintf (stderr, 
-			   "%lu was found by rho, factoring it slowly\n", q);
+#ifdef RHODEBUG
+		    fprintf (stderr, 
+			     "# Composite factor %lu was found by rho, "
+			     "factoring it slowly\n", q);
+#endif
 		  q = iscomposite (q);
 		  ASSERT_ALWAYS (q != 0);
 		  trialdiv_one_prime (q, norm, nr_primes, primes, 
@@ -1686,6 +1720,7 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
   mpz_init (scaled_poly_r[0]);
   mpz_init (scaled_poly_r[1]);
 
+  ul_rho_time = 0LL;
   rdtscll (tsc1);
 
   /* Multiply f_i (and g_i resp.) by b^(deg-i) and put in scaled_poly */
@@ -1788,7 +1823,7 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 	      "with %lu repeats\n",
 	      ul_rho_called, ul_rho_called - ul_rho_called1, 
 	      mpz_rho_called, mpz_rho_called - mpz_rho_called1);
-
+      printf ("# Calls to ul_rho() took %llu clocks\n", ul_rho_time);
     }
   
   for (i = 0; i <= (unsigned)poly->degree; i++)
@@ -1867,7 +1902,6 @@ main (int argc, char **argv)
   cado_poly cpoly;
   char report_a_threshold, report_r_threshold;
 
-  rho_timing();
 
   while (argc > 1 && argv[1][0] == '-')
     {
@@ -1901,7 +1935,12 @@ main (int argc, char **argv)
 	  argc -= 2;
 	  argv += 2;
 	}
-
+      else  if (argc > 1 && strcmp (argv[1], "-rhotiming") == 0)
+	{
+	  rho_timing();
+	  argc--;
+	  argv++;
+	}
       else 
 	break;
     }
