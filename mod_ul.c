@@ -50,6 +50,7 @@
 #define mod_mul              modul_mul
 #define mod_tomontgomery     modul_tomontgomery
 #define mod_frommontgomery   modul_frommontgomery
+#define mod_addredc_ul       modul_addredc_ul
 #define mod_mulredc          modul_mulredc
 #define mod_mulredc_ul       modul_mulredc_ul
 #define mod_muladdredc_ul    modul_muladdredc_ul
@@ -248,6 +249,30 @@ modul_add_ul_2ul (unsigned long *r1, unsigned long *r2, const unsigned long a)
 #endif
 }
 
+/* Add two unsigned longs to two unsigned longs with carry propagation from 
+   low word to high word. Any carry out from high word is lost. */
+
+static inline void
+modul_add_2ul_2ul (unsigned long *r1, unsigned long *r2, 
+                   const unsigned long a1, const unsigned long a2)
+{
+#if defined(__x86_64__) && defined(__GNUC__)
+  __asm__ ( "addq %2, %0\n\t"
+            "adcq %3, %1\n"
+            : "+&r" (*r1), "+r" (*r2)
+            : "rm" (a1), "rm" (a2)
+            : "cc");
+#elif defined(__i386__) && defined(__GNUC__)
+  __asm__ ( "addl %2, %0\n\t"
+            "adcl %3, %1\n"
+            : "+&r" (*r1), "+r" (*r2)
+            : "rm" (a1), "rm" (a2)
+            : "cc");
+#else
+  abort ();
+#endif
+}
+
 static inline void
 mul_ul_ul_2ul (unsigned long *r1, unsigned long *r2, const unsigned long a,
                const unsigned long b)
@@ -350,6 +375,22 @@ modul_frommontgomery (residueul r, const residueul a, const unsigned long invm,
 }
 
 
+/* Computes (a / 2^wordsize) % m, but result can be r = m */
+__GNUC_ATTRIBUTE_UNUSED__
+static inline void
+modul_redcsemi_ul_not0 (residueul r, unsigned long a, 
+                        const unsigned long invm, const modulusul m)
+{
+  unsigned long tlow, thigh;
+
+  ASSERT (a != 0);
+
+  mul_ul_ul_2ul (&tlow, &thigh, a, invm);
+  mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
+  r[0] = thigh + 1UL;
+}
+
+
 /* Computes ((a + b) / 2^wordsize) % m */
 __GNUC_ATTRIBUTE_UNUSED__
 static inline void
@@ -376,6 +417,34 @@ modul_addredc_ul (residueul r, const residueul a, const unsigned long b,
   */
   if (r[0] == m[0])
     r[0] = 0UL;
+}
+
+
+/* Computes ((a + b) / 2^wordsize) % m */
+__GNUC_ATTRIBUTE_UNUSED__
+static inline void
+modul_addredcsemi_ul (residueul r, const residueul a, 
+                      const unsigned long b, const unsigned long invm, 
+                      const modulusul m)
+{
+  unsigned long slow, shigh, tlow;
+  
+  slow = b;
+  shigh = 0UL;
+  modul_add_ul_2ul (&slow, &shigh, a[0]);
+  
+  mul_ul_ul_2ul (&tlow, r, slow, invm);
+  mul_ul_ul_2ul (&tlow, r, tlow, m[0]);
+  ASSERT (slow + tlow == 0UL);
+  r[0] += shigh + (slow != 0UL);
+
+  /* r = ((a+b) + (((a+b)%2^w * invp) % 2^w) * p) / 2^w
+     r <= ((a+b) + (2^w - 1) * p) / 2^w
+     r <= (p-1 + 2^w-1 + p2^w - p) / 2^w
+     r <= (2^w -2 + p2^w) / 2^w
+     r <= p + 1 - 2/2^w
+     r <= p
+  */
 }
 
 

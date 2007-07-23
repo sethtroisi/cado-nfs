@@ -34,7 +34,7 @@
 /* We'll use ul_rho() instead of trial division if the size in bits 
    of the missing factor base prime is > UL_RHO_LOGTHRES */
 #ifndef UL_RHO_LOGTHRES
-#define UL_RHO_LOGTHRES 12
+#define UL_RHO_LOGTHRES 16
 #define UL_RHO_LOGTHRES_DEFAULT
 #endif
 
@@ -50,6 +50,7 @@ unsigned long sumprimes, nrprimes; /* For largest non-report fb primes */
 unsigned long sumprimes2, nrprimes2;  /* For 2nd largest non-report fb prim. */
 unsigned long ul_rho_called = 0, ul_rho_called1 = 0, 
   mpz_rho_called = 0, mpz_rho_called1 = 0;
+unsigned long ul_rho_toolarge_nr, ul_rho_toolarge_sum; 
 long long ul_rho_time;
 
 #ifdef TRACE_RELATION_A
@@ -885,23 +886,127 @@ trialdiv_with_root (factorbase_degn_t *fbptr, const long a,
   return 0;
 }
 
+
+/* Returns 1 if fbptr->p divides norm, 0 otherwise */
+
 static inline int
 trialdiv_with_norm (factorbase_degn_t *fbptr, const mpz_t norm)
 {
   modulus m;
   residue r;
-  int i;
+  unsigned int i;
+
+  ASSERT (mpz_sgn (norm) >= 0);
 
   mod_initmod_ul (m, fbptr->p);
   mod_init (r, m);
-
-  for (i = 0; i < norm->_mp_size; i++)
-    {
-      modul_addredc_ul (r, r, (norm[0])._mp_d[i], 
-			fbptr->invp, m);
-    }
+  
+  for (i = 0; i < mpz_size (norm); i++)
+    modul_addredc_ul (r, r, mpz_getlimbn (norm, i), fbptr->invp, m);
 
   i = (mod_get_ul (r, m) == 0);
+
+  mod_clear (r, m);
+  mod_clearmod (m);
+  return i;
+}
+
+
+/* Same, assuming norm has 1 limb (plus the add value) */
+static inline int
+trialdiv_with_norm1 (factorbase_degn_t *fbptr, const mpz_t norm, 
+		     const unsigned long add)
+{
+  modulus m;
+  residue r;
+  int i;
+
+  ASSERT (mpz_sgn (norm) > 0);
+
+  mod_initmod_ul (m, fbptr->p);
+  mod_init_noset0 (r, m);
+
+  modul_redcsemi_ul_not0 (r, mpz_getlimbn (norm, 0), fbptr->invp, m);
+
+  i = (mod_get_ul (r, m) + add == 0 || mod_get_ul (r, m) + add == m[0]);
+
+  mod_clear (r, m);
+  mod_clearmod (m);
+  return i;
+}
+
+
+/* Same, assuming norm has 2 limbs (plus the add value) */
+static inline int
+trialdiv_with_norm2 (factorbase_degn_t *fbptr, const mpz_t norm,
+		     const unsigned long add)
+{
+  modulus m;
+  residue r;
+  int i;
+
+  ASSERT (mpz_sgn (norm) > 0);
+
+  mod_initmod_ul (m, fbptr->p);
+  mod_init_noset0 (r, m);
+
+  modul_redcsemi_ul_not0 (r, mpz_getlimbn (norm, 0), fbptr->invp, m);
+  modul_addredcsemi_ul (r, r, mpz_getlimbn (norm, 1), fbptr->invp, m);
+
+  i = (mod_get_ul (r, m) + add == 0 || mod_get_ul (r, m) + add == m[0]);
+
+  mod_clear (r, m);
+  mod_clearmod (m);
+  return i;
+}
+
+
+/* Same, with assuming norm has 3 limbs (plus the add value) */
+static inline int
+trialdiv_with_norm3 (factorbase_degn_t *fbptr, const mpz_t norm,
+		     const unsigned long add)
+{
+  modulus m;
+  residue r;
+  int i;
+
+  ASSERT (mpz_sgn (norm) > 0);
+
+  mod_initmod_ul (m, fbptr->p);
+  mod_init_noset0 (r, m);
+
+  modul_redcsemi_ul_not0 (r, mpz_getlimbn (norm, 0), fbptr->invp, m);
+  modul_addredcsemi_ul (r, r, mpz_getlimbn (norm, 1), fbptr->invp, m);
+  modul_addredcsemi_ul (r, r, mpz_getlimbn (norm, 2), fbptr->invp, m);
+
+  i = (mod_get_ul (r, m) + add == 0 || mod_get_ul (r, m) + add == m[0]);
+
+  mod_clear (r, m);
+  mod_clearmod (m);
+  return i;
+}
+
+
+/* Same, with assuming norm has 4 limbs (plus the add value) */
+static inline int
+trialdiv_with_norm4 (factorbase_degn_t *fbptr, const mpz_t norm,
+		     const unsigned long add)
+{
+  modulus m;
+  residue r;
+  int i;
+
+  ASSERT (mpz_sgn (norm) > 0);
+
+  mod_initmod_ul (m, fbptr->p);
+  mod_init_noset0 (r, m);
+
+  modul_redcsemi_ul_not0 (r, mpz_getlimbn (norm, 0), fbptr->invp, m);
+  modul_addredcsemi_ul (r, r, mpz_getlimbn (norm, 1), fbptr->invp, m);
+  modul_addredcsemi_ul (r, r, mpz_getlimbn (norm, 2), fbptr->invp, m);
+  modul_addredcsemi_ul (r, r, mpz_getlimbn (norm, 3), fbptr->invp, m);
+
+  i = (mod_get_ul (r, m) + add == 0 || mod_get_ul (r, m) + add == m[0]);
 
   mod_clear (r, m);
   mod_clearmod (m);
@@ -1160,42 +1265,98 @@ ul_prp (const unsigned long n, const unsigned long invn, const unsigned long b)
 
 
 /* If n <= 10^10 then this function proves primality/compositeness
-   of n. */
+   of n. For larger n, return value 0 means n is composite, return 
+   value 1 means it is probably prime */
+
 int
 ul_proven_prime (unsigned long n)
 {
   modulusul m;
   unsigned long invn;
+  int r = 0;
   
-  if (n % 2UL == 0UL)
-    return (n == 2UL);
-
-  if (n <= 61UL) /* Want modulus > 61 for tests below */
+  if (n % 2UL == 0UL) /* We want odd modulus for REDC */
     {
-      if (n % 3UL == 0UL)
-	return (n == 3UL);
-      if (n % 5UL == 0UL)
-	return (n == 5UL);
-      return (n != 49UL);
+      r = (n == 2UL);
+      goto end;
     }
 
   modul_initmod_ul (m, n);
   invn = -mod_invmodlong (m);
   modul_clearmod (m);
 
-  if (ul_prp (n, invn, 2UL) && ul_prp (n, invn, 7UL) && ul_prp (n, invn, 61UL) 
-      && n != 4759123141UL && n != 8411807377UL)
+  if (!ul_prp (n, invn, 2UL))
+    goto end;
+
+  if (n < 2047)
     {
-#if defined(PARI)
-      printf ("isprime(%lu) == 1 /* PARI */\n", n);
-#endif
-      return 1;
+      r = 1;
+      goto end;
     }
 
+  if (ul_prp (n, invn, 7UL) && ul_prp (n, invn, 61UL) 
+      && n != 4759123141UL && n != 8411807377UL)
+    r = 1;
+
+ end:
 #if defined(PARI)
-  printf ("isprime(%lu) == 0 /* PARI */\n", n);
+  printf ("isprime(%lu) == %d /* PARI */\n", r, n);
 #endif
-  return 0;
+  return r;
+}
+
+
+/* Returns a pointer to factor base entry which is either the 
+   end-of-factorbase marker, or the first entry whose p divides norm.
+   Requires that norm > fbptr->p */
+
+static factorbase_degn_t *
+trialdiv_find_next (factorbase_degn_t *fbptr, const mpz_t norm)
+{
+  size_t s = mpz_size (norm);
+  unsigned long add = 0;
+
+  if (mpz_getlimbn (norm, s - 1) < fbptr -> p)
+    {
+      add = mpz_getlimbn (norm, s - 1);
+      s--;
+    }
+
+  ASSERT_ALWAYS (s > 0);
+
+  /* Choose good trial division routine outside of loop over fb primes */
+  if (s == 1)
+    {
+      for (; fbptr->p != 0; fbptr = fb_next (fbptr))
+	if (trialdiv_with_norm1 (fbptr, norm, add))
+	  break;
+    }
+  else if (s == 2)
+    {
+      for (; fbptr->p != 0; fbptr = fb_next (fbptr))
+	if (trialdiv_with_norm2 (fbptr, norm, add))
+	  break;
+    }
+  else if (s == 3)
+    {
+      for (; fbptr->p != 0; fbptr = fb_next (fbptr))
+	if (trialdiv_with_norm3 (fbptr, norm, add))
+	  break;
+    }
+  else if (s == 4)
+    {
+      for (; fbptr->p != 0; fbptr = fb_next (fbptr))
+	if (trialdiv_with_norm4 (fbptr, norm, add))
+	  break;
+    }
+  else
+    {
+      for (; fbptr->p != 0; fbptr = fb_next (fbptr))
+	if (trialdiv_with_norm (fbptr, norm))
+	  break;
+    }
+
+  return fbptr;
 }
 
 /* 1. Compute the norm
@@ -1231,13 +1392,10 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
   unsigned int k;
   factorbase_degn_t *fbptr;
   size_t log2size;
-  unsigned char reportlog, normlog;
+  unsigned char reportlog, missinglog;
   const double log_proj_divisor = log ((double) proj_divisor) * log_scale;
   double dpoly[MAXDEGREE + 1];
   int nr_report_primes;
-
-  for (k = 0; (int) k <= degree; k++)
-    dpoly[k] = mpz_get_d (scaled_poly[k]);
 
   /* 1. Compute norm */
   mp_poly_eval (norm, scaled_poly, degree, a);
@@ -1245,10 +1403,13 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
   TRACE_A (a, __func__, "norm for degree %d is %Zd\n", degree, norm);
   
   /* Compute approx. log of norm */
-  normlog = log_norm (dpoly, degree, (double) a, log_scale, 
+  for (k = 0; (int) k <= degree; k++)
+    dpoly[k] = mpz_get_d (scaled_poly[k]);
+  missinglog = log_norm (dpoly, degree, (double) a, log_scale, 
 		      log_proj_divisor);
-  TRACE_A (a, __func__, "normlog = %hhu\n", normlog);
-
+  TRACE_A (a, __func__, "normlog = %hhu\n", missinglog);
+  
+  
   /* 2. Divide out the primes with projective roots */
   if (proj_divisor > 1)
     {
@@ -1275,11 +1436,11 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 	    }
 	}
     }
-
+  
   
   /* 3. Divide the report primes out of this norm and find the smallest 
      approximate log */
-   /* There must be at least one valid report */
+  /* There must be at least one valid report */
   ASSERT_ALWAYS (reports->a == a && reports->p != 0);
   reportlog = reports->l;
   nr_report_primes = 0;
@@ -1296,168 +1457,143 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 	  ASSERT_ALWAYS (r > 0); /* If a report prime is listed but does not
 				    divide the norm, there is a serious bug
 				    in the sieve code */
-	  normlog -= fb_log ((double) reports->p, log_scale, 0.);
+	  missinglog -= fb_log ((double) reports->p, log_scale, 0.);
 	  nr_report_primes++;
 
 	  TRACE_A (a, __func__, "dividing out report prime " FBPRIME_FORMAT 
-		   ". New new norm = %Zd, normlog = %hhd\n", 
-		   reports->p, norm, normlog);
+		   ". New new norm = %Zd, missinglog = %hhd\n", 
+		   reports->p, norm, missinglog);
 	}
 
       /* Find the smallest approximate log. */
       if (add_error (reports->l) < add_error (reportlog))
 	reportlog = reports->l;
-
+	  
       reports++;
     }
-  TRACE_A (a, __func__, "reportlog is %hhd\n", reportlog);
+  missinglog -= reportlog;
+  TRACE_A (a, __func__, "reportlog is %hhd, new missinglog = %hhd\n", 
+	   reportlog, missinglog);
 
   /* 
-     When we divide out a prime, we subtract log(p) from normlog. When 
-     reportlog == normlog, we know we are done. When 
-     normlog - reportlog < 2*log(p), we know that exactly one more 
-     prime divides.
+     When we divide out a prime, we subtract log(p) from missinglog. When 
+     missinglog == 0, we know we are done. When missinglog < 2*log(p), 
+     we know that exactly one more factor base prime divides.
   */
 
-  /* Treat factor base prime p == 2 separately */
+  /* Treat factor base prime p == 2 separately. We want to be able to use
+     REDC in what follows and it requires an odd modulus */
   fbptr = fullfb;
   TRACE_A (a, __func__, "first fb prime is " FBPRIME_FORMAT "\n", fbptr->p);
   if (fbptr->p == 2)
     {
       if (mpz_even_p (norm))
+	missinglog -= fbptr->plog;
+      while (mpz_even_p (norm))
 	{
 	  mpz_tdiv_q_2exp (norm, norm, 1);
 	  add_fbprime_to_list (primes, nr_primes, max_nr_primes, 2);
-	  normlog -= fbptr->plog;
 	  TRACE_A (a, __func__, "dividing out fb prime 2. New norm = %Zd, "
-		   "new normlog = %hhd\n", norm, normlog);
+		   "missinglog = %hhd\n", norm, missinglog);
+	}
+      fbptr = fb_next (fbptr);
+    }
+  else
+    {
+      ASSERT_ALWAYS (!mpz_even_p (norm));
+    }
+  
+  /* 4. Go through the factor base until missinglog == 0 */
+
+  while (missinglog != 0)
+    {
+      fbptr = trialdiv_find_next (fbptr, norm);
+
+      if (fbptr->p == 0)
+	{
+	  fprintf (stderr, "Warning, reached end of fb for (%ld, %lu). "
+		   "missinglog = %d\n", a, b, (int) missinglog);
+	  gmp_fprintf (stderr, "Remaining norm = %Zd\n", norm);
+	  break;
+	}
+      
+      ASSERT (mpz_divisible_ui_p (norm, fbptr->p));
+      trialdiv_one_prime (fbptr->p, norm, nr_primes, primes,
+			  max_nr_primes, 1);
+
+      ASSERT_ALWAYS (missinglog >= fbptr->plog);
+      missinglog -= fbptr->plog;
+      
+      TRACE_A (a, __func__, "dividing out fb prime " FBPRIME_FORMAT
+	       ". New norm = %Zd, missinglog = %hhd\n", 
+	       fbptr->p, norm, missinglog);
+      
+      /* If we aren't done yet, there must remain at least one fb prime
+	 greater than the one we just processed. Check that the
+	 difference of approximate logs allows for that prime. */
+      if (missinglog != 0 && missinglog < fbptr->plog)
+	{
+	  gmp_fprintf (stderr, "Error, a = %ld, b = %lu, missinglog = %d, "
+		       "p = " FBPRIME_FORMAT ", plog = %d. "
+		       "Remaining norm = %Zd\n", 
+		       a, b, missinglog, fbptr->p, (int) fbptr->plog, norm);
+	  abort ();
+	}
+
+      if (missinglog < 2 * fbptr->plog)
+	{
+	  /* We know there's exactly one prime (possibly repeated) 
+	     missing, and we know its approximate size. We can choose 
+	     a more efficient algorithm here to find it. */
+	  
+	  nrprimes2++;
+	  sumprimes2 += (unsigned long) fbptr->p;
+	  
+	  if (mpz_fits_ulong_p (norm))
+	    {
+	      /* We can use the fast ul_rho() function */
+	      if (missinglog > UL_RHO_LOGTHRES)
+		break;
+	    }
+	  else
+	    {
+	      /* We need to use the slower mpz_rho() function */
+	      if (missinglog > MPZ_RHO_LOGTHRES)
+		break;
+	    }
+	  
+	  /* If we can't use Pollard rho, let's try skipping forward in 
+	     the factor base to those primes that have the correct 
+	     rounded log. Keep in mind that the for() loop advances 
+	     fbptr once after this while loop exits! */
+#if TRIALDIV_SKIPFORWARD
+	  while (fb_next (fbptr)->p != 0 && 
+		 fb_next (fbptr)->plog < missinglog)
+	    fbptr = fb_next (fbptr);
+#endif
 	}
       fbptr = fb_next (fbptr);
     }
 
-  /* 4. Go through the factor base until normlog == reportlog */
-
-  if (reportlog != normlog)
-  for (; fbptr->p != 0; fbptr = fb_next (fbptr))
-    {
-#ifdef REDC_ROOTS
-      /* if (trialdiv_with_root (fbptr, a, b)) */
-      if (trialdiv_with_norm (fbptr, norm))
-	{
-	  ASSERT (mpz_divisible_ui_p (norm, fbptr->p));
-	  trialdiv_one_prime (fbptr->p, norm, nr_primes, primes,
-			      max_nr_primes, 0);
-#else
-      if (trialdiv_one_prime (fbptr->p, norm, nr_primes, primes,
-				max_nr_primes, 0) > 0)
-	{
-#endif
-	  normlog -= fbptr->plog;
-	  ASSERT (add_error(reportlog) <= add_error(normlog));
-
-	  /* If we aren't done yet, there must be at least one fb prime
-	     greater than the one we just processed left. Check that the
-	     difference of approximate logs allows for that prime. */
-	  if (! (reportlog == normlog || 
-		 add_error(normlog) - add_error(reportlog) >= fbptr->plog))
-	    {
-	      gmp_fprintf (stderr, "Error, a = %ld, b = %lu, reportlog = %d, "
-			   "normlog = %d, p = " FBPRIME_FORMAT ", plog = %d. "
-			   "Remaining norm = %Zd\n", 
-			   a, b, reportlog, normlog, fbptr->p, 
-			   (int) fbptr->plog, norm);
-	      abort ();
-	    }
-
-	  TRACE_A (a, __func__, "dividing out fb prime " FBPRIME_FORMAT
-		   ". New norm = %Zd, normlog = %hhd\n", 
-		   fbptr->p, norm, normlog);
-
-	  if (reportlog == normlog)
-	    break;
-
-	  {
-	    int missinglog = uc_sub (normlog, reportlog);
-	    if (missinglog < 2 * fbptr->plog)
-	      {
-		/* We know there's exactly one prime (possibly repeated) 
-		   missing, and we know its approximate size. We could choose 
-		   a more efficient algorithm here to find it. */
-
-		nrprimes2++;
-		sumprimes2 += (unsigned long) fbptr->p;
-		
-		if (mpz_fits_ulong_p (norm))
-		  {
-		    /* We can use the fast ul_rho() function */
-		    if (missinglog > UL_RHO_LOGTHRES)
-		      break;
-		  }
-		else
-		  {
-		    /* We need to use the slower mpz_rho() function */
-		    if (missinglog > MPZ_RHO_LOGTHRES)
-		      break;
-		  }
-
-		
-		/* If we can't use Pollard rho, let's try skipping forward in 
-		   the factor base to those primes that have the correct 
-		   rounded log. Keep in mind that the for() loop advances 
-		   fbptr once after this while loop exits! */
-#if TRIALDIV_SKIPFORWARD
-		while (fb_next (fbptr)->p != 0 && 
-		       fb_next (fbptr)->plog < missinglog)
-		  fbptr = fb_next (fbptr);
-#endif
-	      }
-	  }
-	}
-#if 0
-	} /* Emacs paranthesis matching gets confused */
-#endif
-    }
-
-  if (fbptr->p == 0)
-    {
-      fprintf (stderr, "Warning, reached end of fb for (%ld, %lu). "
-	       "reached normlog = %d, report log = %d\n", 
-	       a, b, (int) normlog, (int) reportlog);
-      gmp_fprintf (stderr, "Remaining norm = %Zd\n", norm);
-    }
-  
   if (fbptr->p != 0)
     {
       sumprimes += (unsigned long) (fbptr->p);
       nrprimes++;
     }
 
-  /* We divided out each prime only once so far, because that's what the
-     sieving code did and we wanted identical size of the cofactor.
-     Now see if any of the primes so far divide in a power greater than one */
-  for (k = 0; k < *nr_primes; k++)
-    {
-      if (trialdiv_one_prime (primes[k], norm, nr_primes, primes, 
-			      max_nr_primes, 1))
-	{
-	  TRACE_A (a, __func__, "dividing out repeated fb prime " 
-		   FBPRIME_FORMAT "\n", primes[k]);
-	}
-    }
-
-  if (normlog != reportlog)
+  if (missinglog != 0)
     {
       /* There is one more factor base prime (possibly in a power) that we 
 	 want to find with a more efficient algorithm. */
 
       unsigned long q, r, s = 5;
 
-      ASSERT_ALWAYS (uc_sub (normlog, reportlog) >= fbptr->plog &&
-		     uc_sub (normlog, reportlog) < 2 * fbptr->plog);
+      ASSERT_ALWAYS (missinglog >= fbptr->plog && 
+		     missinglog < 2 * fbptr->plog);
 
 
       /* While in this loop, norm contains a factor base prime (possibly
-	 in a power > 1) whose log norm = uc_sub (normlog, reportlog). 
+	 in a power > 1) whose log norm = missinglog. 
 	 That is also the smallest prime factor in norm. */
       do
 	{
@@ -1602,12 +1738,12 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 	    }
 	} while (1);
 
-      if (fb_log (q, log_scale, 0.) != uc_sub (normlog, reportlog))
+      if (fb_log (q, log_scale, 0.) != missinglog)
 	{
 	  /* q was not the missing factor base prime ? */
 	  fprintf (stderr, "Warning, expected to find fb prime of log size "
 		   "%hhu, but found %lu. a = %ld, b = %lu\n", 
-		   uc_sub (normlog, reportlog), q, a, b);
+		   missinglog, q, a, b);
 	}
     }
 
@@ -1743,6 +1879,7 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 
   sumprimes = nrprimes = 0;
   sumprimes2 = nrprimes2 = 0;
+  ul_rho_toolarge_nr = ul_rho_toolarge_sum = 0;
 
   for (i = 0, j = 0; i < reports_a_nr && j < reports_r_nr;)
     {
@@ -1823,6 +1960,9 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 	      "with %lu repeats\n",
 	      ul_rho_called, ul_rho_called - ul_rho_called1, 
 	      mpz_rho_called, mpz_rho_called - mpz_rho_called1);
+      printf ("# %lu cofactors too large for ul_rho and too small for "
+	      "mpz_rho, average %.3f", ul_rho_toolarge_nr, 
+	      (double) ul_rho_toolarge_sum / (double) ul_rho_toolarge_nr);
       printf ("# Calls to ul_rho() took %llu clocks\n", ul_rho_time);
     }
   
