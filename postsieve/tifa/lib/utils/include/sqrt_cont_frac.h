@@ -141,18 +141,12 @@ struct struct_cont_frac_state_t {
         * \internal
         * (Used in the computation of <tt>a</tt>).
         */
-    mpz_t _a0_;
-       /**
-        * \internal
-        * (Used in the computation of <tt>a</tt>).
-        */
-    mpz_t _a1_;
+    mpz_t _a_old_;
         //
         // The following variables are not needed in the CFRAC algorithm.
         // Uncomment these declarations to also compute the denominator b.
         //
-    //mpz_t _b0_;
-    //mpz_t _b1_;
+    //mpz_t _b_old_;
        /**
         * \internal
         * Pointer to the function used to compute convergents. This pointer
@@ -161,7 +155,6 @@ struct struct_cont_frac_state_t {
         * approximated by a continued fraction.
         */
     void (*step_function)(struct struct_cont_frac_state_t* const, uint32_t);
-
 };
 
    /**

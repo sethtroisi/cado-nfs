@@ -214,6 +214,13 @@ do {                                                         \
 #define ARE_ODD(uia, uib) ((((uia) | (uib)) & 1) != 0)
 
    /**
+    * \def BIT(N, i)
+    * Macro returning the value of the i-th least significant bit of N.
+    * BIT(N, 0) returns the least significant bit of N.
+    */
+#define BIT(N, i) ( ((N) & (1<<(i))) ? 1 : 0 )
+
+   /**
     * \def MPN_ADD(A, B, C)
     * 
     * Syntaxic sugar macro wrapping a call to <tt>mpn_add</tt>. Performs
@@ -336,7 +343,6 @@ do {                                                         \
     *
     * \see The GMP documentation for more information on the \c mpn_mul
     * function.
-     
     */
 #define MPN_MUL(A, B, C)                                            \
     do {                                                            \

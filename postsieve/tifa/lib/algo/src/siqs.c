@@ -712,6 +712,9 @@ static ecode_t clear_siqs_context(factoring_machine_t* const machine) {
 
         clear_uint32_array(context->sieve);
         free(context->sieve);
+        
+        clear_uint32_array(context->sqrtm_pi);
+        free(context->sqrtm_pi);
 
         clear_binary_matrix(context->matrix);
         free(context->matrix);

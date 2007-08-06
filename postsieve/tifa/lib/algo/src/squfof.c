@@ -20,12 +20,15 @@
 /**
  * \file    squfof.c
  * \author  Jerome Milan
- * \date    Tue Jun 27 2007
- * \version 1.2.1
+ * \date    Thu Aug 2 2007
+ * \version 1.3
  */
 
  /*
   * History:
+  *   1.3:   Thu Aug 2 2007 by JM
+  *        - Implemented Williams & Wunderlich's "large step" algorithm for
+  *          a "fast return" in step 4) of the SQUFOF algorithm.
   *   1.2.1: Tue Jun 27 2007 by JM
   *        - Suppressed user parameters. Now performs a multiplier race only
   *          if needed.
@@ -37,17 +40,28 @@
   *        - Initial version.
   */
 
-#define SQUFOF_DEBUG 0
-#if SQUFOF_DEBUG
-  #define SQUFOF_PRINT(...) printf(__VA_ARGS__)
-#else
-  #define SQUFOF_PRINT(...) /* intentionally left empty */
-#endif
-
   //------------------------------------------------------------------------
-  // Ref. "Square Form Factorization",
-  //       Jason E. Gowen, Samuel S. Wagstaff Jr.,
-  //       accepted for publication in Mathematics of Computation
+  // References:
+  //------------------------------------------------------------------------
+  // - For a thorough explanation of the SQUFOF algorithm:
+  //         "Square Form Factorization",
+  //         Jason E. Gowen, Samuel S. Wagstaff Jr.,
+  //         Mathematics of Computation,
+  //         S 0025-5718(07)02010-8,
+  //         Article electronically published on May 14, 2007.
+  //
+  // - For an alternate explanation, including Shanks' very notes on SQUFOF,
+  //   see David Joyner and Stephen McMath's work at:
+  //       http://cadigweb.ew.usna.edu/~wdj/mcmath 
+  //   URL last retrieved on Wed Aug 1 2007.
+  //
+  // - For a description of the "large step algorithm" used to quickly
+  //   jump over several forms:
+  //         "On the Parallel Generation of the Residues for the Continued
+  //         Fraction Factoring Algorithm",
+  //         Hugh C. Williams, Marvin C. Wunderlich,
+  //         Mathematics of Computation, Volume 48, Number 177,
+  //         January 1987, pages 405-423 
   //------------------------------------------------------------------------
 
 #include "tifa_config.h"
@@ -61,6 +75,16 @@
 #include "funcs.h"
 #include "macros.h"
 #include "linked_list.h"
+
+#define SQUFOF_DEBUG 0
+#if SQUFOF_DEBUG
+  #include <stdio.h>
+  #define SQUFOF_GMP_PRINT(...) gmp_printf(__VA_ARGS__)
+  #define SQUFOF_PRINT(...)     printf(__VA_ARGS__)
+#else
+  #define SQUFOF_GMP_PRINT(...) /* intentionally left empty */
+  #define SQUFOF_PRINT(...)     /* intentionally left empty */
+#endif
 
 #define __PREFIX__  "squfof: "
 #define __VERBOSE__ TIFA_VERBOSE_SQUFOF
@@ -87,7 +111,7 @@
 //
 // A really quick and dirty trick to (hopefully) speed up divisions if
 // we know with a relatively high probability that the result will be one or 
-// two _and_ that the result won't be zero. In our case, the quotient 
+// two _and_ that the result *won't be zero*. In our case, the quotient 
 // distribution has been experimentally determined to be roughly:
 //
 //      Quotient Percentage
@@ -104,7 +128,7 @@
 //
 // First, a macro to declare needed local variables...
 //
-#define INIT_DIVIDE_TRICK_VARS      \
+#define DECL_DIVIDE_TRICK_VARS      \
     unsigned long int __D__ = 0;    \
     unsigned long int __N__ = 0
 //
@@ -174,12 +198,354 @@
 //
 #if USE_DIVISION_TRICK
     #define DIVIDE(Q, N, D) DIVIDE_TRICK(Q, N, D)
-    #define INIT_DIVIDE_VARS INIT_DIVIDE_TRICK_VARS
+    #define DECL_DIVIDE_VARS DECL_DIVIDE_TRICK_VARS
 #else
     #define DIVIDE(Q, N, D) Q = ((N) / (D))
-    #define INIT_DIVIDE_VARS /* intentionally left empty */
+    #define DECL_DIVIDE_VARS /* intentionally left empty */
 #endif
-   
+
+//-----------------------------------------------------------------------------
+//           MACROS AND DEFINES RELATED TO THE LARGE STEP ALGORITHM
+//-----------------------------------------------------------------------------
+
+//
+// _NOTE_: We only implement here a simplified version of Williams & 
+//         Wunderlich's large step algorithm. This is used in step 4 of the 
+//         SQUFOF algorithm (using Gowen & Wagstaff's description) to achieve 
+//         what Shanks calls the "fast return". Note that Gowen & Wagstaff's 
+//         description does not include this "fast return".
+// 
+//         The large step algorithm is implemented by way of macros to avoid
+//         any overhead (which can be significant since SQUFOF is only likely to 
+//         be used to factor very small integers). The downside of this is that 
+//         it makes for a rather ugly and messy code. I plead guilty...
+//
+
+//
+// Only use the large step algorithm if the number of forms to compute (from
+// the inverse square root of a found square form) is larger than a certain
+// threshold.
+//
+#define LARGE_STEP_THRESHOLD 4096
+
+//
+// Use a special way to "tag" local variables used in the single step algorithm
+// macro to avoid name clashes.
+//
+#define VSF(X) __ ## X ## _single_step_var__
+
+//
+// Declares local variables used to perform the single step algorithm.
+//
+#define DECL_SINGLE_STEP_VARS()         \
+    unsigned long int  VSF(q)  = 0;     \
+    unsigned long int  VSF(PP) = 0;     \
+    unsigned long int  VSF(t)  = 0;
+
+//
+// Clears local variables used to perform the single step algorithm (there's
+// actually nothing to clear for the time being).
+//
+#define CLEAR_SINGLE_STEP_VARS() /* intentionally left empty */
+
+//
+// Performs the single step algorithm. This is actually just a step in
+// a continued fraction expansion and is used to step from a binary quadratic
+// form to the next adjacent one (notations follow Gower's & Wagstaff's).
+//
+// The macro DECL_SINGLE_STEP_VARS() should be called before using this macro.
+//
+#define SINGLE_STEP(P, Q, QQ, S)        \
+    do {                                \
+        DIVIDE(VSF(q), (S) + (P), (Q)); \
+        VSF(PP)  = VSF(q);              \
+        VSF(PP) *= (Q);                 \
+        VSF(PP) -= (P);                 \
+        VSF(t)   = (P);                 \
+        VSF(t)  -= VSF(PP);             \
+        VSF(t)  *= VSF(q);              \
+        VSF(t)  += (QQ);                \
+        QQ  = (Q);                      \
+        Q   = VSF(t);                   \
+        P   = VSF(PP);                  \
+    } while (0)
+
+//
+// Use a special way to "tag" local variables used in the large step algorithm
+// macro to avoid name clashes.
+//
+#define VLS(X) __ ## X ## _large_step_var__
+
+//
+// Declares local variables used to perform the large step algorithm.
+//
+#define DECL_LARGE_STEP_VARS()           \
+    unsigned long int VLS(gcd_ui) = 0;   \
+    unsigned long int VLS(qk) = 0;       \
+    unsigned long int VLS(PP) = 0;       \
+    mpz_t VLS(Q0);                       \
+    mpz_t VLS(M);                        \
+    mpz_t VLS(gcd_z);                    \
+    mpz_t VLS(u);                        \
+    mpz_t VLS(qa_z);                     \
+    mpz_t VLS(qb_z);                     \
+    mpz_t VLS(P0);                       \
+    mpz_t VLS(tmp);                      \
+    mpz_t VLS(rem);                      \
+    mpz_t VLS(quot);                     \
+    mpz_init(VLS(Q0));                   \
+    mpz_init(VLS(M));                    \
+    mpz_init(VLS(gcd_z));                \
+    mpz_init(VLS(u));                    \
+    mpz_init(VLS(qa_z));                 \
+    mpz_init(VLS(qb_z));                 \
+    mpz_init(VLS(P0));                   \
+    mpz_init(VLS(tmp));                  \
+    mpz_init(VLS(rem));                  \
+    mpz_init(VLS(quot));
+
+//
+// Clears local variables used to perform the large step algorithm.
+//
+#define CLEAR_LARGE_STEP_VARS()          \
+    mpz_clear(VLS(Q0));                  \
+    mpz_clear(VLS(M));                   \
+    mpz_clear(VLS(gcd_z));               \
+    mpz_clear(VLS(u));                   \
+    mpz_clear(VLS(qa_z));                \
+    mpz_clear(VLS(qb_z));                \
+    mpz_clear(VLS(P0));                  \
+    mpz_clear(VLS(tmp));                 \
+    mpz_clear(VLS(rem));                 \
+    mpz_clear(VLS(quot));
+
+//
+// Performs the large step algorithm, "composing" the form given by
+// (-QQA, PA, QA) with the one given by (-QQB, PB, QB) (or a nearby form)
+// and stores the resulting form in (-QQ, P, Q).
+// Notations mostly follow Williams & Wunderlich's with S = sqrt(D).
+// All parameters are unsigned long int, except D, which is a mpz_t.
+//
+// The macros DECL_SINGLE_STEP_VARS() and DECL_LARGE_STEP_VARS() should be
+// called before using this macro.
+//
+#define LARGE_STEP(P, Q, QQ, PA, QA, QQA, PB, QB, QQB, S, D) do {       \
+    VLS(gcd_ui) = gcd_ulint(QA, QB);                                    \
+    while (VLS(gcd_ui) != 1) {                                          \
+        SINGLE_STEP(PB, QB, QQB, S);                                    \
+        VLS(gcd_ui) = gcd_ulint(QA, QB);                                \
+    }                                                                   \
+    /*                                                                  \
+     * Step 1: Compute Q0 = QA * QB and M, its inverse mod D            \
+     */                                                                 \
+    mpz_set_ui(VLS(Q0), QA);                                            \
+    mpz_mul_ui(VLS(Q0), VLS(Q0), QB);                                   \
+    mpz_invert(VLS(M), VLS(Q0), D);                                     \
+    /*                                                                  \
+     * We require Q0 to be inversible in Z/DZ and gcd(QA, QB) = 1,      \
+     * so we cycle though the nearby forms until we find a suitable     \
+     * Q pairs...                                                       \
+     */                                                                 \
+    while ((mpz_cmp_ui(VLS(M), 0) == 0) || (VLS(gcd_ui) != 1)) {        \
+        SINGLE_STEP(PA, QA, QQA, S);                                    \
+        SINGLE_STEP(PB, QB, QQB, S);                                    \
+        VLS(gcd_ui) = gcd_ulint(QA, QB);                                \
+                                                                        \
+        while (VLS(gcd_ui) != 1) {                                      \
+            SINGLE_STEP(PB, QB, QQB, S);                                \
+            VLS(gcd_ui) = gcd_ulint(QA, QB);                            \
+        }                                                               \
+        mpz_set_ui(VLS(Q0), QA);                                        \
+        mpz_mul_ui(VLS(Q0), VLS(Q0), QB);                               \
+        mpz_invert(VLS(M), VLS(Q0), D);                                 \
+    }                                                                   \
+    /*                                                                  \
+     * Solve X*QA - Y*QB = PA - PB for X                                \
+     */                                                                 \
+    mpz_set_ui(VLS(qa_z), QA);                                          \
+    mpz_set_ui(VLS(qb_z), QB);                                          \
+    mpz_gcdext(VLS(gcd_z), VLS(u), NULL, VLS(qa_z), VLS(qb_z));         \
+                                                                        \
+    mpz_set_ui(VLS(P0), PB);                                            \
+    mpz_sub_ui(VLS(P0), VLS(P0), PA);                                   \
+    mpz_mul(VLS(P0), VLS(u), VLS(P0));                                  \
+    mpz_mul_ui(VLS(P0), VLS(P0), QA);                                   \
+    mpz_add_ui(VLS(P0), VLS(P0), PA);                                   \
+    mpz_mod(VLS(P0), VLS(P0), VLS(Q0));                                 \
+    /*                                                                  \
+     * Step 2: Find Q and P' congruent to P mod Q                       \
+     */                                                                 \
+    mpz_add_ui(VLS(quot), VLS(P0), S);                                  \
+    mpz_tdiv_qr(VLS(quot), VLS(rem), VLS(quot), VLS(Q0));               \
+    while (true) {                                                      \
+        mpz_ui_sub(VLS(P0), S, VLS(rem));                               \
+        mpz_set(VLS(tmp), D);                                           \
+        mpz_submul(VLS(tmp), VLS(P0), VLS(P0));                         \
+        mpz_divexact(VLS(Q0), VLS(tmp), VLS(Q0));                       \
+        mpz_add_ui(VLS(quot), VLS(P0), S);                              \
+        mpz_tdiv_qr(VLS(quot), VLS(rem), VLS(quot), VLS(Q0));           \
+                                                                        \
+        if ((mpz_sgn(VLS(Q0)) > 0) && (mpz_cmp_ui(VLS(Q0), S) <= 0)){   \
+            break;                                                      \
+        }                                                               \
+    }                                                                   \
+    /*                                                                  \
+     * Step 3: Keep Q and P mod Q                                       \
+     */                                                                 \
+    Q = mpz_get_ui(VLS(Q0));                                            \
+    /*                                                                  \
+     * Remark: P0 may be negative and/or not fit in a unsigned long     \
+     * int, so the mpz_mod is necessary...                              \
+     */                                                                 \
+    mpz_mod_ui(VLS(P0), VLS(P0), (Q));                                  \
+    P = mpz_get_ui(VLS(P0));                                            \
+    /*                                                                  \
+     * While not stricly needed, we compute the actual value of P       \
+     * (and not just P mod Q) together with QQ (which is the previous   \
+     * or the next value of Q depending on whether or not we've gone    \
+     * beyond the period of the form cycle)                             \
+     */                                                                 \
+    DIVIDE(VLS(qk), (S) + (P), (Q));                                    \
+    VLS(PP) = VLS(qk) * (Q) - (P);                                      \
+    if (S >= (P)) {                                                     \
+        /*                                                              \
+         * Remember that the DIVISION_TRICK macro potentially used by   \
+         * the DIVIDE macro doesn't work if the result is null, so we   \
+         * treat this case separately...                                \
+         */                                                             \
+        if (((S) - (P)) >= (Q)) {                                       \
+            unsigned long int _tmp_ = 0;                                \
+            DIVIDE(_tmp_, (S) - (P), (Q));                              \
+            VLS(qk) += _tmp_;                                           \
+        }                                                               \
+    } else {                                                            \
+        if (((P) - (S)) >= (Q)) {                                       \
+            unsigned long int _tmp_ = 0;                                \
+            DIVIDE(_tmp_, (P) - (S), (Q));                              \
+            VLS(qk) -= _tmp_;                                           \
+            if (((P) - (S)) != _tmp_ * (Q) ) {                          \
+                VLS(qk)--;                                              \
+            }                                                           \
+        } else {                                                        \
+            if ((P) != (S)) {                                           \
+                VLS(qk)--;                                              \
+            }                                                           \
+        }                                                               \
+    }                                                                   \
+    P = VLS(qk) * (Q) - VLS(PP);                                        \
+                                                                        \
+    mpz_set_ui(VLS(M), (P));                                            \
+    mpz_mul_ui(VLS(M), VLS(M), (P));                                    \
+    mpz_sub(VLS(M), D, VLS(M));                                         \
+    mpz_fdiv_q_ui(VLS(M), VLS(M), (Q));                                 \
+                                                                        \
+    QQ = mpz_get_ui(VLS(M));                                            \
+} while (0)
+
+//
+// Use a special way to "tag" local variables used in the doubling algorithm
+// macro to avoid name clashes.
+//
+#define VDA(X) __ ## X ## _doubling_algo_var__
+
+//
+// Declares local variables used to perform the doubling algorithm.
+//
+#define DECL_DOUBLING_ALGO_VARS()       \
+    unsigned long int VDA(PB)  = 0;     \
+    unsigned long int VDA(QB)  = 0;     \
+    unsigned long int VDA(QQB) = 0;
+
+//
+// Clears local variables used to perform the doubling algorithm (there's
+// actually nothing to clear for the time being).
+//
+#define CLEAR_DOUBLING_ALGO_VARS() /* intentionally left empty */
+
+//
+// Performs the doubling algorithm, composing the form given by (P, Q, QQ)
+// with the nearest suitable form and stores the result in (P2, Q2, QQ2). 
+// All parameters are unsigned long int, except D, which is a mpz_t.
+//
+// The macros DECL_SINGLE_STEP_VARS(), DECL_LARGE_STEP_VARS() and 
+// DECL_DOUBLING_ALGO_VARS() should be called before using this macro.
+//
+#define DOUBLING_ALGO(P2, Q2, QQ2, P, Q, QQ, S, D) do {                  \
+    VDA(PB)  = (P);                                                      \
+    VDA(QB)  = (Q);                                                      \
+    VDA(QQB) = (QQ);                                                     \
+    LARGE_STEP(P2, Q2, QQ2, P, Q, QQ, VDA(PB), VDA(QB), VDA(QQB), S, D); \
+} while (0)
+
+//
+// Mininum number of forms to step through sequentially before using the
+// large step algorithm. If MIN_NSTEP_LS is too small, the large step's
+// overhead will degrade performances. If set too high, we'll be less
+// precise in the length's estimation of the large step.
+//
+#define MIN_NSTEP_LS 128
+
+//
+// Starting with the principal form (1, P0, Q0), jump over (approximately!)
+// K forms to get the form (QQ, P, Q). This is very similar to the standard
+// modular exponentiation algorithm.
+//
+// The macros DECL_SINGLE_STEP_VARS(), DECL_LARGE_STEP_VARS() and 
+// DECL_DOUBLING_ALGO_VARS() should be called before using this macro.
+//
+#define JUMP_OVER_K_STEPS(P, Q, QQ, P0, Q0, QQ0, S, D, K) do {           \
+    if (K <= MIN_NSTEP_LS) {                                             \
+        /*                                                               \
+         * Just perform K single steps sequentially                      \
+         */                                                              \
+        P  = P0;                                                         \
+        Q  = Q0;                                                         \
+        QQ = QQ0;                                                        \
+        for (uint32_t i = 0; i < K; i++) {                               \
+            SINGLE_STEP(P, Q, QQ, S);                                    \
+        }                                                                \
+    } else {                                                             \
+        unsigned long int PMIN  = P0;                                    \
+        unsigned long int QMIN  = Q0;                                    \
+        unsigned long int QQMIN = QQ0;                                   \
+                                                                         \
+        for (uint32_t i = 0; i < MIN_NSTEP_LS; i++) {                    \
+            SINGLE_STEP(PMIN, QMIN, QQMIN, S);                           \
+        }                                                                \
+        uint32_t n = K / MIN_NSTEP_LS;                                   \
+                                                                         \
+        P  = PMIN;                                                       \
+        Q  = QMIN;                                                       \
+        QQ = QQMIN;                                                      \
+                                                                         \
+        uint32_t f = most_significant_bit(n);                            \
+                                                                         \
+        while (f != 0) {                                                 \
+            f--;                                                         \
+            DOUBLING_ALGO(P, Q, QQ, P, Q, QQ, S, D);                     \
+            if (BIT(n, f) == 1) {                                        \
+                LARGE_STEP(P, Q, QQ, P, Q, QQ, PMIN, QMIN, QQMIN, S, D); \
+            }                                                            \
+        }                                                                \
+    }                                                                    \
+} while (0)
+
+//
+// Given the principal form (1, P0, Q0) and (QQ, P, Q), the inverse square root
+// of a found square form, jump through K forms starting from (QQ, P, Q) to get
+// in the vicinity of a point of symmetry of the form cycle of (QQ, P, Q).
+// The resulting form is stored in (QQ, P, Q).
+//
+// The macros DECL_SINGLE_STEP_VARS(), DECL_LARGE_STEP_VARS() and 
+// DECL_DOUBLING_ALGO_VARS() should be called before using this macro.
+//
+#define JUMP_NEAR_SYM_POINT(P, Q, QQ, P0, Q0, QQ0, S, D, K) do { \
+    unsigned long int PH  = 0;                                   \
+    unsigned long int QH  = 0;                                   \
+    unsigned long int QQH = 0;                                   \
+    JUMP_OVER_K_STEPS(PH, QH, QQH, P0, Q0, QQ0, S, D, K);        \
+    LARGE_STEP(P, Q, QQ, P, Q, QQ, PH, QH, QQH, S, D);           \
+} while (0)
 //-----------------------------------------------------------------------------
 
 //-----------------------------------------------------------------------------
@@ -250,17 +616,21 @@ struct struct_squfof_racer_t {
     mpf_t sqrtD;
 
     unsigned long int S;
-    unsigned long int QQ;
+    
     unsigned long int P;
-
     unsigned long int Q;
+    unsigned long int QQ;
+    unsigned long int PP;
+    
+    unsigned long int P0;
+    unsigned long int Q0;
+    unsigned long int QQ0;
+    
     unsigned long int L;
     unsigned long int B;
     unsigned long int i;
 
     unsigned long int q;
-    unsigned long int PP;
-
     unsigned long int t;
     unsigned long int r;
 
@@ -549,6 +919,7 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
     if (n_mod_4 == 1) {
         mpz_mul_2exp(D, D, 1);
     }
+        
     //
     // We need a floating point computation here. See next comment.
     //
@@ -638,32 +1009,32 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
 
     ulint_pair_t* current_pair = NULL;
 
-    INIT_DIVIDE_VARS;
+    DECL_DIVIDE_VARS;
 
     PRINT_FWD_CYCL_MSG;
     START_TIMER;
 
+    SQUFOF_GMP_PRINT("\nD = %Zd\n", D);
     SQUFOF_PRINT("S = %lu\n", S);
     SQUFOF_PRINT("B = %lu\n", B);
-
+        
+    unsigned long int P0  = P;
+    unsigned long int Q0  = Q;
+    unsigned long int QQ0 = 1;
+    
     //
     // Step 2: Cycle forward to find a proper square form
     //
-    unsigned long int istep = 0;
     while (true) {
-        istep++;
-
         SQUFOF_PRINT("\n----------------------------\n");
-        SQUFOF_PRINT("Step 2: Iteration %lu\n", istep);
+        SQUFOF_PRINT("Step 2: Iteration %lu\n", i);
         SQUFOF_PRINT("----------------------------\n");
-
         //
         // Step 2 a)
         //
         // Compute q  = (S + P)/Q;
         //
         DIVIDE(q, S + P, Q);
-        
         //
         // Compute PP = q*Q - P;
         //
@@ -680,7 +1051,6 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
         SQUFOF_PRINT("2a)     PP = %lu\n", PP);
         SQUFOF_PRINT("2a)     t  = %lu\n", t);
         SQUFOF_PRINT("2a)     q  = %lu\n", q);
-        
         //
         // Step 2 b)
         //
@@ -821,45 +1191,129 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
     START_TIMER;
     START_TIMER;
 
-    //
-    // Step 4: Cycle in the reverse direction to find a factor of N
-    //
-    while (true) {
-        DIVIDE(q, S + P, Q);
+    unsigned long int factor = 0;
+
+    if ((i / 2) < LARGE_STEP_THRESHOLD) {
+        //
+        // Step 4: Cycle in the reverse direction to find a factor of N
+        //
+        while (true) {
+            DIVIDE(q, S + P, Q);
+            
+            PP  = q;
+            PP *= Q;
+            PP -= P;
+            if (P == PP) {
+                factor = Q;
+                break;
+            }
+            t  = P;
+            t -= PP;
+            t *= q;
+            t += QQ;
+            QQ = Q;
+            Q  = t;
+            P  = PP;
         
-        PP  = q;
-        PP *= Q;
-        PP -= P;
-        if (P == PP) {
-            break;
+            SQUFOF_PRINT("after iteration of step 4):\n");
+            SQUFOF_PRINT("-----------------------------------\n");
+            SQUFOF_PRINT("4)      Q  = %lu\n", Q);
+            SQUFOF_PRINT("4)      P  = %lu\n", P);
+            SQUFOF_PRINT("4)      QQ = %lu\n", QQ);
+            SQUFOF_PRINT("4)      PP = %lu\n", PP);
+            SQUFOF_PRINT("4)      t  = %lu\n", t);                   
         }
-        t  = P;
-        t -= PP;
-        t *= q;
-        t += QQ;
-        QQ = Q;
-        Q  = t;
-        P  = PP;
+    } else {
+        //
+        // Use the large step algorithm to get closer to the point of symmetry.
+        //
+        DECL_DOUBLING_ALGO_VARS();
+        DECL_LARGE_STEP_VARS();
+        DECL_SINGLE_STEP_VARS();
 
-        SQUFOF_PRINT("after iteration of step 4):\n");
-        SQUFOF_PRINT("-----------------------------------\n");
-        SQUFOF_PRINT("4)      Q  = %lu\n", Q);
-        SQUFOF_PRINT("4)      P  = %lu\n", P);
-        SQUFOF_PRINT("4)      QQ = %lu\n", QQ);
-        SQUFOF_PRINT("4)      PP = %lu\n", PP);
-        SQUFOF_PRINT("4)      t  = %lu\n", t);
+        JUMP_NEAR_SYM_POINT(P, Q, QQ, P0, Q0, QQ0, S, D, i / 2);
+
+        CLEAR_DOUBLING_ALGO_VARS();
+        CLEAR_LARGE_STEP_VARS();
+        CLEAR_SINGLE_STEP_VARS();
+        
+        //
+        // Step 4: Cycle in _both_ directions to find a factor of N
+        //
+        unsigned long int PR  = P;
+        unsigned long int QR  = QQ;
+        unsigned long int QQR = Q;
+        unsigned long int PPR = 0;
+        unsigned long int qr  = 0;
+        
+        while (true) {
+            //
+            // Cycle in the "forward" direction
+            //
+            DIVIDE(q, S + P, Q);
+            PP  = q;
+            PP *= Q;
+            PP -= P;
+            if (P == PP) {
+                factor = Q;
+                break;
+            }
+            //
+            // Cycle in the "reverse" direction
+            //
+            DIVIDE(qr, S + PR, QR);
+            PPR  = qr;
+            PPR *= QR;
+            PPR -= PR;
+            if (PR == PPR) {
+                factor = QR;
+                break;
+            }
+            //
+            // Complete the "forward" direction cycle
+            //    
+            t  = P;
+            t -= PP;
+            t *= q;
+            t += QQ;
+            QQ = Q;
+            Q  = t;
+            P  = PP;
+            //
+            // Complete the "reverse" direction cycle
+            //
+            t  = PR;
+            t -= PPR;
+            t *= qr;
+            t += QQR;
+            QQR = QR;
+            QR  = t;
+            PR  = PPR;
+        
+            SQUFOF_PRINT("after forward iteration of step 4):\n");
+            SQUFOF_PRINT("-----------------------------------\n");
+            SQUFOF_PRINT("4)      Q  = %lu\n", Q);
+            SQUFOF_PRINT("4)      P  = %lu\n", P);
+            SQUFOF_PRINT("4)      QQ = %lu\n", QQ);
+            SQUFOF_PRINT("4)      PP = %lu\n", PP);
+            
+            SQUFOF_PRINT("\tafter reverse iteration of step 4):\n");
+            SQUFOF_PRINT("\t-----------------------------------\n");
+            SQUFOF_PRINT("\t4)      QR  = %lu\n", QR);
+            SQUFOF_PRINT("\t4)      PR  = %lu\n", PR);
+            SQUFOF_PRINT("\t4)      QQR = %lu\n", QQR);
+            SQUFOF_PRINT("\t4)      PPR = %lu\n", PPR);
+        }
     }
-
     STOP_TIMER;
     PRINT_TIMING;
 
     //
     // Step 5: We found a factor of n
     //
-    if (IS_EVEN(Q)) {
-        Q >>= 1;
+    if (IS_EVEN(factor)) {
+        factor >>= 1;
     }
-    unsigned long int factor = Q;
 
     mpz_init_set_ui(machine->factors->data[machine->factors->length], factor);
     machine->factors->length++;
@@ -889,7 +1343,7 @@ static ecode_t perform_squfof_race(factoring_machine_t* const machine) {
 
     ecode_t rcode = 0;
 
-    INIT_DIVIDE_VARS;
+    DECL_DIVIDE_VARS;
 
     PRINT_FWD_CYCL_MSG;
     START_TIMER;
@@ -983,50 +1437,126 @@ static ecode_t perform_squfof_race(factoring_machine_t* const machine) {
     START_TIMER;
     START_TIMER;
 
+    unsigned long int factor_ui = 0;
     //
-    // Step 4: Cycle in the reverse direction to find a factor of N
+    // Use local variables to bypass readings of a non constant pointer. It is
+    // not clear to me if this makes for a measurable difference though...
     //
-    while (true) {    
-        DIVIDE(winner->q, winner->S + winner->P, winner->Q);
-        
-        winner->PP  = winner->q;
-        winner->PP *= winner->Q;
-        winner->PP -= winner->P;
-
-        if (winner->P == winner->PP) {
-            break;
+    unsigned long int S  = winner->S;
+    unsigned long int P  = winner->P;
+    unsigned long int Q  = winner->Q;
+    unsigned long int QQ = winner->QQ;
+    unsigned long int PP = 0;
+    unsigned long int q  = 0;
+    unsigned long int t  = 0;
+    
+    if ((winner->i / 2) < LARGE_STEP_THRESHOLD) {
+        //
+        // Step 4: Cycle in the reverse direction to find a factor of N
+        //
+        while (true) {
+            DIVIDE(q, S + P, Q);
+            PP  = q;
+            PP *= Q;
+            PP -= P;
+            if (P == PP) {
+                factor_ui = Q;
+                break;
+            }
+            t   = P;
+            t  -= PP;
+            t  *= q;
+            t  += QQ;
+            QQ  = Q;
+            Q   = t;
+            P   = PP;
         }
-        winner->t   = winner->P;
-        winner->t  -= winner->PP;
-        winner->t  *= winner->q;
-        winner->t  += winner->QQ;
-        winner->QQ  = winner->Q;
-        winner->Q   = winner->t;
-        winner->P   = winner->PP;
-    }
+    } else {
+        unsigned long int P0  = winner->P0;
+        unsigned long int Q0  = winner->Q0;
+        unsigned long int QQ0 = winner->QQ0;
+        //
+        // Use the large step algorithm to get closer to the point of symmetry.
+        //
+        DECL_DOUBLING_ALGO_VARS();
+        DECL_LARGE_STEP_VARS();
+        DECL_SINGLE_STEP_VARS();
 
+        JUMP_NEAR_SYM_POINT(P, Q, QQ, P0, Q0, QQ0, S, winner->D, winner->i / 2);
+        
+        CLEAR_DOUBLING_ALGO_VARS();
+        CLEAR_LARGE_STEP_VARS();
+        CLEAR_SINGLE_STEP_VARS();
+        //
+        // Step 4: Cycle in _both_ directions to find a factor of N
+        //
+        unsigned long int PR  = P;
+        unsigned long int QR  = QQ;
+        unsigned long int QQR = Q;
+        unsigned long int PPR = 0;
+        unsigned long int qr  = 0;
+        
+        while (true) {
+            //
+            // Cycle in the "forward" direction
+            //
+            DIVIDE(q, S + P, Q);
+            PP  = q;
+            PP *= Q;
+            PP -= P;
+            if (P == PP) {
+                factor_ui = Q;
+                break;
+            }
+            //
+            // Cycle in the "reverse" direction
+            //
+            DIVIDE(qr, S + PR, QR);
+            PPR  = qr;
+            PPR *= QR;
+            PPR -= PR;
+            if (PR == PPR) {
+                factor_ui = QR;
+                break;
+            }
+            //
+            // Complete the "forward" direction cycle
+            //    
+            t   = P;
+            t  -= PP;
+            t  *= q;
+            t  += QQ;
+            QQ  = Q;
+            Q   = t;
+            P   = PP;
+            //
+            // Complete the "reverse" direction cycle
+            //
+            t  = PR;
+            t -= PPR;
+            t *= qr;
+            t += QQR;
+            QQR = QR;
+            QR  = t;
+            PR  = PPR;
+        }
+    }
     STOP_TIMER;
     PRINT_TIMING;
-
     //
     // Step 5: We found a factor of n
     //
-    if (IS_EVEN(winner->Q)) {
-        winner->Q >>= 1;
-    }
+    factor_ui /= gcd_ulint(factor_ui, 2 * winner->multiplier);
+    
+    mpz_t factor_z;
+    
+    mpz_init_set_ui(factor_z, factor_ui);
+    append_mpz_to_array(machine->factors, factor_z);
 
-    mpz_t factor;
+    mpz_divexact(factor_z, context->n, factor_z);
+    append_mpz_to_array(machine->factors, factor_z);
 
-    mpz_init_set_ui(
-        factor,
-        winner->Q / gcd_ulint(winner->Q, 2 * winner->multiplier)
-    );
-    append_mpz_to_array(machine->factors, factor);
-
-    mpz_divexact(factor, context->n, factor);
-    append_mpz_to_array(machine->factors, factor);
-
-    mpz_clear(factor);
+    mpz_clear(factor_z);
 
     return SOME_FACTORS_FOUND;
 }
@@ -1048,7 +1578,7 @@ static ecode_t cycle_forward(squfof_racer_t* const racer) {
         return FAILURE;
     }
     racer->istep = 0;
-    INIT_DIVIDE_VARS;
+    DECL_DIVIDE_VARS;
     while (true) {
         racer->istep++;
         //
@@ -1243,6 +1773,10 @@ static ecode_t init_squfof_racer(squfof_racer_t* const racer, const mpz_t n,
     racer->PP = 0;
     racer->t  = 0;
     racer->r  = 0;
+
+    racer->P0  = racer->P;
+    racer->Q0  = racer->Q;
+    racer->QQ0 = 1;
 
     //
     // Set up the linked list used as the racer's queue and make it circular...

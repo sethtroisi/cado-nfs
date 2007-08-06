@@ -1038,7 +1038,6 @@ uint32_t bern_21_pairs_lp(const mpz_t n,
                             free(key);
                             clear_mpz_pair(found);
                             free(found);
-
                             continue;
                         }
                         smooth_yi->length++;
@@ -1085,9 +1084,9 @@ uint32_t bern_21_rt_pairs_siqs(mpz_array_t* const xi,
                                const mpz_array_t* const cand_yi,
                                const mpz_array_t* const cand_a,
                                const mpz_t z) {
-
     //
-    // _NOTE_:
+    // _NOTE_: Same as bern_21_rt_pairs but specifically tailored to be used
+    //         by the SIQS algorithm.
     //
     if (smooth_yi->length == smooth_yi->alloced) {
         return 0;
@@ -1144,7 +1143,10 @@ uint32_t bern_21_rt_pairs_siqs(mpz_array_t* const xi,
         }
     }
     mpz_clear(yk);
-
+    
+    clear_mpz_tree(rtree);
+    free(rtree);
+    
     return retval;
 }
 //------------------------------------------------------------------------------
@@ -1159,7 +1161,9 @@ uint32_t bern_21_rt_pairs_lp_siqs(const mpz_t n,
                                   const mpz_t z) {
 
     //
-    // _NOTE_: Same as bern_21_rt_pairs but uses the large prime variation.
+    // _NOTE_: Same as bern_21_rt_pairs_lp but specifically tailored to be used
+    //         by the SIQS algorithm as we stores the coefficient "a" of the
+    //         SIQS polynomial used.
     //
     if (smooth_yi->length == smooth_yi->alloced) {
         return 0;
@@ -1307,7 +1311,6 @@ uint32_t bern_21_rt_pairs_lp_siqs(const mpz_t n,
                             free(key);
                             clear_mpz_pair(found);
                             free(found);
-
                             continue;
                         }
                         smooth_yi->length++;
@@ -1345,6 +1348,9 @@ uint32_t bern_21_rt_pairs_lp_siqs(const mpz_t n,
     mpz_clear(gcd);
     mpz_clear(nsp);
     mpz_clear(nsp_inv);
+
+    clear_mpz_tree(rtree);
+    free(rtree);
 
     return retval;
 }

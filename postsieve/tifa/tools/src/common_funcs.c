@@ -38,24 +38,25 @@ void print_hello_msg(char* algo_name) {
     //
     // Title string
     //
-    char buffer[81];
-    sprintf(buffer, "Integer factorization via the %.40s algorithm", algo_name);
+    char title[81];
+    snprintf(title, 81, "Integer factorization via the %.40s algorithm", 
+             algo_name);
     //
-    // An 80 column wide line
+    // An 80-column wide line separator (+1 character for the '\0' of course)
     //
-    char line[81] = "----------------------------------------"
-                    "----------------------------------------";
+    char linesep[81] = "----------------------------------------"
+                       "----------------------------------------";
     //
     // Create the format string to center the title in the line
     //
     char format[8];
-    sprintf(format, "%%%lus\n",
-            strlen(buffer) + (strlen(line) - strlen(buffer))/2);
+    snprintf(format, 81, "%%%lus\n",
+             strlen(title) + (strlen(linesep) - strlen(title))/2);
 
     printf("\n");
-    printf("%s\n", line);
-    printf(format, buffer);
-    printf("%s\n", line);
+    printf("%s\n", linesep);
+    printf(format, title);
+    printf("%s\n", linesep);
     printf("%s (%s)\n\n", TIFA_FULLNAME, TIFA_VERSION);
 }
 //------------------------------------------------------------------------------

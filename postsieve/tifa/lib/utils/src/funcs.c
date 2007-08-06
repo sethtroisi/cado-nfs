@@ -308,8 +308,6 @@ int8_t  kronecker_ui(uint32_t a, uint32_t b) {
     }
 }
 //-----------------------------------------------------------------------------
-#define BIT(N, i) ( ((N) & (1<<(i))) ? 1 : 0 )
-//-----------------------------------------------------------------------------
 uint32_t powm(uint32_t base, uint32_t power, uint32_t modulus) {
     //
     // Left-right binary algorithm to compute (base^power) mod modulus.

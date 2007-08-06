@@ -134,11 +134,6 @@ my $long_license = "//
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 //
 ";
-my $short_license = "/*
- *  Copyright (C) 2006, 2007  INRIA
- *  Licence: GNU Lesser General Public License (LGPL)
- */
-";
 #
 # First, generate the source file...
 #
@@ -153,8 +148,6 @@ $long_license
  * \\date    $date
  * \\version 1.0
  */
-
-$short_license
 
 #include "$name_inc"
 
@@ -256,8 +249,6 @@ $long_license
  * This is a list of the precomputed small primes together with
  * a \\c uint32_array_t wrapper.
  */
-
-$short_license
 
 #if !defined($include_symb)
    /**
