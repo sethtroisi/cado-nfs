@@ -218,7 +218,7 @@ uint32_t first_row_with_one_on_col(uint32_t col,
                                    const binary_matrix_t* const matrix) {
     //
     // This function returns the index of the first row which has a 1 in
-    // its col-th column. It returns UINT32_MAX if no such row is found.
+    // its col-th column. It returns NOT_IN_ARRAY if no such row is found.
     //
 #if BITSTRING_T_SIZE_IS_POW_OF_TWO
     uint32_t col_offset = col & (BITSTRING_T_BITSIZE - 1);
@@ -240,8 +240,9 @@ uint32_t first_row_with_one_on_col(uint32_t col,
     }
     //
     // _KLUDGE_: If no row with a one on column col is found, returns -1 or
-    //           rather UINT32_MAX which, in a signed context, is indeed -1.
+    //           rather NOT_IN_ARRAY (i.e. UINT32_MAX) which, in a signed 
+    //           context, is indeed -1.
     //
-    return UINT32_MAX;
+    return NO_SUCH_ROW;
 }
 //-----------------------------------------------------------------------------

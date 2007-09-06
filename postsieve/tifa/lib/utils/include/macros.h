@@ -221,6 +221,16 @@ do {                                                         \
 #define BIT(N, i) ( ((N) & (1<<(i))) ? 1 : 0 )
 
    /**
+    * \def MPZ_IS_SQUARE(X)
+    * 
+    * Syntaxic sugar macro wrapping a call to <tt>mpz_perfect_square_p </tt>.
+    * "Returns" true if and only if the \c mpz_t X is a perfect square. 
+    *
+    * Takes as parameter an <tt>mpz_t</tt>.
+    */
+#define MPZ_IS_SQUARE(X) (0 != mpz_perfect_square_p(X))
+
+   /**
     * \def MPN_ADD(A, B, C)
     * 
     * Syntaxic sugar macro wrapping a call to <tt>mpn_add</tt>. Performs

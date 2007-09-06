@@ -65,7 +65,7 @@ void gaussian_elim(uint32_array_list_t* relations,
     for (uint32_t icol = ncol - 1; icol != UINT32_MAX; icol--) {
 
         row = first_row_with_one_on_col(icol, matrix);
-        if (row == UINT32_MAX) {
+        if (row == NO_SUCH_ROW) {
             //
             // No row found, so skip to the next column...
             //

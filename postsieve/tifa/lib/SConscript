@@ -135,6 +135,7 @@ tifa_src     = [
     # Algorithms
     #
     os.path.join( algo_srcdir,  'cfrac.c'),
+    os.path.join( algo_srcdir,  'fermat.c'),
     os.path.join( algo_srcdir,  'qs.c'),
     os.path.join( algo_srcdir,  'siqs.c'),
     os.path.join( algo_srcdir,  'squfof.c'),
@@ -173,6 +174,7 @@ tifa_inc = [
     # Algorithms
     #
     os.path.join( algo_incdir,  'cfrac.h'),
+    os.path.join( algo_incdir,  'fermat.h'),
     os.path.join( algo_incdir,  'qs.h'),
     os.path.join( algo_incdir,  'siqs.h'),
     os.path.join( algo_incdir,  'squfof.h'),

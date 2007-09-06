@@ -1,6 +1,23 @@
  TIFA v0.2.0:
  ------------
 
+ - Early September 2007:
+	   - Added modinv_ui function in funcs.c.
+	   - Added sqrtm_p2 function in funcs.c.
+
+ - Late August 2007:
+	   - Added untuned implementation of McKee's speedup of Fermat's
+	     algorithm (more precisely the "greedy" variant). This implementation
+	     is, for the time being, not competitive at all with respect to
+	     SQUFOF or even QS.
+       
+ - Late July/early August 2007:
+       - SQUFOF now uses the "fast return" trick to speed-up the last part
+         of the algorithm.
+
+ - Early July 2007:
+       - Minor optimizations of the quadratic residues generation for CFRAC.
+       
  - June 2007:
        - Misc fixes.
        - Added clone_binary_matrix function.

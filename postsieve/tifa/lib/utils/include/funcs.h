@@ -20,8 +20,8 @@
 /**
  * \file    funcs.h
  * \author  Jerome Milan
- * \date    Mon Mar 13 2006
- * \version 1.0
+ * \date    Tue Sep 4 2007
+ * \version 1.1
  *
  * \brief Number theoretical, hash and comparison functions.
  *
@@ -30,9 +30,14 @@
  */
 
  /*
-  *  License: GNU Lesser General Public License (LGPL)
   *  History:
+  *    1.1: Tue Sep 4 2007 by JM:
+  *          - Added prototype for modinv_ui function (modular inverse).
+  *          - Added prototype for sqrtm_p2 function (modular square root).
+  *    1.0: Mon Mar 13 2006 by JM:
+  *          - Initial version.
   */
+  
 
 #if !defined(_TIFA_FUNCS_H_)
    /**
@@ -45,6 +50,7 @@
 extern "C" {
 #endif
 
+#include <limits.h>
 #include <inttypes.h>
 #include <gmp.h>
 
@@ -207,6 +213,20 @@ void find_coprime_base(mpz_array_t* const base, const mpz_t n,
  */
 
    /**
+    * \def NO_SQRT_MOD_P
+    * Value returned by the <tt>sqrtm(n, p)</tt> function if no modular square 
+    * root of \c n mod \c p exits.
+    */
+#define NO_SQRT_MOD_P (UINT32_MAX)
+
+   /**
+    * \def NO_SQRT_MOD_P2
+    * Value returned by the <tt>sqrtm_p2(n, p)</tt> function if no modular 
+    * square  root of \c n mod <tt>p*p</tt> exits.
+    */
+#define NO_SQRT_MOD_P2 (ULONG_MAX)
+
+   /**
     * \brief Kronecker symbol restricted to positive simple precision integers.
     *
     * Returns the value of the Kronecker symbol (<tt>a</tt>/<tt>b</tt>)
@@ -216,7 +236,7 @@ void find_coprime_base(mpz_array_t* const base, const mpz_t n,
     * \param[in] b A positive integer.
     * \returns The value of the kronecker symbol (<tt>a</tt>/<tt>b</tt>).
     */
-int8_t  kronecker_ui(uint32_t a, uint32_t b);
+int8_t kronecker_ui(uint32_t a, uint32_t b);
 
    /**
     * \brief Modular exponentiation restricted to positive simple precision
@@ -239,7 +259,8 @@ uint32_t powm(uint32_t base, uint32_t power, uint32_t modulus);
     * Returns the modular square root of <tt>a</tt> (mod <tt>p</tt>) (where
     * \c p is an \em odd \em prime) using Shanks' algorithm, that is, returns
     * the positive integer <tt>s</tt> such that <tt>s</tt>^2 = <tt>a</tt>
-    * (mod <tt>p</tt>). If no such integer exists, returns <tt>UINT32_MAX</tt>.
+    * (mod <tt>p</tt>). If no such integer exists, returns 
+    * <tt>NO_SQRT_MOD_P</tt>.
     *
     * \warning The primality of \c p is not checked by <tt>sqrtm</tt>.
     * It is the responsability of the caller to check whether \c p is
@@ -249,7 +270,7 @@ uint32_t powm(uint32_t base, uint32_t power, uint32_t modulus);
     * \param[in] a The modular square.
     * \param[in] p The modulus.
     * \returns The modular square root of <tt>a</tt> (mod <tt>p</tt>) if it
-    *          exists. <tt>UINT32_MAX</tt> otherwise.
+    *          exists. <tt>NO_SQRT_MOD_P</tt> otherwise.
     */
 uint32_t sqrtm(uint32_t a, uint32_t p);
 
@@ -275,6 +296,45 @@ unsigned long int is_square(unsigned long int x);
     * \returns The greatest common divisor of \c a and \c b.
     */
 unsigned long int gcd_ulint(unsigned long int a, unsigned long int b);
+
+   /**
+    * \brief Modular inverse for unsigned long int
+    *
+    * Returns the modular inverse of \c n modulo the odd prime \c p as an 
+    * unsigned long int.
+    *
+    * \warning \c p must be a positive odd prime, strictly less than
+    * <tt>LONG_MAX</tt> (yes, <tt>LONG_MAX</tt> and not <tt>ULONG_MAX</tt>!) 
+    * and, of course, <tt>n % p</tt> must be non-null.
+    *
+    * \param[in] n An unsigned long int.
+    * \param[in] p An odd prime unsigned long int.
+    * \returns The modular inverse of \c n mod <tt>p</tt>.
+    */
+unsigned long int modinv_ui(unsigned long int n, unsigned long int p);
+
+   /**
+    * \brief Modular square root modulo the square of a prime.
+    *
+    * Returns the modular square root of <tt>a</tt> (mod <tt>p*p</tt>) (where
+    * \c p is an \em odd \em prime) that is, returns a positive integer 
+    * <tt>s</tt> such that <tt>s</tt>^2 = <tt>a</tt> (mod <tt>p*p</tt>).
+    * If no such integer exists, returns <tt>NO_SQRT_MOD_P2</tt>.
+    *
+    * \warning In order to use only single precision computation, the product
+    * <tt>p*p</tt> should be strictly less than <tt>LONG_MAX</tt>.
+    *
+    * \warning The primality of \c p is not checked by <tt>sqrtm_p2</tt>.
+    * It is the responsability of the caller to check whether \c p is
+    * indeed prime. Failure to assure such a precondition will lead to
+    * an infinite loop.
+    *
+    * \param[in] a The modular square.
+    * \param[in] p The square root of the modulus.
+    * \returns The modular square root of <tt>a</tt> (mod <tt>p*p</tt>) if it
+    *          exists. <tt>NO_SQRT_MOD_P2</tt> otherwise.
+    */
+unsigned long int sqrtm_p2(uint32_t a, uint32_t p);
 
 /*
  *-----------------------------------------------------------------------------

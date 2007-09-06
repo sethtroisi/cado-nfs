@@ -783,7 +783,7 @@ uint32_t bern_21_rt_pairs_lp(const mpz_t n,
                 uint32_t nsp_ui = mpz_get_ui(nsp);
                 //
                 // Get the index of (cand_yi->data[k] / gcd) in
-                // first_primes_array... If ind != UINT32_MAX, then
+                // first_primes_array... If ind != NOT_IN_ARRAY, then
                 // (cand_yi->data[k] / gcd) is indeed a prime...
                 //
                 uint32_t ind = index_in_sorted_uint32_array(
@@ -792,7 +792,7 @@ uint32_t bern_21_rt_pairs_lp(const mpz_t n,
                                     0,
                                     first_primes_array.length);
 
-                if (ind != UINT32_MAX) {
+                if (ind != NOT_IN_ARRAY) {
                     //
                     // cand_yi->data[k] is the product of a smooth number with
                     // the prime number first_primes_array->data[ind]
@@ -977,7 +977,7 @@ uint32_t bern_21_pairs_lp(const mpz_t n,
                 uint32_t nsp_ui = mpz_get_ui(nsp);
                 //
                 // Get the index of (cand_yi->data[k] / gcd) in
-                // first_primes_array... If ind != UINT32_MAX, then
+                // first_primes_array... If ind != NOT_IN_ARRAY, then
                 // (cand_yi->data[k] / gcd) is indeed a prime...
                 //
                 uint32_t ind = index_in_sorted_uint32_array(
@@ -986,7 +986,7 @@ uint32_t bern_21_pairs_lp(const mpz_t n,
                                     0,
                                     first_primes_array.length);
 
-                if (ind != UINT32_MAX) {
+                if (ind != NOT_IN_ARRAY) {
                     //
                     // cand_yi->data[k] is the product of a smooth number with
                     // the prime number first_primes_array->data[ind]
@@ -1245,7 +1245,7 @@ uint32_t bern_21_rt_pairs_lp_siqs(const mpz_t n,
                 uint32_t nsp_ui = mpz_get_ui(nsp);
                 //
                 // Get the index of (cand_yi->data[k] / gcd) in
-                // first_primes_array... If ind != UINT32_MAX, then
+                // first_primes_array... If ind != NOT_IN_ARRAY, then
                 // (cand_yi->data[k] / gcd) is indeed a prime...
                 //
                 uint32_t ind = index_in_sorted_uint32_array(
@@ -1254,7 +1254,7 @@ uint32_t bern_21_rt_pairs_lp_siqs(const mpz_t n,
                                     0,
                                     first_primes_array.length);
 
-                if (ind != UINT32_MAX) {
+                if (ind != NOT_IN_ARRAY) {
                     //
                     // cand_yi->data[k] is the product of a smooth number with
                     // the prime number first_primes_array->data[ind]

@@ -179,12 +179,13 @@ uint32_t index_in_uint32_array(uint32_t to_find,
     //
     // _KLUDGE_: If the integer to_find is not found, we'd like to return -1.
     //           However, the return type being unsigned, returning -1 would
-    //           not be very elegant, so we return UINT32_MAX which, in a
-    //           signed context, is indeed -1. Of course, the other possibility
-    //           would be to return a int32_t but that would limit the length
-    //           of the uint32_array_t to UINT32_MAX/2 instead of UINT32_MAX-1.
+    //           not be very elegant, so we return UINT32_MAX (i.e. the value
+    //           of the NOT_IN_ARRAY symbol) which, in a signed context, is 
+    //           indeed -1. Of course, the other possibility would be to return 
+    //           a int32_t but that would limit the length of the uint32_array_t 
+    //           to INT32_MAX instead of UINT32_MAX.
     //
-    return UINT32_MAX;
+    return NOT_IN_ARRAY;
 }
 //-----------------------------------------------------------------------------
 uint32_t index_in_sorted_uint32_array(uint32_t to_find,
@@ -216,24 +217,25 @@ uint32_t index_in_sorted_uint32_array(uint32_t to_find,
         return max;
     } else {
         //
-        // _KLUDGE_: Return type is unsigned so -1 is the same as UINT32_MAX
+        // _KLUDGE_: Return type is unsigned so -1 is the same as UINT32_MAX 
+        //           (i.e. the value of the NOT_IN_ARRAY symbol).
         //
-        return UINT32_MAX;
+        return NOT_IN_ARRAY;
     }
 }
 //-----------------------------------------------------------------------------
 bool is_in_uint32_array(uint32_t to_find, const uint32_array_t* const array) {
-    return (UINT32_MAX != index_in_uint32_array(to_find, array));
+    return (NOT_IN_ARRAY != index_in_uint32_array(to_find, array));
 }
 //-----------------------------------------------------------------------------
 bool is_in_sorted_uint32_array(uint32_t to_find,
                                const uint32_array_t* const array) {
-    return (UINT32_MAX != index_in_sorted_uint32_array(
-                              to_find,
-                              array,
-                              0,
-                              array->length - 1
-                          )
+    return (NOT_IN_ARRAY != index_in_sorted_uint32_array(
+                                to_find,
+                                array,
+                                0,
+                                array->length - 1
+                            )
             );
 }
 //-----------------------------------------------------------------------------
@@ -348,12 +350,13 @@ uint32_t index_in_int32_array(int32_t to_find,
     //
     // _KLUDGE_: If the integer to_find is not found, we'd like to return -1.
     //           However, the return type being unsigned, returning -1 would
-    //           not be very elegant, so we return UINT32_MAX which, in a
-    //           signed context, is indeed -1. Of course, the other possibility
-    //           would be to return a int32_t but that would limit the length
-    //           of the uint32_array_t to UINT32_MAX/2 instead of UINT32_MAX-1.
+    //           not be very elegant, so we return UINT32_MAX (i.e. the value
+    //           of the NOT_IN_ARRAY symbol) which, in a signed context, is 
+    //           indeed -1. Of course, the other possibility would be to return 
+    //           a int32_t but that would limit the length of the uint32_array_t 
+    //           to INT32_MAX instead of UINT32_MAX.
     //
-    return UINT32_MAX;
+    return NOT_IN_ARRAY;
 }
 //-----------------------------------------------------------------------------
 uint32_t index_in_sorted_int32_array(int32_t to_find,
@@ -386,23 +389,24 @@ uint32_t index_in_sorted_int32_array(int32_t to_find,
     } else {
         //
         // _KLUDGE_: Return type is unsigned so -1 is the same as UINT32_MAX
+        //           (i.e. the value of the NOT_IN_ARRAY symbol).
         //
-        return UINT32_MAX;
+        return NOT_IN_ARRAY;
     }
 }
 //-----------------------------------------------------------------------------
 bool is_in_int32_array(int32_t to_find, const int32_array_t* const array) {
-    return (UINT32_MAX != index_in_int32_array(to_find, array));
+    return (NOT_IN_ARRAY != index_in_int32_array(to_find, array));
 }
 //-----------------------------------------------------------------------------
 bool is_in_sorted_int32_array(int32_t to_find,
                               const int32_array_t* const array) {
-    return (UINT32_MAX != index_in_sorted_int32_array(
-                              to_find,
-                              array,
-                              0,
-                              array->length - 1
-                          )
+    return (NOT_IN_ARRAY != index_in_sorted_int32_array(
+                                to_find,
+                                array,
+                                0,
+                                array->length - 1
+                            )
             );
 }
 //-----------------------------------------------------------------------------
@@ -524,8 +528,9 @@ uint32_t index_in_mpz_array(const mpz_t to_find,
     }
     //
     // _KLUDGE_: Return type is unsigned so -1 is the same as UINT32_MAX
+    //           (i.e. the value of the NOT_IN_ARRAY symbol).
     //
-    return UINT32_MAX;
+    return NOT_IN_ARRAY;
 }
 //-----------------------------------------------------------------------------
 uint32_t index_in_sorted_mpz_array(const mpz_t to_find,
@@ -558,8 +563,9 @@ uint32_t index_in_sorted_mpz_array(const mpz_t to_find,
     } else {
         //
         // _KLUDGE_: Return type is unsigned so -1 is the same as UINT32_MAX
+        //           (i.e. the value of the NOT_IN_ARRAY symbol).
         //
-        return UINT32_MAX;
+        return NOT_IN_ARRAY;
     }
 }
 //-----------------------------------------------------------------------------
@@ -590,12 +596,12 @@ void qsort_mpz_array(mpz_array_t* const array) {
 }
 //-----------------------------------------------------------------------------
 bool is_in_mpz_array(const mpz_t to_find, const mpz_array_t* const array) {
-    return (UINT32_MAX != index_in_mpz_array(to_find, array));
+    return (NOT_IN_ARRAY != index_in_mpz_array(to_find, array));
 }
 //-----------------------------------------------------------------------------
 bool is_in_sorted_mpz_array(const mpz_t to_find,
                             const mpz_array_t* const array) {
-    return (UINT32_MAX != index_in_sorted_mpz_array(
+    return (NOT_IN_ARRAY != index_in_sorted_mpz_array(
                               to_find,
                               array,
                               0,

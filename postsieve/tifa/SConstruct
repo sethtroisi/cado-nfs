@@ -65,6 +65,8 @@ sys.path.insert(1, scons_extra_dir)
 
 import SubstInFile
 
+from math import sqrt
+
 #-------------------------------------------------------------------------------
 # Command line options and default values : see BuildOptions.py for a more
 # detailled description
@@ -303,6 +305,13 @@ opts.Add(
 )
 opts.Add(
     BoolOption(
+        'VERBOSE_FERMAT',
+        "Set to 'yes' to turn on output messages in the fermat function",
+        1
+    )
+)
+opts.Add(
+    BoolOption(
         'VERBOSE_QS',
         "Set to 'yes' to turn on output messages in the qs function",
         1
@@ -344,6 +353,13 @@ opts.Add(
     BoolOption(
         'TIMING_CFRAC',
         "Set to 'yes' to turn on timing messages for the cfrac function",
+        1
+    )
+)
+opts.Add(
+    BoolOption(
+        'TIMING_FERMAT',
+        "Set to 'yes' to turn on timing messages for the fermat function",
         1
     )
 )
@@ -416,6 +432,7 @@ if env['BUILDDIR_DEPENDS_ON_PLATFORM'] != 0:
 #
 if env['ALLOW_VERBOSE'] == 0:
     env['VERBOSE_CFRAC']  = 0
+    env['VERBOSE_FERMAT'] = 0
     env['VERBOSE_QS']     = 0
     env['VERBOSE_SIQS']   = 0
     env['VERBOSE_SQUFOF'] = 0
@@ -425,6 +442,7 @@ if env['ALLOW_VERBOSE'] == 0:
 #
 if env['ALLOW_TIMING'] == 0:
     env['TIMING_CFRAC']  = 0
+    env['TIMING_FERMAT'] = 0
     env['TIMING_QS']     = 0
     env['TIMING_SIQS']   = 0
     env['TIMING_SQUFOF'] = 0
@@ -533,7 +551,28 @@ int main() {
     ret = context.TryRun(program, '.c')
     context.Result(ret[1])
     return ret[1]
-
+    #------------------------------------------------------------------------------
+def checkLongMax(context):
+    context.Message( 'Getting LONG_MAX... ' )
+    program = """
+#include <stdlib.h>
+#include <stdio.h>
+#include <limits.h>
+int main() {
+    printf("%lu", (unsigned long int)LONG_MAX);
+    return 0;
+}
+"""
+    ret = context.TryCompile(program, '.c')
+    if ret == 0:
+        print "test failed!\n"
+        print "Error: cannot run the following test program:"
+        print program
+        print "Please check your compiler flags."
+        Exit(1)
+    ret = context.TryRun(program, '.c')
+    context.Result(ret[1])
+    return ret[1]
 #------------------------------------------------------------------------------
 
 conf = Configure(
@@ -541,7 +580,8 @@ conf = Configure(
            custom_tests = {
                'checkSizeOf'   : checkSizeOf,
                'checkCharBit'  : checkCharBit,
-               'checkUlongMax' : checkUlongMax
+               'checkUlongMax' : checkUlongMax,
+               'checkLongMax'  : checkLongMax
            }
        )
 
@@ -581,14 +621,32 @@ if (env['USE_GMP_INTERNAL_FUNCS'] != 0):
 conf.env['SIZEOF_BITSTRING_T'] = conf.checkSizeOf(env['BITSTRING_T'])
 conf.env['CHAR_BIT']           = conf.checkCharBit()
 conf.env['ULONG_MAX']          = conf.checkUlongMax()
+conf.env['SIZEOF_ULONG_T']     = conf.checkSizeOf('unsigned long int')
+conf.env['LONG_MAX']           = conf.checkLongMax()
+conf.env['SIZEOF_LONG_T']      = conf.checkSizeOf('long int')
 
 env = conf.Finish()
 
-env['BITSTRING_T_BITSIZE'] =   int(env['SIZEOF_BITSTRING_T']) \
-                             * int(env['CHAR_BIT'])
+env['BITSTRING_T_BITSIZE']    =   int(env['SIZEOF_BITSTRING_T']) \
+                                * int(env['CHAR_BIT'])
+
+env['ULONG_T_BITSIZE']        =   int(env['SIZEOF_ULONG_T']) \
+                                * int(env['CHAR_BIT'])
 env['ULONG_MAX_DIVIDED_BY_2'] = int(env['ULONG_MAX']) / 2
 env['ULONG_MAX_DIVIDED_BY_3'] = int(env['ULONG_MAX']) / 3
 env['ULONG_MAX_DIVIDED_BY_4'] = int(env['ULONG_MAX']) / 4
+env['ULONG_MAX_DIVIDED_BY_5'] = int(env['ULONG_MAX']) / 5
+env['ULONG_MAX_DIVIDED_BY_6'] = int(env['ULONG_MAX']) / 6
+env['SQRT_ULONG_MAX']         = int(sqrt(int(env['ULONG_MAX'])))
+
+env['LONG_T_BITSIZE']        =   int(env['SIZEOF_LONG_T']) \
+                                * int(env['CHAR_BIT'])
+env['LONG_MAX_DIVIDED_BY_2'] = int(env['LONG_MAX']) / 2
+env['LONG_MAX_DIVIDED_BY_3'] = int(env['LONG_MAX']) / 3
+env['LONG_MAX_DIVIDED_BY_4'] = int(env['LONG_MAX']) / 4
+env['LONG_MAX_DIVIDED_BY_5'] = int(env['LONG_MAX']) / 5
+env['LONG_MAX_DIVIDED_BY_6'] = int(env['LONG_MAX']) / 6
+env['SQRT_LONG_MAX']         = int(sqrt(int(env['LONG_MAX'])))
 
 #-------------------------------------------------------------------------------
 # Directories definitions
@@ -668,19 +726,36 @@ subst_dict['%BITSTRING_T%']         = env['BITSTRING_T']
 subst_dict['%SIZEOF_BITSTRING_T%']  = str(env['SIZEOF_BITSTRING_T'])
 subst_dict['%BITSTRING_T_BITSIZE%'] = str(env['BITSTRING_T_BITSIZE'])
 
+subst_dict['%SIZEOF_ULONG_T%']         = str(env['SIZEOF_ULONG_T'])
+subst_dict['%ULONG_T_BITSIZE%']        = str(env['ULONG_T_BITSIZE'])
 subst_dict['%ULONG_MAX%']              = env['ULONG_MAX']
 subst_dict['%ULONG_MAX_DIVIDED_BY_2%'] = str(env['ULONG_MAX_DIVIDED_BY_2'])
 subst_dict['%ULONG_MAX_DIVIDED_BY_3%'] = str(env['ULONG_MAX_DIVIDED_BY_3'])
 subst_dict['%ULONG_MAX_DIVIDED_BY_4%'] = str(env['ULONG_MAX_DIVIDED_BY_4'])
+subst_dict['%ULONG_MAX_DIVIDED_BY_5%'] = str(env['ULONG_MAX_DIVIDED_BY_5'])
+subst_dict['%ULONG_MAX_DIVIDED_BY_6%'] = str(env['ULONG_MAX_DIVIDED_BY_6'])
+subst_dict['%SQRT_ULONG_MAX%']         = str(env['SQRT_ULONG_MAX'])
+
+subst_dict['%SIZEOF_LONG_T%']         = str(env['SIZEOF_LONG_T'])
+subst_dict['%LONG_T_BITSIZE%']        = str(env['LONG_T_BITSIZE'])
+subst_dict['%LONG_MAX%']              = env['LONG_MAX']
+subst_dict['%LONG_MAX_DIVIDED_BY_2%'] = str(env['LONG_MAX_DIVIDED_BY_2'])
+subst_dict['%LONG_MAX_DIVIDED_BY_3%'] = str(env['LONG_MAX_DIVIDED_BY_3'])
+subst_dict['%LONG_MAX_DIVIDED_BY_4%'] = str(env['LONG_MAX_DIVIDED_BY_4'])
+subst_dict['%LONG_MAX_DIVIDED_BY_5%'] = str(env['LONG_MAX_DIVIDED_BY_5'])
+subst_dict['%LONG_MAX_DIVIDED_BY_6%'] = str(env['LONG_MAX_DIVIDED_BY_6'])
+subst_dict['%SQRT_LONG_MAX%']          = str(env['SQRT_LONG_MAX'])
 
 subst_dict['%PRINT_ERROR%']    = str(int(env['PRINT_ERROR']))
 subst_dict['%VERBOSE_CFRAC%']  = str(int(env['VERBOSE_CFRAC']))
+subst_dict['%VERBOSE_FERMAT%'] = str(int(env['VERBOSE_FERMAT']))
 subst_dict['%VERBOSE_QS%']     = str(int(env['VERBOSE_QS']))
 subst_dict['%VERBOSE_SIQS%']   = str(int(env['VERBOSE_SIQS']))
 subst_dict['%VERBOSE_SQUFOF%'] = str(int(env['VERBOSE_SQUFOF']))
 subst_dict['%VERBOSE_TDIV%']   = str(int(env['VERBOSE_TDIV']))
 
 subst_dict['%TIMING_CFRAC%']  = str(int(env['TIMING_CFRAC']))
+subst_dict['%TIMING_FERMAT%'] = str(int(env['TIMING_FERMAT']))
 subst_dict['%TIMING_QS%']     = str(int(env['TIMING_QS']))
 subst_dict['%TIMING_SIQS%']   = str(int(env['TIMING_SIQS']))
 subst_dict['%TIMING_SQUFOF%'] = str(int(env['TIMING_SQUFOF']))

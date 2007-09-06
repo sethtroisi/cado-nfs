@@ -1122,7 +1122,7 @@ static void init_startup_data(qs_context_t* const context) {
         nmodp = mpz_fdiv_ui(n, first_primes[i]);
         t     = sqrtm(nmodp, first_primes[i]);
 
-        if (t != UINT32_MAX) {
+        if (t != NO_SQRT_MOD_P) {
             //
             // i.e. if n has a square root mod first_primes[i]...
             //

@@ -199,6 +199,63 @@ Parameter(s):
 EOS
 
 $cfrac_program->set_help($help);
+
+#-------------------------------------------------------------------------------
+#                       Fermat's algorithm (McKee's speedup)
+#-------------------------------------------------------------------------------
+my $fermat_program = new Tifa::Program();
+
+$algo_to_program{"cfrac"} = $fermat_program;
+
+$fermat_program->set_algo("fermat");
+$fermat_program->set_descr("Fermat's algorithm (McKee's speedup)");
+$fermat_program->set_exe("fermat_factors");
+
+@param_names = (
+    "nprimes_tdiv"
+);
+@param_descrs = (
+    "Number of primes to trial divide the number to factor"
+);
+@param_types = (
+    "int"
+);
+
+$cmdline = join(
+    ' ',
+    "exe",
+    "nprimes_tdiv"
+);
+#
+# Default mode: We should specify all of the parameter values on
+#               the command line
+#
+$fermat_program->add_mode("no_defaults",
+                          "Default mode: specify all parameter values",
+                          \@param_names, \@param_descrs, \@param_types,
+                          $cmdline);
+
+$fermat_program->set_default_mode("no_defaults");
+$fermat_program->set_mode("no_defaults");
+
+$help = <<EOS;
+Parameter(s):
+
+  --exe=s
+      (optional, see general help)
+      Name of the executable command line program. Note that the default value
+      is only used if the algo parameter is set to fermat _and_ the exe
+      parameter is not defined or left empty.
+      Default: fermat_factors
+
+  --nprimes_tdiv=i
+      (mandatory)
+      Number of primes to use to trial divide the integer to factor.
+
+EOS
+
+$fermat_program->set_help($help);
+
 #-------------------------------------------------------------------------------
 #                            QS algorithm
 #-------------------------------------------------------------------------------

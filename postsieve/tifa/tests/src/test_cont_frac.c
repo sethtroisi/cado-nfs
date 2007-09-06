@@ -74,7 +74,7 @@ void do_test() {
 
     //mpf_div(fa, fa, fb);
 
-    printf("nb_step_performed = %"PRIu32"\n\n", state.nb_step_performed);
+    printf("nsteps_performed = %"PRIu32"\n\n", state.nsteps_performed);
 
     gmp_printf("a     = %Zd\n", state.a);
     //gmp_printf("b     = %Zd\n", state.b);
@@ -87,7 +87,7 @@ void do_test() {
     //mpz_neg(a2mb2, a2mb2);
     //mpz_addmul(a2mb2, state.a, state.a);
 
-    if (state.nb_step_performed & 0x1) {
+    if (state.nsteps_performed & 0x1) {
         printf("q     = - a2mb2\n");
     } else {
         printf("q     = + a2mb2\n");

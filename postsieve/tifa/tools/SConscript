@@ -253,6 +253,12 @@ cfrac_src  = [os.path.join(tools_srcdir, 'cfrac_factors.c')] + common_obj
 cfrac_dist = [os.path.join(tools_srcdir, 'cfrac_factors.c')]
 
 #
+# Fermat's factorization program's files
+#
+fermat_src  = [os.path.join(tools_srcdir, 'fermat_factors.c')] + common_obj
+fermat_dist = [os.path.join(tools_srcdir, 'fermat_factors.c')]
+
+#
 # QS program's files
 #
 qs_src  = [os.path.join(tools_srcdir, 'qs_factors.c')] + common_obj
@@ -285,6 +291,17 @@ cfrac = progenv.Program(
             LIBPATH = lib_path,
             source = cfrac_src
         )
+
+#-------------------------------------------------------------------------------
+# Build Fermat's factorization program
+#-------------------------------------------------------------------------------
+fermat = progenv.Program(
+            'fermat_factors',
+            LIBS = libs_to_link,
+            LIBPATH = lib_path,
+            source = fermat_src
+         )
+
 
 #-------------------------------------------------------------------------------
 # Build the QS program
@@ -334,7 +351,7 @@ for i in range(len(modules)):
 #-------------------------------------------------------------------------------
 # Install programs target
 #-------------------------------------------------------------------------------
-progenv.Install(install_tools_dir, [cfrac, qs, siqs, squfof, tdiv])
+progenv.Install(install_tools_dir, [cfrac, fermat, qs, siqs, squfof, tdiv])
 progenv.Alias('install', install_tools_dir)
 progenv.Alias('install-bin', install_tools_dir)
 
@@ -372,6 +389,7 @@ progenv.Alias('install-man', install_pm_man_dir)
 if "dist" in COMMAND_LINE_TARGETS:
     archive = env.Tar(tifa_distname, tdiv_dist)
     env.Tar(tifa_distname, cfrac_dist)
+    env.Tar(tifa_distname, fermat_dist)
     env.Tar(tifa_distname, qs_dist)
     env.Tar(tifa_distname, siqs_dist)
     env.Tar(tifa_distname, squfof_dist)

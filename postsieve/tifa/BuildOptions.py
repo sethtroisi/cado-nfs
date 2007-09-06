@@ -39,7 +39,7 @@
 #
 # Default: 'include/tifa'
 #-------------------------------------------------------------------------------
-#INCLUDEDIR = 'include'
+#INCLUDEDIR = 'include/tifa'
 
 #
 # Install all scripts in PREFIX/SCRIPTDIR if SCRIPTDIR is not an absolute path.
@@ -100,7 +100,7 @@
 #
 # Default: '-O3'
 #-------------------------------------------------------------------------------
-#CCFLAGS = '-g -Wall -Wextra -Werror'
+#CCFLAGS = '-g -Wall -Wextra'
 
 #
 # Build the TIFA library and programs in the BUILDDIR directory (or in a
@@ -172,7 +172,7 @@
 #
 # Default: 'uint64_t'
 #-------------------------------------------------------------------------------
-#TIFA_BITSTRING_T = 'unsigned long int'
+#BITSTRING_T = 'unsigned long int'
 
 #-------------------------------------------------------------------------------
 #                               Verbosity options
@@ -199,6 +199,14 @@
 # Default: 'yes'
 #-------------------------------------------------------------------------------
 #VERBOSE_CFRAC = 'no'
+
+#
+# Set to 'yes' to turn on output messages for the fermat function.
+# Has no effect if ALLOW_VERBOSE is set to 'no'.
+#
+# Default: 'yes'
+#-------------------------------------------------------------------------------
+#VERBOSE_FERMAT = 'no'
 
 #
 # Set to 'yes' to turn on output messages for the qs function.
@@ -244,6 +252,13 @@
 #TIMING_CFRAC = 'no'
 
 #
+# Set to 'yes' to turn on timing messages for the fermat function.
+#
+# Default: 'yes'
+#-------------------------------------------------------------------------------
+#TIMING_FERMAT = 'no'
+
+#
 # Set to 'yes' to turn on timing messages for the qs function.
 #
 # Default: 'yes'
@@ -275,7 +290,7 @@
 #
 # Default: 'yes'
 #-------------------------------------------------------------------------------
-#GENERATE_DOXYGEN_DOC = 'no'
+#GENERATE_DOXYGEN_DOC = 'yes'
 
 #
 # Set the paper type of the PDF Doxygen documentation. Should be one of the

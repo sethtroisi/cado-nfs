@@ -52,7 +52,7 @@
   //
   // - For an alternate explanation, including Shanks' very notes on SQUFOF,
   //   see David Joyner and Stephen McMath's work at:
-  //       http://cadigweb.ew.usna.edu/~wdj/mcmath 
+  //       http://cadigweb.ew.usna.edu/~wdj/mcmath
   //   URL last retrieved on Wed Aug 1 2007.
   //
   // - For a description of the "large step algorithm" used to quickly
@@ -61,7 +61,7 @@
   //         Fraction Factoring Algorithm",
   //         Hugh C. Williams, Marvin C. Wunderlich,
   //         Mathematics of Computation, Volume 48, Number 177,
-  //         January 1987, pages 405-423 
+  //         January 1987, pages 405-423
   //------------------------------------------------------------------------
 
 #include "tifa_config.h"
@@ -110,8 +110,8 @@
 #define NSTEP_CYCLE_FWD  2000
 //
 // A really quick and dirty trick to (hopefully) speed up divisions if
-// we know with a relatively high probability that the result will be one or 
-// two _and_ that the result *won't be zero*. In our case, the quotient 
+// we know with a relatively high probability that the result will be one or
+// two _and_ that the result *won't be zero*. In our case, the quotient
 // distribution has been experimentally determined to be roughly:
 //
 //      Quotient Percentage
@@ -187,7 +187,7 @@
             }                                                   \
         }                                                       \
     }
-    
+
 //
 // Finally a switch toggling this cheap trick on and off
 //
@@ -209,15 +209,15 @@
 //-----------------------------------------------------------------------------
 
 //
-// _NOTE_: We only implement here a simplified version of Williams & 
-//         Wunderlich's large step algorithm. This is used in step 4 of the 
-//         SQUFOF algorithm (using Gowen & Wagstaff's description) to achieve 
-//         what Shanks calls the "fast return". Note that Gowen & Wagstaff's 
+// _NOTE_: We only implement here a simplified version of Williams &
+//         Wunderlich's large step algorithm. This is used in step 4 of the
+//         SQUFOF algorithm (using Gowen & Wagstaff's description) to achieve
+//         what Shanks calls the "fast return". Note that Gowen & Wagstaff's
 //         description does not include this "fast return".
-// 
+//
 //         The large step algorithm is implemented by way of macros to avoid
-//         any overhead (which can be significant since SQUFOF is only likely to 
-//         be used to factor very small integers). The downside of this is that 
+//         any overhead (which can be significant since SQUFOF is only likely to
+//         be used to factor very small integers). The downside of this is that
 //         it makes for a rather ugly and messy code. I plead guilty...
 //
 
@@ -277,7 +277,8 @@
 #define VLS(X) __ ## X ## _large_step_var__
 
 //
-// Declares local variables used to perform the large step algorithm.
+// Declares and initializes local variables used to perform the large step
+// algorithm.
 //
 #define DECL_LARGE_STEP_VARS()           \
     unsigned long int VLS(gcd_ui) = 0;   \
@@ -464,10 +465,10 @@
 
 //
 // Performs the doubling algorithm, composing the form given by (P, Q, QQ)
-// with the nearest suitable form and stores the result in (P2, Q2, QQ2). 
+// with the nearest suitable form and stores the result in (P2, Q2, QQ2).
 // All parameters are unsigned long int, except D, which is a mpz_t.
 //
-// The macros DECL_SINGLE_STEP_VARS(), DECL_LARGE_STEP_VARS() and 
+// The macros DECL_SINGLE_STEP_VARS(), DECL_LARGE_STEP_VARS() and
 // DECL_DOUBLING_ALGO_VARS() should be called before using this macro.
 //
 #define DOUBLING_ALGO(P2, Q2, QQ2, P, Q, QQ, S, D) do {                  \
@@ -490,7 +491,7 @@
 // K forms to get the form (QQ, P, Q). This is very similar to the standard
 // modular exponentiation algorithm.
 //
-// The macros DECL_SINGLE_STEP_VARS(), DECL_LARGE_STEP_VARS() and 
+// The macros DECL_SINGLE_STEP_VARS(), DECL_LARGE_STEP_VARS() and
 // DECL_DOUBLING_ALGO_VARS() should be called before using this macro.
 //
 #define JUMP_OVER_K_STEPS(P, Q, QQ, P0, Q0, QQ0, S, D, K) do {           \
@@ -536,7 +537,7 @@
 // in the vicinity of a point of symmetry of the form cycle of (QQ, P, Q).
 // The resulting form is stored in (QQ, P, Q).
 //
-// The macros DECL_SINGLE_STEP_VARS(), DECL_LARGE_STEP_VARS() and 
+// The macros DECL_SINGLE_STEP_VARS(), DECL_LARGE_STEP_VARS() and
 // DECL_DOUBLING_ALGO_VARS() should be called before using this macro.
 //
 #define JUMP_NEAR_SYM_POINT(P, Q, QQ, P0, Q0, QQ0, S, D, K) do { \
@@ -616,16 +617,16 @@ struct struct_squfof_racer_t {
     mpf_t sqrtD;
 
     unsigned long int S;
-    
+
     unsigned long int P;
     unsigned long int Q;
     unsigned long int QQ;
     unsigned long int PP;
-    
+
     unsigned long int P0;
     unsigned long int Q0;
     unsigned long int QQ0;
-    
+
     unsigned long int L;
     unsigned long int B;
     unsigned long int i;
@@ -729,7 +730,7 @@ void set_squfof_params_to_default(squfof_params_t* const params
     //
     // While there is no user parameters for this SQUFOF implementation, this
     // function is kept as a placeholder: it might be needed in future code
-    // revisions. 
+    // revisions.
     //
     return;
 }
@@ -801,7 +802,7 @@ static ecode_t init_squfof_context(factoring_machine_t* const machine) {
 
     machine->context          = (void*) malloc(sizeof(squfof_context_t));
     squfof_context_t* context = (squfof_context_t*) machine->context;
-    
+
     context->n       = machine->n;
     context->updated = false;
     context->integer_too_large = false;
@@ -819,11 +820,11 @@ static ecode_t clear_squfof_context(factoring_machine_t* const machine) {
     START_TIMER;
 
     squfof_context_t* context = (squfof_context_t*) machine->context;
-    
+
     if (context->updated) {
         for (uint32_t i = 0; i < context->nracers; i++) {
             clear_squfof_racer(&context->racers[i]);
-        }   
+        }
         free(context->racers);
     }
     free(context);
@@ -835,12 +836,12 @@ static ecode_t clear_squfof_context(factoring_machine_t* const machine) {
 }
 //-----------------------------------------------------------------------------
 static ecode_t update_squfof_context(factoring_machine_t* const machine) {
-    
+
     INIT_TIMER;
     START_TIMER;
-    
+
     squfof_context_t* const context = (squfof_context_t*) machine->context;
-    
+
     if (context->integer_too_large) {
         PRINT_UPDATE_GIVEUP_MSG;
         STOP_TIMER;
@@ -849,7 +850,7 @@ static ecode_t update_squfof_context(factoring_machine_t* const machine) {
     }
 
     ecode_t ecode = SUCCESS;
-    
+
     if (!context->updated) {
         //
         // Initialize all the SQUFOF racers needed. For each racer, this will
@@ -857,7 +858,7 @@ static ecode_t update_squfof_context(factoring_machine_t* const machine) {
         // Wagstaff in their paper.
         //
         PRINT_UPDATE_RACE_MSG;
-        
+
         context->nracers = NMULTIPLIERS;
         context->racers  = malloc(
                                context->nracers * sizeof(squfof_racer_t)
@@ -880,7 +881,7 @@ static ecode_t update_squfof_context(factoring_machine_t* const machine) {
     }
     STOP_TIMER;
     PRINT_TIMING;
-    
+
     return ecode;
 }
 //-----------------------------------------------------------------------------
@@ -888,7 +889,7 @@ static ecode_t perform_squfof(factoring_machine_t* const machine) {
     squfof_context_t* const context = (squfof_context_t*) machine->context;
     //
     // Begin by performing SQUFOF without multiplier. This will fail to find
-    // a factor approximately 5% of the time. Should it fail and if the 
+    // a factor approximately 5% of the time. Should it fail and if the
     // factoring mode on the machine is different from SINGLE_RUN, continue
     // the factorization attempt by using a multiplier race.
     //
@@ -919,7 +920,7 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
     if (n_mod_4 == 1) {
         mpz_mul_2exp(D, D, 1);
     }
-        
+
     //
     // We need a floating point computation here. See next comment.
     //
@@ -935,14 +936,14 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
         return INTEGER_TOO_LARGE;
     }
     unsigned long int S = mpf_get_ui(sqrtD);
-    
-    if (S > TIFA_ULONG_MAX_DIVIDED_BY_3) {
+
+    if (S > TIFA_ULONG_MAX_DIVIDED_BY_6) {
         mpz_clear(D);
         mpf_clear(sqrtD);
         context->integer_too_large = true;
         return INTEGER_TOO_LARGE;
     }
-    
+
     //
     // Set up the linked list used as a queue...
     //
@@ -957,7 +958,7 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
     // Nodes' data of the linked list...
     //
     ulint_pair_t       queue_data[MAX_QUEUE_ALLOC];
-    
+
     for (uint32_t i = 0; i < MAX_QUEUE_ALLOC-1; i++) {
         queue_node[i].next = &(queue_node[i+1]);
         queue_node[i].data = (void*)&(queue_data[i]);
@@ -1017,11 +1018,11 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
     SQUFOF_GMP_PRINT("\nD = %Zd\n", D);
     SQUFOF_PRINT("S = %lu\n", S);
     SQUFOF_PRINT("B = %lu\n", B);
-        
+
     unsigned long int P0  = P;
     unsigned long int Q0  = Q;
     unsigned long int QQ0 = 1;
-    
+
     //
     // Step 2: Cycle forward to find a proper square form
     //
@@ -1198,8 +1199,9 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
         // Step 4: Cycle in the reverse direction to find a factor of N
         //
         while (true) {
+
             DIVIDE(q, S + P, Q);
-            
+
             PP  = q;
             PP *= Q;
             PP -= P;
@@ -1214,14 +1216,14 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
             QQ = Q;
             Q  = t;
             P  = PP;
-        
+
             SQUFOF_PRINT("after iteration of step 4):\n");
             SQUFOF_PRINT("-----------------------------------\n");
             SQUFOF_PRINT("4)      Q  = %lu\n", Q);
             SQUFOF_PRINT("4)      P  = %lu\n", P);
             SQUFOF_PRINT("4)      QQ = %lu\n", QQ);
             SQUFOF_PRINT("4)      PP = %lu\n", PP);
-            SQUFOF_PRINT("4)      t  = %lu\n", t);                   
+            SQUFOF_PRINT("4)      t  = %lu\n", t);
         }
     } else {
         //
@@ -1236,7 +1238,7 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
         CLEAR_DOUBLING_ALGO_VARS();
         CLEAR_LARGE_STEP_VARS();
         CLEAR_SINGLE_STEP_VARS();
-        
+
         //
         // Step 4: Cycle in _both_ directions to find a factor of N
         //
@@ -1245,7 +1247,7 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
         unsigned long int QQR = Q;
         unsigned long int PPR = 0;
         unsigned long int qr  = 0;
-        
+
         while (true) {
             //
             // Cycle in the "forward" direction
@@ -1271,7 +1273,7 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
             }
             //
             // Complete the "forward" direction cycle
-            //    
+            //
             t  = P;
             t -= PP;
             t *= q;
@@ -1289,14 +1291,14 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
             QQR = QR;
             QR  = t;
             PR  = PPR;
-        
+
             SQUFOF_PRINT("after forward iteration of step 4):\n");
             SQUFOF_PRINT("-----------------------------------\n");
             SQUFOF_PRINT("4)      Q  = %lu\n", Q);
             SQUFOF_PRINT("4)      P  = %lu\n", P);
             SQUFOF_PRINT("4)      QQ = %lu\n", QQ);
             SQUFOF_PRINT("4)      PP = %lu\n", PP);
-            
+
             SQUFOF_PRINT("\tafter reverse iteration of step 4):\n");
             SQUFOF_PRINT("\t-----------------------------------\n");
             SQUFOF_PRINT("\t4)      QR  = %lu\n", QR);
@@ -1314,13 +1316,15 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
     if (IS_EVEN(factor)) {
         factor >>= 1;
     }
+    mpz_t factor_z;
 
-    mpz_init_set_ui(machine->factors->data[machine->factors->length], factor);
-    machine->factors->length++;
+    mpz_init_set_ui(factor_z, factor);
+    append_mpz_to_array(machine->factors, factor_z);
 
-    mpz_init_set_ui(machine->factors->data[machine->factors->length], factor);
-    mpz_fdiv_ui(machine->factors->data[machine->factors->length], factor);
-    machine->factors->length++;
+    mpz_divexact(factor_z, context->n, factor_z);
+    append_mpz_to_array(machine->factors, factor_z);
+
+    mpz_clear(factor_z);
 
   clean_and_return:
 
@@ -1449,7 +1453,7 @@ static ecode_t perform_squfof_race(factoring_machine_t* const machine) {
     unsigned long int PP = 0;
     unsigned long int q  = 0;
     unsigned long int t  = 0;
-    
+
     if ((winner->i / 2) < LARGE_STEP_THRESHOLD) {
         //
         // Step 4: Cycle in the reverse direction to find a factor of N
@@ -1483,7 +1487,7 @@ static ecode_t perform_squfof_race(factoring_machine_t* const machine) {
         DECL_SINGLE_STEP_VARS();
 
         JUMP_NEAR_SYM_POINT(P, Q, QQ, P0, Q0, QQ0, S, winner->D, winner->i / 2);
-        
+
         CLEAR_DOUBLING_ALGO_VARS();
         CLEAR_LARGE_STEP_VARS();
         CLEAR_SINGLE_STEP_VARS();
@@ -1495,7 +1499,7 @@ static ecode_t perform_squfof_race(factoring_machine_t* const machine) {
         unsigned long int QQR = Q;
         unsigned long int PPR = 0;
         unsigned long int qr  = 0;
-        
+
         while (true) {
             //
             // Cycle in the "forward" direction
@@ -1521,7 +1525,7 @@ static ecode_t perform_squfof_race(factoring_machine_t* const machine) {
             }
             //
             // Complete the "forward" direction cycle
-            //    
+            //
             t   = P;
             t  -= PP;
             t  *= q;
@@ -1547,9 +1551,9 @@ static ecode_t perform_squfof_race(factoring_machine_t* const machine) {
     // Step 5: We found a factor of n
     //
     factor_ui /= gcd_ulint(factor_ui, 2 * winner->multiplier);
-    
+
     mpz_t factor_z;
-    
+
     mpz_init_set_ui(factor_z, factor_ui);
     append_mpz_to_array(machine->factors, factor_z);
 
@@ -1731,7 +1735,7 @@ static ecode_t init_squfof_racer(squfof_racer_t* const racer, const mpz_t n,
         return SUCCESS;
     }
     racer->S = mpf_get_ui(racer->sqrtD);
-    
+
     if (racer->S > TIFA_ULONG_MAX_DIVIDED_BY_3) {
         racer->status = STOPPED;
         racer->number_is_too_large = true;

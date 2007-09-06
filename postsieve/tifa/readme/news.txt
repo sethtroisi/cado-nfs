@@ -14,6 +14,9 @@
       - (untuned) implementation of the basic Quadratic Sieve
       - (untuned) implementation of the Self-Initializing Quadratic Sieve
       - implementation of the Square Form Factorization algorithm (small
-        numbers only though, less than double precision)
+        numbers only though, less than double precision) with "fast return"
+      - (untuned) implementation of McKee's speedup of Fermat's factorization
+        algorithm (greedy variant).
       - switched from MPZ to MPN layer of GMP for critical parts of code
+      - misc bug fixes
 

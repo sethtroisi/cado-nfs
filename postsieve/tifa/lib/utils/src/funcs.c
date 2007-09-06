@@ -20,14 +20,17 @@
 /**
  * \file    funcs.c
  * \author  Jerome Milan
- * \date    Mon Mar 13 2006
- * \version 1.0
+ * \date    Tue Sep 4 2007
+ * \version 1.1
  */
 
  /*
-  *  Copyright (C) 2006, 2007 INRIA
-  *  License: GNU Lesser General Public License (LGPL)
   *  History:
+  *    1.1: Tue Sep 4 2007 by JM:
+  *          - Added modinv_ui function (modular inverse).
+  *          - Added sqrtm_p2 function (modular square root).
+  *    1.0: Mon Mar 13 2006 by JM:
+  *          - Initial version.
   */
 
 #include <stdlib.h>
@@ -347,9 +350,7 @@ uint32_t sqrtm(uint32_t a, uint32_t p) {
         //
         // a does not have a modular square root!
         //
-        // _KLUDGE_: Return type is unsigned so -1 is the same as UINT32_MAX
-        //
-        return UINT32_MAX;
+        return NO_SQRT_MOD_P;
     }
     //
     // Find n such that p = q.2^n + 1 with q odd
@@ -393,9 +394,7 @@ uint32_t sqrtm(uint32_t a, uint32_t p) {
             //
             // a does not have a modular square root!
             //
-            // _KLUDGE_: Return type is unsigned so -1 is the same as UINT32_MAX
-            //
-            return UINT32_MAX;
+            return NO_SQRT_MOD_P;
         }
         t = powm(z, 1 << (k - m - 1), p);
         z = (uint32_t)( ((uint64_t)t * (uint64_t)t) % p);
@@ -539,6 +538,161 @@ unsigned long int gcd_ulint(unsigned long int a, unsigned long int b) {
     } while (1);
 
     return (a << shift);
+}
+//-----------------------------------------------------------------------------
+//
+// The following macros are used by the modinv_ui function, where the
+// *_bit_mask variables are declared, and are thus not intended to be reused
+// elsewhere.
+//
+#define BIT_N(x)           ( (x) & (nth_bit_mask))
+#define BIT_N_MINUS_ONE(x) ( (x) & (nth_minus_one_bit_mask) )
+#define HIGH_BITS(x)       ( (x) & (high_bit_mask) )
+#define LOW_BITS(x)        ( (x) & (low_bit_mask) )
+//-----------------------------------------------------------------------------
+unsigned long int modinv_ui(unsigned long int num, unsigned long int p) {
+    //
+    // Reference:
+    //      "New Algorithm for Classical Modular Inverse",
+    //      Robert Lorencz,
+    //      Lecture Notes In Computer Science, Volume 2523/2003,
+    //      Revised Papers from the 4th International Workshop on
+    //      Cryptographic Hardware and Embedded Systems
+    //
+    unsigned long int a = num % p;
+    long int u = p;
+    long int v = a;
+    long int r = 0;
+    long int s = 1;
+    unsigned long int cu = 0;
+    unsigned long int cv = 0;
+    long int exp_cu = 1;
+    long int exp_cv = 1;
+    unsigned long int n  = most_significant_bit(p) + 1;
+    //
+    // If n is the number of bits of p, computes masks to be used by the
+    // previously defined macros, to:
+    //   - keep the nth bit (i.e. the most significant one);
+    //   - keep the nth-1 bit (i.e. the next most significant one);
+    //   - keep the 2 most significant bits;
+    //   - keep the nth-2 least significant bits.
+    //
+    const unsigned long int high_bit_mask = 3 << (n-1);
+    const unsigned long int low_bit_mask  = (1 << (n-1)) - 1;
+    const unsigned long int nth_bit_mask  = 1 << n;
+    const unsigned long int nth_minus_one_bit_mask  = 1 << (n-1);
+
+    while ((u != exp_cu) && (u != -exp_cu) && (v != exp_cv) && (v != -exp_cv)) {
+
+        if (!HIGH_BITS(u) || (BIT_N(u) && BIT_N_MINUS_ONE(u) && LOW_BITS(u))) {
+            if (cu >= cv) {
+                u <<= 1;
+                r <<= 1;
+                cu++;
+                exp_cu <<= 1;
+            } else {
+                u <<= 1;
+                s >>= 1;
+                cu++;
+                exp_cu <<= 1;
+            }
+        } else {
+            if (   !HIGH_BITS(v)
+                || (BIT_N(v) && BIT_N_MINUS_ONE(v) && LOW_BITS(v)) ) {
+
+               if (cv >= cu) {
+                   v <<= 1;
+                   s <<= 1;
+                   cv++;
+                   exp_cv <<= 1;
+               } else {
+                   v <<= 1;
+                   r >>= 1;
+                   cv++;
+                   exp_cv <<= 1;
+               }
+            } else {
+                if (BIT_N(v) == BIT_N(u)) {
+                    if (cu <= cv) {
+                        u -= v;
+                        r -= s;
+                    } else {
+                        v -= u;
+                        s -= r;
+                    }
+                } else {
+                    if (cu <= cv) {
+                        u += v;
+                        r += s;
+                    } else {
+                        v += u;
+                        s += r;
+                    }
+                }
+            }
+        }
+    }
+    if ((v == exp_cv) || (v == -exp_cv)) {
+        r = s;
+        u = v;
+    }
+    if (BIT_N(u) != 0) {
+        if (r < 0) {
+            r = -r;
+        } else {
+            r = p - r;
+            if (r < 0) {
+                r += p;
+            }
+        }
+    } else {
+        if (r < 0) {
+            r += p;
+        }
+    }
+    return r;
+}
+//-----------------------------------------------------------------------------
+unsigned long int sqrtm_p2(uint32_t n, uint32_t p) {
+    //
+    // _NOTE_: Now this is getting a bit messy. Indeed, the code now mix
+    //         apparently randomly (unsigned) long ints with C99 integer types
+    //         like uint32_t. This can be seen as bad pratice and indeed, it is
+    //         not very pretty. The reason for this is to convey an idea of
+    //         the size of the numbers involved. Maybe only using long ints and
+    //         clearly documenting the expected range of the variables would
+    //         have been better.
+    //
+    long int s = 0;
+
+    uint32_t np = n % p;
+    uint32_t sp = sqrtm(np, p);
+
+    if (sp == NO_SQRT_MOD_P) {
+        //
+        // No solution
+        //
+        return NO_SQRT_MOD_P2;
+    }
+
+    s = sp * sp;
+    s = np - s;
+
+    uint32_t inv = modinv_ui(sp << 1, p);
+
+    s /= (long int)p;
+    s *= inv;
+
+    if (s < 0) {
+        s = p - ((-s) % p);
+    } else {
+        s = s % p;
+    }
+
+    s *= p;
+    s += sp;
+
+    return (unsigned long int)s;
 }
 //-----------------------------------------------------------------------------
 

@@ -25,14 +25,19 @@
  *
  * \brief Higher level arrays and associated functions.
  *
- * Defines higher level arrays and their associated functions.
+ * This file defines higher level arrays together with some associated 
+ * functions.
+ *
+ * The <tt>*_array_t</tt> types and their associated functions are quite
+ * similar, the only differences being the type of the elements these arrays
+ * hold. Each <tt>*_array_t</tt> type is a structure composed of three fields:
+ *
+ * \li \c alloced - The maximum number of element the array can accomodate
+ * \li \c length - The current number of element in the array
+ * \li \c data - A pointer to the allocated memory space of \c alloced elements
  */
 
  /*
-  *  License: GNU Lesser General Public License (LGPL)
-  *  History:
-  *    1.1: Wed Mar 28 2007 by JM:
-  *           - Added factor_array_t and associated functions.
   *    1.0: Wed Mar 1 2006 by JM:
   *           - Initial version.
   */
@@ -63,6 +68,13 @@ extern "C" {
     * \note This is, of course, an hint to GMP's limbs and nails :-)
     */
 #define ELONGATION 16
+
+   /**
+    * \def NOT_IN_ARRAY
+    * Value returned by the <tt>index_in*_array(x, array...)</tt> functions if 
+    * the element \c x is not in the array <tt>array</tt>.
+    */
+#define NOT_IN_ARRAY UINT32_MAX
 
 /*
  *-----------------------------------------------------------------------------
@@ -225,14 +237,12 @@ void qsort_uint32_array(uint32_array_t* const array);
     *
     * Returns the position of the integer \c to_find in the
     * <tt>uint32_array_t</tt> pointed to by \c array. If the integer \c to_find
-    * is not found in the <tt>uint32_array_t</tt>, returns <tt>UINT32_MAX</tt>.
+    * is not found in the <tt>uint32_array_t</tt>, returns 
+    * <tt>NOT_IN_ARRAY</tt>.
     *
-    * \note The <tt>UINT32_MAX</tt> value is actually -1 if interpreted as a
+    * \note The <tt>NOT_IN_ARRAY</tt> value is actually -1 if interpreted as a
     * signed <tt>int32_t</tt>.
-    * \note The fact that \c UINT32_MAX is returned when the integer is not
-    * found in the array means that the practical, usable maximum length of
-    * a <tt>uint32_array_t</tt> is <tt>UINT32_MAX - 1</tt> and not
-    * <tt>UINT32_MAX</tt>.
+    *
     * \note If the array is already sorted, the more efficient function
     * <tt>index_in_sorted_uint32_array</tt> can be used as it uses a basic
     * binary search instead of a complete scanning of the array.
@@ -240,7 +250,7 @@ void qsort_uint32_array(uint32_array_t* const array);
     * \param[in] to_find The integer to find in the <tt>uint32_array_t</tt>.
     * \param[in] array   A pointer to the <tt>uint32_array_t</tt>.
     * \returns The index of \c to_find in the array if \c to_find is found.
-    * \returns <tt>UINT32_MAX</tt> otherwise.
+    * \returns <tt>NOT_IN_ARRAY</tt> otherwise.
     */
 uint32_t index_in_uint32_array(uint32_t to_find,
                                const uint32_array_t* const array);
@@ -269,14 +279,10 @@ bool is_in_uint32_array(uint32_t to_find, const uint32_array_t* const array);
     * Returns the position of the integer \c to_find in a \e sorted portion
     * of the <tt>uint32_array_t</tt> pointed to by \c array. If the integer
     * \c to_find is not found in the portion delimited by \c min_index and
-    * \c max_index, returns <tt>UINT32_MAX</tt>.
+    * \c max_index, returns <tt>NOT_IN_ARRAY</tt>.
     *
-    * \note The <tt>UINT32_MAX</tt> value is actually -1 if interpreted as a
+    * \note The <tt>NOT_IN_ARRAY</tt> value is actually -1 if interpreted as a
     * signed <tt>int32_t</tt>.
-    * \note The fact that \c UINT32_MAX is returned when the integer is not
-    * found in the array means that the practical, usable maximum length of
-    * a <tt>uint32_array_t</tt> is <tt>UINT32_MAX - 1</tt> and not
-    * <tt>UINT32_MAX</tt>.
     *
     * \param[in] to_find The integer to find in the <tt>uint32_array_t</tt>.
     * \param[in] sorted_array A pointer to the <tt>uint32_array_t</tt>.
@@ -285,7 +291,7 @@ bool is_in_uint32_array(uint32_t to_find, const uint32_array_t* const array);
     * \param[in] max_index The end of the sorted array portion to search in.
     * \returns The index of \c to_find in the array if \c to_find is found in
     *          the sorted array portion.
-    * \returns <tt>UINT32_MAX</tt> otherwise.
+    * \returns <tt>NOT_IN_ARRAY</tt> otherwise.
     */
 uint32_t index_in_sorted_uint32_array(uint32_t to_find,
                                       const uint32_array_t* const sorted_array,
@@ -441,14 +447,11 @@ void print_int32_array(const int32_array_t* const array);
     *
     * Returns the position of the integer \c to_find in the
     * <tt>int32_array_t</tt> pointed to by \c array. If the integer \c to_find
-    * is not found in the <tt>int32_array_t</tt>, returns <tt>UINT32_MAX</tt>.
+    * is not found in the <tt>int32_array_t</tt>, returns <tt>NOT_IN_ARRAY</tt>.
     *
-    * \note The <tt>UINT32_MAX</tt> value is actually -1 if interpreted as a
+    * \note The <tt>NOT_IN_ARRAY</tt> value is actually -1 if interpreted as a
     * signed <tt>int32_t</tt>.
-    * \note The fact that \c UINT32_MAX is returned when the integer is not
-    * found in the array means that the practical, usable maximum length of
-    * a <tt>int32_array_t</tt> is <tt>UINT32_MAX - 1</tt> and not
-    * <tt>UINT32_MAX</tt>.
+    *
     * \note If the array is already sorted, the more efficient function
     * <tt>index_in_sorted_int32_array</tt> can be used as it uses a basic
     * binary search instead of a complete scanning of the array.
@@ -456,7 +459,7 @@ void print_int32_array(const int32_array_t* const array);
     * \param[in] to_find The integer to find in the <tt>int32_array_t</tt>.
     * \param[in] array   A pointer to the <tt>int32_array_t</tt>.
     * \returns The index of \c to_find in the array if \c to_find is found.
-    * \returns <tt>UINT32_MAX</tt> otherwise.
+    * \returns <tt>NOT_IN_ARRAY</tt> otherwise.
     */
 uint32_t index_in_int32_array(int32_t to_find,
                               const int32_array_t* const array);
@@ -485,14 +488,10 @@ bool is_in_int32_array(int32_t to_find, const int32_array_t* const array);
     * Returns the position of the integer \c to_find in a \e sorted portion
     * of the <tt>int32_array_t</tt> pointed to by \c array. If the integer
     * \c to_find is not found in the portion delimited by \c min_index and
-    * \c max_index, returns <tt>UINT32_MAX</tt>.
+    * \c max_index, returns <tt>NOT_IN_ARRAY</tt>.
     *
-    * \note The <tt>UINT32_MAX</tt> value is actually -1 if interpreted as a
+    * \note The <tt>NOT_IN_ARRAY</tt> value is actually -1 if interpreted as a
     * signed <tt>int32_t</tt>.
-    * \note The fact that \c UINT32_MAX is returned when the integer is not
-    * found in the array means that the practical, usable maximum length of
-    * a <tt>int32_array_t</tt> is <tt>UINT32_MAX - 1</tt> and not
-    * <tt>UINT32_MAX</tt>.
     *
     * \param[in] to_find The integer to find in the <tt>int32_array_t</tt>.
     * \param[in] sorted_array A pointer to the <tt>int32_array_t</tt>.
@@ -501,7 +500,7 @@ bool is_in_int32_array(int32_t to_find, const int32_array_t* const array);
     * \param[in] max_index The end of the sorted array portion to search in.
     * \returns The index of \c to_find in the array if \c to_find is found in
     *          the sorted array portion.
-    * \returns <tt>UINT32_MAX</tt> otherwise.
+    * \returns <tt>NOT_IN_ARRAY</tt> otherwise.
     */
 uint32_t index_in_sorted_int32_array(int32_t to_find,
                                      const int32_array_t* const sorted_array,
@@ -674,20 +673,16 @@ void print_mpz_array(const mpz_array_t* const array);
     *
     * Returns the position of the \c mpz_t \c to_find in the
     * <tt>mpz_array_t</tt> pointed to by \c array. If the integer \c to_find
-    * is not found in the <tt>mpz_array_t</tt>, returns <tt>UINT32_MAX</tt>.
+    * is not found in the <tt>mpz_array_t</tt>, returns <tt>NOT_IN_ARRAY</tt>.
     *
-    * \note The <tt>UINT32_MAX</tt> value is actually -1 if interpreted as a
+    * \note The <tt>NOT_IN_ARRAY</tt> value is actually -1 if interpreted as a
     * signed <tt>int32_t</tt>.
-    * \note The fact that \c UINT32_MAX is returned when the integer is not
-    * found in the array means that the practical, usable maximum length of
-    * a <tt>mpz_array_t</tt> is <tt>UINT32_MAX - 1</tt> and not
-    * <tt>UINT32_MAX</tt>.
     *
     * \param[in] to_find The \c mpz_t integer to find in the
     *                    <tt>mpz_array_t</tt>.
     * \param[in] array   A pointer to the <tt>mpz_array_t</tt>.
     * \returns The index of \c to_find in the array if \c to_find is found.
-    * \returns <tt>UINT32_MAX</tt> otherwise.
+    * \returns <tt>NOT_IN_ARRAY</tt> otherwise.
     */
 uint32_t index_in_mpz_array(const mpz_t to_find,
                             const mpz_array_t* const array);
@@ -697,14 +692,10 @@ uint32_t index_in_mpz_array(const mpz_t to_find,
     *
     * Returns the position of the \c mpz_t \c to_find in the \e sorted portion
     * of the <tt>mpz_array_t</tt> pointed to by \c array. If the integer \c
-    * to_find is not found in this portion, returns <tt>UINT32_MAX</tt>.
+    * to_find is not found in this portion, returns <tt>NOT_IN_ARRAY</tt>.
     *
-    * \note The <tt>UINT32_MAX</tt> value is actually -1 if interpreted as a
+    * \note The <tt>NOT_IN_ARRAY</tt> value is actually -1 if interpreted as a
     * signed <tt>int32_t</tt>.
-    * \note The fact that \c UINT32_MAX is returned when the integer is not
-    * found in the array means that the practical, usable maximum length of
-    * a <tt>mpz_array_t</tt> is <tt>UINT32_MAX - 1</tt> and not
-    * <tt>UINT32_MAX</tt>.
     *
     * \param[in] to_find The \c mpz_t integer to find in the \c mpz_array_t.
     * \param[in] array   A pointer to the \e sorted <tt>mpz_array_t</tt>.
@@ -712,7 +703,7 @@ uint32_t index_in_mpz_array(const mpz_t to_find,
     *                      search in.
     * \param[in] max_index The end of the sorted array portion to search in.
     * \returns The index of \c to_find in the array if \c to_find is found.
-    * \returns <tt>UINT32_MAX</tt> otherwise.
+    * \returns <tt>NOT_IN_ARRAY</tt> otherwise.
     */
 uint32_t index_in_sorted_mpz_array(const mpz_t to_find,
                                    const mpz_array_t* const sorted_array,

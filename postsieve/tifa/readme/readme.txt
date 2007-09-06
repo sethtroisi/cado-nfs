@@ -48,8 +48,13 @@
   FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License
   for more details.
 
-  A copy of the GNU Lesser General Public License is given in the file
-  license.txt in the same directory than this file.
+  Copies of the GNU Lesser General Public License version 2.1 and version 3 are
+  given in the files license_v2.1.txt and license_v3.txt in the same directory 
+  than this file.
+
+  A copy of the GNU General Public License version 3 (referenced by the GNU
+  Lesser General Public License version 3) is given in the file gpl_v3.txt in 
+  the same directory than this file.
 
 ------------------------------------------------------------------------------
 3. What is it?

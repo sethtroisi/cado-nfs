@@ -62,17 +62,38 @@
 /* Size of type (in bits) used to represent a string of bits */
 #define TIFA_BITSTRING_T_BITSIZE %BITSTRING_T_BITSIZE%
 
+/* Size of type "unsigned long int" (in sizeof units) */
+#define TIFA_SIZEOF_ULONG_T %SIZEOF_ULONG_T%
+
+/* Size of type "unsigned long int" (in bits) */
+#define TIFA_ULONG_T_BITSIZE %ULONG_T_BITSIZE%
+ 
 /* Max value for unsigned long integers and some useful fractions */
 #define TIFA_ULONG_MAX %ULONG_MAX%
 #define TIFA_ULONG_MAX_DIVIDED_BY_2 %ULONG_MAX_DIVIDED_BY_2%
 #define TIFA_ULONG_MAX_DIVIDED_BY_3 %ULONG_MAX_DIVIDED_BY_3%
 #define TIFA_ULONG_MAX_DIVIDED_BY_4 %ULONG_MAX_DIVIDED_BY_4%
+#define TIFA_ULONG_MAX_DIVIDED_BY_5 %ULONG_MAX_DIVIDED_BY_5%
+#define TIFA_ULONG_MAX_DIVIDED_BY_6 %ULONG_MAX_DIVIDED_BY_6%
+#define TIFA_SQRT_ULONG_MAX %SQRT_ULONG_MAX%
+
+/* Max value for signed long integers and some useful fractions */
+#define TIFA_LONG_MAX %LONG_MAX%
+#define TIFA_LONG_MAX_DIVIDED_BY_2 %LONG_MAX_DIVIDED_BY_2%
+#define TIFA_LONG_MAX_DIVIDED_BY_3 %LONG_MAX_DIVIDED_BY_3%
+#define TIFA_LONG_MAX_DIVIDED_BY_4 %LONG_MAX_DIVIDED_BY_4%
+#define TIFA_LONG_MAX_DIVIDED_BY_5 %LONG_MAX_DIVIDED_BY_5%
+#define TIFA_LONG_MAX_DIVIDED_BY_6 %LONG_MAX_DIVIDED_BY_6%
+#define TIFA_SQRT_LONG_MAX %SQRT_LONG_MAX%
 
 /* Define to 1 to print critical error messages on stderr */
 #define TIFA_PRINT_ERROR %PRINT_ERROR%
 
 /* Define to 1 to turn on output messages for the cfrac function */
 #define TIFA_VERBOSE_CFRAC %VERBOSE_CFRAC%
+
+/* Define to 1 to turn on output messages for the fermat function */
+#define TIFA_VERBOSE_FERMAT %VERBOSE_FERMAT%
 
 /* Define to 1 to turn on output messages for the qs function */
 #define TIFA_VERBOSE_QS %VERBOSE_QS%
@@ -88,6 +109,9 @@
 
 /* Define to 1 to turn on timing messages for the cfrac function */
 #define TIFA_TIMING_CFRAC %TIMING_CFRAC%
+
+/* Define to 1 to turn on timing messages for the fermat function */
+#define TIFA_TIMING_FERMAT %TIMING_FERMAT%
 
 /* Define to 1 to turn on timing messages for the qs function */
 #define TIFA_TIMING_QS %TIMING_QS%

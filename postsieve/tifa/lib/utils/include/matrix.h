@@ -52,6 +52,13 @@ extern "C" {
 
 #include <inttypes.h>
 
+   /**
+    * \def NO_SUCH_ROW
+    * Value returned by the <tt>first_row_with_one_on_col(col, matrix)</tt>
+    * function if no row of the matrix has a bit 1 in its \c col-th column.
+    */
+#define NO_SUCH_ROW UINT32_MAX
+
 /*
  *-----------------------------------------------------------------------------
  *              binary_matrix_t and associated functions
@@ -233,7 +240,7 @@ void flip_matrix_bit(uint32_t row, uint32_t col, binary_matrix_t* const matrix);
     *        with a one in a given column.
     *
     * Returns the index of the first row of a <tt>binary_matrix_t</tt> which has
-    * a one on its <tt>col</tt>-th column. It returns UINT32_MAX if no such row
+    * a one on its <tt>col</tt>-th column. It returns NO_SUCH_ROW if no such row
     * is found.
     *
     * \param[in] col The column of the matrix.
@@ -241,7 +248,7 @@ void flip_matrix_bit(uint32_t row, uint32_t col, binary_matrix_t* const matrix);
     * \return
     *  \li An unsigned integer \c row between 0 and <tt>matrix->nrows</tt>-1
     *      such that <tt>(matrix->data[row][col] == 1)</tt>
-    *  \li UINT32_MAX if, for all valid \c i, <tt>(matrix->data[i][col] !=
+    *  \li NO_SUCH_ROW if, for all valid \c i, <tt>(matrix->data[i][col] !=
     *      1)</tt>.
     *
     * \note This function is needed in the gaussian elimination algorithm
@@ -263,9 +270,8 @@ void flip_matrix_bit(uint32_t row, uint32_t col, binary_matrix_t* const matrix);
     * strictly enforce type encapsulation. Indeed, some parts of the code
     * do assume (a minimal!) knowledge of the internal structures of some
     * types (have a look at siqs.c for instance). That does not make it the
-    * right thing to do though, unless when facing a real bottleneck, let's try
+    * right thing to do though. Unless when facing a real bottleneck, let's try
     * to keep the "programmer's omniscience" to a manageable level...
-    *
     */
 uint32_t first_row_with_one_on_col(uint32_t col,
                                    const binary_matrix_t* const matrix);

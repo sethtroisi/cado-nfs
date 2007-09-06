@@ -1,5 +1,5 @@
 
-Here are some short term objectives (as of June 2007):
+Here are some short term objectives (as of July 2007):
 
   - Fallback strategies for all factorization functions (find more relations,
     change multiplier, etc.) to make them more robust. This is currently done

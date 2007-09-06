@@ -20,8 +20,8 @@
 /**
  * \file    bernsteinisms.h
  * \author  Jerome Milan
- * \date    Mon May 22 2006
- * \version 1.0.1
+ * \date    circa March 2007
+ * \version 1.0.2
  *
  * \brief Algorithms from two D. J. Bernstein's papers on the factorization
  * of small integers.
@@ -36,6 +36,10 @@
  /*
   *  License: GNU Lesser General Public License (LGPL)
   *  History:
+  *
+  *  1.0.2: circa March 2007 by JM:
+  *         - Added function bern_21_rt_pairs_siqs.
+  *         - Added function bern_21_rt_pairs_lp_siqs.
   *
   *  1.0.1: Mon May 22 2006 by JM:
   *         - Added function bern_21_pairs.

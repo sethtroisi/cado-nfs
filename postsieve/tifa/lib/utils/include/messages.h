@@ -20,8 +20,8 @@
 /**
  * \file    messages.h
  * \author  Jerome Milan
- * \date    Fri Mar 2 2007
- * \version 1.0
+ * \date    Wed Aug 29 2007
+ * \version 1.0.1
  *
  * \brief Status / error messages output macros
  *
@@ -33,6 +33,15 @@
  * header. It is under the responsability of the including file to check for
  * these symbol definitions or to define them, if needed.
  */
+
+/*
+ * History:
+ *     1.0.1: Wed Aug 29 2007 by JM:
+ *            - Added message for Fermat's algorithm. 
+ *     1.0  : Fri Mar 2 2007 by JM:
+ *            - Initial version.
+ */
+
 
 #if !defined(_TIFA_MESSAGES_H_)
    /**
@@ -87,6 +96,11 @@ extern "C" {
 #define FACTOR_RES_STRING        "factoring residues on the factor base..."
 #define LIN_ALG_STRING           "resolving linear algebra system..."
 #define DED_FACTORS_STRING       "deducing factors..."
+//
+// Strings pertaining to Fermat's factorization only
+//
+#define FERMAT_FACT_STRING       "performing Fermat's factorization..."
+#define FERMAT_FACT_DONE_STRING  "Fermat's factorization..."
 //
 // Strings pertaining to SQUFOF only
 //
@@ -232,6 +246,37 @@ extern "C" {
     #define PRINT_RES_GENERATED_MSG(TIMING) /* intentionally left empty */
     #define PRINT_RES_SELECTED_MSG(TIMING)  /* intentionally left empty */
 #endif
+//
+// Messages pertaining to Fermat's algorithm only
+//
+#if __VERBOSE__
+    #define PRINT_FERMAT_FACT_MSG PRINT_LINE(FERMAT_FACT_STRING)
+#else
+    #define PRINT_FERMAT_FACT_MSG PADDED_PRINTF(FERMAT_FACT_STRING)
+#endif
+
+#if __VERBOSE__ && __TIMING__
+    #define PRINT_FERMAT_FACT_DONE_MSG PRINT_MSG(FERMAT_FACT_DONE_STRING)
+#else
+    #define PRINT_FERMAT_FACT_DONE_MSG /* intentionally left empty */
+#endif
+
+#if __VERBOSE__ && __TIMING__
+    #define PRINT_NEXTPRIME_MSG(TIMING)                                     \
+        PRFX_PRINTF(TAB "primes computed in   "TIMING_FORMAT" seconds\n",   \
+                    TIMING);
+    #define PRINT_SQRTM_MSG(TIMING)                                         \
+        PRFX_PRINTF(TAB "sqrtm computed in    "TIMING_FORMAT" seconds\n",   \
+                    TIMING);
+    #define PRINT_GREEDY_MSG(TIMING)                                        \
+        PRFX_PRINTF(TAB "greedy phase done in "TIMING_FORMAT" seconds\n",   \
+                    TIMING);
+#else
+    #define PRINT_NEXTPRIME_MSG(TIMING)     /* intentionally left empty */
+    #define PRINT_SQRTM_MSG(TIMING)     /* intentionally left empty */
+    #define PRINT_GREEDY_MSG(TIMING)    /* intentionally left empty */
+#endif
+
 //
 // Messages pertaining to SQUFOF only
 //

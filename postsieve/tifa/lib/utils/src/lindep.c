@@ -210,7 +210,7 @@ ecode_t find_factors(mpz_array_t*  const factors,
             // gcd is a non trivial factor of n. Add it to our list if it's
             // not already there...
             //
-            if (UINT32_MAX == index_in_mpz_array(gcd, factors)) {
+            if (NOT_IN_ARRAY == index_in_mpz_array(gcd, factors)) {
                 append_mpz_to_array(factors, gcd);
                 ecode = SOME_FACTORS_FOUND;
             }
