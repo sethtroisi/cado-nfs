@@ -205,7 +205,7 @@ $cfrac_program->set_help($help);
 #-------------------------------------------------------------------------------
 my $fermat_program = new Tifa::Program();
 
-$algo_to_program{"cfrac"} = $fermat_program;
+$algo_to_program{"fermat"} = $fermat_program;
 
 $fermat_program->set_algo("fermat");
 $fermat_program->set_descr("Fermat's algorithm (McKee's speedup)");
