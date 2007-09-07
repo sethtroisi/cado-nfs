@@ -676,7 +676,7 @@ unsigned long int sqrtm_p2(uint32_t n, uint32_t p) {
     }
 
     s = sp * sp;
-    s = np - s;
+    s = n - s;
 
     uint32_t inv = modinv_ui(sp << 1, p);
 

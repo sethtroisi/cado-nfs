@@ -316,7 +316,8 @@ unsigned long int modinv_ui(unsigned long int n, unsigned long int p);
    /**
     * \brief Modular square root modulo the square of a prime.
     *
-    * Returns the modular square root of <tt>a</tt> (mod <tt>p*p</tt>) (where
+    * Provided that \c a verifies 1 <= \c a < <tt>p*p</tt>, returns the 
+    * modular square root of <tt>a</tt> (mod <tt>p*p</tt>) (where
     * \c p is an \em odd \em prime) that is, returns a positive integer 
     * <tt>s</tt> such that <tt>s</tt>^2 = <tt>a</tt> (mod <tt>p*p</tt>).
     * If no such integer exists, returns <tt>NO_SQRT_MOD_P2</tt>.
