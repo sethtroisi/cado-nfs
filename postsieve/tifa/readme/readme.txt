@@ -61,11 +61,11 @@
 ------------------------------------------------------------------------------
 
   The TIFA library implements utilities and algorithms to perform integer
-  factorizations. For the time being, only the CFRAC, SQUFOF, basic Quadratic
-  Sieve, and Self-Initializing Quadratic Sieve algorithms (and... well... the
-  trial division too!) have been implemented. It should be stressed that the
-  QS and SIQS implementations are still crude and need to be optimized and
-  fine-tuned.
+  factorizations. For the time being, only the CFRAC, Fermat's ("fast" McKee's 
+  variation), SQUFOF, basic Quadratic Sieve, and Self-Initializing Quadratic 
+  Sieve algorithms (and... well... the trial division too!) have been 
+  implemented. It should be stressed that the QS and SIQS implementations are 
+  still crude and need to be optimized and fine-tuned.
 
 ------------------------------------------------------------------------------
 4. Requirements
@@ -401,12 +401,12 @@
   provides a more friendly user interface and offers more options than the C
   programs.
 
-  Using the factorize.pl script: factoring with CFRAC, SQUFOF, QS or SIQS
-  -----------------------------------------------------------------------
+  Using the factorize.pl script: factoring with CFRAC, SQUFOF, QS, etc.
+  ---------------------------------------------------------------------
 
-     This script wraps the cfrac_factors, qs_factors, siqs_factors and
-     squfof_factors programs. Typing "factorize.pl --help" on the command line
-     gives the list of the available options.
+     This script wraps the cfrac_factors, fermat_factors, qs_factors, 
+     siqs_factors and squfof_factors programs. Typing "factorize.pl --help"
+     on the command line gives the list of the available options.
 
      > Example: factor a number with CFRAC using the script default parameter
                 values

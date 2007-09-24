@@ -150,7 +150,7 @@ ecode_t run_program(factoring_program_t* const program) {
                         program->params,
                         program->mode
                     );
-
+            
             if (program->mode != FIND_COMPLETE_FACTORIZATION) {
                 //
                 // Simplify the list of found factors by computing and

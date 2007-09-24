@@ -81,9 +81,6 @@ extern "C" {
 //
 #define INIT_STRING             "computing start up data..."
 #define UPDATE_STRING           "updating context... "
-#define UPDATE_MORE_RELS_STRING "updating context to find more relations... "
-#define UPDATE_NEW_MULT_STRING  "updating context to change multiplier... "
-#define UPDATE_RACE_STRING      "updating context to perform a race... "
 #define UPDATE_GIVEUP_STRING    "updating context... give up"
 #define CLEAN_STRING            "cleaning..."
 #define FUNC_SUCCEEDED_STRING   "completed"
@@ -96,17 +93,22 @@ extern "C" {
 #define FACTOR_RES_STRING        "factoring residues on the factor base..."
 #define LIN_ALG_STRING           "resolving linear algebra system..."
 #define DED_FACTORS_STRING       "deducing factors..."
+#define UPDATE_MORE_RELS_STRING  "updating context to find more relations... "
+#define UPDATE_NEW_MULT_STRING   "updating context to change multiplier... "
+
 //
 // Strings pertaining to Fermat's factorization only
 //
 #define FERMAT_FACT_STRING       "performing Fermat's factorization..."
 #define FERMAT_FACT_DONE_STRING  "Fermat's factorization..."
+#define UPDATE_MULTIPREC_STRING  "updating context to use multi-precision... "
 //
 // Strings pertaining to SQUFOF only
 //
-#define FWD_CYCL_STRING   "forward cycling to find a proper form..."
-#define INV_SQRT_STRING   "computing inverse square root of form..."
-#define REV_CYCL_STRING   "reverse cycling to find a factor..."
+#define FWD_CYCL_STRING    "forward cycling to find a proper form..."
+#define INV_SQRT_STRING    "computing inverse square root of form..."
+#define REV_CYCL_STRING    "reverse cycling to find a factor..."
+#define UPDATE_RACE_STRING "updating context to perform a race... "
 //
 // Strings pertaining to trial division only
 //
@@ -157,9 +159,6 @@ extern "C" {
 #define PRINT_FAILURE_NL           PRINTF("failure!\n")
 #define PRINT_INIT_MSG             PRINT_MSG(INIT_STRING)
 #define PRINT_UPDATE_MSG           PRINT_MSG(UPDATE_STRING)
-#define PRINT_UPDATE_MORE_RELS_MSG PRINT_MSG(UPDATE_MORE_RELS_STRING)
-#define PRINT_UPDATE_NEW_MULT_MSG  PRINT_MSG(UPDATE_NEW_MULT_STRING)
-#define PRINT_UPDATE_RACE_MSG      PRINT_MSG(UPDATE_RACE_STRING)
 #define PRINT_UPDATE_GIVEUP_MSG    PRINT_MSG(UPDATE_GIVEUP_STRING)
 #define PRINT_CLEAN_MSG            PRINT_MSG(CLEAN_STRING)
    /**
@@ -211,6 +210,9 @@ extern "C" {
 //
 // Messages pertaining to "congruences of squares" methods only
 //
+#define PRINT_UPDATE_MORE_RELS_MSG PRINT_MSG(UPDATE_MORE_RELS_STRING)
+#define PRINT_UPDATE_NEW_MULT_MSG  PRINT_MSG(UPDATE_NEW_MULT_STRING)
+
 #define PRINT_FACTOR_RES_MSG     PRINT_MSG(FACTOR_RES_STRING)
 #define PRINT_LIN_ALG_MSG        PRINT_MSG(LIN_ALG_STRING)
 #define PRINT_DED_FACTORS_MSG    PRINT_MSG(DED_FACTORS_STRING)
@@ -249,6 +251,8 @@ extern "C" {
 //
 // Messages pertaining to Fermat's algorithm only
 //
+#define PRINT_UPDATE_MULTIPREC_MSG  PRINT_MSG(UPDATE_MULTIPREC_STRING)
+
 #if __VERBOSE__
     #define PRINT_FERMAT_FACT_MSG PRINT_LINE(FERMAT_FACT_STRING)
 #else
@@ -257,11 +261,6 @@ extern "C" {
 
 #if __VERBOSE__ && __TIMING__
     #define PRINT_FERMAT_FACT_DONE_MSG PRINT_MSG(FERMAT_FACT_DONE_STRING)
-#else
-    #define PRINT_FERMAT_FACT_DONE_MSG /* intentionally left empty */
-#endif
-
-#if __VERBOSE__ && __TIMING__
     #define PRINT_NEXTPRIME_MSG(TIMING)                                     \
         PRFX_PRINTF(TAB "primes computed in   "TIMING_FORMAT" seconds\n",   \
                     TIMING);
@@ -272,14 +271,16 @@ extern "C" {
         PRFX_PRINTF(TAB "greedy phase done in "TIMING_FORMAT" seconds\n",   \
                     TIMING);
 #else
-    #define PRINT_NEXTPRIME_MSG(TIMING)     /* intentionally left empty */
+    #define PRINT_NEXTPRIME_MSG(TIMING) /* intentionally left empty */
     #define PRINT_SQRTM_MSG(TIMING)     /* intentionally left empty */
     #define PRINT_GREEDY_MSG(TIMING)    /* intentionally left empty */
+    #define PRINT_FERMAT_FACT_DONE_MSG  /* intentionally left empty */
 #endif
 
 //
 // Messages pertaining to SQUFOF only
 //
+#define PRINT_UPDATE_RACE_MSG PRINT_MSG(UPDATE_RACE_STRING)
 #define PRINT_FWD_CYCL_MSG    PRINT_MSG(FWD_CYCL_STRING)
 #define PRINT_INV_SQRT_MSG    PRINT_MSG(INV_SQRT_STRING)
 #define PRINT_REV_CYCL_MSG    PRINT_MSG(REV_CYCL_STRING)

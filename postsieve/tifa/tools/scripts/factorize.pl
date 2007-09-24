@@ -420,7 +420,7 @@ explicitely written as ' \\' (a space followed by a backslash).
 
 See the provided 'factorize.conf' configuration file for a detailed example.
 
-Type $name --help for more information.";
+Type $name --help for more information.
 EOF
 }
 #-------------------------------------------------------------------------------
