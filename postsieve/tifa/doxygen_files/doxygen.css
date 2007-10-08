@@ -11,6 +11,9 @@ body, td {
     /*font-size: 90%;*/
     font-size:10pt;
 }
+li {
+    margin:0.5em;
+}
 h1 {
     text-align: center;
     font-size: 140%;

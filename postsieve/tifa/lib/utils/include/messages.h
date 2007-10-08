@@ -108,6 +108,7 @@ extern "C" {
 #define FWD_CYCL_STRING    "forward cycling to find a proper form..."
 #define INV_SQRT_STRING    "computing inverse square root of form..."
 #define REV_CYCL_STRING    "reverse cycling to find a factor..."
+#define FR_REV_CYCL_STRING "reverse cycling to find a factor (fast ret)..."
 #define UPDATE_RACE_STRING "updating context to perform a race... "
 //
 // Strings pertaining to trial division only
@@ -147,7 +148,7 @@ extern "C" {
     #define PRINT_MSG(STRING) PADDED_PRINTF(STRING)
 #endif
 
-#if __TIMING__
+#if __VERBOSE__ || __TIMING__
     #define PRINT_SEPARATION_LINE PRINT_LINE(SEPARATION_LINE)
 #else
     #define PRINT_SEPARATION_LINE /* intentionally left empty */
@@ -280,10 +281,11 @@ extern "C" {
 //
 // Messages pertaining to SQUFOF only
 //
-#define PRINT_UPDATE_RACE_MSG PRINT_MSG(UPDATE_RACE_STRING)
-#define PRINT_FWD_CYCL_MSG    PRINT_MSG(FWD_CYCL_STRING)
-#define PRINT_INV_SQRT_MSG    PRINT_MSG(INV_SQRT_STRING)
-#define PRINT_REV_CYCL_MSG    PRINT_MSG(REV_CYCL_STRING)
+#define PRINT_UPDATE_RACE_MSG   PRINT_MSG(UPDATE_RACE_STRING)
+#define PRINT_FWD_CYCL_MSG      PRINT_MSG(FWD_CYCL_STRING)
+#define PRINT_INV_SQRT_MSG      PRINT_MSG(INV_SQRT_STRING)
+#define PRINT_REV_CYCL_MSG      PRINT_MSG(REV_CYCL_STRING)
+#define PRINT_FR_REV_CYCL_MSG   PRINT_MSG(FR_REV_CYCL_STRING)
 //
 // Messages pertaining to trial division only
 //

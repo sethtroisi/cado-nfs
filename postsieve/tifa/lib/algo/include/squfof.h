@@ -34,10 +34,17 @@
  * twice the size of an \c unsigned \c long \c int.
  *
  * \see "Square Form Factorization", Jason E. Gower & Samuel S. Wagstaff Jr.
- * Accepted for publication in Mathematics of Computation.
+ * <i>Mathematics of Computation</i>, S 0025-5718(07)02010-8, Article 
+ * electronically published on May 14, 2007.
  *
  * \see "Square Form Factorization", Jason E. Gower, PhD thesis, Purdue
  * University, December 2004.
+ *
+ * \see For a description of the "large step algorithm" used to quickly
+ * jump over several forms, see: "On the Parallel Generation of the Residues for 
+ * the Continued Fraction Factoring Algorithm", Hugh C. Williams, Marvin C. 
+ * Wunderlich, <i>Mathematics of Computation</i>, Volume 48, Number 177,
+ * January 1987, pages 405-423
  */
 
  /*

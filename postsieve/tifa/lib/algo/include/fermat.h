@@ -33,7 +33,7 @@
  * twice the size of an \c unsigned \c long \c int.
  *
  * \see "Speeding Fermat's Factoring Method", James McKee.
- * Mathematics of Computation, Volume 68, Number 228, pages 1729-1737.
+ * <i>Mathematics of Computation</i>, Volume 68, Number 228, pages 1729-1737.
  *
  */
 

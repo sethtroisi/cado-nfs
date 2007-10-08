@@ -105,8 +105,8 @@ enum ecode_enum {
          */
     GIVING_UP,
         /**
-         * Used by the SQUFOF implementation to indicate that the integer to
-         * factor is too large and cannot be processed.
+         * Used by the SQUFOF and Fermat/McKee implementations to indicate that 
+         * the integer to factor is too large and cannot be processed.
          */
     INTEGER_TOO_LARGE,
         /**

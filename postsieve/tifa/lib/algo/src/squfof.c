@@ -1188,13 +1188,13 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
 
     STOP_TIMER;
     PRINT_TIMING;
-    PRINT_REV_CYCL_MSG;
-    START_TIMER;
+    RESET_TIMER;
     START_TIMER;
 
     unsigned long int factor = 0;
 
     if ((i / 2) < LARGE_STEP_THRESHOLD) {
+        PRINT_REV_CYCL_MSG;
         //
         // Step 4: Cycle in the reverse direction to find a factor of N
         //
@@ -1226,6 +1226,7 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
             SQUFOF_PRINT("4)      t  = %lu\n", t);
         }
     } else {
+        PRINT_FR_REV_CYCL_MSG;
         //
         // Use the large step algorithm to get closer to the point of symmetry.
         //
@@ -1437,8 +1438,7 @@ static ecode_t perform_squfof_race(factoring_machine_t* const machine) {
 
     STOP_TIMER;
     PRINT_TIMING;
-    PRINT_REV_CYCL_MSG;
-    START_TIMER;
+    RESET_TIMER;
     START_TIMER;
 
     unsigned long int factor_ui = 0;
@@ -1455,6 +1455,7 @@ static ecode_t perform_squfof_race(factoring_machine_t* const machine) {
     unsigned long int t  = 0;
 
     if ((winner->i / 2) < LARGE_STEP_THRESHOLD) {
+        PRINT_REV_CYCL_MSG;
         //
         // Step 4: Cycle in the reverse direction to find a factor of N
         //
@@ -1476,6 +1477,8 @@ static ecode_t perform_squfof_race(factoring_machine_t* const machine) {
             P   = PP;
         }
     } else {
+        PRINT_FR_REV_CYCL_MSG;
+        
         unsigned long int P0  = winner->P0;
         unsigned long int Q0  = winner->Q0;
         unsigned long int QQ0 = winner->QQ0;

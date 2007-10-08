@@ -87,7 +87,7 @@
 //
 // Number of multipliers used.
 //
-#define NMULTIPLIERS 2
+#define NMULTIPLIERS 5
 
 //
 // Use a special way to "tag" local variables used by the SQRTM_P2_UI macro to
@@ -207,7 +207,7 @@ typedef struct struct_fermat_context_t fermat_context_t;
 //
 // List of multipliers used.
 //
-static unsigned int multipliers[NMULTIPLIERS] = {1, 3};
+static unsigned int multipliers[NMULTIPLIERS] = {1, 3, 5, 7, 11};
 
 //-----------------------------------------------------------------------------
 //                 PROTOTYPES OF NON PUBLIC FUNCTION(S)

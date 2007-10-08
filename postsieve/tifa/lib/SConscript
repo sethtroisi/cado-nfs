@@ -217,6 +217,11 @@ tifa_inc_dist.remove(os.path.join(top_dir, 'tifa_config.h'))
 #
 tifa_h = "tifa.h"
 
+#
+# Documentation header file (never included nor compiled)
+#
+mainpage_h = 'mainpage.h'
+
 #-------------------------------------------------------------------------------
 # Build the TIFA library
 #-------------------------------------------------------------------------------
@@ -251,6 +256,7 @@ if "dist" in COMMAND_LINE_TARGETS:
     archive = env.Tar(tifa_distname, tifa_inc_dist)
     env.Tar(tifa_distname, tifa_src)
     env.Tar(tifa_distname, tifa_h)
+    env.Tar(tifa_distname, mainpage_h)
     env.Tar(tifa_distname, scripts)
     env.Tar(tifa_distname, doxy_custom_files)
     env.Tar(tifa_distname, 'SConscript')

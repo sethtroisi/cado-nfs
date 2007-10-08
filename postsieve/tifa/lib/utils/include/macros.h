@@ -222,9 +222,9 @@ do {                                                         \
 
    /**
     * \def MPZ_IS_SQUARE(X)
-    * 
+    *
     * Syntaxic sugar macro wrapping a call to <tt>mpz_perfect_square_p </tt>.
-    * "Returns" true if and only if the \c mpz_t X is a perfect square. 
+    * "Returns" true if and only if the \c mpz_t X is a perfect square.
     *
     * Takes as parameter an <tt>mpz_t</tt>.
     */
@@ -232,7 +232,7 @@ do {                                                         \
 
    /**
     * \def MPN_ADD(A, B, C)
-    * 
+    *
     * Syntaxic sugar macro wrapping a call to <tt>mpn_add</tt>. Performs
     * size normalization on the result and takes care of the possible carry
     * out. Does not perform any reallocation: the user should make sure
@@ -259,12 +259,12 @@ do {                                                         \
 
    /**
     * \def MPN_ADD_CS(A, B, C)
-    * 
+    *
     * Syntaxic sugar macro wrapping a call to <tt>mpn_add</tt>. Performs
     * size normalization on the result, takes care of the possible carry
     * out, and Checks the Sizes of the operands to call \c mpn_add with the
-    * proper parameters' order. However, does not perform any reallocation: the 
-    * user should make sure the result has enough space to accomodate the 
+    * proper parameters' order. However, does not perform any reallocation: the
+    * user should make sure the result has enough space to accomodate the
     * possible carry out.
     *
     * Takes as parameters three \c mpz_t (and not arrays of <tt>mp_limb_t</tt>).
@@ -286,7 +286,7 @@ do {                                                         \
     * \def MPN_SUB(A, B, C)
     *
     * Syntaxic sugar macro wrapping a call to <tt>mpn_sub</tt>. Performs
-    * size normalization on the result but does not take care of the possible 
+    * size normalization on the result but does not take care of the possible
     * borrow out.
     *
     * Takes as parameters three \c mpz_t (and not arrays of <tt>mp_limb_t</tt>).
@@ -304,9 +304,9 @@ do {                                                         \
 
    /**
     * \def MPN_SUB(A, B, C)
-    * 
+    *
     * Syntaxic sugar macro wrapping a call to <tt>mpn_sub_n</tt>. Performs
-    * size normalization on the result but does not take care of the possible 
+    * size normalization on the result but does not take care of the possible
     * borrow out.
     *
     * Takes as parameters three \c mpz_t (and not arrays of <tt>mp_limb_t</tt>).
@@ -363,10 +363,10 @@ do {                                                         \
 
    /**
     * \def MPN_MUL_N(A, B, C)
-    * 
+    *
     * Syntaxic sugar macro wrapping a call to <tt>mpn_mul_n</tt>. Performs
     * size normalization on the result.
-    * 
+    *
     * Takes as parameters three \c mpz_t (and not arrays of <tt>mp_limb_t</tt>).
     * \c SIZ(B) and \c SIZ(C) should be the same.
     *
@@ -382,11 +382,11 @@ do {                                                         \
 
    /**
     * \def MPN_MUL_CS(A, B, C)
-    * 
+    *
     * Syntaxic sugar macro wrapping a call to <tt>mpn_mul</tt>. Performs
-    * size normalization on the result, and Checks the Sizes of the operands to 
+    * size normalization on the result, and Checks the Sizes of the operands to
     * call \c mpn_mul with the proper parameters' order.
-    * 
+    *
     * Takes as parameters three \c mpz_t (and not arrays of <tt>mp_limb_t</tt>).
     * \c B and \c C can be used interchangeably.
     *
@@ -406,13 +406,13 @@ do {                                                         \
 
    /**
     * \def DECLARE_MPZ_SWAP_VARS
-    * 
+    *
     * Macro declaring local variables needed by the \c MPZ_SWAP macro.
     * Should be called \emph once prior to any use of the \c MPZ_SWAP macro.
     *
     * \warning
     * Declares the variables \c __TMPPTR__MACROS_H__a9b3c01__ and
-    * <tt>__TMPSIZ__MACROS_H__a9b3c01__<\tt>. Hopefully their names are fancy 
+    * \c __TMPSIZ__MACROS_H__a9b3c01__ . Hopefully their names are fancy
     * enough to avoid any local conflict.
     */
 #define DECLARE_MPZ_SWAP_VARS                                       \
@@ -421,11 +421,11 @@ do {                                                         \
 
    /**
     * \def MPZ_SWAP(A, B)
-    * 
+    *
     * Macro swapping the values of the two \c mpz_t \c A and <tt>B</tt>.
     *
     * \warning
-    * The macro \c DECLARE_MPZ_SWAP_VARS should be called \emph once before 
+    * The macro \c DECLARE_MPZ_SWAP_VARS should be called \emph once before
     * using <tt>MPZ_SWAP</tt>.
     */
 #define MPZ_SWAP(A, B)                                              \

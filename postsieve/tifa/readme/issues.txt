@@ -21,3 +21,6 @@ Main bugs and outstanding issues
   - Should the integer types used be changed? Some functions use standard
     long ints (signed or unsigned) while some use the C99 types int32_t,
     int64_t, etc. Time to unify all that?
+  
+  - lib/utils/src/factoring_machine.c is way too complicated to not be
+    buggy. It will certainly be needed to refactor it at some point...

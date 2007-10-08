@@ -22,6 +22,10 @@
  * \author  Jerome Milan
  * \date    Early March 2007
  * \version 1.0
+ *
+ * \brief Abstraction of an integer factorization algorithm.
+ *
+ * Implements a machine-like abstraction of an integer factorization algorithm.
  */
 
 #if !defined(_TIFA_FACTORING_MACHINE_H_)
@@ -259,7 +263,7 @@ typedef struct factoring_machine_struct factoring_machine_t;
     * Attempt to factor an integer with all parameters given by \c machine.
     *
     * \note This function is meant to be a starting point for implementations
-    * of factorization algorithms and is obvisouly not intended to be directly
+    * of factorization algorithms and is obviously not intended to be directly
     * used as a factoring function all by itself.
     *
     * \param machine A pointer to the \c factoring_machine_t to use.

@@ -182,12 +182,6 @@ void clear_mpz_tree(mpz_tree_t* tree);
     * Prints a tree of \c mpz_t integers on the standard output. Useful
     * only for debugging purposes and for relatively small trees.
     *
-    * \note The tree should be implemented as a single \c mpz_tree_t tree
-    * (i.e. an \c mpz_array_t) with the usual compact representation:
-    * \c tree->data[2i+1] and \c tree->data[2i+2] are the children of the
-    * node \c tree->data[i]. Do NOT call \c clear_mpz_array on an
-    * <tt>mpz_tree_t</tt>!
-    *
     * \param[in] tree Pointer to the \c mpz_array_t containing the tree
     *                 to print.
     */
