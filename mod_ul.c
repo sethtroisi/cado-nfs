@@ -375,17 +375,18 @@ modul_frommontgomery (residueul r, const residueul a, const unsigned long invm,
 }
 
 
-/* Computes (a / 2^wordsize) % m, but result can be r = m */
+/* Computes (a / 2^wordsize) % m, but result can be r = m. 
+   Input a must not be equal 0 */
 __GNUC_ATTRIBUTE_UNUSED__
 static inline void
-modul_redcsemi_ul_not0 (residueul r, unsigned long a, 
+modul_redcsemi_ul_not0 (residueul r, const unsigned long a, 
                         const unsigned long invm, const modulusul m)
 {
   unsigned long tlow, thigh;
 
   ASSERT (a != 0);
 
-  mul_ul_ul_2ul (&tlow, &thigh, a, invm);
+  tlow = a * invm;
   mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
   r[0] = thigh + 1UL;
 }
@@ -403,7 +404,7 @@ modul_addredc_ul (residueul r, const residueul a, const unsigned long b,
   shigh = 0UL;
   modul_add_ul_2ul (&slow, &shigh, a[0]);
   
-  mul_ul_ul_2ul (&tlow, &thigh, slow, invm);
+  tlow = slow * invm;
   mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
   ASSERT (slow + tlow == 0UL);
   r[0] = thigh + shigh + (slow != 0UL);
@@ -420,7 +421,7 @@ modul_addredc_ul (residueul r, const residueul a, const unsigned long b,
 }
 
 
-/* Computes ((a + b) / 2^wordsize) % m */
+/* Computes ((a + b) / 2^wordsize) % m, but result can be == m */
 __GNUC_ATTRIBUTE_UNUSED__
 static inline void
 modul_addredcsemi_ul (residueul r, const residueul a, 
@@ -428,15 +429,27 @@ modul_addredcsemi_ul (residueul r, const residueul a,
                       const modulusul m)
 {
   unsigned long slow, shigh, tlow;
+  unsigned char sb;
   
   slow = b;
+#if 1
+  __asm__ ( "addq %2, %0\n\t"
+            "setne %1\n\t"
+            "adcb $0, %1\n"
+            : "+&r" (slow), "=qm" (sb)
+            : "rm" (a[0])
+            : "cc");
+  shigh = sb;
+#else
   shigh = 0UL;
   modul_add_ul_2ul (&slow, &shigh, a[0]);
-  
-  mul_ul_ul_2ul (&tlow, r, slow, invm);
+  shigh += (slow != 0UL);
+#endif
+
+  tlow = slow * invm;
   mul_ul_ul_2ul (&tlow, r, tlow, m[0]);
   ASSERT (slow + tlow == 0UL);
-  r[0] += shigh + (slow != 0UL);
+  r[0] += shigh;
 
   /* r = ((a+b) + (((a+b)%2^w * invp) % 2^w) * p) / 2^w
      r <= ((a+b) + (2^w - 1) * p) / 2^w
@@ -462,7 +475,7 @@ modul_mulredc (residueul r, const residueul a, const residueul b,
 #endif
   
   mul_ul_ul_2ul (&plow, &phigh, a[0], b[0]);
-  mul_ul_ul_2ul (&tlow, &thigh, plow, invm);
+  tlow = plow * invm;
   mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
   /* Let b = 2^wordsize. We know (phigh * b + plow) + (thigh * b + tlow) 
      == 0 (mod b) so either plow == tlow == 0, or plow !=0 and tlow != 0. 
@@ -491,7 +504,7 @@ modul_mulredc_ul (residueul r, const residueul a, const unsigned long b,
 #endif
   
   mul_ul_ul_2ul (&plow, &phigh, a[0], b);
-  mul_ul_ul_2ul (&tlow, &thigh, plow, invm);
+  tlow = plow * invm;
   mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
   phigh += (plow != 0UL);
   r[0] = (phigh >= m[0] - thigh) ? (phigh - (m[0] - thigh)) : (phigh + thigh);
@@ -520,7 +533,7 @@ modul_muladdredc_ul (residueul r, const residueul a, const unsigned long b,
   
   mul_ul_ul_2ul (&plow, &phigh, a[0], b);
   modul_add_ul_2ul (&plow, &phigh, c);
-  mul_ul_ul_2ul (&tlow, &thigh, plow, invm);
+  tlow = plow * invm;
   mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
   phigh += (plow != 0UL);
   r[0] = (phigh >= m[0] - thigh) ? (phigh - (m[0] - thigh)) : (phigh + thigh);
