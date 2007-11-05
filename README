@@ -1,3 +1,11 @@
+Required software tools:
+=======================
+
+*) GMP (http://gmplib.org): usually installed in most Linux distributions
+*) ECM (http://gforge.inria.fr/projects/ecm/)
+*) PARI/GP (http://pari.math.u-bordeaux.fr/)
+*) Magma (http://magma.maths.usyd.edu.au/magma/)
+
 [Optional: configure]
 =====================
 
