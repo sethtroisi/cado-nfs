@@ -74,7 +74,7 @@ extern "C" {
     * \def QS_DFLT_LSR_METHOD
     * Default linear system resolution method to use.
     */
-#define QS_DFLT_LSR_METHOD       SMART_GAUSS_ELIM
+#define QS_DFLT_LINALG_METHOD    SMART_GAUSS_ELIM
    /**
     * \def QS_DFLT_USE_LARGE_PRIMES
     * Use the large prime variation by default.
@@ -110,7 +110,7 @@ struct struct_qs_params_t {
        /**
         * Linear system resolution method to use.
         */
-    ls_res_method_t lsr_method;
+    linalg_method_t linalg_method;
        /**
         * True if we use the large prime variation.
         * False otherwise.
@@ -129,9 +129,10 @@ typedef struct struct_qs_params_t qs_params_t;
     *
     * Fills a \c qs_params_t with default values.
     *
+    * \param[in]  n      The number to factor.
     * \param[out] params A pointer to the \c qs_params_t structure to fill.
     */
-void set_qs_params_to_default(qs_params_t* const params);
+void set_qs_params_to_default(const mpz_t n, qs_params_t* const params);
 
    /**
     * \brief Integer factorization via the quadratic sieve (QS) algorithm.

@@ -167,7 +167,6 @@
             ECODE = 0;                                      \
         }                                                   \
     }
-
 //-----------------------------------------------------------------------------
 
 //-----------------------------------------------------------------------------
@@ -190,11 +189,31 @@ struct struct_fermat_context_t {
     // Latest prime used in "simpler-precision" (sic!) version before failure.
     // Full multi-precision implementation will start using this prime.
     //
-    unsigned long int latest_p; 
+    unsigned long int latest_p;
+    //
+    // Number of primes tested in the perform_fernmat_simple function.
+    //
+    unsigned long int ntested_primes;
     //
     // Whether the number to factor is too large
     //
     bool integer_too_large;
+    //
+    // n x multipliers for all multipliers used
+    //
+    mpz_t ni[NMULTIPLIERS];
+    //
+    // sqrt(n x multipliers) for all multipliers used
+    //
+    mpz_t sqrtni[NMULTIPLIERS];
+    //
+    // ceil(sqrt(n x multipliers)) for all multipliers used
+    //
+    unsigned long int b[NMULTIPLIERS];
+    //
+    // bounds used in greedy variant for all multipliers used
+    //
+    unsigned long int max_y[NMULTIPLIERS];
 };
 //-----------------------------------------------------------------------------
 typedef struct struct_fermat_context_t fermat_context_t;
@@ -305,13 +324,36 @@ static ecode_t init_fermat_context(factoring_machine_t* const machine) {
     INIT_TIMER;
     START_TIMER;
 
-    machine->context          = (void*) malloc(sizeof(fermat_context_t));
-    fermat_context_t* context = (fermat_context_t*) machine->context;
+    machine->context = (void*) malloc(sizeof(fermat_context_t));
+    fermat_context_t* const context = (fermat_context_t*) machine->context;
 
     context->n       = machine->n;
     context->updated = false;
     context->integer_too_large = false;
-
+    context->ntested_primes = 0;
+    
+    for (unsigned int i = 0; i < NMULTIPLIERS; i++) {
+        mpz_init_set(context->ni[i], context->n);
+        mpz_mul_ui(context->ni[i], context->ni[i], multipliers[i]);
+        
+        mpz_init(context->sqrtni[i]);
+        mpz_sqrt(context->sqrtni[i], context->ni[i]);
+    }
+    if (0 == mpz_fits_ulong_p(context->sqrtni[NMULTIPLIERS-1])) {
+        //
+        // Actually we could try with to factorize without multiplier and so
+        // check for (0 == mpz_fits_ulong_p(sqrtn)) to gain a few bits... but
+        // this algorithm is so rapidly impractical that it doesn't matter in
+        // practice...
+        //
+	    context->integer_too_large = true;
+    }
+    
+    for (unsigned int i = 0; i < NMULTIPLIERS; i++) {
+        context->b[i]     = mpz_get_ui(context->sqrtni[i]) + 1;
+        context->max_y[i] = sqrt(context->b[i]) * MAX_Y_BOUND_MULTIPLIER;
+    }
+    
     STOP_TIMER;
     PRINT_TIMING;
 
@@ -325,8 +367,13 @@ static ecode_t clear_fermat_context(factoring_machine_t* const machine) {
     START_TIMER;
 
     fermat_context_t* context = (fermat_context_t*) machine->context;
+    
+    for (unsigned int i = 0; i < NMULTIPLIERS; i++) {
+        mpz_clear(context->ni[i]);
+        mpz_clear(context->sqrtni[i]);
+    }
     free(context);
-
+    
     STOP_TIMER;
     PRINT_TIMING;
 
@@ -362,13 +409,11 @@ static ecode_t update_fermat_context(factoring_machine_t* const machine
         context->updated = true;
     } else {
         //
-        // Actually this should not happen since we're sure we'll eventually
-        // fund a factor...
+        // Just give up the factorization!
         //
         PRINT_UPDATE_GIVEUP_MSG;
         ecode = GIVING_UP;
     }
-
     STOP_TIMER;
     PRINT_TIMING;
 
@@ -400,49 +445,23 @@ static ecode_t perform_fermat_simple(factoring_machine_t* const machine) {
     START_TIMER;
 
     fermat_context_t* const context = (fermat_context_t*) machine->context;
+    
+    if (context->integer_too_large) {
+        return INTEGER_TOO_LARGE;
+    }
+    
     //
     // Perform a race between the factorization of n and mult*n as suggested by
     // J. McKee in the reference paper "Speeding Fermat's Factoring Method".
     // There are not many comments in the code, but the algorithm is
     // straitforwardly implemented from the description given in the paper.
     //
-    mpz_ptr n = context->n;
+    mpz_ptr n     = context->n;
+    mpz_t* ni     = context->ni;
     
-    mpz_t ni[NMULTIPLIERS];
-    for (unsigned int i = 0; i < NMULTIPLIERS; i++) {
-        mpz_init_set(ni[i], n);
-        mpz_mul_ui(ni[i], ni[i], multipliers[i]);
-    }
-    
-    mpz_t sqrtni[NMULTIPLIERS];
-    for (unsigned int i = 0; i < NMULTIPLIERS; i++) {
-        mpz_init(sqrtni[i]);
-        mpz_sqrt(sqrtni[i], ni[i]);
-    }
-    
-    if (0 == mpz_fits_ulong_p(sqrtni[NMULTIPLIERS-1])) {
-        //
-        // Actually we could try with to factorize without multiplier and so
-        // check for (0 == mpz_fits_ulong_p(sqrtn)) to gain a few bits... but
-        // this algorithm is so rapidly impractical that it doesn't matter in
-        // practice...
-        //
-        for (unsigned int i = 0; i < NMULTIPLIERS; i++) {
-            mpz_clear(ni[i]);
-            mpz_clear(sqrtni[i]);
-        }
-        context->latest_p = 3; 
-	    context->integer_too_large = true;
-        return INTEGER_TOO_LARGE;
-    }
-    unsigned long int b[NMULTIPLIERS];
-    unsigned long int max_y[NMULTIPLIERS];
-    
-    for (unsigned int i = 0; i < NMULTIPLIERS; i++) {
-        b[i] = mpz_get_ui(sqrtni[i]) + 1;
-        max_y[i] = sqrt(b[i]) * MAX_Y_BOUND_MULTIPLIER;
-    }
-    
+    unsigned long int* b     = context->b;
+    unsigned long int* max_y = context->max_y;
+        
     mpz_t Q;
     mpz_t gcd;
     mpz_t ny2;
@@ -451,10 +470,32 @@ static ecode_t perform_fermat_simple(factoring_machine_t* const machine) {
     mpz_init(gcd);
     mpz_init(ny2);
     
-    unsigned long int ip = 1;
-    unsigned long int p  = first_primes[ip];
-    unsigned long int p2 = 0;
+    unsigned long int ip   = 1;
+    unsigned long int pmin = sqrt(b[0]);
+    unsigned long int p    = first_primes[ip];
+    unsigned long int p2   = 0;
     
+    //
+    // Find ip such that the first prime is >= n^1/4
+    //
+    if (pmin > LARGEST_PRIME) {
+        context->latest_p = LARGEST_PRIME;
+        return NO_FACTOR_FOUND;
+    } else {
+        uint32_t min   = - 1;
+        uint32_t max   = NFIRST_PRIMES;
+        uint32_t index = 0;
+
+        while ((max - min) > 1) {
+            index = (max + min)/2;
+            if (pmin <= first_primes[index]) {
+                max = index;
+            } else {
+                min = index;
+            }
+        }
+        ip = index;
+    }
     long int x0 = 0;
                 
     unsigned long int np = 0;
@@ -462,13 +503,15 @@ static ecode_t perform_fermat_simple(factoring_machine_t* const machine) {
     unsigned long int ri = 0;
     unsigned long int xi = 0;
     unsigned long int yi = 0;
+    unsigned long int ntested_primes = 0;
     
     ecode_t ecode = NO_FACTOR_FOUND;
-            
+    
     while (ip <  NFIRST_PRIMES) {
         
         p = first_primes[ip];
         ip++;
+        ntested_primes++;
     
         if (p > TIFA_SQRT_LONG_MAX) {
             context->latest_p = p;
@@ -507,7 +550,6 @@ static ecode_t perform_fermat_simple(factoring_machine_t* const machine) {
             } else {
                 x0 = x0 % p2;
             }
-            
             //
             // Compute Q(x0, 1) mod n
             //
@@ -531,7 +573,6 @@ static ecode_t perform_fermat_simple(factoring_machine_t* const machine) {
             if (0 == x0) {
                 continue;
             }
-            
             //
             // McKee's "Greedy" variant
             //
@@ -665,9 +706,6 @@ static ecode_t perform_fermat_simple(factoring_machine_t* const machine) {
 
   compute_factors_and_return:
 
-    PRINT_SQRTM_MSG(GET_NAMED_TIMING(sqrtm));
-    PRINT_GREEDY_MSG(GET_NAMED_TIMING(greedy));
-
     if (ecode == SOME_FACTORS_FOUND) {
         append_mpz_to_array(machine->factors, gcd);
         mpz_divexact(gcd, context->n, gcd);
@@ -676,11 +714,11 @@ static ecode_t perform_fermat_simple(factoring_machine_t* const machine) {
 
   clean_and_return:
     
-    for (unsigned int i = 0; i < NMULTIPLIERS; i++) {
-        mpz_clear(ni[i]);
-        mpz_clear(sqrtni[i]);
-    }
-        
+    context->ntested_primes = ntested_primes;
+    
+    PRINT_SQRTM_MSG(GET_NAMED_TIMING(sqrtm));
+    PRINT_GREEDY_MSG(GET_NAMED_TIMING(greedy));
+    
     mpz_clear(Q);
     mpz_clear(gcd);
     mpz_clear(ny2);
@@ -701,44 +739,19 @@ static ecode_t perform_fermat_mpz(factoring_machine_t* const machine) {
 
     fermat_context_t* const context = (fermat_context_t*) machine->context;
 
-    mpz_ptr n = context->n;
-
-    mpz_t ni[NMULTIPLIERS];
-    for (unsigned int i = 0; i < NMULTIPLIERS; i++) {
-        mpz_init_set(ni[i], n);
-        mpz_mul_ui(ni[i], ni[i], multipliers[i]);
-    }
-    
-    mpz_t sqrtni[NMULTIPLIERS];
-    for (unsigned int i = 0; i < NMULTIPLIERS; i++) {
-        mpz_init(sqrtni[i]);
-        mpz_sqrt(sqrtni[i], ni[i]);
-    }
-
-    if (0 == mpz_fits_ulong_p(sqrtni[NMULTIPLIERS-1])) {
-        //
-        // Actually we could try with to factorize without multiplier... See
-        // similar comment in perform_fermat_simple()
-        //
-        for (unsigned int i = 0; i < NMULTIPLIERS; i++) {
-            mpz_clear(ni[i]);
-            mpz_clear(sqrtni[i]);
-        }
-	    context->integer_too_large = true;
+    if (context->integer_too_large) {
         return INTEGER_TOO_LARGE;
     }
 
+    mpz_ptr n     = context->n;
+    mpz_t* ni     = context->ni;
+    
+    unsigned long int* b     = context->b;
+    unsigned long int* max_y = context->max_y;
+    
     unsigned long int p;
     unsigned long int retval = 0;
 
-    unsigned long int b[NMULTIPLIERS];
-    unsigned long int max_y[NMULTIPLIERS];
-    
-    for (unsigned int i = 0; i < NMULTIPLIERS; i++) {
-        b[i] = mpz_get_ui(sqrtni[i]) + 1;
-        max_y[i] = sqrt(b[i]) * MAX_Y_BOUND_MULTIPLIER;
-    }
-    
     mpz_t pz;
     mpz_t pz2;
     mpz_t s;
@@ -767,13 +780,15 @@ static ecode_t perform_fermat_mpz(factoring_machine_t* const machine) {
 
     PRINT_FERMAT_FACT_MSG;
     START_TIMER;
+    
+    const unsigned long int ntested_primes = context->ntested_primes;
     //
-    // Starts with the least prime greater than 2.n^1/4 and cycle though the
-    // prime until we find a factor or the abort limit given by MAX_NPRIMES
+    // Starts with the next prime greater than the last used one and go though
+    // the prime until we find a factor or the abort limit given by MAX_NPRIMES
     // is reached.
     //
-    for (unsigned long int ip = 1; ip <= MAX_NPRIMES; ip++) {
-
+    for (unsigned long int ip = ntested_primes; ip <= MAX_NPRIMES; ip++) {
+        
         START_NAMED_TIMER(nextprime);
 
         mpz_nextprime(pz, pz);
@@ -944,10 +959,6 @@ static ecode_t perform_fermat_mpz(factoring_machine_t* const machine) {
     }
 
   compute_factors_and_return:
-  
-    PRINT_NEXTPRIME_MSG(GET_NAMED_TIMING(nextprime));
-    PRINT_SQRTM_MSG(GET_NAMED_TIMING(sqrtm));
-    PRINT_GREEDY_MSG(GET_NAMED_TIMING(greedy));
     
     if (ecode == SOME_FACTORS_FOUND) {
         append_mpz_to_array(machine->factors, gcd);
@@ -957,12 +968,11 @@ static ecode_t perform_fermat_mpz(factoring_machine_t* const machine) {
 
   clean_and_return:
 
-    CLEAR_SQRTM_P2_UI_VARS();
+    PRINT_NEXTPRIME_MSG(GET_NAMED_TIMING(nextprime));
+    PRINT_SQRTM_MSG(GET_NAMED_TIMING(sqrtm));
+    PRINT_GREEDY_MSG(GET_NAMED_TIMING(greedy));
 
-    for (unsigned int i = 0; i < NMULTIPLIERS; i++) {
-        mpz_clear(ni[i]);
-        mpz_clear(sqrtni[i]);
-    }
+    CLEAR_SQRTM_P2_UI_VARS();
     
     mpz_clear(pz);
     mpz_clear(pz2);

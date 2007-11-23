@@ -40,13 +40,12 @@
     */
 #define _TIFA_HASHTABLE_H_
 
+#include <inttypes.h>
+#include "linked_list.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include <inttypes.h>
-
-#include "linked_list.h"
 
    /**
     * \struct struct_hashtable_t hashtable.h lib/utils/include/hashtable.h
@@ -59,18 +58,13 @@ extern "C" {
     * This hashtable implementation uses a simple sequential search in a linked
     * list to solve the collisions.
     *
-    * \note The current implementation \e requires that the size of the
-    * hashtable, i.e. the number of allocated buckets is a power of two.
-    *
     * \warning Due to limitations in the current implementation, it is
     * strongly advised to use \e only pointers to integers or strings as
     * keys.
     */
 struct struct_hashtable_t {
        /**
-        * Number of allocated buckets.
-        * \warning \c alloced \e must be a power of 2. This is not currently
-        * checked, so it is up to the client code to enforce this condition.
+        * Number of allocated buckets (always a power of two).
         */
     uint32_t alloced;
        /**
@@ -138,8 +132,12 @@ typedef struct struct_hashtable_entry_t hashtable_entry_t;
    /**
     * \brief Allocates and returns a new <tt>hashtable_t</tt>.
     *
-    * Allocates and returns a new <tt>hashtable_t</tt> with \c size
-    * allocated buckets.
+    * Allocates and returns a pointer to a new <tt>hashtable_t</tt> with
+    * \c size allocated buckets, using the comparison function pointed by
+    * \c cmp_func and the hash function given by \c hash_func.
+    *
+    * \note If \c size is not a power of two, the lowest power of two greater
+    * than \c size is used instead.
     *
     * \param[in] size The number of allocated buckets.
     * \param[in] cmp_func A pointer to the comparison function.
@@ -154,7 +152,7 @@ hashtable_t* alloc_init_hashtable(
    /**
     * \brief Clears a <tt>hashtable_t</tt>.
     *
-    * Clears a <tt>hashtable_t</tt>.
+    * Clears the <tt>hashtable_t</tt> pointed by \c htable.
     *
     * \warning This function merely clears the memory used by the linked
     * lists but \e does \e not frees the memory space used by the \c key

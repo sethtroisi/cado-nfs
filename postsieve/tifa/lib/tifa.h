@@ -29,11 +29,8 @@
  */
 
  /*
-  *  Copyright (C) 2006, 2007  INRIA
-  *  Licence: GNU Lesser General Public License (LGPL)
   *  History:
-  *
-  *  Mon Sep 4 2006: Initial version by JM
+  *     1.0 Mon Sep 4 2006: Initial version by JM
   */
 
 #if !defined(_TIFA_TIFA_H_)
@@ -47,14 +44,35 @@
 //
 #include "tifa_config.h"
 
+//
+// The following symbols need to be defined before including messages.h
+// and timer.h.
+//
+#if !defined(__VERBOSE__)
+    #define __VERBOSE__ 0
+#endif
+#if !defined(__TIMING__)
+    #define __TIMING__ 0
+#endif
+#if !defined(__PREFIX__)
+    #define __PREFIX__ ""
+#endif
+
+//
+// Includes from lib/algo
+//
 #include "cfrac.h"
 #include "qs.h"
 #include "siqs.h"
 #include "squfof.h"
 #include "tdiv.h"
-
+//
+// Includes from lib/data
+//
 #include "first_primes.h"
-
+//
+// Includes from lib/utils
+//
 #include "array.h"
 #include "bernsteinisms.h"
 #include "bitstring_t.h"
@@ -66,9 +84,14 @@
 #include "hashtable.h"
 #include "lindep.h"
 #include "linked_list.h"
+      //
+      // _NOTE_: macros.h is kept private to avoid poluting client code.
+      //
 #include "matrix.h"
 #include "messages.h"
 #include "print_error.h"
+#include "res_tdiv.h"
+#include "smooth_filter_t.h"
 #include "sqrt_cont_frac.h"
 #include "timer.h"
 #include "x_array_list.h"

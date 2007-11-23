@@ -50,7 +50,11 @@
 
 #include <stdlib.h>
 
-#include "gmp.h"
+#include "tifa_config.h"
+#include <gmp.h>
+#if TIFA_USE_GMP_INTERNAL_FUNCS
+    #include "gmp-impl.h"
+#endif
 #include "gmp_utils.h"
 #include "sqrt_cont_frac.h"
 #include "macros.h"

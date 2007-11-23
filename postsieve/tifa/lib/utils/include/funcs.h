@@ -337,6 +337,27 @@ unsigned long int modinv_ui(unsigned long int n, unsigned long int p);
     */
 unsigned long int sqrtm_p2(uint32_t a, uint32_t p);
 
+   /**
+    * \brief Find best multiplier using the Knuth-Schroeppel function.
+    *
+    * Given the size of factor base \c size_base, returns the "best" 
+    * multiplier to factor \c n, using the modified version of the
+    * Knuth-Schroeppel function described by Silverman in: "The Multiple
+    * Quadratic Sieve".
+    *
+    * \note The greatest multiplier considered is given by
+    * \c LARGEST_MULTIPLIER.
+    *
+    * \see "The Multiple Quadratic Sieve", Robert D. Silverman,
+    * <i>Mathematics of Computation</i>, Volume 48, Number 177,
+    * January 1987, pages 329-339.
+    *
+    * \param[in] n The number to factor
+    * \param[in] size_base The desired size of the factor base
+    * \returns The "best" multiplier to factor n.
+    */
+uint32_t ks_multiplier(const mpz_t n, const uint32_t size_base);
+
 /*
  *-----------------------------------------------------------------------------
  *                          Hash functions

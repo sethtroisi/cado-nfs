@@ -73,9 +73,10 @@ WARN_LOGFILE           =
 #---------------------------------------------------------------------------
 # configuration options related to the input files
 #---------------------------------------------------------------------------
-INPUT                  = %TOPSRCDIR%/lib/utils/include \
-                         %TOPSRCDIR%/lib/algo/include \
-                         %TOPSRCDIR%/lib/data/include \
+INPUT                  = %TOPSRCDIR%/lib/utils/include  \
+                         %TOPSRCDIR%/lib/algo/include   \
+                         %TOPSRCDIR%/lib/data/include   \
+                         %TOPSRCDIR%/lib/               \
                          %TOPSRCDIR%/tools/include
 INPUT_ENCODING         = UTF-8
 FILE_PATTERNS          = *.c *.h

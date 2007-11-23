@@ -47,20 +47,22 @@
 
 //
 // The number of arguments accepted is either :
-//   0 : process interactively
+//   0 : process semi-interactively
 //   1 : the argument is the number to factor
 //   2 : enter the <nprimes_tdiv> parameter then the number to factor
 //   CFRAC_F_MAX_ARGC : specify every parameters
 //
-#define CFRAC_F_MAX_ARGC 8
+#define CFRAC_F_MAX_ARGC 10
 
 //------------------------------------------------------------------------------
 static void print_usage(factoring_program_t* const program) {
     fprintf(stderr, "Usage:\n");
     fprintf(stderr, "%15s\t<nprimes_in_base>\n", program->argv[0]);
     fprintf(stderr, "%15s\t<nprimes_tdiv_residues>\n", "");
+    fprintf(stderr, "%15s\t<filter_method>\n", "");
+    fprintf(stderr, "%15s\t<nsteps_early_abort>\n", "");
     fprintf(stderr, "%15s\t<nrelations>\n", "");
-    fprintf(stderr, "%15s\t<lsr_method>\n", "");
+    fprintf(stderr, "%15s\t<linalg_method>\n", "");
     fprintf(stderr, "%15s\t<use_large_primes>\n", "");
     fprintf(stderr, "%15s\t<nprimes_tdiv>\n", "");
     fprintf(stderr, "%15s\t<number_to_factor>\n", "");
@@ -161,29 +163,29 @@ static void process_args(factoring_program_t* const program) {
         char** endptr = NULL;
         uint32_t use_lp_variation = 0;
 
-        params->nprimes_in_base = strtoul(argv[1], endptr, 10);
-        params->nprimes_tdiv    = strtoul(argv[2], endptr, 10);
-        params->nrelations      = strtoul(argv[3], endptr, 10);
-        params->lsr_method      = strtoul(argv[4], endptr, 10);
-        use_lp_variation        = strtoul(argv[5], endptr, 10);
-        *nprimes_tdiv           = strtoul(argv[6], endptr, 10);
-        *nfactors               = params->nrelations;
+        params->nprimes_in_base    = strtoul(argv[1], endptr, 10);
+        params->nprimes_tdiv       = strtoul(argv[2], endptr, 10);
+        params->filter_method      = strtoul(argv[3], endptr, 10);
+        params->nsteps_early_abort = strtoul(argv[4], endptr, 10);
+        params->nrelations         = strtoul(argv[5], endptr, 10);
+        params->linalg_method      = strtoul(argv[6], endptr, 10);
+        use_lp_variation           = strtoul(argv[7], endptr, 10);
+        *nprimes_tdiv              = strtoul(argv[8], endptr, 10);
+        *nfactors                  = params->nrelations;
 
-        mpz_init_set_str(program->n, argv[7], 10);
+        mpz_init_set_str(program->n, argv[9], 10);
 
         if (0 == use_lp_variation) {
             params->use_large_primes = false;
         } else {
             params->use_large_primes = true;
         }
-
         if (params->nprimes_tdiv == 0) {
             params->nprimes_tdiv = 1;
         }
         if (params->nprimes_tdiv > params->nprimes_in_base) {
             params->nprimes_tdiv = params->nprimes_in_base;
         }
-
         break;
     }
     default:
@@ -202,8 +204,20 @@ static void print_params(factoring_program_t* const program) {
 
     printf("\tnprimes_in_base      : %u\n", params->nprimes_in_base);
     printf("\tnprimes_tdiv_residues: %u\n", params->nprimes_tdiv);
+    printf("\tfilter_method        : %u (%s)\n",
+            params->filter_method,
+            filter_method_to_str[params->filter_method]
+    );
+    if (params->filter_method == TDIV_EARLY_ABORT) {
+        printf("\tnsteps_early_abort   : %u\n", params->nsteps_early_abort);
+    } else {
+        printf("\tnsteps_early_abort   : n/a\n");
+    }
     printf("\tnrelations           : %u\n", params->nrelations);
-    printf("\tlsr_method           : %u\n", params->lsr_method);
+    printf("\tlinalg_method        : %u (%s)\n",
+            params->linalg_method,
+            linalg_method_to_str[params->linalg_method]
+    );
     printf("\tnprimes_tdiv         : %u\n", program->nprimes_tdiv);
     if (params->use_large_primes) {
         printf("\tuse_large_primes     : yes\n");

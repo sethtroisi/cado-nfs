@@ -65570,6 +65570,8 @@ uint32_t const first_primes[NFIRST_PRIMES] __attribute__ ((unused)) = {
 	821641
 };
 
+const uint32_t LARGEST_PRIME __attribute__ ((unused)) = 821641;
+
 //
 // _NOTE_: first_primes_array is merely a uint32_array_t wrapper for
 //         first_primes, and as such, it has no real "alloced" memory.

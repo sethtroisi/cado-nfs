@@ -30,7 +30,7 @@
  * prime variation.
  *
  * \see "A Method of Factoring and the Factorization of F_7",
- * Mathematics of Computation, vol 29, #129, Jan 1975, pages 183-205.
+ * <i>Mathematics of Computation</i>, vol 29, #129, Jan 1975, pages 183-205.
  */
 
 #if !defined(_TIFA_CFRAC_H_)
@@ -50,7 +50,7 @@ extern "C" {
 #include "first_primes.h"
 #include "array.h"
 #include "lindep.h"
-
+#include "smooth_filter.h"
 #include "factoring_machine.h"
 #include "exit_codes.h"
 
@@ -59,24 +59,24 @@ extern "C" {
     * Default number of prime numbers composing the factor base on which
     * to factor the residues.
     */
-#define CFRAC_DFLT_NPRIMES_IN_BASE (NFIRST_PRIMES/16)
+#define CFRAC_DFLT_NPRIMES_IN_BASE  (NFIRST_PRIMES/16)
    /**
     * \def CFRAC_DFLT_NPRIMES_TDIV
     * Default number of the first primes to use in the trial division
     * of the residues.
     */
-#define CFRAC_DFLT_NPRIMES_TDIV (NFIRST_PRIMES/16)
+#define CFRAC_DFLT_NPRIMES_TDIV     (NFIRST_PRIMES/16)
    /**
     * \def CFRAC_DFLT_NRELATIONS
     * Default number of congruence relations to find before attempting the
     * factorization of the large integer.
     */
-#define CFRAC_DFLT_NRELATIONS 32
+#define CFRAC_DFLT_NRELATIONS       32
    /**
     * \def CFRAC_DFLT_LSR_METHOD
     * Default linear system resolution method to use.
     */
-#define CFRAC_DFLT_LSR_METHOD SMART_GAUSS_ELIM
+#define CFRAC_DFLT_LINALG_METHOD    SMART_GAUSS_ELIM
    /**
     * \def CFRAC_DFLT_USE_LARGE_PRIMES
     * Use the large prime variation by default.
@@ -98,25 +98,37 @@ struct struct_cfrac_params_t {
     uint32_t nprimes_in_base;
        /**
         * Number of the first primes to use in the trial division
-        * of the residues.
+        * of the residues known to be smooth.
         *
         * \warning \c nprimes_tdiv should be greater than or equal to 1.
         */
     uint32_t nprimes_tdiv;
        /**
-        * Number of congruence relations to find before attempting the
-        * factorization of the large integer.
+        * Number of linear dependences to find.
         */
     uint32_t nrelations;
        /**
         * Linear system resolution method to use.
         */
-    ls_res_method_t lsr_method;
+    linalg_method_t linalg_method;
        /**
-        * True if we use the large prime variation.
+        * True if we use the single large prime variation.
         * False otherwise.
         */
     bool use_large_primes;
+       /**
+        * Method to use to detect smooth residues and relations.
+        */
+    smooth_filter_method_t filter_method;
+       /**
+        * Number of steps in the early abort strategy. If zero, no early
+        * abort is performed. Only used is \c linalg_method is set to
+        * \c TDIV or \c TDIV_EARLY_ABORT.
+        *
+        * \note \c nsteps should be less than or equal to \c MAX_NSTEPS,
+        * as defined in smooth_filter.h.
+        */
+    unsigned short int nsteps_early_abort;
 };
 
    /**
@@ -160,6 +172,8 @@ void set_cfrac_params_to_default(const mpz_t n, cfrac_params_t* const params);
     * be automatically resized to accommodate the data. This has to be kept
     * in mind when trying to do ingenious stuff with memory management (hint:
     * don't try to be clever here).
+    *
+    * \warning The "no large primes" variant is currently disabled.
     *
     * \param[out] factors Pointer to the found factors of <tt>n</tt>.
     * \param[out] multis Pointer to the multiplicities of the found factors

@@ -157,6 +157,8 @@ tifa_src     = [
     os.path.join( utils_srcdir, 'lindep.c'),
     os.path.join( utils_srcdir, 'linked_list.c'),
     os.path.join( utils_srcdir, 'matrix.c'),
+    os.path.join( utils_srcdir, 'res_tdiv.c'),
+    os.path.join( utils_srcdir, 'smooth_filter.c'),
     os.path.join( utils_srcdir, 'sqrt_cont_frac.c'),
     os.path.join( utils_srcdir, 'x_array_list.c'),
     os.path.join( utils_srcdir, 'x_tree.c')
@@ -201,6 +203,8 @@ tifa_inc = [
     os.path.join( utils_incdir, 'matrix.h'),
     os.path.join( utils_incdir, 'messages.h'),
     os.path.join( utils_incdir, 'print_error.h'),
+    os.path.join( utils_incdir, 'res_tdiv.h'),
+    os.path.join( utils_incdir, 'smooth_filter.h'),
     os.path.join( utils_incdir, 'sqrt_cont_frac.h'),
     os.path.join( utils_incdir, 'timer.h'),
     os.path.join( utils_incdir, 'x_array_list.h'),

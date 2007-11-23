@@ -276,6 +276,114 @@ void flip_matrix_bit(uint32_t row, uint32_t col, binary_matrix_t* const matrix);
 uint32_t first_row_with_one_on_col(uint32_t col,
                                    const binary_matrix_t* const matrix);
 
+/*
+ *-----------------------------------------------------------------------------
+ *              byte_matrix_t and associated functions
+ *-----------------------------------------------------------------------------
+ */
+
+   /**
+    * \struct struct_byte_matrix_t matrix.h lib/utils/include/matrix.h
+    * \brief  Defines a matrix of bytes.
+    *
+    * This structure defines a matrix of bytes which knows its current
+    * dimensions and its allocated memory space.
+    *
+    * \note Internally, a matrix of bytes is represented as a matrix of
+    * \c unsigned char elements.
+    */
+struct struct_byte_matrix_t {
+       /**
+        * Maximum number of rows of the matrix.
+        */
+    uint32_t nrows_alloced;
+       /**
+        * Maximum number of columns of the matrix.
+        */
+    uint32_t ncols_alloced;
+       /**
+        * Current number of rows of the matrix.
+        */
+    uint32_t nrows;
+       /**
+        * Current number of columns of the matrix.
+        */
+    uint32_t ncols;
+       /**
+        * 2D array of \c unsigned char elements whose dimensions are given
+        * by the \c nrows_alloced and \c ncols_alloced fields.
+        */
+    unsigned char** data;
+};
+
+   /**
+    * \typedef byte_matrix_t
+    * \brief Equivalent to <tt>struct struct_byte_matrix_t</tt>.
+    */
+typedef struct struct_byte_matrix_t byte_matrix_t;
+
+   /**
+    * \brief Allocates and returns a new <tt>byte_matrix_t</tt>.
+    *
+    * Allocates and returns a new <tt>byte_matrix_t</tt> such that:
+    * \li its \c nrows_alloced field is set to nrows.
+    * \li its \c ncols_alloced field is set to ncols.
+    * \li its \c nrows field is set to nrows.
+    * \li its \c ncols field is set to ncols.
+    * \li its \c data array of arrays is completely filled with zeroes.
+    *
+    * \note The behaviour of this alloc function differs from the ones in
+    * array.h. This discrepancy will be corrected in later versions.
+    *
+    * \param[in] nrows The maximum number of rows of the \c byte_matrix_t
+    *                  to allocate.
+    * \param[in] ncols The maximum number of columns \c byte_matrix_t
+    *                  to allocate.
+    * \return A pointer to the newly allocated \c byte_matrix_t structure.
+    */
+byte_matrix_t* alloc_byte_matrix(uint32_t nrows, uint32_t ncols);
+
+   /**
+    * \brief Allocates and returns a cloned <tt>byte_matrix_t</tt>.
+    *
+    * Allocates and returns a clone of the <tt>byte_matrix_t</tt> 
+    * pointed by <tt>matrix</tt>.
+    *
+    * \param[in] matrix A pointer to the byte matrix to clone.
+    * \return A pointer to the newly allocated \c byte_matrix_t clone.
+    */
+byte_matrix_t* clone_byte_matrix(const byte_matrix_t * const matrix);
+
+   /**
+    * \brief Sets a <tt>byte_matrix_t</tt> to zero.
+    *
+    * Sets the <tt>byte_matrix_t matrix</tt> to the zero matrix.
+    *
+    * \param[in] matrix A pointer to the <tt>byte_matrix_t</tt> to reset.
+    */
+void reset_byte_matrix(byte_matrix_t* const matrix);
+
+   /**
+    * \brief Clears a <tt>byte_matrix_t</tt>.
+    *
+    * Clears a <tt>byte_matrix_t</tt>, or, more precisely, clears the memory
+    * space used by the arrays pointed by the \c data field of a
+    * <tt>byte_matrix_t</tt>. Also set its \c nrows_alloced,
+    * \c ncols_alloced, \c nrows and \c ncols fields to zero.
+    *
+    * \param[in] matrix A pointer to the <tt>byte_matrix_t</tt> to clear.
+    */
+void clear_byte_matrix(byte_matrix_t* const matrix);
+
+   /**
+    * \brief Prints a <tt>byte_matrix_t</tt>.
+    *
+    * Prints a <tt>byte_matrix_t</tt>'s on the standard output.
+    *
+    * \param[in] matrix A pointer to the <tt>byte_matrix_t</tt> to print.
+    */
+void print_byte_matrix(const byte_matrix_t* const matrix);
+
 #ifdef __cplusplus
 }
 #endif

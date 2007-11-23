@@ -30,14 +30,17 @@ use File::Basename;
 # Author  : Jerome Milan
 # Date    : Sat Mar 10 2007
 # Version : 0.1.1
-# Licence : GNU Lesser General Public License (LGPL)
+# Licence : GNU Lesser General Public License (LGPL) v2.1 or later
+#           Copyright (C) 2006, 2007 INRIA
+#-------------------------------------------------------------------------------
 # History :
-#   0.1.1: Sat Mar 10 2007 by JM:
-#            - Added --gen option to generate the primes instead of reading
-#              them from a file (GMP::Mpz module needed)
-#            - Renamed genprimes.pl
-#   0.1.0: Circa February 2006 by JM:
-#            - Initial version
+#-------------------------------------------------------------------------------
+# 0.1.1: Sat Mar 10 2007 by JM:
+#          - Added --gen option to generate the primes instead of reading
+#            them from a file (GMP::Mpz module needed)
+#          - Renamed genprimes.pl
+# 0.1.0: Circa February 2006 by JM:
+#          - Initial version
 #------------------------------------------------------------------------------
 
 #
@@ -154,7 +157,8 @@ $long_license
 const uint32_t first_primes[NFIRST_PRIMES] __attribute__ ((unused)) = {
 EOF
 
-my $step = 0;
+my $step  = 0;
+my $prime = 1;
 
 if ($input_file) {
     open(IF, "< $input_file") or die("Error: cannot open file $input_file\n");
@@ -175,12 +179,12 @@ if ($input_file) {
         $line =~ s/\D*$//; # Suppress trailing non digit characters
 
         my @primes = split(/\D+/, $line);
-        foreach my $num (@primes) {
+        foreach $prime (@primes) {
            if ($step != $nb_first_primes-1) {
-             print OF "\t$num,\n";
+             print OF "\t$prime,\n";
              $step++;
            } else {
-             print OF "\t$num\n";
+             print OF "\t$prime\n";
              $step++;
              last
            }
@@ -198,7 +202,6 @@ if ($input_file) {
     # Generate the prime numbers like a good boy... with a little help
     # from the GMP::Mpz module...
     #
-    my $prime = 1;
     for (1..$nb_first_primes-1) {
         $prime = nextprime($prime);
         print OF "\t$prime,\n";
@@ -209,6 +212,8 @@ if ($input_file) {
 print(OF "};\n\n");
 
 print OF << "EOF";
+const uint32_t LARGEST_PRIME __attribute__ ((unused)) = $prime;
+
 //
 // _NOTE_: first_primes_array is merely an uint32_array_t wrapper for
 //         first_primes, and as such, it has no real "alloced" memory.
@@ -272,6 +277,11 @@ $long_license
  * containing the first \\c NFIRST_PRIMES prime numbers (from 2 and beyond).
  */
 extern const uint32_t first_primes[NFIRST_PRIMES] __attribute__ ((unused));
+
+/**
+ * The largest prime in the \\c first_primes array.
+ */
+extern const uint32_t LARGEST_PRIME __attribute__ ((unused));
 
 /**
  * \\c first_primes_array is a \\c uint32_array_t wrapper to the array

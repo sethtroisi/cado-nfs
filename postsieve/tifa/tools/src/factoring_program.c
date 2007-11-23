@@ -39,6 +39,10 @@
 #include "funcs.h"
 #include "common_funcs.h"
 
+
+#define __TIMING__ 1
+#include "../../lib/utils/include/timer.h"
+
 //------------------------------------------------------------------------------
 ecode_t run_program(factoring_program_t* const program) {
     //
@@ -140,16 +144,14 @@ ecode_t run_program(factoring_program_t* const program) {
             }
             mpz_array_t*    progfactors = alloc_mpz_array(program->nfactors);
             uint32_array_t* progmultis  = alloc_uint32_array(program->nfactors);
-            //
-            // Proceed with the factoring algorithm.
-            //
+            
             ecode = program->factoring_algo_func(
-                        progfactors,
-                        progmultis,
-                        n_atd,
-                        program->params,
-                        program->mode
-                    );
+                progfactors,
+                progmultis,
+                n_atd,
+                program->params,
+                program->mode
+            );
             
             if (program->mode != FIND_COMPLETE_FACTORIZATION) {
                 //
@@ -248,4 +250,3 @@ ecode_t run_program(factoring_program_t* const program) {
     return ecode;
 }
 //------------------------------------------------------------------------------
-

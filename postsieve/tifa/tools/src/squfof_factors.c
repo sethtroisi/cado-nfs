@@ -157,7 +157,7 @@ int main(int argc, char** argv) {
     program.set_params_to_default_func = set_params_to_default;
 
     ecode_t ecode = run_program(&program);
-
+        
     return ecode;
 }
 //------------------------------------------------------------------------------

@@ -59,16 +59,16 @@
     */
 #define _TIFA_SQUFOF_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdlib.h>
 #include <gmp.h>
 
 #include "array.h"
 #include "factoring_machine.h"
 #include "exit_codes.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
    /**
     * \struct struct_squfof_params_t squfof.h lib/utils/include/squfof.h

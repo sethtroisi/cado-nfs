@@ -32,7 +32,7 @@ package Tifa::SimpleConfigReader;
 # Last modified : Wed Jan 31 2007
 #
 # Version : 0.1.2
-# License : GNU Lesser General Public License (LGPL)
+# License : GNU Lesser General Public License (LGPL) v2.1 or later
 #           Copyright (C) 2006, 2007 INRIA
 #-------------------------------------------------------------------------------
 # History
@@ -299,15 +299,12 @@ sub read_config_file {
                     $nextline = " \\";
                     next;
                 }
-
                 $line .= $nextline;
 
                 $line =~ s/\ \\$//;
                 $line =~ s/\s+/\ /g;
             }
-
         }
-
         $info = "line $. in file $filename";
 
         #
@@ -333,7 +330,6 @@ sub read_config_file {
                     push(@keys, $key);
                     push(@vals, $val);
                 }
-
                 $self->__add_hash_param__($info, $name, \@keys, \@vals);
                 next;
 
@@ -341,7 +337,6 @@ sub read_config_file {
                 croak("$error Invalid syntax at line $. in file $filename\n");
             }
         }
-
         #
         # Matches lists
         #
@@ -411,7 +406,6 @@ sub __add_scalar_param__ {
     }
 
     if ($add_param) {
-
         if ($name !~ m/^[a-zA-Z_]\w*/) {
             croak("$error Invalid parameter name syntax $name.\n");
         }
@@ -447,7 +441,6 @@ sub __add_array_param__ {
     if (defined ${$self->{hash_param_names}}{$name}) {
          croak("$error $name is already defined as a hashtable.\n");
     }
-
     if ($add_param) {
 
         if ($name !~ m/^[a-zA-Z_]\w*/) {
@@ -492,9 +485,7 @@ sub __add_hash_param__ {
     if (defined ${$self->{array_param_names}}{$name}) {
          croak("$error $name is already defined as an array.\n");
     }
-
     if ($add_param) {
-
         if ($name !~ m/^[a-zA-Z_]\w*/) {
             croak("$error Invalid parameter name syntax $name.\n");
         }
@@ -555,7 +546,7 @@ Full-featured, general purpose configuration file parsers abound on the
 Comprehensive Perl Archive Network, from the most simple readers (e.g.
 ConfigReader::Simple) to the most sophiticated parsers (e.g. Config::Scoped)
 understanding blocks and interpolations. The objective of the
-Tifa::SimpleConfigReader is extremely modest: this module is not
+Tifa::SimpleConfigReader module is extremely modest: this module is not
 trying to re-invent (a worse version of) the wheel but to fit a very specific
 need encountered during the development of the TIFA library. So, yes, its
 feature set is very restricted and next to no syntaxic sugar is allowed in
@@ -753,7 +744,7 @@ configuration file be given by:
  positions = hash(Atlas => Octant1, CMS => Octant5)
 
 The following code reads this configuration file and prints the values of the
-parameters of the standard output:
+parameters on the standard output:
 
  $reader = new Tifa::SimpleConfigReader();
  #

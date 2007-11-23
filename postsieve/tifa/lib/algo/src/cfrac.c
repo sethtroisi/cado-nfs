@@ -20,25 +20,27 @@
 /**
  * \file    cfrac.c
  * \author  Jerome Milan
- * \date    Early March 2007
- * \version 1.1
+ * \date    Early November 2007
+ * \version 1.2
  */
 
 /*
  * History:
  *
+ * 1.2: Early November 2007 by JM
+ *      - Now uses a smooth_filter_t object to perform smooth residue
+ *        selection with the choice of trial division, trial division +
+ *        early abort or batch.
  * 1.1: Early March 2007 by JM
  *      - Completely refactored to use a factoring_machine_t.
- *
  * 1.0: Tue Mar 14 2006 by JM
  *      - Initial version.
  */
 
-#include "tifa_config.h"
-
 #include <stdlib.h>
 #include <inttypes.h>
 
+#include "tifa_config.h"
 #include "gmp_utils.h"
 #include "first_primes.h"
 #include "matrix.h"
@@ -49,6 +51,7 @@
 #include "bernsteinisms.h"
 #include "x_tree.h"
 #include "macros.h"
+#include "smooth_filter.h"
 #include "cfrac.h"
 
 #define __PREFIX__      "cfrac: "
@@ -180,6 +183,10 @@ struct struct_cfrac_context_t {
     //
     hashtable_t* htable;
     //
+    // Smoothness filter with multi-step early abort.
+    //
+    smooth_filter_t filter;
+    //
     // Product tree of primes in factor base.
     //
     mpz_tree_t* ptree;
@@ -210,7 +217,7 @@ typedef struct struct_u32pair_t u32pair_t;
 //------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
-const u32pair_t optimal_base_sizes[NRANGES] = {
+static const u32pair_t optimal_base_sizes[NRANGES] = {
    //
    // These optimal values were computed by:
    //    - experimental determination for some given size of numbers
@@ -283,11 +290,7 @@ static void generate_xi_yi_pairs(
     uint32_t npairs
 );
 //------------------------------------------------------------------------------
-inline static void select_xi_yi_pairs(
-    cfrac_context_t* context,
-    const mpz_array_t* const cand_xi,
-    const mpz_array_t* const cand_yi
-);
+inline static uint32_t select_xi_yi_pairs(cfrac_context_t* context);
 //------------------------------------------------------------------------------
 static void compute_factor_base(uint32_array_t* factor_base, const mpz_t kn);
 //------------------------------------------------------------------------------
@@ -338,12 +341,9 @@ void set_cfrac_params_to_default(const mpz_t n, cfrac_params_t* const params) {
     //
     // Size of number to factor = size(n),
     //
-    // If:
-    //     optimal_base_sizes[i].min_size_n <= size(n)
-    // and
-    //     size(n) < optimal_base_sizes[i+1].min_size_n
-    // Then:
-    //     use optimal_base_sizes[i].size_base as size of factor base.
+    // If:    optimal_base_sizes[i].min_size_n <= size(n)
+    // and:   size(n) < optimal_base_sizes[i+1].min_size_n
+    // Then:  use optimal_base_sizes[i].size_base as size of factor base.
     //
     uint32_t size_n = mpz_sizeinbase(n, 2);
     uint32_t i      = NRANGES - 1;
@@ -351,11 +351,14 @@ void set_cfrac_params_to_default(const mpz_t n, cfrac_params_t* const params) {
     while (size_n < optimal_base_sizes[i].min_size_n) {
         i--;
     }
-    params->nprimes_in_base  = optimal_base_sizes[i].size_base;
-    params->nprimes_tdiv     = params->nprimes_in_base;
-    params->nrelations       = CFRAC_DFLT_NRELATIONS;
-    params->lsr_method       = CFRAC_DFLT_LSR_METHOD;
-    params->use_large_primes = CFRAC_DFLT_USE_LARGE_PRIMES;
+    params->nprimes_in_base    = optimal_base_sizes[i].size_base;
+    params->nprimes_tdiv       = params->nprimes_in_base;
+    params->nrelations         = CFRAC_DFLT_NRELATIONS;
+    params->linalg_method      = CFRAC_DFLT_LINALG_METHOD;
+    params->use_large_primes   = CFRAC_DFLT_USE_LARGE_PRIMES;
+    params->filter_method      = DJB_BATCH;
+    params->nsteps_early_abort = 0;
+    
 }
 //------------------------------------------------------------------------------
 
@@ -450,11 +453,15 @@ static ecode_t init_cfrac_context(factoring_machine_t* const machine) {
                               size, uint32_cmp_func, hash_rj_32
                           );
     }
+    // const uint32_t e = ceil_log2(context->nrows_to_collect);
+    //
+    // Uses smaller batches for the time being until we have better studied
+    // the impact of the batch sizes.
+    //
+    const uint32_t e = 6;
 
-    const uint32_t e = ceil_log2(context->nrows_to_collect);
-
-    context->candidate_yi = alloc_mpz_array((1<<e));
-    context->candidate_xi = alloc_mpz_array((1<<e));
+    context->candidate_yi = alloc_mpz_array(1 << e);
+    context->candidate_xi = alloc_mpz_array(1 << e);
     //
     // _TO_DO_: Since the maximum size of the yi is known we can actually
     //          allocate all the space needed by hand with only one call to
@@ -464,6 +471,32 @@ static ecode_t init_cfrac_context(factoring_machine_t* const machine) {
         mpz_init(context->candidate_yi->data[i]);
         mpz_init(context->candidate_xi->data[i]);
     }
+    //
+    // Init filter used for smoothness detection.
+    //
+    context->filter.n             = context->n;
+    context->filter.kn            = context->kn;
+    context->filter.batch_size    = 1 << e;
+    context->filter.nsteps        = params->nsteps_early_abort;
+    context->filter.htable        = context->htable;
+    context->filter.base_size     = context->factor_base->length;
+    context->filter.candidate_xi  = context->candidate_xi;
+    context->filter.candidate_yi  = context->candidate_yi;
+    context->filter.accepted_xi   = &(context->new_accepted_xi);
+    context->filter.accepted_yi   = &(context->new_accepted_yi);
+    context->filter.complete_base = context->factor_base;
+    
+    context->filter.method = params->filter_method;
+    context->filter.nsteps = params->nsteps_early_abort;
+    
+    //
+    // _WARNING_: Large prime variation is mandatory for the time being...
+    //
+    //context->filter.use_large_primes = params->use_large_primes;
+    context->filter.use_large_primes = true;
+    context->filter.use_siqs_variant = false;
+
+    complete_filter_init(&(context->filter), context->factor_base);
 
     STOP_TIMER;
     PRINT_TIMING;
@@ -518,6 +551,8 @@ static ecode_t clear_cfrac_context(factoring_machine_t* const machine) {
         free(context->ptree);
 
         free(context->mult_data);
+        
+        clear_smooth_filter(&(context->filter));
 
         if (context->htable != NULL) {
             clear_mpzpair_htable(context->htable);
@@ -633,7 +668,6 @@ static ecode_t update_cfrac_context(factoring_machine_t* const machine) {
 }
 //------------------------------------------------------------------------------
 static ecode_t perform_cfrac(factoring_machine_t* const machine) {
-
     //
     // Perform the CFRAC algorithm using the current CFRAC context.
     //
@@ -643,7 +677,6 @@ static ecode_t perform_cfrac(factoring_machine_t* const machine) {
     INIT_TIMER;
     PRINT_COLLECT_RELS_MSG;
     START_TIMER;
-
     //
     // Collect xi^2 = yi (mod kn) relations with yi smooth
     //
@@ -655,12 +688,12 @@ static ecode_t perform_cfrac(factoring_machine_t* const machine) {
     PRINT_FACTOR_RES_MSG;
     RESET_TIMER;
     START_TIMER;
-
+    
     uint32_array_t primes_array;
     primes_array.alloced = 0;
     primes_array.length  = params->nprimes_tdiv;
     primes_array.data    = (uint32_t*)(context->factor_base->data);
-
+    
     //
     // Fill the matrix: first by trial divisions...
     //
@@ -682,11 +715,9 @@ static ecode_t perform_cfrac(factoring_machine_t* const machine) {
         primes_array.data   = (uint32_t*) &(
                                 context->factor_base->data[params->nprimes_tdiv]
                               );
-        bern_71(
-            decomp_list,
-            context->partial_yi_array,
-            &primes_array
-        );
+        
+        bern_71(decomp_list, context->partial_yi_array, &primes_array);
+        
         fill_matrix_from_list(
             context->matrix,
             context->partial_yi_array,
@@ -711,7 +742,7 @@ static ecode_t perform_cfrac(factoring_machine_t* const machine) {
     uint32_array_list_t* relations;
     
     if (machine->mode == SINGLE_RUN) {
-        relations = find_dependencies(context->matrix, params->lsr_method);
+        relations = find_dependencies(context->matrix, params->linalg_method);
     } else {
         //
         // We have to clone the matrix and perform the resolution on the copy
@@ -720,12 +751,11 @@ static ecode_t perform_cfrac(factoring_machine_t* const machine) {
         //
         binary_matrix_t* clone = clone_binary_matrix(context->matrix);
         
-        relations = find_dependencies(clone, params->lsr_method);
+        relations = find_dependencies(clone, params->linalg_method);
         
         clear_binary_matrix(clone);
         free(clone);
     }
-
     STOP_TIMER;
     PRINT_TIMING;
     PRINT_DED_FACTORS_MSG;
@@ -768,19 +798,18 @@ static ecode_t recurse(mpz_array_t* const factors, uint32_array_t* const multis,
  */
 
 //------------------------------------------------------------------------------
-static void collect_xi_yi_pairs(cfrac_context_t* context) {
+static void collect_xi_yi_pairs(cfrac_context_t* context) {    
     //
     // Collect relations xi^2 = yi (mod kn) with yi smooth.
     //
-
     INIT_NAMED_TIMER(generation);
     INIT_NAMED_TIMER(selection);
-
+    
     //
-    // We have already selected 'selected' relations. (Used if the CFRAC
+    // We have already accepted 'accepted' relations. (Used if the CFRAC
     // context was updated after a failure to try to find more relations)
     //
-    uint32_t selected = context->all_accepted_yi->length;
+    uint32_t accepted = context->all_accepted_yi->length;
     //
     // Make new_accepted_yi and new_accepted_xi point to subarrays of
     // all_accepted_yi and all_accepted_xi.
@@ -795,15 +824,23 @@ static void collect_xi_yi_pairs(cfrac_context_t* context) {
     context->new_accepted_yi.alloced = context->nrows_to_collect;
     context->new_accepted_xi.alloced = context->nrows_to_collect;
 
-    context->new_accepted_yi.data = &(context->all_accepted_yi->data[selected]);
-    context->new_accepted_xi.data = &(context->all_accepted_xi->data[selected]);
+    context->new_accepted_yi.data = &(context->all_accepted_yi->data[accepted]);
+    context->new_accepted_xi.data = &(context->all_accepted_xi->data[accepted]);
 
     while (context->new_accepted_yi.length != context->nrows_to_collect) {
         //
-        // Compute candidate yi and xi such that yi = xi^2 (mod kn)...
+        // If context->candidate_yi->length != 0, it means that not all
+        // relations were used to reach the amount needed to go to the
+        // linear algebra phase.
+        //
+        // However if the context needs to be updated later on (because none of 
+        // the found relations yields a non trivial factor) we'll come back 
+        // in this loop to collect more residues.
         //
         START_NAMED_TIMER(generation);
-
+        //
+        // Compute candidate yi and xi such that yi = xi^2 (mod kn)...
+        //
         generate_xi_yi_pairs(
             context->cfstate,
             context->candidate_xi,
@@ -812,17 +849,13 @@ static void collect_xi_yi_pairs(cfrac_context_t* context) {
         );
 
         STOP_NAMED_TIMER(generation);
-
         START_NAMED_TIMER(selection);
+
         //
         // ... and keep only pairs for which yi is smooth and pairs found
         // via the large prime variation (if this variation is used).
-        //
-        select_xi_yi_pairs(
-            context,
-            context->candidate_xi,
-            context->candidate_yi
-        );
+        //        
+        filter_new_relations(&(context->filter));
 
         STOP_NAMED_TIMER(selection);
 
@@ -830,23 +863,8 @@ static void collect_xi_yi_pairs(cfrac_context_t* context) {
             context->new_accepted_yi.length,
             context->nrows_to_collect
         );
-        //
-        // _KLUDGE_: For the time being, we reset the lengths of the
-        //           candidate_* arrays. But actually, they may still contain
-        //           xi and yi values that have not been checked. Therefore,
-        //           as things are right now, we _do_ generate extra, unused
-        //           residues. However, such a waste only appears after
-        //           updating the CFRAC context to find more relations. In such
-        //           a case, the number of extra residues to generate is very
-        //           small so the performance penalty is not significant.
-        //
-        // _TO_DO_: Fix the aforementionned behavior while keeping the code
-        //          clean and easy to understand.
-        //
-        context->candidate_yi->length = 0;
-        context->candidate_xi->length = 0;
     }
-
+    
     PRINT_RES_GENERATED_MSG(GET_NAMED_TIMING(generation));
     PRINT_RES_SELECTED_MSG(GET_NAMED_TIMING(selection));
 
@@ -864,17 +882,16 @@ static void generate_xi_yi_pairs(
                         uint32_t npairs) {
 
     //
-    // Generate npairs relations xi^2 = yi (mod kn) and append them in the
-    // xi_array and yi_array.
+    // Generate npairs relations xi^2 = yi (mod kn) and append them in
+    // the xi_array and yi_array.
     //
-
-    uint32_t free_space = xi_array->alloced - xi_array->length;
+    uint32_t const free_space = xi_array->alloced - xi_array->length;
 
     npairs = MIN(npairs, free_space);
 
-    uint32_t from = xi_array->length;
-    uint32_t to   = xi_array->length + npairs;
-    uint32_t i    = from;
+    uint32_t const from = xi_array->length;
+    uint32_t const to   = xi_array->length + npairs;
+    uint32_t       i    = from;
 
     while (i < to) {
 
@@ -908,31 +925,27 @@ static void generate_xi_yi_pairs(
 	yi_array->length += npairs;
 }
 //------------------------------------------------------------------------------
-inline static void select_xi_yi_pairs(
-                            cfrac_context_t* context,
-                            const mpz_array_t* const cand_xi,
-                            const mpz_array_t* const cand_yi) {
+inline static uint32_t select_xi_yi_pairs(cfrac_context_t* context) {
     //
-    // Select relations xi^2 = yi (mod kn) from the cand_xi and cand_yi arrays
-    // so that yi is smooth.
+    // Select relations xi^2 = yi (mod kn) from the candidate_xi and
+    // candidate_yi arrays so that yi is smooth.
     //
-
     if (context->use_large_primes) {
-        bern_21_rt_pairs_lp(
+        return bern_21_rt_pairs_lp(
             context->n,
             context->htable,
             &(context->new_accepted_xi),
             &(context->new_accepted_yi),
-            cand_xi,
-            cand_yi,
+            context->candidate_xi,
+            context->candidate_yi,
             context->ptree->data[0]
         );
     } else {
-        bern_21_rt_pairs(
+        return bern_21_rt_pairs(
             &(context->new_accepted_xi),
             &(context->new_accepted_yi),
-            cand_xi,
-            cand_yi,
+            context->candidate_xi,
+            context->candidate_yi,
             context->ptree->data[0]
         );
     }

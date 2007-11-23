@@ -32,7 +32,7 @@ package Tifa::Program;
 # Last modified : Wed Jan 31 2007
 #
 # Version : 0.1.0
-# License : GNU Lesser General Public License (LGPL)
+# License : GNU Lesser General Public License (LGPL) v2.1 or later
 #           Copyright (C) 2006, 2007 INRIA
 #-------------------------------------------------------------------------------
 # History

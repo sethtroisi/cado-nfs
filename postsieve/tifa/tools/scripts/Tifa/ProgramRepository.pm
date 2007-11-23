@@ -28,16 +28,21 @@ package Tifa::ProgramRepository;
 #-------------------------------------------------------------------------------
 # File          : ProgramRepository.pm
 # Author        : Jerome Milan
-# Created on    : Early Feb 2007
-# Last modified : Early Feb 2007
+# Created on    : February 2007
+# Last modified : November 2007
 #
-# Version : 0.1.0
-# License : GNU Lesser General Public License (LGPL)
+# Version : 0.1.2
+# License : GNU Lesser General Public License (LGPL) v2.1 or later
 #           Copyright (C) 2006, 2007 INRIA
 #-------------------------------------------------------------------------------
 # History
 #-------------------------------------------------------------------------------
-#
+# 0.1.2: November 2007 by JM:
+#        - Added 'use_defaults' mode for QS and SIQS. Changed lsr_method
+#          to linalg_method and nprimes_tdiv_smooth_nb to 
+#          nprimes_tdiv_smooth_res.
+# 0.1.1: September 2007 by JM:
+#        - Added McKee's variant of Fermat's algorithm.
 #-------------------------------------------------------------------------------
 # Short description
 #-------------------------------------------------------------------------------
@@ -82,38 +87,46 @@ $cfrac_program->set_exe("cfrac_factors");
 
 @param_names = (
     "nprimes_in_factor_base",
-    "nprimes_tdiv_smooth_nb",
+    "nprimes_tdiv_smooth_res",
+    "filter_method",
+    "nsteps_early_abort",
     "nrelations",
-    "lsr_method",
+    "linalg_method",
     "use_large_primes",
-    "nprimes_tdiv",
+    "nprimes_tdiv"
 );
 @param_descrs = (
     "Number of primes in factor base",
     "Number of primes to trial divide by the residues",
+    "Method of smooth residue detection",
+    "Number of steps in early abort strategy",
     "Number of relations",
     "Method of linear system resolution",
     "Whether to use the large prime variation or not",
-    "Number of primes to trial divide the number to factor",
+    "Number of primes to trial divide the number to factor"
 );
 @param_types = (
     "int",
     "int",
     "int",
     "int",
-    "switch",
     "int",
+    "int",
+    "switch",
+    "int"
 );
 
 $cmdline = join(
     ' ',
     "exe",
     "nprimes_in_factor_base",
-    "nprimes_tdiv_smooth_nb",
+    "nprimes_tdiv_smooth_res",
+    "filter_method",
+    "nsteps_early_abort",
     "nrelations",
-    "lsr_method",
+    "linalg_method",
     "use_large_primes",
-    "nprimes_tdiv",
+    "nprimes_tdiv"
 );
 #
 # Default mode: We should specify all of the parameter values on
@@ -159,17 +172,28 @@ Parameter(s):
       (mandatory in 'no_defaults' mode)
       Number of primes of the factor base.
 
-  --nprimes_tdiv_smooth_nb=i
+  --nprimes_tdiv_smooth_res=i
       (mandatory in 'no_defaults' mode)
       Number of primes to consider in the trial division of the
       smooth residues.
 
+  --filter_method=i
+      (mandatory in 'no_defaults' mode)
+      Method to use for smooth residue detection.
+      0: Trial division
+      1: Trial division + early abort
+      2: Bernstein's batch
+
+  --nsteps_early_abort=i
+      Number of steps in early abort strategy for residues factorization.
+      No early abort is performed if nsteps_early_abort = 0.
+      
   --nrelations=i
       (mandatory in 'no_defaults' mode)
       Number of relations to find during the linear resolution
       phase of the CFRAC algorithm.
 
-  --lsr_method=i
+  --linalg_method=i
       (mandatory in 'no_defaults' mode)
       Linear system resolution method to use.
       Accepted values:
@@ -269,9 +293,9 @@ $qs_program->set_exe("qs_factors");
 
 @param_names = (
     "nprimes_in_factor_base",
-    "nprimes_tdiv_smooth_nb",
+    "nprimes_tdiv_smooth_res",
     "nrelations",
-    "lsr_method",
+    "linalg_method",
     "use_large_primes",
     "nprimes_tdiv",
 );
@@ -296,9 +320,9 @@ $cmdline = join(
     ' ',
     "exe",
     "nprimes_in_factor_base",
-    "nprimes_tdiv_smooth_nb",
+    "nprimes_tdiv_smooth_res",
     "nrelations",
-    "lsr_method",
+    "linalg_method",
     "use_large_primes",
     "nprimes_tdiv",
 );
@@ -314,6 +338,25 @@ $qs_program->add_mode("no_defaults",
 $qs_program->set_default_mode("no_defaults");
 $qs_program->set_mode("no_defaults");
 
+@param_names  = (
+    "nprimes_tdiv",
+);
+@param_descrs = (
+    "Number of primes to trial divide the number to factor",
+);
+@param_types  = (
+    "int",
+);
+$cmdline =  "exe nprimes_tdiv";
+#
+# use_defaults mode: Let CFRAC use the precomputed optimal parameter values
+#                    depending on the size of the number to factor
+#
+$qs_program->add_mode("use_defaults",
+                      "'Best' mode: let QS use optimal values",
+                      \@param_names, \@param_descrs, \@param_types,
+                      $cmdline);
+
 $help = <<EOS;
 Parameter(s):
 
@@ -328,7 +371,7 @@ Parameter(s):
       (mandatory)
       Number of primes of the factor base.
 
-  --nprimes_tdiv_smooth_nb=i
+  --nprimes_tdiv_smooth_res=i
       (mandatory)
       Number of primes to consider in the trial division of the
       smooth residues.
@@ -338,7 +381,7 @@ Parameter(s):
       Number of relations to find during the linear resolution
       phase of the QS algorithms.
 
-  --lsr_method=i
+  --linalg_method=i
       (mandatory)
       Linear system resolution method to use.
       Accepted values:
@@ -368,9 +411,9 @@ $siqs_program->set_exe("siqs_factors");
 @param_names = (
     "sieve_half_width",
     "nprimes_in_factor_base",
-    "nprimes_tdiv_smooth_nb",
+    "nprimes_tdiv_smooth_res",
     "nrelations",
-    "lsr_method",
+    "linalg_method",
     "use_large_primes",
     "nprimes_tdiv",
 );
@@ -397,9 +440,9 @@ $cmdline = join(
     "exe",
     "sieve_half_width",
     "nprimes_in_factor_base",
-    "nprimes_tdiv_smooth_nb",
+    "nprimes_tdiv_smooth_res",
     "nrelations",
-    "lsr_method",
+    "linalg_method",
     "use_large_primes",
     "nprimes_tdiv",
 );
@@ -414,6 +457,25 @@ $siqs_program->add_mode("no_defaults",
 
 $siqs_program->set_default_mode("no_defaults");
 $siqs_program->set_mode("no_defaults");
+
+@param_names  = (
+    "nprimes_tdiv",
+);
+@param_descrs = (
+    "Number of primes to trial divide the number to factor",
+);
+@param_types  = (
+    "int",
+);
+$cmdline =  "exe nprimes_tdiv";
+#
+# use_defaults mode: Let CFRAC use the precomputed optimal parameter values
+#                    depending on the size of the number to factor
+#
+$siqs_program->add_mode("use_defaults",
+                        "'Best' mode: let QS use optimal values",
+                        \@param_names, \@param_descrs, \@param_types,
+                        $cmdline);
 
 $help = <<EOS;
 Parameter(s):
@@ -434,7 +496,7 @@ Parameter(s):
       (mandatory)
       Number of primes of the factor base.
 
-  --nprimes_tdiv_smooth_nb=i
+  --nprimes_tdiv_smooth_res=i
       (mandatory)
       Number of primes to consider in the trial division of the
       smooth residues.
@@ -444,7 +506,7 @@ Parameter(s):
       Number of relations to find during the linear resolution
       phase of the SIQS algorithms.
 
-  --lsr_method=i
+  --linalg_method=i
       (mandatory)
       Linear system resolution method to use.
       Accepted values:

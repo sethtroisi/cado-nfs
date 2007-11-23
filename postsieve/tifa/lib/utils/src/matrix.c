@@ -44,6 +44,12 @@
 
 #include "bitstring_t.h"
 
+/*
+ *-----------------------------------------------------------------------------
+ *              binary_matrix_t and associated functions
+ *-----------------------------------------------------------------------------
+ */
+
 //-----------------------------------------------------------------------------
 void reset_binary_matrix(binary_matrix_t* const matrix) {
     for (uint32_t i = 0U; i < matrix->nrows_alloced; i++) {
@@ -244,5 +250,102 @@ uint32_t first_row_with_one_on_col(uint32_t col,
     //           context, is indeed -1.
     //
     return NO_SUCH_ROW;
+}
+//-----------------------------------------------------------------------------
+
+/*
+ *-----------------------------------------------------------------------------
+ *              byte_matrix_t and associated functions
+ *-----------------------------------------------------------------------------
+ */
+
+//-----------------------------------------------------------------------------
+void reset_byte_matrix(byte_matrix_t* const matrix) {
+    for (uint32_t i = 0U; i < matrix->nrows_alloced; i++) {
+#if TIFA_USE_CALLOC_MEMSET
+        memset(
+            matrix->data[i],
+            0x00,
+            matrix->ncols_alloced * sizeof(unsigned char)
+        );
+#else
+        for (uint32_t j = 0U; j < matrix->ncols_alloced; j++) {
+            matrix->data[i][j] = 0;
+        }
+#endif
+    }
+}
+//-----------------------------------------------------------------------------
+byte_matrix_t* alloc_byte_matrix(uint32_t nrows, uint32_t ncols) {
+
+    byte_matrix_t* matrix = malloc(sizeof(byte_matrix_t));
+
+    matrix->nrows_alloced = nrows;
+    matrix->ncols_alloced = ncols;
+    
+    matrix->nrows = nrows;
+    matrix->ncols = ncols;
+    
+    matrix->data  = malloc(matrix->nrows_alloced * sizeof(unsigned char*));
+
+    for (uint32_t i = 0U; i < matrix->nrows_alloced; i++) {
+#if TIFA_USE_CALLOC_MEMSET
+        matrix->data[i] = calloc(matrix->ncols_alloced, sizeof(unsigned char));
+#else
+        matrix->data[i] = malloc(matrix->ncols_alloced * sizeof(unsigned char));
+#endif
+    }
+
+#if ! TIFA_USE_CALLOC_MEMSET
+    reset_byte_matrix(matrix);
+#endif
+
+    reset_byte_matrix(matrix);
+
+    return matrix;
+}
+//-----------------------------------------------------------------------------
+byte_matrix_t* clone_byte_matrix(const byte_matrix_t * const matrix) {
+    
+    byte_matrix_t* clone = malloc(sizeof(byte_matrix_t));
+    
+    clone->nrows_alloced = matrix->nrows_alloced;
+    clone->ncols_alloced = matrix->ncols_alloced;
+    clone->nrows = matrix->nrows;
+    clone->ncols = matrix->ncols;    
+    clone->data  = malloc(clone->nrows_alloced * sizeof(unsigned char));
+
+    size_t rowsize = clone->ncols_alloced * sizeof(unsigned char);
+
+    for (uint32_t i = 0U; i < clone->nrows_alloced; i++) {
+        clone->data[i] = malloc(rowsize);
+        memcpy(clone->data[i], matrix->data[i], rowsize);
+    }
+    return clone;
+}
+//-----------------------------------------------------------------------------
+void clear_byte_matrix(byte_matrix_t* const matrix) {
+    for (uint32_t i = 0U; i < matrix->nrows_alloced; i++) {
+        free(matrix->data[i]);
+    }
+    free(matrix->data);
+
+    matrix->nrows_alloced = 0U;
+    matrix->ncols_alloced = 0U;
+    matrix->nrows = 0U;
+    matrix->ncols = 0U;
+}
+//-----------------------------------------------------------------------------
+void print_byte_matrix(const byte_matrix_t* const matrix) {
+    //
+    // Mostly for debugging purposes...
+    //
+    for (uint32_t i = 0U; i < matrix->nrows; i++) {
+        printf("row %4u : ", i);
+        for (uint32_t j = 0U; j < matrix->ncols; j++) {
+            printf("%4u", (unsigned int)matrix->data[i][j]);            
+        }
+        printf("\n");
+    }
 }
 //-----------------------------------------------------------------------------

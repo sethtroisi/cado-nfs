@@ -111,6 +111,10 @@ extern "C" {
 #define FR_REV_CYCL_STRING "reverse cycling to find a factor (fast ret)..."
 #define UPDATE_RACE_STRING "updating context to perform a race... "
 //
+// Strings pertaining to SIQS only
+//
+#define NEXT_A_HACK_STRING "WARNING: running out of polynomials soon..."
+//
 // Strings pertaining to trial division only
 //
 #define DIVIDING_STRING_FORMAT "trial dividing by %lu primes..."
@@ -185,7 +189,6 @@ extern "C" {
     //
     // Introductive messages for all algorithms
     //
-
     #define PRINT_INTRO_MSG(NAME)                                     \
         do {                                                          \
             PRINTF(__PREFIX__ "attempting %s factorization\n", NAME); \
@@ -266,7 +269,7 @@ extern "C" {
         PRFX_PRINTF(TAB "primes computed in   "TIMING_FORMAT" seconds\n",   \
                     TIMING);
     #define PRINT_SQRTM_MSG(TIMING)                                         \
-        PRFX_PRINTF(TAB "sqrtm computed in    "TIMING_FORMAT" seconds\n",   \
+        PRFX_PRINTF(TAB "sqrtm  computed in   "TIMING_FORMAT" seconds\n",   \
                     TIMING);
     #define PRINT_GREEDY_MSG(TIMING)                                        \
         PRFX_PRINTF(TAB "greedy phase done in "TIMING_FORMAT" seconds\n",   \
@@ -286,6 +289,20 @@ extern "C" {
 #define PRINT_INV_SQRT_MSG      PRINT_MSG(INV_SQRT_STRING)
 #define PRINT_REV_CYCL_MSG      PRINT_MSG(REV_CYCL_STRING)
 #define PRINT_FR_REV_CYCL_MSG   PRINT_MSG(FR_REV_CYCL_STRING)
+//
+// Messages pertaining to SIQS only
+//
+#if __VERBOSE__
+    #define PRINT_NEXT_A_HACK_MSG PRINT_LINE(TAB NEXT_A_HACK_STRING)
+#elif __TIMING__
+    #define PRINT_NEXT_A_HACK_MSG do {              \
+            PRINTF("\n");                           \
+            PRINT_LINE(TAB NEXT_A_HACK_STRING);     \
+            PRINT_COLLECT_RELS_MSG;                 \
+        } while (0)
+#else
+    #define PRINT_NEXT_A_HACK_MSG /* intentionally left empty */
+#endif
 //
 // Messages pertaining to trial division only
 //

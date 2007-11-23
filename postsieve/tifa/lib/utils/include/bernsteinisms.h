@@ -20,8 +20,8 @@
 /**
  * \file    bernsteinisms.h
  * \author  Jerome Milan
- * \date    circa March 2007
- * \version 1.0.2
+ * \date    Fri Oct 12 2007
+ * \version 1.1
  *
  * \brief Algorithms from two D. J. Bernstein's papers on the factorization
  * of small integers.
@@ -34,8 +34,10 @@
  */
 
  /*
-  *  License: GNU Lesser General Public License (LGPL)
   *  History:
+  *  
+  *  1.1:   Fri Oct 12 2007 by JM:
+  *         - Added multi-step early abort strategy (see smooth_filter.h)
   *
   *  1.0.2: circa March 2007 by JM:
   *         - Added function bern_21_rt_pairs_siqs.
@@ -64,6 +66,7 @@ extern "C" {
 #include "array.h"
 #include "x_array_list.h"
 #include "hashtable.h"
+#include "smooth_filter.h"
 
 //-----------------------------------------------------------------------------
 // Ref. "How to find small factors of integers", Daniel J. Bernstein
@@ -559,6 +562,59 @@ uint32_t bern_21_rt_pairs_lp_siqs(
     const mpz_t z
 );
 
+  /**
+    * \brief Daniel J. Bernstein's algorithm 2.1 adapted to be used with a
+    * \c smooth_filter_t.
+    *
+    * <h3>If \c filter->nsteps == 0 </h3>
+    *
+    * In such a case, no early abort strategy is performed. The effect of
+    * the function is the same as \c bern_21_*_pairs_* called with:
+    * \verbatim
+    filter->n
+    filter->htable
+    filter->accepted_xi
+    filter->accepted_yi
+    filter->accepted_ai
+    filter->candidate_xi
+    filter->candidate_yi
+    filter->candidate_ai
+    filter->prod_pj[0]
+    \endverbatim
+    * 
+    * <h3>If \c filter->nsteps != 0 </h3>
+    *
+    * An early abort strategy is performed.
+    *
+    * \li If 1 <= \c step < \c filter->nsteps:<br />
+    * Relations at step \c step-1 from \c filter,  
+    * (\c filter->filtered_*[\c step-1]) are used as "candidate" arrays to
+    * populate either \c filter->accepted_* or \c filter->filtered_*[step].
+    * 
+    * \li If \c step == 0:<br />
+    * The candidate relations are taken from \c filter->candidate_*.
+    *
+    * \li If \c step == \c filter->nsteps:<br />
+    * The candidate relations are taken from
+    * \c filter->filtered_*[\c filter->nsteps - 1] and 'good' relations
+    * will be stored in \c filter->accepted_*.
+    *
+    * \see The bern_21_* functions.
+    *
+    * \warning Using \c filter->nsteps != 0 is not recommended. First, it
+    * certainly does not make any sense to try to early-abort the batch.
+    * Second, even if it is useful (for some weird reasons that I'm not
+    * aware of), the cases \c filter->nsteps != 0 have not been tuned / fully
+    * debugged.
+    *
+    * \param filter pointer to the \c smooth_filter_t to use
+    * \param step the step number in the early abort strategy
+    * \return The number of relations used from the "candidate" arrays.
+    */
+inline uint32_t djb_batch_rt(
+    smooth_filter_t* const filter,
+    unsigned long int step
+);
 
 #ifdef __cplusplus
 }

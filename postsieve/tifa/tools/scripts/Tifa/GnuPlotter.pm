@@ -32,7 +32,7 @@ package Tifa::GnuPlotter;
 # Last modified : circa August 2006
 #
 # Version : 0.1
-# License : GNU Lesser General Public License (LGPL)
+# License : GNU Lesser General Public License (LGPL) v2.1 or later
 #           Copyright (C) 2006, 2007 INRIA
 #-------------------------------------------------------------------------------
 # History

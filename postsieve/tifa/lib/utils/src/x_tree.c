@@ -631,11 +631,7 @@ mpz_tree_t* rem_tree(const mpz_t z, const mpz_tree_t* const ptree) {
             // works here because the data we copy does not contain pointers to
             // other data locations...
             //
-            memcpy(
-                remdata,
-                numdata,
-                numalloc * sizeof(mp_limb_t)
-            );
+            memcpy(remdata, numdata, numalloc * sizeof(mp_limb_t));
             resdata[0]->_mp_size  = numsize;
 
         } else {
@@ -647,8 +643,7 @@ mpz_tree_t* rem_tree(const mpz_t z, const mpz_tree_t* const ptree) {
         }
     } else {
 
-        mpn_tdiv_qr(quotdata, remdata, 0,
-                    numdata, numalloc, dendata, denalloc);
+        mpn_tdiv_qr(quotdata, remdata, 0, numdata, numalloc, dendata, denalloc);
 
         if (numsize < 0) {
             mpn_sub(remdata, dendata, denalloc, remdata, denalloc);
@@ -680,11 +675,7 @@ mpz_tree_t* rem_tree(const mpz_t z, const mpz_tree_t* const ptree) {
 
         if (quotalloc <= 0) {
             if (numsize >= 0) {
-                memcpy(
-                    remdata,
-                    numdata,
-                    numalloc * sizeof(mp_limb_t)
-                );
+                memcpy(remdata, numdata, numalloc * sizeof(mp_limb_t));
                 resdata[ichild_1]->_mp_size  = numsize;
             } else {
                 mpn_sub(remdata, dendata, denalloc, numdata, numalloc);
@@ -719,11 +710,7 @@ mpz_tree_t* rem_tree(const mpz_t z, const mpz_tree_t* const ptree) {
 
         if (quotalloc <= 0) {
             if (numsize >= 0) {
-                memcpy(
-                    remdata,
-                    numdata,
-                    numalloc * sizeof(mp_limb_t)
-                );
+                memcpy(remdata, numdata, numalloc * sizeof(mp_limb_t));
                 resdata[ichild_2]->_mp_size  = numsize;
             } else {
                 mpn_sub(remdata, dendata, denalloc, numdata, numalloc);

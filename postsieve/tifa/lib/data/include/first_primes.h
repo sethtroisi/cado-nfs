@@ -58,6 +58,11 @@
 extern const uint32_t first_primes[NFIRST_PRIMES] __attribute__ ((unused));
 
 /**
+ * The largest prime in the \c first_primes array.
+ */
+extern const uint32_t LARGEST_PRIME __attribute__ ((unused));
+
+/**
  * \c first_primes_array is a \c uint32_array_t wrapper to the array
  * \c first_primes.
  *

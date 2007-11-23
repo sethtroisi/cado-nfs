@@ -658,6 +658,10 @@ typedef struct struct_squfof_racer_t squfof_racer_t;
 //
 struct struct_squfof_context_t {
     //
+    // SQUFOF's parameters. Actually none for the time being...
+    //
+    squfof_params_t* params;
+    //
     // The number to factor.
     //
     mpz_ptr n;
@@ -803,10 +807,11 @@ static ecode_t init_squfof_context(factoring_machine_t* const machine) {
     machine->context          = (void*) malloc(sizeof(squfof_context_t));
     squfof_context_t* context = (squfof_context_t*) machine->context;
 
+    context->params  = machine->params;
     context->n       = machine->n;
     context->updated = false;
     context->integer_too_large = false;
-
+        
     STOP_TIMER;
     PRINT_TIMING;
 
@@ -904,6 +909,7 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
 
     INIT_TIMER;
     squfof_context_t* context = (squfof_context_t*) machine->context;
+        
     ecode_t ecode = SOME_FACTORS_FOUND;
 
     mpf_set_default_prec(128);
@@ -1155,7 +1161,6 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
             goto clean_and_return;
         }
     }
-
     STOP_TIMER;
     PRINT_TIMING;
     PRINT_INV_SQRT_MSG;
@@ -1413,7 +1418,7 @@ static ecode_t perform_squfof_race(factoring_machine_t* const machine) {
             return rcode;
         }
     }
-
+    
     STOP_TIMER;
     PRINT_TIMING;
     PRINT_INV_SQRT_MSG;

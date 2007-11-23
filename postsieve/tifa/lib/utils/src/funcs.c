@@ -757,6 +757,66 @@ unsigned long int sqrtm_p2(uint32_t n, uint32_t p) {
     return (unsigned long int)s;
 }
 //-----------------------------------------------------------------------------
+uint32_t ks_multiplier(const mpz_t n, const uint32_t size_base) {
+    
+    mpz_t kn;
+    mpz_init(kn);
+    
+    uint32_t mult   = 1;
+    uint32_t p      = 0;    
+    double   ksf    = 0.0;
+    double   ksfmax = 0.0;
+    
+    for (uint32_t k = 1; k <= LARGEST_MULTIPLIER; k++) {
+    
+        ksf = 0.0;
+    
+        mpz_mul_ui(kn, n, k);
+    
+        if (1 != (mpz_get_ui(kn) & 7)) {
+            //
+            // Silverman suggests to use a multiplier k such that kn mod 8 = 1.
+            //
+            continue;
+        }
+        //
+        // p = 2
+        //
+        if (1 == mpz_kronecker_ui(kn, p)) {
+            ksf += 2.0 * log(2.0);
+        }
+        
+        //
+        // p > 2
+        //
+        uint32_t ip = 1;
+        uint32_t np = 1;
+    
+        while ((np < size_base) && (ip < NFIRST_PRIMES)) {
+    
+            p = first_primes[ip];
+    
+            if (1 == mpz_kronecker_ui(kn, p)) {
+                ksf += log(p) / p;
+                if (k % p != 0) {
+                    ksf += log(p) / p;
+                }
+            }
+            ip++;
+            np++;
+        }
+        ksf -= 0.5 * log(k);
+    
+        if (ksf > ksfmax) {
+            ksfmax = ksf;
+            mult   = k;
+        }
+    }
+    mpz_clear(kn);
+    
+    return mult;
+}
+//-----------------------------------------------------------------------------
 
 /*
  *-----------------------------------------------------------------------------

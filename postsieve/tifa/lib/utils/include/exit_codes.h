@@ -121,7 +121,7 @@ enum ecode_enum {
 
    /**
     * \typedef ecode_t
-    * \brief Equivalent to <tt>struct ecode_enum</tt>.
+    * \brief Equivalent to <tt>enum ecode_enum</tt>.
     */
 typedef enum ecode_enum ecode_t;
 

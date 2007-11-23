@@ -11,12 +11,12 @@
       - refactoring of all of the Perl scripts
       - WARNING: timing files' format changed!
       - WARNING: some API's changed!
-      - (untuned) implementation of the basic Quadratic Sieve
-      - (untuned) implementation of the Self-Initializing Quadratic Sieve
+      - implementation of the basic Quadratic Sieve
+      - implementation of the Self-Initializing Quadratic Sieve
       - implementation of the Square Form Factorization algorithm (small
         numbers only though, less than double precision) with "fast return"
-      - (untuned) implementation of McKee's speedup of Fermat's factorization
-        algorithm (greedy variant).
+      - implementation of McKee's speedup of Fermat's factorization algorithm
+        (greedy variant) with multiplier race.
       - switched from MPZ to MPN layer of GMP for critical parts of code
       - misc bug fixes
 

@@ -17,17 +17,18 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 //
 
-#include <stdio.h>
-
 /**
  * \file    bernsteinisms.c
  * \author  Jerome Milan
- * \date    Wed Apr 18 2007
- * \version 1.0.2
+ * \date    Fri Oct 12 2007
+ * \version 1.1
  */
 
  /*
   *  History:
+  *
+  *  1.1:   Fri Oct 12 2007 by JM:
+  *         - Added multi-step early abort strategy (see smooth_filter.h)
   *
   *  1.0.2: Wed Apr 18 2007 by JM:
   *         - Shorten function names (nothing else!) even though we were
@@ -43,22 +44,61 @@
 
 #include <stdlib.h>
 #include <math.h>
+#include <time.h>
 
+#include "tifa_config.h"
 #include "gmp_utils.h"
 #include "bernsteinisms.h"
 #include "x_tree.h"
 #include "funcs.h"
-#include "macros.h"
+
 #include "first_primes.h"
 #include "hashtable.h"
+#include "macros.h"
+
+#define DEBUG 0
+#if DEBUG
+    #include <stdio.h>
+    #define PRINTF(...)     printf(__VA_ARGS__); fflush(stdout); 
+    #define GMP_PRINTF(...) gmp_printf(__VA_ARGS__); fflush(stdout); 
+#else
+    #define PRINTF(...)     /* */
+    #define GMP_PRINTF(...) /* */
+#endif
+
+//-----------------------------------------------------------------------------
+//                 PROTOTYPES OF NON PUBLIC FUNCTION(S)
+//-----------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
-void bern_63_rec(uint32_array_t*, const mpz_t, const mpz_t[],
-                 uint32_t nb_nodes, uint32_t curnode);
+void bern_63_rec(
+    uint32_array_t*,
+    const mpz_t,
+    const mpz_t[],
+    uint32_t nb_nodes,
+    uint32_t curnode
+);
 //------------------------------------------------------------------------------
-void bern_71_rec(uint32_array_list_t* const, uint32_t* const,
-                 uint32_array_t*, const mpz_array_t* const, uint32_t);
+void bern_71_rec(
+    uint32_array_list_t* const,
+    uint32_t* const,
+    uint32_array_t*,
+    const mpz_array_t* const,
+    uint32_t
+);
 //------------------------------------------------------------------------------
+uint32_t djb_batch_rt_step(smooth_filter_t* const, unsigned long int);
+//------------------------------------------------------------------------------
+uint32_t djb_batch_rt_first(smooth_filter_t* const filter);
+//------------------------------------------------------------------------------
+uint32_t djb_batch_rt_last(smooth_filter_t* const filter);
+//------------------------------------------------------------------------------
+uint32_t djb_batch_rt_no_ea(smooth_filter_t* const filter);
+//------------------------------------------------------------------------------
+
+//-----------------------------------------------------------------------------
+//                 "PUBLIC" FUNCTION(S) IMPLEMENTATION
+//-----------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
 // Ref. "How to find small factors of integers", Daniel J. Bernstein
@@ -776,9 +816,7 @@ uint32_t bern_21_rt_pairs_lp(const mpz_t n,
 			//
             mpz_divexact(nsp, cand_yi->data[k], gcd);
 
-            if (mpz_cmpabs_ui(
-                  nsp,
-                  first_primes_array.data[first_primes_array.length-1]) <= 0 ) {
+            if (mpz_cmpabs_ui(nsp, LARGEST_PRIME) <= 0 ) {
 
                 uint32_t nsp_ui = mpz_get_ui(nsp);
                 //
@@ -970,9 +1008,7 @@ uint32_t bern_21_pairs_lp(const mpz_t n,
 			//
             mpz_divexact(nsp, cand_yi->data[k], gcd);
 
-            if (mpz_cmpabs_ui(
-                  nsp,
-                  first_primes_array.data[first_primes_array.length-1]) <= 0 ) {
+            if (mpz_cmpabs_ui(nsp, LARGEST_PRIME) <= 0 ) {
 
                 uint32_t nsp_ui = mpz_get_ui(nsp);
                 //
@@ -1238,9 +1274,7 @@ uint32_t bern_21_rt_pairs_lp_siqs(const mpz_t n,
             mpz_divexact(nsp, cand_yi->data[k], gcd);
             mpz_abs(nsp, nsp);
 
-            if (mpz_cmp_ui(
-                  nsp,
-                  first_primes_array.data[first_primes_array.length-1]) <= 0 ) {
+            if (mpz_cmp_ui(nsp, LARGEST_PRIME) <= 0 ) {
 
                 uint32_t nsp_ui = mpz_get_ui(nsp);
                 //
@@ -1268,7 +1302,9 @@ uint32_t bern_21_rt_pairs_lp_siqs(const mpz_t n,
                     //
                     // _TO_DO: Try to keep the entry in the hashtable...
                     //
-                    mpz_pair_t *found = remove_entry_in_hashtable(htable, key);
+                //mpz_pair_t *found = remove_entry_in_hashtable(htable, key);
+
+                    mpz_pair_t *found = get_entry_in_hashtable(htable,key);
 
                     if (found != NULL) {
                         //
@@ -1309,8 +1345,8 @@ uint32_t bern_21_rt_pairs_lp_siqs(const mpz_t n,
                             // cumbersome, so we just ignore it...
                             //
                             free(key);
-                            clear_mpz_pair(found);
-                            free(found);
+                            //clear_mpz_pair(found);
+                            //free(found);
                             continue;
                         }
                         smooth_yi->length++;
@@ -1318,8 +1354,8 @@ uint32_t bern_21_rt_pairs_lp_siqs(const mpz_t n,
                         a_for_smooth_gx->length++;
 
                         free(key);
-                        clear_mpz_pair(found);
-                        free(found);
+                        //clear_mpz_pair(found);
+                        //free(found);
 
                         if (smooth_yi->length == smooth_yi->alloced) {
                             retval = k + 1;
@@ -1334,6 +1370,929 @@ uint32_t bern_21_rt_pairs_lp_siqs(const mpz_t n,
                         mpz_init_set(pair->x, cand_xi->data[k]);
                         mpz_init_set(pair->y, cand_yi->data[k]);
                         mpz_mul(pair->y, pair->y, cand_a->data[k]);
+                        add_entry_in_hashtable(htable, (void*)key, (void*)pair);
+                        //
+                        // _WARNING_: Do not free key and pair as they are now
+                        //            referenced by the hashtable!
+                        //
+                    }
+                }
+            }
+        }
+    }
+    mpz_clear(yk);
+    mpz_clear(gcd);
+    mpz_clear(nsp);
+    mpz_clear(nsp_inv);
+
+    clear_mpz_tree(rtree);
+    free(rtree);
+
+    return retval;
+}
+//------------------------------------------------------------------------------
+inline uint32_t djb_batch_rt(smooth_filter_t* const filter,
+                             unsigned long int step) {
+    //
+    // Combining smoothness batches with early abort-like strategies
+    // certainly makes no sense. Right now it is not used (filter->nsteps
+    // will always be zero). The code's here though should one wants to play 
+    // around with it...
+    //
+    if (filter->nsteps == 0) {
+        return djb_batch_rt_no_ea(filter);
+    }
+    if (step == 0) {
+        return djb_batch_rt_first(filter);
+    }
+    if (step == filter->nsteps) {
+        return djb_batch_rt_last(filter);
+    }
+    return djb_batch_rt_step(filter, step - 1);    
+}
+//------------------------------------------------------------------------------
+
+//-----------------------------------------------------------------------------
+//                  "PRIVATE" FUNCTION(S) IMPLEMENTATION
+//-----------------------------------------------------------------------------
+
+//------------------------------------------------------------------------------
+uint32_t djb_batch_rt_no_ea(smooth_filter_t* const filter) {
+        
+    mpz_array_t* const in_xi  = filter->candidate_xi;
+    mpz_array_t* const in_yi  = filter->candidate_yi;
+    mpz_array_t* const acc_xi = filter->accepted_xi;
+    mpz_array_t* const acc_yi = filter->accepted_yi;
+
+    uint32_t next;
+        
+    hashtable_t* const htable = filter->htable;
+    mpz_ptr n = filter->n;
+    
+    if (acc_yi->length == acc_yi->alloced) {
+        return 0;
+    }
+    uint32_t retval = in_xi->length;
+    //
+    // Step 2
+    //
+    mpz_tree_t* const pyitree = prod_tree(in_yi);
+    mpz_tree_t* const rtree   = rem_tree(filter->prod_pj[0], pyitree);
+    
+    clear_mpz_tree(pyitree);
+    free(pyitree);
+    //
+    // Step 3
+    //
+    uint32_t e = 0U;
+    uint32_t msb = 0U;
+
+    mpz_t yk;
+    mpz_init(yk);
+
+    mpz_t gcd;
+    mpz_init(gcd);
+
+    mpz_t nsp;
+    mpz_init(nsp);
+
+    mpz_t nsp_inv;
+    mpz_init(nsp_inv);
+
+    for (uint32_t k = 0U; k < in_yi->length; k++) {
+        msb = mpz_sizeinbase(in_yi->data[k], 2) - 1;
+        e   = most_significant_bit(msb) + 1;
+            
+        mpz_set(yk, rtree->data[rtree->length/2 + k]);
+        mpz_powm_ui(yk, yk, 1<<e, in_yi->data[k]);
+        
+        next = acc_yi->length;    
+        //
+        // _NOTE_: in_yi->data[k] is smooth iff (yk == 0) (no need to compute
+        //         gcd if we just need to know whether in_yi->data[k] is
+        //         smooth or not).
+        //
+        if (0 == mpz_sgn(yk)) {
+            mpz_init_set(acc_yi->data[next], in_yi->data[k]);
+            mpz_init_set(acc_xi->data[next], in_xi->data[k]);
+        
+            acc_xi->length++;
+            acc_yi->length++;
+                    
+            if (acc_yi->length == acc_yi->alloced) {
+                retval = k + 1;
+                break;
+            }
+        } else {            
+            //
+            // Here comes the large prime variation...
+            //
+            mpz_gcd(gcd, yk, in_yi->data[k]);
+    	    //
+    	    // gcd is now the smooth part of in_yi->data[k].
+    	    // Is in_yi->data[k] the product of gcd by a large prime?
+    	    //
+            mpz_divexact(nsp, in_yi->data[k], gcd);
+            
+            if (mpz_cmpabs_ui(nsp, LARGEST_PRIME) <= 0 ) {
+            
+                uint32_t nsp_ui = mpz_get_ui(nsp);
+                //
+                // Get the index of (in_yi->data[k] / gcd) in
+                // first_primes_array... If ind != NOT_IN_ARRAY, then
+                // (in_yi->data[k] / gcd) is indeed a prime...
+                //
+                uint32_t ind = index_in_sorted_uint32_array(
+                                    nsp_ui,
+                                    &first_primes_array,
+                                    0,
+                                    first_primes_array.length
+                                );
+                
+                if (ind != NOT_IN_ARRAY) {
+                    //
+                    // in_yi->data[k] is the product of a smooth number with
+                    // the prime number first_primes_array->data[ind]
+                    //
+                    uint32_t *key = malloc(sizeof(uint32_t));
+                    *key  = ind;
+            
+                    //
+                    // _NOTE_: Actually it may be possible to leave the pair
+                    //         in the hashtable...
+                    //
+                    // _TO_DO: Try to keep the entry in the hashtable...
+                    //
+
+                //mpz_pair_t *found = remove_entry_in_hashtable(htable, key);
+      
+                    mpz_pair_t *found = get_entry_in_hashtable(htable,key);
+            
+                    if (found != NULL) {
+                        //
+                        // The hashtable did contain another entry for this
+                        // particular prime number: we can compute a new
+                        // pair to add in our accepted_* arrays.
+                        //
+                        mpz_init(acc_yi->data[next]);
+                        mpz_init(acc_xi->data[next]);
+                        
+                        mpz_mul(acc_yi->data[next], in_yi->data[k], found->y);
+                        mpz_mul(acc_xi->data[next], in_xi->data[k], found->x);
+                        
+                        mpz_divexact_ui(
+                            acc_yi->data[next],
+                            acc_yi->data[next],
+                            nsp_ui
+                        );
+                        mpz_divexact_ui(
+                            acc_yi->data[next],
+                            acc_yi->data[next],
+                            nsp_ui
+                        );
+            
+                        if (0 != mpz_invert(nsp_inv, nsp, n)) {
+                            mpz_mul(
+                                acc_xi->data[next], 
+                                acc_xi->data[next],
+                                nsp_inv
+                            );
+                        
+                        } else {
+                            //
+                            // This should not happen: since nsp is a prime,
+                            // it has an inverse in Z/nZ... unless n is a
+                            // multiple of nsp! In such a (rare) case, we have
+                            // found a factor of n, but handling it is quite
+                            // cumbersome, so we just ignore it...
+                            //
+                            free(key);
+                            
+                            //clear_mpz_pair(found);
+                            //free(found);
+                            
+                            mpz_clear(acc_yi->data[next]);
+                            mpz_clear(acc_xi->data[next]);
+                            
+                            continue;
+                        }
+                        acc_yi->length++;
+                        acc_xi->length++;
+                        
+                        free(key);
+                    
+                        //clear_mpz_pair(found);
+                        //free(found);
+            
+                        if (acc_yi->length == acc_yi->alloced) {
+                            retval = k + 1;
+                            break;
+                        }
+                    } else {
+                        //
+                        // Add this pair in the hashtable with the position
+                        // of the prime in first_primes_array as key...
+                        //
+                        mpz_pair_t* pair = malloc(sizeof(mpz_pair_t));
+                        mpz_init_set(pair->x, in_xi->data[k]);
+                        mpz_init_set(pair->y, in_yi->data[k]);
+                        add_entry_in_hashtable(htable, (void*)key, (void*)pair);
+                        //
+                        // _WARNING_: Do not free key and pair as they are now
+                        //            referenced by the hashtable!
+                        //
+                    }
+                }
+            }
+        }
+    }
+    mpz_clear(yk);
+    mpz_clear(gcd);
+    mpz_clear(nsp);
+    mpz_clear(nsp_inv);
+
+    clear_mpz_tree(rtree);
+    free(rtree);
+
+    return retval;   
+}
+//------------------------------------------------------------------------------
+uint32_t djb_batch_rt_step(smooth_filter_t* const filter,
+                            unsigned long int step) {
+
+    mpz_array_t* const in_xi   = filter->filtered_xi[step];
+    mpz_array_t* const in_yi   = filter->filtered_yi[step];
+    mpz_array_t* const in_cof  = filter->cofactors  [step];
+    mpz_array_t* const out_xi  = filter->filtered_xi[step + 1];
+    mpz_array_t* const out_yi  = filter->filtered_yi[step + 1];
+    mpz_array_t* const out_cof = filter->cofactors  [step + 1];
+    mpz_array_t* const acc_xi  = filter->accepted_xi;
+    mpz_array_t* const acc_yi  = filter->accepted_yi;
+    
+    uint32_t next_acc;
+    uint32_t next_out;
+    
+    hashtable_t* htable = filter->htable;
+    mpz_ptr n           = filter->n;
+    mpz_ptr bound       = filter->bounds[step + 1];
+    
+    if (out_yi->length == out_yi->alloced) {
+        return 0;
+    }
+    uint32_t retval = in_xi->length;
+
+    //
+    // Step 2
+    //
+    mpz_tree_t* pyitree = prod_tree(in_yi);
+    mpz_tree_t* rtree   = rem_tree(filter->prod_pj[step + 1], pyitree);
+
+    clear_mpz_tree(pyitree);
+    free(pyitree);
+    //
+    // Step 3
+    //
+    uint32_t e = 0U;
+    uint32_t msb = 0U;
+
+    mpz_t yk;
+    mpz_init(yk);
+
+    mpz_t gcd;
+    mpz_init(gcd);
+
+    mpz_t nsp;
+    mpz_init(nsp);
+
+    mpz_t nsp_inv;
+    mpz_init(nsp_inv);
+
+    for (uint32_t k = 0U; k < in_yi->length; k++) {
+        msb = mpz_sizeinbase(in_yi->data[k], 2) - 1;
+        e   = most_significant_bit(msb) + 1;
+
+        mpz_set(yk, rtree->data[rtree->length/2 + k]);
+        mpz_powm_ui(yk, yk, 1<<e, in_yi->data[k]);
+        
+        next_acc = acc_yi->length;
+        next_out = out_yi->length;   
+        //
+        // _NOTE_: in_y->data[k] is smooth iff (yk == 0) (no need to compute
+        //         gcd if we just need to know whether in_y->data[k] is
+        //         smooth or not).
+        //
+        if (0 == mpz_sgn(yk)) {
+
+            mpz_init_set(acc_yi->data[next_acc], in_yi->data[k]);
+            mpz_init_set(acc_xi->data[next_acc], in_xi->data[k]);
+        
+            mpz_mul(
+                acc_yi->data[next_acc],
+                acc_yi->data[next_acc],
+                in_cof->data[k]
+            );
+        
+            acc_xi->length++;
+            acc_yi->length++;
+        
+            if (acc_yi->length == acc_yi->alloced) {
+                retval = k + 1;
+                break;
+            }
+        } else {
+            //
+            // Here comes the large prime variation...
+            //
+            mpz_gcd(gcd, yk, in_yi->data[k]);
+    	    //
+    	    // gcd is now the smooth part of in_y->data[k].
+    	    // Is in_y->data[k] the product of gcd by a large prime?
+    	    //
+            mpz_divexact(nsp, in_yi->data[k], gcd);
+            
+            if (mpz_cmpabs_ui(nsp, LARGEST_PRIME) <= 0) {
+            
+                uint32_t nsp_ui = mpz_get_ui(nsp);
+                //
+                // Get the index of (in_yi->data[k] / gcd) in
+                // first_primes_array... If ind != NOT_IN_ARRAY, then
+                // (in_yi->data[k] / gcd) is indeed a prime...
+                //
+                uint32_t ind = index_in_sorted_uint32_array(
+                                    nsp_ui,
+                                    &first_primes_array,
+                                    0,
+                                    first_primes_array.length);
+                
+                if (ind != NOT_IN_ARRAY) {
+                    //
+                    // in_y->data[k] is the product of a smooth number with
+                    // the prime number first_primes_array->data[ind]
+                    //
+                    uint32_t *key = malloc(sizeof(uint32_t));
+                    *key  = ind;
+            
+                    //
+                    // _NOTE_: Actually it may be possible to leave the pair
+                    //         in the hashtable...
+                    //
+                    // _TO_DO: Try to keep the entry in the hashtable...
+                    //
+                //mpz_pair_t *found = remove_entry_in_hashtable(htable, key);
+
+                    mpz_pair_t *found = get_entry_in_hashtable(htable,key);
+            
+                    if (found != NULL) {
+                        //
+                        // The hashtable did contain another entry for this
+                        // particular prime number: we can compute a new
+                        // pair to add in candidate arrays.
+                        //
+                        mpz_init(acc_yi->data[next_acc]);
+                        mpz_init(acc_xi->data[next_acc]);
+                        
+                        mpz_mul(
+                            acc_yi->data[next_acc],
+                            in_yi->data[k],
+                            found->y
+                        );
+                        
+                        mpz_mul(
+                            acc_yi->data[next_acc],
+                            acc_yi->data[next_acc],
+                            in_cof->data[k]
+                        );
+                        
+                        mpz_mul(
+                            acc_xi->data[next_acc],
+                            in_xi->data[k],
+                            found->x
+                        );
+                        
+                        mpz_divexact_ui(
+                            acc_yi->data[next_acc],
+                            acc_yi->data[next_acc],
+                            nsp_ui
+                        );
+                        
+                        mpz_divexact_ui(
+                            acc_yi->data[next_acc],
+                            acc_yi->data[next_acc],
+                            nsp_ui
+                        );
+            
+                        if (0 != mpz_invert(nsp_inv, nsp, n)) {
+                            mpz_mul(
+                                acc_xi->data[next_acc], 
+                                acc_xi->data[next_acc],
+                                nsp_inv
+                            );
+                        } else {
+                            //
+                            // This should not happen: since nsp is a prime,
+                            // it has an inverse in Z/nZ... unless n is a
+                            // multiple of nsp! In such a (rare) case, we have
+                            // found a factor of n, but handling it is quite
+                            // cumbersome, so we just ignore it...
+                            //
+                            free(key);
+                            //clear_mpz_pair(found);
+                            //free(found);
+                            
+                            mpz_clear(acc_yi->data[next_acc]);
+                            mpz_clear(acc_xi->data[next_acc]);
+            
+                            continue;
+                        }
+                        acc_yi->length++;
+                        acc_xi->length++;
+            
+                        free(key);
+                        //clear_mpz_pair(found);
+                        //free(found);
+            
+                        if (acc_yi->length == acc_yi->alloced) {
+                            retval = k + 1;
+                            break;
+                        }
+                    } else {
+                        //
+                        // Add this pair in the hashtable with the position
+                        // of the prime in first_primes_array as key...
+                        //
+                        mpz_pair_t* pair = malloc(sizeof(mpz_pair_t));
+                        mpz_init_set(pair->x, in_xi->data[k]);
+                        mpz_init_set(pair->y, in_yi->data[k]);
+                        mpz_mul(pair->y, pair->y, in_cof->data[k]);
+                        add_entry_in_hashtable(htable, (void*)key, (void*)pair);
+                        //
+                        // _WARNING_: Do not free key and pair as they are now
+                        //            referenced by the hashtable!
+                        //
+                    }
+                }
+            } else {
+                //
+                // Here comes the early abort strategy that makes no sense here!
+                //
+                // The non smooth part of in_y->data[k] is not the product of
+                // a smooth number by a large prime. If the non smooth part
+                // is greater than a certain bound, just discard it. Otherwise
+                // it qualifies for the next round of smoothness batch!
+                //
+                if (mpz_cmpabs(nsp, bound) > 0) {
+                    continue;
+                }
+                mpz_set(out_yi->data[next_out], nsp);
+                mpz_set(out_xi->data[next_out], in_xi->data[k]);
+                mpz_mul(out_cof->data[next_out], gcd, in_cof->data[k]);
+
+                out_yi->length++;
+                out_xi->length++;
+                out_cof->length++;
+
+                if (out_yi->length == out_yi->alloced) {
+                    retval = k + 1;
+                    break;
+                }
+            }
+        }
+    }
+    mpz_clear(yk);
+    mpz_clear(gcd);
+    mpz_clear(nsp);
+    mpz_clear(nsp_inv);
+
+    clear_mpz_tree(rtree);
+    free(rtree);
+
+    return retval;
+}
+//------------------------------------------------------------------------------
+uint32_t djb_batch_rt_first(smooth_filter_t* const filter) {
+    
+    mpz_array_t* const in_xi  = filter->candidate_xi;
+    mpz_array_t* const in_yi  = filter->candidate_yi;
+    mpz_array_t* const out_xi = filter->filtered_xi[0];
+    mpz_array_t* const out_yi = filter->filtered_yi[0];
+    mpz_array_t* const cofact = filter->cofactors[0];
+    mpz_array_t* const acc_xi = filter->accepted_xi;
+    mpz_array_t* const acc_yi = filter->accepted_yi;
+
+    uint32_t next_acc;
+    uint32_t next_out;
+            
+    hashtable_t* htable = filter->htable;
+    mpz_ptr n           = filter->n;
+    mpz_ptr bound       = filter->bounds[0];
+    
+    if (out_yi->length == out_yi->alloced) {
+        return 0;
+    }
+    uint32_t retval = in_xi->length;
+
+    //
+    // Step 2
+    //
+    mpz_tree_t* pyitree = prod_tree(in_yi);
+    mpz_tree_t* rtree   = rem_tree(filter->prod_pj[0], pyitree);
+
+    clear_mpz_tree(pyitree);
+    free(pyitree);
+    //
+    // Step 3
+    //
+    uint32_t e = 0U;
+    uint32_t msb = 0U;
+
+    mpz_t yk;
+    mpz_init(yk);
+
+    mpz_t gcd;
+    mpz_init(gcd);
+
+    mpz_t nsp;
+    mpz_init(nsp);
+
+    mpz_t nsp_inv;
+    mpz_init(nsp_inv);
+
+    for (uint32_t k = 0U; k < in_yi->length; k++) {
+        msb = mpz_sizeinbase(in_yi->data[k], 2) - 1;
+        e   = most_significant_bit(msb) + 1;
+
+        mpz_set(yk, rtree->data[rtree->length/2 + k]);
+        mpz_powm_ui(yk, yk, 1<<e, in_yi->data[k]);
+        
+        next_acc = acc_yi->length;
+        next_out = out_yi->length;
+        //
+        // _NOTE_: in_yi->data[k] is smooth iff (yk == 0) (no need to compute
+        //         gcd if we just need to know whether in_yi->data[k] is
+        //         smooth or not).
+        //
+        if (0 == mpz_sgn(yk)) {
+
+            mpz_init_set(acc_yi->data[next_acc], in_yi->data[k]);
+            mpz_init_set(acc_xi->data[next_acc], in_xi->data[k]);
+        
+            acc_xi->length++;
+            acc_yi->length++;
+                    
+            if (acc_yi->length == acc_yi->alloced) {
+                retval = k + 1;
+                break;
+            }
+        } else {
+            //
+            // Here comes the large prime variation...
+            //
+            mpz_gcd(gcd, yk, in_yi->data[k]);
+    	    //
+    	    // gcd is now the smooth part of in_yi->data[k].
+    	    // Is in_yi->data[k] the product of gcd by a large prime?
+    	    //
+            mpz_divexact(nsp, in_yi->data[k], gcd);
+            
+            if (mpz_cmpabs_ui(nsp, LARGEST_PRIME) <= 0 ) {
+            
+                uint32_t nsp_ui = mpz_get_ui(nsp);
+                //
+                // Get the index of (in_yi->data[k] / gcd) in
+                // first_primes_array... If ind != NOT_IN_ARRAY, then
+                // (in_yi->data[k] / gcd) is indeed a prime...
+                //
+                uint32_t ind = index_in_sorted_uint32_array(
+                                    nsp_ui,
+                                    &first_primes_array,
+                                    0,
+                                    first_primes_array.length
+                                );
+                
+                if (ind != NOT_IN_ARRAY) {
+                    //
+                    // in_yi->data[k] is the product of a smooth number with
+                    // the prime number first_primes_array->data[ind]
+                    //
+                    uint32_t *key = malloc(sizeof(uint32_t));
+                    *key  = ind;            
+                    //
+                    // _NOTE_: Actually it may be possible to leave the pair
+                    //         in the hashtable...
+                    //
+                    // _TO_DO: Try to keep the entry in the hashtable...
+                    //
+                    
+                 //mpz_pair_t *found = remove_entry_in_hashtable(htable, key);
+                    
+                    mpz_pair_t *found = get_entry_in_hashtable(htable,key);
+            
+                    if (found != NULL) {
+                        //
+                        // The hashtable did contain another entry for this
+                        // particular prime number: we can compute a new
+                        // pair to add in our accepted_* arrays.
+                        //
+                        mpz_init(acc_yi->data[next_acc]);
+                        mpz_init(acc_xi->data[next_acc]);
+                        mpz_mul(
+                            acc_yi->data[next_acc],
+                            in_yi->data[k],
+                            found->y
+                        );
+                        mpz_mul(
+                            acc_xi->data[next_acc],
+                            in_xi->data[k],
+                            found->x
+                        );
+                        mpz_divexact_ui(
+                            acc_yi->data[next_acc],
+                            acc_yi->data[next_acc],
+                            nsp_ui
+                        );
+                        mpz_divexact_ui(
+                            acc_yi->data[next_acc],
+                            acc_yi->data[next_acc],
+                            nsp_ui
+                        );
+            
+                        if (0 != mpz_invert(nsp_inv, nsp, n)) {
+                            mpz_mul(
+                                acc_xi->data[next_acc], 
+                                acc_xi->data[next_acc],
+                                nsp_inv
+                            );
+                        } else {
+                            //
+                            // This should not happen: since nsp is a prime,
+                            // it has an inverse in Z/nZ... unless n is a
+                            // multiple of nsp! In such a (rare) case, we have
+                            // found a factor of n, but handling it is quite
+                            // cumbersome, so we just ignore it...
+                            //
+                            free(key);
+                            //clear_mpz_pair(found);
+                            //free(found);
+                            
+                            mpz_clear(acc_yi->data[next_acc]);
+                            mpz_clear(acc_xi->data[next_acc]);
+                            
+                            continue;
+                        }
+                        acc_yi->length++;
+                        acc_xi->length++;
+            
+                        free(key);
+                        //clear_mpz_pair(found);
+                        //free(found);
+            
+                        if (acc_yi->length == acc_yi->alloced) {
+                            retval = k + 1;
+                            break;
+                        }
+                    } else {
+                        //
+                        // Add this pair in the hashtable with the position
+                        // of the prime in first_primes_array as key...
+                        //
+                        mpz_pair_t* pair = malloc(sizeof(mpz_pair_t));
+                        mpz_init_set(pair->x, in_xi->data[k]);
+                        mpz_init_set(pair->y, in_yi->data[k]);
+                        add_entry_in_hashtable(htable, (void*)key, (void*)pair);
+                        //
+                        // _WARNING_: Do not free key and pair as they are now
+                        //            referenced by the hashtable!
+                        //
+                    }
+                }
+            } else {
+                //
+                // Here comes the early abort strategy!
+                //
+                // in_y->data[k] is not the product of a smooth number by a
+                // large prime. If its non smooth part is greater than a certain
+                // bound, just discard it. Otherwise it qualifies for the next
+                // round of smoothness batch! Congratulations!
+                //
+                if (mpz_cmpabs(nsp, bound) > 0) {
+                    continue;
+                }
+                mpz_set(out_yi->data[next_out], nsp);
+                mpz_set(out_xi->data[next_out], in_xi->data[k]);
+                mpz_set(cofact->data[next_out], gcd);
+                
+                out_yi->length++;
+                out_xi->length++;
+                cofact->length++;
+                
+                if (out_yi->length == out_yi->alloced) {
+                    retval = k + 1;
+                    break;
+                }
+            }
+        }
+    }
+    mpz_clear(yk);
+    mpz_clear(gcd);
+    mpz_clear(nsp);
+    mpz_clear(nsp_inv);
+
+    clear_mpz_tree(rtree);
+    free(rtree);
+
+    return retval;   
+}
+//------------------------------------------------------------------------------
+uint32_t djb_batch_rt_last(smooth_filter_t* const filter) {
+
+    unsigned long int step = filter->nsteps - 1;
+
+    mpz_array_t* const in_xi  = filter->filtered_xi[step];
+    mpz_array_t* const in_yi  = filter->filtered_yi[step];
+    mpz_array_t* const cofact = filter->cofactors[step];
+    mpz_array_t* const acc_xi = filter->accepted_xi;
+    mpz_array_t* const acc_yi = filter->accepted_yi;
+
+    uint32_t next;
+    
+    hashtable_t* htable = filter->htable;
+    mpz_ptr n           = filter->n;
+    
+    if (acc_yi->length == acc_yi->alloced) {
+        return 0;
+    }
+    uint32_t retval = in_xi->length;
+
+    //
+    // Step 2
+    //
+    mpz_tree_t* pyitree = prod_tree(in_yi);
+    mpz_tree_t* rtree   = rem_tree(filter->prod_pj[step + 1], pyitree);
+
+    clear_mpz_tree(pyitree);
+    free(pyitree);
+    //
+    // Step 3
+    //
+    uint32_t e = 0U;
+    uint32_t msb = 0U;
+
+    mpz_t yk;
+    mpz_init(yk);
+
+    mpz_t gcd;
+    mpz_init(gcd);
+
+    mpz_t nsp;
+    mpz_init(nsp);
+
+    mpz_t nsp_inv;
+    mpz_init(nsp_inv);
+
+    for (uint32_t k = 0U; k < in_yi->length; k++) {
+        msb = mpz_sizeinbase(in_yi->data[k], 2) - 1;
+        e   = most_significant_bit(msb) + 1;
+
+        mpz_set(yk, rtree->data[rtree->length/2 + k]);
+        mpz_powm_ui(yk, yk, 1<<e, in_yi->data[k]);
+        
+        next = acc_yi->length;
+        //
+        // _NOTE_: in_y->data[k] is smooth iff (yk == 0) (no need to compute
+        //         gcd if we just need to know whether in_y->data[k] is
+        //         smooth or not).
+        //
+        if (0 == mpz_sgn(yk)) {
+            
+            mpz_init_set(acc_yi->data[next], in_yi->data[k]);
+            mpz_init_set(acc_xi->data[next], in_xi->data[k]);
+        
+            mpz_mul(acc_yi->data[next], acc_yi->data[next], cofact->data[k]);
+        
+            acc_xi->length++;
+            acc_yi->length++;
+        
+            if (acc_yi->length == acc_yi->alloced) {
+                retval = k + 1;
+                break;
+            }
+        } else {
+            //
+            // Here comes the large prime variation...
+            //
+            mpz_gcd(gcd, yk, in_yi->data[k]);
+    	    //
+    	    // gcd is now the smooth part of in_y->data[k].
+    	    // Is in_y->data[k] the product of gcd by a large prime?
+    	    //
+            mpz_divexact(nsp, in_yi->data[k], gcd);
+            
+            if (mpz_cmpabs_ui(nsp, LARGEST_PRIME) <= 0 ) {
+            
+                uint32_t nsp_ui = mpz_get_ui(nsp);
+                //
+                // Get the index of (in_y->data[k] / gcd) in
+                // first_primes_array... If ind != NOT_IN_ARRAY, then
+                // (in_y->data[k] / gcd) is indeed a prime...
+                //
+                uint32_t ind = index_in_sorted_uint32_array(
+                                   nsp_ui,
+                                   &first_primes_array,
+                                   0,
+                                   first_primes_array.length
+                               );
+                
+                if (ind != NOT_IN_ARRAY) {
+                    //
+                    // in_y->data[k] is the product of a smooth number with
+                    // the prime number first_primes_array->data[ind]
+                    //
+                    uint32_t *key = malloc(sizeof(uint32_t));
+                    *key = ind;
+            
+                    //
+                    // _NOTE_: Actually it may be possible to leave the pair
+                    //         in the hashtable...
+                    //
+                    // _TO_DO: Try to keep the entry in the hashtable...
+                    //
+                //mpz_pair_t *found = remove_entry_in_hashtable(htable, key);
+                    
+                    mpz_pair_t *found = get_entry_in_hashtable(htable,key);
+            
+                    if (found != NULL) {
+                        //
+                        // The hashtable did contain another entry for this
+                        // particular prime number: we can compute a new
+                        // pair to add in our accepted arrays.
+                        //
+                        mpz_init(acc_yi->data[next]);
+                        mpz_init(acc_xi->data[next]);
+                        
+                        mpz_mul(acc_yi->data[next], in_yi->data[k], found->y);
+                        mpz_mul(acc_xi->data[next], in_xi->data[k], found->x);
+                        
+                        mpz_mul(
+                            acc_yi->data[next],
+                            acc_yi->data[next],
+                            cofact->data[k]
+                        );
+                        
+                        mpz_divexact_ui(
+                            acc_yi->data[next],
+                            acc_yi->data[next],
+                            nsp_ui
+                        );
+                        
+                        mpz_divexact_ui(
+                            acc_yi->data[next],
+                            acc_yi->data[next],
+                            nsp_ui
+                        );
+            
+                        if (0 != mpz_invert(nsp_inv, nsp, n)) {
+                            mpz_mul(
+                                acc_xi->data[next], 
+                                acc_xi->data[next],
+                                nsp_inv
+                            );
+                        } else {
+                            //
+                            // This should not happen: since nsp is a prime,
+                            // it has an inverse in Z/nZ... unless n is a
+                            // multiple of nsp! In such a (rare) case, we have
+                            // found a factor of n, but handling it is quite
+                            // cumbersome, so we just ignore it...
+                            //
+                            free(key);
+                            //clear_mpz_pair(found);
+                            //free(found);
+                            
+                            mpz_clear(acc_yi->data[next]);
+                            mpz_clear(acc_xi->data[next]);
+            
+                            continue;
+                        }
+                        acc_yi->length++;
+                        acc_xi->length++;
+            
+                        free(key);
+                        //clear_mpz_pair(found);
+                        //free(found);
+            
+                        if (acc_yi->length == acc_yi->alloced) {
+                            retval = k + 1;
+                            break;
+                        }
+                    } else {
+                        //
+                        // Add this pair in the hashtable with the position
+                        // of the prime in first_primes_array as key...
+                        //
+                        mpz_pair_t* pair = malloc(sizeof(mpz_pair_t));
+                        mpz_init_set(pair->x, in_xi->data[k]);
+                        mpz_init_set(pair->y, in_yi->data[k]);
+                        mpz_mul(pair->y, pair->y, cofact->data[k]);
                         add_entry_in_hashtable(htable, (void*)key, (void*)pair);
                         //
                         // _WARNING_: Do not free key and pair as they are now

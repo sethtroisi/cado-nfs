@@ -20,7 +20,7 @@
 /**
  * \file    array.h
  * \author  Jerome Milan
- * \date    Wed Mar 28 2007
+ * \date    Wed Oct 17 2007
  * \version 1.1
  *
  * \brief Higher level arrays and associated functions.
@@ -38,8 +38,11 @@
  */
 
  /*
+  *  History:
+  *    1.1: Wed Oct 17 2007 by JM:
+  *         - Added byte_array_t with corresponding functions.
   *    1.0: Wed Mar 1 2006 by JM:
-  *           - Initial version.
+  *         - Initial version.
   */
 
 #if !defined(_TIFA_ARRAY_H_)
@@ -49,21 +52,20 @@
     */
 #define _TIFA_ARRAY_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include "tifa_config.h"
 
 #include <inttypes.h>
 #include <stdbool.h>
-
 #include <gmp.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
    /**
     * \def ELONGATION
     * Incremental size used when automatically expanding the capacity of a
-    * <tt>*_array_t<\tt>.
+    * \c *_array_t.
     *
     * \note This is, of course, an hint to GMP's limbs and nails :-)
     */
@@ -71,10 +73,254 @@ extern "C" {
 
    /**
     * \def NOT_IN_ARRAY
-    * Value returned by the <tt>index_in*_array(x, array...)</tt> functions if 
-    * the element \c x is not in the array <tt>array</tt>.
+    * Value returned by the <tt>index_in_*_array(x, array, ...)</tt>
+    * functions if the element \c x is not in the array <tt>array</tt>.
     */
 #define NOT_IN_ARRAY UINT32_MAX
+
+   /**
+    * \def ARRAY_IS_FULL
+    * Returns true if the \c *_array_t pointed by \c ARRAY_PTR is full (i.e.
+    * no more element can be added to the array).
+    *
+    * Returns false otherwise.
+    */
+#define ARRAY_IS_FULL(ARRAY_PTR) ((ARRAY_PTR)->length == (ARRAY_PTR)->alloced)
+
+/*
+ *-----------------------------------------------------------------------------
+ *              byte_array_t and associated functions 
+ *-----------------------------------------------------------------------------
+ */
+
+   /**
+    * \struct struct_byte_array_t array.h lib/utils/include/array.h
+    * \brief  Defines an array of bytes.
+    *
+    * This structure defines a special kind of byte array (actually
+    * \c unsigned \c char array) which knows its current length and
+    * its allocated memory space.
+    */
+struct struct_byte_array_t {
+       /**
+        * Memory space allocated for this array's \c data field, given as
+        * a multiple of <tt>sizeof(unsigned char)</tt>. This is the maximum
+        * number of bytes that the array can accommodate.
+        */
+    uint32_t alloced;
+       /**
+        * Current number of bytes hold in the array pointed by the
+        * structure's \c data field.
+        */
+    uint32_t length;
+       /**
+        * Array of \c unsigned \c char whose size is given by the
+        * \c alloced field.
+        */
+    unsigned char* data;
+};
+
+   /**
+    * \typedef byte_array_t
+    * \brief Equivalent to <tt>struct struct_byte_array_t</tt>.
+    */
+typedef struct struct_byte_array_t byte_array_t;
+
+   /**
+    * \brief Allocates and returns a new <tt>byte_array_t</tt>.
+    *
+    * Allocates and returns a new <tt>byte_array_t</tt> such that:
+    * \li its \c alloced field is set to the parameter length.
+    * \li its \c length field is set to zero.
+    * \li its \c data array is completely filled with zeroes.
+    *
+    * \param[in] length The maximum length of the \c byte_array_t to allocate.
+    * \return A pointer to the newly allocated \c byte_array_t structure.
+    */
+byte_array_t* alloc_byte_array(uint32_t length);
+
+   /**
+    * \brief Clears a <tt>byte_array_t</tt>.
+    *
+    * Clears a <tt>byte_array_t</tt>, or, more precisely, clears the memory
+    * space used by the array pointed by the \c data field of a
+    * <tt>byte_array_t</tt>. Also set its \c alloced and \c length fields
+    * to zero.
+    *
+    * \param[in] array A pointer to the <tt>byte_array_t</tt> to clear.
+    */
+void clear_byte_array(byte_array_t* const array);
+
+   /**
+    * \brief Resizes the allocated memory of a <tt>byte_array_t</tt>.
+    *
+    * Resizes the storage available to an <tt>byte_array_t</tt> to make room
+    * for \c alloced integers, while preserving its content. If \c alloced is
+    * less than the length of the array, then obviously some of its content
+    * will be lost.
+    *
+    * \param[in] alloced The new maximum length of the \c byte_array_t to
+    *                    resize.
+    * \return array A pointer to the \c byte_array_t to resize.
+    */
+void resize_byte_array(byte_array_t* const array, uint32_t alloced);
+
+   /**
+    * \brief Appends a \c uint32_t to an <tt>byte_array_t</tt>.
+    *
+    * Appends the byte \c to_append to <tt>array</tt>.
+    * If \c array has not enough capacity to accommodate this extra element it
+    * will be resized via a call to \c resize_byte_array adding \c ELONGATION
+    * byte slots to avoid too frequent resizes.
+    *
+    * \param[in] array A pointer to the recipient <tt>byte_array_t</tt>.
+    * \param[in] to_append The byte to append.
+    */
+void append_byte_to_array(byte_array_t* array, unsigned char to_append);
+
+   /**
+    * \brief Appends the content of a <tt>byte_array_t</tt> to another one.
+    *
+    * Appends the content of the \c to_append array to the \c byte_array_t
+    * named \c array. If \c array has not enough capacity to accommodate all
+    * elements from \c to_append, it will be resized via a call to
+    * \c resize_byte_array with extra room for \c ELONGATION unused
+    * slots to avoid too frequent resizes.
+    *
+    * \param[in] array A pointer to the recipient <tt>byte_array_t</tt>.
+    * \param[in] to_append A pointer to the <tt>byte_array_t</tt> to append.
+    */
+void append_byte_array(byte_array_t* const array,
+                       const byte_array_t* const to_append);
+
+   /**
+    * \brief Swaps two <tt>byte_array_t</tt>'s contents.
+    *
+    * Swaps the contents of \c a and <tt>b</tt>, two <tt>byte_array_t</tt>'s.
+    *
+    * \note In some case, pointer swapping is inappropriate (for example, if
+    * the pointers are passed as function arguments!), hence the need for such
+    * a swapping function.
+    *
+    * \param[in] a A pointer to the first <tt>byte_array_t</tt> to swap.
+    * \param[in] b A pointer to the second <tt>byte_array_t</tt> to swap.
+    */
+void swap_byte_array(byte_array_t* const a, byte_array_t* const b);
+
+   /**
+    * \brief Prints a <tt>byte_array_t</tt>.
+    *
+    * Prints a <tt>byte_array_t</tt>'s \c data elements on the standard
+    * output.
+    *
+    * \note This function is mostly intended for debugging purposes as the
+    * output is not particularly well structured.
+    *
+    * \param[in] array A pointer to the <tt>byte_array_t</tt> to print.
+    */
+void print_byte_array(const byte_array_t* const array);
+
+   /**
+    * \brief Sorts the elements of a <tt>byte_array_t</tt>.
+    *
+    * Sorts the elements of a <tt>byte_array_t</tt> in natural order
+    * using a basic insertion sort.
+    *
+    * \param[in] array A pointer to the <tt>byte_array_t</tt> to sort.
+    */
+void ins_sort_byte_array(byte_array_t* const array);
+
+   /**
+    * \brief Sorts the elements of a <tt>byte_array_t</tt> with a quick sort.
+    *
+    * Sorts the elements of a <tt>byte_array_t</tt> in natural order
+    * using the quick sort algorithm.
+    *
+    * \note This function relies on the C library implementation of the
+    * quick sort provided by the function <tt>qsort</tt>.
+    *
+    * \param[in] array A pointer to the <tt>byte_array_t</tt> to sort.
+    */
+void qsort_byte_array(byte_array_t* const array);
+
+   /**
+    * \brief Returns the position of a byte in a <tt>byte_array_t</tt>.
+    *
+    * Returns the position of the byte \c to_find in the
+    * <tt>byte_array_t</tt> pointed to by \c array. If the byte \c to_find
+    * is not found in the <tt>byte_array_t</tt>, returns 
+    * <tt>NOT_IN_ARRAY</tt>.
+    *
+    * \note The <tt>NOT_IN_ARRAY</tt> value is actually -1 if interpreted as a
+    * signed <tt>int32_t</tt>.
+    *
+    * \note If the array is already sorted, the more efficient function
+    * <tt>index_in_sorted_byte_array</tt> can be used as it uses a basic
+    * binary search instead of a complete scanning of the array.
+    *
+    * \param[in] to_find The byte to find in the <tt>byte_array_t</tt>.
+    * \param[in] array   A pointer to the <tt>byte_array_t</tt>.
+    * \returns The index of \c to_find in the array if \c to_find is found.
+    * \returns <tt>NOT_IN_ARRAY</tt> otherwise.
+    */
+uint32_t index_in_byte_array(unsigned char to_find,
+                             const byte_array_t* const array);
+
+   /**
+    * \brief Returns true if a given byte is in a given array.
+    *
+    * Returns true if the byte \c to_find is in the <tt>byte_array_t</tt>
+    * pointed to by \c array. Returns false otherwise.
+    *
+    * \note If the array is already sorted, the more efficient function
+    * <tt>is_in_sorted_byte_array</tt> can be used as it uses a basic
+    * binary search instead of a complete scanning of the array.
+    *
+    * \param[in] to_find The integer to find in the <tt>byte_array_t</tt>.
+    * \param[in] array   A pointer to the <tt>byte_array_t</tt>.
+    * \returns true if \c to_find is in the array \c array.
+    * \returns false otherwise.
+    */
+bool is_in_byte_array(unsigned char to_find, const byte_array_t* const array);
+
+   /**
+    * \brief Returns the position of an integer in a sorted portion of a
+    * <tt>byte_array_t</tt>.
+    *
+    * Returns the position of the byte \c to_find in a \e sorted portion
+    * of the <tt>byte_array_t</tt> pointed to by \c array. If the byte
+    * \c to_find is not found in the portion delimited by \c min_index and
+    * \c max_index, returns <tt>NOT_IN_ARRAY</tt>.
+    *
+    * \note The <tt>NOT_IN_ARRAY</tt> value is actually -1 if interpreted as a
+    * signed <tt>int32_t</tt>.
+    *
+    * \param[in] to_find The byte to find in the <tt>byte_array_t</tt>.
+    * \param[in] sorted_array A pointer to the <tt>byte_array_t</tt>.
+    * \param[in] min_index The beginning of the sorted array portion to
+    *                      search in.
+    * \param[in] max_index The end of the sorted array portion to search in.
+    * \returns The index of \c to_find in the array if \c to_find is found in
+    *          the sorted array portion.
+    * \returns <tt>NOT_IN_ARRAY</tt> otherwise.
+    */
+uint32_t index_in_sorted_byte_array(unsigned char to_find,
+                                    const byte_array_t* const sorted_array,
+                                    uint32_t min_index, uint32_t max_index);
+
+   /**
+    * \brief Returns true if a given byte is in a sorted \c byte_array_t.
+    *
+    * Returns true if the byte \c to_find is in the (\e already \e sorted)
+    * <tt>byte_array_t</tt> pointed to by \c array. Returns false otherwise.
+    *
+    * \param[in] to_find The byte to find in the <tt>byte_array_t</tt>.
+    * \param[in] array   A pointer to the \e sorted <tt>byte_array_t</tt>.
+    * \returns true if \c to_find is in the array \c array.
+    * \returns false otherwise.
+    */
+inline bool is_in_sorted_byte_array(unsigned char to_find,
+                                    const byte_array_t* const array);
 
 /*
  *-----------------------------------------------------------------------------

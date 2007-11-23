@@ -43,17 +43,62 @@ extern "C" {
 
 #include "tifa_config.h"
 
-#define __ERR_PRFX__ "ERROR: "
+#if !defined(__PREFIX__)
+    #define __PREFIX__ ""
+#endif
+
+#if !defined(__VERBOSE__)
+    #define __VERBOSE__ 0
+#endif
 
 //
 // No error messages are printed if TIFA_PRINT_ERROR is set to 0.
 //
 #if TIFA_PRINT_ERROR
-    #define PRINTF_STDERR(...) fprintf(stderr, __VA_ARGS__); fflush(stdout)
-    #define PRINT_ERROR(...) do {                           \
-        fprintf(stderr, "%s%s: ", __ERR_PRFX__, __func__);  \
-        gmp_fprintf(stderr, __VA_ARGS__);                   \
-    } while (0)
+    #if __VERBOSE__
+        #define __ERR_PRFX__ "ERROR: "
+        
+            /**
+             * \def PRINTF_STDERR(...)
+             * Print on the standard error. Messages are prefixed by
+             * the name of running algorithm.
+             */
+        #define PRINTF_STDERR(...) do {                 \
+            fprintf(stderr, __PREFIX__ __VA_ARGS__);    \
+            fflush(stdout);                             \
+        } while (0)
+            
+            /**
+             * \def PRINTF_ERROR(...)
+             * Print on the standard error. Messages are prefixed by
+             * the name of running algorithm and the function where
+             * the error occured.
+             */
+        #define PRINT_ERROR(...) do {                                   \
+            fprintf(stderr,__PREFIX__ "%s%s: ",__ERR_PRFX__,__func__);  \
+            gmp_fprintf(stderr, __VA_ARGS__);                           \
+        } while (0)
+    #else
+        #define __ERR_PRFX__ "TIFA_ERROR: "
+        
+            /**
+             * \def PRINTF_STDERR(...)
+             * Print on the standard error. Messages are prefixed by
+             * \c __ERR_PRFX__.
+             */
+        #define PRINTF_STDERR(...) fprintf(stderr, __VA_ARGS__); fflush(stdout)
+        
+            /**
+             * \def PRINTF_ERROR(...)
+             * Print on the standard error. Messages are prefixed by
+             * \c __ERR_PRFX__ and the name of the function where
+             * the error occured.
+             */
+        #define PRINT_ERROR(...) do {                           \
+            fprintf(stderr, "%s%s: ", __ERR_PRFX__, __func__);  \
+            gmp_fprintf(stderr, __VA_ARGS__);                   \
+        } while (0)
+    #endif
 #else
     #define PRINTF_STDERR(...) /* intentionally left empty */
     #define PRINT_ERROR(...)   /* intentionally left empty */

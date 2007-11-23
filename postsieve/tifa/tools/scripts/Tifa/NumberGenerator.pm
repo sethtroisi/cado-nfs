@@ -32,7 +32,8 @@ package Tifa::NumberGenerator;
 # Last modified : circa August 2006
 #
 # Version : 0.1
-# Licence : To be determined
+# Licence : GNU Lesser General Public License (LGPL) v2.1 or later
+#           Copyright (C) 2006, 2007 INRIA
 #-------------------------------------------------------------------------------
 # History
 #-------------------------------------------------------------------------------

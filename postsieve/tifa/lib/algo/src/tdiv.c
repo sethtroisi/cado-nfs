@@ -20,33 +20,31 @@
 /**
  * \file    trial_div.c
  * \author  Jerome Milan
- * \date    Fri Jan 26 2007
- * \version 1.1
+ * \date    Thu Mar 15 2007
+ * \version 1.2
  */
 
  /*
-  *  Copyright (C) 2006, 2007  INRIA
-  *  Licence: GNU Lesser General Public License (LGPL)
   *  History:
   *
   *  1.2: Thu Mar 15 2007 by JM
-  *      - Completely refactored to use a factoring_machine_t.
+  *       - Completely refactored to use a factoring_machine_t.
   *  1.1: Fri Jan 26 2007 by JM
-  *      - Added MPN implementation with TIFA_USE_GMP_INTERNAL_FUNCS switch.
+  *       - Added MPN implementation with TIFA_USE_GMP_INTERNAL_FUNCS switch.
   *  1.0: Sat Mar 18 2006
-  *      - Initial version by JM.
+  *       - Initial version by JM.
   */
-
-#include <tifa_config.h>
 
 #include <stdlib.h>
 
+#include "tifa_config.h"
+#include <gmp.h>
+#if TIFA_USE_GMP_INTERNAL_FUNCS
+    #include "gmp-impl.h"
+#endif
+
 #include "tdiv.h"
 #include "first_primes.h"
-
-#if TIFA_USE_GMP_INTERNAL_FUNCS
-#include <gmp-impl.h>
-#endif
 
 #define __PREFIX__  "tdiv: "
 #define __VERBOSE__ TIFA_VERBOSE_TDIV

@@ -32,7 +32,7 @@
  *        - Initial version.
  */
 
-#include <tifa_config.h>
+#include "tifa_config.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -41,7 +41,6 @@
 
 #include "tool_utils.h"
 #include "tdiv.h"
-#include "qs.h"
 #include "factoring_program.h"
 #include "common_funcs.h"
 
@@ -53,8 +52,8 @@
 //------------------------------------------------------------------------------
 static void print_usage(factoring_program_t* const program) {
     fprintf(stderr, "Usage:\n");
-    fprintf(stderr, "%15s <nprimes_to_trial_divide_by>", program->argv[0]);
-    fprintf(stderr, "%15s <number_to_factor>\n", "");
+    fprintf(stderr, "%15s <nprimes_to_trial_divide_by> <number_to_factor>\n",
+            program->argv[0]);
     fprintf(stderr, "or:\n");
     fprintf(stderr, "%15s\n\n", program->argv[0]);
 
@@ -62,9 +61,6 @@ static void print_usage(factoring_program_t* const program) {
 }
 //------------------------------------------------------------------------------
 static void process_args(factoring_program_t* const program) {
-
-    qs_params_t* params = (qs_params_t*) program->params;
-
     int    argc = program->argc;
     char** argv = program->argv;
 
@@ -90,10 +86,9 @@ static void process_args(factoring_program_t* const program) {
             exit(-1);
         }
         mpz_init_set_str(program->n, str_factor_me, 10);
-        set_qs_params_to_default(params);
         *nprimes_tdiv = NPRIMES_TRIAL_DIV;
         *nfactors     = 0;
-
+        
         break;
     }
     case TDIV_F_MAX_ARGC: {
@@ -110,12 +105,12 @@ static void process_args(factoring_program_t* const program) {
             }
         }
         char** endptr = NULL;
-
+        
         *nprimes_tdiv = strtoul(argv[1], endptr, 10);
         *nfactors     = 0;
-
+        
         mpz_init_set_str(program->n, argv[2], 10);
-
+        
         break;
     }
     default:

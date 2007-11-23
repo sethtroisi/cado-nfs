@@ -32,7 +32,7 @@ package Tifa::Bencher;
 # Last modified : Thu Feb 08 2007
 #
 # Version : 0.1.0
-# License : GNU Lesser General Public License (LGPL)
+# License : GNU Lesser General Public License (LGPL) v2.1 or later
 #           Copyright (C) 2006, 2007 INRIA
 #-------------------------------------------------------------------------------
 # History
@@ -209,10 +209,11 @@ EOF
     foreach my $i (0 .. $#cmd_prefixes) {
         my $tag = sprintf("%0"."$width"."d", $i).".txt";
 
-        my $full_cmd = "$cmd_prefixes[$i] > ";
-        $full_cmd   .= $self->{output_dir}."/traces/trace_$tag";
+        my $full_cmd = "$cmd_prefixes[$i] > \$trace_dir/trace_$tag";
+        my $full_cmd_print = "$cmd_prefixes[$i] > ";
+        $full_cmd_print   .= "$output_dir/traces/trace_$tag";
 
-        print("Command to bench:($full_cmd)\n");
+        print("Command to bench:($full_cmd_print)\n");
 
         print OF "push(\@jobs,  \"$full_cmd\");\n";
         print OF "push(\@rslts, \"".$result_lines[$i]."\");\n";

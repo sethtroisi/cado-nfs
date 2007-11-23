@@ -40,11 +40,11 @@
     */
 #define _TIFA_LINKED_LIST_H_
 
+#include <inttypes.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#include <inttypes.h>
 
    /**
     * \struct struct_linked_list_node_t linked_list.h

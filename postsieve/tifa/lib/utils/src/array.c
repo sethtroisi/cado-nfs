@@ -20,14 +20,18 @@
 /**
  * \file    array.c
  * \author  Jerome Milan
- * \date    Wed Mar 1 2006
+ * \date    Wed Oct 17 2007
  * \version 1.1
  */
 
  /*
   *  History:
+  *
+  *    1.1: Wed Oct 17 2007 by JM:
+  *         - Added byte_array_t with corresponding functions.
+  *    
   *    1.0: Wed Mar 1 2006 by JM:
-  *           - Initial version.
+  *         - Initial version.
   */
 
 #include <stdlib.h>
@@ -47,6 +51,201 @@
 
 /*
  *-----------------------------------------------------------------------------
+ *              byte_array_t and associated functions
+ *-----------------------------------------------------------------------------
+ */
+
+//-----------------------------------------------------------------------------
+byte_array_t* alloc_byte_array(uint32_t length) {
+
+    byte_array_t* array = malloc(sizeof(byte_array_t));
+
+    array->alloced = length;
+    array->length  = 0U;
+
+#if USE_CALLOC_MEMSET
+    array->data = calloc(array->alloced, sizeof(unsigned char));
+#else
+    array->data = malloc(array->alloced * sizeof(unsigned char));
+    for (uint32_t i = 0; i < array->alloced; i++) {
+        array->data[i] = 0;
+    }
+#endif
+
+    return array;
+}
+//-----------------------------------------------------------------------------
+void clear_byte_array(byte_array_t* const array) {
+    if (array->alloced != 0U) {
+        free(array->data);
+    }
+    array->alloced = 0U;
+    array->length  = 0U;
+}
+//-----------------------------------------------------------------------------
+void resize_byte_array(byte_array_t* array, uint32_t alloced) {
+
+    if (alloced < array->length) {
+        array->length = alloced;
+    }
+    if (array->alloced > 0) {
+        array->data = realloc(array->data, alloced * sizeof(unsigned char));
+    } else {
+        array->data = malloc(alloced * sizeof(unsigned char));
+    }
+    array->alloced = alloced;
+}
+//-----------------------------------------------------------------------------
+void append_byte_to_array(byte_array_t* array, unsigned char to_append) {
+    if (array->length >= array->alloced) {
+        resize_byte_array(array, array->length + ELONGATION);
+    }
+    array->data[array->length] = to_append;
+    array->length++;
+}
+//-----------------------------------------------------------------------------
+void append_byte_array(byte_array_t* const array,
+                       const byte_array_t* const to_append) {
+
+    if ((array->length + to_append->length) > array->alloced) {
+        resize_byte_array(
+            array,
+            array->length + to_append->length + ELONGATION
+        );
+    }
+    uint32_t current = array->length;
+
+    for (uint32_t i = 0; i < to_append->length; i++ ) {
+        array->data[current] = to_append->data[i];
+        current++;
+    }
+    array->length += to_append->length;
+}
+//-----------------------------------------------------------------------------
+void swap_byte_array(byte_array_t* const a, byte_array_t* const b) {
+
+    uint32_t tmpalloced = a->alloced;
+    uint32_t tmplength  = a->length;
+    unsigned char* tmpdata = a->data;
+
+    a->alloced = b->alloced;
+    a->length  = b->length;
+    a->data    = b->data;
+
+    b->alloced = tmpalloced;
+    b->length  = tmplength;
+    b->data    = tmpdata;
+}
+//-----------------------------------------------------------------------------
+void print_byte_array(const byte_array_t* const array) {
+    //
+    // Mostly for debugging purposes as the output is not particularly
+    // well structured...
+    //
+    for (uint32_t i = 0U; i < array->length; i++) {
+        printf("%u ", (unsigned int)array->data[i]);
+    }
+    printf("\n");
+}
+//-----------------------------------------------------------------------------
+void ins_sort_byte_array(byte_array_t* const array) {
+    //
+    // A very basic insertion sort...
+    //
+    unsigned char to_insert;
+    uint32_t j;
+    for (uint32_t i = 1; i < array->length; i++) {
+        to_insert = array->data[i];
+        j = i;
+        while ((j > 0) && (array->data[j-1] > to_insert)) {
+            array->data[j] = array->data[j-1];
+            j--;
+        }
+        array->data[j] = to_insert;
+    }
+}
+//-----------------------------------------------------------------------------
+void qsort_byte_array(byte_array_t* const array) {
+    //
+    // Quick sort using the qsort function from the standard C library...
+    //
+    qsort(array->data, array->length, sizeof(unsigned char), uint32_cmp_func);
+}
+//-----------------------------------------------------------------------------
+uint32_t index_in_byte_array(unsigned char to_find,
+                             const byte_array_t* const array) {
+
+    for (uint32_t i = 0; i < array->length; i++) {
+        if (to_find == array->data[i]) {
+            return i;
+        }
+    }
+    //
+    // _KLUDGE_: If the integer to_find is not found, we'd like to return -1.
+    //           However, the return type being unsigned, returning -1 would
+    //           not be very elegant, so we return UINT32_MAX (i.e. the value
+    //           of the NOT_IN_ARRAY symbol) which, in a signed context, is 
+    //           indeed -1. Of course, the other possibility would be to return 
+    //           a int32_t but that would limit the length of the uint32_array_t 
+    //           to INT32_MAX instead of UINT32_MAX.
+    //
+    return NOT_IN_ARRAY;
+}
+//-----------------------------------------------------------------------------
+uint32_t index_in_sorted_byte_array(unsigned char to_find,
+                                    const byte_array_t* const sorted_array,
+                                    uint32_t min_index, uint32_t max_index) {
+    //
+    // Basic binary search...
+    //
+    uint32_t min = min_index - 1;
+    //
+    // _KLUDGE_: What if min_index = 0 ? Substracting one will yield
+    //           -1, or rather, UINT32_MAX since min is unsigned. This is
+    //           not very elegant but it works...
+    //
+    uint32_t max = max_index;
+    uint32_t index;
+
+    while ((max - min) > 1) {
+
+        index = (max + min)/2;
+
+        if (to_find <= sorted_array->data[index]) {
+            max = index;
+        } else {
+            min = index;
+        }
+    }
+    if (to_find == sorted_array->data[max]) {
+        return max;
+    } else {
+        //
+        // _KLUDGE_: Return type is unsigned so -1 is the same as UINT32_MAX 
+        //           (i.e. the value of the NOT_IN_ARRAY symbol).
+        //
+        return NOT_IN_ARRAY;
+    }
+}
+//-----------------------------------------------------------------------------
+bool is_in_byte_array(unsigned char to_find, const byte_array_t* const array) {
+    return (NOT_IN_ARRAY != index_in_byte_array(to_find, array));
+}
+//-----------------------------------------------------------------------------
+inline bool is_in_sorted_byte_array(unsigned char to_find,
+                                    const byte_array_t* const array) {
+    return (NOT_IN_ARRAY != index_in_sorted_byte_array(
+                                to_find,
+                                array,
+                                0,
+                                array->length - 1
+                            )
+            );
+}
+//-----------------------------------------------------------------------------
+
+/*
+ *-----------------------------------------------------------------------------
  *              uint32_array_t and associated functions
  *-----------------------------------------------------------------------------
  */
@@ -62,7 +261,7 @@ uint32_array_t* alloc_uint32_array(uint32_t length) {
 #if USE_CALLOC_MEMSET
     array->data = calloc(array->alloced, sizeof(uint32_t));
 #else
-    array->data = malloc(array->alloced*sizeof(uint32_t));
+    array->data = malloc(array->alloced * sizeof(uint32_t));
     for (uint32_t i = 0U; i < array->alloced; i++) {
         array->data[i] = 0U;
     }
@@ -257,7 +456,7 @@ int32_array_t* alloc_int32_array(uint32_t length) {
 #if USE_CALLOC_MEMSET
     array->data = calloc(array->alloced, sizeof(int32_t));
 #else
-    array->data = malloc(array->alloced*sizeof(int32_t));
+    array->data = malloc(array->alloced * sizeof(int32_t));
     for (uint32_t i = 0U; i < array->alloced; i++) {
         array->data[i] = 0;
     }
@@ -424,7 +623,7 @@ mpz_array_t* alloc_mpz_array(uint32_t length) {
 
     array->alloced = length;
     array->length  = 0U;
-    array->data    = malloc(array->alloced*sizeof(mpz_t));
+    array->data    = malloc(array->alloced * sizeof(mpz_t));
 
     return array;
 }

@@ -1,5 +1,4 @@
 #-------------------------------------------------------------------------------
-#
 # This file governs the building and installation process of the TIFA library
 # and its associated programs.
 #
@@ -7,7 +6,6 @@
 #
 # If an option is not defined in this file, its default value will be used.
 # Uncomment and edit this file to suit your needs.
-#
 #-------------------------------------------------------------------------------
 
 #-------------------------------------------------------------------------------

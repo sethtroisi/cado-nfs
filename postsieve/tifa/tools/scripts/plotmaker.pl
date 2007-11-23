@@ -32,7 +32,7 @@
 # Last modified : Wed Feb 14 2007 by JM
 #
 # Version : 0.1.2
-# License : GNU Lesser General Public License (LGPL)
+# License : GNU Lesser General Public License (LGPL) v2.1 or later
 #           Copyright (C) 2006, 2007 INRIA
 #-------------------------------------------------------------------------------
 # History

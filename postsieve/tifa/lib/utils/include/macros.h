@@ -102,7 +102,9 @@ do {                                                         \
     * \note This macro is the SIZ macro from the GMP library. It is
     * redistributed under the GNU LGPL license.
     */
+#if !defined(SIZ)
 #define SIZ(x) ((x)->_mp_size)
+#endif
 
    /**
     * \def ABSIZ(x)
@@ -115,7 +117,9 @@ do {                                                         \
     * \note This macro is the ABSIZ macro from the GMP library. It is
     * redistributed under the GNU LGPL license.
     */
+#if !defined(ABSIZ)
 #define ABSIZ(x) (ABS(SIZ(x)))
+#endif
 
    /**
     * \def PTR(x)
@@ -129,7 +133,9 @@ do {                                                         \
     * \note This macro is the PTR macro from the GMP library. It is
     * redistributed under the GNU LGPL license.
     */
+#if !defined(PTR)
 #define PTR(x) ((x)->_mp_d)
+#endif
 
    /**
     * \def ALLOC(x)
@@ -142,7 +148,9 @@ do {                                                         \
     * \note This macro is the ALLOC macro from the GMP library. It is
     * redistributed under the GNU LGPL license.
     */
+#if !defined(ALLOC)
 #define ALLOC(x) ((x)->_mp_alloc)
+#endif
 
    /**
     * \def MAX(a, b)
@@ -152,7 +160,9 @@ do {                                                         \
     * of macro. The standard disclaimers apply.
     *
     */
+#if !defined(MAX)
 #define MAX(a,b) ( ((a) > (b)) ? (a) : (b) )
+#endif
 
    /**
     * \def MIN(a, b)
@@ -162,7 +172,9 @@ do {                                                         \
     * of macro. The standard disclaimers apply.
     *
     */
+#if !defined(MIN)
 #define MIN(a,b) ( ((a) < (b)) ? (a) : (b) )
+#endif
 
    /**
     * \def ABS(a)
@@ -172,7 +184,9 @@ do {                                                         \
     * kind of macro. The standard disclaimers apply.
     *
     */
+#if !defined(ABS)
 #define ABS(a) ( ((a) < 0) ? (-(a)) : (a) )
+#endif
 
    /**
     * \def IS_POWER_OF_2_UI(ui)

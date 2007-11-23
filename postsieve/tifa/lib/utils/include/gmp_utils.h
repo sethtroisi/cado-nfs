@@ -28,12 +28,6 @@
  * GMP small utilities' definitions should go here.
  */
 
- /*
-  *  Copyright (C) 2006, 2007 INRIA
-  *  License: GNU Lesser General Public License (LGPL)
-  *  History:
-  */
-
 #if !defined(_TIFA_GMP_UTILS_H_)
    /**
     * \def _TIFA_GMP_UTILS_H_

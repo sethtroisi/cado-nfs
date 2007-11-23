@@ -15,8 +15,8 @@ Main bugs and outstanding issues
         (or what's left of it) and, incidentally, give wrong results.
 
   - The QS and SIQS implementations need to be optimized and fine-tuned.
-    Right now, they _are_ definitely sub par performance-wise even if they
-    somewhat improved recently.
+    Right now, they are still sub par performance-wise even if they noticeably
+    improved recently.
 
   - Should the integer types used be changed? Some functions use standard
     long ints (signed or unsigned) while some use the C99 types int32_t,
@@ -24,3 +24,10 @@ Main bugs and outstanding issues
   
   - lib/utils/src/factoring_machine.c is way too complicated to not be
     buggy. It will certainly be needed to refactor it at some point...
+
+  - WARNING:
+  
+        - Simple large prime variation is mandatory for the time being! Code
+          refactoring is (yet again!) in process and the "no large prime"
+          variation has not been "replugged" for the time being.
+  
