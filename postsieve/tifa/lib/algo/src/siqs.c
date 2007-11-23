@@ -81,12 +81,12 @@
 // Largest size of a sieve chunk. The optimal value is architecture dependant,
 // so this value should be tweaked according to the target processor.
 //
-#define SIEVE_CHUNK_MAX_SIZE       4096 //65535
+#define SIEVE_CHUNK_MAX_SIZE       65535
 //
 // Begin to sieve with the (NPRIMES_TO_SKIP + 1)-th prime in the factor base
 // (the so-called small-primes variation).
 //
-#define NPRIMES_TO_SKIP            0
+#define NPRIMES_TO_SKIP            10
 #if (NPRIMES_TO_SKIP == 0)
     //
     // Should we sieve with the prime 2?
