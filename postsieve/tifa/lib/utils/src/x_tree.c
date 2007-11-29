@@ -20,14 +20,15 @@
 /**
  * \file    x_tree.c
  * \author  Jerome Milan
- * \date    Tue Dec 12 2006
- * \version 1.1
+ * \date    Wed Nov 28 2007
+ * \version 1.1.1
  */
 
  /*
-  *  Copyright (C) 2006, 2007 INRIA
-  *  License: GNU Lesser General Public License (LGPL)
   *  History:
+  *
+  *  1.1.1: Wed Nov 28 2007 by JM:
+  *         - Added the (currently unused) 'prod_tree_mod' function.
   *
   *  1.1.0: Tue Dec 12 2006 by JM:
   *         - new typedef: mpz_tree_t.
@@ -224,8 +225,203 @@ mpz_tree_t* prod_tree(const mpz_array_t* const array) {
         //
         // Set the mp_limb_t pointers to their "dedicated" memory spaces...
         //
-        size_1   = ABS(treedata[ichild_1][0]._mp_size);
-        size_2   = ABS(treedata[ichild_2][0]._mp_size);
+        size_1   = ABSIZ(treedata[ichild_1]);
+        size_2   = ABSIZ(treedata[ichild_2]);
+        size_res = size_1 + size_2;
+
+        next_free_space_index -= size_res;
+
+        PTR(treedata[inode]) = &(treelimbs[next_free_space_index]);
+
+        ALLOC(treedata[inode]) = size_res;
+
+        if (size_1 > size_2) {
+            mpn_mul(PTR(treedata[inode]),
+                    PTR(treedata[ichild_1]), size_1,
+                    PTR(treedata[ichild_2]), size_2);
+        } else {
+            mpn_mul(PTR(treedata[inode]),
+                    PTR(treedata[ichild_2]), size_2,
+                    PTR(treedata[ichild_1]), size_1);
+        }
+        //
+        // Normalize the size of the result...
+        //
+        MPN_NORMALIZE(PTR(treedata[inode]), size_res);
+
+        if ((SIZ(treedata[ichild_1]) ^ SIZ(treedata[ichild_2])) >= 0) {
+            SIZ(treedata[inode]) = size_res;
+        } else {
+            SIZ(treedata[inode]) = -size_res;
+        }
+    }
+    //
+    // Root node is computed separately...
+    //
+    size_1   = ABSIZ(treedata[1]);
+    size_2   = ABSIZ(treedata[2]);
+    size_res = size_1 + size_2;
+
+    treedata[0][0]._mp_alloc = size_res;
+
+    if (size_1 > size_2) {
+        mpn_mul(PTR(treedata[0]),
+                PTR(treedata[1]), size_1,
+                PTR(treedata[2]), size_2);
+    } else {
+        mpn_mul(PTR(treedata[0]),
+                PTR(treedata[2]), size_2,
+                PTR(treedata[1]), size_1);
+    }
+    MPN_NORMALIZE(PTR(treedata[0]), size_res);
+
+    if ((SIZ(treedata[1]) ^ SIZ(treedata[2])) >= 0) {
+        SIZ(treedata[0]) = size_res;
+    } else {
+        SIZ(treedata[0]) = -size_res;
+    }
+    return tree;
+}
+//-----------------------------------------------------------------------------
+mpz_tree_t* prod_tree_mod(const mpz_array_t* const array, const mpz_t n) {
+    //
+    // _NOTE_: See introductory comments in the body of the prod_tree function.
+    //
+    // _WARNING_: n should be strictly positive.
+    //
+    // _NOTE_: The differences between this function and the prod_tree
+    //         function are quite minimal. In other words, there is a lot of
+    //         code reuse here which, from a purely software engineering point
+    //         of view, is pretty ugly. It may be worthwhile to rewrite these
+    //         two functions in a clever way to avoid such bad code reuse...
+    //
+    mpz_tree_t* const tree = malloc(sizeof(mpz_tree_t));
+    //
+    // Handle the special cases separately...
+    //
+    if (0 == array->length) {
+        tree->alloced = 0;
+        tree->length = 0;
+        tree->data = NULL;
+        return tree;
+    }
+    if (1 == array->length) {
+        tree->alloced = 1;
+        tree->length = 1;
+        tree->data = malloc(sizeof(mpz_t));
+        mpz_init_set(tree->data[0], array->data[0]);
+        return tree;
+    }
+    //
+    // General case...
+    //
+    // minpow is the least integer such that 2^minpow >= array->length
+    //
+    uint32_t minpow = most_significant_bit(array->length);
+    if (((1U<<minpow) ^ array->length) != 0) {
+        minpow++;
+    }
+    //
+    // The number of leaves is (1<<minpow), which is different from
+    // array->length if array->length is not a power of 2.
+    //
+    tree->alloced = 2*(1<<minpow) - 1;
+    tree->length = tree->alloced;
+    tree->data = malloc(tree->alloced*sizeof(mpz_t));
+    //
+    // Use a local constant pointer to the data to bypass the reading of a
+    // non constant pointer. This should hopefully speed-up things a bit...
+    // A (very) little bit...
+    //
+    mpz_t* const treedata = tree->data;
+    //
+    // i >= offset => tree[i] is a leaf
+    // i <  offset => tree[i] is a node
+    //
+    uint32_t const offset = tree->length/2;
+    //
+    // Computes the memory needed to hold the product tree and allocate the
+    // whole memory needed in only one call to malloc
+    //
+    uint32_t size_tree   = 0;
+    uint32_t size_leaves = 0;
+    for (uint32_t inode = 0U; inode < array->length; inode++) {
+        size_leaves += ABSIZ(array->data[inode]);
+    }
+    for (uint32_t inode = tree->length - 1;
+         inode >= offset + array->length;
+         inode--) {
+        size_leaves++;
+    }
+    size_tree = size_leaves * (minpow + 1);
+
+    PTR(treedata[0]) = malloc(size_tree * sizeof(mp_limb_t));
+    mp_limb_t* const treelimbs = PTR(treedata[0]);
+
+    uint32_t next_free_space_index = size_tree;
+    //
+    // If necessary (i.e. array->length is not a power of 2), sets the
+    // remaining tree leaves to 1. Note that in that case the allocated memory
+    // will be strictly greater than what's really needed, but any
+    // "optimization" here is likely to be more of a waste that just living
+    // with it...
+    //
+    for (uint32_t inode = tree->length - 1;
+         inode >= offset + array->length;
+         inode--) {
+
+        next_free_space_index--;
+
+        treelimbs[next_free_space_index] = (mp_limb_t)1;
+
+        PTR(treedata[inode])   = &(treelimbs[next_free_space_index]);
+        SIZ(treedata[inode])   = 1;
+        ALLOC(treedata[inode]) = 1;
+    }
+    uint32_t iarray = array->length - 1;
+    //
+    // Sets the value of the leaves...
+    //
+    for (uint32_t inode = offset + array->length - 1;
+         inode >= offset; inode--) {
+
+        next_free_space_index -= ABSIZ(array->data[iarray]);
+
+        memcpy(
+            &(treelimbs[next_free_space_index]),
+            PTR(array->data[iarray]),
+            ABSIZ(array->data[iarray]) * sizeof(mp_limb_t)
+        );
+        PTR(treedata[inode])   = &(treelimbs[next_free_space_index]);
+        SIZ(treedata[inode])   = SIZ(array->data[iarray]);
+        ALLOC(treedata[inode]) = ABSIZ(array->data[iarray]);
+
+        iarray--;
+    }
+    
+    mp_limb_t* quotient = malloc(
+                              (size_leaves - SIZ(n) + 1) * sizeof(mp_limb_t)
+                          );
+    mp_limb_t* remainder   = malloc(SIZ(n) * sizeof(mp_limb_t));
+
+    uint32_t ichild_1 = 0;
+    uint32_t ichild_2 = 0;
+    //
+    // Computes the products for each node...
+    //
+    mp_size_t size_1   = 0;
+    mp_size_t size_2   = 0;
+    mp_size_t size_res = 0;
+
+    for (uint32_t inode = offset - 1; inode != 0U; inode--) {
+
+        ichild_1 = (inode<<1) | 1;
+        ichild_2 = (inode<<1) + 2;
+        //
+        // Set the mp_limb_t pointers to their "dedicated" memory spaces...
+        //
+        size_1   = ABSIZ(treedata[ichild_1]);
+        size_2   = ABSIZ(treedata[ichild_2]);
         size_res = size_1 + size_2;
 
         next_free_space_index -= size_res;
@@ -235,51 +431,95 @@ mpz_tree_t* prod_tree(const mpz_array_t* const array) {
         treedata[inode][0]._mp_alloc = size_res;
 
         if (size_1 > size_2) {
-            mpn_mul(treedata[inode][0]._mp_d,
-                    treedata[ichild_1][0]._mp_d, size_1,
-                    treedata[ichild_2][0]._mp_d, size_2);
+            mpn_mul(PTR(treedata[inode]),
+                    PTR(treedata[ichild_1]), size_1,
+                    PTR(treedata[ichild_2]), size_2);
         } else {
-            mpn_mul(treedata[inode][0]._mp_d,
-                    treedata[ichild_2][0]._mp_d, size_2,
-                    treedata[ichild_1][0]._mp_d, size_1);
+            mpn_mul(PTR(treedata[inode]),
+                    PTR(treedata[ichild_2]), size_2,
+                    PTR(treedata[ichild_1]), size_1);
         }
         //
         // Normalize the size of the result...
         //
         MPN_NORMALIZE(PTR(treedata[inode]), size_res);
 
-        if ((  treedata[ichild_1][0]._mp_size
-             ^ treedata[ichild_2][0]._mp_size) >= 0) {
-            treedata[inode][0]._mp_size = size_res;
+        if ((SIZ(treedata[ichild_1]) ^ SIZ(treedata[ichild_2])) >= 0) {
+            SIZ(treedata[inode]) = size_res;
         } else {
-            treedata[inode][0]._mp_size = -size_res;
+            SIZ(treedata[inode]) = -size_res;
+        }   
+        //
+        // Reduce modulo n
+        //
+        if (ABSIZ(treedata[inode]) >= SIZ(n)) {
+            mpn_tdiv_qr(
+                quotient, remainder,
+                0,
+                PTR(treedata[inode]), ABSIZ(treedata[inode]),
+                PTR(n), SIZ(n)
+            );        
+            for (int i = 0; i < SIZ(n); i++) {
+                treedata[inode][0]._mp_d[i] = remainder[i];
+            }
+            SIZ(treedata[inode]) = SIZ(n);
+            
+            MPN_NORMALIZE(PTR(treedata[inode]), SIZ(treedata[inode]));
+            
+            if ((SIZ(treedata[ichild_1]) ^ SIZ(treedata[ichild_2])) < 0) {
+                SIZ(treedata[inode]) = -SIZ(treedata[inode]);
+            }
         }
     }
     //
     // Root node is computed separately...
     //
-    size_1   = ABS(treedata[1][0]._mp_size);
-    size_2   = ABS(treedata[2][0]._mp_size);
+    size_1   = ABSIZ(treedata[1]);
+    size_2   = ABSIZ(treedata[2]);
     size_res = size_1 + size_2;
 
-    treedata[0][0]._mp_alloc = size_res;
+    ALLOC(treedata[0]) = size_res;
 
     if (size_1 > size_2) {
-        mpn_mul(treedata[0][0]._mp_d,
-                treedata[1][0]._mp_d, size_1,
-                treedata[2][0]._mp_d, size_2);
+        mpn_mul(PTR(treedata[0]),
+                PTR(treedata[1]), size_1,
+                PTR(treedata[2]), size_2);
     } else {
-        mpn_mul(treedata[0][0]._mp_d,
-                treedata[2][0]._mp_d, size_2,
-                treedata[1][0]._mp_d, size_1);
+        mpn_mul(PTR(treedata[0]),
+                PTR(treedata[2]), size_2,
+                PTR(treedata[1]), size_1);
     }
     MPN_NORMALIZE(PTR(treedata[0]), size_res);
 
-    if ((treedata[1][0]._mp_size ^ treedata[2][0]._mp_size) >= 0) {
-        treedata[0][0]._mp_size = size_res;
+    if ((SIZ(treedata[1]) ^ SIZ(treedata[2])) >= 0) {
+        SIZ(treedata[0]) = size_res;
     } else {
-        treedata[0][0]._mp_size = -size_res;
+        SIZ(treedata[0]) = -size_res;
     }
+    //
+    // Reduce modulo n
+    //
+    if (ABSIZ(treedata[0]) >= SIZ(n)) {
+        mpn_tdiv_qr(
+            quotient, remainder,
+            0,
+            PTR(treedata[0]), ABSIZ(treedata[0]),
+            PTR(n), SIZ(n)
+        );   
+        for (int i = 0; i < SIZ(n); i++) {
+            treedata[0][0]._mp_d[i] = remainder[i];
+        }
+        SIZ(treedata[0]) = SIZ(n);
+        
+        MPN_NORMALIZE(PTR(treedata[0]), SIZ(treedata[0]));
+        
+        if ((SIZ(treedata[1]) ^ SIZ(treedata[2])) < 0) {
+            SIZ(treedata[0]) = -SIZ(treedata[0]);
+        }
+    }
+    free(quotient);
+    free(remainder);
+    
     return tree;
 }
 //-----------------------------------------------------------------------------
@@ -455,60 +695,59 @@ mpz_tree_t* prod_tree_ui(const uint32_array_t* const array) {
         //
         // Set the mp_limb_t pointers to their "dedicated" memory spaces...
         //
-        size_1   = ABS(treedata[ichild_1][0]._mp_size);
-        size_2   = ABS(treedata[ichild_2][0]._mp_size);
+        size_1   = ABSIZ(treedata[ichild_1]);
+        size_2   = ABSIZ(treedata[ichild_2]);
         size_res = size_1 + size_2;
 
         next_free_space_index -= size_res;
 
         PTR(treedata[inode]) = &(treelimbs[next_free_space_index]);
 
-        treedata[inode][0]._mp_alloc = size_res;
+        ALLOC(treedata[inode]) = size_res;
 
         if (size_1 > size_2) {
-            mpn_mul(treedata[inode][0]._mp_d,
-                    treedata[ichild_1][0]._mp_d, size_1,
-                    treedata[ichild_2][0]._mp_d, size_2);
+            mpn_mul(PTR(treedata[inode]),
+                    PTR(treedata[ichild_1]), size_1,
+                    PTR(treedata[ichild_2]), size_2);
         } else {
-            mpn_mul(treedata[inode][0]._mp_d,
-                    treedata[ichild_2][0]._mp_d, size_2,
-                    treedata[ichild_1][0]._mp_d, size_1);
+            mpn_mul(PTR(treedata[inode]),
+                    PTR(treedata[ichild_2]), size_2,
+                    PTR(treedata[ichild_1]), size_1);
         }
         //
         // Normalize the size of the result...
         //
         MPN_NORMALIZE(PTR(treedata[inode]), size_res);
 
-        if ((  treedata[ichild_1][0]._mp_size
-             ^ treedata[ichild_2][0]._mp_size) >= 0) {
-            treedata[inode][0]._mp_size = size_res;
+        if ((SIZ(treedata[ichild_1]) ^ SIZ(treedata[ichild_2])) >= 0) {
+            SIZ(treedata[inode]) = size_res;
         } else {
-            treedata[inode][0]._mp_size = -size_res;
+            SIZ(treedata[inode]) = -size_res;
         }
     }
     //
     // Root node is computed separately...
     //
-    size_1   = ABS(treedata[1][0]._mp_size);
-    size_2   = ABS(treedata[2][0]._mp_size);
+    size_1   = ABSIZ(treedata[1]);
+    size_2   = ABSIZ(treedata[2]);
     size_res = size_1 + size_2;
 
-    treedata[0][0]._mp_alloc = size_res;
+    ALLOC(treedata[0]) = size_res;
 
     if (size_1 > size_2) {
-        mpn_mul(treedata[0][0]._mp_d,
-                treedata[1][0]._mp_d, size_1,
-                treedata[2][0]._mp_d, size_2);
+        mpn_mul(PTR(treedata[0]),
+                PTR(treedata[1]), size_1,
+                PTR(treedata[2]), size_2);
     } else {
-        mpn_mul(treedata[0][0]._mp_d,
-                treedata[2][0]._mp_d, size_2,
-                treedata[1][0]._mp_d, size_1);
+        mpn_mul(PTR(treedata[0]),
+                PTR(treedata[2]), size_2,
+                PTR(treedata[1]), size_1);
     }
     MPN_NORMALIZE(PTR(treedata[0]), size_res);
-    if ((treedata[1][0]._mp_size ^ treedata[2][0]._mp_size) >= 0) {
-        treedata[0][0]._mp_size = size_res;
+    if ((SIZ(treedata[1]) ^ SIZ(treedata[2])) >= 0) {
+        SIZ(treedata[0]) = size_res;
     } else {
-        treedata[0][0]._mp_size = -size_res;
+        SIZ(treedata[0]) = -size_res;
     }
     return tree;
 }
@@ -767,4 +1006,3 @@ void print_mpz_tree_rec(const mpz_tree_t* const tree,
     }
 }
 //-----------------------------------------------------------------------------
-

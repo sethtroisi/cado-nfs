@@ -237,7 +237,7 @@ struct struct_siqs_context_t {
     //
     mpz_array_t *cand_redgx;
     mpz_array_t *cand_u;
-    mpz_array_t* cand_a_array;
+    mpz_array_t *cand_a_array;
     //
     // All accepted relations, i.e. the g_{a,b}(xi)/a and their
     // corresponding ui = a.xi+b, such that ui^2 = g_{a, b}(xi) (mod n) with
@@ -855,7 +855,7 @@ static ecode_t perform_siqs(factoring_machine_t* const machine) {
 
     byte_matrix_t* decomp_matrix = alloc_byte_matrix(
                                       context->matrix_nrows,
-                                      context->matrix_ncols
+                                      context->factor_base->length
                                    );
 
     //

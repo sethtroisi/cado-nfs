@@ -20,8 +20,8 @@
 /**
  * \file    x_tree.h
  * \author  Jerome Milan
- * \date    Mon Mar 6 2006
- * \version 1.0
+ * \date    Wed Nov 28 2007
+ * \version 1.0.1
  *
  * \brief Product and remainder trees.
  *
@@ -30,8 +30,13 @@
  */
 
  /*
-  *  License: GNU Lesser General Public License (LGPL)
   *  History:
+  *
+  *  1.0.1: Wed Nov 28 2007 by JM:
+  *         - Added the (currently unused) 'prod_tree_mod' function protoype.
+  *
+  *  1.0.0: Mon Mar 6 2006 by JM:
+  *         - Initial version.
   */
 
 #if !defined(_TIFA_X_TREE_H_)
@@ -100,6 +105,23 @@ typedef mpz_array_t mpz_tree_t;
 mpz_tree_t* prod_tree(const mpz_array_t* const array);
 
    /**
+    * \brief Computes the product tree of some \c mpz_t integers modulo
+    * a positive integer.
+    *
+    * Similar to \c prod_tree but each node is reduced mod \c n.
+    *
+    * \warning n should be strictly positive or results will be unpredictable.
+    *
+    * \see The function <tt>prod_tree(const mpz_array_t* const array)</tt>.
+    *
+    * \param[in] array Pointer to the \c mpz_array_t containing the
+    *                  \c mpz_t integers to multiply.
+    * \return A pointer to a newly allocated \c mpz_tree_t holding the
+    * computed product tree.
+    */
+mpz_tree_t* prod_tree_mod(const mpz_array_t* const array, const mpz_t n);
+
+   /**
     * \brief Computes the product tree of some \c uint32_t integers.
     *
     * Computes the product tree of the \c uint32_t integers given by \c array
@@ -124,7 +146,6 @@ mpz_tree_t* prod_tree(const mpz_array_t* const array);
     * array should NOT be modified later on since the memory used is allocated
     * in one huge block to prevent overhead from multiple malloc calls. So the
     * allocated memory of the mpz_t's in the array can NOT be increased...
-    *
     *
     * \param[in] array Pointer to the \c uint32_array_t containing the
     *                  \c mpz_t integers to multiply.

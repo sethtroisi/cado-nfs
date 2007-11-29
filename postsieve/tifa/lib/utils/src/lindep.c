@@ -268,6 +268,9 @@ ecode_t find_factors(mpz_array_t*  const factors,
 
     mpz_t y;
     mpz_init(y);
+    
+    mpz_t rem;
+    mpz_init(rem);
 
     mpz_t gcd;
     mpz_init(gcd);
@@ -292,10 +295,16 @@ ecode_t find_factors(mpz_array_t*  const factors,
             irow = dependencies->data[idep]->data[irel];
             mpz_mul(x, x, xi_array->data[irow]);
             mpz_mod(x, x, n);
+            //
+            // _TO_DO_: We should use a product tree here, but since this
+            //          function is only used with CFRAC (where the size of
+            //          the residues are bounded) this is not critical...
+            //
             mpz_mul(y, y, yi_array->data[irow]);
         }
-
-        if (0 == mpz_perfect_square_p(y)) {
+        mpz_sqrtrem(y, rem, y);
+        
+        if (0 != mpz_sgn(rem)) {
             //
             // At this stage, if we made no mistake, y should be a product
             // of squares. If that's not the case, something went terribly
@@ -307,7 +316,6 @@ ecode_t find_factors(mpz_array_t*  const factors,
             ecode = FATAL_INTERNAL_ERROR;
             goto clean_and_return;
         }
-        mpz_sqrt(y, y);
         mpz_mod(y, y, n);
         mpz_add(x, x, y);
         mpz_gcd(gcd, x, n);
@@ -328,6 +336,7 @@ ecode_t find_factors(mpz_array_t*  const factors,
 
     mpz_clear(x);
     mpz_clear(y);
+    mpz_clear(rem);
     mpz_clear(gcd);
 
     return ecode;
@@ -394,6 +403,12 @@ ecode_t find_factors_decomp(mpz_array_t*  const factors,
         // Compute y = sqrt(product(yi))
         //
         for (uint32_t i = 0; i < yi_decomp_matrix->ncols; i++) {
+            //
+            // _NOTE_: According to my non-exhaustive tests, reducing mod n
+            //         at each step is faster than a standard product tree
+            //         followed by one reduction. Now a product tree with
+            //         a reduction at each node may even be better...
+            //
             mpz_ui_pow_ui(ppow, base_data[i], decomp[i] / 2);
             mpz_mul(y, y, ppow);
             mpz_mod(y, y, n);

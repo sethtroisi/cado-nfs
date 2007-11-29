@@ -30,8 +30,7 @@
  */
 
  /*
-  *  License: GNU Lesser General Public License (LGPL)
-  *  History:
+  *  History: N/A (continuously tweaked)
   */
 
 #if !defined(_TIFA_MACROS_H_)
@@ -75,9 +74,9 @@ extern "C" {
     *
     * Given \c dest, a pointer to an array of \c nlimbs \c mp_limbs_t
     * integers giving the representation of a multi-precision integer n,
-    * computes the effective size of n, i.e the number of significant
-    * \c mp_size_t integers needed to represent n and modifies the value
-    * of \c nlimbs accordingly.
+    * computes the absolute value of the effective size of n, i.e the number
+    * of significant \c mp_size_t integers needed to represent n and modifies 
+    * the value of \c nlimbs accordingly.
     *
     * \note This macro is originally the MPN_NORMALIZE macro from the GMP
     * library. It has been slightly modified.
@@ -119,6 +118,14 @@ do {                                                         \
     */
 #if !defined(ABSIZ)
 #define ABSIZ(x) (ABS(SIZ(x)))
+#endif
+
+   /**
+    * \def MPZ_TO_ABS(x)
+    * Sets the \c mpz_t \c x to its absolute value.
+    */
+#if !defined(MPZ_TO_ABS)
+#define MPZ_TO_ABS(x) (SIZ(x) = ABSIZ(x))
 #endif
 
    /**
@@ -255,6 +262,9 @@ do {                                                         \
     * Takes as parameters three \c mpz_t (and not arrays of <tt>mp_limb_t</tt>).
     * \c SIZ(B) should be greater than or equal to <tt>SIZ(C)</tt>.
     *
+    * \warning \c B and \c C should be both positive or the result will be
+    * unpredictable.
+    *
     * \see The GMP documentation for more information on the \c mpn_add
     * function.
     */
@@ -284,6 +294,9 @@ do {                                                         \
     * Takes as parameters three \c mpz_t (and not arrays of <tt>mp_limb_t</tt>).
     * \c B and \c C can be used interchangeably.
     *
+    * \warning \c B and \c C should be both positive or the result will be
+    * unpredictable.
+    *
     * \see The GMP documentation for more information on the \c mpn_add
     * function.
     */
@@ -306,6 +319,9 @@ do {                                                         \
     * Takes as parameters three \c mpz_t (and not arrays of <tt>mp_limb_t</tt>).
     * \c B should be greater than or equal to <tt>C</tt>.
     *
+    * \warning \c B and \c C should be both positive or the result will be
+    * unpredictable.
+    *
     * \see The GMP documentation for more information on the \c mpn_sub
     * function.
     */
@@ -326,6 +342,9 @@ do {                                                         \
     * Takes as parameters three \c mpz_t (and not arrays of <tt>mp_limb_t</tt>).
     * \c B should be greater than or equal to <tt>C</tt>.
     *
+    * \warning \c B and \c C should be both positive or the result will be
+    * unpredictable.
+    *
     * \see The GMP documentation for more information on the \c mpn_sub_n
     * function.
     */
@@ -344,16 +363,19 @@ do {                                                         \
     *
     * Takes as parameters four \c mpz_t (and not arrays of <tt>mp_limb_t</tt>).
     *
+    * \warning \c N and \c D should be both positive or the result will be
+    * unpredictable.
+    *
     * \see The GMP documentation for more information on the \c mpn_tdiv_qr
     * function.
     */
-#define MPN_TDIV_QR(Q, R, N, D)                                             \
-    do {                                                                    \
-       mpn_tdiv_qr(PTR(Q), PTR(R), 0,  PTR(N), SIZ(N), PTR(D), SIZ(D));     \
-       SIZ(Q) = SIZ(N) - SIZ(D) + 1;                                        \
-       MPN_NORMALIZE(PTR(Q), SIZ(Q));                                       \
-       SIZ(R) = SIZ(D);                                                     \
-       MPN_NORMALIZE(PTR(R), SIZ(R));                                       \
+#define MPN_TDIV_QR(Q, R, N, D)                                           \
+    if (SIZ(N) >= SIZ(D)) {                                               \
+       mpn_tdiv_qr(PTR(Q), PTR(R), 0,  PTR(N), SIZ(N), PTR(D), SIZ(D));   \
+       SIZ(Q) = SIZ(N) - SIZ(D) + 1;                                      \
+       MPN_NORMALIZE(PTR(Q), SIZ(Q));                                     \
+       SIZ(R) = SIZ(D);                                                   \
+       MPN_NORMALIZE(PTR(R), SIZ(R));                                     \
     } while (0)
 
    /**
@@ -364,6 +386,9 @@ do {                                                         \
     *
     * Takes as parameters three \c mpz_t (and not arrays of <tt>mp_limb_t</tt>).
     * \c SIZ(B) should be greater than or equal to <tt>SIZ(C)</tt>.
+    *
+    * \warning \c B and \c C should be both positive or the result will be
+    * unpredictable.
     *
     * \see The GMP documentation for more information on the \c mpn_mul
     * function.
@@ -383,6 +408,9 @@ do {                                                         \
     *
     * Takes as parameters three \c mpz_t (and not arrays of <tt>mp_limb_t</tt>).
     * \c SIZ(B) and \c SIZ(C) should be the same.
+    *
+    * \warning \c B and \c C should be both positive or the result will be
+    * unpredictable.
     *
     * \see The GMP documentation for more information on the \c mpn_mul_n
     * function.
@@ -404,6 +432,9 @@ do {                                                         \
     * Takes as parameters three \c mpz_t (and not arrays of <tt>mp_limb_t</tt>).
     * \c B and \c C can be used interchangeably.
     *
+    * \warning \c B and \c C should be both positive or the result will be
+    * unpredictable.
+    *
     * \see The GMP documentation for more information on the \c mpn_mul
     * function.
     */
@@ -416,6 +447,35 @@ do {                                                         \
        }                                                            \
        SIZ(A) = SIZ(B) + SIZ(C);                                    \
        MPN_NORMALIZE(PTR(A), SIZ(A));                               \
+    } while (0)
+
+   /**
+    * \def MPN_MUL_CS(A, B, C)
+    *
+    * Syntaxic sugar macro wrapping a call to <tt>mpn_mul</tt>. Performs
+    * size normalization on the result, and Checks the Sizes and the Signs
+    * of the operands to call \c mpn_mul with the proper parameters' order.
+    *
+    * Takes as parameters three \c mpz_t (and not arrays of <tt>mp_limb_t</tt>).
+    * \c B and \c C can be used interchangeably.
+    *
+    * \note \c B and \c C are allowed to be negative.
+    *
+    * \see The GMP documentation for more information on the \c mpn_mul
+    * function.
+    */
+#define MPN_MUL_CS_S(A, B, C)                                       \
+    do {                                                            \
+       if (ABSIZ(B) > ABSIZ(C)) {                                   \
+           mpn_mul(PTR(A), PTR(B), ABSIZ(B), PTR(C), ABSIZ(C));     \
+       } else {                                                     \
+           mpn_mul(PTR(A), PTR(C), ABSIZ(C), PTR(B), ABSIZ(B));     \
+       }                                                            \
+       SIZ(A) = ABSIZ(B) + ABSIZ(C);                                \
+       MPN_NORMALIZE(PTR(A), SIZ(A));                               \
+       if ((SIZ(B) ^ SIZ(C)) < 0) {                                 \
+            SIZ(A) = -SIZ(A);                                       \
+       }                                                            \
     } while (0)
 
    /**

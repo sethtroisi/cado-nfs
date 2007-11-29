@@ -758,7 +758,7 @@ static ecode_t perform_qs(factoring_machine_t* const machine) {
 
     byte_matrix_t* decomp_matrix = alloc_byte_matrix(
                                       context->matrix_nrows,
-                                      context->matrix_ncols
+                                      context->factor_base->length
                                    );
 
     //

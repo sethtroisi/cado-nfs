@@ -44,10 +44,6 @@ uint32_t select_res(smooth_filter_t* const filter, unsigned long int step);
 void complete_filter_init(smooth_filter_t* const filter,
                           uint32_array_t*  const base) {   
     
-    if (filter->nsteps == 0) {
-        filter->method = TDIV;
-    }
-    
     switch(filter->method) {
         
     case TDIV:
