@@ -285,7 +285,7 @@ SqrtWithIndexAll(char *prefix, FILE *relfile, FILE *purgedfile, FILE *indexfile,
     unsigned long w;
     int i, j, ret, nlimbs, nrows, ncols, small_nrows, small_ncols;
     char *small_row_used, *rel_used;
-    int *vec; // useful to check dependancy relation in the purged matrix
+    int *vec; // useful to check dependency relation in the purged matrix
 
     fscanf(purgedfile, "%d %d", &nrows, &ncols);
     fscanf(indexfile, "%d %d", &small_nrows, &small_ncols);
@@ -304,7 +304,7 @@ SqrtWithIndexAll(char *prefix, FILE *relfile, FILE *purgedfile, FILE *indexfile,
     // use a hash table to rebuild P2
     hashInit(&H);
     while(1){
-	fprintf(stderr, "# Operating on dependancy #%d\n", ndep);
+	fprintf(stderr, "# Operating on dependency #%d\n", ndep);
 	sprintf(ratname, "%s.rat.%03d", prefix, ndep);
 	ratfile = fopen(ratname, "w");
 	sprintf(algname, "%s.alg.%03d", prefix, ndep);
@@ -333,7 +333,7 @@ int main(int argc, char *argv[])
     if(argc != 9){
 	fprintf(stderr, "Usage: %s relname purgedname indexname", argv[0]);
 	fprintf(stderr, " kername polyname ndep r|a prefix\n");
-	fprintf(stderr, "Dependancy relation i will be put in files prefix.i\n");
+	fprintf(stderr, "Dependency relation i will be put in files prefix.i\n");
 	return 0;
     }
 
