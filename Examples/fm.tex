@@ -72,7 +72,7 @@ b)$, together with the smallest primes dividing the rational
 (resp. algebraic) side; in case the cofactor of the side is a prime,
 add it to the list.
 
-The program \verb+checknorms+ check the relations and norms, plus do
+The program \verb+checknorms+ checks the relations and norms, plus does
 some extra factorization, {\bf in the case where the cofactor was not
 already factored in the {\tt sieve} program}.
 
@@ -86,7 +86,7 @@ file \verb+name.rels+ is
 %%%%% S
 \section{Purging}
 
-The program \verb+purge+ remove singletons, using as low central
+The program \verb+purge+ removes singletons, using as low central
 memory as possible. The output file \verb+name.purged+ is
 something like
 \begin{verbatim}
@@ -115,7 +115,7 @@ Copied from Cavallar's. Used in \verb+purge+ as well as later on for
 rebuilding the rational square.
 
 %%%%% S
-\section{filtering}
+\section{Filtering}
 
 Program \verb+merge+
 will produce a file \verb+name.merge.his+ containing the history of
@@ -391,7 +391,7 @@ reconstructing the rational and algebraic squares, using programs
 \verb+allsqrt+ and later on \verb+fmalgsqrt.c+. Some optimization will
 be needed here and there, but for now it is enough. 
 
-Dependancies are produced as \verb+name.dep.rat.000+ and
+Dependencies are produced as \verb+name.dep.rat.000+ and
 \verb+name.dep.alg.000+, so that we can work on different squareroots
 at the same time if needed.
 
