@@ -3,8 +3,14 @@
 #include <gmp.h>
 #include <assert.h>
 #include <string.h>
+#include <ctype.h>
 #include "mod_ul.c"
 #include "cado.h"
+#include "utils/utils.h"
+
+#include "files.h"
+
+#define DEBUG 0
 
 int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
     int limbs_per_row, int limbs_per_col);
@@ -59,8 +65,9 @@ parse_line (void *target, char *line, const char *tag, int *have,
   return PARSE_MATCH;
 }
 
+// FIXME: why not using the one in polyfile?
 cado_poly *
-read_polynomial (char *filename)
+my_read_polynomial (char *filename)
 {
   FILE *file;
   const int linelen = 512;
@@ -185,7 +192,9 @@ typedef struct {
 int eval_char(long a, unsigned long b, rootprime_t ch) {
   unsigned long ua, aux;
   int res;
-//  printf("a := %ld; b := %lu; p := %lu; r := %lu;", a, b, ch.prime, ch.root);
+#if DEBUG >= 1
+  printf("a := %ld; b := %lu; p := %lu; r := %lu;", a, b, ch.prime, ch.root);
+#endif
   if (a < 0) {
     ua = ((unsigned long) (-a)) % ch.prime;
     b = b % ch.prime;
@@ -200,7 +209,9 @@ int eval_char(long a, unsigned long b, rootprime_t ch) {
     modul_sub(&aux, &ua, &aux, &ch.prime);
     res = modul_jacobi(&aux, &ch.prime);
   }
-//  printf("res := %d; assert (JacobiSymbol(a-b*r, p) eq res);\n", res);
+#if DEBUG >= 1
+  printf("res := %d; assert (JacobiSymbol(a-b*r, p) eq res);\n", res);
+#endif
   return res;
 }
 
@@ -222,7 +233,7 @@ eval_algebraic (mpz_t norm, mpz_t *f, int d, long a, unsigned long b)
 }
 
 void
-handleOneKer(int *charval, int k, rootprime_t * tabchar, FILE * matfile, FILE * kerfile, int nlimbs, cado_poly pol)
+handleOneKer(int *charval, int k, rootprime_t * tabchar, FILE * purgedfile, FILE * kerfile, int nlimbs, cado_poly pol)
 {  
   int i, j, jj;
   int ret;
@@ -235,8 +246,8 @@ handleOneKer(int *charval, int k, rootprime_t * tabchar, FILE * matfile, FILE * 
   mpz_init_set_ui(prd, 1);
   mpz_init(z);
 
-  rewind(matfile);
-  fgets(str, 1024, matfile); // skip first line
+  rewind(purgedfile);
+  fgets(str, 1024, purgedfile); // skip first line
 
   for (i = 0; i < k; ++i) 
     charval[i] = 1;
@@ -246,7 +257,7 @@ handleOneKer(int *charval, int k, rootprime_t * tabchar, FILE * matfile, FILE * 
 //    printf("%lx ", w);
     assert (ret == 1);
     for (j = 0; j < GMP_NUMB_BITS; ++j) {
-      if (fgets(str, 1024, matfile)) {
+      if (fgets(str, 1024, purgedfile)) {
 	if (w & 1UL) {
 	  ret = gmp_sscanf(str, "%ld %lu", &a, &b);
 	  assert (ret == 2);
@@ -529,76 +540,230 @@ typedef struct {
   unsigned int limbs_per_col;
 } dense_mat_t;
 
+// str belongs to the [i, j]-th relation-set in the ker-ified matrix.
 void
-handleKer(dense_mat_t *mat, rootprime_t * tabchar, FILE * matfile, mp_limb_t ** ker, int nlimbs, cado_poly pol)
-{  
-  int i, j, ii, jj, k, n;
-  int ret;
-  unsigned long w;
-  long a;
-  unsigned long b;
-  char str[1024];
-  mpz_t prd, z;
-  int **charval;
+treatOneabpair(int **charval, char *str, int n, int k, int i, int j, mp_limb_t **ker, rootprime_t * tabchar)
+{
+    long a;
+    unsigned long b;
+    int ret, ii, jj;
 
-  n = mat->nrows;
-  k = mat->ncols;
-  charval = (int **) malloc(n*sizeof(int *));
-  assert (charval != NULL);
-  for (i = 0; i < n; ++i) {
-    charval[i] = (int *) malloc(k*sizeof(int));
-    assert (charval[i] != NULL);
-    for (j = 0; j < k; ++j)
-      charval[i][j] = 1;
-  }
-
-  mpz_init_set_ui(prd, 1);
-  mpz_init(z);
-
-  rewind(matfile);
-  fgets(str, 1024, matfile); // skip first line
-
-  for (i = 0; i < nlimbs; ++i) {
-//    fprintf (stderr, "i = %d\n", i);
-    for (j = 0; j < GMP_NUMB_BITS; ++j) {
-      if (fgets(str, 1024, matfile)) {
-	ret = gmp_sscanf(str, "%ld %lu", &a, &b);
-	assert (ret == 2);
-	for (jj = 0; jj < n; ++jj) { // for each vector in ker...
-	  if ((ker[jj][i]>>j) & 1UL) {
+    ret = gmp_sscanf(str, "%ld %lu", &a, &b);
+#if DEBUG >= 1
+    fprintf(stderr, "str=[%s], a=%ld, b=%lu\n", str, a, b);
+#endif
+    assert (ret == 2);
+    for (jj = 0; jj < n; ++jj) { // for each vector in ker...
+	if ((ker[jj][i]>>j) & 1UL) {
 	    for (ii = 0; ii < k; ++ii) { // for each character...
-	      charval[jj][ii] *= eval_char(a, b, tabchar[ii]);
+		charval[jj][ii] *= eval_char(a, b, tabchar[ii]);
 	    }
-	  }
 	}
-      }
-    }
-  }
-
-  for (i = 0; i < n; ++i)
-    for (j = 0; j < mat->limbs_per_row; ++j)
-      mat->data[i*mat->limbs_per_row+j] = 0UL;
-
-  for (i = 0; i < n; ++i)
-    for (j = 0; j < k; ++j) {
-      int j0 = j/GMP_NUMB_BITS;
-      int j1 = j - j0*GMP_NUMB_BITS;
-      if (charval[i][j] == -1)
-	mat->data[i*mat->limbs_per_row+j0] |= (1UL<<j1);
     }
 }
 
+// charmat is small_nrows x k
+void
+computeAllCharacters(int **charmat, int i, int k, rootprime_t * tabchar, long a, unsigned long b)
+{
+    int j;
+    
+    for(j = 0; j < k; j++)
+	charmat[i][j] *= eval_char(a, b, tabchar[j]);
+}
 
+// charmat is small_nrows x k
+// relfile is the big rough relation files;
+// purgedfile contains crunched rows, with their label referring to relfile;
+// indexfile contains the coding "row[i] uses rows i_0...i_r in purgedfile".
+void
+buildCharacterMatrix(int **charmat, int k, rootprime_t * tabchar, FILE *purgedfile, FILE *indexfile, FILE *relfile)
+{
+    relation_t rel;
+    int i, j, r, small_nrows, nr, nrows, ncols, irel, kk;
+    char str[1024];
+    int **charbig;
+
+    // let's dump purgedfile which is a nrows x ncols matrix
+    rewind(purgedfile);
+    fgets(str, 1024, purgedfile);
+    sscanf(str, "%d %d", &nrows, &ncols);
+    fprintf(stderr, "Reading indices in purgedfile\n");
+
+    fprintf(stderr, "Reading all (a, b)'s just once\n");
+    // charbig is nrows x k
+    charbig = (int **)malloc(nrows * sizeof(int *));
+    for(i = 0; i < nrows; i++){
+	charbig[i] = (int *)malloc(k * sizeof(int));
+	for(j = 0; j < k; j++)
+	    charbig[i][j] = 1;
+    }
+    irel = 0;
+    rewind(relfile);
+    for(i = 0; i < nrows; i++){
+	fgets(str, 1024, purgedfile);
+	sscanf(str, "%d", &nr);
+	jumpToRelation(&rel, relfile, irel, nr);
+	irel = nr+1;
+	computeAllCharacters(charbig, i, k, tabchar, rel.a, rel.b);
+    }
+    fprintf(stderr, "Reading index file to reconstruct the characters\n");
+    rewind(indexfile);
+    // skip small_nrows, small_ncols
+    fscanf(indexfile, "%d %d", &small_nrows, &r);
+    // read all relation-sets and update charmat accordingly
+    for(i = 0; i < small_nrows; i++){
+	if(!(i % 10000))
+	    fprintf(stderr, "Treating relation #%d / %d\n", i, small_nrows);
+	fscanf(indexfile, "%d", &nr);
+	for(j = 0; j < nr; j++){
+	    fscanf(indexfile, "%d", &r);
+	    for(kk = 0; kk < k; kk++)
+		charmat[i][kk] *= charbig[r][kk];
+	}
+    }
+    for(i = 0; i < nrows; i++)
+	free(charbig[i]);
+    free(charbig);
+}
+
+void
+printCompactMatrix(mp_limb_t **A, int nrows, int ncols)
+{
+    int i, j;
+
+    fprintf(stderr, "array([\n");
+    for(i = 0; i < nrows; i++){
+        fprintf(stderr, "[");
+	for(j = 0; j < ncols; j++){
+	    int j0 = j/GMP_NUMB_BITS;
+            int j1 = j - j0*GMP_NUMB_BITS;
+	    if((A[i][j0]>>j1) & 1UL)
+		fprintf(stderr, "1");
+	    else
+		fprintf(stderr, "0");
+	    if(j < ncols-1)
+		fprintf(stderr, ", ");
+	}
+	fprintf(stderr, "]");
+	if(i < nrows-1)
+	    fprintf(stderr, ", ");
+	fprintf(stderr, "\n");
+    }
+    fprintf(stderr, "])");
+}
+
+void
+printTabMatrix(dense_mat_t *mat, int nrows, int ncols)
+{
+    int i, j;
+
+    fprintf(stderr, "array([\n");
+    for(i = 0; i < nrows; i++){
+        fprintf(stderr, "[");
+	for(j = 0; j < ncols; j++){
+	    int j0 = j/GMP_NUMB_BITS;
+            int j1 = j - j0*GMP_NUMB_BITS;
+	    if((mat->data[i*mat->limbs_per_row+j0]>>j1) & 1UL)
+		fprintf(stderr, "1");
+	    else
+		fprintf(stderr, "0");
+	    if(j < ncols-1)
+		fprintf(stderr, ", ");
+	}
+	fprintf(stderr, "]");
+	if(i < nrows-1)
+	    fprintf(stderr, ", ");
+	fprintf(stderr, "\n");
+    }
+    fprintf(stderr, "])");
+}
+
+void
+handleKer(dense_mat_t *mat, rootprime_t * tabchar, FILE * purgedfile, mp_limb_t ** ker, int nlimbs, cado_poly pol, FILE *indexfile, FILE *relfile)
+{  
+    int i, j, k, n;
+    char str[1024];
+    int **charmat;
+    int small_nrows, small_ncols;
+
+    rewind(purgedfile);
+    fgets(str, 1024, purgedfile);
+    sscanf(str, "%d %d", &small_nrows, &small_ncols);
+
+    n = mat->nrows;
+    k = mat->ncols;
+    charmat = (int **) malloc(small_nrows * sizeof(int *));
+    assert (charmat != NULL);
+    for (i = 0; i < small_nrows; ++i) {
+	charmat[i] = (int *) malloc(k*sizeof(int));
+	assert (charmat[i] != NULL);
+	for (j = 0; j < k; ++j)
+	    charmat[i][j] = 1;
+    }
+    buildCharacterMatrix(charmat, k, tabchar, purgedfile, indexfile, relfile);
+    for (i = 0; i < small_nrows; ++i)
+	for(j = 0; j < k; j++)
+	    assert((charmat[i][j] == 1) || (charmat[i][j] == -1));
+#if DEBUG >= 1
+    fprintf(stderr, "charmat:=array([");
+    for (i = 0; i < small_nrows; ++i){
+	fprintf(stderr, "[");
+	for(j = 0; j < k; j++){
+	    fprintf(stderr, "%d", (charmat[i][j] == 1 ? 0 : 1));
+	    if(j < k-1)
+		fprintf(stderr, ", ");
+	}
+	fprintf(stderr, "]");
+	if(i < small_nrows-1)
+	    fprintf(stderr, ", ");
+	fprintf(stderr, "\n");
+    }
+    fprintf(stderr, "]);\n");
+    fprintf(stderr, "ker:=");
+    printCompactMatrix(ker, n, small_nrows);
+    fprintf(stderr, ";\n");
+#endif
+
+    // now multiply: ker * charmat 
+    for (i = 0; i < n; ++i)
+	for (j = 0; j < mat->limbs_per_row; ++j)
+	    mat->data[i*mat->limbs_per_row+j] = 0UL;
+
+    // mat[i, j] = sum ker[i][u] * charmat[u][j]
+    for(i = 0; i < n; ++i){
+	for(j = 0; j < k; ++j){
+	    int j0 = j/GMP_NUMB_BITS;
+	    int j1 = j - j0*GMP_NUMB_BITS;
+	    int u;
+	    for(u = 0; u < small_nrows; u++){
+		int u0 = u/GMP_NUMB_BITS;
+		int u1 = u - u0*GMP_NUMB_BITS;
+		if((ker[i][u0]>>u1) & 1UL)
+		    if(charmat[u][j] == -1)
+			mat->data[i*mat->limbs_per_row+j0] ^= (1UL<<j1);
+	    }
+	}
+    }
+#if DEBUG >= 1
+    fprintf(stderr, "prod:=");
+    printTabMatrix(mat, n, k);
+    fprintf(stderr, ";\n");
+#endif
+    // TODO: clean data
+}
+
+// matrix M_purged is nrows x ncols
+// matrix M_small is small_nrows x small_ncols, the kernel of which
+// is contained in ker and is n x small_nrows; small_[nrows,ncols] are
+// accessible in file indexfile.
+// charmat is small_nrows x k; ker * charmat will be n x k, yielding M_tiny.
 int main(int argc, char **argv) {
-  FILE * matfile, *kerfile, *polyfile;
+  FILE *purgedfile, *kerfile, *indexfile, *relfile;
   int ret;
-  unsigned long w;
-  int i, j, k, nlimbs, jj, n;
-  char str[1024];
+  int i, j, k, nlimbs, n;
   rootprime_t *tabchar;
   int *charval;
-  unsigned long b, ua;
-  long a;
   cado_poly *pol;
   mp_limb_t **ker;
   mp_limb_t *newker;
@@ -606,22 +771,29 @@ int main(int argc, char **argv) {
   mp_limb_t **myker;
   int dim;
 
-  if (argc != 6) {
-    fprintf(stderr, "usage: %s matfile kerfile polyfile n k\n", argv[0]);
+  if (argc != 8) {
+    fprintf(stderr, "usage: %s purgedfile kerfile polyfile", argv[0]);
+    fprintf(stderr, "indexfile relfile n k\n");
     fprintf(stderr, "  where n is the number of kernel vector to deal with\n");
     fprintf(stderr, "    and k is the number of characters you want to use\n");
     exit(1);
   }
 
-  matfile = fopen(argv[1], "r");
-  assert (matfile != NULL);
+  purgedfile = fopen(argv[1], "r");
+  assert (purgedfile != NULL);
   kerfile = fopen(argv[2], "r");
   assert (kerfile != NULL);
 
-  ret = gmp_sscanf(argv[4], "%d", &n);
-  assert (ret == 1);
+  pol = my_read_polynomial(argv[3]);
 
-  ret = gmp_sscanf(argv[5], "%d", &k);
+  indexfile = fopen(argv[4], "r");
+  assert (indexfile != NULL);
+  relfile = fopen(argv[5], "r");
+  assert (relfile != NULL);
+
+  ret = gmp_sscanf(argv[6], "%d", &n);
+  assert (ret == 1);
+  ret = gmp_sscanf(argv[7], "%d", &k);
   assert (ret == 1);
 
   tabchar = (rootprime_t *)malloc(k*sizeof(rootprime_t));
@@ -629,20 +801,19 @@ int main(int argc, char **argv) {
   charval = (int *)malloc(k*sizeof(int));
   assert (charval != NULL);
 
-  pol = read_polynomial(argv[3]);
-
   create_characters(tabchar, k, *pol);
 
-  //fprintf(stderr, "using characters (p,r):\n");
-  //for (i = 0; i < k; ++i)
-  //  fprintf(stderr, "\t%lu %lu\n", tabchar[i].prime, tabchar[i].root);
-
+#if DEBUG >= 2
+  fprintf(stderr, "using characters (p,r):\n");
+  for (i = 0; i < k; ++i)
+      fprintf(stderr, "\t%lu %lu\n", tabchar[i].prime, tabchar[i].root);
+#endif
 
   {
-    int nrows, ncols;
-    ret = fscanf(matfile, "%d %d", &nrows, &ncols);
+    int small_nrows, small_ncols;
+    ret = fscanf(indexfile, "%d %d", &small_nrows, &small_ncols);
     assert (ret == 2);
-    nlimbs = (nrows / GMP_NUMB_BITS) + 1;
+    nlimbs = (small_nrows / GMP_NUMB_BITS) + 1;
   }
 
   ker = (mp_limb_t **)malloc(n*sizeof(mp_limb_t *));
@@ -664,7 +835,7 @@ int main(int argc, char **argv) {
 
   fprintf(stderr, "start computing characters...\n");
 
-  handleKer(&mymat, tabchar, matfile, ker, nlimbs, *pol);
+  handleKer(&mymat, tabchar, purgedfile, ker, nlimbs, *pol, indexfile, relfile);
 
   myker = (mp_limb_t **)malloc(mymat.nrows*sizeof(mp_limb_t *));
   assert (myker != NULL);
@@ -674,8 +845,15 @@ int main(int argc, char **argv) {
     for (j = 0; j < mymat.limbs_per_col; ++j) 
       myker[i][j] = 0UL;
   }
+  fprintf(stderr, "Computing tiny kernel\n");
   dim = kernel(mymat.data, myker, mymat.nrows, mymat.ncols, mymat.limbs_per_row, mymat.limbs_per_col);
   fprintf(stderr, "dim of ker = %d\n", dim);
+
+#if DEBUG >= 1
+  fprintf(stderr, "newker:=");
+  printCompactMatrix(myker, dim, k);
+  fprintf(stderr, ";\n");
+#endif
     
   newker = (mp_limb_t *) malloc (nlimbs*sizeof(mp_limb_t));
   assert (newker != NULL);
@@ -702,5 +880,3 @@ int main(int argc, char **argv) {
 
   return 0;
 }
-
-

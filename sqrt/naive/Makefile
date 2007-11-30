@@ -6,10 +6,10 @@ GMPLIB ?= $(GMP)/lib/libgmp.a
 GMPINCLUDE ?= $(GMP)/include/
 
 
-CFLAGS=-g -I $(GMPINCLUDE) -DREV=\"`svnversion`\"
+CFLAGS=-g -Wall -I $(GMPINCLUDE) -DREV=\"`svnversion .`\"
 LDFLAGS=../../utils/libutils.a $(GMPLIB)
 
-all: algsqrt ratsqrt
+all: fmalgsqrt
 
 Makefile.local:
 	echo "Makefile.local does not exist. It can be used to store paths \
@@ -18,6 +18,9 @@ Makefile.local:
 	touch Makefile.local
 
 algsqrt: algsqrt.c poly.o
+	gcc $(CFLAGS) -I../.. -o $@ $< poly.o $(LDFLAGS) 
+
+fmalgsqrt: fmalgsqrt.c poly.o
 	gcc $(CFLAGS) -I../.. -o $@ $< poly.o $(LDFLAGS) 
 
 poly.o: poly.c

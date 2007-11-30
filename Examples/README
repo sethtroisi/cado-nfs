@@ -1,0 +1,5 @@
+Three examples of numbers and associated polys and rough relation set.
+To see how it works, try:
+
+cd c20
+../doit.sh c20

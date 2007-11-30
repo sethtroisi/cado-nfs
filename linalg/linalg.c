@@ -25,7 +25,7 @@ typedef struct {
 } dense_mat_t;
 
 void
-readmat(FILE *file, sparse_mat_t *mat) {
+readmat(FILE *file, sparse_mat_t *mat, int compact) {
   int ret;
   int alloced;
   int used=0;
@@ -39,8 +39,10 @@ readmat(FILE *file, sparse_mat_t *mat) {
     long a;
     unsigned long b;
     int nc;
-    ret = fscanf(file, "%d %d", &a, &b);
-    assert (ret == 2);
+    if(compact == 0){
+	ret = fscanf(file, "%ld %lu", &a, &b);
+	assert (ret == 2);
+    }
     ret = fscanf(file, "%d", &nc);
     assert (ret == 1);
     wt += nc;
@@ -124,19 +126,17 @@ int main(int argc, char **argv) {
   sparse_mat_t mat;
   dense_mat_t dmat;
   mp_limb_t **ker;
-  int dim, i, j;
+  int dim, i, j, compact = 0;
 
-  if (argc == 1) {
-    file = stdin;
-  } else if (argc == 2) {
-    file = fopen(argv[1], "r");
-    assert (file != NULL);
-  } else {
-    fprintf(stderr, "usage: %s [filename]\n", argv[0]);
+  if (argc != 3) {
+    fprintf(stderr, "usage: %s [filename] [compact]\n", argv[0]);
     exit(1);
   }
+  file = fopen(argv[1], "r");
+  assert (file != NULL);
+  compact = atoi(argv[2]);
   
-  readmat(file, &mat);
+  readmat(file, &mat, compact);
   fprintf(stderr, "have read matrix: nrows = %d, ncols = %d\n", mat.nrows, mat.ncols);
   fprintf(stderr, "average wt of rows is %f\n", mat.avg_wt);
 
@@ -153,7 +153,7 @@ int main(int argc, char **argv) {
 
   fprintf(stderr, "printing a 128 first lines of kernel...\n");
 
-  for (i = 0; i < 128; ++i) {
+  for (i = 0; i < (dim > 128 ? 128 : dim); ++i) {
     for (j = 0; j < dmat.limbs_per_col; j++) {
       printf("%lx ", ker[i][j]);
     }

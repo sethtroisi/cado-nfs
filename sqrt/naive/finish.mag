@@ -1,3 +1,6 @@
+// Uses the two files NFSRATFILE and NFSALGFILE defined in /tmp/formagma
+// as well as NFS4MAGMA
+
 function MyIsSqrt(x)
   K := Parent(x);
   f := DefiningPolynomial(K);
@@ -55,16 +58,19 @@ end function;
 
 PP<x> := PolynomialRing(Rationals());
 
-load "/tmp/formagma";
+//load "/tmp/formagma";
+
 /*
 f := -3229755921225369*x^0-48676961965686*x^1-391249724*x^2+516873524*x^3;
 m := 51751964056271939;
 N := 71641520761751435455133616475667090434063332228247871795429;
 */
 
+function finish(f, m, N, ratfile, algfile)
+
 fd := LeadingCoefficient(f);
 K := NumberField(f);
-F := Split(Read("/tmp/algside"));
+F := Split(Read(algfile));
 
 v := StringToInteger(F[#F]);
 Prune(~F);
@@ -82,7 +88,7 @@ assert MyIsSqrt(a);
 p := FindSuitableP(a);
 prec := Ceiling(1.2*Log(p, AbsoluteValue(ff[1])));
 repeat 
-  printf "Trying sqrt with lifting at precision: %o bits\n", Log(2, p^prec);
+  printf "Trying sqrt with lifting at precision: %o bits\n", Truncate(prec * Log(2, p));
   test, b := TrySqrt(a, p, prec);
   if test then
     test := b^2 eq a;
@@ -92,10 +98,22 @@ until test;
 
 gra := Integers(N)!Evaluate(PP!Eltseq(b), m) * (Integers(N)!(1/fd))^(v div 2);
 
-F := StringToInteger(Read("/tmp/ratside"));
+F := StringToInteger(Read(ratfile));
 grr := Integers(N)!F;
+
+if (gra^2-grr^2) eq 0 then
+    printf "R^2=A^2\n";
+else
+    printf "R^2 != A^2\n";
+    printf "grr^2=%o\n", grr^2;
+    printf "gra^2=%o\n", gra^2;
+end if;
+
 g1 := GCD(Integers()!(gra-grr), N);
 g2 := GCD(Integers()!(gra+grr), N);
 
-g1, g2;
+return [g1, g2];
+
+end function;
+
 
