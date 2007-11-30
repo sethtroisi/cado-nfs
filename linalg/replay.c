@@ -175,8 +175,6 @@ flushSparse(char *sparsename, int **sparsemat, int small_nrows, int small_ncols,
     fprintf(ofile, "%d %d\n", small_nrows, small_ncols);
     for(i = 0; i < small_nrows; i++){
 	W += sparsemat[i][0];
-	if(sparsemat[i][0] < 4)
-	    fprintf(stderr, "WARNING: w[%d]=%d\n", i, sparsemat[i][0]);
 	fprintf(ofile, "%d", sparsemat[i][0]);
 	for(j = 1; j <= sparsemat[i][0]; j++){
 #if DEBUG >= 1

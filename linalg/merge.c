@@ -171,6 +171,34 @@ print_row(sparse_mat_t *mat, int i)
 }
 
 void
+matrix2tex(sparse_mat_t *mat)
+{
+    int i, j, k, *tab;
+
+    tab = (int *)malloc(mat->ncols * sizeof(int));
+    fprintf(stderr, "\\begin{array}{l|");
+    for(j = 0; j < mat->ncols; j++)
+	fprintf(stderr, "c");
+    fprintf(stderr, "}\n");
+    for(i = 0; i < mat->nrows; i++){
+	memset(tab, 0, mat->ncols * sizeof(int));
+	for(k = 0; k < mat->data[i].len; k++)
+	    tab[mat->data[i].val[k]] = 1;
+	fprintf(stderr, "R_{%d}", i);
+	for(j = 0; j < mat->ncols; j++)
+	    fprintf(stderr, "& %d", tab[j]);
+	fprintf(stderr, "\\\\\n");
+    }
+    fprintf(stderr, "\\hline\n");
+    fprintf(stderr, "\\text{weight}");
+    for(j = 0; j < mat->ncols; j++)
+	fprintf(stderr, "& %lu", mat->wt[j]);
+    fprintf(stderr, "\\\\\n");
+    fprintf(stderr, "\\end{array}\n");
+    free(tab);
+}
+
+void
 destroy_row(sparse_mat_t *mat, int i)
 {
     free(mat->data[i].val);
@@ -303,7 +331,7 @@ merge2rows(sparse_mat_t *mat, int j)
     used[i2] = -1;
 #endif
 #if DEBUG >= 1
-    fprintf(stderr, "Merging rows %d and %d into %d j=%d\n", i1, i2, i1, j);
+    fprintf(stderr, "Merging rows: %d += %d [j=%d]\n", i1, i2, j);
 #endif
     printf("%d %d\n", i2, i1); // note the order!!!
     addrows(mat, i1, i2);
@@ -311,6 +339,9 @@ merge2rows(sparse_mat_t *mat, int j)
     destroy_row(mat, i2);
     mat->rem_nrows--;
     mat->rem_ncols--;
+#if DEBUG >= 1
+    matrix2tex(mat);
+#endif
 }
 
 void
@@ -318,6 +349,9 @@ merge2(sparse_mat_t *mat, int nb_merge_max)
 {
     int j, nb_merge = 0;
 
+#if DEBUG >= 1
+    matrix2tex(mat);
+#endif
     for(j = 0; j < mat->ncols; j++){
 	if(nb_merge == nb_merge_max){
 	    fprintf(stderr, "Warning: nb_merge has reached its maximum:");
@@ -402,9 +436,9 @@ findBestIndex3(sparse_mat_t *mat, int *ind)
     w1 = w01+w12-wtot;
     w2 = w02+w12-wtot;
 #if DEBUG >= 1
-    fprintf(stderr, "Using r0: %d\n", w0);
-    fprintf(stderr, "Using r1: %d\n", w1);
-    fprintf(stderr, "Using r2: %d\n", w2);
+    fprintf(stderr, "Using r0 = r[%d]: %d\n", ind[0], w0);
+    fprintf(stderr, "Using r1 = r[%d]: %d\n", ind[1], w1);
+    fprintf(stderr, "Using r2 = r[%d]: %d\n", ind[2], w2);
 #endif
     if(w0 < w1)
 	i = (w0 < w2 ? 0 : 2);
@@ -504,10 +538,11 @@ mergeGe3(sparse_mat_t *mat, int m)
 	    //	    fprintf(stderr, "# wt[%d] = %d\n", j, m);
 	    nbm++;
 	}
-    fprintf(stderr, "There are %d columns of weight %d\n", nbm, m);
-#if 1
+    fprintf(stderr, "There are %d column(s) of weight %d\n", nbm, m);
     if(m == 3)
     	merge_m(mat, m);
+#if DEBUG >= 1
+    matrix2tex(mat);
 #endif
 }
 
