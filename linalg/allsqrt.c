@@ -181,8 +181,9 @@ treatSign(relation_t rel, cado_poly pol)
 }
 
 int
-treatDep(FILE *ratfile, FILE *algfile, FILE *relfile, FILE *purgedfile, FILE *indexfile, FILE *kerfile, cado_poly pol, int nrows, int ncols, char *small_row_used, int small_nrows, hashtable_t *H, int nlimbs, char *rel_used, int *vec, int rora, int verbose)
+treatDep(char *ratname, char *algname, FILE *relfile, FILE *purgedfile, FILE *indexfile, FILE *kerfile, cado_poly pol, int nrows, int ncols, char *small_row_used, int small_nrows, hashtable_t *H, int nlimbs, char *rel_used, int *vec, int rora, int verbose)
 {
+    FILE *ratfile, *algfile;
     relation_t rel;
     unsigned long w;
     int ret, i, j, nrel, r, irel, nr, sg, ind;
@@ -239,6 +240,8 @@ treatDep(FILE *ratfile, FILE *algfile, FILE *relfile, FILE *purgedfile, FILE *in
     memset(vec, 0, ncols * sizeof(int));
     // FIXME: sg should be removed...
     sg = 1;
+    ratfile = fopen(ratname, "w");
+    algfile = fopen(algname, "w");
     // now really read the purged matrix in
     rewind(purgedfile);
     fgets(str, 1024, purgedfile); // skip first line
@@ -273,13 +276,14 @@ treatDep(FILE *ratfile, FILE *algfile, FILE *relfile, FILE *purgedfile, FILE *in
 	if((rora == 1) || (rora == 3))
 	    finishRationalSqrt(ratfile, H, pol);
     }
+    fclose(ratfile);
+    fclose(algfile);
     return 1;
 }
 
 void
 SqrtWithIndexAll(char *prefix, FILE *relfile, FILE *purgedfile, FILE *indexfile, FILE *kerfile, cado_poly pol, int rora, int ndep, int verbose)
 {
-    FILE *ratfile, *algfile;
     char ratname[200], algname[200];
     hashtable_t H;
     unsigned long w;
@@ -304,16 +308,12 @@ SqrtWithIndexAll(char *prefix, FILE *relfile, FILE *purgedfile, FILE *indexfile,
     // use a hash table to rebuild P2
     hashInit(&H);
     while(1){
-	fprintf(stderr, "# Operating on dependency #%d\n", ndep);
 	sprintf(ratname, "%s.rat.%03d", prefix, ndep);
-	ratfile = fopen(ratname, "w");
 	sprintf(algname, "%s.alg.%03d", prefix, ndep);
-	algfile = fopen(algname, "w");
-	ret = treatDep(ratfile, algfile, relfile, purgedfile, indexfile, kerfile, pol, nrows, ncols, small_row_used, small_nrows, &H, nlimbs, rel_used, vec, rora, verbose);
-	fclose(ratfile);
-	fclose(algfile);
+	ret = treatDep(ratname, algname, relfile, purgedfile, indexfile, kerfile, pol, nrows, ncols, small_row_used, small_nrows, &H, nlimbs, rel_used, vec, rora, verbose);
 	if(ret == -1)
 	    break;
+	fprintf(stderr, "# Treated dependency #%d\n", ndep);
 	hashClear(&H);
 	ndep++;
     }

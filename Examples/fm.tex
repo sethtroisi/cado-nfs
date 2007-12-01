@@ -133,7 +133,10 @@ a line \verb+r1 r2 ... rk+ means row \verb+r1+ was added into rows
 Program \verb+replay+ produces the sparse encoding of the final {\em
 small} matrix, under \verb+name.small+. It will also produce a file
 \verb+name.index+ which for each row \verb+r+ in \verb+name.small+,
-gives the list of the corresponding rows in \verb+name.purged+.
+gives the list of the corresponding rows in \verb+name.purged+. Note
+that \verb+replay+ will renumber the columns so that they fit in
+$[0..small\_ncols[$, hence $M_{small}$ will be $small\_nrows \times
+small\_ncols$.
 
 %%%%%%%%%% SS
 \subsection{Useful parameters}

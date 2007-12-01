@@ -29,10 +29,10 @@ echo "Entering the last phase"
 
 mag=$name.mag
 ndep=0; ndepmax=`wc -l $name.ker | awk '{print $1}'`
-while [ $ndep -le $ndepmax ]
+while [ $ndep -lt $ndepmax ]
 do
   suf=`echo $ndep | awk '{printf("%03d\n", $1)}'`
-  echo "# Dependancy $suf"
+  echo "# Dependency $suf"
   rat=$name.dep.rat.$suf
   alg=$name.dep.alg.$suf
   args2="$name.poly $rat $alg $name.algside"
