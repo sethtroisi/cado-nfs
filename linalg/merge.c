@@ -645,11 +645,15 @@ minimumSpanningTree(int **A, int m)
     return minimumSpanningTreeWithKruskal(A, m);
 }
 
+#define MERGE_LEVEL_MAX 30
+
+// not mallocing to speed up(?).
 int
 findBestIndex(sparse_mat_t *mat, int m, int *ind)
 {
-    int A[20][20], i, j, imin, wmin, w;
+    int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], i, j, imin, wmin, w;
 
+    assert(m <= MERGE_LEVEL_MAX);
 #if 0 // obsolete...
     if(m == 3)
 	return findBestIndex3(mat, ind);
@@ -754,15 +758,15 @@ mergeGe3(sparse_mat_t *mat, int m)
 {
     int j, nbm;
 
+    // TODO: remove this and start directly merge_m?
     for(j = 0, nbm = 0; j < mat->ncols; j++)
-	if((mat->wt[j] > 0) && (mat->wt[j] < m))
-	    fprintf(stderr, "#W# wt[%d] = %ld\n", j, mat->wt[j]);
-        else if(mat->wt[j] == m){
+	if(mat->wt[j] == m){
 	    //	    fprintf(stderr, "# wt[%d] = %d\n", j, m);
 	    nbm++;
 	}
     fprintf(stderr, "There are %d column(s) of weight %d\n", nbm, m);
-    merge_m(mat, m);
+    if(nbm)
+	merge_m(mat, m);
 #if DEBUG >= 1
     matrix2tex(mat);
 #endif
@@ -813,8 +817,8 @@ merge(sparse_mat_t *mat, int nb_merge_max, int maxlevel, int rwmax)
 	    merge2(mat, nb_merge_max);
 	else
 	    mergeGe3(mat, m);
-	fprintf(stderr, "=> nrows=%d ncols=%d weight=%d\n",
-		mat->rem_nrows, mat->rem_ncols, mat->rem_weight);
+	fprintf(stderr, "=> nrows=%d ncols=%d\n",
+		mat->rem_nrows, mat->rem_ncols);
 	inspectRowWeight(mat, rwmax);
 	mm = minColWeight(mat);
 	fprintf(stderr, "Min col weight = %d\n", mm);

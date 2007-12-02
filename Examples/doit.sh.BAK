@@ -1,12 +1,14 @@
 #!/bin/sh -
 # We assume that a directory $name exists
 #
-# Typical use: cd c20; ../doit.sh c20
+# Typical use: cd c20; ../doit.sh c20 5
 #
 linalg=../../linalg
 sqrt=../../sqrt/naive
 
-name=$1; nker=30; nchar=50; maxlevel=5
+nker=30; nchar=50; maxlevel=5; cwmax=10
+
+name=$1; if [ $# -eq 2 ]; then maxlevel=$2; fi
 
 rels=$name.rels; nrels=`wc -l $rels | awk '{print $1}'`
 
@@ -15,18 +17,28 @@ $linalg/purge $rels $nrels > $name.purged
 echo "Performing merges"
 
 nb_merge_max=1000000
-argsa="-merge $nb_merge_max -mat $name.purged -maxlevel $maxlevel -cwmax 10"
-$linalg/merge $argsa > $name.merge.his # 2> $name.merge.err
-$linalg/replay $name.purged $name.merge.his $name.sparse $name.index
+argsa="-merge $nb_merge_max -mat $name.purged"
+argsa="$argsa -maxlevel $maxlevel -cwmax $cwmax"
+time $linalg/merge $argsa > $name.merge.his # 2> $name.merge.err
+
+echo "Replaying merges"
+
+time $linalg/replay $name.purged $name.merge.his $name.sparse $name.index
 
 echo "Performing the linear algebra phase"
 
 $linalg/linalg $name.sparse 1 > $name.ker_raw
+
+echo "Adding characters"
+
 args0="$name.purged $name.ker_raw $name.poly $name.index $name.rels"
 args0="$args0 $nker $nchar"
-$linalg/characters $args0 > $name.ker
+time $linalg/characters $args0 > $name.ker
+
+echo "Preparing squareroots"
+
 args1="$name.rels $name.purged $name.index $name.ker $name.poly"
-$linalg/allsqrt $args1 0 ar $name.dep
+time $linalg/allsqrt $args1 0 ar $name.dep
 
 echo "Entering the last phase"
 
@@ -39,7 +51,7 @@ do
   rat=$name.dep.rat.$suf
   alg=$name.dep.alg.$suf
   args2="$name.poly $rat $alg $name.algside"
-  $sqrt/fmalgsqrt $args2 $mag
+  time $sqrt/fmalgsqrt $args2 $mag
 magma << EOF
 load "$sqrt/finish.mag";
 load "$mag";

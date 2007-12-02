@@ -8,7 +8,9 @@ sqrt=../../sqrt/naive
 
 nker=30; nchar=50; maxlevel=5; cwmax=10
 
-name=$1; if [ $# -eq 2 ]; then maxlevel=$2; fi
+name=$1
+if [ $# -ge 2 ]; then maxlevel=$2; fi
+if [ $# -ge 3 ]; then cwmax=$3; fi
 
 rels=$name.rels; nrels=`wc -l $rels | awk '{print $1}'`
 
@@ -23,11 +25,11 @@ time $linalg/merge $argsa > $name.merge.his # 2> $name.merge.err
 
 echo "Replaying merges"
 
-time $linalg/replay $name.purged $name.merge.his $name.sparse $name.index
+time $linalg/replay $name.purged $name.merge.his $name.small $name.index
 
 echo "Performing the linear algebra phase"
 
-$linalg/linalg $name.sparse 1 > $name.ker_raw
+$linalg/linalg $name.small 1 > $name.ker_raw
 
 echo "Adding characters"
 
