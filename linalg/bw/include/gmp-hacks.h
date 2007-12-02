@@ -29,6 +29,10 @@
 #define	MPN_COPY(dst, src, n)	memcpy((dst), (src), (n) * sizeof(mp_limb_t))
 #endif
 
+#ifndef	MPN_ZERO
+#define	MPN_ZERO(dst, n)	memset((dst), 0, (n) * sizeof(mp_limb_t))
+#endif
+
 /* Note : A better construction is provided by gcc : ({ ... }) ; */
 	
 #define BEGIN_BLOCK	do {
