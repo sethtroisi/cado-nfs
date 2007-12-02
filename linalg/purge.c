@@ -250,7 +250,7 @@ scan_relations(FILE *file, int nrel, int *nprimes, tab_prime_t *bad_primes, hash
     rel_compact = (int **)malloc(nrel * sizeof(int *));
     while(1){
 	irel++;
-	if(!(irel % 10000))
+	if(!(irel % 100000))
 	    fprintf(stderr, "irel = %d\n", irel);
 	rel_used[irel] = 1;
 	ret = fread_relation (file, &rel);
@@ -413,7 +413,7 @@ reread(char *ficrel, tab_prime_t bad_primes, hashtable_t *H)
     }
     do{
 	irel++;
-	if(!(irel % 10000))
+	if(!(irel % 100000))
 	    fprintf(stderr, "irel = %d\n", irel);
 	ret = fread_relation (file, &rel);
 	if(ret == 1){

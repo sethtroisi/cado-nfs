@@ -6,14 +6,17 @@
 linalg=../../linalg
 sqrt=../../sqrt/naive
 
-name=$1; nker=30; nchar=50
+name=$1; nker=30; nchar=50; maxlevel=5
 
 rels=$name.rels; nrels=`wc -l $rels | awk '{print $1}'`
 
 $linalg/purge $rels $nrels > $name.purged
+
+echo "Performing merges"
+
 nb_merge_max=1000000
-argsa="-merge $nb_merge_max -mat $name.purged -maxlevel 3 -wmax 10"
-$linalg/merge $argsa > $name.merge.his
+argsa="-merge $nb_merge_max -mat $name.purged -maxlevel $maxlevel -cwmax 10"
+$linalg/merge $argsa > $name.merge.his # 2> $name.merge.err
 $linalg/replay $name.purged $name.merge.his $name.sparse $name.index
 
 echo "Performing the linear algebra phase"
@@ -32,7 +35,7 @@ ndep=0; ndepmax=`wc -l $name.ker | awk '{print $1}'`
 while [ $ndep -lt $ndepmax ]
 do
   suf=`echo $ndep | awk '{printf("%03d\n", $1)}'`
-  echo "# Dependancy $suf"
+  echo "# Dependency $suf"
   rat=$name.dep.rat.$suf
   alg=$name.dep.alg.$suf
   args2="$name.poly $rat $alg $name.algside"

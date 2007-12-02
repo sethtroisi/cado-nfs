@@ -142,7 +142,7 @@ makeSparse(int **sparsemat, int *colweight, FILE *purgedfile, int nrows, int nco
     fscanf(purgedfile, "%d %d", &i, &j); // skip first line; check?
     ind = 0;
     while(fscanf(purgedfile, "%d %d", &i, &nj) != EOF){
-	if(!(ind % 1000))
+	if(!(ind % 10000))
 	    fprintf(stderr, "Treating old rel #%d\n", ind);
 	// store primes in rel
 	if(nj > buf_len){
@@ -267,7 +267,9 @@ addrows(int **sparsemat, int i1, int i2)
 	else if(sparsemat[i1][k1] > sparsemat[i2][k2])
             tmp[k++] = sparsemat[i2][k2++];
 	else{
+#if DEBUG >= 1
 	    fprintf(stderr, "WARNING: j1=j2=%d in addrows\n", k1);
+#endif
 	    k1++;
 	    k2++;
 	}
@@ -316,32 +318,35 @@ renumber(int *small_ncols, int *colweight, int ncols)
 
 // a line is "i i1 ... ik", row[i] is to be added to row i1 and destroyed
 // at the end of the process...
+// Works also is i is alone (hence: destroyed row)
 void
 doAllAdds(int **newrows, char *str)
 {
     char *t = str;
     int i, ii;
 
-    for(t = str, i = 0; *t != ' '; t++)
+    for(t = str, i = 0; (*t != ' ') && (*t != '\n'); t++)
 	i = 10 * i + (*t - '0');
 #if DEBUG >= 1
     fprintf(stderr, "first i is %d\n", i);
 #endif
-    ++t;
-    ii = 0;
-    while(1){
-	if((*t == '\n') || (*t == ' ')){
+    if(*t != '\n'){
+	++t;
+	ii = 0;
+	while(1){
+	    if((*t == '\n') || (*t == ' ')){
 #if DEBUG >= 1
-	    fprintf(stderr, "next ii is %d\n", ii);
+		fprintf(stderr, "next ii is %d\n", ii);
 #endif
-	    addrows(newrows, ii, i);
-	    ii = 0;
+		addrows(newrows, ii, i);
+		ii = 0;
+	    }
+	    else
+		ii = 10 * ii + (*t - '0');
+	    if(*t == '\n')
+		break;
+	    t++;
 	}
-	else
-	    ii = 10 * ii + (*t - '0');
-	if(*t == '\n')
-	    break;
-	t++;
     }
     // destroy initial row!
     free(newrows[i]);

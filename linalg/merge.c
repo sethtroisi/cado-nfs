@@ -8,6 +8,7 @@
  */
 
 // TODO: use compact lists...!
+// TODO: keep track of the number of columns dropped at first sight
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -52,7 +53,7 @@ cmp(const void *p, const void *q) {
 }
 
 void
-inspectWeight(int *usecol, FILE *purgedfile, int nrows, int ncols, int wmax)
+inspectWeight(int *usecol, FILE *purgedfile, int nrows, int ncols, int cwmax)
 {
     int i, j, ret, x, nwlarge, nc;
 
@@ -70,11 +71,11 @@ inspectWeight(int *usecol, FILE *purgedfile, int nrows, int ncols, int wmax)
     }
     nwlarge = 0;
     for(j = 0; j < ncols; j++)
-	if(usecol[j] > wmax){
+	if(usecol[j] > cwmax){
 	    usecol[j] = 0;
 	    nwlarge++;
 	}
-    fprintf(stderr, "#(w > %d) = %d\n", wmax, nwlarge);
+    fprintf(stderr, "#(w > %d) = %d\n", cwmax, nwlarge);
 }
 
 /* Reads a matrix file, and puts in mat->wt[j], 0 <= j < ncols, the
@@ -85,14 +86,14 @@ inspectWeight(int *usecol, FILE *purgedfile, int nrows, int ncols, int wmax)
 
 */
 void
-readmat(FILE *file, sparse_mat_t *mat, int *usecol, int wmax)
+readmat(FILE *file, sparse_mat_t *mat, int *usecol, int cwmax)
 {
   int ret;
   int i, j, l2, *w;
   int nc, x, buf[100], ibuf;
 
-  w = (int *)malloc((wmax+1) * sizeof(int));
-  memset(w, 0, (wmax+1) * sizeof(int));
+  w = (int *)malloc((cwmax+1) * sizeof(int));
+  memset(w, 0, (cwmax+1) * sizeof(int));
 
   ret = fscanf (file, "%d %d", &(mat->nrows), &(mat->ncols));
   assert (ret == 2);
@@ -146,7 +147,7 @@ readmat(FILE *file, sparse_mat_t *mat, int *usecol, int wmax)
   for(j = l2 = 0; j < mat->ncols; j++){
       if(mat->wt[j] >= 2){
 	  l2++;
-	  if(mat->wt[j] <= wmax)
+	  if(mat->wt[j] <= cwmax)
 	      w[mat->wt[j]]++;
       }
       else if(usecol[j])
@@ -154,10 +155,12 @@ readmat(FILE *file, sparse_mat_t *mat, int *usecol, int wmax)
 		  mat->wt[j]);
   }
   fprintf (stderr, "Found %d primes appearing at least twice\n", l2);
-  for(j = 2; j <= wmax; j++)
+  for(j = 2; j <= cwmax; j++)
       if(w[j] > 0)
 	  fprintf (stderr, "Found %d primes of weight %d\n", w[j], j);
-  mat->rem_ncols = l2;
+  // we need to keep informed of what really happens; this will be an upper
+  // bound on the number of active columns, I guess
+  mat->rem_ncols = mat->ncols;
   free(w);
 }
 
@@ -199,7 +202,7 @@ matrix2tex(sparse_mat_t *mat)
 }
 
 void
-destroy_row(sparse_mat_t *mat, int i)
+destroyRow(sparse_mat_t *mat, int i)
 {
     free(mat->data[i].val);
     mat->data[i].val = NULL;
@@ -213,6 +216,35 @@ removeWeight(sparse_mat_t *mat, int i)
 
     for(k = 0; k < mat->data[i].len; k++)
 	mat->wt[mat->data[i].val[k]]--;
+}
+
+int
+hasCol(sparse_mat_t *mat, int i, int j)
+{
+    int k;
+
+    for(k = 0; k < mat->data[i].len; k++)
+	if(mat->data[i].val[k] == j)
+	    return 1;
+    return 0;
+}
+
+void
+removeSingletons(sparse_mat_t *mat)
+{
+    int i, j;
+
+    for(j = 0; j < mat->ncols; j++)
+	if(mat->wt[j] == 1){
+	    // find row...
+	    for(i = 0; i < mat->nrows; i++)
+		if(hasCol(mat, i, j))
+		    break;
+	    assert(i < mat->nrows);
+	    removeWeight(mat, i);
+	    destroyRow(mat, i);
+	    printf("%d\n", i); // signal to replay...!
+	}
 }
 
 // i1 += i2, mat->wt is updated at the same time.
@@ -254,7 +286,7 @@ addrows(sparse_mat_t *mat, int i1, int i2)
 		    mat->data[i1].val[k1], 
 		    mat->wt[mat->data[i1].val[k1]]);
 #endif
-	    mat->rem_weight -= 2; // enough?
+	    //	    mat->rem_weight -= 2; // enough?
 	    k1++;
 	    k2++;
 	}
@@ -336,7 +368,7 @@ merge2rows(sparse_mat_t *mat, int j)
     printf("%d %d\n", i2, i1); // note the order!!!
     addrows(mat, i1, i2);
     removeWeight(mat, i2);
-    destroy_row(mat, i2);
+    destroyRow(mat, i2);
     mat->rem_nrows--;
     mat->rem_ncols--;
 #if DEBUG >= 1
@@ -365,8 +397,8 @@ merge2(sparse_mat_t *mat, int nb_merge_max)
 	    nb_merge++;
 	    merge2rows(mat, j);
 	    if(!(nb_merge % 1000))
-		fprintf(stderr, "nrows=%d ncols=%d weight=%d\n",
-			mat->rem_nrows, mat->rem_ncols, mat->rem_weight);
+		fprintf(stderr, "nrows=%d ncols=%d\n",
+			mat->rem_nrows, mat->rem_ncols);
 	}
     }
 }
@@ -448,43 +480,229 @@ findBestIndex3(sparse_mat_t *mat, int *ind)
     return i;
 }
 
+//////////////////////////////////////////////////////////////////////
+// Prim
+
+void
+popQueue(int *s, int *t, int **Q, int *fQ, int *lQ)
+{
+    *s = Q[*fQ][0];
+    *t = Q[*fQ][1];
+    *fQ += 1;
+}
+
+void
+printQueue(int **Q, int fQ, int lQ)
+{
+    int i;
+
+    for(i = fQ; i < lQ; i++)
+	fprintf(stderr, "Q[%d] = [%d, %d, %d]\n", i,Q[i][0], Q[i][1], Q[i][2]);
+}
+
+void
+addEdge(int **Q, int *fQ, int *lQ, int u, int v, int Auv)
+{
+    int i, j;
+
+    for(i = *fQ; i < *lQ; i++)
+	if(Auv < Q[i][2])
+	    break;
+    // shift everybody: Auv >= Q[i][2]
+    for(j = *lQ; j > i; j--){
+	Q[j][0] = Q[j-1][0];
+	Q[j][1] = Q[j-1][1];
+	Q[j][2] = Q[j-1][2];
+    }
+    Q[i][0] = u;
+    Q[i][1] = v;
+    Q[i][2] = Auv;
+    *lQ += 1;
+}
+
+// Add all neighbors of u
+void
+addAllEdges(int **Q, int *fQ, int *lQ, int u, int *Y, int **A, int m)
+{
+    int v;
+
+    for(v = 0; v < m; v++)
+	if(v != u)
+	    addEdge(Q, fQ, lQ, u, v, A[u][v]);
+}
+
+// TODO: count the number of neighbors in T; the one with # = m-1 is
+// the vertex we are looking for and the one that must be eliminated.
+int
+minimumSpanningTreeWithPrim(int **A, int m)
+{
+    int **Q, m2 = m*m, u, *Y, fQ = 0, lQ = 0, s, t, i, cardY;
+
+    // over-conservative
+    Q = (int **)malloc(m2 * sizeof(int *));
+    for(i = 0; i < m2; i++)
+	Q[i] = (int *)malloc(3 * sizeof(int));
+    // nodes of T
+    Y = (int *)malloc(m * sizeof(int));
+    memset(Y, 0, m * sizeof(int));
+    u = 0;
+    Y[u] = 1;
+    cardY = m-1;
+    addAllEdges(Q, &fQ, &lQ, u, Y, A, m);
+    printQueue(Q, fQ, lQ);
+    // active part of Q is Q[fQ..lQ[
+    assert(fQ == 0);
+    assert(lQ == (m-1));
+    while(fQ != lQ){
+	// while queue is non empty
+	// pop queue
+	popQueue(&s, &t, Q, &fQ, &lQ);
+	fprintf(stderr, "a = (%d, %d)\n", s, t);
+	if(!Y[t]){
+	    // t does not close a cycle
+	    Y[t] = 1;
+	    cardY--;
+	    // T[u] <- T[u] union (s, t)
+	    Y[s]++; // trick!!!
+	    fprintf(stderr, "new edge: (%d, %d)\n", s, t);
+	    if(cardY == 0)
+		break;
+	    addAllEdges(Q, &fQ, &lQ, t, Y, A, m);
+	    printQueue(Q, fQ, lQ);
+	}
+    }
+    // the index we are looking for is that for which Y[s] == m-1
+    for(s = 0; s < m; s++)
+	if(Y[s] >= (m-1)) // Y[s] = m for s=0 perhaps...!
+	    break;
+    assert((s < m) && (Y[s] >= (m-1)));
+    free(Y);
+    for(i = 0; i < m2; i++)
+	free(Q[i]);
+    free(Q);
+    return s;
+}
+
+// TODO: count the number of neighbors in T; the one with # = m-1 is
+// the vertex we are looking for and the one that must be eliminated.
+int
+minimumSpanningTreeWithKruskal(int **A, int m)
+{
+    int *E, m2 = m*(m-1), i, j, nE = 0, lE = 3*m2, *Y, cardY, s;
+
+    E = (int *)malloc(lE * sizeof(int));
+    for(i = 0; i < m; i++)
+	for(j = 0; j < m; j++){
+	    if(j != i){
+		E[nE++] = A[i][j];
+		E[nE++] = i;
+		E[nE++] = j;
+	    }
+	}
+    // sort edges
+    qsort(E, m2, 3 * sizeof(int), cmp);
+#if DEBUG >= 1
+    for(i = 0; i < m2; i++)
+	fprintf(stderr, "w(%d, %d)=%d\n", E[3*i+1], E[3*i+2], E[3*i]);
+#endif
+    Y = (int *)malloc(m * sizeof(int));
+    memset(Y, 0, m * sizeof(int));
+    cardY = 0;
+    nE = -3;
+    while(1){
+	nE += 3;
+	if(!(Y[E[nE+1]] && Y[E[nE+2]])){
+#if DEBUG >= 1
+	    fprintf(stderr, "New edge: (%d, %d) of weight %d\n", 
+		    E[nE+1], E[nE+2], E[nE]);
+#endif
+	    if(Y[E[nE+1]] == 0)
+		cardY++;
+	    if(Y[E[nE+2]] == 0)
+		cardY++;
+	    Y[E[nE+1]]++;
+	    Y[E[nE+2]]++;
+	    if(cardY == m)
+		break;
+	}
+    }
+    // the index we are looking for is that for which Y[s] == m-1
+    for(s = 0; s < m; s++)
+	if(Y[s] >= (m-1)) // Y[s] = m for s=0 perhaps...!
+	    break;
+    if(s >= m)
+	s = -1;
+    free(Y);
+    free(E);
+    return s;
+}
+
+// TODO: count the number of neighbors in T; the one with # = m-1 is
+// the vertex we are looking for and the one that must be eliminated.
+int
+minimumSpanningTree(int **A, int m)
+{
+    return minimumSpanningTreeWithKruskal(A, m);
+}
+
 int
 findBestIndex(sparse_mat_t *mat, int m, int *ind)
 {
-    int **A, i, j;
+    int A[20][20], i, j, imin, wmin, w;
 
+#if 0 // obsolete...
     if(m == 3)
 	return findBestIndex3(mat, ind);
-    fprintf(stderr, "Being implemented...!\n");
-    A = (int **)malloc(m * sizeof(int *));
-    for(i = 0; i < m; i++){
-	A[i] = (int *)malloc(m * sizeof(int));
+#endif
+    for(i = 0; i < m; i++)
 	A[i][i] = 0;
-    }
     // A[i][j] <- Weight(R[ind[i]]+R[ind[j]]);
     for(i = 0; i < m; i++)
 	for(j = i+1; j < m; j++){
 	    A[i][j] = weightSum(mat, ind[i], ind[j]);
 	    A[j][i] = A[i][j];
+#if DEBUG >= 1
+	    fprintf(stderr, "A[%d][%d] = A[%d][%d] = %d\n",i,j,j,i,A[i][j]);
+#endif
 	}
-    for(i = 0; i < m; i++)
-	free(A[i]);
-    free(A);
-    return -1;
+#if 0 // I do not believe in this, actually
+    s = minimumSpanningTree(A, m);
+#endif
+    // iterate over all vertices
+    imin = -1;
+    wmin = 0;
+    for(i = 0; i < m; i++){
+	// compute the new total weight if i is used as pivot
+	w = 0;
+	for(j = 0; j < m; j++)
+	    // note A[i][i] = 0
+	    w += A[i][j];
+#if DEBUG >= 1
+	fprintf(stderr, "W[%d]=%d\n", i, w);
+#endif
+	if((imin == -1) || (w < wmin)){
+	    imin = i;
+	    wmin = w;
+	}
+    }
+    return imin;
 }
 
 void
 merge_m(sparse_mat_t *mat, int m)
 {
-    int *ind, j, k, i;
+    int *ind, j, k, i, njproc = 0;
 
 #if DEBUG >= 1
-    fprintf(stderr, "Weight 3:");
+    fprintf(stderr, "Weight %d:", m);
 #endif
     ind = (int *)malloc(m * sizeof(int));
     for(j = 0; j < mat->ncols; j++){
 	if(mat->wt[j] != m)
 	    continue;
+	njproc++;
+	if(!(njproc % 1000))
+	    fprintf(stderr, "# %d columns of weight %d processed\n",njproc,m);
 	// we need to find the three rows and then
 	if(!findAllRowsWithGivenj(ind, mat, j, m))
 	    fprintf(stderr, "Could not find the %d required rows\n", m);
@@ -500,6 +718,11 @@ merge_m(sparse_mat_t *mat, int m)
 	fprintf(stderr, "\n");
 #endif
 	i = findBestIndex(mat, m, ind);
+	if(i == -1){
+	    fprintf(stderr, "Sorry, could not find best index\n");
+	    // or do some more clever stuff?
+	    continue;
+	}
 #if DEBUG >= 1
 	fprintf(stderr, "Minimal is i=%d\n", i);
 #endif
@@ -518,7 +741,7 @@ merge_m(sparse_mat_t *mat, int m)
 	    }
 	printf("\n");
 	removeWeight(mat, ind[i]);
-	destroy_row(mat, ind[i]);
+	destroyRow(mat, ind[i]);
 	mat->rem_nrows--;
 	mat->rem_ncols--;
 	mat->wt[j] = 0;
@@ -539,29 +762,69 @@ mergeGe3(sparse_mat_t *mat, int m)
 	    nbm++;
 	}
     fprintf(stderr, "There are %d column(s) of weight %d\n", nbm, m);
-    if(m == 3)
-    	merge_m(mat, m);
+    merge_m(mat, m);
 #if DEBUG >= 1
     matrix2tex(mat);
 #endif
 }
 
-void
-merge(sparse_mat_t *mat, int nb_merge_max, int maxlevel)
+int
+minColWeight(sparse_mat_t *mat)
 {
-    int old_nrows, old_ncols;
+    int j, minw = mat->nrows;
+
+    for(j = 0; j < mat->ncols; j++)
+	if((mat->wt[j] > 0) && (mat->wt[j] < minw))
+	    minw = mat->wt[j];
+    return minw;
+}
+
+void
+inspectRowWeight(sparse_mat_t *mat, int rwmax)
+{
+    int i, maxw = 0;
+
+    for(i = 0; i < mat->nrows; i++)
+	if(mat->data[i].val != NULL){
+	    if(mat->data[i].len > rwmax){
+		fprintf(stderr, "Too heavy row[%d]: %d\n", i, mat->data[i].len);
+		// TODO: destroy row...!
+	    }
+	    if(mat->data[i].len > maxw)
+		maxw = mat->data[i].len;
+	}
+    fprintf(stderr, "Max row weight is %d\n", maxw);
+}
+
+void
+merge(sparse_mat_t *mat, int nb_merge_max, int maxlevel, int rwmax)
+{
+    int old_nrows, old_ncols, m, mm;
 
     printf("%d %d\n", mat->nrows, mat->ncols);
-    do{
+    m = 2;
+    while(1){
+	fprintf(stderr, "Performing merge %d\n", m);
 	old_nrows = mat->rem_nrows;
 	old_ncols = mat->rem_ncols;
-	merge2(mat, nb_merge_max);
+	if(m == 1)
+	    removeSingletons(mat);
+	else if(m == 2)
+	    merge2(mat, nb_merge_max);
+	else
+	    mergeGe3(mat, m);
 	fprintf(stderr, "=> nrows=%d ncols=%d weight=%d\n",
 		mat->rem_nrows, mat->rem_ncols, mat->rem_weight);
-	break; // TODO: destroy this?
-    } while((old_nrows != mat->rem_nrows) && (old_ncols != mat->rem_ncols));
-    if(maxlevel >= 3)
-	mergeGe3(mat, maxlevel);
+	inspectRowWeight(mat, rwmax);
+	mm = minColWeight(mat);
+	fprintf(stderr, "Min col weight = %d\n", mm);
+	if((old_nrows == mat->rem_nrows) && (old_ncols == mat->rem_ncols)){
+	    // nothing happened this time and mm > m
+	    m = mm;
+	    if(m > maxlevel)
+		break;
+	}
+    }
 }
 
 void
@@ -609,7 +872,7 @@ main (int argc, char *argv[])
   sparse_mat_t mat;
   char *purgedname = NULL, *hisname = NULL;
   int nb_merge_max = 0, domerge = 0, *usecol, nrows, ncols;
-  int wmax = 20, maxlevel = 2;
+  int cwmax = 20, rwmax = 1000000, maxlevel = 2;
 
   fprintf (stderr, "%s rev. %s\n", argv[0], REV);
 
@@ -634,9 +897,15 @@ main (int argc, char *argv[])
 	  argc -= 2;
 	  argv += 2;
 	}
-      else if (argc > 2 && strcmp (argv[1], "-wmax") == 0)
+      else if (argc > 2 && strcmp (argv[1], "-cwmax") == 0)
 	{
-	  wmax = atoi(argv[2]);
+	  cwmax = atoi(argv[2]);
+	  argc -= 2;
+	  argv += 2;
+	}
+      else if (argc > 2 && strcmp (argv[1], "-rwmax") == 0)
+	{
+	  rwmax = atoi(argv[2]);
 	  argc -= 2;
 	  argv += 2;
 	}
@@ -651,12 +920,13 @@ main (int argc, char *argv[])
     }
 
   purgedfile = fopen(purgedname, "r");
+  assert(purgedfile != NULL);
   fscanf(purgedfile, "%d %d", &nrows, &ncols);
   usecol = (int *)malloc(ncols *sizeof(int));
-  inspectWeight(usecol, purgedfile, nrows, ncols, wmax);
+  inspectWeight(usecol, purgedfile, nrows, ncols, cwmax);
 
   rewind(purgedfile);
-  readmat(purgedfile, &mat, usecol, wmax);
+  readmat(purgedfile, &mat, usecol, cwmax);
   fclose(purgedfile);
 #if DEBUG >= 3
   checkmat(&mat);
@@ -666,7 +936,7 @@ main (int argc, char *argv[])
       used = (char *)malloc(mat.nrows * sizeof(char));
       memset(used, 0, mat.nrows * sizeof(char));
 #endif
-      merge(&mat, nb_merge_max, maxlevel);
+      merge(&mat, nb_merge_max, maxlevel, rwmax);
   }
   return 0;
 }

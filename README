@@ -64,6 +64,8 @@ cd sieve
 ./checknorms -poly $tmp/$name.poly $tmp/$name.rels_raw > $tmp/$name.rels
 cd ..
 
+########## will shortly become deprecated; see Examples/doit.sh for a start
+
 # create matrix
 linalg/procrels $tmp/$name.rels > $tmp/$name.mat_raw
 ## If excess is not positive, goto SIEVING_STEP with larger value
