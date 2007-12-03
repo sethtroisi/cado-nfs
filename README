@@ -55,12 +55,12 @@ polyselect/polyselect -full -e 1000000 < $tmp/$name > $tmp/$name.poly
 
 cd sieve
 ## this has to be done by hand, sorry!
-## and it depends on the polynomial found by polyselect (also the b-bound 1300
+## and it depends on the polynomial found by polyselect (also the b-bound 2500
 ## below might be too small with different polynomials)
 
 ./mkroots.sh $tmp/$name.poly > $tmp/$name.roots
 ## SIEVING_STEP
-# note: the following was tested with polyselect rev. 326 and sieve r. 231
+# note: the following was tested with revision 329 of polyselect and sieve
 ./sieve -poly $tmp/$name.poly -fb $tmp/$name.roots -1000000 1000000 1 2500 > $tmp/$name.rels_raw
 # checking norms and splitting large cofactors
 ./checknorms -poly $tmp/$name.poly $tmp/$name.rels_raw > $tmp/$name.rels
@@ -71,7 +71,7 @@ cd ..
 # create matrix
 linalg/procrels $tmp/$name.rels > $tmp/$name.mat_raw
 ## If excess is not positive, goto SIEVING_STEP with larger value
-## for example ./sieve ... -1000000 1000000 1301 1400 >> $tmp/$name.rels_raw
+## for example ./sieve ... -1000000 1000000 2501 2600 >> $tmp/$name.rels_raw
 
 # reduce excess of relations (optional)
 linalg/matprune -keep 128 $tmp/$name.mat_raw > $tmp/$name.mat_raw2
