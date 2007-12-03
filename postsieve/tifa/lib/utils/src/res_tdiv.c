@@ -208,9 +208,12 @@ uint32_t res_tdiv_no_ea(smooth_filter_t* const filter) {
 
         } else {
             //
-    		// y is now the non-smooth part of in_yi->data[i].
-    		// Is y a large prime?
-    		//
+            // y is now the non-smooth part of in_yi->data[i].
+            // Is y a large prime?
+            //
+            if (mpz_sgn(y) < 0) {
+                mpz_neg(y, y);
+            }
             if (mpz_cmp_ui(y, LARGEST_PRIME) <= 0 ) {
 
                 uint32_t nsp_ui = mpz_get_ui(y);
@@ -471,9 +474,12 @@ uint32_t res_tdiv_step(smooth_filter_t* const filter, unsigned long int step) {
 
         } else {
             //
-    		// y is now the non-smooth part of in_yi->data[i].
-    		// Is y a large prime?
-    		//
+            // y is now the non-smooth part of in_yi->data[i].
+            // Is y a large prime?
+            //
+            if (mpz_sgn(y) < 0) {
+                mpz_neg(y, y);
+            }
             if (mpz_cmp_ui(y, LARGEST_PRIME) <= 0 ) {
 
                 uint32_t nsp_ui = mpz_get_ui(y);
@@ -501,7 +507,7 @@ uint32_t res_tdiv_step(smooth_filter_t* const filter, unsigned long int step) {
                     //
                     // _TO_DO: Try to keep the entry in the hashtable...
                     //
-                //mpz_pair_t *found = remove_entry_in_hashtable(htable, key);
+                  //mpz_pair_t *found = remove_entry_in_hashtable(htable, key);
 
                     mpz_pair_t *found = get_entry_in_hashtable(htable,key);
 
@@ -680,7 +686,7 @@ uint32_t res_tdiv_first(smooth_filter_t* const filter) {
         k--;
         used++;
         mpz_set(y, in_yi->data[k]);
-
+            
 #if TIFA_USE_GMP_INTERNAL_FUNCS
         //
         // Use some internal GMP functions.
@@ -763,16 +769,19 @@ uint32_t res_tdiv_first(smooth_filter_t* const filter) {
 
             acc_yi->length++;
             acc_xi->length++;
-
+            
             if (acc_xi->length == acc_xi->alloced) {
                 break;
             }
 
         } else {
             //
-    		// y is now the non-smooth part of in_yi->data[i].
-    		// Is y a large prime?
-    		//
+            // y is now the non-smooth part of in_yi->data[i].
+            // Is y a large prime?
+            //
+            if (mpz_sgn(y) < 0) {
+                mpz_neg(y, y);
+            }
             if (mpz_cmp_ui(y, LARGEST_PRIME) <= 0 ) {
 
                 uint32_t nsp_ui = mpz_get_ui(y);
@@ -800,7 +809,7 @@ uint32_t res_tdiv_first(smooth_filter_t* const filter) {
                     //
                     // _TO_DO: Try to keep the entry in the hashtable...
                     //
-                //mpz_pair_t *found = remove_entry_in_hashtable(htable, key);
+                 //mpz_pair_t *found = remove_entry_in_hashtable(htable, key);
 
                     mpz_pair_t *found = get_entry_in_hashtable(htable,key);
 
@@ -839,6 +848,7 @@ uint32_t res_tdiv_first(smooth_filter_t* const filter) {
                                 acc_xi->data[next_acc],
                                 nsp_inv
                             );
+                                                    
                         } else {
                             //
                             // This should not happen: since y is a prime,
@@ -894,8 +904,7 @@ uint32_t res_tdiv_first(smooth_filter_t* const filter) {
                 }
                 mpz_set(out_yi->data[next_out], y);
                 mpz_set(out_xi->data[next_out], in_xi->data[k]);
-                mpz_set(cofact->data[next_out], in_yi->data[k]);
-                mpz_divexact(cofact->data[next_out], cofact->data[next_out], y);
+                mpz_divexact(cofact->data[next_out], in_yi->data[k], y);
 
                 out_yi->length++;
                 out_xi->length++;
@@ -907,7 +916,6 @@ uint32_t res_tdiv_first(smooth_filter_t* const filter) {
             }
         }
     }
-
     mpz_clear(y);
     mpz_clear(nsp_inv);
 
@@ -1048,9 +1056,12 @@ uint32_t res_tdiv_last(smooth_filter_t* const filter) {
 
         } else {
             //
-    		// y is now the non-smooth part of in_yi->data[i].
-    		// Is y a large prime?
-    		//
+            // y is now the non-smooth part of in_yi->data[i].
+            // Is y a large prime?
+            //
+            if (mpz_sgn(y) < 0) {
+                mpz_neg(y, y);
+            }
             if (mpz_cmp_ui(y, LARGEST_PRIME) <= 0 ) {
 
                 uint32_t nsp_ui = mpz_get_ui(y);
@@ -1099,13 +1110,11 @@ uint32_t res_tdiv_last(smooth_filter_t* const filter) {
                             acc_yi->data[next],
                             cofact->data[k]
                         );
-
                         mpz_divexact_ui(
                             acc_yi->data[next],
                             acc_yi->data[next],
                             nsp_ui
                         );
-
                         mpz_divexact_ui(
                             acc_yi->data[next],
                             acc_yi->data[next],
@@ -1117,7 +1126,7 @@ uint32_t res_tdiv_last(smooth_filter_t* const filter) {
                                 acc_xi->data[next],
                                 acc_xi->data[next],
                                 nsp_inv
-                            );
+                            );                            
                         } else {
                             //
                             // This should not happen: since y is a prime,
@@ -1148,11 +1157,12 @@ uint32_t res_tdiv_last(smooth_filter_t* const filter) {
                         //
                         // Add this pair in the hashtable with the position
                         // of the prime in first_primes_array as key...
-                        //
+                        //                        
                         mpz_pair_t* pair = malloc(sizeof(mpz_pair_t));
                         mpz_init_set(pair->x, in_xi->data[k]);
                         mpz_init_set(pair->y, in_yi->data[k]);
                         mpz_mul(pair->y, pair->y, cofact->data[k]);
+
                         add_entry_in_hashtable(htable, (void*)key, (void*)pair);
                         //
                         // _WARNING_: Do not free key and pair as they are now
@@ -1169,4 +1179,3 @@ uint32_t res_tdiv_last(smooth_filter_t* const filter) {
     return used;
 }
 //------------------------------------------------------------------------------
-
