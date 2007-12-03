@@ -9,17 +9,21 @@
 
 struct gather_arguments {
 	unsigned int scol;
+	int nbys;
 	std::vector<std::string> file_names;
 	gather_arguments() {
 		scol = (unsigned int) -1;
+		nbys = 1;
 	}
 
 	bool parse(argparser::situation& s) {
+		if (s("--nbys", nbys)) return true;
 		if (file_names.empty() && s(NULL, scol)) return true;
 		file_names.push_back((const char*)s);
 		return true;
 	}
 	void doc(std::ostream& o) {
+		o << "--nbys <nbys>\t# of solutions to handle simultaneously\n";
 		o << "<col>\tbase of solution\n";
 		o << "[<fname> ... ]\tfragment files\n";
 	}

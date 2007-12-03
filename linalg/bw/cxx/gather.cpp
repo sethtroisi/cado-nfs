@@ -24,6 +24,18 @@
 #include <boost/cstdint.hpp>
 #include <iterator>
 
+/*
+ * Note on vectorization. Unlike slave and mksol, this program is NOT
+ * vectorized. Mostly because it does not make much sense, since this one
+ * is so simple. We even use generic code inconditionnally.
+ *
+ * One way to use this program in a vectorized manner would be to gather
+ * several solutions at once, but again it would not make much sense.
+ *
+ * This being said, a --nbys option exists, and is mandatory in order to
+ * read from the output of a vectorizaed mksol.
+ */
+
 gather_arguments mine;
 
 using namespace std;
@@ -36,7 +48,7 @@ namespace globals {
 	uint m, n;
 	uint col;
 	uint nr;
-	// int nbys;
+	int nbys;
 	mpz_class modulus;
 	uint8_t modulus_u8;
 	uint16_t modulus_u16;
@@ -86,17 +98,24 @@ void add_file(const std::string& fn)
 	must_open(f, fn);
 	using namespace globals;
 
-	istream_iterator<mpz_class> it(f);
-
 	for(unsigned int i = 0 ; i < nr ; i++) {
+		/* This really works only with one member, as the
+		 * operation is not too much focused on vectoring things
+		 * so far.
+		 */
 		std::vector<mpz_class> foo(1);
 		traits::assign(foo, v[i]);
-		// for(int j = 0 ; j < nbys ; j++) {
-			foo [0] +=  *it++;
-		// }
+		std::string line;
+		getline(f, line);
+		istringstream ss(line);
+		int ny;
+		mpz_class blah;
+		for(ny = 0 ; ss >> blah ; foo[0] += blah, ny++);
+		BUG_ON(ny != nbys);
 		traits::assign(v[i], foo, 0);
 	}
-	BUG_ON(it != istream_iterator<mpz_class>());
+	f >> ws;
+	BUG_ON(!f.eof());
 }
 
 void do_sum()
@@ -214,6 +233,9 @@ int main(int argc, char *argv[])
 	get_matrix_header(mtx, nr, mstr);
 
 	globals::modulus = mpz_class(mstr);
+	globals::modulus_u8	= globals::modulus.get_ui();
+	globals::modulus_u16	= globals::modulus.get_ui();
+	globals::modulus_u32	= globals::modulus.get_ui();
 
 	if (SIZ(globals::modulus.get_mpz_t()) != MODULUS_SIZE) {
 		cerr << fmt("ERROR: RECOMPILE WITH"
@@ -248,7 +270,29 @@ int main(int argc, char *argv[])
 		fill_matrix_data(mtx, 0, nb_coeffs, 0, nr, idx, val);
 	}
 
-	program<typical_scalar_traits<MODULUS_SIZE> > x;
+	globals::nbys = mine.nbys;
+
+#if 0
+	if (MODULUS_BITS < 8 && nbys == 8) {
+		cout << "// Using SSE-2 code\n";
+		program<sse2_8words_traits > x;
+		x.go();
+	} else if (nbys == 1 && SIZ(globals::modulus.get_mpz_t()) == MODULUS_SIZE) {
+		cout << "// Using code for " << MODULUS_SIZE << " words\n";
+		program<typical_scalar_traits<MODULUS_SIZE> > x;
+		x.go();
+	} else if (nbys == 1) {
+		/* This amounts to at least a 2x slowdown */
+		cout << "// Using generic code\n";
+		program<variable_scalar_traits> x;
+		x.go();
+	} else {
+		cerr << "no available code\n";
+		exit(1);
+	}
+#endif
+	cout << "// Using generic code\n";
+	program<variable_scalar_traits> x;
 	x.go();
 }
 

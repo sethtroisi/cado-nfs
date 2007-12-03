@@ -818,7 +818,7 @@ int main(int argc, char *argv[])
 		cout << "// Using code for " << MODULUS_SIZE << " words\n";
 		return program<typical_scalar_traits<MODULUS_SIZE> >();
 	} else if (nbys == 1) {
-		/* This amounts to at least a 2x slowdown at least */
+		/* This amounts to at least a 2x slowdown */
 		cout << "// Using generic code\n";
 		return program<variable_scalar_traits>();
 	} else {

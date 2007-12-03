@@ -54,6 +54,14 @@ void contribute_check_overflow(vector<int>& m,
 	}
 }
 
+int modred(int x, int p)
+{
+	x += p/2;
+	x %= p;
+	x -= p/2;
+	return x;
+}
+
 int main(int argc, char * argv[])
 {
 	ios_base::sync_with_stdio(false);
@@ -112,6 +120,15 @@ int main(int argc, char * argv[])
 	cout << "// ok" << endl;
 
 	ofstream o;
+
+	mpz_class px(mstr);
+	if (px <= 32768) {
+		int p = px.get_si();
+		for(unsigned int i = 0 ; i < nr ; i++) {
+			x[i] = modred(x[i], p);
+			m[i] = modred(m[i], p);
+		}
+	}
 
 	must_open(o, files::x0);
 	copy(x.begin(), x.end(), ostream_iterator<int>(o, "\n"));

@@ -94,6 +94,14 @@ struct sse2_8words_traits {
 			z[i+7].get_si(),
 		};
 	}
+	static inline void assign(std::vector<mpz_class>& z, scalar_t const & x) {
+		int16_t foo[8] __attribute__((aligned(16)));
+		memcpy(foo, &x.p, sizeof(sse2_scalars));
+		BUG_ON(z.size() != 8);
+		for(int i = 0 ; i < 8 ; i++) {
+			z[i] = foo[i];
+		}
+	}
 
 	static std::ostream& print(std::ostream& o, scalar_t const& x) {
 		int16_t foo[8] __attribute__((aligned(16)));
