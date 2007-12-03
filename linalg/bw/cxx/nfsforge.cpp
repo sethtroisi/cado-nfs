@@ -68,6 +68,12 @@ void reduce_mline(matrix_line& v, boost::int32_t p)
 	v.erase(dst, v.end());
 }
 
+/* Note that it is important to do the clamping in the most trivial
+ * manner here. If we do it in a smarter way, then we'll have to face
+ * true life later on, and abandon the quirky matrix.txt.ur trick.
+ */
+
+/* columns[i]'s are ideal appearance vectors. */
 void clamp(vector<matrix_line>& columns)
 {
 	vector<matrix_line>::iterator dst = columns.begin();
@@ -83,18 +89,27 @@ void clamp(vector<matrix_line>& columns)
 	}
 }
 
-int prune_empty_rows(vector<matrix_line>& columns)
+int prune_empty_rows(vector<matrix_line>& columns, vector<int>& ideal_idx)
 {
 	vector<matrix_line>::iterator dst = columns.begin();
 	vector<matrix_line>::const_iterator src = columns.begin();
-	for( ; src != columns.end() ; src++) {
-		if (!src->empty())
+	vector<int>::iterator idst = ideal_idx.begin();
+	vector<int>::const_iterator isrc = ideal_idx.begin();
+	assert(columns.size() == ideal_idx.size());
+	for( ; src != columns.end() ; src++, isrc++) {
+		if (!src->empty()) {
 			*dst++=*src;
+			*idst++=*isrc;
+		}
 	}
 	int r = (columns.end()-dst);
 	cout << "Erasing " << r << " zero rows\n";
+
 	columns.erase(dst, columns.end());
+	ideal_idx.erase(idst, ideal_idx.end());
+
 	columns.insert(columns.end(),extra,matrix_line());
+	ideal_idx.insert(ideal_idx.end(),extra,-1);
 	return r;
 }
 
@@ -124,15 +139,6 @@ int main(int argc, char * argv[])
 		if (!(mtx >> q >> r >> x >> li)) {
 			break;
 		}
-
-		matrix_line::const_iterator src;
-		matrix_line::iterator dst;
-		dst = li.begin();
-		for(src = li.begin() ; src != li.end() ; src++) {
-			*dst++ = *src;
-		}
-
-		li.erase(dst, li.end());
 
 		sstr << q << ' ' << r << ' ' << x << flush;
 
@@ -192,20 +198,32 @@ int main(int argc, char * argv[])
 	}
 
 	vector<matrix_line> columns;
+	vector<int> ideal_idx(rows.size());
 	columns.assign(rows.size(), matrix_line());
+	for(unsigned int j = 0 ; j < rows.size() ; j++) {
+		ideal_idx[j]=j;
+	}
 	unsigned int total_coeffs = 0;
 	{
 		vector<matrix_line>::const_iterator src;
 		for(src = rows.begin() ; src != rows.end() ; src++) {
+			int i = src - rows.begin();
 			for(unsigned int j = 0 ; j < src->size() ; j++) {
 				unsigned int jj = (*src)[j].first;
-				columns[jj].push_back(make_pair(src - rows.begin(), (*src)[j].second));
+				int v = (*src)[j].second;
+				columns[jj].push_back(make_pair(i, v));
 			}
 			total_coeffs += src->size();
 		}
 	}
 
 	cout << "total: "  << total_coeffs << " coefficients\n";
+
+	/* We might choose some very heavy ideal rows (those which were
+	 * columns before -- we've now translated the thing) to become
+	 * character rows. It means that we'll no longer have them in the
+	 * matrix.
+	 */
 	if (mine.nchar) {
 		/* Look for good character row candidates */
 		/* (yes, these are rows by now) */
@@ -255,19 +273,28 @@ int main(int argc, char * argv[])
 
 #if 1
 	for(;;) {
-		int r=prune_empty_rows(columns);
+		int r=prune_empty_rows(columns, ideal_idx);
 		if (r == extra)
 			break;
 		clamp(columns);
 	}
 #endif
 
+	/* The clink info should be linked to pruning/clampind better
+	 * than it is now */
 	ofstream clink;
 	must_open(clink, mine.clink);
 	for(unsigned int i = 0 ; i < columns.size() ; i++) {
 		clink << clink_data[i] << "\n";
 	}
 	clink.close();
+
+	ofstream rlink;
+	must_open(rlink, mine.rlink);
+	for(unsigned int i = 0 ; i < ideal_idx.size() ; i++) {
+		rlink << ideal_idx[i] << "\n";
+	}
+	rlink.close();
 
 
 	must_open(cfile, mine.out);
