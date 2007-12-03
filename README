@@ -20,7 +20,6 @@ EOF
 (cd utils; ln -s ../Makefile.local .)
 (cd polyselect; ln -s ../Makefile.local .)
 (cd sieve; ln -s ../Makefile.local .)
-(cd linalg; ln -s ../Makefile.local .)
 (cd sqrt/naive; ln -s ../../Makefile.local .)
 
 
