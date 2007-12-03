@@ -3,8 +3,8 @@
 #
 # Typical use: cd c20; ../doit.sh c20 5
 #
-linalg=../../linalg
-sqrt=../../sqrt/naive
+linalg=linalg
+sqrt=sqrt/naive
 
 nker=30; nchar=50; maxlevel=5; cwmax=10
 

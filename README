@@ -21,6 +21,7 @@ EOF
 (cd polyselect; ln -s ../Makefile.local .)
 (cd sieve; ln -s ../Makefile.local .)
 (cd sqrt/naive; ln -s ../../Makefile.local .)
+(cd linalg; ln -s ../../Makefile.local .)
 
 
 Compile:
@@ -66,24 +67,6 @@ cd sieve
 ./checknorms -poly $tmp/$name.poly $tmp/$name.rels_raw > $tmp/$name.rels
 cd ..
 
-########## will shortly become deprecated; see Examples/doit.sh for a start
+./merge_linalg_sqrt.sh $tmp/$name
 
-# create matrix
-linalg/procrels $tmp/$name.rels > $tmp/$name.mat_raw
-## If excess is not positive, goto SIEVING_STEP with larger value
-## for example ./sieve ... -1000000 1000000 2501 2600 >> $tmp/$name.rels_raw
-
-# reduce excess of relations (optional)
-linalg/matprune -keep 128 $tmp/$name.mat_raw > $tmp/$name.mat_raw2
-mv $tmp/$name.mat_raw2 $tmp/$name.mat_raw
-
-# sort matrix columns (not mandatory, but speeds up the linear algebra)
-linalg/matsort $tmp/$name.mat_raw > $tmp/$name.mat
-linalg/linalg $tmp/$name.mat > $tmp/$name.ker_raw
-linalg/characters $tmp/$name.mat $tmp/$name.ker_raw $tmp/$name.poly 20 40 > $tmp/$name.ker
-
-
-cd sqrt/naive
-./tryonedep.sh -depnum 0 $tmp/$name.mat $tmp/$name.ker $tmp/$name.poly
-## If gcd is trivial, try another dependency (-depnum 1, -depnum 2, ...)
 
