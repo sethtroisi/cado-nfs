@@ -19,10 +19,11 @@
 #include <boost/shared_array.hpp>
 #include <utility>
 #include <vector>
+#include <set>
 #include <iostream>
 #include <fstream>
 #include <functional>
- 
+
 #define Lmacro(N, m, n) (iceildiv((N)+2*(n),(m))+iceildiv((N)+2*(n),(n))+10)
 
 /* avoid this one ! */
@@ -87,9 +88,9 @@ struct bcol {/*{{{*/
     friend class bmat;
     uint nrows;
     inline uint stride() const { return BITS_TO_WORDS(nrows, ULONG_BITS); }
-private:
+    private:
     boost::shared_array<ulong> x;
-public:
+    public:
     bcol(uint nrows)
         : nrows(nrows), x(new ulong[stride()])
     {}
@@ -135,11 +136,11 @@ struct bmat { /* This is for example small-e, an m times b matrix *//*{{{*/
     friend class polmat;
     uint nrows;
     uint ncols;
-private:
+    private:
     boost::shared_array<ulong> x;
     boost::shared_array<uint> order;
     inline uint stride() const { return BITS_TO_WORDS(nrows, ULONG_BITS); }
-public:
+    public:
     bmat(uint nrows, uint ncols)
         : nrows(nrows), ncols(ncols), x(new ulong[ncols*stride()]),
         order(new uint[ncols])
@@ -237,28 +238,28 @@ public:
     }
 };/*}}}*/
 struct polmat { /* {{{ */
-/* polmat may represent:
- * - big-E, an m times b matrix of polynomials having nc max coeffs
- * - PI,     a b times b matrix of polynomials having nc max coeffs
- *
- * coeffs of big-E will eventually be stored in reversed bit order for
- * efficiency, but this is of little concern here.
- *
- * polmat may also represent other things, but for which speed is not
- * important.
- */
+    /* polmat may represent:
+     * - big-E, an m times b matrix of polynomials having nc max coeffs
+     * - PI,     a b times b matrix of polynomials having nc max coeffs
+     *
+     * coeffs of big-E will eventually be stored in reversed bit order for
+     * efficiency, but this is of little concern here.
+     *
+     * polmat may also represent other things, but for which speed is not
+     * important.
+     */
     uint nrows;
     uint ncols;
     uint ncoef;
     static bool critical;
-private:
+    private:
     boost::shared_array<ulong> x;
     boost::shared_array<uint> order;
     boost::shared_array<int> _deg;
     inline uint stride() const { return BITS_TO_WORDS(ncoef, ULONG_BITS); }
     inline uint colstride() const { return nrows * stride(); }
     static void brev_warning();
-public:
+    public:
     int& deg(uint j) { return _deg[order[j]]; }
     int const & deg(uint j) const { return _deg[order[j]]; }
     polmat(uint nrows, uint ncols, uint ncoef)
@@ -298,13 +299,13 @@ public:
          * this assumption ?
          */
     }
-private:
+    private:
     void cow() {
         if (x.get() != NULL && !x.unique()) {
             *this = clone();
         }
     }
-public:
+    public:
     polmat& operator=(polmat const& a) {
         nrows = a.nrows;
         ncols = a.ncols;
@@ -351,17 +352,30 @@ public:
         memset(x.get() + order[j] * colstride(), 0, colstride() * sizeof(ulong));
         _deg[order[j]] = -1;
     }
-    void xmul_col(uint j) {
+    void xmul_col(uint j, uint s=1) {
         /* cow check ??? */
         mp_limb_t * dst = x.get() + order[j] * colstride();
-        mpn_lshift(dst, dst, colstride(), 1);
+        mpn_lshift(dst, dst, colstride(), s);
         /* We may have garbage for the low bits. It may matter, or maybe
          * not. If it does, call xclean0_col */
         _deg[order[j]] += _deg[order[j]] >= 0;
     }
+    void xmul_poly(uint i, uint j, uint s=1) {
+        /* cow check ??? */
+        ulong * dst = x.get() + (order[j] * nrows + i) * stride();
+        mpn_lshift(dst, dst, stride(), s);
+        /* We may have garbage for the low bits. It may matter, or maybe
+         * not. If it does, call xclean0_col */
+        // _deg[order[j]] += _deg[order[j]] >= 0;
+    }
+    void addpoly(uint i, uint j, const ulong * src) {
+        ulong * dst = x.get() + (order[j] * nrows + i) * stride();
+        for(uint k = 0 ; k < stride() ; k++)
+            dst[k] ^= src[k];
+    }
     void xclean0_col(uint j) {
         /* cow check ??? */
-        mp_limb_t * dst = x.get() + order[j] * colstride();
+        ulong * dst = x.get() + order[j] * colstride();
         for(uint i = 0 ; i < nrows ; i++, dst += stride())
             dst[0] &= ~1UL;
         _deg[order[j]] -= _deg[order[j]] == 0;
@@ -412,18 +426,18 @@ public:
     {
         return x.get() + (order[j] * nrows + i) * stride();
     }
-    ulong * col(uint j) { return poly(j, 0); }
-    ulong const * col(uint j) const { return poly(j, 0); }
+    ulong * col(uint j) { return poly(0, j); }
+    ulong const * col(uint j) const { return poly(0, j); }
     /* shift is understood ``shift left'' (multiply by X) */
     void import_col_shift(uint k, polmat const& a, uint j, int s)
     {
         BUG_ON(a.nrows != nrows);
         ulong const * src = a.col(j);
         ulong * dst = col(k);
-        if (s) {
+        if (s > 0) {
             mpn_lshift(dst, src, colstride(), s);
         } else {
-            mpn_rshift(dst, src, colstride(), s);
+            mpn_rshift(dst, src, colstride(), -s);
         }
     }
 
@@ -523,7 +537,6 @@ void multiply_slow(polmat& res, polmat const &a, polmat const &b,
     }
 }
 
-
 namespace globals {
     uint nrows;
     uint m,n;
@@ -534,7 +547,10 @@ namespace globals {
     polmat E;
     bmat e0;
 
-    polmat F0;
+    // F0 is exactly the n x n identity matrix, plus the X^(s-exponent)e_{cnum}
+    // vectors. Here we store the cnum,exponent pairs.
+    std::vector<std::pair<uint, uint> > f0_data;
+
 }
 
 #if 0/*{{{*/
@@ -674,11 +690,76 @@ struct prxr_bydeg {
 
 #endif/*}}}*/
 
+// To multiply on the right an m x n matrix A by F0, we start by copying
+// A into the first n columns. Since we're also dividing out by X^t0, the
+// result has to be shifted t0 positions to the right.
+// Afterwards, column n+j of the result is column cnum[j] of A, shifted
+// exponent[j] positions to the right.
+void compute_E_from_A(polmat const &a)
+{
+    using namespace globals;
+    E = polmat(n, m + n, a.ncoef - t0);
+    for(uint j = 0 ; j < n ; j++) {
+        E.import_col_shift(j, a, j, - (int) t0);
+    }
+    for(uint j = 0 ; j < m ; j++) {
+        uint cnum = f0_data[j].first;
+        uint exponent = f0_data[j].second;
+        E.import_col_shift(n + j, a, cnum, - (int) exponent);
+    }
+}
+
+// F is in fact F0 * PI.
+// To multiply on the *left* by F, we cannot work directly at the column
+// level (we could work at the row level, but it does not fit well with
+// the way data is organized). So it's merely a matter of adding
+// polynomials.
+void compute_final_F_from_PI(polmat& F, polmat const& pi)
+{
+    using namespace globals;
+    // We take t0 rows, so that we can do as few shifts as possible
+    polmat tmpmat(t0,1,pi.ncoef);
+    F = polmat(n, m + n, globals::t0 + pi.ncoef - 1);
+    using namespace std;
+    for(uint i = 0 ; i < n ; i++) {
+        // What contributes to entries in this row ?
+        vector<pair<uint, uint> > l;
+        set<uint> sexps;
+        // l.push_back(make_pair(i,0));
+        for(uint j = 0 ; j < m ; j++) {
+            if (f0_data[j].first == i) {
+                l.push_back(make_pair(n + j, f0_data[j].second));
+                sexps.insert(f0_data[j].second);
+            }
+        }
+        vector<uint> exps(sexps.begin(), sexps.end());
+        // So the i-th row of f0 has a 1 at position i, and then
+        // X^(t0-f.second) at position n+j whenever f.first == i.
+        //
+        // Now fill in the row.
+        for(uint j = 0 ; j < m + n ; j++) {
+            // We zero out the whole column, it's less trouble.
+            tmpmat.zcol(0);
+            for(uint k = 0 ; k < l.size() ; k++) {
+                tmpmat.addpoly(l[k].second, 0, pi.poly(l[k].first, j));
+            }
+            F.addpoly(i,j,pi.poly(i,j));
+            for(uint k = 0 ; k < exps.size() ; k++) {
+                tmpmat.xmul_poly(exps[k],0,t0-exps[k]);
+                F.addpoly(i,j,tmpmat.poly(exps[k],0));
+            }
+        }
+    }
+    for(uint j = 0 ; j < m + n ; j++) {
+        F.deg(j) = t0 + pi.deg(j);
+    }
+}
+
 
 const char *a_meta_filename = "A-%02d-%02d";
 const char *f_meta_filename = "F%02d";
 const char *pi_meta_filename = "pi-%d-%d";
-const char *f_base_filename = "F_INIT";
+const char *f_base_filename = "F_INIT_QUICK";
 
 
 std::pair<polmat,int> read_data_for_series()/*{{{*/
@@ -792,10 +873,102 @@ std::pair<polmat,int> read_data_for_series()/*{{{*/
 
     return std::make_pair(a,read_coeffs);
 }/*}}}*/
+void write_polmat(polmat const& P, const char * fn)/*{{{*/
+{
+    std::ofstream f(fn);
+    if (!f.is_open()) {
+        perror(fn);
+        exit(1);
+    }
 
+    for(uint k = 0 ; k < P.ncoef ; k++) {
+        for(uint i = 0 ; i < P.nrows ; i++) {
+            for(uint j = 0 ; j < P.ncols ; j++) {
+                if (j) f << " ";
+                if ((int) k <= P.deg(j)) {
+                    f << P.coeff(i,j,k);
+                } else {
+                    f << 0;
+                }
+            }
+            f << "\n";
+        }
+        f << "\n";
+    }
+    printf("Written f to %s\n",fn);
+}/*}}}*/
 
+bool recover_f0_data(const char * fn)
+{
+    std::ifstream f(fn);
 
-#if 1
+    using namespace globals;
+    for(uint i = 0 ; i < m ; i++) {
+        uint exponent,cnum;
+        if (!(f >> cnum >> exponent))
+            return false;
+        f0_data.push_back(std::make_pair(cnum,exponent));
+    }
+    std::cout << fmt("recovered init data % on disk with t0=%\n") % fn % t0;
+    return true;
+}
+
+bool write_f0_data(const char * fn)
+{
+    std::ofstream f(fn);
+
+    using namespace globals;
+    for(uint i = 0 ; i < m ; i++) {
+        uint cnum = f0_data[i].first;
+        uint exponent = f0_data[i].second;
+        if (!(f << " " << cnum << " " << exponent))
+            return false;
+    }
+    f << std::endl;
+    std::cout << fmt("written init data % to disk\n") % fn;
+    return true;
+}
+
+// the computation of F0 says that the column number cnum of the
+// coefficient X^exponent of A increases the rank.
+//
+// These columns are gathered into an invertible matrix at step t0, t0
+// being strictly greater than the greatest exponent above. This is so
+// that there is no trivial column dependency in F0.
+void set_t0_delta_from_F0()
+{
+    using namespace globals;
+    t0 = f0_data.back().second + 1;     // see above for the +1
+    for(uint j = 0 ; j < m + n ; j++) {
+        delta[j] = t0;
+        // Even irrespective of the value of the exponent, we get t0 for
+        // delta.
+    }
+}
+
+void write_F0_from_F0_quick()
+{
+    using namespace globals;
+    uint s = t0;
+    /* Now build f */
+    polmat F0(n, m + n, s + 1);
+
+    /* First n columns: identity matrix */
+    /* rest: X^(s-exponent)cnum's */
+    for(uint i=0;i<n;i++) {
+        F0.addcoeff(i,i,0,1);
+        F0.deg(i) = 0;
+    }
+    for(uint j=0;j<m;j++) {
+        uint cnum = f0_data[j].first;
+        uint exponent = f0_data[j].second;
+        F0.addcoeff(cnum,n+j,t0-exponent,1);
+        F0.deg(n + j) = t0-exponent;
+    }
+    write_polmat(F0, "F_INIT");
+}
+
+#if 0
 bool read_f_init(polmat & F0, const char * fn, uint nr, uint nc)/*{{{*/
 {
     ulong blah;
@@ -844,56 +1017,28 @@ bool read_f_init(polmat & F0, const char * fn, uint nr, uint nc)/*{{{*/
     }
     return k > 0;
 }/*}}}*/
-#endif
-void write_polmat(polmat const& P, const char * fn)/*{{{*/
+// give_poly_rank_info is no longer useful, compute_f_init does much
+// more, much better.
+void give_poly_rank_info(polmat& a, int deg)    /* informative *//*{{{*/
 {
-    std::ofstream f(fn);
-    if (!f.is_open()) {
-        perror(fn);
-        exit(1);
+    uint k;
+    uint grank=globals::m;
+    uint m = std::min(deg, 200);
+    std::cout << fmt("Rank of first % A matrices:") % m << std::flush;
+    for(k = 0 ; k < m ; k++) {
+        uint r = compute_rank(a.extract_coeff(k));
+        std::cout << " " << r;
+        if (k < m / 2 || r >= grank)
+            grank = r;
+        std::cout << std::flush;
     }
-
-    for(uint k = 0 ; k < P.ncoef ; k++) {
-        for(uint i = 0 ; i < P.nrows ; i++) {
-            for(uint j = 0 ; j < P.ncols ; j++) {
-                if (j) f << " ";
-                if ((int) k <= P.deg(j)) {
-                    f << P.coeff(i,j,k);
-                } else {
-                    f << 0;
-                }
-            }
-            f << "\n";
-        }
-        f << "\n";
+    std::cout << std::endl;
+    if (grank != globals::m) {
+        std::cout << "The program will almost surely fail"
+                " because the choice of X-vectors was bad\n";
+        sleep(3);
     }
-    printf("Written f to %s\n",fn);
 }/*}}}*/
-/*{{{*/
-void bw_commit_f(polmat& F)
-{
-    char filename[FILENAME_LENGTH];
-
-    using namespace globals;
-    using namespace std;
-
-    for (uint j = 0; j < m + n ; j++) {
-        sprintf(filename, f_meta_filename, j);
-        ofstream f(filename);
-        if (!f.is_open()) {
-            perror("writing f");
-            eternal_sleep();
-        }
-        printf("Writing %s\n", filename);
-        for (int k = 0; k <= F.deg(j); k++) {
-            for (uint i = 0; i < n; i++) {
-                f << F.coeff(i,j,k) << (i == (n-1) ? "\n" : " ");
-            }
-        }
-    }
-}
-/*}}}*/
-
 static uint compute_rank(bmat const& a0)/*{{{*/
 {
     bmat a = a0.clone();
@@ -921,26 +1066,32 @@ static uint compute_rank(bmat const& a0)/*{{{*/
     }
     return rank;
 }/*}}}*/
-void give_poly_rank_info(polmat& a, int deg)    /* informative *//*{{{*/
+#endif
+
+void bw_commit_f(polmat& F) /*{{{*/
 {
-    uint k;
-    uint grank=globals::m;
-    uint m = std::min(deg, 200);
-    std::cout << fmt("Rank of first % A matrices:") % m << std::flush;
-    for(k = 0 ; k < m ; k++) {
-        uint r = compute_rank(a.extract_coeff(k));
-        std::cout << " " << r;
-        if (k < m / 2 || r >= grank)
-            grank = r;
-        std::cout << std::flush;
+    char filename[FILENAME_LENGTH];
+
+    using namespace globals;
+    using namespace std;
+
+    for (uint j = 0; j < m + n ; j++) {
+        sprintf(filename, f_meta_filename, j);
+        ofstream f(filename);
+        if (!f.is_open()) {
+            perror("writing f");
+            eternal_sleep();
+        }
+        printf("Writing %s\n", filename);
+        for (int k = 0; k <= F.deg(j); k++) {
+            for (uint i = 0; i < n; i++) {
+                f << F.coeff(i,j,k) << (i == (n-1) ? "\n" : " ");
+            }
+        }
     }
-    std::cout << std::endl;
-    if (grank != globals::m) {
-        std::cout << "The program will almost surely fail"
-                " because the choice of X-vectors was bad\n";
-        sleep(3);
-    }
-}/*}}}*/
+}
+/*}}}*/
+
 
 void compute_f_init(polmat& A)/*{{{*/
 {
@@ -950,11 +1101,11 @@ void compute_f_init(polmat& A)/*{{{*/
     printf("Computing t0\n");
 
     /* For each integer i between 0 and m-1, we have a column, picked
-     * from column jk[i] of coeff ik[i] of A which, once reduced modulo
+     * from column cnum[i] of coeff exponent[i] of A which, once reduced modulo
      * the other ones, has coefficient at row pivots[i] unequal to zero.
      */
     bcol pcols[m];
-    uint pivots[m], ik[m], jk[m];
+    uint pivots[m], exponent[m], cnum[m];
 
     uint r = 0;
     for(uint k=0;r < m && k<A.ncoef;k++) {
@@ -982,8 +1133,10 @@ void compute_f_init(polmat& A)/*{{{*/
 
             /* Bingo, it's a new independent col. */
             pivots[r]=u;
-            jk[r]=j;
-            ik[r]=k;
+            cnum[r]=j;
+            exponent[r]=k;
+
+            f0_data.push_back(std::make_pair(cnum[r], exponent[r]));
 
             /* TODO: For non-binary stuff, multiply the column so that
              * acol[u] becomes -1
@@ -996,44 +1149,25 @@ void compute_f_init(polmat& A)/*{{{*/
         }
     }
 
-    globals::t0 = ik[r-1] + 1;
+    t0 = exponent[r-1] + 1;
     printf("Found satisfying init data for t0=%d\n", t0);
                     
-    /*
     printf("Init e0 matrix\n");
     for(uint i = 0 ; i < m ; i++) {
         for(uint j = 0 ; j < n ; j++) {
-            std::cout << A.coeff(i,j,s);
+            std::cout << A.coeff(i,j,t0);
         }
         for(uint j = 0 ; j < m ; j++) {
-            std::cout << A.coeff(i,jk[j],ik[j]);
+            std::cout << A.coeff(i,cnum[j],exponent[j]);
         }
         std::cout << "\n";
     }
-    */
 
 
     if (r!=m) {
         printf("This amount of data is insufficient. "
                 "Cannot find %u independent cols within A\n",m);
         exit(1);
-    }
-
-    uint s = t0;
-    /* Now build f */
-    F0 = polmat(n, m+n, s + 1);
-
-    /* First n columns: identity matrix */
-    /* rest: X^(s-ik)jk's */
-    for(uint i=0;i<n;i++) {
-        F0.addcoeff(i,i,0,1);
-        F0.deg(i) = 0;
-        delta[i] = 1;
-    }
-    for(uint j=0;j<m;j++) {
-        F0.addcoeff(jk[j],n+j,s-ik[j],1);
-        delta[n+j] = 1 + s-ik[j];
-        F0.deg(n + j) = s-ik[j];
     }
 
 }/*}}}*/
@@ -1104,11 +1238,25 @@ static void bw_init(void)
 
     delta.assign(m + n, -1);
 
-    if (!read_f_init(F0, f_base_filename, n, m + n)) {
-	give_poly_rank_info(A, read_coeffs - 1);
+    if (!recover_f0_data(f_base_filename)) {
+        // This is no longer useful
+	// give_poly_rank_info(A, read_coeffs - 1);
 	compute_f_init(A);
-	write_polmat(F0, f_base_filename);
+	write_f0_data(f_base_filename);
     }
+    set_t0_delta_from_F0();
+
+    // this is not used. It's only a debugging aid for the helper magma
+    // code.
+    write_F0_from_F0_quick();
+
+    /*
+        if (!read_f_init(F0, f_base_filename, n, m + n)) {
+            give_poly_rank_info(A, read_coeffs - 1);
+            compute_f_init(A);
+            write_f0_data(F0, f_base_filename);
+        }
+    */
     t = t0;
     printf("t0 = %d\n", t0);
 
@@ -1128,7 +1276,8 @@ static void bw_init(void)
     std::cout << "Computing value of E(X)=A(X)F(X) "
         << fmt("(degree %) [ +O(X^%) ]\n") % (total_work-1) % total_work;
     
-    multiply_slow(E, A, F0, t0, total_work-1);
+    // multiply_slow(E, A, F0, t0, total_work-1);
+    compute_E_from_A(A);
 
     printf("Throwing out a(X)\n");
     A.clear();
@@ -1944,7 +2093,7 @@ static void extract_coeff_degree_t(uint t, uint piv[], polmat const& PI)
                 chance_list[i] = 0;
             } else {
                 uint w = chance_list[i] += ncha[i];
-                std::cout << " " << z[i];
+                std::cout << " " << i;
                 if (w >= 2) {
                     std::cout << fmt("[%]") %w;
                 }
@@ -2394,7 +2543,7 @@ void block_wiedemann(void)
     go_quadratic(pi_left);
 
     polmat F;
-    multiply_slow(F, F0, pi_left);
+    compute_final_F_from_PI(F, pi_left);
     bw_commit_f(F);
 
 	printf("// step %d LOOK [", t);
