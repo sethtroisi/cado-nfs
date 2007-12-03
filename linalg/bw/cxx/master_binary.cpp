@@ -1236,7 +1236,6 @@ static void gauss(uint piv[], polmat& PI)
     }
     std::cout << " ]\n";
     */
-
 }
 
 void read_mat_file_header(const char *name)
