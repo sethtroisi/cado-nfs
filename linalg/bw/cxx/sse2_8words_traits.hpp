@@ -12,8 +12,8 @@ namespace globals {
 }
 
 struct sse2_8words_traits {
-	static const int max_accumulate = 100;
-	static const int max_accumulate_wide = 100;
+	static const int max_accumulate = 50;
+	static const int max_accumulate_wide = 50;
 	typedef int16_t sse2_scalars __attribute__((vector_size(16)));
 
 	struct scalar_t { sse2_scalars p; };
