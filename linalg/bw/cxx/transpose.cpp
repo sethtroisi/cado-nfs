@@ -9,6 +9,7 @@
 #include "matrix_line.hpp"
 #include "must_open.hpp"
 #include "parsing_tools.hpp"
+#include "transpose_arguments.hpp"
 
 #include <boost/cstdint.hpp>
 #include <iterator>
@@ -17,18 +18,12 @@
 #include <algorithm>
 
 common_arguments common;
+transpose_arguments mine;
 
 using namespace std;
 
-int main(int argc, char * argv[])
+void doit(std::ostream& o)
 {
-	ios_base::sync_with_stdio(false);
-	cerr.tie(&cout);
-	cout.rdbuf()->pubsetbuf(0,0);
-	cerr.rdbuf()->pubsetbuf(0,0);
-
-	no_arguments nothing;
-	process_arguments(argc, argv, common, nothing);
 	unsigned int nr;
 	unsigned int nc;
 	string mstr;
@@ -111,9 +106,27 @@ int main(int argc, char * argv[])
 			columns[jj].push_back(li[j]);
 		}
 	}
-	put_matrix_header(std::cout, nc, mstr);
+	put_matrix_header(o, nc, mstr);
 	for(unsigned int j = 0 ; j < nc ; j++) {
-		std::cout << columns[j] << "\n";
+		o << columns[j] << "\n";
+	}
+}
+
+int main(int argc, char * argv[])
+{
+	ios_base::sync_with_stdio(false);
+	cerr.tie(&cout);
+	cout.rdbuf()->pubsetbuf(0,0);
+	cerr.rdbuf()->pubsetbuf(0,0);
+
+	process_arguments(argc, argv, common, mine);
+
+	if (!mine.out.empty()) {
+		ofstream ofile;
+		must_open(ofile, mine.out);
+		doit(ofile);
+	} else {
+		doit(cout);
 	}
 
 	return 0;
