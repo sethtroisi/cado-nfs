@@ -76,12 +76,21 @@ void read(const std::string& fn)
 	using namespace globals;
 
 	std::vector<mpz_class> foo(1);
-	for(unsigned int i = 0 ; i < nr ; i++) {
+	unsigned int i;
+	for(i = 0 ; i < nr ; i++) {
 		if (!(f >> foo[0])) {
-			BUG();
+			break;
 		}
 		traits::assign(v[i], foo, 0);
 	}
+	if (i < nr) {
+		cerr << "Vector " << fn << " has only " << i << " coordinates\n";
+	}
+	foo[0]=0;
+	for( ; i < nr ; i++) {
+		traits::assign(v[i], foo, 0);
+	}
+
 	f >> ws;
 	BUG_ON(!f.eof());
 }
