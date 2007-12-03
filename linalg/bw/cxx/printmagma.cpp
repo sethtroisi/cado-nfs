@@ -1,3 +1,11 @@
+#include <iostream>
+#include <iterator>
+#include <gmp.h>
+#include <gmpxx.h>
+
+#include <sys/types.h>
+#include <dirent.h>
+
 #include "constants.hpp"
 #include "matrix_header.hpp"
 #include "matrix_line.hpp"
@@ -7,24 +15,19 @@
 #include "common_arguments.hpp"
 #include "detect_params.hpp"
 
-#include <iostream>
-#include <iterator>
-
-#include <sys/types.h>
-#include <dirent.h>
-
 
 using namespace std;
 using namespace boost;
 
-void pvec(const std::string& n, const vector<long>& co)
+template<typename T>
+void pvec(const std::string& n, const vector<T>& co)
 {
     if (co.empty()) {
         return;
     }
     cout << fmt("%:=Vector([GF(p) | \n") % n;
     copy(co.begin(), co.end() - 1,
-            ostream_iterator<long>(cout, ", "));
+            ostream_iterator<T>(cout, ", "));
     cout << co.back() << "]);\n";
 }
 
@@ -55,13 +58,15 @@ bool rvec(const std::string& f, vector<T>& co)
 {
     ifstream y;
     if (!open(y, f)) return false;
+    co.clear();
     copy(istream_iterator<T>(y),
             istream_iterator<T>(),
             back_insert_iterator<vector<T> >(co));
     return true;
 }
 
-bool r_avec(vector<long>& co, int m, int n)
+template<typename T>
+bool r_avec(vector<T>& co, int m, int n)
 {
     for(int i = 0 ; i < m ; i++) {
         /* rows are always in separate files. */
@@ -69,7 +74,7 @@ bool r_avec(vector<long>& co, int m, int n)
             /* columns might come together ! */
             std::string a_nm = files::a % i % j;
             int ny;
-            long t;
+            T t;
             {
                 ifstream a(a_nm.c_str());
                 if (!a.is_open()) {
@@ -97,7 +102,7 @@ bool r_avec(vector<long>& co, int m, int n)
                 if (k != ny && !a.eof()) {
                     std::string line;
                     getline(a, line);
-                    cerr << fmt("error parsing %\n") % a_nm;
+                    cerr << fmt("error parsing % (asking for %x% data, nbys=%)\n") % a_nm % m % n % ny;
                     return false;
                 }
             }
@@ -108,15 +113,17 @@ bool r_avec(vector<long>& co, int m, int n)
     return true;
 }
 
+template<typename T>
 void do_pi(std::string const& mname, std::string const& fname, int m, int n)
 {
-    vector<unsigned long> co;
+    vector<T> co;
     if (!rvec(fname, co)) {
         cerr << fmt("Uh, % vanished in the air\n");
     }
     pmatpol(mname, co, m+n, m+n);
 }
 
+template<typename T>
 void
 try_pi(int m, int n)
 {
@@ -131,7 +138,7 @@ try_pi(int m, int n)
     for(;(curr=readdir(pi_dir))!=NULL;) {
         int s,e;
         if (sscanf(curr->d_name,"pi-%d-%d",&s,&e)==2) {
-            do_pi(fmt("pi_%_%")%s%e, curr->d_name, m, n);
+            do_pi<T>(fmt("pi_%_%")%s%e, curr->d_name, m, n);
         }
     }
 
@@ -224,7 +231,7 @@ int main(int argc, char * argv[])
         ifstream x;
         unsigned int c;
         if (!open(x, files::x % j)) break;
-        vector<long> co(nr, 0);
+        vector<mpz_class> co(nr, 0);
         x >> wanted('e') >> c;
         co[c] = 1;
         pvec(fmt("X%")%j, co);
@@ -241,7 +248,7 @@ int main(int argc, char * argv[])
     }
 
     for(unsigned int j = 0 ; j < n ; j++) {
-        vector<long> co;
+        vector<mpz_class> co;
         if (!rvec(files::y % j, co)) break;
         pvec(fmt("Y%")%j, co);
     }
@@ -253,12 +260,12 @@ int main(int argc, char * argv[])
     }
 
     do {
-        vector<long> co;
+        vector<mpz_class> co;
         if (!rvec(files::m0, co)) break;
         pvec("CM0", co);
     } while (0);
     do {
-        vector<long> co;
+        vector<mpz_class> co;
         if (!rvec(files::x0, co)) break;
         pvec("CX0", co);
     } while (0);
@@ -269,17 +276,25 @@ int main(int argc, char * argv[])
     /* Also dump master information if found */
 
     do {
-        vector<long> co;
+        vector<mpz_class> co;
         if (!rvec(files::f_init, co)) break;
         pmatpol("F_INIT", co, n, m+n);
+        if (!rvec("F00", co)) break; pmatpol("F00", co, n, 1);
+        if (!rvec("F01", co)) break; pmatpol("F01", co, n, 1);
+        if (!rvec("F02", co)) break; pmatpol("F02", co, n, 1);
+        if (!rvec("F03", co)) break; pmatpol("F03", co, n, 1);
+        if (!rvec("F04", co)) break; pmatpol("F04", co, n, 1);
+        if (!rvec("F05", co)) break; pmatpol("F05", co, n, 1);
+        if (!rvec("F06", co)) break; pmatpol("F06", co, n, 1);
+        if (!rvec("F07", co)) break; pmatpol("F07", co, n, 1);
     } while (0);
 
     do {
-        vector<long> co;
+        vector<mpz_class> co;
         if (!r_avec(co, m, n)) break;
         pmatpol("A", co, m, n);
     } while (0);
 
-    try_pi(m,n);
+    try_pi<mpz_class>(m,n);
 }
 /* vim:set sw=4 sta et: */

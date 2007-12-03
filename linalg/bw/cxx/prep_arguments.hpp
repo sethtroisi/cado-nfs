@@ -3,18 +3,24 @@
 
 #include "arguments.hpp"
 
+#include <cstdlib>
+#include <ctime>
+
 struct prep_arguments {
 	int m, n;
+	unsigned int seed;
 	prep_arguments() :
-		m(-1), n(-1)
+		m(-1), n(-1), seed(0)
 	{}
 	bool parse(argparser::situation& s) {
 		if (m == -1 && s(NULL, m)) return true;
 		if (n == -1 && s(NULL, n)) return true;
+		if (seed == 0 && s("--seed", seed)) return true;
 		return false;
 	}
 	void doc(std::ostream& o) {
 		o
+		<< "[--seed <s>]\tUse s as a seed value\n"
 		<< "<m>\tnumber or blocking rows\n"
 		<< "<n>\tnumber or blocking columns\n";
 	}
@@ -26,7 +32,13 @@ struct prep_arguments {
 		}
 		return b;
 	}
-	void trigger() const {}
+	void trigger() const {
+		if (seed == 0) {
+			srandom(time(NULL));
+		} else {
+			srandom(seed);
+		}
+	}
 };
 
 #endif	/* PREP_ARGUMENTS_HPP_ */

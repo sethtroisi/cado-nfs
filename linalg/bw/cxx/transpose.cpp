@@ -107,8 +107,14 @@ void doit(std::ostream& o)
 		}
 	}
 	put_matrix_header(o, nc, mstr);
-	for(unsigned int j = 0 ; j < nc ; j++) {
-		o << columns[j] << "\n";
+	if (mstr != string("2")) {
+		for(unsigned int j = 0 ; j < nc ; j++) {
+			o << columns[j] << "\n";
+		}
+	} else {
+		for(unsigned int j = 0 ; j < nc ; j++) {
+			print_line_without_ones(o, columns[j]) << "\n";
+		}
 	}
 }
 

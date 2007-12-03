@@ -37,6 +37,9 @@ using namespace std;
  *
  * As randomness is really not a concern, we are happy with the sequence :
  * +1, -1, +2, -2, ...
+ *
+ *
+ * very obviously this check is not very useful in characteristic two.
  */
 
 void contribute_check_overflow(vector<int>& m,

@@ -39,6 +39,16 @@
 static struct bw_context	*cx;
 static struct bw_iterator	*it;
 
+const char f_base_filename[] = "F_INIT";
+
+/* Setting this too low will trigger bugs with small moduli. Even then,
+ * one should probably grow this above 8.
+ *
+ * Note that this value must be in accordance with the margin used for
+ * the computation of L=N/m+N/n+...
+ */
+int chance_cutoff = 8;
+
 #ifdef	VERY_VERBOSE
 int bw_dump_f(FILE *f, struct bw_iterator * it)
 {
@@ -269,7 +279,9 @@ bw_init(struct bw_iterator * it, struct bw_context * cx, int start)
 		printf("This amount of data is insufficient.\n");
 		exit(1);
 	}
+
 	it->t = cx->t0 = ik[r-1]+1;
+	printf("t0 = %d\n", it->t);
 			
 	/* Now build f */
 
@@ -282,6 +294,18 @@ bw_init(struct bw_iterator * it, struct bw_context * cx, int start)
 		bw_scalar_set_one(nbmat_scal(nbpoly_coeff(it->f,it->t-ik[j]),rk[j],n_param+j));
 	}
 
+	{
+		FILE * f=fopen(f_base_filename,"w");
+		if (f==NULL) {
+			perror(f_base_filename);
+		} else {
+			int test=nbpoly_write(f,it->f,cx->t0);
+			fclose(f);
+			if (test==0) {
+				printf("Written f to %s\n",f_base_filename);
+			}
+		}
+	}
 	for(j=0;j<bigdim;j++) {
 		it->clist[j].degnom = it->t;
 		it->clist[j].pos    = j;
@@ -605,10 +629,16 @@ block_wiedemann(int start)
 		timer_r(&step_time, TIMER_SET);
 		bw_do_ctaf();
 		chance = bw_check_chance(it);
-		if (chance > 2)
+		if (chance > chance_cutoff)
 			break;
 		bw_gauss(it);
 		bw_iterate(it);
+		{
+			int k;
+			printf("DELTA : ( ");
+			for(k=0;k<bigdim;k++) printf("%d ",it->clist[k].degnom);
+			printf(")\n");
+		}
 		tt=timer_r(&step_time, TIMER_ASK);
 		totaltime=timer_r(&start_time, TIMER_ASK);
 
@@ -699,7 +729,9 @@ main(int argc, char *argv[])
 	consistency_check("bw_longsize",computed_bw_longsize,bw_longsize);
 #endif
 
+#ifndef	NDEBUG
 	block_signals();
+#endif
 	block_wiedemann(start);
 
 	return 0;

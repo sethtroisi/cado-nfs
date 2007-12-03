@@ -65,6 +65,10 @@ namespace files {
 	EXTERN_LINKAGE	meta_filename f_init	INIT_WITH("F_INIT");
 	EXTERN_LINKAGE	meta_filename fxy
 				INIT_WITH("F%[f0w2]-Y%[f0w2].%[f0w3]");
+
+	/* TODO: maybe bump up the format width a wee bit, or drop the f0
+	 * thing.
+	 */
 }
 
 #undef	INIT_WITH

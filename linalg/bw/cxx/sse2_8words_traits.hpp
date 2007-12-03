@@ -4,20 +4,29 @@
 #include <gmp.h>
 #include <gmpxx.h>
 #include <vector>
-
-namespace globals {
-	extern uint8_t modulus_u8;
-	extern uint16_t modulus_u16;
-	extern uint32_t modulus_u32;
-}
+#include "traits_globals.hpp"
+#include "matrix_repr_prime.hpp"
 
 struct sse2_8words_traits {
+	typedef matrix_repr_prime representation;
 	static const int max_accumulate = 50;
 	static const int max_accumulate_wide = 50;
 	typedef int16_t sse2_scalars __attribute__((vector_size(16)));
 
 	struct scalar_t { sse2_scalars p; };
 	typedef scalar_t wide_scalar_t;
+
+	typedef prime_field_any coeff_field;
+
+	struct name {
+		const char * operator()() const {
+			return "SSE-2 code [ 8 words ]";
+		}
+	};
+
+	static int can() {
+		return globals::nbys == 8 && MODBITS() < 8;
+	}
 
 	static inline mpz_class get_y(scalar_t const & x, int i) {
 		int16_t foo[8] __attribute__((aligned(16)));

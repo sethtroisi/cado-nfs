@@ -20,7 +20,6 @@
 #include "threads.hpp"
 #include "ticks.hpp"
 #include "traits.hpp"
-#include "mul.hpp"
 
 #include <boost/cstdint.hpp>
 #include <iterator>
@@ -28,13 +27,13 @@
 /*
  * Note on vectorization. Unlike slave and mksol, this program is NOT
  * vectorized. Mostly because it does not make much sense, since this one
- * is so simple. We even use generic code inconditionnally.
+ * is so simple. We even use generic code unconditionnally.
  *
  * One way to use this program in a vectorized manner would be to gather
  * several solutions at once, but again it would not make much sense.
  *
  * This being said, a --nbys option exists, and is mandatory in order to
- * read from the output of a vectorizaed mksol.
+ * read from the output of a vectorized mksol.
  */
 
 gather_arguments mine;
@@ -58,19 +57,20 @@ namespace globals {
 
 	uint nb_coeffs;
 
-	uint32_t * idx;
-	int32_t  * val;
 }
 
 template<typename traits>
-struct program {
+class program_common {
+public:
 	typedef typename traits::scalar_t scalar_t;
 	typedef typename traits::wide_scalar_t wide_scalar_t;
+
+	typename traits::representation::matrix_rowset mat;
 
 	scalar_t *v;
 	scalar_t *w;
 	wide_scalar_t *scrap;
-
+private:
 void init_data()
 {
 	using namespace globals;
@@ -80,6 +80,14 @@ void init_data()
 
 	traits::zero(v, nr);
 	traits::zero(w, nr);
+
+	mat.alloc(nr, nb_coeffs);
+
+	{
+		ifstream mtx;
+		must_open(mtx, files::matrix);
+		mat.fill(mtx, 0, 0, nr);
+	}
 }
 
 void clear_data()
@@ -90,7 +98,7 @@ void clear_data()
 	delete[] scrap;
 
 }
-
+public:
 void add_file(const std::string& fn)
 {
 	ifstream f;
@@ -163,19 +171,25 @@ int nb_nonzero(const scalar_t * vec) {
 
 void multiply()
 {
-	multiply_ur<traits>(scrap, v, globals::idx, globals::val, globals::nr);
+	mat.template mul<traits>(scrap, v);
 	traits::reduce(w, scrap, 0, globals::nr);
 }
 
-program() { init_data(); }
-~program() { clear_data(); }
+program_common() { init_data(); }
+~program_common() { clear_data(); }
 
+};
+
+template<typename traits>
+struct program : public program_common<traits> {
+	typedef program_common<traits> super;
+	using super::v;
+	using super::w;
 void go()
 {
 	using namespace globals;
 
-	init_data();
-	do_sum();
+	super::do_sum();
 
 	traits::reduce(v, v, 0, nr);
 
@@ -190,8 +204,8 @@ void go()
 	for(i = 0 ; i < 20 ; i++) {
 		traits::copy(v, w, nr);
 		cout << fmt("// trying B^%*y") % i;
-		multiply();
-		int r = nb_nonzero(w);
+		super::multiply();
+		int r = super::nb_nonzero(w);
 		if (r) {
 			cout << fmt(" -- % non-zero") % r << endl;
 		} else {
@@ -200,9 +214,14 @@ void go()
 		}
 	}
 
-	if (i == 20 && !is_zero(w)) {
+	if (i == 20 && !super::is_zero(w)) {
 		cerr << "// no solution found\n";
-		BUG();
+		cerr << "// this may either be a bug, or an indication that\n";
+		cerr << "// the span of x^T*B^i is too small. In the latter\n";
+		cerr << "// case, recombining the vectors might work.\n";
+		/* doing so automatically is bound to be a pain. */
+		exit(1);
+		// BUG();
 	}
 
 	cout << fmt("// B^%*y is a solution\n") % i;
@@ -218,7 +237,89 @@ void go()
 	}
 	wf.close();
 }
+};
 
+template<typename traits>
+class program_secondtry : public program_common<traits> {
+public:
+	typedef typename traits::scalar_t scalar_t;
+	typedef typename traits::wide_scalar_t wide_scalar_t;
+	typedef program_common<traits> super;
+	scalar_t *zv;
+	scalar_t *zw;
+	using super::v;
+	using super::w;
+private:
+void init_data()
+{
+	using namespace globals;
+	zv = new scalar_t[nr];
+	zw = new scalar_t[nr];
+
+	traits::zero(zv, nr);
+	traits::zero(zw, nr);
+}
+
+void clear_data()
+{
+	delete[] zv;
+	delete[] zw;
+
+}
+public:
+program_secondtry() { init_data(); }
+~program_secondtry() { clear_data(); }
+void go()
+{
+	using namespace globals;
+
+	super::do_sum();
+
+	traits::reduce(v, v, 0, nr);
+	super::multiply();
+
+	traits::copy(zw, w, nr);
+
+	int i;
+
+	for(i = 0 ; i < 20 ; i++) {
+		traits::copy(v, w, nr);
+		cout << fmt("// trying B^%*y") % i;
+		super::multiply();
+
+		/* find some point for pivoting */
+		int r = super::nb_nonzero(w);
+		if (r) {
+			cout << fmt(" -- % non-zero") % r << endl;
+		} else {
+			cout << " -- zero !" << endl;
+			break;
+		}
+	}
+
+	if (i == 20 && !super::is_zero(w)) {
+		cerr << "// no solution found\n";
+		cerr << "// this may either be a bug, or an indication that\n";
+		cerr << "// the span of x^T*B^i is too small. In the latter\n";
+		cerr << "// case, recombining the vectors might work.\n";
+		/* doing so automatically is bound to be a pain. */
+		exit(1);
+		// BUG();
+	}
+
+	cout << fmt("// B^%*y is a solution\n") % i;
+
+	mpz_class middle = globals::modulus / 2;
+
+	ofstream wf;
+	must_open(wf, files::w % mine.scol);
+	for(uint i = 0 ; i < nr ; i++) {
+		if (v[i] > middle)
+			v[i] -= globals::modulus;
+		traits::print(wf,v[i]) << "\n";
+	}
+	wf.close();
+}
 };
 
 int main(int argc, char *argv[])
@@ -272,15 +373,6 @@ int main(int argc, char *argv[])
 	cout.flush();
 	cerr.flush();
 
-	idx = new uint32_t[nr + nb_coeffs];
-	val = new  int32_t[nr + nb_coeffs];
-
-	{
-		ifstream mtx;
-		must_open(mtx, files::matrix);
-		fill_matrix_data(mtx, 0, nb_coeffs, 0, nr, idx, val);
-	}
-
 	globals::nbys = mine.nbys;
 
 #if 0
@@ -305,9 +397,6 @@ int main(int argc, char *argv[])
 	cout << "// Using generic code\n";
 	program<variable_scalar_traits> x;
 	x.go();
-
-	delete[] idx;
-	delete[] val;
 }
 
 /* vim:set sw=8: */

@@ -20,10 +20,12 @@
 #include "threads.hpp"
 #include "ticks.hpp"
 #include "traits.hpp"
-#include "mul.hpp"
 
 #include <boost/cstdint.hpp>
 #include <iterator>
+
+/* This is a standalone program that performs an example matrix
+ * multiplication */
 
 mul_arguments mine;
 
@@ -33,17 +35,16 @@ using namespace core_ops;
 
 typedef unsigned int uint;
 
+typedef variable_scalar_traits traits;
+
 namespace globals {
 	uint nr;
 	mpz_class modulus;
 
 	uint nb_coeffs;
 
-	uint32_t * idx;
-	int32_t  * val;
+	traits::representation::matrix_rowset mat;
 }
-
-typedef variable_scalar_traits traits;
 
 typedef traits::scalar_t scalar_t;
 typedef traits::wide_scalar_t wide_scalar_t;
@@ -107,9 +108,10 @@ bool is_zero(const scalar_t * vec) {
 void one(std::string const& s)
 {
 	std::string outfile;
+	using namespace globals;
 
 	read(s);
-	multiply_ur<traits>(w, v, globals::idx, globals::val, globals::nr);
+	mat.mul<traits>(w,v);
 	if (!mine.integer) {
 		traits::reduce(w, w, 0, globals::nr);
 	}
@@ -166,22 +168,18 @@ int main(int argc, char *argv[])
 	cout.flush();
 	cerr.flush();
 
-	idx = new uint32_t[nr + nb_coeffs];
-	val = new  int32_t[nr + nb_coeffs];
+	mat.alloc(nr, nb_coeffs);
 
 	{
 		ifstream mtx;
 		must_open(mtx, files::matrix);
-		fill_matrix_data(mtx, 0, nb_coeffs, 0, nr, idx, val);
+		mat.fill(mtx, 0, 0, nr);
 	}
 
 	cout << "// Using generic code\n";
 	init_data();
 	go();
 	clear_data();
-
-	delete[] idx;
-	delete[] val;
 }
 
 /* vim:set sw=8: */

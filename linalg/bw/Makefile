@@ -71,6 +71,7 @@ BW_PRINTMAGMA_SOURCES:=					\
 		auxfuncs.c cxx/matrix_header.cpp	\
 		cxx/files.cpp				\
 		cxx/matrix_line.cpp cxx/printmagma.cpp
+BW_PRINTMAGMA_LIBS:=-lgmp -lgmpxx
 -include .bw-printmagma.mkf
 
 

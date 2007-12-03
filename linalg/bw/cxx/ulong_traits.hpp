@@ -1,43 +1,40 @@
-#ifndef VARIABLE_SCALAR_TRAITS_HPP_
-#define VARIABLE_SCALAR_TRAITS_HPP_
+#ifndef ULONG_TRAITS_HPP_
+#define ULONG_TRAITS_HPP_
 
 #include <gmp.h>
 #include <gmpxx.h>
+#include <vector>
+#include <limits.h>
 #include "traits_globals.hpp"
 #include "matrix_repr_prime.hpp"
 
-struct variable_scalar_traits {
+struct ulong_traits {
 	typedef matrix_repr_prime representation;
 
-	typedef mpz_class scalar_t;
-	typedef mpz_class wide_scalar_t;
-	static const int max_accumulate = INT_MAX;
-	static const int max_accumulate_wide = INT_MAX;
+	static const int max_accumulate = 250;
+	static const int max_accumulate_wide = 250;
 
 	typedef prime_field_any coeff_field;
+	struct scalar_t { long p; };
+	typedef scalar_t wide_scalar_t;
+
 	struct name {
 		const char * operator()() const {
-			return "variable-size code (SLOW SLOW SLOW !)";
+			return "ulong code";
 		}
 	};
 
 	static int can() {
-		return 1;
+		return globals::nbys == 1 &&
+			MODBITS() < (sizeof(unsigned long) * CHAR_BIT / 2 - 4);
 	}
 
-	/*
-	static inline mpz_class reduce(wide_scalar_t & t) {
-		mpz_class r;
-		mpz_fdiv_r(r.get_mpz_t(), t.get_mpz_t(), globals::modulus.get_mpz_t());
-		return r;
-	}
-	*/
 	static inline mpz_class get_y(scalar_t const & x, int i) {
-		BUG_ON(i != 0);
-		return x;
+		BUG_ON(i);
+		return mpz_class(x.p);
 	}
 	static inline void reduce(scalar_t & d, wide_scalar_t & s) {
-		mpz_fdiv_r(d.get_mpz_t(), s.get_mpz_t(), globals::modulus.get_mpz_t());
+		d.p = s.p % (long) globals::modulus_ulong;
 	}
 	static inline void reduce(scalar_t * dst, wide_scalar_t * src,
 		unsigned int i0, unsigned int i1)
@@ -47,40 +44,30 @@ struct variable_scalar_traits {
 		}
 	}
 	static inline void addmul(wide_scalar_t & dst, scalar_t const & src, int32_t x) {
-		dst += src * x;
+		dst.p += src.p * x;
 	}
 
-	static inline void zero(mpz_class & x) {
-		x = 0;
-	}
 	static inline void zero(scalar_t * p, unsigned int n) {
-		for(unsigned int i = 0 ; i < n ; i++) {
-			p[i] = 0;
-		}
+		memset(p, 0, n * sizeof(scalar_t));
 	}
+	static inline void zero(scalar_t & x) { zero(&x, 1); }
 	static inline void copy(scalar_t * q, const scalar_t * p, unsigned int n) {
-		for(unsigned int i = 0 ; i < n ; i++) {
-			q[i] = p[i];
-		}
+		memcpy(q, p, n * sizeof(scalar_t));
 	}
-	static inline bool is_zero(mpz_class const& x) {
-		return x == 0;
+
+	static inline bool is_zero(scalar_t const& x) {
+		return x.p == 0;
 	}
 	/*
-	static inline void wzero(wide_scalar_t & x) {
-		core_ops::zero<width+2>(x.p);
+	static inline void assign(mpz_class& z, scalar_t const & x) {
+		MPZ_SET_MPN(z.get_mpz_t(), x.p, width);
 	}
 	*/
-	static inline void assign(std::vector<mpz_class>& z, scalar_t const & x) {
-		BUG_ON(z.size() != 1);
-		z[0] = x;
-	}
 	static inline void addmul_wide(scalar_t & dst,
 			scalar_t const & a,
 			scalar_t const & b)
 	{
-		mpz_class x = dst + a * b;
-		reduce(dst, x);
+		dst.p += a.p * b.p;
 	}
 	static inline void
 	assign(scalar_t & x, std::vector<mpz_class> const& z,  unsigned int i)
@@ -88,12 +75,16 @@ struct variable_scalar_traits {
 		/* This one affects from a vector. We provide the
 		 * position, in case we're doing SIMD.
 		 */
-		x = z[i];
+		x.p = z[i].get_si();
+	}
+	static inline void assign(std::vector<mpz_class>& z, scalar_t const & x) {
+		BUG_ON(z.size() != 1);
+		z[0] = x.p;
 	}
 
 	static std::ostream& print(std::ostream& o, scalar_t const& x) {
-		return o << x;
+		return o << x.p;
 	}
 };
 
-#endif	/* VARIABLE_SCALAR_TRAITS_HPP_ */
+#endif	/* ULONG_TRAITS_HPP_ */

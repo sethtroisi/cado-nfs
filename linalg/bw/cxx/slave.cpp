@@ -20,10 +20,18 @@
 #include "state.hpp"
 #include "threads.hpp"
 #include "ticks.hpp"
-#include "mul.hpp"
+
+// #include "matmul.hpp"
 
 #include <boost/cstdint.hpp>
 #include <iterator>
+
+#include "traits_globals.hpp"
+
+/* TODO: maybe remove checks entirely in characteristic two, as they are
+ * hardly useful... Most probably something more sensible would be
+ * necessary.
+ */
 
 slave_arguments mine;
 
@@ -161,8 +169,11 @@ struct thread : public traits
 	typedef typename traits::wide_scalar_t wide_scalar_t;
 	typedef thread<traits, Derived> self;
 	int t;
+	typename traits::representation::matrix_rowset mat;
+	/*
 	uint32_t * idx;
 	int32_t  * val;
+	*/
 	uint i0;
 	uint i1;
 	scalar_t *v;
@@ -199,8 +210,7 @@ struct thread : public traits
 		w = new scalar_t[nr];
 		scrap = new wide_scalar_t[i1 - i0];
 
-		idx = new uint32_t[i1 - i0 + nb_coeffs[t]];
-		val = new  int32_t[i1 - i0 + nb_coeffs[t]];
+		mat.alloc(i1 - i0, nb_coeffs[t]);
 		check_x0 = new int32_t[i1 - i0];
 		check_m0 = new int32_t[i1 - i0];
 
@@ -209,8 +219,7 @@ struct thread : public traits
 		{
 			ifstream mtx;
 			must_open(mtx, files::matrix);
-			fill_matrix_data(mtx, mtxfile_pos[t], nb_coeffs[t],
-					i0, i1, idx, val);
+			mat.fill(mtx, mtxfile_pos[t], i0, i1);
 		}
 
 		fill_check_vector(i0, i1, check_x0, files::x0);
@@ -232,10 +241,9 @@ struct thread : public traits
 		delete[] v;
 		delete[] w;
 		delete[] scrap;
-		delete[] idx;
-		delete[] val;
 		delete[] check_x0;
 		delete[] check_m0;
+		/* the matrix rowset is deleted by the dtor */
 	}
 
 	void display_stats(bool sync = true)
@@ -300,9 +308,9 @@ struct thread : public traits
 		}
 	}
 	
-	void multiply(wide_scalar_t * dst, const scalar_t * src)
+	inline void multiply(wide_scalar_t * dst, const scalar_t * src)
 	{
-		multiply_ur<traits>(dst,src,idx,val,i1-i0);
+		mat.template mul<traits>(dst, src);
 	}
 
 	void note_waited(double twait)
@@ -483,7 +491,7 @@ struct mksol_thread : public thread<traits, mksol_thread<traits> > {
 	int cp_lag;
 	uint bound_deg_f;
 	uint degf;
-	scalar_t *sum;
+	scalar_t * sum;
 	scalar_t * fptr;
 	int accumulate_wide;
 	mksol_thread(void * ptr) : super(ptr) {
@@ -633,6 +641,19 @@ uint set_f_coeffs(typename traits::scalar_t * f, uint maxdeg)
 		traits::assign(f[deg], line, globals::col);
 	}
 	deg--;
+	for(;deg >= 0 && traits::is_zero(f[deg]);deg--) {
+		/* I don't really have time to check this -- shoudl be
+		 * okay though. One thing is for sure, it's that we
+		 * violate the fact that x^TB^iy = 0. However it's worth
+		 * trying, still, to get a kernel vector.
+		 */
+		cout << "WARNING -- this needs to be double-checked\n";
+		cout << fmt("skipping zero scalar at degree % : ") % deg;
+		traits::print(cout,f[deg]);
+		cout << endl;
+	}
+
+
 	return deg;
 }
 
@@ -750,10 +771,12 @@ int main(int argc, char *argv[])
 	globals::modulus_u32	= globals::modulus.get_ui();
 	globals::modulus_ulong	= globals::modulus.get_ui();
 
+	/*
 	if (SIZ(globals::modulus.get_mpz_t()) != MODULUS_SIZE) {
 		cerr << "### Not compiled with proper MODULUS_BITS\n"
 			<< "Using generic code instead\n";
 	}
+	*/
 
 	detect_mn(m, n);
 	cout << fmt("// detected m = %\n") % m;
@@ -803,14 +826,13 @@ int main(int argc, char *argv[])
 	cout.flush();
 	cerr.flush();
 
-	cout << "// MODULUS_BITS: " << MODULUS_BITS << " (hard-coded)\n";
-	cout << "// MODULUS_SIZE: " << MODULUS_SIZE << " (hard-coded)\n";
 	cout << "// modulus: " << globals::modulus << "\n";
-	cout << "// modulus: " << SIZ(globals::modulus.get_mpz_t()) << " words\n";
+	cout << "// modulus: " << MODLIMBS() << " words\n";
+	cout << "// modulus: " << MODBITS() << " bits\n";
 	cout << "// nbys: " << nbys << "\n";
 
-	unsigned int modbits = mpz_sizeinbase(globals::modulus.get_mpz_t(),2);
-
+	TRY_ALL_BINARY_CODES(program);
+#if 0
 	if (modbits < 8 && nbys == 8) {
 		cout << "// Using SSE-2 code\n";
 		return program<sse2_8words_traits >();
@@ -820,7 +842,7 @@ int main(int argc, char *argv[])
 	} else if (nbys == 1 && modbits <= (sizeof(unsigned long) * 8 / 2 - 4)) {
 		cout << "// Using half-ulong code\n";
 		return program<ulong_traits>();
-	} else if (nbys == 1 && SIZ(globals::modulus.get_mpz_t()) == MODULUS_SIZE) {
+	} else if (nbys == 1 && modwords == MODULUS_SIZE) {
 		cout << "// Using code for " << MODULUS_SIZE << " words\n";
 		return program<typical_scalar_traits<MODULUS_SIZE> >();
 	} else if (nbys == 1) {
@@ -832,6 +854,7 @@ int main(int argc, char *argv[])
 		cerr << "no available code\n";
 		exit(1);
 	}
+#endif
 
 	return 0;
 }

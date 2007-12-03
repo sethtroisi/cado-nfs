@@ -4,14 +4,35 @@
 #include <gmp.h>
 #include <gmpxx.h>
 #include <vector>
+#include <cstdio>
 #include "addmul.hpp"
+#include "traits_globals.hpp"
+#include "matrix_repr_prime.hpp"
+
 
 template<mp_size_t width>
 struct typical_scalar_traits {
+	typedef matrix_repr_prime representation;
+
 	static const int max_accumulate = INT_MAX;
 	static const int max_accumulate_wide = INT_MAX;
 	struct scalar_t { mp_limb_t p[width]; };
 	struct wide_scalar_t { mp_limb_t p[width+2]; };
+
+	typedef prime_field_any coeff_field;
+
+	struct name {
+		char x[40];
+		name() {
+			snprintf(x,sizeof(x),"fixed-width %ld code",width);
+		}
+		const char * operator()() const { return x; }
+	};
+
+	static int can() {
+		return globals::nbys == 1 && MODLIMBS() == width;
+	}
+
 	/*
 	static inline mpz_class reduce(wide_scalar_t & t) {
 		return core_ops::reduce<width>(t.p);

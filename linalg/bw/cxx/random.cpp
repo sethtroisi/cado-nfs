@@ -29,10 +29,18 @@ int main(int argc, char * argv[])
 	cout.rdbuf()->pubsetbuf(0,0);
 	cerr.rdbuf()->pubsetbuf(0,0);
 
+	unsigned int seed = time(NULL);
+
+	if (argc >= 3 && strcmp(argv[1], "--seed") == 0) {
+		seed = atoi(argv[2]);
+		argv++,argc--;
+		argv++,argc--;
+	}
 	if (argc != 3 && argc != 4) {
-		cerr << "Usage : ./random <msize> <modulus> [<density>]\n";
+		cerr << "Usage : ./random [--seed <seed>] <msize> <modulus> [<density>]\n";
 		exit(1);
 	}
+	srandom(seed);
 
 	unsigned int nr = atoi(argv[1]);
 	string mstr(argv[2]);
@@ -60,7 +68,7 @@ int main(int argc, char * argv[])
 			}
 			cout << l << "\n";
 		}
-	} else {
+	} else if (px != 2) {
 		int p = px.get_si();
 		for(unsigned int i = 0 ; i < nr ; i++) {
 			matrix_line l;
@@ -83,6 +91,22 @@ int main(int argc, char * argv[])
 				l.push_back(make_pair(j, v));
 			}
 			cout << l << "\n";
+		}
+	} else {
+		for(unsigned int i = 0 ; i < nr ; i++) {
+			matrix_line l;
+			if (i == 0) {
+				cout << 0 << "\n";
+				continue;
+			}
+			for(unsigned int j = 0 ; j < nr ; j++) {
+				double t = random() / (double) RAND_MAX;
+				if (t > d) continue;
+				if (random_coeff() & 1 == 0)
+					continue;
+				l.push_back(make_pair(j, 1));
+			}
+			print_line_without_ones(cout,l) << "\n";
 		}
 	}
 	return 0;

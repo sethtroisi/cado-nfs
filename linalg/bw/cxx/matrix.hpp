@@ -5,10 +5,31 @@
 #include <vector>
 #include <boost/cstdint.hpp>
 
-extern void fill_matrix_data(std::istream&,
-		std::streampos, uint32_t,
-		uint, uint, 
-		uint32_t *, int32_t *);
+// #include "matrix_repr_prime.hpp"
+
+#if 0
+inline void fill_matrix_data(std::istream& mtx,
+                std::streampos pos, uint32_t nc,
+                uint i0, uint i1,
+                uint32_t * idx, int32_t * val)
+__attribute__((deprecated));
+
+/* Legacy wrappers */
+
+void fill_matrix_data(std::istream& mtx,
+                std::streampos pos, uint32_t nc,
+                uint i0, uint i1,
+                uint32_t * idx, int32_t * val)
+{
+    typedef matrix_repr_prime T;
+
+    T::ptr p;
+    p.idx = idx;
+    p.val = val;
+    T::fill(mtx, pos, nc, i0, i1);
+}
+#endif
+
 extern void count_matrix_coeffs(std::istream&,
 		unsigned int,
 		std::vector<std::streampos>&,

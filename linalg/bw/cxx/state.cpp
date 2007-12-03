@@ -3,6 +3,8 @@
 #include "auxfuncs.h"
 #include "manu.h"
 
+#include <errno.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <gmp.h>
@@ -100,8 +102,15 @@ int recover_iteration(int m, int col, int nbys, int r)
 			a_pos = a.tellg();
 			a.close();
 		}
-		cout << fmt("// truncating % to size %\n") % a_nm % a_pos;
-		truncate(a_nm, a_pos);
+		struct stat s[1];
+		if (stat(a_nm, s) == 0) {
+			cout << fmt("// truncating % to size %\n")
+				% a_nm % a_pos;
+			truncate(a_nm, a_pos);
+		} else if (errno != ENOENT) {
+			cout << fmt("// % ->> %\n")
+				% a_nm % strerror(errno);
+		}
 	}
 	return 0;
 }

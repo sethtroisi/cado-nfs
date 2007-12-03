@@ -9,6 +9,10 @@
 use strict;
 use warnings;
 
+use Time::HiRes qw(gettimeofday); # For seed values
+
+use Data::Dumper;
+
 print "$0 @ARGV\n";
 
 my $param = {
@@ -146,14 +150,32 @@ my $method =	$param->{'method'};	dumpvar 'method';
 my $threshold =	$param->{'threshold'};	dumpvar 'threshold';
 my $multisols =	$param->{'multisols'};	dumpvar 'multisols';
 my $maxload =	$param->{'maxload'};	dumpvar 'maxload';
+my $seed =	$param->{'seed'};	dumpvar 'seed';
 
 if ($param->{'dumpcfg'}) {
 	print $dumped;
 	exit 0;
 }
 
+my $seeding = '';
+if ($seed) {
+	$seeding = "--seed $seed";
+} else {
+	my $seed = (gettimeofday)[1] % 999983;
+	print "Selecting seed $seed\n";
+	$seeding = "--seed $seed";
+}
+
+
+
 if ($vectoring && ($n % $vectoring != 0)) {
 	die "vectoring parameter must divide n";
+}
+
+sub magmadump {
+	if ($dump) {
+		action "${bindir}bw-printmagma --subdir $wdir > $wdir/m.m";
+	}
 }
 
 # Prepare the directory.
@@ -205,7 +227,7 @@ if ($resume) {
 	} else {
 		# If no matrix parameter is set at this moment, then surely it
 		# means we're playing with a random sample: create it !
-		action "${bindir}bw-random $msize $modulus $dens > $wdir/matrix.txt";
+		action "${bindir}bw-random $seeding $msize $modulus $dens > $wdir/matrix.txt";
 	}
 }
 
@@ -226,7 +248,7 @@ if ($resume && -f "$wdir/X00") {
 	closedir $dh;
 	if (scalar $gy != $n) { die "Bad m param ($n != $gy)\n"; }
 } else {
-	action "${bindir}bw-prep --subdir $wdir $m $n"
+	action "${bindir}bw-prep $seeding --subdir $wdir $m $n"
 }
 
 if ($dump) {
@@ -292,7 +314,7 @@ sub compute_spanned {
 		print "Reaped processes: ", join(' ', @dead), "\n";
 	} else {
 		for my $job (@jlist) {
-			system "$job\n";
+			action $job;
 		}
 	}
 }
@@ -375,6 +397,7 @@ MASTER : {
 			}
 		}
 		if (!scalar @sols) {
+			magmadump;
 			die "No solution found";
 		}
 		last MASTER;
@@ -402,6 +425,7 @@ MASTER : {
 		}
 	}
 	if (!scalar @sols) {
+		magmadump;
 		die "No solution found";
 	}
 }
@@ -435,19 +459,22 @@ MKSOL : {
 			}
 			(0..int($n/$vectoring) - 1) ];
 
-		push @mksoljobs, $t;
+		push @mksoljobs, @$t;
 	}
+
 	if (scalar @mksoljobs) {
 		print "--- mksol jobs: ---\n";
 		for my $t (@mksoljobs) {
-			for my $j (@$t) {
-				print "// $j\n";
-			}
+			#for my $j (@$t) {
+			#print "// $j\n";
+			#}
+			print "// $t\n";
 		}
-		for my $t (@mksoljobs) {
-			compute_spanned @$t;
-			rsync_pull;
-		}
+		compute_spanned @mksoljobs;
+			# for my $t (@mksoljobs) {
+			#	compute_spanned @$t;
+			#	rsync_pull;
+			# }
 	}
 
 	if (!$multisols) {
@@ -486,6 +513,10 @@ MKSOL : {
 			}
 		}
 	}
+}
+
+if ($dump) {
+	magmadump;
 }
 
 if ($tidy) {

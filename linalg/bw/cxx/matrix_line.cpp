@@ -4,6 +4,17 @@
 #include "parsing_tools.hpp"
 #include "matrix_line.hpp"
 
+std::ostream& print_line_without_ones(std::ostream& os, const matrix_line& m)
+{
+	os << m.size();
+	for(unsigned int i = 0 ; i < m.size() ; i++) {
+		os << " " << m[i].first;
+		if (m[i].second != 1)
+			os << ":" << m[i].second;
+	}
+	return os;
+}
+
 std::ostream& std::operator<<(std::ostream& os, const matrix_line& m)
 {
 	os << m.size();
@@ -43,9 +54,18 @@ std::istream& std::operator>>(std::istream& is, matrix_line& m)
 		boost::uint32_t idx;
 		boost::int32_t val;
 		
-		if (!(st >> idx >> wanted(':') >> noskipws >> val)) {
+		if (!(st >> idx)) {
 			is.setstate(ios::failbit);
 			return is;
+		}
+
+		/* This also recognizes binary matrices. */
+		val = 1;
+		if (try_match(st, ':')) {
+			if (!(st >> noskipws >> val)) {
+				is.setstate(ios::failbit); 
+				return is;
+			}
 		}
 
 		if (val == 0) {
