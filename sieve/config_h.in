@@ -4,6 +4,7 @@
 // #define HAVE_MSRH 1
 #define WANT_ASSERT 1
 #define WANT_ASSERT_EXPENSIVE 0
+#define REDC_ROOTS 1
 
 /* Number of blocking levels for small factor base primes, should
    correspond to cache levels. Sieving will be done in SIEVE_BLOCKING + 1
