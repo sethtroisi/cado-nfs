@@ -30,10 +30,14 @@ my $param = {
 	maxload=>1, # How many simultaneous jobs on one machine.
 };
 
+
+my $favorite_tmp = "$ENV{HOME}/Local";
+$favorite_tmp = "/tmp" if ! -d $favorite_tmp;
+
 # Parameters that will be used only if nothing sets them earlier.
 my $weak = {
 	tidy=>1,
-	wdir=>"$ENV{HOME}/Local/testmat",
+	wdir=> "$favorite_tmp/testmat",
 };
 
 sub dirname  { $_[0] =~ m{^(.*)/[^/]*$}; return $1 || '.'; };
@@ -49,6 +53,10 @@ my $bindir;
 		/^BINARY_DIR=(.*)$/ && do { $bindir=$1; };
 	}
 	close F;
+
+	if ($bindir eq '') {
+		$bindir="$srcdir/";
+	}
 }
 
 my $slavebindir=$bindir;

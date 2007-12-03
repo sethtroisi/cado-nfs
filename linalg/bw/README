@@ -3,7 +3,9 @@ Block Wiedemann.
 For the impatient, there's a ./doit.pl script which illustrates how the
 solver works. It works as follows:
 
-./doit.pl msize=10000 dens=100 modulus=31 mn=8 vectoring=2
+./doit.pl msize=10000 dens=100 modulus=31 mn=8 vectoring=2 threshold=128
+
+./doit.pl msize=10000 dens=100 modulus=2 mn=64 vectoring=64 multisols=1
 
 or
 
