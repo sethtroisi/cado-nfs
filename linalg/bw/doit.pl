@@ -151,6 +151,7 @@ my $threshold =	$param->{'threshold'};	dumpvar 'threshold';
 my $multisols =	$param->{'multisols'};	dumpvar 'multisols';
 my $maxload =	$param->{'maxload'};	dumpvar 'maxload';
 my $seed =	$param->{'seed'};	dumpvar 'seed';
+my $precond =	$param->{'precond'};	dumpvar 'precond';
 
 if ($param->{'dumpcfg'}) {
 	print $dumped;
@@ -183,6 +184,22 @@ system "rm -rf $wdir" unless $resume;
 if (!-d $wdir) {
 	mkdir $wdir or die
 		"Cannot create $wdir: $! -- select something non-default with wdir=";
+}
+
+if ($resume) {
+	if ($precond && -f "$wdir/precond.txt") {
+		print "There is already a $wdir/precond.txt file; let's hope it is the same as $precond !\n"
+	} elsif ($precond && ! -f "$wdir/precond.txt")  {
+		die "$wdir/precond.txt is missing";
+	}
+	# Having a precond file present but not required by cmdline is
+	# conceivable if I introduce rhs someday.
+	#
+	# Having none is ok of course.
+} else {
+	if ($precond) {
+		action "cp $precond $wdir/precond.txt";
+	}
 }
 
 # In case of multiple machines, make sure that all machines see the
@@ -383,27 +400,31 @@ rsync_pull;
 my @sols;
 
 MASTER : {
-	if ($resume) {
-		my $allfiles=-f "$wdir/master.log";
-		for my $x (0..$m+$n-1) {
-			my $p = sprintf "%02d", $x;
-			$allfiles = $allfiles && -f "$wdir-$p";
-		}
-		if ($allfiles) {
-			print "master: all files found, reusing\n";
-		}
-		open my $ph, "tail -1 $wdir/master.log |";
-		while (defined(my $x=<$ph>)) {
-			if ($x =~ /LOOK \[\s*([\d\s]*)\]$/) {
-				print "$x\n";
-				@sols = split ' ',$1;
+	RECYCLE_MASTER: {
+		if ($resume) {
+			my $allfiles=-f "$wdir/master.log";
+			for my $x (0..$m+$n-1) {
+				my $p = sprintf "%02d", $x;
+				$allfiles = $allfiles && -f "$wdir-$p";
 			}
+			if ($allfiles) {
+				print "master: all files found, reusing\n";
+			} else {
+				last RECYCLE_MASTER;
+			}
+			open my $ph, "tail -1 $wdir/master.log |";
+			while (defined(my $x=<$ph>)) {
+				if ($x =~ /LOOK \[\s*([\d\s]*)\]$/) {
+					print "$x\n";
+					@sols = split ' ',$1;
+				}
+			}
+			if (!scalar @sols) {
+				magmadump;
+				die "No solution found";
+			}
+			last MASTER;
 		}
-		if (!scalar @sols) {
-			magmadump;
-			die "No solution found";
-		}
-		last MASTER;
 	}
 
 	my $exe = "${bindir}bw-master";

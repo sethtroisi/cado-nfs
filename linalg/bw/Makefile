@@ -45,7 +45,8 @@ BW_SLAVE_SOURCES:=					\
 		cxx/slave.cpp cxx/state.cpp		\
 		cxx/threads.cpp	cxx/corners.cpp		\
 		cxx/matrix.cpp cxx/matrix_line.cpp	\
-		cxx/files.cpp cxx/matrix_header.cpp
+		cxx/files.cpp cxx/matrix_header.cpp	\
+		cxx/preconditioner.cpp
 BW_SLAVE_LIBS:=-lgmp -lgmpxx
 BW_SLAVE_EXTRA_MODELS:=mt
 BW_SLAVE_MT_LIBS:=-lgmp -lgmpxx
@@ -184,7 +185,8 @@ BW_GATHER_SOURCES:=					\
 		cxx/detect_params.cpp			\
 		cxx/gather.cpp				\
 		cxx/matrix.cpp	cxx/matrix_line.cpp	\
-		cxx/files.cpp cxx/matrix_header.cpp
+		cxx/files.cpp cxx/matrix_header.cpp	\
+		cxx/preconditioner.cpp
 BW_GATHER_LIBS:=-lgmp -lgmpxx
 -include .bw-gather.mkf
 

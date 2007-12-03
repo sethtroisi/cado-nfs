@@ -63,6 +63,13 @@ struct variable_scalar_traits {
 			q[i] = p[i];
 		}
 	}
+        /*       [duplicate]
+	static inline void copy(wide_scalar_t * q, const wide_scalar_t * p, unsigned int n) {
+		for(unsigned int i = 0 ; i < n ; i++) {
+			q[i] = p[i];
+		}
+	}
+        */
 	static inline bool is_zero(mpz_class const& x) {
 		return x == 0;
 	}

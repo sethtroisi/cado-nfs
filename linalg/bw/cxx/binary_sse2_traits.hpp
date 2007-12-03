@@ -70,6 +70,12 @@ struct binary_sse2_traits {
 	static inline void copy(scalar_t * q, const scalar_t * p, unsigned int n) {
 		memcpy(q, p, n * sizeof(scalar_t));
 	}
+        /*      [duplicate]
+	static inline void copy(wide_scalar_t * q, const wide_scalar_t * p, unsigned int n) {
+		memcpy(q, p, n * sizeof(wide_scalar_t));
+	}
+        */
+
 
 	static inline bool is_zero(scalar_t const& x) {
 		int64_t foo[2] __attribute__((aligned(16)));

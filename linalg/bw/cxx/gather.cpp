@@ -20,6 +20,7 @@
 #include "threads.hpp"
 #include "ticks.hpp"
 #include "traits.hpp"
+#include "preconditioner.hpp"
 
 #include <boost/cstdint.hpp>
 #include <iterator>
@@ -67,6 +68,8 @@ public:
 
 	typename traits::representation::matrix_rowset mat;
 
+	preconditioner<traits> precond;
+
 	scalar_t *v;
 	scalar_t *w;
 	wide_scalar_t *scrap;
@@ -88,6 +91,7 @@ void init_data()
 		must_open(mtx, files::matrix);
 		mat.fill(mtx, 0, 0, nr);
 	}
+	precond.init(0,nr,files::precond);
 }
 
 void clear_data()
@@ -171,6 +175,7 @@ int nb_nonzero(const scalar_t * vec) {
 
 void multiply()
 {
+	precond(v);
 	mat.template mul<traits>(scrap, v);
 	traits::reduce(w, scrap, 0, globals::nr);
 }
@@ -230,6 +235,13 @@ void go()
 
 	ofstream wf;
 	must_open(wf, files::w % mine.scol);
+	/* Last but not least, apply the preconditioner in order to get a
+	 * true solution !!! */
+	precond(v);
+	if (is_zero(v)) {
+		cerr << "// trivial solution found after preconditioning !\n";
+		BUG();
+	}
 	for(uint i = 0 ; i < nr ; i++) {
 		if (v[i] > middle)
 			v[i] -= globals::modulus;

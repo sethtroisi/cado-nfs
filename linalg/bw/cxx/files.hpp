@@ -59,6 +59,7 @@ namespace files {
 	EXTERN_LINKAGE	meta_filename x		INIT_WITH("X%[f0w2]");
 	EXTERN_LINKAGE	meta_filename y		INIT_WITH("Y%[f0w2]");
 	EXTERN_LINKAGE	meta_filename z		INIT_WITH("Z%[f0w2]");
+	EXTERN_LINKAGE	std::string precond	INIT_WITH("precond.txt");
 	EXTERN_LINKAGE	std::string m0		INIT_WITH("M0-vector");
 	EXTERN_LINKAGE	std::string x0		INIT_WITH("X0-vector");
 	EXTERN_LINKAGE	meta_filename f		INIT_WITH("F%[f0w2]");

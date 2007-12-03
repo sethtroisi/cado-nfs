@@ -20,6 +20,7 @@
 #include "state.hpp"
 #include "threads.hpp"
 #include "ticks.hpp"
+#include "preconditioner.hpp"
 
 // #include "matmul.hpp"
 
@@ -188,6 +189,7 @@ struct thread : public traits
 	uint go_mark;
 	double ticks_ref;
 	double wct_ref;
+	preconditioner<traits> precond;
 
 	thread(void * ptr) {
 		using globals::nr;
@@ -224,6 +226,8 @@ struct thread : public traits
 
 		fill_check_vector(i0, i1, check_x0, files::x0);
 		fill_check_vector(i0, i1, check_m0, files::m0);
+
+		precond.init(i0, i1, files::precond);
 
 		BUG_ON(globals::iter0 & 1);
 
@@ -308,8 +312,9 @@ struct thread : public traits
 		}
 	}
 	
-	inline void multiply(wide_scalar_t * dst, const scalar_t * src)
+	inline void multiply(wide_scalar_t * dst, scalar_t * src)
 	{
+		precond(src);
 		mat.template mul<traits>(dst, src);
 	}
 
