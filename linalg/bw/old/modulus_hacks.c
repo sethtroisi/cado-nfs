@@ -60,7 +60,7 @@ void do_modulus_precomps(void)
 
 #endif /* ACTIVATE_HACKS */
 
-#ifndef ACTIVATE_HACKS
+#if (0 || !defined(ACTIVATE_HACKS))
 /* Crap is seldomly efficient. */
 void addmul(mp_limb_t * dest, mp_limb_t * s1, mp_limb_t * s2)
 {
@@ -73,7 +73,7 @@ void addmul(mp_limb_t * dest, mp_limb_t * s1, mp_limb_t * s2)
 
 	mpn_tdiv_qr(	tmp+bw_allocsize, dest, 0,
 			tmp, 2*bw_allocsize,
-			modulus_hbs, bw_allocsize);
+			modulus_plain, bw_allocsize);
 	FAST_FREE(tmp);
 
 }

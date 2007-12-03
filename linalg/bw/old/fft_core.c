@@ -10,6 +10,8 @@
 mp_limb_t *l_roots;
 int *phi_tab;
 int tabulated_order;
+fft_capable_function direct_fft, inverse_fft;
+
 /**********************************************************************/
 /* fft engine. */
 

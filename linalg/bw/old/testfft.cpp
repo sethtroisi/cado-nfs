@@ -29,7 +29,7 @@
 #include "right_action.h"
 #include "e_polynomial.h"
 #include "twisting_polynomials.h"
-#include "fft_on_matrices.h"
+#include "fft_on_matrices.hpp"
 #include "field_def.h"
 #include "field_prime.h"
 #include "field_quad.h"
@@ -39,11 +39,14 @@
 #define USE_MACROS
 
 #define	ELT	mp_limb_t *
+extern "C" {
 extern void complex_field_addmul(ELT, ELT, ELT, struct field *);
 extern void quad_field_addmul(ELT, ELT, ELT, struct field *);
 extern void prime_field_mul(ELT, ELT, ELT, struct field *);
 extern void prime_field_addmul(ELT, ELT, ELT, struct field *);
 extern void prime_field_set_mpn(ELT, mp_limb_t *, mp_size_t, struct field *);
+}
+
 extern mp_limb_t * l_roots;
 
 #define fdeg	bw_allocsize
@@ -63,9 +66,9 @@ struct multi_array {
 struct multi_array * declare_multi_array(const int dim[3], const int per[3], int ext)
 {
 	struct multi_array * res;
-	res         = malloc(sizeof(struct multi_array));
+	res         = (multi_array *) malloc(sizeof(struct multi_array));
 	res->nlimbs = dim[0]*dim[1]*dim[2]*ext;
-	res->raw    = malloc(res->nlimbs*sizeof(mp_limb_t));
+	res->raw    = (mp_limb_t *) malloc(res->nlimbs*sizeof(mp_limb_t));
 	memcpy(res->dim,dim,3*sizeof(int));
 	memcpy(res->per,per,3*sizeof(int));
 	res->ext    = ext;
@@ -239,7 +242,7 @@ int perm_mix2[3]= {O_ROWS, O_COLUMNS, O_INNER};
 
 void checkzero(mp_limb_t * x, size_t n)
 {
-	int i;
+	size_t i;
 	for(i=0;i<n;i++) {
 		if (x[i]) {
 			die("Warning, got unexpected non-zero\n",1);
@@ -316,10 +319,10 @@ do {								\
 	}							\
 } while (0);
 
-void generic_operation_1op_function(da,tt,op)
-	struct multi_array * da;
-	int tt[2];
-	void (*op)(mp_limb_t *, int);
+void generic_operation_1op_function(
+	struct multi_array * da,
+	int tt[2],
+	void (*op)(mp_limb_t *, int))
 {
 	int z[3];
 	mp_limb_t * x;
@@ -389,10 +392,11 @@ do {								\
 	}							\
 } while (0);
 
-void generic_operation_2op_function(da,sa,tt,op)
-	struct multi_array *da, *sa;
-	int tt[3];
-	void (*op)(mp_limb_t *, mp_limb_t *);
+void generic_operation_2op_function(
+	struct multi_array *da,
+	struct multi_array *sa,
+	int tt[3],
+	void (*op)(mp_limb_t *, mp_limb_t *))
 {
 	int z[3];
 	mp_limb_t * dst, * src;
@@ -534,10 +538,12 @@ void generic_operation_2op_function(da,sa,tt,op)
 	}								\
 }
 
-void generic_operation_3op_function(zr,zp,zq,tt,op)
-	struct multi_array *zr,*zp,*zq;
-	int tt[4];
-	void (*op)(mp_limb_t *, mp_limb_t *, mp_limb_t *);
+void generic_operation_3op_function(
+	struct multi_array *zr,
+	struct multi_array *zp,
+	struct multi_array *zq,
+	int tt[4],
+	void (*op)(mp_limb_t *, mp_limb_t *, mp_limb_t *))
 {
 	int z[4];
 	int p_pos[4];
@@ -651,7 +657,7 @@ void extend(mp_limb_t * dst, mp_limb_t * src)
  * the src argument to this function. This argument is not necessarily
  * the source argument.
  */
-void restrict(mp_limb_t * dst, mp_limb_t * src)
+void do_restrict(mp_limb_t * dst, mp_limb_t * src)
 {
 	/*	memcpy(src,dst,fdeg*sizeof(mp_limb_t)); */
 	prime_field_mul(src,dst,one_over_n,field_k);
@@ -677,9 +683,11 @@ void do_conv(mp_limb_t * r, mp_limb_t * p, mp_limb_t * q)
 	}
 }
 
-void do_naive_mult(zr,zp,zq,tt)
-	struct multi_array *zr,*zp,*zq;
-	int tt[5];
+void do_naive_mult(
+	struct multi_array *zr,
+	struct multi_array *zp,
+	struct multi_array *zq,
+	int tt[5])
 {
 	int z[5];
 	int p_pos[5];
@@ -833,8 +841,10 @@ void do_naive_mult(zr,zp,zq,tt)
 	}
 }
 
-static void do_my_fft_mul(pr,pp,pq)
-	struct multi_array *pr, *pp, *pq;
+static void do_my_fft_mul(
+	struct multi_array *pr,
+	struct multi_array *pp,
+	struct multi_array *pq)
 {
 	struct multi_array * dp;
 	struct multi_array * dq;
@@ -906,7 +916,7 @@ static void do_my_fft_mul(pr,pp,pq)
 		prime_field_mul(src,dst,one_over_n,field_k);
 		checkzero(dst+fdeg,fdeg));
 #else	/* USE_MACROS */
-	generic_operation_2op_function(dr,pr,trans_r,&restrict);
+	generic_operation_2op_function(dr,pr,trans_r,&do_restrict);
 #endif	/* USE_MACROS */
 	tm_pop_table(40);
 
@@ -915,9 +925,11 @@ static void do_my_fft_mul(pr,pp,pq)
 	delete_multi_array(dr);
 }
 
-void do_mix_gmp_mult(zr,zp,zq,tt)
-	struct multi_array *zr,*zp,*zq;
-	int tt[3];
+void do_mix_gmp_mult(
+	struct multi_array *zr,
+	struct multi_array *zp,
+	struct multi_array *zq,
+	int tt[3])
 {
 	int z[3];
 	int p_pos[3];
@@ -966,7 +978,7 @@ void do_mix_gmp_mult(zr,zp,zq,tt)
 	mou_hr=hr->dim[2]*hr->ext-nlimbs_r;
 	assert(mou_hr>=0);
 
-	buf=malloc(MAX(nlimbs_r,1+padded)*sizeof(mp_limb_t));
+	buf=(mp_limb_t *) malloc(MAX(nlimbs_r,1+padded)*sizeof(mp_limb_t));
 	
 	memset(zr->raw,0,zr->nlimbs*sizeof(mp_limb_t));
 	assert(zr->dim[0]==zp->dim[0]);	/* rows in p & r */
@@ -1054,7 +1066,7 @@ void do_mix_gmp_mult(zr,zp,zq,tt)
 	}
 
 	assert(zr->nlimbs%fdeg==0);
-	for(k=0;k<zr->nlimbs/fdeg;k++) {
+	for(k=0;k< (int) zr->nlimbs/fdeg;k++) {
 		memcpy(buf,hr->raw+k*padded,padded*sizeof(mp_limb_t));
 		prime_field_set_mpn(zr->raw+k*fdeg,buf,padded,field_k);
 	}
@@ -1080,15 +1092,15 @@ static void	do_tests(int maxdeg)
 	printf("\n");
 
 	tm_push("Filling the input with random data.");
-	buf=malloc((fdeg+1)*sizeof(mp_limb_t));
-	for(i=0;i<pp->nlimbs/fdeg;i++) {
+	buf=(mp_limb_t *) malloc((fdeg+1)*sizeof(mp_limb_t));
+	for(i=0;i<(int) pp->nlimbs/fdeg;i++) {
 		int j;
 		for(j=0;j<fdeg;j++) {
 			buf[j]=rand();
 		}
 		prime_field_set_mpn(pp->raw+i*fdeg,buf,fdeg,field_k);
 	}
-	for(i=0;i<pq->nlimbs/fdeg;i++) {
+	for(i=0;i<(int) pq->nlimbs/fdeg;i++) {
 		int j;
 		for(j=0;j<fdeg;j++) {
 			buf[j]=rand();
@@ -1200,7 +1212,7 @@ int main(int argc, char *argv[])
 
 	prepare_fft_engine(order,enable_cplx);
 
-	one_over_n=malloc(k_size*sizeof(mp_limb_t));
+	one_over_n=(mp_limb_t *) malloc(k_size*sizeof(mp_limb_t));
 	k_set_int(one_over_n,1<<order);
 	k_inv(one_over_n,one_over_n);
 

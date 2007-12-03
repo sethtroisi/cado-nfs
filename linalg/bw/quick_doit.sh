@@ -3,14 +3,14 @@
 D=~/Local/testmat
 
 # MODULUS=9903520314283042199192993767
-MODULUS=17
-FFT_THRESHOLD=64
+MODULUS=65537
+FFT_THRESHOLD=128
 
 # A good FFT modulus (859*2^118+1, 128 bits).
 # MODULUS=285451712094810683706092566195203997697
 # FFT_THRESHOLD=512
 
-MSIZE=5000
+MSIZE=400
 SRC=~/NDL/linalg
 eval `make -s -C $SRC variables`
 B="$BINARY_DIR"
@@ -20,8 +20,10 @@ fi
 M=4
 N=4
 
-# Probability that a coefficient is non-zero
-DENS=0.002
+# Probability that a coefficient is non-zero ; either directly as a
+# probability, or as an expected # of non-zero coefficients per row.
+# DENS=0.002
+DENS=10
 
 action() {
 	echo "$@"

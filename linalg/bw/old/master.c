@@ -686,6 +686,9 @@ main(int argc, char *argv[])
 	read_mat_file_header(argv[1]);
 	m_param = atoi(argv[2]);
 	n_param = atoi(argv[3]);
+#ifndef HARDCODE_PARAMS
+        bigdim = m_param + n_param;
+#endif
 
 	total_work = Lmacro(nrows, m_param, n_param);
 

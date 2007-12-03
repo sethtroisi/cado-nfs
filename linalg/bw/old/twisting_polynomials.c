@@ -204,14 +204,19 @@ tp_transvec(struct t_poly * tp,
 	j1=tp->clist[o_j1];
 	j2=tp->clist[o_j2];
 
-	assert(tp->degnom[j1] <= tp->degnom[j2]);
-
 #if 0
+	assert(tp->degnom[j1] <= tp->degnom[j2]);
+#endif
+
+	/* Apparently this might happen, and rightfully. One thing is
+	 * certain, it's that the _deltas_ corresponding to these columns
+	 * are in order. As for the local nominal degrees, anything can
+	 * happen (particularly for small moduli.
+	 */
 	if (tp->degnom[j1] > tp->degnom[j2]) {
 		printf("wild degree increase in tp_transvec\n");
 		tp->degnom[j2]=tp->degnom[j1];
 	}
-#endif
 
 	if (bw_scalar_is_zero(lambda))
 		return;

@@ -7,6 +7,7 @@
 
 int computed_m_param;
 int computed_n_param;
+int computed_bigdim;
 int total_work;
 coord_t nrows;
 

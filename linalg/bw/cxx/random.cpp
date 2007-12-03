@@ -41,6 +41,7 @@ int main(int argc, char * argv[])
 		istringstream foo(argv[3]);
 		foo >> d;
 	}
+	if (d > 1) { d = d/nr; }
 
 	mpz_class px(mstr);
 

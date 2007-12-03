@@ -1,3 +1,4 @@
+#if 0
 #include "ops_poly.h"
 
 #if (OPS_POLY == OPS_POLY_FFT)
@@ -8,4 +9,5 @@
 #include "ops_poly_integerfft.c"
 #elif (OPS_POLY == OPS_POLY_WRAP)
 #include "ops_poly_wrap.c"
+#endif
 #endif

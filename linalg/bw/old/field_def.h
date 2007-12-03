@@ -1,6 +1,8 @@
 #ifndef FIELD_DEF_H_
 #define FIELD_DEF_H_
 
+#include <gmp.h>
+
 #ifdef	__cplusplus
 extern "C" {
 #endif

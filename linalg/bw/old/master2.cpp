@@ -23,14 +23,15 @@
 #include "modulus_hacks.h"
 #include "e_polynomial.h"
 #include "twisting_polynomials.h"
-#include "fft_on_matrices.h"
+#include "fft_on_matrices.hpp"
 #include "field_def.h"
 #include "field_prime.h"
 #include "field_quad.h"
 #include "field_usage.h"
 /* #include "version.h" */
 #include "master_common.h"
-#include "ops_poly.h"
+#include "ops_poly.hpp"
+#include <list>
 
 bw_nbpoly	f_poly;
 int		t_counter;
@@ -44,9 +45,9 @@ static int	preferred_quadratic_algorithm;	/* Defaults to 0 (old) */
 static int	t_init;
 static int	check_input = 1;
 
-struct charptr_list_t * ops_poly_args = NULL;
-
 const char f_base_filename[] = "F_INIT";
+
+std::list<char *> ops_poly_args;
 
 
 #define SAVE_LEVEL_THRESHOLD	4
@@ -183,7 +184,7 @@ retrieve_pi_files(struct t_poly ** p_pi, int t_start)
 		return t_start;
 	}
 
-	pi_files=malloc(n_pi_files*sizeof(struct couple));
+	pi_files=(struct couple *) malloc(n_pi_files*sizeof(struct couple));
 	
 	rewinddir(pi_dir);
 
@@ -265,8 +266,8 @@ retrieve_pi_files(struct t_poly ** p_pi, int t_start)
 		*p_pi=tp_comp_alloc(left,right);
 		core_if_null(*p_pi,"*p_pi");
 
-		ft_order(&order, (*p_pi)->degree+1);
-		o_i = ft_order_int(order);
+		order.set((*p_pi)->degree+1);
+		o_i = order;
 		
 		dft_left=fft_tp_dft(left,order,&tt);
 		printf("DFT(pi_left,%d) : %.2fs\n",o_i,tt);
@@ -354,7 +355,7 @@ static struct e_coeff * bw_init(void)
 			
 	/* Data read stage completed. */
 
-	ft_ops_init((total_work<<1)+2, ops_poly_args);
+	ft_order_t::init((total_work<<1)+2, ops_poly_args);
 
 	printf("Setting up primary polynomial f (t0=%d)\n",t0);
 
@@ -396,7 +397,7 @@ static struct e_coeff * bw_init(void)
 		gmp_randclear(randstate);
 		mpz_clear(blah);
 
-		for(i = 0 ; i < subdim ; i++) {
+		for(i = 0 ; i < n_param ; i++) {
 			bw_scalar_set_one(nbmat_scal(nbpoly_coeff(f_poly, t0),
 						i, m_param+ i));
 		}
@@ -413,9 +414,9 @@ static struct e_coeff * bw_init(void)
 		}
 	}
 
-	clist		= malloc(bigdim * sizeof(unsigned int));
-	global_delta	= malloc(bigdim * sizeof(int));
-	chance_list	= malloc(bigdim * sizeof(unsigned int));
+	clist	= (unsigned int *) malloc(bigdim * sizeof(unsigned int));
+	global_delta	= (int *) malloc(bigdim * sizeof(int));
+	chance_list= (unsigned int *) malloc(bigdim * sizeof(unsigned int));
 	for(j=0;j<bigdim;j++) {
 		clist[j]	= j;
 		global_delta[j]	= t_counter;
@@ -499,8 +500,7 @@ col_cmp(const struct xcol_id * x, const struct xcol_id * y)
 }
 
 /* Sort the degree table delta, with local ordering obeying the columns
- * of pi. The permutation is applied to delta, but not to pi. It is
- * returned, as a malloc'ed int*
+ * of pi. The permutation is applied to delta, but not to pi.
  */
 static void
 column_order(unsigned int * perm, int * delta, struct t_poly * pi)
@@ -508,7 +508,7 @@ column_order(unsigned int * perm, int * delta, struct t_poly * pi)
 	struct xcol_id * tmp_delta;
 	int i;
 
-	tmp_delta   = malloc(bigdim  * sizeof(struct xcol_id));
+	tmp_delta   = (xcol_id *) malloc(bigdim  * sizeof(struct xcol_id));
 
 	for(i=0;i<bigdim;i++) {
 		tmp_delta[i].pos=i;
@@ -580,10 +580,10 @@ bw_gauss_onestep(bw_mbmat e,
 	if (pivlist)
 		pivots_list = pivlist;
 	else
-		pivots_list = malloc(m_param * sizeof(int));
+		pivots_list = (unsigned int *) malloc(m_param * sizeof(int));
 	
-	inv	= malloc(k_size * sizeof(mp_limb_t));
-	lambda	= malloc(k_size * sizeof(mp_limb_t));
+	inv	= (mp_limb_t *) malloc(k_size * sizeof(mp_limb_t));
+	lambda	= (mp_limb_t *) malloc(k_size * sizeof(mp_limb_t));
 
 	/* Pay attention here, this is a gaussian elimination on
 	 * *columns* */
@@ -642,7 +642,7 @@ static int
 bw_check_chance(bw_mbmat e, unsigned int * clist)
 {
 	int i,j;
-	int maxchance;
+	unsigned int maxchance;
 
 	maxchance=0;
 
@@ -694,10 +694,12 @@ compute_ctaf(bw_mbmat e,
 
 	timer_r(&tv,TIMER_SET);
 
-	bounds=malloc(bigdim*sizeof(int));
+	bounds=(int*) malloc(bigdim*sizeof(int));
 	memset(bounds,0,bigdim*sizeof(int));
 	if (known_cols) for(j=0;j<m_param;j++) {
-		bounds[pi->clist[j]]=-1;
+		/* 20070501 -- farewell to this 6+-year-old bug (!) */
+		/* bounds[pi->clist[j]]=-1; */
+		bounds[pi->clist[known_cols[j]]]=-1;
 	}
 	for(j=0;j<bigdim;j++) {
 		if (bounds[j]==-1)
@@ -730,8 +732,8 @@ bw_traditional_algo_1(struct e_coeff * ec, int * delta,
 	double inner_1,inner_2,last;
 	int k;
 
-	perm=malloc(bigdim*sizeof(unsigned int));
-	pivlist=malloc(m_param*sizeof(unsigned int));
+	perm=(unsigned int *) malloc(bigdim*sizeof(unsigned int));
+	pivlist=(unsigned int *) malloc(m_param*sizeof(unsigned int));
 
 	mbmat_alloc(e);
 	mbmat_zero(e);
@@ -768,7 +770,7 @@ bw_traditional_algo_2(struct e_coeff * ec, int * delta,
 	int deg;
 	double inner,last;
 
-	perm=malloc(bigdim*sizeof(unsigned int));
+	perm=(unsigned int *) malloc(bigdim*sizeof(unsigned int));
 
 	assert(!ec_is_twisted(ec));
 
@@ -839,10 +841,10 @@ int check_zero_and_advance(struct e_coeff * ec, unsigned int kill)
 		int res=1;
 		int j;
 		for(j=0;res && j<bigdim;j++) {
-			res = res && mcol_is_zero(
-					mbmat_col(
-					mbpoly_coeff(ec->p,0),
-					j));
+			if (!mcol_is_zero(mbmat_col(mbpoly_coeff(ec->p,0),j))) {
+				die("argh, not zero !\n",1);
+				return 1;
+			}
 		}
 		if (!res) {
 			return 0;
@@ -922,9 +924,9 @@ bw_recursive_algorithm(struct e_coeff * ec,
 #else
 	kill=0;
 #endif
-	ft_order(&sub_order, deg+expected_pi_deg-kill+1);
+	sub_order.set(deg+expected_pi_deg-kill+1);
 
-	so_i = ft_order_int(sub_order);
+	so_i = sub_order;
 
 	dft_e_left	= fft_ec_dft(ec,sub_order,&t_dft_e_l);
 	reclevel_prolog();
@@ -940,7 +942,7 @@ bw_recursive_algorithm(struct e_coeff * ec,
 	core_if_null(dft_pi_left,"dft_pi_left");
 
 	printf("deg(pi_l)=%d, bound is %d\n",pi_left->degree,expected_pi_deg);
-	if (!ft_order_fits(sub_order, deg+pi_left->degree-kill + 1)) {
+	if (!sub_order.fits(deg+pi_left->degree-kill + 1)) {
 		printf("Argl. pi grows above its expected degree...\n");
 		printf("order %d , while :\n"
 				"deg=%d\n"
@@ -977,7 +979,7 @@ bw_recursive_algorithm(struct e_coeff * ec,
 		die("argh, e * pi_l != 0 mod X^d", 1);
 	}
 	reclevel_prolog();
-	printf("IDFT(e,%d) : %.2fs\n", ft_order_int(dft_e_middle->order),
+	printf("IDFT(e,%d) : %.2fs\n", (int) (dft_e_middle->order),
 			t_idft_e);
 
 	dft_mb_free(dft_e_middle);
@@ -992,7 +994,7 @@ bw_recursive_algorithm(struct e_coeff * ec,
 	core_if_null(*p_pi,"*p_pi");
 	
 	printf("deg(pi_prod)=%d (order %d)\n",(*p_pi)->degree, so_i);
-	assert(ft_order_fits(sub_order, (*p_pi)->degree + 1));
+	assert(sub_order.fits((*p_pi)->degree + 1));
 	
 	dft_pi_right	= fft_tp_dft(pi_right, sub_order, &t_dft_pi_r);
 	reclevel_prolog();
@@ -1007,7 +1009,7 @@ bw_recursive_algorithm(struct e_coeff * ec,
 
 	fft_tp_invdft(*p_pi,dft_pi,&t_idft_pi);
 	reclevel_prolog();
-	printf("IDFT(pi,%d) : %.2fs\n",ft_order_int(dft_pi->order),t_idft_pi);
+	printf("IDFT(pi,%d) : %.2fs\n",(int)(dft_pi->order),t_idft_pi);
 
 	dft_bb_free(dft_pi);
 	dft_bb_free(dft_pi_right);
@@ -1152,14 +1154,14 @@ block_wiedemann(void)
 
 #ifdef	HAS_CONVOLUTION_SPECIAL
 		if (check_input) {
-			ft_order(&order, 1+pi_left->degree+ec->degree);
+			order.set(1+pi_left->degree+ec->degree);
 		} else {
-			ft_order(&order, 1+pi_left->degree+ec->degree-dg_kill);
+			order.set(1+pi_left->degree+ec->degree-dg_kill);
 		}
 #else
-		ft_order(&order, 1+pi_left->degree+ec->degree);
+		order.set(1+pi_left->degree+ec->degree);
 #endif
-		o_i = ft_order_int(order);
+		o_i = order;
 		
 		dft_e_left=fft_ec_dft(ec,order,&tt);
 		printf("DFT(e_left,%d) : %.2fs\n",o_i,tt);
@@ -1249,8 +1251,8 @@ block_wiedemann(void)
 		pi_prod=tp_comp_alloc(pi_left,pi_right);
 		core_if_null(pi_prod,"pi_prod");
 
-		ft_order(&order, pi_prod->degree+1);
-		o_i = ft_order_int(order);
+		order.set(pi_prod->degree+1);
+		o_i = order;
 		
 		dft_pi_left=fft_tp_dft(pi_left,order,&tt);
 		printf("DFT(pi_left,%d) : %.2fs\n",o_i,tt);
@@ -1300,8 +1302,6 @@ void usage()
 int
 main(int argc, char *argv[])
 {
-	struct charptr_list_t ** ops_poly_args_tail = &ops_poly_args;
-
 	setvbuf(stdout,NULL,_IONBF,0);
 	setvbuf(stderr,NULL,_IONBF,0);
 
@@ -1338,12 +1338,7 @@ main(int argc, char *argv[])
 		if (strcmp(argv[0], "--enable-complex-field") == 0
 			|| strcmp(argv[0], "--fermat-prime") == 0)
 		{
-			struct charptr_list_t * x;
-			x = malloc(sizeof(struct charptr_list_t));
-			x->p = argv[0];
-			x->next = NULL;
-			*ops_poly_args_tail = x;
-			ops_poly_args_tail = &(x->next);
+			ops_poly_args.push_back(argv[0]);
 			argv++, argc--;
 			continue;
 		}
@@ -1387,6 +1382,9 @@ main(int argc, char *argv[])
 	if (m_param == 0 || n_param == 0) {
 		usage();
 	}
+#ifndef	HARDCODE_PARAMS
+	bigdim = m_param + n_param;
+#endif
 
 	total_work = Lmacro(nrows, m_param, n_param);
 
@@ -1406,14 +1404,7 @@ main(int argc, char *argv[])
 
 	block_wiedemann();
 
-	ft_ops_cleanup();
-	/* clean this up */
-	for( ; ops_poly_args != NULL ; ) {
-		struct charptr_list_t * ntail;
-		ntail = ops_poly_args->next;
-		free(ops_poly_args);
-		ops_poly_args = ntail;
-	}
+	ft_order_t::cleanup();
 
 	return 0;
 }

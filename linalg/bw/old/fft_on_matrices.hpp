@@ -1,29 +1,29 @@
 #ifndef FFT_ON_MATRICES_H_
 #define FFT_ON_MATRICES_H_
 
-#include "ops_poly.h"
+#include "ops_poly.hpp"
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
 
 struct dft_mb {
-	ft_mat_mb p;
+	ft_order_t::mat_mb p;
 	unsigned int degree;
 	ft_order_t order;
 };
 
 struct dft_bb {
-	ft_mat_bb p;
+	ft_order_t::mat_bb p;
 	unsigned int degree;
 	ft_order_t order;
 };
 
 extern struct dft_mb *
-fft_ec_dft(     struct e_coeff *, ft_order_t,    double *);
+fft_ec_dft(     struct e_coeff *, ft_order_t const&,    double *);
 
 extern struct dft_bb *
-fft_tp_dft(     struct t_poly *,  ft_order_t,    double *);
+fft_tp_dft(     struct t_poly *,  ft_order_t const&,    double *);
 
 #ifdef	HAS_CONVOLUTION_SPECIAL
 extern struct dft_mb *

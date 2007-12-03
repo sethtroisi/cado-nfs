@@ -28,7 +28,7 @@
 #include "right_action.h"
 #include "e_polynomial.h"
 #include "twisting_polynomials.h"
-#include "fft_on_matrices.h"
+#include "fft_on_matrices.hpp"
 #include "field_def.h"
 #include "field_prime.h"
 #include "field_quad.h"

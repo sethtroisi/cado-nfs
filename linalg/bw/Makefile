@@ -91,14 +91,17 @@ BW_MASTER2_SOURCES:=						\
 		auxfuncs.c					\
 		old/bw_scalar.c old/endian.c			\
 		old/timer.c			\
-		old/variables.c	old/fft_on_matrices.c		\
-		old/ops_poly.c				\
+		old/variables.c	old/fft_on_matrices.cpp		\
+		old/ops_poly_fft.cpp				\
+		old/ops_poly_schoolbook.cpp			\
+		old/ops_poly_integerfft.cpp			\
+		old/ops_poly_wrap.cpp			\
 		old/fft_core.c			\
 		old/field_common.c old/field_prime.c		\
 		old/field_quad.c old/field_complex.c		\
 		old/field_usage.c old/modulus_hacks.c		\
 		old/e_polynomial.c old/structure.c		\
-		old/structure_debug.c old/master2.c		\
+		old/structure_debug.c old/master2.cpp		\
 		old/twisting_polynomials.c			\
 		old/master_common.c
 BW_MASTER2_LIBS:=-lgmp
@@ -118,19 +121,40 @@ BW_MASTER_OLD_SOURCES:=						\
 BW_MASTER_OLD_LIBS:=-lgmp
 -include .bw-master-old.mkf
 
+BW_FFT_BASICTEST_SOURCES:=					\
+		auxfuncs.c					\
+		old/bw_scalar.c					\
+		old/variables.c 				\
+		old/ops_poly_fft.cpp				\
+		old/ops_poly_schoolbook.cpp			\
+		old/ops_poly_integerfft.cpp			\
+		old/ops_poly_wrap.cpp				\
+		old/fft_core.c					\
+		old/field_common.c old/field_prime.c		\
+		old/field_quad.c old/field_complex.c		\
+		old/field_usage.c old/modulus_hacks.c		\
+		old/structure.c					\
+		old/structure_debug.c				\
+		old/fft-basictest.cpp
+BW_FFT_BASICTEST_LIBS:=-lgmp
+-include .bw-fft-basictest.mkf
+
 BW_BENCHFFT_SOURCES:=						\
 		auxfuncs.c					\
 		old/bw_scalar.c old/endian.c			\
 		old/options.c					\
 		old/timer.c					\
-		old/variables.c old/fft_on_matrices.c		\
-		old/ops_poly.c				\
+		old/variables.c old/fft_on_matrices.cpp		\
+		old/ops_poly_fft.cpp				\
+		old/ops_poly_schoolbook.cpp			\
+		old/ops_poly_integerfft.cpp			\
+		old/ops_poly_wrap.cpp			\
 		old/fft_core.c					\
 		old/field_common.c old/field_prime.c		\
 		old/field_quad.c old/field_complex.c		\
 		old/field_usage.c old/modulus_hacks.c		\
 		old/structure.c old/structure_debug.c		\
-		old/testfft.c
+		old/testfft.cpp
 BW_BENCHFFT_LIBS:=-lgmp
 -include .bw-benchfft.mkf
 

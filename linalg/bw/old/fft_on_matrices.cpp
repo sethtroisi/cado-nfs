@@ -18,8 +18,8 @@
 #include "modulus_hacks.h"
 #include "twisting_polynomials.h"
 #include "e_polynomial.h"
-#include "ops_poly.h"
-#include "fft_on_matrices.h"
+#include "ops_poly.hpp"
+#include "fft_on_matrices.hpp"
 #include "field_def.h"
 #include "field_prime.h"
 #include "field_quad.h"
@@ -41,20 +41,20 @@
  * huge time anyway. So it might be better to keep polynomials gathered
  * in a single area.
  */
-struct dft_mb *fft_ec_dft(struct e_coeff *ec, ft_order_t order, double *tm)
+struct dft_mb *fft_ec_dft(struct e_coeff *ec, ft_order_t const& order, double *tm)
 {
     struct dft_mb *res;
-    unsigned int i, j;
+    int i, j;
     struct timeval tv;
 
     timer_r(&tv, TIMER_SET);
 
-    res = malloc(sizeof(struct dft_mb));
+    res = (dft_mb *) malloc(sizeof(struct dft_mb));
     if (res == NULL)
 	return res;
     res->degree = ec->degree;
-    ft_order_copy(res->order, order);
-    if (!(ft_mat_mb_alloc(order, res->p))) {
+    res->order = order;
+    if (!(order.mat_mb_alloc(res->p))) {
 	free(res);
 	return NULL;
     }
@@ -69,8 +69,8 @@ struct dft_mb *fft_ec_dft(struct e_coeff *ec, ft_order_t order, double *tm)
             mp_limb_t * src0, * src1;
             src0 = mbmat_scal(mbpoly_coeff(ec->p, 0), i, j);
             src1 = mbmat_scal(mbpoly_coeff(ec->p, 1), i, j);
-            ft_zero(order, ft_mat_mb_get(order, res->p, i, j));
-            ft_transform(order, ft_mat_mb_get(order, res->p, i, j),
+            order.zero(order.mat_mb_get(res->p, i, j));
+            order.transform(order.mat_mb_get(res->p, i, j),
                     src0, src1 - src0, ec->degree);
 	    printf("."); fflush(stdout);
 	}
@@ -83,20 +83,20 @@ struct dft_mb *fft_ec_dft(struct e_coeff *ec, ft_order_t order, double *tm)
 }
 
 
-struct dft_bb *fft_tp_dft(struct t_poly *tp, ft_order_t order, double *tm)
+struct dft_bb *fft_tp_dft(struct t_poly *tp, ft_order_t const& order, double *tm)
 {
     struct dft_bb *res;
-    unsigned int i, j, jr;
+    int i, j, jr;
     struct timeval tv;
 
     timer_r(&tv, TIMER_SET);
 
-    res = malloc(sizeof(struct dft_bb));
+    res = (dft_bb *) malloc(sizeof(struct dft_bb));
     if (res == NULL)
 	return res;
     res->degree = tp->degree;
-    ft_order_copy(res->order, order);
-    if (!(ft_mat_bb_alloc(order, res->p))) {
+    res->order = order;
+    if (!(order.mat_bb_alloc(res->p))) {
 	free(res);
 	return NULL;
     }
@@ -111,8 +111,8 @@ struct dft_bb *fft_tp_dft(struct t_poly *tp, ft_order_t order, double *tm)
             src0 = bbmat_scal(bbpoly_coeff(tp->p, 0), i, jr);
             src1 = bbmat_scal(bbpoly_coeff(tp->p, 1), i, jr);
 
-            ft_zero(order, ft_mat_bb_get(order, res->p, i, j));
-            ft_transform(order, ft_mat_bb_get(order, res->p, i, j),
+            order.zero(order.mat_bb_get(res->p, i, j));
+            order.transform(order.mat_bb_get(res->p, i, j),
                     src0, src1-src0, tp->degnom[jr]);
 
 	    printf("."); fflush(stdout);
@@ -131,18 +131,18 @@ struct dft_mb *fft_mbb_conv_sp(struct dft_mb *p,
 			       unsigned int dg_kill, double *tm)
 {
     struct dft_mb *res;
-    unsigned int i, j, l;
+    int i, j, l;
     struct timeval tv;
 
     timer_r(&tv, TIMER_SET);
 
-    res = malloc(sizeof(struct dft_mb));
+    res = (dft_mb *) malloc(sizeof(struct dft_mb));
     if (res == NULL)
 	return res;
     res->degree = p->degree + q->degree - dg_kill;
-    assert(ft_order_eq(p->order,q->order));
-    ft_order_copy(res->order, p->order);
-    if (!(ft_mat_mb_alloc(res->order, res->p))) {
+    assert(p->order == q->order);;
+    res->order = p->order;
+    if (!(res->order.mat_mb_alloc(res->p))) {
 	free(res);
 	return NULL;
     }
@@ -150,12 +150,12 @@ struct dft_mb *fft_mbb_conv_sp(struct dft_mb *p,
     /* TODO: Multiply using Strassen's algorithm instead. */
     for (i = 0; i < m_param; i++) {
 	for (j = 0; j < bigdim; j++) {
-            ft_zero(res->order, ft_mat_mb_get(res->order, res->p, i, j));
+            res->order.zero(res->order.mat_mb_get(res->p, i, j));
 	    for (l = 0; l < bigdim; l++) {
-                ft_convolution_special(res->order,
-                        ft_mat_mb_get(res->order, res->p, i, j),
-                        ft_mat_mb_get(res->order, p->p, i, l),
-                        ft_mat_bb_get(res->order, q->p, l, j),
+                res->order.convolution_special(
+                        res->order.mat_mb_get(res->p, i, j),
+                        res->order.mat_mb_get(p->p, i, l),
+                        res->order.mat_bb_get(q->p, l, j),
                         dg_kill);
 	    }
 	    printf("."); fflush(stdout);
@@ -178,18 +178,18 @@ struct dft_mb *fft_mbb_conv(struct dft_mb *p,
 			       double *tm)
 {
     struct dft_mb *res;
-    unsigned int i, j, l;
+    int i, j, l;
     struct timeval tv;
 
     timer_r(&tv, TIMER_SET);
 
-    res = malloc(sizeof(struct dft_mb));
+    res = (dft_mb *) malloc(sizeof(struct dft_mb));
     if (res == NULL)
 	return res;
     res->degree = p->degree + q->degree;
-    assert(ft_order_eq(p->order,q->order));
-    ft_order_copy(res->order, p->order);
-    if (!(ft_mat_mb_alloc(res->order, res->p))) {
+    assert(p->order == q->order);;
+    res->order = p->order;
+    if (!(res->order.mat_mb_alloc(res->p))) {
 	free(res);
 	return NULL;
     }
@@ -197,12 +197,12 @@ struct dft_mb *fft_mbb_conv(struct dft_mb *p,
     /* TODO: Multiply using Strassen's algorithm instead. */
     for (i = 0; i < m_param; i++) {
 	for (j = 0; j < bigdim; j++) {
-            ft_zero(res->order, ft_mat_mb_get(res->order, res->p, i, j));
+            res->order.zero(res->order.mat_mb_get(res->p, i, j));
 	    for (l = 0; l < bigdim; l++) {
-                ft_convolution(res->order,
-                        ft_mat_mb_get(res->order, res->p, i, j),
-                        ft_mat_mb_get(res->order, p->p, i, l),
-                        ft_mat_bb_get(res->order, q->p, l, j));
+                res->order.convolution(
+                        res->order.mat_mb_get(res->p, i, j),
+                        res->order.mat_mb_get(p->p, i, l),
+                        res->order.mat_bb_get(q->p, l, j));
 	    }
 	    printf("."); fflush(stdout);
 	}
@@ -217,18 +217,18 @@ struct dft_mb *fft_mbb_conv(struct dft_mb *p,
 struct dft_bb *fft_bbb_conv(struct dft_bb *p, struct dft_bb *q, double *tm)
 {
     struct dft_bb *res;
-    unsigned int i, j, l;
+    int i, j, l;
     struct timeval tv;
 
     timer_r(&tv, TIMER_SET);
 
-    res = malloc(sizeof(struct dft_bb));
+    res = (dft_bb *) malloc(sizeof(struct dft_bb));
     if (res == NULL)
 	return res;
     res->degree = 0;		/* we don't care, this is meaningless anyway */
-    assert(ft_order_eq(p->order,q->order));
-    ft_order_copy(res->order, p->order);
-    if (!(ft_mat_bb_alloc(res->order, res->p))) {
+    assert(p->order == q->order);;
+    res->order = p->order;
+    if (!(res->order.mat_bb_alloc(res->p))) {
 	free(res);
 	return NULL;
     }
@@ -236,12 +236,12 @@ struct dft_bb *fft_bbb_conv(struct dft_bb *p, struct dft_bb *q, double *tm)
     /* TODO: Multiply using Strassen's algorithm instead. */
     for (i = 0; i < bigdim; i++) {
 	for (j = 0; j < bigdim; j++) {
-	    ft_zero(res->order, ft_mat_bb_get(res->order, res->p, i, j));
+	    res->order.zero(res->order.mat_bb_get(res->p, i, j));
 	    for (l = 0; l < bigdim; l++) {
-		ft_convolution(res->order,
-			       ft_mat_bb_get(res->order, res->p, i, j),
-			       ft_mat_bb_get(res->order, p->p, i, l),
-			       ft_mat_bb_get(res->order, q->p, l, j));
+		res->order.convolution(
+			       res->order.mat_bb_get(res->p, i, j),
+			       res->order.mat_bb_get(p->p, i, l),
+			       res->order.mat_bb_get(q->p, l, j));
 	    }
 	    printf("."); fflush(stdout);
 	}
@@ -256,12 +256,12 @@ struct dft_bb *fft_bbb_conv(struct dft_bb *p, struct dft_bb *q, double *tm)
 void fft_mb_invdft(bw_mbpoly dest,
 		   struct dft_mb *p, unsigned int deg, double *tm)
 {
-    unsigned int i, j;
+    int i, j;
     struct timeval tv;
 
     timer_r(&tv, TIMER_SET);
 
-    assert(ft_order_fits(p->order, deg + 1));
+    assert(p->order.fits(deg + 1));
 
     for (i = 0; i < m_param; i++) {
 	for (j = 0; j < bigdim; j++) {
@@ -269,8 +269,8 @@ void fft_mb_invdft(bw_mbpoly dest,
             mp_limb_t * dst1;
             dst0 = mbmat_scal(mbpoly_coeff(dest, 0), i, j);
             dst1 = mbmat_scal(mbpoly_coeff(dest, 1), i, j);
-            ft_itransform(p->order, 
-                    dst0, dst1-dst0, deg, ft_mat_mb_get(p->order, p->p, i, j));
+            p->order.itransform(
+                    dst0, dst1-dst0, deg, p->order.mat_mb_get(p->p, i, j));
 
 	    printf("."); fflush(stdout);
 	}
@@ -282,7 +282,7 @@ void fft_mb_invdft(bw_mbpoly dest,
 
 void fft_tp_invdft(struct t_poly *tp, struct dft_bb *p, double *tm)
 {
-    unsigned int i, j;
+    int i, j;
     struct timeval tv;
 
     timer_r(&tv, TIMER_SET);
@@ -302,8 +302,8 @@ void fft_tp_invdft(struct t_poly *tp, struct dft_bb *p, double *tm)
             mp_limb_t * dst1;
             dst0 = bbmat_scal(bbpoly_coeff(tp->p, 0), i, j);
             dst1 = bbmat_scal(bbpoly_coeff(tp->p, 1), i, j);
-            ft_itransform(p->order, dst0, dst1-dst0, tp->degnom[j],
-                    ft_mat_bb_get(p->order, p->p, i, j));
+            p->order.itransform(dst0, dst1-dst0, tp->degnom[j],
+                    p->order.mat_bb_get(p->p, i, j));
 	    printf("."); fflush(stdout);
 	}
     }
@@ -315,23 +315,23 @@ void fft_tp_invdft(struct t_poly *tp, struct dft_bb *p, double *tm)
 struct dft_bb *fft_bb_dft_init_one(unsigned int deg)
 {
     struct dft_bb *res;
-    unsigned int i, j;
+    int i, j;
 
-    res = malloc(sizeof(struct dft_bb));
+    res = (dft_bb *) malloc(sizeof(struct dft_bb));
     if (res == NULL)
 	return res;
     res->degree = 0;
-    ft_order(&(res->order), deg + 1);
-    if (!(ft_mat_bb_alloc(res->order, res->p))) {
+    res->order.set(deg + 1);
+    if (!(res->order.mat_bb_alloc(res->p))) {
 	free(res);
 	return NULL;
     }
 
     for (i = 0; i < bigdim; i++) {
 	for (j = 0; j < bigdim; j++) {
-            ft_zero(res->order, ft_mat_bb_get(res->order, res->p, i, j));
+            res->order.zero(res->order.mat_bb_get(res->p, i, j));
         }
-        ft_one(res->order, ft_mat_bb_get(res->order, res->p, i, i));
+        res->order.one(res->order.mat_bb_get(res->p, i, i));
     }
 
     return res;
@@ -339,13 +339,13 @@ struct dft_bb *fft_bb_dft_init_one(unsigned int deg)
 
 void dft_mb_free(struct dft_mb *p)
 {
-    ft_mat_mb_free(p->order, p->p);
+    p->order.mat_mb_free(p->p);
     free(p);
 }
 
 void dft_bb_free(struct dft_bb *p)
 {
-    ft_mat_bb_free(p->order, p->p);
+    p->order.mat_bb_free(p->p);
     free(p);
 }
 

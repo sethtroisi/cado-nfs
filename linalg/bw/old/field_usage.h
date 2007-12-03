@@ -1,6 +1,8 @@
 #ifndef FIELD_USAGE_H
 #define FIELD_USAGE_H
 
+#include "field_def.h"
+
 #ifdef	__cplusplus
 extern "C" {
 #endif

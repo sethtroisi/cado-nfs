@@ -36,13 +36,13 @@ typedef mp_limb_t		* bw_$1mat_r;
 define(`matrix_common_defs',``
 #define $1mat_size		($2*$3*$5)
 #ifdef HARDCODE_PARAMS
-#define $1mat_alloc_m(x)	(x)
+#define $1mat_alloc_m(x)	((void*)(x))
 #define $1mat_free_m(x)
-#define $1mat_head_m(x)		(&($1mat_pos_m(x,0,0,0)))
+#define $1mat_head_m(x)		((void*) &($1mat_pos_m(x,0,0,0)))
 #else	/* HARDCODE_PARAMS */
-#define $1mat_alloc_m(x)	(x = mymalloc($1mat_size*sizeof(mp_limb_t)))
+#define $1mat_alloc_m(x)	((void *) (x = (bw_$1mat_r) mymalloc($1mat_size*sizeof(mp_limb_t))))
 #define $1mat_free_m(x)		free(x)
-#define $1mat_head_m(x)		(x)
+#define $1mat_head_m(x)		((void *) (x))
 #endif	/* HARDCODE_PARAMS */
 #define $1mat_zero_m(x)		(void) memset($1mat_head_m(x),0,$1mat_size*sizeof(mp_limb_t))
 #define $1mat_copy_m(y,x)	(void) memcpy(y,x,$1mat_size*sizeof(mp_limb_t))
@@ -268,7 +268,7 @@ typedef mp_limb_t		* 	bw_$1dft_r;
 #define $1dft_poly_m(s,x,i,j)	((x)+(($4)<<(s))*((i)+$2*(j)))
 #define $1dft_scal_m(s,x,i,j,k)	($1dft_poly_m((s),(x),(i),(j))+(($4)*k))
 #define $1dft_size(s)		(($2*$3*$4)<<(s))
-#define $1dft_alloc_m(s,x)	(x = mymalloc($1dft_size((s))*sizeof(mp_limb_t)))
+#define $1dft_alloc_m(s,x)	(x = (bw_$1dft_r) mymalloc($1dft_size((s))*sizeof(mp_limb_t)))
 #define $1dft_free_m(s,x)	free(x)
 #define $1dft_head_m(s,x)	(x)
 #define $1dft_zero_m(s,x)	(void) memset($1dft_head_m((s),(x)),0,$1dft_size((s))*sizeof(mp_limb_t))
