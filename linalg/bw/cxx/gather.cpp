@@ -77,8 +77,8 @@ void init_data()
 	w = new scalar_t[nr];
 	scrap = new wide_scalar_t[nr];
 
-	memset(v, 0, sizeof(scalar_t[nr]));
-	memset(w, 0, sizeof(scalar_t[nr]));
+	traits::zero(v, nr);
+	traits::zero(w, nr);
 }
 
 void clear_data()
@@ -87,8 +87,6 @@ void clear_data()
 	delete[] v;
 	delete[] w;
 	delete[] scrap;
-	delete[] idx;
-	delete[] val;
 
 }
 
@@ -186,12 +184,12 @@ void go()
 		cerr << "// trivial solution encountered !\n";
 		BUG();
 	}
-	memcpy(w, v, nr * sizeof(scalar_t));
+	traits::copy(w, v, nr);
 
 	uint i;
 
 	for(i = 0 ; i < 100 && !is_zero(w) ; i++) {
-		memcpy(v, w, nr * sizeof(scalar_t));
+		traits::copy(v, w, nr);
 		cout << fmt("// trying B^%*y") % i << endl;
 		multiply();
 	}
@@ -294,6 +292,9 @@ int main(int argc, char *argv[])
 	cout << "// Using generic code\n";
 	program<variable_scalar_traits> x;
 	x.go();
+
+	delete[] idx;
+	delete[] val;
 }
 
 /* vim:set sw=8: */
