@@ -2,10 +2,17 @@
 #include <stdio.h>
 #include <gmp.h>
 #include <errno.h>
+#include <assert.h>
+#include <unistd.h>
 
 #include "master_common.h"
 #include "gmp-hacks.h"
 #include "auxfuncs.h"
+#include "modulus_hacks.h"
+#include "field_def.h"
+#include "field_prime.h"
+#include "field_quad.h"
+#include "field_usage.h"
 
 const char *a_meta_filename = "A-%02d-%02d";
 const char *valu_meta_filename = "val-%02d";
@@ -90,6 +97,72 @@ void print_chance_list(unsigned int t, unsigned int *chance_list)
 			printf(" %d", j);
 	}
 	printf(" ]\n");
+}
+
+static void a_transvec(bw_mnmat ax,
+        int j1,
+        int j2,
+        int ikill,
+        bw_scalar lambda)
+{
+    int i;
+
+    bw_scalar_set_zero(mnmat_scal(ax,ikill,j2));
+    for(i=ikill+1;i<m_param;i++) {
+        addmul( mnmat_scal(ax,i,j2),
+                mnmat_scal(ax,i,j1),
+                lambda);
+        k_reduce(mnmat_scal(ax,i,j2));
+    }
+}
+
+static int
+compute_rank(bw_mnmat a)
+{
+    bw_mnmat ax;
+    int i,j,k;
+    bw_scalar piv;
+    int rank;
+    mp_limb_t * inv;
+    mp_limb_t * lambda;
+
+    mnmat_alloc(ax);
+    mnmat_copy(ax,a);
+
+    inv	= (mp_limb_t *) malloc(k_size * sizeof(mp_limb_t));
+    lambda	= (mp_limb_t *) malloc(k_size * sizeof(mp_limb_t));
+
+    /* Pay attention here, this is a gaussian elimination on
+     * *columns* */
+
+    rank = 0 ;
+    for(j = 0 ; j < n_param ; j++) {
+        /* Find the pivot inside the column. */
+        for(i = 0 ; i < m_param ; i++) {
+            piv = mnmat_scal(ax,i,j);
+            if (!k_is_zero(piv))
+                break;
+        }
+        if (i == m_param)
+            continue;
+        assert(rank < m_param);
+	rank++;
+        k_inv(inv,mnmat_scal(ax,i,j));
+        /* Cancel this coeff in all other columns. */
+        for(k = j + 1 ; k < n_param ; k++) {
+            k_mul(lambda,mnmat_scal(ax,i,k),inv);
+            k_neg(lambda,lambda);
+            a_transvec(ax,j,k,i,lambda);
+        }
+
+    }
+
+    free(inv);
+    free(lambda);
+
+    mnmat_free(ax);
+
+    return rank;
 }
 
 
@@ -183,6 +256,26 @@ int read_data_for_series(bw_mnpoly a)
 	/* XXX k or k-1 */
 	return k;
 }
+
+void give_mnpoly_rank_info(bw_mnpoly a, int deg)
+{
+	int k;
+	int minrank=m_param;
+	printf("Rank of first A matrices:"); fflush(stdout);
+	for(k = 0 ; k <= deg && k < 20 ; k++) {
+		int r = compute_rank(mnpoly_coeff(a, k));
+		printf(" %d", r);
+		minrank = r;
+		fflush(stdout);
+	}
+	printf("\n"); fflush(stdout);
+	if (minrank != m_param) {
+		printf("The program will almost surely fail"
+				" because the choice of X-vectors was bad\n");
+		sleep(3);
+	}
+}
+
 void read_mat_file_header(const char *name)
 {
 	FILE *f = fopen(name, "r");

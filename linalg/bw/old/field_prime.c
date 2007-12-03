@@ -240,7 +240,8 @@ void prime_field_print(mp_limb_t * p, struct field * f)
 	mpz_t a;
 	mpz_init(a);
 	MPZ_SET_MPN(a,p,f->size);
-	mpz_out_str(stdout,10,a);
+	gmp_printf("%2Zd", a);
+	/* mpz_out_str(stdout,10,a); */
 	mpz_clear(a);
 }
 

@@ -19,6 +19,123 @@
 #include "field_def.h"
 #include "field_usage.h"
 
+#ifndef	NDEBUG
+extern int magma_display;
+
+void p_pirow(struct t_poly * tp, int i, int k)
+{
+	int j;
+	mp_limb_t * zero_elt;
+	zero_elt = malloc(k_size * sizeof(mp_limb_t));
+	memset(zero_elt,0,k_size * sizeof(mp_limb_t));
+
+	printf("[ ");
+	for(j = 0 ; j < bigdim ; j++) {
+		int jr = tp->clist[j];
+		if (k > tp->degnom[jr]) {
+			k_print(zero_elt);
+		} else {
+			k_print(bbmat_scal(bbpoly_coeff(tp->p,k),i,jr));
+		}
+		if (magma_display && j+1 < bigdim )
+			printf(",%c", (magma_display==2)?0x20:0x09);
+		else
+			printf(" ");
+		/*
+			*/
+	}
+	printf("]\n");
+
+	free(zero_elt);
+}
+
+void p_picol(struct t_poly * tp, int j, int k)
+{
+	int i;
+	int jr = tp->clist[j];
+	mp_limb_t * zero_elt;
+	zero_elt = malloc(k_size * sizeof(mp_limb_t));
+	memset(zero_elt,0,k_size * sizeof(mp_limb_t));
+
+	printf("\n");
+	if (magma_display) {
+		printf("[ ");
+		for(i = 0 ; i < bigdim ; i++) {
+			if (k > tp->degnom[jr]) {
+				k_print(zero_elt);
+			} else {
+				k_print(bbmat_scal(bbpoly_coeff(tp->p,k),i,jr));
+			}
+			if (magma_display !=2 && i+1<bigdim)
+				printf(",\n  ");
+		}
+		printf(" ]\n");
+	} else {
+		for(i = 0 ; i < bigdim ; i++) {
+			printf("[ ");
+			if (k > tp->degnom[jr]) {
+				k_print(zero_elt);
+			} else {
+				k_print(bbmat_scal(bbpoly_coeff(tp->p,k),i,jr));
+			}
+			printf(" ]\n");
+		}
+	}
+
+	free(zero_elt);
+}
+
+void p_pimat(struct t_poly * tp, int k)
+{
+	int i;
+	mp_limb_t * zero_elt;
+	zero_elt = malloc(k_size * sizeof(mp_limb_t));
+	memset(zero_elt,0,k_size * sizeof(mp_limb_t));
+	if (magma_display) {
+		int i,j;
+
+		printf("[ ");
+		for(i = 0 ; i < bigdim ; i++) {
+			for(j = 0 ; j < bigdim ; j++) {
+				int jr = tp->clist[j];
+				if (k > tp->degnom[jr]) {
+					k_print(zero_elt);
+				} else {
+					k_print(bbmat_scal(bbpoly_coeff(tp->p,k),i,jr));
+				}
+				if ((i+1<bigdim || j+1<bigdim) && magma_display) {
+					printf(",%c",
+						(magma_display==2)?0x20:0x09);
+				}
+			}
+			if (magma_display !=2 && i+1<bigdim)
+				printf("\n  ");
+		}
+		printf("    ]\n");
+	} else {
+		for(i = 0 ; i < bigdim ; i++)
+			p_pirow(tp,i,k);
+	}
+	free(zero_elt);
+}
+
+void p_pipoly(struct t_poly * tp, int d)
+{
+	int i;
+	if (d == -1) {
+		d = tp->degree;
+	}
+	printf("[\n");
+	for(i = 0 ; i <= d ; i++) {
+		p_pimat(tp,i);
+		if (magma_display && i < d)
+			printf(",\n");
+
+	}
+	printf("]\n");
+}
+#endif
+
 static int * degtable_entry(struct t_poly * tp, int i, int j)
 {
 	return tp->degree_table+i*bigdim+j;

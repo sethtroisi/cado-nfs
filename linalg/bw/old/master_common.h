@@ -35,6 +35,7 @@ typedef int (*sortfunc_t)(const void*, const void*);
 extern void bw_commit_f(bw_nbpoly fpoly, const int *);
 extern void print_chance_list(unsigned int t, unsigned int *);
 extern int read_data_for_series(bw_mnpoly a);
+extern void give_mnpoly_rank_info(bw_mnpoly a, int deg);
 extern void read_mat_file_header(const char * name);
 
 extern const char * a_meta_filename;

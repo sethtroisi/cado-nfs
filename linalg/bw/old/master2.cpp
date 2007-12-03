@@ -358,6 +358,8 @@ static struct e_coeff * bw_init(void)
 
     printf("Setting up primary polynomial f (t0=%d)\n",t0);
 
+    give_mnpoly_rank_info(a_poly, total_work);
+
     f=fopen(f_base_filename,"r");
     test=(f!=NULL);
 
@@ -545,9 +547,7 @@ static void e_transvec(bw_mbmat e,
         addmul( mbmat_scal(e,i,j2),
                 mbmat_scal(e,i,j1),
                 lambda);
-        /*
-           k_reduce(mbmat_scal(e,i,j2));
-           */
+        k_reduce(mbmat_scal(e,i,j2));
     }
 }
 
@@ -710,21 +710,23 @@ compute_ctaf(bw_mbmat e,
         mcol_zero(mbmat_col(e,j));
     }
 
-    for(j = 0 ; j < bigdim ; j++)
-        for(s = 0 ; s <= bounds[j] ; s++)
-            for(i = 0 ; i <  m_param; i++)
+    for(j = 0 ; j < bigdim ; j++) {
+        for(s = 0 ; s <= bounds[j] ; s++) {
+            for(i = 0 ; i <  m_param; i++) {
                 for(k = 0 ; k <  bigdim; k++)	{
                     addmul( mbmat_scal(e,i,j),
                             mbmat_scal(mbpoly_coeff(ec->p,t-s),i,k),
                             bbmat_scal(bbpoly_coeff(pi->p,s),k,j));
                 }
-    /*
-       for(i = 0     ; i <  m_param;    i++) {
-       for(j = 0     ; j <  bigdim ;    j++) {
-       k_reduce(mbmat_scal(e,i,j));
-       }
-       }
-       */
+            }
+        }
+    }
+
+    for(i = 0     ; i <  m_param;    i++) {
+        for(j = 0     ; j <  bigdim ;    j++) {
+            k_reduce(mbmat_scal(e,i,j));
+        }
+    }
     free(bounds);
 
     *tt=timer_r(&tv,TIMER_SET);

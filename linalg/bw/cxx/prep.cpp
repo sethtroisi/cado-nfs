@@ -44,7 +44,15 @@ void setup_vectors(unsigned int nrows, int m, int n, const mpz_class& p)
 
 	for (int i = 0; i < m ; i++) {
 		must_open(o, files::x % i);
-#if 1
+		/* If we choose X vectors such that the Krylov subspace
+		 * respective to M^T and X has low dimension, then the
+		 * process will fail : the expected degree necessary for
+		 * producing a dependency will be higher than N/m. This
+		 * means that the quadratic bw-master will fail, and that
+		 * the sub-quadratic one will crash, because the
+		 * assumptions on the degree of pi will be wrong.
+		 */
+#if 0
 		o << fmt("e%") % i << "\n";
 #else
 		o << fmt("e%") % ((rand() + time(NULL)) % nrows) << "\n";

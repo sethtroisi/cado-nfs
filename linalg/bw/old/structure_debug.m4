@@ -13,7 +13,9 @@ void p_$1row(bw_$1mat mat, int i)
 		if (magma_display && j+1 < $3 )
 			printf(",%c", (magma_display==2)?0x20:0x09);
 		else
-			printf("   ");
+			printf(" ");
+		/*
+			*/
 	}
 	printf("]\n");
 }'')
@@ -54,9 +56,10 @@ void p_$1mat(bw_$1mat mat)
 		for(i = 0 ; i < $2 ; i++) {
 			for(j = 0 ; j < $3 ; j++) {
 				$4($1mat_scal(mat,i,j));
-				if (i+1<$2 || j+1<$3)
+				if ((i+1<$2 || j+1<$3) && magma_display) {
 					printf(",%c",
 						(magma_display==2)?0x20:0x09);
+				}
 			}
 			if (magma_display !=2 && i+1<$2)
 				printf("\n  ");
