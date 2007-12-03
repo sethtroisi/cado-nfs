@@ -1,4 +1,6 @@
 
+[ important : read at the end of this file about the sub-quadratic version ]
+
 INPUT:
 
 * a matrix file, which is actually unread except for its header line which
@@ -43,3 +45,18 @@ f_{0,2} f{1,2} ... f_{n-1,2}
 ...
 
 (in the case m=n=1, F is the reversal of the minimal polynomial)
+
+SUB-QUADRATIC VERSION and FFT.
+
+Previous version of this package had the sub-quadratic version working
+only for ``fft fields'', where 2^n roots of unity were readily available.
+
+I am in the process of lifting this requirement. By using the integer
+FFT, arbitrary moduli should become supported. However the current
+version (20070614) is still buggy ; it apparently fails with moduli
+exceeding half the machine word size.
+
+Binary fields are not yet supported (but will be, at some point).
+
+For selecting between different FFT options, modify the ops_poly.hpp
+file.

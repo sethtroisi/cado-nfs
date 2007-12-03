@@ -6,11 +6,7 @@
 #include "ops_poly_integerfft.hpp"
 #include "ops_poly_wrap.hpp"
 
-/*
-template<typename T>
-struct ops_poly : public T
-{ };
-*/
+/* Select the proper layer here for the polynomial multiplication */
 
 // typedef ops_poly_fft ft_order_t;
 // typedef ops_poly_scbk ft_order_t;

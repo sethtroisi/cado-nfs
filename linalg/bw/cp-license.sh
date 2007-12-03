@@ -12,7 +12,8 @@ fi
 
 case "$b" in
 	*.[ch]) (echo "/* $copy */" ; echo ; cat $src) > $dst ;;
+	*.[ch]pp) (echo "/* $copy */" ; echo ; cat $src) > $dst ;;
 	*.m4) (echo "dnl $copy" ; echo "dnl" ; cat $src) > $dst ;;
-	*) echo "not handled" ; exit 1;;
+	*) echo "$b : not handled" ; exit 1;;
 esac
 

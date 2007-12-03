@@ -34,31 +34,36 @@ structure_inlines_automatic.h: structure.m4
 structure_debug_automatic.h:   structure_debug.m4
 	m4 -Doutputfile=DEBUG < $< > $@
 
-BW_MASTER_SOURCES:=						\
-		auxfuncs.c \
-		bw_scalar.c \
-		timer.c			\
-		master_common.c	\
-		variables.c field_common.c		\
-		field_prime.c field_quad.c		\
-		field_complex.c field_usage.c		\
-		modulus_hacks.c structure.c		\
-		structure_debug.c master.c
+BW_MASTER_SOURCES:=					\
+                auxfuncs.c				\
+                timer.c					\
+                bw_scalar.c 				\
+                variables.c field_common.c      	\
+                field_prime.c field_quad.c      	\
+                field_complex.c field_usage.c   	\
+                modulus_hacks.c structure.c     	\
+                structure_debug.c master.c      	\
+                master_common.c
 BW_MASTER_LIBS:=-lgmp
 -include .bw-master.mkf
 
-BW_MASTER2_SOURCES:=						\
-		auxfuncs.c					\
-		bw_scalar.c	\
-		timer.c			\
-		variables.c	fft_on_matrices.c		\
-		field_common.c field_prime.c		\
-		field_quad.c field_complex.c		\
-		field_usage.c modulus_hacks.c		\
-		e_polynomial.c structure.c		\
-		structure_debug.c master2.c		\
-		master_common.c	\
-		twisting_polynomials.c
+BW_MASTER2_SOURCES:=					\
+                auxfuncs.c                              \
+                bw_scalar.c				\
+                timer.c                                 \
+                variables.c fft_on_matrices.cpp         \
+                ops_poly_fft.cpp                        \
+                ops_poly_schoolbook.cpp                 \
+                ops_poly_integerfft.cpp                 \
+                ops_poly_wrap.cpp                       \
+                fft_core.c                              \
+                field_common.c field_prime.c            \
+                field_quad.c field_complex.c            \
+                field_usage.c modulus_hacks.c           \
+                e_polynomial.c structure.c              \
+                structure_debug.c master2.cpp           \
+                twisting_polynomials.c                  \
+                master_common.c
 BW_MASTER2_LIBS:=-lgmp
 -include .bw-master2.mkf
 
