@@ -19,6 +19,7 @@
 #include "state.hpp"
 #include "threads.hpp"
 #include "ticks.hpp"
+#include "traits.hpp"
 
 #include <boost/cstdint.hpp>
 #include <iterator>
@@ -27,6 +28,7 @@ gather_arguments mine;
 
 using namespace std;
 using namespace boost;
+using namespace core_ops;
 
 typedef unsigned int uint;
 
@@ -38,31 +40,29 @@ namespace globals {
 
 	uint nb_coeffs;
 
-	mp_limb_t (*v) [MODULUS_SIZE];
-	mp_limb_t (*w) [MODULUS_SIZE];
-	mp_limb_t (*scrap) [MODULUS_SIZE + 2];
 	uint32_t * idx;
 	int32_t  * val;
 }
 
+template<typename traits>
+struct program {
+
+	typedef typename traits::scalar_t scalar_t;
+	typedef typename traits::wide_scalar_t wide_scalar_t;
+
+	scalar_t *v;
+	scalar_t *w;
+	wide_scalar_t *scrap;
+
 void init_data()
 {
 	using namespace globals;
-	v = new mp_limb_t[nr][MODULUS_SIZE];
-	w = new mp_limb_t[nr][MODULUS_SIZE];
-	scrap = new mp_limb_t[nr][MODULUS_SIZE + 2];
+	v = new scalar_t[nr];
+	w = new scalar_t[nr];
+	scrap = new wide_scalar_t[nr];
 
-	idx = new uint32_t[nr + nb_coeffs];
-	val = new  int32_t[nr + nb_coeffs];
-
-	{
-		ifstream mtx;
-		must_open(mtx, files::matrix);
-		fill_matrix_data(mtx, 0, nb_coeffs, 0, nr, idx, val);
-	}
-
-	memset(v, 0, sizeof(mp_limb_t[nr][MODULUS_SIZE]));
-	memset(w, 0, sizeof(mp_limb_t[nr][MODULUS_SIZE]));
+	memset(v, 0, sizeof(scalar_t[nr]));
+	memset(w, 0, sizeof(scalar_t[nr]));
 }
 
 void clear_data()
@@ -86,9 +86,9 @@ void add_file(const std::string& fn)
 
 	for(unsigned int i = 0 ; i < nr ; i++) {
 		mpz_class foo;
-		MPZ_SET_MPN(foo.get_mpz_t(), v[i], MODULUS_SIZE);
+		traits::assign(foo, v[i]);
 		foo += *it++;
-		assign<MODULUS_SIZE>(v[i], foo);
+		traits::assign(v[i], foo);
 	}
 	BUG_ON(it != istream_iterator<mpz_class>());
 }
@@ -120,10 +120,11 @@ void do_sum()
 	}
 }
 
-bool is_zero(const mp_limb_t vec[][MODULUS_SIZE]) {
-	for(uint i = 0 ; i < MODULUS_SIZE * globals::nr ; i++) {
-		if (vec[i / MODULUS_SIZE][i % MODULUS_SIZE] != 0)
+bool is_zero(const scalar_t * vec) {
+	for(uint i = 0 ; i < globals::nr ; i++) {
+		if (!traits::is_zero(v[i])) {
 			return false;
+		}
 	}
 	return true;
 }
@@ -134,17 +135,58 @@ void multiply()
 	const uint32_t * ip = idx;
 	const int32_t  * vp = val;
 	for(uint i = 0 ; i < nr ; i++) {
-		zero<MODULUS_SIZE + 2>(scrap[i]);
+		traits::zero(scrap[i]);
 		uint c = 0;
 		for( ; *vp != 0 ; ip++, vp++) {
 			c += *ip;
-			addmul<MODULUS_SIZE>(scrap[i], v[c], *vp);
+			traits::addmul(scrap[i], v[c], *vp);
 		}
 		ip++;
 		vp++;
 	}
-	reduce<MODULUS_SIZE>(w, scrap, 0, nr);
+	traits::reduce(w, scrap, 0, nr);
 }
+
+program() { init_data(); }
+~program() { clear_data(); }
+
+void go()
+{
+	using namespace globals;
+
+	init_data();
+	do_sum();
+
+	if (is_zero(v)) {
+		cerr << "// trivial solution encountered !\n";
+		BUG();
+	}
+	memcpy(w, v, nr * sizeof(scalar_t));
+
+	uint i;
+
+	for(i = 0 ; i < 100 && !is_zero(w) ; i++) {
+		memcpy(v, w, nr * sizeof(scalar_t));
+		cout << fmt("// trying B^%*y") % i << endl;
+		multiply();
+	}
+
+	if (i == 100 && !is_zero(w)) {
+		cerr << "// no solution found\n";
+		BUG();
+	}
+
+	cout << fmt("// B^%*y is a solution\n") % (i-1);
+
+	ofstream w;
+	must_open(w, files::w % mine.scol);
+	for(uint i = 0 ; i < nr ; i++) {
+		traits::print(w,v[i]) << "\n";
+	}
+
+}
+
+};
 
 int main(int argc, char *argv[])
 {
@@ -191,40 +233,17 @@ int main(int argc, char *argv[])
 	cout.flush();
 	cerr.flush();
 
-	init_data();
+	idx = new uint32_t[nr + nb_coeffs];
+	val = new  int32_t[nr + nb_coeffs];
 
-	do_sum();
-
-	if (is_zero(v)) {
-		cerr << "// trivial solution encountered !\n";
-		BUG();
-	}
-	memcpy(w, v, nr * sizeof(mp_limb_t[MODULUS_SIZE]));
-
-	uint i;
-
-	for(i = 0 ; i < 100 && !is_zero(w) ; i++) {
-		memcpy(v, w, nr * sizeof(mp_limb_t[MODULUS_SIZE]));
-		cout << fmt("// trying B^%*y") % i << endl;
-		multiply();
+	{
+		ifstream mtx;
+		must_open(mtx, files::matrix);
+		fill_matrix_data(mtx, 0, nb_coeffs, 0, nr, idx, val);
 	}
 
-	if (i == 100 && !is_zero(w)) {
-		cerr << "// no solution found\n";
-		BUG();
-	}
-
-	cout << fmt("// B^%*y is a solution\n") % (i-1);
-
-	ofstream w;
-	must_open(w, files::w % mine.scol);
-	for(uint i = 0 ; i < nr ; i++) {
-		mpz_class z;
-		MPZ_SET_MPN(z.get_mpz_t(), globals::v[i], MODULUS_SIZE);
-		w << z << "\n";
-	}
-
-	clear_data();
+	program<typical_scalar_traits<MODULUS_SIZE> > x;
+	x.go();
 }
 
 /* vim:set sw=8: */

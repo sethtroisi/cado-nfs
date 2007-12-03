@@ -332,7 +332,6 @@ template<> RESOLVE1(inversion, mg_elt, mg_elt);
 }
 
 /* }}} */
-
 /* {{{ conversion ************************************************ */
 
 TOPLEVEL_BINARY_OP(convert, conversion);

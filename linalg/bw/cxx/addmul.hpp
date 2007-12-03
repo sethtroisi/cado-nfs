@@ -11,6 +11,8 @@ namespace globals {
 	extern mpz_class modulus;
 }
 
+
+namespace core_ops {
 /* CORE OPS : reduce & addmul */
 /* reduce only a scalar */
 template<mp_size_t width>
@@ -126,5 +128,7 @@ inline void assign(mp_limb_t dst[width], const mp_limb_t z[nw])
 	}
 }
 #endif
+
+}
 
 #endif	/* ADDMUL_HPP_ */

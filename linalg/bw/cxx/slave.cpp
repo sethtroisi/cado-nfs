@@ -58,8 +58,6 @@ namespace globals {
 	uint iter0;
 	mpz_class modulus;
 	vector<uint32_t> bw_x;
-	mp_limb_t (*v0) [MODULUS_SIZE];
-	mp_limb_t (*f) [MODULUS_SIZE];	// mksol only
 	uint degf;			// mksol only
 	barrier_t	main_loop_barrier;
 	mpz_class dotprod_diff_check;
@@ -68,6 +66,12 @@ namespace globals {
 	vector<std::streampos> mtxfile_pos;
 	vector<uint> nb_coeffs;
 	vector<void *> thread_class_ptr;
+
+	template<typename traits> struct vdata {
+		typedef typename traits::scalar_t scalar_t;
+		scalar_t * v0;
+		scalar_t * f;
+	};
 }
 
 /* {{{ I/O : reading tasks */
@@ -140,18 +144,21 @@ string pdelta(double t)
 template<typename> int addup(int);
 
 /* The Derived type supplies the use_vector part */
-template<mp_size_t width, typename Derived>
-struct thread
+template<typename traits, typename Derived>
+	// typename traits = typical_scalar_traits<width> >
+struct thread : public traits
 {
-	typedef thread<width, Derived> self;
+	typedef typename traits::scalar_t scalar_t;
+	typedef typename traits::wide_scalar_t wide_scalar_t;
+	typedef thread<traits, Derived> self;
 	int t;
 	uint32_t * idx;
 	int32_t  * val;
 	uint i0;
 	uint i1;
-	mp_limb_t (*v) [width];
-	mp_limb_t (*w) [width];
-	mp_limb_t (*scrap) [width + 2];
+	scalar_t *v;
+	scalar_t *w;
+	wide_scalar_t *scrap;
 	int32_t  * check_x0;
 	int32_t  * check_m0;
 	double maxwait;
@@ -162,11 +169,13 @@ struct thread
 	double ticks_ref;
 	double wct_ref;
 
-	thread() {
+	thread(void * ptr) {
 		using globals::nr;
 		using globals::thread_class_ptr;
 		using globals::nb_coeffs;
 		using globals::mtxfile_pos;
+
+		globals::vdata<traits> * vptr = (globals::vdata<traits> *) ptr;
 
 		t = tseqid();
 
@@ -177,9 +186,9 @@ struct thread
 		i1 = ((t + 1) * nr) / mine.nt;
 		maxwait = 0.1;
 
-		v = new mp_limb_t[nr][width];
-		w = new mp_limb_t[nr][width];
-		scrap = new mp_limb_t[i1 - i0][width + 2];
+		v = new scalar_t[nr];
+		w = new scalar_t[nr];
+		scrap = new wide_scalar_t[i1 - i0];
 
 		idx = new uint32_t[i1 - i0 + nb_coeffs[t]];
 		val = new  int32_t[i1 - i0 + nb_coeffs[t]];
@@ -198,8 +207,8 @@ struct thread
 
 		BUG_ON(globals::iter0 & 1);
 
-		memcpy(v, globals::v0, sizeof(mp_limb_t[nr][width]));
-		memset(w, 0, sizeof(mp_limb_t[nr][width]));
+		memcpy(v, vptr->v0, nr * sizeof(scalar_t));
+		memset(w, 0, nr * sizeof(scalar_t));
 
 		go_mark = done = globals::iter0;
 		ticks_ref = thread_ticks();
@@ -255,26 +264,27 @@ struct thread
 			<< endl;
 	}
 
-	mpz_class one_dotprod(const int32_t * sv, const mp_limb_t lv[][width])
+	mpz_class one_dotprod(const int32_t * sv, const scalar_t lv[])
 	{
-		mp_limb_t tmp[width + 2] = {0, };
+		wide_scalar_t tmp;
+		zero(tmp);
 
 		for(uint i = i0 ; i < i1 ; i++) {
-			addmul<width>(tmp, lv[i], sv[i-i0]);
+			addmul(tmp, lv[i], sv[i-i0]);
 		}
-		return reduce<width>(tmp);
+		return reduce(tmp);
 	}
 	
-	void multiply(mp_limb_t dst[][width + 2], const mp_limb_t src[][width])
+	void multiply(wide_scalar_t dst[], const scalar_t src[])
 	{
 		const uint32_t * ip = idx;
 		const int32_t  * vp = val;
 		for(uint i = 0 ; i < i1 - i0 ; i++) {
-			zero<width + 2>(dst[i]);
+			zero(dst[i]);
 			uint c = 0;
 			for( ; *vp != 0 ; ip++, vp++) {
 				c += *ip;
-				addmul<width>(dst[i], src[c], *vp);
+				addmul(dst[i], src[c], *vp);
 			}
 			ip++;
 			vp++;
@@ -291,8 +301,8 @@ struct thread
 
 	/* src is expected to be B^done * y ; compute B^(done+1) y into dst,
 	 * increment i */
-	void flip_flap(	mp_limb_t dst[][width],
-			mp_limb_t src[][width])
+	void flip_flap(	scalar_t dst[],
+			scalar_t src[])
 	{
 		double twait;
 		bool ok;
@@ -305,7 +315,7 @@ struct thread
 			multiply(scrap, src);
 			mpz_class ds = one_dotprod(check_m0, src);
 
-			reduce<width>(dst, scrap, i0, i1);
+			reduce(dst, scrap, i0, i1);
 			mpz_class dt = one_dotprod(check_x0, dst);
 
 			dot_part = ds - dt;
@@ -321,12 +331,12 @@ struct thread
 			if (x == t) continue;
 			uint xi0 = (x * nr) / mine.nt;
 			uint xi1 = ((x + 1) * nr) / mine.nt;
-			const thread<width, Derived>* xptr = 
-				(const thread<width, Derived>*)
+			const self* xptr = 
+				(const self*)
 				globals::thread_class_ptr[x];
 			memcpy(dst + xi0,
 					((done & 1) ? xptr->v : xptr->w) + xi0,
-					(xi1 - xi0) * sizeof(mp_limb_t[width]));
+					(xi1 - xi0) * sizeof(scalar_t));
 		}
 
 		++done;
@@ -357,14 +367,16 @@ struct thread
 };
 
 /* do the work that differs when task == slave and task == mksol */
-template<mp_size_t width>
-struct slave_thread : public thread<width, slave_thread<width> > {
-	typedef slave_thread<width> self;
-	typedef thread<width, self> super;
+template<typename traits>
+struct slave_thread : public thread<traits, slave_thread<traits> > {
+	typedef slave_thread<traits> self;
+	typedef thread<traits, self> super;
+	typedef typename traits::scalar_t scalar_t;
+	typedef typename traits::wide_scalar_t wide_scalar_t;
 	ofstream * a;
 	vector<uint> px;
 	int cp_lag;
-	slave_thread() : super() {
+	slave_thread(void * x) : super(x) {
 		int x0 = (super::t * globals::m) / mine.nt ;
 		int x1 = ((super::t + 1) * globals::m) / mine.nt ;
 		a = new ofstream[x1 - x0];
@@ -381,12 +393,13 @@ struct slave_thread : public thread<width, slave_thread<width> > {
 		cp_lag = globals::cp_lag;
 	}
 	~slave_thread() { delete[] a; }
-	void use_vector(mp_limb_t dst[][width]) {
-		mpz_class z;
+	void use_vector(scalar_t dst[]) {
+		// mpz_class z;
 
 		for(uint x = 0 ; x < px.size() ; x++) {
-			MPZ_SET_MPN(z.get_mpz_t(), dst[px[x]], width);
-			a[x] << z << "\n";
+			// MPZ_SET_MPN(z.get_mpz_t(), dst[px[x]], width);
+			// a[x] << z << "\n";
+			traits::print(a[x], dst[px[x]]) << "\n";
 		}
 
 		if (super::done % cp_lag != 0) return;
@@ -407,8 +420,9 @@ struct slave_thread : public thread<width, slave_thread<width> > {
 			ofstream v;
 			must_open(v, nm);
 			for(uint i = 0 ; i < globals::nr ; i++) {
-				MPZ_SET_MPN(z.get_mpz_t(), dst[i], width);
-				v << z << "\n";
+				// MPZ_SET_MPN(z.get_mpz_t(), dst[i], width);
+				// v << z << "\n";
+				traits::print(v, dst[i]) << "\n";
 			}
 		}
 
@@ -422,41 +436,46 @@ struct slave_thread : public thread<width, slave_thread<width> > {
 	}
 };
 
-template<mp_size_t width>
-struct mksol_thread : public thread<width, mksol_thread<width> > {
-	typedef mksol_thread<width> self;
-	typedef thread<width, self> super;
+template<typename traits>
+struct mksol_thread : public thread<traits, mksol_thread<traits> > {
+	typedef mksol_thread<traits> self;
+	typedef thread<traits, self> super;
+	typedef typename traits::scalar_t scalar_t;
+	typedef typename traits::wide_scalar_t wide_scalar_t;
 	int cp_lag;
 	uint bound_deg_f;
 	uint degf;
-	mp_limb_t (*sum) [width];
-	mksol_thread() : super() {
+	scalar_t *sum;
+	scalar_t * fptr;
+	mksol_thread(void * ptr) : super(ptr) {
 		using namespace globals;
+		fptr = ((globals::vdata<traits> *) ptr)->f;
 
-		sum = new mp_limb_t[super::i1 - super::i0][width];
-		memset(sum, 0, (super::i1 - super::i0) * sizeof(mp_limb_t[width]));
+		sum = new scalar_t[super::i1 - super::i0];
+		memset(sum, 0, (super::i1 - super::i0) * sizeof(scalar_t));
 		cp_lag = globals::cp_lag;
 	}
 	~mksol_thread() {
 		delete[] sum;
 	}
-	void use_vector(mp_limb_t dst[][width]) {
+	void use_vector(scalar_t dst[]) {
 		/* We have the full vector available here. However it is
 		 * only available for writing */
 
-		using globals::f;
 		using globals::degf;
 
 		for(uint i = super::i0 ; i < super::i1 ; i++) {
-			mp_limb_t t[2 * width + 1];
-			mp_limb_t c;
-			mpn_mul_n(t, dst[i], f[degf - super::done], width);
-			c = mpn_add_n(t, t, sum[i - super::i0], width);
-			if (c)
-				c = mpn_add_1(t + width, t + width, width, c);
-			t[2 * width] = c;
-
-			assign<width, 2 * width + 1>(sum[i - super::i0], t);
+// 			mp_limb_t t[2 * width + 1];
+// 			mp_limb_t c;
+// 			mpn_mul_n(t, dst[i], f[degf - super::done], width);
+// 			c = mpn_add_n(t, t, sum[i - super::i0], width);
+// 			if (c)
+// 				c = mpn_add_1(t + width, t + width, width, c);
+// 			t[2 * width] = c;
+// 
+// 			core_ops::assign<width, 2 * width + 1>(sum[i - super::i0], t);
+// 
+			traits::addmul(sum[i - super::i0], dst[i], fptr[degf - super::done]);
 		}
 
 		if (super::done % cp_lag != 0) return;
@@ -494,15 +513,16 @@ struct mksol_thread : public thread<width, mksol_thread<width> > {
 					(const self*)
 					globals::thread_class_ptr[x];
 				for(uint xi = xi0 ; xi < xi1 ; xi++) {
-					MPZ_SET_MPN(z.get_mpz_t(),
-							xptr->sum[xi - xi0],
-							width);
-					v << z << "\n";
+					// MPZ_SET_MPN(z.get_mpz_t(),
+					// xptr->sum[xi - xi0],
+					// width);
+					// v << z << "\n";
+					traits::print(v, xptr->sum[xi - xi0]) << "\n";
 				}
 			}
 		}
 		barrier_wait(&globals::main_loop_barrier, NULL, NULL);
-		memset(sum, 0, (super::i1 - super::i0) * width * sizeof(mp_limb_t));
+		memset(sum, 0, (super::i1 - super::i0) * sizeof(scalar_t));
 	}
 };
 
@@ -531,11 +551,11 @@ int addup(int k)
 
 /* mksol stuff only */
 
-uint set_f_coeffs(uint maxdeg)
+template<typename traits>
+uint set_f_coeffs(typename traits::scalar_t f[], uint maxdeg)
 {
-	using namespace globals;
 	uint deg = 0;
-	memset(f, 0, (maxdeg + 1) * MODULUS_SIZE * sizeof(mp_limb_t));
+	memset(f, 0, (maxdeg + 1) * sizeof(typename traits::scalar_t));
 	ifstream fx;
 	must_open(fx, files::f % mine.scol);
 	istream_iterator<mpz_class> inp(fx);
@@ -543,25 +563,29 @@ uint set_f_coeffs(uint maxdeg)
 		vector<mpz_class> line;
 		BUG_ON(deg > maxdeg);
 		back_insert_iterator<vector<mpz_class> > foo(line);
+		/* read all n coefficients, only select the one we're
+		 * really interested in.
+		 */
 		for(uint i = 0 ; i < globals::n ; i++) {
 			*foo++ = *inp++;
 		}
-		assign<MODULUS_SIZE>(f[deg], line[globals::col]);
+		// core_ops::assign<MODULUS_SIZE>(f[deg], line[globals::col]);
+		traits::assign(f[deg], line, globals::col);
 	}
 	deg--;
 	return deg;
 }
 
 
-template<template <mp_size_t> class X>
-void * thread_program(void *)
+template<template <typename> class X, typename traits>
+void * thread_program(void * ptr)
 {
 	cout.flush();
 	cerr.flush();
 
 	cout << fmt("// thread % : setting up temporaries\n") % tseqid();
 	cout << flush;
-	X<MODULUS_SIZE> blah;
+	X<traits> blah(ptr);
 	barrier_wait(&globals::main_loop_barrier, NULL, NULL);
 	cout << fmt("// thread % : go\n") % tseqid() << flush;
 	blah.loop();
@@ -569,6 +593,76 @@ void * thread_program(void *)
 	barrier_wait(&globals::main_loop_barrier, NULL, NULL);
 
 	return NULL;
+}
+
+template<typename traits>
+int program()
+{
+	using namespace globals;
+	typedef typename traits::scalar_t scalar_t;
+
+	int recover;
+
+	nb_iter = nr + 2 * n;
+	nb_iter = iceildiv(nb_iter, m) + iceildiv(nb_iter, n) + 10;
+	cp_lag  = max(nb_iter / CHECKPOINTS, 1u);
+	cp_lag += cp_lag & 1;
+
+	barrier_init(&main_loop_barrier, mine.nt, NULL);
+
+	cout << fmt("// checkpointing is done every % iterations\n") % cp_lag;
+
+	globals::vdata<traits> v0_and_f;
+	std::vector<void *> targs(mine.nt, (void *) &v0_and_f);
+
+	if (mine.task == "slave") {
+
+		recover = recoverable_iteration(m, col, cp_lag);
+		iter0   = recover * cp_lag;
+
+		if (iter0 >= nb_iter) {
+			cout << "// everything already done for column "
+				<< col << "\n";
+			exit(0);
+		}
+
+		cout << fmt("// recovering up to checkpoint % == iteration %\n")
+			% recover % iter0;
+		cout << fmt("// % total iterations needed, % to go\n")
+			% nb_iter % (nb_iter - iter0);
+		cout << flush;
+
+		recover_iteration(m, col, iter0);
+
+		v0_and_f.v0 = new scalar_t[nr];
+		recover_vector<traits>(nr, col, recover, v0_and_f.v0);
+
+		start_threads(thread_program<slave_thread, traits>, targs);
+		delete[] v0_and_f.v0;
+	} else if (mine.task == "mksol") {
+
+		/* See the discussion in master.cpp concerning the bound
+		 * on the degree of f */
+		uint bound_deg_f = iceildiv(m, n) +
+			iceildiv(m * iceildiv(nr, m), n) + 10;
+
+		v0_and_f.f = new scalar_t[bound_deg_f + 1];
+		v0_and_f.v0 = new scalar_t[nr];
+
+		degf = set_f_coeffs<traits>(v0_and_f.f, bound_deg_f);
+		
+		cout << fmt("// F%[f0w2] has degree %\n") % mine.scol % degf;
+		nb_iter = degf;
+
+		/* FIXME ; the 0 here is intended to be changed */
+		recover_vector<traits>(nr, col, 0, v0_and_f.v0);
+
+		start_threads(thread_program<mksol_thread, traits>, targs);
+
+		delete[] v0_and_f.v0;
+		delete[] v0_and_f.f;
+	}
+	return 0;
 }
 
 int main(int argc, char *argv[])
@@ -593,10 +687,8 @@ int main(int argc, char *argv[])
 	globals::modulus = mpz_class(mstr);
 
 	if (SIZ(globals::modulus.get_mpz_t()) != MODULUS_SIZE) {
-		cerr << fmt("ERROR: RECOMPILE WITH"
-				" ``#define MODULUS_SIZE %''\n")
-			% SIZ(globals::modulus.get_mpz_t());
-		exit(1);
+		cerr << "### Not compiled with proper MODULUS_BITS\n"
+			<< "Using generic code instead\n";
 	}
 
 	detect_mn(m, n);
@@ -646,63 +738,7 @@ int main(int argc, char *argv[])
 	cout.flush();
 	cerr.flush();
 
-	int recover;
-
-	nb_iter = nr + 2 * n;
-	nb_iter = iceildiv(nb_iter, m) + iceildiv(nb_iter, n) + 10;
-	cp_lag  = max(nb_iter / CHECKPOINTS, 1u);
-	cp_lag += cp_lag & 1;
-
-	barrier_init(&main_loop_barrier, mine.nt, NULL);
-
-	cout << fmt("// checkpointing is done every % iterations\n") % cp_lag;
-
-	if (mine.task == "slave") {
-
-		recover = recoverable_iteration(m, col, cp_lag);
-		iter0   = recover * cp_lag;
-
-		if (iter0 >= nb_iter) {
-			cout << "// everything already done for column "
-				<< col << "\n";
-			exit(0);
-		}
-
-		cout << fmt("// recovering up to checkpoint % == iteration %\n")
-			% recover % iter0;
-		cout << fmt("// % total iterations needed, % to go\n")
-			% nb_iter % (nb_iter - iter0);
-		cout << flush;
-
-		recover_iteration(m, col, iter0);
-
-		v0 = new mp_limb_t[nr][MODULUS_SIZE];
-		recover_vector(nr, col, recover, v0);
-
-		start_threads(thread_program<slave_thread>, mine.nt);
-		delete[] v0;
-
-	} else if (mine.task == "mksol") {
-
-		/* See the discussion in master.cpp concerning the bound
-		 * on the degree of f */
-		uint bound_deg_f = iceildiv(m, n) +
-			iceildiv(m * iceildiv(nr, m), n) + 10;
-		globals::f = new mp_limb_t[bound_deg_f + 1][MODULUS_SIZE];
-		degf = set_f_coeffs(bound_deg_f);
-		
-		cout << fmt("// F%[f0w2] has degree %\n") % mine.scol % degf;
-		nb_iter = degf;
-
-		v0 = new mp_limb_t[nr][MODULUS_SIZE];
-		/* FIXME ; the 0 here is intended to be changed */
-		recover_vector(nr, col, 0, v0);
-
-		start_threads(thread_program<mksol_thread>, mine.nt);
-
-		delete[]f;
-		delete[] v0;
-	}
+	return program<typical_scalar_traits<MODULUS_SIZE> >();
 }
 
 /* vim:set sw=8: */

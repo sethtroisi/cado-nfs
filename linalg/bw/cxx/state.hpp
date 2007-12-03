@@ -7,7 +7,11 @@
 #include <fstream>
 
 extern int recoverable_iteration(int, int, int);
-extern int recover_vector(int, int, int, mp_limb_t (*)[MODULUS_SIZE]);
 extern int recover_iteration(int, int, int);
+
+template<typename traits>
+int recover_vector(int nr, int col, int r, typename traits::scalar_t * w);
+
+#include "state.tcc"
 
 #endif	/* STATE_HPP_ */

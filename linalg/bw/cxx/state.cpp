@@ -63,31 +63,6 @@ int recoverable_iteration(int m, int col, int cp_lag)
 	return mi / cp_lag;
 }
 
-template<typename T> inline istream_iterator<T> beginof(ifstream& i)
-{ return istream_iterator<T>(i); }
-template<typename T> inline istream_iterator<T> endof(ifstream&)
-{ return istream_iterator<T>(); }
-
-int recover_vector(int nr, int col, int r, mp_limb_t (*w)[MODULUS_SIZE])
-{
-	ifstream v;
-	if (r) {
-		must_open(v, files::v % col % r);
-	} else {
-		must_open(v, files::y % col);
-	}
-	mpz_class z;
-	istream_iterator<mpz_class> it(v);
-	for( ; nr && it != endof<mpz_class>(v) ; it++, nr--, w++) {
-		z = *it;
-		BUG_ON(z < 0);
-		BUG_ON(ABS(SIZ(z.get_mpz_t())) > MODULUS_SIZE);
-		MPN_SET_MPZ(*w, MODULUS_SIZE, z.get_mpz_t());
-	}
-	BUG_ON(nr != 0);
-	return 0;
-}
-
 /* We read the first r == (k * cp_lag) integers in the A files.  */
 int recover_iteration(int m, int col, int r)
 {
