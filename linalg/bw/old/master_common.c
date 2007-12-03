@@ -221,7 +221,7 @@ int read_data_for_series(bw_mnpoly a)
 	for (k = 0; k <= total_work; k++) {
 		int rc = 0;
 
-		for (i = 0; i < m_param; i++)
+		for (i = 0; i < m_param; i++) {
 			for (j = 0; j < n_param; j+=a_nbys[j]) {
 				int l;
 				for(l = 0 ; l < a_nbys[j] ; l++) {
@@ -235,11 +235,12 @@ int read_data_for_series(bw_mnpoly a)
 							bw_allocsize, blah);
 				}
 			}
+		}
 		if (rc == 0) {
 			break;
 		} else if (rc != m_param * n_param) {
-			die("problem with A files (not in sync, rc=%d)\n", 1,
-			    rc);
+			fprintf(stderr, "A files not in sync ; read only %d coeffs in X^%d\n", rc, k);
+			break;
 		}
 	}
 

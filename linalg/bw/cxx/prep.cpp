@@ -75,6 +75,8 @@ int main(int argc, char *argv[])
 	string mstr;
 	ifstream mtx;
 	
+	srand(time(NULL));
+
 	must_open(mtx, files::matrix);
 
 	get_matrix_header(mtx, nr, mstr);

@@ -86,7 +86,7 @@ int main(int argc, char * argv[])
 	istream_iterator<matrix_line> mit(mtx);
 	unsigned int maxb = 2;
 	for(unsigned int p = 0 ; mit != istream_iterator<matrix_line>() ; p++) {
-		vector<bool> accept(512, true);
+		vector<bool> accept(2048, true);
 		matrix_line l = *mit++;
 		unsigned int b;
 		for(unsigned int k = 0 ; k < l.size() ; k++) {
