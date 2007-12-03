@@ -206,6 +206,22 @@ BW_DUMP_SOURCES:=auxfuncs.c old/endian.c old/dump.c
 BW_DUMP_LIBS:=
 -include .bw-dump.mkf
 
+BW_TRANSPOSE_SOURCES:=				\
+		auxfuncs.c			\
+		cxx/transpose.cpp cxx/files.cpp	\
+		cxx/matrix_header.cpp		\
+		cxx/matrix_line.cpp
+BW_TRANSPOSE_LIBS:=
+-include .bw-transpose.mkf
+
+NFSFORGE_SOURCES:=				\
+		auxfuncs.c			\
+		cxx/nfsforge.cpp cxx/files.cpp	\
+		cxx/matrix_header.cpp		\
+		cxx/matrix_line.cpp
+NFSFORGE_LIBS:=-lgmp -lgmpxx
+-include .nfsforge.mkf
+
 BW_BALANCE_SOURCES:=				\
 		auxfuncs.c			\
 		cxx/balance.cpp cxx/files.cpp	\
