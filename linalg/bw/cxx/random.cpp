@@ -5,10 +5,13 @@
 #include "parsing_tools.hpp"
 
 #include <cstdlib>
+#include <cmath>
 #include <iostream>
 
 #include <string>
 #include <sstream>
+
+#include <set>
 
 #include <gmp.h>
 #include <gmpxx.h>
@@ -21,6 +24,110 @@ int random_coeff()
 	int v = (1 - (b & 1) * 2) * ((b / 2) + 1);
 	return v;
 }
+
+struct rcoeff_large {
+	int32_t operator()() const {
+		return random_coeff();
+	}
+};
+
+struct rcoeff_small {
+	int p;
+	rcoeff_small(mpz_class const& x) : p(x.get_si()) {}
+	int32_t operator()() const {
+		int v = random_coeff() % p;
+		if (v < (-p/2)) {
+			v += p;
+		} else if (v > p/2) {
+			v -= p;
+		}
+		return v;
+	}
+};
+
+struct rcoeff_binary { int32_t operator()() const { return 1; } };
+
+class fill_row_binomial {
+	unsigned int nr;
+	double p;
+public:
+	fill_row_binomial(unsigned int nr, double p) :
+		nr(nr), p(p) {}
+template<class T>
+void operator()(matrix_line & l, T const& op) const
+{
+	l.clear();
+	for(unsigned int j = 0 ; j < nr ; j++) {
+		double t = random() / (double) RAND_MAX;
+		if (t > p) continue;
+		int32_t v = op();
+		if (v == 0) continue;
+		l.push_back(make_pair(j, v));
+	}
+}
+};
+
+class fill_row_normal {
+	unsigned int nr;
+	double mean, sigma;
+	double pick() const
+	{
+		double a = random() / (double) RAND_MAX;
+		double b = random() / (double) RAND_MAX;
+		double z = sqrt(-2*log(a)) * cos(2*M_PI*b);
+		return abs(mean + sigma * z);
+	}
+public:
+	fill_row_normal(unsigned int nr, double p) :
+		nr(nr),
+		mean(nr * p),
+		sigma(sqrt(nr*p*(1-p))) {}
+
+template<class T>
+void operator()(matrix_line & l, T const& op) const
+{
+	l.clear();
+	unsigned int n = (unsigned int) pick();
+	set<uint32_t> indices;
+	for(unsigned int i = 0 ; i < n ; i++) {
+		double t = random() / (double) RAND_MAX;
+		indices.insert((uint32_t) (t*nr));
+	}
+	for(set<uint32_t>::const_iterator j = indices.begin() ; j != indices.end() ; j++) {
+		int32_t v = op();
+		if (v == 0) continue;
+		l.push_back(make_pair(*j, v));
+	}
+}
+};
+
+struct fillmat {
+	template<typename filler>
+	void operator()(unsigned int nr, unsigned int nz,
+			mpz_class const& px, filler const& f) const
+	{
+	if (px > 128) {
+		for(unsigned int i = nz ; i < nr ; i++) {
+			matrix_line l;
+			f(l, rcoeff_large());
+			cout << l << "\n";
+		}
+	} else if (px != 2) {
+		rcoeff_small op(px);
+		for(unsigned int i = nz ; i < nr ; i++) {
+			matrix_line l;
+			f(l, op);
+			cout << l << "\n";
+		}
+	} else {
+		for(unsigned int i = nz ; i < nr ; i++) {
+			matrix_line l;
+			f(l, rcoeff_binary());
+			print_line_without_ones(cout,l) << "\n";
+		}
+	}
+	}
+};
 
 int main(int argc, char * argv[])
 {
@@ -44,71 +151,31 @@ int main(int argc, char * argv[])
 
 	unsigned int nr = atoi(argv[1]);
 	string mstr(argv[2]);
-	double d = 0.5;
+	double p = 0.5;
 	if (argc > 3) {
 		istringstream foo(argv[3]);
-		foo >> d;
+		foo >> p;
 	}
-	if (d > 1) { d = d/nr; }
+	if (p > 1) { p = p/nr; }
 
 	mpz_class px(mstr);
 
 	put_matrix_header(cout, nr, mstr);
-	if (px > 128) {
-		for(unsigned int i = 0 ; i < nr ; i++) {
-			matrix_line l;
-			if (i == 0) {
-				cout << l << "\n";
-				continue;
-			}
-			for(unsigned int j = 0 ; j < nr ; j++) {
-				double t = random() / (double) RAND_MAX;
-				if (t > d) continue;
-				l.push_back(make_pair(j, random_coeff()));
-			}
-			cout << l << "\n";
-		}
-	} else if (px != 2) {
-		int p = px.get_si();
-		for(unsigned int i = 0 ; i < nr ; i++) {
-			matrix_line l;
-			if (i == 0) {
-				cout << l << "\n";
-				continue;
-			}
-			for(unsigned int j = 0 ; j < nr ; j++) {
-				double t = random() / (double) RAND_MAX;
-				if (t > d) continue;
-				int v = random_coeff() % p;
-				if (v < (-p/2)) {
-					v += p;
-				} else if (v > p/2) {
-					v -= p;
-				}
-				if (v == 0) {
-					continue;
-				}
-				l.push_back(make_pair(j, v));
-			}
-			cout << l << "\n";
-		}
+
+	/* Put a zero for the first row */
+	cout << 0 << "\n";
+	unsigned int nz = 1;
+
+	if (nr > 100) {
+		/* We should check nr*p and nr*(1-p) as well if we were
+		 * concerned by good approximation, but it's not really
+		 * the case */
+		cerr << "Using normal approximation\n";
+		fillmat()(nr, nz, px, fill_row_normal(nr, p));
 	} else {
-		for(unsigned int i = 0 ; i < nr ; i++) {
-			matrix_line l;
-			if (i == 0) {
-				cout << 0 << "\n";
-				continue;
-			}
-			for(unsigned int j = 0 ; j < nr ; j++) {
-				double t = random() / (double) RAND_MAX;
-				if (t > d) continue;
-				if (random_coeff() & 1 == 0)
-					continue;
-				l.push_back(make_pair(j, 1));
-			}
-			print_line_without_ones(cout,l) << "\n";
-		}
+		fillmat()(nr, nz, px, fill_row_binomial(nr, p));
 	}
+
 	return 0;
 }
 

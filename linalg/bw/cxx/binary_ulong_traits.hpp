@@ -11,38 +11,36 @@
 #include <string>
 #include <sstream>
 
-#ifndef	ULONG_BITS
-#define	ULONG_BITS	((int) (sizeof(unsigned long) * CHAR_BIT))
-#endif
-
-struct binary_ulong_traits {
+template<typename T>
+struct binary_pod_traits {
 	typedef matrix_repr_binary representation;
 	static const int max_accumulate = UINT_MAX;
 	static const int max_accumulate_wide = UINT_MAX;
 
+	static const int nbits = sizeof(T) * CHAR_BIT;
 	typedef binary_field coeff_field;
 
-	struct scalar_t { unsigned long p; };
+	struct scalar_t { T p; };
 	typedef scalar_t wide_scalar_t;
 
 	struct name {
-		std::string s;
+		char x[40];
 		name() {
-			std::ostringstream st(s);
-			st << "binary ulong code [ " << ULONG_BITS << " bits ]";
+			snprintf(x, sizeof(x), "binary POD code [%d bits]",
+					nbits);
 		}
 		const char * operator()() const {
-			return s.c_str();
+			return x;
 		}
 	};
 
 	static int can() {
-		return globals::nbys == ULONG_BITS && globals::modulus_ulong == 2;
+		return globals::nbys == nbits && globals::modulus_ulong == 2;
 	}
 
 	/* FIXME -- this used to return an mpz_class */
 	static inline int get_y(scalar_t const & x, int i) {
-		BUG_ON(i >= ULONG_BITS || i < 0);
+		BUG_ON(i >= nbits || i < 0);
 		int bit = (x.p >> i) & 1UL;
 		return bit;
 	}
@@ -104,12 +102,12 @@ struct binary_ulong_traits {
 		 * nbys ??? */
 		x.p = 0;
 		for(int j = 0 ; j < globals::nbys ; j++)
-			x.p ^= (ulong) (z[i+j] != 0) << j;
+			x.p ^= (T) (z[i+j] != 0) << j;
 	}
 	static inline void assign(std::vector<mpz_class>& z, scalar_t const & x) {
 		BUG_ON(z.size() != ULONG_BITS);
 		for(unsigned int i = 0 ; i < ULONG_BITS ; i++) {
-			z[i] = (x.p >> i) & 1UL;
+			z[i] = (x.p >> i) & (T) 1;
 		}
 	}
 
@@ -130,10 +128,16 @@ struct binary_ulong_traits {
 #endif
 		for(int i = 0 ; i < globals::nbys ; i++) {
 			if (i) { o << " "; }
-			o << ((x.p >> i) & 1UL);
+			o << ((x.p >> i) & (T) 1);
 		}
 		return o;
 	}
 };
+
+typedef binary_pod_traits<ulong> binary_ulong_traits;
+typedef binary_pod_traits<uint64_t> binary_uint64_traits;
+typedef binary_pod_traits<uint32_t> binary_uint32_traits;
+typedef binary_pod_traits<uint16_t> binary_uint16_traits;
+typedef binary_pod_traits<uint8_t> binary_uint8_traits;
 
 #endif	/* BINARY_ULONG_TRAITS_HPP_ */

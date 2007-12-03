@@ -110,6 +110,25 @@ BW_MASTER2_LIBS:=-lgmp
 -include .bw-master2.mkf
 endif
 
+BW_MASTER_BINARY_SOURCES:=					\
+		auxfuncs.c					\
+		old/bw_scalar.c old/endian.c			\
+		old/timer.c					\
+		old/variables.c	old/fft_on_matrices.cpp		\
+		old/ops_poly_fft.cpp				\
+		old/ops_poly_schoolbook.cpp			\
+		old/ops_poly_integerfft.cpp			\
+		old/ops_poly_wrap.cpp				\
+		old/fft_core.c					\
+		old/field_common.c old/field_prime.c		\
+		old/field_quad.c old/field_complex.c		\
+		old/field_usage.c old/modulus_hacks.c		\
+		old/e_polynomial.c old/structure.c		\
+		old/structure_debug.c cxx/master_binary.cpp	\
+		old/twisting_polynomials.c
+BW_MASTER_BINARY_LIBS:=-lgmp
+-include .bw-master-binary.mkf
+
 BW_MASTER_OLD_SOURCES:=						\
 		auxfuncs.c barrier.c				\
 		old/bw_scalar.c old/endian.c			\

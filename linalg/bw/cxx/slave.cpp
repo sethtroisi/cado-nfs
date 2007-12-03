@@ -458,12 +458,17 @@ struct slave_thread : public thread<traits, slave_thread<traits> > {
 		 * what we have at hand for lowest pain... */
 		int rc = barrier_wait(&globals::main_loop_barrier, NULL, NULL);
 		if (rc == 1) {
-			for(int i = 0 ; i < globals::nbys ; i++) {
-				std::string nm = files::v % (globals::col+i) % r;
+			{
 				thread_lock(& globals::console_lock);
-				cout << fmt("T% writes %")
-					% super::t % nm << endl;
+				std::string nm0 = files::v % (globals::col) % r;
+				std::string nm1 = files::v % (globals::col + globals::nbys - 1) % r;
+				cout << fmt("T% writes % to %")
+					% super::t % nm0 % nm1 << endl;
 				thread_unlock(& globals::console_lock);
+			}
+			for(int i = 0 ; i < globals::nbys ; i++) {
+				std::string nm;
+				nm = files::v % (globals::col+i) % r;
 				ofstream v;
 				must_open(v, nm);
 				for(uint j = 0 ; j < globals::nr ; j++) {

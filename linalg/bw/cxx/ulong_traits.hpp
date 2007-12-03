@@ -8,25 +8,31 @@
 #include "traits_globals.hpp"
 #include "matrix_repr_prime.hpp"
 
-struct ulong_traits {
+template <typename T, int acc>
+struct pod_traits {
 	typedef matrix_repr_prime representation;
 
-	static const int max_accumulate = 250;
-	static const int max_accumulate_wide = 250;
+	static const int max_accumulate = acc;
+	static const int max_accumulate_wide = acc;
+	static const int nbits = sizeof(T)*CHAR_BIT;
 
 	typedef prime_field_any coeff_field;
-	struct scalar_t { long p; };
+	struct scalar_t { T p; };
 	typedef scalar_t wide_scalar_t;
 
 	struct name {
+		char x[40];
+		name() {
+			snprintf(x,sizeof(x),"pod-type (%d bits) code", nbits);
+		}
 		const char * operator()() const {
-			return "ulong code";
+			return x;
 		}
 	};
 
 	static int can() {
 		return globals::nbys == 1 &&
-			MODBITS() < (sizeof(unsigned long) * CHAR_BIT / 2 - 4);
+			acc < 1UL << (nbits - 2*MODBITS()); 
 	}
 
 	static inline mpz_class get_y(scalar_t const & x, int i) {
@@ -34,7 +40,7 @@ struct ulong_traits {
 		return mpz_class(x.p);
 	}
 	static inline void reduce(scalar_t & d, wide_scalar_t & s) {
-		d.p = s.p % (long) globals::modulus_ulong;
+		d.p = s.p % (T) globals::modulus_ulong;
 	}
 	static inline void reduce(scalar_t * dst, wide_scalar_t * src,
 		unsigned int i0, unsigned int i1)
@@ -86,5 +92,11 @@ struct ulong_traits {
 		return o << x.p;
 	}
 };
+
+typedef pod_traits<long, 250> ulong_traits;
+typedef pod_traits<int64_t, 250> int64_traits;
+typedef pod_traits<int32_t, 50> int32_traits;
+typedef pod_traits<int16_t, 10> int16_traits;
+typedef pod_traits<int8_t, 6> int8_traits;
 
 #endif	/* ULONG_TRAITS_HPP_ */

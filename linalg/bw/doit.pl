@@ -404,7 +404,9 @@ MASTER : {
 	}
 
 	my $exe = "${bindir}bw-master";
-	if ($method =~ /^(?:q(?:uadratic)?|old)$/) {
+	if ($modulus eq '2') {
+		$exe .= '-binary';
+	} elsif ($method =~ /^(?:q(?:uadratic)?|old)$/) {
 		$exe .= '-old';
 	} else {
 		die "threshold needed" unless $threshold;

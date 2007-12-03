@@ -28,6 +28,10 @@
 #define	TRY_ALL_BINARY_CODES(tmpl) do {				\
 	TRY_ONE_BINARY_CODE(tmpl,binary_ulong_traits);		\
 	TRY_ONE_BINARY_CODE(tmpl,binary_sse2_traits);		\
+	TRY_ONE_BINARY_CODE(tmpl,binary_uint8_traits);		\
+	TRY_ONE_BINARY_CODE(tmpl,binary_uint16_traits);		\
+	TRY_ONE_BINARY_CODE(tmpl,binary_uint32_traits);		\
+	TRY_ONE_BINARY_CODE(tmpl,binary_uint64_traits);		\
 	TRY_ONE_BINARY_CODE(tmpl,sse2_8words_traits);		\
 	TRY_ONE_BINARY_CODE(tmpl,sse2_2words_traits);		\
 	TRY_ONE_BINARY_CODE(tmpl,ulong_traits);			\
