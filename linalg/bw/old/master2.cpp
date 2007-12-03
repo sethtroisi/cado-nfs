@@ -44,6 +44,7 @@ static int	print_min=10;
 static int	preferred_quadratic_algorithm;	/* Defaults to 0 (old) */
 static int	t_init;
 static int	check_input = 1;
+static int	check_pi = 1;
 
 const char f_base_filename[] = "F_INIT";
 
@@ -1172,7 +1173,12 @@ block_wiedemann(void)
     pi_left=pi_right=0;
 
     t_start=t_counter;
-    new_t=retrieve_pi_files(&pi_left,t_counter);
+    if (check_pi) {
+        new_t=retrieve_pi_files(&pi_left,t_counter);
+    } else {
+        printf("Not reading pi files due to --nopi option\n");
+        new_t = t_counter;
+    }
 
     printf("ec->degree=%d, new_t=%d, t_counter=%d\n",
             ec->degree,new_t,t_counter);
@@ -1255,14 +1261,16 @@ block_wiedemann(void)
         dft_mb_free(dft_e_middle);
         t_counter=new_t;
 
-        save_pi(pi_left,t_start,-1,t_counter);
+        if (check_pi)
+            save_pi(pi_left,t_start,-1,t_counter);
     }
     if (pi_left!=NULL && !check_input && ec->degree<new_t-t_counter) {
         printf("We are not interested in the computation of e(X)\n");
         ec_advance(ec,new_t-t_counter);
         tp_act_on_delta(pi_left,global_delta);
         t_counter=new_t;
-        save_pi(pi_left,t_start,-1,t_counter);
+        if (check_pi)
+            save_pi(pi_left,t_start,-1,t_counter);
     }
 
     global_sum_delta=sum_delta(global_delta);
@@ -1309,7 +1317,9 @@ block_wiedemann(void)
         dft_bb_free(dft_pi_prod);
         pi_left=NULL;
         pi_right=NULL;
-        save_pi(pi_prod,t_start,new_t,t_counter);
+        if (check_pi) {
+            save_pi(pi_prod,t_start,new_t,t_counter);
+        }
         /* new_t is the inner value that has to be discarded */
     } else {
         pi_prod=pi_right;
@@ -1377,6 +1387,11 @@ main(int argc, char *argv[])
         }
         if (strcmp(argv[0], "--no-check-input") == 0) {
             check_input = 0;
+            argv++, argc--;
+            continue;
+        }
+        if (strcmp(argv[0], "--nopi") == 0) {
+            check_pi = 0;
             argv++, argc--;
             continue;
         }
