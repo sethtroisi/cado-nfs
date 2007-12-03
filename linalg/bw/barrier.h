@@ -45,6 +45,8 @@ extern "C" {
  */
 
 #ifdef ENABLE_PTHREADS
+#include <pthread.h>
+
 typedef struct barrier_tag {
     pthread_mutex_t     mutex;          /* Control access to barrier */
     pthread_cond_t      cv;             /* wait for barrier */
@@ -55,14 +57,28 @@ typedef struct barrier_tag {
     int			result;		/* Result of the companion function */
     int			cancelstate;	/* PTHREAD_CANCEL_DISABLE by default */
 } barrier_t;
+typedef pthread_mutex_t thread_lock_t;
 
 #define BARRIER_VALID   0xdbcafe
 #define BARRIER_INITIALIZER(cnt) \
     {PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER, \
     BARRIER_VALID, cnt, cnt, 0}
+#define	THREAD_LOCK_INITIALIZER	PTHREAD_MUTEX_INITIALIZER
+static inline int thread_lock(thread_lock_t * x) { return pthread_mutex_lock(x); }
+static inline int thread_unlock(thread_lock_t * x) { return pthread_mutex_unlock(x); }
+static inline int thread_trylock(thread_lock_t * x) { return pthread_mutex_trylock(x); }
+
 #else	/* ENABLE_PTHREADS */
+
+
 typedef void * barrier_t;
+typedef void * thread_lock_t;
 #define BARRIER_INITIALIZER(n)	NULL
+#define	THREAD_LOCK_INITIALIZER	NULL
+static inline int thread_lock(thread_lock_t * x) { return 0; }
+static inline int thread_unlock(thread_lock_t * x) { return 0; }
+static inline int thread_trylock(thread_lock_t * x) { return 0; }
+
 #endif	/* ENABLE_PTHREADS */
 
 extern int barrier_init (barrier_t *, int, int *);

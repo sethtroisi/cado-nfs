@@ -200,6 +200,7 @@ BW_RANDOM_SOURCES:=			\
 		cxx/matrix_header.cpp	\
 		cxx/matrix_line.cpp	\
 		cxx/random.cpp
+BW_RANDOM_LIBS:=-lgmp -lgmpxx
 -include .bw-random.mkf
 
 BW_DUMP_SOURCES:=auxfuncs.c old/endian.c old/dump.c

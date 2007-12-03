@@ -10,6 +10,9 @@
 #include <string>
 #include <sstream>
 
+#include <gmp.h>
+#include <gmpxx.h>
+
 using namespace std;
 
 int random_coeff()
@@ -39,15 +42,47 @@ int main(int argc, char * argv[])
 		foo >> d;
 	}
 
+	mpz_class px(mstr);
+
 	put_matrix_header(cout, nr, mstr);
-	for(unsigned int i = 0 ; i < nr ; i++) {
-		matrix_line l;
-		if (i) for(unsigned int j = 0 ; j < nr ; j++) {
-			double t = random() / (double) RAND_MAX;
-			if (t > d) continue;
-			l.push_back(make_pair(j, random_coeff()));
+	if (px > 128) {
+		for(unsigned int i = 0 ; i < nr ; i++) {
+			matrix_line l;
+			if (i == 0) {
+				cout << l << "\n";
+				continue;
+			}
+			for(unsigned int j = 0 ; j < nr ; j++) {
+				double t = random() / (double) RAND_MAX;
+				if (t > d) continue;
+				l.push_back(make_pair(j, random_coeff()));
+			}
+			cout << l << "\n";
 		}
-		cout << l << "\n";
+	} else {
+		int p = px.get_si();
+		for(unsigned int i = 0 ; i < nr ; i++) {
+			matrix_line l;
+			if (i == 0) {
+				cout << l << "\n";
+				continue;
+			}
+			for(unsigned int j = 0 ; j < nr ; j++) {
+				double t = random() / (double) RAND_MAX;
+				if (t > d) continue;
+				int v = random_coeff() % p;
+				if (v < (-p/2)) {
+					v += p;
+				} else if (v > p/2) {
+					v -= p;
+				}
+				if (v == 0) {
+					continue;
+				}
+				l.push_back(make_pair(j, v));
+			}
+			cout << l << "\n";
+		}
 	}
 	return 0;
 }

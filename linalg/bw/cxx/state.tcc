@@ -55,17 +55,13 @@ int recover_vector(int nr, int col, int r, typename traits::scalar_t * w)
 }
 #endif
 
-namespace globals {
-	extern int nbys;
-}
-
 template<typename traits>
-int recover_vector(int nr, int col, int r, typename traits::scalar_t * w)
+int recover_vector(int nr, int col, int nbys, int r, typename traits::scalar_t * w)
 {
-	std::ifstream vs[globals::nbys];
+	std::ifstream vs[nbys];
 
 	using namespace state_details;
-	for(int i = 0 ; i < globals::nbys ; i++) {
+	for(int i = 0 ; i < nbys ; i++) {
 		if (r) {
 			must_open(vs[i], files::v % (col+i) % r);
 		} else {
@@ -75,7 +71,7 @@ int recover_vector(int nr, int col, int r, typename traits::scalar_t * w)
 	for( ; nr ; nr--, w++) {
 		std::vector<mpz_class> foo;
 		int nfail = 0;
-		for(int i = 0 ; i < globals::nbys ; i++) {
+		for(int i = 0 ; i < nbys ; i++) {
 			mpz_class x;
 			if (vs[i] >> x) {
 				foo.push_back(x);

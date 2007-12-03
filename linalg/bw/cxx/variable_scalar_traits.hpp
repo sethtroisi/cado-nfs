@@ -9,6 +9,7 @@ struct variable_scalar_traits {
 	typedef mpz_class scalar_t;
 	typedef mpz_class wide_scalar_t;
 	static const int max_accumulate = INT_MAX;
+	static const int max_accumulate_wide = INT_MAX;
 	/*
 	static inline mpz_class reduce(wide_scalar_t & t) {
 		mpz_class r;
@@ -59,7 +60,7 @@ struct variable_scalar_traits {
 		BUG_ON(z.size() != 1);
 		z[0] = x;
 	}
-	static inline void addmul(scalar_t & dst,
+	static inline void addmul_wide(scalar_t & dst,
 			scalar_t const & a,
 			scalar_t const & b)
 	{

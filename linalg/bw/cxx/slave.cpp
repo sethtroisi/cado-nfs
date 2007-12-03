@@ -64,6 +64,8 @@ namespace globals {
 	vector<uint32_t> bw_x;
 	uint degf;			// mksol only
 	barrier_t	main_loop_barrier;
+	thread_lock_t console_lock = THREAD_LOCK_INITIALIZER;
+
 	vector<mpz_class> dotprod_diff_check;
 
 	/* only for threads */
@@ -76,6 +78,7 @@ namespace globals {
 		scalar_t * v0;
 		scalar_t * f;
 	};
+
 }
 
 /* {{{ I/O : reading tasks */
@@ -263,6 +266,7 @@ struct thread : public traits
 			eta = fmt("% .. %") % e1 % e2;
 		}
 
+		thread_lock(& globals::console_lock);
 		cout << fmt("T% N=% av=% M0=%[.3]s %[F.1]%% tw=% eta=<%>")
 			% t % done % pdelta(av)
 			% m0_estim
@@ -270,6 +274,7 @@ struct thread : public traits
 			% pdelta(tw)
 			% eta
 			<< endl;
+		thread_unlock(& globals::console_lock);
 	}
 
 	void one_dotprod(vector<mpz_class> & r, const int32_t * sv, const scalar_t * lv)
@@ -448,14 +453,17 @@ struct slave_thread : public thread<traits, slave_thread<traits> > {
 		 * what we have at hand for lowest pain... */
 		int rc = barrier_wait(&globals::main_loop_barrier, NULL, NULL);
 		if (rc == 1) {
-			std::string nm = files::v % globals::col % r;
-			cout << fmt("T% writes %") % super::t % nm << endl;
-			ofstream v;
-			must_open(v, nm);
-			for(uint i = 0 ; i < globals::nr ; i++) {
-				// MPZ_SET_MPN(z.get_mpz_t(), dst[i], width);
-				// v << z << "\n";
-				traits::print(v, dst[i]) << "\n";
+			for(int i = 0 ; i < globals::nbys ; i++) {
+				std::string nm = files::v % (globals::col+i) % r;
+				thread_lock(& globals::console_lock);
+				cout << fmt("T% writes %")
+					% super::t % nm << endl;
+				thread_unlock(& globals::console_lock);
+				ofstream v;
+				must_open(v, nm);
+				for(uint j = 0 ; j < globals::nr ; j++) {
+					v << traits::get_y(dst[j],i) << "\n";
+				}
 			}
 		}
 
@@ -480,6 +488,7 @@ struct mksol_thread : public thread<traits, mksol_thread<traits> > {
 	uint degf;
 	scalar_t *sum;
 	scalar_t * fptr;
+	int accumulate_wide;
 	mksol_thread(void * ptr) : super(ptr) {
 		using namespace globals;
 		fptr = ((globals::vdata<traits> *) ptr)->f;
@@ -488,6 +497,7 @@ struct mksol_thread : public thread<traits, mksol_thread<traits> > {
 		// memset(sum, 0, (super::i1 - super::i0) * sizeof(scalar_t));
 		traits::zero(sum, super::i1 - super::i0);
 		cp_lag = globals::cp_lag;
+		accumulate_wide = 0;
 	}
 	~mksol_thread() {
 		delete[] sum;
@@ -509,7 +519,12 @@ struct mksol_thread : public thread<traits, mksol_thread<traits> > {
 // 
 // 			core_ops::assign<width, 2 * width + 1>(sum[i - super::i0], t);
 // 
-			traits::addmul(sum[i - super::i0], dst[i], fptr[degf - super::done]);
+			traits::addmul_wide(sum[i - super::i0], dst[i], fptr[degf - super::done]);
+		}
+		if (++accumulate_wide >= traits::max_accumulate_wide) {
+			for(uint i = super::i0 ; i < super::i1 ; i++) {
+				traits::reduce(sum[i - super::i0], sum[i - super::i0]);
+			}
 		}
 
 		if (super::done % cp_lag != 0) return;
@@ -524,6 +539,11 @@ struct mksol_thread : public thread<traits, mksol_thread<traits> > {
 		uint r = super::done / cp_lag;
 
 		if (!priv) r++;
+
+		for(uint i = super::i0 ; i < super::i1 ; i++) {
+			traits::reduce(sum[i - super::i0], sum[i - super::i0]);
+		}
+		accumulate_wide = 1;
 
 		/* There is potential that the last call here, which
 		 * comes right before the dtor, is exactly after a
@@ -660,7 +680,7 @@ int program()
 
 	if (mine.task == "slave") {
 
-		recover = recoverable_iteration(m, col, cp_lag);
+		recover = recoverable_iteration(m, col, nbys, cp_lag);
 		iter0   = recover * cp_lag;
 
 		if (iter0 >= nb_iter) {
@@ -675,10 +695,10 @@ int program()
 			% nb_iter % (nb_iter - iter0);
 		cout << flush;
 
-		recover_iteration(m, col, iter0);
+		recover_iteration(m, col, nbys, iter0);
 
 		v0_and_f.v0 = new scalar_t[nr];
-		recover_vector<traits>(nr, col, recover, v0_and_f.v0);
+		recover_vector<traits>(nr, col, nbys, recover, v0_and_f.v0);
 
 		start_threads(thread_program<slave_thread, traits>, targs);
 		delete[] v0_and_f.v0;
@@ -698,7 +718,7 @@ int program()
 		nb_iter = degf;
 
 		/* FIXME ; the 0 here is intended to be changed */
-		recover_vector<traits>(nr, col, 0, v0_and_f.v0);
+		recover_vector<traits>(nr, col, nbys, 0, v0_and_f.v0);
 
 		start_threads(thread_program<mksol_thread, traits>, targs);
 

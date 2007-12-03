@@ -20,22 +20,37 @@
 #include "parsing_tools.hpp"
 
 #include <iterator>
+#include <string>
+#include <sstream>
 
 using namespace std;
 
-int recoverable_iteration(int m, int col, int cp_lag)
+int recoverable_iteration(int m, int col, int nbys, int cp_lag)
 {
 	mpz_class t;
 
 	vector<int> per_row;
 	for(int i = 0 ; i < m ; i++) {
-		ifstream a((files::a % i % col).c_str());
+		std::string a_nm = files::a % i % col;
+		ifstream a(a_nm.c_str());
 		if (!a.is_open()) {
 			per_row.push_back(0);
 			continue;
 		}
-		int v;
-		for(v = 0 ; a >> t ; v++);
+		int v = 0;
+		std::string line;
+		for( ; getline(a, line) ; ) {
+			istringstream ss(line);
+			int ny;
+			for(ny = 0 ; ss >> t ; ny++);
+			if (ny != nbys) {
+				/* The data file might not have been
+				 * flushed */
+				BUG_ON(!a.eof());
+				break;
+			}
+			v++;
+		}
 		per_row.push_back(v);
 	}
 	BUG_ON(per_row.empty());
@@ -64,7 +79,7 @@ int recoverable_iteration(int m, int col, int cp_lag)
 }
 
 /* We read the first r == (k * cp_lag) integers in the A files.  */
-int recover_iteration(int m, int col, int r)
+int recover_iteration(int m, int col, int nbys, int r)
 {
 	for(int i = 0 ; i < m ; i++) {
 		string a_string = files::a % i % col;
@@ -78,8 +93,8 @@ int recover_iteration(int m, int col, int r)
 			mpz_class dummy;
 			must_open(a, a_nm);
 			int j;
-			for(j = 0 ; j < r && (a >> dummy); j++);
-			BUG_ON(j != r);
+			for(j = 0 ; j < r * nbys && (a >> dummy); j++);
+			BUG_ON(j != r * nbys);
 			/* Important : get the newline as well ! */
 			a >> ws;
 			a_pos = a.tellg();

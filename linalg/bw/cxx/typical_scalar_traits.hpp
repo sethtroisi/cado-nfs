@@ -9,6 +9,7 @@
 template<mp_size_t width>
 struct typical_scalar_traits {
 	static const int max_accumulate = INT_MAX;
+	static const int max_accumulate_wide = INT_MAX;
 	struct scalar_t { mp_limb_t p[width]; };
 	struct wide_scalar_t { mp_limb_t p[width+2]; };
 	/*
@@ -22,6 +23,7 @@ struct typical_scalar_traits {
 		MPZ_SET_MPN(z.get_mpz_t(), x.p, width);
 		return z;
 	}
+	static inline void reduce(scalar_t & d, scalar_t & s) { }
 	static inline void reduce(scalar_t & d, wide_scalar_t & s) {
 		core_ops::reduce<width>(d.p,s.p);
 	}
@@ -79,7 +81,7 @@ struct typical_scalar_traits {
 		BUG_ON(z.size() != 1);
 		MPZ_SET_MPN(z[0].get_mpz_t(), x.p, width);
 	}
-	static inline void addmul(scalar_t & dst,
+	static inline void addmul_wide(scalar_t & dst,
 			scalar_t const & a,
 			scalar_t const & b)
 	{

@@ -14,19 +14,20 @@ namespace globals {
 
 struct sse2_8words_traits {
 	static const int max_accumulate = 250;
-	typedef unsigned short sse2_scalars __attribute__((vector_size(16)));
+	static const int max_accumulate_wide = 250;
+	typedef int16_t sse2_scalars __attribute__((vector_size(16)));
 
 	struct scalar_t { sse2_scalars p; };
 	typedef scalar_t wide_scalar_t;
 
 	static inline mpz_class get_y(scalar_t const & x, int i) {
-		unsigned short foo[8] __attribute__((aligned(16)));
+		int16_t foo[8] __attribute__((aligned(16)));
 		memcpy(foo, &x.p, sizeof(sse2_scalars));
 		BUG_ON(i >= 8 || i < 0);
 		return mpz_class(foo[i]);
 	}
 	static inline void reduce(scalar_t & d, wide_scalar_t & s) {
-		unsigned short foo[8] __attribute__((aligned(16)));
+		int16_t foo[8] __attribute__((aligned(16)));
 		memcpy(foo, &s.p, sizeof(sse2_scalars));
 		for(unsigned int i = 0 ; i < 8 ; i++) {
 			foo[i] %= globals::modulus_u8;
@@ -57,7 +58,7 @@ struct sse2_8words_traits {
 	}
 
 	static inline bool is_zero(scalar_t const& x) {
-		unsigned short foo[8] __attribute__((aligned(16)));
+		int16_t foo[8] __attribute__((aligned(16)));
 		memcpy(foo, &x.p, sizeof(sse2_scalars));
 		for(unsigned int i = 0 ; i < 8 ; i++) {
 			if (foo[i])
@@ -70,7 +71,7 @@ struct sse2_8words_traits {
 		MPZ_SET_MPN(z.get_mpz_t(), x.p, width);
 	}
 	*/
-	static inline void addmul(scalar_t & dst,
+	static inline void addmul_wide(scalar_t & dst,
 			scalar_t const & a,
 			scalar_t const & b)
 	{
@@ -95,7 +96,7 @@ struct sse2_8words_traits {
 	}
 
 	static std::ostream& print(std::ostream& o, scalar_t const& x) {
-		unsigned short foo[8] __attribute__((aligned(16)));
+		int16_t foo[8] __attribute__((aligned(16)));
 		memcpy(foo, &x.p, sizeof(sse2_scalars));
 		for(int i = 0 ; i < 8 ; i++) {
 			if (i) { o << " "; }
