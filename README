@@ -48,8 +48,11 @@ n:71641520761751435455133616475667090434063332228247871795429
 EOF
 
 
+# note: revision 229 of polyselect is broken, use r207 in the meantime
 polyselect/polyselect -full -e 1000000 < $tmp/$name > $tmp/$name.poly
 
+# note for CACAO members: some data files with sieve relations are available
+# in /local/fleur/cado/Examples/{c20,c59,c80}
 
 cd sieve
 ## this has to be done by hand, sorry!
@@ -58,6 +61,7 @@ cd sieve
 
 ./mkroots.sh $tmp/$name.poly > $tmp/$name.roots
 ## SIEVING_STEP
+# note: the following worked with revision 231
 ./sieve -poly $tmp/$name.poly -fb $tmp/$name.roots -1000000 1000000 1 1300 > $tmp/$name.rels_raw
 # checking norms and splitting large cofactors
 ./checknorms -poly $tmp/$name.poly $tmp/$name.rels_raw > $tmp/$name.rels
