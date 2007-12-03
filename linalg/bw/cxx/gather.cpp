@@ -153,6 +153,14 @@ bool is_zero(const scalar_t * vec) {
 	return true;
 }
 
+int nb_nonzero(const scalar_t * vec) {
+	int res = 0;
+	for(uint i = 0 ; i < globals::nr ; i++) {
+		res += !traits::is_zero(vec[i]);
+	}
+	return res;
+}
+
 void multiply()
 {
 	multiply_ur<traits>(scrap, v, globals::idx, globals::val, globals::nr);
@@ -177,20 +185,27 @@ void go()
 	}
 	traits::copy(w, v, nr);
 
-	uint i;
+	int i;
 
-	for(i = 0 ; i < 100 && !is_zero(w) ; i++) {
+	for(i = 0 ; i < 20 ; i++) {
 		traits::copy(v, w, nr);
-		cout << fmt("// trying B^%*y") % i << endl;
+		cout << fmt("// trying B^%*y") % i;
 		multiply();
+		int r = nb_nonzero(w);
+		if (r) {
+			cout << fmt(" -- % non-zero") % r << endl;
+		} else {
+			cout << " -- zero !" << endl;
+			break;
+		}
 	}
 
-	if (i == 100 && !is_zero(w)) {
+	if (i == 20 && !is_zero(w)) {
 		cerr << "// no solution found\n";
 		BUG();
 	}
 
-	cout << fmt("// B^%*y is a solution\n") % (i-1);
+	cout << fmt("// B^%*y is a solution\n") % i;
 
 	mpz_class middle = globals::modulus / 2;
 
