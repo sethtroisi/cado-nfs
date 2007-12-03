@@ -1427,7 +1427,7 @@ generate_poly (cado_poly out, double T, int verbose)
   mpz_init (t);
   mpz_init (r);
 
-#if 0
+#if 1
   if (d > 7)
     {
       fprintf (stderr, "Error, too large degree in generate_poly\n");
