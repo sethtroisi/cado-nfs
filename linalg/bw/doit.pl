@@ -95,6 +95,7 @@ if ($param->{'matrix'}) {
 	$param->{'modulus'} = $1;
 
 	my $hash = `head -c 2048 $f | md5sum | cut -c1-8`;
+	chomp($hash);
 	$weak->{'wdir'} .= ".$hash";
 }
 
@@ -337,7 +338,6 @@ MKSOL : {
 		compute_spanned @mksoljobs;
 		rsync_pull;
 		action "${bindir}bw-gather --subdir $wdir $s --nbys $vectoring";
-		rsync_pull;
 
 		if ($matrix) {
 			my $d = dirname $matrix;
