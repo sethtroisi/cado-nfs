@@ -30,6 +30,7 @@
 #include "field_usage.h"
 /* #include "version.h" */
 #include "master_common.h"
+#include "ops_poly.h"
 
 bw_nbpoly	f_poly;
 int		t_counter;
@@ -41,11 +42,12 @@ static int	rec_threshold=1;
 static int	print_min=10;
 static int	preferred_quadratic_algorithm;	/* Defaults to 0 (old) */
 static int	t_init;
-static int	no_check_input;
-static int	enable_cplx;
-static int	fermat_prime;
+static int	check_input = 1;
+
+struct charptr_list_t * ops_poly_args = NULL;
 
 const char f_base_filename[] = "F_INIT";
+
 
 #define SAVE_LEVEL_THRESHOLD	4
 
@@ -143,7 +145,8 @@ retrieve_pi_files(struct t_poly ** p_pi, int t_start)
 	const char *pattern;
 	int i;
 	struct t_poly * left = NULL, * right = NULL;
-	int order;
+	ft_order_t order;
+	int o_i;
 	struct dft_bb * dft_left, * dft_right, * dft_prod;
 	double tt;
 
@@ -262,22 +265,23 @@ retrieve_pi_files(struct t_poly ** p_pi, int t_start)
 		*p_pi=tp_comp_alloc(left,right);
 		core_if_null(*p_pi,"*p_pi");
 
-		order=ceil_log2((*p_pi)->degree+1);
+		ft_order(&order, (*p_pi)->degree+1);
+		o_i = ft_order_int(order);
 		
 		dft_left=fft_tp_dft(left,order,&tt);
-		printf("DFT(pi_left,%d) : %.2fs\n",order,tt);
+		printf("DFT(pi_left,%d) : %.2fs\n",o_i,tt);
 		core_if_null(dft_left,"dft_left");
 
 		dft_right=fft_tp_dft(right,order,&tt);
-		printf("DFT(pi_right,%d) : %.2fs\n",order,tt);
+		printf("DFT(pi_right,%d) : %.2fs\n",o_i,tt);
 		core_if_null(dft_right,"dft_right");
 
 		dft_prod=fft_bbb_conv(dft_left,dft_right,&tt);
-		printf("CONV(pi_left,pi_right,%d) : %.2fs\n",order,tt);
+		printf("CONV(pi_left,pi_right,%d) : %.2fs\n",o_i,tt);
 		core_if_null(dft_prod,"dft_prod");
 
 		fft_tp_invdft(*p_pi,dft_prod,&tt);
-		printf("IDFT(pi,%d) : %.2fs\n",order,tt);
+		printf("IDFT(pi,%d) : %.2fs\n",o_i,tt);
 
 		tp_free(left);
 		tp_free(right);
@@ -340,25 +344,17 @@ static struct e_coeff * bw_init(void)
 			"revision up to stamp %d is mandatory\n",t_counter);
 		exit(1);
 	}
-	if (reached_degree != total_work) {
-		printf( "Since we do not have the full information yet, we\n"
-			"merely can tell if the system looks like doable\n");
+	if (reached_degree < total_work) {
+		printf( "Since we do not have the full information yet "
+			"(only %d coefficients while %d were needed)"
+			", we\n"
+			"merely can tell if the system looks like doable\n",
+			reached_degree, total_work);
 	}
 			
 	/* Data read stage completed. */
 
-	printf("Preparing FFT engine\n");
-	if (fermat_prime) {
-#ifdef	HAS_NATIVE_FFT
-		enable_cplx=-1;
-#else
-		die("To use the --fermat-prime option, "
-			"recompile with -DHAS_NATIVE_FFT\n",1);
-#endif
-	}
-
-
-	prepare_fft_engine(ceil_log2((total_work<<1)+2),enable_cplx);
+	ft_ops_init((total_work<<1)+2, ops_poly_args);
 
 	printf("Setting up primary polynomial f (t0=%d)\n",t0);
 
@@ -459,6 +455,14 @@ static struct e_coeff * bw_init(void)
 				nbmat_scal(nbpoly_coeff(f_poly,s),k,j));
 		}}}
 	}}
+
+	for(s = t0 ; s <= total_work ; s++) {
+		for(i = 0     ; i <  m_param;    i++) {
+		for(j = 0     ; j <  bigdim ;    j++) {
+			k_reduce(mbmat_scal(mbpoly_coeff(e_poly,s),i,j));
+		}
+		}
+	}
 
 	printf("Throwing out a(X)\n");
 	mnpoly_free(a_poly);
@@ -595,7 +599,7 @@ bw_gauss_onestep(bw_mbmat e,
 		}
 		if (i == m_param)
 			continue;
-		assert(rank<m_param);
+		assert(rank < m_param);
 		pivots_list[rank++] = j;
 		k_inv(inv,mbmat_scal(e,i,jr));
 		/* Cancel this coeff in all other columns. */
@@ -828,6 +832,26 @@ bw_traditional_algorithm(struct e_coeff * ec,
 	return tt;
 }
 
+int check_zero_and_advance(struct e_coeff * ec, unsigned int kill)
+{
+	unsigned int i;
+	for(i = 0 ; i < kill ; i++) {
+		int res=1;
+		int j;
+		for(j=0;res && j<bigdim;j++) {
+			res = res && mcol_is_zero(
+					mbmat_col(
+					mbpoly_coeff(ec->p,0),
+					j));
+		}
+		if (!res) {
+			return 0;
+		}
+		ec_advance(ec,1);
+	}
+	return 1;
+}
+
 static double
 bw_recursive_algorithm(struct e_coeff * ec,
 		int * delta,
@@ -838,11 +862,13 @@ bw_recursive_algorithm(struct e_coeff * ec,
 	struct dft_mb *dft_e_left,*dft_e_middle;
 	struct dft_bb *dft_pi_left,*dft_pi_right;
 	struct dft_bb *dft_pi;
-	unsigned int sub_order;
+	ft_order_t sub_order;
+	int so_i;
 	int expected_pi_deg;
 	struct timeval tv;
 	double	t_dft_e_l,  t_dft_pi_l, t_conv_e, t_idft_e,
 		t_dft_pi_r, t_conv_pi,  t_idft_pi, t_ft, t_cv, t_sub;
+	int kill;
 
 	timer_r(&tv,TIMER_SET);
 
@@ -891,11 +917,18 @@ bw_recursive_algorithm(struct e_coeff * ec,
 	 */
 	
 	expected_pi_deg = iceildiv(ldeg*m_param, bigdim);
-	sub_order=ceil_log2(deg+expected_pi_deg-ldeg+1);
+#ifdef	HAS_CONVOLUTION_SPECIAL
+	kill=ldeg;
+#else
+	kill=0;
+#endif
+	ft_order(&sub_order, deg+expected_pi_deg-kill+1);
+
+	so_i = ft_order_int(sub_order);
 
 	dft_e_left	= fft_ec_dft(ec,sub_order,&t_dft_e_l);
 	reclevel_prolog();
-	printf("DFT(e,%d) : %.2fs\n", sub_order, t_dft_e_l);
+	printf("DFT(e,%d) : %.2fs\n", so_i, t_dft_e_l);
 	core_if_null(dft_e_left,"dft_e_left");
 
 	ec->degree	= ldeg - 1;
@@ -903,25 +936,30 @@ bw_recursive_algorithm(struct e_coeff * ec,
 
 	dft_pi_left	= fft_tp_dft(pi_left,sub_order,&t_dft_pi_l);
 	reclevel_prolog();
-	printf("DFT(pi_l,%d) : %.2fs\n", sub_order, t_dft_pi_l);
+	printf("DFT(pi_l,%d) : %.2fs\n", so_i, t_dft_pi_l);
 	core_if_null(dft_pi_left,"dft_pi_left");
 
 	printf("deg(pi_l)=%d, bound is %d\n",pi_left->degree,expected_pi_deg);
-	if ((1<<sub_order) < deg+pi_left->degree-ldeg + 1) {
+	if (!ft_order_fits(sub_order, deg+pi_left->degree-kill + 1)) {
 		printf("Argl. pi grows above its expected degree...\n");
-		printf("%d is the bound, while :\n"
+		printf("order %d , while :\n"
 				"deg=%d\n"
 				"deg(pi_left)=%d\n"
 				"ldeg-1=%d\n"
 				"hence, %d is too big\n",
-				(1<<sub_order),deg,pi_left->degree,ldeg - 1,
-				deg+pi_left->degree-ldeg + 1);
+				so_i,
+				deg,pi_left->degree,ldeg - 1,
+				deg+pi_left->degree-kill + 1);
 		eternal_sleep();
 	}
 
+#ifdef  HAS_CONVOLUTION_SPECIAL
 	dft_e_middle = fft_mbb_conv_sp(dft_e_left,dft_pi_left,ldeg,&t_conv_e);
+#else
+	dft_e_middle = fft_mbb_conv(dft_e_left,dft_pi_left,&t_conv_e);
+#endif
 	reclevel_prolog();
-	printf("CONV(e*pi_l,%d) : %.2fs\n", sub_order, t_conv_e);
+	printf("CONV(e*pi_l,%d) : %.2fs\n", so_i, t_conv_e);
 	core_if_null(dft_e_middle,"dft_e_middle");
 
 	/* This is a special convolution in the sense that we
@@ -929,15 +967,18 @@ bw_recursive_algorithm(struct e_coeff * ec,
 	 * interested in fg div X^k (we know fg mod X^k==0)
 	 */
 	
-#if 0
-	ec_park(ec);				/* moderately useful... */
-#endif
+	ec_park(ec);
 	ec_untwist(ec);
-	fft_mb_invdft(ec->p,dft_e_middle,deg-ldeg,&t_idft_e);
-	reclevel_prolog();
-	printf("IDFT(e,%d) : %.2fs\n", dft_e_middle->order, t_idft_e);
 
-	ec->degree=deg-ldeg;
+	fft_mb_invdft(ec->p,dft_e_middle,deg - kill,&t_idft_e);
+	ec->degree=deg-kill;
+
+	if (!check_zero_and_advance(ec, ldeg - kill)) {
+		die("argh, e * pi_l != 0 mod X^d", 1);
+	}
+	reclevel_prolog();
+	printf("IDFT(e,%d) : %.2fs\n", ft_order_int(dft_e_middle->order),
+			t_idft_e);
 
 	dft_mb_free(dft_e_middle);
 	dft_mb_free(dft_e_left);
@@ -950,23 +991,23 @@ bw_recursive_algorithm(struct e_coeff * ec,
 	*p_pi		= tp_comp_alloc(pi_left,pi_right);
 	core_if_null(*p_pi,"*p_pi");
 	
-	printf("deg(pi_prod)=%d (max=%d)\n",(*p_pi)->degree, (1<<sub_order));
-	assert((*p_pi)->degree < (1<<sub_order));
+	printf("deg(pi_prod)=%d (order %d)\n",(*p_pi)->degree, so_i);
+	assert(ft_order_fits(sub_order, (*p_pi)->degree + 1));
 	
 	dft_pi_right	= fft_tp_dft(pi_right, sub_order, &t_dft_pi_r);
 	reclevel_prolog();
-	printf("DFT(pi_r,%d) : %.2fs\n", sub_order, t_dft_pi_r);
+	printf("DFT(pi_r,%d) : %.2fs\n", so_i, t_dft_pi_r);
 	core_if_null(dft_pi_right,"dft_pi_right");
 
 	dft_pi		= fft_bbb_conv(dft_pi_left,dft_pi_right, &t_conv_pi);
 	reclevel_prolog();
-	printf("CONV(pi_l*pi_r,%d) : %.2fs\n", sub_order, t_conv_pi);
+	printf("CONV(pi_l*pi_r,%d) : %.2fs\n", so_i, t_conv_pi);
 	core_if_null(dft_pi,"dft_pi");
 
 
 	fft_tp_invdft(*p_pi,dft_pi,&t_idft_pi);
 	reclevel_prolog();
-	printf("IDFT(pi,%d) : %.2fs\n",dft_pi->order,t_idft_pi);
+	printf("IDFT(pi,%d) : %.2fs\n",ft_order_int(dft_pi->order),t_idft_pi);
 
 	dft_bb_free(dft_pi);
 	dft_bb_free(dft_pi_right);
@@ -982,24 +1023,24 @@ bw_recursive_algorithm(struct e_coeff * ec,
 	printf("proper : %.2fs (%.2fs FT + %.2fs CV), sub : %.2fs\n",
 			t_ft+t_cv,t_ft,t_cv,t_sub);
 	printf("constants : c_ft=%.4e c_cv=%.4e		# %d,%d\n",
-			t_ft/(double)(sub_order<<sub_order),
-			t_cv/(double)(1<<sub_order),
-			deg,sub_order);
+			t_ft/(double)(so_i<<so_i),
+			t_cv/(double)(1<<so_i),
+			deg,so_i);
 	printf("Different values for M1:");
 	printf("   e_left: M1=%.3e\n",
-			t_dft_e_l/ (sub_order<<sub_order)/(m_param*bigdim));
+			t_dft_e_l/ (so_i<<so_i)/(m_param*bigdim));
 	printf("  pi_left: M1=%.3e\n",
-			t_dft_pi_l/(sub_order<<sub_order)/(bigdim*bigdim));
+			t_dft_pi_l/(so_i<<so_i)/(bigdim*bigdim));
 	printf("    e_inv: M1=%.3e\n",
-			t_idft_e/  (sub_order<<sub_order)/(m_param*bigdim));
+			t_idft_e/  (so_i<<so_i)/(m_param*bigdim));
 	printf(" pi_right: M1=%.3e\n",
-			t_dft_pi_r/(sub_order<<sub_order)/(bigdim*bigdim));
+			t_dft_pi_r/(so_i<<so_i)/(bigdim*bigdim));
 	printf("   pi_inv: M1=%.3e\n",
-			t_idft_pi/ (sub_order<<sub_order)/(bigdim*bigdim));
+			t_idft_pi/ (so_i<<so_i)/(bigdim*bigdim));
 	printf("   e_conv: M1=%.3e\n",
-			t_conv_e/ (1<<sub_order)  /(m_param*bigdim*bigdim));
+			t_conv_e/ (1<<so_i)  /(m_param*bigdim*bigdim));
 	printf("  pi_conv: M1=%.3e\n",
-			t_conv_pi/ (1<<sub_order) / (bigdim*bigdim*bigdim));
+			t_conv_pi/ (1<<so_i) / (bigdim*bigdim*bigdim));
 	return timer_r(&tv,TIMER_ASK);
 }
 
@@ -1083,7 +1124,7 @@ block_wiedemann(void)
 {
 	struct e_coeff * ec;
 	struct t_poly * pi_left, * pi_right, *pi_prod;
-	int j, t_start, new_t;
+	int t_start, new_t;
 	double tt;
 
 	ec=bw_init();
@@ -1095,11 +1136,12 @@ block_wiedemann(void)
 	printf("ec->degree=%d, new_t=%d, t_counter=%d\n",
 			ec->degree,new_t,t_counter);
 
-	if (pi_left!=NULL && !(no_check_input && ec->degree<new_t-t_counter)) {
+	if (pi_left!=NULL && !(!check_input && ec->degree<new_t-t_counter)) {
 		int dg_kill;
 		struct dft_bb * dft_pi_left;
 		struct dft_mb * dft_e_left, * dft_e_middle;
-		int order;
+		ft_order_t order;
+		int o_i;
 
 		printf("Beginning multiplication (e_left*pi_left)\n");
 		
@@ -1108,22 +1150,28 @@ block_wiedemann(void)
 
 		dg_kill=new_t-t_counter;
 
-		if (no_check_input==0) {
-			order=ceil_log2(1+pi_left->degree+ec->degree);
+#ifdef	HAS_CONVOLUTION_SPECIAL
+		if (check_input) {
+			ft_order(&order, 1+pi_left->degree+ec->degree);
 		} else {
-			order=ceil_log2(1+pi_left->degree+ec->degree-dg_kill);
+			ft_order(&order, 1+pi_left->degree+ec->degree-dg_kill);
 		}
+#else
+		ft_order(&order, 1+pi_left->degree+ec->degree);
+#endif
+		o_i = ft_order_int(order);
 		
 		dft_e_left=fft_ec_dft(ec,order,&tt);
-		printf("DFT(e_left,%d) : %.2fs\n",order,tt);
+		printf("DFT(e_left,%d) : %.2fs\n",o_i,tt);
 		core_if_null(dft_e_left,"dft_e_left");
 
 		dft_pi_left=fft_tp_dft(pi_left,order,&tt);
-		printf("DFT(pi_left,%d) : %.2fs\n",order,tt);
+		printf("DFT(pi_left,%d) : %.2fs\n",o_i,tt);
 		core_if_null(dft_pi_left,"dft_pi_left");
 
 		ec_untwist(ec);
-		if (no_check_input==0) {
+#ifdef  HAS_CONVOLUTION_SPECIAL
+		if (check_input) {
 			dft_e_middle=fft_mbb_conv_sp(dft_e_left,dft_pi_left,
 					0,&tt);
 		} else {
@@ -1131,33 +1179,40 @@ block_wiedemann(void)
 					dg_kill,&tt);
 			ec_advance(ec,dg_kill);
 		}
-		printf("CONV(e_left,pi_left,%d) : %.2fs\n",order,tt);
+#else
+		dft_e_middle=fft_mbb_conv(dft_e_left,dft_pi_left,&tt);
+#endif
+
+		printf("CONV(e_left,pi_left,%d) : %.2fs\n",o_i,tt);
 		core_if_null(dft_e_middle,"dft_e_middle");
 
-		if (no_check_input==0) {
+#ifdef  HAS_CONVOLUTION_SPECIAL
+		if (check_input) {
 			fft_mb_invdft(ec->p,dft_e_middle,
 					ec->degree,&tt);
-			printf("IDFT(e,%d) : %.2fs\n",order,tt);
+			printf("IDFT(e,%d) : %.2fs\n",o_i,tt);
 			printf("Verifying the product\n");
-			for(;t_counter<new_t;t_counter++) {
-				int res=1;
-				for(j=0;res && j<bigdim;j++) {
-					res = res && mcol_is_zero(
-							mbmat_col(
-							mbpoly_coeff(ec->p,0),
-							j));
-				}
-				if (!res) {
-					die("Incorrect input\n",1);
-				}
-				ec_advance(ec,1);
+			if (check_zero_and_advance(ec, dg_kill)) {
+				printf("Input OK\n");
+			} else {
+				die("Incorrect input\n",1);
 			}
-			printf("Input OK\n");
 		} else {
 			fft_mb_invdft(ec->p,dft_e_middle,
 					ec->degree-dg_kill,&tt);
-			printf("IDFT(e,%d) : %.2fs\n",order,tt);
+			printf("IDFT(e,%d) : %.2fs\n",o_i,tt);
 		}
+#else
+		fft_mb_invdft(ec->p,dft_e_middle,
+				ec->degree,&tt);
+		printf("IDFT(e,%d) : %.2fs\n",o_i,tt);
+		printf("Verifying the product\n");
+		if (check_zero_and_advance(ec, dg_kill)) {
+			printf("Input OK\n");
+		} else {
+			die("Incorrect input\n",1);
+		}
+#endif
 		tp_act_on_delta(pi_left,global_delta);
 
 		dft_bb_free(dft_pi_left);
@@ -1167,7 +1222,7 @@ block_wiedemann(void)
 
 		save_pi(pi_left,t_start,-1,t_counter);
 	}
-	if (pi_left!=NULL && no_check_input && ec->degree<new_t-t_counter) {
+	if (pi_left!=NULL && !check_input && ec->degree<new_t-t_counter) {
 		printf("We are not interested in the computation of e(X)\n");
 		ec_advance(ec,new_t-t_counter);
 		tp_act_on_delta(pi_left,global_delta);
@@ -1187,28 +1242,30 @@ block_wiedemann(void)
 
 	if (pi_left!=NULL) {
 		struct dft_bb * dft_pi_left, * dft_pi_right, * dft_pi_prod;
-		int order;
+		ft_order_t order;
+		int o_i;
 
 		printf("Beginning multiplication (pi_left*pi_right)\n");
 		pi_prod=tp_comp_alloc(pi_left,pi_right);
 		core_if_null(pi_prod,"pi_prod");
 
-		order=ceil_log2(pi_prod->degree+1);
+		ft_order(&order, pi_prod->degree+1);
+		o_i = ft_order_int(order);
 		
 		dft_pi_left=fft_tp_dft(pi_left,order,&tt);
-		printf("DFT(pi_left,%d) : %.2fs\n",order,tt);
+		printf("DFT(pi_left,%d) : %.2fs\n",o_i,tt);
 		core_if_null(dft_pi_left,"dft_pi_left");
 
 		dft_pi_right=fft_tp_dft(pi_right,order,&tt);
-		printf("DFT(pi_right,%d) : %.2fs\n",order,tt);
+		printf("DFT(pi_right,%d) : %.2fs\n",o_i,tt);
 		core_if_null(dft_pi_right,"dft_pi_right");
 
 		dft_pi_prod=fft_bbb_conv(dft_pi_left,dft_pi_right,&tt);
-		printf("CONV(pi_left,pi_right,%d) : %.2fs\n",order,tt);
+		printf("CONV(pi_left,pi_right,%d) : %.2fs\n",o_i,tt);
 		core_if_null(dft_pi_prod,"dft_pi_prod");
 
 		fft_tp_invdft(pi_prod,dft_pi_prod,&tt);
-		printf("IDFT(pi,%d) : %.2fs\n",order,tt);
+		printf("IDFT(pi,%d) : %.2fs\n",o_i,tt);
 
 		tp_free(pi_left);
 		tp_free(pi_right);
@@ -1243,6 +1300,8 @@ void usage()
 int
 main(int argc, char *argv[])
 {
+	struct charptr_list_t ** ops_poly_args_tail = &ops_poly_args;
+
 	setvbuf(stdout,NULL,_IONBF,0);
 	setvbuf(stderr,NULL,_IONBF,0);
 
@@ -1276,18 +1335,20 @@ main(int argc, char *argv[])
 			argc-=2;
 			continue;
 		}
-		if (strcmp(argv[0], "--enable-complex-field") == 0) {
-			enable_cplx = 1;
-			argv++, argc--;
-			continue;
-		}
-		if (strcmp(argv[0], "--fermat-prime") == 0) {
-			fermat_prime = 1;
+		if (strcmp(argv[0], "--enable-complex-field") == 0
+			|| strcmp(argv[0], "--fermat-prime") == 0)
+		{
+			struct charptr_list_t * x;
+			x = malloc(sizeof(struct charptr_list_t));
+			x->p = argv[0];
+			x->next = NULL;
+			*ops_poly_args_tail = x;
+			ops_poly_args_tail = &(x->next);
 			argv++, argc--;
 			continue;
 		}
 		if (strcmp(argv[0], "--no-check-input") == 0) {
-			no_check_input = 1;
+			check_input = 0;
 			argv++, argc--;
 			continue;
 		}
@@ -1344,6 +1405,15 @@ main(int argc, char *argv[])
 	/********************************************************************/
 
 	block_wiedemann();
+
+	ft_ops_cleanup();
+	/* clean this up */
+	for( ; ops_poly_args != NULL ; ) {
+		struct charptr_list_t * ntail;
+		ntail = ops_poly_args->next;
+		free(ops_poly_args);
+		ops_poly_args = ntail;
+	}
 
 	return 0;
 }

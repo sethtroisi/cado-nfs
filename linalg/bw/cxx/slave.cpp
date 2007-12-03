@@ -61,6 +61,7 @@ namespace globals {
 	uint8_t modulus_u8;
 	uint16_t modulus_u16;
 	uint32_t modulus_u32;
+	unsigned long modulus_ulong;
 	vector<uint32_t> bw_x;
 	uint degf;			// mksol only
 	barrier_t	main_loop_barrier;
@@ -751,6 +752,7 @@ int main(int argc, char *argv[])
 	globals::modulus_u8	= globals::modulus.get_ui();
 	globals::modulus_u16	= globals::modulus.get_ui();
 	globals::modulus_u32	= globals::modulus.get_ui();
+	globals::modulus_ulong	= globals::modulus.get_ui();
 
 	if (SIZ(globals::modulus.get_mpz_t()) != MODULUS_SIZE) {
 		cerr << "### Not compiled with proper MODULUS_BITS\n"
@@ -814,12 +816,16 @@ int main(int argc, char *argv[])
 	if (MODULUS_BITS < 8 && nbys == 8) {
 		cout << "// Using SSE-2 code\n";
 		return program<sse2_8words_traits >();
+	} else if (nbys == 1 && mpz_sizeinbase(globals::modulus.get_mpz_t(),2) <= (sizeof(unsigned long) * 8 / 2 - 4)) {
+		cout << "// Using half-ulong code\n";
+		return program<ulong_traits>();
 	} else if (nbys == 1 && SIZ(globals::modulus.get_mpz_t()) == MODULUS_SIZE) {
 		cout << "// Using code for " << MODULUS_SIZE << " words\n";
 		return program<typical_scalar_traits<MODULUS_SIZE> >();
 	} else if (nbys == 1) {
 		/* This amounts to at least a 2x slowdown */
 		cout << "// Using generic code\n";
+		cout << "// SLOW SLOW SLOW SLOW SLOW SLOW SLOW SLOW SLOW\n";
 		return program<variable_scalar_traits>();
 	} else {
 		cerr << "no available code\n";

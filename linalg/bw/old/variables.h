@@ -1,6 +1,8 @@
 #ifndef VARIABLES_H_
 #define VARIABLES_H_
 
+#include "types.h"
+
 #ifdef	__cplusplus
 extern "C" {
 #endif

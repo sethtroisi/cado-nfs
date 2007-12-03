@@ -53,6 +53,7 @@ namespace globals {
 	uint8_t modulus_u8;
 	uint16_t modulus_u16;
 	uint32_t modulus_u32;
+	unsigned long modulus_ulong;
 
 	uint nb_coeffs;
 
@@ -145,7 +146,7 @@ void do_sum()
 
 bool is_zero(const scalar_t * vec) {
 	for(uint i = 0 ; i < globals::nr ; i++) {
-		if (!traits::is_zero(v[i])) {
+		if (!traits::is_zero(vec[i])) {
 			return false;
 		}
 	}
@@ -234,13 +235,16 @@ int main(int argc, char *argv[])
 	globals::modulus_u8	= globals::modulus.get_ui();
 	globals::modulus_u16	= globals::modulus.get_ui();
 	globals::modulus_u32	= globals::modulus.get_ui();
+	globals::modulus_ulong	= globals::modulus.get_ui();
 
+	/*
 	if (SIZ(globals::modulus.get_mpz_t()) != MODULUS_SIZE) {
 		cerr << fmt("ERROR: RECOMPILE WITH"
 				" ``#define MODULUS_SIZE %''\n")
 			% SIZ(globals::modulus.get_mpz_t());
 		exit(1);
 	}
+	*/
 
 	detect_mn(m, n);
 	cout << fmt("// detected m = %\n") % m;

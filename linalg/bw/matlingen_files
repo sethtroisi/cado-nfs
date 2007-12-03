@@ -39,6 +39,11 @@ old/twisting_polynomials.h
 old/types.h
 old/variables.c
 old/variables.h
+old/ops_poly.c
+old/ops_poly_fft.c
+old/ops_poly.h
+old/fft_core.c
+old/fft_core.h
 ../include/manu.h
 ../include/gmp-hacks.h
 auxfuncs.c

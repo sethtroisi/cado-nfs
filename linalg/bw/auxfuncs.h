@@ -11,6 +11,7 @@ extern "C" {
 #define DOES_NOT_RETURN /**/
 #endif
 
+unsigned int ceil_log2(unsigned int d);
 void die(const char *, int, ... ) DOES_NOT_RETURN;
 void eternal_sleep(void);
 void * _my_malloc(size_t,const char *,int);

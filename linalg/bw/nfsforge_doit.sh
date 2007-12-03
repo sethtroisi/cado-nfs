@@ -64,9 +64,9 @@ for mi in {0..`expr $N1 / 8`} ; do
 done
 
 if [ "$FFT_THRESHOLD" != "" ] ; then
-	action ${B}../../matlingen/bw-master2 --subdir $D -t $FFT_THRESHOLD matrix.txt $M $N  | tee "$D/master.log"
+	action ${B}bw-master2 --subdir $D -t $FFT_THRESHOLD matrix.txt $M $N  | tee "$D/master.log"
 else
-	action ${B}../../matlingen/bw-master --subdir $D matrix.txt $M $N  | tee "$D/master.log"
+	action ${B}bw-master-old --subdir $D matrix.txt $M $N  | tee "$D/master.log"
 fi
 
 # ./wrap_old_master_code.sh ${B}bw-master-old $D $MODULUS $MSIZE $M $N  | tee "$D/master.log"

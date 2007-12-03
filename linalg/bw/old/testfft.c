@@ -34,6 +34,7 @@
 #include "field_prime.h"
 #include "field_quad.h"
 #include "field_usage.h"
+#include "fft_core.h"
 
 #define USE_MACROS
 
@@ -50,10 +51,6 @@ extern mp_limb_t * l_roots;
 static int	enable_cplx;
 static int	order;
 mp_limb_t * one_over_n;
-
-/* That's grabbed from fft_on_matrices */
-typedef void (*fft_capable_function)(mp_limb_t *,mp_size_t,mp_limb_t *,unsigned int);
-extern fft_capable_function direct_fft,inverse_fft;
 
 struct multi_array {
 	mp_limb_t * raw;

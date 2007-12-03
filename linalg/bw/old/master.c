@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include "master_params.h"
 #include "params.h"
@@ -644,6 +645,20 @@ block_wiedemann(int start)
 	bw_free(it,cx);
 }
 
+void block_signals()
+{
+	struct sigaction act;
+	act.sa_handler=SIG_IGN;
+	sigemptyset(&act.sa_mask);
+	act.sa_flags=0;
+	sigaction(SIGUSR1, &act, NULL);
+	sigaction(SIGUSR2, &act, NULL);
+	sigaction(SIGHUP,  &act, NULL);
+	sigaction(SIGQUIT, &act, NULL);
+	sigaction(SIGINT,  &act, NULL);
+	sigaction(SIGTERM, &act, NULL);
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -681,6 +696,7 @@ main(int argc, char *argv[])
 	consistency_check("bw_longsize",computed_bw_longsize,bw_longsize);
 #endif
 
+	block_signals();
 	block_wiedemann(start);
 
 	return 0;

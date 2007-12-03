@@ -4,7 +4,6 @@
 #include <gmp.h>
 #include <gmpxx.h>
 #include <vector>
-#include "addmul.hpp"
 
 namespace globals {
 	extern uint8_t modulus_u8;

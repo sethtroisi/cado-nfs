@@ -152,18 +152,23 @@ void prime_field_set_mpn(mp_limb_t * a,
 		mp_size_t n,
 		struct field * f)
 {
+	mp_limb_t * t;
 	if (n < f->size) {
 		memcpy(a,p,n*sizeof(mp_limb_t));
 		memset(a+n,0,(f->size-n)*sizeof(mp_limb_t));
 	} else {
-		/* XXX Super-Watch out ! p must have enough size to store
+		/* We use a temporary in order to avoid a problem.
+		 * Otherwise, p would have to have enough size to store
 		 * __n+1__ limbs... This is a requirement due to tdiv_qr
 		 * and the fact that the modulus needs not have highest
 		 * bit set.
 		 */
-		mpn_tdiv_qr(p+f->size, p,0, p,n, f->modulus,f->size);
-		memset(p+f->size,0,(n+1-f->size)*sizeof(mp_limb_t));
-		memcpy(a,p,f->size*sizeof(mp_limb_t));
+		t=FAST_ALLOC((n+1)*sizeof(mp_limb_t));
+		mpn_tdiv_qr(t+f->size, t,0, p,n, f->modulus,f->size);
+		/* memset(p+f->size,0,(n+1-f->size)*sizeof(mp_limb_t));
+		 */
+		memcpy(a,t,f->size*sizeof(mp_limb_t));
+		FAST_FREE(t);
 	}
 }
 

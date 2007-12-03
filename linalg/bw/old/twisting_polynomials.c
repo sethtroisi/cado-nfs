@@ -349,7 +349,7 @@ struct t_poly * tp_read(FILE * f, unsigned int n)
 		}
 	}
 	if (rc != 0) {
-		die("Estimation of pi degree was wrong\n", 1);
+		die("Estimation of pi degree was wrong (more than %d)\n", 1, n);
 	}
 	for(j=0;j<bigdim;j++) {
 		int d = -1;

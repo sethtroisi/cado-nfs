@@ -3,8 +3,10 @@
 D=~/Local/testmat
 
 # MODULUS=9903520314283042199192993767
+MODULUS=17
+FFT_THRESHOLD=64
+
 # A good FFT modulus (859*2^118+1, 128 bits).
-MODULUS=65537
 # MODULUS=285451712094810683706092566195203997697
 # FFT_THRESHOLD=512
 
@@ -15,8 +17,10 @@ B="$BINARY_DIR"
 if [ "$B" = "" ] ; then
 	B=`pwd`/
 fi
-M=2
-N=2
+M=4
+N=4
+
+# Probability that a coefficient is non-zero
 DENS=0.002
 
 action() {
@@ -73,9 +77,9 @@ for i in {0..$N1} ; do
 done
 
 if [ "$FFT_THRESHOLD" != "" ] ; then
-	action ${B}../../matlingen/bw-master2 --subdir $D -t $FFT_THRESHOLD matrix.txt $M $N  | tee "$D/master.log"
+	action ${B}bw-master2 --subdir $D -t $FFT_THRESHOLD matrix.txt $M $N  | tee "$D/master.log"
 else
-	action ${B}../../matlingen/bw-master --subdir $D matrix.txt $M $N  | tee "$D/master.log"
+	action ${B}bw-master-old --subdir $D matrix.txt $M $N  | tee "$D/master.log"
 fi
 
 # ./wrap_old_master_code.sh ${B}bw-master-old $D $MODULUS $MSIZE $M $N  | tee "$D/master.log"

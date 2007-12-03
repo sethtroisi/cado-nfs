@@ -92,6 +92,8 @@ BW_MASTER2_SOURCES:=						\
 		old/bw_scalar.c old/endian.c			\
 		old/timer.c			\
 		old/variables.c	old/fft_on_matrices.c		\
+		old/ops_poly.c				\
+		old/fft_core.c			\
 		old/field_common.c old/field_prime.c		\
 		old/field_quad.c old/field_complex.c		\
 		old/field_usage.c old/modulus_hacks.c		\
@@ -122,6 +124,8 @@ BW_BENCHFFT_SOURCES:=						\
 		old/options.c					\
 		old/timer.c					\
 		old/variables.c old/fft_on_matrices.c		\
+		old/ops_poly.c				\
+		old/fft_core.c					\
 		old/field_common.c old/field_prime.c		\
 		old/field_quad.c old/field_complex.c		\
 		old/field_usage.c old/modulus_hacks.c		\

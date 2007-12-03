@@ -68,6 +68,20 @@ void p_$1mat(bw_$1mat mat)
 	}
 }'')
 
+define(`print_poly',``
+void p_$1poly(bw_$1poly x, int d)
+{
+	int i;
+	printf("[\n");
+	for(i = 0 ; i <= d ; i++) {
+		p_$1mat($1poly_coeff(x,i));
+		if (magma_display && i < d)
+			printf(",\n");
+
+	}
+	printf("]\n");
+}'')
+
 define(`helpers_poly',``
 bw_$1mat h_$1coeff(bw_$1poly p, int t)
 {
@@ -79,12 +93,14 @@ define(`debug_k_matrix_type',`dnl
 print_row($1,$2,$3,`k_print')
 print_col($1,$2,$3,`k_print')
 print_mat($1,$2,$3,`k_print')
+print_poly($1)
 helpers_poly($1)')
 
 define(`debug_l_matrix_type',`dnl
 print_row($1,$2,$3,`l_print')
 print_col($1,$2,$3,`l_print')
 print_mat($1,$2,$3,`l_print')
+print_poly($1)
 helpers_poly($1)')
 
 divert(0)dnl

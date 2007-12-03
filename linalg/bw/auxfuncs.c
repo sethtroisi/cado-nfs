@@ -17,6 +17,13 @@
 #define FILENAME_LENGTH		80
 #define MALLOC_LOG_LIMIT	16384
 
+unsigned int ceil_log2(unsigned int d)
+{
+	unsigned int k;
+	for(k=0;d;k++) d>>=1;
+	return k;
+}
+
 void die(const char * fmt, int signal, ... )
 {
 	va_list ap;
