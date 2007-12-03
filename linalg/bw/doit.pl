@@ -44,6 +44,8 @@ my $bindir;
 	close F;
 }
 
+my $slavebindir=$bindir;
+
 my @args = @ARGV;
 while (defined(my $x = shift(@args))) {
 	if ($x =~ m/^mn=(.*)$/) {
@@ -56,7 +58,7 @@ while (defined(my $x = shift(@args))) {
 		# read a possible config file, and apply options right
 		# now.
 		open my $xh, $x or die "$x: $!";
-		push @args, <$xh>;
+		unshift @args, <$xh>;
 		close $xh;
 	} else {
 		# Then it should be a matrix file.
@@ -171,6 +173,9 @@ if (@mlist) {
 			exit 1;
 		}
 	}
+	# TODO: what about inhomogeneous computations ?
+        action "cp ${bindir}bw-slave $wdir/";
+	$slavebindir="$wdir/";
 }
 
 if ($matrix) {
@@ -208,7 +213,7 @@ if ($dump) {
 sub rsync_push {
 	if (!$shared && $rsync) {
 		for my $m (@mlist) {
-			action "rsync -av $wdir/ $m:$wdir/";
+			action "rsync -av @_ $wdir/ $m:$wdir/";
 		}
 	}
 }
@@ -216,12 +221,12 @@ sub rsync_push {
 sub rsync_pull {
 	if (!$shared && $rsync) {
 		for my $m (@mlist) {
-			action "rsync -av $m:$wdir/ $wdir/";
+			action "rsync -av @_ $m:$wdir/ $wdir/";
 		}
 	}
 }
 
-rsync_push;
+rsync_push "--delete";
 
 sub compute_spanned {
 	my @jlist = @_;
@@ -256,7 +261,7 @@ my $n1=$n-1;
 
 # Gather the list of slave commands.
 SLAVE : {
-	my $exe="${bindir}bw-slave";
+	my $exe="${slavebindir}bw-slave";
 	if ($mt) {
 		$exe .= "-mt --nthreads $mt";
 	}
@@ -291,6 +296,7 @@ MASTER : {
 	}
 	$exe .= " --subdir $wdir matrix.txt $m $n";
 	open my $mlog, ">$wdir/master.log";
+	print "$exe\n";
 	open my $mh, "$exe |";
 	while (defined(my $x=<$mh>)) {
 		print $mlog $x;
@@ -314,7 +320,7 @@ if (!$multisols) {
 my @solfiles=();
 
 MKSOL : {
-	my $exe="${bindir}bw-slave";
+	my $exe="${slavebindir}bw-slave";
 	if ($mt) {
 		$exe .= "-mt --nthreads $mt";
 	}
