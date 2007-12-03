@@ -7,6 +7,8 @@
 #include <math.h>
 #include <ctype.h>
 #ifdef HAVE_MSRH
+#include <asm/types.h>
+typedef __u32 u32;
 #include <asm/msr.h>
 #else
 #define rdtscll(x)
