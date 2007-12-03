@@ -7,9 +7,10 @@ GMPINCLUDE ?= $(GMP)/include/
 
 CFLAGS=-g -Wall -DREV=\"`svnversion .`\" -O2 
 LDFLAGS=../utils/libutils.a $(GMPLIB)
-INC=-I $(GMPINCLUDE) -I..
+INC=-I $(GMPINCLUDE) -I.. -I../utils
 
-all: allsqrt replay merge purge procrels linalg characters matsort matprune
+all: allsqrt replay merge purge procrels linalg	\
+	characters matsort matprune transpose
 
 Makefile.local:
 	echo "Makefile.local does not exist. It can be used to store paths \
@@ -32,14 +33,17 @@ merge: merge.c ../utils/libutils.a
 replay: replay.c ../utils/libutils.a
 	gcc $(CFLAGS) $(INC) $< $(LDFLAGS) -o $@
 
-linalg: linalg.c gauss.o
-	gcc $(CFLAGS) gauss.o $(INC) $< $(LDFLAGS) -o $@
+linalg: linalg.o gauss.o readmat.o
+	gcc $(CFLAGS) $^ $(LDFLAGS) -o $@
 
 gauss.o: gauss.c
 	gcc -c $(CFLAGS) -DMULTI_ROW=3 -DNO_MAIN $(INC) $< -o $@
 
-files.o: files.c
+.c.o:
 	gcc -c $(CFLAGS) $(INC) $< -o $@
+
+transpose: transpose.o readmat.o
+	gcc $(CFLAGS) $(INC) $^ $(LDFLAGS) -o $@
 
 characters: characters.c files.o gauss.o
 	gcc $(CFLAGS) $(INC) $< files.o gauss.o $(LDFLAGS) -o $@
@@ -52,6 +56,8 @@ matsort: matsort.c gauss.o
 
 matprune: matprune.c
 	gcc $(CFLAGS) $(INC) $< $(LDFLAGS) -o $@
+
+
 
 clean:
 	\rm replay merge purge procrels gauss.o linalg characters matsort matprune

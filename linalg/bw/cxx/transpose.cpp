@@ -66,38 +66,6 @@ void doit(std::ostream& o)
 
 		unsigned int j0 = 0;
 		unsigned int j = 0;
-#if 0
-		if (li[j].first == 0) {
-			li[j].second +=  3;
-			if (li[j].second) li[j0++] = li[j];
-			j++;
-		}
-		if (li[j].first == 1) {
-			li[j].second +=  4;
-			if (li[j].second) li[j0++] = li[j];
-			j++;
-		}
-		if (li[j].first == 2) {
-			li[j].second +=  1;
-			if (li[j].second) li[j0++] = li[j];
-			j++;
-		}
-		if (li[j].first == 3) {
-			li[j].second +=  1;
-			if (li[j].second) li[j0++] = li[j];
-			j++;
-		}
-		if (li[j].first == 4) {
-			li[j].second +=  -1;
-			if (li[j].second) li[j0++] = li[j];
-			j++;
-		}
-		if (li[j].first == 5) {
-			li[j].second +=  1;
-			if (li[j].second) li[j0++] = li[j];
-			j++;
-		}
-#endif
 		for( ; j < li.size() ; li[j0++] = li[j++]);
 
 		for(j = 0 ; j < j0 ; j++) {

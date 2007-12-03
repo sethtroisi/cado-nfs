@@ -2,7 +2,14 @@
 #define MANU_H_
 
 #ifdef	__cplusplus
+#include <cstdlib>
 #include <cassert>
+#else
+#include <stdlib.h>
+#include <assert.h>
+#endif
+
+#ifdef	__cplusplus
 extern "C" {
 #endif
 

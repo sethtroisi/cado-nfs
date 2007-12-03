@@ -96,21 +96,32 @@ sub parse_matrix_header {
 		do {
 			last HEADER unless defined(my $x = <$mh>);
 			$hline = $x if $x =~ /ROWS/;
+			if (!defined($hline)) {
+				$hline = $x if $x =~ /^\d+\s\d+$/;
+			}
 			push @header, $x;
 		} until (scalar @header == 10);
 	}
 	if (!defined($hline)) {
 		die "No header line in first ten lines of $f";
 	}
-	$hline =~ /(\d+)\s+ROWS/i or die "bad header line in $f : $hline";
-	$h->{'msize'} = $1;
-	$hline =~ /(\d+)\s+COLUMNS/i or die "bad header line in $f : $hline";
-	if ($h->{'msize'} != $1) {
-		die "Matrix is not square ($h->{'msize'}x$1)";
+	if ($hline =~ /^(\d+)\s(\d+)$/) {
+		$h->{'msize'} = $1;
+		$h->{'modulus'} = 2;
+		print "CADO format $1 rows $2 columns\n";
+	} else {
+		$hline =~ /(\d+)\s+ROWS/i
+			or die "bad header line in $f : $hline";
+		$h->{'msize'} = $1;
+		$hline =~ /(\d+)\s+COLUMNS/i
+			or die "bad header line in $f : $hline";
+		if ($h->{'msize'} != $1) {
+			die "Matrix is not square ($h->{'msize'}x$1)";
+		}
+		$hline =~ /MODULUS\s+(\d+)/i
+			or die "bad header line in $f : $hline";
+		$h->{'modulus'} = $1;
 	}
-	$hline =~ /MODULUS\s+(\d+)/i or die "bad header line in $f : $hline";
-	$h->{'modulus'} = $1;
-
 	my $hash = `head -c 2048 $f | md5sum | cut -c1-8`;
 	chomp($hash);
 	$h->{'hash'} = $hash;
