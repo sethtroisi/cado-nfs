@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "../mod_ul.c"
+#include "mod_ul.h"
 
 /*
   Convention for I/O of rels:

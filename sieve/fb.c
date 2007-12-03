@@ -23,7 +23,7 @@
 #endif
 #include "basicnt.h"
 #include "fb.h"
-#include "mod_ul.c"
+#include "utils/mod_ul.h"
 #include "sieve_aux.h"
 
 /* Some prototypes for functions scattered in various files with no 

@@ -28,7 +28,7 @@ Makefile.local:
 	"future invocations of make."
 	touch Makefile.local
 
-sieve: sieve.c fb.c ../utils/libutils.a ../mod_ul.c config.h sieve_aux.h ../cado.h Makefile.local
+sieve: sieve.c fb.c ../utils/libutils.a config.h sieve_aux.h ../cado.h Makefile.local
 	gcc -I. -I.. -I$(GMPINCLUDE) $(CFLAGS) -o $@ -Wall -Wextra sieve.c fb.c ../utils/libutils.a $(GMPLIB) -lm
 
 checknorms: checknorms.c Makefile.local

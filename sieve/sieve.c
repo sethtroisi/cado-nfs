@@ -14,8 +14,8 @@ typedef __u32 u32;
 #define rdtscll(x)
 #endif
 #include "cado.h"
+#include "../utils/mod_ul.h"
 #include "fb.h"
-#include "mod_ul.c"
 #include "sieve_aux.h"
 #include "basicnt.h"
 #include "../utils/utils.h"
