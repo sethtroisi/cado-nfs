@@ -1,7 +1,7 @@
 #ifndef CONSTANTS_HPP_
 #define CONSTANTS_HPP_
 
-#define	MODULUS_BITS	8
+#define	MODULUS_BITS	5
 #define	BITS_TO_WORDS(B,W)	(((B)+(W)-1)/(W))
 
 #ifdef	__x86_64

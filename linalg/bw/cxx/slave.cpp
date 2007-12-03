@@ -56,11 +56,15 @@ namespace globals {
 	uint nb_iter;
 	uint cp_lag;
 	uint iter0;
+	int nbys;
 	mpz_class modulus;
+	uint8_t modulus_u8;
+	uint16_t modulus_u16;
+	uint32_t modulus_u32;
 	vector<uint32_t> bw_x;
 	uint degf;			// mksol only
 	barrier_t	main_loop_barrier;
-	mpz_class dotprod_diff_check;
+	vector<mpz_class> dotprod_diff_check;
 
 	/* only for threads */
 	vector<std::streampos> mtxfile_pos;
@@ -163,7 +167,7 @@ struct thread : public traits
 	int32_t  * check_m0;
 	double maxwait;
 	uint done;
-	mpz_class dot_part;
+	vector<mpz_class> dot_part;
 	/* reference timing */
 	uint go_mark;
 	double ticks_ref;
@@ -195,6 +199,8 @@ struct thread : public traits
 		check_x0 = new int32_t[i1 - i0];
 		check_m0 = new int32_t[i1 - i0];
 
+		dot_part.assign(globals::nbys, mpz_class());
+
 		{
 			ifstream mtx;
 			must_open(mtx, files::matrix);
@@ -207,8 +213,10 @@ struct thread : public traits
 
 		BUG_ON(globals::iter0 & 1);
 
-		memcpy(v, vptr->v0, nr * sizeof(scalar_t));
-		memset(w, 0, nr * sizeof(scalar_t));
+		// memcpy(v, vptr->v0, nr * sizeof(scalar_t));
+		// memset(w, 0, nr * sizeof(scalar_t));
+		traits::copy(v, vptr->v0, nr);
+		traits::zero(w, nr);
 
 		go_mark = done = globals::iter0;
 		ticks_ref = thread_ticks();
@@ -264,27 +272,42 @@ struct thread : public traits
 			<< endl;
 	}
 
-	mpz_class one_dotprod(const int32_t * sv, const scalar_t lv[])
+	void one_dotprod(vector<mpz_class> & r, const int32_t * sv, const scalar_t * lv)
 	{
 		wide_scalar_t tmp;
 		zero(tmp);
+		scalar_t foo;
+		int acc = 0;
 
 		for(uint i = i0 ; i < i1 ; i++) {
 			addmul(tmp, lv[i], sv[i-i0]);
+			if (++acc == traits::max_accumulate) {
+				reduce(tmp, tmp);
+				acc = 1;
+			}
 		}
-		return reduce(tmp);
+		reduce(foo, tmp);
+
+		for(int i = 0 ; i < globals::nbys ; i++) {
+			r[i] = traits::get_y(foo, i);
+		}
 	}
 	
-	void multiply(wide_scalar_t dst[], const scalar_t src[])
+	void multiply(wide_scalar_t * dst, const scalar_t * src)
 	{
 		const uint32_t * ip = idx;
 		const int32_t  * vp = val;
+		int acc = 0;
 		for(uint i = 0 ; i < i1 - i0 ; i++) {
 			zero(dst[i]);
 			uint c = 0;
 			for( ; *vp != 0 ; ip++, vp++) {
 				c += *ip;
 				addmul(dst[i], src[c], *vp);
+				if (++acc == traits::max_accumulate) {
+					reduce(dst[i], dst[i]);
+					acc = 1;
+				}
 			}
 			ip++;
 			vp++;
@@ -301,8 +324,8 @@ struct thread : public traits
 
 	/* src is expected to be B^done * y ; compute B^(done+1) y into dst,
 	 * increment i */
-	void flip_flap(	scalar_t dst[],
-			scalar_t src[])
+	void flip_flap(	scalar_t * dst,
+			scalar_t * src)
 	{
 		double twait;
 		bool ok;
@@ -313,12 +336,17 @@ struct thread : public traits
 
 		do {
 			multiply(scrap, src);
-			mpz_class ds = one_dotprod(check_m0, src);
+			vector<mpz_class> ds(nbys);
+			vector<mpz_class> dt(nbys);
 
+			one_dotprod(ds, check_m0, src);
 			reduce(dst, scrap, i0, i1);
-			mpz_class dt = one_dotprod(check_x0, dst);
+			one_dotprod(dt, check_x0, dst);
 
-			dot_part = ds - dt;
+			// traits::subtract(dot_part, ds, dt);
+			for(int i = 0 ; i < nbys ; i++) {
+				dot_part[i] = ds[i] - dt[i];
+			}
 
 			ok = barrier_wait(&main_loop_barrier,
 					&twait, &addup<self>);
@@ -334,9 +362,14 @@ struct thread : public traits
 			const self* xptr = 
 				(const self*)
 				globals::thread_class_ptr[x];
+			/*
 			memcpy(dst + xi0,
 					((done & 1) ? xptr->v : xptr->w) + xi0,
 					(xi1 - xi0) * sizeof(scalar_t));
+					*/
+			traits::copy(dst + xi0,
+					((done & 1) ? xptr->v : xptr->w) + xi0,
+					xi1 - xi0);
 		}
 
 		++done;
@@ -393,7 +426,7 @@ struct slave_thread : public thread<traits, slave_thread<traits> > {
 		cp_lag = globals::cp_lag;
 	}
 	~slave_thread() { delete[] a; }
-	void use_vector(scalar_t dst[]) {
+	void use_vector(scalar_t * dst) {
 		// mpz_class z;
 
 		for(uint x = 0 ; x < px.size() ; x++) {
@@ -452,13 +485,14 @@ struct mksol_thread : public thread<traits, mksol_thread<traits> > {
 		fptr = ((globals::vdata<traits> *) ptr)->f;
 
 		sum = new scalar_t[super::i1 - super::i0];
-		memset(sum, 0, (super::i1 - super::i0) * sizeof(scalar_t));
+		// memset(sum, 0, (super::i1 - super::i0) * sizeof(scalar_t));
+		traits::zero(sum, super::i1 - super::i0);
 		cp_lag = globals::cp_lag;
 	}
 	~mksol_thread() {
 		delete[] sum;
 	}
-	void use_vector(scalar_t dst[]) {
+	void use_vector(scalar_t * dst) {
 		/* We have the full vector available here. However it is
 		 * only available for writing */
 
@@ -522,7 +556,8 @@ struct mksol_thread : public thread<traits, mksol_thread<traits> > {
 			}
 		}
 		barrier_wait(&globals::main_loop_barrier, NULL, NULL);
-		memset(sum, 0, (super::i1 - super::i0) * sizeof(scalar_t));
+		// memset(sum, 0, (super::i1 - super::i0) * sizeof(scalar_t));
+		traits::zero(sum, super::i1 - super::i0);
 	}
 };
 
@@ -532,17 +567,24 @@ int addup(int k)
 	using namespace globals;
 
 	if (k == 0) {
-		dotprod_diff_check = 0;
+		for(int i = 0 ; i < nbys ; i++) {
+			dotprod_diff_check[i] = 0;
+		}
 	}
 	const T& me = *(const T*)(thread_class_ptr[tseqid()]);
 
-	dotprod_diff_check += me.dot_part;
+	for(int i = 0 ; i < nbys ; i++) {
+		dotprod_diff_check[i] += me.dot_part[i];
+	}
 
-	if (k == mine.nt - 1) {
-		dotprod_diff_check %= globals::modulus;
-		if (dotprod_diff_check != 0) {
-			cerr << fmt("// s = %, not 0 !!!\n")
-				% dotprod_diff_check;
+	if (k != mine.nt - 1)
+		return 1;
+
+	for(int i = 0 ; i < nbys ; i++) {
+		dotprod_diff_check[i] %= globals::modulus;
+		if (dotprod_diff_check[i] != 0) {
+			cerr << fmt("// s[%] = %, not 0 !!!\n")
+				% i % dotprod_diff_check[i];
 			return 0;
 		}
 	}
@@ -552,10 +594,11 @@ int addup(int k)
 /* mksol stuff only */
 
 template<typename traits>
-uint set_f_coeffs(typename traits::scalar_t f[], uint maxdeg)
+uint set_f_coeffs(typename traits::scalar_t * f, uint maxdeg)
 {
 	uint deg = 0;
-	memset(f, 0, (maxdeg + 1) * sizeof(typename traits::scalar_t));
+	// memset(f, 0, (maxdeg + 1) * sizeof(typename traits::scalar_t));
+	traits::zero(f, maxdeg + 1);
 	ifstream fx;
 	must_open(fx, files::f % mine.scol);
 	istream_iterator<mpz_class> inp(fx);
@@ -684,7 +727,10 @@ int main(int argc, char *argv[])
 	must_open(mtx, files::matrix);
 	get_matrix_header(mtx, nr, mstr);
 
-	globals::modulus = mpz_class(mstr);
+	globals::modulus 	= mpz_class(mstr);
+	globals::modulus_u8	= globals::modulus.get_ui();
+	globals::modulus_u16	= globals::modulus.get_ui();
+	globals::modulus_u32	= globals::modulus.get_ui();
 
 	if (SIZ(globals::modulus.get_mpz_t()) != MODULUS_SIZE) {
 		cerr << "### Not compiled with proper MODULUS_BITS\n"
@@ -711,9 +757,10 @@ int main(int argc, char *argv[])
 		BUG_ON((int) m != (mine.e.first - mine.b.first + 1));
 	}
 
-	/* Oh, this is already checked elsewhere... */
-	BUG_ON(mine.b.second != mine.e.second);
+	nbys = mine.e.second - mine.b.second + 1;
 	col = mine.b.second;
+
+	dotprod_diff_check.assign(nbys, mpz_class());
 
 	/* Configure the thread data area, so that we can pre-fill it */
 	configure_threads(mine.nt);
@@ -738,7 +785,28 @@ int main(int argc, char *argv[])
 	cout.flush();
 	cerr.flush();
 
-	return program<typical_scalar_traits<MODULUS_SIZE> >();
+	cout << "// MODULUS_BITS: " << MODULUS_BITS << " (hard-coded)\n";
+	cout << "// MODULUS_SIZE: " << MODULUS_SIZE << " (hard-coded)\n";
+	cout << "// modulus: " << globals::modulus << "\n";
+	cout << "// modulus: " << SIZ(globals::modulus.get_mpz_t()) << " words\n";
+	cout << "// nbys: " << nbys << "\n";
+
+	if (MODULUS_BITS < 8 && nbys == 8) {
+		cout << "// Using SSE-2 code\n";
+		return program<sse2_8words_traits >();
+	} else if (nbys == 1 && SIZ(globals::modulus.get_mpz_t()) == MODULUS_SIZE) {
+		cout << "// Using code for " << MODULUS_SIZE << " words\n";
+		return program<typical_scalar_traits<MODULUS_SIZE> >();
+	} else if (nbys == 1) {
+		/* This amounts to at least a 2x slowdown at least */
+		cout << "// Using generic code\n";
+		return program<variable_scalar_traits>();
+	} else {
+		cerr << "no available code\n";
+		exit(1);
+	}
+
+	return 0;
 }
 
 /* vim:set sw=8: */

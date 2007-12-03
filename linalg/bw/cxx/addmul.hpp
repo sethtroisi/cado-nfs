@@ -21,7 +21,8 @@ mpz_class reduce(mp_limb_t tmp[width + 2])
 	mpz_class p;
 	mpz_class r;
 
-	if (tmp[width + 1] >> mp_bits_per_limb) {
+	/* FIXME -- make sure it's indeed (mp_bits_per_limb-1) */
+	if (tmp[width + 1] >> (mp_bits_per_limb-1)) {
 		mp_size_t i;
 		for(i = 0 ; i < width + 2 && !(tmp[i] = -tmp[i]) ; i++);
 		for( i++  ; i < width + 2 ; i++) tmp[i] = ~ tmp[i];

@@ -36,7 +36,11 @@ namespace globals {
 	uint m, n;
 	uint col;
 	uint nr;
+	// int nbys;
 	mpz_class modulus;
+	uint8_t modulus_u8;
+	uint16_t modulus_u16;
+	uint32_t modulus_u32;
 
 	uint nb_coeffs;
 
@@ -85,10 +89,12 @@ void add_file(const std::string& fn)
 	istream_iterator<mpz_class> it(f);
 
 	for(unsigned int i = 0 ; i < nr ; i++) {
-		mpz_class foo;
+		std::vector<mpz_class> foo(1);
 		traits::assign(foo, v[i]);
-		foo += *it++;
-		traits::assign(v[i], foo);
+		// for(int j = 0 ; j < nbys ; j++) {
+			foo [0] +=  *it++;
+		// }
+		traits::assign(v[i], foo, 0);
 	}
 	BUG_ON(it != istream_iterator<mpz_class>());
 }

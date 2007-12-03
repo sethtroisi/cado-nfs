@@ -20,6 +20,7 @@
 #include "must_open.hpp"
 // #include "parsing_tools.hpp"
 #include <iterator>
+#include <vector>
 #include "state.hpp"
 
 namespace state_details {
@@ -29,6 +30,7 @@ template<typename T> inline std::istream_iterator<T> endof(std::ifstream&)
 { return std::istream_iterator<T>(); }
 }
 
+#if 0
 template<typename traits>
 int recover_vector(int nr, int col, int r, typename traits::scalar_t * w)
 {
@@ -40,8 +42,50 @@ int recover_vector(int nr, int col, int r, typename traits::scalar_t * w)
 		must_open(v, files::y % col);
 	}
 	std::istream_iterator<mpz_class> it(v);
-	for( ; nr && it != endof<mpz_class>(v) ; it++, nr--, w++) {
-		traits::assign(*w, *it);
+	for( ; nr && it != endof<mpz_class>(v) ; nr--, w++) {
+		std::vector<mpz_class> foo(globals::nbys);
+		for(int i = 0 ; i < globals::nbys ; i++) {
+			BUG_ON(it == endof<mpz_class>(v));
+			foo[i] = *it++;
+		}
+		traits::assign(*w, foo, 0);
+	}
+	BUG_ON(nr != 0);
+	return 0;
+}
+#endif
+
+namespace globals {
+	extern int nbys;
+}
+
+template<typename traits>
+int recover_vector(int nr, int col, int r, typename traits::scalar_t * w)
+{
+	std::ifstream vs[globals::nbys];
+
+	using namespace state_details;
+	for(int i = 0 ; i < globals::nbys ; i++) {
+		if (r) {
+			must_open(vs[i], files::v % (col+i) % r);
+		} else {
+			must_open(vs[i], files::y % (col+i));
+		}
+	}
+	for( ; nr ; nr--, w++) {
+		std::vector<mpz_class> foo;
+		int nfail = 0;
+		for(int i = 0 ; i < globals::nbys ; i++) {
+			mpz_class x;
+			if (vs[i] >> x) {
+				foo.push_back(x);
+			} else {
+				nfail++;
+			}
+		}
+		// nr should be such that everything is ok.
+		BUG_ON(nfail);
+		traits::assign(*w, foo, 0);
 	}
 	BUG_ON(nr != 0);
 	return 0;

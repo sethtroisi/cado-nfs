@@ -53,6 +53,7 @@ struct slave_arguments {
 				ok = false;
 			}
 		}
+#if 0
 		if (b.second != e.second) {
 			/* should work, ideally, but for now this is
 			 * completely unexpected in the source code
@@ -60,6 +61,7 @@ struct slave_arguments {
 			o << "come back someday when nbys != 1 is supported\n";
 			ok = false;
 		}
+#endif
 		if (task == "mksol") {
 			if (scol == (unsigned int) -1) {
 				o << "mksol requires --sc\n";
