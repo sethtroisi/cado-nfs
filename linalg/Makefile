@@ -5,7 +5,7 @@ GMP ?= /usr/local/
 GMPLIB ?= $(GMP)/lib/libgmp.a
 GMPINCLUDE ?= $(GMP)/include/
 
-CFLAGS=-g -Wall -DREV=\"`svnversion .`\" #-O2 
+CFLAGS=-g -Wall -DREV=\"`svnversion .`\" -O2 
 LDFLAGS=../utils/libutils.a $(GMPLIB)
 INC=-I $(GMPINCLUDE) -I..
 
