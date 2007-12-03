@@ -96,7 +96,6 @@ ALLSOLS=`grep 'LOOK' "$D/master.log" | tr -d '[]' | cut -d\  -f6-`
 		done
 		action ${B}bw-gather --subdir $D $X --nbys 8
 		cp "$D/W0$X" `dirname $FILE`
-		cp "$D/MW0$X" `dirname $FILE`
 	done
 #else
 #X=$(grep 'LOOK' "$D/master.log" | tail -1 | awk '// { print $6; }')
@@ -116,6 +115,5 @@ if [ "$REMOVE_D" = yes ] ; then
 		F="${FILE}.solution"
 	fi
 	cp "$D/W"* `dirname $FILE`
-	cp "$D/MW"* `dirname $FILE`
 	cp "$D/W0$X" $F && rm -rf "$D"
 fi

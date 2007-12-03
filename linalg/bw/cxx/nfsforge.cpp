@@ -46,6 +46,26 @@ nfsforge_arguments mine;
 
 using namespace std;
 
+void reduce_mline(matrix_line& v, boost::int32_t p)
+{
+	matrix_line::iterator dst;
+	matrix_line::const_iterator src;
+	dst = v.begin();
+	for(src = v.begin() ; src != v.end() ; src++) {
+		boost::int32_t pm;
+		pm = src->second % mine.p;
+		if (pm < -(p/2)) {
+			pm+=p;
+		} else if (pm > p/2) {
+			pm-=p;
+		}
+		if (pm) {
+			*dst++ = make_pair(src->first, pm);
+		}
+	}
+	v.erase(dst, v.end());
+}
+
 int main(int argc, char * argv[])
 {
 	ios_base::sync_with_stdio(false);
@@ -76,19 +96,10 @@ int main(int argc, char * argv[])
 		matrix_line::const_iterator src;
 		matrix_line::iterator dst;
 		dst = li.begin();
-		boost::int32_t p = mine.p;
 		for(src = li.begin() ; src != li.end() ; src++) {
-			boost::int32_t pm;
-			pm = src->second % mine.p;
-			if (pm < -(p/2)) {
-				pm+=p;
-			} else if (pm > p/2) {
-				pm-=p;
-			}
-			if (pm) {
-				*dst++ = make_pair(src->first, pm);
-			}
+			*dst++ = *src;
 		}
+
 		li.erase(dst, li.end());
 
 		sstr << q << ' ' << r << ' ' << x << flush;
@@ -188,12 +199,23 @@ int main(int argc, char * argv[])
 		cout << "now: "  << total_coeffs << " coefficients\n";
 	}
 
-	ofstream cfile;
-	must_open(cfile, mine.out);
 	ostringstream mstr;
 	mstr << mine.p;
+
+	ofstream cfile;
+
+	/* First write the unreduced version of the matrix */
+	must_open(cfile, mine.out + ".ur");
 	put_matrix_header(cfile, rows.size(), mstr.str());
 	for(unsigned int j = 0 ; j < columns.size() ; j++) {
+		cfile << columns[j] << "\n";
+	}
+	cfile.close();
+
+	must_open(cfile, mine.out);
+	put_matrix_header(cfile, rows.size(), mstr.str());
+	for(unsigned int j = 0 ; j < columns.size() ; j++) {
+		reduce_mline(columns[j], mine.p);
 		cfile << columns[j] << "\n";
 	}
 	cfile.close();

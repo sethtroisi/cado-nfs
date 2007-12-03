@@ -5,7 +5,7 @@ D=~/Local/testmat
 # MODULUS=9903520314283042199192993767
 # MODULUS=65537
 MODULUS=531137992816767098689588206552468627329593117727031923199444138200403559860852242739162502265229285668889329486246501015346579337652707239409519978766587351943831270835393219031728127
-FFT_THRESHOLD=128
+# FFT_THRESHOLD=128
 
 # A good FFT modulus (859*2^118+1, 128 bits).
 # MODULUS=285451712094810683706092566195203997697
@@ -49,12 +49,10 @@ if [ "$1" = tiny ] ; then
 fi
 
 if [ -f "$1" ] ; then
-	M=2
-	N=2
 	# works because we're zsh.
 	grep ROWS "$1" | head -1 | tr -d ';' | read x x x MSIZE x x MODULUS
 	cp "$1" $D/matrix.txt
-	unset FFT_THRESHOLD
+	# unset FFT_THRESHOLD
 else
 	${B}bw-random $MSIZE $MODULUS $DENS > $D/matrix.txt
 fi
@@ -89,13 +87,24 @@ fi
 
 # action ${B}bw-master --subdir $D | tee "$D/master.log"
 
-X=$(grep 'LOOK' "$D/master.log" | tail -1 | awk '// { print $6; }')
+ALLSOLS=`grep 'LOOK' "$D/master.log" | tr -d '[]' | cut -d\  -f6-`
 
-for i in {0..$N1} ; do
-        action ${B}bw-slave-mt --nthreads 2 --task mksol --subdir $D --sc $X $i
-done
+if [ -n $MULTISOLS ] ; then
+	for X in `echo $ALLSOLS` ; do
+		for i in {0..$N1} ; do
+			action ${B}bw-slave-mt --nthreads 2 --task mksol --subdir $D --sc $X $i
+		done
+		action ${B}bw-gather --subdir $D $X
+		cp "$D/W0$X" `dirname $FILE`
+	done
+else
+	X=$(grep 'LOOK' "$D/master.log" | tail -1 | awk '// { print $6; }')
+	for i in {0..$N1} ; do
+		action ${B}bw-slave-mt --nthreads 2 --task mksol --subdir $D --sc $X $i
+	done
 
-action ${B}bw-gather --subdir $D $X
+	action ${B}bw-gather --subdir $D $X
+fi
 
 if [ "$REMOVE_D" = yes ] ; then
 	F=`echo $FILE | sed -e s/matrix/solution/g`
