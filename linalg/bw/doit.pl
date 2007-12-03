@@ -9,6 +9,8 @@
 use strict;
 use warnings;
 
+print "$0 @ARGV\n";
+
 my $param = {
 	# example data
 	modulus=>"531137992816767098689588206552468627329593117727031923199444138200403559860852242739162502265229285668889329486246501015346579337652707239409519978766587351943831270835393219031728127",
@@ -21,6 +23,7 @@ my $param = {
 	vectoring=>4,
 	method=>'ifft',
 	multisols=>0,
+	maxload=>1, # How many simultaneous jobs on one machine.
 };
 
 # Parameters that will be used only if nothing sets them earlier.
@@ -70,10 +73,12 @@ sub action { print "@_\n"; system @_; }
 
 # If we already have a matrix, parse its header to obtain some
 # information.
-if ($param->{'matrix'}) {
-	my $f = $param->{'matrix'};
+
+sub parse_matrix_header {
+	my $f = shift @_;
 	open my $mh, $f or die "$f: $!";
 	my @header = ();
+	my $h = {};
 	my $hline;
 	HEADER: {
 		do {
@@ -86,17 +91,25 @@ if ($param->{'matrix'}) {
 		die "No header line in first ten lines of $f";
 	}
 	$hline =~ /(\d+)\s+ROWS/i or die "bad header line in $f : $hline";
-	$param->{'msize'} = $1;
+	$h->{'msize'} = $1;
 	$hline =~ /(\d+)\s+COLUMNS/i or die "bad header line in $f : $hline";
-	if ($param->{'msize'} != $1) {
-		die "Matrix is not square ($param->{'msize'}x$1)";
+	if ($h->{'msize'} != $1) {
+		die "Matrix is not square ($h->{'msize'}x$1)";
 	}
 	$hline =~ /MODULUS\s+(\d+)/i or die "bad header line in $f : $hline";
-	$param->{'modulus'} = $1;
+	$h->{'modulus'} = $1;
 
 	my $hash = `head -c 2048 $f | md5sum | cut -c1-8`;
 	chomp($hash);
-	$weak->{'wdir'} .= ".$hash";
+	$h->{'hash'} = $hash;
+	return $h;
+}
+
+if ($param->{'matrix'}) {
+	my $h = parse_matrix_header $param->{'matrix'};
+	$param->{'msize'} = $h->{'msize'};
+	$param->{'modulus'} = $h->{'modulus'};
+	$weak->{'wdir'} .= ".$h->{'hash'}";
 }
 
 for my $k (keys %$weak) {
@@ -132,6 +145,7 @@ my $rsync =	$param->{'rsync'};	dumpvar 'rsync';
 my $method =	$param->{'method'};	dumpvar 'method';
 my $threshold =	$param->{'threshold'};	dumpvar 'threshold';
 my $multisols =	$param->{'multisols'};	dumpvar 'multisols';
+my $maxload =	$param->{'maxload'};	dumpvar 'maxload';
 
 if ($param->{'dumpcfg'}) {
 	print $dumped;
@@ -156,7 +170,7 @@ if (@mlist) {
 	my $tms = time;
 	system "touch $wdir/$tms";
 	for my $m (@mlist) {
-		open my $xh, "ssh $m ls $wdir/$tms 2>&1 |";
+		open my $xh, "ssh -n $m ls $wdir/$tms 2>&1 |";
 		while (defined(my $x=<$xh>)) {
 			print "($m)\t$x";
 			chomp($x);
@@ -176,19 +190,27 @@ if (@mlist) {
 	}
 	# TODO: what about inhomogeneous computations ?
         action "cp ${bindir}bw-slave $wdir/";
+        action "cp ${bindir}bw-slave-mt $wdir/";
 	$slavebindir="$wdir/";
 }
 
-if ($matrix) {
-	action "cp $matrix $wdir/matrix.txt";
+if ($resume) {
+	die "Cannot resume: no matrix file" unless -f "$wdir/matrix.txt";
+	my $h = parse_matrix_header "$wdir/matrix.txt";
+	$param->{'msize'} = $h->{'msize'};
+	$param->{'modulus'} = $h->{'modulus'};
 } else {
-	# If no matrix parameter is set at this moment, then surely it
-	# means we're playing with a random sample: create it !
-	action "${bindir}bw-random $msize $modulus $dens > $wdir/matrix.txt";
+	if ($matrix) {
+		action "cp $matrix $wdir/matrix.txt";
+	} else {
+		# If no matrix parameter is set at this moment, then surely it
+		# means we're playing with a random sample: create it !
+		action "${bindir}bw-random $msize $modulus $dens > $wdir/matrix.txt";
+	}
 }
 
 action "${bindir}bw-balance --subdir $wdir"
-	unless ($resume && -f "$wdir/matrix.txt.orig");
+	unless ($resume && -f "$wdir/matrix.txt.old");
 action "${bindir}bw-secure --subdir $wdir"
 	unless ($resume && -f "$wdir/X0-vector");
 
@@ -231,31 +253,59 @@ rsync_push "--delete";
 
 sub compute_spanned {
 	my @jlist = @_;
-	for my $job (@jlist) {
-		print "$job\n";
-	}
+	# for my $job (@jlist) { print "$job\n"; }
 	if (@mlist) {
-		for my $i (0..$#jlist) {
-			my $job = $jlist[$i];
-			my $machine = $mlist[$i % scalar @mlist];
-			next if fork;
-			# kid code
-			print "($machine/job$i)\t$job\n";
-			open my $ch, "ssh $machine $job 2>&1 |";
-			while (defined(my $x = <$ch>)) {
-				print "($machine/job$i)\t$x";
-			}
-			close $ch;
-			exit 0;
-			# end of kid code.
+		my @kids=();
+		my @assignments=();
+		for my $j (1..($maxload * scalar @mlist)) {
+			push @assignments, [];
 		}
-		for my $i (0..$#jlist) { wait; }
+		for my $j (0..$#jlist) {
+			my $job = $jlist[$j];
+			push @{$assignments[$j % scalar @assignments]}, $j;
+		}
+
+		for my $i (0..$#assignments) {
+			my $a = $assignments[$i];
+			my $machine = $mlist[$i % scalar @mlist];
+			my $pid=fork;
+			if ($pid) {
+				push @kids, $pid;
+				next;
+			}
+			for my $j (@$a) {
+				my $job = $jlist[$j];
+				# kid code
+				print "($machine/job$j)\t$job\n";
+				open my $ch, "ssh -n $machine $job 2>&1 |";
+				while (defined(my $x = <$ch>)) {
+					print "($machine/job$j)\t$x";
+				}
+				close $ch;
+			}
+			# end of kid code.
+			exit 0;
+		}
+		print "Child processes: ", join(' ', @kids), "\n";
+		my @dead=();
+		for my $i (0..$#assignments) { push @dead, wait; }
+		print "Reaped processes: ", join(' ', @dead), "\n";
 	} else {
 		for my $job (@jlist) {
 			system "$job\n";
 		}
 	}
 }
+
+sub nlines {
+	my $f = shift @_;
+	open my $fh, "<$f" or return 0;
+	my $l=0;
+	while (<$fh>) { $l++; }
+	close $fh;
+	return $l;
+}
+
 
 my $m1=$m-1;
 my $n1=$n-1;
@@ -269,15 +319,38 @@ SLAVE : {
 	$exe .= " --task slave --subdir $wdir";
 
 
-	my @slavejobs = map
-		{
-			my ($i,$ni1)=($vectoring*$_,$vectoring*($_+1)-1);
-			"$exe 0,$i $m1,$ni1";
+	my @slavejobs = ();
+	
+	for my $vi (0..int($n/$vectoring) - 1) {
+		my ($i,$ni1)=($vectoring*$vi,$vectoring*($vi+1)-1);
+		# That's really a crude approximation.
+		my $l_approx=$msize/$m + $msize/$n;
+		my @linecounts=();
+		for my $j (0..$m1) {
+			my $x = nlines "$wdir/A-0$m1-00";
+			if ($x < $l_approx) {
+				# Then this one is not finished. We have
+				# to go forward.
+				last;
+			}
+			push @linecounts, $x;
 		}
-		(0..int($n/$vectoring) - 1);
+		if (scalar @linecounts == $m) {
+			for my $j (0..$m1) {
+				print "$wdir/A-0$m1-00 : $linecounts[$j] lines, over.\n";
+			}
+		} else {
+			push @slavejobs, "$exe 0,$i $m1,$ni1";
+		}
+	}
 
-
-	compute_spanned @slavejobs;
+	if (scalar @slavejobs) {
+		print "--- slave jobs: ---\n";
+		for my $j (@slavejobs) {
+			print "// $j\n";
+		}
+		compute_spanned @slavejobs;
+	}
 }
 
 rsync_pull;
@@ -285,6 +358,28 @@ rsync_pull;
 my @sols;
 
 MASTER : {
+	if ($resume) {
+		my $allfiles=-f "$wdir/master.log";
+		for my $x (0..$m+$n-1) {
+			my $p = sprintf "%02d", $x;
+			$allfiles = $allfiles && -f "$wdir-$p";
+		}
+		if ($allfiles) {
+			print "master: all files found, reusing\n";
+		}
+		open my $ph, "tail -1 $wdir/master.log |";
+		while (defined(my $x=<$ph>)) {
+			if ($x =~ /LOOK \[\s*([\d\s]*)\]$/) {
+				print "$x\n";
+				@sols = split ' ',$1;
+			}
+		}
+		if (!scalar @sols) {
+			die "No solution found";
+		}
+		last MASTER;
+	}
+
 	my $exe = "${bindir}bw-master";
 	if ($method =~ /^(?:q(?:uadratic)?|old)$/) {
 		$exe .= '-old';
@@ -327,22 +422,47 @@ MKSOL : {
 	}
 	$exe .= " --task mksol --subdir $wdir";
 
+	my @mksoljobs=();
 	for my $s (@sols) {
-		my @mksoljobs = map
+		if ($resume && -f "$wdir/W0$s") {
+			print "$wdir/W0$s already exists\n";
+			next;
+		}
+		my $t = [ map
 			{
 			my ($i,$ni1)=($vectoring*$_,$vectoring*($_+1)-1);
 			"$exe --sc $s 0,$i $m1,$ni1";
 			}
-			(0..int($n/$vectoring) - 1);
+			(0..int($n/$vectoring) - 1) ];
 
-		compute_spanned @mksoljobs;
-		rsync_pull;
+		push @mksoljobs, $t;
+	}
+	if (scalar @mksoljobs) {
+		print "--- mksol jobs: ---\n";
+		for my $t (@mksoljobs) {
+			for my $j (@$t) {
+				print "// $j\n";
+			}
+		}
+		for my $t (@mksoljobs) {
+			compute_spanned @$t;
+			rsync_pull;
+		}
+	}
+
+	if (!$multisols) {
+		@sols = ($sols[0]);
+		print "Restricting to solution @sols\n";
+	}
+
+	for my $s (@sols) {
 		action "${bindir}bw-gather --subdir $wdir $s --nbys $vectoring";
-
 		if ($matrix) {
 			my $d = dirname $matrix;
-			system "cp \"$wdir/W0$s\" \"$d\"";
-			push @solfiles, "$d/W0$s";
+			if (-f "$wdir/W0$s") {
+				system "cp \"$wdir/W0$s\" \"$d\"";
+				push @solfiles, "$d/W0$s";
+			}
 		}
 	}
 
@@ -351,12 +471,19 @@ MKSOL : {
 		for my $f (@solfiles) { print "$f\n"; }
 	}
 
-	if ($matrix && !$multisols) {
-		(my $sf = $matrix) =~ s/matrix/solution/;
-		if ($sf ne $matrix) {
-			my $s = $sols[0];
-			system "cp \"$wdir/W0$s\" \"$sf\"";
-			print "also: $sf\n";
+	if ($matrix) {
+		if (scalar @solfiles != scalar @sols) {
+			print "POSSIBLE BUG: not all wanted solutions were found\n";
+			$tidy=0;
+		}
+
+		if (!$multisols && @solfiles) {
+			(my $sf = $matrix) =~ s/matrix/solution/;
+			if ($sf ne $matrix) {
+				my $s = $solfiles[0];
+				system "cp --link \"$s\" \"$sf\"";
+				print "also: $sf\n";
+			}
 		}
 	}
 }
