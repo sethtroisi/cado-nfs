@@ -134,9 +134,9 @@ typedef unsigned long largeprime_t; /* On IA32 they'll only get 32 bit
 /* Factor base entry with (possibly) several roots */
 typedef struct {
   fbprime_t p;            /* A prime or a prime power */
-#ifdef REDC_ROOTS
+/* #ifdef REDC_ROOTS */
   unsigned long invp;     /* 1/p (mod 2^wordsize) for REDC */
-#endif
+/* #endif */
   unsigned char plog;     /* logarithm (to some suitable base) of this prime */
   unsigned char nr_roots; /* how many roots there are for this prime */
   unsigned char size;     /* The length of the struct in bytes */

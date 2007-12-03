@@ -1,7 +1,7 @@
 #ifndef __CONFIG_H__
 #define __CONFIG_H__
 
-#define HAVE_MSRH 1
+// #define HAVE_MSRH 1
 #define WANT_ASSERT 1
 #define WANT_ASSERT_EXPENSIVE 0
 
