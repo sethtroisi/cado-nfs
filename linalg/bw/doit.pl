@@ -161,7 +161,7 @@ my $seeding = '';
 if ($seed) {
 	$seeding = "--seed $seed";
 } else {
-	my $seed = (gettimeofday)[1] % 999983;
+	$seed = (gettimeofday)[1] % 999983;
 	print "Selecting seed $seed\n";
 	$seeding = "--seed $seed";
 }
@@ -428,7 +428,7 @@ MASTER : {
 	}
 	if (!scalar @sols) {
 		magmadump;
-		die "No solution found";
+		die "No solution found ; seed was $seed";
 	}
 }
 
@@ -439,6 +439,9 @@ if (!$multisols) {
 	@sols = ($sols[0]);
 }
 
+my @sols_found  = ();
+
+# within the matrix source directory
 my @solfiles=();
 
 MKSOL : {
@@ -486,6 +489,9 @@ MKSOL : {
 
 	for my $s (@sols) {
 		action "${bindir}bw-gather --subdir $wdir $s --nbys $vectoring";
+		if (-f "$wdir/W0$s") {
+			push @sols_found, "W0$s";
+		}
 		if ($matrix) {
 			my $d = dirname $matrix;
 			if (-f "$wdir/W0$s") {
@@ -493,6 +499,12 @@ MKSOL : {
 				push @solfiles, "$d/W0$s";
 			}
 		}
+	}
+
+	if ($multisols) {
+		print scalar @sols_found, " solutions found ",
+			"(from ", scalar @sols, " out of master)\n";
+		for my $f (@sols_found) { print "$f\n"; }
 	}
 
 	if (@solfiles) {
@@ -524,3 +536,5 @@ if ($dump) {
 if ($tidy) {
 	system "rm -rf $wdir";
 }
+
+print "Seed value for this run was $seed\n";

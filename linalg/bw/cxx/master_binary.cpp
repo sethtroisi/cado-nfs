@@ -53,6 +53,17 @@
  * significant first
  */
 
+// applies a permutation on the source indices
+template<typename T>
+void permute(std::vector<T>& a, uint p[])
+{
+    std::vector<T> b(a.size());
+    for(uint i = 0 ; i < a.size() ; i++) {
+        b[p[i]] = a[i];
+    }
+    a.swap(b);
+}
+
 
 /* Needed operations on critical path.
  *
@@ -76,6 +87,10 @@
  * - initialization -> computation of F0
  *                  -> computation of initial E = A * F0
  * - termination -> computation of final F = F0 * PI
+ *
+ * (while uncritical, the computation of the initial E and the final F
+ * may become a problem for debugging situations when the block size is
+ * largish).
  *
  * all this stuff has linear complexity.
  */
@@ -113,6 +128,7 @@ struct bcol {/*{{{*/
     }
     inline ulong coeff(uint i) const
     {
+        ASSERT(i < nrows);
         uint offset = i / ULONG_BITS;
         ulong shift = i % ULONG_BITS;
         return (x[offset] >> shift) & 1UL;
@@ -166,9 +182,11 @@ struct bmat { /* This is for example small-e, an m times b matrix *//*{{{*/
     }
     /* zero column j */
     void zcol(uint j) {
+        ASSERT(j < ncols);
         memset(x.get() + order[j] * stride(), 0, stride() * sizeof(ulong));
     }
     bool col_is_zero(uint j) const {
+        ASSERT(j < ncols);
         const ulong * src = x.get() + order[j] * stride();
         for(uint i = 0 ; i < stride() ; i++) {
             if (src[i] != 0) return false;
@@ -183,6 +201,8 @@ struct bmat { /* This is for example small-e, an m times b matrix *//*{{{*/
     }
     inline ulong coeff(uint i, uint j) const
     {
+        ASSERT(i < nrows);
+        ASSERT(j < ncols);
         uint offset = i / ULONG_BITS;
         ulong shift = i % ULONG_BITS;
         return (x[order[j] * stride() + offset] >> shift) & 1UL;
@@ -192,6 +212,8 @@ struct bmat { /* This is for example small-e, an m times b matrix *//*{{{*/
      * The mask corresponds to a multiplicating coefficient.
      */
     void acol(uint j, uint j0, uint b = 0, ulong mask = 1UL) {
+        ASSERT(j < ncols);
+        ASSERT(j0 < ncols);
         ulong * dst = x.get() + order[j] * stride();
         const ulong * src = x.get() + order[j0] * stride();
         for(uint l = b / ULONG_BITS ; l < stride() ; l++) {
@@ -199,6 +221,7 @@ struct bmat { /* This is for example small-e, an m times b matrix *//*{{{*/
         }
     }
     void acol(uint j, bcol& a, uint b = 0, ulong mask = 1UL) {
+        ASSERT(j < ncols);
         ulong * dst = x.get() + order[j] * stride();
         const ulong * src = a.x.get();
         for(uint l = b / ULONG_BITS ; l < stride() ; l++) {
@@ -206,6 +229,7 @@ struct bmat { /* This is for example small-e, an m times b matrix *//*{{{*/
         }
     }
     uint ffs(uint j) const {
+        ASSERT(j < ncols);
         uint z = 0;
         const ulong * src = x.get() + order[j] * stride();
         ulong w;
@@ -216,6 +240,7 @@ struct bmat { /* This is for example small-e, an m times b matrix *//*{{{*/
     }
     bcol extract_col(uint j) const
     {
+        ASSERT(j < ncols);
         bcol a(nrows);
         memcpy(a.x.get(), x.get() + order[j] * stride(), stride() * sizeof(ulong));
         return a;
@@ -232,11 +257,15 @@ struct bmat { /* This is for example small-e, an m times b matrix *//*{{{*/
     }
     void addcoeff(uint i, uint j, ulong z)
     {
+        ASSERT(i < nrows);
+        ASSERT(j < ncols);
         /* cow check ??? */
         uint offset = i / ULONG_BITS;
         x[order[j] * stride() + offset] ^= z << (i % ULONG_BITS);
     }
 };/*}}}*/
+// using sharedarrays is probably unnecessary here. It should be
+// converted to something more simple.
 struct polmat { /* {{{ */
     /* polmat may represent:
      * - big-E, an m times b matrix of polynomials having nc max coeffs
@@ -260,8 +289,8 @@ struct polmat { /* {{{ */
     inline uint colstride() const { return nrows * stride(); }
     static void brev_warning();
     public:
-    int& deg(uint j) { return _deg[order[j]]; }
-    int const & deg(uint j) const { return _deg[order[j]]; }
+    int& deg(uint j) { ASSERT(j < ncols); return _deg[order[j]]; }
+    int const & deg(uint j) const { ASSERT(j < ncols); return _deg[order[j]]; }
     polmat(uint nrows, uint ncols, uint ncoef)
         : nrows(nrows), ncols(ncols), ncoef(ncoef),
         x(new ulong[ncols*colstride()]),
@@ -348,40 +377,54 @@ struct polmat { /* {{{ */
     }
     /* zero column j */
     void zcol(uint j) {
+        ASSERT(j < ncols);
         /* cow check ??? */
         memset(x.get() + order[j] * colstride(), 0, colstride() * sizeof(ulong));
-        _deg[order[j]] = -1;
+        deg(j) = -1;
     }
     void xmul_col(uint j, uint s=1) {
+        ASSERT(j < ncols);
         /* cow check ??? */
         mp_limb_t * dst = x.get() + order[j] * colstride();
         mpn_lshift(dst, dst, colstride(), s);
         /* We may have garbage for the low bits. It may matter, or maybe
          * not. If it does, call xclean0_col */
-        _deg[order[j]] += _deg[order[j]] >= 0;
+        deg(j) += deg(j) >= 0;
+        // BUG_ON(deg(j) >= (int) ncoef);
+        // we do NOT consider this a bug. Instead, this means that te
+        // corresponding column has gone live. 
+        // Normally not a problem since it is supposed to occur only
+        // when sufficiently many generators are known.
     }
     void xmul_poly(uint i, uint j, uint s=1) {
+        ASSERT(i < nrows);
+        ASSERT(j < ncols);
         /* cow check ??? */
         ulong * dst = x.get() + (order[j] * nrows + i) * stride();
         mpn_lshift(dst, dst, stride(), s);
         /* We may have garbage for the low bits. It may matter, or maybe
          * not. If it does, call xclean0_col */
-        // _deg[order[j]] += _deg[order[j]] >= 0;
+        // deg(j) += deg(j) >= 0;
     }
     void addpoly(uint i, uint j, const ulong * src) {
+        ASSERT(i < nrows);
+        ASSERT(j < ncols);
         ulong * dst = x.get() + (order[j] * nrows + i) * stride();
         for(uint k = 0 ; k < stride() ; k++)
             dst[k] ^= src[k];
     }
     void xclean0_col(uint j) {
+        ASSERT(j < ncols);
         /* cow check ??? */
         ulong * dst = x.get() + order[j] * colstride();
         for(uint i = 0 ; i < nrows ; i++, dst += stride())
             dst[0] &= ~1UL;
-        _deg[order[j]] -= _deg[order[j]] == 0;
+        deg(j) -= deg(j) == 0;
     }
     /* add column j times mask to column i. */
     void acol(uint i, uint j, ulong mask = 1UL) {
+        ASSERT(i < nrows);
+        ASSERT(j < ncols);
         /* cow check ??? */
         ulong * dst = x.get() + order[i] * colstride();
         const ulong * src = x.get() + order[j] * colstride();
@@ -389,7 +432,7 @@ struct polmat { /* {{{ */
             dst[l] ^= src[l] & -mask;
         }
         // ASSERT(_deg[order[i]] >= _deg[order[j]]);
-        _deg[order[i]] = std::max(_deg[order[j]], _deg[order[i]]);
+        deg(i) = std::max(deg(j), deg(i));
     }
     /* permute columns: column presently referred to with index i will
      * now be accessed at index p[i]
@@ -403,6 +446,8 @@ struct polmat { /* {{{ */
         order.swap(norder);
     }
     uint ffs(uint j, uint k) const {
+        ASSERT(k < nrows);
+        ASSERT(j < ncols);
         uint offset = k / ULONG_BITS;
         ulong mask = 1UL << (k % ULONG_BITS);
         const ulong * src = x.get() + j * colstride() + offset;
@@ -420,10 +465,14 @@ struct polmat { /* {{{ */
      */
     ulong * poly(uint i, uint j)
     {
+        ASSERT(i < nrows);
+        ASSERT(j < ncols);
         return x.get() + (order[j] * nrows + i) * stride();
     }
     ulong const * poly(uint i, uint j) const
     {
+        ASSERT(i < nrows);
+        ASSERT(j < ncols);
         return x.get() + (order[j] * nrows + i) * stride();
     }
     ulong * col(uint j) { return poly(0, j); }
@@ -431,19 +480,55 @@ struct polmat { /* {{{ */
     /* shift is understood ``shift left'' (multiply by X) */
     void import_col_shift(uint k, polmat const& a, uint j, int s)
     {
+        ASSERT(k < ncols);
+        ASSERT(j < a.ncols);
         BUG_ON(a.nrows != nrows);
         ulong const * src = a.col(j);
         ulong * dst = col(k);
-        if (s > 0) {
-            mpn_lshift(dst, src, colstride(), s);
+        if (colstride() == a.colstride()) {
+            /* Then this is fast */
+            if (s > 0) {
+                mpn_lshift(dst, src, colstride(), s);
+            } else {
+                mpn_rshift(dst, src, colstride(), -s);
+            }
+        } else if (colstride() < a.colstride()) {
+            /* Otherwise, we have to resample... */
+            ulong tmp[a.colstride()];
+            BUG_ON(critical);
+            for(uint i = 0 ; i < nrows ; i++) {
+                if (s > 0) {
+                    mpn_lshift(tmp, src, a.stride(), s);
+                } else {
+                    mpn_rshift(tmp, src, a.stride(), -s);
+                }
+                memcpy(dst, tmp, stride() * sizeof(ulong));
+                src += a.stride();
+                dst += stride();
+            }
         } else {
-            mpn_rshift(dst, src, colstride(), -s);
+            BUG();
+            // I doubt we'll ever end up here, so I do not have a test
+            // case. It should be ok though 
+            BUG_ON(critical);
+            for(uint i = 0 ; i < nrows ; i++) {
+                if (s > 0) {
+                    dst[stride()] = mpn_lshift(dst, src, a.stride(), s);
+                } else {
+                    mpn_rshift(dst, src, a.stride(), -s);
+                }
+                src += a.stride();
+                dst += stride();
+            }
         }
     }
 
     /* these accessors are not the preferred ones for performance */
     inline ulong coeff(uint i, uint j, uint k) const
     {
+        ASSERT(i < nrows);
+        ASSERT(j < ncols);
+        ASSERT(k < ncoef);
         BUG_ON(critical);
         brev_warning();
         uint offset = k / ULONG_BITS;
@@ -452,6 +537,7 @@ struct polmat { /* {{{ */
     }
     bmat extract_coeff(uint k) const
     {
+        ASSERT(k < ncoef);
         BUG_ON(critical);
         brev_warning();
         bmat a(nrows, ncols);
@@ -467,6 +553,9 @@ struct polmat { /* {{{ */
     }
     void addcoeff(uint i, uint j, uint k, ulong z)
     {
+        ASSERT(i < nrows);
+        ASSERT(j < ncols);
+        ASSERT(k < ncoef);
         /* cow check ??? */
         BUG_ON(critical);
         brev_warning();
@@ -543,6 +632,7 @@ namespace globals {
     uint t,t0,total_work;
     std::vector<uint> delta;
     std::vector<uint> chance_list;
+    std::vector<uint> gone_mad;
 
     polmat E;
     bmat e0;
@@ -719,7 +809,7 @@ void compute_final_F_from_PI(polmat& F, polmat const& pi)
     using namespace globals;
     // We take t0 rows, so that we can do as few shifts as possible
     polmat tmpmat(t0,1,pi.ncoef);
-    F = polmat(n, m + n, globals::t0 + pi.ncoef - 1);
+    F = polmat(n, m + n, globals::t0 + pi.ncoef);
     using namespace std;
     for(uint i = 0 ; i < n ; i++) {
         // What contributes to entries in this row ?
@@ -738,6 +828,8 @@ void compute_final_F_from_PI(polmat& F, polmat const& pi)
         //
         // Now fill in the row.
         for(uint j = 0 ; j < m + n ; j++) {
+            if (gone_mad[j])
+                continue;
             // We zero out the whole column, it's less trouble.
             tmpmat.zcol(0);
             for(uint k = 0 ; k < l.size() ; k++) {
@@ -751,6 +843,8 @@ void compute_final_F_from_PI(polmat& F, polmat const& pi)
         }
     }
     for(uint j = 0 ; j < m + n ; j++) {
+        if (gone_mad[j])
+            continue;
         F.deg(j) = t0 + pi.deg(j);
     }
 }
@@ -1077,6 +1171,12 @@ void bw_commit_f(polmat& F) /*{{{*/
 
     for (uint j = 0; j < m + n ; j++) {
         sprintf(filename, f_meta_filename, j);
+        if (gone_mad[j]) {
+            cout << fmt("not writing % -- gone haywire since step %, "
+                    "hence % steps ago\n")
+                % filename % gone_mad[j] % (t-gone_mad[j]);
+            continue;
+        }
         ofstream f(filename);
         if (!f.is_open()) {
             perror("writing f");
@@ -1237,6 +1337,8 @@ static void bw_init(void)
     // ft_order_t::init(ncmax, ops_poly_args);
 
     delta.assign(m + n, -1);
+    gone_mad.assign(m + n, 0);
+    chance_list.assign(m + n, 0);
 
     if (!recover_f0_data(f_base_filename)) {
         // This is no longer useful
@@ -1261,7 +1363,6 @@ static void bw_init(void)
     printf("t0 = %d\n", t0);
 
 
-    chance_list.assign(m + n, 0);
     /*
        for(j=0;j< m + n ;j++) {
        global_delta[j]  = t_counter;
@@ -1356,20 +1457,20 @@ static void rearrange_ordering(polmat & PI, uint piv[])
         corresp[i] = make_pair(make_pair(delta[i],PI.deg(i)), i);
     }
     sort(corresp.begin(), corresp.end(), less<corresp_t>());
-    uint perm[m+n];
-    std::vector<uint> permuted_global_deltas(m+n,-1);
+    uint p[m+n];
     for(uint i = 0 ; i < m + n ; i++) {
-        perm[corresp[i].second] = i;
-        permuted_global_deltas[i] = delta[corresp[i].second];
+        p[corresp[i].second] = i;
     }
+    permute(delta, p);
+    permute(chance_list, p);
+    permute(gone_mad, p);
     if (piv) {
         for(uint i = 0 ; i < m ; i++) {
-            piv[i] = perm[piv[i]];
+            piv[i] = p[piv[i]];
         }
     }
-    PI.perm(perm);
-    e0.perm(perm);
-    swap(permuted_global_deltas, delta);
+    PI.perm(p);
+    e0.perm(p);
 }
 
 static void gauss(uint piv[], polmat& PI)
@@ -1420,6 +1521,13 @@ static void gauss(uint piv[], polmat& PI)
         PI.xmul_col(j);
         // E.xmul_col(j);
         delta[j]++;
+        if (PI.deg(j) >= (int) PI.ncoef) {
+            if (gone_mad[j] == 0) {
+                std::cout << fmt("Column % goes haywire from step %\n")%j%t;
+            }
+            gone_mad[j]++;
+            PI.deg(j) = PI.ncoef-1;
+        }
     }
     BUG_ON (rank != m);
 
@@ -2069,7 +2177,7 @@ static void extract_coeff_degree_t(uint t, uint piv[], polmat const& PI)
         for(uint i = 0 ; i < m ; i++) {
             ulong c = 0;
             for(uint k = 0 ; k < m + n ; k++) {
-                c ^= extract_coeff_degree_t(t,
+                c ^= extract_coeff_degree_t(t - t0,
                         E.poly(i, k), E.ncoef + 1,
                         PI.poly(k, j), PI.deg(j));
             }
@@ -2132,11 +2240,12 @@ static void go_quadratic(polmat & PI)
 
     for (uint dt = 0; dt <= deg ; dt++) {
         print_deltas();
-	extract_coeff_degree_t(t - t0, dt ? piv : NULL, PI);
+	extract_coeff_degree_t(t, dt ? piv : NULL, PI);
         gauss(piv, PI);
         rearrange_ordering(PI, piv);
         t++;
-        // write_polmat(PI,std::string(fmt("pi-%-%") % t0 % t).c_str());
+        // if (t % 60 < 10 || deg-dt < 30)
+            // write_polmat(PI,std::string(fmt("pi-%-%") % t0 % t).c_str());
     }
     write_polmat(PI,std::string(fmt("pi-%-%") % t0 % t).c_str());
     print_deltas();
