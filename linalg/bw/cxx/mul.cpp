@@ -1,0 +1,178 @@
+#include <cstdio>
+#include <cstdlib>
+#include "auxfuncs.h"
+#include "manu.h"
+#include "gmp-hacks.h"
+
+#include "addmul.hpp"
+#include "arguments.hpp"
+#include "common_arguments.hpp"
+#include "constants.hpp"
+#include "detect_params.hpp"
+#include "mul_arguments.hpp"
+#include "files.hpp"
+#include "matrix.hpp"
+#include "matrix_header.hpp"
+#include "matrix_line.hpp"
+#include "must_open.hpp"
+#include "parsing_tools.hpp"
+#include "state.hpp"
+#include "threads.hpp"
+#include "ticks.hpp"
+#include "traits.hpp"
+#include "mul.hpp"
+
+#include <boost/cstdint.hpp>
+#include <iterator>
+
+mul_arguments mine;
+
+using namespace std;
+using namespace boost;
+using namespace core_ops;
+
+typedef unsigned int uint;
+
+namespace globals {
+	uint nr;
+	mpz_class modulus;
+
+	uint nb_coeffs;
+
+	uint32_t * idx;
+	int32_t  * val;
+}
+
+typedef variable_scalar_traits traits;
+
+typedef traits::scalar_t scalar_t;
+typedef traits::wide_scalar_t wide_scalar_t;
+
+scalar_t *v;
+wide_scalar_t *w;
+
+void init_data()
+{
+	using namespace globals;
+	v = new scalar_t[nr];
+	w = new wide_scalar_t[nr];
+
+	traits::zero(v, nr);
+	traits::zero(w, nr);
+}
+
+void clear_data()
+{
+	using namespace globals;
+	delete[] v;
+	delete[] w;
+
+}
+
+void read(const std::string& fn)
+{
+	ifstream f;
+	must_open(f, fn);
+	using namespace globals;
+
+	std::vector<mpz_class> foo(1);
+	for(unsigned int i = 0 ; i < nr ; i++) {
+		if (!(f >> foo[0])) {
+			BUG();
+		}
+		traits::assign(v[i], foo, 0);
+	}
+	f >> ws;
+	BUG_ON(!f.eof());
+}
+
+bool is_zero(const scalar_t * vec) {
+	for(uint i = 0 ; i < globals::nr ; i++) {
+		if (!traits::is_zero(vec[i])) {
+			return false;
+		}
+	}
+	return true;
+}
+
+void one(std::string const& s)
+{
+	std::string outfile;
+
+	read(s);
+	multiply_ur<traits>(w, v, globals::idx, globals::val, globals::nr);
+	if (!mine.integer) {
+		traits::reduce(w, w, 0, globals::nr);
+	}
+
+	outfile = s;
+	outfile.append(".mul");
+
+	ofstream wf;
+	must_open(wf, outfile);
+	for(uint i = 0 ; i < globals::nr ; i++) {
+		traits::print(wf,w[i]) << "\n";
+	}
+	wf.close();
+}
+
+void go()
+{
+	for(unsigned int i = 0 ; i < mine.file_names.size() ; i++) {
+		one(mine.file_names[i]);
+	}
+}
+
+int main(int argc, char *argv[])
+{
+	ios_base::sync_with_stdio(false);
+	cerr.tie(&cout);
+	cout.rdbuf()->pubsetbuf(0,0);
+	cerr.rdbuf()->pubsetbuf(0,0);
+
+	common_arguments common;
+
+	process_arguments(argc, argv, common, mine);
+
+	string mstr;
+	ifstream mtx;
+	
+	using namespace globals;
+
+	must_open(mtx, files::matrix);
+	get_matrix_header(mtx, nr, mstr);
+
+	globals::modulus = mpz_class(mstr);
+
+	cout << "// counting coefficients\n" << flush;
+	vector<std::streampos> foo(1);
+	vector<uint> bar(1);
+	count_matrix_coeffs(mtx, nr, foo, bar);
+	
+	nb_coeffs = bar[0];
+
+	cout << fmt("// matrix has % coeffs\n") % nb_coeffs;
+	mtx.close();
+
+	cout.flush();
+	cerr.flush();
+
+	idx = new uint32_t[nr + nb_coeffs];
+	val = new  int32_t[nr + nb_coeffs];
+
+	{
+		ifstream mtx;
+		must_open(mtx, files::matrix);
+		fill_matrix_data(mtx, 0, nb_coeffs, 0, nr, idx, val);
+	}
+
+	cout << "// Using generic code\n";
+	init_data();
+	go();
+	clear_data();
+
+	delete[] idx;
+	delete[] val;
+}
+
+/* vim:set sw=8: */

@@ -6,9 +6,11 @@ D=~/Local/testmat
 # A good FFT modulus (859*2^118+1, 128 bits).
 MODULUS=17
 # MODULUS=285451712094810683706092566195203997697
-# FFT_THRESHOLD=512
+FFT_THRESHOLD=32
+MULTISOLS=1
 
-MSIZE=1000
+# 40/8/8/8 -> big pi without solution found.
+MSIZE=2000
 SRC=~/NDL/linalg
 eval `make -s -C $SRC variables`
 B="$BINARY_DIR"
@@ -17,7 +19,7 @@ if [ "$B" = "" ] ; then
 fi
 M=8
 N=8
-DENS=0.002
+DENS=0.01
 
 action() {
 	echo "$@"
@@ -28,7 +30,7 @@ if [ -f "$1" ] ; then
 	FILE=$1
 	SPECIAL=$(head -c 2048 $FILE | md5sum | cut -c1-8)
 	D="${D}.$SPECIAL"
-	REMOVE_D=yes
+	# REMOVE_D=yes
 fi
 
 rm -rf $D
@@ -37,15 +39,15 @@ mkdir $D
 if [ "$1" = tiny ] ; then
 	MSIZE=10
 	DENS=0.6
-	M=1
-	N=1
+	M=8
+	N=8
 fi
 
 if [ -f "$1" ] ; then
 	# works because we're zsh.
 	grep ROWS "$1" | head -1 | tr -d ';' | read x x x MSIZE x x MODULUS
 	cp "$1" $D/matrix.txt
-	unset FFT_THRESHOLD
+	# unset FFT_THRESHOLD
 else
 	echo ${B}bw-random $MSIZE $MODULUS $DENS
 	${B}bw-random $MSIZE $MODULUS $DENS > $D/matrix.txt
@@ -83,20 +85,37 @@ fi
 
 # action ${B}bw-master --subdir $D | tee "$D/master.log"
 
-X=$(grep 'LOOK' "$D/master.log" | tail -1 | awk '// { print $6; }')
+ALLSOLS=`grep 'LOOK' "$D/master.log" | tr -d '[]' | cut -d\  -f6-`
 
-for mi in {0..`expr $N1 / 8`} ; do
-	i=`expr $mi \* 8`
-	ni1=`expr $i + 7`
-        action ${B}bw-slave-mt --nthreads 2 --task mksol --subdir $D --sc $X 0,$i $M1,$ni1
-done
-
-action ${B}bw-gather --subdir $D $X --nbys 8
+#if [ -n $MULTISOLS ] ; then
+	for X in `echo $ALLSOLS` ; do
+		for mi in {0..`expr $N1 / 8`} ; do
+			i=`expr $mi \* 8`
+			ni1=`expr $i + 7`
+			action ${B}bw-slave-mt --nthreads 2 --task mksol --subdir $D --sc $X 0,$i $M1,$ni1
+		done
+		action ${B}bw-gather --subdir $D $X --nbys 8
+		cp "$D/W0$X" `dirname $FILE`
+		cp "$D/MW0$X" `dirname $FILE`
+	done
+#else
+#X=$(grep 'LOOK' "$D/master.log" | tail -1 | awk '// { print $6; }')
+#
+#for mi in {0..`expr $N1 / 8`} ; do
+#	i=`expr $mi \* 8`
+#	ni1=`expr $i + 7`
+#        action ${B}bw-slave-mt --nthreads 2 --task mksol --subdir $D --sc $X 0,$i $M1,$ni1
+#done
+#
+#action ${B}bw-gather --subdir $D $X --nbys 8
+#fi
 
 if [ "$REMOVE_D" = yes ] ; then
 	F=`echo $FILE | sed -e s/matrix/solution/g`
 	if [ "$F" = "$FILE" ] ; then
 		F="${FILE}.solution"
 	fi
+	cp "$D/W"* `dirname $FILE`
+	cp "$D/MW"* `dirname $FILE`
 	cp "$D/W0$X" $F && rm -rf "$D"
 fi

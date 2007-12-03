@@ -62,6 +62,7 @@ namespace files {
 	EXTERN_LINKAGE	std::string m0		INIT_WITH("M0-vector");
 	EXTERN_LINKAGE	std::string x0		INIT_WITH("X0-vector");
 	EXTERN_LINKAGE	meta_filename f		INIT_WITH("F%[f0w2]");
+	EXTERN_LINKAGE	meta_filename f_init	INIT_WITH("F_INIT");
 	EXTERN_LINKAGE	meta_filename fxy
 				INIT_WITH("F%[f0w2]-Y%[f0w2].%[f0w3]");
 }

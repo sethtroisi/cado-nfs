@@ -43,7 +43,7 @@ void ops_poly_ifft::set(int nc)
 {
     // unsigned long k, K, M, Nprime, nprime, maxLK;
     // int n;
-    ncoeffs = nc;
+    ncoeffs = limbs_per_coeff * nc;
     k = __gmpn_fft_best_k (ncoeffs, 0);
     n = __gmpn_fft_next_size (ncoeffs, k);
     // K = 1 << k;
@@ -170,6 +170,8 @@ void ops_poly_ifft::init(unsigned int nmax, std::list<char *> const& args)
 	limbs_per_coeff = nlimbs;
 
 	mpz_clear(z);
+
+	/* limbs_per_coeff+=8; */
 
 	printf("// Using %ld limbs per coefficient\n", limbs_per_coeff);
 }

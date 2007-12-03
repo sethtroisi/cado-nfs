@@ -133,7 +133,7 @@ int main(int argc, char * argv[])
 		for(src = rows.begin() ; src != rows.end() ; src++) {
 			if (src->size() < discard_weight) {
 				*dst++ = *src;
-				clink << *c_iter;
+				clink << *c_iter << "\n";
 				if (++nselected >= nindexes + 1)
 					break;
 			}

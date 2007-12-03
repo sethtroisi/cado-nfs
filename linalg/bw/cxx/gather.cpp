@@ -20,6 +20,7 @@
 #include "threads.hpp"
 #include "ticks.hpp"
 #include "traits.hpp"
+#include "mul.hpp"
 
 #include <boost/cstdint.hpp>
 #include <iterator>
@@ -63,7 +64,6 @@ namespace globals {
 
 template<typename traits>
 struct program {
-
 	typedef typename traits::scalar_t scalar_t;
 	typedef typename traits::wide_scalar_t wide_scalar_t;
 
@@ -155,20 +155,8 @@ bool is_zero(const scalar_t * vec) {
 
 void multiply()
 {
-	using namespace globals;
-	const uint32_t * ip = idx;
-	const int32_t  * vp = val;
-	for(uint i = 0 ; i < nr ; i++) {
-		traits::zero(scrap[i]);
-		uint c = 0;
-		for( ; *vp != 0 ; ip++, vp++) {
-			c += *ip;
-			traits::addmul(scrap[i], v[c], *vp);
-		}
-		ip++;
-		vp++;
-	}
-	traits::reduce(w, scrap, 0, nr);
+	multiply_ur<traits>(scrap, v, globals::idx, globals::val, globals::nr);
+	traits::reduce(w, scrap, 0, globals::nr);
 }
 
 program() { init_data(); }
@@ -180,6 +168,8 @@ void go()
 
 	init_data();
 	do_sum();
+
+	traits::reduce(v, v, 0, nr);
 
 	if (is_zero(v)) {
 		cerr << "// trivial solution encountered !\n";
@@ -202,12 +192,16 @@ void go()
 
 	cout << fmt("// B^%*y is a solution\n") % (i-1);
 
-	ofstream w;
-	must_open(w, files::w % mine.scol);
-	for(uint i = 0 ; i < nr ; i++) {
-		traits::print(w,v[i]) << "\n";
-	}
+	mpz_class middle = globals::modulus / 2;
 
+	ofstream wf;
+	must_open(wf, files::w % mine.scol);
+	for(uint i = 0 ; i < nr ; i++) {
+		if (v[i] > middle)
+			v[i] -= globals::modulus;
+		traits::print(wf,v[i]) << "\n";
+	}
+	wf.close();
 }
 
 };

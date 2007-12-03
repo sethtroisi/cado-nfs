@@ -20,6 +20,7 @@
 #include "state.hpp"
 #include "threads.hpp"
 #include "ticks.hpp"
+#include "mul.hpp"
 
 #include <boost/cstdint.hpp>
 #include <iterator>
@@ -301,23 +302,7 @@ struct thread : public traits
 	
 	void multiply(wide_scalar_t * dst, const scalar_t * src)
 	{
-		const uint32_t * ip = idx;
-		const int32_t  * vp = val;
-		int acc = 0;
-		for(uint i = 0 ; i < i1 - i0 ; i++) {
-			zero(dst[i]);
-			uint c = 0;
-			for( ; *vp != 0 ; ip++, vp++) {
-				c += *ip;
-				addmul(dst[i], src[c], *vp);
-				if (++acc == traits::max_accumulate) {
-					reduce(dst[i], dst[i]);
-					acc = 1;
-				}
-			}
-			ip++;
-			vp++;
-		}
+		multiply_ur<traits>(dst,src,idx,val,i1-i0);
 	}
 
 	void note_waited(double twait)

@@ -51,7 +51,7 @@ BW_SLAVE_EXTRA_MODELS:=mt
 BW_SLAVE_MT_LIBS:=-lgmp -lgmpxx
 -include .bw-slave.mkf
 
-# BW_SLAVE_OLD_SOURCES:=					\
+# BW_SLAVE_OLD_SOURCES:=				\
 # 		auxfuncs.c barrier.c			\
 # 		old/bw_scalar.c old/endian.c		\
 # 		old/filenames.c old/options.c		\
@@ -67,6 +67,7 @@ BW_SLAVE_MT_LIBS:=-lgmp -lgmpxx
 # -include .bw-slave-old.mkf
  
 BW_PRINTMAGMA_SOURCES:=					\
+		cxx/detect_params.cpp			\
 		auxfuncs.c cxx/matrix_header.cpp	\
 		cxx/files.cpp				\
 		cxx/matrix_line.cpp cxx/printmagma.cpp
@@ -90,13 +91,13 @@ ifeq (0,0)
 BW_MASTER2_SOURCES:=						\
 		auxfuncs.c					\
 		old/bw_scalar.c old/endian.c			\
-		old/timer.c			\
+		old/timer.c					\
 		old/variables.c	old/fft_on_matrices.cpp		\
 		old/ops_poly_fft.cpp				\
 		old/ops_poly_schoolbook.cpp			\
 		old/ops_poly_integerfft.cpp			\
-		old/ops_poly_wrap.cpp			\
-		old/fft_core.c			\
+		old/ops_poly_wrap.cpp				\
+		old/fft_core.c					\
 		old/field_common.c old/field_prime.c		\
 		old/field_quad.c old/field_complex.c		\
 		old/field_usage.c old/modulus_hacks.c		\
@@ -159,13 +160,21 @@ BW_BENCHFFT_LIBS:=-lgmp
 -include .bw-benchfft.mkf
 
 BW_GATHER_SOURCES:=					\
-		auxfuncs.c barrier.c			\
+		auxfuncs.c				\
 		cxx/detect_params.cpp			\
 		cxx/gather.cpp				\
 		cxx/matrix.cpp	cxx/matrix_line.cpp	\
 		cxx/files.cpp cxx/matrix_header.cpp
 BW_GATHER_LIBS:=-lgmp -lgmpxx
 -include .bw-gather.mkf
+
+BW_MUL_SOURCES:=					\
+		auxfuncs.c	\
+		cxx/mul.cpp				\
+		cxx/matrix.cpp	cxx/matrix_line.cpp	\
+		cxx/files.cpp cxx/matrix_header.cpp
+BW_MUL_LIBS:=-lgmp -lgmpxx
+-include .bw-mul.mkf
 
 # useless -- these were the days where the output of the master code was
 # really a mess.

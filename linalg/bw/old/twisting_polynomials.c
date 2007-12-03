@@ -230,6 +230,7 @@ tp_transvec(struct t_poly * tp,
 			addmul( bbmat_scal(bbpoly_coeff(tp->p,t),i,j2),
 				bbmat_scal(bbpoly_coeff(tp->p,t),i,j1),
 				lambda);
+			k_reduce(bbmat_scal(bbpoly_coeff(tp->p,t),i,j2));
 
 		}
 	}
