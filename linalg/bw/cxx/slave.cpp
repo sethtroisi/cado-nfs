@@ -426,6 +426,12 @@ struct slave_thread : public thread<traits, slave_thread<traits> > {
 			traits::print(a[x], dst[px[x]]) << "\n";
 		}
 
+		if (super::done == 200) {
+			/* exceptional case ; only in order to be able to
+			 * check early that the system is doable */
+			flush();
+		}
+
 		if (super::done % cp_lag != 0) return;
 
 		uint r = super::done / cp_lag;
@@ -798,10 +804,12 @@ int main(int argc, char *argv[])
 	cout << "// modulus: " << SIZ(globals::modulus.get_mpz_t()) << " words\n";
 	cout << "// nbys: " << nbys << "\n";
 
-	if (MODULUS_BITS < 8 && nbys == 8) {
+	unsigned int modbits = mpz_sizeinbase(globals::modulus.get_mpz_t(),2);
+
+	if (modbits < 8 && nbys == 8) {
 		cout << "// Using SSE-2 code\n";
 		return program<sse2_8words_traits >();
-	} else if (nbys == 1 && mpz_sizeinbase(globals::modulus.get_mpz_t(),2) <= (sizeof(unsigned long) * 8 / 2 - 4)) {
+	} else if (nbys == 1 && modbits <= (sizeof(unsigned long) * 8 / 2 - 4)) {
 		cout << "// Using half-ulong code\n";
 		return program<ulong_traits>();
 	} else if (nbys == 1 && SIZ(globals::modulus.get_mpz_t()) == MODULUS_SIZE) {
