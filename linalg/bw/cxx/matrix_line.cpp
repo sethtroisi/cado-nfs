@@ -17,6 +17,8 @@ std::istream& std::operator>>(std::istream& is, matrix_line& m)
 {
 	using namespace std;
 
+	bool sorted = true;
+
 	if (is.eof()) return is;
 
 	/* clear the fail bit */
@@ -47,15 +49,19 @@ std::istream& std::operator>>(std::istream& is, matrix_line& m)
 		}
 
 		if (val == 0) {
+			cerr << "error: coefficients must not be zero\n";
 			/* Coefficients must not be zero */
 			is.setstate(ios::failbit);
 			return is;
 		}
 
 		if (!m.empty() && idx <= m.back().first) {
+			sorted = false;
+#if 0
 			/* Coefficients must come in increasing order */
 			is.setstate(ios::failbit);
 			return is;
+#endif
 		}
 
 		m.push_back(make_pair(idx,val));
@@ -66,6 +72,10 @@ std::istream& std::operator>>(std::istream& is, matrix_line& m)
 		 * quantity */
 		is.setstate(ios::failbit);
 		return is;
+	}
+
+	if (!sorted) {
+		std::sort(m.begin(), m.end());
 	}
 
 	return is;
