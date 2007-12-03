@@ -680,7 +680,7 @@ main(int argc, char *argv[])
 	}
 
 	if (argc != 4) {
-		die("Usage: mater-old <mat-file> <m> <n>\n", 1);
+		die("Usage: master-old <mat-file> <m> <n>\n", 1);
 	}
 
 	read_mat_file_header(argv[1]);
