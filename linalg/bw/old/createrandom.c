@@ -77,7 +77,7 @@ int main(int argc, char *argv[])
 	fprintf(fm, "WIEDEMANN INSTANCE %u x %u OVER Z/(%s)Z\n",
 			size, size, modulus_str);
 
-	places = my_malloc(density * sizeof(unsigned int));
+	places = malloc(density * sizeof(unsigned int));
 
 	for(i=0;i<size;i++) {
 		int local_weight;

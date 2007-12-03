@@ -181,8 +181,8 @@ void bw_lvblock_reduce_separated(bw_vector_block x)
 	mp_limb_t buf3[bw_allocsize+2];
 #else
 	mp_limb_t *buf1,*buf3;
-	buf1=my_malloc(bw_longsize*sizeof(mp_limb_t));
-	buf3=my_malloc(bw_allocsize*sizeof(mp_limb_t));
+	buf1=malloc(bw_longsize*sizeof(mp_limb_t));
+	buf3=malloc(bw_allocsize*sizeof(mp_limb_t));
 #endif
 #define buf2 (buf1+bw_allocsize+2)
 	bw_lvblock_step_n00(x,tsv()->i0);
@@ -320,8 +320,8 @@ bw_multiproduct(bw_vector_block w, bw_vector_block v, bw_vector_block s)
 	mp_limb_t buf3[bw_allocsize+2];
 #else
 	mp_limb_t *buf1,*buf3;
-	buf1=my_malloc(bw_longsize*sizeof(mp_limb_t));
-	buf3=my_malloc(bw_allocsize*sizeof(mp_limb_t));
+	buf1=malloc(bw_longsize*sizeof(mp_limb_t));
+	buf3=malloc(bw_allocsize*sizeof(mp_limb_t));
 #endif
 
 	/* TODO */
@@ -344,10 +344,10 @@ void plvblock(bw_vector_block x)
 	int maxcn;
 	int z;
 	
-	buf1=my_malloc(bw_longsize*sizeof(mp_limb_t));
+	buf1=malloc(bw_longsize*sizeof(mp_limb_t));
 #define buf2 (buf1+bw_allocsize+2)
 	maxcn = (bw_allocsize+2)*10+2;
-	str = my_malloc(maxcn);
+	str = malloc(maxcn);
 	y=x;
 	printf("\n");
 	for(j=0;j<ncols;j++) {
@@ -418,9 +418,9 @@ bw_lvblock_is_zero(bw_vector_block v)
 
 	bw_lvblock_reduce(v);
 
-	buf[0] = my_malloc(bw_allocsize * sizeof(mp_limb_t));
-	buf[1] = my_malloc(bw_allocsize * sizeof(mp_limb_t));
-	buf[2] = my_malloc(bw_allocsize * sizeof(mp_limb_t));
+	buf[0] = malloc(bw_allocsize * sizeof(mp_limb_t));
+	buf[1] = malloc(bw_allocsize * sizeof(mp_limb_t));
+	buf[2] = malloc(bw_allocsize * sizeof(mp_limb_t));
 
 	res = 1;
 

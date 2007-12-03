@@ -51,27 +51,31 @@ BW_SLAVE_EXTRA_MODELS:=mt
 BW_SLAVE_MT_LIBS:=-lgmp -lgmpxx
 -include .bw-slave.mkf
 
-BW_SLAVE_OLD_SOURCES:=					\
-		auxfuncs.c barrier.c			\
-		old/bw_scalar.c old/endian.c		\
-		old/filenames.c old/options.c		\
-		old/tagfile.c old/timer.c		\
-		old/variables.c old/addmul.c		\
-		old/corners.c old/matrix.c		\
-		old/recovery.c	old/slave.c		\
-		old/state.c old/threaded.c		\
-		old/bw_lvblock.c old/certificate.c
-BW_SLAVE_OLD_LIBS:=-lgmp
-BW_SLAVE_OLD_EXTRA_MODELS:=mt
-BW_SLAVE_OLD_MT_LIBS:=-lgmp -lrt
--include .bw-slave-old.mkf
-
+# BW_SLAVE_OLD_SOURCES:=					\
+# 		auxfuncs.c barrier.c			\
+# 		old/bw_scalar.c old/endian.c		\
+# 		old/filenames.c old/options.c		\
+# 		old/tagfile.c old/timer.c		\
+# 		old/variables.c old/addmul.c		\
+# 		old/corners.c old/matrix.c		\
+# 		old/recovery.c	old/slave.c		\
+# 		old/state.c old/threaded.c		\
+# 		old/bw_lvblock.c old/certificate.c
+# BW_SLAVE_OLD_LIBS:=-lgmp
+# BW_SLAVE_OLD_EXTRA_MODELS:=mt
+# BW_SLAVE_OLD_MT_LIBS:=-lgmp -lrt
+# -include .bw-slave-old.mkf
+ 
 BW_PRINTMAGMA_SOURCES:=					\
 		auxfuncs.c cxx/matrix_header.cpp	\
 		cxx/files.cpp				\
 		cxx/matrix_line.cpp cxx/printmagma.cpp
 -include .bw-printmagma.mkf
 
+
+# These are the sources of the new master code thing in C++. So far, it's
+# such a mess that it doesn't even compile. It's also terribly slower
+# than it should (when it actually compiles...).
 ifeq ($(BROKEN),also)
 BW_MASTER_SOURCES:=					\
 		auxfuncs.c				\
@@ -86,15 +90,15 @@ ifeq (0,0)
 BW_MASTER2_SOURCES:=						\
 		auxfuncs.c					\
 		old/bw_scalar.c old/endian.c			\
-		old/filenames.c	old/options.c			\
-		old/tagfile.c old/timer.c			\
+		old/timer.c			\
 		old/variables.c	old/fft_on_matrices.c		\
 		old/field_common.c old/field_prime.c		\
 		old/field_quad.c old/field_complex.c		\
 		old/field_usage.c old/modulus_hacks.c		\
 		old/e_polynomial.c old/structure.c		\
 		old/structure_debug.c old/master2.c		\
-		old/twisting_polynomials.c
+		old/twisting_polynomials.c			\
+		old/master_common.c
 BW_MASTER2_LIBS:=-lgmp
 -include .bw-master2.mkf
 endif
@@ -102,21 +106,21 @@ endif
 BW_MASTER_OLD_SOURCES:=						\
 		auxfuncs.c barrier.c				\
 		old/bw_scalar.c old/endian.c			\
-		old/filenames.c old/options.c			\
-		old/tagfile.c old/timer.c			\
+		old/timer.c			\
 		old/variables.c old/field_common.c		\
 		old/field_prime.c old/field_quad.c		\
 		old/field_complex.c old/field_usage.c		\
 		old/modulus_hacks.c old/structure.c		\
-		old/structure_debug.c old/master.c
+		old/structure_debug.c old/master.c		\
+		old/master_common.c
 BW_MASTER_OLD_LIBS:=-lgmp
 -include .bw-master-old.mkf
 
 BW_BENCHFFT_SOURCES:=						\
 		auxfuncs.c					\
 		old/bw_scalar.c old/endian.c			\
-		old/filenames.c old/options.c			\
-		old/tagfile.c old/timer.c			\
+		old/options.c					\
+		old/timer.c					\
 		old/variables.c old/fft_on_matrices.c		\
 		old/field_common.c old/field_prime.c		\
 		old/field_quad.c old/field_complex.c		\
@@ -125,32 +129,6 @@ BW_BENCHFFT_SOURCES:=						\
 		old/testfft.c
 BW_BENCHFFT_LIBS:=-lgmp
 -include .bw-benchfft.mkf
-
-BW_FINDSOL_SOURCES:=						\
-		auxfuncs.c					\
-		old/bw_scalar.c old/endian.c			\
-		old/filenames.c old/options.c			\
-		old/tagfile.c old/variables.c			\
-		old/field_common.c old/field_prime.c		\
-		old/field_quad.c old/field_complex.c		\
-		old/field_usage.c old/modulus_hacks.c		\
-		old/structure.c old/structure_debug.c		\
-		old/findsol.c
-BW_FINDSOL_LIBS:=-lgmp
--include .bw-findsol.mkf
-
-BW_REDRESS_SOURCES:=					\
-		auxfuncs.c				\
-		old/bw_scalar.c old/endian.c		\
-		old/filenames.c old/options.c		\
-		old/tagfile.c old/timer.c		\
-		old/variables.c old/addmul.c		\
-		old/bw_lvblock.c old/matrix.c		\
-		old/redress.c old/threaded.c
-BW_REDRESS_LIBS:=-lgmp
-BW_REDRESS_EXTRA_MODELS:=mt
-BW_REDRESS_MT_LIBS:=-lgmp -lrt
--include .bw-redress.mkf
 
 BW_GATHER_SOURCES:=					\
 		auxfuncs.c barrier.c			\
@@ -161,39 +139,71 @@ BW_GATHER_SOURCES:=					\
 BW_GATHER_LIBS:=-lgmp -lgmpxx
 -include .bw-gather.mkf
 
-BW_GATHER_OLD_SOURCES:=					\
-		auxfuncs.c old/bw_scalar.c		\
-		old/endian.c old/filenames.c		\
-		old/options.c old/tagfile.c		\
-		old/timer.c old/variables.c		\
-		old/addmul.c old/bw_lvblock.c		\
-		old/matrix.c old/gather.c		\
-		old/threaded.c
-BW_GATHER_OLD_LIBS:=-lgmp
-BW_GATHER_OLD_EXTRA_MODELS:=mt
-BW_GATHER_OLD_MT_LIBS:=-lgmp -lrt
--include .bw-gather-old.mkf
+# useless -- these were the days where the output of the master code was
+# really a mess.
+# BW_FINDSOL_SOURCES:=						\
+# 		auxfuncs.c					\
+# 		old/bw_scalar.c old/endian.c			\
+# 		old/filenames.c old/options.c			\
+# 		old/tagfile.c old/variables.c			\
+# 		old/field_common.c old/field_prime.c		\
+# 		old/field_quad.c old/field_complex.c		\
+# 		old/field_usage.c old/modulus_hacks.c		\
+# 		old/structure.c old/structure_debug.c		\
+# 		old/findsol.c
+# BW_FINDSOL_LIBS:=-lgmp
+# -include .bw-findsol.mkf
 
-BW_TRYMUL_SOURCES:=					\
-		auxfuncs.c				\
-		old/bw_scalar.c old/endian.c		\
-		old/filenames.c	old/options.c		\
-		old/tagfile.c old/timer.c		\
-		old/variables.c old/addmul.c 		\
-		old/bw_lvblock.c old/matrix.c		\
-		old/trymul.c old/threaded.c
-BW_TRYMUL_LIBS:=-lgmp
-BW_TRYMUL_EXTRA_MODELS:=mt
-BW_TRYMUL_MT_LIBS:=-lgmp -lrt
--include .bw-trymul.mkf
+# useless
+# BW_REDRESS_SOURCES:=					\
+# 		auxfuncs.c				\
+# 		old/bw_scalar.c old/endian.c		\
+# 		old/filenames.c old/options.c		\
+# 		old/tagfile.c old/timer.c		\
+# 		old/variables.c old/addmul.c		\
+# 		old/bw_lvblock.c old/matrix.c		\
+# 		old/redress.c old/threaded.c
+# BW_REDRESS_LIBS:=-lgmp
+# BW_REDRESS_EXTRA_MODELS:=mt
+# BW_REDRESS_MT_LIBS:=-lgmp -lrt
+# -include .bw-redress.mkf
 
-BW_ADDVEC_SOURCES:=					\
-		auxfuncs.c				\
-		old/bw_scalar.c old/endian.c		\
-		old/filenames.c old/tagfile.c		\
-		old/variables.c old/addvec.c
-BW_ADDVEC_LIBS:=-lgmp
--include .bw-addvec.mkf
+# useless
+# BW_GATHER_OLD_SOURCES:=					\
+# 		auxfuncs.c old/bw_scalar.c		\
+# 		old/endian.c old/filenames.c		\
+# 		old/options.c old/tagfile.c		\
+# 		old/timer.c old/variables.c		\
+# 		old/addmul.c old/bw_lvblock.c		\
+# 		old/matrix.c old/gather.c		\
+# 		old/threaded.c
+# BW_GATHER_OLD_LIBS:=-lgmp
+# BW_GATHER_OLD_EXTRA_MODELS:=mt
+# BW_GATHER_OLD_MT_LIBS:=-lgmp -lrt
+# -include .bw-gather-old.mkf
+
+# useless
+# BW_TRYMUL_SOURCES:=					\
+# 		auxfuncs.c				\
+# 		old/bw_scalar.c old/endian.c		\
+# 		old/filenames.c	old/options.c		\
+# 		old/tagfile.c old/timer.c		\
+# 		old/variables.c old/addmul.c 		\
+# 		old/bw_lvblock.c old/matrix.c		\
+# 		old/trymul.c old/threaded.c
+# BW_TRYMUL_LIBS:=-lgmp
+# BW_TRYMUL_EXTRA_MODELS:=mt
+# BW_TRYMUL_MT_LIBS:=-lgmp -lrt
+# -include .bw-trymul.mkf
+
+# useless
+# BW_ADDVEC_SOURCES:=					\
+# 		auxfuncs.c				\
+# 		old/bw_scalar.c old/endian.c		\
+# 		old/filenames.c old/tagfile.c		\
+# 		old/variables.c old/addvec.c
+# BW_ADDVEC_LIBS:=-lgmp
+# -include .bw-addvec.mkf
 
 BW_RANDOM_SOURCES:=			\
 		auxfuncs.c		\
@@ -244,6 +254,16 @@ BW_PCOLUMN_LIBS:=
 BW_MATRIX_WRITER_SOURCES:=auxfuncs.c old/endian.c old/matrix_writer.c
 BW_MATRIX_WRITER_LIBS:=
 -include .bw-matrix-writer.mkf
+
+matlingen_dist:
+	D=matlingen-`date '+%Y%m%d'` ;		\
+	cp -a matlingen.skel $$D ;		\
+	for f in `cat matlingen_files` ; do	\
+		./cp-license.sh $$f $$D/ ;	\
+	done ;					\
+	tar cvvzf $$D.tgz $$D ;			\
+	rm -rf $$D
+
 ######################################################################
 
 $(eval $(MAKEFILE_TRAILER))

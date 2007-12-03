@@ -88,7 +88,7 @@ for i in {0..$N1} ; do
         action ${B}bw-slave-mt --nthreads 2 --task mksol --subdir $D --sc $X $i
 done
 
-${B}bw-gather --subdir $D $X
+action ${B}bw-gather --subdir $D $X
 
 if [ "$REMOVE_D" = yes ] ; then
 	F=`echo $FILE | sed -e s/matrix/solution/g`

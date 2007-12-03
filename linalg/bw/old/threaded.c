@@ -38,7 +38,7 @@ void configure_threads(int n, coord_t cols)
 	number_of_threads=n;
 	if (tsv_table)
 		free(tsv_table);
-	tsv_table=my_malloc(n * sizeof(struct tsv));
+	tsv_table=malloc(n * sizeof(struct tsv));
 	for(i=0;i<n;i++) {
 		tsv_table[i].i0=i*cols/n;
 		tsv_table[i].i1=(i+1)*cols/n;
@@ -83,7 +83,7 @@ static void * thread_starter(struct thread_starter_info * p)
 	int rc;
 
 	pthread_once(&id_alloc_once, &id_alloc);
-	pthread_setspecific(id_alloc_key, my_malloc(sizeof(unsigned int)));
+	pthread_setspecific(id_alloc_key, malloc(sizeof(unsigned int)));
 	*(unsigned int*)pthread_getspecific(id_alloc_key)=p->i;
 	printf("Thread %d : pid %d\n",p->i,getpid());
 #ifdef GROSBUG
@@ -135,8 +135,8 @@ double start_threads(void* (*fcn) (void*), int iterations)
 	 */
 
 	t=t0=timer(TIMER_ASK);
-	tid=my_malloc(number_of_threads*sizeof(pthread_t));
-	tsi=my_malloc(number_of_threads*sizeof(struct thread_starter_info));
+	tid=malloc(number_of_threads*sizeof(pthread_t));
+	tsi=malloc(number_of_threads*sizeof(struct thread_starter_info));
 	is_multithreaded=1;
 	for(i=0;i<number_of_threads;i++) {
 		tsi[i].i=i;

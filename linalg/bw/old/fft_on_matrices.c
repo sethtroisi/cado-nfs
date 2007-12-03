@@ -193,7 +193,7 @@ struct dft_mb *	fft_ec_dft(struct e_coeff * ec, unsigned int order, double *tm)
 
 	timer_r(&tv,TIMER_SET);
 
-	res=my_malloc(sizeof(struct dft_mb));
+	res=malloc(sizeof(struct dft_mb));
 	if (res==NULL) return res;
 	res->degree=ec->degree;
 	res->order=order;
@@ -243,7 +243,7 @@ struct dft_bb *	fft_tp_dft(struct t_poly * tp, unsigned int order, double *tm)
 
 	timer_r(&tv,TIMER_SET);
 
-	res=my_malloc(sizeof(struct dft_bb));
+	res=malloc(sizeof(struct dft_bb));
 	if (res==NULL) return res;
 	res->degree=tp->degree;
 	res->order=order;
@@ -289,7 +289,7 @@ struct dft_mb *	fft_mbb_conv_sp(struct dft_mb * p,
 
 	timer_r(&tv,TIMER_SET);
 
-	res=my_malloc(sizeof(struct dft_mb));
+	res=malloc(sizeof(struct dft_mb));
 	if (res==NULL) return res;
 	res->degree=p->degree + q->degree - dg_kill;
 	assert(p->order==q->order);
@@ -300,7 +300,7 @@ struct dft_mb *	fft_mbb_conv_sp(struct dft_mb * p,
 	}
 
 	mbdft_zero(res->order,res->p);
-	tmp=my_malloc(l_size*sizeof(mp_limb_t));
+	tmp=malloc(l_size*sizeof(mp_limb_t));
 
 	for(i=0;i<m_param;i++)
 	for(j=0;j<bigdim;j++) {
@@ -332,7 +332,7 @@ struct dft_bb *	fft_bbb_conv(struct dft_bb * p, struct dft_bb * q, double *tm)
 	
 	timer_r(&tv,TIMER_SET);
 
-	res=my_malloc(sizeof(struct dft_bb));
+	res=malloc(sizeof(struct dft_bb));
 	if (res==NULL) return res;
 	res->degree=0;	/* we don't care, this is meaningless anyway */
 	assert(p->order==q->order);
@@ -371,7 +371,7 @@ void fft_mb_invdft(bw_mbpoly dest,
 
 	timer_r(&tv,TIMER_SET);
 
-	one_over_n=my_malloc(k_size*sizeof(mp_limb_t));
+	one_over_n=malloc(k_size*sizeof(mp_limb_t));
 	k_set_int(one_over_n,1<<(p->order));
 	k_inv(one_over_n,one_over_n);
 
@@ -413,7 +413,7 @@ void fft_tp_invdft(struct t_poly * tp, struct dft_bb * p, double *tm)
 
 	timer_r(&tv,TIMER_SET);
 
-	one_over_n=my_malloc(k_size*sizeof(mp_limb_t));
+	one_over_n=malloc(k_size*sizeof(mp_limb_t));
 	k_set_int(one_over_n,1<<(p->order));
 	k_inv(one_over_n,one_over_n);
 	/*
@@ -455,7 +455,7 @@ struct dft_bb * fft_bb_dft_init_one(unsigned int deg)
 	struct dft_bb *res;
 	unsigned int j,k;
 
-	res=my_malloc(sizeof(struct dft_bb));
+	res=malloc(sizeof(struct dft_bb));
 	if (res==NULL) return res;
 	res->degree=0;
 	res->order=ceil_log2(deg+1);
@@ -492,13 +492,13 @@ void prepare_fft_engine(unsigned int max_order, int enable_cplx)
 	mp_limb_t * ptr, *nptr;
 
 	tabulated_order=max_order;
-	phi_tab=my_malloc((1<<max_order)*sizeof(int));
+	phi_tab=malloc((1<<max_order)*sizeof(int));
 	compute_phi(max_order);
 
 	prepare_fields_for_fft(max_order,enable_cplx);
 	r=fetch_primitive_root(max_order);
 
-	l_roots=my_malloc((1<<max_order)*l_size*sizeof(mp_limb_t));
+	l_roots=malloc((1<<max_order)*l_size*sizeof(mp_limb_t));
 	ptr=l_roots;	/* phi_tab[0]=0. Always. */
 	l_set_one(ptr);
 	for(i=1;i<(1<<max_order);i++) {

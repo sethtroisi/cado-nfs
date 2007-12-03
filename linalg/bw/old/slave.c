@@ -524,7 +524,7 @@ static void read_m_vector(void)
 				mvec_filename,strerror(errno));
 		exit(errno);
 	}
-	bw_m=my_malloc(sbuf.st_size);
+	bw_m=malloc(sbuf.st_size);
 	fread(bw_m,sizeof(stype32),sbuf.st_size/sizeof(stype32),f);
 	DO_BIG_ENDIAN(int i;
 		for(i=0;i<sbuf.st_size/sizeof(stype32);i++) {
@@ -550,7 +550,7 @@ static void read_x0_vector(void)
 				x0_filename,strerror(errno));
 		exit(errno);
 	}
-	bw_x0=my_malloc(sbuf.st_size);
+	bw_x0=malloc(sbuf.st_size);
 	fread(bw_x0,sizeof(stype32),sbuf.st_size/sizeof(stype32),f);
 	DO_BIG_ENDIAN(int i;
 		for(i=0;i<sbuf.st_size/sizeof(stype32);i++) {
@@ -619,7 +619,7 @@ void open_polynomials(int n)
 	int	l;
 	char	filename[FILENAME_LENGTH];
 
-	tsv()->aux_files = my_malloc(nbys * sizeof(FILE*));
+	tsv()->aux_files = malloc(nbys * sizeof(FILE*));
 	n+=mksd.valuation;
 	for(l=0;l<nbys;l++) {
 		FILE *f;
@@ -790,7 +790,7 @@ iteration_2:
 	 */
 	state_checkpoint(dst_vec,1);
 
-	t=my_malloc(sizeof(double));
+	t=malloc(sizeof(double));
 	*t=timer_r(&(tsv()->elapsed_time),TIMER_ASK | TIMER_MTH);
 
 
@@ -815,7 +815,7 @@ static void mksol_setup(void)
 	bw_lvblock_alloc(bw_sum);
 	bw_lvblock_set_zero_separated(bw_sum);
 
-	scalar_block=my_malloc(nbys*bw_allocsize*sizeof(mp_limb_t));
+	scalar_block=malloc(nbys*bw_allocsize*sizeof(mp_limb_t));
 	memset(scalar_block,0,nbys*bw_allocsize*sizeof(mp_limb_t));
 
 	sprintf(filename,valu_meta_filename,mksd.solution_col,mksd.t_value);
@@ -952,7 +952,7 @@ int main(int argc, char *argv[])
 
 	configure_threads(1,ncols);
 
-	bw_x=my_malloc(nbxs*sizeof(coord_t));
+	bw_x=malloc(nbxs*sizeof(coord_t));
 	bw_lvblock_alloc(bw_v);
 	bw_lvblock_alloc(bw_w);
 	bw_lvblock_set_zero_separated(bw_w);

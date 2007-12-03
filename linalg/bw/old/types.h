@@ -70,8 +70,6 @@ typedef  int8_t  stype8;
 #define UC8(x)    ((type8)(x))
 #define SC8(x)   ((stype8)(x))
 
-#endif	/* TYPES_H_ */
-
 /*****************************************************************************/
 /* coord_t */
 
@@ -80,5 +78,7 @@ typedef type32 coord_t;
 #ifdef	__cplusplus
 }
 #endif
+
+#endif	/* TYPES_H_ */
 
 /* vim:set sw=8: */

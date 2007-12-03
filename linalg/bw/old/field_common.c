@@ -52,7 +52,7 @@ void generic_field_exp(mp_limb_t * a, mp_limb_t * r,
 
 	f->set(a,r,f);
 
-	u=my_malloc(f->size*sizeof(mp_limb_t));
+	u=malloc(f->size*sizeof(mp_limb_t));
 
 	for(;lead>0;lead--) {
 		if (j--==0) {

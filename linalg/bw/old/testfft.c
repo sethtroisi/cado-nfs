@@ -1180,7 +1180,7 @@ int main(int argc, char *argv[])
 
 	coredump_limit(0);
 
-	set_all_filenames(bank_num);
+	// set_all_filenames(bank_num);
 
 	/* This is necessary since we want the modulus info. */
 	if (bw_read_modulus_info(modul, 1)<0)
@@ -1203,7 +1203,7 @@ int main(int argc, char *argv[])
 
 	prepare_fft_engine(order,enable_cplx);
 
-	one_over_n=my_malloc(k_size*sizeof(mp_limb_t));
+	one_over_n=malloc(k_size*sizeof(mp_limb_t));
 	k_set_int(one_over_n,1<<order);
 	k_inv(one_over_n,one_over_n);
 

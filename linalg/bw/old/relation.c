@@ -41,14 +41,14 @@ void _relation_alloc (relation * p_r, type32 lnginfo)
 {
     int data_length=0;
 
-    (*p_r)	 = my_malloc(sizeof(relation_s));
+    (*p_r)	 = malloc(sizeof(relation_s));
     (*p_r)->info = lnginfo;
     if (lnginfo==0)
 	(*p_r)->data = NULL;
     else
     {
 	data_length  = RELATION_DATASIZE(*p_r);
-	(*p_r)->data = my_malloc(data_length*sizeof(type32));
+	(*p_r)->data = malloc(data_length*sizeof(type32));
     }
 }
 
@@ -56,7 +56,7 @@ void _ext_relation_alloc (ext_relation * p_r, type32 lnginfo)
 {
     int hascs;
 
-    (*p_r)	 = my_malloc(sizeof(ext_relation_s));
+    (*p_r)	 = malloc(sizeof(ext_relation_s));
     (*p_r)->info = lnginfo;
     (*p_r)->nSPs = RELATION_NSPS(*p_r);
     (*p_r)->nLPs = RELATION_NLPS(*p_r);
@@ -72,7 +72,7 @@ void _ext_relation_alloc (ext_relation * p_r, type32 lnginfo)
     }
     else
     {
-	(*p_r)->data = my_malloc((*p_r)->data_length*sizeof(type32));
+	(*p_r)->data = malloc((*p_r)->data_length*sizeof(type32));
 	(*p_r)->LP	 = RELATION_LP(*p_r);
 	(*p_r)->SP	 = RELATION_SP(*p_r);
 	(*p_r)->checksum = RELATION_CS(*p_r);
@@ -121,7 +121,7 @@ int relation_read (relation r, FILE *f)
     }
 #endif
 
-    r->data=my_malloc(RELATION_DATASIZE(r)*sizeof(type32));
+    r->data=malloc(RELATION_DATASIZE(r)*sizeof(type32));
     fread(r->data,sizeof(type32),RELATION_DATASIZE(r),f);
     DO_BIG_ENDIAN(
 	unsigned int i;
@@ -163,7 +163,7 @@ int ext_relation_read(ext_relation r, FILE *f)
 	/* return 0; */
     }
 
-    r->data=my_malloc(r->data_length*sizeof(type32));
+    r->data=malloc(r->data_length*sizeof(type32));
     n=fread(r->data,sizeof(type32),r->data_length,f);
     if (((unsigned int) n) < r->data_length)
     {
@@ -246,7 +246,7 @@ void _relation_extend (ext_relation * p_s, relation * p_r)
 {
     ext_relation n;
 
-    n=my_malloc(sizeof(ext_relation_s));
+    n=malloc(sizeof(ext_relation_s));
     memcpy(n,*p_r,sizeof(relation_s));
 
     n->nSPs	   = RELATION_NSPS(*p_r);
@@ -265,9 +265,9 @@ void _relation_extend (ext_relation * p_s, relation * p_r)
 
 void _ext_relation_dup(ext_relation * p_s, ext_relation r)
 {
-    *p_s	 = my_malloc(sizeof(ext_relation_s));
+    *p_s	 = malloc(sizeof(ext_relation_s));
     memcpy(*p_s,r,sizeof(ext_relation_s));
-    (*p_s)->data = my_malloc(r->data_length*sizeof(type32));
+    (*p_s)->data = malloc(r->data_length*sizeof(type32));
     memcpy((*p_s)->data,r->data,r->data_length*sizeof(type32));
     (*p_s)->SP	   = RELATION_SP(*p_s);
     (*p_s)->LP	   = RELATION_LP(*p_s);
@@ -283,7 +283,7 @@ void ext_relation_reap_checksum(ext_relation s)
 
     s->data_length -= 2;
 
-    alt	= my_malloc(s->data_length*sizeof(type32));
+    alt	= malloc(s->data_length*sizeof(type32));
     memcpy(alt,s->data+2,s->data_length*sizeof(type32));
     free(s->data);
     s->data	 = alt;

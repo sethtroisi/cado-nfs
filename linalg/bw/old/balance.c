@@ -153,7 +153,7 @@ void give_info_after(void)
 		 * opt_chain[1] */
 		assert(flow>0);
 		
-		order=my_malloc(family[flow].np * sizeof(int));
+		order=malloc(family[flow].np * sizeof(int));
 		for(k=n=0;k<family[IMBRICATED_OPTS-1].np;k++) {
 			n+=compute_ordering(order+n,flow,IMBRICATED_OPTS-1,k);
 		}
@@ -284,7 +284,7 @@ void balance_packets(struct packet_family * dst, struct packet_family * src)
 	/* Sort the packets */
 	qsort(src->p,src->np,sizeof(struct line_packet),&cmp_packets);
 	
-	order=my_malloc(dst->np*sizeof(type32));
+	order=malloc(dst->np*sizeof(type32));
 	for(i=0;i<dst->np;i++) {
 		order[i]=i;
 	}
@@ -311,12 +311,12 @@ void optimization_chain(void)
 
 	/* Build the original packet structure */
 	family[0].np = nlines;
-	family[0].p  = my_malloc(nlines*sizeof(struct line_packet));
+	family[0].p  = malloc(nlines*sizeof(struct line_packet));
 
 	for(j=0;j<nlines;j++) {
 		family[0].p[j].n=1;
 		family[0].p[j].w=line_pool[j].w;
-		family[0].p[j].lines=my_malloc(sizeof(type32));
+		family[0].p[j].lines=malloc(sizeof(type32));
 		family[0].p[j].lines[0]=j;
 		family[0].p[j].alloc=1;
 	}
@@ -325,7 +325,7 @@ void optimization_chain(void)
 
 	for(i=1;i<IMBRICATED_OPTS;i++) {
 		family[i].np=opt_chain[i];
-		family[i].p=my_malloc(opt_chain[i]*sizeof(struct line_packet));
+		family[i].p=malloc(opt_chain[i]*sizeof(struct line_packet));
 		for(j=0;j<family[i].np;j++) {
 			family[i].p[j].n=0;
 			family[i].p[j].w=0;

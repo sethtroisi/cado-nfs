@@ -28,16 +28,16 @@ static struct t_poly * tp_pre_alloc(void)
 {
 	struct t_poly * res;
 
-	if ((res = my_malloc(sizeof(struct t_poly)))==NULL)
+	if ((res = malloc(sizeof(struct t_poly)))==NULL)
 		goto fail_0;
 
-	if ((res->degree_table=my_malloc(bigdim*bigdim*sizeof(int)))==NULL)
+	if ((res->degree_table=malloc(bigdim*bigdim*sizeof(int)))==NULL)
 		goto fail_1;
 
-	if ((res->clist=my_malloc(bigdim*sizeof(unsigned int)))==NULL)
+	if ((res->clist=malloc(bigdim*sizeof(unsigned int)))==NULL)
 		goto fail_2;
 
-	if ((res->degnom=my_malloc(bigdim*sizeof(int)))==NULL)
+	if ((res->degnom=malloc(bigdim*sizeof(int)))==NULL)
 		goto fail_3;
 
 	res->alloc=0;
@@ -132,7 +132,7 @@ struct t_poly * tp_comp_alloc(struct t_poly * left,struct t_poly * right)
 void tp_act_on_delta(struct t_poly *tp, int * delta)
 {
 	int * tmp_delta, d, i, j;
-	tmp_delta=my_malloc(bigdim*sizeof(int));
+	tmp_delta=malloc(bigdim*sizeof(int));
 	for(j=0;j<bigdim;j++) {
 		tmp_delta[j]=-1;
 		for(i=0;i<bigdim;i++) {
@@ -180,7 +180,7 @@ tp_apply_perm(struct t_poly * tp, unsigned int * sigma)
 	unsigned int * tmp;
 	int i;
 
-	tmp=my_malloc(bigdim * sizeof(unsigned int));
+	tmp=malloc(bigdim * sizeof(unsigned int));
 	for(i=0;i<bigdim;i++) {
 		tmp[i]=tp->clist[sigma[i]];
 	}
@@ -283,67 +283,83 @@ void tp_print(struct t_poly * tp)
 
 int tp_write(FILE *f, struct t_poly *tp)
 {
-	int i,j,k,l,res,jr;
-	const mp_limb_t zero_limb=(mp_limb_t) 0;
+	int i,j,k,jr;
+	mpz_t blah;
+
+	mpz_init(blah);
 	
-	for(j=0;j<bigdim;j++) {
-		jr=tp->clist[j];
+	for(k=0;k<=tp->degree;k++) {
 		for(i=0;i<bigdim;i++) {
-			for(k=0;k<=tp->degnom[jr];k++) {
-				res=bw_scalar_write(f,
-						bbmat_scal(
-						bbpoly_coeff(tp->p,k),i,jr));
-				if (res != bw_filesize)
-					return -1;
-			}
-			for(;k<=tp->degree;k++) for(l=0;l<bw_filesize;l++) {
-				res=fwrite(&zero_limb,sizeof(mp_limb_t),1,f);
-				if (res!=1)
-					return -1;
+			for(j=0;j<bigdim;j++) {
+				jr=tp->clist[j];
+				if (k <= tp->degnom[jr]) {
+					MPZ_SET_MPN(blah, bbmat_scal( bbpoly_coeff(tp->p,k),i,jr), bw_allocsize);
+					gmp_fprintf(f, "%Zd%c", blah,
+							(j==bigdim-1)?'\n':' ');
+				} else {
+					gmp_fprintf(f, "0%c",
+							(j==bigdim-1)?'\n':' ');
+				}
 			}
 		}
+		fprintf(f, "\n");
 	}
 
+	mpz_clear(blah);
 	return 0;
 }
 
-struct t_poly * tp_read(FILE * f)
+struct t_poly * tp_read(FILE * f, unsigned int n)
 {
-	int i,j,k,n,d;
+	int i,j,k,dmax;
 	struct t_poly *res;
-	struct stat sbuf;
-	
-	if (fstat(fileno(f),&sbuf)<0)
-		return NULL;
-	n=((sbuf.st_size)/((bbmat_size/bw_allocsize)*bw_filesize*
-				sizeof(mp_limb_t)))-1;
-	if (n==-1) {
-		return NULL;
-	}
+	mpz_t blah;
+
+	dmax = -1;
+
 	res=tp_alloc(n);
+	mpz_init(blah);
 	
 	for(j=0;j<bigdim;j++) {
-		d=-1;
 		res->clist[j]=j;
 		for(i=0;i<bigdim;i++) {
-			int d2=-1;
-			for(k=0;k<=res->degree;k++) {
-				mp_limb_t *u;
-				u=bbmat_scal(bbpoly_coeff(res->p,k),i,j);
-				n=bw_scalar_read(u, f);
-				if (n != bw_filesize) {
-					tp_free(res);
-					return NULL;
-				}
-				if (k>d2 && !bw_scalar_is_zero(u)) {
-					d2=k;
+			*degtable_entry(res, i, j) = -1;
+		}
+	}
+
+	int rc = 0;
+	for(k=0;k<=res->degree;k++) {
+		rc = 0;
+		for(i=0;i<bigdim;i++) {
+			for(j=0;j<bigdim;j++) {
+				if (gmp_fscanf(f, "%Zd", blah) != 1)
+					continue;
+				rc++;
+				MPN_SET_MPZ(bbmat_scal(bbpoly_coeff(res->p,k),i,j), bw_allocsize, blah);
+				if (mpz_cmp_ui(blah, 0) != 0) {
+					*degtable_entry(res, i, j) = k;
 				}
 			}
-			if (d2>d)
-				d=d2;
-			*degtable_entry(res,i,j)=d2;
+		}
+		if (rc == 0) {
+			res->degree = k-1;
+			break;
+		} else if (rc != bigdim * bigdim) {
+			die("Reading pi file : not in sync\n",1);
+		}
+	}
+	if (rc != 0) {
+		die("Estimation of pi degree was wrong\n", 1);
+	}
+	for(j=0;j<bigdim;j++) {
+		int d = -1;
+		for(i=0;i<bigdim;i++) {
+			int d2 = *degtable_entry(res, i, j);
+			if (d2 > d)
+				d = d2;
 		}
 		res->degnom[j]=d;
 	}
+	mpz_clear(blah);
 	return res;
 }

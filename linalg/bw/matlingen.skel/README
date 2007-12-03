@@ -1,0 +1,45 @@
+
+INPUT:
+
+* a matrix file, which is actually unread except for its header line which
+must have the following format:
+
+// 1000 ROWS 1000 COLUMNS ; MODULUS 285451712094810683706092566195203997697
+
+(the matrix must be square)
+
+* The real input consists of files A-00-00, A-00-01, ... where A-II-JJ is
+the sequence ( Transpose(X_II) * M^i * Y_JJ), for increasing indices
+starting from _zero_. Together these files form the m*n matrix polynomial
+A(X)\in K[X]^(m*n).
+
+OUTPUT:
+
+* output is placed in files F00 F01 ..., where  each file represents a
+vector polynomial F(X)\in K[X]^(n*1), satisfying:
+
+A(X) F(X) = G(X) + O(X^t)
+
+only some correspond to generating polynomials (where t-\deg G shows some
+gap). These are the ones mentioned in the ``LOOK'' statement as output by
+the program upon exit:
+
+// step 1013 LOOK [ 2 3 ]
+
+which suggests looking at F02 and F03, as we can expect them to be
+generators (a rule of thumb is that generally, the generators are in the
+smallest files, because their nominal degree stopped increasing).
+
+one F file represent some vector polynomial, hence n polynomials
+\sum_i f_{0,i}X^i
+\sum_i f_{1,i}X^i
+...
+\sum_i f_{n-1,i}X^i
+
+the F files are written as follows:
+f_{0,0} f{1,0} ... f_{n-1,0}
+f_{0,1} f{1,1} ... f_{n-1,1}
+f_{0,2} f{1,2} ... f_{n-1,2}
+...
+
+(in the case m=n=1, F is the reversal of the minimal polynomial)

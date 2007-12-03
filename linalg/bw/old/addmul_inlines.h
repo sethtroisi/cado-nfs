@@ -322,7 +322,7 @@ addmultiply(bw_vector_block w, bw_vector_block v, stype32 x)
 	int k,l;
 #ifndef HARDCODE_PARAMS
 	mp_limb_t *lbuf;
-	lbuf=my_malloc(nbys*sizeof(mp_limb_t));
+	lbuf=malloc(nbys*sizeof(mp_limb_t));
 #else
 	mp_limb_t lbuf[nbys];
 #endif

@@ -204,7 +204,7 @@ struct field * new_complex_field(struct field * base)
 {
 	struct field * res;
 
-	res=my_malloc(sizeof(struct field));
+	res=malloc(sizeof(struct field));
 	res->size=2*base->size;
 	res->degree=2;
 	res->minpoly	= NULL;

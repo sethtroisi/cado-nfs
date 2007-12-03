@@ -14,7 +14,6 @@ extern "C" {
 void die(const char *, int, ... ) DOES_NOT_RETURN;
 void eternal_sleep(void);
 void * _my_malloc(size_t,const char *,int);
-#define my_malloc(s) _my_malloc(s,__FILE__,__LINE__)
 #define mymalloc(s) _my_malloc(s,__FILE__,__LINE__)
 // #define BUG()	_BUG(__FILE__,__LINE__)
 // void _BUG(const char *, const int);

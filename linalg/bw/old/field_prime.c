@@ -243,9 +243,9 @@ struct field * new_prime_field(mp_limb_t * p, mp_size_t n)
 {
 	struct field * res;
 
-	res=my_malloc(sizeof(struct field));
+	res=malloc(sizeof(struct field));
 	res->size=n;
-	res->modulus=my_malloc(n*sizeof(mp_limb_t));
+	res->modulus=malloc(n*sizeof(mp_limb_t));
 	memcpy(res->modulus,p,n*sizeof(mp_limb_t));
 	res->degree=1;
 	res->base_field	= res;

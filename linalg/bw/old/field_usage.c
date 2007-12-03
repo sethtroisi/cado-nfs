@@ -80,7 +80,7 @@ void prepare_fields_for_fft(int root_order UNUSED_VARIABLE, int enable_cplx)
 	}
 	printf("Found L=K(sqrt(%d))\n",i);
 	mpz_clear(a);
-	d=my_malloc(k_size*sizeof(mp_limb_t));
+	d=malloc(k_size*sizeof(mp_limb_t));
 	k_set_int(d,i);
 	field_l=new_quad_field(field_k,d);
 	free(d);
@@ -113,9 +113,9 @@ mp_limb_t * fetch_primitive_root(int root_order)
 	}
 
 	
-	t=my_malloc(l_size*sizeof(mp_limb_t));
-	r=my_malloc(l_size*sizeof(mp_limb_t));
-	a=my_malloc(l_size*sizeof(mp_limb_t));
+	t=malloc(l_size*sizeof(mp_limb_t));
+	r=malloc(l_size*sizeof(mp_limb_t));
+	a=malloc(l_size*sizeof(mp_limb_t));
 
 	for(i=0;i<ROOT_LIMIT;i++) {
 		mpn_random(t,l_size);

@@ -6,9 +6,7 @@
 #include "timer.h"
 
 #include "types.h"
-#include "bw_scalar.h"
-#include "bw_lvblock.h"
-#include "threaded.h"
+/* #include "threaded.h" */
 
 /* linuxthreads : thread == self, actually
  *

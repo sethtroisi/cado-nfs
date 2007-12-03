@@ -141,7 +141,7 @@ locate_solution_columns(void)
 	int t_0;
 	int j,k;
 
-	clist=my_malloc(n_param*sizeof(unsigned int));
+	clist=malloc(n_param*sizeof(unsigned int));
 	t_0=(m_param+n_param-1)/n_param;
 
 	k=0;
@@ -178,9 +178,9 @@ static int do_gauss_on_f(void)
 	unsigned int * zero;
 	int nz=0;
 
-	inv	= my_malloc(k_size * sizeof(mp_limb_t));
-	lambda	= my_malloc(k_size * sizeof(mp_limb_t));
-	zero	= my_malloc(n_param* sizeof(unsigned int));
+	inv	= malloc(k_size * sizeof(mp_limb_t));
+	lambda	= malloc(k_size * sizeof(mp_limb_t));
+	zero	= malloc(n_param* sizeof(unsigned int));
 
 	f_0=nbpoly_coeff(f_rev_poly,0);
 
@@ -313,9 +313,9 @@ int main(int argc, char * argv[])
 	consistency_check("bw_longsize",computed_bw_longsize,bw_longsize);
 #endif
 
-	degnom=my_malloc(bigdim*sizeof(int));
-	degree=my_malloc(bigdim*sizeof(int));
-	valuation=my_malloc(bigdim*sizeof(int));
+	degnom=malloc(bigdim*sizeof(int));
+	degree=malloc(bigdim*sizeof(int));
+	valuation=malloc(bigdim*sizeof(int));
 	
 	field_k=new_prime_field(modulus_plain,bw_allocsize);
 	

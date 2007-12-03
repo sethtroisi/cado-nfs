@@ -1,0 +1,190 @@
+######################################################################
+# To build with profiling:
+# make <target> PFLAGS=-pg
+
+.PHONY: all late_all clean dep messages dclean
+BINARY_IN_LOCAL_FAILURE:=$(shell [ -e "$(TOPPATH)/.binary_in_local" ] && [ ! -d "$$HOME/Local/build" ] && echo yes || echo no)
+BINARY_IN_LOCAL:=$(shell [ -e "$(TOPPATH)/.binary_in_local" ] && [ -d "$$HOME/Local/build" ] && echo yes || echo no)
+
+# Default values ; only if undefined yet.
+CC?=gcc
+CXX?=g++
+ARQCV?=ar qcv
+OFLAGS?=
+PFLAGS?=
+IFLAGS?=
+LFLAGS?=
+
+ifeq ($(STATIC),yes)
+LFLAGS+=-static
+endif
+
+CFLAGS:=-Wall -ggdb
+CXXFLAGS:=-Wall -ggdb
+LIBS:=
+
+ifneq ($(GMP),)
+IFLAGS+=-I$(GMP)/include
+LFLAGS+=-L$(GMP)/lib -Wl,-rpath -Wl,$(GMP)/lib
+endif
+
+ifneq ($(MPFR),)
+IFLAGS+=-I$(MPFR)/include
+LFLAGS+=-L$(MPFR)/lib -Wl,-rpath -Wl,$(MPFR)/lib
+endif
+
+# CFLAGS+=-DCFLAGS="\"$(PFLAGS) $(OFLAGS)\""
+# CXXFLAGS+=-DCXXFLAGS="\"$(PFLAGS) $(OFLAGS)\""
+
+CFLAGS+=$(PFLAGS) $(OFLAGS) $(IFLAGS)
+CXXFLAGS+=$(PFLAGS) $(OFLAGS) $(IFLAGS)
+
+DIST_SUBDIRS:=
+
+all:: messages late_all
+
+messages::
+
+preliminary::
+
+ifndef	DEPDIR
+DEPDIR:=.deps/
+endif
+
+Makefile:	preliminary
+
+ifeq ($(BINARY_IN_LOCAL_FAILURE),yes)
+messages::
+	@echo "No $$HOME/Local/build directory exists ; building in current directory"
+endif
+
+# The BINARY_DIR must be slash-terminated or void
+BINARY_DIR:=
+ifeq ($(BINARY_IN_LOCAL),yes)
+# We prepend the basename of the top directory, so that different project
+# don't get similar binaries messed up.
+BINARY_DIR:=$(shell $(TOPPATH)/util/translate_path.sh "$$HOME/Local/build" $(TOPPATH)/..)/
+endif
+
+# I'm not quite happy with this.
+.PHONY: tags
+tags:
+	ctags --exclude=.git --exclude=.svn -R $(TOPPATH)
+
+CLEAN_PATTERN:=*~ *.bak
+DCLEAN_PATTERN:=
+BIN_TARGETS:=
+LIB_TARGETS:=
+ALLDEPS:=
+
+ifeq ($(TOPPATH),)
+TOPPATH:=.
+endif
+
+# The -MP flag is here to accommodate the situation where a header file
+# on which a dep file depends automatically has a phony target: thereby,
+# if the header file goes away, the make process still works.
+DEPCC:=$(CC) -M -MM -MG -MP
+DEPCXX:=$(CXX) -M -MM -MG -MP
+
+# This has the effect of implicitly setting -r, so that we don't get
+# bothered by implicit rules.
+.SUFFIXES:
+
+ifndef	V
+define INFORM
+@echo -e " [$(1)]\t$(2)" ;
+endef
+else
+INFORM:=
+endif
+
+define	SUB_MAKE
++$(call INFORM,MAKE,$(1)/$(2))$(MAKE)$(if $(V),, --no-print-directory) -C $(1) $(2)
+endef
+
+# This machinery handles to perl the substitution job which is hardly
+# doable by make itself.
+.%.mkf: $(TOPPATH)/util/sub_mkf_maker.pl
+	$(call INFORM,MKF,$@)perl $(TOPPATH)/util/sub_mkf_maker.pl $@
+
+
+# @echo "Doing depcheck$$(if $(2), [$(2)],) on $$<"
+
+# Older dependency rules suited for precompiled headers are in
+# a file named rules-pch.mki, probably buried somewhere.
+#
+# The rules here give an example of substitution capabilities. Ahem.
+
+MODEL__CFLAGS=
+MODEL__CXXFLAGS=
+MODEL_SO_CFLAGS:=-fPIC
+MODEL_SO_CXXFLAGS:=$(MODEL_SO_CFLAGS)
+MODEL_MT_CFLAGS:=-pthread -D_REENTRANT -DENABLE_PTHREADS
+MODEL_MT_CXXFLAGS:=$(MODEL_MT_CFLAGS)
+MODEL_MT_LFLAGS:=-pthread
+MODEL_MT_LXXFLAGS:=$(MODEL_MT_LFLAGS)
+
+define	MODEL_TEMPLATE
+MODEL_$(2)_CFLAGS+=$(CFLAGS)
+MODEL_$(2)_CXXFLAGS+=$(CXXFLAGS)
+PMODEL_$(2):=$$(if $(2),[$(2)] ,)
+$(DEPDIR)%.c$(1).d: %.c
+	@mkdir -p $$$$(dirname $$@) ; :
+	$$(call INFORM,DEP,$$(PMODEL_$(2))$$<)$$(DEPCC) $$(MODEL_$(2)_CFLAGS) -MF $$@ -MT '$$@ $(BINARY_DIR)$$*$(1).o' $$<
+$(DEPDIR)%.cpp$(1).d: %.cpp
+	@mkdir -p $$$$(dirname $$@) ; :
+	$$(call INFORM,DEP,$$(PMODEL_$(2))$$<)$$(DEPCXX) $$(MODEL_$(2)_CXXFLAGS) -MF $$@ -MT '$$@ $(BINARY_DIR)$$*$(1).o' $$<
+$(BINARY_DIR)%$(1).o: %.c
+	@[ -n "`dirname $$@`" ] && mkdir -p "`dirname $$@`" ; :
+	$$(call INFORM,CC,$$(PMODEL_$(2))$$<)$$(CC) -c $$(MODEL_$(2)_CFLAGS) $$< -o $$@
+$(BINARY_DIR)%$(1).o: %.cpp
+	@[ -n "`dirname $$@`" ] && mkdir -p "`dirname $$@`" ; :
+	$$(call INFORM,CXX,$$(PMODEL_$(2))$$<)$$(CXX) -c $$(MODEL_$(2)_CXXFLAGS) $$< -o $$@
+endef
+
+#####################################################################
+# not clear that this rule is really intended.
+#.cpp.s:
+#	$(CXX) -S $(CXXFLAGS) $< -o $@
+
+#####################################################################
+define	MAKEFILE_TRAILER
+
+ifeq ($$(findstring clean,$$(MAKECMDGOALS)),)
+ifneq ($$(ALLDEPS),)
+-include $$(ALLDEPS)
+endif
+endif
+
+$(eval $(call MODEL_TEMPLATE,,,))
+$(eval $(call MODEL_TEMPLATE,-so,SO,))
+$(eval $(call MODEL_TEMPLATE,-mt,MT,))
+
+clean: messages
+	-@rm -vf $(CLEAN_PATTERN)
+	-@rm -vf *.prm
+	-+@for f in $(DIST_SUBDIRS) ; do $(MAKE) -s -C $$f clean ; done
+
+dclean: clean
+	-@rm -vf $(DCLEAN_PATTERN)
+
+variables::
+	@echo "BINARY_DIR=$(BINARY_DIR)"
+
+late_all: $$(BIN_TARGETS) $$(LIB_TARGETS)
+
+dep: $$(ALLDEPS)
+
+ifneq ($$(TARNAME),)
+tar:	$$(TARNAME).tar.gz
+
+$$(TARNAME).tar.gz: $$(DISTFILES)
+	ln -s . $$(TARNAME)
+	tar chzf $$@ $$(patsubst %,$$(TARNAME)/%,$$^)
+	rm -f $$(TARNAME)
+endif
+
+endef
+
+# vim:ft=make

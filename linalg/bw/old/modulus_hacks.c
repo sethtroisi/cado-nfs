@@ -27,7 +27,7 @@ void do_modulus_precomps(void)
 	int i;
 	mp_limb_t * p;
 
-	p = my_malloc((bw_allocsize+1)*sizeof(mp_limb_t));
+	p = malloc((bw_allocsize+1)*sizeof(mp_limb_t));
 	memset(p,0,(bw_allocsize+1)*sizeof(mp_limb_t));
 	p[0]=2;
 	for(i=1;i<(1<<20)&&(p[0]!=1||mpn_cmp(p+1,zero,bw_allocsize-1)!=0);i++) {

@@ -27,7 +27,7 @@ extern void tp_act_on_delta(struct t_poly *, int *);
 extern void tp_print(struct t_poly *);
 extern void tp_free(struct t_poly *);
 extern int tp_write(FILE *, struct t_poly *);
-extern struct t_poly * tp_read(FILE *);
+extern struct t_poly * tp_read(FILE *, unsigned int);
 
 #ifdef	__cplusplus
 }

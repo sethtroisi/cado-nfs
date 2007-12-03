@@ -8,9 +8,7 @@
 #include <gmp.h>
 #include "macros.h"
 #include "types.h"
-#include "endian.h"
 #include "auxfuncs.h"
-#include "filenames.h"
 #include "bw_scalar.h"
 
 
@@ -79,8 +77,8 @@ static void set_hbs(void)
 	/* We must do so to recover the most significant bit (otherwise
 	 * it is cleared. A nicer way would be to use mpzs... */
 
-	two_n_plus_2_mod_p=my_malloc(bw_allocsize*sizeof(mp_limb_t));
-	s=my_malloc((bw_allocsize+7)*sizeof(mp_limb_t));
+	two_n_plus_2_mod_p=malloc(bw_allocsize*sizeof(mp_limb_t));
+	s=malloc((bw_allocsize+7)*sizeof(mp_limb_t));
 	memset(s,0,(bw_allocsize+7)*sizeof(mp_limb_t));
 	s[bw_allocsize+2]=1;
 	mpn_tdiv_qr(s+bw_allocsize+3,two_n_plus_2_mod_p,0,
@@ -116,7 +114,7 @@ CRAP 	mp_limb_t buf[n];
 CRAP #else
 CRAP 	mp_limb_t * buf;
 CRAP 
-CRAP 	buf=my_malloc(n*sizeof(mp_limb_t));
+CRAP 	buf=malloc(n*sizeof(mp_limb_t));
 CRAP #endif
 CRAP 	
 CRAP 	mask1=(1UL<<(mp_bits_per_limb-1));
@@ -150,18 +148,11 @@ static int bw_read_raw_modulus(const char * modulusname)
 		init_done=1;
 	}
 
-	fprintf(stdout,"No modulus description file named %s found.\n",
-			modulusname);
-
 	if (mpz_set_str(modulus, modulusname, 0)<0) {
 		fprintf(stderr,"%s is not an acceptable modulus.\n",
 				modulusname);
 		return -1;
 	}
-
-	fprintf(stdout,"Using modulus %s instead. It'd better be prime!\n",
-			modulusname);
-	fprintf(stdout,"You'll have to supply a description file later.\n");
 
 	set_allocsize();
 	register_factor(modulus);
@@ -173,14 +164,12 @@ static int bw_read_raw_modulus(const char * modulusname)
 
 int bw_read_modulus_info(const char * modulusname, int allow)
 {
-	char filename[FILENAME_LENGTH+MODULUSNAME_MAX_LENGTH];
 	FILE *f;
 	mpz_t tempo;
 	char idcheck[7];
 	int i;
 
-	sprintf(filename,modulus_info_meta_filename,modulusname);
-	f = fopen(filename,"r");
+	f = fopen(modulusname,"r");
 	if (f==NULL) {
 		if (allow)
 			return bw_read_raw_modulus(modulusname);
@@ -242,7 +231,7 @@ mp_size_t _bw_scalar_alloc(bw_scalar * px, int mode)
 		default: /*BW_SCALAR_MEDIUM*/ s=bw_allocsize+1; break;
 	}
 
-	*px=my_malloc(s*sizeof(mp_limb_t));
+	*px=malloc(s*sizeof(mp_limb_t));
 
 	return s;
 }
@@ -272,7 +261,7 @@ int bw_scalar_fits_word(bw_scalar a, type32 *p, int *s)
 	mpz_init(mmx);
 
 	x->_mp_alloc=x->_mp_size=bw_allocsize;
-	x->_mp_d=my_malloc(x->_mp_alloc*sizeof(mp_limb_t));
+	x->_mp_d=malloc(x->_mp_alloc*sizeof(mp_limb_t));
 	memcpy(x->_mp_d,a,x->_mp_alloc*sizeof(mp_limb_t));
 	for(;x->_mp_d[x->_mp_size-1]==0 && x->_mp_size>1;x->_mp_size--);
 
@@ -304,47 +293,6 @@ int bw_scalar_fits_word(bw_scalar a, type32 *p, int *s)
 	return res;
 }
 
-int bw_scalar_read(bw_scalar x, FILE *f)
-{
-	mp_limb_t	*p;
-	int 		res;
-	mp_limb_t	*quot;
-
-	p	= my_malloc(bw_filesize*sizeof(mp_limb_t));
-	quot	= my_malloc((bw_filesize-bw_allocsize+1)*sizeof(mp_limb_t));
-	res	= fread(p,sizeof(mp_limb_t),(unsigned)bw_filesize,f);
-
-	DO_BIG_ENDIAN(int i;
-		for(i=0;i<bw_filesize;i++)
-		reverse((char*) (p+i),1,sizeof(mp_limb_t)));
-
-	mpn_tdiv_qr(quot,x,0,p,bw_filesize,modulus_plain,bw_allocsize);
-	free(quot);
-	free(p);
-
-	return res;
-}
-
-int bw_scalar_write(FILE *f, bw_scalar x)
-{
-	mp_limb_t	*p;
-	int		i,res;
-
-	p = my_malloc(bw_filesize*sizeof(mp_limb_t));
-	memcpy(p,x,bw_allocsize*sizeof(mp_limb_t));
-	bw_reduce_short_scalar(p);
-	for(i=bw_allocsize;i<bw_filesize;p[i++]=0);
-
-	DO_BIG_ENDIAN(for(i=0;i<bw_filesize;i++)
-		reverse((char*) (p+i),1,sizeof(mp_limb_t)));
-
-	res=fwrite(p,sizeof(mp_limb_t),(unsigned)bw_filesize,f);
-
-	free(p);
-
-	return res;
-}
-
 void bw_scalar_set_random(bw_scalar x)
 {
 	mpz_t y;
@@ -365,29 +313,9 @@ mp_size_t _bw_vector_alloc(bw_vector *pv, coord_t n, int mode)
 		default: /*BW_SCALAR_MEDIUM*/ s=bw_allocsize+1; break;
 	}
 
-	*pv=my_malloc(s*n*sizeof(mp_limb_t));
+	*pv=malloc(s*n*sizeof(mp_limb_t));
 
 	return s*n;
-}
-
-int bw_vector_read(bw_vector v, int n, FILE * f)
-{
-	bw_lemming l;
-	int res=0,i;
-	for(i=0,bw_lemming_reset(l,v);i<n;bw_lemming_step(l,1),i++)
-		res+=bw_scalar_read(l,f);
-	bw_lemming_clear(l);
-	return res;
-}
-
-int bw_vector_write(FILE *f, bw_vector v, int n)
-{
-	bw_lemming l;
-	int res=0,i;
-	for(i=0,bw_lemming_reset(l,v);i<n;bw_lemming_step(l,1),i++)
-		res+=bw_scalar_write(f,l);
-	bw_lemming_clear(l);
-	return res;
 }
 
 void bw_vector_set_random(bw_vector v, int n)
@@ -406,8 +334,8 @@ void pscalar(mp_limb_t * p)
 	mp_limb_t * bar;
 	int i,l;
 
-	bar=my_malloc((bw_allocsize+1)*sizeof(mp_limb_t));
-	foo=my_malloc((bw_allocsize+1)*mp_bits_per_limb);
+	bar=malloc((bw_allocsize+1)*sizeof(mp_limb_t));
+	foo=malloc((bw_allocsize+1)*mp_bits_per_limb);
 	/* overly exaggerated... */
 	memcpy(bar,p,bw_allocsize*sizeof(mp_limb_t));
 	l=mpn_get_str((unsigned char*)foo,10,bar,bw_allocsize);
@@ -430,8 +358,8 @@ void fpscalar_n(FILE *f, mp_limb_t * p, mp_size_t n)
 	mp_limb_t * bar;
 	int i,l;
 
-	bar=my_malloc((n+1)*sizeof(mp_limb_t));
-	foo=my_malloc((n+1)*mp_bits_per_limb);
+	bar=malloc((n+1)*sizeof(mp_limb_t));
+	foo=malloc((n+1)*mp_bits_per_limb);
 	/* overly exaggerated... */
 	memcpy(bar,p,n*sizeof(mp_limb_t));
 	l=mpn_get_str((unsigned char*)foo,10,bar,n);

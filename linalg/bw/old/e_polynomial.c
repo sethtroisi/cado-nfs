@@ -21,7 +21,7 @@ struct e_coeff * ec_encapsulate(bw_mbpoly p,
 	       int degree)
 {
 	struct e_coeff *res;
-	res=my_malloc(sizeof(struct e_coeff));
+	res=malloc(sizeof(struct e_coeff));
 	if (res==NULL) return NULL;
 	res->p=res->original_p=p;
 	res->clist=clist;
@@ -41,7 +41,7 @@ ec_apply_perm(struct e_coeff * ec, unsigned int * sigma)
 	unsigned int * tmp;
 	unsigned int i;
 
-	tmp=my_malloc(bigdim * sizeof(unsigned int));
+	tmp=malloc(bigdim * sizeof(unsigned int));
 	for(i=0;i<bigdim;i++) {
 		tmp[i]=ec->clist[sigma[i]];
 	}

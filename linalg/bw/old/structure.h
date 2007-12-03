@@ -1,6 +1,9 @@
 #ifndef STRUCTURE_H_
 #define STRUCTURE_H_
 
+#include "params.h"
+#include "master_params.h"
+
 #ifndef NO_STRICT_TYPECHECKING
 #define STRICT_TYPECHECKING
 #endif
@@ -77,6 +80,12 @@ STRICTTYPE_DECL(bw_scalar, bw_rvector);
 # define FASTFUNC extern __inline__
 #endif
 
+#include <stdlib.h>
+#include <string.h>
+#include "bw_scalar.h"
+#include "auxfuncs.h"
+#include "variables.h"
+
 #define INCLUDING_STRUCTURE_AUTOMATIC_H_
 #include "structure_automatic.h"
 
@@ -91,7 +100,7 @@ extern "C" {
 #endif
 
 extern int nbpoly_write(FILE *, bw_nbpoly, int);
-extern bw_nbpoly nbpoly_read(int *, FILE *);
+extern bw_nbpoly nbpoly_read(FILE *, int);
 
 #ifdef	__cplusplus
 }

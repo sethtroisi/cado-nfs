@@ -108,7 +108,7 @@ struct t_filename * new_t_filename(int tag, const char * name)
 {
 	struct t_filename * res;
 
-	res=my_malloc(sizeof(struct t_filename));
+	res=malloc(sizeof(struct t_filename));
 	res->x=tag;
 	mkfname(res->filename,"%s",name);
 	res->next=NULL;	/* That's not necessary, but it's probably wiser to
@@ -138,7 +138,7 @@ struct certificate * new_certificate(int type, int j, int r0)
 {
 	struct certificate * res;
 
-	res=my_malloc(sizeof(struct certificate));
+	res=malloc(sizeof(struct certificate));
 	res->type=type;
 	res->vecnum=j;
 	res->r0 = r0;
@@ -395,7 +395,7 @@ struct pinfo * read_pinfo(const char * filename)
 	char	linebuf[LINEBUF_LENGTH];
 
 	f=fopen(filename,"r");
-	res=my_malloc(sizeof(struct pinfo));
+	res=malloc(sizeof(struct pinfo));
 
 	for(;;) {
 		tag=read_one_line(&s,linebuf,f);
@@ -422,7 +422,7 @@ struct certificate * read_certificate(const char * filename)
 	long	offset;
 	
 	f=fopen(filename,"r");
-	res=my_malloc(sizeof(struct certificate));
+	res=malloc(sizeof(struct certificate));
 	res->type=-1;
 	res->vecnum=-1;
 	res->r0 = -1;

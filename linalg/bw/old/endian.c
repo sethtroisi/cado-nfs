@@ -13,7 +13,7 @@ void reverse(char *a, size_t width, size_t n)
     int i;
     char *buf;
 
-    buf = my_malloc(width);
+    buf = malloc(width);
 
     for(i = 0 ; i < ((int) n) - i - 1 ; i++)
     {

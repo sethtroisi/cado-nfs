@@ -203,7 +203,7 @@ int main(int argc, char *argv[])
 	configure_threads(1,ncols);
 	compute_thread_offsets();
 
-	bw_x=my_malloc(nbxs*sizeof(coord_t));
+	bw_x=malloc(nbxs*sizeof(coord_t));
 	load_x_vectors(bw_x,0,nbxs);
 
 	bw_lvblock_alloc(bw_v);

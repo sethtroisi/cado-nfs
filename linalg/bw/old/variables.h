@@ -6,7 +6,6 @@ extern "C" {
 #endif
 
 extern coord_t nrows;
-extern coord_t ncols;
 #ifdef HARDCODE_PARAMS
 #define m_param HARD_m_param
 #define n_param HARD_n_param
@@ -16,9 +15,7 @@ extern coord_t ncols;
 #endif
 extern int computed_m_param;
 extern int computed_n_param;
-extern int bank_num;
 extern int total_work;
-extern int periodicity;
 
 #define subdim	n_param
 #define bigdim	(subdim + m_param)

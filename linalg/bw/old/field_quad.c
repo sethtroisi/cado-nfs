@@ -199,10 +199,10 @@ struct field * new_quad_field(struct field * base, mp_limb_t * p)
 {
 	struct field * res;
 
-	res=my_malloc(sizeof(struct field));
+	res=malloc(sizeof(struct field));
 	res->size=2*base->size;
 	res->degree=2;
-	res->minpoly=my_malloc(base->size*sizeof(mp_limb_t));
+	res->minpoly=malloc(base->size*sizeof(mp_limb_t));
 	base->set(res->minpoly,p,base);
 	res->base_field	= base;
 	res->add	= quad_field_add;

@@ -34,8 +34,8 @@ D="${D}.$SPECIAL"
 rm -rf $D
 mkdir $D
 
-M=16
-N=16
+M=8
+N=8
 # works because we're zsh.
 grep ROWS "$1" | head -1 | tr -d ';' | read x x x MSIZE x x MODULUS
 cp "$1" $D/matrix.txt
@@ -53,9 +53,11 @@ if [ "$1" = tiny ] ; then
 fi
 
 
-for i in {0..$N1} ; do
+for mi in {0..`expr $N1 / 8`} ; do
+        i=`expr $mi \* 8`
+        ni1=`expr $i + 7`
 	if [ ! -f "$D/A-00-$(printf '%02d' $i)" ] ; then
-		action ${B}bw-slave-mt --nthreads 2 --task slave --subdir $D $i
+		action ${B}bw-slave-mt --nthreads 2 --task slave --subdir $D 0,$i $M1,$ni1
 	else
 		echo "Column $i already done"
 	fi
@@ -73,11 +75,13 @@ fi
 
 X=$(grep 'LOOK' "$D/master.log" | tail -1 | awk '// { print $6; }')
 
-for i in {0..$N1} ; do
-        action ${B}bw-slave-mt --nthreads 2 --task mksol --subdir $D --sc $X $i
+for mi in {0..`expr $N1 / 8`} ; do
+        i=`expr $mi \* 8`
+        ni1=`expr $i + 7`
+        action ${B}bw-slave-mt --nthreads 2 --task mksol --subdir $D --sc $X 0,$i $M1,$ni1
 done
 
-${B}bw-gather --subdir $D $X
+action ${B}bw-gather --subdir $D $X --nbys 8
 
 if [ "$REMOVE_D" = yes ] ; then
 	F=`echo $FILE | sed -e s/matrix/solution/g`

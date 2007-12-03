@@ -13,19 +13,14 @@
 #include "params.h"
 #include <assert.h>
 #include "types.h"
-#include "endian.h"
 #include "macros.h"
 #include "auxfuncs.h"
 #include "bw_scalar.h"
-#include "filenames.h"
-#include "options.h"
-#include "tagfile.h"
 #include "timer.h"
 #include "variables.h"
 #include "structure.h"
 #include "gmp-hacks.h"
 #include "modulus_hacks.h"
-#include "right_action.h"
 #include "e_polynomial.h"
 #include "twisting_polynomials.h"
 #include "fft_on_matrices.h"
@@ -34,6 +29,7 @@
 #include "field_quad.h"
 #include "field_usage.h"
 /* #include "version.h" */
+#include "master_common.h"
 
 bw_nbpoly	f_poly;
 int		t_counter;
@@ -42,13 +38,14 @@ int		global_sum_delta;
 unsigned int  * chance_list;
 static int	recursion_level;	/* static, hence 0 on init */
 static int	rec_threshold=1;
-static int	graph;
 static int	print_min=10;
 static int	preferred_quadratic_algorithm;	/* Defaults to 0 (old) */
 static int	t_init;
 static int	no_check_input;
 static int	enable_cplx;
 static int	fermat_prime;
+
+const char f_base_filename[] = "F_INIT";
 
 #define SAVE_LEVEL_THRESHOLD	4
 
@@ -72,6 +69,7 @@ int max_delta(int * delta)
 	for(i=0;i<bigdim;i++) if (delta[i]>res) res=delta[i];
 	return res;
 }
+
 
 static int
 save_pi(struct t_poly * pi, int t_start, int t_middle, int t_end)
@@ -142,7 +140,7 @@ retrieve_pi_files(struct t_poly ** p_pi, int t_start)
 	struct dirent * curr;
 	int n_pi_files;
 	struct couple {int s; int e;} * pi_files;
-	char *pattern;
+	const char *pattern;
 	int i;
 	struct t_poly * left = NULL, * right = NULL;
 	int order;
@@ -151,16 +149,19 @@ retrieve_pi_files(struct t_poly ** p_pi, int t_start)
 
 	*p_pi=NULL;
 
-	if ((pi_dir=opendir(wdir_filename))==NULL) {
-		perror(wdir_filename);
+	if ((pi_dir=opendir("."))==NULL) {
+		perror(".");
 		return t_start;
 	}
 
-	printf("Scanning directory %s for pi files\n", wdir_filename);
+	printf("Scanning directory %s for pi files\n", ".");
 
-	pattern=strrchr(pi_meta_filename,'/');
-	assert(pattern!=NULL && *pattern=='/');
-	pattern++;
+	pattern = strrchr(pi_meta_filename,'/');
+	if (pattern == NULL) {
+		pattern = pi_meta_filename;
+	} else {
+		pattern++;
+	}
 
 	for(n_pi_files=0;(curr=readdir(pi_dir))!=NULL;) {
 		int s,e;
@@ -179,7 +180,7 @@ retrieve_pi_files(struct t_poly ** p_pi, int t_start)
 		return t_start;
 	}
 
-	pi_files=my_malloc(n_pi_files*sizeof(struct couple));
+	pi_files=malloc(n_pi_files*sizeof(struct couple));
 	
 	rewinddir(pi_dir);
 
@@ -224,13 +225,24 @@ retrieve_pi_files(struct t_poly ** p_pi, int t_start)
 		}
 
 		sprintf(filename,pi_meta_filename,t_start,t_max);
+		printf("trying %s\n", filename);
 		f=fopen(filename,"r");
 		if (f==NULL) {
 			perror(filename);
 			pi_files[best].e=-1;
 			continue;
 		}
-		right=tp_read(f);
+		/* Which degree can we expect for t_start..t_max ?
+		 */
+
+		unsigned int pideg;
+		pideg = iceildiv(m_param * (t_max - t_start), bigdim);
+		pideg += 10;
+		if (t_max > total_work) {
+			pideg += t_max - total_work;
+		}
+
+		right=tp_read(f, pideg);
 		fclose(f);
 
 		if (right==NULL) {
@@ -282,61 +294,6 @@ retrieve_pi_files(struct t_poly ** p_pi, int t_start)
 	return t_start;
 }
 
-static void
-bw_commit_f(int * delta)
-{
-	int i;
-	int j;
-	int t;
-	char filename[FILENAME_LENGTH];
-	FILE *f;
-
-	for(j=0;j<bigdim;j++) {
-		for(i=0;i<n_param;i++) {
-			sprintf(filename,f_meta_filename,i,j,t_counter);
-			f = fopen(filename,"w");
-			if (f == NULL) {
-				perror("writing f");
-				eternal_sleep();
-			}
-			printf("Writing %s\n",filename);
-			for(t=0;t<=delta[j];t++) {
-				bw_scalar_write(f,nbmat_scal(
-					nbpoly_coeff(f_poly,delta[j]-t), i,j));
-			}
-			/* Je les écris dans le sens inverse. Pour une
-			 * fois... En fait, c'est plus cohérent pour
-			 * l'utilisation qui suit, vu que l'évaluation
-			 * bête-et-conne n'est pas moins rapide que par
-			 * Horner */
-			fclose(f);
-		}
-		for(t=0;;t++) {
-			if (!ncol_is_zero(nbmat_col(nbpoly_coeff(f_poly,
-							delta[j]-t), j)))
-				break;
-		}
-		
-		/* t is now the valuation of the (reversed) column. */
-	
-		sprintf(filename,valu_meta_filename,j,t_counter);
-		f = fopen(filename,"w");
-		if (f == NULL) {
-			perror("Writing valuation file");
-			eternal_sleep();
-		}
-		printf("Writing %s\n",filename);
-		fprintf(f,"COLUMN %d VALUATION %d DEGNOM %d HAPPY %d TIMES\n",
-				j,t, delta[j],chance_list[j]);
-		fclose(f);
-	}
-
-	printf("#RESULT %d\n", t_counter);
-	for(j=0;j<bigdim;j++) {
-		if (chance_list[j]) printf("#RESULT %d\n", j);
-	}
-}
-
 /*
  * bw_init
  *
@@ -354,10 +311,8 @@ bw_commit_f(int * delta)
  */
 static struct e_coeff * bw_init(void)
 {
-	FILE		* a_disk=NULL; /* To make gcc happy */
 	int		  reached_degree;
 	int		  i,j,k,s,t,t0,test;
-	char		  filename[FILENAME_LENGTH];
 	mpz_t		  blah;
 	bw_mnpoly	  a_poly;
 	bw_mbpoly	  e_poly;
@@ -365,19 +320,7 @@ static struct e_coeff * bw_init(void)
 	unsigned long int	  seed;
 	unsigned int		* clist;
 	struct e_coeff		* res;
-	int			  high_rev;
 	FILE		* f;
-
-	/* In case later checkpoints have been committed */
-	high_rev = 1 + iceildiv(total_work,periodicity);
-
-	printf("Read tag file. total_work=%d, periodicity=%d, high_rev=%d\n",
-			total_work,periodicity,high_rev);
-
-	if (graph) {
-		printf("Test mode : restricting input to degree %d\n",graph);
-		total_work=graph;
-	}
 
 #ifdef	CORRECT_STUPID_WOE
 	printf("Using A(X) div X in order to consider Y as starting point\n");
@@ -388,40 +331,7 @@ static struct e_coeff * bw_init(void)
 	mnpoly_alloc(a_poly,total_work);
 	mnpoly_zero(a_poly,total_work);
 	
-	reached_degree=total_work;
-
-	mpz_init(blah);
-
-	for(i=0;i<m_param;i++) for(j=0;j<n_param;j++) {
-		printf("Reading file <%02d,%02d>\n",i,j);
-		for(k=high_rev;k>=0;k--) {
-			sprintf(filename,a_meta_filename,i,j,k);
-			a_disk=fopen(filename,"r");
-			if (a_disk) break;
-			if (errno == ENOENT) continue;
-			die("fopen : %s",errno,strerror(errno));
-		}
-		if (k<0)
-			die("Unable to find data for (%d,%d)\n",1,i,j);
-#ifdef	CORRECT_STUPID_WOE
-		fseek(a_disk,bw_filesize*sizeof(mp_limb_t),SEEK_SET);
-#endif
-		for(k=0;k<=reached_degree && !feof(a_disk);k++) {
-			bw_scalar_read(mnmat_scal(mnpoly_coeff(a_poly,k),i,j),
-					a_disk);
-			MPZ_SET_MPN(blah,mnmat_scal(mnpoly_coeff(a_poly,k),i,j),
-					bw_allocsize);
-			mpz_fdiv_r(blah,blah,modulus);
-			MPN_SET_MPZ(mnmat_scal(mnpoly_coeff(a_poly,k),i,j),
-					bw_allocsize,blah);
-		}
-		if (k<=reached_degree) {
-			printf("Degree truncated from %d to %d\n",
-					reached_degree,k);
-			reached_degree=k-1;
-		}
-		fclose(a_disk);
-	}
+	reached_degree = read_data_for_series(a_poly);
 
 	t_counter = t0 = t_init = iceildiv(m_param,n_param);
 
@@ -456,17 +366,11 @@ static struct e_coeff * bw_init(void)
 	test=(f!=NULL);
 
 	if (test) {
-		int deg;
 		printf("Found data on disk. Restoring\n");
-		f_poly=nbpoly_read(&deg,f);
+		f_poly=nbpoly_read(f, t0);
 		fclose(f);
 		if (STRICTTYPE_VAL(f_poly)==NULL) {
 			perror(f_base_filename);
-			test=0;
-		}
-		if (deg!=t0) {
-			fprintf(stderr,"File on disk has bad degree\n");
-			nbpoly_free(f_poly);
 			test=0;
 		}
 	}
@@ -480,6 +384,7 @@ static struct e_coeff * bw_init(void)
 		*/
 		seed=0x3b7b99de;
 		gmp_randseed_ui(randstate,seed);
+		mpz_init(blah);
 		printf("Building f from random data (seed=0x%08lx)\n",seed);
 		for(k=0; k < t0  ;k++)
 		for(j=0; j < m_param;j++)
@@ -512,9 +417,9 @@ static struct e_coeff * bw_init(void)
 		}
 	}
 
-	clist		= my_malloc(bigdim * sizeof(unsigned int));
-	global_delta	= my_malloc(bigdim * sizeof(int));
-	chance_list	= my_malloc(bigdim * sizeof(unsigned int));
+	clist		= malloc(bigdim * sizeof(unsigned int));
+	global_delta	= malloc(bigdim * sizeof(int));
+	chance_list	= malloc(bigdim * sizeof(unsigned int));
 	for(j=0;j<bigdim;j++) {
 		clist[j]	= j;
 		global_delta[j]	= t_counter;
@@ -573,16 +478,14 @@ static struct e_coeff * bw_init(void)
  * The positional sort, however, *is* cosmetic (makes debugging easier).
  */
 
-typedef int (*sortfunc_t)(const void*, const void*);
-
-struct col_id {
+struct xcol_id {
 	unsigned int pos;
 	int deg;
 	int sdeg;
 };
 
 static int
-col_cmp(const struct col_id * x, const struct col_id * y)
+col_cmp(const struct xcol_id * x, const struct xcol_id * y)
 {
 	int diff;
 	int sdiff;
@@ -593,15 +496,15 @@ col_cmp(const struct col_id * x, const struct col_id * y)
 
 /* Sort the degree table delta, with local ordering obeying the columns
  * of pi. The permutation is applied to delta, but not to pi. It is
- * returned, as a my_malloc'ed int*
+ * returned, as a malloc'ed int*
  */
 static void
 column_order(unsigned int * perm, int * delta, struct t_poly * pi)
 {
-	struct col_id * tmp_delta;
+	struct xcol_id * tmp_delta;
 	int i;
 
-	tmp_delta   = my_malloc(bigdim  * sizeof(struct col_id));
+	tmp_delta   = malloc(bigdim  * sizeof(struct xcol_id));
 
 	for(i=0;i<bigdim;i++) {
 		tmp_delta[i].pos=i;
@@ -609,7 +512,7 @@ column_order(unsigned int * perm, int * delta, struct t_poly * pi)
 		tmp_delta[i].sdeg=pi->degnom[pi->clist[i]];
 	}
 
-	qsort(tmp_delta,bigdim,sizeof(struct col_id),(sortfunc_t)&col_cmp);
+	qsort(tmp_delta,bigdim,sizeof(struct xcol_id),(sortfunc_t)&col_cmp);
 
 	for(i=0;i<bigdim;i++) {
 		perm[i]=tmp_delta[i].pos;
@@ -673,10 +576,10 @@ bw_gauss_onestep(bw_mbmat e,
 	if (pivlist)
 		pivots_list = pivlist;
 	else
-		pivots_list = my_malloc(m_param * sizeof(int));
+		pivots_list = malloc(m_param * sizeof(int));
 	
-	inv	= my_malloc(k_size * sizeof(mp_limb_t));
-	lambda	= my_malloc(k_size * sizeof(mp_limb_t));
+	inv	= malloc(k_size * sizeof(mp_limb_t));
+	lambda	= malloc(k_size * sizeof(mp_limb_t));
 
 	/* Pay attention here, this is a gaussian elimination on
 	 * *columns* */
@@ -787,7 +690,7 @@ compute_ctaf(bw_mbmat e,
 
 	timer_r(&tv,TIMER_SET);
 
-	bounds=my_malloc(bigdim*sizeof(int));
+	bounds=malloc(bigdim*sizeof(int));
 	memset(bounds,0,bigdim*sizeof(int));
 	if (known_cols) for(j=0;j<m_param;j++) {
 		bounds[pi->clist[j]]=-1;
@@ -823,8 +726,8 @@ bw_traditional_algo_1(struct e_coeff * ec, int * delta,
 	double inner_1,inner_2,last;
 	int k;
 
-	perm=my_malloc(bigdim*sizeof(unsigned int));
-	pivlist=my_malloc(m_param*sizeof(unsigned int));
+	perm=malloc(bigdim*sizeof(unsigned int));
+	pivlist=malloc(m_param*sizeof(unsigned int));
 
 	mbmat_alloc(e);
 	mbmat_zero(e);
@@ -861,7 +764,7 @@ bw_traditional_algo_2(struct e_coeff * ec, int * delta,
 	int deg;
 	double inner,last;
 
-	perm=my_malloc(bigdim*sizeof(unsigned int));
+	perm=malloc(bigdim*sizeof(unsigned int));
 
 	assert(!ec_is_twisted(ec));
 
@@ -1325,57 +1228,111 @@ block_wiedemann(void)
 
 	compute_f_final(pi_prod);
 
-	bw_commit_f(global_delta);
+	bw_commit_f(f_poly, global_delta);
+
+	print_chance_list(total_work, chance_list);
 
 	/* Now I can clean up everything if I want... if I want... */
 }
 
-const struct textflag_desc quad_algo[]={
-		{"coppersmith old uneven",0},
-		{"new even",1},
-		{NULL,0}
-};
+void usage()
+{
+	die("Usage: ./master2 -t <n> [options]\n",1);
+}
 
 int
 main(int argc, char *argv[])
 {
-	struct opt_desc * opts = NULL;
-	int n_opts=0;
-	
 	setvbuf(stdout,NULL,_IONBF,0);
 	setvbuf(stderr,NULL,_IONBF,0);
 
-	/* puts(version_string); */
-	check_endianness(stdout);
+	argv++, argc--;
 
-	new_option(&opts,&n_opts,
-			OPT_INTPRM(NULL,&bank_num,OPT_INDEP|OPT_REQUIRED));
-	new_option(&opts,&n_opts,
-			OPT_INTPRM("-t",&rec_threshold,OPT_INDEP|OPT_REQUIRED));
-	new_option(&opts,&n_opts,
-			OPT_FLAG("--enable-complex-field",&enable_cplx));
-	new_option(&opts,&n_opts,
-			OPT_FLAG("--fermat-prime",&fermat_prime));
-	new_option(&opts,&n_opts,
-			OPT_FLAG("--no-check-input",&no_check_input));
-	new_option(&opts,&n_opts,
-			OPT_INTPRM("--graph -g",&graph,OPT_INDEP));
-	new_option(&opts,&n_opts,
-			OPT_INTPRM("-p",&print_min,OPT_INDEP));
-	new_option(&opts,&n_opts,"--quad-algo -q",
-			1,PARAM_TEXTFLAG("old",quad_algo),
-			builtin_process_textflag,
-			&preferred_quadratic_algorithm,
-			OPT_ONCE,
-			"changes the quadratic algorithm employed");
+	int pop = 0;
 
-	process_options(argc,argv,n_opts,opts);
+	for( ; argc ; ) {
+		if (strcmp(argv[0], "-t") == 0) {
+			if (argc <= 1) usage();
+			argv++, argc--;
+			rec_threshold = atoi(argv[0]);
+			argv++, argc--;
+			continue;
+		}
+		if (strcmp(argv[0], "-p") == 0) {
+			if (argc <= 1) usage();
+			argv++, argc--;
+			print_min = atoi(argv[0]);
+			argv++, argc--;
+			continue;
+		}
+		if (strcmp(argv[0], "--subdir") == 0) {
+			if (argc <= 1) usage();
+			int rc = chdir(argv[1]);
+			if (rc < 0) {
+				perror(argv[1]);
+				exit(errno);
+			}
+			argv+=2;
+			argc-=2;
+			continue;
+		}
+		if (strcmp(argv[0], "--enable-complex-field") == 0) {
+			enable_cplx = 1;
+			argv++, argc--;
+			continue;
+		}
+		if (strcmp(argv[0], "--fermat-prime") == 0) {
+			fermat_prime = 1;
+			argv++, argc--;
+			continue;
+		}
+		if (strcmp(argv[0], "--no-check-input") == 0) {
+			no_check_input = 1;
+			argv++, argc--;
+			continue;
+		}
+		if (strcmp(argv[0], "-q") == 0) {
+			if (argc <= 1) usage();
+			argv++, argc--;
+			preferred_quadratic_algorithm = atoi(argv[0]);
+			argv++, argc--;
+			continue;
+			/* changes the quadratic algorithm employed
+		{"coppersmith old uneven",0},
+		{"new even",1},
+			 */
+		}
+
+		if (pop == 0) {
+			read_mat_file_header(argv[0]);
+			pop++;
+			argv++, argc--;
+			continue;
+		} else if (pop == 1) {
+			m_param = atoi(argv[0]);
+			pop++;
+			argv++, argc--;
+			continue;
+		} else if (pop == 2) {
+			n_param = atoi(argv[0]);
+			pop++;
+			argv++, argc--;
+			continue;
+		}
+
+		usage();
+	}
+
+	if (m_param == 0 || n_param == 0) {
+		usage();
+	}
+
+	total_work = Lmacro(nrows, m_param, n_param);
+
+	if (rec_threshold == 1)
+		usage();
 
 	coredump_limit(1);
-
-	set_all_filenames(bank_num);
-
-	read_tag_file();
 
 #ifdef HARDCODE_PARAMS
 	consistency_check("m_param",computed_m_param,m_param);

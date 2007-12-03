@@ -3,6 +3,9 @@
 
 #include <gmp.h>
 
+#include "types.h"
+#include <stdio.h>
+
 /* This files contains the mandatory definitions for handling basic
  * scalar types (elements of Z/NZ).
  *
@@ -34,8 +37,6 @@ extern mp_size_t _bw_scalar_alloc(bw_scalar *, int);
 #define bw_long_scalar_set_zero(x) memset(x,0,bw_longsize*sizeof(mp_limb_t));
 #define bw_scalar_is_zero(x) (mpn_cmp(x,zero,bw_allocsize)==0)
 extern int bw_scalar_fits_word(bw_scalar, type32 *, int *);
-extern int bw_scalar_read(bw_scalar, FILE *);
-extern int bw_scalar_write(FILE *, bw_scalar);
 extern void bw_scalar_set_random(bw_scalar);
 extern void bw_scalar_set_one(bw_scalar);
 
@@ -46,10 +47,6 @@ extern mp_size_t _bw_vector_alloc(bw_vector *, coord_t, int);
 #define bw_vector_free(x,n) free(x)
 #define bw_vector_set_zero(x,n) memset(x,0,bw_allocsize*n*sizeof(mp_limb_t));
 #define bw_long_vector_set_zero(x,n) memset(x,0,bw_longsize*n*sizeof(mp_limb_t));
-extern int bw_vector_read(bw_vector, int, FILE *);
-extern int bw_vector_write(FILE *, bw_vector, int);
-/*int bw_long_vector_read(bw_vector, int, FILE *);*/
-/*int bw_long_vector_write(FILE *, bw_vector, int);*/
 extern void bw_vector_set_random(bw_vector, int);
 
 /* lemmings (tiny animals who step through vectors!) */

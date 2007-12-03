@@ -199,8 +199,8 @@ int main(int argc, char *argv[])
 	 * \pm 1's could be a good idea.
 	 */
 	printf("Building a random vector with %d coefficients\n", nrows);
-	eigenvec = my_malloc(nrows*sizeof(stype32));
-	mvec	 = my_malloc(nrows*sizeof(stype32));
+	eigenvec = malloc(nrows*sizeof(stype32));
+	mvec	 = malloc(nrows*sizeof(stype32));
 	for(i=0;i<nrows;i++)
 		eigenvec[i]=1;
 	memset(mvec,0,nrows*sizeof(stype32));
