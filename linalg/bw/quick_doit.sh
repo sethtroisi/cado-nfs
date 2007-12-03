@@ -34,6 +34,13 @@ fi
 rm -rf $D
 mkdir $D
 
+if [ "$1" = tiny ] ; then
+	MSIZE=10
+	DENS=0.6
+	M=1
+	N=1
+fi
+
 if [ -f "$1" ] ; then
 	M=2
 	N=2
@@ -43,13 +50,6 @@ if [ -f "$1" ] ; then
 	unset FFT_THRESHOLD
 else
 	${B}bw-random $MSIZE $MODULUS $DENS > $D/matrix.txt
-fi
-
-if [ "$1" = tiny ] ; then
-	MSIZE=10
-	DENS=0.6
-	M=1
-	N=1
 fi
 
 M1=`expr $M - 1`
@@ -65,7 +65,11 @@ fi
 
 
 for i in {0..$N1} ; do
-	action ${B}bw-slave-mt --nthreads 2 --task slave --subdir $D $i
+	if [ ! -f "$D/A-00-$(printf '%02d' $i)" ] ; then
+		action ${B}bw-slave-mt --nthreads 2 --task slave --subdir $D $i
+	else
+		echo "Column $i already done"
+	fi
 done
 
 if [ "$FFT_THRESHOLD" != "" ] ; then
@@ -88,5 +92,8 @@ ${B}bw-gather --subdir $D $X
 
 if [ "$REMOVE_D" = yes ] ; then
 	F=`echo $FILE | sed -e s/matrix/solution/g`
+	if [ "$F" = "$FILE" ] ; then
+		F="${FILE}.solution"
+	fi
 	cp "$D/W0$X" $F && rm -rf "$D"
 fi
