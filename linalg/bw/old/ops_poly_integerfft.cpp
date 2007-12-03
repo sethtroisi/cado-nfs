@@ -18,11 +18,11 @@ using namespace std;
 /* This file requires a patched version of GMP, using the patch at the
  * following URL:
  *
- * http://www.loria.fr/~zimmerma/bignum/fft_patch.gmp-4.2
+ * http://www.loria.fr/~zimmerma/bignum/fft_patch.gmp-4.2.1
  *
  */
 extern "C" {
-extern mp_size_t mpn_fft_init (mp_fft_t, mp_size_t);
+extern mp_size_t mpn_fft_init (mp_fft_t, mp_size_t, unsigned long);
 extern void mpn_fft_transform (mp_fft_t, mp_ptr, mp_size_t);
 extern void mpn_fft_mul (mp_fft_t, mp_fft_t);
 extern void mpn_fft_add (mp_fft_t, mp_fft_t);
@@ -35,7 +35,21 @@ void mpn_fft_copy (mp_fft_t r, mp_fft_t s)
 {
    MPN_COPY (r->d[0], s->d[0], (s->nprime + 1) << s->k);
 }
+void mpn_fft_zero (mp_fft_t s)
+{
+   MPN_ZERO (s->d[0], (s->nprime + 1) << s->k);
 }
+void mpn_fft_one (mp_fft_t s)
+{
+	mpn_fft_zero(s);
+	for(int i = 0 ; i < (1 << s->k) ; i++) {
+		s->d[i][0] = 1UL;
+	}
+}
+}
+
+// XXX debug.
+mpz_t bound;
 
 mp_size_t ops_poly_ifft::limbs_per_coeff;
 
@@ -44,6 +58,10 @@ void ops_poly_ifft::set(int nc)
     // unsigned long k, K, M, Nprime, nprime, maxLK;
     // int n;
     ncoeffs = limbs_per_coeff * nc;
+    /* These are used only for comparison between fft blocks. They have
+     * to match the parameters chosen by fft_init, but fortunately it is
+     * not too messy.
+     */
     k = __gmpn_fft_best_k (ncoeffs, 0);
     n = __gmpn_fft_next_size (ncoeffs, k);
     // K = 1 << k;
@@ -55,12 +73,14 @@ void ops_poly_ifft::set(int nc)
 
 static void _ft_mat_alloc_init_many(ops_poly_ifft::transform_t & x, int nb, int ncoeffs)
 {
+	unsigned long l;
 	x = (mp_fft_t *) malloc(nb * sizeof(mp_fft_t));
 	if (x == NULL) {
 		return;
 	}
+	for(l = 1 ; bigdim > (1 << l) ; l++);
 	for(int i = 0 ; i < nb ; i++) {
-		mpn_fft_init(x[i], ncoeffs);
+		mpn_fft_init(x[i], ncoeffs, l);
 	}
 }
 
@@ -73,30 +93,18 @@ static void _ft_mat_clear_free_many(ops_poly_ifft::transform_t p, int nb)
 }
 
 
-void ops_poly_ifft::zero(transform_t p) const
-{
-	for(int i = 0 ; i < (1 << p[0]->k) ; i++) {
-		memset(p[0]->d[i], 0, (p[0]->nprime+1) * sizeof(mp_limb_t));
-	}
-}
+void ops_poly_ifft::zero(transform_t p) const { mpn_fft_zero(p[0]); }
 
-void ops_poly_ifft::one(transform_t p) const
-{
-	/* I'm not too sure yet, but it's most likely that the transform
-	 * of 1 will adequately have mostly ones.
-	 */
-	for(int i = 0 ; i < (1 << p[0]->k) ; i++) {
-		memset(p[0]->d[i], 0, (p[0]->nprime+1) * sizeof(mp_limb_t));
-		p[0]->d[i][0] = 1UL;
-	}
-}
+void ops_poly_ifft::one(transform_t p) const { mpn_fft_one(p[0]); }
 
 void ops_poly_ifft::convolution(transform_t r, transform_t p, transform_t q) const
 {
 	/* ugly ; find another way, perhaps directly in the order field
 	 */
 	mp_fft_t tmp;
-	mpn_fft_init(tmp, ncoeffs);
+	unsigned long l;
+	for(l = 1 ; bigdim > (1 << l) ; l++);
+	mpn_fft_init(tmp, ncoeffs, bigdim);
 	mpn_fft_copy(tmp, p[0]);
 	mpn_fft_mul(tmp, q[0]);
 	mpn_fft_add(r[0], tmp);
@@ -125,6 +133,10 @@ void ops_poly_ifft::itransform(
 	memset(tmp, 0, (p[0]->n+1) * sizeof(mp_limb_t));
 	mpn_fft_itransform(tmp, p[0]);
 	for(i = 0 ; i <= deg ; i++) {
+		if (mpn_cmp(tmp + i * limbs_per_coeff, PTR(bound), limbs_per_coeff) >= 0) {
+			fprintf(stderr, "Argh, ifft bound failed\n");
+			abort();
+		}
 		k_set_mpn(dst + i * stride, 
 				tmp + i * limbs_per_coeff,
 				limbs_per_coeff);
@@ -167,16 +179,17 @@ void ops_poly_ifft::init(unsigned int nmax, std::list<char *> const& args)
 	nbits = mpz_sizeinbase(z, 2);
 	nlimbs = SIZ(z);
 
+	mpz_init_set(bound, z);
+
 	limbs_per_coeff = nlimbs;
 
 	mpz_clear(z);
-
-	/* limbs_per_coeff+=8; */
 
 	printf("// Using %ld limbs per coefficient\n", limbs_per_coeff);
 }
 void ops_poly_ifft::cleanup()
 {
+	mpz_clear(bound);
 }
 
 bool ops_poly_ifft::operator==(ops_poly_ifft const& b) const {
