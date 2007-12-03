@@ -661,6 +661,10 @@ bw_check_chance(bw_mbmat e, unsigned int * clist)
                 maxchance=chance_list[j];
             printf("Column %d happens to be zero ! (%d)\n",
                     j,chance_list[j]);
+            if (t_counter < 30) {
+                fprintf(stderr, "surely a degenerate case :-(\n");
+                BUG();
+            }
         } else
             chance_list[j]=0;
     }

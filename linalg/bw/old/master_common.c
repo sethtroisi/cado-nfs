@@ -261,16 +261,17 @@ int read_data_for_series(bw_mnpoly a)
 void give_mnpoly_rank_info(bw_mnpoly a, int deg)
 {
 	int k;
-	int minrank=m_param;
+	int grank=m_param;
 	printf("Rank of first A matrices:"); fflush(stdout);
-	for(k = 0 ; k <= deg && k < 20 ; k++) {
+	for(k = 0 ; k <= deg && k < 200 ; k++) {
 		int r = compute_rank(mnpoly_coeff(a, k));
 		printf(" %d", r);
-		minrank = r;
+		if (k < 100 || r >= grank)
+			grank = r;
 		fflush(stdout);
 	}
 	printf("\n"); fflush(stdout);
-	if (minrank != m_param) {
+	if (grank != m_param) {
 		printf("The program will almost surely fail"
 				" because the choice of X-vectors was bad\n");
 		sleep(3);
