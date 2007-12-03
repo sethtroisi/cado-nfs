@@ -1,0 +1,51 @@
+Block Wiedemann.
+
+For the impatient, there's a ./doit.pl script which illustrates how the
+solver works. It works as follows:
+
+./doit.pl msize=10000 dens=100 modulus=31 mn=8 vectoring=2
+
+or
+
+./doit.pl matrix=/tmp/my_matrix.txt
+
+
+The latter forms allows solving of an arbitrary matrix.
+
+
+The solver looks for a ***COLUMN*** dependency.
+There is (for now) some idiosyncrasy on the matrix format. It has to
+start with a magic comment like:
+// 12345 ROWS 12345 COLUMNS MODULUS 41
+Then rows indicate the number of non-zero coeffs, plus the indices of the
+zero coeffs (append :42 if the coeff equals 42 and not 1).
+
+
+Some data on the options:
+
+
+msize=, dens=	set the characteristics for an example matrix
+modulus=	guess...
+mn=, m=, n=	set the m and n parameters for block wiedemann (mn sets both)
+vectoring=k	process k vectors y at a time. There must be code capable
+		of handling this, cf for instance sse2_2words_traits.hpp
+method=		selection of the FFT method for the fast linear generator
+		computation
+dump=1		(only relevant for small tests -- dump magma code for debugging)
+dumpcfg=1	prints what should go in a test file. Useful for
+		producing regression tests in tests/
+multisols=1	produces all solutions instead of only one.
+threshold=xxx	threshold for the fast lingen algorithm (mandatory when
+		relevant). 128 is a good hint.
+resume=1	try to resume from an interrupted computation
+wdir=		working directory ($ENV{HOME}/Local/testmat by default)
+seed=xxx	select random seed
+precond=	input preconditioner (look forward to rhs= option, someday)
+mt=1		select multithreaded code
+machines=	set of slave machines
+rsync=1		push working dir to machines with rsync (alternatively,
+		one can use an NFS shared dir)
+
+
+
+

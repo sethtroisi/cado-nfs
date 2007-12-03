@@ -180,7 +180,10 @@ sub magmadump {
 
 # Prepare the directory.
 system "rm -rf $wdir" unless $resume;
-mkdir $wdir unless -d $wdir;
+if (!-d $wdir) {
+	mkdir $wdir or die
+		"Cannot create $wdir: $! -- select something non-default with wdir=";
+}
 
 # In case of multiple machines, make sure that all machines see the
 # directory.
