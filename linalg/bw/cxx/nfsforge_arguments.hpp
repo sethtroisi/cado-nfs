@@ -7,14 +7,15 @@
 #include <gmpxx.h>
 
 struct nfsforge_arguments {
-	long p;
+	mpz_class p;
+	std::string pstring;
 	std::string in;
 	std::string out;
 	std::string clink;
 	int nchar;
-	nfsforge_arguments() : p(0), nchar(0) {}
+	nfsforge_arguments() : nchar(0) {}
 	bool parse(argparser::situation& s) {
-		if (s("--modulus", p)) return true;
+		if (s("--modulus", pstring)) return true;
 		if (s("--in", in)) return true;
 		if (s("--out", out)) return true;
 		if (s("--clink", clink)) return true;
@@ -34,13 +35,15 @@ struct nfsforge_arguments {
 			o << "--in, --out, --clink are mandatory\n";
 			ok = false;
 		}
-		if (!p) {
+		if (pstring.empty()) {
 			o << "--modulus is mandatory\n";
 			ok = false;
 		}
 		return ok;
 	}
-	void trigger() { }
+	void trigger() {
+		p = mpz_class(pstring);
+	}
 };
 
 #endif	/* NFSFORGE_ARGUMENTS_HPP_ */

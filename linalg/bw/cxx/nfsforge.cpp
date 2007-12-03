@@ -46,6 +46,8 @@ nfsforge_arguments mine;
 
 using namespace std;
 
+const int extra = 64;
+
 void reduce_mline(matrix_line& v, boost::int32_t p)
 {
 	matrix_line::iterator dst;
@@ -53,7 +55,7 @@ void reduce_mline(matrix_line& v, boost::int32_t p)
 	dst = v.begin();
 	for(src = v.begin() ; src != v.end() ; src++) {
 		boost::int32_t pm;
-		pm = src->second % mine.p;
+		pm = src->second % p;
 		if (pm < -(p/2)) {
 			pm+=p;
 		} else if (pm > p/2) {
@@ -64,6 +66,36 @@ void reduce_mline(matrix_line& v, boost::int32_t p)
 		}
 	}
 	v.erase(dst, v.end());
+}
+
+void clamp(vector<matrix_line>& columns)
+{
+	vector<matrix_line>::iterator dst = columns.begin();
+	for(dst = columns.begin() ; dst != columns.end() ; dst++) {
+		/* We should really do it more carefully */
+		vector<matrix_line::value_type>::iterator q = dst->begin();
+		vector<matrix_line::value_type>::const_iterator p = dst->begin();
+		for( ; p != dst->end() ; p++) {
+			if (p->first < columns.size())
+				*q++ = *p;
+		}
+		dst->erase(q, dst->end());
+	}
+}
+
+int prune_empty_rows(vector<matrix_line>& columns)
+{
+	vector<matrix_line>::iterator dst = columns.begin();
+	vector<matrix_line>::const_iterator src = columns.begin();
+	for( ; src != columns.end() ; src++) {
+		if (!src->empty())
+			*dst++=*src;
+	}
+	int r = (columns.end()-dst);
+	cout << "Erasing " << r << " zero rows\n";
+	columns.erase(dst, columns.end());
+	columns.insert(columns.end(),extra,matrix_line());
+	return r;
 }
 
 int main(int argc, char * argv[])
@@ -121,50 +153,56 @@ int main(int argc, char * argv[])
 	cout << "seen " << nindexes << " columns\n";
 
 	/* We have nindexes columns. A dependency can be obtained as soon
-	 * as nindexes < the number of rows selected
-	 */
+	 * as nindexes < the number of rows selected. */
 
-	if (rows.size() <= nindexes) {
+	if (rows.size() < nindexes + extra) {
 		cerr << "Cannot ensure a dependency\n";
 		exit(0);
 	}
 
 	std::sort(sizes.begin(), sizes.end());
 
-	ofstream clink;
-	must_open(clink, mine.clink);
-	unsigned int discard_weight = sizes[nindexes + 1] + 1;
+	/* We need to have as many as nindexes + extra ideal relations,
+	 * so that it exceeds the # of FB ideals (nindexes) by at least
+	 * extra
+	 */
+	unsigned int discard_weight = sizes[nindexes + extra] + 1;
 	{
 		vector<matrix_line>::iterator dst;
 		vector<matrix_line>::const_iterator src;
-		vector<string>::const_iterator c_iter;
-		c_iter = clink_data.begin();
+		vector<string>::iterator c_dst;
+		vector<string>::const_iterator c_src;
+		c_src = clink_data.begin();
+		c_dst = clink_data.begin();
 		dst = rows.begin();
 		unsigned int nselected = 0;
 		for(src = rows.begin() ; src != rows.end() ; src++) {
 			if (src->size() < discard_weight) {
 				*dst++ = *src;
-				clink << *c_iter << "\n";
-				if (++nselected >= nindexes + 1)
+				*c_dst++ = *c_src;
+				// clink << *c_iter << "\n";
+				if (++nselected >= nindexes + extra)
 					break;
 			}
-			c_iter++;
+			c_src++;
 		}
 		cout << (dst - rows.begin()) << " rows selected\n";
 		rows.erase(dst, rows.end());
+		clink_data.erase(c_dst, clink_data.end());
 	}
-	clink.close();
 
 	vector<matrix_line> columns;
 	columns.assign(rows.size(), matrix_line());
-	vector<matrix_line>::const_iterator src;
 	unsigned int total_coeffs = 0;
-	for(src = rows.begin() ; src != rows.end() ; src++) {
-		for(unsigned int j = 0 ; j < src->size() ; j++) {
-			unsigned int jj = (*src)[j].first;
-			columns[jj].push_back(make_pair(src - rows.begin(), (*src)[j].second));
+	{
+		vector<matrix_line>::const_iterator src;
+		for(src = rows.begin() ; src != rows.end() ; src++) {
+			for(unsigned int j = 0 ; j < src->size() ; j++) {
+				unsigned int jj = (*src)[j].first;
+				columns[jj].push_back(make_pair(src - rows.begin(), (*src)[j].second));
+			}
+			total_coeffs += src->size();
 		}
-		total_coeffs += src->size();
 	}
 
 	cout << "total: "  << total_coeffs << " coefficients\n";
@@ -203,20 +241,47 @@ int main(int argc, char * argv[])
 	mstr << mine.p;
 
 	ofstream cfile;
-
-	/* First write the unreduced version of the matrix */
+	/* First write the unreduced version of the matrix. We do so
+	 * BEFORE pruning part of the matrix, because otherwise the magma
+	 * code will get nuts.
+	 */ 
 	must_open(cfile, mine.out + ".ur");
-	put_matrix_header(cfile, rows.size(), mstr.str());
+	put_matrix_header(cfile, columns.size(), mstr.str());
 	for(unsigned int j = 0 ; j < columns.size() ; j++) {
 		cfile << columns[j] << "\n";
+
 	}
 	cfile.close();
 
+#if 1
+	for(;;) {
+		int r=prune_empty_rows(columns);
+		if (r == extra)
+			break;
+		clamp(columns);
+	}
+#endif
+
+	ofstream clink;
+	must_open(clink, mine.clink);
+	for(unsigned int i = 0 ; i < columns.size() ; i++) {
+		clink << clink_data[i] << "\n";
+	}
+	clink.close();
+
+
 	must_open(cfile, mine.out);
-	put_matrix_header(cfile, rows.size(), mstr.str());
-	for(unsigned int j = 0 ; j < columns.size() ; j++) {
-		reduce_mline(columns[j], mine.p);
-		cfile << columns[j] << "\n";
+	put_matrix_header(cfile, columns.size(), mstr.str());
+
+	if (mine.p < 1000000) {
+		for(unsigned int j = 0 ; j < columns.size() ; j++) {
+			reduce_mline(columns[j], mine.p.get_si());
+			cfile << columns[j] << "\n";
+		}
+	} else {
+		for(unsigned int j = 0 ; j < columns.size() ; j++) {
+			cfile << columns[j] << "\n";
+		}
 	}
 	cfile.close();
 
