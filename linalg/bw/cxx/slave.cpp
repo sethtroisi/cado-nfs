@@ -431,6 +431,11 @@ struct slave_thread : public thread<traits, slave_thread<traits> > {
 			 * check early that the system is doable */
 			flush();
 		}
+#ifndef	NDEBUG
+		if (super::done < 20) {
+			flush();
+		}
+#endif
 
 		if (super::done % cp_lag != 0) return;
 
@@ -809,6 +814,9 @@ int main(int argc, char *argv[])
 	if (modbits < 8 && nbys == 8) {
 		cout << "// Using SSE-2 code\n";
 		return program<sse2_8words_traits >();
+	} else if (modbits < 20 && nbys == 2) {
+		cout << "// Using SSE-2 code [ 2 words ]\n";
+		return program<sse2_2words_traits >();
 	} else if (nbys == 1 && modbits <= (sizeof(unsigned long) * 8 / 2 - 4)) {
 		cout << "// Using half-ulong code\n";
 		return program<ulong_traits>();
