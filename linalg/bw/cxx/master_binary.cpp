@@ -24,6 +24,11 @@
 #include <fstream>
 #include <functional>
 
+#include "cado.h"
+#undef  ASSERT
+#undef  ASSERT_ALWAYS
+#include "utils.h"
+
 #define Lmacro(N, m, n) (iceildiv((N)+2*(n),(m))+iceildiv((N)+2*(n),(n))+10)
 
 /* avoid this one ! */
@@ -607,6 +612,7 @@ namespace globals {
     // vectors. Here we store the cnum,exponent pairs.
     std::vector<std::pair<uint, uint> > f0_data;
 
+    double start_time;
 }
 
 // To multiply on the right an m x n matrix A by F0, we start by copying
@@ -832,7 +838,7 @@ bool recover_f0_data(const char * fn)
             return false;
         f0_data.push_back(std::make_pair(cnum,exponent));
     }
-    std::cout << fmt("recovered init data % on disk with t0=%\n") % fn % t0;
+    std::cout << fmt("recovered init data % on disk\n") % fn;
     return true;
 }
 
@@ -973,14 +979,16 @@ void compute_f_init(polmat& A)/*{{{*/
             pcols[r] = acol;
             r++;
 
-            printf("[X^%d] A, col %d increases rank to %d (head row %d)\n",
-                    k,j,r,u);
+            if (r == m)
+                printf("[X^%d] A, col %d increases rank to %d (head row %d)\n",
+                        k,j,r,u);
         }
     }
 
     t0 = exponent[r-1] + 1;
     printf("Found satisfying init data for t0=%d\n", t0);
                     
+    /*
     printf("Init e0 matrix\n");
     for(uint i = 0 ; i < m ; i++) {
         for(uint j = 0 ; j < n ; j++) {
@@ -991,6 +999,7 @@ void compute_f_init(polmat& A)/*{{{*/
         }
         std::cout << "\n";
     }
+    */
 
 
     if (r!=m) {
@@ -1005,9 +1014,27 @@ void print_deltas()
 {
     using namespace globals;
     std::cout << fmt("[t=%[w4]] delta =") % t;
+    uint last = UINT_MAX;
+    uint nrep = 0;
     for(uint i = 0 ; i < m + n ; i++) {
-        std::cout << " " << delta[i];
+        uint d = delta[i];
+        if (d == last) {
+            nrep++;
+            continue;
+        }
+        // Flush the pending repeats
+        if (last != UINT_MAX) {
+            std::cout << " " << last;
+            if (nrep > 1)
+                std::cout << "[" << nrep << "]";
+        }
+        last = d;
+        nrep = 1;
     }
+    BUG_ON(last == UINT_MAX);
+    std::cout << " " << last;
+    if (nrep > 1)
+        std::cout << "[" << nrep << "]";
     std::cout << "\n";
 }
 
@@ -1611,7 +1638,21 @@ static void go_quadratic(polmat & PI)
 
     rearrange_ordering(PI, NULL);
 
+
     for (uint dt = 0; dt <= deg ; dt++) {
+        double delta;
+        delta = seconds() - start_time;
+
+        double percent = (double) dt / (deg + 1);
+        percent = percent * percent;
+
+        double estim_final = delta / percent;
+
+        percent *= 100.0;
+            
+        printf("%5.0f / est %-7.0f (%2.0f%%) ",
+                delta, estim_final, percent);
+
         print_deltas();
 	extract_coeff_degree_t(t, dt ? piv : NULL, PI);
         gauss(piv, PI);
@@ -2000,6 +2041,8 @@ void block_wiedemann(void)
     for(uint i = 0 ; i < m + n ; i++) {
         E.deg(i) = E.ncoef - 1;
     }
+
+    start_time = seconds();
 
     // E.resize(deg + 1);
     go_quadratic(pi_left);

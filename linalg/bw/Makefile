@@ -13,8 +13,8 @@ CXX:=g++
 ARQCV:=ar qcv
 OFLAGS:=
 PFLAGS:=
-IFLAGS:=-iquote $(TOPPATH)/include -iquote . -iquote old
-LFLAGS:=
+IFLAGS:=-iquote ../.. -iquote ../../utils -iquote $(TOPPATH)/include -iquote . -iquote old
+LFLAGS:=-L ../../utils
 
 # No more variable changes after this include.
 include $(TOPPATH)/util/main.mki
@@ -127,7 +127,7 @@ BW_MASTER_BINARY_SOURCES:=					\
 		old/e_polynomial.c old/structure.c		\
 		old/structure_debug.c cxx/master_binary.cpp	\
 		old/twisting_polynomials.c
-BW_MASTER_BINARY_LIBS:=-lgmp
+BW_MASTER_BINARY_LIBS:=-lgmp -lutils
 -include .bw-master-binary.mkf
 
 BW_MASTER_OLD_SOURCES:=						\
