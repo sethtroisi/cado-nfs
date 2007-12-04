@@ -94,8 +94,8 @@ void
 update_tables (tab_relation_t *rel_table, tab_rootprime_t *alg_table,
                tab_prime_t *rat_table, tab_prime_t *bad_primes)
 {
-  long a;
-  unsigned long b;
+  // long a;
+  // unsigned long b;
   int i, j;
   relation_t *rel;
 
@@ -194,7 +194,7 @@ cmpabpairs(const void *p, const void *q) {
 static int
 getindex_rat (tab_prime_t rat_table, rat_prime_t pe) {
   int i, j;
-  int found = 0;
+  // int found = 0;
   unsigned long p = pe.p;
 
   i = 0; j = rat_table.length-1;
@@ -333,7 +333,7 @@ void onepass_singleton_removal(tab_relation_t *rel_table,
     }
     rat_table->length = j;
   }
-  fprintf(stderr, "%d rat primes remain\n", rat_table->length);
+  fprintf(stderr, "%lu rat primes remain\n", rat_table->length);
   // remove singleton algebraic primes
   {
     rootprime_t *ptab = alg_table->tab;
@@ -354,7 +354,7 @@ void onepass_singleton_removal(tab_relation_t *rel_table,
     }
     alg_table->length = j;
   }
-  fprintf(stderr, "%d alg primes remain\n", alg_table->length);
+  fprintf(stderr, "%lu alg primes remain\n", alg_table->length);
   // remove singleton relations (sort bad (a,b) pairs, and then browse
   // through all relations).
   qsort(ab_single.tab, l_alg+l_rat, sizeof(abpair_t), cmpabpairs);
@@ -369,7 +369,7 @@ void onepass_singleton_removal(tab_relation_t *rel_table,
     }
     rel_table->length = j;
   }
-  fprintf(stderr, "%d relations remain\n", rel_table->length);
+  fprintf(stderr, "%lu relations remain\n", rel_table->length);
   free(ab_single.tab);
 }
 
@@ -454,9 +454,9 @@ fprint_rel_row (FILE *file, relation_t rel, tab_prime_t rat_table,
   if (parity == 1)
     table_ind[nb_coeff++] = index + rat_table.length;
 
-  fprintf(file, "%lu ", nb_coeff);
+  fprintf(file, "%d ", nb_coeff);
   for (i = 0; i < nb_coeff; ++i) {
-    fprintf(file, "%lu ", table_ind[i]);
+    fprintf(file, "%d ", table_ind[i]);
   }
 
   fprintf(file, "\n");
@@ -537,10 +537,10 @@ fread_relations(FILE *file, tab_relation_t *rel_table) {
   } while (ret == 1);
 
   if (ret == 0) {
-    fprintf(stderr, "Warning: error when reading relation nb %d\n", rel_table->length);
+    fprintf(stderr, "Warning: error when reading relation nb %lu\n", rel_table->length);
   }
 
-  fprintf(stderr, "loaded %d relations\n", rel_table->length);
+  fprintf(stderr, "loaded %lu relations\n", rel_table->length);
 
   for (i = 0; i < rel_table->length; ++i)
     {
@@ -557,7 +557,7 @@ main (int argc, char **argv)
 {
   tab_rootprime_t alg_table;
   tab_prime_t rat_table, bad_primes;
-  tab_abpair_t ab_single;
+  // tab_abpair_t ab_single;
   FILE *file;
   tab_relation_t rel_table;
   int ret;
@@ -621,13 +621,13 @@ main (int argc, char **argv)
 
   purge_badprimes (&alg_table, bad_primes);
 
-  fprintf(stderr, "nb of rational primes = %d\n", rat_table.length);
-  fprintf(stderr, "nb of algebraic primes = %d\n", alg_table.length);
-  fprintf(stderr, "Total number of primes = %d (excess %d)\n",
+  fprintf(stderr, "nb of rational primes = %lu\n", rat_table.length);
+  fprintf(stderr, "nb of algebraic primes = %lu\n", alg_table.length);
+  fprintf(stderr, "Total number of primes = %lu (excess %lu)\n",
           rat_table.length + alg_table.length,
           rel_table.length - (rat_table.length + alg_table.length));
 
-  printf("%d %d\n", rel_table.length, rat_table.length + alg_table.length);
+  printf("%lu %lu\n", rel_table.length, rat_table.length + alg_table.length);
 
   for (i = 0; i < rel_table.length; ++i)
     fprint_rel_row (stdout, rel_table.tab[i], rat_table, alg_table, bad_primes);

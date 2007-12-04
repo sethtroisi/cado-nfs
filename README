@@ -27,11 +27,10 @@ EOF
 Compile:
 =======
 
-(cd utils; make)
-(cd polyselect; make)
-(cd sieve; make)
-(cd linalg; make)
-(cd sqrt/naive; make)
+make clean ; make
+
+(really do make clean if you happen to touch .h files, are there are no
+auto-dependencies)
 
 Run an example:
 ===============

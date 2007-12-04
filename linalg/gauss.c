@@ -41,7 +41,7 @@ If just the dimension of kernel is wanted, set ker=NULL.
 #include <stdlib.h>
 #include <assert.h>
 #include "gmp.h"   /* only used for setting a random matrix */
-#include "cado.h"  /* for cputime() */
+#include "utils.h"  /* for seconds() */
 
 #ifndef VERBOSE
 #define VERBOSE 0
@@ -103,8 +103,10 @@ INLINE static void add3Rows(int row, int row2, int row3, int pivot,
 			    mp_limb_t mask, int j_current,
 			    mp_limb_t **ptr_current);
 INLINE static int getPivot(mp_limb_t **ptr, mp_limb_t mask);
+#if VERBOSE
 static void printVector(mp_limb_t *V, int n);
 static void printMatrix(mp_limb_t *M, int nrows, int ncols, int limbs_per_row);
+#endif
 
 
 /*===========================================================================*/
@@ -230,7 +232,7 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
   int *set_used;
   int j_current, col_current;
   mp_limb_t mask1, mask2;
-  int st0 = cputime (), st;
+  double st0 = seconds(), st;
 
   /* store the data in the global variables */
   matrix = mat;
@@ -322,11 +324,12 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
 	  } /* end if */
 	  ++i;
 	} /* end while */
-	if (i1 >= 0) 
+	if (i1 >= 0)  {
 	  if (i2 >= 0)
 	    add2Rows(i1, i2, pivot, mask1, j_current, ptr_current);
 	  else
 	    addRows(i1, pivot, mask1, j_current, ptr_current);
+	}
       } /* end block */
 #else
 #error MULTI_ROW must be 1, 2, or 3.
@@ -352,9 +355,10 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
     /* some verbosity... */
     if ((col_current % 128) == 0)
       {
-        st = (cputime () - st0) / 1000; /* time in seconds */
-        fprintf (stderr, "done %d pivots in %ds (est. %1.0fs)\n", col_current,
-                 st, (double) NCOLS * (double) st / (double) col_current);
+        st = (seconds () - st0); /* time in seconds */
+        fprintf (stderr, "done %d pivots in %1.0fs (est. %1.0fs)\n",
+			col_current,
+                 st, (double) NCOLS * st / (double) col_current);
       }
 
   } /* end while */
@@ -442,8 +446,9 @@ INLINE static void addRows(int row, int pivot, mp_limb_t mask, int j_current,
  */
 
 INLINE static void add2Rows(int row, int row2, int pivot, mp_limb_t mask,
-			    int j_current, mp_limb_t **ptr_current) {
-  int i;
+			    int j_current, mp_limb_t **ptr_current)
+{
+  // int i;
   mp_limb_t *ptr1, *ptr2, *ptr3, *ptr_lim;
 
   ptr1 = ptr_rows[row];
@@ -463,7 +468,7 @@ INLINE static void add2Rows(int row, int row2, int pivot, mp_limb_t mask,
 INLINE static void add3Rows(int row, int row2, int row3, int pivot,
 			    mp_limb_t mask, int j_current,
 			    mp_limb_t **ptr_current) {
-  int i;
+  // int i;
   mp_limb_t *ptr1, *ptr2, *ptr3, *ptr_piv, *ptr_lim;
 
   ptr1 = ptr_rows[row];
@@ -492,7 +497,7 @@ INLINE static void add3Rows(int row, int row2, int row3, int pivot,
 
 static void addPartialRows(int row, int pivot, mp_limb_t mask, int j_current,
 			   mp_limb_t **ptr_current) {
-  int i;
+  // int i;
   mp_limb_t *ptr1, *ptr2, *ptrlim;
 
   *ptr_current[row] ^= (*ptr_current[pivot] & mask);
@@ -518,6 +523,7 @@ INLINE static int getPivot(mp_limb_t **ptr, mp_limb_t mask) {
 }
 
 
+#if	VERBOSE
 static void printVector(mp_limb_t *V, int n) {
   int i;
   printf("[");
@@ -543,3 +549,4 @@ static void printMatrix(mp_limb_t *M, int nrows, int ncols,
   }
   printf("\n]\n");
 }
+#endif

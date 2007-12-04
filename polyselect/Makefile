@@ -19,4 +19,4 @@ Makefile.local:
 	touch Makefile.local
 
 clean:
-	rm polyselect *~
+	-rm -f polyselect *~ *.o

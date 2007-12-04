@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <gmp.h>
+#include <string.h>
 
 typedef struct {
   long a;
@@ -51,10 +52,9 @@ void
 readmat (FILE *file, sparse_mat_t *mat)
 {
   int ret;
-  int used = 0;
   int i, j, l2;
   long a;
-  unsigned long b, *wt;
+  unsigned long b;
   int nc, x;
 
   ret = fscanf (file, "%d %d", &(mat->nrows), &(mat->ncols));
@@ -73,7 +73,7 @@ readmat (FILE *file, sparse_mat_t *mat)
 
   for (i = 0; i < mat->nrows; i++)
     {
-      ret = fscanf (file, "%d %d", &a, &b);
+      ret = fscanf (file, "%ld %lu", &a, &b);
       assert (ret == 2);
       mat->data[i].a = a;
       mat->data[i].b = b;
@@ -98,8 +98,8 @@ readmat (FILE *file, sparse_mat_t *mat)
       if (mat->wt[j] >= 2)
         l2 ++;
       else
-        fprintf (stderr, "Warning: prime %d appears only %d time(s)\n", j,
-                 wt[j]);
+        fprintf (stderr, "Warning: prime %d appears only %lu time(s)\n", j,
+                 mat->wt[j]);
     }
   fprintf (stderr, "Found %d primes appearing at least twice\n", l2);
   mat->rem_ncols = l2;
@@ -300,7 +300,7 @@ void
 renumber_cols (sparse_mat_t *mat)
 {
   unsigned long *perm; /* perm[j] = k if old column j coes to new column k */
-  int j, s, i;
+  int j, s;
 
   perm = mat->wt;
   for (j = s = 0; j < mat->ncols; j++)
@@ -321,9 +321,9 @@ print_matrix (sparse_mat_t *mat)
     if (mat->nodes[i] >= 0)
       {
         r = mat->data[i];
-        printf ("%d %d %d", r.a, r.b, r.len);
+        printf ("%ld %lu %d", r.a, r.b, r.len);
         for (j = 0; j < r.len; j++)
-          printf (" %d", perm[r.val[j]]);
+          printf (" %lu", perm[r.val[j]]);
         printf ("\n");
       }
 }

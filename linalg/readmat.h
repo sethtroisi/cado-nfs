@@ -1,5 +1,5 @@
-#ifndef READMAT_H_
-#define READMAT_H_
+#ifndef CADO_LINALG_READMAT_H_
+#define CADO_LINALG_READMAT_H_
 
 #include <gmp.h>
 #include <stdio.h>
@@ -22,6 +22,9 @@ typedef struct {
 /* Reads the whole matrix */
 extern void readmat(FILE *file, sparse_mat_t mat, int compact);
 
+static inline void readmat_with_ab(FILE *file, sparse_mat_t mat)
+{ readmat(file, mat, 0); }
+
 extern void read_matrix_header(FILE *file, sparse_mat_t mat);
 
 /* Reads only one row of the matrix. Reallocates the sparse_mat_t
@@ -36,4 +39,4 @@ extern void sparse_mat_clear(sparse_mat_t dst);
 }
 #endif
 
-#endif	/* READMAT_H_ */
+#endif	/* CADO_LINALG_READMAT_H_ */

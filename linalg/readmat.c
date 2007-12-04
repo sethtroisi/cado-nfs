@@ -1,12 +1,18 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+#include <limits.h>
+
 #include "readmat.h"
 #include "manu.h"
 
-unsigned int next_alloc_size(unsigned int orig)
+unsigned int next_alloc_size(unsigned int s, unsigned int needed)
 {
-    return MAX(orig + 1024, orig << 1);
+    /* most probably only one spin */
+    for( ; s < needed ; ) {
+        s = MAX(s + 1024, s + s / 4);
+    }
+    return s;
 }
 
 unsigned int *read_matrix_row(FILE * file, sparse_mat_t mat,
@@ -16,25 +22,44 @@ unsigned int *read_matrix_row(FILE * file, sparse_mat_t mat,
     unsigned int j;
     int ret;
 
+
+    long a;
+    unsigned long b;
+
     if (compact == 0) {
-	long a;
-	unsigned long b;
 	ret = fscanf(file, "%ld %lu", &a, &b);
 	BUG_ON_MSG(ret != 2, "Could not read a and b");
+
+        /* FIXME -- having a and b stored in the sparse mat struct simply
+         * won't scale ! */
+
+        BUG_ON_MSG(a > (long) INT_MAX, "Time to enlarge !");
+        BUG_ON_MSG(a < (long) INT_MIN, "Time to enlarge !");
+        BUG_ON_MSG(b > (unsigned long) INT_MAX, "Time to enlarge !");
     }
 
     ret = fscanf(file, "%d", &nc);
     BUG_ON_MSG(ret != 1, "Could not read ncoeffs");
 
     unsigned int offset = dst - mat->data;
+    unsigned int needed = offset + nc + 1;
 
-    if (offset + nc + 1 >= mat->alloc) {
-	unsigned int next = next_alloc_size(mat->alloc);
+    if (compact == 0)
+        needed += 2;
+
+    if (needed > mat->alloc) {
+	unsigned int next = next_alloc_size(mat->alloc, needed);
 	mat->data = (unsigned int *) realloc(mat->data,
 					     next * sizeof(unsigned int));
 	mat->alloc = next;
 	dst = mat->data + offset;
     }
+
+    if (compact == 0) {
+        *dst++ = (int) a;
+        *dst++ = (int) b;
+    }
+
     *dst++ = nc;
     for (j = 0; j < nc; ++j) {
 	unsigned int x;

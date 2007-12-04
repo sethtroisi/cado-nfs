@@ -1,6 +1,6 @@
 CFLAGS=-g -O2
 
-names:=polyfile relation cputime long_poly getprime mod_ul
+names:=polyfile relation timing long_poly getprime mod_ul
 src:=$(patsubst %,%.c,$(names))
 obj:=$(patsubst %,%.o,$(names))
 
@@ -13,5 +13,5 @@ libutils.a: $(obj)
 	ar r libutils.a $(obj)
 
 clean:
-	rm -f $(obj) libutils.a
+	-rm -f *~ *.bak $(obj) libutils.a
 

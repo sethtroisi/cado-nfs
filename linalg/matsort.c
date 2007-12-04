@@ -12,7 +12,9 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <gmp.h>
+#include "readmat.h"
 
+#if 0
 /* FIXME: should be shared with linalg.c.
    Data is stored in a huge table:
    [ a b nb_coeff c0 c1 ... ck a b nb_coeff c0 c1 ..... ] */
@@ -62,6 +64,7 @@ readmat (FILE *file, sparse_mat_t *mat)
       }
   }
 }
+#endif
 
 typedef struct
 {
@@ -76,7 +79,7 @@ cmpcol (const void *c1, const void *c2)
 }
 
 void
-sort_columns (sparse_mat_t *mat, column_t *C)
+sort_columns (sparse_mat_t mat, column_t *C)
 {
   int i, j, k, l, nc;
 
@@ -124,7 +127,7 @@ sort_columns (sparse_mat_t *mat, column_t *C)
 }
 
 void
-print_matrix (sparse_mat_t *mat, column_t *C)
+print_matrix (sparse_mat_t mat, column_t *C)
 {
   int i, j, k, nc;
 
@@ -163,17 +166,20 @@ main (int argc, char *argv[])
       exit (1);
   }
   
-  readmat (file, &mat);
+  sparse_mat_init(mat);
+
+  readmat_with_ab (file, mat);
   fprintf (stderr, "have read matrix: nrows = %d, ncols = %d\n",
-           mat.nrows, mat.ncols);
+           mat->nrows, mat->ncols);
 
-  C = (column_t*) malloc (mat.ncols * sizeof (column_t));
+  C = (column_t*) malloc (mat->ncols * sizeof (column_t));
 
-  sort_columns (&mat, C);
+  sort_columns (mat, C);
 
-  print_matrix (&mat, C);
+  print_matrix (mat, C);
 
-  free (mat.data);
+  sparse_mat_clear(mat);
+
   free (C);
   fclose (file);
 
