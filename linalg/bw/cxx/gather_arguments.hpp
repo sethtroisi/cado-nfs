@@ -13,7 +13,7 @@ struct gather_arguments {
 	std::vector<std::string> file_names;
 	gather_arguments() {
 		scol = (unsigned int) -1;
-		nbys = 1;
+		nbys = -1;
 	}
 
 	bool parse(argparser::situation& s) {
@@ -23,7 +23,8 @@ struct gather_arguments {
 		return true;
 	}
 	void doc(std::ostream& o) {
-		o << "--nbys <nbys>\t# of solutions to handle simultaneously\n";
+		o << "--nbys <nbys>\t# of vector iterates grouped together\n";
+		o << "\t\t(defaults to auto-detect)\n";
 		o << "<col>\tbase of solution\n";
 		o << "[<fname> ... ]\tfragment files\n";
 	}

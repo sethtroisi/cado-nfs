@@ -38,7 +38,7 @@ typedef unsigned int uint;
 typedef variable_scalar_traits traits;
 
 namespace globals {
-	uint nr;
+	uint nr, nc;
 	mpz_class modulus;
 
 	uint nb_coeffs;
@@ -55,10 +55,10 @@ wide_scalar_t *w;
 void init_data()
 {
 	using namespace globals;
-	v = new scalar_t[nr];
+	v = new scalar_t[nc];
 	w = new wide_scalar_t[nr];
 
-	traits::zero(v, nr);
+	traits::zero(v, nc);
 	traits::zero(w, nr);
 }
 
@@ -78,17 +78,17 @@ void read(const std::string& fn)
 
 	std::vector<mpz_class> foo(1);
 	unsigned int i;
-	for(i = 0 ; i < nr ; i++) {
+	for(i = 0 ; i < nc ; i++) {
 		if (!(f >> foo[0])) {
 			break;
 		}
 		traits::assign(v[i], foo, 0);
 	}
-	if (i < nr) {
+	if (i < nc) {
 		cerr << "Vector " << fn << " has only " << i << " coordinates\n";
 	}
 	foo[0]=0;
-	for( ; i < nr ; i++) {
+	for( ; i < nc ; i++) {
 		traits::assign(v[i], foo, 0);
 	}
 
@@ -96,6 +96,7 @@ void read(const std::string& fn)
 	BUG_ON(!f.eof());
 }
 
+/*
 bool is_zero(const scalar_t * vec) {
 	for(uint i = 0 ; i < globals::nr ; i++) {
 		if (!traits::is_zero(vec[i])) {
@@ -104,6 +105,7 @@ bool is_zero(const scalar_t * vec) {
 	}
 	return true;
 }
+*/
 
 void one(std::string const& s)
 {
@@ -113,7 +115,10 @@ void one(std::string const& s)
 	read(s);
 	mat.mul<traits>(w,v);
 	if (!mine.integer) {
-		traits::reduce(w, w, 0, globals::nr);
+		traits::reduce(w, w, 0, nr);
+		// we prefer to have something which does not care on the
+		// input matrix shape.
+		// traits::zero(w + nr, nc - nr);
 	}
 
 	outfile = s;
@@ -151,7 +156,7 @@ int main(int argc, char *argv[])
 	using namespace globals;
 
 	must_open(mtx, files::matrix);
-	get_matrix_header(mtx, nr, mstr);
+	get_matrix_header(mtx, nr, nc, mstr);
 
 	globals::modulus = mpz_class(mstr);
 

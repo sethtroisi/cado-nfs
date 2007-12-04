@@ -264,7 +264,7 @@ int main(int argc, char * argv[])
 	 * code will get nuts.
 	 */ 
 	must_open(cfile, mine.out + ".ur");
-	put_matrix_header(cfile, columns.size(), mstr.str());
+	put_matrix_header(cfile, columns.size(), columns.size(), mstr.str());
 	for(unsigned int j = 0 ; j < columns.size() ; j++) {
 		cfile << columns[j] << "\n";
 
@@ -298,7 +298,7 @@ int main(int argc, char * argv[])
 
 
 	must_open(cfile, mine.out);
-	put_matrix_header(cfile, columns.size(), mstr.str());
+	put_matrix_header(cfile, columns.size(), columns.size(), mstr.str());
 
 	if (mine.p < 1000000) {
 		for(unsigned int j = 0 ; j < columns.size() ; j++) {

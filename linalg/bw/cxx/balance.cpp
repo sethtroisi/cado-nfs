@@ -58,7 +58,7 @@ int main(int argc, char * argv[])
 
     no_arguments nothing;
     process_arguments(argc, argv, common, nothing);
-    unsigned int nr;
+    unsigned int nr, nc;
     string mstr;
     unsigned int total = 0;
 #ifndef	LOWMEM
@@ -70,7 +70,7 @@ int main(int argc, char * argv[])
 	ifstream mtx;
 
 	must_open(mtx, files::matrix);
-	get_matrix_header(mtx, nr, mstr);
+	get_matrix_header(mtx, nr, nc, mstr);
 
 
 	cout << "// reading matrix rows" << endl;
@@ -90,8 +90,18 @@ int main(int argc, char * argv[])
 	}
 	cout << "// ok" << endl;
     }
-    sort(sizes.begin(), sizes.end());
     BUG_ON(sizes.size() != nr);
+
+    for(unsigned int i = nr ; i < nc ; i++) {
+	sizes.push_back(make_pair(0,i));
+#ifndef LOWMEM
+	lines.push_back(matrix_line());
+#endif
+    }
+    BUG_ON(sizes.size() != nc);
+
+    sort(sizes.begin(), sizes.end());
+
 
     vector<vector<rel> > buckets(24);
     vector<pair<sz, int> > bucket_sizes;
@@ -100,11 +110,11 @@ int main(int argc, char * argv[])
 	bucket_sizes.push_back(make_pair(0, i));
     }
 
-    ad_hoc_cmp foo(buckets, nr / NBUCKETS);
+    ad_hoc_cmp foo(buckets, nc / NBUCKETS);
     make_heap(bucket_sizes.begin(),
 	    bucket_sizes.end(), 
 	    foo);
-    for( ; sizes.size() > nr % NBUCKETS ; ) {
+    for( ; sizes.size() > nc % NBUCKETS ; ) {
 	pair<sz, rel> top = sizes.back();
 	sizes.pop_back();
 	buckets[bucket_sizes[0].second].push_back(top.second);
@@ -132,7 +142,7 @@ int main(int argc, char * argv[])
 	unsigned int j = bucket_sizes[i].second;
 	pair<sz, int> blah(bucket_sizes[i].first, j);
 
-	if (buckets[j].size() == nr / NBUCKETS) {
+	if (buckets[j].size() == nc / NBUCKETS) {
 	    small_buckets.push_back(blah);
 	} else {
 	    big_buckets.push_back(blah);
@@ -147,14 +157,14 @@ int main(int argc, char * argv[])
     vector<pair<sz, int> > reorder;
     for(unsigned int i = 0 ; i < NBUCKETS ; i++) {
 	unsigned int s;
-	unsigned int r0 = (i * nr) / NBUCKETS;;
-	unsigned int r1 = ((i+1) * nr) / NBUCKETS;;
+	unsigned int r0 = (i * nc) / NBUCKETS;;
+	unsigned int r1 = ((i+1) * nc) / NBUCKETS;;
 
 	s = r1 - r0;
 
 	deque<pair<sz, int> > * bpool;
 
-	if (s == nr / NBUCKETS) {
+	if (s == nc / NBUCKETS) {
 	    bpool = &small_buckets;
 	} else {
 	    bpool = &big_buckets;
@@ -176,7 +186,9 @@ int main(int argc, char * argv[])
 
     ofstream newmat;
     must_open(newmat, fmt("%.new") % files::matrix);
-    put_matrix_header(newmat, nr, mstr);
+
+    /* Pad with zeroes ! */
+    put_matrix_header(newmat, nc, nc, mstr);
 
 #ifdef	LOWMEM
     /* read the matrix NBUCKETS times */
@@ -196,7 +208,8 @@ int main(int argc, char * argv[])
 	matrix_line tmp;
 	rel pos = 0;
 	if (mstr != string("2")) {
-	    for(unsigned int k = 0 ; k < buckets[j].size() ; ) {
+	    unsigned int k;
+	    for(k = 0 ; k < buckets[j].size() && buckets[j][k] < nr ; ) {
 		ASSERT_ALWAYS(mit != istream_iterator<matrix_line>());
 		tmp = *mit++;
 		if (pos++ == buckets[j][k]) {
@@ -204,14 +217,21 @@ int main(int argc, char * argv[])
 		    k++;
 		}
 	    }
+	    for( ; k < buckets[j].size() ; k++) {
+		newmat << "0\n";
+	    }
 	} else {
-	    for(unsigned int k = 0 ; k < buckets[j].size() ; ) {
+	    unsigned int k;
+	    for(k = 0 ; k < buckets[j].size() && buckets[j][k] < nr ; ) {
 		ASSERT_ALWAYS(mit != istream_iterator<matrix_line>());
 		tmp = *mit++;
 		if (pos++ == buckets[j][k]) {
 		    print_line_without_ones(newmat, tmp) << "\n";
 		    k++;
 		}
+	    }
+	    for( ; k < buckets[j].size() ; k++) {
+		newmat << "0\n";
 	    }
 	}
     }

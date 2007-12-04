@@ -16,14 +16,14 @@ struct matrix_repr_binary {
 
     struct matrix_rowset : public ptr {
 	uint32_t nr;
-	uint32_t nc;
+	uint32_t ncoef;
 	matrix_rowset() { idx = NULL; }
 	/* This thing does not have a copy ctor ! */
 
 	void alloc(uint r, uint c) {
 	    nr = r;
-	    nc = c;
-	    BUG_ON(idx != NULL); idx = new uint32_t[nr + nc];
+	    ncoef = c;
+	    BUG_ON(idx != NULL); idx = new uint32_t[nr + ncoef];
 	}
 	~matrix_rowset() {
 	    if (idx != NULL) delete[] idx;
@@ -45,7 +45,7 @@ struct matrix_repr_binary {
 		    *q.idx++ = lit->first - v;
 		    v = lit->first;
 		}
-		BUG_ON((uint) (q.idx - idx) > (nr + nc));
+		BUG_ON((uint) (q.idx - idx) > (nr + ncoef));
 	    }
 	    BUG_ON(i != i1);
 	}
@@ -58,9 +58,9 @@ struct matrix_repr_binary {
 	    const_ptr q(*this);
 	    for(uint i = 0 ; i < nr ; i++) {
 		traits::zero(dst[i]);
-		unsigned int nc = *q.idx++;
+		unsigned int ncoef = *q.idx++;
 		unsigned int c = 0;
-		for( ; nc-- ; q.idx++) {
+		for( ; ncoef-- ; q.idx++) {
 		    c += *q.idx;
 		    /* if we're here, then the traits:: class
 		     * should have a bare addmul() routine that

@@ -74,16 +74,19 @@ int main(int argc, char * argv[])
 
 	no_arguments nothing;
 	process_arguments(argc, argv, common, nothing);
-	unsigned int nr;
+	unsigned int nr, nc;
 	string mstr;
 
 	ifstream mtx;
 
 	must_open(mtx, files::matrix);
-	get_matrix_header(mtx, nr, mstr);
+	get_matrix_header(mtx, nr, nc, mstr);
+	BUG_ON_MSG(nr != nc, "Matrix is not square\n");
+	/* It's a pain to handle the non-square case. And hardly useful
+	 */
 
 	vector<int> x(nr, 0);
-	vector<int> m(nr, 0);
+	vector<int> m(nc, 0);
 
 	cout << "// reading matrix rows" << endl;
 	istream_iterator<matrix_line> mit(mtx);
@@ -129,6 +132,8 @@ int main(int argc, char * argv[])
 		int p = px.get_si();
 		for(unsigned int i = 0 ; i < nr ; i++) {
 			x[i] = modred(x[i], p);
+		}
+		for(unsigned int i = 0 ; i < nc ; i++) {
 			m[i] = modred(m[i], p);
 		}
 	}

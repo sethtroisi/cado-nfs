@@ -18,7 +18,6 @@ print "$0 @ARGV\n";
 my $param = {
 	# example data
 	modulus=>"531137992816767098689588206552468627329593117727031923199444138200403559860852242739162502265229285668889329486246501015346579337652707239409519978766587351943831270835393219031728127",
-	msize => 5000,
 	dens => 10,
 	# everything can be overriden from the command line with switches
 	# of the form ``param=xxx''
@@ -105,23 +104,27 @@ sub parse_matrix_header {
 	if (!defined($hline)) {
 		die "No header line in first ten lines of $f";
 	}
+	my $fmt;
 	if ($hline =~ /^(\d+)\s(\d+)$/) {
-		$h->{'msize'} = $1;
+		$fmt = 'CADO';
+		$h->{'nrows'} = $1;
+		$h->{'ncols'} = $2;
 		$h->{'modulus'} = 2;
-		print "CADO format $1 rows $2 columns\n";
 	} else {
+		$fmt = 'BW-LEGACY';
 		$hline =~ /(\d+)\s+ROWS/i
 			or die "bad header line in $f : $hline";
-		$h->{'msize'} = $1;
+		$h->{'nrows'}=$1;
 		$hline =~ /(\d+)\s+COLUMNS/i
 			or die "bad header line in $f : $hline";
-		if ($h->{'msize'} != $1) {
-			die "Matrix is not square ($h->{'msize'}x$1)";
-		}
+		$h->{'ncols'}=$2;
 		$hline =~ /MODULUS\s+(\d+)/i
 			or die "bad header line in $f : $hline";
 		$h->{'modulus'} = $1;
 	}
+	print "$fmt format $h->{'nrows'} rows $h->{'ncols'} columns\n";
+	die "Must have ncols >= nrows for a column dependency\n"
+		if $h->{'ncols'} < $h->{'nrows'};
 	my $hash = `head -c 2048 $f | md5sum | cut -c1-8`;
 	chomp($hash);
 	$h->{'hash'} = $hash;
@@ -130,7 +133,8 @@ sub parse_matrix_header {
 
 if ($param->{'matrix'}) {
 	my $h = parse_matrix_header $param->{'matrix'};
-	$param->{'msize'} = $h->{'msize'};
+	$param->{'ncols'} = $h->{'ncols'};
+	$param->{'nrows'} = $h->{'nrows'};
 	$param->{'modulus'} = $h->{'modulus'};
 	$weak->{'wdir'} .= ".$h->{'hash'}";
 }
@@ -154,6 +158,8 @@ sub dumpvar {
 my $matrix =	$param->{'matrix'};	dumpvar 'matrix';
 my $modulus =	$param->{'modulus'};	dumpvar 'modulus';
 my $msize =	$param->{'msize'};	dumpvar 'msize';
+my $nrows =	$param->{'nrows'};	dumpvar 'nrows';
+my $ncols =	$param->{'ncols'};	dumpvar 'ncols';
 my $m =		$param->{'m'};		dumpvar 'm';
 my $n =		$param->{'n'};		dumpvar 'n';
 my $wdir =	$param->{'wdir'};	dumpvar 'wdir';
@@ -192,6 +198,15 @@ if ($vectoring && ($n % $vectoring != 0)) {
 	die "vectoring parameter must divide n";
 }
 
+if ($msize) {
+	die "msize conflicts with nrows/ncols" if ($nrows || $ncols);
+	$nrows = $ncols = $msize;
+} else {
+	die "supply either msize or both nrows and ncols"
+		unless ($nrows && $ncols);
+}
+
+
 sub magmadump {
 	if ($dump) {
 		action "${bindir}bw-printmagma --subdir $wdir > $wdir/m.m";
@@ -204,6 +219,13 @@ if (!-d $wdir) {
 	mkdir $wdir or die
 		"Cannot create $wdir: $! -- select something non-default with wdir=";
 }
+
+
+open STDOUT, "| tee -a $wdir/solve.out";
+open STDERR, "| tee -a $wdir/solve.err";
+
+print "Solver started ", scalar localtime, "\nargs:\n$dumped\n";
+print STDERR "Solver started ", scalar localtime, "\nargs:\n$dumped\n";
 
 if ($resume) {
 	if ($precond && -f "$wdir/precond.txt") {
@@ -258,7 +280,8 @@ if (@mlist) {
 if ($resume) {
 	die "Cannot resume: no matrix file" unless -f "$wdir/matrix.txt";
 	my $h = parse_matrix_header "$wdir/matrix.txt";
-	$param->{'msize'} = $h->{'msize'};
+	$param->{'ncols'} = $h->{'ncols'};
+	$param->{'nrows'} = $h->{'nrows'};
 	$param->{'modulus'} = $h->{'modulus'};
 } else {
 	if ($matrix) {
@@ -266,7 +289,7 @@ if ($resume) {
 	} else {
 		# If no matrix parameter is set at this moment, then surely it
 		# means we're playing with a random sample: create it !
-		action "${bindir}bw-random $seeding $msize $modulus $dens > $wdir/matrix.txt";
+		action "${bindir}bw-random $seeding $nrows $ncols $modulus $dens > $wdir/matrix.txt";
 	}
 }
 
@@ -385,7 +408,7 @@ SLAVE : {
 	for my $vi (0..int($n/$vectoring) - 1) {
 		my ($i,$ni1)=($vectoring*$vi,$vectoring*($vi+1)-1);
 		# That's really a crude approximation.
-		my $l_approx=$msize/$m + $msize/$n;
+		my $l_approx=$ncols/$m + $ncols/$n;
 		my @linecounts=();
 		for my $j (0..$m1) {
 			my $x = nlines "$wdir/A-0$m1-00";
@@ -531,7 +554,8 @@ MKSOL : {
 	}
 
 	for my $s (@sols) {
-		action "${bindir}bw-gather --subdir $wdir $s --nbys $vectoring";
+		# --nbys now defaults to auto-detect.
+		action "${bindir}bw-gather --subdir $wdir $s";
 		if (-f "$wdir/W0$s") {
 			push @sols_found, "W0$s";
 		}

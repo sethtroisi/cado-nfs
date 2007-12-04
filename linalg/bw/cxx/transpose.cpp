@@ -74,7 +74,7 @@ void doit(std::ostream& o)
 			columns[jj].push_back(li[j]);
 		}
 	}
-	put_matrix_header(o, nc, mstr);
+	put_matrix_header(o, nc, nr, mstr);
 	if (mstr != string("2")) {
 		for(unsigned int j = 0 ; j < nc ; j++) {
 			o << columns[j] << "\n";

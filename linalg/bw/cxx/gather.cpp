@@ -33,8 +33,6 @@
  * One way to use this program in a vectorized manner would be to gather
  * several solutions at once, but again it would not make much sense.
  *
- * This being said, a --nbys option exists, and is mandatory in order to
- * read from the output of a vectorized mksol.
  */
 
 gather_arguments mine;
@@ -48,7 +46,7 @@ typedef unsigned int uint;
 namespace globals {
 	uint m, n;
 	uint col;
-	uint nr;
+	uint nr, nc;
 	int nbys;
 	mpz_class modulus;
 	uint8_t modulus_u8;
@@ -77,12 +75,12 @@ private:
 void init_data()
 {
 	using namespace globals;
-	v = new scalar_t[nr];
-	w = new scalar_t[nr];
-	scrap = new wide_scalar_t[nr];
+	v = new scalar_t[nc];
+	w = new scalar_t[nc];
+	scrap = new wide_scalar_t[nc];
 
-	traits::zero(v, nr);
-	traits::zero(w, nr);
+	traits::zero(v, nc);
+	traits::zero(w, nc);
 
 	mat.alloc(nr, nb_coeffs);
 
@@ -109,7 +107,7 @@ void add_file(const std::string& fn)
 	must_open(f, fn);
 	using namespace globals;
 
-	for(unsigned int i = 0 ; i < nr ; i++) {
+	for(unsigned int i = 0 ; i < nc ; i++) {
 		/* This really works only with one member, as the
 		 * operation is not too much focused on vectoring things
 		 * so far.
@@ -122,6 +120,15 @@ void add_file(const std::string& fn)
 		int ny;
 		mpz_class blah;
 		for(ny = 0 ; ss >> blah ; foo[0] += blah, ny++);
+		if (nbys == -1 && ny != 0) {
+			cerr << "// auto-detected nbys=" << ny << "\n";
+			nbys = ny;
+		}
+		if (ny == 0 && f.eof()) {
+			cerr << fmt("// reached EOF after reading % coords from %\n")
+				% i % fn;
+			abort();
+		}
 		BUG_ON(ny != nbys);
 		traits::assign(v[i], foo, 0);
 	}
@@ -157,7 +164,7 @@ void do_sum()
 }
 
 bool is_zero(const scalar_t * vec) {
-	for(uint i = 0 ; i < globals::nr ; i++) {
+	for(uint i = 0 ; i < globals::nc ; i++) {
 		if (!traits::is_zero(vec[i])) {
 			return false;
 		}
@@ -167,7 +174,7 @@ bool is_zero(const scalar_t * vec) {
 
 int nb_nonzero(const scalar_t * vec) {
 	int res = 0;
-	for(uint i = 0 ; i < globals::nr ; i++) {
+	for(uint i = 0 ; i < globals::nc ; i++) {
 		res += !traits::is_zero(vec[i]);
 	}
 	return res;
@@ -175,9 +182,11 @@ int nb_nonzero(const scalar_t * vec) {
 
 void multiply()
 {
+	using namespace globals;
 	precond(v);
 	mat.template mul<traits>(scrap, v);
-	traits::reduce(w, scrap, 0, globals::nr);
+	traits::reduce(w, scrap, 0, nr);
+	traits::zero(w + nr, nc-nr);
 }
 
 program_common() { init_data(); }
@@ -202,12 +211,12 @@ void go()
 		cerr << "// trivial solution encountered !\n";
 		BUG();
 	}
-	traits::copy(w, v, nr);
+	traits::copy(w, v, nc);
 
 	int i;
 
 	for(i = 0 ; i < 20 ; i++) {
-		traits::copy(v, w, nr);
+		traits::copy(v, w, nc);
 		cout << fmt("// trying B^%*y") % i;
 		super::multiply();
 		int r = super::nb_nonzero(w);
@@ -351,7 +360,8 @@ int main(int argc, char *argv[])
 	using namespace globals;
 
 	must_open(mtx, files::matrix);
-	get_matrix_header(mtx, nr, mstr);
+	get_matrix_header(mtx, nr, nc, mstr);
+	BUG_ON_MSG(nr > nc, "Matrix has too many rows\n");
 
 	globals::modulus = mpz_class(mstr);
 	globals::modulus_u8	= globals::modulus.get_ui();

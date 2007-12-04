@@ -593,6 +593,7 @@ void dpmat(polmat const * pa, uint k)
 
 namespace globals {
     uint nrows;
+    uint ncols;
     uint m,n;
     uint t,t0,total_work;
     std::vector<uint> delta;
@@ -1245,11 +1246,10 @@ void read_mat_file_header(const char *name)
         die("fopen(%s): %s", errno, name, strerror(errno));
     }
     char modulus[512];
-    uint ncols;
     fscanf(f, "// %u ROWS %u COLUMNS ; MODULUS %s",
-            &globals::nrows, &ncols, modulus);
+            &globals::nrows, &globals::ncols, modulus);
     BUG_ON(strcmp(modulus,"2") != 0);
-    BUG_ON(globals::nrows != ncols);
+    BUG_ON(globals::nrows > globals::ncols);
 
     fclose(f);
 }
@@ -2169,7 +2169,7 @@ int main(int argc, char *argv[])
         usage();
     }
 
-    total_work = Lmacro(nrows, m, n);
+    total_work = Lmacro(ncols, m, n);
 
     // if (rec_threshold == 1) usage();
 

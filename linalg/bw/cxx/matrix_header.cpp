@@ -11,9 +11,9 @@
 
 using namespace std;
 
-void put_matrix_header(ostream & mtx, unsigned int nr, const string & mstr)
+void put_matrix_header(ostream & mtx, unsigned int nr, unsigned int nc, const string & mstr)
 {
-    mtx << fmt("// % ROWS % COLUMNS ; MODULUS %\n") % nr % nr % mstr;
+    mtx << fmt("// % ROWS % COLUMNS ; MODULUS %\n") % nr % nc % mstr;
     mtx << flush;
 }
 
@@ -33,7 +33,7 @@ void get_matrix_header(istream & mtx,
         if (!startswith(buffer, "//")) {
             if (line == 0 && st >> nr >> nc) {
                 mstr="2";
-                cerr << "Auto-detected cado format\n";
+                cerr << "// Auto-detected cado format\n";
                 ok = true;
             }
             /* Too late, the header should have come
@@ -62,11 +62,4 @@ void get_matrix_header(istream & mtx,
     die("unable to get matrix header ; file is corrupted\n", 1);
 }
 
-void get_matrix_header(istream & mtx, unsigned int &nr, string & mstr)
-{
-    unsigned int nc;
-    get_matrix_header(mtx, nr, nc, mstr);
-    if (nr != nc)
-        die("matrix is not square\n", 1);
-}
 /* vim: set sw=4 sta et: */

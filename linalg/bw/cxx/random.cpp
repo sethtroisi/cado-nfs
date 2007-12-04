@@ -48,16 +48,16 @@ struct rcoeff_small {
 struct rcoeff_binary { int32_t operator()() const { return 1; } };
 
 class fill_row_binomial {
-	unsigned int nr;
+	unsigned int nc;
 	double p;
 public:
-	fill_row_binomial(unsigned int nr, double p) :
-		nr(nr), p(p) {}
+	fill_row_binomial(unsigned int nc, double p) :
+		nc(nc), p(p) {}
 template<class T>
 void operator()(matrix_line & l, T const& op) const
 {
 	l.clear();
-	for(unsigned int j = 0 ; j < nr ; j++) {
+	for(unsigned int j = 0 ; j < nc ; j++) {
 		double t = random() / (double) RAND_MAX;
 		if (t > p) continue;
 		int32_t v = op();
@@ -68,7 +68,7 @@ void operator()(matrix_line & l, T const& op) const
 };
 
 class fill_row_normal {
-	unsigned int nr;
+	unsigned int nc;
 	double mean, sigma;
 	double pick() const
 	{
@@ -78,10 +78,10 @@ class fill_row_normal {
 		return abs(mean + sigma * z);
 	}
 public:
-	fill_row_normal(unsigned int nr, double p) :
-		nr(nr),
-		mean(nr * p),
-		sigma(sqrt(nr*p*(1-p))) {}
+	fill_row_normal(unsigned int nc, double p) :
+		nc(nc),
+		mean(nc * p),
+		sigma(sqrt(nc*p*(1-p))) {}
 
 template<class T>
 void operator()(matrix_line & l, T const& op) const
@@ -91,7 +91,7 @@ void operator()(matrix_line & l, T const& op) const
 	set<uint32_t> indices;
 	for(unsigned int i = 0 ; i < n ; i++) {
 		double t = random() / (double) RAND_MAX;
-		indices.insert((uint32_t) (t*nr));
+		indices.insert((uint32_t) (t*nc));
 	}
 	for(set<uint32_t>::const_iterator j = indices.begin() ; j != indices.end() ; j++) {
 		int32_t v = op();
@@ -138,42 +138,43 @@ int main(int argc, char * argv[])
 
 	unsigned int seed = time(NULL);
 
-	if (argc >= 3 && strcmp(argv[1], "--seed") == 0) {
+	if (argc >= 4 && strcmp(argv[1], "--seed") == 0) {
 		seed = atoi(argv[2]);
 		argv++,argc--;
 		argv++,argc--;
 	}
-	if (argc != 3 && argc != 4) {
-		cerr << "Usage : ./random [--seed <seed>] <msize> <modulus> [<density>]\n";
+	if (argc != 4 && argc != 5) {
+		cerr << "Usage : ./random [--seed <seed>] <nrows> <ncols> <modulus> [<density>]\n";
 		exit(1);
 	}
 	srandom(seed);
 
 	unsigned int nr = atoi(argv[1]);
-	string mstr(argv[2]);
+	unsigned int nc = atoi(argv[2]);
+	string mstr(argv[3]);
 	double p = 0.5;
 	if (argc > 3) {
-		istringstream foo(argv[3]);
+		istringstream foo(argv[4]);
 		foo >> p;
 	}
-	if (p > 1) { p = p/nr; }
+	if (p > 1) { p = p/nc; }
 
 	mpz_class px(mstr);
 
-	put_matrix_header(cout, nr, mstr);
+	put_matrix_header(cout, nr, nc, mstr);
 
 	/* Put a zero for the first row */
 	cout << 0 << "\n";
 	unsigned int nz = 1;
 
 	if (nr > 100) {
-		/* We should check nr*p and nr*(1-p) as well if we were
+		/* We should check nc*p and nc*(1-p) as well if we were
 		 * concerned by good approximation, but it's not really
 		 * the case */
 		cerr << "Using normal approximation\n";
-		fillmat()(nr, nz, px, fill_row_normal(nr, p));
+		fillmat()(nr, nz, px, fill_row_normal(nc, p));
 	} else {
-		fillmat()(nr, nz, px, fill_row_binomial(nr, p));
+		fillmat()(nr, nz, px, fill_row_binomial(nc, p));
 	}
 
 	return 0;

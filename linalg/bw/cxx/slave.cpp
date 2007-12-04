@@ -61,7 +61,7 @@ void load_x_vectors(vector < uint32_t > &bw_x) /*{{{ */
 namespace globals {
     uint m, n;
     uint col;
-    uint nr;
+    uint nr, nc;
     uint nb_iter;
     uint cp_lag;
     uint iter0;
@@ -194,6 +194,7 @@ struct thread:public traits {
      preconditioner < traits > precond;
 
      thread(void *ptr) {
+	using globals::nc;
 	using globals::nr;
 	using globals::thread_class_ptr;
 	using globals::nb_coeffs;
@@ -210,8 +211,8 @@ struct thread:public traits {
 	 i1 = ((t + 1) * nr) / mine.nt;
 	 maxwait = 0.1;
 
-	 v = new scalar_t[nr];
-	 w = new scalar_t[nr];
+	 v = new scalar_t[nc];
+	 w = new scalar_t[nc];
 	 scrap = new wide_scalar_t[i1 - i0];
 
 	 mat.alloc(i1 - i0, nb_coeffs[t]);
@@ -220,21 +221,37 @@ struct thread:public traits {
 
 	 dot_part.assign(globals::nbys, mpz_class());
 
+	thread_lock(&globals::console_lock);
+	cout << fmt("T% reading %")
+            % t % files::matrix << endl;
+	thread_unlock(&globals::console_lock);
 	{
-	    ifstream mtx;
-	     must_open(mtx, files::matrix);
-	     mat.fill(mtx, mtxfile_pos[t], i0, i1);
-	} fill_check_vector(i0, i1, check_x0, files::x0);
+            ifstream mtx;
+	    must_open(mtx, files::matrix);
+	    mat.fill(mtx, mtxfile_pos[t], i0, i1);
+	}
+	thread_lock(&globals::console_lock);
+	cout << fmt("T% reading % and %")
+            % t % files::x0 % files::m0 << endl;
+	thread_unlock(&globals::console_lock);
+	fill_check_vector(i0, i1, check_x0, files::x0);
 	fill_check_vector(i0, i1, check_m0, files::m0);
 
-	precond.init(i0, i1, files::precond);
+	thread_lock(&globals::console_lock);
+	cout << fmt("T% done reading input data") % t << endl;
+	thread_unlock(&globals::console_lock);
+        /* 0 and nr are for the locations affected in the destination
+         * vector. As we're only slicing the matrix horizontally so far,
+         * it's pointless 
+         */
+	precond.init(0, nr, files::precond);
 
 	BUG_ON(globals::iter0 & 1);
 
-	// memcpy(v, vptr->v0, nr * sizeof(scalar_t));
-	// memset(w, 0, nr * sizeof(scalar_t));
-	traits::copy(v, vptr->v0, nr);
-	traits::zero(w, nr);
+	// memcpy(v, vptr->v0, nc * sizeof(scalar_t));
+	// memset(w, 0, nc * sizeof(scalar_t));
+	traits::copy(v, vptr->v0, nc);
+	traits::zero(w, nc);
 
 	go_mark = done = globals::iter0;
 	ticks_ref = thread_ticks();
@@ -289,11 +306,10 @@ struct thread:public traits {
 	thread_unlock(&globals::console_lock);
     }
 
-    void one_dotprod(vector < mpz_class > &r, const int32_t * sv,
+    void one_dotprod(scalar_t &r, const int32_t * sv,
 		     const scalar_t * lv) {
 	wide_scalar_t tmp;
 	zero(tmp);
-	scalar_t foo;
 	int acc = 0;
 
 	for (uint i = i0; i < i1; i++) {
@@ -303,11 +319,8 @@ struct thread:public traits {
 		acc = 1;
 	    }
 	}
-	reduce(foo, tmp);
-
-	for (int i = 0; i < globals::nbys; i++) {
-	    r[i] = traits::get_y(foo, i);
-	}
+        addmul(tmp, r, 1);
+	reduce(r, tmp);
     }
 
     inline void multiply(wide_scalar_t * dst, scalar_t * src) {
@@ -332,18 +345,21 @@ struct thread:public traits {
 	ASSERT(dst == ((done & 1) ? v : w));
 	ASSERT(src == ((done & 1) ? w : v));
 
+        scalar_t ds, dt;
+        traits::zero(ds);
+        traits::zero(dt);
+
 	do {
 	    multiply(scrap, src);
-	    vector < mpz_class > ds(nbys);
-	    vector < mpz_class > dt(nbys);
 
 	    one_dotprod(ds, check_m0, src);
 	    reduce(dst, scrap, i0, i1);
+            traits::zero(dst + nr, nc - nr);
 	    one_dotprod(dt, check_x0, dst);
 
 	    // traits::subtract(dot_part, ds, dt);
 	    for (int i = 0; i < nbys; i++) {
-		dot_part[i] = ds[i] - dt[i];
+		dot_part[i] = traits::get_y(ds,i) - traits::get_y(dt,i);
 	    }
 
 	    ok = barrier_wait(&main_loop_barrier, &twait, &addup < self >);
@@ -473,7 +489,7 @@ template < typename traits >
 		nm = files::v % (globals::col + i) % r;
 		ofstream v;
 		must_open(v, nm);
-		for (uint j = 0; j < globals::nr; j++) {
+		for (uint j = 0; j < globals::nc; j++) {
 		    v << traits::get_y(dst[j], i) << "\n";
 		}
 	    }
@@ -691,7 +707,7 @@ template < typename traits > int program()
 
     int recover;
 
-    nb_iter = nr + 2 * n;
+    nb_iter = nc + 2 * n;
     nb_iter = iceildiv(nb_iter, m) + iceildiv(nb_iter, n) + 10;
     cp_lag = max(nb_iter / CHECKPOINTS, 1u);
     cp_lag += cp_lag & 1;
@@ -721,8 +737,8 @@ template < typename traits > int program()
 
 	recover_iteration(m, col, nbys, iter0);
 
-	v0_and_f.v0 = new scalar_t[nr];
-	recover_vector < traits > (nr, col, nbys, recover, v0_and_f.v0);
+	v0_and_f.v0 = new scalar_t[nc];
+	recover_vector < traits > (nc, col, nbys, recover, v0_and_f.v0);
 
 	start_threads(thread_program < slave_thread, traits >, targs);
 	delete[]v0_and_f.v0;
@@ -731,10 +747,10 @@ template < typename traits > int program()
 	/* See the discussion in master.cpp concerning the bound
 	 * on the degree of f */
 	uint bound_deg_f = iceildiv(m, n) +
-	    iceildiv(m * iceildiv(nr, m), n) + 10;
+	    iceildiv(m * iceildiv(nc, m), n) + 10;
 
 	v0_and_f.f = new scalar_t[bound_deg_f + 1];
-	v0_and_f.v0 = new scalar_t[nr];
+	v0_and_f.v0 = new scalar_t[nc];
 
 	degf = set_f_coeffs < traits > (v0_and_f.f, bound_deg_f);
 
@@ -742,7 +758,7 @@ template < typename traits > int program()
 	nb_iter = degf;
 
 	/* FIXME ; the 0 here is intended to be changed */
-	recover_vector < traits > (nr, col, nbys, 0, v0_and_f.v0);
+	recover_vector < traits > (nc, col, nbys, 0, v0_and_f.v0);
 
 	start_threads(thread_program < mksol_thread, traits >, targs);
 
@@ -769,7 +785,12 @@ int main(int argc, char *argv[])
     using namespace globals;
 
     must_open(mtx, files::matrix);
-    get_matrix_header(mtx, nr, mstr);
+    get_matrix_header(mtx, nr, nc, mstr);
+    BUG_ON_MSG(nr != nc, "Matrix is not square\n");
+    /* It should not be too hard to accomodate zero-padded matrices, but:
+     * - it causes problem with checks
+     * - it's of little use anyway
+     */
 
     globals::modulus = mpz_class(mstr);
     globals::modulus_u8 = globals::modulus.get_ui();

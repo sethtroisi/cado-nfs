@@ -139,7 +139,7 @@ int main(int argc, char *argv[])
 
 	process_arguments(argc, argv, common, mine);
 
-	unsigned int nr;
+	unsigned int nr, nc;
 	string mstr;
 	ifstream mtx;
 	
@@ -148,12 +148,12 @@ int main(int argc, char *argv[])
 
 	must_open(mtx, files::matrix);
 
-	get_matrix_header(mtx, nr, mstr);
+	get_matrix_header(mtx, nr, nc, mstr);
 	build_zero_table(zrows,mtx);
 
 	mtx.close();
 
-	setup_vectors(nr, mine.m, mine.n, mpz_class(mstr));
+	setup_vectors(nc, mine.m, mine.n, mpz_class(mstr));
 }
 
 
