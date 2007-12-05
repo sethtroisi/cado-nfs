@@ -1,0 +1,50 @@
+--- GF2X.c.orig	2003-10-22 16:00:56.000000000 +0200
++++ GF2X.c	2003-10-22 16:45:32.000000000 +0200
+@@ -469,6 +469,9 @@
+ // inlining mul1 seems to help with g++; morever,
+ // the IBM xlC compiler inlines it anyway.
+ 
++#if 1
++#include "mul1.c"
++#else
+ static inline
+ void mul1(_ntl_ulong *c, _ntl_ulong a, _ntl_ulong b)
+ {
+@@ -500,6 +503,7 @@
+    c[0] = lo;
+    c[1] = hi;
+ }
++#endif
+ 
+ static inline
+ void mul_half(_ntl_ulong *c, _ntl_ulong a, _ntl_ulong b)
+@@ -537,6 +541,9 @@
+ // I adapted these routines from LiDIA.
+ // Inlining these seems to hurt, not help.
+ 
++#include "Mul1.c"
++#include "AddMul1.c"
++
+ static
+ void mul2(_ntl_ulong *c, const _ntl_ulong *a, const _ntl_ulong *b)
+ {
+@@ -561,6 +568,11 @@
+ static
+ void mul3 (_ntl_ulong *c, const _ntl_ulong *a, const _ntl_ulong *b)
+ {
++#if 1
++  c[3] = Mul1 (c, a, 3, b[0]);
++  c[4] = AddMul1 (c + 1, c + 1, a, 3, b[1]);
++  c[5] = AddMul1 (c + 2, c + 2, a, 3, b[2]);
++#else
+    _ntl_ulong hs0[2], hs1[2];
+    _ntl_ulong hl2[4];
+ 
+@@ -582,6 +594,7 @@
+    c[3] ^= hl2[1];
+    c[4] ^= hl2[2];
+    c[5] ^= hl2[3];
++#endif
+ }
+ 
+ static

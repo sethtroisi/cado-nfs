@@ -1,0 +1,49 @@
+Cantor's multiplication algorithm for GF(2)[x].
+===============================================
+
+Authors: Richard Brent, Pierrick Gaudry, Emmanuel Thomé, Paul Zimmermann.
+Licence: GNU General Public License (version 2 or any later version).
+
+This package provides an implementation of Cantor's algorithm for
+multiplying two binary polynomials using "additive FFT".
+
+The main exported function is:
+
+void mulCantor128(uint64_t *H, uint64_t *F, int Fl, uint64_t *G, int Gl);
+
+It multiplies two polynomials F(x) and G(x) and put the results in H(x).
+F(x) is represented in a dense way by an array F of Fl blocks of 64 bits,
+the same for G, with Gl blocks, and the result is put in the table H,
+that must have room for Fl+Gl blocks of 64 bits.
+
+A non-truncated variant is exported as well:
+
+void mulCantor128Plain(uint64_t *H, uint64_t *F, int Fl, uint64_t *G, int Gl);
+
+This package relies on some routines taken from the Mpfq library. This
+should work (?) on any x86 computer with SSE2 instruction set. The GMP
+library must be installed.
+
+To compile it, adjust the FLAGS variable in the Makefile, and type
+
+make all
+
+This should produce 3 binaries:
+  - bench
+  - bench_notrunc
+  - cantor
+
+bench measures the time spent to multiply two polynomials (type ./bench
+for usage). bench_notrunc is similar but calls the non-truncated version.
+cantor is a small utility that takes two random polynomials, multiply
+them and print the corresponding data, for testing purpose. It is used by
+the script check_cantor that will checked the result against Magma
+(assuming it is installed).
+
+Examples:
+
+./bench 64 1000 -f 1.1
+./bench_notrunc 64 1000 -f 1.1
+
+
+

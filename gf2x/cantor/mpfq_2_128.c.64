@@ -1,0 +1,87 @@
+/*
+  This file is part of the MPFQ library
+
+  Copyright 2007 Pierrick Gaudry and Emmanuel Thomé
+
+  This program is free software; you can redistribute it and/or modify it
+  under the terms of the GNU General Public License as published by the
+  Free Software Foundation; either version 2 of the License, or (at your
+  option) any later version.
+
+  This program is distributed in the hope that it will be useful, but WITHOUT
+  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+  more details.
+
+  You should have received a copy of the GNU General Public License along
+  with this program; see the file COPYING.  If not, write to the Free
+  Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+  02111-1307, USA.
+*/
+
+/* MPFQ generated file -- do not edit */
+
+#include "mpfq_2_128.h"
+
+#if GMP_LIMB_BITS == 64
+/* Active handler: field */
+/* Automatically generated code for GF(2^128) */
+/* Definition polynomial P = X^128 + X^7 + X^2 + X + 1 */
+/* Active handler: trivialities */
+/* Active handler: io */
+/* Active handler: linearops */
+/* Active handler: inversion */
+/* Active handler: reduction */
+/* Active handler: plain_c */
+/* Options used: sqrslice=8 mul_ur=sb_aligned_sse2 slice=4 favor_sse2=1 machine=core2 */
+
+/* Functions operating on the field structure */
+
+/* Element allocation functions */
+
+/* Elementary assignment functions */
+/* missing set_mpn */
+/* missing set_mpz */
+/* missing get_mpn */
+/* missing get_mpz */
+
+/* Assignment of random values */
+
+/* Arithmetic operations on elements */
+
+/* Operations involving unreduced elements */
+/* missing elt_ur_init */
+/* missing elt_ur_clear */
+
+/* Comparison functions */
+
+/* Vector allocation functions */
+
+/* Input/output functions */
+void mpfq_2_128_print(mpfq_2_128_field_ptr K UNUSED_VARIABLE, FILE * f, mpfq_2_128_src_elt s)
+{
+	unsigned int j;
+	int sth = 0;
+	for(j = 0 ; j < 128 ; j++) {
+		if (s[j/64] >> (j % 64) & 1UL) {
+			if (sth) fprintf(f, " + ");
+			sth = 1;
+			if (j == 0) {
+				fprintf(f, "1");
+			} else if (j == 1) {
+				fprintf(f, "z");
+			} else {
+				fprintf(f, "z^%d",j);
+			}
+		}
+	}
+	if (!sth) {
+		fprintf(f, "0");
+	}
+	fprintf(f, "\n");
+}
+
+#endif      /* GMP_LIMB_BITS == 64 */
+
+
+/* vim:set ft=cpp: */

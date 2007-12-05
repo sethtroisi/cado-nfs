@@ -1,0 +1,33 @@
+#!/bin/csh
+# Tuning program for mul1.c, Mul1.c, AddMul1.c
+# Usage: tune1 <bits_per_word> <size>
+
+# Copyright Paul Zimmermann 2007.
+#   
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of the GNU General Public License as published by the
+# Free Software Foundation; either version 2 of the License, or (at your
+# option) any later version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+# FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+# more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; see the file COPYING.  If not, write to the Free
+# Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+# 02111-1307, USA.
+
+set FLAGS = "-O2 -g"
+
+gcc $FLAGS gen_bb_mul_code.c -o gen_bb_mul_code
+
+foreach k (1 2 3 4 5 6 7 8)
+   echo -n $k " : "
+   ./gen_bb_mul_code $1 $k 0 > mul1.c
+   ./gen_bb_mul_code $1 $k 1 > Mul1.c
+   ./gen_bb_mul_code $1 $k 2 > AddMul1.c
+   gcc -DTUNE_MUL1 $FLAGS -DNTL_BITS_PER_LONG=$1 -DMUL_KARA_THRESHOLD=$2 tuneup.c -o tuneup
+   ./tuneup -nokara $2
+end
