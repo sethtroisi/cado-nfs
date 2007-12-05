@@ -43,6 +43,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <string.h>
 #include <assert.h>
 #include <limits.h> /* for ULONG_MAX */
+#include <float.h> /* for DBL_MAX */
 #include <math.h>   /* for log, fabs */
 #include "cado.h"
 #include "utils/utils.h" /* for cputime() */
@@ -1397,7 +1398,7 @@ generate_poly (cado_poly out, double T, int verbose)
 {
   unsigned long d = out->degree, alim;
   double B, logmu, alpha, E, mB;
-  double best_E = 1.797693134862315708145274237E308; /* DBL_MAX */
+  double best_E = DBL_MAX;
   mpz_t best_m, k, t, r;
   /* value of T = B^eff[d] for d <= 7 */
   static double eff[] = {0.0, 0.0, 3.0, 3.0, 3.333, 4.5, 6.6, 9.0};
