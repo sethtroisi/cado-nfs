@@ -13,7 +13,13 @@ struct binary_sse2_traits {
 	typedef matrix_repr_binary representation;
 	static const int max_accumulate = UINT_MAX;
 	static const int max_accumulate_wide = UINT_MAX;
-	typedef int64_t sse2_scalars __attribute__((vector_size(16)));
+#if defined(__OpenBSD__) && defined(__x86_64)
+	/* I know it's outright stupid */
+	typedef long inner_type;
+#else
+	typedef int64_t inner_type;
+#endif
+	typedef inner_type sse2_scalars __attribute__((vector_size(16)));
 
 	typedef binary_field coeff_field;
 
@@ -32,7 +38,7 @@ struct binary_sse2_traits {
 
 	/* FIXME -- this used to return an mpz_class */
 	static inline int get_y(scalar_t const & x, int i) {
-		int64_t foo[2] __attribute__((aligned(16)));
+		inner_type foo[2] __attribute__((aligned(16)));
 		memcpy(foo, &x.p, sizeof(sse2_scalars));
 		BUG_ON(i >= 128 || i < 0);
 		int bit = (foo[i >> 6] >> (i & 63)) & 1;
@@ -57,7 +63,7 @@ struct binary_sse2_traits {
 	 * the check is essentially useless in characteristic two, that's
 	 * bad.
 	 */
-	static inline void addmul(wide_scalar_t & dst, scalar_t const & src, int64_t x)
+	static inline void addmul(wide_scalar_t & dst, scalar_t const & src, inner_type x)
 	{
 		sse2_scalars mask = (sse2_scalars) { -x, -x, };
 		dst.p ^= mask & src.p;
@@ -78,7 +84,7 @@ struct binary_sse2_traits {
 
 
 	static inline bool is_zero(scalar_t const& x) {
-		int64_t foo[2] __attribute__((aligned(16)));
+		inner_type foo[2] __attribute__((aligned(16)));
 		memcpy(foo, &x.p, sizeof(sse2_scalars));
 		for(unsigned int i = 0 ; i < 2 ; i++) {
 			if (foo[i])
@@ -106,13 +112,13 @@ struct binary_sse2_traits {
 		// WARNING("slow");
 		/* FIXME -- should we go up to 128 here, or restrict to
 		 * nbys ??? */
-		int64_t foo[2] __attribute__((aligned(16))) = { 0, };
+		inner_type foo[2] __attribute__((aligned(16))) = { 0, };
 		for(unsigned int j = 0 ; j < 128 ; j++)
-			foo[j>>6] ^= (int64_t) (z[i+j] != 0) << (j & 63);
+			foo[j>>6] ^= (inner_type) (z[i+j] != 0) << (j & 63);
 		x.p = (sse2_scalars) { foo[0], foo[1], };
 	}
 	static inline void assign(std::vector<mpz_class>& z, scalar_t const & x) {
-		int64_t foo[2] __attribute__((aligned(16)));
+		inner_type foo[2] __attribute__((aligned(16)));
 		memcpy(foo, &x.p, sizeof(sse2_scalars));
 		BUG_ON(z.size() != 128);
 		for(unsigned int i = 0 ; i < 128 ; i++) {
@@ -121,7 +127,7 @@ struct binary_sse2_traits {
 	}
 
 	static std::ostream& print(std::ostream& o, scalar_t const& x) {
-		int64_t foo[2] __attribute__((aligned(16)));
+		inner_type foo[2] __attribute__((aligned(16)));
 		memcpy(foo, &x.p, sizeof(sse2_scalars));
 		/*
 		 * TODO: allow some sort of compressed I/O. The problem

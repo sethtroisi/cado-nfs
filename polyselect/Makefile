@@ -2,7 +2,7 @@ include Makefile.local
 
 # Set default filenames/paths if not already set.
 GMP ?= /usr/local/
-GMPLIB ?= $(GMP)/lib/libgmp.a
+GMPLIB ?= -L $(GMP)/lib -lgmp
 GMPINCLUDE ?= $(GMP)/include/
 
 

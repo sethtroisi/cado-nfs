@@ -13,8 +13,16 @@ CXX:=g++
 ARQCV:=ar qcv
 OFLAGS:=
 PFLAGS:=
-IFLAGS:=-iquote ../.. -iquote ../../utils -iquote $(TOPPATH)/include -iquote . -iquote old
+IFLAGS:=-I ../.. -I ../../utils -I $(TOPPATH)/include -I . -I old
 LFLAGS:=-L ../../utils
+
+-include Makefile.local
+#ifdef GMP
+#GMPINCLUDE?=$(GMP)/include
+#GMPLIB?=-L$(GMP)/lib
+#IFLAGS+=$(GMPINCLUDE)
+#LFLAGS+=$(GMPLIB)
+#endif
 
 # No more variable changes after this include.
 include $(TOPPATH)/util/main.mki

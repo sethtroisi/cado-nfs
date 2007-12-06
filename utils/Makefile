@@ -1,3 +1,8 @@
+include Makefile.local
+
+# Set default filenames/paths if not already set.
+GMP ?= /usr/local/
+GMPINCLUDE ?= $(GMP)/include/
 CFLAGS=-g -O2
 
 names:=polyfile relation timing long_poly getprime mod_ul
@@ -7,11 +12,12 @@ obj:=$(patsubst %,%.o,$(names))
 all: libutils.a
 
 %.o: %.c
-	gcc $(CFLAGS) -c $< -I..
+	gcc $(CFLAGS) -c $< -I.. -I$(GMPINCLUDE)
 
 libutils.a: $(obj)
 	ar r libutils.a $(obj)
 
 clean:
 	-rm -f *~ *.bak $(obj) libutils.a
+
 

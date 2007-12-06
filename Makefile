@@ -2,15 +2,15 @@
 .PHONY: clean all
 
 all:
-	make -C utils
-	make -C polyselect
-	make -C sieve
-	make -C linalg
-	make -C sqrt/naive
+	$(MAKE) -C utils
+	$(MAKE) -C polyselect
+	$(MAKE) -C sieve
+	$(MAKE) -C linalg
+	$(MAKE) -C sqrt/naive
 
 clean:
-	make -C utils	clean
-	make -C polyselect	clean
-	make -C sieve	clean
-	make -C linalg	clean
-	make -C sqrt/naive	clean
+	$(MAKE) -C utils	clean
+	$(MAKE) -C polyselect	clean
+	$(MAKE) -C sieve	clean
+	$(MAKE) -C linalg	clean
+	$(MAKE) -C sqrt/naive	clean

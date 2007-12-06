@@ -17,19 +17,18 @@ Makefile.local:
 	future invocations of make."
 	touch Makefile.local
 
-algsqrt: algsqrt.c poly.o
-	gcc $(CFLAGS) -I../.. -o $@ $< poly.o $(LDFLAGS) 
+.c.o:
+	gcc $(CFLAGS) -I../.. -o $@ -c $<
 
-fmalgsqrt: fmalgsqrt.c poly.o
-	gcc $(CFLAGS) -I../.. -o $@ $< poly.o $(LDFLAGS) 
+algsqrt: algsqrt.o poly.o
+	gcc -o $@ $^ $(LDFLAGS) 
 
-poly.o: poly.c
-	gcc $(CLFAGS) -c $< -o $@
+fmalgsqrt: fmalgsqrt.o poly.o
+	gcc -o $@ $^ $(LDFLAGS)
 
-ratsqrt: ratsqrt.c
-	gcc $(CFLAGS) -I../.. -o $@ $< $(LDFLAGS)
-
+ratsqrt: ratsqrt.o
+	gcc -o $@ $^ $(LDFLAGS)
 
 clean:
-	rm -f poly.o algsqrt ratsqrt
+	-rm -f poly algsqrt ratsqrt *.o *~
 

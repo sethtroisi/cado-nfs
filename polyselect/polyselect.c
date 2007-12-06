@@ -1050,7 +1050,8 @@ init_poly (cado_poly p, cado_input in)
 {
   int i;
 
-  strcpy (p->name, "");
+  /* strcpy (p->name, ""); */
+  p->name[0] = '\0';
   mpz_init_set (p->n, in->n);
   p->degree = in->degree;
   if (p->degree == 0)
@@ -1058,7 +1059,7 @@ init_poly (cado_poly p, cado_input in)
   p->f = alloc_mpz_array (p->degree + 1);
   p->g = alloc_mpz_array (3);
   mpz_init (p->m);
-  strcpy (p->type, "gnfs");
+  strncpy (p->type, "gnfs", sizeof(p->type));
 }
 
 static void

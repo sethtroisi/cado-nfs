@@ -11,6 +11,7 @@
 #include <sys/types.h>
 #include <cerrno>
 #include <cstdlib>
+#include <unistd.h>
 
 struct common_arguments {
 	std::string subdir;

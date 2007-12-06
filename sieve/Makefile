@@ -29,13 +29,13 @@ Makefile.local:
 	touch Makefile.local
 
 sieve: sieve.c fb.c ../utils/libutils.a config.h sieve_aux.h ../cado.h Makefile.local
-	gcc -I. -I.. -I$(GMPINCLUDE) $(CFLAGS) -o $@ -Wall -Wextra sieve.c fb.c ../utils/libutils.a $(GMPLIB) -lm
+	gcc -I. -I.. -I$(GMPINCLUDE) $(CFLAGS) -o $@ -Wall -W sieve.c fb.c ../utils/libutils.a $(GMPLIB) -lm
 
 checknorms: checknorms.c Makefile.local
-	gcc -I. -I.. -I$(ECMINCLUDE) $(CFLAGS) -o $@ $< ../utils/libutils.a $(ECMLIB) $(GMPLIB) -lm
+	gcc -I. -I.. -I$(GMPINCLUDE) -I$(ECMINCLUDE) $(CFLAGS) -o $@ $< ../utils/libutils.a $(ECMLIB) $(GMPLIB) -lm
 
 makefb: makefb.c Makefile.local
-	gcc -I. -I.. $(CFLAGS) -o $@ $< ../utils/libutils.a $(GMPLIB) -lm
+	gcc -I. -I.. -I$(GMPINCLUDE) $(CFLAGS) -o $@ $< ../utils/libutils.a $(GMPLIB) -lm
 
 config.h: config_h.in
 	cp config_h.in config.h

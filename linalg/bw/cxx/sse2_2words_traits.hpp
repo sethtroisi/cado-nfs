@@ -4,13 +4,19 @@
 #include <gmp.h>
 #include <gmpxx.h>
 #include <vector>
+#include <stdint.h>
 #include "traits_globals.hpp"
 #include "matrix_repr_prime.hpp"
 
 struct sse2_2words_traits {
 	typedef matrix_repr_prime representation;
 
+#if defined(__OpenBSD__) && defined(__x86_64)
+	/* I know it's outright stupid */
+	typedef long inner_type;
+#else
 	typedef int64_t inner_type;
+#endif
 	static const int sse2_vectoring = 2;
 
 	static const int max_accumulate = 50;
