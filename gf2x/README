@@ -5,97 +5,73 @@ Authors: Richard Brent, Pierrick Gaudry, Emmanuel Thomé, Paul Zimmermann.
 Licence: GNU General Public License (version 2 or any later version).
 
 This package contains routines for fast arithmetic in GF(2)[x]
-(multiplication, squaring, gcd). It is originally designed to be
-used with the NTL library from Victor Shoup.
+(multiplication, squaring, gcd).
 
 It contains the following files:
 
-BestToom.c - chooses the best routine between Karatsuba and Toom-Cook variants
-COPYING    - GNU General Public License
-factor.c   - finds smallest irreducible factor of trinomial over GF(2)
+
+Misc:
+
+README       - this file
+COPYING      - GNU General Public License
+
+Actual code:
+
+gf2x.h            - main header file
+thresholds.h      - tuning results. The file contains some defaults.
+mul-gf2x.c        - main entry code
 gen_bb_mul_code.c - generates low-level multiplication routines
-HalfGCD.c  - subquadratic gcd over GF(2)[x]
-mul2t.c    - implements 128x128 -> 256 bit product using SSE2 instructions
-mul.c      - main file for Karatsuba and Toom-Cook multiplication
-mulfft-bit.c - multiplication over GF(2)[x] using Fast Fourier Transform
-mul-tc3.c  - Toom-Cook 3-way (adapted from original file from Marco Bodrato)
-mul-tc3u.c - Toom-Cook 2x4 unbalanced multiplication
-mul-tc3w.c - Toom-Cook 3-way (word-aligned variant)
-mul-tc4.c  - Toom-Cook 4-way (adapted from original file from Marco Bodrato)
-patch-wrt-ntl-5.3.1 - patch for file GF2X.c from NTL
-README     - this file
-TC.h       - header file for Toom-Cook routines
-Toom.c     - general Toom-Cook multiplication
-ToomSpace.c - memory usage of the Toom-Cook routines
-tune1      - tuning shell-script for mul1 (calls gen_bb_mul_code)
+mul2t.c           - implements 128x128 -> 256 bit product with SSE2 instructions
+mul-small.c       - code for small sizes
+mul-basecase.c    - base case code
+mul-toom.c        - main file for Karatsuba and Toom-Cook multiplication
+mulfft-bit.c      - multiplication over GF(2)[x] using Fast Fourier Transform
+
+For tuning:
+
+tuneup.c   - tuning program for schoolbook/Karatsuba/Toom-Cook multiplication
 tunefft.c  - program to tune the FFT multiplication
 tunetoom.c - program to tune Toom-Cook multiplication
-tuneup.c   - tuning program for schoolbook/Karatsuba/Toom-Cook multiplication
+best_k.sh  - helper script for tuning
+replace.c  - Helper code
+replace.h  - Helper code
+timing.c   - Helper code
+timing.h   - Helper code
+
+For testing:
+
+factor.c     - finds smallest irreducible factor of trinomial over GF(2)
+HalfGCD.c    - subquadratic gcd over GF(2)[x]
+test.c       - trivial test.
+checkXXX.*   - test sets
+
+No longer used:
+
+patch-wrt-ntl-5.3.1 - patch for file GF2X.c from NTL
 
 Instructions to install the package:
 ===================================
 
-1) download and compile NTL (here 5.3.2).
-   In ntl-5.3.2/src:
+1) Type:
 
-   $ ./configure; make
+      make
 
-   and copy all the files from the gf2x package to the ntl-xxx/src directory:
+   If your machine word size is not automatically detected, you might
+   have to type:
+   
+      make w=64
 
-   $ cp .../gf2x-x.y/* .
+   At this point, you should have a working libgf2x.a ; However it is not
+   tuned. It means in particular that the FFT is not available.
 
-2) tune the base case multiplication
+2) tune Karatsuba/Toom-Cook and FFT multiplication
 
-   $ patch -i patch-wrt-ntl-5.3.1
-   $ w=32 # word bit size, adjust if your computer is 64-bit
-   $ touch besttoom.h
-   $ ./tune1 $w 1
-   1  : mul took 346ns
-   2  : mul took 152ns
-   3  : mul took 112ns
-   4  : mul took 106ns
-   5  : mul took 154ns
-   6  : mul took 240ns
-   7  : mul took 396ns
-   8  : mul took 684ns
+      make tune-all
 
-   Select the best value (here 4), and generate optimal routines:
- 
-    k=4
-    rm -f mul1.c Mul1.c AddMul1.c        
-    ./gen_bb_mul_code $w $k 0 > mul1.c
-    ./gen_bb_mul_code $w $k 1 > Mul1.c
-    ./gen_bb_mul_code $w $k 2 > AddMul1.c
+   This unfortunately takes a long while.
 
-3) tune Karatsuba/Toom-Cook multiplication
+3) run:
 
-   $ touch mparam.h
-   $ make tunetoom
-   $ ./tunetoom 2000 # or use a smaller value, e.g., 200
-   Generating entries best_tab[1..2000]
-   10 TC2:7.39e-06 TC3:0.00e+00 TC3W:8.73e-06 TC4:0.00e+00 best:7.39e-06 TC2
-   ...
-   Generating entries best_utab[1..2000]
-   32 default:3.27e-05 TC3U:0.00e+00 best:3.27e-05 default
-   ...
-   tunetoom finished, output in besttoom.h
+      make check
 
-4) tune the FFT multiplication
-
-   $ make tunefft
-   $ ./tunefft 1000000 # up to degree 64,000,000 on a 64-bit machine
-   501..501 TC:3.2e-03 F1(3):8.3e-03 F2(9):9.9e-03 F2(27):7.5e-03 TC
-   ...
-   tunefft finished, output in mparam.h
-
-5) compile the factor program
-
-   $ make factor
-
-   Quick check (you should get the same exact result, except maybe the version
-   number):
-
-   $ echo 12 u | ./factor 1279
-   ./factor 1279 
-   This is factor version 1.72
-   12 41 p3f5c0802ded
+   to see whether everything went ok.

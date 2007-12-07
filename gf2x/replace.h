@@ -1,6 +1,6 @@
-/* Forward declarations for Toom-Cook routines
-
-  Copyright 2007 Richard P. Brent.
+/* Helper program for rewriting headers after tuning.
+   
+  Copyright 2007 Emmanuel Thome'.
 
   This program is free software; you can redistribute it and/or modify it
   under the terms of the GNU General Public License as published by the
@@ -18,11 +18,24 @@
   02111-1307, USA.
 */
 
-static void Toom3Mul (_ntl_ulong *c, const _ntl_ulong *a, const _ntl_ulong *b,
-              long n, _ntl_ulong *stk);
-             
-static void Toom3WMul (_ntl_ulong *c, const _ntl_ulong *a, const _ntl_ulong *b,
-              long n, _ntl_ulong *stk);
+#ifndef REPLACE_H_
+#define REPLACE_H_
 
-static void Toom4Mul (_ntl_ulong *c, const _ntl_ulong *a, const _ntl_ulong *b,
-              long n, _ntl_ulong *stk);
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+struct hash_define	{
+	char * identifier;
+	char * string;
+};
+
+void set_hash_define_int(struct hash_define * ptr, const char * name, int x);
+void set_hash_define(struct hash_define * ptr, const char * name, const char * v);
+void replace(struct hash_define * ptr, unsigned int n, const char * fname);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif	/* REPLACE_H_ */

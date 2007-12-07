@@ -26,16 +26,13 @@
   02111-1307, USA.
 */
 
-#define mpfq_wizard_mul2_interleave3 mul2
-#define mpfq_wizard_dst_elt _ntl_ulong*
-#define mpfq_wizard_src_elt const _ntl_ulong*
-#define mp_limb_t _ntl_ulong
+#include <stdint.h>
 
 static inline
-void mpfq_wizard_mul2_interleave3(mpfq_wizard_dst_elt t, mpfq_wizard_src_elt s1, mpfq_wizard_src_elt s2)
+void mul2(ulong * t, ulong const * s1, ulong const * s2)
 {
 	typedef uint64_t v2di __attribute__ ((vector_size (16)));
-	typedef union { v2di s; mp_limb_t x[2]; } v2di_proxy;
+	typedef union { v2di s; ulong x[2]; } v2di_proxy;
 #define SHL(x,r) (v2di)__builtin_ia32_psllqi128   ((x),(r))
 #define SHR(x,r) (v2di)__builtin_ia32_psrlqi128   ((x),(r))
 #define SHLD(x,r) (v2di)__builtin_ia32_pslldqi128 ((x),(r))

@@ -38,169 +38,202 @@
       (see instructions in tunefft.c).
 */
 
+#define _BSD_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
-#include <limits.h> /* for LONG_MAX */
+#include <limits.h>		/* for LONG_MAX */
 #include <assert.h>
-#include <NTL/GF2X.h>
+#include <string.h>
+#include <time.h>
+#include <ctype.h>
+#include <sys/utsname.h>        /* for uname */
+#include "gf2x.h"
+#include "timing.h"
+#include "replace.h"
 
-NTL_CLIENT
 
-#define TUNING
+struct hash_define replacements[100];
+unsigned int nrepl=0;
 
-#define BESTMAX 2048
+/* Peek into mul-toom.c */
+extern short best_tab[TOOM_TUNING_LIMIT];
+extern short best_utab[TOOM_TUNING_LIMIT];
 
-short best_tab[BESTMAX];
-
-short best_utab[] = {0};
-
-#include "HalfGCD.c"
+#define MINI_MUL_TOOM_THRESHOLD 	17
+#define MINI_MUL_TOOMW_THRESHOLD	8
+#define MINI_MUL_TOOM4_THRESHOLD	30
+#define MINI_MUL_TOOMU_THRESHOLD	33
 
 #define BESTMIN (MUL_KARA_THRESHOLD-1)
-
 #define BESTMINU (MUL_TOOMU_THRESHOLD-1)
 
-#define MINTIME 0.5 /* time resolution */
+#define MINTIME 0.5		/* time resolution */
 
 FILE *fp;
 
 #define TIME(x, i)				\
   { long j, k = 1;				\
-    double s0 = GetTime ();			\
+    double s0 = seconds ();			\
     do {					\
       for (j = 0; j < k; j++) (i);		\
       k = 2 * k;				\
-      x = GetTime () - s0;			\
+      x = seconds () - s0;			\
     } while (x < MINTIME);			\
     (x) = (x) / (k - 1);			\
   }
 
-void random (_ntl_ulong *a, long n)
+void random_wordstring(unsigned long *a, long n)
 {
-  for (long i = 0; i < n; i++)
-    a[i] = RandomWord ();
+    long i;
+    for (i = 0; i < n; i++)
+	a[i] = random();
 }
 
-void check (const _ntl_ulong *a, const _ntl_ulong *b, long n, long flag)
+void dump(const unsigned long *a, long m, const unsigned long *b, long n,
+	  const unsigned long *c, const unsigned long *d)
 {
-  for (long i = 0; i < n; i++)
-    {
-    if (a[i] != b[i])
-      {
-      if (flag == 2)
-        printf("Error detected: Toom3Mul and KarMul give different results\n");
-      if (flag == 3)
-        printf("Error detected: Toom3WMul and KarMul give different results\n");
-      if (flag == 4)
-        printf("Error detected: Toom4Mul and KarMul give different results\n");
-      if ((flag < 2) || (flag > 4))
-        printf("Error in call to check, illegal flag %ld\n", flag);
-      exit (1);  
-      }
-    }  
-} 
-
-void tunetoom (long tablesz)
+    printf("failed:=[");
+    printf("[");
+    int j;
+    for (j = 0; j < m; j++) {
+	if (j)
+	    printf(", ");
+	printf("%lu", a[j]);
+    }
+    printf("],");
+    printf("[");
+    for (j = 0; j < n; j++) {
+	if (j)
+	    printf(", ");
+	printf("%lu", b[j]);
+    }
+    printf("],");
+    printf("[");
+    for (j = 0; j < m + n; j++) {
+	if (j)
+	    printf(", ");
+	printf("%lu", c[j]);
+    }
+    printf("],");
+    printf("[");
+    for (j = 0; j < m + n; j++) {
+	if (j)
+	    printf(", ");
+	printf("%lu", d[j]);
+    }
+    printf("]");
+    printf("];\n");
+}
+void check(const unsigned long *a, long m,
+	   const unsigned long *b, long n,
+	   const unsigned long *c, const unsigned long *d, long flag)
 {
-  extern short best_tab[BESTMAX];
-  long high, n, k, i;
-  double T3[1], TK[1], TW[1], T4[1];
-  double mint;
-  _ntl_ulong *a, *b, *c, *d, *t;
-
-  high = tablesz;
-  if (high < BESTMIN) high = BESTMIN;
-    
-  if (high > BESTMAX)
-    {
-    printf ("Increase constant BESTMAX in tunetoom.c to %ld\n", high);
-    exit (1);
+    if (memcmp(c, d, (m + n) * sizeof(unsigned long)) != 0) {
+	if (flag == 2)
+	    printf
+		("Error detected: Toom3Mul and KarMul give different results\n");
+	if (flag == 3)
+	    printf
+		("Error detected: Toom3WMul and KarMul give different results\n");
+	if (flag == 4)
+	    printf
+		("Error detected: Toom4Mul and KarMul give different results\n");
+	if ((flag < 2) || (flag > 4))
+	    printf("Error in call to check, illegal flag %ld\n", flag);
+	dump(a, m, b, n, c, d);
+	abort();
     }
-    
-  for (n = 1; n <= BESTMAX; n++)
-    best_tab[n-1] = 1;  
-  
-  printf ("Generating entries best_tab[%ld..%ld]\n", 1, high);
-  fflush (stdout);
+}
 
-  a = (_ntl_ulong*) malloc (high * sizeof (_ntl_ulong));
-  b = (_ntl_ulong*) malloc (high * sizeof (_ntl_ulong));
-  c = (_ntl_ulong*) malloc (2 * high * sizeof (_ntl_ulong));
-  d = (_ntl_ulong*) malloc (2 * high * sizeof (_ntl_ulong));
-  t = (_ntl_ulong*) malloc (toomspace(high) * sizeof (_ntl_ulong));
 
-  for (n = BESTMIN+1; n <= high; n++)
+void tunetoom(long tablesz)
+{
+    long high, n, k;
+    double T3[1], TK[1], TW[1], T4[1];
+    double mint;
+    unsigned long *a, *b, *c, *d, *t;
 
-      {
-      TK[0] = T3[0] = TW[0] = T4[0] = 0.0;
-      printf ("%ld ", n);
-      fflush (stdout);
-      random (a, n);
-      random (b, n);
-      if (n >= MUL_KARA_THRESHOLD)
-        TIME (TK[0], KarMul (c, a, b, n, t));
-      if (n >= MUL_TOOM_THRESHOLD)
-        {
-        TIME (T3[0], Toom3Mul (d, a, b, n, t));
-        check (c, d, 2*n, 2);
-        }
-      if (n >= MUL_TOOMW_THRESHOLD)
-        {
-        TIME (TW[0], Toom3WMul (d, a, b, n, t));
-        check (c, d, 2*n, 3);
-        }
-      if (n >= MUL_TOOM4_THRESHOLD)   
-        {
-        TIME (T4[0], Toom4Mul (d, a, b, n, t));
-        check (c, d, 2*n, 4);
-        }
-      printf ("TC2:%1.2e TC3:%1.2e TC3W:%1.2e TC4:%1.2e ", 
-      	       TK[0], T3[0], TW[0], T4[0]);
-      mint = TK[0];
-      k = 1;
-      if ((T3[0] < mint) && (n >= MUL_TOOM_THRESHOLD))
-        { mint = T3[0]; k = 2; }
-      if ((TW[0] < mint) && (n >= MUL_TOOMW_THRESHOLD)) 
-        { mint = TW[0]; k = 3; }
-      if ((T4[0] < mint) && (n >= MUL_TOOM4_THRESHOLD))
-        { mint = T4[0]; k = 4; }
-      best_tab[n-1] = (short)k;			// Final value of best_tab[n]  
-      printf ("best:%1.2e ", mint);
-      if (k == 1) printf("TC2");
-      if (k == 2) printf("TC3");
-      if (k == 3) printf("TC3W");
-      if (k == 4) printf("TC4");
-      printf ("\n");
-      fflush (stdout);
-      }
+    high = tablesz;
+    if (high < BESTMIN)
+	high = BESTMIN;
 
-  free (a);
-  free (b);
-  free (c);
-  free (d);
-  free (t);
-
-  while (best_tab[high-1] == 4) 
-    high--;				// No need to include final "4" entries
-
-  fprintf (fp, "/* file automatically generated, edit at your peril */\n\n");
-  fprintf (fp, "#define BEST_TOOM_TABLE {\\\n");
-
-  for (n = 1; n <= high; n++) 
-    {
-    if ((n-1)%20 == 0)
-      fprintf (fp, "      ");
-    fprintf (fp, "%d", best_tab[n-1]);			// Write new values
-    if (n == high)
-      fprintf (fp, " }\n");
-    else
-      {
-      fprintf (fp, ",");
-      if (n%20 == 0)
-        fprintf (fp, "\\\n");
-      }
+    if (high > TOOM_TUNING_LIMIT) {
+	printf
+	    ("Increase constant TOOM_TUNING_LIMIT in thresholds.h to %ld\n",
+	     high);
+	exit(1);
     }
-  return;
+
+    for (n = 1; n <= TOOM_TUNING_LIMIT; n++)
+	best_tab[n - 1] = 0;
+
+    printf("Generating entries best_tab[%ld..%ld]\n", 1L, high);
+    fflush(stdout);
+
+    a = (unsigned long *) malloc(high * sizeof(unsigned long));
+    b = (unsigned long *) malloc(high * sizeof(unsigned long));
+    c = (unsigned long *) malloc(2 * high * sizeof(unsigned long));
+    d = (unsigned long *) malloc(2 * high * sizeof(unsigned long));
+    t = (unsigned long *) malloc(toomspace(high) * sizeof(unsigned long));
+
+    for (n = BESTMIN + 1; n <= high; n++) {
+	srandom(1);
+	TK[0] = T3[0] = TW[0] = T4[0] = 0.0;
+	printf("%ld ", n);
+	fflush(stdout);
+	random_wordstring(a, n);
+	random_wordstring(b, n);
+	if (n >= MUL_KARA_THRESHOLD)
+	    TIME(TK[0], mul_kara(c, a, b, n, t));
+	if (n >= MINI_MUL_TOOM_THRESHOLD) {
+	    TIME(T3[0], mul_tc3(d, a, b, n, t));
+	    check(a, n, b, n, c, d, 2);
+	}
+	if (n >= MINI_MUL_TOOMW_THRESHOLD) {
+	    TIME(TW[0], mul_tc3w(d, a, b, n, t));
+	    check(a, n, b, n, c, d, 3);
+	}
+	if (n >= MINI_MUL_TOOM4_THRESHOLD) {
+	    TIME(T4[0], mul_tc4(d, a, b, n, t));
+	    check(a, n, b, n, c, d, 3);
+	}
+	printf("TC2:%1.2e TC3:%1.2e TC3W:%1.2e TC4:%1.2e ",
+	       TK[0], T3[0], TW[0], T4[0]);
+	mint = TK[0];
+	k = GF2X_SELECT_KARA;
+	if ((T3[0] < mint) && (n >= MINI_MUL_TOOM_THRESHOLD)) {
+	    mint = T3[0];
+	    k = GF2X_SELECT_TC3;
+	}
+	if ((TW[0] < mint) && (n >= MINI_MUL_TOOMW_THRESHOLD)) {
+	    mint = TW[0];
+	    k = GF2X_SELECT_TC3W;
+	}
+	if ((T4[0] < mint) && (n >= MINI_MUL_TOOM4_THRESHOLD)) {
+	    mint = T4[0];
+	    k = GF2X_SELECT_TC4;
+	}
+	best_tab[n - 1] = (short) k;	// Final value of best_tab[n]  
+	printf("best:%1.2e ", mint);
+	if (k == GF2X_SELECT_KARA)
+	    printf("TC2");
+	if (k == GF2X_SELECT_TC3)
+	    printf("TC3");
+	if (k == GF2X_SELECT_TC3W)
+	    printf("TC3W");
+	if (k == GF2X_SELECT_TC4)
+	    printf("TC4");
+	printf("\n");
+	fflush(stdout);
+    }
+
+    free(a);
+    free(b);
+    free(c);
+    free(d);
+    free(t);
+
+    return;
 }
 
 /* Forms c := a*b where b has size sb, a has size sa = (sb+1)/2 (words),
@@ -209,180 +242,303 @@ void tunetoom (long tablesz)
    
    The code is essentially the same as in HalfGCD.c   */
 
-static void mul21 (_ntl_ulong *c, const _ntl_ulong *b, long sb,
-                    const _ntl_ulong *a, _ntl_ulong *stk)
-              
+static void mul21(unsigned long *c, const unsigned long *b, long sb,
+		  const unsigned long *a, unsigned long *stk)
 {
-  long i, j;
-  long sa = (sb+1)/2;
-  long sc = sa + sb;
-  _ntl_ulong *v;
-  v = stk;
-  stk += 2*sa;
-  for (i = 0; i < sc; i++)
-    c[i] = 0; 
-  do 
-    {
-    if (sa == 0)
-      break;
+    long i, j;
+    long sa = (sb + 1) / 2;
+    long sc = sa + sb;
+    unsigned long *v;
+    v = stk;
+    stk += 2 * sa;
+    for (i = 0; i < sc; i++)
+	c[i] = 0;
+    do {
+	if (sa == 0)
+	    break;
 
-    if (sa == 1)
-      {
-      c[sb] ^= AddMul1 (c, c, b, sb, a[0]);
-      break;
-      }
-              
-    for (i = 0; i+sa <= sb; i += sa)
-      {
-      Toom (v, a, b + i, sa, stk);	    // Generic Toom-Cook mult.
-      for (j = 0; j < 2*sa; j++)
-        c[i+j] ^= v[j];
-      }  
+	if (sa == 1) {
+	    c[sb] ^= addmul_1_n(c, c, b, sb, a[0]);
+	    break;
+	}
 
-    { const _ntl_ulong *t; t = a; a = b + i; b = t; }
-    { long t; t = sa; sa = sb - i; sb = t; }
-    c = c + i;
+	for (i = 0; i + sa <= sb; i += sa) {
+	    mul_toom(v, a, b + i, sa, stk);	// Generic Toom-Cook mult.
+	    for (j = 0; j < 2 * sa; j++)
+		c[i + j] ^= v[j];
+	}
+
+	{
+	    const unsigned long *t;
+	    t = a;
+	    a = b + i;
+	    b = t;
+	}
+	{
+	    long t;
+	    t = sa;
+	    sa = sb - i;
+	    sb = t;
+	}
+	c = c + i;
     }
-  while (1);
+    while (1);
 }
 
-void checku (const _ntl_ulong *a, const _ntl_ulong *b, long n)
+void checku(const unsigned long *a, const unsigned long *b, long n)
 {
-  for (long i = 0; i < n; i++)
-    {
-    if (a[i] != b[i])
-      {
-      printf("Error detected: Toom3uMul and default give different results\n");
-      printf("index %ld\n", i);
-      exit (1);  
-      }
-    }  
-} 
-
-void tuneutoom (long tabsz)
-
-{
-  short best_utab[BESTMAX];
-  long high, n, k, i;
-  double T3[1], TK[1];
-  double mint;
-  _ntl_ulong *a, *b, *c, *d, *t;
-
-  high = tabsz;
-  if (high < BESTMINU) high = BESTMINU;
-    
-  if (high > BESTMAX)
-    {
-    printf ("Increase constant BESTMAX in tuneutoom.c to %ld\n", high);
-    exit (1);
+    long i;
+    for (i = 0; i < n; i++) {
+	if (a[i] != b[i]) {
+	    printf
+		("Error detected: mul_toom3u and default give different results\n");
+	    printf("index %ld\n", i);
+	    exit(1);
+	}
     }
-    
-  for (n = 1; n <= BESTMAX; n++)
-    best_utab[n-1] = 0;  
-  
-  printf ("Generating entries best_utab[%ld..%ld]\n", 1, high);
-  fflush (stdout);
+}
 
-  long sa = high;
-  long sb = (sa+1)/2;
+void tuneutoom(long tabsz)
+{
+    long high, n, k;
+    double T3[1], TK[1];
+    double mint;
+    unsigned long *a, *b, *c, *d, *t;
 
-  long sp1 = toomuspace(sa);		// space for Toom3uMul
-  long sp2 = toomspace(sb) + 2*sb;	// space for mul21
-  long sp = (sp1 > sp2) ? sp1 : sp2;
-      
-  a = (_ntl_ulong*) malloc (sa * sizeof (_ntl_ulong));
-  b = (_ntl_ulong*) malloc (sb * sizeof (_ntl_ulong));
-  c = (_ntl_ulong*) malloc (3 * sb * sizeof (_ntl_ulong));
-  d = (_ntl_ulong*) malloc (3 * sb * sizeof (_ntl_ulong));
-  t = (_ntl_ulong*) malloc (sp * sizeof (_ntl_ulong));
+    high = tabsz;
+    if (high < BESTMINU)
+	high = BESTMINU;
 
-  
-  for (sa = BESTMINU; sa <= high; sa++)
-      {
-      sb = (sa+1)/2;
-      random (a, sa);
-      random (b, sb);
-      TK[0] = T3[0] = 0.0;
-      printf ("%ld ", sa);
-      fflush (stdout);
-      TIME (TK[0], mul21 (c, a, sa, b, t));
-      if (sa >= MUL_TOOMU_THRESHOLD)
-        {
-        TIME (T3[0], Toom3uMul (d, a, sa, b, t));
-        checku (c, d, sa+sb);
+    if (high > TOOM_TUNING_LIMIT) {
+	printf
+	    ("Increase constant TOOM_TUNING_LIMIT in thresholds.c to %ld\n",
+	     high);
+	exit(1);
+    }
+
+    for (n = 1; n <= TOOM_TUNING_LIMIT; n++)
+	best_utab[n - 1] = 0;
+
+    printf("Generating entries best_utab[%ld..%ld]\n", 1L, high);
+    fflush(stdout);
+
+    long sa = high;
+    long sb = (sa + 1) / 2;
+
+    long sp1 = toomuspace(sa);	// space for mul_toom3u
+    long sp2 = toomspace(sb) + 2 * sb;	// space for mul21
+    long sp = (sp1 > sp2) ? sp1 : sp2;
+
+    a = (unsigned long *) malloc(sa * sizeof(unsigned long));
+    b = (unsigned long *) malloc(sb * sizeof(unsigned long));
+    c = (unsigned long *) malloc(3 * sb * sizeof(unsigned long));
+    d = (unsigned long *) malloc(3 * sb * sizeof(unsigned long));
+    t = (unsigned long *) malloc(sp * sizeof(unsigned long));
+
+
+    for (sa = BESTMINU + 1; sa <= high; sa++) {
+	sb = (sa + 1) / 2;
+	random_wordstring(a, sa);
+	random_wordstring(b, sb);
+	TK[0] = T3[0] = 0.0;
+	printf("%ld ", sa);
+	fflush(stdout);
+	TIME(TK[0], mul21(c, a, sa, b, t));
+	if (sa >= MINI_MUL_TOOMU_THRESHOLD) {
+	    TIME(T3[0], mul_tc3u(d, a, sa, b, t));
+	    checku(c, d, sa + sb);
+	}
+	printf("default:%1.2e TC3U:%1.2e ", TK[0], T3[0]);
+	mint = TK[0];
+	k = GF2X_SELECT_UNB_DFLT;
+	if ((T3[0] < mint) && (sa >= MINI_MUL_TOOMU_THRESHOLD)) {
+	    mint = T3[0];
+	    k = GF2X_SELECT_UNB_TC3U;
+	}
+	best_utab[sa - 1] = (short) k;	// Final value
+	printf("best:%1.2e ", mint);
+	if (k == GF2X_SELECT_UNB_DFLT)
+	    printf("default");
+	if (k == GF2X_SELECT_UNB_TC3U)
+	    printf("TC3U");
+	printf("\n");
+	fflush(stdout);
+    }
+
+    free(a);
+    free(b);
+    free(c);
+    free(d);
+    free(t);
+
+    return;
+}
+
+void prepare_and_push_hash_define_tbl(const char * name, short * tbl, size_t n)
+{
+    size_t sz = 3 + 3*n+(n+19)/20*4 + 10;
+    size_t h = 0;
+    char * table_string = malloc(sz);
+    size_t i;
+
+    h += snprintf(table_string + h, sz-h, "{");
+    for (i = 1 ; i <= n ; i++) {
+        if ((i-1) % 20 == 0) {
+            h += snprintf(table_string + h, sz-h, "\t\\\n\t");
         }
-      printf ("default:%1.2e TC3U:%1.2e ", TK[0], T3[0]);
-      mint = TK[0];
-      k = 0;
-      if ((T3[0] < mint) && (sa >= MUL_TOOMU_THRESHOLD))
-        { mint = T3[0]; k = 1; }
-      best_utab[sa-1] = (short)k;		// Final value
-      printf ("best:%1.2e ", mint);
-      if (k == 0) printf("default");
-      if (k == 1) printf("TC3U");
-      printf ("\n");
-      fflush (stdout);
-      }
-
-  free (a);
-  free (b);
-  free (c);
-  free (d);
-  free (t);
-
-  while (best_utab[high-1] == 1) 
-    high--;				// No need to include final "1" entries
-
-  fprintf (fp, "\n#define BEST_UTOOM_TABLE {\\\n");
-
-  for (n = 1; n <= high; n++) 
-    {
-    if ((n-1)%20 == 0)
-      fprintf (fp, "      ");
-    fprintf (fp, "%d", best_utab[n-1]);			// Write new values
-    if (n == high)
-      fprintf (fp, " }\n");
-    else
-      {
-      fprintf (fp, ",");
-      if (n%20 == 0)
-        fprintf (fp, "\\\n");
-      }
+        h += snprintf(table_string + h, sz-h, "%d, ", tbl[i-1]);
     }
+    h += snprintf(table_string + h, sz-h, "}\n");
+    if (h >= sz) abort();
 
-  return;
+    set_hash_define(replacements + nrepl++, name, table_string);
+
+    free(table_string);
 }
 
-int main (int argc, char *argv[])
+
+void print_tuning_results(unsigned int blim, unsigned int ulim)
 {
-  long tabsz1, tabsz2;
-  if ((argc != 2) && (argc != 3))
-    {
-      fprintf (stderr, "Usage: tunetoom table-size1 [table-size2]\n");
-      fprintf (stderr, " where %ld <= table-size1 <= %ld\n", 
-               BESTMIN, BESTMAX);
-      fprintf (stderr, " and  %ld <= table-size2 <= %ld\n", 
-               BESTMINU, BESTMAX);
-      exit (1);
+    /* Get the values for the balanced thresholds:
+     * MUL_TOOM_THRESHOLD
+     * MUL_TOOMW_THRESHOLD
+     * MUL_TOOM4_THRESHOLD
+     * MUL_TOOM4_ALWAYS_THRESHOLD
+     */
+    unsigned int t3 = UINT_MAX;
+    unsigned int tw = UINT_MAX;
+    unsigned int t4 = UINT_MAX;
+    unsigned int t4a = UINT_MAX;
+
+    unsigned int i;
+
+    for (i = BESTMIN + 1; i <= blim; i++) {
+	if (best_tab[i - 1] == GF2X_SELECT_TC3) {
+	    t3 = i;
+	    break;
+	}
+    }
+    for (i = BESTMIN + 1; i <= blim; i++) {
+	if (best_tab[i - 1] == GF2X_SELECT_TC3W) {
+	    tw = i;
+	    break;
+	}
+    }
+    for (i = BESTMIN + 1; i <= blim; i++) {
+	if (best_tab[i - 1] == GF2X_SELECT_TC4) {
+	    t4 = i;
+	    break;
+	}
+    }
+    if (t4 < blim) {
+	for (t4a = t4; t4a >= MINI_MUL_TOOM4_THRESHOLD; t4a--) {
+	    if (best_tab[t4a - 1] != GF2X_SELECT_TC4) {
+		t4a++;
+		break;
+	    }
+	}
+    } else {
+        t4 = blim;
+	t4a = blim;
+    }
+    /* Now do some sanity checks */
+
+    int err = 0;
+
+    if (!(tw <= t3)) {
+	fprintf(stderr,
+		"MUL_TOOMW_THRESHOLD(%d) must be below MUL_TOOM_THRESHOLD(%d)\n",
+		tw, t3);
+	err = 1;
     }
 
-  tabsz1 = tabsz2 = atoi (argv[1]);
-  if (argc == 3)
-  tabsz2 = atoi (argv[2]);
+    set_hash_define_int(replacements + nrepl++, "MUL_TOOM_THRESHOLD", t3);
+    set_hash_define_int(replacements + nrepl++, "MUL_TOOMW_THRESHOLD", tw);
+    set_hash_define_int(replacements + nrepl++, "MUL_TOOM4_THRESHOLD", t4);
+    set_hash_define_int(replacements + nrepl++,
+            "MUL_TOOM4_ALWAYS_THRESHOLD", t4a);
+    prepare_and_push_hash_define_tbl("BEST_TOOM_TABLE", best_tab, t4a);
+    /* Get the values for the unbalanced thresholds:
+     * MUL_TOOM3U_THRESHOLD
+     * MUL_TOOM3U_ALWAYS_THRESHOLD
+     */
+    unsigned int tu = UINT_MAX;
+    unsigned int tua = UINT_MAX;
 
-  fp = fopen ("besttoom.h", "w");
+    for (i = BESTMINU + 1; i <= ulim; i++) {
+	if (best_utab[i - 1] == GF2X_SELECT_UNB_TC3U) {
+	    tu = i;
+	    break;
+	}
+    }
+    if (tu < ulim) {
+	for (tua = tu; tua >= MINI_MUL_TOOMU_THRESHOLD; tua--) {
+	    if (best_utab[tua - 1] != GF2X_SELECT_UNB_TC3U) {
+		tua++;
+		break;
+	    }
+	}
+    } else {
+        tu = ulim;
+	tua = ulim;
+    }
+    set_hash_define_int(replacements + nrepl++, "MUL_TOOMU_THRESHOLD", tu);
+    set_hash_define_int(replacements + nrepl++, "MUL_TOOMU_ALWAYS_THRESHOLD", tua);
+    prepare_and_push_hash_define_tbl("BEST_UTOOM_TABLE",best_utab,tua);
 
-  tunetoom (tabsz1);		// Tune balanced routines
+    if (err) {
+        printf("/* Warning: Something fishy happened with this tuning */\n");
+    }
 
-  fflush (fp);
-  
-  tuneutoom (tabsz2);		// Tune unbalanced routines
-  
-  fclose (fp);
+    {
+        char id[80];
+        char date[40];
+        time_t t;
+        size_t u;
+        struct utsname buf;
+        time(&t);
+        ctime_r(&t, date);
+        u = strlen(date);
+        for(;u && isspace(date[u-1]);date[--u]='\0');
+        uname(&buf);
+        snprintf(id,sizeof(id),"\"%s (%d %d) run on %s on %s\"",
+                __FILE__,blim,ulim,buf.nodename,date);
+        set_hash_define(replacements + nrepl++, "TOOM_TUNING_INFO", id);
+    }
 
-  printf ("tunetoom finished, output in besttoom.h\n");
-  fflush (stdout);
-
-  return 0;
+    replace(replacements, nrepl, "thresholds.h");
+    for(i = 0 ; i < nrepl; i++ ) {
+        free(replacements[i].identifier);
+        free(replacements[i].string);
+    }
 }
 
+int main(int argc, char *argv[])
+{
+    long tabsz1, tabsz2;
+    if ((argc != 2) && (argc != 3)) {
+	fprintf(stderr, "Usage: tunetoom table-size1 [table-size2]\n");
+	fprintf(stderr, " where %d <= table-size1 <= %d\n",
+		BESTMIN, TOOM_TUNING_LIMIT);
+	fprintf(stderr, " and  %d <= table-size2 <= %d\n",
+		BESTMINU, TOOM_TUNING_LIMIT);
+	exit(1);
+    }
+
+
+    tabsz1 = tabsz2 = atoi(argv[1]);
+    if (argc == 3)
+	tabsz2 = atoi(argv[2]);
+
+    tunetoom(tabsz1);		// Tune balanced routines
+
+    tuneutoom(tabsz2);		// Tune unbalanced routines
+
+    print_tuning_results(tabsz1, tabsz2);
+
+    fflush(stdout);
+
+    return 0;
+}
+
+/* vim: set sw=4 sta et: */

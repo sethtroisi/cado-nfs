@@ -45,28 +45,13 @@ long mulktm = 0x3fffff;		// mask for mul1kt, mul2kt
 long addktm = 0xffff;		// mask for Mul1kt, Add1kt
 long mul1kt = 0;		// counts calls to mul1 or mul1rpb
 long mul2kt = 0;		// counts calls to mul2 or mul2t
-long Mul1kt = 0;		// counts calls to Mul1
-long Mul1kts = 0;		// sum of sizes sb in calls to Mul1
-long Add1kt = 0;		// counts calls to AddMul1
-long Add1kts = 0;		// sum of sizes sb in calls to AddMul1
+long Mul1kt = 0;		// counts calls to mul_1_n
+long Mul1kts = 0;		// sum of sizes sb in calls to mul_1_n
+long Add1kt = 0;		// counts calls to addmul_1_n
+long Add1kts = 0;		// sum of sizes sb in calls to addmul_1_n
 #endif
 
-#ifdef BOGONG
-#include "mul1rpb.c"	// faster than mul1 on bogong
-#else
-#include "mul1.c"	// generate with gen_bb_mul_code 64/32 5/4 0
-#endif 
-
-#include "Mul1.c"	// generate with gen_bb_mul_code 64/32 5/4 1		
-#include "AddMul1.c"	// generate with gen_bb_mul_code 64/32 5/4 2
-#include "TC.h"
-#include "mul.c"
-#include "mulfft-bit.c"
-#include "mparam.h"
-
-#ifdef MUL_FFT_TABLE
-long T_FFT_TAB[][2] = MUL_FFT_TABLE;
-#endif
+#include "gf2x.h"
 
 class GF2XMatrix {
 private:
@@ -84,22 +69,6 @@ public:
    const GF2X& operator() (long i, long j) const { return elts[i][j]; }
 };
 
-/* an >= bn > 0 */
-static void
-mul_basecase (_ntl_ulong *cp, const _ntl_ulong *ap, long an,
-              const _ntl_ulong *bp, long bn)
-{
-  if (an == 1) /* then bn=1 since an >= bn */
-    {
-      mul1 (cp, ap[0], bp[0]);
-      return;
-    }
-
-  cp[an] = Mul1 (cp, ap, an, bp[0]);
-  for (long i = 1; i < bn; i++)
-    cp[an + i] = AddMul1 (cp + i, cp + i, ap, an, bp[i]);
-}
-
 void mul_gen (GF2X& c, const GF2X& a, const GF2X& b)
 {
   long sa = a.xrep.length();
@@ -114,10 +83,9 @@ void mul_gen (GF2X& c, const GF2X& a, const GF2X& b)
   // the general case
    
   static WordVector mem;
-  static WordVector stk;
-  static WordVector vec;
 
-  const _ntl_ulong *ap, *bp;
+  const _ntl_ulong *ap = a.xrep.elts();
+  const _ntl_ulong *bp = b.xrep.elts();
   _ntl_ulong *cp;
 
   long sc = sa + sb;
@@ -135,108 +103,12 @@ void mul_gen (GF2X& c, const GF2X& a, const GF2X& b)
       cp = c.xrep.elts();
     }
 
-  long n, hn, sp1, sp2, sp;
+  mul_gf2x(cp, ap, sa, bp, sb);
 
-  n = min(sa, sb);
-  
-  if (sa > sb)
-    {
-      { long t; t = sa; sa = sb; sb = t; }
-      ap = b.xrep.elts();
-      bp = a.xrep.elts();
-    }
-  else
-    {
-      ap = a.xrep.elts();
-      bp = b.xrep.elts();
-    }
-
-  // now sa <= sb (note: sa and sb are interchanged in Toom3uMul etc
-
-  if (sa < MUL_SMALL_THRESHOLD)
-    mul_basecase (cp, bp, sb, ap, sa);
-  else
-    {
-#ifdef MUL_FFT_TABLE
-      long ix, K, sab = sc/2;
-      long FFT2;
-      for (ix = 0; T_FFT_TAB[ix+1][0] <= sab; ix ++);
-      /* now T_FFT_TAB[ix][0] <= sab < T_FFT_TAB[ix+1][0] */
-      K = T_FFT_TAB[ix][1];
-      if (K < 0)
-        {
-        FFT2 = 1;
-        K = -K;
-        }
-      else
-        FFT2 = 0;  
-        
-      if ((K >= 3) && (sc >= MUL_FFT_THRESHOLD))
-      
-      		  /* FFTMul can handle unbalanced operands if not too
-      		     small: return the result in {cp, sa+sb} */
-	{
-	if (FFT2)
-          FFTMul2 (cp, ap, sa, bp, sb, K);	// Split FFT into two
-       else  
-          FFTMul (cp, ap, sa, bp, sb, K);	// Don't split here
-        }
-      else
-#endif
-        {
-        sp1 = toomspace(n);		// Space for balanced TC routines
-        sp2 = toomuspace(2*n);		// Space for unbalanced TC routines
-        sp = max(sp1, sp2); 		// Worst-case space required
-                                        // Simpler bound is 7*(n+10)
-        stk.SetLength(sp);
-        _ntl_ulong *stk_p = stk.elts();
-
-        if (sa == sb)
-          Toom (cp, ap, bp, sa, stk_p);		// Avoid copy in common case
-
-        else if ((sa == (sb+1)/2) && BestuToom(sb)) // Another common case
-          Toom3uMul (cp, bp, sb, ap, stk_p);	    // due to GCD algorithm
-
-        else
-
-          {
-          vec.SetLength (2 * sa);
-          _ntl_ulong *v = vec.elts();
-      
-          long i, j;
-
-          for (i = 0; i < sc; i++)
-            cp[i] = 0;
-
-          do 
-            {
-            if (sa == 0)
-              break;
-
-            if (sa == 1)
-              {
-              cp[sb] ^= AddMul1 (cp, cp, bp, sb, ap[0]);
-              break;
-              }
-          
-            // finally: the general case
-
-            for (i = 0; i+sa <= sb; i += sa)
-              {
-              Toom (v, ap, bp + i, sa, stk_p);	    // Generic Toom-Cook mult.
-              for (j = 0; j < 2*sa; j++)
-                cp[i+j] ^= v[j];
-              }  
-
-            { const _ntl_ulong *t; t = ap; ap = bp + i; bp = t; }
-            { long t; t = sa; sa = sb - i; sb = t; }
-            cp = cp + i;
-            } 
-          while (1);
-          }
-        }  
-    }
-
+  /* FIXME
+   * This does an extra copy, which shouldn't be technically necessary if
+   * we allow moving c's data pointer behind the scenes. 
+   */
   if (in_mem)
     c.xrep = mem;
 

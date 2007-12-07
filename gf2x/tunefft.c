@@ -31,216 +31,264 @@
    3) compile factor.c.
 */
 
+#define _BSD_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
-#include <limits.h> /* for LONG_MAX */
-#include <NTL/GF2X.h>
-
-NTL_CLIENT
+#include <string.h>
+#include <ctype.h>
+#include <limits.h>		/* for LONG_MAX */
+#include <time.h>
+#include <sys/utsname.h>	/* for uname */
+#include "gf2x.h"
+#include "timing.h"
+#include "replace.h"
 
 /* This version of tunefft uses the midpoint of each stair */
-   
-#define MUL_FFT_THRESHOLD 1000		/* Must be at least 28, but it
-					   saves time to set larger */
+
+/* Must be at least 28, but it saves time to set larger */
+#define MUL_FFT_THRESHOLD 1000
+
 #define STEPMAX 50
 
-#include "HalfGCD.c"
 
-#define MINTIME 0.5 /* time resolution */
+struct hash_define replacements[100];
+unsigned int nrepl = 0;
+
+#define MINTIME 0.5		/* time resolution */
 
 #define TIME(x, i)				\
   { long j, k = 1;				\
-    double s0 = GetTime ();			\
+    double s0 = seconds ();			\
     do {					\
       for (j = 0; j < k; j++) (i);		\
       k = 2 * k;				\
-      x = GetTime () - s0;			\
+      x = seconds () - s0;			\
     } while (x < MINTIME);			\
     (x) = (x) / (k - 1);			\
   }
 
 /* Return the largest m >= n such that a product of m*m words with an FFT of
    length K leads to the same size of pointwise products as with n words.
-   More precisely if f(n) = K/3 * ceil(6*n*NTL_BITS_PER_LONG/K^2) then m is the
+   More precisely if f(n) = K/3 * ceil(6*n*WORDSIZE/K^2) then m is the
    largest integer such that
-   ceil(f(n)/NTL_BITS_PER_LONG) = ceil(f(m)/NTL_BITS_PER_LONG).
+   ceil(f(n)/WORDSIZE) = ceil(f(m)/WORDSIZE).
    In fact we take for m the largest integer such that g(n) = g(m) with
-   g(n) = ceil(6*n*NTL_BITS_PER_LONG/K^2).
+   g(n) = ceil(6*n*WORDSIZE/K^2).
 */
 
-long end_of_stair (long n, long K)
+long end_of_stair(long n, long K)
 {
-  long g = 6 * n * NTL_BITS_PER_LONG;
-  
-  g = 1 + (g - 1) / K; /* ceil(g/K) */
-  g = 1 + (g - 1) / K; /* ceil(g/K^2) */
-  g = g * K * K;
-  return g / (6 * NTL_BITS_PER_LONG);
+    long g = 6 * n * WORDSIZE;
+
+    g = 1 + (g - 1) / K;	/* ceil(g/K) */
+    g = 1 + (g - 1) / K;	/* ceil(g/K^2) */
+    g = g * K * K;
+    return g / (6 * WORDSIZE);
 }
 
-long next_step (long n, long K)
+long next_step(long n, long K)
 {
-  long n1 = end_of_stair (n, K);		// Next stair
-  long n2 = n + (n + STEPMAX - 1)/STEPMAX;	// ceil(n*(1.0 + 1.0/STEPMAX)
-  if (n1 < n2)
-    return n1;					// Return the minimum so
-  else						// steps are not too large
-    return n2;  
+    long n1 = end_of_stair(n, K);	// Next stair
+    long n2 = n + (n + STEPMAX - 1) / STEPMAX;	// ceil(n*(1.0 + 1.0/STEPMAX)
+    if (n1 < n2)
+	return n1;		// Return the minimum so
+    else			// steps are not too large
+	return n2;
 }
 
-void random (_ntl_ulong *a, long n)
+void random_wordstring(ulong * a, long n)
 {
-  for (long i = 0; i < n; i++)
-    a[i] = RandomWord ();
+    for (long i = 0; i < n; i++)
+	a[i] = random();
 }
 
-void check (const _ntl_ulong *a, const _ntl_ulong *b, long n, 
-	long K, long flag)
+void check(const ulong * a, const ulong * b, long n, long K, long flag)
 {
-  for (long i = 0; i < n; i++)
-    {
-    if (a[i] != b[i])
-      {
-      printf("\nError detected: FFT%ld (K=%ld) and Toom differ at %ld\n",
-        flag, K, n);
-      exit (1);  
-      }
-    }  
-} 
+    for (long i = 0; i < n; i++) {
+	if (a[i] != b[i]) {
+	    printf
+		("\nError detected: FFT%ld (K=%ld) and Toom differ at %ld\n",
+		 flag, K, n);
+	    exit(1);
+	}
+    }
+}
 
-int main (int argc, char *argv[])
+struct fft_tuning_pair {
+    long sz;
+    int method;
+};
+
+void prepare_and_push_hash_define_fft_tbl(const char *name,
+					  struct fft_tuning_pair *tbl,
+					  size_t n)
 {
-  long maxn, mid, n, n1, n2, ns, i, fpkt;
-  long besti; /* 0 for TC, 1, 2, ... for FFT(K0*3^(bestK-1)) */
-  long bestK, oldbestK = -1;
-  long K, K0 = 3; /* try K0, 3*K0, 9*K0 */
-  double T[4]; /* T[0] is for TC, T[1] for K0, T[2] for 3*K0, T[3] for 9*K0 */
-  double t1[4], t2[4];
-  _ntl_ulong *a, *b, *c, *t, *u;
-  FILE *fp;
+    size_t sz = 10 + 30 * n;
+    size_t h = 0;
+    char *table_string = malloc(sz);
+    size_t i;
 
-  if (argc != 2)
-    {
-      fprintf (stderr, "Usage: tunefft max_word_size\n");
-      exit (1);
+    h += snprintf(table_string + h, sz - h, "{");
+    for (i = 0; i < n; i++) {
+	if (i % 4 == 0) {
+	    h += snprintf(table_string + h, sz - h, "\t\\\n\t");
+	}
+	h += snprintf(table_string + h, sz - h, "{ %ld, %d }, ", tbl[i].sz,
+		      tbl[i].method);
+    }
+    h += snprintf(table_string + h, sz - h, "}\n");
+    if (h >= sz)
+	abort();
+
+    set_hash_define(replacements + nrepl++, name, table_string);
+
+    free(table_string);
+}
+
+struct fft_tuning_pair fft_tbl[1000];
+unsigned int nstairs = 0;
+
+int main(int argc, char *argv[])
+{
+    long maxn, mid, n, n1, n2, ns, i;
+    long besti;			/* 0 for TC, 1, 2, ... for FFT(K0*3^(bestK-1)) */
+    long bestK, oldbestK = -1;
+    long K, K0 = 3;		/* try K0, 3*K0, 9*K0 */
+    double T[4];		/* T[0] is for TC, T[1] for K0, T[2] for 3*K0, T[3] for 9*K0 */
+    double t1[4], t2[4];
+    ulong *a, *b, *c, *t, *u;
+
+    n1=0; /* hush gcc */
+
+    if (argc != 2) {
+	fprintf(stderr, "Usage: tunefft max_word_size\n");
+	exit(1);
     }
 
-  maxn = atoi (argv[1]);
-  if (maxn <= 0) maxn = 1000000;		// default
+    maxn = atoi(argv[1]);
+    if (maxn <= 0)
+	maxn = 1000000;		// default
 
-  printf ("Tuning FFT multiplication to wordsize %ld\n\n", maxn);
+    printf("Tuning FFT multiplication to wordsize %ld\n\n", maxn);
 
-  fp = fopen ("mparam.h", "w");
-  fpkt = 0;
-  fprintf (fp, "/* file automatically generated, do not edit  */\n");
-  fprintf (fp, "/* {n, K} means use FFT(|K|) up from n words, */\n"); 
-  fprintf (fp, "/* where K=1 stands for Toom-Cook 3, K < 0 means use FFT2 */\n");
-  fprintf (fp, "#define MUL_FFT_TABLE {");
-  fflush (fp);
+    a = (ulong *) malloc(maxn * sizeof(ulong));
+    b = (ulong *) malloc(maxn * sizeof(ulong));
+    c = (ulong *) malloc(2 * maxn * sizeof(ulong));
+    u = (ulong *) malloc(2 * maxn * sizeof(ulong));
+    t = (ulong *) malloc(toomspace(maxn) * sizeof(ulong));
 
-  a = (_ntl_ulong*) malloc (maxn * sizeof (_ntl_ulong));
-  b = (_ntl_ulong*) malloc (maxn * sizeof (_ntl_ulong));
-  c = (_ntl_ulong*) malloc (2 * maxn * sizeof (_ntl_ulong));
-  u = (_ntl_ulong*) malloc (2 * maxn * sizeof (_ntl_ulong));
-  t = (_ntl_ulong*) malloc (toomspace(maxn) * sizeof (_ntl_ulong));
-
-  random (a, maxn);
-  random (b, maxn);
+    random_wordstring(a, maxn);
+    random_wordstring(b, maxn);
 
 /* Skip n if (2*n < MUL_FFT_THRESHOLD) as this is too small for the FFT */
 
-  for (n = MUL_FFT_THRESHOLD/2 + 1; n <= maxn;)
-    {
-      n2 = next_step (n, 3 * K0);			// End of interval
-      if (n2 > maxn)					// Only go as far
-        n2 = maxn;					// as maxn.
-      mid = (n + n2)/2;					// Mid-point
-      printf ("%ld..%ld ", n, n2);
-      fflush (stdout);
-        
-      TIME (T[0], Toom (u, a, b, mid, t));		// Time Toom-Cook
-      printf ("TC:%1.1e ", T[0]);
-      fflush (stdout);
-      besti = 0;
-      bestK = 1;
-      for (K = K0, i = 1; i <= 3; i++)
-	{
-	  TIME (t1[i], FFTMul (c, a, mid, b, mid, K));
-	  check (c, u, 2*mid, K, 1);			// Compare results			
-	  TIME (t2[i], FFTMul2 (c, a, mid, b, mid, K));
-	  check (c, u, 2*mid, K, 2);			// Compare results
-	  if (t1[i] < t2[i])
-	    {
-	    T[i] = t1[i];
-	    printf ("F1(%ld):%1.1e ", K, T[i]);
+    for (n = MUL_FFT_THRESHOLD / 2 + 1; n <= maxn;) {
+	n2 = next_step(n, 3 * K0);	// End of interval
+	if (n2 > maxn)		// Only go as far
+	    n2 = maxn;		// as maxn.
+	mid = (n + n2) / 2;	// Mid-point
+	printf("%ld..%ld ", n, n2);
+	fflush(stdout);
+
+	TIME(T[0], mul_toom(u, a, b, mid, t));	// Time Toom-Cook
+	printf("TC:%1.1e ", T[0]);
+	fflush(stdout);
+	besti = 0;
+	bestK = 1;
+	for (K = K0, i = 1; i <= 3; i++) {
+	    TIME(t1[i], FFTMul(c, a, mid, b, mid, K));
+	    check(c, u, 2 * mid, K, 1);	// Compare results                      
+	    TIME(t2[i], FFTMul2(c, a, mid, b, mid, K));
+	    check(c, u, 2 * mid, K, 2);	// Compare results
+	    if (t1[i] < t2[i]) {
+		T[i] = t1[i];
+		printf("F1(%ld):%1.1e ", K, T[i]);
+	    } else {
+		T[i] = t2[i];
+		printf("F2(%ld):%1.1e ", K, T[i]);
 	    }
-	  else
-	    {
-	    T[i] = t2[i];
-	    printf ("F2(%ld):%1.1e ", K, T[i]);
+	    fflush(stdout);
+	    if (T[i] < T[besti]) {
+		besti = i;
+		bestK = (t2[i] > t1[i]) ? K : -K;	/* -K for FFT2(|K|) */
 	    }
-	  fflush (stdout);
-	  if (T[i] < T[besti])
-	    {
-	    besti = i;
-	    bestK = (t2[i] > t1[i]) ? K: -K;	/* -K for FFT2(|K|) */
-	    }
-	  K *= 3;
+	    K *= 3;
 	}
 //    printf ("best:");
-      if (bestK == 1)
-	printf ("TC");
-      else
-        {
-        if (bestK > 0)
-  	  printf ("F1(%ld)", bestK);
-  	else
-  	  printf ("F2(%ld)", -bestK);  
+	if (bestK == 1)
+	    printf("TC");
+	else {
+	    if (bestK > 0)
+		printf("F1(%ld)", bestK);
+	    else
+		printf("F2(%ld)", -bestK);
 	}
-      printf ("\n");
-      fflush (stdout);
+	printf("\n");
+	fflush(stdout);
 
-      if (bestK != oldbestK)
-	  n1 = (n == MUL_FFT_THRESHOLD/2 + 1) ? 1 : n; 
+	if (bestK != oldbestK)
+	    n1 = (n == MUL_FFT_THRESHOLD / 2 + 1) ? 1 : n;
 
-      if (T[3] < T[1] && T[3] < T[2])
-	K0 *= 3;
-      else if (T[1] < T[2] && T[1] < T[3] && K0 > 3)
-	K0 /= 3;
-	
-      /* go to next size */
-      ns = n;
-      n = next_step (n, 3 * K0);    /* middle value of K */
-      if (n > n2) n = n2;	    /* end of last stair if K0 increased */
-      n++;
-      if (n < mid)                  /* revert to former n if K0 decreased */
-        n = ns;
-      else
-        {
-        if (bestK != oldbestK)
-	  { 
-	  if (n1 == 1) bestK = 1;
-	  fprintf (fp, "{%ld, %ld}, ", n1, bestK);
-	  fpkt++;
-	  if ((fpkt%4) == 0)
-	    fprintf (fp, "\\\n      ");
-	  fflush (fp);
-	  oldbestK = bestK;
-	  }
+	if (T[3] < T[1] && T[3] < T[2])
+	    K0 *= 3;
+	else if (T[1] < T[2] && T[1] < T[3] && K0 > 3)
+	    K0 /= 3;
+
+	/* go to next size */
+	ns = n;
+	n = next_step(n, 3 * K0);	/* middle value of K */
+	if (n > n2)
+	    n = n2;		/* end of last stair if K0 increased */
+	n++;
+	if (n < mid)		/* revert to former n if K0 decreased */
+	    n = ns;
+	else {
+	    if (bestK != oldbestK) {
+		if (n1 == 1)
+		    bestK = 1;
+		fft_tbl[nstairs].sz = n1;
+		fft_tbl[nstairs].method = bestK;
+		nstairs++;
+		oldbestK = bestK;
+	    }
 	}
     }
 
-  fprintf (fp, "{%ld, 0}}\n", LONG_MAX);
-  fclose (fp);
+    fft_tbl[nstairs].sz = LONG_MAX;
+    fft_tbl[nstairs].method = 0;
+    nstairs++;
 
-  free (a);
-  free (b);
-  free (c);
-  free (t);
-  free (u);
+    {
+	char id[80];
+	char date[40];
+	time_t t;
+	size_t u;
+	struct utsname buf;
+	time(&t);
+	ctime_r(&t, date);
+	u = strlen(date);
+	for (; u && isspace(date[u - 1]); date[--u] = '\0');
+	uname(&buf);
+	snprintf(id, sizeof(id), "\"%s (%ld) run on %s on %s\"",
+		 __FILE__, maxn, buf.nodename, date);
+	set_hash_define(replacements + nrepl++, "FFT_TUNING_INFO", id);
+    }
 
-  printf ("tunefft finished, output in mparam.h\n");
-  fflush (stdout);
-  
-  return 0;
+    prepare_and_push_hash_define_fft_tbl("MUL_FFT_TABLE", fft_tbl, nstairs);
+    replace(replacements, nrepl, "thresholds.h");
+    for(i = 0 ; i < nrepl; i++ ) {
+	free(replacements[i].identifier);
+	free(replacements[i].string);
+    }
+
+    free(a);
+    free(b);
+    free(c);
+    free(t);
+    free(u);
+
+    printf("tunefft finished, output in mparam.h\n");
+    fflush(stdout);
+
+    return 0;
 }
