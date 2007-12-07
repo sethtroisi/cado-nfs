@@ -11,7 +11,7 @@
 #include <assert.h>
 #include "types.h"
 #include "macros.h"
-#include "endian.h"
+#include "old-endian.h"
 #include "auxfuncs.h"
 
 const char * c_fmt="run/output/%d/C<%02d>.%03d";

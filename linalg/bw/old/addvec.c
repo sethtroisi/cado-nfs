@@ -10,7 +10,7 @@
 #include "params.h"
 #include <assert.h>
 #include "types.h"
-#include "endian.h"
+#include "old-endian.h"
 #include "macros.h"
 #include "auxfuncs.h"
 #include "bw_scalar.h"

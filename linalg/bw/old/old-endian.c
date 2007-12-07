@@ -4,7 +4,7 @@
 #include "macros.h"
 #include "types.h"
 #include "auxfuncs.h"
-#include "endian.h"
+#include "old-endian.h"
 
 type32 builtin_endianness;
 

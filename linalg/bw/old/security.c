@@ -11,7 +11,7 @@
 #include <assert.h>
 #include "types.h"
 #include "macros.h"
-#include "endian.h"
+#include "old-endian.h"
 #include "auxfuncs.h"
 #include "variables.h"
 #include "filenames.h"

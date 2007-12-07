@@ -8,7 +8,7 @@
 
 #include "macros.h"
 #include "types.h"
-#include "endian.h"
+#include "old-endian.h"
 #include "auxfuncs.h"
 #include "relation.h"
 

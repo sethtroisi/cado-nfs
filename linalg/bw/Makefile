@@ -62,7 +62,7 @@ BW_SLAVE_MT_LIBS:=-lgmp -lgmpxx
 
 # BW_SLAVE_OLD_SOURCES:=				\
 # 		auxfuncs.c barrier.c			\
-# 		old/bw_scalar.c old/endian.c		\
+# 		old/bw_scalar.c old/old-endian.c		\
 # 		old/filenames.c old/options.c		\
 # 		old/tagfile.c old/timer.c		\
 # 		old/variables.c old/addmul.c		\
@@ -100,7 +100,7 @@ endif
 ifeq (0,0)
 BW_MASTER2_SOURCES:=						\
 		auxfuncs.c					\
-		old/bw_scalar.c old/endian.c			\
+		old/bw_scalar.c old/old-endian.c			\
 		old/timer.c					\
 		old/variables.c	old/fft_on_matrices.cpp		\
 		old/ops_poly_fft.cpp				\
@@ -121,7 +121,7 @@ endif
 
 BW_MASTER_BINARY_SOURCES:=					\
 		auxfuncs.c					\
-		old/bw_scalar.c old/endian.c			\
+		old/bw_scalar.c old/old-endian.c			\
 		old/timer.c					\
 		old/variables.c	old/fft_on_matrices.cpp		\
 		old/ops_poly_fft.cpp				\
@@ -140,7 +140,7 @@ BW_MASTER_BINARY_LIBS:=-lgmp -lutils
 
 BW_MASTER_OLD_SOURCES:=						\
 		auxfuncs.c barrier.c				\
-		old/bw_scalar.c old/endian.c			\
+		old/bw_scalar.c old/old-endian.c			\
 		old/timer.c			\
 		old/variables.c old/field_common.c		\
 		old/field_prime.c old/field_quad.c		\
@@ -171,7 +171,7 @@ BW_FFT_BASICTEST_LIBS:=-lgmp
 
 BW_BENCHFFT_SOURCES:=						\
 		auxfuncs.c					\
-		old/bw_scalar.c old/endian.c			\
+		old/bw_scalar.c old/old-endian.c			\
 		old/options.c					\
 		old/timer.c					\
 		old/variables.c old/fft_on_matrices.cpp		\
@@ -210,7 +210,7 @@ BW_MUL_LIBS:=-lgmp -lgmpxx
 # really a mess.
 # BW_FINDSOL_SOURCES:=						\
 # 		auxfuncs.c					\
-# 		old/bw_scalar.c old/endian.c			\
+# 		old/bw_scalar.c old/old-endian.c			\
 # 		old/filenames.c old/options.c			\
 # 		old/tagfile.c old/variables.c			\
 # 		old/field_common.c old/field_prime.c		\
@@ -224,7 +224,7 @@ BW_MUL_LIBS:=-lgmp -lgmpxx
 # useless
 # BW_REDRESS_SOURCES:=					\
 # 		auxfuncs.c				\
-# 		old/bw_scalar.c old/endian.c		\
+# 		old/bw_scalar.c old/old-endian.c		\
 # 		old/filenames.c old/options.c		\
 # 		old/tagfile.c old/timer.c		\
 # 		old/variables.c old/addmul.c		\
@@ -238,7 +238,7 @@ BW_MUL_LIBS:=-lgmp -lgmpxx
 # useless
 # BW_GATHER_OLD_SOURCES:=					\
 # 		auxfuncs.c old/bw_scalar.c		\
-# 		old/endian.c old/filenames.c		\
+# 		old/old-endian.c old/filenames.c		\
 # 		old/options.c old/tagfile.c		\
 # 		old/timer.c old/variables.c		\
 # 		old/addmul.c old/bw_lvblock.c		\
@@ -252,7 +252,7 @@ BW_MUL_LIBS:=-lgmp -lgmpxx
 # useless
 # BW_TRYMUL_SOURCES:=					\
 # 		auxfuncs.c				\
-# 		old/bw_scalar.c old/endian.c		\
+# 		old/bw_scalar.c old/old-endian.c		\
 # 		old/filenames.c	old/options.c		\
 # 		old/tagfile.c old/timer.c		\
 # 		old/variables.c old/addmul.c 		\
@@ -266,7 +266,7 @@ BW_MUL_LIBS:=-lgmp -lgmpxx
 # useless
 # BW_ADDVEC_SOURCES:=					\
 # 		auxfuncs.c				\
-# 		old/bw_scalar.c old/endian.c		\
+# 		old/bw_scalar.c old/old-endian.c		\
 # 		old/filenames.c old/tagfile.c		\
 # 		old/variables.c old/addvec.c
 # BW_ADDVEC_LIBS:=-lgmp
@@ -280,7 +280,7 @@ BW_RANDOM_SOURCES:=			\
 BW_RANDOM_LIBS:=-lgmp -lgmpxx
 -include .bw-random.mkf
 
-BW_DUMP_SOURCES:=auxfuncs.c old/endian.c old/dump.c
+BW_DUMP_SOURCES:=auxfuncs.c old/old-endian.c old/dump.c
 BW_DUMP_LIBS:=
 -include .bw-dump.mkf
 
@@ -314,11 +314,11 @@ BW_SECURE_SOURCES:=						\
 BW_SECURE_LIBS:=-lgmp -lgmpxx
 -include .bw-secure.mkf
 
-BW_PCOLUMN_SOURCES:=auxfuncs.c old/endian.c old/pcolumn.c
+BW_PCOLUMN_SOURCES:=auxfuncs.c old/old-endian.c old/pcolumn.c
 BW_PCOLUMN_LIBS:=
 -include .bw-pcolumn.mkf
 
-BW_MATRIX_WRITER_SOURCES:=auxfuncs.c old/endian.c old/matrix_writer.c
+BW_MATRIX_WRITER_SOURCES:=auxfuncs.c old/old-endian.c old/matrix_writer.c
 BW_MATRIX_WRITER_LIBS:=
 -include .bw-matrix-writer.mkf
 

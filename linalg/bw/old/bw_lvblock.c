@@ -7,7 +7,7 @@
 #include <assert.h>
 #include "macros.h"
 #include "types.h"
-#include "endian.h"
+#include "old-endian.h"
 #include "auxfuncs.h"
 #include "bw_scalar.h"
 #include "bw_lvblock.h"

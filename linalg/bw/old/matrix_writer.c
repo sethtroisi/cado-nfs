@@ -6,7 +6,7 @@
 #include <assert.h>
 #include "types.h"
 #include "macros.h"
-#include "endian.h"
+#include "old-endian.h"
 #include "auxfuncs.h"
 
 /* There must be plenty of space so that even a very heavy line fits...
