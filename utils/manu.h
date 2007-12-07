@@ -161,16 +161,15 @@ extern "C" {
 #endif
 
 /**********************************************************************/
-/*
 #ifndef DISABLE_ALLOCA
-#include <alloca.h>
+/* This turns out to work fairly often */
+#include <stdlib.h>
 #define FAST_ALLOC(x)   alloca(x)
 #define FAST_FREE(x)    
 #else
 #define FAST_ALLOC(x)   my_malloc(x)
 #define FAST_FREE(x)    free(x)
 #endif
-*/
 
 /**********************************************************************/
 /* That's dirty, but I really don't want to link libm in */
