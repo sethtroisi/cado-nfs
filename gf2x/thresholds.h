@@ -7,7 +7,7 @@
 /* If you read "placeholder" here, it means that the tuning program has
  * not been run (or has not completed) */
 #define	TOOM_TUNING_INFO		"tunetoom.c (2048 2048) run on pasta.loria.fr on Fri Dec  7 17:52:50 2007"
-#define	FFT_TUNING_INFO		"placeholder"
+#define FFT_TUNING_INFO		"tunefft.c (100000) run on pasta.loria.fr on Fri Dec  7 18:23:55 2007"
 
 /* First size for which KARA is used. Essentially hard-coded, since the
  * sizes up to 9 words are already karatsuba, unrolled. The unrolled
@@ -235,7 +235,19 @@
 
 /* {n, K} means use FFT(|K|) up from n words, */
 /* where |K|<3 stands for Toom-Cook 3, K < 0 means use FFT2 */
-#undef	MUL_FFT_TABLE		/* no default value before tuning */
+#define MUL_FFT_TABLE		{	\
+	{ 1, 1 }, { 1145, -81 }, { 1265, 81 }, { 1282, -81 }, 	\
+	{ 1367, 1 }, { 1384, -81 }, { 1402, 1 }, { 1419, -81 }, 	\
+	{ 1436, 1 }, { 1800, 243 }, { 1846, 1 }, { 2068, -81 }, 	\
+	{ 2085, 1 }, { 2119, -81 }, { 2666, -243 }, { 3691, 243 }, 	\
+	{ 3845, -243 }, { 4614, 729 }, { 5536, -243 }, { 7997, -729 }, 	\
+	{ 8304, -243 }, { 8612, 729 }, { 9688, -729 }, { 11072, -243 }, 	\
+	{ 11380, 729 }, { 12456, -729 }, { 13840, -243 }, { 14763, -729 }, 	\
+	{ 22144, 2187 }, { 23503, -729 }, { 24000, 2187 }, { 24912, -729 }, 	\
+	{ 33216, 2187 }, { 37367, -729 }, { 44287, -2187 }, { 49823, 2187 }, 	\
+	{ 62279, -2187 }, { 74734, -729 }, { 91342, -2187 }, { 99646, 6561 }, 	\
+	{ 9223372036854775807, 0 }, }
+
 
 /* These flags are for internal use */
 #define	GF2X_SELECT_KARA	0	/* do not change ! */
