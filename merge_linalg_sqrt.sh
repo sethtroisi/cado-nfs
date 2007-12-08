@@ -1,12 +1,12 @@
 #!/bin/sh -
 # We assume that a directory $name exists
 #
-# Typical use: cd c20; ../doit.sh c20 5
+# Typical use: ./merge_linalg_sqrt.sh Examples/c20/c20 5
 #
 linalg=linalg
 sqrt=sqrt/naive
 
-nker=30; nchar=50; maxlevel=5; cwmax=10
+nkermax=30; nchar=50; maxlevel=5; cwmax=10
 
 name=$1
 if [ $# -ge 2 ]; then maxlevel=$2; fi
@@ -25,11 +25,17 @@ time $linalg/merge $argsa > $name.merge.his # 2> $name.merge.err
 
 echo "Replaying merges"
 
-time $linalg/replay $name.purged $name.merge.his $name.small $name.index
+argsr="$name.purged $name.merge.his $name.small $name.index"
+time $linalg/replay $argsr # 2> $name.replay.err
 
 echo "Performing the linear algebra phase"
 
 $linalg/linalg $name.small 1 > $name.ker_raw
+
+if [ ! -s $name.ker_raw ]; then echo "Zerodim kernel, stopping"; exit; fi
+
+nker=`wc -l $name.ker_raw | awk '{print $1}'`
+if [ $nker -lt $nkermax ]; then nkermax=$nker; fi
 
 echo "Adding characters"
 
@@ -37,15 +43,18 @@ args0="$name.purged $name.ker_raw $name.poly $name.index $name.rels"
 args0="$args0 $nker $nchar"
 time $linalg/characters $args0 > $name.ker
 
-echo "Preparing squareroots"
+ndepmax=`wc -l $name.ker | awk '{print $1}'`
+if [ $ndepmax -ge 30 ]; then ndepmax=30; fi
+
+echo "Preparing $ndepmax squareroots"
 
 args1="$name.rels $name.purged $name.index $name.ker $name.poly"
-time $linalg/allsqrt $args1 0 ar $name.dep
+time $linalg/allsqrt $args1 0 $ndepmax ar $name.dep
 
 echo "Entering the last phase"
 
 mag=$name.mag
-ndep=0; ndepmax=`wc -l $name.ker | awk '{print $1}'`
+ndep=0 
 while [ $ndep -lt $ndepmax ]
 do
   suf=`echo $ndep | awk '{printf("%03d\n", $1)}'`
