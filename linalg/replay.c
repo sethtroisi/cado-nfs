@@ -305,6 +305,9 @@ renumber(int *small_ncols, int *colweight, int ncols)
     memset(tmp, 0, (ncols<<1) * sizeof(int));
     for(j = 0, nb = 0; j < ncols; j++)
 	if(colweight[j] > 0){
+#if DEBUG >= 1
+	    fprintf(stderr, "column %d used with weight %d\n",j,colweight[j]);
+#endif
 	    tmp[nb++] = colweight[j];
 	    tmp[nb++] = j;
 	}
@@ -316,17 +319,28 @@ renumber(int *small_ncols, int *colweight, int ncols)
     free(tmp);
 }
 
-// a line is "i i1 ... ik", row[i] is to be added to row i1 and destroyed
-// at the end of the process...
-// Works also is i is alone (hence: destroyed row)
+// A line is "i i1 ... ik".
+// If i >= 0 then
+//     row[i] is to be added to rows i1...ik and destroyed at the end of
+//     the process.
+//     Works also is i is alone (hence: destroyed row).
+// If i < 0 then
+//     row[-i-1] is to be added to rows i1...ik and NOT destroyed.
+//
 void
 doAllAdds(int **newrows, char *str)
 {
     char *t = str;
-    int i, ii;
+    int i, ii, destroy = 1;
 
-    for(t = str, i = 0; (*t != ' ') && (*t != '\n'); t++)
+    if(*t == '-'){
+	destroy = 0;
+	t++;
+    }
+    for(i = 0; (*t != ' ') && (*t != '\n'); t++)
 	i = 10 * i + (*t - '0');
+    if(!destroy)
+	i--; // what a trick, man!
 #if DEBUG >= 1
     fprintf(stderr, "first i is %d\n", i);
 #endif
@@ -348,9 +362,11 @@ doAllAdds(int **newrows, char *str)
 	    t++;
 	}
     }
-    // destroy initial row!
-    free(newrows[i]);
-    newrows[i] = NULL;
+    if(destroy){
+	// destroy initial row!
+	free(newrows[i]);
+	newrows[i] = NULL;
+    }
 }
 
 // We start from M_purged which is nrows x ncols;
