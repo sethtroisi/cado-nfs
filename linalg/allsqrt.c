@@ -282,7 +282,7 @@ treatDep(char *ratname, char *algname, FILE *relfile, FILE *purgedfile, FILE *in
 }
 
 void
-SqrtWithIndexAll(char *prefix, FILE *relfile, FILE *purgedfile, FILE *indexfile, FILE *kerfile, cado_poly pol, int rora, int ndep, int verbose)
+SqrtWithIndexAll(char *prefix, FILE *relfile, FILE *purgedfile, FILE *indexfile, FILE *kerfile, cado_poly pol, int rora, int ndepmin, int ndepmax, int verbose)
 {
     char ratname[200], algname[200];
     hashtable_t H;
@@ -300,22 +300,24 @@ SqrtWithIndexAll(char *prefix, FILE *relfile, FILE *purgedfile, FILE *indexfile,
     rel_used = (char *)malloc(nrows * sizeof(char));
     vec = (int *)malloc(ncols * sizeof(int));
 
-    // skip first ndep-1 relations
-    for(j = 0; j < ndep; j++)
+    // skip first ndepmin-1 relations
+    for(j = 0; j < ndepmin; j++)
 	for(i = 0; i < nlimbs; ++i)
 	    ret = fscanf(kerfile, "%lx", &w);
 
     // use a hash table to rebuild P2
     hashInit(&H);
     while(1){
-	sprintf(ratname, "%s.rat.%03d", prefix, ndep);
-	sprintf(algname, "%s.alg.%03d", prefix, ndep);
+	if(ndepmin >= ndepmax)
+	    break;
+	sprintf(ratname, "%s.rat.%03d", prefix, ndepmin);
+	sprintf(algname, "%s.alg.%03d", prefix, ndepmin);
 	ret = treatDep(ratname, algname, relfile, purgedfile, indexfile, kerfile, pol, nrows, ncols, small_row_used, small_nrows, &H, nlimbs, rel_used, vec, rora, verbose);
 	if(ret == -1)
 	    break;
-	fprintf(stderr, "# Treated dependency #%d\n", ndep);
+	fprintf(stderr, "# Treated dependency #%d\n", ndepmin);
 	hashClear(&H);
-	ndep++;
+	ndepmin++;
     }
     hashFree(&H);
     free(small_row_used);
@@ -328,11 +330,11 @@ int main(int argc, char *argv[])
     char *relname, *purgedname, *indexname, *kername, *polyname;
     FILE *relfile, *purgedfile, *indexfile, *kerfile;
     cado_poly pol;
-    int verbose = 1, ndep, rora, ret;
+    int verbose = 1, ndepmin, ndepmax, rora, ret;
 
-    if(argc != 9){
+    if(argc != 10){
 	fprintf(stderr, "Usage: %s relname purgedname indexname", argv[0]);
-	fprintf(stderr, " kername polyname ndep r|a prefix\n");
+	fprintf(stderr, " kername polyname ndepmin ndepmax r|a prefix\n");
 	fprintf(stderr, "Dependency relation i will be put in files prefix.i\n");
 	return 0;
     }
@@ -342,7 +344,8 @@ int main(int argc, char *argv[])
     indexname = argv[3];
     kername = argv[4];
     polyname = argv[5];
-    ndep = atoi(argv[6]);
+    ndepmin = atoi(argv[6]);
+    ndepmax = atoi(argv[7]);
     
     relfile = fopen(relname, "r");
     purgedfile = fopen(purgedname, "r");
@@ -352,14 +355,14 @@ int main(int argc, char *argv[])
     ret = read_polynomial(pol, polyname);
     assert (ret);
 
-    if(!strcmp(argv[7], "r"))
+    if(!strcmp(argv[8], "r"))
 	rora = 1;
-    else if(!strcmp(argv[7], "a"))
+    else if(!strcmp(argv[8], "a"))
 	rora = 2;
-    else if(!strcmp(argv[7], "ar") || !strcmp(argv[7], "ra"))
+    else if(!strcmp(argv[8], "ar") || !strcmp(argv[8], "ra"))
 	rora = 3;
     verbose = 0;
-    SqrtWithIndexAll(argv[8], relfile, purgedfile, indexfile, kerfile, pol, rora, ndep, verbose);
+    SqrtWithIndexAll(argv[9], relfile, purgedfile, indexfile, kerfile, pol, rora, ndepmin, ndepmax, verbose);
 
     fclose(relfile);
     fclose(purgedfile);
