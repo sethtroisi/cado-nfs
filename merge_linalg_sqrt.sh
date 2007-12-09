@@ -8,29 +8,39 @@ sqrt=sqrt/naive
 
 nkermax=30; nchar=50; maxlevel=5; cwmax=10
 
-name=$1
+root=$1
 if [ $# -ge 2 ]; then maxlevel=$2; fi
 if [ $# -ge 3 ]; then cwmax=$3; fi
+name=$root.$maxlevel"x"$cwmax
 
-rels=$name.rels; nrels=`wc -l $rels | awk '{print $1}'`
+rels=$root.rels; nrels=`wc -l $rels | awk '{print $1}'`
+poly=$root.poly
+purged=$root.purged
 
-$linalg/purge $rels $nrels > $name.purged
+if [ -s $purged ]
+then
+  echo "File $purged already exists"
+else
+  time $linalg/purge $rels $nrels > $purged
+fi
 
 echo "Performing merges"
 
 nb_merge_max=1000000
-argsa="-merge $nb_merge_max -mat $name.purged"
+argsa="-merge $nb_merge_max -mat $purged"
 argsa="$argsa -maxlevel $maxlevel -cwmax $cwmax"
 time $linalg/merge $argsa > $name.merge.his # 2> $name.merge.err
+echo "SIZE(merge.his): `ls -s $name.merge.his`"
 
 echo "Replaying merges"
 
-argsr="$name.purged $name.merge.his $name.small $name.index"
+argsr="$purged $name.merge.his $name.small $name.index"
 time $linalg/replay $argsr # 2> $name.replay.err
+echo "SIZE(index): `ls -s $name.index`"
 
 echo "Performing the linear algebra phase"
 
-$linalg/linalg $name.small 1 > $name.ker_raw
+time $linalg/linalg $name.small 1 > $name.ker_raw
 
 if [ ! -s $name.ker_raw ]; then echo "Zerodim kernel, stopping"; exit; fi
 
@@ -39,7 +49,7 @@ if [ $nker -lt $nkermax ]; then nkermax=$nker; fi
 
 echo "Adding characters"
 
-args0="$name.purged $name.ker_raw $name.poly $name.index $name.rels"
+args0="$purged $name.ker_raw $poly $name.index $rels"
 args0="$args0 $nker $nchar"
 time $linalg/characters $args0 > $name.ker
 
@@ -48,7 +58,7 @@ if [ $ndepmax -ge 30 ]; then ndepmax=30; fi
 
 echo "Preparing $ndepmax squareroots"
 
-args1="$name.rels $name.purged $name.index $name.ker $name.poly"
+args1="$rels $purged $name.index $name.ker $poly"
 time $linalg/allsqrt $args1 0 $ndepmax ar $name.dep
 
 echo "Entering the last phase"
@@ -61,7 +71,7 @@ do
   echo "# Dependency $suf"
   rat=$name.dep.rat.$suf
   alg=$name.dep.alg.$suf
-  args2="$name.poly $rat $alg $name.algside"
+  args2="$poly $rat $alg $name.algside"
   time $sqrt/fmalgsqrt $args2 $mag
 magma << EOF
 load "$sqrt/finish.mag";
