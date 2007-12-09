@@ -35,8 +35,9 @@ char *used;
 //  * heavy columns are killed.
 // 2 means:
 //  * fast as above;
-//  * heavy columns are just not counted anymore but still there.
-#define USE_MERGE_FAST 1
+//  * heavy columns are present, but not in S[]; this yields more acurate
+//    weights.
+#define USE_MERGE_FAST 2
 
 typedef struct {
   int len;    /* number of non-zero entries */
@@ -70,7 +71,7 @@ typedef struct{
     dclist *S, *A;
     int *Wj;
     int **R;
-    int cwmax;
+    int cwmax, mergelevelmax;
 } swar_t;
 
 dclist
@@ -131,7 +132,7 @@ dclistInsert(dclist dcl, int j)
 
 // TODO: ncols could be a new renumbered ncols...
 void
-initSWAR(swar_t *SWAR, int cwmax, int ncols)
+initSWAR(swar_t *SWAR, int ncols, int cwmax, int mergelevelmax)
 {
 #if USE_MERGE_FAST
     // cwmax+2 to prevent bangs
@@ -142,6 +143,7 @@ initSWAR(swar_t *SWAR, int cwmax, int ncols)
     int j;
 #endif
     SWAR->cwmax = cwmax;
+    SWAR->mergelevelmax = mergelevelmax;
 #if USE_MERGE_FAST
     // S[0] has a meaning at least for temporary reasons
     for(j = 0; j <= cwmax+1; j++)
@@ -410,14 +412,18 @@ readmat(swar_t *SWAR, FILE *file, sparse_mat_t *mat, int *usecol)
 		assert (0 <= x && x < mat->ncols);
 #if USE_MERGE_FAST <= 1
 		if(usecol[x] <= SWAR->cwmax){
-#endif
 		    buf[ibuf++] = x;
 		    mat->wt[x]++;
+		}
+#else
+		// always store x
+		buf[ibuf++] = x;
+		mat->wt[x]++;
+#endif
+		if(usecol[x] <= SWAR->cwmax){
 		    SWAR->R[x][0]++;
 		    SWAR->R[x][SWAR->R[x][0]] = i;
-#if USE_MERGE_FAST <= 1
 		}
-#endif
 	    }
 	    mat->data[i].len = ibuf;
 	    mat->data[i].val = (int*) malloc (ibuf * sizeof (int));
@@ -1141,8 +1147,15 @@ removeCellFast(sparse_mat_t *mat, int i, int j, swar_t *SWAR)
 #endif
     ind = SWAR->Wj[j] = decrS(SWAR->Wj[j]);
 #if USE_MERGE_FAST > 1
-    if(ind < 0)
+    if(ind < 0){
+	// what if abs(weight) becomes below cwmax?
+	// we should incorporate the column and update the data structure, no?
+	// TODO: yep, do it!
+	if(abs(ind) <= SWAR->mergelevelmax)
+	    fprintf(stderr, "WARNING: column %d becomes light at %d...!\n",
+		    j, abs(ind));
 	return;
+    }
 #endif
     remove_j_from_S(SWAR, j);
     if(SWAR->Wj[j] > SWAR->cwmax)
@@ -1746,7 +1759,7 @@ main (int argc, char *argv[])
   usecol = (int *)malloc(ncols *sizeof(int));
   inspectWeight(usecol, purgedfile, nrows, ncols, cwmax);
 
-  initSWAR(&SWAR, cwmax, ncols);
+  initSWAR(&SWAR, ncols, cwmax, maxlevel);
   fillSWAR(&SWAR, usecol, ncols);
     
   rewind(purgedfile);
