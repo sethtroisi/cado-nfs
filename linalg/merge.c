@@ -9,6 +9,7 @@
 
 // TODO: use compact lists...!
 // TODO: keep track of the number of columns dropped at first sight
+// TODO: merge SWAR into sparse?
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,6 +29,13 @@ char *used;
 
 #define MERGE_LEVEL_MAX 30
 
+// 0 means dummy filtering using slow methods
+// 1 means:
+//  * fast with optimized-though-memory-consuming data structure;
+//  * heavy columns are killed.
+// 2 means:
+//  * fast as above;
+//  * heavy columns are just not counted anymore but still there.
 #define USE_MERGE_FAST 1
 
 typedef struct {
@@ -43,11 +51,6 @@ typedef struct {
   int rem_ncols;     /* number of remaining columns */
   rel_t *data;
   int *wt; /* weight of prime j, <= 1 for a deleted prime */
-  unsigned long* ad; /* ad[j] contains the sum of indices of all rows
-                        containing prime j; when wt[j]=2, and we know
-                        that row i contains j, then the other row is
-                        simply k = ad[j] - i. Overflow is not a problem,
-                        since the value is always exact mod 2^32 or 2^64. */
 } sparse_mat_t;
 
 static int 
@@ -65,7 +68,7 @@ typedef struct dclist{
 
 typedef struct{
     dclist *S, *A;
-    int *Wj, *W;
+    int *Wj;
     int **R;
     int cwmax;
 } swar_t;
@@ -88,6 +91,18 @@ dclistPrint(FILE *file, dclist dcl)
 	fprintf(file, " -> %d", dcl->j);
 	dcl = dcl->next;
     }
+}
+
+int
+dclistLength(dclist dcl)
+{
+    int l = 0;
+
+    while(dcl != NULL){
+	l++;
+	dcl = dcl->next;
+    }
+    return l;
 }
 
 void
@@ -116,55 +131,73 @@ dclistInsert(dclist dcl, int j)
 
 // TODO: ncols could be a new renumbered ncols...
 void
-initSWAR(swar_t *SWAR, int cwmax, int *usecol, int ncols)
+initSWAR(swar_t *SWAR, int cwmax, int ncols)
 {
 #if USE_MERGE_FAST
     // cwmax+2 to prevent bangs
     dclist *S = (dclist *)malloc((cwmax+2) * sizeof(dclist));
     dclist *A = (dclist *)malloc(ncols * sizeof(dclist));
     int *Wj = (int *)malloc(ncols * sizeof(int));
-    int *W = (int *)malloc((cwmax+2) * sizeof(int));
-    int **R, *Rj;
+    int **R;
     int j;
 #endif
     SWAR->cwmax = cwmax;
 #if USE_MERGE_FAST
-    memset(W, 0, (cwmax+2) * sizeof(int));
     // S[0] has a meaning at least for temporary reasons
     for(j = 0; j <= cwmax+1; j++)
 	S[j] = dclistCreate(-1);
     R = (int **)malloc(ncols * sizeof(int *));
-    for(j = 0; j < ncols; j++)
-	if(usecol[j] > 0){
-	    Wj[j] = usecol[j]; // TODO: simplify this!
-	    W[usecol[j]]++; // TODO: is W useful?
-	    A[j] = dclistInsert(S[usecol[j]], j);
-#if DEBUG >= 1
-	    fprintf(stderr, "Inserting %d in S[%d]:", j, usecol[j]);
-	    dclistPrint(stderr, S[usecol[j]]->next);
-	    fprintf(stderr, "\n");
-#endif
-	    Rj = (int *)malloc((usecol[j]+1) * sizeof(int));
-	    Rj[0] = 0; // last index used
-	    R[j] = Rj;
-	}
-	else{
-	    Wj[j] = -1;
-	    A[j] = NULL; // TODO: renumber j's?????
-	    R[j] = NULL;
-	}
     SWAR->S = S;
-    SWAR->W = W;
     SWAR->A = A;
     SWAR->R = R;
     SWAR->Wj = Wj;
 #endif
 }
 
+void
+fillSWAR(swar_t *SWAR, int *usecol, int ncols)
+{
+    int j, *Rj;
+
+    for(j = 0; j < ncols; j++){
+	if(usecol[j] <= SWAR->cwmax){
+	    SWAR->Wj[j] = usecol[j]; // TODO: simplify this!
+	    SWAR->A[j] = dclistInsert(SWAR->S[usecol[j]], j);
+#  if DEBUG >= 1
+	    fprintf(stderr, "Inserting %d in S[%d]:", j, usecol[j]);
+	    dclistPrint(stderr, SWAR->S[usecol[j]]->next);
+	    fprintf(stderr, "\n");
+#  endif
+	    Rj = (int *)malloc((usecol[j]+1) * sizeof(int));
+	    Rj[0] = 0; // last index used
+	    SWAR->R[j] = Rj;
+	}
+	else{
+#if USE_MERGE_FAST <= 1
+	    SWAR->Wj[j] = -1;
+#else
+	    SWAR->Wj[j] = -usecol[j]; // trick!!!
+#endif
+	    SWAR->A[j] = NULL; // TODO: renumber j's?????
+	    SWAR->R[j] = NULL;
+	}
+    }
+}
+
 // TODO
 void
 closeSWAR(swar_t *SWAR)
 {
+}
+
+void
+printStats(swar_t *SWAR)
+{
+    int w;
+
+    for(w = 0; w <= SWAR->cwmax; w++)
+	fprintf(stderr, "I found %d primes of weight %d\n",
+		dclistLength(SWAR->S[w]->next), w);
 }
 
 void
@@ -226,7 +259,7 @@ matrix2tex(sparse_mat_t *mat, int *W)
     fprintf(stderr, "\\hline\n");
     fprintf(stderr, "\\text{weight}");
     for(j = 0; j < mat->ncols; j++)
-	fprintf(stderr, "& %d", W[j]);
+	fprintf(stderr, "& %d", mat->wt[j]);
     fprintf(stderr, "\\\\\n");
     fprintf(stderr, "\\end{array}$$\n");
     free(tab);
@@ -315,7 +348,7 @@ report2(int i1, int i2)
 void
 inspectWeight(int *usecol, FILE *purgedfile, int nrows, int ncols, int cwmax)
 {
-    int i, j, ret, x, nwlarge, nc;
+    int i, j, ret, x, nc;
 
     memset(usecol, 0, ncols * sizeof(int));
     for(i = 0; i < nrows; i++){
@@ -329,18 +362,10 @@ inspectWeight(int *usecol, FILE *purgedfile, int nrows, int ncols, int cwmax)
 	    usecol[x]++;
 	}
     }
-    nwlarge = 0;
-    for(j = 0; j < ncols; j++)
-	if(usecol[j] > cwmax){
-	    usecol[j] = 0;
-	    nwlarge++;
-	}
-    fprintf(stderr, "Card(w > %d) = %d\n", cwmax, nwlarge);
 }
 
 /* Reads a matrix file, and puts in mat->wt[j], 0 <= j < ncols, the
-   weight of column j (adapted from matsort.c), and in mat->ad[j],
-   0 <= j < ncols, the sum of row indices where j appears. 
+   weight of column j (adapted from matsort.c).
 
    We skip columns that are too heavy, that is columns for which usecol[j]==0.
 
@@ -349,24 +374,19 @@ void
 readmat(swar_t *SWAR, FILE *file, sparse_mat_t *mat, int *usecol)
 {
     int ret;
-    int i, j, l2, *w;
+    int i, j;
     int nc, x, buf[100], ibuf;
-
-    // TODO: w is useless thanks to SWAR->W...
-    w = (int *)malloc((SWAR->cwmax+1) * sizeof(int));
-    memset(w, 0, (SWAR->cwmax+1) * sizeof(int));
 
     ret = fscanf (file, "%d %d", &(mat->nrows), &(mat->ncols));
     assert (ret == 2);
     
-    fprintf (stderr, "Reading matrix of %d rows and %d columns: excess is %d\n",
-	     mat->nrows, mat->ncols, mat->nrows - mat->ncols);
+    fprintf(stderr, "Reading matrix of %d rows and %d columns: excess is %d\n",
+	    mat->nrows, mat->ncols, mat->nrows - mat->ncols);
     mat->rem_nrows = mat->nrows;
     
     mat->wt = (int*) malloc (mat->ncols * sizeof (int));
-    mat->ad = (unsigned long*) malloc (mat->ncols * sizeof (unsigned long));
     for (j = 0; j < mat->ncols; j++)
-	mat->wt[j] = mat->ad[j] = 0;
+	mat->wt[j] = 0;
     
     mat->data = (rel_t*) malloc (mat->nrows * sizeof (rel_t));
     
@@ -388,13 +408,16 @@ readmat(swar_t *SWAR, FILE *file, sparse_mat_t *mat, int *usecol)
 #endif
 		assert (ret == 1);
 		assert (0 <= x && x < mat->ncols);
-		if(usecol[x]){
+#if USE_MERGE_FAST <= 1
+		if(usecol[x] <= SWAR->cwmax){
+#endif
 		    buf[ibuf++] = x;
-		    mat->wt[x] ++;
-		    mat->ad[x] += i; /* computed mod 2^32 or 2^64 */
+		    mat->wt[x]++;
 		    SWAR->R[x][0]++;
 		    SWAR->R[x][SWAR->R[x][0]] = i;
+#if USE_MERGE_FAST <= 1
 		}
+#endif
 	    }
 	    mat->data[i].len = ibuf;
 	    mat->data[i].val = (int*) malloc (ibuf * sizeof (int));
@@ -403,28 +426,10 @@ readmat(swar_t *SWAR, FILE *file, sparse_mat_t *mat, int *usecol)
 	    qsort(mat->data[i].val, ibuf, sizeof(int), cmp);
 	}
     }
-
-    // TODO: why w and wt?
-    
-    /* count the number of primes appearing at least twice */
-    for(j = l2 = 0; j < mat->ncols; j++){
-	if(mat->wt[j] >= 2){
-	    l2++;
-	    if(mat->wt[j] <= SWAR->cwmax)
-		w[mat->wt[j]]++;
-	}
-	else if(usecol[j])
-	    fprintf(stderr, "Warning: prime %d appears only %d time(s)\n", j,
-		    mat->wt[j]);
-    }
-    fprintf (stderr, "Found %d primes appearing at least twice\n", l2);
-    for(j = 2; j <= SWAR->cwmax; j++)
-	if(w[j] > 0)
-	    fprintf (stderr, "Found %d primes of weight %d\n", w[j], j);
     // we need to keep informed of what really happens; this will be an upper
     // bound on the number of active columns, I guess
     mat->rem_ncols = mat->ncols;
-    free(w);
+    printStats(SWAR);
 }
 
 void
@@ -550,9 +555,6 @@ merge2rows(sparse_mat_t *mat, int j)
 	printf("Pb in merge2rows: no row containing %d\n", j);
 	return;
     }
-#if 0 // one day...
-    i2 = mat->ad[j]-i1;
-#else
     ok = 0;
     for(i2 = i1+1; i2 < mat->nrows; i2++){
 	if(mat->data[i2].val == NULL)
@@ -569,7 +571,6 @@ merge2rows(sparse_mat_t *mat, int j)
 	printf("Pb in merge2rows: no 2nd row containing %d\n", j);
 	return;
     }
-#endif
 #if USE_USED >= 1
     if(used[i1])
 	fprintf(stderr, "R%d used %d times\n", i1, (int)used[i1]);
@@ -1107,20 +1108,43 @@ add_i_to_Rj(swar_t *SWAR, int i, int j)
     }
 }
 
+int
+decrS(int w)
+{
+#if USE_MERGE_FAST <= 1
+    return w-1;
+#else
+    return (w >= 0 ? w-1 : w+1);
+#endif
+}
+
+int
+incrS(int w)
+{
+#if USE_MERGE_FAST <= 1
+    return w+1;
+#else
+    return (w >= 0 ? w+1 : w-1);
+#endif
+}
+
 // A[j] contains the address where j is stored
 void
 removeCellFast(sparse_mat_t *mat, int i, int j, swar_t *SWAR)
 {
     int ind;
 
-    remove_j_from_S(SWAR, j);
     // update weight
 #if DEBUG >= 1
     fprintf(stderr, "Moving j=%d from S[%d] to S[%d]\n",
 	    j, SWAR->Wj[j], SWAR->Wj[j]-1);
 #endif
-    SWAR->Wj[j]--;
-    ind = SWAR->Wj[j];
+    ind = SWAR->Wj[j] = decrS(SWAR->Wj[j]);
+#if USE_MERGE_FAST > 1
+    if(ind < 0)
+	return;
+#endif
+    remove_j_from_S(SWAR, j);
     if(SWAR->Wj[j] > SWAR->cwmax)
 	ind = SWAR->cwmax+1;
     // update A[j]
@@ -1152,14 +1176,17 @@ addCellFast(sparse_mat_t *mat, int i, int j, swar_t *SWAR)
 {
     int ind;
 
-    remove_j_from_S(SWAR, j);
     // update weight
 #if DEBUG >= 1
     fprintf(stderr, "Moving j=%d from S[%d] to S[%d]\n",
 	    j, SWAR->Wj[j], SWAR->Wj[j]+1);
 #endif
-    SWAR->Wj[j]++;
-    ind = SWAR->Wj[j]; // storing index in S[]
+    ind = SWAR->Wj[j] = incrS(SWAR->Wj[j]);
+#if USE_MERGE_FAST > 1
+    if(ind < 0)
+	return;
+#endif
+    remove_j_from_S(SWAR, j);
     if(SWAR->Wj[j] > SWAR->cwmax){
 #if DEBUG >= 1
 	fprintf(stderr, "WARNING: column %d is too heavy (%d)\n", j,
@@ -1278,10 +1305,16 @@ deleteAllColsFromStack(sparse_mat_t *mat, swar_t *SWAR, int iS)
 #endif
 	// we destroy column j
 	// TODO: do faster?
+#if USE_MERGE_FAST > 1
+	if(iS == 1)
+#endif
 	for(k = 1; k <= SWAR->R[j][0]; k++)
 	    if(SWAR->R[j][k] != -1)
 		remove_j_from_row(mat, SWAR->R[j][k], j);
 	remove_j_from_SWAR(SWAR, j);
+#if USE_MERGE_FAST > 1
+	SWAR->Wj[j] = -iS;
+#endif
     }
 #if DEBUG >= 1
     if(njrem > 0)
@@ -1713,7 +1746,8 @@ main (int argc, char *argv[])
   usecol = (int *)malloc(ncols *sizeof(int));
   inspectWeight(usecol, purgedfile, nrows, ncols, cwmax);
 
-  initSWAR(&SWAR, cwmax, usecol, ncols);
+  initSWAR(&SWAR, cwmax, ncols);
+  fillSWAR(&SWAR, usecol, ncols);
     
   rewind(purgedfile);
   readmat(&SWAR, purgedfile, &mat, usecol);
