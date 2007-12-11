@@ -59,9 +59,6 @@ typedef struct {
   unsigned long length;
 } tab_relation_t;
 
-int** rel_compact;
-char *rel_used;
-
 static int 
 isBadPrime(unsigned long p, tab_prime_t bad_primes) {
 #if 1
@@ -238,24 +235,19 @@ reduce_exponents_mod2 (relation_t *rel)
   rel->nb_ap = j;
 }
 
-// Read all relations from file.
-int
-scan_relations(FILE *file, int nrel, int *nprimes, tab_prime_t *bad_primes, hashtable_t *H)
+int scan_relations_from_file(int *irel, char *rel_used, int **rel_compact, int *nprimes, tab_prime_t *bad_primes, hashtable_t *H, FILE *file)
 {
     relation_t rel;
-    int ret, j, irel = -1, *tmp, itmp, h;
-    
-    *nprimes = 0;
-    rel_used = (char *)malloc(nrel * sizeof(char));
-    rel_compact = (int **)malloc(nrel * sizeof(int *));
+    int ret, j, *tmp, itmp, h;
+
     while(1){
-	irel++;
-	if(!(irel % 100000))
-	    fprintf(stderr, "irel = %d\n", irel);
-	rel_used[irel] = 1;
 	ret = fread_relation (file, &rel);
 	if(ret != 1)
 	    break;
+	*irel += 1;
+	if(!(*irel % 100000))
+	    fprintf(stderr, "irel = %d\n", *irel);
+	rel_used[*irel] = 1;
 	reduce_exponents_mod2 (&rel);
 	computeroots (&rel);
 	tmp = (int *)malloc((rel.nb_rp + rel.nb_ap + 1) * sizeof(int));
@@ -286,13 +278,34 @@ scan_relations(FILE *file, int nrel, int *nprimes, tab_prime_t *bad_primes, hash
 	    }
 	}
 	tmp[itmp] = -1; // sentinel
-	rel_compact[irel] = tmp;
+	rel_compact[*irel] = tmp;
     }
+    return ret;
+}
+
+// Read all relations from file.
+int
+scan_relations(char *ficname[], int nbfic, int nrel, int *nprimes, tab_prime_t *bad_primes, hashtable_t *H, char *rel_used, int **rel_compact)
+{
+    FILE *relfile;
+    int ret, i, irel = -1;
     
-    if (ret == 0) {
-	fprintf(stderr, "Warning: error when reading relation nb %d\n", irel);
+    *nprimes = 0;
+
+    for(i = 0; i < nbfic; i++){
+	relfile = fopen(ficname[i], "r");
+	if(relfile == NULL){
+	    fprintf(stderr, "Pb opening file %s\n", ficname[i]);
+	    exit(1);
+	}
+	fprintf(stderr, "Adding file %s\n", ficname[i]);
+	ret = scan_relations_from_file(&irel, rel_used, rel_compact, nprimes, bad_primes, H, relfile);
+	if (ret == 0) {
+	    fprintf(stderr, "Warning: error when reading file %s\n", ficname[i]);
+	    break;
+	}
+	fclose(relfile);
     }
-    
     fprintf(stderr, "Scanned %d relations\n", nrel);
 
     return (ret == -1);
@@ -309,7 +322,7 @@ has_singleton(int *tab, hashtable_t *H)
     return -1;
 }
 
-void delete_relation(int i, int hs, int *nprimes, hashtable_t *H)
+void delete_relation(int i, int hs, int *nprimes, hashtable_t *H, char *rel_used, int **rel_compact)
 {
     int j, *tab = rel_compact[i];
 
@@ -324,7 +337,7 @@ void delete_relation(int i, int hs, int *nprimes, hashtable_t *H)
 }
 
 void
-onepass_singleton_removal(int nrelmax, int *nrel, int *nprimes, hashtable_t *H)
+onepass_singleton_removal(int nrelmax, int *nrel, int *nprimes, hashtable_t *H, char *rel_used, int **rel_compact)
 {
     int i, h;
 
@@ -336,14 +349,14 @@ onepass_singleton_removal(int nrelmax, int *nrel, int *nprimes, hashtable_t *H)
 		printf("h = %d is single -> (%ld, %ld)\n", 
 		       h, H->hashtab_p[h], H->hashtab_r[h]);
 #endif
-		delete_relation(i, h, nprimes, H);
+		delete_relation(i, h, nprimes, H, rel_used, rel_compact);
 		*nrel -= 1;
 	    }
 	}
 }
 
 void
-find(int nrel, int h)
+find(int nrel, int h, char *rel_used, int **rel_compact)
 {
     int i;
 
@@ -357,13 +370,13 @@ find(int nrel, int h)
 }
 
 void
-remove_singletons(int *nrel, int *nprimes, hashtable_t *H)
+remove_singletons(int *nrel, int *nprimes, hashtable_t *H, char *rel_used, int **rel_compact)
 {
     int old, newnrel = *nrel, newnprimes = *nprimes, i;
 
     do{
 	old = newnrel;
-	onepass_singleton_removal(*nrel, &newnrel, &newnprimes, H);
+	onepass_singleton_removal(*nrel, &newnrel, &newnprimes, H, rel_used, rel_compact);
 	fprintf(stderr, "new/old = %d/%d; %d\n", newnrel, old, newnprimes);
     } while(newnrel != old);
     // clean empty rows
@@ -400,109 +413,125 @@ renumber(int *nprimes, tab_prime_t bad_primes, hashtable_t *H)
 }
 
 void
-reread(char *ficrel, tab_prime_t bad_primes, hashtable_t *H)
+reread(char *ficname[], int nbfic, tab_prime_t bad_primes, hashtable_t *H, char *rel_used, int nrows, int cols)
 {
     FILE *file;
     relation_t rel;
-    int irel = -1, ret;
+    int irel = -1, ret, i, nr = 0;
 
-    file = fopen(ficrel, "r");
-    if (file == NULL) {
-	fprintf(stderr, "problem opening file %s for reading\n", ficrel);
-	exit(1);
-    }
-    do{
-	irel++;
-	if(!(irel % 100000))
-	    fprintf(stderr, "irel = %d\n", irel);
-	ret = fread_relation (file, &rel);
-	if(ret == 1){
-	    if(rel_used[irel]){
-		reduce_exponents_mod2 (&rel);
-		computeroots (&rel);
-		fprint_rel_row(stdout, irel, rel, bad_primes, H);
-	    }
+    for(i = 0; i < nbfic; i++){
+	file = fopen(ficname[i], "r");
+	if (file == NULL) {
+	    fprintf(stderr,"problem opening file %s for reading\n",ficname[i]);
+	    exit(1);
 	}
-    } while(ret == 1);
-    fclose(file);
+	fprintf(stderr, "Adding file %s\n", ficname[i]);
+	do{
+	    ret = fread_relation (file, &rel);
+	    if(ret == 1){
+		irel++;
+		if(!(irel % 100000))
+		    fprintf(stderr, "irel = %d\n", irel);
+		if(rel_used[irel]){
+		    reduce_exponents_mod2 (&rel);
+		    computeroots (&rel);
+		    fprint_rel_row(stdout, irel, rel, bad_primes, H);
+		    nr++;
+		    if(nr >= nrows){
+			ret = 0;
+			break;
+		    }
+		}
+	    }
+	} while(ret == 1);
+	fclose(file);
+    }
 }
 
 int
 main (int argc, char **argv)
 {
-  tab_prime_t bad_primes;
-  hashtable_t H;
-  FILE *relfile;
-  int ret;
-  int i, nrel, nprimes, nrel_new, nprimes_new;
-  
-  fprintf (stderr, "%s revision %s\n", argv[0], REV);
+    tab_prime_t bad_primes;
+    hashtable_t H;
+    FILE *relfile;
+    char *rel_used;
+    int **rel_compact;
+    int ret;
+    int i, nrel, nprimes, nrel_new, nprimes_new;
+    
+    fprintf (stderr, "%s revision %s\n", argv[0], REV);
+    
+    if (argc == 1) {
+	relfile = stdin;
+	fprintf(stderr, "usage: %s [filename]\n", argv[0]);
+	fprintf(stderr, "  stdin input is not yet available, sorry.\n");
+	exit(1);
+    } 
+    if (argc < 3) {
+	fprintf(stderr, "usage: %s nrel file1 ... filen\n", argv[0]);
+	fprintf(stderr, "  if no filename is given, takes input on stdin\n");
+	exit(1);
+    }
+    nrel = atoi(argv[1]);
+    
+    fprintf(stderr, "initializing hash tables...\n");
+    hashInit(&H);
+    
+    rel_used = (char *)malloc(nrel * sizeof(char));
+    rel_compact = (int **)malloc(nrel * sizeof(int *));
+    
+    bad_primes.allocated = 100;
+    bad_primes.length = 0;
+    bad_primes.tab = (unsigned long *)malloc(bad_primes.allocated*sizeof(unsigned long));
 
-  if (argc == 1) {
-    relfile = stdin;
-    fprintf(stderr, "usage: %s [filename]\n", argv[0]);
-    fprintf(stderr, "  stdin input is not yet available, sorry.\n");
-    exit(1);
-  } 
-  if (argc != 3) {
-    fprintf(stderr, "usage: %s filename nrel\n", argv[0]);
-    fprintf(stderr, "  if no filename is given, takes input on stdin\n");
-    exit(1);
-  }
-  relfile = fopen(argv[1], "r");
-  if (relfile == NULL) {
-    fprintf(stderr, "problem opening file %s for reading\n", argv[1]);
-    exit(1);
-  }
-  nrel = atoi(argv[2]);
-
-  fprintf(stderr, "initializing hash tables...\n");
-  hashInit(&H);
-
-  bad_primes.allocated = 100;
-  bad_primes.length = 0;
-  bad_primes.tab = (unsigned long *)malloc(bad_primes.allocated*sizeof(unsigned long));
-
-  fprintf(stderr, "reading file of relations...\n");
-  ret = scan_relations(relfile, nrel, &nprimes, &bad_primes, &H);
-  assert (ret);
-  fclose(relfile);
-
-  fprintf(stderr, "nrel=%d, nprimes=%d\n", nrel, nprimes);
-
+    fprintf(stderr, "reading file of relations...\n");
+    ret = scan_relations(argv+2, argc-2, nrel, &nprimes, &bad_primes, &H, rel_used, rel_compact);
+    assert (ret);
+    
+    fprintf(stderr, "nrel=%d, nprimes=%d\n", nrel, nprimes);
+    
 #if DEBUG >= 2
-  for(i = 0; i < hashmod; i++)
-      if(hashcount[i] == 1)
-	  printf("H[%ld, %ld] = 1\n", hashtab_p[i], hashtab_r[i]);
+    for(i = 0; i < hashmod; i++)
+	if(hashcount[i] == 1)
+	    printf("H[%ld, %ld] = 1\n", hashtab_p[i], hashtab_r[i]);
 #endif
-
-  fprintf(stderr, "starting singleton removal...\n");
-  nrel_new = nrel;
-  nprimes_new = nprimes;
-  remove_singletons(&nrel_new, &nprimes_new, &H);
-
-  fprintf(stderr, "\nbadprimes = \n");
-  for (i = 0; i < bad_primes.length; ++i){
-    fprintf(stderr, "%lu ", bad_primes.tab[i]);
-    nprimes_new--;
-  }
-  fprintf(stderr, "\n");
-
-  fprintf(stderr, "nrel=%d, nprimes=%d; excess=%d\n", 
-	  nrel_new, nprimes_new, nrel_new - nprimes_new);
-
-  // we have to renumber the primes in increasing weight order
-  renumber(&nprimes_new, bad_primes, &H);
-
+    
+    fprintf(stderr, "starting singleton removal...\n");
+    nrel_new = nrel;
+    nprimes_new = nprimes;
+    remove_singletons(&nrel_new, &nprimes_new, &H, rel_used, rel_compact);
+    
+    fprintf(stderr, "\nbadprimes = \n");
+    for (i = 0; i < bad_primes.length; ++i){
+	fprintf(stderr, "%lu ", bad_primes.tab[i]);
+	nprimes_new--;
+    }
+    fprintf(stderr, "\n");
+    
+    fprintf(stderr, "nrel=%d, nprimes=%d; excess=%d\n", 
+	    nrel_new, nprimes_new, nrel_new - nprimes_new);
+    
+    // we have to renumber the primes in increasing weight order
+    renumber(&nprimes_new, bad_primes, &H);
+    
 #if DEBUG >= 2
-  hashCheck(nprimes_new);
+    hashCheck(nprimes_new);
 #endif
+    
+    // TODO: do more fancy things, like killing too heavy rows, etc.
+    if((nrel_new - nprimes_new) >= 500)
+	nrel_new = nprimes_new + 500;
 
-  // now, we reread the file of relations and convert it to the new coding...
-  printf("%d %d\n", nrel_new, nprimes_new);
-  reread(argv[1], bad_primes, &H);
-
-  free(bad_primes.tab);
-
-  return 0;
+    // now, we reread the file of relations and convert it to the new coding...
+    printf("%d %d\n", nrel_new, nprimes_new);
+    reread(argv+2, argc-2, bad_primes, &H, rel_used, nrel_new, nprimes_new);
+    
+    free(bad_primes.tab);
+    free(rel_used);
+    for(i = 0; i < nrel; i++)
+	if(rel_compact[i] != NULL)
+	    free(rel_compact[i]);
+    free(rel_compact);
+    
+    return 0;
 }
