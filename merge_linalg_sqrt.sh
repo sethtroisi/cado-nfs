@@ -6,7 +6,7 @@
 linalg=linalg
 sqrt=sqrt/naive
 
-nkermax=30; nchar=50; maxlevel=5; cwmax=10; rwmax=100
+nkermax=30; nchar=50; maxlevel=5; cwmax=10; rwmax=1000000
 
 root=$1
 if [ $# -ge 2 ]; then maxlevel=$2; fi
@@ -33,7 +33,7 @@ echo "Performing merges"
 
 nb_merge_max=1000000
 argsa="-merge $nb_merge_max -mat $purged"
-argsa="$argsa -maxlevel $maxlevel -cwmax $cwmax"
+argsa="$argsa -maxlevel $maxlevel -cwmax $cwmax -rwmax $rwmax"
 time $linalg/merge $argsa > $name.merge.his # 2> $name.merge.err
 echo "SIZE(merge.his): `ls -s $name.merge.his`"
 
