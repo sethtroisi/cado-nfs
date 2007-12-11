@@ -3,7 +3,7 @@
  * Author : F. Morain
  * Purpose: merging relations
  * 
- * Algorithm: Cavallar++
+ * Algorithm: digest and interpolation from Cavallar.
  *
  */
 
@@ -1015,6 +1015,33 @@ merge_m_slow(sparse_mat_t *mat, int m)
     free(ind);
 }
 
+// w(j) has decreased in such a way that it can be incorporated in the
+// SWAR structure. We need find all the info we need to do that. Note this
+// can be costly. We must not store row index i0, since j was discovered
+// when row i was treated.
+void
+incorporateColumn(swar_t *SWAR, sparse_mat_t *mat, int j, int i0)
+{
+    int i, ni, *Rj, wj;
+
+    wj = -SWAR->Wj[j]-1;
+    Rj = (int *)malloc((wj+1) * sizeof(int));
+    // find all rows in which j appears
+    for(i = 0, ni = 1; i < mat->nrows; i++)
+	if(mat->data[i].val != NULL)
+	    if((i != i0) && hasCol(mat, i, j))
+#if 1
+		Rj[ni++] = i;
+#else
+                ni++;
+    fprintf(stderr, "iC: %d %d\n", j, ni);
+#endif
+    Rj[0] = ni-1;
+    SWAR->R[j] = Rj;
+    SWAR->Wj[j] = wj;
+    SWAR->A[j] = dclistInsert(SWAR->S[wj], j);
+}
+
 int
 getNextj(dclist dcl)
 {
@@ -1150,10 +1177,11 @@ removeCellFast(sparse_mat_t *mat, int i, int j, swar_t *SWAR)
     if(ind < 0){
 	// what if abs(weight) becomes below cwmax?
 	// we should incorporate the column and update the data structure, no?
-	// TODO: yep, do it!
-	if(abs(ind) <= SWAR->mergelevelmax)
+	if(abs(ind) <= SWAR->mergelevelmax){
 	    fprintf(stderr, "WARNING: column %d becomes light at %d...!\n",
 		    j, abs(ind));
+	    incorporateColumn(SWAR, mat, j, i);
+	}
 	return;
     }
 #endif
@@ -1324,9 +1352,13 @@ deleteAllColsFromStack(sparse_mat_t *mat, swar_t *SWAR, int iS)
 	for(k = 1; k <= SWAR->R[j][0]; k++)
 	    if(SWAR->R[j][k] != -1)
 		remove_j_from_row(mat, SWAR->R[j][k], j);
-	remove_j_from_SWAR(SWAR, j);
 #if USE_MERGE_FAST > 1
-	SWAR->Wj[j] = -iS;
+	k = SWAR->Wj[j]; // make a copy of the weight
+#endif
+	remove_j_from_SWAR(SWAR, j);
+	// SWAR->Wj[j] is put to -1...
+#if USE_MERGE_FAST > 1
+	SWAR->Wj[j] = -k-1; // restore and update
 #endif
     }
 #if DEBUG >= 1
@@ -1644,6 +1676,15 @@ merge(sparse_mat_t *mat, int nb_merge_max, int maxlevel, int rwmax, swar_t *SWAR
 #endif
 	else
 	    njrem += mergeGe2(mat, m, nb_merge_max, SWAR);
+#if 0
+    {
+	int i, ni = 0;
+	for(i = 0; i < mat->nrows; i++)
+	    if((mat->data[i].val != NULL) && hasCol(mat, i, 301))
+		ni++;
+	printf("CHECK: %d %d\n", ni, SWAR->Wj[301]);
+    }
+#endif
 	fprintf(stderr, "=> nrows=%d ncols=%d njrem=%d\n",
 		mat->rem_nrows, mat->rem_ncols, njrem);
 	inspectRowWeight(mat, rwmax);
