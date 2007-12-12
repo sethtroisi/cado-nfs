@@ -6,11 +6,12 @@ GMPLIB ?= -L $(GMP)/lib -lgmp
 GMPINCLUDE ?= $(GMP)/include/
 
 
-CFLAGS=-O2 -g -I$(GMPINCLUDE) -DREV=\"`svnversion .`\"
+CFLAGS=-O2 -g -W -Wall
+EXTRAFLAGS=-I$(GMPINCLUDE) -DREV=\"`svnversion .`\"
 LDFLAGS=../utils/libutils.a $(GMPLIB) -lm
 
 polyselect: polyselect.c ../cado.h
-	gcc $(CFLAGS) -I.. $< $(LDFLAGS) -o $@
+	gcc $(CFLAGS) $(EXTRAFLAGS) -I.. $< $(LDFLAGS) -o $@
 
 Makefile.local:
 	echo "Makefile.local does not exist. It can be used to store paths \

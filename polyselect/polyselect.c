@@ -43,8 +43,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <string.h>
 #include <assert.h>
 #include <limits.h> /* for ULONG_MAX */
-#include <float.h> /* for DBL_MAX */
+#include <float.h>  /* for DBL_MAX */
 #include <math.h>   /* for log, fabs */
+#define __USE_ISOC99 /* for isblank */
+#include <ctype.h>  /* for isspace, islower */
 #include "cado.h"
 #include "utils/utils.h" /* for cputime() */
 
@@ -332,7 +334,13 @@ special_val0 (mpz_t *f, int d, unsigned long p)
 #if 1
   assert (d > 0);
   roots = (long*) malloc (d * sizeof (long));
+  if (roots == NULL)
+    {
+      fprintf (stderr, "Error, not enough memory\n");
+      exit (1);
+    }
   nroots = roots_mod_long (roots, g, d, p);
+  assert (nroots <= d);
   for (r0 = 0, i = 0; i < nroots; i++)
     {
       r = roots[i];
@@ -413,7 +421,7 @@ always returns 0 in val(f,p).
 Assumes p divides disc = disc(f), d is the degree of f.
 */
 double
-special_valuation (long *r, mpz_t *f, int d, unsigned long p, mpz_t disc)
+special_valuation (mpz_t *f, int d, unsigned long p, mpz_t disc)
 {
   mpz_t t;
   double v;
@@ -427,7 +435,7 @@ special_valuation (long *r, mpz_t *f, int d, unsigned long p, mpz_t disc)
   p_divides_lc = mpz_divisible_ui_p (f[d], p);
   if ((mpz_divisible_ui_p (t, p) == 0) && (p_divides_lc == 0))
     {
-      int e, i;
+      int e;
       v = (double) p;
       e = roots_mod_long (NULL, f, d, p);
       v = (v * (double) e - 1.0) / (v * v - 1.0);
@@ -715,13 +723,12 @@ mpz_poly_gcd (mpz_poly_t fp, mpz_poly_t g, unsigned long p)
 }
 
 /* Return the number of roots of f(x) mod p, where f has degree d.
-   If r is not NULL, put the n roots of f(x) mod p in r[0]...r[n-1].
 */
 int
-roots_mod (long *r, mpz_t *f, int d, const long p)
+roots_mod (mpz_t *f, int d, const long p)
 {
   mpz_poly_t fp, g, h;
-  int i, j, k, df, dg;
+  int k, df;
 
   //  printf ("enter roots_mod, p=%d, f=", p); fprint_polynomial (stdout, f, d);
 
@@ -766,7 +773,7 @@ roots_mod (long *r, mpz_t *f, int d, const long p)
   mpz_poly_clear (g);
   mpz_poly_clear (h);
 
-  printf ("p=%d:%d\n", p, df);
+  printf ("p=%ld:%d\n", p, df);
 
   return df;
 }
@@ -796,31 +803,27 @@ isprime (unsigned long p)
    eps is the target accuracy for the "bad-behaved primes".
 */
 double
-get_alpha (mpz_t *f, const int d, unsigned long B, int verbose)
+get_alpha (mpz_t *f, const int d, unsigned long B)
 {
   double alpha, e;
-  unsigned long p, q;
+  unsigned long p;
   mpz_t disc;
-  long *roots;
 
   mpz_init (disc);
   discriminant (disc, f, d);
 
-  roots = (long*) malloc (d * sizeof (long));
-
   /* prime p=2 */
-  e = special_valuation (roots, f, d, 2, disc);
+  e = special_valuation (f, d, 2, disc);
   alpha = (1.0 - e) * log (2.0);
 
   /* FIXME: generate all primes up to B and pass them to get_alpha */
   for (p = 3; p <= B; p += 2)
     if (isprime (p))
       {
-	e = special_valuation (roots, f, d, p, disc);
+	e = special_valuation (f, d, p, disc);
 	alpha += (1.0 / (double) (p - 1) - e) * log ((double) p);
       }
   mpz_clear (disc);
-  free (roots);
   return alpha;
 }
 
@@ -1048,8 +1051,6 @@ default_qint (mpz_t n)
 static void
 init_poly (cado_poly p, cado_input in)
 {
-  int i;
-
   /* strcpy (p->name, ""); */
   p->name[0] = '\0';
   mpz_init_set (p->n, in->n);
@@ -1285,14 +1286,14 @@ get_logmu (mpz_t *p, unsigned long degree, mpz_t m, double S2)
 {
   double mu;
   double S = sqrt (S2);
-  int i;
+  long i;
 
   mu = fabs (mpz_get_d (p[degree]));
   for (i = degree - 1; i >= 0; i--)
     mu = mu * S2 + fabs (mpz_get_d (p[i]));
-  for (i = 0; i < degree; i += 2)
+  for (i = 0; (unsigned long) i < degree; i += 2)
     mu /= S2;
-  if (i < degree)
+  if ((unsigned long) i < degree)
     mu /= S;
   return log((mpz_get_d (m) / S + S) * mu);
 }
@@ -1301,16 +1302,20 @@ get_logmu (mpz_t *p, unsigned long degree, mpz_t m, double S2)
 void
 generate_base_m (cado_poly p, mpz_t m)
 {
-  unsigned long i, g = 1, mg;
-  long k, im;
+  unsigned long i, g = 1;
   int d = p->degree;
-  mpz_t powm;
+
+  assert (d >= 0);
 
 #ifdef WANT_MONIC
   mpz_ndiv_qr (p->f[1], p->f[0], p->n, m);
-  for (i = 1; i < d; i++)
+  for (i = 1; i < (unsigned long) d; i++)
     mpz_ndiv_qr (p->f[i+1], p->f[i], p->f[i], m);
 #else
+  {
+    unsigned long mg;
+    long k, im;
+    mpz_t powm;
   mpz_init (powm);
   mpz_pow_ui (powm, m, d);
   mpz_ndiv_qr (p->f[d], p->f[d - 1], p->n, powm);
@@ -1338,6 +1343,7 @@ generate_base_m (cado_poly p, mpz_t m)
       mpz_divexact_ui (p->f[i - 1], p->f[i - 1], g);
     }
   mpz_clear (powm);
+  }
 #endif
   mpz_neg (p->g[0], m);
   mpz_set_ui (p->g[1], g);
@@ -1371,7 +1377,7 @@ rotate (mpz_t *f, int d, unsigned long alim, long K, mpz_t m, long *bestk)
   mpz_addmul_ui (f[0], m, K);
   for (k = -K; k <= K; k++)
     {
-      alpha = get_alpha (f, d, alim, 0);
+      alpha = get_alpha (f, d, alim);
       if (alpha < best_alpha)
         {
           best_alpha = alpha;
@@ -1395,7 +1401,7 @@ rotate (mpz_t *f, int d, unsigned long alim, long K, mpz_t m, long *bestk)
    For d=5, T = B^4.5; for d=4, T = B^3.3.
 */
 void
-generate_poly (cado_poly out, double T, int verbose)
+generate_poly (cado_poly out, double T)
 {
   unsigned long d = out->degree, alim;
   double B, logmu, alpha, E, mB;
@@ -1410,7 +1416,7 @@ generate_poly (cado_poly out, double T, int verbose)
   unsigned long Malloc2;
   unsigned long Msize2, i;
   int st;
-  long k0, bestk;
+  long k0, bestk = 0;
 
   assert (T <= 9007199254740992.0); /* if T > 2^53, T-- will loop */
 
@@ -1494,7 +1500,7 @@ generate_poly (cado_poly out, double T, int verbose)
     {
       logmu = M[i].logmu;
       generate_base_m (out, M[i].m);
-      alpha = get_alpha (out->f, d, alim, verbose);
+      alpha = get_alpha (out->f, d, alim);
       E = logmu + alpha;
       /* the following overwrites the M database */
       Msize2 = m_logmu_insert (M, Malloc2, Msize2, out->m, E);
@@ -1552,7 +1558,7 @@ print_poly (FILE *fp, cado_poly p, int argc, char *argv[], int st, int raw)
   fprintf (fp, "\n");
   fprintf (fp, "skew: %1.3f\n", p->skew);
   logmu = get_logmu (p->f, p->degree, p->m, p->skew);
-  alpha = get_alpha (p->f, p->degree, (p->alim > 1000) ? 1000 : p->alim, 0);
+  alpha = get_alpha (p->f, p->degree, (p->alim > 1000) ? 1000 : p->alim);
   fprintf (fp, "# logmu: %1.2f, alpha: %1.2f logmu+alpha=%1.2f\n", logmu,
 	   alpha, logmu + alpha);
   for (i = p->degree; i >= 0; i--)
@@ -1685,7 +1691,7 @@ main (int argc, char *argv[])
   mpz_set (out->m, m); /* if non zero, use given value of m */
   clear (in);
 
-  generate_poly (out, effort, verbose);
+  generate_poly (out, effort);
   print_poly (stdout, out, argc0, argv0, st, raw);
   clear_poly (out);
 
