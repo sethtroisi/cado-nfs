@@ -518,9 +518,12 @@ main (int argc, char **argv)
     hashCheck(nprimes_new);
 #endif
     
+#if 0
     // TODO: do more fancy things, like killing too heavy rows, etc.
+    // if just doing this, then singletons may appear again, etc.
     if((nrel_new - nprimes_new) >= 500)
 	nrel_new = nprimes_new + 500;
+#endif
 
     // now, we reread the file of relations and convert it to the new coding...
     printf("%d %d\n", nrel_new, nprimes_new);
