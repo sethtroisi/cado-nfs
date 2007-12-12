@@ -54,12 +54,45 @@ check_prime (mpz_t p, unsigned long sb, long a, unsigned long b)
     }
 }
 
+// Get a prime factor of norm and put it in p1.
+void
+find_prime_factor(mpz_t p1, mpz_t norm)
+{
+    mpz_t r;
+    int res;
+
+    /* stupid? */
+    mpz_init(r);
+    mpz_sqrtrem(p1, r, norm);
+    res = mpz_cmp_ui(r, 0) == 0;
+    mpz_clear(r);
+    if(res){
+	fprintf(stderr, "Perfect square!!!\n");
+	return;
+    }
+    /* the following seems to work well for a large prime bound of 2^24,
+       i.e., residues less than 2^48 */
+    double B1 = 4.0 * (double) mpz_sizeinbase (norm, 2);
+    do
+	{
+	    //	    gmp_fprintf (stderr, "ECM on %Zd\n", norm);
+	    res = ecm_factor (p1, norm, B1, NULL);
+	    //	    fprintf(stderr, "Used ecm_factor: %d\n", res);
+	    B1 += sqrt (B1);
+	}
+    while (res == 0 || mpz_cmp (p1, norm) == 0 
+	   || mpz_probab_prime_p (p1, REPS) == 0);
+}
+
 /* factor norm into at most 2 primes smaller than 2^lp:
    0) if norm = 1, return 0
    1) if norm is prime, norm < 2^lp, put it into p1 and return 1
    2) if norm = p1*p2 with p1,p2 primes < 2^lp, return 2
    3) otherwise if norm has 3 prime factors of more,
       or if one prime factor is >= 2^lp, return 3.
+
+   TODO: check that the case p1 == p2 (rare) doesn't destroy anything
+
 */
 unsigned long
 factor (mpz_t p1, mpz_t p2, mpz_t norm, size_t lp)
@@ -77,17 +110,7 @@ factor (mpz_t p1, mpz_t p2, mpz_t norm, size_t lp)
     }
   else /* two or more factors */
     {
-      int res;
-      /* the following seems to work well for a large prime bound of 2^24,
-	 i.e., residues less than 2^48 */
-      double B1 = 4.0 * (double) mpz_sizeinbase (norm, 2);
-      do
-	{
-	  res = ecm_factor (p1, norm, B1, NULL);
-	  B1 += sqrt (B1);
-	}
-      while (res == 0 || mpz_cmp (p1, norm) == 0 
-             || mpz_probab_prime_p (p1, REPS) == 0);
+      find_prime_factor(p1, norm);
       /* p1 is a non trivial prime factor of norm */
       /* we want p1 < 2^lp */
       if (mpz_sizeinbase (p1, 2) > lp) /* this should be rare */
@@ -301,8 +324,11 @@ checkrels (char *f, cado_poly cpoly, int verbose, size_t mfbr, size_t mfba,
 	}
 
       rels ++;
-      if (ok >= 3)
+      if (ok >= 3){
 	out_rels ++;
+	if(!(out_rels % 1000))
+	    fprintf(stderr, "%lu-th relation found\n", out_rels);
+      }
     end:
       /* read to end of line */
       while (c != '\n' && c != EOF)
