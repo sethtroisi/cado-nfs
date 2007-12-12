@@ -6,7 +6,7 @@ GMPLIB ?= -L $(GMP)/lib -lgmp
 GMPINCLUDE ?= $(GMP)/include/
 
 
-CFLAGS=-O2 -g -W -Wall
+CFLAGS=-O2 -g -W -Wall -std=c99
 EXTRAFLAGS=-I$(GMPINCLUDE) -DREV=\"`svnversion .`\"
 LDFLAGS=../utils/libutils.a $(GMPLIB) -lm
 

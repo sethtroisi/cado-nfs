@@ -45,7 +45,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <limits.h> /* for ULONG_MAX */
 #include <float.h>  /* for DBL_MAX */
 #include <math.h>   /* for log, fabs */
-#define __USE_ISOC99 /* for isblank */
+/* for isblank */
+/* #define _ISOC99_SOURCE */
+/* We use -std=c99 */
 #include <ctype.h>  /* for isspace, islower */
 #include "cado.h"
 #include "utils/utils.h" /* for cputime() */
