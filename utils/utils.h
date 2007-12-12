@@ -37,6 +37,7 @@ typedef struct {
 } __long_poly_struct;
 typedef __long_poly_struct long_poly_t[1];
 extern int roots_mod_long (long*, mpz_t*, int, const long);
+extern int nbits (unsigned long);
 
 /* getprime */
 extern unsigned long getprime (unsigned long);

@@ -3,7 +3,7 @@ include Makefile.local
 # Set default filenames/paths if not already set.
 GMP ?= /usr/local/
 GMPINCLUDE ?= $(GMP)/include/
-CFLAGS=-g -O2
+CFLAGS=-g -O2 -W -Wall
 
 names:=polyfile relation timing long_poly getprime mod_ul
 src:=$(patsubst %,%.c,$(names))

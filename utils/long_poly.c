@@ -10,9 +10,13 @@ static long*
 alloc_long_array (int d)
 {
   long *f;
-  int i;
 
   f = (long*) malloc (d * sizeof (long));
+  if (f == NULL)
+    {
+      fprintf (stderr, "Error, not enough memory\n");
+      exit (1);
+    }
   return f;
 }
 
@@ -20,16 +24,23 @@ alloc_long_array (int d)
 static long*
 realloc_long_array (long *f, int d)
 {
-  return (long*) realloc (f, d * sizeof (long));
+  f = (long*) realloc (f, d * sizeof (long));
+  if (f == NULL)
+    {
+      fprintf (stderr, "Error, not enough memory\n");
+      exit (1);
+    }
+  return f;
 }
 
 /* initialize a polynomial with maximal degree d */
 void
 long_poly_init (long_poly_t f, int d)
 {
-  f->alloc = d + 1;
+  assert (d >= 0);
   f->degree = -1; /* initialize to 0 */
   f->coeff = alloc_long_array (d + 1);
+  f->alloc = d + 1;
 }
 
 /* clear a polynomial */
@@ -37,6 +48,7 @@ void
 long_poly_clear (long_poly_t f)
 {
   free (f->coeff);
+  f->alloc = 0;
 }
 
 /* realloc f to (at least) n coefficients */
@@ -121,12 +133,12 @@ int
 long_poly_set_mod (long_poly_t fp, mpz_t *f, int d, long p)
 {
   int i;
-  long ifd;
 
   while (d >= 0 && mpz_divisible_ui_p (f[d], p))
     d --;
-  ASSERT (d >= 0); /* f is 0 mod p: should not happen since otherwise p would
-		      divide N, because f(m)=N */
+  ASSERT (d >= 0); /* f is 0 mod p: should not happen in the CADO-NFS context
+                      since otherwise p would divide N, indeed f(m)=N */
+  long_poly_realloc (fp, d + 1);
   fp->degree = d;
   for (i = 0; i <= d; i++)
     fp->coeff[i] = mpz_fdiv_ui (f[i], p);
@@ -168,9 +180,17 @@ void
 long_poly_sqr (long_poly_t h, const long_poly_t g, long p)
 {
   int i, j, dg = g->degree;
-  long *gc = g->coeff, *hc = h->coeff;
+  long *gc, *hc;
 
-  long_poly_realloc (h, 2 * g->degree + 1);
+  assert (dg >= -1);
+  if (dg == -1) /* g is zero */
+    {
+      h->degree = -1;
+      return;
+    }
+  long_poly_realloc (h, 2 * dg + 1);
+  gc = g->coeff;
+  hc = h->coeff;
   for (i = 0; i <= dg; i++)
     for (j = i + 1; j <= dg; j++)
       if (i == 0 || j == dg)
@@ -205,11 +225,12 @@ void
 long_poly_mod_ui (long_poly_t g, const long_poly_t h, long p)
 {
   int i;
+  int dh = h->degree;
 
-  long_poly_realloc (g, h->degree + 1);
-  for (i = 0; i <= h->degree; i++)
+  long_poly_realloc (g, dh + 1);
+  for (i = 0; i <= dh; i++)
     g->coeff[i] = h->coeff[i] % p;
-  g->degree = h->degree;
+  g->degree = dh;
   long_poly_normalize (g);
 }
 
@@ -218,13 +239,15 @@ void
 long_poly_mul_x (long_poly_t h, long a, long p)
 {
   int i, d = h->degree;
+  long *hc;
 
-  long_poly_realloc (h, d + 2);
-  h->coeff[d + 1] = h->coeff[d];
+  long_poly_realloc (h, d + 2); /* (x+a)*h has degree d+1, thus d+2 coeffs */
+  hc = h->coeff;
+  hc[d + 1] = hc[d];
   for (i = d - 1; i >= 0; i--)
-    h->coeff[i + 1] = (h->coeff[i] + a * h->coeff[i + 1]) % p;
-  h->coeff[0] = (a * h->coeff[0]) % p;
-  h->degree ++;
+    hc[i + 1] = (hc[i] + a * hc[i + 1]) % p;
+  hc[0] = (a * hc[0]) % p;
+  h->degree = d + 1;
 }
 
 /* h <- g - x mod p */
@@ -233,7 +256,9 @@ long_poly_sub_x (long_poly_t h, const long_poly_t g, long p)
 {
   int i, d = g->degree;
 
-  long_poly_realloc (h, (d < 2) ? 2 : d + 1);
+  /* if g has degree d >= 2, then g-x has degree d too;
+     otherwise g-x has degree <= 1 */
+  long_poly_realloc (h, ((d < 2) ? 1 : d) + 1);
   for (i = 0; i <= d; i++)
     h->coeff[i] = g->coeff[i];
   for (i = d + 1; i <= 1; i++)
@@ -249,7 +274,8 @@ long_poly_sub_1 (long_poly_t h, const long_poly_t g, long p)
 {
   int i, d = g->degree;
 
-  long_poly_realloc (h, (d < 1) ? 1 : d + 1);
+  /* g-1 has degree d if d >= 1, and degree 0 otherwise */
+  long_poly_realloc (h, ((d < 1) ? 0 : d) + 1);
   for (i = 0; i <= d; i++)
     h->coeff[i] = g->coeff[i];
   for (i = d + 1; i <= 0; i++)
@@ -261,10 +287,10 @@ long_poly_sub_1 (long_poly_t h, const long_poly_t g, long p)
 
 /* h <- rem(h, f) mod p, f not necessarily monic */
 void
-long_poly_div_r (long_poly_t h, long_poly_t f, long p)
+long_poly_div_r (long_poly_t h, const long_poly_t f, long p)
 {
   int i, d = f->degree, dh = h->degree, monic;
-  long *hc = h->coeff, t;
+  long *hc = h->coeff, t = 1;
 
   monic = f->coeff[d] == 1;
   if (!monic)
@@ -287,7 +313,6 @@ long_poly_div_r (long_poly_t h, long_poly_t f, long p)
       while (dh >= 0 && hc[dh] == 0);
       h->degree = dh;
     }
-  h->degree = dh;
   /* reduce mod p */
   long_poly_mod_ui (h, h, p);
 }
@@ -297,7 +322,7 @@ void
 long_poly_divexact (long_poly_t q, long_poly_t h, const long_poly_t f, long p)
 {
   int i, d = f->degree, dh = h->degree, monic;
-  long *hc = h->coeff, t;
+  long *hc = h->coeff, t = 1;
 
   assert (d >= 0);
   assert (dh >= 0);
@@ -323,9 +348,7 @@ long_poly_divexact (long_poly_t q, long_poly_t h, const long_poly_t f, long p)
       if (dh >= 0)
 	hc[dh] = hc[dh] % p;
     }
-  h->degree = dh;
   long_poly_normalize (q);
-  long_poly_normalize (h);
 }
 
 /* fp <- gcd (fp, g), clobbers g */
@@ -351,9 +374,9 @@ long_poly_out (FILE *fp, long_poly_t f)
       int i;
       for (i = 0; i <= f->degree; i++)
 	if (f->coeff[i] > 0)
-	  fprintf (fp, "+%d*x^%d", f->coeff[i], i);
+	  fprintf (fp, "+%ld*x^%d", f->coeff[i], i);
 	else if (f->coeff[i] < 0)
-	  fprintf (fp, "%d*x^%d", f->coeff[i], i);
+	  fprintf (fp, "%ld*x^%d", f->coeff[i], i);
       fprintf (fp, ";\n");
     }
 }
@@ -363,7 +386,8 @@ long
 long_poly_eval (long_poly_t f, long x, long p)
 {
   int i, d = f->degree;
-
+  
+  assert (d >= 0);
   long v = f->coeff[d];
   for (i = d - 1; i >= 0; i--)
     v = (v * x + f->coeff[i]) % p;
@@ -398,7 +422,7 @@ nbits (unsigned long p)
   return k;
 }
 
-/* g <- (x+a)^e mod (fp, e), using auxiliary polynomial h */
+/* g <- (x+a)^e mod (fp, p), using auxiliary polynomial h */
 void
 long_poly_powmod_ui (long_poly_t g, long_poly_t fp, long_poly_t h, long a,
 		     long e, long p)
@@ -433,7 +457,7 @@ long_poly_cantor_zassenhaus (long *r, long_poly_t f, long p, int depth)
   long a;
   long_poly_t q, h, ff;
   int d = f->degree, dq, n, m;
-  
+
   assert (p & 1);
   assert (d >= 1);
 
@@ -457,6 +481,7 @@ long_poly_cantor_zassenhaus (long *r, long_poly_t f, long p, int depth)
       long_poly_set (h, f);
       long_poly_gcd (q, h, p);
       dq = q->degree;
+      assert (dq >= 0);
       if (0 < dq && dq < d)
 	{
 	  n = long_poly_cantor_zassenhaus (r, q, p, depth + 1);
@@ -510,6 +535,7 @@ roots_mod_long (long *r, mpz_t *f, int d, const long p)
 
   long_poly_init (fp, d);
   d = long_poly_set_mod (fp, f, d, p);
+  /* d is the degree of fp (-1 if fp=0) */
 
   if (d == 0)
     {
@@ -545,6 +571,7 @@ roots_mod_long (long *r, mpz_t *f, int d, const long p)
   /* now fp contains gcd(x^p-x, f) */
 
   df = fp->degree;
+  assert (df >= 0);
   
   if (r != NULL && df > 0)
     {
@@ -553,6 +580,7 @@ roots_mod_long (long *r, mpz_t *f, int d, const long p)
     }
 
   long_poly_clear (g);
+
   long_poly_clear (h);
 
  clear_fp:
