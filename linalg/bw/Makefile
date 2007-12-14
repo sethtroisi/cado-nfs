@@ -24,6 +24,10 @@ LFLAGS:=-L ../../utils
 #LFLAGS+=$(GMPLIB)
 #endif
 
+ifdef PATCHED_GMP
+IFLAGS+=-DPATCHED_GMP
+endif
+
 # No more variable changes after this include.
 include $(TOPPATH)/util/main.mki
 
@@ -105,7 +109,6 @@ BW_MASTER2_SOURCES:=						\
 		old/variables.c	old/fft_on_matrices.cpp		\
 		old/ops_poly_fft.cpp				\
 		old/ops_poly_schoolbook.cpp			\
-		old/ops_poly_integerfft.cpp			\
 		old/ops_poly_wrap.cpp				\
 		old/fft_core.c					\
 		old/field_common.c old/field_prime.c		\
@@ -115,6 +118,9 @@ BW_MASTER2_SOURCES:=						\
 		old/structure_debug.c old/master2.cpp		\
 		old/twisting_polynomials.c			\
 		old/master_common.c
+ifdef	PATCHED_GMP
+BW_MASTER2_SOURCES+=old/ops_poly_integerfft.cpp
+endif
 BW_MASTER2_LIBS:=-lgmp
 -include .bw-master2.mkf
 endif
@@ -126,7 +132,6 @@ BW_MASTER_BINARY_SOURCES:=					\
 		old/variables.c	old/fft_on_matrices.cpp		\
 		old/ops_poly_fft.cpp				\
 		old/ops_poly_schoolbook.cpp			\
-		old/ops_poly_integerfft.cpp			\
 		old/ops_poly_wrap.cpp				\
 		old/fft_core.c					\
 		old/field_common.c old/field_prime.c		\
@@ -135,6 +140,9 @@ BW_MASTER_BINARY_SOURCES:=					\
 		old/e_polynomial.c old/structure.c		\
 		old/structure_debug.c cxx/master_binary.cpp	\
 		old/twisting_polynomials.c
+ifdef	PATCHED_GMP
+BW_MASTER_BINARY_SOURCES+=old/ops_poly_integerfft.cpp
+endif
 BW_MASTER_BINARY_LIBS:=-lgmp -lutils
 -include .bw-master-binary.mkf
 
@@ -157,7 +165,6 @@ BW_FFT_BASICTEST_SOURCES:=					\
 		old/variables.c 				\
 		old/ops_poly_fft.cpp				\
 		old/ops_poly_schoolbook.cpp			\
-		old/ops_poly_integerfft.cpp			\
 		old/ops_poly_wrap.cpp				\
 		old/fft_core.c					\
 		old/field_common.c old/field_prime.c		\
@@ -166,6 +173,9 @@ BW_FFT_BASICTEST_SOURCES:=					\
 		old/structure.c					\
 		old/structure_debug.c				\
 		old/fft-basictest.cpp
+ifdef	PATCHED_GMP
+BW_FFT_BASICTEST_SOURCES+=old/ops_poly_integerfft.cpp
+endif
 BW_FFT_BASICTEST_LIBS:=-lgmp
 -include .bw-fft-basictest.mkf
 
@@ -177,7 +187,6 @@ BW_BENCHFFT_SOURCES:=						\
 		old/variables.c old/fft_on_matrices.cpp		\
 		old/ops_poly_fft.cpp				\
 		old/ops_poly_schoolbook.cpp			\
-		old/ops_poly_integerfft.cpp			\
 		old/ops_poly_wrap.cpp			\
 		old/fft_core.c					\
 		old/field_common.c old/field_prime.c		\
@@ -185,6 +194,9 @@ BW_BENCHFFT_SOURCES:=						\
 		old/field_usage.c old/modulus_hacks.c		\
 		old/structure.c old/structure_debug.c		\
 		old/testfft.cpp
+ifdef	PATCHED_GMP
+BW_BENCHFFT_SOURCES+=old/ops_poly_integerfft.cpp
+endif
 BW_BENCHFFT_LIBS:=-lgmp
 -include .bw-benchfft.mkf
 

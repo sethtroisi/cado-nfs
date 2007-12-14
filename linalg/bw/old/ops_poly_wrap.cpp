@@ -34,6 +34,7 @@ void ops_poly_wrap::itransform  (
 		free(res_fft);
 	}
 
+#ifdef	PATCHED_GMP
 	{
 		mp_limb_t * res_ifft;
 		res_ifft = (mp_limb_t *) malloc((deg+1)*bw_allocsize*sizeof(mp_limb_t));
@@ -49,5 +50,6 @@ void ops_poly_wrap::itransform  (
 		}
 		free(res_ifft);
 	}
+#endif
 	fprintf(stderr, "checked degree %d ok\n", deg);
 }
