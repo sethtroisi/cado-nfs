@@ -75,6 +75,8 @@ F := Split(Read(algfile));
 v := StringToInteger(F[#F]);
 Prune(~F);
 
+printf "Here is v = %o and #F = %o\n", v, #F;
+
 if IsOdd(v) then
   ff := [fd*StringToInteger(x, 16) :  x in F];
   v +:= 1;
@@ -84,6 +86,9 @@ end if;
 
 a := K!ff;
 assert MyIsSqrt(a);
+
+printf "and now for ff[1]\n";
+//printf "abs(ff[1])=%o\n", AbsoluteValue(ff[1]);
 
 p := FindSuitableP(a);
 prec := Ceiling(1.2*Log(p, AbsoluteValue(ff[1])));
@@ -111,6 +116,9 @@ end if;
 
 g1 := GCD(Integers()!(gra-grr), N);
 g2 := GCD(Integers()!(gra+grr), N);
+
+if not IsProbablePrime(g1) then printf "g1 is composite\n"; end if;
+if not IsProbablePrime(g2) then printf "g2 is composite\n"; end if;
 
 return [g1, g2];
 
