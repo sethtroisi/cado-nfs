@@ -67,7 +67,7 @@ int main(int argc, char **argv)
 	nab++;
     }
 
-    fprintf(stderr, "v = %d\n", prd->v);
+    fprintf(stderr, "#(a, b) = %d, v = %d\n", nab, prd->v);
     fprintf(stderr, "sizeinbit of cst term = %d\n", (int)mpz_sizeinbase(prd->p->coeff[0], 2));
     fprintf(stderr, "sizeinbit of leading term = %d\n", (int)mpz_sizeinbase(prd->p->coeff[pol->degree-1], 2));
     
