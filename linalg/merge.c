@@ -15,16 +15,8 @@
 #include <gmp.h>
 #include <string.h>
 
+#define WANT_ASSERT
 #include "utils/utils.h"
-
-#define USE_FM_ASSERT
-
-#ifdef USE_FM_ASSERT
-#include <assert.h>
-#define FM_ASSERT(x) assert((x))
-#else
-#define FM_ASSERT(x)
-#endif
 
 #define DEBUG 0
 #define TEX 0
@@ -363,12 +355,12 @@ inspectWeight(sparse_mat_t *mat, FILE *purgedfile)
     memset(mat->wt, 0, mat->ncols * sizeof(int));
     for(i = 0; i < mat->nrows; i++){
 	ret = fscanf(purgedfile, "%d", &j); // unused index to rels file
-	FM_ASSERT (ret == 1);
+	ASSERT (ret == 1);
 	ret = fscanf (purgedfile, "%d", &nc);
-	FM_ASSERT (ret == 1);
+	ASSERT (ret == 1);
 	for(j = 0; j < nc; j++){
 	    ret = fscanf(purgedfile, "%d", &x);
-	    FM_ASSERT (ret == 1);
+	    ASSERT (ret == 1);
 	    mat->wt[x]++;
 	}
     }
@@ -391,7 +383,7 @@ readmat(sparse_mat_t *mat, FILE *file)
     int nc, x, buf[BUF_LEN], ibuf;
 
     ret = fscanf (file, "%d %d", &(mat->nrows), &(mat->ncols));
-    FM_ASSERT (ret == 2);
+    ASSERT (ret == 2);
     
     fprintf(stderr, "Reading matrix of %d rows and %d columns: excess is %d\n",
 	    mat->nrows, mat->ncols, mat->nrows - mat->ncols);
@@ -400,9 +392,9 @@ readmat(sparse_mat_t *mat, FILE *file)
 
     for (i = 0; i < mat->nrows; i++){
 	ret = fscanf(file, "%d", &j); // unused index to rels file
-	FM_ASSERT (ret == 1);
+	ASSERT (ret == 1);
 	ret = fscanf (file, "%d", &nc);
-	FM_ASSERT (ret == 1);
+	ASSERT (ret == 1);
 	if(nc == 0){
 	    mat->data[i].len = 0;
 	    mat->data[i].val = NULL;
@@ -414,8 +406,8 @@ readmat(sparse_mat_t *mat, FILE *file)
 #if DEBUG >= 1
 		fprintf(stderr, "i = %d, j = %d, x = %d\n", i, j, x);
 #endif
-		FM_ASSERT (ret == 1);
-		FM_ASSERT (0 <= x && x < mat->ncols);
+		ASSERT (ret == 1);
+		ASSERT (0 <= x && x < mat->ncols);
 #if USE_MERGE_FAST <= 1
 		if(mat->wt[x] > 0)
 		    buf[ibuf++] = x;
@@ -429,7 +421,7 @@ readmat(sparse_mat_t *mat, FILE *file)
 		    mat->R[x][mat->R[x][0]] = i;
 		}
 	    }
-	    FM_ASSERT(ibuf <= BUF_LEN);
+	    ASSERT(ibuf <= BUF_LEN);
 	    mat->data[i].len = ibuf;
 	    mat->data[i].val = (int*) malloc (ibuf * sizeof (int));
 	    memcpy(mat->data[i].val, buf, ibuf * sizeof(int));
@@ -465,8 +457,10 @@ removeWeight(sparse_mat_t *mat, int i)
 {
     int k;
 
-    for(k = 0; k < mat->data[i].len; k++)
+    for(k = 0; k < mat->data[i].len; k++){
 	mat->wt[mat->data[i].val[k]]--;
+	mat->weight--;
+    }
 }
 
 int
@@ -506,10 +500,12 @@ addRows(sparse_mat_t *mat, int i1, int i2)
 	if(mat->data[i1].val[k1] < mat->data[i2].val[k2]){
 	    tmp[k++] = mat->data[i1].val[k1++];
 	    mat->wt[mat->data[i1].val[k1-1]]++;
+	    mat->weight++;
 	}
 	else if(mat->data[i1].val[k1] > mat->data[i2].val[k2]){
             tmp[k++] = mat->data[i2].val[k2++];
 	    mat->wt[mat->data[i2].val[k2-1]]++;
+	    mat->weight++;
 	}
 	else{
 #if DEBUG >= 1
@@ -527,11 +523,13 @@ addRows(sparse_mat_t *mat, int i1, int i2)
     for( ; k1 < mat->data[i1].len; k1++){
 	tmp[k++] = mat->data[i1].val[k1];
 	mat->wt[mat->data[i1].val[k1]]++;
+	mat->weight++;
     }
     // finish with k2
     for( ; k2 < mat->data[i2].len; k2++){
 	tmp[k++] = mat->data[i2].val[k2];
 	mat->wt[mat->data[i2].val[k2]]++;
+	mat->weight++;
     }
     // destroy and copy back
     free(mat->data[i1].val);
@@ -784,8 +782,8 @@ minimalSpanningTreeWithPrim(int *father, int *height, int A[MERGE_LEVEL_MAX][MER
     printQueue(Q, fQ, lQ);
 #endif
     // active part of Q is Q[fQ..lQ[
-    FM_ASSERT(fQ == 0);
-    FM_ASSERT(lQ == (m-1));
+    ASSERT(fQ == 0);
+    ASSERT(lQ == (m-1));
     while(fQ != lQ){
 	// while queue is non empty
 	// pop queue
@@ -919,7 +917,7 @@ findBestIndex(sparse_mat_t *mat, int m, int *ind)
 {
     int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], i, j, imin, wmin, w;
 
-    FM_ASSERT(m <= MERGE_LEVEL_MAX);
+    ASSERT(m <= MERGE_LEVEL_MAX);
     if(m == 2)
 	return 0;
 #if 0 // obsolete...
@@ -1029,14 +1027,14 @@ checkCoherence(sparse_mat_t *mat, int m, int j)
     for(k = 1; k <= mat->R[j][0]; k++)
 	if(mat->R[j][k] != -1)
 	    nchk++;
-    FM_ASSERT(nchk == (mat->wt[j] >= 0 ? mat->wt[j] : -mat->wt[j]));
+    ASSERT(nchk == (mat->wt[j] >= 0 ? mat->wt[j] : -mat->wt[j]));
     if(m != -1){
 	if(nchk != m){
 	    fprintf(stderr, "HYPERCHECK:");
 	    fprintf(stderr, "mat->R[%d][0]=%d, m=%d\n", j, mat->R[j][0], m);
 	    fprintf(stderr, "Gasp: nchk=%d\n", nchk);
 	}
-	FM_ASSERT(nchk == m);
+	ASSERT(nchk == m);
     }
 }
 
@@ -1064,7 +1062,7 @@ incorporateColumn(sparse_mat_t *mat, int j, int i0)
     Rj[0] = ni-1;
     mat->R[j] = Rj;
     mat->wt[j] = wj;
-    FM_ASSERT(wj == Rj[0]);
+    ASSERT(wj == Rj[0]);
     mat->A[j] = dclistInsert(mat->S[wj], j);
 }
 
@@ -1244,8 +1242,10 @@ removeRowFast(sparse_mat_t *mat, int i)
 {
     int k;
 
-    for(k = 0; k < mat->data[i].len; k++)
+    for(k = 0; k < mat->data[i].len; k++){
 	removeCellFast(mat, i, mat->data[i].val[k]);
+	mat->weight--;
+    }
 }
 
 void
@@ -1310,21 +1310,29 @@ addRowsFast(sparse_mat_t *mat, int i1, int i2)
     removeRowFast(mat, i1);
     // loop while everybody is here
     while((k1 < mat->data[i1].len) && (k2 < mat->data[i2].len)){
-	if(mat->data[i1].val[k1] < mat->data[i2].val[k2])
+	if(mat->data[i1].val[k1] < mat->data[i2].val[k2]){
 	    tmp[k++] = mat->data[i1].val[k1++];
-	else if(mat->data[i1].val[k1] > mat->data[i2].val[k2])
+	    mat->weight++;
+	}
+	else if(mat->data[i1].val[k1] > mat->data[i2].val[k2]){
             tmp[k++] = mat->data[i2].val[k2++];
+	    mat->weight++;
+        }
 	else{
 	    k1++;
 	    k2++;
 	}
     }
     // finish with k1
-    for( ; k1 < mat->data[i1].len; k1++)
+    for( ; k1 < mat->data[i1].len; k1++){
 	tmp[k++] = mat->data[i1].val[k1];
+	mat->weight++;
+    }
     // finish with k2
-    for( ; k2 < mat->data[i2].len; k2++)
+    for( ; k2 < mat->data[i2].len; k2++){
 	tmp[k++] = mat->data[i2].val[k2];
+	mat->weight++;
+    }
     // destroy and copy back
     free(mat->data[i1].val);
     tmp2 = (int *)malloc(k * sizeof(int));
@@ -1352,11 +1360,12 @@ remove_j_from_row(sparse_mat_t *mat, int i, int j)
     for(k = 0; k < mat->data[i].len; k++)
 	if(mat->data[i].val[k] == j)
 	    break;
-    FM_ASSERT(k < mat->data[i].len);
+    ASSERT(k < mat->data[i].len);
     // crunch
     for(++k; k < mat->data[i].len; k++)
 	mat->data[i].val[k-1] = mat->data[i].val[k];
     mat->data[i].len -= 1;
+    mat->weight--;
 #if DEBUG >= 2
     fprintf(stderr, "row[%d]_a=", i);
     print_row(mat, i);
@@ -1423,7 +1432,7 @@ removeSingletons(sparse_mat_t *mat)
 	    for(i = 0; i < mat->nrows; i++)
 		if(hasCol(mat, i, j))
 		    break;
-	    FM_ASSERT(i < mat->nrows);
+	    ASSERT(i < mat->nrows);
 	    removeWeight(mat, i);
 	    destroyRow(mat, i);
 	    report1(i); // signal to replay...!
@@ -1569,7 +1578,18 @@ checkWeight(sparse_mat_t *mat, int j)
 		w++;
 	    }
     fprintf(stderr, "\n");
-    FM_ASSERT(w == (mat->wt[j] >= 0 ? mat->wt[j] : -mat->wt[j]));
+    ASSERT(w == (mat->wt[j] >= 0 ? mat->wt[j] : -mat->wt[j]));
+}
+
+void
+checkMatrixWeight(sparse_mat_t *mat)
+{
+    int i, w = 0;
+
+    for(i = 0; i < mat->nrows; i++)
+	if(mat->data[i].val != NULL)
+	    w += mat->data[i].len;
+    ASSERT(w == mat->weight);
 }
 
 int
@@ -1587,6 +1607,7 @@ merge_m_fast(sparse_mat_t *mat, int m)
     //    checkWeight(mat, 132461);
 
     while(1){
+	checkMatrixWeight(mat);
 	// get next j
 	dcl = mat->S[m]->next;
 	if(dcl == NULL)
@@ -1734,7 +1755,7 @@ merge(sparse_mat_t *mat, int nb_merge_max, int maxlevel)
     report2(mat->nrows, mat->ncols);
     m = 2;
     while(1){
-	fprintf(stderr, "Performing merge %d on w(M)=%d\n", m, mat->weight);
+	fprintf(stderr, "Performing merge %d; w(M)=%d\n", m, mat->weight);
 	old_nrows = mat->rem_nrows;
 	old_ncols = mat->rem_ncols;
 	if(m == 1)
@@ -1804,7 +1825,7 @@ dumpSparse(FILE *ofile, sparse_mat_t *mat, int *code)
 	    fprintf(ofile, " %d", buf[k]);
 	fprintf(ofile, "\n");
     }
-    FM_ASSERT(new_nrows == mat->rem_nrows);
+    ASSERT(new_nrows == mat->rem_nrows);
 }
 
 int
@@ -1857,7 +1878,7 @@ main(int argc, char *argv[])
     }
     
     purgedfile = fopen(purgedname, "r");
-    FM_ASSERT(purgedfile != NULL);
+    ASSERT(purgedfile != NULL);
     fscanf(purgedfile, "%d %d", &nrows, &ncols);
 
     mat.nrows = nrows;
