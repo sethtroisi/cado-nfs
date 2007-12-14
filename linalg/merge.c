@@ -1559,8 +1559,10 @@ useMinimalSpanningTree(sparse_mat_t *mat, int m, int *ind, int *tfill, int *tMST
 void
 findOptimalCombination(sparse_mat_t *mat, int m, int *ind, int *tfill, int *tMST)
 {
-    if(m <= 3)
+    if(m <= 3){
+	*tfill = *tMST = 0;
 	tryAllCombinations(mat, m, ind);
+    }
     else{
 #if 0
 	tryAllCombinations(mat, m, ind);
