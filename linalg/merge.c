@@ -1475,14 +1475,18 @@ tryAllCombinations(sparse_mat_t *mat, int m, int *ind)
 }
 
 void
-useMinimalSpanningTree(sparse_mat_t *mat, int m, int *ind)
+useMinimalSpanningTree(sparse_mat_t *mat, int m, int *ind, int *tfill, int *tMST)
 {
     int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX];
     int i, father[MERGE_LEVEL_MAX], height[MERGE_LEVEL_MAX], hmax, nV = m, h;
     int adds[MERGE_LEVEL_MAX << 1], nadds, tab[MERGE_LEVEL_MAX << 1], itab;
 
+    *tfill = cputime();
     fillRowAddMatrix(A, mat, m, ind);
+    *tfill = cputime()-*tfill;
+    *tMST = cputime();
     hmax = minimalSpanningTree(father, height, mat, m, A);
+    *tMST = cputime()-*tMST;
 #if DEBUG >= 1
     for(i = 0; i < m; i++)
 	fprintf(stderr, "father[%d] = %d\n", i, father[i]);
@@ -1553,7 +1557,7 @@ useMinimalSpanningTree(sparse_mat_t *mat, int m, int *ind)
 }
 
 void
-findOptimalCombination(sparse_mat_t *mat, int m, int *ind)
+findOptimalCombination(sparse_mat_t *mat, int m, int *ind, int *tfill, int *tMST)
 {
     if(m <= 3)
 	tryAllCombinations(mat, m, ind);
@@ -1561,7 +1565,7 @@ findOptimalCombination(sparse_mat_t *mat, int m, int *ind)
 #if 0
 	tryAllCombinations(mat, m, ind);
 #else
-	useMinimalSpanningTree(mat, m, ind);
+	useMinimalSpanningTree(mat, m, ind, tfill, tMST);
 #endif
     }
 }
@@ -1596,7 +1600,7 @@ checkMatrixWeight(sparse_mat_t *mat)
 int
 merge_m_fast(sparse_mat_t *mat, int m)
 {
-    int totopt = 0, tt;
+    int totopt = 0, tot = cputime(), tt, totfill = 0, totMST = 0, tfill, tMST;
     int *ind, j, k, njproc = 0, ni, njrem = 0;
     dclist dcl = mat->S[m];
 
@@ -1654,14 +1658,18 @@ merge_m_fast(sparse_mat_t *mat, int m)
 	fprintf(stderr, "\n");
 #endif
 	tt = cputime();
-	findOptimalCombination(mat, m, ind);
+	findOptimalCombination(mat, m, ind, &tfill, &tMST);
 	totopt += (cputime()-tt);
+	totfill += tfill;
+	totMST += tMST;
 	mat->rem_nrows--;
 	mat->rem_ncols--;
 	remove_j_from_SWAR(mat, j);
 	njrem += deleteHeavyColumns(mat);
     }
-    fprintf(stderr, "TIME: m=%d nj=%d findopt=%d\n", m, njproc, totopt);
+    tot = cputime()-tot;
+    fprintf(stderr, "TIME: m=%d nj=%d findopt=%d (%d/%d) tot=%d\n", 
+	    m, njproc, totopt, totfill, totMST, tot);
     free(ind);
 #if DEBUG >= 1
     fprintf(stderr, "Status at the end of the process\n");
