@@ -16,6 +16,7 @@
 #include <string.h>
 
 #define WANT_ASSERT
+
 #include "utils/utils.h"
 
 #define DEBUG 0
@@ -1607,7 +1608,9 @@ merge_m_fast(sparse_mat_t *mat, int m)
     //    checkWeight(mat, 132461);
 
     while(1){
+#if DEBUG >= 1
 	checkMatrixWeight(mat);
+#endif
 	// get next j
 	dcl = mat->S[m]->next;
 	if(dcl == NULL)
@@ -1755,7 +1758,8 @@ merge(sparse_mat_t *mat, int nb_merge_max, int maxlevel)
     report2(mat->nrows, mat->ncols);
     m = 2;
     while(1){
-	fprintf(stderr, "Performing merge %d; w(M)=%d\n", m, mat->weight);
+	fprintf(stderr, "Performing merge %d; w(M)=%d, ncols*w(M)=%ld\n",
+		m, mat->weight, ((long)mat->rem_ncols) * ((long)mat->weight));
 	old_nrows = mat->rem_nrows;
 	old_ncols = mat->rem_ncols;
 	if(m == 1)
@@ -1781,12 +1785,18 @@ merge(sparse_mat_t *mat, int nb_merge_max, int maxlevel)
 	inspectRowWeight(mat);
 	mm = minColWeight(mat);
 	fprintf(stderr, "Min col weight = %d\n", mm);
-	if((old_nrows == mat->rem_nrows) && (old_ncols == mat->rem_ncols)){
-	    // nothing happened this time and mm > m
+#if 1
+	if(mm < m)
+	    // something new happened, anyway
 	    m = mm;
-	    if((m > maxlevel) || (m <= 0))
-		break;
-	}
+	else
+#endif
+	    if((old_nrows == mat->rem_nrows) && (old_ncols == mat->rem_ncols)){
+		// nothing happened this time and mm > m
+		m = mm;
+		if((m > maxlevel) || (m <= 0))
+		    break;
+	    }
     }
 }
 
@@ -1901,6 +1911,8 @@ main(int argc, char *argv[])
     memset(used, 0, mat.nrows * sizeof(char));
 #endif
     merge(&mat, nb_merge_max, maxlevel);
+    fprintf(stderr, "Final matrix has w(M)=%d, ncols*w(M)=%ld\n",
+	    mat.weight, ((long)mat.rem_ncols) * ((long)mat.weight));
 #if TEX
     fprintf(stderr, "\\end{verbatim}\n");
 #endif
