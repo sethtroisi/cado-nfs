@@ -13,6 +13,8 @@
 #include <assert.h>
 #include <string.h>
 
+#include "sparse.h"
+
 #define DEBUG 0
 
 // newrows[i] contains a new row formed of old rows that correspond to
@@ -20,16 +22,6 @@
 //
 // After computing newrows, we deduce for all old rows the list of newrows
 // containing it.
-
-void
-printRow(FILE *file, int *row)
-{
-    int i;
-
-    fprintf(file, "[%d]", row[0]);
-    for(i = 1; i <= row[0]; i++)
-	fprintf(file, " %d", row[i]);
-}
 
 void
 printOldRows(int **oldrows, int nrows)
@@ -40,7 +32,7 @@ printOldRows(int **oldrows, int nrows)
     for(i = 0; i < nrows; i++)
 	if(oldrows[i][0] != 0){
 	    fprintf(stderr, "old row_%d takes part to new row(s)", i);
-	    printRow(stderr, oldrows[i]);
+	    fprintRow(stderr, oldrows[i]);
 	    fprintf(stderr, "\n");
 	}
 }
@@ -53,15 +45,6 @@ printBuf(FILE *file, int *buf, int ibuf)
     fprintf(file, "buf[%d] =", ibuf);
     for(i = 0; i < ibuf; i++)
 	fprintf(file, " %d", buf[i]);
-}
-
-void
-removeWeight(int **sparsemat, int *colweight, int i)
-{
-    int k;
-
-    for(k = 1; k <= sparsemat[i][0]; k++)
-	colweight[sparsemat[i][k]]--;
 }
 
 // add buf[0..ibuf[ to row i of sparsemat
@@ -81,7 +64,7 @@ addrel(int **sparsemat, int *colweight, int *buf, int ibuf, int i)
     }
     else{
 #if DEBUG >= 1
-	printRow(stderr, rowi); fprintf(stderr, "\n");
+	fprintRow(stderr, rowi); fprintf(stderr, "\n");
 	printBuf(stderr, buf, ibuf); fprintf(stderr, "\n");
 #endif
 	// rowi is bound to disappear
@@ -116,7 +99,7 @@ addrel(int **sparsemat, int *colweight, int *buf, int ibuf, int i)
 	free(rowi);
 	sparsemat[i] = tmp;
 #if DEBUG >= 1
-	printRow(stderr, tmp); fprintf(stderr, "\n");
+	fprintRow(stderr, tmp); fprintf(stderr, "\n");
 	if(tmp[0] != (tmp_len-1))
 	    printf("#W# shorter length\n"); // who cares, really?
 #endif
@@ -238,60 +221,6 @@ makeIndexFile(char *indexname, int nrows, int **newrows, int small_nrows, int sm
 	    fprintf(indexfile, "\n");
 	}
     fclose(indexfile);
-}
-
-// i1 += i2
-// A row is row[0..max] where row[0] = max and the real components are
-// row[1..max].
-void
-addrows(int **sparsemat, int i1, int i2)
-{
-    int k1, k2, k, len, *tmp, *tmp2;
-
-    assert(sparsemat[i1] != NULL);
-    assert(sparsemat[i2] != NULL);
-#if DEBUG >= 1
-    fprintf(stderr, "R[%d] =", i1); printRow(stderr, sparsemat[i1]); 
-    fprintf(stderr, "\n");
-    fprintf(stderr, "R[%d] =", i2); printRow(stderr, sparsemat[i2]);
-    fprintf(stderr, "\n");
-#endif
-    len = sparsemat[i1][0] + sparsemat[i2][0] + 1;
-    tmp = (int *)malloc(len * sizeof(tmp));
-    k = k1 = k2 = 1;
-
-    // loop while everybody is here
-    while((k1 <= sparsemat[i1][0]) && (k2 <= sparsemat[i2][0])){
-	if(sparsemat[i1][k1] < sparsemat[i2][k2])
-	    tmp[k++] = sparsemat[i1][k1++];
-	else if(sparsemat[i1][k1] > sparsemat[i2][k2])
-            tmp[k++] = sparsemat[i2][k2++];
-	else{
-#if DEBUG >= 1
-	    fprintf(stderr, "WARNING: j1=j2=%d in addrows\n", k1);
-#endif
-	    k1++;
-	    k2++;
-	}
-    }
-    // finish with k1
-    for( ; k1 <= sparsemat[i1][0]; k1++)
-	tmp[k++] = sparsemat[i1][k1];
-    // finish with k2
-    for( ; k2 <= sparsemat[i2][0]; k2++)
-	tmp[k++] = sparsemat[i2][k2];
-    assert(k <= len);
-    // copy back
-    free(sparsemat[i1]);
-    tmp2 = (int *)malloc(k * sizeof(int));
-    memcpy(tmp2, tmp, k * sizeof(int));
-    tmp2[0] = k-1;
-    sparsemat[i1] = tmp2;
-    free(tmp);
-#if DEBUG >= 1
-    fprintf(stderr, "row[%d]+row[%d] =", i1, i2);
-    printRow(stderr, sparsemat[i1]); fprintf(stderr, "\n");
-#endif
 }
 
 // on input, colweight[j] contains the weight; on exit, colweight[j]

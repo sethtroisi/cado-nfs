@@ -16,7 +16,7 @@ hashClear(hashtable_t *H)
 }
 
 void
-hashInit(hashtable_t *H)
+hashInit(hashtable_t *H, int n)
 {
     H->hashmod = 100000007;
     H->hashmod = 10000019; // nextprime(10^7)

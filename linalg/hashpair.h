@@ -12,7 +12,7 @@ typedef struct {
 } hashtable_t;
 
 extern void hashClear(hashtable_t *H);
-extern void hashInit(hashtable_t *H);
+extern void hashInit(hashtable_t *H, int n);
 extern void hashFree(hashtable_t *H);
 extern int getHashAddr(hashtable_t *H, unsigned long p, unsigned long r);
 extern int hashInsert(hashtable_t *H, unsigned long p, unsigned long r);

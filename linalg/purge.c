@@ -475,7 +475,7 @@ main (int argc, char **argv)
     nrel = atoi(argv[1]);
     
     fprintf(stderr, "initializing hash tables...\n");
-    hashInit(&H);
+    hashInit(&H, nrel);
     
     rel_used = (char *)malloc(nrel * sizeof(char));
     rel_compact = (int **)malloc(nrel * sizeof(int *));

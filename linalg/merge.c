@@ -464,6 +464,17 @@ removeWeight(sparse_mat_t *mat, int i)
     }
 }
 
+void
+addWeight(sparse_mat_t *mat, int i)
+{
+    int k;
+
+    for(k = 0; k < mat->data[i].len; k++){
+	mat->wt[mat->data[i].val[k]]++;
+	mat->weight++;
+    }
+}
+
 int
 hasCol(sparse_mat_t *mat, int i, int j)
 {
@@ -475,9 +486,9 @@ hasCol(sparse_mat_t *mat, int i, int j)
     return 0;
 }
 
-// i1 += i2, mat->wt is updated at the same time.
+// i1 += i2; weights are taken care of outside...
 void
-addRows(sparse_mat_t *mat, int i1, int i2)
+addRowsData(rel_t *data, int i1, int i2)
 {
     int k1, k2, k, len, *tmp, *tmp2;
 
@@ -488,56 +499,40 @@ addRows(sparse_mat_t *mat, int i1, int i2)
     fprintf(stderr, "\n");
 #endif
     // merge row[i1] and row[i2] in i1...
-    len = mat->data[i1].len + mat->data[i2].len;
+    len = data[i1].len + data[i2].len;
     tmp = (int *)malloc(len * sizeof(tmp));
     k = k1 = k2 = 0;
 
-    // TODO: how do we update ad????
-
-    // i1 is to disappear, replaced by a new one
-    removeWeight(mat, i1);
     // loop while everybody is here
-    while((k1 < mat->data[i1].len) && (k2 < mat->data[i2].len)){
-	if(mat->data[i1].val[k1] < mat->data[i2].val[k2]){
-	    tmp[k++] = mat->data[i1].val[k1++];
-	    mat->wt[mat->data[i1].val[k1-1]]++;
-	    mat->weight++;
-	}
-	else if(mat->data[i1].val[k1] > mat->data[i2].val[k2]){
-            tmp[k++] = mat->data[i2].val[k2++];
-	    mat->wt[mat->data[i2].val[k2-1]]++;
-	    mat->weight++;
-	}
+    while((k1 < data[i1].len) && (k2 < data[i2].len)){
+	if(data[i1].val[k1] < data[i2].val[k2])
+	    tmp[k++] = data[i1].val[k1++];
+	else if(data[i1].val[k1] > data[i2].val[k2])
+            tmp[k++] = data[i2].val[k2++];
 	else{
 #if DEBUG >= 1
 	    fprintf(stderr, "ADD[%d=(%ld,%lu), %d=(%ld,%lu)]: new w[%d]=%lu\n", 
-		    i1, mat->data[i1].a, mat->data[i1].b,
-		    i2, mat->data[i2].a, mat->data[i2].b,
-		    mat->data[i1].val[k1], 
-		    mat->wt[mat->data[i1].val[k1]]);
+		    i1, data[i1].a, data[i1].b,
+		    i2, data[i2].a, data[i2].b,
+		    data[i1].val[k1], 
+		    wt[data[i1].val[k1]]);
 #endif
 	    k1++;
 	    k2++;
 	}
     }
     // finish with k1
-    for( ; k1 < mat->data[i1].len; k1++){
-	tmp[k++] = mat->data[i1].val[k1];
-	mat->wt[mat->data[i1].val[k1]]++;
-	mat->weight++;
-    }
+    for( ; k1 < data[i1].len; k1++)
+	tmp[k++] = data[i1].val[k1];
     // finish with k2
-    for( ; k2 < mat->data[i2].len; k2++){
-	tmp[k++] = mat->data[i2].val[k2];
-	mat->wt[mat->data[i2].val[k2]]++;
-	mat->weight++;
-    }
+    for( ; k2 < data[i2].len; k2++)
+	tmp[k++] = data[i2].val[k2];
     // destroy and copy back
-    free(mat->data[i1].val);
+    free(data[i1].val);
     tmp2 = (int *)malloc(k * sizeof(int));
     memcpy(tmp2, tmp, k * sizeof(int));
-    mat->data[i1].len = k;
-    mat->data[i1].val = tmp2;
+    data[i1].len = k;
+    data[i1].val = tmp2;
     free(tmp);
 #if DEBUG >= 2
     fprintf(stderr, "row[%d]+row[%d] =", i1, i2);
@@ -545,89 +540,15 @@ addRows(sparse_mat_t *mat, int i1, int i2)
 #endif
 }
 
+// i1 += i2, mat->wt is updated at the same time.
 void
-merge2rows(sparse_mat_t *mat, int j)
+addRows(sparse_mat_t *mat, int i1, int i2)
 {
-    int i1, i2, ok = 0, k1, k2;
-
-    for(i1 = 0; i1 < mat->nrows; i1++){
-	if(mat->data[i1].val == NULL)
-	    continue;
-	for(k1 = 0; k1 < mat->data[i1].len; k1++)
-	    if(mat->data[i1].val[k1] == j){
-		ok = 1;
-		break;
-	    }
-	if(ok)
-	    break;
-    }
-    if(!ok){
-	printf("Pb in merge2rows: no row containing %d\n", j);
-	return;
-    }
-    ok = 0;
-    for(i2 = i1+1; i2 < mat->nrows; i2++){
-	if(mat->data[i2].val == NULL)
-	    continue;
-	for(k2 = 0; k2 < mat->data[i2].len; k2++)
-            if(mat->data[i2].val[k2] == j){
-                ok = 1;
-                break;
-            }
-	if(ok)
-	    break;
-    }
-    if(!ok){
-	printf("Pb in merge2rows: no 2nd row containing %d\n", j);
-	return;
-    }
-#if USE_USED >= 1
-    if(used[i1])
-	fprintf(stderr, "R%d used %d times\n", i1, (int)used[i1]);
-    if(used[i2])
-	fprintf(stderr, "R%d used %d times\n", i2, (int)used[i2]);
-    used[i1]++;
-    used[i2] = -1;
-#endif
-#if DEBUG >= 1
-    fprintf(stderr, "Merging rows: %d += %d [j=%d]\n", i1, i2, j);
-#endif
-    printf("%d %d\n", i2, i1); // note the order!!!
-    addRows(mat, i1, i2);
-    removeWeight(mat, i2);
-    destroyRow(mat, i2);
-    mat->rem_nrows--;
-    mat->rem_ncols--;
-#if DEBUG >= 1
-    matrix2tex(mat);
-#endif
-}
-
-void
-merge2(sparse_mat_t *mat, int nb_merge_max)
-{
-    int j, nb_merge = 0;
-
-#if DEBUG >= 1
-    matrix2tex(mat);
-#endif
-    for(j = 0; j < mat->ncols; j++){
-	if(nb_merge == nb_merge_max){
-	    fprintf(stderr, "Warning: nb_merge has reached its maximum:");
-	    fprintf(stderr, " %d\n", nb_merge_max);
-	    break; // useful for debugging and more...!
-	}
-	if(mat->wt[j] == 2){
-#if DEGUB >= 1
-	    fprintf(stderr, "j = %d has weight 2\n", j);
-#endif
-	    nb_merge++;
-	    merge2rows(mat, j);
-	    if(!(nb_merge % 1000))
-		fprintf(stderr, "nrows=%d ncols=%d\n",
-			mat->rem_nrows, mat->rem_ncols);
-	}
-    }
+    // i1 is to disappear, replaced by a new one
+    removeWeight(mat, i1);
+    addRowsData(mat->data, i1, i2);
+    // new row i1 has to contribute to the weight
+    addWeight(mat, i1);
 }
 
 // what is the weight of the sum of Ra and Rb?
@@ -673,39 +594,6 @@ findAllRowsWithGivenj(int *ind, sparse_mat_t *mat, int j, int nb)
 	}
     }
     return 0;
-}
-
-int
-findBestIndex3(sparse_mat_t *mat, int *ind)
-{
-    int w01, w02, w12, wtot, w0, w1, w2, k, i;
-
-    w01 = weightSum(mat, ind[0], ind[1]);
-    w02 = weightSum(mat, ind[0], ind[2]);
-    w12 = weightSum(mat, ind[1], ind[2]);
-#if DEBUG >= 1
-    fprintf(stderr,"W(0+1)=%d\n", w01);
-    fprintf(stderr,"W(0+2)=%d\n", w02);
-    fprintf(stderr,"W(1+2)=%d\n", w12);
-#endif
-    // first scenario r1 += r0, r2 += r0, r0 disappears
-    wtot = 0;
-    for(k = 0; k < 3; k++)
-	wtot += mat->data[ind[k]].len;
-    w0 = w01+w02-wtot;
-    w1 = w01+w12-wtot;
-    w2 = w02+w12-wtot;
-#if DEBUG >= 1
-    fprintf(stderr, "Using r0 = r[%d]: %d\n", ind[0], w0);
-    fprintf(stderr, "Using r1 = r[%d]: %d\n", ind[1], w1);
-    fprintf(stderr, "Using r2 = r[%d]: %d\n", ind[2], w2);
-#endif
-    if(w0 < w1)
-	i = (w0 < w2 ? 0 : 2);
-    else
-	// w0 >= w1
-	i = (w1 < w2 ? 1 : 2);
-    return i;
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -921,10 +809,6 @@ findBestIndex(sparse_mat_t *mat, int m, int *ind)
     ASSERT(m <= MERGE_LEVEL_MAX);
     if(m == 2)
 	return 0;
-#if 0 // obsolete...
-    if(m == 3)
-	return findBestIndex3(mat, ind);
-#endif
     fillRowAddMatrix(A, mat, m, ind);
     // iterate over all vertices
     imin = -1;
@@ -1283,14 +1167,17 @@ addRowFast(sparse_mat_t *mat, int i)
 {
     int k;
 
-    for(k = 0; k < mat->data[i].len; k++)
+    for(k = 0; k < mat->data[i].len; k++){
 	addCellFast(mat, i, mat->data[i].val[k]);
+	mat->weight++; // here
+    }
 }
 
 // i1 += i2.
 void
 addRowsFast(sparse_mat_t *mat, int i1, int i2)
 {
+#if 0 // original version
     int k1, k2, k, len, *tmp, *tmp2;
 
 #if TEX
@@ -1345,6 +1232,12 @@ addRowsFast(sparse_mat_t *mat, int i1, int i2)
 #if DEBUG >= 1
     fprintf(stderr, "row[%d]+row[%d] =", i1, i2);
     print_row(mat, i1); fprintf(stderr, "\n");
+#endif
+#else // cleaner one, that shares addRowsData() to prepare the next move...!
+    // i1 is to disappear, replaced by a new one
+    removeRowFast(mat, i1);
+    addRowsData(mat->data, i1, i2);
+    addRowFast(mat, i1);
 #endif
 }
 
@@ -1774,10 +1667,6 @@ merge(sparse_mat_t *mat, int nb_merge_max, int maxlevel)
 	old_ncols = mat->rem_ncols;
 	if(m == 1)
 	    njrem += removeSingletons(mat);
-#if 0
-	else if(m == 2)
-	    merge2(mat, nb_merge_max);
-#endif
 	else
 	    njrem += mergeGe2(mat, m, nb_merge_max);
 #if 0

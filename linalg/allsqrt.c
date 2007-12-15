@@ -306,7 +306,7 @@ SqrtWithIndexAll(char *prefix, FILE *relfile, FILE *purgedfile, FILE *indexfile,
 	    ret = fscanf(kerfile, "%lx", &w);
 
     // use a hash table to rebuild P2
-    hashInit(&H);
+    hashInit(&H, nrows);
     while(1){
 	if(ndepmin >= ndepmax)
 	    break;
