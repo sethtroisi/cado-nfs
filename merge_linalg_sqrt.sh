@@ -1,18 +1,18 @@
 #!/bin/sh -
 # We assume that a directory $name exists
 #
-# Typical use: ./merge_linalg_sqrt.sh Examples/c20/c20 5 10
+# Typical use: ./merge_linalg_sqrt.sh Examples/c20/c20 5 10 100
 #
 linalg=linalg
 sqrt=sqrt/naive
 
-nkermax=30; nchar=50; maxlevel=5; cwmax=10; rwmax=1000000
+nkermax=30; nchar=50; maxlevel=5; cwmax=10; rwmax=100
 
 root=$1
 if [ $# -ge 2 ]; then maxlevel=$2; fi
 if [ $# -ge 3 ]; then cwmax=$3; fi
 if [ $# -ge 4 ]; then rwmax=$4; fi
-name=$root.$maxlevel"x"$cwmax
+name=$root.$maxlevel"x"$cwmax"x"$rwmax
 
 rels=$root.rels; nrels=`wc -l $rels | awk '{print $1}'`
 poly=$root.poly
@@ -26,7 +26,12 @@ else
   if [ ! -s $purged ]; then echo "zero file $purged"; exit; fi
   excess=`head -1 $purged | awk '{nrows=$1; ncols=$2; print (nrows-ncols)}'`
   echo "excess = $excess"
-  if [ $excess -lt 0 ]; then echo "exess < 0, sorry"; exit; fi
+  if [ $excess -lt 0 ]
+  then 
+      echo "excess < 0, sorry"
+      /bin/rm -f $purged
+      exit
+  fi
 fi
 
 echo "Performing merges"
