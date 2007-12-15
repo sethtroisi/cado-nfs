@@ -327,7 +327,8 @@ checkrels (char *f, cado_poly cpoly, int verbose, size_t mfbr, size_t mfba,
       if (ok >= 3){
 	out_rels ++;
 	if(!(out_rels % 1000))
-	    fprintf(stderr, "%lu-th relation found\n", out_rels);
+	    fprintf(stderr, "%lu-th relation found // %lu read\n",
+		    out_rels, rels);
       }
     end:
       /* read to end of line */
