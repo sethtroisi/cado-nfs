@@ -22,6 +22,18 @@
 #define DEBUG 0
 #define TEX 0
 
+#define USE_TAB 0
+
+#if USE_TAB == 0
+#define isRowNull(mat, i) ((mat)->data[(i)].val == NULL)
+#define lengthRow(mat, i) (mat)->data[(i)].len
+#define cell(mat, i, k) (mat)->data[(i)].val[(k)]
+#else
+#define isRowNull(mat, i) ((mat)->rows[(i)] == NULL)
+#define lengthRow(mat, i) (mat)->rows[(i)][0]
+#define cell(mat, i, k) (mat)->rows[(i)][(k)]
+#endif
+
 #define USE_USED 0
 #if USE_USED >= 1
 char *used;
@@ -57,6 +69,7 @@ typedef struct {
   int rem_nrows;     /* number of remaining rows */
   int rem_ncols;     /* number of remaining columns */
   rel_t *data;
+  int **rows;
   int *wt; /* weight of prime j, <= 1 for a deleted prime */
   int weight;
   int cwmax;         /* bound on weight of j to enter the SWAR structure */
@@ -141,7 +154,11 @@ initSWAR(sparse_mat_t *mat, int cwmax, int rwmax, int mergelevelmax)
     int **R;
     int j;
 #endif
+#if USE_TAB == 0
     mat->data = (rel_t*) malloc (mat->nrows * sizeof (rel_t));
+#else
+    mat->rows = (int **)malloc(mat->nrows * sizeof (int *));
+#endif
     mat->wt = (int*) malloc (mat->ncols * sizeof (int));
     memset(mat->wt, 0, mat->ncols * sizeof (int));
     mat->rwmax = rwmax;
@@ -252,8 +269,8 @@ matrix2tex(sparse_mat_t *mat)
     fprintf(stderr, "}\n");
     for(i = 0; i < mat->nrows; i++){
 	memset(tab, 0, mat->ncols * sizeof(int));
-	for(k = 0; k < mat->data[i].len; k++)
-	    tab[mat->data[i].val[k]] = 1;
+	for(k = 0; k < lengthRow(mat, i); k++)
+	    tab[cell(mat, i, k)] = 1;
 	fprintf(stderr, "R_{%d}", i);
 	for(j = 0; j < mat->ncols; j++)
 	    fprintf(stderr, "& %d", tab[j]);
@@ -397,8 +414,12 @@ readmat(sparse_mat_t *mat, FILE *file)
 	ret = fscanf (file, "%d", &nc);
 	ASSERT (ret == 1);
 	if(nc == 0){
-	    mat->data[i].len = 0;
+#if USE_TAB == 0
+	    lengthRow(mat, i) = 0;
 	    mat->data[i].val = NULL;
+#else
+	    mat->rows[i] = NULL;
+#endif
 	    mat->rem_nrows--;
 	}
 	else{
@@ -423,11 +444,19 @@ readmat(sparse_mat_t *mat, FILE *file)
 		}
 	    }
 	    ASSERT(ibuf <= BUF_LEN);
-	    mat->data[i].len = ibuf;
+#if USE_TAB == 0
+	    lengthRow(mat, i) = ibuf;
 	    mat->data[i].val = (int*) malloc (ibuf * sizeof (int));
 	    memcpy(mat->data[i].val, buf, ibuf * sizeof(int));
 	    // sort indices in val to ease row merges
 	    qsort(mat->data[i].val, ibuf, sizeof(int), cmp);
+#else
+	    mat->rows[i] = (int*) malloc ((ibuf+1) * sizeof (int));
+	    mat->rows[i][0] = ibuf;
+	    memcpy(mat->rows[i]+1, buf, ibuf * sizeof(int));
+	    // sort indices in val to ease row merges
+            qsort(mat->rows[i]+1, ibuf, sizeof(int), cmp);
+#endif
 	}
     }
     // we need to keep informed of what really happens; this will be an upper
@@ -441,38 +470,53 @@ print_row(sparse_mat_t *mat, int i)
 {
     int k;
     
-    for(k = 0; k < mat->data[i].len; k++)
-	fprintf(stderr, " %d", mat->data[i].val[k]);
+#if USE_TAB == 0
+    for(k = 0; k < lengthRow(mat, i); k++)
+	fprintf(stderr, " %d", cell(mat, i, k));
+#else
+    fprintRow(stderr, mat->rows[i]);
+#endif
 }
 
 void
 destroyRow(sparse_mat_t *mat, int i)
 {
+#if USE_TAB == 0
     free(mat->data[i].val);
     mat->data[i].val = NULL;
-    mat->data[i].len = 0;
+    lengthRow(mat, i) = 0;
+#else
+    free(mat->rows[i]);
+    mat->rows[i] = NULL;
+#endif
 }
 
 void
-removeWeight(sparse_mat_t *mat, int i)
+removeWeightFromRow(sparse_mat_t *mat, int i)
 {
     int k;
 
-    for(k = 0; k < mat->data[i].len; k++){
-	mat->wt[mat->data[i].val[k]]--;
-	mat->weight--;
-    }
+    mat->weight -= lengthRow(mat, i);
+#if USE_TAB == 0
+    for(k = 0; k < lengthRow(mat, i); k++)
+	mat->wt[cell(mat, i, k)]--;
+#else
+    removeWeight(mat->rows, mat->wt, i);
+#endif
 }
 
 void
-addWeight(sparse_mat_t *mat, int i)
+addWeightFromRow(sparse_mat_t *mat, int i)
 {
     int k;
 
-    for(k = 0; k < mat->data[i].len; k++){
-	mat->wt[mat->data[i].val[k]]++;
-	mat->weight++;
-    }
+    mat->weight += lengthRow(mat, i);
+#if USE_TAB == 0
+    for(k = 0; k < lengthRow(mat, i); k++)
+	mat->wt[cell(mat, i, k)]++;
+#else
+    addWeight(mat->rows, mat->wt, i);
+#endif
 }
 
 int
@@ -480,9 +524,15 @@ hasCol(sparse_mat_t *mat, int i, int j)
 {
     int k;
 
-    for(k = 0; k < mat->data[i].len; k++)
-	if(mat->data[i].val[k] == j)
+#if USE_TAB == 0
+    for(k = 0; k < lengthRow(mat, i); k++)
+	if(cell(mat, i, k) == j)
 	    return 1;
+#else
+    for(k = 1; k <= mat->rows[i][0]; k++)
+	if(cell(mat, i, k) == j)
+	    return 1;
+#endif
     return 0;
 }
 
@@ -545,24 +595,30 @@ void
 addRows(sparse_mat_t *mat, int i1, int i2)
 {
     // i1 is to disappear, replaced by a new one
-    removeWeight(mat, i1);
+    removeWeightFromRow(mat, i1);
     addRowsData(mat->data, i1, i2);
     // new row i1 has to contribute to the weight
-    addWeight(mat, i1);
+    addWeightFromRow(mat, i1);
 }
 
 // what is the weight of the sum of Ra and Rb?
 int
 weightSum(sparse_mat_t *mat, int i1, int i2)
 {
-    int k1 = 0, k2 = 0, w = 0;
+    int k1, k2, w = 0;
 
-    while((k1 < mat->data[i1].len) && (k2 < mat->data[i2].len)){
-	if(mat->data[i1].val[k1] < mat->data[i2].val[k2]){
+#if USE_TAB == 0
+    k1 = k2 = 0;
+    while((k1 < lengthRow(mat, i1)) && (k2 < lengthRow(mat, i2))){
+#else
+    k1 = k2 = 1;
+    while((k1 <= lengthRow(mat, i1)) && (k2 <= lengthRow(mat, i2))){
+#endif
+	if(cell(mat, i1, k1) < cell(mat, i2, k2)){
 	    k1++;
 	    w++;
 	}
-	else if(mat->data[i1].val[k1] > mat->data[i2].val[k2]){
+	else if(cell(mat, i1, k1) > cell(mat, i2, k2)){
 	    k2++;
 	    w++;
 	}
@@ -570,8 +626,8 @@ weightSum(sparse_mat_t *mat, int i1, int i2)
 	    k1++; k2++;
 	}
     }
-    w += (k1 > mat->data[i1].len ? 0 : mat->data[i1].len-k1+1);
-    w += (k2 > mat->data[i2].len ? 0 : mat->data[i2].len-k2+1);
+    w += (k1 > lengthRow(mat, i1) ? 0 : lengthRow(mat, i1)-k1+1);
+    w += (k2 > lengthRow(mat, i2) ? 0 : lengthRow(mat, i2)-k2+1);
     return w;
 }
 
@@ -582,16 +638,27 @@ findAllRowsWithGivenj(int *ind, sparse_mat_t *mat, int j, int nb)
 
     // TODO: special hack for nb==2???
     for(i = 0; i < mat->nrows; i++){
-	if(mat->data[i].val == NULL)
+	if(isRowNull(mat, i))
 	    continue;
-	for(k = 0; k < mat->data[i].len-1; k++) // trick!
-	    if(mat->data[i].val[k] >= j)
+#if USE_TAB == 0
+	for(k = 0; k < lengthRow(mat, i)-1; k++) // trick!
+	    if(cell(mat, i, k) >= j)
 		break;
-	if(mat->data[i].val[k] == j){
+	if(cell(mat, i, k) == j){
 	    ind[r++] = i;
 	    if(r == nb)
 		return 1;
 	}
+#else
+	for(k = 1; k <= mat->rows[i][0]-1; k++) // trick!
+	    if(mat->rows[i][k] >= j)
+		break;
+	if(mat->rows[i][k] == j){
+	    ind[r++] = i;
+	    if(r == nb)
+		return 1;
+	}
+#endif
     }
     return 0;
 }
@@ -892,7 +959,7 @@ merge_m_slow(sparse_mat_t *mat, int m)
 	}
 	reportn(ind, m);
 	totadd += (cputime()-tt);
-	removeWeight(mat, ind[0]);
+	removeWeightFromRow(mat, ind[0]);
 	destroyRow(mat, ind[0]);
 	mat->rem_nrows--;
 	mat->rem_ncols--;
@@ -936,7 +1003,7 @@ incorporateColumn(sparse_mat_t *mat, int j, int i0)
     Rj = (int *)malloc((wj+1) * sizeof(int));
     // find all rows in which j appears
     for(i = 0, ni = 1; i < mat->nrows; i++)
-	if(mat->data[i].val != NULL)
+	if(!isRowNull(mat, i))
 	    if((i != i0) && hasCol(mat, i, j))
 #if 1
 		Rj[ni++] = i;
@@ -1080,13 +1147,13 @@ incrS(int w)
 
 // A[j] contains the address where j is stored
 void
-removeCellFast(sparse_mat_t *mat, int i, int j)
+removeCellSWAR(sparse_mat_t *mat, int i, int j)
 {
     int ind;
 
     // update weight
 #if DEBUG >= 1
-    fprintf(stderr, "removeCellFast: moving j=%d from S[%d] to S[%d]\n",
+    fprintf(stderr, "removeCellSWAR: moving j=%d from S[%d] to S[%d]\n",
 	    j, mat->wt[j], decrS(mat->wt[j]));
 #endif
     ind = mat->wt[j] = decrS(mat->wt[j]);
@@ -1123,24 +1190,29 @@ removeCellFast(sparse_mat_t *mat, int i, int j)
 
 // for all j in row[i], removes j and update data
 void
-removeRowFast(sparse_mat_t *mat, int i)
+removeRowSWAR(sparse_mat_t *mat, int i)
 {
     int k;
 
-    for(k = 0; k < mat->data[i].len; k++){
-	removeCellFast(mat, i, mat->data[i].val[k]);
-	mat->weight--;
-    }
+#if USE_TAB == 0
+    mat->weight -= lengthRow(mat, i);
+    for(k = 0; k < lengthRow(mat, i); k++)
+	removeCellSWAR(mat, i, cell(mat, i, k));
+#else
+    mat->weight -= mat->rows[i][0];
+    for(k = 1; k <= mat->rows[i][0]; k++)
+	removeCellSWAR(mat, i, mat->rows[i][k]);
+#endif
 }
 
 void
-addCellFast(sparse_mat_t *mat, int i, int j)
+addCellSWAR(sparse_mat_t *mat, int i, int j)
 {
     int ind;
 
     // update weight
 #if DEBUG >= 1
-    fprintf(stderr, "addCellFast: moving j=%d from S[%d] to S[%d]\n",
+    fprintf(stderr, "addCellSWAR: moving j=%d from S[%d] to S[%d]\n",
 	    j, mat->wt[j], incrS(mat->wt[j]));
 #endif
     ind = mat->wt[j] = incrS(mat->wt[j]);
@@ -1163,19 +1235,24 @@ addCellFast(sparse_mat_t *mat, int i, int j)
 }
 
 void
-addRowFast(sparse_mat_t *mat, int i)
+addRowSWAR(sparse_mat_t *mat, int i)
 {
     int k;
 
-    for(k = 0; k < mat->data[i].len; k++){
-	addCellFast(mat, i, mat->data[i].val[k]);
-	mat->weight++; // here
-    }
+#if USE_TAB == 0
+    mat->weight += lengthRow(mat, i);
+    for(k = 0; k < lengthRow(mat, i); k++)
+	addCellSWAR(mat, i, cell(mat, i, k));
+#else
+    mat->weight += mat->rows[i][0];
+    for(k = 1; k <= mat->rows[i][0]; k++)
+	addCellSWAR(mat, i, mat->rows[i][k]);
+#endif
 }
 
 // i1 += i2.
 void
-addRowsFast(sparse_mat_t *mat, int i1, int i2)
+addRowsSWAR(sparse_mat_t *mat, int i1, int i2)
 {
 #if 0 // original version
     int k1, k2, k, len, *tmp, *tmp2;
@@ -1195,7 +1272,7 @@ addRowsFast(sparse_mat_t *mat, int i1, int i2)
     k = k1 = k2 = 0;
 
     // i1 is to disappear, replaced by a new one
-    removeRowFast(mat, i1);
+    removeRowSWAR(mat, i1);
     // loop while everybody is here
     while((k1 < mat->data[i1].len) && (k2 < mat->data[i2].len)){
 	if(mat->data[i1].val[k1] < mat->data[i2].val[k2]){
@@ -1228,16 +1305,16 @@ addRowsFast(sparse_mat_t *mat, int i1, int i2)
     mat->data[i1].len = k;
     mat->data[i1].val = tmp2;
     free(tmp);
-    addRowFast(mat, i1);
+    addRowSWAR(mat, i1);
 #if DEBUG >= 1
     fprintf(stderr, "row[%d]+row[%d] =", i1, i2);
     print_row(mat, i1); fprintf(stderr, "\n");
 #endif
 #else // cleaner one, that shares addRowsData() to prepare the next move...!
     // i1 is to disappear, replaced by a new one
-    removeRowFast(mat, i1);
+    removeRowSWAR(mat, i1);
     addRowsData(mat->data, i1, i2);
-    addRowFast(mat, i1);
+    addRowSWAR(mat, i1);
 #endif
 }
 
@@ -1251,14 +1328,24 @@ remove_j_from_row(sparse_mat_t *mat, int i, int j)
     print_row(mat, i);
     fprintf(stderr, "\n");
 #endif
-    for(k = 0; k < mat->data[i].len; k++)
-	if(mat->data[i].val[k] == j)
+#if USE_TAB == 0
+    for(k = 0; k < lengthRow(mat, i); k++)
+	if(cell(mat, i, k) == j)
 	    break;
-    ASSERT(k < mat->data[i].len);
+    ASSERT(k < lengthRow(mat, i));
     // crunch
-    for(++k; k < mat->data[i].len; k++)
-	mat->data[i].val[k-1] = mat->data[i].val[k];
-    mat->data[i].len -= 1;
+    for(++k; k < lengthRow(mat, i); k++)
+	cell(mat, i, k-1) = cell(mat, i, k);
+#else
+    for(k = 1; k <= lengthRow(mat, i); k++)
+	if(cell(mat, i, k) == j)
+	    break;
+    ASSERT(k <= lenghtRow(mat, i));
+    // crunch
+    for(++k; k <= lengthRow(mat, i); k++)
+	cell(mat, i, k-1) = cell(mat, i, k);
+#endif
+    lengthRow(mat, i) -= 1;
     mat->weight--;
 #if DEBUG >= 2
     fprintf(stderr, "row[%d]_a=", i);
@@ -1327,7 +1414,7 @@ removeSingletons(sparse_mat_t *mat)
 		if(hasCol(mat, i, j))
 		    break;
 	    ASSERT(i < mat->nrows);
-	    removeWeight(mat, i);
+	    removeWeightFromRow(mat, i);
 	    destroyRow(mat, i);
 	    report1(i); // signal to replay...!
 	}
@@ -1348,7 +1435,7 @@ tryAllCombinations(sparse_mat_t *mat, int m, int *ind)
 #endif
     for(k = 0; k < m; k++)
 	if(k != i){
-	    addRowsFast(mat, ind[k], ind[i]);
+	    addRowsSWAR(mat, ind[k], ind[i]);
 #if DEBUG >= 1
 	    fprintf(stderr, "new row[%d]=", ind[k]);
 	    print_row(mat, ind[k]);
@@ -1363,7 +1450,7 @@ tryAllCombinations(sparse_mat_t *mat, int m, int *ind)
 	ind[0] = itmp;
     }
     reportn(ind, m);
-    removeRowFast(mat, ind[0]);
+    removeRowSWAR(mat, ind[0]);
     destroyRow(mat, ind[0]);
 }
 
@@ -1400,7 +1487,7 @@ useMinimalSpanningTree(sparse_mat_t *mat, int m, int *ind, int *tfill, int *tMST
 #endif
 		nV--;
 
-		addRowsFast(mat, i1, i2);
+		addRowsSWAR(mat, i1, i2);
 
 		// TODO: use the fact we know w(i1, i2) = A[][] to compute
 		// the length of row[i1]+row[i2] directly
@@ -1445,7 +1532,7 @@ useMinimalSpanningTree(sparse_mat_t *mat, int m, int *ind, int *tfill, int *tMST
     // delete root!
     report1(ind[0]);
 #endif
-    removeRowFast(mat, ind[0]);
+    removeRowSWAR(mat, ind[0]);
     destroyRow(mat, ind[0]);
 }
 
@@ -1472,7 +1559,7 @@ checkWeight(sparse_mat_t *mat, int j)
 
     fprintf(stderr, "Rows containing %d:", j);
     for(i = 0; i < mat->nrows; i++)
-	if(mat->data[i].val != NULL)
+	if(!isRowNull(mat, i))
 	    if(hasCol(mat, i, j)){
 		fprintf(stderr, " %d", i);
 		w++;
@@ -1487,8 +1574,8 @@ checkMatrixWeight(sparse_mat_t *mat)
     int i, w = 0;
 
     for(i = 0; i < mat->nrows; i++)
-	if(mat->data[i].val != NULL)
-	    w += mat->data[i].len;
+	if(!isRowNull(mat, i))
+	    w += lengthRow(mat, i);
     ASSERT(w == mat->weight);
 }
 
@@ -1634,21 +1721,21 @@ inspectRowWeight(sparse_mat_t *mat)
     int i, maxw = 0;
 
     for(i = 0; i < mat->nrows; i++)
-	if(mat->data[i].val != NULL){
-	    if(mat->data[i].len > mat->rwmax){
+	if(!isRowNull(mat, i)){
+	    if(lengthRow(mat, i) > mat->rwmax){
 		if((mat->rem_nrows - mat->rem_ncols) > mat->delta){
 #if DEBUG >= 1
 		    fprintf(stderr, "Too heavy row[%d]: %d\n", 
-			    i, mat->data[i].len);
+			    i, lengthRow(mat, i));
 #endif
-		    removeRowFast(mat, i);
+		    removeRowSWAR(mat, i);
 		    destroyRow(mat, i);
 		    report1(i);
 		    mat->rem_nrows--;
 		}
 	    }
-	    if(mat->data[i].len > maxw)
-		maxw = mat->data[i].len;
+	    if(lengthRow(mat, i) > maxw)
+		maxw = lengthRow(mat, i);
 	}
     fprintf(stderr, "nrows=%d; max row weight is %d\n", mat->rem_nrows, maxw);
 }
@@ -1712,7 +1799,7 @@ checkmat(sparse_mat_t *mat)
     exit(-1);
 }
 
-// not activated anymore...!
+#if 0 // not activated anymore...!
 void
 dumpSparse(FILE *ofile, sparse_mat_t *mat, int *code)
 {
@@ -1724,8 +1811,8 @@ dumpSparse(FILE *ofile, sparse_mat_t *mat, int *code)
 	    continue;
 	new_nrows++;
 	ibuf = 0;
-	for(k = 0; k < mat->data[i].len; k++){
-	    j = mat->data[i].val[k];
+	for(k = 0; k < lengthRow(mat, i); k++){
+	    j = cell(mat, i, k);
 	    if(code[j])
 		buf[ibuf++] = code[j]-1;
 	}
@@ -1736,6 +1823,7 @@ dumpSparse(FILE *ofile, sparse_mat_t *mat, int *code)
     }
     ASSERT(new_nrows == mat->rem_nrows);
 }
+#endif
 
 int
 main(int argc, char *argv[])
