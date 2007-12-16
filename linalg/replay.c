@@ -281,7 +281,7 @@ doAllAdds(int **newrows, char *str)
 #if DEBUG >= 1
 		fprintf(stderr, "next ii is %d\n", ii);
 #endif
-		addrows(newrows, ii, i);
+		addRows(newrows, ii, i);
 		ii = 0;
 	    }
 	    else

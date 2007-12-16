@@ -18,6 +18,7 @@
 #define WANT_ASSERT
 
 #include "utils/utils.h"
+#include "sparse.h"
 
 #define DEBUG 0
 #define TEX 0
@@ -68,8 +69,11 @@ typedef struct {
   int ncols;
   int rem_nrows;     /* number of remaining rows */
   int rem_ncols;     /* number of remaining columns */
+#if USE_TAB == 0
   rel_t *data;
+#else
   int **rows;
+#endif
   int *wt; /* weight of prime j, <= 1 for a deleted prime */
   int weight;
   int cwmax;         /* bound on weight of j to enter the SWAR structure */
@@ -592,11 +596,15 @@ addRowsData(rel_t *data, int i1, int i2)
 
 // i1 += i2, mat->wt is updated at the same time.
 void
-addRows(sparse_mat_t *mat, int i1, int i2)
+addRowsWithWeight(sparse_mat_t *mat, int i1, int i2)
 {
     // i1 is to disappear, replaced by a new one
     removeWeightFromRow(mat, i1);
+#if USE_TAB == 0
     addRowsData(mat->data, i1, i2);
+#else
+    addRows(mat->rows, i1, i2);
+#endif
     // new row i1 has to contribute to the weight
     addWeightFromRow(mat, i1);
 }
@@ -650,10 +658,10 @@ findAllRowsWithGivenj(int *ind, sparse_mat_t *mat, int j, int nb)
 		return 1;
 	}
 #else
-	for(k = 1; k <= mat->rows[i][0]-1; k++) // trick!
-	    if(mat->rows[i][k] >= j)
+	for(k = 1; k <= lenghtRow(mat, i)-1; k++) // trick!
+	    if(cell(mat, i, k) >= j)
 		break;
-	if(mat->rows[i][k] == j){
+	if(cell(mat, i, k) == j){
 	    ind[r++] = i;
 	    if(r == nb)
 		return 1;
@@ -943,7 +951,7 @@ merge_m_slow(sparse_mat_t *mat, int m)
 	tt = cputime();
 	for(k = 0; k < m; k++)
 	    if(k != i){
-		addRows(mat, ind[k], ind[i]);
+		addRowsWithWeight(mat, ind[k], ind[i]);
 #if DEBUG >= 1
 		fprintf(stderr, "new row[%d]=", ind[k]);
 		print_row(mat, ind[k]);
@@ -1194,15 +1202,13 @@ removeRowSWAR(sparse_mat_t *mat, int i)
 {
     int k;
 
-#if USE_TAB == 0
     mat->weight -= lengthRow(mat, i);
+#if USE_TAB == 0
     for(k = 0; k < lengthRow(mat, i); k++)
-	removeCellSWAR(mat, i, cell(mat, i, k));
 #else
-    mat->weight -= mat->rows[i][0];
-    for(k = 1; k <= mat->rows[i][0]; k++)
-	removeCellSWAR(mat, i, mat->rows[i][k]);
+    for(k = 1; k <= lengthRow(mat, i; k++)
 #endif
+	removeCellSWAR(mat, i, cell(mat, i, k));
 }
 
 void
@@ -1239,15 +1245,13 @@ addRowSWAR(sparse_mat_t *mat, int i)
 {
     int k;
 
-#if USE_TAB == 0
     mat->weight += lengthRow(mat, i);
+#if USE_TAB == 0
     for(k = 0; k < lengthRow(mat, i); k++)
-	addCellSWAR(mat, i, cell(mat, i, k));
 #else
-    mat->weight += mat->rows[i][0];
-    for(k = 1; k <= mat->rows[i][0]; k++)
-	addCellSWAR(mat, i, mat->rows[i][k]);
+    for(k = 1; k <= lengthRow(mat, i); k++)
 #endif
+	addCellSWAR(mat, i, cell(mat, i, k));
 }
 
 // i1 += i2.
@@ -1313,7 +1317,11 @@ addRowsSWAR(sparse_mat_t *mat, int i1, int i2)
 #else // cleaner one, that shares addRowsData() to prepare the next move...!
     // i1 is to disappear, replaced by a new one
     removeRowSWAR(mat, i1);
+#if USE_TAB == 0
     addRowsData(mat->data, i1, i2);
+#else
+    addRows(mat->rows, i1, i2);
+#endif
     addRowSWAR(mat, i1);
 #endif
 }

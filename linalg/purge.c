@@ -510,6 +510,9 @@ main (int argc, char **argv)
     
     fprintf(stderr, "nrel=%d, nprimes=%d; excess=%d\n", 
 	    nrel_new, nprimes_new, nrel_new - nprimes_new);
+
+    if(nrel_new < nprimes_new)
+	exit(1);
     
     // we have to renumber the primes in increasing weight order
     renumber(&nprimes_new, bad_primes, &H);
