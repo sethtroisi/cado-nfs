@@ -68,9 +68,11 @@ N := 71641520761751435455133616475667090434063332228247871795429;
 
 function finish(f, m, N, ratfile, algfile, algprod)
 
-if (Degree(f) mod 2) eq 1 then
+if false then
+  if (Degree(f) mod 2) eq 1 then
     printf "// Using JMC's algorithm\n";
     return finishWithJMC(N, f, m, ratfile, algfile);
+  end if;
 end if;
 
 fd := LeadingCoefficient(f);
