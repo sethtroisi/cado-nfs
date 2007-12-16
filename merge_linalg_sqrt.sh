@@ -84,9 +84,10 @@ do
   args2="$poly $rat $alg $name.algside"
   time $sqrt/fmalgsqrt $args2 $mag
 magma << EOF
+load "$sqrt/jmc.mag";
 load "$sqrt/finish.mag";
 load "$mag";
-finish(f, m, N, "$rat", "$name.algside");
+finish(f, m, N, "$rat", "$alg", "$name.algside");
 quit;
 EOF
   ndep=`expr $ndep '+' 1`
