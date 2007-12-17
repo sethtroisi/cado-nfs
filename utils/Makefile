@@ -17,6 +17,12 @@ all: libutils.a
 libutils.a: $(obj)
 	ar r libutils.a $(obj)
 
+Makefile.local:
+	echo "Makefile.local does not exist. It can be used to store paths \
+	to libraries etc.  Making an empty file to avoid warnings in \
+	future invocations of make."
+	touch Makefile.local
+
 clean:
 	-rm -f *~ *.bak $(obj) libutils.a
 
