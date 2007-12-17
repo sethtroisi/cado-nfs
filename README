@@ -17,13 +17,6 @@ GMPINCLUDE=/usr/include
 ECM=/users/spaces/logiciels/ecm-6.1.2/x86_64
 EOF
 
-(cd utils; ln -s ../Makefile.local .)
-(cd polyselect; ln -s ../Makefile.local .)
-(cd sieve; ln -s ../Makefile.local .)
-(cd sqrt/naive; ln -s ../../Makefile.local .)
-(cd linalg; ln -s ../../Makefile.local .)
-
-
 Compile:
 =======
 
