@@ -33,8 +33,8 @@ purge: purge.c ../utils/libutils.a hashpair.o
 merge: merge.c ../utils/libutils.a
 	gcc $(CFLAGS) $(INC) $< $(LDFLAGS) -o $@
 
-replay: replay.c ../utils/libutils.a
-	gcc $(CFLAGS) $(INC) $< $(LDFLAGS) -o $@
+replay: replay.c sparse.c ../utils/libutils.a
+	gcc $(CFLAGS) $(INC) $< sparse.c $(LDFLAGS) -o $@
 
 linalg: linalg.o gauss.o readmat.o
 	gcc $(CFLAGS) $^ $(LDFLAGS) -o $@
