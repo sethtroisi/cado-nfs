@@ -40,24 +40,24 @@ cat <<EOF > $tmp/$name
 n:71641520761751435455133616475667090434063332228247871795429
 EOF
 
-
 polyselect/polyselect -full -e 1000000 < $tmp/$name > $tmp/$name.poly
 
 # note for CACAO members: some data files with sieve relations are available
 # in /local/fleur/cado/Examples/{c20,c59,c80}
 
-cd sieve
 ## this has to be done by hand, sorry!
 ## and it depends on the polynomial found by polyselect (also the b-bound 2500
 ## below might be too small with different polynomials)
 
-./mkroots.sh $tmp/$name.poly > $tmp/$name.roots
+# creating factor base
+(cd sieve; ./mkroots.sh $tmp/$name.poly > $tmp/$name.roots)
+
 ## SIEVING_STEP
 # note: the following was tested with revision 329 of polyselect and sieve
-./sieve -poly $tmp/$name.poly -fb $tmp/$name.roots -1000000 1000000 1 2500 > $tmp/$name.rels_raw
+sieve/sieve -poly $tmp/$name.poly -fb $tmp/$name.roots -1000000 1000000 1 2500\
+ > $tmp/$name.rels_raw
 # checking norms and splitting large cofactors
-./checknorms -poly $tmp/$name.poly $tmp/$name.rels_raw > $tmp/$name.rels
-cd ..
+sieve/checknorms -poly $tmp/$name.poly $tmp/$name.rels_raw > $tmp/$name.rels
 
 ./merge_linalg_sqrt.sh $tmp/$name
 
