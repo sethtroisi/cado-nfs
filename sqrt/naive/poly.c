@@ -32,7 +32,7 @@ void cleandeg(poly_t f, int deg) {
 
 
 void poly_setcoeff(poly_t f, int i, mpz_t z) {
-  int j, deg;
+  int j;
   if (i >= f->alloc) {
     f->coeff = (mpz_t *)realloc(f->coeff, (i+1)*sizeof(mpz_t));
     assert (f->coeff != NULL);
