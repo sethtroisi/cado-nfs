@@ -2,7 +2,12 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <gmp.h>
+
+#define WANT_ASSERT
+
+#include "cado.h"
 #include "readmat.h"
+
 
 int kernel(mp_limb_t * mat, mp_limb_t ** ker, int nrows, int ncols,
 	   int limbs_per_row, int limbs_per_col);
@@ -68,6 +73,7 @@ void sparse2dense(dense_mat_t Dmat, sparse_mat_t Smat)
     Dmat->data =
 	(mp_limb_t *) malloc(Dmat->limbs_per_row * Dmat->nrows *
 			     sizeof(mp_limb_t));
+    ASSERT(Dmat->data != NULL);
     for (i = 0; i < Dmat->limbs_per_row * Dmat->nrows; ++i)
 	Dmat->data[i] = 0UL;
 
