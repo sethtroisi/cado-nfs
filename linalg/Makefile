@@ -6,8 +6,8 @@ GMPLIB ?= $(GMP)/lib/libgmp.a
 GMPINCLUDE ?= $(GMP)/include/
 
 SVNVER:=$(shell svnversion .)
-CFLAGS=-g -Wall -DREV=\"$(SVNVER)\" -O2 
-LDFLAGS=../utils/libutils.a $(GMPLIB)
+CFLAGS=-g -Wall -DREV=\"$(SVNVER)\" # -O2 
+LDFLAGS=../utils/libutils.a $(GMPLIB)# -lefence
 INC=-I $(GMPINCLUDE) -I.. -I../utils
 
 binaries:=allsqrt replay merge purge procrels linalg	\
@@ -30,11 +30,8 @@ hashpair: hashpair.c
 purge: purge.c ../utils/libutils.a hashpair.o
 	gcc $(CFLAGS) $(INC) $< hashpair.o $(LDFLAGS) -o $@
 
-merge: merge.c ../utils/libutils.a
-	gcc $(CFLAGS) $(INC) $< $(LDFLAGS) -o $@
-
-replay: replay.c sparse.c ../utils/libutils.a
-	gcc $(CFLAGS) $(INC) $< sparse.c $(LDFLAGS) -o $@
+merge: merge.c ../utils/libutils.a sparse.o
+	gcc $(CFLAGS) $(INC) $< sparse.o $(LDFLAGS) -o $@
 
 linalg: linalg.o gauss.o readmat.o
 	gcc $(CFLAGS) $^ $(LDFLAGS) -o $@
