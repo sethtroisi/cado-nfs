@@ -15,7 +15,7 @@
 #include <gmp.h>
 #include <string.h>
 
-#define WANT_ASSERT
+//#define WANT_ASSERT
 
 #include "utils/utils.h"
 #include "sparse.h"
@@ -23,7 +23,7 @@
 #define DEBUG 0
 #define TEX 0
 
-#define USE_TAB 0
+#define USE_TAB 1 // for compact rows...
 
 #if USE_TAB == 0
 #define isRowNull(mat, i) ((mat)->data[(i)].val == NULL)
@@ -160,8 +160,10 @@ initSWAR(sparse_mat_t *mat, int cwmax, int rwmax, int mergelevelmax)
 #endif
 #if USE_TAB == 0
     mat->data = (rel_t*) malloc (mat->nrows * sizeof (rel_t));
+    ASSERT_ALWAYS(mat->data != NULL);
 #else
     mat->rows = (int **)malloc(mat->nrows * sizeof (int *));
+    ASSERT_ALWAYS(mat->rows != NULL);
 #endif
     mat->wt = (int*) malloc (mat->ncols * sizeof (int));
     memset(mat->wt, 0, mat->ncols * sizeof (int));
@@ -173,6 +175,7 @@ initSWAR(sparse_mat_t *mat, int cwmax, int rwmax, int mergelevelmax)
     for(j = 0; j <= cwmax+1; j++)
 	S[j] = dclistCreate(-1);
     R = (int **)malloc(mat->ncols * sizeof(int *));
+    ASSERT_ALWAYS(R != NULL);
     mat->S = S;
     mat->A = A;
     mat->R = R;
@@ -377,12 +380,12 @@ inspectWeight(sparse_mat_t *mat, FILE *purgedfile)
     memset(mat->wt, 0, mat->ncols * sizeof(int));
     for(i = 0; i < mat->nrows; i++){
 	ret = fscanf(purgedfile, "%d", &j); // unused index to rels file
-	ASSERT (ret == 1);
+	ASSERT_ALWAYS (ret == 1);
 	ret = fscanf (purgedfile, "%d", &nc);
-	ASSERT (ret == 1);
+	ASSERT_ALWAYS (ret == 1);
 	for(j = 0; j < nc; j++){
 	    ret = fscanf(purgedfile, "%d", &x);
-	    ASSERT (ret == 1);
+	    ASSERT_ALWAYS (ret == 1);
 	    mat->wt[x]++;
 	}
     }
@@ -405,7 +408,7 @@ readmat(sparse_mat_t *mat, FILE *file)
     int nc, x, buf[BUF_LEN], ibuf;
 
     ret = fscanf (file, "%d %d", &(mat->nrows), &(mat->ncols));
-    ASSERT (ret == 2);
+    ASSERT_ALWAYS (ret == 2);
     
     fprintf(stderr, "Reading matrix of %d rows and %d columns: excess is %d\n",
 	    mat->nrows, mat->ncols, mat->nrows - mat->ncols);
@@ -414,9 +417,9 @@ readmat(sparse_mat_t *mat, FILE *file)
 
     for (i = 0; i < mat->nrows; i++){
 	ret = fscanf(file, "%d", &j); // unused index to rels file
-	ASSERT (ret == 1);
+	ASSERT_ALWAYS (ret == 1);
 	ret = fscanf (file, "%d", &nc);
-	ASSERT (ret == 1);
+	ASSERT_ALWAYS (ret == 1);
 	if(nc == 0){
 #if USE_TAB == 0
 	    lengthRow(mat, i) = 0;
@@ -432,8 +435,8 @@ readmat(sparse_mat_t *mat, FILE *file)
 #if DEBUG >= 1
 		fprintf(stderr, "i = %d, j = %d, x = %d\n", i, j, x);
 #endif
-		ASSERT (ret == 1);
-		ASSERT (0 <= x && x < mat->ncols);
+		ASSERT_ALWAYS (ret == 1);
+		ASSERT_ALWAYS (0 <= x && x < mat->ncols);
 #if USE_MERGE_FAST <= 1
 		if(mat->wt[x] > 0)
 		    buf[ibuf++] = x;
@@ -447,7 +450,7 @@ readmat(sparse_mat_t *mat, FILE *file)
 		    mat->R[x][mat->R[x][0]] = i;
 		}
 	    }
-	    ASSERT(ibuf <= BUF_LEN);
+	    ASSERT_ALWAYS(ibuf <= BUF_LEN);
 #if USE_TAB == 0
 	    lengthRow(mat, i) = ibuf;
 	    mat->data[i].val = (int*) malloc (ibuf * sizeof (int));
@@ -472,9 +475,9 @@ readmat(sparse_mat_t *mat, FILE *file)
 void
 print_row(sparse_mat_t *mat, int i)
 {
+#if USE_TAB == 0
     int k;
     
-#if USE_TAB == 0
     for(k = 0; k < lengthRow(mat, i); k++)
 	fprintf(stderr, " %d", cell(mat, i, k));
 #else
@@ -498,29 +501,29 @@ destroyRow(sparse_mat_t *mat, int i)
 void
 removeWeightFromRow(sparse_mat_t *mat, int i)
 {
+#if USE_TAB == 0
     int k;
 
-    mat->weight -= lengthRow(mat, i);
-#if USE_TAB == 0
     for(k = 0; k < lengthRow(mat, i); k++)
 	mat->wt[cell(mat, i, k)]--;
 #else
     removeWeight(mat->rows, mat->wt, i);
 #endif
+    mat->weight -= lengthRow(mat, i);
 }
 
 void
 addWeightFromRow(sparse_mat_t *mat, int i)
 {
+#if USE_TAB == 0
     int k;
 
-    mat->weight += lengthRow(mat, i);
-#if USE_TAB == 0
     for(k = 0; k < lengthRow(mat, i); k++)
 	mat->wt[cell(mat, i, k)]++;
 #else
     addWeight(mat->rows, mat->wt, i);
 #endif
+    mat->weight += lengthRow(mat, i);
 }
 
 int
@@ -658,7 +661,7 @@ findAllRowsWithGivenj(int *ind, sparse_mat_t *mat, int j, int nb)
 		return 1;
 	}
 #else
-	for(k = 1; k <= lenghtRow(mat, i)-1; k++) // trick!
+	for(k = 1; k <= lengthRow(mat, i)-1; k++) // trick!
 	    if(cell(mat, i, k) >= j)
 		break;
 	if(cell(mat, i, k) == j){
@@ -1206,7 +1209,7 @@ removeRowSWAR(sparse_mat_t *mat, int i)
 #if USE_TAB == 0
     for(k = 0; k < lengthRow(mat, i); k++)
 #else
-    for(k = 1; k <= lengthRow(mat, i; k++)
+    for(k = 1; k <= lengthRow(mat, i); k++)
 #endif
 	removeCellSWAR(mat, i, cell(mat, i, k));
 }
@@ -1348,7 +1351,7 @@ remove_j_from_row(sparse_mat_t *mat, int i, int j)
     for(k = 1; k <= lengthRow(mat, i); k++)
 	if(cell(mat, i, k) == j)
 	    break;
-    ASSERT(k <= lenghtRow(mat, i));
+    ASSERT(k <= lengthRow(mat, i));
     // crunch
     for(++k; k <= lengthRow(mat, i); k++)
 	cell(mat, i, k-1) = cell(mat, i, k);
@@ -1463,18 +1466,18 @@ tryAllCombinations(sparse_mat_t *mat, int m, int *ind)
 }
 
 void
-useMinimalSpanningTree(sparse_mat_t *mat, int m, int *ind, int *tfill, int *tMST)
+useMinimalSpanningTree(sparse_mat_t *mat, int m, int *ind, double *tfill, double *tMST)
 {
     int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX];
     int i, father[MERGE_LEVEL_MAX], height[MERGE_LEVEL_MAX], hmax, nV = m, h;
     int adds[MERGE_LEVEL_MAX << 1], nadds, tab[MERGE_LEVEL_MAX << 1], itab;
 
-    *tfill = cputime();
+    *tfill = seconds();
     fillRowAddMatrix(A, mat, m, ind);
-    *tfill = cputime()-*tfill;
-    *tMST = cputime();
+    *tfill = seconds()-*tfill;
+    *tMST = seconds();
     hmax = minimalSpanningTree(father, height, mat, m, A);
-    *tMST = cputime()-*tMST;
+    *tMST = seconds()-*tMST;
 #if DEBUG >= 1
     for(i = 0; i < m; i++)
 	fprintf(stderr, "father[%d] = %d\n", i, father[i]);
@@ -1545,7 +1548,7 @@ useMinimalSpanningTree(sparse_mat_t *mat, int m, int *ind, int *tfill, int *tMST
 }
 
 void
-findOptimalCombination(sparse_mat_t *mat, int m, int *ind, int *tfill, int *tMST)
+findOptimalCombination(sparse_mat_t *mat, int m, int *ind, double *tfill, double *tMST)
 {
     if(m <= 3){
 	*tfill = *tMST = 0;
@@ -1590,7 +1593,8 @@ checkMatrixWeight(sparse_mat_t *mat)
 int
 merge_m_fast(sparse_mat_t *mat, int m)
 {
-    int totopt = 0, tot = cputime(), tt, totfill = 0, totMST = 0, tfill, tMST;
+    double totopt=0, tot=seconds(), tt, totfill=0, totMST=0, tfill, tMST;
+    double totdel = 0;
     int *ind, j, k, njproc = 0, ni, njrem = 0;
     dclist dcl = mat->S[m];
 
@@ -1647,19 +1651,24 @@ merge_m_fast(sparse_mat_t *mat, int m)
 	}
 	fprintf(stderr, "\n");
 #endif
-	tt = cputime();
+	tt = seconds();
 	findOptimalCombination(mat, m, ind, &tfill, &tMST);
-	totopt += (cputime()-tt);
+	totopt += (seconds()-tt);
 	totfill += tfill;
 	totMST += tMST;
 	mat->rem_nrows--;
 	mat->rem_ncols--;
 	remove_j_from_SWAR(mat, j);
+	tt = seconds();
 	njrem += deleteHeavyColumns(mat);
+	totdel += (seconds()-tt);
     }
-    tot = cputime()-tot;
-    fprintf(stderr, "TIME: m=%d nj=%d findopt=%d (%d/%d) tot=%d\n", 
-	    m, njproc, totopt, totfill, totMST, tot);
+    tot = seconds()-tot;
+    fprintf(stderr, "TIME: m=%d nj=%d", m, njproc);
+    fprintf(stderr, " findopt=%2.2lf (fill=%2.2lf mst=%2.2lf) tot=%2.2lf", 
+	    totopt, totfill, totMST, tot);
+    fprintf(stderr, " del=%2.2lf\n", totdel);
+	    
     free(ind);
 #if DEBUG >= 1
     fprintf(stderr, "Status at the end of the process\n");
@@ -1742,7 +1751,7 @@ inspectRowWeight(sparse_mat_t *mat)
 		    mat->rem_nrows--;
 		}
 	    }
-	    if(lengthRow(mat, i) > maxw)
+	    if(!isRowNull(mat, i) && (lengthRow(mat, i) > maxw))
 		maxw = lengthRow(mat, i);
 	}
     fprintf(stderr, "nrows=%d; max row weight is %d\n", mat->rem_nrows, maxw);
@@ -1774,23 +1783,31 @@ merge(sparse_mat_t *mat, int nb_merge_max, int maxlevel)
 	printf("CHECK: %d %d\n", ni, mat->wt[j0]);
     }
 #endif
-	fprintf(stderr, "=> nrows=%d ncols=%d njrem=%d\n",
-		mat->rem_nrows, mat->rem_ncols, njrem);
+	fprintf(stderr, "=> nrows=%d ncols=%d (%d) njrem=%d\n",
+		mat->rem_nrows, mat->rem_ncols, 
+		mat->rem_nrows - mat->rem_ncols, njrem);
 	inspectRowWeight(mat);
 	mm = minColWeight(mat);
 	fprintf(stderr, "Min col weight = %d\n", mm);
 #if 1
+	// jump to the next minimal merge level immediately
+	m = mm;
+	if((m > maxlevel) || (m <= 0))
+	    break;
+#else
+#  if 1
 	if(mm < m)
 	    // something new happened, anyway
 	    m = mm;
 	else
-#endif
+#  endif
 	    if((old_nrows == mat->rem_nrows) && (old_ncols == mat->rem_ncols)){
 		// nothing happened this time and mm > m
 		m = mm;
 		if((m > maxlevel) || (m <= 0))
 		    break;
 	    }
+#endif
     }
 }
 
@@ -1883,7 +1900,7 @@ main(int argc, char *argv[])
     }
     
     purgedfile = fopen(purgedname, "r");
-    ASSERT(purgedfile != NULL);
+    ASSERT_ALWAYS(purgedfile != NULL);
     fscanf(purgedfile, "%d %d", &nrows, &ncols);
 
     mat.nrows = nrows;
