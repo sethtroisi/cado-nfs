@@ -10,7 +10,7 @@ CFLAGS=-g -Wall -DREV=\"$(SVNVER)\" # -O2
 LDFLAGS=../utils/libutils.a $(GMPLIB)# -lefence
 INC=-I $(GMPINCLUDE) -I.. -I../utils
 
-binaries:=allsqrt replay merge purge procrels linalg	\
+binaries:=allsqrt merge purge procrels linalg	\
 	characters matsort matprune transpose
 
 all:	$(binaries)
