@@ -1,6 +1,6 @@
 #
-# Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-# Computer Science and Control)
+# Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+# in Computer Science and Control)
 #
 # This library is free software; you can redistribute it and/or modify it under
 # the terms of the GNU Lesser General Public License as published by the Free
@@ -22,19 +22,17 @@
 # File          : lib/SConscript
 # Author        : Jerome Milan
 # Created on    : Wed Aug 23 2006
-# Last modified : Wed Jan 24 2007
+# Last modified : Thu Dec 13 2007
 #
-# Version : 0.1.2
-# Licence : GNU Lesser General Public License (LGPL)
-#           Copyright (C) 2006, 2007 INRIA
+# Version : 0.1.4
+# Licence : GNU Lesser General Public License (LGPL) v2.1 or later
+#           Copyright (C) 2006, 2007, 2008 INRIA
 #-------------------------------------------------------------------------------
 # History :
 #
-# 0.1.2: Wed Jan 24 2007 by JM
-#     - Added instructions for the squfof_factors program
-#
-# 0.1.1: Mon Jan 22 2007 by JM
-#     - Added 'dist' command line argument for creating tgz package
+# 0.1.4: Thu Dec 13 2007 by JM
+#     - Added instructions for tifa_factor function
+#     - Bug fix (tifa_config.h was not distributed)
 #
 #-------------------------------------------------------------------------------
 #
@@ -140,6 +138,7 @@ tifa_src     = [
     os.path.join( algo_srcdir,  'siqs.c'),
     os.path.join( algo_srcdir,  'squfof.c'),
     os.path.join( algo_srcdir,  'tdiv.c'),
+    os.path.join( algo_srcdir,  'tifa_factor.c'),
     #
     # Data
     #
@@ -181,6 +180,7 @@ tifa_inc = [
     os.path.join( algo_incdir,  'siqs.h'),
     os.path.join( algo_incdir,  'squfof.h'),
     os.path.join( algo_incdir,  'tdiv.h'),
+    os.path.join( algo_incdir,  'tifa_factor.h'),
     #
     # Data
     #
@@ -213,7 +213,7 @@ tifa_inc = [
 #
 # Distributed header files
 #
-tifa_inc_dist = tifa_inc
+tifa_inc_dist = tifa_inc[:] 
 tifa_inc_dist.remove(os.path.join(top_dir, 'tifa_config.h'))
 
 #
