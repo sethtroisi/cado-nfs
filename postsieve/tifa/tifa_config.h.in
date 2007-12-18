@@ -1,6 +1,6 @@
 //
-// Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-// Computer Science and Control)
+// Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research 
+// in Computer Science and Control)
 //
 // This library is free software; you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -47,11 +47,29 @@
 /* Patch version number of package */
 #define TIFA_VERSION_PATCH %VERSION_PATCH%
 
-/* Set to 1 to allow use of some GMP's internal functions */
-#define TIFA_USE_GMP_INTERNAL_FUNCS %USE_GMP_INTERNAL_FUNCS%
+/* Endianness of the processor (big|little) */
+#define TIFA_ENDIANNESS %ENDIANNESS%
+
+/* Size of machine word in bits */
+#define TIFA_WORDSIZE %WORDSIZE%
+
+/* Identification of machine used to compile TIFA */
+#define TIFA_COMPILED_ON "%COMPILED_ON%"
+
+/* Identification of machine used to compile TIFA (OS only) */
+#define TIFA_COMPILED_ON_OS "%COMPILED_ON_OS%"
+
+/* Identification of machine used to compile TIFA (OS release only) */
+#define TIFA_COMPILED_ON_RELEASE "%COMPILED_ON_RELEASE%"
+
+/* Identification of machine used to compile TIFA (architecture only) */
+#define TIFA_COMPILED_ON_MACHINE "%COMPILED_ON_MACHINE%"
 
 /* Set to 1 to use calloc/memset for integer array initialization */
 #define TIFA_USE_CALLOC_MEMSET %USE_CALLOC_MEMSET%
+
+/* Set to 1 to allow use of some GMP's internal functions */
+#define TIFA_USE_GMP_INTERNAL_FUNCS %USE_GMP_INTERNAL_FUNCS%
 
 /* Native type used to represent a string of bits */
 #define TIFA_BITSTRING_T %BITSTRING_T%

@@ -26,12 +26,9 @@
 
 #include <stdlib.h>
 
-#include "cfrac.h"
-#include "qs.h"
+#include "tifa_config.h"
 #include "siqs.h"
 #include "squfof.h"
-#include "tdiv.h"
-
 #include "tifa_factor.h"
 
 //-----------------------------------------------------------------------------
@@ -39,7 +36,19 @@ ecode_t tifa_factor(mpz_array_t* const factors, uint32_array_t* const multis,
                     const mpz_t n, const factoring_mode_t mode) {
     
     unsigned long int sizen = mpz_sizeinbase(n, 2);
-    
+
+#if TIFA_WORDSIZE < 64
+    //
+    // On 32 bit machines SQUFOF will start to fail for 59-ish bit numbers.
+    //
+    unsigned long int squfof_threshold = 58;
+#else
+    //
+    // SIQS starts to be better than SQUFOF for 64 bit numbers.
+    //
+    unsigned long int squfof_threshold = 64;
+#endif
+
     //
     // _NOTE_: The following choice of algorithm has been obtained by benching
     //         all TIFA's factoring algorithms with RSA moduli (i.e. numbers
@@ -52,7 +61,7 @@ ecode_t tifa_factor(mpz_array_t* const factors, uint32_array_t* const multis,
     //          depending on the situation, this should be done before calling
     //          tifa_factor. To do: add the trial division step here...
     //
-    if (sizen <= 64) {
+    if (sizen <= squfof_threshold) {
         squfof_params_t params;
         set_squfof_params_to_default(&params);
         

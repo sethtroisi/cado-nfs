@@ -1,6 +1,6 @@
 #
-# Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-# Computer Science and Control)
+# Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+# in Computer Science and Control)
 #
 # This library is free software; you can redistribute it and/or modify it under
 # the terms of the GNU Lesser General Public License as published by the Free
@@ -16,20 +16,20 @@
 # along with this library; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301 USA
 #
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 # General Information
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 # File          : SConstruct
 # Author        : Jerome Milan
 # Created on    : Wed Aug 23 2006
 # Last modified : Tue Jun 19 2007
 #
 # Version : 0.1.4
-# Licence : GNU Lesser General Public License (LGPL)
-#           Copyright (C) 2006, 2007 INRIA
-#-------------------------------------------------------------------------------
+# Licence : GNU Lesser General Public License (LGPL) v2.1 or later
+#           Copyright (C) 2006, 2007, 2008 INRIA
+#------------------------------------------------------------------------------
 # History :
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 #
 # 0.1.4: Tue Jun 19 2007 by JM
 #     - Added PRINT_ERROR option
@@ -44,17 +44,17 @@
 # 0.1.1: Mon Nov 13 2006 by JM
 #     - Added option to find the GMP library in non-standard locations
 #
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 # Short description
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 #
 # This is the top level SCons input file.
 #
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 # Imported Python modules
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 import os
 import sys
 import re
@@ -67,10 +67,10 @@ import SubstInFile
 
 from math import sqrt
 
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 # Command line options and default values : see BuildOptions.py for a more
 # detailled description
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 devel_conf_file = 'LocalBuildOptions.py'
 devel_build     = False
 if os.path.exists(os.path.join(os.getcwd(), devel_conf_file)):
@@ -268,16 +268,32 @@ opts.Add(
     ''
 )
 opts.Add(
+    'BITSTRING_T',
+    'Native type used to represent a string of bits',
+    'uint64_t'
+)
+#
+# Machine / architecture dependant stuff
+#
+opts.Add(
+    EnumOption(
+        'ENDIANNESS',
+        'Endianness of the processor',
+        'infer',
+        allowed_values = ('big', 'little', 'infer')
+    )
+)
+opts.Add(
+    'WORDSIZE',
+    'Wordsize of the processor (in bits)',
+    ''
+)
+opts.Add(
     BoolOption(
         'USE_CALLOC_MEMSET',
         "Set to 'yes' to use calloc/memset for integer array initialization",
         1
     )
-)
-opts.Add(
-    'BITSTRING_T',
-    'Native type used to represent a string of bits',
-    'uint64_t'
 )
 #
 # Verbosity options
@@ -338,7 +354,6 @@ opts.Add(
         1
     )
 )
-
 #
 # Timing options
 #
@@ -392,10 +407,9 @@ opts.Add(
     )
 )
 
-
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 # Create a custom environement
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 #
 # Import the whole external environement
 #
@@ -408,14 +422,15 @@ env = Environment(
 #
 # Check install and build directories
 #
-for directory in installdirs:
+for directory in installdirs:    
     if not os.path.isabs(directory):
         env[directory] = os.path.join(env['PREFIX'], env[directory])
-
+    
 if not os.path.isabs(env['BUILDDIR']):
     env['BUILDDIR'] = os.path.join(os.getcwd(), env['BUILDDIR'])
 
 if env['BUILDDIR_DEPENDS_ON_PLATFORM'] != 0:
+    print "Infering build directory... "
     try:
         import platform
         system = platform.system().lower()
@@ -426,6 +441,51 @@ if env['BUILDDIR_DEPENDS_ON_PLATFORM'] != 0:
         print "         -> platform build directory based on OS name only."
         platform = sys.platform.lower()
         env['BUILDDIR'] = os.path.join(env['BUILDDIR'], platform)
+    except:
+        print "Warning: Cannot infer build directory:"
+        print "         -> using directory BUILDDIR from BuildOptions.py."
+
+#
+# Check machine / architecture dependant options
+#
+if env['ENDIANNESS'] == "infer":
+    print "Checking for endianness..."
+    try:
+        env['ENDIANNESS'] = sys.byteorder
+    except:
+        print "ERROR: Cannot infer endianness:"
+        print "         -> Please set ENDIANNESS manually in BuildOptions.py."
+
+if (env['WORDSIZE'] == "") or (env['WORDSIZE'] == "infer"):
+    print "Checking for size of machine word..."
+    try:
+        import platform
+        env['WORDSIZE'] = platform.architecture()[0][0:2]
+    except ImportError:
+        print "Warning: Cannot find python module 'platform':"
+        print "         -> wordsize based on max integer."
+        print sys.maxint
+        if sys.maxint == 65535:
+            env['WORDSIZE'] = 16
+        elif sys.maxint == 2147483647:
+            env['WORDSIZE'] = 32
+        elif sys.maxint == 9223372036854775807:
+            env['WORDSIZE'] = 64
+        else:
+            print "Warning: Cannot infer size of machine word:"
+            print "         -> Please set WORDSIZE manually in BuildOptions.py."
+    except:
+        print sys.maxint
+        print "Warning: Cannot infer size of machine word:"
+        print "         -> Please set WORDSIZE manually in BuildOptions.py."
+
+sysinfo = os.uname();
+
+env['COMPILED_ON_OS']      = sysinfo[0];
+env['COMPILED_ON_RELEASE'] = sysinfo[2];
+env['COMPILED_ON_MACHINE'] = sysinfo[4];
+env['COMPILED_ON']         = '-'.join([sysinfo[0], sysinfo[2],
+                                       sysinfo[4], env['WORDSIZE'] + "bit"])
 
 #
 # Check verbosity options
@@ -463,16 +523,16 @@ if (env['USE_GMP_INTERNAL_FUNCS'] != 0):
         gmpincdir = Dir(env['GMP_INTERNAL_INCDIR']).abspath
         env.Prepend(CPPPATH = [str(gmpincdir)])
 
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 # Generate help text given by "scons -h"
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 Help(opts.GenerateHelpText(env))
 
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 # Configure for host: checks for libraries, header files, functions, etc...
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 
-#
+#------------------------------------------------------------------------------
 # Some checking subroutines
 #------------------------------------------------------------------------------
 def checkSizeOf(context, type):
@@ -584,7 +644,6 @@ conf = Configure(
                'checkLongMax'  : checkLongMax
            }
        )
-
 #
 # Check for the Math library and header...
 #
@@ -648,9 +707,9 @@ env['LONG_MAX_DIVIDED_BY_5'] = int(env['LONG_MAX']) / 5
 env['LONG_MAX_DIVIDED_BY_6'] = int(env['LONG_MAX']) / 6
 env['SQRT_LONG_MAX']         = int(sqrt(int(env['LONG_MAX'])))
 
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 # Directories definitions
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 top_dir   = os.getcwd()
 lib_dir   = os.path.join(top_dir, 'lib')
 tools_dir = os.path.join(top_dir, 'tools')
@@ -665,9 +724,9 @@ lib_build_dir   = os.path.join(base_build_dir, 'lib')
 tools_build_dir = os.path.join(base_build_dir, 'tools')
 tests_build_dir = os.path.join(base_build_dir, 'tests')
 
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 # Misc. variables
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 env['VERSION_MAJOR']  = '0'
 env['VERSION_MINOR']  = '2'
 env['VERSION_PATCH']  = '0'
@@ -702,9 +761,9 @@ tifa_distname = os.path.join(os.getcwd(), tifa_distname)
 
 doxy_style_dir = os.path.join(os.getcwd(), 'doxygen_files')
 
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 # Create the project's tifa_config.h file
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 subst_dict = {}
 
 subst_dict['%SHORTNAME%'] = env['SHORTNAME']
@@ -718,6 +777,14 @@ subst_dict['%VERSION_MAJOR%'] = env['VERSION_MAJOR']
 subst_dict['%VERSION_MINOR%'] = env['VERSION_MINOR']
 subst_dict['%VERSION_PATCH%'] = env['VERSION_PATCH']
 subst_dict['%VERSION%']       = env['VERSION']
+
+subst_dict['%COMPILED_ON_OS%']      = env['COMPILED_ON_OS']
+subst_dict['%COMPILED_ON_RELEASE%'] = env['COMPILED_ON_RELEASE']
+subst_dict['%COMPILED_ON_MACHINE%'] = env['COMPILED_ON_MACHINE']
+subst_dict['%COMPILED_ON%']         = env['COMPILED_ON']
+
+subst_dict['%ENDIANNESS%'] = env['ENDIANNESS']
+subst_dict['%WORDSIZE%']   = env['WORDSIZE']
 
 subst_dict['%USE_GMP_INTERNAL_FUNCS%'] = str(int(env['USE_GMP_INTERNAL_FUNCS']))
 
@@ -766,9 +833,9 @@ config_h    = 'tifa_config.h'
 
 env.SubstInFile(config_h, config_h_in, SUBST_DICT = subst_dict)
 
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 # Files to be distributed in the TIFA tar package
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 env['TARFLAGS']  = '-czvf'
 env['TARCOM']    = '$TAR $TARFLAGS $TARGET $SOURCES'
 env['TARSUFFIX'] = '.tgz'
@@ -790,9 +857,9 @@ if "dist" in COMMAND_LINE_TARGETS:
     env.Tar(tifa_distname, 'reset.sh')
     env.Alias('dist', archive)
 
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 # Exported variables
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 Export('env')
 Export('top_dir')
 Export('lib_dir')
@@ -803,17 +870,17 @@ Export('tifa_libname')
 Export('tifa_distname')
 Export('doxy_style_dir')
 
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 # Recurse in the lib directory to build the TIFA library
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 SConscript(lib_scons_file, build_dir = lib_build_dir, duplicate = 0)
 
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 # Recurse in the tools directory to build the programs
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 SConscript(tools_scons_file, build_dir = tools_build_dir, duplicate = 0)
 
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 # Recurse in the tests directory to build the tests programs
-#-------------------------------------------------------------------------------
+#------------------------------------------------------------------------------
 SConscript(tests_scons_file, build_dir = tests_build_dir, duplicate = 0)
