@@ -43,7 +43,7 @@ EOF
 polyselect/polyselect -full -e 1000000 < $tmp/$name > $tmp/$name.poly
 
 # note for CACAO members: some data files with sieve relations are available
-# in /local/fleur/cado/Examples/{c20,c59,c80}
+# in /local/fleur/cado/Examples/{c20,c59,c80} (see below how to use them)
 
 ## this has to be done by hand, sorry!
 ## and it depends on the polynomial found by polyselect (also the b-bound 2500
@@ -61,4 +61,18 @@ sieve/checknorms -poly $tmp/$name.poly $tmp/$name.rels_raw > $tmp/$name.rels
 
 ./merge_linalg_sqrt.sh $tmp/$name
 
+##############################################################################
 
+(for CACAO members) How to use the files in /local/fleur/cado/Examples.
+-----------------------------------------------------------------------
+
+Example with /local/fleur/cado/Examples/c80 (for sh addicts):
+
+$ name=c80
+$ d=/local/fleur/cado/Examples/$name
+$ tmp=/tmp
+$ cp $d/$name.poly $tmp
+$ cp $d/$name.rels $tmp/$name.rels_raw
+# normally the norms are already completely factored, but just in case...
+$ sieve/checknorms -poly $tmp/$name.poly $tmp/$name.rels_raw > $tmp/$name.rels
+$ ./merge_linalg_sqrt.sh $tmp/$name
