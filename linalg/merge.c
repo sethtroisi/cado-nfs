@@ -15,7 +15,7 @@
 #include <gmp.h>
 #include <string.h>
 
-//#define WANT_ASSERT
+#define WANT_ASSERT
 
 #include "utils/utils.h"
 #include "sparse.h"
@@ -23,7 +23,10 @@
 #define DEBUG 0
 #define TEX 0
 
-#define USE_TAB 1 // for compact rows...
+#define TRACE_COL -1 // 231 // put to -1 if not...!
+#define TRACE_ROW -1 // 30530 // put to -1 if not...!
+
+#define USE_TAB 0 // 1 for compact rows...
 
 #if USE_TAB == 0
 #define isRowNull(mat, i) ((mat)->data[(i)].val == NULL)
@@ -230,12 +233,15 @@ printStats(sparse_mat_t *mat)
 void
 checkData(sparse_mat_t *mat)
 {
-    int j;
+    int j, nbj = 0;
 
-    fprintf(stderr, "Checking final data\n");
     for(j = 0; j < mat->ncols; j++)
-	if(mat->wt[j] > 0)
-	    fprintf(stderr, "Wj[%d] = %d\n", j, mat->wt[j]);
+	if(mat->wt[j])
+	    nbj++;
+    if(mat->rem_ncols != nbj){
+	fprintf(stderr, "rem_ncols=%d nbj=%d\n", mat->rem_ncols, nbj);
+	exit(1);
+    }
 }
 
 // dump for debugging reasons
@@ -606,7 +612,7 @@ addRowsWithWeight(sparse_mat_t *mat, int i1, int i2)
 #if USE_TAB == 0
     addRowsData(mat->data, i1, i2);
 #else
-    addRows(mat->rows, i1, i2);
+    addRows(mat->rows, i1, i2, -1);
 #endif
     // new row i1 has to contribute to the weight
     addWeightFromRow(mat, i1);
@@ -1084,7 +1090,7 @@ remove_j_from_SWAR(sparse_mat_t *mat, int j)
 {
     remove_j_from_S(mat, j);
     mat->A[j] = NULL;
-    mat->wt[j] = 0; // minus 1
+    mat->wt[j] = 0;
     destroyRj(mat, j);
 }
 
@@ -1207,11 +1213,18 @@ removeRowSWAR(sparse_mat_t *mat, int i)
 
     mat->weight -= lengthRow(mat, i);
 #if USE_TAB == 0
-    for(k = 0; k < lengthRow(mat, i); k++)
+    for(k = 0; k < lengthRow(mat, i); k++){
 #else
-    for(k = 1; k <= lengthRow(mat, i); k++)
+    for(k = 1; k <= lengthRow(mat, i); k++){
+#endif
+#if TRACE_COL >= 0
+	if(cell(mat, i, k) == TRACE_COL){
+	    fprintf(stderr, "removeRowSWAR removes %d from R_%d\n",
+		    TRACE_COL, i);
+	}
 #endif
 	removeCellSWAR(mat, i, cell(mat, i, k));
+    }
 }
 
 void
@@ -1258,8 +1271,9 @@ addRowSWAR(sparse_mat_t *mat, int i)
 }
 
 // i1 += i2.
+// len could be the real length of row[i1]+row[i2] or -1.
 void
-addRowsSWAR(sparse_mat_t *mat, int i1, int i2)
+addRowsSWAR(sparse_mat_t *mat, int i1, int i2, int len)
 {
 #if 0 // original version
     int k1, k2, k, len, *tmp, *tmp2;
@@ -1323,12 +1337,13 @@ addRowsSWAR(sparse_mat_t *mat, int i1, int i2)
 #if USE_TAB == 0
     addRowsData(mat->data, i1, i2);
 #else
-    addRows(mat->rows, i1, i2);
+    addRows(mat->rows, i1, i2, len);
 #endif
     addRowSWAR(mat, i1);
 #endif
 }
 
+// Remove j from R[i] and crunch R[i].
 void
 remove_j_from_row(sparse_mat_t *mat, int i, int j)
 {
@@ -1365,6 +1380,15 @@ remove_j_from_row(sparse_mat_t *mat, int i, int j)
 #endif
 }
 
+void
+removeRowDefinitely(sparse_mat_t *mat, int i)
+{
+    removeRowSWAR(mat, i);
+    destroyRow(mat, i);
+    report1(i);
+    mat->rem_nrows--;
+}
+
 // These columns are simply removed from the current squeleton matrix, but
 // not from the small matrix.
 int
@@ -1382,20 +1406,33 @@ deleteAllColsFromStack(sparse_mat_t *mat, int iS)
 #if DEBUG >= 1
 	fprintf(stderr, "Removing column %d from S[%d]\n", j, iS);
 #endif
+#if TRACE_COL >= 0
+	if(j == TRACE_COL)
+	    fprintf(stderr, "Removing column %d from S[%d]\n", j, iS);
+#endif
 	// we destroy column j
 	// TODO: do faster?
-#if USE_MERGE_FAST > 1
-	if(iS == 1)
-#endif
-	for(k = 1; k <= mat->R[j][0]; k++)
-	    if(mat->R[j][k] != -1)
-		remove_j_from_row(mat, mat->R[j][k], j);
-#if USE_MERGE_FAST > 1
+#if USE_MERGE_FAST <= 1
+	fprintf(stderr, "FIXMEEEEEEEEE.\n");
+#else
+	if(iS == 0)
+	    mat->rem_ncols--;
+	if(iS == 1){
+	    for(k = 1; k <= mat->R[j][0]; k++)
+		if(mat->R[j][k] != -1){
+# if TRACE_COL >= 0
+		    if(j == TRACE_COL)
+			fprintf(stderr, "deleteAllCols: row is %d\n",mat->R[j][k]);
+# endif
+		    remove_j_from_row(mat, mat->R[j][k], j);
+		    removeRowDefinitely(mat, mat->R[j][k]);
+		    mat->rem_ncols--;
+		}
+	    mat->wt[j] = 0;
+	}
 	k = mat->wt[j]; // make a copy of the weight
-#endif
 	remove_j_from_SWAR(mat, j);
 	// mat->wt[j] is put to 0...
-#if USE_MERGE_FAST > 1
 	mat->wt[j] = -k; // restore and update
 #endif
     }
@@ -1446,7 +1483,7 @@ tryAllCombinations(sparse_mat_t *mat, int m, int *ind)
 #endif
     for(k = 0; k < m; k++)
 	if(k != i){
-	    addRowsSWAR(mat, ind[k], ind[i]);
+	    addRowsSWAR(mat, ind[k], ind[i], -1);
 #if DEBUG >= 1
 	    fprintf(stderr, "new row[%d]=", ind[k]);
 	    print_row(mat, ind[k]);
@@ -1498,10 +1535,8 @@ useMinimalSpanningTree(sparse_mat_t *mat, int m, int *ind, double *tfill, double
 #endif
 		nV--;
 
-		addRowsSWAR(mat, i1, i2);
-
-		// TODO: use the fact we know w(i1, i2) = A[][] to compute
-		// the length of row[i1]+row[i2] directly
+		// we know the length of row[i1]+row[i2]...!
+		addRowsSWAR(mat, i1, i2, A[i][father[i]]);
 
 		// since we want to add without destroying, we report
 		// -(i2+1) i1 // hack!!!!
@@ -1550,7 +1585,7 @@ useMinimalSpanningTree(sparse_mat_t *mat, int m, int *ind, double *tfill, double
 void
 findOptimalCombination(sparse_mat_t *mat, int m, int *ind, double *tfill, double *tMST)
 {
-    if(m <= 3){
+    if(m <= 2){
 	*tfill = *tMST = 0;
 	tryAllCombinations(mat, m, ind);
     }
@@ -1608,6 +1643,7 @@ merge_m_fast(sparse_mat_t *mat, int m)
     while(1){
 #if DEBUG >= 1
 	checkMatrixWeight(mat);
+	checkData(mat);
 #endif
 	// get next j
 	dcl = mat->S[m]->next;
@@ -1643,7 +1679,7 @@ merge_m_fast(sparse_mat_t *mat, int m)
 	}
 #if DEBUG >= 1
 	fprintf(stderr, " %d", j);
-	fprintf(stderr, "=> the %d rows are:\n", j);
+	fprintf(stderr, "=> the %d rows are:\n", m);
 	for(k = 0; k < m; k++){
 	    fprintf(stderr, "row[%d]=", ind[k]);
 	    print_row(mat, ind[k]);
@@ -1653,6 +1689,10 @@ merge_m_fast(sparse_mat_t *mat, int m)
 #endif
 	tt = seconds();
 	findOptimalCombination(mat, m, ind, &tfill, &tMST);
+#if TRACE_COL >= 0
+	fprintf(stderr, "wt[%d]=%d after findOptimalCombination\n",
+		TRACE_COL, mat->wt[TRACE_COL]);
+#endif
 	totopt += (seconds()-tt);
 	totfill += tfill;
 	totMST += tMST;
@@ -1662,6 +1702,10 @@ merge_m_fast(sparse_mat_t *mat, int m)
 	tt = seconds();
 	njrem += deleteHeavyColumns(mat);
 	totdel += (seconds()-tt);
+#if TRACE_COL >= 0
+        fprintf(stderr, "wt[%d]=%d after deleteHeavyColumns\n",
+                TRACE_COL, mat->wt[TRACE_COL]);
+#endif
     }
     tot = seconds()-tot;
     fprintf(stderr, "TIME: m=%d nj=%d", m, njproc);
@@ -1737,23 +1781,26 @@ inspectRowWeight(sparse_mat_t *mat)
 {
     int i, maxw = 0;
 
-    for(i = 0; i < mat->nrows; i++)
+    for(i = 0; i < mat->nrows; i++){
 	if(!isRowNull(mat, i)){
 	    if(lengthRow(mat, i) > mat->rwmax){
 		if((mat->rem_nrows - mat->rem_ncols) > mat->delta){
 #if DEBUG >= 1
-		    fprintf(stderr, "Too heavy row[%d]: %d\n", 
+		    fprintf(stderr, "Removing too heavy row[%d]: %d\n", 
 			    i, lengthRow(mat, i));
 #endif
-		    removeRowSWAR(mat, i);
-		    destroyRow(mat, i);
-		    report1(i);
-		    mat->rem_nrows--;
+#if TRACE_ROW >= 0
+		    if(i == TRACE_ROW)
+			fprintf(stderr, "Removing too heavy row[%d]: %d\n", 
+				i, lengthRow(mat, i));
+#endif
+		    removeRowDefinitely(mat, i);
 		}
 	    }
 	    if(!isRowNull(mat, i) && (lengthRow(mat, i) > maxw))
 		maxw = lengthRow(mat, i);
 	}
+    }
     fprintf(stderr, "nrows=%d; max row weight is %d\n", mat->rem_nrows, maxw);
 }
 
@@ -1773,6 +1820,9 @@ merge(sparse_mat_t *mat, int nb_merge_max, int maxlevel)
 	    njrem += removeSingletons(mat);
 	else
 	    njrem += mergeGe2(mat, m, nb_merge_max);
+#if DEBUG >= 1
+	checkData(mat);
+#endif
 #if 0
     {
 	int i, ni = 0, j0 = 191342;
@@ -1787,6 +1837,7 @@ merge(sparse_mat_t *mat, int nb_merge_max, int maxlevel)
 		mat->rem_nrows, mat->rem_ncols, 
 		mat->rem_nrows - mat->rem_ncols, njrem);
 	inspectRowWeight(mat);
+	deleteAllColsFromStack(mat, 0);
 	mm = minColWeight(mat);
 	fprintf(stderr, "Min col weight = %d\n", mm);
 #if 1
@@ -1824,31 +1875,40 @@ checkmat(sparse_mat_t *mat)
     exit(-1);
 }
 
-#if 0 // not activated anymore...!
 void
-dumpSparse(FILE *ofile, sparse_mat_t *mat, int *code)
+dumpSparse(FILE *ofile, sparse_mat_t *mat)
 {
+    long w = 0;
     int i, j, k, buf[1000], ibuf, new_nrows = 0;
 
     fprintf(ofile, "%d %d\n", mat->rem_nrows, mat->rem_ncols);
     for(i = 0; i < mat->nrows; i++){
-	if(mat->data[i].val == NULL)
+	if(isRowNull(mat, i))
 	    continue;
+	w += lengthRow(mat, i);
 	new_nrows++;
 	ibuf = 0;
-	for(k = 0; k < lengthRow(mat, i); k++){
-	    j = cell(mat, i, k);
-	    if(code[j])
-		buf[ibuf++] = code[j]-1;
-	}
+#if USE_TAB == 0
+	for(k = 0; k < lengthRow(mat, i); k++)
+#else
+	for(k = 1; k <= lengthRow(mat, i); k++)
+#endif
+	    buf[ibuf++] = cell(mat, i, k);
 	fprintf(ofile, "%d", ibuf);
 	for(k = 0; k < ibuf; k++)
 	    fprintf(ofile, " %d", buf[k]);
 	fprintf(ofile, "\n");
     }
+    fprintf(stderr, "Weight = %ld\n", w);
     ASSERT(new_nrows == mat->rem_nrows);
+    // check j used
+    for(j = 0; j < mat->ncols; j++)
+	if(mat->wt[j] != 0){
+	    fprintf(ofile, "J %d %d\n", j, abs(mat->wt[j]));
+	    if(abs(mat->wt[j]) <= mat->mergelevelmax)
+		fprintf(stderr, "Gasp: %d %d\n", j, mat->wt[j]);
+	}
 }
-#endif
 
 int
 main(int argc, char *argv[])
@@ -1914,6 +1974,7 @@ main(int argc, char *argv[])
     
     rewind(purgedfile);
     readmat(&mat, purgedfile);
+
     fclose(purgedfile);
 #if DEBUG >= 3
     checkmat(&mat);
@@ -1928,7 +1989,13 @@ main(int argc, char *argv[])
 #if TEX
     fprintf(stderr, "\\end{verbatim}\n");
 #endif
-    //  checkData(&mat);
+#if DEBUG >= 1
+    {
+	FILE *ofile = fopen("toto", "w");
+	dumpSparse(ofile, &mat);
+	fclose(ofile);
+    }
+#endif
     closeSWAR(&mat);
     return 0;
 }

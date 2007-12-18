@@ -235,10 +235,11 @@ reduce_exponents_mod2 (relation_t *rel)
   rel->nb_ap = j;
 }
 
-int scan_relations_from_file(int *irel, char *rel_used, int **rel_compact, int *nprimes, tab_prime_t *bad_primes, hashtable_t *H, FILE *file)
+// nrel can decrease, for instance in case of duplicate rows.
+int scan_relations_from_file(int *irel, int *nrel, char *rel_used, int **rel_compact, int *nprimes, tab_prime_t *bad_primes, hashtable_t *H, hashtable_t *Hab, FILE *file)
 {
     relation_t rel;
-    int ret, j, *tmp, itmp, h;
+    int ret, j, *tmp, itmp, h, hab;
 
     while(1){
 	ret = fread_relation (file, &rel);
@@ -247,6 +248,14 @@ int scan_relations_from_file(int *irel, char *rel_used, int **rel_compact, int *
 	*irel += 1;
 	if(!(*irel % 100000))
 	    fprintf(stderr, "irel = %d\n", *irel);
+	hab = hashInsert(Hab, rel.a, rel.b);
+	if(Hab->hashcount[hab] > 1){
+	    fprintf(stderr,"(%ld, %ld) appears more than once?\n",rel.a,rel.b);
+	    rel_used[*irel] = 0;
+	    rel_compact[*irel] = NULL;
+	    *nrel -= 1;
+	    continue;
+	}
 	rel_used[*irel] = 1;
 	reduce_exponents_mod2 (&rel);
 	computeroots (&rel);
@@ -285,7 +294,7 @@ int scan_relations_from_file(int *irel, char *rel_used, int **rel_compact, int *
 
 // Read all relations from file.
 int
-scan_relations(char *ficname[], int nbfic, int nrel, int *nprimes, tab_prime_t *bad_primes, hashtable_t *H, char *rel_used, int **rel_compact)
+scan_relations(char *ficname[], int nbfic, int *nrel, int *nprimes, tab_prime_t *bad_primes, hashtable_t *H, hashtable_t *Hab, char *rel_used, int **rel_compact)
 {
     FILE *relfile;
     int ret, i, irel = -1;
@@ -299,14 +308,14 @@ scan_relations(char *ficname[], int nbfic, int nrel, int *nprimes, tab_prime_t *
 	    exit(1);
 	}
 	fprintf(stderr, "Adding file %s\n", ficname[i]);
-	ret = scan_relations_from_file(&irel, rel_used, rel_compact, nprimes, bad_primes, H, relfile);
+	ret = scan_relations_from_file(&irel, nrel, rel_used, rel_compact, nprimes, bad_primes, H, Hab, relfile);
 	if (ret == 0) {
 	    fprintf(stderr, "Warning: error when reading file %s\n", ficname[i]);
 	    break;
 	}
 	fclose(relfile);
     }
-    fprintf(stderr, "Scanned %d relations\n", nrel);
+    fprintf(stderr, "Scanned %d relations\n", irel+1);
 
     return (ret == -1);
 }
@@ -370,17 +379,17 @@ find(int nrel, int h, char *rel_used, int **rel_compact)
 }
 
 void
-remove_singletons(int *nrel, int *nprimes, hashtable_t *H, char *rel_used, int **rel_compact)
+remove_singletons(int *nrel, int nrelmax, int *nprimes, hashtable_t *H, char *rel_used, int **rel_compact)
 {
     int old, newnrel = *nrel, newnprimes = *nprimes, i;
 
     do{
 	old = newnrel;
-	onepass_singleton_removal(*nrel, &newnrel, &newnprimes, H, rel_used, rel_compact);
+	onepass_singleton_removal(nrelmax, &newnrel, &newnprimes, H, rel_used, rel_compact);
 	fprintf(stderr, "new/old = %d/%d; %d\n", newnrel, old, newnprimes);
     } while(newnrel != old);
     // clean empty rows
-    for(i = 0; i < *nrel; i++){
+    for(i = 0; i < nrelmax; i++){
 	if(rel_used[i]){
 	    if(rel_compact[i][0] == -1){
 		fprintf(stderr, "Empty row: %d\n", i);
@@ -403,7 +412,13 @@ renumber(int *nprimes, tab_prime_t bad_primes, hashtable_t *H)
 	if(isBadPrime(H->hashtab_p[i], bad_primes) || (H->hashcount[i] == 0))
 	    H->hashcount[i] = -1;
 	else{
+#if 1
+	    if(H->hashcount[i] <= 1)
+		fprintf(stderr, "WARNING: H->hashcount[%d] = %d\n",
+			i, H->hashcount[i]);
+#else
 	    assert(H->hashcount[i] > 1);
+#endif
 	    if(H->hashcount[i] > 0)
 		H->hashcount[i] = nb++;
 	}
@@ -452,12 +467,12 @@ int
 main (int argc, char **argv)
 {
     tab_prime_t bad_primes;
-    hashtable_t H;
+    hashtable_t H, Hab;
     FILE *relfile;
     char *rel_used;
     int **rel_compact;
     int ret;
-    int i, nrel, nprimes, nrel_new, nprimes_new;
+    int i, nrelmax, nrel, nprimes, nrel_new, nprimes_new;
     
     fprintf (stderr, "%s revision %s\n", argv[0], REV);
     
@@ -472,23 +487,25 @@ main (int argc, char **argv)
 	fprintf(stderr, "  if no filename is given, takes input on stdin\n");
 	exit(1);
     }
-    nrel = atoi(argv[1]);
+    nrelmax = atoi(argv[1]);
     
     fprintf(stderr, "initializing hash tables...\n");
-    hashInit(&H, nrel);
+    hashInit(&H, nrelmax);
+    hashInit(&Hab, nrelmax);
     
-    rel_used = (char *)malloc(nrel * sizeof(char));
-    rel_compact = (int **)malloc(nrel * sizeof(int *));
+    rel_used = (char *)malloc(nrelmax * sizeof(char));
+    rel_compact = (int **)malloc(nrelmax * sizeof(int *));
     
     bad_primes.allocated = 100;
     bad_primes.length = 0;
     bad_primes.tab = (unsigned long *)malloc(bad_primes.allocated*sizeof(unsigned long));
 
     fprintf(stderr, "reading file of relations...\n");
-    ret = scan_relations(argv+2, argc-2, nrel, &nprimes, &bad_primes, &H, rel_used, rel_compact);
+    nrel = nrelmax;
+    ret = scan_relations(argv+2, argc-2, &nrel, &nprimes, &bad_primes, &H, &Hab, rel_used, rel_compact);
     assert (ret);
     
-    fprintf(stderr, "nrel=%d, nprimes=%d\n", nrel, nprimes);
+    fprintf(stderr, "nrel(useful)=%d, nprimes=%d\n", nrel, nprimes);
     
 #if DEBUG >= 2
     for(i = 0; i < hashmod; i++)
@@ -499,7 +516,7 @@ main (int argc, char **argv)
     fprintf(stderr, "starting singleton removal...\n");
     nrel_new = nrel;
     nprimes_new = nprimes;
-    remove_singletons(&nrel_new, &nprimes_new, &H, rel_used, rel_compact);
+    remove_singletons(&nrel_new, nrelmax, &nprimes_new, &H, rel_used, rel_compact);
     
     fprintf(stderr, "\nbadprimes = \n");
     for (i = 0; i < bad_primes.length; ++i){
@@ -534,7 +551,7 @@ main (int argc, char **argv)
     
     free(bad_primes.tab);
     free(rel_used);
-    for(i = 0; i < nrel; i++)
+    for(i = 0; i < nrelmax; i++)
 	if(rel_compact[i] != NULL)
 	    free(rel_compact[i]);
     free(rel_compact);

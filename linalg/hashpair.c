@@ -11,7 +11,7 @@ void
 hashClear(hashtable_t *H)
 {
     memset(H->hashcount, 0, H->hashmod * sizeof(int));
-    memset(H->hashtab_p, 0, H->hashmod * sizeof(unsigned long));
+    memset(H->hashtab_p, 0, H->hashmod * sizeof(long));
     memset(H->hashtab_r, 0, H->hashmod * sizeof(unsigned long));
 }
 
@@ -29,7 +29,7 @@ hashInit(hashtable_t *H, int n)
     //    ASSERT(i <= ntab);
     fprintf(stderr, "hashmod = %lu\n", H->hashmod);
     H->hashcount = (int *)malloc(H->hashmod * sizeof(int));
-    H->hashtab_p = (unsigned long *)malloc(H->hashmod * sizeof(unsigned long));
+    H->hashtab_p = (long *)malloc(H->hashmod * sizeof(long));
     H->hashtab_r = (unsigned long *)malloc(H->hashmod * sizeof(unsigned long));
     hashClear(H);
 }
@@ -44,15 +44,15 @@ hashFree(hashtable_t *H)
 
 // Returns a new address or the one already containing (p, r).
 int
-getHashAddr(hashtable_t *H, unsigned long p, unsigned long r)
+getHashAddr(hashtable_t *H, long p, unsigned long r)
 {
-    unsigned long tmp = HC0 * p + HC1 * r;
+    unsigned long tmp = HC0 * ((unsigned long)p) + HC1 * r;
     int h = (int)(tmp % H->hashmod);
 #if DEBUG >= 1
     int cpt = 0;
 #endif
 #if DEBUG >= 2
-    printf("H(%ld, %ld) = %d\n", p, r, h);
+    printf("H(%ld, %lu) = %d\n", p, r, h);
 #endif
 
     while(1){
@@ -76,7 +76,7 @@ getHashAddr(hashtable_t *H, unsigned long p, unsigned long r)
 }
 
 int
-hashInsert(hashtable_t *H, unsigned long p, unsigned long r)
+hashInsert(hashtable_t *H, long p, unsigned long r)
 {
     int h = getHashAddr(H, p, r);
     if(H->hashcount[h] == 0){

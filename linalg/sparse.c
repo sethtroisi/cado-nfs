@@ -19,6 +19,8 @@
 
 #include "sparse.h"
 
+#define DEBUG 0
+
 void
 fprintRow(FILE *file, int *row)
 {
@@ -32,20 +34,21 @@ fprintRow(FILE *file, int *row)
 // i1 += i2
 // A row is row[0..max] where row[0] = max and the real components are
 // row[1..max].
+// If len != -1, then it is the real length of row[i1]+row[i2].
 void
-addRows(int **rows, int i1, int i2)
+addRows(int **rows, int i1, int i2, int len0)
 {
     int k1, k2, k, len, *tmp, *tmp2;
 
     ASSERT(rows[i1] != NULL);
     ASSERT(rows[i2] != NULL);
 #if DEBUG >= 1
-    fprintf(stderr, "R[%d] =", i1); printRow(stderr, rows[i1]); 
+    fprintf(stderr, "R[%d] =", i1); fprintRow(stderr, rows[i1]); 
     fprintf(stderr, "\n");
-    fprintf(stderr, "R[%d] =", i2); printRow(stderr, rows[i2]);
+    fprintf(stderr, "R[%d] =", i2); fprintRow(stderr, rows[i2]);
     fprintf(stderr, "\n");
 #endif
-    len = rows[i1][0] + rows[i2][0] + 1;
+    len = 1 + (len0 != -1 ? len0 : rows[i1][0] + rows[i2][0]);
     tmp = (int *)malloc(len * sizeof(tmp));
     k = k1 = k2 = 1;
 
@@ -72,14 +75,21 @@ addRows(int **rows, int i1, int i2)
     ASSERT(k <= len);
     // copy back
     free(rows[i1]);
-    tmp2 = (int *)malloc(k * sizeof(int));
-    memcpy(tmp2, tmp, k * sizeof(int));
-    tmp2[0] = k-1;
-    rows[i1] = tmp2;
-    free(tmp);
+    if(len0 != -1){
+	tmp[0] = k-1;
+	rows[i1] = tmp;
+	ASSERT(tmp[0] == len0);
+    }
+    else{
+	tmp2 = (int *)malloc(k * sizeof(int));
+	memcpy(tmp2, tmp, k * sizeof(int));
+	tmp2[0] = k-1;
+	rows[i1] = tmp2;
+	free(tmp);
+    }
 #if DEBUG >= 1
     fprintf(stderr, "row[%d]+row[%d] =", i1, i2);
-    printRow(stderr, rows[i1]); fprintf(stderr, "\n");
+    fprintRow(stderr, rows[i1]); fprintf(stderr, "\n");
 #endif
 }
 

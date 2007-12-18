@@ -17,6 +17,8 @@
 
 #define DEBUG 0
 
+#define TRACE_COL -1 // 231 // put to -1 if not...!
+
 // newrows[i] contains a new row formed of old rows that correspond to
 // true original relations (and not multirelations).
 //
@@ -59,8 +61,13 @@ addrel(int **sparsemat, int *colweight, int *buf, int ibuf, int i)
 	rowi[0] = ibuf;
 	memcpy(rowi+1, buf, ibuf * sizeof(int));
 	sparsemat[i] = rowi;
-	for(k = 1; k <= rowi[0]; k++)
+	for(k = 1; k <= rowi[0]; k++){
+#if TRACE_COL >= 0
+	    if(rowi[k] == TRACE_COL)
+		fprintf(stderr, "addrel: j=%d appears 1st in R_%d\n",TRACE_COL,i);
+#endif
 	    colweight[rowi[k]]++;
+	}
     }
     else{
 #if DEBUG >= 1
@@ -75,6 +82,12 @@ addrel(int **sparsemat, int *colweight, int *buf, int ibuf, int i)
 	k2 = 0;
 	k = 1;
 	while((k1 <= rowi[0]) && (k2 < ibuf)){
+#if TRACE_COL >= 0
+	    if(rowi[k1] == TRACE_COL)
+		fprintf(stderr, "addrel: j=%d appears in R_%d\n",TRACE_COL,i);
+	    if(buf[k2] == TRACE_COL)
+		fprintf(stderr, "addrel: j=%d appears in buf_%d\n",TRACE_COL,i);
+#endif
 	    if(rowi[k1] < buf[k2]){
 		tmp[k++] = rowi[k1++];
 		colweight[rowi[k1-1]]++;
@@ -100,9 +113,10 @@ addrel(int **sparsemat, int *colweight, int *buf, int ibuf, int i)
 	sparsemat[i] = tmp;
 #if DEBUG >= 1
 	fprintRow(stderr, tmp); fprintf(stderr, "\n");
-	if(tmp[0] != (tmp_len-1))
-	    printf("#W# shorter length\n"); // who cares, really?
+	//	if(tmp[0] != (tmp_len-1))
+	//	    printf("#W# shorter length\n"); // who cares, really?
 #endif
+	//	fprintf(stderr, "W: 231 -> %d\n", colweight[231]);
     }
 }
 
@@ -235,7 +249,7 @@ renumber(int *small_ncols, int *colweight, int ncols)
     for(j = 0, nb = 0; j < ncols; j++)
 	if(colweight[j] > 0){
 #if DEBUG >= 1
-	    fprintf(stderr, "column %d used with weight %d\n",j,colweight[j]);
+	    fprintf(stderr, "J %d %d\n", j, colweight[j]);
 #endif
 	    tmp[nb++] = colweight[j];
 	    tmp[nb++] = j;
@@ -281,7 +295,7 @@ doAllAdds(int **newrows, char *str)
 #if DEBUG >= 1
 		fprintf(stderr, "next ii is %d\n", ii);
 #endif
-		addRows(newrows, ii, i);
+		addRows(newrows, ii, i, -1);
 		ii = 0;
 	    }
 	    else

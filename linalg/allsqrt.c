@@ -153,7 +153,7 @@ finishAlgebraicSqrt(FILE *algfile, hashtable_t *H, cado_poly pol)
 	    assert(!(H->hashcount[i] & 1));
 	    if(H->hashtab_r[i] == ((unsigned long)-2))
 		continue;
-	    fprintf(algfile, "%lu %ld %d\n", 
+	    fprintf(algfile, "%ld %ld %d\n", 
 		    H->hashtab_p[i], H->hashtab_r[i], H->hashcount[i]>>1);
 #if DEBUG >= 1
 	    fprintf(stderr, "# H[%d] = %d\n", i, H->hashcount[i]);
