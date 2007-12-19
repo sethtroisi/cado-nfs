@@ -86,10 +86,10 @@ computefree(relation_t *rel)
 {
     int i;
 
-    rel->rp[0].e = 1;
     for(i = 0; i < rel->nb_ap; i++){
 	rel->ap[i].r = rel->ap[i].p;
 	rel->ap[i].p = rel->a;
+	rel->ap[i].e = 1;
     }
 }
 
@@ -197,6 +197,9 @@ treatSign(relation_t rel, cado_poly pol)
     return s;
 }
 
+// RETURN VALUE: -1 if file exhausted.
+//                0 if product is negative...
+//                1 if product is positive...
 int
 treatDep(char *ratname, char *algname, FILE *relfile, FILE *purgedfile, FILE *indexfile, FILE *kerfile, cado_poly pol, int nrows, int ncols, char *small_row_used, int small_nrows, hashtable_t *H, int nlimbs, char *rel_used, int *vec, int rora, int verbose)
 {
@@ -284,9 +287,8 @@ treatDep(char *ratname, char *algname, FILE *relfile, FILE *purgedfile, FILE *in
 	}
     }
     ASSERT(checkVector(vec, ncols));
-    if(sg == -1){
+    if(sg == -1)
 	fprintf(stderr, "prod(a-b*m) < 0\n");
-    }
     else{
 	if((rora == 2) || (rora == 3))
 	    finishAlgebraicSqrt(algfile, H, pol);
@@ -295,7 +297,7 @@ treatDep(char *ratname, char *algname, FILE *relfile, FILE *purgedfile, FILE *in
     }
     fclose(ratfile);
     fclose(algfile);
-    return 1;
+    return (sg == -1 ? 0 : 1);
 }
 
 void

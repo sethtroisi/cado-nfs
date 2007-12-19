@@ -304,7 +304,7 @@ insertFreeRelation(int **rel_compact, int irel, int *nprimes, hashtable_t *H, re
     long p = rel->a; // rel->b == 0
     int j, *tmp, itmp, h;
 
-    tmp = (int *)malloc((rel->nb_ap + 2) * sizeof(int));
+    tmp = (int *)malloc((1 + rel->nb_ap + 1) * sizeof(int));
     itmp = 0;
     h = hashInsert(H, p, -2);
     tmp[itmp++] = h;
@@ -512,8 +512,6 @@ reread(char *ficname[], int nbfic, tab_prime_t bad_primes, hashtable_t *H, char 
 			reduce_exponents_mod2 (&rel);
 			computeroots (&rel);
 		    }
-		    else
-			rel.nb_rp = 0;
 		    fprint_rel_row(stdout, irel, rel, bad_primes, H);
 		    nr++;
 		    if(nr >= nrows){
