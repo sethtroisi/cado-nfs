@@ -1807,13 +1807,28 @@ inspectRowWeight(sparse_mat_t *mat)
 void
 merge(sparse_mat_t *mat, int nb_merge_max, int maxlevel)
 {
+    long oldcost = -1, cost, ncost = 0;
     int old_nrows, old_ncols, m, mm, njrem = 0;
 
     report2(mat->nrows, mat->ncols);
     m = 2;
     while(1){
-	fprintf(stderr, "Performing merge %d; w(M)=%d, ncols*w(M)=%ld\n",
-		m, mat->weight, ((long)mat->rem_ncols) * ((long)mat->weight));
+	cost = ((long)mat->rem_ncols) * ((long)mat->weight);
+	fprintf(stderr, "w(M)=%d, ncols*w(M)=%ld\n", mat->weight, cost);
+	if((oldcost != -1) && (cost > oldcost)){
+	    fprintf(stderr, "WARNING: New cost > old cost (%2.2lf)\n",
+		    ((double)cost)/((double)oldcost));
+	    ncost++;
+	    if(ncost >= 5){
+		fprintf(stderr, "WARNING: New cost > old cost %d times",ncost);
+		fprintf(stderr, " in a row, stopping\n");
+		break;
+	    }
+	}
+	else
+	    ncost = 0;
+	oldcost = cost;
+	fprintf(stderr, "Performing merge %d at %2.2lf\n", m, seconds());
 	old_nrows = mat->rem_nrows;
 	old_ncols = mat->rem_ncols;
 	if(m == 1)
