@@ -81,13 +81,13 @@ do
   echo "# Dependency $suf"
   rat=$name.dep.rat.$suf
   alg=$name.dep.alg.$suf
-  args2="$poly $rat $alg $name.algside"
+  args2="$poly $rat $alg $name.algside.$suf"
   time $sqrt/fmalgsqrt $args2 $mag
 magma << EOF
 load "$sqrt/jmc.mag";
 load "$sqrt/finish.mag";
 load "$mag";
-finish(f, m, N, "$rat", "$alg", "$name.algside");
+finish(f, m, N, "$rat", "$alg", "$name.algside.$suf");
 quit;
 EOF
   ndep=`expr $ndep '+' 1`
