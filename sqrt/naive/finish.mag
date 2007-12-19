@@ -66,6 +66,27 @@ m := 51751964056271939;
 N := 71641520761751435455133616475667090434063332228247871795429;
 */
 
+function FromF(F)
+	ff:=[];
+	for i:=1 to #F do
+	    printf "Converting F[%o] at %o\n", i, Cputime();
+	    ff[i]:=StringToInteger(F[i], 16);
+	end for;
+	if ff[1] gt 0 then
+	    lgff1:=Log(ff[1]);
+	else
+	    lgff1:=Log(-ff[1]);
+	end if;
+	printf "log(ff[1])=%o, %o (%o)\n", lgff1, #F[1], #F[1] * Log(16);
+	// patch!!!!
+	if lgff1 lt 0 then
+	    printf "PATCHHHHHHHHHHHH!\n";
+	    // length(#F[1]) approx Log(|ff[1]|)/Log(16)
+	    lgff1:=#F[1] * Log(16);
+	end if;
+	return ff, lgff1;
+end function;
+
 function finish(f, m, N, ratfile, algfile, algprod)
 
 if false then
@@ -84,21 +105,24 @@ Prune(~F);
 
 printf "Here is v = %o and #F = %o\n", v, #F;
 
+ff,lgff1:=FromF(F);
 if IsOdd(v) then
-  ff := [fd*StringToInteger(x, 16) :  x in F];
+  ff := [fd*ff[i] : i in [1..#ff]];
   v +:= 1;
-else 
-  ff := [StringToInteger(x, 16) :  x in F];
 end if;
 
+printf "Checking that a looks like a square at %o\n", Cputime();
 a := K!ff;
 assert MyIsSqrt(a);
 
-printf "and now for ff[1]\n";
+//printf "and now for ff[1]\n";
 //printf "abs(ff[1])=%o\n", AbsoluteValue(ff[1]);
 
+printf "Finding a suitable p at %o\n", Cputime();
 p := FindSuitableP(a);
-prec := Ceiling(1.2*Log(p, AbsoluteValue(ff[1])));
+printf "p = %o => Log(p) = %o, lgff1 = %o\n", p, Log(p), lgff1;
+//prec := Ceiling(1.2*Log(p, AbsoluteValue(ff[1])));
+prec:=Ceiling(1.2 * lgff1/Log(p));
 repeat 
   printf "Trying sqrt with lifting at precision: %o bits\n", Truncate(prec * Log(2, p));
   test, b := TrySqrt(a, p, prec);
