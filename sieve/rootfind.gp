@@ -6,6 +6,7 @@ logn = log (n);
    the minimum value in powers[] */
 
 print ("# Roots for polynomial ", f);
+print ("# DEGREE: ", poldegree(f));
 
 powlen = floor (logn / log(2));
 powers = vector (powlen, i, 2^(i+1));
