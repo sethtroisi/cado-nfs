@@ -1,6 +1,6 @@
 //
-// Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-// Computer Science and Control)
+// Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+// in Computer Science and Control)
 //
 // This library is free software; you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -71,10 +71,11 @@
 #include <inttypes.h>
 #include <gmp.h>
 
-#include "squfof.h"
 #include "funcs.h"
 #include "macros.h"
 #include "linked_list.h"
+#include "factoring_machine.h"
+#include "squfof.h"
 
 #define SQUFOF_DEBUG 0
 #if SQUFOF_DEBUG
@@ -222,11 +223,23 @@
 //
 
 //
+// Should we perform the "fast return" variant?
+//
+#define PERFORM_FAST_RETURN 1
+
+//
 // Only use the large step algorithm if the number of forms to compute (from
 // the inverse square root of a found square form) is larger than a certain
 // threshold.
 //
-#define LARGE_STEP_THRESHOLD 4096
+#if PERFORM_FAST_RETURN
+    #define LARGE_STEP_THRESHOLD 4096
+#else
+    //
+    // For the numbers likely to be factored with SQUFOF, this means never...
+    //
+    #define LARGE_STEP_THRESHOLD TIFA_LONG_MAX
+#endif
 
 //
 // Use a special way to "tag" local variables used in the single step algorithm
@@ -347,7 +360,7 @@
      * so we cycle though the nearby forms until we find a suitable     \
      * Q pairs...                                                       \
      */                                                                 \
-    while ((mpz_cmp_ui(VLS(M), 0) == 0) || (VLS(gcd_ui) != 1)) {        \
+    while (mpz_invert(VLS(M), VLS(Q0), D) == 0) {                       \
         SINGLE_STEP(PA, QA, QQA, S);                                    \
         SINGLE_STEP(PB, QB, QQB, S);                                    \
         VLS(gcd_ui) = gcd_ulint(QA, QB);                                \
@@ -358,7 +371,6 @@
         }                                                               \
         mpz_set_ui(VLS(Q0), QA);                                        \
         mpz_mul_ui(VLS(Q0), VLS(Q0), QB);                               \
-        mpz_invert(VLS(M), VLS(Q0), D);                                 \
     }                                                                   \
     /*                                                                  \
      * Solve X*QA - Y*QB = PA - PB for X                                \

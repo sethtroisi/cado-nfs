@@ -455,6 +455,7 @@ if env['ENDIANNESS'] == "infer":
     except:
         print "ERROR: Cannot infer endianness:"
         print "         -> Please set ENDIANNESS manually in BuildOptions.py."
+        sys.exit(-1)
 
 if (env['WORDSIZE'] == "") or (env['WORDSIZE'] == "infer"):
     print "Checking for size of machine word..."
@@ -476,8 +477,9 @@ if (env['WORDSIZE'] == "") or (env['WORDSIZE'] == "infer"):
             print "         -> Please set WORDSIZE manually in BuildOptions.py."
     except:
         print sys.maxint
-        print "Warning: Cannot infer size of machine word:"
-        print "         -> Please set WORDSIZE manually in BuildOptions.py."
+        print "ERROR: Cannot infer size of machine word:"
+        print "       -> Please set WORDSIZE manually in BuildOptions.py."
+        sys.exit(-1)
 
 sysinfo = os.uname();
 
