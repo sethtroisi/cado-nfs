@@ -148,6 +148,23 @@ fprint_alg(int *table_ind, int *nb_coeff, relation_t rel, tab_prime_t bad_primes
     *nb_coeff = nbc;
 }
 
+void
+fprint_free(int *table_ind, int *nb_coeff, relation_t rel, hashtable_t *H)
+{
+    long p = rel.a;
+    int i, nbc = *nb_coeff, index;
+
+    index = getHashAddr(H, p, -2);
+    if(H->hashcount[index] >= 0)
+	table_ind[nbc++] = H->hashcount[index];
+    for(i = 0; i < rel.nb_ap; i++){
+	index = getHashAddr(H, p, rel.ap[i].p);
+	if(H->hashcount[index] >= 0)
+	    table_ind[nbc++] = H->hashcount[index];
+    }
+    *nb_coeff = nbc;
+}
+
 /* Print relations in a matrix format:
    don't take into account bad primes and even powers of primes.
    WARNING: the primes in the input relation are not necessarily sorted.
@@ -163,15 +180,20 @@ fprint_rel_row (FILE *file, int irel, relation_t rel, tab_prime_t bad_primes, ha
   table_ind = (int*) malloc((rel.nb_rp + rel.nb_ap)*sizeof(int));
 
   nb_coeff = 0;
-  if(rel.nb_rp == 0)
-      fprintf(stderr, "WARNING: nb_rp = 0\n");
-  else
-      fprint_rat(table_ind, &nb_coeff, rel, H);
 
-  if(rel.nb_ap == 0)
-      fprintf(stderr, "WARNING: nb_ap=0\n");
-  else
-      fprint_alg(table_ind, &nb_coeff, rel, bad_primes, H);
+  if(rel.b == 0)
+      fprint_free(table_ind, &nb_coeff, rel, H);
+  else{
+      if((rel.nb_rp == 0) && (rel.b > 0))
+	  fprintf(stderr, "WARNING: nb_rp = 0\n");
+      else
+	  fprint_rat(table_ind, &nb_coeff, rel, H);
+      
+      if(rel.nb_ap == 0)
+	  fprintf(stderr, "WARNING: nb_ap=0\n");
+      else
+	  fprint_alg(table_ind, &nb_coeff, rel, bad_primes, H);
+  }
   if(nb_coeff == 0)
       fprintf(stderr, "nb_coeff[%d] == 0\n", irel);
 #if 0 // TODO: hum
@@ -235,11 +257,76 @@ reduce_exponents_mod2 (relation_t *rel)
   rel->nb_ap = j;
 }
 
+void
+insertNormalRelation(int **rel_compact, int irel, int *nprimes, tab_prime_t *bad_primes, hashtable_t *H, relation_t *rel)
+{
+    int *tmp, itmp, j, h;
+
+    reduce_exponents_mod2(rel);
+    computeroots(rel);
+    tmp = (int *)malloc((rel->nb_rp + rel->nb_ap + 1) * sizeof(int));
+    itmp = 0;
+    for(j = 0; j < rel->nb_rp; j++){
+	h = hashInsert(H, rel->rp[j].p, -2);
+	tmp[itmp++] = h;
+	if(H->hashcount[h] == 1)
+	    // new prime
+	    *nprimes += 1;
+	}
+    for(j = 0; j < rel->nb_ap; j++){
+	h = hashInsert(H, rel->ap[j].p, rel->ap[j].r);
+	tmp[itmp++] = h;
+	if(H->hashcount[h] == 1){
+	    // new prime
+	    *nprimes += 1;
+	    if(rel->ap[j].r == -1){
+		// bad prime
+		if (bad_primes->allocated == bad_primes->length) {
+		    bad_primes->allocated += 100;
+		    bad_primes->tab = (unsigned long *)realloc((void *)bad_primes->tab, (bad_primes->allocated)*sizeof(unsigned long));
+		    assert (bad_primes->tab != NULL);
+		}
+		bad_primes->tab[bad_primes->length] = rel->ap[j].p;
+		bad_primes->length++;
+	    }
+	}
+    }
+    tmp[itmp] = -1; // sentinel
+    rel_compact[irel] = tmp;
+}
+
+// The information is stored in the ap[].p part, which is odd, but convenient.
+// rel->ap.p[0..deg[ contains the deg roots of f(x) mod p, leading to deg
+// ideals for the factorization of (p).
+void
+insertFreeRelation(int **rel_compact, int irel, int *nprimes, hashtable_t *H, relation_t *rel)
+{
+    long p = rel->a; // rel->b == 0
+    int j, *tmp, itmp, h;
+
+    tmp = (int *)malloc((rel->nb_ap + 2) * sizeof(int));
+    itmp = 0;
+    h = hashInsert(H, p, -2);
+    tmp[itmp++] = h;
+    if(H->hashcount[h] == 1)
+	// new prime
+	*nprimes += 1;
+    for(j = 0; j < rel->nb_ap; j++){
+	h = hashInsert(H, p, rel->ap[j].p);
+	tmp[itmp++] = h;
+	if(H->hashcount[h] == 1)
+	    // new prime
+	    *nprimes += 1;
+    }
+    tmp[itmp] = -1; // sentinel
+    rel_compact[irel] = tmp;
+}
+
 // nrel can decrease, for instance in case of duplicate rows.
 int scan_relations_from_file(int *irel, int *nrel, char *rel_used, int **rel_compact, int *nprimes, tab_prime_t *bad_primes, hashtable_t *H, hashtable_t *Hab, FILE *file)
 {
     relation_t rel;
-    int ret, j, *tmp, itmp, h, hab;
+    int ret, hab;
 
     while(1){
 	ret = fread_relation (file, &rel);
@@ -257,37 +344,10 @@ int scan_relations_from_file(int *irel, int *nrel, char *rel_used, int **rel_com
 	    continue;
 	}
 	rel_used[*irel] = 1;
-	reduce_exponents_mod2 (&rel);
-	computeroots (&rel);
-	tmp = (int *)malloc((rel.nb_rp + rel.nb_ap + 1) * sizeof(int));
-	itmp = 0;
-	for(j = 0; j < rel.nb_rp; j++){
-	    h = hashInsert(H, rel.rp[j].p, -2);
-	    tmp[itmp++] = h;
-	    if(H->hashcount[h] == 1)
-		// new prime
-		*nprimes += 1;
-	}
-	for(j = 0; j < rel.nb_ap; j++){
-	    h = hashInsert(H, rel.ap[j].p, rel.ap[j].r);
-	    tmp[itmp++] = h;
-	    if(H->hashcount[h] == 1){
-		// new prime
-		*nprimes += 1;
-		if(rel.ap[j].r == -1){
-		    // bad prime
-		    if (bad_primes->allocated == bad_primes->length) {
-			bad_primes->allocated += 100;
-			bad_primes->tab = (unsigned long *)realloc((void *)bad_primes->tab, (bad_primes->allocated)*sizeof(unsigned long));
-			assert (bad_primes->tab != NULL);
-		    }
-		    bad_primes->tab[bad_primes->length] = rel.ap[j].p;
-		    bad_primes->length++;
-		}
-	    }
-	}
-	tmp[itmp] = -1; // sentinel
-	rel_compact[*irel] = tmp;
+	if(rel.b > 0)
+	    insertNormalRelation(rel_compact,*irel,nprimes,bad_primes,H,&rel);
+	else
+	    insertFreeRelation(rel_compact, *irel, nprimes, H, &rel);
     }
     return ret;
 }
@@ -448,8 +508,12 @@ reread(char *ficname[], int nbfic, tab_prime_t bad_primes, hashtable_t *H, char 
 		if(!(irel % 100000))
 		    fprintf(stderr, "irel = %d\n", irel);
 		if(rel_used[irel]){
-		    reduce_exponents_mod2 (&rel);
-		    computeroots (&rel);
+		    if(rel.b > 0){
+			reduce_exponents_mod2 (&rel);
+			computeroots (&rel);
+		    }
+		    else
+			rel.nb_rp = 0;
 		    fprint_rel_row(stdout, irel, rel, bad_primes, H);
 		    nr++;
 		    if(nr >= nrows){
@@ -492,7 +556,7 @@ main (int argc, char **argv)
     fprintf(stderr, "initializing hash tables...\n");
     hashInit(&H, nrelmax);
     hashInit(&Hab, nrelmax);
-    
+
     rel_used = (char *)malloc(nrelmax * sizeof(char));
     rel_compact = (int **)malloc(nrelmax * sizeof(int *));
     

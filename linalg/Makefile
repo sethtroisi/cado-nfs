@@ -7,10 +7,10 @@ GMPINCLUDE ?= $(GMP)/include/
 
 SVNVER:=$(shell svnversion .)
 CFLAGS=-g -Wall -DREV=\"$(SVNVER)\" # -O2 
-LDFLAGS=../utils/libutils.a $(GMPLIB)# -lefence
+LDFLAGS=../utils/libutils.a $(GMPLIB) -lm # -lefence
 INC=-I $(GMPINCLUDE) -I.. -I../utils
 
-binaries:=allsqrt replay merge purge procrels linalg	\
+binaries:=allsqrt replay merge purge freerel procrels linalg	\
 	characters matsort matprune transpose
 
 all:	$(binaries)
@@ -26,6 +26,9 @@ procrels: procrels.c ../utils/libutils.a
 
 hashpair: hashpair.c
 	gcc $(CFLAGS) $(INC) $< $(LDFLAGS) -o $@
+
+freerel: freerel.c ../utils/libutils.a ../sieve/fb.o
+	gcc $(CFLAGS) $(INC) $< ../sieve/fb.o $(LDFLAGS) -o $@
 
 purge: purge.c ../utils/libutils.a hashpair.o
 	gcc $(CFLAGS) $(INC) $< hashpair.o $(LDFLAGS) -o $@

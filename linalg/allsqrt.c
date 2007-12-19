@@ -12,6 +12,8 @@
 #define DEBUG 0
 #define MAPLE 0
 
+#define WANT_ASSERT
+
 int
 checkVector(int *vec, int ncols)
 {
@@ -80,11 +82,26 @@ treatRationalRelation(hashtable_t *H, relation_t rel)
 }
 
 void
+computefree(relation_t *rel)
+{
+    int i;
+
+    rel->rp[0].e = 1;
+    for(i = 0; i < rel->nb_ap; i++){
+	rel->ap[i].r = rel->ap[i].p;
+	rel->ap[i].p = rel->a;
+    }
+}
+
+void
 treatAlgebraicRelation(FILE *algfile, hashtable_t *H, relation_t rel)
 {
     int j, h;
 
-    computeroots(&rel);
+    if(rel.b > 0)
+	computeroots(&rel);
+    else
+	computefree(&rel);
     fprintf(algfile, "%ld %lu\n", rel.a, rel.b);
 #if MAPLE >= 1
     fprintf(stderr, "NORM:=NORM*mynorm(f, %ld, %lu):\n", rel.a, rel.b);
@@ -119,7 +136,7 @@ finishRationalSqrt(FILE *ratfile, hashtable_t *H, cado_poly pol)
 	if(H->hashcount[i] > 0){
 	    if(H->hashtab_r[i] != ((unsigned long)-2))
 		continue;
-	    assert(!(H->hashcount[i] & 1));
+	    ASSERT(!(H->hashcount[i] & 1));
 #if MAPLE >= 1
 	    fprintf(stderr, "R:=R*%ld^%d:\n",
 		    H->hashtab_p[i], H->hashcount[i]>>1);
@@ -150,7 +167,7 @@ finishAlgebraicSqrt(FILE *algfile, hashtable_t *H, cado_poly pol)
 #endif
     for(i = 0; i < H->hashmod; i++)
 	if(H->hashcount[i] > 0){
-	    assert(!(H->hashcount[i] & 1));
+	    ASSERT(!(H->hashcount[i] & 1));
 	    if(H->hashtab_r[i] == ((unsigned long)-2))
 		continue;
 	    fprintf(algfile, "%ld %ld %d\n", 
@@ -195,7 +212,7 @@ treatDep(char *ratname, char *algname, FILE *relfile, FILE *purgedfile, FILE *in
 	ret = fscanf(kerfile, "%lx", &w);
 	if(ret == -1)
 	    return ret;
-	assert (ret == 1);
+	ASSERT (ret == 1);
 	if(verbose)
 	    fprintf(stderr, "w=%lx\n", w);
 	for(j = 0; j < GMP_NUMB_BITS; ++j){
@@ -266,7 +283,7 @@ treatDep(char *ratname, char *algname, FILE *relfile, FILE *purgedfile, FILE *in
 	    sg *= treatSign(rel, pol);
 	}
     }
-    assert(checkVector(vec, ncols));
+    ASSERT(checkVector(vec, ncols));
     if(sg == -1){
 	fprintf(stderr, "prod(a-b*m) < 0\n");
     }
@@ -353,7 +370,7 @@ int main(int argc, char *argv[])
     kerfile = fopen(kername, "r");
 
     ret = read_polynomial(pol, polyname);
-    assert (ret);
+    ASSERT (ret);
 
     if(!strcmp(argv[8], "r"))
 	rora = 1;

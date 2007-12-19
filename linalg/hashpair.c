@@ -18,8 +18,11 @@ hashClear(hashtable_t *H)
 void
 hashInit(hashtable_t *H, int n)
 {
-    int ntab = 5, i;
-    unsigned long tab[] = {10000019,50000017,100000007,500000003,1000000007};
+    int ntab = 10, i;
+    unsigned long tab[] = {500009, 750019, 1000003, 
+			   5000011, 7500013, 10000019, 
+			   50000017, 100000007,
+			   500000003, 1000000007};
 
     for(i = 0; i < ntab; i++)
 	if(n < tab[i]){
@@ -27,7 +30,7 @@ hashInit(hashtable_t *H, int n)
 	    break;
 	}
     //    ASSERT(i <= ntab);
-    fprintf(stderr, "hashmod = %lu\n", H->hashmod);
+    fprintf(stderr, "# hashmod[%d] = %lu\n", i, H->hashmod);
     H->hashcount = (int *)malloc(H->hashmod * sizeof(int));
     H->hashtab_p = (long *)malloc(H->hashmod * sizeof(long));
     H->hashtab_r = (unsigned long *)malloc(H->hashmod * sizeof(unsigned long));
