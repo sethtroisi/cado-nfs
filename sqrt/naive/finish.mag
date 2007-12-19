@@ -69,7 +69,7 @@ N := 71641520761751435455133616475667090434063332228247871795429;
 function FromF(F)
 	ff:=[];
 	for i:=1 to #F do
-	    printf "Converting F[%o] at %o\n", i, Cputime();
+//	    printf "Converting F[%o] at %o\n", i, Cputime();
 	    ff[i]:=StringToInteger(F[i], 16);
 	end for;
 	if ff[1] gt 0 then
@@ -77,7 +77,7 @@ function FromF(F)
 	else
 	    lgff1:=Log(RealField(20) ! (-ff[1]));
 	end if;
-	printf "log(ff[1])=%o, %o (%o)\n", lgff1, #F[1], #F[1] * Log(16);
+//	printf "log(ff[1])=%o, %o (%o)\n", lgff1, #F[1], #F[1] * Log(16);
 	// patch!!!!
 	if lgff1 lt 0 then
 	    printf "PATCHHHHHHHHHHHH!\n";
@@ -120,7 +120,7 @@ assert MyIsSqrt(a);
 
 printf "Finding a suitable p at %o\n", Cputime();
 p := FindSuitableP(a);
-printf "p = %o => Log(p) = %o, lgff1 = %o\n", p, Log(p), lgff1;
+printf "p = %o => lgff1 = %o\n", p, lgff1;
 //prec := Ceiling(1.2*Log(p, AbsoluteValue(ff[1])));
 prec:=Ceiling(1.2 * lgff1/Log(p));
 repeat 
