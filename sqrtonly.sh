@@ -14,13 +14,19 @@ do
   echo "# Dependency $suf"
   rat=$name.dep.rat.$suf
   alg=$name.dep.alg.$suf
-  args2="$poly $rat $alg $name.algside.$suf"
-  time $sqrt/fmalgsqrt $args2 $mag
+  algprod=$name.algside.$suf
+  if [ -s $algprod ]
+  then
+    echo "File $algprod already exists..."
+  else
+    args2="$poly $rat $alg $algprod"
+    time $sqrt/fmalgsqrt $args2 $mag
+  fi
 magma << EOF
 load "$sqrt/jmc.mag";
 load "$sqrt/finish.mag";
 load "$mag";
-finish(f, m, N, "$rat", "$alg", "$name.algside.$suf");
+finish(f, m, N, "$rat", "$alg", "$algprod");
 quit;
 EOF
   ndep=`expr $ndep '+' 1`
