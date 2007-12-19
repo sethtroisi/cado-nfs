@@ -73,9 +73,9 @@ function FromF(F)
 	    ff[i]:=StringToInteger(F[i], 16);
 	end for;
 	if ff[1] gt 0 then
-	    lgff1:=Log(ff[1]);
+	    lgff1:=Log(RealField(20) ! ff[1]);
 	else
-	    lgff1:=Log(-ff[1]);
+	    lgff1:=Log(RealField(20) ! (-ff[1]));
 	end if;
 	printf "log(ff[1])=%o, %o (%o)\n", lgff1, #F[1], #F[1] * Log(16);
 	// patch!!!!
