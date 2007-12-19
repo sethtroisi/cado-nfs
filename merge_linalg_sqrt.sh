@@ -73,22 +73,4 @@ time $linalg/allsqrt $args1 0 $ndepmax ar $name.dep
 
 echo "Entering the last phase"
 
-mag=$name.mag
-ndep=0 
-while [ $ndep -lt $ndepmax ]
-do
-  suf=`echo $ndep | awk '{printf("%03d\n", $1)}'`
-  echo "# Dependency $suf"
-  rat=$name.dep.rat.$suf
-  alg=$name.dep.alg.$suf
-  args2="$poly $rat $alg $name.algside.$suf"
-  time $sqrt/fmalgsqrt $args2 $mag
-magma << EOF
-load "$sqrt/jmc.mag";
-load "$sqrt/finish.mag";
-load "$mag";
-finish(f, m, N, "$rat", "$alg", "$name.algside.$suf");
-quit;
-EOF
-  ndep=`expr $ndep '+' 1`
-done
+./sqrtonly.sh $root $name 0 $ndepmax
