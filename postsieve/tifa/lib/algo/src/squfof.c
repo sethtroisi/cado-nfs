@@ -20,12 +20,14 @@
 /**
  * \file    squfof.c
  * \author  Jerome Milan
- * \date    Thu Aug 2 2007
- * \version 1.3
+ * \date    Wed Dec 19 2007
+ * \version 1.3.1
  */
 
  /*
   * History:
+  *   1.3.1: Wed Dec 19 2007 by JM
+  *        - Fixed two mighty bugs in LARGE_STEP macro.
   *   1.3:   Thu Aug 2 2007 by JM
   *        - Implemented Williams & Wunderlich's "large step" algorithm for
   *          a "fast return" in step 4) of the SQUFOF algorithm.
@@ -235,10 +237,7 @@
 #if PERFORM_FAST_RETURN
     #define LARGE_STEP_THRESHOLD 4096
 #else
-    //
-    // For the numbers likely to be factored with SQUFOF, this means never...
-    //
-    #define LARGE_STEP_THRESHOLD TIFA_LONG_MAX
+    #define LARGE_STEP_THRESHOLD TIFA_ULONG_MAX
 #endif
 
 //
@@ -354,7 +353,6 @@
      */                                                                 \
     mpz_set_ui(VLS(Q0), QA);                                            \
     mpz_mul_ui(VLS(Q0), VLS(Q0), QB);                                   \
-    mpz_invert(VLS(M), VLS(Q0), D);                                     \
     /*                                                                  \
      * We require Q0 to be inversible in Z/DZ and gcd(QA, QB) = 1,      \
      * so we cycle though the nearby forms until we find a suitable     \
@@ -378,7 +376,6 @@
     mpz_set_ui(VLS(qa_z), QA);                                          \
     mpz_set_ui(VLS(qb_z), QB);                                          \
     mpz_gcdext(VLS(gcd_z), VLS(u), NULL, VLS(qa_z), VLS(qb_z));         \
-                                                                        \
     mpz_set_ui(VLS(P0), PB);                                            \
     mpz_sub_ui(VLS(P0), VLS(P0), PA);                                   \
     mpz_mul(VLS(P0), VLS(u), VLS(P0));                                  \
@@ -389,14 +386,14 @@
      * Step 2: Find Q and P' congruent to P mod Q                       \
      */                                                                 \
     mpz_add_ui(VLS(quot), VLS(P0), S);                                  \
-    mpz_tdiv_qr(VLS(quot), VLS(rem), VLS(quot), VLS(Q0));               \
+    mpz_fdiv_qr(VLS(quot), VLS(rem), VLS(quot), VLS(Q0));               \
     while (true) {                                                      \
         mpz_ui_sub(VLS(P0), S, VLS(rem));                               \
         mpz_set(VLS(tmp), D);                                           \
         mpz_submul(VLS(tmp), VLS(P0), VLS(P0));                         \
         mpz_divexact(VLS(Q0), VLS(tmp), VLS(Q0));                       \
         mpz_add_ui(VLS(quot), VLS(P0), S);                              \
-        mpz_tdiv_qr(VLS(quot), VLS(rem), VLS(quot), VLS(Q0));           \
+        mpz_fdiv_qr(VLS(quot), VLS(rem), VLS(quot), VLS(Q0));           \
                                                                         \
         if ((mpz_sgn(VLS(Q0)) > 0) && (mpz_cmp_ui(VLS(Q0), S) <= 0)){   \
             break;                                                      \
