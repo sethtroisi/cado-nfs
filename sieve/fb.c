@@ -132,7 +132,9 @@ factorbase_degn_t *
 fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale, 
 		const int verbose)
 {
+#ifdef HAVE_MSRH
   long long tsc1, tsc2;
+#endif
   fbprime_t p;
   factorbase_degn_t *fb = NULL, *fb_cur, *fb_new;
   size_t fbsize = 0, fballoc = 0;
@@ -441,7 +443,9 @@ fb_read (const char *filename, const double log_scale, const int verbose)
 void
 fb_disable_roots (factorbase_degn_t *fb, const unsigned long b, const int verbose)
 {
+#ifdef HAVE_MSRH
   long long tsc1, tsc2;
+#endif
   unsigned long t;
   
   /* Remove the roots of primes that divide b, and of the powers of those 
@@ -480,7 +484,9 @@ fb_disable_roots (factorbase_degn_t *fb, const unsigned long b, const int verbos
 void
 fb_restore_roots (factorbase_degn_t *fb, const unsigned long b, const int verbose)
 {
+#ifdef HAVE_MSRH
   long long tsc1, tsc2;
+#endif
   unsigned long t;
 
   /* Put the roots back in */

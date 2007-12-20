@@ -194,6 +194,7 @@ fpoly_eval (const double *f, const int deg, const double x)
   return r;
 }
 
+#if 0
 /* Print polynomial with floating point coefficients. Assumes f[deg] != 0
    if deg > 0. */
 static void 
@@ -226,6 +227,7 @@ fpoly_print (const double *f, const int deg, char *name)
 
   printf ("\n");
 }
+#endif
 
 /* Used only in compute_norms() */
 static unsigned char
@@ -248,13 +250,18 @@ log_norm (const double *f, const int deg, const double x,
 unsigned char
 compute_norms (unsigned char *sievearray, const long amin, const long amax, 
 	       const unsigned long b, const double *poly, const int deg, 
-	       const double proj_roots, const double log_scale, const int odd, 
-	       const int verbose)
+	       const double proj_roots, const double log_scale, const int odd
+#ifdef HAVE_MSRH
+	       , const int verbose
+#endif
+               )
 {
   double f[MAXDEGREE + 1]; /* Polynomial in $a$ for a given fixed $b$ */
   double df[MAXDEGREE]; /* The derivative of f(x) */
   double bpow;
+#ifdef HAVE_MSRH
   unsigned long long tsc1, tsc2;
+#endif
   const double log_proj_roots = log(proj_roots) * log_scale;
   long a, a2;
   int i, fsign1, fsign2, dfsign1, dfsign2;
@@ -675,7 +682,9 @@ sieve_block (const int lvl, unsigned char *sievearray,
 	     const unsigned long arraylen, factorbase_t fb, 
 	     long long *times)
 {
+#ifdef HAVE_MSRH
   long long tsc1, tsc2;
+#endif
   unsigned long blockstart;
   const unsigned long b = fb->fbsmallbound[lvl];
 
@@ -690,7 +699,9 @@ sieve_block (const int lvl, unsigned char *sievearray,
       rdtscll (tsc1);
       sieve_small_slow (sievearray + blockstart, fb->fbinit[lvl], blocklen);
       rdtscll (tsc2);
+#ifdef HAVE_MSRH
       times[lvl] += tsc2 - tsc1;
+#endif
     }
 }
 
@@ -704,7 +715,9 @@ sieve_one_side (unsigned char *sievearray, factorbase_t fb,
 		const double *dpoly, const unsigned int deg, 
 		sieve_report_t *other_reports, const int verbose)
 {
+#ifdef HAVE_MSRH
   long long tsc1, tsc2;
+#endif
   long long times[SIEVE_BLOCKING];
   unsigned long reports_nr = 0;
   int lvl;
@@ -717,15 +730,21 @@ sieve_one_side (unsigned char *sievearray, factorbase_t fb,
   fb_disable_roots (fb->fblarge, b, verbose);
   
   compute_norms (sievearray, eff_amin, eff_amax, b, dpoly, deg, proj_roots, 
-		 log_scale, odd, verbose);
+		 log_scale, odd
+#ifdef HAVE_MSRH
+                 , verbose
+#endif
+                 );
 
   /* Init small primes for sieving this line */
   rdtscll (tsc1);
   for (lvl = 0; lvl < SIEVE_BLOCKING; lvl++)
       fb_initloc_small (fb->fbinit[lvl], fb->fbsmall[lvl], eff_amin, b, odd);
   rdtscll (tsc2);
+#ifdef HAVE_MSRH
   if (SIEVE_BLOCKING > 0 && verbose)
     printf ("# Initing small primes fb took %lld clocks\n", tsc2 - tsc1);
+#endif
 
   for (lvl = 0; lvl < SIEVE_BLOCKING; lvl++)
     times[lvl] = 0;
@@ -764,12 +783,14 @@ sieve_one_side (unsigned char *sievearray, factorbase_t fb,
 			    reports_threshold, 
 			    eff_amin, l, b, odd, other_reports);
       rdtscll (tsc2);
+#ifdef HAVE_MSRH
       if (verbose)
 	{
 	  printf ("# Finding sieve reports took %lld clocks\n", tsc2 - tsc1);
 	  printf ("# There were %lu sieve reports after sieving small "
 		  "primes\n", reports_nr);
 	}
+#endif
     }
   
   rdtscll (tsc1);
@@ -1068,7 +1089,9 @@ ul_rho (const unsigned long N, const unsigned long cparm)
   int i;
   unsigned int iterations = 0;
   const int iterations_between_gcd = 32;
+#ifdef HAVE_MSRH
   long long tsc1, tsc2;
+#endif
 
   ASSERT (cparm < N);
 
@@ -1116,8 +1139,10 @@ ul_rho (const unsigned long N, const unsigned long cparm)
   modul_clear (diff, m);
   modul_clearmod (m);
 
+#ifdef HAVE_MSRH
   rdtscll (tsc2);
   ul_rho_time += tsc2 - tsc1;
+#endif
 
   /* printf ("ul_rho: took %u iterations to find %lu\n", iterations, g); */
 
@@ -1838,7 +1863,9 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 		    factorbase_t fba, factorbase_t fbr, 
 		    const double log_scale, const int verbose)
 {
+#ifdef HAVE_MSRH
   unsigned long long tsc1, tsc2;
+#endif
   unsigned long proj_divisor_a, proj_divisor_r;
   unsigned int i, j, k;
   const unsigned int max_nr_primes = 128, max_nr_proj_primes = 16;
@@ -2000,9 +2027,11 @@ void rho_timing()
 {
   mpz_t m;
   unsigned long n, q;
-  unsigned long long tsc1, tsc2;
   unsigned int i;
+#ifdef HAVE_MSRH
+  unsigned long long tsc1, tsc2;
   const unsigned int iterations = 10000;
+#endif
 
   n = 404428732271UL;
   mpz_init (m);
@@ -2011,16 +2040,21 @@ void rho_timing()
   rdtscll (tsc1);
   for (i = 0; i < 10000; i++)
     q = ul_rho (n, 2UL);
+
+#ifdef HAVE_MSRH
   rdtscll (tsc2);
   printf ("%u iteratios of ul_rho took %lld clocks\n", 
 	  iterations, tsc2 - tsc1);
+#endif
 
   rdtscll (tsc1);
   for (i = 0; i < 10000; i++)
     q = mpz_rho (m, 2UL);
   rdtscll (tsc2);
+#ifdef HAVE_MSRH
   printf ("%u iteratios of mpz_rho took %lld clocks\n", 
 	  iterations, tsc2 - tsc1);
+#endif
   fflush (stdout);
   mpz_clear (m);
 }
