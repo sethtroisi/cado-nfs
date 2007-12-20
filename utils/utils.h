@@ -4,6 +4,9 @@
 #include "cado.h"
 #include <stdint.h>
 
+#define LONG int64_t
+#define ULONG uint64_t
+
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -29,15 +32,15 @@ extern uint64_t microseconds();
 static inline int cputime(void) { return (int) microseconds() / 1000; }
 static inline double seconds(void) { return (double) microseconds() /1.0e6; }
 
-/* long_poly arithmetic */
+/* long_poly: long_poly arithmetic */
 typedef struct {
   int alloc;    /* number of allocated coefficients */
   int degree;   /* degree < alloc */
-  long *coeff; /* coefficient list */
+  LONG *coeff; /* coefficient list */
 } __long_poly_struct;
 typedef __long_poly_struct long_poly_t[1];
-extern int roots_mod_long (long*, mpz_t*, int, const long);
-extern int nbits (unsigned long);
+extern int roots_mod_long (LONG*, mpz_t*, int, const LONG);
+extern int nbits (ULONG);
 
 /* getprime */
 extern unsigned long getprime (unsigned long);

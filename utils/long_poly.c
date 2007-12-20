@@ -6,12 +6,12 @@
 #include "utils.h"
 
 /* allocate an array of d coefficients, and initialize it */
-static long*
+static LONG*
 alloc_long_array (int d)
 {
-  long *f;
+  LONG *f;
 
-  f = (long*) malloc (d * sizeof (long));
+  f = (LONG*) malloc (d * sizeof (LONG));
   if (f == NULL)
     {
       fprintf (stderr, "Error, not enough memory\n");
@@ -21,10 +21,10 @@ alloc_long_array (int d)
 }
 
 /* reallocate an array to d coefficients */
-static long*
-realloc_long_array (long *f, int d)
+static LONG*
+realloc_long_array (LONG *f, int d)
 {
-  f = (long*) realloc (f, d * sizeof (long));
+  f = (LONG*) realloc (f, d * sizeof (LONG));
   if (f == NULL)
     {
       fprintf (stderr, "Error, not enough memory\n");
@@ -63,11 +63,11 @@ long_poly_realloc (long_poly_t f, int n)
 }
 
 /* return 1/s mod t */
-long
-invert_si (long s, long t)
+LONG
+invert_si (LONG s, LONG t)
 {
-  long u1, v1, q;
-  long u2, v2;
+  LONG u1, v1, q;
+  LONG u2, v2;
 
   assert (t > 0);
  
@@ -114,10 +114,10 @@ long_poly_set (long_poly_t f, const long_poly_t g)
 
 /* f <- f/lc(f) mod p */
 void
-long_poly_make_monic (long_poly_t f, long p)
+long_poly_make_monic (long_poly_t f, LONG p)
 {
   int d = f->degree, i;
-  long ilc;
+  LONG ilc;
 
   if (f->coeff[d] == 1)
     return;
@@ -130,7 +130,7 @@ long_poly_make_monic (long_poly_t f, long p)
 
 /* fp <- f/lc(f) mod p. Return degree of fp (-1 if fp=0). */
 int
-long_poly_set_mod (long_poly_t fp, mpz_t *f, int d, long p)
+long_poly_set_mod (long_poly_t fp, mpz_t *f, int d, LONG p)
 {
   int i;
 
@@ -149,7 +149,7 @@ long_poly_set_mod (long_poly_t fp, mpz_t *f, int d, long p)
 
 /* f <- a*x+b, a <> 0 */
 void
-long_poly_set_linear (long_poly_t f, long a, long b)
+long_poly_set_linear (long_poly_t f, LONG a, LONG b)
 {
   long_poly_realloc (f, 2);
   f->degree = 1;
@@ -162,7 +162,7 @@ void
 long_poly_swap (long_poly_t f, long_poly_t g)
 {
   int i;
-  long *t;
+  LONG *t;
 
   i = f->alloc;
   f->alloc = g->alloc;
@@ -177,10 +177,10 @@ long_poly_swap (long_poly_t f, long_poly_t g)
 
 /* h <- g^2 mod p, g and h must differ */
 void
-long_poly_sqr (long_poly_t h, const long_poly_t g, long p)
+long_poly_sqr (long_poly_t h, const long_poly_t g, LONG p)
 {
   int i, j, dg = g->degree;
-  long *gc, *hc;
+  LONG *gc, *hc;
 
   assert (dg >= -1);
   if (dg == -1) /* g is zero */
@@ -222,7 +222,7 @@ long_poly_normalize (long_poly_t h)
 
 /* g <- h mod p */
 void
-long_poly_mod_ui (long_poly_t g, const long_poly_t h, long p)
+long_poly_mod_ui (long_poly_t g, const long_poly_t h, LONG p)
 {
   int i;
   int dh = h->degree;
@@ -236,10 +236,10 @@ long_poly_mod_ui (long_poly_t g, const long_poly_t h, long p)
 
 /* h <- (x+a)*h mod p */
 void
-long_poly_mul_x (long_poly_t h, long a, long p)
+long_poly_mul_x (long_poly_t h, LONG a, LONG p)
 {
   int i, d = h->degree;
-  long *hc;
+  LONG *hc;
 
   long_poly_realloc (h, d + 2); /* (x+a)*h has degree d+1, thus d+2 coeffs */
   hc = h->coeff;
@@ -252,7 +252,7 @@ long_poly_mul_x (long_poly_t h, long a, long p)
 
 /* h <- g - x mod p */
 void
-long_poly_sub_x (long_poly_t h, const long_poly_t g, long p)
+long_poly_sub_x (long_poly_t h, const long_poly_t g, LONG p)
 {
   int i, d = g->degree;
 
@@ -270,7 +270,7 @@ long_poly_sub_x (long_poly_t h, const long_poly_t g, long p)
 
 /* h <- g - 1 mod p */
 void
-long_poly_sub_1 (long_poly_t h, const long_poly_t g, long p)
+long_poly_sub_1 (long_poly_t h, const long_poly_t g, LONG p)
 {
   int i, d = g->degree;
 
@@ -287,10 +287,10 @@ long_poly_sub_1 (long_poly_t h, const long_poly_t g, long p)
 
 /* h <- rem(h, f) mod p, f not necessarily monic */
 void
-long_poly_div_r (long_poly_t h, const long_poly_t f, long p)
+long_poly_div_r (long_poly_t h, const long_poly_t f, LONG p)
 {
   int i, d = f->degree, dh = h->degree, monic;
-  long *hc = h->coeff, t = 1;
+  LONG *hc = h->coeff, t = 1;
 
   monic = f->coeff[d] == 1;
   if (!monic)
@@ -319,10 +319,10 @@ long_poly_div_r (long_poly_t h, const long_poly_t f, long p)
 
 /* q <- divexact(h, f) mod p, f not necessarily monic. Clobbers h. */
 void
-long_poly_divexact (long_poly_t q, long_poly_t h, const long_poly_t f, long p)
+long_poly_divexact (long_poly_t q, long_poly_t h, const long_poly_t f, LONG p)
 {
   int i, d = f->degree, dh = h->degree, monic;
-  long *hc = h->coeff, t = 1;
+  LONG *hc = h->coeff, t = 1;
 
   assert (d >= 0);
   assert (dh >= 0);
@@ -353,7 +353,7 @@ long_poly_divexact (long_poly_t q, long_poly_t h, const long_poly_t f, long p)
 
 /* fp <- gcd (fp, g), clobbers g */
 void
-long_poly_gcd (long_poly_t fp, long_poly_t g, unsigned long p)
+long_poly_gcd (long_poly_t fp, long_poly_t g, ULONG p)
 {
   while (g->degree >= 0)
     {
@@ -374,21 +374,22 @@ long_poly_out (FILE *fp, long_poly_t f)
       int i;
       for (i = 0; i <= f->degree; i++)
 	if (f->coeff[i] > 0)
-	  fprintf (fp, "+%ld*x^%d", f->coeff[i], i);
+	  fprintf (fp, "+%lld*x^%d", (long long int) f->coeff[i], i);
 	else if (f->coeff[i] < 0)
-	  fprintf (fp, "%ld*x^%d", f->coeff[i], i);
+	  fprintf (fp, "%lld*x^%d", (long long int) f->coeff[i], i);
       fprintf (fp, ";\n");
     }
 }
 
 /* returns f(x) mod p */
-long
-long_poly_eval (long_poly_t f, long x, long p)
+LONG
+long_poly_eval (long_poly_t f, LONG x, LONG p)
 {
   int i, d = f->degree;
+  LONG v;
   
   assert (d >= 0);
-  long v = f->coeff[d];
+  v = f->coeff[d];
   for (i = d - 1; i >= 0; i--)
     v = (v * x + f->coeff[i]) % p;
   return v;
@@ -397,10 +398,10 @@ long_poly_eval (long_poly_t f, long x, long p)
 /* Return the number n of roots of f mod p using a naive algorithm.
    If r is not NULL, put the roots in r[0], ..., r[n-1]. */
 int
-long_poly_roots_mod (long *r, long_poly_t f, const long p)
+long_poly_roots_mod (LONG *r, long_poly_t f, const LONG p)
 {
   int n = 0;
-  long x;
+  LONG x;
   
   for (x = 0; x < p; x++)
     if (long_poly_eval (f, x, p) == 0)
@@ -414,7 +415,7 @@ long_poly_roots_mod (long *r, long_poly_t f, const long p)
 
 /* return the number of bits of p */
 int
-nbits (unsigned long p)
+nbits (ULONG p)
 {
   int k;
 
@@ -424,8 +425,8 @@ nbits (unsigned long p)
 
 /* g <- (x+a)^e mod (fp, p), using auxiliary polynomial h */
 void
-long_poly_powmod_ui (long_poly_t g, long_poly_t fp, long_poly_t h, long a,
-		     long e, long p)
+long_poly_powmod_ui (long_poly_t g, long_poly_t fp, long_poly_t h, LONG a,
+		     LONG e, LONG p)
 {
   int k = nbits (e);
 
@@ -452,9 +453,9 @@ long_poly_powmod_ui (long_poly_t g, long_poly_t fp, long_poly_t h, long a,
    Assumes p is odd, and deg(f) >= 1.
 */
 int
-long_poly_cantor_zassenhaus (long *r, long_poly_t f, long p, int depth)
+long_poly_cantor_zassenhaus (LONG *r, long_poly_t f, LONG p, int depth)
 {
-  long a;
+  LONG a;
   long_poly_t q, h, ff;
   int d = f->degree, dq, n, m;
 
@@ -526,7 +527,7 @@ long_poly_cantor_zassenhaus (long *r, long_poly_t f, long p, int depth)
    which has lower degree? Warning: if f has root -a, we might miss it.]
 */
 int
-roots_mod_long (long *r, mpz_t *f, int d, const long p)
+roots_mod_long (LONG *r, mpz_t *f, int d, const LONG p)
 {
   long_poly_t fp, g, h;
   int df, n;

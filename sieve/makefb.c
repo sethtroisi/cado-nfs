@@ -9,7 +9,7 @@ makefb (FILE *fp, cado_poly cpoly)
 {
   unsigned long p;
   int d = cpoly->degree;
-  long *roots, r;
+  LONG *roots, r;
   int nroots, i, j;
 
   fprintf (fp, "# Roots for polynomial ");
@@ -17,7 +17,7 @@ makefb (FILE *fp, cado_poly cpoly)
 
   fprintf (fp, "# DEGREE: %d\n", d);
 
-  roots = (long*) malloc (d * sizeof (long));
+  roots = (LONG*) malloc (d * sizeof (LONG));
 
   for (p = 2; p <= cpoly->alim; p = getprime (p))
     {
@@ -36,9 +36,9 @@ makefb (FILE *fp, cado_poly cpoly)
         }
       if (nroots != 0)
         {
-          fprintf (fp, "%lu: %ld", p, roots[0]);
+          fprintf (fp, "%lu: %lld", p, (long long int) roots[0]);
           for (i = 1; i < nroots; i++)
-            fprintf (fp, ",%ld", roots[i]);
+            fprintf (fp, ",%lld", (long long int) roots[i]);
           fprintf (fp, "\n");
         }
     }
