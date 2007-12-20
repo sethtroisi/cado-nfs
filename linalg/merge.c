@@ -1820,7 +1820,8 @@ merge(sparse_mat_t *mat, int nb_merge_max, int maxlevel)
 		    ((double)cost)/((double)oldcost));
 	    ncost++;
 	    if(ncost >= 5){
-		fprintf(stderr, "WARNING: New cost > old cost %d times",ncost);
+		fprintf(stderr, "WARNING: New cost > old cost %ld times",
+                        ncost);
 		fprintf(stderr, " in a row, stopping\n");
 		break;
 	    }

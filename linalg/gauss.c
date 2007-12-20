@@ -93,8 +93,10 @@ static mp_limb_t** ptr_rows = NULL;
 int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
 	   int limbs_per_row, int limbs_per_col);
 static void check_soundness();
+#if 0 /* ununsed currently */
 static void addPartialRows(int row, int pivot, mp_limb_t mask,
 			   int j_cur, mp_limb_t **ptr);
+#endif
 INLINE static void addRows(int row, int pivot, mp_limb_t mask,
 			   int j_cur, mp_limb_t **ptr);
 INLINE static void add2Rows(int row, int row2, int pivot, mp_limb_t mask,
@@ -437,7 +439,7 @@ INLINE static void addRows(int row, int pivot, mp_limb_t mask, int j_current,
   for (i = 0; i < LIMBS_PER_ROW; ++i) 
     ptr1[i] ^= ptr2[i];
   *ptr_current[row] |= mask; 
-} /* end function addPartialRows */
+} /* end function addRows */
 
 
 /* add the pivot row to the two given rows, expect for the given column 
@@ -462,7 +464,7 @@ INLINE static void add2Rows(int row, int row2, int pivot, mp_limb_t mask,
 
   *ptr_current[row] |= mask; 
   *ptr_current[row2] |= mask; 
-} /* end function addPartialRows */
+} /* end function add2Rows */
 
 
 INLINE static void add3Rows(int row, int row2, int row3, int pivot,
@@ -486,9 +488,9 @@ INLINE static void add3Rows(int row, int row2, int row3, int pivot,
   *ptr_current[row] |= mask; 
   *ptr_current[row2] |= mask; 
   *ptr_current[row3] |= mask; 
-} /* end function addPartialRows */
+} /* end function add3Rows */
 
-
+#if 0 /* unused currently */
 /* add the pivot row to the given row, starting with the given column+1
    Note: the mask and ptr_current allow to do this quickly. */
 /*
@@ -508,7 +510,7 @@ static void addPartialRows(int row, int pivot, mp_limb_t mask, int j_current,
   while (ptr1 < ptrlim)
     *ptr1++ ^= *ptr2++;
 } /* end function addPartialRows */
-
+#endif
 
 /* Return the index of the first row with a one in the desired column. */
 /* If the column is empty, return -1 */
