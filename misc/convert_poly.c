@@ -282,7 +282,7 @@ usage (char *argv0)
   fprintf (stderr, "        cado  - CADO-NFS format (default)\n");
   fprintf (stderr, "        fk    - Franke-Kleinjung format\n");
   fprintf (stderr, "        ggnfs - GGNFS format\n");
-  fprintf (stderr, "        ggnfs - CWI format\n");
+  fprintf (stderr, "        cwi - CWI format\n");
 }
 
 #define FORMAT_CADO  0
