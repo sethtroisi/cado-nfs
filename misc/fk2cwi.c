@@ -159,8 +159,6 @@ void
 read_ggnfs (mpz_t N, mpz_t X5, mpz_t X4, mpz_t X3, mpz_t X2, mpz_t X1,
 	    mpz_t X0, mpz_t Y1, mpz_t Y0, mpz_t M)
 {
-  int c;
-
   readline (); /* name: ... */
   readstring ("n: ");
   if (mpz_inp_str (N, stdin, 0) == 0)
