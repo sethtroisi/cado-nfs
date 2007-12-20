@@ -60,7 +60,7 @@ sieve/sieve -poly $tmp/$name.poly -fb $tmp/$name.roots -1000000 1000000 1 2500\
 # checking norms, splitting large cofactors and appending to rels
 sieve/checknorms -poly $tmp/$name.poly $tmp/$name.rels_raw >> $tmp/$name.rels
 
-/bin/rm -f $tmp/$name.purged
+/bin/rm -f $tmp/$name.purged $tmp/$name.*algside*
 ./merge_linalg_sqrt.sh $tmp/$name
 
 ## CLEANING STEP: detroies everything, which might not be what you want...
