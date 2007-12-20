@@ -63,7 +63,7 @@ sieve/checknorms -poly $tmp/$name.poly $tmp/$name.rels_raw >> $tmp/$name.rels
 /bin/rm -f $tmp/$name.purged
 ./merge_linalg_sqrt.sh $tmp/$name
 
-## CLEANING STEP
+## CLEANING STEP: detroies everything, which might not be what you want...
 /bin/rm $tmp/$name.*
 
 ##############################################################################
