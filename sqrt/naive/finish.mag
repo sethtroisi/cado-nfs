@@ -148,8 +148,18 @@ end if;
 g1 := GCD(Integers()!(gra-grr), N);
 g2 := GCD(Integers()!(gra+grr), N);
 
-if not IsProbablePrime(g1) then printf "g1 is composite\n"; end if;
-if not IsProbablePrime(g2) then printf "g2 is composite\n"; end if;
+if IsProbablePrime(g1) then
+    res:="PRIME";
+else
+    res:="COMPOSITE";
+end if;
+if IsProbablePrime(g2) then
+    res:=res * "PRIME";
+else
+    res:=res * "COMPOSITE";
+end if;
+
+print res;
 
 return [g1, g2];
 
