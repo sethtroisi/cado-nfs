@@ -16,6 +16,7 @@
 #include <assert.h>
 #include "utils/utils.h"
 #include "hashpair.h"
+#include "files.h"
 
 #include <string.h>
 
@@ -530,7 +531,8 @@ main (int argc, char **argv)
 {
     tab_prime_t bad_primes;
     hashtable_t H, Hab;
-    FILE *relfile;
+    char **fic;
+    int nfic;
     char *rel_used;
     int **rel_compact;
     int ret;
@@ -539,7 +541,6 @@ main (int argc, char **argv)
     fprintf (stderr, "%s revision %s\n", argv[0], REV);
     
     if (argc == 1) {
-	relfile = stdin;
 	fprintf(stderr, "usage: %s [filename]\n", argv[0]);
 	fprintf(stderr, "  stdin input is not yet available, sorry.\n");
 	exit(1);
@@ -550,6 +551,13 @@ main (int argc, char **argv)
 	exit(1);
     }
     nrelmax = atoi(argv[1]);
+
+    if(nrelmax > 0){
+	fic = argv+2;
+	nfic = argc-2;
+    }
+    else
+	fic = extractFic(&nfic, &nrelmax, argv[2]);
     
     fprintf(stderr, "initializing hash tables...\n");
     hashInit(&H, nrelmax);
@@ -564,7 +572,7 @@ main (int argc, char **argv)
 
     fprintf(stderr, "reading file of relations...\n");
     nrel = nrelmax;
-    ret = scan_relations(argv+2, argc-2, &nrel, &nprimes, &bad_primes, &H, &Hab, rel_used, rel_compact);
+    ret = scan_relations(fic, nfic, &nrel, &nprimes, &bad_primes, &H, &Hab, rel_used, rel_compact);
     assert (ret);
     
     fprintf(stderr, "nrel(useful)=%d, nprimes=%d\n", nrel, nprimes);
@@ -609,7 +617,7 @@ main (int argc, char **argv)
 
     // now, we reread the file of relations and convert it to the new coding...
     printf("%d %d\n", nrel_new, nprimes_new);
-    reread(argv+2, argc-2, bad_primes, &H, rel_used, nrel_new, nprimes_new);
+    reread(fic, nfic, bad_primes, &H, rel_used, nrel_new, nprimes_new);
     
     free(bad_primes.tab);
     free(rel_used);
