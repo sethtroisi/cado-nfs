@@ -15,6 +15,8 @@ makefb (FILE *fp, cado_poly cpoly)
   fprintf (fp, "# Roots for polynomial ");
   fprint_polynomial (fp, cpoly->f, d);
 
+  fprintf (fp, "# DEGREE: %d\n", d);
+
   roots = (long*) malloc (d * sizeof (long));
 
   for (p = 2; p <= cpoly->alim; p = getprime (p))
