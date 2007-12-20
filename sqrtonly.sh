@@ -34,7 +34,7 @@ EOF
   res=`grep "PRIMEPRIME" $fact`
   if [ "X$res" != "X" ]
   then
-      echo "Stopping, since we have to probable prime cofactors"
+      echo "Stopping, since we have two probable prime cofactors"
       exit
   fi
   ndep=`expr $ndep '+' 1`
