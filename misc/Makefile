@@ -3,7 +3,7 @@ GMP ?= /usr/local/
 GMPINCLUDE ?= $(GMP)/include/
 CFLAGS=-g -O2 -W -Wall
 
-targets:=fk2cwi ggnfs2cado
+targets:=convert_poly convert_rels
 
 all: $(targets)
 
