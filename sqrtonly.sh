@@ -15,6 +15,7 @@ do
   rat=$name.dep.rat.$suf
   alg=$name.dep.alg.$suf
   algprod=$name.algside.$suf
+  fact=$name.fact.$suf
   if [ -s $algprod ]
   then
     echo "File $algprod already exists..."
@@ -22,12 +23,19 @@ do
     args2="$poly $rat $alg $algprod"
     time $sqrt/fmalgsqrt $args2 $mag
   fi
-magma << EOF
+magma > $fact << EOF
 load "$sqrt/jmc.mag";
 load "$sqrt/finish.mag";
 load "$mag";
 finish(f, m, N, "$rat", "$alg", "$algprod");
 quit;
 EOF
+  cat $fact
+  res=`grep "PRIMEPRIME" $fact`
+  if [ "X$res" != "X" ]
+  then
+      echo "Stopping, since we have to probable prime cofactors"
+      exit
+  fi
   ndep=`expr $ndep '+' 1`
 done
