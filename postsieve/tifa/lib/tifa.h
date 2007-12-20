@@ -66,6 +66,7 @@
 #include "siqs.h"
 #include "squfof.h"
 #include "tdiv.h"
+#include "tifa_factor.h"
 //
 // Includes from lib/data
 //
