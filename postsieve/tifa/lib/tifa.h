@@ -91,7 +91,7 @@
 #include "messages.h"
 #include "print_error.h"
 #include "res_tdiv.h"
-#include "smooth_filter_t.h"
+#include "smooth_filter.h"
 #include "sqrt_cont_frac.h"
 #include "timer.h"
 #include "x_array_list.h"
