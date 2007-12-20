@@ -3,7 +3,6 @@ Required software tools:
 
 *) GMP (http://gmplib.org): usually installed in most Linux distributions
 *) ECM (http://gforge.inria.fr/projects/ecm/)
-*) PARI/GP (http://pari.math.u-bordeaux.fr/)
 *) Magma (http://magma.maths.usyd.edu.au/magma/)
 
 [Optional: configure]
@@ -35,34 +34,37 @@ name=c59
 # setenv tmp /tmp
 # setenv name c59
 
-
 cat <<EOF > $tmp/$name
 n:71641520761751435455133616475667090434063332228247871795429
 EOF
 
+## POLYNOMIAL SELECTION STEP
 polyselect/polyselect -full -e 1000000 < $tmp/$name > $tmp/$name.poly
 
-# note for CACAO members: some data files with sieve relations are available
-# in /local/fleur/cado/Examples/{c20,c59,c80} (see below how to use them)
-
-## this has to be done by hand, sorry!
-## and it depends on the polynomial found by polyselect (also the b-bound 2500
-## below might be too small with different polynomials)
-
 # creating factor base
-(cd sieve; ./mkroots.sh $tmp/$name.poly > $tmp/$name.roots)
+sieve/makefb -poly $tmp/$name.poly > $tmp/$name.roots
 
 # if you want to use free relations
 ./linalg/freerel $tmp/$name.roots > $tmp/$name.rels
 
 ## SIEVING_STEP
-# note: the following was tested with revision 329 of polyselect and sieve
+## the sieving parameters must be given by hand, sorry!
+## and they depend on the polynomial found by polyselect (i.e., b-bound 2500
+## below might be too small with different polynomials)
 sieve/sieve -poly $tmp/$name.poly -fb $tmp/$name.roots -1000000 1000000 1 2500\
  > $tmp/$name.rels_raw
+# note: the above was tested with revision 329 of polyselect and sieve
+# note for CACAO members: some data files with sieve relations are available
+# in /local/fleur/cado/Examples/{c20,c59,c80} (see below how to use them)
+
 # checking norms, splitting large cofactors and appending to rels
 sieve/checknorms -poly $tmp/$name.poly $tmp/$name.rels_raw >> $tmp/$name.rels
 
+/bin/rm -f $tmp/$name.purged
 ./merge_linalg_sqrt.sh $tmp/$name
+
+## CLEANING STEP
+/bin/rm $tmp/$name.*
 
 ##############################################################################
 
@@ -71,11 +73,11 @@ sieve/checknorms -poly $tmp/$name.poly $tmp/$name.rels_raw >> $tmp/$name.rels
 
 Example with /local/fleur/cado/Examples/c80 (for sh addicts):
 
-$ name=c80
-$ d=/local/fleur/cado/Examples/$name
-$ tmp=/tmp
-$ cp $d/$name.poly $tmp
-$ cp $d/$name.rels $tmp/$name.rels_raw
+name=c80
+d=/local/fleur/cado/Examples/$name
+tmp=/tmp
+cp $d/$name.poly $tmp
+cp $d/$name.rels $tmp/$name.rels_raw
 # normally the norms are already completely factored, but just in case...
-$ sieve/checknorms -poly $tmp/$name.poly $tmp/$name.rels_raw > $tmp/$name.rels
-$ ./merge_linalg_sqrt.sh $tmp/$name
+sieve/checknorms -poly $tmp/$name.poly $tmp/$name.rels_raw > $tmp/$name.rels
+./merge_linalg_sqrt.sh $tmp/$name
