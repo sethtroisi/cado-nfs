@@ -5,6 +5,9 @@
 #include <string.h>
 #include <ctype.h>
 #include "mod_ul.c"
+
+#define WANT_ASSERT
+
 #include "cado.h"
 #include "utils/utils.h"
 
@@ -255,12 +258,12 @@ handleOneKer(int *charval, int k, rootprime_t * tabchar, FILE * purgedfile, FILE
   for (i = 0; i < nlimbs; ++i) {
     ret = fscanf(kerfile, "%lx", &w);
 //    printf("%lx ", w);
-    assert (ret == 1);
+    ASSERT (ret == 1);
     for (j = 0; j < GMP_NUMB_BITS; ++j) {
       if (fgets(str, 1024, purgedfile)) {
 	if (w & 1UL) {
 	  ret = gmp_sscanf(str, "%ld %lu", &a, &b);
-	  assert (ret == 2);
+	  ASSERT (ret == 2);
 	  for (jj = 0; jj < k; ++jj)
 	    charval[jj] *= eval_char(a, b, tabchar[jj]);
 
@@ -526,7 +529,7 @@ readOneKer(mp_limb_t *vec, FILE *file, int nlimbs) {
   int ret, i;
   for (i = 0; i < nlimbs; ++i) {
     ret = fscanf(file, "%lx", &w);
-    assert (ret == 1);
+    ASSERT (ret == 1);
     *vec = w;
     vec++;
   }
@@ -552,7 +555,7 @@ treatOneabpair(int **charval, char *str, int n, int k, int i, int j, mp_limb_t *
 #if DEBUG >= 1
     fprintf(stderr, "str=[%s], a=%ld, b=%lu\n", str, a, b);
 #endif
-    assert (ret == 2);
+    ASSERT (ret == 2);
     for (jj = 0; jj < n; ++jj) { // for each vector in ker...
 	if ((ker[jj][i]>>j) & 1UL) {
 	    for (ii = 0; ii < k; ++ii) { // for each character...
@@ -564,12 +567,12 @@ treatOneabpair(int **charval, char *str, int n, int k, int i, int j, mp_limb_t *
 
 // charmat is small_nrows x k
 void
-computeAllCharacters(int **charmat, int i, int k, rootprime_t * tabchar, long a, unsigned long b)
+computeAllCharacters(char **charmat, int i, int k, rootprime_t * tabchar, long a, unsigned long b)
 {
     int j;
     
     for(j = 0; j < k; j++)
-	charmat[i][j] *= eval_char(a, b, tabchar[j]);
+	charmat[i][j] *= (char)eval_char(a, b, tabchar[j]);
 }
 
 // charmat is small_nrows x k
@@ -577,12 +580,12 @@ computeAllCharacters(int **charmat, int i, int k, rootprime_t * tabchar, long a,
 // purgedfile contains crunched rows, with their label referring to relfile;
 // indexfile contains the coding "row[i] uses rows i_0...i_r in purgedfile".
 void
-buildCharacterMatrix(int **charmat, int k, rootprime_t * tabchar, FILE *purgedfile, FILE *indexfile, FILE *relfile)
+buildCharacterMatrix(char **charmat, int k, rootprime_t * tabchar, FILE *purgedfile, FILE *indexfile, FILE *relfile)
 {
     relation_t rel;
     int i, j, r, small_nrows, nr, nrows, ncols, irel, kk;
     char str[1024];
-    int **charbig;
+    char **charbig;
 
     // let's dump purgedfile which is a nrows x ncols matrix
     rewind(purgedfile);
@@ -592,14 +595,14 @@ buildCharacterMatrix(int **charmat, int k, rootprime_t * tabchar, FILE *purgedfi
 
     fprintf(stderr, "Reading all (a, b)'s just once\n");
     // charbig is nrows x k
-    charbig = (int **)malloc(nrows * sizeof(int *));
+    charbig = (char **)malloc(nrows * sizeof(char *));
     for(i = 0; i < nrows; i++){
-	charbig[i] = (int *)malloc(k * sizeof(int));
+	charbig[i] = (char *)malloc(k * sizeof(char));
 	for(j = 0; j < k; j++)
 	    charbig[i][j] = 1;
     }
     irel = 0;
-    rewind(relfile);
+    //    rewind(relfile); // useless?
     for(i = 0; i < nrows; i++){
 	fgets(str, 1024, purgedfile);
 	sscanf(str, "%d", &nr);
@@ -684,7 +687,7 @@ handleKer(dense_mat_t *mat, rootprime_t * tabchar, FILE * purgedfile, mp_limb_t 
 {  
     int i, j, k, n;
     char str[1024];
-    int **charmat;
+    char **charmat;
     int small_nrows, small_ncols;
 
     rewind(purgedfile);
@@ -693,18 +696,20 @@ handleKer(dense_mat_t *mat, rootprime_t * tabchar, FILE * purgedfile, mp_limb_t 
 
     n = mat->nrows;
     k = mat->ncols;
-    charmat = (int **) malloc(small_nrows * sizeof(int *));
-    assert (charmat != NULL);
+    charmat = (char **) malloc(small_nrows * sizeof(char *));
+    ASSERT (charmat != NULL);
     for (i = 0; i < small_nrows; ++i) {
-	charmat[i] = (int *) malloc(k*sizeof(int));
-	assert (charmat[i] != NULL);
+	charmat[i] = (char *) malloc(k*sizeof(char));
+	ASSERT (charmat[i] != NULL);
 	for (j = 0; j < k; ++j)
 	    charmat[i][j] = 1;
     }
     buildCharacterMatrix(charmat, k, tabchar, purgedfile, indexfile, relfile);
+#ifdef WANT_ASSERT
     for (i = 0; i < small_nrows; ++i)
 	for(j = 0; j < k; j++)
-	    assert((charmat[i][j] == 1) || (charmat[i][j] == -1));
+	    ASSERT((charmat[i][j] == 1) || (charmat[i][j] == -1));
+#endif
 #if DEBUG >= 1
     fprintf(stderr, "charmat:=array([");
     for (i = 0; i < small_nrows; ++i){
@@ -780,26 +785,26 @@ int main(int argc, char **argv) {
   }
 
   purgedfile = fopen(argv[1], "r");
-  assert (purgedfile != NULL);
+  ASSERT (purgedfile != NULL);
   kerfile = fopen(argv[2], "r");
-  assert (kerfile != NULL);
+  ASSERT (kerfile != NULL);
 
   pol = my_read_polynomial(argv[3]);
 
   indexfile = fopen(argv[4], "r");
-  assert (indexfile != NULL);
+  ASSERT (indexfile != NULL);
   relfile = fopen(argv[5], "r");
-  assert (relfile != NULL);
+  ASSERT (relfile != NULL);
 
   ret = gmp_sscanf(argv[6], "%d", &n);
-  assert (ret == 1);
+  ASSERT (ret == 1);
   ret = gmp_sscanf(argv[7], "%d", &k);
-  assert (ret == 1);
+  ASSERT (ret == 1);
 
   tabchar = (rootprime_t *)malloc(k*sizeof(rootprime_t));
-  assert (tabchar != NULL);
+  ASSERT (tabchar != NULL);
   charval = (int *)malloc(k*sizeof(int));
-  assert (charval != NULL);
+  ASSERT (charval != NULL);
 
   create_characters(tabchar, k, *pol);
 
@@ -812,15 +817,15 @@ int main(int argc, char **argv) {
   {
     int small_nrows, small_ncols;
     ret = fscanf(indexfile, "%d %d", &small_nrows, &small_ncols);
-    assert (ret == 2);
+    ASSERT (ret == 2);
     nlimbs = (small_nrows / GMP_NUMB_BITS) + 1;
   }
 
   ker = (mp_limb_t **)malloc(n*sizeof(mp_limb_t *));
-  assert (ker != NULL);
+  ASSERT (ker != NULL);
   for (j = 0; j < n; ++j) {
     ker[j] = (mp_limb_t *) malloc (nlimbs*sizeof(mp_limb_t));
-    assert (ker[j] != NULL);
+    ASSERT (ker[j] != NULL);
     readOneKer(ker[j], kerfile, nlimbs);
   }
   fprintf(stderr, "finished reading kernel file\n");
@@ -831,17 +836,17 @@ int main(int argc, char **argv) {
   mymat.limbs_per_col =  ((mymat.nrows-1) / GMP_NUMB_BITS) + 1;
 
   mymat.data = (mp_limb_t *) malloc(mymat.limbs_per_row*mymat.nrows*sizeof(mp_limb_t));
-  assert (mymat.data != NULL);
+  ASSERT (mymat.data != NULL);
 
   fprintf(stderr, "start computing characters...\n");
 
   handleKer(&mymat, tabchar, purgedfile, ker, nlimbs, *pol, indexfile, relfile);
 
   myker = (mp_limb_t **)malloc(mymat.nrows*sizeof(mp_limb_t *));
-  assert (myker != NULL);
+  ASSERT (myker != NULL);
   for (i = 0; i < mymat.nrows; ++i) {
     myker[i] = (mp_limb_t *)malloc(mymat.limbs_per_col*sizeof(mp_limb_t));
-    assert (myker[i] != NULL);
+    ASSERT (myker[i] != NULL);
     for (j = 0; j < mymat.limbs_per_col; ++j) 
       myker[i][j] = 0UL;
   }
@@ -856,7 +861,7 @@ int main(int argc, char **argv) {
 #endif
     
   newker = (mp_limb_t *) malloc (nlimbs*sizeof(mp_limb_t));
-  assert (newker != NULL);
+  ASSERT (newker != NULL);
   for (i = 0; i < dim; ++i) {
     for (j = 0; j < nlimbs; ++j)
       newker[j] = 0;
