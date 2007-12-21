@@ -30,8 +30,8 @@ hashpair: hashpair.c
 freerel: freerel.c ../utils/libutils.a ../sieve/fb.o
 	gcc $(CFLAGS) $(INC) $< ../sieve/fb.o $(LDFLAGS) -o $@
 
-purge: purge.c ../utils/libutils.a hashpair.o
-	gcc $(CFLAGS) $(INC) $< hashpair.o $(LDFLAGS) -o $@
+purge: purge.c ../utils/libutils.a hashpair.o files.o
+	gcc $(CFLAGS) $(INC) $< hashpair.o files.o $(LDFLAGS) -o $@
 
 merge: merge.c ../utils/libutils.a sparse.o
 	gcc $(CFLAGS) $(INC) $< sparse.o $(LDFLAGS) -o $@
