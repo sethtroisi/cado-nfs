@@ -26,7 +26,7 @@
 #define TRACE_COL -1 // 231 // put to -1 if not...!
 #define TRACE_ROW -1 // 30530 // put to -1 if not...!
 
-#define USE_TAB 0 // 1 for compact rows...
+#define USE_TAB 1 // 1 for compact rows...
 
 #if USE_TAB == 0
 #define isRowNull(mat, i) ((mat)->data[(i)].val == NULL)
@@ -1338,6 +1338,7 @@ addRowsSWAR(sparse_mat_t *mat, int i1, int i2, int len)
 #if USE_TAB == 0
     addRowsData(mat->data, i1, i2);
 #else
+    // we know the length of row[i1]+row[i2]
     addRows(mat->rows, i1, i2, len);
 #endif
     addRowSWAR(mat, i1);
