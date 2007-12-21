@@ -29,9 +29,8 @@ Run an example:
 tmp=/tmp
 name=c59
 
-# (for csh addicts:)
-# setenv tmp /tmp
-# setenv name c59
+# or for csh addicts:
+setenv tmp /tmp; setenv name c59
 
 cat <<EOF > $tmp/$name
 n:71641520761751435455133616475667090434063332228247871795429
@@ -62,7 +61,7 @@ sieve/checknorms -poly $tmp/$name.poly $tmp/$name.rels_raw >> $tmp/$name.rels
 /bin/rm -f $tmp/$name.purged $tmp/$name.*algside*
 ./merge_linalg_sqrt.sh $tmp/$name
 
-## CLEANING STEP: detroies everything, which might not be what you want...
+## CLEANING STEP: destroys everything, which might not be what you want...
 /bin/rm $tmp/$name.*
 
 ##############################################################################
@@ -72,11 +71,13 @@ sieve/checknorms -poly $tmp/$name.poly $tmp/$name.rels_raw >> $tmp/$name.rels
 
 Example with /local/fleur/cado/Examples/c80 (for sh addicts):
 
-name=c80
-d=/local/fleur/cado/Examples/$name
-tmp=/tmp
-cp $d/$name.poly $tmp
-cp $d/$name.rels $tmp/$name.rels_raw
+tmp=/tmp; name=c80; d=/local/fleur/cado/Examples
+# of for csh addicts:
+set tmp=/tmp; set name=c80; set d=/local/fleur/cado/Examples
+
+/bin/rm -f $tmp/$name.*
+cp $d/$name/$name.poly $tmp
 # normally the norms are already completely factored, but just in case...
-sieve/checknorms -poly $tmp/$name.poly $tmp/$name.rels_raw > $tmp/$name.rels
+sieve/checknorms -poly $tmp/$name.poly $d/$name/$name.rels > $tmp/$name.rels
 ./merge_linalg_sqrt.sh $tmp/$name
+/bin/rm -f $tmp/$name.*
