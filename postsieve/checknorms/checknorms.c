@@ -374,8 +374,8 @@ unsigned long checkrels(char *f, cado_poly cpoly, int verbose,
             if (report++ < MAXNMSG) {
                 WARNING("Discarded relation (%ld, %lu) since (a, b) are "
                         "not coprime\n", a, b);
-                continue;
             }
+            continue;
         }
         //
         // Evaluate norm on rational side
