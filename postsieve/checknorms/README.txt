@@ -13,7 +13,7 @@ To compile it, you will obviously need to compile TIFA. The provided Makefile
 has a switch called USE_TIFA_FROM_SVN. If set to one (1), the needed TIFA files
 (library and headers) will be searched in the SVN repository. Note that you
 will probably have to modify the TIFALIB variable since TIFA's building
-directory may depends on the host and OS used (this depends on the options
+directory may depend on the host and OS used (this depends on the options
 chosen when compiling TIFA). If USE_TIFA_FROM_SVN is different from one (1)
 the needed files will be searched in the directory where TIFA was installed.
 
