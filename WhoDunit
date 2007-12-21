@@ -1,0 +1,94 @@
+For each binary, we gives the files it reads, and the files it writes.
+The files might be stdin / stdout; in that case, we take the typical name
+given in README.
+
+
+polyselect:
+	reads:
+		input number
+	writes:
+		.poly
+
+makefb:
+	reads:
+		.poly
+	writes:
+		.roots
+
+freerels:
+	reads:
+		.roots
+	writes:
+		.rels (this will be part of the final .rels)
+
+sieve:
+	reads:
+		.poly
+		.roots
+	writes:
+		.rels.raw
+
+checknorms:
+	reads:
+		.poly
+		.rels.raw
+	writes:
+		.rels (concatenated with output of freerels)
+
+purge:
+	reads:
+		.poly
+		.rels
+	writes:
+		.purged
+
+merge / replay:
+	reads:
+		.purged
+	writes:
+		.small
+		.index
+		.merge.his (not used thereafter)
+
+linalg:
+	reads:
+		.small
+	writes:
+		.ker.raw
+
+characters:
+	reads:
+		.poly
+		.rels
+		.purged
+		.index
+		.ker.raw
+	writes:
+		.ker
+
+allsqrt:
+	reads:
+		.poly
+		.rels
+		.purged
+		.index
+		.ker
+	writes:
+		.dep.rat.i
+		.dep.alg.i
+
+fmalgsqrt:
+	reads:
+		.poly
+		.dep.rat.i (why???)
+		.dep.alg.i
+	writes:
+		.algside.i
+
+magma / finish.mag:
+	reads:
+		.dep.rat.i
+		.algside.i
+		.poly (or at least, the corresponding info is passed)
+	writes:
+		.fact.i
