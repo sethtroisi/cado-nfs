@@ -1,10 +1,12 @@
-These parameters are experimental and are used as input for merge_linagl_sqrt:
+These parameters are experimental and were *used* as input for
+merge_linagl_sqrt. They are not supposed nor proven to be optimal.
 
-	mergelevel	cwmax	rwmax
+	mergelevel	cwmax	rwmax		comment
+F7	10		15	 50		F7
 c72	20		30	100
-c85a	20		40	50
+c85a	20		40	 50		pic94
 c90	20		40	100
-c95	20		40	80
+c95	20		40	 80
 rsa100	20		40	150/200	
 
 For new parameters, some fiddling is needed, with respect to the final
