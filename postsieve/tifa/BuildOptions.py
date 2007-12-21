@@ -114,7 +114,7 @@
 #
 # Default: 'yes'
 #-------------------------------------------------------------------------------
-#BUILDDIR_DEPENDS_ON_PLATFORM = 'no'
+BUILDDIR_DEPENDS_ON_PLATFORM = 'no'
 
 #
 # Directory where the GMP library is installed. If left empty, SCons will
