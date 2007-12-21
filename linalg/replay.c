@@ -128,9 +128,11 @@ cmp(const void *p, const void *q) {
 }
 
 void
-makeSparse(int **sparsemat, int *colweight, FILE *purgedfile, int nrows, int ncols, int **oldrows)
+makeSparse(int **sparsemat, int *colweight, FILE *purgedfile, int nrows,
+           int ncols, int **oldrows, int verbose)
 {
     int i, j, nj, *buf, buf_len, ibuf, ind, k;
+    int report = (verbose == 0) ? 100000 : 10000;
 
     buf_len = 100;
     buf = (int *)malloc(buf_len * sizeof(int));
@@ -139,7 +141,7 @@ makeSparse(int **sparsemat, int *colweight, FILE *purgedfile, int nrows, int nco
     fscanf(purgedfile, "%d %d", &i, &j); // skip first line; check?
     ind = 0;
     while(fscanf(purgedfile, "%d %d", &i, &nj) != EOF){
-	if(!(ind % 100000))
+	if(!(ind % report))
 	    fprintf(stderr, "Treating old rel #%d\n", ind);
 	// store primes in rel
 	if(nj > buf_len){
@@ -326,11 +328,21 @@ main(int argc, char *argv[])
     int **newrows, i, j, nb, *nbrels, **oldrows, *colweight;
     int ind, small_nrows, small_ncols, **sparsemat;
     char str[1024];
+    int verbose = 0;
 
-    if(argc != 5){
-	fprintf(stderr, "Usage: %s purgedfile hisfile sparsefile abfile\n", argv[0]);
+    if (argc > 1 && strcmp (argv[1], "-v") == 0)
+      {
+        verbose ++;
+        argv ++;
+        argc --;
+      }
+
+    if (argc != 5)
+      {
+	fprintf (stderr, "Usage: %s purgedfile hisfile sparsefile abfile\n",
+                 argv[0]);
 	return 0;
-    }
+      }
     
     purgedfile = fopen(argv[1], "r");
     assert(purgedfile != NULL);
@@ -396,7 +408,8 @@ main(int argc, char *argv[])
     sparsemat = (int **)malloc(small_nrows * sizeof(int *));
     for(i = 0; i < small_nrows; i++)
 	sparsemat[i] = NULL;
-    makeSparse(sparsemat, colweight, purgedfile, nrows, ncols, oldrows);
+    makeSparse(sparsemat, colweight, purgedfile, nrows, ncols, oldrows,
+               verbose);
     fclose(purgedfile);
 
     fprintf(stderr, "Renumbering columns (including sorting w.r.t. weight)\n");

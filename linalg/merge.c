@@ -915,10 +915,11 @@ findBestIndex(sparse_mat_t *mat, int m, int *ind)
 }
 
 void
-merge_m_slow(sparse_mat_t *mat, int m)
+merge_m_slow(sparse_mat_t *mat, int m, int verbose)
 {
     int totfindrows = 0, totfindbest = 0, totadd = 0, tt;
     int *ind, j, k, i, njproc = 0;
+    int report = (verbose == 0) ? 10000 : 1000;
 
 #if DEBUG >= 1
     fprintf(stderr, "Weight %d:", m);
@@ -928,7 +929,7 @@ merge_m_slow(sparse_mat_t *mat, int m)
 	if(mat->wt[j] != m)
 	    continue;
 	njproc++;
-	if(!(njproc % 10000))
+	if(!(njproc % report))
 	    fprintf(stderr, "# %d columns of weight %d processed\n",njproc,m);
 	// we need to find the m rows and then
 	tt = cputime();
@@ -1626,12 +1627,13 @@ checkMatrixWeight(sparse_mat_t *mat)
 }
 
 int
-merge_m_fast(sparse_mat_t *mat, int m)
+merge_m_fast(sparse_mat_t *mat, int m, int verbose)
 {
     double totopt=0, tot=seconds(), tt, totfill=0, totMST=0, tfill, tMST;
     double totdel = 0;
     int *ind, j, k, njproc = 0, ni, njrem = 0;
     dclist dcl = mat->S[m];
+    int report = (verbose == 0) ? 10000 : 1000;
 
 #if DEBUG >= 1
     fprintf(stderr, "Weight %d:", m);
@@ -1651,7 +1653,7 @@ merge_m_fast(sparse_mat_t *mat, int m)
 	    break;
 	j = dcl->j;
 	njproc++;
-	if(!(njproc % 10000))
+	if(!(njproc % report))
 	    fprintf(stderr, "# %d columns of weight %d processed\n",njproc,m);
 #if DEBUG >= 1
 	fprintf(stderr, "Treating %d-th column %d of weight %d\n", njproc, j,
@@ -1722,18 +1724,18 @@ merge_m_fast(sparse_mat_t *mat, int m)
 }
 
 int
-merge_m(sparse_mat_t *mat, int m)
+  merge_m(sparse_mat_t *mat, int m, int verbose)
 {
 #if USE_MERGE_FAST >= 1
-    return merge_m_fast(mat, m);
+  return merge_m_fast(mat, m, verbose);
 #else
-    return merge_m_slow(mat, m);
+  return merge_m_slow(mat, m, verbose);
 #endif
 }
 
 // TODO: use mergemax?
 int
-mergeGe2(sparse_mat_t *mat, int m, int nb_merge_max)
+mergeGe2(sparse_mat_t *mat, int m, int nb_merge_max, int verbose)
 {
 #if USE_MERGE_FAST == 0
     int j, nbm;
@@ -1749,7 +1751,7 @@ mergeGe2(sparse_mat_t *mat, int m, int nb_merge_max)
     fprintf(stderr, "There are %d column(s) of weight %d\n", nbm, m);
     if(nbm)
 #endif
-	return merge_m(mat, m);
+      return merge_m(mat, m, verbose);
 #if DEBUG >= 1
     matrix2tex(mat);
 #endif
@@ -1805,7 +1807,7 @@ inspectRowWeight(sparse_mat_t *mat)
 }
 
 void
-merge(sparse_mat_t *mat, int nb_merge_max, int maxlevel)
+merge(sparse_mat_t *mat, int nb_merge_max, int maxlevel, int verbose)
 {
     long oldcost = -1, cost, ncost = 0;
     int old_nrows, old_ncols, m, mm, njrem = 0;
@@ -1835,7 +1837,7 @@ merge(sparse_mat_t *mat, int nb_merge_max, int maxlevel)
 	if(m == 1)
 	    njrem += removeSingletons(mat);
 	else
-	    njrem += mergeGe2(mat, m, nb_merge_max);
+            njrem += mergeGe2(mat, m, nb_merge_max, verbose);
 #if DEBUG >= 1
 	checkData(mat);
 #endif
@@ -1934,6 +1936,7 @@ main(int argc, char *argv[])
     char *purgedname = NULL, *hisname = NULL;
     int nb_merge_max = 0, nrows, ncols;
     int cwmax = 20, rwmax = 1000000, maxlevel = 2;
+    int verbose = 0; /* default verbose level */
     
 #if TEX
     fprintf(stderr, "\\begin{verbatim}\n");
@@ -1971,6 +1974,11 @@ main(int argc, char *argv[])
 	    argc -= 2;
 	    argv += 2;
 	}
+	else if (argc > 1 && strcmp (argv[1], "-v") == 0){
+            verbose ++;
+	    argc -= 1;
+	    argv += 1;
+	}
 	else 
 	    break;
     }
@@ -1999,7 +2007,7 @@ main(int argc, char *argv[])
     used = (char *)malloc(mat.nrows * sizeof(char));
     memset(used, 0, mat.nrows * sizeof(char));
 #endif
-    merge(&mat, nb_merge_max, maxlevel);
+    merge(&mat, nb_merge_max, maxlevel, verbose);
     fprintf(stderr, "Final matrix has w(M)=%d, ncols*w(M)=%ld\n",
 	    mat.weight, ((long)mat.rem_ncols) * ((long)mat.weight));
 #if TEX
