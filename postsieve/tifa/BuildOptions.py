@@ -112,9 +112,9 @@
 # Set to 'yes' to build the TIFA library and programs in an platform dependent
 # subdirectory of BUILDDIR.
 #
-# Default: 'yes'
+# Default: 'no'
 #-------------------------------------------------------------------------------
-BUILDDIR_DEPENDS_ON_PLATFORM = 'no'
+#BUILDDIR_DEPENDS_ON_PLATFORM = 'yes'
 
 #
 # Directory where the GMP library is installed. If left empty, SCons will
@@ -155,6 +155,35 @@ BUILDDIR_DEPENDS_ON_PLATFORM = 'no'
 #GMP_INTERNAL_INCDIR = '/home/username/include'
 
 #
+# Native C type used to represent a string of bits.
+#
+# Default: 'uint64_t'
+#-------------------------------------------------------------------------------
+#BITSTRING_T = 'unsigned long int'
+
+#-------------------------------------------------------------------------------
+#                  Misc. machine / architecture dependant options
+#-------------------------------------------------------------------------------
+
+#
+# Endianness of the processor. Accepted values: big, little, infer.
+# If set to 'infer' the endianness will be infered during the build process.
+# Be warned that this may fail.
+#
+# Default: infer
+#-------------------------------------------------------------------------------
+#ENDIANNESS = big
+
+#
+# Wordsize of the processor (in bits). If left empty or set to 'infer' the 
+# wordsize will be infered during the build process.
+# Be warned that this may fail.
+#
+# Default: '' (empty string)
+#-------------------------------------------------------------------------------
+#WORDSIZE = 64
+
+#
 # Use the calloc and memset functions to allocate and/or initialize integer
 # arrays to 0. Note that this works if and only if the binary representation
 # of the value 0 is indeed only made up by 0 bits. This is indeed the case
@@ -164,13 +193,6 @@ BUILDDIR_DEPENDS_ON_PLATFORM = 'no'
 # Default: 'yes'
 #-------------------------------------------------------------------------------
 #USE_CALLOC_MEMSET = 'no'
-
-#
-# Native C type used to represent a string of bits.
-#
-# Default: 'uint64_t'
-#-------------------------------------------------------------------------------
-#BITSTRING_T = 'unsigned long int'
 
 #-------------------------------------------------------------------------------
 #                               Verbosity options

@@ -242,7 +242,7 @@ opts.Add(
     BoolOption(
         'BUILDDIR_DEPENDS_ON_PLATFORM',
         "Set to 'yes' to build in platform dependent subdirectory of BUILDDIR",
-        1
+        0
     )
 )
 opts.Add(
