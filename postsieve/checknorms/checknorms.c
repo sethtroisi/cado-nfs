@@ -146,7 +146,6 @@ unsigned long factor(mpz_t p1, mpz_t p2, mpz_t norm, size_t lp) {
     if (IS_SQUARE(norm)) {
         //
         // _TO_DO_: Check that the rare case p1 == p2 doesn't destroy anything.
-        //          For the time being, we discard the relation to be safe.
         //
         WARNING("norm is a perfect square!\n");
         mpz_sqrt(p1, norm);
