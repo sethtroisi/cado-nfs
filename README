@@ -37,7 +37,7 @@ n:71641520761751435455133616475667090434063332228247871795429
 EOF
 
 ## POLYNOMIAL SELECTION STEP
-polyselect/polyselect -full -e 1000000 < $tmp/$name > $tmp/$name.poly
+polyselect/polyselect -full -e 1e6 < $tmp/$name > $tmp/$name.poly
 
 # creating factor base
 sieve/makefb -poly $tmp/$name.poly > $tmp/$name.roots
