@@ -559,7 +559,7 @@ main (int argc, char **argv)
     else
 	fic = extractFic(&nfic, &nrelmax, argv[2]);
     
-    fprintf(stderr, "initializing hash tables...\n");
+    fprintf(stderr, "initializing hash tables with nrelmax=%d...\n", nrelmax);
     hashInit(&H, nrelmax);
     hashInit(&Hab, nrelmax);
 
