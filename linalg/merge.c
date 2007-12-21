@@ -928,7 +928,7 @@ merge_m_slow(sparse_mat_t *mat, int m)
 	if(mat->wt[j] != m)
 	    continue;
 	njproc++;
-	if(!(njproc % 1000))
+	if(!(njproc % 10000))
 	    fprintf(stderr, "# %d columns of weight %d processed\n",njproc,m);
 	// we need to find the m rows and then
 	tt = cputime();
@@ -1651,7 +1651,7 @@ merge_m_fast(sparse_mat_t *mat, int m)
 	    break;
 	j = dcl->j;
 	njproc++;
-	if(!(njproc % 1000))
+	if(!(njproc % 10000))
 	    fprintf(stderr, "# %d columns of weight %d processed\n",njproc,m);
 #if DEBUG >= 1
 	fprintf(stderr, "Treating %d-th column %d of weight %d\n", njproc, j,

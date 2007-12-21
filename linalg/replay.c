@@ -139,7 +139,7 @@ makeSparse(int **sparsemat, int *colweight, FILE *purgedfile, int nrows, int nco
     fscanf(purgedfile, "%d %d", &i, &j); // skip first line; check?
     ind = 0;
     while(fscanf(purgedfile, "%d %d", &i, &nj) != EOF){
-	if(!(ind % 10000))
+	if(!(ind % 100000))
 	    fprintf(stderr, "Treating old rel #%d\n", ind);
 	// store primes in rel
 	if(nj > buf_len){
