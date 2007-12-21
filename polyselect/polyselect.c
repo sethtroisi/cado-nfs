@@ -304,8 +304,8 @@ special_val0 (mpz_t *f, int d, unsigned long p)
 {
   double v;
   mpz_t c, *g, *h;
-  int alloc, i, r, r0, nroots;
-  long *roots;
+  int alloc, i, r0, nroots;
+  LONG *roots, r;
 
   mpz_init (c);
   content_poly (c, f, d);
@@ -331,11 +331,9 @@ special_val0 (mpz_t *f, int d, unsigned long p)
       mpz_mul (h[i], g[i], c);
       mpz_mul_ui (c, c, p);
     }
-  /* naive loop to search for roots of g mod p.
-     FIXME: replace by a faster algorithm, by implementing Cantor-Zassenhaus */
-#if 1
+  /* Search for roots of g mod p */
   assert (d > 0);
-  roots = (long*) malloc (d * sizeof (long));
+  roots = (LONG*) malloc (d * sizeof (LONG));
   if (roots == NULL)
     {
       fprintf (stderr, "Error, not enough memory\n");
@@ -359,26 +357,6 @@ special_val0 (mpz_t *f, int d, unsigned long p)
 	}
     }
   free (roots);
-#else
-  for (r0 = r = 0; r < p; r++)
-    {
-      eval_poly_ui (c, g, d, r);
-      if (mpz_divisible_ui_p (c, p)) /* g(r) = 0 mod p */
-        {
-          eval_poly_diff_ui (c, g, d, r);
-          if (mpz_divisible_ui_p (c, p) == 0) /* g'(r) <> 0 mod p */
-            v += 1.0 / (double) (p - 1);
-          else /* hard case */
-            {
-              /* g(px+r) = h(x + r/p), thus we can go from h0(x)=g(px+r0)
-                 to h1(x)=g(px+r1) by computing h0(x + (r1-r0)/p) */
-              poly_shift_divp (h, d, r - r0, p);
-	      r0 = r;
-              v += special_val0 (h, d, p) / (double) p;
-            }
-        }
-    }
-#endif
   poly_clear (h, d);
 
   if (alloc != 0)
