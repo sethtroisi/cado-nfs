@@ -8,6 +8,8 @@ poly=$root.poly
 sqrt=sqrt/naive
 mag=$name.mag
 ndep=$ndepmin
+factors=$name.factors.mag
+echo "factors:=[];" > $factors
 while [ $ndep -lt $ndepmax ]
 do
   suf=`echo $ndep | awk '{printf("%03d\n", $1)}'`
@@ -27,15 +29,17 @@ magma > $fact << EOF
 load "$sqrt/jmc.mag";
 load "$sqrt/finish.mag";
 load "$mag";
-finish(f, m, N, "$rat", "$alg", "$algprod");
+load "$factors";
+finish(f, m, N, factors, "$rat", "$alg", "$algprod");
 quit;
 EOF
   cat $fact
-  res=`grep "PRIMEPRIME" $fact`
+  res=`grep "FINISHED" $fact`
   if [ "X$res" != "X" ]
   then
-      echo "Stopping, since we have two probable prime cofactors"
+      echo "Stopping, since we have probably finished"
       exit
   fi
   ndep=`expr $ndep '+' 1`
+  grep "FACTORS" $fact >> $factors
 done
