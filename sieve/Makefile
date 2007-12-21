@@ -1,19 +1,15 @@
 # Usage: make <target> 
 
 # Paths and anything specific to a host go in Makefile.local. It can specify
-# the full path/filename to the ECM libarary in ECMLIB, and full path to ECM 
-# header file in ECMINCLUDE. If not specified, defaults are derived by the
+# the full path/filename to the GMP library in GMPLIB, and full path to GMP
+# header file in GMPINCLUDE. If not specified, defaults are derived by the
 # variable assignments below.
-# Same thing for GMPLIB and GMPINCLUDE for the GMP library.
 
 include Makefile.local
 
 
 # Set default filenames/paths if not already set.
-ECM ?= /usr/local/
 GMP ?= /usr/local/
-ECMLIB ?= $(ECM)/lib/libecm.a
-ECMINCLUDE ?= $(ECM)/include/
 GMPLIB ?= $(GMP)/lib/libgmp.a
 GMPINCLUDE ?= $(GMP)/include/
 
@@ -21,7 +17,7 @@ OPTCFLAGS ?= -g -Wall -W
 CFLAGS=$(OPTCFLAGS) -fkeep-inline-functions -DREV=\"`svnversion .`\"
 LDFLAGS=
 
-all: sieve checknorms makefb
+all: sieve makefb
 
 
 Makefile.local:
@@ -31,9 +27,6 @@ Makefile.local:
 sieve: sieve.c fb.c ../utils/libutils.a config.h sieve_aux.h ../cado.h Makefile.local
 	gcc -I. -I.. -I$(GMPINCLUDE) $(CFLAGS) -o $@ -Wall -W sieve.c fb.c ../utils/libutils.a $(GMPLIB) -lm
 
-checknorms: checknorms.c Makefile.local
-	gcc -I. -I.. -I$(GMPINCLUDE) -I$(ECMINCLUDE) $(CFLAGS) -o $@ $< ../utils/libutils.a $(ECMLIB) $(GMPLIB) -lm
-
 makefb: makefb.c Makefile.local
 	gcc -I. -I.. -I$(GMPINCLUDE) $(CFLAGS) -o $@ $< ../utils/libutils.a $(GMPLIB) -lm
 
@@ -41,4 +34,4 @@ config.h: config_h.in
 	cp config_h.in config.h
 
 clean:
-	rm -f sieve checknorms makefb
+	rm -f sieve makefb
