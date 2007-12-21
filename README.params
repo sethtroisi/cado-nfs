@@ -1,12 +1,32 @@
 These parameters are experimental and were *used* as input for
-merge_linagl_sqrt. They are not supposed nor proven to be optimal.
+merge_linalg_sqrt (timings on a 2.4Ghz Opteron, *** indicates the best
+parameters):
 
-	mergelevel	cwmax	rwmax		comment
-F7	10		15	 50		F7
-c72	20		30	100
-c85a	20		40	 50		pic94
+	mergelevel	cwmax	rwmax  merge  matrix-size  gauss merge+gauss
+F7	10		15	 50    comment: F7
+
+c72      8              30      100    20s    30125x29997   390s 410s
+c72      9              30      100    26s    28849x28721   359s 385s
+c72     10              30      100    33s    27819x27691   338s 371s ***
+c72     11              30      100    41s    28964x28836   374s 415s
+c72     15              30      100    96s    30201x30073   401s 497s
+c72	20		30	100   205s    28836x28708   359s 564s
+
+c80      5              40      100    7s     48771x48643  1083s 1090s
+c80      6              40      100    7s     45114x44986  1005s 1012s
+c80      7              40      100    9s     42576x42448   869s  878s
+c80      8              40      100    9s     40605x40477   887s  896s
+c80      9              40      100   10s     39002x38874   762s  772s ***
+c80     10              40      100   11s     37697x37569   791s  802s
+c80     11              40      100   12s     36670x36542   779s  791s
+c80     20              40      100   12s     36670x36542   781s  793s
+
+c85a	20		40	 50   comment: pic94
+
 c90	20		40	100
+
 c95	20		40	 80
+
 rsa100	20		40	150/200	
 
 For new parameters, some fiddling is needed, with respect to the final
