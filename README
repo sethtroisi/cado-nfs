@@ -5,16 +5,15 @@ Required software tools:
 *) ECM (http://gforge.inria.fr/projects/ecm/)
 *) Magma (http://magma.maths.usyd.edu.au/magma/)
 
-[Optional: configure]
+[Configure]
 =====================
 
-cat <<EOF > Makefile.local
-GMP=/usr
-GMPLIB=-lgmp
-GMPINCLUDE=/usr/include
+cp Makefile.local.example Makefile.local
+Edit according to your local settings and your taste
 
-ECM=/users/spaces/logiciels/ecm-6.1.2/x86_64
-EOF
+You can have specific Makefile.local in each subdir, if you want.
+Otherwise a link to your main Makefile.local is automatically created
+during compilation.
 
 Compile:
 =======

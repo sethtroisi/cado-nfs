@@ -4,10 +4,12 @@ include Makefile.local
 GMP ?= /usr/local/
 GMPLIB ?= $(GMP)/lib/libgmp.a
 GMPINCLUDE ?= $(GMP)/include/
+OPTCFLAGS ?= -g -Wall
 
 SVNVER:=$(shell svnversion .)
-CFLAGS=-g -Wall -DREV=\"$(SVNVER)\" # -O2 
-LDFLAGS=../utils/libutils.a $(GMPLIB) -lm # -lefence
+CFLAGS=$(OPTCFLAGS) -DREV=\"$(SVNVER)\"
+
+LDFLAGS=../utils/libutils.a $(GMPLIB) -lm
 INC=-I $(GMPINCLUDE) -I.. -I../utils
 
 binaries:=allsqrt replay merge purge freerel procrels linalg	\
@@ -16,9 +18,7 @@ binaries:=allsqrt replay merge purge freerel procrels linalg	\
 all:	$(binaries)
 
 Makefile.local:
-	@echo "Makefile.local does not exist. It can be used to store paths \
-	to libraries etc.  Making an empty file to avoid warnings in \
-	future invocations of make."
+	@echo "Makefile.local does not exist. Making a link to parent dir's one."
 	ln -s ../Makefile.local
 
 procrels: procrels.c ../utils/libutils.a

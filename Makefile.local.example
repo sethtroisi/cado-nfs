@@ -1,0 +1,7 @@
+GMP=/usr
+GMPLIB=-lgmp
+GMPINCLUDE=/usr/include
+
+ECM=/users/cacao/logiciels/ecm-6.1.2/x86_64
+
+OPTCFLAGS=-g -Wall -W

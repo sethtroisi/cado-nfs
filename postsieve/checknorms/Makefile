@@ -40,11 +40,10 @@ INCFLAGS ?= -I. -I.. -I../.. -I$(GMPINCLUDE) $(TIFAINCFLAGS) -I$(UTILSINCLUDE)
 
 all: checknorms
 
+
 Makefile.local:
-	echo "Makefile.local does not exist. It can be used to store paths" \
-	"to libraries etc.  Making an empty file to avoid warnings in" \
-	"future invocations of make."
-	touch Makefile.local
+	@echo "Makefile.local does not exist. Making a link to parent dir's one."
+	ln -s ../../Makefile.local .
 
 checknorms: checknorms.c Makefile.local
 	gcc $(INCFLAGS) $(CFLAGS) -o $@ $< $(UTILSLIB) $(TIFALIB) $(GMPLIB) $(LDFLAGS)

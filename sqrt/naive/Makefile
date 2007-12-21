@@ -5,17 +5,17 @@ GMP ?= /usr/local/
 GMPLIB ?= $(GMP)/lib/libgmp.a
 GMPINCLUDE ?= $(GMP)/include/
 
+OPTCFLAGS ?= -g -Wall
 
-CFLAGS=-g -Wall -I $(GMPINCLUDE) -DREV=\"`svnversion .`\"
+CFLAGS=$(OPTCFLAGS) -I $(GMPINCLUDE) -DREV=\"`svnversion .`\"
+
 LDFLAGS=../../utils/libutils.a $(GMPLIB)
 
 all: fmalgsqrt
 
 Makefile.local:
-	echo "Makefile.local does not exist. It can be used to store paths \
-	to libraries etc.  Making an empty file to avoid warnings in \
-	future invocations of make."
-	touch Makefile.local
+	@echo "Makefile.local does not exist. Making a link to parent dir's one."
+	ln -s ../../Makefile.local .
 
 .c.o:
 	gcc $(CFLAGS) -I../.. -o $@ -c $<

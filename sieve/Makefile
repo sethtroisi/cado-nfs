@@ -8,9 +8,6 @@
 
 include Makefile.local
 
-OPTFLAGS ?= -O2
-CFLAGS=$(OPTFLAGS) -g -fkeep-inline-functions -Wall -W -DREV=\"`svnversion .`\"
-LDFLAGS=
 
 # Set default filenames/paths if not already set.
 ECM ?= /usr/local/
@@ -20,13 +17,16 @@ ECMINCLUDE ?= $(ECM)/include/
 GMPLIB ?= $(GMP)/lib/libgmp.a
 GMPINCLUDE ?= $(GMP)/include/
 
+OPTCFLAGS ?= -g -Wall -W
+CFLAGS=$(OPTCFLAGS) -fkeep-inline-functions -DREV=\"`svnversion .`\"
+LDFLAGS=
+
 all: sieve checknorms makefb
 
+
 Makefile.local:
-	echo "Makefile.local does not exist. It can be used to store paths" \
-	"to libraries etc.  Making an empty file to avoid warnings in" \
-	"future invocations of make."
-	touch Makefile.local
+	echo "Makefile.local does not exist. Making a link to parent dir's one."
+	ln -s ../Makefile.local .
 
 sieve: sieve.c fb.c ../utils/libutils.a config.h sieve_aux.h ../cado.h Makefile.local
 	gcc -I. -I.. -I$(GMPINCLUDE) $(CFLAGS) -o $@ -Wall -W sieve.c fb.c ../utils/libutils.a $(GMPLIB) -lm

@@ -1,7 +1,7 @@
 # Set default filenames/paths if not already set.
 GMP ?= /usr/local/
 GMPINCLUDE ?= $(GMP)/include/
-CFLAGS=-g -O2 -W -Wall
+CFLAGS ?= -g -O2 -W -Wall
 
 targets:=convert_poly convert_rels
 
