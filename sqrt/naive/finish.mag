@@ -87,7 +87,42 @@ function FromF(F)
 	return ff, lgff1;
 end function;
 
-function finish(f, m, N, ratfile, algfile, algprod)
+// A little better?
+function cleanFactors(factors, N, f)
+	for i:=1 to #factors do
+	    if factors[i] eq f then return false; end if;
+	end for;
+	// at this point, f is new
+	C:=N;
+	for i:=1 to #factors do
+	    if (C mod factors[i]) eq 0 then
+		C:=C div factors[i];
+	    end if;
+	end for;
+	if C eq f then
+	    printf "FINISHED:";
+	    for i:=1 to #factors do
+		printf " %o", factors[i];
+	    end for;
+	    printf " %o\n", f;
+	else
+	    if (C mod f) ne 0 then error("C not divisible by f"); end if;
+	    C:=C div f;
+	    if IsProbablePrime(C) then
+		printf "FINISHED:";
+		for i:=1 to #factors do
+                    printf " %o", factors[i];
+                end for;
+                printf " %o %o\n", f, C;
+	    end if;
+	end if;
+	return true;
+end function;
+
+// factors contains the prime(?) factors already found.
+function finish(f, m, N, factors, ratfile, algfile, algprod)
+
+printf "Prime factors already found: %o\n", factors;
 
 if false then
   if (Degree(f) mod 2) eq 1 then
@@ -148,16 +183,27 @@ end if;
 g1 := GCD(Integers()!(gra-grr), N);
 g2 := GCD(Integers()!(gra+grr), N);
 
+nf:=#factors;
 if IsProbablePrime(g1) then
     res:="PRIME";
+    if cleanFactors(factors, N, g1) then
+	nf:=nf+1;
+	printf "factors[%o]:=%o; // FACTORS\n", nf, g1;
+    end if;
 else
     res:="COMPOSITE";
 end if;
 if IsProbablePrime(g2) then
     res:=res * "PRIME";
+    if cleanFactors(factors, N, g2) then
+        nf:=nf+1;
+ 	printf "factors[%o]:=%o; // FACTORS\n", nf, g2;
+    end if;
 else
     res:=res * "COMPOSITE";
 end if;
+
+if res eq "PRIMEPRIME" then res:="FINISHED"; end if;
 
 print res;
 
