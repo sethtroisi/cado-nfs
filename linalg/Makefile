@@ -9,7 +9,7 @@ OPTCFLAGS ?= -g -Wall
 SVNVER:=$(shell svnversion .)
 CFLAGS=$(OPTCFLAGS) -DREV=\"$(SVNVER)\"
 
-LDFLAGS=../utils/libutils.a $(GMPLIB) -lm
+LDFLAGS=../utils/libutils.a $(GMPLIB) -lm# -lefence
 INC=-I $(GMPINCLUDE) -I.. -I../utils
 
 binaries:=allsqrt replay merge purge freerel procrels linalg	\
@@ -24,8 +24,11 @@ Makefile.local:
 procrels: procrels.c ../utils/libutils.a
 	gcc $(CFLAGS) $(INC) $< $(LDFLAGS) -o $@
 
-hashpair: hashpair.c
+hashpair: hashpair.c hashpair.h
 	gcc $(CFLAGS) $(INC) $< $(LDFLAGS) -o $@
+
+prune.o: prune.c prune.h
+	gcc -c $(CFLAGS) $(INC) $< -o $@
 
 freerel: freerel.c ../utils/libutils.a ../sieve/fb.o
 	gcc $(CFLAGS) $(INC) $< ../sieve/fb.o $(LDFLAGS) -o $@
@@ -33,8 +36,8 @@ freerel: freerel.c ../utils/libutils.a ../sieve/fb.o
 purge: purge.c ../utils/libutils.a hashpair.o files.o
 	gcc $(CFLAGS) $(INC) $< hashpair.o files.o $(LDFLAGS) -o $@
 
-merge: merge.c ../utils/libutils.a sparse.o
-	gcc $(CFLAGS) $(INC) $< sparse.o $(LDFLAGS) -o $@
+merge: merge.c ../utils/libutils.a sparse.o prune.o
+	gcc $(CFLAGS) $(INC) $< sparse.o prune.o $(LDFLAGS) -o $@
 
 replay: replay.c ../utils/libutils.a sparse.o
 	gcc $(CFLAGS) $(INC) $< sparse.o $(LDFLAGS) -o $@

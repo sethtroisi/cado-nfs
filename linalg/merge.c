@@ -19,24 +19,14 @@
 
 #include "utils/utils.h"
 #include "sparse.h"
+#include "merge.h"
+#include "prune.h"
 
 #define DEBUG 0
 #define TEX 0
 
 #define TRACE_COL -1 // 231 // put to -1 if not...!
 #define TRACE_ROW -1 // 30530 // put to -1 if not...!
-
-#define USE_TAB 1 // 1 for compact rows...
-
-#if USE_TAB == 0
-#define isRowNull(mat, i) ((mat)->data[(i)].val == NULL)
-#define lengthRow(mat, i) (mat)->data[(i)].len
-#define cell(mat, i, k) (mat)->data[(i)].val[(k)]
-#else
-#define isRowNull(mat, i) ((mat)->rows[(i)] == NULL)
-#define lengthRow(mat, i) (mat)->rows[(i)][0]
-#define cell(mat, i, k) (mat)->rows[(i)][(k)]
-#endif
 
 #define USE_USED 0
 #if USE_USED >= 1
@@ -60,32 +50,6 @@ typedef struct {
   int *val;   /* array of size len containing column indices of non-zero
                  entries */
 } rel_t;
-
-// doubly chained lists
-typedef struct dclist{
-    int j;
-    struct dclist *prev, *next;
-} *dclist;
-
-typedef struct {
-  int nrows;
-  int ncols;
-  int rem_nrows;     /* number of remaining rows */
-  int rem_ncols;     /* number of remaining columns */
-#if USE_TAB == 0
-  rel_t *data;
-#else
-  int **rows;
-#endif
-  int *wt; /* weight of prime j, <= 1 for a deleted prime */
-  int weight;
-  int cwmax;         /* bound on weight of j to enter the SWAR structure */
-  int rwmax;         /* if a weight(row) > rwmax, kill that row */
-  int delta;         /* bound for nrows-ncols */
-  int mergelevelmax; /* says it */
-  dclist *S, *A;
-  int **R;
-} sparse_mat_t;
 
 static int 
 cmp(const void *p, const void *q) {
@@ -1813,7 +1777,6 @@ merge(sparse_mat_t *mat, int nb_merge_max, int maxlevel, int verbose)
     long oldcost = -1, cost, ncost = 0;
     int old_nrows, old_ncols, m, mm, njrem = 0;
 
-    report2(mat->nrows, mat->ncols);
     m = 2;
     while(1){
 	cost = ((long)mat->rem_ncols) * ((long)mat->weight);
@@ -2008,6 +1971,11 @@ main(int argc, char *argv[])
     used = (char *)malloc(mat.nrows * sizeof(char));
     memset(used, 0, mat.nrows * sizeof(char));
 #endif
+
+    report2(mat.nrows, mat.ncols);
+
+    //    prune(&mat, 128);
+
     merge(&mat, nb_merge_max, maxlevel, verbose);
     fprintf(stderr, "Final matrix has w(M)=%d, ncols*w(M)=%ld\n",
 	    mat.weight, ((long)mat.rem_ncols) * ((long)mat.weight));

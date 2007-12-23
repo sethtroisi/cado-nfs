@@ -13,7 +13,7 @@
 #include <assert.h>
 #include <string.h>
 
-#define WANT_ASSERT
+//#define WANT_ASSERT
 
 #include "cado.h"
 
