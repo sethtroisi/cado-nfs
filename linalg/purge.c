@@ -7,20 +7,23 @@
  *
  */
 
-
-#include "cado.h"
 #include <gmp.h>
 #include "mod_ul.c"
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <math.h>
+#include <string.h>
+
+#define WANT_ASSERT
+
 #include "utils/utils.h"
+
 #include "hashpair.h"
 #include "files.h"
 
-#include <string.h>
-
 #define DEBUG 1
+#define USE_HAB 1
 
 // Data structure for one algebraic prime and for a table of those.
 typedef struct {
@@ -259,7 +262,7 @@ reduce_exponents_mod2 (relation_t *rel)
 }
 
 void
-insertNormalRelation(int **rel_compact, int irel, int *nprimes, tab_prime_t *bad_primes, hashtable_t *H, relation_t *rel)
+insertNormalRelation(int **rel_compact, int irel, int *nprimes, tab_prime_t *bad_primes, hashtable_t *H, relation_t *rel, unsigned long rlim, unsigned long alim)
 {
     int *tmp, itmp, j, h;
 
@@ -268,6 +271,10 @@ insertNormalRelation(int **rel_compact, int irel, int *nprimes, tab_prime_t *bad
     tmp = (int *)malloc((rel->nb_rp + rel->nb_ap + 1) * sizeof(int));
     itmp = 0;
     for(j = 0; j < rel->nb_rp; j++){
+#if 0
+	if(rel->rp[j].p <= rlim)
+	    continue;
+#endif
 	h = hashInsert(H, rel->rp[j].p, -2);
 	tmp[itmp++] = h;
 	if(H->hashcount[h] == 1)
@@ -275,6 +282,10 @@ insertNormalRelation(int **rel_compact, int irel, int *nprimes, tab_prime_t *bad
 	    *nprimes += 1;
 	}
     for(j = 0; j < rel->nb_ap; j++){
+#if 0
+	if(rel->ap[j].p <= alim)
+	    continue;
+#endif
 	h = hashInsert(H, rel->ap[j].p, rel->ap[j].r);
 	tmp[itmp++] = h;
 	if(H->hashcount[h] == 1){
@@ -324,7 +335,7 @@ insertFreeRelation(int **rel_compact, int irel, int *nprimes, hashtable_t *H, re
 }
 
 // nrel can decrease, for instance in case of duplicate rows.
-int scan_relations_from_file(int *irel, int *nrel, char *rel_used, int **rel_compact, int *nprimes, tab_prime_t *bad_primes, hashtable_t *H, hashtable_t *Hab, FILE *file)
+int scan_relations_from_file(int *irel, int *nrel, char *rel_used, int **rel_compact, int *nprimes, tab_prime_t *bad_primes, hashtable_t *H, hashtable_t *Hab, FILE *file, unsigned long rlim, unsigned long alim)
 {
     relation_t rel;
     int ret, hab;
@@ -336,6 +347,7 @@ int scan_relations_from_file(int *irel, int *nrel, char *rel_used, int **rel_com
 	*irel += 1;
 	if(!(*irel % 100000))
 	    fprintf(stderr, "nrel = %d at %2.2lf\n", *irel, seconds());
+#if USE_HAB == 1
 	hab = hashInsert(Hab, rel.a, rel.b);
 	if(Hab->hashcount[hab] > 1){
 	    fprintf(stderr,"(%ld, %ld) appears more than once?\n",rel.a,rel.b);
@@ -344,18 +356,21 @@ int scan_relations_from_file(int *irel, int *nrel, char *rel_used, int **rel_com
 	    *nrel -= 1;
 	    continue;
 	}
+#endif
 	rel_used[*irel] = 1;
 	if(rel.b > 0)
-	    insertNormalRelation(rel_compact,*irel,nprimes,bad_primes,H,&rel);
+	    insertNormalRelation(rel_compact,*irel,nprimes,bad_primes,H,&rel,rlim,alim);
+#if 1 // do not insert free relation, since it cannot be large...!
 	else
 	    insertFreeRelation(rel_compact, *irel, nprimes, H, &rel);
+#endif
     }
     return ret;
 }
 
 // Read all relations from file.
 int
-scan_relations(char *ficname[], int nbfic, int *nrel, int *nprimes, tab_prime_t *bad_primes, hashtable_t *H, hashtable_t *Hab, char *rel_used, int **rel_compact)
+scan_relations(char *ficname[], int nbfic, int *nrel, int *nprimes, tab_prime_t *bad_primes, hashtable_t *H, hashtable_t *Hab, char *rel_used, int **rel_compact, unsigned long rlim, unsigned long alim)
 {
     FILE *relfile;
     int ret, i, irel = -1;
@@ -369,7 +384,7 @@ scan_relations(char *ficname[], int nbfic, int *nrel, int *nprimes, tab_prime_t 
 	    exit(1);
 	}
 	fprintf(stderr, "Adding file %s\n", ficname[i]);
-	ret = scan_relations_from_file(&irel, nrel, rel_used, rel_compact, nprimes, bad_primes, H, Hab, relfile);
+	ret = scan_relations_from_file(&irel, nrel, rel_used, rel_compact, nprimes, bad_primes, H, Hab, relfile, rlim, alim);
 	if (ret == 0) {
 	    fprintf(stderr, "Warning: error when reading file %s\n", ficname[i]);
 	    break;
@@ -536,7 +551,8 @@ main (int argc, char **argv)
     char *rel_used;
     int **rel_compact;
     int ret;
-    int i, nrelmax, nrel, nprimes, nrel_new, nprimes_new;
+    int i, nrelmax, nrel, nprimes, nrel_new, nprimes_new, Hsize;
+    cado_poly pol;
     
     fprintf (stderr, "%s revision %s\n", argv[0], REV);
     
@@ -545,23 +561,31 @@ main (int argc, char **argv)
 	fprintf(stderr, "  stdin input is not yet available, sorry.\n");
 	exit(1);
     } 
-    if (argc < 3) {
-	fprintf(stderr, "usage: %s nrel file1 ... filen\n", argv[0]);
+    if (argc < 4) {
+	fprintf(stderr, "usage: %s poly nrel file1 ... filen\n", argv[0]);
 	fprintf(stderr, "  if no filename is given, takes input on stdin\n");
 	exit(1);
     }
-    nrelmax = atoi(argv[1]);
+    read_polynomial(pol, argv[1]);
+
+    // estimating the number of primes
+    Hsize = (1<<pol[0].lpbr)/((int)(pol[0].lpbr * log(2.0)));
+    Hsize += (1<<pol[0].lpba)/((int)(pol[0].lpba * log(2.0)));
+
+    nrelmax = atoi(argv[2]);
 
     if(nrelmax > 0){
-	fic = argv+2;
-	nfic = argc-2;
+	fic = argv+3;
+	nfic = argc-3;
     }
     else
-	fic = extractFic(&nfic, &nrelmax, argv[2]);
+	fic = extractFic(&nfic, &nrelmax, argv[3]);
     
-    fprintf(stderr, "initializing hash tables with nrelmax=%d...\n", nrelmax);
-    hashInit(&H, nrelmax);
-    hashInit(&Hab, nrelmax);
+    fprintf(stderr, "initializing hash tables with Hsize=%d...\n", Hsize);
+    hashInit(&H, Hsize);
+#if USE_HAB == 1
+    hashInit(&Hab, Hsize);
+#endif
 
     rel_used = (char *)malloc(nrelmax * sizeof(char));
     rel_compact = (int **)malloc(nrelmax * sizeof(int *));
@@ -572,10 +596,10 @@ main (int argc, char **argv)
 
     fprintf(stderr, "reading file of relations...\n");
     nrel = nrelmax;
-    ret = scan_relations(fic, nfic, &nrel, &nprimes, &bad_primes, &H, &Hab, rel_used, rel_compact);
+    ret = scan_relations(fic, nfic, &nrel, &nprimes, &bad_primes, &H, &Hab, rel_used, rel_compact, pol[0].rlim, pol[0].alim);
     assert (ret);
     
-    fprintf(stderr, "nrel(useful)=%d, nprimes=%d\n", nrel, nprimes);
+    fprintf(stderr, "nrel(useful)=%d, nprimes=%d (%d)\n",nrel,nprimes,Hsize);
     
 #if DEBUG >= 2
     for(i = 0; i < hashmod; i++)

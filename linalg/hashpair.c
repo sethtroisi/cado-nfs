@@ -18,10 +18,11 @@ hashClear(hashtable_t *H)
 void
 hashInit(hashtable_t *H, int n)
 {
-    int ntab = 10, i;
+    int ntab = 13, i;
     unsigned long tab[] = {500009, 750019, 1000003, 
 			   5000011, 7500013, 10000019, 
-			   50000017, 100000007,
+			   50000017, 
+			   100000007, 200000033, 300000007, 400000009,
 			   500000003, 1000000007};
 
     n = (3*n)/2;
@@ -51,10 +52,10 @@ int
 getHashAddr(hashtable_t *H, long p, unsigned long r)
 {
     unsigned long tmp = HC0 * ((unsigned long)p) + HC1 * r;
-    int h = (int)(tmp % H->hashmod);
-#if DEBUG >= 1
-    int cpt = 0;
-#endif
+    static int cptmax = 0;
+    int h, h0;
+
+    h = h0 = (int)(tmp % H->hashmod);
 #if DEBUG >= 2
     printf("H(%ld, %lu) = %d\n", p, r, h);
 #endif
@@ -66,16 +67,17 @@ getHashAddr(hashtable_t *H, long p, unsigned long r)
 	    // (p, r) already known
 	    break;
 	h++;
-#if DEBUG >= 1
-	cpt++;
-#endif
 	if(h >= H->hashmod)
 	    h = 0;
     }
 #if DEBUG >= 1
-    if(cpt >= 5)
-	printf("#W# cpt = %d >= 5\n", cpt);
-#endif    
+    if((h-h0) >= 50)
+	printf("#W# cpt = %d >= 50\n", h-h0);
+#endif
+    if((h-h0) >= cptmax){
+	cptmax = h-h0;
+	if(cptmax > 100) fprintf(stderr, "HASH: cptmax = %d\n", cptmax);
+    }
     return h;
 }
 
