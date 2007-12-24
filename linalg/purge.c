@@ -551,7 +551,7 @@ main (int argc, char **argv)
     char *rel_used;
     int **rel_compact;
     int ret;
-    int i, nrelmax, nrel, nprimes, nrel_new, nprimes_new, Hsize;
+    int i, nrelmax, nrel, nprimes, nrel_new, nprimes_new, Hsize,Hsizer,Hsizea;
     cado_poly pol;
     
     fprintf (stderr, "%s revision %s\n", argv[0], REV);
@@ -569,8 +569,9 @@ main (int argc, char **argv)
     read_polynomial(pol, argv[1]);
 
     // estimating the number of primes
-    Hsize = (1<<pol[0].lpbr)/((int)(pol[0].lpbr * log(2.0)));
-    Hsize += (1<<pol[0].lpba)/((int)(pol[0].lpba * log(2.0)));
+    Hsizer = (1<<pol[0].lpbr)/((int)(pol[0].lpbr * log(2.0)));
+    Hsizea = (1<<pol[0].lpba)/((int)(pol[0].lpba * log(2.0)));
+    Hsize = (Hsizer > Hsizea ? Hsizer : Hsizea);
 
     nrelmax = atoi(argv[2]);
 
