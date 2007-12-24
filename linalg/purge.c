@@ -335,7 +335,7 @@ int scan_relations_from_file(int *irel, int *nrel, char *rel_used, int **rel_com
 	    break;
 	*irel += 1;
 	if(!(*irel % 100000))
-	    fprintf(stderr, "irel = %d\n", *irel);
+	    fprintf(stderr, "nrel = %d at %2.2lf\n", *irel, seconds());
 	hab = hashInsert(Hab, rel.a, rel.b);
 	if(Hab->hashcount[hab] > 1){
 	    fprintf(stderr,"(%ld, %ld) appears more than once?\n",rel.a,rel.b);
@@ -507,7 +507,7 @@ reread(char *ficname[], int nbfic, tab_prime_t bad_primes, hashtable_t *H, char 
 	    if(ret == 1){
 		irel++;
 		if(!(irel % 100000))
-		    fprintf(stderr, "irel = %d\n", irel);
+		    fprintf(stderr, "nrel = %d at %2.2lf\n", irel, seconds());
 		if(rel_used[irel]){
 		    if(rel.b > 0){
 			reduce_exponents_mod2 (&rel);

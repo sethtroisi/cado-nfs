@@ -24,6 +24,7 @@ hashInit(hashtable_t *H, int n)
 			   50000017, 100000007,
 			   500000003, 1000000007};
 
+    n = (3*n)/2;
     for(i = 0; i < ntab; i++)
 	if(n < tab[i]){
 	    H->hashmod = tab[i];

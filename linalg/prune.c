@@ -222,7 +222,7 @@ prune(sparse_mat_t *mat, int keep)
 	    delete(i, nodes, mat);
 	    // humf!
 	    deleteAllColsFromStack(mat, 0);
-#if DEBUG >= 1
+#if DEBUG >= 0
 	    fprintf(stderr,"Removed component %d with %d nodes and %d edges\n",
 		    i, old_nrows - mat->rem_nrows,
 		    old_ncols - mat->rem_ncols);

@@ -1743,10 +1743,10 @@ minColWeight(sparse_mat_t *mat)
 #endif
 }
 
-void
+int
 inspectRowWeight(sparse_mat_t *mat)
 {
-    int i, maxw = 0;
+    int i, maxw = 0, nirem = 0;
 
     for(i = 0; i < mat->nrows; i++){
 	if(!isRowNull(mat, i)){
@@ -1762,18 +1762,22 @@ inspectRowWeight(sparse_mat_t *mat)
 				i, lengthRow(mat, i));
 #endif
 		    removeRowDefinitely(mat, i);
+		    nirem++;
 		}
 	    }
 	    if(!isRowNull(mat, i) && (lengthRow(mat, i) > maxw))
 		maxw = lengthRow(mat, i);
 	}
     }
-    fprintf(stderr, "nrows=%d; max row weight is %d\n", mat->rem_nrows, maxw);
+    fprintf(stderr, "nirem=%d; nrows=%d; max row weight is %d\n", 
+	    nirem, mat->rem_nrows, maxw);
+    return nirem;
 }
 
 void
 merge(sparse_mat_t *mat, int nb_merge_max, int maxlevel, int verbose)
 {
+    double tt;
     long oldcost = -1, cost, ncost = 0;
     int old_nrows, old_ncols, m, mm, njrem = 0;
 
@@ -1818,7 +1822,9 @@ merge(sparse_mat_t *mat, int nb_merge_max, int maxlevel, int verbose)
 	fprintf(stderr, "=> nrows=%d ncols=%d (%d) njrem=%d\n",
 		mat->rem_nrows, mat->rem_ncols, 
 		mat->rem_nrows - mat->rem_ncols, njrem);
+	tt = seconds();
 	inspectRowWeight(mat);
+	fprintf(stderr, "inspectRowWeight: %2.2lf\n", seconds()-tt);
 	deleteAllColsFromStack(mat, 0);
 	mm = minColWeight(mat);
 	fprintf(stderr, "Min col weight = %d\n", mm);
@@ -1974,7 +1980,9 @@ main(int argc, char *argv[])
 
     report2(mat.nrows, mat.ncols);
 
-    //    prune(&mat, 128);
+#if 0 // not convincing yet!
+    prune(&mat, (mat.nrows-mat.ncols)/4);
+#endif
 
     merge(&mat, nb_merge_max, maxlevel, verbose);
     fprintf(stderr, "Final matrix has w(M)=%d, ncols*w(M)=%ld\n",
