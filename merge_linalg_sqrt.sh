@@ -1,7 +1,7 @@
 #!/bin/sh -
 # We assume that a directory $name exists
 #
-# Typical use: ./merge_linalg_sqrt.sh Examples/c20/c20 5 10 100
+# Typical use: ./merge_linalg_sqrt.sh Examples/c20/c20 5 10 100 [v]
 #
 linalg=linalg
 sqrt=sqrt/naive
@@ -13,6 +13,9 @@ if [ $# -ge 2 ]; then maxlevel=$2; fi
 if [ $# -ge 3 ]; then cwmax=$3; fi
 if [ $# -ge 4 ]; then rwmax=$4; fi
 name=$root.$maxlevel"x"$cwmax"x"$rwmax
+if [ $# -ge 5 ]; then verbose="-v"; fi
+
+echo "Args: $0"
 
 rels=$root.rels; nrels=`wc -l $rels | awk '{print $1}'`
 poly=$root.poly
@@ -22,7 +25,7 @@ if [ -s $purged ]
 then
   echo "File $purged already exists"
 else
-  time $linalg/purge $nrels $rels > $purged
+  time $linalg/purge $poly $nrels $rels > $purged
   if [ ! -s $purged ]; then echo "zero file $purged"; exit; fi
   excess=`head -1 $purged | awk '{nrows=$1; ncols=$2; print (nrows-ncols)}'`
   echo "excess = $excess"
@@ -38,14 +41,14 @@ echo "Performing merges"
 
 nb_merge_max=1000000
 argsa="-merge $nb_merge_max -mat $purged"
-argsa="$argsa -maxlevel $maxlevel -cwmax $cwmax -rwmax $rwmax"
+argsa="$argsa -maxlevel $maxlevel -cwmax $cwmax -rwmax $rwmax $verbose"
 time $linalg/merge $argsa > $name.merge.his # 2> $name.merge.err
 echo "SIZE(merge.his): `ls -s $name.merge.his`"
 
 echo "Replaying merges"
 
 argsr="$purged $name.merge.his $name.small $name.index"
-time $linalg/replay $argsr # 2> $name.replay.err
+time $linalg/replay $argsr $verbose # 2> $name.replay.err
 echo "SIZE(index): `ls -s $name.index`"
 
 echo "Performing the linear algebra phase"
