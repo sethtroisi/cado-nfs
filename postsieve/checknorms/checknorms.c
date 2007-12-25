@@ -110,6 +110,7 @@ unsigned long factor(mpz_t p1, mpz_t p2, mpz_t norm, size_t lp) {
     //
     static unsigned long count_too_large_norm  = 0;
     static unsigned long count_no_factor_found = 0;
+    static unsigned long count_perfect_square  = 0;
 
     unsigned long sn = BITSIZE(norm);
 
@@ -147,7 +148,9 @@ unsigned long factor(mpz_t p1, mpz_t p2, mpz_t norm, size_t lp) {
         //
         // _TO_DO_: Check that the rare case p1 == p2 doesn't destroy anything.
         //
-        WARNING("norm is a perfect square!\n");
+        count_perfect_square ++;
+        if (count_perfect_square < MAXNMSG)
+          WARNING("norm is a perfect square!\n");
         mpz_sqrt(p1, norm);
         if (IS_PRIME(p1)) {
             mpz_set(p2, p1);
@@ -548,7 +551,7 @@ unsigned long checkrels(char *f, cado_poly cpoly, int verbose,
             break;
         }
         nrels_out++;
-        if(!(nrels_out & 1023)) {
+        if(verbose && !(nrels_out & 1023)) {
             MSG("%lu-th relation found\t\t(%lu read)\n",
                 nrels_out, nrels_in);
         }

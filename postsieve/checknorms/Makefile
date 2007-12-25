@@ -45,7 +45,7 @@ Makefile.local:
 	@echo "Makefile.local does not exist. Making a link to parent dir's one."
 	ln -s ../../Makefile.local .
 
-checknorms: checknorms.c Makefile.local
+checknorms: checknorms.c Makefile.local $(TIFALIB)
 	gcc $(INCFLAGS) $(CFLAGS) -o $@ $< $(UTILSLIB) $(TIFALIB) $(GMPLIB) $(LDFLAGS)
 
 config.h: config_h.in
