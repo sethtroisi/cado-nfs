@@ -210,7 +210,7 @@
 #
 # Default: 'yes'
 #-------------------------------------------------------------------------------
-#ALLOW_VERBOSE = 'no'
+ALLOW_VERBOSE = 'no'
 
 #
 # Set to 'yes' to turn on output messages for the cfrac function.
@@ -262,7 +262,7 @@
 #
 # Default: 'yes'
 #-------------------------------------------------------------------------------
-#ALLOW_TIMING = 'no'
+ALLOW_TIMING = 'no'
 
 #
 # Set to 'yes' to turn on timing messages for the cfrac function.
