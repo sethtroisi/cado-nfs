@@ -25,7 +25,7 @@ if [ -s $purged ]
 then
   echo "File $purged already exists"
 else
-  time $linalg/purge $poly $nrels $rels > $purged
+  time $linalg/purge -final -poly $poly -nrels $nrels $rels > $purged
   if [ ! -s $purged ]; then echo "zero file $purged"; exit; fi
   excess=`head -1 $purged | awk '{nrows=$1; ncols=$2; print (nrows-ncols)}'`
   echo "excess = $excess"
