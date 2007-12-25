@@ -546,7 +546,7 @@ onepass_singleton_removal(int nrelmax, int *nrel, int *nprimes, hashtable_t *H, 
     int i;
 
     for(i = 0; i < nrelmax; i++){
-#if DEBUG >= 1
+#if DEBUG >= 2
 	if(!(i % 1000000))
 	    fprintf(stderr, "onepass: (i, nrel, nprimes)=(%d, %d, %d) at %2.2lf\n",
 		    i, *nrel, *nprimes, seconds());
