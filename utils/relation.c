@@ -37,7 +37,13 @@ copy_rel (relation_t *Rel, relation_t rel)
     }
 }
 
-
+// Sometimes, we want our space back...!
+void
+clear_relation (relation_t *rel)
+{
+    free(rel->rp);
+    free(rel->ap);
+}
 
 // return 0 on failure.
 // The input should be a single line of the form

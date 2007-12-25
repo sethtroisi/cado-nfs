@@ -19,6 +19,7 @@ extern void fprint_polynomial (FILE *, mpz_t *, const int);
 
 // Relation I/O
 extern void copy_rel(relation_t *Rel, relation_t rel);
+extern void clear_relation(relation_t *rel);
 extern int read_relation(relation_t *rel, const char *str);
 extern int fread_relation(FILE *file, relation_t *rel);
 extern unsigned long findroot(long a, unsigned long b, unsigned long p);
