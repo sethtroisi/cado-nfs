@@ -21,13 +21,26 @@ c80     10              40      100   11s     37697x37569   791s  802s
 c80     11              40      100   12s     36670x36542   779s  791s
 c80     20              40      100   12s     36670x36542   781s  793s
 
-c85a	20		40	 50   comment: pic94
+c85a    comment: pic94
+c85a	 5		40	 50   22s    116138x116010
+c85a	 6     		40	 50   24s    107223x107095
+c85a	 7     		40	 50   27s    100653x100525
+c85a	20		40	 50
 
 c90	20		40	100
 
 c95	20		40	 80
 
 rsa100	20		40	150/200	
+
+rsa110   5              40      200   143s   769366x609225
+rsa110   6              40      200   208s   614125x499664
+rsa110   7              40      200   291s   352493x352365
+rsa110   8              40      200   318s   337053x336925
+rsa110   9              40      200   389s   325825x325697
+rsa110  10              40      200   381s   325825x325697
+rsa110  15              40      200  1571s   325859x325731
+rsa110  20              40      200  5901s   324760x324632
 
 For new parameters, some fiddling is needed, with respect to the final
 weight of the small matrix and/or the number of rows/columns depending on
