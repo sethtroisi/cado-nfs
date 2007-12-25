@@ -177,7 +177,7 @@ eval_algebraic (mpz_t norm, mpz_t *f, int d, long a, unsigned long b)
 }
 
 /* Read one relation in CADO format from fp, and put it in rel.
-   Return 1 if relation is valid, 0 if end of file. */
+   Return 1 if relation is valid, 0 if invalid, -1 if end of file. */
 int
 read_relation_cado (FILE *fp, relation_t *rel)
 {
@@ -253,7 +253,7 @@ read_relation_cado (FILE *fp, relation_t *rel)
 
 /* Read one relation in GGNFS format (adapted from function dataConvertToRel
    in GGNFS, file rels.c).
-   Return value: 1 if relation is ok, 0 if end of file.
+   Return value: 1 if relation is ok, 0 if invalid, -1 if end of file.
 */
 int
 read_relation_ggnfs (FILE *fp, relation_t *rel, mpz_t norm, mpz_t *f,
@@ -316,12 +316,10 @@ read_relation_ggnfs (FILE *fp, relation_t *rel, mpz_t norm, mpz_t *f,
       get_uint32 (fp); /* corresponding root, not used here */
       p = rel->large_aprimes[i];
       if (!mpz_divisible_ui_p (norm, p))
-        {
-          fprintf (stderr, "Error, f(%d,%d) not divisible by large prime %d\n",
-                   rel->a, rel->b, p);
-          exit (1);
-        }
-      mpz_divexact_ui (norm, norm, p);
+        fprintf (stderr, "Warning, f(%d,%d) not divisible by large prime %d\n",
+                 rel->a, rel->b, p);
+      else
+        mpz_divexact_ui (norm, norm, p);
     }
 
   i = 0; /* number of special primes */
@@ -355,7 +353,7 @@ read_relation_ggnfs (FILE *fp, relation_t *rel, mpz_t norm, mpz_t *f,
           i ++;
         }
     }
-  return 1;
+  return 1; /* valid relation */
 }
 
 /* Read relations from file fp, with input format is 'iformat'. 
@@ -374,7 +372,7 @@ convert_relations (char *rels, int32 *rfb, int32 *afb, mpz_t *f, int degf,
 {
   FILE *fp;
   relation_t rel[1];
-  uint32 relsInFile;
+  uint32 relsInFile, outputRels = 0;
   unsigned int j;
   mpz_t norm;
   int ok;
@@ -413,22 +411,26 @@ convert_relations (char *rels, int32 *rfb, int32 *afb, mpz_t *f, int degf,
           exit (1);
         }
 
-      if (ok == 0) /* end of file */
+      if (ok == -1) /* end of file */
         break;
 
-      switch (oformat)
-	{
-	case FORMAT_CADO:
-	  print_relation_cado (rel, rfb, afb);
-	  break;
-	case FORMAT_FK:
-	  print_relation_fk (rel, rfb, afb, iformat);
-          break;
-	default:
-	  fprintf (stderr, "Error, unknown format %d\n", oformat);
-	  exit (1);
-	}
-      fflush (stdout);
+      if (ok != 0) /* valid relation */
+        {
+          switch (oformat)
+            {
+            case FORMAT_CADO:
+              print_relation_cado (rel, rfb, afb);
+              break;
+            case FORMAT_FK:
+              print_relation_fk (rel, rfb, afb, iformat);
+              break;
+            default:
+              fprintf (stderr, "Error, unknown format %d\n", oformat);
+              exit (1);
+            }
+          fflush (stdout);
+          outputRels ++;
+        }
     }
 
   if (iformat == FORMAT_GGNFS)
@@ -446,7 +448,7 @@ convert_relations (char *rels, int32 *rfb, int32 *afb, mpz_t *f, int degf,
 
   fclose (fp);
 
-  return relsInFile;
+  return outputRels;
 }
 
 #define BF_DELIMITER 0x0a
