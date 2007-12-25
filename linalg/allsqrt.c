@@ -284,6 +284,7 @@ treatDep(char *ratname, char *algname, FILE *relfile, FILE *purgedfile, FILE *in
 	    if((rora == 2) || (rora == 3))
 		treatAlgebraicRelation(algfile, H, rel);
 	    sg *= treatSign(rel, pol);
+	    clear_relation(&rel);
 	}
     }
     ASSERT(checkVector(vec, ncols));
