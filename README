@@ -73,7 +73,7 @@ postsieve/checknorms/checknorms -poly $tmp/$name.poly $tmp/$name.rels_raw \
 Example with /local/fleur/cado/Examples/c80 (for sh addicts):
 
 tmp=/localdisk/tmp; name=c80; d=/local/fleur/cado/Examples
-# of for csh addicts:
+# or for csh addicts:
 set tmp=/localdisk/tmp; set name=c80; set d=/local/fleur/cado/Examples
 
 /bin/rm -f $tmp/$name.*
