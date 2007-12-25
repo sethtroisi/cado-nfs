@@ -301,6 +301,7 @@ read_relation_ggnfs (FILE *fp, relation_t *rel, mpz_t norm, mpz_t *f,
          base and large primes have been divided out. We thus put the
          exponents to 0 for now. */
       rel->sprimes[i] = get_uint32 (fp);
+      get_int32 (fp); /* reads the exponent field (not used) */
       rel->sexp[i] = 0;
     }
   rel->qcb1 = get_uint32 (fp);
@@ -400,7 +401,7 @@ convert_relations (char *rels, int32 *rfb, int32 *afb, mpz_t *f, int degf,
   else
     relsInFile = UINT32_MAX;
 
-  for (j = 0; feof (fp) == 0; j++)
+  for (j = 0; feof (fp) == 0 && j < relsInFile; j++)
     {
       if (iformat == FORMAT_GGNFS)
         ok = read_relation_ggnfs (fp, rel, norm, f, degf, afb);
