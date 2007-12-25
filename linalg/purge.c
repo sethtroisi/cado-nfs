@@ -546,9 +546,11 @@ onepass_singleton_removal(int nrelmax, int *nrel, int *nprimes, hashtable_t *H, 
     int i;
 
     for(i = 0; i < nrelmax; i++){
+#if DEBUG >= 1
 	if(!(i % 1000000))
 	    fprintf(stderr, "onepass: (i, nrel, nprimes)=(%d, %d, %d) at %2.2lf\n",
 		    i, *nrel, *nprimes, seconds());
+#endif
 	if(rel_used[i] > 0){
 #if 1
 	    int h = has_singleton(rel_compact[i], H);
@@ -664,6 +666,7 @@ reread(char *ficname[], int nbfic, tab_prime_t bad_primes, hashtable_t *H, char 
 			break;
 		    }
 		}
+		clear_relation(&rel);
 	    }
 	} while(ret == 1);
 	fclose(file);
@@ -832,22 +835,20 @@ main(int argc, char **argv)
 	if((nrel_new - nprimes_new) >= 500)
 	    nrel_new = nprimes_new + 500;
 #endif
-	
+
+	// we do not use it anymore
+	for(i = 0; i < nrelmax; i++)
+	    if(rel_compact[i] != NULL)
+		free(rel_compact[i]);
+	free(rel_compact);
+    
 	// now, we reread the file of relations and convert it to the new coding...
 	printf("%d %d\n", nrel_new, nprimes_new);
 	reread(fic, nfic, bad_primes, &H, rel_used, nrel_new, nprimes_new);
-	
     }
 
     free(bad_primes.tab);
     free(rel_used);
 
-    if(final){
-	for(i = 0; i < nrelmax; i++)
-	    if(rel_compact[i] != NULL)
-		free(rel_compact[i]);
-	free(rel_compact);
-    }
-    
     return 0;
 }
