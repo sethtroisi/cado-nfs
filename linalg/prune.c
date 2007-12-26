@@ -19,7 +19,9 @@
 
 typedef struct {
   int ind;        /* row index of starting of component */
+#if 0
   int dif;        /* edges[i] - nodes[i] >= -1 */
+#endif
   int edg;        /* edges[i] */
 } component_t;
 
@@ -95,10 +97,9 @@ delete(int i, int *nodes, sparse_mat_t *mat)
     mat->rem_nrows--;
 }
 
-/* Compares two connected components: the best one is the one with the
-   largest edge-node difference (i.e., more primes than relations are
-   deleted), and in case of equality, with the largest number of edges.
-   With qsort, the best component will be last.
+/* Compares two connected components. Since most components are trees,
+   i.e., should have dif := #edges - #nodes = -1, we simply compare
+   the number of edges. With qsort, the best component will be last.
 */
 int
 compare(const void *v1, const void *v2)
@@ -106,12 +107,7 @@ compare(const void *v1, const void *v2)
   component_t *c1 = (component_t*) v1;
   component_t *c2 = (component_t*) v2;
 
-  /* FIXME: normally, all component should be trees, i.e., should have
-     dif := #edges - #nodes = -1. We could optimize for that case. */
-  if (c1->dif != c2->dif)
-    return c1->dif - c2->dif;
-  else
-    return c1->edg - c2->edg;
+  return c1->edg - c2->edg;
 }
 
 /* Compute connected components. Assume mat->nodes and mat->edges have
@@ -144,7 +140,9 @@ compute_components(component_t **comps, int *ncomps, int *alloc, int *nodes, int
 						lalloc * sizeof(component_t));
 	    }
 	    lcomps[lncomps].ind = i;
+#if 0
 	    lcomps[lncomps].dif = edges[i] - nodes[i];
+#endif
 	    lcomps[lncomps].edg = edges[i];
 	    lncomps++;
 	}
@@ -164,7 +162,7 @@ compute_components(component_t **comps, int *ncomps, int *alloc, int *nodes, int
     */
     qsort(lcomps, lncomps, sizeof(component_t), compare);
 #if DEBUG >= 0
-    fprintf (stderr, "Found %d connected components\n", lncomps);
+    fprintf (stderr, "****** Found %d connected components\n", lncomps);
 #endif
     *alloc = lalloc;
     *ncomps = lncomps;
@@ -210,11 +208,12 @@ compute_components(component_t **comps, int *ncomps, int *alloc, int *nodes, int
 void
 prune(sparse_mat_t *mat, int keep)
 {
-    int i, t, excess, old_nrows, old_ncols;
+    int i, t, excess, old_nrows, old_ncols, mid;
     int *nodes, *edges, alloc, ncomps;
     component_t *c, *comps;
     int cur_nodes, old_nodes = 0;
     int count_recompute = 1;
+    int iter = 0;
     
     nodes = (int*) malloc(mat->nrows * sizeof (int));
     edges = (int*) malloc(mat->nrows * sizeof (int));
@@ -228,8 +227,12 @@ prune(sparse_mat_t *mat, int keep)
     
     compute_components(&comps, &ncomps, &alloc, nodes, edges, mat);
     excess = mat->nrows - mat->ncols;
-             
-    while(ncomps > 0 && excess + comps[ncomps - 1].dif >= keep){
+
+    mid = (excess + keep) / 2;
+    /* in theory, we should write excess + comps[ncomps - 1].dif >= keep,
+       but in most cases dif is -1, thus we simply write excess > keep */
+    while (ncomps > 0 && excess > keep)
+      {
 	t = ncomps - 1;
 	c = comps + t;
 	i = c->ind;
@@ -239,27 +242,31 @@ prune(sparse_mat_t *mat, int keep)
 	    old_ncols = mat->rem_ncols;
 	    delete(i, nodes, mat);
 	    // humf!
-	    deleteAllColsFromStack(mat, 0);
+            deleteAllColsFromStack(mat, 0);
             cur_nodes = old_nrows - mat->rem_nrows;
+	    excess = mat->rem_nrows - mat->rem_ncols;
 #if DEBUG >= 0
-	    fprintf(stderr,"Removed %d rels/%d primes, ",
-		    cur_nodes, old_ncols - mat->rem_ncols);
-	    fprintf(stderr, "remains %d rels/%d primes (excess %d)\n",
-		    mat->rem_nrows, mat->rem_ncols,
-		    mat->rem_nrows - mat->rem_ncols);
+            if (iter++ < 10 || (iter & 2047) == 0)
+              {
+                fprintf(stderr,"Removed %d rels/%d primes, ",
+                        cur_nodes, old_ncols - mat->rem_ncols);
+                fprintf(stderr, "remains %d rels/%d primes (excess %d)\n",
+                        mat->rem_nrows, mat->rem_ncols, excess);
+              }
 #endif
-	    excess += c->dif;
             if (old_nodes == 0)
               old_nodes = cur_nodes;
             /* New strategy: instead of recomputing the components when the
                excess is divided by two, recompute whenever the size of the
                removed components decreases. This should avoid we remove very
                small components at the first iteration. */
-	    else if (cur_nodes < old_nodes){
-                fprintf(stderr,"*** Recompute connected components\n");
+	    else if (cur_nodes < old_nodes || excess < mid)
+              {
 		compute_components(&comps, &ncomps, &alloc, nodes, edges, mat);
                 count_recompute ++;
                 old_nodes = 0;
+                iter = 0;
+                mid = (excess + keep) / 2;
             }
         }
 	ncomps = t;
