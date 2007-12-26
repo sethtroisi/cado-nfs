@@ -2,24 +2,29 @@ These parameters are experimental and were *used* as input for
 merge_linalg_sqrt (timings on a 2.4Ghz Opteron, *** indicates the best
 parameters):
 
-	mergelevel	cwmax	rwmax  merge  matrix-size  gauss merge+gauss
-F7	10		15	 50    comment: F7
+      prune mergelevel  cwmax   rwmax  merge  matrix-size  gauss merge+gauss
+F7             10	15	 50    comment: F7
 
-r454 (same matrix up to r462):
-c72     10              30      100    33s    27819x27691   336s 369s
-r480:
-c72     10              30      100    33s    31662x31534   419s 452s
+c72     1.0    10       30      100    15s    31662x31534   297s 312s
+c72     0.6    10       30      100    10s    28217x28089   257s 267s ***
 
-c80     10              40      100   10s     40748x40620   915s  925s
+c80     1.0    10       40      100    6s     40748x40620   670s  676s
+c80     0.8    10       40      100    8s     37803x37675   581s  589s ***
 
 c85a    comment: pic94
-c85a	10     		40	 50   37s     88493x88365
-c85a	10		40	100   65s     83859x83731
-c85a	15		40	100  168s     81364x81236 
+c85a	1.0    15	40	100   79s     81364x81236  6635s 6714s
+c85a	0.8    15	40	100   68s     81971x81843  
 
-c90	20		40	100  465s    104980x104852
+c90	1.0    20	40	100  204s    104980x104852
+c90	0.7    20	40	100   84s    101571x101443
 
-c95	20		40	 80
+c95	1.0     6	40	 80  236s    153053x152925
+c95	0.9     6	40	 80  210s    152935x152807
+c95	0.8     7	40	 80  215s    144471x144343
+c95	0.7     9	40	 80  321s    138169x138041 ***
+c95	1.0    10	40	 80  907s    138202x138074
+c95	0.6    10	40	 80  390s    139360x139232
+c95	1.0    20	40	 80 4244s    138278x138150
 
 rsa100	10		40	150   391s   179360x179232
 rsa100	12		40	200   169s   341984x225643

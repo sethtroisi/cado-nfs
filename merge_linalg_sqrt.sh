@@ -6,16 +6,18 @@
 linalg=linalg
 sqrt=sqrt/naive
 
-nkermax=30; nchar=50; maxlevel=5; cwmax=10; rwmax=100
+# default parameters (see README.params)
+nkermax=30; nchar=50; prune=1.0; maxlevel=5; cwmax=10; rwmax=100
 
 root=$1
-if [ $# -ge 2 ]; then maxlevel=$2; fi
-if [ $# -ge 3 ]; then cwmax=$3; fi
-if [ $# -ge 4 ]; then rwmax=$4; fi
+if [ $# -ge 2 ]; then prune=$2; fi
+if [ $# -ge 3 ]; then maxlevel=$3; fi
+if [ $# -ge 4 ]; then cwmax=$4; fi
+if [ $# -ge 5 ]; then rwmax=$5; fi
 name=$root.$maxlevel"x"$cwmax"x"$rwmax
-if [ $# -ge 5 ]; then verbose="-v"; fi
+if [ $# -ge 6 ]; then verbose="-v"; fi
 
-echo "Args: $0"
+echo "Args: $*"
 
 rels=$root.rels; nrels=`wc -l $rels | awk '{print $1}'`
 poly=$root.poly
@@ -40,7 +42,7 @@ fi
 echo "Performing merges"
 
 nb_merge_max=1000000
-argsa="-merge $nb_merge_max -mat $purged"
+argsa="-prune $prune -merge $nb_merge_max -mat $purged"
 argsa="$argsa -maxlevel $maxlevel -cwmax $cwmax -rwmax $rwmax $verbose"
 time $linalg/merge $argsa > $name.merge.his # 2> $name.merge.err
 echo "SIZE(merge.his): `ls -s $name.merge.his`"
