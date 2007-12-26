@@ -35,6 +35,9 @@ char *used;
 
 #define MERGE_LEVEL_MAX 30
 
+/* minimum excess we want to keep */
+#define DELTA 128
+
 // 0 means dummy filtering using slow methods
 // 1 means:
 //  * fast with optimized-though-memory-consuming data structure;
@@ -180,7 +183,7 @@ fillSWAR(sparse_mat_t *mat)
 
 // TODO
 void
-closeSWAR(sparse_mat_t *mat)
+closeSWAR(/*sparse_mat_t *mat*/)
 {
 }
 
@@ -650,7 +653,7 @@ findAllRowsWithGivenj(int *ind, sparse_mat_t *mat, int j, int nb)
 // Prim
 
 void
-popQueue(int *s, int *t, int **Q, int *fQ, int *lQ)
+popQueue(int *s, int *t, int **Q, int *fQ /*, int *lQ */)
 {
     *s = Q[*fQ][0];
     *t = Q[*fQ][1];
@@ -726,7 +729,7 @@ minimalSpanningTreeWithPrim(int *father, int *height, int A[MERGE_LEVEL_MAX][MER
     while(fQ != lQ){
 	// while queue is non empty
 	// pop queue
-	popQueue(&s, &t, Q, &fQ, &lQ);
+        popQueue(&s, &t, Q, &fQ /*, &lQ */);
 #if DEBUG >= 1
 	fprintf(stderr, "Popping a = (%d, %d)\n", s, t);
 #endif
@@ -755,6 +758,7 @@ minimalSpanningTreeWithPrim(int *father, int *height, int A[MERGE_LEVEL_MAX][MER
     return hmax;
 }
 
+#if 0
 void
 minimalSpanningTreeWithKruskal(int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], int m)
 {
@@ -824,9 +828,10 @@ minimalSpanningTreeWithKruskal(int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], int m)
     free(father);
 #endif
 }
+#endif
 
 int
-minimalSpanningTree(int *father, int *height, sparse_mat_t *mat, int m, int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX])
+minimalSpanningTree(int *father, int *height, /*sparse_mat_t *mat,*/ int m, int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX])
 {
     return minimalSpanningTreeWithPrim(father, height, A, m);
     //    minimalSpanningTreeWithKruskal(A, m);
@@ -1481,7 +1486,7 @@ useMinimalSpanningTree(sparse_mat_t *mat, int m, int *ind, double *tfill, double
     fillRowAddMatrix(A, mat, m, ind);
     *tfill = seconds()-*tfill;
     *tMST = seconds();
-    hmax = minimalSpanningTree(father, height, mat, m, A);
+    hmax = minimalSpanningTree(father, height, /*mat,*/ m, A);
     *tMST = seconds()-*tMST;
 #if DEBUG >= 1
     for(i = 0; i < m; i++)
@@ -1702,7 +1707,7 @@ int
 
 // TODO: use mergemax?
 int
-mergeGe2(sparse_mat_t *mat, int m, int nb_merge_max, int verbose)
+mergeGe2(sparse_mat_t *mat, int m, /*int nb_merge_max,*/ int verbose)
 {
 #if USE_MERGE_FAST == 0
     int j, nbm;
@@ -1781,7 +1786,7 @@ inspectRowWeight(sparse_mat_t *mat)
                     // 2: jump to minimal possible mergelevel
 
 void
-merge(sparse_mat_t *mat, int nb_merge_max, int maxlevel, int verbose)
+merge(sparse_mat_t *mat, /*int nb_merge_max,*/ int maxlevel, int verbose)
 {
     double tt;
     long oldcost = -1, cost, ncost = 0;
@@ -1811,7 +1816,7 @@ merge(sparse_mat_t *mat, int nb_merge_max, int maxlevel, int verbose)
 	if(m == 1)
 	    njrem += removeSingletons(mat);
 	else
-            njrem += mergeGe2(mat, m, nb_merge_max, verbose);
+            njrem += mergeGe2(mat, m, /*nb_merge_max,*/ verbose);
 #if DEBUG >= 1
 	checkData(mat);
 #endif
@@ -1913,7 +1918,8 @@ main(int argc, char *argv[])
     int nb_merge_max = 0, nrows, ncols;
     int cwmax = 20, rwmax = 1000000, maxlevel = 2, iprune = 0;
     int verbose = 0; /* default verbose level */
-    double tt, kprune = 0.0;
+    double tt;
+    double kprune = 1.0; /* prune keeps kprune * (initial excess) */
     
 #if TEX
     fprintf(stderr, "\\begin{verbatim}\n");
@@ -1971,7 +1977,7 @@ main(int argc, char *argv[])
 
     mat.nrows = nrows;
     mat.ncols = ncols;
-    mat.delta = 128;
+    mat.delta = DELTA;
     
     tt = seconds();
     initSWAR(&mat, cwmax, rwmax, maxlevel);
@@ -1999,11 +2005,15 @@ main(int argc, char *argv[])
 
     report2(mat.nrows, mat.ncols);
 
+    /* iprune is the excess we want at the end of prune */
     iprune = (mat.nrows-mat.ncols) * kprune;
-    if(iprune)
+    if (iprune < DELTA) /* ensures iprune >= DELTA */
+      iprune = DELTA;
+    /* only call prune if the current excess is larger than iprune */
+    if (iprune < mat.nrows - mat.ncols)
 	prune(&mat, iprune);
 
-    merge(&mat, nb_merge_max, maxlevel, verbose);
+    merge(&mat, /*nb_merge_max,*/ maxlevel, verbose);
     fprintf(stderr, "Final matrix has w(M)=%d, ncols*w(M)=%ld\n",
 	    mat.weight, ((long)mat.rem_ncols) * ((long)mat.weight));
 #if TEX
@@ -2016,6 +2026,6 @@ main(int argc, char *argv[])
 	fclose(ofile);
     }
 #endif
-    closeSWAR(&mat);
+    closeSWAR(/*&mat*/);
     return 0;
 }
