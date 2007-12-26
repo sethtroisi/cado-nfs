@@ -13,7 +13,7 @@ GMP ?= /usr/local/
 GMPLIB ?= $(GMP)/lib/libgmp.a
 GMPINCLUDE ?= $(GMP)/include/
 
-OPTCFLAGS ?= -g -Wall -W
+OPTCFLAGS ?= -O2 -g -Wall -W
 CFLAGS=$(OPTCFLAGS) -fkeep-inline-functions -DREV=\"`svnversion .`\"
 LDFLAGS=
 
