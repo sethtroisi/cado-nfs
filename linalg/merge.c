@@ -1839,19 +1839,20 @@ merge(sparse_mat_t *mat, int nb_merge_max, int maxlevel, int verbose)
 	m = mm;
 	if((m > maxlevel) || (m <= 0))
 	    break;
-#endif
-#if STRATEGIE == 1
+#else
+#  if STRATEGIE == 1
 	if(mm < m)
 	    // something new happened, anyway
 	    m = mm;
 	else
-#endif
+#  endif
 	    if((old_nrows == mat->rem_nrows) && (old_ncols == mat->rem_ncols)){
 		// nothing happened this time and mm > m
 		m = mm;
 		if((m > maxlevel) || (m <= 0))
 		    break;
 	    }
+#endif
     }
 }
 
