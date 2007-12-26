@@ -236,6 +236,8 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
   mp_limb_t mask1, mask2;
   double st0 = seconds(), st;
 
+  fprintf (stderr, "Using MULTI_ROW=%d\n", MULTI_ROW);
+
   /* store the data in the global variables */
   matrix = mat;
   NROWS = nrows;
