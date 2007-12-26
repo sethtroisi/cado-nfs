@@ -5,6 +5,9 @@ parameters):
 	mergelevel	cwmax	rwmax  merge  matrix-size  gauss merge+gauss
 F7	10		15	 50    comment: F7
 
+r454 (same matrix up to r462):
+c72     10              30      100    33s    27819x27691   336s 369s
+r480:
 c72     10              30      100    33s    31662x31534   419s 452s
 
 c80     10              40      100   10s     40748x40620   915s  925s
