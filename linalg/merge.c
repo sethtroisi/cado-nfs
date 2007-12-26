@@ -386,6 +386,8 @@ readmat(sparse_mat_t *mat, FILE *file)
     mat->weight = 0;
 
     for (i = 0; i < mat->nrows; i++){
+	if(!(i % 100000))
+	    fprintf(stderr, "Reading %d-th row\n", i);
 	ret = fscanf(file, "%d", &j); // unused index to rels file
 	ASSERT_ALWAYS (ret == 1);
 	ret = fscanf (file, "%d", &nc);
@@ -1774,6 +1776,10 @@ inspectRowWeight(sparse_mat_t *mat)
     return nirem;
 }
 
+#define STRATEGIE 2 // 0: finish that mergelevel
+                    // 1: change if min weight < mergelevel
+                    // 2: jump to minimal possible mergelevel
+
 void
 merge(sparse_mat_t *mat, int nb_merge_max, int maxlevel, int verbose)
 {
@@ -1828,25 +1834,24 @@ merge(sparse_mat_t *mat, int nb_merge_max, int maxlevel, int verbose)
 	deleteAllColsFromStack(mat, 0);
 	mm = minColWeight(mat);
 	fprintf(stderr, "Min col weight = %d\n", mm);
-#if 1
+#if STRATEGIE == 2
 	// jump to the next minimal merge level immediately
 	m = mm;
 	if((m > maxlevel) || (m <= 0))
 	    break;
-#else
-#  if 1
+#endif
+#if STRATEGIE == 1
 	if(mm < m)
 	    // something new happened, anyway
 	    m = mm;
 	else
-#  endif
+#endif
 	    if((old_nrows == mat->rem_nrows) && (old_ncols == mat->rem_ncols)){
 		// nothing happened this time and mm > m
 		m = mm;
 		if((m > maxlevel) || (m <= 0))
 		    break;
 	    }
-#endif
     }
 }
 
@@ -1905,8 +1910,9 @@ main(int argc, char *argv[])
     sparse_mat_t mat;
     char *purgedname = NULL, *hisname = NULL;
     int nb_merge_max = 0, nrows, ncols;
-    int cwmax = 20, rwmax = 1000000, maxlevel = 2;
+    int cwmax = 20, rwmax = 1000000, maxlevel = 2, iprune = 0;
     int verbose = 0; /* default verbose level */
+    double tt, kprune = 0.0;
     
 #if TEX
     fprintf(stderr, "\\begin{verbatim}\n");
@@ -1944,6 +1950,11 @@ main(int argc, char *argv[])
 	    argc -= 2;
 	    argv += 2;
 	}
+	else if (argc > 2 && strcmp (argv[1], "-prune") == 0){
+	    kprune = strtod(argv[2], NULL);
+	    argc -= 2;
+	    argv += 2;
+	}
 	else if (argc > 1 && strcmp (argv[1], "-v") == 0){
             verbose ++;
 	    argc -= 1;
@@ -1960,11 +1971,18 @@ main(int argc, char *argv[])
     mat.nrows = nrows;
     mat.ncols = ncols;
     mat.delta = 128;
-    initSWAR(&mat, cwmax, rwmax, maxlevel);
-
-    inspectWeight(&mat, purgedfile);
     
+    tt = seconds();
+    initSWAR(&mat, cwmax, rwmax, maxlevel);
+    fprintf(stderr, "Time for initSWAR: %2.2lf\n", seconds()-tt);
+
+    tt = seconds();
+    inspectWeight(&mat, purgedfile);
+    fprintf(stderr, "Time for inspectWeight: %2.2lf\n", seconds()-tt);
+    
+    tt = seconds();
     fillSWAR(&mat);
+    fprintf(stderr, "Time for fillSWAR: %2.2lf\n", seconds()-tt);
     
     rewind(purgedfile);
     readmat(&mat, purgedfile);
@@ -1980,9 +1998,9 @@ main(int argc, char *argv[])
 
     report2(mat.nrows, mat.ncols);
 
-#if 0 // not convincing yet!
-    prune(&mat, (mat.nrows-mat.ncols)/4);
-#endif
+    iprune = (mat.nrows-mat.ncols) * kprune;
+    if(iprune)
+	prune(&mat, iprune);
 
     merge(&mat, nb_merge_max, maxlevel, verbose);
     fprintf(stderr, "Final matrix has w(M)=%d, ncols*w(M)=%ld\n",
