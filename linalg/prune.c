@@ -97,7 +97,7 @@ delete(int i, int *nodes, sparse_mat_t *mat)
 
 /* Compares two connected components: the best one is the one with the
    largest edge-node difference (i.e., more primes than relations are
-   deleted), and in case of equality, with the largest value of edge.
+   deleted), and in case of equality, with the largest number of edges.
    With qsort, the best component will be last.
 */
 int
@@ -106,6 +106,8 @@ compare(const void *v1, const void *v2)
   component_t *c1 = (component_t*) v1;
   component_t *c2 = (component_t*) v2;
 
+  /* FIXME: normally, all component should be trees, i.e., should have
+     dif := #edges - #nodes = -1. We could optimize for that case. */
   if (c1->dif != c2->dif)
     return c1->dif - c2->dif;
   else
@@ -146,7 +148,21 @@ compute_components(component_t **comps, int *ncomps, int *alloc, int *nodes, int
 	    lcomps[lncomps].edg = edges[i];
 	    lncomps++;
 	}
-    qsort(lcomps, *ncomps, sizeof(component_t), compare);
+    /* FIXME: since we only keep the largest components in prune, we do not
+       need to sort, just to put the largest components at the end, which
+       can be done in O(n) in a single pass:
+       i = 0 # current component
+       j = n-1 # last component, we assume size(c[j])=...=size(c[n-1])
+       while (i < j)
+          if size(c[i])<size(c[j])
+             j = n - 1
+             swap(c[i], c[j])
+          elif size(c[i])=size(c[j])
+             j = j - 1
+             swap(c[i], c[j])
+          i = i + 1
+    */
+    qsort(lcomps, lncomps, sizeof(component_t), compare);
 #if DEBUG >= 0
     fprintf (stderr, "Found %d connected components\n", lncomps);
 #endif
@@ -194,9 +210,11 @@ compute_components(component_t **comps, int *ncomps, int *alloc, int *nodes, int
 void
 prune(sparse_mat_t *mat, int keep)
 {
-    int i, t, excess, old_nrows, old_ncols, mid;
+    int i, t, excess, old_nrows, old_ncols;
     int *nodes, *edges, alloc, ncomps;
     component_t *c, *comps;
+    int cur_nodes, old_nodes = 0;
+    int count_recompute = 1;
     
     nodes = (int*) malloc(mat->nrows * sizeof (int));
     edges = (int*) malloc(mat->nrows * sizeof (int));
@@ -210,7 +228,7 @@ prune(sparse_mat_t *mat, int keep)
     
     compute_components(&comps, &ncomps, &alloc, nodes, edges, mat);
     excess = mat->nrows - mat->ncols;
-    mid = (excess + keep) / 2;
+             
     while(ncomps > 0 && excess + comps[ncomps - 1].dif >= keep){
 	t = ncomps - 1;
 	c = comps + t;
@@ -222,24 +240,31 @@ prune(sparse_mat_t *mat, int keep)
 	    delete(i, nodes, mat);
 	    // humf!
 	    deleteAllColsFromStack(mat, 0);
+            cur_nodes = old_nrows - mat->rem_nrows;
 #if DEBUG >= 0
-	    fprintf(stderr,"Removed component %d with %d nodes and %d edges\n",
-		    i, old_nrows - mat->rem_nrows,
-		    old_ncols - mat->rem_ncols);
-	    fprintf(stderr, "Remains %d relations and %d primes (excess %d)\n",
+	    fprintf(stderr,"Removed %d rels/%d primes, ",
+		    cur_nodes, old_ncols - mat->rem_ncols);
+	    fprintf(stderr, "remains %d rels/%d primes (excess %d)\n",
 		    mat->rem_nrows, mat->rem_ncols,
 		    mat->rem_nrows - mat->rem_ncols);
 #endif
 	    excess += c->dif;
-	    if(excess <= mid){
-		fprintf(stderr,"Remains %d relations and %d primes (excess %d)\n",
-			mat->rem_nrows, mat->rem_ncols,
-			mat->rem_nrows - mat->rem_ncols);
+            if (old_nodes == 0)
+              old_nodes = cur_nodes;
+            /* New strategy: instead of recomputing the components when the
+               excess is divided by two, recompute whenever the size of the
+               removed components decreases. This should avoid we remove very
+               small components at the first iteration. */
+	    else if (cur_nodes < old_nodes){
+                fprintf(stderr,"*** Recompute connected components\n");
 		compute_components(&comps, &ncomps, &alloc, nodes, edges, mat);
-		mid = (excess + keep) / 2;
+                count_recompute ++;
+                old_nodes = 0;
             }
         }
 	ncomps = t;
     }
+    fprintf (stderr, "Number of connected components computations: %d\n",
+             count_recompute);
 }
 
