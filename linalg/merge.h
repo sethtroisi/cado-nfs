@@ -17,6 +17,7 @@ typedef struct {
   int **rows;
 #endif
   int *wt; /* weight of prime j, <= 1 for a deleted prime */
+  unsigned long *ad;
   int weight;
   int cwmax;         /* bound on weight of j to enter the SWAR structure */
   int rwmax;         /* if a weight(row) > rwmax, kill that row */
@@ -40,4 +41,4 @@ extern void report1(int i);
 extern void removeCellSWAR(sparse_mat_t *mat, int i, int j);
 extern void destroyRow(sparse_mat_t *mat, int i);
 extern int removeSingletons(sparse_mat_t *mat);
-extern int deleteAllColsFromStack(sparse_mat_t *mat, int iS);
+extern int deleteEmptyColumns(sparse_mat_t *mat);

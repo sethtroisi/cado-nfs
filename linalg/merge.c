@@ -119,7 +119,7 @@ dclistInsert(dclist dcl, int j)
 
 // TODO: ncols could be a new renumbered ncols...
 void
-initSWAR(sparse_mat_t *mat, int cwmax, int rwmax, int mergelevelmax)
+initMat(sparse_mat_t *mat, int cwmax, int rwmax, int mergelevelmax)
 {
 #if USE_MERGE_FAST
     // cwmax+2 to prevent bangs
@@ -1423,6 +1423,30 @@ deleteHeavyColumns(sparse_mat_t *mat)
 }
 
 int
+deleteEmptyColumns(sparse_mat_t *mat)
+{
+#if 0
+    return deleteAllColsFromStack(mat, 0);
+#else
+    dclist dcl = mat->S[0], foo;
+    int njrem = 0, j;
+
+    while(dcl->next != NULL){
+	foo = dcl->next;
+	j = foo->j;
+	dcl->next = foo->next;
+	free(foo);
+	njrem++;
+	mat->A[j] = NULL;
+	mat->wt[j] = 0;
+	destroyRj(mat, j);
+    }
+    mat->rem_ncols -= njrem;
+    return njrem;
+#endif
+}
+
+int
 removeSingletons(sparse_mat_t *mat)
 {
 #if USE_MERGE_FAST == 0
@@ -1753,7 +1777,7 @@ minColWeight(sparse_mat_t *mat)
 int
 inspectRowWeight(sparse_mat_t *mat)
 {
-    int i, maxw = 0, nirem = 0;
+    int i, maxw = 0, nirem = 0, niremmax = 128;
 
     for(i = 0; i < mat->nrows; i++){
 	if(!isRowNull(mat, i)){
@@ -1770,6 +1794,11 @@ inspectRowWeight(sparse_mat_t *mat)
 #endif
 		    removeRowDefinitely(mat, i);
 		    nirem++;
+		    if(!(nirem % 10000))
+			fprintf(stderr, "#removed_rows=%d at %2.2lf\n",
+				nirem, seconds());
+		    if(nirem > niremmax)
+			break;
 		}
 	    }
 	    if(!isRowNull(mat, i) && (lengthRow(mat, i) > maxw))
@@ -1836,7 +1865,7 @@ merge(sparse_mat_t *mat, /*int nb_merge_max,*/ int maxlevel, int verbose)
 	tt = seconds();
 	inspectRowWeight(mat);
 	fprintf(stderr, "inspectRowWeight: %2.2lf\n", seconds()-tt);
-	deleteAllColsFromStack(mat, 0);
+	deleteEmptyColumns(mat);
 	mm = minColWeight(mat);
 	fprintf(stderr, "Min col weight = %d\n", mm);
 #if STRATEGIE == 2
@@ -1980,8 +2009,8 @@ main(int argc, char *argv[])
     mat.delta = DELTA;
     
     tt = seconds();
-    initSWAR(&mat, cwmax, rwmax, maxlevel);
-    fprintf(stderr, "Time for initSWAR: %2.2lf\n", seconds()-tt);
+    initMat(&mat, cwmax, rwmax, maxlevel);
+    fprintf(stderr, "Time for initMat: %2.2lf\n", seconds()-tt);
 
     tt = seconds();
     inspectWeight(&mat, purgedfile);
@@ -2010,8 +2039,12 @@ main(int argc, char *argv[])
     if (iprune < DELTA) /* ensures iprune >= DELTA */
       iprune = DELTA;
     /* only call prune if the current excess is larger than iprune */
-    if (iprune < mat.nrows - mat.ncols)
+    if (iprune < mat.nrows - mat.ncols){
+	double tt = seconds();
 	prune(&mat, iprune);
+	fprintf(stderr, "Pruning: nrows=%d ncols=%d %2.2lf\n",
+		mat.rem_nrows, mat.rem_ncols, seconds()-tt);
+    }
 
     merge(&mat, /*nb_merge_max,*/ maxlevel, verbose);
     fprintf(stderr, "Final matrix has w(M)=%d, ncols*w(M)=%ld\n",

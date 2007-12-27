@@ -215,6 +215,7 @@ prune(sparse_mat_t *mat, int keep)
     int count_recompute = 1;
     int iter = 0;
     
+    fprintf(stderr, "Entering prune with keep=%d\n", keep);
     nodes = (int*) malloc(mat->nrows * sizeof (int));
     edges = (int*) malloc(mat->nrows * sizeof (int));
     
@@ -242,7 +243,7 @@ prune(sparse_mat_t *mat, int keep)
 	    old_ncols = mat->rem_ncols;
 	    delete(i, nodes, mat);
 	    // humf!
-            deleteAllColsFromStack(mat, 0);
+            deleteEmptyColumns(mat);
             cur_nodes = old_nrows - mat->rem_nrows;
 	    excess = mat->rem_nrows - mat->rem_ncols;
 #if DEBUG >= 0
@@ -269,7 +270,8 @@ prune(sparse_mat_t *mat, int keep)
                 mid = (excess + keep) / 2;
             }
         }
-	ncomps = t;
+	else
+	    ncomps = t;
     }
     fprintf (stderr, "Number of connected components computations: %d\n",
              count_recompute);
