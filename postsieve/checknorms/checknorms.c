@@ -256,6 +256,7 @@ unsigned long factor(mpz_t p1, mpz_t p2, mpz_t norm, size_t lp) {
             MSGDEBUG("lp is %lu\n", lp);
         }
     } else {
+        /* see comment about FIND_COMPLETE_FACTORIZATION above */
         MSGDEBUG("factor %Zd and / or %Zd is not prime\n", x1, x2);
     }
 
