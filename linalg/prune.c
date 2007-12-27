@@ -69,11 +69,13 @@ visit(int i, int *nodes, int *edges, sparse_mat_t *mat)
 /* Delete relations and primes in component of i.
    FIXME: if some wt[j] becomes 2, we should join the connected components
    of the two remaining relations containing j.
+   RETURN VALUE: number of deletions performed, hence the number of j
+   removed (have become of weight 0).
 */
-void
+int
 delete(int i, int *nodes, sparse_mat_t *mat)
 {
-    int j, k, v;
+    int j, k, v, nd = 0;
     
     nodes[i] = -1; /* mark as deleted and visited */
     // inspired from removeRowSWAR(mat, i) but for the recursive call
@@ -86,15 +88,18 @@ delete(int i, int *nodes, sparse_mat_t *mat)
 #endif
 	j = cell(mat, i, k);
 	removeCellSWAR(mat, i, j);
+	if(mat->wt[j] == 0)
+	    nd++;
 	if(mat->wt[j] == 1){
 	    v = getOtherRow(mat, i, j);
 	    if(nodes[v] >= 0)
-		delete(v, nodes, mat);
+		nd += delete(v, nodes, mat);
 	}
     }
     destroyRow(mat, i);
     report1(i);
     mat->rem_nrows--;
+    return nd;
 }
 
 /* Compares two connected components. Since most components are trees,
@@ -241,9 +246,15 @@ prune(sparse_mat_t *mat, int keep)
 	if(nodes[i] >= 0){ /* it was not deleted */
 	    old_nrows = mat->rem_nrows;
 	    old_ncols = mat->rem_ncols;
-	    delete(i, nodes, mat);
+#if 0 // old code
+	    fprintf(stderr, "New rem_ncols should be %d\n",
+		    mat->rem_ncols - delete(i, nodes, mat));
 	    // humf!
             deleteEmptyColumns(mat);
+	    fprintf(stderr, "New rem_ncols is %d\n", mat->rem_ncols);
+#else
+	    mat->rem_ncols -= delete(i, nodes, mat);
+#endif
             cur_nodes = old_nrows - mat->rem_nrows;
 	    excess = mat->rem_nrows - mat->rem_ncols;
 #if DEBUG >= 0
@@ -273,6 +284,12 @@ prune(sparse_mat_t *mat, int keep)
 	else
 	    ncomps = t;
     }
+#if 1 // old code replace by this...
+    // humf!
+    t = mat->rem_ncols;
+    deleteEmptyColumns(mat);
+    mat->rem_ncols = t;
+#endif
     fprintf (stderr, "Number of connected components computations: %d\n",
              count_recompute);
 }
