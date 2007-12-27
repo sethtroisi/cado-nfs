@@ -40,9 +40,8 @@ getOtherRow(sparse_mat_t *mat, int i, int j)
 
 /* visit connected component of relation i, and compute nodes[i] and
    edges[i], which is twice the numbers of edges of that component */
-// TODO: force i to have some j of weight 2...
 void
-visit(int i, int *nodes, int *edges, sparse_mat_t *mat)
+visit(int i, int *nodes, int *edges, sparse_mat_t *mat, char *has2)
 {
     int m, j, k;
     
@@ -58,7 +57,7 @@ visit(int i, int *nodes, int *edges, sparse_mat_t *mat)
 	    edges[i]++;
 	    k = getOtherRow(mat, i, j);
 	    if(nodes[k] == 0){
-		visit(k, nodes, edges, mat);
+		visit(k, nodes, edges, mat, has2);
 		nodes[i] += nodes[k];
 		edges[i] += edges[k];
             }
@@ -118,7 +117,7 @@ compare(const void *v1, const void *v2)
 /* Compute connected components. Assume mat->nodes and mat->edges have
    already been allocated, with mat->nrows entries each. */
 void
-compute_components(component_t **comps, int *ncomps, int *alloc, int *nodes, int *edges, sparse_mat_t *mat)
+compute_components(component_t **comps, int *ncomps, int *alloc, int *nodes, int *edges, sparse_mat_t *mat, char *has2)
 {
     component_t *lcomps = *comps;
     int i, lncomps = 0, lalloc = *alloc;
@@ -128,8 +127,8 @@ compute_components(component_t **comps, int *ncomps, int *alloc, int *nodes, int
 	    nodes[i] = 0;
     /* we use nodes[i] for visited[i], since nodes[i] >= 1 */
     for(i = 0; i < mat->nrows; i++)
-	if(nodes[i] == 0){
-	    visit(i, nodes, edges, mat);
+	if(has2[i] && nodes[i] == 0){
+	    visit(i, nodes, edges, mat, has2);
 	    // i is interesting if nodes[i] > 1
 	    if(nodes[i] == 1)
 		continue;
@@ -172,6 +171,24 @@ compute_components(component_t **comps, int *ncomps, int *alloc, int *nodes, int
     *alloc = lalloc;
     *ncomps = lncomps;
     *comps = lcomps;
+}
+
+// mat->S[2] contains all j of weight 2; mat->R[j] then contains all the
+// rows containing j.
+void
+fill2(char *has2, sparse_mat_t *mat)
+{
+    dclist dcl = mat->S[2]->next;
+    int j, k;
+
+    memset(has2, 0, mat->nrows);
+    while(dcl != NULL){
+	j = dcl->j;
+	for(k = 1; k <= mat->R[j][0]; k++)
+	    if(mat->R[j][k] != -1)
+		has2[mat->R[j][k]] = 1;
+	dcl = dcl->next;
+    }
 }
 
 /* We consider the graph whose vertices are rows of the matrix
@@ -219,19 +236,22 @@ prune(sparse_mat_t *mat, int keep)
     int cur_nodes, old_nodes = 0;
     int count_recompute = 1;
     int iter = 0;
+    char *has2;
     
     fprintf(stderr, "Entering prune with keep=%d\n", keep);
     nodes = (int*) malloc(mat->nrows * sizeof (int));
     edges = (int*) malloc(mat->nrows * sizeof (int));
+    has2 = (char*) malloc(mat->nrows * sizeof (char));
     
     for(i = 0; i < mat->nrows; i++)
 	nodes[i] = 0;
+    fill2(has2, mat);
     
     alloc = 0;
     comps = NULL;
     ncomps = 0;
     
-    compute_components(&comps, &ncomps, &alloc, nodes, edges, mat);
+    compute_components(&comps, &ncomps, &alloc, nodes, edges, mat, has2);
     excess = mat->nrows - mat->ncols;
 
     mid = (excess + keep) / 2;
@@ -274,7 +294,7 @@ prune(sparse_mat_t *mat, int keep)
                small components at the first iteration. */
 	    else if (cur_nodes < old_nodes || excess < mid)
               {
-		compute_components(&comps, &ncomps, &alloc, nodes, edges, mat);
+		compute_components(&comps,&ncomps,&alloc,nodes,edges,mat,has2);
                 count_recompute ++;
                 old_nodes = 0;
                 iter = 0;
@@ -292,5 +312,8 @@ prune(sparse_mat_t *mat, int keep)
 #endif
     fprintf (stderr, "Number of connected components computations: %d\n",
              count_recompute);
+    free(nodes);
+    free(edges);
+    free(has2);
 }
 
