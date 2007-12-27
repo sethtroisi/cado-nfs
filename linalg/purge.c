@@ -608,7 +608,7 @@ remove_singletons(int *nrel, int nrelmax, int *nprimes, hashtable_t *H, char *re
 }
 
 // we locate used primes and do not try to do fancy things as sorting w.r.t.
-// weight, since this will probably done later on.
+// weight, since this will probably be done later on.
 // All rows will be 1 more that needed -> subtract 1 in fprint...!
 void
 renumber(int *nprimes, tab_prime_t bad_primes, hashtable_t *H)
