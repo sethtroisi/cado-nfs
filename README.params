@@ -2,46 +2,38 @@ These parameters are experimental and were *used* as input for
 merge_linalg_sqrt (timings on a 2.4Ghz Opteron, *** indicates the best
 parameters).
 
-Note: for the moment, we do not take into accout free relations.
+The following figures correspond to the data in /local/fleur/cado/Examples
+(see README file).
 
       prune mergelevel  cwmax   rwmax  merge  matrix-size  gauss merge+gauss
 F7             10	15	 50    comment: F7
 
-c72     1.0    10       30      100    17s    28828x28700   255s 272s
-c72     0.6    10       30      100    14s    28115x27987   247s 261s ***
+c72     1.0    10       30      100    21s    27581x27453   233s 254s ***
+c72     0.5    10       30      100    17s    27789x27661   289s 306s
 
-c80     1.0    10       40      100    6s     39184x39056   590s  596s
-c80     0.6    10       40      100   11s     37908x37780   581s  592s ***
+c80     1.0    10       40      100    8s     38618x38490   549s  557s
+c80     0.9    10       40      100    9s     37132x37004   532s  541s ***
 
 c85a    comment: pic94
-c85a	1.0    15	40	100   79s     86984x86856
-c85a	0.5    15	40	100   67s     82575x82447 ***
+c85a	1.0    15	40	100   94s     93874x93746  7236s 7330s
+c85a    0.6    15       40      100   99s     80553x80425  5784s 5883s
 
-c90	1.0    20	40	100  213s    105436x105308
-c90	0.9    20	40	100  200s     94340x94212  ***
+c90	1.0    20	40	100  259s     96142x96014
+c90	0.1    20	40	100  101s     98235x98107
 
------------------ values below this line are out of date -----------------
+c95	1.0    10	40	 80 21m6s    137075x136947
+c95     0.8    10       40       80 13m16s   127965x127837
 
-c95	1.0     6	40	 80  236s    153053x152925
-c95	0.9     6	40	 80  210s    152935x152807
-c95	0.8     7	40	 80  215s    144471x144343
-c95	0.7     9	40	 80  321s    138169x138041 ***
-c95	1.0    10	40	 80  907s    138202x138074
-c95	0.6    10	40	 80  390s    139360x139232
-c95	1.0    20	40	 80 4244s    138278x138150
+rsa100  1.0    15	40	150  12m25   171485x171357
+rsa100  0.4    15       40      150   5m11   167581x167453
 
-rsa100	10		40	150   391s   179360x179232
-rsa100	12		40	200   169s   341984x225643
-rsa100	13		40	200  2878s   163204x163076
+(Note: checknorms only outputs 7272158 out of 7309995 relations.)
+rsa110  1.0    10       40      200   4m35   337412x337284
+rsa110  0.8    10       40      200  17m26   313399x313271
 
-rsa110   5              40      200   143s   769366x609225
-rsa110   6              40      200   208s   614125x499664
-rsa110   7              40      200   291s   352493x352365
-rsa110   8              40      200   318s   337053x336925
-rsa110   9              40      200   389s   325825x325697
-rsa110  10              40      200   381s   325825x325697 ***
-rsa110  15              40      200  1571s   325859x325731
-rsa110  20              40      200  5901s   324760x324632
+(Note: checknorms only outputs 7851953 out of 7892349 relations.)
+rsa120  1.0    10       40      200   5m58   564777x564649
+        0.7                          16m28   565775x565647
 
 For new parameters, some fiddling is needed, with respect to the final
 weight of the small matrix and/or the number of rows/columns depending on
