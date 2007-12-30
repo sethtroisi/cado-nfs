@@ -683,9 +683,12 @@ printTabMatrix(dense_mat_t *mat, int nrows, int ncols)
 }
 
 void
-handleKer(dense_mat_t *mat, rootprime_t * tabchar, FILE * purgedfile, mp_limb_t ** ker, int nlimbs, cado_poly pol, FILE *indexfile, FILE *relfile)
+handleKer(dense_mat_t *mat, rootprime_t * tabchar, FILE * purgedfile,
+          mp_limb_t ** ker, /*int nlimbs, cado_poly pol, */
+          FILE *indexfile, FILE *relfile)
 {  
-    int i, j, k, n;
+    int i, n;
+    unsigned int j, k;
     char str[1024];
     char **charmat;
     int small_nrows, small_ncols;
@@ -766,7 +769,8 @@ handleKer(dense_mat_t *mat, rootprime_t * tabchar, FILE * purgedfile, mp_limb_t 
 int main(int argc, char **argv) {
   FILE *purgedfile, *kerfile, *indexfile, *relfile;
   int ret;
-  int i, j, k, nlimbs, n;
+  int k;
+  unsigned int i, j, n, nlimbs;
   rootprime_t *tabchar;
   int *charval;
   cado_poly *pol;
@@ -774,7 +778,7 @@ int main(int argc, char **argv) {
   mp_limb_t *newker;
   dense_mat_t mymat;
   mp_limb_t **myker;
-  int dim;
+  unsigned int dim;
 
   if (argc != 8) {
     fprintf(stderr, "usage: %s purgedfile kerfile polyfile", argv[0]);
@@ -840,7 +844,8 @@ int main(int argc, char **argv) {
 
   fprintf(stderr, "start computing characters...\n");
 
-  handleKer(&mymat, tabchar, purgedfile, ker, nlimbs, *pol, indexfile, relfile);
+  handleKer(&mymat, tabchar, purgedfile, ker, /*nlimbs, *pol, */
+            indexfile, relfile);
 
   myker = (mp_limb_t **)malloc(mymat.nrows*sizeof(mp_limb_t *));
   ASSERT (myker != NULL);
@@ -866,7 +871,8 @@ int main(int argc, char **argv) {
     for (j = 0; j < nlimbs; ++j)
       newker[j] = 0;
     for (j = 0; j < mymat.limbs_per_col; ++j) {
-      int jj, kk;
+      int jj;
+      unsigned int kk;
       unsigned long w = myker[i][j];
       for (jj = 0; jj < GMP_NUMB_BITS; ++jj) {
 	if (w & 1UL) {

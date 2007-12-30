@@ -1,8 +1,10 @@
 #define USE_TAB 1 // 1 for compact rows...
 
+/* INT is defined in sparse.h */
+
 // doubly chained lists
 typedef struct dclist{
-    int j;
+    INT j;
     struct dclist *prev, *next;
 } *dclist;
 
@@ -14,7 +16,7 @@ typedef struct {
 #if USE_TAB == 0
   rel_t *data;
 #else
-  int **rows;
+  INT **rows;
 #endif
   int *wt; /* weight of prime j, <= 1 for a deleted prime */
   unsigned long *ad;
@@ -24,7 +26,7 @@ typedef struct {
   int delta;         /* bound for nrows-ncols */
   int mergelevelmax; /* says it */
   dclist *S, *A;
-  int **R;
+  INT **R;
 } sparse_mat_t;
 
 #if USE_TAB == 0
@@ -37,8 +39,8 @@ typedef struct {
 #define cell(mat, i, k) (mat)->rows[(i)][(k)]
 #endif
 
-extern void report1(int i);
-extern void removeCellSWAR(sparse_mat_t *mat, int i, int j);
+extern void report1(INT i);
+extern void removeCellSWAR(sparse_mat_t *mat, int i, INT j);
 extern void destroyRow(sparse_mat_t *mat, int i);
 extern int removeSingletons(sparse_mat_t *mat);
 extern int deleteEmptyColumns(sparse_mat_t *mat);

@@ -1,4 +1,4 @@
-/* 
+/*
  * Program: merge
  * Author : F. Morain
  * Purpose: merging relations
@@ -50,7 +50,7 @@ char *used;
 
 typedef struct {
   int len;    /* number of non-zero entries */
-  int *val;   /* array of size len containing column indices of non-zero
+  INT *val;   /* array of size len containing column indices of non-zero
                  entries */
 } rel_t;
 
@@ -62,7 +62,7 @@ cmp(const void *p, const void *q) {
 }
 
 dclist
-dclistCreate(int j)
+dclistCreate(INT j)
 {
     dclist dcl = (dclist)malloc(sizeof(struct dclist));
 
@@ -76,7 +76,7 @@ void
 dclistPrint(FILE *file, dclist dcl)
 {
     while(dcl != NULL){
-	fprintf(file, " -> %d", dcl->j);
+      fprintf(file, " -> %ld", (long int) dcl->j);
 	dcl = dcl->next;
     }
 }
@@ -98,14 +98,15 @@ dclistTex(FILE *file, dclist dcl)
 {
     fprintf(stderr, "\\begin{array}{r}\n");
     while(dcl != NULL){
-	fprintf(file, "%d\\\\\n", dcl->j);
+      fprintf(file, "%ld\\\\\n", (long int) dcl->j);
 	dcl = dcl->next;
     }
     fprintf(stderr, "\\end{array}\n");
 }
 
+/* insert j in doubly-chained list dcl */
 dclist
-dclistInsert(dclist dcl, int j)
+dclistInsert(dclist dcl, INT j)
 {
     dclist newdcl = dclistCreate(j);
 
@@ -125,14 +126,14 @@ initMat(sparse_mat_t *mat, int cwmax, int rwmax, int mergelevelmax)
     // cwmax+2 to prevent bangs
     dclist *S = (dclist *)malloc((cwmax+2) * sizeof(dclist));
     dclist *A = (dclist *)malloc(mat->ncols * sizeof(dclist));
-    int **R;
+    INT **R;
     int j;
 #endif
 #if USE_TAB == 0
     mat->data = (rel_t*) malloc (mat->nrows * sizeof (rel_t));
     ASSERT_ALWAYS(mat->data != NULL);
 #else
-    mat->rows = (int **)malloc(mat->nrows * sizeof (int *));
+    mat->rows = (INT **)malloc(mat->nrows * sizeof (INT *));
     ASSERT_ALWAYS(mat->rows != NULL);
 #endif
     mat->wt = (int*) malloc (mat->ncols * sizeof (int));
@@ -144,7 +145,7 @@ initMat(sparse_mat_t *mat, int cwmax, int rwmax, int mergelevelmax)
     // S[0] has a meaning at least for temporary reasons
     for(j = 0; j <= cwmax+1; j++)
 	S[j] = dclistCreate(-1);
-    R = (int **)malloc(mat->ncols * sizeof(int *));
+    R = (INT **)malloc(mat->ncols * sizeof(INT *));
     ASSERT_ALWAYS(R != NULL);
     mat->S = S;
     mat->A = A;
@@ -152,10 +153,19 @@ initMat(sparse_mat_t *mat, int cwmax, int rwmax, int mergelevelmax)
 #endif
 }
 
+/* Initializes the SWAR data structure.
+   Inputs:
+      mat->ncols - number of columns of matrix mat
+      mat->wt[j] - weight of column j, for 0 <= j < mat->ncols
+      mat->cwmax - weight bound
+      mat->S[w]  - empty lists, 0 <= w <= mat->cwmax
+   Outputs:
+      mat->S[w]  - doubly-chained list with columns j of weight w
+ */
 void
 fillSWAR(sparse_mat_t *mat)
 {
-    int j, *Rj;
+    INT j, *Rj;
 
     for(j = 0; j < mat->ncols; j++){
 	if(mat->wt[j] <= mat->cwmax){
@@ -165,7 +175,7 @@ fillSWAR(sparse_mat_t *mat)
 	    dclistPrint(stderr, mat->S[mat->wt[j]]->next);
 	    fprintf(stderr, "\n");
 #  endif
-	    Rj = (int *)malloc((mat->wt[j]+1) * sizeof(int));
+	    Rj = (INT *)malloc((mat->wt[j]+1) * sizeof(INT));
 	    Rj[0] = 0; // last index used
 	    mat->R[j] = Rj;
 	}
@@ -215,7 +225,8 @@ checkData(sparse_mat_t *mat)
 void
 printSWAR(sparse_mat_t *mat, int ncols)
 {
-    int j, k, w;
+    int j, w;
+    INT k;
 
     fprintf(stderr, "===== S is\n");
     for(w = 0; w <= mat->cwmax; w++){
@@ -232,7 +243,7 @@ printSWAR(sparse_mat_t *mat, int ncols)
 	    continue;
 	fprintf(stderr, "  R[%d]=", j);
 	for(k = 1; k <= mat->R[j][0]; k++)
-	    fprintf(stderr, " %d", mat->R[j][k]);
+          fprintf(stderr, " %ld", (long int) mat->R[j][k]);
 	fprintf(stderr, "\n");
     }
 }
@@ -268,7 +279,8 @@ matrix2tex(sparse_mat_t *mat)
 void
 texSWAR(sparse_mat_t *mat)
 {
-    int j, k, w;
+    int j, w;
+    INT k;
 
     fprintf(stderr, "\\end{verbatim}\n");
     matrix2tex(mat);
@@ -307,7 +319,7 @@ texSWAR(sparse_mat_t *mat)
 	    continue;
 	fprintf(stderr, "  R[%d]=", j);
 	for(k = 1; k <= mat->R[j][0]; k++)
-	    fprintf(stderr, " %d", mat->R[j][k]);
+          fprintf(stderr, " %ld", (long int) mat->R[j][k]);
 	fprintf(stderr, "\n");
     }
 }
@@ -315,7 +327,7 @@ texSWAR(sparse_mat_t *mat)
 // terrific hack: everybody on the same line
 // the first is to be destroyed in replay!!!
 void
-reportn(int *ind, int n)
+reportn(INT *ind, int n)
 {
     int i;
 
@@ -323,7 +335,7 @@ reportn(int *ind, int n)
     fprintf(stderr, "Reporting for n=%d\n", n);
 #endif
     for(i = 0; i < n; i++){
-	printf("%d", ind[i]);
+      printf("%ld", (long int) ind[i]);
 	if(i < n-1)
 	    printf(" ");
     }
@@ -331,20 +343,23 @@ reportn(int *ind, int n)
 }
 
 void
-report1(int i)
+report1(INT i)
 {
     reportn(&i, 1);
 }
 
 void
-report2(int i1, int i2)
+report2(INT i1, INT i2)
 {
-    int tmp[2];
+    INT tmp[2];
     tmp[0] = i1;
     tmp[1] = i2;
     reportn(tmp, 2);
 }
 
+/* compute the weight mat->wt[j] of each column j, for the set of relations
+   in file purgedfile.
+*/
 void
 inspectWeight(sparse_mat_t *mat, FILE *purgedfile)
 {
@@ -378,7 +393,8 @@ readmat(sparse_mat_t *mat, FILE *file)
 {
     int ret;
     int i, j;
-    int nc, x, buf[BUF_LEN], ibuf;
+    int nc, x, buf[BUF_LEN];
+    INT ibuf;
 
     ret = fscanf (file, "%d %d", &(mat->nrows), &(mat->ncols));
     ASSERT_ALWAYS (ret == 2);
@@ -433,11 +449,11 @@ readmat(sparse_mat_t *mat, FILE *file)
 	    // sort indices in val to ease row merges
 	    qsort(mat->data[i].val, ibuf, sizeof(int), cmp);
 #else
-	    mat->rows[i] = (int*) malloc ((ibuf+1) * sizeof (int));
+	    mat->rows[i] = (INT*) malloc ((ibuf+1) * sizeof (INT));
 	    mat->rows[i][0] = ibuf;
-	    memcpy(mat->rows[i]+1, buf, ibuf * sizeof(int));
+	    memcpy(mat->rows[i]+1, buf, ibuf * sizeof(INT));
 	    // sort indices in val to ease row merges
-            qsort(mat->rows[i]+1, ibuf, sizeof(int), cmp);
+            qsort(mat->rows[i]+1, ibuf, sizeof(INT), cmp);
 #endif
 	}
     }
@@ -502,9 +518,9 @@ addWeightFromRow(sparse_mat_t *mat, int i)
 }
 
 int
-hasCol(sparse_mat_t *mat, int i, int j)
+hasCol(sparse_mat_t *mat, int i, INT j)
 {
-    int k;
+    INT k;
 
 #if USE_TAB == 0
     for(k = 0; k < lengthRow(mat, i); k++)
@@ -522,7 +538,8 @@ hasCol(sparse_mat_t *mat, int i, int j)
 void
 addRowsData(rel_t *data, int i1, int i2)
 {
-    int k1, k2, k, len, *tmp, *tmp2;
+    int k1, k2, k, len;
+    INT *tmp, *tmp2;
 
 #if DEBUG >= 2
     fprintf(stderr, "row[%d] =", i1); print_row(mat, i1);
@@ -532,7 +549,7 @@ addRowsData(rel_t *data, int i1, int i2)
 #endif
     // merge row[i1] and row[i2] in i1...
     len = data[i1].len + data[i2].len;
-    tmp = (int *)malloc(len * sizeof(tmp));
+    tmp = (INT *)malloc(len * sizeof(INT));
     k = k1 = k2 = 0;
 
     // loop while everybody is here
@@ -561,8 +578,8 @@ addRowsData(rel_t *data, int i1, int i2)
 	tmp[k++] = data[i2].val[k2];
     // destroy and copy back
     free(data[i1].val);
-    tmp2 = (int *)malloc(k * sizeof(int));
-    memcpy(tmp2, tmp, k * sizeof(int));
+    tmp2 = (INT *)malloc(k * sizeof(INT));
+    memcpy(tmp2, tmp, k * sizeof(INT));
     data[i1].len = k;
     data[i1].val = tmp2;
     free(tmp);
@@ -618,7 +635,7 @@ weightSum(sparse_mat_t *mat, int i1, int i2)
 }
 
 int
-findAllRowsWithGivenj(int *ind, sparse_mat_t *mat, int j, int nb)
+findAllRowsWithGivenj(INT *ind, sparse_mat_t *mat, INT j, int nb)
 {
     int i, k, r = 0;
 
@@ -838,7 +855,8 @@ minimalSpanningTree(int *father, int *height, /*sparse_mat_t *mat,*/ int m, int 
 }
 
 void
-fillRowAddMatrix(int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], sparse_mat_t *mat, int m, int *ind)
+fillRowAddMatrix(int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], sparse_mat_t *mat,
+                 int m, INT *ind)
 {
     int i, j;
 
@@ -857,7 +875,7 @@ fillRowAddMatrix(int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], sparse_mat_t *mat, int
 
 // not mallocing to speed up(?).
 int
-findBestIndex(sparse_mat_t *mat, int m, int *ind)
+findBestIndex(sparse_mat_t *mat, int m, INT *ind)
 {
     int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], i, j, imin, wmin, w;
 
@@ -889,13 +907,14 @@ void
 merge_m_slow(sparse_mat_t *mat, int m, int verbose)
 {
     int totfindrows = 0, totfindbest = 0, totadd = 0, tt;
-    int *ind, j, k, i, njproc = 0;
+    int j, k, i, njproc = 0;
+    INT *ind;
     int report = (verbose == 0) ? 10000 : 1000;
 
 #if DEBUG >= 1
     fprintf(stderr, "Weight %d:", m);
 #endif
-    ind = (int *)malloc(m * sizeof(int));
+    ind = (INT *)malloc(m * sizeof(INT));
     for(j = 0; j < mat->ncols; j++){
 	if(mat->wt[j] != m)
 	    continue;
@@ -972,7 +991,8 @@ checkCoherence(sparse_mat_t *mat, int m, int j)
     if(m != -1){
 	if(nchk != m){
 	    fprintf(stderr, "HYPERCHECK:");
-	    fprintf(stderr, "mat->R[%d][0]=%d, m=%d\n", j, mat->R[j][0], m);
+	    fprintf(stderr, "mat->R[%d][0]=%ld, m=%d\n", j,
+                    (long int) mat->R[j][0], m);
 	    fprintf(stderr, "Gasp: nchk=%d\n", nchk);
 	}
 	ASSERT(nchk == m);
@@ -984,12 +1004,13 @@ checkCoherence(sparse_mat_t *mat, int m, int j)
 // can be costly. We must not store row index i0, since j was discovered
 // when row i0 was treated.
 void
-incorporateColumn(sparse_mat_t *mat, int j, int i0)
+incorporateColumn(sparse_mat_t *mat, INT j, int i0)
 {
-    int i, ni, *Rj, wj;
+    int i, ni, wj;
+    INT *Rj;
 
     wj = -mat->wt[j];
-    Rj = (int *)malloc((wj+1) * sizeof(int));
+    Rj = (INT *)malloc((wj+1) * sizeof(INT));
     // find all rows in which j appears
     for(i = 0, ni = 1; i < mat->nrows; i++)
 	if(!isRowNull(mat, i))
@@ -1010,7 +1031,7 @@ incorporateColumn(sparse_mat_t *mat, int j, int i0)
 int
 getNextj(dclist dcl)
 {
-    int j;
+    INT j;
     dclist foo;
 
     foo = dcl->next;
@@ -1108,7 +1129,7 @@ add_i_to_Rj(sparse_mat_t *mat, int i, int j)
 	fprintf(stderr, "WARNING: reallocing things in add_i_to_Rj for R[%d]\n", j);
 #endif
 	int l = mat->R[j][0]+2;
-	mat->R[j] = (int *)realloc(mat->R[j], l * sizeof(int));
+	mat->R[j] = (INT *)realloc(mat->R[j], l * sizeof(INT));
 	mat->R[j][l-1] = i;
 	mat->R[j][0] = l-1;
     }
@@ -1136,7 +1157,7 @@ incrS(int w)
 
 // A[j] contains the address where j is stored
 void
-removeCellSWAR(sparse_mat_t *mat, int i, int j)
+removeCellSWAR(sparse_mat_t *mat, int i, INT j)
 {
     int ind;
 
@@ -1200,7 +1221,7 @@ removeRowSWAR(sparse_mat_t *mat, int i)
 }
 
 void
-addCellSWAR(sparse_mat_t *mat, int i, int j)
+addCellSWAR(sparse_mat_t *mat, int i, INT j)
 {
     int ind;
 
@@ -1261,7 +1282,7 @@ addRowsSWAR(sparse_mat_t *mat, int i1, int i2, int len)
 #endif
     // merge row[i1] and row[i2] in i1...
     len = mat->data[i1].len + mat->data[i2].len;
-    tmp = (int *)malloc(len * sizeof(tmp));
+    tmp = (INT *)malloc(len * sizeof(INT));
     k = k1 = k2 = 0;
 
     // i1 is to disappear, replaced by a new one
@@ -1293,8 +1314,8 @@ addRowsSWAR(sparse_mat_t *mat, int i1, int i2, int len)
     }
     // destroy and copy back
     free(mat->data[i1].val);
-    tmp2 = (int *)malloc(k * sizeof(int));
-    memcpy(tmp2, tmp, k * sizeof(int));
+    tmp2 = (INT *)malloc(k * sizeof(INT));
+    memcpy(tmp2, tmp, k * sizeof(INT));
     mat->data[i1].len = k;
     mat->data[i1].val = tmp2;
     free(tmp);
@@ -1354,7 +1375,7 @@ remove_j_from_row(sparse_mat_t *mat, int i, int j)
 }
 
 void
-removeRowDefinitely(sparse_mat_t *mat, int i)
+removeRowDefinitely(sparse_mat_t *mat, INT i)
 {
     removeRowSWAR(mat, i);
     destroyRow(mat, i);
@@ -1368,7 +1389,8 @@ int
 deleteAllColsFromStack(sparse_mat_t *mat, int iS)
 {
     dclist dcl;
-    int j, k, njrem = 0;
+    INT j;
+    int k, njrem = 0;
 
     while(1){
 	dcl = mat->S[iS]->next;
@@ -1429,7 +1451,8 @@ deleteEmptyColumns(sparse_mat_t *mat)
     return deleteAllColsFromStack(mat, 0);
 #else
     dclist dcl = mat->S[0], foo;
-    int njrem = 0, j;
+    int njrem = 0;
+    INT j;
 
     while(dcl->next != NULL){
 	foo = dcl->next;
@@ -1450,7 +1473,7 @@ int
 removeSingletons(sparse_mat_t *mat)
 {
 #if USE_MERGE_FAST == 0
-    int i, j;
+    INT i, j;
 
     for(j = 0; j < mat->ncols; j++)
 	if(mat->wt[j] == 1){
@@ -1470,7 +1493,7 @@ removeSingletons(sparse_mat_t *mat)
 
 // try all combinations to find the smaller one
 void
-tryAllCombinations(sparse_mat_t *mat, int m, int *ind)
+tryAllCombinations(sparse_mat_t *mat, int m, INT *ind)
 {
     int i, k;
     
@@ -1500,11 +1523,13 @@ tryAllCombinations(sparse_mat_t *mat, int m, int *ind)
 }
 
 void
-useMinimalSpanningTree(sparse_mat_t *mat, int m, int *ind, double *tfill, double *tMST)
+useMinimalSpanningTree(sparse_mat_t *mat, int m, INT *ind, double *tfill,
+                       double *tMST)
 {
     int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX];
     int i, father[MERGE_LEVEL_MAX], height[MERGE_LEVEL_MAX], hmax, nV = m, h;
-    int adds[MERGE_LEVEL_MAX << 1], nadds, tab[MERGE_LEVEL_MAX << 1], itab;
+    int adds[MERGE_LEVEL_MAX << 1], nadds, itab;
+    INT tab[MERGE_LEVEL_MAX << 1];
 
     *tfill = seconds();
     fillRowAddMatrix(A, mat, m, ind);
@@ -1580,7 +1605,8 @@ useMinimalSpanningTree(sparse_mat_t *mat, int m, int *ind, double *tfill, double
 }
 
 void
-findOptimalCombination(sparse_mat_t *mat, int m, int *ind, double *tfill, double *tMST)
+findOptimalCombination(sparse_mat_t *mat, int m, INT *ind, double *tfill,
+                       double *tMST)
 {
     if(m <= 2){
 	*tfill = *tMST = 0;
@@ -1596,11 +1622,11 @@ findOptimalCombination(sparse_mat_t *mat, int m, int *ind, double *tfill, double
 }
 
 void
-checkWeight(sparse_mat_t *mat, int j)
+checkWeight(sparse_mat_t *mat, INT j)
 {
     int i, w = 0;
 
-    fprintf(stderr, "Rows containing %d:", j);
+    fprintf(stderr, "Rows containing %ld:", (long int) j);
     for(i = 0; i < mat->nrows; i++)
 	if(!isRowNull(mat, i))
 	    if(hasCol(mat, i, j)){
@@ -1627,14 +1653,15 @@ merge_m_fast(sparse_mat_t *mat, int m, int verbose)
 {
     double totopt=0, tot=seconds(), tt, totfill=0, totMST=0, tfill, tMST;
     double totdel = 0;
-    int *ind, j, k, njproc = 0, ni, njrem = 0;
+    int k, njproc = 0, ni, njrem = 0;
+    INT *ind, j;
     dclist dcl = mat->S[m];
     int report = (verbose == 0) ? 10000 : 1000;
 
 #if DEBUG >= 1
     fprintf(stderr, "Weight %d:", m);
 #endif
-    ind = (int *)malloc(m * sizeof(int));
+    ind = (INT *)malloc(m * sizeof(INT));
 
     //    checkWeight(mat, 132461);
 
@@ -1949,11 +1976,15 @@ main(int argc, char *argv[])
     int verbose = 0; /* default verbose level */
     double tt;
     double kprune = 1.0; /* prune keeps kprune * (initial excess) */
+    int i;
     
 #if TEX
     fprintf(stderr, "\\begin{verbatim}\n");
 #endif    
-    fprintf (stderr, "%s rev. %s\n", argv[0], REV);
+    fprintf (stderr, "%s.r%s", argv[0], REV);
+    for (i = 1; i < argc; i++)
+      fprintf (stderr, " %s", argv[i]);
+    fprintf (stderr, "\n");
     
     while(argc > 1 && argv[1][0] == '-'){
 	if(argc > 2 && strcmp (argv[1], "-merge") == 0){

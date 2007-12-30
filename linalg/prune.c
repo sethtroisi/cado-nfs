@@ -65,28 +65,30 @@ visit(int i, int *nodes, int *edges, sparse_mat_t *mat, char *has2)
     }
 }
 
-/* Delete relations and primes in component of i.
-   FIXME: if some wt[j] becomes 2, we should join the connected components
-   of the two remaining relations containing j.
+/* Delete relations and primes in component of relation/row i.
+   FIXME: if some wt[j] becomes 2, for some prime/column j, we should join
+   the connected components of the two remaining relations containing j.
    RETURN VALUE: number of deletions performed, hence the number of j
    removed (have become of weight 0).
 */
 int
 delete(int i, int *nodes, sparse_mat_t *mat)
 {
-    int j, k, v, nd = 0;
+    INT j;
+    int k, v, nd = 0;
+    int l = lengthRow(mat, i); /* number of non-zero entries in row i */
     
-    nodes[i] = -1; /* mark as deleted and visited */
+    nodes[i] = -1; /* mark row i as deleted and visited */
     // inspired from removeRowSWAR(mat, i) but for the recursive call
     // to delete...!
-    mat->weight -= lengthRow(mat, i);
+    mat->weight -= l; /* decrease the total weight of the matrix */
 #if USE_TAB == 0
     for(k = 0; k < mat->data[i].len; k++){
 #else
-    for(k = 1; k <= lengthRow(mat, i); k++){
+    for(k = 1; k <= l; k++){
 #endif
-	j = cell(mat, i, k);
-	removeCellSWAR(mat, i, j);
+        j = cell(mat, i, k); /* column index of the kth non-zero coefficient */
+	removeCellSWAR(mat, i, j); /* defined in merge.c */
 	if(mat->wt[j] == 0)
 	    nd++;
 	if(mat->wt[j] == 1){

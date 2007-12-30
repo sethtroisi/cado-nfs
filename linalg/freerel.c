@@ -85,6 +85,12 @@ main(int argc, char *argv[])
 {
     int nfree, deg;
 
+    if (argc != 2)
+      {
+        fprintf (stderr, "Usage: %s xxx.roots\n", argv[0]);
+        exit (1);
+      }
+
     nfree = countFreeRelations(&deg, argv[1]);
     fprintf(stderr, "# Free relations: %d\n", nfree);
     

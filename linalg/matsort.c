@@ -81,7 +81,7 @@ cmpcol (const void *c1, const void *c2)
 void
 sort_columns (sparse_mat_t mat, column_t *C)
 {
-  int i, j, k, l, nc;
+  unsigned int i, j, k, l, nc;
 
   for (j = 0; j < mat->ncols; j++)
     {
@@ -129,7 +129,7 @@ sort_columns (sparse_mat_t mat, column_t *C)
 void
 print_matrix (sparse_mat_t mat, column_t *C)
 {
-  int i, j, k, nc;
+  unsigned int i, j, k, nc;
 
   printf("%d %d\n", mat->nrows, mat->ncols);
   for (i = k = 0; i < mat->nrows; i++)

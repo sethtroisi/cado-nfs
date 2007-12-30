@@ -126,7 +126,8 @@ void
 finishRationalSqrt(FILE *ratfile, hashtable_t *H, cado_poly pol)
 {
     mpz_t prod;
-    int i, j;
+    int j;
+    unsigned int i;
 
     mpz_init_set_ui(prod, 1);
 #if MAPLE >= 1
@@ -156,10 +157,10 @@ finishRationalSqrt(FILE *ratfile, hashtable_t *H, cado_poly pol)
     mpz_clear(prod);
 }
 
-void
-finishAlgebraicSqrt(FILE *algfile, hashtable_t *H, cado_poly pol)
+static void
+finishAlgebraicSqrt(FILE *algfile, hashtable_t *H /*, cado_poly pol*/)
 {
-    int i;
+    unsigned int i;
 
     fprintf(algfile, "0 0\n");
 #if DEBUG >= 1
@@ -292,7 +293,7 @@ treatDep(char *ratname, char *algname, FILE *relfile, FILE *purgedfile, FILE *in
 	fprintf(stderr, "prod(a-b*m) < 0\n");
     else{
 	if((rora == 2) || (rora == 3))
-	    finishAlgebraicSqrt(algfile, H, pol);
+          finishAlgebraicSqrt(algfile, H /*, pol*/);
 	if((rora == 1) || (rora == 3))
 	    finishRationalSqrt(ratfile, H, pol);
     }
@@ -381,6 +382,11 @@ int main(int argc, char *argv[])
 	rora = 2;
     else if(!strcmp(argv[8], "ar") || !strcmp(argv[8], "ra"))
 	rora = 3;
+    else
+      {
+        fprintf (stderr, "Error, 8th argument must be r, a, ar or ra\n");
+        exit (1);
+      }
     verbose = 0;
     SqrtWithIndexAll(argv[9], relfile, purgedfile, indexfile, kerfile, pol, rora, ndepmin, ndepmax, verbose);
 

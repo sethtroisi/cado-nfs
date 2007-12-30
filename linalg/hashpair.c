@@ -16,7 +16,7 @@ hashClear(hashtable_t *H)
 }
 
 void
-hashInit(hashtable_t *H, int n)
+hashInit(hashtable_t *H, unsigned int n)
 {
     int ntab = 20, i;
     unsigned long tab[] = {500009, 750019, 
@@ -53,10 +53,11 @@ int
 getHashAddr(hashtable_t *H, long p, unsigned long r)
 {
     unsigned long tmp = HC0 * ((unsigned long)p) + HC1 * r;
-    static int cptmax = 0;
-    int h, h0;
+    static unsigned int cptmax = 0;
+    unsigned int cpt = 0; /* number of iterations to find a free location */
+    unsigned int h;
 
-    h = h0 = (int)(tmp % H->hashmod);
+    h = (int) (tmp % H->hashmod);
 #if DEBUG >= 2
     printf("H(%ld, %lu) = %d\n", p, r, h);
 #endif
@@ -68,16 +69,17 @@ getHashAddr(hashtable_t *H, long p, unsigned long r)
 	    // (p, r) already known
 	    break;
 	h++;
+        cpt++;
 	if(h >= H->hashmod)
 	    h = 0;
     }
 #if DEBUG >= 1
-    if((h-h0) >= 50)
-	printf("#W# cpt = %d >= 50\n", h-h0);
+    if(cpt >= 50)
+	printf("#W# cpt = %u >= 50\n", cpt);
 #endif
-    if((h-h0) >= cptmax){
-	cptmax = h-h0;
-	if(cptmax > 100) fprintf(stderr, "HASH: cptmax = %d\n", cptmax);
+    if(cpt >= cptmax){
+	cptmax = cpt;
+	if(cptmax > 100) fprintf(stderr, "HASH: cptmax = %u\n", cptmax);
     }
     return h;
 }
@@ -97,7 +99,8 @@ hashInsert(hashtable_t *H, long p, unsigned long r)
 
 void hashCheck(hashtable_t *H, int nprimes)
 {
-    int i, nb = 0;
+    int nb = 0;
+    unsigned int i;
 
     for(i = 0; i < H->hashmod; i++)
 	if(H->hashcount[i] > 0)

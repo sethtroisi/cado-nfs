@@ -84,7 +84,7 @@ void read_matrix_header(FILE * file, sparse_mat_t mat)
 
 void readmat(FILE * file, sparse_mat_t mat, int compact)
 {
-    int i;
+    unsigned int i;
     unsigned int *dst;
     read_matrix_header(file, mat);
     dst = mat->data;

@@ -98,11 +98,11 @@ static void addPartialRows(int row, int pivot, mp_limb_t mask,
 			   int j_cur, mp_limb_t **ptr);
 #endif
 INLINE static void addRows(int row, int pivot, mp_limb_t mask,
-			   int j_cur, mp_limb_t **ptr);
+			   /*int j_cur,*/ mp_limb_t **ptr);
 INLINE static void add2Rows(int row, int row2, int pivot, mp_limb_t mask,
-			    int j_cur, mp_limb_t **ptr_current);
+			    /*int j_cur,*/ mp_limb_t **ptr_current);
 INLINE static void add3Rows(int row, int row2, int row3, int pivot,
-			    mp_limb_t mask, int j_current,
+			    mp_limb_t mask, /* int j_current, */
 			    mp_limb_t **ptr_current);
 INLINE static int getPivot(mp_limb_t **ptr, mp_limb_t mask);
 #if VERBOSE
@@ -284,7 +284,7 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
       for (i = pivot + 1; i < NROWS; ++i) {
 	/* is there a 1 in position (i, col_current) ? */
 	if ( (*ptr_current[i]) & mask1 )   
-	  addRows(i, pivot, mask1, j_current, ptr_current);
+	  addRows(i, pivot, mask1, /*j_current,*/ ptr_current);
       }      
 #elif MULTI_ROW == 2
       /* try with two rows at a time */
@@ -295,7 +295,7 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
 	while (i < NROWS) {
 	  if ( (*ptr_current[i]) & mask1 ) {
 	    if (i1 >= 0) {
-	      add2Rows(i1, i, pivot, mask1, j_current, ptr_current);
+	      add2Rows(i1, i, pivot, mask1, /*j_current,*/ ptr_current);
 	      i1 = -1;
 	    } else {
 	      i1 = i;
@@ -304,7 +304,7 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
 	  ++i;
 	} /* end while */
 	if (i1 >= 0) 
-	  addRows(i1, pivot, mask1, j_current, ptr_current);
+	  addRows(i1, pivot, mask1, /*j_current,*/ ptr_current);
       } /* end block */
 #elif MULTI_ROW == 3
       /* try with three rows at a time */
@@ -316,7 +316,7 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
 	  if ( (*ptr_current[i]) & mask1 ) {
 	    if (i1 >= 0) {
 	      if (i2 >= 0) {
-		add3Rows(i1, i2, i, pivot, mask1, j_current, ptr_current);
+		add3Rows(i1, i2, i, pivot, mask1, /*j_current,*/ ptr_current);
 		i1 = -1; i2 = -1;
 	      }
 	      else {
@@ -330,9 +330,9 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
 	} /* end while */
 	if (i1 >= 0)  {
 	  if (i2 >= 0)
-	    add2Rows(i1, i2, pivot, mask1, j_current, ptr_current);
+	    add2Rows(i1, i2, pivot, mask1, /*j_current,*/ ptr_current);
 	  else
-	    addRows(i1, pivot, mask1, j_current, ptr_current);
+	    addRows(i1, pivot, mask1, /*j_current,*/ ptr_current);
 	}
       } /* end block */
 #else
@@ -340,7 +340,7 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
 #endif 
 
       /* Purge the pivot line */
-      addRows(pivot, pivot, mask1, j_current, ptr_current);
+      addRows(pivot, pivot, mask1, /*j_current,*/ ptr_current);
     }
 
     /* increment */
@@ -430,8 +430,8 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
  *   j_current is the number of the limb which contains the column
  */
 
-INLINE static void addRows(int row, int pivot, mp_limb_t mask, int j_current,
-			   mp_limb_t **ptr_current) {
+INLINE static void addRows(int row, int pivot, mp_limb_t mask,
+                           /*int j_current,*/  mp_limb_t **ptr_current) {
   int i;
   mp_limb_t *ptr1, *ptr2;
 
@@ -450,7 +450,7 @@ INLINE static void addRows(int row, int pivot, mp_limb_t mask, int j_current,
  */
 
 INLINE static void add2Rows(int row, int row2, int pivot, mp_limb_t mask,
-			    int j_current, mp_limb_t **ptr_current)
+			    /*int j_current,*/ mp_limb_t **ptr_current)
 {
   // int i;
   mp_limb_t *ptr1, *ptr2, *ptr3, *ptr_lim;
@@ -470,7 +470,7 @@ INLINE static void add2Rows(int row, int row2, int pivot, mp_limb_t mask,
 
 
 INLINE static void add3Rows(int row, int row2, int row3, int pivot,
-			    mp_limb_t mask, int j_current,
+			    mp_limb_t mask, /* int j_current, */
 			    mp_limb_t **ptr_current) {
   // int i;
   mp_limb_t *ptr1, *ptr2, *ptr3, *ptr_piv, *ptr_lim;

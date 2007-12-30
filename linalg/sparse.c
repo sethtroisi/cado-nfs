@@ -22,7 +22,7 @@
 #define DEBUG 0
 
 void
-fprintRow(FILE *file, int *row)
+fprintRow(FILE *file, INT *row)
 {
     int i;
 
@@ -36,9 +36,9 @@ fprintRow(FILE *file, int *row)
 // row[1..max].
 // If len != -1, then it is the real length of row[i1]+row[i2].
 void
-addRows(int **rows, int i1, int i2, int len0)
+addRows(INT **rows, int i1, int i2, int len0)
 {
-    int k1, k2, k, len, *tmp, *tmp2;
+    INT k1, k2, k, len, *tmp, *tmp2;
 
     ASSERT(rows[i1] != NULL);
     ASSERT(rows[i2] != NULL);
@@ -49,7 +49,7 @@ addRows(int **rows, int i1, int i2, int len0)
     fprintf(stderr, "\n");
 #endif
     len = 1 + (len0 != -1 ? len0 : rows[i1][0] + rows[i2][0]);
-    tmp = (int *)malloc(len * sizeof(tmp));
+    tmp = (INT *)malloc(len * sizeof(INT));
     k = k1 = k2 = 1;
 
     // loop while everybody is here
@@ -81,8 +81,8 @@ addRows(int **rows, int i1, int i2, int len0)
 	ASSERT(tmp[0] == len0);
     }
     else{
-	tmp2 = (int *)malloc(k * sizeof(int));
-	memcpy(tmp2, tmp, k * sizeof(int));
+	tmp2 = (INT *)malloc(k * sizeof(INT));
+	memcpy(tmp2, tmp, k * sizeof(INT));
 	tmp2[0] = k-1;
 	rows[i1] = tmp2;
 	free(tmp);
@@ -94,18 +94,18 @@ addRows(int **rows, int i1, int i2, int len0)
 }
 
 void
-removeWeight(int **rows, int *wt, int i)
+removeWeight(INT **rows, int *wt, int i)
 {
-    int k;
+    INT k;
 
     for(k = 1; k <= rows[i][0]; k++)
 	wt[rows[i][k]]--;
 }
 
 void
-addWeight(int **rows, int *wt, int i)
+addWeight(INT **rows, int *wt, int i)
 {
-    int k;
+    INT k;
 
     for(k = 1; k <= rows[i][0]; k++)
 	wt[rows[i][k]]++;

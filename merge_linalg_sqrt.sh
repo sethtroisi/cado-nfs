@@ -7,7 +7,7 @@ linalg=linalg
 sqrt=sqrt/naive
 
 # default parameters (see README.params)
-nkermax=30; nchar=50; prune=1.0; maxlevel=5; cwmax=10; rwmax=100
+nkermax=30; nchar=50; prune=1.0; maxlevel=6; cwmax=10; rwmax=100
 
 root=$1
 if [ $# -ge 2 ]; then prune=$2; fi

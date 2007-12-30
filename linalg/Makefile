@@ -12,8 +12,7 @@ CFLAGS=$(OPTCFLAGS) -DREV=\"$(SVNVER)\"
 LDFLAGS=../utils/libutils.a $(GMPLIB) -lm# -lefence
 INC=-I $(GMPINCLUDE) -I.. -I../utils
 
-binaries:=allsqrt replay merge purge freerel procrels linalg	\
-	characters matsort matprune transpose
+binaries:=allsqrt replay merge purge freerel linalg characters
 
 all:	$(binaries)
 
@@ -36,7 +35,7 @@ freerel: freerel.c ../utils/libutils.a ../sieve/fb.o
 purge: purge.c ../utils/libutils.a hashpair.o files.o
 	gcc $(CFLAGS) $(INC) $< hashpair.o files.o $(LDFLAGS) -o $@
 
-merge: merge.c ../utils/libutils.a sparse.o prune.o
+merge: merge.c merge.h ../utils/libutils.a sparse.o prune.o
 	gcc $(CFLAGS) $(INC) $< sparse.o prune.o $(LDFLAGS) -o $@
 
 replay: replay.c ../utils/libutils.a sparse.o
@@ -48,7 +47,7 @@ linalg: linalg.o gauss.o readmat.o
 gauss.o: gauss.c
 	gcc -c $(CFLAGS) -DMULTI_ROW=3 -DNO_MAIN $(INC) $< -o $@
 
-.c.o:
+.c.o: merge.h sparse.h readmat.h ../utils/utils.h
 	gcc -c $(CFLAGS) $(INC) $< -o $@
 
 transpose: transpose.o readmat.o

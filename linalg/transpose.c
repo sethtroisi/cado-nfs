@@ -148,7 +148,7 @@ void rebuild()
                     ret += fscanf(fin_vchunks[i], "%u", &idx);
                     vec_uint_push_back(rows[k], idx);
                 }
-                BUG_ON(ret != nc);
+                BUG_ON(ret != (int) nc);
             }
         }
         for(k = 0 ; k < kmax ; k++) {

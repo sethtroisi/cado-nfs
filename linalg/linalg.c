@@ -38,8 +38,8 @@ void setcoeff(dense_mat_t Dmat, unsigned int i, unsigned int j)
 
 void sparse2densetranspose(dense_mat_t Dmat, sparse_mat_t Smat)
 {
-    int i, j;
-    unsigned int *ptr;
+    unsigned int i, j, *ptr;
+
     Dmat->nrows = Smat->ncols;
     Dmat->ncols = Smat->nrows;
     Dmat->limbs_per_row = (Dmat->ncols / GMP_NUMB_BITS) + 1;
@@ -63,8 +63,8 @@ void sparse2densetranspose(dense_mat_t Dmat, sparse_mat_t Smat)
 
 void sparse2dense(dense_mat_t Dmat, sparse_mat_t Smat)
 {
-    int i, j;
-    unsigned int *ptr;
+    unsigned int i, j, *ptr;
+
     Dmat->nrows = Smat->nrows;
     Dmat->ncols = Smat->ncols;
     Dmat->limbs_per_row = (Dmat->ncols / GMP_NUMB_BITS) + 1;
@@ -94,7 +94,8 @@ int main(int argc, char **argv)
     sparse_mat_t mat;
     dense_mat_t dmat;
     mp_limb_t **ker;
-    int dim, i, j, compact = 0;
+    int compact = 0;
+    unsigned int i, j, dim;
 
     if (argc != 3) {
 	fprintf(stderr, "usage: %s [filename] [compact]\n", argv[0]);

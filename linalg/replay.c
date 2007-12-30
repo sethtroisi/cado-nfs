@@ -127,9 +127,9 @@ cmp(const void *p, const void *q) {
     return (x <= y ? -1 : 1);
 }
 
-void
-makeSparse(int **sparsemat, int *colweight, FILE *purgedfile, int nrows,
-           int ncols, int **oldrows, int verbose)
+static void
+makeSparse(int **sparsemat, int *colweight, FILE *purgedfile,
+           /*int nrows, int ncols,*/ int **oldrows, int verbose)
 {
     int i, j, nj, *buf, buf_len, ibuf, ind, k;
     int report = (verbose == 0) ? 100000 : 10000;
@@ -408,7 +408,7 @@ main(int argc, char *argv[])
     sparsemat = (int **)malloc(small_nrows * sizeof(int *));
     for(i = 0; i < small_nrows; i++)
 	sparsemat[i] = NULL;
-    makeSparse(sparsemat, colweight, purgedfile, nrows, ncols, oldrows,
+    makeSparse(sparsemat, colweight, purgedfile, /*nrows, ncols,*/ oldrows,
                verbose);
     fclose(purgedfile);
 
