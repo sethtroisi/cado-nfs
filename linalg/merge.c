@@ -44,7 +44,7 @@ char *used;
 //  * heavy columns are killed.
 // 2 means:
 //  * fast as above;
-//  * heavy columns are present, but not in S[]; this yields more acurate
+//  * heavy columns are present, but not in S[]; this yields more accurate
 //    weights.
 #define USE_MERGE_FAST 2
 
@@ -104,16 +104,17 @@ dclistTex(FILE *file, dclist dcl)
     fprintf(stderr, "\\end{array}\n");
 }
 
-/* insert j in doubly-chained list dcl */
-dclist
-dclistInsert(dclist dcl, INT j)
+/* insert j in doubly-chained list dcl (between cell of dcl and dcl->next),
+   and return pointer at cell containing j */
+static dclist
+dclistInsert (dclist dcl, INT j)
 {
     dclist newdcl = dclistCreate(j);
 
     newdcl->next = dcl->next;
     newdcl->prev = dcl;
-    if(newdcl->next != NULL)
-	newdcl->next->prev = newdcl;
+    if (newdcl->next != NULL)
+      newdcl->next->prev = newdcl;
     dcl->next = newdcl;
     return newdcl;
 }
@@ -158,7 +159,7 @@ initMat(sparse_mat_t *mat, int cwmax, int rwmax, int mergelevelmax)
       mat->ncols - number of columns of matrix mat
       mat->wt[j] - weight of column j, for 0 <= j < mat->ncols
       mat->cwmax - weight bound
-      mat->S[w]  - empty lists, 0 <= w <= mat->cwmax
+      mat->S[w]  - lists containing only one element (-1), 0 <= w <= mat->cwmax
    Outputs:
       mat->S[w]  - doubly-chained list with columns j of weight w
  */
@@ -169,7 +170,7 @@ fillSWAR(sparse_mat_t *mat)
 
     for(j = 0; j < mat->ncols; j++){
 	if(mat->wt[j] <= mat->cwmax){
-	    mat->A[j] = dclistInsert(mat->S[mat->wt[j]], j);
+	    mat->A[j] = dclistInsert (mat->S[mat->wt[j]], j);
 #  if DEBUG >= 1
 	    fprintf(stderr, "Inserting %d in S[%d]:", j, mat->wt[j]);
 	    dclistPrint(stderr, mat->S[mat->wt[j]]->next);
@@ -1025,7 +1026,7 @@ incorporateColumn(sparse_mat_t *mat, INT j, int i0)
     mat->R[j] = Rj;
     mat->wt[j] = wj;
     ASSERT(wj == Rj[0]);
-    mat->A[j] = dclistInsert(mat->S[wj], j);
+    mat->A[j] = dclistInsert (mat->S[wj], j);
 }
 
 int
@@ -1155,7 +1156,15 @@ incrS(int w)
 #endif
 }
 
-// A[j] contains the address where j is stored
+/* remove the cell (i,j), and updates matrix correspondingly.
+   Note: A[j] contains the address of the cell in S[w] where j is stored.
+   
+   Updates:
+   - mat->wt[j] (weight of column j)
+   - mat->S[w] : cell j is removed, with w = weight(j)
+   - mat->S[w-1] : cell j is added
+   - A[j] : points to S[w-1] instead of S[w]
+*/
 void
 removeCellSWAR(sparse_mat_t *mat, int i, INT j)
 {
@@ -1189,7 +1198,7 @@ removeCellSWAR(sparse_mat_t *mat, int i, INT j)
     fprintf(stderr, "S[%d]_b=", ind);
     dclistPrint(stderr, mat->S[ind]->next); fprintf(stderr, "\n");
 #endif
-    mat->A[j] = dclistInsert(mat->S[ind], j);
+    mat->A[j] = dclistInsert (mat->S[ind], j);
 #if DEBUG >= 2
     fprintf(stderr, "S[%d]_a=", ind);
     dclistPrint(stderr, mat->S[ind]->next); fprintf(stderr, "\n");
@@ -1244,7 +1253,7 @@ addCellSWAR(sparse_mat_t *mat, int i, INT j)
 	ind = mat->cwmax+1; // trick
     }
     // update A[j]
-    mat->A[j] = dclistInsert(mat->S[ind], j);
+    mat->A[j] = dclistInsert (mat->S[ind], j);
     // update R[j] by adding i
     add_i_to_Rj(mat, i, j);
 }
@@ -2042,7 +2051,7 @@ main(int argc, char *argv[])
     tt = seconds();
     initMat(&mat, cwmax, rwmax, maxlevel);
     fprintf(stderr, "Time for initMat: %2.2lf\n", seconds()-tt);
-
+    
     tt = seconds();
     inspectWeight(&mat, purgedfile);
     fprintf(stderr, "Time for inspectWeight: %2.2lf\n", seconds()-tt);

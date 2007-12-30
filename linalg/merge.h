@@ -8,6 +8,7 @@ typedef struct dclist{
     struct dclist *prev, *next;
 } *dclist;
 
+/* rows correspond to relations, and columns to primes (or prime ideals) */
 typedef struct {
   int nrows;
   int ncols;
@@ -18,15 +19,28 @@ typedef struct {
 #else
   INT **rows;
 #endif
-  int *wt; /* weight of prime j, <= 1 for a deleted prime */
+  int *wt;           /* weight w of column j, if w <= cwmax,
+                        else <= 1 for a deleted column
+                        (trick: we store -w if w > cwmax) */
   unsigned long *ad;
   int weight;
   int cwmax;         /* bound on weight of j to enter the SWAR structure */
   int rwmax;         /* if a weight(row) > rwmax, kill that row */
   int delta;         /* bound for nrows-ncols */
   int mergelevelmax; /* says it */
-  dclist *S, *A;
-  INT **R;
+  dclist *S;         /* S[w] is a doubly-chained list with columns of weight w,
+                        for w <= cwmax. For technical reasons (to avoid NULL
+                        arguments that we can't modify), S[w] always contains
+                        a first cell with value -1, thus the real list is
+                        S[w]->next. */
+  dclist *A;         /* A[j] points to the unique cell in S[w] containing j,
+                        where w = weight(j), for w <= cwmax. A[j]=NULL for
+                        w > cwmax. */
+  INT **R;           /* R[j][k] contains the rows of the non-empty elements
+                        of column j, 0 <= j < ncols, 1 <= k <= R[j][0], for
+                        weight(j) <= cwmax.
+                        R[j][k] = -1 if the corresponding row has been deleted.
+                        R[j]=NULL for weight(j) > cwmax. */
 } sparse_mat_t;
 
 #if USE_TAB == 0
