@@ -18,9 +18,9 @@ do
   alg=$name.dep.alg.$suf
   algprod=$name.algside.$suf
   fact=$name.fact.$suf
-  if [ -s $algprod ]
+  if [ -s $algprod -a $algprod -nt $alg ]
   then
-    echo "File $algprod already exists..."
+    echo "File $algprod already exists and is more recent than $alg..."
   else
     args2="$poly $rat $alg $algprod"
     time $sqrt/fmalgsqrt $args2 $mag
