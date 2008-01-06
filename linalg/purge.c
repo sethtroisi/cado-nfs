@@ -285,9 +285,9 @@ specialHashInsert(hashtable_t *H, long p, unsigned long r, int irel)
 // here and there, but we don't care, since they will be dealt with in
 // merge.
 void
-insertNormalRelation(char *rel_used, int **rel_compact, int irel, int *nprimes, tab_prime_t *bad_primes, hashtable_t *H, relation_t *rel, unsigned long rlim, unsigned long alim, int final)
+insertNormalRelation(char *rel_used, int **rel_compact, int irel, int *nprimes, tab_prime_t *bad_primes, hashtable_t *H, relation_t *rel, unsigned long rlim, unsigned long alim, long maxpr, long maxpa, int final)
 {
-    int *tmp = NULL, ltmp = 0, itmp, j, h;
+    int *tmp = NULL, ltmp = 0, itmp, j, h, ok = 1;
 
 #if LP_ONLY == 0
     rlim = alim = 0; // ohhhhhhhhhhhhh!
@@ -297,11 +297,22 @@ insertNormalRelation(char *rel_used, int **rel_compact, int irel, int *nprimes, 
     if(final){
 	// first count number of "large" primes
 	for(j = 0; j < rel->nb_rp; j++)
-	    if(rel->rp[j].p > rlim)
+	    if(rel->rp[j].p > rlim){
+		if(rel->rp[j].p > maxpr)
+		    ok = 0;
 		ltmp++;
+	    }
 	for(j = 0; j < rel->nb_ap; j++)
-	    if(rel->ap[j].p > alim)
+	    if(rel->ap[j].p > alim){
+		if(rel->ap[j].p > maxpa)
+		    ok = 0;
 		ltmp++;
+	    }
+	if(ok == 0){
+	    rel_used[irel] = 0;
+	    rel_compact[irel] = NULL;
+	    return;
+	}
 	if(ltmp == 0)
 	    // ff??
 	    rel_used[irel] = -1; // and tmp won't be used anyhow
@@ -431,7 +442,7 @@ insertFreeRelation(char *rel_used, int **rel_compact, int irel, int *nprimes, ha
 }
 
 // nrel can decrease, for instance in case of duplicate rows.
-int scan_relations_from_file(int *irel, int *nrel, char *rel_used, int **rel_compact, int *nprimes, tab_prime_t *bad_primes, hashtable_t *H, hashtable_t *Hab, FILE *file, unsigned long rlim, unsigned long alim, int duplicate, int final)
+int scan_relations_from_file(int *irel, int *nrel, char *rel_used, int **rel_compact, int *nprimes, tab_prime_t *bad_primes, hashtable_t *H, hashtable_t *Hab, FILE *file, unsigned long rlim, unsigned long alim, long maxpr, long maxpa, int duplicate, int final)
 {
     relation_t rel;
     int ret;
@@ -455,9 +466,12 @@ int scan_relations_from_file(int *irel, int *nrel, char *rel_used, int **rel_com
 	}
 	rel_used[*irel] = 1;
 	if(rel.b > 0)
-	    insertNormalRelation(rel_used, rel_compact,*irel,nprimes,bad_primes,H,&rel,rlim,alim,final);
+	    insertNormalRelation(rel_used, rel_compact,*irel,nprimes,bad_primes,H,&rel,rlim,alim,maxpr,maxpa,final);
 	else
 	    insertFreeRelation(rel_used,rel_compact,*irel,nprimes,H,&rel,final);
+	if(rel_used[*irel] <= 0)
+	    // relation removed
+	    *nrel -= 1;
 	clear_relation(&rel);
     }
     return ret;
@@ -465,10 +479,7 @@ int scan_relations_from_file(int *irel, int *nrel, char *rel_used, int **rel_com
 
 // Read all relations from file.
 int
-scan_relations(char *ficname[], unsigned int nbfic, int *nrel, int *nprimes,
-               tab_prime_t *bad_primes, hashtable_t *H, hashtable_t *Hab,
-               char *rel_used, int **rel_compact, unsigned long rlim,
-               unsigned long alim, int duplicate, int final)
+scan_relations(char *ficname[], int nbfic, int *nrel, int *nprimes, tab_prime_t *bad_primes, hashtable_t *H, hashtable_t *Hab, char *rel_used, int **rel_compact, unsigned long rlim, unsigned long alim, long maxpr, long maxpa, int duplicate, int final)
 {
     FILE *relfile;
     int ret, irel = -1;
@@ -477,7 +488,7 @@ scan_relations(char *ficname[], unsigned int nbfic, int *nrel, int *nprimes,
     *nprimes = 0;
 
     ASSERT(nbfic > 0);
-    ASSERT(rel_compact != NULL);
+    ASSERT(!final || (final && rel_compact != NULL));
     for(i = 0; i < nbfic; i++){
 	relfile = fopen(ficname[i], "r");
 	if(relfile == NULL){
@@ -485,7 +496,7 @@ scan_relations(char *ficname[], unsigned int nbfic, int *nrel, int *nprimes,
 	    exit(1);
 	}
 	fprintf(stderr, "Adding file %s\n", ficname[i]);
-	ret = scan_relations_from_file(&irel, nrel, rel_used, rel_compact, nprimes, bad_primes, H, Hab, relfile, rlim, alim, duplicate, final);
+	ret = scan_relations_from_file(&irel, nrel, rel_used, rel_compact, nprimes, bad_primes, H, Hab, relfile, rlim, alim, maxpr, maxpa, duplicate, final);
 	if (ret == 0) {
 	    fprintf(stderr, "Warning: error when reading file %s\n", ficname[i]);
 	    break;
@@ -553,8 +564,44 @@ removeSingletonIfAny(int *nprimes, hashtable_t *H, char *rel_used, int **rel_com
     return (j0 > -1);
 }
 
+int
+compare(const void *v1, const void *v2)
+{
+    int w1 = *((int*) v1);
+    int w2 = *((int*) v2);
+
+    return (w1 >= w2 ? -1 : 1);
+}
+
+// We sort rows w.r.t. their weight and decide which one to delete.
 void
-onepass_singleton_removal(int nrelmax, int *nrel, int *nprimes, hashtable_t *H, char *rel_used, int **rel_compact)
+deleteHeavierRows(hashtable_t *H, int *nrel, int *nprimes, char *rel_used, int **rel_compact, int nrelmax, int keep)
+{
+    int *tmp, i, j = 0, nl;
+
+    if((*nrel - *nprimes) < keep)
+	return;
+    tmp = (int *)malloc(((*nrel) << 1) * sizeof(int));
+    for(i = 0; i < nrelmax; i++){
+	if(rel_used[i] > 0){
+	    for(nl = 0; rel_compact[i][nl] != -1; nl++);
+	    tmp[j++] = nl;
+	    tmp[j++] = i;
+	}
+    }
+    qsort(tmp, *nrel, 2 * sizeof(int), compare);
+    // first stupid idea: just remove heavy rows
+    for(i = 0; i < *nrel; i += 2){
+	if((*nrel)-(*nprimes) < keep)
+	    break;
+	delete_relation(tmp[i+1], 0, nprimes, H, rel_used, rel_compact);
+	*nrel -= 1;
+    }
+    free(tmp);
+}
+
+void
+onepass_singleton_removal(int nrelmax, int *nrel, int *nprimes, hashtable_t *H, char *rel_used, int **rel_compact, int keep)
 {
     int i;
 
@@ -598,13 +645,15 @@ find(int nrel, int h, char *rel_used, int **rel_compact)
 }
 
 void
-remove_singletons(int *nrel, int nrelmax, int *nprimes, hashtable_t *H, char *rel_used, int **rel_compact)
+remove_singletons(int *nrel, int nrelmax, int *nprimes, hashtable_t *H, char *rel_used, int **rel_compact, int keep)
 {
     int old, newnrel = *nrel, newnprimes = *nprimes, i;
 
     do{
 	old = newnrel;
-	onepass_singleton_removal(nrelmax, &newnrel, &newnprimes, H, rel_used, rel_compact);
+	deleteHeavierRows(H,&newnrel,&newnprimes,rel_used,rel_compact,nrelmax,keep);
+	fprintf(stderr,"dHR: %d %d at %2.2lf\n",newnrel,newnprimes,seconds());
+	onepass_singleton_removal(nrelmax, &newnrel, &newnprimes, H, rel_used, rel_compact, keep);
 	fprintf(stderr, "new/old = %d/%d; newnprimes=%d at %2.2lf\n",
 		newnrel, old, newnprimes, seconds());
     } while(newnrel != old);
@@ -739,6 +788,7 @@ main(int argc, char **argv)
     int nrel, nprimes = 0, duplicate = 0, final = 0;
     unsigned int nrelmax = 0, i;
     int nrel_new, nprimes_new, Hsize, Hsizer, Hsizea;
+    long maxpr = 0, maxpa = 0, keep = -1; // maximum value for nrows-ncols
     cado_poly pol;
     
     fprintf (stderr, "%s revision %s\n", argv[0], REV);
@@ -769,6 +819,21 @@ main(int argc, char **argv)
 	    argc -= 2;
 	    argv += 2;
 	}
+	else if(argc > 2 && strcmp (argv[1], "-maxpr") == 0){
+	    maxpr = atol(argv[2]);
+	    argc -= 2;
+	    argv += 2;
+	}
+	else if(argc > 2 && strcmp (argv[1], "-maxpa") == 0){
+	    maxpa = atol(argv[2]);
+	    argc -= 2;
+	    argv += 2;
+	}
+	else if(argc > 2 && strcmp (argv[1], "-keep") == 0){
+	    keep = atol(argv[2]);
+	    argc -= 2;
+	    argv += 2;
+	}
 	else if(argc > 1 && strcmp (argv[1], "-final") == 0){
 	    final = 1;
 	    argc--;
@@ -780,6 +845,8 @@ main(int argc, char **argv)
 	    argv++;
 	}
     }
+    if(keep == -1)
+	keep = nrelmax;
 
     if (polyname == NULL)
       {
@@ -797,11 +864,16 @@ main(int argc, char **argv)
     nfic = argc-1;
     //	fic = extractFic(&nfic, &nrelmax, argv[3]);
     read_polynomial(pol, polyname);
+    if(maxpr == 0)
+	maxpr = 1L << pol[0].lpbr;
+    if(maxpa == 0)
+	maxpa = 1L << pol[0].lpba;
     fprintf(stderr, "Number of relations is %u\n", nrelmax);
     if(nprimes > 0)
 	Hsize = nprimes;
     else{
 	// estimating the number of primes
+	// TODO: use maxpr and maxpa
 	Hsizer = (1<<pol[0].lpbr)/((int)(pol[0].lpbr * log(2.0)));
 	Hsizea = (1<<pol[0].lpba)/((int)(pol[0].lpba * log(2.0)));
 	Hsize = (Hsizer > Hsizea ? Hsizer : Hsizea);
@@ -821,7 +893,7 @@ main(int argc, char **argv)
 
     fprintf(stderr, "reading file of relations...\n");
     nrel = nrelmax;
-    ret = scan_relations(fic, nfic, &nrel, &nprimes, &bad_primes, &H, &Hab, rel_used, rel_compact, pol[0].rlim, pol[0].alim, duplicate, final);
+    ret = scan_relations(fic, nfic, &nrel, &nprimes, &bad_primes, &H, &Hab, rel_used, rel_compact, pol[0].rlim, pol[0].alim, maxpr, maxpa, duplicate, final);
     ASSERT (ret);
     
     fprintf(stderr, "nrel(useful)=%d, nprimes=%d (%d)\n",nrel,nprimes,Hsize);
@@ -838,7 +910,7 @@ main(int argc, char **argv)
 	fprintf(stderr, "starting singleton removal...\n");
 	nrel_new = nrel;
 	nprimes_new = nprimes;
-	remove_singletons(&nrel_new,nrelmax,&nprimes_new,&H,rel_used,rel_compact);
+	remove_singletons(&nrel_new,nrelmax,&nprimes_new,&H,rel_used,rel_compact,keep);
 	
 	fprintf(stderr, "\nbadprimes = \n");
 	for (i = 0; i < bad_primes.length; ++i){
