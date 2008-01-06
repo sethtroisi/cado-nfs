@@ -33,6 +33,8 @@
 char *used;
 #endif
 
+#define USE_CONNECT 0
+
 #define MERGE_LEVEL_MAX 30
 
 /* minimum excess we want to keep */
@@ -117,6 +119,15 @@ dclistInsert (dclist dcl, INT j)
       newdcl->next->prev = newdcl;
     dcl->next = newdcl;
     return newdcl;
+}
+
+// connect dcl to S
+void
+dclistConnect(dclist S, dclist dcl)
+{
+    dcl->next = S->next;
+    dcl->prev = S;
+    S->next = dcl;
 }
 
 // TODO: ncols could be a new renumbered ncols...
@@ -1069,7 +1080,9 @@ remove_j_from_S(sparse_mat_t *mat, int j)
     fprintf(stderr, "S[%d]_a=", ind);
     dclistPrint(stderr, mat->S[ind]->next); fprintf(stderr, "\n");
 #endif
+#if USE_CONNECT == 0
     free(dcl);
+#endif
 }
 
 void
@@ -1083,6 +1096,9 @@ void
 remove_j_from_SWAR(sparse_mat_t *mat, int j)
 {
     remove_j_from_S(mat, j);
+#if USE_CONNECT
+    free(mat->A[j]);
+#endif
     mat->A[j] = NULL;
     mat->wt[j] = 0;
     destroyRj(mat, j);
@@ -1180,13 +1196,15 @@ removeCellSWAR(sparse_mat_t *mat, int i, INT j)
     if(ind < 0){
 	// what if abs(weight) becomes below cwmax?
 	// we should incorporate the column and update the data structure, no?
+# if USE_MERGE_FAST > 2
 	if(abs(ind) <= mat->mergelevelmax){
-#if DEBUG >= 1
+#  if DEBUG >= 1
 	    fprintf(stderr, "WARNING: column %d becomes light at %d...!\n",
 		    j, abs(ind));
-#endif
+#  endif
 	    incorporateColumn(mat, j, i);
 	}
+# endif
 	return;
     }
 #endif
@@ -1198,7 +1216,12 @@ removeCellSWAR(sparse_mat_t *mat, int i, INT j)
     fprintf(stderr, "S[%d]_b=", ind);
     dclistPrint(stderr, mat->S[ind]->next); fprintf(stderr, "\n");
 #endif
-    mat->A[j] = dclistInsert (mat->S[ind], j);
+    // TODO: replace this with a move of pointers...!
+#if USE_CONNECT == 0
+    mat->A[j] = dclistInsert(mat->S[ind], j);
+#else
+    dclistConnect(mat->S[ind], mat->A[j]);
+#endif
 #if DEBUG >= 2
     fprintf(stderr, "S[%d]_a=", ind);
     dclistPrint(stderr, mat->S[ind]->next); fprintf(stderr, "\n");
@@ -1253,7 +1276,11 @@ addCellSWAR(sparse_mat_t *mat, int i, INT j)
 	ind = mat->cwmax+1; // trick
     }
     // update A[j]
-    mat->A[j] = dclistInsert (mat->S[ind], j);
+#if USE_CONNECT == 0
+    mat->A[j] = dclistInsert(mat->S[ind], j);
+#else
+    dclistConnect(mat->S[ind], mat->A[j]);
+#endif
     // update R[j] by adding i
     add_i_to_Rj(mat, i, j);
 }
@@ -1686,7 +1713,8 @@ merge_m_fast(sparse_mat_t *mat, int m, int verbose)
 	j = dcl->j;
 	njproc++;
 	if(!(njproc % report))
-	    fprintf(stderr, "# %d columns of weight %d processed\n",njproc,m);
+	    fprintf(stderr, "# %d columns of weight %d processed at %2.2lf\n",
+		    njproc, m, seconds());
 #if DEBUG >= 1
 	fprintf(stderr, "Treating %d-th column %d of weight %d\n", njproc, j,
 		mat->wt[j]);
