@@ -594,7 +594,7 @@ deleteHeavierRows(hashtable_t *H, int *nrel, int *nprimes, char *rel_used, int *
     for(i = 0; i < *nrel; i += 2){
 	if((*nrel)-(*nprimes) < keep)
 	    break;
-	delete_relation(tmp[i+1], 0, nprimes, H, rel_used, rel_compact);
+	delete_relation(tmp[i+1], /*0,*/ nprimes, H, rel_used, rel_compact);
 	*nrel -= 1;
     }
     free(tmp);
@@ -785,7 +785,7 @@ main(int argc, char **argv)
     char *rel_used;
     int **rel_compact = NULL;
     int ret;
-    int nrel, nprimes = 0, duplicate = 0, final = 0;
+    int nrel, nprimes = 0, duplicate = 0, final = 1;
     unsigned int nrelmax = 0, i;
     int nrel_new, nprimes_new, Hsize, Hsizer, Hsizea;
     long maxpr = 0, maxpa = 0, keep = -1; // maximum value for nrows-ncols
@@ -834,8 +834,8 @@ main(int argc, char **argv)
 	    argc -= 2;
 	    argv += 2;
 	}
-	else if(argc > 1 && strcmp (argv[1], "-final") == 0){
-	    final = 1;
+	else if(argc > 1 && strcmp (argv[1], "-nonfinal") == 0){
+	    final = 0;
 	    argc--;
 	    argv++;
 	}
