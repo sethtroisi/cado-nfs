@@ -309,7 +309,7 @@ opts.Add(
     BoolOption(
         'ALLOW_VERBOSE',
         "Set to 'yes' to turn on output messages in some tifa functions",
-        1
+        0
     )
 )
 opts.Add(
@@ -361,7 +361,7 @@ opts.Add(
     BoolOption(
         'ALLOW_TIMING',
         "Set to 'yes' to turn on timing measurements in some tifa functions",
-        1
+        0
     )
 )
 opts.Add(

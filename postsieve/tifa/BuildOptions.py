@@ -201,16 +201,16 @@
 #
 # Set to 'yes' to print critical error messages on stderr.
 #
-# Default: 'yes'
+# Default: 'no'
 #-------------------------------------------------------------------------------
-#PRINT_ERROR = 'no'
+#PRINT_ERROR = 'yes'
 
 #
 # Set to 'yes' to turn on output messages for some Tifa functions and programs.
 #
 # Default: 'yes'
 #-------------------------------------------------------------------------------
-ALLOW_VERBOSE = 'no'
+#ALLOW_VERBOSE = 'no'
 
 #
 # Set to 'yes' to turn on output messages for the cfrac function.
@@ -260,9 +260,9 @@ ALLOW_VERBOSE = 'no'
 # Set to 'yes' to turn on timing measurements for some Tifa functions and
 # programs.
 #
-# Default: 'yes'
+# Default: 'no'
 #-------------------------------------------------------------------------------
-ALLOW_TIMING = 'no'
+#ALLOW_TIMING = 'yes'
 
 #
 # Set to 'yes' to turn on timing messages for the cfrac function.
