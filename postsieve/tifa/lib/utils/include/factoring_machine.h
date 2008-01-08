@@ -1,6 +1,6 @@
 //
-// Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-// Computer Science and Control)
+// Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+// in Computer Science and Control)
 //
 // This library is free software; you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -89,6 +89,18 @@ enum factoring_mode_enum {
     * \brief Equivalent to <tt>struct factoring_mode_enum</tt>.
     */
 typedef enum factoring_mode_enum factoring_mode_t;
+
+   /**
+    * Global constant array mapping factoring modes to their respective best
+    * outcome.
+    */
+static const int mode_to_outcome[5] = {
+    SOME_FACTORS_FOUND,
+    SOME_FACTORS_FOUND,
+    SOME_COPRIME_FACTORS_FOUND,
+    SOME_PRIME_FACTORS_FOUND,
+    COMPLETE_FACTORIZATION_FOUND
+};
 
    /**
     * \enum machine_state_enum

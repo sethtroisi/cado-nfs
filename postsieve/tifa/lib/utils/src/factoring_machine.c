@@ -1,6 +1,6 @@
 //
-// Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-// Computer Science and Control)
+// Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+// in Computer Science and Control)
 //
 // This library is free software; you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -29,22 +29,9 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#include "factoring_machine.h"
+#include "macros.h"
 #include "funcs.h"
-
-//------------------------------------------------------------------------------
-//                         NON PUBLIC DEFINE(S)
-//------------------------------------------------------------------------------
-
-//
-// Number of Miller-Rabin iterations to perform for each compositeness test.
-//
-#define NMILLER_RABIN       32
-//
-// Mere shortcut to GMP's mpz_probab_prime_p
-//
-#define IS_PRIME(X) (0 != mpz_probab_prime_p((X), NMILLER_RABIN))
-//-----------------------------------------------------------------------------
+#include "factoring_machine.h"
 
 //------------------------------------------------------------------------------
 //                 PROTOTYPES OF NON PUBLIC FUNCTION(S)
@@ -402,7 +389,7 @@ ecode_t find_complete_factorization(factoring_machine_t* machine) {
                 mpz_clear(cofactor);
                 break;
             }
-            if (IS_PRIME(cofactor)) {
+            if (MPZ_IS_PRIME(cofactor)) {
 
                 append_mpz_to_array(machine->factors, cofactor);
                 append_uint32_to_array(machine->multis, 1);
@@ -504,7 +491,7 @@ ecode_t find_complete_factorization(factoring_machine_t* machine) {
 
             for (uint32_t i = 0; i < machine->factors->length; i++) {
 
-                if (IS_PRIME(machine->factors->data[i])) {
+                if (MPZ_IS_PRIME(machine->factors->data[i])) {
 
                     append_mpz_to_array(all_factors, machine->factors->data[i]);
                     append_uint32_to_array(
@@ -622,7 +609,7 @@ bool are_all_prime(const mpz_array_t* const array) {
     //
     bool all_prime = true;
     for (uint32_t i = 0; i < array->length; i++) {
-        if (!IS_PRIME(array->data[i])) {
+        if (!MPZ_IS_PRIME(array->data[i])) {
             all_prime = false;
             break;
         }

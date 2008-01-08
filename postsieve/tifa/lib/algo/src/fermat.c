@@ -1,6 +1,6 @@
 //
-// Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-// Computer Science and Control)
+// Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+// in Computer Science and Control)
 //
 // This library is free software; you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -51,6 +51,7 @@
 
 #include "first_primes.h"
 #include "fermat.h"
+#include "tifa_factor.h"
 #include "funcs.h"
 #include "macros.h"
 #include "linked_list.h"
@@ -264,10 +265,15 @@ void set_fermat_params_to_default(fermat_params_t* const params
 static ecode_t recurse(mpz_array_t* const factors, uint32_array_t* const multis,
                        const mpz_t n, factoring_mode_t mode) {
 
-    fermat_params_t params;
-    set_fermat_params_to_default(&params);
-
-    return fermat(factors, multis, n, &params, mode);
+    return tifa_factor(factors, multis, n, mode);
+    
+    //
+    // The following code should be used to factor a number using _only_ 
+    // McKee's method.
+    //
+    //fermat_params_t params;
+    //set_fermat_params_to_default(&params);
+    //return fermat(factors, multis, n, &params, mode);
 }
 //-----------------------------------------------------------------------------
 ecode_t fermat(mpz_array_t* const factors, uint32_array_t* const multis,

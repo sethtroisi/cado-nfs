@@ -1,6 +1,6 @@
 //
-// Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-// Computer Science and Control)
+// Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+// in Computer Science and Control)
 //
 // This library is free software; you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -21,7 +21,7 @@
  * \file    macros.h
  * \author  Jerome Milan
  * \date    Thu Nov 23 2006
- * \version 1.0
+ * \version 1.x
  *
  * \brief Various CPP macros.
  *
@@ -250,6 +250,23 @@ do {                                                         \
     * Takes as parameter an <tt>mpz_t</tt>.
     */
 #define MPZ_IS_SQUARE(X) (0 != mpz_perfect_square_p(X))
+
+   /**
+    * \def NMILLER_RABIN
+    *
+    * Number of Miller-Rabin iterations to perform for each compositeness test.
+    */
+#define NMILLER_RABIN    32
+
+   /**
+    * \def MPZ_IS_PRIME(X)
+    *
+    * Syntaxic sugar macro wrapping a call to <tt>mpz_probab_prime_p</tt>.
+    * "Returns" true if and only if the \c mpz_t \c X is (probably) prime.
+    *
+    * Takes as parameter an <tt>mpz_t</tt>.
+    */
+#define MPZ_IS_PRIME(X) (0 != mpz_probab_prime_p((X), NMILLER_RABIN))
 
    /**
     * \def MPN_ADD(A, B, C)

@@ -1,6 +1,6 @@
 //
-// Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-// Computer Science and Control)
+// Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+// in Computer Science and Control)
 //
 // This library is free software; you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -52,7 +52,9 @@
 #include "x_tree.h"
 #include "macros.h"
 #include "smooth_filter.h"
+#include "factoring_machine.h"
 #include "cfrac.h"
+#include "tifa_factor.h"
 
 #define __PREFIX__      "cfrac: "
 #define __VERBOSE__     TIFA_VERBOSE_CFRAC
@@ -351,6 +353,7 @@ void set_cfrac_params_to_default(const mpz_t n, cfrac_params_t* const params) {
     while (size_n < optimal_base_sizes[i].min_size_n) {
         i--;
     }
+    
     params->nprimes_in_base    = optimal_base_sizes[i].size_base;
     params->nprimes_tdiv       = params->nprimes_in_base;
     params->nrelations         = CFRAC_DFLT_NRELATIONS;
@@ -429,6 +432,19 @@ static ecode_t init_cfrac_context(factoring_machine_t* const machine) {
     //
     sort_multipliers(context);
     choose_multiplier(context);
+    
+    //
+    // Alternatively, evaluate the multiplier using Silverman's modified 
+    // Knuth-Knoeppel function.
+    //
+    //context->multiplier = ks_multiplier(
+    //                          context->n,
+    //                          context->factor_base->alloced
+    //                      );
+    //
+    //mpz_mul_ui(context->kn, context->n, context->multiplier);
+    //
+    
     //
     // Compute the factor base using the found multiplier.
     //
@@ -568,7 +584,6 @@ static ecode_t clear_cfrac_context(factoring_machine_t* const machine) {
 }
 //------------------------------------------------------------------------------
 static ecode_t update_cfrac_context(factoring_machine_t* const machine) {
-
     //
     // If no factors (or not enough factors) are found, update the CFRAC
     // context according to the following strategy:
@@ -727,7 +742,6 @@ static ecode_t perform_cfrac(factoring_machine_t* const machine) {
         clear_uint32_array_list(decomp_list);
         free(decomp_list);
     }
-
     STOP_TIMER;
     PRINT_TIMING;
     
@@ -742,7 +756,9 @@ static ecode_t perform_cfrac(factoring_machine_t* const machine) {
     uint32_array_list_t* relations;
     
     if (machine->mode == SINGLE_RUN) {
+                
         relations = find_dependencies(context->matrix, params->linalg_method);
+    
     } else {
         //
         // We have to clone the matrix and perform the resolution on the copy
@@ -784,10 +800,14 @@ static ecode_t perform_cfrac(factoring_machine_t* const machine) {
 static ecode_t recurse(mpz_array_t* const factors, uint32_array_t* const multis,
                        const mpz_t n, factoring_mode_t mode) {
 
-    cfrac_params_t params;
-    set_cfrac_params_to_default(n, &params);
-
-    return cfrac(factors, multis, n, &params, mode);
+    return tifa_factor(factors, multis, n, mode);
+    
+    //
+    // The following code should be used to factor a number using _only_ CFRAC.
+    //
+    //cfrac_params_t params;
+    //set_cfrac_params_to_default(n, &params);
+    //return cfrac(factors, multis, n, &params, mode);
 }
 //------------------------------------------------------------------------------
 
@@ -906,7 +926,7 @@ static void generate_xi_yi_pairs(
         if (mpz_cmpabs_ui(cfstate->q, first_primes[0]) >= 0) {
 
         	if (IS_ODD(cfstate->nsteps_performed)) {
-        	    mpz_neg(yi_array->data[i], cfstate->q);
+        	    mpz_neg(yi_array->data[i], cfstate->q); 
             } else {
                 mpz_set(yi_array->data[i], cfstate->q);
             }

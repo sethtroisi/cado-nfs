@@ -445,42 +445,6 @@ if env['BUILDDIR_DEPENDS_ON_PLATFORM'] != 0:
         print "Warning: Cannot infer build directory:"
         print "         -> using directory BUILDDIR from BuildOptions.py."
 
-#
-# Check machine / architecture dependant options
-#
-if env['ENDIANNESS'] == "infer":
-    print "Checking for endianness..."
-    try:
-        env['ENDIANNESS'] = sys.byteorder
-    except:
-        print "ERROR: Cannot infer endianness:"
-        print "         -> Please set ENDIANNESS manually in BuildOptions.py."
-        sys.exit(-1)
-
-if (env['WORDSIZE'] == "") or (env['WORDSIZE'] == "infer"):
-    print "Checking for size of machine word..."
-    try:
-        import platform
-        env['WORDSIZE'] = platform.architecture()[0][0:2]
-    except ImportError:
-        print "Warning: Cannot find python module 'platform':"
-        print "         -> wordsize based on max integer."
-        print sys.maxint
-        if sys.maxint == 65535:
-            env['WORDSIZE'] = 16
-        elif sys.maxint == 2147483647:
-            env['WORDSIZE'] = 32
-        elif sys.maxint == 9223372036854775807:
-            env['WORDSIZE'] = 64
-        else:
-            print "Warning: Cannot infer size of machine word:"
-            print "         -> Please set WORDSIZE manually in BuildOptions.py."
-    except:
-        print sys.maxint
-        print "ERROR: Cannot infer size of machine word:"
-        print "       -> Please set WORDSIZE manually in BuildOptions.py."
-        sys.exit(-1)
-
 sysinfo = os.uname();
 
 env['COMPILED_ON_OS']      = sysinfo[0];
@@ -613,7 +577,8 @@ int main() {
     ret = context.TryRun(program, '.c')
     context.Result(ret[1])
     return ret[1]
-    #------------------------------------------------------------------------------
+
+#------------------------------------------------------------------------------
 def checkLongMax(context):
     context.Message( 'Getting LONG_MAX... ' )
     program = """
@@ -636,14 +601,57 @@ int main() {
     context.Result(ret[1])
     return ret[1]
 #------------------------------------------------------------------------------
+def checkEndianness(context):
+    context.Message("Checking for endianness... ")
+    if context.env['ENDIANNESS'] == "infer":
+        try:
+            context.Result(sys.byteorder)
+            return str(sys.byteorder)
+        except:
+            print "ERROR: Cannot infer endianness:"
+            print "       -> Set ENDIANNESS manually in BuildOptions.py."
+            sys.exit(-1)
+#------------------------------------------------------------------------------
+def checkSizeWord(context):
+    if (context.env['WORDSIZE'] == "") or (context.env['WORDSIZE'] == "infer"):
+        context.Message("Checking for size of machine word... ")
+        try:
+            import platform
+            res = platform.architecture()[0][0:2]
+            context.Result(res)
+            return res
+        except ImportError:
+            print "Warning: Cannot find python module 'platform':"
+            print "         -> wordsize based on max integer."
+            if sys.maxint == 65535:
+                context.Result(16)
+                return 16
+            elif sys.maxint == 2147483647:
+                context.Result(32)
+                return 32
+            elif sys.maxint == 9223372036854775807:
+                context.Result(64)
+                return 64
+            else:
+                print "Warning: Cannot infer size of machine word:"
+                print "         -> Set WORDSIZE manually in BuildOptions.py."
+        except:
+            print sys.maxint
+            print "ERROR: Cannot infer size of machine word:"
+            print "       -> Set WORDSIZE manually in BuildOptions.py."
+            sys.exit(-1)
+    
+#------------------------------------------------------------------------------
 
 conf = Configure(
            env,
            custom_tests = {
-               'checkSizeOf'   : checkSizeOf,
-               'checkCharBit'  : checkCharBit,
-               'checkUlongMax' : checkUlongMax,
-               'checkLongMax'  : checkLongMax
+               'checkSizeOf'     : checkSizeOf,
+               'checkCharBit'    : checkCharBit,
+               'checkUlongMax'   : checkUlongMax,
+               'checkLongMax'    : checkLongMax,
+               'checkEndianness' : checkEndianness,
+               'checkSizeWord'   : checkSizeWord
            }
        )
 #
@@ -685,6 +693,12 @@ conf.env['ULONG_MAX']          = conf.checkUlongMax()
 conf.env['SIZEOF_ULONG_T']     = conf.checkSizeOf('unsigned long int')
 conf.env['LONG_MAX']           = conf.checkLongMax()
 conf.env['SIZEOF_LONG_T']      = conf.checkSizeOf('long int')
+
+#
+# Machine or architecture dependant checks
+#
+conf.env['ENDIANNESS']         = conf.checkEndianness()
+conf.env['WORDSIZE']           = conf.checkSizeWord()
 
 env = conf.Finish()
 

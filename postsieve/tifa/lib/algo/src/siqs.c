@@ -1,6 +1,6 @@
 //
-// Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-// Computer Science and Control)
+// Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+// in Computer Science and Control)
 //
 // This library is free software; you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -59,7 +59,9 @@
 #include "x_tree.h"
 #include "hashtable.h"
 #include "bernsteinisms.h"
+#include "factoring_machine.h"
 #include "siqs.h"
+#include "tifa_factor.h"
 
 #define __PREFIX__  "siqs: "
 #define __VERBOSE__ TIFA_VERBOSE_SIQS
@@ -387,7 +389,7 @@ static const u32triplet_t optimal_params[NRANGES] = {
    //
    // These "optimal" values were computed by experimental determination.
    // Actually, they should be regarded more as "good enough" values than
-   // "optimal" values as they are still quite crude and not as fine-tuned as 
+   // "optimal" values as they are still quite crude and not as fine-tuned as
    // CFRAC's.
    //
    {.min_size_n = 0	 , .size_base = 64  , .hwidth = 5000  },
@@ -508,7 +510,7 @@ void set_siqs_params_to_default(const mpz_t n, siqs_params_t* const params) {
     // _TO_DO_: Gather more data to provide better parameter values depending
     //          on the size of the number to factor.
     //
-    
+
     //
     // Size of number to factor = size(n),
     //
@@ -543,7 +545,7 @@ void set_siqs_params_to_default(const mpz_t n, siqs_params_t* const params) {
  */
 
 //------------------------------------------------------------------------------
-static ecode_t init_siqs_context(factoring_machine_t* const machine) { 
+static ecode_t init_siqs_context(factoring_machine_t* const machine) {
     //
     // Initialize the SIQS implementation specific variables...
     //
@@ -559,20 +561,19 @@ static ecode_t init_siqs_context(factoring_machine_t* const machine) {
 
     mpz_init_set(context->n, machine->n);
     mpz_init(context->kn);
-    
+
     context->factor_base     = alloc_uint32_array(params->nprimes_in_base);
     context->log_factor_base = alloc_byte_array(context->factor_base->alloced);
     context->sqrtm_pi        = alloc_uint32_array(
                                    context->factor_base->alloced
                                );
-    
+
     context->multiplier = ks_multiplier(
                               context->n,
                               context->factor_base->alloced
                           );
-    
+
     mpz_mul_ui(context->kn, context->n, context->multiplier);
-    
     //
     // Initialize all the data common to all the polynomials we are likely to
     // use for the sieving.
@@ -772,7 +773,7 @@ static ecode_t clear_siqs_context(factoring_machine_t* const machine) {
 
         clear_byte_array(context->sieve);
         free(context->sieve);
-        
+
         clear_uint32_array(context->sqrtm_pi);
         free(context->sqrtm_pi);
 
@@ -815,15 +816,15 @@ static ecode_t perform_siqs(factoring_machine_t* const machine) {
 
     siqs_context_t* context = (siqs_context_t*) machine->context;
     siqs_params_t*  params  = context->params;
-    
+
     PRINT_COLLECT_RELS_MSG;
     START_TIMER;
-    
+
     //
     // Collect congruences relations
     //
     ecode_t ecode = collect_relations(context);
-    
+
     if (ecode != SUCCESS) {
         return ecode;
     }
@@ -920,7 +921,7 @@ static ecode_t perform_siqs(factoring_machine_t* const machine) {
     PRINT_DED_FACTORS_MSG;
     RESET_TIMER;
     START_TIMER;
-    
+
     //
     // Deduce factors of n using the found relations.
     //
@@ -932,7 +933,7 @@ static ecode_t perform_siqs(factoring_machine_t* const machine) {
                 relations,
                 context->factor_base
             );
-    
+
     STOP_TIMER;
     PRINT_TIMING;
 
@@ -951,10 +952,14 @@ static ecode_t perform_siqs(factoring_machine_t* const machine) {
 static ecode_t recurse(mpz_array_t* const factors, uint32_array_t* const multis,
                        const mpz_t n, factoring_mode_t mode) {
 
-    siqs_params_t params;
-    set_siqs_params_to_default(n, &params);
-
-    return siqs(factors, multis, n, &params, mode);
+    return tifa_factor(factors, multis, n, mode);
+    
+    //
+    // The following code should be used to factor a number using _only_ SIQS.
+    //
+    //siqs_params_t params;
+    //set_siqs_params_to_default(n, &params);
+    //return siqs(factors, multis, n, &params, mode);
 }
 //------------------------------------------------------------------------------
 
@@ -996,9 +1001,9 @@ static void fill_sieve(siqs_context_t* const context) {
     uint32_t curprime = 0;
     uint32_t cursol   = 0;
     uint32_t sindex   = 0;
-    
+
     const uint32_t fblength = factor_base->length;
-    
+
     const uint32_t* const fbdata     = factor_base->data;
     const uint32_t* const sol1data   = sol1->data;
     const uint32_t* const sol2data   = sol2->data;
@@ -1023,7 +1028,7 @@ static void fill_sieve(siqs_context_t* const context) {
     //
     // Sieve with the prime 2 only with sol1 and only if SIEVE_WITH_2 != 0.
     //
-#if SIEVE_WITH_2    
+#if SIEVE_WITH_2
     //
     // imax (respectively imin) is the maximum (resp. minimum) value of i
     // for which (sol1->data[0] + 2*i) >= sieve_begin and
@@ -1079,20 +1084,30 @@ static void fill_sieve(siqs_context_t* const context) {
         } else {
             imax = ((imax + 1) / (int32_t)curprime) - 1;
         }
-        
+
         imin = (sieve_begin - (int32_t)cursol);
         if (imin <= 0) {
             imin = (imin / (int32_t)curprime);
         } else {
             imin = ((imin - 1) / (int32_t)curprime) + 1;
         }
-        
+
         sindex = cursol + (curprime * imin) - sieve_begin;
-        
+
         for (int32_t i = imax; i >= imin; i--) {
             sieve_data[sindex] += logp;
             sindex += curprime;
-        }        
+        }
+
+/*      unsigned char* siaddr = (&sieve_data[0]) + sindex;       
+      for (int32_t i = imax; i >= imin; i--) {
+          *(siaddr) += logp;
+          siaddr += curprime;
+          sindex += curprime;
+      }
+*/
+
+
         //
         // Sieve with sol2
         //
@@ -1103,14 +1118,14 @@ static void fill_sieve(siqs_context_t* const context) {
         //   (sol2->data[p] + factor_base->data[p]*i) <= sieve_end
         //
         cursol = sol2data[p];
-        
+
         imax = (sieve_end - (int32_t)cursol);
         if (imax >= 0) {
             imax = imax / (int32_t)curprime;
         } else {
             imax = ((imax + 1) / (int32_t)curprime) - 1;
         }
-        
+
         imin = (sieve_begin - (int32_t)cursol);
         if (imin <= 0) {
             imin = (imin / (int32_t)curprime);
@@ -1151,7 +1166,7 @@ static void scan_sieve(siqs_context_t* const context) {
     const uint32_t xpoolalloced     = xpool->alloced;
     int32_t* const xpooldata        = xpool->data;
     const unsigned char* const sievedata = sieve->data;
-    
+
     int32_t  sieve_end = 0;
     const uint32_t sievelength = sieve->length;
 
@@ -1297,7 +1312,7 @@ static void determine_first_a(siqs_context_t* const context) {
     uint32_t* const imax             = &(context->imax);
     const mpz_ptr to_approx          = context->to_approx;
     const uint32_array_t* const base = context->factor_base;
-    
+
     *imin = 0;
     *imax = 0;
 
@@ -1330,7 +1345,7 @@ static void determine_first_a(siqs_context_t* const context) {
         //}
     }
     *imax = *imin;
-    
+
     //
     // Finding 'imin' and 'imax' in the simplest fashion: just multiply the
     // smallest numbers from the base (without taking twice the same factor)
@@ -1362,7 +1377,7 @@ static void determine_first_a(siqs_context_t* const context) {
     context->nb_poly_same_a = 1 << (context->nprimes_in_a - 1);
     context->loga           = mpz_sizeinbase(context->a, 2);
     context->first_imin     = *imin;
-    
+
     mpz_clear(threshold);
 }
 //-----------------------------------------------------------------------------
@@ -1384,12 +1399,12 @@ static ecode_t determine_next_a(siqs_context_t* const context) {
     if ((*imax + 2) < base->length) {
         //
         // To keep the coefficients at more or less the same order of
-        // magnitude, the new 'a' is derived from the previous 'a' simply by 
-        // incrementing the 'imin' and 'imax' indexes by 2 (and updating 'a' 
-        // accordingly). Why not incrementing these indexes by 1? Well, it seems 
-        // that we get a lot of redundant relations if several values of 'a' 
-        // differ only by a single prime. This is explained in S.P. Contini's 
-        // thesis "Factoring integers with the Self-initializing Quadratic 
+        // magnitude, the new 'a' is derived from the previous 'a' simply by
+        // incrementing the 'imin' and 'imax' indexes by 2 (and updating 'a'
+        // accordingly). Why not incrementing these indexes by 1? Well, it seems
+        // that we get a lot of redundant relations if several values of 'a'
+        // differ only by a single prime. This is explained in S.P. Contini's
+        // thesis "Factoring integers with the Self-initializing Quadratic
         // Sieve" and was indeed confirmed by our own experimentations.
         //
         mpz_divexact_ui(a, a, base->data[*imin]);
@@ -1404,7 +1419,7 @@ static ecode_t determine_next_a(siqs_context_t* const context) {
 
     } else {
         //
-        // _WARNING_: We're running out of primes in the base so we can't 
+        // _WARNING_: We're running out of primes in the base so we can't
         //            use the previous scheme anymore. This should be avoided
         //            and indeed with a reasonnable choice of parameters, this
         //            won't happen. This means we are using a too narrow sieve
@@ -1441,10 +1456,10 @@ static ecode_t determine_next_a(siqs_context_t* const context) {
         // one prime...
         //
         context->nprimes_in_a += 1;
-        
+
         (*imin) = context->first_imin;
         (*imax) = (*imin) + context->nprimes_in_a - 1;
-    
+
         mpz_set_ui(a, base->data[*imin]);
 
         for (unsigned int i = 1; i < context->nprimes_in_a; i++) {
@@ -1456,7 +1471,7 @@ static ecode_t determine_next_a(siqs_context_t* const context) {
         //
         clear_mpz_array(context->Bl);
         free(context->Bl);
-        
+
         context->Bl = alloc_mpz_array(context->nprimes_in_a);
 
         for (uint32_t i = 0; i < context->nprimes_in_a; i++) {
@@ -1493,7 +1508,7 @@ static ecode_t init_first_polynomial(siqs_context_t* const context) {
     uint32_array_t* const sol2        = context->sol2;
 
     ecode_t ecode = SUCCESS;
-   
+
     mpz_t inv;
     mpz_init(inv);
     mpz_t mpzp;
@@ -1529,7 +1544,7 @@ static ecode_t init_first_polynomial(siqs_context_t* const context) {
             PRINTF_STDERR("\n");
             PRINT_ERROR("%Zd has no inverse mod %Zd!\n", Bl->data[l], mpzp);
             PRINT_ERROR("this should not happen - factorization aborted!\n");
-            
+
             ecode = FATAL_INTERNAL_ERROR;
             goto clean_and_return;
         };
@@ -1548,7 +1563,7 @@ static ecode_t init_first_polynomial(siqs_context_t* const context) {
         mpz_add(b, b, Bl->data[l]);
     }
     Bl->length = Bl->alloced;
-    
+
     mpz_mul(c, b, b);
     mpz_sub(c, c, context->kn);
     mpz_divexact(c, c, a);
@@ -1582,7 +1597,7 @@ static ecode_t init_first_polynomial(siqs_context_t* const context) {
             PRINTF_STDERR("\n");
             PRINT_ERROR("%Zd has no inverse mod %"PRIu32"!\n", a, curprime);
             PRINT_ERROR("This should not happen - Factorization aborted!\n");
-            
+
             ecode = FATAL_INTERNAL_ERROR;
             goto clean_and_return;
         };
@@ -1592,7 +1607,7 @@ static ecode_t init_first_polynomial(siqs_context_t* const context) {
             gamma *= (2 * mpz_get_ui(inv));
             gamma %= factor_base->data[i];
             Bainv2[i][j] = (uint32_t) gamma;
-        }  
+        }
         //
         // Computes the first solution to the g_{a,b}(x) = 0 mod p congruence
         //
@@ -1619,7 +1634,7 @@ static ecode_t init_first_polynomial(siqs_context_t* const context) {
             tmp64 += curprime;
         }
         sol2->data[i] = (uint32_t) tmp64;
-    }    
+    }
     //
     // Setting the length are not strictly needed (as we don't use them), but
     // let's try to maintain a bit of consistency...
@@ -1628,7 +1643,7 @@ static ecode_t init_first_polynomial(siqs_context_t* const context) {
     sol2->length   = sol2->alloced;
 
   clean_and_return:
-  
+
     mpz_clear(inv);
     mpz_clear(mpzp);
 
@@ -1782,7 +1797,7 @@ static void compute_reduced_polynomial_values(siqs_context_t* const context) {
     cand_u->length       = x->length;
     cand_a_array->length = x->length;
 
-    mpz_clear(rgx); 
+    mpz_clear(rgx);
 }
 //-----------------------------------------------------------------------------
 static uint32_t get_sieve_threshold(siqs_context_t* const context) {
@@ -1830,7 +1845,7 @@ static ecode_t collect_relations(siqs_context_t* const context) {
     // Collect the relations (a.xi + b)^2 = g_{a,b}(xi) mod (kn). This is
     // of course the 'core' of the SIQS algorithm...
     //
-    siqs_params_t*  params  = context->params;
+    siqs_params_t*  params = context->params;
 
     bool chunk_partially_scanned = false;
     bool sieve_fully_scanned     = false;
@@ -1953,7 +1968,7 @@ static ecode_t collect_relations(siqs_context_t* const context) {
             context->smooth_redgx->alloced
         );
     }
-   
+
     return SUCCESS;
 }
 //-----------------------------------------------------------------------------
@@ -2014,7 +2029,7 @@ static ecode_t update_current_polynomial(siqs_context_t* const context) {
         if (ecode != SUCCESS) {
             return ecode;
         }
-        
+
         ecode = init_first_polynomial(context);
         if (ecode != SUCCESS) {
             return ecode;

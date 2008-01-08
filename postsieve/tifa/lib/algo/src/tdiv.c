@@ -1,6 +1,6 @@
 //
-// Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-// Computer Science and Control)
+// Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+// in Computer Science and Control)
 //
 // This library is free software; you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -36,6 +36,7 @@
   */
 
 #include <stdlib.h>
+#include <stdbool.h>
 
 #include "tifa_config.h"
 #include <gmp.h>
@@ -43,14 +44,17 @@
     #include "gmp-impl.h"
 #endif
 
-#include "tdiv.h"
 #include "first_primes.h"
+#include "factoring_machine.h"
+#include "macros.h"
+#include "tdiv.h"
+#include "tifa_factor.h"
 
 #define __PREFIX__  "tdiv: "
 #define __VERBOSE__ TIFA_VERBOSE_TDIV
 #define __TIMING__  TIFA_TIMING_TDIV
 
-#include <messages.h>
+#include "messages.h"
 
 //------------------------------------------------------------------------------
 //                   NON PUBLIC STRUCTURE(S) AND TYPEDEF(S)
@@ -130,8 +134,10 @@ static ecode_t update_tdiv_context(factoring_machine_t* const machine
 //------------------------------------------------------------------------------
 static ecode_t perform_tdiv(factoring_machine_t* const machine) {
 
-    tdiv_context_t* context = (tdiv_context_t*) machine->context;
-
+    tdiv_context_t*  context = (tdiv_context_t*)   machine->context;
+    
+    bool have_found_factors = false;
+    
     if (context->nprimes == 0) {
         return NO_FACTOR_FOUND;
     }
@@ -173,24 +179,25 @@ static ecode_t perform_tdiv(factoring_machine_t* const machine) {
     //
     // Divisions by 2
     //
-    if ( (num[0] & 1) == 0) {
+    if (IS_EVEN(num[0])) {
 
         mpz_setbit(factor, 1);
 
         append_mpz_to_array(machine->factors, factor);
         append_uint32_to_array(machine->multis, 1);
-
+        
         mpn_rshift(num, num, size, 1);
         MPN_NORMALIZE(num, size);
         SIZ(context->n_atd) = size;
 
-        while ( (num[0] & 1) == 0) {
+        while (IS_EVEN(num[0])) {
             mpn_rshift(num, num, size, 1);
             MPN_NORMALIZE(num, size);
             SIZ(context->n_atd) = size;
 
             machine->multis->data[machine->multis->length - 1]++;
         }
+        have_found_factors = true;
     }
     //
     // Divisions by odd primes:
@@ -202,6 +209,10 @@ static ecode_t perform_tdiv(factoring_machine_t* const machine) {
     //
     for (pi = 1; pi < nprimes; pi++) {
 
+        if (mpz_cmp_ui(context->n_atd, 1) == 0) {
+            break;
+        }
+        
         if (mpn_modexact_1_odd(num, size, first_primes[pi]) == 0) {
 
             mpn_divexact_1(num, num, size, first_primes[pi]);
@@ -212,13 +223,14 @@ static ecode_t perform_tdiv(factoring_machine_t* const machine) {
 
             append_mpz_to_array(machine->factors, factor);
             append_uint32_to_array(machine->multis, 1);
-
+            
             while (mpn_modexact_1_odd(num, size, first_primes[pi]) == 0) {
                 mpn_divexact_1(num, num, size, first_primes[pi]);
                 MPN_NORMALIZE(num, size);
                 SIZ(context->n_atd) = size;
                 machine->multis->data[machine->multis->length - 1]++;
             }
+            have_found_factors = true;
         }
     }
 
@@ -230,6 +242,9 @@ static ecode_t perform_tdiv(factoring_machine_t* const machine) {
     // significant benefits according to my tests, at least on Opteron)
     //
     for (uint32_t i = 0; i < nprimes; i++) {
+        if (mpz_cmp_ui(context->n_atd, 1) == 0) {
+            break;
+        }
         if (mpz_divisible_ui_p(context->n_atd, first_primes[i])) {
 
             mpz_set_ui(factor, first_primes[i]);
@@ -237,11 +252,12 @@ static ecode_t perform_tdiv(factoring_machine_t* const machine) {
 
             append_mpz_to_array(machine->factors, factor);
             append_uint32_to_array(machine->multis, 1);
-
+            
             while (mpz_divisible_ui_p(context->n_atd, first_primes[i])) {
                 mpz_divexact_ui(context->n_atd, context->n_atd,first_primes[i]);
                 machine->multis->data[machine->multis->length - 1]++;
             }
+            have_found_factors = true;
         }
     }
 #endif
@@ -252,12 +268,18 @@ static ecode_t perform_tdiv(factoring_machine_t* const machine) {
     PRINT_TIMING;
 
     ecode_t ecode;
-    if (machine->factors->length != 0) {
+    if (have_found_factors) {
         ecode = SOME_FACTORS_FOUND;
     } else {
         ecode = NO_FACTOR_FOUND;
     }
     return ecode;
+}
+//------------------------------------------------------------------------------
+static ecode_t recurse(mpz_array_t* const factors, uint32_array_t* const multis,
+                       const mpz_t n, factoring_mode_t mode) {
+
+    return tifa_factor(factors, multis, n, mode);
 }
 //------------------------------------------------------------------------------
 
@@ -269,7 +291,11 @@ static ecode_t perform_tdiv(factoring_machine_t* const machine) {
 ecode_t tdiv(mpz_t n_atd, mpz_array_t* const factors,
              uint32_array_t* const multis, const mpz_t n,
              const uint32_t nprimes) {
-
+    //
+    // _TO_DO_: The tdiv function does not have the same signature than the 
+    //          other factoring functions. This should be corrected to maintain
+    //          consistency.
+    //
     PRINT_INTRO_MSG("trial division");
     INIT_TIMER;
     START_TIMER;
@@ -286,11 +312,12 @@ ecode_t tdiv(mpz_t n_atd, mpz_array_t* const factors,
     mpz_init_set(machine.n, n);
     mpz_set(context.n_atd, machine.n);
 
-    machine.mode                = FIND_SOME_FACTORS;
+    machine.mode                = SINGLE_RUN;
     machine.params              = NULL;
     machine.context             = (void*)&context;
     machine.init_context_func   = init_tdiv_context;
     machine.perform_algo_func   = perform_tdiv;
+    machine.recurse_func        = recurse;
     machine.update_context_func = update_tdiv_context;
     machine.clear_context_func  = clear_tdiv_context;
     machine.factors             = factors;

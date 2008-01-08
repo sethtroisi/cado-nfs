@@ -78,6 +78,7 @@
 #include "linked_list.h"
 #include "factoring_machine.h"
 #include "squfof.h"
+#include "tifa_factor.h"
 
 #define SQUFOF_DEBUG 0
 #if SQUFOF_DEBUG
@@ -237,7 +238,7 @@
 #if PERFORM_FAST_RETURN
     #define LARGE_STEP_THRESHOLD 4096
 #else
-    #define LARGE_STEP_THRESHOLD TIFA_ULONG_MAX
+    #define LARGE_STEP_THRESHOLD TIFA_LONG_MAX
 #endif
 
 //
@@ -751,10 +752,14 @@ void set_squfof_params_to_default(squfof_params_t* const params
 static ecode_t recurse(mpz_array_t* const factors, uint32_array_t* const multis,
                        const mpz_t n, factoring_mode_t mode) {
 
-    squfof_params_t params;
-    set_squfof_params_to_default(&params);
-
-    return squfof(factors, multis, n, &params, mode);
+    return tifa_factor(factors, multis, n, mode);
+    
+    //
+    // The following code should be used to factor a number using _only_ SQUFOF.
+    //
+    //squfof_params_t params;
+    //set_squfof_params_to_default(&params);
+    //return squfof(factors, multis, n, &params, mode);
 }
 //-----------------------------------------------------------------------------
 ecode_t squfof(mpz_array_t* const factors, uint32_array_t* const multis,
@@ -1877,4 +1882,3 @@ void print_queue(linked_list_t* queue) {
 }
 #endif
 //-----------------------------------------------------------------------------
-

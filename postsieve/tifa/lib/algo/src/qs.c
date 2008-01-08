@@ -1,6 +1,6 @@
 //
-// Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-// Computer Science and Control)
+// Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+// in Computer Science and Control)
 //
 // This library is free software; you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -60,7 +60,9 @@
 #include "hashtable.h"
 #include "x_tree.h"
 #include "bernsteinisms.h"
+#include "factoring_machine.h"
 #include "qs.h"
+#include "tifa_factor.h"
 
 #define __PREFIX__  "qs: "
 #define __VERBOSE__ TIFA_VERBOSE_QS
@@ -846,10 +848,14 @@ static ecode_t perform_qs(factoring_machine_t* const machine) {
 static ecode_t recurse(mpz_array_t* const factors, uint32_array_t* const multis,
                        const mpz_t n, factoring_mode_t mode) {
 
-    qs_params_t params;
-    set_qs_params_to_default(n, &params);
-
-    return qs(factors, multis, n, &params, mode);
+    return tifa_factor(factors, multis, n, mode);
+    
+    //
+    // The following code should be used to factor a number using _only_ QS.
+    //
+    //qs_params_t params;
+    //set_qs_params_to_default(n, &params);
+    //return qs(factors, multis, n, &params, mode);
 }
 //------------------------------------------------------------------------------
 
