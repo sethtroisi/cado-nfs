@@ -292,8 +292,6 @@ static void generate_xi_yi_pairs(
     uint32_t npairs
 );
 //------------------------------------------------------------------------------
-inline static uint32_t select_xi_yi_pairs(cfrac_context_t* context);
-//------------------------------------------------------------------------------
 static void compute_factor_base(uint32_array_t* factor_base, const mpz_t kn);
 //------------------------------------------------------------------------------
 static void sort_multipliers(cfrac_context_t* const context);
@@ -943,32 +941,6 @@ static void generate_xi_yi_pairs(
 	}
 	xi_array->length += npairs;
 	yi_array->length += npairs;
-}
-//------------------------------------------------------------------------------
-inline static uint32_t select_xi_yi_pairs(cfrac_context_t* context) {
-    //
-    // Select relations xi^2 = yi (mod kn) from the candidate_xi and
-    // candidate_yi arrays so that yi is smooth.
-    //
-    if (context->use_large_primes) {
-        return bern_21_rt_pairs_lp(
-            context->n,
-            context->htable,
-            &(context->new_accepted_xi),
-            &(context->new_accepted_yi),
-            context->candidate_xi,
-            context->candidate_yi,
-            context->ptree->data[0]
-        );
-    } else {
-        return bern_21_rt_pairs(
-            &(context->new_accepted_xi),
-            &(context->new_accepted_yi),
-            context->candidate_xi,
-            context->candidate_yi,
-            context->ptree->data[0]
-        );
-    }
 }
 //------------------------------------------------------------------------------
 
