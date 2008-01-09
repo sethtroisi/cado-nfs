@@ -1879,7 +1879,7 @@ inspectRowWeight(sparse_mat_t *mat)
                     // 2: jump to minimal possible mergelevel
 
 void
-merge(sparse_mat_t *mat, /*int nb_merge_max,*/ int maxlevel, int verbose)
+merge(sparse_mat_t *mat, /*int nb_merge_max,*/ int maxlevel, int verbose, int forbw)
 {
     double tt;
     long oldcost = -1, cost, ncost = 0;
@@ -1889,7 +1889,7 @@ merge(sparse_mat_t *mat, /*int nb_merge_max,*/ int maxlevel, int verbose)
     while(1){
 	cost = ((long)mat->rem_ncols) * ((long)mat->weight);
 	fprintf(stderr, "w(M)=%d, ncols*w(M)=%ld\n", mat->weight, cost);
-	if((oldcost != -1) && (cost > oldcost)){
+	if(forbw && ((oldcost != -1) && (cost > oldcost))){
 	    fprintf(stderr, "WARNING: New cost > old cost (%2.2lf)\n",
 		    ((double)cost)/((double)oldcost));
 	    ncost++;
@@ -2013,7 +2013,7 @@ main(int argc, char *argv[])
     int verbose = 0; /* default verbose level */
     double tt;
     double kprune = 1.0; /* prune keeps kprune * (initial excess) */
-    int i;
+    int i, forbw = 0;
     
 #if TEX
     fprintf(stderr, "\\begin{verbatim}\n");
@@ -2061,6 +2061,11 @@ main(int argc, char *argv[])
 	}
 	else if (argc > 1 && strcmp (argv[1], "-v") == 0){
             verbose ++;
+	    argc -= 1;
+	    argv += 1;
+	}
+	else if (argc > 1 && strcmp (argv[1], "-forbw") == 0){
+	    forbw = 1;
 	    argc -= 1;
 	    argv += 1;
 	}
@@ -2114,7 +2119,7 @@ main(int argc, char *argv[])
 		mat.rem_nrows, mat.rem_ncols, seconds()-tt);
     }
 
-    merge(&mat, /*nb_merge_max,*/ maxlevel, verbose);
+    merge(&mat, /*nb_merge_max,*/ maxlevel, verbose, forbw);
     fprintf(stderr, "Final matrix has w(M)=%d, ncols*w(M)=%ld\n",
 	    mat.weight, ((long)mat.rem_ncols) * ((long)mat.weight));
 #if TEX
