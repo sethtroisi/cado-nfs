@@ -1,0 +1,10 @@
+Recent changes:
+---------------
+
+  - Tue Jan  8 2008 by JM:
+      - Added '-factorall' option changing behaviour of factorization of norms.
+      - WARNING: revision 504 or higher of the TIFA library required to use
+        to use the '-factorall' option.
+
+  - Thu Dec 20 2007 by JM:
+      - Initial version based on Paul Zimmermann's checknorms program.
