@@ -769,7 +769,7 @@ handleKer(dense_mat_t *mat, rootprime_t * tabchar, FILE * purgedfile,
 int main(int argc, char **argv) {
   FILE *purgedfile, *kerfile, *indexfile, *relfile;
   int ret;
-  int k;
+  int k, isz;
   unsigned int i, j, n, nlimbs;
   rootprime_t *tabchar;
   int *charval;
@@ -882,9 +882,18 @@ int main(int argc, char **argv) {
 	w >>= 1;
       }
     }
-    for (j = 0; j < nlimbs; ++j)
-      printf("%lx ", newker[j]);
-    printf("\n");
+    // do not print zero vector...!
+    isz = 1;
+    for(j = 0; j < nlimbs; ++j)
+	if(newker[j]){
+	    isz = 0;
+	    break;
+	}
+    if(!isz){
+	for(j = 0; j < nlimbs; ++j)
+	    printf("%lx ", newker[j]);
+	printf("\n");
+    }
   }
 
   free(pol);
