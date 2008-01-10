@@ -18,30 +18,41 @@
 //
 
 /**
- * \file    tifa.h
+ * \file    tifa_internals.h
  * \author  Jerome Milan
  * \date    Thu Jan 10 2008
- * \version 1.1
+ * \version 1.0
  *
- * \brief Library wide public include file.
+ * \brief Library wide include file (complete with internal structures /
+ * functions).
  *
- * Includes only TIFA's structures and functions needed from client code
- * perspective.
+ * Includes all TIFA's structures and functions.
+ *
+ * \warning Usually, only the tifa.h include file is needed. tifa_internals.h
+ * should only be included to access some internal structures or functions.
+ * Be warned that conflicts with client code or external libraries are then
+ * more likely to occur.
  */
-
- /*
-  *  History:
-  *    1.1: Thu Jan 10 2008 by JM:
-  *         - Cleaned: now includes only the bare minimum needed. 
-  *    1.0: Thu Jan 25 2007 by JM:
-  *         - Initial version.
-  */
 
 #if !defined(_TIFA_TIFA_H_)
 #define _TIFA_TIFA_H_
 
 //
-// The configuration file is not strictly needed but nice to have...
+// The following symbols need to be defined before including messages.h
+// and timer.h.
+//
+#if !defined(__VERBOSE__)
+    #define __VERBOSE__ 0
+#endif
+#if !defined(__TIMING__)
+    #define __TIMING__ 0
+#endif
+#if !defined(__PREFIX__)
+    #define __PREFIX__ ""
+#endif
+
+//
+// Configuration file
 //
 #include "tifa_config.h"
 //
@@ -61,7 +72,28 @@
 // Includes from lib/utils
 //
 #include "array.h"
+#include "bernsteinisms.h"
+#include "bitstring_t.h"
 #include "exit_codes.h"
 #include "factoring_machine.h"
+#include "funcs.h"
+#include "gauss_elim.h"
+#include "gmp_utils.h"
+#include "hashtable.h"
+#include "lindep.h"
+#include "linked_list.h"
+      //
+      // _NOTE_: we also include macros.h but conflicts are highly likely!
+      //
+#include "macros.h"
+#include "matrix.h"
+#include "messages.h"
+#include "print_error.h"
+#include "res_tdiv.h"
+#include "smooth_filter.h"
+#include "sqrt_cont_frac.h"
+#include "timer.h"
+#include "x_array_list.h"
+#include "x_tree.h"
 
 #endif

@@ -1,6 +1,6 @@
 //
-// Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-// Computer Science and Control)
+// Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+// in Computer Science and Control)
 //
 // This library is free software; you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -29,13 +29,12 @@
  * Gaussian elimination over GF(2) as presented in the paper "A compact
  * algorithm for Gaussian elimination over GF(2) implemented on highly
  * parallel computers" written by Dennis Parkinson and Marvin Wunderlich
- * (Parallel Computing 1 (1984) pages 65-73).
+ * (Parallel Computing 1, 1984).
+ *
+ * \see "A compact algorithm for Gaussian elimination over GF(2) implemented
+ * on highly parallel computers", D. Parkinson and M. Wunderlich,
+ * <i>Parallel Computing 1</i>, 1984, pages 65-73.
  */
-
- /*
-  *  License: GNU Lesser General Public License (LGPL)
-  *  History:
-  */
 
 #if !defined(_TIFA_GAUSS_ELIM_H_)
    /**
@@ -51,13 +50,6 @@ extern "C" {
 #include <inttypes.h>
 #include "matrix.h"
 #include "x_array_list.h"
-
-//---------------------------------------------------------------------
-// Ref. "A compact algorithm for Gaussian elimination over GF(2)
-//       implemented on highly parallel computers",
-//       Dennis Parkinson, Marvin Wunderlich,
-//       Parallel Computing 1 (1984) 65-73
-//---------------------------------------------------------------------
 
    /**
     * \brief Gaussian elimination on a <tt>binary_matrix_t</tt>.

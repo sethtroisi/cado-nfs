@@ -1,6 +1,6 @@
 //
-// Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-// Computer Science and Control)
+// Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+// in Computer Science and Control)
 //
 // This library is free software; you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -82,7 +82,7 @@ extern "C" {
  */
 
    /**
-    * \struct struct_mult_data_t cfrac.h lib/utils/include/cfrac.h
+    * \struct struct_mult_data_t funcs.h lib/utils/include/funcs.h
     * \brief  Ad hoc structure used in the computation of the multiplier
     * to use.
     *
@@ -172,7 +172,9 @@ inline uint32_t ceil_log2(uint32_t n);
     *
     * Finds a coprime base for the list of factors of \c n given by the
     * array \c *factors and stores it in the allocated but \e uninitialized
-    * array \c base.
+    * array \c base. After invocation, we know that \c n is smooth on the
+    * returned computed base and that all elements of the base are coprime
+    * to each other.
     *
     * The resulting base is obtained:
     * <ol>
@@ -186,8 +188,9 @@ inline uint32_t ceil_log2(uint32_t n);
     * </ol>
     *
     * \warning There is absolutely no guarantee that the returned base elements
-    * are prime or, if they happen to be, that all prime factors of \c n
-    * appear in the returned base.
+    * are prime.  If, by chance, the base only contains primes then it means
+    * that we  have found the complete factorization of \c n (up to the prime 
+    * multiplicities).
     *
     * \note If the \c base array has not enough room to hold all the
     * coprimes found, it will be resized via a call to

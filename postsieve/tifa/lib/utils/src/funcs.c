@@ -1,6 +1,6 @@
 //
-// Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-// Computer Science and Control)
+// Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+// in Computer Science and Control)
 //
 // This library is free software; you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -130,10 +130,11 @@ void augment_coprime_base(mpz_t f, mpz_array_t* base) {
     //                - remove y from the base
     //                - call augment_coprime_base for y/gcd(y, 'f')
     //          - If gcd(y, 'f') == y:
-    //                - keep y in the array
+    //                - keep y in the base
     //                - call augment_coprime_base for 'f'/gcd(y, 'f')
     //          - Otherwise:
-    //                - add gcd in the array
+    //                - add gcd in the base
+    //                - remove y from the base    
     //                - call augment_coprime_base for f/gcd(y, 'f')
     //                - call augment_coprime_base for y/gcd(y, 'f')
     //
@@ -143,40 +144,23 @@ void augment_coprime_base(mpz_t f, mpz_array_t* base) {
     if (mpz_cmp_ui(f, 1) == 0) {
         return;
     }
+    if (base->length == 0) {
+        append_mpz_to_array(base, f);
+        return;
+    }
 
     uint32_t size_f = mpz_sizeinbase(f, 2);
     uint32_t len    = base->length;
 
-    mpz_t gcd;
-    mpz_init2(gcd, size_f);
-
     bool coprime_with_all_others = true;
-
-    //
-    // Add the integer f in the base if it is coprime with all other
-    // integers in the base.
-    //
-    for (uint32_t i = 0; i < len; i++) {
-
-        mpz_gcd(gcd, base->data[i], f);
-
-        if ((mpz_cmp_ui(gcd, 1) != 0) ) {
-            coprime_with_all_others = false;
-            break;
-        }
-    }
-    if (coprime_with_all_others) {
-        if (! is_in_mpz_array(f, base)) {
-            append_mpz_to_array(base, f);
-        }
-        goto clear_gcd_and_return;
-    }
 
     mpz_t cofactor_1;
     mpz_t cofactor_2;
+    mpz_t gcd;
 
     mpz_init2(cofactor_1, size_f);
     mpz_init2(cofactor_2, size_f);
+    mpz_init2(gcd, size_f);
 
     for (uint32_t i = 0; i < len; i++) {
 
@@ -185,7 +169,8 @@ void augment_coprime_base(mpz_t f, mpz_array_t* base) {
         if ((mpz_cmp_ui(gcd, 1) == 0) ) {
             continue;
         }
-
+        coprime_with_all_others = false;
+        
         if ((mpz_cmp(gcd, f) == 0) ) {
             //
             // Keep the gcd in the base and call recursively
@@ -194,7 +179,6 @@ void augment_coprime_base(mpz_t f, mpz_array_t* base) {
             mpz_divexact(cofactor_2, base->data[i], gcd);
             mpz_set(base->data[i], gcd);
             augment_coprime_base(cofactor_2, base);
-
             break;
         }
         if ((mpz_cmp(gcd, base->data[i]) == 0) ) {
@@ -204,7 +188,6 @@ void augment_coprime_base(mpz_t f, mpz_array_t* base) {
             //
             mpz_divexact(cofactor_2, f, gcd);
             augment_coprime_base(cofactor_2, base);
-
             break;
         }
         //
@@ -218,21 +201,21 @@ void augment_coprime_base(mpz_t f, mpz_array_t* base) {
         //
         mpz_divexact(cofactor_1, f, gcd);
         mpz_divexact(cofactor_2, base->data[i], gcd);
-
         mpz_set(base->data[i], gcd);
-
         augment_coprime_base(cofactor_1, base);
         augment_coprime_base(cofactor_2, base);
-
         break;
     }
-
+    if (coprime_with_all_others) {
+        //
+        // Add the integer f in the base if it is coprime with all other
+        // integers in the base.
+        //
+        append_mpz_to_array(base, f);
+    }
+    mpz_clear(gcd);
     mpz_clear(cofactor_1);
     mpz_clear(cofactor_2);
-
-  clear_gcd_and_return:
-
-    mpz_clear(gcd);
 }
 //-----------------------------------------------------------------------------
 void find_coprime_base(mpz_array_t* const base, const mpz_t n,
@@ -341,7 +324,7 @@ uint32_t powm(uint32_t base, uint32_t power, uint32_t modulus) {
 //-----------------------------------------------------------------------------
 uint32_t sqrtm(uint32_t a, uint32_t p) {
     //
-    // Shanks' algorithm for modular square roots.
+    // Shanks's algorithm for modular square roots.
     //
     // See for example algorithm 1.5.1 from the book "A Course in Computational
     // Algebraic Number Theory" by Henri Cohen, Springer-Verlag 1993.
@@ -642,7 +625,7 @@ unsigned long int modinv_ui(unsigned long int num, unsigned long int p) {
     const unsigned long int high_bit_mask = 3 << (n-1);
     const unsigned long int low_bit_mask  = (1 << (n-1)) - 1;
     const unsigned long int nth_bit_mask  = 1 << n;
-    const unsigned long int nth_minus_one_bit_mask  = 1 << (n-1);
+    const unsigned long int nth_minus_one_bit_mask = 1 << (n-1);
 
     while ((u != exp_cu) && (u != -exp_cu) && (v != exp_cv) && (v != -exp_cv)) {
 
