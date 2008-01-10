@@ -35,7 +35,8 @@ char *used;
 
 #define USE_CONNECT 0
 
-#define MERGE_LEVEL_MAX 30
+#define MERGE_LEVEL_MAX 128 // maximum level for a merge; such a large value
+                            // is only useful when not using BW
 
 /* minimum excess we want to keep */
 #define DELTA 128
@@ -48,6 +49,9 @@ char *used;
 //  * fast as above;
 //  * heavy columns are present, but not in S[]; this yields more accurate
 //    weights.
+// 3 means:
+//  * reintroduce columns whose weight is <= mergelevelmax (not suggested
+//    for large numbers).
 #define USE_MERGE_FAST 2
 
 typedef struct {
