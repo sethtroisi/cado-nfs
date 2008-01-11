@@ -14,7 +14,7 @@ if [ $# -ge 2 ]; then prune=$2; fi
 if [ $# -ge 3 ]; then maxlevel=$3; fi
 if [ $# -ge 4 ]; then cwmax=$4; fi
 if [ $# -ge 5 ]; then rwmax=$5; fi
-name=$root.$maxlevel"x"$cwmax"x"$rwmax
+name=$root.$prune"x"$maxlevel"x"$cwmax"x"$rwmax
 if [ $# -ge 6 ]; then verbose="-v"; fi
 
 echo "Args: $*"
