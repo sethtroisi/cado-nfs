@@ -8,10 +8,7 @@
 #include "cado.h"
 #include "readmat.h"
 
-
-int kernel(mp_limb_t * mat, mp_limb_t ** ker, int nrows, int ncols,
-	   int limbs_per_row, int limbs_per_col);
-
+#include "gauss.h"
 
 typedef struct {
     unsigned int nrows;
@@ -115,8 +112,10 @@ int main(int argc, char **argv)
     sparse2dense(dmat, mat);
 
     ker = (mp_limb_t **) malloc(dmat->nrows * sizeof(mp_limb_t *));
+#if SAVE_KERNEL_MEMORY == 0
     for (i = 0; i < dmat->nrows; ++i)
 	ker[i] = (mp_limb_t *) malloc(dmat->limbs_per_col * sizeof(mp_limb_t));
+#endif
 
     dim = kernel(dmat->data, ker, dmat->nrows, dmat->ncols,
 		 dmat->limbs_per_row, dmat->limbs_per_col);

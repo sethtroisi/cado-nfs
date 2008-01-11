@@ -42,6 +42,7 @@ If just the dimension of kernel is wanted, set ker=NULL.
 #include <assert.h>
 #include "gmp.h"   /* only used for setting a random matrix */
 #include "utils.h"  /* for seconds() */
+#include "gauss.h"
 
 #ifndef VERBOSE
 #define VERBOSE 0
@@ -86,13 +87,10 @@ static int LIMBS_PER_ROW = 0;
 static mp_limb_t* matrix = NULL;
 static mp_limb_t** ptr_rows = NULL;
 
-
-
 /* functions declaration */
 
-int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
-	   int limbs_per_row, int limbs_per_col);
 static void check_soundness();
+
 #if 0 /* ununsed currently */
 static void addPartialRows(int row, int pivot, mp_limb_t mask,
 			   int j_cur, mp_limb_t **ptr);
@@ -387,6 +385,10 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
       rank--;
       if (ker != NULL) {
 	/* each unused row gives one element of the kernel */
+#if SAVE_KERNEL_MEMORY
+	ker[0] = (mp_limb_t *) malloc(limbs_per_col * sizeof(mp_limb_t));
+#endif
+
 	/* ker[0] contains the space for the new element of the kernel */
 	mp_limb_t *ptr = ptr_rows[i];
 	
