@@ -103,65 +103,6 @@ static const int mode_to_outcome[5] = {
 };
 
    /**
-    * \enum machine_state_enum
-    *
-    * An enumeration of the state of a <tt>factoring_machine_t</tt>.
-    */
-enum machine_state_enum {
-       /**
-        * Initial state (init the context, perform needed allocation, etc.).
-        */
-    INITIAL_STATE,
-       /**
-        * Update context of algorithm state (update the context of the
-        * algorithm used).
-        */
-    UPDATE_CONTEXT_STATE,
-       /**
-        * Run algorithm state (perform a run of the algorithm).
-        */
-    RUN_ALGO_STATE,
-       /**
-        * Test primality state (test if the found factors are all prime).
-        */
-    TEST_PRIMALITY_STATE,
-       /**
-        * Complete factorization test state (test if the found factors yield
-        * a complete factorization of the number, as product of primes).
-        */
-    TEST_FACTORIZATION_STATE,
-       /**
-        * Recursive factorization state: some factors were found, some of them
-        * non prime. Factor each of these non prime factors independently...
-        */
-    RECURSIVE_FACTORIZATION_STATE,
-       /**
-        * Failure state (the algorithm either failed to find some factors or
-        * failed to reach its goal as provided by the \c factoring_mode_t used).
-        */
-    FAILURE_STATE,
-       /**
-        * Success state (the algorithm succeded to reach its goal as provided
-        * by the \c factoring_mode_t used).
-        */
-    SUCCESS_STATE,
-       /**
-        * Clean state (perform all cleaning, release memory, etc.).
-        */
-    CLEAN_STATE,
-       /**
-        * Final state (dummy state used to indicate end of factorization
-        * task).
-        */
-    FINAL_STATE,
-};
-   /**
-    * \typedef machine_state_t
-    * \brief Equivalent to <tt>struct machine_state_enum</tt>.
-    */
-typedef enum machine_state_enum machine_state_t;
-
-   /**
     * \struct factoring_machine_struct factoring_machine.h
     *         tools/include/factoring_machine.h
     *

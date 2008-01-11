@@ -50,9 +50,10 @@ ecode_t find_complete_factorization(factoring_machine_t*);
 //-----------------------------------------------------------------------------
 bool are_all_prime(const mpz_array_t* const);
 //------------------------------------------------------------------------------
-void compute_cofactor(
-    mpz_t, uint32_array_t* const,
-    const mpz_t, const mpz_array_t* const
+ecode_t compute_multiplicities(
+    uint32_array_t* const multis,
+    const mpz_t n,
+    const mpz_array_t* const factors
 );
 //-----------------------------------------------------------------------------
 
@@ -290,308 +291,159 @@ ecode_t find_complete_factorization(factoring_machine_t* machine) {
     // Try to find a "complete factorization", that is try to find _all_ prime
     // factors together with their multiplicities.
     //
-    // _NOTE_: Things are getting quite ugly here. The code looks opaque
-    //         and the overall strategy certainly could be improved.
-    //
-    // _NOTE_: This function is actually written in a finate state machine
-    //         style because earlier (read "even buggier"!) versions followed
-    //         a much more complicated code flow. After some clean-ups (and
-    //         concessions!) things turned out to be simpler than previously
-    //         thought so using the FSM nomenclature is now completely overkill
-    //         and certainly degrades the readability of the function...
-    //
-    // _TO_DO_: Just read the previous note to infer what's to do! :-)
-    //
-    machine_state_t state = INITIAL_STATE;
-    ecode_t exit_code     = NO_FACTOR_FOUND;
-    ecode_t retcode       = FAILURE;
-
-    while (state != FINAL_STATE) {
-
-        switch (state) {
-
-        case INITIAL_STATE:
-            retcode = machine->init_context_func(machine);
-            state = RUN_ALGO_STATE;
-            break;
-
-        case RUN_ALGO_STATE:
-            retcode = machine->perform_algo_func(machine);
-            
-            switch (retcode) {
-            
-            case SOME_FACTORS_FOUND:
-                state = TEST_PRIMALITY_STATE;
-                break;
-            
-            case FATAL_INTERNAL_ERROR:
-                state     = FAILURE_STATE;
-                exit_code = FATAL_INTERNAL_ERROR;
-                break;
-            
-            default:
-                state = UPDATE_CONTEXT_STATE;
-            }
-            break;
-
-        case UPDATE_CONTEXT_STATE:
-            retcode = machine->update_context_func(machine);
-            if (retcode != SUCCESS) {
-                state = FAILURE_STATE;
-            } else {
-                state = RUN_ALGO_STATE;
-            }
-            break;
-
-        case TEST_PRIMALITY_STATE: {
-            //
-            // Compute a coprime base for all the found factors, then check
-            // the primality of each element in said base.
-            //
-            uint32_t     flen = machine->factors->length;
-            mpz_array_t* base = alloc_mpz_array(flen * (flen + 1));
-
-            find_coprime_base(base, machine->n, machine->factors);
-
-            swap_mpz_array(machine->factors, base);
-
-            clear_mpz_array(base);
-            free(base);
-
-            if (are_all_prime(machine->factors)) {
-                state = TEST_FACTORIZATION_STATE;
-            } else {
-                state = RECURSIVE_FACTORIZATION_STATE;
-            }
+    ecode_t exit_code = NO_FACTOR_FOUND;
+    machine->success  = false;
+    
+    exit_code = machine->init_context_func(machine);
+    exit_code = machine->perform_algo_func(machine);
+    
+    while (true) {
+        if (exit_code == SOME_FACTORS_FOUND) {
             break;
         }
+        if (exit_code == FATAL_INTERNAL_ERROR) {
+            break;
+        }
+        exit_code = machine->update_context_func(machine);
 
-        case TEST_FACTORIZATION_STATE: {
+        if (exit_code != SUCCESS) {
+            break;
+        }
+        exit_code = machine->perform_algo_func(machine);
+    }
+    machine->clear_context_func(machine);
+
+    if (exit_code != SOME_FACTORS_FOUND) {
+        return exit_code;
+    }
+    //
+    // We have found at least one factor. Compute a coprime base for all the
+    // found factors, then compute the multiplicity of each element in said
+    // base (even if they are not all prime).
+    //
+    uint32_t     flen = machine->factors->length;
+    mpz_array_t* base = alloc_mpz_array(flen * (flen + 1));
+        
+    find_coprime_base(base, machine->n, machine->factors);
+    swap_mpz_array(machine->factors, base);
+    
+    clear_mpz_array(base);
+    free(base);
+    
+    exit_code = compute_multiplicities(
+                    machine->multis,
+                    machine->n,
+                    machine->factors
+                );
+    
+    if (exit_code != SUCCESS) {
+        return exit_code;
+    }
+    
+    if (are_all_prime(machine->factors)) {
+        //
+        // The found factors stored in machine->factors are all prime!
+        // This means that we have found the complete factorization of
+        // machine->n.
+        //
+        machine->success = true;
+        return COMPLETE_FACTORIZATION_FOUND;
+    }
+    
+    //
+    // We have a coprime base together with the multiplicity of each of its
+    // element. However, some of these factors are not prime so we should
+    // factorize them.
+    //
+    uint32_t alloced = 2 * machine->factors->length;
+    
+    //
+    // The all_* arrays will hold all the (hopefully prime) factors of
+    // machine->n and their multiplicities.
+    //
+    mpz_array_t*    all_factors = alloc_mpz_array(alloced);
+    uint32_array_t* all_multis  = alloc_uint32_array(alloced);
+
+    bool factorization_is_partial = false;
+
+    for (uint32_t i = 0; i < machine->factors->length; i++) {
+        
+        const mpz_ptr curfactor = machine->factors->data[i];
+        const uint32_t curmulti = machine->multis->data[i];
+        
+        if (MPZ_IS_PRIME(curfactor)) {
+            
+            append_mpz_to_array(all_factors, curfactor);
+            append_uint32_to_array(all_multis, curmulti);
+
+        } else {
             //
-            // The found factors stored in machine->factors are all prime!
-            // Check if these factors are enough to obtain the complete
-            // factorization.
+            // Proceed to factorize this non prime factor...
             //
-            mpz_t cofactor;
-            mpz_init(cofactor);
+            mpz_array_t*   morefactors = alloc_mpz_array(ELONGATION);
+            uint32_array_t* moremultis = alloc_uint32_array(ELONGATION);
 
-            compute_cofactor(
-                cofactor,
-                machine->multis,
-                machine->n,
-                machine->factors
-            );
-
-            if (mpz_cmp_ui(cofactor, 1) == 0) {
-                state     = SUCCESS_STATE;
-                exit_code = COMPLETE_FACTORIZATION_FOUND;
-
-                mpz_clear(cofactor);
-                break;
-            }
-            if (MPZ_IS_PRIME(cofactor)) {
-
-                append_mpz_to_array(machine->factors, cofactor);
-                append_uint32_to_array(machine->multis, 1);
-
-                state     = SUCCESS_STATE;
-                exit_code = COMPLETE_FACTORIZATION_FOUND;
-
-                mpz_clear(cofactor);
-                break;
-            }
-            //
-            // If we reach this point then cofactor is different from 1 and
-            // it is not a prime. So let's factorize it.
-            //
-            mpz_array_t*    morefactors = alloc_mpz_array(ELONGATION);
-            uint32_array_t* moremultis  = alloc_uint32_array(ELONGATION);
-
-            retcode = machine->recurse_func(
-                          morefactors,
-                          moremultis,
-                          cofactor,
-                          machine->mode
-                      );
+            ecode_t retcode = machine->recurse_func(
+                                  morefactors,
+                                  moremultis,
+                                  curfactor,
+                                  FIND_COMPLETE_FACTORIZATION
+                              );
 
             switch (retcode) {
 
             case COMPLETE_FACTORIZATION_FOUND:
-                //
-                // Since machine->factors holds only prime factors and since
-                // we know that these factors cannot divide cofactor, we
-                // can just concatenate our result arrays to obtain the
-                // complete factorization.
-                //
-                append_mpz_array(machine->factors, morefactors);
-                append_uint32_array(machine->multis, moremultis);
-                state     = SUCCESS_STATE;
-                exit_code = COMPLETE_FACTORIZATION_FOUND;
+                for (uint32_t j = 0; j < moremultis->length; j++) {
+                    moremultis->data[j] *= curmulti;
+                }
+                append_mpz_array(all_factors, morefactors);
+                append_uint32_array(all_multis, moremultis);
                 break;
 
             case PARTIAL_FACTORIZATION_FOUND:
-                //
-                // Since machine->factors holds only prime factors and since
-                // we know that these factors cannot divide cofactor, we
-                // can just concatenate our result arrays. However, we do
-                // not have the complete factorization...
-                //
-                append_mpz_array(machine->factors, morefactors);
-                append_uint32_array(machine->multis, moremultis);
-                state     = FAILURE_STATE;
-                exit_code = PARTIAL_FACTORIZATION_FOUND;
-                break;
+                factorization_is_partial = true;
                 
+                for (uint32_t j = 0; j < moremultis->length; j++) {
+                    moremultis->data[j] *= machine->multis->data[i];
+                }
+                append_mpz_array(all_factors, morefactors);
+                append_uint32_array(all_multis, moremultis);
+                break;
+
             case FATAL_INTERNAL_ERROR:
             case NO_FACTOR_FOUND:
             case GIVING_UP:
-                //
-                // What should we do here? For the time being we just return
-                // with the found factors and give up. Ideally, we could
-                // try different factoring algorithms here before resigning.
-                //
-                append_mpz_to_array(machine->factors, cofactor);
-                append_uint32_to_array(machine->multis, 1);
-                state     = FAILURE_STATE;
-                exit_code = PARTIAL_FACTORIZATION_FOUND;
-                break;
-
             default:
                 //
-                // This switch case cannot be accessed... presumably...
+                // For the time being we just return with the found
+                // factors and give up. Ideally, we could try different
+                // factoring algorithms here before resigning.
                 //
-                append_mpz_to_array(machine->factors, cofactor);
-                append_uint32_to_array(machine->multis, 1);
-                state     = FAILURE_STATE;
-                exit_code = PARTIAL_FACTORIZATION_FOUND;
+                factorization_is_partial = true;
+                append_mpz_to_array(all_factors, curfactor);
+                append_uint32_to_array(all_multis, curmulti);
                 break;
             }
-
             clear_mpz_array(morefactors);
             clear_uint32_array(moremultis);
-
             free(morefactors);
             free(moremultis);
-
-            mpz_clear(cofactor);
-            break;
-        }
-
-        case RECURSIVE_FACTORIZATION_STATE: {
-            //
-            // Some coprime factors were found. They are, however, not
-            // necessarily prime, so we should factor the non prime ones.
-            //
-            uint32_t alloced = 2 * machine->factors->length;
-
-            mpz_array_t*    all_factors = alloc_mpz_array(alloced);
-            uint32_array_t* all_multis  = alloc_uint32_array(alloced);
-
-            bool factorization_is_partial = false;
-
-            for (uint32_t i = 0; i < machine->factors->length; i++) {
-
-                if (MPZ_IS_PRIME(machine->factors->data[i])) {
-
-                    append_mpz_to_array(all_factors, machine->factors->data[i]);
-                    append_uint32_to_array(
-                        all_multis,
-                        machine->multis->data[i]
-                    );
-
-                } else {
-                    //
-                    // Proceed to factorize the non prime factor...
-                    //
-                    mpz_array_t*   morefactors = alloc_mpz_array(ELONGATION);
-                    uint32_array_t* moremultis = alloc_uint32_array(ELONGATION);
-
-                    retcode = machine->recurse_func(
-                                  morefactors,
-                                  moremultis,
-                                  machine->factors->data[i],
-                                  machine->mode
-                              );
-
-                    switch (retcode) {
-
-                    case COMPLETE_FACTORIZATION_FOUND:
-                        append_mpz_array(machine->factors, morefactors);
-                        append_uint32_array(machine->multis, moremultis);
-                        break;
-
-                    case PARTIAL_FACTORIZATION_FOUND:
-                        factorization_is_partial = true;
-                        append_mpz_array(machine->factors, morefactors);
-                        append_uint32_array(machine->multis, moremultis);
-                        break;
-
-                    case FATAL_INTERNAL_ERROR:
-                    case NO_FACTOR_FOUND:
-                    case GIVING_UP:
-                        //
-                        // Same remark as in the test factorization state:
-                        //
-                        // For the time being we just return with the found
-                        // factors and give up. Ideally, we could try different
-                        // factoring algorithms here before resigning.
-                        //
-                    default:
-                        factorization_is_partial = true;
-                        append_mpz_to_array(
-                            machine->factors,
-                            machine->factors->data[i]
-                        );
-                        append_uint32_to_array(machine->multis, 1);
-
-                        break;
-                    }
-                    clear_mpz_array(morefactors);
-                    clear_uint32_array(moremultis);
-
-                    free(morefactors);
-                    free(moremultis);
-                }
-            }
-            swap_mpz_array(machine->factors, all_factors);
-            swap_uint32_array(machine->multis, all_multis);
-
-            clear_mpz_array(all_factors);
-            clear_uint32_array(all_multis);
-
-            free(all_factors);
-            free(all_multis);
-
-            if (factorization_is_partial) {
-                state     = FAILURE_STATE;
-                exit_code = PARTIAL_FACTORIZATION_FOUND;
-            } else {
-                state     = SUCCESS_STATE;
-                exit_code = COMPLETE_FACTORIZATION_FOUND;
-            }
-            break;
-        }
-
-        case SUCCESS_STATE:
-            machine->success = true;
-            state = CLEAN_STATE;
-            break;
-
-        case FAILURE_STATE:
-            machine->success = false;
-            state = CLEAN_STATE;
-            break;
-
-        case CLEAN_STATE:
-            machine->clear_context_func(machine);
-            state = FINAL_STATE;
-            break;
-
-        default:
-            return FATAL_INTERNAL_ERROR;
         }
     }
-    return exit_code;
+    swap_mpz_array(machine->factors, all_factors);
+    swap_uint32_array(machine->multis, all_multis);
+
+    clear_mpz_array(all_factors);
+    clear_uint32_array(all_multis);
+    free(all_factors);
+    free(all_multis);
+
+    if (factorization_is_partial) {
+        return PARTIAL_FACTORIZATION_FOUND;
+    } else {
+        machine->success = true;
+        return COMPLETE_FACTORIZATION_FOUND;
+    }
 }
 //-----------------------------------------------------------------------------
 
@@ -617,14 +469,15 @@ bool are_all_prime(const mpz_array_t* const array) {
     return all_prime;
 }
 //-----------------------------------------------------------------------------
-void compute_cofactor(mpz_t cofactor, uint32_array_t* const multis,
-                      const mpz_t n, const mpz_array_t* const factors) {
+ecode_t compute_multiplicities(uint32_array_t* const multis,
+                               const mpz_t n,
+                               const mpz_array_t* const factors) {
     //
-    // Computes the cofactor of 'n' obtained after trial division by its known
-    // factors stored in the coprime base 'factors' and stores it in, you
-    // guessed it, 'cofactor'.
+    // Computes the multiplicities of the factors of 'n' given by the coprime
+    // base 'factors' and stores them in the 'multis' array.
     //
-    mpz_set(cofactor, n);
+    mpz_t cofactor;
+    mpz_init_set(cofactor, n);
 
     multis->length = 0;
 
@@ -632,10 +485,10 @@ void compute_cofactor(mpz_t cofactor, uint32_array_t* const multis,
         //
         // _NOTE_: We already know that 'n' is divisible by each element in
         //         the array 'factors' _and_ we known that these factors are
-        //         coprime with each other (i.e. 'factors' is a coprime base).
+        //         coprime with each other (i.e. 'factors' is a coprime base)
+        //         so no divisibility test is required for the first division.
         //
         mpz_divexact(cofactor, cofactor, factors->data[i]);
-
         append_uint32_to_array(multis, 1);
     }
     if (mpz_cmp_ui(cofactor, 1) != 0) {
@@ -649,5 +502,17 @@ void compute_cofactor(mpz_t cofactor, uint32_array_t* const multis,
             }
         }
     }
+    if (mpz_cmp_ui(cofactor, 1) != 0) {
+        //
+        // This should not happen since 'n' is supposed to be
+        // smooth of the coprime base given by 'factors'! We could return
+        // the found factors and multiplities but that would mask a potential 
+        // nasty bug in the code, so let's be convervative and return an error.
+        //
+        mpz_clear(cofactor);
+        return FATAL_INTERNAL_ERROR;
+    }
+    mpz_clear(cofactor);
+    return SUCCESS;
 }
 //-----------------------------------------------------------------------------
