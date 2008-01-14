@@ -314,6 +314,8 @@ doAllAdds(int **newrows, char *str)
     }
 }
 
+#define STRLENMAX 2048
+
 // We start from M_purged which is nrows x ncols;
 // we build M_small which is small_nrows x small_ncols.
 // newrows[i] if != NULL, contains a list of the indices of the rows in
@@ -327,7 +329,7 @@ main(int argc, char *argv[])
     int nrows, ncols;
     int **newrows, i, j, nb, *nbrels, **oldrows, *colweight;
     int ind, small_nrows, small_ncols, **sparsemat;
-    char str[1024];
+    char str[STRLENMAX];
     int verbose = 0;
 
     if (argc > 1 && strcmp (argv[1], "-v") == 0)
@@ -349,7 +351,7 @@ main(int argc, char *argv[])
     // read parameters that should be the same as in purgedfile!
     hisfile = fopen(argv[2], "r");
     assert(hisfile != NULL);
-    fgets(str, 1024, hisfile);
+    fgets(str, STRLENMAX, hisfile);
     sscanf(str, "%d %d", &nrows, &ncols);
     newrows = (int **)malloc(nrows * sizeof(int *));
     for(i = 0; i < nrows; i++){
@@ -358,8 +360,13 @@ main(int argc, char *argv[])
 	newrows[i][1] = i;
     }
     fprintf(stderr, "Reading row additions\n");
-    while(fgets(str, 1024, hisfile))
+    while(fgets(str, STRLENMAX, hisfile)){
+	if(str[strlen(str)-1] != '\n'){
+	    fprintf(stderr, "Gasp: too long a line!\n");
+	    exit(0);
+	}
 	doAllAdds(newrows, str);
+    }
     fclose(hisfile);
     nbrels = (int *)malloc(nrows * sizeof(int));
     memset(nbrels, 0, nrows * sizeof(int));
