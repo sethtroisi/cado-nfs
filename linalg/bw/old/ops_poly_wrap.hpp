@@ -3,7 +3,9 @@
 
 #include "ops_poly_fft.hpp"
 #include "ops_poly_schoolbook.hpp"
+#ifdef	PATCHED_GMP
 #include "ops_poly_integerfft.hpp"
+#endif
 
 class ops_poly_wrap {
 	ops_poly_fft fft;
