@@ -35,7 +35,7 @@ char *used;
 
 #define USE_CONNECT 0
 
-#define MERGE_LEVEL_MAX 128 // maximum level for a merge; such a large value
+#define MERGE_LEVEL_MAX 256 // maximum level for a merge; such a large value
                             // is only useful when not using BW
 
 /* minimum excess we want to keep */
@@ -685,33 +685,43 @@ findAllRowsWithGivenj(INT *ind, sparse_mat_t *mat, INT j, int nb)
 //////////////////////////////////////////////////////////////////////
 // Prim
 
+#define QUEUE_TYPE 1 // 0 for naive, 1 for heap
+
+#if QUEUE_TYPE == 0
+
+// we put fQ in Q[0][0], lQ in Q[0][1].
+
+#define isQueueEmpty(Q) (Q[0][0] == Q[0][1])
+
 void
-popQueue(int *s, int *t, int **Q, int *fQ /*, int *lQ */)
+popQueue(int *s, int *t, int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3])
 {
-    *s = Q[*fQ][0];
-    *t = Q[*fQ][1];
-    *fQ += 1;
+    int fQ = Q[0][0];
+
+    *s = Q[fQ][0];
+    *t = Q[fQ][1];
+    Q[0][0]++;
 }
 
 void
-printQueue(int **Q, int fQ, int lQ)
+printQueue(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3])
 {
     int i;
 
-    for(i = fQ; i < lQ; i++)
+    for(i = Q[0][0]; i < Q[0][1]; i++)
 	fprintf(stderr, "Q[%d] = [%d, %d, %d]\n", i,Q[i][0], Q[i][1], Q[i][2]);
 }
 
 void
-addEdge(int **Q, int *fQ, int *lQ, int u, int v, int Auv)
+addEdge(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3], int u, int v, int Auv)
 {
-    int i, j;
+    int i, j, fQ = Q[0][0], lQ = Q[0][1];
 
-    for(i = *fQ; i < *lQ; i++)
+    for(i = fQ; i < lQ; i++)
 	if(Auv < Q[i][2])
 	    break;
     // shift everybody: Auv >= Q[i][2]
-    for(j = *lQ; j > i; j--){
+    for(j = lQ; j > i; j--){
 	Q[j][0] = Q[j-1][0];
 	Q[j][1] = Q[j-1][1];
 	Q[j][2] = Q[j-1][2];
@@ -719,75 +729,180 @@ addEdge(int **Q, int *fQ, int *lQ, int u, int v, int Auv)
     Q[i][0] = u;
     Q[i][1] = v;
     Q[i][2] = Auv;
-    *lQ += 1;
+    Q[0][1]++;
 }
+
+#else
+// Q[0][0] contains the number of items in Q[], so that useful part of Q
+// is Q[1..Q[0][0]].
+
+#define isQueueEmpty(Q) (Q[0][0] == 0)
+
+void
+printQueue(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3])
+{
+    int level = 0, imax = 1, i;
+
+    fprintf(stderr, "L0:");
+    for(i = 1; i <= Q[0][0]; i++){
+	fprintf(stderr, " %d", Q[i][2]);
+	if(i == imax){
+	    imax = (imax<<1)+1;
+	    fprintf(stderr, "\nL%d:", ++level);
+	}
+    }
+    fprintf(stderr, "\n");
+}
+
+void
+upQueue(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3], int k)
+{
+    int x = Q[k][0], y = Q[k][1], v = Q[k][2];
+
+    while((k > 1) && (Q[k/2][2] >= v)){
+	// we are at level > 0 and the father is >= son
+	// the father replaces the son
+	Q[k][0] = Q[k/2][0];
+	Q[k][1] = Q[k/2][1];
+	Q[k][2] = Q[k/2][2];
+	k /= 2;
+    }
+    // we found the place of (x, y, v)
+    Q[k][0] = x;
+    Q[k][1] = y;
+    Q[k][2] = v;
+}
+
+void
+addEdge(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3], int u, int v, int Auv)
+{
+    Q[0][0]++;
+    Q[Q[0][0]][0] = u;
+    Q[Q[0][0]][1] = v;
+    Q[Q[0][0]][2] = Auv;
+    upQueue(Q, Q[0][0]);
+    if(Q[0][0] >= MERGE_LEVEL_MAX*MERGE_LEVEL_MAX-2)
+	fprintf(stderr, "size(Q) -> %d\n", Q[0][0]);
+}
+
+// Move Q[1] down.
+void
+downQueue(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3], int k)
+{
+    int x = Q[k][0], y = Q[k][1], v = Q[k][2], j;
+
+    while(k <= Q[0][0]/2){
+	// k has at least a left son
+	j = 2*k;
+	if(j < Q[0][0])
+	    // k has a right son
+	    if(Q[j][2] > Q[j+1][2])
+		j++;
+	// at this point, Q[j] is the largest son
+	if(v <= Q[j][2])
+	    break;
+	else{
+	    // the father takes the place of the son
+	    Q[k][0] = Q[j][0];
+	    Q[k][1] = Q[j][1];
+	    Q[k][2] = Q[j][2];
+	    k = j;
+	}
+    }
+    // we found the place of v
+    Q[k][0] = x;
+    Q[k][1] = y;
+    Q[k][2] = v;
+}
+
+// smallest edge (s, t) is always in Q[1]
+void
+popQueue(int *s, int *t, int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3])
+{
+    *s = Q[1][0];
+    *t = Q[1][1];
+    Q[1][0] = Q[Q[0][0]][0];
+    Q[1][1] = Q[Q[0][0]][1];
+    Q[1][2] = Q[Q[0][0]][2];
+    Q[0][0]--;
+    downQueue(Q, 1);
+}
+#endif
 
 // Add all neighbors of u, which is already in T; all edges with v in T
 // are not useful anymore.
 void
-addAllEdges(int **Q, int *fQ, int *lQ, int u, int *father, int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], int m)
+addAllEdges(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3],
+	    int u, int *father, int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], int m)
 {
     int v;
 
     for(v = 0; v < m; v++)
 	if((v != u) && (father[v] < 0))
-	    addEdge(Q, fQ, lQ, u, v, A[u][v]);
+	    addEdge(Q, u, v, A[u][v]);
 }
 
 // height[0] = 0, etc. Returns hmax.
 int
-minimalSpanningTreeWithPrim(int *father, int *height, int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], int m)
+minimalSpanningTreeWithPrim(int *father, int *height, 
+			    int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
+			    int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], int m)
 {
-    int **Q, m2 = m*m, u, fQ = 0, lQ = 0, s, t, i, nV, hmax = 0;
+    int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3]; // over-conservative
+    int u, s, t, i, nV, hmax = 0;
 
-    // over-conservative
-    Q = (int **)malloc(m2 * sizeof(int *));
-    for(i = 0; i < m2; i++)
-	Q[i] = (int *)malloc(3 * sizeof(int));
     // nodes of T
     for(i = 0; i < m; i++){
 	father[i] = -1;
 	height[i] = 0;
+	sons[i][0] = 0; // last occupied position for a son of i
     }
     u = 0;
     father[u] = u; // for the root, isn't it?
     nV = m-1;
-    addAllEdges(Q, &fQ, &lQ, u, father, A, m);
-#if DEBUG >= 1
-    printQueue(Q, fQ, lQ);
-#endif
+#if QUEUE_TYPE == 0
+    Q[0][0] = 1;
+    Q[0][1] = 1;
+    addAllEdges(Q, u, father, A, m);
     // active part of Q is Q[fQ..lQ[
-    ASSERT(fQ == 0);
-    ASSERT(lQ == (m-1));
-    while(fQ != lQ){
+    ASSERT(Q[0][0] == 1);
+    ASSERT(Q[0][1] == m);
+#else
+    Q[0][0] = 0;
+    addAllEdges(Q, u, father, A, m);
+#endif
+#if DEBUG >= 1
+    printQueue(Q);
+#endif
+    while(! isQueueEmpty(Q)){
 	// while queue is non empty
 	// pop queue
-        popQueue(&s, &t, Q, &fQ /*, &lQ */);
+        popQueue(&s, &t, Q);
 #if DEBUG >= 1
-	fprintf(stderr, "Popping a = (%d, %d)\n", s, t);
+	fprintf(stderr, "Popping a = (%d, %d) of weight %d\n", s, t, A[s][t]);
 #endif
 	if(father[t] == -1){
 	    // t does not close a cycle
 	    // T[u] <- T[u] union (s, t)
 #if DEBUG >= 1
-	    fprintf(stderr, "new edge: (%d, %d)\n", s, t);
+	    fprintf(stderr, "new edge: (%d, %d) of weight %d\n",s,t,A[s][t]);
 #endif
 	    father[t] = s;
+	    // store new son for s
+	    sons[s][0]++;
+	    sons[s][sons[s][0]] = t;
 	    height[t] = height[s]+1;
 	    if(height[t] > hmax)
 		hmax = height[t];
 	    nV--;
 	    if(nV == 0)
 		break;
-	    addAllEdges(Q, &fQ, &lQ, t, father, A, m);
+	    addAllEdges(Q, t, father, A, m);
 #if DEBUG >= 1
-	    printQueue(Q, fQ, lQ);
+	    printQueue(Q);
 #endif
 	}
     }
-    for(i = 0; i < m2; i++)
-	free(Q[i]);
-    free(Q);
     return hmax;
 }
 
@@ -864,9 +979,11 @@ minimalSpanningTreeWithKruskal(int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], int m)
 #endif
 
 int
-minimalSpanningTree(int *father, int *height, /*sparse_mat_t *mat,*/ int m, int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX])
+minimalSpanningTree(int *father, int *height, 
+		    int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
+		    int m, int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX])
 {
-    return minimalSpanningTreeWithPrim(father, height, A, m);
+    return minimalSpanningTreeWithPrim(father, height, sons, A, m);
     //    minimalSpanningTreeWithKruskal(A, m);
 }
 
@@ -1563,24 +1680,14 @@ tryAllCombinations(sparse_mat_t *mat, int m, INT *ind)
 }
 
 void
-useMinimalSpanningTree(sparse_mat_t *mat, int m, INT *ind, double *tfill,
-                       double *tMST)
+addFatherToSonsHeight(sparse_mat_t *mat, int m, int *ind,
+		      int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX],
+		      int *father, int *height, int hmax)
 {
-    int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX];
-    int i, father[MERGE_LEVEL_MAX], height[MERGE_LEVEL_MAX], hmax, nV = m, h;
     int adds[MERGE_LEVEL_MAX << 1], nadds, itab;
     INT tab[MERGE_LEVEL_MAX << 1];
+    int i, h, nV = m;
 
-    *tfill = seconds();
-    fillRowAddMatrix(A, mat, m, ind);
-    *tfill = seconds()-*tfill;
-    *tMST = seconds();
-    hmax = minimalSpanningTree(father, height, /*mat,*/ m, A);
-    *tMST = seconds()-*tMST;
-#if DEBUG >= 1
-    for(i = 0; i < m; i++)
-	fprintf(stderr, "father[%d] = %d\n", i, father[i]);
-#endif
     // add each father to each of his sons, but from bottom to top...!
     for(h = hmax; h > 0; h--){
 	// we are currently at height h
@@ -1636,6 +1743,75 @@ useMinimalSpanningTree(sparse_mat_t *mat, int m, INT *ind, double *tfill,
 	    tab[0] = -tab[0]-1; // what a trick!
 	reportn(tab, itab);
     }
+}
+
+// add u to its sons
+void
+addFatherToSonsRec(sparse_mat_t *mat, int m, int *ind,
+		   int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX],
+		   int *father,
+		   int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
+		   int u)
+{
+    int k, tab[MERGE_LEVEL_MAX], itab = 0, i1, i2;
+
+    if(sons[u][0] == 0)
+	// nothing to do for a leaf...!
+	return;
+    i2 = ind[u];
+    if(u == father[u])
+	tab[itab++] = i2; // trick for the root!!!
+    else
+	tab[itab++] = -(i2+1); // the usual trick not to destroy row
+    for(k = 1; k <= sons[u][0]; k++){
+	addFatherToSonsRec(mat, m, ind, A, father, sons, sons[u][k]);
+	i1 = ind[sons[u][k]];
+	// add u to its son
+	addRowsSWAR(mat, i1, i2, A[sons[u][k]][u]);
+	tab[itab++] = i1;
+    }
+    reportn(tab, itab);
+}
+
+void
+addFatherToSons(sparse_mat_t *mat, int m, int *ind,
+		int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX],
+		int *father, int *height, int hmax,
+		int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1])
+{
+#if 0
+    addFatherToSonsHeight(mat, m, ind, A, father, height, hmax);
+#else
+    addFatherToSonsRec(mat, m, ind, A, father, sons, 0);
+#endif
+}
+
+void
+useMinimalSpanningTree(sparse_mat_t *mat, int m, INT *ind, double *tfill,
+                       double *tMST)
+{
+    int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX];
+    int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1];
+    int i, father[MERGE_LEVEL_MAX], height[MERGE_LEVEL_MAX], hmax;
+
+    *tfill = seconds();
+    fillRowAddMatrix(A, mat, m, ind);
+    *tfill = seconds()-*tfill;
+    *tMST = seconds();
+    hmax = minimalSpanningTree(father, height, sons, m, A);
+    *tMST = seconds()-*tMST;
+#if DEBUG >= 1
+    for(i = 0; i < m; i++)
+	fprintf(stderr, "father[%d] = %d\n", i, father[i]);
+    for(i = 0; i < m; i++){
+	int k;
+	fprintf(stderr, "Sons of %d:", i);
+	for(k = 1; k <= sons[i][0]; k++)
+	    fprintf(stderr, " %d", sons[i][k]);
+	fprintf(stderr, "\n");
+    }
+#endif
+    addFatherToSons(mat, m, ind, A, father, height, hmax, sons);
 #if 0 // for non compact reporting
     // delete root!
     report1(ind[0]);
