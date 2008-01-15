@@ -17,11 +17,14 @@ std::ostream& print_line_without_ones(std::ostream& os, const matrix_line& m)
 
 std::ostream& std::operator<<(std::ostream& os, const matrix_line& m)
 {
+	/*
 	os << m.size();
 	for(unsigned int i = 0 ; i < m.size() ; i++) {
 		os << " " << m[i].first << ":" << m[i].second;
 	}
 	return os;
+	*/
+	return print_line_without_ones(os,m);
 }
 
 std::istream& std::operator>>(std::istream& is, matrix_line& m)

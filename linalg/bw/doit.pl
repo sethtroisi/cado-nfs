@@ -117,7 +117,7 @@ sub parse_matrix_header {
 		$h->{'nrows'}=$1;
 		$hline =~ /(\d+)\s+COLUMNS/i
 			or die "bad header line in $f : $hline";
-		$h->{'ncols'}=$2;
+		$h->{'ncols'}=$1;
 		$hline =~ /MODULUS\s+(\d+)/i
 			or die "bad header line in $f : $hline";
 		$h->{'modulus'} = $1;

@@ -133,14 +133,19 @@ int main(int argc, char * argv[])
 
 	for( ;; ) {
 		matrix_line li;
-		string q,r,x;
+		string s;
 		ostringstream sstr;
-
-		if (!(mtx >> q >> r >> x >> li)) {
+		getline(mtx, s);
+		if (mtx.eof())
+			break;
+		unsigned int x = s.find('|');
+		istringstream mt(s.substr(x+2));
+		
+		if (!(mt >> li)) {
 			break;
 		}
 
-		sstr << q << ' ' << r << ' ' << x << flush;
+		sstr << s.substr(0,x) << endl;
 
 		clink_data.push_back(sstr.str());
 		rows.push_back(li);

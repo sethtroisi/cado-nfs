@@ -32,6 +32,7 @@ struct pod_traits {
 
 	static int can() {
 		return globals::nbys == 1 &&
+			nbits >= 2*(int) MODBITS() &&
 			acc < 1UL << (nbits - 2*MODBITS()); 
 	}
 
