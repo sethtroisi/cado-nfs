@@ -909,7 +909,7 @@ void bw_commit_f(polmat& F) /*{{{*/
         if (gone_mad[j]) {
             cout << fmt("not writing % -- gone haywire since step %, "
                     "hence % steps ago\n")
-                % filename % gone_mad[j] % (t-gone_mad[j]);
+                % filename % (t-gone_mad[j]) % gone_mad[j] ;
             continue;
         }
         ofstream f(filename);

@@ -47,7 +47,7 @@ BW_PREP_SOURCES:=					\
 		auxfuncs.c				\
 		cxx/prep.cpp cxx/files.cpp		\
 		cxx/matrix_header.cpp
-BW_PREP_LIBS:=-lgmp -lgmpxx
+BW_PREP_LIBS:=-lgmpxx -lgmp
 -include .bw-prep.mkf
 
 BW_SLAVE_SOURCES:=					\
@@ -59,9 +59,9 @@ BW_SLAVE_SOURCES:=					\
 		cxx/matrix.cpp cxx/matrix_line.cpp	\
 		cxx/files.cpp cxx/matrix_header.cpp	\
 		cxx/preconditioner.cpp
-BW_SLAVE_LIBS:=-lgmp -lgmpxx
+BW_SLAVE_LIBS:=-lgmpxx -lgmp
 BW_SLAVE_EXTRA_MODELS:=mt
-BW_SLAVE_MT_LIBS:=-lgmp -lgmpxx
+BW_SLAVE_MT_LIBS:=-lgmpxx -lgmp
 -include .bw-slave.mkf
 
 # BW_SLAVE_OLD_SOURCES:=				\
@@ -84,7 +84,7 @@ BW_PRINTMAGMA_SOURCES:=					\
 		auxfuncs.c cxx/matrix_header.cpp	\
 		cxx/files.cpp				\
 		cxx/matrix_line.cpp cxx/printmagma.cpp
-BW_PRINTMAGMA_LIBS:=-lgmp -lgmpxx
+BW_PRINTMAGMA_LIBS:=-lgmpxx -lgmp
 -include .bw-printmagma.mkf
 
 
@@ -97,7 +97,7 @@ BW_MASTER_SOURCES:=					\
 		cxx/master.cpp cxx/detect_params.cpp	\
 		cxx/files.cpp cxx/matrix_header.cpp	\
 		cxx/ticks.cpp cxx/matrices_printing.cpp
-BW_MASTER_LIBS:=-lgmp -lgmpxx
+BW_MASTER_LIBS:=-lgmpxx -lgmp
 -include .bw-master.mkf
 endif
 
@@ -207,7 +207,7 @@ BW_GATHER_SOURCES:=					\
 		cxx/matrix.cpp	cxx/matrix_line.cpp	\
 		cxx/files.cpp cxx/matrix_header.cpp	\
 		cxx/preconditioner.cpp
-BW_GATHER_LIBS:=-lgmp -lgmpxx
+BW_GATHER_LIBS:=-lgmpxx -lgmp
 -include .bw-gather.mkf
 
 BW_MUL_SOURCES:=					\
@@ -215,7 +215,7 @@ BW_MUL_SOURCES:=					\
 		cxx/mul.cpp				\
 		cxx/matrix.cpp	cxx/matrix_line.cpp	\
 		cxx/files.cpp cxx/matrix_header.cpp
-BW_MUL_LIBS:=-lgmp -lgmpxx
+BW_MUL_LIBS:=-lgmpxx -lgmp
 -include .bw-mul.mkf
 
 # useless -- these were the days where the output of the master code was
@@ -289,7 +289,7 @@ BW_RANDOM_SOURCES:=			\
 		cxx/matrix_header.cpp	\
 		cxx/matrix_line.cpp	\
 		cxx/random.cpp
-BW_RANDOM_LIBS:=-lgmp -lgmpxx
+BW_RANDOM_LIBS:=-lgmpxx -lgmp
 -include .bw-random.mkf
 
 BW_DUMP_SOURCES:=auxfuncs.c old/old-endian.c old/dump.c
@@ -309,7 +309,7 @@ NFSFORGE_SOURCES:=				\
 		cxx/nfsforge.cpp cxx/files.cpp	\
 		cxx/matrix_header.cpp		\
 		cxx/matrix_line.cpp
-NFSFORGE_LIBS:=-lgmp -lgmpxx
+NFSFORGE_LIBS:=-lgmpxx -lgmp
 -include .nfsforge.mkf
 
 BW_BALANCE_SOURCES:=				\
@@ -323,7 +323,7 @@ BW_BALANCE_LIBS:=
 BW_SECURE_SOURCES:=						\
 		auxfuncs.c cxx/files.cpp cxx/matrix_header.cpp	\
 		cxx/matrix_line.cpp cxx/secure.cpp
-BW_SECURE_LIBS:=-lgmp -lgmpxx
+BW_SECURE_LIBS:=-lgmpxx -lgmp
 -include .bw-secure.mkf
 
 BW_PCOLUMN_SOURCES:=auxfuncs.c old/old-endian.c old/pcolumn.c
