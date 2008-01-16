@@ -197,19 +197,45 @@ checkWithIndexAll(char *purgedname, char *indexname, char *kername, int verbose)
 
 int main(int argc, char *argv[])
 {
-    int verbose = 1;
+    char *matname = NULL, *indexname = NULL, *purgedname = NULL;
+    char *kername = NULL;
+    int verbose = 0, compact = 0;
 
-#if 0
-    int compact = 0;
-    if(argc > 3){
-	compact = atoi(argv[3]);
-	if(argc > 4)
-	    verbose = atoi(argv[4]);
+    while(argc > 1 && argv[1][0] == '-'){
+        if(argc > 2 && strcmp (argv[1], "-mat") == 0){
+	    matname = argv[2];
+            argc -= 2;
+            argv += 2;
+        }
+        else if(argc > 2 && strcmp (argv[1], "-ker") == 0){
+	    kername = argv[2];
+            argc -= 2;
+            argv += 2;
+        }
+        else if(argc > 2 && strcmp (argv[1], "-index") == 0){
+	    indexname = argv[2];
+            argc -= 2;
+            argv += 2;
+        }
+        else if(argc > 2 && strcmp (argv[1], "-purged") == 0){
+	    purgedname = argv[2];
+            argc -= 2;
+            argv += 2;
+        }
+	else if(argc > 1 && strcmp (argv[1], "-compact") == 0){
+	    compact = 1;
+	    argc -= 1;
+	    argv += 1;
+	}
+	else if(argc > 1 && strcmp (argv[1], "-verbose") == 0){
+	    verbose = 1;
+	    argc -= 1;
+	    argv += 1;
+	}
     }
-    checkSparseAll(argv[1], argv[2], compact, verbose);
-#else
-    verbose = 0;
-    checkWithIndexAll(argv[1], argv[2], argv[3], verbose);
-#endif
+    if(indexname != NULL)
+	checkWithIndexAll(purgedname, indexname, kername, verbose);
+    else
+	checkSparseAll(matname, kername, compact, verbose);
     return 0;
 }
