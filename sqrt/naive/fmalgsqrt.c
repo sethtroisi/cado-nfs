@@ -52,7 +52,7 @@ int main(int argc, char **argv)
     nab = 0;
     while(fscanf(abfile, "%ld %lu", &a, &b) != EOF){
 	if(!(nab % 100000))
-	    fprintf(stderr, "# Reading ab pair #%d\n", nab);
+	    fprintf(stderr, "# Reading ab pair #%d at %2.2lf\n",nab,seconds());
 	if((a == 0) && (b == 0))
 	    break;
 	polymodF_from_ab(tmp, a, b);
