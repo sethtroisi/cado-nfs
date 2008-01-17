@@ -890,7 +890,9 @@ int main(int argc, char **argv) {
 	    isz = 0;
 	    break;
 	}
-    if(!isz){
+    if(isz)
+	fprintf(stderr, "Sorry %d-th vector is 0\n", i);
+    else{
 	for(j = 0; j < nlimbs; ++j)
 	    printf("%lx ", newker[j]);
 	printf("\n");
