@@ -28,8 +28,7 @@ rsa100  1.0    15	40	150  12m25   171485x171357
 rsa100  0.1    15       40      150   2m33   168213x168085
 
 (Note: checknorms only outputs 7272158 out of 7309995 relations.)
-rsa110  1.0    10       40      200   4m35   337412x337284
-rsa110  0.0    11       40      200   2m34   318285x318157
+rsa110  1.0   120      300      500  78m13   189584x189456
 
 (Note: checknorms only outputs 7851953 out of 7892349 relations.)
 rsa120  1.0    10       40      200   5m58   564777x564649
