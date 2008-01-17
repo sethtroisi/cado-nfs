@@ -336,7 +336,8 @@ SqrtWithIndexAll(char *prefix, FILE *relfile, FILE *purgedfile, FILE *indexfile,
 	ret = treatDep(ratname, algname, relfile, purgedfile, indexfile, kerfile, pol, nrows, ncols, small_row_used, small_nrows, &H, nlimbs, rel_used, vec, rora, verbose);
 	if(ret == -1)
 	    break;
-	fprintf(stderr, "# Treated dependency #%d\n", ndepmin);
+	fprintf(stderr, "# Treated dependency #%d at %2.2lf\n",
+		ndepmin, seconds());
 	hashClear(&H);
 	ndepmin++;
     }

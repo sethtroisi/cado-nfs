@@ -617,7 +617,8 @@ buildCharacterMatrix(char **charmat, int k, rootprime_t * tabchar, FILE *purgedf
     // read all relation-sets and update charmat accordingly
     for(i = 0; i < small_nrows; i++){
 	if(!(i % 10000))
-	    fprintf(stderr, "Treating relation #%d / %d\n", i, small_nrows);
+	    fprintf(stderr, "Treating relation #%d / %d at %2.2lf\n",
+		    i, small_nrows, seconds());
 	fscanf(indexfile, "%d", &nr);
 	for(j = 0; j < nr; j++){
 	    fscanf(indexfile, "%d", &r);
