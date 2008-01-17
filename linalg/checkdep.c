@@ -65,6 +65,56 @@ checkSparse(FILE *matfile, FILE *kerfile, int ncols, int nlimbs, int *vec, int c
     return ret;
 }
 
+// one bit per line...!
+int
+checkBW(FILE *matfile, FILE *kerfile, int nrows, int ncols, int *vec, int compact, int verbose)
+{
+    long a;
+    unsigned long b;
+    int i, j, ret, nc, cc, jj, bb;
+    char c;
+
+    memset(vec, 0, ncols * sizeof(int));
+    // get next dependance relation
+    rewind(matfile);
+    fscanf(matfile, "%d %d", &i, &j);
+    while((c = getc(matfile)) != '\n');
+    for(i = 0; i < nrows; ++i){
+	ret = fscanf(kerfile, "%x", &bb);
+	if(ret == -1)
+	    break;
+	assert (ret == 1);
+	if(verbose)
+	    fprintf(stderr, "b=%x\n", bb);
+	if(bb){
+	    if(verbose)
+		fprintf(stderr, "+R_%d\n", i);
+	    if(compact == 0)
+		fscanf(matfile, "%ld %lu %d", &a, &b, &nc);
+	    else
+		fscanf(matfile, "%d", &nc);
+	    for(jj = 0; jj < nc; jj++){
+		fscanf(matfile, "%d", &cc);
+		if(verbose >= 2)
+		    fprintf(stderr, "vec[%d]++\n", cc);
+		vec[cc]++;
+	    }
+	    if(verbose >= 2)
+		printVec(vec, ncols);
+	    while((c = getc(matfile)) != '\n')
+		if(feof(matfile))
+		    break;
+	}
+	else{
+	    // skip line
+	    while((c = getc(matfile)) != '\n')
+		if(feof(matfile))
+		    break;
+	}
+    }
+    return ret;
+}
+
 void
 checkVector(int *vec, int ncols)
 {
@@ -83,7 +133,7 @@ checkVector(int *vec, int ncols)
 }
 
 void
-checkSparseAll(char *matname, char *kername, int compact, int verbose)
+checkSparseAll(char *matname, char *kername, int compact, int verbose, int bw)
 {
     FILE *matfile, *kerfile;
     int nrows, ncols, nlimbs, *vec, ndep, ret;
@@ -97,7 +147,10 @@ checkSparseAll(char *matname, char *kername, int compact, int verbose)
     while(1){
 	if(verbose)
 	    fprintf(stderr, "Checking dep %d\n", ndep++);
-	ret = checkSparse(matfile,kerfile,ncols,nlimbs,vec,compact,verbose);
+	if(bw == 0)
+	    ret=checkSparse(matfile,kerfile,ncols,nlimbs,vec,compact,verbose);
+	else
+	    ret=checkBW(matfile,kerfile,nrows,ncols,vec,compact,verbose);
 	if(ret == -1)
 	    break;
 	if(verbose >= 2)
@@ -199,7 +252,7 @@ int main(int argc, char *argv[])
 {
     char *matname = NULL, *indexname = NULL, *purgedname = NULL;
     char *kername = NULL;
-    int verbose = 0, compact = 0;
+    int verbose = 0, compact = 0, bw = 0;
 
     while(argc > 1 && argv[1][0] == '-'){
         if(argc > 2 && strcmp (argv[1], "-mat") == 0){
@@ -232,10 +285,15 @@ int main(int argc, char *argv[])
 	    argc -= 1;
 	    argv += 1;
 	}
+	else if(argc > 1 && strcmp (argv[1], "-bw") == 0){
+	    bw = 1;
+	    argc -= 1;
+	    argv += 1;
+	}
     }
     if(indexname != NULL)
 	checkWithIndexAll(purgedname, indexname, kername, verbose);
     else
-	checkSparseAll(matname, kername, compact, verbose);
+	checkSparseAll(matname, kername, compact, verbose, bw);
     return 0;
 }
