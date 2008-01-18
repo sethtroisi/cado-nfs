@@ -316,7 +316,7 @@ Brent12_curve_from_sigma (residue A, residue x, residue sigma, modulus m)
   addmod (v, sigma, sigma, m);
   addmod (v, v, v, m); /* v = 4*sigma */
   mulmod (u, sigma, sigma, m);
-  setmod_ul (t, 5, m);
+  setmod_ul (t, 5UL, m);
   submod (u, u, t, m); /* u = sigma^2 - 5 */
   mulmod (t, u, u, m);
   mulmod (x, t, u, m);
@@ -341,7 +341,7 @@ Brent12_curve_from_sigma (residue A, residue x, residue sigma, modulus m)
       mulmod (x, x, v, m);
       mulmod (v, u, z, m);
       mulmod (t, A, v, m);
-      setmod_ul (u, 2, m);
+      setmod_ul (u, 2UL, m);
       submod (A, t, u, m);
   }
 
@@ -511,7 +511,7 @@ ecm (unsigned long p_par, double B1, unsigned long sigma_par,
     abort();
   }
 
-  addmod_ul (b, A, 2, p);
+  addmod_ul (b, A, 2UL, p);
   div2mod (b, b, p);
   div2mod (b, b, p);
 
@@ -552,8 +552,9 @@ ecm (unsigned long p_par, double B1, unsigned long sigma_par,
   return (invmod (u, z, p) == 0); /* return 1 if non-trivial gcd is found */
 }
 
-/* Determine order of a point on a curve, both defined by the sigma value
-   as in ECM */
+/* Determine order of a point P on a curve, both defined by the sigma value
+   as in ECM. Looks for i in Hasse interval so that i*P = O, has complexity
+   O(sqrt(m)). */
 
 unsigned long
 ell_pointorder (const unsigned long m_par, const unsigned long sigma_par)
@@ -579,7 +580,7 @@ ell_pointorder (const unsigned long m_par, const unsigned long sigma_par)
 	    "y^2 = x^3 + %ld * x + b (mod %ld)\n", 
 	    x1[0], y1[0], a[0], m[0]);
 
-  i = 2 * (unsigned long) sqrt(m_par);
+  i = 2 * (unsigned long) sqrt((double) m_par);
   min = m_par - i + 1;
   max = m_par + i + 1;
   setmod (xi, x1);
@@ -633,7 +634,7 @@ ell_pointorder (const unsigned long m_par, const unsigned long sigma_par)
 }
 
 
-/* Count points on curve using the Jacobi symbol */
+/* Count points on curve using the Jacobi symbol. This has complexity O(m). */
 
 unsigned long 
 ellM_curveorderjacobi (residue A, residue X, modulus m)
@@ -648,7 +649,7 @@ ellM_curveorderjacobi (residue A, residue X, modulus m)
   setmod (t, X);
   addmod (t, t, A, m);
   mulmod (t, t, X, m);
-  addmod_ul (t, t, 1, m);
+  addmod_ul (t, t, 1UL, m);
   mulmod (t, t, X, m);
   bchar = jacobimod (t, m);
   ASSERT (bchar != 0);
@@ -660,7 +661,7 @@ ellM_curveorderjacobi (residue A, residue X, modulus m)
       setmod (t, X);
       addmod (t, t, A, m);
       mulmod (t, t, X, m);
-      addmod_ul (t, t, 1, m);
+      addmod_ul (t, t, 1UL, m);
       mulmod (t, t, X, m);
       if (bchar == 1) 
 	order = order + 1 + jacobimod (t, m);
@@ -701,6 +702,10 @@ ell_curveorder (const unsigned long m_par, const unsigned long sigma_par,
   }
   order = ellM_curveorderjacobi (A, X, m);
 
+#ifdef WANT_ASSERT
+  ASSERT (parameterization != BRENT12 || order == ell_pointorder (m, sigma));
+#endif
+
   return order;
 }
 
@@ -710,6 +715,11 @@ usage (const char *s)
 {
   printf ("Usage: %s Pmin Pmax B1 sigma\n", s); 
   printf ("Find all primes >= Pmin, <= Pmax hit by ECM(B1,sigma)\n");
+  printf ("Options:\n");
+  printf ("-v        Increase verbosity\n");
+  printf ("-gnuplot  Make output suitable for gnuplot\n");
+  printf ("-c        Print average exponent of 2, 3, 5, 7 in group order\n");
+  printf ("-m12      Make curves of rational 12 torsion from Montgomery's thesis\n");
   exit (1);
 }
 
@@ -784,7 +794,7 @@ main (int argc, char *argv[])
 	  printf ("Testing p = %ld", (unsigned long) p);
 	}
 
-      if (ecm ((unsigned long) p, B1, sigma, parameterization))
+      if (ecm ((unsigned long) p, (double) B1, sigma, parameterization))
 	{
 	  found ++;
 	  if (verbose)
@@ -793,15 +803,16 @@ main (int argc, char *argv[])
 
       if (do_count)
 	{
-	  nr_points = ell_curveorder (p, sigma, parameterization);
+	  nr_points = ell_curveorder ((unsigned long) p, sigma, 
+	                              parameterization);
 	  if (verbose)
 	      printf (", order = %ld", nr_points);
 	  if (nr_points > 0)
 	    {
-	      pow2 += prime_exponent (nr_points, 2);
-	      pow3 += prime_exponent (nr_points, 3);
-	      pow5 += prime_exponent (nr_points, 5);
-	      pow7 += prime_exponent (nr_points, 7);
+	      pow2 += prime_exponent (nr_points, 2UL);
+	      pow3 += prime_exponent (nr_points, 3UL);
+	      pow5 += prime_exponent (nr_points, 5UL);
+	      pow7 += prime_exponent (nr_points, 7UL);
 	    }
 	}
       if (verbose)

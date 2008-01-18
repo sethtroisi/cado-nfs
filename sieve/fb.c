@@ -157,8 +157,8 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
   p = 2;
   while (p <= bound)
     {
-      modulus m;
-      residue r1, r2;
+      modulus_t m;
+      residue_t r1, r2;
 
       fb_cur->p = p;
       fb_cur->plog = fb_log (fb_cur->p, log_scale, 0.);
@@ -167,6 +167,20 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
       mod_init_noset0 (r1, m);
       mod_init_noset0 (r2, m);
       
+      /* We want f_1 * a + f_0 * b == 0 (mod p^k) 
+	 with a, b coprime and f_1, f_0 coprime
+
+	 p^m = gcd (f_1, p^k)
+
+	 p^k | F(a,b) <=>
+	 ( f_0 * b == 0 (mod p^m) <=> b == 0 (mod p^m)  && 
+	   (f_1/p^m) * a + f_0 * (b/p^m) == 0 (mod p^(k-m)) )
+	 
+	 p^m = (p^k, f_1) => 
+	   p^k | F(a,b) <=> p^m | b && f(a/b) == 0 (mod p^(k-m))
+	 
+      */
+
       mod_set_ul_reduced (r2, mpz_fdiv_ui (poly[1], p), m);
       /* If p | g1 and !(p | g0), p|G(a,b) <=> p|b and that will be handeled
 	 by the projective roots */
@@ -182,7 +196,7 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
 
 #ifdef WANT_ASSERT
       {
-	residue r3;
+	residue_t r3;
 	mod_init_noset0 (r3, m);
 	mod_set_ul_reduced (r3, mpz_fdiv_ui (poly[1], p), m);
 	mod_mul (r3, r3, r2, m); /* g1 * (- g0 / g1) */
@@ -396,7 +410,7 @@ fb_read (const char *filename, const double log_scale, const int verbose)
       /* Compute invp */
       if (fb_cur->p % 2 != 0)
 	{
-	  modulus m;
+	  modulus_t m;
 	  
 	  mod_initmod_ul (m, fb_cur->p);
 	  fb_cur->invp = - mod_invmodlong (m);
@@ -696,8 +710,8 @@ fb_check (factorbase_t fb, cado_poly poly, int side)
 
       for (i = 0; i < fbptr->nr_roots; i++)
 	{
-	  modulus m;
-	  residue val, r, c;
+	  modulus_t m;
+	  residue_t val, r, c;
 	  unsigned long res;
 
 	  mod_initmod_ul (m, p);

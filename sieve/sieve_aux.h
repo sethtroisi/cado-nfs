@@ -7,8 +7,8 @@ static inline fbroot_t
 first_sieve_loc (const fbprime_t p, const fbroot_t r, 
                  const fbroot_t amin_p, const unsigned long b, const int odd)
 {
-  modulus m;
-  residue r1, r2;
+  modulus_t m;
+  residue_t r1, r2;
   fbroot_t d;
 
   /* Find first index d in sievearray where p on this root divides.

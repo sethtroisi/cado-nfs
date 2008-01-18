@@ -878,8 +878,8 @@ trialdiv_with_root (factorbase_degn_t *fbptr, const long a,
 		    const unsigned long b)
 {
   int i;
-  modulus m;
-  residue r;
+  modulus_t m;
+  residue_t r;
   unsigned long absa;
 
   mod_initmod_ul (m, fbptr->p);
@@ -915,8 +915,8 @@ trialdiv_with_root (factorbase_degn_t *fbptr, const long a,
 static inline int
 trialdiv_with_norm (factorbase_degn_t *fbptr, const mpz_t norm)
 {
-  modulus m;
-  residue r;
+  modulus_t m;
+  residue_t r;
   unsigned int i;
 
   ASSERT (mpz_sgn (norm) >= 0);
@@ -940,8 +940,8 @@ static inline int
 trialdiv_with_norm1 (factorbase_degn_t *fbptr, const mpz_t norm, 
 		     const unsigned long add)
 {
-  modulus m;
-  residue r;
+  modulus_t m;
+  residue_t r;
   int i;
 
   ASSERT (mpz_sgn (norm) > 0);
@@ -964,8 +964,8 @@ static inline int
 trialdiv_with_norm2 (factorbase_degn_t *fbptr, const mpz_t norm,
 		     const unsigned long add)
 {
-  modulus m;
-  residue r;
+  modulus_t m;
+  residue_t r;
   int i;
 
   ASSERT (mpz_sgn (norm) > 0);
@@ -989,8 +989,8 @@ static inline int
 trialdiv_with_norm3 (factorbase_degn_t *fbptr, const mpz_t norm,
 		     const unsigned long add)
 {
-  modulus m;
-  residue r;
+  modulus_t m;
+  residue_t r;
   int i;
 
   ASSERT (mpz_sgn (norm) > 0);
@@ -1015,8 +1015,8 @@ static inline int
 trialdiv_with_norm4 (factorbase_degn_t *fbptr, const mpz_t norm,
 		     const unsigned long add)
 {
-  modulus m;
-  residue r;
+  modulus_t m;
+  residue_t r;
   int i;
 
   ASSERT (mpz_sgn (norm) > 0);
@@ -1083,8 +1083,8 @@ ul_sqrtint (const unsigned long n, unsigned long *e)
 static unsigned long
 ul_rho (const unsigned long N, const unsigned long cparm)
 {
-  modulusul m;
-  residueul r1, r2, c, diff, accu;
+  modulusul_t m;
+  residueul_t r1, r2, c, diff, accu;
   unsigned long invm, g;
   int i;
   unsigned int iterations = 0;
@@ -1233,8 +1233,8 @@ mpz_rho (const mpz_t N, const unsigned long c)
 int
 ul_prp (const unsigned long n, const unsigned long invn, const unsigned long b)
 {
-  modulusul m;
-  residueul b1, r1, t;
+  modulusul_t m;
+  residueul_t b1, r1, t;
   int i, po2 = 1;
   unsigned long nm1 = (n - 1UL) >> 1;
 
@@ -1298,7 +1298,7 @@ ul_prp (const unsigned long n, const unsigned long invn, const unsigned long b)
 int
 ul_proven_prime (unsigned long n)
 {
-  modulusul m;
+  modulusul_t m;
   unsigned long invn;
   int r = 0;
   

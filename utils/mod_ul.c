@@ -11,12 +11,12 @@
 #endif
 
 void
-modul_div3 (residueul r, residueul a, modulusul m)
+modul_div3 (residueul_t r, residueul_t a, modulusul_t m)
 {
-  const unsigned long a3 = a[0] % 3;
-  const unsigned long m3 = m[0] % 3;
+  const unsigned long a3 = a[0] % 3UL;
+  const unsigned long m3 = m[0] % 3UL;
 #ifdef WANT_ASSERT
-  residueul t;
+  residueul_t t;
 #endif
 
   ASSERT(m3 != 0UL);
@@ -35,7 +35,7 @@ modul_div3 (residueul r, residueul a, modulusul m)
 }
 
 unsigned long
-modul_gcd (residueul r, modulusul m)
+modul_gcd (residueul_t r, modulusul_t m)
 {
   unsigned long a = r[0], b = m[0], t;
 
@@ -59,7 +59,7 @@ modul_gcd (residueul r, modulusul m)
 /* Compute 1/t (mod 2^wordsize) */
 /* FIXME: not optimised yet */
 unsigned long
-modul_invmodlong (modulusul m)
+modul_invmodlong (modulusul_t m)
 {
   unsigned long p, r; 
   int i;
@@ -80,8 +80,8 @@ modul_invmodlong (modulusul m)
 
 /* Compute r = b^e, with r and a in Montgomery representation */
 void
-modul_powredc_ul (residueul r, residueul b, unsigned long e, 
-                  unsigned long invm, modulusul m)
+modul_powredc_ul (residueul_t r, residueul_t b, unsigned long e, 
+                  unsigned long invm, modulusul_t m)
 {
   unsigned long mask = ~0UL - (~0UL >> 1); /* Only MSB set */
 
@@ -126,7 +126,7 @@ modul_powredc_ul (residueul r, residueul b, unsigned long e,
    or return 0 if s is not invertible */
 
 int
-modul_inv (residueul r, residueul s, modulusul t)
+modul_inv (residueul_t r, residueul_t s, modulusul_t t)
 {
   long u1, v1;
   unsigned long q, u2, v2;
@@ -205,7 +205,7 @@ modul_inv (residueul r, residueul s, modulusul t)
 }
 
 int
-modul_jacobi (residueul a_par, modulusul m_par)
+modul_jacobi (residueul_t a_par, modulusul_t m_par)
 {
   unsigned long a, m, s;
   int t = 1;
@@ -216,14 +216,14 @@ modul_jacobi (residueul a_par, modulusul m_par)
   
   while (a != 0UL)
   {
-    while (a % 2 == 0)
+    while (a % 2UL == 0UL)
     {
       a /= 2UL;
-      if (m % 8 == 3 || m % 8 == 5)
+      if (m % 8UL == 3UL || m % 8UL == 5UL)
         t = -t;
     }
     s = a; a = m; m = s; /* swap */
-    if (a % 4 == 3 && m % 4 == 3)
+    if (a % 4UL == 3UL && m % 4UL == 3UL)
       t = -t;
     a %= m;
   }
