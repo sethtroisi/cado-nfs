@@ -2059,6 +2059,13 @@ void rho_timing()
   mpz_clear (m);
 }
 
+static void
+usage (void)
+{
+  fprintf (stderr, "Usage: sieve [-v] [-fb file] [-poly file] [-reports_a_len int] [-reports_r_len int] [-rhotiming] amin amax bmin bmax\n");
+  exit (1);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -2118,7 +2125,7 @@ main (int argc, char **argv)
 	  argv++;
 	}
       else 
-	break;
+	usage ();
     }
 
   if (argc < 5)
