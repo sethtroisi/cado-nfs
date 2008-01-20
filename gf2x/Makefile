@@ -17,7 +17,7 @@ endif
 
 all: tune1 libgf2x.a tunetoom
 
-LIBGF2X_FILES:=mul-toom.c mul-gf2x.c
+LIBGF2X_FILES:=mul-toom.c mul-gf2x.c mulfft-bit.c
 
 libgf2x.a: $(patsubst %.c,%.o,$(LIBGF2X_FILES))
 	rm -f $@
