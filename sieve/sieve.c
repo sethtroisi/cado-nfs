@@ -2124,13 +2124,13 @@ main (int argc, char **argv)
 	  argc--;
 	  argv++;
 	}
-      else 
-	usage ();
+      else
+	break;
     }
 
   if (argc < 5)
     {
-      fprintf (stderr, "Please specify amin amax bmin bmax\n");
+      usage ();
       exit (EXIT_FAILURE);
     }
 
