@@ -56,6 +56,7 @@ namespace files {
 	EXTERN_LINKAGE	meta_filename a		INIT_WITH("A-%[f0w2]-%[f0w2]");
 	EXTERN_LINKAGE	meta_filename v		INIT_WITH("V%[f0w2].%[f0w3]");
 	EXTERN_LINKAGE	meta_filename w		INIT_WITH("W%[f0w2]");
+	EXTERN_LINKAGE	meta_filename r		INIT_WITH("R%[f0w2]");
 	EXTERN_LINKAGE	meta_filename x		INIT_WITH("X%[f0w2]");
 	EXTERN_LINKAGE	meta_filename y		INIT_WITH("Y%[f0w2]");
 	EXTERN_LINKAGE	meta_filename z		INIT_WITH("Z%[f0w2]");

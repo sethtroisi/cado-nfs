@@ -189,6 +189,28 @@ void multiply()
 	traits::zero(w + nr, nc-nr);
 }
 
+void shipout(scalar_t * v, string const & s, bool check=true)
+{
+	using namespace globals;
+
+	mpz_class middle = globals::modulus / 2;
+	ofstream wf;
+	must_open(wf, s);
+	/* Last but not least, apply the preconditioner in order to get a
+	 * true solution !!! */
+	precond(v);
+	if (check && is_zero(v)) {
+		cerr << "// trivial solution found after preconditioning !\n";
+		BUG();
+	}
+	for(uint i = 0 ; i < nr ; i++) {
+		if (v[i] > middle)
+			v[i] -= globals::modulus;
+		traits::print(wf,v[i]) << "\n";
+	}
+	wf.close();
+}
+
 program_common() { init_data(); }
 ~program_common() { clear_data(); }
 
@@ -203,9 +225,12 @@ void go()
 {
 	using namespace globals;
 
+
 	super::do_sum();
 
 	traits::reduce(v, v, 0, nr);
+
+	shipout(v, files::r % mine.scol, false);
 
 	if (is_zero(v)) {
 		cerr << "// trivial solution encountered !\n";
@@ -240,23 +265,7 @@ void go()
 
 	cout << fmt("// B^%*y is a solution\n") % i;
 
-	mpz_class middle = globals::modulus / 2;
-
-	ofstream wf;
-	must_open(wf, files::w % mine.scol);
-	/* Last but not least, apply the preconditioner in order to get a
-	 * true solution !!! */
-	precond(v);
-	if (is_zero(v)) {
-		cerr << "// trivial solution found after preconditioning !\n";
-		BUG();
-	}
-	for(uint i = 0 ; i < nr ; i++) {
-		if (v[i] > middle)
-			v[i] -= globals::modulus;
-		traits::print(wf,v[i]) << "\n";
-	}
-	wf.close();
+	shipout(v, files::w % mine.scol);
 }
 };
 

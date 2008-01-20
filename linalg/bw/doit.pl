@@ -206,6 +206,19 @@ if ($msize) {
 		unless ($nrows && $ncols);
 }
 
+# Check that we have the threshold argument if needed
+my $exe_master = "${bindir}bw-master";
+if ($modulus eq '2') {
+	$exe_master .= '-binary';
+} elsif ($method =~ /^(?:q(?:uadratic)?|old)$/) {
+	$exe_master .= '-old';
+} else {
+	die "threshold needed" unless $threshold;
+	# TODO: allow runtime selection of method or (probably
+	# smarter) runtime checking that the proper binary is
+	# being used.
+	$exe_master .= "2 -t $threshold";
+}
 
 sub magmadump {
 	if ($dump) {
@@ -469,18 +482,7 @@ MASTER : {
 		}
 	}
 
-	my $exe = "${bindir}bw-master";
-	if ($modulus eq '2') {
-		$exe .= '-binary';
-	} elsif ($method =~ /^(?:q(?:uadratic)?|old)$/) {
-		$exe .= '-old';
-	} else {
-		die "threshold needed" unless $threshold;
-		# TODO: allow runtime selection of method or (probably
-		# smarter) runtime checking that the proper binary is
-		# being used.
-		$exe .= "2 -t $threshold";
-	}
+	my $exe = $exe_master;
 	$exe .= " --subdir $wdir matrix.txt $m $n";
 	open my $mlog, ">$wdir/master.log";
 	print "$exe\n";
@@ -547,6 +549,9 @@ MKSOL : {
 			#	compute_spanned @$t;
 			#	rsync_pull;
 			# }
+		# Eh ? If we don't pull the results from our pals,  who's
+		# gonna do it ?
+		rsync_pull;
 	}
 
 	if (!$multisols) {
