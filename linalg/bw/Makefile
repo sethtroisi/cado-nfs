@@ -13,8 +13,8 @@ CXX:=g++
 ARQCV:=ar qcv
 OFLAGS:=
 PFLAGS:=
-IFLAGS:=-I ../.. -I ../../utils -I $(TOPPATH)/include -I . -I old
-LFLAGS:=-L ../../utils
+IFLAGS:=-I ../.. -I ../../utils -I ../../gf2x -I $(TOPPATH)/include -I . -I old
+LFLAGS:=-L ../../utils -L ../../gf2x
 
 -include Makefile.local
 #ifdef GMP
@@ -143,7 +143,7 @@ BW_MASTER_BINARY_SOURCES:=					\
 ifdef	PATCHED_GMP
 BW_MASTER_BINARY_SOURCES+=old/ops_poly_integerfft.cpp
 endif
-BW_MASTER_BINARY_LIBS:=-lgmp -lutils
+BW_MASTER_BINARY_LIBS:=-lgmp -lutils -lgf2x
 -include .bw-master-binary.mkf
 
 BW_MASTER_OLD_SOURCES:=						\

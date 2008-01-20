@@ -39,8 +39,6 @@ void setup_vectors(unsigned int nrows, int m, int n, const mpz_class& p)
 	 * and want to be able to do %p simply ! */
 	mpz_class t;
 
-	WARNING("Beware: algorithm for setting up Y has changed\n");
-
 	for (int j = 0; j < n; j++) {
 		must_open(o, files::y % j);
 #if 0
