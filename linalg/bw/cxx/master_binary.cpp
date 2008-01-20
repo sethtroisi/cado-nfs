@@ -294,12 +294,14 @@ public:
         delete[] x;
         delete[] order;
     };
+#if 0
     bmat clone() const {
         bmat dst(nrows, ncols);
         memcpy(dst.x, x, ncols*stride()*sizeof(ulong));
         memcpy(dst.order, order, ncols*sizeof(uint));
         return dst;
     }
+#endif
     /* zero column j */
     void zcol(uint j) {
         ASSERT(j < ncols);
@@ -450,6 +452,7 @@ struct polmat { /* {{{ */
         podswap(_deg,n._deg);
     }
     public:
+#if 0
     polmat clone() {
         polmat dst(nrows, ncols, ncoef);
         memcpy(dst.x, x, ncols*colstride()*sizeof(ulong));
@@ -457,6 +460,7 @@ struct polmat { /* {{{ */
         memcpy(dst._deg, _deg, ncols*sizeof(uint));
         return dst;
     }
+#endif
     /* this handles expansion and shrinking */
     void resize(uint ncoef2) {
         uint newstride = BITS_TO_WORDS(ncoef2, ULONG_BITS);
@@ -477,12 +481,6 @@ struct polmat { /* {{{ */
             }
         }
         swap(n);
-    }
-    /* zero column j */
-    void zcol(uint j) {
-        ASSERT(j < ncols);
-        memset(x + order[j] * colstride(), 0, colstride() * sizeof(ulong));
-        deg(j) = -1;
     }
     void xmul_col(uint j, uint s=1) {
         ASSERT(j < ncols);
@@ -571,6 +569,12 @@ struct polmat { /* {{{ */
     }
     ulong * col(uint j) { return poly(0, j); }
     ulong const * col(uint j) const { return poly(0, j); }
+    /* zero column j */
+    void zcol(uint j) {
+        ASSERT(j < ncols);
+        memset(col(j), 0, colstride() * sizeof(ulong));
+        deg(j) = -1;
+    }
     /* shift is understood ``shift left'' (multiply by X) */
     void import_col_shift(uint k, polmat const& a, uint j, int s)
     {
@@ -728,13 +732,13 @@ template<typename fft_type> struct tpolmat /* {{{ */
         for(uint j = 0 ; j < ncols ; j++) _deg[j]=-1;
     }
     void clear() {
-        nrows = ncols = ncoef = 0;
+        nrows = ncols = 0;
         o.clear(x);
         delete[] order; order = NULL;
         delete[] _deg; _deg = NULL;
     }
     tpolmat() {
-        nrows = ncols = ncoef = 0;
+        nrows = ncols = 0;
         x = NULL;
         order = NULL;
         _deg = NULL;
@@ -751,12 +755,13 @@ template<typename fft_type> struct tpolmat /* {{{ */
     inline void swap(tpolmat & n) {
         tpodswap(nrows,n.nrows);
         tpodswap(ncols,n.ncols);
-        tpodswap(ncoef,n.ncoef);
+        tpodswap(o,n.o);
         tpodswap(x,n.x);
         tpodswap(order,n.order);
         tpodswap(_deg,n._deg);
     }
     public:
+#if 0
     tpolmat clone() {
         tpolmat dst(nrows, ncols, o);
         memcpy(dst.x, x, ncols*colstride()*sizeof(ulong));
@@ -764,12 +769,7 @@ template<typename fft_type> struct tpolmat /* {{{ */
         memcpy(dst._deg, _deg, ncols*sizeof(uint));
         return dst;
     }
-    /* zero column j */
-    void zcol(uint j) {
-        ASSERT(j < ncols);
-        o.zero(o.get(x, order[j] * nrows));
-        deg(j) = -1;
-    }
+#endif
     /* permute columns: column presently referred to with index i will
      * now be accessed at index p[i]
      */
@@ -785,16 +785,22 @@ template<typename fft_type> struct tpolmat /* {{{ */
     {
         ASSERT(i < nrows);
         ASSERT(j < ncols);
-        return x + (order[j] * nrows + i) * stride();
+        return o.get(x, order[j] * nrows + i);
     }
     ulong const * poly(uint i, uint j) const
     {
         ASSERT(i < nrows);
         ASSERT(j < ncols);
-        return x + (order[j] * nrows + i) * stride();
+        return o.get(x, order[j] * nrows + i);
     }
     ulong * col(uint j) { return poly(0, j); }
     ulong const * col(uint j) const { return poly(0, j); }
+    /* zero column j */
+    void zcol(uint j) {
+        ASSERT(j < ncols);
+        o.zero(col(j));
+        deg(j) = -1;
+    }
 };
 /*}}}*/
 
