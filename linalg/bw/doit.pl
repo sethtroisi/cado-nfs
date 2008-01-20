@@ -519,8 +519,9 @@ MKSOL : {
 
 	my @mksoljobs=();
 	for my $s (@sols) {
-		if ($resume && -f "$wdir/W0$s") {
-			print "$wdir/W0$s already exists\n";
+		my $s0 = sprintf '%02d', $s;
+		if ($resume && -f "$wdir/W$s0") {
+			print "$wdir/W$s0 already exists\n";
 			next;
 		}
 		my $t = [ map
@@ -556,14 +557,15 @@ MKSOL : {
 	for my $s (@sols) {
 		# --nbys now defaults to auto-detect.
 		action "${bindir}bw-gather --subdir $wdir $s";
-		if (-f "$wdir/W0$s") {
+		my $s0 = sprintf '%02d', $s;
+		if (-f "$wdir/W$s0") {
 			push @sols_found, "W0$s";
 		}
 		if ($matrix) {
 			my $d = dirname $matrix;
-			if (-f "$wdir/W0$s") {
-				system "cp \"$wdir/W0$s\" \"$d\"";
-				push @solfiles, "$d/W0$s";
+			if (-f "$wdir/W$s0") {
+				system "cp \"$wdir/W$s0\" \"$d\"";
+				push @solfiles, "$d/W$s0";
 			}
 		}
 	}
