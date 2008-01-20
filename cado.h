@@ -49,21 +49,21 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #define DEFAULT_DEGREES_LENGTH 3
 
 /* default rational/algebraic factor base bounds */
-#define DEFAULT_RLIM {{70, 200000}, {80, 350000}, {100, 1800000}, {110, 2500000}, {130, 3497867}, {140, 8000000}, {155, 16777216}, {ULONG_MAX, 4294967295UL}}
+#define DEFAULT_RLIM {{70, 200000}, {80, 350000}, {100, 1800000}, {110, 3200000}, {130, 3497867}, {140, 8000000}, {155, 16777216}, {ULONG_MAX, 4294967295UL}}
 #define DEFAULT_RLIM_LENGTH 8
-#define DEFAULT_ALIM {{70, 200000}, {80, 500000}, {100, 1800000}, {110, 2500000}, {130, 11380951}, {140, 16777215}, {155, 16777216}, {ULONG_MAX, 4294967295UL}}
+#define DEFAULT_ALIM {{70, 200000}, {80, 500000}, {100, 1800000}, {110, 3200000}, {130, 11380951}, {140, 16777215}, {155, 16777216}, {ULONG_MAX, 4294967295UL}}
 #define DEFAULT_ALIM_LENGTH DEFAULT_RLIM_LENGTH
 
 /* default large prime bounds */
-#define DEFAULT_LPBR {{70, 23}, {90, 24}, {110, 26}, {120, 27}, {130, 28}, {140, 29}, {155, 30}, {ULONG_MAX, 40}}
+#define DEFAULT_LPBR {{70, 23}, {90, 24}, {110, 27}, {120, 27}, {130, 28}, {140, 29}, {155, 30}, {ULONG_MAX, 40}}
 #define DEFAULT_LPBR_LENGTH 8
-#define DEFAULT_LPBA {{70, 23}, {90, 24}, {110, 26}, {120, 27}, {130, 28}, {140, 30}, {155, 30}, {ULONG_MAX, 40}}
+#define DEFAULT_LPBA {{70, 23}, {90, 24}, {110, 27}, {120, 27}, {130, 28}, {140, 30}, {155, 30}, {ULONG_MAX, 40}}
 #define DEFAULT_LPBA_LENGTH DEFAULT_LPBR_LENGTH
 
 /* default factor-residual bounds */
-#define DEFAULT_MFBR {{70, 35}, {90, 37}, {100, 48}, {110, 49}, {130, 56}, {140, 58}, {155, 60}, {ULONG_MAX, 80}}
+#define DEFAULT_MFBR {{70, 35}, {90, 37}, {100, 48}, {110, 50}, {130, 56}, {140, 58}, {155, 60}, {ULONG_MAX, 80}}
 #define DEFAULT_MFBR_LENGTH 8
-#define DEFAULT_MFBA {{70, 35}, {90, 37}, {100, 48}, {110, 49}, {130, 56}, {140, 60}, {155, 60}, {ULONG_MAX, 80}}
+#define DEFAULT_MFBA {{70, 35}, {90, 37}, {100, 48}, {110, 50}, {130, 56}, {140, 60}, {155, 60}, {ULONG_MAX, 80}}
 #define DEFAULT_MFBA_LENGTH DEFAULT_MFBR_LENGTH
 
 /* default lambda values: after subtracting the approximate logarithms of
@@ -76,7 +76,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #define DEFAULT_ALAMBDA_LENGTH DEFAULT_RLAMBDA_LENGTH
 
 /* default sieving block lengths */
-#define DEFAULT_QINT {{70, 5000}, {90, 10000}, {100, 100000}, {130, 150000}, \
+#define DEFAULT_QINT {{70, 5000}, {90, 10000}, {110, 100000}, {130, 150000}, \
                       {140, 100000}, {155, 200000}, {ULONG_MAX, 1000000}}
 #define DEFAULT_QINT_LENGTH 7
 
