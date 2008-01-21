@@ -42,6 +42,14 @@ typedef struct {
 typedef __long_poly_struct long_poly_t[1];
 extern int roots_mod_long (LONG*, mpz_t*, int, const LONG);
 extern int nbits (ULONG);
+void long_poly_init (long_poly_t f, int d);
+void long_poly_clear (long_poly_t f);
+int long_poly_set_mod (long_poly_t fp, mpz_t *f, int d, LONG p);
+int isirreducible_mod_long(long_poly_t fp, const LONG p);
+
+
+
+
 
 /* getprime */
 extern unsigned long getprime (unsigned long);

@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <gmp.h>
 #include <assert.h>
 #include "cado.h"
@@ -14,78 +15,145 @@ void polymodF_from_ab(polymodF_t tmp, long a, unsigned long b) {
   mpz_neg(tmp->p->coeff[1], tmp->p->coeff[1]);
   mpz_set_si(tmp->p->coeff[0], a);
 }
-#if 0
-void polymodF_reduce_mod_ui(poly_t z, polymodF_t x, unsigned long p) {
 
-}
-
-// z := x^n mod f (mod p)
-void poly_power_mod_ui(poly_t z, poly_t x, poly_t f, mpz_t n, unsigned long p) {
-
-}
-
-void poly_reduce_makemonic_mod(poly_t f, poly_t F, mpz_t pk) {
-
-}
-
-void poly_reduce_mod(poly_t f, poly_t F, mpz_t pk) {
-
-}
-
-void polymodF_sqrt(polymodF_t res, polymodF_t x, poly_t F, unsigned long p) {
-  poly_t tmp, tmp2, f;
-  const int d=F->deg;
-  mpz_t q, pk, aux;
-
-  mpz_init(q);
-  mpz_init(pk);
+// Check whether the coefficients of R (that are given modulo m) are in
+// fact genuine integers. We assume that x mod m is a genuine integer if
+// x or m-x is less than m/10^6.
+int poly_integer_reconstruction(poly_t Q, const poly_t R, const mpz_t m) {
+  int i;
+  mpz_t aux;
   mpz_init(aux);
-  poly_alloc(tmp, d);
-  poly_alloc(tmp2, d);
+  for (i=0; i <= R->deg; ++i) {
+    mpz_mul_ui(aux, R->coeff[i], 1000000);
+    if (mpz_cmp(aux, m) <= 0)
+      poly_setcoeff(Q, i, R->coeff[i]);
+    else {
+      mpz_sub(aux, m, R->coeff[i]);
+      mpz_mul_ui(aux, aux, 1000000);
+      if (mpz_cmp(aux, m) > 0)
+	return 0;
+      else {
+	mpz_sub(aux, m, R->coeff[i]);
+	poly_setcoeff(Q, i, aux);
+      }
+    }
+  }
+  return 1;
+}
+
+
+// compute Sqrt(A) mod F, using p-adiv lifting, at prime p.
+void polymodF_sqrt(polymodF_t res, polymodF_t AA, poly_t F, unsigned long p) {
+  poly_t A;
+  int v;
+  int d = F->deg;
+
+  poly_alloc(A, d-1);
+  // Clean up the mess with denominator: if it is an odd power of fd,
+  // then multiply num and denom by fd to make it even.
+  if (((AA->v)&1) == 0) {
+    v = AA->v / 2;
+    poly_copy(A, AA->p);
+  } else {
+    v = (1+AA->v) / 2;
+    poly_mul_mpz(A, AA->p, F->coeff[d]);
+  }
+
+  // Now, we just have to take the square root of A (without denom) and
+  // divide by fd^v.
+
+  // Variables for the lifted values
+  poly_t invsqrtA, sqrtA;
+  // variables for A and F modulo pk
+  poly_t a, f;
+  poly_alloc(invsqrtA, d-1);
+  poly_alloc(sqrtA, d-1);
+  poly_alloc(a, d-1);
   poly_alloc(f, d);
-  
-  mpz_ui_pow_ui(q, p, (unsigned long)d);
+  // variable for the current pk
+  mpz_t pk;
+  mpz_init(pk);
+
+  // Initialize things modulo p:
   mpz_set_ui(pk, p);
+  poly_reduce_makemonic_mod_mpz(f, F, pk);
+  poly_reduce_mod_mpz(a, A, pk);
 
-  poly_reduce_makemonic_mod(f, F, pk);
+  // First compute the inverse square root modulo p
+  { 
+    mpz_t q, aux;
+    mpz_init(q);
+    mpz_init(aux);
 
-  polymodF_reduce_mod_ui(tmp, x, p);	// tmp := x mod p
-  mpz_add_ui(aux, q, 1);
-  mpz_sub_ui(q, q, 2);
-  mpz_mul(aux, aux, q);
-  mpz_add_ui(q, q, 2);
-  mpz_divexact_ui(aux, aux, 4);		// aux := (q-2)(q+1)/4
-  poly_power_mod_ui(tmp, tmp, f, aux, p);	// tmp := tmp^((q-2)(q+1)/4) mod p
+    // compute (q-2)(q+1)/4   (assume q == 3 mod 4, here !!!!!)
+    // where q = p^d, the size of the finite field extension.
+    // since we work mod q-1, this gives (3*q-5)/4
+    mpz_ui_pow_ui(q, p, (unsigned long)d);
+    mpz_mul_ui(aux, q, 3);
+    mpz_sub_ui(aux, aux, 5);
+    mpz_divexact_ui(aux, aux, 4);		        // aux := (3q-5)/4
+    poly_power_mod_f_mod_ui(invsqrtA, a, f, aux, p);	
 
-  // now tmp contains the inverse of the square root of x modulo p
-  // Let's lift it.
+    mpz_clear(aux);
+    mpz_clear(q);
+  }
 
+  // Now, the lift begins
+  // When entering the loop, invsqrtA contains the inverse square root
+  // of A computed modulo pk.
+  
+  poly_t tmp, tmp2;
+  poly_alloc(tmp, 2*d-1);
+  poly_alloc(tmp2, 2*d-1);
   do {
-    mpz_sqr(pk, pk);	// double the current precision
-    poly_reduce_makemonic_mod(f, F, pk);  
+    mpz_mul(pk, pk, pk);	// double the current precision
+    // compute F,A modulo the new modulus.
+    poly_reduce_makemonic_mod_mpz(f, F, pk);  
+    poly_reduce_mod_mpz(a, A, pk);
 
-    poly_mul(tmp2, tmp, tmp);
-    poly_mod(tmp2, tmp2, f);
-    poly_reduce_mod(tmp2, tmp2, pk);
+    // now, do the Newton operation x <- 1/2(3*x-a*x^3)
+    poly_sqr_mod_f_mod_mpz(tmp, invsqrtA, f, pk);
+    poly_mul_mod_f_mod_mpz(tmp, tmp, invsqrtA, f, pk);
+    poly_mul_mod_f_mod_mpz(tmp, tmp, a, f, pk);
+    poly_mul_ui(tmp2, a, 3);
+    poly_sub_mod_mpz(tmp, tmp2, tmp, pk);
+    poly_div_ui_mod_mpz(invsqrtA, tmp, 2, pk); 
+
+    // multiply by a, to check if rational reconstruction succeeds
+    poly_mul_mod_f_mod_mpz(tmp, invsqrtA, a, f, pk);
+  } while (!poly_integer_reconstruction(tmp, tmp, pk));
+
+  poly_copy(res->p, tmp);
+  res->v = v;
 
 
-
-    
-
-
-
-
-
-
-
-  mpz_clear(q);
-  mpz_clear(qk);
-  mpz_clear(aux);
+  mpz_clear(pk);
   poly_free(tmp);
   poly_free(tmp2);
   poly_free(f);
 }
-#endif
+
+unsigned long FindSuitableModP(poly_t F) {
+  unsigned long p = 2;
+  int dF = F->deg;
+  
+  long_poly_t fp;
+  long_poly_init(fp, dF);
+  while (1) {
+    int d;
+    // select prime congruent to 3 mod 4 to have easy sqrt.
+    do {
+      p = getprime(p);
+    } while ((p%4)!= 3);
+    d = long_poly_set_mod (fp, F->coeff, dF, p);
+    if (d!=dF)
+      continue;
+    if (isirreducible_mod_long(fp, p))
+      break;
+  }
+  long_poly_clear(fp);
+  return p;
+}
 
 
 int main(int argc, char **argv) {
@@ -178,8 +246,9 @@ int main(int argc, char **argv) {
   }
 
   fprintf(stderr, "v = %d\n", prd->v);
-  fprintf(stderr, "sizeinbit of cst term = %d\n", mpz_sizeinbase(prd->p->coeff[0], 2));
-  fprintf(stderr, "sizeinbit of leading term = %d\n", mpz_sizeinbase(prd->p->coeff[pol->degree-1], 2));
+  fprintf(stderr, "sizeinbit of cst term = %ld\n", mpz_sizeinbase(prd->p->coeff[0], 2));
+  fprintf(stderr, "sizeinbit of leading term = %ld\n", mpz_sizeinbase(prd->p->coeff[pol->degree-1], 2));
+
 
   for (i = 0; i < pol->degree; ++i) 
     gmp_printf("%Zx\n", prd->p->coeff[i]);

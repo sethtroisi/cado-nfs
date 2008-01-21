@@ -175,6 +175,29 @@ long_poly_swap (long_poly_t f, long_poly_t g)
   g->coeff = t;
 }
 
+/* h <- f*g mod p */
+void
+long_poly_mul(long_poly_t h, const long_poly_t f, const long_poly_t g, LONG p) {
+  int df = f->degree;
+  int dg = g->degree;
+  int i, j;
+  long_poly_t res;
+
+  long_poly_init(res, df+dg);
+  for (i = 0; i <= df+dg; ++i)
+    res->coeff[i] = 0;
+  for (i = 0; i <= df; ++i)
+    for (j = 0; j <= dg; ++j)
+      res->coeff[i+j] += f->coeff[i]*g->coeff[j];
+  /* reduce mod p */
+  for (i = 0; i <= df+dg; i++)
+    res->coeff[i] %= p;
+  res->degree=df+dg;
+  long_poly_set(h, res);
+  long_poly_clear(h);
+}
+
+
 /* h <- g^2 mod p, g and h must differ */
 void
 long_poly_sqr (long_poly_t h, const long_poly_t g, LONG p)
@@ -447,6 +470,32 @@ long_poly_powmod_ui (long_poly_t g, long_poly_t fp, long_poly_t h, LONG a,
     }
 }
 
+/* g <- g^e mod (fp, p), using auxiliary polynomial h */
+void
+long_poly_general_powmod_ui (long_poly_t g, long_poly_t fp, long_poly_t h,
+		     LONG e, LONG p)
+{
+  int k = nbits (e);
+  long_poly_t g_sav;
+
+  long_poly_init(g_sav, g->degree);
+  long_poly_set(g_sav, g);
+
+  long_poly_make_monic (fp, p);
+
+  assert (e > 0);
+  for (k -= 2; k >= 0; k--)
+    {
+      long_poly_sqr (h, g, p);             /* h <- g^2 */
+      long_poly_div_r (h, fp, p);       /* h -> rem(h, fp) */
+      long_poly_mod_ui (g, h, p);       /* g <- h mod p */
+      if (e & (1 << k))
+        long_poly_mul (h, h, g_sav, p);            /* h <- g_sav*h */
+      long_poly_div_r (h, fp, p);       /* h -> rem(h, fp) */
+      long_poly_mod_ui (g, h, p);       /* g <- h mod p */
+    }
+  long_poly_clear(g_sav);
+}
 /* Assuming f is a (squarefree) product of linear factors mod p, splits it
    and put the corresponding roots mod p in r[]. 
    Return number of roots found (should be degree of f).
@@ -590,3 +639,48 @@ roots_mod_long (LONG *r, mpz_t *f, int d, const LONG p)
   return df;
 }
 
+int isirreducible_mod_long(long_poly_t fp, const LONG p) {
+  long_poly_t g, gmx, h;
+  int d, i;
+
+  long_poly_make_monic (fp, p);
+  d = fp->degree;
+
+  if (d == 0)
+    return 1;
+
+  assert (d > 0);
+
+  long_poly_init (g, 2 * d - 1);
+  long_poly_init (gmx, 2 * d - 1);
+  long_poly_init (h, 2 * d - 1);
+
+  for (i = 1; 2*i <= d; ++i) {
+    /* we first compute x^(p^i) mod fp; since fp has degree d, all operations can
+       be done with polynomials of degree < 2d: a square give at most degree
+       2d-2, and multiplication by x gives 2d-1. */
+
+    if (i == 1) {
+      /* g <- x^p mod fp */
+      long_poly_powmod_ui (g, fp, h, 0, p, p);
+    } else {
+      /* g <- g^p mod fp */
+      long_poly_general_powmod_ui (g, fp, h, p, p);
+    }
+
+    /* subtract x */
+    long_poly_sub_x (gmx, g, p);
+
+    /* h <- gcd (fp, x^(p^i)-x) */
+    long_poly_set(h, fp);
+    long_poly_gcd (h, gmx, p);
+
+    if (h->degree > 0)
+      return 0;
+  }
+
+  long_poly_clear (g);
+  long_poly_clear (gmx);
+  long_poly_clear (h);
+  return 1;
+}

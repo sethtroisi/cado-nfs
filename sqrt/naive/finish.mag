@@ -35,6 +35,7 @@ function TrySqrt(x, p, prec)
   for t in x do
     test, y := RationalReconstruction(t);
     if not test then return false, K!0; end if;
+    printf "Denominator is %o\n", Denominator(y);
     Append(~X, y);
   end for;
 

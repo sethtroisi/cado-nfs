@@ -20,7 +20,7 @@ Compile:
 
 make clean ; make
 
-(really do make clean if you happen to touch .h files, are there are no
+(really do make clean if you happen to touch .h files, as there are no
 auto-dependencies)
 
 Run an example:
