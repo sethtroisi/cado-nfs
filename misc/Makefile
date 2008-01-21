@@ -1,5 +1,7 @@
+include Makefile.local
 # Set default filenames/paths if not already set.
 GMP ?= /usr/local/
+GMPLIB ?= $(GMP)/lib/libgmp.a
 GMPINCLUDE ?= $(GMP)/include/
 CFLAGS ?= -g -O2 -W -Wall
 
@@ -10,7 +12,7 @@ all: $(targets)
 .SUFFIXES: .c
 
 .c:
-	gcc $(CFLAGS) $< -I.. -I$(GMPINCLUDE) $(GMP)/lib/libgmp.a -o $@
+	gcc $(CFLAGS) $< -I.. -I$(GMPINCLUDE) $(GMPLIB) -o $@
 
 clean:
 	\rm -f $(targets) *~
