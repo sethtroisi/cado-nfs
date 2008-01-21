@@ -105,8 +105,11 @@ void polymodF_sqrt(polymodF_t res, polymodF_t AA, poly_t F, unsigned long p) {
   poly_t tmp, tmp2;
   poly_alloc(tmp, 2*d-1);
   poly_alloc(tmp2, 2*d-1);
+  int expo = 1;
   do {
     mpz_mul(pk, pk, pk);	// double the current precision
+    expo <<= 1;
+    fprintf(stderr, "lifting mod p^%d\n", expo);
     // compute F,A modulo the new modulus.
     poly_reduce_makemonic_mod_mpz(f, F, pk);  
     poly_reduce_mod_mpz(a, A, pk);
@@ -155,7 +158,73 @@ unsigned long FindSuitableModP(poly_t F) {
   return p;
 }
 
+int main(int argc, char **argv) {
+  FILE * depfile;
+  cado_poly pol;
+  poly_t F;
+  polymodF_t prd, tmp;
+  long a;
+  unsigned long b;
+  int ret, i;
+  unsigned long p;
 
+  if (argc != 3) {
+    fprintf(stderr, "usage: %s depfile polyfile\n", argv[0]);
+    exit(1);
+  }
+
+  depfile = fopen(argv[1], "r");
+  ASSERT_ALWAYS(depfile != NULL);
+  ret = read_polynomial(pol, argv[2]);
+  ASSERT_ALWAYS(ret == 1);
+
+  // Init F to be the algebraic polynomial
+  poly_alloc(F, pol->degree);
+  for (i = pol->degree; i >= 0; --i)
+    poly_setcoeff(F, i, pol->f[i]);
+
+  // Init prd to 1.
+  poly_alloc(prd->p, pol->degree);
+  mpz_set_ui(prd->p->coeff[0], 1);
+  prd->p->deg = 0;
+  prd->v = 0;
+
+  // Allocate tmp
+  poly_alloc(tmp->p, 1);
+
+  // Accumulate product
+  // TODO: do a subproduct tree, here.
+  int nab = 0;
+  while(fscanf(depfile, "%ld %lu", &a, &b) != EOF){
+    if(!(nab % 100000))
+      fprintf(stderr, "# Reading ab pair #%d at %2.2lf\n",nab,seconds());
+    if((a == 0) && (b == 0))
+      break;
+    polymodF_from_ab(tmp, a, b);
+    polymodF_mul(prd, prd, tmp, F);
+    nab++;
+  }
+  fprintf(stderr, "Finished accumulating the product in %2.2lf\n", seconds());
+  fprintf(stderr, "v = %d\n", prd->v);
+  fprintf(stderr, "sizeinbit of cst term = %ld\n", mpz_sizeinbase(prd->p->coeff[0], 2));
+  fprintf(stderr, "sizeinbit of leading term = %ld\n", mpz_sizeinbase(prd->p->coeff[pol->degree-1], 2));
+
+  p = FindSuitableModP(F);
+  fprintf(stderr, "Using p=%lu for lifting\n", p);
+
+  polymodF_sqrt(prd, prd, F, p);
+
+  poly_free(F);
+  poly_free(prd->p);
+  poly_free(tmp->p);
+  return 0;
+}
+
+ 
+
+
+
+# if 0
 int main(int argc, char **argv) {
   FILE * matfile, *kerfile;
   cado_poly pol;
@@ -280,3 +349,4 @@ int main(int argc, char **argv) {
 
   return 0;
 }
+#endif
