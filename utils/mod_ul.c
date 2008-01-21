@@ -78,7 +78,7 @@ modul_invmodlong (modulusul_t m)
   return r;
 }
 
-/* Compute r = b^e, with r and a in Montgomery representation */
+/* Compute r = b^e, with r and b in Montgomery representation */
 void
 modul_powredc_ul (residueul_t r, residueul_t b, unsigned long e, 
                   unsigned long invm, modulusul_t m)
@@ -87,7 +87,8 @@ modul_powredc_ul (residueul_t r, residueul_t b, unsigned long e,
 
   if (e == 0UL)
     {
-      r[0] = 1UL;
+      const residueul_t one = {1UL};
+      modul_tomontgomery (r, one, m);
       return;
     }
 
@@ -100,9 +101,9 @@ modul_powredc_ul (residueul_t r, residueul_t b, unsigned long e,
 
   /* Exponentiate */
 
-  modul_set (r, b, m);       /* e -= mask; */
+  modul_set (r, b, m);       /* (r*b)^mask * b^(e-mask) = r^mask * b^e */
 #ifdef WANT_ASSERT
-  e -= mask;                 /* (r*b)^mask * b^(e-mask) = r^mask * b^e */
+  e -= mask;                 /* e -= mask; */
 #endif
 
   while (mask > 1UL)
