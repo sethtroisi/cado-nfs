@@ -161,18 +161,21 @@ modul_is0 (residueul_t a, modulusul_t m __GNUC_ATTRIBUTE_UNUSED__)
 
 __GNUC_ATTRIBUTE_UNUSED__
 static inline void
-modul_add (residueul_t r, residueul_t a, residueul_t b, modulusul_t m)
+modul_add (residueul_t r, residueul_t a, residueul_t b, const modulusul_t m)
 {
   ASSERT(a[0] < m[0] && b[0] < m[0]);
 #ifdef MODTRACE
   printf ("modul_add: a = %lu, b = %lu", a[0], b[0]);
 #endif
+
   r[0] = (a[0] >= m[0] - b[0]) ? (a[0] - (m[0] - b[0])) : (a[0] + b[0]);
+
 #ifdef MODTRACE
   printf (", r = %lu\n", r[0]);
 #endif
 }
 
+/* FIXME: This function is really modul_add_ul_reduced */
 __GNUC_ATTRIBUTE_UNUSED__
 static inline void
 modul_add_ul (residueul_t r, residueul_t a, unsigned long b, modulusul_t m)
@@ -187,6 +190,22 @@ modul_add_ul (residueul_t r, residueul_t a, unsigned long b, modulusul_t m)
 #endif
 }
 
+__GNUC_ATTRIBUTE_UNUSED__
+static inline void
+modul_sub (residueul_t r, residueul_t a, residueul_t b, modulusul_t m)
+{
+  ASSERT(a[0] < m[0] && b[0] < m[0]);
+#ifdef MODTRACE
+  printf ("submod_ul: a = %lu, b = %lu", a[0], b[0]);
+#endif
+  r[0] = (a[0] < b[0]) ? (a[0] + (m[0] - b[0])) : (a[0] - b[0]);
+#ifdef MODTRACE
+  printf (", r = %lu\n", r[0]);
+#endif
+}
+
+
+/* FIXME: This function is really modul_sub_ul_reduced */
 __GNUC_ATTRIBUTE_UNUSED__
 static inline void
 modul_sub_ul (residueul_t r, residueul_t a, unsigned long b, modulusul_t m)
@@ -210,21 +229,6 @@ modul_neg (residueul_t r, residueul_t a, modulusul_t m)
   else
     r[0] = m[0] - a[0];
 }
-
-__GNUC_ATTRIBUTE_UNUSED__
-static inline void
-modul_sub (residueul_t r, residueul_t a, residueul_t b, modulusul_t m)
-{
-  ASSERT(a[0] < m[0] && b[0] < m[0]);
-#ifdef MODTRACE
-  printf ("submod_ul: a = %lu, b = %lu", a[0], b[0]);
-#endif
-  r[0] = (a[0] < b[0]) ? (a[0] + (m[0] - b[0])) : (a[0] - b[0]);
-#ifdef MODTRACE
-  printf (", r = %lu\n", r[0]);
-#endif
-}
-
 
 /* Add an unsigned long to two unsigned longs with carry propagation from 
    low word to high word. Any carry out from high word is lost. */
@@ -273,6 +277,10 @@ modul_add_2ul_2ul (unsigned long *r1, unsigned long *r2,
 #endif
 }
 
+
+/* Multiply two unsigned long "a" and "b" and put the result as 
+   r2:r1 (r2 being the high word) */
+
 static inline void
 mul_ul_ul_2ul (unsigned long *r1, unsigned long *r2, const unsigned long a,
                const unsigned long b)
@@ -292,13 +300,14 @@ mul_ul_ul_2ul (unsigned long *r1, unsigned long *r2, const unsigned long a,
 #endif
 }
 
-/* Integer division of a two ulong value by a ulong divisor. Returns
+/* Integer division of a two ulong value a2:a1 by a ulong divisor. Returns
    quotient and remainder. */
 
 static inline void
 div_2ul_ul_ul (unsigned long *q, unsigned long *r, const unsigned long a1,
                const unsigned long a2, const unsigned long b)
 {
+  ASSERT(a2 < b); /* Or there will be quotient overflow */
 #if defined(__x86_64__) && defined(__GNUC__)
   __asm__ ( "divq %4"
             : "=a" (*q), "=d" (*r)
@@ -321,6 +330,7 @@ static inline void
 div_2ul_ul_ul_r (unsigned long *r, unsigned long a1,
                  const unsigned long a2, const unsigned long b)
 {
+  ASSERT(a2 < b); /* Or there will be quotient overflow */
 #if defined(__x86_64__) && defined(__GNUC__)
   __asm__ ( "divq %3"
             : "+a" (a1), "=d" (*r)
@@ -346,6 +356,7 @@ modul_mul (residueul_t r, const residueul_t a, const residueul_t b,
   printf ("mulmod_ul: a = %lu, b = %lu", a[0], b[0]);
 #endif
   
+  ASSERT (a[0] < m[0] && b[0] < m[0]);
   mul_ul_ul_2ul (&t1, &t2, a[0], b[0]);
   div_2ul_ul_ul (&dummy, r, t1, t2, m[0]);
   
@@ -354,10 +365,12 @@ modul_mul (residueul_t r, const residueul_t a, const residueul_t b,
 #endif
 }
 
+/* Computes (a * 2^wordsize) % m */
 __GNUC_ATTRIBUTE_UNUSED__
 static inline void
 modul_tomontgomery (residueul_t r, const residueul_t a, const modulusul_t m)
 {
+  ASSERT (a[0] < m[0]);
   div_2ul_ul_ul_r (r, 0UL, a[0], m[0]);
 }
 
@@ -392,7 +405,7 @@ modul_redcsemi_ul_not0 (residueul_t r, const unsigned long a,
 }
 
 
-/* Computes ((a + b) / 2^wordsize) % m */
+/* Computes ((a + b) / 2^wordsize) % m. a <= m is permissible */
 __GNUC_ATTRIBUTE_UNUSED__
 static inline void
 modul_addredc_ul (residueul_t r, const residueul_t a, const unsigned long b, 
@@ -400,6 +413,7 @@ modul_addredc_ul (residueul_t r, const residueul_t a, const unsigned long b,
 {
   unsigned long slow, shigh, tlow, thigh;
   
+  ASSERT (a[0] <= m[0]);
   slow = b;
   shigh = 0UL;
   modul_add_ul_2ul (&slow, &shigh, a[0]);
@@ -409,19 +423,20 @@ modul_addredc_ul (residueul_t r, const residueul_t a, const unsigned long b,
   ASSERT (slow + tlow == 0UL);
   r[0] = thigh + shigh + (slow != 0UL);
   
-  /* r = ((a+b) + (((a+b)%2^w * invp) % 2^w) * p) / 2^w
-     r <= ((a+b) + (2^w - 1) * p) / 2^w
-     r <= (p-1 + 2^w-1 + p2^w - p) / 2^w
-     r <= (2^w -2 + p2^w) / 2^w
-     r <= p + 1 - 2/2^w
-     r <= p
+  /* r = ((a+b) + (((a+b)%2^w * invm) % 2^w) * m) / 2^w  Use a<=m-1, b<=2^w-1
+     r <= (m + 2^w - 1 + (2^w - 1) * m) / 2^w
+        = (m - 1 + 2^w + m*2^w - m) / 2^w
+        = (- 1 + 2^w + m2^w) / 2^w
+        = m + 1 - 1/2^w
+     r <= m, since r is an integer
   */
   if (r[0] == m[0])
     r[0] = 0UL;
 }
 
 
-/* Computes ((a + b) / 2^wordsize) % m, but result can be == m */
+/* Computes ((a + b) / 2^wordsize) % m, but result can be == m.
+   a <= m is permissible */
 __GNUC_ATTRIBUTE_UNUSED__
 static inline void
 modul_addredcsemi_ul (residueul_t r, const residueul_t a, 
@@ -431,9 +446,18 @@ modul_addredcsemi_ul (residueul_t r, const residueul_t a,
   unsigned long slow, shigh, tlow;
   unsigned char sb;
   
+  ASSERT(a[0] <= m[0]);
   slow = b;
-#if 1
-  __asm__ ( "addq %2, %0\n\t"
+#if defined(__x86_64__) && defined(__GNUC__)
+   __asm__ ( "addq %2, %0\n\t"
+            "setne %1\n\t"
+            "adcb $0, %1\n"
+            : "+&r" (slow), "=qm" (sb)
+            : "rm" (a[0])
+            : "cc");
+  shigh = sb;
+#elif defined(__i386__) && defined(__GNUC__)
+   __asm__ ( "addl %2, %0\n\t"
             "setne %1\n\t"
             "adcb $0, %1\n"
             : "+&r" (slow), "=qm" (sb)
@@ -451,11 +475,11 @@ modul_addredcsemi_ul (residueul_t r, const residueul_t a,
   ASSERT (slow + tlow == 0UL);
   r[0] += shigh;
 
-  /* r = ((a+b) + (((a+b)%2^w * invp) % 2^w) * p) / 2^w
-     r <= ((a+b) + (2^w - 1) * p) / 2^w
-     r <= (p-1 + 2^w-1 + p2^w - p) / 2^w
-     r <= (2^w -2 + p2^w) / 2^w
-     r <= p + 1 - 2/2^w
+  /* r = ((a+b) + (((a+b)%2^w * invm) % 2^w) * m) / 2^w
+     r <= ((a+b) + (2^w - 1) * m) / 2^w
+     r <= (m + 2^w-1 + m*2^w - m) / 2^w
+     r <= (2^w -1 + p2^w) / 2^w
+     r <= p + 1 - 1/2^w
      r <= p
   */
 }
@@ -469,6 +493,7 @@ modul_mulredc (residueul_t r, const residueul_t a, const residueul_t b,
   unsigned long plow, phigh, tlow, thigh;
 
   ASSERT(m[0] % 2 != 0);
+  ASSERT(a[0] < m[0] && b[0] < m[0]);
 #if defined(MODTRACE)
   printf ("(%lu * %lu / 2^%ld) %% %lu", 
           a[0], b[0], 8 * sizeof(unsigned long), m[0]);
@@ -477,13 +502,14 @@ modul_mulredc (residueul_t r, const residueul_t a, const residueul_t b,
   mul_ul_ul_2ul (&plow, &phigh, a[0], b[0]);
   tlow = plow * invm;
   mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
-  /* Let b = 2^wordsize. We know (phigh * b + plow) + (thigh * b + tlow) 
-     == 0 (mod b) so either plow == tlow == 0, or plow !=0 and tlow != 0. 
+  /* Let w = 2^wordsize. We know (phigh * w + plow) + (thigh * w + tlow) 
+     == 0 (mod w) so either plow == tlow == 0, or plow !=0 and tlow != 0. 
      In the former case we want phigh + thigh + 1, in the latter 
      phigh + thigh */
-  /* Since a <= p-1 and b <= p-1, and p <= b-1, a*b <= b^2 - 4*b + 4, so
+  /* Since a <= p-1 and b <= p-1, and p <= w-1, a*b <= w^2 - 4*w + 4, so
      adding 1 to phigh is safe */
   phigh += (plow != 0UL);
+
   r[0] = (phigh >= m[0] - thigh) ? (phigh - (m[0] - thigh)) : (phigh + thigh);
   
 #if defined(MODTRACE)
@@ -491,6 +517,7 @@ modul_mulredc (residueul_t r, const residueul_t a, const residueul_t b,
 #endif
 }
                          
+/* FIXME: check for overflow if b > m */
 __GNUC_ATTRIBUTE_UNUSED__
 static inline void
 modul_mulredc_ul (residueul_t r, const residueul_t a, const unsigned long b,
