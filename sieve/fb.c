@@ -126,6 +126,14 @@ fb_log (double n, double log_scale, double offset)
   return (unsigned char) floor (log (n) * log_scale + offset + 0.5);
 }
 
+/* Returns the smallest prime > p */
+static fbprime_t
+nextprime (fbprime_t p)
+{
+  do {p++;} while (iscomposite (p));
+  return p;
+}
+
 /* Generate a factor base with primes <= bound for a linear polynomial */
 
 factorbase_degn_t *
@@ -155,7 +163,7 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
     }
 
   p = 2;
-  while (p <= bound)
+  for ( ; p <= bound; p = nextprime (p))
     {
       modulus_t m;
       residue_t r1, r2;
@@ -227,9 +235,6 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
       fb = fb_new;
       
       /* FIXME: handle prime powers */
-
-      /* Skip to next prime. FIXME: use a sieve */
-      do {p++;} while (iscomposite (p));
     }
 
   if (fb != NULL) /* If nothing went wrong so far, put the end-of-fb mark */
