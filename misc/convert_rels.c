@@ -12,7 +12,6 @@
 #include <stdlib.h>
 #include <stdint.h> /* for UINT32_MAX */
 #include <string.h>
-#include <tiff.h>
 #include "gmp.h"
 
 #define MAX_PRIMES 255 /* maximal number of factor base primes */
@@ -20,25 +19,25 @@
 #define DEGF_MAX 5
 #define REPS 10
 
-uint32
+uint32_t
 get_uint32 (FILE *fp)
 {
-  uint32 w;
-  fread (&w, sizeof (uint32), 1, fp);
+  uint32_t w;
+  fread (&w, sizeof (uint32_t), 1, fp);
   return w;
 }
 
-int32
+int32_t
 get_int32 (FILE *fp)
 {
-  int32 w;
-  fread (&w, sizeof (int32), 1, fp);
+  int32_t w;
+  fread (&w, sizeof (int32_t), 1, fp);
   return w;
 }
 
 typedef struct
 {
-  int32 a, b;
+  int32_t a, b;
   unsigned int rfb_entries;
   unsigned int afb_entries;
   unsigned int sp_entries;
@@ -49,18 +48,18 @@ typedef struct
   unsigned long aprimes[MAX_PRIMES];
   unsigned long aexp[MAX_PRIMES];
   unsigned long sprimes[MAX_PRIMES];
-  uint32 sexp[MAX_PRIMES];
-  uint32 large_rprimes[MAX_LPRIMES]; /* large rational primes are 32-bit */
-  uint32 large_aprimes[MAX_LPRIMES]; /* large algebraic primes are 32-bit
+  uint32_t sexp[MAX_PRIMES];
+  uint32_t large_rprimes[MAX_LPRIMES]; /* large rational primes are 32-bit */
+  uint32_t large_aprimes[MAX_LPRIMES]; /* large algebraic primes are 32-bit
 					  too, but the file stores also the
 					  corresponding root, which we don't
 					  need here. */
-  int32 qcb1, qcb2; /* quadratic characters */
+  int32_t qcb1, qcb2; /* quadratic characters */
 } relation_t;
 
 /* prints a large prime, given its low and high 32-bit parts */
 void
-print_large_prime (uint32 l, uint32 h)
+print_large_prime (uint32_t l, uint32_t h)
 {
   mpz_t P;
 
@@ -78,7 +77,7 @@ print_large_prime (uint32 l, uint32 h)
    p1,p2,...,pn are the primes on the rational side.
 */
 void
-print_relation_cado (relation_t *rel, int32 *rfb, int32 *afb)
+print_relation_cado (relation_t *rel, int32_t *rfb, int32_t *afb)
 {
   unsigned int i, j;
 
@@ -128,7 +127,7 @@ print_relation_cado (relation_t *rel, int32 *rfb, int32 *afb)
    Y 444B A6CF C827 2C8627 B 25 209 527 B 2 2 2
 */
 void
-print_relation_fk (relation_t *rel, int32 *rfb, int32 *afb, int iformat)
+print_relation_fk (relation_t *rel, int32_t *rfb, int32_t *afb, int iformat)
 {
   unsigned int i, j;
 
@@ -141,7 +140,7 @@ print_relation_fk (relation_t *rel, int32 *rfb, int32 *afb, int iformat)
   for (i = 0; i < rel->afb_entries; i++)
     for (j = 0; j < rel->aexp[i]; j++)
       printf (" %x", (iformat == FORMAT_GGNFS) ? afb[rel->aprimes[i]]
-              : (int32) rel->aprimes[i]);
+              : (int32_t) rel->aprimes[i]);
   for (i = 0; i < rel->sp_entries; i++)
     for (j = 0; j < rel->sexp[i]; j++)
       printf (" %lx", rel->sprimes[i]);
@@ -153,7 +152,7 @@ print_relation_fk (relation_t *rel, int32 *rfb, int32 *afb, int iformat)
   for (i = 0; i < rel->rfb_entries; i++)
     for (j = 0; j < rel->rexp[i]; j++)
       printf (" %x", (iformat == FORMAT_GGNFS) ? rfb[rel->rprimes[i]]
-              : (int32) rel->rprimes[i]);
+              : (int32_t) rel->rprimes[i]);
   for (i = 0; i < rel->num_lrp; i++)
     printf (" %x", rel->large_rprimes[i]);
   printf ("\n");
@@ -257,17 +256,17 @@ read_relation_cado (FILE *fp, relation_t *rel)
 */
 int
 read_relation_ggnfs (FILE *fp, relation_t *rel, mpz_t norm, mpz_t *f,
-                         int degf, int32 *afb)
+                         int degf, int32_t *afb)
 {
-  uint32 size_field; /* 32 bits */
+  uint32_t size_field; /* 32 bits */
   unsigned int i = 0; /* gcc 4.1.2 warns that i may be used uninitialized,
                          but this does not seem correct */
   unsigned int k;
-  int32 p;
+  int32_t p;
 
   size_field = get_uint32 (fp);
-  rel->a = (int32) get_int32 (fp);
-  rel->b = (int32) get_uint32 (fp);
+  rel->a = (int32_t) get_int32 (fp);
+  rel->b = (int32_t) get_uint32 (fp);
   eval_algebraic (norm, f, degf, rel->a, rel->b);
   rel->rfb_entries = size_field >> 24;
   for (i = 0; i < rel->rfb_entries; i++)
@@ -367,12 +366,12 @@ read_relation_ggnfs (FILE *fp, relation_t *rel, mpz_t norm, mpz_t *f,
    f[0]...f[degf].
 */
 unsigned long
-convert_relations (char *rels, int32 *rfb, int32 *afb, mpz_t *f, int degf,
+convert_relations (char *rels, int32_t *rfb, int32_t *afb, mpz_t *f, int degf,
 		int iformat, int oformat, int verbose)
 {
   FILE *fp;
   relation_t rel[1];
-  uint32 relsInFile, outputRels = 0;
+  uint32_t relsInFile, outputRels = 0;
   unsigned int j;
   mpz_t norm;
   int ok;
@@ -391,7 +390,7 @@ convert_relations (char *rels, int32 *rfb, int32 *afb, mpz_t *f, int degf,
 
   if (iformat == FORMAT_GGNFS)
     {
-      fread (&relsInFile, sizeof (int32), 1, fp);
+      fread (&relsInFile, sizeof (int32_t), 1, fp);
       if (verbose)
         fprintf (stderr, "File %s: header says %d relations.\n",
                  rels, relsInFile);
@@ -482,8 +481,8 @@ get_string (char *s, FILE *fp, int verbose)
    Returns degree d.
 */
 int
-read_fb (FILE *fp, int32 **rfb, int32 *rfb_size, int32 **afb, int32 *afb_size,
-	 int verbose, mpz_t *f)
+read_fb (FILE *fp, int32_t **rfb, int32_t *rfb_size, int32_t **afb, 
+         int32_t *afb_size, int verbose, mpz_t *f)
 {
   int c, i, degf;
   long RFBsize, AFBsize;
@@ -549,9 +548,9 @@ read_fb (FILE *fp, int32 **rfb, int32 *rfb_size, int32 **afb, int32 *afb_size,
   if (verbose)
     fprintf (stderr, "\nRFBsize=%ld AFBsize=%ld\n", RFBsize, AFBsize);
   *rfb_size = RFBsize;
-  *rfb = (int32*) malloc (RFBsize * sizeof(int32));
+  *rfb = (int32_t*) malloc (RFBsize * sizeof(int32_t));
   *afb_size = AFBsize;
-  *afb = (int32*) malloc (AFBsize * sizeof(int32));
+  *afb = (int32_t*) malloc (AFBsize * sizeof(int32_t));
   for (i = 0; i < RFBsize; i++)
     {
       (*rfb)[i] = get_uint32 (fp);
@@ -584,8 +583,8 @@ main (int argc, char *argv[])
 {
   FILE *fp;
   unsigned long num_rels = 0;
-  int32 *rfb = NULL, *afb = NULL;
-  int32 rfb_size, afb_size;
+  int32_t *rfb = NULL, *afb = NULL;
+  int32_t rfb_size, afb_size;
   int verbose = 0, i, degf = 0;
   int iformat = FORMAT_GGNFS; /* default input format */
   int oformat = FORMAT_CADO; /* default output format */
