@@ -1853,8 +1853,8 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
     }
 }
 
-
-static void
+/* return the number of printed relations */
+static unsigned int
 trialdiv_and_print (cado_poly poly, const unsigned long b, 
                     const sieve_report_t *reports_a, 
 		    const unsigned int reports_a_nr, 
@@ -2020,6 +2020,8 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 	    cof_a_toolarge, lp_a_toolarge, cof_r_toolarge, lp_r_toolarge);
   }
 #endif
+
+  return relations_found;
 }
 
 
@@ -2084,7 +2086,8 @@ main (int argc, char **argv)
   const double log_scale = 1. / log (2.); /* Lets use log_2() for a start */
   cado_poly cpoly;
   char report_a_threshold, report_r_threshold;
-
+  unsigned long relations_found = 0;
+  double total_time = seconds ();
 
   while (argc > 1 && argv[1][0] == '-')
     {
@@ -2402,9 +2405,14 @@ main (int argc, char **argv)
 		   "full with %u entries for b=%lu\n", reports_r_len, b);
 
       /* Not trial factor the candidate relations */
-      trialdiv_and_print (cpoly, b, reports_a, reports_a_nr, reports_r, 
-			  reports_r_nr, fba, fbr, log_scale, verbose);
+      relations_found += trialdiv_and_print (cpoly, b, reports_a, reports_a_nr,
+                                             reports_r, reports_r_nr, fba, fbr,
+                                             log_scale, verbose);
     }
+
+  total_time = seconds () - total_time;
+  fprintf (stderr, "Found %lu relations in %1.0f seconds (%1.2e s/r)\n",
+           relations_found, total_time, total_time / (double) relations_found);
 
 #if 0
   /* FIXME implement this */
