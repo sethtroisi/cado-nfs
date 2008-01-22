@@ -670,6 +670,7 @@ struct polmat { /* {{{ */
             src += stride();
         }
         int k;
+        y[stride()-1] &= (1UL << (ncoef & (ULONG_BITS-1)))-1UL;
         for(k = stride() - 1 ; y[k] == 0 ; k--);
         deg(j) = (k+1) * ULONG_BITS - clzl(y[k]) - 1;
     } /* }}} */
@@ -2137,7 +2138,7 @@ static void go_recursive(polmat& pi)
 
     E.resize(ldeg - 1 + 1);
     polmat pi_left;
-    go_quadratic(pi_left);
+    compute_lingen<fft_type>(pi_left);
     E.clear();
 
     if (t < t0 + ldeg) {
@@ -2197,7 +2198,7 @@ static void go_recursive(polmat& pi)
     E.xdiv_resize(ldeg - kill, rdeg - 1 + 1);
 
     polmat pi_right;
-    go_quadratic(pi_right);
+    compute_lingen<fft_type>(pi_right);
     int pi_r_deg = pi_right.maxdeg();
     E.clear();
 
