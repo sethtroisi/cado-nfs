@@ -163,6 +163,14 @@ read_polynomial (cado_poly poly, char *filename)
       free (poly->g);
       return 0;
     }
+  
+  // compute m, the common root of f and g mod n
+  mpz_init(poly->m);
+  mpz_invert(poly->m, poly->g[1], poly->n);
+  mpz_mul(poly->m, poly->m, poly->g[0]);
+  mpz_mod(poly->m, poly->m, poly->n);
+  mpz_sub(poly->m, poly->n, poly->m);
+  mpz_mod(poly->m, poly->m, poly->n);
   return 1;
 }
 

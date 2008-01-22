@@ -22,6 +22,20 @@ void poly_free(poly_t f) {
   free(f->coeff);
 }
 
+void poly_print(poly_t f) {
+  int i;
+  if (f->deg == -1) {
+    printf("0\n");
+    return;
+  } else if (f->deg == 0) {
+    gmp_printf("%Zd\n", f->coeff[0]);
+    return;
+  }
+  gmp_printf("%Zd + ", f->coeff[0]);
+  for (i = 1; i < f->deg; ++i)
+    gmp_printf("%Zd*x^%d + ", f->coeff[i], i);
+  gmp_printf("%Zd*x^%d\n", f->coeff[f->deg], f->deg);
+}
 
 
 void cleandeg(poly_t f, int deg) {
@@ -153,6 +167,22 @@ void poly_div_ui_mod_mpz(poly_t f, poly_t g, unsigned long a, mpz_t m) {
 }
 
 
+// compute res := f(x) mod m
+void poly_eval_mod_mpz(mpz_t res, const poly_t f, const mpz_t x, const mpz_t m) 
+{
+  int i, d;
+  d = f->deg;
+  if (d == -1) {
+    mpz_set_ui(res, 0);
+    return;
+  }
+  mpz_mod(res, f->coeff[d], m);
+  for (i = d-1; i>=0; --i) {
+    mpz_mul(res, res, x);
+    mpz_add(res, res, f->coeff[i]);
+    mpz_mod(res, res, m);
+  }
+}
 
 void poly_mul(poly_t f, poly_t g, poly_t h) {
   int i, j, maxdeg;
@@ -325,7 +355,7 @@ poly_mul_mod_f_mod_mpz(poly_t Q, const poly_t P1, const poly_t P2,
     }
     d--;
   }
-  cleandeg(R, d-1);
+  cleandeg(R, d);
   poly_copy(Q, R);
   poly_free(R);
   mpz_clear(aux);

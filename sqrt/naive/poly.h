@@ -34,6 +34,7 @@ void poly_sub(poly_t f, poly_t g, poly_t h);
 void poly_sub_mod_mpz(poly_t f, poly_t g, poly_t h, mpz_t m);
 void poly_mul_ui(poly_t f, poly_t g, unsigned long a);
 void poly_div_ui_mod_mpz(poly_t f, poly_t g, unsigned long a, mpz_t m);
+void poly_eval_mod_mpz(mpz_t res, const poly_t f, const mpz_t x, const mpz_t m);
 void poly_mul(poly_t f, poly_t g, poly_t h);
 void poly_reducemodF(polymodF_t P, poly_t p, poly_t F);
 void polymodF_mul(polymodF_t Q, polymodF_t P1, polymodF_t P2, poly_t F);

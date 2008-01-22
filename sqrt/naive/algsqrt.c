@@ -34,6 +34,7 @@ int poly_integer_reconstruction(poly_t Q, const poly_t R, const mpz_t m) {
 	return 0;
       else {
 	mpz_sub(aux, m, R->coeff[i]);
+	mpz_neg(aux, aux);
 	poly_setcoeff(Q, i, aux);
       }
     }
@@ -118,7 +119,7 @@ void polymodF_sqrt(polymodF_t res, polymodF_t AA, poly_t F, unsigned long p) {
     poly_sqr_mod_f_mod_mpz(tmp, invsqrtA, f, pk);
     poly_mul_mod_f_mod_mpz(tmp, tmp, invsqrtA, f, pk);
     poly_mul_mod_f_mod_mpz(tmp, tmp, a, f, pk);
-    poly_mul_ui(tmp2, a, 3);
+    poly_mul_ui(tmp2, invsqrtA, 3);
     poly_sub_mod_mpz(tmp, tmp2, tmp, pk);
     poly_div_ui_mod_mpz(invsqrtA, tmp, 2, pk); 
 
@@ -212,141 +213,26 @@ int main(int argc, char **argv) {
   p = FindSuitableModP(F);
   fprintf(stderr, "Using p=%lu for lifting\n", p);
 
+  double tm = seconds();
   polymodF_sqrt(prd, prd, F, p);
+  fprintf(stderr, "Square root lifted in %2.2lf\n", seconds()-tm);
+  
+  mpz_t algsqrt, aux;
+  mpz_init(algsqrt);
+  mpz_init(aux);
+  poly_eval_mod_mpz(algsqrt, prd->p, pol->m, pol->n);
+  mpz_invert(aux, F->coeff[F->deg], pol->n);  // 1/fd mod n
+  mpz_powm_ui(aux, aux, prd->v, pol->n);      // 1/fd^v mod n
+  mpz_mul(algsqrt, algsqrt, aux);
+  mpz_mod(algsqrt, algsqrt, pol->n);
 
+  gmp_printf("%Zd\n", algsqrt);
+
+  mpz_clear(aux);
+  mpz_clear(algsqrt);
   poly_free(F);
   poly_free(prd->p);
   poly_free(tmp->p);
   return 0;
 }
 
- 
-
-
-
-# if 0
-int main(int argc, char **argv) {
-  FILE * matfile, *kerfile;
-  cado_poly pol;
-  long a;
-  unsigned long b;
-  poly_t F;
-  polymodF_t prd, tmp;
-  int ret;
-  unsigned long w;
-  int i, j, nlimbs;
-  char str[1024];
-  int depnum = 0;
-
-  if (argc > 2 && strcmp (argv[1], "-depnum") == 0)
-    {
-      depnum = atoi (argv[2]);
-      argc -= 2;
-      argv += 2;
-    }
-
-  if (argc != 4) {
-    fprintf(stderr, "usage: %s [-depnum nnn] matfile kerfile polyfile\n", argv[0]);
-    exit(1);
-  }
-
-  matfile = fopen(argv[1], "r");
-  assert (matfile != NULL);
-  kerfile = fopen(argv[2], "r");
-  assert (kerfile != NULL);
-
-  ret = read_polynomial(pol, argv[3]);
-  assert (ret == 1);
-
-  // Init F to be the algebraic polynomial
-  poly_alloc(F, pol->degree);
-  for (i = pol->degree; i >= 0; --i)
-    poly_setcoeff(F, i, pol->f[i]);
-
-  // Init prd to 1.
-  poly_alloc(prd->p, pol->degree);
-  mpz_set_ui(prd->p->coeff[0], 1);
-  prd->p->deg = 0;
-  prd->v = 0;
-
-  // Allocate tmp
-  poly_alloc(tmp->p, 1);
-
-  {
-    int nrows, ncols;
-    ret = fscanf(matfile, "%d %d", &nrows, &ncols);
-    assert (ret == 2);
-    fgets(str, 1024, matfile); // read end of first line
-    nlimbs = (nrows / GMP_NUMB_BITS) + 1;
-  }
-
-  /* go to dependency depnum */
-  while (depnum > 0)
-    {
-      int c;
-      /* read one line */
-      while ((c = fgetc (kerfile)) != '\n')
-        if (c == EOF)
-          break;
-      depnum --;
-    }
-
-  if (depnum > 0)
-    {
-      fprintf (stderr, "Error, not enough dependencies\n");
-      exit (1);
-    }
-
-  for (i = 0; i < nlimbs; ++i) {
-    ret = fscanf(kerfile, "%lx", &w);
-    assert (ret == 1);
-    for (j = 0; j < GMP_NUMB_BITS; ++j) {
-      if (fgets(str, 1024, matfile)) {
-	if (w & 1UL) {
-	  ret = sscanf(str, "%ld %lu", &a, &b);
-	  assert (ret == 2);
-
-	  polymodF_from_ab(tmp, a, b);
-	  polymodF_mul(prd, prd, tmp, F);
-	}
-      }
-      w >>= 1;
-    }
-  }
-
-  fprintf(stderr, "v = %d\n", prd->v);
-  fprintf(stderr, "sizeinbit of cst term = %ld\n", mpz_sizeinbase(prd->p->coeff[0], 2));
-  fprintf(stderr, "sizeinbit of leading term = %ld\n", mpz_sizeinbase(prd->p->coeff[pol->degree-1], 2));
-
-
-  for (i = 0; i < pol->degree; ++i) 
-    gmp_printf("%Zx\n", prd->p->coeff[i]);
-  printf("%d\n", prd->v);
-
-  {
-    FILE * formagma;
-    mpz_t m;
-
-    formagma = fopen("/tmp/formagma", "w");
-    if (formagma == NULL) {
-      fprintf(stderr, "can not create /tmp/formagma\n");
-      return 1;
-    }
-    fprintf(formagma, "f := ");
-    for (i = 0; i <= pol->degree; ++i)
-      gmp_fprintf(formagma, "%+Zd*x^%d", pol->f[i], i);
-    fprintf(formagma, ";\nm := ");
-    mpz_init(m);
-    mpz_neg(m, pol->g[0]);
-    gmp_fprintf(formagma, "%Zd;\nN := %Zd;\n", m, pol->n);
-    mpz_clear(m);
-    fclose(formagma);
-  }
-
-  poly_free(F);
-  poly_free(prd->p);
-  poly_free(tmp->p);
-
-  return 0;
-}
-#endif
