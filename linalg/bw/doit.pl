@@ -210,13 +210,15 @@ if ($msize) {
 my $exe_master = "${bindir}bw-master";
 if ($modulus eq '2') {
 	$exe_master .= '-binary';
+	die "threshold needed" unless $threshold;
+	$exe_master .= " -t $threshold";
 } elsif ($method =~ /^(?:q(?:uadratic)?|old)$/) {
 	$exe_master .= '-old';
 } else {
-	die "threshold needed" unless $threshold;
 	# TODO: allow runtime selection of method or (probably
 	# smarter) runtime checking that the proper binary is
 	# being used.
+	die "threshold needed" unless $threshold;
 	$exe_master .= "2 -t $threshold";
 }
 

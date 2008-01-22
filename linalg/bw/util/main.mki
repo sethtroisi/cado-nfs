@@ -19,6 +19,12 @@ ifeq ($(STATIC),yes)
 LFLAGS+=-static
 endif
 
+ifeq ($(origin CFLAGS),command line)
+ifneq ($(IFLAGS),)
+$(error CFLAGS cannot be overridden. Use OFLAGS)
+endif
+endif
+
 CFLAGS:=-Wall -ggdb
 CXXFLAGS:=-Wall -ggdb
 LIBS:=
