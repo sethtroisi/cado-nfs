@@ -74,8 +74,6 @@ struct fake_fft {/*{{{*/
     unsigned int nc;
     unsigned int size;
 
-    struct xs_proxy {/*{{{*/
-        unsigned int size;
         xs_proxy() {}
         xs_proxy(uint s) : size(s) {}
         ulong * alloc(unsigned int n) const {
@@ -93,7 +91,6 @@ struct fake_fft {/*{{{*/
         ulong const * cget(ulong * const p, unsigned int i) const {
             return p + size * i;
         }
-    };/*}}}*/
 
     public:
     fake_fft() { d1 = d2 = d3 = acc = nc = size = 0; }

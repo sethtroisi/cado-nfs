@@ -1,22 +1,19 @@
-FLAGS=-O4 -DNDEBUG 
-#FLAGS=-g
+CC:=gcc
+CFLAGS:=-W -Wall -O4 -DNDEBUG 
 
+all: cantor bench
 
-SRC_CANTOR=cantor128.c mpfq_2_128.h.32 mpfq_2_128.h.64 mpfq_2_128.c.32 mpfq_2_128.c.64
-
-cantor128.o: $(SRC_CANTOR)
-	gcc $(FLAGS) -c -msse2 cantor128.c mpfq_2_128.c
-
-bench: cantor128.o bench.c
-	gcc $(FLAGS) -o bench cantor128.o bench.c -lgmp
-
-bench_notrunc: cantor128.o bench.c
-	gcc $(FLAGS) -DMULCANTOR=mulCantor128Plain -o bench_notrunc cantor128.o bench.c -lgmp
-
-cantor: $(SRC_CANTOR)
-	gcc $(FLAGS) -DWANT_MAIN -msse2 -o cantor cantor128.c mpfq_2_128.c -lgmp
-
+cantor128.o: mpfq_2_128.h.32 mpfq_2_128.h.64
+mpfq_2_128.o: mpfq_2_128.c.32 mpfq_2_128.c.64
+mpfq_2_128.o: mpfq_2_128.h.32 mpfq_2_128.h.64
+cantor_main.o:
+c.o:
+	$(CC) $(CFLAGS) -m sse2 -o $@ -c $<
+bench: bench.o cantor128.o
+	$(CC) $(FLAGS) -o $@ $^ -lgmp
+cantor: cantor_main.o cantor128.o
+	$(CC) $(FLAGS) -msse2 -o $@ $^ -lgmp
+test: cantor
+	./check_cantor.sh `seq 60 70` `seq 120 140` `seq 250 270`
 clean: 
-	rm -f cantor bench cantor128.o mpfq_2_128.o bench_notrunc
-
-all: bench bench_notrunc cantor
+	-rm -f cantor bench *.o *~

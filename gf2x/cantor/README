@@ -7,18 +7,59 @@ Licence: GNU General Public License (version 2 or any later version).
 This package provides an implementation of Cantor's algorithm for
 multiplying two binary polynomials using "additive FFT".
 
-The main exported function is:
+The exported function are:
 
 void mulCantor128(uint64_t *H, uint64_t *F, int Fl, uint64_t *G, int Gl);
 
-It multiplies two polynomials F(x) and G(x) and put the results in H(x).
-F(x) is represented in a dense way by an array F of Fl blocks of 64 bits,
-the same for G, with Gl blocks, and the result is put in the table H,
-that must have room for Fl+Gl blocks of 64 bits.
+	multiplies two polynomials F(x) and G(x) and put the results in
+	H(x).  F(x) is represented in a dense way by an array F of Fl
+	blocks of 64 bits, the same for G, with Gl blocks, and the result
+	is put in the table H, that must have room for Fl+Gl blocks of 64
+	bits.
 
-A non-truncated variant is exported as well:
+as well as other functions allowing FFT caching.
 
-void mulCantor128Plain(uint64_t *H, uint64_t *F, int Fl, uint64_t *G, int Gl);
+extern void cantor_setup_info(cantor_info_t p, int Fl, int Gl);
+
+	sets up the appropriate data for multiplying polynomials having
+	respectively Fl and Gl 64-bit words.
+	
+extern cantor_transform_t cantor_transform_alloc(const cantor_info_t p,
+int n);
+
+	allocates space for n transforms.
+
+extern void cantor_transform_free(const cantor_info_t p,
+cantor_transform_t x, int n); 
+
+	frees the n transforms allocated at x
+
+extern inline cantor_transform_get(const cantor_info_t p,
+cantor_transform_t x, int k); 
+
+	accesses the k-th transform stored at location x.
+
+extern void cantor_transform(const cantor_info_t p, cantor_transform_t x,
+uint64_t * F, int Fl);
+
+	performs a direct transform of F, having Fl 64-bit words.
+
+extern void cantor_compose(const cantor_info_t p, cantor_transform_t y,
+cantor_transform_t x1, cantor_transform_t x2);
+
+	composes the transforms of two polynomials. The result is by
+	definition the transform of their product.
+
+extern void cantor_compose(const cantor_info_t p, cantor_transform_t y,
+cantor_transform_t x1, cantor_transform_t x2);
+
+	adds two transforms (the direct transform is linear).
+
+extern void cantor_itransform(const cantor_info_t p, uint64_t * H, int
+Hl, cantor_transform_t h);
+
+	performs an inverse transform.
+
 
 This package relies on some routines taken from the Mpfq library. This
 should work (?) on any x86 computer with SSE2 instruction set. The GMP
@@ -30,20 +71,17 @@ make all
 
 This should produce 3 binaries:
   - bench
-  - bench_notrunc
   - cantor
 
 bench measures the time spent to multiply two polynomials (type ./bench
-for usage). bench_notrunc is similar but calls the non-truncated version.
-cantor is a small utility that takes two random polynomials, multiply
-them and print the corresponding data, for testing purpose. It is used by
-the script check_cantor that will checked the result against Magma
-(assuming it is installed).
+for usage).  cantor is a small utility that takes two random polynomials,
+multiply them and print the corresponding data, for testing purpose. It
+is used by the script check_cantor that will checked the result against
+Magma (assuming it is installed).
 
 Examples:
 
 ./bench 64 1000 -f 1.1
-./bench_notrunc 64 1000 -f 1.1
 
 
 
