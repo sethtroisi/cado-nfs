@@ -248,7 +248,7 @@ poly_reducemodF(polymodF_t P, poly_t p, poly_t F) {
 }
 
 void
-polymodF_mul(polymodF_t Q, polymodF_t P1, polymodF_t P2, poly_t F) {
+polymodF_mul(polymodF_t Q, const polymodF_t P1, const polymodF_t P2, const poly_t F) {
   poly_t prd;
   int v;
   poly_alloc(prd, P1->p->deg+P2->p->deg);

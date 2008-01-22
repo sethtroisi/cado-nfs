@@ -159,6 +159,54 @@ unsigned long FindSuitableModP(poly_t F) {
   return p;
 }
 
+#define THRESHOLD 2 /* must be >= 2 */
+
+/* accumulate up to THRESHOLD products in prd[0], 2^i*THRESHOLD in prd[i].
+   nprd is the number of already accumulated values: if nprd = n0 + 
+   n1 * THRESHOLD + n2 * THRESHOLD^2 + ..., then prd[0] has n0 entries,
+   prd[1] has n1*THRESHOLD entries, and so on.
+*/
+// Products are computed modulo the polynomial F.
+polymodF_t*
+accumulate_fast (polymodF_t *prd, const polymodF_t a, const poly_t F, unsigned long *lprd,
+    unsigned long nprd)
+{
+  unsigned long i;
+
+  polymodF_mul(prd[0], prd[0], a, F);
+  nprd ++;
+
+  for (i = 0; nprd % THRESHOLD == 0; i++, nprd /= THRESHOLD)
+    {
+      /* need to access prd[i + 1], thus i+2 entries */
+      if (i + 2 > *lprd)
+        {
+          lprd[0] ++;
+          prd = (polymodF_t*) realloc (prd, *lprd * sizeof (polymodF_t));
+	  poly_alloc(prd[i+1]->p, F->deg);
+          mpz_set_ui(prd[i + 1]->p->coeff[0], 1);
+	  prd[i+1]->p->deg = 0;
+	  prd[i+1]->v = 0;
+        }
+      polymodF_mul(prd[i+1], prd[i+1], prd[i], F);
+      mpz_set_ui(prd[i]->p->coeff[0], 1);
+      prd[i]->p->deg = 0;
+      prd[i]->v = 0;
+    }
+
+  return prd;
+}
+
+/* prd[0] <- prd[0] * prd[1] * ... * prd[lprd-1] */
+void
+accumulate_fast_end (polymodF_t *prd, const poly_t F, unsigned long lprd)
+{
+  unsigned long i;
+
+  for (i = 1; i < lprd; i++)
+    polymodF_mul(prd[0], prd[0], prd[i], F);
+}
+
 int main(int argc, char **argv) {
   FILE * depfile;
   cado_poly pol;
@@ -194,8 +242,9 @@ int main(int argc, char **argv) {
   poly_alloc(tmp->p, 1);
 
   // Accumulate product
-  // TODO: do a subproduct tree, here.
   int nab = 0;
+#if 0
+  // Naive version, without subproduct tree
   while(fscanf(depfile, "%ld %lu", &a, &b) != EOF){
     if(!(nab % 100000))
       fprintf(stderr, "# Reading ab pair #%d at %2.2lf\n",nab,seconds());
@@ -205,6 +254,35 @@ int main(int argc, char **argv) {
     polymodF_mul(prd, prd, tmp, F);
     nab++;
   }
+#else
+  {
+    polymodF_t *prd_tab;
+    unsigned long lprd = 1; /* number of elements in prd_tab[] */
+    unsigned long nprd = 0; /* number of accumulated products in prd_tab[] */
+    prd_tab = (polymodF_t*) malloc (lprd * sizeof (polymodF_t));
+    poly_alloc(prd_tab[0]->p, F->deg);
+    mpz_set_ui(prd_tab[0]->p->coeff[0], 1);
+    prd_tab[0]->p->deg = 0;
+    prd_tab[0]->v = 0;
+    while(fscanf(depfile, "%ld %lu", &a, &b) != EOF){
+      if(!(nab % 100000))
+	fprintf(stderr, "# Reading ab pair #%d at %2.2lf\n",nab,seconds());
+      if((a == 0) && (b == 0))
+	break;
+      polymodF_from_ab(tmp, a, b);
+      prd_tab = accumulate_fast (prd_tab, tmp, F, &lprd, nprd++);
+      nab++;
+    }
+    accumulate_fast_end (prd_tab, F, lprd);
+
+    poly_copy(prd->p, prd_tab[0]->p);
+    prd->v = prd_tab[0]->v;
+    for (i = 0; i < (long)lprd; ++i)
+      poly_free(prd_tab[i]->p);
+    free(prd_tab);
+  }
+#endif
+
   fprintf(stderr, "Finished accumulating the product in %2.2lf\n", seconds());
   fprintf(stderr, "v = %d\n", prd->v);
   fprintf(stderr, "sizeinbit of cst term = %ld\n", mpz_sizeinbase(prd->p->coeff[0], 2));
