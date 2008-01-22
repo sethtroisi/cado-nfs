@@ -45,8 +45,9 @@ static void mul_basecase(ulong * c, const ulong * a,
 	}
     } else {
 	if (na < nb) {
+	    long i;
 	    c[nb] = mul_1_n(c, b, nb, a[0]);
-	    for (long i = 1; i < na; i++) {
+	    for (i = 1; i < na; i++) {
 		c[nb + i] = addmul_1_n(c + i, c + i, b, nb, a[i]);
 	    }
 	} else {
