@@ -13,13 +13,14 @@ README.txt file updated on Tue Jan 8 2008 by JM
 
   Also added a '-factorall' option changing the behaviour of the program when
   factoring the norms. What the '-factorall' option does is:
-      - Set the tdmax parameter to min(10, tdmax)
+      - Set the tdmax parameter to min(20, tdmax)
       - Attempt to completely factor the norms and accept relations if norm can
         be written as pa^ma * pb^mb where pa and pb are two (possibly
         identical) large primes.
 
   Note that using the '-factorall' option will slow down the program
-  noticeably. My feeling is that _usually_ you don't need to care about it...
+  noticeably. My gut feeling is that _usually_ you don't need to care about 
+  it...
 
 2. How to compile it?
 ---------------------

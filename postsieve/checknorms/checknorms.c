@@ -3,7 +3,7 @@
  * \author  Jerome Milan (heavily based on Paul Zimmermann's checknorms program)
  * \date    Tue Jan 8 2008
  * \brief   Check relations produced by siever and factor residues.
- * \version 0.2
+ * \version 0.2.1
  *
  * This is a slight modification of Paul Zimmermann's checknorms program
  * to use TIFA's factoring primitives instead of ECM. Usage is unchanged:
@@ -14,6 +14,13 @@
 /*
  * History:
  * --------
+ *   0.2.1: Tue Jan 22 2008 by JM
+ *          - Jump to next relation if a prime does not divide norm (was
+ *            previously aborting the whole program)
+ *          - Fixed extra comma appearing when appending primes to empty list.
+ *          - Fixed compilation warning (hopefully).
+ *          - Fixed bug in control flow.
+ *          - Raised tdmax to 20 when using option '-factorall'
  *     0.2: Tue Jan  8 2008 by JM
  *          - Added '-factorall' option.
  *     0.1: Thu Dec 20 2007 by JM
@@ -29,11 +36,13 @@
 #include "cado.h"
 #include "utils.h"
 #include "tifa.h"
+#include "funcs.h"  // "Private" header file from the TIFA library
 
 //------------------------------------------------------------------------------
-#define VERBOSE             1
-#define PERFORM_CHECK_PRIME 1
-#define DEBUG               0
+#define VERBOSE             1  // to print warnings
+#define PERFORM_CHECK_PRIME 1  // to check size of prime
+#define DEBUG               0  // to run step by step (with lots of messages!)
+#define PRINT_SUMMARY       1  // to print reporting info at end of program
 #if DEBUG
     //
     // _WARNING_: Setting DEBUG to one will prompt for user input before
@@ -59,14 +68,26 @@
 #define NFACTORS        8    /* (initial) size of array for norm's factors */
 #define MAXNMSG         10   /* max number of warning messages             */
 #define REL_MAXLENGTH   1024 /* max length in characters of a relation     */
-#define NMILLER_RABIN   20   /* self explanatory                           */
+#define NMILLER_RABIN   20   /* number of iterations in composition test   */
 //------------------------------------------------------------------------------
 #define IS_PRIME(X)     (0 != mpz_probab_prime_p((X), NMILLER_RABIN))
 #define IS_COMPOSITE(X) (0 == mpz_probab_prime_p((X), NMILLER_RABIN))
-#define IS_SQUARE(X)    (0 != mpz_perfect_square_p(X))
-#define BITSIZE(X)      (mpz_sizeinbase(X, 2))
+#define IS_SQUARE(X)    (0 != mpz_perfect_square_p((X)))
+#define BITSIZE(X)      (mpz_sizeinbase((X), 2))
 //------------------------------------------------------------------------------
-
+//
+// Global variables (bouh!) used for error reporting... 
+//
+static unsigned long count_more_two_factors     = 0;
+static unsigned long count_too_large_norm       = 0;
+static unsigned long count_bad_factor           = 0;
+static unsigned long count_too_large_prime_norm = 0;
+static unsigned long count_no_factor_found      = 0;
+static unsigned long count_partial_fact_found   = 0;
+static unsigned long count_factorization_pb     = 0;
+static unsigned long count_perfect_square       = 0;
+static unsigned long count_perfect_power        = 0;
+static unsigned long check_prime_reports        = 0;
 //-----------------------------------------------------------------------------
 void get_rational_norm(mpz_t norm, mpz_t *g, long a, unsigned long b) {
     //
@@ -100,9 +121,12 @@ inline void check_prime(mpz_t p, unsigned long sb, long a, unsigned long b) {
     //
     // Prints a warning message if p <= sb
     //
-    static unsigned long reports = 0;
+    // _WARNING_: Uses and modifies the following global variable:
+    //            - check_prime_reports
+    //
     if (mpz_cmp_ui(p, sb) <= 0) {
-        if (++reports <= MAXNMSG) {
+        check_prime_reports++;
+        if (check_prime_reports <= MAXNMSG) {
             WARNING("(a=%ld, b=%lu): prime %Zd smaller "
                     "than factor base bound %lu\n", a, b, p, sb);
         }
@@ -127,10 +151,15 @@ unsigned long factor(mpz_t p1, mpz_t p2,
     //
     // _TO_DO_: Check that the rare case p1 == p2 doesn't destroy anything.
     //
-    static unsigned long count_too_large_norm  = 0;
-    static unsigned long count_no_factor_found = 0;
-    static unsigned long count_perfect_square  = 0;
-  
+    // _WARNING_: Uses and modifies the following global variables:
+    //            - count_more_two_factors
+    //            - count_bad_factor
+    //            - count_factorization_pb
+    //            - count_too_large_prime_norm
+    //            - count_too_large_norm
+    //            - count_no_factor_found
+    //            - count_perfect_square
+    //
     unsigned long sn = BITSIZE(norm);
   
     if (mpz_cmp_ui(norm, 1) == 0) {
@@ -142,6 +171,7 @@ unsigned long factor(mpz_t p1, mpz_t p2,
             //
             // This happens very frequently
             //
+            count_too_large_prime_norm++;
             MSGDEBUG("Prime norm %Zd is too large\n", norm);
             return 3;
         }
@@ -154,7 +184,7 @@ unsigned long factor(mpz_t p1, mpz_t p2,
     if (sn > 2 * lp) {
         //
         // norm has either exactly 2 prime factors with (at least) one larger
-        // than 2^lp or norm has more than 3 factors. Either way, we discard the
+        // than 2^lp or norm has more than 2 factors. Either way, we discard the
         // relation...
         //
         count_too_large_norm++;
@@ -176,6 +206,7 @@ unsigned long factor(mpz_t p1, mpz_t p2,
             mpz_set(p2, p1);
             return 2;
         }
+        count_more_two_factors++;
         return 3;
     }
     unsigned long int retval = 3;
@@ -215,14 +246,15 @@ unsigned long factor(mpz_t p1, mpz_t p2,
         // not be prime but that does not make any difference: norm != p1 * p2.
         //
         MSGDEBUG("Composite norm %Zd has more than 2 prime factors\n", norm);
+        count_more_two_factors++;
         goto clear_and_return;
     }
     mpz_ptr x1 = norm_factors->data[0];
   
     if (norm_factors->length == 1) {
         //
-        // If the found factor is not prime there is no way norm could be a
-        // product of only two primes.
+        // If the found non trivial factor is not prime there is no way norm 
+        // could be a product of only two primes.
         //
         if (IS_PRIME(x1) && (BITSIZE(x1) <= lp)) {
             mpz_divexact(p2, norm, x1);
@@ -233,9 +265,11 @@ unsigned long factor(mpz_t p1, mpz_t p2,
                 mpz_set(p1, x1);
                 retval = 2;
             } else {
+                count_bad_factor++;
                 MSGDEBUG("factor p2=%Zd not prime and/or too large!\n", p2);
             }
         } else {
+            count_bad_factor++;
             MSGDEBUG("factor p1=%Zd not prime and/or too large!\n", p1);
         }
         goto clear_and_return;
@@ -268,6 +302,7 @@ unsigned long factor(mpz_t p1, mpz_t p2,
             mpz_set(p2, x2);
             retval = 2;
         } else {
+            count_bad_factor++;
             MSGDEBUG("factors %Zd and %Zd are prime but sizes mismatch!"
                      " (norm=%Zd)\n", x1, x2, norm);
             MSGDEBUG("size of %Zd is %lu\n", x1, sx1);
@@ -281,6 +316,8 @@ unsigned long factor(mpz_t p1, mpz_t p2,
         // This mode is used by the function factor_complete which is used
         // when the '-factorall' option is passed on the command line...
         //
+        count_more_two_factors++;
+        
         MSGDEBUG("factor %Zd and / or %Zd is not prime\n", x1, x2);
     }
   
@@ -315,9 +352,13 @@ unsigned long factor_completely(mpz_t p1, mpz_t p2,
     //
     // _TO_DO_: Check that the rare case p1 == p2 doesn't destroy anything.
     //
-    static unsigned long count_no_factor_found    = 0;
-    static unsigned long count_partial_fact_found = 0;
-    
+    // _WARNING_: Uses and modifies the following global variables:
+    //            - count_too_large_prime_norm
+    //            - count_bad_factor
+    //            - count_no_factor_found
+    //            - count_perfect_power
+    //            - count_more_two_factors
+    //
     unsigned long sn = BITSIZE(norm);
     
     if (mpz_cmp_ui(norm, 1) == 0) {
@@ -329,6 +370,7 @@ unsigned long factor_completely(mpz_t p1, mpz_t p2,
             //
             // This happens very frequently
             //
+            count_too_large_prime_norm++;
             MSGDEBUG("Prime norm %Zd is too large\n", norm);
             return 3;
         }
@@ -353,6 +395,8 @@ unsigned long factor_completely(mpz_t p1, mpz_t p2,
     //          and not likely to arise in this special case. But I do not
     //          guarantee anything... 
     //
+    // _NOTE_:  The perfect square test is performed directly in tifa_factor.
+    //
     ecode_t ecode = tifa_factor(
                         factors, multis, norm,
                         FIND_COMPLETE_FACTORIZATION
@@ -372,6 +416,7 @@ unsigned long factor_completely(mpz_t p1, mpz_t p2,
             
             if ((BITSIZE(x1) > lp) || (BITSIZE(x2) > lp)) {
                 MSGDEBUG("norm has a too large prime factor!\n");
+                count_bad_factor++;
                 goto clear_and_return;
             }
             mpz_set(p1, x1);
@@ -385,22 +430,24 @@ unsigned long factor_completely(mpz_t p1, mpz_t p2,
             mpz_ptr x1 = factors->data[0];
             
             if (BITSIZE(x1) > lp) {
+                count_bad_factor++;
                 MSGDEBUG("norm has a too large prime factor!\n");
                 goto clear_and_return;
             }
+            count_perfect_power++;
             mpz_set(p1, x1);
             *m1 = multis->data[0];
             retval = 1;
             break;
         }
         default:
+            count_more_two_factors++;
             MSGDEBUG("norm %Zd has more than 2 prime factors\n", norm);
             goto clear_and_return;
         }
         break;
     
     case PARTIAL_FACTORIZATION_FOUND:
-        count_partial_fact_found++;
         if (count_partial_fact_found < MAXNMSG) {
             WARNING("TIFA only partially factored norm %Zd\n", norm);
         }
@@ -434,9 +481,12 @@ unsigned long factor_completely(mpz_t p1, mpz_t p2,
             //
             // _TO_DO_: Check for prime powers!
             //
+            count_factorization_pb++;
+            fprintf(stderr, "PARTIAL FACTORIZATION!\n");
             goto clear_and_return;
         }
         default:
+            count_more_two_factors++;
             MSGDEBUG("norm %Zd has more than 2 prime factors\n", norm);
             goto clear_and_return;
         }
@@ -487,6 +537,9 @@ unsigned long checkrels(char *f, cado_poly cpoly,
     //
     FILE *fp;
 
+    unsigned long count_large_algprime = 0;
+    unsigned long count_large_ratprime = 0;
+    unsigned long not_coprime_reports  = 0;
     unsigned long mfba_reports = 0;
     unsigned long mfbr_reports = 0;
     unsigned long nfac;
@@ -505,6 +558,7 @@ unsigned long checkrels(char *f, cado_poly cpoly,
 
     int c;      // number of variables set by sscanf
     int n;      // number of characters consumed by sscanf
+    int npr;    // number of primes read by sscanf
 
     mpz_t norm; 
     mpz_t p1;            // first prime factor of norm (if any)
@@ -512,7 +566,6 @@ unsigned long checkrels(char *f, cado_poly cpoly,
     
     unsigned int m1 = 1; // multiplicity of first prime factor of norm
     unsigned int m2 = 1; // multiplicity of second prime factor of norm
-    
     
     unsigned long (*factor_func) (mpz_t, mpz_t, unsigned int* const,
                                   unsigned int* const, const mpz_t,
@@ -525,7 +578,6 @@ unsigned long checkrels(char *f, cado_poly cpoly,
     if (verbose) {
         MSG("Checking relations from file %s\n", f);
     }
-    
     if (factorall) {
         MSG("Performing full factorization of cofactors' norms...\n");
         factor_func = factor_completely;
@@ -542,10 +594,13 @@ unsigned long checkrels(char *f, cado_poly cpoly,
 #if DEBUG
     char cont = 0;
 #endif
+
     while (true) {
 
-        MSGDEBUG("[Type enter to read new relation] ");
+      next_relation:
+
 #if DEBUG
+        MSGDEBUG("[Type enter to read new relation] ");
         cont = getchar();
 #endif
 
@@ -572,7 +627,7 @@ unsigned long checkrels(char *f, cado_poly cpoly,
             // Skip commented lines...
             //
             printf("%s", line);
-            continue;
+            goto next_relation;
         }
         nrels_in++;
 
@@ -591,38 +646,43 @@ unsigned long checkrels(char *f, cado_poly cpoly,
         // Check that a and b are coprime
         //
         if (!coprime(a, b)) {
-            static unsigned long report = 0;
-            if (report++ < MAXNMSG) {
+            not_coprime_reports++;
+            if (not_coprime_reports < MAXNMSG) {
                 WARNING("Discarded relation (%ld, %lu) since (a, b) are "
                         "not coprime\n", a, b);
             }
-            continue;
+            goto next_relation;
         }
         //
         // Evaluate norm on rational side
         //
         get_rational_norm(norm, cpoly->g, a, b);
 
+        npr = 0;
         //
         // Read primes on rational side
         //
         while (sscanf(lineptr, "%x%n", &p, &n) != 0) {
+            npr++;
             //
-            // Check that p divides the norm. Otherwise terminate with error.
+            // Check that p divides the norm. Otherwise discard the relation.
             //
             if (mpz_fdiv_q_ui(norm, norm, p) != 0) {
-                ERROR("Prime %x=%u does not divide norm on rational side "
+                WARNING("Prime %x=%u does not divide norm on rational side "
                       "for a=%ld, b=%lu\n", p, p, a, b);
-                exit(EXIT_FAILURE);
+                goto next_relation;
             }
             //
             // Check that p is smaller than the large prime bound. Otherwise
             // discard relation.
             //
             if (p > (1UL << cpoly->lpbr)) {
-                WARNING("Rational prime %x exceeds large prime bound 2^%d\n",
-                         p, cpoly->lpbr);
-                continue;
+                count_large_ratprime++;
+                if (count_large_ratprime <= MAXNMSG) {
+                    WARNING("Rational prime %x exceeds large prime "
+                            "bound 2^%d\n", p, cpoly->lpbr);
+                }
+                goto next_relation;
             }
             lineptr += n;
             if (lineptr[0] == ':') {
@@ -639,8 +699,13 @@ unsigned long checkrels(char *f, cado_poly cpoly,
         //
         for (unsigned long i = 0; i < nprimes; i++) {
             while (mpz_divisible_ui_p(norm, primes[i])) {
-                outlength += sprintf(outrel + outlength, ",%lx", primes[i]);
+                if (npr == 0) {
+                    outlength += sprintf(outrel + outlength, "%lx", primes[i]);
+                } else {
+                    outlength += sprintf(outrel + outlength, ",%lx", primes[i]);
+                }
                 mpz_divexact_ui(norm, norm, primes[i]);
+                npr++;
             }
         }
         //
@@ -652,7 +717,7 @@ unsigned long checkrels(char *f, cado_poly cpoly,
                 WARNING("Rat. residue %Zd exceeds bound for a=%ld, b=%lu\n",
                          norm, a, b);
             }
-            continue;
+            goto next_relation;
         }
 
         nfac = factor_func(p1, p2, &m1, &m2, norm, cpoly->lpbr);
@@ -665,17 +730,28 @@ unsigned long checkrels(char *f, cado_poly cpoly,
             MSGDEBUG("checkrels: rational side: nfac = 1\n");
             CHECK_PRIME(p1, cpoly->rlim, a, b);
             
-            for (unsigned int i = 0; i < m1; i++) {
-                outlength += gmp_sprintf(outrel + outlength, ",%Zx:", p1);
+            if (npr == 0) {
+                outlength += gmp_sprintf(outrel + outlength, "%Zx", p1);
+            } else {
+                outlength += gmp_sprintf(outrel + outlength, ",%Zx", p1);
             }
+            for (unsigned int i = 1; i < m1; i++) {
+                outlength += gmp_sprintf(outrel + outlength, ",%Zx", p1);
+            }
+            outlength += gmp_sprintf(outrel + outlength, ":");
             break;
 
         case 2:
             MSGDEBUG("checkrels: rational side: nfac = 2\n");
             CHECK_PRIME(p1, cpoly->rlim, a, b);
             CHECK_PRIME(p2, cpoly->rlim, a, b);
-
-            for (unsigned int i = 0; i < m1; i++) {
+            
+            if (npr == 0) {
+                outlength += gmp_sprintf(outrel + outlength, "%Zx", p1);
+            } else {
+                outlength += gmp_sprintf(outrel + outlength, ",%Zx", p1);
+            }
+            for (unsigned int i = 1; i < m1; i++) {
                 outlength += gmp_sprintf(outrel + outlength, ",%Zx", p1);
             }
             for (unsigned int i = 0; i < m2; i++) {
@@ -691,8 +767,7 @@ unsigned long checkrels(char *f, cado_poly cpoly,
 
         default:
             MSGDEBUG("checkrels: rational side: nfac = 3 -> REL DISCARDED\n");
-            continue;
-            break;
+            goto next_relation;
         }
         
         //
@@ -700,26 +775,31 @@ unsigned long checkrels(char *f, cado_poly cpoly,
         //
         get_algebraic_norm(norm, cpoly->f, cpoly->degree, a, b);
 
+        npr = 0;
         //
         // Read primes on algebraic side
         //
         while (lineptr[0] != '\n' && sscanf(lineptr, "%x%n", &p, &n) != 0) {
+            npr++;
             //
             // Check that p divides the norm. Otherwise terminate with error.
             //
             if (mpz_fdiv_q_ui(norm, norm, p) != 0) {
-                ERROR("Prime %x=%u does not divide norm on algebraic side "
+                WARNING("Prime %x=%u does not divide norm on algebraic side "
                       "for a=%ld, b=%lu\n", p, p, a, b);
-                exit(EXIT_FAILURE);
+                goto next_relation;
             }
             //
             // Check that p is smaller than the large prime bound. Otherwise
             // discard relation.
             //
             if (p > (1UL << cpoly->lpba)) {
-                WARNING("Algebraic prime %x exceeds large prime bound 2^%d\n",
-                        p, cpoly->lpba);
-                continue;
+                count_large_algprime++;
+                if (count_large_algprime <= MAXNMSG) {
+                    WARNING("Algebraic prime %x exceeds large prime "
+                            "bound 2^%d\n", p, cpoly->lpba);
+                }
+                goto next_relation;
             }
             lineptr += n;
             if (lineptr[0] != ',') {
@@ -735,8 +815,13 @@ unsigned long checkrels(char *f, cado_poly cpoly,
         //
         for (unsigned long i = 0; i < nprimes; i++) {
             while (mpz_divisible_ui_p(norm, primes[i])) {
-                outlength += sprintf(outrel + outlength, ",%lx", primes[i]);
+                if (npr == 0) {
+                    outlength += sprintf(outrel + outlength, "%lx", primes[i]);
+                } else {
+                    outlength += sprintf(outrel + outlength, ",%lx", primes[i]);
+                }
                 mpz_divexact_ui(norm, norm, primes[i]);
+                npr++;
             }
         }
         //
@@ -748,7 +833,7 @@ unsigned long checkrels(char *f, cado_poly cpoly,
                 WARNING("Alg. residue %Zd exceeds bound for a=%ld, b=%lu\n",
                          norm, a, b);
             }
-            continue;
+            goto next_relation;
         }
     
         nfac = factor_func(p1, p2, &m1, &m2, norm, cpoly->lpba);
@@ -761,7 +846,12 @@ unsigned long checkrels(char *f, cado_poly cpoly,
             MSGDEBUG("checkrels: algebraic side: nfac = 1\n");
             CHECK_PRIME(p1, cpoly->alim, a, b);
             
-            for (unsigned int i = 0; i < m1; i++) {
+            if (npr == 0) {
+                outlength += gmp_sprintf(outrel + outlength, "%Zx", p1);
+            } else {
+                outlength += gmp_sprintf(outrel + outlength, ",%Zx", p1);
+            }
+            for (unsigned int i = 1; i < m1; i++) {
                 outlength += gmp_sprintf(outrel + outlength, ",%Zx", p1);
             }
             break;
@@ -771,7 +861,12 @@ unsigned long checkrels(char *f, cado_poly cpoly,
             CHECK_PRIME(p1, cpoly->alim, a, b);
             CHECK_PRIME(p2, cpoly->alim, a, b);
             
-            for (unsigned int i = 0; i < m1; i++) {
+            if (npr == 0) {
+                outlength += gmp_sprintf(outrel + outlength, "%Zx", p1);
+            } else {
+                outlength += gmp_sprintf(outrel + outlength, ",%Zx", p1);
+            }
+            for (unsigned int i = 1; i < m1; i++) {
                 outlength += gmp_sprintf(outrel + outlength, ",%Zx", p1);
             }
             for (unsigned int i = 0; i < m2; i++) {
@@ -785,8 +880,7 @@ unsigned long checkrels(char *f, cado_poly cpoly,
 
         default:
             MSGDEBUG("checkrels: algebraic side: nfac = 3 -> REL DISCARDED\n");
-            continue;
-            break;
+            goto next_relation;
         }
         
         nrels_out++;
@@ -801,8 +895,51 @@ unsigned long checkrels(char *f, cado_poly cpoly,
     mpz_clear(p1);
     mpz_clear(p2);
 
-    MSG("File %s: output %lu out of %lu relations\n", f, nrels_out, nrels_in);
+#if PRINT_SUMMARY
 
+    MSG("-----------------------------------------------------------------\n");
+    MSG("File %s\n", f);
+    MSG("-----------------------------------------------------------------\n");
+    MSG("Miscellaneous information:\n");
+    
+    if (!factorall) {
+        MSG("    > Found %lu norm(s) to be perfect prime square(s)\n", 
+            count_perfect_square);
+    } else {
+        MSG("    > Found %lu norms to be perfect prime power(s)\n",
+            count_perfect_power);
+        MSG("    > Found %lu partial factorization(s)\n",
+            count_partial_fact_found);
+    }
+    MSG("    > check_prime issued %lu warning(s)\n", check_prime_reports);
+
+    MSG("-----------------------------------------------------------------\n");
+    MSG("Discarded relations:\n");
+    MSG("    > %lu relations because (a, b) were not coprime\n",
+        not_coprime_reports);
+    MSG("    > %lu relations because of too large rational residue\n",
+        mfbr_reports);
+    MSG("    > %lu relations because of too large algebraic residue\n",
+        mfba_reports);
+    MSG("    > %lu relations because of too large rational prime\n",
+        count_large_ratprime);
+    MSG("    > %lu relations because of too large algebraic prime\n",
+        count_large_algprime);
+    MSG("    > %lu relations because of too large prime norm\n",
+        count_too_large_prime_norm);
+    MSG("    > %lu relations because of too large composite norm\n",
+        count_too_large_norm);
+    MSG("    > %lu relations because of failed factorization\n",
+        count_no_factor_found + count_factorization_pb);
+    MSG("    > %lu relations because of norm had more than 2 factors\n",
+        count_more_two_factors);
+    MSG("    > %lu relations because of non suitable factor of norm\n", 
+        count_bad_factor);
+#endif    
+    MSG("-----------------------------------------------------------------\n");
+    MSG("File %s: output %lu out of %lu relations\n", f, nrels_out, nrels_in);
+    MSG("-----------------------------------------------------------------\n");
+    
     return nrels_out;
 }
 //-----------------------------------------------------------------------------
@@ -840,7 +977,7 @@ int main(int argc, char *argv[]) {
             factorall++;
             argc--;
             argv++;
-            tdmax = (tdmax < 10) ? 10 : tdmax;
+            tdmax = (tdmax < 20) ? 20 : tdmax;
         
         } else if (argc > 2 && strcmp (argv[1], "-poly") == 0) {
             polyfilename = argv[2];

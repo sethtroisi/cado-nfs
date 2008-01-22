@@ -1,5 +1,13 @@
 Recent changes:
 ---------------
+  
+  - Tue Jan 22 2008 by JM:
+      - Jump to next relation if a prime does not divide norm (was previously
+        aborting the whole program)
+      - Fixed extra comma bug appearing when appending primes to an empty list.
+      - Fixed compilation warning (hopefully).
+      - Fixed bug in control flow.
+      - Raised tdmax to 20 when using option '-factorall'
 
   - Tue Jan  8 2008 by JM:
       - Added '-factorall' option changing behaviour of factorization of norms.
