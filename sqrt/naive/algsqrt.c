@@ -304,14 +304,14 @@ int main(int argc, char **argv) {
   int ret, i;
   unsigned long p;
 
-  if (argc != 3) {
-    fprintf(stderr, "usage: %s depfile polyfile\n", argv[0]);
+  if (argc != 4) {
+    fprintf(stderr, "usage: %s algdepfile ratdepfile polyfile\n", argv[0]);
     exit(1);
   }
 
   depfile = fopen(argv[1], "r");
   ASSERT_ALWAYS(depfile != NULL);
-  ret = read_polynomial(pol, argv[2]);
+  ret = read_polynomial(pol, argv[3]);
   ASSERT_ALWAYS(ret == 1);
 
   // Init F to be the algebraic polynomial
@@ -362,6 +362,7 @@ int main(int argc, char **argv) {
       nab++;
     }
     accumulate_fast_end (prd_tab, F, lprd);
+    fclose(depfile);
 
     poly_copy(prd->p, prd_tab[0]->p);
     prd->v = prd_tab[0]->v;
@@ -392,7 +393,46 @@ int main(int argc, char **argv) {
   mpz_mul(algsqrt, algsqrt, aux);
   mpz_mod(algsqrt, algsqrt, pol->n);
 
-  gmp_printf("%Zd\n", algsqrt);
+  gmp_fprintf(stderr, "Algebraic square root is: %Zd\n", algsqrt);
+
+  depfile = fopen(argv[2], "r");
+  ASSERT_ALWAYS(depfile != NULL);
+  gmp_fscanf(depfile, "%Zd", aux);
+  fclose(depfile);
+
+  gmp_fprintf(stderr, "Rational square root is: %Zd\n", aux);
+
+  int found = 0;
+  {
+    mpz_t g1, g2;
+    mpz_init(g1);
+    mpz_init(g2);
+
+    // First check that the squares agree
+    mpz_mul(g1, aux, aux);
+    mpz_mod(g1, g1, pol->n);
+    mpz_mul(g2, algsqrt, algsqrt);
+    mpz_mod(g2, g2, pol->n);
+    if (mpz_cmp(g1, g2)!=0) {
+      fprintf(stderr, "Bug: the squares do not agree modulo n!\n");
+    }
+    mpz_sub(g1, aux, algsqrt);
+    mpz_gcd(g1, g1, pol->n);
+    if (mpz_probab_prime_p(g1, 5)) {
+      found = 1;
+      gmp_printf("%Zd\n", g1);
+    }
+    mpz_add(g2, aux, algsqrt);
+    mpz_gcd(g2, g2, pol->n);
+    if (mpz_probab_prime_p(g2, 5)) {
+      found = 1;
+      gmp_printf("%Zd\n", g2);
+    }
+    mpz_clear(g1);
+    mpz_clear(g2);
+  }
+  if (!found)
+    printf("Failed\n");
 
   mpz_clear(aux);
   mpz_clear(algsqrt);

@@ -194,7 +194,7 @@ long_poly_mul(long_poly_t h, const long_poly_t f, const long_poly_t g, LONG p) {
     res->coeff[i] %= p;
   res->degree=df+dg;
   long_poly_set(h, res);
-  long_poly_clear(h);
+  long_poly_clear(res);
 }
 
 

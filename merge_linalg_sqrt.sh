@@ -78,4 +78,6 @@ time $linalg/allsqrt $args1 0 $ndepmax ar $name.dep
 
 echo "Entering the last phase"
 
-./sqrtonly.sh $root $name 0 $ndepmax
+./newsqrtonly.sh $root $name 0 $ndepmax
+## If this fails, use the backup version, based on magma:
+##   ./sqrtonly.sh $root $name 0 $ndepmax

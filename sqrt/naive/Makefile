@@ -11,7 +11,7 @@ CFLAGS=$(OPTCFLAGS) -I $(GMPINCLUDE) -DREV=\"`svnversion .`\"
 
 LDFLAGS=../../utils/libutils.a $(GMPLIB)
 
-all: fmalgsqrt
+all: fmalgsqrt algsqrt
 
 Makefile.local:
 	@echo "Makefile.local does not exist. Making a link to parent dir's one."
