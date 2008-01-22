@@ -2,7 +2,7 @@
 #define STRUCTURE_H_
 
 #include "params.h"
-#include "master_params.h"
+#include "lingen_params.h"
 
 #ifndef NO_STRICT_TYPECHECKING
 #define STRICT_TYPECHECKING

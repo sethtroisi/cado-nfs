@@ -273,7 +273,7 @@ int main(int argc, char * argv[])
     if (!m || !n)
         return 0;
 
-    /* Also dump master information if found */
+    /* Also dump lingen information if found */
 
     do {
         vector<mpz_class> co;

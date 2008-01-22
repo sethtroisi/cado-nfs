@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <gmp.h>
-#include "master_params.h"
+#include "lingen_params.h"
 #include "params.h"
 #include <assert.h>
 #include "types.h"

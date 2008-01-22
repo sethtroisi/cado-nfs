@@ -9,7 +9,7 @@
 #include "common_arguments.hpp"
 #include "constants.hpp"
 #include "detect_params.hpp"
-#include "master_arguments.hpp"
+#include "lingen_arguments.hpp"
 #include "matrix_header.hpp"
 #include "files.hpp"
 #include "must_open.hpp"
@@ -27,7 +27,7 @@ using namespace boost;
 
 typedef unsigned int uint;
 
-master_arguments mine;
+lingen_arguments mine;
 
 namespace globals {
 	uint nr;

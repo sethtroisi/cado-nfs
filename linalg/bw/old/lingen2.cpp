@@ -9,7 +9,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "master_params.h"
+#include "lingen_params.h"
 #include "params.h"
 #include <assert.h>
 #include "types.h"
@@ -29,7 +29,7 @@
 #include "field_quad.h"
 #include "field_usage.h"
 /* #include "version.h" */
-#include "master_common.h"
+#include "lingen_common.h"
 #include "ops_poly.hpp"
 #include <list>
 
@@ -1123,7 +1123,7 @@ bw_lingen(struct e_coeff * ec,
 
 void showuse(void)
 {
-    die("Usage : bw-master <bank#>\n",1);
+    die("Usage : bw-lingen <bank#>\n",1);
 }
 
 void compute_f_final(struct t_poly * pi_prod)
@@ -1339,7 +1339,7 @@ block_wiedemann(void)
 
 void usage()
 {
-    die("Usage: ./master2 -t <n> [options]\n",1);
+    die("Usage: ./lingen2 -t <n> [options]\n",1);
 }
 
     int

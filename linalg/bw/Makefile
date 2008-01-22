@@ -92,17 +92,17 @@ BW_PRINTMAGMA_LIBS:=-lgmpxx -lgmp
 # such a mess that it doesn't even compile. It's also terribly slower
 # than it should (when it actually compiles...).
 ifeq ($(BROKEN),also)
-BW_MASTER_SOURCES:=					\
+BW_LINGEN_SOURCES:=					\
 		auxfuncs.c				\
-		cxx/master.cpp cxx/detect_params.cpp	\
+		cxx/lingen.cpp cxx/detect_params.cpp	\
 		cxx/files.cpp cxx/matrix_header.cpp	\
 		cxx/ticks.cpp cxx/matrices_printing.cpp
-BW_MASTER_LIBS:=-lgmpxx -lgmp
--include .bw-master.mkf
+BW_LINGEN_LIBS:=-lgmpxx -lgmp
+-include .bw-lingen.mkf
 endif
 
 ifeq (0,0)
-BW_MASTER2_SOURCES:=						\
+BW_LINGEN2_SOURCES:=						\
 		auxfuncs.c					\
 		old/bw_scalar.c old/old-endian.c			\
 		old/timer.c					\
@@ -115,39 +115,25 @@ BW_MASTER2_SOURCES:=						\
 		old/field_quad.c old/field_complex.c		\
 		old/field_usage.c old/modulus_hacks.c		\
 		old/e_polynomial.c old/structure.c		\
-		old/structure_debug.c old/master2.cpp		\
+		old/structure_debug.c old/lingen2.cpp		\
 		old/twisting_polynomials.c			\
-		old/master_common.c
+		old/lingen_common.c
 ifdef	PATCHED_GMP
-BW_MASTER2_SOURCES+=old/ops_poly_integerfft.cpp
+BW_LINGEN2_SOURCES+=old/ops_poly_integerfft.cpp
 endif
-BW_MASTER2_LIBS:=-lgmp
--include .bw-master2.mkf
+BW_LINGEN2_LIBS:=-lgmp
+-include .bw-lingen2.mkf
 endif
 
-BW_LINGEN_BINARY_SOURCES:=					\
-		auxfuncs.c					\
-		old/bw_scalar.c old/old-endian.c			\
-		old/timer.c					\
-		old/variables.c	old/fft_on_matrices.cpp		\
-		old/ops_poly_fft.cpp				\
-		old/ops_poly_schoolbook.cpp			\
-		old/ops_poly_wrap.cpp				\
-		old/fft_core.c					\
-		old/field_common.c old/field_prime.c		\
-		old/field_quad.c old/field_complex.c		\
-		old/field_usage.c old/modulus_hacks.c		\
-		old/e_polynomial.c old/structure.c		\
-		old/structure_debug.c cxx/lingen_binary.cpp	\
-		old/twisting_polynomials.c			\
+BW_LINGEN_BINARY_SOURCES:=		\
+		auxfuncs.c		\
+		old/timer.c		\
+		cxx/lingen_binary.cpp	\
 		cxx/fake_fft.c
-ifdef	PATCHED_GMP
-BW_LINGEN_BINARY_SOURCES+=old/ops_poly_integerfft.cpp
-endif
 BW_LINGEN_BINARY_LIBS:=-lgmp -lutils -lgf2x ../../gf2x/cantor/cantor128.o
 -include .bw-lingen-binary.mkf
 
-BW_MASTER_OLD_SOURCES:=						\
+BW_LINGEN_OLD_SOURCES:=						\
 		auxfuncs.c barrier.c				\
 		old/bw_scalar.c old/old-endian.c			\
 		old/timer.c			\
@@ -155,10 +141,10 @@ BW_MASTER_OLD_SOURCES:=						\
 		old/field_prime.c old/field_quad.c		\
 		old/field_complex.c old/field_usage.c		\
 		old/modulus_hacks.c old/structure.c		\
-		old/structure_debug.c old/master.c		\
-		old/master_common.c
-BW_MASTER_OLD_LIBS:=-lgmp
--include .bw-master-old.mkf
+		old/structure_debug.c old/lingen.c		\
+		old/lingen_common.c
+BW_LINGEN_OLD_LIBS:=-lgmp
+-include .bw-lingen-old.mkf
 
 BW_FFT_BASICTEST_SOURCES:=					\
 		auxfuncs.c					\
@@ -219,7 +205,7 @@ BW_MUL_SOURCES:=					\
 BW_MUL_LIBS:=-lgmpxx -lgmp
 -include .bw-mul.mkf
 
-# useless -- these were the days where the output of the master code was
+# useless -- these were the days where the output of the lingen code was
 # really a mess.
 # BW_FINDSOL_SOURCES:=						\
 # 		auxfuncs.c					\

@@ -3,7 +3,7 @@
 #include <string.h>
 #include <alloca.h>
 #include <gmp.h>
-#include "master_params.h"
+#include "lingen_params.h"
 #include "params.h"
 #include <assert.h>
 #include "types.h"

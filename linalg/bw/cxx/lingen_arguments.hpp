@@ -1,13 +1,13 @@
-#ifndef MASTER_ARGUMENTS_HPP_
-#define MASTER_ARGUMENTS_HPP_
+#ifndef LINGEN_ARGUMENTS_HPP_
+#define LINGEN_ARGUMENTS_HPP_
 
 #include "corners.hpp"
 #include "arguments.hpp"
 #include "fmt.hpp"
 
-struct master_arguments {
+struct lingen_arguments {
 	unsigned int threshold;
-	master_arguments() {
+	lingen_arguments() {
 		threshold = 900;
 	}
 
@@ -24,4 +24,4 @@ struct master_arguments {
 	void trigger() const {}
 };
 
-#endif	/* MASTER_ARGUMENTS_HPP_ */
+#endif	/* LINGEN_ARGUMENTS_HPP_ */

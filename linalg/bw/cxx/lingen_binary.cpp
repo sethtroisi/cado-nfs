@@ -33,23 +33,12 @@
 
 unsigned int rec_threshold = 0;
 
-/* avoid this one ! */
-// #define  VARIABLES_H_
-// #define  STRUCTURE_H_
-
 #include "constants.hpp"
-// #include "masters.h"
 #include "params.h"
 #include "types.h"
 #include "macros.h"
 #include "auxfuncs.h"
 #include "timer.h"
-// #include "e_polynomial.h"
-// #include "twisting_polynomials.h"
-// #include "fft_on_matrices.hpp"
-// #include "ops_poly.hpp"
-
-// #include "master_common.h"
 #include "auxfuncs.h"
 
 #include "fmt.hpp"
@@ -1457,7 +1446,7 @@ static void gauss(uint piv[], polmat& PI)/*{{{*/
 
     /* Note that we do *NOT* modify E. It seems to be the fastest option,
      * although the other deserves being investigated as well (see
-     * old/master2.c, there are two versions of the quadratic algorithm).
+     * old/lingen2.c, there are two versions of the quadratic algorithm).
      */
     uint i,j,k;
     uint rank;
@@ -2146,262 +2135,6 @@ static void compute_lingen(polmat& pi)
     }
 }
 
-#if 0/*{{{*/
-static double bw_recursive_algorithm(struct e_coeff * ec,
-        int * delta,
-        struct t_poly ** p_pi)
-{
-    struct t_poly * pi_left, * pi_right;
-    int deg,ldeg,rdeg;
-    struct dft_mb *dft_e_left,*dft_e_middle;
-    struct dft_bb *dft_pi_left,*dft_pi_right;
-    struct dft_bb *dft_pi;
-    ft_order_t sub_order;
-    int so_i;
-    int expected_pi_deg;
-    struct timeval tv;
-    double	t_dft_e_l,  t_dft_pi_l, t_conv_e, t_idft_e,
-                t_dft_pi_r, t_conv_pi,  t_idft_pi, t_ft, t_cv, t_sub;
-    int kill;
-    int t0 = t_counter;
-
-    timer_r(&tv,TIMER_SET);
-
-    deg=ec->degree;
-
-    /* Repartition of the job:
-     *
-     *		left		right
-     * deg==0	1		0	(never recursive)
-     * deg==1	1		1
-     * deg==2	2		1
-     * deg==n	n/2 + 1		(n+1)/2
-     * 
-     * The figures are for the number of steps, each one corres-
-     * ponding to a m/(m+n) increase of the average degree of pi.
-     */
-
-    ldeg=(deg   /2)+1;
-    rdeg=(deg+1)/2;
-
-    assert(ldeg && rdeg && ldeg + rdeg == deg + 1);
-
-    /* We aim at computing ec * pi / X^ldeg. The degree of this
-     * product will be
-     *
-     * ec->degree + pi->degree - ldeg
-     *
-     * (We are actually only interested in the low (ec->degree-ldeg)
-     * degree part of the product, but the whole thing is required)
-     *
-     * The expected value of pi->degree is 
-     * 	ceil(ldeg*m/(m+n))
-     *
-     * The probability that pi exceeds this expected degree
-     * depends on the base field, but is actually low.
-     * However, by the end of the computations, this does
-     * happen because the degrees increase unevenly.
-     *
-     * The DFTs of e and pi can be computed using only the
-     * number of points given above, *even if their actual
-     * degree is higher*. The FFT routines need to have
-     * provision for this.
-     *
-     * The number of points will then be the smallest power
-     * of 2 above deg+ceil(ldeg*m/(m+n))-ldeg+1
-     */
-
-    expected_pi_deg = 10 + iceildiv(ldeg*m, (m+n));
-#ifdef	HAS_CONVOLUTION_SPECIAL
-    kill=ldeg;
-#else
-    kill=0;
-#endif
-    sub_order.set(deg+expected_pi_deg-kill+1);
-
-    so_i = sub_order;
-
-    dft_e_left	= fft_ec_dft(ec,sub_order,&t_dft_e_l);
-    reclevel_prolog();
-    printf("DFT(e,%d) : %.2fs\n", so_i, t_dft_e_l);
-    core_if_null(dft_e_left,"dft_e_left");
-
-    /* at this point E can be shrinked. */
-    ec->degree	= ldeg - 1;
-    t_sub=bw_lingen(ec,delta,&pi_left);
-
-    if (t_counter < t0 + ldeg) {
-        printf("Exceptional situation, small generator ; escaping\n");
-        *p_pi = pi_left;
-        dft_mb_free(dft_e_left);
-        return timer_r(&tv,TIMER_ASK);
-    }
-
-    printf("deg(pi_l)=%d, bound is %d\n",pi_left->degree,expected_pi_deg);
-    if (!sub_order.fits(deg+pi_left->degree-kill + 1)) {
-        printf("Warning : pi grows above its expected degree...\n");
-        printf("order %d , while :\n"
-                "deg=%d\n"
-                "deg(pi_left)=%d\n"
-                "ldeg-1=%d\n"
-                "hence, %d is too big\n",
-                so_i,
-                deg,pi_left->degree,ldeg - 1,
-                deg+pi_left->degree-kill + 1);
-
-        int n_exceptional = 0;
-        for(int i = 0 ; i < m + n ; i++) {
-            n_exceptional += chance_list[i] * m;
-        }
-        if (!n_exceptional) {
-            die("This should only happen at the end of the computation\n",1);
-        }
-        *p_pi = pi_left;
-        dft_mb_free(dft_e_left);
-        return timer_r(&tv,TIMER_ASK);
-    }
-
-    dft_pi_left	= fft_tp_dft(pi_left,sub_order,&t_dft_pi_l);
-    reclevel_prolog();
-    printf("DFT(pi_l,%d) : %.2fs\n", so_i, t_dft_pi_l);
-    core_if_null(dft_pi_left,"dft_pi_left");
-
-#ifdef  HAS_CONVOLUTION_SPECIAL
-    dft_e_middle = fft_mbb_conv_sp(dft_e_left,dft_pi_left,ldeg,&t_conv_e);
-#else
-    dft_e_middle = fft_mbb_conv(dft_e_left,dft_pi_left,&t_conv_e);
-#endif
-    reclevel_prolog();
-    printf("CONV(e*pi_l,%d) : %.2fs\n", so_i, t_conv_e);
-    core_if_null(dft_e_middle,"dft_e_middle");
-
-    /* This is a special convolution in the sense that we
-     * compute f(w)*g(w) / w^k for k=ldeg, since we are
-     * interested in fg div X^k (we know fg mod X^k==0)
-     */
-
-    ec_park(ec);
-    ec_untwist(ec);
-
-    fft_mb_invdft(ec->p,dft_e_middle,deg - kill,&t_idft_e);
-    ec->degree=deg-kill;
-
-    check_zero_and_advance(ec, ldeg - kill);
-    reclevel_prolog();
-    printf("IDFT(e,%d) : %.2fs\n", (int) (dft_e_middle->order), t_idft_e);
-
-    dft_mb_free(dft_e_middle);
-    dft_mb_free(dft_e_left);
-
-    assert(ec->degree==rdeg-1);
-
-    t_sub+=bw_lingen(ec,delta,&pi_right);
-    printf("deg(pi_r)=%d, bound is %d\n",pi_right->degree,expected_pi_deg);
-
-    *p_pi		= tp_comp_alloc(pi_left,pi_right);
-    core_if_null(*p_pi,"*p_pi");
-
-    printf("deg(pi_prod)=%d (order %d)\n",(*p_pi)->degree, so_i);
-    assert(sub_order.fits((*p_pi)->degree + 1));
-
-    dft_pi_right	= fft_tp_dft(pi_right, sub_order, &t_dft_pi_r);
-    reclevel_prolog();
-    printf("DFT(pi_r,%d) : %.2fs\n", so_i, t_dft_pi_r);
-    core_if_null(dft_pi_right,"dft_pi_right");
-
-    dft_pi		= fft_bbb_conv(dft_pi_left,dft_pi_right, &t_conv_pi);
-    reclevel_prolog();
-    printf("CONV(pi_l*pi_r,%d) : %.2fs\n", so_i, t_conv_pi);
-    core_if_null(dft_pi,"dft_pi");
-
-
-    fft_tp_invdft(*p_pi,dft_pi,&t_idft_pi);
-    reclevel_prolog();
-    printf("IDFT(pi,%d) : %.2fs\n",(int)(dft_pi->order),t_idft_pi);
-
-    dft_bb_free(dft_pi);
-    dft_bb_free(dft_pi_right);
-    dft_bb_free(dft_pi_left);
-    tp_free(pi_left);
-    tp_free(pi_right);
-
-    reclevel_prolog();
-
-    t_ft=t_dft_e_l+t_dft_pi_l+t_idft_e+t_dft_pi_r+t_idft_pi;
-    t_cv=t_conv_e+t_conv_pi;
-
-    printf("proper : %.2fs (%.2fs FT + %.2fs CV), sub : %.2fs\n",
-            t_ft+t_cv,t_ft,t_cv,t_sub);
-    printf("constants : c_ft=%.4e c_cv=%.4e		# %d,%d\n",
-            t_ft/(double)(so_i<<so_i),
-            t_cv/(double)(1<<so_i),
-            deg,so_i);
-    printf("Different values for M1:");
-    printf("   e_left: M1=%.3e\n",
-            t_dft_e_l/ (so_i<<so_i) / (m*(m+n)));
-    printf("  pi_left: M1=%.3e\n",
-            t_dft_pi_l/(so_i<<so_i) / ((m+n)*(m+n)));
-    printf("    e_inv: M1=%.3e\n",
-            t_idft_e/  (so_i<<so_i) / (m*(m+n)));
-    printf(" pi_right: M1=%.3e\n",
-            t_dft_pi_r/(so_i<<so_i) / ((m+n)*(m+n)));
-    printf("   pi_inv: M1=%.3e\n",
-            t_idft_pi/ (so_i<<so_i) / ((m+n)*(m+n)));
-    printf("   e_conv: M1=%.3e\n",
-            t_conv_e/ (1<<so_i)  / (m*(m+n)*(m+n)));
-    printf("  pi_conv: M1=%.3e\n",
-            t_conv_pi/ (1<<so_i) /  ((m+n)*(m+n)*(m+n)));
-    return timer_r(&tv,TIMER_ASK);
-}
-
-static double bw_lingen(struct e_coeff * ec,
-        int * delta,
-        struct t_poly ** p_pi)
-{
-    /* int check_chance; */
-    double inner;
-    int deg;
-    int t_before;
-    int did_rec=0;
-
-    t_before=t_counter;
-    deg=ec->degree;
-    reclevel_prolog();
-    printf("Degree %d\n",deg);
-
-    recursion_level++;
-    /* check_chance=(t_counter > total_work - 5); */
-    if (ec->degree < rec_threshold) {
-        /* check_chance=(t_counter > total_work - 5 - ec->degree); */
-        inner=bw_traditional_algorithm(ec,delta,p_pi,1);
-    } else {
-        did_rec=1;
-        inner=bw_recursive_algorithm(ec,delta,p_pi);
-    }
-    recursion_level--;
-
-    reclevel_prolog();
-    printf("Degree %d : took %.2fs\n",deg,inner);
-
-    if (recursion_level <= SAVE_LEVEL_THRESHOLD) {
-        if (!did_rec || recursion_level == SAVE_LEVEL_THRESHOLD) {
-            save_pi(*p_pi,t_before,-1,t_counter);
-        } else {
-            int t_middle;
-            t_middle=t_before+(deg/2)+1;
-            save_pi(*p_pi,t_before,t_middle,t_counter);
-        }
-    }
-
-    return inner;
-}
-
-void showuse(void)
-{
-    die("Usage : bw-master <bank#>\n",1);
-}
-#endif/*}}}*/
-
 
 void recycle_old_pi(polmat& pi)
 {
@@ -2695,16 +2428,11 @@ int main(int argc, char *argv[])
 
     total_work = Lmacro(ncols, m, n);
 
-    // if (rec_threshold == 1) usage();
-
     coredump_limit(1);
-
-    /********************************************************************/
 
     block_wiedemann();
 
-    // ft_order_t::cleanup();
-
     return 0;
 }
+
 /* vim: set sw=4 sta et: */

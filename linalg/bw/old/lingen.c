@@ -9,7 +9,7 @@
 #include <unistd.h>
 #include <signal.h>
 
-#include "master_params.h"
+#include "lingen_params.h"
 #include "params.h"
 #include <assert.h>
 #include "macros.h"
@@ -22,7 +22,7 @@
 #include "gmp-hacks.h"
 #include "modulus_hacks.h"
 /* #include "version.h" */
-#include "master_common.h"
+#include "lingen_common.h"
 
 #define	xxxVERY_VERBOSE
 /* Warning ! ; the (pos) field here is only used from within the gauss
@@ -574,10 +574,8 @@ bw_free(struct bw_iterator * it, struct bw_context * cx)
 
 void showuse(void)
 {
-	die("Usage : bw-master <bank#>\n",1);
+	die("Usage : bw-lingen <bank#>\n",1);
 }
-
-#define MASTER_NUM_OPTIONS 1
 
 double muops(int t)
 {
@@ -710,7 +708,7 @@ main(int argc, char *argv[])
 	}
 
 	if (argc != 4) {
-		die("Usage: master-old <mat-file> <m> <n>\n", 1);
+		die("Usage: lingen-old <mat-file> <m> <n>\n", 1);
 	}
 
 	read_mat_file_header(argv[1]);

@@ -10,7 +10,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "master_params.h"
+#include "lingen_params.h"
 #include "params.h"
 #include <assert.h>
 #include "types.h"

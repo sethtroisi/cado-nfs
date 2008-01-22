@@ -5,7 +5,7 @@
 #include <assert.h>
 #include <unistd.h>
 
-#include "master_common.h"
+#include "lingen_common.h"
 #include "gmp-hacks.h"
 #include "auxfuncs.h"
 #include "modulus_hacks.h"

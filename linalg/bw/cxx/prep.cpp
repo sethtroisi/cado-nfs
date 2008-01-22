@@ -81,7 +81,7 @@ void setup_vectors(unsigned int nrows, int m, int n, const mpz_class& p)
 		 * respective to M^T and X has low dimension, then the
 		 * process will fail : the expected degree necessary for
 		 * producing a dependency will be higher than N/m. This
-		 * means that the quadratic bw-master will fail, and that
+		 * means that the quadratic bw-lingen will fail, and that
 		 * the sub-quadratic one will crash, because the
 		 * assumptions on the degree of pi will be wrong.
 		 *

@@ -1,5 +1,5 @@
-#ifndef MASTER_COMMON_H_
-#define MASTER_COMMON_H_
+#ifndef LINGEN_COMMON_H_
+#define LINGEN_COMMON_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -46,4 +46,4 @@ extern const char * pi_meta_filename;
 }
 #endif
 
-#endif	/* MASTER_COMMON_H_ */
+#endif	/* LINGEN_COMMON_H_ */

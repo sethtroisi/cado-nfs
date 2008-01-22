@@ -750,7 +750,7 @@ template < typename traits > int program()
 	delete[]v0_and_f.v0;
     } else if (mine.task == "mksol") {
 
-	/* See the discussion in master.cpp concerning the bound
+	/* See the discussion in lingen.cpp concerning the bound
 	 * on the degree of f */
 	uint bound_deg_f = iceildiv(m, n) +
 	    iceildiv(m * iceildiv(nc, m), n) + 10;

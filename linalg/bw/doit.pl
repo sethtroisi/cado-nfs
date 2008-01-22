@@ -207,7 +207,7 @@ if ($msize) {
 }
 
 # Check that we have the threshold argument if needed
-my $exe_lingen = "${bindir}bw-master";
+my $exe_lingen = "${bindir}bw-lingen";
 if ($modulus eq '2') {
 	$exe_lingen = "${bindir}bw-lingen-binary"
 	die "threshold needed" unless $threshold;
