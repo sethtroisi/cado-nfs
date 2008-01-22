@@ -285,7 +285,10 @@ specialHashInsert(hashtable_t *H, long p, unsigned long r, int irel)
 // here and there, but we don't care, since they will be dealt with in
 // merge.
 void
-insertNormalRelation(char *rel_used, int **rel_compact, int irel, int *nprimes, tab_prime_t *bad_primes, hashtable_t *H, relation_t *rel, unsigned long rlim, unsigned long alim, long maxpr, long maxpa, int final)
+insertNormalRelation(char *rel_used, int **rel_compact, int irel, int *nprimes,
+                     /* tab_prime_t *bad_primes, */ hashtable_t *H,
+                     relation_t *rel, unsigned long rlim, unsigned long alim,
+                     long maxpr, long maxpa, int final)
 {
     int *tmp = NULL, ltmp = 0, itmp, j, h, ok = 1;
 
@@ -298,13 +301,13 @@ insertNormalRelation(char *rel_used, int **rel_compact, int irel, int *nprimes, 
 	// first count number of "large" primes
 	for(j = 0; j < rel->nb_rp; j++)
 	    if(rel->rp[j].p > rlim){
-		if(rel->rp[j].p > maxpr)
+              if (rel->rp[j].p > (unsigned long) maxpr)
 		    ok = 0;
 		ltmp++;
 	    }
 	for(j = 0; j < rel->nb_ap; j++)
 	    if(rel->ap[j].p > alim){
-		if(rel->ap[j].p > maxpa)
+              if(rel->ap[j].p > (unsigned long) maxpa)
 		    ok = 0;
 		ltmp++;
 	    }
@@ -333,6 +336,7 @@ insertNormalRelation(char *rel_used, int **rel_compact, int irel, int *nprimes, 
 	    if(H->hashcount[h] == 1){
 		// new prime
 		*nprimes += 1;
+#if 0 /* commented out, waiting for the FIXME to be solved */
                 /* FIXME: the following comparison can never be true, since
                    rel->ap[j].r is an unsigned long!!! */
 		if(rel->ap[j].r == -1){
@@ -345,6 +349,7 @@ insertNormalRelation(char *rel_used, int **rel_compact, int irel, int *nprimes, 
 		    bad_primes->tab[bad_primes->length] = rel->ap[j].p;
 		    bad_primes->length++;
 		}
+#endif
 	    }
 	    if(rel->ap[j].p <= alim)
 		continue;
@@ -370,6 +375,7 @@ insertNormalRelation(char *rel_used, int **rel_compact, int irel, int *nprimes, 
 	    if(H->hashcount[h] < 0){
 		// new prime
 		*nprimes += 1;
+#if 0 /* commented out: waiting for FIXME to be solved */
                 /* FIXME: the following comparison can never be true, since
                    rel->ap[j].r is an unsigned long!!! */
 		if(rel->ap[j].r == -1){
@@ -382,6 +388,7 @@ insertNormalRelation(char *rel_used, int **rel_compact, int irel, int *nprimes, 
 		    bad_primes->tab[bad_primes->length] = rel->ap[j].p;
 		    bad_primes->length++;
 		}
+#endif
 	    }
 	}
     }
@@ -442,10 +449,18 @@ insertFreeRelation(char *rel_used, int **rel_compact, int irel, int *nprimes, ha
 }
 
 // nrel can decrease, for instance in case of duplicate rows.
-int scan_relations_from_file(int *irel, int *nrel, char *rel_used, int **rel_compact, int *nprimes, tab_prime_t *bad_primes, hashtable_t *H, hashtable_t *Hab, FILE *file, unsigned long rlim, unsigned long alim, long maxpr, long maxpa, int duplicate, int final)
+int
+scan_relations_from_file (int *irel, int *nrel, char *rel_used,
+                          int **rel_compact, int *nprimes,
+                          /* tab_prime_t *bad_primes, */ hashtable_t *H,
+                          hashtable_t *Hab, FILE *file, unsigned long rlim,
+                          unsigned long alim, long maxpr, long maxpa,
+                          int duplicate, int final)
 {
     relation_t rel;
     int ret;
+    unsigned long file_duplicates = 0;         /* duplicates in this file */
+    static unsigned long total_duplicates = 0; /* duplicates in all files */
 
     while(1){
 	ret = fread_relation (file, &rel);
@@ -457,7 +472,9 @@ int scan_relations_from_file(int *irel, int *nrel, char *rel_used, int **rel_com
 	if(duplicate){
 	    int hab = hashInsert(Hab, rel.a, rel.b);
 	    if(Hab->hashcount[hab] > 1){
-		fprintf(stderr,"(%ld, %ld) appears more than once?\n",rel.a,rel.b);
+                if (file_duplicates ++ < 10)
+                  fprintf (stderr, "(%ld, %ld) appears more than once\n",
+                           rel.a, rel.b);
 		rel_used[*irel] = 0;
 		rel_compact[*irel] = NULL;
 		*nrel -= 1;
@@ -466,7 +483,9 @@ int scan_relations_from_file(int *irel, int *nrel, char *rel_used, int **rel_com
 	}
 	rel_used[*irel] = 1;
 	if(rel.b > 0)
-	    insertNormalRelation(rel_used, rel_compact,*irel,nprimes,bad_primes,H,&rel,rlim,alim,maxpr,maxpa,final);
+          insertNormalRelation (rel_used, rel_compact, *irel, nprimes,
+                                /*bad_primes,*/ H, &rel, rlim, alim,
+                                maxpr, maxpa, final);
 	else
 	    insertFreeRelation(rel_used,rel_compact,*irel,nprimes,H,&rel,final);
 	if(rel_used[*irel] <= 0)
@@ -474,16 +493,23 @@ int scan_relations_from_file(int *irel, int *nrel, char *rel_used, int **rel_com
 	    *nrel -= 1;
 	clear_relation(&rel);
     }
+    total_duplicates += file_duplicates;
+    fprintf (stderr, "Found %lu duplicates in this file (total %lu)\n",
+             file_duplicates, total_duplicates);
     return ret;
 }
 
 // Read all relations from file.
 int
-scan_relations(char *ficname[], int nbfic, int *nrel, int *nprimes, tab_prime_t *bad_primes, hashtable_t *H, hashtable_t *Hab, char *rel_used, int **rel_compact, unsigned long rlim, unsigned long alim, long maxpr, long maxpa, int duplicate, int final)
+scan_relations (char *ficname[], int nbfic, int *nrel, int *nprimes,
+                /*tab_prime_t *bad_primes,*/ hashtable_t *H, hashtable_t *Hab,
+                char *rel_used, int **rel_compact, unsigned long rlim,
+                unsigned long alim, long maxpr, long maxpa, int duplicate,
+                int final)
 {
     FILE *relfile;
     int ret, irel = -1;
-    unsigned int i;
+    int i;
     
     *nprimes = 0;
 
@@ -496,7 +522,10 @@ scan_relations(char *ficname[], int nbfic, int *nrel, int *nprimes, tab_prime_t 
 	    exit(1);
 	}
 	fprintf(stderr, "Adding file %s\n", ficname[i]);
-	ret = scan_relations_from_file(&irel, nrel, rel_used, rel_compact, nprimes, bad_primes, H, Hab, relfile, rlim, alim, maxpr, maxpa, duplicate, final);
+	ret = scan_relations_from_file (&irel, nrel, rel_used, rel_compact,
+                                        nprimes, /* bad_primes,*/ H, Hab,
+                                        relfile, rlim, alim, maxpr, maxpa,
+                                        duplicate, final);
 	if (ret == 0) {
 	    fprintf(stderr, "Warning: error when reading file %s\n", ficname[i]);
 	    break;
@@ -601,7 +630,7 @@ deleteHeavierRows(hashtable_t *H, int *nrel, int *nprimes, char *rel_used, int *
 }
 
 void
-onepass_singleton_removal(int nrelmax, int *nrel, int *nprimes, hashtable_t *H, char *rel_used, int **rel_compact, int keep)
+onepass_singleton_removal(int nrelmax, int *nrel, int *nprimes, hashtable_t *H, char *rel_used, int **rel_compact /*, int keep*/)
 {
     int i;
 
@@ -653,7 +682,7 @@ remove_singletons(int *nrel, int nrelmax, int *nprimes, hashtable_t *H, char *re
 	old = newnrel;
 	deleteHeavierRows(H,&newnrel,&newnprimes,rel_used,rel_compact,nrelmax,keep);
 	fprintf(stderr,"dHR: %d %d at %2.2lf\n",newnrel,newnprimes,seconds());
-	onepass_singleton_removal(nrelmax, &newnrel, &newnprimes, H, rel_used, rel_compact, keep);
+	onepass_singleton_removal(nrelmax, &newnrel, &newnprimes, H, rel_used, rel_compact /*, keep*/);
 	fprintf(stderr, "new/old = %d/%d; newnprimes=%d at %2.2lf\n",
 		newnrel, old, newnprimes, seconds());
     } while(newnrel != old);
@@ -893,7 +922,9 @@ main(int argc, char **argv)
 
     fprintf(stderr, "reading file of relations...\n");
     nrel = nrelmax;
-    ret = scan_relations(fic, nfic, &nrel, &nprimes, &bad_primes, &H, &Hab, rel_used, rel_compact, pol[0].rlim, pol[0].alim, maxpr, maxpa, duplicate, final);
+    ret = scan_relations (fic, nfic, &nrel, &nprimes, /*&bad_primes,*/ &H,
+                          &Hab, rel_used, rel_compact, pol[0].rlim,
+                          pol[0].alim, maxpr, maxpa, duplicate, final);
     ASSERT (ret);
     
     fprintf(stderr, "nrel(useful)=%d, nprimes=%d (%d)\n",nrel,nprimes,Hsize);
