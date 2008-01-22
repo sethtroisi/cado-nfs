@@ -19,10 +19,10 @@ void mulCantor128(uint64_t *H, uint64_t *F, int Fl, uint64_t *G, int Gl);
 
 as well as other functions allowing FFT caching.
 
-extern void cantor_setup_info(cantor_info_t p, int Fl, int Gl);
+extern void cantor_setup_info(cantor_info_t p, int dF, int dG);
 
 	sets up the appropriate data for multiplying polynomials having
-	respectively Fl and Gl 64-bit words.
+	degrees bounded respectively by dF and dG.
 	
 extern cantor_transform_t cantor_transform_alloc(const cantor_info_t p,
 int n);
@@ -40,9 +40,9 @@ cantor_transform_t x, int k);
 	accesses the k-th transform stored at location x.
 
 extern void cantor_transform(const cantor_info_t p, cantor_transform_t x,
-uint64_t * F, int Fl);
+uint64_t * F, int dF);
 
-	performs a direct transform of F, having Fl 64-bit words.
+	performs a direct transform of F, having degree at most dF.
 
 extern void cantor_compose(const cantor_info_t p, cantor_transform_t y,
 cantor_transform_t x1, cantor_transform_t x2);
@@ -56,7 +56,7 @@ cantor_transform_t x1, cantor_transform_t x2);
 	adds two transforms (the direct transform is linear).
 
 extern void cantor_itransform(const cantor_info_t p, uint64_t * H, int
-Hl, cantor_transform_t h);
+dH, cantor_transform_t h);
 
 	performs an inverse transform.
 

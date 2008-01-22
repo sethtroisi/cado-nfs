@@ -477,11 +477,14 @@ void recomposeK(uint64_t * F, Kelt * f, int Fl, int k UNUSED_VARIABLE)
 	F[i] = f[i][0] ^ f[i - 1][1];
 }
 
-void cantor_setup_info(cantor_info_t p, int Fl, int Gl)
+void cantor_setup_info(cantor_info_t p, int dF, int dG)
 {
     int k;
     int Hl;
     int n;
+
+    int Fl = (dF + 1 + 63) / 64;
+    int Gl = (dG + 1 + 63) / 64;
 
     Hl = Fl + Gl;		// nb of uint64_t of the result
     n = Hl;			// nb of Kelt of the result.
@@ -514,8 +517,9 @@ void cantor_transform(
         const cantor_info_t p,
         cantor_transform_t x,
         uint64_t * F,
-        int Fl)
+        int dF)
 {
+    int Fl = (dF + 1 + 63) / 64;
     decomposeK(x,F,Fl,p->k);
     multievaluateKnew_trunc(x, p->k, p->n);
 }
@@ -544,9 +548,11 @@ void cantor_add(
 void cantor_itransform(
         const cantor_info_t p,
         uint64_t * H,
-        int Hl,
+        int dH,
         cantor_transform_t h)
 {
+    int Hl = (dH + 1 + 63) / 64;
+
     // fill in with zeros to facilitate interpolation
     memset(h + p->n, 0, ((1 << p->k) - p->n) * sizeof(Kelt));
     if (p->n & (p->n - 1)) {
@@ -568,18 +574,21 @@ void mulCantor128(uint64_t * H, uint64_t * F, int Fl, uint64_t * G, int Gl)
     cantor_info_t order;
     cantor_transform_t f,g;
 
-    cantor_setup_info(order, Fl, Gl);
+    int dF = Fl * 64 - 1;
+    int dG = Gl * 64 - 1;
+
+    cantor_setup_info(order, dF, dG);
 
     f = cantor_transform_alloc(order, 1);
-    cantor_transform(order, f, F, Fl);
+    cantor_transform(order, f, F, dF);
 
     g = cantor_transform_alloc(order, 1);
-    cantor_transform(order, g, G, Gl);
+    cantor_transform(order, g, G, dG);
 
     cantor_compose(order, f, f, g);
 
     cantor_transform_free(order, g, 1);
-    cantor_itransform(order, H, Fl + Gl, f);
+    cantor_itransform(order, H, dF + dG, f);
 
     cantor_transform_free(order, f, 1);
 }
