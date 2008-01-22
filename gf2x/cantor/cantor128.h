@@ -1,34 +1,52 @@
 #ifndef CANTOR128_H_
 #define CANTOR128_H_
 
+#include <stdint.h>
+#include <stdlib.h>
+#include "mpfq_2_128.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <stdint.h>
-#include "mpfq_2_128.h"
-
-struct cantor_info_struct {
+struct c128_info_struct {
     int k;
     int n;
 };
-typedef struct cantor_info_struct cantor_info_t[1];
+typedef struct c128_info_struct c128_info_t[1];
 
-typedef mpfq_2_128_elt * cantor_transform_t;
+typedef mpfq_2_128_elt * c128_t;
+/* aliasing is not our friend here ;-( */
+typedef mpfq_2_128_elt * c128_src_t;
 
-extern void cantor_setup_info(cantor_info_t p, int dF, int dG);
-extern cantor_transform_t cantor_transform_alloc(const cantor_info_t p, int n);
-extern void cantor_transform_free(const cantor_info_t p, cantor_transform_t x, int n);
-extern inline cantor_transform_t cantor_transform_get(const cantor_info_t p, cantor_transform_t x, int k) {
+extern void c128_setup(c128_info_t p, int dF, int dG);
+extern inline c128_t c128_alloc(const c128_info_t p, int n)
+{
+    return (c128_t) malloc((n << p->k) * sizeof(mpfq_2_128_elt));
+}
+extern inline void c128_free(
+        const c128_info_t p UNUSED_VARIABLE,
+        c128_t x,
+        int n UNUSED_VARIABLE)
+{
+    free(x);
+}
+extern inline c128_t c128_get(const c128_info_t p, c128_t x, int k) {
 	return x + (k << p->k);
 }
-extern void cantor_transform(const cantor_info_t p, cantor_transform_t x, uint64_t * F, int dF);
-extern void cantor_compose(const cantor_info_t p, cantor_transform_t y, cantor_transform_t x1, cantor_transform_t x2);
-extern void cantor_add(const cantor_info_t p, cantor_transform_t y, cantor_transform_t x1, cantor_transform_t x2);
-extern void cantor_itransform(const cantor_info_t p, uint64_t * H, int Hl, cantor_transform_t h);
+extern inline void c128_zero(const c128_info_t p, c128_t x, int n)
+{
+	memset(x, 0, n * (1 << p->k) * sizeof(mpfq_2_128_elt));
+}
+extern void c128_dft(const c128_info_t p, c128_t x, unsigned long * F, int dF);
+extern void c128_compose(const c128_info_t p,
+		c128_t y, c128_src_t x1, c128_src_t x2);
+extern void c128_add(const c128_info_t p,
+		c128_t y, c128_src_t x1, c128_src_t x2);
+extern void c128_ift(const c128_info_t p,
+		unsigned long * H, int Hl, c128_src_t h);
 
-
-extern void mulCantor128(uint64_t *H, uint64_t *F, int Fl, uint64_t *G, int Gl);
+extern void mulCantor128(unsigned long *H, unsigned long *F, int Fl, unsigned long *G, int Gl);
 #ifdef __cplusplus
 }
 #endif

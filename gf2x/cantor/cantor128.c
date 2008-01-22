@@ -84,37 +84,37 @@ static const Kelt Betai[32] = {
 // The S_i polynomials of Cantor's algorithm: linearized polynomials such
 // that S_i | S_{i+1}.
 static const int ind_S[31][15] = {
-    {},				// S0
-    {1},			// S1
-    {1},			// S2
-    {4, 2, 1},			// S3
-    {1},			// S4
-    {16, 2, 1},			// S5
-    {16, 4, 1},			// S6
-    {64, 32, 16, 8, 4, 2, 1},	// S7
-    {1},			// S8
-    {256, 2, 1},		// S9
-    {256, 4, 1},		// S10
-    {1024, 512, 256, 8, 4, 2, 1},	// S11
-    {256, 16, 1},		// S12
-    {4096, 512, 256, 32, 16, 2, 1},	// S13
-    {4096, 1024, 256, 64, 16, 4, 1},	// S14
-    {16384, 8192, 4096, 2048, 1024, 512, 256, 128, 64, 32, 16, 8, 4, 2, 1},	// S15
-    {1},			// S16
-    {65536, 2, 1},		// S17
-    {65536, 4, 1},		// S18
-    {262144, 131072, 65536, 8, 4, 2, 1},	// S19
-    {65536, 16, 1},		// S20
-    {1048576, 131072, 65536, 32, 16, 2, 1},	// S21
-    {1048576, 262144, 65536, 64, 16, 4, 1},	// S22
-    {4194304, 2097152, 1048576, 524288, 262144, 131072, 65536, 128, 64, 32, 16, 8, 4, 2, 1},	// S23
-    {65536, 256, 1},		// S24
-    {16777216, 131072, 65536, 512, 256, 2, 1},	// S25
-    {16777216, 262144, 65536, 1024, 256, 4, 1},	// S26
-    {67108864, 33554432, 16777216, 524288, 262144, 131072, 65536, 2048, 1024, 512, 256, 8, 4, 2, 1},	// S27
-    {16777216, 1048576, 65536, 4096, 256, 16, 1},	// S28
-    {268435456, 33554432, 16777216, 2097152, 1048576, 131072, 65536, 8192, 4096, 512, 256, 32, 16, 2, 1},	// S29
-    {268435456, 67108864, 16777216, 4194304, 1048576, 262144, 65536, 16384, 4096, 1024, 256, 64, 16, 4, 1},	// S30
+    {},                         // S0
+    {1},                        // S1
+    {1},                        // S2
+    {4, 2, 1},                  // S3
+    {1},                        // S4
+    {16, 2, 1},                 // S5
+    {16, 4, 1},                 // S6
+    {64, 32, 16, 8, 4, 2, 1},   // S7
+    {1},                        // S8
+    {256, 2, 1},                // S9
+    {256, 4, 1},                // S10
+    {1024, 512, 256, 8, 4, 2, 1},       // S11
+    {256, 16, 1},               // S12
+    {4096, 512, 256, 32, 16, 2, 1},     // S13
+    {4096, 1024, 256, 64, 16, 4, 1},    // S14
+    {16384, 8192, 4096, 2048, 1024, 512, 256, 128, 64, 32, 16, 8, 4, 2, 1},     // S15
+    {1},                        // S16
+    {65536, 2, 1},              // S17
+    {65536, 4, 1},              // S18
+    {262144, 131072, 65536, 8, 4, 2, 1},        // S19
+    {65536, 16, 1},             // S20
+    {1048576, 131072, 65536, 32, 16, 2, 1},     // S21
+    {1048576, 262144, 65536, 64, 16, 4, 1},     // S22
+    {4194304, 2097152, 1048576, 524288, 262144, 131072, 65536, 128, 64, 32, 16, 8, 4, 2, 1},    // S23
+    {65536, 256, 1},            // S24
+    {16777216, 131072, 65536, 512, 256, 2, 1},  // S25
+    {16777216, 262144, 65536, 1024, 256, 4, 1}, // S26
+    {67108864, 33554432, 16777216, 524288, 262144, 131072, 65536, 2048, 1024, 512, 256, 8, 4, 2, 1},    // S27
+    {16777216, 1048576, 65536, 4096, 256, 16, 1},       // S28
+    {268435456, 33554432, 16777216, 2097152, 1048576, 131072, 65536, 8192, 4096, 512, 256, 32, 16, 2, 1},       // S29
+    {268435456, 67108864, 16777216, 4194304, 1048576, 262144, 65536, 16384, 4096, 1024, 256, 64, 16, 4, 1},     // S30
 };
 
 // The number of terms in S_i.
@@ -132,11 +132,11 @@ static inline void allBetai(Kelt x, int i)
     x[1] = 0;
     j = 0;
     while (i != 0) {
-	if (i & 1) {
-	    Kadd(x, x, Betai[j]);
+        if (i & 1) {
+            Kadd(x, x, Betai[j]);
         }
-	i >>= 1;
-	j++;
+        i >>= 1;
+        j++;
     }
 }
 
@@ -155,18 +155,18 @@ static inline void reduceSi(int k, Kelt * f, Kelt beta)
     K = 1 << k;
     // put rest mod Sk+beta in low part of f and quo in high part.
     for (i = 2 * K - 1; i >= K; --i) {
-	fi = f[i];
-	for (j = 0; j < ind_number[k]; ++j) {
-	    int index = ind_S[k][j] + i - K;
-	    Kadd(f[index], f[index], fi);
-	}
-	Kmul(coeff, fi, beta);
-	Kadd(f[i - K], f[i - K], coeff);
+        fi = f[i];
+        for (j = 0; j < ind_number[k]; ++j) {
+            int index = ind_S[k][j] + i - K;
+            Kadd(f[index], f[index], fi);
+        }
+        Kmul(coeff, fi, beta);
+        Kadd(f[i - K], f[i - K], coeff);
     }
 
     // The other rest is just the sum of low and hi parts
     for (i = 0; i < K; ++i)
-	Kadd(f[i + K], f[i + K], f[i]);
+        Kadd(f[i + K], f[i + K], f[i]);
 }
 
 // The generic reduction function.
@@ -179,16 +179,16 @@ static inline void reduceSiNobeta_trunc(int k, Kelt * f, int L)
     K = 1 << k;
     // put rest mod Sk+beta in low part of f and quo in high part.
     for (i = L - 1; i >= K; --i) {
-	fi = f[i];
-	for (j = 0; j < ind_number[k]; ++j) {
-	    int index = ind_S[k][j] + i - K;
-	    Kadd(f[index], f[index], fi);
-	}
+        fi = f[i];
+        for (j = 0; j < ind_number[k]; ++j) {
+            int index = ind_S[k][j] + i - K;
+            Kadd(f[index], f[index], fi);
+        }
     }
 
     // The other rest is just the sum of low and hi parts
     for (i = 0; i < K; ++i)
-	Kadd(f[i + K], f[i + K], f[i]);
+        Kadd(f[i + K], f[i + K], f[i]);
 }
 
 // A generic interpolation function.
@@ -199,18 +199,18 @@ static inline void interpolateSi(int k, Kelt * f, Kelt beta)
     int K = 1 << k;
 
     for (i = 0; i < K; ++i)
-	Kadd(f[i + K], f[i + K], f[i]);
+        Kadd(f[i + K], f[i + K], f[i]);
 
     for (i = K; i < K << 1; ++i) {
-	Kelt coeff;
-	Ksrc_elt fi;
-	fi = f[i];
-	for (j = 0; j < ind_number[k]; ++j) {
-	    int index = ind_S[k][j] + i - K;
-	    Kadd(f[index], f[index], fi);
-	}
-	Kmul(coeff, fi, beta);
-	Kadd(f[i - K], f[i - K], coeff);
+        Kelt coeff;
+        Ksrc_elt fi;
+        fi = f[i];
+        for (j = 0; j < ind_number[k]; ++j) {
+            int index = ind_S[k][j] + i - K;
+            Kadd(f[index], f[index], fi);
+        }
+        Kmul(coeff, fi, beta);
+        Kadd(f[i - K], f[i - K], coeff);
     }
 }
 
@@ -220,15 +220,15 @@ static inline void interpolateSiNobeta(int k, Kelt * f)
     int K = 1 << k;
 
     for (i = 0; i < K; ++i)
-	Kadd(f[i + K], f[i + K], f[i]);
+        Kadd(f[i + K], f[i + K], f[i]);
 
     for (i = K; i < K << 1; ++i) {
-	Ksrc_elt fi;
-	fi = f[i];
-	for (j = 0; j < ind_number[k]; ++j) {
-	    int index = ind_S[k][j] + i - K;
-	    Kadd(f[index], f[index], fi);
-	}
+        Ksrc_elt fi;
+        fi = f[i];
+        for (j = 0; j < ind_number[k]; ++j) {
+            int index = ind_S[k][j] + i - K;
+            Kadd(f[index], f[index], fi);
+        }
     }
 }
 
@@ -241,34 +241,34 @@ void multievaluateKrec(Kelt * f, int i, int rep_beta)
     reduceSi(i - 1, f, beta);
 
     if (i == 2) {
-	rep_beta <<= 1;
-	allBetai(beta, rep_beta);
-	reduceSi(0, f, beta);
-	Kadd(beta, beta, Betai[1]);
-	reduceSi(0, f + 2, beta);
-	return;
+        rep_beta <<= 1;
+        allBetai(beta, rep_beta);
+        reduceSi(0, f, beta);
+        Kadd(beta, beta, Betai[1]);
+        reduceSi(0, f + 2, beta);
+        return;
     }
     if (i == 3) {
-	rep_beta <<= 1;
-	allBetai(beta, rep_beta);
-	reduceSi(1, f, beta);
-	Kadd(beta, beta, Betai[1]);
-	reduceSi(1, f + 4, beta);
+        rep_beta <<= 1;
+        allBetai(beta, rep_beta);
+        reduceSi(1, f, beta);
+        Kadd(beta, beta, Betai[1]);
+        reduceSi(1, f + 4, beta);
 
-	rep_beta <<= 1;
-	allBetai(beta, rep_beta);
-	reduceSi(0, f, beta);
-	Kadd(beta, beta, Betai[1]);
-	reduceSi(0, f + 2, beta);
-	Kadd(beta, beta, Betai[2]);
-	reduceSi(0, f + 6, beta);
-	Kadd(beta, beta, Betai[1]);
-	reduceSi(0, f + 4, beta);
-	return;
+        rep_beta <<= 1;
+        allBetai(beta, rep_beta);
+        reduceSi(0, f, beta);
+        Kadd(beta, beta, Betai[1]);
+        reduceSi(0, f + 2, beta);
+        Kadd(beta, beta, Betai[2]);
+        reduceSi(0, f + 6, beta);
+        Kadd(beta, beta, Betai[1]);
+        reduceSi(0, f + 4, beta);
+        return;
     }
     if (i > 1) {
-	multievaluateKrec(f, i - 1, rep_beta);
-	multievaluateKrec(f + (1 << (i - 1)), i - 1, rep_beta + 1);
+        multievaluateKrec(f, i - 1, rep_beta);
+        multievaluateKrec(f + (1 << (i - 1)), i - 1, rep_beta + 1);
     }
 }
 
@@ -280,40 +280,40 @@ void multievaluateKrec_trunc(Kelt * f, int i, int rep_beta, int length)
     reduceSi(i - 1, f, beta);
 
     if (i == 2) {
-	rep_beta <<= 1;
-	allBetai(beta, rep_beta);
-	reduceSi(0, f, beta);
-	Kadd(beta, beta, Betai[1]);
-	reduceSi(0, f + 2, beta);
-	return;
+        rep_beta <<= 1;
+        allBetai(beta, rep_beta);
+        reduceSi(0, f, beta);
+        Kadd(beta, beta, Betai[1]);
+        reduceSi(0, f + 2, beta);
+        return;
     }
     if (i == 3) {
-	rep_beta <<= 1;
-	allBetai(beta, rep_beta);
-	reduceSi(1, f, beta);
-	Kadd(beta, beta, Betai[1]);
-	reduceSi(1, f + 4, beta);
+        rep_beta <<= 1;
+        allBetai(beta, rep_beta);
+        reduceSi(1, f, beta);
+        Kadd(beta, beta, Betai[1]);
+        reduceSi(1, f + 4, beta);
 
-	rep_beta <<= 1;
-	allBetai(beta, rep_beta);
-	reduceSi(0, f, beta);
-	Kadd(beta, beta, Betai[1]);
-	reduceSi(0, f + 2, beta);
-	Kadd(beta, beta, Betai[2]);
-	reduceSi(0, f + 6, beta);
-	Kadd(beta, beta, Betai[1]);
-	reduceSi(0, f + 4, beta);
-	return;
+        rep_beta <<= 1;
+        allBetai(beta, rep_beta);
+        reduceSi(0, f, beta);
+        Kadd(beta, beta, Betai[1]);
+        reduceSi(0, f + 2, beta);
+        Kadd(beta, beta, Betai[2]);
+        reduceSi(0, f + 6, beta);
+        Kadd(beta, beta, Betai[1]);
+        reduceSi(0, f + 4, beta);
+        return;
     }
     if (i > 1) {
-	if (length < (1 << (i - 1))) {
-	    multievaluateKrec_trunc(f, i - 1, rep_beta, length);
+        if (length < (1 << (i - 1))) {
+            multievaluateKrec_trunc(f, i - 1, rep_beta, length);
         } else if (length > (1 << (i - 1))) {
-	    multievaluateKrec(f, i - 1, rep_beta);
-	    multievaluateKrec_trunc(f + (1 << (i - 1)), i - 1, rep_beta + 1,
-				    length - (1 << (i - 1)));
-	} else { // length == 1<<(i-1)
-	    multievaluateKrec(f, i - 1, rep_beta);
+            multievaluateKrec(f, i - 1, rep_beta);
+            multievaluateKrec_trunc(f + (1 << (i - 1)), i - 1, rep_beta + 1,
+                                    length - (1 << (i - 1)));
+        } else { // length == 1<<(i-1)
+            multievaluateKrec(f, i - 1, rep_beta);
         }
     }
 }
@@ -325,7 +325,7 @@ void multievaluateKnew_trunc(Kelt * f, int k, int length)
 
     multievaluateKrec(f, k - 1, 0);
     multievaluateKrec_trunc(f + (1 << (k - 1)), k - 1, 1,
-			    length - (1 << (k - 1)));
+                            length - (1 << (k - 1)));
 }
 
 // Interpolation with subproduct tree.
@@ -335,11 +335,11 @@ void interpolateK(Kelt * f, int k)
     Kelt beta;
 
     for (i = 0; i < k - 1; ++i) {
-	for (j = 0; j < (1 << (k - 1 - i)); ++j) {
-	    int index = j * (1 << (i + 1));
-	    allBetai(beta, 2 * j);
-	    interpolateSi(i, f + index, beta);
-	}
+        for (j = 0; j < (1 << (k - 1 - i)); ++j) {
+            int index = j * (1 << (i + 1));
+            allBetai(beta, 2 * j);
+            interpolateSi(i, f + index, beta);
+        }
     }
     interpolateSiNobeta(k - 1, f);
 }
@@ -357,13 +357,13 @@ static inline void quotremSi(int k, Kelt * f, int L, Kelt beta)
     K = 1 << k;
     // put rest mod Sk+beta in low part of f and quo in high part.
     for (i = L - 1; i >= K; --i) {
-	fi = f[i];
-	for (j = 0; j < ind_number[k]; ++j) {
-	    int index = ind_S[k][j] + i - K;
-	    Kadd(f[index], f[index], fi);
-	}
-	Kmul(coeff, fi, beta);
-	Kadd(f[i - K], f[i - K], coeff);
+        fi = f[i];
+        for (j = 0; j < ind_number[k]; ++j) {
+            int index = ind_S[k][j] + i - K;
+            Kadd(f[index], f[index], fi);
+        }
+        Kmul(coeff, fi, beta);
+        Kadd(f[i - K], f[i - K], coeff);
     }
 }
 
@@ -377,15 +377,15 @@ static inline void mulSi(int k, Kelt * f, int L, Kelt beta)
     int K = 1 << k;
 
     for (i = 0; i < L; ++i) {
-	Kelt coeff;
-	Ksrc_elt fi;
-	fi = f[i];
-	for (j = 0; j < ind_number[k]; ++j) {
-	    int index = ind_S[k][j] + i - K;
-	    Kadd(f[index], f[index], fi);
-	}
-	Kmul(coeff, fi, beta);
-	Kadd(f[i - K], f[i - K], coeff);
+        Kelt coeff;
+        Ksrc_elt fi;
+        fi = f[i];
+        for (j = 0; j < ind_number[k]; ++j) {
+            int index = ind_S[k][j] + i - K;
+            Kadd(f[index], f[index], fi);
+        }
+        Kmul(coeff, fi, beta);
+        Kadd(f[i - K], f[i - K], coeff);
     }
 }
 
@@ -402,12 +402,12 @@ static inline void reduceModTrunc(Kelt * f, int k, int length)
     // go down, computing quotrems
     offset_f = 0;
     for (i = k - 1; i >= 0; --i) {
-	if (len >> i) {
-	    allBetai(beta, offset_f >> i);
-	    quotremSi(i, f + offset_f, (1 << k) - offset_f, beta);
-	    offset_f += 1 << i;
-	    len -= 1 << i;
-	}
+        if (len >> i) {
+            allBetai(beta, offset_f >> i);
+            quotremSi(i, f + offset_f, (1 << k) - offset_f, beta);
+            offset_f += 1 << i;
+            len -= 1 << i;
+        }
     }
 
     // go up, reconstructing general rem
@@ -419,12 +419,12 @@ static inline void reduceModTrunc(Kelt * f, int k, int length)
     i++;
     len >>= 1;
     for (; i <= k - 1; ++i) {
-	if (len & 1) {
-	    allBetai(beta, (length - (1 << i) - ii) >> i);
-	    mulSi(i, pf - ii, ii, beta);
-	    ii += 1 << i;
-	}
-	len >>= 1;
+        if (len & 1) {
+            allBetai(beta, (length - (1 << i) - ii) >> i);
+            mulSi(i, pf - ii, ii, beta);
+            ii += 1 << i;
+        }
+        len >>= 1;
     }
 }
 
@@ -439,45 +439,94 @@ void interpolateK_trunc(Kelt * f, int k, int length)
     Kelt beta;
 
     for (i = 0; i < k - 1; ++i) {
-	int maxj = 1 << (k - 1 - i);
-	for (j = 0; j < maxj; ++j) {
-	    int index = j * (1 << (i + 1));
-	    if (length <= (index + (1 << i))) {
-		break;
-	    }
-	    allBetai(beta, 2 * j);
-	    interpolateSi(i, f + index, beta);
-	}
+        int maxj = 1 << (k - 1 - i);
+        for (j = 0; j < maxj; ++j) {
+            int index = j * (1 << (i + 1));
+            if (length <= (index + (1 << i))) {
+                break;
+            }
+            allBetai(beta, 2 * j);
+            interpolateSi(i, f + index, beta);
+        }
     }
     if (length > (1 << (k - 1)))
-	interpolateSiNobeta(k - 1, f);
+        interpolateSiNobeta(k - 1, f);
 
     reduceModTrunc(f, k, length);
 }
 
-void decomposeK(Kelt * f, uint64_t * F, int Fl, int k)
+#if (GMP_LIMB_BITS == 64)
+/* Assume that ulongs are 64 bits */
+#define ULONG_BITS 64
+#elif (GMP_LIMB_BITS == 32)
+#define ULONG_BITS 32
+#else
+#error "define GMP_LIMB_BITS"
+#endif
+
+#if (ULONG_BITS == 64)
+void decomposeK(Kelt * f, unsigned long * F, int Fl, int k)
 {
     int i;
     for (i = 0; i < Fl; ++i) {
-	f[i][0] = F[i];
-	f[i][1] = 0;
+        f[i][0] = F[i];
+        f[i][1] = 0;
     }
-    for (i = Fl; i < (1 << k); ++i) {
-	f[i][0] = 0;
-	f[i][1] = 0;
-    }
+    memset(f + i, 0, ((1 << k) - Fl) * sizeof(Kelt));
 }
 
-void recomposeK(uint64_t * F, Kelt * f, int Fl, int k UNUSED_VARIABLE)
+void recomposeK(unsigned long * F, Kelt * f, int Fl, int k UNUSED_VARIABLE)
 {
     int i;
 
     F[0] = f[0][0];
-    for (i = 1; i < Fl; ++i)
-	F[i] = f[i][0] ^ f[i - 1][1];
+    for (i = 1; i < Fl ; ++i)
+        F[i] = f[i][0] ^ f[i - 1][1];
+}
+#elif (ULONG_BITS == 32)
+
+/* untested */
+
+void decomposeK(Kelt * f, unsigned long * F, int Fl, int k)
+{
+    int i;
+    int Fll = Fl + (Fl & 1);
+    for (i = 0; i < Fl / 2 ; ++i) {
+        f[i][0] = F[2*i];
+        f[i][1] = F[2*i + 1];
+        f[i][2] = 0;
+        f[i][3] = 0;
+    }
+    if (Fl & 1) {
+        f[i][0] = F[2*i];
+        f[i][1] = 0;
+        f[i][2] = 0;
+        f[i][3] = 0;
+        memset(f + i, 0, ((1 << k) - Fl/2 - 1) * sizeof(Kelt));
+    } else {
+        memset(f + i, 0, ((1 << k) - Fl/2) * sizeof(Kelt));
+    }
 }
 
-void cantor_setup_info(cantor_info_t p, int dF, int dG)
+void recomposeK(unsigned long * F, Kelt * f, int Fl, int k UNUSED_VARIABLE)
+{
+    int i;
+
+    F[0] = f[0][0];
+    F[1] = f[0][1];
+    for (i = 2; i < Fl; i += 2) {
+        F[i] = f[i/2][0] ^ f[i/2 - 1][2];
+        F[i+1] = f[i/2][1] ^ f[i/2 - 1][3];
+    }
+    if (Fl & 1) {
+            F[i] = f[i/2][0] ^ f[i/2 - 1][2];
+    }
+}
+#else
+#error "define ULONG_BITS"
+#endif
+
+void c128_setup(c128_info_t p, int dF, int dG)
 {
     int k;
     int Hl;
@@ -486,72 +535,46 @@ void cantor_setup_info(cantor_info_t p, int dF, int dG)
     int Fl = (dF + 1 + 63) / 64;
     int Gl = (dG + 1 + 63) / 64;
 
-    Hl = Fl + Gl;		// nb of uint64_t of the result
-    n = Hl;			// nb of Kelt of the result.
+    Hl = Fl + Gl;               // nb of uint64_t of the result
+    n = Hl;                     // nb of Kelt of the result.
     k = 1;
     while ((1 << k) < n)
-	++k;
+        ++k;
     if (k < 7) {
-	fprintf(stderr, "this code is for k >= 7, sorry\n");
-	exit(1);
+        fprintf(stderr, "this code is for k >= 7, sorry\n");
+        exit(1);
     }
     p->k = k;
     p->n = n;
 }
 
-cantor_transform_t
-cantor_transform_alloc(
-        const cantor_info_t p,
-        int n UNUSED_VARIABLE)
+void c128_dft(const c128_info_t p, c128_t x, unsigned long * F, int dF)
 {
-    return (cantor_transform_t) malloc((1 << p->k) * sizeof(Kelt));
-}
-void cantor_transform_free(
-        const cantor_info_t p UNUSED_VARIABLE,
-        cantor_transform_t x,
-        int n UNUSED_VARIABLE)
-{
-    free(x);
-}
-void cantor_transform(
-        const cantor_info_t p,
-        cantor_transform_t x,
-        uint64_t * F,
-        int dF)
-{
-    int Fl = (dF + 1 + 63) / 64;
+    int Fl = 1 + dF / ULONG_BITS;
     decomposeK(x,F,Fl,p->k);
     multievaluateKnew_trunc(x, p->k, p->n);
 }
-void cantor_compose(
-        const cantor_info_t p,
-        cantor_transform_t y,
-        cantor_transform_t x1,
-        cantor_transform_t x2)
+void c128_compose(const c128_info_t p, c128_t y, c128_src_t x1, c128_src_t x2)
 {
     int j;
     for (j = 0; j < p->n; ++j) {
-	Kmul(y[j], x1[j], x2[j]);
+        Kmul(y[j], x1[j], x2[j]);
     }
 }
-void cantor_add(
-        const cantor_info_t p,
-        cantor_transform_t y,
-        cantor_transform_t x1,
-        cantor_transform_t x2)
+void c128_add(const c128_info_t p, c128_t y, c128_src_t x1, c128_src_t x2)
 {
     int j;
     for (j = 0; j < p->n; ++j) {
-	Kadd(y[j], x1[j], x2[j]);
+        Kadd(y[j], x1[j], x2[j]);
     }
 }
-void cantor_itransform(
-        const cantor_info_t p,
-        uint64_t * H,
+void c128_ift(
+        const c128_info_t p,
+        unsigned long * H,
         int dH,
-        cantor_transform_t h)
+        c128_t h)
 {
-    int Hl = (dH + 1 + 63) / 64;
+    int Hl = 1 + dH / ULONG_BITS;
 
     // fill in with zeros to facilitate interpolation
     memset(h + p->n, 0, ((1 << p->k) - p->n) * sizeof(Kelt));
@@ -569,26 +592,27 @@ void cantor_itransform(
 // Takes two arrays of 64 bit limbs and compute their
 // product as polynomials over GF(2). 
 // H must have room for the result (Fl+Gl limbs)
-void mulCantor128(uint64_t * H, uint64_t * F, int Fl, uint64_t * G, int Gl)
+void mulCantor128(unsigned long * H, unsigned long * F, int Fl, unsigned long * G, int Gl)
 {
-    cantor_info_t order;
-    cantor_transform_t f,g;
+    c128_info_t order;
+    c128_t f,g;
 
-    int dF = Fl * 64 - 1;
-    int dG = Gl * 64 - 1;
+    int dF = Fl * ULONG_BITS - 1;
+    int dG = Gl * ULONG_BITS - 1;
 
-    cantor_setup_info(order, dF, dG);
+    c128_setup(order, dF, dG);
 
-    f = cantor_transform_alloc(order, 1);
-    cantor_transform(order, f, F, dF);
+    f = c128_alloc(order, 1);
+    c128_dft(order, f, F, dF);
 
-    g = cantor_transform_alloc(order, 1);
-    cantor_transform(order, g, G, dG);
+    g = c128_alloc(order, 1);
+    c128_dft(order, g, G, dG);
 
-    cantor_compose(order, f, f, g);
+    c128_compose(order, f, f, g);
 
-    cantor_transform_free(order, g, 1);
-    cantor_itransform(order, H, dF + dG, f);
+    c128_free(order, g, 1);
+    c128_ift(order, H, dF + dG, f);
 
-    cantor_transform_free(order, f, 1);
+    c128_free(order, f, 1);
 }
+/* vim: set sw=4 sta et: */
