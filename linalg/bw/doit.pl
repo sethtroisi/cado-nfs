@@ -58,7 +58,7 @@ my $bindir;
 	}
 }
 
-my $slavebindir=$bindir;
+my $krylovbindir=$bindir;
 
 my @args = @ARGV;
 while (defined(my $x = shift(@args))) {
@@ -207,19 +207,19 @@ if ($msize) {
 }
 
 # Check that we have the threshold argument if needed
-my $exe_master = "${bindir}bw-master";
+my $exe_lingen = "${bindir}bw-master";
 if ($modulus eq '2') {
-	$exe_master .= '-binary';
+	$exe_lingen = "${bindir}bw-lingen-binary"
 	die "threshold needed" unless $threshold;
-	$exe_master .= " -t $threshold";
+	$exe_lingen .= " -t $threshold";
 } elsif ($method =~ /^(?:q(?:uadratic)?|old)$/) {
-	$exe_master .= '-old';
+	$exe_lingen .= '-old';
 } else {
 	# TODO: allow runtime selection of method or (probably
 	# smarter) runtime checking that the proper binary is
 	# being used.
 	die "threshold needed" unless $threshold;
-	$exe_master .= "2 -t $threshold";
+	$exe_lingen .= "2 -t $threshold";
 }
 
 sub magmadump {
@@ -287,9 +287,9 @@ if (@mlist) {
 		}
 	}
 	# TODO: what about inhomogeneous computations ?
-        action "cp ${bindir}bw-slave $wdir/";
-        action "cp ${bindir}bw-slave-mt $wdir/";
-	$slavebindir="$wdir/";
+        action "cp ${bindir}bw-krylov $wdir/";
+        action "cp ${bindir}bw-krylov-mt $wdir/";
+	$krylovbindir="$wdir/";
 }
 
 if ($resume) {
@@ -409,16 +409,16 @@ sub nlines {
 my $m1=$m-1;
 my $n1=$n-1;
 
-# Gather the list of slave commands.
-SLAVE : {
-	my $exe="${slavebindir}bw-slave";
+# Gather the list of krylov commands.
+KRYLOV : {
+	my $exe="${krylovbindir}bw-krylov";
 	if ($mt) {
 		$exe .= "-mt --nthreads $mt";
 	}
-	$exe .= " --task slave --subdir $wdir";
+	$exe .= " --task krylov --subdir $wdir";
 
 
-	my @slavejobs = ();
+	my @krylovjobs = ();
 	
 	for my $vi (0..int($n/$vectoring) - 1) {
 		my ($i,$ni1)=($vectoring*$vi,$vectoring*($vi+1)-1);
@@ -439,16 +439,16 @@ SLAVE : {
 				print "$wdir/A-0$m1-00 : $linecounts[$j] lines, over.\n";
 			}
 		} else {
-			push @slavejobs, "$exe 0,$i $m1,$ni1";
+			push @krylovjobs, "$exe 0,$i $m1,$ni1";
 		}
 	}
 
-	if (scalar @slavejobs) {
-		print "--- slave jobs: ---\n";
-		for my $j (@slavejobs) {
+	if (scalar @krylovjobs) {
+		print "--- krylov jobs: ---\n";
+		for my $j (@krylovjobs) {
 			print "// $j\n";
 		}
-		compute_spanned @slavejobs;
+		compute_spanned @krylovjobs;
 	}
 }
 
@@ -456,20 +456,20 @@ rsync_pull;
 
 my @sols;
 
-MASTER : {
-	RECYCLE_MASTER: {
+LINGEN : {
+	RECYCLE_LINGEN: {
 		if ($resume) {
-			my $allfiles=-f "$wdir/master.log";
+			my $allfiles=-f "$wdir/lingen.log";
 			for my $x (0..$m+$n-1) {
 				my $p = sprintf "%02d", $x;
 				$allfiles = $allfiles && -f "$wdir-$p";
 			}
 			if ($allfiles) {
-				print "master: all files found, reusing\n";
+				print "lingen: all files found, reusing\n";
 			} else {
-				last RECYCLE_MASTER;
+				last RECYCLE_LINGEN;
 			}
-			open my $ph, "tail -1 $wdir/master.log |";
+			open my $ph, "tail -1 $wdir/lingen.log |";
 			while (defined(my $x=<$ph>)) {
 				if ($x =~ /LOOK \[\s*([\d\s]*)\]$/) {
 					print "$x\n";
@@ -480,13 +480,13 @@ MASTER : {
 				magmadump;
 				die "No solution found";
 			}
-			last MASTER;
+			last LINGEN;
 		}
 	}
 
-	my $exe = $exe_master;
+	my $exe = $exe_lingen;
 	$exe .= " --subdir $wdir matrix.txt $m $n";
-	open my $mlog, ">$wdir/master.log";
+	open my $mlog, ">$wdir/lingen.log";
 	print "$exe\n";
 	open my $mh, "$exe |";
 	while (defined(my $x=<$mh>)) {
@@ -515,7 +515,7 @@ my @sols_found  = ();
 my @solfiles=();
 
 MKSOL : {
-	my $exe="${slavebindir}bw-slave";
+	my $exe="${krylovbindir}bw-krylov";
 	if ($mt) {
 		$exe .= "-mt --nthreads $mt";
 	}
@@ -579,7 +579,7 @@ MKSOL : {
 
 	if ($multisols) {
 		print scalar @sols_found, " solutions found ",
-			"(from ", scalar @sols, " out of master)\n";
+			"(from ", scalar @sols, " out of lingen)\n";
 		for my $f (@sols_found) { print "$f\n"; }
 	}
 

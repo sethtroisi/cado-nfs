@@ -10,7 +10,7 @@
 #include "common_arguments.hpp"
 #include "constants.hpp"
 #include "detect_params.hpp"
-#include "slave_arguments.hpp"
+#include "krylov_arguments.hpp"
 #include "files.hpp"
 #include "matrix.hpp"
 #include "matrix_header.hpp"
@@ -34,7 +34,7 @@
  * necessary.
  */
 
-slave_arguments mine;
+krylov_arguments mine;
 
 using namespace std;
 using namespace boost;
@@ -414,17 +414,17 @@ struct thread:public traits {
     }
 };
 
-/* do the work that differs when task == slave and task == mksol */
+/* do the work that differs when task == krylov and task == mksol */
 template < typename traits >
-    struct slave_thread:public thread < traits, slave_thread < traits > > {
-    typedef slave_thread < traits > self;
+    struct krylov_thread:public thread < traits, krylov_thread < traits > > {
+    typedef krylov_thread < traits > self;
     typedef thread < traits, self > super;
     typedef typename traits::scalar_t scalar_t;
     typedef typename traits::wide_scalar_t wide_scalar_t;
     ofstream *a;
      vector < uint > px;
     int cp_lag;
-     slave_thread(void *x):super(x) {
+     krylov_thread(void *x):super(x) {
 	int x0 = (super::t * globals::m) / mine.nt;
 	int x1 = ((super::t + 1) * globals::m) / mine.nt;
 	 a = new ofstream[x1 - x0];
@@ -437,7 +437,7 @@ template < typename traits >
 	     px.push_back(globals::bw_x[x]);
 	} cp_lag = globals::cp_lag;
     }
-    ~slave_thread() {
+    ~krylov_thread() {
 	delete[]a;
     }
     void use_vector(scalar_t * dst) {
@@ -725,7 +725,7 @@ template < typename traits > int program()
     globals::vdata < traits > v0_and_f;
     std::vector < void *>targs(mine.nt, (void *) &v0_and_f);
 
-    if (mine.task == "slave") {
+    if (mine.task == "krylov") {
 
 	recover = recoverable_iteration(m, col, nbys, cp_lag);
 	iter0 = recover * cp_lag;
@@ -746,7 +746,7 @@ template < typename traits > int program()
 	v0_and_f.v0 = new scalar_t[nc];
 	recover_vector < traits > (nc, col, nbys, recover, v0_and_f.v0);
 
-	start_threads(thread_program < slave_thread, traits >, targs);
+	start_threads(thread_program < krylov_thread, traits >, targs);
 	delete[]v0_and_f.v0;
     } else if (mine.task == "mksol") {
 

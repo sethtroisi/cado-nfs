@@ -1,16 +1,16 @@
-#ifndef SLAVE_ARGUMENTS_HPP_
-#define SLAVE_ARGUMENTS_HPP_
+#ifndef KRYLOV_ARGUMENTS_HPP_
+#define KRYLOV_ARGUMENTS_HPP_
 
 #include "corners.hpp"
 #include "arguments.hpp"
 #include "fmt.hpp"
 
-struct slave_arguments {
+struct krylov_arguments {
 	corner b, e;
 	unsigned int scol;
 	std::string task;
 	int nt;
-	slave_arguments() {
+	krylov_arguments() {
 		scol = (unsigned int) -1;
 		nt = -1;
 	}
@@ -32,7 +32,7 @@ struct slave_arguments {
 		return false;
 	}
 	void doc(std::ostream& o) {
-		o << "--task [ slave | mksol ]\ttask type\n";
+		o << "--task [ krylov | mksol ]\ttask type\n";
 		o << "--sc <col>\t[mksol] solution column to try\n";
 #ifdef	ENABLE_PTHREADS
 		o << "--nthreads <n>\tnumber of threads to start\n";
@@ -68,8 +68,8 @@ struct slave_arguments {
 				ok = false;
 			}
 		} else {
-			if (task != "slave") {
-				o << "--task is \"slave\" or \"mksol\"\n";
+			if (task != "krylov") {
+				o << "--task is \"krylov\" or \"mksol\"\n";
 				ok = false;
 			}
 			if (scol != (unsigned int) -1) {
@@ -96,4 +96,4 @@ struct slave_arguments {
 	}
 };
 
-#endif	/* SLAVE_ARGUMENTS_HPP_ */
+#endif	/* KRYLOV_ARGUMENTS_HPP_ */

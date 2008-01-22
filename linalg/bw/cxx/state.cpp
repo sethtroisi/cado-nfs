@@ -14,7 +14,7 @@
 #include "arguments.hpp"
 #include "common_arguments.hpp"
 #include "constants.hpp"
-#include "slave_arguments.hpp"
+#include "krylov_arguments.hpp"
 #include "files.hpp"
 #include "matrix_header.hpp"
 #include "matrix_line.hpp"

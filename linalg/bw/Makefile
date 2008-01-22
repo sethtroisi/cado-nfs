@@ -50,19 +50,19 @@ BW_PREP_SOURCES:=					\
 BW_PREP_LIBS:=-lgmpxx -lgmp
 -include .bw-prep.mkf
 
-BW_SLAVE_SOURCES:=					\
+BW_KRYLOV_SOURCES:=					\
 		auxfuncs.c barrier.c			\
 		cxx/detect_params.cpp			\
 		cxx/ticks.cpp				\
-		cxx/slave.cpp cxx/state.cpp		\
+		cxx/krylov.cpp cxx/state.cpp		\
 		cxx/threads.cpp	cxx/corners.cpp		\
 		cxx/matrix.cpp cxx/matrix_line.cpp	\
 		cxx/files.cpp cxx/matrix_header.cpp	\
 		cxx/preconditioner.cpp
-BW_SLAVE_LIBS:=-lgmpxx -lgmp
-BW_SLAVE_EXTRA_MODELS:=mt
-BW_SLAVE_MT_LIBS:=-lgmpxx -lgmp
--include .bw-slave.mkf
+BW_KRYLOV_LIBS:=-lgmpxx -lgmp
+BW_KRYLOV_EXTRA_MODELS:=mt
+BW_KRYLOV_MT_LIBS:=-lgmpxx -lgmp
+-include .bw-krylov.mkf
 
 # BW_SLAVE_OLD_SOURCES:=				\
 # 		auxfuncs.c barrier.c			\
@@ -88,7 +88,7 @@ BW_PRINTMAGMA_LIBS:=-lgmpxx -lgmp
 -include .bw-printmagma.mkf
 
 
-# These are the sources of the new master code thing in C++. So far, it's
+# These are the sources of the new lingen code thing in C++. So far, it's
 # such a mess that it doesn't even compile. It's also terribly slower
 # than it should (when it actually compiles...).
 ifeq ($(BROKEN),also)
@@ -125,7 +125,7 @@ BW_MASTER2_LIBS:=-lgmp
 -include .bw-master2.mkf
 endif
 
-BW_MASTER_BINARY_SOURCES:=					\
+BW_LINGEN_BINARY_SOURCES:=					\
 		auxfuncs.c					\
 		old/bw_scalar.c old/old-endian.c			\
 		old/timer.c					\
@@ -138,14 +138,14 @@ BW_MASTER_BINARY_SOURCES:=					\
 		old/field_quad.c old/field_complex.c		\
 		old/field_usage.c old/modulus_hacks.c		\
 		old/e_polynomial.c old/structure.c		\
-		old/structure_debug.c cxx/master_binary.cpp	\
+		old/structure_debug.c cxx/lingen_binary.cpp	\
 		old/twisting_polynomials.c			\
 		cxx/fake_fft.c
 ifdef	PATCHED_GMP
-BW_MASTER_BINARY_SOURCES+=old/ops_poly_integerfft.cpp
+BW_LINGEN_BINARY_SOURCES+=old/ops_poly_integerfft.cpp
 endif
-BW_MASTER_BINARY_LIBS:=-lgmp -lutils -lgf2x ../../gf2x/cantor/cantor128.o
--include .bw-master-binary.mkf
+BW_LINGEN_BINARY_LIBS:=-lgmp -lutils -lgf2x ../../gf2x/cantor/cantor128.o
+-include .bw-lingen-binary.mkf
 
 BW_MASTER_OLD_SOURCES:=						\
 		auxfuncs.c barrier.c				\
