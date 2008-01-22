@@ -74,23 +74,6 @@ struct fake_fft {/*{{{*/
     unsigned int nc;
     unsigned int size;
 
-        xs_proxy() {}
-        xs_proxy(uint s) : size(s) {}
-        ulong * alloc(unsigned int n) const {
-            return new ulong[n * size];
-        }
-        void zero(ulong * p, unsigned int n = 1) const {
-            memset(p, 0, n * size * sizeof(ulong));
-        }
-        void clear(ulong * p, unsigned int n) const {
-            delete[] p;
-        }
-        ulong * get(ulong * p, unsigned int i) const {
-            return p + size * i;
-        }
-        ulong const * cget(ulong * const p, unsigned int i) const {
-            return p + size * i;
-        }
 
     public:
     fake_fft() { d1 = d2 = d3 = acc = nc = size = 0; }
@@ -108,14 +91,24 @@ struct fake_fft {/*{{{*/
         if (d2 == INT_MAX) d2 = d1;
         if (d3 == INT_MAX) d3 = d1 + d2;
         nc = std::max(d1,d2) + 1;
-        size = BITS_TO_WORDS(nc, ULONG_BITS);
+        size = 2 * BITS_TO_WORDS(nc, ULONG_BITS);
     }
 
-    typedef xs_proxy fwd_type;
-    typedef xs_proxy bck_type;
-    fwd_type fwd() { return xs_proxy(size); }
-    bck_type bck() { return xs_proxy(2 * size); }
-
+    ulong * alloc(unsigned int n) const {
+        return new ulong[n * size];
+    }
+    void zero(ulong * p, unsigned int n = 1) const {
+        memset(p, 0, n * size * sizeof(ulong));
+    }
+    void clear(ulong * p, unsigned int n) const {
+        delete[] p;
+    }
+    ulong * get(ulong * p, unsigned int i) const {
+        return p + size * i;
+    }
+    ulong const * cget(ulong * const p, unsigned int i) const {
+        return p + size * i;
+    }
     void transform(ulong * dst, ulong const * src, int n) const {
         ASSERT(n <= std::max(d1,d2));
         unsigned int s = BITS_TO_WORDS(n + 1, ULONG_BITS);
@@ -132,7 +125,7 @@ struct fake_fft {/*{{{*/
         mul_gf2x(dst, s1, n1, s2, n2);
     }
     void add(ulong * dst, ulong const * s1, ulong const * s2) {
-        for(unsigned int i = 0 ; i < 2*size ; i++) {
+        for(unsigned int i = 0 ; i < size ; i++) {
             dst[i] = s1[i] ^ s2[i];
         }
     }
@@ -2019,9 +2012,9 @@ static void go_quadratic(polmat& pi)/*{{{*/
 }/*}}}*/
 
 template<typename fft_type>
-void transform(tpolmat<typename fft_type::fwd_type>& dst, polmat& src, fft_type& o, int d)
+void transform(tpolmat<fft_type>& dst, polmat& src, fft_type& o, int d)
 {
-    tpolmat<typename fft_type::fwd_type> tmp(src.nrows, src.ncols, o.fwd());
+    tpolmat<fft_type> tmp(src.nrows, src.ncols, o);
     tmp.zero();
     for(uint j = 0 ; j < src.ncols ; j++) {
         for(uint i = 0 ; i < src.nrows ; i++) {
@@ -2034,15 +2027,15 @@ void transform(tpolmat<typename fft_type::fwd_type>& dst, polmat& src, fft_type&
 /* XXX Do Strassen here ! */
 template<typename fft_type>
 void compose(
-        tpolmat<typename fft_type::bck_type>& dst,
-        tpolmat<typename fft_type::fwd_type> const & s1,
-        tpolmat<typename fft_type::fwd_type> const & s2,
+        tpolmat<fft_type>& dst,
+        tpolmat<fft_type> const & s1,
+        tpolmat<fft_type> const & s2,
         fft_type& o)
 {
-    tpolmat<typename fft_type::bck_type> tmp(s1.nrows, s2.ncols, o.bck());
+    tpolmat<fft_type> tmp(s1.nrows, s2.ncols, o);
     ASSERT(s1.ncols == s2.nrows);
     tmp.zero();
-    ulong * x = o.bck().alloc(1);
+    ulong * x = o.alloc(1);
     for(uint j = 0 ; j < s2.ncols ; j++) {
         for(uint k = 0 ; k < s1.ncols ; k++) {
             for(uint i = 0 ; i < s1.nrows ; i++) {
@@ -2051,12 +2044,12 @@ void compose(
             }
         }
     }
-    o.bck().clear(x,1);
+    o.clear(x,1);
     dst.swap(tmp);
 }
 
 template<typename fft_type>
-void itransform(polmat& dst, tpolmat<typename fft_type::bck_type>& src, fft_type& o, int d)
+void itransform(polmat& dst, tpolmat<fft_type>& src, fft_type& o, int d)
 {
     polmat tmp(src.nrows, src.ncols, d + 1);
     for(uint j = 0 ; j < src.ncols ; j++) {
@@ -2130,7 +2123,7 @@ static void go_recursive(polmat& pi)
     std::cout << "Recursive call, degree " << deg << std::endl;
     fft_type o(deg, expected_pi_deg, deg + expected_pi_deg - kill, m + n);
 
-    tpolmat<typename fft_type::fwd_type> E_hat;
+    tpolmat<fft_type> E_hat;
     transform(E_hat, E, o, deg);
 
     E.resize(ldeg - 1 + 1);
@@ -2171,11 +2164,11 @@ static void go_recursive(polmat& pi)
         return;
     }/*}}}*/
 
-    tpolmat<typename fft_type::fwd_type> pi_l_hat;
+    tpolmat<fft_type> pi_l_hat;
     transform(pi_l_hat, pi_left, o, pi_l_deg);
     pi_left.clear();
 
-    tpolmat<typename fft_type::bck_type> E_middle_hat;
+    tpolmat<fft_type> E_middle_hat;
 
     /* XXX Do special convolutions here */
     compose(E_middle_hat, E_hat, pi_l_hat, o);
@@ -2199,11 +2192,11 @@ static void go_recursive(polmat& pi)
     int pi_r_deg = pi_right.maxdeg();
     E.clear();
 
-    tpolmat<typename fft_type::fwd_type> pi_r_hat;
+    tpolmat<fft_type> pi_r_hat;
     transform(pi_r_hat, pi_right, o, pi_r_deg);
     pi_right.clear();
 
-    tpolmat<typename fft_type::bck_type> pi_hat;
+    tpolmat<fft_type> pi_hat;
     compose(pi_hat, pi_l_hat, pi_r_hat, o);
     pi_l_hat.clear();
     pi_r_hat.clear();
