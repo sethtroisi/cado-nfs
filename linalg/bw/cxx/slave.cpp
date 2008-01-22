@@ -478,7 +478,7 @@ template < typename traits >
 	    {
 		thread_lock(&globals::console_lock);
 		std::string nm0 = files::v % (globals::col) % r;
-                if (global::nbys > 1) {
+                if (globals::nbys > 1) {
                     std::string nm1 =
                         files::v % (globals::col + globals::nbys - 1) % r;
                     cout << fmt("T% writes % to %")
