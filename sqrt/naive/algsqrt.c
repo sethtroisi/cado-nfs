@@ -42,8 +42,89 @@ int poly_integer_reconstruction(poly_t Q, const poly_t R, const mpz_t m) {
   return 1;
 }
 
+// compute res := sqrt(a) in Fp[x]/f(x)
+void TonelliShanks(poly_t res, const poly_t a, const poly_t f, unsigned long p) {
+  int d = f->deg;
+  mpz_t q;
+  poly_t delta;  // a non quadratic residue
+  poly_t auxpol;
+  mpz_t aux;
+  mpz_t t;
+  int s;
+  mpz_t myp;
 
-// compute Sqrt(A) mod F, using p-adiv lifting, at prime p.
+  mpz_init_set_ui(myp, p);
+
+  mpz_init(aux);
+  mpz_init(q);
+  poly_alloc(auxpol, d);
+  mpz_ui_pow_ui(q, p, (unsigned long)d);
+    
+  // compute aux = (q-1)/2
+  // and (s,t) s.t.  q-1 = 2^s*t
+  mpz_sub_ui(aux, q, 1);
+  mpz_divexact_ui(aux, aux, 2);
+  mpz_init_set(t, aux);
+  s = 1;
+  while (mpz_divisible_2exp_p(t, 1)) {
+    s++;
+    mpz_divexact_ui(t, t, 2);
+  }
+  // find a non quadratic residue delta
+  {
+    poly_alloc(delta, d);
+    gmp_randstate_t state;
+    gmp_randinit_default(state);
+    do {
+      int i;
+      // pick a random delta
+      for (i = 0; i < d; ++i)
+	mpz_urandomm(delta->coeff[i], state, myp);
+      cleandeg(delta, d-1);
+      // raise it to power (q-1)/2
+      poly_power_mod_f_mod_ui(auxpol, delta, f, aux, p);
+    } while ((auxpol->deg != 0) || (mpz_cmp_ui(auxpol->coeff[0], p-1)!= 0));
+  }
+
+  // follow the description of Crandall-Pomerance, page 94
+  {
+    poly_t A, D;
+    mpz_t m;
+    int i;
+    poly_alloc(A, d);
+    poly_alloc(D, d);
+    mpz_init_set_ui(m, 0);
+    poly_power_mod_f_mod_ui(A, a, f, t, p);
+    poly_power_mod_f_mod_ui(D, delta, f, t, p);
+    for (i = 0; i <= s-1; ++i) {
+      poly_power_mod_f_mod_ui(auxpol, D, f, m, p);
+      poly_mul_mod_f_mod_mpz(auxpol, auxpol, A, f, myp);
+      mpz_ui_pow_ui(aux, 2, (s-1-i));
+      poly_power_mod_f_mod_ui(auxpol, auxpol, f, aux, p);
+      if ((auxpol->deg == 0) && (mpz_cmp_ui(auxpol->coeff[0], p-1)== 0))
+	mpz_add_ui(m, m, 1UL<<i);
+    }
+    mpz_add_ui(t, t, 1);
+    mpz_divexact_ui(t, t, 2);
+    poly_power_mod_f_mod_ui(res, a, f, t, p);
+    mpz_divexact_ui(m, m, 2);
+    poly_power_mod_f_mod_ui(auxpol, D, f, m, p);
+
+    poly_mul_mod_f_mod_mpz(res, res, auxpol, f, myp);
+    poly_free(D);
+    poly_free(A);
+    mpz_clear(m);
+  }
+
+  poly_free(auxpol);
+  poly_free(delta);
+  mpz_clear(q);
+  mpz_clear(aux);
+  mpz_clear(myp);
+}
+
+
+// compute Sqrt(A) mod F, using p-adic lifting, at prime p.
 void polymodF_sqrt(polymodF_t res, polymodF_t AA, poly_t F, unsigned long p) {
   poly_t A;
   int v;
@@ -85,15 +166,21 @@ void polymodF_sqrt(polymodF_t res, polymodF_t AA, poly_t F, unsigned long p) {
     mpz_t q, aux;
     mpz_init(q);
     mpz_init(aux);
+    mpz_ui_pow_ui(q, p, (unsigned long)d);
 
+#if 0
     // compute (q-2)(q+1)/4   (assume q == 3 mod 4, here !!!!!)
     // where q = p^d, the size of the finite field extension.
     // since we work mod q-1, this gives (3*q-5)/4
-    mpz_ui_pow_ui(q, p, (unsigned long)d);
     mpz_mul_ui(aux, q, 3);
     mpz_sub_ui(aux, aux, 5);
     mpz_divexact_ui(aux, aux, 4);		        // aux := (3q-5)/4
     poly_power_mod_f_mod_ui(invsqrtA, a, f, aux, p);	
+#else
+    TonelliShanks(invsqrtA, a, f, p);
+    mpz_sub_ui(aux, q, 2);
+    poly_power_mod_f_mod_ui(invsqrtA, invsqrtA, f, aux, p);
+#endif
 
     mpz_clear(aux);
     mpz_clear(q);
@@ -146,9 +233,9 @@ unsigned long FindSuitableModP(poly_t F) {
   while (1) {
     int d;
     // select prime congruent to 3 mod 4 to have easy sqrt.
-    do {
+  //  do {
       p = getprime(p);
-    } while ((p%4)!= 3);
+  //  } while ((p%4)!= 3);
     d = long_poly_set_mod (fp, F->coeff, dF, p);
     if (d!=dF)
       continue;
@@ -255,6 +342,7 @@ int main(int argc, char **argv) {
     nab++;
   }
 #else
+  // With a subproduct tree
   {
     polymodF_t *prd_tab;
     unsigned long lprd = 1; /* number of elements in prd_tab[] */

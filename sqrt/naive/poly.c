@@ -22,7 +22,7 @@ void poly_free(poly_t f) {
   free(f->coeff);
 }
 
-void poly_print(poly_t f) {
+void poly_print(const poly_t f) {
   int i;
   if (f->deg == -1) {
     printf("0\n");
@@ -45,7 +45,7 @@ void cleandeg(poly_t f, int deg) {
 }
 
 
-void poly_setcoeff(poly_t f, int i, mpz_t z) {
+void poly_setcoeff(poly_t f, int i, const mpz_t z) {
   int j;
   if (i >= f->alloc) {
     f->coeff = (mpz_t *)realloc(f->coeff, (i+1)*sizeof(mpz_t));
@@ -71,7 +71,7 @@ void poly_copy(poly_t g, const poly_t f) {
 #define max(a,b) ((a)<(b) ? (b) : (a))
 #endif
 
-void poly_add(poly_t f, poly_t g, poly_t h) {
+void poly_add(poly_t f, const poly_t g, const poly_t h) {
   int i, maxdeg;
   mpz_t z;
 
@@ -92,7 +92,7 @@ void poly_add(poly_t f, poly_t g, poly_t h) {
   cleandeg(f, maxdeg);
 }
 
-void poly_sub(poly_t f, poly_t g, poly_t h) {
+void poly_sub(poly_t f, const poly_t g, const poly_t h) {
   int i, maxdeg;
   mpz_t z;
 
@@ -113,7 +113,7 @@ void poly_sub(poly_t f, poly_t g, poly_t h) {
   cleandeg(f, maxdeg);
 }
 
-void poly_sub_mod_mpz(poly_t f, poly_t g, poly_t h, mpz_t m) {
+void poly_sub_mod_mpz(poly_t f, const poly_t g, const poly_t h, const mpz_t m) {
   int i, maxdeg;
   mpz_t z;
 
@@ -139,7 +139,7 @@ void poly_sub_mod_mpz(poly_t f, poly_t g, poly_t h, mpz_t m) {
 }
 
 
-void poly_mul_ui(poly_t f, poly_t g, unsigned long a) {
+void poly_mul_ui(poly_t f, const poly_t g, unsigned long a) {
   int i;
   mpz_t aux;
   mpz_init(aux);
@@ -150,7 +150,7 @@ void poly_mul_ui(poly_t f, poly_t g, unsigned long a) {
   mpz_clear(aux);
 }
 
-void poly_div_ui_mod_mpz(poly_t f, poly_t g, unsigned long a, mpz_t m) {
+void poly_div_ui_mod_mpz(poly_t f, const poly_t g, unsigned long a, const mpz_t m) {
   int i;
   mpz_t aux, inva;
   mpz_init(inva);
@@ -184,7 +184,7 @@ void poly_eval_mod_mpz(mpz_t res, const poly_t f, const mpz_t x, const mpz_t m)
   }
 }
 
-void poly_mul(poly_t f, poly_t g, poly_t h) {
+void poly_mul(poly_t f, const poly_t g, const poly_t h) {
   int i, j, maxdeg;
   mpz_t z;
   poly_t prd;
@@ -219,7 +219,7 @@ void poly_mul(poly_t f, poly_t g, poly_t h) {
 // The result is of type polymodF_t P.
 // WARNING: this function destroys its input p !!!
 void
-poly_reducemodF(polymodF_t P, poly_t p, poly_t F) {
+poly_reducemodF(polymodF_t P, poly_t p, const poly_t F) {
   int v = 0;
 
   if (p->deg < F->deg) {
@@ -377,6 +377,12 @@ poly_power_mod_f_mod_ui(poly_t Q, const poly_t P, const poly_t F,
   mpz_t m;
   int k = mpz_sizeinbase(a, 2);
   poly_t R;
+
+  if (mpz_cmp_ui(a, 0) == 0) {
+    Q->deg = 0;
+    mpz_set_ui(Q->coeff[0], 1);
+    return;
+  }
 
   mpz_init_set_ui(m, p);
   poly_alloc(R, 2*F->deg);
