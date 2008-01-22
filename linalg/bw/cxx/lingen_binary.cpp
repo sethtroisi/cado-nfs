@@ -266,7 +266,7 @@ void read_data_for_series(polmat& A, int & rc)/*{{{*/
         }
     }
 
-    unsigned int read_coeffs;
+    unsigned int read_coeffs = 0;       /* please gcc */
 
     for (i = 0; i < m; i++) {
         unsigned long * pol[n];
@@ -1340,9 +1340,13 @@ static void compute_lingen(polmat& pi)
 
     if (deg <= rec_threshold) {
         go_quadratic(pi);
-    } else if (deg <= (1 << 15)) {
+    } else if (deg < 3264) {
+        /* The bound is such that deg + deg/4 is 64 words or less */
         go_recursive<fake_fft>(pi);
     } else {
+        /* Presently, c128 requires input polynomials that are large
+         * enough.
+         */
         go_recursive<cantor_fft>(pi);
     }
 }

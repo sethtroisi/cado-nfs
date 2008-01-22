@@ -148,7 +148,9 @@ BW_LINGEN_OLD_LIBS:=-lgmp
 
 
 BENCH_POLMATMUL_SOURCES:=					\
-		cxx/bench_polmatmul.cpp
+		cxx/bench_polmatmul.cpp				\
+		cxx/fake_fft.c
+BENCH_POLMATMUL_LIBS:=-lgmp -lutils -lgf2x ../../gf2x/cantor/cantor128.o
 -include .bench_polmatmul.mkf
 
 BW_FFT_BASICTEST_SOURCES:=					\

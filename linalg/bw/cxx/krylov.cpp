@@ -484,7 +484,7 @@ template < typename traits >
                     cout << fmt("T% writes % to %")
                         % super::t % nm0 % nm1 << endl;
                 } else {
-                    cout << fmt("T% writes % to %")
+                    cout << fmt("T% writes %")
                         % super::t % nm0 << endl;
                 }
 
