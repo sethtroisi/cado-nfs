@@ -3,16 +3,6 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <limits.h>
-
-#ifndef ULONG_BITS
-#define	ULONG_BITS	((int) (sizeof(unsigned long) * CHAR_BIT))
-#endif
-
-#ifndef  BITS_TO_WORDS
-#define	BITS_TO_WORDS(B,W)	(((B)+(W)-1)/(W))
-#endif
-
 /* This file is a placeholder for the typical requirements of an FFT
  * interface. Of course, there is nothing interesting being done here.
  * It's just an E-X-A-M-P-L-E. See also the .c file.

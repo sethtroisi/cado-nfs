@@ -10,6 +10,7 @@
 #include "matrix_repr_binary.hpp"
 #include <string>
 #include <sstream>
+#include "manu.h"
 
 template<typename T>
 struct binary_pod_traits {
@@ -17,6 +18,7 @@ struct binary_pod_traits {
 	static const int max_accumulate = UINT_MAX;
 	static const int max_accumulate_wide = UINT_MAX;
 
+	/* This is unfortunately *NOT* what it should */
 	static const int nbits = sizeof(T) * CHAR_BIT;
 	typedef binary_field coeff_field;
 
@@ -111,8 +113,8 @@ struct binary_pod_traits {
 			x.p ^= (T) (z[i+j] != 0) << j;
 	}
 	static inline void assign(std::vector<mpz_class>& z, scalar_t const & x) {
-		BUG_ON(z.size() != ULONG_BITS);
-		for(unsigned int i = 0 ; i < ULONG_BITS ; i++) {
+		BUG_ON(z.size() != nbits);
+		for(unsigned int i = 0 ; i < nbits ; i++) {
 			z[i] = (x.p >> i) & (T) 1;
 		}
 	}

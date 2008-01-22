@@ -26,31 +26,6 @@ namespace files {
 		const char * c_str() const { return str().c_str(); }
 	};
 
-	/*
-	* std::string wip_tag	INIT_WITH("WORKING");
-	* std::string matrix	INIT_WITH("matrix");
-	* std::string indexes	INIT_WITH("indexes");
-	* std::string values	INIT_WITH("values");
-	std::string w		INIT_WITH("W");
-	* std::string pre_stats	INIT_WITH("FIRST.INFO");
-	meta_filename a_sub	INIT_WITH("sA-%[f0w2]-%[f0w2].%[f0w3]-%[f0w3]");
-	meta_filename s		INIT_WITH("S-%[f0w2].%[f0w3]");
-	meta_filename ds	INIT_WITH("ndS-%[f0w2].%[f0w3]-%[f0w3]");
-	meta_filename v		INIT_WITH("V-%[f0w2].%[f0w3]");
-	meta_filename f		INIT_WITH("rF-%[f0w2]-%[f0w2].%[f0w4]");
-	meta_filename f_sub	INIT_WITH("srF-%[f0w2]-%[f0w2].%[f0w4].%-%");
-	meta_filename f_base	INIT_WITH("F_INIT");
-	meta_filename pi	INIT_WITH("P-%-%");
-	meta_filename h		INIT_WITH("H.%[f0w2]");
-	* meta_filename l		INIT_WITH("LOCAL_INFO-%[f0w2]");
-	meta_filename x		INIT_WITH("X%[f0w2]");
-	meta_filename y		INIT_WITH("Y%[f0w2]");
-	meta_filename z		INIT_WITH("Z%[f0w2]");
-	meta_filename valu	INIT_WITH("VALUATION-%[f0w2].%[f0w4]");
-	* meta_filename i_matrix	INIT_WITH("matrix.%d");
-	* meta_filename i_vector	INIT_WITH("vector.%d");
-	* meta_filename certif	INIT_WITH("CERTIF-%-%-%");
-	*/
 	EXTERN_LINKAGE	std::string matrix      INIT_WITH("matrix.txt");
 	EXTERN_LINKAGE	std::string params      INIT_WITH("bw.cfg");
 	EXTERN_LINKAGE	meta_filename a		INIT_WITH("A-%[f0w2]-%[f0w2]");
@@ -65,12 +40,13 @@ namespace files {
 	EXTERN_LINKAGE	std::string x0		INIT_WITH("X0-vector");
 	EXTERN_LINKAGE	meta_filename f		INIT_WITH("F%[f0w2]");
 	EXTERN_LINKAGE	meta_filename f_init	INIT_WITH("F_INIT");
+	EXTERN_LINKAGE	meta_filename f_initq	INIT_WITH("F_INIT_QUICK");
 	EXTERN_LINKAGE	meta_filename fxy
 				INIT_WITH("F%[f0w2]-Y%[f0w2].%[f0w3]");
+	EXTERN_LINKAGE	meta_filename pi	INIT_WITH("pi-%-%");
 
 	/* TODO: maybe bump up the format width a wee bit, or drop the f0
-	 * thing.
-	 */
+	 * thing.  */
 }
 
 #undef	INIT_WITH

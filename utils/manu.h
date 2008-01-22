@@ -1,13 +1,8 @@
 #ifndef MANU_H_
 #define MANU_H_
 
-#ifdef	__cplusplus
-#include <cstdlib>
-#include <cassert>
-#else
-#include <stdlib.h>
+#include <limits.h>
 #include <assert.h>
-#endif
 
 #ifdef	__cplusplus
 extern "C" {
@@ -162,7 +157,7 @@ extern "C" {
 
 /**********************************************************************/
 #ifndef DISABLE_ALLOCA
-/* This turns out to work fairly often */
+/* This turns out to work fairly often for defining alloca */
 #include <stdlib.h>
 #define FAST_ALLOC(x)   alloca(x)
 #define FAST_FREE(x)    
@@ -174,6 +169,18 @@ extern "C" {
 /**********************************************************************/
 /* That's dirty, but I really don't want to link libm in */
 #define iceildiv(x,y)	(((x)+(y)-1)/(y))
+
+/* unfortunate -- does not take into account the possibility of having
+ * padding bits */
+#ifndef ULONG_BITS
+#define	ULONG_BITS	((int) (sizeof(unsigned long) * CHAR_BIT))
+#endif
+
+/* Number of W-bits words that hold B bits */
+#ifndef  BITS_TO_WORDS
+#define	BITS_TO_WORDS(B,W)	iceildiv((B),(W))
+#endif
+
 
 #ifdef  __GNUC__
 #define clzl(x)         __builtin_clzl(x)

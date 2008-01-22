@@ -127,7 +127,7 @@ endif
 
 BW_LINGEN_BINARY_SOURCES:=		\
 		auxfuncs.c		\
-		old/timer.c		\
+		cxx/files.cpp		\
 		cxx/lingen_binary.cpp	\
 		cxx/fake_fft.c
 BW_LINGEN_BINARY_LIBS:=-lgmp -lutils -lgf2x ../../gf2x/cantor/cantor128.o
@@ -145,6 +145,11 @@ BW_LINGEN_OLD_SOURCES:=						\
 		old/lingen_common.c
 BW_LINGEN_OLD_LIBS:=-lgmp
 -include .bw-lingen-old.mkf
+
+
+BENCH_POLMATMUL_SOURCES:=					\
+		cxx/bench_polmatmul.cpp
+-include .bench_polmatmul.mkf
 
 BW_FFT_BASICTEST_SOURCES:=					\
 		auxfuncs.c					\

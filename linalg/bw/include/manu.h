@@ -1,8 +1,10 @@
 #ifndef MANU_H_
 #define MANU_H_
 
+#include <limits.h>
+#include <assert.h>
+
 #ifdef	__cplusplus
-#include <cassert>
 extern "C" {
 #endif
 
@@ -155,7 +157,8 @@ extern "C" {
 
 /**********************************************************************/
 #ifndef DISABLE_ALLOCA
-#include <alloca.h>
+/* This turns out to work fairly often for defining alloca */
+#include <stdlib.h>
 #define FAST_ALLOC(x)   alloca(x)
 #define FAST_FREE(x)    
 #else
@@ -167,6 +170,56 @@ extern "C" {
 /* That's dirty, but I really don't want to link libm in */
 #define iceildiv(x,y)	(((x)+(y)-1)/(y))
 
+/* unfortunate -- does not take into account the possibility of having
+ * padding bits */
+#ifndef ULONG_BITS
+#define	ULONG_BITS	((int) (sizeof(unsigned long) * CHAR_BIT))
+#endif
+
+/* Number of W-bits words that hold B bits */
+#ifndef  BITS_TO_WORDS
+#define	BITS_TO_WORDS(B,W)	iceildiv((B),(W))
+#endif
+
+
+#ifdef  __GNUC__
+#define clzl(x)         __builtin_clzl(x)
+#define ctzl(x)         __builtin_ctzl(x)
+#define parityl(x)      __builtin_parityl(x)
+#else
+/* provide slow fallbacks */
+static inline int clzl(unsigned long x)
+{
+        static const int t[4] = { 2, 1, 0, 0 };
+        int a = 0;
+        int res;
+#if (GMP_LIMB_BITS == 64)
+        if (x >> 32) { a += 32; x >>= 32; }
+#endif  
+        if (x >> 16) { a += 16; x >>= 16; }
+        if (x >>  8) { a +=  8; x >>=  8; }
+        if (x >>  4) { a +=  4; x >>=  4; }
+        if (x >>  2) { a +=  2; x >>=  2; }
+        res = GMP_LIMB_BITS - 2 - a + t[x];
+        return res;
+}
+static inline int ctzl(unsigned long x)
+{
+	return GMP_LIMB_BITS - clzl(x & - x);
+}
+static inline int parityl(unsigned long x)
+{
+	static const int t[4] = { 0, 1, 1, 0, };
+#if (GMP_LIMB_BITS == 64)
+	x ^= (x >> 32);
+#endif
+	x ^= (x >> 16);
+	x ^= (x >>  8);
+	x ^= (x >>  4);
+	x ^= (x >>  2);
+	return t[x & 3UL];
+}
+#endif
 
 #ifdef	__cplusplus
 }

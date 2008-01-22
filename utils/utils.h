@@ -7,6 +7,17 @@
 #define LONG int64_t
 #define ULONG uint64_t
 
+#include <limits.h>
+
+/* It's awful, but I confess that this ULONG_BITS is not ``portable'',
+ * norm-wise.  GMP_LIMB_BITS is at hand, but could differ. An #ifdef
+ * switch depending on macros like __x86_64 is considerably more fragile.
+ */
+#define	ULONG_BITS	((int) (sizeof(unsigned long) * CHAR_BIT))
+
+/* Number of words holding B bits ; better naming sought. */
+#define	BITS_TO_WORDS(B,W)	(((B)+(W)-1)/(W))
+
 #ifdef	__cplusplus
 extern "C" {
 #endif
