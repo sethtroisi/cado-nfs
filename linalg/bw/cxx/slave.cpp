@@ -478,10 +478,16 @@ template < typename traits >
 	    {
 		thread_lock(&globals::console_lock);
 		std::string nm0 = files::v % (globals::col) % r;
-		std::string nm1 =
-		    files::v % (globals::col + globals::nbys - 1) % r;
-		cout << fmt("T% writes % to %")
-		    % super::t % nm0 % nm1 << endl;
+                if (global::nbys > 1) {
+                    std::string nm1 =
+                        files::v % (globals::col + globals::nbys - 1) % r;
+                    cout << fmt("T% writes % to %")
+                        % super::t % nm0 % nm1 << endl;
+                } else {
+                    cout << fmt("T% writes % to %")
+                        % super::t % nm0 << endl;
+                }
+
 		thread_unlock(&globals::console_lock);
 	    }
 	    for (int i = 0; i < globals::nbys; i++) {

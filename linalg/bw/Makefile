@@ -13,8 +13,8 @@ CXX:=g++
 ARQCV:=ar qcv
 OFLAGS:=
 PFLAGS:=
-IFLAGS:=-I ../.. -I ../../utils -I ../../gf2x -I $(TOPPATH)/include -I . -I old
-LFLAGS:=-L ../../utils -L ../../gf2x
+IFLAGS:=-I ../.. -I ../../utils -I ../../gf2x -I ../../gf2x/cantor -I $(TOPPATH)/include -I . -I old
+LFLAGS:=-L ../../utils -L ../../gf2x -L ../../gf2x/cantor
 
 -include Makefile.local
 #ifdef GMP
@@ -139,11 +139,12 @@ BW_MASTER_BINARY_SOURCES:=					\
 		old/field_usage.c old/modulus_hacks.c		\
 		old/e_polynomial.c old/structure.c		\
 		old/structure_debug.c cxx/master_binary.cpp	\
-		old/twisting_polynomials.c
+		old/twisting_polynomials.c			\
+		cxx/fake_fft.c
 ifdef	PATCHED_GMP
 BW_MASTER_BINARY_SOURCES+=old/ops_poly_integerfft.cpp
 endif
-BW_MASTER_BINARY_LIBS:=-lgmp -lutils -lgf2x
+BW_MASTER_BINARY_LIBS:=-lgmp -lutils -lgf2x ../../gf2x/cantor/cantor128.o
 -include .bw-master-binary.mkf
 
 BW_MASTER_OLD_SOURCES:=						\

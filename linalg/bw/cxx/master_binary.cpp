@@ -54,82 +54,9 @@ unsigned int rec_threshold = 0;
 
 #include "fmt.hpp"
 
-
-// Requirements for the transform interface.
-//
-// - Must define an info struct[1]. This type may contain info
-//   on the FFT size and so on, but NO DATA.
-//
-// - Must define a data_t typedef. This type is expected
-//   to be as bare as possible (typically a pointer), and its
-//   interpretation is not expected to be possible without the
-//   accompanying fft_order_info_t struct.
-//
-// - Must define the functions as in the example below.
-
-#include "gf2x.h"
-struct fake_fft {/*{{{*/
-    int d1,d2,d3;
-    unsigned int acc;
-    unsigned int nc;
-    unsigned int size;
+#include "fft_adapter.hpp"
 
 
-    public:
-    fake_fft() { d1 = d2 = d3 = acc = nc = size = 0; }
-    /* Set up the parameters for a multiplications of polynomials of
-     * degree d1 and d2, into a polynomial of degree d3. The acc
-     * parameter indicates the number of transform that we might occur to
-     * add together.
-     *
-     * d3 might be different from d1 + d2, but not without help 
-     */
-    fake_fft(int d1, int d2, int d3,
-            unsigned int acc)
-        : d1(d1), d2(d2), d3(d3), acc(acc)
-    {
-        if (d2 == INT_MAX) d2 = d1;
-        if (d3 == INT_MAX) d3 = d1 + d2;
-        nc = std::max(d1,d2) + 1;
-        size = 2 * BITS_TO_WORDS(nc, ULONG_BITS);
-    }
-
-    ulong * alloc(unsigned int n) const {
-        return new ulong[n * size];
-    }
-    void zero(ulong * p, unsigned int n = 1) const {
-        memset(p, 0, n * size * sizeof(ulong));
-    }
-    void clear(ulong * p, unsigned int n) const {
-        delete[] p;
-    }
-    ulong * get(ulong * p, unsigned int i) const {
-        return p + size * i;
-    }
-    ulong const * cget(ulong * const p, unsigned int i) const {
-        return p + size * i;
-    }
-    void transform(ulong * dst, ulong const * src, int n) const {
-        ASSERT(n <= std::max(d1,d2));
-        unsigned int s = BITS_TO_WORDS(n + 1, ULONG_BITS);
-        memcpy(dst, src, s * sizeof(ulong));
-    }
-    void itransform(ulong * dst, ulong const * src, int n) const {
-        ASSERT(n <= d3);
-        unsigned int t = BITS_TO_WORDS(n + 1, ULONG_BITS);
-        memcpy(dst, src, t * sizeof(ulong));
-    }
-    void compose(ulong * dst, ulong const * s1, ulong const * s2) {
-        unsigned int n1 = BITS_TO_WORDS(d1 + 1, ULONG_BITS);
-        unsigned int n2 = BITS_TO_WORDS(d2 + 1, ULONG_BITS);
-        mul_gf2x(dst, s1, n1, s2, n2);
-    }
-    void add(ulong * dst, ulong const * s1, ulong const * s2) {
-        for(unsigned int i = 0 ; i < size ; i++) {
-            dst[i] = s1[i] ^ s2[i];
-        }
-    }
-};/*}}}*/
 
 /* output: F0x is the candidate number x. All coordinates of the
  * candidate are grouped, and coefficients come in order (least
@@ -838,10 +765,7 @@ template<typename fft_type> struct tpolmat /* {{{ */
     uint ncols;
     fft_type o;
     private:
-    /* XXX do we force ulong * as a type ? Not necessarily in the long
-     * run, but it seems fair enough for the time being.
-     */
-    ulong * x;
+    typename fft_type::t x;
     uint  * order;
     int   * _deg;
     // inline uint stride() const { return BITS_TO_WORDS(ncoef, ULONG_BITS); }
@@ -864,7 +788,7 @@ template<typename fft_type> struct tpolmat /* {{{ */
     }
     void clear() {
         nrows = ncols = 0;
-        o.clear(x, nrows * ncols); x = NULL;
+        o.free(x, nrows * ncols); x = NULL;
         delete[] order; order = NULL;
         delete[] _deg; _deg = NULL;
     }
@@ -879,7 +803,7 @@ template<typename fft_type> struct tpolmat /* {{{ */
     tpolmat& operator=(tpolmat const&){ return *this;}
     public:
     ~tpolmat() {
-        o.clear(x,  nrows * ncols);
+        o.free(x,  nrows * ncols);
         delete[] order;
         delete[] _deg;
     }
@@ -912,24 +836,24 @@ template<typename fft_type> struct tpolmat /* {{{ */
         podswap(order,norder);
         delete[] norder;
     }
-    ulong * poly(uint i, uint j)
+    typename fft_type::t poly(uint i, uint j)
     {
         ASSERT(i < nrows);
         ASSERT(j < ncols);
         return o.get(x, order[j] * nrows + i);
     }
-    ulong const * poly(uint i, uint j) const
+    typename fft_type::src_t poly(uint i, uint j) const
     {
         ASSERT(i < nrows);
         ASSERT(j < ncols);
         return o.get(x, order[j] * nrows + i);
     }
-    ulong * col(uint j) { return poly(0, j); }
-    ulong const * col(uint j) const { return poly(0, j); }
+    typename fft_type::t col(uint j) { return poly(0, j); }
+    typename fft_type::src_t col(uint j) const { return poly(0, j); }
     /* zero column j */
     void zcol(uint j) {
         ASSERT(j < ncols);
-        o.zero(col(j));
+        o.zero(col(j), 1);
         deg(j) = -1;
     }
 };
@@ -2018,7 +1942,7 @@ void transform(tpolmat<fft_type>& dst, polmat& src, fft_type& o, int d)
     tmp.zero();
     for(uint j = 0 ; j < src.ncols ; j++) {
         for(uint i = 0 ; i < src.nrows ; i++) {
-            o.transform(tmp.poly(i,j), src.poly(i,j), d);
+            o.dft(tmp.poly(i,j), src.poly(i,j), d);
         }
     }
     dst.swap(tmp);
@@ -2035,7 +1959,7 @@ void compose(
     tpolmat<fft_type> tmp(s1.nrows, s2.ncols, o);
     ASSERT(s1.ncols == s2.nrows);
     tmp.zero();
-    ulong * x = o.alloc(1);
+    typename fft_type::t x = o.alloc(1);
     for(uint j = 0 ; j < s2.ncols ; j++) {
         for(uint k = 0 ; k < s1.ncols ; k++) {
             for(uint i = 0 ; i < s1.nrows ; i++) {
@@ -2044,7 +1968,7 @@ void compose(
             }
         }
     }
-    o.clear(x,1);
+    o.free(x,1);
     dst.swap(tmp);
 }
 
@@ -2054,14 +1978,13 @@ void itransform(polmat& dst, tpolmat<fft_type>& src, fft_type& o, int d)
     polmat tmp(src.nrows, src.ncols, d + 1);
     for(uint j = 0 ; j < src.ncols ; j++) {
         for(uint i = 0 ; i < src.nrows ; i++) {
-            o.itransform(tmp.poly(i,j), src.poly(i,j), d);
+            o.ift(tmp.poly(i,j), d, src.poly(i,j));
         }
         tmp.setdeg(j);
     }
     dst.swap(tmp);
 }
 
-template<typename fft_type>
 static void compute_lingen(polmat& pi);
 
 template<typename fft_type>
@@ -2128,7 +2051,7 @@ static void go_recursive(polmat& pi)
 
     E.resize(ldeg - 1 + 1);
     polmat pi_left;
-    compute_lingen<fft_type>(pi_left);
+    compute_lingen(pi_left);
     E.clear();
 
     if (t < t0 + ldeg) {
@@ -2188,7 +2111,7 @@ static void go_recursive(polmat& pi)
     E.xdiv_resize(ldeg - kill, rdeg - 1 + 1);
 
     polmat pi_right;
-    compute_lingen<fft_type>(pi_right);
+    compute_lingen(pi_right);
     int pi_r_deg = pi_right.maxdeg();
     E.clear();
 
@@ -2206,7 +2129,6 @@ static void go_recursive(polmat& pi)
     write_polmat(pi,std::string(fmt("pi-%-%") % tstart % t).c_str());
 }
 
-template<typename fft_type>
 static void compute_lingen(polmat& pi)
 {
     /* reads the data in the global thing, E and delta. ;
@@ -2217,13 +2139,12 @@ static void compute_lingen(polmat& pi)
 
     if (deg <= rec_threshold) {
         go_quadratic(pi);
+    } else if (deg <= (1 << 15)) {
+        go_recursive<fake_fft>(pi);
     } else {
-        go_recursive<fft_type>(pi);
+        go_recursive<cantor_fft>(pi);
     }
 }
-
-/* This is a fallback, when nothing fits */
-template<> static void compute_lingen<void>(polmat& pi) { go_quadratic(pi); }
 
 #if 0/*{{{*/
 static double bw_recursive_algorithm(struct e_coeff * ec,
@@ -2607,7 +2528,7 @@ void block_wiedemann(void)
 
     // E.resize(deg + 1);
     polmat pi_left;
-    compute_lingen<fake_fft>(pi_left);
+    compute_lingen(pi_left);
 
     polmat F;
     compute_final_F_from_PI(F, pi_left);
@@ -2673,8 +2594,6 @@ void block_wiedemann(void)
          */
     }
 #endif/*}}}*/
-
-
     // print_chance_list(total_work, chance_list);
 }
 
