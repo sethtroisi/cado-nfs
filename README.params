@@ -2,27 +2,26 @@ These parameters are experimental and were *used* as input for
 merge_linalg_sqrt (timings on a 2.4Ghz Opteron, *** indicates the best
 parameters).
 
-The following figures correspond to the data in /local/fleur/cado/Examples
-(see README file).
+The following figures correspond to the data in /local/fleur/cado/Examples,
+with the free relations (see README file). 
 
       prune mergelevel  cwmax   rwmax  merge  matrix-size  gauss merge+gauss
 F7             10	15	 50    comment: F7
 
-c72     1.0    10       30      100    21s    27581x27453   233s 254s
-c72     0.7    10       30      100    12s    27516x27388   230s 242s ***
+c72     1.0    10       30      100     9s    27651x27523   231s 240s
 
-c80     1.0    10       40      100    8s     38618x38490   549s  557s ***
-c80     0.1    10       40      100    6s     37935x37807   577s  583s
+c80     1.0    10       40      100    7s     37149x37021   634s  641s
 
 c85a    comment: pic94
-c85a	1.0    15	40	100  106s     93874x93746  7236s 7342s
-c85a    0.7    15       40      100   59s     83078x82950              ***
+c85a	1.0    15	40	100   54s     72957x72829
 
-c90	1.0    20	40	100  259s     96142x96014 ***
-c90     0.8    20       40      100  225s     99168x99040
+c90     nrel=624350, nprimes=531028; excess=93322
+c90	1.0    20	40	100   69s     78430x78302
 
-c95	1.0    10	40	 80 21m6s    137075x136947
-c95     0.2    10       40       80  7m43    132364x132236
+c95     nrel=1749115, nprimes=1368089; excess=381026
+c95	1.0    10	40	 80  Seg. fault: Row 426632 already empty
+
+--------- needs to be updated below this line ----------------
 
 rsa100  1.0    15	40	150  12m25   171485x171357
 rsa100  0.1    15       40      150   2m33   168213x168085
