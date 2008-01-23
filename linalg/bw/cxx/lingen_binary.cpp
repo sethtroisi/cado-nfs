@@ -32,6 +32,7 @@
 #define Lmacro(N, m, n) (iceildiv((N)+2*(n),(m))+iceildiv((N)+2*(n),(n))+10)
 
 unsigned int rec_threshold = 0;
+unsigned int cantor_threshold = UINT_MAX;
 
 #include "auxfuncs.h"   /* for die, coredump_limit */
 #include "constants.hpp"
@@ -1340,7 +1341,7 @@ static void compute_lingen(polmat& pi)
 
     if (deg <= rec_threshold) {
         go_quadratic(pi);
-    } else if (deg < 3300) {
+    } else if (deg < cantor_threshold) {
         /* The bound is such that deg + deg/4 is 64 words or less */
         go_recursive<fake_fft>(pi);
     } else {
@@ -1578,6 +1579,13 @@ int main(int argc, char *argv[])
             if (argc <= 1) usage();
             argv++, argc--;
             rec_threshold = atoi(argv[0]);
+            argv++, argc--;
+            continue;
+        }
+        if (strcmp(argv[0], "-c") == 0) {
+            if (argc <= 1) usage();
+            argv++, argc--;
+            cantor_threshold = atoi(argv[0]);
             argv++, argc--;
             continue;
         }

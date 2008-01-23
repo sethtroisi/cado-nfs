@@ -1,7 +1,6 @@
-Block Wiedemann.
-
+Block Wiedemann.  
 For the impatient, there's a ./doit.pl script which illustrates how the
-solver works. It works as follows:
+solver works. It works as follows, for checking random matrices.
 
 ./doit.pl msize=10000 dens=100 modulus=31 mn=8 vectoring=2 threshold=128
 
@@ -16,12 +15,25 @@ The latter forms allows solving of an arbitrary matrix.
 
 
 The solver looks for a ***COLUMN*** dependency.
-There is (for now) some idiosyncrasy on the matrix format. It has to
-start with a magic comment like:
+
+Two matrix formats are recognized.
+Either the matrix file has to start with a magic comment like:
 // 12345 ROWS 12345 COLUMNS MODULUS 41
+or with a single header line:
+12345 12345
+(nrows, ncolumns), meaning that we're working over the binary field.
+
 Then rows indicate the number of non-zero coeffs, plus the indices of the
 zero coeffs (append :42 if the coeff equals 42 and not 1).
 
+
+In order to obtain several column dependencies on a binary matrix /tmp/mat, one
+would do:
+
+./doit.pl matrix=/tmp/mat mn=64 vectoring=64 tidy=0 multisols=1 threshold=9999999
+
+(the 9999999 is here to provide a working fallback for the time being, as
+there's a bug disturbing me).
 
 Some data on the options:
 

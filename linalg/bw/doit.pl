@@ -27,6 +27,7 @@ my $param = {
 	method=>'ifft',
 	multisols=>0,
 	maxload=>1, # How many simultaneous jobs on one machine.
+	threshold=>64,	# A good starting value.
 };
 
 
