@@ -4,7 +4,7 @@ include Makefile.local
 GMP ?= /usr/local/
 GMPLIB ?= $(GMP)/lib/libgmp.a
 GMPINCLUDE ?= $(GMP)/include/
-OPTCFLAGS ?= -O2 -g -W -Wall
+OPTCFLAGS ?= -g -W -Wall#-O2
 
 SVNVER:=$(shell svnversion .)
 CFLAGS=$(OPTCFLAGS) -DREV=\"$(SVNVER)\"
@@ -12,7 +12,7 @@ CFLAGS=$(OPTCFLAGS) -DREV=\"$(SVNVER)\"
 LDFLAGS=../utils/libutils.a $(GMPLIB) -lm# -lefence
 INC=-I $(GMPINCLUDE) -I.. -I../utils
 
-binaries:=allsqrt replay merge purge freerel linalg characters
+binaries:=allsqrt replay merge purge freerel linalg characters duplicates
 
 all:	$(binaries)
 
@@ -32,6 +32,9 @@ prune.o: prune.c prune.h
 freerel: freerel.c ../utils/libutils.a ../sieve/fb.o
 	gcc $(CFLAGS) $(INC) $< ../sieve/fb.o $(LDFLAGS) -o $@
 
+duplicates: duplicates.c ../utils/libutils.a hashpair.o files.o
+	gcc $(CFLAGS) $(INC) $< hashpair.o files.o $(LDFLAGS) -o $@
+
 purge: purge.c ../utils/libutils.a hashpair.o files.o
 	gcc $(CFLAGS) $(INC) $< hashpair.o files.o $(LDFLAGS) -o $@
 
@@ -44,7 +47,7 @@ replay: replay.c ../utils/libutils.a sparse.o
 linalg: linalg.o gauss.o readmat.o
 	gcc $(CFLAGS) $^ $(LDFLAGS) -o $@
 
-gauss.o: gauss.c
+gauss.o: gauss.c gauss.h
 	gcc -c $(CFLAGS) -DMULTI_ROW=3 -DNO_MAIN $(INC) $< -o $@
 
 .c.o: merge.h sparse.h readmat.h ../utils/utils.h
