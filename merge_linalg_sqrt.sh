@@ -19,7 +19,7 @@ if [ $# -ge 6 ]; then verbose="-v"; fi
 
 echo "Args: $*"
 
-rels=$root.rels; nrels=`wc -l $rels | awk '{print $1}'`
+rels=$root.rels
 poly=$root.poly
 nodup=$root.nodup
 purged=$root.purged
@@ -28,6 +28,7 @@ if [ -s $nodup ]
 then
   echo "File $nodup already exists"
 else
+  nrels=`wc -l $rels | awk '{print $1}'`
   time $linalg/duplicates -nrels $nrels $rels > $nodup
   if [ ! -s $nodup ]; then echo "zero file $nodup"; exit; fi
 fi
