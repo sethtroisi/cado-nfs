@@ -374,8 +374,10 @@ int main(int argc, char **argv) {
 
   fprintf(stderr, "Finished accumulating the product in %2.2lf\n", seconds());
   fprintf(stderr, "v = %d\n", prd->v);
-  fprintf(stderr, "sizeinbit of cst term = %ld\n", mpz_sizeinbase(prd->p->coeff[0], 2));
-  fprintf(stderr, "sizeinbit of leading term = %ld\n", mpz_sizeinbase(prd->p->coeff[pol->degree-1], 2));
+  fprintf(stderr, "sizeinbit of cst term = %lu\n",
+	  (unsigned long) mpz_sizeinbase(prd->p->coeff[0], 2));
+  fprintf(stderr, "sizeinbit of leading term = %lu\n",
+	  (unsigned long) mpz_sizeinbase(prd->p->coeff[pol->degree-1], 2));
 
   p = FindSuitableModP(F);
   fprintf(stderr, "Using p=%lu for lifting\n", p);

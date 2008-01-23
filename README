@@ -3,7 +3,6 @@ Required software tools:
 
 *) SCONS (http://www.scons.org/)
 *) GMP (http://gmplib.org): usually installed in most Linux distributions
-*) Magma (http://magma.maths.usyd.edu.au/magma/)
 
 [Configure]
 =====================)
