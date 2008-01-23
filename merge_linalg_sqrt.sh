@@ -21,13 +21,25 @@ echo "Args: $*"
 
 rels=$root.rels; nrels=`wc -l $rels | awk '{print $1}'`
 poly=$root.poly
+nodup=$root.nodup
 purged=$root.purged
+
+if [ -s $nodup ]
+then
+  echo "File $nodup already exists"
+else
+  time $linalg/duplicates -nrels $nrels $rels > $nodup
+  if [ ! -s $nodup ]; then echo "zero file $nodup"; exit; fi
+fi
+
+# update
+nrels=`wc -l $nodup | awk '{print $1}'`
 
 if [ -s $purged ]
 then
   echo "File $purged already exists"
 else
-  time $linalg/purge -duplicate -poly $poly -nrels $nrels $rels > $purged
+  time $linalg/purge -poly $poly -nrels $nrels $nodup > $purged
   if [ ! -s $purged ]; then echo "zero file $purged"; exit; fi
   excess=`head -1 $purged | awk '{nrows=$1; ncols=$2; print (nrows-ncols)}'`
   echo "excess = $excess"
@@ -64,7 +76,7 @@ if [ $nker -lt $nkermax ]; then nkermax=$nker; fi
 
 echo "Adding characters"
 
-args0="$purged $name.ker_raw $poly $name.index $rels"
+args0="$purged $name.ker_raw $poly $name.index $nodup"
 args0="$args0 $nker $nchar"
 time $linalg/characters $args0 > $name.ker
 
@@ -73,7 +85,7 @@ if [ $ndepmax -ge 30 ]; then ndepmax=30; fi
 
 echo "Preparing $ndepmax squareroots"
 
-args1="$rels $purged $name.index $name.ker $poly"
+args1="$nodup $purged $name.index $name.ker $poly"
 time $linalg/allsqrt $args1 0 $ndepmax ar $name.dep
 
 echo "Entering the last phase"
