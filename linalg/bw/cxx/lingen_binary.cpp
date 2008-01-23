@@ -1340,7 +1340,7 @@ static void compute_lingen(polmat& pi)
 
     if (deg <= rec_threshold) {
         go_quadratic(pi);
-    } else if (deg < 3264) {
+    } else if (deg < 3300) {
         /* The bound is such that deg + deg/4 is 64 words or less */
         go_recursive<fake_fft>(pi);
     } else {

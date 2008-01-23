@@ -11,7 +11,7 @@ TOPPATH:=.
 CC:=gcc
 CXX:=g++
 ARQCV:=ar qcv
-OFLAGS:=
+OFLAGS:=-O2 -DNDEBUG
 PFLAGS:=
 IFLAGS:=-I ../.. -I ../../utils -I ../../gf2x -I ../../gf2x/cantor -I $(TOPPATH)/include -I . -I old
 LFLAGS:=-L ../../utils -L ../../gf2x -L ../../gf2x/cantor
@@ -91,15 +91,23 @@ BW_PRINTMAGMA_LIBS:=-lgmpxx -lgmp
 # These are the sources of the new lingen code thing in C++. So far, it's
 # such a mess that it doesn't even compile. It's also terribly slower
 # than it should (when it actually compiles...).
-ifeq ($(BROKEN),also)
-BW_LINGEN_SOURCES:=					\
-		auxfuncs.c				\
-		cxx/lingen.cpp cxx/detect_params.cpp	\
-		cxx/files.cpp cxx/matrix_header.cpp	\
-		cxx/ticks.cpp cxx/matrices_printing.cpp
-BW_LINGEN_LIBS:=-lgmpxx -lgmp
--include .bw-lingen.mkf
-endif
+# ifeq ($(BROKEN),also)
+# BW_LINGEN_SOURCES:=					\
+# 		auxfuncs.c				\
+# 		cxx/lingen.cpp cxx/detect_params.cpp	\
+# 		cxx/files.cpp cxx/matrix_header.cpp	\
+# 		cxx/ticks.cpp cxx/matrices_printing.cpp
+# BW_LINGEN_LIBS:=-lgmpxx -lgmp
+# -include .bw-lingen.mkf
+# endif
+
+BW_LINGEN_BINARY_SOURCES:=		\
+		auxfuncs.c		\
+		cxx/files.cpp		\
+		cxx/lingen_binary.cpp	\
+		cxx/fake_fft.c
+BW_LINGEN_BINARY_LIBS:=-lgmp -lutils -lgf2x ../../gf2x/cantor/cantor128.o
+-include .bw-lingen-binary.mkf
 
 ifeq (0,0)
 BW_LINGEN2_SOURCES:=						\
@@ -125,14 +133,6 @@ BW_LINGEN2_LIBS:=-lgmp
 -include .bw-lingen2.mkf
 endif
 
-BW_LINGEN_BINARY_SOURCES:=		\
-		auxfuncs.c		\
-		cxx/files.cpp		\
-		cxx/lingen_binary.cpp	\
-		cxx/fake_fft.c
-BW_LINGEN_BINARY_LIBS:=-lgmp -lutils -lgf2x ../../gf2x/cantor/cantor128.o
--include .bw-lingen-binary.mkf
-
 BW_LINGEN_OLD_SOURCES:=						\
 		auxfuncs.c barrier.c				\
 		old/bw_scalar.c old/old-endian.c			\
@@ -153,47 +153,47 @@ BENCH_POLMATMUL_SOURCES:=					\
 BENCH_POLMATMUL_LIBS:=-lgmp -lutils -lgf2x ../../gf2x/cantor/cantor128.o
 -include .bench_polmatmul.mkf
 
-BW_FFT_BASICTEST_SOURCES:=					\
-		auxfuncs.c					\
-		old/bw_scalar.c					\
-		old/variables.c 				\
-		old/ops_poly_fft.cpp				\
-		old/ops_poly_schoolbook.cpp			\
-		old/ops_poly_wrap.cpp				\
-		old/fft_core.c					\
-		old/field_common.c old/field_prime.c		\
-		old/field_quad.c old/field_complex.c		\
-		old/field_usage.c old/modulus_hacks.c		\
-		old/structure.c					\
-		old/structure_debug.c				\
-		old/fft-basictest.cpp
-ifdef	PATCHED_GMP
-BW_FFT_BASICTEST_SOURCES+=old/ops_poly_integerfft.cpp
-endif
-BW_FFT_BASICTEST_LIBS:=-lgmp
--include .bw-fft-basictest.mkf
-
-BW_BENCHFFT_SOURCES:=						\
-		auxfuncs.c					\
-		old/bw_scalar.c old/old-endian.c			\
-		old/options.c					\
-		old/timer.c					\
-		old/variables.c old/fft_on_matrices.cpp		\
-		old/ops_poly_fft.cpp				\
-		old/ops_poly_schoolbook.cpp			\
-		old/ops_poly_wrap.cpp			\
-		old/fft_core.c					\
-		old/field_common.c old/field_prime.c		\
-		old/field_quad.c old/field_complex.c		\
-		old/field_usage.c old/modulus_hacks.c		\
-		old/structure.c old/structure_debug.c		\
-		old/testfft.cpp
-ifdef	PATCHED_GMP
-BW_BENCHFFT_SOURCES+=old/ops_poly_integerfft.cpp
-endif
-BW_BENCHFFT_LIBS:=-lgmp
--include .bw-benchfft.mkf
-
+# BW_FFT_BASICTEST_SOURCES:=					\
+# 		auxfuncs.c					\
+# 		old/bw_scalar.c					\
+# 		old/variables.c 				\
+# 		old/ops_poly_fft.cpp				\
+# 		old/ops_poly_schoolbook.cpp			\
+# 		old/ops_poly_wrap.cpp				\
+# 		old/fft_core.c					\
+# 		old/field_common.c old/field_prime.c		\
+# 		old/field_quad.c old/field_complex.c		\
+# 		old/field_usage.c old/modulus_hacks.c		\
+# 		old/structure.c					\
+# 		old/structure_debug.c				\
+# 		old/fft-basictest.cpp
+# ifdef	PATCHED_GMP
+# BW_FFT_BASICTEST_SOURCES+=old/ops_poly_integerfft.cpp
+# endif
+# BW_FFT_BASICTEST_LIBS:=-lgmp
+# -include .bw-fft-basictest.mkf
+# 
+# BW_BENCHFFT_SOURCES:=						\
+# 		auxfuncs.c					\
+# 		old/bw_scalar.c old/old-endian.c			\
+# 		old/options.c					\
+# 		old/timer.c					\
+# 		old/variables.c old/fft_on_matrices.cpp		\
+# 		old/ops_poly_fft.cpp				\
+# 		old/ops_poly_schoolbook.cpp			\
+# 		old/ops_poly_wrap.cpp			\
+# 		old/fft_core.c					\
+# 		old/field_common.c old/field_prime.c		\
+# 		old/field_quad.c old/field_complex.c		\
+# 		old/field_usage.c old/modulus_hacks.c		\
+# 		old/structure.c old/structure_debug.c		\
+# 		old/testfft.cpp
+# ifdef	PATCHED_GMP
+# BW_BENCHFFT_SOURCES+=old/ops_poly_integerfft.cpp
+# endif
+# BW_BENCHFFT_LIBS:=-lgmp
+# -include .bw-benchfft.mkf
+# 
 BW_GATHER_SOURCES:=					\
 		auxfuncs.c				\
 		cxx/detect_params.cpp			\
@@ -211,72 +211,6 @@ BW_MUL_SOURCES:=					\
 		cxx/files.cpp cxx/matrix_header.cpp
 BW_MUL_LIBS:=-lgmpxx -lgmp
 -include .bw-mul.mkf
-
-# useless -- these were the days where the output of the lingen code was
-# really a mess.
-# BW_FINDSOL_SOURCES:=						\
-# 		auxfuncs.c					\
-# 		old/bw_scalar.c old/old-endian.c			\
-# 		old/filenames.c old/options.c			\
-# 		old/tagfile.c old/variables.c			\
-# 		old/field_common.c old/field_prime.c		\
-# 		old/field_quad.c old/field_complex.c		\
-# 		old/field_usage.c old/modulus_hacks.c		\
-# 		old/structure.c old/structure_debug.c		\
-# 		old/findsol.c
-# BW_FINDSOL_LIBS:=-lgmp
-# -include .bw-findsol.mkf
-
-# useless
-# BW_REDRESS_SOURCES:=					\
-# 		auxfuncs.c				\
-# 		old/bw_scalar.c old/old-endian.c		\
-# 		old/filenames.c old/options.c		\
-# 		old/tagfile.c old/timer.c		\
-# 		old/variables.c old/addmul.c		\
-# 		old/bw_lvblock.c old/matrix.c		\
-# 		old/redress.c old/threaded.c
-# BW_REDRESS_LIBS:=-lgmp
-# BW_REDRESS_EXTRA_MODELS:=mt
-# BW_REDRESS_MT_LIBS:=-lgmp -lrt
-# -include .bw-redress.mkf
-
-# useless
-# BW_GATHER_OLD_SOURCES:=					\
-# 		auxfuncs.c old/bw_scalar.c		\
-# 		old/old-endian.c old/filenames.c		\
-# 		old/options.c old/tagfile.c		\
-# 		old/timer.c old/variables.c		\
-# 		old/addmul.c old/bw_lvblock.c		\
-# 		old/matrix.c old/gather.c		\
-# 		old/threaded.c
-# BW_GATHER_OLD_LIBS:=-lgmp
-# BW_GATHER_OLD_EXTRA_MODELS:=mt
-# BW_GATHER_OLD_MT_LIBS:=-lgmp -lrt
-# -include .bw-gather-old.mkf
-
-# useless
-# BW_TRYMUL_SOURCES:=					\
-# 		auxfuncs.c				\
-# 		old/bw_scalar.c old/old-endian.c		\
-# 		old/filenames.c	old/options.c		\
-# 		old/tagfile.c old/timer.c		\
-# 		old/variables.c old/addmul.c 		\
-# 		old/bw_lvblock.c old/matrix.c		\
-# 		old/trymul.c old/threaded.c
-# BW_TRYMUL_LIBS:=-lgmp
-# BW_TRYMUL_EXTRA_MODELS:=mt
-# BW_TRYMUL_MT_LIBS:=-lgmp -lrt
-# -include .bw-trymul.mkf
-
-# useless
-# BW_ADDVEC_SOURCES:=					\
-# 		auxfuncs.c				\
-# 		old/bw_scalar.c old/old-endian.c		\
-# 		old/filenames.c old/tagfile.c		\
-# 		old/variables.c old/addvec.c
-# BW_ADDVEC_LIBS:=-lgmp
-# -include .bw-addvec.mkf
 
 BW_RANDOM_SOURCES:=			\
 		auxfuncs.c		\
