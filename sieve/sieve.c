@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <string.h>
 #include <math.h>
@@ -1322,7 +1323,10 @@ ul_proven_prime (unsigned long n)
     }
 
   if (ul_prp (n, invn, 7UL) && ul_prp (n, invn, 61UL) 
-      && n != 4759123141UL && n != 8411807377UL)
+#if (ULONG_MAX > 4294967295UL)
+      && n != 4759123141UL && n != 8411807377UL
+#endif
+      )
     r = 1;
 
  end:
@@ -2035,7 +2039,11 @@ void rho_timing()
   const unsigned int iterations = 10000;
 #endif
 
+#if (ULONG_MAX > 4294967295UL)
   n = 404428732271UL;
+#else
+  n = 4292870399UL; /* Too small really for meaningful tests */
+#endif
   mpz_init (m);
   mpz_set_ui (m, n);
 
