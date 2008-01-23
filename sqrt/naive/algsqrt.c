@@ -1,3 +1,11 @@
+/* 
+ * Program: algsqrt
+ * Author : P. Gaudry
+ * Purpose: computing the squareroots and finishing the factorization
+ * 
+ *
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -197,7 +205,7 @@ void polymodF_sqrt(polymodF_t res, polymodF_t AA, poly_t F, unsigned long p) {
   do {
     mpz_mul(pk, pk, pk);	// double the current precision
     expo <<= 1;
-    fprintf(stderr, "lifting mod p^%d\n", expo);
+    fprintf(stderr, "lifting mod p^%d at %2.2lf\n", expo, seconds());
     // compute F,A modulo the new modulus.
     poly_reduce_makemonic_mod_mpz(f, F, pk);  
     poly_reduce_mod_mpz(a, A, pk);
