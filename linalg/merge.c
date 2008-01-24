@@ -26,7 +26,7 @@
 #define TEX 0
 
 #define TRACE_COL -1 // 231 // put to -1 if not...!
-#define TRACE_ROW -1 // 30530 // put to -1 if not...!
+#define TRACE_ROW -1 // 253224 // put to -1 if not...!
 
 #define USE_USED 0
 #if USE_USED >= 1
@@ -38,8 +38,13 @@ char *used;
 #define MERGE_LEVEL_MAX 256 // maximum level for a merge; such a large value
                             // is only useful when not using BW
 
-/* minimum excess we want to keep */
+// minimum excess we want to keep
 #define DELTA 128
+
+#define M_STRATEGY 2 // 0: finish that mergelevel
+                     // 1: change if min weight < mergelevel
+                     // 2: jump to minimal possible mergelevel
+                     // 3: perform one merge, then check for next min weight
 
 // 0 means dummy filtering using slow methods
 // 1 means:
@@ -516,6 +521,11 @@ removeWeightFromRow(sparse_mat_t *mat, int i)
 #else
     removeWeight(mat->rows, mat->wt, i);
 #endif
+#if TRACE_ROW >= 0
+    if(i == TRACE_ROW)
+	fprintf(stderr, "TRACE_ROW: removeWeightFromRow %d\n", 
+		lengthRow(mat, i));
+#endif
     mat->weight -= lengthRow(mat, i);
 }
 
@@ -618,6 +628,12 @@ addRowsWithWeight(sparse_mat_t *mat, int i1, int i2)
 #endif
     // new row i1 has to contribute to the weight
     addWeightFromRow(mat, i1);
+#if TRACE_ROW >= 0
+    if(i1 == TRACE_ROW)
+	fprintf(stderr, "TRACE_ROW: addRowsWithWeight i1=%d\n", i1);
+    if(i2 == TRACE_ROW)
+	fprintf(stderr, "TRACE_ROW: addRowsWithWeight i2=%d\n", i2);
+#endif
 }
 
 // what is the weight of the sum of Ra and Rb?
@@ -1307,6 +1323,11 @@ removeCellSWAR(sparse_mat_t *mat, int i, INT j)
 {
     int ind;
 
+#if TRACE_ROW >= 0
+    if(i == TRACE_ROW){
+	fprintf(stderr, "TRACE_ROW: removeCellSWAR i=%d j=%d\n", i, j);
+    }
+#endif
     // update weight
 #if DEBUG >= 1
     fprintf(stderr, "removeCellSWAR: moving j=%d from S[%d] to S[%d]\n",
@@ -1357,6 +1378,10 @@ removeRowSWAR(sparse_mat_t *mat, int i)
 {
     int k;
 
+#if TRACE_ROW >= 0
+    if(i == TRACE_ROW)
+	fprintf(stderr, "TRACE_ROW: removeRowSWAR i=%d\n", i);
+#endif
     mat->weight -= lengthRow(mat, i);
 #if USE_TAB == 0
     for(k = 0; k < lengthRow(mat, i); k++){
@@ -1378,6 +1403,10 @@ addCellSWAR(sparse_mat_t *mat, int i, INT j)
 {
     int ind;
 
+#if TRACE_ROW >= 0
+    if(i == TRACE_ROW)
+	fprintf(stderr, "TRACE_ROW: addCellSWAR i=%d j=%d\n", i, j);
+#endif
     // update weight
 #if DEBUG >= 1
     fprintf(stderr, "addCellSWAR: moving j=%d from S[%d] to S[%d]\n",
@@ -1500,6 +1529,11 @@ remove_j_from_row(sparse_mat_t *mat, int i, int j)
 {
     int k;
 
+#if TRACE_ROW >= 0
+    if(i == TRACE_ROW){
+	fprintf(stderr, "TRACE_ROW: remove_j_from_row i=%d j=%d\n", i, j);
+    }
+#endif
 #if DEBUG >= 2
     fprintf(stderr, "row[%d]_b=", i);
     print_row(mat, i);
@@ -1983,7 +2017,7 @@ mergeGe2(sparse_mat_t *mat, int m, /*int nb_merge_max,*/ int verbose)
     // TODO: remove this and start directly merge_m?
     for(j = 0, nbm = 0; j < mat->ncols; j++)
 	if(mat->wt[j] == m){
-# if DEBUG >= 0
+# if DEBUG >= 1
 	    fprintf(stderr, "# wt[%d] = %d\n", j, m);
 # endif
 	    nbm++;
@@ -2033,7 +2067,8 @@ inspectRowWeight(sparse_mat_t *mat)
 #endif
 #if TRACE_ROW >= 0
 		    if(i == TRACE_ROW)
-			fprintf(stderr, "Removing too heavy row[%d]: %d\n", 
+			fprintf(stderr, 
+				"TRACE_ROW: removing too heavy row[%d]: %d\n", 
 				i, lengthRow(mat, i));
 #endif
 		    removeRowDefinitely(mat, i);
@@ -2054,10 +2089,6 @@ inspectRowWeight(sparse_mat_t *mat)
     return nirem;
 }
 
-#define STRATEGIE 2 // 0: finish that mergelevel
-                    // 1: change if min weight < mergelevel
-                    // 2: jump to minimal possible mergelevel
-
 void
 merge(sparse_mat_t *mat, /*int nb_merge_max,*/ int maxlevel, int verbose, int forbw)
 {
@@ -2068,7 +2099,9 @@ merge(sparse_mat_t *mat, /*int nb_merge_max,*/ int maxlevel, int verbose, int fo
     m = 2;
     while(1){
 	cost = ((long)mat->rem_ncols) * ((long)mat->weight);
-	fprintf(stderr, "w(M)=%d, ncols*w(M)=%ld\n", mat->weight, cost);
+	fprintf(stderr, "w(M)=%d, w(M)*ncols=%ld", mat->weight, cost);
+	fprintf(stderr, " w(M)/ncols=%2.2lf\n", 
+		((double)mat->weight)/((double)mat->rem_ncols));
 	if(forbw && ((oldcost != -1) && (cost > oldcost))){
 	    fprintf(stderr, "WARNING: New cost > old cost (%2.2lf)\n",
 		    ((double)cost)/((double)oldcost));
@@ -2112,13 +2145,13 @@ merge(sparse_mat_t *mat, /*int nb_merge_max,*/ int maxlevel, int verbose, int fo
 	deleteEmptyColumns(mat);
 	mm = minColWeight(mat);
 	fprintf(stderr, "Min col weight = %d\n", mm);
-#if STRATEGIE == 2
+#if M_STRATEGY == 2
 	// jump to the next minimal merge level immediately
 	m = mm;
 	if((m > maxlevel) || (m <= 0))
 	    break;
 #else
-#  if STRATEGIE == 1
+#  if M_STRATEGY == 1
 	if(mm < m)
 	    // something new happened, anyway
 	    m = mm;
