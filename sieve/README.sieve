@@ -45,3 +45,6 @@ Parameters for the siever are
                  algebraic side
 -reports_r_len : how many entries to allocate for reports list on 
                  rational side
+The four final numbers give the range to sieve, that is, the minimal
+and maximal value for a, then the minimal and maximal value for b
+(classically, b is positive and a centred around 0).

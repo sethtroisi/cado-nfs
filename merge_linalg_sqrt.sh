@@ -44,9 +44,9 @@ else
   if [ ! -s $purged ]; then echo "zero file $purged"; exit; fi
   excess=`head -1 $purged | awk '{nrows=$1; ncols=$2; print (nrows-ncols)}'`
   echo "excess = $excess"
-  if [ $excess -lt 0 ]
+  if [ $excess -le 0 ]
   then 
-      echo "excess < 0, sorry"
+      echo "excess <= 0, sorry"
       /bin/rm -f $purged
       exit
   fi

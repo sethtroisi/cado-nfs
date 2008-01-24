@@ -58,8 +58,9 @@ sieve/sieve -poly $tmp/$name.poly -fb $tmp/$name.roots -1000000 1000000 1 2500\
 postsieve/checknorms/checknorms -poly $tmp/$name.poly $tmp/$name.rels_raw \
    >> $tmp/$name.rels
 
-/bin/rm -f $tmp/$name.purged $tmp/$name.*algside*
-./merge_linalg_sqrt.sh $tmp/$name <parameters> [see README.params]
+/bin/rm -f $tmp/$name.nodup $tmp/$name.purged $tmp/$name.*algside*
+./merge_linalg_sqrt.sh $tmp/$name 1.0 50 500 200
+## (see README.params for parameter values)
 
 ## CLEANING STEP: destroys everything, which might not be what you want...
 /bin/rm $tmp/$name.*
