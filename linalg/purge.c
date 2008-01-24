@@ -44,7 +44,7 @@ typedef struct {
   unsigned long length;
 } tab_prime_t;
 
-// Data strucutre for an (a,b) pair and for a table of those
+// Data structure for an (a,b) pair and for a table of those
 typedef struct {
   long a;
   unsigned long b;
@@ -493,9 +493,11 @@ scan_relations_from_file (int *irel, int *nrel, char *rel_used,
 	    *nrel -= 1;
 	clear_relation(&rel);
     }
-    total_duplicates += file_duplicates;
-    fprintf (stderr, "Found %lu duplicates in this file (total %lu)\n",
-             file_duplicates, total_duplicates);
+    if(duplicate){
+	total_duplicates += file_duplicates;
+	fprintf (stderr, "Found %lu duplicates in this file (total %lu)\n",
+		 file_duplicates, total_duplicates);
+    }
     return ret;
 }
 
