@@ -21,10 +21,9 @@ c90	1.0    20	40	100   69s     78430x78302
 c95     nrel=1749115, nprimes=1368089; excess=381026
 c95	1.0    10	40	 80  Seg. fault: Row 426632 already empty
 
---------- needs to be updated below this line ----------------
+rsa100  1.0    15	40	150   2m38   148102x147974
 
-rsa100  1.0    15	40	150  12m25   171485x171357
-rsa100  0.1    15       40      150   2m33   168213x168085
+--------- needs to be updated below this line ----------------
 
 (Note: checknorms only outputs 7272158 out of 7309995 relations.)
 rsa110  1.0   120      300      500  78m13   189584x189456
