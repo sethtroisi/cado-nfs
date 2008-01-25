@@ -139,8 +139,6 @@ void get_algebraic_norm(mpz_t norm, mpz_t *f, int d, long a, unsigned long b);
 inline void check_prime(mpz_t p, unsigned long sb, long a, unsigned long b);
 //-----------------------------------------------------------------------------
 //
-// Factor norm into at most 2 primes smaller than 2^lp:
-//
 // Attempts to factor norm and stores the found factors in the array
 // factors and the multiplicities in the array multis. It returns:
 //
