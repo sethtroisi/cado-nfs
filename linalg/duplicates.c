@@ -42,7 +42,7 @@ fprint_relation_raw(FILE *file, relation_t rel)
     fprintf(file, ":");
     for(i = 0; i < rel.nb_ap; ++i){
 	for(j = 0; j < rel.ap[i].e; j++){
-	    fprintf (file, "%lx", rel.ap[i].p);
+	    fprintf(file, "%lx", rel.ap[i].p);
 	    if(j < rel.ap[i].e-1)
                 fprintf(file, ",");
         }
@@ -81,8 +81,8 @@ remove_duplicates_from_file(int *irel, unsigned int *nrels, hashtable_t *Hab, FI
 	}
     }
     total_duplicates += file_duplicates;
-    fprintf (stderr, "Found %lu duplicates in this file (total %lu)\n",
-             file_duplicates, total_duplicates);
+    fprintf(stderr, "Found %lu duplicates in this file (total %lu)\n",
+	    file_duplicates, total_duplicates);
     return ret;
 }
 
@@ -95,6 +95,7 @@ remove_duplicates(char *ficname[], int nbfic, unsigned int *nrels, hashtable_t *
     int i;
     
     ASSERT(nbfic > 0);
+    *nrels = 0;
     for(i = 0; i < nbfic; i++){
 	relfile = fopen(ficname[i], "r");
 	if(relfile == NULL){
@@ -102,8 +103,8 @@ remove_duplicates(char *ficname[], int nbfic, unsigned int *nrels, hashtable_t *
 	    exit(1);
 	}
 	fprintf(stderr, "Adding file %s\n", ficname[i]);
-	ret = remove_duplicates_from_file (&irel, nrels, Hab, relfile);
-	if (ret == 0) {
+	ret = remove_duplicates_from_file(&irel, nrels, Hab, relfile);
+	if(ret == 0) {
 	    fprintf(stderr, "Warning: error when reading file %s\n", ficname[i]);
 	    break;
 	}
@@ -123,30 +124,30 @@ main(int argc, char **argv)
     int ret;
     unsigned int nrelsmax = 0, nrels;
     
-    fprintf (stderr, "%s revision %s\n", argv[0], REV);
+    fprintf(stderr, "%s revision %s\n", argv[0], REV);
     
-    if (argc == 1) {
+    if(argc == 1) {
 	fprintf(stderr, "usage: %s [filename]\n", argv[0]);
 	fprintf(stderr, "  stdin input is not yet available, sorry.\n");
 	exit(1);
     } 
-    if (argc < 4) {
+    if(argc < 4) {
 	fprintf(stderr, "usage: %s nrel file1 ... filen\n", argv[0]);
 	fprintf(stderr, "  if no filename is given, takes input on stdin\n");
 	exit(1);
     }
     while(argc > 1 && argv[1][0] == '-'){
-	if(argc > 2 && strcmp (argv[1], "-nrels") == 0){
+	if(argc > 2 && strcmp(argv[1], "-nrels") == 0){
 	    nrelsmax = atoi(argv[2]);
 	    argc -= 2;
 	    argv += 2;
 	}
     }
 
-    if (nrelsmax == 0)
+    if(nrelsmax == 0)
       {
-        fprintf (stderr, "Error, missing -nrels ... option\n");
-        exit (1);
+        fprintf(stderr, "Error, missing -nrels ... option\n");
+        exit(1);
       }
 
     fic = argv+1;
