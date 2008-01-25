@@ -24,14 +24,23 @@ Makefile.local:
 	echo "Makefile.local does not exist. Making a link to parent dir's one."
 	ln -s ../Makefile.local .
 
-sieve: sieve.c fb.c ../utils/libutils.a config.h sieve_aux.h ../cado.h Makefile.local
-	gcc -I. -I.. -I$(GMPINCLUDE) $(CFLAGS) -o $@ -Wall -W sieve.c fb.c ../utils/libutils.a $(GMPLIB) -lm
+fb.o : fb.c fb.h config.h basicnt.h sieve_aux.h Makefile.local
+	gcc -c -I. -I.. -I$(GMPINCLUDE) $(CFLAGS) fb.c
 
-makefb: makefb.c Makefile.local
-	gcc -I. -I.. -I$(GMPINCLUDE) $(CFLAGS) -o $@ $< ../utils/libutils.a $(GMPLIB) -lm
+sieve.o : sieve.c config.h basicnt.h sieve_aux.h ../cado.h Makefile.local
+	gcc -c -I. -I.. -I$(GMPINCLUDE) $(CFLAGS) sieve.c
+
+makefb.o : makefb.c Makefile.local
+	gcc -c -I. -I.. -I$(GMPINCLUDE) $(CFLAGS) makefb.c
+
+sieve: sieve.o fb.o ../utils/libutils.a
+	gcc $(CFLAGS) -o $@ sieve.o fb.o ../utils/libutils.a $(GMPLIB) -lm
+
+makefb: makefb.o ../utils/libutils.a
+	gcc $(CFLAGS) -o $@ makefb.o ../utils/libutils.a $(GMPLIB) -lm
 
 config.h: config_h.in
 	cp config_h.in config.h
 
 clean:
-	rm -f sieve makefb
+	rm -f sieve makefb *.o *~
