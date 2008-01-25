@@ -1,13 +1,21 @@
 Recent changes:
 ---------------
-  
-  - Tue Jan 22 2008 by JM:
-      - Jump to next relation if a prime does not divide norm (was previously
-        aborting the whole program)
-      - Fixed extra comma bug appearing when appending primes to an empty list.
-      - Fixed compilation warning (hopefully).
-      - Fixed bug in control flow.
-      - Raised tdmax to 20 when using option '-factorall'
+
+  - Fri Jan 25 2008 by JM:
+      - Renamed the previous checknorms.c version to checknorms.2lp.c ("2lp" 
+        standing for "2 large primes")
+      - Splitted checknorms in .c and .h parts.
+      - Removed -factorall option.
+      - checknorms now accepts residuals with as many large primes as wanted.
+        Default is 4. Use -maxnlp option on the command line to override.
+      - Added -cmult option (short for "count multiplicites") to consider p^m
+        as m large prime. By default checknorms will handle it as a single 
+        prime.
+      - Added -h (help) option.
+      - WARNING: This revamped checknorms is not fully tested yet. The
+                 daredevils are welcomed to play with it but the faints of
+                 heart should stick with the older one (checknorms.2lp.c is
+                 also compiled).
 
   - Tue Jan  8 2008 by JM:
       - Added '-factorall' option changing behaviour of factorization of norms.
@@ -16,3 +24,4 @@ Recent changes:
 
   - Thu Dec 20 2007 by JM:
       - Initial version based on Paul Zimmermann's checknorms program.
+

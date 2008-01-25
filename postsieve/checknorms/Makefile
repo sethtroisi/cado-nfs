@@ -1,5 +1,5 @@
 # Usage: make <target>
-
+#
 # Paths and anything specific to a host go in Makefile.local. It can specify
 # the full path/filename to the ECM libarary in ECMLIB, and full path to ECM
 # header file in ECMINCLUDE. If not specified, defaults are derived by the
@@ -38,8 +38,7 @@ CFLAGS=$(OPTFLAGS) -DREV=\"`svnversion .`\"
 LDFLAGS ?= -lm
 INCFLAGS ?= -I. -I.. -I../.. -I$(GMPINCLUDE) $(TIFAINCFLAGS) -I$(UTILSINCLUDE)
 
-all: checknorms
-
+all: checknorms checknorms.2lp
 
 Makefile.local:
 	@echo "Makefile.local does not exist. Making a link to parent dir's one."
@@ -48,8 +47,13 @@ Makefile.local:
 checknorms: checknorms.c Makefile.local $(TIFALIB)
 	gcc $(INCFLAGS) $(CFLAGS) -o $@ $< $(UTILSLIB) $(TIFALIB) $(GMPLIB) $(LDFLAGS)
 
+checknorms.2lp: checknorms.2lp.c Makefile.local $(TIFALIB)
+	gcc $(INCFLAGS) $(CFLAGS) -o $@ $< $(UTILSLIB) $(TIFALIB) $(GMPLIB) $(LDFLAGS)
+
 config.h: config_h.in
 	cp config_h.in config.h
 
 clean:
 	rm -f checknorms
+	rm -f checknorms.2lp
+

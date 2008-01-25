@@ -1,27 +1,52 @@
-README.txt file updated on Tue Jan 8 2008 by JM
+README.txt file updated on Fri Jan 25 2008 by JM
 
 1. What is it?
 --------------
 
   This is a slightly revamped variant of Paul's checknorms program. It has
-  been modified to use TIFA instead of ECM. Usage is unchanged:
+  been modified to use TIFA instead of ECM. Usage is mostly unchanged:
 
       checknorms -poly <file.poly> <file.raw.rels> > <file.rels>
 
-  Note that no warning is issued if some prime factor of the residue is larger
-  than the factor base bound contrary to Paul's version.
-
-  Also added a '-factorall' option changing the behaviour of the program when
-  factoring the norms. What the '-factorall' option does is:
-      - Set the tdmax parameter to min(20, tdmax)
-      - Attempt to completely factor the norms and accept relations if norm can
-        be written as pa^ma * pb^mb where pa and pb are two (possibly
-        identical) large primes.
-
-  Note that using the '-factorall' option will slow down the program
-  noticeably. My gut feeling is that _usually_ you don't need to care about 
-  it...
-
+  However new options are avaible (type ./checknorms -h).
+    
+     Usage:
+     ------
+       ./checknorms [-h] [-v] [-cmult]
+                    [-maxnlp <num>] [-mfbr <num>] [-mfba <num>] [-t <num>]
+                    -poly <file> <relfile_1> [<relfile_2> ... <relfile_n>]
+    
+     Mandatory arguments:
+     --------------------
+       -poly FILE
+           CADO polynomial file.
+       <relfile_i> FILES
+           Space-separated list of relation files obtained from CADO siever.
+    
+     Options:
+     --------
+       -v
+           Turn verbose mode on.
+       -h
+           Print this help.
+       -cmult
+           Take into account multiplicities of residues' factors.
+       -maxnlp NUM
+           Maximum number of large primes to allow.
+           Multiplicities are taken into account if the option -cmult is given.
+           Default: 8
+       -mfbr NUM
+           Bound for rational residues (in bits).
+           Default: use value from polynomial file
+       -mfba NUM
+           Bound for algebraic residues (in bits).
+           Default: use value from polynomial file
+       -t NUM
+           Bound for largest prime for trial division.
+           Default: 100
+    
+  WARNING: Please note that the '-factorall' option has been removed!
+  
 2. How to compile it?
 ---------------------
 
