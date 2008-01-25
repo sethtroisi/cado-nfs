@@ -46,6 +46,10 @@ checkSparse(FILE *matfile, FILE *kerfile, int ncols, int nlimbs, int *vec, int c
 		    fscanf(matfile, "%d", &cc);
 		    if(verbose >= 2)
 			fprintf(stderr, "vec[%d]++\n", cc);
+		    if(cc >= ncols){
+			fprintf(stderr, "GASP: cc=%d > ncols=%d", cc, ncols);
+			fprintf(stderr, " at line %d\n", (i*GMP_NUMB_BITS)+j);
+		    }
 		    vec[cc]++;
 		}
 		if(verbose >= 2)
