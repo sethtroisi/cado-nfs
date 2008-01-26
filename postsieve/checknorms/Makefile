@@ -1,5 +1,5 @@
 # Usage: make <target>
-
+#
 # Paths and anything specific to a host go in Makefile.local. It can specify
 # the full path/filename to the ECM libarary in ECMLIB, and full path to ECM
 # header file in ECMINCLUDE. If not specified, defaults are derived by the
@@ -15,7 +15,7 @@ GMPINCLUDE ?= $(GMP)/include
 
 # Set USE_TIFA_FROM_SVN to one to use TIFA headers/library from local SVN
 # repository. Of course TIFA has to be compiled.
-USE_TIFA_FROM_SVN ?= 0
+USE_TIFA_FROM_SVN ?= 1
 
 # Set default filenames/paths for TIFA if not already set.
 ifeq ($(USE_TIFA_FROM_SVN), 1)
@@ -30,8 +30,8 @@ else
 endif
 
 # Set default filenames/paths for utils if not already set.
-UTILSLIB ?= /Users/jem/wrk/dev/cado/trunk/dist/src/utils/libutils.a
-UTILSINCLUDE ?= /Users/jem/wrk/dev/cado/trunk/dist/src/utils/
+UTILSLIB ?= ../../utils/libutils.a
+UTILSINCLUDE ?= ../../utils
 
 OPTFLAGS ?= -std=c99 -O2 -g -fkeep-inline-functions -Wall -W
 CFLAGS=$(OPTFLAGS) -DREV=\"`svnversion .`\"
@@ -41,10 +41,8 @@ INCFLAGS ?= -I. -I.. -I../.. -I$(GMPINCLUDE) $(TIFAINCFLAGS) -I$(UTILSINCLUDE)
 all: checknorms checknorms.2lp
 
 Makefile.local:
-	echo "Makefile.local does not exist. It can be used to store paths" \
-	"to libraries etc.  Making an empty file to avoid warnings in" \
-	"future invocations of make."
-	touch Makefile.local
+	@echo "Makefile.local does not exist. Making a link to parent dir's one."
+	ln -s ../../Makefile.local .
 
 checknorms: checknorms.c checknorms.h Makefile.local $(TIFALIB) $(UTILSLIB)
 	gcc $(INCFLAGS) $(CFLAGS) -o $@ $< $(UTILSLIB) $(TIFALIB) $(GMPLIB) $(LDFLAGS)
@@ -57,3 +55,5 @@ config.h: config_h.in
 
 clean:
 	rm -f checknorms
+	rm -f checknorms.2lp
+

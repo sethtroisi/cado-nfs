@@ -265,12 +265,10 @@ unsigned long factor(mpz_t p1, mpz_t p2,
                 mpz_set(p1, x1);
                 retval = 2;
             } else {
-                MSG(">>> A: norm=%Zd\n", norm);
                 count_bad_factor++;
                 MSGDEBUG("factor p2=%Zd not prime and/or too large!\n", p2);
             }
         } else {
-            MSG(">>> B: norm=%Zd\n", norm);
             count_bad_factor++;
             MSGDEBUG("factor p1=%Zd not prime and/or too large!\n", p1);
         }
@@ -306,17 +304,6 @@ unsigned long factor(mpz_t p1, mpz_t p2,
             mpz_set(p2, x2);
             retval = 2;
         } else {
-            
-            MSG(">>> C: norm=%Zd\n", norm);
-            
-            MSG("factors %Zd and %Zd are prime but sizes mismatch!"
-                     " (norm=%Zd)\n", x1, x2, norm);
-            MSG("size of %Zd is %lu\n", x1, sx1);
-            MSG("size of %Zd is %lu\n", x2, sx2);
-            MSG("size of %Zd is %lu\n", norm, sn);
-            MSG("lp is %lu\n", lp);
-            
-            
             count_bad_factor++;
             MSGDEBUG("factors %Zd and %Zd are prime but sizes mismatch!"
                      " (norm=%Zd)\n", x1, x2, norm);
@@ -332,7 +319,6 @@ unsigned long factor(mpz_t p1, mpz_t p2,
         // when the '-factorall' option is passed on the command line...
         //
         count_more_two_factors++;
-
         MSGDEBUG("factor %Zd and / or %Zd is not prime\n", x1, x2);
     }
 
@@ -430,8 +416,6 @@ unsigned long factor_completely(mpz_t p1, mpz_t p2,
             mpz_ptr x2 = factors->data[1];
 
             if ((BITSIZE(x1) > lp) || (BITSIZE(x2) > lp)) {
-                
-                MSG(">>> D: norm=%Zd\n", norm);
                 MSGDEBUG("norm has a too large prime factor!\n");
                 count_bad_factor++;
                 goto clear_and_return;
@@ -447,7 +431,6 @@ unsigned long factor_completely(mpz_t p1, mpz_t p2,
             mpz_ptr x1 = factors->data[0];
 
             if (BITSIZE(x1) > lp) {
-                MSG(">>> E: norm=%Zd\n", norm);
                 count_bad_factor++;
                 MSGDEBUG("norm has a too large prime factor!\n");
                 goto clear_and_return;
