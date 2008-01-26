@@ -421,7 +421,7 @@ int main(int argc, char **argv) {
     // First check that the squares agree
     mpz_mul(g1, aux, aux);
     mpz_mod(g1, g1, pol->n);
-    if(mpz_cmp_ui(pol->g[1], 1)){
+    if(mpz_cmp_ui(pol->g[1], 1) != 0){
 	// case g(X)=m1*X+m2 with m1 != 1
 	// we should have prod (a+b*m2/m1) = A^2 = R^2/m1^nab
 	// and therefore nab should be even
