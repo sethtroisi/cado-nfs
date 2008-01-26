@@ -55,21 +55,21 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #define DEFAULT_ALIM_LENGTH DEFAULT_RLIM_LENGTH
 
 /* default large prime bounds */
-#define DEFAULT_LPBR {{70, 23}, {90, 24}, {110, 27}, {120, 27}, {130, 28}, {140, 29}, {155, 30}, {ULONG_MAX, 40}}
-#define DEFAULT_LPBR_LENGTH 8
-#define DEFAULT_LPBA {{70, 23}, {90, 24}, {110, 27}, {120, 27}, {130, 28}, {140, 30}, {155, 30}, {ULONG_MAX, 40}}
+#define DEFAULT_LPBR {{70, 23}, {90, 24}, {100, 26}, {110, 27}, {120, 27}, {130, 28}, {140, 29}, {155, 30}, {ULONG_MAX, 40}}
+#define DEFAULT_LPBR_LENGTH 9
+#define DEFAULT_LPBA {{70, 23}, {90, 24}, {100, 26}, {110, 27}, {120, 27}, {130, 28}, {140, 30}, {155, 30}, {ULONG_MAX, 40}}
 #define DEFAULT_LPBA_LENGTH DEFAULT_LPBR_LENGTH
 
 /* default factor-residual bounds */
-#define DEFAULT_MFBR {{70, 35}, {90, 37}, {100, 48}, {110, 50}, {130, 52}, {140, 58}, {155, 60}, {ULONG_MAX, 80}}
+#define DEFAULT_MFBR {{70, 35}, {90, 37}, {100, 52}, {110, 54}, {130, 52}, {140, 58}, {155, 60}, {ULONG_MAX, 80}}
 #define DEFAULT_MFBR_LENGTH 8
-#define DEFAULT_MFBA {{70, 35}, {90, 37}, {100, 48}, {110, 50}, {130, 52}, {140, 60}, {155, 60}, {ULONG_MAX, 80}}
+#define DEFAULT_MFBA {{70, 35}, {90, 37}, {100, 52}, {110, 54}, {130, 52}, {140, 60}, {155, 60}, {ULONG_MAX, 80}}
 #define DEFAULT_MFBA_LENGTH DEFAULT_MFBR_LENGTH
 
 /* default lambda values: after subtracting the approximate logarithms of
    factor base primes, we keep the sieve reports whose base-2 logarithm is
    less than [ra]lambda * lpb[ra]. */
-#define DEFAULT_RLAMBDA {{70, 1.0}, {80, 1.1}, {90, 1.3}, {100, 1.8}, {110, 2.6}, {120, 2.7}, {130, 2.5}, {ULONG_MAX, 2.8}}
+#define DEFAULT_RLAMBDA {{70, 1.0}, {80, 1.1}, {90, 1.3}, {100, 2.1}, {110, 2.6}, {120, 2.7}, {130, 2.5}, {ULONG_MAX, 2.8}}
 #define DEFAULT_RLAMBDA_LENGTH 8
 #define DEFAULT_ALAMBDA DEFAULT_RLAMBDA
 #define DEFAULT_ALAMBDA_LENGTH DEFAULT_RLAMBDA_LENGTH

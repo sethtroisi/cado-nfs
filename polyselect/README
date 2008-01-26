@@ -1,12 +1,21 @@
 See ../../test/inputs/README for the input format used for polyselect.
 
+Contents:
+1. Output format of polyselect
+2. How to choose the sieve region
+3. How to check the mfbr, mfba, rlambda, alambda parameters
+
+##############################################################################
+
+1. Output format of polyselect
+
 The output format is that of ggnfs (any line starting with # is a comment,
 sss is a string, nnn a non-negative integer, zzz a signed integer, ddd a
 floating-point number):
 
 name: sss # optional
 n: nnn    # number to factor
-skew: ddd # skewness
+skew: ddd # skewness S, sieve region should be |a| <= H*sqrt(S), b <= H/sqrt(S)
 c5: zzz   # coefficient of degree 5 (algebraic side)
 ...
 c0: zzz   # coefficient of degree 0 (algebraic side)
@@ -19,7 +28,85 @@ lpbr: nnn # rational large prime bound is 2^nnn
 lpba: nnn # algebraic large prime bound is 2^nnn
 mfbr: nnn # only residuals below 2^nnn are factored on the rational side
 mfba: nnn # only residuals below 2^nnn are factored on the algebraic side
-rlambda: ddd # lambda sieve parameter on the rational side
-alambda: ddd # lambda sieve parameter on the algebraic side
-qintsize: nnn # after nnn special q (lattice sieve), stop and count relations
-q0:   nnn # special-q must be >= q0
+rlambda: ddd # lambda sieve parameter on the rational side: we try to keep
+             # only sieve reports with a residual of rlambda*lpbr bits
+alambda: ddd # lambda sieve parameter on the algebraic side: we try to keep
+             # only sieve reports with a residual of alambda*lpba bits
+
+##############################################################################
+
+2. How to choose the sieve region
+
+For a given number to factor, the optimal sieve region depends on the
+polynomial used. More precisely, if the skewness is S, the optimal sieve
+region is of the form -H*sqrt(S) <= a <= H*sqrt(S), 1 <= b <= H/sqrt(S).
+
+The expected number of relations is about
+
+     N = 0.8*2^lpbr/log(2^lpbr) + 0.8*2^lpba/log(2^lpba).
+
+For example, if lpbr=lpba=27, we need about 11.5M relations.
+
+First choose an initial value of H, say H = 10^7. Then compute A = H*sqrt(S)
+and B = H/sqrt(S), where S is the 'skew' value in the polynomial file.
+
+Then perform a sieving try around B/2:
+
+$ sieve ... -A A B/2 B/2+5 > /tmp/rels
+$ checknorms ... /tmp/rels > /tmp/rels2
+
+(The interval B/2..B/2+5 is chosen to average the effect of divisors of 2 and
+3 in B, since only values for which gcd(a,b)=1 are sieved.)
+
+If n relations are obtained after checknorms, the total number of relations
+obtained in [-A, A] x [1, B] is guessed as B*n/6 (the yield decreases when
+b increases, we take as rule of thumb that B/2 gives the average yield
+over 1..B, and the factor 1/6 takes into account for B/2..B/2+5).
+
+If B*n/6 is larger than N, say by a factor r, then one needs to reduce A and
+B by a factor sqrt(r) each.
+
+If B*n/6 is smaller than N, say by a factor r, then one needs to enlarge A and
+B by a factor sqrt(r) each.
+
+If the new sieve region is quite different from the previous one, then one
+can perform another sieving try as above with the new region.
+
+Before sieving, see Section 3 below.
+
+##############################################################################
+
+3. How to check the mfbr, mfba, rlambda, alambda parameters
+
+WARNING: the mfbr, mfba, rlambda, alambda parameters given by polyselect
+with option -full might not be optimal.
+
+rlambda and alambda control the size of the sieve reports which are kept in
+the sieving. After sieving, residues will less than roughly rlambda*lpbr bits
+will be kept on the rational side (this is roughly because of rounding errors,
+and this is used only on log-estimates of the residues).
+
+Once the kept residues are really computed (by computation of the norm and
+division by the primes in the factor base), they are finally kept only if they
+have at most mfbr bits on the rational side. Thus mfbr should be at least
+rlambda*lpbr (up to rounding errors), otherwise residues in the interval
+[mfbr, rlambda*lpbr] will be eliminated in the resieving, thus one could
+reduce rlambda to mfbr/lpbr and still get the same relations.
+
+For example, if rlambda = 2.0, this means that all relations with two large
+primes will be kept. Note that one can have more large primes: for example
+with rlim = 200000 and mfbr = 54, one can have 3 large primes since
+200000^3 < 2^54.
+
+We suggest the following strategy to find optimal mfbr, mfba, rlambda, alambda:
+
+a. Estimate the yield obtained with the default parameters obtained with
+   polyselect -full (see above).
+b. Try to increase mfbr and rlambda (resp. mfba and alambda), while keeping
+   mfbr ~ rlambda * lpbr, and estimate the new yield. If the time per relation
+   decreases, then those new parameters are better, and go to b.
+   If the time per relation increases, then stop (or try to decrease the
+   parameters).
+
+
+
