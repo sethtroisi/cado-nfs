@@ -30,5 +30,5 @@ ratsqrt: ratsqrt.o
 	gcc -o $@ $^ $(LDFLAGS)
 
 clean:
-	-rm -f poly algsqrt ratsqrt *.o *~
+	-rm -f poly algsqrt ratsqrt fmalgsqrt *.o *~
 
