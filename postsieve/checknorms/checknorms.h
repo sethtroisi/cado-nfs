@@ -79,6 +79,7 @@ extern "C" {
 //
 static unsigned long count_too_many_factors     = 0;
 static unsigned long count_too_large_prime_norm = 0;
+static unsigned long count_too_large_factor     = 0;
 static unsigned long count_no_factor_found      = 0;
 static unsigned long count_partial_fact_found   = 0;
 static unsigned long count_perfect_power        = 0;

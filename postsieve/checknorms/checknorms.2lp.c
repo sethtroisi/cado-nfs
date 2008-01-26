@@ -76,7 +76,7 @@
 #define BITSIZE(X)      (mpz_sizeinbase((X), 2))
 //------------------------------------------------------------------------------
 //
-// Global variables (bouh!) used for error reporting... 
+// Global variables (bouh!) used for error reporting...
 //
 static unsigned long count_more_two_factors     = 0;
 static unsigned long count_too_large_norm       = 0;
@@ -161,7 +161,7 @@ unsigned long factor(mpz_t p1, mpz_t p2,
     //            - count_perfect_square
     //
     unsigned long sn = BITSIZE(norm);
-  
+
     if (mpz_cmp_ui(norm, 1) == 0) {
         MSGDEBUG("norm is one!\n", norm);
         return 0;
@@ -210,12 +210,12 @@ unsigned long factor(mpz_t p1, mpz_t p2,
         return 3;
     }
     unsigned long int retval = 3;
-  
+
     //
     // Use the TIFA library to factor norm
     //
     mpz_array_t* const norm_factors = alloc_mpz_array(NFACTORS);
-  
+
     MSGDEBUG("factor: tifa_factor() called with norm %Zd\n", norm);
     //
     // _TO_DO_: We could use TIFA's FIND_COMPLETE_FACTORIZATION mode
@@ -223,7 +223,7 @@ unsigned long factor(mpz_t p1, mpz_t p2,
     //          comfortable using it and b) it is overkill here.
     //
     ecode_t ecode = tifa_factor(norm_factors, NULL, norm, FIND_SOME_FACTORS);
-  
+
     if (ecode != SOME_FACTORS_FOUND) {
         //
         // Should be rare but I cannot give any warranties here... So what
@@ -250,10 +250,10 @@ unsigned long factor(mpz_t p1, mpz_t p2,
         goto clear_and_return;
     }
     mpz_ptr x1 = norm_factors->data[0];
-  
+
     if (norm_factors->length == 1) {
         //
-        // If the found non trivial factor is not prime there is no way norm 
+        // If the found non trivial factor is not prime there is no way norm
         // could be a product of only two primes.
         //
         if (IS_PRIME(x1) && (BITSIZE(x1) <= lp)) {
@@ -265,10 +265,12 @@ unsigned long factor(mpz_t p1, mpz_t p2,
                 mpz_set(p1, x1);
                 retval = 2;
             } else {
+                MSG(">>> A: norm=%Zd\n", norm);
                 count_bad_factor++;
                 MSGDEBUG("factor p2=%Zd not prime and/or too large!\n", p2);
             }
         } else {
+            MSG(">>> B: norm=%Zd\n", norm);
             count_bad_factor++;
             MSGDEBUG("factor p1=%Zd not prime and/or too large!\n", p1);
         }
@@ -286,9 +288,11 @@ unsigned long factor(mpz_t p1, mpz_t p2,
     if (IS_PRIME(x1) && IS_PRIME(x2)) {
         unsigned long int sx1 = BITSIZE(x1);
         unsigned long int sx2 = BITSIZE(x2);
-  
-        if (   (sx1 <= lp) && (sx2 <= lp)
-            && ((sx1 + sx2 == sn) || (sx1 + sx2 == sn + 1)) ) {
+
+        bool xok = (sx1 <= lp) && (sx2 <= lp);
+        bool nok = (sx1 + sx2 == sn) || (sx1 + sx2 == sn + 1);
+
+        if (xok && nok) {
             //
             // We have norm = p1 * p2 with pi < lp
             //
@@ -302,6 +306,17 @@ unsigned long factor(mpz_t p1, mpz_t p2,
             mpz_set(p2, x2);
             retval = 2;
         } else {
+            
+            MSG(">>> C: norm=%Zd\n", norm);
+            
+            MSG("factors %Zd and %Zd are prime but sizes mismatch!"
+                     " (norm=%Zd)\n", x1, x2, norm);
+            MSG("size of %Zd is %lu\n", x1, sx1);
+            MSG("size of %Zd is %lu\n", x2, sx2);
+            MSG("size of %Zd is %lu\n", norm, sn);
+            MSG("lp is %lu\n", lp);
+            
+            
             count_bad_factor++;
             MSGDEBUG("factors %Zd and %Zd are prime but sizes mismatch!"
                      " (norm=%Zd)\n", x1, x2, norm);
@@ -317,17 +332,17 @@ unsigned long factor(mpz_t p1, mpz_t p2,
         // when the '-factorall' option is passed on the command line...
         //
         count_more_two_factors++;
-        
+
         MSGDEBUG("factor %Zd and / or %Zd is not prime\n", x1, x2);
     }
-  
+
   clear_and_return:
-  
+
     clear_mpz_array(norm_factors);
     free(norm_factors);
-  
+
     return retval;
-    
+
 }
 //-----------------------------------------------------------------------------
 unsigned long factor_completely(mpz_t p1, mpz_t p2,
@@ -339,7 +354,7 @@ unsigned long factor_completely(mpz_t p1, mpz_t p2,
     //
     // _WARNING_: This is NOT the 'standard' behaviour of checknorms as we
     //            knew it!
-    // 
+    //
     // Factor norm into at most 2 primes smaller than 2^lp:
     //
     //     0) if norm = 1, return 0
@@ -360,7 +375,7 @@ unsigned long factor_completely(mpz_t p1, mpz_t p2,
     //            - count_more_two_factors
     //
     unsigned long sn = BITSIZE(norm);
-    
+
     if (mpz_cmp_ui(norm, 1) == 0) {
         MSGDEBUG("norm is one!\n", norm);
         return 0;
@@ -376,7 +391,7 @@ unsigned long factor_completely(mpz_t p1, mpz_t p2,
         }
         mpz_set(p1, norm);
         *m1 = 1;
-        
+
         return 1;
     }
     unsigned long int retval = 3;
@@ -393,7 +408,7 @@ unsigned long factor_completely(mpz_t p1, mpz_t p2,
     //          pain. This is only partially done now. Based on my numerous
     //          experiments I think that factoring failures are rare
     //          and not likely to arise in this special case. But I do not
-    //          guarantee anything... 
+    //          guarantee anything...
     //
     // _NOTE_:  The perfect square test is performed directly in tifa_factor.
     //
@@ -403,7 +418,7 @@ unsigned long factor_completely(mpz_t p1, mpz_t p2,
                     );
 
     switch (ecode) {
-        
+
     case COMPLETE_FACTORIZATION_FOUND:
         //
         // We have found the complete factorization of the composite norm,
@@ -413,8 +428,10 @@ unsigned long factor_completely(mpz_t p1, mpz_t p2,
         case 2: {
             mpz_ptr x1 = factors->data[0];
             mpz_ptr x2 = factors->data[1];
-            
+
             if ((BITSIZE(x1) > lp) || (BITSIZE(x2) > lp)) {
+                
+                MSG(">>> D: norm=%Zd\n", norm);
                 MSGDEBUG("norm has a too large prime factor!\n");
                 count_bad_factor++;
                 goto clear_and_return;
@@ -428,8 +445,9 @@ unsigned long factor_completely(mpz_t p1, mpz_t p2,
         }
         case 1: {
             mpz_ptr x1 = factors->data[0];
-            
+
             if (BITSIZE(x1) > lp) {
+                MSG(">>> E: norm=%Zd\n", norm);
                 count_bad_factor++;
                 MSGDEBUG("norm has a too large prime factor!\n");
                 goto clear_and_return;
@@ -446,14 +464,14 @@ unsigned long factor_completely(mpz_t p1, mpz_t p2,
             goto clear_and_return;
         }
         break;
-    
+
     case PARTIAL_FACTORIZATION_FOUND:
         if (count_partial_fact_found < MAXNMSG) {
             WARNING("TIFA only partially factored norm %Zd\n", norm);
         }
         //
         // Theoretically, this is the difficult case. It should be very rare,
-        // particularly in this context, but no there is no way to be 100% sure. 
+        // particularly in this context, but no there is no way to be 100% sure.
         // So what can happen here?
         //
         // First if norm was a power of prime, it would have been catched when
@@ -465,15 +483,15 @@ unsigned long factor_completely(mpz_t p1, mpz_t p2,
         // no way norm could then be written as pa^ma * pb^mb with ma, mb prime.
         // So discard the relation.
         //
-        // The hard case is when we found 2 coprime factors, with at least one 
-        // of them not prime. In this case, TIFA was not able to break up the 
+        // The hard case is when we found 2 coprime factors, with at least one
+        // of them not prime. In this case, TIFA was not able to break up the
         // composite factor so it's of no use to try again. The only case we're
         // interested in here in when these unfactored composite are powers of
         // prime. This check has yet to be implemented. For the time being,
         // we just throw out everything even if there's a baby in the bath
         // water...
         //
-        // _TO_DO_: Check for prime powers if exactly two coprime factors are 
+        // _TO_DO_: Check for prime powers if exactly two coprime factors are
         //          found.
         //
         switch (factors->length) {
@@ -491,7 +509,7 @@ unsigned long factor_completely(mpz_t p1, mpz_t p2,
             goto clear_and_return;
         }
         break;
-        
+
     case NO_FACTOR_FOUND:
     case FATAL_INTERNAL_ERROR:
     default:
@@ -507,7 +525,7 @@ unsigned long factor_completely(mpz_t p1, mpz_t p2,
         goto clear_and_return;
         break;
     }
-    
+
   clear_and_return:
 
     clear_mpz_array(factors);
@@ -560,17 +578,17 @@ unsigned long checkrels(char *f, cado_poly cpoly,
     int n;      // number of characters consumed by sscanf
     int npr;    // number of primes read by sscanf
 
-    mpz_t norm; 
+    mpz_t norm;
     mpz_t p1;            // first prime factor of norm (if any)
     mpz_t p2;            // second prime factor of norm (if any)
-    
+
     unsigned int m1 = 1; // multiplicity of first prime factor of norm
     unsigned int m2 = 1; // multiplicity of second prime factor of norm
-    
+
     unsigned long (*factor_func) (mpz_t, mpz_t, unsigned int* const,
                                   unsigned int* const, const mpz_t,
                                   const size_t);
-    
+
     mpz_init(norm);
     mpz_init(p1);
     mpz_init(p2);
@@ -721,7 +739,7 @@ unsigned long checkrels(char *f, cado_poly cpoly,
         }
 
         nfac = factor_func(p1, p2, &m1, &m2, norm, cpoly->lpbr);
-        
+
         //
         // Write additional primes from the factorization of norm (if any).
         //
@@ -729,7 +747,7 @@ unsigned long checkrels(char *f, cado_poly cpoly,
         case 1:
             MSGDEBUG("checkrels: rational side: nfac = 1\n");
             CHECK_PRIME(p1, cpoly->rlim, a, b);
-            
+
             if (npr == 0) {
                 outlength += gmp_sprintf(outrel + outlength, "%Zx", p1);
             } else {
@@ -745,7 +763,7 @@ unsigned long checkrels(char *f, cado_poly cpoly,
             MSGDEBUG("checkrels: rational side: nfac = 2\n");
             CHECK_PRIME(p1, cpoly->rlim, a, b);
             CHECK_PRIME(p2, cpoly->rlim, a, b);
-            
+
             if (npr == 0) {
                 outlength += gmp_sprintf(outrel + outlength, "%Zx", p1);
             } else {
@@ -769,7 +787,7 @@ unsigned long checkrels(char *f, cado_poly cpoly,
             MSGDEBUG("checkrels: rational side: nfac = 3 -> REL DISCARDED\n");
             goto next_relation;
         }
-        
+
         //
         // Evaluate norm on algebraic side
         //
@@ -835,17 +853,17 @@ unsigned long checkrels(char *f, cado_poly cpoly,
             }
             goto next_relation;
         }
-    
+
         nfac = factor_func(p1, p2, &m1, &m2, norm, cpoly->lpba);
-        
+
         //
         // Write additional primes from the factorization of norm (if any).
-        //    
+        //
         switch (nfac) {
         case 1:
             MSGDEBUG("checkrels: algebraic side: nfac = 1\n");
             CHECK_PRIME(p1, cpoly->alim, a, b);
-            
+
             if (npr == 0) {
                 outlength += gmp_sprintf(outrel + outlength, "%Zx", p1);
             } else {
@@ -860,7 +878,7 @@ unsigned long checkrels(char *f, cado_poly cpoly,
             MSGDEBUG("checkrels: algebraic side: nfac = 2\n");
             CHECK_PRIME(p1, cpoly->alim, a, b);
             CHECK_PRIME(p2, cpoly->alim, a, b);
-            
+
             if (npr == 0) {
                 outlength += gmp_sprintf(outrel + outlength, "%Zx", p1);
             } else {
@@ -882,7 +900,7 @@ unsigned long checkrels(char *f, cado_poly cpoly,
             MSGDEBUG("checkrels: algebraic side: nfac = 3 -> REL DISCARDED\n");
             goto next_relation;
         }
-        
+
         nrels_out++;
         if (verbose && !(nrels_out & 4095)) {
             MSG("%lu-th relation found\t\t(%lu read)\n", nrels_out, nrels_in);
@@ -901,9 +919,9 @@ unsigned long checkrels(char *f, cado_poly cpoly,
     MSG("File %s\n", f);
     MSG("-----------------------------------------------------------------\n");
     MSG("Miscellaneous information:\n");
-    
+
     if (!factorall) {
-        MSG("    > Found %lu norm(s) to be perfect prime square(s)\n", 
+        MSG("    > Found %lu norm(s) to be perfect prime square(s)\n",
             count_perfect_square);
     } else {
         MSG("    > Found %lu norms to be perfect prime power(s)\n",
@@ -933,13 +951,13 @@ unsigned long checkrels(char *f, cado_poly cpoly,
         count_no_factor_found + count_factorization_pb);
     MSG("    > %lu relations because of norm had more than 2 factors\n",
         count_more_two_factors);
-    MSG("    > %lu relations because of non suitable factor of norm\n", 
+    MSG("    > %lu relations because of non suitable factor of norm\n",
         count_bad_factor);
-#endif    
+#endif
     MSG("-----------------------------------------------------------------\n");
     MSG("File %s: output %lu out of %lu relations\n", f, nrels_out, nrels_in);
     MSG("-----------------------------------------------------------------\n");
-    
+
     return nrels_out;
 }
 //-----------------------------------------------------------------------------
@@ -978,7 +996,7 @@ int main(int argc, char *argv[]) {
             argc--;
             argv++;
             tdmax = (tdmax < 20) ? 20 : tdmax;
-        
+
         } else if (argc > 2 && strcmp (argv[1], "-poly") == 0) {
             polyfilename = argv[2];
             argc -= 2;

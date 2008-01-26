@@ -480,7 +480,12 @@ unsigned long checkrels(char *f, cado_poly cpoly,
             }
             goto next_relation;
         }
-
+        //
+        // Reset factors and multiplicities before new factorization.
+        //
+        reset_mpz_array(factors);
+        multis->length = 0;
+        
         ecode = factor_completely(
                     factors, multis, norm, cpoly->lpba, maxnlp, cmult
                 );
@@ -592,6 +597,10 @@ unsigned long checkrels(char *f, cado_poly cpoly,
         MSG("    > %lu relations because norm had too much prime factors\n",
             count_too_many_factors);
     }
+    if (count_too_large_factor != 0) {
+        MSG("    > %lu relations because norm had a too large prime factor\n",
+            count_too_large_factor);
+    }
 #endif
 
     MSG("-----------------------------------------------------------------\n");
@@ -647,7 +656,7 @@ unsigned long factor_completely(mpz_array_t*    const factors,
     //          guarantee anything...
     //
     // _NOTE_:  The perfect square test is performed directly in tifa_factor.
-    //
+    //    
     ecode_t ecode = tifa_factor(
                         factors, multis, norm,
                         FIND_COMPLETE_FACTORIZATION
@@ -668,7 +677,7 @@ unsigned long factor_completely(mpz_array_t*    const factors,
             if (mtot > maxnlp) {
                 count_too_many_factors++;
                 if (count_too_many_factors <= MAXNMSG) {
-                    WARNING("Residues %Zd has too much prime factors\n", norm);
+                    WARNING("Residue %Zd has too much prime factors\n", norm);
                 }
                 retval = NORM_IS_REJECTED;
                 goto clean_and_return;
@@ -679,13 +688,17 @@ unsigned long factor_completely(mpz_array_t*    const factors,
         } else if (factors->length > maxnlp) {
             count_too_many_factors++;
             if (count_too_many_factors <= MAXNMSG) {
-                WARNING("Residues %Zd has too much prime factors\n", norm);
+                WARNING("Residue %Zd has too much prime factors\n", norm);
             }
             retval = NORM_IS_REJECTED;
             goto clean_and_return;
         }
         for (uint32_t i = 0; i < factors->length; i++) {
-            if (BITSIZE(factors->data[0]) >= lp) {
+            if (BITSIZE(factors->data[i]) > lp) {
+                count_too_large_factor++;
+                if (count_too_many_factors <= MAXNMSG) {
+                    WARNING("Residue %Zd has too large prime factor\n", norm);
+                }
                 retval = NORM_IS_REJECTED;
                 goto clean_and_return;
             }
@@ -733,12 +746,13 @@ void get_rational_norm(mpz_t norm, mpz_t *g, long a, unsigned long b) {
 }
 //-----------------------------------------------------------------------------
 void get_algebraic_norm(mpz_t norm, mpz_t *f, int d, long a, unsigned long b) {
+    
     mpz_t bpow;
     mpz_init_set_ui(bpow, 1);
     mpz_set(norm, f[d]);
-
+    
     d--;
-    while (d > 0) {
+    while (d >= 0) {
         mpz_mul_si(norm, norm, a);
         mpz_mul_ui(bpow, bpow, b);
         mpz_addmul(norm, f[d], bpow);
@@ -771,12 +785,8 @@ inline bool coprime(long a, unsigned long b) {
 //-----------------------------------------------------------------------------
 uint32_t pi_approx(uint64_t x) {
     size_t i = 0;
-    while (1) {
-        if (x  > pi_table_x[i]) {
-            i++;
-        } else {
-            break;
-        }
+    while (x  > pi_table_x[i]) {
+        i++;
     }
     return pi_table_pi[i];
 }
