@@ -381,7 +381,7 @@ int main(int argc, char **argv) {
 #endif
 
   fprintf(stderr, "Finished accumulating the product in %2.2lf\n", seconds());
-  fprintf(stderr, "v = %d\n", prd->v);
+  fprintf(stderr, "nab = %d, v = %d\n", nab, prd->v);
   fprintf(stderr, "sizeinbit of cst term = %lu\n",
 	  (unsigned long) mpz_sizeinbase(prd->p->coeff[0], 2));
   fprintf(stderr, "sizeinbit of leading term = %lu\n",
@@ -421,6 +421,19 @@ int main(int argc, char **argv) {
     // First check that the squares agree
     mpz_mul(g1, aux, aux);
     mpz_mod(g1, g1, pol->n);
+    if(mpz_cmp_ui(pol->g[1], 1)){
+	// case g(X)=m1*X+m2 with m1 != 1
+	// we should have prod (a+b*m2/m1) = A^2 = R^2/m1^nab
+	// and therefore nab should be even
+	if(nab & 1){
+	    fprintf(stderr, "Sorry, but #(a, b) is odd\n");
+	    printf("Failed\n");
+	    return 0;
+	}
+	mpz_powm_ui(g2, pol->g[1], (nab>>1), pol->n);
+	mpz_mul(algsqrt, algsqrt, g2);
+	mpz_mod(algsqrt, algsqrt, pol->n);
+    }
     mpz_mul(g2, algsqrt, algsqrt);
     mpz_mod(g2, g2, pol->n);
     if (mpz_cmp(g1, g2)!=0) {
