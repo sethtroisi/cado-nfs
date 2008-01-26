@@ -48,6 +48,8 @@ sieve/makefb -poly $tmp/$name.poly > $tmp/$name.roots
 ## the sieving parameters must be given by hand, sorry!
 ## and they depend on the polynomial found by polyselect (i.e., b-bound 2500
 ## below might be too small with different polynomials)
+## WARNING: see polyselect/README to know how to optimize the sieving region
+## and check the sieving parameters are optimal
 sieve/sieve -poly $tmp/$name.poly -fb $tmp/$name.roots -1000000 1000000 1 2500\
  > $tmp/$name.rels_raw
 
