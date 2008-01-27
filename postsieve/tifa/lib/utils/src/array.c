@@ -96,7 +96,7 @@ void resize_byte_array(byte_array_t* array, uint32_t alloced) {
     array->alloced = alloced;
 }
 //-----------------------------------------------------------------------------
-void append_byte_to_array(byte_array_t* array, unsigned char to_append) {
+void append_byte_to_array(byte_array_t* array, const unsigned char to_append) {
     if (array->length >= array->alloced) {
         resize_byte_array(array, array->length + ELONGATION);
     }
@@ -291,7 +291,7 @@ void resize_uint32_array(uint32_array_t* array, uint32_t alloced) {
     array->alloced = alloced;
 }
 //-----------------------------------------------------------------------------
-void append_uint32_to_array(uint32_array_t* array, uint32_t to_append) {
+void append_uint32_to_array(uint32_array_t* array, const uint32_t to_append) {
     if (array->length >= array->alloced) {
         resize_uint32_array(array, array->length + ELONGATION);
     }
@@ -486,7 +486,7 @@ void resize_int32_array(int32_array_t* array, uint32_t alloced) {
     array->alloced = alloced;
 }
 //-----------------------------------------------------------------------------
-void append_int32_to_array(int32_array_t* array, int32_t to_append) {
+void append_int32_to_array(int32_array_t* array, const int32_t to_append) {
     if (array->length >= array->alloced) {
         resize_int32_array(array, array->length + ELONGATION);
     }
@@ -659,7 +659,7 @@ void resize_mpz_array(mpz_array_t* const array, uint32_t alloced) {
     array->alloced = alloced;
 }
 //-----------------------------------------------------------------------------
-void append_mpz_to_array(mpz_array_t* array, mpz_t to_append) {
+void append_mpz_to_array(mpz_array_t* array, const mpz_t to_append) {
     if (array->length >= array->alloced) {
         resize_mpz_array(array, array->length + ELONGATION);
     }
@@ -884,7 +884,7 @@ void resize_binary_array(binary_array_t* array, uint32_t alloced) {
     array->alloced = nalloc;
 }
 //-----------------------------------------------------------------------------
-void append_bit_to_array(binary_array_t* array, unsigned int to_append) {
+void append_bit_to_array(binary_array_t* array, const unsigned int to_append) {
 
     if (array->length >= (array->alloced * BITSTRING_T_BITSIZE)) {
         resize_binary_array(

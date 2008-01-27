@@ -176,7 +176,7 @@ void resize_byte_array(byte_array_t* const array, uint32_t alloced);
     * \param[in] array A pointer to the recipient <tt>byte_array_t</tt>.
     * \param[in] to_append The byte to append.
     */
-void append_byte_to_array(byte_array_t* array, unsigned char to_append);
+void append_byte_to_array(byte_array_t* array, const unsigned char to_append);
 
    /**
     * \brief Appends the content of a <tt>byte_array_t</tt> to another one.
@@ -409,7 +409,7 @@ void resize_uint32_array(uint32_array_t* const array, uint32_t alloced);
     * \param[in] array A pointer to the recipient <tt>uint32_array_t</tt>.
     * \param[in] to_append The integer to append.
     */
-void append_uint32_to_array(uint32_array_t* array, uint32_t to_append);
+void append_uint32_to_array(uint32_array_t* array, const uint32_t to_append);
 
    /**
     * \brief Appends the content of a <tt>uint32_array_t</tt> to another one.
@@ -644,7 +644,7 @@ void resize_int32_array(int32_array_t* const array, uint32_t alloced);
     * \param[in] array A pointer to the recipient <tt>int32_array_t</tt>.
     * \param[in] to_append The integer to append.
     */
-void append_int32_to_array(int32_array_t* array, int32_t to_append);
+void append_int32_to_array(int32_array_t* array, const int32_t to_append);
 
    /**
     * \brief Appends the content of an <tt>int32_array_t</tt> to another one.
@@ -884,7 +884,7 @@ void swap_mpz_array(mpz_array_t* const a, mpz_array_t* const b);
     * \param[in] array A pointer to the recipient <tt>mpz_array_t</tt>.
     * \param[in] to_append The <tt>mpz_t</tt> to append.
     */
-void append_mpz_to_array(mpz_array_t* array, mpz_t to_append);
+void append_mpz_to_array(mpz_array_t* array, const mpz_t to_append);
 
    /**
     * \brief Appends the content of an <tt>mpz_array_t</tt> to another one.
@@ -1109,8 +1109,7 @@ void resize_binary_array(binary_array_t* const array, uint32_t alloced);
     * \param[in] to_append The bit to append (1 if <tt>to_append != 0</tt>,
     *                      0 otherwise).
     */
-void append_binary_to_array(binary_array_t* array, unsigned int to_append);
-
+void append_bit_to_array(binary_array_t* array, const unsigned int to_append);
 
    /**
     * \brief Prints a <tt>binary_array_t</tt>.
