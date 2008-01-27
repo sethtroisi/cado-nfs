@@ -697,8 +697,11 @@ unsigned long factor_completely(mpz_array_t*    const factors,
             if (BITSIZE(factors->data[i]) > lp) {
                 count_too_large_factor++;
                 if (count_too_large_factor <= MAXNMSG) {
-                    WARNING("Residue %Zd has too large prime factor %Zd (%lu bits)\n",
-                            norm, factors->data[i], BITSIZE(factors->data[i]));
+                    WARNING(
+                        "Residue %Zd has too large prime factor %Zd "
+                        "(%lu bits)\n", norm, factors->data[i],
+                        BITSIZE(factors->data[i])
+                    );
                 }
                 retval = NORM_IS_REJECTED;
                 goto clean_and_return;
