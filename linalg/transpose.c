@@ -163,6 +163,10 @@ void rebuild()
     vec_uint_clear_array(&rows, NROWS_CORE);
     for(i = 0 ; i < nfiles ; i++) {
         fclose(fin_vchunks[i]);
+        char dstfile[80];
+        snprintf(dstfile, sizeof(dstfile), "%s/temp.%u.%04d",
+                tmpdir, getpid(), i);
+        unlink(dstfile);
     }
     free(fin_vchunks);
 }
