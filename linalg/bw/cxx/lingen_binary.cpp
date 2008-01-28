@@ -1182,7 +1182,7 @@ static void go_quadratic(polmat& pi)/*{{{*/
         rearrange_ordering(tmp_pi, piv);
         t++;
         // if (t % 60 < 10 || deg-dt < 30)
-        write_polmat(tmp_pi,std::string(fmt("pi-%-%") % tstart % t).c_str());
+        // write_polmat(tmp_pi,std::string(fmt("pi-%-%") % tstart % t).c_str());
     }
     pi.swap(tmp_pi);
     write_polmat(pi,std::string(fmt("pi-%-%") % tstart % t).c_str());

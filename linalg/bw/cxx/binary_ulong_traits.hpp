@@ -133,7 +133,7 @@ struct binary_pod_traits {
         static std::istream& get(std::istream& o, scalar_t & x)
         {
             T z = 0;
-            unsigned int v;
+            unsigned long v;
             for(unsigned int i = 0 ; i < nbits ; i++) {
                 o >> v;
                 z |= (v << i);
