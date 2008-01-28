@@ -209,7 +209,7 @@ if ($msize) {
 		unless ($nrows && $ncols);
 }
 
-if ($dimk > $msize / 2) {
+if (defined($msize) && !defined($matrix) && $dimk > $msize / 2) {
     die "dimk $dimk seems unreasonably large for matrix size $msize";
 }
 

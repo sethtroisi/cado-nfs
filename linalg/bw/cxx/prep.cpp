@@ -282,7 +282,7 @@ void setup_vectors(simple_matmul_toy<traits>& matmul)
         unsigned int r;
         r = compute_rank(& a1a2[0][0], m, NBITER * n, globals::modulus);
 
-        cout << "// Rank: " << r << "\n";
+        cout << "// Rank: " << r << endl;
 
         if (r == m)
             break;
@@ -293,7 +293,7 @@ void setup_vectors(simple_matmul_toy<traits>& matmul)
     for(unsigned int c = 0; c < nr;c++ ) {
         for (unsigned int j = 0 ; j < n/nbys ; j++) {
             if (j) o << " ";
-            o << ystrips[j][c];
+            traits::print(o, ystrips[j][c]);
         }
         o << "\n";
     }
@@ -331,7 +331,6 @@ int main(int argc, char *argv[])
     stats(files::matrix);
 
     BUG_ON(stats.nr!= stats.nc);
-    simple_matmul_toy<variable_scalar_traits> mul_code(stats, files::matrix);
 
     globals::m = mine.m;
     globals::n = mine.n;
@@ -349,7 +348,44 @@ int main(int argc, char *argv[])
         cfg << fmt("m=%\n") %  globals::m;
     }
 
-    setup_vectors(mul_code);
+    if (globals::modulus == 2) {
+        if (mine.n % 128 == 0) {
+            typedef binary_sse2_traits T;
+            globals::nbys = 128;
+            simple_matmul_toy<T> mul_code(stats, files::matrix);
+            setup_vectors(mul_code);
+        } else if (mine.n % 64 == 0) {
+            typedef binary_pod_traits<uint64_t> T;
+            globals::nbys = 64;
+            simple_matmul_toy<T> mul_code(stats, files::matrix);
+            setup_vectors(mul_code);
+        } else if (mine.n % 32 == 0) {
+            typedef binary_pod_traits<uint32_t> T;
+            globals::nbys = 32;
+            simple_matmul_toy<T> mul_code(stats, files::matrix);
+            setup_vectors(mul_code);
+        } else if (mine.n % 16 == 0) {
+            typedef binary_pod_traits<uint16_t> T;
+            globals::nbys = 16;
+            simple_matmul_toy<T> mul_code(stats, files::matrix);
+            setup_vectors(mul_code);
+        } else if (mine.n % 8 == 0) {
+            typedef binary_pod_traits<uint8_t> T;
+            globals::nbys = 8;
+            simple_matmul_toy<T> mul_code(stats, files::matrix);
+            setup_vectors(mul_code);
+        } else {
+            typedef variable_scalar_traits T; 
+            globals::nbys = 1;
+            simple_matmul_toy<T> mul_code(stats, files::matrix);
+            setup_vectors(mul_code);
+        }
+    } else {
+        typedef variable_scalar_traits T; 
+        globals::nbys = 1;
+        simple_matmul_toy<T> mul_code(stats, files::matrix);
+        setup_vectors(mul_code);
+    }
 }
 
 
