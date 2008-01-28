@@ -29,7 +29,29 @@
 
 using namespace std;
 
+
 set<unsigned int> zrows;
+
+#ifdef  USE_GMP_RANDOM
+static gmp_randstate_t random_state;
+static mp_limb_t myrand()
+{
+        return gmp_urandomb_ui(random_state, GMP_LIMB_BITS);
+}
+static void myseed(unsigned long int x)
+{
+        gmp_randseed_ui(random_state, x);
+}
+#else
+static mp_limb_t myrand()
+{
+        return random();
+}
+static void myseed(unsigned long int x)
+{
+        srand(x);
+}
+#endif
 
 void setup_vectors(unsigned int nrows, int m, int n, const mpz_class& p)
 {
@@ -43,13 +65,14 @@ void setup_vectors(unsigned int nrows, int m, int n, const mpz_class& p)
 		must_open(o, files::y % j);
 #if 0
 		for (unsigned int c = 0; c < nrows; c++) {
-			t = random() | 0x01UL;
+			t = myrand() | 0x01UL;
 			t %= p;
 			o << t << "\n";
 		}
 #endif
 		typedef set<unsigned int>::const_iterator suci_t;
 		suci_t sc = zrows.begin();
+                int kz = 0;
 		for(unsigned int c = 0; c < nrows; ) {
 			uint next_c;
 			if (sc == zrows.end()) {
@@ -60,14 +83,16 @@ void setup_vectors(unsigned int nrows, int m, int n, const mpz_class& p)
 			}
 			/* aside zero rows, there's no constraint */
 			for( ; c < next_c ; c++) {
-				t = random() % p;
+				t = myrand() % p;
 				o << t << "\n";
 			}
 			/* For zero rows, we'd better stay OUT of the
 			 * subspace of the image ! */
 			if (c < nrows) {
-				t = random() % p;
-				t += (t == 0);
+				// t = myrand() % p;
+                                // force the intersection with the zero
+                                // cols to be a set of I_n matrices.
+                                t = ((kz++ - j) % n == 0);
 				o << t << "\n";
 				c++;
 			}
@@ -89,7 +114,7 @@ void setup_vectors(unsigned int nrows, int m, int n, const mpz_class& p)
 		 */
 		unsigned int idx;
 		for(;;) {
-			idx= ((random()) % nrows);
+			idx= ((myrand()) % nrows);
 			if (zrows.find(idx) == zrows.end()) {
 				break;
 			}
@@ -141,8 +166,14 @@ int main(int argc, char *argv[])
 	string mstr;
 	ifstream mtx;
 	
-	/* Random state seeding is done from within the argument parser
-	 */
+#ifdef  USE_GMP_RANDOM
+        gmp_randinit_mt(random_state);
+#endif
+        if (mine.seed == 0) {
+                myseed(time(NULL));
+        } else {
+                myseed(mine.seed);
+        }
 
 	must_open(mtx, files::matrix);
 

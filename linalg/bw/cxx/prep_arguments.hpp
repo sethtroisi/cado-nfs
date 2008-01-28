@@ -33,11 +33,6 @@ struct prep_arguments {
 		return b;
 	}
 	void trigger() const {
-		if (seed == 0) {
-			srandom(time(NULL));
-		} else {
-			srandom(seed);
-		}
 	}
 };
 
