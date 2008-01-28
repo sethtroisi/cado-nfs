@@ -519,7 +519,6 @@ template < typename traits >
     typedef typename traits::wide_scalar_t wide_scalar_t;
     int cp_lag;
     uint bound_deg_f;
-    uint degf;
     scalar_t *sum;
     scalar_t *fptr;
     int accumulate_wide;
@@ -652,6 +651,7 @@ template < typename traits >
     uint set_f_coeffs(typename traits::scalar_t * f, uint maxdeg)
 {
     uint deg = 0;
+    int largest_nz = -1;
     // memset(f, 0, (maxdeg + 1) * sizeof(typename traits::scalar_t));
     traits::zero(f, maxdeg + 1);
     ifstream fx;
@@ -664,12 +664,20 @@ template < typename traits >
 	/* read all n coefficients, only select the one we're
 	 * really interested in.
 	 */
+        int nonzero = 0;
 	for (uint i = 0; i < globals::n; i++) {
-	    *foo++ = *inp++;
+            mpz_class z = *inp++;
+            *foo++ = z;
+	    nonzero += z != 0;
 	}
 	// core_ops::assign<MODULUS_SIZE>(f[deg], line[globals::col]);
 	traits::assign(f[deg], line, globals::col);
+        if (nonzero) {
+            largest_nz = deg;
+        }
     }
+    deg = largest_nz;
+#if 0
     deg--;
     for (; deg >= 0 && traits::is_zero(f[deg]); deg--) {
 	/* I don't really have time to check this -- shoudl be
@@ -682,7 +690,7 @@ template < typename traits >
 	traits::print(cout, f[deg]);
 	cout << endl;
     }
-
+#endif
 
     return deg;
 }

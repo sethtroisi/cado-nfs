@@ -19,13 +19,52 @@
 using namespace std;
 using namespace boost;
 
+std::string& sanitize(std::string& s)
+{
+    for(unsigned int i = 0 ; i < s.size() ; i++) {
+        switch(s[i]) {
+            case '.':
+            case ':':
+            case '-':
+                s[i] = '_';
+            default:
+                break;
+        }
+    }
+    return s;
+}
+
 template<typename T>
-void pvec(const std::string& n, const vector<T>& co)
+int data_per_row(std::string const f)
+{
+    T t;
+    ifstream a(f.c_str());
+    if (!a.is_open()) {
+        cerr << fmt("no file %\n") % f;
+        return -1;
+    }
+    std::string line;
+    getline(a, line);
+    istringstream ss(line);
+    int ny;
+    for(ny = 0 ; ss >> t ; ny++);
+    a.close();
+
+    if (ny == 0) {
+        cerr << fmt("problem with file %\n") % f;
+    }
+
+    return ny;
+}
+
+template<typename T>
+void pvec(const std::string& s, const vector<T>& co)
 {
     if (co.empty()) {
         return;
     }
-    cout << fmt("%:=Vector([GF(p) | \n") % n;
+    // cerr << s << endl;
+    cout << fmt("%:=Vector([GF(p) | \n") % s;
     copy(co.begin(), co.end() - 1,
             ostream_iterator<T>(cout, ", "));
     cout << co.back() << "]);\n";
@@ -34,6 +73,7 @@ void pvec(const std::string& n, const vector<T>& co)
 template<typename T>
 void pmatpol(const std::string& s, const vector<T>& co, int m, int n)
 {
+    // cerr << s << endl;
     if (co.size() % (m*n) != 0) {
         cerr << fmt("% has size % which is not a multiple of %*%\n")
             % s % co.size() % m % n;
@@ -57,6 +97,7 @@ template<typename T>
 bool rvec(const std::string& f, vector<T>& co)
 {
     ifstream y;
+    // cerr << "?" << f << endl ;
     if (!open(y, f)) return false;
     co.clear();
     copy(istream_iterator<T>(y),
@@ -73,24 +114,11 @@ bool r_avec(vector<T>& co, int m, int n)
         for(int j = 0 ; j < n ; ) {
             /* columns might come together ! */
             std::string a_nm = files::a % i % j;
-            int ny;
-            T t;
-            {
-                ifstream a(a_nm.c_str());
-                if (!a.is_open()) {
-                    cerr << fmt("no file %\n") % a_nm;
-                    return false;
-                }
-                std::string line;
-                getline(a, line);
-                istringstream ss(line);
-                for(ny = 0 ; ss >> t ; ny++);
-                a.close();
-            }
-            if (ny == 0) {
-                cerr << fmt("problem with file %\n") % a_nm;
-            }
+            int ny = data_per_row<T>(a_nm);
+            if (ny < 0)
+                break;
             ifstream a(a_nm.c_str());
+            T t;
             for(int d = 0 ; !a.eof() ; d++) {
                 int k;
                 for(k = 0 ; k < ny && a >> t ; k++) {
@@ -135,12 +163,25 @@ try_pi(int m, int n)
         return;
     }
 
+    int smin = INT_MAX;
+    int emax = INT_MIN;
+
     for(;(curr=readdir(pi_dir))!=NULL;) {
         int s,e;
         if (sscanf(curr->d_name,"pi-%d-%d",&s,&e)==2) {
-            do_pi<T>(fmt("pi_%_%")%s%e, curr->d_name, m, n);
+            std::string v = curr->d_name;
+            sanitize(v);
+            do_pi<T>(v, curr->d_name, m, n);
+            if (s < smin)
+                smin = s;
+            if (e > emax)
+                emax = e;
         }
     }
+    std::string v = fmt("pi-%-%")        %smin%emax;
+    sanitize(v);
+
+    cout << fmt("if assigned % then PI:=%; end if;\n") % v % v;
 
     closedir(pi_dir);
 
@@ -287,14 +328,28 @@ int main(int argc, char * argv[])
         vector<mpz_class> co;
         if (!rvec(files::f_init, co)) break;
         pmatpol("F_INIT", co, n, m+n);
-        if (!rvec("F00", co)) break; pmatpol("F00", co, n, 1);
-        if (!rvec("F01", co)) break; pmatpol("F01", co, n, 1);
-        if (!rvec("F02", co)) break; pmatpol("F02", co, n, 1);
-        if (!rvec("F03", co)) break; pmatpol("F03", co, n, 1);
-        if (!rvec("F04", co)) break; pmatpol("F04", co, n, 1);
-        if (!rvec("F05", co)) break; pmatpol("F05", co, n, 1);
-        if (!rvec("F06", co)) break; pmatpol("F06", co, n, 1);
-        if (!rvec("F07", co)) break; pmatpol("F07", co, n, 1);
+        for(unsigned int j = 0 ; j < n ; j++) {
+            std::string fi = files::f % j;
+
+            if (rvec(fi, co)) {
+                sanitize(fi);
+                pmatpol(fi, co, n, 1);
+                for(unsigned int k = 0 ; k < n ; k++) {
+                    // FjYk
+                    for(unsigned int l = 1 ;  ; l++) {
+                        std::string fxy = files::fxy % j % k % l;
+                        if (rvec(fxy, co)) {
+                            // int ny = data_per_row(a_nm);
+                            sanitize(fxy);
+                            pvec(fxy, co);
+                        } else {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
     } while (0);
 
     do {
