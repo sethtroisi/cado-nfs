@@ -585,7 +585,7 @@ MKSOL : {
 		action "${bindir}bw-gather --subdir $wdir $s";
 		my $s0 = sprintf '%02d', $s;
 		if (-f "$wdir/W$s0") {
-			push @sols_found, "W0$s";
+			push @sols_found, "W$s0";
 		}
 		if ($matrix) {
 			my $d = dirname $matrix;

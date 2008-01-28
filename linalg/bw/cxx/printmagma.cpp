@@ -89,8 +89,8 @@ void pmatpol(const std::string& s, const vector<T>& co, int m, int n)
         cout << "]";
     }
     cout << "];\n";
-    cout << fmt("%:=&+[X^(i-1)*RMatrixSpace(KP,%,%)!(%_mats[i]) : "
-            "i in [1..#%_mats]];\n") % s % m % n % s % s;
+    cout << fmt("%:=&+[RMatrixSpace(KP,%,%)|X^(i-1)*RMatrixSpace(KP,%,%)!(%_mats[i]) : "
+            "i in [1..#%_mats]];\n")%s%m%n%m%n%s%s;
 }
 
 template<typename T>

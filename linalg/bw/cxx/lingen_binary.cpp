@@ -32,6 +32,8 @@
 #define Lmacro(N, m, n) (iceildiv((N)+2*(n),(m))+iceildiv((N)+2*(n),(n))+10)
 
 unsigned int rec_threshold = 0;
+
+/* This disables cantor for the time being */
 unsigned int cantor_threshold = UINT_MAX;
 
 #include "auxfuncs.h"   /* for die, coredump_limit */
@@ -127,7 +129,6 @@ namespace globals {
     unsigned int t,t0,total_work;
     std::vector<unsigned int> delta;
     std::vector<unsigned int> chance_list;
-    std::vector<unsigned int> gone_mad;
 
     polmat E;
     bmat e0;
@@ -189,8 +190,6 @@ void compute_final_F_from_PI(polmat& F, polmat const& pi)/*{{{*/
         //
         // Now fill in the row.
         for(unsigned int j = 0 ; j < m + n ; j++) {
-            if (gone_mad[j])
-                continue;
             // We zero out the whole column, it's less trouble.
             tmpmat.zcol(0);
             for(unsigned int k = 0 ; k < l.size() ; k++) {
@@ -204,8 +203,6 @@ void compute_final_F_from_PI(polmat& F, polmat const& pi)/*{{{*/
         }
     }
     for(unsigned int j = 0 ; j < m + n ; j++) {
-        if (gone_mad[j])
-            continue;
         tmp_F.deg(j) = t0 + pi.deg(j);
     }
     F.swap(tmp_F);
@@ -426,12 +423,6 @@ void bw_commit_f(polmat& F) /*{{{*/
 
     for (unsigned int j = 0; j < m + n ; j++) {
         std::string filename = files::f % j;
-        if (gone_mad[j]) {
-            cout << fmt("not writing % -- gone haywire since step %, "
-                    "hence % steps ago\n")
-                % filename % (t-gone_mad[j]) % gone_mad[j] ;
-            continue;
-        }
         ofstream f(filename.c_str());
         cout << "Writing " << filename << endl;
         if (!f.is_open()) {
@@ -616,7 +607,6 @@ static void bw_init(void)
     // ft_order_t::init(ncmax, ops_poly_args);
 
     delta.assign(m + n, -1);
-    gone_mad.assign(m + n, 0);
     chance_list.assign(m + n, 0);
 
     if (!recover_f0_data(files::f_initq.c_str())) {
@@ -690,7 +680,6 @@ static void rearrange_ordering(polmat & PI, unsigned int piv[])/*{{{*/
     }
     permute(delta, p);
     permute(chance_list, p);
-    permute(gone_mad, p);
     if (piv) {
         for(unsigned int i = 0 ; i < m ; i++) {
             piv[i] = p[piv[i]];
@@ -700,7 +689,7 @@ static void rearrange_ordering(polmat & PI, unsigned int piv[])/*{{{*/
     e0.perm(p);
 }/*}}}*/
 
-static void gauss(unsigned int piv[], polmat& PI)/*{{{*/
+static bool gauss(unsigned int piv[], polmat& PI)/*{{{*/
 {
     /* Do one step of (column) gaussian elimination on e0. The columns
      * are assumed to be in the exact order that corresponds to the
@@ -713,6 +702,7 @@ static void gauss(unsigned int piv[], polmat& PI)/*{{{*/
      */
     unsigned int i,j,k;
     unsigned int rank;
+    bool finished = false;
 
     rank = 0 ;
 
@@ -748,16 +738,26 @@ static void gauss(unsigned int piv[], polmat& PI)/*{{{*/
         PI.xmul_col(j);
         // E.xmul_col(j);
         delta[j]++;
-        if (PI.deg(j) >= (int) PI.ncoef) {
-            if (gone_mad[j] == 0) {
-                std::cout << fmt("Column % goes haywire from step %\n")%j%t;
-            }
-            gone_mad[j]++;
-            PI.deg(j) = PI.ncoef-1;
+        if (PI.deg(j) >= (int) PI.ncoef - 1) {
+            std::cout << fmt("Column % exceeds max deg % at step %\n")
+                %j%(PI.ncoef - 1)%t;
+            finished = true;
         }
     }
     BUG_ON (rank != m);
 
+    /* Normally our bound is set up so that we're assured to have at
+     * least one generator found.
+     */
+    if (finished) {
+        unsigned ctot = 0;
+        for (unsigned int j = 0; j < m + n; j++) {
+            ctot += chance_list[j];
+        }
+        BUG_ON(!ctot);
+    }
+
+    return finished;
     /*
     std::cout << "Invertible e0 matrix\n";
     for(unsigned int i = 0 ; i < m ; i++) {
@@ -1136,6 +1136,25 @@ static void extract_coeff_degree_t(unsigned int tstart, unsigned int dt, unsigne
     }
 }/*}}}*/
 
+static unsigned int pi_deg_bound(unsigned int d)/*{{{*/
+{
+    using namespace globals;
+    /* How many coefficients should we allocate for the transition matrix pi
+     * corresponding to a degree d increase ?
+     *
+     * The average value is
+     *
+     * \left\lceil d\frac{m}{m+n}\right\rceil
+     *
+     * With large probability, we expect the growth of the degree in the
+     * different columns to be quite even. Only at the end of the computation
+     * does it begin to go live.
+     *
+     * The + 10 excess here is sort of a safety net.
+     */
+    return iceildiv(d * m, (m + n)) + 10;
+}/*}}}*/
+
 /*
  * Rule : in the following, ec can be trashed at will.
  *
@@ -1145,14 +1164,14 @@ static void extract_coeff_degree_t(unsigned int tstart, unsigned int dt, unsigne
  *
  */
 
-static void go_quadratic(polmat& pi)/*{{{*/
+static bool go_quadratic(polmat& pi)/*{{{*/
 {
     using namespace globals;
 
     unsigned int piv[m];
     unsigned int deg = E.ncoef - 1;
 
-    polmat tmp_pi(m + n, m + n, deg * m / (m + n) + 10);
+    polmat tmp_pi(m + n, m + n, pi_deg_bound(deg) + 1);
     for(unsigned int i = 0 ; i < m + n ; i++) {
         tmp_pi.addcoeff(i,i,0,1UL);
         tmp_pi.deg(i) = 0;
@@ -1161,8 +1180,8 @@ static void go_quadratic(polmat& pi)/*{{{*/
     rearrange_ordering(tmp_pi, NULL);
 
     unsigned int tstart = t;
-
-    for (unsigned int dt = 0; dt <= deg ; dt++) {
+    bool finished = false;
+    for (unsigned int dt = 0; !finished && dt <= deg ; dt++) {
         double delta;
         delta = seconds() - start_time;
 
@@ -1178,7 +1197,7 @@ static void go_quadratic(polmat& pi)/*{{{*/
 
         print_deltas();
 	extract_coeff_degree_t(tstart, dt, dt ? piv : NULL, tmp_pi);
-        gauss(piv, tmp_pi);
+        finished = gauss(piv, tmp_pi);
         rearrange_ordering(tmp_pi, piv);
         t++;
         // if (t % 60 < 10 || deg-dt < 30)
@@ -1187,60 +1206,32 @@ static void go_quadratic(polmat& pi)/*{{{*/
     pi.swap(tmp_pi);
     write_polmat(pi,std::string(fmt("pi-%-%") % tstart % t).c_str());
     print_deltas();
+
+    return finished;
 }/*}}}*/
 
 
-static void compute_lingen(polmat& pi);
+static bool compute_lingen(polmat& pi);
 
 template<typename fft_type>
-static void go_recursive(polmat& pi)
+static bool go_recursive(polmat& pi)
 {
     using namespace globals;
-    unsigned int deg = E.ncoef - 1;
-    unsigned int ldeg = deg / 2 + 1;
-    unsigned int rdeg = (deg + 1) / 2;
 
-    /* Repartition of the job:
-     *
-     *		left		right
-     * deg==0	1		0	(never recursive)
-     * deg==1	1		1
-     * deg==2	2		1
-     * deg==n	n/2 + 1		(n+1)/2
-     * 
-     * The figures are for the number of steps, each one corres-
-     * ponding to a m/(m+n) increase of the average degree of pi.
+    /* E is known up to O(X^E.ncoef), so we'll consider this is a problem
+     * of degree E.ncoef -- this is exactly the number of increases we
+     * have to make
      */
-    /* We aim at computing ec * pi / X^ldeg. The degree of this
-     * product will be
-     *
-     * ec->degree + pi->degree - ldeg
-     *
-     * (We are actually only interested in the low (ec->degree-ldeg)
-     * degree part of the product, but the whole thing is required)
-     *
-     * The expected value of pi->degree is 
-     * 	ceil(ldeg*m/(m+n))
-     *
-     * The probability that pi exceeds this expected degree
-     * depends on the base field, but is actually low.
-     * However, by the end of the computations, this does
-     * happen because the degrees increase unevenly.
-     *
-     * The DFTs of e and pi can be computed using only the
-     * number of points given above, *even if their actual
-     * degree is higher*. The FFT routines need to have
-     * provision for this.
-     *
-     * The number of points will then be the smallest power
-     * of 2 above deg+ceil(ldeg*m/(m+n))-ldeg+1
-     */
+    unsigned int deg = E.ncoef;
+    unsigned int rdeg = deg / 2;
+    unsigned int ldeg = deg - rdeg;
 
-    assert(ldeg && rdeg && ldeg + rdeg == deg + 1);
+    assert(ldeg && rdeg && ldeg + rdeg == deg);
 
-    unsigned int expected_pi_deg = 10 + iceildiv(ldeg*m, (m+n));
+    unsigned int expected_pi_deg = pi_deg_bound(ldeg);
     unsigned int kill;
     unsigned int tstart = t;
+    bool finished_early;
 
 #ifdef	HAS_CONVOLUTION_SPECIAL
     kill=ldeg;
@@ -1254,20 +1245,41 @@ static void go_recursive(polmat& pi)
     tpolmat<fft_type> E_hat;
     transform(E_hat, E, o, deg);
 
-    E.resize(ldeg - 1 + 1);
+    E.resize(ldeg);
     polmat pi_left;
-    compute_lingen(pi_left);
+    finished_early = compute_lingen(pi_left);
     E.clear();
-
-    if (t < t0 + ldeg) {
-        printf("Exceptional situation, small generator ; escaping\n");
-        pi.swap(pi_left);
-        return;
-    }
-
     int pi_l_deg = pi_left.maxdeg();
 
+    if (t < t0 + ldeg) {
+        ASSERT(finished_early);
+    }
+    if (finished_early) {
+        printf("Exceptional situation:\n"
+                "generator of degree %d ; escaping\n",
+                pi_l_deg);
+        pi.swap(pi_left);
+        return true;
+    }
+
     printf("deg(pi_l)=%d, bound is %d\n",pi_l_deg,expected_pi_deg);
+
+    /* Since we break early now, this should no longer occur except in
+     * VERY pathological cases. Two uneven increases might go unnoticed
+     * if the safety margin within pi_deg_bound is loose enough. However
+     * this will imply that the product has larger degree than expected
+     * -- and will keep going on the steeper slope. Normally this would
+     * go with ``finishing early'', unless there's something odd with
+     * the rational form of the matrix -- typically  a matrix with
+     * hu-u-uge kernel might trigger odd behaviour to this respect.
+     *
+     * For the record: (20080128):
+     *
+     * ./doit.pl msize=500 dimk=99 mn=8 vectoring=8 modulus=2 dens=4
+     * multisols=1 tidy=0 seed=714318 dump=1
+     */
+    BUG_ON(pi_l_deg >= (int) expected_pi_deg);
+#if 0
     if (pi_l_deg >= (int) expected_pi_deg) {/*{{{*/
         printf("Warning : pi grows above its expected degree...\n");
         /*
@@ -1291,6 +1303,7 @@ static void go_recursive(polmat& pi)
         pi.swap(pi_left);
         return;
     }/*}}}*/
+#endif
 
     tpolmat<fft_type> pi_l_hat;
     transform(pi_l_hat, pi_left, o, pi_l_deg);
@@ -1303,7 +1316,7 @@ static void go_recursive(polmat& pi)
     E_hat.clear();
     /* pi_l_hat is used later on ! */
 
-    itransform(E, E_middle_hat, o, deg + pi_l_deg - kill);
+    itransform(E, E_middle_hat, o, deg-1 + pi_l_deg - kill);
     E_middle_hat.clear();
 
     /* Make sure that the first ldeg-kill coefficients of all entries of
@@ -1313,10 +1326,10 @@ static void go_recursive(polmat& pi)
     ASSERT(E.valuation() >= ldeg - kill);
 
     /* This chops off some data */
-    E.xdiv_resize(ldeg - kill, rdeg - 1 + 1);
+    E.xdiv_resize(ldeg - kill, rdeg);
 
     polmat pi_right;
-    compute_lingen(pi_right);
+    finished_early = compute_lingen(pi_right);
     int pi_r_deg = pi_right.maxdeg();
     E.clear();
 
@@ -1332,9 +1345,16 @@ static void go_recursive(polmat& pi)
     itransform(pi, pi_hat, o, pi_l_deg + pi_r_deg);
 
     write_polmat(pi,std::string(fmt("pi-%-%") % tstart % t).c_str());
+
+    if (finished_early) {
+        printf("Exceptional situation:\n"
+                "generator of degree %d ; escaping\n",
+                pi.maxdeg());
+    }
+    return finished_early;
 }
 
-static void compute_lingen(polmat& pi)
+static bool compute_lingen(polmat& pi)
 {
     /* reads the data in the global thing, E and delta. ;
      * compute the linear generator from this.
@@ -1343,15 +1363,15 @@ static void compute_lingen(polmat& pi)
     unsigned int deg = E.ncoef - 1;
 
     if (deg <= rec_threshold) {
-        go_quadratic(pi);
+        return go_quadratic(pi);
     } else if (deg < cantor_threshold) {
         /* The bound is such that deg + deg/4 is 64 words or less */
-        go_recursive<fake_fft>(pi);
+        return go_recursive<fake_fft>(pi);
     } else {
         /* Presently, c128 requires input polynomials that are large
          * enough.
          */
-        go_recursive<cantor_fft>(pi);
+        return go_recursive<cantor_fft>(pi);
     }
 }
 
