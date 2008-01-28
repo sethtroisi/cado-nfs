@@ -28,6 +28,7 @@ my $param = {
 	multisols=>0,
 	maxload=>1, # How many simultaneous jobs on one machine.
 	threshold=>64,	# A good starting value.
+	dimk=>10,
 };
 
 
@@ -178,6 +179,7 @@ my $multisols =	$param->{'multisols'};	dumpvar 'multisols';
 my $maxload =	$param->{'maxload'};	dumpvar 'maxload';
 my $seed =	$param->{'seed'};	dumpvar 'seed';
 my $precond =	$param->{'precond'};	dumpvar 'precond';
+my $dimk =	$param->{'dimk'};	dumpvar 'dimk';
 
 if ($param->{'dumpcfg'}) {
 	print $dumped;
@@ -305,7 +307,7 @@ if ($resume) {
 	} else {
 		# If no matrix parameter is set at this moment, then surely it
 		# means we're playing with a random sample: create it !
-		action "${bindir}bw-random $seeding $nrows $ncols $modulus $dens > $wdir/matrix.txt";
+		action "${bindir}bw-random $seeding --dimk $dimk $nrows $ncols $modulus $dens > $wdir/matrix.txt";
 	}
 }
 

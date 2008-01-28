@@ -253,6 +253,14 @@ int main(int argc, char * argv[])
         pvec(fmt("Y%")%j, co);
     }
 
+    for(unsigned int j = 0 ; j < m + n ; j++) {
+        vector<mpz_class> co;
+        if (rvec(files::r % j, co))
+            pvec(fmt("R%[f0w2]")%j, co);
+        if (rvec(files::w % j, co))
+            pvec(fmt("W%[f0w2]")%j, co);
+    }
+
     if (n) {
         cout << "YY:=Matrix([";
         for(unsigned int j = 0 ; j < n-1 ; j++) cout << fmt("Y%, ")%j;

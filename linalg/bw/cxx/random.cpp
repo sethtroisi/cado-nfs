@@ -129,6 +129,15 @@ struct fillmat {
 	}
 };
 
+void usage()
+{
+	cerr << "Usage : ./random"
+		<< " [--seed <seed>]"
+		<< " [--dimk <kernel dimension>]"
+		<< " <nrows> <ncols> <modulus> [<density>]\n";
+	exit(1);
+}
+
 int main(int argc, char * argv[])
 {
 	ios_base::sync_with_stdio(false);
@@ -137,44 +146,83 @@ int main(int argc, char * argv[])
 	cerr.rdbuf()->pubsetbuf(0,0);
 
 	unsigned int seed = time(NULL);
+	unsigned int nr = 0;
+	unsigned int nc = 0;
+	unsigned int dimk = 1;
+	string mstr;
+	double p = 0.5;
+	int set_freeform = 0;
 
-	if (argc >= 4 && strcmp(argv[1], "--seed") == 0) {
-		seed = atoi(argv[2]);
-		argv++,argc--;
-		argv++,argc--;
+	argc--,argv++;
+
+	for( ; argc ; ) {
+		if (strcmp(argv[0], "--seed") == 0) {
+			argv++,argc--;
+			if (!argc) usage();
+			seed = atoi(argv[0]);
+			argv++,argc--;
+			continue;
+		}
+		if (strcmp(argv[0], "--dimk") == 0) {
+			argv++,argc--;
+			if (!argc) usage();
+			dimk = atoi(argv[0]);
+			argv++,argc--;
+			continue;
+		}
+		if (set_freeform == 0) {
+			set_freeform++;
+			nr = atoi(argv[0]);
+			argv++,argc--;
+			continue;
+		}
+		if (set_freeform == 1) {
+			set_freeform++;
+			nc = atoi(argv[0]);
+			argv++,argc--;
+			continue;
+		}
+		if (set_freeform == 2) {
+			set_freeform++;
+			mstr = argv[0];
+			argv++,argc--;
+			continue;
+		}
+		if (set_freeform == 3) {
+			set_freeform++;
+			istringstream foo(argv[0]);
+			foo >> p;
+			argv++,argc--;
+			continue;
+		}
+		usage();
 	}
-	if (argc != 4 && argc != 5) {
-		cerr << "Usage : ./random [--seed <seed>] <nrows> <ncols> <modulus> [<density>]\n";
-		exit(1);
+
+	if (set_freeform < 3 || nr == 0 || nc == 0 || mstr.empty()) {
+		usage();
 	}
+
 	srandom(seed);
 
-	unsigned int nr = atoi(argv[1]);
-	unsigned int nc = atoi(argv[2]);
-	string mstr(argv[3]);
-	double p = 0.5;
-	if (argc > 3) {
-		istringstream foo(argv[4]);
-		foo >> p;
-	}
 	if (p > 1) { p = p/nc; }
 
 	mpz_class px(mstr);
 
 	put_matrix_header(cout, nr, nc, mstr);
 
-	/* Put a zero for the first row */
-	cout << 0 << "\n";
-	unsigned int nz = 1;
+	/* Put zero to force the kernel */
+	for(unsigned int i = 0 ; i < dimk ; i++) {
+		cout << 0 << "\n";
+	}
 
 	if (nr > 100) {
 		/* We should check nc*p and nc*(1-p) as well if we were
 		 * concerned by good approximation, but it's not really
 		 * the case */
 		cerr << "Using normal approximation\n";
-		fillmat()(nr, nz, px, fill_row_normal(nc, p));
+		fillmat()(nr, dimk, px, fill_row_normal(nc, p));
 	} else {
-		fillmat()(nr, nz, px, fill_row_binomial(nc, p));
+		fillmat()(nr, dimk, px, fill_row_binomial(nc, p));
 	}
 
 	return 0;
