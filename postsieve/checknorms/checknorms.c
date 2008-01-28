@@ -410,6 +410,7 @@ unsigned long checkrels(char *f, cado_poly cpoly,
             MSGDEBUG("checkrels: rational side: ERROR_FACTORING_NORM\n");
             goto next_relation;
         }
+        outlength += gmp_sprintf(outrel + outlength, ":");
 
         //
         // Evaluate norm on algebraic side.
