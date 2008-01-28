@@ -427,6 +427,7 @@ int main(int argc, char **argv) {
 	// and therefore nab should be even
 	if(nab & 1){
 	    fprintf(stderr, "Sorry, but #(a, b) is odd\n");
+	    fprintf(stderr, "Bug: this should be patched! Please report your bugguy input\n");
 	    printf("Failed\n");
 	    return 0;
 	}
