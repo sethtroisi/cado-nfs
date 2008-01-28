@@ -32,15 +32,14 @@ namespace files {
 	EXTERN_LINKAGE	meta_filename v		INIT_WITH("V%[f0w2].%[f0w3]");
 	EXTERN_LINKAGE	meta_filename w		INIT_WITH("W%[f0w2]");
 	EXTERN_LINKAGE	meta_filename r		INIT_WITH("R%[f0w2]");
-	EXTERN_LINKAGE	meta_filename x		INIT_WITH("X%[f0w2]");
-	EXTERN_LINKAGE	meta_filename y		INIT_WITH("Y%[f0w2]");
-	EXTERN_LINKAGE	meta_filename z		INIT_WITH("Z%[f0w2]");
+	EXTERN_LINKAGE	std::string x		INIT_WITH("X");
+	EXTERN_LINKAGE	std::string y		INIT_WITH("Y");
 	EXTERN_LINKAGE	std::string precond	INIT_WITH("precond.txt");
 	EXTERN_LINKAGE	std::string m0		INIT_WITH("M0-vector");
 	EXTERN_LINKAGE	std::string x0		INIT_WITH("X0-vector");
 	EXTERN_LINKAGE	meta_filename f		INIT_WITH("F%[f0w2]");
-	EXTERN_LINKAGE	meta_filename f_init	INIT_WITH("F_INIT");
-	EXTERN_LINKAGE	meta_filename f_initq	INIT_WITH("F_INIT_QUICK");
+	EXTERN_LINKAGE	std::string f_init	INIT_WITH("F_INIT");
+	EXTERN_LINKAGE	std::string f_initq	INIT_WITH("F_INIT_QUICK");
 	EXTERN_LINKAGE	meta_filename fxy
 				INIT_WITH("F%[f0w2]-Y%[f0w2].%[f0w3]");
 	EXTERN_LINKAGE	meta_filename pi	INIT_WITH("pi-%-%");

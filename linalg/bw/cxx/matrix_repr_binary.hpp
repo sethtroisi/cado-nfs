@@ -4,6 +4,7 @@
 #include <iterator>
 #include <istream>
 
+#include "matrix.hpp"
 #include "matrix_line.hpp"
 #include "matrix_repr.hpp"
 
@@ -15,28 +16,28 @@ struct matrix_repr_binary {
     };
 
     struct matrix_rowset : public ptr {
-	uint32_t nr;
-	uint32_t ncoef;
 	matrix_rowset() { idx = NULL; }
 	/* This thing does not have a copy ctor ! */
-
+        unsigned int nrows_slice;
+        private:
 	void alloc(uint r, uint c) {
-	    nr = r;
-	    ncoef = c;
-	    BUG_ON(idx != NULL); idx = new uint32_t[nr + ncoef];
+            nrows_slice = r;
+	    BUG_ON(idx != NULL); idx = new uint32_t[r + c];
 	}
+        public:
 	~matrix_rowset() {
 	    if (idx != NULL) delete[] idx;
 	}
 
-	void fill(std::istream& mtx, std::streampos pos, uint i0, uint i1)
+	void fill(std::istream& mtx, matrix_slice const & slice)
 	{
-	    mtx.seekg(pos);
+            alloc(slice.i1 - slice.i0, slice.ncoeffs);
+	    mtx.seekg(slice.pos);
 	    std::istream_iterator<matrix_line> mit(mtx);
 	    uint i;
 	    ptr q((ptr const&) *this);
-	    BUG_ON(i1 - i0 != nr);
-	    for(i = i0 ; i < i1 && mit != endof<matrix_line>(mtx); i++) {
+            uint maxdata = slice.i1 - slice.i0 + slice.ncoeffs;
+	    for(i = slice.i0 ; i < slice.i1 && mit != endof<matrix_line>(mtx); i++) {
 		matrix_line l = *mit++;
 		int v = 0;
 		typedef matrix_line::const_iterator lit_t;
@@ -45,9 +46,9 @@ struct matrix_repr_binary {
 		    *q.idx++ = lit->first - v;
 		    v = lit->first;
 		}
-		BUG_ON((uint) (q.idx - idx) > (nr + ncoef));
+		BUG_ON((uint) (q.idx - idx) > maxdata);
 	    }
-	    BUG_ON(i != i1);
+	    BUG_ON(i != slice.i1);
 	}
 
 	template<typename traits>
@@ -56,7 +57,7 @@ struct matrix_repr_binary {
 		const typename traits::scalar_t * src) const
 	{
 	    const_ptr q(*this);
-	    for(uint i = 0 ; i < nr ; i++) {
+	    for(uint i = 0 ; i < nrows_slice ; i++) {
 		traits::zero(dst[i]);
 		unsigned int ncoef = *q.idx++;
 		unsigned int c = 0;

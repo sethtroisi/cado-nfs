@@ -46,13 +46,15 @@ old/structure_debug_automatic.h:   old/structure_debug.m4
 BW_PREP_SOURCES:=					\
 		auxfuncs.c				\
 		cxx/prep.cpp cxx/files.cpp		\
-		cxx/matrix_header.cpp
+		cxx/matrix_header.cpp cxx/matrix.cpp	\
+		cxx/preconditioner.cpp			\
+		cxx/matrix_line.cpp
 BW_PREP_LIBS:=-lgmpxx -lgmp
 -include .bw-prep.mkf
 
 BW_KRYLOV_SOURCES:=					\
 		auxfuncs.c barrier.c			\
-		cxx/detect_params.cpp			\
+		cxx/config_file.cpp			\
 		cxx/ticks.cpp				\
 		cxx/krylov.cpp cxx/state.cpp		\
 		cxx/threads.cpp	cxx/corners.cpp		\
@@ -80,9 +82,10 @@ BW_KRYLOV_MT_LIBS:=-lgmpxx -lgmp
 # -include .bw-slave-old.mkf
  
 BW_PRINTMAGMA_SOURCES:=					\
-		cxx/detect_params.cpp			\
+		cxx/config_file.cpp			\
 		auxfuncs.c cxx/matrix_header.cpp	\
 		cxx/files.cpp				\
+		cxx/matrix.cpp				\
 		cxx/matrix_line.cpp cxx/printmagma.cpp
 BW_PRINTMAGMA_LIBS:=-lgmpxx -lgmp
 -include .bw-printmagma.mkf
@@ -94,7 +97,7 @@ BW_PRINTMAGMA_LIBS:=-lgmpxx -lgmp
 # ifeq ($(BROKEN),also)
 # BW_LINGEN_SOURCES:=					\
 # 		auxfuncs.c				\
-# 		cxx/lingen.cpp cxx/detect_params.cpp	\
+# 		cxx/lingen.cpp cxx/config_file.cpp	\
 # 		cxx/files.cpp cxx/matrix_header.cpp	\
 # 		cxx/ticks.cpp cxx/matrices_printing.cpp
 # BW_LINGEN_LIBS:=-lgmpxx -lgmp
@@ -105,8 +108,12 @@ BW_LINGEN_BINARY_SOURCES:=		\
 		auxfuncs.c		\
 		cxx/files.cpp		\
 		cxx/lingen_binary.cpp	\
+		cxx/matrix.cpp		\
+		cxx/matrix_header.cpp		\
+		cxx/matrix_line.cpp		\
+		cxx/config_file.cpp	\
 		cxx/fake_fft.c
-BW_LINGEN_BINARY_LIBS:=-lgmp -lutils -lgf2x ../../gf2x/cantor/cantor128.o
+BW_LINGEN_BINARY_LIBS:=-lgmpxx -lgmp -lutils -lgf2x ../../gf2x/cantor/cantor128.o
 -include .bw-lingen-binary.mkf
 
 ifeq (0,0)
@@ -196,7 +203,7 @@ BENCH_POLMATMUL_LIBS:=-lgmp -lutils -lgf2x ../../gf2x/cantor/cantor128.o
 # 
 BW_GATHER_SOURCES:=					\
 		auxfuncs.c				\
-		cxx/detect_params.cpp			\
+		cxx/config_file.cpp			\
 		cxx/gather.cpp				\
 		cxx/matrix.cpp	cxx/matrix_line.cpp	\
 		cxx/files.cpp cxx/matrix_header.cpp	\

@@ -12,9 +12,9 @@ template <typename T, int acc>
 struct pod_traits {
 	typedef matrix_repr_prime representation;
 
-	static const int max_accumulate = acc;
-	static const int max_accumulate_wide = acc;
-	static const int nbits = sizeof(T)*CHAR_BIT;
+	static const unsigned int max_accumulate = acc;
+	static const unsigned int max_accumulate_wide = acc;
+	static const unsigned int nbits = sizeof(T)*CHAR_BIT;
 
 	typedef prime_field_any coeff_field;
 	struct scalar_t { T p; };
@@ -32,11 +32,11 @@ struct pod_traits {
 
 	static int can() {
 		return globals::nbys == 1 &&
-			nbits >= 2*(int) MODBITS() &&
+			nbits >= 2*MODBITS() &&
 			acc < 1UL << (nbits - 2*MODBITS()); 
 	}
 
-	static inline mpz_class get_y(scalar_t const & x, int i) {
+	static inline mpz_class get_y(scalar_t const & x, unsigned int i) {
 		BUG_ON(i);
 		return mpz_class(x.p);
 	}
@@ -95,9 +95,12 @@ struct pod_traits {
 		z[0] = x.p;
 	}
 
-	static std::ostream& print(std::ostream& o, scalar_t const& x) {
-		return o << x.p;
-	}
+        static inline std::ostream& print(std::ostream& o, scalar_t const& x) {
+            return o << x.p;
+        }
+        static inline std::istream& get(std::istream& o, scalar_t & x) {
+            return o >> x.p;
+        }
 };
 
 typedef pod_traits<long, 250> ulong_traits;
@@ -105,5 +108,21 @@ typedef pod_traits<int64_t, 250> int64_traits;
 typedef pod_traits<int32_t, 50> int32_traits;
 typedef pod_traits<int16_t, 10> int16_traits;
 typedef pod_traits<int8_t, 6> int8_traits;
+
+/*
+template <typename T, int acc>
+std::ostream& operator<<(std::ostream& o,
+        typename pod_traits<T, acc>::scalar_t const& x)
+{
+    return o << x.p;
+}
+
+template <typename T, int acc>
+std::istream& operator>>(std::istream& i,
+        typename pod_traits<T, acc>::scalar_t & x)
+{
+    return i >> x.p;
+}
+*/
 
 #endif	/* ULONG_TRAITS_HPP_ */

@@ -4,6 +4,8 @@
 #include <boost/cstdint.hpp>
 #include <gmp.h>
 #include <gmpxx.h>
+#include <istream>
+#include <ostream>
 #include "gmp-hacks.h"
 
 namespace globals {
@@ -12,7 +14,7 @@ namespace globals {
 	extern uint32_t modulus_u32;
 	extern mpz_class modulus;
 	extern unsigned long modulus_ulong;
-	extern int nbys;
+	extern unsigned int nbys;
 }
 
 #include "coeff_field_tags.hpp"

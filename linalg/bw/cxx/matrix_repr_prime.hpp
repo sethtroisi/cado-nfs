@@ -5,6 +5,7 @@
 #include <istream>
 
 #include "manu.h"
+#include "matrix.hpp"
 #include "matrix_line.hpp"
 #include "matrix_repr.hpp"
 
@@ -20,34 +21,33 @@ struct matrix_repr_prime {
     };
 
     struct matrix_rowset : public ptr {
-	uint32_t nr;
-	uint32_t nc;
 	matrix_rowset() {
 	    idx = NULL;
 	    val = NULL;
 	}
 	/* This thing does not have a copy ctor ! */
-
+        unsigned int nrows_slice;
+        private:
 	void alloc(uint r, uint c) {
-	    nr = r;
-	    nc = c;
-	    BUG_ON(idx != NULL); idx = new uint32_t[nr + nc];
-	    BUG_ON(val != NULL); val = new  int32_t[nr + nc];
+            nrows_slice = r;
+	    BUG_ON(idx != NULL); idx = new uint32_t[r + c];
+	    BUG_ON(val != NULL); val = new  int32_t[r + c];
 	}
+        public:
 	~matrix_rowset() {
 	    if (idx != NULL) delete[] idx;
 	    if (val != NULL) delete[] val;
 	}
 
-	void fill(std::istream& mtx, std::streampos pos,
-		uint i0, uint i1)
+	void fill(std::istream& mtx, matrix_slice const& slice)
 	{
-	    mtx.seekg(pos);
+            alloc(slice.i1 - slice.i0, slice.ncoeffs); 
+	    mtx.seekg(slice.pos);
 	    std::istream_iterator<matrix_line> mit(mtx);
 	    uint i;
 	    ptr q((ptr const&) *this);
-	    BUG_ON(i1 - i0 != nr);
-	    for(i = i0 ; i < i1 && mit != endof<matrix_line>(mtx); i++) {
+            uint maxdata = slice.i1 - slice.i0 + slice.ncoeffs;
+            for(i = slice.i0 ; i < slice.i1 && mit != endof<matrix_line>(mtx); i++) {
 		matrix_line l = *mit++;
 		int v = 0;
 		typedef matrix_line::const_iterator lit_t;
@@ -56,19 +56,19 @@ struct matrix_repr_prime {
 		    *q.val++ = lit->second;
 		    v = lit->first;
 		}
-		*q.idx++ = 0; BUG_ON((uint) (q.idx - idx) > (nr + nc));
-		*q.val++ = 0; BUG_ON((uint) (q.val - val) > (nr + nc));
+		*q.idx++ = 0; BUG_ON((uint) (q.idx - idx) > maxdata);
+		*q.val++ = 0; BUG_ON((uint) (q.val - val) > maxdata);
 	    }
-	    BUG_ON(i != i1);
+	    BUG_ON(i != slice.i1);
 	}
 	template<typename traits>
 	void mul(
 		typename traits::wide_scalar_t * dst,
 		const typename traits::scalar_t * src) const
 	{
-	    int acc=0;
+	    unsigned int acc=0;
 	    const_ptr q(*this);
-	    for(uint i = 0 ; i < nr ; i++) {
+	    for(uint i = 0 ; i < nrows_slice ; i++) {
 		traits::zero(dst[i]);
 		unsigned int c = 0;
 		for( ; *q.val != 0 ; q.idx++, q.val++) {

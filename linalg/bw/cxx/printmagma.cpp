@@ -13,8 +13,8 @@
 #include "parsing_tools.hpp"
 #include "arguments.hpp"
 #include "common_arguments.hpp"
-#include "detect_params.hpp"
-
+#include "config_file.hpp"
+#include "matrix.hpp"
 
 using namespace std;
 using namespace boost;
@@ -210,11 +210,9 @@ int main(int argc, char * argv[])
         get_matrix_header(mtx, nr, nc, mstr);
 
         cout << fmt("p:=%;\n") % mstr;
-        cout << fmt("M:=SparseMatrix(GF(p), %, %, [\n") % nr % nc;
         istream_iterator<matrix_line> mit(mtx);
         unsigned int p;
         vector<pair<pair<uint32_t, uint32_t>, int32_t> > coeffs;
-
         for(p = 0 ; mit != istream_iterator<matrix_line>() ; p++) {
             matrix_line l = *mit++;
             for(unsigned int k = 0 ; k < l.size() ; k++) {
@@ -227,7 +225,11 @@ int main(int argc, char * argv[])
             }
         }
 
-        for(unsigned int k = 0 ; k < coeffs.size() - 1; k++) {
+        if (coeffs.empty())
+            break;
+
+        cout << fmt("M:=SparseMatrix(GF(p), %, %, [\n") % nr % nc;
+        for(unsigned int k = 0 ; k + 1 < coeffs.size() ; k++) {
             cout << fmt("<%, %, %>, ")
                 % coeffs[k].first.first
                 % coeffs[k].first.second
@@ -243,7 +245,22 @@ int main(int argc, char * argv[])
     } while (0);
 
     unsigned int m,n;
-    detect_mn(m,n);
+    config_file_t cf;
+
+    read_config_file(cf, files::params);
+
+    bool rc = true;
+    rc &= get_config_value(cf, "m",m); cout << fmt("// m = %\n") % m;
+    rc &= get_config_value(cf, "n",n); cout << fmt("// n = %\n") % n;
+
+    matrix_stats stat;
+    stat(files::matrix);
+
+    if (!rc) {
+        cerr << "Missing config file " << files::params << "\n";
+        exit(1);
+    }
+
 
     if (m && n) {
         cout << "K:=GF(p);\n";
@@ -264,34 +281,42 @@ int main(int argc, char * argv[])
         cout << "KPn1:=RMatrixSpace(KP,m,1);\n";
     }
 
-    if (m == 0) {
-        cerr << "No X files found\n";
-    }
+    do {
+        ifstream xvec;
+        xvec.open(files::x.c_str());
+        if (!xvec.is_open()) {
+            cerr << "No X files found\n";
+            break;
+        }
+        for (int i = 0;; i++) {
+            vector<mpz_class> co(nr, 0);
+            uint32_t x;
+            string s;
+            getline(xvec, s);
+            if (xvec.eof())
+                break;
+            istringstream st(s);
 
-    for(unsigned int j = 0 ; j < m ; j++) {
-        ifstream x;
-        unsigned int c;
-        if (!open(x, files::x % j)) break;
-        vector<mpz_class> co(nr, 0);
-        x >> wanted('e') >> c;
-        co[c] = 1;
-        pvec(fmt("X%")%j, co);
-    }
+            for( ; st >> wanted('e') ; st >> ws) {
+                st >> x;
+                co[x] = 1;
+            }
+            pvec(fmt("X%")%i, co);
+        }
 
-    if (m) {
         cout << "XX:=Matrix([";
         for(unsigned int j = 0 ; j < m-1 ; j++) cout << fmt("X%, ")%j;
         cout << fmt("X%]);\n")%(m-1);
-    }
+    } while (0);
 
-    if (n == 0) {
-        cerr << "No Y files found\n";
-    }
-
-    for(unsigned int j = 0 ; j < n ; j++) {
+    {
         vector<mpz_class> co;
-        if (!rvec(files::y % j, co)) break;
-        pvec(fmt("Y%")%j, co);
+        if (rvec(files::y, co)) {
+            pvec("Yvecs", co);
+            cout << fmt("YY:=Transpose(Matrix(%,%,Yvecs));\n")% nr% n;
+        } else {
+            cerr << "No Y files found\n";
+        }
     }
 
     for(unsigned int j = 0 ; j < m + n ; j++) {
@@ -302,11 +327,6 @@ int main(int argc, char * argv[])
             pvec(fmt("W%[f0w2]")%j, co);
     }
 
-    if (n) {
-        cout << "YY:=Matrix([";
-        for(unsigned int j = 0 ; j < n-1 ; j++) cout << fmt("Y%, ")%j;
-        cout << fmt("Y%]);\n")%(n-1);
-    }
 
     do {
         vector<mpz_class> co;

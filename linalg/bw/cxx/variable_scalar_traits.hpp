@@ -11,8 +11,8 @@ struct variable_scalar_traits {
 
 	typedef mpz_class scalar_t;
 	typedef mpz_class wide_scalar_t;
-	static const int max_accumulate = INT_MAX;
-	static const int max_accumulate_wide = INT_MAX;
+	static const unsigned int max_accumulate = INT_MAX;
+	static const unsigned int max_accumulate_wide = INT_MAX;
 
 	typedef prime_field_any coeff_field;
 	struct name {
@@ -22,7 +22,7 @@ struct variable_scalar_traits {
 	};
 
 	static int can() {
-		return 1;
+		return globals::nbys == 1;
 	}
 
 	/*
@@ -32,7 +32,7 @@ struct variable_scalar_traits {
 		return r;
 	}
 	*/
-	static inline mpz_class get_y(scalar_t const & x, int i) {
+	static inline mpz_class get_y(scalar_t const & x, unsigned int i) {
 		BUG_ON(i != 0);
 		return x;
 	}
@@ -97,10 +97,18 @@ struct variable_scalar_traits {
 		 */
 		x = z[i];
 	}
+        static inline std::ostream& print(std::ostream& o, scalar_t const& x)
+        {
+            return o << x;
+        }
 
-	static std::ostream& print(std::ostream& o, scalar_t const& x) {
-		return o << x;
-	}
+        static inline std::istream& get(std::istream& i, scalar_t & x)
+        {
+            return i >> x;
+        }
 };
+
+
+
 
 #endif	/* VARIABLE_SCALAR_TRAITS_HPP_ */

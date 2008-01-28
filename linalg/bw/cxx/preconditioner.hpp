@@ -35,7 +35,7 @@ template<typename traits> class preconditioner : public preconditioner_base
         for(clit_t i = combinations.begin() ; i != combinations.end() ; i++) {
             typename traits::wide_scalar_t tmp;
             traits::zero(tmp);
-            int acc = 0;
+            unsigned int acc = 0;
             for(sit_t j = i->first.begin() ; j != i->first.end() ; j++) {
                 traits::addmul(tmp, src[j->first], j->second);
                 if (++acc == traits::max_accumulate) {

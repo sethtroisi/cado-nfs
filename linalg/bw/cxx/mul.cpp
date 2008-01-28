@@ -8,7 +8,6 @@
 #include "arguments.hpp"
 #include "common_arguments.hpp"
 #include "constants.hpp"
-#include "detect_params.hpp"
 #include "mul_arguments.hpp"
 #include "files.hpp"
 #include "matrix.hpp"
@@ -156,30 +155,17 @@ int main(int argc, char *argv[])
 	using namespace globals;
 
 	must_open(mtx, files::matrix);
-	get_matrix_header(mtx, nr, nc, mstr);
 
-	globals::modulus = mpz_class(mstr);
+        matrix_stats stat;
+        std::vector<matrix_slice> slices(1);
 
-	cout << "// counting coefficients\n" << flush;
-	vector<std::streampos> foo(1);
-	vector<uint> bar(1);
-	count_matrix_coeffs(mtx, nr, foo, bar);
+        stat(mtx);
 	
-	nb_coeffs = bar[0];
-
-	cout << fmt("// matrix has % coeffs\n") % nb_coeffs;
-	mtx.close();
-
 	cout.flush();
 	cerr.flush();
 
-	mat.alloc(nr, nb_coeffs);
-
-	{
-		ifstream mtx;
-		must_open(mtx, files::matrix);
-		mat.fill(mtx, 0, 0, nr);
-	}
+        mat.fill(mtx, slices[0]);
+	mtx.close();
 
 	cout << "// Using generic code\n";
 	init_data();

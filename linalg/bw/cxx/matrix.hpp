@@ -1,38 +1,37 @@
 #ifndef MATRIX_HPP_
 #define MATRIX_HPP_
 
-#include <istream>
+#include <set>
 #include <vector>
-#include <boost/cstdint.hpp>
+#include <fstream>
+#include <iosfwd>
+#include <gmp.h>
+#include <gmpxx.h>
+#include <stdint.h>
 
-// #include "matrix_repr_prime.hpp"
+struct matrix_slice {
+    unsigned int i0;
+    unsigned int i1;
+    uint32_t ncoeffs;
+    std::streampos pos;
+};
 
-#if 0
-inline void fill_matrix_data(std::istream& mtx,
-                std::streampos pos, uint32_t nc,
-                uint i0, uint i1,
-                uint32_t * idx, int32_t * val)
-__attribute__((deprecated));
-
-/* Legacy wrappers */
-
-void fill_matrix_data(std::istream& mtx,
-                std::streampos pos, uint32_t nc,
-                uint i0, uint i1,
-                uint32_t * idx, int32_t * val)
-{
-    typedef matrix_repr_prime T;
-
-    T::ptr p;
-    p.idx = idx;
-    p.val = val;
-    T::fill(mtx, pos, nc, i0, i1);
-}
-#endif
-
-extern void count_matrix_coeffs(std::istream&,
-		unsigned int,
-		std::vector<std::streampos>&,
-		std::vector<boost::uint32_t>&);
+class matrix_stats {
+    public:
+    unsigned int nr;
+    unsigned int nc;
+    mpz_class modulus;
+    private:
+    std::vector<matrix_slice> * slices;
+    std::set<uint32_t> * zrows;
+    std::set<uint32_t> * zcols;
+    public:
+    matrix_stats() : slices(NULL), zrows(NULL), zcols(NULL) {}
+    void need_slices(std::vector<matrix_slice> * ptr, unsigned int nt = 0);
+    void need_zcols(std::set<uint32_t> * ptr);
+    void need_zrows(std::set<uint32_t> * ptr);
+    void operator()(std::ifstream& mtx);
+    void operator()(std::string const & name);
+};
 
 #endif	/* MATRIX_HPP_ */

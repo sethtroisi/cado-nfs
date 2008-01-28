@@ -1,78 +1,133 @@
+#include <iostream>
+#include <sstream>
+#include <string>
+#include "must_open.hpp"
 #include "matrix.hpp"
 #include "manu.h"
 #include "matrix_line.hpp"
+#include "matrix_header.hpp"
 #include "parsing_tools.hpp"
-
-#include <iterator>
-#include <string>
-#include <sstream>
-
-/* The routines here populate an in-memory structure with the
- * speed-critical version of the matrix data. Everything is permitted
- * as for HOW this data is represented. */
-
-/* the fill() routine is not speed-critical by itself. */
-
-/* typical layout: */
-#if 0
-struct matrix_repr_XXXXX {
-    struct ptr { XXXXX };
-    static void fill(std::istream& mtx, std::streampos pos, uint32_t nc,
-	    uint i0, uint i1, ptr p);
-    static void count(std::istream& mtx,
-	    unsigned int nr,
-	    vector<std::streampos>& offsets,
-	    vector<boost::uint32_t>& ncoeffs);
-};
-#endif
+#include "manu.h"
 
 using namespace std;
 
-void count_matrix_coeffs(istream& mtx,
-                unsigned int nr,
-                vector<streampos>& offsets,
-                vector<boost::uint32_t>& ncoeffs)
-{
-    BUG_ON(offsets.empty());
-    BUG_ON(offsets.size() != ncoeffs.size());
-    unsigned int nt = offsets.size();
 
-    offsets.clear();
-    ncoeffs.clear();
+void matrix_stats::need_slices(vector<matrix_slice> * ptr, unsigned int nt) {
+    slices = ptr;
+    BUG_ON(nt && slices->size());
+    BUG_ON(!nt && slices->empty());
+    if (nt) {
+        slices->assign(nt, matrix_slice());
+    } else {
+        nt = slices->size();
+    }
+}
+/* Obtaining the information about zero columns seems pointless at
+ * first. However it's useful for tests, and prevents silly mistakes
+ * that one might make. And it's kinda cheap anyway.
+ */
+void matrix_stats::need_zcols(set<uint32_t> * ptr) {
+    zcols = ptr;
+}
+void matrix_stats::need_zrows(set<uint32_t> * ptr) {
+    zrows = ptr;
+}
+void matrix_stats::operator()(std::ifstream& mtx) {
+    std::string mstr;
+    get_matrix_header(mtx, nr, nc, mstr);
+    std::istringstream ss(mstr);
+    if (!(ss >> modulus >> ws) || !ss.eof()) {
+        die("Garbage while reading modulus string: <<%s>>", 1, mstr.c_str());
+    }
 
-    /* Note that the std::istream_iterator ctor advances beforehand in the
-     * file. So we keep track of the file position in advance. */
-    /* TODO: now that the iterator is gone here, perhaps it's
-     * sensible to simplify this function. */
+    if (!slices && !zrows && !zcols)
+        return;
+
+    unsigned int nhslices = slices ? slices->size() : 1;
 
     std::streampos pos = mtx.tellg();
-
     comment_strip cs(mtx, "//");
 
-    // std::istream_iterator<matrix_line> mtxi(mtx);
-
-    for(uint j = 0 ; j < nt ; j++) {
-	uint i0, i1;
-	boost::uint32_t nc = 0;
-
-	offsets.push_back(pos);
-
-	i0 = (j * nr) / nt;
-	i1 = ((j + 1) * nr) / nt;
-	for(uint i = i0 ; i < i1 ; i++) {
-	    pos = mtx.tellg();
-	    std::string s;
-	    cs.getline(s);
-	    std::istringstream st(s);
-	    uint z;
-	    if (!(st >> z)) {
-		BUG();
-	    }
-	    nc += z;
-	}
-	ncoeffs.push_back(nc);
+    vector<bool> colmap;
+    if (zcols) {
+        colmap.assign(nc,false);
+    }
+    // We'll constitute an horizontal slice info anyway, even if
+    // there's only one such.
+    for(uint j = 0 ; j < nhslices ; j++) {
+        matrix_slice slice;
+        slice.i0 = (j * nr) / nhslices;
+        slice.i1 = ((j + 1) * nr) / nhslices;
+        slice.ncoeffs = 0;
+        slice.pos = mtx.tellg();
+        for(uint i = slice.i0 ; i < slice.i1 ; i++) {
+            std::string s;
+            cs.getline(s);
+            std::istringstream st(s);
+            uint z;
+            matrix_line mi;
+            if (zcols) {
+                if (!(st >> mi)) { BUG(); }
+                z = mi.size();
+                for(uint k = 0 ; k < mi.size() ; k++) {
+                    colmap[mi[k].first] = true;
+                }
+            } else {
+                if (!(st >> z)) { BUG(); }
+            }
+            if (zrows && !z) {
+                zrows->insert(i);
+            }
+            slice.ncoeffs += z;
+        }
+        if (slices) {
+            (*slices)[j] = slice;
+            std::cout << fmt("// slice % : % rows (%..%) % coeffs from pos %\n")
+                % j
+                % (slice.i1 - slice.i0)
+                % slice.i0
+                % slice.i1
+                % slice.ncoeffs
+                % slice.pos;
+            std::cout << std::flush;
+        }
+    }
+    typedef set<uint32_t>::const_iterator suci_t;
+    if (zrows) {
+        std::cout << "// " << zrows->size() << " zero rows:";
+        for(suci_t xi = zrows->begin() ; xi != zrows->end() ; xi++) {
+            std::cout << " " << *xi;
+        }
+        std::cout << "\n";
+        std::cout << std::flush;
+    }
+    if (zcols) {
+        typedef std::vector<bool>::const_iterator vbci_t;
+        uint j=0;
+        for(vbci_t xj = colmap.begin() ; xj != colmap.end() ; xj++,j++) {
+            if (!*xj) zcols->insert(j);
+        }
+        std::cout << "// " << zcols->size() << " zero cols:";
+        for(suci_t xi = zcols->begin() ; xi != zcols->end() ; xi++) {
+            std::cout << " " << *xi;
+        }
+        std::cout << "\n";
+        std::cout << std::flush;
+        if (zcols->size() != 0) {
+            std::cerr << "// ZERO COLS FOUND -- MOST CERTAINLY A BUG !!\n";
+        }
     }
 }
 
+void matrix_stats::operator()(std::string const & name) {
+    /* It's probably forbidden to close the input stream before
+     * reusing the offsets, so most probably it's forbidden to use
+     * this entry point when slices are needed.
+     */
+    ifstream mtx;
+    must_open(mtx, name);
+    (*this)(mtx);
+    mtx.close();
+}
 
 /* vim: set sw=4: */

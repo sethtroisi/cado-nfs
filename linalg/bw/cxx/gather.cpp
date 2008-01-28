@@ -8,7 +8,7 @@
 #include "arguments.hpp"
 #include "common_arguments.hpp"
 #include "constants.hpp"
-#include "detect_params.hpp"
+#include "config_file.hpp"
 #include "gather_arguments.hpp"
 #include "files.hpp"
 #include "matrix.hpp"
@@ -21,6 +21,7 @@
 #include "ticks.hpp"
 #include "traits.hpp"
 #include "preconditioner.hpp"
+#include "matmul_toy.hpp"
 
 #include <boost/cstdint.hpp>
 #include <iterator>
@@ -44,63 +45,28 @@ using namespace core_ops;
 typedef unsigned int uint;
 
 namespace globals {
-	uint m, n;
-	uint col;
-	uint nr, nc;
-	int nbys;
+	unsigned int m, n;
+	unsigned int col;
+	unsigned int nr, nc;
+	unsigned int nbys;
 	mpz_class modulus;
 	uint8_t modulus_u8;
 	uint16_t modulus_u16;
 	uint32_t modulus_u32;
 	unsigned long modulus_ulong;
-
-	uint nb_coeffs;
-
 }
 
 template<typename traits>
-class program_common {
-public:
+struct program_common: public simple_matmul_toy<traits>
+{
 	typedef typename traits::scalar_t scalar_t;
 	typedef typename traits::wide_scalar_t wide_scalar_t;
-
 	typename traits::representation::matrix_rowset mat;
+        typedef simple_matmul_toy<traits> super;
+	using super::v;
+	using super::w;
 
-	preconditioner<traits> precond;
-
-	scalar_t *v;
-	scalar_t *w;
-	wide_scalar_t *scrap;
-private:
-void init_data()
-{
-	using namespace globals;
-	v = new scalar_t[nc];
-	w = new scalar_t[nc];
-	scrap = new wide_scalar_t[nc];
-
-	traits::zero(v, nc);
-	traits::zero(w, nc);
-
-	mat.alloc(nr, nb_coeffs);
-
-	{
-		ifstream mtx;
-		must_open(mtx, files::matrix);
-		mat.fill(mtx, 0, 0, nr);
-	}
-	precond.init(0,nr,files::precond);
-}
-
-void clear_data()
-{
-	using namespace globals;
-	delete[] v;
-	delete[] w;
-	delete[] scrap;
-
-}
-public:
+        program_common() : super(files::matrix) {}
 void add_file(const std::string& fn)
 {
 	ifstream f;
@@ -117,11 +83,11 @@ void add_file(const std::string& fn)
 		std::string line;
 		getline(f, line);
 		istringstream ss(line);
-		int ny;
+		unsigned int ny;
 		mpz_class blah;
 		for(ny = 0 ; ss >> blah ; foo[0] += blah, ny++);
-		if (nbys == -1 && ny != 0) {
-			cerr << "// auto-detected nbys=" << ny << "\n";
+		if (nbys == 0 || ny != 0) {
+			// cerr << "// auto-detected nbys=" << ny << "\n";
 			nbys = ny;
 		}
 		if (ny == 0 && f.eof()) {
@@ -163,32 +129,6 @@ void do_sum()
 	}
 }
 
-bool is_zero(const scalar_t * vec) {
-	for(uint i = 0 ; i < globals::nc ; i++) {
-		if (!traits::is_zero(vec[i])) {
-			return false;
-		}
-	}
-	return true;
-}
-
-int nb_nonzero(const scalar_t * vec) {
-	int res = 0;
-	for(uint i = 0 ; i < globals::nc ; i++) {
-		res += !traits::is_zero(vec[i]);
-	}
-	return res;
-}
-
-void multiply()
-{
-	using namespace globals;
-	precond(v);
-	mat.template mul<traits>(scrap, v);
-	traits::reduce(w, scrap, 0, nr);
-	traits::zero(w + nr, nc-nr);
-}
-
 void shipout(scalar_t * v, string const & s, bool check=true)
 {
 	using namespace globals;
@@ -210,10 +150,6 @@ void shipout(scalar_t * v, string const & s, bool check=true)
 	}
 	wf.close();
 }
-
-program_common() { init_data(); }
-~program_common() { clear_data(); }
-
 };
 
 template<typename traits>
@@ -221,6 +157,7 @@ struct program : public program_common<traits> {
 	typedef program_common<traits> super;
 	using super::v;
 	using super::w;
+public:
 void go()
 {
 	using namespace globals;
@@ -370,6 +307,8 @@ int main(int argc, char *argv[])
 
 	must_open(mtx, files::matrix);
 	get_matrix_header(mtx, nr, nc, mstr);
+	mtx.close();
+
 	BUG_ON_MSG(nr > nc, "Matrix has too many rows\n");
 
 	globals::modulus = mpz_class(mstr);
@@ -387,19 +326,18 @@ int main(int argc, char *argv[])
 	}
 	*/
 
-	detect_mn(m, n);
-	cout << fmt("// detected m = %\n") % m;
-	cout << fmt("// detected n = %\n") % n;
+        config_file_t cf;
+        read_config_file(cf, files::params);
 
-	cout << "// counting coefficients\n" << flush;
-	vector<std::streampos> foo(1);
-	vector<uint> bar(1);
-	count_matrix_coeffs(mtx, nr, foo, bar);
-	
-	nb_coeffs = bar[0];
+        bool rc = true;
+        rc &= get_config_value(cf, "m",m); cout << fmt("// m = %\n") % m;
+        rc &= get_config_value(cf, "n",n); cout << fmt("// n = %\n") % n;
 
-	cout << fmt("// matrix has % coeffs\n") % nb_coeffs;
-	mtx.close();
+        if (!rc) {
+                cerr << "Missing config file " << files::params << "\n";
+                exit(1);
+        }
+
 
 	cout.flush();
 	cerr.flush();
@@ -426,6 +364,7 @@ int main(int argc, char *argv[])
 	}
 #endif
 	cout << "// Using generic code\n";
+        nbys = 0;
 	program<variable_scalar_traits> x;
 	x.go();
 }

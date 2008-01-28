@@ -41,6 +41,8 @@ unsigned int cantor_threshold = UINT_MAX;
 #include "fft_adapter.hpp"
 #include "lingen_mat_types.hpp"
 #include "files.hpp"
+#include "config_file.hpp"
+#include "matrix.hpp"
 
 /* output: F0x is the candidate number x. All coordinates of the
  * candidate are grouped, and coefficients come in order (least
@@ -314,8 +316,9 @@ void read_data_for_series(polmat& A, int & rc)/*{{{*/
         }
     }
 
-    printf("Stopped after reading %u coefficients (not counting 1st)\n",
-            read_coeffs);
+    printf("Stopped after reading %u coefficients (not counting 1st)"
+            " -- total work was %u\n",
+            read_coeffs, total_work);
 
     rc = read_coeffs;
     A.swap(a);
@@ -1179,7 +1182,7 @@ static void go_quadratic(polmat& pi)/*{{{*/
         rearrange_ordering(tmp_pi, piv);
         t++;
         // if (t % 60 < 10 || deg-dt < 30)
-        // write_polmat(tmp_pi,std::string(fmt("pi-%-%") % tstart % t).c_str());
+        write_polmat(tmp_pi,std::string(fmt("pi-%-%") % tstart % t).c_str());
     }
     pi.swap(tmp_pi);
     write_polmat(pi,std::string(fmt("pi-%-%") % tstart % t).c_str());
@@ -1559,9 +1562,8 @@ int main(int argc, char *argv[])
 
     argv++, argc--;
 
-    int pop = 0;
-
     using namespace globals;
+    using namespace std;
 
     for( ; argc ; ) {
         if (strcmp(argv[0], "--subdir") == 0) {
@@ -1626,29 +1628,30 @@ int main(int argc, char *argv[])
              */
         }
 #endif/*}}}*/
-        if (pop == 0) {
-            read_mat_file_header(argv[0]);
-            pop++;
-            argv++, argc--;
-            continue;
-        } else if (pop == 1) {
-            m = atoi(argv[0]);
-            pop++;
-            argv++, argc--;
-            continue;
-        } else if (pop == 2) {
-            n = atoi(argv[0]);
-            pop++;
-            argv++, argc--;
-            continue;
-        }
-
         usage();
     }
 
-    if (m == 0 || n == 0 || rec_threshold == 0) {
+    config_file_t cf;
+    read_config_file(cf, files::params);
+
+    bool rc = true;
+    rc &= get_config_value(cf, "m",m); cout << fmt("// m = %\n") % m;
+    rc &= get_config_value(cf, "n",n); cout << fmt("// n = %\n") % n;
+
+    matrix_stats stat;
+    stat(files::matrix);
+
+    if (!rc) {
+        cerr << "Missing config file " << files::params << "\n";
+        exit(1);
+    }
+
+    if (rec_threshold == 0) {
         usage();
     }
+
+    globals::nrows = stat.nr;
+    globals::ncols = stat.nc;
 
     total_work = Lmacro(ncols, m, n);
 

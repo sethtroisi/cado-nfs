@@ -209,6 +209,10 @@ if ($msize) {
 		unless ($nrows && $ncols);
 }
 
+if ($dimk > $msize / 2) {
+    die "dimk $dimk seems unreasonably large for matrix size $msize";
+}
+
 # Check that we have the threshold argument if needed
 my $exe_lingen = "${bindir}bw-lingen";
 if ($modulus eq '2') {
@@ -259,7 +263,15 @@ if ($resume) {
 	if ($precond) {
 		action "cp $precond $wdir/precond.txt";
 	}
+        
+        open CFG, ">$wdir/bw.cfg";
+        print CFG <<EOF;
+n: $n
+m: $m
+EOF
+        close CFG;
 }
+
 
 # In case of multiple machines, make sure that all machines see the
 # directory.
@@ -488,7 +500,11 @@ LINGEN : {
 	}
 
 	my $exe = $exe_lingen;
-	$exe .= " --subdir $wdir matrix.txt $m $n";
+        if ($modulus == 2) {
+            $exe .= " --subdir $wdir";
+        } else {
+            $exe .= " --subdir $wdir matrix.txt $m $n";
+        }
 	open my $mlog, ">$wdir/lingen.log";
 	print "$exe\n";
 	open my $mh, "$exe |";

@@ -13,6 +13,7 @@
 #include "must_open.hpp"
 #include "parsing_tools.hpp"
 #include "prep_arguments.hpp"
+#include "matmul_toy.hpp"
 #include <gmp.h>
 #include <gmpxx.h>
 
@@ -27,163 +28,329 @@
  * - Choose random Y vectors
  */
 
+namespace globals {
+    unsigned int nbys = 1;
+    mpz_class modulus;
+    uint8_t modulus_u8;
+    uint16_t modulus_u16;
+    uint32_t modulus_u32;
+    unsigned long modulus_ulong;
+    unsigned int m,n;
+    unsigned int nr;
+    std::set<uint32_t> zrows;
+    std::set<uint32_t> zcols;
+    std::vector<std::vector<uint32_t> > xvecs;
+}
+
 using namespace std;
 
-
-set<unsigned int> zrows;
-
+/* {{{ myrand() myseed() */
 #ifdef  USE_GMP_RANDOM
 static gmp_randstate_t random_state;
 static mp_limb_t myrand()
 {
-        return gmp_urandomb_ui(random_state, GMP_LIMB_BITS);
+    return gmp_urandomb_ui(random_state, GMP_LIMB_BITS);
 }
 static void myseed(unsigned long int x)
 {
-        gmp_randseed_ui(random_state, x);
+    gmp_randseed_ui(random_state, x);
 }
 #else
 static mp_limb_t myrand()
 {
-        return random();
+    return random();
 }
 static void myseed(unsigned long int x)
 {
-        srand(x);
+    srand(x);
 }
 #endif
+/* }}} */
 
-void setup_vectors(unsigned int nrows, int m, int n, const mpz_class& p)
+/* x vectors, if equal to single coordinates, must not have their only one
+ * at an index which corresponds to a zero row. Because otherwise we will
+ * never have a matrix A(X) of full rank.
+ *
+ * Again if they equal single coordinates, at least one of them must
+ * appear outside of the image of transpose(M). We do not know how to
+ * compute this image, of course, but if M has zero columns (it should
+ * not) then the coordinate in question must be chosen amongst those --
+ * at least one of them, that is.
+ *
+ * The y vectors must not be im the image of M. More specifically, the
+ * intersection of the span of y's and Image(M) must be of dimension n.
+ * Again, the image is not know, but if zero rows are known then the
+ * projection must have full rank.
+ */
+
+void setup_x()
 {
-	ofstream o;
+    using namespace globals;
+    using namespace std;
 
-	/* as ridiculous as it seems, but we're far from critical here,
-	 * and want to be able to do %p simply ! */
-	mpz_class t;
+    bool zcols_still_to_be_hit = !zcols.empty();
+    ofstream o;
+    must_open(o, files::x);
+    xvecs.clear();
+    for (unsigned int i = 0; i < m ; i++) {
+        unsigned int idx;
+        for(;;) {
+            bool testing_zcol=false;
+            if (!zcols.empty()) {
+                idx = * zcols.begin();
+                cout << fmt("// Testing zero col %\n")%idx;
+                zcols.erase(zcols.begin());
+                testing_zcol=true;
+            } else {
+                idx= ((myrand()) % nr);
+            }
+            if (zrows.find(idx) != zrows.end()) {
+                cout << fmt("// Avoiding zero row %\n") % idx;
+            }
 
-	for (int j = 0; j < n; j++) {
-		must_open(o, files::y % j);
+            if (testing_zcol)
+                zcols_still_to_be_hit=false;
+            break;
+        }
+        o << "e" << idx << "\n";
+        xvecs.push_back(vector<uint32_t>(1, idx));
+    }
+    if (zcols_still_to_be_hit) {
+        die("Could not find starting x vectors."
+                " This matrix is too weird\n", 1);
+    }
+}
+
+unsigned int compute_rank(mpz_class * a, unsigned int nrows, unsigned int ncols, mpz_class& p)
+{
+    unsigned int rank = 0;
+    unsigned int i,j,k,l;
+
+    for(i = 0 ; i < nrows ; i++) {
+        /* Find the pivot inside the row */
+        mpz_class * row = a + i * ncols;
+        for(j = 0 ; j < ncols ; j++) {
+            if (row[j] == 0) {
+                continue;
+            }
+            /* make this row more canonical */
+            mpz_class w;
+            mpz_invert(w.get_mpz_t(), row[j].get_mpz_t(), p.get_mpz_t());
+            row[j] = 1;
+            for(unsigned int k = j + 1 ; k < ncols ; k++) {
+                row[k] = (row[k] * w) % p;
+            }
+            break;
+        }
+        if (j == ncols)
+            continue;
+        assert(rank < nrows && rank < ncols);
+        rank++;
+        // std::cout << fmt("row % is the %-th pivot\n") % i % rank;
+        /* Cancel this coeff in all other rows. */
+        for(k = i + 1 ; k < nrows ; k++) {
+            mpz_class * rowk = a + k * ncols;
+            for(l = 0 ; l < ncols ; l++) {
+                if (l == j) continue;
+                rowk[l] = (rowk[l] - row[l] * rowk[j]) % p;
+            }
+            rowk[j] = 0;
+        }
+    }
+    return rank;
+}
+
+template<typename traits>
+void setup_vectors(simple_matmul_toy<traits>& matmul)
+{
+    using namespace globals;
+    using namespace std;
+
+
+    typedef typename traits::scalar_t scalar_t;
+    typedef typename traits::wide_scalar_t wide_scalar_t;
+    typedef scalar_t * vector_bunch;
+//    vector_bunch * ystrips;
+//
+//    BUG_ON(n % nbys != 0);
+//
+//    ystrips = new vector_bunch[n / nbys];
+//    for (unsigned int j = 0 ; j < n/nbys ; j++) {
+//        ystrips[j] = new scalar_t[nr];
+//    }
+
+    scalar_t ystrips[n/nbys][nr];
+
+
+    /* as ridiculous as it seems, we'll use full blown mpzs for storing
+     * coordinates.  the point is that we're far from critical here, and
+     * want to be able to do modular reductions simply ! */
+    vector<mpz_class> ys(nbys, 0);
+
+    /* How many iterates do we check ? */
+#define NBITER  2
+
+    for(;;) {
+        cout << "// Generating new x,y vector pair\n";
+        setup_x();
+
+        /* We'll try several times until we're happy. We're going to
+         * compute the first iterates online.  */
+        mpz_class a1a2[m][NBITER*n];
+
+        for (unsigned int j = 0 ; j < n ; j += nbys) {
+            /* Generate this nbys y vectors at a time, as it's going to
+             * help us with the online precomputation of the first
+             * iterates.  */
+
+            typedef set<unsigned int>::const_iterator suci_t;
+            suci_t sc = zrows.begin();
+            int kz = 0;
+
+            for(unsigned int c = 0; c < nr; ) {
+                unsigned int next_c;
+                if (sc == zrows.end()) {
+                    next_c = nr;
+                } else {
+                    next_c = *sc;
+                    sc++;
+                }
+
+                /* aside zero rows, there's no constraint */
+                for( ; c < next_c ; c++) {
+                    for(unsigned int y = 0 ; y < nbys ; y++) {
+                        ys[y] = myrand() % globals::modulus;
+                    }
+                    traits::assign(ystrips[j/nbys][c], ys, 0);
+                }
+                if (c < nr) {
+                    /* This row is special, it's zero. We force the
+                     * intersection of the y block with the zero rows to be a
+                     * set of I_n matrices. */
+                    unsigned int y = (kz++ % n) - j;
+                    ys.assign(nbys,0);
+                    if (y < nbys) {
+                        ys[y] = 1;
+                        /* otherwise the 1 is for another vertical strip */
+                    }
+                    traits::assign(ystrips[j/nbys][c], ys, 0);
+                }
+            }
+
+            /* OK so now ystrips[j/nbys] holds a candidate y vector. Use
+             * it to populate some entries of the a1a2 matrix.
+             */
+
+            traits::copy(matmul.v, ystrips[j/nbys], nr);
+
+            wide_scalar_t wsum;
+
+            for(int l = 0 ; l < NBITER ; l++) {
+                matmul.multiply();
+                BUG_ON(xvecs.size() != m);
+                for(unsigned int i = 0 ; i < m ; i++) {
+                    scalar_t sum;
+                    traits::zero(wsum);
+                    for(unsigned int k = 0 ; k < xvecs[i].size() ; k++) {
+                        traits::addmul(wsum, matmul.w[xvecs[i][k]], 1);
+                    }
+                    traits::reduce(sum, wsum);
+
+                    traits::assign(ys, sum);
+                    for(unsigned int y = 0 ; y < nbys ; y++) {
+                        a1a2[i][j+y+l*n] = ys[y];
+                    }
+                }
+                swap(matmul.v, matmul.w);
+            }
+        }
+
+        /* At this point we should check the rank of a1a2 */
+
 #if 0
-		for (unsigned int c = 0; c < nrows; c++) {
-			t = myrand() | 0x01UL;
-			t %= p;
-			o << t << "\n";
-		}
+        cout << fmt("amat:=Matrix(%,%,[")%m%(NBITER*n);
+        for(unsigned int i = 0 ; i < m ; i++) {
+            for(unsigned int j = 0 ; j < NBITER * n ; j++) {
+                if (i||j) cout << ", ";
+                cout << a1a2[i][j];
+            }
+        }
+        cout << "]);\n";
+        cout << flush;
 #endif
-		typedef set<unsigned int>::const_iterator suci_t;
-		suci_t sc = zrows.begin();
-                int kz = 0;
-		for(unsigned int c = 0; c < nrows; ) {
-			uint next_c;
-			if (sc == zrows.end()) {
-				next_c = nrows;
-			} else {
-				next_c = *sc;
-				sc++;
-			}
-			/* aside zero rows, there's no constraint */
-			for( ; c < next_c ; c++) {
-				t = myrand() % p;
-				o << t << "\n";
-			}
-			/* For zero rows, we'd better stay OUT of the
-			 * subspace of the image ! */
-			if (c < nrows) {
-				// t = myrand() % p;
-                                // force the intersection with the zero
-                                // cols to be a set of I_n matrices.
-                                t = ((kz++ - j) % n == 0);
-				o << t << "\n";
-				c++;
-			}
-		}
-		o.close();
-	}
 
-	for (int i = 0; i < m ; i++) {
-		must_open(o, files::x % i);
-		/* If we choose X vectors such that the Krylov subspace
-		 * respective to M^T and X has low dimension, then the
-		 * process will fail : the expected degree necessary for
-		 * producing a dependency will be higher than N/m. This
-		 * means that the quadratic bw-lingen will fail, and that
-		 * the sub-quadratic one will crash, because the
-		 * assumptions on the degree of pi will be wrong.
-		 *
-		 * so idx = i is clearly wrong here.
-		 */
-		unsigned int idx;
-		for(;;) {
-			idx= ((myrand()) % nrows);
-			if (zrows.find(idx) == zrows.end()) {
-				break;
-			}
+        unsigned int r;
+        r = compute_rank(& a1a2[0][0], m, NBITER * n, globals::modulus);
 
-			cout << fmt("// Avoiding zero row %\n") % idx;
-		}
-		o << fmt("e%") % idx << "\n";
-		o.close();
-	}
-}
+        cout << "// Rank: " << r << "\n";
 
-void build_zero_table(set<unsigned int> & zrows, ifstream& is)
-{
-	cout << "// looking for zero rows..." << flush;
+        if (r == m)
+            break;
+    }
 
-	/* clear the fail bit */
-	is.clear();
+    ofstream o;
+    must_open(o, files::y);
+    for(unsigned int c = 0; c < nr;c++ ) {
+        for (unsigned int j = 0 ; j < n/nbys ; j++) {
+            if (j) o << " ";
+            o << ystrips[j][c];
+        }
+        o << "\n";
+    }
+    o.close();
 
-	comment_strip cs(is, "//");
-	string buffer;
-
-	for(unsigned int p = 0 ; ; p++) {
-		getline(cs, buffer);
-		istringstream st (buffer);
-		unsigned int n;
-	
-		if (!(st >> n)) {
-			is.setstate(ios::failbit);
-			break;
-		} else if (n == 0) {
-			zrows.insert(p);
-			cout << " [" << p << "]";
-		}
-	}
-	cout << " ok" << endl;
+//    for (unsigned int j = 0 ; j < n/nbys ; j++) {
+//        delete[] ystrips[j];
+//    }
+//    delete[] ystrips;
 }
 
 int main(int argc, char *argv[])
 {
-	ios_base::sync_with_stdio(false);
-	cerr.tie(&cout);
+    ios_base::sync_with_stdio(false);
+    cerr.tie(&cout);
 
-	common_arguments common;
-	prep_arguments mine;
+    common_arguments common;
+    prep_arguments mine;
 
-	process_arguments(argc, argv, common, mine);
+    process_arguments(argc, argv, common, mine);
 
-	unsigned int nr, nc;
-	string mstr;
-	ifstream mtx;
-	
 #ifdef  USE_GMP_RANDOM
-        gmp_randinit_mt(random_state);
+    gmp_randinit_mt(random_state);
 #endif
-        if (mine.seed == 0) {
-                myseed(time(NULL));
-        } else {
-                myseed(mine.seed);
-        }
+    if (mine.seed == 0) {
+        myseed(time(NULL));
+    } else {
+        myseed(mine.seed);
+    }
 
-	must_open(mtx, files::matrix);
+    matrix_stats stats;
+    stats.need_zrows(&globals::zrows);
+    stats.need_zcols(&globals::zcols);
 
-	get_matrix_header(mtx, nr, nc, mstr);
-	build_zero_table(zrows,mtx);
+    stats(files::matrix);
 
-	mtx.close();
+    BUG_ON(stats.nr!= stats.nc);
+    simple_matmul_toy<variable_scalar_traits> mul_code(stats, files::matrix);
 
-	setup_vectors(nc, mine.m, mine.n, mpz_class(mstr));
+    globals::m = mine.m;
+    globals::n = mine.n;
+    globals::nr= stats.nr;
+    globals::modulus = stats.modulus;
+    globals::modulus_u8 = globals::modulus.get_ui();
+    globals::modulus_u16 = globals::modulus.get_ui();
+    globals::modulus_u32 = globals::modulus.get_ui();
+    globals::modulus_ulong = globals::modulus.get_ui();
+
+    {
+        ofstream cfg;
+        cfg.open(files::params.c_str());
+        cfg << fmt("n=%\n") %  globals::n;
+        cfg << fmt("m=%\n") %  globals::m;
+    }
+
+    setup_vectors(mul_code);
 }
 
 
-/* vim:set sw=8: */
+/* vim:set sw=4 sta et: */

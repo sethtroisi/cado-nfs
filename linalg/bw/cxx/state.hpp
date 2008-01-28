@@ -6,6 +6,10 @@
 #include <ostream>
 #include <fstream>
 
+namespace globals {
+    extern unsigned int n;
+}
+
 extern int recoverable_iteration(int, int, int, int);
 extern int recover_iteration(int, int, int, int);
 

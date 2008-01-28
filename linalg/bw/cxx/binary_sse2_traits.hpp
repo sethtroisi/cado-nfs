@@ -11,15 +11,17 @@
 
 struct binary_sse2_traits {
 	typedef matrix_repr_binary representation;
-	static const int max_accumulate = UINT_MAX;
-	static const int max_accumulate_wide = UINT_MAX;
+	static const unsigned int max_accumulate = UINT_MAX;
+	static const unsigned int max_accumulate_wide = UINT_MAX;
 #if defined(__OpenBSD__) && defined(__x86_64)
 	/* I know it's outright stupid */
 	typedef long inner_type;
 #else
 	typedef int64_t inner_type;
 #endif
+	static const int sse2_vectoring = 2;
 	typedef inner_type sse2_scalars __attribute__((vector_size(16)));
+	typedef inner_type vec_t[sse2_vectoring] __attribute__((aligned(16)));
 
 	typedef binary_field coeff_field;
 
@@ -38,7 +40,7 @@ struct binary_sse2_traits {
 
 	/* FIXME -- this used to return an mpz_class */
 	static inline int get_y(scalar_t const & x, int i) {
-		inner_type foo[2] __attribute__((aligned(16)));
+		vec_t foo;
 		memcpy(foo, &x.p, sizeof(sse2_scalars));
 		BUG_ON(i >= 128 || i < 0);
 		int bit = (foo[i >> 6] >> (i & 63)) & 1;
@@ -84,7 +86,7 @@ struct binary_sse2_traits {
 
 
 	static inline bool is_zero(scalar_t const& x) {
-		inner_type foo[2] __attribute__((aligned(16)));
+		vec_t foo;
 		memcpy(foo, &x.p, sizeof(sse2_scalars));
 		for(unsigned int i = 0 ; i < 2 ; i++) {
 			if (foo[i])
@@ -112,13 +114,13 @@ struct binary_sse2_traits {
 		// WARNING("slow");
 		/* FIXME -- should we go up to 128 here, or restrict to
 		 * nbys ??? */
-		inner_type foo[2] __attribute__((aligned(16))) = { 0, };
+		vec_t foo;
 		for(unsigned int j = 0 ; j < 128 ; j++)
 			foo[j>>6] ^= (inner_type) (z[i+j] != 0) << (j & 63);
 		x.p = (sse2_scalars) { foo[0], foo[1], };
 	}
 	static inline void assign(std::vector<mpz_class>& z, scalar_t const & x) {
-		inner_type foo[2] __attribute__((aligned(16)));
+		vec_t foo;
 		memcpy(foo, &x.p, sizeof(sse2_scalars));
 		BUG_ON(z.size() != 128);
 		for(unsigned int i = 0 ; i < 128 ; i++) {
@@ -127,7 +129,7 @@ struct binary_sse2_traits {
 	}
 
 	static std::ostream& print(std::ostream& o, scalar_t const& x) {
-		inner_type foo[2] __attribute__((aligned(16)));
+		vec_t foo;
 		memcpy(foo, &x.p, sizeof(sse2_scalars));
 		/*
 		 * TODO: allow some sort of compressed I/O. The problem
@@ -143,12 +145,53 @@ struct binary_sse2_traits {
 		}
 		o.flags(f);
 #endif
-		for(int i = 0 ; i < globals::nbys ; i++) {
+		for(uint i = 0 ; i < globals::nbys ; i++) {
 			if (i) { o << " "; }
 			o << ((foo[i>>6] >> (i & 63)) & 1UL);
 		}
 		return o;
 	}
+        static std::ostream& print(std::ostream& o, scalar_t & x)
+        {
+            vec_t w;
+            memcpy(&w, &x, sizeof(w));
+            long mask;
+            mask = 1L;
+            for(unsigned int i = 0 ; i < 64 ; i++) {
+                if (i) o << " ";
+                o << ((w[0] & mask) != 0);
+                mask <<=1;
+            }
+            mask = 1L;
+            for(unsigned int i = 0 ; i < 64 ; i++) {
+                o << " ";
+                o << ((w[1] & mask) != 0);
+                mask <<=1;
+            }
+            return o;
+        }
+
+        static std::istream& get(std::istream& is, binary_sse2_traits::scalar_t & x)
+        {
+            vec_t w;
+            long v;
+            long z;
+            z = 0;
+            for(unsigned int i = 0 ; i < 64 ; i++) {
+                is >> v;
+                z |= (v << i);
+            }
+            w[0] = z;
+            z = 0;
+            for(unsigned int i = 0 ; i < 64 ; i++) {
+                is >> v;
+                z |= (v << i);
+            }
+            w[1] = z;
+            memcpy(&x, &w, sizeof(w));
+            return is;
+        }
+
 };
 
 #endif	/* BINARY_SSE2_TRAITS_HPP_ */

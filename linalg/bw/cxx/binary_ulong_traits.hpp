@@ -15,11 +15,11 @@
 template<typename T>
 struct binary_pod_traits {
 	typedef matrix_repr_binary representation;
-	static const int max_accumulate = UINT_MAX;
-	static const int max_accumulate_wide = UINT_MAX;
+	static const unsigned int max_accumulate = UINT_MAX;
+	static const unsigned int max_accumulate_wide = UINT_MAX;
 
 	/* This is unfortunately *NOT* what it should */
-	static const int nbits = sizeof(T) * CHAR_BIT;
+	static const unsigned int nbits = sizeof(T) * CHAR_BIT;
 	typedef binary_field coeff_field;
 
 	struct scalar_t { T p; };
@@ -41,8 +41,8 @@ struct binary_pod_traits {
 	}
 
 	/* FIXME -- this used to return an mpz_class */
-	static inline int get_y(scalar_t const & x, int i) {
-		BUG_ON(i >= nbits || i < 0);
+	static inline int get_y(scalar_t const & x, unsigned int i) {
+		BUG_ON(i >= nbits);
 		int bit = (x.p >> i) & 1UL;
 		return bit;
 	}
@@ -109,7 +109,7 @@ struct binary_pod_traits {
 		/* FIXME -- should we go up to 128 here, or restrict to
 		 * nbys ??? */
 		x.p = 0;
-		for(int j = 0 ; j < globals::nbys ; j++)
+		for(unsigned int j = 0 ; j < globals::nbys ; j++)
 			x.p ^= (T) (z[i+j] != 0) << j;
 	}
 	static inline void assign(std::vector<mpz_class>& z, scalar_t const & x) {
@@ -119,27 +119,28 @@ struct binary_pod_traits {
 		}
 	}
 
-	static std::ostream& print(std::ostream& o, scalar_t const& x) {
-		/*
-		 * TODO: allow some sort of compressed I/O. The problem
-		 * is that it interfers a lot with other stuff. a 4x, or
-		 * even 16x reduction of the output size would be nice...
-		 */
-#if 0
-		std::ios_base::fmtflags f(o.flags());
-		o << std::setw(16) << std::hex;
-		for(int i = 0 ; i < 2 ; i++) {
-			if (i) { o << " "; }
-			o << foo[i];
-		}
-		o.flags(f);
-#endif
-		for(int i = 0 ; i < globals::nbys ; i++) {
-			if (i) { o << " "; }
-			o << ((x.p >> i) & (T) 1);
-		}
-		return o;
-	}
+        static std::ostream& print(std::ostream& o, scalar_t const& x)
+        {
+            T mask = 1;
+            for(unsigned int i = 0 ; i < nbits ; i++) {
+                if (i) o << " ";
+                o << ((x.p & mask) != 0);
+                mask <<=1;
+            }
+            return o;
+        }
+
+        static std::istream& get(std::istream& o, scalar_t & x)
+        {
+            T z = 0;
+            unsigned int v;
+            for(unsigned int i = 0 ; i < nbits ; i++) {
+                o >> v;
+                z |= (v << i);
+            }
+            x.p = z;
+            return o;
+        }
 };
 
 typedef binary_pod_traits<ulong> binary_ulong_traits;
