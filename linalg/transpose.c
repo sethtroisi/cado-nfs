@@ -7,7 +7,7 @@
 #include "manu.h"
 
 /* Number of unsigned ints that fit in RAM */
-#define	MEM_LIMIT	(1UL << 20)	
+#define	MEM_LIMIT	(1UL << 27)	
 
 /* Rows processed simultaneously when outputting the result */
 #define NROWS_CORE      20
