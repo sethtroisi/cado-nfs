@@ -11,10 +11,13 @@ names:=polyfile relation timing long_poly getprime mod_ul
 src:=$(patsubst %,%.c,$(names))
 obj:=$(patsubst %,%.o,$(names))
 
-all: libutils.a
+all: libutils.a cache
 
 %.o: %.c
 	gcc $(CFLAGS) -c $< -I.. -I$(GMPINCLUDE)
+
+cache: cache.c timing.o
+	gcc $(CFLAGS) $< timing.c -I.. -o $@
 
 libutils.a: $(obj)
 	ar r libutils.a $(obj)
@@ -25,6 +28,6 @@ Makefile.local:
 	ln -s ../Makefile.local .
 
 clean:
-	-rm -f *~ *.bak $(obj) libutils.a
+	-rm -f *~ *.bak $(obj) libutils.a cache
 
 
