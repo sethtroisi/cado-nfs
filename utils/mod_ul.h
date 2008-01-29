@@ -58,6 +58,7 @@
 #define mod_div3             modul_div3
 #define mod_invmodlong       modul_invmodlong
 #define mod_powredc_ul       modul_powredc_ul
+#define mod_sprp             modul_sprp
 #define mod_gcd              modul_gcd
 #define mod_inv              modul_inv
 #define mod_jacobi           modul_jacobi
@@ -82,7 +83,7 @@ modul_init (residueul_t r, modulusul_t m __GNUC_ATTRIBUTE_UNUSED__)
 __GNUC_ATTRIBUTE_UNUSED__
 static inline void
 modul_init_noset0 (residueul_t r __GNUC_ATTRIBUTE_UNUSED__, 
-                   modulusul_t m __GNUC_ATTRIBUTE_UNUSED__)
+                   const modulusul_t m __GNUC_ATTRIBUTE_UNUSED__)
 {
   return;
 }
@@ -91,7 +92,7 @@ modul_init_noset0 (residueul_t r __GNUC_ATTRIBUTE_UNUSED__,
 __GNUC_ATTRIBUTE_UNUSED__
 static inline void
 modul_clear (residueul_t r __GNUC_ATTRIBUTE_UNUSED__, 
-             modulusul_t m __GNUC_ATTRIBUTE_UNUSED__)
+             const modulusul_t m __GNUC_ATTRIBUTE_UNUSED__)
 {
   return;
 }
@@ -99,7 +100,8 @@ modul_clear (residueul_t r __GNUC_ATTRIBUTE_UNUSED__,
 
 __GNUC_ATTRIBUTE_UNUSED__
 static inline void
-modul_set (residueul_t r, residueul_t s, modulusul_t m __GNUC_ATTRIBUTE_UNUSED__)
+modul_set (residueul_t r, const residueul_t s, const 
+	   modulusul_t m __GNUC_ATTRIBUTE_UNUSED__)
 {
   r[0] = s[0];
 }
@@ -107,7 +109,7 @@ modul_set (residueul_t r, residueul_t s, modulusul_t m __GNUC_ATTRIBUTE_UNUSED__
 
 __GNUC_ATTRIBUTE_UNUSED__
 static inline void
-modul_set_ul (residueul_t r, unsigned long s, modulusul_t m)
+modul_set_ul (residueul_t r, const unsigned long s, const modulusul_t m)
 {
   r[0] = s % m[0];
 }
@@ -117,8 +119,8 @@ modul_set_ul (residueul_t r, unsigned long s, modulusul_t m)
 
 __GNUC_ATTRIBUTE_UNUSED__
 static inline void
-modul_set_ul_reduced (residueul_t r, unsigned long s, 
-                      modulusul_t m __GNUC_ATTRIBUTE_UNUSED__)
+modul_set_ul_reduced (residueul_t r, const unsigned long s, 
+                      const modulusul_t m __GNUC_ATTRIBUTE_UNUSED__)
 {
   ASSERT (s < m[0]);
   r[0] = s;
@@ -126,7 +128,7 @@ modul_set_ul_reduced (residueul_t r, unsigned long s,
 
 __GNUC_ATTRIBUTE_UNUSED__
 static inline void
-modul_initmod_ul (modulusul_t r, unsigned long s)
+modul_initmod_ul (modulusul_t r, const unsigned long s)
 {
   r[0] = s;
 }
@@ -140,28 +142,31 @@ modul_clearmod (modulusul_t m __GNUC_ATTRIBUTE_UNUSED__)
 
 __GNUC_ATTRIBUTE_UNUSED__
 static inline unsigned long
-modul_get_ul (residueul_t s, modulusul_t m __GNUC_ATTRIBUTE_UNUSED__)
+modul_get_ul (const residueul_t s, 
+	      const modulusul_t m __GNUC_ATTRIBUTE_UNUSED__)
 {
   return s[0];
 }
 
 __GNUC_ATTRIBUTE_UNUSED__
 static inline int
-modul_cmp (residueul_t a, residueul_t b, modulusul_t m __GNUC_ATTRIBUTE_UNUSED__)
+modul_cmp (const residueul_t a, const residueul_t b, 
+	   const modulusul_t m __GNUC_ATTRIBUTE_UNUSED__)
 {
   return (a[0] < b[0]) ? -1 : ((a[0] == b[0]) ? 0 : 1);
 }
 
 __GNUC_ATTRIBUTE_UNUSED__
 static inline int
-modul_is0 (residueul_t a, modulusul_t m __GNUC_ATTRIBUTE_UNUSED__)
+modul_is0 (const residueul_t a, const modulusul_t m __GNUC_ATTRIBUTE_UNUSED__)
 {
   return (a[0] == 0UL);
 }
 
 __GNUC_ATTRIBUTE_UNUSED__
 static inline void
-modul_add (residueul_t r, residueul_t a, residueul_t b, const modulusul_t m)
+modul_add (residueul_t r, const residueul_t a, const residueul_t b, 
+	   const modulusul_t m)
 {
   ASSERT(a[0] < m[0] && b[0] < m[0]);
 #ifdef MODTRACE
@@ -178,7 +183,8 @@ modul_add (residueul_t r, residueul_t a, residueul_t b, const modulusul_t m)
 /* FIXME: This function is really modul_add_ul_reduced */
 __GNUC_ATTRIBUTE_UNUSED__
 static inline void
-modul_add_ul (residueul_t r, residueul_t a, unsigned long b, modulusul_t m)
+modul_add_ul (residueul_t r, const residueul_t a, const unsigned long b, 
+	      const modulusul_t m)
 {
   ASSERT(a[0] < m[0] && b < m[0]);
 #ifdef MODTRACE
@@ -192,7 +198,8 @@ modul_add_ul (residueul_t r, residueul_t a, unsigned long b, modulusul_t m)
 
 __GNUC_ATTRIBUTE_UNUSED__
 static inline void
-modul_sub (residueul_t r, residueul_t a, residueul_t b, modulusul_t m)
+modul_sub (residueul_t r, const residueul_t a, const residueul_t b, 
+	   const modulusul_t m)
 {
   ASSERT(a[0] < m[0] && b[0] < m[0]);
 #ifdef MODTRACE
@@ -208,7 +215,8 @@ modul_sub (residueul_t r, residueul_t a, residueul_t b, modulusul_t m)
 /* FIXME: This function is really modul_sub_ul_reduced */
 __GNUC_ATTRIBUTE_UNUSED__
 static inline void
-modul_sub_ul (residueul_t r, residueul_t a, unsigned long b, modulusul_t m)
+modul_sub_ul (residueul_t r, const residueul_t a, const unsigned long b, 
+	      const modulusul_t m)
 {
   ASSERT(a[0] < m[0] && b < m[0]);
 #ifdef MODTRACE
@@ -222,7 +230,7 @@ modul_sub_ul (residueul_t r, residueul_t a, unsigned long b, modulusul_t m)
 
 __GNUC_ATTRIBUTE_UNUSED__
 static inline void
-modul_neg (residueul_t r, residueul_t a, modulusul_t m)
+modul_neg (residueul_t r, const residueul_t a, const modulusul_t m)
 {
   if (a[0] == 0UL)
     r[0] = a[0];
@@ -575,18 +583,24 @@ __GNUC_ATTRIBUTE_UNUSED__
 static inline void
 modul_div2 (residueul_t r, residueul_t a, modulusul_t m)
 {
-  ASSERT(m[0] % 2 != 0);
-  r[0] = (a[0] % 2 == 0) ? (a[0] / 2) : (a[0] / 2 + m[0] / 2 + 1UL);
+  if (a[0] % 2UL == 0UL)
+    r[0] = a[0] / 2UL;
+  else
+    {
+      ASSERT(m[0] % 2UL != 0UL);
+      r[0] = a[0] / 2UL + m[0] / 2UL + 1UL;
+    }
 }
 
 /* prototypes of non-inline functions */
-void modul_div3 (residueul_t r, residueul_t a, modulusul_t m);
-unsigned long modul_gcd (residueul_t r, modulusul_t m);
-unsigned long modul_invmodlong (modulusul_t m);
-void modul_powredc_ul (residueul_t r, residueul_t b, unsigned long e, 
-                       unsigned long invm, modulusul_t m);
-int modul_inv (residueul_t r, residueul_t s, modulusul_t t);
-int modul_jacobi (residueul_t a_par, modulusul_t m_par);
+void modul_div3 (residueul_t, residueul_t, modulusul_t);
+unsigned long modul_gcd (residueul_t, modulusul_t);
+unsigned long modul_invmodlong (modulusul_t);
+void modul_powredc_ul (residueul_t, const residueul_t, const unsigned long, 
+		       const unsigned long, const modulusul_t);
+int modul_sprp (const residueul_t, const unsigned long, const modulusul_t);
+int modul_inv (residueul_t, residueul_t, modulusul_t);
+int modul_jacobi (residueul_t, modulusul_t);
 
 /* Try to restore the macro defines to the same state they had been in */
 #ifdef MOD_UL_ASSERT

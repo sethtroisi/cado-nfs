@@ -19,13 +19,16 @@ modul_div3 (residueul_t r, residueul_t a, modulusul_t m)
   residueul_t t;
 #endif
 
-  ASSERT(m3 != 0UL);
   if (a3 == 0UL)
     r[0] = a[0] / 3UL;
-  else if (a3 + m3 == 3UL) /* Hence a3 == 1, m3 == 2 or a3 == 3, m3 == 1 */
-    r[0] = a[0] / 3UL + m[0] / 3UL + 1UL;
-  else /* a3 == 1, m3 == 1 or a3 == 2, m3 == 2 */
-    r[0] = m[0] - (m[0] - a[0]) / 3UL;
+  else 
+    {
+      ASSERT(m3 != 0UL);
+      if (a3 + m3 == 3UL) /* Hence a3 == 1, m3 == 2 or a3 == 3, m3 == 1 */
+	r[0] = a[0] / 3UL + m[0] / 3UL + 1UL;
+      else /* a3 == 1, m3 == 1 or a3 == 2, m3 == 2 */
+	r[0] = m[0] - (m[0] - a[0]) / 3UL;
+    }
 
 #ifdef WANT_ASSERT
   modul_add (t, r, r, m);
@@ -80,11 +83,13 @@ modul_invmodlong (modulusul_t m)
 
 /* Compute r = b^e, with r and b in Montgomery representation */
 void
-modul_powredc_ul (residueul_t r, residueul_t b, unsigned long e, 
-                  unsigned long invm, modulusul_t m)
+modul_powredc_ul (residueul_t r, const residueul_t b, const unsigned long e, 
+                  const unsigned long invm, const modulusul_t m)
 {
   unsigned long mask = ~0UL - (~0UL >> 1); /* Only MSB set */
-
+#ifdef WANT_ASSERT
+  unsigned long e1 = e;
+#endif
   if (e == 0UL)
     {
       const residueul_t one = {1UL};
@@ -103,7 +108,7 @@ modul_powredc_ul (residueul_t r, residueul_t b, unsigned long e,
 
   modul_set (r, b, m);       /* (r*b)^mask * b^(e-mask) = r^mask * b^e */
 #ifdef WANT_ASSERT
-  e -= mask;                 /* e -= mask; */
+  e1 -= mask;
 #endif
 
   while (mask > 1UL)
@@ -114,12 +119,83 @@ modul_powredc_ul (residueul_t r, residueul_t b, unsigned long e,
         {
 	  modul_mulredc (r, r, b, invm, m);
 #ifdef WANT_ASSERT
-          e -= mask;         /* e -= mask; As above */
+          e1 -= mask;
 #endif
         }
     }
-  ASSERT (e == 0 && mask == 1);
+  ASSERT (e1 == 0UL && mask == 1UL);
   /* Now e = 0, mask = 1, and r^mask * b^0 = r^mask is the result we want */
+}
+
+
+/* Returns 1 if m is a strong probable prime wrt base b, 0 otherwise.
+   b must be < m.
+   b is NOT passed in Montgomery form, even though the exponentiation
+   in this function uses REDC - this function converts b by itself.
+   invn must be passed so that n * invn  == -1 (mod 2^wordsize).  */
+int
+modul_sprp (const residueul_t b, const unsigned long invn, 
+	    const modulusul_t m)
+{
+  residueul_t b1, r1, t;
+  int i = 0, po2 = 1;
+  unsigned long mm1 = (m[0] - 1UL) >> 1;
+
+  ASSERT (b[0] < m[0]);
+  ASSERT (invn * m[0] == (unsigned long) -1);
+
+  if (m[0] <= 3UL)
+    return (m[0] >= 2UL);
+
+  if (m[0] % 2UL == 0UL)
+    return 0;
+
+  /* Set mm1 to the odd part of m-1 */
+  while (mm1 % 2UL == 0UL)
+    {
+      po2++;
+      mm1 >>= 1;
+    }
+  /* Hence, m-1 = mm1 * 2^po2 */
+
+  modul_init_noset0 (b1, m);
+  modul_init_noset0 (r1, m);
+  modul_init_noset0 (t, m);
+  mod_tomontgomery (b1, b, m);
+
+  /* Exponentiate */
+  modul_powredc_ul (r1, b1, mm1, invn, m);
+  modul_clear (b1, m);
+
+  modul_frommontgomery (t, r1, invn, m);
+  /* Now t == b^mm1 (mod m) */
+#if defined(PARI)
+  printf ("(Mod(%lu,%lu) ^ %lu) == %lu /* PARI */\n", 
+	  b, n, mm1, modul_get_ul (t, m));
+#endif
+  
+  /* If m is prime, then b^mm1 might be == 1 or == -1 (mod m) here */
+  if (modul_get_ul (t, m) == 1UL || modul_get_ul (t, m) == m[0] - 1UL)
+    i = 1;
+  else
+    {
+      /* If m is a prime, then one of b^(2*mm1), b^(2^2*mm1), ..., 
+	 b^(2^(po2 - 1)*mm1)  must be == -1 (mod m) */
+      for ( ; po2 > 1; po2--)
+	{
+	  modul_mulredc (r1, r1, r1, invn, m);
+	  modul_frommontgomery (t, r1, invn, m);
+	  if (modul_get_ul (t, m) == m[0] - 1UL)
+	    {
+	      i = 1;
+	      break;
+	    }
+	}
+    }
+
+  modul_clear (r1, m);
+  modul_clear (t, m);
+  return i;
 }
 
 
