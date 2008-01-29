@@ -18,16 +18,18 @@ main ()
                                 {19, 524287}, {20, 1048573}};
   unsigned long i, j, k, p, q, n, mask, L1 = 0;
   uint64_t t, mintime = ~((uint64_t) 0);
-  char *s;
+  char *s, *s0;
 
   for (i = 0; i < L1_NUM; i++)
     {
       n = 1 << T[i][0];
+      mask = n - 1;
       p = T[i][1];
-      s = malloc (n * sizeof (char));
+      s0 = malloc (2 * n * sizeof (char));
+      /* align s on a multiple of n */
+      s = s0 + (n - ((unsigned long) s0 & mask));
       for (j = 0; j < n; j++)
         s[j] = 0;
-      mask = n - 1;
       /* We compute k(j) = 2*j + 3*j^2 mod n.
          We have k(j+1) - k(j) = 6*j + 5. */
       t = microseconds ();
@@ -39,12 +41,15 @@ main ()
           q += 6;
         }
       t = microseconds () - t;
-      fprintf (stderr, "size=%lu time=%lu\n", n, t);
       if (t < mintime)
         mintime = t;
-      if (t < mintime + (mintime / 10))
+      /* we consider that if the time increases by more than 50% with respect
+         to the minimum, we have exceeded the cache size */
+      if (t < mintime + (mintime / 2))
         L1 = n;
-      free (s);
+      fprintf (stderr, "size=%lu time=%lu (%1.2f)\n", n, t,
+               (double) t / (double) mintime);
+      free (s0);
     }
   printf ("#define L1_CACHE_SIZE %lu\n", L1);
   return 0;
