@@ -187,6 +187,11 @@ treatSign(relation_t rel, cado_poly pol)
     mpz_t tmp1, tmp2;
     int s;
 
+    /* first perform a quick check */
+    s = (rel.a > 0) ? mpz_sgn (pol->g[1]) : -mpz_sgn (pol->g[1]);
+    if (mpz_sgn (pol->g[0]) == s)
+      return s;
+
     mpz_init(tmp1);
     mpz_mul_si(tmp1, pol->g[1], rel.a);
     mpz_init(tmp2);
@@ -195,6 +200,7 @@ treatSign(relation_t rel, cado_poly pol)
     s = (mpz_sgn(tmp1) >= 0 ? 1 : -1);
     mpz_clear(tmp1);
     mpz_clear(tmp2);
+
     return s;
 }
 
@@ -352,7 +358,7 @@ int main(int argc, char *argv[])
     char *relname, *purgedname, *indexname, *kername, *polyname;
     FILE *relfile, *purgedfile, *indexfile, *kerfile;
     cado_poly pol;
-    int verbose = 1, ndepmin, ndepmax, rora, ret;
+    int verbose = 1, ndepmin, ndepmax, rora, ret, i;
 
     if(argc != 10){
 	fprintf(stderr, "Usage: %s relname purgedname indexname", argv[0]);
@@ -360,6 +366,12 @@ int main(int argc, char *argv[])
 	fprintf(stderr, "Dependency relation i will be put in files prefix.i\n");
 	return 0;
     }
+
+    /* print the command line */
+    fprintf (stderr, "%s.r%s", argv[0], REV);
+    for (i = 1; i < argc; i++)
+      fprintf (stderr, " %s", argv[i]);
+    fprintf (stderr, "\n");
 
     relname = argv[1];
     purgedname = argv[2];
