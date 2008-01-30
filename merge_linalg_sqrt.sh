@@ -36,7 +36,7 @@ fi
 # update
 nrels=`wc -l $nodup | awk '{print $1}'`
 
-if [ -s $purged ]
+if [ -s $purged -a $purged -nt $nodup ]
 then
   echo "File $purged already exists"
 else
