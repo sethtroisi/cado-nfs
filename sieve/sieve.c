@@ -58,7 +58,7 @@ long long ul_rho_time;
 
 #ifdef TRACE_RELATION_A
 static void 
-TRACE_A (long a, const char *fn, const char *s, ...)
+TRACE_A (long a, const char *fn, const int line, const char *s, ...)
 {
   va_list ap;
 
@@ -66,7 +66,7 @@ TRACE_A (long a, const char *fn, const char *s, ...)
 
   if (a == TRACE_RELATION_A)
     {
-      printf ("# TRACE RELATION a = %ld in %s: ", a, fn);
+      printf ("# TRACE RELATION a = %ld in %s(%d): ", a, fn, line);
       gmp_vprintf (s, ap);
       fflush (stdout);
     }
@@ -230,7 +230,7 @@ fpoly_print (const double *f, const int deg, char *name)
 }
 #endif
 
-/* Used only in compute_norms() */
+/* Used only in compute_norms() and trialdiv_one_side()*/
 static unsigned char
 log_norm (const double *f, const int deg, const double x, 
 	  const double log_scale, const double log_proj_roots)
@@ -317,7 +317,7 @@ compute_norms (unsigned char *sievearray, const long amin, const long amax,
 	  if (a <= TRACE_RELATION_A && TRACE_RELATION_A < a2)
 	    printf ("# TRACE RELATION a = %ld in compute_norms: log norm "
 		    "(range computed) for degree %d is %d\n", 
-		    TRACE_RELATION_A, deg, (int) n1);
+		    (long) TRACE_RELATION_A, deg, (int) n1);
 #endif
 	  memset (sievearray + ((a - amin) >> odd), n1, (a2 - a) >> odd);
 	}
@@ -334,8 +334,10 @@ compute_norms (unsigned char *sievearray, const long amin, const long amax,
 	      unsigned char n = log_norm (f, deg, (double) a, log_scale, 
 					  log_proj_roots);
 
-	      TRACE_A (a, __func__, "log norm (individually computed) for "
-		       "degree %d is %d\n", deg, (int) n);
+	      TRACE_A (a, __func__, __LINE__, 
+		       "log norm (individually computed) for degree %d is "
+		       "%d, norm is %f\n", 
+		       deg, (int) n, fpoly_eval (f, deg, (double) a));
 
 	      sievearray[(a - amin) >> odd] = n;
 	      if (n > nmax)
@@ -459,22 +461,32 @@ sieve (unsigned char *sievearray, factorbase_degn_t *fb,
 	      unsigned char k;
 	      k = sievearray[d] - plog;
 
-	      TRACE_A (amin + ((long)d << odd), __func__, "new approx norm "
-		       "after sieving out " FBPRIME_FORMAT " is %d\n",
-		       p, (int) k);
+	      TRACE_A (amin + ((long)d << odd), __func__, __LINE__, 
+		       "new approx norm after sieving out " FBPRIME_FORMAT 
+		       " is %d\n", p, (int) k);
 
 	      sievearray[d] = k;
-	      if (add_error (k) <= threshold_with_error && reports_length > 0)
+	      if (add_error (k) <= threshold_with_error)
 		{
-		  TRACE_A ((amin + ((long)d << odd)), __func__, 
-			   "writing sieve report a = %ld, p = %u, l = %d\n",
-			   (amin + ((long)d << odd)), p, (int) k);
-
-		  reports->a = amin + ((long)d << odd);
-		  reports->p = p;
-		  reports->l = k;
-		  reports++;
-		  reports_length--;
+		  if (reports_length > 0)
+		    {
+		      TRACE_A ((amin + ((long)d << odd)), __func__, __LINE__,
+			       "writing sieve report a = %ld, p = %u, l = %d\n",
+			       (amin + ((long)d << odd)), p, (int) k);
+		      
+		      reports->a = amin + ((long)d << odd);
+		      reports->p = p;
+		      reports->l = k;
+		      reports++;
+		      reports_length--;
+		    }
+		  else
+		    {
+		      TRACE_A ((amin + ((long)d << odd)), __func__, __LINE__,
+			       "Cannot writing sieve report a = %ld, p = %u, "
+			       "l = %d, report buffer full\n",
+			       (amin + ((long)d << odd)), p, (int) k);
+		    }
 		}
 	    }
         }
@@ -487,33 +499,6 @@ sieve (unsigned char *sievearray, factorbase_degn_t *fb,
     reports->p = 0; /* Put end marker */
 }
 
-void
-print_useful (const fbprime_t *useful_primes, 
-	      const unsigned int useful_length)
-{
-  unsigned int useful_count = 0;
-
-  if (useful_primes == NULL)
-    return;
-
-  if (*useful_primes == 0)
-    {
-      printf ("# There were no useful primes\n");
-      return;
-    }
-
-  printf ("# Useful primes were: ");
-  while (*useful_primes != 0)
-    {
-      useful_count ++;
-      printf (FBPRIME_FORMAT " ", *useful_primes++);
-    }
-  printf ("\n");
-  if (useful_count == useful_length - 1)
-    printf ("#Storage for useful primes is full, "
-	    "consider increasing useful_length\n");
-  fflush (stdout);
-}
 
 static unsigned long
 find_sieve_reports (const unsigned char *sievearray, sieve_report_t *reports, 
@@ -540,19 +525,27 @@ find_sieve_reports (const unsigned char *sievearray, sieve_report_t *reports,
 	{
 	  const long a = amin + ((long)d << odd);
 	  
+	  /* Testing n%3==0 is quite fast, and eliminates useless reports */
 	  if (a % 3 == 0 && b % 3 == 0)
 	    continue;
 
+	  /* If other_reports was passed, store this report only if there
+	     is a matching report in other_reports */
 	  if (other_reports != NULL)
 	    {
 	      while (other_reports->p != 0 && other_reports->a < a)
 		other_reports++;
 	      if (other_reports->a != a)
 		{
-		  TRACE_A (a, __func__, 
+		  TRACE_A (a, __func__, __LINE__,
 			   "no matching report in other_reports\n");
 		  
 		  continue;
+		}
+	      else
+		{
+		  TRACE_A (a, __func__, __LINE__, 
+			   "matching report in other_reports\n");
 		}
 	    }
 
@@ -560,8 +553,9 @@ find_sieve_reports (const unsigned char *sievearray, sieve_report_t *reports,
 	  reports[reports_nr].p = 1;
 	  reports[reports_nr].l = sievearray[d];
 	  reports_nr++;
-	  TRACE_A (a, __func__, "sieve report a = %ld, p = 1, l = %d added to "
-		   "list\n", a, (int) sievearray[d]);
+	  TRACE_A (a, __func__, __LINE__,
+		   "sieve report a = %ld, p = 1, l = %d added to list\n", 
+		   a, (int) sievearray[d]);
 
 	  if (reports_nr == reports_len)
 	    {
@@ -765,7 +759,7 @@ sieve_one_side (unsigned char *sievearray, factorbase_t fb,
 #ifdef TRACE_RELATION_A
   if (eff_amin <= TRACE_RELATION_A && TRACE_RELATION_A <= eff_amax)
     printf ("# TRACE RELATION a = %ld in sieve_one_side: approx norm after "
-	    "sieving small primes is %d\n", TRACE_RELATION_A, 
+	    "sieving small primes is %d\n", (long) TRACE_RELATION_A, 
 	    sievearray[(TRACE_RELATION_A - eff_amin) >> odd]);
 #endif
 
@@ -1229,69 +1223,6 @@ mpz_rho (const mpz_t N, const unsigned long c)
 }
 
 
-/* Returns 1 if n is a strong probable prime wrt base b, 0 otherwise.
-   invn must be passed so that n * invn  == -1 (mod 2^wordsize) */
-int
-ul_prp (const unsigned long n, const unsigned long invn, const unsigned long b)
-{
-  modulusul_t m;
-  residueul_t b1, r1, t;
-  int i, po2 = 1;
-  unsigned long nm1 = (n - 1UL) >> 1;
-
-  ASSERT (b < n);
-  ASSERT (n > 2UL);
-  ASSERT (n % 2 != 0);
-
-  while (nm1 % 2 == 0)
-    {
-      po2++;
-      nm1 >>= 1;
-    }
-
-  modul_initmod_ul (m, n);
-  modul_init_noset0 (b1, m);
-  modul_init_noset0 (r1, m);
-  modul_init_noset0 (t, m);
-  modul_set_ul_reduced (b1, b, m);
-  mod_tomontgomery (b1, b1, m);
-
-  /* Exponentiate */
-  modul_powredc_ul (r1, b1, nm1, invn, m);
-
-  modul_frommontgomery (t, r1, invn, m);
-#if defined(PARI)
-  printf ("(Mod(%lu,%lu) ^ %lu) == %lu /* PARI */\n", 
-	  b, n, nm1, modul_get_ul (t, m));
-#endif
-    
-  if (modul_get_ul (t, m) == 1UL)
-    i = 1;
-  else
-    {
-      /* One of the r, r^2, r^(2^2), ..., r^(2^(po2 - 1)) must be == -1 */
-      for ( ; po2 > 1; po2--)
-	{
-	  modul_frommontgomery (t, r1, invn, m);
-	  if (modul_get_ul (t, m) == n - 1UL)
-	    break;
-	  modul_mulredc (r1, r1, r1, invn, m);
-	}
-      if (po2 > 1)
-	i = 1;
-      else
-	{
-	  modul_frommontgomery (t, r1, invn, m);
-	  i = (modul_get_ul (t, m) == n - 1UL);
-	}
-    }
-
-  modul_clear (r1, m);
-  modul_clearmod (m);
-  return i;
-}
-
-
 /* If n <= 10^10 then this function proves primality/compositeness
    of n. For larger n, return value 0 means n is composite, return 
    value 1 means it is probably prime */
@@ -1300,6 +1231,7 @@ int
 ul_proven_prime (unsigned long n)
 {
   modulusul_t m;
+  residueul_t b;
   unsigned long invn;
   int r = 0;
   
@@ -1310,10 +1242,11 @@ ul_proven_prime (unsigned long n)
     }
 
   modul_initmod_ul (m, n);
+  modul_init_noset0 (b, m);
   invn = -mod_invmodlong (m);
-  modul_clearmod (m);
 
-  if (!ul_prp (n, invn, 2UL))
+  modul_set_ul (b, 2UL, m);
+  if (!modul_sprp (b, invn, m))
     goto end;
 
   if (n < 2047)
@@ -1322,17 +1255,23 @@ ul_proven_prime (unsigned long n)
       goto end;
     }
 
-  if (ul_prp (n, invn, 7UL) && ul_prp (n, invn, 61UL) 
+  modul_set_ul (b, 7UL, m);
+  if (modul_sprp (b, invn, m))
+    {
+      modul_set_ul (b, 61UL, m);
+      if (modul_sprp (b, invn, m)
 #if (ULONG_MAX > 4294967295UL)
-      && n != 4759123141UL && n != 8411807377UL
+	&& n != 4759123141UL && n != 8411807377UL
 #endif
-      )
-    r = 1;
-
+	  )
+	r = 1;
+    }
+  
  end:
 #if defined(PARI)
-  printf ("isprime(%lu) == %d /* PARI */\n", r, n);
+  printf ("isprime(%lu) == %d /* PARI */\n", n, r);
 #endif
+  modul_clearmod (m);
   return r;
 }
 
@@ -1347,13 +1286,13 @@ trialdiv_find_next (factorbase_degn_t *fbptr, const mpz_t norm)
   size_t s = mpz_size (norm);
   unsigned long add = 0;
 
+  ASSERT (mpz_cmp_ui (norm, fbptr->p) >= 0);
+
   if (mpz_getlimbn (norm, s - 1) < fbptr -> p)
     {
       add = mpz_getlimbn (norm, s - 1);
       s--;
     }
-
-  ASSERT_ALWAYS (s > 0);
 
   /* Choose good trial division routine outside of loop over fb primes */
   if (s == 1)
@@ -1431,14 +1370,15 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
   /* 1. Compute norm */
   mp_poly_eval (norm, scaled_poly, degree, a);
   mpz_abs (norm, norm);
-  TRACE_A (a, __func__, "norm for degree %d is %Zd\n", degree, norm);
+  TRACE_A (a, __func__, __LINE__, "norm for degree %d is %Zd\n", degree, norm);
   
-  /* Compute approx. log of norm */
+  /* Compute approx. log of norm as was used for initialising the 
+     sieve array */
   for (k = 0; (int) k <= degree; k++)
     dpoly[k] = mpz_get_d (scaled_poly[k]);
   missinglog = log_norm (dpoly, degree, (double) a, log_scale, 
-		      log_proj_divisor);
-  TRACE_A (a, __func__, "normlog = %hhu\n", missinglog);
+			 log_proj_divisor);
+  TRACE_A (a, __func__, __LINE__, "missinglog = %hhu\n", missinglog);
   
   
   /* 2. Divide out the primes with projective roots */
@@ -1449,8 +1389,8 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
       r = mpz_tdiv_q_ui (norm, norm, proj_divisor);
       ASSERT_ALWAYS (r == 0);
       
-      TRACE_A (a, __func__, "dividing out proj. divisor %lu. New norm is "
-	       "%Zd.\n", proj_divisor, norm);
+      TRACE_A (a, __func__, __LINE__, "dividing out proj. divisor %lu. "
+	       "New norm is %Zd.\n", proj_divisor, norm);
 
       for (k = 0; k < nr_proj_primes; k++)
 	{
@@ -1462,8 +1402,9 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 	      mpz_tdiv_q_ui (norm, norm, proj_primes[k]);
 	      add_fbprime_to_list (primes, nr_primes, max_nr_primes, 
 				   proj_primes[k]);
-	      TRACE_A (a, __func__, "dividing out extra power of proj. "
-		       "prime %lu. New norm = %Zd\n", proj_primes[k], norm);
+	      TRACE_A (a, __func__, __LINE__, "dividing out extra power of "
+		       "proj. ""prime %lu. New norm = %Zd\n", 
+		       proj_primes[k], norm);
 	    }
 	}
     }
@@ -1491,8 +1432,8 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 	  missinglog -= fb_log ((double) reports->p, log_scale, 0.);
 	  nr_report_primes++;
 
-	  TRACE_A (a, __func__, "dividing out report prime " FBPRIME_FORMAT 
-		   ". New new norm = %Zd, missinglog = %hhd\n", 
+	  TRACE_A (a, __func__, __LINE__, "dividing out report prime " 
+		   FBPRIME_FORMAT ". New new norm = %Zd, missinglog = %hhd\n", 
 		   reports->p, norm, missinglog);
 	}
 
@@ -1503,7 +1444,7 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
       reports++;
     }
   missinglog -= reportlog;
-  TRACE_A (a, __func__, "reportlog is %hhd, new missinglog = %hhd\n", 
+  TRACE_A (a, __func__, __LINE__, "reportlog is %hhd, new missinglog = %hhd\n", 
 	   reportlog, missinglog);
 
   /* 
@@ -1515,7 +1456,8 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
   /* Treat factor base prime p == 2 separately. We want to be able to use
      REDC in what follows and it requires an odd modulus */
   fbptr = fullfb;
-  TRACE_A (a, __func__, "first fb prime is " FBPRIME_FORMAT "\n", fbptr->p);
+  TRACE_A (a, __func__, __LINE__, "first fb prime is " FBPRIME_FORMAT "\n", 
+	   fbptr->p);
   if (fbptr->p == 2)
     {
       if (mpz_even_p (norm))
@@ -1524,8 +1466,8 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 	{
 	  mpz_tdiv_q_2exp (norm, norm, 1);
 	  add_fbprime_to_list (primes, nr_primes, max_nr_primes, 2);
-	  TRACE_A (a, __func__, "dividing out fb prime 2. New norm = %Zd, "
-		   "missinglog = %hhd\n", norm, missinglog);
+	  TRACE_A (a, __func__, __LINE__, "dividing out fb prime 2." 
+		   "New norm = %Zd, missinglog = %hhd\n", norm, missinglog);
 	}
       fbptr = fb_next (fbptr);
     }
@@ -1555,7 +1497,7 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
       ASSERT_ALWAYS (missinglog >= fbptr->plog);
       missinglog -= fbptr->plog;
       
-      TRACE_A (a, __func__, "dividing out fb prime " FBPRIME_FORMAT
+      TRACE_A (a, __func__, __LINE__, "dividing out fb prime " FBPRIME_FORMAT
 	       ". New norm = %Zd, missinglog = %hhd\n", 
 	       fbptr->p, norm, missinglog);
       
@@ -1601,6 +1543,8 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 	  while (fb_next (fbptr)->p != 0 && 
 		 fb_next (fbptr)->plog < missinglog)
 	    fbptr = fb_next (fbptr);
+	  TRACE_A (a, __func__, __LINE__, "skipping forward in fb, next prime "
+		   "is " FBPRIME_FORMAT "\n", fb_next (fbptr)->p);
 #endif
 	}
       fbptr = fb_next (fbptr);
@@ -1657,8 +1601,8 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 	      if (!ul_proven_prime (q))
 		q = iscomposite (q);
 
-	      TRACE_A (a, __func__, "norm %Zd is a power, %lu divides it\n", 
-		       norm, q);
+	      TRACE_A (a, __func__, __LINE__, "norm %Zd is a power, %lu "
+		       "divides it\n", norm, q);
 	      ASSERT_ALWAYS (q != 0);
 	      trialdiv_one_prime (q, norm, nr_primes, primes, max_nr_primes, 
 				  1);
@@ -1676,8 +1620,9 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 			  "necessary\n", norm, a, b);
 	      fflush (stdout);
 #endif
-	      TRACE_A (a, __func__, "norm %Zd is < fbb %lu, assuming it is "
-		       "prime and adding to list of primes\n", norm, fbb);
+	      TRACE_A (a, __func__, __LINE__, "norm %Zd is < fbb %lu, "
+		       "assuming it is prime and adding to list of primes\n", 
+		       norm, fbb);
 	      q = mpz_get_ui (norm);
 	      ASSERT (ul_proven_prime (q));
 	      trialdiv_one_prime (q, norm, nr_primes, primes, max_nr_primes, 
@@ -1689,7 +1634,8 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 	      /* Not <fbb or prime power. Since we know there is a fb prime
 		 in norm, not being < fbb implies being composite. 
 		 Try to factor it */
-	      TRACE_A (a, __func__, "Trying Pollard rho on norm %Zd\n", norm);
+	      TRACE_A (a, __func__, __LINE__, "Trying Pollard rho on norm "
+		       "%Zd\n", norm);
 	      if (mpz_fits_ulong_p (norm))
 		{
 		  unsigned long n;
@@ -1710,7 +1656,7 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 		  } while (q == 1);
 		  ASSERT (mpz_divisible_ui_p (norm, q));
 		}
-	      TRACE_A (a, __func__, "Pollard rho found %lu\n", q);
+	      TRACE_A (a, __func__, __LINE__, "Pollard rho found %lu\n", q);
 
 	      /* Pollard rho has a way of discovering powers of primes if
 		 they divide the input number. Let's at least check for a
@@ -1780,7 +1726,8 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 
   /* 5. Check if the cofactor is small enough */
   log2size = mpz_sizeinbase (norm, 2);
-  TRACE_A (a, __func__, "log2size of cofactor %Zd is %d\n", norm, log2size);
+  TRACE_A (a, __func__, __LINE__, "log2size of cofactor %Zd is %d\n", 
+	   norm, log2size);
 
   if ((double) log2size > 
       lpb * lambda + SIEVE_PERMISSIBLE_ERROR)
@@ -1794,15 +1741,15 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
   if ((int) log2size > mfb)
     {
       (*cof_toolarge)++;
-      TRACE_A (a, __func__, "log2size %d > mfb %d, discarding relation\n",
-	       (int) log2size, (int) mfb);
+      TRACE_A (a, __func__, __LINE__, "log2size %d > mfb %d, discarding "
+	       "relation\n", (int) log2size, (int) mfb);
       return 0;
     }
   
   /* 6. Check if the cofactor is < lpb */
   if (mpz_cmp_ui (norm, 1UL) == 0)
     {
-      TRACE_A (a, __func__, "Cofactor is 1. This side is smooth.\n");
+      TRACE_A (a, __func__, __LINE__, "Cofactor is 1. This side is smooth.\n");
       return 1;    
     }
 
@@ -1816,8 +1763,8 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 	  /* If this cofactor is a prp, add it to the list of primes */
 	  q = (fbprime_t) mpz_get_ui (norm);
 	  add_fbprime_to_list (primes, nr_primes, max_nr_primes, q);
-	  TRACE_A (a, __func__, "cofactor" FBPRIME_FORMAT "is <= 2^lpb and "
-		   "prp. This side is smooth.\n", q);
+	  TRACE_A (a, __func__, __LINE__, "cofactor" FBPRIME_FORMAT 
+		   "is <= 2^lpb and prp. This side is smooth.\n", q);
 	  mpz_set_ui (norm, 1UL);
 	  return 1;
 	}
@@ -1826,8 +1773,8 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 	  /* If not prp, just ignore it, print the relation and let the 
 	     next program in the tool chain figure out the prime factors 
 	     of this composite */
-	  TRACE_A (a, __func__, "cofactor %Zd is <= 2^lpb and composite. "
-		   "This side is smooth.\n", norm);
+	  TRACE_A (a, __func__, __LINE__, "cofactor %Zd is <= 2^lpb and "
+		   "composite. This side is smooth.\n", norm);
 
 	  /* It is a bit odd though to have a composite factor <lpb.
 	     Print a warning about it. */
@@ -1843,15 +1790,15 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 	 skip this report */
       if (mpz_probab_prime_p (norm, PRP_REPS))
 	{
-	  TRACE_A (a, __func__, "cofactor %Zd is > 2^lpb and prp. "
+	  TRACE_A (a, __func__, __LINE__, "cofactor %Zd is > 2^lpb and prp. "
 		   "Discarding relation.\n", norm);
 	  (*lp_toolarge)++;
 	  return 0;
 	}
       else
 	{
-	  TRACE_A (a, __func__, "cofactor %Zd is > 2^lpb and composite. "
-		   "This side may be smooth.\n", norm);
+	  TRACE_A (a, __func__, __LINE__, "cofactor %Zd is > 2^lpb and "
+		   "composite. This side may be smooth.\n", norm);
 	  return 1;
 	}
     }
@@ -2218,7 +2165,8 @@ main (int argc, char **argv)
 #endif
 
 #ifdef TRACE_RELATION_A
-      printf ("# Tracing the fate of relation %ld.\n", TRACE_RELATION_A);
+      printf ("# Tracing the fate of relations with a=%ld.\n", 
+	      (long) TRACE_RELATION_A);
 #else
       printf ("# Relation tracing disabled.\n");
 #endif
