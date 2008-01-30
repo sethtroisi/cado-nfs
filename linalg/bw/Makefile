@@ -33,6 +33,8 @@ include $(TOPPATH)/util/main.mki
 
 ######################################################################
 
+mkbitstrings: mkbitstrings.c
+	$(CC) -O2 -g -W -Wall -Iinclude -std=c99 $< -o $@
 
 old/structure_automatic.h: old/structure.m4
 	m4 -Doutputfile=MAIN < $< > $@
