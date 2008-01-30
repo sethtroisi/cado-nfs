@@ -1,0 +1,110 @@
+#!/bin/sh -
+# same as merge_linalg_sqrt.sh, but with Block-Wiedemann
+#
+# We assume that a directory $name exists
+#
+# Typical use: ./merge_bw_sqrt.sh Examples/c20/c20 1.0 5 10 100 [v]
+#
+linalg=linalg
+sqrt=sqrt/naive
+
+# default parameters (see README.params)
+nkermax=30; nchar=50; prune=1.0; maxlevel=6; cwmax=10; rwmax=100
+
+root=$1
+if [ $# -ge 2 ]; then prune=$2; fi
+if [ $# -ge 3 ]; then maxlevel=$3; fi
+if [ $# -ge 4 ]; then cwmax=$4; fi
+if [ $# -ge 5 ]; then rwmax=$5; fi
+name=$root.$prune"x"$maxlevel"x"$cwmax"x"$rwmax
+if [ $# -ge 6 ]; then verbose="-v"; fi
+
+echo "Args: $*"
+
+rels=$root.rels
+poly=$root.poly
+nodup=$root.nodup
+purged=$root.purged
+
+if [ -s $nodup ]
+then
+  echo "File $nodup already exists"
+else
+  nrels=`wc -l $rels | awk '{print $1}'`
+  time $linalg/duplicates -nrels $nrels $rels > $nodup
+  if [ ! -s $nodup ]; then echo "zero file $nodup"; exit; fi
+fi
+
+# update
+nrels=`wc -l $nodup | awk '{print $1}'`
+
+if [ -s $purged -a $purged -nt $nodup ]
+then
+  echo "File $purged already exists"
+else
+  time $linalg/purge -poly $poly -nrels $nrels $nodup > $purged
+  if [ ! -s $purged ]; then echo "zero file $purged"; exit; fi
+  excess=`head -1 $purged | awk '{nrows=$1; ncols=$2; print (nrows-ncols)}'`
+  echo "excess = $excess"
+  if [ $excess -le 0 ]
+  then 
+      echo "excess <= 0, sorry"
+      /bin/rm -f $purged
+      exit
+  fi
+fi
+
+echo "Performing merges"
+
+nb_merge_max=1000000
+argsa="-forbw -prune $prune -merge $nb_merge_max -mat $purged"
+argsa="$argsa -maxlevel $maxlevel -cwmax $cwmax -rwmax $rwmax $verbose"
+time $linalg/merge $argsa > $name.merge.his # 2> $name.merge.err
+echo "SIZE(merge.his): `ls -s $name.merge.his`"
+
+echo "Replaying merges"
+
+argsr="$purged $name.merge.his $name.small $name.index"
+time $linalg/replay $argsr $verbose # 2> $name.replay.err
+echo "SIZE(index): `ls -s $name.index`"
+
+echo "Transposing the matrix"
+
+time $linalg/transpose $name.small $name.small.tr
+
+echo "Calling Block-Wiedemann"
+
+if [ ! -e $root.testmat ]
+then
+   mkdir $root.testmat
+fi
+time $linalg/bw/doit.pl matrix=$name.small.tr mn=64 vectoring=64 multisols=1 wdir=$root.testmat
+
+echo "Converting dependencies to CADO format"
+
+time $linalg/bw/mkbitstrings /tmp/W* > $name.ker_raw
+
+if [ ! -s $name.ker_raw ]; then echo "Zerodim kernel, stopping"; exit; fi
+
+nker=`wc -l $name.ker_raw | awk '{print $1}'`
+if [ $nker -lt $nkermax ]; then nkermax=$nker; fi
+
+echo "Adding characters"
+
+args0="$purged $name.ker_raw $poly $name.index $nodup"
+args0="$args0 $nker $nchar"
+time $linalg/characters $args0 > $name.ker
+
+ndepmax=`wc -l $name.ker | awk '{print $1}'`
+if [ $ndepmax -ge 30 ]; then ndepmax=30; fi
+
+echo "Preparing $ndepmax squareroots"
+
+args1="$nodup $purged $name.index $name.ker $poly"
+time $linalg/allsqrt $args1 0 $ndepmax ar $name.dep
+
+echo "Entering the last phase"
+
+./newsqrtonly.sh $root $name 0 $ndepmax
+## If this fails, use the backup version, based on magma:
+##   ./sqrtonly.sh $root $name 0 $ndepmax
