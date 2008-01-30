@@ -77,6 +77,7 @@ TRACE_A (long a, const char *fn, const int line, const char *s, ...)
 static void
 TRACE_A (__attribute__ ((unused)) long a, 
 	 __attribute__ ((unused)) const char *fn, 
+	 __attribute__ ((unused)) const int line,
 	 __attribute__ ((unused)) const char *s, ...)
 {
 }
