@@ -14,12 +14,14 @@ or
 The latter forms allows solving of an arbitrary matrix.
 
 The solver looks for a ***COLUMN*** dependency, thus one first has to apply
-the linalg/transpose program to the "small" matrix produced by merge. For
-example for the c59:
+the linalg/transpose program if row dependencies are sought.
+For example for a c59 NFS run:
 
 % set tmp=/localdisk/tmp
 % ../transpose $tmp/c59.1.0x6x10x100.small $tmp/c59.1.0x6x10x100.small.tr
-% ./doit.pl matrix=$tmp/c59.1.0x6x10x100.small.tr
+% ./doit.pl matrix=$tmp/c59.1.0x6x10x100.small.tr mn=64 vectoring=64 multisols=1 
+
+The parameters mn and vectoring are documented below.
 
 Two matrix formats are recognized.
 Either the matrix file has to start with a magic comment like:
@@ -35,10 +37,7 @@ zero coeffs (append :42 if the coeff equals 42 and not 1).
 In order to obtain several column dependencies on a binary matrix /tmp/mat, one
 would do:
 
-./doit.pl matrix=/tmp/mat mn=64 vectoring=64 tidy=0 multisols=1 threshold=9999999
-
-(the 9999999 is here to provide a working fallback for the time being, as
-there's a bug disturbing me).
+./doit.pl matrix=/tmp/mat mn=64 vectoring=64 tidy=0 multisols=1
 
 Some data on the options (defaults in brackets)
 
@@ -47,7 +46,8 @@ msize=, dens=	set the characteristics for an example matrix
 modulus=	guess...
 mn=, m=, n=	set the m and n parameters for block wiedemann (mn sets both)
 vectoring=k	process k vectors y at a time. There must be code capable
-		of handling this, cf for instance sse2_2words_traits.hpp
+		of handling this. For binary fields, 8, 16, 32, 64, and
+                128 are accepted values.
 method=		selection of the FFT method for the fast linear generator
 		computation
 dump=1		only relevant for small tests -- dump magma code for debugging.
