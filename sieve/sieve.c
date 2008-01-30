@@ -7,13 +7,7 @@
 #include <string.h>
 #include <math.h>
 #include <ctype.h>
-#ifdef HAVE_MSRH
-#include <asm/types.h>
-typedef __u32 u32;
-#include <asm/msr.h>
-#else
-#define rdtscll(x)
-#endif
+#include <time.h>
 #include "cado.h"
 #include "../utils/mod_ul.h"
 #include "fb.h"
@@ -252,18 +246,13 @@ log_norm (const double *f, const int deg, const double x,
 unsigned char
 compute_norms (unsigned char *sievearray, const long amin, const long amax, 
 	       const unsigned long b, const double *poly, const int deg, 
-	       const double proj_roots, const double log_scale, const int odd
-#ifdef HAVE_MSRH
-	       , const int verbose
-#endif
-               )
+	       const double proj_roots, const double log_scale, const int odd,
+	       const int verbose)
 {
   double f[MAXDEGREE + 1]; /* Polynomial in $a$ for a given fixed $b$ */
   double df[MAXDEGREE]; /* The derivative of f(x) */
   double bpow;
-#ifdef HAVE_MSRH
-  unsigned long long tsc1, tsc2;
-#endif
+  clock_t tsc1, tsc2;
   const double log_proj_roots = log(proj_roots) * log_scale;
   long a, a2;
   int i, fsign1, fsign2, dfsign1, dfsign2;
@@ -275,7 +264,7 @@ compute_norms (unsigned char *sievearray, const long amin, const long amax,
   ASSERT (!odd || (amax & 1) == 1);
   ASSERT (amin <= amax);
 
-  rdtscll (tsc1);
+  tsc1 = clock ();
   
   bpow = 1.;
   for (i = deg; i >= 0; i--)
@@ -301,15 +290,17 @@ compute_norms (unsigned char *sievearray, const long amin, const long amax,
 
   while (a <= amax)
     {
+      double n;
       /* We'll cover [a ... a2[ now */
       ASSERT (a == a2);
-      ASSERT (n1 == log_norm (f, deg, (double) a, log_scale, log_proj_roots));
+      ASSERT_EXPENSIVE (n1 == log_norm (f, deg, (double) a, log_scale, log_proj_roots));
       a2 = MIN(a + stride, amax + (1 << odd));
       ASSERT (!odd || (a2 - a) % 2 == 0);
       
-      n2 = log_norm (f, deg, (double) a2, log_scale, log_proj_roots);
-      fsign2 = (fpoly_eval (f, deg, (double) a2) < 0) ? -1 : 1;
-      dfsign2 = (fpoly_eval (df, deg - 1, (double) a2) < 0) ? -1 : 1;
+      n = fpoly_eval (f, deg, (double) a2);
+      n2 = fb_log (n, log_scale, log_proj_roots);
+      fsign2 = (n < 0.) ? -1 : 1;
+      dfsign2 = (fpoly_eval (df, deg - 1, (double) a2) < 0.) ? -1 : 1;
 
       if (n1 == n2 && fsign1 == fsign2 && dfsign1 == dfsign2)
 	{
@@ -352,14 +343,12 @@ compute_norms (unsigned char *sievearray, const long amin, const long amax,
       dfsign1 = dfsign2;
     }
   
-  rdtscll (tsc2);
-#ifdef HAVE_MSRH
+  tsc2 = clock ();
   if (verbose)
     {
       printf ("# Computing norms took %lld clocks\n", tsc2 - tsc1);
       printf ("# Maximum rounded log norm is %u\n", (unsigned int) nmax);
     }
-#endif
   
 #ifdef PARI
   for (a = amin; a <= amax; a += 1 << odd)
@@ -678,9 +667,7 @@ sieve_block (const int lvl, unsigned char *sievearray,
 	     const unsigned long arraylen, factorbase_t fb, 
 	     long long *times)
 {
-#ifdef HAVE_MSRH
-  long long tsc1, tsc2;
-#endif
+  clock_t tsc1, tsc2;
   unsigned long blockstart;
   const unsigned long b = fb->fbsmallbound[lvl];
 
@@ -692,12 +679,10 @@ sieve_block (const int lvl, unsigned char *sievearray,
       if (lvl > 0)
 	sieve_block (lvl - 1, sievearray + blockstart, blocklen, fb, times);
 
-      rdtscll (tsc1);
+      tsc1 = clock ();
       sieve_small_slow (sievearray + blockstart, fb->fbinit[lvl], blocklen);
-      rdtscll (tsc2);
-#ifdef HAVE_MSRH
+      tsc2 = clock ();
       times[lvl] += tsc2 - tsc1;
-#endif
     }
 }
 
@@ -711,9 +696,7 @@ sieve_one_side (unsigned char *sievearray, factorbase_t fb,
 		const double *dpoly, const unsigned int deg, 
 		sieve_report_t *other_reports, const int verbose)
 {
-#ifdef HAVE_MSRH
-  long long tsc1, tsc2;
-#endif
+  clock_t tsc1, tsc2;
   long long times[SIEVE_BLOCKING];
   unsigned long reports_nr = 0;
   int lvl;
@@ -726,21 +709,15 @@ sieve_one_side (unsigned char *sievearray, factorbase_t fb,
   fb_disable_roots (fb->fblarge, b, verbose);
   
   compute_norms (sievearray, eff_amin, eff_amax, b, dpoly, deg, proj_roots, 
-		 log_scale, odd
-#ifdef HAVE_MSRH
-                 , verbose
-#endif
-                 );
+		 log_scale, odd, verbose);
 
   /* Init small primes for sieving this line */
-  rdtscll (tsc1);
+  tsc1 = clock ();
   for (lvl = 0; lvl < SIEVE_BLOCKING; lvl++)
       fb_initloc_small (fb->fbinit[lvl], fb->fbsmall[lvl], eff_amin, b, odd);
-  rdtscll (tsc2);
-#ifdef HAVE_MSRH
+  tsc2 = clock ();
   if (SIEVE_BLOCKING > 0 && verbose)
     printf ("# Initing small primes fb took %lld clocks\n", tsc2 - tsc1);
-#endif
 
   for (lvl = 0; lvl < SIEVE_BLOCKING; lvl++)
     times[lvl] = 0;
@@ -771,32 +748,28 @@ sieve_one_side (unsigned char *sievearray, factorbase_t fb,
      Those reports are found here instead. */
   if (find_smallprime_reports)
     {
-      rdtscll (tsc1);
+      tsc1 = clock ();
       reports_nr +=
 	find_sieve_reports (sievearray, 
 			    reports + reports_nr, 
 			    reports_length - reports_nr, 
 			    reports_threshold, 
 			    eff_amin, l, b, odd, other_reports);
-      rdtscll (tsc2);
-#ifdef HAVE_MSRH
+      tsc2 = clock ();
       if (verbose)
 	{
 	  printf ("# Finding sieve reports took %lld clocks\n", tsc2 - tsc1);
 	  printf ("# There were %lu sieve reports after sieving small "
 		  "primes\n", reports_nr);
 	}
-#endif
     }
   
-  rdtscll (tsc1);
+  tsc1 = clock ();
   sieve (sievearray, fb->fblarge, eff_amin, eff_amax, b, reports_threshold, 
 	 reports + reports_nr, reports_length - reports_nr, odd);
-  rdtscll (tsc2);
-#ifdef HAVE_MSRH
+  tsc2 = clock ();
   if (verbose)
     printf ("# Sieving large fb primes took %lld clocks\n", tsc2 - tsc1);
-#endif
   
   fb_restore_roots (fb->fblarge, b, verbose);
   
@@ -1085,13 +1058,11 @@ ul_rho (const unsigned long N, const unsigned long cparm)
   int i;
   unsigned int iterations = 0;
   const int iterations_between_gcd = 32;
-#ifdef HAVE_MSRH
-  long long tsc1, tsc2;
-#endif
+  clock_t tsc1, tsc2;
 
   ASSERT (cparm < N);
 
-  rdtscll (tsc1);
+  tsc1 = clock ();
 
   /* printf ("ul_rho: factoring %lu\n", N); */
 
@@ -1135,10 +1106,8 @@ ul_rho (const unsigned long N, const unsigned long cparm)
   modul_clear (diff, m);
   modul_clearmod (m);
 
-#ifdef HAVE_MSRH
-  rdtscll (tsc2);
+  tsc2 = clock ();
   ul_rho_time += tsc2 - tsc1;
-#endif
 
   /* printf ("ul_rho: took %u iterations to find %lu\n", iterations, g); */
 
@@ -1815,9 +1784,7 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 		    factorbase_t fba, factorbase_t fbr, 
 		    const double log_scale, const int verbose)
 {
-#ifdef HAVE_MSRH
-  unsigned long long tsc1, tsc2;
-#endif
+  clock_t tsc1, tsc2;
   unsigned long proj_divisor_a, proj_divisor_r;
   unsigned int i, j, k;
   const unsigned int max_nr_primes = 128, max_nr_proj_primes = 16;
@@ -1838,7 +1805,7 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
   mpz_init (scaled_poly_r[1]);
 
   ul_rho_time = 0LL;
-  rdtscll (tsc1);
+  tsc1 = clock ();
 
   /* Multiply f_i (and g_i resp.) by b^(deg-i) and put in scaled_poly */
   mp_poly_scale (scaled_poly_a, poly->f, poly->degree, b, -1); 
@@ -1955,8 +1922,7 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
   mpz_clear (Fab);
   mpz_clear (Gab);
   
-  rdtscll (tsc2);
-#ifdef HAVE_MSRH
+  tsc2 = clock ();
   if (verbose)
   {
     printf ("# Trial factoring/printing%s took %lld clocks\n", 
@@ -1971,7 +1937,6 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 	    "rat > mfbr: %d, rat prp > lpbr: %d\n", 
 	    cof_a_toolarge, lp_a_toolarge, cof_r_toolarge, lp_r_toolarge);
   }
-#endif
 
   return relations_found;
 }
@@ -1982,10 +1947,8 @@ void rho_timing()
   mpz_t m;
   unsigned long n, q;
   unsigned int i;
-#ifdef HAVE_MSRH
-  unsigned long long tsc1, tsc2;
+  clock_t tsc1, tsc2;
   const unsigned int iterations = 10000;
-#endif
 
 #if (ULONG_MAX > 4294967295UL)
   n = 404428732271UL;
@@ -1995,24 +1958,21 @@ void rho_timing()
   mpz_init (m);
   mpz_set_ui (m, n);
 
-  rdtscll (tsc1);
+  tsc1 = clock ();
   for (i = 0; i < 10000; i++)
     q = ul_rho (n, 2UL);
 
-#ifdef HAVE_MSRH
-  rdtscll (tsc2);
+  tsc2 = clock ();
   printf ("%u iteratios of ul_rho took %lld clocks\n", 
 	  iterations, tsc2 - tsc1);
-#endif
 
-  rdtscll (tsc1);
+  tsc1 = clock ();
   for (i = 0; i < 10000; i++)
     q = mpz_rho (m, 2UL);
-  rdtscll (tsc2);
-#ifdef HAVE_MSRH
+  tsc2 = clock ();
   printf ("%u iteratios of mpz_rho took %lld clocks\n", 
 	  iterations, tsc2 - tsc1);
-#endif
+
   fflush (stdout);
   mpz_clear (m);
 }
