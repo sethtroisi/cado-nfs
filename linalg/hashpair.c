@@ -57,7 +57,7 @@ getHashAddr(hashtable_t *H, long p, unsigned long r)
     unsigned int cpt = 0; /* number of iterations to find a free location */
     unsigned int h;
 
-    h = (int) (tmp % H->hashmod);
+    h = (unsigned int) (tmp % H->hashmod);
 #if DEBUG >= 2
     printf("H(%ld, %lu) = %d\n", p, r, h);
 #endif

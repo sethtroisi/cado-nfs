@@ -5,16 +5,18 @@
 
 #include "files.h"
 
+#define STRMAX 2048
+
 // TODO: make this more efficient...
 void
 getRelation(relation_t *rel, FILE *relfile, int ind)
 {
-    char str[1024];
+    char str[STRMAX];
     int i;
 
     rewind(relfile);
     for(i = 0; i < ind; i++)
-	fgets(str, 1024, relfile);
+	fgets(str, STRMAX, relfile);
     fread_relation(relfile, rel);
 }
 
@@ -22,11 +24,15 @@ getRelation(relation_t *rel, FILE *relfile, int ind)
 void
 jumpToRelation(relation_t *rel, FILE *relfile, int old, int new)
 {
-    char str[1024];
+    char str[STRMAX];
     int i;
 
-    for(i = old; i < new; i++)
-	fgets(str, 1024, relfile);
+    for(i = old; i < new; i++){
+	fgets(str, STRMAX, relfile);
+	if(str[strlen(str)-1] != '\n'){
+	    fprintf(stderr, "Too long string in jumpToRelation\n");
+	}
+    }
     fread_relation(relfile, rel);
 }
 
@@ -44,7 +50,7 @@ char **
 extractFic(int *nfic, int *nrelmax, char *input)
 {
     FILE *ifile = fopen(input, "r");
-    char str[1024];
+    char str[STRMAX];
     char **fic;
     int i, nrel;
 

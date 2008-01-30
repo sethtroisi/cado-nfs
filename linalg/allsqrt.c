@@ -180,21 +180,21 @@ finishAlgebraicSqrt(FILE *algfile, hashtable_t *H /*, cado_poly pol*/)
     fprintf(algfile, "0 0\n");
 }
 
-// returns the sign of a-b*m
+// returns the sign of m1*a+m2*b
 int
 treatSign(relation_t rel, cado_poly pol)
 {
-    mpz_t m, a;
+    mpz_t tmp1, tmp2;
     int s;
 
-    mpz_init(m);
-    mpz_neg(m, pol->g[0]);
-    mpz_init_set_si(a, rel.a);
-    mpz_mul_ui(m, m, rel.b);
-    // s = -1 iff a-b*m < 0
-    s = (mpz_cmp(m, a) > 0 ? -1 : 1);
-    mpz_clear(a);
-    mpz_clear(m);
+    mpz_init(tmp1);
+    mpz_mul_si(tmp1, pol->g[1], rel.a);
+    mpz_init(tmp2);
+    mpz_mul_ui(tmp2, pol->g[0], rel.b);
+    mpz_add(tmp1, tmp1, tmp2);
+    s = (mpz_sgn(tmp1) >= 0 ? 1 : -1);
+    mpz_clear(tmp1);
+    mpz_clear(tmp2);
     return s;
 }
 

@@ -25,8 +25,8 @@
 #define DEBUG 0
 #define TEX 0
 
-#define TRACE_COL -1 // 231 // put to -1 if not...!
-#define TRACE_ROW -1 // 253224 // put to -1 if not...!
+#define TRACE_COL -1 // 253224 // 231 // put to -1 if not...!
+#define TRACE_ROW -1 // put to -1 if not...!
 
 #define USE_USED 0
 #if USE_USED >= 1
@@ -45,6 +45,7 @@ char *used;
                      // 1: change if min weight < mergelevel
                      // 2: jump to minimal possible mergelevel
                      // 3: perform one merge, then check for next min weight
+                     //    NYI
 
 // 0 means dummy filtering using slow methods
 // 1 means:
@@ -118,14 +119,14 @@ dclistTex(FILE *file, dclist dcl)
 /* insert j in doubly-chained list dcl (between cell of dcl and dcl->next),
    and return pointer at cell containing j */
 static dclist
-dclistInsert (dclist dcl, INT j)
+dclistInsert(dclist dcl, INT j)
 {
     dclist newdcl = dclistCreate(j);
 
     newdcl->next = dcl->next;
     newdcl->prev = dcl;
-    if (newdcl->next != NULL)
-      newdcl->next->prev = newdcl;
+    if(newdcl->next != NULL)
+	newdcl->next->prev = newdcl;
     dcl->next = newdcl;
     return newdcl;
 }
@@ -382,7 +383,7 @@ report2(INT i1, INT i2)
    in file purgedfile.
 */
 void
-inspectWeight(sparse_mat_t *mat, FILE *purgedfile)
+initWeightFromFile(sparse_mat_t *mat, FILE *purgedfile)
 {
     int i, j, ret, x, nc;
 
@@ -1198,7 +1199,7 @@ remove_j_from_S(sparse_mat_t *mat, int j)
     dclist dcl = mat->A[j], foo;
 
     if(dcl == NULL){
-	fprintf(stderr, "Already removed? %d\n", j);
+	fprintf(stderr, "Column %d already removed?\n", j);
 	return;
     }
 #if DEBUG >= 2
@@ -1333,12 +1334,13 @@ removeCellSWAR(sparse_mat_t *mat, int i, INT j)
     fprintf(stderr, "removeCellSWAR: moving j=%d from S[%d] to S[%d]\n",
 	    j, mat->wt[j], decrS(mat->wt[j]));
 #endif
-    ind = mat->wt[j] = decrS(mat->wt[j]);
 #if USE_MERGE_FAST > 1
-    if(ind < 0){
-	// what if abs(weight) becomes below cwmax?
-	// we should incorporate the column and update the data structure, no?
+    if(mat->wt[j] < 0){
+	// if mat->wt[j] is already < 0, we don't care about
+	// decreasing, updating, etc. except when > 2
 # if USE_MERGE_FAST > 2
+	ind = mat->wt[j] = decrS(mat->wt[j]);
+	// we incorporate the column and update the data structure
 	if(abs(ind) <= mat->mergelevelmax){
 #  if DEBUG >= 1
 	    fprintf(stderr, "WARNING: column %d becomes light at %d...!\n",
@@ -1350,6 +1352,8 @@ removeCellSWAR(sparse_mat_t *mat, int i, INT j)
 	return;
     }
 #endif
+    // at this point, we should have mat->wt[j] > 0
+    ind = mat->wt[j] = decrS(mat->wt[j]);
     remove_j_from_S(mat, j);
     if(mat->wt[j] > mat->cwmax)
 	ind = mat->cwmax+1;
@@ -2299,8 +2303,8 @@ main(int argc, char *argv[])
     fprintf(stderr, "Time for initMat: %2.2lf\n", seconds()-tt);
     
     tt = seconds();
-    inspectWeight(&mat, purgedfile);
-    fprintf(stderr, "Time for inspectWeight: %2.2lf\n", seconds()-tt);
+    initWeightFromFile(&mat, purgedfile);
+    fprintf(stderr, "Time for initWeightFromFile: %2.2lf\n", seconds()-tt);
     
     tt = seconds();
     fillSWAR(&mat);
