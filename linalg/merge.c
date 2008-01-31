@@ -1894,7 +1894,8 @@ checkWeight(sparse_mat_t *mat, INT j)
 void
 checkMatrixWeight(sparse_mat_t *mat)
 {
-    int i, w = 0;
+    unsigned long w = 0;
+    int i;
 
     for(i = 0; i < mat->nrows; i++)
 	if(!isRowNull(mat, i))
@@ -2103,13 +2104,16 @@ merge(sparse_mat_t *mat, /*int nb_merge_max,*/ int maxlevel, int verbose, int fo
     m = 2;
     while(1){
 	cost = ((unsigned long)mat->rem_ncols) * ((unsigned long)mat->weight);
-	fprintf(stderr, "w(M)=%d, w(M)*ncols=%2.2lf",
+	fprintf(stderr, "w(M)=%lu, w(M)*ncols=%2.2lf",
 		mat->weight, (double)cost);
 	fprintf(stderr, " w(M)/ncols=%2.2lf\n", 
 		((double)mat->weight)/((double)mat->rem_ncols));
 	if((mincost == 0) || (cost < oldcost))
 	    mincost = cost;
-	if(forbw && ((mincost != 0) && (cost > oldcost))){
+	if(forbw)
+	    // what a trick!!!!
+	    printf("BWCOST: %lu\n", cost);
+	if(forbw && (cost > oldcost)){
 	    fprintf(stderr, "WARNING: New cost > old cost (%2.2lf)\n",
 		    ((double)cost)/((double)oldcost));
 	    ncost++;
@@ -2342,8 +2346,8 @@ main(int argc, char *argv[])
     }
 
     merge(&mat, /*nb_merge_max,*/ maxlevel, verbose, forbw);
-    fprintf(stderr, "Final matrix has w(M)=%d, ncols*w(M)=%ld\n",
-	    mat.weight, ((long)mat.rem_ncols) * ((long)mat.weight));
+    fprintf(stderr, "Final matrix has w(M)=%lu, ncols*w(M)=%lu\n",
+	    mat.weight, ((unsigned long)mat.rem_ncols) * mat.weight);
 #if TEX
     fprintf(stderr, "\\end{verbatim}\n");
 #endif

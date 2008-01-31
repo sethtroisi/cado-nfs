@@ -365,7 +365,9 @@ main(int argc, char *argv[])
 	    fprintf(stderr, "Gasp: too long a line!\n");
 	    exit(0);
 	}
-	doAllAdds(newrows, str);
+	if(strncmp(str, "BWCOST: ", 8) != 0)
+	    doAllAdds(newrows, str);
+	// TODO: adapt this for bw as soon as needed...!
     }
     fclose(hisfile);
     nbrels = (int *)malloc(nrows * sizeof(int));
