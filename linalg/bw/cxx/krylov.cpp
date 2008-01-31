@@ -681,6 +681,7 @@ unsigned int set_f_coeffs(typename traits::scalar_t * f, unsigned int maxdeg)
         }
     }
     deg = largest_nz;
+    BUG_ON(largest_nz < 0);
 #if 0
     deg--;
     for (; deg >= 0 && traits::is_zero(f[deg]); deg--) {
