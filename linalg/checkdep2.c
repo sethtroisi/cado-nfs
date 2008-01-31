@@ -10,8 +10,10 @@ void
 check (char *matname, char *kername, int depnum, int verbose)
 {
   FILE *mat, *ker;
-  unsigned long nrows, ncols, i, j, n, depr = 0, k, nonzero, totnonzero = 0;
+  unsigned long nrows, ncols, i, j, n, depr, k, nonzero, totnonzero = 0;
+  unsigned long l;
   uint64_t *vec, depw;
+  int ret;
 
   mat = fopen (matname, "r");
   if (mat == NULL)
@@ -27,8 +29,8 @@ check (char *matname, char *kername, int depnum, int verbose)
       exit (1);
     }
 
-  i = fscanf (mat, "%lu %lu\n", &nrows, &ncols);
-  if (i != 2)
+  ret = fscanf (mat, "%lu %lu\n", &nrows, &ncols);
+  if (ret != 2)
     {
       fprintf (stderr, "Error, cannot read nrows/ncols\n");
       exit (1);
@@ -51,17 +53,36 @@ check (char *matname, char *kername, int depnum, int verbose)
   for (i = 0; i < n; i++)
     vec[i] = 0;
 
-  while (nrows-- > 0)
+  depr = 0;
+  for (l = 0; l < nrows; l++)
     {
       /* read next bit from dependency */
       if (depr == 0) /* read next 64-bit word */
-        fscanf (ker, "%lx ", &depw);
+        {
+          ret = fscanf (ker, "%lx", &depw);
+          if (ret == 0)
+            {
+              fprintf (stderr, "Error, cannot read next dependency word\n");
+              exit (1);
+            }
+          depr = 64;
+        }
       
       /* read next row from matrix */
-      fscanf (mat, "%lu", &k); /* number of elements */
+      ret = fscanf (mat, "%lu", &k); /* number of elements */
+      if (ret == 0)
+        {
+          fprintf (stderr, "Error, cannot read length of next matrix row\n");
+          exit (1);
+        }
       for (i = 0; i < k; i++)
         {
-          fscanf (mat, " %lu", &j);
+          ret = fscanf (mat, "%lu", &j);
+          if (ret == 0)
+            {
+              fprintf (stderr, "Error, cannot read next matrix element\n");
+              exit (1);
+            }
           if (depw & 1)
             vec[j >> 6] ^= (uint64_t) 1 << (j & 63);
         }
