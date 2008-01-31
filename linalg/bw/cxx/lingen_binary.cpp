@@ -1256,7 +1256,7 @@ static bool go_recursive(polmat& pi)
     }
     if (finished_early) {
         printf("Exceptional situation:\n"
-                "generator of degree %d ; escaping\n",
+                "generator (l) of degree %d ; escaping\n",
                 pi_l_deg);
         pi.swap(pi_left);
         return true;
@@ -1348,7 +1348,7 @@ static bool go_recursive(polmat& pi)
 
     if (finished_early) {
         printf("Exceptional situation:\n"
-                "generator of degree %d ; escaping\n",
+                "generator (r) of degree %d ; escaping\n",
                 pi.maxdeg());
     }
     return finished_early;
@@ -1362,17 +1362,22 @@ static bool compute_lingen(polmat& pi)
     using namespace globals;
     unsigned int deg = E.ncoef - 1;
 
+    double st = seconds();
+    bool b;
+
     if (deg <= rec_threshold) {
-        return go_quadratic(pi);
+        b = go_quadratic(pi);
     } else if (deg < cantor_threshold) {
         /* The bound is such that deg + deg/4 is 64 words or less */
-        return go_recursive<fake_fft>(pi);
+        b = go_recursive<fake_fft>(pi);
     } else {
         /* Presently, c128 requires input polynomials that are large
          * enough.
          */
-        return go_recursive<cantor_fft>(pi);
+        b = go_recursive<cantor_fft>(pi);
     }
+    printf("lingen(deg=%d) took %f s\n", deg, seconds() - st);
+    return b;
 }
 
 
