@@ -36,15 +36,15 @@ include $(TOPPATH)/util/main.mki
 mkbitstrings: mkbitstrings.c
 	$(CC) -O2 -g -W -Wall -Iinclude -std=c99 $< -o $@
 
-old/structure_automatic.h: old/structure.m4
-	m4 -Doutputfile=MAIN < $< > $@
-
-old/structure_inlines_automatic.h: old/structure.m4
-	m4 -Doutputfile=COMPANION < $< > $@
-
-old/structure_debug_automatic.h:   old/structure_debug.m4
-	m4 -Doutputfile=DEBUG < $< > $@
-
+#old/structure_automatic.h: old/structure.m4
+#	m4 -Doutputfile=MAIN < $< > $@
+#
+#old/structure_inlines_automatic.h: old/structure.m4
+#	m4 -Doutputfile=COMPANION < $< > $@
+#
+#old/structure_debug_automatic.h:   old/structure_debug.m4
+#	m4 -Doutputfile=DEBUG < $< > $@
+#
 BW_PREP_SOURCES:=					\
 		auxfuncs.c				\
 		cxx/prep.cpp cxx/files.cpp		\
