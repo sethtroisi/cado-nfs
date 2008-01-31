@@ -2098,7 +2098,7 @@ merge(sparse_mat_t *mat, /*int nb_merge_max,*/ int maxlevel, int verbose, int fo
 {
     double tt;
     unsigned long mincost = 0, oldcost, cost;
-    int old_nrows, old_ncols, m, mm, njrem = 0;
+    int old_nrows, old_ncols, m, mm, njrem = 0, ncost = 0;
 
     m = 2;
     while(1){
@@ -2114,7 +2114,7 @@ merge(sparse_mat_t *mat, /*int nb_merge_max,*/ int maxlevel, int verbose, int fo
 		    ((double)cost)/((double)oldcost));
 	    ncost++;
 	    if(ncost >= 5){
-		fprintf(stderr, "WARNING: New cost > old cost %ld times",
+		fprintf(stderr, "WARNING: New cost > old cost %d times",
                         ncost);
 		fprintf(stderr, " in a row, stopping\n");
 		break;
