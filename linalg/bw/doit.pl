@@ -523,15 +523,12 @@ LINGEN : {
 
 rsync_push;
 
-# Aggressively select only one solution.
-if (!$multisols) {
-	@sols = ($sols[0]);
-}
-
 my @sols_found  = ();
 
 # within the matrix source directory
 my @solfiles=();
+
+my $orig_nsols = scalar @sols;
 
 MKSOL : {
 	my $exe="${krylovbindir}bw-krylov";
@@ -539,6 +536,15 @@ MKSOL : {
 		$exe .= "-mt --nthreads $mt";
 	}
 	$exe .= " --task mksol --subdir $wdir";
+
+        if (!$multisols) {
+            # Aggressively select only one solution.
+            @sols = ($sols[0]);
+            print "Restricting to solution @sols\n";
+        } elsif ($multisols > 1) {
+            @sols = @sols[0..$multisols-1];
+            print "Restricting to solutions $multisols first solutions\n";
+        }
 
 	my @mksoljobs=();
 	for my $s (@sols) {
@@ -575,10 +581,6 @@ MKSOL : {
 		rsync_pull;
 	}
 
-	if (!$multisols) {
-		@sols = ($sols[0]);
-		print "Restricting to solution @sols\n";
-	}
 
 	for my $s (@sols) {
 		# --nbys now defaults to auto-detect.
@@ -598,7 +600,8 @@ MKSOL : {
 
 	if ($multisols) {
 		print scalar @sols_found, " solutions found ",
-			"(from ", scalar @sols, " out of lingen)\n";
+			"(from ", scalar @sols, " selected from ",
+                        "$orig_nsols out of lingen)\n";
 		for my $f (@sols_found) { print "$f\n"; }
 	}
 
