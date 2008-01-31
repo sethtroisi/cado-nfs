@@ -2002,7 +2002,7 @@ merge_m_fast(sparse_mat_t *mat, int m, int verbose)
 }
 
 int
-  merge_m(sparse_mat_t *mat, int m, int verbose)
+merge_m(sparse_mat_t *mat, int m, int verbose)
 {
 #if USE_MERGE_FAST >= 1
   return merge_m_fast(mat, m, verbose);
@@ -2097,16 +2097,19 @@ void
 merge(sparse_mat_t *mat, /*int nb_merge_max,*/ int maxlevel, int verbose, int forbw)
 {
     double tt;
-    long oldcost = -1, cost, ncost = 0;
+    unsigned long mincost = 0, oldcost, cost;
     int old_nrows, old_ncols, m, mm, njrem = 0;
 
     m = 2;
     while(1){
-	cost = ((long)mat->rem_ncols) * ((long)mat->weight);
-	fprintf(stderr, "w(M)=%d, w(M)*ncols=%ld", mat->weight, cost);
+	cost = ((unsigned long)mat->rem_ncols) * ((unsigned long)mat->weight);
+	fprintf(stderr, "w(M)=%d, w(M)*ncols=%2.2lf",
+		mat->weight, (double)cost);
 	fprintf(stderr, " w(M)/ncols=%2.2lf\n", 
 		((double)mat->weight)/((double)mat->rem_ncols));
-	if(forbw && ((oldcost != -1) && (cost > oldcost))){
+	if((mincost == 0) || (cost < oldcost))
+	    mincost = cost;
+	if(forbw && ((mincost != 0) && (cost > oldcost))){
 	    fprintf(stderr, "WARNING: New cost > old cost (%2.2lf)\n",
 		    ((double)cost)/((double)oldcost));
 	    ncost++;
@@ -2169,6 +2172,8 @@ merge(sparse_mat_t *mat, /*int nb_merge_max,*/ int maxlevel, int verbose, int fo
 	    }
 #endif
     }
+    if(forbw)
+	fprintf(stderr, "MINCOST=%lu\n", mincost);
 }
 
 void
