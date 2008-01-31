@@ -82,7 +82,9 @@ time $linalg/bw/doit.pl matrix=$name.small.tr mn=64 vectoring=64 multisols=1 wdi
 
 echo "Converting dependencies to CADO format"
 
-time $linalg/bw/mkbitstrings /tmp/W* > $name.ker_raw
+# doit.pl put the dependencies W* in the directory where the matrix was
+d=`dirname $root`
+time $linalg/bw/mkbitstrings $d/W* > $name.ker_raw
 
 if [ ! -s $name.ker_raw ]; then echo "Zerodim kernel, stopping"; exit; fi
 
