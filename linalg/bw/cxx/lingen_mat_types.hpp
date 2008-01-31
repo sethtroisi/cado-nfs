@@ -483,7 +483,7 @@ struct polmat { /* {{{ */
     void setdeg(unsigned int j) { /* {{{ */
         unsigned long y[stride()];
         for(unsigned int k = 0 ; k < stride() ; k++) {
-            y[1 + k] = 0;
+            y[k] = 0;
         }
         const unsigned long * src = poly(0,j);
         for(unsigned int i = 0 ; i < nrows ; i++) {
@@ -493,9 +493,14 @@ struct polmat { /* {{{ */
             src += stride();
         }
         int k;
-        y[stride()-1] &= (1UL << (ncoef & (ULONG_BITS-1)))-1UL;
-        for(k = stride() - 1 ; y[k] == 0 ; k--);
-        deg(j) = (k+1) * ULONG_BITS - clzl(y[k]) - 1;
+        /* Keep only (ULONG_BITS-ncoef) mod ULONG BITS in the top word. */
+        y[stride()-1] &= ~0UL >> ((-ncoef) & (ULONG_BITS-1));
+        for(k = stride() - 1 ; k >= 0 && y[k] == 0 ; k--);
+        if (k < 0) {
+            deg(j) = -1;
+        } else {
+            deg(j) = (k+1) * ULONG_BITS - clzl(y[k]) - 1;
+        }
     } /* }}} */
     unsigned long * poly(unsigned int i, unsigned int j)/*{{{*/
     {
