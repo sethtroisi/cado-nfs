@@ -346,7 +346,7 @@ compute_norms (unsigned char *sievearray, const long amin, const long amax,
   tsc2 = clock ();
   if (verbose)
     {
-      printf ("# Computing norms took %lld clocks\n", tsc2 - tsc1);
+      printf ("# Computing norms took %ld clocks\n", (long int) (tsc2 - tsc1));
       printf ("# Maximum rounded log norm is %u\n", (unsigned int) nmax);
     }
   
@@ -717,7 +717,8 @@ sieve_one_side (unsigned char *sievearray, factorbase_t fb,
       fb_initloc_small (fb->fbinit[lvl], fb->fbsmall[lvl], eff_amin, b, odd);
   tsc2 = clock ();
   if (SIEVE_BLOCKING > 0 && verbose)
-    printf ("# Initing small primes fb took %lld clocks\n", tsc2 - tsc1);
+    printf ("# Initing small primes fb took %ld clocks\n", 
+	    (long int) (tsc2 - tsc1));
 
   for (lvl = 0; lvl < SIEVE_BLOCKING; lvl++)
     times[lvl] = 0;
@@ -758,7 +759,8 @@ sieve_one_side (unsigned char *sievearray, factorbase_t fb,
       tsc2 = clock ();
       if (verbose)
 	{
-	  printf ("# Finding sieve reports took %lld clocks\n", tsc2 - tsc1);
+	  printf ("# Finding sieve reports took %ld clocks\n", 
+		  (long int) (tsc2 - tsc1));
 	  printf ("# There were %lu sieve reports after sieving small "
 		  "primes\n", reports_nr);
 	}
@@ -769,7 +771,8 @@ sieve_one_side (unsigned char *sievearray, factorbase_t fb,
 	 reports + reports_nr, reports_length - reports_nr, odd);
   tsc2 = clock ();
   if (verbose)
-    printf ("# Sieving large fb primes took %lld clocks\n", tsc2 - tsc1);
+    printf ("# Sieving large fb primes took %ld clocks\n", 
+	    (long int) (tsc2 - tsc1));
   
   fb_restore_roots (fb->fblarge, b, verbose);
   
@@ -1925,13 +1928,13 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
   tsc2 = clock ();
   if (verbose)
   {
-    printf ("# Trial factoring/printing%s took %lld clocks\n", 
+    printf ("# Trial factoring/printing%s took %ld clocks\n", 
 #ifdef REDC_ROOTS
 	    " (with    REDC)",
 #else
 	    " (without REDC)",
 #endif
-	    tsc2 - tsc1);
+	    (long int) (tsc2 - tsc1));
     printf ("# Too large cofactors (discarded in this order): "
 	    "alg > mfba: %d, alg prp > lpba: %d, "
 	    "rat > mfbr: %d, rat prp > lpbr: %d\n", 
@@ -1963,15 +1966,15 @@ void rho_timing()
     q = ul_rho (n, 2UL);
 
   tsc2 = clock ();
-  printf ("%u iteratios of ul_rho took %lld clocks\n", 
-	  iterations, tsc2 - tsc1);
+  printf ("%u iteratios of ul_rho took %ld clocks\n", 
+	  iterations, (long int) (tsc2 - tsc1));
 
   tsc1 = clock ();
   for (i = 0; i < 10000; i++)
     q = mpz_rho (m, 2UL);
   tsc2 = clock ();
-  printf ("%u iteratios of mpz_rho took %lld clocks\n", 
-	  iterations, tsc2 - tsc1);
+  printf ("%u iteratios of mpz_rho took %ld clocks\n", 
+	  iterations, (long int) (tsc2 - tsc1));
 
   fflush (stdout);
   mpz_clear (m);
