@@ -5,9 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <gmp.h>
+
 #include <algorithm>
-#include <ostream>
-#include <vector>
 
 /* See the discussion in lingen_binary about the pros and cons of data
  * ordering schemes */
@@ -793,15 +792,6 @@ void itransform(polmat& dst, tpolmat<fft_type>& src, fft_type& o, int d)
     }
     dst.swap(tmp);
 }
-
-std::ostream& operator<<(std::ostream& o, polmat const& P);
-std::istream& operator>>(std::istream& o, polmat & P);
-
-#if 0
-std::ostream& write_polmat_columns(std::ostream& o, polmat const& P,
-        std::vector<unsigned int> const& c);
-#endif
-
 
 
 #endif	/* LINGEN_MAT_TYPES_HPP_ */

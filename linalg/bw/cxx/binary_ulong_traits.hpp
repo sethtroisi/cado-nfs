@@ -11,7 +11,6 @@
 #include <string>
 #include <sstream>
 #include "manu.h"
-#include "bitstring.hpp"
 
 template<typename T>
 struct binary_pod_traits {
@@ -22,8 +21,6 @@ struct binary_pod_traits {
 	/* This is unfortunately *NOT* what it should */
 	static const unsigned int nbits = sizeof(T) * CHAR_BIT;
 	typedef binary_field coeff_field;
-        typedef coeff_field::elt Kelt;
-        typedef coeff_field::vec_t Kvec_t;
 
 	struct scalar_t { T p; };
 	typedef scalar_t wide_scalar_t;
@@ -43,9 +40,10 @@ struct binary_pod_traits {
 		return globals::nbys == nbits && globals::modulus_ulong == 2;
 	}
 
-	static inline Kelt get_y(scalar_t const & x, unsigned int i) {
+	/* FIXME -- this used to return an mpz_class */
+	static inline int get_y(scalar_t const & x, unsigned int i) {
 		BUG_ON(i >= nbits);
-		Kelt bit = (x.p >> i) & 1UL;
+		int bit = (x.p >> i) & 1UL;
 		return bit;
 	}
 	static inline void reduce(scalar_t & d, wide_scalar_t & s) {
@@ -102,50 +100,46 @@ struct binary_pod_traits {
 		dst.p ^= a.p & b.p;
 	}
 	static inline void
-	assign(scalar_t & x, Kvec_t const& z,  unsigned int i)
+	assign(scalar_t & x, std::vector<mpz_class> const& z,  unsigned int i)
 	{
-            const unsigned long * ptr = z + i / ULONG_BITS;
-            i %= ULONG_BITS;
-            x.p = 0;
-            for(unsigned int stuffed = 0; stuffed < nbits ; ) {
-                x.p ^= *ptr++ >> i;
-                stuffed += ULONG_BITS-i;
-                if (stuffed >= nbits) break;
-                x.p ^= *ptr << (ULONG_BITS-i);
-                stuffed += i;
-            }
-        }
-        static inline void assign(Kvec_t& z, scalar_t const & x) {
-            unsigned int i = 0;
-            for(unsigned int stuffed = 0; stuffed < nbits ; ) {
-                z[i] = x.p >> stuffed;
-                stuffed += ULONG_BITS;
-                i++;
-            }
-        }
+		/* This one affects from a vector. We provide the
+		 * position, in case we're doing SIMD.
+		 */
+		// WARNING("slow");
+		/* FIXME -- should we go up to 128 here, or restrict to
+		 * nbys ??? */
+		x.p = 0;
+		for(unsigned int j = 0 ; j < globals::nbys ; j++)
+			x.p ^= (T) (z[i+j] != 0) << j;
+	}
+	static inline void assign(std::vector<mpz_class>& z, scalar_t const & x) {
+		BUG_ON(z.size() != nbits);
+		for(unsigned int i = 0 ; i < nbits ; i++) {
+			z[i] = (x.p >> i) & (T) 1;
+		}
+	}
 
         static std::ostream& print(std::ostream& o, scalar_t const& x)
         {
-            /* This seems silly, but we're disturbed by uint64_t on
-             * 32-bit machines.
-             */
-            unsigned long v[nbits / ULONG_BITS];
-            for(unsigned int i = 0 ; i < nbits ; i += ULONG_BITS) {
-                v[i / ULONG_BITS] = x.p >> i;
+            T mask = 1;
+            for(unsigned int i = 0 ; i < nbits ; i++) {
+                if (i) o << " ";
+                o << ((x.p & mask) != 0);
+                mask <<=1;
             }
-            field::vec_write(o, v, nbits);
             return o;
         }
 
-        static std::istream& get(std::istream& is, scalar_t & x)
+        static std::istream& get(std::istream& o, scalar_t & x)
         {
-            unsigned long v[nbits / ULONG_BITS];
-            field::vec_read(is, v, nbits);
-            x.p = 0;
-            for(unsigned int i = 0 ; i < nbits ; i += ULONG_BITS) {
-                x.p |= ((T) v[i / ULONG_BITS]) << i;
+            T z = 0;
+            unsigned long v;
+            for(unsigned int i = 0 ; i < nbits ; i++) {
+                o >> v;
+                z |= (v << i);
             }
-            return is;
+            x.p = z;
+            return o;
         }
 };
 
