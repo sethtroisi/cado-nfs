@@ -2094,17 +2094,48 @@ inspectRowWeight(sparse_mat_t *mat)
     return nirem;
 }
 
+// Delete superfluous rows s.t. nrows-ncols >= keep.
+// It could be fun to find rows s.t. at least one j is of small weight.
+// Or components of rows with some sharing?
+// We could define sf(row) = sum_{j in row} w(j) and remove the
+// rows of smallest value of sf?
+// For the time being, remove heaviest rows.
+int
+deleteSuperfluousRows(sparse_mat_t *mat, int keep, int niremmax)
+{
+    int nirem = 0, *tmp, ntmp, itmp, i;
+
+    if((mat->rem_nrows - mat->rem_ncols) <= keep)
+	return 0;
+    ntmp = mat->rem_nrows << 1;
+    tmp = (int *)malloc(ntmp * sizeof(int));
+    for(i = 0, itmp = 0; i < mat->nrows; i++)
+        if(!isRowNull(mat, i)){
+	    tmp[itmp++] = lengthRow(mat, i);
+	    tmp[itmp++] = i;
+	}
+    qsort(tmp, ntmp>>1, 2 * sizeof(int), cmp);
+    for(i = ntmp-1; i >= 0; i -= 2){
+	if((nirem >= niremmax) || (mat->rem_nrows - mat->rem_ncols) <= keep)
+	    break;
+	removeRowDefinitely(mat, tmp[i]);
+	nirem++;
+    }
+    free(tmp);
+    return nirem;
+}
+
 void
 merge(sparse_mat_t *mat, /*int nb_merge_max,*/ int maxlevel, int verbose, int forbw)
 {
     double tt;
-    unsigned long mincost = 0, oldcost, cost;
+    unsigned long mincost = 0, oldcost = 0, cost;
     int old_nrows, old_ncols, m, mm, njrem = 0, ncost = 0;
 
     m = 2;
     while(1){
 	cost = ((unsigned long)mat->rem_ncols) * ((unsigned long)mat->weight);
-	fprintf(stderr, "w(M)=%lu, w(M)*ncols=%2.2lf",
+	fprintf(stderr, "w(M)=%lu, w(M)*ncols=%2.6e",
 		mat->weight, (double)cost);
 	fprintf(stderr, " w(M)/ncols=%2.2lf\n", 
 		((double)mat->weight)/((double)mat->rem_ncols));
@@ -2113,15 +2144,26 @@ merge(sparse_mat_t *mat, /*int nb_merge_max,*/ int maxlevel, int verbose, int fo
 	if(forbw)
 	    // what a trick!!!!
 	    printf("BWCOST: %lu\n", cost);
-	if(forbw && (cost > oldcost)){
-	    fprintf(stderr, "WARNING: New cost > old cost (%2.2lf)\n",
-		    ((double)cost)/((double)oldcost));
+	if(forbw && (oldcost > 0) && (cost > oldcost)){
+	    fprintf(stderr, "WARNING: New cost > old cost (%2.6e)\n",
+		    ((double)cost)-((double)oldcost));
 	    ncost++;
 	    if(ncost >= 5){
+		int nirem;
+
 		fprintf(stderr, "WARNING: New cost > old cost %d times",
                         ncost);
-		fprintf(stderr, " in a row, stopping\n");
-		break;
+		fprintf(stderr, " in a row:");
+		nirem = deleteSuperfluousRows(mat, mat->delta, 128);
+		if(nirem == 0){
+		    fprintf(stderr, " stopping\n");
+		    break;
+		}
+		else{
+		    fprintf(stderr, " try again after removing %d rows!\n",
+			    nirem);
+		    continue;
+		}
 	    }
 	}
 	else
