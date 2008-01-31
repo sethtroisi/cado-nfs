@@ -50,6 +50,7 @@ BW_PREP_SOURCES:=					\
 		cxx/prep.cpp cxx/files.cpp		\
 		cxx/matrix_header.cpp cxx/matrix.cpp	\
 		cxx/preconditioner.cpp			\
+		cxx/bitstring.cpp			\
 		cxx/matrix_line.cpp
 BW_PREP_LIBS:=-lgmpxx -lgmp
 -include .bw-prep.mkf
@@ -62,6 +63,7 @@ BW_KRYLOV_SOURCES:=					\
 		cxx/threads.cpp	cxx/corners.cpp		\
 		cxx/matrix.cpp cxx/matrix_line.cpp	\
 		cxx/files.cpp cxx/matrix_header.cpp	\
+		cxx/bitstring.cpp			\
 		cxx/preconditioner.cpp
 BW_KRYLOV_LIBS:=-lgmpxx -lgmp
 BW_KRYLOV_EXTRA_MODELS:=mt
@@ -111,10 +113,12 @@ BW_LINGEN_BINARY_SOURCES:=		\
 		cxx/files.cpp		\
 		cxx/lingen_binary.cpp	\
 		cxx/matrix.cpp		\
-		cxx/matrix_header.cpp		\
-		cxx/matrix_line.cpp		\
+		cxx/matrix_header.cpp	\
+		cxx/matrix_line.cpp	\
 		cxx/config_file.cpp	\
-		cxx/fake_fft.c
+		cxx/bitstring.cpp			\
+		cxx/fake_fft.c		\
+		cxx/lingen_mat_types.hpp
 BW_LINGEN_BINARY_LIBS:=-lgmpxx -lgmp -lutils -lgf2x ../../gf2x/cantor/cantor128.o
 -include .bw-lingen-binary.mkf
 
@@ -207,6 +211,7 @@ BW_GATHER_SOURCES:=					\
 		auxfuncs.c				\
 		cxx/config_file.cpp			\
 		cxx/gather.cpp				\
+		cxx/bitstring.cpp			\
 		cxx/matrix.cpp	cxx/matrix_line.cpp	\
 		cxx/files.cpp cxx/matrix_header.cpp	\
 		cxx/preconditioner.cpp
@@ -216,6 +221,7 @@ BW_GATHER_LIBS:=-lgmpxx -lgmp
 BW_MUL_SOURCES:=					\
 		auxfuncs.c	\
 		cxx/mul.cpp				\
+		cxx/bitstring.cpp			\
 		cxx/matrix.cpp	cxx/matrix_line.cpp	\
 		cxx/files.cpp cxx/matrix_header.cpp
 BW_MUL_LIBS:=-lgmpxx -lgmp
@@ -259,6 +265,7 @@ BW_BALANCE_LIBS:=
 
 BW_SECURE_SOURCES:=						\
 		auxfuncs.c cxx/files.cpp cxx/matrix_header.cpp	\
+		cxx/bitstring.cpp			\
 		cxx/matrix_line.cpp cxx/secure.cpp
 BW_SECURE_LIBS:=-lgmpxx -lgmp
 -include .bw-secure.mkf

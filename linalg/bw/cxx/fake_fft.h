@@ -3,6 +3,8 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include "manu.h"
+
 /* This file is a placeholder for the typical requirements of an FFT
  * interface. Of course, there is nothing interesting being done here.
  * It's just an E-X-A-M-P-L-E. See also the .c file.
@@ -30,7 +32,7 @@ extern void fake_setup(fake_info_t p, int dF, int dG);
 extern inline fake_t fake_alloc(const fake_info_t p, int n) {
     return (fake_t) malloc(n * p->size * sizeof(ulong));
 }
-extern inline void fake_free(const fake_info_t p, fake_t x, int n) {
+extern inline void fake_free(const fake_info_t p UNUSED_VARIABLE, fake_t x, int n UNUSED_VARIABLE) {
     free(x);
 }
 extern inline fake_t fake_get(const fake_info_t p, fake_t x, int k) {

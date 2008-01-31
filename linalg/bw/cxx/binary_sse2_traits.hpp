@@ -8,6 +8,7 @@
 #include <ios>
 #include <iomanip>
 #include "matrix_repr_binary.hpp"
+#include "bitstring.hpp"
 
 struct binary_sse2_traits {
 	typedef matrix_repr_binary representation;
@@ -24,6 +25,9 @@ struct binary_sse2_traits {
 	typedef inner_type vec_t[sse2_vectoring] __attribute__((aligned(16)));
 
 	typedef binary_field coeff_field;
+        typedef coeff_field::elt Kelt;
+        typedef coeff_field::vec_t Kvec_t;
+
 
 	struct scalar_t { sse2_scalars p; };
 	typedef scalar_t wide_scalar_t;
@@ -38,12 +42,11 @@ struct binary_sse2_traits {
 		return globals::nbys == 128 && globals::modulus_ulong == 2;
 	}
 
-	/* FIXME -- this used to return an mpz_class */
-	static inline int get_y(scalar_t const & x, int i) {
+	static inline Kelt get_y(scalar_t const & x, int i) {
 		vec_t foo;
-		memcpy(foo, &x.p, sizeof(sse2_scalars));
+		memcpy(foo, &x, sizeof(vec_t));
 		BUG_ON(i >= 128 || i < 0);
-		int bit = (foo[i >> 6] >> (i & 63)) & 1;
+		Kelt bit = (foo[i >> 6] >> (i & 63)) & 1;
 		return bit;
 	}
 	static inline void reduce(scalar_t & d, wide_scalar_t & s) {
@@ -87,7 +90,7 @@ struct binary_sse2_traits {
 
 	static inline bool is_zero(scalar_t const& x) {
 		vec_t foo;
-		memcpy(foo, &x.p, sizeof(sse2_scalars));
+		memcpy(foo, &x, sizeof(vec_t));
 		for(unsigned int i = 0 ; i < 2 ; i++) {
 			if (foo[i])
 				return false;
@@ -96,7 +99,7 @@ struct binary_sse2_traits {
 	}
 	/*
 	static inline void assign(mpz_class& z, scalar_t const & x) {
-		MPZ_SET_MPN(z.get_mpz_t(), x.p, width);
+		MPZ_SET_MPN(z.get_mpz_t(), x, width);
 	}
 	*/
 	static inline void addmul_wide(scalar_t & dst,
@@ -106,92 +109,69 @@ struct binary_sse2_traits {
 		dst.p ^= a.p & b.p;
 	}
 	static inline void
-	assign(scalar_t & x, std::vector<mpz_class> const& z,  unsigned int i)
+	assign(scalar_t & x, Kvec_t const& z,  unsigned int i)
 	{
-		/* This one affects from a vector. We provide the
-		 * position, in case we're doing SIMD.
-		 */
-		// WARNING("slow");
-		/* FIXME -- should we go up to 128 here, or restrict to
-		 * nbys ??? */
-		vec_t foo;
-		for(unsigned int j = 0 ; j < 128 ; j++)
-			foo[j>>6] ^= (inner_type) (z[i+j] != 0) << (j & 63);
+            vec_t foo;
+            const unsigned long * ptr = z + i / ULONG_BITS;
+            i %= ULONG_BITS;
+            foo[0] = 0;
+            for(unsigned int stuffed = 0; stuffed < 64 ; ) {
+                foo[0] ^= *ptr++ >> i;
+                stuffed += ULONG_BITS-i;
+                if (stuffed >= 64) break;
+                foo[0] ^= *ptr << (ULONG_BITS-i);
+                stuffed += i;
+            }
+            foo[1] = 0;
+            for(unsigned int stuffed = 0; stuffed < 64 ; ) {
+                foo[1] ^= *ptr++ >> i;
+                stuffed += ULONG_BITS-i;
+                if (stuffed >= 64) break;
+                foo[1] ^= *ptr << (ULONG_BITS-i);
+                stuffed += i;
+            }
 		x.p = (sse2_scalars) { foo[0], foo[1], };
 	}
 	static inline void assign(std::vector<mpz_class>& z, scalar_t const & x) {
 		vec_t foo;
-		memcpy(foo, &x.p, sizeof(sse2_scalars));
+		memcpy(foo, &x, sizeof(vec_t));
 		BUG_ON(z.size() != 128);
 		for(unsigned int i = 0 ; i < 128 ; i++) {
 			z[i] = (foo[i>>6] >> (i & 63)) & 1UL;
 		}
 	}
 
-	static std::ostream& print(std::ostream& o, scalar_t const& x) {
-		vec_t foo;
-		memcpy(foo, &x.p, sizeof(sse2_scalars));
-		/*
-		 * TODO: allow some sort of compressed I/O. The problem
-		 * is that it interfers a lot with other stuff. a 4x, or
-		 * even 16x reduction of the output size would be nice...
-		 */
-#if 0
-		std::ios_base::fmtflags f(o.flags());
-		o << std::setw(16) << std::hex;
-		for(int i = 0 ; i < 2 ; i++) {
-			if (i) { o << " "; }
-			o << foo[i];
-		}
-		o.flags(f);
-#endif
-		for(uint i = 0 ; i < globals::nbys ; i++) {
-			if (i) { o << " "; }
-			o << ((foo[i>>6] >> (i & 63)) & 1UL);
-		}
-		return o;
-	}
-        static std::ostream& print(std::ostream& o, scalar_t & x)
+        static std::ostream& print(std::ostream& o, scalar_t const& x)
         {
-            vec_t w;
-            memcpy(&w, &x, sizeof(w));
-            long mask;
-            mask = 1L;
-            for(unsigned int i = 0 ; i < 64 ; i++) {
-                if (i) o << " ";
-                o << ((w[0] & mask) != 0);
-                mask <<=1;
+            vec_t foo;
+            memcpy(foo, &x, sizeof(vec_t));
+            unsigned long v[128 / ULONG_BITS];
+            for(unsigned int i = 0 ; i < 64 ; i += ULONG_BITS) {
+                v[i / ULONG_BITS] = foo[0] >> i;
             }
-            mask = 1L;
-            for(unsigned int i = 0 ; i < 64 ; i++) {
-                o << " ";
-                o << ((w[1] & mask) != 0);
-                mask <<=1;
+            for(unsigned int i = 0 ; i < 64 ; i += ULONG_BITS) {
+                v[(i + 64) / ULONG_BITS] = foo[1] >> i;
             }
+            write_hexstring(o, v, 128);
             return o;
         }
 
-        static std::istream& get(std::istream& is, binary_sse2_traits::scalar_t & x)
+        static std::istream& get(std::istream& is, scalar_t & x)
         {
-            vec_t w;
-            long v;
-            long z;
-            z = 0;
-            for(unsigned int i = 0 ; i < 64 ; i++) {
-                is >> v;
-                z |= (v << i);
+            unsigned long v[128 / ULONG_BITS];
+            vec_t foo;
+            read_hexstring(is, v, 128);
+            foo[0] = 0;
+            for(unsigned int i = 0 ; i < 64 ; i += ULONG_BITS) {
+                foo[0] |= ((inner_type) v[i / ULONG_BITS]) << i;
             }
-            w[0] = z;
-            z = 0;
-            for(unsigned int i = 0 ; i < 64 ; i++) {
-                is >> v;
-                z |= (v << i);
+            foo[1] = 0;
+            for(unsigned int i = 0 ; i < 64 ; i += ULONG_BITS) {
+                foo[1] |= ((inner_type) v[(i + 64) / ULONG_BITS]) << i;
             }
-            w[1] = z;
-            memcpy(&x, &w, sizeof(w));
+            memcpy(&x, foo, sizeof(vec_t));
             return is;
         }
-
 };
 
 #endif	/* BINARY_SSE2_TRAITS_HPP_ */

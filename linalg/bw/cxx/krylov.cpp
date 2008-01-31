@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <cstdlib>
+#include "config.hpp"
 #include "auxfuncs.h"
 #include "barrier.h"
 #include "manu.h"
@@ -27,6 +28,8 @@
 
 #include "traits_globals.hpp"
 #include "parsing_tools.hpp"
+#include "globals.hpp"
+#include "basefield.hpp"
 
 /* TODO: maybe remove checks entirely in characteristic two, as they are
  * hardly useful... Most probably something more sensible would be
@@ -63,18 +66,10 @@ void load_x_vectors(vector < vector<uint32_t> > &bw_x) /*{{{ */
 }				/*}}} */
 
 namespace globals {
-    unsigned int m, n;
     unsigned int col;
-    unsigned int nr, nc;
     unsigned int nb_iter;
     unsigned int cp_lag;
     unsigned int iter0;
-    unsigned int nbys;
-    mpz_class modulus;
-    uint8_t modulus_u8;
-    uint16_t modulus_u16;
-    uint32_t modulus_u32;
-    unsigned long modulus_ulong;
     vector < vector<uint32_t> > bw_x;
     unsigned int degf;			// mksol only
     barrier_t main_loop_barrier;
@@ -651,9 +646,32 @@ template < typename T > int addup(int k)
 
 /* mksol stuff only */
 
-    template < typename traits >
+template < typename traits >
 unsigned int set_f_coeffs(typename traits::scalar_t * f, unsigned int maxdeg)
 {
+    /* The columns of the generator F are stored one in each line. Then
+     * it's n coefficients at a time, and the degree is the number of
+     * such blobs in the line.
+     */
+    ifstream fx;
+    must_open(fx, files::fgen);
+    string line;
+    /* Content ourselves with the first line for the time being */
+    getline(fx, line);
+    field::vec_t v;
+    field::vec_init(&v, globals::n);
+    unsigned int i = 0;
+    for(istringstream st(line) ; !st.eof() ; st >> ws) {
+        field::vec_read(st, v, globals::n);
+        BUG_ON(!st && !st.eof());
+        traits::assign(f[i], v, globals::col);
+        i++;
+    }
+    return i;
+}
+
+
+#if 0
     unsigned int deg = 0;
     int largest_nz = -1;
     // memset(f, 0, (maxdeg + 1) * sizeof(typename traits::scalar_t));
@@ -698,7 +716,7 @@ unsigned int set_f_coeffs(typename traits::scalar_t * f, unsigned int maxdeg)
 #endif
 
     return deg;
-}
+#endif
 
 
     template < template < typename > class X, typename traits >
@@ -853,11 +871,7 @@ int main(int argc, char *argv[])
      * - it's of little use anyway
      */
 
-    globals::modulus = stats.modulus;
-    globals::modulus_u8 = globals::modulus.get_ui();
-    globals::modulus_u16 = globals::modulus.get_ui();
-    globals::modulus_u32 = globals::modulus.get_ui();
-    globals::modulus_ulong = globals::modulus.get_ui();
+    globals::set_modulus(stats.modulus);
 
     /* Configure the thread data area, so that we can pre-fill it */
     configure_threads(mine.nt);

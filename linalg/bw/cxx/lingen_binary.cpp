@@ -45,6 +45,7 @@ unsigned int cantor_threshold = UINT_MAX;
 #include "files.hpp"
 #include "config_file.hpp"
 #include "matrix.hpp"
+#include "bitxs.hpp"
 
 /* output: F0x is the candidate number x. All coordinates of the
  * candidate are grouped, and coefficients come in order (least
@@ -160,6 +161,65 @@ void compute_E_from_A(polmat const &a)/*{{{*/
     E.swap(tmp_E);
 }/*}}}*/
 
+void read_data_for_series(polmat& A, int & rc)/*{{{*/
+{
+    /* Reads several A matrices (possibly vertically split), and gather
+     * them into a polmat object.
+     */
+
+    using namespace globals;
+
+    unsigned int i, j;
+
+    unsigned int ncoef = total_work+1;
+    polmat a(m,n,ncoef);
+    a.zero();
+
+    rc = INT_MAX;
+
+    for (j = 0; j < n;) {
+        unsigned int ny;
+        unsigned long b[iceildiv(n, ULONG_BITS)];
+        std::string filename = files::a % j;
+
+        ifstream f;
+        must_open(f, filename.c_str());
+        printf("Reading file %s", filename.c_str());
+
+
+        ny = read_hexstring(is, b, n);
+        for(i = 1 ; i < m ; i++) {
+            unsigned int ny2 = read_hexstring(is, b, n);
+            BUG_ON(ny != ny2);
+        }
+
+        bitxs k;
+        for(; k < ncoef && !f.eof() ; k++) {
+            for(i = 0 ; i < m ; i++) {
+                unsigned int ny2 = read_hexstring(is, b, n);
+                BUG_ON(ny != ny2);
+                for(bitxs xy ; xy < ny ; xy++) {
+                    unsigned long * pol = a.poly(i,j+y);
+                    k.set(pol, xy.get(y));
+                }
+            }
+        }
+
+        j += ny;
+        if (rc == INT_MAX) {
+            rc = k;
+        } else {
+            BUG_ON(k != (unsigned int) rc);
+        }
+    }
+
+    printf("Stopped after reading %u coefficients (not counting 1st)"
+            " -- total work was %u\n",
+            rc, rc);
+
+    A.swap(a);
+}/*}}}*/
+
 // F is in fact F0 * PI.
 // To multiply on the *left* by F, we cannot work directly at the column
 // level (we could work at the row level, but it does not fit well with
@@ -207,145 +267,13 @@ void compute_final_F_from_PI(polmat& F, polmat const& pi)/*{{{*/
     }
     F.swap(tmp_F);
 }/*}}}*/
-
-
-void read_data_for_series(polmat& A, int & rc)/*{{{*/
-{
-    using namespace globals;
-
-    FILE * files[m][n];
-    unsigned int nbys[n];
-
-    polmat a(m,n,total_work+1);
-
-    unsigned int i, j;
-    unsigned int k;
-
-    for (j = 0; j < n; j++) { nbys[j] = 0; }
-
-    for (i = 0; i < m; i++) {
-        for (j = 0; j < n;) {
-            unsigned int y = 0;
-            char * ptr;
-            int d;
-            std::string filename = files::a % i % j;
-            files[i][j] = fopen(filename.c_str(),"r");
-            if (files[i][j] == NULL) {
-                die("fopen(%s) : %s", errno, filename.c_str(),
-                        strerror(errno));
-            }
-            printf("Reading file %s", filename.c_str());
-
-            /* NOTE : we drop the first coefficient, because
-             * we mean to work with the sequence generated
-             * on x and By, so that we obtain a generator
-             * afterwards.
-             */
-
-            char row[1024];
-            unsigned long blah;
-            /* We also use this in order to read the number
-             * of coefficients per row */
-            fgets(row, sizeof(row), files[i][j]);
-            ptr = row;
-            for(y = 0 ; sscanf(ptr,"%lu%n",&blah,&d) >= 1 ; ptr += d, y++);
-            if (y == 0) {
-                fprintf(stderr, "\nproblem while reading %s, line = %s\n",
-                        filename.c_str(), row);
-                abort();
-            }
-            if (y > 1) {
-                printf(" [ %d values per row ]", y);
-            }
-            printf("\n");
-            if (nbys[j] != 0) {
-                BUG_ON(y != nbys[j]);
-            }
-            nbys[j] = y;
-            j += y;
-        }
-    }
-
-    unsigned int read_coeffs = 0;       /* please gcc */
-
-    for (i = 0; i < m; i++) {
-        unsigned long * pol[n];
-        for (j = 0; j < n; j ++) {
-            pol[j] = a.poly(i,j);
-        }
-        unsigned long mask = 1UL;
-        unsigned int shift = 0;
-        for (k = 0; k <= total_work; k++) {
-            unsigned int rc = 0;
-            for (j = 0; j < n; j += nbys[j]) {
-                unsigned int l;
-                for(l = 0 ; l < nbys[j] ; l++) {
-                    unsigned long blah;
-                    rc += 1 == fscanf(files[i][j], "%lu", &blah);
-                    pol[j + l][shift] |= mask & -blah;
-                }
-            }
-            if (rc == 0) {
-                break;
-            } else if (rc != n) {
-                fprintf(stderr, "A files not in sync ; "
-                        "read only %u coeffs in X^%d, row %d\n", rc, k, i);
-                break;
-            }
-            mask <<= 1;
-            shift += mask == 0;
-            mask += mask == 0;
-        }
-        if (i == 0) {
-            read_coeffs = k;
-        } else {
-            /* This happens when A files have gone live */
-            BUG_ON(k != read_coeffs);
-        }
-    }
-    for (j = 0; j < n; j ++) {
-        a.deg(j) = read_coeffs - 1;
-    }
-
-    for (i = 0; i < m; i++) {
-        for (j = 0; j < n; j+= nbys[j]) {
-            fclose(files[i][j]);
-        }
-    }
-
-    printf("Stopped after reading %u coefficients (not counting 1st)"
-            " -- total work was %u\n",
-            read_coeffs, total_work);
-
-    rc = read_coeffs;
-    A.swap(a);
-}/*}}}*/
-
 void write_polmat(polmat const& P, const char * fn)/*{{{*/
 {
-    std::ofstream f(fn);
-    if (!f.is_open()) {
-        perror(fn);
-        exit(1);
-    }
-
-    for(unsigned int k = 0 ; k < P.ncoef ; k++) {
-        for(unsigned int i = 0 ; i < P.nrows ; i++) {
-            for(unsigned int j = 0 ; j < P.ncols ; j++) {
-                if (j) f << " ";
-                if ((int) k <= P.deg(j)) {
-                    f << P.coeff(i,j,k);
-                } else {
-                    f << 0;
-                }
-            }
-            f << "\n";
-        }
-        f << "\n";
-    }
+    std::ofstream f;
+    must_open(f, fn);
+    f << P;
     printf("Written f to %s\n",fn);
 }/*}}}*/
-
 bool recover_f0_data(const char * fn)/*{{{*/
 {
     std::ifstream f(fn);
@@ -360,7 +288,6 @@ bool recover_f0_data(const char * fn)/*{{{*/
     std::cout << fmt("recovered init data % on disk\n") % fn;
     return true;
 }/*}}}*/
-
 bool write_f0_data(const char * fn)/*{{{*/
 {
     std::ofstream f(fn);
@@ -393,7 +320,6 @@ void set_t0_delta_from_F0()/*{{{*/
         // delta.
     }
 }/*}}}*/
-
 void write_F0_from_F0_quick()/*{{{*/
 {
     using namespace globals;
@@ -415,29 +341,6 @@ void write_F0_from_F0_quick()/*{{{*/
     }
     write_polmat(F0, "F_INIT");
 }/*}}}*/
-
-void bw_commit_f(polmat& F) /*{{{*/
-{
-    using namespace globals;
-    using namespace std;
-
-    for (unsigned int j = 0; j < m + n ; j++) {
-        std::string filename = files::f % j;
-        ofstream f(filename.c_str());
-        cout << "Writing " << filename << endl;
-        if (!f.is_open()) {
-            perror("writing f");
-            die("ugh",1);
-        }
-        for (int k = 0; k <= F.deg(j); k++) {
-            for (unsigned int i = 0; i < n; i++) {
-                f << F.coeff(i,j,k) << (i == (n-1) ? "\n" : " ");
-            }
-        }
-    }
-}
-/*}}}*/
-
 void compute_f_init(polmat& A)/*{{{*/
 {
     using namespace globals;
@@ -526,7 +429,6 @@ void compute_f_init(polmat& A)/*{{{*/
     }
 
 }/*}}}*/
-
 void print_deltas()/*{{{*/
 {
     using namespace globals;
@@ -554,7 +456,6 @@ void print_deltas()/*{{{*/
         std::cout << "[" << nrep << "]";
     std::cout << "\n";
 }/*}}}*/
-
 /*{{{*//* bw_init
  *
  * fill in the structures with the data available on disk. a(X) is
@@ -653,7 +554,6 @@ static void bw_init(void)
     A.clear();
 }
 /*}}} */
-
 static void rearrange_ordering(polmat & PI, unsigned int piv[])/*{{{*/
 {
     /* Sort the columns. It might seem merely cosmetic and useless to
@@ -688,7 +588,6 @@ static void rearrange_ordering(polmat & PI, unsigned int piv[])/*{{{*/
     PI.perm(p);
     e0.perm(p);
 }/*}}}*/
-
 static bool gauss(unsigned int piv[], polmat& PI)/*{{{*/
 {
     /* Do one step of (column) gaussian elimination on e0. The columns
@@ -788,7 +687,6 @@ static bool gauss(unsigned int piv[], polmat& PI)/*{{{*/
     std::cout << " ]\n";
     */
 }/*}}}*/
-
 void read_mat_file_header(const char *name)/*{{{*/
 {
     FILE *f = fopen(name, "r");
@@ -803,7 +701,6 @@ void read_mat_file_header(const char *name)/*{{{*/
 
     fclose(f);
 }/*}}}*/
-
 #if 0/* {{{ */
 const char *pi_meta_filename = "pi-%d-%d";
 
@@ -1060,7 +957,6 @@ static void bw_traditional_algo_2(struct e_coeff * ec, int * delta,
     free(perm);
 }
 #endif/*}}}*/
-
 static unsigned long extract_coeff_degree_t(unsigned int t, unsigned long const * a, unsigned int da, unsigned long const * b, unsigned int db)/*{{{*/
 {
     unsigned long c = 0;
@@ -1081,8 +977,6 @@ static unsigned long extract_coeff_degree_t(unsigned int t, unsigned long const 
     }
     return c & 1UL;
 }/*}}}*/
-
-
 static void extract_coeff_degree_t(unsigned int tstart, unsigned int dt, unsigned int piv[], polmat const& PI)/*{{{*/
 {
     using namespace std;
@@ -1135,7 +1029,6 @@ static void extract_coeff_degree_t(unsigned int tstart, unsigned int dt, unsigne
         std::cout << "\n";
     }
 }/*}}}*/
-
 static unsigned int pi_deg_bound(unsigned int d)/*{{{*/
 {
     using namespace globals;
@@ -1510,7 +1403,7 @@ void block_wiedemann(void)
 
     polmat F;
     compute_final_F_from_PI(F, pi_left);
-    bw_commit_f(F);
+    write_polmat(F, files::f);
 
     printf("// step %d LOOK [", t);
     for (unsigned int j = 0; j < m + n; j++) {

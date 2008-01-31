@@ -1,25 +1,33 @@
-#ifndef VARIABLE_SCALAR_TRAITS_HPP_
-#define VARIABLE_SCALAR_TRAITS_HPP_
+#ifndef VECTORING_STACK_HPP_
+#define VECTORING_STACK_HPP_
 
 #include <gmp.h>
 #include <gmpxx.h>
-#include "traits_globals.hpp"
-#include "matrix_repr_prime.hpp"
 
-struct variable_scalar_traits {
-    typedef mpz_class scalar_t;
-    typedef mpz_class wide_scalar_t;
-    static const unsigned int max_accumulate = UINT_MAX;
-    static const unsigned int max_accumulate_wide = UINT_MAX;
-    static const unsigned int min_y = 1U;
+/* This vectoring code does nothing apart allowing any number of y
+ * vectors which is a multiple of the underlying vectoring constraint */
 
-    typedef prime_field_any field;
-    typedef field::elt elt;
-    typedef field::elt_ur elt_ur;
 
-    const char * name() const {
-        return "variable-size code (SLOW SLOW SLOW !)";
+template<typename traits>
+struct vectoring_stack : private traits {
+    typedef typename traits::scalar_t * scalar_t;
+    typedef typename traits::wide_scalar_t * wide_scalar_t;
+    using traits::max_accumulate;
+    using traits::max_accumulate_wide;
+    using traits::min_y;
+
+    using traits::field;
+    using traits::elt;
+    using traits::elt_ur;
+
+    std::string name() const {
+        std::ostringstream os;
+        os << "multiplexed [" << traits::name() << "]";
     }
+
+    unsigned int stride;
+
+    vectoring_stack() : stride(globals::nbys / min_y) {}
 
     void init(scalar_t ** p, unsigned int n) const
         { *p = new scalar_t[n]; }
@@ -78,4 +86,4 @@ struct variable_scalar_traits {
         { return i >> x; }
 };
 
-#endif	/* VARIABLE_SCALAR_TRAITS_HPP_ */
+#endif	/* VECTORING_STACK_HPP_ */

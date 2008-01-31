@@ -28,24 +28,21 @@ namespace files {
 
 	EXTERN_LINKAGE	std::string matrix      INIT_WITH("matrix.txt");
 	EXTERN_LINKAGE	std::string params      INIT_WITH("bw.cfg");
-	EXTERN_LINKAGE	meta_filename a		INIT_WITH("A-%[f0w2]-%[f0w2]");
-	EXTERN_LINKAGE	meta_filename v		INIT_WITH("V%[f0w2].%[f0w3]");
-	EXTERN_LINKAGE	meta_filename w		INIT_WITH("W%[f0w2]");
-	EXTERN_LINKAGE	meta_filename r		INIT_WITH("R%[f0w2]");
+	EXTERN_LINKAGE	meta_filename a		INIT_WITH("A%");
+	EXTERN_LINKAGE	meta_filename v		INIT_WITH("V%.%");
+	EXTERN_LINKAGE	meta_filename w		INIT_WITH("W%");
+	EXTERN_LINKAGE	meta_filename r		INIT_WITH("R%");
 	EXTERN_LINKAGE	std::string x		INIT_WITH("X");
 	EXTERN_LINKAGE	std::string y		INIT_WITH("Y");
 	EXTERN_LINKAGE	std::string precond	INIT_WITH("precond.txt");
 	EXTERN_LINKAGE	std::string m0		INIT_WITH("M0-vector");
 	EXTERN_LINKAGE	std::string x0		INIT_WITH("X0-vector");
-	EXTERN_LINKAGE	meta_filename f		INIT_WITH("F%[f0w2]");
+	EXTERN_LINKAGE	std::string f		INIT_WITH("F");
+	EXTERN_LINKAGE	std::string fgen	INIT_WITH("Fgen");
 	EXTERN_LINKAGE	std::string f_init	INIT_WITH("F_INIT");
 	EXTERN_LINKAGE	std::string f_initq	INIT_WITH("F_INIT_QUICK");
-	EXTERN_LINKAGE	meta_filename fxy
-				INIT_WITH("F%[f0w2]-Y%[f0w2].%[f0w3]");
+	EXTERN_LINKAGE	meta_filename fxy       INIT_WITH("F%-Y%.%");
 	EXTERN_LINKAGE	meta_filename pi	INIT_WITH("pi-%-%");
-
-	/* TODO: maybe bump up the format width a wee bit, or drop the f0
-	 * thing.  */
 }
 
 #undef	INIT_WITH

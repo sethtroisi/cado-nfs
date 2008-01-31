@@ -346,8 +346,22 @@ int main(int argc, char *argv[])
         cfg.open(files::params.c_str());
         cfg << fmt("n=%\n") %  globals::n;
         cfg << fmt("m=%\n") %  globals::m;
+        cfg << fmt("p=%\n") %  globals::modulus;
     }
 
+    /* This is just for generating the vectors.
+     * The actual nbys that will be used may differ.
+     */
+    globals::nbys = n;
+
+    if (! field::match()) {
+        fprintf(stderr, "This binary does not work with these parameters\n");
+        exit(2);
+    }
+    simple_matmul_toy<vectoring> mul_code(stats, files::matrix);
+    setup_vectors(mul_code); 
+
+#if 0   /* {{{ */
     if (globals::modulus == 2) {
         if (mine.n % 128 == 0) {
             typedef binary_sse2_traits T;
@@ -386,6 +400,7 @@ int main(int argc, char *argv[])
         simple_matmul_toy<T> mul_code(stats, files::matrix);
         setup_vectors(mul_code);
     }
+#endif  /* }}} */
 }
 
 
