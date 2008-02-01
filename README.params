@@ -5,43 +5,29 @@ parameters).
 The following figures correspond to the data in /local/fleur/cado/Examples,
 with the free relations (see README file). 
 
-      prune mergelevel  cwmax   rwmax  merge  matrix-size  gauss merge+gauss
-F7             10	15	 50    comment: F7
+      prune mergelevel  cwmax   rwmax  merge  matrix-size    bw
 
-c72     1.0    10       30      100     9s    27651x27523   231s 240s
-c72     1.0    10       30      100     9s    29727x29599   1m42 (bw)
+c72     1.0    10       30      100    9s     29727x29599   1m32
 
-c80     1.0    10       40      100    7s     37149x37021   634s  641s
-c80     1.0    10       40      100    8s     37321x37193   2m34  (bw)
+c80     1.0    10       40      100    7s     37321x37193   2m11
 
 c85a    comment: pic94
-c85a	1.0    15	40	100   54s     72957x72829
-c85a    1.0    15       40      100   50s     82725x82597  10m13 (bw)
+c85a    1.0    15       40      100   43s     82725x82597   8m14
 
 c90     nrel=624350, nprimes=531028; excess=93322
-c90	1.0    20	40	100   69s     78430x78302
-c90	1.0    20	40	100   45s    108739x108611 13m41 (bw)
+c90	1.0    20	40	100   41s    108739x108611 14m04
 
 c95     nrel=1749115, nprimes=1368089; excess=381026
-c95	1.0    10	40	 80   4m55   129420x129292
-c95	1.0    10	40	 80   3m14   133597x133469 121m06 (bw) [*]
+c95	1.0    10	40	 80   3m18   133597x133469 22m48
 
 rsa100  nrel=1370048, nprimes=1187600; excess=182448
-rsa100  1.0    15	40	150   3m48   148102x147974
-rsa100  1.0    15	40	150   3m19   166720x166592 (bw)
+rsa100  1.0    15	40	150   2m37   166720x166592 39m31
 
 rsa110  nrel=2550427, nprimes=2329197; excess=221230
-rsa110  1.0   120      300      500  78m13   189584x189456
-rsa110  1.0    15       40      150   5m30   324036x323908 (bw)
-rsa110  1.0   120      300      200  13m46   333129x333001 (bw)
+rsa110  1.0    15       40      150   3m55   324036x323908
 
---------- needs to be updated below this line ----------------
-
-(Note: checknorms only outputs 7851953 out of 7892349 relations.)
-rsa120  1.0    10       40      200   5m58   564777x564649
-rsa120  0.1    10       40      200   3m42   576300x576172
-
-[*] timings on meringue (Core 2)
+rsa120  nrel=3142405, nprimes=2929171; excess=213234
+rsa120  1.0    15       40      150   7m42   552583x552455
 
 For new parameters, some fiddling is needed, with respect to the final
 weight of the small matrix and/or the number of rows/columns depending on
