@@ -72,7 +72,7 @@ echo "Performing the linear algebra phase"
 
 if [ ! -s $name.ker_raw ]; then echo "Zerodim kernel, stopping"; exit; fi
 
-nker=`wc -l $name.ker_raw | awk '{print $1}'`
+nker=`wc -l < $name.ker_raw`
 if [ $nker -lt $nkermax ]; then nkermax=$nker; fi
 
 echo "Adding characters"
