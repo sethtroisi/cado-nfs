@@ -324,6 +324,12 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
+  /* print the command line */
+  fprintf (stderr, "%s.r%s", argv[0], REV);
+  for (k = 1; k < argc; k++)
+    fprintf (stderr, " %s", argv[k]);
+  fprintf (stderr, "\n");
+
   purgedfile = fopen(argv[1], "r");
   ASSERT (purgedfile != NULL);
   kerfile = fopen(argv[2], "r");
