@@ -114,6 +114,7 @@ static void
 readOneKer(mp_limb_t *vec, FILE *file, int nlimbs) {
   unsigned long w;
   int ret, i;
+
   for (i = 0; i < nlimbs; ++i) {
     ret = fscanf(file, "%lx", &w);
     ASSERT (ret == 1);
@@ -391,7 +392,7 @@ int main(int argc, char **argv) {
   {
     ret = fscanf(indexfile, "%d %d", &small_nrows, &small_ncols);
     ASSERT (ret == 2);
-    nlimbs = (small_nrows / GMP_NUMB_BITS) + 1;
+    nlimbs = ((small_nrows - 1) / GMP_NUMB_BITS) + 1;
   }
 
   ker = (mp_limb_t **)malloc(n*sizeof(mp_limb_t *));
