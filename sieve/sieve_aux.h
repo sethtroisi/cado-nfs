@@ -23,13 +23,14 @@ first_sieve_loc (const fbprime_t p, const fbroot_t r,
   ASSERT (amin_p < p);
   ASSERT_EXPENSIVE (b % p != 0);
 
-  mod_initmod_ul (m, p); /* Most of the mod_*() calls are no-ops */
+  /* Most of the mod_*() calls are no-ops */
+  mod_initmod_ul (m, (unsigned long) p);
   mod_init_noset0 (r1, m);
   mod_init_noset0 (r2, m);
-  mod_set_ul_reduced (r2, r, m);
+  mod_set_ul_reduced (r2, (unsigned long) r, m);
   mod_set_ul (r1, b, m); /* Modular reduction */
   mod_mul (r1, r1, r2, m); /* Multiply and mod reduction. */
-  mod_sub_ul (r1, r1, amin_p, m);
+  mod_sub_ul (r1, r1, (unsigned long) amin_p, m);
   if (odd)
     mod_div2 (r1, r1, m);
   d = mod_get_ul (r1, m); 

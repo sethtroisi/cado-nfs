@@ -42,6 +42,10 @@
 #define MPZ_RHO_LOGTHRES_DEFAULT
 #endif
 
+#define uc_add(a,b) ((unsigned char) ((a)+(b)))
+#define uc_sub(a,b) ((unsigned char) ((a)-(b)))
+#define add_error(a) ((unsigned char) ((a) + SIEVE_PERMISSIBLE_ERROR))
+
 
 unsigned long sumprimes, nrprimes; /* For largest non-report fb primes */
 unsigned long sumprimes2, nrprimes2;  /* For 2nd largest non-report fb prim. */
@@ -105,7 +109,7 @@ mp_poly_scale (mpz_t *r, mpz_t *poly, const int deg, const long c,
   ASSERT (inv == 1 || inv == -1);
 
   mpz_init (t);
-  mpz_set_ui (t, 1);
+  mpz_set_ui (t, 1UL);
   for (i = 0; i <= deg; i++)
     {
       const int j = (inv == 1) ? i : deg - i;
@@ -156,24 +160,6 @@ mp_poly_print (mpz_t *poly, int deg, const char *name, int homogeneous)
 	    }
 	}
     }
-}
-
-static inline unsigned char
-uc_add (unsigned char a, unsigned char b)
-{
-  return (unsigned char) (a + b);
-}
-
-static inline unsigned char
-uc_sub (unsigned char a, unsigned char b)
-{
-  return (unsigned char) (a - b);
-}
-
-static inline unsigned char 
-add_error (unsigned char n)
-{
-  return uc_add (n, SIEVE_PERMISSIBLE_ERROR);
 }
 
 /* Evaluate the poynomial f of degree deg at point x */
@@ -235,7 +221,7 @@ log_norm (const double *f, const int deg, const double x,
 
   r = fpoly_eval (f, deg, x);
   n = fb_log (fabs (r), log_scale, - log_proj_roots);
-  /* printf ("Norm at x = %.0f is %.0f, rounded log is %hhd\n", x, r, n); */
+  /* printf ("Norm at x = %.0f is %.0f, rounded log is %hhu\n", x, r, n); */
   return n;
 }
 
@@ -307,11 +293,17 @@ compute_norms (unsigned char *sievearray, const long amin, const long amax,
 	  /* Let's assume the log norm is n1 everywhere in this interval */
 #ifdef TRACE_RELATION_A
 	  if (a <= TRACE_RELATION_A && TRACE_RELATION_A < a2)
-	    printf ("# TRACE RELATION a = %ld in compute_norms: log norm "
-		    "(range computed) for degree %d is %d\n", 
-		    (long) TRACE_RELATION_A, deg, (int) n1);
+	    {
+	      double na = log(fpoly_eval (f, deg, (double) a2)) * log_scale 
+		- log_proj_roots;
+	      printf ("# TRACE RELATION a = %ld in compute_norms: rounded log "
+		      "norm without projective divisors (range computed) for "
+		      "degree %d is %d, exact log of norm is %f\n", 
+		      (long) TRACE_RELATION_A, deg, (int) n1, na);
+	    }
 #endif
-	  memset (sievearray + ((a - amin) >> odd), n1, (a2 - a) >> odd);
+	  memset (sievearray + ((a - amin) >> odd), n1, 
+	          (size_t) ((a2 - a) >> odd));
 	}
       else
 	{
@@ -708,8 +700,8 @@ sieve_one_side (unsigned char *sievearray, factorbase_t fb,
 
   fb_disable_roots (fb->fblarge, b, verbose);
   
-  compute_norms (sievearray, eff_amin, eff_amax, b, dpoly, deg, proj_roots, 
-		 log_scale, odd, verbose);
+  compute_norms (sievearray, eff_amin, eff_amax, b, dpoly, deg, 
+                 (double) proj_roots, log_scale, odd, verbose);
 
   /* Init small primes for sieving this line */
   tsc1 = clock ();
@@ -796,6 +788,7 @@ add_fbprime_to_list (fbprime_t *list, unsigned int *cursize,
     list[(*cursize)++] = toadd;
 }
 
+
 /* Divides the prime q and its powers out of C, appends each q divided out 
    to primes_a, subject to the length restriction *nr_primes < max_nr_primes. 
    Returns the exponent of q that divided (0 if q didn't divide at all). */
@@ -854,7 +847,7 @@ trialdiv_with_root (factorbase_degn_t *fbptr, const long a,
   residue_t r;
   unsigned long absa;
 
-  mod_initmod_ul (m, fbptr->p);
+  mod_initmod_ul (m, (unsigned long) fbptr->p);
   mod_init_noset0 (r, m);
 
   absa = labs(a);
@@ -862,13 +855,14 @@ trialdiv_with_root (factorbase_degn_t *fbptr, const long a,
   for (i = 0; i < fbptr->nr_roots ; i++)
     {
       if (a <= 0) /* We compute rb - a */
-	mod_set_ul_reduced (r, fbptr->roots[i], m);
+	mod_set_ul_reduced (r, (unsigned long) fbptr->roots[i], m);
       else /* We compute (-r)b + a */
-	mod_set_ul_reduced (r, fbptr->p - fbptr->roots[i], m);
+	mod_set_ul_reduced (r, (unsigned long) (fbptr->p - fbptr->roots[i]), 
+	                    m);
 
-      mod_muladdredc_ul (r, r, b, absa, fbptr->invp, m);
+      mod_muladdredc_ul (r, r, b, absa, (unsigned long) fbptr->invp, m);
       
-      if (mod_get_ul (r, m) == 0)
+      if (mod_get_ul (r, m) == 0UL)
 	{
 	  mod_clear (r, m);
 	  mod_clearmod (m);
@@ -889,21 +883,22 @@ trialdiv_with_norm (factorbase_degn_t *fbptr, const mpz_t norm)
 {
   modulus_t m;
   residue_t r;
-  unsigned int i;
+  size_t i;
+  int j;
 
   ASSERT (mpz_sgn (norm) >= 0);
 
-  mod_initmod_ul (m, fbptr->p);
+  mod_initmod_ul (m, (unsigned long) fbptr->p);
   mod_init (r, m);
   
   for (i = 0; i < mpz_size (norm); i++)
     modul_addredc_ul (r, r, mpz_getlimbn (norm, i), fbptr->invp, m);
 
-  i = (mod_get_ul (r, m) == 0);
+  j = (mod_get_ul (r, m) == 0);
 
   mod_clear (r, m);
   mod_clearmod (m);
-  return i;
+  return j;
 }
 
 
@@ -918,12 +913,13 @@ trialdiv_with_norm1 (factorbase_degn_t *fbptr, const mpz_t norm,
 
   ASSERT (mpz_sgn (norm) > 0);
 
-  mod_initmod_ul (m, fbptr->p);
+  mod_initmod_ul (m, (unsigned long) fbptr->p);
   mod_init_noset0 (r, m);
 
-  modul_redcsemi_ul_not0 (r, mpz_getlimbn (norm, 0), fbptr->invp, m);
+  modul_redcsemi_ul_not0 (r, mpz_getlimbn (norm, (mp_size_t) 0), 
+                          fbptr->invp, m);
 
-  i = (mod_get_ul (r, m) + add == 0 || mod_get_ul (r, m) + add == m[0]);
+  i = (mod_get_ul (r, m) + add == 0UL || mod_get_ul (r, m) + add == m[0]);
 
   mod_clear (r, m);
   mod_clearmod (m);
@@ -942,13 +938,15 @@ trialdiv_with_norm2 (factorbase_degn_t *fbptr, const mpz_t norm,
 
   ASSERT (mpz_sgn (norm) > 0);
 
-  mod_initmod_ul (m, fbptr->p);
+  mod_initmod_ul (m, (unsigned long)fbptr->p);
   mod_init_noset0 (r, m);
 
-  modul_redcsemi_ul_not0 (r, mpz_getlimbn (norm, 0), fbptr->invp, m);
-  modul_addredcsemi_ul (r, r, mpz_getlimbn (norm, 1), fbptr->invp, m);
+  modul_redcsemi_ul_not0 (r, mpz_getlimbn (norm, (mp_size_t) 0), 
+                          fbptr->invp, m);
+  modul_addredcsemi_ul (r, r, mpz_getlimbn (norm, (mp_size_t) 1), 
+                        fbptr->invp, m);
 
-  i = (mod_get_ul (r, m) + add == 0 || mod_get_ul (r, m) + add == m[0]);
+  i = (mod_get_ul (r, m) + add == 0UL || mod_get_ul (r, m) + add == m[0]);
 
   mod_clear (r, m);
   mod_clearmod (m);
@@ -967,14 +965,17 @@ trialdiv_with_norm3 (factorbase_degn_t *fbptr, const mpz_t norm,
 
   ASSERT (mpz_sgn (norm) > 0);
 
-  mod_initmod_ul (m, fbptr->p);
+  mod_initmod_ul (m, (unsigned long) fbptr->p);
   mod_init_noset0 (r, m);
 
-  modul_redcsemi_ul_not0 (r, mpz_getlimbn (norm, 0), fbptr->invp, m);
-  modul_addredcsemi_ul (r, r, mpz_getlimbn (norm, 1), fbptr->invp, m);
-  modul_addredcsemi_ul (r, r, mpz_getlimbn (norm, 2), fbptr->invp, m);
+  modul_redcsemi_ul_not0 (r, mpz_getlimbn (norm, (mp_size_t) 0), 
+                          fbptr->invp, m);
+  modul_addredcsemi_ul (r, r, mpz_getlimbn (norm, (mp_size_t) 1), 
+                        fbptr->invp, m);
+  modul_addredcsemi_ul (r, r, mpz_getlimbn (norm, (mp_size_t) 2), 
+                        fbptr->invp, m);
 
-  i = (mod_get_ul (r, m) + add == 0 || mod_get_ul (r, m) + add == m[0]);
+  i = (mod_get_ul (r, m) + add == 0UL || mod_get_ul (r, m) + add == m[0]);
 
   mod_clear (r, m);
   mod_clearmod (m);
@@ -993,15 +994,19 @@ trialdiv_with_norm4 (factorbase_degn_t *fbptr, const mpz_t norm,
 
   ASSERT (mpz_sgn (norm) > 0);
 
-  mod_initmod_ul (m, fbptr->p);
+  mod_initmod_ul (m, (unsigned long) fbptr->p);
   mod_init_noset0 (r, m);
 
-  modul_redcsemi_ul_not0 (r, mpz_getlimbn (norm, 0), fbptr->invp, m);
-  modul_addredcsemi_ul (r, r, mpz_getlimbn (norm, 1), fbptr->invp, m);
-  modul_addredcsemi_ul (r, r, mpz_getlimbn (norm, 2), fbptr->invp, m);
-  modul_addredcsemi_ul (r, r, mpz_getlimbn (norm, 3), fbptr->invp, m);
+  modul_redcsemi_ul_not0 (r, mpz_getlimbn (norm, (mp_size_t) 0), 
+                          fbptr->invp, m);
+  modul_addredcsemi_ul (r, r, mpz_getlimbn (norm, (mp_size_t) 1), 
+                        fbptr->invp, m);
+  modul_addredcsemi_ul (r, r, mpz_getlimbn (norm, (mp_size_t) 2), 
+                        fbptr->invp, m);
+  modul_addredcsemi_ul (r, r, mpz_getlimbn (norm, (mp_size_t) 3), 
+                        fbptr->invp, m);
 
-  i = (mod_get_ul (r, m) + add == 0 || mod_get_ul (r, m) + add == m[0]);
+  i = (mod_get_ul (r, m) + add == 0UL || mod_get_ul (r, m) + add == m[0]);
 
   mod_clear (r, m);
   mod_clearmod (m);
@@ -1079,7 +1084,7 @@ ul_rho (const unsigned long N, const unsigned long cparm)
   modul_set_ul_reduced (c, cparm, m); /* We set c to cparm and use that as 
 					 the Montgomery representation of 
 					 cparm*2^-w % m */
-  modul_set_ul_reduced (r1, 2, m);
+  modul_set_ul_reduced (r1, 2UL, m);
   modul_set (r2, r1, m);
   modul_set (accu, r1, m);
 
@@ -1140,9 +1145,9 @@ mpz_rho (const mpz_t N, const unsigned long c)
   mpz_init (accu);
 
   mpz_set (m, N);
-  mpz_set_ui (r1, 2);
-  mpz_set_ui (r2, 2);
-  mpz_set_ui (accu, 2);
+  mpz_set_ui (r1, 2UL);
+  mpz_set_ui (r2, 2UL);
+  mpz_set_ui (accu, 2UL);
 
   do {
     for (i = 0; i < iterations_between_gcd; i++)
@@ -1164,7 +1169,7 @@ mpz_rho (const mpz_t N, const unsigned long c)
       }
     iterations += iterations_between_gcd;
     mpz_gcd (t, accu, m);
-  } while (mpz_cmp_ui (t, 1) == 0);
+  } while (mpz_cmp_ui (t, 1UL) == 0);
 
   /* FIXME: deal with too large factors better than this! */
   if (!mpz_fits_ulong_p (t))
@@ -1200,6 +1205,14 @@ mpz_rho (const mpz_t N, const unsigned long c)
    of n. For larger n, return value 0 means n is composite, return 
    value 1 means it is probably prime */
 
+/* if n == 1 (mod 3), then the only pseudoprimes < 10^10 
+   to bases 2, 5 and 7 are 3014101261, 3215031751, 7535192941,
+   to bases 2, 7 and 61 are 4759123141, 8411807377 */
+
+/* If n == 2 (mod 3), then the only pseudoprimes < 10^13 to bases
+   2, 3 and 5 are 244970876021, 405439595861, 1566655993781, 3857382025841,
+   4074652846961, 5783688565841 (i.e. there are none < 10^10) */
+
 int
 ul_proven_prime (unsigned long n)
 {
@@ -1228,16 +1241,31 @@ ul_proven_prime (unsigned long n)
       goto end;
     }
 
-  modul_set_ul (b, 7UL, m);
-  if (modul_sprp (b, invn, m))
+  if (n % 3UL == 1UL)
     {
-      modul_set_ul (b, 61UL, m);
-      if (modul_sprp (b, invn, m)
+      modul_set_ul (b, 7UL, m);
+      if (modul_sprp (b, invn, m))
+	{
+	  modul_set_ul (b, 61UL, m);
+	  if (modul_sprp (b, invn, m)
 #if (ULONG_MAX > 4294967295UL)
-	&& n != 4759123141UL && n != 8411807377UL
+	      && n != 4759123141UL && n != 8411807377UL
 #endif
-	  )
-	r = 1;
+	      )
+	    r = 1;
+	}
+    }
+  else
+    {
+      /* Case n % 3 == 0, 2 */
+      
+      modul_set_ul (b, 3UL, m);
+      if (modul_sprp (b, invn, m))
+	{
+	  modul_set_ul (b, 5UL, m);
+	  if (modul_sprp (b, invn, m))
+	    r = 1;
+	}
     }
   
  end:
@@ -1251,7 +1279,7 @@ ul_proven_prime (unsigned long n)
 
 /* Returns a pointer to factor base entry which is either the 
    end-of-factorbase marker, or the first entry whose p divides norm.
-   Requires that norm > fbptr->p */
+   Requires that norm >= fbptr->p */
 
 static factorbase_degn_t *
 trialdiv_find_next (factorbase_degn_t *fbptr, const mpz_t norm)
@@ -1259,11 +1287,11 @@ trialdiv_find_next (factorbase_degn_t *fbptr, const mpz_t norm)
   size_t s = mpz_size (norm);
   unsigned long add = 0;
 
-  ASSERT (mpz_cmp_ui (norm, fbptr->p) >= 0);
+  ASSERT (mpz_cmp_ui (norm, (unsigned long) fbptr->p) >= 0);
 
-  if (mpz_getlimbn (norm, s - 1) < fbptr -> p)
+  if (mpz_getlimbn (norm, (mp_size_t) (s - 1)) < fbptr -> p)
     {
-      add = mpz_getlimbn (norm, s - 1);
+      add = mpz_getlimbn (norm, (mp_size_t) (s - 1));
       s--;
     }
 
@@ -1335,10 +1363,12 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
   unsigned int k;
   factorbase_degn_t *fbptr;
   size_t log2size;
-  unsigned char reportlog, missinglog;
+  unsigned char sievelog, finallog;
   const double log_proj_divisor = log ((double) proj_divisor) * log_scale;
   double dpoly[MAXDEGREE + 1];
-  int nr_report_primes;
+  int nr_report_primes, r;
+  fbprime_t p;
+  const unsigned char MAX_SIEVELOG_ERROR = 1;
 
   /* 1. Compute norm */
   mp_poly_eval (norm, scaled_poly, degree, a);
@@ -1346,84 +1376,73 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
   TRACE_A (a, __func__, __LINE__, "norm for degree %d is %Zd\n", degree, norm);
   
   /* Compute approx. log of norm as was used for initialising the 
-     sieve array */
+     sieve array. We assume that the absolute difference between this 
+     sievelog here the the value from initialisation the sieve array is no 
+     greater than MAX_SIEVELOG_ERROR */
   for (k = 0; (int) k <= degree; k++)
     dpoly[k] = mpz_get_d (scaled_poly[k]);
-  missinglog = log_norm (dpoly, degree, (double) a, log_scale, 
-			 log_proj_divisor);
-  TRACE_A (a, __func__, __LINE__, "missinglog = %hhu\n", missinglog);
+  sievelog = log_norm (dpoly, degree, (double) a, log_scale, log_proj_divisor);
+  TRACE_A (a, __func__, __LINE__, "sievelog = %hhu\n", sievelog);
   
   
-  /* 2. Divide out the primes with projective roots */
-  if (proj_divisor > 1)
+  /* 2. Divide the primes with projective roots and their powers out of norm */
+  for (k = 0; k < nr_proj_primes; k++)
     {
-      unsigned long r;
-      ASSERT_ALWAYS (nr_proj_primes > 0);
-      r = mpz_tdiv_q_ui (norm, norm, proj_divisor);
-      ASSERT_ALWAYS (r == 0);
-      
-      TRACE_A (a, __func__, __LINE__, "dividing out proj. divisor %lu. "
-	       "New norm is %Zd.\n", proj_divisor, norm);
-
-      for (k = 0; k < nr_proj_primes; k++)
-	{
-	  ASSERT (proj_divisor % proj_primes[k] == 0);
-	  add_fbprime_to_list (primes, nr_primes, max_nr_primes, 
-			       proj_primes[k]);
-	  while (mpz_divisible_ui_p (norm, proj_primes[k]))
-	    {
-	      mpz_tdiv_q_ui (norm, norm, proj_primes[k]);
-	      add_fbprime_to_list (primes, nr_primes, max_nr_primes, 
-				   proj_primes[k]);
-	      TRACE_A (a, __func__, __LINE__, "dividing out extra power of "
-		       "proj. ""prime %lu. New norm = %Zd\n", 
-		       proj_primes[k], norm);
-	    }
-	}
+      r = trialdiv_one_prime (proj_primes[k], norm, nr_primes, primes, 
+			      max_nr_primes, 1);
+      ASSERT_ALWAYS (r > 0);
+      TRACE_A (a, __func__, __LINE__, "dividing out " FBPRIME_FORMAT "^%d " 
+	       "with proj. root. New norm is %Zd.\n", proj_primes[k], r, norm);
     }
   
   
-  /* 3. Divide the report primes out of this norm and find the smallest 
+  /* 3. Divide the report primes out of this norm and find the largest 
      approximate log */
   /* There must be at least one valid report */
   ASSERT_ALWAYS (reports->a == a && reports->p != 0);
-  reportlog = reports->l;
+  finallog = reports->l;
+  p = reports->p;
   nr_report_primes = 0;
   while (reports->a == a && reports->p != 0)
     {
       /* We allow reports without a report prime. In that case the 
 	 sieve_report_t may contain p == 1. */
-      if (reports->p != 1)
+      if (reports->p != (fbprime_t) 1)
 	{
-	  int r;
-
 	  r = trialdiv_one_prime (reports->p, norm, nr_primes, 
-				  primes, max_nr_primes, 0);
+				  primes, max_nr_primes, 1);
 	  ASSERT_ALWAYS (r > 0); /* If a report prime is listed but does not
 				    divide the norm, there is a serious bug
 				    in the sieve code */
-	  missinglog -= fb_log ((double) reports->p, log_scale, 0.);
 	  nr_report_primes++;
 
 	  TRACE_A (a, __func__, __LINE__, "dividing out report prime " 
-		   FBPRIME_FORMAT ". New new norm = %Zd, missinglog = %hhd\n", 
-		   reports->p, norm, missinglog);
+		   FBPRIME_FORMAT "^%d. New norm = %Zd\n",
+		   reports->p, r, norm);
 	}
 
-      /* Find the smallest approximate log. */
-      if (add_error (reports->l) < add_error (reportlog))
-	reportlog = reports->l;
-	  
+      /* Find the largest approximate log. */
+      if (add_error (reports->l) > add_error (finallog))
+	{
+	  finallog = reports->l;
+	  p = reports->p;
+	}
+      
       reports++;
     }
-  missinglog -= reportlog;
-  TRACE_A (a, __func__, __LINE__, "reportlog is %hhd, new missinglog = %hhd\n", 
-	   reportlog, missinglog);
+  /* If there was a report prime in the report with the largest log,
+     add this prime's log (we want to reach the log the sieve had before
+     dividing out this prime). */
+  if (p != 1)
+    finallog += fb_log ((double) p, log_scale, 0.);
+  TRACE_A (a, __func__, __LINE__, "finallog = %hhu\n", finallog);
 
   /* 
-     When we divide out a prime, we subtract log(p) from missinglog. When 
-     missinglog == 0, we know we are done. When missinglog < 2*log(p), 
-     we know that exactly one more factor base prime divides.
+     When we divide out a prime, we subtract log(p) from sievelog. When 
+     sievelog +- MAX_SIEVELOG_ERROR == finallog, we know we are done
+     (assuming the remaining factor base primes have log > MAX_SIEVELOG_ERROR)
+     When sievelog +- MAX_SIEVELOG_ERROR - finallog < 2*log(p), we know that 
+     exactly one more factor base prime divides.
   */
 
   /* Treat factor base prime p == 2 separately. We want to be able to use
@@ -1431,16 +1450,16 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
   fbptr = fullfb;
   TRACE_A (a, __func__, __LINE__, "first fb prime is " FBPRIME_FORMAT "\n", 
 	   fbptr->p);
-  if (fbptr->p == 2)
+  if (fbptr->p == (fbprime_t) 2)
     {
       if (mpz_even_p (norm))
-	missinglog -= fbptr->plog;
-      while (mpz_even_p (norm))
 	{
-	  mpz_tdiv_q_2exp (norm, norm, 1);
-	  add_fbprime_to_list (primes, nr_primes, max_nr_primes, 2);
-	  TRACE_A (a, __func__, __LINE__, "dividing out fb prime 2." 
-		   "New norm = %Zd, missinglog = %hhd\n", norm, missinglog);
+	  sievelog -= fbptr->plog;
+	  r = trialdiv_one_prime ((fbprime_t) 2, norm, nr_primes, primes, 
+				  max_nr_primes, 1);
+	  ASSERT (r > 0);
+	  TRACE_A (a, __func__, __LINE__, "dividing out fb prime 2^%d." 
+		   "New norm = %Zd, sievelog = %hhu\n", r, norm, sievelog);
 	}
       fbptr = fb_next (fbptr);
     }
@@ -1449,265 +1468,135 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
       ASSERT_ALWAYS (!mpz_even_p (norm));
     }
   
-  /* 4. Go through the factor base until missinglog == 0 */
+  /* 4. Go through the factor base until 
+     sievelog +- MAX_SIEVELOG_ERROR == finallog or 
+     sievelog +- MAX_SIEVELOG_ERROR - finallog < 2*log(next fb base prime).
+  */
 
-  while (missinglog != 0)
+  /* If sievelog <= finallog + MAX_SIEVELOG_ERROR, dividing out another 
+     fb prime would surely push sievelog < finallog - MAX_SIEVELOG_ERROR
+     (assuming log(fbprime) > 2*MAX_SIEVELOG_ERROR) + 1, so we can stop. */
+
+  /* We only abort early if we know for sure that exactly 1 fb prime is 
+     missing. Hence we loop while
+     sievelog + MAX_SIEVELOG_ERROR - finallog >= 2*log(next fb base prime)
+  */
+
+  while (add_error (sievelog) > add_error (finallog) + MAX_SIEVELOG_ERROR && 
+	 uc_sub(sievelog, finallog) + MAX_SIEVELOG_ERROR >= 2*fbptr->plog)
     {
       fbptr = trialdiv_find_next (fbptr, norm);
-
+      
       if (fbptr->p == 0)
 	{
 	  fprintf (stderr, "Warning, reached end of fb for (%ld, %lu). "
-		   "missinglog = %d\n", a, b, (int) missinglog);
+		   "sievelog = %hhu, finallog = %hhu\n", 
+		   a, b, sievelog, finallog);
 	  gmp_fprintf (stderr, "Remaining norm = %Zd\n", norm);
 	  break;
 	}
       
-      ASSERT (mpz_divisible_ui_p (norm, fbptr->p));
-      trialdiv_one_prime (fbptr->p, norm, nr_primes, primes,
-			  max_nr_primes, 1);
-
-      ASSERT_ALWAYS (missinglog >= fbptr->plog);
-      missinglog -= fbptr->plog;
-      
+      r = trialdiv_one_prime (fbptr->p, norm, nr_primes, primes,
+			      max_nr_primes, 1);
+      ASSERT_ALWAYS (r > 0);
+      sievelog -= fbptr->plog;
       TRACE_A (a, __func__, __LINE__, "dividing out fb prime " FBPRIME_FORMAT
-	       ". New norm = %Zd, missinglog = %hhd\n", 
-	       fbptr->p, norm, missinglog);
-      
-      /* If we aren't done yet, there must remain at least one fb prime
-	 greater than the one we just processed. Check that the
-	 difference of approximate logs allows for that prime. */
-      if (missinglog != 0 && missinglog < fbptr->plog)
-	{
-	  gmp_fprintf (stderr, "Error, a = %ld, b = %lu, missinglog = %d, "
-		       "p = " FBPRIME_FORMAT ", plog = %d. "
-		       "Remaining norm = %Zd\n", 
-		       a, b, missinglog, fbptr->p, (int) fbptr->plog, norm);
-	  abort ();
-	}
-
-      if (missinglog < 2 * fbptr->plog)
-	{
-	  /* We know there's exactly one prime (possibly repeated) 
-	     missing, and we know its approximate size. We can choose 
-	     a more efficient algorithm here to find it. */
-	  
-	  nrprimes2++;
-	  sumprimes2 += (unsigned long) fbptr->p;
-	  
-	  if (mpz_fits_ulong_p (norm))
-	    {
-	      /* We can use the fast ul_rho() function */
-	      if (missinglog > UL_RHO_LOGTHRES)
-		break;
-	    }
-	  else
-	    {
-	      /* We need to use the slower mpz_rho() function */
-	      if (missinglog > MPZ_RHO_LOGTHRES)
-		break;
-	    }
-	  
-	  /* If we can't use Pollard rho, let's try skipping forward in 
-	     the factor base to those primes that have the correct 
-	     rounded log. Keep in mind that the for() loop advances 
-	     fbptr once after this while loop exits! */
-#if TRIALDIV_SKIPFORWARD
-	  while (fb_next (fbptr)->p != 0 && 
-		 fb_next (fbptr)->plog < missinglog)
-	    fbptr = fb_next (fbptr);
-	  TRACE_A (a, __func__, __LINE__, "skipping forward in fb, next prime "
-		   "is " FBPRIME_FORMAT "\n", fb_next (fbptr)->p);
-#endif
-	}
+	       "^%d. New norm = %Zd, sievelog = %hhu\n", 
+	       fbptr->p, r, norm, sievelog);
       fbptr = fb_next (fbptr);
     }
 
-  if (fbptr->p != 0)
+  /* Now at least one of these conditions hold:
+     1. add_error (sievelog) <= add_error (finallog)
+     2. uc_sub(sievelog, finallog) < 2*fbptr->plog
+     3. fbptr->p == 0 
+
+     If 1. or 3. hold, trial division over factor base primes is finished.
+     If only 2. holds, there is exactly one more fb prime left in norm.
+  */
+
+  if (add_error (sievelog) > add_error (finallog) &&
+      fbptr->p != 0)
     {
-      sumprimes += (unsigned long) (fbptr->p);
-      nrprimes++;
-    }
-
-  if (missinglog != 0)
-    {
-      /* There is one more factor base prime (possibly in a power) that we 
-	 want to find with a more efficient algorithm. */
-
-      unsigned long q, r, s = 5;
-
-      ASSERT_ALWAYS (missinglog >= fbptr->plog && 
-		     missinglog < 2 * fbptr->plog);
-
-
-      /* While in this loop, norm contains a factor base prime (possibly
-	 in a power > 1) whose log norm = missinglog. 
-	 That is also the smallest prime factor in norm. */
-      do
+      factorbase_degn_t *oldfbptr = fbptr;
+      /* There is exactly one more fb prime to divide out. */
+      
+      ASSERT (uc_sub(sievelog, finallog) < 2*fbptr->plog);
+      /* That prime should have log size equal to sievelog - finallog,
+	 assuming the sieve was initialised correctly. In case it was 
+	 initialised incorrectly, we allow an extra 1 */
+      
+      if (add_error (sievelog) > add_error (finallog) && 
+	  uc_sub (sievelog, finallog) + 1 < fbptr->plog)
 	{
-	  ASSERT_ALWAYS (mpz_cmp_ui (norm, 1) > 0);
-	  
-	  /* Check if norm is itself a prime (power), i.e. if there are no 
-	     large primes present. */
-	  if (mpz_perfect_power_p (norm))
-	    {
-	      /* Will rarely happen, need not be that fast */
-	      mpz_t t;
-	      unsigned long i;
-
-	      mpz_init (t);
-	      for (i = 2UL; !mpz_root (t, norm, i); i++);
-	      ASSERT_ALWAYS (mpz_fits_ulong_p (t));
-	      q = mpz_get_ui (t);
-	      mpz_clear (t);
-	      
-#ifdef RHODEBUG
-	      gmp_printf ("# %Zd is an %lu-th power of %lu for a = %ld, "
-			  "b = %lu, no rho necessary\n", norm, i, q, a, b);
-	      fflush (stdout);
-#endif
-
-	      /* norm may be a power of a composite value! I.e. if the large
-		 prime also appears in the same power. If q is composite, 
-		 find the smallest prime dividing it. This will happen very 
-		 rarely. */
-	      if (!ul_proven_prime (q))
-		q = iscomposite (q);
-
-	      TRACE_A (a, __func__, __LINE__, "norm %Zd is a power, %lu "
-		       "divides it\n", norm, q);
-	      ASSERT_ALWAYS (q != 0);
-	      trialdiv_one_prime (q, norm, nr_primes, primes, max_nr_primes, 
-				  1);
-	      /* q may not have been the only prime that divides norm.
-	         If it isn't, we simply loop again */
-	      if (mpz_cmp_ui (norm, 1UL) == 0)
-		break;
-	    }
-	  else if (mpz_cmp_ui (norm, fbb) <= 0)
-	    {
-	      /* Smaller than factor base bound and not a prime power, 
-		 so it should be prime. */
-#ifdef RHODEBUG
-	      gmp_printf ("# %Zd is prime for a = %ld, b = %lu, no rho "
-			  "necessary\n", norm, a, b);
-	      fflush (stdout);
-#endif
-	      TRACE_A (a, __func__, __LINE__, "norm %Zd is < fbb %lu, "
-		       "assuming it is prime and adding to list of primes\n", 
-		       norm, fbb);
-	      q = mpz_get_ui (norm);
-	      ASSERT (ul_proven_prime (q));
-	      trialdiv_one_prime (q, norm, nr_primes, primes, max_nr_primes, 
-				  1);
-	      break;
-	    }
-	  else
-	    {
-	      /* Not <fbb or prime power. Since we know there is a fb prime
-		 in norm, not being < fbb implies being composite. 
-		 Try to factor it */
-	      TRACE_A (a, __func__, __LINE__, "Trying Pollard rho on norm "
-		       "%Zd\n", norm);
-	      if (mpz_fits_ulong_p (norm))
-		{
-		  unsigned long n;
-		  n = mpz_get_ui (norm);
-		  ul_rho_called1++;
-		  do {
-		    q = ul_rho (n, s++);
-		    ul_rho_called++;
-		  } while (q == n);
-		  ASSERT (n % q == 0);
-		}
-	      else
-		{
-		  mpz_rho_called1++;
-		  do {
-		    q = mpz_rho (norm, s++);
-		    mpz_rho_called++;
-		  } while (q == 1);
-		  ASSERT (mpz_divisible_ui_p (norm, q));
-		}
-	      TRACE_A (a, __func__, __LINE__, "Pollard rho found %lu\n", q);
-
-	      /* Pollard rho has a way of discovering powers of primes if
-		 they divide the input number. Let's at least check for a
-		 square here. */
-	      {
-		unsigned long e, t;
-		t = ul_sqrtint (q, &e);
-		if (e == 0)
-		  q = t;
-	      }
-
-	      /* So we have a divisor of norm, q. See if it is the factor
-	         base prime we were looking for. */
-
-	      if (q < fbb) /* It must be the missing factor base prime,
-			      maybe a power of it divides norm */
-		{
-		  ASSERT (ul_proven_prime (q));
-		  add_fbprime_to_list (primes, nr_primes, max_nr_primes, q);
-		  r = mpz_tdiv_q_ui (norm, norm, q);
-		  ASSERT_ALWAYS (r == 0);
-		  /* Maybe a power of it divides norm */
-		  trialdiv_one_prime (q, norm, nr_primes, primes, 
-				      max_nr_primes, 1);
-		  break;
-		}
-
-	      /* So it's not the factor base prime, but possibly a large 
-		 prime. If it is, divide it out and try again */
-	      if (ul_proven_prime (q))
-		{
-		  if (q > (1UL << lpb))
-		    return 0;
-
-		  add_fbprime_to_list (primes, nr_primes, max_nr_primes, q);
-		  r = mpz_tdiv_q_ui (norm, norm, q);
-		  ASSERT_ALWAYS (r == 0);
-		}
-	      else
-		{
-		  /* Composite factor that is not a power of the factor 
-		     base prime. Let's do it the hard way, should happen 
-		     rarely enough. */
-#ifdef RHODEBUG
-		    fprintf (stderr, 
-			     "# Composite factor %lu was found by rho, "
-			     "factoring it slowly\n", q);
-#endif
-		  q = iscomposite (q);
-		  ASSERT_ALWAYS (q != 0);
-		  trialdiv_one_prime (q, norm, nr_primes, primes, 
-				      max_nr_primes, 1);
-		  if (q < fbb)
-		    break;
-		}
-	    }
-	} while (1);
-
-      if (fb_log (q, log_scale, 0.) != missinglog)
-	{
-	  /* q was not the missing factor base prime ? */
-	  fprintf (stderr, "Warning, expected to find fb prime of log size "
-		   "%hhu, but found %lu. a = %ld, b = %lu\n", 
-		   missinglog, q, a, b);
+	  gmp_fprintf (stderr, "Error, a = %ld, b = %lu, sievelog = %hhu, "
+		       "finallog = %hhu, p = " FBPRIME_FORMAT ", plog = %d. "
+		       "Remaining norm = %Zd\n", 
+		       a, b, sievelog, finallog, fbptr->p, (int) fbptr->plog, 
+		       norm);
+	  abort ();
 	}
+      
+      /* Jump ahead in the factor base to primes of approximately 
+	 the correct size. */
+      nrprimes2++;
+      sumprimes2 += (unsigned long) fbptr->p;
+      
+#if TRIALDIV_SKIPFORWARD
+      const unsigned char missinglog = uc_sub (sievelog, finallog);
+      /* We know add_error (sievelog) > add_error (finallog), so
+	 missinglog is positive */
+      /* Skip forward to the factor base prime of the right size */
+      TRACE_A (a, __func__, __LINE__, "skipping forward in fb to prime of "
+	       "log norm %hhu\n", missinglog);
+      while (fbptr->p != 0 && 
+	     fbptr->plog < missinglog)
+	fbptr = fb_next (fbptr);
+      TRACE_A (a, __func__, __LINE__, "skipped forward in fb, next prime "
+	       "is " FBPRIME_FORMAT "\n", fbptr->p);
+#endif
+      fbptr = trialdiv_find_next (fbptr, norm);
+      if (fbptr->p == (fbprime_t) 0)
+	{
+	  /* Reached end of factor base? Maybe sieve was not initialised
+	     correctly and finallog is one too small, causing us to skip
+	     ahead too far. Try again without skipping */
+	  fbptr = trialdiv_find_next (oldfbptr, norm);
+	}
+      /* This time is must have worked */
+      ASSERT_ALWAYS (fbptr->p != 0);
+      
+      r = trialdiv_one_prime (fbptr->p, norm, nr_primes, primes,
+			      max_nr_primes, 1);
+      ASSERT_ALWAYS (r > 0);
+      sievelog -= fbptr->plog;
+      TRACE_A (a, __func__, __LINE__, "dividing out fb prime " 
+	       FBPRIME_FORMAT "^%d. New norm = %Zd, sievelog = %hhu\n", 
+	       fbptr->p, r, norm, sievelog);
+      /* Now we should have sievelog == finallog +- 1 */
+      ASSERT_ALWAYS (add_error(sievelog) <= add_error(finallog) + 1 &&
+		     add_error(sievelog) + 1 >= add_error(finallog));
     }
 
+  /* Now we should have all factor base primes < the smallest report prime,
+     and if the report buffer did not overflow, all primes >= the smallest
+     report prime as well. */
+
+
+  /* Lets try to factor the rest, i.e. remaining fb primes (if report buffer
+     overflowed) and large primes.
+     We still apply the mfb restriction, so this may discard relations 
+     where not all report primes were given */
+  
   /* 5. Check if the cofactor is small enough */
   log2size = mpz_sizeinbase (norm, 2);
   TRACE_A (a, __func__, __LINE__, "log2size of cofactor %Zd is %d\n", 
-	   norm, log2size);
+	   norm, (int) log2size);
 
-  if ((double) log2size > 
-      lpb * lambda + SIEVE_PERMISSIBLE_ERROR)
+  if ((double) log2size > lpb * lambda + SIEVE_PERMISSIBLE_ERROR)
     {
-      gmp_fprintf (stderr, 
-		   "Sieve report (%ld, %lu) is not smooth for degree %d poly, "
-		   "cofactor is %Zd with %d bits\n", 
+      gmp_fprintf (stderr, "Sieve report (%ld, %lu) is not smooth for "
+                   "degree %d poly, cofactor is %Zd with %d bits\n", 
 		   a, b, degree, norm, mpz_sizeinbase (norm, 2));
       return 0;
     }
@@ -1718,63 +1607,60 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 	       "relation\n", (int) log2size, (int) mfb);
       return 0;
     }
-  
-  /* 6. Check if the cofactor is < lpb */
+
+  /* If cofactor is 1, nothing left to do */
   if (mpz_cmp_ui (norm, 1UL) == 0)
     {
-      TRACE_A (a, __func__, __LINE__, "Cofactor is 1. This side is smooth.\n");
-      return 1;    
+      TRACE_A (a, __func__, __LINE__, "Cofactor is 1, this side is smooth\n");
+      return 1;
     }
 
-
-  if ((int) log2size <= lpb)
+  p = fbptr->p;
+  if (p == 0)
+    p = fbb;
+  /* All remaining prime factors of norm should be > p now, hence if 
+     norm < p^2, it should be prime. */
+  ASSERT(mpz_cmp_ui (norm, (unsigned long) p) > 0);
+  {
+    mpz_t t;
+    mpz_init (t);
+    mpz_set_ui (t, (unsigned long) p);
+    mpz_mul_ui (t, t, (unsigned long) p);
+    r = mpz_cmp (norm, t);
+    mpz_clear (t);
+  }
+  /* If r < 0, assert it's really a prime */
+  ASSERT (r >= 0 || mpz_probab_prime_p (norm, PRP_REPS));
+  if (r < 0 || mpz_probab_prime_p (norm, PRP_REPS))
     {
-      fbprime_t q;
-
-      if (mpz_probab_prime_p (norm, PRP_REPS))
+      /* It's a prime */
+      /* sizeinbase2 (n) = k  <==>  2^(k-1) <= n < 2^k */
+      if (mpz_sizeinbase (norm, 2) <= (size_t) lpb)
 	{
-	  /* If this cofactor is a prp, add it to the list of primes */
-	  q = (fbprime_t) mpz_get_ui (norm);
-	  add_fbprime_to_list (primes, nr_primes, max_nr_primes, q);
-	  TRACE_A (a, __func__, __LINE__, "cofactor" FBPRIME_FORMAT 
-		   "is <= 2^lpb and prp. This side is smooth.\n", q);
-	  mpz_set_ui (norm, 1UL);
+	  /* Prime and <2^lpb: relation is smooth */
+	  TRACE_A (a, __func__, __LINE__, "cofactor %Zd is prime and <2^lpb"
+		   " = 2^%d. This side is smooth.\n", norm, lpb);
+	  ASSERT (mpz_fits_ulong_p (norm));
+	  add_fbprime_to_list (primes, nr_primes, max_nr_primes, 
+			       (fbprime_t) mpz_get_ui (norm));
 	  return 1;
 	}
       else
 	{
-	  /* If not prp, just ignore it, print the relation and let the 
-	     next program in the tool chain figure out the prime factors 
-	     of this composite */
-	  TRACE_A (a, __func__, __LINE__, "cofactor %Zd is <= 2^lpb and "
-		   "composite. This side is smooth.\n", norm);
-
-	  /* It is a bit odd though to have a composite factor <lpb.
-	     Print a warning about it. */
-	  gmp_fprintf (stderr, "Warning: cofactor %Zd <lpb, but not "
-		       "prime for (%ld, %lu), degree %d polynomial\n", 
-		       norm, a, b, degree);
-	  return 1;
-	}
-    }
-  else
-    {
-      /* If this cofactor is a prp, since it's > lpb, 
-	 skip this report */
-      if (mpz_probab_prime_p (norm, PRP_REPS))
-	{
-	  TRACE_A (a, __func__, __LINE__, "cofactor %Zd is > 2^lpb and prp. "
-		   "Discarding relation.\n", norm);
+	  /* Prime and >2^lpb: relation is not smooth */
+	  TRACE_A (a, __func__, __LINE__, "cofactor %Zd is prime and >2^lpb"
+		   " = 2^%d. This side is not smooth.\n", norm, lpb);
 	  (*lp_toolarge)++;
 	  return 0;
 	}
-      else
-	{
-	  TRACE_A (a, __func__, __LINE__, "cofactor %Zd is > 2^lpb and "
-		   "composite. This side may be smooth.\n", norm);
-	  return 1;
-	}
     }
+
+  TRACE_A (a, __func__, __LINE__, "cofactor %Zd is not prime and < 2^mfb, "
+           "keeping relation\n", norm);
+
+  /* So the cofactor is not a prime. Later we'll try to factor it somehow,
+     for now we just print the relation with the large primes missing. */
+  return 1;
 }
 
 /* return the number of printed relations */
@@ -1835,7 +1721,7 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
   for (i = 0, j = 0; i < reports_a_nr && j < reports_r_nr;)
     {
       if (reports_a[i].a == reports_r[j].a && 
-	  gcd(labs(reports_a[i].a), b) == 1)
+	  gcd((unsigned long) labs(reports_a[i].a), b) == 1UL)
 	{
           const long a = reports_a[i].a;
 
