@@ -83,7 +83,7 @@ static void myseed(unsigned long int x)
  * projection must have full rank.
  */
 
-void setup_x()
+void setup_x(unsigned int v = 1)
 {
     using namespace globals;
     using namespace std;
@@ -94,26 +94,50 @@ void setup_x()
     xvecs.clear();
     for (unsigned int i = 0; i < m ; i++) {
         unsigned int idx;
-        for(;;) {
-            bool testing_zcol=false;
-            if (!zcols.empty()) {
-                idx = * zcols.begin();
-                cout << fmt("// Testing zero col %\n")%idx;
-                zcols.erase(zcols.begin());
-                testing_zcol=true;
-            } else {
-                idx= ((myrand()) % nr);
-            }
-            if (zrows.find(idx) != zrows.end()) {
-                cout << fmt("// Avoiding zero row %\n") % idx;
-            }
+        if (v == 1) {
+            for(;;) {
+                bool testing_zcol=false;
+                if (!zcols.empty()) {
+                    idx = * zcols.begin();
+                    cout << fmt("// Testing zero col %\n")%idx;
+                    zcols.erase(zcols.begin());
+                     testing_zcol=true;
+                } else {
+                    idx= ((myrand()) % nr);
+                }
+                if (zrows.find(idx) != zrows.end()) {
+                    cout << fmt("// Avoiding zero row %\n") % idx;
+                    continue;
+                }
 
-            if (testing_zcol)
-                zcols_still_to_be_hit=false;
-            break;
+                if (testing_zcol)
+                    zcols_still_to_be_hit=false;
+                break;
+            }
+            o << "e" << idx << "\n";
+            xvecs.push_back(vector<uint32_t>(1, idx));
+        } else {
+            set<uint32_t> vs;
+            for (unsigned int j = 0 ; j < v ; j++) {
+                if (zcols_still_to_be_hit) {
+                    idx = * zcols.begin();
+                    cout << fmt("// Testing zero col %\n")%idx;
+                    zcols.erase(zcols.begin());
+                    zcols_still_to_be_hit = false;
+                } else {
+                    idx= ((myrand()) % nr);
+                }
+                vs.insert(idx);
+            }
+            vector<uint32_t> xs;
+            xs.insert(xs.end(), vs.begin(), vs.end());
+            for(unsigned int j = 0 ; j < xs.size() ; j++) {
+                if (j) o << " ";
+                o << "e" << xs[j];
+            }
+            o << "\n";
+            xvecs.push_back(xs);
         }
-        o << "e" << idx << "\n";
-        xvecs.push_back(vector<uint32_t>(1, idx));
     }
     if (zcols_still_to_be_hit) {
         die("Could not find starting x vectors."
@@ -170,14 +194,6 @@ void setup_vectors(simple_matmul_toy<traits>& matmul)
     typedef typename traits::scalar_t scalar_t;
     typedef typename traits::wide_scalar_t wide_scalar_t;
     typedef scalar_t * vector_bunch;
-//    vector_bunch * ystrips;
-//
-//    BUG_ON(n % nbys != 0);
-//
-//    ystrips = new vector_bunch[n / nbys];
-//    for (unsigned int j = 0 ; j < n/nbys ; j++) {
-//        ystrips[j] = new scalar_t[nr];
-//    }
 
     scalar_t ystrips[n/nbys][nr];
 
@@ -190,9 +206,13 @@ void setup_vectors(simple_matmul_toy<traits>& matmul)
     /* How many iterates do we check ? */
 #define NBITER  2
 
-    for(;;) {
+    unsigned int nx = 1;
+    for(unsigned ntri = 0 ; ; ntri++) {
         cout << "// Generating new x,y vector pair\n";
-        setup_x();
+        if (ntri >= nx * 10) {
+            cout << "// Getting bored. Trying " << ++nx << " x vectors\n";
+        }
+        setup_x(nx);
 
         /* We'll try several times until we're happy. We're going to
          * compute the first iterates online.  */
@@ -266,7 +286,6 @@ void setup_vectors(simple_matmul_toy<traits>& matmul)
         }
 
         /* At this point we should check the rank of a1a2 */
-
 #if 0
         cout << fmt("amat:=Matrix(%,%,[")%m%(NBITER*n);
         for(unsigned int i = 0 ; i < m ; i++) {
@@ -298,11 +317,6 @@ void setup_vectors(simple_matmul_toy<traits>& matmul)
         o << "\n";
     }
     o.close();
-
-//    for (unsigned int j = 0 ; j < n/nbys ; j++) {
-//        delete[] ystrips[j];
-//    }
-//    delete[] ystrips;
 }
 
 int main(int argc, char *argv[])
