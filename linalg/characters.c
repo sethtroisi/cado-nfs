@@ -54,6 +54,30 @@ static int eval_char(long a, unsigned long b, rootprime_t ch) {
   return res;
 }
 
+  
+// returns the sign of m1*a+m2*b
+static int eval_rat_char(long a, unsigned long b, cado_poly pol)
+{
+    mpz_t tmp1, tmp2;
+    int s;
+
+    /* first perform a quick check */
+    s = (a > 0) ? mpz_sgn (pol->g[1]) : -mpz_sgn (pol->g[1]);
+    if (mpz_sgn (pol->g[0]) == s)
+      return s;
+
+    mpz_init(tmp1);
+    mpz_mul_si(tmp1, pol->g[1], a);
+    mpz_init(tmp2);
+    mpz_mul_ui(tmp2, pol->g[0], b);
+    mpz_add(tmp1, tmp1, tmp2);
+    s = (mpz_sgn(tmp1) >= 0 ? 1 : -1);
+    mpz_clear(tmp1);
+    mpz_clear(tmp2);
+
+    return s;
+}
+
 static void
 create_characters (rootprime_t * tabchar, int k, cado_poly pol)
 {
@@ -108,12 +132,13 @@ typedef struct {
 
 // charmat is small_nrows x k
 static void
-computeAllCharacters(char **charmat, int i, int k, rootprime_t * tabchar, long a, unsigned long b)
+computeAllCharacters(char **charmat, int i, int k, rootprime_t * tabchar, long a, unsigned long b, cado_poly pol)
 {
     int j;
     
-    for(j = 0; j < k; j++)
+    for(j = 0; j < k-1; j++)
 	charmat[i][j] = (char)eval_char(a, b, tabchar[j]);
+    charmat[i][k-1] = (char)eval_rat_char(a, b, pol);
 }
 
 // charmat is small_nrows x k
@@ -121,7 +146,7 @@ computeAllCharacters(char **charmat, int i, int k, rootprime_t * tabchar, long a
 // purgedfile contains crunched rows, with their label referring to relfile;
 // indexfile contains the coding "row[i] uses rows i_0...i_r in purgedfile".
 static void
-buildCharacterMatrix(char **charmat, int k, rootprime_t * tabchar, FILE *purgedfile, FILE *indexfile, FILE *relfile)
+buildCharacterMatrix(char **charmat, int k, rootprime_t * tabchar, FILE *purgedfile, FILE *indexfile, FILE *relfile, cado_poly pol)
 {
     relation_t rel;
     int i, j, r, small_nrows, nr, nrows, ncols, irel, kk;
@@ -146,7 +171,7 @@ buildCharacterMatrix(char **charmat, int k, rootprime_t * tabchar, FILE *purgedf
 	sscanf(str, "%d", &nr);
 	jumpToRelation(&rel, relfile, irel, nr);
 	irel = nr+1;
-	computeAllCharacters(charbig, i, k, tabchar, rel.a, rel.b);
+	computeAllCharacters(charbig, i, k, tabchar, rel.a, rel.b, pol);
 	clear_relation(&rel);
     }
     fprintf(stderr, "Reading index file to reconstruct the characters\n");
@@ -226,7 +251,7 @@ printTabMatrix(dense_mat_t *mat, int nrows, int ncols)
 
 static void
 handleKer(dense_mat_t *mat, rootprime_t * tabchar, FILE * purgedfile,
-          mp_limb_t ** ker, /*int nlimbs, cado_poly pol, */
+          mp_limb_t ** ker, cado_poly pol,
           FILE *indexfile, FILE *relfile,
 	  int small_nrows)
 {  
@@ -244,7 +269,7 @@ handleKer(dense_mat_t *mat, rootprime_t * tabchar, FILE * purgedfile,
 	for (j = 0; j < k; ++j)
 	    charmat[i][j] = 1;
     }
-    buildCharacterMatrix(charmat, k, tabchar, purgedfile, indexfile, relfile);
+    buildCharacterMatrix(charmat, k, tabchar, purgedfile, indexfile, relfile, pol);
 #ifdef WANT_ASSERT
     for (i = 0; i < small_nrows; ++i)
 	for(j = 0; j < k; j++)
@@ -309,7 +334,6 @@ int main(int argc, char **argv) {
   int k, isz;
   unsigned int i, j, n, nlimbs;
   rootprime_t *tabchar;
-  int *charval;
   cado_poly pol;
   mp_limb_t **ker;
   mp_limb_t *newker;
@@ -348,16 +372,15 @@ int main(int argc, char **argv) {
   ret = gmp_sscanf(argv[7], "%d", &k);
   ASSERT (ret == 1);
 
-  tabchar = (rootprime_t *)malloc(k*sizeof(rootprime_t));
+  // only k-1, since the k-th character is sign on rational side
+  tabchar = (rootprime_t *)malloc((k-1)*sizeof(rootprime_t));
   ASSERT (tabchar != NULL);
-  charval = (int *)malloc(k*sizeof(int));
-  ASSERT (charval != NULL);
 
-  create_characters(tabchar, k, pol);
+  create_characters(tabchar, k-1, pol);
 
 #if DEBUG >= 2
   fprintf(stderr, "using characters (p,r):\n");
-  for (i = 0; i < k; ++i)
+  for (i = 0; i < k-1; ++i)
       fprintf(stderr, "\t%lu %lu\n", tabchar[i].prime, tabchar[i].root);
 #endif
 
@@ -388,7 +411,7 @@ int main(int argc, char **argv) {
 
   fprintf(stderr, "start computing characters...\n");
 
-  handleKer(&mymat, tabchar, purgedfile, ker, /*nlimbs, *pol, */
+  handleKer(&mymat, tabchar, purgedfile, ker, pol,
             indexfile, relfile, small_nrows);
 
   myker = (mp_limb_t **)malloc(mymat.nrows*sizeof(mp_limb_t *));
