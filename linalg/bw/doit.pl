@@ -9,7 +9,9 @@
 use strict;
 use warnings;
 
-use Time::HiRes qw(gettimeofday); # For seed values
+use Time::HiRes qw(gettimeofday);
+# For seed values. 1 sec granularity is too coarse for repeated
+# experiments.
 
 use Data::Dumper;
 
@@ -82,11 +84,16 @@ while (defined(my $x = shift(@args))) {
 	}
 }
 
-sub action { print "@_\n"; system @_; }
+sub action { print join(@_,' '), "\n"; system @_; }
+
+# We could possibly do cp --symlink just as well, or maybe ln (cp --link
+# is a gnu-ism). Not ln -s without caution, because this would require
+# some knowledge about the right path back, which could be quite a bit of
+# a hack. I'm happy with cp --link at the moment.
+sub do_cp { my @x = @_; unshift @x, "cp", "--link"; action @x; }
 
 # If we already have a matrix, parse its header to obtain some
 # information.
-
 sub parse_matrix_header {
 	my $f = shift @_;
 	open my $mh, $f or die "$f: $!";
@@ -249,6 +256,23 @@ open STDERR, "| tee -a $wdir/solve.err";
 print "Solver started ", scalar localtime, "\nargs:\n$dumped\n";
 print STDERR "Solver started ", scalar localtime, "\nargs:\n$dumped\n";
 
+my $tstart = gettimeofday;
+my $tlast = $tstart;
+
+my $times = { };
+
+sub account {
+    my $t = gettimeofday;
+    my $k = $_[0];
+    if (!exists($times->{$k})) {
+        $times->{$k} = 0.0;
+    }
+    $times->{$_[0]} += $t - $tlast;
+    $tlast = $t;
+}
+
+
+
 if ($resume) {
 	if ($precond && -f "$wdir/precond.txt") {
 		print "There is already a $wdir/precond.txt file; let's hope it is the same as $precond !\n"
@@ -261,7 +285,7 @@ if ($resume) {
 	# Having none is ok of course.
 } else {
 	if ($precond) {
-		action "cp $precond $wdir/precond.txt";
+		do_cp $precond, "$wdir/precond.txt";
 	}
         
         open CFG, ">$wdir/bw.cfg";
@@ -302,8 +326,8 @@ if (@mlist) {
 		}
 	}
 	# TODO: what about inhomogeneous computations ?
-        action "cp ${bindir}bw-krylov $wdir/";
-        action "cp ${bindir}bw-krylov-mt $wdir/";
+        do_cp "${bindir}bw-krylov", "$wdir/";
+        do_cp "${bindir}bw-krylov-mt", "$wdir/";
 	$krylovbindir="$wdir/";
 }
 
@@ -315,13 +339,20 @@ if ($resume) {
 	$param->{'modulus'} = $h->{'modulus'};
 } else {
 	if ($matrix) {
-		action "cp $matrix $wdir/matrix.txt";
+		do_cp $matrix, "$wdir/matrix.txt";
 	} else {
 		# If no matrix parameter is set at this moment, then surely it
 		# means we're playing with a random sample: create it !
 		action "${bindir}bw-random $seeding --dimk $dimk $nrows $ncols $modulus $dens > $wdir/matrix.txt";
 	}
 }
+
+if ($modulus eq '2' && $multisols == 0) {
+    print "Forcing multisols=1 for modulus 2\n";
+    $multisols=1;
+}
+
+account 'io';
 
 action "${bindir}bw-balance --subdir $wdir"
 	unless ($resume && -f "$wdir/matrix.txt.old");
@@ -343,9 +374,13 @@ if ($resume && -f "$wdir/X00") {
 	action "${bindir}bw-prep $seeding --subdir $wdir $m $n"
 }
 
+account 'prep';
+
 if ($dump) {
 	action "${bindir}bw-printmagma --subdir $wdir > $wdir/m.m";
 }
+
+account 'io';
 
 sub rsync_push {
 	if (!$shared && $rsync) {
@@ -364,6 +399,8 @@ sub rsync_pull {
 }
 
 rsync_push "--delete";
+
+account 'io';
 
 sub compute_spanned {
 	my @jlist = @_;
@@ -467,7 +504,11 @@ KRYLOV : {
 	}
 }
 
+account 'krylov';
+
 rsync_pull;
+
+account 'io';
 
 my @sols;
 
@@ -521,7 +562,11 @@ LINGEN : {
 	}
 }
 
+account 'lingen';
+
 rsync_push;
+account 'io';
+
 
 my @sols_found  = ();
 
@@ -571,9 +616,11 @@ MKSOL : {
 			#	compute_spanned @$t;
 			#	rsync_pull;
 			# }
+                account 'mksol';
 		# Eh ? If we don't pull the results from our pals,  who's
 		# gonna do it ?
 		rsync_pull;
+                account 'io';
 	}
 
 
@@ -582,10 +629,11 @@ MKSOL : {
 		if ($matrix) {
 			my $d = dirname $matrix;
 			if (-f "$wdir/W") {
-				system "cp \"$wdir/W\" \"$d\"";
+				do_cp "$wdir/W", $d;
 				push @solfiles, "$d/W";
 			}
 		}
+                account 'gather';
 
 # 	if ($multisols) {
 # 		print scalar @sols_found, " solutions found ",
@@ -609,19 +657,30 @@ MKSOL : {
 			(my $sf = $matrix) =~ s/matrix/solution/;
 			if ($sf ne $matrix) {
 				my $s = $solfiles[0];
-				system "cp --link \"$s\" \"$sf\"";
+				do_cp $s, $sf;
 				print "also: $sf\n";
 			}
 		}
 	}
+        account 'io';
 }
 
 if ($dump) {
 	magmadump;
 }
+account 'io';
 
 if ($tidy) {
 	system "rm -rf $wdir";
 }
+account 'io';
 
+print "-+" x 30, "\n";
+print "times (in seconds):\n";
+for my $k (keys %$times) {
+    print "$k\t", sprintf("%.2f", $times->{$k}), "\n";
+}
+print "total\t", sprintf("%.2f",(gettimeofday-$tstart)), "\n";
+print "-+" x 30, "\n";
 print "Seed value for this run was $seed\n";
+
