@@ -9,7 +9,8 @@ unsigned int write_hexstring(FILE * f, const unsigned long * ptr, unsigned int n
     unsigned int i = 0;
     for( ; i < n ; ) {
         unsigned long v = *ptr++;
-        for(unsigned int ir = 0 ; ir < ULONG_BITS && i < n ; ) {
+        unsigned int ir;
+        for(ir = 0 ; ir < ULONG_BITS && i < n ; ) {
             fputc(hxits[v&0x0f], f);
             if (ferror(f) || feof(f)) return i;
             v >>= 4;
