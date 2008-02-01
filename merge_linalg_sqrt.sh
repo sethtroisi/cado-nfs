@@ -55,7 +55,7 @@ fi
 echo "Performing merges"
 
 nb_merge_max=1000000
-argsa="-prune $prune -merge $nb_merge_max -mat $purged"
+argsa="-forbw -prune $prune -merge $nb_merge_max -mat $purged"
 argsa="$argsa -maxlevel $maxlevel -cwmax $cwmax -rwmax $rwmax $verbose"
 time $linalg/merge $argsa > $name.merge.his # 2> $name.merge.err
 echo "SIZE(merge.his): `ls -s $name.merge.his`"
