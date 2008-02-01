@@ -11,6 +11,8 @@
 #include <iostream>	/* for cerr in process_arguments */
 #include <cstdlib>	/* for exit() in process_arguments */
 
+#include <vector>
+
 #include "manu.h"	/* for UNUSED_VARIABLE */
 
 namespace argparser {
@@ -47,6 +49,15 @@ class situation {
 	bool operator==(std::string & x) const { return x == p[0]; }
 	bool operator!=(const char *x) const { return !operator==(x); }
 	bool operator!=(std::string & x) const { return !operator==(x); }
+	template<typename T>
+	bool operator()(const char * opt, std::vector<T> & var) {
+		if (!check(opt, 1)) return false;
+		std::istringstream s(p[0]);
+                T v;
+		s >> v;
+                var.push_back(v);
+		return s.eof() && !s.fail();
+	}
 	template<typename T>
 	bool operator()(const char * opt, T & var) {
 		if (!check(opt, 1)) return false;

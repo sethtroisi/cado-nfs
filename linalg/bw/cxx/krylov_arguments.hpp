@@ -7,11 +7,10 @@
 
 struct krylov_arguments {
 	corner b, e;
-	unsigned int scol;
+        std::vector<unsigned int> scol;
 	std::string task;
 	int nt;
 	krylov_arguments() {
-		scol = (unsigned int) -1;
 		nt = -1;
 	}
 
@@ -63,7 +62,7 @@ struct krylov_arguments {
 		}
 #endif
 		if (task == "mksol") {
-			if (scol == (unsigned int) -1) {
+			if (scol.empty()) {
 				o << "mksol requires --sc\n";
 				ok = false;
 			}
@@ -72,7 +71,7 @@ struct krylov_arguments {
 				o << "--task is \"krylov\" or \"mksol\"\n";
 				ok = false;
 			}
-			if (scol != (unsigned int) -1) {
+			if (!scol.empty()) {
 				o << "--sc is mksol-only\n";
 				ok = false;
 			}

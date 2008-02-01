@@ -9,7 +9,6 @@
 #include "common_arguments.hpp"
 #include "constants.hpp"
 #include "config_file.hpp"
-#include "gather_arguments.hpp"
 #include "files.hpp"
 #include "matrix.hpp"
 #include "matrix_header.hpp"
@@ -22,21 +21,12 @@
 #include "traits.hpp"
 #include "preconditioner.hpp"
 #include "matmul_toy.hpp"
+#include "bitstring.hpp"
 
 #include <boost/cstdint.hpp>
 #include <iterator>
 
-/*
- * Note on vectorization. Unlike slave and mksol, this program is NOT
- * vectorized. Mostly because it does not make much sense, since this one
- * is so simple. We even use generic code unconditionnally.
- *
- * One way to use this program in a vectorized manner would be to gather
- * several solutions at once, but again it would not make much sense.
- *
- */
-
-gather_arguments mine;
+no_arguments mine;
 
 using namespace std;
 using namespace boost;
@@ -48,7 +38,7 @@ namespace globals {
 	unsigned int m, n;
 	unsigned int col;
 	unsigned int nr, nc;
-	unsigned int nbys;
+	unsigned int nsols;
 	mpz_class modulus;
 	uint8_t modulus_u8;
 	uint16_t modulus_u16;
@@ -74,6 +64,7 @@ void add_file(const std::string& fn)
 	using namespace globals;
 
 	for(unsigned int i = 0 ; i < nc ; i++) {
+#if 0
 		/* This really works only with one member, as the
 		 * operation is not too much focused on vectoring things
 		 * so far.
@@ -97,6 +88,10 @@ void add_file(const std::string& fn)
 		}
 		BUG_ON(ny != nbys);
 		traits::assign(v[i], foo, 0);
+#endif
+                uint64_t x;
+                read_hexstring(f, &x, 64);
+                v[i].p ^= x;
 	}
 	f >> ws;
 	BUG_ON(!f.eof());
@@ -105,24 +100,25 @@ void add_file(const std::string& fn)
 void do_sum()
 {
 	using namespace globals;
-	if (mine.file_names.empty()) {
+        vector<string> file_names;
+	if (file_names.empty()) {
 		for(uint j = 0 ; j < m ; j++) {
 			for(uint r = 1 ; ; r++) {
 				ifstream fxy;
-				string nm = files::fxy % mine.scol % j % r;
+				string nm = files::fxy % j % r;
 				if (!open(fxy, nm))
 					break;
-				mine.file_names.push_back(nm);
+				file_names.push_back(nm);
 				cout << "// selecting " << nm << endl;
 			}
 		}
 	}
 
-	BUG_ON(mine.file_names.empty());
+	BUG_ON(file_names.empty());
 
 	typedef vector<string>::const_iterator vsci_t;
-	for(vsci_t it = mine.file_names.begin() ; 
-			it != mine.file_names.end() ;
+	for(vsci_t it = file_names.begin() ; 
+			it != file_names.end() ;
 			it++)
 	{
 		add_file(*it);
@@ -144,9 +140,13 @@ void shipout(scalar_t * v, string const & s, bool check=true)
 		BUG();
 	}
 	for(uint i = 0 ; i < nr ; i++) {
+        /*
 		if (v[i] > middle)
 			v[i] -= globals::modulus;
 		traits::print(wf,v[i]) << "\n";
+        */
+                write_hexstring(wf, &(v[i].p), 64);
+                wf << "\n";
 	}
 	wf.close();
 }
@@ -167,7 +167,7 @@ void go()
 
 	traits::reduce(v, v, 0, nr);
 
-	shipout(v, files::r % mine.scol, false);
+	shipout(v, files::r, false);
 
 	if (is_zero(v)) {
 		cerr << "// trivial solution encountered !\n";
@@ -202,7 +202,7 @@ void go()
 
 	cout << fmt("// B^%*y is a solution\n") % i;
 
-	shipout(v, files::w % mine.scol);
+	shipout(v, files::w);
 }
 };
 
@@ -279,7 +279,7 @@ void go()
 	mpz_class middle = globals::modulus / 2;
 
 	ofstream wf;
-	must_open(wf, files::w % mine.scol);
+	must_open(wf, files::w);
 	for(uint i = 0 ; i < nr ; i++) {
 		if (v[i] > middle)
 			v[i] -= globals::modulus;
@@ -312,6 +312,8 @@ int main(int argc, char *argv[])
 	BUG_ON_MSG(nr > nc, "Matrix has too many rows\n");
 
 	globals::modulus = mpz_class(mstr);
+        BUG_ON(globals::modulus != 2);
+
 	globals::modulus_u8	= globals::modulus.get_ui();
 	globals::modulus_u16	= globals::modulus.get_ui();
 	globals::modulus_u32	= globals::modulus.get_ui();
@@ -342,8 +344,6 @@ int main(int argc, char *argv[])
 	cout.flush();
 	cerr.flush();
 
-	globals::nbys = mine.nbys;
-
 #if 0
 	if (MODULUS_BITS < 8 && nbys == 8) {
 		cout << "// Using SSE-2 code\n";
@@ -364,8 +364,7 @@ int main(int argc, char *argv[])
 	}
 #endif
 	cout << "// Using generic code\n";
-        nbys = 0;
-	program<variable_scalar_traits> x;
+	program<binary_pod_traits<uint64_t> > x;
 	x.go();
 }
 

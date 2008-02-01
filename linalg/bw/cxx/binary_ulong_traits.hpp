@@ -93,11 +93,18 @@ struct binary_pod_traits {
 		MPZ_SET_MPN(z.get_mpz_t(), x.p, width);
 	}
 	*/
-	static inline void addmul_wide(scalar_t & dst,
+	static inline void addmul_wide(uint64_t & dst,
 			scalar_t const & a,
 			scalar_t const & b)
 	{
-		dst.p ^= a.p & b.p;
+		uint64_t x = a.p & b.p;
+#if (GMP_LIMB_BITS == 64)
+                dst = __builtin_parityl(x);
+#elif (GMP_LIMB_BITS == 32)
+                dst = __builtin_parityll(x);
+#else
+#error "ouch"
+#endif
 	}
 	static inline void
 	assign(scalar_t & x, std::vector<mpz_class> const& z,  unsigned int i)
@@ -109,7 +116,7 @@ struct binary_pod_traits {
 		/* FIXME -- should we go up to 128 here, or restrict to
 		 * nbys ??? */
 		x.p = 0;
-		for(unsigned int j = 0 ; j < globals::nbys ; j++)
+		for(unsigned int j = 0 ; j < nbits ; j++)
 			x.p ^= (T) (z[i+j] != 0) << j;
 	}
 	static inline void assign(std::vector<mpz_class>& z, scalar_t const & x) {

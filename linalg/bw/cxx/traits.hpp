@@ -26,27 +26,14 @@
  * trees.
  */
 #define	TRY_ALL_BINARY_CODES(tmpl) do {				\
-	TRY_ONE_BINARY_CODE(tmpl,binary_ulong_traits);		\
 	TRY_ONE_BINARY_CODE(tmpl,binary_sse2_traits);		\
 	TRY_ONE_BINARY_CODE(tmpl,binary_uint8_traits);		\
 	TRY_ONE_BINARY_CODE(tmpl,binary_uint16_traits);		\
 	TRY_ONE_BINARY_CODE(tmpl,binary_uint32_traits);		\
-	TRY_ONE_BINARY_CODE(tmpl,binary_uint64_traits);		\
-	TRY_ONE_BINARY_CODE(tmpl,sse2_8words_traits);		\
-	TRY_ONE_BINARY_CODE(tmpl,sse2_2words_traits);		\
-	TRY_ONE_BINARY_CODE(tmpl,ulong_traits);			\
-	TRY_ONE_BINARY_CODE(tmpl,typical_scalar_traits<1>);	\
-	TRY_ONE_BINARY_CODE(tmpl,typical_scalar_traits<2>);	\
-	TRY_ONE_BINARY_CODE(tmpl,typical_scalar_traits<3>);	\
-	TRY_ONE_BINARY_CODE(tmpl,typical_scalar_traits<4>);	\
-	TRY_ONE_BINARY_CODE(tmpl,typical_scalar_traits<5>);	\
-	TRY_ONE_BINARY_CODE(tmpl,typical_scalar_traits<6>);	\
-	TRY_ONE_BINARY_CODE(tmpl,typical_scalar_traits<7>);	\
-	TRY_ONE_BINARY_CODE(tmpl,typical_scalar_traits<8>);	\
-	TRY_ONE_BINARY_CODE(tmpl,typical_scalar_traits<9>);	\
-	TRY_ONE_BINARY_CODE(tmpl,typical_scalar_traits<10>);	\
-	TRY_ONE_BINARY_CODE(tmpl,variable_scalar_traits);	\
+	TRY_ONE_BINARY_CODE(tmpl,binary_uint64_traits);         \
 } while (0)
+
+/* removed lots of traits types used by the prime field version */
 
 
 

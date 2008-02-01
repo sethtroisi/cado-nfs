@@ -15,6 +15,7 @@
 #include "common_arguments.hpp"
 #include "config_file.hpp"
 #include "matrix.hpp"
+#include "bitstring.hpp"
 
 using namespace std;
 using namespace boost;
@@ -70,6 +71,24 @@ void pvec(const std::string& s, const vector<T>& co)
     cout << co.back() << "]);\n";
 }
 
+void pvec_bin(const std::string& s, const vector<uint64_t>& co)
+{
+    if (co.empty()) {
+        return;
+    }
+    // cerr << s << endl;
+    cout << fmt("%:=Vector([GF(p) | \n") % s;
+    for(unsigned int i = 0 ; i < co.size() ; i++) {
+        uint64_t s = co[i];
+        for(unsigned int j = 0 ; j < 64 ; j++) {
+            if (i||j) cout << ", ";
+            cout << (s & 1UL);
+            s >>= 1;
+        }
+    }
+    cout << "]);\n";
+}
+
 template<typename T>
 void pmatpol(const std::string& s, const vector<T>& co, int m, int n)
 {
@@ -103,6 +122,20 @@ bool rvec(const std::string& f, vector<T>& co)
     copy(istream_iterator<T>(y),
             istream_iterator<T>(),
             back_insert_iterator<vector<T> >(co));
+    return true;
+}
+
+bool rvec_bin(const std::string& f, vector<uint64_t>& co)
+{
+    ifstream y;
+    // cerr << "?" << f << endl ;
+    if (!open(y, f)) return false;
+    co.clear();
+    unsigned long z;
+    for( ; !y.eof() ; y >> ws) {
+        read_hexstring(y, &z, 64);
+        co.push_back(z);
+    }
     return true;
 }
 
@@ -319,12 +352,12 @@ int main(int argc, char * argv[])
         }
     }
 
-    for(unsigned int j = 0 ; j < m + n ; j++) {
-        vector<mpz_class> co;
-        if (rvec(files::r % j, co))
-            pvec(fmt("R%[f0w2]")%j, co);
-        if (rvec(files::w % j, co))
-            pvec(fmt("W%[f0w2]")%j, co);
+    {
+        vector<uint64_t> co;
+        if (rvec_bin(files::r, co))
+            pvec_bin(files::r, co);
+        if (rvec_bin(files::w, co))
+            pvec_bin(files::w, co);
     }
 
 
@@ -354,22 +387,25 @@ int main(int argc, char * argv[])
             if (rvec(fi, co)) {
                 sanitize(fi);
                 pmatpol(fi, co, n, 1);
-                for(unsigned int k = 0 ; k < n ; k++) {
-                    // FjYk
-                    for(unsigned int l = 1 ;  ; l++) {
-                        std::string fxy = files::fxy % j % k % l;
-                        if (rvec(fxy, co)) {
-                            // int ny = data_per_row(a_nm);
-                            sanitize(fxy);
-                            pvec(fxy, co);
-                        } else {
-                            break;
-                        }
-                    }
+            }
+        }
+    } while (0);
+
+    do {
+        vector<uint64_t> co;
+        for(unsigned int k = 0 ; k < n ; k++) {
+            // FjYk
+            for(unsigned int l = 1 ;  ; l++) {
+                std::string fxy = files::fxy % k % l;
+                if (rvec_bin(fxy, co)) {
+                    // int ny = data_per_row(a_nm);
+                    sanitize(fxy);
+                    pvec_bin(fxy, co);
+                } else {
+                    break;
                 }
             }
         }
-
     } while (0);
 
     do {

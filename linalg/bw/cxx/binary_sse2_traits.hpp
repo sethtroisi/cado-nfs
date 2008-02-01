@@ -99,11 +99,22 @@ struct binary_sse2_traits {
 		MPZ_SET_MPN(z.get_mpz_t(), x.p, width);
 	}
 	*/
-	static inline void addmul_wide(scalar_t & dst,
+	static inline void addmul_wide(uint64_t & dst,
 			scalar_t const & a,
 			scalar_t const & b)
 	{
-		dst.p ^= a.p & b.p;
+		scalar_t x;
+                x.p = a.p & b.p;
+                vec_t foo;
+                memcpy(foo, &x.p, sizeof(sse2_scalars));
+                uint64_t y = foo[0] ^ foo[1];
+#if (GMP_LIMB_BITS == 64)
+                dst = __builtin_parityl(y);
+#elif (GMP_LIMB_BITS == 32)
+                dst = __builtin_parityll(y);
+#else
+#error "ouch"
+#endif
 	}
 	static inline void
 	assign(scalar_t & x, std::vector<mpz_class> const& z,  unsigned int i)

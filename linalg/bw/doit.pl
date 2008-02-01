@@ -546,22 +546,17 @@ MKSOL : {
             print "Restricting to solutions $multisols first solutions\n";
         }
 
-	my @mksoljobs=();
+        my $common = $exe;
 	for my $s (@sols) {
-		my $s0 = sprintf '%02d', $s;
-		if ($resume && -f "$wdir/W$s0") {
-			print "$wdir/W$s0 already exists\n";
-			next;
-		}
-		my $t = [ map
-			{
-			my ($i,$ni1)=($vectoring*$_,$vectoring*($_+1)-1);
-			"$exe --sc $s 0,$i $m1,$ni1";
-			}
-			(0..int($n/$vectoring) - 1) ];
-
-		push @mksoljobs, @$t;
+                $common .= " --sc $s";
 	}
+
+        my @mksoljobs = ( map
+        {
+            my ($i,$ni1)=($vectoring*$_,$vectoring*($_+1)-1);
+            "$common 0,$i $m1,$ni1";
+        }
+        (0..int($n/$vectoring) - 1) );
 
 	if (scalar @mksoljobs) {
 		print "--- mksol jobs: ---\n";
@@ -582,28 +577,22 @@ MKSOL : {
 	}
 
 
-	for my $s (@sols) {
 		# --nbys now defaults to auto-detect.
-		action "${bindir}bw-gather --subdir $wdir $s";
-		my $s0 = sprintf '%02d', $s;
-		if (-f "$wdir/W$s0") {
-			push @sols_found, "W$s0";
-		}
+		action "${bindir}bw-gather --subdir $wdir";
 		if ($matrix) {
 			my $d = dirname $matrix;
-			if (-f "$wdir/W$s0") {
-				system "cp \"$wdir/W$s0\" \"$d\"";
-				push @solfiles, "$d/W$s0";
+			if (-f "$wdir/W") {
+				system "cp \"$wdir/W\" \"$d\"";
+				push @solfiles, "$d/W";
 			}
 		}
-	}
 
-	if ($multisols) {
-		print scalar @sols_found, " solutions found ",
-			"(from ", scalar @sols, " selected from ",
-                        "$orig_nsols out of lingen)\n";
-		for my $f (@sols_found) { print "$f\n"; }
-	}
+# 	if ($multisols) {
+# 		print scalar @sols_found, " solutions found ",
+# 			"(from ", scalar @sols, " selected from ",
+#                         "$orig_nsols out of lingen)\n";
+# 		for my $f (@sols_found) { print "$f\n"; }
+# 	}
 
 	if (@solfiles) {
 		print "solution files\n";
@@ -611,10 +600,10 @@ MKSOL : {
 	}
 
 	if ($matrix) {
-		if (scalar @solfiles != scalar @sols) {
-			print "POSSIBLE BUG: not all wanted solutions were found\n";
-			$tidy=0;
-		}
+# 		if (scalar @solfiles != scalar @sols) {
+# 			print "POSSIBLE BUG: not all wanted solutions were found\n";
+# 			$tidy=0;
+# 		}
 
 		if (!$multisols && @solfiles) {
 			(my $sf = $matrix) =~ s/matrix/solution/;

@@ -27,6 +27,7 @@
 
 #include "traits_globals.hpp"
 #include "parsing_tools.hpp"
+#include "bitstring.hpp"
 
 /* TODO: maybe remove checks entirely in characteristic two, as they are
  * hardly useful... Most probably something more sensible would be
@@ -76,7 +77,6 @@ namespace globals {
     uint32_t modulus_u32;
     unsigned long modulus_ulong;
     vector < vector<uint32_t> > bw_x;
-    unsigned int degf;			// mksol only
     barrier_t main_loop_barrier;
     thread_lock_t console_lock = THREAD_LOCK_INITIALIZER;
 
@@ -87,10 +87,13 @@ namespace globals {
 
     vector < void *>thread_class_ptr;
 
+    unsigned int degf;
+
+
     template < typename traits > struct vdata {
         typedef typename traits::scalar_t scalar_t;
         scalar_t *v0;
-        scalar_t *f;
+        std::vector<scalar_t *> f;
     };
 
 }
@@ -520,49 +523,45 @@ struct mksol_thread:public thread < traits, mksol_thread < traits > > {
     typedef typename traits::scalar_t scalar_t;
     typedef typename traits::wide_scalar_t wide_scalar_t;
     int cp_lag;
-    unsigned int bound_deg_f;
-    scalar_t *sum;
-    scalar_t *fptr;
+    uint64_t * sum;
+    std::vector<scalar_t *> const & fptr;
     unsigned int accumulate_wide;
-    mksol_thread(void *ptr):super(ptr) {
+    mksol_thread(void *ptr)
+        : super(ptr), fptr(((globals::vdata < traits > *)ptr)->f)
+    {
         using namespace globals;
-        fptr = ((globals::vdata < traits > *)ptr)->f;
 
-        sum = new scalar_t[super::i1 - super::i0];
-        // memset(sum, 0, (super::i1 - super::i0) * sizeof(scalar_t));
-        traits::zero(sum, super::i1 - super::i0);
+        BUG_ON(fptr.size() > 64);
+
+            sum = new uint64_t[super::i1 - super::i0];
+            memset(sum, 0, (super::i1 - super::i0) * sizeof(uint64_t));
         cp_lag = globals::cp_lag;
         accumulate_wide = 0;
     }
-    
     ~mksol_thread() {
-        delete[]sum;
+            delete[] sum;
     }
     void use_vector(scalar_t * dst) {
         /* We have the full vector available here. However it is
          * only available for writing */
 
-        using globals::degf;
-
         for (unsigned int i = super::i0; i < super::i1; i++) {
-            //                      mp_limb_t t[2 * width + 1];
-            //                      mp_limb_t c;
-            //                      mpn_mul_n(t, dst[i], f[degf - super::done], width);
-            //                      c = mpn_add_n(t, t, sum[i - super::i0], width);
-            //                      if (c)
-            //                              c = mpn_add_1(t + width, t + width, width, c);
-            //                      t[2 * width] = c;
-            // 
-            //                      core_ops::assign<width, 2 * width + 1>(sum[i - super::i0], t);
-            // 
-            traits::addmul_wide(sum[i - super::i0], dst[i],
-                    fptr[degf - super::done]);
+            uint64_t s = 0;
+            uint64_t x = 0;
+            for(unsigned int j = 0 ; j < fptr.size() ; j++) {
+                traits::addmul_wide(x, dst[i],
+                        fptr[j][super::done]);
+                s = s << 1 ^ x;
+            }
+            sum[i - super::i0] ^= s;
         }
+#if 0
         if (++accumulate_wide >= traits::max_accumulate_wide) {
             for (unsigned int i = super::i0; i < super::i1; i++) {
                 traits::reduce(sum[i - super::i0], sum[i - super::i0]);
             }
         }
+#endif
 
         if (super::done % cp_lag != 0)
             return;
@@ -579,10 +578,11 @@ struct mksol_thread:public thread < traits, mksol_thread < traits > > {
 
         if (!priv)
             r++;
-
+#if 0
         for (unsigned int i = super::i0; i < super::i1; i++) {
             traits::reduce(sum[i - super::i0], sum[i - super::i0]);
         }
+#endif
         accumulate_wide = 1;
 
         /* There is potential that the last call here, which
@@ -595,7 +595,7 @@ struct mksol_thread:public thread < traits, mksol_thread < traits > > {
          * accumulated sum up to this cp value */
         int rc = barrier_wait(&globals::main_loop_barrier, NULL, NULL);
         if (rc == 1) {
-            std::string nm = files::fxy % mine.scol % globals::col % r;
+            std::string nm = files::fxy % globals::col % r;
             cout << fmt("T% writes %") % super::t % nm << endl;
             ofstream v;
             must_open(v, nm);
@@ -610,13 +610,14 @@ struct mksol_thread:public thread < traits, mksol_thread < traits > > {
                     // xptr->sum[xi - xi0],
                     // width);
                     // v << z << "\n";
-                    traits::print(v, xptr->sum[xi - xi0]) << "\n";
+                    write_hexstring(v, xptr->sum + (xi - xi0), fptr.size());
+                    v << "\n";
                 }
             }
         }
         barrier_wait(&globals::main_loop_barrier, NULL, NULL);
-        // memset(sum, 0, (super::i1 - super::i0) * sizeof(scalar_t));
-        traits::zero(sum, super::i1 - super::i0);
+        memset(sum, 0, (super::i1 - super::i0) * sizeof(uint64_t));
+        // traits::zero(sum, super::i1 - super::i0);
     }
 };
 
@@ -652,14 +653,14 @@ template < typename T > int addup(int k)
 /* mksol stuff only */
 
     template < typename traits >
-unsigned int set_f_coeffs(typename traits::scalar_t * f, unsigned int maxdeg)
+unsigned int set_f_coeffs(typename traits::scalar_t * f, unsigned int c,  unsigned int maxdeg)
 {
     unsigned int deg = 0;
     int largest_nz = -1;
     // memset(f, 0, (maxdeg + 1) * sizeof(typename traits::scalar_t));
     traits::zero(f, maxdeg + 1);
     ifstream fx;
-    must_open(fx, files::f % mine.scol);
+    must_open(fx, files::f % c);
     istream_iterator < mpz_class > inp(fx);
     for (deg = 0; !fx.eof(); deg++) {
         vector < mpz_class > line;
@@ -675,28 +676,16 @@ unsigned int set_f_coeffs(typename traits::scalar_t * f, unsigned int maxdeg)
             nonzero += z != 0;
         }
         // core_ops::assign<MODULUS_SIZE>(f[deg], line[globals::col]);
-        traits::assign(f[deg], line, globals::col);
+        traits::assign(f[maxdeg-deg], line, globals::col);
         if (nonzero) {
             largest_nz = deg;
         }
     }
     deg = largest_nz;
     BUG_ON(largest_nz < 0);
-#if 0
-    deg--;
-    for (; deg >= 0 && traits::is_zero(f[deg]); deg--) {
-        /* I don't really have time to check this -- shoudl be
-         * okay though. One thing is for sure, it's that we
-         * violate the fact that x^TB^iy = 0. However it's worth
-         * trying, still, to get a kernel vector.
-         */
-        cout << "WARNING -- this needs to be double-checked\n";
-        cout << fmt("skipping zero scalar at degree % : ") % deg;
-        traits::print(cout, f[deg]);
-        cout << endl;
-    }
-#endif
-
+    /* Coeffs zero to maxdeg-deg-1 are zero. So we must do a shift.  */
+    traits::copy(f, f + maxdeg-deg, deg + 1);
+    traits::zero(f + deg + 1, maxdeg-deg);
     return deg;
 }
 
@@ -738,6 +727,8 @@ template < typename traits > int program()
     globals::vdata < traits > v0_and_f;
     std::vector < void *>targs(mine.nt, (void *) &v0_and_f);
 
+        v0_and_f.v0 = new scalar_t[nc];
+
     if (mine.task == "krylov") {
 
         recover = recoverable_iteration(m, col, nbys, cp_lag);
@@ -756,34 +747,39 @@ template < typename traits > int program()
 
         recover_iteration(m, col, nbys, iter0);
 
-        v0_and_f.v0 = new scalar_t[nc];
         recover_vector < traits > (nc, col, nbys, recover, v0_and_f.v0);
 
         start_threads(thread_program < krylov_thread, traits >, targs);
-        delete[]v0_and_f.v0;
     } else if (mine.task == "mksol") {
 
         /* See the discussion in lingen.cpp concerning the bound
          * on the degree of f */
-        unsigned int bound_deg_f = iceildiv(m, n) +
-            iceildiv(m * iceildiv(nc, m), n) + 10;
+        degf = iceildiv(m, n) + iceildiv(m * iceildiv(nc, m), n) + 10;
 
-        v0_and_f.f = new scalar_t[bound_deg_f + 1];
-        v0_and_f.v0 = new scalar_t[nc];
-
-        degf = set_f_coeffs < traits > (v0_and_f.f, bound_deg_f);
-
-        cout << fmt("// F%[f0w2] has degree %\n") % mine.scol % degf;
+        unsigned int maxdeg = 0;
         nb_iter = degf;
+        for(unsigned int i = 0 ; i < mine.scol.size() ; i++) {
+            scalar_t * nf = new scalar_t[degf + 1];
+            unsigned int d = set_f_coeffs < traits > (nf, mine.scol[i], degf);
+            cout << fmt("// F%[f0w2] has degree %\n") % mine.scol[i] % d;
+            if (d >= maxdeg)
+                maxdeg = d;
+            v0_and_f.f.push_back(nf);
+        }
+        cout << "// Maximum degree " << maxdeg << "\n";
+        nb_iter = maxdeg;
 
         /* FIXME ; the 0 here is intended to be changed */
         recover_vector < traits > (nc, col, nbys, 0, v0_and_f.v0);
 
         start_threads(thread_program < mksol_thread, traits >, targs);
 
-        delete[]v0_and_f.v0;
-        delete[]v0_and_f.f;
+        for(unsigned int i = 0 ; i < mine.scol.size() ; i++) {
+            delete[] v0_and_f.f[i];
+        }
+
     }
+        delete[]v0_and_f.v0;
     return 0;
 }
 
