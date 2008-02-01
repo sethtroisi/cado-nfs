@@ -1,46 +1,46 @@
-Four binaries in this subdir:
-  procrels
-  linalg
-  ratsqrt
-  characters
-
-Makefile should do the compilation (nothing problematic, here).
-
-Assume that the output of checknorms is in a file called rels.
-Then you can type:
-$ ./procrels rels > mat
-
-On stderr, there is some diagnostic messages. In particular you'll get
-the number of relations after singleton removal and the number of primes
-on each side. If you want to be sure to have a non-trivial kernel, you
-should check that there are more relations than the sum of the two number
-of primes.
-
-On stdin (redirected to file mat in the example), procrels will create
-data describing the matrix. This include the labels (a,b) for each row.
-
-Now you can type:
-$ ./linalg mat > ker
-
-This will compute the kernel of the matrix and print it to ker. For the
-moment the output format is not fixed and 128 vectors are printed.
-
-For the sequel, two more binaries: ratsqrt and characters.
-
-$ ./characters mat ker poly 40 60 > ker2
-
-where 40 is the number of vectors of ker you want to analyze, and 60 is
-the number of characters that should be used (use at least 20 more, I
-think). 
-
-TODO:
-  - add a character for the sign of the rational side
-
-For the moment this prints the matrix of characters for the vectors. This
-shows which vectors should be combined to create genuine relations.
-
-$ ./ratsqrt [-depnum nnn] mat ker2 m
-
-This solve the square root problem on the rational side (with a naive
-algorithm). 
-
+#OUTDATED!# Four binaries in this subdir: procrels linalg ratsqrt
+#OUTDATED!# characters
+#OUTDATED!# 
+#OUTDATED!# Makefile should do the compilation (nothing problematic,
+#OUTDATED!# here).
+#OUTDATED!# 
+#OUTDATED!# Assume that the output of checknorms is in a file called
+#OUTDATED!# rels.  Then you can type: $ ./procrels rels > mat
+#OUTDATED!# 
+#OUTDATED!# On stderr, there is some diagnostic messages. In particular
+#OUTDATED!# you'll get the number of relations after singleton removal
+#OUTDATED!# and the number of primes on each side. If you want to be
+#OUTDATED!# sure to have a non-trivial kernel, you should check that
+#OUTDATED!# there are more relations than the sum of the two number of
+#OUTDATED!# primes.
+#OUTDATED!# 
+#OUTDATED!# On stdin (redirected to file mat in the example), procrels
+#OUTDATED!# will create data describing the matrix. This include the
+#OUTDATED!# labels (a,b) for each row.
+#OUTDATED!# 
+#OUTDATED!# Now you can type: $ ./linalg mat > ker
+#OUTDATED!# 
+#OUTDATED!# This will compute the kernel of the matrix and print it to
+#OUTDATED!# ker. For the moment the output format is not fixed and 128
+#OUTDATED!# vectors are printed.
+#OUTDATED!# 
+#OUTDATED!# For the sequel, two more binaries: ratsqrt and characters.
+#OUTDATED!# 
+#OUTDATED!# $ ./characters mat ker poly 40 60 > ker2
+#OUTDATED!# 
+#OUTDATED!# where 40 is the number of vectors of ker you want to
+#OUTDATED!# analyze, and 60 is the number of characters that should be
+#OUTDATED!# used (use at least 20 more, I think). 
+#OUTDATED!# 
+#OUTDATED!# TODO:
+#OUTDATED!#   - add a character for the sign of the rational side
+#OUTDATED!# 
+#OUTDATED!# For the moment this prints the matrix of characters for the
+#OUTDATED!# vectors. This shows which vectors should be combined to
+#OUTDATED!# create genuine relations.
+#OUTDATED!# 
+#OUTDATED!# $ ./ratsqrt [-depnum nnn] mat ker2 m
+#OUTDATED!# 
+#OUTDATED!# This solve the square root problem on the rational side
+#OUTDATED!# (with a naive algorithm). 
+#OUTDATED!# 
