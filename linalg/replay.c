@@ -374,7 +374,7 @@ main(int argc, char *argv[])
 	else{
 	    if(strncmp(str, "BWCOSTMIN", 9) != 0){
 		sscanf(str+8, "%lu", &bwcost);
-		fprintf(stderr, "Read bwcost=%lu\n", bwcost);
+		//		fprintf(stderr, "Read bwcost=%lu\n", bwcost);
 		if((bwcostmin != 0) && (bwcost == bwcostmin)){
 		    // what a damn tricky feature!!!!!!!
 		    fprintf(stderr, "Activating tricky stopping feature\n");
