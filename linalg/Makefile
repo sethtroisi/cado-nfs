@@ -4,7 +4,7 @@ include Makefile.local
 GMP ?= /usr/local/
 GMPLIB ?= $(GMP)/lib/libgmp.a
 GMPINCLUDE ?= $(GMP)/include/
-OPTCFLAGS ?= -g -W -Wall#-O2
+OPTCFLAGS ?= -g -W -Wall -O2
 
 SVNVER:=$(shell svnversion .)
 CFLAGS=$(OPTCFLAGS) -DREV=\"$(SVNVER)\"
