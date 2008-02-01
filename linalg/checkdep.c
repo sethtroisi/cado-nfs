@@ -19,7 +19,7 @@ checkSparse(FILE *matfile, FILE *kerfile, int ncols, int nlimbs, int *vec, int c
 {
     long a;
     unsigned long w, b;
-    int i, j, ret, nc, cc, jj;
+    int i, j, ret = 0, nc, cc, jj;
     char c;
 
     memset(vec, 0, ncols * sizeof(int));
@@ -75,7 +75,7 @@ checkBW(FILE *matfile, FILE *kerfile, int nrows, int ncols, int *vec, int compac
 {
     long a;
     unsigned long b;
-    int i, j, ret, nc, cc, jj, bb;
+    int i, j, ret = 0, nc, cc, jj, bb;
     char c;
 
     memset(vec, 0, ncols * sizeof(int));

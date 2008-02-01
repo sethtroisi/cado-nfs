@@ -91,7 +91,7 @@ int
 remove_duplicates(char *ficname[], int nbfic, unsigned int *nrels, hashtable_t *Hab)
 {
     FILE *relfile;
-    int ret, irel = -1;
+    int ret = 0, irel = -1;
     int i;
     
     ASSERT(nbfic > 0);

@@ -1,7 +1,7 @@
 /* 
- * Program: history
+ * Program: replay
  * Author : F. Morain
- * Purpose: managing history of merges
+ * Purpose: replaying history of merges to build the small matrix
  * 
  * Algorithm:
  *
@@ -326,25 +326,29 @@ int
 main(int argc, char *argv[])
 {
     FILE *hisfile, *purgedfile;
+    unsigned long bwcost, bwcostmin = 0;
     int nrows, ncols;
     int **newrows, i, j, nb, *nbrels, **oldrows, *colweight;
     int ind, small_nrows, small_ncols, **sparsemat;
     char str[STRLENMAX];
     int verbose = 0;
 
-    if (argc > 1 && strcmp (argv[1], "-v") == 0)
-      {
+    if(argc > 1 && strcmp (argv[1], "-v") == 0){
         verbose ++;
         argv ++;
         argc --;
-      }
+    }
 
-    if (argc != 5)
-      {
-	fprintf (stderr, "Usage: %s purgedfile hisfile sparsefile abfile\n",
-                 argv[0]);
+    if(argc < 5){
+	fprintf(stderr, "Usage: %s", argv[0]);
+	fprintf(stderr, " purgedfile hisfile sparsefile abfile [bwcostmin]\n");
 	return 0;
-      }
+    }
+
+    if(argc == 6)
+	sscanf(argv[5], "%lu", &bwcostmin);
+    else
+	bwcostmin = 0;
     
     purgedfile = fopen(argv[1], "r");
     assert(purgedfile != NULL);
@@ -365,9 +369,19 @@ main(int argc, char *argv[])
 	    fprintf(stderr, "Gasp: too long a line!\n");
 	    exit(0);
 	}
-	if(strncmp(str, "BWCOST: ", 8) != 0)
+	if(strncmp(str, "BWCOST", 6) != 0)
 	    doAllAdds(newrows, str);
-	// TODO: adapt this for bw as soon as needed...!
+	else{
+	    if(strncmp(str, "BWCOSTMIN", 9) != 0){
+		sscanf(str+8, "%lu", &bwcost);
+		fprintf(stderr, "Read bwcost=%lu\n", bwcost);
+		if((bwcostmin != 0) && (bwcost == bwcostmin)){
+		    // what a damn tricky feature!!!!!!!
+		    fprintf(stderr, "Activating tricky stopping feature\n");
+		    break;
+		}
+	    }
+	}
     }
     fclose(hisfile);
     nbrels = (int *)malloc(nrows * sizeof(int));
