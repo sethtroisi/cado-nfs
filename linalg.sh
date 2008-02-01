@@ -1,15 +1,33 @@
 #!/bin/sh -
 linalg=linalg
 
-if true
+# parameters names from merge_linalg_sqrt.sh:
+# $1 is $name.small
+# $2 is $name.ker_raw
+# $3 is $root (only used for bw)
+
+mat=$1
+ker=$2
+root=$3
+
+if false
 then
-    time $linalg/linalg $1 1 > $2
+   # use gauss
+   time $linalg/linalg $mat 1 > $ker
 else
-    tmp=`head -1 $1`
-    nrows=`echo $tmp | awk '{print $1}'`
-    ncols=`echo $tmp | awk '{print $2}'`
-    dep=$1.dep
-    args="-d $dep -p $1.pm2 -m $1 -r $nrows -c $ncols -t 128 -v1 -g -n 128"
-    time $linalg/wiedemann $args
-    $linalg/4cado $nrows $dep $2
+   # use Block-Wiedemann (recommended for large matrices)
+   echo "Transposing the matrix"
+   time $linalg/transpose $mat $mat.tr
+
+   echo "Calling Block-Wiedemann"
+   if [ ! -e $root.testmat ]
+   then
+      mkdir $root.testmat
+   fi
+   time $linalg/bw/doit.pl matrix=$mat.tr mn=64 vectoring=64 multisols=1 wdir=$root.testmat
+
+   echo "Converting dependencies to CADO format"
+   # doit.pl put the dependencies W* in the directory where the matrix was
+   d=`dirname $root`
+   time $linalg/bw/mkbitstrings $d/W* > $ker
 fi
