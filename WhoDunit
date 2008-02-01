@@ -35,10 +35,16 @@ checknorms:
 	writes:
 		.rels (concatenated with output of freerels)
 
+duplicates:
+        reads:
+                .rels
+        writes:
+                .nodup
+
 purge:
 	reads:
 		.poly
-		.rels
+		.nodup
 	writes:
 		.purged
 
@@ -50,7 +56,7 @@ merge / replay:
 		.index
 		.merge.his (not used thereafter)
 
-linalg:
+linalg || bw/doit.pl:
 	reads:
 		.small
 	writes:
@@ -59,7 +65,7 @@ linalg:
 characters:
 	reads:
 		.poly
-		.rels
+		.nodup
 		.purged
 		.index
 		.ker.raw
@@ -69,7 +75,7 @@ characters:
 allsqrt:
 	reads:
 		.poly
-		.rels
+		.nodup
 		.purged
 		.index
 		.ker
@@ -77,18 +83,11 @@ allsqrt:
 		.dep.rat.i
 		.dep.alg.i
 
-fmalgsqrt:
+algsqrt:
 	reads:
 		.poly
-		.dep.rat.i (why???)
+		.dep.rat.i 
 		.dep.alg.i
 	writes:
-		.algside.i
-
-magma / finish.mag:
-	reads:
-		.dep.rat.i
-		.algside.i
-		.poly (or at least, the corresponding info is passed)
-	writes:
 		.fact.i
+
