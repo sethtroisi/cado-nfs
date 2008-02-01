@@ -113,7 +113,7 @@ computeAllCharacters(char **charmat, int i, int k, rootprime_t * tabchar, long a
     int j;
     
     for(j = 0; j < k; j++)
-	charmat[i][j] *= (char)eval_char(a, b, tabchar[j]);
+	charmat[i][j] = (char)eval_char(a, b, tabchar[j]);
 }
 
 // charmat is small_nrows x k
@@ -137,11 +137,8 @@ buildCharacterMatrix(char **charmat, int k, rootprime_t * tabchar, FILE *purgedf
     fprintf(stderr, "Reading all (a, b)'s just once\n");
     // charbig is nrows x k
     charbig = (char **)malloc(nrows * sizeof(char *));
-    for(i = 0; i < nrows; i++){
+    for(i = 0; i < nrows; i++)
 	charbig[i] = (char *)malloc(k * sizeof(char));
-	for(j = 0; j < k; j++)
-	    charbig[i][j] = 1;
-    }
     irel = 0;
     //    rewind(relfile); // useless?
     for(i = 0; i < nrows; i++){
@@ -229,17 +226,12 @@ printTabMatrix(dense_mat_t *mat, int nrows, int ncols)
 static void
 handleKer(dense_mat_t *mat, rootprime_t * tabchar, FILE * purgedfile,
           mp_limb_t ** ker, /*int nlimbs, cado_poly pol, */
-          FILE *indexfile, FILE *relfile)
+          FILE *indexfile, FILE *relfile,
+	  int small_nrows)
 {  
     int i, n;
     unsigned int j, k;
-    char str[1024];
     char **charmat;
-    int small_nrows, small_ncols;
-
-    rewind(purgedfile);
-    fgets(str, 1024, purgedfile);
-    sscanf(str, "%d %d", &small_nrows, &small_ncols);
 
     n = mat->nrows;
     k = mat->ncols;
@@ -362,8 +354,8 @@ int main(int argc, char **argv) {
       fprintf(stderr, "\t%lu %lu\n", tabchar[i].prime, tabchar[i].root);
 #endif
 
+  int small_nrows, small_ncols;
   {
-    int small_nrows, small_ncols;
     ret = fscanf(indexfile, "%d %d", &small_nrows, &small_ncols);
     ASSERT (ret == 2);
     nlimbs = (small_nrows / GMP_NUMB_BITS) + 1;
@@ -390,7 +382,7 @@ int main(int argc, char **argv) {
   fprintf(stderr, "start computing characters...\n");
 
   handleKer(&mymat, tabchar, purgedfile, ker, /*nlimbs, *pol, */
-            indexfile, relfile);
+            indexfile, relfile, small_nrows);
 
   myker = (mp_limb_t **)malloc(mymat.nrows*sizeof(mp_limb_t *));
   ASSERT (myker != NULL);
