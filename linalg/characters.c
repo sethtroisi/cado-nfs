@@ -465,5 +465,11 @@ int main(int argc, char **argv) {
     }
   }
 
+  free (tabchar);
+  for (j = 0; j < n; ++j)
+    free (ker[j]);
+  free (ker);
+  free (newker);
+
   return 0;
 }
