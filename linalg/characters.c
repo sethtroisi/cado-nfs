@@ -320,7 +320,10 @@ handleKer(dense_mat_t *mat, rootprime_t * tabchar, FILE * purgedfile,
     printTabMatrix(mat, n, k);
     fprintf(stderr, ";\n");
 #endif
-    // TODO: clean data
+    
+    for (i = 0; i < small_nrows; ++i)
+      free (charmat[i]);
+    free (charmat);
 }
 
 // matrix M_purged is nrows x ncols
@@ -470,6 +473,10 @@ int main(int argc, char **argv) {
     free (ker[j]);
   free (ker);
   free (newker);
+  free (mymat.data);
+  for (i = 0; i < mymat.nrows; ++i)
+    free (myker[i]);
+  free (myker);
 
   return 0;
 }
