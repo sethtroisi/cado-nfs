@@ -25,7 +25,7 @@ typedef struct {
 } rootprime_t;
 
 static int eval_char(long a, unsigned long b, rootprime_t ch) {
-  unsigned long ua, aux;
+  unsigned long ua, aux, saveb = b;
   int res;
 #if DEBUG >= 1
   printf("a := %ld; b := %lu; p := %lu; r := %lu;", a, b, ch.prime, ch.root);
@@ -44,6 +44,10 @@ static int eval_char(long a, unsigned long b, rootprime_t ch) {
     modul_sub(&aux, &ua, &aux, &ch.prime);
     res = modul_jacobi(&aux, &ch.prime);
   }
+  if (res == 0) {
+    fprintf(stderr, "Strange: have a jacobi symbol that is zero:\n");
+    fprintf(stderr, "  a = %ld, b = %lu, p := %lu; r := %lu;", a, saveb, ch.prime, ch.root);
+   }
 #if DEBUG >= 1
   printf("res := %d; assert (JacobiSymbol(a-b*r, p) eq res);\n", res);
 #endif
@@ -70,7 +74,10 @@ create_characters (rootprime_t * tabchar, int k, cado_poly pol)
       if (ret == 0)
         continue;
       tabchar[i].prime = p;
-      tabchar[i].root = roots[0];
+      if (roots[0] > 0 )
+	tabchar[i].root = roots[0];
+      else 
+	tabchar[i].root = p - (-roots[0]);
       i++;
     }
   while (i < k);
