@@ -147,6 +147,7 @@ buildCharacterMatrix(char **charmat, int k, rootprime_t * tabchar, FILE *purgedf
 	jumpToRelation(&rel, relfile, irel, nr);
 	irel = nr+1;
 	computeAllCharacters(charbig, i, k, tabchar, rel.a, rel.b);
+	clear_relation(&rel);
     }
     fprintf(stderr, "Reading index file to reconstruct the characters\n");
     rewind(indexfile);
