@@ -298,7 +298,7 @@ compute_norms (unsigned char *sievearray, const long amin, const long amax,
       ASSERT (!odd || (a2 - a) % 2 == 0);
       
       n = fpoly_eval (f, deg, (double) a2);
-      n2 = fb_log (n, log_scale, log_proj_roots);
+      n2 = fb_log (fabs(n), log_scale, -log_proj_roots);
       fsign2 = (n < 0.) ? -1 : 1;
       dfsign2 = (fpoly_eval (df, deg - 1, (double) a2) < 0.) ? -1 : 1;
 
