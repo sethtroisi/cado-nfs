@@ -1,46 +1,38 @@
-#OUTDATED!# Four binaries in this subdir: procrels linalg ratsqrt
-#OUTDATED!# characters
-#OUTDATED!# 
-#OUTDATED!# Makefile should do the compilation (nothing problematic,
-#OUTDATED!# here).
-#OUTDATED!# 
-#OUTDATED!# Assume that the output of checknorms is in a file called
-#OUTDATED!# rels.  Then you can type: $ ./procrels rels > mat
-#OUTDATED!# 
-#OUTDATED!# On stderr, there is some diagnostic messages. In particular
-#OUTDATED!# you'll get the number of relations after singleton removal
-#OUTDATED!# and the number of primes on each side. If you want to be
-#OUTDATED!# sure to have a non-trivial kernel, you should check that
-#OUTDATED!# there are more relations than the sum of the two number of
-#OUTDATED!# primes.
-#OUTDATED!# 
-#OUTDATED!# On stdin (redirected to file mat in the example), procrels
-#OUTDATED!# will create data describing the matrix. This include the
-#OUTDATED!# labels (a,b) for each row.
-#OUTDATED!# 
-#OUTDATED!# Now you can type: $ ./linalg mat > ker
-#OUTDATED!# 
-#OUTDATED!# This will compute the kernel of the matrix and print it to
-#OUTDATED!# ker. For the moment the output format is not fixed and 128
-#OUTDATED!# vectors are printed.
-#OUTDATED!# 
-#OUTDATED!# For the sequel, two more binaries: ratsqrt and characters.
-#OUTDATED!# 
-#OUTDATED!# $ ./characters mat ker poly 40 60 > ker2
-#OUTDATED!# 
-#OUTDATED!# where 40 is the number of vectors of ker you want to
-#OUTDATED!# analyze, and 60 is the number of characters that should be
-#OUTDATED!# used (use at least 20 more, I think). 
-#OUTDATED!# 
-#OUTDATED!# TODO:
-#OUTDATED!#   - add a character for the sign of the rational side
-#OUTDATED!# 
-#OUTDATED!# For the moment this prints the matrix of characters for the
-#OUTDATED!# vectors. This shows which vectors should be combined to
-#OUTDATED!# create genuine relations.
-#OUTDATED!# 
-#OUTDATED!# $ ./ratsqrt [-depnum nnn] mat ker2 m
-#OUTDATED!# 
-#OUTDATED!# This solve the square root problem on the rational side
-#OUTDATED!# (with a naive algorithm). 
-#OUTDATED!# 
+  
+duplicates -nrels <n> <rel_file>  >  <rel_file2>
+  Remove duplicates. The output format is the same as the input format
+  for relations.
+
+purge -poly <poly_file> -nrels <n> <rel_file>  >  <purged_file>
+  Remove singletons. The format of the purged file is as follows:
+     nrows ncols
+     index_in_rel_file nb_of_entries ncol_1 ncol_2 ...
+     index_in_rel_file nb_of_entries ncol_1 ncol_2 ...
+     ...
+
+merge -prune <p> -merge <m> -mat <purged_file> -maxlevel <l> -cwmax <c> -rwmax <r> [-v] > <history_file>
+  Perform the merging. Keep the info in the history file, that contains on each
+  line the indices of two rows to be added.
+
+replay <purged_file> <history_file> <small_matrix_file> <index_file> [-v]
+  Replays the history given by merge in order to produce a small matrix. The
+  correspondance with the initial data is kept in index_file.
+  The format of the small matrix is:
+    nrows ncols
+    nb_entries ncol_1 ncol_2 ...
+    nb_entries ncol_1 ncol_2 ...
+    nb_entries ncol_1 ncol_2 ...
+    ...
+  The format of the index file is:
+    nrows ncols    ## same as in small matrix
+    nb_of_ab_pairs index_in_rel_file_1 index_in_rel_file_2 ...
+    nb_of_ab_pairs index_in_rel_file_1 index_in_rel_file_2 ...
+    ...
+  The lines of small matrix and index files are in correspondance.
+
+linalg <small_matrix_file> <ker_file>
+  Produces vectors in the the kernel of the matrix.
+
+characters / allsqrt : do not really belong to linalg subdir, and will change
+anyway, so we don't explain more.
+
