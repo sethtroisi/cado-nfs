@@ -219,7 +219,7 @@ int main(int argc, char * argv[])
     extern gmp_randstate_t  __gmp_rands;
 
     __gmp_rands_initialized = 1;
-    gmp_randinit_mt (__gmp_rands);
+    gmp_randinit_default (__gmp_rands);
     gmp_randseed_ui(__gmp_rands, time(NULL));
 
 

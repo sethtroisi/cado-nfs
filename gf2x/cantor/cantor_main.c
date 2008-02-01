@@ -27,7 +27,7 @@ int main(int argc, char **argv)
     h = (uint64_t *) malloc(2 * N * sizeof(uint64_t));
 
     __gmp_rands_initialized = 1;
-    gmp_randinit_mt (__gmp_rands);
+    gmp_randinit_default (__gmp_rands);
     gmp_randseed_ui(__gmp_rands, time(NULL));
 
     mpn_random((mp_limb_t *) f, (sizeof(uint64_t) / sizeof(mp_limb_t)) * N);
