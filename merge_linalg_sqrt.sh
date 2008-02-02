@@ -24,9 +24,9 @@ poly=$root.poly
 nodup=$root.nodup
 purged=$root.purged
 
-if [ -s $nodup ]
+if [ -s $nodup -a $nodup -nt $rels ]
 then
-  echo "File $nodup already exists"
+  echo "File $nodup already exists and is newer than $rels"
 else
   nrels=`wc -l $rels | awk '{print $1}'`
   time $linalg/duplicates -nrels $nrels $rels > $nodup
@@ -38,7 +38,7 @@ nrels=`wc -l $nodup | awk '{print $1}'`
 
 if [ -s $purged -a $purged -nt $nodup ]
 then
-  echo "File $purged already exists"
+  echo "File $purged already exists and is newer than $nodup"
 else
   time $linalg/purge -poly $poly -nrels $nrels $nodup > $purged
   if [ ! -s $purged ]; then echo "zero file $purged"; exit; fi
