@@ -168,9 +168,10 @@ int main(int argc, char *argv[]) {
 
     if (nfiles > 1) {
         MSG("\n");
-        MSG("-------------------------------------------------------\n");
-        MSG("     All input files: output %lu relations\n", nrels_out);
-        MSG("-------------------------------------------------------\n");
+        MSG("--------------------------------------------------------------\n");
+        MSG(" All input files: output %lu out of %lu relations\n",
+            nrels_out, total_nrelations_read);
+        MSG("--------------------------------------------------------------\n");
     }
     return 0;
 }
@@ -607,7 +608,9 @@ unsigned long checkrels(char *f, cado_poly cpoly,
     MSG("-----------------------------------------------------------------\n");
     MSG("File %s: output %lu out of %lu relations\n", f, nrels_out, nrels_in);
     MSG("-----------------------------------------------------------------\n");
-
+    
+    total_nrelations_read += nrels_in;
+    
     return nrels_out;
 }
 //-----------------------------------------------------------------------------

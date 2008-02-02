@@ -75,7 +75,7 @@ extern "C" {
 #define MSG(...)    gmp_fprintf(stderr, __VA_ARGS__)
 //------------------------------------------------------------------------------
 //
-// Global variables (bouh!) used for error reporting... 
+// Global variables (bouh!) used for reporting... 
 //
 static unsigned long count_too_many_factors     = 0;
 static unsigned long count_too_large_prime_norm = 0;
@@ -90,6 +90,7 @@ static unsigned long count_not_coprime          = 0;
 static unsigned long count_not_dividing         = 0;
 static unsigned long count_larger_mfba          = 0;
 static unsigned long count_larger_mfbr          = 0;
+static unsigned long total_nrelations_read      = 0;
 //-----------------------------------------------------------------------------
 #define NPIX      46        // number of entries in pi(x) table
 #define MAX_X_PIX 1000000   // largest x for pi(x) table
