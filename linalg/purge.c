@@ -815,14 +815,12 @@ main(int argc, char **argv)
     unsigned int nfic;
     char *rel_used;
     int **rel_compact = NULL;
-    int ret;
+    int ret, k;
     int nrel, nprimes = 0, duplicate = 0, final = 1;
     unsigned int nrelmax = 0, i;
     int nrel_new, nprimes_new, Hsize, Hsizer, Hsizea;
     long maxpr = 0, maxpa = 0, keep = -1; // maximum value for nrows-ncols
     cado_poly pol;
-    
-    fprintf (stderr, "%s revision %s\n", argv[0], REV);
     
     if (argc == 1) {
 	fprintf(stderr, "usage: %s [filename]\n", argv[0]);
@@ -834,6 +832,12 @@ main(int argc, char **argv)
 	fprintf(stderr, "  if no filename is given, takes input on stdin\n");
 	exit(1);
     }
+
+    fprintf (stderr, "%s.r%s", argv[0], REV);
+    for (k = 1; k < argc; k++)
+      fprintf (stderr, " %s", argv[k]);
+    fprintf (stderr, "\n");
+    
     while(argc > 1 && argv[1][0] == '-'){
 	if(argc > 2 && strcmp (argv[1], "-poly") == 0){
 	    polyname = argv[2];

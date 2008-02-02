@@ -121,10 +121,8 @@ main(int argc, char **argv)
     hashtable_t Hab;
     char **fic;
     unsigned int nfic;
-    int ret;
+    int ret, k;
     unsigned int nrelsmax = 0, nrels;
-    
-    fprintf(stderr, "%s revision %s\n", argv[0], REV);
     
     if(argc == 1) {
 	fprintf(stderr, "usage: %s [filename]\n", argv[0]);
@@ -136,6 +134,12 @@ main(int argc, char **argv)
 	fprintf(stderr, "  if no filename is given, takes input on stdin\n");
 	exit(1);
     }
+
+    fprintf (stderr, "%s.r%s", argv[0], REV);
+    for (k = 1; k < argc; k++)
+      fprintf (stderr, " %s", argv[k]);
+    fprintf (stderr, "\n");
+    
     while(argc > 1 && argv[1][0] == '-'){
 	if(argc > 2 && strcmp(argv[1], "-nrels") == 0){
 	    nrelsmax = atoi(argv[2]);
