@@ -37,6 +37,34 @@ modul_div3 (residueul_t r, residueul_t a, modulusul_t m)
 #endif
 }
 
+/* Compute 1/t (mod 2^wordsize) */
+/* FIXME: not optimised yet */
+unsigned long
+modul_invmodlong (modulusul_t m)
+{
+  unsigned long r;
+
+  ASSERT (m[0] % 2UL != 0UL);
+  
+  /* The square of an odd integer is always 1 (mod 8). So by
+     initing r = m, the low three bits in the approximate inverse
+     are correct. 
+     When r = 1/m (mod 16), the 4th bit of r happens to be the
+     XOR of bits 2, 3 and 4 of m. This gives us an approximate 
+     inverse with the 4 lowest bits correct, so 3 (for 32 bit) or
+     4 (for 64 bit) Newton iterations are enough. */
+  r = m[0] ^ ((m[0] & 4UL) << 1) ^ ((m[0] & 2UL) << 2);
+  r = 2UL * r - r * r * m[0]; /* Newton iteration */
+  r = 2UL * r - r * r * m[0];
+  r = 2UL * r - r * r * m[0];
+  if (sizeof (unsigned long) > 4)
+    r = 2UL * r - r * r * m[0];
+
+  ASSERT (r * m[0] = 1UL);
+
+  return r;
+}
+
 unsigned long
 modul_gcd (residueul_t r, modulusul_t m)
 {
@@ -58,28 +86,6 @@ modul_gcd (residueul_t r, modulusul_t m)
   return b;
 }
 
-
-/* Compute 1/t (mod 2^wordsize) */
-/* FIXME: not optimised yet */
-unsigned long
-modul_invmodlong (modulusul_t m)
-{
-  unsigned long p, r; 
-  int i;
-
-  ASSERT (m[0] % 2 != 0);
-  
-  r = 1UL; p = m[0];
-  for (i = 1; p != 1UL; i++) /* Invariant: r * t == p (mod 2^wordsize) */
-    if ((1UL << i) & p)
-      {
-        r += 1UL << i;
-        p += m[0] << i;
-      }
-
-  ASSERT (r * m[0] == 1UL);
-  return r;
-}
 
 /* Compute r = b^e, with r and b in Montgomery representation */
 void
@@ -125,6 +131,54 @@ modul_powredc_ul (residueul_t r, const residueul_t b, const unsigned long e,
     }
   ASSERT (e1 == 0UL && mask == 1UL);
   /* Now e = 0, mask = 1, and r^mask * b^0 = r^mask is the result we want */
+}
+
+
+/* Compute r = b^e, with r and b in Montgomery representation. 
+   Here e is a multiple precision integer 
+   sum_{i=0}^{e_nrwords} e[i] * (machine word base)^i */
+void
+modul_powredc_mp (residueul_t r, const residueul_t b, const unsigned long *e, 
+                  const int e_nrwords, const unsigned long invm, 
+                  const modulusul_t m)
+{
+  unsigned long mask = ~0UL - (~0UL >> 1); /* Only MSB set */
+  int i = e_nrwords - 1;
+
+  if (e_nrwords == 0 || e[i] == 0UL)
+    {
+      const residueul_t one = {1UL};
+      modul_tomontgomery (r, one, m);
+      return;
+    }
+
+  /* Find highest set bit in e. */
+  while ((e[i] & mask) == 0UL)
+    mask >>= 1; /* r = 1, so r^(mask/2) * b^e = r^mask * b^e  */
+
+  /* Exponentiate */
+
+  modul_set (r, b, m);       /* (r*b)^mask * b^(e-mask) = r^mask * b^e */
+
+  while (mask > 1UL)
+    {
+      modul_mulredc (r, r, r, invm, m);
+      mask >>= 1;            /* (r^2)^(mask/2) * b^e = r^mask * b^e */
+      if (e[i] & mask)
+        modul_mulredc (r, r, b, invm, m);
+    }
+
+  for (i--; i >= 0; i--)
+    {
+      mask = ~0UL - (~0UL >> 1);
+      while (mask > 1UL)
+        {
+          modul_mulredc (r, r, r, invm, m);
+          mask >>= 1;            /* (r^2)^(mask/2) * b^e = r^mask * b^e */
+          if (e[i] & mask)
+            modul_mulredc (r, r, b, invm, m);
+        }
+    }
 }
 
 
