@@ -1388,9 +1388,18 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
   /* 2. Divide the primes with projective roots and their powers out of norm */
   for (k = 0; k < nr_proj_primes; k++)
     {
+      /* proj_primes contains repeated prime factors */
+      r = trialdiv_one_prime (proj_primes[k], norm, nr_primes, primes, 
+			      max_nr_primes, 0);
+      ASSERT_ALWAYS (r > 0);
+      TRACE_A (a, __func__, __LINE__, "dividing out " FBPRIME_FORMAT "^%d " 
+	       "with proj. root. New norm is %Zd.\n", proj_primes[k], r, norm);
+    }
+  for (k = 0; k < nr_proj_primes; k++)
+    {
+      /* These primes may divide norm in a higher power than proj_divisor */
       r = trialdiv_one_prime (proj_primes[k], norm, nr_primes, primes, 
 			      max_nr_primes, 1);
-      ASSERT_ALWAYS (r > 0);
       TRACE_A (a, __func__, __LINE__, "dividing out " FBPRIME_FORMAT "^%d " 
 	       "with proj. root. New norm is %Zd.\n", proj_primes[k], r, norm);
     }
