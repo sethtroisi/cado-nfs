@@ -68,7 +68,7 @@ echo "SIZE(index): `ls -s $name.index`"
 
 echo "Performing the linear algebra phase"
 
-./linalg.sh $name.small $name.ker_raw $root
+./linalg.sh $name
 
 if [ ! -s $name.ker_raw ]; then echo "Zerodim kernel, stopping"; exit; fi
 
