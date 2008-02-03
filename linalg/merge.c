@@ -2219,8 +2219,10 @@ merge(sparse_mat_t *mat, /*int nb_merge_max,*/ int maxlevel, int verbose, int fo
 	    }
 #endif
     }
-    if(forbw)
+    if(forbw){
 	printf("BWCOSTMIN: %lu\n", bwcostmin);
+	fprintf(stderr, "Minimal bwcost found: %lu\n", bwcostmin);
+    }
 }
 
 void
