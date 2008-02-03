@@ -45,7 +45,6 @@ char *used;
                      // 1: change if min weight < mergelevel
                      // 2: jump to minimal possible mergelevel
                      // 3: perform one merge, then check for next min weight
-                     //    NYI
 
 // 0 means dummy filtering using slow methods
 // 1 means:
@@ -1903,20 +1902,67 @@ checkMatrixWeight(sparse_mat_t *mat)
     ASSERT(w == mat->weight);
 }
 
+// j has weight m.
+void
+mergeForColumn(double *tt, double *tfill, double *tMST, sparse_mat_t *mat, int m, INT j)
+{
+    INT ind[MERGE_LEVEL_MAX];
+    int ni, k;
+
+#if DEBUG >= 1
+    fprintf(stderr, "Treating column %d of weight %d\n", j, mat->wt[j]);
+#endif
+#if (DEBUG >= 1) || TEX
+    fprintf(stderr, "Status before next j=%d to start\n", j);
+# if TEX
+    texSWAR(mat);
+# else
+    printSWAR(mat, mat->ncols);
+# endif
+#endif
+    // the corresponding rows are in R[j], skipping 1st cell and -1's
+#if DEBUG >= 2
+    checkCoherence(mat, m, j);
+#endif
+    ni = 0;
+    for(k = 1; k <= mat->R[j][0]; k++){
+	if(mat->R[j][k] != -1){
+	    ind[ni++] = mat->R[j][k];
+	    if(ni == m)
+		break;
+	}
+    }
+#if DEBUG >= 1
+    fprintf(stderr, " %d", j);
+    fprintf(stderr, "=> the %d rows are:\n", m);
+    for(k = 0; k < m; k++){
+	fprintf(stderr, "row[%d]=", ind[k]);
+	print_row(mat, ind[k]);
+	fprintf(stderr, "\n");
+    }
+    fprintf(stderr, "\n");
+#endif
+    *tt = seconds();
+    findOptimalCombination(mat, m, ind, tfill, tMST);
+    *tt = seconds()-(*tt);
+    mat->rem_nrows--;
+    mat->rem_ncols--;
+    remove_j_from_SWAR(mat, j);
+}
+
 int
 merge_m_fast(sparse_mat_t *mat, int m, int verbose)
 {
     double totopt=0, tot=seconds(), tt, totfill=0, totMST=0, tfill, tMST;
     double totdel = 0;
-    int k, njproc = 0, ni, njrem = 0;
-    INT *ind, j;
+    int njproc = 0, njrem = 0;
+    INT j;
     dclist dcl = mat->S[m];
     int report = (verbose == 0) ? 10000 : 1000;
 
 #if DEBUG >= 1
     fprintf(stderr, "Weight %d:", m);
 #endif
-    ind = (INT *)malloc(m * sizeof(INT));
 
     //    checkWeight(mat, 132461);
 
@@ -1934,52 +1980,14 @@ merge_m_fast(sparse_mat_t *mat, int m, int verbose)
 	if(!(njproc % report))
 	    fprintf(stderr, "# %d columns of weight %d processed at %2.2lf\n",
 		    njproc, m, seconds());
-#if DEBUG >= 1
-	fprintf(stderr, "Treating %d-th column %d of weight %d\n", njproc, j,
-		mat->wt[j]);
-#endif
-#if (DEBUG >= 1) || TEX
-	fprintf(stderr, "Status before next j=%d to start\n", j);
-# if TEX
-	texSWAR(mat);
-# else
-	printSWAR(mat, mat->ncols);
-# endif
-#endif
-	// the corresponding rows are in R[j], skipping 1st cell and -1's
-#if DEBUG >= 2
-	checkCoherence(mat, m, j);
-#endif
-	ni = 0;
-	for(k = 1; k <= mat->R[j][0]; k++){
-	    if(mat->R[j][k] != -1){
-		ind[ni++] = mat->R[j][k];
-		if(ni == m)
-		    break;
-	    }
-	}
-#if DEBUG >= 1
-	fprintf(stderr, " %d", j);
-	fprintf(stderr, "=> the %d rows are:\n", m);
-	for(k = 0; k < m; k++){
-	    fprintf(stderr, "row[%d]=", ind[k]);
-	    print_row(mat, ind[k]);
-	    fprintf(stderr, "\n");
-	}
-	fprintf(stderr, "\n");
-#endif
-	tt = seconds();
-	findOptimalCombination(mat, m, ind, &tfill, &tMST);
+	mergeForColumn(&tt, &tfill, &tMST, mat, m, j);
 #if TRACE_COL >= 0
 	fprintf(stderr, "wt[%d]=%d after findOptimalCombination\n",
 		TRACE_COL, mat->wt[TRACE_COL]);
 #endif
-	totopt += (seconds()-tt);
+	totopt += tt;
 	totfill += tfill;
 	totMST += tMST;
-	mat->rem_nrows--;
-	mat->rem_ncols--;
-	remove_j_from_SWAR(mat, j);
 	tt = seconds();
 	njrem += deleteHeavyColumns(mat);
 	totdel += (seconds()-tt);
@@ -1994,7 +2002,6 @@ merge_m_fast(sparse_mat_t *mat, int m, int verbose)
 	    totopt, totfill, totMST, tot);
     fprintf(stderr, " del=%2.2lf\n", totdel);
 	    
-    free(ind);
 #if DEBUG >= 1
     fprintf(stderr, "Status at the end of the process\n");
     texSWAR(mat);
@@ -2136,8 +2143,7 @@ merge(sparse_mat_t *mat, /*int nb_merge_max,*/ int maxlevel, int verbose, int fo
     m = 2;
     while(1){
 	cost = ((unsigned long)mat->rem_ncols) * ((unsigned long)mat->weight);
-	fprintf(stderr, "w(M)=%lu, w(M)*ncols=%lu",
-		mat->weight, (double)cost);
+	fprintf(stderr, "w(M)=%lu, w(M)*ncols=%lu", mat->weight, cost);
 	fprintf(stderr, " w(M)/ncols=%2.2lf\n", 
 		((double)mat->weight)/((double)mat->rem_ncols));
 	if((bwcostmin == 0) || (cost < bwcostmin))
@@ -2218,6 +2224,102 @@ merge(sparse_mat_t *mat, /*int nb_merge_max,*/ int maxlevel, int verbose, int fo
 		    break;
 	    }
 #endif
+    }
+    if(forbw){
+	printf("BWCOSTMIN: %lu\n", bwcostmin);
+	fprintf(stderr, "Minimal bwcost found: %lu\n", bwcostmin);
+    }
+}
+
+void
+mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
+{
+    double tt, totopt = 0.0, totfill = 0.0, totMST = 0.0, totdel = 0.0;
+    double tfill, tMST;
+    unsigned long bwcostmin = 0, oldcost = 0, cost;
+    dclist dcl;
+    int old_nrows, old_ncols, m = 2, njrem = 0, ncost = 0, ncostmax, j, njproc;
+
+    ncostmax = 20; // was 5
+    njproc = 0;
+    while(1){
+	cost = ((unsigned long)mat->rem_ncols) * ((unsigned long)mat->weight);
+	fprintf(stderr, "w(M)=%lu, w(M)*ncols=%lu", mat->weight, cost);
+	fprintf(stderr, " w(M)/ncols=%2.2lf\n", 
+		((double)mat->weight)/((double)mat->rem_ncols));
+	if((bwcostmin == 0) || (cost < bwcostmin))
+	    bwcostmin = cost;
+	if(forbw)
+	    // what a trick!!!!
+	    printf("BWCOST: %lu\n", cost);
+	if(forbw && (oldcost != 0) && (cost > oldcost)){
+	    ncost++;
+	    fprintf(stderr, "WARNING: New cost > old cost (%2.6e) [%d/%d]\n",
+		    ((double)cost)-((double)oldcost), ncost, ncostmax);
+	    if(ncost >= ncostmax){
+		int nirem;
+
+		fprintf(stderr, "WARNING: New cost > old cost %d times",
+                        ncost);
+		fprintf(stderr, " in a row:");
+		nirem = deleteSuperfluousRows(mat, mat->delta, 128);
+		if(nirem == 0){
+		    fprintf(stderr, " stopping\n");
+		    break;
+		}
+		else{
+		    fprintf(stderr, " try again after removing %d rows!\n",
+			    nirem);
+		    continue;
+		}
+	    }
+	}
+	else
+	    ncost = 0;
+	oldcost = cost;
+	old_nrows = mat->rem_nrows;
+	old_ncols = mat->rem_ncols;
+	m = minColWeight(mat);
+	if(m == -1){
+	    fprintf(stderr, "All stacks empty, stopping!\n");
+	    break;
+	}
+	if(m == 1){
+	    // do all of these
+	    fprintf(stderr, "Removing singletons at %2.2lf\n", seconds());
+	    njrem += removeSingletons(mat);
+	}
+	else if(m == 2){
+	    fprintf(stderr, "Performing all merges for m=%d at %2.2lf\n",
+		    m, seconds());
+	    njrem += mergeGe2(mat, m, verbose);
+	}
+	else{
+	    fprintf(stderr, "Performing one merge for m=%d\n", m);
+	    dcl = mat->S[m]->next;
+	    j = dcl->j;
+            mergeForColumn(&tt, &tfill, &tMST, mat, m, j);
+	    totopt += tt;
+	    totfill += tfill;
+	    totMST += tMST;
+	    tt = seconds();
+	    njrem += deleteHeavyColumns(mat);
+	    totdel += (seconds()-tt);
+	    njproc++;
+	}
+	if((m <= 2) || ((njproc % 1000) == 0)){
+	    fprintf(stderr, "=> nrows=%d ncols=%d (%d) njrem=%d at %2.2lf\n",
+		    mat->rem_nrows, mat->rem_ncols, 
+		    mat->rem_nrows - mat->rem_ncols, njrem, seconds());
+	    tt = seconds();
+	    inspectRowWeight(mat);
+	    fprintf(stderr, "inspectRowWeight: %2.2lf\n", seconds()-tt);
+	}
+	deleteEmptyColumns(mat);
+	if((old_nrows == mat->rem_nrows) && (old_ncols == mat->rem_ncols)){
+	    if((m > maxlevel) || (m <= 0))
+		break;
+	}
     }
     if(forbw){
 	printf("BWCOSTMIN: %lu\n", bwcostmin);
@@ -2390,7 +2492,11 @@ main(int argc, char *argv[])
 		mat.rem_nrows, mat.rem_ncols, seconds()-tt);
     }
 
+#if M_STRATEGY <= 2
     merge(&mat, /*nb_merge_max,*/ maxlevel, verbose, forbw);
+#else
+    mergeOneByOne(&mat, maxlevel, verbose, forbw);
+#endif
     fprintf(stderr, "Final matrix has w(M)=%lu, ncols*w(M)=%lu\n",
 	    mat.weight, ((unsigned long)mat.rem_ncols) * mat.weight);
 #if TEX
