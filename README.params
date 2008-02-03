@@ -28,6 +28,9 @@ rsa110  1.0    15       40      150   3m55   324036x323908
 
 rsa120  nrel=3142405, nprimes=2929171; excess=213234
 rsa120  1.0    15       40      150   7m42   552583x552455
+rsa120  1.0   150      200      200  27m40   618116x615353 523m11 (*)
+
+(*) by Francois at LIX, bwcostmin=28788324616143
 
 For new parameters, some fiddling is needed, with respect to the final
 weight of the small matrix and/or the number of rows/columns depending on
