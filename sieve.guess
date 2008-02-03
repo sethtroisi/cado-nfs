@@ -1,0 +1,58 @@
+#!/bin/csh
+# program to guess sieve region
+# this is highly experimental, feel free to improve!
+
+# usage: sieve.guess name skew wrels 
+# name - number name: $name.poly must exist (factor base is recomputed)
+# skew - polynomial skewness (could be read from polynomial file, but I don't
+#        know how to do that, awk/perl expert wanted)
+# Warning: skew must be integer
+# wrels - number of relations wanted (could be deduced from large prime bounds
+#         as 0.8 * (2^lpbr/log(2^lpbr) + 2^lpba/log(2^lpba)), i.e., about
+#         1.15 * (2^lpbr/lpbr + 2^lpba/lpba), awk/perl expert also wanted)
+set name=$1
+set skew=$2
+set wrels=$3
+
+# start with tiny sieving region
+@ Bmax = 500
+@ expected_rels=0
+echo "Generating factor base"
+set poly=$name.poly
+sieve/makefb -poly $poly > $name.roots
+@ width = 6
+while ( $expected_rels < $wrels )
+   @ t = 4 * $expected_rels
+   if ( $t < $wrels ) then
+      @ Bmax = 2 * $Bmax
+   else
+      @ Bmax = $Bmax + ($Bmax / 10)
+   endif
+   @ Amax = $Bmax * $skew
+   @ Bmid = $Bmax / 2
+   # we try sieving from $Bmid to $Bmid+$width-1
+   @ b0 = $Bmid
+   @ b1 = $Bmid + $width - 1
+   echo Trying sieving region -$Amax $Amax 1 $Bmax
+   set region="-$Amax $Amax $b0 $b1"
+   echo "   trying" small region $region
+   sieve/sieve -poly $poly -fb $name.roots $region > /tmp/rels_raw$$
+   # FIXME: we might want to redirect stderr from checknorms to /dev/null
+   postsieve/checknorms/checknorms -poly $poly /tmp/rels_raw$$ > /tmp/rels$$
+   @ nrels = `wc -l /tmp/rels$$ | cut -d" " -f 1`
+   echo "   remains" $nrels relations after checknorms
+   /bin/rm /tmp/rels_raw$$ /tmp/rels$$
+   @ expected_rels = ($nrels * $Bmax) / $width
+   echo "   total" $expected_rels relations expected on whole sieving region
+   # we want a nrels >= 100 to avoid small effects
+   if ( $nrels < 100 ) then
+      @ width = $width * 2
+      echo "   increasing width to" $width
+   endif
+   if ( $nrels > 200 && $width > 6 ) then
+      @ width = $width / 2
+      echo "   decreasing width to" $width
+   endif
+end
+echo Final sieving region: -$Amax $Amax 1 $Bmax
+echo Total $expected_rels expected relations
