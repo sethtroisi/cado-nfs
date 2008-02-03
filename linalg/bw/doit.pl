@@ -31,6 +31,7 @@ my $param = {
 	maxload=>1, # How many simultaneous jobs on one machine.
 	threshold=>64,	# A good starting value.
 	dimk=>10,
+        solution=>'W',  # Name of the solution file.
 };
 
 
@@ -165,6 +166,7 @@ sub dumpvar {
 }
 
 my $matrix =	$param->{'matrix'};	dumpvar 'matrix';
+my $solution =	$param->{'solution'};	dumpvar 'solution';
 my $modulus =	$param->{'modulus'};	dumpvar 'modulus';
 my $msize =	$param->{'msize'};	dumpvar 'msize';
 my $nrows =	$param->{'nrows'};	dumpvar 'nrows';
@@ -623,17 +625,23 @@ MKSOL : {
                 account 'io';
 	}
 
+        # --nbys now defaults to auto-detect.
+        action "${bindir}bw-gather --subdir $wdir";
+        account 'gather';
 
-		# --nbys now defaults to auto-detect.
-		action "${bindir}bw-gather --subdir $wdir";
-		if ($matrix) {
-			my $d = dirname $matrix;
-			if (-f "$wdir/W") {
-				do_cp "$wdir/W", $d;
-				push @solfiles, "$d/W";
-			}
-		}
-                account 'gather';
+        if ($matrix) {
+            my $d = dirname $matrix;
+            my $sol;
+            if ($solution =~ m{^/}) {
+                $sol = $solution;
+            } else {
+                $sol = "$d/$solution";
+            }
+            if (-f "$wdir/W") {
+                do_cp "$wdir/W", $sol;
+                push @solfiles, $sol;
+            }
+        }
 
 # 	if ($multisols) {
 # 		print scalar @sols_found, " solutions found ",
@@ -642,45 +650,46 @@ MKSOL : {
 # 		for my $f (@sols_found) { print "$f\n"; }
 # 	}
 
-	if (@solfiles) {
-		print "solution files\n";
-		for my $f (@solfiles) { print "$f\n"; }
-	}
+        if (@solfiles) {
+            print "solution files\n";
+            for my $f (@solfiles) { print "$f\n"; }
+        }
 
-	if ($matrix) {
-# 		if (scalar @solfiles != scalar @sols) {
-# 			print "POSSIBLE BUG: not all wanted solutions were found\n";
-# 			$tidy=0;
-# 		}
-
-		if (!$multisols && @solfiles) {
-			(my $sf = $matrix) =~ s/matrix/solution/;
-			if ($sf ne $matrix) {
-				my $s = $solfiles[0];
-				do_cp $s, $sf;
-				print "also: $sf\n";
-			}
-		}
-	}
         account 'io';
-}
 
-if ($dump) {
-	magmadump;
-}
-account 'io';
+#	if ($matrix) {
+## 		if (scalar @solfiles != scalar @sols) {
+## 			print "POSSIBLE BUG: not all wanted solutions were found\n";
+## 			$tidy=0;
+## 		}
+        #
+#		if (!$multisols && @solfiles) {
+#			(my $sf = $matrix) =~ s/matrix/solution/;
+#			if ($sf ne $matrix) {
+#				my $s = $solfiles[0];
+#				do_cp $s, $sf;
+#				print "also: $sf\n";
+#			}
+#		}
+#	}
+    }
 
-if ($tidy) {
-	system "rm -rf $wdir";
-}
-account 'io';
+    if ($dump) {
+        magmadump;
+    }
+    account 'io';
 
-print "-+" x 30, "\n";
-print "times (in seconds):\n";
-for my $k (keys %$times) {
-    print "$k\t", sprintf("%.2f", $times->{$k}), "\n";
-}
-print "total\t", sprintf("%.2f",(gettimeofday-$tstart)), "\n";
-print "-+" x 30, "\n";
-print "Seed value for this run was $seed\n";
+    if ($tidy) {
+        system "rm -rf $wdir";
+    }
+    account 'io';
+
+    print "-+" x 30, "\n";
+    print "times (in seconds):\n";
+    for my $k (keys %$times) {
+        print "$k\t", sprintf("%.2f", $times->{$k}), "\n";
+    }
+    print "total\t", sprintf("%.2f",(gettimeofday-$tstart)), "\n";
+    print "-+" x 30, "\n";
+    print "Seed value for this run was $seed\n";
 
