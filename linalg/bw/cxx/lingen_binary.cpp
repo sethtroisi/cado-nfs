@@ -739,7 +739,8 @@ static bool gauss(unsigned int piv[], polmat& PI)/*{{{*/
         // E.xmul_col(j);
         delta[j]++;
         if (PI.deg(j) >= (int) PI.ncoef - 1) {
-            std::cout << fmt("Column % exceeds max deg % at step %\n")
+            std::cout << fmt("Column % exceeds max deg % at step %"
+                    " (normal at the end)\n")
                 %j%(PI.ncoef - 1)%t;
             finished = true;
         }

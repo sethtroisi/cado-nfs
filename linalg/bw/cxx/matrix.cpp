@@ -95,9 +95,11 @@ void matrix_stats::operator()(std::ifstream& mtx) {
     typedef set<uint32_t>::const_iterator suci_t;
     if (zrows) {
         std::cout << "// " << zrows->size() << " zero rows:";
+        /*
         for(suci_t xi = zrows->begin() ; xi != zrows->end() ; xi++) {
             std::cout << " " << *xi;
         }
+        */
         std::cout << "\n";
         std::cout << std::flush;
     }
