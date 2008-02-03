@@ -2130,12 +2130,13 @@ merge(sparse_mat_t *mat, /*int nb_merge_max,*/ int maxlevel, int verbose, int fo
 {
     double tt;
     unsigned long bwcostmin = 0, oldcost = 0, cost;
-    int old_nrows, old_ncols, m, mm, njrem = 0, ncost = 0;
+    int old_nrows, old_ncols, m, mm, njrem = 0, ncost = 0, ncostmax;
 
+    ncostmax = 20; // was 5
     m = 2;
     while(1){
 	cost = ((unsigned long)mat->rem_ncols) * ((unsigned long)mat->weight);
-	fprintf(stderr, "w(M)=%lu, w(M)*ncols=%2.6e",
+	fprintf(stderr, "w(M)=%lu, w(M)*ncols=%lu",
 		mat->weight, (double)cost);
 	fprintf(stderr, " w(M)/ncols=%2.2lf\n", 
 		((double)mat->weight)/((double)mat->rem_ncols));
@@ -2145,10 +2146,10 @@ merge(sparse_mat_t *mat, /*int nb_merge_max,*/ int maxlevel, int verbose, int fo
 	    // what a trick!!!!
 	    printf("BWCOST: %lu\n", cost);
 	if(forbw && (oldcost != 0) && (cost > oldcost)){
-	    fprintf(stderr, "WARNING: New cost > old cost (%2.6e)\n",
-		    ((double)cost)-((double)oldcost));
 	    ncost++;
-	    if(ncost >= 5){
+	    fprintf(stderr, "WARNING: New cost > old cost (%2.6e) [%d/%d]\n",
+		    ((double)cost)-((double)oldcost), ncost, ncostmax);
+	    if(ncost >= ncostmax){
 		int nirem;
 
 		fprintf(stderr, "WARNING: New cost > old cost %d times",
