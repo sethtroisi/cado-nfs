@@ -22,10 +22,9 @@ else
    if [ ! -e $root.bw ] ; then
       mkdir $root.bw
    fi
-   time $linalg/bw/doit.pl matrix=$mat.tr mn=64 vectoring=64 multisols=1 wdir=$root.bw
+   time $linalg/bw/doit.pl matrix=$mat.tr mn=64 vectoring=64 multisols=1 wdir=$root.bw solution=$root.W
 
    echo "Converting dependencies to CADO format"
    # doit.pl puts the dependency file W in the directory where the matrix was
-   d=`dirname $root`
-   time $linalg/bw/mkbitstrings $d/W > $ker
+   time $linalg/bw/mkbitstrings $root.W > $ker
 fi
