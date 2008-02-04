@@ -2,21 +2,35 @@
 # program to guess sieve region
 # this is highly experimental, feel free to improve!
 
-# usage: sieve.guess name wrels
-# name - number name: $name.poly must exist (factor base is recomputed)
-name=$1
-poly=$name.poly
+# usage: sieve.guess --poly poly [--wanted <nrels>]
+# poly : some polynomial file.
+while [ $# -gt 0 ] ; do
+    if [ "$1" = "--poly" ] ; then
+        shift ; if [ $# = 0 ] ; then echo "arg required" >&2 ; exit 1 ; fi
+        poly=$1 ; shift
+    elif [ "$1" = "--wanted" ] ; then
+        shift ; if [ $# = 0 ] ; then echo "arg required" >&2 ; exit 1 ; fi
+        wrels=$1 ; shift
+    else
+        echo "Usage: $0 [args]" >&2
+        echo "Required: --poly <poly file>" >&2
+        echo "Optional: --wanted <number of relations wanted>" >&2
+        exit 1
+    fi
+done
+if [ ! -f "$poly" ] ; then echo "$poly: no such file" >&2 ; exit 1 ; fi
 skew=`awk '/^skew/ {print int($2)}' < $poly`
+if [ "$skew" = "" ] ; then echo "$poly: no skew ?" >&2 ; exit 1 ; fi
 lpbr=`awk '/^lpbr/ {print int($2)}' < $poly`
+if [ "$lpbr" = "" ] ; then echo "$poly: no lpbr ?" >&2 ; exit 1 ; fi
 lpba=`awk '/^lpba/ {print int($2)}' < $poly`
+if [ "$lpba" = "" ] ; then echo "$poly: no lpba ?" >&2 ; exit 1 ; fi
 # wrels - number of relations wanted
 #         as 0.8 * (2^lpbr/log(2^lpbr) + 2^lpba/log(2^lpba)), i.e., about
 #         1.15 * (2^lpbr/lpbr + 2^lpba/lpba).
-let wrels=(2**$lpbr/$lpbr+2**$lpba/$lpba)*115
-let wrels=$wrels/100
-
-if [ "$2" != "" ] ; then
-    let wrels=$2
+if [ "$wrels" = "" ] ; then
+    let wrels=(2**$lpbr/$lpbr+2**$lpba/$lpba)*115
+    let wrels=$wrels/100
 fi
 
 echo "Relations wanted: $wrels"
