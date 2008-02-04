@@ -1,59 +1,68 @@
-#!/bin/csh
+#!/bin/bash
 # program to guess sieve region
 # this is highly experimental, feel free to improve!
 
 # usage: sieve.guess name wrels
 # name - number name: $name.poly must exist (factor base is recomputed)
-# wrels - number of relations wanted (could be deduced from large prime bounds
+name=$1
+poly=$name.poly
+skew=`awk '/^skew/ {print int($2)}' < $poly`
+lpbr=`awk '/^lpbr/ {print int($2)}' < $poly`
+lpba=`awk '/^lpba/ {print int($2)}' < $poly`
+# wrels - number of relations wanted
 #         as 0.8 * (2^lpbr/log(2^lpbr) + 2^lpba/log(2^lpba)), i.e., about
-#         1.15 * (2^lpbr/lpbr + 2^lpba/lpba), awk/perl expert also wanted)
-set name=$1
-set poly=$name.poly
-set skew=`grep skew $poly | awk '{print int($NF)}'`
-set wrels=$2
+#         1.15 * (2^lpbr/lpbr + 2^lpba/lpba).
+let wrels=(2**$lpbr/$lpbr+2**$lpba/$lpba)*115
+let wrels=$wrels/100
 
-set tmp=/tmp
-set fb=/tmp/roots$$
+if [ "$2" != "" ] ; then
+    let wrels=$2
+fi
+
+echo "Relations wanted: $wrels"
+
+tmp=/tmp
+fb=$tmp/roots$$
 
 # start with tiny sieving region
-@ Bmax = 500
-@ expected_rels=0
+let Bmax=500
+let expected_rels=0
 echo "Generating factor base"
 sieve/makefb -poly $poly > $fb
-@ width = 6
-while ( $expected_rels < $wrels )
-   @ t = 4 * $expected_rels
-   if ( $t < $wrels ) then
-      @ Bmax = 2 * $Bmax
-   else
-      @ Bmax = $Bmax + ($Bmax / 10)
-   endif
-   @ Amax = $Bmax * $skew
-   @ Bmid = $Bmax / 2
-   # we try sieving from $Bmid to $Bmid+$width-1
-   @ b0 = $Bmid
-   @ b1 = $Bmid + $width - 1
-   echo Trying sieving region -$Amax $Amax 1 $Bmax
-   set region="-$Amax $Amax $b0 $b1"
-   echo "   trying" small region $region
-   sieve/sieve -poly $poly -fb $fb $region > /tmp/rels_raw$$
-   # FIXME: we might want to redirect stderr from checknorms to /dev/null
-   postsieve/checknorms/checknorms -poly $poly /tmp/rels_raw$$ > /tmp/rels$$
-   @ nrels = `wc -l /tmp/rels$$ | cut -d" " -f 1`
-   echo "   remains" $nrels relations after checknorms
-   /bin/rm /tmp/rels_raw$$ /tmp/rels$$
-   @ expected_rels = ($nrels * $Bmax) / $width
-   echo "   total" $expected_rels relations expected on whole sieving region
-   # we want a nrels >= 100 to avoid small effects
-   if ( $nrels < 100 ) then
-      @ width = $width * 2
-      echo "   increasing width to" $width
-   endif
-   if ( $nrels > 200 && $width > 6 ) then
-      @ width = $width / 2
-      echo "   decreasing width to" $width
-   endif
-end
+let width=6
+while [ $expected_rels -lt $wrels ] ; do
+    let t=4*$expected_rels
+    if [ $t -lt $wrels ] ; then
+        let Bmax=2*$Bmax
+    else
+        let Bmax=($Bmax/10)+$Bmax
+    fi
+    let Amax=$Bmax*$skew
+    let Bmid=$Bmax/2
+    # we try sieving from $Bmid to $Bmid+$width-1
+    let b0=$Bmid
+    let b1=$Bmid+$width-1
+    echo Trying sieving region -$Amax $Amax 1 $Bmax
+    region="-$Amax $Amax $b0 $b1"
+    echo "   trying small region $region"
+    sieve/sieve -poly $poly -fb $fb `echo $region` > $tmp/rels_raw$$
+    # FIXME: we might want to redirect stderr from checknorms to /dev/null
+    postsieve/checknorms/checknorms -poly $poly $tmp/rels_raw$$ > $tmp/rels$$
+    let nrels=`wc -l < $tmp/rels$$`
+    echo "   remains $nrels relations after checknorms"
+    /bin/rm $tmp/rels_raw$$ $tmp/rels$$
+    let expected_rels=($nrels*$Bmax)/$width
+    echo "   total $expected_rels relations expected on whole sieving region"
+    # we want a nrels >= 100 to avoid small effects
+    if [ $nrels -lt 100 ] ; then
+        let width=$width*2
+        echo "   increasing width to $width"
+    fi
+    if [ $nrels -gt 200 ] && [ $width -gt 6 ] ; then
+        let width=$width/2
+        echo "   decreasing width to $width"
+    fi
+done
 /bin/rm $fb
-echo Final sieving region: -$Amax $Amax 1 $Bmax
-echo Total $expected_rels expected relations
+echo "Final sieving region: -$Amax $Amax 1 $Bmax"
+echo "Total $expected_rels expected relations"
