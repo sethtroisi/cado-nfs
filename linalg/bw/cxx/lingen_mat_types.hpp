@@ -234,7 +234,6 @@ struct polmat { /* {{{ */
     int   * _deg;
     inline unsigned int stride() const { return BITS_TO_WORDS(ncoef, ULONG_BITS); }/*{{{*/
     inline unsigned int colstride() const { return nrows * stride(); }/*}}}*/
-    static void brev_warning();
     public:
     int& deg(unsigned int j) { ASSERT(j < ncols); return _deg[order[j]]; }/*{{{*/
     int deg(unsigned int j) const { ASSERT(j < ncols); return _deg[order[j]]; }
@@ -595,7 +594,7 @@ struct polmat { /* {{{ */
         ASSERT(j < ncols);
         ASSERT(k < ncoef);
         BUG_ON(critical);
-        brev_warning();
+        // brev_warning();
         unsigned int offset = k / ULONG_BITS;
         unsigned long shift = k % ULONG_BITS;
         return poly(i,j)[offset] >> shift & 1UL;
@@ -604,7 +603,7 @@ struct polmat { /* {{{ */
     {
         ASSERT(k < ncoef);
         BUG_ON(critical);
-        brev_warning();
+        // brev_warning();
         bmat tmp_a(nrows, ncols);
         for(unsigned int j = 0 ; j < ncols ; j++) {
             for(unsigned int i = 0 ; i < nrows ; i++) {
@@ -622,21 +621,13 @@ struct polmat { /* {{{ */
         ASSERT(j < ncols);
         ASSERT(k < ncoef);
         BUG_ON(critical);
-        brev_warning();
+        // brev_warning();
         unsigned int offset = k / ULONG_BITS;
         poly(i,j)[offset] ^= z << (k % ULONG_BITS);
     }/*}}}*/
 };
 
 bool polmat::critical = false;
-void polmat::brev_warning()
-{
-    static bool told;
-    if (!told) {
-        WARNING("attention : bit reverse might come here !");
-    }
-    told = 1;
-}
 
 /*}}}*/
 template<typename fft_type> struct tpolmat /* {{{ */
