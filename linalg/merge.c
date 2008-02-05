@@ -2067,6 +2067,7 @@ minColWeight(sparse_mat_t *mat)
 int
 inspectRowWeight(sparse_mat_t *mat)
 {
+    //    double tt = seconds();
     int i, maxw = 0, nirem = 0, niremmax = 128;
 
     for(i = 0; i < mat->nrows; i++){
@@ -2096,8 +2097,8 @@ inspectRowWeight(sparse_mat_t *mat)
 		maxw = lengthRow(mat, i);
 	}
     }
-    fprintf(stderr, "nirem=%d; nrows=%d; max row weight is %d\n", 
-	    nirem, mat->rem_nrows, maxw);
+    //    fprintf(stderr, "nirem=%d; nrows=%d; max row weight is %d (%2.2lf)\n", 
+    //	    nirem, mat->rem_nrows, maxw, seconds()-tt);
     return nirem;
 }
 
@@ -2135,7 +2136,6 @@ deleteSuperfluousRows(sparse_mat_t *mat, int keep, int niremmax)
 void
 merge(sparse_mat_t *mat, /*int nb_merge_max,*/ int maxlevel, int verbose, int forbw)
 {
-    double tt;
     unsigned long bwcostmin = 0, oldcost = 0, cost;
     int old_nrows, old_ncols, m, mm, njrem = 0, ncost = 0, ncostmax;
 
@@ -2199,9 +2199,7 @@ merge(sparse_mat_t *mat, /*int nb_merge_max,*/ int maxlevel, int verbose, int fo
 	fprintf(stderr, "=> nrows=%d ncols=%d (%d) njrem=%d\n",
 		mat->rem_nrows, mat->rem_ncols, 
 		mat->rem_nrows - mat->rem_ncols, njrem);
-	tt = seconds();
 	inspectRowWeight(mat);
-	fprintf(stderr, "inspectRowWeight: %2.2lf\n", seconds()-tt);
 	deleteEmptyColumns(mat);
 	mm = minColWeight(mat);
 	fprintf(stderr, "Min col weight = %d\n", mm);
@@ -2240,42 +2238,10 @@ mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
     dclist dcl;
     int old_nrows, old_ncols, m = 2, njrem = 0, ncost = 0, ncostmax, j, njproc;
 
+    fprintf(stderr, "Using mergeOneByOne\n");
     ncostmax = 20; // was 5
     njproc = 0;
     while(1){
-	cost = ((unsigned long)mat->rem_ncols) * ((unsigned long)mat->weight);
-	fprintf(stderr, "w(M)=%lu, w(M)*ncols=%lu", mat->weight, cost);
-	fprintf(stderr, " w(M)/ncols=%2.2lf\n", 
-		((double)mat->weight)/((double)mat->rem_ncols));
-	if((bwcostmin == 0) || (cost < bwcostmin))
-	    bwcostmin = cost;
-	if(forbw)
-	    // what a trick!!!!
-	    printf("BWCOST: %lu\n", cost);
-	if(forbw && (oldcost != 0) && (cost > oldcost)){
-	    ncost++;
-	    fprintf(stderr, "WARNING: New cost > old cost (%2.6e) [%d/%d]\n",
-		    ((double)cost)-((double)oldcost), ncost, ncostmax);
-	    if(ncost >= ncostmax){
-		int nirem;
-
-		fprintf(stderr, "WARNING: New cost > old cost %d times",
-                        ncost);
-		fprintf(stderr, " in a row:");
-		nirem = deleteSuperfluousRows(mat, mat->delta, 128);
-		if(nirem == 0){
-		    fprintf(stderr, " stopping\n");
-		    break;
-		}
-		else{
-		    fprintf(stderr, " try again after removing %d rows!\n",
-			    nirem);
-		    continue;
-		}
-	    }
-	}
-	else
-	    ncost = 0;
 	oldcost = cost;
 	old_nrows = mat->rem_nrows;
 	old_ncols = mat->rem_ncols;
@@ -2295,7 +2261,7 @@ mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 	    njrem += mergeGe2(mat, m, verbose);
 	}
 	else{
-	    fprintf(stderr, "Performing one merge for m=%d\n", m);
+	    //	    fprintf(stderr, "Performing one merge for m=%d\n", m);
 	    dcl = mat->S[m]->next;
 	    j = dcl->j;
             mergeForColumn(&tt, &tfill, &tMST, mat, m, j);
@@ -2307,19 +2273,61 @@ mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 	    totdel += (seconds()-tt);
 	    njproc++;
 	}
-	if((m <= 2) || ((njproc % 1000) == 0)){
-	    fprintf(stderr, "=> nrows=%d ncols=%d (%d) njrem=%d at %2.2lf\n",
-		    mat->rem_nrows, mat->rem_ncols, 
-		    mat->rem_nrows - mat->rem_ncols, njrem, seconds());
-	    tt = seconds();
-	    inspectRowWeight(mat);
-	    fprintf(stderr, "inspectRowWeight: %2.2lf\n", seconds()-tt);
-	}
 	deleteEmptyColumns(mat);
 	if((old_nrows == mat->rem_nrows) && (old_ncols == mat->rem_ncols)){
 	    if((m > maxlevel) || (m <= 0))
 		break;
 	}
+	cost = ((unsigned long)mat->rem_ncols) * ((unsigned long)mat->weight);
+	if((njproc % 1000) == 0){ // somewhat arbitrary...!
+	    deleteSuperfluousRows(mat, mat->delta, 64);
+	    inspectRowWeight(mat);
+	}
+	if((njproc % 10000) == 0){
+	    fprintf(stderr, "T=%d nrows=%d ncols=%d (%d)",
+		    (int)seconds(),
+		    mat->rem_nrows, mat->rem_ncols, 
+		    mat->rem_nrows - mat->rem_ncols);
+	    fprintf(stderr, " wM*N=%lu", cost);
+	    fprintf(stderr, " wM/N=%2.2lf\n", 
+		    ((double)mat->weight)/((double)mat->rem_ncols));
+	    // njrem=%d at %2.2lf\n",
+	    if(forbw)
+		// what a trick!!!!
+		printf("BWCOST: %lu\n", cost);
+	}
+	if((bwcostmin == 0) || (cost < bwcostmin)){
+	    bwcostmin = cost;
+	    if(forbw)
+		// what a trick!!!!
+		printf("BWCOST: %lu\n", cost);
+	}
+	if(forbw && (oldcost != 0) && (cost > oldcost)){
+	    ncost++;
+#if 0
+	    fprintf(stderr, "New cost > old cost (%2.6e) [%d/%d]\n",
+		    ((double)cost)-((double)oldcost), ncost, ncostmax);
+#endif
+	    if(ncost >= ncostmax){
+		int nirem;
+
+		fprintf(stderr, "New cost > old cost %d times", ncost);
+		fprintf(stderr, " in a row:");
+		nirem = deleteSuperfluousRows(mat, mat->delta, 128);
+		if(nirem == 0){
+		    fprintf(stderr, " stopping\n");
+		    break;
+		}
+		else{
+		    fprintf(stderr, " try again after removing %d rows!\n",
+			    nirem);
+		    njproc += nirem; // humf: odd name for njproc...!
+		    continue;
+		}
+	    }
+	}
+	else
+	    ncost = 0;
     }
     if(forbw){
 	printf("BWCOSTMIN: %lu\n", bwcostmin);
