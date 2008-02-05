@@ -1179,36 +1179,34 @@ eval_double_poly (double *g, int d, double s)
   return v;
 }
 
-/* Return the square of the value of S that minimizes the expression:
-   [|p[d]|*S^d + ... + |p[0]|*S^{-d}] * [m/S + S],
-   i.e., a zero of g(S) = (d+1) |p[d]| S^d + ... - (d-1) |p[0]| S^{-d}
-   + (d-1) m |p[d]| S^{d-2} + ... - (d+1) m |p[0]| S^{-d-2}.
+/* Return the ***square*** of the value of S that minimizes the expression:
+
+                |p[d]| * S^d + ... + |p[0]| * S^{-d}
+
+   S is a zero of g(S) = d |p[d]| S^{d-1} + ... - d |p[0]| S^{-d-1},
+   thus S^2 is a zero of d |p[d]| x^d + ... - d |p[0]|.
+
    This correspond to a sieving region |a| <= S^{1/2} R, and |b| <= R/S^{1/2}.
-   Note: Bernstein in [2] defines the 'skewness' as the square of that value,
-   with |a| <= SR and |b| <= R/S. We follow here the convention from [1].
+   Note: Bernstein [2] defines the 'skewness' as S, i.e., the square root of
+   the returned value, with |a| <= SR and |b| <= R/S. We prefer here to follow
+   the convention from [1], which gives sieving bound Amax = S * Bmax.
 
    Since there is only one sign change in the coefficients of g, it has
    exactly one root on [0, +Inf[. We search it by dichotomy.
-   There are two differences with respect to Definition 3.1 in [1]:
-   (a) we consider the L1 norm instead of the Linf norm;
-   (b) we also take into account the linear polynomial.
+   There is one difference with respect to Definition 3.1 in [1]:
+   we consider the L1 norm instead of the Linf norm.
 */
 double
-skewness (mpz_t *p, int d, double m)
+skewness (mpz_t *p, int d)
 {
   double *g, sa, sb, s;
   int i;
 
-  g = (double*) malloc ((d + 2) * sizeof (double));
-  /* g[0] stores the coefficient of degree -d-2, ..., 
-     g[d+1] that of degree d */
-  g[0] = 0.0;
+  g = (double*) malloc ((d + 1) * sizeof (double));
+  /* g[0] stores the coefficient of degree -d-1 of g(S), ..., 
+     g[d] that of degree d-1 */
   for (i = 0; i <= d; i++)
-    {
-      s = fabs (mpz_get_d (p[i]));
-      g[i + 1] = (double) (2 * i - d + 1) * s;
-      g[i] += (double) (2 * i - d - 1) * (double) m * s;
-    }
+    g[i] = (double) (2 * i - d) * fabs (mpz_get_d (p[i]));
   if (eval_double_poly (g, d, 1.0) > 0) /* g(1.0) > 0 */
     {
       /* search sa < 1 such that g(sa) <= 0 */
@@ -1224,7 +1222,7 @@ skewness (mpz_t *p, int d, double m)
   /* now g(sa) < 0, g(sb) > 0, and sb = 2*sa.
      We use 10 iterations only, which gives a relative precision of
      2^(-10) ~ 0.001, which is enough for our needs. */
-  for (i = 0; i < 10; i++)
+  for (i = 0; i < 100; i++)
     {
       s = (sa + sb) / 2.0;
       if (eval_double_poly (g, d, s) < 0)
@@ -1315,7 +1313,7 @@ generate_base_m (cado_poly p, mpz_t m)
   mpz_neg (p->g[0], m);
   mpz_set_ui (p->g[1], g);
   mpz_set (p->m, m);
-  p->skew = skewness (p->f, d, mpz_get_d (m));
+  p->skew = skewness (p->f, d);
 }
 
 void
