@@ -632,7 +632,9 @@ MKSOL : {
         if ($matrix) {
             my $d = dirname $matrix;
             my $sol;
-            if ($solution =~ m{^/}) {
+            # If there is no slash, assume it is a basename and put it
+            # aside the matrix. Otherwise, trust the user.
+            if ($solution =~ m{/}) {
                 $sol = $solution;
             } else {
                 $sol = "$d/$solution";
