@@ -37,8 +37,8 @@ modul_div3 (residueul_t r, residueul_t a, modulusul_t m)
 #endif
 }
 
+
 /* Compute 1/t (mod 2^wordsize) */
-/* FIXME: not optimised yet */
 unsigned long
 modul_invmodlong (modulusul_t m)
 {
@@ -60,10 +60,11 @@ modul_invmodlong (modulusul_t m)
   if (sizeof (unsigned long) > 4)
     r = 2UL * r - r * r * m[0];
 
-  ASSERT (r * m[0] = 1UL);
+  ASSERT (r * m[0] == 1UL);
 
   return r;
 }
+
 
 unsigned long
 modul_gcd (residueul_t r, modulusul_t m)
@@ -159,25 +160,65 @@ modul_powredc_mp (residueul_t r, const residueul_t b, const unsigned long *e,
   /* Exponentiate */
 
   modul_set (r, b, m);       /* (r*b)^mask * b^(e-mask) = r^mask * b^e */
+  mask >>= 1;
 
-  while (mask > 1UL)
+  for ( ; i >= 0; i--)
     {
-      modul_mulredc (r, r, r, invm, m);
-      mask >>= 1;            /* (r^2)^(mask/2) * b^e = r^mask * b^e */
-      if (e[i] & mask)
-        modul_mulredc (r, r, b, invm, m);
-    }
-
-  for (i--; i >= 0; i--)
-    {
-      mask = ~0UL - (~0UL >> 1);
-      while (mask > 1UL)
+      while (mask > 0UL)
         {
           modul_mulredc (r, r, r, invm, m);
-          mask >>= 1;            /* (r^2)^(mask/2) * b^e = r^mask * b^e */
           if (e[i] & mask)
             modul_mulredc (r, r, b, invm, m);
+          mask >>= 1;            /* (r^2)^(mask/2) * b^e = r^mask * b^e */
         }
+      mask = ~0UL - (~0UL >> 1);
+    }
+}
+
+void
+modul_2powredc_mp (residueul_t r, const unsigned long *e, 
+                   const int e_nrwords, const unsigned long invm, 
+                   const modulusul_t m)
+{
+  unsigned long mask = ~0UL - (~0UL >> 1); /* Only MSB set */
+  int i = e_nrwords - 1;
+
+  if (e_nrwords == 0 || e[i] == 0UL)
+    {
+      const residueul_t one = {1UL};
+      modul_tomontgomery (r, one, m);
+      return;
+    }
+
+  /* Find highest set bit in e. */
+  while ((e[i] & mask) == 0UL)
+    mask >>= 1; /* r = 1, so r^(mask/2) * b^e = r^mask * b^e  */
+
+  /* Set r to 2 in Montgomery representation. We use the fact that
+     (m*invm + 1)/w == 1/w (mod m) */
+  {
+    unsigned long dummy;
+    mul_ul_ul_2ul (r , &dummy, m[0], invm);
+    r[0]++;
+  }
+
+  /* Exponentiate */
+  {
+    const residueul_t two = {2UL};
+    modul_tomontgomery (r, two, m);  
+  }
+  mask >>= 1;
+
+  for ( ; i >= 0; i--)
+    {
+      while (mask > 0UL)
+        {
+          modul_mulredc (r, r, r, invm, m);
+          if (e[i] & mask)
+            modul_add (r, r, r, m);
+          mask >>= 1;            /* (r^2)^(mask/2) * b^e = r^mask * b^e */
+        }
+      mask = ~0UL - (~0UL >> 1);
     }
 }
 

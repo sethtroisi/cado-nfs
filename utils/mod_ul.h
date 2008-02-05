@@ -58,6 +58,8 @@
 #define mod_div3             modul_div3
 #define mod_invmodlong       modul_invmodlong
 #define mod_powredc_ul       modul_powredc_ul
+#define mod_powredc_mp       modul_powredc_mp
+#define mod_2powredc_mp      modul_2powredc_mp
 #define mod_sprp             modul_sprp
 #define mod_gcd              modul_gcd
 #define mod_inv              modul_inv
@@ -598,6 +600,10 @@ unsigned long modul_gcd (residueul_t, modulusul_t);
 unsigned long modul_invmodlong (modulusul_t);
 void modul_powredc_ul (residueul_t, const residueul_t, const unsigned long, 
 		       const unsigned long, const modulusul_t);
+void modul_powredc_mp (residueul_t, const residueul_t, const unsigned long *,
+                       const int, const unsigned long, const modulusul_t);
+void modul_2powredc_mp (residueul_t, const unsigned long *, const int, 
+                        const unsigned long, const modulusul_t);
 int modul_sprp (const residueul_t, const unsigned long, const modulusul_t);
 int modul_inv (residueul_t, residueul_t, modulusul_t);
 int modul_jacobi (residueul_t, modulusul_t);
