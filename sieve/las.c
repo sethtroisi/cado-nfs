@@ -183,6 +183,8 @@ sieve_slow (unsigned char *S, const factorbase_degn_t *fb,
 // this main is just to play with rsa155
 // compile with:
 //   gcc -O4 -o las -I.. las.c fb.o ../utils/libutils.a -lgmp -lm
+// and run with:
+//   ./las rsa155.roots
 int main(int argc, char ** argv) {
     sieve_info_t si;
     const double log_scale = 1.4426950408889634073599246810018921374;
@@ -212,14 +214,18 @@ int main(int argc, char ** argv) {
     sieve_slow(S, fb, &si);
 
     unsigned char min=255;
-    int imin = 0;
-    int i;
-    for (i = 0; i < si.I*si.J; ++i)
-        if ((S[i] < min) && (S[i]>30) ) {
-            imin = i;
-            min = S[i];
+    int kmin = 0;
+    int i, j, k;
+    for (k = 0; k < si.I*si.J; ++k)
+        if ((S[k] < min) && (S[k]>30) ) {
+            kmin = k;
+            min = S[k];
         }
-    printf("Min of %d is obtained for i = %d\n", min, imin);
+    
+    i = (kmin % (si.I)) - si.I / 2;
+    j = kmin / si.I;
+    
+    printf("Min of %d is obtained for (i,j) = (%d,%d)\n", min, i, j);
 
 }
 
