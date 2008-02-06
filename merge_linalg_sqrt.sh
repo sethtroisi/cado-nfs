@@ -62,8 +62,9 @@ echo "SIZE(merge.his): `ls -s $name.merge.his`"
 
 echo "Replaying merges"
 
+bwcostmin=`tail $name.merge.his | grep "BWCOSTMIN:" | awk '{print $NF}'`
 argsr="$purged $name.merge.his $name.small $name.index"
-time $linalg/replay $argsr $verbose # 2> $name.replay.err
+time $linalg/replay $argsr $bwcostmin # 2> $name.replay.err
 echo "SIZE(index): `ls -s $name.index`"
 
 echo "Performing the linear algebra phase"
