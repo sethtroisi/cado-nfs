@@ -252,32 +252,18 @@ reduce_plattice(plattice_info_t *pli, const fbprime_t p, const fbprime_t r, cons
             a0 += b0;
             a1 += b1;
           }
-        k++;
-        if (-a0 < I)
-          {
-            /* b0 > 0, a0 < 0, with |b0| > |a0| */
-            while (b0 >= I)
-              {
-                b0 += a0;
-                b1 += a1;
-              }
-            goto case_k_even;
-          }
         /* b0 > 0, a0 < 0 with |b0| > |a0| */
-        while (b0 + a0 >= 0)
+        while (b0 + a0 >= 0 && b0 >= I)
           {
             b0 += a0;
             b1 += a1;
           }
-        k++;
     }
-    /* k is odd here */
     while (a0 <= -I)
       {
         a0 += b0;
         a1 += b1;
       }
- case_k_even:
     pli->alpha = a0;
     pli->beta = a1;
     pli->gamma = b0;
