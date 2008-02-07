@@ -112,13 +112,17 @@ fb_root_in_qlattice(const fbprime_t p, const fbprime_t R, const sieve_info_t * s
 static void
 special_case_0() 
 {
+#ifndef NO_WARNING
     fprintf(stderr, "Warning: special_case_0() not implemented\n");
+#endif
 }
 
 static void
 special_case_p() 
 {
+#ifndef NO_WARNING
     fprintf(stderr, "Warning: special_case_p() not implemented\n");
+#endif
 }
 
 static void
@@ -218,31 +222,7 @@ reduce_plattice(plattice_info_t *pli, const fbprime_t p, const fbprime_t r, cons
     I = si->I;
     a0 = -p; a1 = 0;
     b0 = r;  b1 = 1;
-#if 1
-    while ( abs(b0) >= I )  // Since I is a power of 2, this can be made fast
-    {
-        ak = (int32_t) floor( fabs( (double)a0 / (double)b0 ) ); // costly!
-        c0 = a0 + ak*b0;
-        c1 = a1 + ak*b1;
-        a0 = b0; a1 = b1;
-        b0 = c0; b1 = c1;
-        k++;
-    }
-    ak = (int32_t) ceil( fabs((double)(abs(a0)+1-I) / (double)b0) );
-    a0 += ak*b0; 
-    a1 += ak*b1; 
-    if ((k%2) == 1) {
-        pli->alpha = a0;
-        pli->beta = a1;
-        pli->gamma = b0;
-        pli->delta = b1;
-    } else {
-        pli->alpha = b0;
-        pli->beta = b1;
-        pli->gamma = a0;
-        pli->delta = a1;
-    } 
-#else
+#if 0
     /* subtractive variant of Euclid's algorithm */
     while ( b0 >= I )
     {
@@ -264,6 +244,47 @@ reduce_plattice(plattice_info_t *pli, const fbprime_t p, const fbprime_t r, cons
         a0 += b0;
         a1 += b1;
       }
+    pli->alpha = a0;
+    pli->beta = a1;
+    pli->gamma = b0;
+    pli->delta = b1;
+#else 
+    /* another subtractive variant of Euclid's algorithm */
+    /* Seems to be faster... */
+    while ( b0 >= I )
+    {
+      /* a0 < 0, b0 > 0 with |a0| > |b0| */
+        while (a0 + b0 <= 0)
+          {
+            a0 += b0;
+            a1 += b1;
+          }
+        k++;
+        if (-a0 < I)
+          {
+            /* b0 > 0, a0 < 0, with |b0| > |a0| */
+            while (b0 >= I)
+              {
+                b0 += a0;
+                b1 += a1;
+              }
+            goto case_k_even;
+          }
+        /* b0 > 0, a0 < 0 with |b0| > |a0| */
+        while (b0 + a0 >= 0)
+          {
+            b0 += a0;
+            b1 += a1;
+          }
+        k++;
+    }
+    /* k is odd here */
+    while (a0 <= -I)
+      {
+        a0 += b0;
+        a1 += b1;
+      }
+ case_k_even:
     pli->alpha = a0;
     pli->beta = a1;
     pli->gamma = b0;
@@ -295,6 +316,8 @@ sieve_random_access (unsigned char *S, const factorbase_degn_t *fb,
     unsigned int d;
     unsigned char logp;
     unsigned char *S_ptr;
+    int start_large = 0;
+    double tm = seconds();
 
     // Loop over all primes in the factor base.
     while (fb->p > 0) {
@@ -320,6 +343,12 @@ sieve_random_access (unsigned char *S, const factorbase_degn_t *fb,
 
             // Branch to lattice-sieving for large p
             if (p > I) {
+                if (start_large == 0) {
+                    start_large = 1;
+                    printf("small primes sieved in %f sec\n", seconds()-tm);
+                    tm = seconds();
+                }
+
                 plattice_info_t pli;
                 reduce_plattice(&pli, p, r, si);
 
@@ -343,38 +372,28 @@ sieve_random_access (unsigned char *S, const factorbase_degn_t *fb,
                 }
                 asm("## Inner sieving routine stops here!!!\n");
             }  else { 
+                // line sieving
                 unsigned long j;
+                long ii0 = Is2modp; // this will be (rj+I/2) mod p
                 for (j = 0; j < si->J; ++j) {
                     long i0;
                     // init i0 = -I/2 + ( (rj+I/2) mod p)
-                    {
-                        modulus_t m;
-                        residueul_t x, rr, jj;
-
-                        // TODO:
-                        // Assuming that p < 2^32 and we are on 64bit
-                        // machine, this can be improved a lot! No need to
-                        // use mod_ul lib.
-                        mod_initmod_ul(m, p);
-                        modul_initmod_ul(rr, r);
-                        if (j >= p) 
-                            modul_initmod_ul(jj, j % p);
-                        else
-                            modul_initmod_ul(jj, j);
-                        modul_mul(x, rr, jj, m);            // here there is a modulo p
-                        modul_add_ul(x, x, Is2modp, m);
-                        i0 = (long)modul_get_ul(x, m) - (long)(I>>1) ;
-                    }
-
+                    i0 = ii0 - (long)(I>>1);
                     S_ptr = S + (j*I + (I>>1));
                     // sieve one j-line
                     for (; i0 < (I>>1); i0 += p)
                         S_ptr[i0] -= logp;
+                    // update starting point
+                    ii0 += r;
+                    if (ii0 >= p)
+                        ii0 -= p;
+
                 }
             }
         }
         fb = fb_next (fb); // cannot do fb++, due to variable size !
     }
+    printf("large primes sieved in %f sec\n", seconds()-tm);
 }
 
 
@@ -440,16 +459,19 @@ int main(int argc, char ** argv) {
 
     S = (unsigned char *) malloc (si.I*si.J*sizeof(unsigned char));
     ASSERT_ALWAYS(S != NULL);
-    // Put 255 everywhere, since we don't want to compute norms for the
-    // moment.
-    memset(S, 255, si.I*si.J);
 
     factorbase_degn_t * fb;
     fb = fb_read (argv[1], log_scale, 1);
     ASSERT_ALWAYS(fb != NULL);
 
+    // Put 255 everywhere, since we don't want to compute norms for the
+    // moment.
+    memset(S, 255, si.I*si.J);
+
+    double tm = seconds();
     //sieve_slow(S, fb, &si);
     sieve_random_access(S, fb, &si);
+    printf("Done sieving in %f sec\n", seconds()-tm);
 
     unsigned char min=255;
     int kmin = 0;
