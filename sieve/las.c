@@ -218,6 +218,7 @@ reduce_plattice(plattice_info_t *pli, const fbprime_t p, const fbprime_t r, cons
     I = si->I;
     a0 = -p; a1 = 0;
     b0 = r;  b1 = 1;
+#if 1
     while ( abs(b0) >= I )  // Since I is a power of 2, this can be made fast
     {
         ak = (int32_t) floor( fabs( (double)a0 / (double)b0 ) ); // costly!
@@ -241,6 +242,47 @@ reduce_plattice(plattice_info_t *pli, const fbprime_t p, const fbprime_t r, cons
         pli->gamma = a0;
         pli->delta = a1;
     } 
+#else
+    /* subtractive variant of Euclid's algorithm */
+    while ( b0 >= I )
+    {
+      /* a0 < 0, b0 > 0 with |a0| > |b0| */
+        while (a0 + b0 <= 0)
+          {
+            a0 += b0;
+            a1 += b1;
+          }
+        k++;
+        if (-a0 < I)
+          {
+            /* b0 > 0, a0 < 0, with |b0| > |a0| */
+            while (b0 >= I)
+              {
+                b0 += a0;
+                b1 += a1;
+              }
+            goto case_k_even;
+          }
+        /* b0 > 0, a0 < 0 with |b0| > |a0| */
+        while (b0 + a0 >= 0)
+          {
+            b0 += a0;
+            b1 += a1;
+          }
+        k++;
+    }
+    /* k is odd here */
+    while (a0 <= -I)
+      {
+        a0 += b0;
+        a1 += b1;
+      }
+ case_k_even:
+    pli->alpha = a0;
+    pli->beta = a1;
+    pli->gamma = b0;
+    pli->delta = b1;
+#endif
     assert (pli->beta > 0);
     assert (pli->delta > 0);
     assert ((pli->alpha <= 0) && (pli->alpha > -I));
