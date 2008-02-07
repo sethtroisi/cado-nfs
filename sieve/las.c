@@ -319,8 +319,8 @@ sieve_random_access (unsigned char *S, const factorbase_degn_t *fb,
     int start_large = 0;
     double tm = seconds();
 
-    // Loop over all primes in the factor base.
-    while (fb->p > 0) {
+    // Loop over all primes in the factor base <= I
+    while (fb->p > 0 && fb->p <= si->I) {
         unsigned char nr;
         p = fb->p;
         logp = fb->plog;
@@ -339,39 +339,7 @@ sieve_random_access (unsigned char *S, const factorbase_degn_t *fb,
             } 
             
             const uint32_t I = si->I;
-            const uint32_t maskI = I-1;
-
-            // Branch to lattice-sieving for large p
-            if (p > I) {
-                if (start_large == 0) {
-                    start_large = 1;
-                    printf("small primes sieved in %f sec\n", seconds()-tm);
-                    tm = seconds();
-                }
-
-                plattice_info_t pli;
-                reduce_plattice(&pli, p, r, si);
-
-                // Start sieving from (0,0) which is I/2 in x-coordinate
-                uint32_t x;
-                x = (I>>1);
-                // TODO: to gain speed, by aligning the start of the
-                // loop, in assembly.
-                // Besides this small trick, gcc does a good job with
-                // this loop: no branching for the if(), and a dozen of
-                // instructions inside the while().
-                asm("## Inner sieving routine starts here!!!\n");
-                while (x < I*si->J) {
-                    uint32_t i;
-                    i = x & maskI;   // x mod I
-                    S[x] -= logp;
-                    if (i >= pli.b1)
-                        x += pli.a;
-                    if (i < pli.b0)
-                        x += pli.c;
-                }
-                asm("## Inner sieving routine stops here!!!\n");
-            }  else { 
+            { 
                 // line sieving
                 unsigned long j;
                 long ii0 = Is2modp; // this will be (rj+I/2) mod p
@@ -393,10 +361,108 @@ sieve_random_access (unsigned char *S, const factorbase_degn_t *fb,
         }
         fb = fb_next (fb); // cannot do fb++, due to variable size !
     }
+    printf("small primes sieved in %f sec\n", seconds()-tm);
+    tm = seconds();
+
+    // Loop over all primes in the factor base > I
+    while (fb->p > 0) {
+        unsigned char nr;
+        p = fb->p;
+        logp = fb->plog;
+
+        for (nr = 0; nr < fb->nr_roots; ++nr) {
+            R = fb->roots[nr];
+            r = fb_root_in_qlattice(p, R, si);
+            if (r == 0) {
+                special_case_0();
+                continue;
+            } 
+            if (r == p) {
+                special_case_p();
+                continue;
+            } 
+            
+            const uint32_t I = si->I;
+            const uint32_t maskI = I-1;
+ 
+            plattice_info_t pli;
+            reduce_plattice(&pli, p, r, si);
+
+            // Start sieving from (0,0) which is I/2 in x-coordinate
+            uint32_t x;
+            x = (I>>1);
+            // TODO: to gain speed, by aligning the start of the
+            // loop, in assembly.
+            // Besides this small trick, gcc does a good job with
+            // this loop: no branching for the if(), and a dozen of
+            // instructions inside the while().
+            asm("## Inner sieving routine starts here!!!\n");
+            while (x < I*si->J) {
+                uint32_t i;
+                i = x & maskI;   // x mod I
+                S[x] -= logp;
+                if (i >= pli.b1)
+                    x += pli.a;
+                if (i < pli.b0)
+                    x += pli.c;
+            }
+            asm("## Inner sieving routine stops here!!!\n");
+        }
+        fb = fb_next (fb); // cannot do fb++, due to variable size !
+    }
     printf("large primes sieved in %f sec\n", seconds()-tm);
 }
 
+#if 0
 
+typedef uint32_t v4si __attribute__ ((vector_size (16)));
+
+
+// r = (x < y) ? a : b
+static inline void
+xmm_cmovlt(v4si *r, v4si x, v4si y, v4si a, v4si b) {
+    v4si tmp;
+    tmp = __builtin_ia32_pcmpgtd128(y, x); // tmp = x<y ? 0xffff..fff. : 0
+    a = __builtin_ia32_pand128(a, tmp);  // a = x<y ? a : 0
+    tmp = __builtin_ia32_pandn128(tmp, b); // tmp = x<y ? 0 : b
+    *r = __builtin_ia32_por128(a, tmp); 
+}
+
+void
+loop()
+{
+    v4si x, i;
+    const v4si maskI4 = { maskI, maskI, maskI, maskI };
+    const v4si zero = { 0,0,0,0 };
+    const v4si b14 = { b1,b1,b1,b1 };
+    const v4si b04 = { b0,b0,b0,b0 };
+
+    for(;;) {
+        reportx(x);
+        i = __builtin_ia32_pand128(x, maskI);
+        xmm_cmovge(&tmp, i, b14, a, zero);
+        x += tmp;
+        xmm_cmovlt(&tmp, i, b04, c, zero);
+        x += tmp;
+    }
+}
+
+void dummy() {
+    uint32_t x[4] = {17, 42, 876412, 987235};
+    uint32_t y[4] = {17, 13587, 12, 35};
+    uint32_t a[4] = {1, 2, 3, 4};
+    uint32_t b[4] = {11, 22, 33, 44};
+    uint32_t r[4];
+
+    xmm_cmovlt((v4si *)(&r),
+            (v4si){x[0], x[1], x[2], x[3]},
+            (v4si){y[0], y[1], y[2], y[3]},
+            (v4si){a[0], a[1], a[2], a[3]},
+            (v4si){b[0], b[1], b[2], b[3]});
+    printf("%d %d %d %d\n", r[0], r[1], r[2], r[3]);
+
+}
+#endif
 
 // Conversions between different representations for sieve locations:
 //   x          is the index in the sieving array. x in [0,I*J[
