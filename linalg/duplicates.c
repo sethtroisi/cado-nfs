@@ -6,13 +6,15 @@
  *
  */
 
-#include <gmp.h>
-#include "mod_ul.c"
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <math.h>
 #include <string.h>
+#include <ctype.h>
+
+#include <gmp.h>
+#include "mod_ul.c"
 
 #define WANT_ASSERT
 
@@ -20,6 +22,8 @@
 
 #include "hashpair.h"
 #include "files.h"
+
+#define STR_LEN_MAX 1024
 
 // TODO: read line by line and do not parse/print relations
 // but only print strbuf when new.
@@ -52,32 +56,92 @@ fprint_relation_raw(FILE *file, relation_t rel)
     fprintf(file, "\n");
 }
 
+// stolen from relation.c
+int
+fread_buf(char str[STR_LEN_MAX], FILE *file)
+{
+  int c, i;
+    
+  // skip spaces and commented lines
+  do {
+    // skip spaces
+    do {
+      c = fgetc(file);
+      if (c == EOF)
+	return -1;
+    } while (isspace(c));
+    // skip commented lines
+    if (c == '#') {
+      do {
+	c = fgetc(file);
+	if (c == EOF)
+	  return -1;
+      } while (c != '\n');
+    } else {
+      ungetc(c, file);
+      break;
+    }
+  } while (1);
+  
+  // copy line into str
+  i = 0;
+  do {
+    c = fgetc(file);
+    if (c == EOF)
+      return -1;
+    str[i++] = c;
+    if (i == STR_LEN_MAX) {
+      fprintf(stderr, "warning: line too long\n");
+      return 0;
+    }
+  } while (c != '\n');
+
+  str[i] = '\0';
+  return 1;
+}
+
+// No comment.
+void
+get_ab(long *a, unsigned long *b, char str[STR_LEN_MAX])
+{
+    int ia, ib;
+
+    for(ia = 0; str[ia] != ','; ia++);
+    str[ia] = ' ';
+    for(ib = ia+1; str[ib] != ':'; ib++);
+    str[ib] = ' ';
+    sscanf(str, "%ld %lu", a, b);
+    str[ia] = ',';
+    str[ib] = ':';
+}
+
 int
 remove_duplicates_from_file(int *irel, unsigned int *nrels, hashtable_t *Hab, FILE *file)
 {
-    relation_t rel;
     int ret, hab;
+    long a;
+    unsigned long b;
     unsigned long file_duplicates = 0;         /* duplicates in this file */
     static unsigned long total_duplicates = 0; /* duplicates in all files */
+    char str[STR_LEN_MAX];
 
     while(1){
-	ret = fread_relation(file, &rel);
+	ret = fread_buf(str, file);
 	if(ret != 1)
 	    break;
 	*irel += 1;
 	if(!(*irel % 100000))
 	    fprintf(stderr, "nrel = %d at %2.2lf\n", *irel, seconds());
-	hab = hashInsert(Hab, rel.a, rel.b);
+	get_ab(&a, &b, str);
+	hab = hashInsert(Hab, a, b);
 	if(Hab->hashcount[hab] > 1){
 	    if(file_duplicates ++ < 10)
-		fprintf(stderr, "(%ld, %ld) appears more than once\n",
-			rel.a, rel.b);
+		fprintf(stderr, "(%ld, %lu) appears more than once\n", a, b);
 	    continue;
 	}
 	else{
 	    *nrels += 1;
-	    fprint_relation_raw(stdout, rel);
-	    clear_relation(&rel);
+	    printf("%s", str);
 	}
     }
     total_duplicates += file_duplicates;
