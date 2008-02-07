@@ -54,41 +54,49 @@ fi
 
 echo "Performing merges"
 
+if [ -d $name ]
+then
+    echo "Directory $name already exists"
+else
+    echo "Creating directory $name"
+    mkdir $name
+fi
+
 nb_merge_max=1000000
 argsa="-forbw -prune $prune -merge $nb_merge_max -mat $purged"
 argsa="$argsa -maxlevel $maxlevel -cwmax $cwmax -rwmax $rwmax $verbose"
-time $linalg/merge $argsa > $name.merge.his # 2> $name.merge.err
-echo "SIZE(merge.his): `ls -s $name.merge.his`"
+time $linalg/merge $argsa > $name/merge.his # 2> $name.merge.err
+echo "SIZE(merge.his): `ls -s $name/merge.his`"
 
 echo "Replaying merges"
 
-bwcostmin=`tail $name.merge.his | grep "BWCOSTMIN:" | awk '{print $NF}'`
-argsr="$purged $name.merge.his $name.small $name.index"
+bwcostmin=`tail $name/merge.his | grep "BWCOSTMIN:" | awk '{print $NF}'`
+argsr="$purged $name/merge.his $name/small $name/index"
 time $linalg/replay $argsr $bwcostmin # 2> $name.replay.err
-echo "SIZE(index): `ls -s $name.index`"
+echo "SIZE(index): `ls -s $name/index`"
 
 echo "Performing the linear algebra phase"
 
 ./linalg.sh $name
 
-if [ ! -s $name.ker_raw ]; then echo "Zerodim kernel, stopping"; exit; fi
+if [ ! -s $name/ker_raw ]; then echo "Zerodim kernel, stopping"; exit; fi
 
-nker=`wc -l < $name.ker_raw`
+nker=`wc -l < $name/ker_raw`
 if [ $nker -lt $nkermax ]; then nkermax=$nker; fi
 
 echo "Adding characters"
 
-args0="$purged $name.ker_raw $poly $name.index $nodup"
+args0="$purged $name/ker_raw $poly $name/index $nodup"
 args0="$args0 $nker $nchar"
-time $linalg/characters $args0 > $name.ker
+time $linalg/characters $args0 > $name/ker
 
-ndepmax=`wc -l $name.ker | awk '{print $1}'`
+ndepmax=`wc -l $name/ker | awk '{print $1}'`
 if [ $ndepmax -ge 30 ]; then ndepmax=30; fi
 
 echo "Preparing $ndepmax squareroots"
 
-args1="$nodup $purged $name.index $name.ker $poly"
-time $linalg/allsqrt $args1 0 $ndepmax ar $name.dep
+args1="$nodup $purged $name/index $name/ker $poly"
+time $linalg/allsqrt $args1 0 $ndepmax ar $name/dep
 
 echo "Entering the last phase"
 
