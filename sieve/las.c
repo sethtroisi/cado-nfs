@@ -61,19 +61,19 @@ fb_root_in_qlattice(const fbprime_t p, const fbprime_t R, const sieve_info_t * s
     modulus_t m;
     residueul_t RR, aa, bb, x, y;
     mod_initmod_ul(m, p);
-    modul_initmod_ul(RR, R);
+    modul_initmod_ul(RR, R);  // already reduced
     // nuemrator
     if (si->a1 < 0) {
-        modul_initmod_ul(aa, (unsigned long) (-si->a1));
+        modul_initmod_ul(aa, ((unsigned long) (-si->a1)) % p);
         modul_neg(aa, aa, m);
     } else {
-        modul_initmod_ul(aa, (unsigned long) si->a1);
+        modul_initmod_ul(aa, ((unsigned long) si->a1) % p);
     }
     if (si->b1 < 0) {
-        modul_initmod_ul(bb, (unsigned long) (-si->b1));
+        modul_initmod_ul(bb, ((unsigned long) (-si->b1)) % p);
         modul_neg(bb, bb, m);
     } else {
-        modul_initmod_ul(bb, (unsigned long) si->b1);
+        modul_initmod_ul(bb, ((unsigned long) si->b1) % p);
     }
 
     modul_mul(x, bb, RR, m);
@@ -83,16 +83,16 @@ fb_root_in_qlattice(const fbprime_t p, const fbprime_t R, const sieve_info_t * s
     
     // denominator
     if (si->a0 < 0) {
-        modul_initmod_ul(aa, (unsigned long) (-si->a0));
+        modul_initmod_ul(aa, ((unsigned long) (-si->a0)) % p);
         modul_neg(aa, aa, m);
     } else {
-        modul_initmod_ul(aa, (unsigned long) si->a0);
+        modul_initmod_ul(aa, ((unsigned long) si->a0) % p);
     }
     if (si->b0 < 0) {
-        modul_initmod_ul(bb, (unsigned long) (-si->b0));
+        modul_initmod_ul(bb, ((unsigned long) (-si->b0)) % p);
         modul_neg(bb, bb, m);
     } else {
-        modul_initmod_ul(bb, (unsigned long) si->b0);
+        modul_initmod_ul(bb, ((unsigned long) si->b0) % p);
     }
 
     modul_mul(y, bb, RR, m);
@@ -134,6 +134,7 @@ sieve_slow (unsigned char *S, const factorbase_degn_t *fb,
         unsigned char nr;
         p = fb->p;
         logp = fb->plog;
+        unsigned long Is2modp = (unsigned long)(si->I>>1) % p;
 
         for (nr = 0; nr < fb->nr_roots; ++nr) {
             R = fb->roots[nr];
@@ -162,9 +163,12 @@ sieve_slow (unsigned char *S, const factorbase_degn_t *fb,
                     // use mod_ul lib.
                     mod_initmod_ul(m, p);
                     modul_initmod_ul(rr, r);
-                    modul_initmod_ul(jj, j);
-                    modul_mul(x, rr, jj, m);
-                    modul_add_ul(x, x, (unsigned long)(I>>1), m);
+                    if (j >= p) 
+                        modul_initmod_ul(jj, j % p);
+                    else
+                        modul_initmod_ul(jj, j);
+                    modul_mul(x, rr, jj, m);            // here there is a modulo p
+                    modul_add_ul(x, x, Is2modp, m);
                     i0 = (long)modul_get_ul(x, m) - (long)(I>>1) ;
                 }
 
@@ -177,6 +181,42 @@ sieve_slow (unsigned char *S, const factorbase_degn_t *fb,
 //        fprintf(stderr, "done %lu\n", p);
         fb = fb_next (fb); // cannot do fb++, due to variable size !
     }
+}
+
+// Conversions between different representations for sieve locations:
+//   x          is the index in the sieving array. x in [0,I*J[
+//   (i,j)      is the coordinates in the q-lattice. i in [-I/2,I/2[
+//                                                   j in [0,J[
+//   (a,b)      is the original coordinates. a is signed, b is unsigned.
+
+void 
+xToIJ(int *i, int *j, int x, sieve_info_t * si)
+{
+    *i = (x % (si.I)) - (si.I >> 1);
+    *j = x / si.I;
+}
+
+void
+IJTox(int *x, int i, int j, sieve_info_t * si)
+{
+    *x = i + (si->I)*j + (si->I>>1);
+}
+
+void
+IJToAB(int64_t *a, uint64_t *b, int i, int j, sieve_info_t * si)
+{
+    *a = i*si->a0 + j*si->a1;
+    *b = i*si->b0 + j*si->b1;
+}
+
+void
+xToAB(int64_t *a, uint64_t *b, int x, sieve_info_t * si)
+{
+    int i, j;
+    i = (x % (si.I)) - (si.I >> 1);
+    j = x / si.I;
+    *a = i*si->a0 + j*si->a1;
+    *b = i*si->b0 + j*si->b1;
 }
 
 
@@ -217,15 +257,24 @@ int main(int argc, char ** argv) {
     int kmin = 0;
     int i, j, k;
     for (k = 0; k < si.I*si.J; ++k)
-        if ((S[k] < min) && (S[k]>30) ) {
+        if ((S[k] < min) && (S[k]>50) ) {
             kmin = k;
             min = S[k];
         }
     
-    i = (kmin % (si.I)) - si.I / 2;
-    j = kmin / si.I;
-    
+    xToIJ(&i, &j, kmin, si);
     printf("Min of %d is obtained for (i,j) = (%d,%d)\n", min, i, j);
+
+    int stat[256];
+    for (i = 0; i < 256; ++i)
+        stat[i]=0;
+    for (i = 0; i < si.I*si.J; ++i)
+        stat[S[i]]++;
+    for (i = 0; i < 256; ++i)
+        printf("[%d]%d ", i, stat[i]);
+    printf("\n");
+
+
 
 }
 
