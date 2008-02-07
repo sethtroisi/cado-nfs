@@ -1,6 +1,6 @@
 //
-// Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-// Computer Science and Control)
+// Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+// in Computer Science and Control)
 //
 // This library is free software; you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -246,8 +246,6 @@ int main(int argc, char** argv) {
     program.algo_name = "CFRAC";
     program.params    = (void*) &params;
     //program.mode      = FIND_SOME_FACTORS;
-    //program.mode      = FIND_SOME_COPRIME_FACTORS;
-    //program.mode      = FIND_SOME_PRIME_FACTORS;
     //program.mode      = FIND_COMPLETE_FACTORIZATION;
     program.mode      = SINGLE_RUN;
 

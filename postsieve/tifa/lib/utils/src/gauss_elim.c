@@ -1,6 +1,6 @@
 //
-// Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-// Computer Science and Control)
+// Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+// in Computer Science and Control)
 //
 // This library is free software; you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -48,21 +48,21 @@ void gaussian_elim(uint32_array_list_t* relations,
     //            description of the algorithm. See comments for futher
     //            explanation...
     //
-    uint32_t nrow = matrix->nrows;
-    uint32_t ncol = matrix->ncols;
+    const uint32_t nrows = matrix->nrows;
+    const uint32_t ncols = matrix->ncols;
 
     uint32_t row = 0;
 
-    binary_array_t* used  = alloc_binary_array(nrow);
-    uint32_array_t* pivot = alloc_uint32_array(ncol);
-    used->length  = nrow;
+    binary_array_t* used  = alloc_binary_array(nrows);
+    uint32_array_t* pivot = alloc_uint32_array(ncols);
+    used->length  = nrows;
     //
     // Stage 1: Process the matrix
     //
     // _NOTE_: We process the matrix from right to left since the rightmost
     //         part of the matrix is sparser than the leftmost part
     //
-    for (uint32_t icol = ncol - 1; icol != UINT32_MAX; icol--) {
+    for (uint32_t icol = ncols - 1; icol != UINT32_MAX; icol--) {
         row = first_row_with_one_on_col(icol, matrix);
         if (row == NO_SUCH_ROW) {
             //
@@ -72,13 +72,10 @@ void gaussian_elim(uint32_array_list_t* relations,
         }
         pivot->data[icol] = row;
 
-        for (uint32_t irow = row+1; irow < nrow; irow++) {
-
+        for (uint32_t irow = row + 1; irow < nrows; irow++) {
             if (1 == get_matrix_bit(irow, icol, matrix)) {
-
-                for (uint32_t index = 0U; index < matrix->ncols_alloced;
-                     index++) {
-                    matrix->data[irow][index] ^= matrix->data[row][index];
+                for (uint32_t jcol = 0U; jcol < matrix->ncols_alloced; jcol++) {
+                    matrix->data[irow][jcol] ^= matrix->data[row][jcol];
                 }
                 set_matrix_bit_to_one(irow, icol, matrix);
             }
@@ -89,9 +86,8 @@ void gaussian_elim(uint32_array_list_t* relations,
         //            icol-th bit of the row "row" to one but to zero
         //            all the other bits in this row.
         //
-        for (uint32_t index = 0U; index < matrix->ncols_alloced;
-             index++) {
-            matrix->data[row][index] = 0U;
+        for (uint32_t jcol = 0U; jcol < matrix->ncols_alloced; jcol++) {
+            matrix->data[row][jcol] = 0U;
         }
         set_matrix_bit_to_one(row, icol, matrix);
         //
@@ -99,11 +95,11 @@ void gaussian_elim(uint32_array_list_t* relations,
         //
         set_array_bit_to_one(row, used);
     }
-    pivot->length = ncol;
+    pivot->length = ncols;
     //
     // Stage 2: Find dependencies
     //
-    for (uint32_t irow = 0U; irow < matrix->nrows; irow++) {
+    for (uint32_t irow = 0U; irow < nrows; irow++) {
         if (relations->length == relations->alloced) {
             break;
         }
@@ -112,7 +108,7 @@ void gaussian_elim(uint32_array_list_t* relations,
             // Computes the size of the uint32_array_t to hold the relation
             //
             uint32_t nrows_in_rel = 0U;
-            for (uint32_t icol = 0U; icol < matrix->ncols; icol++) {
+            for (uint32_t icol = 0U; icol < ncols; icol++) {
                 if (1 == get_matrix_bit(irow, icol, matrix)) {
                     nrows_in_rel++;
                 }
@@ -125,7 +121,7 @@ void gaussian_elim(uint32_array_list_t* relations,
             rel->length = nrows_in_rel+1;
 
             nrows_in_rel = 0U;
-            for (uint32_t icol = 0U; icol < matrix->ncols; icol++) {
+            for (uint32_t icol = 0U; icol < ncols; icol++) {
                 if (1 == get_matrix_bit(irow, icol, matrix)) {
                     rel->data[nrows_in_rel] = pivot->data[icol];
                     nrows_in_rel++;

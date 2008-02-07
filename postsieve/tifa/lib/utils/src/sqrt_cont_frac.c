@@ -1,6 +1,6 @@
 //
-// Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-// Computer Science and Control)
+// Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+// in Computer Science and Control)
 //
 // This library is free software; you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -66,13 +66,13 @@
 //------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
-void step_function_mpz(cont_frac_state_t* const state, uint32_t nb_steps);
+void step_function_mpz(cont_frac_state_t* const state, uint32_t nsteps);
 //------------------------------------------------------------------------------
-void step_function_mpn(cont_frac_state_t* const state, uint32_t nb_steps);
+void step_function_mpn(cont_frac_state_t* const state, uint32_t nsteps);
 //------------------------------------------------------------------------------
-void step_function_mpn_ui(cont_frac_state_t* const state, uint32_t nb_steps);
+void step_function_mpn_ui(cont_frac_state_t* const state, uint32_t nsteps);
 //------------------------------------------------------------------------------
-void step_function_ui(cont_frac_state_t* const state, uint32_t nb_steps);
+void step_function_ui(cont_frac_state_t* const state, uint32_t nsteps);
 //------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
@@ -199,8 +199,8 @@ void clear_cont_frac_state(cont_frac_state_t* const state) {
 }
 //------------------------------------------------------------------------------
 inline void
-step_cont_frac_state(cont_frac_state_t* const state, uint32_t nb_steps) {
-    state->step_function(state, nb_steps);
+step_cont_frac_state(cont_frac_state_t* const state, uint32_t nsteps) {
+    state->step_function(state, nsteps);
 }
 //------------------------------------------------------------------------------
 
@@ -209,9 +209,9 @@ step_cont_frac_state(cont_frac_state_t* const state, uint32_t nb_steps) {
     //
 
 //------------------------------------------------------------------------------
-void step_function_mpz(cont_frac_state_t* const state, uint32_t nb_steps) {
+void step_function_mpz(cont_frac_state_t* const state, uint32_t nsteps) {
 
-    for (uint32_t i = 0; i < nb_steps; i++) {
+    for (uint32_t i = 0; i < nsteps; i++) {
         mpz_add(state->t, state->sqrtn, state->p);
         mpz_tdiv_qr(state->t, state->_ztmp_q_, state->t, state->q);
         mpz_sub(state->p, state->sqrtn, state->_ztmp_q_);
@@ -248,14 +248,14 @@ void step_function_mpz(cont_frac_state_t* const state, uint32_t nb_steps) {
     return;
 }
 //------------------------------------------------------------------------------
-void step_function_mpn(cont_frac_state_t* const state, uint32_t nb_steps) {
+void step_function_mpn(cont_frac_state_t* const state, uint32_t nsteps) {
 
     DECLARE_MPZ_SWAP_VARS;
 
     //
     // Mostly MPN version of the step function. Some MPZ functions remain.
     //
-    for (uint32_t i = 0; i < nb_steps; i++) {
+    for (uint32_t i = 0; i < nsteps; i++) {
 
         MPN_ADD(state->_ztmp_q_, state->sqrtn, state->p);
         MPN_TDIV_QR(state->t, state->_ztmp_, state->_ztmp_q_, state->q);
@@ -338,7 +338,7 @@ void step_function_mpn(cont_frac_state_t* const state, uint32_t nb_steps) {
    return;
 }
 //------------------------------------------------------------------------------
-void step_function_mpn_ui(cont_frac_state_t* const state, uint32_t nb_steps) {
+void step_function_mpn_ui(cont_frac_state_t* const state, uint32_t nsteps) {
 
     //
     // Mostly MPN version of the step function, with a few single precision
@@ -346,7 +346,7 @@ void step_function_mpn_ui(cont_frac_state_t* const state, uint32_t nb_steps) {
     //
     DECLARE_MPZ_SWAP_VARS;
 
-    for (uint32_t i = 0; i < nb_steps; i++) {
+    for (uint32_t i = 0; i < nsteps; i++) {
 
         VAL(t) = (VAL(sqrtn) + VAL(p)) / VAL(q);
         VAL(p) = VAL(t) * VAL(q) - VAL(p);
@@ -428,13 +428,13 @@ void step_function_mpn_ui(cont_frac_state_t* const state, uint32_t nb_steps) {
     return;
 }
 //------------------------------------------------------------------------------
-void step_function_ui(cont_frac_state_t* const state, uint32_t nb_steps) {
+void step_function_ui(cont_frac_state_t* const state, uint32_t nsteps) {
 
     mp_limb_t _tmp_;
     //
     // Version of the step function with mostly single precision computations.
     //
-    for (uint32_t i = 0; i < nb_steps; i++) {
+    for (uint32_t i = 0; i < nsteps; i++) {
 
         VAL(t) = (VAL(sqrtn) + VAL(p)) / VAL(q);
         //

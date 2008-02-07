@@ -20,8 +20,8 @@
 /**
  * \file    funcs.h
  * \author  Jerome Milan
- * \date    Tue Sep 4 2007
- * \version 1.1
+ * \date    Wed Jan 30 2008
+ * \version 1.2
  *
  * \brief Number theoretical, hash and comparison functions.
  *
@@ -31,6 +31,8 @@
 
  /*
   *  History:
+  *    1.2: Wed Jan 30 2008 by JM:
+  *          - Added is_prime function (composition test).
   *    1.1: Tue Sep 4 2007 by JM:
   *          - Added prototype for modinv_ui function (modular inverse).
   *          - Added prototype for sqrtm_p2 function (modular square root).
@@ -287,6 +289,22 @@ uint32_t sqrtm(uint32_t a, uint32_t p);
     * \returns sqrt(\c x) if \c x is a perfect square. 0 otherwise.
     */
 unsigned long int is_square(unsigned long int x);
+
+   /**
+    * \brief Composition test for \c uint32_t integers
+    *
+    * Returns \c false if \c n is definitely composite. Returns \c true if
+    * \c n is \e probably prime.
+    *
+    * \note This is actually a basic Miller-Rabin composition test with
+    * \c NMILLER_RABIN iterations preceded with some trial divisions if
+    * \c n is sufficiently small.
+    *
+    * \param[in] n The \c uint32_t to be checked for composition.
+    * \returns Returns \c false if \c n is found to be definitely composite.
+    *          \c true otherwise.
+    */
+bool is_prime(uint32_t n);
 
    /**
     * \brief Greatest common divisor for unsigned long int

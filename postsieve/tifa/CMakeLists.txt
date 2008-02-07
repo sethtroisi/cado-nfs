@@ -1,5 +1,6 @@
 SET (algo_sources 
     lib/algo/src/cfrac.c
+    lib/algo/src/ecm.c
     lib/algo/src/fermat.c
     lib/algo/src/qs.c
     lib/algo/src/siqs.c

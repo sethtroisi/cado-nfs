@@ -1,6 +1,6 @@
 #
-# Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-# Computer Science and Control)
+# Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research 
+# in Computer Science and Control)
 #
 # This library is free software; you can redistribute it and/or modify it under
 # the terms of the GNU Lesser General Public License as published by the Free
@@ -25,8 +25,8 @@
 # Last modified : Wed Jan 24 2007
 #
 # Version : 0.1.2
-# Licence : GNU Lesser General Public License (LGPL)
-#           Copyright (C) 2006, 2007 INRIA
+# Licence : GNU Lesser General Public License (LGPL) v2.1 or later
+#           Copyright (C) 2006, 2007, 2008 INRIA
 #-------------------------------------------------------------------------------
 # History :
 #
@@ -253,6 +253,12 @@ cfrac_src  = [os.path.join(tools_srcdir, 'cfrac_factors.c')] + common_obj
 cfrac_dist = [os.path.join(tools_srcdir, 'cfrac_factors.c')]
 
 #
+# ECM program's files
+#
+ecm_src  = [os.path.join(tools_srcdir, 'ecm_factors.c')] + common_obj
+ecm_dist = [os.path.join(tools_srcdir, 'ecm_factors.c')]
+
+#
 # Fermat's factorization program's files
 #
 fermat_src  = [os.path.join(tools_srcdir, 'fermat_factors.c')] + common_obj
@@ -291,6 +297,14 @@ cfrac = progenv.Program(
             LIBPATH = lib_path,
             source = cfrac_src
         )
+        #-------------------------------------------------------------------------------
+# Build the CFRAC program        #-------------------------------------------------------------------------------
+ecm = progenv.Program(
+          'ecm_factors',
+          LIBS = libs_to_link,
+          LIBPATH = lib_path,
+          source = ecm_src
+      )
 
 #-------------------------------------------------------------------------------
 # Build Fermat's factorization program
@@ -301,7 +315,6 @@ fermat = progenv.Program(
             LIBPATH = lib_path,
             source = fermat_src
          )
-
 
 #-------------------------------------------------------------------------------
 # Build the QS program
@@ -351,7 +364,7 @@ for i in range(len(modules)):
 #-------------------------------------------------------------------------------
 # Install programs target
 #-------------------------------------------------------------------------------
-progenv.Install(install_tools_dir, [cfrac, fermat, qs, siqs, squfof, tdiv])
+progenv.Install(install_tools_dir, [cfrac, ecm, fermat, qs, siqs, squfof, tdiv])
 progenv.Alias('install', install_tools_dir)
 progenv.Alias('install-bin', install_tools_dir)
 
@@ -389,6 +402,7 @@ progenv.Alias('install-man', install_pm_man_dir)
 if "dist" in COMMAND_LINE_TARGETS:
     archive = env.Tar(tifa_distname, tdiv_dist)
     env.Tar(tifa_distname, cfrac_dist)
+    env.Tar(tifa_distname, ecm_dist)
     env.Tar(tifa_distname, fermat_dist)
     env.Tar(tifa_distname, qs_dist)
     env.Tar(tifa_distname, siqs_dist)

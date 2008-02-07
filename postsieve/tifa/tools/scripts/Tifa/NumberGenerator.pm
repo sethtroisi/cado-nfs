@@ -1,6 +1,6 @@
 #
-# Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-# Computer Science and Control)
+# Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research 
+# in Computer Science and Control)
 #
 # This library is free software; you can redistribute it and/or modify it under
 # the terms of the GNU Lesser General Public License as published by the Free
@@ -33,7 +33,7 @@ package Tifa::NumberGenerator;
 #
 # Version : 0.1
 # Licence : GNU Lesser General Public License (LGPL) v2.1 or later
-#           Copyright (C) 2006, 2007 INRIA
+#           Copyright (C) 2006, 2007, 2008 INRIA
 #-------------------------------------------------------------------------------
 # History
 #-------------------------------------------------------------------------------
@@ -115,15 +115,15 @@ sub generate_prime {
 sub generate_composite {
     #
     # Generate a composite integer of $size bits from the multiplication of
-    # $nb_factors primes. The primes are either choosen randomly, or in a
+    # $nfactors primes. The primes are either choosen randomly, or in a
     # deterministic fashion if $self->{rstate} is undefined.
     #
-    my $self       = shift(@_);
-    my $size       = shift(@_);
-    my $nb_factors = shift(@_);
-    my $rstate     = $self->{rstate};
+    my $self     = shift(@_);
+    my $size     = shift(@_);
+    my $nfactors = shift(@_);
+    my $rstate   = $self->{rstate};
 
-    if ($nb_factors == 1) {
+    if ($nfactors == 1) {
         return $self->generate_prime($size);
     }
 
@@ -138,9 +138,9 @@ sub generate_composite {
     # although not rigorous, helps to avoid too much discrepancies between
     # the factors' size...
     #
-    my $length = $size + $nb_factors - 1;
-    my $faclength = int($length/$nb_factors);
-    my $lastfaclength = $length - (($nb_factors - 1) * $faclength);
+    my $length = $size + $nfactors - 1;
+    my $faclength = int($length/$nfactors);
+    my $lastfaclength = $length - (($nfactors - 1) * $faclength);
     my $result;
 
     if ($rstate) {
@@ -149,7 +149,7 @@ sub generate_composite {
         # required bit lengths.
         #
         my $composite = mpz(1);
-        for (1..($nb_factors - 1)) {
+        for (1..($nfactors - 1)) {
             $composite *= $self->generate_prime($faclength);
         }
         $lastfaclength = $size - sizeinbase($composite, 2);
@@ -159,7 +159,7 @@ sub generate_composite {
         # a square.
         #
         while ((sizeinbase($result, 2) != $size) || perfect_square_p($result)) {
-            $result = $self->generate_composite($size, $nb_factors);
+            $result = $self->generate_composite($size, $nfactors);
         }
     } else {
         #
@@ -170,7 +170,7 @@ sub generate_composite {
         #
         my $composite = mpz(1);
         my $factor    = $self->generate_prime($faclength);
-        for (1..($nb_factors - 1)) {
+        for (1..($nfactors - 1)) {
             $composite *= $factor;
             $factor = nextprime($factor);
         }
@@ -233,7 +233,7 @@ This module provides the following methods:
     use_random()
     dont_use_random()
     generate_prime($size)
-    generate_composite($size, $nb_factors)
+    generate_composite($size, $nfactors)
 
 =head2 Methods description
 
@@ -249,9 +249,9 @@ This module provides the following methods:
     generate_prime($size)
         Returns a prime of $size bits as a GMP::Mpz object.
 
-    generate_composite($size, $nb_factors)
+    generate_composite($size, $nfactors)
         Returns a non-square composite integer of $size bits (obtained
-        by multiplying $nb_factors prime integers of roughly equal sizes)
+        by multiplying $nfactors prime integers of roughly equal sizes)
         as a GMP::Mpz object.
 
 =head2 A note on deterministic generation
@@ -311,8 +311,8 @@ Jerome Milan, E<lt>milanj@lix.polytechnique.frE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2006 INRIA (French National Institute for Research in Computer
-Science and Control)
+Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+in Computer Science and Control)
 
 This module is part of the TIFA (Tools for Integer FActorization) library.
 

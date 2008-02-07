@@ -1,6 +1,6 @@
 #
-# Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-# Computer Science and Control)
+# Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research 
+# in Computer Science and Control)
 #
 # This library is free software; you can redistribute it and/or modify it under
 # the terms of the GNU Lesser General Public License as published by the Free
@@ -33,7 +33,7 @@ package Tifa::DataDescriptor;
 #
 # Version : 0.1
 # License : GNU Lesser General Public License (LGPL) v2.1 or later
-#           Copyright (C) 2006, 2007 INRIA
+#           Copyright (C) 2006, 2007, 2008 INRIA
 #-------------------------------------------------------------------------------
 # History
 #-------------------------------------------------------------------------------
@@ -482,8 +482,8 @@ Jerome Milan, E<lt>milanj@lix.polytechnique.frE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-Computer Science and Control)
+Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+in Computer Science and Control)
 
 This module is part of the TIFA library (Tools for Integer FActorization).
 

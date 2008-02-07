@@ -321,6 +321,13 @@ opts.Add(
 )
 opts.Add(
     BoolOption(
+        'VERBOSE_ECM',
+        "Set to 'yes' to turn on output messages in the ecm function",
+        1
+    )
+)
+opts.Add(
+    BoolOption(
         'VERBOSE_FERMAT',
         "Set to 'yes' to turn on output messages in the fermat function",
         1
@@ -368,6 +375,13 @@ opts.Add(
     BoolOption(
         'TIMING_CFRAC',
         "Set to 'yes' to turn on timing messages for the cfrac function",
+        1
+    )
+)
+opts.Add(
+    BoolOption(
+        'TIMING_ECM',
+        "Set to 'yes' to turn on timing messages for the ecm function",
         1
     )
 )
@@ -458,6 +472,7 @@ env['COMPILED_ON']         = '-'.join([sysinfo[0], sysinfo[2],
 #
 if env['ALLOW_VERBOSE'] == 0:
     env['VERBOSE_CFRAC']  = 0
+    env['VERBOSE_ECM']    = 0
     env['VERBOSE_FERMAT'] = 0
     env['VERBOSE_QS']     = 0
     env['VERBOSE_SIQS']   = 0
@@ -468,6 +483,7 @@ if env['ALLOW_VERBOSE'] == 0:
 #
 if env['ALLOW_TIMING'] == 0:
     env['TIMING_CFRAC']  = 0
+    env['TIMING_ECM']    = 0
     env['TIMING_FERMAT'] = 0
     env['TIMING_QS']     = 0
     env['TIMING_SIQS']   = 0
@@ -642,7 +658,6 @@ def checkSizeWord(context):
             sys.exit(-1)
     
 #------------------------------------------------------------------------------
-
 conf = Configure(
            env,
            custom_tests = {
@@ -751,7 +766,11 @@ if devel_build:
     today = time.localtime()
     env['VERSION_DEVTAG'] = '%.4s%.2d%.2d' % (today[0], today[1], today[2])
 else:
-    env['VERSION_DEVTAG'] = ''
+    #
+    # Quick and _really_ dirty hack to tag the released development version
+    #
+    devel_build = 1
+    env['VERSION_DEVTAG'] = '20080128'
 
 env['VERSION'] = '.'.join([env['VERSION_MAJOR'],
                            env['VERSION_MINOR'],
@@ -831,6 +850,7 @@ subst_dict['%SQRT_LONG_MAX%']          = str(env['SQRT_LONG_MAX'])
 
 subst_dict['%PRINT_ERROR%']    = str(int(env['PRINT_ERROR']))
 subst_dict['%VERBOSE_CFRAC%']  = str(int(env['VERBOSE_CFRAC']))
+subst_dict['%VERBOSE_ECM%']    = str(int(env['VERBOSE_ECM']))
 subst_dict['%VERBOSE_FERMAT%'] = str(int(env['VERBOSE_FERMAT']))
 subst_dict['%VERBOSE_QS%']     = str(int(env['VERBOSE_QS']))
 subst_dict['%VERBOSE_SIQS%']   = str(int(env['VERBOSE_SIQS']))
@@ -838,6 +858,7 @@ subst_dict['%VERBOSE_SQUFOF%'] = str(int(env['VERBOSE_SQUFOF']))
 subst_dict['%VERBOSE_TDIV%']   = str(int(env['VERBOSE_TDIV']))
 
 subst_dict['%TIMING_CFRAC%']  = str(int(env['TIMING_CFRAC']))
+subst_dict['%TIMING_ECM%']    = str(int(env['TIMING_ECM']))
 subst_dict['%TIMING_FERMAT%'] = str(int(env['TIMING_FERMAT']))
 subst_dict['%TIMING_QS%']     = str(int(env['TIMING_QS']))
 subst_dict['%TIMING_SIQS%']   = str(int(env['TIMING_SIQS']))

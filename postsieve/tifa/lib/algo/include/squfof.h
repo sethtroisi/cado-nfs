@@ -1,6 +1,6 @@
 //
-// Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-// Computer Science and Control)
+// Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+// in Computer Science and Control)
 //
 // This library is free software; you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -71,7 +71,7 @@ extern "C" {
 #endif
 
    /**
-    * \struct struct_squfof_params_t squfof.h lib/utils/include/squfof.h
+    * \struct struct_squfof_params_t squfof.h lib/algo/include/squfof.h
     * \brief  Defines the variable parameters used in the SQUFOF algorithm
     *         (dummy structure).
     *

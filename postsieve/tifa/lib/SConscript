@@ -133,6 +133,7 @@ tifa_src     = [
     # Algorithms
     #
     os.path.join( algo_srcdir,  'cfrac.c'),
+    os.path.join( algo_srcdir,  'ecm.c'),
     os.path.join( algo_srcdir,  'fermat.c'),
     os.path.join( algo_srcdir,  'qs.c'),
     os.path.join( algo_srcdir,  'siqs.c'),
@@ -175,6 +176,7 @@ tifa_inc = [
     # Algorithms
     #
     os.path.join( algo_incdir,  'cfrac.h'),
+    os.path.join( algo_incdir,  'ecm.h'),
     os.path.join( algo_incdir,  'fermat.h'),
     os.path.join( algo_incdir,  'qs.h'),
     os.path.join( algo_incdir,  'siqs.h'),
@@ -217,9 +219,10 @@ tifa_inc_dist = tifa_inc[:]
 tifa_inc_dist.remove(os.path.join(top_dir, 'tifa_config.h'))
 
 #
-# TIFA global header file
+# TIFA global header files
 #
-tifa_h = "tifa.h"
+tifa_h           = "tifa.h"
+tifa_internals_h = "tifa_internals.h"
 
 #
 # Documentation header file (never included nor compiled)
@@ -237,6 +240,7 @@ libtifa = libenv.Library(tifa_libname, source = tifa_src)
 libenv.Install(libenv['LIBDIR'], libtifa)
 libenv.Install(libenv['INCLUDEDIR'], tifa_inc)
 libenv.Install(libenv['INCLUDEDIR'], tifa_h)
+libenv.Install(libenv['INCLUDEDIR'], tifa_internals_h)
 libenv.Alias('install', libenv['LIBDIR'])
 libenv.Alias('install', libenv['INCLUDEDIR'])
 libenv.Alias('install-lib', libenv['LIBDIR'])
@@ -260,6 +264,7 @@ if "dist" in COMMAND_LINE_TARGETS:
     archive = env.Tar(tifa_distname, tifa_inc_dist)
     env.Tar(tifa_distname, tifa_src)
     env.Tar(tifa_distname, tifa_h)
+    env.Tar(tifa_distname, tifa_internals_h)
     env.Tar(tifa_distname, mainpage_h)
     env.Tar(tifa_distname, scripts)
     env.Tar(tifa_distname, doxy_custom_files)

@@ -1,8 +1,8 @@
 #!/usr/bin/perl -w
 
 #
-# Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-# Computer Science and Control)
+# Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+# in Computer Science and Control)
 #
 # This library is free software; you can redistribute it and/or modify it under
 # the terms of the GNU Lesser General Public License as published by the Free
@@ -33,7 +33,7 @@
 #
 # Version : 0.4.0
 # License : GNU Lesser General Public License (LGPL) v2.1 or later
-#           Copyright (C) 2006, 2007 INRIA
+#           Copyright (C) 2006, 2007, 2008 INRIA
 #-------------------------------------------------------------------------------
 # History
 #-------------------------------------------------------------------------------
@@ -365,15 +365,15 @@ sub generate_args_file {
     open(OUT, ">$outfile")
         or croak( "ERROR: generate_args_file: Cannot create file $outfile");
 
-    foreach my $nb_factors (@{$param_values{"nprime_factors_in_n"}}) {
+    foreach my $nfactors (@{$param_values{"nprime_factors_in_n"}}) {
 
         foreach my $length (@{$param_values{"bit_length_of_n"}}) {
 
-            my $n = $generator->generate_composite($length, $nb_factors);
+            my $n = $generator->generate_composite($length, $nfactors);
 
             print OUT "#\n";
             print OUT "# Bitsize: $length";
-            print OUT " Number of prime factors: $nb_factors\n";
+            print OUT " Number of prime factors: $nfactors\n";
             print OUT "#\n";
             print OUT "$n\n";
         }

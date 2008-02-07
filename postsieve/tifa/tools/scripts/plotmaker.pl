@@ -1,8 +1,8 @@
 #!/usr/bin/perl -w
 
 #
-# Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-# Computer Science and Control)
+# Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research 
+# in Computer Science and Control)
 #
 # This library is free software; you can redistribute it and/or modify it under
 # the terms of the GNU Lesser General Public License as published by the Free
@@ -33,7 +33,7 @@
 #
 # Version : 0.1.2
 # License : GNU Lesser General Public License (LGPL) v2.1 or later
-#           Copyright (C) 2006, 2007 INRIA
+#           Copyright (C) 2006, 2007, 2008 INRIA
 #-------------------------------------------------------------------------------
 # History
 #-------------------------------------------------------------------------------
@@ -259,23 +259,23 @@ foreach my $plot_desc (@plot_descr_array) {
 		#
 		next if (scalar(@x_array) == 0);
 		#
-		# Split the main label in $nb_lines lines.
+		# Split the main label in $nlines lines.
 		#
 		my $main_label = "";
-		my $nb_lines = 2;
+		my $nlines = 2;
 		my @varkeys = sort {$a cmp $b } (keys %$fixed_set_ref);
 		my $key_cnt = @varkeys;
-		my $nb_fields_per_line = int($key_cnt/$nb_lines + 0.5);
+		my $nfields_per_line = int($key_cnt/$nlines + 0.5);
 
-        for my $nline (0..($nb_lines - 2)) {
-            for (my $i = $nline * $nb_fields_per_line;
-                    $i < ($nline + 1) * $nb_fields_per_line;
+        for my $nline (0..($nlines - 2)) {
+            for (my $i = $nline * $nfields_per_line;
+                    $i < ($nline + 1) * $nfields_per_line;
                     $i++) {
     			$main_label .= "$varkeys[$i]=$$fixed_set_ref{$varkeys[$i]}    ";
     		}
             $main_label .= '\n';
         }
-        for (my $i = ($nb_lines - 1) * $nb_fields_per_line;
+        for (my $i = ($nlines - 1) * $nfields_per_line;
                 $i < $key_cnt;
                 $i++) {
 			$main_label .= "$varkeys[$i]=$$fixed_set_ref{$varkeys[$i]}    ";
@@ -495,11 +495,11 @@ sub read_all_data {
     $descr->set_comment_style("Perl");
     open(my $handle, "<$filename") or die("Cannot open $filename\n");
     $descr->load_descriptions($handle);
-    my $nb_keys = 1;
-    while ($nb_keys != 0) {
+    my $nkeys = 1;
+    while ($nkeys != 0) {
         my %entry = $descr->read_next_data_entry($handle);
-        $nb_keys = scalar(keys %entry);
-        if ($nb_keys != 0) {
+        $nkeys = scalar(keys %entry);
+        if ($nkeys != 0) {
             push(@$arrayref, \%entry);
         }
     }

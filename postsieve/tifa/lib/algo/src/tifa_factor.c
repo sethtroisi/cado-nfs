@@ -32,6 +32,8 @@
 #include "squfof.h"
 #include "tifa_factor.h"
 
+#include <stdio.h>
+
 //-----------------------------------------------------------------------------
 ecode_t tifa_factor(mpz_array_t* const factors, uint32_array_t* const multis,
                     const mpz_t n, const factoring_mode_t mode) {
@@ -47,19 +49,27 @@ ecode_t tifa_factor(mpz_array_t* const factors, uint32_array_t* const multis,
         mpz_t rootn;
         mpz_init(rootn);
         mpz_sqrt(rootn, n);
-        
+
         if (MPZ_IS_PRIME(rootn)) {
             append_mpz_to_array(factors, rootn);
             if (mode == FIND_COMPLETE_FACTORIZATION) {   
                 append_uint32_to_array(multis, 2);
             }
+            //
+            // We have found the complete factorization but the exit code to
+            // return actually depends on the factorization mode used.
+            //
             return mode_to_outcome[mode];
         }
+        uint32_t old_length = 0;
         
+        if (mode == FIND_COMPLETE_FACTORIZATION) {
+            old_length = multis->length;
+        }
         ecode_t ecode = tifa_factor(factors, multis, rootn, mode);
         
         if (mode == FIND_COMPLETE_FACTORIZATION) {
-            for (uint32_t i = 0; i < multis->length; i++) {
+            for (uint32_t i = old_length; i < multis->length; i++) {
                 multis->data[i] <<= 1;
             }
         }
@@ -67,7 +77,6 @@ ecode_t tifa_factor(mpz_array_t* const factors, uint32_array_t* const multis,
         
         return ecode;
     }
-    
     unsigned long int sizen = mpz_sizeinbase(n, 2);
 
 #if TIFA_WORDSIZE < 64
@@ -98,7 +107,7 @@ ecode_t tifa_factor(mpz_array_t* const factors, uint32_array_t* const multis,
     if (sizen <= squfof_threshold) {
         squfof_params_t params;
         set_squfof_params_to_default(&params);
-        
+
         return squfof(factors, multis, n, &params, mode);
     }
     siqs_params_t params;

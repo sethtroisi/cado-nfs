@@ -1,6 +1,10 @@
  TIFA v0.2.0:
  ------------
 
+ - December 2007:
+       - Misc. clean ups.
+       - Added generic tifa_factor functions.
+
  - Late October / November 2007:
        - Several enhancements to QS / SIQS and some cleaning / refactoring.
 

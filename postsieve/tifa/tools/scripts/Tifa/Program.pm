@@ -1,6 +1,6 @@
 #
-# Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-# Computer Science and Control)
+# Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research 
+# in Computer Science and Control)
 #
 # This library is free software; you can redistribute it and/or modify it under
 # the terms of the GNU Lesser General Public License as published by the Free
@@ -33,7 +33,7 @@ package Tifa::Program;
 #
 # Version : 0.1.0
 # License : GNU Lesser General Public License (LGPL) v2.1 or later
-#           Copyright (C) 2006, 2007 INRIA
+#           Copyright (C) 2006, 2007, 2008 INRIA
 #-------------------------------------------------------------------------------
 # History
 #-------------------------------------------------------------------------------
@@ -502,8 +502,8 @@ This module provides the following methods:
         Basic constructor allocating a Tifa::Program object.
 
     set_algo($algo)
-        Sets the name of the algorithm implemented by the Program object
-        to $algo.
+        Sets the name of the algorithm implemented by the Program
+        object to $algo.
 
     get_algo()
         Gets the name of the algorithm implemented by the Program object.
@@ -527,8 +527,8 @@ This module provides the following methods:
         Gets the help message as a string.
 
     set_default_mode($mode)
-        Sets the name of the default mode of the Program object to $mode.
-        Exits if mode $mode does not exist.
+        Sets the name of the default mode of the Program object to
+        $mode. Exits if mode $mode does not exist.
 
     get_default_mode()
         Gets the name of the default mode of the Program object.
@@ -602,22 +602,22 @@ This module provides the following methods:
 
     get_getopt_strings()
         Returns an array of strings that can be passed as parameters to
-        the GetOptions function of the Getopt::Long module. These strings
-        are of the form <param_name>(=(s|i|o|f))?. For exemple: "help",
-        "infile=s", etc. All of the parameters are included here,
-        regardless of the current program's mode. Also options for
-        selecting the program's mode are included. These are of the form
-        <mode_name>=s.
+        the GetOptions function of the Getopt::Long module. These
+        strings are of the form <param_name>(=(s|i|o|f))?.
+        For exemple: "help", "infile=s", etc. All of the parameters are
+        included here, regardless of the current program's mode. Also
+        options for selecting the program's mode are included. These are
+        of the form <mode_name>=s.
 
     execute(\%param_values, $args, $postcmd)
         Executes the command line program $self->{exe} in the current
         mode with the parameter values being given by the hashtable
-        %param_values (whose reference is passed as a parameter) for the
-        arguments given in $args. Note that the %param_values hashtable
-        should map the parameter names to their actual values.
-        Optionnally, a third argument $postcmd can be passed. It will be
-        appended to the command string and can be used to implement
-        pipes, i/o redirections, etc.
+        %param_values (whose reference is passed as a parameter) for
+        the arguments given in $args. Note that the %param_values
+        hashtable should map the parameter names to their actual
+        values. Optionnally, a third argument $postcmd can be passed.
+        It will be appended to the command string and can be used to
+        implement pipes, i/o redirections, etc.
 
         Returns 'undef' if some parameters were missing in the hashtable,
         in which case the program is not executed.
@@ -683,9 +683,9 @@ can be used.
      # For example, all of the factoring programs are wrapped in such
      # a way in the Tifa::ProgramRepository module, so that the
      # other TIFA scripts and/or modules can use them without having to
-     # know any specifics about the programs. For example, this makes
-     # possible to reuse the benchmark framework with an user-defined
-     # Tifa::Program without delving into the scripts' internals.
+     # know any specifics about the programs. This makes possible to
+     # reuse the benchmark framework with an user-defined Tifa::Program
+     # without delving into the scripts' internals.
      #
 
 =head1 EXPORT
@@ -706,8 +706,8 @@ Jerome Milan, E<lt>milanj@lix.polytechnique.frE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-Computer Science and Control)
+Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+in Computer Science and Control)
 
 This module is part of the TIFA library (Tools for Integer FActorization).
 

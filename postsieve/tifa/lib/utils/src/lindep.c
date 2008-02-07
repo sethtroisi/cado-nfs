@@ -1,6 +1,6 @@
 //
-// Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-// Computer Science and Control)
+// Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+// in Computer Science and Control)
 //
 // This library is free software; you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -355,11 +355,13 @@ ecode_t find_factors_decomp(mpz_array_t*  const factors,
     mpz_t x;
     mpz_t y;
     mpz_t ppow;
+    mpz_t prime;
     mpz_t gcd;
 
     mpz_init(x);
     mpz_init(y);
     mpz_init(ppow);
+    mpz_init(prime);
     mpz_init(gcd);
 
     uint32_t irow = 0;
@@ -409,7 +411,12 @@ ecode_t find_factors_decomp(mpz_array_t*  const factors,
             //         followed by one reduction. Now a product tree with
             //         a reduction at each node may even be better...
             //
-            mpz_ui_pow_ui(ppow, base_data[i], decomp[i] / 2);
+            mpz_set_ui(prime, base_data[i]);
+            mpz_powm_ui(ppow, prime, decomp[i] / 2, n);
+            //
+            // Or: mpz_ui_pow_ui(ppow, base_data[i], decomp[i] / 2);
+            // which is maybe a tiny bit faster for small numbers...
+            //
             mpz_mul(y, y, ppow);
             mpz_mod(y, y, n);
         }
@@ -431,6 +438,7 @@ ecode_t find_factors_decomp(mpz_array_t*  const factors,
     mpz_clear(y);
     mpz_clear(gcd);
     mpz_clear(ppow);
+    mpz_clear(prime);
 
     return ecode;
 }

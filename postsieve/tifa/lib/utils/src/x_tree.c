@@ -1,6 +1,6 @@
 //
-// Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-// Computer Science and Control)
+// Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+// in Computer Science and Control)
 //
 // This library is free software; you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -780,7 +780,7 @@ mpz_tree_t* rem_tree(const mpz_t z, const mpz_tree_t* const ptree) {
     // _UPDATE_: Tue Dec 12 2006 by JM
     //
     //         This function has been modified to allocate all the needed
-    //         memory with a single call to malloc (See the warning). This
+    //         memory with a single call to malloc (see the warning). This
     //         is more than twice as fast as a straitforward mpz implementation.
     //
     mpz_tree_t* const res = malloc(sizeof(mpz_tree_t));

@@ -1,6 +1,6 @@
 //
-// Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-// Computer Science and Control)
+// Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+// in Computer Science and Control)
 //
 // This library is free software; you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -27,11 +27,6 @@
  *
  * Yet another implementation of a generic hashtable.
  */
-
- /*
-  *  License: GNU Lesser General Public License (LGPL)
-  *  History:
-  */
 
 #if !defined(_TIFA_HASHTABLE_H_)
    /**
@@ -70,7 +65,7 @@ struct struct_hashtable_t {
        /**
         * Current number of entries in the hashtable.
         */
-    uint32_t nb_entries;
+    uint32_t nentries;
        /**
         * Array of \c linked_list_t of size <tt>alloced</tt> used to store the
         * hashtable's entries.

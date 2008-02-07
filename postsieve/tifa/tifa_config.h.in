@@ -110,6 +110,9 @@
 /* Define to 1 to turn on output messages for the cfrac function */
 #define TIFA_VERBOSE_CFRAC %VERBOSE_CFRAC%
 
+/* Define to 1 to turn on output messages for the ecm function */
+#define TIFA_VERBOSE_ECM %VERBOSE_ECM%
+
 /* Define to 1 to turn on output messages for the fermat function */
 #define TIFA_VERBOSE_FERMAT %VERBOSE_FERMAT%
 
@@ -127,6 +130,9 @@
 
 /* Define to 1 to turn on timing messages for the cfrac function */
 #define TIFA_TIMING_CFRAC %TIMING_CFRAC%
+
+/* Define to 1 to turn on timing messages for the ecm function */
+#define TIFA_TIMING_ECM %TIMING_ECM%
 
 /* Define to 1 to turn on timing messages for the fermat function */
 #define TIFA_TIMING_FERMAT %TIMING_FERMAT%

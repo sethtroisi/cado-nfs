@@ -1,6 +1,6 @@
 //
-// Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-// Computer Science and Control)
+// Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+// in Computer Science and Control)
 //
 // This library is free software; you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -28,7 +28,6 @@
 #include <inttypes.h>
 
 #include "hashtable.h"
-
 #include "macros.h"
 #include "funcs.h"
 
@@ -39,11 +38,11 @@
 //
 
 //-----------------------------------------------------------------------------
-hashtable_t*
-alloc_init_hashtable(uint32_t size,
-                    int (*cmp_func) (const void* const key_a,
-                                     const void* const key_b),
-                    uint32_t (*hash_func) (const void* const key) ) {
+hashtable_t* alloc_init_hashtable(
+                        uint32_t size,
+                        int (*cmp_func) (const void* const key_a,
+                                         const void* const key_b),
+                        uint32_t (*hash_func) (const void* const key) ) {
 
     hashtable_t *htable = malloc(sizeof(hashtable_t));
     //
@@ -54,9 +53,9 @@ alloc_init_hashtable(uint32_t size,
         size = ceil_log2(size);
         size = 1 << size;
     }
-    htable->alloced    = size;
-    htable->nb_entries = 0;
-    htable->buckets    = malloc(size*sizeof(linked_list_t));
+    htable->alloced  = size;
+    htable->nentries = 0;
+    htable->buckets  = malloc(size * sizeof(linked_list_t));
 
     htable->hash_func = hash_func;
     htable->cmp_func  = cmp_func;
@@ -79,7 +78,7 @@ void clear_hashtable(hashtable_t* const htable) {
     }
     free(htable->buckets);
     htable->alloced    = 0;
-    htable->nb_entries = 0;
+    htable->nentries = 0;
 }
 //-----------------------------------------------------------------------------
 void add_entry_in_hashtable(hashtable_t* const htable,
@@ -138,7 +137,7 @@ void* remove_entry_in_hashtable(hashtable_t* const htable,
             free(entry->key);
             free(entry);
             free(node);
-            htable->nb_entries--;
+            htable->nentries--;
             return data;
         }
         node = node->next;

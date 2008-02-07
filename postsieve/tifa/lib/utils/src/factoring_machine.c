@@ -20,9 +20,18 @@
 /**
  * \file    factoring_machine.c
  * \author  Jerome Milan
- * \date    March 2007
- * \version 0.1
+ * \date    Fri Jan 11 2008
+ * \version 0.2
  */
+
+ /*
+  *  History:
+  *    0.2: Fri Jan 11 2008 by JM:
+  *         - Rewrote function find_complete_factorization(...) (was 
+  *           complicated, obscure and completely buggy). 
+  *    0.1: March 2007 by JM:
+  *         - Initial version.
+  */
 
 #include <stdlib.h>
 #include <inttypes.h>

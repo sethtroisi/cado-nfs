@@ -1,6 +1,6 @@
 #
-# Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-# Computer Science and Control)
+# Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research 
+# in Computer Science and Control)
 #
 # This library is free software; you can redistribute it and/or modify it under
 # the terms of the GNU Lesser General Public License as published by the Free
@@ -33,7 +33,7 @@ package Tifa::GnuPlotter;
 #
 # Version : 0.1
 # License : GNU Lesser General Public License (LGPL) v2.1 or later
-#           Copyright (C) 2006, 2007 INRIA
+#           Copyright (C) 2006, 2007, 2008 INRIA
 #-------------------------------------------------------------------------------
 # History
 #-------------------------------------------------------------------------------
@@ -113,7 +113,7 @@ my %set_terminal_cmds = (
 #
 # Number of predefined line styles
 #
-my $nb_line_styles = 20;
+my $nline_styles = 20;
 #
 # Gnuplot code predefining some line styles
 #
@@ -490,7 +490,7 @@ EOF
 plot \\
 EOF
     foreach my $zvalue (0..($nzvals-2)) {
-        $linestyle = 1 + ($zvalue % ($nb_line_styles - 1));
+        $linestyle = 1 + ($zvalue % ($nline_styles - 1));
         print MAC << "EOF";
      \"$self->{data_filename}\" \\
      using 1:((\$3==$zvals[$zvalue]) ? \$2 : 1/0) \\
@@ -500,7 +500,7 @@ EOF
 \\
 EOF
     }
-    $linestyle = 1 + (($nzvals - 1) % ($nb_line_styles - 1));
+    $linestyle = 1 + (($nzvals - 1) % ($nline_styles - 1));
     print MAC << "EOF";
      \"$self->{data_filename}\" \\
      using 1:((\$3==$zvals[$nzvals-1]) ? \$2 : 1/0) \\
@@ -740,8 +740,8 @@ Jerome Milan, E<lt>milanj@lix.polytechnique.frE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-Computer Science and Control)
+Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+in Computer Science and Control)
 
 This module is part of the TIFA library (Tools for Integer FActorization).
 

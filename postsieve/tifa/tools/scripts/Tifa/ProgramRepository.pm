@@ -1,6 +1,6 @@
 #
-# Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-# Computer Science and Control)
+# Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research 
+# in Computer Science and Control)
 #
 # This library is free software; you can redistribute it and/or modify it under
 # the terms of the GNU Lesser General Public License as published by the Free
@@ -33,7 +33,7 @@ package Tifa::ProgramRepository;
 #
 # Version : 0.1.2
 # License : GNU Lesser General Public License (LGPL) v2.1 or later
-#           Copyright (C) 2006, 2007 INRIA
+#           Copyright (C) 2006, 2007, 2008 INRIA
 #-------------------------------------------------------------------------------
 # History
 #-------------------------------------------------------------------------------
@@ -223,6 +223,110 @@ Parameter(s):
 EOS
 
 $cfrac_program->set_help($help);
+
+#-------------------------------------------------------------------------------
+#                           ECM algorithm
+#-------------------------------------------------------------------------------
+my $ecm_program = new Tifa::Program();
+
+$algo_to_program{"ecm"} = $ecm_program;
+
+$ecm_program->set_algo("ecm");
+$ecm_program->set_descr("The Elliptic Curve Method");
+$ecm_program->set_exe("ecm_factors");
+
+@param_names = (
+    "nprimes_tdiv",
+    "b1",
+    "b2",
+    "ncurves"
+);
+@param_descrs = (
+    "Number of primes to trial divide the number to factor",
+    "Bound for phase 1",
+    "Bound for phase 2",
+    "Number of curves to try before giving up"
+);
+@param_types = (
+    "int",
+    "int",
+    "int",
+    "int"
+);
+
+$cmdline = join(
+    ' ',
+    "exe",
+    "nprimes_tdiv",
+    "b1",
+    "b2",
+    "ncurves"
+);
+#
+# Default mode: We should specify all of the parameter values on
+#               the command line
+#
+$ecm_program->add_mode("no_defaults",
+                       "Default mode: specify all parameter values",
+                        \@param_names, \@param_descrs, \@param_types,
+                        $cmdline);
+
+$ecm_program->set_default_mode("no_defaults");
+$ecm_program->set_mode("no_defaults");
+
+@param_names  = (
+    "nprimes_tdiv",
+);
+@param_descrs = (
+    "Number of primes to trial divide the number to factor",
+);
+@param_types  = (
+    "int",
+);
+$cmdline =  "exe nprimes_tdiv";
+#
+# use_defaults mode: Let ECM use the precomputed optimal parameter values
+#                    depending on the size of the number to factor
+#
+$ecm_program->add_mode("use_defaults",
+                       "'Best' mode: let ECM use optimal values",
+                        \@param_names, \@param_descrs, \@param_types,
+                        $cmdline);
+$help = <<EOS;
+Parameter(s):
+
+  --b1=i
+      (mandatory in 'no_defaults' mode)
+      Bound used in phase 1 of the ECM.
+  
+  --b2=i
+      (mandatory in 'no_defaults' mode)
+      Bound used in phase 2 of the ECM.
+
+  --ncurves=i
+      (mandatory in 'no_defaults' mode)
+      Number of curves to try before giving up.
+
+  --mode=s
+      (optional, default value used if none provided)
+      Sets the program mode to use.
+
+      use_defaults: In this mode, the ECM program will determine the values
+                    of the aforementioned parameters. These values are choosen
+                    according to the size of the number to factor and are more
+                    or less optimal if this size is between 60 and 200 bits.
+
+      no_defaults:  In this mode, all parameters should be specified.
+
+      Default value: no_defaults
+
+  --nprimes_tdiv=i
+      (mandatory in all modes)
+      Number of primes to use to trial divide the integer to factor.
+
+EOS
+
+$ecm_program->set_help($help);
 
 #-------------------------------------------------------------------------------
 #                       Fermat's algorithm (McKee's speedup)
@@ -807,8 +911,8 @@ module can be used.
  $program = $algo_to_program{"squfof"};
 
  %param_vals = {
-     "exe"       => "./squfof_factors",
-     "nb_tdiv"   => 128,
+     "exe"   => "./squfof_factors",
+     "ntdiv" => 128,
  };
 
  $program->execute(\%param_vals, 816379, "> trace.txt");
@@ -831,8 +935,8 @@ Jerome Milan, E<lt>milanj@lix.polytechnique.frE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-Computer Science and Control)
+Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+in Computer Science and Control)
 
 This module is part of the TIFA library (Tools for Integer FActorization).
 

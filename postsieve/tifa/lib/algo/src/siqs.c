@@ -78,7 +78,7 @@
 // Multiplicative correction factor applied to the computed threshold to
 // account for the fact that we do not sieve with powers of primes.
 //
-#define SIEVE_THRESHOLD_MULTIPLIER 0.7
+#define SIEVE_THRESHOLD_MULTIPLIER 0.8
 //
 // Largest size of a sieve chunk. The optimal value is architecture dependant,
 // so this value should be tweaked according to the target processor.
@@ -1099,15 +1099,6 @@ static void fill_sieve(siqs_context_t* const context) {
             sindex += curprime;
         }
 
-/*      unsigned char* siaddr = (&sieve_data[0]) + sindex;       
-      for (int32_t i = imax; i >= imin; i--) {
-          *(siaddr) += logp;
-          siaddr += curprime;
-          sindex += curprime;
-      }
-*/
-
-
         //
         // Sieve with sol2
         //
@@ -1447,7 +1438,7 @@ static ecode_t determine_next_a(siqs_context_t* const context) {
         // To buy ourselves some breathing room, we just start with much
         // smaller primes even if these small primes should be avoided...
         //
-        context->first_imin   /= 2;
+        context->first_imin /= 2;
         //
         // We should not to generate the same 'a's over and over
         // again... However we must be aware that the 'a's can become

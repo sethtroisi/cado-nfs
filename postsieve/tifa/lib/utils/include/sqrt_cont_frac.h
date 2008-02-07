@@ -1,6 +1,6 @@
 //
-// Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-// Computer Science and Control)
+// Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+// in Computer Science and Control)
 //
 // This library is free software; you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -193,16 +193,16 @@ void clear_cont_frac_state(cont_frac_state_t* const state);
     * \brief Computes another term of a continued fraction.
     *
     * Computes another coefficient in the expansion of a continued fraction and
-    * updates the structure <tt>state</tt>. The parameter \c nb_steps gives the
+    * updates the structure <tt>state</tt>. The parameter \c nsteps gives the
     * number of iteration to perform. A new term is computed at each iteration.
     *
     * \note This function is actually given by <tt>state->step_function</tt>.
     *
     * \param[in] state A pointer to the <tt>cont_frac_state_t</tt>.
-    * \param[in] nb_steps Number of steps to perfom.
+    * \param[in] nsteps Number of steps to perfom.
     */
 inline void step_cont_frac_state(cont_frac_state_t* const state,
-                                 uint32_t nb_steps);
+                                 uint32_t nsteps);
 
 #ifdef __cplusplus
 }

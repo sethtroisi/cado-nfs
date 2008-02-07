@@ -1,6 +1,6 @@
 //
-// Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-// Computer Science and Control)
+// Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+// in Computer Science and Control)
 //
 // This library is free software; you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -28,11 +28,6 @@
  * This is a list of the precomputed small primes together with
  * a \c uint32_array_t wrapper.
  */
-
- /*
-  *  Copyright (C) 2006, 2007  INRIA
-  *  Licence: GNU Lesser General Public License (LGPL)
-  */
 
 #if !defined(_TIFA_FIRST_PRIMES_H_)
    /**

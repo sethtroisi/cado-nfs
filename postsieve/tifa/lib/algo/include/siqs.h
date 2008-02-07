@@ -1,6 +1,6 @@
 //
-// Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-// Computer Science and Control)
+// Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+// in Computer Science and Control)
 //
 // This library is free software; you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -43,7 +43,6 @@ extern "C" {
 
 #include "array.h"
 #include "lindep.h"
-
 #include "factoring_machine.h"
 #include "exit_codes.h"
 
@@ -83,7 +82,7 @@ extern "C" {
 #define SIQS_DFLT_USE_LARGE_PRIMES true
 
    /**
-    * \struct struct_siqs_params_t siqs.h lib/utils/include/siqs.h
+    * \struct struct_siqs_params_t siqs.h lib/algo/include/siqs.h
     * \brief  Defines the variable parameters used in the SIQS algorithm.
     *
     * This structure defines the set of the variable parameters used in the

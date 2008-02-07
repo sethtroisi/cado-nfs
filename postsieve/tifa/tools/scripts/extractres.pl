@@ -1,8 +1,8 @@
 #!/usr/bin/perl -w
 
 #
-# Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-# Computer Science and Control)
+# Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research 
+# in Computer Science and Control)
 #
 # This library is free software; you can redistribute it and/or modify it under
 # the terms of the GNU Lesser General Public License as published by the Free
@@ -33,7 +33,7 @@
 #
 # Version : 0.1.0
 # License : GNU Lesser General Public License (LGPL) v2.1 or later
-#           Copyright (C) 2006, 2007 INRIA
+#           Copyright (C) 2006, 2007, 2008 INRIA
 #-------------------------------------------------------------------------------
 # History
 #-------------------------------------------------------------------------------
@@ -65,7 +65,7 @@ eval "use GMP::Mpz qw(:all); 1" or die "ERROR: Module GMP::Mpz not found!";
 my $input_file;
 my $output_file;
 my $trace_dir;
-my $nb_factors = -1;
+my $nfactors = -1;
 my $help;
 
 #
@@ -104,7 +104,7 @@ GetOptions(
     "in=s"        => \$input_file,
     "out=s"       => \$output_file,
     "tracedir=s"  => \$trace_dir,
-    "nfactors=i"  => \$nb_factors,
+    "nfactors=i"  => \$nfactors,
     "help"        => \$help
 );
 
@@ -230,7 +230,7 @@ Usage:
 EOF
 
     printf("%15s --in <input_file> --out <output_file>\n", $name);
-    printf("%15s --tracedir <trace_directory> --nfactors <nb_factors>\n", '');
+    printf("%15s --tracedir <trace_directory> --nfactors <nfactors>\n", '');
     printf("%15s [--help]\n", '');
 
 print << "EOF";
@@ -515,7 +515,7 @@ sub make_new_entry {
     $entry{"tdivtime"}    = $tdiv_time;
     $entry{"totaltime"}   = $total_time;
 
-    $entry{"nfactors"} = $nb_factors;
+    $entry{"nfactors"} = $nfactors;
     $entry{"n"}        = $$old_entry_ref{"argmt"};
     $entry{"nbits"}    = sizeinbase($$old_entry_ref{"argmt"}, 2);
 

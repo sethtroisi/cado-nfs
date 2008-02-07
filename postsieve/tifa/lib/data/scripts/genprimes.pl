@@ -1,8 +1,8 @@
 #!/usr/bin/perl -w
 
 #
-# Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-# Computer Science and Control)
+# Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+# in Computer Science and Control)
 #
 # This library is free software; you can redistribute it and/or modify it under
 # the terms of the GNU Lesser General Public License as published by the Free
@@ -31,7 +31,7 @@ use File::Basename;
 # Date    : Sat Mar 10 2007
 # Version : 0.1.1
 # Licence : GNU Lesser General Public License (LGPL) v2.1 or later
-#           Copyright (C) 2006, 2007 INRIA
+#           Copyright (C) 2006, 2007, 2008 INRIA
 #-------------------------------------------------------------------------------
 # History :
 #-------------------------------------------------------------------------------
@@ -46,11 +46,11 @@ use File::Basename;
 #
 # Options' declarations and default values, if any...
 #
-my $input_file      = "";
-my $generate        = "";
-my $output_prefix   = "";
-my $nb_first_primes = 4096;
-my $help            = "";
+my $input_file    = "";
+my $generate      = "";
+my $output_prefix = "";
+my $nfirst_primes = 4096;
+my $help          = "";
 #
 # Get the list of options...
 #
@@ -58,7 +58,7 @@ GetOptions(
     "in=s"      => \$input_file,
     "gen"       => \$generate,
     "out=s"     => \$output_prefix,
-    "nprimes=i" => \$nb_first_primes,
+    "nprimes=i" => \$nfirst_primes,
     "help"      => \$help
 );
 #
@@ -106,9 +106,9 @@ if (-e $output_src) {
 # Say what we do and do what we... oh wait!
 #
 if ($generate) {
-    print("Generating $nb_first_primes prime numbers...\n");
+    print("Generating $nfirst_primes prime numbers...\n");
 } else {
-    print("Reading $nb_first_primes numbers from $input_file\n");
+    print("Reading $nfirst_primes numbers from $input_file\n");
 }
 print("Writing output in $output_inc and $output_src... ");
 #
@@ -168,7 +168,7 @@ if ($input_file) {
     #
     # For example, on can use the files from http://primes.utm.edu/.
     #
-    while ( defined(my $line = <IF>) and ($step < $nb_first_primes) ) {
+    while ( defined(my $line = <IF>) and ($step < $nfirst_primes) ) {
 
         next if ($line =~ m/^(\s)*$/);       # Skips empty or blank lines
         next if ($line =~ m/^(\s)*\#.*$/);   # Skip comments...
@@ -180,7 +180,7 @@ if ($input_file) {
 
         my @primes = split(/\D+/, $line);
         foreach $prime (@primes) {
-           if ($step != $nb_first_primes-1) {
+           if ($step != $nfirst_primes-1) {
              print OF "\t$prime,\n";
              $step++;
            } else {
@@ -191,7 +191,7 @@ if ($input_file) {
         }
     }
     close(IF);
-    if ($step != $nb_first_primes) {
+    if ($step != $nfirst_primes) {
         print("ERROR: Not enough primes defined in $input_file\n");
         unlink($output_src);
         exit(-1);
@@ -202,7 +202,7 @@ if ($input_file) {
     # Generate the prime numbers like a good boy... with a little help
     # from the GMP::Mpz module...
     #
-    for (1..$nb_first_primes-1) {
+    for (1..$nfirst_primes-1) {
         $prime = nextprime($prime);
         print OF "\t$prime,\n";
     }
@@ -270,7 +270,7 @@ $long_license
  * \\def NFIRST_PRIMES
  * Number of precomputed primes in the \\c first_primes array.
  */
-#define NFIRST_PRIMES $nb_first_primes
+#define NFIRST_PRIMES $nfirst_primes
 
 /**
  * The \\c first_primes array is a global array of \\c uint32_t elements

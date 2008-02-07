@@ -20,12 +20,14 @@
 /**
  * \file    funcs.c
  * \author  Jerome Milan
- * \date    Tue Sep 4 2007
- * \version 1.1
+ * \date    Wed Jan 30 2008
+ * \version 1.2
  */
 
  /*
   *  History:
+  *    1.2: Wed Jan 30 2008 by JM:
+  *          - Added is_prime function (composition test).
   *    1.1: Tue Sep 4 2007 by JM:
   *          - Added modinv_ui function (modular inverse).
   *          - Added sqrtm_p2 function (modular square root).
@@ -515,6 +517,106 @@ unsigned long int is_square(unsigned long int x) {
     return 0;
 }
 //-----------------------------------------------------------------------------
+//
+// The following threshold values were experimentally determined on a
+// PowerPC 7455 (for the 32 bit case) and on an Opteron 250 (64 bit) using
+// respectively GCC 4.0.0 and GCC 4.1.2. Be aware that this threshold is
+// probably very different on an 32 bit x86 processor.
+//
+#if TIFA_WORDSIZE == 64
+    #define PRIMALITY_TDIV_THRESHOLD 2500000
+#elif TIFA_WORDSIZE == 32
+    #define PRIMALITY_TDIV_THRESHOLD 80000000
+#else
+    //
+    // This is picked up out of the blue and should be determined... if we
+    // really care about very (old|odd) architectures.
+    //
+    #define PRIMALITY_TDIV_THRESHOLD 15000
+#endif
+//-----------------------------------------------------------------------------
+bool is_prime(uint32_t n) {
+    //
+    // A very basic (Dubois-Selfridge-) Miller-Rabin composition test.
+    //
+    // See for example algorithm 8.2.2 from the book "A Course in Computational
+    // Algebraic Number Theory" by Henri Cohen, Springer-Verlag 1993. The
+    // description given in this book has been straitforwardly adapted.
+    //
+    // We also roughly follow the strategy used in the mpz_probab_prime_p()
+    // function from the GMP library with some trial divisions up to a certain
+    // threshold.
+    //
+    if (n == 1) { return false; }
+    if (n == 2) { return true; }
+    
+    if (IS_EVEN(n)) {
+        return false;
+    }
+    //
+    // Trial division if n is smaller than PRIMALITY_TDIV_THRESHOLD. See above
+    // comment in this symbol's definition.
+    //
+    uint32_t q;
+    uint32_t r = 1;
+    uint32_t d = 3;
+
+    if (n < PRIMALITY_TDIV_THRESHOLD) {
+        while (r != 0) {
+            q = n / d;
+            r = n - q * d;
+            if (q < d) {
+   	            return true;
+            }
+            d += 2;
+        }
+        return false;
+    }
+    r = n % 255255; // r = n mod (3 * 5 * 7 * 11 * 13 * 17)
+
+    if (   !(r % 3) || !(r % 5) || !(r % 7) || !(r % 11) || !(r % 13)
+        || !(r % 17)) {
+        return false;
+    }
+
+    r = n % 392863; // r = n mod (19 * 23 * 29 * 31)
+
+    if (!(r % 19) || !(r % 23) || !(r % 29) || !(r % 31)) {
+        return false;
+    }
+    
+    //
+    // Perform standard Miller-Rabin test...
+    //
+    unsigned short try = NMILLER_RABIN;
+    
+    q = n - 1;
+    int t = 0;
+    
+    while (IS_EVEN(q)) {
+        q >>= 1;
+        t++;
+    }
+    while (try > 0) {
+        int      e = 0;
+        uint32_t a = 2 + rand() % (n - 2);
+        uint64_t b = powm(a, q, n);
+
+        if (b != 1) {
+            while ( (b != 1) && (b != (n - 1)) && (e <= (t - 2)) ) {
+                b *= b;
+                b %= n;
+                e += 1;
+            }
+            if (b != n - 1) {
+                return false;
+            }
+        }
+        try--;
+    }
+    return true;
+}
+//-----------------------------------------------------------------------------
 unsigned long int gcd_ulint(unsigned long int a, unsigned long int b) {
     //
     // Standard "right-shift" binary gcd algorithm.
@@ -839,10 +941,10 @@ uint32_t hash_pjw(const void* const keyptr) {
     uint32_t g = 0;
 
     for (p = (char*)keyptr; *p != '\0'; p++) {
-        hash = (hash<<4) + (*p);
+        hash = (hash << 4) + (*p);
         g = (hash & 0xf0000000);
         if (0 != g) {
-            hash ^= (g>>24);
+            hash ^= (g >> 24);
             hash ^= g;
         }
     }

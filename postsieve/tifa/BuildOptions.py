@@ -208,9 +208,9 @@
 #
 # Set to 'yes' to turn on output messages for some Tifa functions and programs.
 #
-# Default: 'yes'
+# Default: 'no'
 #-------------------------------------------------------------------------------
-#ALLOW_VERBOSE = 'no'
+#ALLOW_VERBOSE = 'yes'
 
 #
 # Set to 'yes' to turn on output messages for the cfrac function.
@@ -219,6 +219,14 @@
 # Default: 'yes'
 #-------------------------------------------------------------------------------
 #VERBOSE_CFRAC = 'no'
+
+#
+# Set to 'yes' to turn on output messages for the ecm function.
+# Has no effect if ALLOW_VERBOSE is set to 'no'.
+#
+# Default: 'yes'
+#-------------------------------------------------------------------------------
+#VERBOSE_ECM = 'no'
 
 #
 # Set to 'yes' to turn on output messages for the fermat function.
@@ -270,6 +278,13 @@
 # Default: 'yes'
 #-------------------------------------------------------------------------------
 #TIMING_CFRAC = 'no'
+
+#
+# Set to 'yes' to turn on timing messages for the ecm function.
+#
+# Default: 'yes'
+#-------------------------------------------------------------------------------
+#TIMING_ECM = 'no'
 
 #
 # Set to 'yes' to turn on timing messages for the fermat function.

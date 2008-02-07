@@ -42,10 +42,10 @@
 //------------------------------------------------------------------------------
 void do_test() {
 
-    uint32_t nb_rows = 9;
-    uint32_t nb_cols = 7;
+    uint32_t nrows = 9;
+    uint32_t ncols = 7;
 
-    binary_matrix_t* matrix = alloc_binary_matrix(nb_rows, nb_cols);
+    binary_matrix_t* matrix = alloc_binary_matrix(nrows, ncols);
 /*
     set_matrix_bit_to_one(0, 2, matrix);
     set_matrix_bit_to_one(0, 5, matrix);
@@ -114,7 +114,7 @@ void do_test() {
     print_binary_matrix(matrix);
 
     uint32_array_list_t* relations;
-    relations = alloc_uint32_array_list(matrix->nb_rows - matrix->nb_cols);
+    relations = alloc_uint32_array_list(matrix->nrows - matrix->ncols);
     gaussian_elim(relations, matrix);
 
     printf("---------------------------\n");

@@ -56,7 +56,7 @@ extern "C" {
     * set to \c FIND_COMPLETE_FACTORIZATION, factors' multiplicities are stored
     * in the array <tt>multis</tt>. For the time being, no trial divisions
     * are performed so depending on the situation, it could be worthwhile to
-    * carry out such a step before calling \c tifa_factor.
+    * carry out such a step <i>before</i> calling \c tifa_factor.
     *
     * \note If the factoring mode used is different from
     * \c FIND_COMPLETE_FACTORIZATION, \c multis is allowed to be a NULL

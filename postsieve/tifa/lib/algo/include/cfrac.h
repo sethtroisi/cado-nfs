@@ -1,6 +1,6 @@
 //
-// Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-// Computer Science and Control)
+// Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+// in Computer Science and Control)
 //
 // This library is free software; you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -29,8 +29,9 @@
  * algorithm from M. A. Morrison and J. Brillhart, together with the large
  * prime variation.
  *
- * \see "A Method of Factoring and the Factorization of F_7",
- * <i>Mathematics of Computation</i>, vol 29, #129, Jan 1975, pages 183-205.
+ * \see "A Method of Factoring and the Factorization of F_7", M. A. Morrison and 
+ * J. Brillhart, <i>Mathematics of Computation</i>, vol 29, #129, Jan 1975, 
+ * pages 183-205.
  */
 
 #if !defined(_TIFA_CFRAC_H_)
@@ -84,7 +85,7 @@ extern "C" {
 #define CFRAC_DFLT_USE_LARGE_PRIMES true
 
    /**
-    * \struct struct_cfrac_params_t cfrac.h lib/utils/include/cfrac.h
+    * \struct struct_cfrac_params_t cfrac.h lib/algo/include/cfrac.h
     * \brief  Defines the variable parameters used in the CFRAC algorithm.
     *
     * This structure defines the set of the variable parameters used in the

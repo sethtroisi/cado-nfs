@@ -1,6 +1,6 @@
 //
-// Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-// Computer Science and Control)
+// Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+// in Computer Science and Control)
 //
 // This library is free software; you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -161,13 +161,13 @@ extern "C" {
     #define RESET_NAMED_TIMER(NAME)   /* intentionally left empty */
     #define START_NAMED_TIMER(NAME)   /* intentionally left empty */
     #define STOP_NAMED_TIMER(NAME)    /* intentionally left empty */
-    #define GET_NAMED_TIMING(NAME)    /* intentionally left empty */
+    #define GET_NAMED_TIMING(NAME)    (-1.0)
 
     #define INIT_TIMER    /* intentionally left empty */
     #define RESET_TIMER   /* intentionally left empty */
     #define START_TIMER   /* intentionally left empty */
     #define STOP_TIMER    /* intentionally left empty */
-    #define GET_TIMING    /* intentionally left empty */
+    #define GET_TIMING    (-1.0)
 #endif
 
 #ifdef __cplusplus

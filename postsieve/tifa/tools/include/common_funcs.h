@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
+// Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
 // Computer Science and Control)
 //
 // This library is free software; you can redistribute it and/or modify it under
@@ -36,6 +36,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#include "first_primes.h"
 
     //
     // Various macros used to keep output messages consistent throughout the
@@ -77,9 +79,9 @@ extern "C" {
     * \def PRINT_USAGE_WARNING_MSG()
     * Macro printing a boilerplate usage warning on the standard error.
     */
-#define PRINT_USAGE_WARNING_MSG() do {                                       \
-    fprintf(stderr, "Please, use the perl wrapper factorize.pl instead of"); \
-    fprintf(stderr, " a direct invocation of this program.\n");              \
+#define PRINT_USAGE_WARNING_MSG() do {                                        \
+    fprintf(stderr, "Please, use the perl wrapper factorize.pl instead of "); \
+    fprintf(stderr, "a direct invocation\nof this program.\n");               \
 } while (0)
 
    /**
@@ -97,7 +99,7 @@ extern "C" {
     * Default number of prime numbers used in trial division of number to
     * factor.
     */
-#define NPRIMES_TRIAL_DIV 1024
+#define NPRIMES_TRIAL_DIV NFIRST_PRIMES
 
    /**
     * \brief Function used by the "tool" programs to print a greeting message.

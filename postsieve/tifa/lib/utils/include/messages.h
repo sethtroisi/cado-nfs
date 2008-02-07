@@ -1,6 +1,6 @@
 //
-// Copyright (C) 2006, 2007 INRIA (French National Institute for Research in
-// Computer Science and Control)
+// Copyright (C) 2006, 2007, 2008 INRIA (French National Institute for Research
+// in Computer Science and Control)
 //
 // This library is free software; you can redistribute it and/or modify it under
 // the terms of the GNU Lesser General Public License as published by the Free
@@ -20,8 +20,8 @@
 /**
  * \file    messages.h
  * \author  Jerome Milan
- * \date    Wed Aug 29 2007
- * \version 1.0.1
+ * \date    Feb  7 2008
+ * \version 1.0.2
  *
  * \brief Status / error messages output macros
  *
@@ -33,15 +33,6 @@
  * header. It is under the responsability of the including file to check for
  * these symbol definitions or to define them, if needed.
  */
-
-/*
- * History:
- *     1.0.1: Wed Aug 29 2007 by JM:
- *            - Added message for Fermat's algorithm. 
- *     1.0  : Fri Mar 2 2007 by JM:
- *            - Initial version.
- */
-
 
 #if !defined(_TIFA_MESSAGES_H_)
    /**
@@ -95,13 +86,20 @@ extern "C" {
 #define DED_FACTORS_STRING       "deducing factors..."
 #define UPDATE_MORE_RELS_STRING  "updating context to find more relations... "
 #define UPDATE_NEW_MULT_STRING   "updating context to change multiplier... "
-
 //
 // Strings pertaining to Fermat's factorization only
 //
 #define FERMAT_FACT_STRING       "performing Fermat's factorization..."
 #define FERMAT_FACT_DONE_STRING  "Fermat's factorization..."
-#define UPDATE_MULTIPREC_STRING  "updating context to use multi-precision... "
+#define UPDATE_MULTIPREC_STRING  "updating context to use multi-precision..."
+//
+// Strings pertaining to ECM factorization only
+//
+#define PERFORMING_ECM_STRING      "performing elliptic curve factorization..."
+#define PERFORMING_P2_PRECOMP_STRING "performing phase 2 precomputations..."
+#define CHOOSED_CURVES_IN_STRING     "choosing curves..."
+#define PHASE_1_IN_STRING            "phase 1 (accumulated)..."
+#define PHASE_2_IN_STRING            "phase 2 (accumulated)..."
 //
 // Strings pertaining to SQUFOF only
 //
@@ -252,6 +250,7 @@ extern "C" {
     #define PRINT_RES_GENERATED_MSG(TIMING) /* intentionally left empty */
     #define PRINT_RES_SELECTED_MSG(TIMING)  /* intentionally left empty */
 #endif
+
 //
 // Messages pertaining to Fermat's algorithm only
 //
@@ -280,6 +279,24 @@ extern "C" {
     #define PRINT_GREEDY_MSG(TIMING)    /* intentionally left empty */
     #define PRINT_FERMAT_FACT_DONE_MSG  /* intentionally left empty */
 #endif
+
+//
+// Messages pertaining to ECM only
+//
+#define PRINT_PERFORMING_ECM            PRINT_MSG(PERFORMING_ECM_STRING)
+#define PRINT_PERFORMING_P2_PRECOMP     PRINT_MSG(PERFORMING_P2_PRECOMP_STRING)
+#if __TIMING__
+    #define PRINT_CHOOSED_CURVES_IN     PRINT_MSG(CHOOSED_CURVES_IN_STRING)
+    #define PRINT_PHASE_1_IN            PRINT_MSG(PHASE_1_IN_STRING)
+    #define PRINT_PHASE_2_IN            PRINT_MSG(PHASE_2_IN_STRING)
+#else
+    #define PRINT_CHOOSED_CURVES_IN     /* intentionally left empty */
+    #define PRINT_PHASE_1_IN            /* intentionally left empty */
+    #define PRINT_PHASE_2_IN            /* intentionally left empty */
+#endif
+
+#define PRINT_NCURVES_USED(NCURVES) \
+            PRFX_PRINTF("used %"PRIu32" curve(s)\n", (uint32_t)NCURVES)
 
 //
 // Messages pertaining to SQUFOF only

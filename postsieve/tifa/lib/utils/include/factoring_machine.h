@@ -20,13 +20,21 @@
 /**
  * \file    factoring_machine.h
  * \author  Jerome Milan
- * \date    Early March 2007
- * \version 1.0
+ * \date    Fri Jan 11 2008
+ * \version 1.1
  *
  * \brief Abstraction of an integer factorization algorithm.
  *
  * Implements a machine-like abstraction of an integer factorization algorithm.
  */
+
+ /*
+  *  History:
+  *    1.1: Fri Jan 11 2008 by JM:
+  *         - Removed machine_state_enum and machine_state_t.
+  *    1.0: March 2007 by JM:
+  *         - Initial version.
+  */
 
 #if !defined(_TIFA_FACTORING_MACHINE_H_)
    /**
