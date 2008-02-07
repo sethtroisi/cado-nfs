@@ -377,7 +377,8 @@ main(int argc, char *argv[])
 		//		fprintf(stderr, "Read bwcost=%lu\n", bwcost);
 		if((bwcostmin != 0) && (bwcost == bwcostmin)){
 		    // what a damn tricky feature!!!!!!!
-		    fprintf(stderr, "Activating tricky stopping feature\n");
+		    fprintf(stderr, "Activating tricky stopping feature");
+		    fprintf(stderr, " when finding %lu\n", bwcostmin);
 		    break;
 		}
 	    }

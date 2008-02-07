@@ -4,9 +4,6 @@
 
 #include "hashpair.h"
 
-#define HC0 314159265358979323UL
-#define HC1 271828182845904523UL
-
 void
 hashClear(hashtable_t *H)
 {
@@ -15,8 +12,8 @@ hashClear(hashtable_t *H)
     memset(H->hashtab_r, 0, H->hashmod * sizeof(unsigned long));
 }
 
-void
-hashInit(hashtable_t *H, unsigned int n)
+unsigned long
+getHashMod(unsigned long n)
 {
     int ntab = 20, i;
     unsigned long tab[] = {500009, 750019, 
@@ -26,14 +23,18 @@ hashInit(hashtable_t *H, unsigned int n)
 			   100000007, 200000033, 300000007, 400000009,
 			   500000003, 1000000007};
 
-    n = (3*n)/2;
     for(i = 0; i < ntab; i++)
-	if(n < tab[i]){
-	    H->hashmod = tab[i];
+	if(n < tab[i])
 	    break;
-	}
     //    ASSERT(i <= ntab);
-    fprintf(stderr, "# hashmod[%d] = %lu\n", i, H->hashmod);
+    fprintf(stderr, "# hashmod[%d] = %lu\n", i, tab[i]);
+    return tab[i];
+}
+
+void
+hashInit(hashtable_t *H, unsigned int n)
+{
+    H->hashmod = getHashMod((3*n)/2);
     H->hashcount = (int *)malloc(H->hashmod * sizeof(int));
     H->hashtab_p = (long *)malloc(H->hashmod * sizeof(long));
     H->hashtab_r = (unsigned long *)malloc(H->hashmod * sizeof(unsigned long));
@@ -52,12 +53,11 @@ hashFree(hashtable_t *H)
 int
 getHashAddr(hashtable_t *H, long p, unsigned long r)
 {
-    unsigned long tmp = HC0 * ((unsigned long)p) + HC1 * r;
     static unsigned int cptmax = 0;
     unsigned int cpt = 0; /* number of iterations to find a free location */
     unsigned int h;
 
-    h = (unsigned int) (tmp % H->hashmod);
+    h = getInitialAddress((unsigned long)p, r, H->hashmod);
 #if DEBUG >= 2
     printf("H(%ld, %lu) = %d\n", p, r, h);
 #endif

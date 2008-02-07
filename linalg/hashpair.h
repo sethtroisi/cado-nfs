@@ -12,6 +12,12 @@ typedef struct {
     unsigned long *hashtab_r;
 } hashtable_t;
 
+#define HC0 314159265358979323UL
+#define HC1 271828182845904523UL
+
+#define getInitialAddress(a, b, M) ((unsigned int)((HC0*(a)+HC1*(b)) % M))
+
+extern unsigned long getHashMod(unsigned long n);
 extern void hashClear(hashtable_t *H);
 extern void hashInit(hashtable_t *H, unsigned int n);
 extern void hashFree(hashtable_t *H);

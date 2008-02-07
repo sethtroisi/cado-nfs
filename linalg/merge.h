@@ -23,7 +23,7 @@ typedef struct {
                         else <= 1 for a deleted column
                         (trick: we store -w if w > cwmax) */
   unsigned long *ad;
-  int weight;
+  unsigned long weight;
   int cwmax;         /* bound on weight of j to enter the SWAR structure */
   int rwmax;         /* if a weight(row) > rwmax, kill that row */
   int delta;         /* bound for nrows-ncols */
@@ -47,10 +47,12 @@ typedef struct {
 #define isRowNull(mat, i) ((mat)->data[(i)].val == NULL)
 #define lengthRow(mat, i) (mat)->data[(i)].len
 #define cell(mat, i, k) (mat)->data[(i)].val[(k)]
+#define SPARSE_ITERATE(mat, i, k) for((k)=0; (k)<lengthRow((mat),(i)); (k)++)
 #else
 #define isRowNull(mat, i) ((mat)->rows[(i)] == NULL)
 #define lengthRow(mat, i) (mat)->rows[(i)][0]
 #define cell(mat, i, k) (mat)->rows[(i)][(k)]
+#define SPARSE_ITERATE(mat, i, k) for((k)=1; (k)<=lengthRow((mat),(i)); (k)++)
 #endif
 
 extern void report1(INT i);

@@ -41,7 +41,7 @@ char *used;
 // minimum excess we want to keep
 #define DELTA 128
 
-#define M_STRATEGY 2 // 0: finish that mergelevel
+#define M_STRATEGY 3 // 0: finish that mergelevel
                      // 1: change if min weight < mergelevel
                      // 2: jump to minimal possible mergelevel
                      // 3: perform one merge, then check for next min weight
@@ -1997,7 +1997,7 @@ merge_m_fast(sparse_mat_t *mat, int m, int verbose)
 #endif
     }
     tot = seconds()-tot;
-    fprintf(stderr, "TIME: m=%d nj=%d", m, njproc);
+    fprintf(stderr, "T=%d m=%d nj=%d", (int)seconds(), m, njproc);
     fprintf(stderr, " findopt=%2.2lf (fill=%2.2lf mst=%2.2lf) tot=%2.2lf", 
 	    totopt, totfill, totMST, tot);
     fprintf(stderr, " del=%2.2lf\n", totdel);
@@ -2252,12 +2252,14 @@ mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 	}
 	if(m == 1){
 	    // do all of these
-	    fprintf(stderr, "Removing singletons at %2.2lf\n", seconds());
 	    njrem += removeSingletons(mat);
+	    fprintf(stderr, "T=%d after m=1\n", (int)(seconds()));
 	}
 	else if(m == 2){
+#if 0
 	    fprintf(stderr, "Performing all merges for m=%d at %2.2lf\n",
 		    m, seconds());
+#endif
 	    njrem += mergeGe2(mat, m, verbose);
 	}
 	else{
@@ -2280,7 +2282,10 @@ mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 	}
 	cost = ((unsigned long)mat->rem_ncols) * ((unsigned long)mat->weight);
 	if((njproc % 1000) == 0){ // somewhat arbitrary...!
-	    deleteSuperfluousRows(mat, mat->delta, 64);
+	    int ni2rem = mat->rem_nrows-mat->rem_ncols;
+
+	    ni2rem = (ni2rem > 20 * mat->delta, mat->delta, mat->delta/2);
+	    deleteSuperfluousRows(mat, mat->delta, ni2rem);
 	    inspectRowWeight(mat);
 	}
 	if((njproc % 10000) == 0){
@@ -2288,8 +2293,8 @@ mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 		    (int)seconds(),
 		    mat->rem_nrows, mat->rem_ncols, 
 		    mat->rem_nrows - mat->rem_ncols);
-	    fprintf(stderr, " wM*N=%lu", cost);
-	    fprintf(stderr, " wM/N=%2.2lf\n", 
+	    fprintf(stderr, " c*N=%lu", cost);
+	    fprintf(stderr, " c/N=%2.2lf\n", 
 		    ((double)mat->weight)/((double)mat->rem_ncols));
 	    // njrem=%d at %2.2lf\n",
 	    if(forbw)
@@ -2499,6 +2504,11 @@ main(int argc, char *argv[])
 	fprintf(stderr, "Pruning: nrows=%d ncols=%d %2.2lf\n",
 		mat.rem_nrows, mat.rem_ncols, seconds()-tt);
     }
+
+    // ouhhhhhhhhhh
+    // we do not have a clear idea of which function to minimize...!
+    forbw = 0;
+    fprintf(stderr, "WARNING: forcing forbw=0...!!!!\n");
 
 #if M_STRATEGY <= 2
     merge(&mat, /*nb_merge_max,*/ maxlevel, verbose, forbw);

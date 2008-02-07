@@ -25,38 +25,22 @@
 
 #define STR_LEN_MAX 1024
 
+#define AGRESSIVE_MODE 0
+
+#if AGRESSIVE_MODE == 1
+typedef struct {
+    unsigned long hashmod;
+    int len;
+    unsigned long *tab;
+} smallhash_t;
+
+#define NBITS (sizeof(unsigned long) << 3)
+#endif
+
 // TODO: read line by line and do not parse/print relations
 // but only print strbuf when new.
 
-void
-fprint_relation_raw(FILE *file, relation_t rel)
-{
-    int i, j;
-
-    fprintf(file, "%ld,%lu:", rel.a, rel.b);
-    for(i = 0; i < rel.nb_rp; ++i){
-	for(j = 0; j < rel.rp[i].e; j++){
-	    fprintf(file, "%lx", rel.rp[i].p);
-	    if(j < rel.rp[i].e-1)
-		fprintf(file, ",");
-	}
-	if(i < rel.nb_rp-1)
-	    fprintf(file, ",");
-    }
-    fprintf(file, ":");
-    for(i = 0; i < rel.nb_ap; ++i){
-	for(j = 0; j < rel.ap[i].e; j++){
-	    fprintf(file, "%lx", rel.ap[i].p);
-	    if(j < rel.ap[i].e-1)
-                fprintf(file, ",");
-        }
-        if(i < rel.nb_ap-1)
-            fprintf(file, ",");
-    }
-    fprintf(file, "\n");
-}
-
-// stolen from relation.c
+// stolen from relation.c with the same semantics
 int
 fread_buf(char str[STR_LEN_MAX], FILE *file)
 {
@@ -115,10 +99,39 @@ get_ab(long *a, unsigned long *b, char str[STR_LEN_MAX])
     str[ib] = ':';
 }
 
+#if AGRESSIVE_MODE == 0
+int
+is_ab_new(hashtable_t *Hab, long a, unsigned long b)
+{
+    int hab = hashInsert(Hab, a, b);
+
+    return (Hab->hashcount[hab] == 1);
+}
+#else
+int
+is_ab_new(smallhash_t *Hab, long a, unsigned long b)
+{
+    int hab = getInitialAddress((unsigned long)a, b, Hab->hashmod);
+    int i0, i1;
+
+    i0 = hab / NBITS;
+    i1 = hab - (i0 * NBITS);
+    if(Hab->tab[i0] & ((1UL)<<i1))
+	return 0;
+    Hab->tab[i0] |= ((1UL)<<i1);
+    return 1;
+}
+#endif
+
+#if AGRESSIVE_MODE == 0
 int
 remove_duplicates_from_file(int *irel, unsigned int *nrels, hashtable_t *Hab, FILE *file)
+#else
+int
+remove_duplicates_from_file(int *irel, unsigned int *nrels, smallhash_t *Hab, FILE *file)
+#endif
 {
-    int ret, hab;
+    int ret;
     long a;
     unsigned long b;
     unsigned long file_duplicates = 0;         /* duplicates in this file */
@@ -131,17 +144,17 @@ remove_duplicates_from_file(int *irel, unsigned int *nrels, hashtable_t *Hab, FI
 	    break;
 	*irel += 1;
 	if(!(*irel % 100000))
-	    fprintf(stderr, "nrel = %d at %2.2lf\n", *irel, seconds());
+	    fprintf(stderr, "nrel = %d fdup = %lu at %2.2lf\n",
+		    *irel, file_duplicates, seconds());
 	get_ab(&a, &b, str);
-	hab = hashInsert(Hab, a, b);
-	if(Hab->hashcount[hab] > 1){
+	if(is_ab_new(Hab, a, b)){
+	    *nrels += 1;
+	    printf("%s", str);
+	}
+	else{
 	    if(file_duplicates ++ < 10)
 		fprintf(stderr, "(%ld, %lu) appears more than once\n", a, b);
 	    continue;
-	}
-	else{
-	    *nrels += 1;
-	    printf("%s", str);
 	}
     }
     total_duplicates += file_duplicates;
@@ -151,8 +164,13 @@ remove_duplicates_from_file(int *irel, unsigned int *nrels, hashtable_t *Hab, FI
 }
 
 // Read all relations from file.
+#if AGRESSIVE_MODE == 0
 int
 remove_duplicates(char *ficname[], int nbfic, unsigned int *nrels, hashtable_t *Hab)
+#else
+int
+remove_duplicates(char *ficname[], int nbfic, unsigned int *nrels, smallhash_t *Hab)
+#endif
 {
     FILE *relfile;
     int ret = 0, irel = -1;
@@ -182,7 +200,11 @@ remove_duplicates(char *ficname[], int nbfic, unsigned int *nrels, hashtable_t *
 int
 main(int argc, char **argv)
 {
+#if AGRESSIVE_MODE == 0
     hashtable_t Hab;
+#else
+    smallhash_t Hab;
+#endif
     char **fic;
     unsigned int nfic;
     int ret, k;
@@ -222,7 +244,15 @@ main(int argc, char **argv)
     nfic = argc-1;
     //	fic = extractFic(&nfic, &nrelsmax, argv[3]);
     fprintf(stderr, "Number of relations is %u\n", nrelsmax);
+#if AGRESSIVE_MODE == 0
     hashInit(&Hab, nrelsmax);
+#else
+    fprintf(stderr, "AGRESSIVE_MODE used\n");
+    Hab.hashmod = getHashMod(((unsigned long)nrelsmax) * 10);
+    Hab.len = 1 + (Hab.hashmod / NBITS);
+    Hab.tab = (unsigned long *)malloc(Hab.len * sizeof(unsigned long));
+    memset(Hab.tab, 0, Hab.len * sizeof(unsigned long));
+#endif
 
     fprintf(stderr, "reading files of relations...\n");
     ret = remove_duplicates(fic, nfic, &nrels, &Hab);
