@@ -8,13 +8,25 @@
 #include <ios>
 #include <iomanip>
 #include "matrix_repr_binary.hpp"
+#include "matrix_repr_binary_sliced.hpp"
 #include <string>
 #include <sstream>
 #include "manu.h"
 
+/* This enables the purportedly cache-friendly code in
+ * matrix_repr_binary_sliced.hpp. Compile with make -V to reproduce the
+ * command line invocation which can be derived to produced the assembly
+ * file.
+ */
+#define xxxUSE_SLICED_MATRIX
+
 template<typename T>
 struct binary_pod_traits {
+#ifdef  USE_SLICED_MATRIX
+	typedef matrix_repr_binary_sliced representation;
+#else
 	typedef matrix_repr_binary representation;
+#endif
 	static const unsigned int max_accumulate = UINT_MAX;
 	static const unsigned int max_accumulate_wide = UINT_MAX;
 

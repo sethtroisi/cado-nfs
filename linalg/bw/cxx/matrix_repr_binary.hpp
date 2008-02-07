@@ -8,12 +8,13 @@
 #include "matrix_line.hpp"
 #include "matrix_repr.hpp"
 
-struct matrix_repr_binary {
+class matrix_repr_binary {
     struct ptr { uint32_t * idx; };
     struct const_ptr {
 	const uint32_t * idx;
 	const_ptr(ptr const& p) :idx(p.idx) {}
     };
+    public:
 
     struct matrix_rowset : public ptr {
 	matrix_rowset() { idx = NULL; }
@@ -56,11 +57,13 @@ struct matrix_repr_binary {
 		typename traits::wide_scalar_t * dst,
 		const typename traits::scalar_t * src) const
 	{
+            asm("# multiplication code\n");
 	    const_ptr q(*this);
 	    for(uint i = 0 ; i < nrows_slice ; i++) {
 		traits::zero(dst[i]);
 		unsigned int ncoef = *q.idx++;
 		unsigned int c = 0;
+                asm("# critical loop\n");
 		for( ; ncoef-- ; q.idx++) {
 		    c += *q.idx;
 		    /* if we're here, then the traits:: class
@@ -70,7 +73,9 @@ struct matrix_repr_binary {
 		     */
 		    traits::addmul(dst[i], src[c]);
 		}
+                asm("# end of critical loop\n");
 	    }
+            asm("# end of multiplication code\n");
 	}
     };	/* matrix_rowset */
 };
