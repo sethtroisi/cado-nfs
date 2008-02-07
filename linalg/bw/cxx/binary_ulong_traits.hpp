@@ -18,7 +18,7 @@
  * command line invocation which can be derived to produced the assembly
  * file.
  */
-#define xxxUSE_SLICED_MATRIX
+#define USE_SLICED_MATRIX
 
 template<typename T>
 struct binary_pod_traits {

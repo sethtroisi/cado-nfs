@@ -1,3 +1,10 @@
+
+/* The norm requires that UINT16_MAX be defined only when this is on. It
+ * is used in matrix_repr_binary_sliced.hpp */
+
+#define __STDC_LIMIT_MACROS
+#include <stdint.h>
+
 #include <cstdio>
 #include <cstdlib>
 #include "auxfuncs.h"
@@ -287,6 +294,7 @@ struct thread:public traits {
         pcpu = ticks_diff / wct_diff;
         av = ticks_diff / (double) (done - go_mark);
         m0_estim = av / (double) globals::slices[t].ncoeffs;
+        m0_estim *= 1e9;
         tw = globals::nb_iter * av;
         rem = av * (globals::nb_iter - done);
         string eta;
@@ -303,7 +311,7 @@ struct thread:public traits {
         }
 
         thread_lock(&globals::console_lock);
-        cout << fmt("T% N=% av=% M0=%[.3]s %[F.1]%% tw=% eta=<%>")
+        cout << fmt("T% N=% av=% M0=%[.2]ns %[F.1]%% tw=% eta=<%>")
             % t % done % pdelta(av)
             % m0_estim % (pcpu * 100.0)
             % pdelta(tw)

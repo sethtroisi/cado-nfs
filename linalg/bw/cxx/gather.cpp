@@ -1,3 +1,8 @@
+/* The norm requires that UINT16_MAX be defined only when this is on. It
+ * is used in matrix_repr_binary_sliced.hpp */
+#define __STDC_LIMIT_MACROS
+#include <stdint.h>
+
 #include <cstdio>
 #include <cstdlib>
 #include "auxfuncs.h"

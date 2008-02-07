@@ -8,6 +8,7 @@
 #include "matrix.hpp"
 #include "matrix_line.hpp"
 #include "matrix_repr.hpp"
+#include "limits.h"
 #include <vector>
 
 /* This should be more cache-friendly than matrix_repr_binary.
@@ -18,15 +19,21 @@
 class matrix_repr_binary_sliced {
 public:
     struct matrix_rowset {
-        typedef std::vector<uint32_t> data_t;
+        typedef std::vector<uint16_t> data_t;
         typedef data_t::iterator ptr;
         typedef data_t::const_iterator const_ptr;
         data_t data;
         unsigned int nrows_slice;
+        inline void push(uint32_t x) {
+            BUG_ON(x > UINT16_MAX);
+            data.push_back(x);
+        }
         public:
 
 	void fill(std::istream& mtx, matrix_slice const & slice)
 	{
+            uint32_t datamax = 0;
+            using namespace std;
 	    mtx.seekg(slice.pos);
 	    std::istream_iterator<matrix_line> mit(mtx);
             unsigned int npack = 2048;
@@ -49,7 +56,19 @@ public:
                         L.push_back(std::make_pair(lit->first,di));
                     }
                 }
+                /* L is the list of (column index, row index) of all
+                 * coefficients in the current horizontal slice */
                 std::sort(L.begin(), L.end());
+
+                /* Tetracapillectomy is the fact of having a separate
+                 * array for each column ; in most cases it's a bad idea,
+                 * since the corresponding array will be rather small,
+                 * and its size will be quite erratic. Hence we will have
+                 * many mispredictions.
+                 *
+                 * So it's not expected to be a smart move.
+                 */
+#ifdef TETRACAPILLECTOMY
                 /* Now L is sorted by column. Group together the blocks
                  * corresponding to one given column. */
 
@@ -68,18 +87,35 @@ public:
                 }
                 L.clear();
 
-                data.push_back(npack);
-                data.push_back(C.size());
+                push(npack);
+                push(C.size() & ((1u << 16) - 1));
+                push(C.size() >> 16);
                 uint32_t j = 0;
                 for(C_t::const_iterator cp = C.begin() ; cp != C.end() ; ++cp) {
-                    data.push_back(cp->first - j); j = cp->first;
-                    data.push_back(cp->second.size());
+                    push(cp->first - j);
+                    j = cp->first;
+                    push(cp->second.size());
+                    /* Take it easy for this one -- we know that values
+                     * are bounded by npack anyway */
                     data.insert(data.end(),
                             cp->second.begin(),
                             cp->second.end());
                 }
+#else
+                push(npack);
+                push(L.size() & ((1u << 16) - 1));
+                push(L.size() >> 16);
+                uint32_t j = 0;
+                for(Lci_t lp = L.begin() ; lp != L.end() ; ++lp) {
+                    push(lp->first - j); j = lp->first;
+                    push(lp->second);
+                }
                 data[0]++;
+#endif
+
+
             }
+            cout << "Max coeff in data array is " << datamax << endl;
 	}
 
 	template<typename traits>
@@ -89,25 +125,39 @@ public:
 	{
             asm("# multiplication code\n");
 	    const_ptr q = data.begin();
-            uint32_t nhstrips = *q++;
+            uint16_t nhstrips = *q++;
             uint32_t i = 0;
-            for(uint32_t s = 0 ; s < nhstrips ; s++) {
+            for(uint16_t s = 0 ; s < nhstrips ; s++) {
                 uint32_t j = 0;
-                uint32_t nrows_packed = *q++;
+                uint16_t nrows_packed = *q++;
                 for(uint32_t di = 0 ; di < nrows_packed ; di++) {
                     traits::zero(dst[i+di]);
                 }
                 asm("# critical loop\n");
-                uint32_t ncols_used = *q++;
+#ifdef  TETRACAPILLECTOMY
+                uint32_t ncols_used;
+                ncols_used = *q++;
+                ncols_used |= ((uint32_t) *q++) << 16;
                 for(uint32_t c = 0 ; c < ncols_used ; c++) {
                     j += *q++;
                     typename traits::scalar_t x = src[j];
-                    uint32_t nrows_touched_bycol = *q++;
-                    for(uint32_t r = 0 ; r < nrows_touched_bycol ; r++) {
+                    uint16_t nrows_touched_bycol = *q++;
+                    for(uint16_t r = 0 ; r < nrows_touched_bycol ; r++) {
                         uint32_t di = *q++;
                         traits::addmul(dst[i + di], x);
                     }
                 }
+#else
+                uint32_t ncoeffs_slice;
+                ncoeffs_slice = *q++;
+                ncoeffs_slice |= ((uint32_t) *q++) << 16;
+                for(uint32_t c = 0 ; c < ncoeffs_slice ; c++) {
+                    j += *q++;
+                    typename traits::scalar_t x = src[j];
+                    uint32_t di = *q++;
+                    traits::addmul(dst[i + di], x);
+                }
+#endif
                 i += nrows_packed;
                 asm("# end of critical loop\n");
             }
