@@ -2324,7 +2324,7 @@ mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 	// to be cleaned one day...
 	if(!forbw){
 	    double r = ((double)bwcost)/((double)bwcostmin);
-	    if(r > 1.1){
+	    if((r > 1.1) && (mat->rem_nrows-mat->rem_ncols <= mat->delta)){
 		fprintf(stderr, "cN too high, stopping [%2.2lf]\n", r);
 		break;
 	    }
