@@ -88,15 +88,17 @@ static long
 sieveidx_to_a (unsigned long i, long amin, int odd) 
 {
   ASSERT_EXPENSIVE (odd == 0 || odd == 1);
+  ASSERT_EXPENSIVE (odd == 0 || (amin & 1) == 1);
   return amin + ((long)(i) << (odd));
 }
 
 static unsigned long 
 a_to_sieveidx (long a, long amin, int odd)
 {
-  ASSERT_EXPENSIVE (a > amin);
+  ASSERT_EXPENSIVE (a >= amin);
   ASSERT_EXPENSIVE (odd == 0 || odd == 1);
-  ASSERT_EXPENSIVE (odd == 0 || a & 1 == 1);
+  ASSERT_EXPENSIVE (odd == 0 || (a & 1) == 1);
+  ASSERT_EXPENSIVE (odd == 0 || (amin & 1) == 1);
   return (a - amin) >> odd;
 }
 
