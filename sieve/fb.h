@@ -25,6 +25,7 @@ void		fb_initloc_small (factorbase_small_inited_t *,
                                   factorbase_small_t *, const long, 
                                   const unsigned long, const int);
 int             fb_check (factorbase_t, cado_poly, int);
+void            fb_clear (factorbase_t);
 
 
 /* Some inlined functions which need to be fast */

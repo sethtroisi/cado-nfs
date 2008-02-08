@@ -517,7 +517,7 @@ find_sieve_reports (const unsigned char *sievearray, sieve_report_t *reports,
 	    {
 	      while (other_reports->p != 0 && other_reports->a < a)
 		other_reports++;
-	      if (other_reports->a != a)
+	      if (other_reports->p != 0 && other_reports->a != a)
 		{
 		  TRACE_A (a, __func__, __LINE__,
 			   "no matching report in other_reports\n");
@@ -2229,11 +2229,10 @@ main (int argc, char **argv)
   fprintf (stderr, "Found %lu relations in %1.0f seconds (%1.2e s/r)\n",
            relations_found, total_time, total_time / (double) relations_found);
 
-#if 0
-  /* FIXME implement this */
+  clear_polynomial (cpoly);
   fb_clear (fba);
   fb_clear (fbr);
-#endif
+
   free (reports_a);
   free (reports_r);
   free (sievearray);

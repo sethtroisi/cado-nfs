@@ -16,11 +16,7 @@
 #else
   #define ASSERT(x)
 #endif
-#ifdef HAVE_MSRH
-  #include <asm/msr.h>
-#else
-  #define rdtscll(x)
-#endif
+#define rdtscll(x)
 #include "basicnt.h"
 #include "fb.h"
 #include "utils/mod_ul.h"
@@ -246,6 +242,8 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
 	free (fb);
       fb = fb_new;
     }
+
+  free (fb_cur);
 
   rdtscll (tsc2);
 #ifdef HAVE_MSRH
@@ -765,4 +763,20 @@ fb_check (factorbase_t fb, cado_poly poly, int side)
       /* FIXME: add the tests for the small factor bases */
     }
   return 0;
+}
+
+void
+fb_clear (factorbase_t fb)
+{
+  int i;
+  free (fb->fullfb);
+  fb->fullfb = NULL;
+  fb->fblarge = NULL;
+  for (i = 0; i < SIEVE_BLOCKING; i++)
+    {
+      free (fb->fbsmall[i]);
+      fb->fbsmall[i] = NULL;
+      free (fb->fbinit[i]);
+      fb->fbinit[i] = NULL;
+    }
 }
