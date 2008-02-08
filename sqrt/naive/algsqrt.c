@@ -317,6 +317,12 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
+  /* print the command line */
+  fprintf (stderr, "%s.r%s", argv[0], REV);
+  for (i = 1; i < argc; i++)
+    fprintf (stderr, " %s", argv[i]);
+  fprintf (stderr, "\n");
+
   depfile = fopen(argv[1], "r");
   ASSERT_ALWAYS(depfile != NULL);
   ret = read_polynomial(pol, argv[3]);
