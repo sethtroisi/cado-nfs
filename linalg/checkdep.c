@@ -4,7 +4,8 @@
 #include <gmp.h>
 #include <string.h>
 
-void printVec(int *vec, int ncols)
+static void
+printVec (int *vec, int ncols)
 {
     int i;
 
@@ -14,8 +15,9 @@ void printVec(int *vec, int ncols)
     fprintf(stderr, "\n");
 }
 
-int
-checkSparse(FILE *matfile, FILE *kerfile, int ncols, int nlimbs, int *vec, int compact, int verbose)
+static int
+checkSparse (FILE *matfile, FILE *kerfile, int ncols, int nlimbs, int *vec,
+             int compact, int verbose)
 {
     long a;
     unsigned long w, b;
@@ -69,58 +71,8 @@ checkSparse(FILE *matfile, FILE *kerfile, int ncols, int nlimbs, int *vec, int c
     return ret;
 }
 
-// one bit per line...!
-int
-checkBW(FILE *matfile, FILE *kerfile, int nrows, int ncols, int *vec, int compact, int verbose)
-{
-    long a;
-    unsigned long b;
-    int i, j, ret = 0, nc, cc, jj, bb;
-    char c;
-
-    memset(vec, 0, ncols * sizeof(int));
-    // get next dependance relation
-    rewind(matfile);
-    fscanf(matfile, "%d %d", &i, &j);
-    while((c = getc(matfile)) != '\n');
-    for(i = 0; i < nrows; ++i){
-	ret = fscanf(kerfile, "%x", &bb);
-	if(ret == -1)
-	    break;
-	assert (ret == 1);
-	if(verbose)
-	    fprintf(stderr, "b=%x\n", bb);
-	if(bb){
-	    if(verbose)
-		fprintf(stderr, "+R_%d\n", i);
-	    if(compact == 0)
-		fscanf(matfile, "%ld %lu %d", &a, &b, &nc);
-	    else
-		fscanf(matfile, "%d", &nc);
-	    for(jj = 0; jj < nc; jj++){
-		fscanf(matfile, "%d", &cc);
-		if(verbose >= 2)
-		    fprintf(stderr, "vec[%d]++\n", cc);
-		vec[cc]++;
-	    }
-	    if(verbose >= 2)
-		printVec(vec, ncols);
-	    while((c = getc(matfile)) != '\n')
-		if(feof(matfile))
-		    break;
-	}
-	else{
-	    // skip line
-	    while((c = getc(matfile)) != '\n')
-		if(feof(matfile))
-		    break;
-	}
-    }
-    return ret;
-}
-
-void
-checkVector(int *vec, int ncols)
+static void
+checkVector (int *vec, int ncols)
 {
     int ok, i;
 
@@ -136,8 +88,8 @@ checkVector(int *vec, int ncols)
 	fprintf(stderr, "[n (%d)]", i);
 }
 
-void
-checkSparseAll(char *matname, char *kername, int compact, int verbose, int bw)
+static void
+checkSparseAll (char *matname, char *kername, int compact, int verbose)
 {
     FILE *matfile, *kerfile;
     int nrows, ncols, nlimbs, *vec, ndep, ret;
@@ -151,10 +103,7 @@ checkSparseAll(char *matname, char *kername, int compact, int verbose, int bw)
     while(1){
 	if(verbose)
 	    fprintf(stderr, "Checking dep %d\n", ndep++);
-	if(bw == 0)
-	    ret=checkSparse(matfile,kerfile,ncols,nlimbs,vec,compact,verbose);
-	else
-	    ret=checkBW(matfile,kerfile,nrows,ncols,vec,compact,verbose);
+        ret = checkSparse(matfile,kerfile,ncols,nlimbs,vec,compact,verbose);
 	if(ret == -1)
 	    break;
 	if(verbose >= 2)
@@ -167,8 +116,9 @@ checkSparseAll(char *matname, char *kername, int compact, int verbose, int bw)
     fclose(kerfile);
 }
 
-int
-checkWithIndex(FILE *purgedfile, FILE *indexfile, FILE *kerfile, int verbose, int nrows, int ncols, int small_nrows, int small_ncols, int *vec)
+static int
+checkWithIndex (FILE *purgedfile, FILE *indexfile, FILE *kerfile, int verbose,
+                int nrows, int ncols, int small_nrows, int *vec)
 {
     unsigned long w;
     int i, j, k, ret, nlimbs, ind, nrel, r, nc;
@@ -225,8 +175,9 @@ checkWithIndex(FILE *purgedfile, FILE *indexfile, FILE *kerfile, int verbose, in
     return 1;
 }
 
-void
-checkWithIndexAll(char *purgedname, char *indexname, char *kername, int verbose)
+static void
+checkWithIndexAll (char *purgedname, char *indexname, char *kername,
+                   int verbose)
 {
     FILE *purgedfile = fopen(purgedname, "r");
     FILE *indexfile = fopen(indexname, "r");
@@ -240,7 +191,7 @@ checkWithIndexAll(char *purgedname, char *indexname, char *kername, int verbose)
     while(1){
         if(verbose)
             fprintf(stderr, "Checking dep %d\n", ndep++);
-        ret = checkWithIndex(purgedfile,indexfile,kerfile,verbose,nrows,ncols,small_nrows, small_ncols, vec);
+        ret = checkWithIndex(purgedfile,indexfile,kerfile,verbose,nrows,ncols,small_nrows, vec);
 	if(ret == -1)
 	    break;
 	checkVector(vec, ncols);
@@ -252,11 +203,20 @@ checkWithIndexAll(char *purgedname, char *indexname, char *kername, int verbose)
     fclose(indexfile);
 }
 
-int main(int argc, char *argv[])
+static void
+usage (void)
+{
+  fprintf (stderr, "Usage: checkdep [-verbose] -purged file -index file -ker file\n");
+  fprintf (stderr, "       checkdep [-verbose] [-compact] -mat file -ker file\n");
+  exit (1);
+}
+
+int
+main (int argc, char *argv[])
 {
     char *matname = NULL, *indexname = NULL, *purgedname = NULL;
     char *kername = NULL;
-    int verbose = 0, compact = 0, bw = 0;
+    int verbose = 0, compact = 0;
 
     while(argc > 1 && argv[1][0] == '-'){
         if(argc > 2 && strcmp (argv[1], "-mat") == 0){
@@ -289,15 +249,19 @@ int main(int argc, char *argv[])
 	    argc -= 1;
 	    argv += 1;
 	}
-	else if(argc > 1 && strcmp (argv[1], "-bw") == 0){
-	    bw = 1;
-	    argc -= 1;
-	    argv += 1;
-	}
     }
-    if(indexname != NULL)
-	checkWithIndexAll(purgedname, indexname, kername, verbose);
+
+    if (indexname != NULL)
+      {
+        if (purgedname == NULL || kername == NULL)
+          usage ();
+	checkWithIndexAll (purgedname, indexname, kername, verbose);
+      }
     else
-	checkSparseAll(matname, kername, compact, verbose, bw);
+      {
+        if (matname == NULL || kername == NULL)
+          usage ();
+	checkSparseAll (matname, kername, compact, verbose);
+      }
     return 0;
 }
