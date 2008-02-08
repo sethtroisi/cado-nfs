@@ -232,19 +232,23 @@ reduce_plattice(plattice_info_t *pli, const fbprime_t p, const fbprime_t r, cons
 #if 0
     /* subtractive variant of Euclid's algorithm */
     while ( b0 >= I )
-    {
-      /* a0 < 0, b0 > 0 with |a0| > |b0| */
-        while (a0 + b0 <= 0)
+      {
+        /* a0 < 0, b0 > 0 with |a0| > |b0|: this loop is executed at least
+           once */
+        do
           {
             a0 += b0;
             a1 += b1;
           }
-        /* b0 > 0, a0 < 0 with |b0| > |a0| */
-        while (b0 + a0 >= 0 && b0 >= I)
+        while (a0 + b0 <= 0);
+        /* b0 > 0, a0 < 0 with |b0| > |a0|: since b0 >= I here, this loop is
+           also executed at least once */
+        do
           {
             b0 += a0;
             b1 += a1;
           }
+        while (b0 + a0 >= 0 && b0 >= I);
     }
     while (a0 <= -I)
       {
