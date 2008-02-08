@@ -27,6 +27,7 @@ extern "C" {
 // stderr)
 extern int read_polynomial (cado_poly, char *filename);
 extern void fprint_polynomial (FILE *, mpz_t *, const int);
+void clear_polynomial (cado_poly);
 
 // Relation I/O
 extern void copy_rel(relation_t *Rel, relation_t rel);
