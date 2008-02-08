@@ -208,19 +208,26 @@ typedef struct {
 //    beta, delta > 0
 //    -I < alpha <= 0 <= gamma < I
 //    gamma-alpha >= I
-// TODO: 
-// The algorithm is essentially the continued fraction of r/p. This can
-// probably be made faster by avoiding the ugly floating point divides.
-// Assuming all ak are close to one, iterated subtracts should do the
-// job.
-// For the moment, it seems to take negligible time in the whole process.
+//
+// Sizes:
+//    p is less than 32 bits and I fits easily in 32 bits.
+//    So, alpha and beta fit easily in 32 bits, since they are less than I
+//    Now, gamma and delta are also bounded by p, so 32 bits is enough
+//    However: a and c can be as large as p*I (not both ?).
+//    We still store them in 32 bits, since if they are larger, it means
+//    that as soon as they are added to the offset for S, the index will
+//    be out of range for S and the loop stops. Hence, this is safe to
+//    replace a and c by a large value within 32 bits, when they are
+//    larger than 32 bits.
+//
 void
 reduce_plattice(plattice_info_t *pli, const fbprime_t p, const fbprime_t r, const sieve_info_t * si)
 {
-    int32_t a0, a1, b0, b1, c0, c1, I, ak;
+    int64_t a0, a1, b0, b1, c0, c1, I, J, ak;
     int k = 1;
     I = si->I;
-    a0 = -p; a1 = 0;
+    J = si->J;
+    a0 = -((int64_t)p); a1 = 0;
     b0 = r;  b1 = 1;
 #if 0
     /* subtractive variant of Euclid's algorithm */
@@ -285,49 +292,49 @@ reduce_plattice(plattice_info_t *pli, const fbprime_t p, const fbprime_t r, cons
         a1 += b1;
       }
  case_k_even:
-    pli->alpha = a0;
-    pli->beta = a1;
-    pli->gamma = b0;
-    pli->delta = b1;
+    pli->alpha = (int32_t) a0;
+    pli->beta = (int32_t) a1;
+    pli->gamma = (int32_t) b0;
+    pli->delta = (int32_t) b1;
 #endif
     assert (pli->beta > 0);
     assert (pli->delta > 0);
     assert ((pli->alpha <= 0) && (pli->alpha > -I));
     assert ((pli->gamma >= 0) && (pli->gamma < I));
     assert (pli->gamma-pli->alpha >= I);
-    pli->a = pli->beta*I + pli->alpha;
-    pli->c = pli->delta*I + pli->gamma;
+
+    // WARNING: Here, we assume a lot on a bound on I,J
+    // TODO: clean these bound problems
+    int64_t aa = ((int64_t)pli->beta)*I + (int64_t)(pli->alpha);
+    if (aa > I*J)
+        pli->a = (uint32_t)(INT32_MAX/2);
+    else
+        pli->a = (uint32_t)aa;
+    int64_t cc = ((int64_t)pli->delta)*I + (int64_t)(pli->gamma);
+    if (cc > I*J)
+        pli->c = (uint32_t)(INT32_MAX/2);
+    else
+        pli->c = (uint32_t)cc;
     pli->b0 = -pli->alpha;
     pli->b1 = I - pli->gamma;
 }
 
-
-// This version of the sieve implements the following:
-//   - naive line-sieving for small p
-//   - Franke-Kleinjung lattice-sieving for large p
-//   - write directly the reports in the sieve-array (no buckets)
-// WARNING: STILL AT WORK!
-static void
-sieve_random_access (unsigned char *S, const factorbase_degn_t *fb,
+static void line_sieve(unsigned char *S, factorbase_degn_t **fb_ptr, 
         const sieve_info_t *si)
 {
-    fbprime_t p;
-    fbprime_t r, R;
-    unsigned int d;
-    unsigned char logp;
-    unsigned char *S_ptr;
-    int start_large = 0;
+    const uint32_t I = si->I;
     double tm = seconds();
-
-    // Loop over all primes in the factor base <= I
-    while (fb->p > 0 && fb->p <= si->I) {
+    unsigned char *S_ptr;
+    fbprime_t p, r, R;
+    unsigned char logp;
+    while ((*fb_ptr)->p > 0 && (*fb_ptr)->p <= I) {
         unsigned char nr;
-        p = fb->p;
-        logp = fb->plog;
-        unsigned long Is2modp = (unsigned long)(si->I>>1) % p;
+        p = (*fb_ptr)->p;
+        logp = (*fb_ptr)->plog;
+        unsigned long Is2modp = (unsigned long)(I>>1) % p;
 
-        for (nr = 0; nr < fb->nr_roots; ++nr) {
-            R = fb->roots[nr];
+        for (nr = 0; nr < (*fb_ptr)->nr_roots; ++nr) {
+            R = (*fb_ptr)->roots[nr];
             r = fb_root_in_qlattice(p, R, si);
             if (r == 0) {
                 special_case_0();
@@ -338,7 +345,6 @@ sieve_random_access (unsigned char *S, const factorbase_degn_t *fb,
                 continue;
             } 
             
-            const uint32_t I = si->I;
             { 
                 // line sieving
                 unsigned long j;
@@ -359,18 +365,156 @@ sieve_random_access (unsigned char *S, const factorbase_degn_t *fb,
                 }
             }
         }
-        fb = fb_next (fb); // cannot do fb++, due to variable size !
+        (*fb_ptr) = fb_next ((*fb_ptr)); // cannot do fb++, due to variable size !
     }
     printf("small primes sieved in %f sec\n", seconds()-tm);
-    tm = seconds();
+}
+
+
+typedef uint32_t v4si __attribute__ ((vector_size (16)));
+
+// r = (x < y) ? a : b
+static inline void
+xmm_cmovlt(v4si *r, v4si x, v4si y, v4si a, v4si b) {
+    v4si tmp;
+    tmp = __builtin_ia32_pcmpgtd128(y, x); // tmp = x<y ? 0xffff..fff. : 0
+    a = __builtin_ia32_pand128(a, tmp);  // a = x<y ? a : 0
+    tmp = __builtin_ia32_pandn128(tmp, b); // tmp = x<y ? 0 : b
+    *r = __builtin_ia32_por128(a, tmp); 
+}
+
+// r = (x >= y) ? a : b
+static inline void
+xmm_cmovge(v4si *r, v4si x, v4si y, v4si a, v4si b) {
+    v4si tmp0, tmp1;
+    tmp0 = __builtin_ia32_pcmpgtd128(x, y); // tmp0 = x > y ? 0xffff..fff. : 0
+    tmp1 = __builtin_ia32_pcmpeqd128(x, y); // tmp1 = x == y ? 0xffff..fff. : 0
+    tmp0 |= tmp1;  // tmp0 = x >= y ? 0xffff..fff. : 0
+    a = __builtin_ia32_pand128(a, tmp0);  
+    tmp0 = __builtin_ia32_pandn128(tmp0, b); 
+    *r = __builtin_ia32_por128(a, tmp0); 
+}
+
+// This version of the sieve implements the following:
+//   - naive line-sieving for small p
+//   - Franke-Kleinjung lattice-sieving for large p
+//   - write directly the reports in the sieve-array (no buckets)
+// WARNING: STILL AT WORK!
+static void
+sieve_random_access (unsigned char *S, factorbase_degn_t *fb,
+        const sieve_info_t *si)
+{
+    // Sieve primes <= I.
+    line_sieve(S, &fb, si);
+
+    double tm = seconds();
+#ifdef TRY_SSE
+    if (fb->p == 0)
+        return;
+    int finished = 0;
+    int cur_root = 0;
+    fbprime_t p[4];
+    fbprime_t r[4];
+    fbprime_t R[4];
+    unsigned char logp[4];
+    int how_many = 0;
+    // when we enter this loop, we assume that 
+    //   fb->p > 0
+    //   cur_root < fb->nb_roots
+    // describe the next prime ideal to process.
+    // (except if finished is set, of course)
+    while (!finished) {
+        // Get next 4 primes in fb.
+        how_many = 0;
+        while (how_many < 4) {
+            //printf("Dealing with p = %d, r = %d\n", fb->p, fb->roots[cur_root]);
+            p[how_many] = fb->p;
+            R[how_many] = fb->roots[cur_root];
+            logp[how_many] = fb->plog;
+            r[how_many] = fb_root_in_qlattice(p[how_many], R[how_many], si);
+            how_many++;
+            if (r[how_many-1] == 0) {
+                special_case_0();
+                how_many--;
+            } else if (r[how_many-1] == p[how_many-1]) {
+                special_case_p();
+                how_many--;
+            }
+            if (cur_root < fb->nr_roots-1)
+                cur_root++;
+            else {
+                cur_root = 0;
+                fb = fb_next (fb);
+                if (fb->p == 0) {
+                    finished = 1;
+                    break;
+                }
+            }
+        }
+        if (how_many != 4)
+            break;
+
+        // Here we have 4 consecutives prime ideals to sieve.
+
+        const uint32_t I = si->I;
+        const uint32_t maskI = I-1;
+        plattice_info_t pli[4];
+        // precomupte appropriate basis for p-lattices.
+        {
+            int i;
+            for (i = 0; i < 4; ++i) {
+                reduce_plattice(pli + i, p[i], r[i], si);
+            }
+        }
+
+        // Start sieving from (0,0) which is I/2 in x-coordinate
+        uint32_t x0, x1, x2, x3;
+        x0 = (I>>1);
+        x1 = (I>>1);
+        x2 = (I>>1);
+        x3 = (I>>1);
+        const uint32_t IJ = I*si->J;
+
+        v4si vec_b0 = { pli[0].b0, pli[1].b0, pli[2].b0, pli[3].b0 };
+        v4si vec_b1 = { pli[0].b1, pli[1].b1, pli[2].b1, pli[3].b1 };
+        v4si vec_a = { pli[0].a, pli[1].a, pli[2].a, pli[3].a };
+        v4si vec_c = { pli[0].c, pli[1].c, pli[2].c, pli[3].c };
+        v4si vec_x = { x0, x1, x2, x3 };
+        v4si vec_maskI = { maskI, maskI, maskI, maskI };
+        v4si vec_IJ = { IJ, IJ, IJ, IJ };
+        v4si vec_zero = { 0, 0, 0, 0};
+        asm("## Inner sieving routine starts here!!!\n");
+        while (x0 < IJ) {
+            uint32_t i;
+            v4si vec_i, vec_tmp;
+            vec_i = vec_x & vec_maskI;
+            S[x0] -= logp[0];
+            S[x1] -= logp[1];
+            S[x2] -= logp[2];
+            S[x3] -= logp[3];
+            xmm_cmovge(&vec_tmp, vec_i, vec_b1, vec_a, vec_zero);
+            vec_x += vec_tmp;
+            xmm_cmovlt(&vec_tmp, vec_i, vec_b0, vec_c, vec_zero);
+            vec_x += vec_tmp;
+            // x = ( IJ < x ) ? IJ : x
+            xmm_cmovlt(&vec_x, vec_IJ, vec_x, vec_IJ, vec_x);
+            x0 = ((uint32_t *)(&vec_x))[0];
+            x1 = ((uint32_t *)(&vec_x))[1];
+            x2 = ((uint32_t *)(&vec_x))[2];
+            x3 = ((uint32_t *)(&vec_x))[3];
+        }
+        asm("## Inner sieving routine stops here!!!\n");
+    }
+#endif
 
     // Loop over all primes in the factor base > I
     while (fb->p > 0) {
         unsigned char nr;
-        p = fb->p;
-        logp = fb->plog;
+        fbprime_t p = fb->p;
+        unsigned char logp = fb->plog;
 
         for (nr = 0; nr < fb->nr_roots; ++nr) {
+            fbprime_t r, R;
             R = fb->roots[nr];
             r = fb_root_in_qlattice(p, R, si);
             if (r == 0) {
@@ -412,57 +556,6 @@ sieve_random_access (unsigned char *S, const factorbase_degn_t *fb,
     }
     printf("large primes sieved in %f sec\n", seconds()-tm);
 }
-
-#if 0
-
-typedef uint32_t v4si __attribute__ ((vector_size (16)));
-
-
-// r = (x < y) ? a : b
-static inline void
-xmm_cmovlt(v4si *r, v4si x, v4si y, v4si a, v4si b) {
-    v4si tmp;
-    tmp = __builtin_ia32_pcmpgtd128(y, x); // tmp = x<y ? 0xffff..fff. : 0
-    a = __builtin_ia32_pand128(a, tmp);  // a = x<y ? a : 0
-    tmp = __builtin_ia32_pandn128(tmp, b); // tmp = x<y ? 0 : b
-    *r = __builtin_ia32_por128(a, tmp); 
-}
-
-void
-loop()
-{
-    v4si x, i;
-    const v4si maskI4 = { maskI, maskI, maskI, maskI };
-    const v4si zero = { 0,0,0,0 };
-    const v4si b14 = { b1,b1,b1,b1 };
-    const v4si b04 = { b0,b0,b0,b0 };
-
-    for(;;) {
-        reportx(x);
-        i = __builtin_ia32_pand128(x, maskI);
-        xmm_cmovge(&tmp, i, b14, a, zero);
-        x += tmp;
-        xmm_cmovlt(&tmp, i, b04, c, zero);
-        x += tmp;
-    }
-}
-
-void dummy() {
-    uint32_t x[4] = {17, 42, 876412, 987235};
-    uint32_t y[4] = {17, 13587, 12, 35};
-    uint32_t a[4] = {1, 2, 3, 4};
-    uint32_t b[4] = {11, 22, 33, 44};
-    uint32_t r[4];
-
-    xmm_cmovlt((v4si *)(&r),
-            (v4si){x[0], x[1], x[2], x[3]},
-            (v4si){y[0], y[1], y[2], y[3]},
-            (v4si){a[0], a[1], a[2], a[3]},
-            (v4si){b[0], b[1], b[2], b[3]});
-    printf("%d %d %d %d\n", r[0], r[1], r[2], r[3]);
-
-}
-#endif
 
 // Conversions between different representations for sieve locations:
 //   x          is the index in the sieving array. x in [0,I*J[
@@ -511,9 +604,9 @@ int main(int argc, char ** argv) {
     const double log_scale = 1.4426950408889634073599246810018921374;
 
 
-    si.I = 1<<13;
-    si.logI = 13;
-    si.J = 1<<12;
+    si.I = 1<<14;
+    si.logI = 14;
+    si.J = 1<<13;
     si.q = 16777291;
     si.rho = 4078255;
     si.a0 = 464271;
@@ -523,7 +616,8 @@ int main(int argc, char ** argv) {
 
     unsigned char * S;
 
-    S = (unsigned char *) malloc (si.I*si.J*sizeof(unsigned char));
+    // One more is for the garbage during SSE
+    S = (unsigned char *) malloc ((1+si.I*si.J)*sizeof(unsigned char));
     ASSERT_ALWAYS(S != NULL);
 
     factorbase_degn_t * fb;
