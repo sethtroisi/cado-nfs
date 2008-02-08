@@ -2238,18 +2238,21 @@ mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 {
     double tt, totopt = 0.0, totfill = 0.0, totMST = 0.0, totdel = 0.0;
     double tfill, tMST;
-    unsigned long bwcostmin = 0, oldcost = 0, cost;
+    unsigned long bwcostmin = 0, oldbwcost = 0, bwcost;
     dclist dcl;
     int old_nrows, old_ncols, m = 2, njrem = 0, ncost = 0, ncostmax, j, njproc;
+    int mmax = 0;
 
     fprintf(stderr, "Using mergeOneByOne\n");
     ncostmax = 20; // was 5
     njproc = 0;
     while(1){
-	oldcost = cost;
+	oldbwcost = bwcost;
 	old_nrows = mat->rem_nrows;
 	old_ncols = mat->rem_ncols;
 	m = minColWeight(mat);
+	if(m > mmax)
+	    mmax = m;
 	if(m == -1){
 	    fprintf(stderr, "All stacks empty, stopping!\n");
 	    break;
@@ -2284,38 +2287,47 @@ mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 	    if((m > maxlevel) || (m <= 0))
 		break;
 	}
-	cost = ((unsigned long)mat->rem_ncols) * ((unsigned long)mat->weight);
+	bwcost=((unsigned long)mat->rem_ncols) * ((unsigned long)mat->weight);
 	if((njproc % 1000) == 0){ // somewhat arbitrary...!
 	    int ni2rem = mat->rem_nrows-mat->rem_ncols;
 
-	    ni2rem = (ni2rem > 20 * mat->delta, mat->delta, mat->delta/2);
+	    ni2rem = (ni2rem > 20 * mat->delta ? mat->delta : mat->delta/2);
 	    deleteSuperfluousRows(mat, mat->delta, ni2rem);
 	    inspectRowWeight(mat);
 	}
 	if((njproc % 10000) == 0){
-	    fprintf(stderr, "T=%d nrows=%d ncols=%d (%d)",
+	    fprintf(stderr, "T=%d mmax=%d nr=%d N=%d (%d)",
 		    (int)seconds(),
+		    mmax,
 		    mat->rem_nrows, mat->rem_ncols, 
 		    mat->rem_nrows - mat->rem_ncols);
-	    fprintf(stderr, " c*N=%lu", cost);
+	    fprintf(stderr, " cN=%lu", bwcost);
 	    fprintf(stderr, " c/N=%2.2lf\n", 
 		    ((double)mat->weight)/((double)mat->rem_ncols));
 	    // njrem=%d at %2.2lf\n",
 	    if(forbw)
 		// what a trick!!!!
-		printf("BWCOST: %lu\n", cost);
+		printf("BWCOST: %lu\n", bwcost);
 	}
-	if((bwcostmin == 0) || (cost < bwcostmin)){
-	    bwcostmin = cost;
+	if((bwcostmin == 0) || (bwcost < bwcostmin)){
+	    bwcostmin = bwcost;
 	    if(forbw)
 		// what a trick!!!!
-		printf("BWCOST: %lu\n", cost);
+		printf("BWCOST: %lu\n", bwcost);
 	}
-	if(forbw && (oldcost != 0) && (cost > oldcost)){
+	// to be cleaned one day...
+	if(!forbw){
+	    double r = ((double)bwcost)/((double)bwcostmin);
+	    if(r > 1.1){
+		fprintf(stderr, "cN too high, stopping [%2.2lf]\n", r);
+		break;
+	    }
+	}
+	if(forbw && (oldbwcost != 0) && (bwcost > oldbwcost)){
 	    ncost++;
 #if 0
 	    fprintf(stderr, "New cost > old cost (%2.6e) [%d/%d]\n",
-		    ((double)cost)-((double)oldcost), ncost, ncostmax);
+		    ((double)bwcost)-((double)oldbwcost), ncost, ncostmax);
 #endif
 	    if(ncost >= ncostmax){
 		int nirem;

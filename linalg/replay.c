@@ -13,6 +13,8 @@
 #include <assert.h>
 #include <string.h>
 
+#include "utils/utils.h"
+
 #include "sparse.h"
 
 #define DEBUG 0
@@ -142,7 +144,7 @@ makeSparse(int **sparsemat, int *colweight, FILE *purgedfile,
     ind = 0;
     while(fscanf(purgedfile, "%d %d", &i, &nj) != EOF){
 	if(!(ind % report))
-	    fprintf(stderr, "Treating old rel #%d\n", ind);
+	    fprintf(stderr, "Treating old rel #%d at %2.2lf\n",ind,seconds());
 	// store primes in rel
 	if(nj > buf_len){
 	    fprintf(stderr, "WARNING: realloc for buf [nj=%d]\n", nj);
@@ -326,7 +328,7 @@ int
 main(int argc, char *argv[])
 {
     FILE *hisfile, *purgedfile;
-    unsigned long bwcost, bwcostmin = 0;
+    unsigned long bwcost, bwcostmin = 0, addread = 0;
     int nrows, ncols;
     int **newrows, i, j, nb, *nbrels, **oldrows, *colweight;
     int ind, small_nrows, small_ncols, **sparsemat;
@@ -345,8 +347,10 @@ main(int argc, char *argv[])
 	return 0;
     }
 
-    if(argc == 6)
+    if(argc == 6){
 	sscanf(argv[5], "%lu", &bwcostmin);
+	fprintf(stderr, "Read bwcostmin=%lu\n", bwcostmin);
+    }
     else
 	bwcostmin = 0;
     
@@ -357,6 +361,7 @@ main(int argc, char *argv[])
     assert(hisfile != NULL);
     fgets(str, STRLENMAX, hisfile);
     sscanf(str, "%d %d", &nrows, &ncols);
+    fprintf(stderr, "Original matrix has size %d x %d\n", nrows, ncols);
     newrows = (int **)malloc(nrows * sizeof(int *));
     for(i = 0; i < nrows; i++){
 	newrows[i] = (int *)malloc(2 * sizeof(int));
@@ -365,9 +370,13 @@ main(int argc, char *argv[])
     }
     fprintf(stderr, "Reading row additions\n");
     while(fgets(str, STRLENMAX, hisfile)){
+	addread++;
+	if((addread % 100000) == 0)
+	    fprintf(stderr, "%lu lines read at %2.2lf\n", addread, seconds());
 	if(str[strlen(str)-1] != '\n'){
-	    fprintf(stderr, "Gasp: too long a line!\n");
-	    exit(0);
+	    fprintf(stderr, "Gasp: not a complete a line!");
+	    fprintf(stderr, " I stop reading and go to the next phase\n");
+	    break;
 	}
 	if(strncmp(str, "BWCOST", 6) != 0)
 	    doAllAdds(newrows, str);
