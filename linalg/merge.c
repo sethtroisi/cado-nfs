@@ -41,7 +41,7 @@ char *used;
 // minimum excess we want to keep
 #define DELTA 128
 
-#define M_STRATEGY 2 // 0: finish that mergelevel
+#define M_STRATEGY 3 // 0: finish that mergelevel
                      // 1: change if min weight < mergelevel
                      // 2: jump to minimal possible mergelevel
                      // 3: perform one merge, then check for next min weight
@@ -2241,7 +2241,7 @@ mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
     unsigned long bwcostmin = 0, oldbwcost = 0, bwcost;
     dclist dcl;
     int old_nrows, old_ncols, m = 2, njrem = 0, ncost = 0, ncostmax, j, njproc;
-    int mmax = 0;
+    int mmax = 0, target = 10000;
 
     fprintf(stderr, "Using mergeOneByOne\n");
     ncostmax = 20; // was 5
@@ -2280,22 +2280,27 @@ mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 	    tt = seconds();
 	    njrem += deleteHeavyColumns(mat);
 	    totdel += (seconds()-tt);
-	    njproc++;
+	    
 	}
+	// number of columns removed
+	njproc += old_ncols - mat->rem_ncols;
 	deleteEmptyColumns(mat);
 	if((old_nrows == mat->rem_nrows) && (old_ncols == mat->rem_ncols)){
 	    if((m > maxlevel) || (m <= 0))
 		break;
 	}
 	bwcost=((unsigned long)mat->rem_ncols) * ((unsigned long)mat->weight);
-	if((njproc % 1000) == 0){ // somewhat arbitrary...!
-	    int ni2rem = mat->rem_nrows-mat->rem_ncols;
+	if(njproc >= target){ // somewhat arbitrary...!
+	    int kappa = (mat->rem_nrows-mat->rem_ncols) / mat->delta, ni2rem;
 
-	    ni2rem = (ni2rem > 20 * mat->delta ? mat->delta : mat->delta/2);
+	    if(kappa <= 16)
+		ni2rem = mat->delta/2;
+	    else if(kappa <= 128)
+		ni2rem = mat->delta * (kappa/4);
+	    else
+		ni2rem = mat->delta * (kappa/8);
 	    deleteSuperfluousRows(mat, mat->delta, ni2rem);
 	    inspectRowWeight(mat);
-	}
-	if((njproc % 10000) == 0){
 	    fprintf(stderr, "T=%d mmax=%d nr=%d N=%d (%d)",
 		    (int)seconds(),
 		    mmax,
@@ -2308,6 +2313,7 @@ mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 	    if(forbw)
 		// what a trick!!!!
 		printf("BWCOST: %lu\n", bwcost);
+	    target = njproc + 10000;
 	}
 	if((bwcostmin == 0) || (bwcost < bwcostmin)){
 	    bwcostmin = bwcost;
