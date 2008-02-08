@@ -49,15 +49,14 @@ hashFree(hashtable_t *H)
     free(H->hashtab_r);
 }
 
-// Returns a new address or the one already containing (p, r).
+// Returns a new address or the one already containing (p, r), starting from
+// h.
 int
-getHashAddr(hashtable_t *H, long p, unsigned long r)
+getHashAddrAux(hashtable_t *H, long p, unsigned long r, unsigned int h)
 {
     static unsigned int cptmax = 0;
     unsigned int cpt = 0; /* number of iterations to find a free location */
-    unsigned int h;
 
-    h = getInitialAddress((unsigned long)p, r, H->hashmod);
 #if DEBUG >= 2
     printf("H(%ld, %lu) = %d\n", p, r, h);
 #endif
@@ -82,6 +81,14 @@ getHashAddr(hashtable_t *H, long p, unsigned long r)
 	if(cptmax > 100) fprintf(stderr, "HASH: cptmax = %u\n", cptmax);
     }
     return h;
+}
+
+int
+getHashAddr(hashtable_t *H, long p, unsigned long r)
+{
+    unsigned int h = getInitialAddress((unsigned long)p, r, H->hashmod);
+
+    return getHashAddrAux(H, p, r, h);
 }
 
 int

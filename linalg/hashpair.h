@@ -21,6 +21,7 @@ extern unsigned long getHashMod(unsigned long n);
 extern void hashClear(hashtable_t *H);
 extern void hashInit(hashtable_t *H, unsigned int n);
 extern void hashFree(hashtable_t *H);
+extern int getHashAddrAux(hashtable_t *H, long p, unsigned long r, unsigned int h);
 extern int getHashAddr(hashtable_t *H, long p, unsigned long r);
 extern int hashInsert(hashtable_t *H, long p, unsigned long r);
 
