@@ -2356,6 +2356,8 @@ mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 	else
 	    ncost = 0;
     }
+    deleteSuperfluousRows(mat, mat->delta, 
+			  mat->rem_nrows-mat->rem_ncols+mat->delta);
     if(forbw){
 	printf("BWCOSTMIN: %lu\n", bwcostmin);
 	fprintf(stderr, "Minimal bwcost found: %lu\n", bwcostmin);
