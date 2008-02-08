@@ -41,7 +41,7 @@ char *used;
 // minimum excess we want to keep
 #define DELTA 128
 
-#define M_STRATEGY 3 // 0: finish that mergelevel
+#define M_STRATEGY 2 // 0: finish that mergelevel
                      // 1: change if min weight < mergelevel
                      // 2: jump to minimal possible mergelevel
                      // 3: perform one merge, then check for next min weight
@@ -1829,7 +1829,7 @@ useMinimalSpanningTree(sparse_mat_t *mat, int m, INT *ind, double *tfill,
 {
     int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX];
     int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1];
-    int i, father[MERGE_LEVEL_MAX], height[MERGE_LEVEL_MAX], hmax;
+    int father[MERGE_LEVEL_MAX], height[MERGE_LEVEL_MAX], hmax;
 
     *tfill = seconds();
     fillRowAddMatrix(A, mat, m, ind);
@@ -1838,14 +1838,18 @@ useMinimalSpanningTree(sparse_mat_t *mat, int m, INT *ind, double *tfill,
     hmax = minimalSpanningTree(father, height, sons, m, A);
     *tMST = seconds()-*tMST;
 #if DEBUG >= 1
-    for(i = 0; i < m; i++)
-	fprintf(stderr, "father[%d] = %d\n", i, father[i]);
-    for(i = 0; i < m; i++){
-	int k;
-	fprintf(stderr, "Sons of %d:", i);
-	for(k = 1; k <= sons[i][0]; k++)
-	    fprintf(stderr, " %d", sons[i][k]);
-	fprintf(stderr, "\n");
+    {
+      int i;
+      for (i = 0; i < m; i++)
+	fprintf (stderr, "father[%d] = %d\n", i, father[i]);
+      for (i = 0; i < m; i++)
+        {
+          int k;
+          fprintf (stderr, "Sons of %d:", i);
+          for (k = 1; k <= sons[i][0]; k++)
+	    fprintf (stderr, " %d", sons[i][k]);
+          fprintf (stderr, "\n");
+        }
     }
 #endif
     addFatherToSons(mat, m, ind, A, father, height, hmax, sons);
