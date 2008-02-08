@@ -81,6 +81,24 @@ TRACE_A (__attribute__ ((unused)) long a,
 }
 #endif
 
+/* Given an index i to the sieve array, an amin value and whether 
+   only odd $a$ are in the sieve (odd=1) or not (odd=0),
+   return the value of $a$ at sieve location i */
+static long 
+sieveidx_to_a (unsigned long i, long amin, int odd) 
+{
+  ASSERT_EXPENSIVE (odd == 0 || odd == 1);
+  return amin + ((long)(i) << (odd));
+}
+
+static unsigned long 
+a_to_sieveidx (long a, long amin, int odd)
+{
+  ASSERT_EXPENSIVE (a > amin);
+  ASSERT_EXPENSIVE (odd == 0 || odd == 1);
+  ASSERT_EXPENSIVE (odd == 0 || a & 1 == 1);
+  return (a - amin) >> odd;
+}
 
 /* Some multiple precision functions we'll need */
 
@@ -702,6 +720,26 @@ sieve_one_side (unsigned char *sievearray, factorbase_t fb,
   
   compute_norms (sievearray, eff_amin, eff_amax, b, dpoly, deg, 
                  (double) proj_roots, log_scale, odd, verbose);
+
+  if (other_reports != NULL)
+    {
+      /* Set sievearray[n] to 255 if that $n$ is not in the list of
+	 reports on the other side - we know this $a$ can never become
+	 a relation and we don't want it to produce unnecessary sieve
+	 reports */
+      long a = eff_amin;
+      int i;
+      for (i = 0; other_reports[i].p != 0; i++)
+	{
+	  unsigned long startidx, endidx;
+	  startidx = a_to_sieveidx (a, eff_amin, odd);
+	  endidx = a_to_sieveidx (other_reports[i].a, eff_amin, odd);
+	  /* Set sievearray[startidx ... endidx - 1] to 0 */
+	  if (endidx > startidx)
+	    memset (sievearray + startidx, 255, endidx - startidx);
+	  a = other_reports[i].a + (1 << odd);
+	}
+    }
 
   /* Init small primes for sieving this line */
   tsc1 = clock ();
