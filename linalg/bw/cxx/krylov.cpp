@@ -284,7 +284,8 @@ struct thread:public traits {
             return;
 
         double ticks_diff = thread_ticks() - ticks_ref;
-        double wct_diff = wallclock_ticks() - wct_ref;
+        double wct_now = wallclock_ticks();
+        double wct_diff = wct_now - wct_ref;
         double av;
         double m0_estim;
         double tw;
@@ -299,8 +300,8 @@ struct thread:public traits {
         rem = av * (globals::nb_iter - done);
         string eta;
 
-        string e1 = pdate(wct_ref + rem);
-        string e2 = pdate(wct_ref + rem / pcpu);
+        string e1 = pdate(wct_now + rem);
+        string e2 = pdate(wct_now + rem / pcpu);
         if (e1 == e2) {
             eta = e1;
         } else {
@@ -311,7 +312,7 @@ struct thread:public traits {
         }
 
         thread_lock(&globals::console_lock);
-        cout << fmt("T% N=% av=% M0=%[.2]ns %[F.1]%% tw=% eta=<%>")
+        cout << fmt("T% N=% av=% M0=%[F.1]ns %[F.1]%% tw=% eta=<%>")
             % t % done % pdelta(av)
             % m0_estim % (pcpu * 100.0)
             % pdelta(tw)

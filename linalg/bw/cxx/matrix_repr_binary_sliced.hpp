@@ -36,7 +36,7 @@ public:
             using namespace std;
 	    mtx.seekg(slice.pos);
 	    std::istream_iterator<matrix_line> mit(mtx);
-            unsigned int npack = 2048;
+            unsigned int npack = 3072;
             data.push_back(0);
             for(unsigned int i = slice.i0 ; i < slice.i1 ; i += npack) {
                 unsigned int next = i + npack;
