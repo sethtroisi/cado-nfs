@@ -265,11 +265,10 @@ reduce_plattice(plattice_info_t *pli, const fbprime_t p, const fbprime_t r, cons
     while ( b0 >= I )
     {
       /* a0 < 0, b0 > 0 with |a0| > |b0| */
-        while (a0 + b0 <= 0)
-          {
+        do {
             a0 += b0;
             a1 += b1;
-          }
+        } while (a0 + b0 <= 0);
         k++;
         if (-a0 < I)
           {
@@ -282,11 +281,10 @@ reduce_plattice(plattice_info_t *pli, const fbprime_t p, const fbprime_t r, cons
             goto case_k_even;
           }
         /* b0 > 0, a0 < 0 with |b0| > |a0| */
-        while (b0 + a0 >= 0)
-          {
+        do {
             b0 += a0;
             b1 += a1;
-          }
+        } while (b0 + a0 >= 0);
         k++;
     }
     /* k is odd here */
@@ -608,9 +606,9 @@ int main(int argc, char ** argv) {
     const double log_scale = 1.4426950408889634073599246810018921374;
 
 
-    si.I = 1<<14;
-    si.logI = 14;
-    si.J = 1<<13;
+    si.logI = 13;
+    si.I = 1<<si.logI;
+    si.J = 1<<(si.logI-1);
     si.q = 16777291;
     si.rho = 4078255;
     si.a0 = 464271;
