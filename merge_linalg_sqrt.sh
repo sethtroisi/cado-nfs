@@ -73,7 +73,19 @@ echo "Replaying merges"
 bwcostmin=`tail $name/merge.his | grep "BWCOSTMIN:" | awk '{print $NF}'`
 argsr="$purged $name/merge.his $name/small $name/index"
 time $linalg/replay $argsr $bwcostmin # 2> $name.replay.err
+
+if [ ! -s $name/index ]
+then
+    echo "Index file $name/index does not exist, stopping"
+    exit
+fi
 echo "SIZE(index): `ls -s $name/index`"
+
+if [ ! -s $name/small ]
+then
+    echo "Small matrix $name/small does not exist, stopping"
+    exit
+fi
 
 echo "Performing the linear algebra phase"
 
