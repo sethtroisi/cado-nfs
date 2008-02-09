@@ -33,13 +33,11 @@ else
   if [ ! -s $nodup ]; then echo "zero file $nodup"; exit; fi
 fi
 
-# update
-nrels=`wc -l $nodup | awk '{print $1}'`
-
 if [ -s $purged -a $purged -nt $nodup ]
 then
   echo "File $purged already exists and is newer than $nodup"
 else
+  nrels=`wc -l $nodup | awk '{print $1}'`
   time $linalg/purge -poly $poly -nrels $nrels $nodup > $purged
   if [ ! -s $purged ]; then echo "zero file $purged"; exit; fi
   excess=`head -1 $purged | awk '{nrows=$1; ncols=$2; print (nrows-ncols)}'`
