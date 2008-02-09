@@ -329,6 +329,8 @@ int main(int argc, char *argv[])
     ios_base::sync_with_stdio(false);
     cerr.tie(&cout);
 
+    std::cout << "// This is bw-prep, version " VERSION << std::endl;
+
     common_arguments common;
     prep_arguments mine;
 

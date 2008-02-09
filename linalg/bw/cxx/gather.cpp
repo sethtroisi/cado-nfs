@@ -301,6 +301,8 @@ int main(int argc, char *argv[])
 	cout.rdbuf()->pubsetbuf(0,0);
 	cerr.rdbuf()->pubsetbuf(0,0);
 
+    std::cout << "// This is bw-gather, version " VERSION << std::endl;
+
 	common_arguments common;
 
 	process_arguments(argc, argv, common, mine);

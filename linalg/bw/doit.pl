@@ -255,8 +255,12 @@ if (!-d $wdir) {
 open STDOUT, "| tee -a $wdir/solve.out";
 open STDERR, "| tee -a $wdir/solve.err";
 
+
 print "Solver started ", scalar localtime, "\nargs:\n$dumped\n";
 print STDERR "Solver started ", scalar localtime, "\nargs:\n$dumped\n";
+my $version=`$srcdir/util/version.sh`;
+print "version info:\n$version";
+print STDERR "version info:\n$version";
 
 my $tstart = gettimeofday;
 my $tlast = $tstart;
@@ -356,8 +360,10 @@ if ($modulus eq '2' && $multisols == 0) {
 
 account 'io';
 
-action "${bindir}bw-balance --subdir $wdir"
-	unless ($resume && -f "$wdir/matrix.txt.old");
+if ($mt) {
+    action "${bindir}bw-balance --subdir $wdir --nbuckets $mt"
+            unless ($resume && -f "$wdir/matrix.txt.old");
+}
 action "${bindir}bw-secure --subdir $wdir"
 	unless ($resume && -f "$wdir/X0-vector");
 

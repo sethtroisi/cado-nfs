@@ -58,6 +58,8 @@ int main(int argc, char * argv[])
     cout.rdbuf()->pubsetbuf(0,0);
     cerr.rdbuf()->pubsetbuf(0,0);
 
+    std::cout << "// This is bw-balance, version " VERSION << std::endl;
+
     process_arguments(argc, argv, common, mine);
     unsigned int nr, nc;
     string mstr;

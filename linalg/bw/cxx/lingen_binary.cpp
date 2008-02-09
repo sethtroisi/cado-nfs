@@ -1588,6 +1588,8 @@ int main(int argc, char *argv[])
 
     argv++, argc--;
 
+    std::cout << "// This is bw-lingen-binary, version " VERSION << std::endl;
+
     using namespace globals;
     using namespace std;
 

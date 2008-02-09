@@ -24,6 +24,8 @@ LFLAGS:=-L ../../utils -L ../../gf2x -L ../../gf2x/cantor
 #LFLAGS+=$(GMPLIB)
 #endif
 
+IFLAGS+=-DVERSION="\"$(shell util/version.sh)\""
+
 ifdef PATCHED_GMP
 IFLAGS+=-DPATCHED_GMP
 endif

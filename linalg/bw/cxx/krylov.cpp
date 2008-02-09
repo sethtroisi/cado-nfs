@@ -801,6 +801,8 @@ int main(int argc, char *argv[])
 
     common_arguments common;
 
+    std::cout << "// This is bw-krylov, version " VERSION << std::endl;
+
     process_arguments(argc, argv, common, mine);
 
     using namespace globals;

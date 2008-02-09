@@ -72,6 +72,8 @@ int main(int argc, char * argv[])
 	cout.rdbuf()->pubsetbuf(0,0);
 	cerr.rdbuf()->pubsetbuf(0,0);
 
+    std::cout << "// This is bw-secure, version " VERSION << std::endl;
+
 	no_arguments nothing;
 	process_arguments(argc, argv, common, nothing);
 	unsigned int nr, nc;
