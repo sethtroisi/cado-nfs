@@ -13,7 +13,7 @@ LDFLAGS=../utils/libutils.a $(GMPLIB) -lm# -lefence
 INC=-I $(GMPINCLUDE) -I.. -I../utils
 
 binaries:=allsqrt replay merge purge freerel linalg characters duplicates \
-	  transpose
+	  transpose checkdep
 
 all:	$(binaries)
 
