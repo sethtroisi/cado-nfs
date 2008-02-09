@@ -8,40 +8,35 @@ with the free relations (see README file).
       prune mergelevel  cwmax   rwmax  merge  matrix-size    bw
 
 c72     nrel=186615, nprimes=157887; excess=28728
-c72     1.0    10       30      100   11s     27651x27523   1m26
-(krylov 15.30, gather 1.06, mksol 14.45, lingen 51.62, prep 5.04, io 0.09)
+c72     1.0    10       30      100   10s     25162x25034   1m16
 
 c80     nrel=154172, nprimes=143453; excess=10719
-c80     1.0    10       40      100    7s     37321x37193   2m11
-(krylov 27.65, gather 1.42, mksol 25.30, lingen 70.49, prep 7.19, io 0.10)
+c80     1.0    10       40      100   17s     27586x27458   1m53
 
 c85a    comment: pic94
 c85a    nrel=594106, nprimes=503677; excess=90429
-c85a    1.0    15       40      100   43s     82725x82597   8m23
-(krylov 156.34, gather 3.47, mksol 134.39, lingen 195.23, prep 17.58, io 0.20)
+c85a    1.0    15       40      100   52s    61716x61588   7m10
 
 c90     nrel=624350, nprimes=531028; excess=93322
-c90	1.0    20	40	100   41s    108739x108611 14m04
-(krylov 232.16, gather 3.60, mksol 213.46, lingen 282.09, prep 17.47, io 0.27)
+c90	1.0    20	40	100  1m06    72262x71402   9m09
 
 c95     nrel=1749115, nprimes=1368089; excess=381026
-c95	1.0    10	40	 80   3m15   129420x129292 24m03
-(krylov 560.24, gather 5.88, mksol 492.33, lingen 374.57, prep 28.77, io 0.30)
+c95	1.0    10	40	 80   1m03   135613x135485 16m33
 
 rsa100  nrel=1370048, nprimes=1187600; excess=182448
-rsa100  1.0    15	40	150   2m51   148102x147974 47m31
-(krylov 1446.8, gather 10.08, mksol 973.23, lingen 411.89, prep 51.40, io 0.46)
+rsa100  1.0    15	40	150   0m59   170102x169974 25m07
 
 rsa110  nrel=2550427, nprimes=2329197; excess=221230
-rsa110  1.0    15       40      150   3m55   324036x323908 203m53
+rsa110  1.0    15       40      150   2m17   310918x310790 89m58
 (krylov 6652.4, gather 17.1, mksol 4397.1, lingen 1092.3, prep 86.6, io 0.8)
 
 rsa120  nrel=3142405, nprimes=2929171; excess=213234
-rsa120  1.0    15       40      150   6m33   552583x552455 590m10
-(krylov 18884.9, gather 31.1, mksol 14031.2, lingen 2354.5, prep 155.5, io 1.3)
+rsa120  1.0   120      300      200   16m    559304x559176 330m (*)
+(krylov 10067.9, gather 43.4, mksol 6655.2, lingen 2766.2, prep 236.4, io 10.0)
 
-rsa120  1.0   150      200      200  27m40   618116x615353 523m11 (*)
-(*) by Francois at LIX, bwcostmin=28788324616143, Opteron 2.2Ghz
+rsa130                                      1318137x1318009     (*)
+
+(*) by Francois at LIX, Opteron 2.2Ghz
 
 For new parameters, some fiddling is needed, with respect to the final
 weight of the small matrix and/or the number of rows/columns depending on
