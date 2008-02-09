@@ -65,7 +65,7 @@ postsieve/checknorms/checknorms -poly $tmp/$name.poly $tmp/$name.rels_raw \
 ## (see README.params for parameter values)
 
 ## CLEANING STEP: destroys everything, which might not be what you want...
-/bin/rm $tmp/$name.*
+/bin/rm -fr $tmp/$name.*
 
 ##############################################################################
 
@@ -78,7 +78,7 @@ tmp=/localdisk/tmp; name=c80; d=/local/fleur/cado/Examples
 # or for csh addicts:
 set tmp=/localdisk/tmp; set name=c80; set d=/local/fleur/cado/Examples
 
-/bin/rm -f $tmp/$name.*
+/bin/rm -fr $tmp/$name.*
 cp $d/$name/$name.poly $tmp
 # generate free relations (optional)
 sieve/makefb -poly $tmp/$name.poly > $tmp/$name.roots
@@ -87,4 +87,4 @@ sieve/makefb -poly $tmp/$name.poly > $tmp/$name.roots
 postsieve/checknorms/checknorms -poly $tmp/$name.poly $d/$name/$name.rels \
    >> $tmp/$name.rels
 ./merge_linalg_sqrt.sh $tmp/$name <parameters> [see README.params]
-/bin/rm -f $tmp/$name.*
+/bin/rm -fr $tmp/$name.*
