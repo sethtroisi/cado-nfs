@@ -80,21 +80,61 @@ addFreeRelations(char *roots, int deg)
     }
 }
 
+static void
+usage (char *argv0)
+{
+  fprintf (stderr, "Usage: %s -poly xxx.poly -fb xxx.roots\n", argv0);
+  exit (1);
+}
+
 int
 main(int argc, char *argv[])
 {
     int nfree, deg;
+    char *fbfilename = NULL, *polyfilename = NULL;
+    char *argv0 = argv[0];
+    cado_poly cpoly;
 
-    if (argc != 2)
+    while (argc > 1 && argv[1][0] == '-')
       {
-        fprintf (stderr, "Usage: %s xxx.roots\n", argv[0]);
+        if (argc > 2 && strcmp (argv[1], "-fb") == 0)
+          {
+            fbfilename = argv[2];
+            argc -= 2;
+            argv += 2;
+          }
+        else if (argc > 2 && strcmp (argv[1], "-poly") == 0)
+          {
+            polyfilename = argv[2];
+            argc -= 2;
+            argv += 2;
+          }
+        else
+          usage (argv0);
+      }
+
+    if (argc != 1 || polyfilename == NULL || fbfilename == NULL)
+      usage (argv0);
+
+    if (!read_polynomial (cpoly, polyfilename))
+      {
+        fprintf (stderr, "Error reading polynomial file\n");
+        exit (EXIT_FAILURE);
+      }
+
+    if (mpz_cmp_ui (cpoly->g[1], 1) != 0)
+      {
+        fprintf (stderr, "Error, non-monic linear polynomial not yet treated");
+        fprintf (stderr, " (more theory needed)\n");
         exit (1);
       }
 
-    nfree = countFreeRelations(&deg, argv[1]);
-    fprintf(stderr, "# Free relations: %d\n", nfree);
+    nfree = countFreeRelations (&deg, fbfilename);
+    fprintf (stderr, "# Free relations: %d\n", nfree);
     
-    fprintf(stderr, "Handling free relations...\n");
-    addFreeRelations(argv[1], deg);
+    fprintf (stderr, "Handling free relations...\n");
+    addFreeRelations (fbfilename, deg);
+    clear_polynomial (cpoly);
+
     return 0;
 }

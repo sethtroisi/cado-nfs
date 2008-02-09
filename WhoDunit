@@ -17,6 +17,7 @@ makefb:
 
 freerels:
 	reads:
+		.poly
 		.roots
 	writes:
 		.rels (this will be part of the final .rels)

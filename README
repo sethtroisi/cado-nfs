@@ -42,7 +42,7 @@ polyselect/polyselect -full -e 1e6 < $tmp/$name > $tmp/$name.poly
 sieve/makefb -poly $tmp/$name.poly > $tmp/$name.roots
 
 # if you want to use free relations
-./linalg/freerel $tmp/$name.roots > $tmp/$name.rels
+./linalg/freerel -poly $tmp/$name.poly -fb $tmp/$name.roots > $tmp/$name.rels
 
 ## SIEVING_STEP
 ## the sieving parameters must be given by hand, sorry!
@@ -82,7 +82,7 @@ set tmp=/localdisk/tmp; set name=c80; set d=/local/fleur/cado/Examples
 cp $d/$name/$name.poly $tmp
 # generate free relations (optional)
 sieve/makefb -poly $tmp/$name.poly > $tmp/$name.roots
-./linalg/freerel $tmp/$name.roots > $tmp/$name.rels
+./linalg/freerel -poly $tmp/$name.poly -fb $tmp/$name.roots > $tmp/$name.rels
 # normally the norms are already completely factored, but just in case...
 postsieve/checknorms/checknorms -poly $tmp/$name.poly $d/$name/$name.rels \
    >> $tmp/$name.rels

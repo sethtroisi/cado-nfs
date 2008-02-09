@@ -1,6 +1,5 @@
 These parameters are experimental and were *used* as input for
-merge_linalg_sqrt (timings on a 2.4Ghz Opteron, *** indicates the best
-parameters).
+merge_linalg_sqrt (timings on a 2.4Ghz Opteron).
 
 The following figures correspond to the data in /local/fleur/cado/Examples,
 with the free relations (see README file). 
@@ -30,13 +29,14 @@ rsa110  nrel=2550427, nprimes=2329197; excess=221230
 rsa110  1.0    15       40      150   2m17   310918x310790 89m58
 (krylov 6652.4, gather 17.1, mksol 4397.1, lingen 1092.3, prep 86.6, io 0.8)
 
+rsa110  nrel=2548384, nprimes=2329096; excess=219288 (without free rels)
+rsa110  1.0    15       40      150   2m07   311333x311205 85m55
+
 rsa120  nrel=3142405, nprimes=2929171; excess=213234
-rsa120  1.0   120      300      200   16m    559304x559176 330m (*)
+rsa120  1.0   120      300      200   16m    559304x559176 330m
 (krylov 10067.9, gather 43.4, mksol 6655.2, lingen 2766.2, prep 236.4, io 10.0)
 
-rsa130                                      1318137x1318009     (*)
-
-(*) by Francois at LIX, Opteron 2.2Ghz
+rsa130                                      1318137x1318009     
 
 For new parameters, some fiddling is needed, with respect to the final
 weight of the small matrix and/or the number of rows/columns depending on
