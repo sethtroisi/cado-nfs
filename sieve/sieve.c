@@ -81,6 +81,7 @@ TRACE_A (__attribute__ ((unused)) long a,
 }
 #endif
 
+#if 0
 /* Given an index i to the sieve array, an amin value and whether 
    only odd $a$ are in the sieve (odd=1) or not (odd=0),
    return the value of $a$ at sieve location i */
@@ -91,6 +92,7 @@ sieveidx_to_a (unsigned long i, long amin, int odd)
   ASSERT_EXPENSIVE (odd == 0 || (amin & 1) == 1);
   return amin + ((long)(i) << (odd));
 }
+#endif
 
 static unsigned long 
 a_to_sieveidx (long a, long amin, int odd)
@@ -2199,7 +2201,9 @@ main (int argc, char **argv)
 					 sizeof (sieve_report_t));
   ASSERT (reports_r != NULL);
 
-  for (b = bmin; b <= bmax; b++)
+  /* we sieve over bmin <= b < bmax, to avoid duplicates when sieving b0..b1,
+     then b1..b2, and to figure out the initialization time */
+  for (b = bmin; b < bmax; b++)
     {
       unsigned long proj_roots; /* = gcd (b, leading coefficient) */
       
