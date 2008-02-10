@@ -1943,7 +1943,7 @@ main (int argc, char **argv)
   cado_poly cpoly;
   char report_a_threshold, report_r_threshold;
   unsigned long relations_found = 0;
-  double total_time = seconds ();
+  double init_time = seconds (), sieve_time;
 
   while (argc > 1 && argv[1][0] == '-')
     {
@@ -2201,6 +2201,9 @@ main (int argc, char **argv)
 					 sizeof (sieve_report_t));
   ASSERT (reports_r != NULL);
 
+  sieve_time = seconds ();
+  init_time = sieve_time - init_time;
+
   /* we sieve over bmin <= b < bmax, to avoid duplicates when sieving b0..b1,
      then b1..b2, and to figure out the initialization time */
   for (b = bmin; b < bmax; b++)
@@ -2269,9 +2272,10 @@ main (int argc, char **argv)
                                              log_scale, verbose);
     }
 
-  total_time = seconds () - total_time;
-  fprintf (stderr, "Found %lu relations in %1.0f seconds (%1.2e s/r)\n",
-           relations_found, total_time, total_time / (double) relations_found);
+  sieve_time = seconds () - sieve_time;
+  fprintf (stderr, "Found %lu relations in %1.0f seconds (%1.2e s/r)",
+           relations_found, sieve_time, sieve_time / (double) relations_found);
+  fprintf (stderr, " [init time = %1.0f seconds]\n", init_time);
 
   clear_polynomial (cpoly);
   fb_clear (fba);
