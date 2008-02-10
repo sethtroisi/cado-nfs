@@ -105,8 +105,9 @@ void transpose_and_save(unsigned int i0, unsigned int i1)
             */
 }
 
-
-void rebuild()
+// skip first 'skip' (heavy) rows, corresponding to heaviest rows in original
+// matrix.
+void rebuild(int skip)
 {
     FILE * fout;
     FILE ** fin_vchunks;
@@ -116,7 +117,7 @@ void rebuild()
     fout = fopen(filename_out, "w");
     BUG_ON_MSG(fout == NULL, "Cannot open output matrix");
 
-    fprintf(fout, "%u %u\n", mat->ncols, mat->nrows);
+    fprintf(fout, "%u %u\n", mat->ncols - skip, mat->nrows);
 
     fin_vchunks = malloc(nfiles * sizeof(FILE *));
     for(i = 0 ; i < nfiles ; i++) {
@@ -153,6 +154,10 @@ void rebuild()
         }
         for(k = 0 ; k < kmax ; k++) {
             unsigned int c;
+	    if(skip > 0){
+		skip--;
+		continue;
+	    }
             fprintf(fout, "%d", rows[k]->size);
             for(c = 0 ; c < rows[k]->size ; c++) {
                 fprintf(fout, " %d", rows[k]->data[c]);
@@ -176,19 +181,36 @@ int main(int argc, char * argv[])
 {
 
     FILE * fin;
+    int skip = 0;
 
+#if 0 // FIXME
     if (argc != 3 && argc != 4) {
         fprintf(stderr, "usage: ./transpose <input matrix> <output matrix> [ <tmp dir> ]\n");
     }
+#endif
 
-    if (argc >= 3) {
-        filename_in = argv[1];
-        filename_out = argv[2];
-    }
-    if (argc == 4) {
-        tmpdir = argv[3];
-    } else {
-        tmpdir = "/tmp";
+    tmpdir = "/tmp";
+    while(argc > 1 && argv[1][0] == '-'){
+        if(argc > 2 && strcmp (argv[1], "-in") == 0){
+            filename_in = argv[2];
+            argc -= 2;
+            argv += 2;
+        }
+        if(argc > 2 && strcmp (argv[1], "-out") == 0){
+            filename_out = argv[2];
+            argc -= 2;
+            argv += 2;
+        }
+        if(argc > 2 && strcmp (argv[1], "-T") == 0){
+            tmpdir = argv[2];
+            argc -= 2;
+            argv += 2;
+        }
+        if(argc > 2 && strcmp (argv[1], "-skip") == 0){
+            skip = atoi(argv[2]);
+            argc -= 2;
+            argv += 2;
+        }
     }
 
     fin = fopen(filename_in, "r");
@@ -227,7 +249,7 @@ int main(int argc, char * argv[])
     }
     vec_uint_clear_array(&transposed, mat->ncols);
 
-    rebuild();
+    rebuild(skip);
 
     return 0;
 }

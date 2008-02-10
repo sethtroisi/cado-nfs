@@ -38,9 +38,6 @@ char *used;
 #define MERGE_LEVEL_MAX 256 // maximum level for a merge; such a large value
                             // is only useful when not using BW
 
-// minimum excess we want to keep
-#define DELTA 128
-
 #define M_STRATEGY 3 // 0: finish that mergelevel
                      // 1: change if min weight < mergelevel
                      // 2: jump to minimal possible mergelevel
@@ -2293,12 +2290,18 @@ mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 	if(njproc >= target){ // somewhat arbitrary...!
 	    int kappa = (mat->rem_nrows-mat->rem_ncols) / mat->delta, ni2rem;
 
-	    if(kappa <= 16)
+	    if(kappa <= (1<<4))
 		ni2rem = mat->delta/2;
-	    else if(kappa <= 128)
+	    else if(kappa <= (1<<5))
 		ni2rem = mat->delta * (kappa/4);
-	    else
+	    else if(kappa <= (1<<10))
 		ni2rem = mat->delta * (kappa/8);
+	    else if(kappa <= (1<<15))
+		ni2rem = mat->delta * (kappa/16);
+	    else if(kappa <= (1<<20))
+		ni2rem = mat->delta * (kappa/32);
+	    else
+		ni2rem = mat->delta * (kappa/64);
 	    deleteSuperfluousRows(mat, mat->delta, ni2rem);
 	    inspectRowWeight(mat);
 	    fprintf(stderr, "T=%d mmax=%d nr=%d N=%d (%d)",
@@ -2419,7 +2422,7 @@ main(int argc, char *argv[])
     sparse_mat_t mat;
     char *purgedname = NULL, *hisname = NULL;
     int nb_merge_max = 0, nrows, ncols;
-    int cwmax = 20, rwmax = 1000000, maxlevel = 2, iprune = 0;
+    int cwmax = 20, rwmax = 1000000, maxlevel = 2, iprune = 0, keep = 128;
     int verbose = 0; /* default verbose level */
     double tt;
     double kprune = 1.0; /* prune keeps kprune * (initial excess) */
@@ -2469,6 +2472,11 @@ main(int argc, char *argv[])
 	    argc -= 2;
 	    argv += 2;
 	}
+	else if (argc > 2 && strcmp (argv[1], "-keep") == 0){
+	    keep = atoi(argv[2]);
+	    argc -= 2;
+	    argv += 2;
+	}
 	else if (argc > 1 && strcmp (argv[1], "-v") == 0){
             verbose ++;
 	    argc -= 1;
@@ -2489,7 +2497,7 @@ main(int argc, char *argv[])
 
     mat.nrows = nrows;
     mat.ncols = ncols;
-    mat.delta = DELTA;
+    mat.delta = keep; // FIXME: change the name of delta
     
     tt = seconds();
     initMat(&mat, cwmax, rwmax, maxlevel);
@@ -2519,8 +2527,8 @@ main(int argc, char *argv[])
 
     /* iprune is the excess we want at the end of prune */
     iprune = (mat.nrows-mat.ncols) * kprune;
-    if (iprune < DELTA) /* ensures iprune >= DELTA */
-      iprune = DELTA;
+    if (iprune < mat.delta) /* ensures iprune >= DELTA */
+      iprune = mat.delta;
     /* only call prune if the current excess is larger than iprune */
     if (iprune < mat.nrows - mat.ncols){
 	double tt = seconds();

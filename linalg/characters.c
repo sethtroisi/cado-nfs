@@ -250,11 +250,31 @@ printTabMatrix(dense_mat_t *mat, int nrows, int ncols)
 }
 #endif
 
+// We add the heaviest columns of M_small to the last [kmin..kmin+skip[ 
+// columns of charmat.
+static void
+addHeavyBlock(char **charmat, FILE *smallfile, int kmin, int skip)
+{
+    int i, nc, j, u;
+
+    fprintf(stderr, "Adding heavy block of width %d\n", skip);
+    fscanf(smallfile, "%d %d", &i, &nc);
+    i = 0;
+    while(fscanf(smallfile, "%d", &nc) != EOF){
+	for(u = 0; u < nc; u++){
+	    fscanf(smallfile, "%d", &j);
+	    if(j < skip)
+		charmat[i][kmin + j] = -1; // humf...!
+	}
+	i++;
+    }
+}
+
 static void
 handleKer(dense_mat_t *mat, rootprime_t * tabchar, FILE * purgedfile,
           mp_limb_t ** ker, cado_poly pol,
           FILE *indexfile, FILE *relfile,
-	  int small_nrows)
+	  int small_nrows, FILE *smallfile, int skip)
 {  
     int i, n;
     unsigned int j, k;
@@ -270,7 +290,10 @@ handleKer(dense_mat_t *mat, rootprime_t * tabchar, FILE * purgedfile,
 	for (j = 0; j < k; ++j)
 	    charmat[i][j] = 1;
     }
-    buildCharacterMatrix(charmat, k, tabchar, purgedfile, indexfile, relfile, pol);
+    buildCharacterMatrix(charmat, k-skip, tabchar, 
+			 purgedfile, indexfile, relfile, pol);
+    if(skip > 0)
+	addHeavyBlock(charmat, smallfile, k-skip, skip);
 #ifdef WANT_ASSERT
     for (i = 0; i < small_nrows; ++i)
 	for(j = 0; j < k; j++)
@@ -333,9 +356,9 @@ handleKer(dense_mat_t *mat, rootprime_t * tabchar, FILE * purgedfile,
 // accessible in file indexfile.
 // charmat is small_nrows x k; ker * charmat will be n x k, yielding M_tiny.
 int main(int argc, char **argv) {
-  FILE *purgedfile, *kerfile, *indexfile, *relfile;
+  FILE *purgedfile, *kerfile, *indexfile, *relfile, *smallfile;
   int ret;
-  int k, isz;
+  int k, isz, skip = 0;
   unsigned int i, j, n, nlimbs;
   rootprime_t *tabchar;
   cado_poly pol;
@@ -345,6 +368,8 @@ int main(int argc, char **argv) {
   mp_limb_t **myker;
   unsigned int dim;
 
+#if 0
+  // FIXME...
   if (argc != 8) {
     fprintf(stderr, "usage: %s purgedfile kerfile polyfile", argv[0]);
     fprintf(stderr, "indexfile relfile n k\n");
@@ -352,6 +377,7 @@ int main(int argc, char **argv) {
     fprintf(stderr, "    and k is the number of characters you want to use\n");
     exit(1);
   }
+#endif
 
   /* print the command line */
   fprintf (stderr, "%s.r%s", argv[0], REV);
@@ -359,22 +385,59 @@ int main(int argc, char **argv) {
     fprintf (stderr, " %s", argv[k]);
   fprintf (stderr, "\n");
 
-  purgedfile = fopen(argv[1], "r");
+  while(argc > 1 && argv[1][0] == '-'){
+      if(argc > 2 && strcmp (argv[1], "-purged") == 0){
+	  purgedfile = fopen(argv[2], "r");
+	  argc -= 2;
+	  argv += 2;
+      }
+      if(argc > 2 && strcmp (argv[1], "-ker") == 0){
+	  kerfile = fopen(argv[2], "r");
+	  argc -= 2;
+	  argv += 2;
+      }
+      if(argc > 2 && strcmp (argv[1], "-poly") == 0){
+	  read_polynomial(pol, argv[2]);
+	  argc -= 2;
+	  argv += 2;
+      }
+      if(argc > 2 && strcmp (argv[1], "-index") == 0){
+	  indexfile = fopen(argv[2], "r");
+	  argc -= 2;
+	  argv += 2;
+      }
+      if(argc > 2 && strcmp (argv[1], "-rel") == 0){
+	  relfile = fopen(argv[2], "r");
+	  argc -= 2;
+	  argv += 2;
+      }
+      if(argc > 2 && strcmp (argv[1], "-nker") == 0){
+	  n = atoi(argv[2]);
+	  argc -= 2;
+	  argv += 2;
+      }
+      if(argc > 2 && strcmp (argv[1], "-nchar") == 0){
+	  k = atoi(argv[2]);
+	  argc -= 2;
+	  argv += 2;
+      }
+      if(argc > 2 && strcmp (argv[1], "-small") == 0){
+	  smallfile = fopen(argv[2], "r");
+	  argc -= 2;
+	  argv += 2;
+      }
+      if(argc > 2 && strcmp (argv[1], "-skip") == 0){
+	  skip = atoi(argv[2]);
+	  argc -= 2;
+	  argv += 2;
+      }
+  }
+
   ASSERT (purgedfile != NULL);
-  kerfile = fopen(argv[2], "r");
   ASSERT (kerfile != NULL);
-
-  read_polynomial(pol, argv[3]);
-
-  indexfile = fopen(argv[4], "r");
   ASSERT (indexfile != NULL);
-  relfile = fopen(argv[5], "r");
   ASSERT (relfile != NULL);
-
-  ret = gmp_sscanf(argv[6], "%d", &n);
-  ASSERT (ret == 1);
-  ret = gmp_sscanf(argv[7], "%d", &k);
-  ASSERT (ret == 1);
+  ASSERT (smallfile != NULL);
 
   // only k-1, since the k-th character is sign on rational side
   tabchar = (rootprime_t *)malloc((k-1)*sizeof(rootprime_t));
@@ -406,7 +469,7 @@ int main(int argc, char **argv) {
   fprintf(stderr, "finished reading kernel file\n");
 
   mymat.nrows = n;
-  mymat.ncols = k;
+  mymat.ncols = k+skip; // 1 (for sign) + (k-1) characters + skip
   mymat.limbs_per_row =  ((mymat.ncols-1) / GMP_NUMB_BITS) + 1;
   mymat.limbs_per_col =  ((mymat.nrows-1) / GMP_NUMB_BITS) + 1;
 
@@ -416,7 +479,7 @@ int main(int argc, char **argv) {
   fprintf(stderr, "start computing characters...\n");
 
   handleKer(&mymat, tabchar, purgedfile, ker, pol,
-            indexfile, relfile, small_nrows);
+            indexfile, relfile, small_nrows, smallfile, skip);
 
   myker = (mp_limb_t **)malloc(mymat.nrows*sizeof(mp_limb_t *));
   ASSERT (myker != NULL);

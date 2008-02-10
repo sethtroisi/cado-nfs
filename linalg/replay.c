@@ -261,8 +261,17 @@ renumber(int *small_ncols, int *colweight, int ncols)
     *small_ncols = nb>>1;
     qsort(tmp, nb>>1, 2*sizeof(int), cmp);
     memset(colweight, 0, ncols * sizeof(int));
+#if 0
+    // useful for Gauss only...
+    fprintf(stderr, "Sorting in INcreasing weight order of j\n");
     for(j = 0, k = 1; j < nb; j += 2)
 	colweight[tmp[j+1]] = k++; // always this +1 trick
+#else
+    // useful for BW + skipping heavy part only...
+    fprintf(stderr, "Sorting in DEcreasing weight order of j\n");
+    for(j = nb-1, k = 1; j >= 0; j -= 2)
+	colweight[tmp[j]] = k++; // always this +1 trick
+#endif
     free(tmp);
 }
 
