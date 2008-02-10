@@ -157,12 +157,29 @@ int main(int argc, char *argv[]) {
     // Check and complete relations from each relation file...
     //
     while (argc > 1) {
-      nrels_out += checkrels(
+        //
+        // Reset reporting info...
+        //
+        count_too_many_factors     = 0;
+        count_too_large_prime_norm = 0;
+        count_too_large_factor     = 0;
+        count_no_factor_found      = 0;
+        count_partial_fact_found   = 0;
+        count_perfect_power        = 0;
+        count_check_prime          = 0;
+        count_large_algprime       = 0;
+        count_large_ratprime       = 0;
+        count_not_coprime          = 0;
+        count_not_dividing         = 0;
+        count_larger_mfba          = 0;
+        count_larger_mfbr          = 0;
+        
+        nrels_out += checkrels(
                        argv[1], cpoly, verbose, maxnlp, cmult, mfbr, mfba,
                        primes, nprimes
-                   );
-      argc--;
-      argv++;
+                     );
+        argc--;
+        argv++;
     }
     free (primes);
 

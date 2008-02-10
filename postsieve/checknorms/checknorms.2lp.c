@@ -1045,10 +1045,24 @@ int main(int argc, char *argv[]) {
     nb_files = argc - 1;
 
     while (argc > 1) {
-      tot_rels += checkrels(argv[1], cpoly, verbose, factorall, mfbr, mfba,
+        //
+        // Reset reporting info...
+        //
+        count_more_two_factors     = 0;
+        count_too_large_norm       = 0;
+        count_bad_factor           = 0;
+        count_too_large_prime_norm = 0;
+        count_no_factor_found      = 0;
+        count_partial_fact_found   = 0;
+        count_factorization_pb     = 0;
+        count_perfect_square       = 0;
+        count_perfect_power        = 0;
+        check_prime_reports        = 0;
+        
+        tot_rels += checkrels(argv[1], cpoly, verbose, factorall, mfbr, mfba,
                             primes, nprimes);
-      argc--;
-      argv++;
+        argc--;
+        argv++;
     }
     free (primes);
 
