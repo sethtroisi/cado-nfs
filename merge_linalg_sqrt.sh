@@ -8,6 +8,7 @@ sqrt=sqrt/naive
 
 # default parameters (see README.params)
 nkermax=30; nchar=50; prune=1.0; maxlevel=6; cwmax=10; rwmax=100
+skip=16
 
 root=$1
 if [ $# -ge 2 ]; then prune=$2; fi
@@ -61,7 +62,8 @@ else
 fi
 
 nb_merge_max=1000000
-argsa="-forbw -prune $prune -merge $nb_merge_max -mat $purged"
+keep=`expr 128 '+' $skip`
+argsa="-forbw -prune $prune -merge $nb_merge_max -mat $purged -keep $keep"
 argsa="$argsa -maxlevel $maxlevel -cwmax $cwmax -rwmax $rwmax $verbose"
 time $linalg/merge $argsa > $name/merge.his # 2> $name.merge.err
 echo "SIZE(merge.his): `ls -s $name/merge.his`"
@@ -87,7 +89,7 @@ fi
 
 echo "Performing the linear algebra phase"
 
-./linalg.sh $name
+./linalg.sh $name $skip
 
 if [ ! -s $name/ker_raw ]; then echo "Zerodim kernel, stopping"; exit; fi
 
@@ -96,8 +98,9 @@ if [ $nker -lt $nkermax ]; then nkermax=$nker; fi
 
 echo "Adding characters"
 
-args0="$purged $name/ker_raw $poly $name/index $nodup"
-args0="$args0 $nker $nchar"
+args0="-purged $purged -ker $name/ker_raw -poly $poly -index $name/index"
+args0="$args0 -rel $nodup -small $name/small"
+args0="$args0 -nker $nker -nchar $nchar -skip $skip"
 time $linalg/characters $args0 > $name/ker
 
 ndepmax=`wc -l $name/ker | awk '{print $1}'`
