@@ -133,13 +133,15 @@ typedef struct {
 
 // charmat is small_nrows x k
 static void
-computeAllCharacters(char **charmat, int i, int k, rootprime_t * tabchar, long a, unsigned long b, cado_poly pol)
+computeAllCharacters(char **charbig, int i, int k, rootprime_t * tabchar, long a, unsigned long b, cado_poly pol)
 {
     int j;
     
-    for(j = 0; j < k-1; j++)
-	charmat[i][j] = (char)eval_char(a, b, tabchar[j]);
-    charmat[i][k-1] = (char)eval_rat_char(a, b, pol);
+    for(j = 0; j < k-2; j++)
+	charbig[i][j] = (char)eval_char(a, b, tabchar[j]);
+    charbig[i][k-2] = (char)eval_rat_char(a, b, pol);
+    // last column is for the free relations...
+    charbig[i][k-1] = (b == 0 ? (char)(-1) : 1); // ohhhhhhhhhhh!
 }
 
 // charmat is small_nrows x k
@@ -264,7 +266,7 @@ addHeavyBlock(char **charmat, FILE *smallfile, int kmin, int skip)
 	for(u = 0; u < nc; u++){
 	    fscanf(smallfile, "%d", &j);
 	    if(j < skip)
-		charmat[i][kmin + j] = -1; // humf...!
+		charmat[i][kmin + j] = (char)(-1); // humf...!
 	}
 	i++;
     }
@@ -281,7 +283,7 @@ handleKer(dense_mat_t *mat, rootprime_t * tabchar, FILE * purgedfile,
     char **charmat;
 
     n = mat->nrows;
-    k = mat->ncols;
+    k = mat->ncols; // [(nchar-1)+1]+skip+1
     charmat = (char **) malloc(small_nrows * sizeof(char *));
     ASSERT (charmat != NULL);
     for (i = 0; i < small_nrows; ++i) {
@@ -469,7 +471,7 @@ int main(int argc, char **argv) {
   fprintf(stderr, "finished reading kernel file\n");
 
   mymat.nrows = n;
-  mymat.ncols = k+skip; // 1 (for sign) + (k-1) characters + skip
+  mymat.ncols = k+skip+1; // 1 (rat sign)+(k-1) characters+skip+1 (freerels)
   mymat.limbs_per_row =  ((mymat.ncols-1) / GMP_NUMB_BITS) + 1;
   mymat.limbs_per_col =  ((mymat.nrows-1) / GMP_NUMB_BITS) + 1;
 

@@ -2539,8 +2539,10 @@ main(int argc, char *argv[])
 
     // ouhhhhhhhhhh
     // we do not have a clear idea of which function to minimize...!
+#if 0
     forbw = 0;
     fprintf(stderr, "WARNING: forcing forbw=0...!!!!\n");
+#endif
 
 #if M_STRATEGY <= 2
     merge(&mat, /*nb_merge_max,*/ maxlevel, verbose, forbw);
