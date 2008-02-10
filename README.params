@@ -36,7 +36,8 @@ rsa120  nrel=3142405, nprimes=2929171; excess=213234
 rsa120  1.0   120      300      200   16m    559304x559176 330m
 (krylov 10067.9, gather 43.4, mksol 6655.2, lingen 2766.2, prep 236.4, io 10.0)
 
-rsa130                                      1318137x1318009     
+rsa130  1.0   150      300      300   ??    1318137x1318009 27.5h
+(krylov 48677s, gather 103s, mksol 41253s, lingen 8425s, prep 568s, io 55s)
 
 For new parameters, some fiddling is needed, with respect to the final
 weight of the small matrix and/or the number of rows/columns depending on
