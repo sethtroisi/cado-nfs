@@ -55,7 +55,7 @@ while [ $expected_rels -lt $wrels ] ; do
     let Bmid=$Bmax/2
     # we try sieving from $Bmid to $Bmid+$width-1
     let b0=$Bmid
-    let b1=$Bmid+$width-1
+    let b1=$Bmid+$width
     echo Trying sieving region -$Amax $Amax 1 $Bmax
     region="-$Amax $Amax $b0 $b1"
     echo "   trying small region $region"
