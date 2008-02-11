@@ -20,6 +20,7 @@ typedef struct {
     int bucket_size;    // should be around L1 cache size
     int nb_buckets;
     int bucket_limit;   // maximal number of bucket_reports allowed in one bucket.
+    double maxnorm; /* max |F(a0*i+a1*j, b0*i+b1*j)| */
 } sieve_info_t;
 
 /*
@@ -125,13 +126,13 @@ special_case_p()
 #endif
 }
 
+#if 0
 static void
 sieve_slow (unsigned char *S, const factorbase_degn_t *fb,
         const sieve_info_t *si)
 {
     fbprime_t p;
     fbprime_t r, R;
-    unsigned int d;
     unsigned char logp;
     unsigned char *S_ptr;
 
@@ -187,8 +188,7 @@ sieve_slow (unsigned char *S, const factorbase_degn_t *fb,
         fb = fb_next (fb); // cannot do fb++, due to variable size !
     }
 }
-
-
+#endif
 
 
 /*
@@ -223,7 +223,7 @@ typedef struct {
 void
 reduce_plattice(plattice_info_t *pli, const fbprime_t p, const fbprime_t r, const sieve_info_t * si)
 {
-    int64_t a0, a1, b0, b1, c0, c1, I, J, ak;
+    int64_t a0, a1, b0, b1, I, J;
     int k = 1;
     I = si->I;
     J = si->J;
@@ -566,7 +566,7 @@ sieve_random_access (unsigned char *S, factorbase_degn_t *fb,
 //   (a,b)      is the original coordinates. a is signed, b is unsigned.
 
 void 
-xToIJ(int *i, int *j, int x, sieve_info_t * si)
+xToIJ(int *i, unsigned int *j, int x, sieve_info_t * si)
 {
     *i = (x % (si->I)) - (si->I >> 1);
     *j = x / si->I;
@@ -595,16 +595,359 @@ xToAB(int64_t *a, uint64_t *b, int x, sieve_info_t * si)
     *b = i*si->b0 + j*si->b1;
 }
 
+/*********************** norm computation ************************************/
+
+/* Puts in fij[] the coefficients of f'(i) = F(a0*i+a1, b0*i+b1).
+   Assumes the coefficients of fij[] are initialized. */
+void
+fij_from_f (mpz_t *fij, mpz_t *f, int d, int32_t a0, int32_t a1,
+            int32_t b0, int32_t b1)
+{
+  int k, l;
+  mpz_t *g; /* will contain the coefficients of (b0*i+b1)^l */
+  mpz_t f0;
+
+  for (k = 0; k <= d; k++)
+    mpz_set (fij[k], f[k]);
+
+  g = malloc ((d + 1) * sizeof (mpz_t));
+  for (k = 0; k <= d; k++)
+    mpz_init (g[k]);
+  mpz_init (f0);
+
+  /* Let h(x) = quo(f(x), x), then F(x,y) = H(x,y)*x + f0*y^d, thus
+     F(a0*i+a1, b0*i+b1) = H(a0*i+a1, b0*i+b1)*(a0*i+a1) + f0*(b0*i+b1)^d.
+     We use that formula recursively. */
+
+  mpz_set_ui (g[0], 1); /* g = 1 */
+
+  for (k = d - 1; k >= 0; k--)
+    {
+      /* invariant: we have already translated coefficients of degree > k,
+         in f[k+1..d], and g = (b0*i+b1)^(d - (k+1)), with coefficients in
+         g[0..d - (k+1)]:
+         f[k]   <- f[k] + a1*f[k+1]
+         ...
+         f[l] <- a0*f[l]+a1*f[l+1] for k < l < d
+         ...
+         f[d] <- a0*f[d] */
+      mpz_swap (f0, fij[k]); /* save the new constant coefficient */
+      mpz_mul_si (fij[k], fij[k + 1], a1);
+      for (l = k + 1; l < d; l++)
+        {
+          mpz_mul_si (fij[l], fij[l], a0);
+          mpz_addmul_si (fij[l], fij[l + 1], a1);
+        }
+      mpz_mul_si (fij[d], fij[d], a0);
+
+      /* now compute (b0*i+b1)^(d-k) from the previous (b0*i+b1)^(d-k-1):
+         g[d-k] = b0*g[d-k-1]
+         ...
+         g[l] = b1*g[l]+b0*g[l-1] for 0 < l < d-k
+         ...
+         g[0] = b1*g[0]
+      */
+      mpz_mul_si (g[d - k], g[d - k - 1], b0);
+      for (l = d - k - 1; l > 0; l--)
+        {
+          mpz_mul_si (g[l], g[l], b1);
+          mpz_addmul_si (g[l], g[l-1], b0);
+        }
+      mpz_mul_si (g[0], g[0], b1);
+
+      /* now g has degree d-k, and we add f0*g */
+      for (l = k; l <= d; l++)
+        mpz_addmul (fij[l], g[l - k], f0);
+    }
+
+  mpz_clear (f0);
+  for (k = 0; k <= d; k++)
+    mpz_clear (g[k]);
+  free (g);
+}
+
+/* Set z to q. Warning: on 32-bit machines, we cannot use mpz_set_ui! */
+static void
+mpz_set_uint64 (mpz_t z, uint64_t q)
+{
+  if (sizeof (unsigned long int) == 8)
+    mpz_set_ui (z, (unsigned long int) q);
+  else
+    {
+      ASSERT_ALWAYS (sizeof (unsigned long int) == 4);
+      mpz_set_ui (z, (unsigned long int) (q >> 32));
+      mpz_mul_2exp (z, z, 32);
+      mpz_add_ui (z, z, (unsigned long int) (q & 4294967295UL));
+    }
+}
+
+/* f(x) -> f(x+1) */
+void
+translate_right (mpz_t *f, int d)
+{
+  int k, l;
+  
+  for (k = d - 1; k >= 0; k--)
+    {
+      /* if f(x) = h(x)*x + f0, then f(x+1) = h(x+1)*(x+1) + f0:
+         f[d] is unchanged
+         ...
+         f[l] <- f[l] + f[l+1] */
+      for (l = k; l < d; l++)
+        mpz_add (f[l], f[l], f[l + 1]);
+    }
+}
+
+/* f(x) -> f(x-1) */
+void
+translate_left (mpz_t *f, int d)
+{
+  int k, l;
+  
+  for (k = d - 1; k >= 0; k--)
+    {
+      /* if f(x) = h(x)*x + f0, then f(x-1) = h(x-1)*(x-1) + f0:
+         f[d] is unchanged
+         ...
+         f[l] <- f[l] - f[l+1] */
+      for (l = k; l < d; l++)
+        mpz_sub (f[l], f[l], f[l + 1]);
+    }
+}
+
+/* f(x) -> f(x+a) */
+void
+translate_hori_si (mpz_t *f, int d, long a)
+{
+  int k, l;
+  
+  for (k = d - 1; k >= 0; k--)
+    {
+      for (l = k; l < d; l++)
+        mpz_addmul_si (f[l], f[l + 1], a);
+    }
+}
+
+/* f(x,y) -> f(x,y+1) */
+void
+translate_up (mpz_t *f, int d)
+{
+  int k, l;
+  
+  for (k = 1; k <= d; k++)
+    {
+      /* if f(y) = h(y)*y + c, then f(y+1) = h(y+1)*(y+1) + c:
+         f[0] is unchanged
+         ...
+         f[l] <- f[l] + f[l-1] */
+      for (l = k; l > 0; l--)
+        mpz_add (f[l], f[l], f[l - 1]);
+    }
+}
+
+/* f(x,y) -> f(x,y-1) */
+void
+translate_down (mpz_t *f, int d)
+{
+  int k, l;
+  
+  for (k = 1; k <= d; k++)
+    {
+      for (l = k; l > 0; l--)
+        mpz_sub (f[l], f[l], f[l - 1]);
+    }
+}
+
+/* f(x,y) -> f(x,y+a), a positive: up, a negative: down */
+void
+translate_vert_si (mpz_t *f, int d, long a)
+{
+  int k, l;
+  
+  for (k = 1; k <= d; k++)
+    {
+      for (l = k; l > 0; l--)
+        mpz_addmul_si (f[l], f[l - 1], a);
+    }
+}
+
+/* returns the maximal value of |F(a,b)| for 
+   a = a0 * i + a1 * j, b = b0 * i + b1 * j,
+   -I/2 <= i <= I/2, 0 <= j <= J */
+double
+get_maxnorm (char *polyfilename, sieve_info_t si)
+{
+  cado_poly cpoly;
+  mpz_t max_norm, *fij, qq;
+  double ret;
+  unsigned int d, k, j0;
+  int i0;
+  uint64_t time = cputime ();
+
+  if (!read_polynomial (cpoly, polyfilename))
+    {
+      fprintf (stderr, "Error reading polynomial file\n");
+      exit (EXIT_FAILURE);
+    }
+
+  d = cpoly->degree;
+
+  fij = malloc ((d + 1) * sizeof (mpz_t));
+  for (k = 0; k <= d; k++)
+    mpz_init (fij[k]);
+  mpz_init_set_ui (max_norm, 0);
+  mpz_init (qq);
+
+  fij_from_f (fij, cpoly->f, d, si.a0, si.a1, si.b0, si.b1);
+
+  /* divide the coefficients of fij by q */
+  mpz_set_uint64 (qq, si.q);
+  for (k = 0; k <= d; k++)
+    {
+      ASSERT_ALWAYS (mpz_divisible_p (fij[k], qq));
+      mpz_divexact (fij[k], fij[k], qq);
+    }
+
+  fprintf (stderr, "F'(x,1) = ");
+  fprint_polynomial (stderr, fij, d);
+
+  /* for 0 <= i <= I/2, we have F'(i,0) = fij[d]*i^d, thus the maximum is
+     attained at i=I/2, which is on the right border treated below */
+
+  /* translate to i=I/2: the coefficients of F(I/2, j) are f[k]*(I/2)^k */
+  for (k = 1; k <= d; k++)
+    mpz_mul_2exp (fij[k], fij[k], (si.logI - 1) * k);
+  /* F'(I/2,0) is the leading coefficient */
+  mpz_abs (max_norm, fij[d]);
+  i0 = si.I / 2;
+  j0 = 0;
+
+  /* now consider the right border i = I/2, 0 <= j <= J */
+  for (k = 1; k <= si.J; k++)
+    {
+      translate_up (fij, d);
+      /* now the f[k] are the coefficients of j -> F(I/2, k + j),
+         with f[d] the constant coefficient */
+      if (mpz_cmpabs (fij[d], max_norm) > 0)
+        {
+          mpz_abs (max_norm, fij[d]);
+          i0 = si.I / 2;
+          j0 = k;
+        }
+    }
+
+  translate_vert_si (fij, d, - (long) si.J); /* back in (I/2, 0) */
+
+  /* back in (0,0) */
+  for (k = 1; k <= d; k++)
+    mpz_div_2exp (fij[k], fij[k], (si.logI - 1) * k);
+
+  /* translate in (0,J) */
+  for (k = 0; k < d; k++)
+    {
+      /* multiply fij[k] by J^(d-k) */
+      mpz_ui_pow_ui (qq, si.J, d - k);
+      mpz_mul (fij[k], fij[k], qq);
+    }
+
+  /* translate in (I/2, J) */
+  translate_hori_si (fij, d, si.I / 2);
+
+  /* upper border: -I/2 <= i <= I/2, j = J */
+  for (k = 0; k < si.I; k++)
+    {
+      translate_left (fij, d);
+      if (mpz_cmpabs (fij[0], max_norm) > 0)
+        {
+          mpz_abs (max_norm, fij[0]);
+          i0 = (int) si.I / 2 - k;
+          j0 = si.J;
+        }
+    }
+  
+  /* now in (-I/2, J), go back in (0,J) */
+  translate_hori_si (fij, d, si.I / 2);
+
+  /* now go back in (0,0) */
+  for (k = 0; k < d; k++)
+    {
+      /* divide fij[k] by J^(d-k) */
+      mpz_ui_pow_ui (qq, si.J, d - k);
+      mpz_divexact (fij[k], fij[k], qq);
+    }
+
+  /* translate to i=-I/2: the coefficients of F(-I/2, j) are f[k]*(-I/2)^k */
+  for (k = 1; k <= d; k++)
+    {
+      mpz_mul_2exp (fij[k], fij[k], (si.logI - 1) * k);
+      if (k & 1)
+        mpz_neg (fij[k], fij[k]);
+    }
+
+  /* now consider the right border i = I/2, 0 <= j <= J */
+  for (k = 0; k < si.J; k++)
+    {
+      /* now the f[k] are the coefficients of j -> F(-I/2, k + j),
+         with f[d] the constant coefficient */
+      if (mpz_cmpabs (fij[d], max_norm) > 0)
+        {
+          mpz_abs (max_norm, fij[d]);
+          i0 = - (int) si.I / 2;
+          j0 = k;
+        }
+      translate_up (fij, d);
+    }
+  ret = mpz_get_d (max_norm);
+  fprintf (stderr, "max norm F'(%d,%u)=%1.3e [time=%lums]\n", i0, j0, ret,
+           cputime () - time);
+
+  for (k = 0; k <= d; k++)
+    mpz_clear (fij[k]);
+  free (fij);
+  clear_polynomial (cpoly);
+  mpz_clear (max_norm);
+  mpz_clear (qq);
+  return ret;
+}
+
+/*************************** main program ************************************/
+
+static void
+usage (char *argv0)
+{
+  fprintf (stderr, "Usage: %s -poly xxx.poly -fb xxx.roots\n", argv0);
+  exit (1);
+}
 
 // this main is just to play with rsa155
-// compile with:
-//   gcc -O4 -o las -I.. las.c fb.o ../utils/libutils.a -lgmp -lm
 // and run with:
 //   ./las rsa155.roots
 int main(int argc, char ** argv) {
+    char *argv0 = argv[0];
     sieve_info_t si;
     const double log_scale = 1.4426950408889634073599246810018921374;
+    char *fbfilename = NULL, *polyfilename = NULL;
 
+    while (argc > 1 && argv[1][0] == '-')
+      {
+        if (argc > 2 && strcmp (argv[1], "-fb") == 0)
+          {
+            fbfilename = argv[2];
+            argc -= 2;
+            argv += 2;
+          }
+        else if (argc > 2 && strcmp (argv[1], "-poly") == 0)
+          {
+            polyfilename = argv[2];
+            argc -= 2;
+            argv += 2;
+          }
+        else
+          usage (argv0);
+      }
+
+    if (polyfilename == NULL || fbfilename == NULL)
+      usage (argv0);
 
     si.logI = 13;
     si.I = 1<<si.logI;
@@ -615,6 +958,7 @@ int main(int argc, char ** argv) {
     si.b0 = -4;
     si.a1 = -100184;
     si.b1 = 37;
+    si.maxnorm = get_maxnorm (polyfilename, si);
 
     unsigned char * S;
 
@@ -623,7 +967,7 @@ int main(int argc, char ** argv) {
     ASSERT_ALWAYS(S != NULL);
 
     factorbase_degn_t * fb;
-    fb = fb_read (argv[1], log_scale, 1);
+    fb = fb_read (fbfilename, log_scale, 1);
     ASSERT_ALWAYS(fb != NULL);
 
     // Put 255 everywhere, since we don't want to compute norms for the
@@ -637,7 +981,8 @@ int main(int argc, char ** argv) {
 
     unsigned char min=255;
     int kmin = 0;
-    int i, j, k;
+    int i;
+    unsigned int j, k;
     for (k = 0; k < si.I*si.J; ++k)
         if ((S[k] < min) && (S[k]>50) ) {
             kmin = k;
@@ -648,13 +993,14 @@ int main(int argc, char ** argv) {
     printf("Min of %d is obtained for (i,j) = (%d,%d)\n", min, i, j);
 
     int stat[256];
-    for (i = 0; i < 256; ++i)
-        stat[i]=0;
-    for (i = 0; i < si.I*si.J; ++i)
-        stat[S[i]]++;
-    for (i = 0; i < 256; ++i)
-        printf("[%d]%d ", i, stat[i]);
+    for (k = 0; k < 256; ++k)
+        stat[k]=0;
+    for (k = 0; k < si.I*si.J; ++k)
+        stat[S[k]]++;
+    for (k = 0; k < 256; ++k)
+        printf("[%d]%d ", k, stat[k]);
     printf("\n");
 
+    return 0;
 }
 
