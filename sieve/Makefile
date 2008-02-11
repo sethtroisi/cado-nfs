@@ -43,7 +43,7 @@ config.h: config_h.in
 	cp config_h.in config.h
 
 las: las.c fb.o
-	gcc -O4 -o las -I.. las.c fb.o ../utils/libutils.a $(GMPLIB) -lm
+	gcc -Wall -W -O4 -o las -I.. las.c fb.o ../utils/libutils.a $(GMPLIB) -lm
 
 clean:
 	rm -f sieve makefb las *.o *~
