@@ -343,7 +343,7 @@ int main(int argc, char **argv) {
   poly_alloc(tmp->p, 1);
 
   // Accumulate product
-  int nab = 0;
+  int nab = 0, nfree = 0;
 #if 0
   // Naive version, without subproduct tree
   while(fscanf(depfile, "%ld %lu", &a, &b) != EOF){
@@ -374,6 +374,8 @@ int main(int argc, char **argv) {
       polymodF_from_ab(tmp, a, b);
       prd_tab = accumulate_fast (prd_tab, tmp, F, &lprd, nprd++);
       nab++;
+      if(b == 0)
+	  nfree++;
     }
     accumulate_fast_end (prd_tab, F, lprd);
     fclose(depfile);
@@ -387,7 +389,7 @@ int main(int argc, char **argv) {
 #endif
 
   fprintf(stderr, "Finished accumulating the product in %2.2lf\n", seconds());
-  fprintf(stderr, "nab = %d, v = %d\n", nab, prd->v);
+  fprintf(stderr, "nab = %d, nfree = %d, v = %d\n", nab, nfree, prd->v);
   fprintf(stderr, "sizeinbit of cst term = %lu\n",
 	  (unsigned long) mpz_sizeinbase(prd->p->coeff[0], 2));
   fprintf(stderr, "sizeinbit of leading term = %lu\n",
@@ -429,7 +431,7 @@ int main(int argc, char **argv) {
     mpz_mod(g1, g1, pol->n);
     if(mpz_cmp_ui(pol->g[1], 1) != 0){
 	// case g(X)=m1*X+m2 with m1 != 1
-	// we should have prod (a+b*m2/m1) = A^2 = R^2/m1^nab
+	// we should have prod (a+b*m2/m1) = A^2 = R^2/m1^(nab-nfree)
 	// and therefore nab should be even
 	if(nab & 1){
 	    fprintf(stderr, "Sorry, but #(a, b) is odd\n");
@@ -437,7 +439,7 @@ int main(int argc, char **argv) {
 	    printf("Failed\n");
 	    return 0;
 	}
-	mpz_powm_ui(g2, pol->g[1], (nab>>1), pol->n);
+	mpz_powm_ui(g2, pol->g[1], (nab-nfree)>>1, pol->n);
 	mpz_mul(algsqrt, algsqrt, g2);
 	mpz_mod(algsqrt, algsqrt, pol->n);
     }
@@ -445,6 +447,7 @@ int main(int argc, char **argv) {
     mpz_mod(g2, g2, pol->n);
     if (mpz_cmp(g1, g2)!=0) {
       fprintf(stderr, "Bug: the squares do not agree modulo n!\n");
+      //      gmp_printf("g1:=%Zd;\ng2:=%Zd;\n", g1, g2);
     }
     mpz_sub(g1, aux, algsqrt);
     mpz_gcd(g1, g1, pol->n);
