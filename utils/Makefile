@@ -7,7 +7,7 @@ OPTCFLAGS ?= -g -O2 -W -Wall
 
 CFLAGS = $(OPTCFLAGS)
 
-names:=polyfile relation timing long_poly getprime mod_ul
+names:=polyfile relation timing long_poly getprime mod_ul gmp_aux
 src:=$(patsubst %,%.c,$(names))
 obj:=$(patsubst %,%.o,$(names))
 

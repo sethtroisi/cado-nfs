@@ -8,6 +8,10 @@
 #include "fb.h"
 #include "../utils/utils.h"
 
+#define LOG_SCALE 1.4426950408889634 /* 1/log(2) to 17 digits, rounded to
+                                        nearest. This is enough to uniquely
+                                        identify the corresponding IEEE 754
+                                        double precision number */
 
 // General information about the siever
 typedef struct {
@@ -20,7 +24,9 @@ typedef struct {
     int bucket_size;    // should be around L1 cache size
     int nb_buckets;
     int bucket_limit;   // maximal number of bucket_reports allowed in one bucket.
-    double maxnorm; /* max |F(a0*i+a1*j, b0*i+b1*j)| */
+    unsigned int degree;   /* polynomial degree */
+    double lgmaxnorm; /* log (max |F(a0*i+a1*j, b0*i+b1*j)|) / log(2) */
+    mpz_t *fij;       /* coefficients of F(a0*i+a1*j, b0*i+b1*j) */
 } sieve_info_t;
 
 /*
@@ -42,6 +48,32 @@ typedef struct {
     uint32_t r;
     int32_t alpha, beta, gamma, delta;
 } prime_info_t;
+
+/************************** sieve info stuff *********************************/
+
+void
+sieve_info_init (sieve_info_t *si, unsigned int d)
+{
+  unsigned int k;
+
+  si->degree = d;
+  si->fij = malloc ((d + 1) * sizeof (mpz_t));
+  for (k = 0; k <= d; k++)
+    mpz_init (si->fij[k]);
+}
+
+void
+sieve_info_clear (sieve_info_t *si)
+{
+  unsigned int d = si->degree;
+  unsigned int k;
+
+  for (k = 0; k <= d; k++)
+    mpz_clear (si->fij[k]);
+  free (si->fij);
+}
+
+/*****************************************************************************/
 
 void
 push_bucket_report(bucket_t * B, char logp, uint8_t p_low, uint32_t x)
@@ -599,7 +631,7 @@ xToAB(int64_t *a, uint64_t *b, int x, sieve_info_t * si)
 
 /* Puts in fij[] the coefficients of f'(i) = F(a0*i+a1, b0*i+b1).
    Assumes the coefficients of fij[] are initialized. */
-void
+static void
 fij_from_f (mpz_t *fij, mpz_t *f, int d, int32_t a0, int32_t a1,
             int32_t b0, int32_t b1)
 {
@@ -666,23 +698,8 @@ fij_from_f (mpz_t *fij, mpz_t *f, int d, int32_t a0, int32_t a1,
   free (g);
 }
 
-/* Set z to q. Warning: on 32-bit machines, we cannot use mpz_set_ui! */
-static void
-mpz_set_uint64 (mpz_t z, uint64_t q)
-{
-  if (sizeof (unsigned long int) == 8)
-    mpz_set_ui (z, (unsigned long int) q);
-  else
-    {
-      ASSERT_ALWAYS (sizeof (unsigned long int) == 4);
-      mpz_set_ui (z, (unsigned long int) (q >> 32));
-      mpz_mul_2exp (z, z, 32);
-      mpz_add_ui (z, z, (unsigned long int) (q & 4294967295UL));
-    }
-}
-
 /* f(x) -> f(x+1) */
-void
+static void
 translate_right (mpz_t *f, int d)
 {
   int k, l;
@@ -699,7 +716,7 @@ translate_right (mpz_t *f, int d)
 }
 
 /* f(x) -> f(x-1) */
-void
+static void
 translate_left (mpz_t *f, int d)
 {
   int k, l;
@@ -715,8 +732,32 @@ translate_left (mpz_t *f, int d)
     }
 }
 
+/* f(x) -> f(x+2^i) */
+static void
+translate_right_2exp (mpz_t *f, unsigned int d, unsigned long i)
+{
+  unsigned int k;
+
+  for (k = 1; k <= d; k++)
+    mpz_mul_2exp (f[k], f[k], i * k);
+}
+
+/* f(x) -> f(x-2^i) */
+static void
+translate_left_2exp (mpz_t *f, unsigned int d, unsigned long i)
+{
+  unsigned int k;
+
+  for (k = 1; k <= d; k++)
+    {
+      mpz_mul_2exp (f[k], f[k], i * k);
+      if (k & 1)
+        mpz_neg (f[k], f[k]);
+    }
+}
+
 /* f(x) -> f(x+a) */
-void
+static void
 translate_hori_si (mpz_t *f, int d, long a)
 {
   int k, l;
@@ -729,7 +770,7 @@ translate_hori_si (mpz_t *f, int d, long a)
 }
 
 /* f(x,y) -> f(x,y+1) */
-void
+static void
 translate_up (mpz_t *f, int d)
 {
   int k, l;
@@ -745,21 +786,8 @@ translate_up (mpz_t *f, int d)
     }
 }
 
-/* f(x,y) -> f(x,y-1) */
-void
-translate_down (mpz_t *f, int d)
-{
-  int k, l;
-  
-  for (k = 1; k <= d; k++)
-    {
-      for (l = k; l > 0; l--)
-        mpz_sub (f[l], f[l], f[l - 1]);
-    }
-}
-
 /* f(x,y) -> f(x,y+a), a positive: up, a negative: down */
-void
+static void
 translate_vert_si (mpz_t *f, int d, long a)
 {
   int k, l;
@@ -774,27 +802,17 @@ translate_vert_si (mpz_t *f, int d, long a)
 /* returns the maximal value of |F(a,b)| for 
    a = a0 * i + a1 * j, b = b0 * i + b1 * j,
    -I/2 <= i <= I/2, 0 <= j <= J */
-double
-get_maxnorm (char *polyfilename, sieve_info_t si)
+static double
+get_maxnorm (cado_poly cpoly, sieve_info_t si, mpz_t *fij)
 {
-  cado_poly cpoly;
-  mpz_t max_norm, *fij, qq;
+  mpz_t max_norm, qq;
   double ret;
   unsigned int d, k, j0;
   int i0;
   uint64_t time = cputime ();
 
-  if (!read_polynomial (cpoly, polyfilename))
-    {
-      fprintf (stderr, "Error reading polynomial file\n");
-      exit (EXIT_FAILURE);
-    }
-
   d = cpoly->degree;
 
-  fij = malloc ((d + 1) * sizeof (mpz_t));
-  for (k = 0; k <= d; k++)
-    mpz_init (fij[k]);
   mpz_init_set_ui (max_norm, 0);
   mpz_init (qq);
 
@@ -814,9 +832,9 @@ get_maxnorm (char *polyfilename, sieve_info_t si)
   /* for 0 <= i <= I/2, we have F'(i,0) = fij[d]*i^d, thus the maximum is
      attained at i=I/2, which is on the right border treated below */
 
-  /* translate to i=I/2: the coefficients of F(I/2, j) are f[k]*(I/2)^k */
-  for (k = 1; k <= d; k++)
-    mpz_mul_2exp (fij[k], fij[k], (si.logI - 1) * k);
+  /* translate to i=I/2 */
+  translate_right_2exp (fij, d, si.logI - 1);
+
   /* F'(I/2,0) is the leading coefficient */
   mpz_abs (max_norm, fij[d]);
   i0 = si.I / 2;
@@ -877,14 +895,9 @@ get_maxnorm (char *polyfilename, sieve_info_t si)
     }
 
   /* translate to i=-I/2: the coefficients of F(-I/2, j) are f[k]*(-I/2)^k */
-  for (k = 1; k <= d; k++)
-    {
-      mpz_mul_2exp (fij[k], fij[k], (si.logI - 1) * k);
-      if (k & 1)
-        mpz_neg (fij[k], fij[k]);
-    }
+  translate_left_2exp (fij, d, si.logI - 1);
 
-  /* now consider the right border i = I/2, 0 <= j <= J */
+  /* now consider the left border i = -I/2, 0 <= j <= J */
   for (k = 0; k < si.J; k++)
     {
       /* now the f[k] are the coefficients of j -> F(-I/2, k + j),
@@ -897,17 +910,44 @@ get_maxnorm (char *polyfilename, sieve_info_t si)
         }
       translate_up (fij, d);
     }
-  ret = mpz_get_d (max_norm);
-  fprintf (stderr, "max norm F'(%d,%u)=%1.3e [time=%lums]\n", i0, j0, ret,
-           cputime () - time);
+  ret = log (mpz_get_d (max_norm)) * LOG_SCALE;
+  fprintf (stderr, "max norm F'(%d,%u) has %1.2f bits [time=%lums]\n",
+           i0, j0, ret, cputime () - time);
 
-  for (k = 0; k <= d; k++)
-    mpz_clear (fij[k]);
-  free (fij);
-  clear_polynomial (cpoly);
+  translate_vert_si (fij, d, - (int) si.J); /* back to (-I/2, 0) */
+  for (k = 1; k <= d; k++) /* back to (0,0) */
+    {
+      mpz_div_2exp (fij[k], fij[k], (si.logI - 1) * k);
+      if (k & 1)
+        mpz_neg (fij[k], fij[k]);
+    }
+
   mpz_clear (max_norm);
   mpz_clear (qq);
   return ret;
+}
+
+/* initialize S[i+I/2+j*I] to round(log(|F'(i,j)|)/log(rho))
+   where log(maxnorm)/log(rho) = 255, i.e., rho = maxnorm^(1/255) */
+static void
+init_norms (unsigned char *S, cado_poly cpoly, sieve_info_t si)
+{
+  unsigned int j;
+
+#if 0
+  /* special case for j=0, since f(i,j) = i^d*f[d] */
+  fprint_polynomial (stderr, si.fij, si.degree);
+
+  for (j = 0; j < si.J; j++)
+    {
+      /* invariant: fij is the polynomial at (0, j) */
+      
+      /* translate to (-I/2, j) */
+    }
+#else
+    // Put lgmaxnorm everywhere, assuming it is <= 255
+  memset(S, (unsigned char) si.lgmaxnorm, si.I*si.J);
+#endif
 }
 
 /*************************** main program ************************************/
@@ -925,8 +965,8 @@ usage (char *argv0)
 int main(int argc, char ** argv) {
     char *argv0 = argv[0];
     sieve_info_t si;
-    const double log_scale = 1.4426950408889634073599246810018921374;
     char *fbfilename = NULL, *polyfilename = NULL;
+    cado_poly cpoly;
 
     while (argc > 1 && argv[1][0] == '-')
       {
@@ -949,16 +989,28 @@ int main(int argc, char ** argv) {
     if (polyfilename == NULL || fbfilename == NULL)
       usage (argv0);
 
+    if (!read_polynomial (cpoly, polyfilename))
+      {
+        fprintf (stderr, "Error reading polynomial file\n");
+        exit (EXIT_FAILURE);
+      }
+
+    sieve_info_init (&si, cpoly->degree);
+
+    /* those values do not depend on q */
     si.logI = 13;
     si.I = 1<<si.logI;
     si.J = 1<<(si.logI-1);
+    
+    /* those values depend on q, and should thus be updated for each new
+       special q (and root rho) */
     si.q = 16777291;
     si.rho = 4078255;
     si.a0 = 464271;
     si.b0 = -4;
     si.a1 = -100184;
     si.b1 = 37;
-    si.maxnorm = get_maxnorm (polyfilename, si);
+    si.lgmaxnorm = get_maxnorm (cpoly, si, si.fij);
 
     unsigned char * S;
 
@@ -967,12 +1019,10 @@ int main(int argc, char ** argv) {
     ASSERT_ALWAYS(S != NULL);
 
     factorbase_degn_t * fb;
-    fb = fb_read (fbfilename, log_scale, 1);
+    fb = fb_read (fbfilename, LOG_SCALE, 1);
     ASSERT_ALWAYS(fb != NULL);
 
-    // Put 255 everywhere, since we don't want to compute norms for the
-    // moment.
-    memset(S, 255, si.I*si.J);
+    init_norms (S, cpoly, si);
 
     double tm = seconds();
     //sieve_slow(S, fb, &si);
@@ -1000,6 +1050,9 @@ int main(int argc, char ** argv) {
     for (k = 0; k < 256; ++k)
         printf("[%d]%d ", k, stat[k]);
     printf("\n");
+
+    sieve_info_clear (&si);
+    clear_polynomial (cpoly);
 
     return 0;
 }

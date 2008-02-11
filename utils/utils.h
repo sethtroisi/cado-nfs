@@ -78,6 +78,9 @@ int isirreducible_mod_long(long_poly_t fp, const LONG p);
 /* getprime */
 extern unsigned long getprime (unsigned long);
 
+/* gmp_aux */
+void mpz_set_uint64 (mpz_t, uint64_t);
+
 #ifdef	__cplusplus
 }	// extern "C"
 #endif
