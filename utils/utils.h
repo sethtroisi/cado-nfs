@@ -18,6 +18,18 @@
 /* Number of words holding B bits ; better naming sought. */
 #define	BITS_TO_WORDS(B,W)	(((B)+(W)-1)/(W))
 
+/* the following function is missing in GMP */
+#ifndef mpz_addmul_si
+#define mpz_addmul_si(a, b, c)                  \
+  do {                                          \
+    if (c >= 0)                                 \
+      mpz_addmul_ui (a, b, c);                  \
+    else                                        \
+      mpz_submul_ui (a, b, -c);                 \
+  }                                             \
+  while (0)
+#endif
+
 #ifdef	__cplusplus
 extern "C" {
 #endif
@@ -58,10 +70,6 @@ void long_poly_init (long_poly_t f, int d);
 void long_poly_clear (long_poly_t f);
 int long_poly_set_mod (long_poly_t fp, mpz_t *f, int d, LONG p);
 int isirreducible_mod_long(long_poly_t fp, const LONG p);
-
-
-
-
 
 /* getprime */
 extern unsigned long getprime (unsigned long);
