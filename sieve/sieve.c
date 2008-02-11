@@ -2075,7 +2075,7 @@ main (int argc, char **argv)
     }
 
   /* Read polynomial from file */
-  if(!read_polynomial (cpoly, polyfilename))
+  if (!read_polynomial (cpoly, polyfilename))
     {
       fprintf (stderr, "Error reading polynomial file\n");
       exit (EXIT_FAILURE);

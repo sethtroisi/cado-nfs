@@ -1539,7 +1539,7 @@ print_poly (FILE *fp, cado_poly p, int argc, char *argv[], int st, int raw)
   fprintf (fp, "Y0: ");
   mpz_out_str (fp, 10, p->g[0]);
   fprintf (fp, "\n");
-  fprintf (fp, "# m: ");
+  fprintf (fp, "m: ");
   mpz_out_str (fp, 10, p->m);
   fprintf (fp, "\n");
   fprintf (fp, "type: %s\n", p->type);
