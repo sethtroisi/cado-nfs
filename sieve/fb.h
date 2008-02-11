@@ -11,6 +11,7 @@ factorbase_degn_t *fb_add_to (factorbase_degn_t *, size_t *, size_t *,
 factorbase_degn_t *	fb_find_p (factorbase_degn_t *, const fbprime_t);
 void            fb_sortprimes (fbprime_t *, const unsigned int);
 unsigned char	fb_log (double, double, double);
+void            fb_init_firstlog (factorbase_t);
 factorbase_degn_t * 	fb_make_linear (mpz_t *, const fbprime_t, const double, 
                                 const int);
 factorbase_degn_t *	fb_read (const char *, const double, const int);

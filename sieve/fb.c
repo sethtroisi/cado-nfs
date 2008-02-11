@@ -130,6 +130,23 @@ nextprime (fbprime_t p)
   return p;
 }
 
+void
+fb_init_firstlog (factorbase_t fb)
+{
+  int i;
+  factorbase_degn_t *fbp;
+
+  for (i = 0; i < 256; i++)
+    fb->firstlog[i] = NULL;
+
+  for (fbp = fb->fullfb; fbp->p != 0; fbp = fb_next (fbp))
+    {
+      if (fb->firstlog[fbp->plog] == NULL)
+	fb->firstlog[fbp->plog] = fbp;
+    }
+}
+
+
 /* Generate a factor base with primes <= bound for a linear polynomial */
 
 factorbase_degn_t *

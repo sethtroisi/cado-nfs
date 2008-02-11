@@ -157,10 +157,8 @@ typedef struct {
   factorbase_degn_t *fullfb; /* The complete factor base */
   factorbase_degn_t *fblarge; /* Pointer to the entries in fullfb with primes
   				 > fbL2bound */
-#if 0
-  factorbase_degn_t *fbfirstlog[256]; /* Pointers to the first entry in 
-                                         fullfb with plog == i */
-#endif
+  factorbase_degn_t *firstlog[256]; /* Pointers to the first entry in 
+                                       fullfb with plog == i */
   factorbase_small_t *fbsmall[SIEVE_BLOCKING_MAX];
   factorbase_small_inited_t *fbinit[SIEVE_BLOCKING_MAX];
   unsigned int fbsmallsize[SIEVE_BLOCKING_MAX];  /* Number of entries in small

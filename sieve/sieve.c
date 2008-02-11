@@ -1362,7 +1362,7 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 		   const unsigned long proj_divisor, 
 		   const unsigned int nr_proj_primes, 
 		   const fbprime_t *proj_primes,
-		   factorbase_degn_t *fullfb,
+		   factorbase_t fb,
 		   const sieve_reportbuffer_t *reports,
 		   size_t report_idx, 
 		   unsigned int *cof_toolarge, unsigned int *lp_toolarge,
@@ -1370,7 +1370,7 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 		   const double lambda, const double log_scale)
 {
   unsigned int k;
-  factorbase_degn_t *fbptr;
+  factorbase_degn_t *fullfb = fb->fullfb, *fbptr;
   size_t log2size;
   unsigned char sievelog, finallog;
   const double log_proj_divisor = log ((double) proj_divisor) * log_scale;
@@ -1565,9 +1565,20 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
       /* Skip forward to the factor base prime of the right size */
       TRACE_A (a, __func__, __LINE__, "skipping forward in fb to prime of "
 	       "log norm %hhu\n", missinglog);
+#if 0
       while (fbptr->p != 0 && 
 	     fbptr->plog < missinglog)
 	fbptr = fb_next (fbptr);
+      ASSERT (fbptr->p == 0 || fb->firstlog[missinglog] < fbptr || 
+	      fbptr == fb->firstlog[missinglog]);
+#else
+      /* This code is somewhat faster, more so for large factor bases */
+      if (fbptr->plog < missinglog &&
+	  fb->firstlog[missinglog] != NULL)
+	{
+	  fbptr = fb->firstlog[missinglog];
+	}
+#endif
       TRACE_A (a, __func__, __LINE__, "skipped forward in fb, next prime "
 	       "is " FBPRIME_FORMAT "\n", fbptr->p);
 #endif
@@ -1752,7 +1763,7 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 	      ok = trialdiv_one_side (Fab, scaled_poly_a, poly->degree, a, b, 
 				      primes_a, &nr_primes_a, max_nr_primes,
 				      proj_divisor_a, nr_proj_primes_a, 
-				      proj_primes_a, fba->fullfb, 
+				      proj_primes_a, fba, 
 				      reports_a, i,
 				      &cof_a_toolarge, &lp_a_toolarge, 
 				      poly->alim, poly->lpba, poly->mfba, 
@@ -1766,7 +1777,7 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 	      ok = trialdiv_one_side (Gab, scaled_poly_r, 1, a, b, 
 				      primes_r, &nr_primes_r, max_nr_primes,
 				      proj_divisor_r, nr_proj_primes_r, 
-				      proj_primes_r, fbr->fullfb, 
+				      proj_primes_r, fbr, 
 				      reports_r, j,
 				      &cof_r_toolarge, &lp_r_toolarge, 
 				      poly->rlim, poly->lpbr, poly->mfbr, 
@@ -2088,6 +2099,7 @@ main (int argc, char **argv)
       exit (EXIT_FAILURE);
     }
   fba->fblarge = fba->fullfb;
+  fb_init_firstlog (fba);
   /* Extract the small primes into their small prime arrays */
   for (i = 0; i < SIEVE_BLOCKING; i++)
     fb_extract_small (fba, CACHESIZES[i], i, verbose);
@@ -2103,6 +2115,7 @@ main (int argc, char **argv)
       exit (EXIT_FAILURE);
     }
   fbr->fblarge = fbr->fullfb;
+  fb_init_firstlog (fbr);
   /* Extract the small primes into their small prime arrays */
   for (i = 0; i < SIEVE_BLOCKING; i++)
     fb_extract_small (fbr, CACHESIZES[i], i, verbose);
