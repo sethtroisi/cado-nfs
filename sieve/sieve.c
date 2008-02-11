@@ -514,7 +514,7 @@ sieve (unsigned char *sievearray, factorbase_degn_t *fb,
 }
 
 
-static unsigned long
+static void
 find_sieve_reports (const unsigned char *sievearray, 
 		    sieve_reportbuffer_t *reports, 
                     const unsigned char threshold, 
@@ -1736,69 +1736,71 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
   for (i = 0, j = 0; i < reports_a->nr && j < reports_r->nr;)
     {
       if (reports_a->reports[i].a == reports_r->reports[j].a)
-	if (gcd_ul ((unsigned long) labs(reports_a->reports[i].a), b) > 1UL)
-	  {
-	    not_coprime++;
-	  }
-	else
 	{
-          const long a = reports_a->reports[i].a;
-
-	  matching_reports++;
-      
-          /* Do the algebraic side */
-	  nr_primes_a = 0;
-	  ok = trialdiv_one_side (Fab, scaled_poly_a, poly->degree, a, b, 
-				  primes_a, &nr_primes_a, max_nr_primes,
-				  proj_divisor_a, nr_proj_primes_a, 
-				  proj_primes_a, fba->fullfb, 
-				  reports_a, i,
-				  &cof_a_toolarge, &lp_a_toolarge, 
-				  poly->alim, poly->lpba, poly->mfba, 
-				  poly->alambda, log_scale);
-
-	  if (!ok) 
-	    goto nextreport;
-
-          /* Now the rational side */
-	  nr_primes_r = 0;
-	  ok = trialdiv_one_side (Gab, scaled_poly_r, 1, a, b, 
-				  primes_r, &nr_primes_r, max_nr_primes,
-				  proj_divisor_r, nr_proj_primes_r, 
-				  proj_primes_r, fbr->fullfb, 
-				  reports_r, j,
-				  &cof_r_toolarge, &lp_r_toolarge, 
-				  poly->rlim, poly->lpbr, poly->mfbr, 
-				  poly->rlambda, log_scale);
-
-	  if (!ok) 
-	    goto nextreport;
-
-	  /* Now print the relations */
-	  relations_found++;
-	  fb_sortprimes (primes_r, nr_primes_r);
-	  fb_sortprimes (primes_a, nr_primes_a);
-
-	  printf ("%ld,%lu:", a, b);
-	  for (k = 0; k < nr_primes_r; k++)
-	    printf ("%x%s", primes_r[k], k+1==nr_primes_r?"":",");
-	  printf (":");
-	  for (k = 0; k < nr_primes_a; k++)
-	    printf ("%x%s", primes_a[k], k+1==nr_primes_a?"":",");
-	  printf ("\n");
-	  fflush (stdout);
-
-	nextreport:
-	  /* Skip over duplicates that might cause relations to be
-	     trial divided/output repeatedly */
-	  while (i + 1 < reports_a->nr && 
-		 reports_a->reports[i].a == reports_a->reports[i + 1].a)
-	    i++;
-	  while (j + 1 < reports_r->nr && 
-		 reports_r->reports[j].a == reports_r->reports[j + 1].a)
-	    j++;
+	  if (gcd_ul ((unsigned long) labs(reports_a->reports[i].a), b) > 1UL)
+	    {
+	      not_coprime++;
+	    }
+	  else
+	    {
+	      const long a = reports_a->reports[i].a;
+	      
+	      matching_reports++;
+	      
+	      /* Do the algebraic side */
+	      nr_primes_a = 0;
+	      ok = trialdiv_one_side (Fab, scaled_poly_a, poly->degree, a, b, 
+				      primes_a, &nr_primes_a, max_nr_primes,
+				      proj_divisor_a, nr_proj_primes_a, 
+				      proj_primes_a, fba->fullfb, 
+				      reports_a, i,
+				      &cof_a_toolarge, &lp_a_toolarge, 
+				      poly->alim, poly->lpba, poly->mfba, 
+				      poly->alambda, log_scale);
+	      
+	      if (!ok) 
+		goto nextreport;
+	      
+	      /* Now the rational side */
+	      nr_primes_r = 0;
+	      ok = trialdiv_one_side (Gab, scaled_poly_r, 1, a, b, 
+				      primes_r, &nr_primes_r, max_nr_primes,
+				      proj_divisor_r, nr_proj_primes_r, 
+				      proj_primes_r, fbr->fullfb, 
+				      reports_r, j,
+				      &cof_r_toolarge, &lp_r_toolarge, 
+				      poly->rlim, poly->lpbr, poly->mfbr, 
+				      poly->rlambda, log_scale);
+	      
+	      if (!ok) 
+		goto nextreport;
+	      
+	      /* Now print the relations */
+	      relations_found++;
+	      fb_sortprimes (primes_r, nr_primes_r);
+	      fb_sortprimes (primes_a, nr_primes_a);
+	      
+	      printf ("%ld,%lu:", a, b);
+	      for (k = 0; k < nr_primes_r; k++)
+		printf ("%x%s", primes_r[k], k+1==nr_primes_r?"":",");
+	      printf (":");
+	      for (k = 0; k < nr_primes_a; k++)
+		printf ("%x%s", primes_a[k], k+1==nr_primes_a?"":",");
+	      printf ("\n");
+	      fflush (stdout);
+	      
+	    nextreport:
+	      /* Skip over duplicates that might cause relations to be
+		 trial divided/output repeatedly */
+	      while (i + 1 < reports_a->nr && 
+		     reports_a->reports[i].a == reports_a->reports[i + 1].a)
+		i++;
+	      while (j + 1 < reports_r->nr && 
+		     reports_r->reports[j].a == reports_r->reports[j + 1].a)
+		j++;
+	    }
 	}
-
+      
       /* Assumes values in reports_a are sorted, same for reports_r  */
       if (reports_a->reports[i].a < reports_r->reports[j].a)
 	i++;
