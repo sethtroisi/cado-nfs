@@ -12,6 +12,8 @@ makefb (FILE *fp, cado_poly cpoly)
   LONG *roots, r;
   int nroots, i, j;
 
+  check_polynomials (cpoly);
+
   fprintf (fp, "# Roots for polynomial ");
   fprint_polynomial (fp, cpoly->f, d);
 

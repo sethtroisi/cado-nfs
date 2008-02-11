@@ -2054,6 +2054,10 @@ main (int argc, char **argv)
       fprintf (stderr, "Error reading polynomial file\n");
       exit (EXIT_FAILURE);
     }
+
+  /* check that n divides Res(f,g) [might be useful to factor n...] */
+  check_polynomials (cpoly);
+
   if (verbose)
   {
       printf ("# Read polynomial file %s\n", polyfilename);

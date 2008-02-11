@@ -122,6 +122,9 @@ main(int argc, char *argv[])
         exit (EXIT_FAILURE);
       }
 
+    /* check that n divides Res(f,g) [might be useful to factor n...] */
+    check_polynomials (cpoly);
+
     if (mpz_cmp_ui (cpoly->g[1], 1) != 0)
       {
         fprintf (stderr, "Error, non-monic linear polynomial not yet treated");

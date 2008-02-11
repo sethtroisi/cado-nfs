@@ -293,6 +293,36 @@ void fprint_polynomial(FILE * fp, mpz_t * f, const int d)
     fprintf(fp, "\n");
 }
 
+/* check that n divides b^d*f(m/d), where g = b*x-m */
+void
+check_polynomials (cado_poly cpoly)
+{
+  mpz_t r, q;
+  int k;
+  int d = cpoly->degree;
+
+  mpz_init_set (r, cpoly->f[d]);
+  mpz_init_set_ui (q, 1);
+
+  for (k = d - 1; k >= 0; k--)
+    {
+      mpz_mul (q, q, cpoly->g[1]);
+      /* invariant: q = b^(d-k) */
+      mpz_mul (r, r, cpoly->g[0]);
+      mpz_neg (r, r);
+      mpz_addmul (r, q, cpoly->f[k]);
+    }
+
+  if (mpz_divisible_p (r, cpoly->n) == 0)
+    {
+      fprintf (stderr, "Error, n does does divide Res(f,g)\n");
+      exit (EXIT_FAILURE);
+    }
+
+  mpz_clear (r);
+  mpz_clear (q);
+}
+
 #undef PARSE_MATCH
 #undef PARSE_ERROR
 #undef PARSE_NOMATCH

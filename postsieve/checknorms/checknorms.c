@@ -124,6 +124,10 @@ int main(int argc, char *argv[]) {
         ERROR("Could not read polynomial file %s.\n", polyfilename);
         exit(EXIT_FAILURE);
     }
+
+    /* check that n divides Res(f,g) [might be useful to factor n...] */
+    check_polynomials (cpoly);
+
     //
     // Default residue bounds are those from the polynomial file, if not
     // overridden by command line parameters.

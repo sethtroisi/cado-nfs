@@ -34,6 +34,7 @@
 extern "C" {
 #endif
 
+/* file polyfile.c */
 // This reads a file created by polyselect and fill in the structure
 // accordingly. Return 1 if success, 0 if failure (and diagnostic on
 // stderr)
@@ -42,6 +43,7 @@ extern void fprint_polynomial (FILE *, mpz_t *, const int);
 void clear_polynomial (cado_poly);
 void cado_poly_init (cado_poly);
 void cado_poly_clear (cado_poly);
+void check_polynomials (cado_poly);
 
 // Relation I/O
 extern void copy_rel(relation_t *Rel, relation_t rel);
