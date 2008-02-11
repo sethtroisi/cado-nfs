@@ -9,6 +9,7 @@
 #include <ctype.h>
 #include <time.h>
 #include "cado.h"
+#include "sieve.h"
 #include "../utils/mod_ul.h"
 #include "fb.h"
 #include "sieve_aux.h"
@@ -81,7 +82,6 @@ TRACE_A (__attribute__ ((unused)) long a,
 }
 #endif
 
-#if 0
 /* Given an index i to the sieve array, an amin value and whether 
    only odd $a$ are in the sieve (odd=1) or not (odd=0),
    return the value of $a$ at sieve location i */
@@ -92,7 +92,6 @@ sieveidx_to_a (unsigned long i, long amin, int odd)
   ASSERT_EXPENSIVE (odd == 0 || (amin & 1) == 1);
   return amin + ((long)(i) << (odd));
 }
-#endif
 
 static unsigned long 
 a_to_sieveidx (long a, long amin, int odd)
@@ -376,6 +375,40 @@ compute_norms (unsigned char *sievearray, const long amin, const long amax,
 }
 
 
+/* Add a sieve report (a, p, l) to the report buffer *reports. 
+   If the buffer becomes full, this function reallocates for more space. */
+
+static void
+add_sieve_report (sieve_reportbuffer_t *reports, const long a, 
+		  const fbprime_t p, const unsigned char l)
+{
+  ASSERT (reports != NULL);
+  ASSERT (reports->alloc > (size_t) 0);
+  ASSERT (reports->nr <= reports->alloc);
+
+  if (reports->nr == reports->alloc)
+    {
+      /* List is full, need to reallocate. Double its size */
+      reports->alloc *= 2;
+      TRACE_A (a, __func__, __LINE__, "increasing report buffer size to %ld"
+	       "entries\n", (long) reports->alloc);
+#if 0
+      printf ("# Increasing reports buffer size to %ld entries\n", 
+	      (long) reports->alloc);
+#endif
+      reports->reports = (sieve_report_t *) 
+	realloc (reports->reports, reports->alloc * sizeof (sieve_report_t));
+      ASSERT_ALWAYS (reports->reports != NULL);
+    }
+
+  TRACE_A (a, __func__, __LINE__, "adding report, p = %" FBPRIME_FORMAT
+	   ", remaining log norm = %hhu\n", p, l);
+  reports->reports[reports->nr].a = a;
+  reports->reports[reports->nr].p = p;
+  reports->reports[reports->nr].l = l;
+  reports->nr++;
+}
+
 static void 
 sieve_small_slow (unsigned char *sievearray, factorbase_small_inited_t *fb,
 		  const unsigned int arraylen)
@@ -421,8 +454,8 @@ sieve_small_slow (unsigned char *sievearray, factorbase_small_inited_t *fb,
 void 
 sieve (unsigned char *sievearray, factorbase_degn_t *fb, 
        const long amin, const long amax, const unsigned long b, 
-       const unsigned char threshold, sieve_report_t *reports,
-       unsigned int reports_length, const int odd)
+       const unsigned char threshold, sieve_reportbuffer_t *reports,
+       const int odd)
 {
   /* The sievearray[0] entry corresponds to (amin, b), and
      sievearray[d] to (amin + d * (1 + odd), b) */
@@ -465,112 +498,93 @@ sieve (unsigned char *sievearray, factorbase_degn_t *fb,
 	      unsigned char k;
 	      k = sievearray[d] - plog;
 
-	      TRACE_A (amin + ((long)d << odd), __func__, __LINE__, 
+	      TRACE_A (sieveidx_to_a(d, amin, odd), __func__, __LINE__, 
 		       "new approx norm after sieving out " FBPRIME_FORMAT 
 		       " is %d\n", p, (int) k);
 
 	      sievearray[d] = k;
 	      if (add_error (k) <= threshold_with_error)
-		{
-		  if (reports_length > 0)
-		    {
-		      TRACE_A ((amin + ((long)d << odd)), __func__, __LINE__,
-			       "writing sieve report a = %ld, p = %u, l = %d\n",
-			       (amin + ((long)d << odd)), p, (int) k);
-		      
-		      reports->a = amin + ((long)d << odd);
-		      reports->p = p;
-		      reports->l = k;
-		      reports++;
-		      reports_length--;
-		    }
-		  else
-		    {
-		      TRACE_A ((amin + ((long)d << odd)), __func__, __LINE__,
-			       "Cannot writing sieve report a = %ld, p = %u, "
-			       "l = %d, report buffer full\n",
-			       (amin + ((long)d << odd)), p, (int) k);
-		    }
-		}
+		add_sieve_report (reports, sieveidx_to_a(d, amin, odd), p, k);
 	    }
         }
       
       /* Move on to the next factor base prime */
       fb = fb_next (fb);
     }
-
-  if (reports_length > 0)
-    reports->p = 0; /* Put end marker */
 }
 
 
 static unsigned long
-find_sieve_reports (const unsigned char *sievearray, sieve_report_t *reports, 
-                    const unsigned int reports_len, 
+find_sieve_reports (const unsigned char *sievearray, 
+		    sieve_reportbuffer_t *reports, 
                     const unsigned char threshold, 
                     const long amin, const unsigned long l, 
 		    const unsigned long b, const int odd,
-		    sieve_report_t *other_reports)
+		    sieve_reportbuffer_t *other_reports)
 {
-  unsigned long reports_nr, d;
+  unsigned long d;
   const unsigned char threshold_with_error = add_error (threshold);
+  size_t other_idx = 0;
   
   ASSERT (odd == 0 || odd == 1);
   ASSERT (!odd || (amin & 1) == 1);
   ASSERT (b > 0);
-
-  reports_nr = 0;
-  if (reports_nr == reports_len)
-    return reports_nr;
-
+  ASSERT (reports->nr <= reports->alloc);
+  ASSERT (other_reports == NULL || other_reports->nr <= other_reports->alloc);
+  
   for (d = 0; d < l; d++)
     {
       if (add_error(sievearray[d]) <= threshold_with_error)
 	{
-	  const long a = amin + ((long)d << odd);
+	  const long a = sieveidx_to_a (d, amin, odd);
 	  
+	  TRACE_A (a, __func__, __LINE__, "remaining log norm %hhu is small"
+		   "enough\n", sievearray[d]);
+
 	  /* Testing n%3==0 is quite fast, and eliminates useless reports */
 	  if (a % 3 == 0 && b % 3 == 0)
-	    continue;
+	    {
+	      TRACE_A (a, __func__, __LINE__, "both a and b are divisible "
+		       "by 3, not adding to report buffer\n");
+	      continue;
+	    }
 
 	  /* If other_reports was passed, store this report only if there
 	     is a matching report in other_reports */
 	  if (other_reports != NULL)
 	    {
-	      while (other_reports->p != 0 && other_reports->a < a)
-		other_reports++;
-	      if (other_reports->p != 0 && other_reports->a != a)
+	      while (other_idx < other_reports->nr && 
+		     other_reports->reports[other_idx].a < a)
+		{
+		  /* Test that reports in other_reports are sorted in order of
+		     increasing a value */
+		  ASSERT (other_idx == 0 || 
+			  other_reports->reports[other_idx - 1].a <=
+			  other_reports->reports[other_idx].a);
+	      
+		  other_idx++;
+		}
+	      if (other_idx == other_reports->nr || 
+		  other_reports->reports[other_idx].a != a)
 		{
 		  TRACE_A (a, __func__, __LINE__,
 			   "no matching report in other_reports\n");
-		  
 		  continue;
 		}
 	      else
 		{
 		  TRACE_A (a, __func__, __LINE__, 
-			   "matching report in other_reports\n");
+			   "found matching report in other_reports\n");
 		}
 	    }
 
-	  reports[reports_nr].a = a;
-	  reports[reports_nr].p = 1;
-	  reports[reports_nr].l = sievearray[d];
-	  reports_nr++;
 	  TRACE_A (a, __func__, __LINE__,
-		   "sieve report a = %ld, p = 1, l = %d added to list\n", 
+		   "sieve report a = %ld, p = 1, l = %d added to buffer\n", 
 		   a, (int) sievearray[d]);
 
-	  if (reports_nr == reports_len)
-	    {
-	      fprintf (stderr, "Warning: find_sieve_reports: reports list "
-		       "full at a = %ld\n", a);
-	      return reports_nr;
-	    }
+	  add_sieve_report (reports, a, (fbprime_t) 1, sievearray[d]);
 	}
     }
-  
-  return reports_nr;
 }
 
 
@@ -593,11 +607,11 @@ swap_reports (sieve_report_t *r1, sieve_report_t *r2)
 /* Sort sieve reports by increasing a value */
 
 static void 
-sort_sieve_reports (sieve_report_t *r, const unsigned long l)
+sort_sieve_reports_recurse (sieve_report_t *r, const size_t l)
 {
   long p; /* pivot element */
-  unsigned long b, h;
-  const unsigned long m = (l - 1) / 2; /* The midpoint */
+  size_t b, h;
+  const size_t m = (l - 1) / 2; /* The midpoint */
 
   if (l < 2)
     return;
@@ -628,7 +642,7 @@ sort_sieve_reports (sieve_report_t *r, const unsigned long l)
 
   while (b < h)
     {
-      while (r[b].a <= p && b <= h)
+      while (b <= h && r[b].a <= p)
 	b++;  /* r[i].a <= p for all 0 <= i < b */
       while (r[h].a > p)
 	h--;
@@ -661,8 +675,8 @@ sort_sieve_reports (sieve_report_t *r, const unsigned long l)
   }
 #endif
 
-  sort_sieve_reports (r, b);
-  sort_sieve_reports (r + h, l - h);
+  sort_sieve_reports_recurse (r, b);
+  sort_sieve_reports_recurse (r + h, l - h);
 
 #ifdef WANT_ASSERT
   {
@@ -675,6 +689,11 @@ sort_sieve_reports (sieve_report_t *r, const unsigned long l)
 #endif
 }
 
+static void
+sort_sieve_reports (sieve_reportbuffer_t *reports)
+{
+  sort_sieve_reports_recurse (reports->reports, reports->nr);
+}
 
 static void
 sieve_block (const int lvl, unsigned char *sievearray, 
@@ -703,16 +722,15 @@ sieve_block (const int lvl, unsigned char *sievearray,
 
 static unsigned long
 sieve_one_side (unsigned char *sievearray, factorbase_t fb,
-		sieve_report_t *reports, const unsigned int reports_length,
+		sieve_reportbuffer_t *reports, 
 		const unsigned char reports_threshold,
 		const long amin, const long amax, const unsigned long b,
 		const unsigned long proj_roots, const double log_scale,
 		const double *dpoly, const unsigned int deg, 
-		sieve_report_t *other_reports, const int verbose)
+		sieve_reportbuffer_t *other_reports, const int verbose)
 {
   clock_t tsc1, tsc2;
   long long times[SIEVE_BLOCKING];
-  unsigned long reports_nr = 0;
   int lvl;
   const int odd = 1 - (b & 1); /* If odd=1, only odd $a$ are sieved */
   const long eff_amin = amin + ((odd && (amin & 1) == 0) ? 1 : 0);
@@ -731,17 +749,15 @@ sieve_one_side (unsigned char *sievearray, factorbase_t fb,
 	 reports on the other side - we know this $a$ can never become
 	 a relation and we don't want it to produce unnecessary sieve
 	 reports */
-      long a = eff_amin;
-      int i;
-      for (i = 0; other_reports[i].p != 0; i++)
+      unsigned long startidx = 0, endidx;
+      size_t i;
+      for (i = 0; i < other_reports->nr; i++)
 	{
-	  unsigned long startidx, endidx;
-	  startidx = a_to_sieveidx (a, eff_amin, odd);
-	  endidx = a_to_sieveidx (other_reports[i].a, eff_amin, odd);
+	  endidx = a_to_sieveidx (other_reports->reports[i].a, eff_amin, odd);
 	  /* Set sievearray[startidx ... endidx - 1] to 0 */
 	  if (endidx > startidx)
 	    memset (sievearray + startidx, 255, endidx - startidx);
-	  a = other_reports[i].a + (1 << odd);
+	  startidx = endidx + 1;
 	}
     }
 
@@ -776,6 +792,10 @@ sieve_one_side (unsigned char *sievearray, factorbase_t fb,
 	    sievearray[(TRACE_RELATION_A - eff_amin) >> odd]);
 #endif
 
+
+  /* Set the report buffer to empty */
+  reports->nr = 0;
+
   /* If the factor base limit is very small compared to the 
      largest block length, we may get many relations that are 
      smooth over the small fb primes and will not produce sieve 
@@ -784,25 +804,21 @@ sieve_one_side (unsigned char *sievearray, factorbase_t fb,
   if (find_smallprime_reports)
     {
       tsc1 = clock ();
-      reports_nr +=
-	find_sieve_reports (sievearray, 
-			    reports + reports_nr, 
-			    reports_length - reports_nr, 
-			    reports_threshold, 
-			    eff_amin, l, b, odd, other_reports);
+      find_sieve_reports (sievearray, reports, reports_threshold, 
+			  eff_amin, l, b, odd, other_reports);
       tsc2 = clock ();
       if (verbose)
 	{
 	  printf ("# Finding sieve reports took %ld clocks\n", 
 		  (long int) (tsc2 - tsc1));
 	  printf ("# There were %lu sieve reports after sieving small "
-		  "primes\n", reports_nr);
+		  "primes\n", reports->nr);
 	}
     }
   
   tsc1 = clock ();
   sieve (sievearray, fb->fblarge, eff_amin, eff_amax, b, reports_threshold, 
-	 reports + reports_nr, reports_length - reports_nr, odd);
+	 reports, odd);
   tsc2 = clock ();
   if (verbose)
     printf ("# Sieving large fb primes took %ld clocks\n", 
@@ -810,16 +826,10 @@ sieve_one_side (unsigned char *sievearray, factorbase_t fb,
   
   fb_restore_roots (fb->fblarge, b, verbose);
   
-  /* Count the sieve reports and sort by increasing a */
-  for (reports_nr = 0; reports_nr < reports_length; reports_nr++)
-    {
-      if (reports[reports_nr].p == 0)
-	break;
-    }
-
-  sort_sieve_reports (reports, reports_nr);
+  /* Sort the sieve reports in order of increasing a value */
+  sort_sieve_reports (reports);
   
-  return reports_nr;
+  return reports->nr;
 }
 
 static inline void
@@ -1056,49 +1066,6 @@ trialdiv_with_norm4 (factorbase_degn_t *fbptr, const mpz_t norm,
 }
 
 
-/* Square root. Returns the largest integer x so that x^2 <= n.
-   If e != NULL, stores n - x^2 in *e. Should be compiled with 
-   -funroll-loops for best performance. */
-
-static inline unsigned long  
-ul_sqrtint (const unsigned long n, unsigned long *e)
-{
-  int i;   
-  unsigned long xs, c, d, s2;
-
-  d = n; /* d = n - x^2 */
-  xs = 0UL;
-  s2 = 1UL << (sizeof (unsigned long) * 8 - 2);
-
-  for (i = sizeof (unsigned long) * 4 - 1; i != 0; i--)
-    {
-      /* Here, s2 = 1 << (2*i) */
-      /* xs = x << (i + 1), the value of x shifted left i+1 bits */
-
-      c = xs + s2; /* c = (x + 2^i) ^ 2 - x^2 = 2^(i+1) * x + 2^(2*i) */
-      xs >>= 1; /* Now xs is shifted only i positions */
-      if (d >= c)
-        {
-          d -= c;
-          xs |= s2; /* x |= 1UL << i <=> xs |= 1UL << (2*i) */
-        }
-      s2 >>= 2;
-    }
-
-  c = xs + s2; 
-  xs >>= 1;
-  if (d >= c)
-    {
-      d -= c;   
-      xs |= s2;
-    }
- 
-  if (e != NULL)
-    *e = d;
-  return xs;
-}
-
-
 static unsigned long
 ul_rho (const unsigned long N, const unsigned long cparm)
 {
@@ -1277,7 +1244,7 @@ ul_proven_prime (unsigned long n)
   if (!modul_sprp (b, invn, m))
     goto end;
 
-  if (n < 2047)
+  if (n < 2047UL)
     {
       r = 1;
       goto end;
@@ -1374,8 +1341,8 @@ trialdiv_find_next (factorbase_degn_t *fbptr, const mpz_t norm)
 
 /* 1. Compute the norm
    2. Divide out primes with projective roots
-   3. Divide out the report prime(s), remembering the smallest one and remember
-      the smallest approximate log from the reports
+   3. Divide out the report prime(s), remembering the smallest one and 
+      remembering the smallest approximate log from the reports
    4. Trial divide up to the smallest report prime (or up to the factor base 
       limit if there was no report prime)
    5. Check if the cofactor is small enough
@@ -1396,9 +1363,9 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 		   const unsigned int nr_proj_primes, 
 		   const fbprime_t *proj_primes,
 		   factorbase_degn_t *fullfb,
-		   const sieve_report_t *reports,
-		   unsigned int *cof_toolarge,
-		   unsigned int *lp_toolarge,
+		   const sieve_reportbuffer_t *reports,
+		   size_t report_idx, 
+		   unsigned int *cof_toolarge, unsigned int *lp_toolarge,
 		   const unsigned long fbb, const int lpb, const int mfb, 
 		   const double lambda, const double log_scale)
 {
@@ -1408,7 +1375,7 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
   unsigned char sievelog, finallog;
   const double log_proj_divisor = log ((double) proj_divisor) * log_scale;
   double dpoly[MAXDEGREE + 1];
-  int nr_report_primes, r;
+  int r;
   fbprime_t p;
   const unsigned char MAX_SIEVELOG_ERROR = 1;
 
@@ -1450,36 +1417,34 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
   /* 3. Divide the report primes out of this norm and find the largest 
      approximate log */
   /* There must be at least one valid report */
-  ASSERT_ALWAYS (reports->a == a && reports->p != 0);
-  finallog = reports->l;
-  p = reports->p;
-  nr_report_primes = 0;
-  while (reports->a == a && reports->p != 0)
+  ASSERT_ALWAYS (report_idx < reports->nr);
+  ASSERT_ALWAYS (reports->reports[report_idx].a == a);
+  finallog = reports->reports[report_idx].l;
+  p = reports->reports[report_idx].p;
+  while (report_idx < reports->nr && reports->reports[report_idx].a == a)
     {
       /* We allow reports without a report prime. In that case the 
-	 sieve_report_t may contain p == 1. */
-      if (reports->p != (fbprime_t) 1)
+	 sieve_report_t contains p == 1. */
+      if (reports->reports[report_idx].p != (fbprime_t) 1)
 	{
-	  r = trialdiv_one_prime (reports->p, norm, nr_primes, 
-				  primes, max_nr_primes, 1);
+	  r = trialdiv_one_prime (reports->reports[report_idx].p, norm, 
+				  nr_primes, primes, max_nr_primes, 1);
 	  ASSERT_ALWAYS (r > 0); /* If a report prime is listed but does not
 				    divide the norm, there is a serious bug
 				    in the sieve code */
-	  nr_report_primes++;
-
 	  TRACE_A (a, __func__, __LINE__, "dividing out report prime " 
 		   FBPRIME_FORMAT "^%d. New norm = %Zd\n",
-		   reports->p, r, norm);
+		   reports->reports[report_idx].p, r, norm);
 	}
 
       /* Find the largest approximate log. */
-      if (add_error (reports->l) > add_error (finallog))
+      if (add_error (reports->reports[report_idx].l) > add_error (finallog))
 	{
-	  finallog = reports->l;
-	  p = reports->p;
+	  finallog = reports->reports[report_idx].l;
+	  p = reports->reports[report_idx].p;
 	}
       
-      reports++;
+      report_idx++;
     }
   /* If there was a report prime in the report with the largest log,
      add this prime's log (we want to reach the log the sieve had before
@@ -1714,13 +1679,12 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
   return 1;
 }
 
+
 /* return the number of printed relations */
 static unsigned int
 trialdiv_and_print (cado_poly poly, const unsigned long b, 
-                    const sieve_report_t *reports_a, 
-		    const unsigned int reports_a_nr, 
-		    const sieve_report_t *reports_r, 
-		    const unsigned int reports_r_nr, 
+                    const sieve_reportbuffer_t *reports_a, 
+		    const sieve_reportbuffer_t *reports_r, 
 		    factorbase_t fba, factorbase_t fbr, 
 		    const double log_scale, const int verbose)
 {
@@ -1734,7 +1698,7 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
   unsigned int nr_primes_a, nr_primes_r, nr_proj_primes_a, nr_proj_primes_r;
   unsigned int matching_reports = 0, relations_found = 0;
   unsigned int lp_a_toolarge = 0, lp_r_toolarge = 0, 
-    cof_a_toolarge = 0, cof_r_toolarge = 0;
+    cof_a_toolarge = 0, cof_r_toolarge = 0, not_coprime = 0;
   int ok;
 
   mpz_init (Fab);
@@ -1769,12 +1733,16 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
   sumprimes2 = nrprimes2 = 0;
   ul_rho_toolarge_nr = ul_rho_toolarge_sum = 0;
 
-  for (i = 0, j = 0; i < reports_a_nr && j < reports_r_nr;)
+  for (i = 0, j = 0; i < reports_a->nr && j < reports_r->nr;)
     {
-      if (reports_a[i].a == reports_r[j].a && 
-	  gcd((unsigned long) labs(reports_a[i].a), b) == 1UL)
+      if (reports_a->reports[i].a == reports_r->reports[j].a)
+	if (gcd_ul ((unsigned long) labs(reports_a->reports[i].a), b) > 1UL)
+	  {
+	    not_coprime++;
+	  }
+	else
 	{
-          const long a = reports_a[i].a;
+          const long a = reports_a->reports[i].a;
 
 	  matching_reports++;
       
@@ -1784,7 +1752,7 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 				  primes_a, &nr_primes_a, max_nr_primes,
 				  proj_divisor_a, nr_proj_primes_a, 
 				  proj_primes_a, fba->fullfb, 
-				  reports_a + i,
+				  reports_a, i,
 				  &cof_a_toolarge, &lp_a_toolarge, 
 				  poly->alim, poly->lpba, poly->mfba, 
 				  poly->alambda, log_scale);
@@ -1798,7 +1766,7 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 				  primes_r, &nr_primes_r, max_nr_primes,
 				  proj_divisor_r, nr_proj_primes_r, 
 				  proj_primes_r, fbr->fullfb, 
-				  reports_r + j,
+				  reports_r, j,
 				  &cof_r_toolarge, &lp_r_toolarge, 
 				  poly->rlim, poly->lpbr, poly->mfbr, 
 				  poly->rlambda, log_scale);
@@ -1823,14 +1791,16 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 	nextreport:
 	  /* Skip over duplicates that might cause relations to be
 	     trial divided/output repeatedly */
-	  while (i < reports_a_nr && reports_a[i].a == reports_a[i + 1].a)
+	  while (i + 1 < reports_a->nr && 
+		 reports_a->reports[i].a == reports_a->reports[i + 1].a)
 	    i++;
-	  while (j < reports_r_nr && reports_r[j].a == reports_r[j + 1].a)
+	  while (j + 1 < reports_r->nr && 
+		 reports_r->reports[j].a == reports_r->reports[j + 1].a)
 	    j++;
 	}
 
       /* Assumes values in reports_a are sorted, same for reports_r  */
-      if (reports_a[i].a < reports_r[j].a)
+      if (reports_a->reports[i].a < reports_r->reports[j].a)
 	i++;
       else
 	j++;
@@ -1838,7 +1808,10 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 
   if (verbose)
     {
-      printf ("# Number of matching reports: %u\n", matching_reports);
+      printf ("# Number of matching reports with a,b not coprime: %u\n",
+	      not_coprime);
+      printf ("# Number of matching reports with a,b coprime: %u\n", 
+	      matching_reports);
       printf ("# Number of relations found: %u\n", relations_found);
       printf ("# Sum and number of largest non-report fb primes: %lu, %lu, avg: %.0f\n",
 	      sumprimes, nrprimes, (double)sumprimes / (double)nrprimes);
@@ -1929,12 +1902,11 @@ main (int argc, char **argv)
 {
   long amin, amax;
   unsigned long bmin, bmax, b;
-  sieve_report_t *reports_a, *reports_r;
+  sieve_reportbuffer_t reports_a, reports_r;
   factorbase_t fba, fbr;
   char *fbfilename = NULL, *polyfilename = NULL;
   unsigned char *sievearray;
   unsigned int reports_a_len = 0, reports_r_len = 0;
-  unsigned int reports_a_nr, reports_r_nr;
   int verbose = 0;
   unsigned int deg;
   unsigned int i;
@@ -2177,29 +2149,40 @@ main (int argc, char **argv)
       fflush(stdout);
     }
   sievearray = (unsigned char *) malloc ((amax - amin + 1) * sizeof (char));
-  if (reports_a_len == 0) /* if not given on command line */
-    reports_a_len = ((amax - amin + 1)) / 5 + 1000;
-  if (reports_r_len == 0) /* if not given on command line */
-    reports_r_len = ((amax - amin + 1)) / 5 + 1000;
 
+  /* Allocate report buffers */
+
+  if (reports_a_len == 0) /* if not given on command line */
+    reports_a_len = ((amax - amin + 1)) / 256 + 1000;
   if (verbose)
     {
-      printf ("# Allocating %ld bytes for reports_a\n",
-	      reports_a_len * (long int) sizeof (sieve_report_t));
+      printf ("# Allocating %lu entries (%lu bytes) for reports_a\n",
+	      (unsigned long) reports_a_len, (unsigned long) 
+	      (reports_a_len * (long int) sizeof (sieve_report_t)));
       fflush(stdout);
     }
-  reports_a = (sieve_report_t *) malloc (reports_a_len * 
-					 sizeof (sieve_report_t));
-  ASSERT (reports_a != NULL);
+  reports_a.alloc = reports_a_len;
+  reports_a.nr = 0;
+  reports_a.reports = (sieve_report_t *) malloc (reports_a_len * 
+						 sizeof (sieve_report_t));
+  ASSERT_ALWAYS (reports_a.reports != NULL);
   if (verbose)
     {
-      printf ("# Allocating %ld bytes for reports_r\n",
-	      reports_r_len * (long int) sizeof (sieve_report_t));
+      printf ("# Allocating %lu entries (%lu bytes) for reports_r\n",
+	      (unsigned long) reports_r_len, 
+	      (unsigned long) (reports_r_len * sizeof (sieve_report_t)));
       fflush(stdout);
     }
-  reports_r = (sieve_report_t *) malloc (reports_r_len * 
-					 sizeof (sieve_report_t));
-  ASSERT (reports_r != NULL);
+
+  if (reports_r_len == 0) /* if not given on command line */
+    reports_r_len = ((amax - amin + 1)) / 256 + 1000;
+  reports_r.alloc = reports_r_len;
+  reports_r.nr = 0;
+  reports_r.reports = (sieve_report_t *) malloc (reports_r_len * 
+						 sizeof (sieve_report_t));
+  ASSERT_ALWAYS (reports_r.reports != NULL);
+
+  /* Do the sieving */
 
   sieve_time = seconds ();
   init_time = sieve_time - init_time;
@@ -2215,8 +2198,8 @@ main (int argc, char **argv)
 
       proj_roots = mpz_gcd_ui (NULL, cpoly->f[deg], b);
       if (verbose)
-	printf ("# Projective roots for b = %lu on algebtaic side are: %lu\n", 
-	        b, proj_roots);
+	printf ("# Primes with projective roots for b = %lu on algebtaic side "
+		"divide %lu\n", b, proj_roots);
 
       if (verbose)
 	  printf ("# Sieving algebraic side\n");
@@ -2225,21 +2208,19 @@ main (int argc, char **argv)
       mp_poly_print (cpoly->f, cpoly->degree, "P(a,b) = ", 1);
       printf (" /* PARI */\n");
 #endif
-
-      reports_a_nr = 
-	sieve_one_side (sievearray, fba,  
-			reports_a, reports_a_len, report_a_threshold, 
-			amin, amax, b, proj_roots, log_scale, 
-			dpoly_a, deg, NULL, verbose);
+      
+      sieve_one_side (sievearray, fba, &reports_a, report_a_threshold, 
+		      amin, amax, b, proj_roots, log_scale, 
+		      dpoly_a, deg, NULL, verbose);
 
       if (verbose)
-	printf ("# There were %d sieve reports on the algebraic side\n",
-		reports_a_nr);
+	printf ("# There were %lu sieve reports on the algebraic side\n",
+		(unsigned long) reports_a.nr);
 
       proj_roots = mpz_gcd_ui (NULL, cpoly->g[1], b);
       if (verbose)
-	printf ("# Projective roots for b = %lu on rational side are: %lu\n", 
-	        b, proj_roots);
+	printf ("# Primes with projective roots for b = %lu on rational side "
+		"divide %lu\n", b, proj_roots);
 
       if (verbose)
 	printf ("# Sieving rational side\n");
@@ -2249,27 +2230,16 @@ main (int argc, char **argv)
       printf (" /* PARI */\n");
 #endif
 
-      reports_r_nr = 
-	sieve_one_side (sievearray, fbr, 
-			reports_r, reports_r_len, report_r_threshold, 
-			amin, amax, b, proj_roots, log_scale, 
-			dpoly_r, 1, reports_a, verbose);
+      sieve_one_side (sievearray, fbr, &reports_r, report_r_threshold, 
+		      amin, amax, b, proj_roots, log_scale, 
+		      dpoly_r, 1, &reports_a, verbose);
       if (verbose)
-	printf ("# There were %d sieve reports on the rational side\n",
-		reports_r_nr);
-
-      if (reports_a_len == reports_a_nr)
-	  fprintf (stderr, "Warning: sieve reports list on algebraic side "
-		   "full with %u entries for b=%lu\n", reports_a_len, b);
-
-      if (reports_r_len == reports_r_nr)
-	  fprintf (stderr, "Warning: sieve reports list on rational side "
-		   "full with %u entries for b=%lu\n", reports_r_len, b);
+	printf ("# There were %lu sieve reports on the rational side\n",
+		(unsigned long) reports_r.nr);
 
       /* Not trial factor the candidate relations */
-      relations_found += trialdiv_and_print (cpoly, b, reports_a, reports_a_nr,
-                                             reports_r, reports_r_nr, fba, fbr,
-                                             log_scale, verbose);
+      relations_found += trialdiv_and_print (cpoly, b, &reports_a, &reports_r, 
+					     fba, fbr, log_scale, verbose);
     }
 
   sieve_time = seconds () - sieve_time;
@@ -2281,8 +2251,8 @@ main (int argc, char **argv)
   fb_clear (fba);
   fb_clear (fbr);
 
-  free (reports_a);
-  free (reports_r);
+  free (reports_a.reports);
+  free (reports_r.reports);
   free (sievearray);
 
   return 0;

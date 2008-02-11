@@ -636,7 +636,7 @@ fb_initloc_small (factorbase_small_inited_t *initfb,
       ASSERT (root < p);
       plog = smallfb->root_and_log >> 24;
 
-      if (gcd(p, b) == 1) /* FIXME: Speed up this gcd */
+      if (gcd_ul (p, b) == 1) /* FIXME: Speed up this gcd */
 	{
 	  amin_p = signed_mod_longto32 (amin, p);
 	  /* Replace low 24 bits by first sieve location */

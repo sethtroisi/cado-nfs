@@ -8,7 +8,7 @@
 #if 0
 /* Buggy ? */
 static inline unsigned long
-gcd (unsigned long a, unsigned long b)
+gcd_ul (unsigned long a, unsigned long b)
 {
   unsigned long t;
   uint32_t a32, b32, t32;
@@ -46,7 +46,7 @@ gcd (unsigned long a, unsigned long b)
 }
 #else
 static inline unsigned long
-gcd (unsigned long a, unsigned long b)
+gcd_ul (unsigned long a, unsigned long b)
 {
   unsigned long t;
 
@@ -99,3 +99,48 @@ signed_mod_longto32 (long a, uint32_t p)
 
   return amodp;
 }
+
+
+/* Square root. Returns the largest integer x so that x^2 <= n.
+   If e != NULL, stores n - x^2 in *e. Should be compiled with 
+   -funroll-loops for best performance. */
+
+static inline unsigned long  
+sqrtint_ul (const unsigned long n, unsigned long *e)
+{
+  int i;   
+  unsigned long xs, c, d, s2;
+
+  d = n; /* d = n - x^2 */
+  xs = 0UL;
+  s2 = 1UL << (sizeof (unsigned long) * 8 - 2);
+
+  for (i = sizeof (unsigned long) * 4 - 1; i != 0; i--)
+    {
+      /* Here, s2 = 1 << (2*i) */
+      /* xs = x << (i + 1), the value of x shifted left i+1 bits */
+
+      c = xs + s2; /* c = (x + 2^i) ^ 2 - x^2 = 2^(i+1) * x + 2^(2*i) */
+      xs >>= 1; /* Now xs is shifted only i positions */
+      if (d >= c)
+        {
+          d -= c;
+          xs |= s2; /* x |= 1UL << i <=> xs |= 1UL << (2*i) */
+        }
+      s2 >>= 2;
+    }
+
+  c = xs + s2; 
+  xs >>= 1;
+  if (d >= c)
+    {
+      d -= c;   
+      xs |= s2;
+    }
+ 
+  if (e != NULL)
+    *e = d;
+  return xs;
+}
+
+
