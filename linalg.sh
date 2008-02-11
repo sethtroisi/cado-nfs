@@ -10,7 +10,8 @@ mat=$name/small
 ker=$name/ker_raw
 
 # enabling multithreading
-mt=4 # default to 0???
+mt=0 # default to 0: no multi-threading
+     # note that mt=1 uses the multi-thread binary with one thread only
 
 if false ; then
    echo "Calling Gauss"
