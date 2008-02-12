@@ -30,8 +30,8 @@ hashpair: hashpair.c hashpair.h
 prune.o: prune.c prune.h
 	gcc -c $(CFLAGS) $(INC) $< -o $@
 
-freerel: freerel.c ../utils/libutils.a ../sieve/fb.o
-	gcc $(CFLAGS) $(INC) $< ../sieve/fb.o $(LDFLAGS) -o $@
+freerel: freerel.c ../utils/libutils.a ../sieve/fb.o hashpair.o
+	gcc $(CFLAGS) $(INC) $< ../sieve/fb.o hashpair.o $(LDFLAGS) -o $@
 
 duplicates: duplicates.c ../utils/libutils.a hashpair.o files.o
 	gcc $(CFLAGS) $(INC) $< hashpair.o files.o $(LDFLAGS) -o $@
