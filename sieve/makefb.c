@@ -23,7 +23,10 @@ makefb (FILE *fp, cado_poly cpoly)
 
   for (p = 2; p <= cpoly->alim; p = getprime (p))
     {
-      nroots = roots_mod_long (roots, cpoly->f, d, p);
+      if (long_poly_fits (d, p))
+        nroots = roots_mod_long (roots, cpoly->f, d, p);
+      else
+        nroots = modul_roots_mod_long (roots, cpoly->f, d, &p);
       /* normalize roots in [0, p-1] */
       for (i = 0; i < nroots; i++)
         if (roots[i] < 0)

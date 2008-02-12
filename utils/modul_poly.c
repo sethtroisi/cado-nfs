@@ -4,9 +4,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "utils.h"
-#include "mod_ul.h"
-
-
 
 #ifdef LONG
 #undef LONG
@@ -398,16 +395,6 @@ modul_poly_roots_mod (LONG *r, modul_poly_t f, modulus_t p)
 	n ++;
       }
   return n;
-}
-
-/* return the number of bits of p */
-int
-nbits (ULONG p)
-{
-  int k;
-
-  for (k = 0; p != 0; p >>= 1, k ++);
-  return k;
 }
 
 /* g <- (x+a)^e mod (fp, p), using auxiliary polynomial h */

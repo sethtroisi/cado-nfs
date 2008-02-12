@@ -2,6 +2,7 @@
 #define	CADO_UTILS_H_
 
 #include "cado.h"
+#include "mod_ul.h"
 #include <stdint.h>
 
 #define LONG int64_t
@@ -75,6 +76,10 @@ void long_poly_init (long_poly_t f, int d);
 void long_poly_clear (long_poly_t f);
 int long_poly_set_mod (long_poly_t fp, mpz_t *f, int d, LONG p);
 int isirreducible_mod_long(long_poly_t fp, const LONG p);
+int long_poly_fits (unsigned int, long);
+
+/* modul_poly */
+int modul_roots_mod_long (unsigned long*, mpz_t*, int, modulus_t);
 
 /* getprime */
 extern unsigned long getprime (unsigned long);

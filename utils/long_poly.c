@@ -21,9 +21,9 @@
 #include <limits.h>
 #include "utils.h"
 
-/* check (p-1)+d*(p-1)^2 fits in a long */
-static int
-check_bound (unsigned int d, long p)
+/* return non-zero if (p-1)+d*(p-1)^2 fits in a long */
+int
+long_poly_fits (unsigned int d, long p)
 {
   long max;
 
@@ -643,7 +643,7 @@ roots_mod_long (LONG *r, mpz_t *f, int d, const LONG p)
   long_poly_t fp, g, h;
   int df, n;
 
-  if (check_bound (d, p) == 0)
+  if (long_poly_fits (d, p) == 0)
     {
       fprintf (stderr, "Error, (p-1)+deg(f)(p-1)^2 does not fits in a long\n");
       exit (EXIT_FAILURE);
