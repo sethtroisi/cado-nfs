@@ -1,0 +1,27 @@
+#!/bin/sh -
+# shell-script to automate the (re)factorization of reference numbers
+# Usage: factor_from_rels name <parameters>
+
+# update if necessary, or better autoselect directory from site (LORIA/LIX)
+d=/local/fleur/cado/Examples
+tmp=/localdisk/tmp
+
+name=$1
+
+# default parameters
+prune=1.0; maxlevel=6; cwmax=10; rwmax=100
+
+if [ $# -ge 2 ]; then prune=$2; fi
+if [ $# -ge 3 ]; then maxlevel=$3; fi
+if [ $# -ge 4 ]; then cwmax=$4; fi
+if [ $# -ge 5 ]; then rwmax=$5; fi
+
+/bin/rm -fr $tmp/$name.*
+cp $d/$name/$name.poly $tmp
+sieve/makefb -poly $tmp/$name.poly > $tmp/$name.roots
+./linalg/freerel -poly $tmp/$name.poly -fb $tmp/$name.roots > $tmp/$name.rels
+postsieve/checknorms/checknorms -poly $tmp/$name.poly $d/$name/$name.rels \
+   >> $tmp/$name.rels
+./merge_linalg_sqrt.sh $tmp/$name $prune $maxlevel $cwmax $rwmax
+/bin/rm -fr $tmp/$name.*
+
