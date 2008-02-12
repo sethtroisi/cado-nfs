@@ -125,21 +125,25 @@ scan_relations(FILE *file, int *nprimes_alg, hashtable_t *H)
 }
 
 void
-largeFreeRelations(cado_poly pol, char *relsname)
+largeFreeRelations(cado_poly pol, char **fic, int nfic)
 {
-    FILE *fic = fopen(relsname, "r");
+    FILE *file;
     hashtable_t H;
-    int Hsizea, nprimes_alg = 0, nfree = 0;
+    int Hsizea, nprimes_alg = 0, nfree = 0, i;
 
     ASSERT(fic != NULL);
     Hsizea = (1<<pol[0].lpba)/((int)(pol[0].lpba * log(2.0)));
     hashInit(&H, Hsizea);
     fprintf(stderr, "Scanning relations\n");
-    scan_relations(fic, &nprimes_alg, &H);
+    for(i = 0; i < nfic; i++){
+	fprintf(stderr, "Adding file %s\n", fic[i]);
+	file = fopen(fic[i], "r");
+	scan_relations(file, &nprimes_alg, &H);
+	fclose(file);
+    }
     fprintf(stderr, "nprimes_alg = %d\n", nprimes_alg);
     nfree = findFreeRelations(&H, pol, nprimes_alg);
     fprintf(stderr, "Found %d usable free relations\n", nfree);
-    fclose(fic);
 }
 
 int
@@ -205,13 +209,6 @@ addFreeRelations(char *roots, int deg)
 }
 
 static void
-usage (char *argv0)
-{
-  fprintf (stderr, "Usage: %s -poly xxx.poly -fb xxx.roots\n", argv0);
-  exit (1);
-}
-
-void
 smallFreeRelations(char *fbfilename)
 {
     int deg;
@@ -222,12 +219,21 @@ smallFreeRelations(char *fbfilename)
     addFreeRelations (fbfilename, deg);
 }
 
+static void
+usage (char *argv0)
+{
+  fprintf (stderr, "Usage: %s -poly xxx.poly [-fb xxx.roots]", argv0);
+  fprintf (stderr, " [xxx.rels1 xxx.rels2 ... xxx.relsk]\n");
+  exit (1);
+}
+
 int
 main(int argc, char *argv[])
 {
-    char *fbfilename = NULL, *polyfilename = NULL, *relsname = NULL;
+    char *fbfilename = NULL, *polyfilename = NULL, **fic;
     char *argv0 = argv[0];
     cado_poly cpoly;
+    int nfic = 0;
 
     while (argc > 1 && argv[1][0] == '-')
       {
@@ -243,18 +249,14 @@ main(int argc, char *argv[])
             argc -= 2;
             argv += 2;
           }
-        else if (argc > 2 && strcmp (argv[1], "-rels") == 0)
-          {
-	    relsname = argv[2];
-            argc -= 2;
-            argv += 2;
-          }
         else
           usage (argv0);
       }
 
-    if (argc != 1 || polyfilename == NULL || 
-	((fbfilename == NULL) && (relsname == NULL)))
+    fic = argv+1;
+    nfic = argc-1;
+
+    if (polyfilename == NULL || ((fbfilename == NULL) && (nfic == 0)))
       usage (argv0);
 
     if (!read_polynomial (cpoly, polyfilename))
@@ -275,10 +277,10 @@ main(int argc, char *argv[])
       }
 #endif
 
-    if(relsname == NULL)
+    if(nfic == 0)
 	smallFreeRelations(fbfilename);
     else
-	largeFreeRelations(cpoly, relsname);
+	largeFreeRelations(cpoly, fic, nfic);
 
     clear_polynomial (cpoly);
 
