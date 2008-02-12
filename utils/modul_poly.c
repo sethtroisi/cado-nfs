@@ -78,46 +78,6 @@ modul_poly_realloc (modul_poly_t f, int n)
     }
 }
 
-#if 0
-/* return 1/s mod t */
-LONG
-invert_si (LONG s, LONG t)
-{
-  LONG u1, v1, q;
-  LONG u2, v2;
-
-  assert (t > 0);
- 
-  u1 = 1;
-  v1 = 0;
-  u2 = (s > 0) ? s : -s;
-  v2 = t;
-
-  while (v2 != 0)
-    {
-      /* unroll twice and swap u/v */
-      q = u2 / v2;
-      u1 = u1 - q * v1;
-      u2 = u2 - q * v2;
-      
-      if (u2 == 0)
-	{
-	  u1 = v1;
-	  break;
-	}
-
-      q = v2 / u2;
-      v1 = v1 - q * u1;
-      v2 = v2 - q * u2;
-    }
- 
-  if (u1 < 0)
-    u1 = u1 - t * (-u1 / t - 1);
-  
-  return (s > 0) ? u1 : t-u1;
-}
-#endif
-
 /* f <- g */
 void
 modul_poly_set (modul_poly_t f, const modul_poly_t g)
@@ -262,22 +222,6 @@ modul_poly_normalize (modul_poly_t h)
     dh --;
   h->degree = dh;
 }
-
-#if 0
-/* g <- h mod p */
-void
-modul_poly_mod_ui (modul_poly_t g, const modul_poly_t h, LONG p)
-{
-  int i;
-  int dh = h->degree;
-
-  modul_poly_realloc (g, dh + 1);
-  for (i = 0; i <= dh; i++)
-    g->coeff[i] = h->coeff[i] % p;
-  g->degree = dh;
-  modul_poly_normalize (g);
-}
-#endif
 
 /* h <- (x+a)*h mod p */
 void
@@ -607,7 +551,7 @@ modul_roots_mod_long (LONG *r, mpz_t *f, int d, modulus_t p)
 
   modul_poly_init (fp, d);
   d = modul_poly_set_mod (fp, f, d, p);
-  /* d is the degree of fp (-1 if fp=0) */
+   /* d is the degree of fp (-1 if fp=0) */
 
   if (d == 0)
     {
