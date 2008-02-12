@@ -49,8 +49,7 @@ extern "C" {
 #endif
 
 #if __TIMING__
-    #include <time.h>
-
+    #include "stopwatch.h"
        /**
         * \def TIMING_FORMAT
         * Format used to print timing measurements.
@@ -68,22 +67,17 @@ extern "C" {
         *
         * This warning holds for all of the <tt>*_NAMED_TIMER</tt> macros.
         */
-    #define INIT_NAMED_TIMER(NAME)                           \
-        clock_t __TIFA_START_TIME__ ##NAME = (clock_t) 0.0;  \
-        clock_t __TIFA_STOP_TIME__ ##NAME  = (clock_t) 0.0;  \
-        double  __TIFA_ELAPSED__ ##NAME    = 0.0;            \
-        int     __TIFA_RUNNING__ ##NAME    = 0;
+    #define INIT_NAMED_TIMER(NAME)                  \
+        stopwatch_t __TIFA_STOPWATCH_ ##NAME;       \
+        init_stopwatch(&__TIFA_STOPWATCH_ ##NAME);
 
        /**
         * \def RESET_NAMED_TIMER(NAME)
         * Reset the timer named NAME to zero.
         */
-    #define RESET_NAMED_TIMER(NAME)                    \
-        do {                                           \
-            __TIFA_ELAPSED__ ##NAME = 0.0;             \
-            if (__TIFA_RUNNING__ ##NAME != 0) {        \
-                __TIFA_START_TIME__ ##NAME = clock();  \
-            }                                          \
+    #define RESET_NAMED_TIMER(NAME)                     \
+        do {                                            \
+            reset_stopwatch(&__TIFA_STOPWATCH_ ##NAME); \
         } while (0)
 
        /**
@@ -92,19 +86,16 @@ extern "C" {
         *
         * \note Consecutive "calls" to START_NAMED_TIMER are without effect.
         */
-    #define START_NAMED_TIMER(NAME)                    \
-        do {                                           \
-            if (__TIFA_RUNNING__ ##NAME == 0) {        \
-                __TIFA_START_TIME__ ##NAME = clock();  \
-                __TIFA_RUNNING__ ##NAME    = 1;        \
-            }                                          \
+    #define START_NAMED_TIMER(NAME)                     \
+        do {                                            \
+            start_stopwatch(&__TIFA_STOPWATCH_ ##NAME); \
         } while (0)
 
        /**
         * \def STOP_NAMED_TIMER(NAME)
         * Stop the timer named NAME. Successive "calls" to START_NAMED_TIMER
         * and STOP_NAMED_TIMER are cumulative. In other words, the timer's state
-        * hold the time elapsed during all previous time intervals defined by
+        * holds the time elapsed during all previous time intervals defined by
         * a "call" to START_NAMED_TIMER followed by a "call" to
         * STOP_NAMED_TIMER (provided that the timer was not reset via
         * RESET_NAMED_TIMER).
@@ -112,14 +103,9 @@ extern "C" {
         * \note Consecutive "calls" to STOP_NAMED_TIMER are without side
         * effects.
         */
-    #define STOP_NAMED_TIMER(NAME)                                            \
-        do {                                                                  \
-          if (__TIFA_RUNNING__ ##NAME != 0) {                                 \
-            __TIFA_STOP_TIME__ ##NAME = clock();                              \
-            __TIFA_ELAPSED__ ##NAME  += (double)(__TIFA_STOP_TIME__ ##NAME);  \
-            __TIFA_ELAPSED__ ##NAME  -= (double)(__TIFA_START_TIME__ ##NAME); \
-            __TIFA_RUNNING__ ##NAME   = 0;                                    \
-          }                                                                   \
+    #define STOP_NAMED_TIMER(NAME)                      \
+        do {                                            \
+            stop_stopwatch(&__TIFA_STOPWATCH_ ##NAME);  \
         } while (0)
 
        /**
@@ -129,8 +115,9 @@ extern "C" {
         * \warning The returned result is only meaningful if the timer is
         * not running (i.e. it has been stopped via STOP_NAMED_TIMER).
         */
-    #define GET_NAMED_TIMING(NAME) (__TIFA_ELAPSED__ ##NAME / CLOCKS_PER_SEC)
-
+    #define GET_NAMED_TIMING(NAME)                          \
+        get_stopwatch_elapsed(&__TIFA_STOPWATCH_ ##NAME)
+        
        /**
         * \def INIT_TIMER
         * Initialize an unamed timer.
