@@ -1,14 +1,43 @@
 /* Arithmetic on polynomials over Z/pZ, with coefficients represented by
    the 'long' type.
+
    Since products are performed with the '*' operator, and several products
    are accumulated before a reduction by '% p', p should be at most half the
    size of the 'long' type.
-   FIXME: get a precise bound on p.
+
+   Assumes that (p-1)+deg(f)*(p-1)^2 fits in a long [for long_poly_div_r],
+   where f is the algebraic polynomial. This gives the following bounds:
+
+   deg(f)      32-bit machine      64-bit machine
+     2         p <= 32749          p <= 2147483647
+     3         p <= 26737          p <= 1753413037
+     4         p <= 23167          p <= 1518500213
+     5         p <= 20719          p <= 1358187913
+     6         p <= 18917          p <= 1239850223
 */
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
 #include "utils.h"
+
+/* check (p-1)+d*(p-1)^2 fits in a long */
+static int
+check_bound (unsigned int d, long p)
+{
+  long max;
+
+  max = LONG_MAX - (p - 1); /* > 0 since p <= LONG_MAX */
+
+  /* computes floor(max/d) */
+  max = max / d;
+  
+  if (max < p - 1)
+    return 0;
+  
+  max = max / (p - 1);
+  return (max >= p - 1);
+}
 
 /* allocate an array of d coefficients, and initialize it */
 static LONG*
@@ -57,7 +86,7 @@ long_poly_clear (long_poly_t f)
 }
 
 /* realloc f to (at least) n coefficients */
-void
+static void
 long_poly_realloc (long_poly_t f, int n)
 {
   if (f->alloc < n)
@@ -67,8 +96,10 @@ long_poly_realloc (long_poly_t f, int n)
     }
 }
 
-/* return 1/s mod t */
-LONG
+/* Return 1/s mod t.
+   Assumes t > 0, |s| < t, and gcd(s,t) = 1.
+ */
+static LONG
 invert_si (LONG s, LONG t)
 {
   LONG u1, v1, q;
@@ -81,8 +112,14 @@ invert_si (LONG s, LONG t)
   u2 = (s > 0) ? s : -s;
   v2 = t;
 
+  /* invariant: u2 = u1*s (mod t)
+                v2 = v1*s (mod t) */
+
   while (v2 != 0)
     {
+      /* (u2,v2) are elements of the remainder sequence starting from
+         |s|, thus remain nonnegative and in the interval 0..t */
+
       /* unroll twice and swap u/v */
       q = u2 / v2;
       u1 = u1 - q * v1;
@@ -98,15 +135,17 @@ invert_si (LONG s, LONG t)
       v1 = v1 - q * u1;
       v2 = v2 - q * u2;
     }
- 
+
+  /* now u2 = 1 = u1*s + w1*t with |u1| < t */
+
   if (u1 < 0)
-    u1 = u1 - t * (-u1 / t - 1);
+    u1 = u1 + t;
   
-  return (s > 0) ? u1 : t-u1;
+  return (s > 0) ? u1 : t - u1; /* since u1 <> 0, 0 < t - u1 < t */
 }
 
 /* f <- g */
-void
+static void
 long_poly_set (long_poly_t f, const long_poly_t g)
 {
   int i, d = g->degree;
@@ -117,8 +156,11 @@ long_poly_set (long_poly_t f, const long_poly_t g)
     f->coeff[i] = g->coeff[i];
 }
 
-/* f <- f/lc(f) mod p */
-void
+/* f <- f/lc(f) mod p.
+   Assumes the coefficients of f are in [-p+1, p-1].
+   Requires that (p-1)^2 fits in a long.
+ */
+static void
 long_poly_make_monic (long_poly_t f, LONG p)
 {
   int d = f->degree, i;
@@ -146,14 +188,14 @@ long_poly_set_mod (long_poly_t fp, mpz_t *f, int d, LONG p)
   long_poly_realloc (fp, d + 1);
   fp->degree = d;
   for (i = 0; i <= d; i++)
-    fp->coeff[i] = mpz_fdiv_ui (f[i], p);
+    fp->coeff[i] = mpz_fdiv_ui (f[i], p); /* 0 <= c[i] < p */
   long_poly_make_monic (fp, p);
 
   return d;
 }
 
 /* f <- a*x+b, a <> 0 */
-void
+static void
 long_poly_set_linear (long_poly_t f, LONG a, LONG b)
 {
   long_poly_realloc (f, 2);
@@ -163,7 +205,7 @@ long_poly_set_linear (long_poly_t f, LONG a, LONG b)
 }
 
 /* swap f and g */
-void
+static void
 long_poly_swap (long_poly_t f, long_poly_t g)
 {
   int i;
@@ -180,31 +222,38 @@ long_poly_swap (long_poly_t f, long_poly_t g)
   g->coeff = t;
 }
 
-/* h <- f*g mod p */
-void
-long_poly_mul(long_poly_t h, const long_poly_t f, const long_poly_t g, LONG p) {
+/* h <- f*g mod p
+   Assumes the coefficients of f and g are in [-p+1, p-1].
+   Work properly if min(deg(f), deg(g))*(p-1)^2 fits in a long.
+ */
+static void
+long_poly_mul (long_poly_t h, const long_poly_t f, const long_poly_t g, LONG p)
+{
   int df = f->degree;
   int dg = g->degree;
   int i, j;
   long_poly_t res;
 
-  long_poly_init(res, df+dg);
-  for (i = 0; i <= df+dg; ++i)
+  long_poly_init (res, df + dg);
+  for (i = 0; i <= df + dg; ++i)
     res->coeff[i] = 0;
   for (i = 0; i <= df; ++i)
     for (j = 0; j <= dg; ++j)
-      res->coeff[i+j] += f->coeff[i]*g->coeff[j];
+      res->coeff[i+j] += f->coeff[i] * g->coeff[j];
   /* reduce mod p */
-  for (i = 0; i <= df+dg; i++)
+  for (i = 0; i <= df + dg; i++)
     res->coeff[i] %= p;
-  res->degree=df+dg;
-  long_poly_set(h, res);
-  long_poly_clear(res);
+  res->degree = df + dg;
+  long_poly_set (h, res);
+  long_poly_clear (res);
 }
 
 
-/* h <- g^2 mod p, g and h must differ */
-void
+/* h <- g^2 mod p, g and h must differ.
+   Assumes the coefficients of g are in [-p+1, p-1].
+   Assumes deg(g)*(p-1)^2 fits in a long.
+ */
+static void
 long_poly_sqr (long_poly_t h, const long_poly_t g, LONG p)
 {
   int i, j, dg = g->degree;
@@ -249,7 +298,7 @@ long_poly_normalize (long_poly_t h)
 }
 
 /* g <- h mod p */
-void
+static void
 long_poly_mod_ui (long_poly_t g, const long_poly_t h, LONG p)
 {
   int i;
@@ -262,8 +311,10 @@ long_poly_mod_ui (long_poly_t g, const long_poly_t h, LONG p)
   long_poly_normalize (g);
 }
 
-/* h <- (x+a)*h mod p */
-void
+/* h <- (x+a)*h mod p with 0 <= a < p.
+   Requires that p*(p-1) fits in a long.
+ */
+static void
 long_poly_mul_x (long_poly_t h, LONG a, LONG p)
 {
   int i, d = h->degree;
@@ -279,7 +330,7 @@ long_poly_mul_x (long_poly_t h, LONG a, LONG p)
 }
 
 /* h <- g - x mod p */
-void
+static void
 long_poly_sub_x (long_poly_t h, const long_poly_t g, LONG p)
 {
   int i, d = g->degree;
@@ -297,7 +348,7 @@ long_poly_sub_x (long_poly_t h, const long_poly_t g, LONG p)
 }
 
 /* h <- g - 1 mod p */
-void
+static void
 long_poly_sub_1 (long_poly_t h, const long_poly_t g, LONG p)
 {
   int i, d = g->degree;
@@ -313,8 +364,10 @@ long_poly_sub_1 (long_poly_t h, const long_poly_t g, LONG p)
   long_poly_normalize (h);
 }
 
-/* h <- rem(h, f) mod p, f not necessarily monic */
-void
+/* h <- rem(h, f) mod p, f not necessarily monic.
+   Requires that (p-1)+deg(f)*(p-1)^2 fits in a long.
+*/
+static void
 long_poly_div_r (long_poly_t h, const long_poly_t f, LONG p)
 {
   int i, d = f->degree, dh = h->degree, monic;
@@ -330,7 +383,6 @@ long_poly_div_r (long_poly_t h, const long_poly_t f, LONG p)
 	hc[dh] = (hc[dh] * t) % p;
       for (i = 0; i < d; i++)
 	hc[dh - d + i] -= hc[dh] * f->coeff[i];
-      h->degree = dh - 1;
       /* it is not necessary to reduce h[j] mod p here for j < dh */
       do
 	{
@@ -339,14 +391,14 @@ long_poly_div_r (long_poly_t h, const long_poly_t f, LONG p)
 	    hc[dh] = hc[dh] % p;
 	}
       while (dh >= 0 && hc[dh] == 0);
-      h->degree = dh;
     }
+  h->degree = dh;
   /* reduce mod p */
   long_poly_mod_ui (h, h, p);
 }
 
 /* q <- divexact(h, f) mod p, f not necessarily monic. Clobbers h. */
-void
+static void
 long_poly_divexact (long_poly_t q, long_poly_t h, const long_poly_t f, LONG p)
 {
   int i, d = f->degree, dh = h->degree, monic;
@@ -376,23 +428,23 @@ long_poly_divexact (long_poly_t q, long_poly_t h, const long_poly_t f, LONG p)
       if (dh >= 0)
 	hc[dh] = hc[dh] % p;
     }
-  long_poly_normalize (q);
+  /* no need to normalize q, since deg(q) = deg(h) - deg(f) */
 }
 
 /* fp <- gcd (fp, g), clobbers g */
-void
+static void
 long_poly_gcd (long_poly_t fp, long_poly_t g, ULONG p)
 {
   while (g->degree >= 0)
     {
       long_poly_div_r (fp, g, p);
-      long_poly_mod_ui (fp, fp, p);
       /* now deg(fp) < deg(g): swap f and g */
       long_poly_swap (fp, g);
     }
 }
 
-void
+#if 0
+static void
 long_poly_out (FILE *fp, long_poly_t f)
 {
   if (f->degree < 0)
@@ -408,9 +460,10 @@ long_poly_out (FILE *fp, long_poly_t f)
       fprintf (fp, ";\n");
     }
 }
+#endif
 
 /* returns f(x) mod p */
-LONG
+static LONG
 long_poly_eval (long_poly_t f, LONG x, LONG p)
 {
   int i, d = f->degree;
@@ -425,7 +478,7 @@ long_poly_eval (long_poly_t f, LONG x, LONG p)
 
 /* Return the number n of roots of f mod p using a naive algorithm.
    If r is not NULL, put the roots in r[0], ..., r[n-1]. */
-int
+static int
 long_poly_roots_mod (LONG *r, long_poly_t f, const LONG p)
 {
   int n = 0;
@@ -451,8 +504,10 @@ nbits (ULONG p)
   return k;
 }
 
-/* g <- (x+a)^e mod (fp, p), using auxiliary polynomial h */
-void
+/* g <- (x+a)^e mod (fp, p), using auxiliary polynomial h.
+   Assumes 0 <= a < p.
+ */
+static void
 long_poly_powmod_ui (long_poly_t g, long_poly_t fp, long_poly_t h, LONG a,
 		     LONG e, LONG p)
 {
@@ -471,12 +526,15 @@ long_poly_powmod_ui (long_poly_t g, long_poly_t fp, long_poly_t h, LONG a,
         long_poly_mul_x (h, a, p);            /* h <- x*h */
 
       long_poly_div_r (h, fp, p);       /* h -> rem(h, fp) */
-      long_poly_mod_ui (g, h, p);       /* g <- h mod p */
+      long_poly_swap (g, h);            /* h is already reduced mod p */
     }
 }
 
-/* g <- g^e mod (fp, p), using auxiliary polynomial h */
-void
+/* g <- g^e mod (fp, p), using auxiliary polynomial h
+   Assumes deg(g) < deg(fp) on input.
+   Assumes (p-1)+deg(fp)*(p-1)^2 fits in a long [for long_poly_div_r].
+ */
+static void
 long_poly_general_powmod_ui (long_poly_t g, long_poly_t fp, long_poly_t h,
 		     LONG e, LONG p)
 {
@@ -493,11 +551,10 @@ long_poly_general_powmod_ui (long_poly_t g, long_poly_t fp, long_poly_t h,
     {
       long_poly_sqr (h, g, p);             /* h <- g^2 */
       long_poly_div_r (h, fp, p);       /* h -> rem(h, fp) */
-      long_poly_mod_ui (g, h, p);       /* g <- h mod p */
       if (e & (1L << k))
         long_poly_mul (h, h, g_sav, p);            /* h <- g_sav*h */
       long_poly_div_r (h, fp, p);       /* h -> rem(h, fp) */
-      long_poly_mod_ui (g, h, p);       /* g <- h mod p */
+      long_poly_swap (g, h);            /* h is already reduced mod p */
     }
   long_poly_clear(g_sav);
 }
@@ -506,7 +563,7 @@ long_poly_general_powmod_ui (long_poly_t g, long_poly_t fp, long_poly_t h,
    Return number of roots found (should be degree of f).
    Assumes p is odd, and deg(f) >= 1.
 */
-int
+static int
 long_poly_cantor_zassenhaus (LONG *r, long_poly_t f, LONG p, int depth)
 {
   LONG a;
@@ -585,6 +642,12 @@ roots_mod_long (LONG *r, mpz_t *f, int d, const LONG p)
 {
   long_poly_t fp, g, h;
   int df, n;
+
+  if (check_bound (d, p) == 0)
+    {
+      fprintf (stderr, "Error, (p-1)+deg(f)(p-1)^2 does not fits in a long\n");
+      exit (EXIT_FAILURE);
+    }
 
   /* the number of roots is the degree of gcd(x^p-x,f) */
 
