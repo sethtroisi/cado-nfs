@@ -18,6 +18,8 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
+#include <sys/time.h>     /* for getrusage */
+#include <sys/resource.h> /* for getrusage */
 
 #include "cado.h"   // For cado_poly type
 #include "utils.h"  // For read_polynomial(...)

@@ -33,6 +33,9 @@
 #include <string.h>
 #include <ctype.h>
 #include <math.h>
+#include <sys/time.h>     /* for getrusage */
+#include <sys/resource.h> /* for getrusage */
+
 #include "cado.h"
 #include "utils.h"
 #include "tifa.h"
