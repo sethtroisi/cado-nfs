@@ -360,7 +360,7 @@ modul_poly_out (FILE *fp, modul_poly_t f)
       int i;
       for (i = 0; i <= f->degree; i++)
 	if (f->coeff[i] > 0)
-	  fprintf (fp, "+%lld*x^%d", (long long int) f->coeff[i], i);
+	  fprintf (fp, "+%llu*x^%d", (long long int) f->coeff[i], i);
       fprintf (fp, ";\n");
     }
 }
@@ -426,7 +426,7 @@ modul_poly_powmod_ui (modul_poly_t g, modul_poly_t fp, modul_poly_t h, LONG a,
   for (k -= 2; k >= 0; k--)
     {
       modul_poly_sqr (h, g, p);             /* h <- g^2 */
-      if (e & (1 << k))
+      if (e & (1UL << k))
         modul_poly_mul_x (h, a, p);            /* h <- x*h */
 
       modul_poly_div_r (h, fp, p);       /* h -> rem(h, fp) */
@@ -453,7 +453,7 @@ modul_poly_general_powmod_ui (modul_poly_t g, modul_poly_t fp, modul_poly_t h,
       modul_poly_sqr (h, g, p);             /* h <- g^2 */
       modul_poly_div_r (h, fp, p);       /* h -> rem(h, fp) */
       modul_poly_set (g, h);       /* g <- h */
-      if (e & (1 << k))
+      if (e & (1UL << k))
         modul_poly_mul (h, h, g_sav, p);            /* h <- g_sav*h */
       modul_poly_div_r (h, fp, p);       /* h -> rem(h, fp) */
       modul_poly_set (g, h);       /* g <- h */

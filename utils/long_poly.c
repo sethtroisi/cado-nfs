@@ -1,5 +1,10 @@
-/* arithmetic on polynomials over Z/pZ, with coefficients represented by
-   the 'long' type */
+/* Arithmetic on polynomials over Z/pZ, with coefficients represented by
+   the 'long' type.
+   Since products are performed with the '*' operator, and several products
+   are accumulated before a reduction by '% p', p should be at most half the
+   size of the 'long' type.
+   FIXME: get a precise bound on p.
+*/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -462,7 +467,7 @@ long_poly_powmod_ui (long_poly_t g, long_poly_t fp, long_poly_t h, LONG a,
   for (k -= 2; k >= 0; k--)
     {
       long_poly_sqr (h, g, p);             /* h <- g^2 */
-      if (e & (1 << k))
+      if (e & (1L << k))
         long_poly_mul_x (h, a, p);            /* h <- x*h */
 
       long_poly_div_r (h, fp, p);       /* h -> rem(h, fp) */
@@ -489,7 +494,7 @@ long_poly_general_powmod_ui (long_poly_t g, long_poly_t fp, long_poly_t h,
       long_poly_sqr (h, g, p);             /* h <- g^2 */
       long_poly_div_r (h, fp, p);       /* h -> rem(h, fp) */
       long_poly_mod_ui (g, h, p);       /* g <- h mod p */
-      if (e & (1 << k))
+      if (e & (1L << k))
         long_poly_mul (h, h, g_sav, p);            /* h <- g_sav*h */
       long_poly_div_r (h, fp, p);       /* h -> rem(h, fp) */
       long_poly_mod_ui (g, h, p);       /* g <- h mod p */
