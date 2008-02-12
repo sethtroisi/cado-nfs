@@ -319,6 +319,7 @@ struct polmat { /* {{{ */
     /* Divide by X^k, keep ncoef2 coefficients *//*{{{*/
     void xdiv_resize(unsigned int k, unsigned int ncoef2) {
         ASSERT(k + ncoef2 <= ncoef);
+        ASSERT(k);
         unsigned int newstride = BITS_TO_WORDS(ncoef2, ULONG_BITS);
         if (newstride == stride()) {
             /*
@@ -326,7 +327,7 @@ struct polmat { /* {{{ */
             mp_size_t sb = k & (GMP_LIMB_BITS - 1);
             mpn_rshift(x, x + sw, ncols * colstride() - sw, sb);
             */
-            ASSERT(k < GMP_LIMB_BITS);
+            ASSERT(k && k < GMP_LIMB_BITS);
             mpn_rshift(x, x, ncols * colstride(), k);
             ncoef = ncoef2;
             return;
@@ -350,6 +351,7 @@ struct polmat { /* {{{ */
             for(j = 0 ; j < ncols-1 ; j++) {
                 const unsigned long * src = poly(0,j);
                 for(i = 0 ; i < nrows ; i++) {
+                    ASSERT(sb && sb < GMP_LIMB_BITS);
                     mpn_rshift(dst, src + sw, input_length, sb);
                     dst += newstride;
                     src += stride();
@@ -359,12 +361,14 @@ struct polmat { /* {{{ */
             {
                 const unsigned long * src = poly(0,j);
                 for(i = 0 ; i < nrows - 1 ; i++) {
+                    ASSERT(sb && sb < GMP_LIMB_BITS);
                     mpn_rshift(dst, src + sw, input_length, sb);
                     dst += newstride;
                     src += stride();
                 }
 
                 unsigned long * tmp = new unsigned long[input_length];
+                ASSERT(sb && sb < GMP_LIMB_BITS);
                 mpn_rshift(tmp, src + sw, input_length, sb);
                 memcpy(dst, tmp, newstride * sizeof(unsigned long));
                 delete[] tmp;
@@ -375,6 +379,7 @@ struct polmat { /* {{{ */
             for(unsigned int j = 0 ; j < ncols ; j++) {
                 const unsigned long * src = poly(0,j);
                 for(unsigned int i = 0 ; i < nrows ; i++) {
+                    ASSERT(sb && sb < GMP_LIMB_BITS);
                     mpn_rshift(dst, src + sw, input_length, sb);
                     dst += newstride;
                     src += stride();
@@ -537,31 +542,42 @@ struct polmat { /* {{{ */
         BUG_ON(a.nrows != nrows);
         unsigned long const * src = a.col(j);
         unsigned long * dst = col(k);
+        unsigned int as = s > 0 ? s : -s;
+        mp_size_t sw = as / GMP_LIMB_BITS;
+        mp_size_t sb = as & (GMP_LIMB_BITS - 1);
         /* Beware, trailing bits are lurking here and there */
         if (colstride() == a.colstride()) {
             /* Then this is fast *//*{{{*/
-            if (s > 0) {
-                mp_size_t sw = s / GMP_LIMB_BITS;
-                mp_size_t sb = s & (GMP_LIMB_BITS - 1);
-                mpn_lshift(dst + sw, src, colstride() - sw, sb);
+            if (sb) {
+                if (s > 0) {
+                    mpn_lshift(dst + sw, src, colstride() - sw, sb);
+                } else {
+                    mpn_rshift(dst, src + sw, colstride() - sw, sb);
+                }
             } else {
-                mp_size_t sw = (-s) / GMP_LIMB_BITS;
-                mp_size_t sb = (-s) & (GMP_LIMB_BITS - 1);
-                mpn_rshift(dst, src + sw, colstride() - sw, sb);
+                if (s > 0) {
+                    memcpy(dst + sw, src, (colstride()-sw)*sizeof(mp_limb_t));
+                } else {
+                    memcpy(dst, src + sw, (colstride()-sw)*sizeof(mp_limb_t));
+                }
             }/*}}}*/
         } else if (colstride() < a.colstride()) {
             /* Otherwise, we have to resample... *//*{{{*/
             unsigned long tmp[a.colstride()];
             BUG_ON(critical);
             for(unsigned int i = 0 ; i < nrows ; i++) {
-                if (s > 0) {
-                    mp_size_t sw = s / GMP_LIMB_BITS;
-                    mp_size_t sb = s & (GMP_LIMB_BITS - 1);
-                    mpn_lshift(tmp + sw, src, a.stride() - sw, sb);
+                if (sb) {
+                    if (s > 0) {
+                        mpn_lshift(tmp + sw, src, a.stride() - sw, sb);
+                    } else {
+                        mpn_rshift(tmp, src + sw, a.stride() - sw, sb);
+                    }
                 } else {
-                    mp_size_t sw = (-s) / GMP_LIMB_BITS;
-                    mp_size_t sb = (-s) & (GMP_LIMB_BITS - 1);
-                    mpn_rshift(tmp, src + sw, a.stride() - sw, sb);
+                    if (s > 0) {
+                        memcpy(tmp + sw, src,(a.stride()-sw)*sizeof(mp_limb_t));
+                    } else {
+                        memcpy(tmp, src + sw,(a.stride()-sw)*sizeof(mp_limb_t));
+                    }
                 }
                 memcpy(dst, tmp, stride() * sizeof(unsigned long));
                 src += a.stride();
@@ -573,14 +589,18 @@ struct polmat { /* {{{ */
             // case. It should be ok though 
             BUG_ON(critical);
             for(unsigned int i = 0 ; i < nrows ; i++) {
-                if (s > 0) {
-                    mp_size_t sw = s / GMP_LIMB_BITS;
-                    mp_size_t sb = s & (GMP_LIMB_BITS - 1);
-                    dst[stride()] = mpn_lshift(dst + sw, src, a.stride() -sw, sb);
+                if (sb) {
+                    if (s > 0) {
+                        dst[stride()] = mpn_lshift(dst + sw, src, a.stride() -sw, sb);
+                    } else {
+                        mpn_rshift(dst, src + sw, a.stride() - sw, sb);
+                    }
                 } else {
-                    mp_size_t sw = (-s) / GMP_LIMB_BITS;
-                    mp_size_t sb = (-s) & (GMP_LIMB_BITS - 1);
-                    mpn_rshift(dst, src + sw, a.stride() - sw, sb);
+                    if (s > 0) {
+                        memcpy(dst+sw,src,(a.stride()-sw)*sizeof(mp_limb_t));
+                    } else {
+                        memcpy(dst,src+sw,(a.stride()-sw)*sizeof(mp_limb_t));
+                    }
                 }
                 src += a.stride();
                 dst += stride();
