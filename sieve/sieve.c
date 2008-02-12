@@ -50,6 +50,9 @@
 
 unsigned long sumprimes, nrprimes; /* For largest non-report fb primes */
 unsigned long sumprimes2, nrprimes2;  /* For 2nd largest non-report fb prim. */
+unsigned long skipped_ahead_too_far;
+#define missinglog_hist_max 32
+unsigned int missinglog_hist[missinglog_hist_max];
 unsigned long ul_rho_called = 0, ul_rho_called1 = 0, 
   mpz_rho_called = 0, mpz_rho_called1 = 0;
 unsigned long ul_rho_toolarge_nr, ul_rho_toolarge_sum; 
@@ -315,8 +318,8 @@ compute_norms (unsigned char *sievearray, const long amin, const long amax,
 #ifdef TRACE_RELATION_A
 	  if (a <= TRACE_RELATION_A && TRACE_RELATION_A < a2)
 	    {
-	      double na = log(fpoly_eval (f, deg, (double) a2)) * log_scale 
-		- log_proj_roots;
+	      double na = log(fabs (fpoly_eval (f, deg, (double) a2))) * 
+	                  log_scale - log_proj_roots;
 	      printf ("# TRACE RELATION a = %ld in compute_norms: rounded log "
 		      "norm without projective divisors (range computed) for "
 		      "degree %d is %d, exact log of norm is %f\n", 
@@ -401,7 +404,7 @@ add_sieve_report (sieve_reportbuffer_t *reports, const long a,
       ASSERT_ALWAYS (reports->reports != NULL);
     }
 
-  TRACE_A (a, __func__, __LINE__, "adding report, p = %" FBPRIME_FORMAT
+  TRACE_A (a, __func__, __LINE__, "adding report, p = " FBPRIME_FORMAT
 	   ", remaining log norm = %hhu\n", p, l);
   reports->reports[reports->nr].a = a;
   reports->reports[reports->nr].p = p;
@@ -756,7 +759,16 @@ sieve_one_side (unsigned char *sievearray, factorbase_t fb,
 	  endidx = a_to_sieveidx (other_reports->reports[i].a, eff_amin, odd);
 	  /* Set sievearray[startidx ... endidx - 1] to 0 */
 	  if (endidx > startidx)
-	    memset (sievearray + startidx, 255, endidx - startidx);
+	    {
+#ifdef TRACE_RELATION_A
+              if (sieveidx_to_a (startidx, eff_amin, odd) <= TRACE_RELATION_A &&
+                  TRACE_RELATION_A < sieveidx_to_a (endidx, eff_amin, odd))
+                TRACE_A (TRACE_RELATION_A, __func__, __LINE__,
+                         "this a does not appear in other_reports, setting "
+                         "log norm to 255\n");
+#endif
+	      memset (sievearray + startidx, 255, endidx - startidx);
+            }
 	  startidx = endidx + 1;
 	}
     }
@@ -1474,7 +1486,7 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 	  r = trialdiv_one_prime ((fbprime_t) 2, norm, nr_primes, primes, 
 				  max_nr_primes, 1);
 	  ASSERT (r > 0);
-	  TRACE_A (a, __func__, __LINE__, "dividing out fb prime 2^%d." 
+	  TRACE_A (a, __func__, __LINE__, "dividing out fb prime 2^%d. " 
 		   "New norm = %Zd, sievelog = %hhu\n", r, norm, sievelog);
 	}
       fbptr = fb_next (fbptr);
@@ -1535,15 +1547,16 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
       fbptr->p != 0)
     {
       factorbase_degn_t *oldfbptr = fbptr;
+      const unsigned char missinglog = uc_sub (sievelog, finallog);
       /* There is exactly one more fb prime to divide out. */
       
       ASSERT (uc_sub(sievelog, finallog) < 2*fbptr->plog);
       /* That prime should have log size equal to sievelog - finallog,
 	 assuming the sieve was initialised correctly. In case it was 
-	 initialised incorrectly, we allow an extra 1 */
+	 initialised incorrectly, we allow an extra MAX_SIEVELOG_ERROR */
       
       if (add_error (sievelog) > add_error (finallog) && 
-	  uc_sub (sievelog, finallog) + 1 < fbptr->plog)
+	  uc_sub (sievelog, finallog) + MAX_SIEVELOG_ERROR < fbptr->plog)
 	{
 	  gmp_fprintf (stderr, "Error, a = %ld, b = %lu, sievelog = %hhu, "
 		       "finallog = %hhu, p = " FBPRIME_FORMAT ", plog = %d. "
@@ -1553,45 +1566,43 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 	  abort ();
 	}
       
-      /* Jump ahead in the factor base to primes of approximately 
-	 the correct size. */
-      nrprimes2++;
-      sumprimes2 += (unsigned long) fbptr->p;
-      
+      {
+        /* Jump ahead in the factor base to primes of approximately 
+           the correct size. */
+        nrprimes2++;
+        sumprimes2 += (unsigned long) fbptr->p;
+        
 #if TRIALDIV_SKIPFORWARD
-      const unsigned char missinglog = uc_sub (sievelog, finallog);
-      /* We know add_error (sievelog) > add_error (finallog), so
-	 missinglog is positive */
-      /* Skip forward to the factor base prime of the right size */
-      TRACE_A (a, __func__, __LINE__, "skipping forward in fb to prime of "
-	       "log norm %hhu\n", missinglog);
-#if 0
-      while (fbptr->p != 0 && 
-	     fbptr->plog < missinglog)
-	fbptr = fb_next (fbptr);
-      ASSERT (fbptr->p == 0 || fb->firstlog[missinglog] < fbptr || 
-	      fbptr == fb->firstlog[missinglog]);
-#else
-      /* This code is somewhat faster, more so for large factor bases */
-      if (fbptr->plog < missinglog &&
-	  fb->firstlog[missinglog] != NULL)
-	{
-	  fbptr = fb->firstlog[missinglog];
-	}
+        if (missinglog < missinglog_hist_max)
+          missinglog_hist[missinglog]++;
+        /* We know add_error (sievelog) > add_error (finallog), so
+           missinglog is positive */
+        /* Skip forward to the factor base prime of the right size */
+        TRACE_A (a, __func__, __LINE__, "skipping forward in fb to prime of "
+                 "log norm %hhu\n", missinglog);
+
+        if (fbptr->plog < missinglog &&
+            fb->firstlog[missinglog] != NULL)
+          {
+            fbptr = fb->firstlog[missinglog];
+          }
+        TRACE_A (a, __func__, __LINE__, "skipped forward in fb, next prime "
+                 "is " FBPRIME_FORMAT "\n", fbptr->p);
 #endif
-      TRACE_A (a, __func__, __LINE__, "skipped forward in fb, next prime "
-	       "is " FBPRIME_FORMAT "\n", fbptr->p);
-#endif
-      fbptr = trialdiv_find_next (fbptr, norm);
-      if (fbptr->p == (fbprime_t) 0)
-	{
-	  /* Reached end of factor base? Maybe sieve was not initialised
-	     correctly and finallog is one too small, causing us to skip
-	     ahead too far. Try again without skipping */
-	  fbptr = trialdiv_find_next (oldfbptr, norm);
-	}
-      /* This time is must have worked */
-      ASSERT_ALWAYS (fbptr->p != 0);
+        fbptr = trialdiv_find_next (fbptr, norm);
+        if (fbptr->p == (fbprime_t) 0)
+          {
+            /* Reached end of factor base? Maybe sieve was not initialised
+               correctly and finallog is one too small, causing us to skip
+               ahead too far. Try again without skipping */
+            skipped_ahead_too_far++;
+            fbptr = trialdiv_find_next (oldfbptr, norm);
+          }
+        /* This time is must have worked */
+        ASSERT_ALWAYS (fbptr->p != 0);
+        nrprimes++;
+        sumprimes += (unsigned long) fbptr->p;
+      }
       
       r = trialdiv_one_prime (fbptr->p, norm, nr_primes, primes,
 			      max_nr_primes, 1);
@@ -1742,6 +1753,9 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 
   sumprimes = nrprimes = 0;
   sumprimes2 = nrprimes2 = 0;
+  skipped_ahead_too_far = 0;
+  for (i = 0; i < missinglog_hist_max; i++)
+    missinglog_hist[i] = 0;
   ul_rho_toolarge_nr = ul_rho_toolarge_sum = 0;
 
   for (i = 0, j = 0; i < reports_a->nr && j < reports_r->nr;)
@@ -1826,10 +1840,16 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
       printf ("# Number of matching reports with a,b coprime: %u\n", 
 	      matching_reports);
       printf ("# Number of relations found: %u\n", relations_found);
-      printf ("# Sum and number of largest non-report fb primes: %lu, %lu, avg: %.0f\n",
-	      sumprimes, nrprimes, (double)sumprimes / (double)nrprimes);
-      printf ("# Sum and number of 2nd largest non-report fb primes: %lu, %lu, avg: %.0f\n",
-	      sumprimes2, nrprimes2, (double)sumprimes2 / (double)nrprimes2);
+      printf ("# Average of largest non-report fb primes: %.0f\n",
+	      (double)sumprimes / (double)nrprimes);
+      printf ("# Average of 2nd largest non-report fb primes: %.0f\n",
+	      (double)sumprimes2 / (double)nrprimes2);
+      printf ("# We skipped ahead too far in the factor base %lu times\n",
+              skipped_ahead_too_far);
+      printf ("# Histogram of missinglog: ");
+      for (i = 0; i < missinglog_hist_max; i++)
+        printf ("%d ", missinglog_hist[i]);
+      printf ("\n");
       printf ("# Called ul_rho %lu times with %lu repeats, mpz_rho %lu times "
 	      "with %lu repeats\n",
 	      ul_rho_called, ul_rho_called - ul_rho_called1, 
@@ -2185,6 +2205,9 @@ main (int argc, char **argv)
   reports_a.reports = (sieve_report_t *) malloc (reports_a_len * 
 						 sizeof (sieve_report_t));
   ASSERT_ALWAYS (reports_a.reports != NULL);
+
+  if (reports_r_len == 0) /* if not given on command line */
+    reports_r_len = ((amax - amin + 1)) / 256 + 1000;
   if (verbose)
     {
       printf ("# Allocating %lu entries (%lu bytes) for reports_r\n",
@@ -2192,9 +2215,6 @@ main (int argc, char **argv)
 	      (unsigned long) (reports_r_len * sizeof (sieve_report_t)));
       fflush(stdout);
     }
-
-  if (reports_r_len == 0) /* if not given on command line */
-    reports_r_len = ((amax - amin + 1)) / 256 + 1000;
   reports_r.alloc = reports_r_len;
   reports_r.nr = 0;
   reports_r.reports = (sieve_report_t *) malloc (reports_r_len * 
@@ -2217,7 +2237,7 @@ main (int argc, char **argv)
 
       proj_roots = mpz_gcd_ui (NULL, cpoly->f[deg], b);
       if (verbose)
-	printf ("# Primes with projective roots for b = %lu on algebtaic side "
+	printf ("# Primes with projective roots for b = %lu on algebraic side "
 		"divide %lu\n", b, proj_roots);
 
       if (verbose)
