@@ -4,14 +4,13 @@ linalg=linalg
 # parameter from merge_linalg_sqrt.sh: 
 # $1 is $name
 # $2 is $skip
+# [optional] $3 is $mt
 
 name=$1; skip=$2
+if [ $# -ge 3 ]; then mt=$3; else mt=0; fi
+
 mat=$name/small
 ker=$name/ker_raw
-
-# enabling multithreading
-mt=0 # default to 0: no multi-threading
-     # note that mt=1 uses the multi-thread binary with one thread only
 
 if false ; then
    echo "Calling Gauss"
