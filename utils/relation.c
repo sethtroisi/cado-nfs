@@ -260,4 +260,49 @@ fprint_relation(FILE *file, relation_t rel) {
   assert (rel.ap[rel.nb_ap-1].e == 1);
 }
 
+/* reduces exponents mod 2, and discards primes with even exponent */
+void
+reduce_exponents_mod2 (relation_t *rel)
+{
+  int i, j;
+
+  if(rel->nb_rp == 0)
+      fprintf(stderr, "WARNING: nb_rp = 0 in reduce_exponents_mod2\n");
+
+  for (i = j = 0; i < rel->nb_rp; i++)
+    {
+      rel->rp[i].e &= 1;
+      if (rel->rp[i].e != 0)
+        {
+          rel->rp[j].p = rel->rp[i].p;
+          rel->rp[j].e = 1;
+          j ++;
+        }
+    }
+  if(j == 0)
+      fprintf(stderr, "WARNING: j_rp=0 in reduce_exponents_mod2\n");
+  else
+      rel->rp = (rat_prime_t*) realloc (rel->rp, j * sizeof (rat_prime_t));
+  rel->nb_rp = j;
+
+  if(rel->nb_ap == 0)
+      fprintf(stderr, "WARNING: nb_ap = 0 in reduce_exponents_mod2\n");
+
+  for (i = j = 0; i < rel->nb_ap; i++)
+    {
+      rel->ap[i].e &= 1;
+      if (rel->ap[i].e != 0)
+        {
+          rel->ap[j].p = rel->ap[i].p;
+          rel->ap[j].e = 1;
+          j ++;
+        }
+    }
+  if(j == 0)
+      fprintf(stderr, "WARNING: j_ap = 0 in reduce_exponents_mod2\n");
+  else
+      rel->ap = (alg_prime_t*) realloc (rel->ap, j * sizeof (alg_prime_t));
+  rel->nb_ap = j;
+}
+
 
