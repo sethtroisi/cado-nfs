@@ -26,10 +26,10 @@ else
       mkdir $name/bw
    fi
 
-   time $linalg/bw/doit.pl mt=$mt matrix=$mat.tr mn=64 vectoring=64 multisols=1 wdir=$name/bw solution=$name/W
+   time $linalg/bw/bw.pl mt=$mt matrix=$mat.tr mn=64 vectoring=64 multisols=1 wdir=$name/bw solution=$name/W
 
    echo "Converting dependencies to CADO format"
-   # doit.pl puts the dependency file W in the directory where the matrix was
+   # bw.pl puts the dependency file W in the directory where the matrix was
    time $linalg/bw/mkbitstrings $name/W > $ker
 
 fi
