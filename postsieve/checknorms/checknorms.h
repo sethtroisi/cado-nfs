@@ -204,6 +204,15 @@ void print_usage(char* progname);
 //
 void print_help(char* progname);
 //-----------------------------------------------------------------------------
+// ckn_mu_secs: ChecKNorms's MicroSECondS
+//
+// Returns current time expressed as microseconds. Used to get elapsed time
+// intervals taking into account CPU time _and_ system time spent on behalf of
+// the calling process. microseconds() from src/utils/timing.c discards system
+// time.
+//
+uint64_t ckn_mu_secs();
+//-----------------------------------------------------------------------------
 
 #ifdef __cplusplus
 }

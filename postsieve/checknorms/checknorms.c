@@ -24,11 +24,12 @@
 #include "tifa.h"   // Use TIFA for residues factorization
 #include "funcs.h"  // "Private" header file from the TIFA library to use
                     // gcd_ulint(...)
-
 #include "checknorms.h"
 
 //-----------------------------------------------------------------------------
 int main(int argc, char *argv[]) {
+
+    uint64_t t = ckn_mu_secs();
 
     char *polyfilename = NULL;
     cado_poly cpoly;
@@ -124,10 +125,11 @@ int main(int argc, char *argv[]) {
         ERROR("Could not read polynomial file %s.\n", polyfilename);
         exit(EXIT_FAILURE);
     }
-
-    /* check that n divides Res(f,g) [might be useful to factor n...] */
-    check_polynomials (cpoly);
-
+    //
+    // Check that n divides Res(f,g) (might be useful to factor n)
+    //
+    check_polynomials(cpoly);
+    
     //
     // Default residue bounds are those from the polynomial file, if not
     // overridden by command line parameters.
@@ -186,7 +188,7 @@ int main(int argc, char *argv[]) {
         argv++;
     }
     free (primes);
-
+    
     if (nfiles > 1) {
         MSG("\n");
         MSG("--------------------------------------------------------------\n");
@@ -194,6 +196,9 @@ int main(int argc, char *argv[]) {
             nrels_out, total_nrelations_read);
         MSG("--------------------------------------------------------------\n");
     }
+    t = ckn_mu_secs() - t;
+    MSG("\nCompleted in: %.3f seconds\n", t / 1000000.0);
+    
     return 0;
 }
 //-----------------------------------------------------------------------------
@@ -866,5 +871,16 @@ void print_help(char* progname) {
     printf("  -t NUM\n");
     printf("      Bound for largest prime for trial division.\n");
     printf("      Default: %i\n", DFLT_TDMAX);
+}
+//-----------------------------------------------------------------------------
+uint64_t ckn_mu_secs() {
+    struct rusage res[1];
+    getrusage(RUSAGE_SELF, res);
+    
+    uint64_t r;
+    r  = (uint64_t) res->ru_utime.tv_sec + res->ru_stime.tv_sec;
+    r *= (uint64_t) 1000000UL;
+    r += (uint64_t) res->ru_utime.tv_usec + res->ru_stime.tv_usec;
+    return r;
 }
 //-----------------------------------------------------------------------------

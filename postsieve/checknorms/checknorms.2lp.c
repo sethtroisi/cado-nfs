@@ -36,7 +36,7 @@
 #include "cado.h"
 #include "utils.h"
 #include "tifa.h"
-#include "funcs.h"  // "Private" header file from the TIFA library
+#include "funcs.h"        // "Private" header file from the TIFA library
 
 //------------------------------------------------------------------------------
 #define VERBOSE             1  // to print warnings
@@ -88,6 +88,24 @@ static unsigned long count_factorization_pb     = 0;
 static unsigned long count_perfect_square       = 0;
 static unsigned long count_perfect_power        = 0;
 static unsigned long check_prime_reports        = 0;
+//-----------------------------------------------------------------------------
+uint64_t ckn_mu_secs() {
+    // ckn_mu_secs: ChecKNorms's MicroSECondS
+    //
+    // Returns current time expressed as microseconds. Used to get elapsed time
+    // intervals taking into account CPU time _and_ system time spent on behalf
+    // of the calling process. microseconds() from src/utils/timing.c discards 
+    // system time.
+    //
+    struct rusage res[1];
+    getrusage(RUSAGE_SELF, res);
+    
+    uint64_t r;
+    r  = (uint64_t) res->ru_utime.tv_sec + res->ru_stime.tv_sec;
+    r *= (uint64_t) 1000000UL;
+    r += (uint64_t) res->ru_utime.tv_usec + res->ru_stime.tv_usec;
+    return r;
+}
 //-----------------------------------------------------------------------------
 void get_rational_norm(mpz_t norm, mpz_t *g, long a, unsigned long b) {
     //
@@ -940,12 +958,14 @@ unsigned long checkrels(char *f, cado_poly cpoly,
     MSG("-----------------------------------------------------------------\n");
     MSG("File %s: output %lu out of %lu relations\n", f, nrels_out, nrels_in);
     MSG("-----------------------------------------------------------------\n");
-
+    
     return nrels_out;
 }
 //-----------------------------------------------------------------------------
 int main(int argc, char *argv[]) {
-
+    
+    uint64_t t = ckn_mu_secs();
+        
     char *polyfilename = NULL;
     cado_poly cpoly;
 
@@ -1015,6 +1035,11 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
     //
+    // Check that n divides Res(f,g) (might be useful to factor n)
+    //
+    check_polynomials(cpoly);
+    
+    //
     // Default residue bounds are those from file, if not overridden by
     // command line parameters
     //
@@ -1069,7 +1094,9 @@ int main(int argc, char *argv[]) {
     if (nb_files > 1) {
         MSG("All input files: output %lu relations\n", tot_rels);
     }
-
+    t = ckn_mu_secs() - t;
+    MSG("   Completed in: %.3f seconds\n", t / 1000000.0);
+    
     return 0;
 }
 //-----------------------------------------------------------------------------
