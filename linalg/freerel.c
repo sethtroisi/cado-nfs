@@ -5,18 +5,142 @@
  * 
  */
 
-
-#include "cado.h"
-#include <gmp.h>
-#include "mod_ul.c"
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
-#include "utils/utils.h"
-
 #include <string.h>
+#include <math.h>
 
+#include <gmp.h>
+#include "cado.h"
+#include "mod_ul.c"
+#include "utils/utils.h"
 #include "sieve/fb.h"
+
+#include "hashpair.h"
+
+// When p1 == p2, sort r's in increasing order
+int
+compare_ul2(const void *v1, const void *v2)
+{
+    unsigned long w1 = *((unsigned long*) v1);
+    unsigned long w2 = *((unsigned long*) v2);
+
+    if(w1 > w2)
+	return 1;
+    if(w1 < w2)
+	return -1;
+    w1 = *(1 + (unsigned long*) v1);
+    w2 = *(1 + (unsigned long*) v2);
+    return (w1 >= w2 ? 1 : -1);
+}
+
+// find free relations by inspection.
+int
+findFreeRelations(hashtable_t *H, cado_poly pol, int nprimes)
+{
+    unsigned long *tmp = (unsigned long *)malloc((2+(nprimes<<1)) * sizeof(unsigned long));
+    unsigned int i, j, k, ntmp = 0;
+    int pdeg, nfree;
+
+    for(i = 0; i < H->hashmod; i++)
+	if(H->hashcount[i] > 0){
+	    tmp[ntmp++] = (unsigned long)H->hashtab_p[i];
+	    tmp[ntmp++] = H->hashtab_r[i];
+	}
+    qsort(tmp, (ntmp>>1), 2 * sizeof(unsigned long), compare_ul2);
+    // add a sentinel
+    tmp[ntmp] = 0;
+    tmp[ntmp+1] = 0;
+    // now, inspect
+    for(i = 0; ; i += 2)
+	if(((long)tmp[i+1]) >= 0)
+	    break;
+    j = i+2;
+    pdeg = 1;
+    nfree = 0;
+    while(1){
+	if(tmp[j] == tmp[i]){
+	    // same prime
+	    if(((long)tmp[j+1]) >= 0)
+		// another algebraic factor
+		pdeg++;
+	}
+	else{
+	    // new prime
+	    if(pdeg == pol[0].degree){
+		// a free relation
+		printf("%lu,0:%lx:", tmp[i], tmp[i]);
+		for(k = i; k < i+(pdeg<<1); k += 2){
+		    printf("%lx", tmp[k+1]);
+		    if(k < i+(pdeg<<1)-2)
+			printf(",");
+		}
+		printf("\n");
+		nfree++;
+	    }
+	    i = j;
+	    if(tmp[j] == 0)
+		break;
+	    pdeg = 1;
+	}
+	j += 2;
+    }
+    free(tmp);
+    return nfree;
+}
+
+int
+scan_relations(FILE *file, int *nprimes_alg, hashtable_t *H)
+{
+    relation_t rel;
+    unsigned int h;
+    int ret, irel = -1, j;
+    
+    while(1){
+	ret = fread_relation (file, &rel);
+	if(ret != 1)
+	    break;
+	irel += 1;
+	if(!(irel % 100000))
+	    fprintf(stderr, "nrel = %d at %2.2lf\n", irel, seconds());
+	// ignore already found free relations...
+	if(rel.b == 0){
+	    fprintf(stderr, "Ignoring already found free relation...\n");
+	}
+	else{
+	    reduce_exponents_mod2(&rel);
+	    computeroots(&rel);
+	    for(j = 0; j < rel.nb_ap; j++){
+		h = hashInsert(H, rel.ap[j].p, rel.ap[j].r);
+		if(H->hashcount[h] == 1){
+		    // new prime
+		    *nprimes_alg += 1;
+		}
+	    }
+	}
+	clear_relation(&rel);
+    }
+    return ret;
+}
+
+void
+largeFreeRelations(cado_poly pol, char *relsname)
+{
+    FILE *fic = fopen(relsname, "r");
+    hashtable_t H;
+    int Hsizea, nprimes_alg = 0, nfree = 0;
+
+    ASSERT(fic != NULL);
+    Hsizea = (1<<pol[0].lpba)/((int)(pol[0].lpba * log(2.0)));
+    hashInit(&H, Hsizea);
+    fprintf(stderr, "Scanning relations\n");
+    scan_relations(fic, &nprimes_alg, &H);
+    fprintf(stderr, "nprimes_alg = %d\n", nprimes_alg);
+    nfree = findFreeRelations(&H, pol, nprimes_alg);
+    fprintf(stderr, "Found %d usable free relations\n", nfree);
+    fclose(fic);
+}
 
 int
 countFreeRelations(int *deg, char *roots)
@@ -87,11 +211,21 @@ usage (char *argv0)
   exit (1);
 }
 
+void
+smallFreeRelations(char *fbfilename)
+{
+    int deg;
+    int nfree = countFreeRelations (&deg, fbfilename);
+    fprintf (stderr, "# Free relations: %d\n", nfree);
+    
+    fprintf (stderr, "Handling free relations...\n");
+    addFreeRelations (fbfilename, deg);
+}
+
 int
 main(int argc, char *argv[])
 {
-    int nfree, deg;
-    char *fbfilename = NULL, *polyfilename = NULL;
+    char *fbfilename = NULL, *polyfilename = NULL, *relsname = NULL;
     char *argv0 = argv[0];
     cado_poly cpoly;
 
@@ -109,11 +243,18 @@ main(int argc, char *argv[])
             argc -= 2;
             argv += 2;
           }
+        else if (argc > 2 && strcmp (argv[1], "-rels") == 0)
+          {
+	    relsname = argv[2];
+            argc -= 2;
+            argv += 2;
+          }
         else
           usage (argv0);
       }
 
-    if (argc != 1 || polyfilename == NULL || fbfilename == NULL)
+    if (argc != 1 || polyfilename == NULL || 
+	((fbfilename == NULL) && (relsname == NULL)))
       usage (argv0);
 
     if (!read_polynomial (cpoly, polyfilename))
@@ -134,11 +275,11 @@ main(int argc, char *argv[])
       }
 #endif
 
-    nfree = countFreeRelations (&deg, fbfilename);
-    fprintf (stderr, "# Free relations: %d\n", nfree);
-    
-    fprintf (stderr, "Handling free relations...\n");
-    addFreeRelations (fbfilename, deg);
+    if(relsname == NULL)
+	smallFreeRelations(fbfilename);
+    else
+	largeFreeRelations(cpoly, relsname);
+
     clear_polynomial (cpoly);
 
     return 0;

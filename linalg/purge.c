@@ -218,51 +218,6 @@ fprint_rel_row (FILE *file, int irel, relation_t rel,
   free(table_ind);
 }
 
-/* reduces exponents mod 2, and discards primes with even exponent */
-void
-reduce_exponents_mod2 (relation_t *rel)
-{
-  int i, j;
-
-  if(rel->nb_rp == 0)
-      fprintf(stderr, "WARNING: nb_rp = 0 in reduce_exponents_mod2\n");
-
-  for (i = j = 0; i < rel->nb_rp; i++)
-    {
-      rel->rp[i].e &= 1;
-      if (rel->rp[i].e != 0)
-        {
-          rel->rp[j].p = rel->rp[i].p;
-          rel->rp[j].e = 1;
-          j ++;
-        }
-    }
-  if(j == 0)
-      fprintf(stderr, "WARNING: j_rp=0 in reduce_exponents_mod2\n");
-  else
-      rel->rp = (rat_prime_t*) realloc (rel->rp, j * sizeof (rat_prime_t));
-  rel->nb_rp = j;
-
-  if(rel->nb_ap == 0)
-      fprintf(stderr, "WARNING: nb_ap = 0 in reduce_exponents_mod2\n");
-
-  for (i = j = 0; i < rel->nb_ap; i++)
-    {
-      rel->ap[i].e &= 1;
-      if (rel->ap[i].e != 0)
-        {
-          rel->ap[j].p = rel->ap[i].p;
-          rel->ap[j].e = 1;
-          j ++;
-        }
-    }
-  if(j == 0)
-      fprintf(stderr, "WARNING: j_ap = 0 in reduce_exponents_mod2\n");
-  else
-      rel->ap = (alg_prime_t*) realloc (rel->ap, j * sizeof (alg_prime_t));
-  rel->nb_ap = j;
-}
-
 int
 specialHashInsert(hashtable_t *H, long p, unsigned long r, int irel)
 {
@@ -453,14 +408,12 @@ int
 scan_relations_from_file (int *irel, int *nrel, char *rel_used,
                           int **rel_compact, int *nprimes,
                           /* tab_prime_t *bad_primes, */ hashtable_t *H,
-                          hashtable_t *Hab, FILE *file, unsigned long rlim,
+                          FILE *file, unsigned long rlim,
                           unsigned long alim, long maxpr, long maxpa,
-                          int duplicate, int final)
+                          int final)
 {
     relation_t rel;
     int ret;
-    unsigned long file_duplicates = 0;         /* duplicates in this file */
-    static unsigned long total_duplicates = 0; /* duplicates in all files */
 
     while(1){
 	ret = fread_relation (file, &rel);
@@ -469,18 +422,6 @@ scan_relations_from_file (int *irel, int *nrel, char *rel_used,
 	*irel += 1;
 	if(!(*irel % 100000))
 	    fprintf(stderr, "nrel = %d at %2.2lf\n", *irel, seconds());
-	if(duplicate){
-	    int hab = hashInsert(Hab, rel.a, rel.b);
-	    if(Hab->hashcount[hab] > 1){
-                if (file_duplicates ++ < 10)
-                  fprintf (stderr, "(%ld, %ld) appears more than once\n",
-                           rel.a, rel.b);
-		rel_used[*irel] = 0;
-		rel_compact[*irel] = NULL;
-		*nrel -= 1;
-		continue;
-	    }
-	}
 	rel_used[*irel] = 1;
 	if(rel.b > 0)
           insertNormalRelation (rel_used, rel_compact, *irel, nprimes,
@@ -493,21 +434,15 @@ scan_relations_from_file (int *irel, int *nrel, char *rel_used,
 	    *nrel -= 1;
 	clear_relation(&rel);
     }
-    if(duplicate){
-	total_duplicates += file_duplicates;
-	fprintf (stderr, "Found %lu duplicates in this file (total %lu)\n",
-		 file_duplicates, total_duplicates);
-    }
     return ret;
 }
 
 // Read all relations from file.
 int
 scan_relations (char *ficname[], int nbfic, int *nrel, int *nprimes,
-                /*tab_prime_t *bad_primes,*/ hashtable_t *H, hashtable_t *Hab,
+                /*tab_prime_t *bad_primes,*/ hashtable_t *H,
                 char *rel_used, int **rel_compact, unsigned long rlim,
-                unsigned long alim, long maxpr, long maxpa, int duplicate,
-                int final)
+                unsigned long alim, long maxpr, long maxpa, int final)
 {
     FILE *relfile;
     int ret, irel = -1;
@@ -525,9 +460,9 @@ scan_relations (char *ficname[], int nbfic, int *nrel, int *nprimes,
 	}
 	fprintf(stderr, "Adding file %s\n", ficname[i]);
 	ret = scan_relations_from_file (&irel, nrel, rel_used, rel_compact,
-                                        nprimes, /* bad_primes,*/ H, Hab,
+                                        nprimes, /* bad_primes,*/ H,
                                         relfile, rlim, alim, maxpr, maxpa,
-                                        duplicate, final);
+                                        final);
 	if (ret == 0) {
 	    fprintf(stderr, "Warning: error when reading file %s\n", ficname[i]);
 	    break;
@@ -810,13 +745,13 @@ int
 main(int argc, char **argv)
 {
     tab_prime_t bad_primes;
-    hashtable_t H, Hab;
+    hashtable_t H;
     char **fic, *polyname = NULL;
     unsigned int nfic;
     char *rel_used;
     int **rel_compact = NULL;
     int ret, k;
-    int nrel, nprimes = 0, duplicate = 0, final = 1;
+    int nrel, nprimes = 0, final = 1, nfree;
     unsigned int nrelmax = 0, i;
     int nrel_new, nprimes_new, Hsize, Hsizer, Hsizea;
     long maxpr = 0, maxpa = 0, keep = -1; // maximum value for nrows-ncols
@@ -874,11 +809,6 @@ main(int argc, char **argv)
 	    argc--;
 	    argv++;
 	}
-	else if(argc > 1 && strcmp (argv[1], "-duplicate") == 0){
-	    duplicate = 1;
-	    argc--;
-	    argv++;
-	}
     }
     if(keep == -1)
 	keep = nrelmax;
@@ -915,8 +845,6 @@ main(int argc, char **argv)
     }
     fprintf(stderr, "initializing hash tables with Hsize=%d...\n", Hsize);
     hashInit(&H, Hsize);
-    if(duplicate)
-	hashInit(&Hab, nrelmax);
 
     rel_used = (char *)malloc(nrelmax * sizeof(char));
     if (final)
@@ -929,12 +857,12 @@ main(int argc, char **argv)
     fprintf(stderr, "reading file of relations...\n");
     nrel = nrelmax;
     ret = scan_relations (fic, nfic, &nrel, &nprimes, /*&bad_primes,*/ &H,
-                          &Hab, rel_used, rel_compact, pol[0].rlim,
-                          pol[0].alim, maxpr, maxpa, duplicate, final);
+                          rel_used, rel_compact, pol[0].rlim,
+                          pol[0].alim, maxpr, maxpa, final);
     ASSERT (ret);
     
     fprintf(stderr, "nrel(useful)=%d, nprimes=%d (%d)\n",nrel,nprimes,Hsize);
-    
+
 #if DEBUG >= 2
     for(i = 0; i < hashmod; i++)
 	if(hashcount[i] == 1)
@@ -969,13 +897,6 @@ main(int argc, char **argv)
 	hashCheck(nprimes_new);
 #endif
 	
-#if 0
-	// TODO: do more fancy things, like killing too heavy rows, etc.
-	// if just doing this, then singletons may appear again, etc.
-	if((nrel_new - nprimes_new) >= 500)
-	    nrel_new = nprimes_new + 500;
-#endif
-
 	// we do not use it anymore
 	for(i = 0; i < nrelmax; i++)
 	    if(rel_compact[i] != NULL)
