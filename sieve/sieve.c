@@ -1722,6 +1722,10 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
   unsigned int lp_a_toolarge = 0, lp_r_toolarge = 0, 
     cof_a_toolarge = 0, cof_r_toolarge = 0, not_coprime = 0;
   int ok;
+  const int have_a_reports = reports_a->reports != NULL;
+  const int have_r_reports = reports_r->reports != NULL;
+
+  ASSERT_ALWAYS (have_a_reports || have_r_reports);
 
   mpz_init (Fab);
   mpz_init (Gab);
@@ -1758,47 +1762,55 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
     missinglog_hist[i] = 0;
   ul_rho_toolarge_nr = ul_rho_toolarge_sum = 0;
 
-  for (i = 0, j = 0; i < reports_a->nr && j < reports_r->nr;)
+  for (i = 0, j = 0; (!have_a_reports || i < reports_a->nr)
+	 && (!have_r_reports || j < reports_r->nr); )
     {
-      if (reports_a->reports[i].a == reports_r->reports[j].a)
+      if (!have_a_reports || !have_r_reports || 
+	  reports_a->reports[i].a == reports_r->reports[j].a)
 	{
-	  if (gcd_ul ((unsigned long) labs(reports_a->reports[i].a), b) > 1UL)
+	  const long a = (have_a_reports) ? reports_a->reports[i].a : 
+	    reports_r->reports[j].a;
+	      
+	  if (gcd_ul ((unsigned long) labs(a), b) > 1UL)
 	    {
 	      not_coprime++;
 	    }
 	  else
 	    {
-	      const long a = reports_a->reports[i].a;
-	      
 	      matching_reports++;
 	      
 	      /* Do the algebraic side */
 	      nr_primes_a = 0;
-	      ok = trialdiv_one_side (Fab, scaled_poly_a, poly->degree, a, b, 
-				      primes_a, &nr_primes_a, max_nr_primes,
-				      proj_divisor_a, nr_proj_primes_a, 
-				      proj_primes_a, fba, 
-				      reports_a, i,
-				      &cof_a_toolarge, &lp_a_toolarge, 
-				      poly->alim, poly->lpba, poly->mfba, 
-				      poly->alambda, log_scale);
-	      
-	      if (!ok) 
-		goto nextreport;
+	      if (have_a_reports)
+		{
+		  ok = trialdiv_one_side (Fab, scaled_poly_a, poly->degree, 
+					  a, b, 
+					  primes_a, &nr_primes_a, max_nr_primes,
+					  proj_divisor_a, nr_proj_primes_a, 
+					  proj_primes_a, fba, 
+					  reports_a, i,
+					  &cof_a_toolarge, &lp_a_toolarge, 
+					  poly->alim, poly->lpba, poly->mfba, 
+					  poly->alambda, log_scale);
+		  if (!ok) 
+		    goto nextreport;
+		}
 	      
 	      /* Now the rational side */
 	      nr_primes_r = 0;
-	      ok = trialdiv_one_side (Gab, scaled_poly_r, 1, a, b, 
-				      primes_r, &nr_primes_r, max_nr_primes,
-				      proj_divisor_r, nr_proj_primes_r, 
-				      proj_primes_r, fbr, 
-				      reports_r, j,
-				      &cof_r_toolarge, &lp_r_toolarge, 
-				      poly->rlim, poly->lpbr, poly->mfbr, 
-				      poly->rlambda, log_scale);
-	      
-	      if (!ok) 
-		goto nextreport;
+	      if (have_r_reports)
+		{
+		  ok = trialdiv_one_side (Gab, scaled_poly_r, 1, a, b, 
+					  primes_r, &nr_primes_r, max_nr_primes,
+					  proj_divisor_r, nr_proj_primes_r, 
+					  proj_primes_r, fbr, 
+					  reports_r, j,
+					  &cof_r_toolarge, &lp_r_toolarge, 
+					  poly->rlim, poly->lpbr, poly->mfbr, 
+					  poly->rlambda, log_scale);
+		  if (!ok) 
+		    goto nextreport;
+		}
 	      
 	      /* Now print the relations */
 	      relations_found++;
@@ -1817,17 +1829,22 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 	    nextreport:
 	      /* Skip over duplicates that might cause relations to be
 		 trial divided/output repeatedly */
-	      while (i + 1 < reports_a->nr && 
+	      while (have_a_reports && i + 1 < reports_a->nr && 
 		     reports_a->reports[i].a == reports_a->reports[i + 1].a)
 		i++;
-	      while (j + 1 < reports_r->nr && 
+
+	      while (have_r_reports && j + 1 < reports_r->nr && 
 		     reports_r->reports[j].a == reports_r->reports[j + 1].a)
 		j++;
 	    }
 	}
       
       /* Assumes values in reports_a are sorted, same for reports_r  */
-      if (reports_a->reports[i].a < reports_r->reports[j].a)
+      if (!have_a_reports)
+	j++;
+      else if (!have_r_reports)
+	i++;
+      else if (reports_a->reports[i].a < reports_r->reports[j].a)
 	i++;
       else
 	j++;
@@ -1926,7 +1943,7 @@ void rho_timing()
 static void
 usage (void)
 {
-  fprintf (stderr, "Usage: sieve [-v] [-fb file] [-poly file] [-reports_a_len int] [-reports_r_len int] [-rhotiming] amin amax bmin bmax\n");
+  fprintf (stderr, "Usage: sieve [-v] [-fb file] [-poly file] [-reports_a_len int] [-reports_r_len int] [-skip_a|-skip_r]  [-rhotiming] amin amax bmin bmax\n");
   exit (1);
 }
 
@@ -1949,6 +1966,7 @@ main (int argc, char **argv)
   char report_a_threshold, report_r_threshold;
   unsigned long relations_found = 0;
   double init_time = seconds (), sieve_time;
+  int sieve_a = 1, sieve_r = 1;
 
   while (argc > 1 && argv[1][0] == '-')
     {
@@ -1985,6 +2003,18 @@ main (int argc, char **argv)
       else  if (argc > 1 && strcmp (argv[1], "-rhotiming") == 0)
 	{
 	  rho_timing();
+	  argc--;
+	  argv++;
+	}
+      else  if (argc > 1 && strcmp (argv[1], "-skip_a") == 0)
+	{
+	  sieve_a = 0;
+	  argc--;
+	  argv++;
+	}
+      else  if (argc > 1 && strcmp (argv[1], "-skip_r") == 0)
+	{
+	  sieve_r = 0;
 	  argc--;
 	  argv++;
 	}
@@ -2028,6 +2058,12 @@ main (int argc, char **argv)
     {
       fprintf (stderr, 
 	       "Please specify a factor base file with the -fb option\n");
+      exit (EXIT_FAILURE);
+    }
+
+  if (! sieve_a && ! sieve_r)
+    {
+      fprintf (stderr, "You must sieve at least one side.\n");
       exit (EXIT_FAILURE);
     }
 
@@ -2077,7 +2113,13 @@ main (int argc, char **argv)
       printf ("# Relation tracing disabled.\n");
 #endif
 
-    }
+      if (sieve_a && sieve_r)
+	printf ("# Sieving both algebraic and rational sides\n");
+      if (sieve_a && !sieve_r)
+	printf ("# Sieving only algebraic side\n");
+      if (!sieve_a && sieve_r)
+	printf ("# Sieving only rational side\n");
+     }
 
   /* Read polynomial from file */
   if (!read_polynomial (cpoly, polyfilename))
@@ -2111,53 +2153,64 @@ main (int argc, char **argv)
 
   /* Read/generate and split the factor bases */
 
-  /* Read the factor base for the algebraic side from file */
-  fba->fullfb = fb_read (fbfilename, log_scale, verbose);
-  if (fba->fullfb == NULL)
+  if (sieve_a)
     {
-      fprintf (stderr, "Could not read factor base\n");
-      exit (EXIT_FAILURE);
+      /* Read the factor base for the algebraic side from file */
+      fba->fullfb = fb_read (fbfilename, log_scale, verbose);
+      if (fba->fullfb == NULL)
+	{
+	  fprintf (stderr, "Could not read factor base\n");
+	  exit (EXIT_FAILURE);
+	}
+      fba->fblarge = fba->fullfb;
+      fb_init_firstlog (fba);
+      /* Extract the small primes into their small prime arrays */
+      for (i = 0; i < SIEVE_BLOCKING; i++)
+	fb_extract_small (fba, CACHESIZES[i], i, verbose);
     }
-  fba->fblarge = fba->fullfb;
-  fb_init_firstlog (fba);
-  /* Extract the small primes into their small prime arrays */
-  for (i = 0; i < SIEVE_BLOCKING; i++)
-    fb_extract_small (fba, CACHESIZES[i], i, verbose);
 
-
-  /* Generate rational fb */
-  fbr->fullfb = fb_make_linear (cpoly->g, (fbprime_t) cpoly->rlim, 
-				log_scale, verbose);
-  if (fbr == NULL)
+  if (sieve_r)
     {
-      fprintf (stderr, 
-	       "Could not generate factor base for linear polynomial\n");
-      exit (EXIT_FAILURE);
+      /* Generate rational fb */
+      fbr->fullfb = fb_make_linear (cpoly->g, (fbprime_t) cpoly->rlim, 
+				    log_scale, verbose);
+      if (fbr == NULL)
+	{
+	  fprintf (stderr, 
+		   "Could not generate factor base for linear polynomial\n");
+	  exit (EXIT_FAILURE);
+	}
+      fbr->fblarge = fbr->fullfb;
+      fb_init_firstlog (fbr);
+      /* Extract the small primes into their small prime arrays */
+      for (i = 0; i < SIEVE_BLOCKING; i++)
+	fb_extract_small (fbr, CACHESIZES[i], i, verbose);
     }
-  fbr->fblarge = fbr->fullfb;
-  fb_init_firstlog (fbr);
-  /* Extract the small primes into their small prime arrays */
-  for (i = 0; i < SIEVE_BLOCKING; i++)
-    fb_extract_small (fbr, CACHESIZES[i], i, verbose);
   
 #ifdef WANT_ASSERT
   /* Check the factor bases for correctness */
   
-  if (fb_check (fba, cpoly, 0) != 0)
+  if (sieve_a)
     {
-      fprintf (stderr, "Error in algebraic factor base\n");
-      exit (EXIT_FAILURE);
+      if (fb_check (fba, cpoly, 0) != 0)
+	{
+	  fprintf (stderr, "Error in algebraic factor base\n");
+	  exit (EXIT_FAILURE);
+	}
+      else if (verbose)
+	printf ("# Algebraic factor base test passed\n");
     }
-  else if (verbose)
-    printf ("# Algebraic factor base test passed\n");
 
-  if (fb_check (fbr, cpoly, 1) != 0)
+  if (sieve_r)
     {
-      fprintf (stderr, "Error in ratinal factor base\n");
-      exit (EXIT_FAILURE);
+      if (fb_check (fbr, cpoly, 1) != 0)
+	{
+	  fprintf (stderr, "Error in ratinal factor base\n");
+	  exit (EXIT_FAILURE);
+	}
+      else if (verbose)
+	printf ("# Rational factor base test passed\n");
     }
-  else if (verbose)
-    printf ("# Rational factor base test passed\n");
 #endif
 
   deg = cpoly->degree;
@@ -2191,35 +2244,53 @@ main (int argc, char **argv)
 
   /* Allocate report buffers */
 
-  if (reports_a_len == 0) /* if not given on command line */
-    reports_a_len = ((amax - amin + 1)) / 256 + 1000;
-  if (verbose)
+  if (sieve_a)
     {
-      printf ("# Allocating %lu entries (%lu bytes) for reports_a\n",
-	      (unsigned long) reports_a_len, (unsigned long) 
-	      (reports_a_len * (long int) sizeof (sieve_report_t)));
-      fflush(stdout);
+      if (reports_a_len == 0) /* if not given on command line */
+	reports_a_len = ((amax - amin + 1)) / 256 + 1000;
+      if (verbose)
+	{
+	  printf ("# Allocating %lu entries (%lu bytes) for reports_a\n",
+		  (unsigned long) reports_a_len, (unsigned long) 
+		  (reports_a_len * (long int) sizeof (sieve_report_t)));
+	  fflush(stdout);
+	}
+      reports_a.alloc = reports_a_len;
+      reports_a.nr = 0;
+      reports_a.reports = (sieve_report_t *) malloc (reports_a_len * 
+						     sizeof (sieve_report_t));
+      ASSERT_ALWAYS (reports_a.reports != NULL);
     }
-  reports_a.alloc = reports_a_len;
-  reports_a.nr = 0;
-  reports_a.reports = (sieve_report_t *) malloc (reports_a_len * 
-						 sizeof (sieve_report_t));
-  ASSERT_ALWAYS (reports_a.reports != NULL);
+  else
+    {
+      reports_a.alloc = 0;
+      reports_a.nr = 0;
+      reports_a.reports = NULL;
+    }
 
-  if (reports_r_len == 0) /* if not given on command line */
-    reports_r_len = ((amax - amin + 1)) / 256 + 1000;
-  if (verbose)
+  if (sieve_r)
     {
-      printf ("# Allocating %lu entries (%lu bytes) for reports_r\n",
-	      (unsigned long) reports_r_len, 
-	      (unsigned long) (reports_r_len * sizeof (sieve_report_t)));
-      fflush(stdout);
+      if (reports_r_len == 0) /* if not given on command line */
+	reports_r_len = ((amax - amin + 1)) / 256 + 1000;
+      if (verbose)
+	{
+	  printf ("# Allocating %lu entries (%lu bytes) for reports_r\n",
+		  (unsigned long) reports_r_len, 
+		  (unsigned long) (reports_r_len * sizeof (sieve_report_t)));
+	  fflush(stdout);
+	}
+      reports_r.alloc = reports_r_len;
+      reports_r.nr = 0;
+      reports_r.reports = (sieve_report_t *) malloc (reports_r_len * 
+						     sizeof (sieve_report_t));
+      ASSERT_ALWAYS (reports_r.reports != NULL);
     }
-  reports_r.alloc = reports_r_len;
-  reports_r.nr = 0;
-  reports_r.reports = (sieve_report_t *) malloc (reports_r_len * 
-						 sizeof (sieve_report_t));
-  ASSERT_ALWAYS (reports_r.reports != NULL);
+  else
+    {
+      reports_r.alloc = 0;
+      reports_r.nr = 0;
+      reports_r.reports = NULL; 
+    }
 
   /* Do the sieving */
 
@@ -2235,46 +2306,52 @@ main (int argc, char **argv)
       if (verbose)
 	printf ("# Sieving line b = %lu\n", b);
 
-      proj_roots = mpz_gcd_ui (NULL, cpoly->f[deg], b);
-      if (verbose)
-	printf ("# Primes with projective roots for b = %lu on algebraic side "
-		"divide %lu\n", b, proj_roots);
+      if (sieve_a)
+	{
+	  proj_roots = mpz_gcd_ui (NULL, cpoly->f[deg], b);
+	  if (verbose)
+	    printf ("# Primes with projective roots for b = %lu on algebraic "
+		    "side divide %lu\n", b, proj_roots);
+	  
+	  if (verbose)
+	    printf ("# Sieving algebraic side\n");
+	  
+#ifdef PARI
+	  mp_poly_print (cpoly->f, cpoly->degree, "P(a,b) = ", 1);
+	  printf (" /* PARI */\n");
+#endif
+	  
+	  sieve_one_side (sievearray, fba, &reports_a, report_a_threshold, 
+			  amin, amax, b, proj_roots, log_scale, 
+			  dpoly_a, deg, NULL, verbose);
+	  
+	  if (verbose)
+	    printf ("# There were %lu sieve reports on the algebraic side\n",
+		    (unsigned long) reports_a.nr);
+	}
 
-      if (verbose)
-	  printf ("# Sieving algebraic side\n");
+      if (sieve_r)
+	{
+	  proj_roots = mpz_gcd_ui (NULL, cpoly->g[1], b);
+	  if (verbose)
+	    printf ("# Primes with projective roots for b = %lu on rational "
+		    "side divide %lu\n", b, proj_roots);
+	  
+	  if (verbose)
+	    printf ("# Sieving rational side\n");
 
 #ifdef PARI
-      mp_poly_print (cpoly->f, cpoly->degree, "P(a,b) = ", 1);
-      printf (" /* PARI */\n");
-#endif
-      
-      sieve_one_side (sievearray, fba, &reports_a, report_a_threshold, 
-		      amin, amax, b, proj_roots, log_scale, 
-		      dpoly_a, deg, NULL, verbose);
-
-      if (verbose)
-	printf ("# There were %lu sieve reports on the algebraic side\n",
-		(unsigned long) reports_a.nr);
-
-      proj_roots = mpz_gcd_ui (NULL, cpoly->g[1], b);
-      if (verbose)
-	printf ("# Primes with projective roots for b = %lu on rational side "
-		"divide %lu\n", b, proj_roots);
-
-      if (verbose)
-	printf ("# Sieving rational side\n");
-
-#ifdef PARI
-      mp_poly_print (cpoly->g, 1, "P(a,b) = ", 1);
-      printf (" /* PARI */\n");
+	  mp_poly_print (cpoly->g, 1, "P(a,b) = ", 1);
+	  printf (" /* PARI */\n");
 #endif
 
-      sieve_one_side (sievearray, fbr, &reports_r, report_r_threshold, 
-		      amin, amax, b, proj_roots, log_scale, 
-		      dpoly_r, 1, &reports_a, verbose);
-      if (verbose)
-	printf ("# There were %lu sieve reports on the rational side\n",
-		(unsigned long) reports_r.nr);
+	  sieve_one_side (sievearray, fbr, &reports_r, report_r_threshold, 
+			  amin, amax, b, proj_roots, log_scale, 
+			  dpoly_r, 1, &reports_a, verbose);
+	  if (verbose)
+	    printf ("# There were %lu sieve reports on the rational side\n",
+		    (unsigned long) reports_r.nr);
+	}
 
       /* Not trial factor the candidate relations */
       relations_found += trialdiv_and_print (cpoly, b, &reports_a, &reports_r, 
@@ -2287,11 +2364,17 @@ main (int argc, char **argv)
   fprintf (stderr, " [init time = %1.0f seconds]\n", init_time);
 
   clear_polynomial (cpoly);
-  fb_clear (fba);
-  fb_clear (fbr);
+  if (sieve_a)
+    {
+      fb_clear (fba);
+      free (reports_a.reports);
+    }
+  if (sieve_r)
+    {
+      fb_clear (fbr);
+      free (reports_r.reports);
+    }
 
-  free (reports_a.reports);
-  free (reports_r.reports);
   free (sievearray);
 
   return 0;
