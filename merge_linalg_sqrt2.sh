@@ -3,8 +3,12 @@
 #
 # Typical use: ./merge_linalg_sqrt.sh params rels1 rels2 ... relsk
 #
+# If no relation files are given, used $root/rels.*
+#
 linalg=linalg
 sqrt=sqrt/naive
+
+echo "Args: $*"
 
 params=$1; shift
 
@@ -37,7 +41,10 @@ if [ "X$verbose" = "X" ]; then verbose="-v"; fi
 name=`grep "name: " $params | awk '{print $NF}'`
 if [ "X$name" = "X" ]; then name=$root.$prune"x"$maxlevel"x"$cwmax"x"$rwmax; fi
 
-echo "Args: $*"
+dir=`dirname $root`
+if [ $# -eq 0 ]; then allrels=`ls $dir/rels.*`; else allrels="$*"; fi
+
+echo $allrels
 
 poly=$root.poly
 nodup=$root.nodup
@@ -47,8 +54,8 @@ if [ -s $nodup ]
 then
   echo "File $nodup already exists"
 else
-  nrels=`wc -l $* | tail -1 | awk '{print $1}'`
-  time $linalg/duplicates -nrels $nrels $* > $nodup
+  nrels=`wc -l $allrels | tail -1 | awk '{print $1}'`
+  time $linalg/duplicates -nrels $nrels $allrels > $nodup
   if [ ! -s $nodup ]; then echo "zero file $nodup"; exit; fi
 fi
 
