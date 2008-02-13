@@ -13,6 +13,10 @@
                                         identify the corresponding IEEE 754
                                         double precision number */
 
+#define LOG_MAX 255.9 /* this should be as near as possible from 256, to
+                         get more accuracy in the norm computations, but not
+                         too much, otherwise a norm might be rounded to zero */
+
 // General information about the siever
 typedef struct {
     uint32_t I;
@@ -25,7 +29,7 @@ typedef struct {
     int nb_buckets;
     int bucket_limit;   // maximal number of bucket_reports allowed in one bucket.
     unsigned int degree;   /* polynomial degree */
-    double lgmaxnorm; /* log (max |F(a0*i+a1*j, b0*i+b1*j)|) / log(2) */
+    double scale;     /* LOG_MAX / log (max |F(a0*i+a1*j, b0*i+b1*j)|) */
     mpz_t *fij;       /* coefficients of F(a0*i+a1*j, b0*i+b1*j) */
 } sieve_info_t;
 
@@ -390,7 +394,7 @@ static void line_sieve(unsigned char *S, factorbase_degn_t **fb_ptr,
                     S_ptr = S + (j*I + (I>>1));
                     // sieve one j-line
                     for (; i0 < (I>>1); i0 += p)
-                        S_ptr[i0] -= logp;
+                      S_ptr[i0] -= logp;
                     // update starting point
                     ii0 += r;
                     if (ii0 >= p)
@@ -698,6 +702,7 @@ fij_from_f (mpz_t *fij, mpz_t *f, int d, int32_t a0, int32_t a1,
   free (g);
 }
 
+#if 0
 /* f(x) -> f(x+1) */
 static void
 translate_right (mpz_t *f, int d)
@@ -714,6 +719,7 @@ translate_right (mpz_t *f, int d)
         mpz_add (f[l], f[l], f[l + 1]);
     }
 }
+#endif
 
 /* f(x) -> f(x-1) */
 static void
@@ -799,7 +805,7 @@ translate_vert_si (mpz_t *f, int d, long a)
     }
 }
 
-/* returns the maximal value of |F(a,b)| for 
+/* returns the maximal value of log |F(a,b)| for 
    a = a0 * i + a1 * j, b = b0 * i + b1 * j,
    -I/2 <= i <= I/2, 0 <= j <= J */
 static double
@@ -818,6 +824,9 @@ get_maxnorm (cado_poly cpoly, sieve_info_t si, mpz_t *fij)
 
   fij_from_f (fij, cpoly->f, d, si.a0, si.a1, si.b0, si.b1);
 
+  /* do not divide by q, since at the end we must take q into account in the
+     remaining norm */
+#if 0
   /* divide the coefficients of fij by q */
   mpz_set_uint64 (qq, si.q);
   for (k = 0; k <= d; k++)
@@ -825,22 +834,23 @@ get_maxnorm (cado_poly cpoly, sieve_info_t si, mpz_t *fij)
       ASSERT_ALWAYS (mpz_divisible_p (fij[k], qq));
       mpz_divexact (fij[k], fij[k], qq);
     }
+#endif
 
-  fprintf (stderr, "F'(x,1) = ");
+  fprintf (stderr, "F_q(x,1) = ");
   fprint_polynomial (stderr, fij, d);
 
-  /* for 0 <= i <= I/2, we have F'(i,0) = fij[d]*i^d, thus the maximum is
+  /* for 0 <= i <= I/2, we have F_q(i,0) = fij[d]*i^d, thus the maximum is
      attained at i=I/2, which is on the right border treated below */
 
   /* translate to i=I/2 */
   translate_right_2exp (fij, d, si.logI - 1);
 
-  /* F'(I/2,0) is the leading coefficient */
+  /* F_q(I/2,0) is the leading coefficient */
   mpz_abs (max_norm, fij[d]);
   i0 = si.I / 2;
   j0 = 0;
 
-  /* now consider the right border i = I/2, 0 <= j <= J */
+  /* now consider the right border i = I/2, 0 < j <= J */
   for (k = 1; k <= si.J; k++)
     {
       translate_up (fij, d);
@@ -871,14 +881,14 @@ get_maxnorm (cado_poly cpoly, sieve_info_t si, mpz_t *fij)
   /* translate in (I/2, J) */
   translate_hori_si (fij, d, si.I / 2);
 
-  /* upper border: -I/2 <= i <= I/2, j = J */
+  /* upper border: -I/2 <= i < I/2, j = J */
   for (k = 0; k < si.I; k++)
     {
       translate_left (fij, d);
       if (mpz_cmpabs (fij[0], max_norm) > 0)
         {
           mpz_abs (max_norm, fij[0]);
-          i0 = (int) si.I / 2 - k;
+          i0 = (int) si.I / 2 - (k + 1);
           j0 = si.J;
         }
     }
@@ -910,9 +920,9 @@ get_maxnorm (cado_poly cpoly, sieve_info_t si, mpz_t *fij)
         }
       translate_up (fij, d);
     }
-  ret = log (mpz_get_d (max_norm)) * LOG_SCALE;
-  fprintf (stderr, "max norm F'(%d,%u) has %1.2f bits [time=%lums]\n",
-           i0, j0, ret, cputime () - time);
+  ret = log (mpz_get_d (max_norm));
+  fprintf (stderr, "max norm F_q(%d,%u) has %1.2f bits [time=%lums]\n",
+           i0, j0, ret * LOG_SCALE, cputime () - time);
 
   translate_vert_si (fij, d, - (int) si.J); /* back to (-I/2, 0) */
   for (k = 1; k <= d; k++) /* back to (0,0) */
@@ -927,27 +937,132 @@ get_maxnorm (cado_poly cpoly, sieve_info_t si, mpz_t *fij)
   return ret;
 }
 
-/* initialize S[i+I/2+j*I] to round(log(|F'(i,j)|)/log(rho))
+/* v <- f(i,j), where f is of degree d */
+static void
+eval_fij (mpz_t v, mpz_t *f, unsigned int d, long i, unsigned long j)
+{
+  unsigned int k;
+  mpz_t jpow;
+
+  mpz_init_set_ui (jpow, 1);
+  mpz_set (v, f[d]);
+  for (k = d; k-- > 0;)
+    {
+      mpz_mul_si (v, v, i);
+      mpz_mul_ui (jpow, jpow, j);
+      mpz_addmul (v, f[k], jpow);
+    }
+  mpz_clear (jpow);
+}
+
+/* initialize S[i+I/2+j*I] to round(log(|F_q(i,j)|)/log(rho))
    where log(maxnorm)/log(rho) = 255, i.e., rho = maxnorm^(1/255) */
 static void
 init_norms (unsigned char *S, cado_poly cpoly, sieve_info_t si)
 {
-  unsigned int j;
+  unsigned int i, j, k, l;
+  unsigned int d = cpoly->degree;
+  mpz_t *t;
+  uint64_t time = cputime ();
 
-#if 0
-  /* special case for j=0, since f(i,j) = i^d*f[d] */
-  fprint_polynomial (stderr, si.fij, si.degree);
+  /* si.scale = LOG_MAX / log(max |F(a0*i+a1*j, b0*i+b1*j)|) */
+  
+  /* invariant: si.fij is the f(i,j) polynomial at (0, 0) */
 
-  for (j = 0; j < si.J; j++)
+  /* on each row (j fixed), the norms are a polynomial in i of degree d,
+     which we evaluate using a table-of-difference method */
+
+  t = malloc ((d + 1) * sizeof (mpz_t));
+  for (k = 0; k <= d; k++)
+    mpz_init (t[k]);
+
+  for (i = j = 0; j < si.J; j++)
     {
-      /* invariant: fij is the polynomial at (0, j) */
+      for (k = 0; k <= d; k++)
+        eval_fij (t[k], si.fij, d, - ((long) si.I) / 2 + (long) k, j);
       
-      /* translate to (-I/2, j) */
+      /* initialize table of differences */
+      for (k = 1; k <= d; k++)
+        for (l = d; l >= k; l--)
+          mpz_sub (t[l], t[l], t[l - 1]);
+
+      /* now compute norms */
+      for (k = 0; k < si.I; k++)
+        {
+          /* F_q(-I/2+k, j) is t[0] */
+          S[i++] = (unsigned char) (log (fabs (mpz_get_d (t[0]))) * si.scale);
+
+          /* update table of differences */
+          for (l = 0; l < d; l++)
+            mpz_add (t[l], t[l], t[l + 1]);
+        }
     }
-#else
-    // Put lgmaxnorm everywhere, assuming it is <= 255
-  memset(S, (unsigned char) si.lgmaxnorm, si.I*si.J);
-#endif
+
+  for (k = 0; k <= d; k++)
+    mpz_clear (t[k]);
+  free (t);
+
+  fprintf (stderr, "computing norms took %lums\n", cputime () - time);
+}
+
+/* check that the double x fits into an int32_t */
+#define fits_int32_t(x) \
+  ((double) INT32_MIN <= (x)) && ((x) <= (double) INT32_MAX)
+
+void
+SkewGauss (sieve_info_t *si, double skewness)
+{
+  double a[2], b[2], q;
+
+  a[0] = (double) si->q;
+  ASSERT_ALWAYS(a[0] < 9007199254740992.0); /* si.q should be less than 2^53
+                                               so that a[0] is exact */
+  a[1] = 0.0;
+  b[0] = (double) si->rho;
+  skewness = rint (skewness);
+  b[1] = skewness;
+  while (1)
+    {
+      q = (a[0] * b[0] + a[1] * b[1]) / (b[0] * b[0] + b[1] * b[1]);
+      q = rint (q);
+      if (q == 0.0)
+        {
+          /* si->a0 and si->a1 should the larger values, in
+             a[0] and b[0] */
+          ASSERT_ALWAYS(fits_int32_t(a[0]));
+          si->a0 = (int32_t) a[0];
+          a[1] /= skewness;
+          ASSERT_ALWAYS(fits_int32_t(a[1]));
+          si->b0 = (int32_t) a[1];
+          ASSERT_ALWAYS(fits_int32_t(b[0]));
+          si->a1 = (int32_t) b[0];
+          b[1] /= skewness;
+          ASSERT_ALWAYS(fits_int32_t(b[1]));
+          si->b1 = (int32_t) b[1];
+          return;
+        }
+      a[0] -= q * b[0];
+      a[1] -= q * b[1];
+      q = (a[0] * b[0] + a[1] * b[1]) / (a[0] * a[0] + a[1] * a[1]);
+      q = rint (q);
+      if (q == 0.0)
+        {
+          /* exchange a and b */
+          ASSERT_ALWAYS(fits_int32_t(a[0]));
+          si->a1 = (int32_t) a[0];
+          a[1] /= skewness;
+          ASSERT_ALWAYS(fits_int32_t(a[1]));
+          si->b1 = (int32_t) a[1];
+          ASSERT_ALWAYS(fits_int32_t(b[0]));
+          si->a0 = (int32_t) b[0];
+          b[1] /= skewness;
+          ASSERT_ALWAYS(fits_int32_t(b[1]));
+          si->b0 = (int32_t) b[1];
+          return;
+        }
+      b[0] -= q * a[0];
+      b[1] -= q * a[1];
+    }
 }
 
 /*************************** main program ************************************/
@@ -1002,15 +1117,12 @@ int main(int argc, char ** argv) {
     si.I = 1<<si.logI;
     si.J = 1<<(si.logI-1);
     
-    /* those values depend on q, and should thus be updated for each new
-       special q (and root rho) */
+    /* special q (and root rho) */
     si.q = 16777291;
     si.rho = 4078255;
-    si.a0 = 464271;
-    si.b0 = -4;
-    si.a1 = -100184;
-    si.b1 = 37;
-    si.lgmaxnorm = get_maxnorm (cpoly, si, si.fij);
+    SkewGauss (&si, cpoly->skew); /* computes a0, b0, a1, b1 from q, rho, and
+                                   the skewness */
+    si.scale = LOG_MAX / get_maxnorm (cpoly, si, si.fij);
 
     unsigned char * S;
 
@@ -1018,29 +1130,46 @@ int main(int argc, char ** argv) {
     S = (unsigned char *) malloc ((1+si.I*si.J)*sizeof(unsigned char));
     ASSERT_ALWAYS(S != NULL);
 
-    factorbase_degn_t * fb;
-    fb = fb_read (fbfilename, LOG_SCALE, 1);
-    ASSERT_ALWAYS(fb != NULL);
-
     init_norms (S, cpoly, si);
+
+    factorbase_degn_t * fb;
+    /* the logarithm scale is LOG_MAX / log(max norm) */
+    fb = fb_read (fbfilename, si.scale, 1);
+    ASSERT_ALWAYS(fb != NULL);
 
     double tm = seconds();
     //sieve_slow(S, fb, &si);
     sieve_random_access(S, fb, &si);
     printf("Done sieving in %f sec\n", seconds()-tm);
 
+    /* sieve reports are those for which the remaining bit-size is less than
+       lambda * lpb */
+    unsigned char report_bound;
+    report_bound = (unsigned char) (cpoly->alambda * cpoly->lpba
+                                    * (si.scale / LOG_SCALE));
+    printf ("report_bound=%u\n", report_bound);
+
     unsigned char min=255;
+    unsigned long reports = 0;
     int kmin = 0;
     int i;
     unsigned int j, k;
     for (k = 0; k < si.I*si.J; ++k)
-        if ((S[k] < min) && (S[k]>50) ) {
-            kmin = k;
-            min = S[k];
+      if (k != (si.I / 2))
+        {
+          /* don't consider i=j=0, which corresponds to k=I/2, and is divisible
+             by every prime */
+          if (S[k] < min)
+            {
+              kmin = k;
+              min = S[k];
+            }
+          reports += (S[k] <= report_bound);
         }
-    
+
     xToIJ(&i, &j, kmin, &si);
     printf("Min of %d is obtained for (i,j) = (%d,%d)\n", min, i, j);
+    printf ("Number of reports on algebraic side: %lu\n", reports);
 
     int stat[256];
     for (k = 0; k < 256; ++k)
