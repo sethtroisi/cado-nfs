@@ -14,6 +14,7 @@
 #include <string.h>
 
 #include "utils/utils.h"
+#include "files.h"
 
 #include "sparse.h"
 
@@ -154,7 +155,7 @@ makeSparse(int **sparsemat, int *colweight, FILE *purgedfile,
 	// take everybody, clean later...!
 	ibuf = 0;
 	for(i = 0; i < nj; i++){
-	    fscanf(purgedfile, "%d", buf+ibuf);
+	    fscanf(purgedfile, PURGE_INT_FORMAT, buf+ibuf);
 	    ibuf++;
 	}
 	qsort(buf, ibuf, sizeof(int), cmp);

@@ -7,6 +7,8 @@
 extern "C" {
 #endif
 
+#define PURGE_INT_FORMAT "%x"
+
 typedef struct{
     FILE *relfile, *purgedfile, *indexfile, *kerfile;
 } files_t;

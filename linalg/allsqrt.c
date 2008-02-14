@@ -34,14 +34,30 @@ checkVector(int *vec, int ncols)
     return ok;
 }
 
+// str is a row coming from purgedfile
 void
 str2Vec(int *vec, char *str)
 {
     char *t = str;
-    int k = 0;
+    int j, k = 0, nc;
 
     // skip first integer which is the index
     for(; *t != ' '; t++);
+#if 1
+    sscanf(t+1, "%d", &nc);
+    for(j = 0; j < nc; j++){
+	// t is on a "space"
+	t++;
+	// t begins on a number
+	sscanf(t, PURGE_INT_FORMAT, &k);
+	vec[k]++;
+	if(j == (nc-1))
+	    // no need to read further
+	    break;
+	// go to end of number
+	for(; *t != ' '; t++);
+    }
+#else
     // skip second integer which is the number of primes
     for(++t; *t != ' '; t++);
     t++;
@@ -57,6 +73,7 @@ str2Vec(int *vec, char *str)
 	    k = k*10+(*t - '0');
 	t++;
     }
+#endif
 }
 
 void

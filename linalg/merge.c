@@ -18,6 +18,7 @@
 #define WANT_ASSERT
 
 #include "utils/utils.h"
+#include "files.h"
 #include "sparse.h"
 #include "merge.h"
 #include "prune.h"
@@ -390,7 +391,7 @@ initWeightFromFile(sparse_mat_t *mat, FILE *purgedfile)
 	ret = fscanf (purgedfile, "%d", &nc);
 	ASSERT_ALWAYS (ret == 1);
 	for(j = 0; j < nc; j++){
-	    ret = fscanf(purgedfile, "%d", &x);
+	    ret = fscanf(purgedfile, PURGE_INT_FORMAT, &x);
 	    ASSERT_ALWAYS (ret == 1);
 	    mat->wt[x]++;
 	}
@@ -440,7 +441,7 @@ readmat(sparse_mat_t *mat, FILE *file)
 	}
 	else{
 	    for(j = 0, ibuf = 0; j < nc; j++){
-		ret = fscanf(file, "%d", &x);
+		ret = fscanf(file, PURGE_INT_FORMAT, &x);
 #if DEBUG >= 1
 		fprintf(stderr, "i = %d, j = %d, x = %d\n", i, j, x);
 #endif

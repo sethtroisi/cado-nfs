@@ -208,7 +208,9 @@ fprint_rel_row (FILE *file, int irel, relation_t rel,
 #endif
       fprintf(file, "%d %d", irel, nb_coeff);
       for (i = 0; i < nb_coeff; ++i) {
-	  fprintf(file, " %d", table_ind[i]-1); // due to the +1 in renumber
+	  fprintf(file, " ");
+	  // due to the +1 in renumber
+	  fprintf(file, PURGE_INT_FORMAT, table_ind[i]-1);
       }
       fprintf(file, "\n");
 #if 0 // TODO: hum
@@ -751,7 +753,7 @@ main(int argc, char **argv)
     char *rel_used;
     int **rel_compact = NULL;
     int ret, k;
-    int nrel, nprimes = 0, final = 1, nfree;
+    int nrel, nprimes = 0, final = 1;
     unsigned int nrelmax = 0, i;
     int nrel_new, nprimes_new, Hsize, Hsizer, Hsizea;
     long maxpr = 0, maxpa = 0, keep = -1; // maximum value for nrows-ncols
