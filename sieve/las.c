@@ -19,13 +19,16 @@
 
 // General information about the siever
 typedef struct {
+    // sieving area
     uint32_t I;
     uint32_t J;
+    int logI; // such that I = 1<<logI
+    // description of the q-lattice
     uint64_t q;
     uint64_t rho;
     int32_t a0, b0, a1, b1;
-    int logI; // such that I = 1<<logI
-    int bucket_size;    // should be around L1 cache size
+    // parameters for bucket sieving
+    int bucket_size;    // should be around L1 cache size, and a multiple of I.
     int nb_buckets;
     int bucket_limit;   // maximal number of bucket_reports allowed in one bucket.
     unsigned int degree;   /* polynomial degree */
@@ -37,21 +40,30 @@ typedef struct {
  * Some bucket stuff, for later...
  */
 
+/*
+ * For the moment, we will keep the bucket reports aligned by adding an
+ * 8-bit field that can contain, for instance, the low bits of p.
+ *
+ * TODO:
+ * If the memory pressure becomes too high with this, we can remove this
+ * p_low field and pack the reports as follows:
+ *    [ x0 ] [ x1 ] [ x2 ] [ x3 ] [logp0] [logp1] [logp2] [logp3] 
+ * in the bucket. 
+ * 
+ * This will be slightly more tricky to store/load bucket reports, but
+ * the additional cost should be negligible.
+ */
+
 typedef struct {
+    uint16_t x;
     char logp;
     uint8_t p_low;  // to keep alignment and help trial div.
-    uint16_t x;
 } bucket_report_t;
 
 typedef struct {
     bucket_report_t * reports;
     int nbr;
 } bucket_t;
-
-typedef struct {
-    uint32_t r;
-    int32_t alpha, beta, gamma, delta;
-} prime_info_t;
 
 /************************** sieve info stuff *********************************/
 
@@ -408,7 +420,7 @@ static void line_sieve(unsigned char *S, factorbase_degn_t **fb_ptr,
     printf("small primes sieved in %f sec\n", seconds()-tm);
 }
 
-
+#ifdef TRY_SSE
 typedef uint32_t v4si __attribute__ ((vector_size (16)));
 
 // r = (x < y) ? a : b
@@ -432,6 +444,7 @@ xmm_cmovge(v4si *r, v4si x, v4si y, v4si a, v4si b) {
     tmp0 = __builtin_ia32_pandn128(tmp0, b); 
     *r = __builtin_ia32_por128(a, tmp0); 
 }
+#endif
 
 // This version of the sieve implements the following:
 //   - naive line-sieving for small p
@@ -1154,7 +1167,7 @@ int main(int argc, char ** argv) {
     int kmin = 0;
     int i;
     unsigned int j, k;
-    for (k = 0; k < si.I*si.J; ++k)
+    for (k = 0; k < si.I*si.J; ++k) 
       if (k != (si.I / 2))
         {
           /* don't consider i=j=0, which corresponds to k=I/2, and is divisible
@@ -1166,7 +1179,6 @@ int main(int argc, char ** argv) {
             }
           reports += (S[k] <= report_bound);
         }
-
     xToIJ(&i, &j, kmin, &si);
     printf("Min of %d is obtained for (i,j) = (%d,%d)\n", min, i, j);
     printf ("Number of reports on algebraic side: %lu\n", reports);
