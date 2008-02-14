@@ -24,14 +24,6 @@
 #undef STATS		// If defined, statistics will be gathered
 			// and printed on stdout
 
-#define MUL_SMALL_THRESHOLD 4
-#define MUL_KARA_THRESHOLD 10
-#define MUL_TOOM_THRESHOLD 17
-#define MUL_TOOMW_THRESHOLD 10
-
-#ifndef MUL_FFT_THRESHOLD
-#define MUL_FFT_THRESHOLD 28
-#endif
 
 /* This threshold controls the internal calls to HalfGCD. */
    
