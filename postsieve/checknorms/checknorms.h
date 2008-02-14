@@ -45,7 +45,7 @@ extern "C" {
 #define REL_MAXLENGTH   1024     // max length in characters of a relation
 #define NMILLER_RABIN   20       // number of iterations in composition test
 #define DFLT_MAX_NLP    4        // default number of large primes accepted
-#define DFLT_TDMAX      100      // bound for largest prime for trial division
+#define DFLT_TDMAX      100      // default bound for trial division
 //------------------------------------------------------------------------------
 #define IS_PRIME(X)     (0 != mpz_probab_prime_p((X), NMILLER_RABIN))
 #define IS_COMPOSITE(X) (0 == mpz_probab_prime_p((X), NMILLER_RABIN))
@@ -118,7 +118,7 @@ static const uint32_t pi_table_pi[NPIX] = {
 };
 //-----------------------------------------------------------------------------
 //
-// Returns an approximation of pi(x) for x < NPIX.
+// Returns an approximation of pi(x) for x <= MAX_X_PIX.
 // Returned approximation is always greater than or equals to pi(x).
 //
 uint32_t pi_approx(uint64_t x);
@@ -180,7 +180,8 @@ inline bool coprime(long a, unsigned long b);
 //    mfba : bound for algebraic residues is 2^mfba
 //  primes : small primes used for trial division (should contains primes
 //           omitted in relations)
-// nprimes : number of such small primes
+//     npa : number of small primes to trial divide by on rational side
+//     npa : number of small primes to trial divide by on algebraic side
 //
 unsigned long checkrels(
     char *f,
@@ -191,7 +192,8 @@ unsigned long checkrels(
     size_t mfbr,
     size_t mfba,
     unsigned long *primes,
-    unsigned long nprimes
+    unsigned long npr,
+    unsigned long npa
 );
 //-----------------------------------------------------------------------------
 //

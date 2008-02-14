@@ -1,9 +1,10 @@
 /**
  * \file    checknorms.c
  * \author  Jerome Milan (heavily based on Paul Zimmermann's checknorms program)
- * \date    Fri Jan 25 2008
+ * \date    Created on Thu Dec 20 2007
+ * \date    Last updated on Thu Feb 14 2008
  * \brief   Check relations produced by siever and factor residues.
- * \version 0.3
+ * \version 0.3.1
  *
  * This is a slight modification of Paul Zimmermann's checknorms program
  * to use TIFA's factoring primitives instead of ECM. Usage is unchanged:
@@ -18,8 +19,8 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
-#include <sys/time.h>     /* for getrusage */
-#include <sys/resource.h> /* for getrusage */
+#include <sys/time.h>     // for getrusage
+#include <sys/resource.h> // for getrusage
 
 #include "cado.h"   // For cado_poly type
 #include "utils.h"  // For read_polynomial(...)
@@ -28,6 +29,10 @@
                     // gcd_ulint(...)
 #include "checknorms.h"
 
+//-----------------------------------------------------------------------------
+#if !defined(MAX)
+#define MAX(a, b) ( ((a) > (b)) ? (a) : (b) )
+#endif
 //-----------------------------------------------------------------------------
 int main(int argc, char *argv[]) {
 
@@ -38,13 +43,17 @@ int main(int argc, char *argv[]) {
 
     unsigned long nrels_out = 0; // total number of accepted relations
 
-    unsigned long tdmax = 1; // bound for largest prime for trial division
-    unsigned long *primes;   // small primes omitted in relations
-    unsigned long nprimes;   // number of small primes to precompute
+    unsigned long tdmax   = DFLT_TDMAX; // bound for trial division
+    unsigned long tdrmax  = 0;    // same bound for rational side (optional)
+    unsigned long tdamax  = 0;    // same bound for algebraic side (optional)
+    unsigned long *primes = NULL; // small primes omitted in relations
+    unsigned long nprimes = 0;    // number of small primes to precompute
+    unsigned long npr     = 0;    // number of small primes for rational side
+    unsigned long npa     = 0;    // number of small primes for algebraic side
 
-    unsigned int mfbr = 0;   // bound for rational  residues is 2^mfbr
-    unsigned int mfba = 0;   // bound for algebraic residues is 2^mfba
-    unsigned int nfiles;     // number of relation files to check
+    unsigned int mfbr   = 0;  // bound for rational  residues is 2^mfbr
+    unsigned int mfba   = 0;  // bound for algebraic residues is 2^mfba
+    unsigned int nfiles = 0;  // number of relation files to check
 
     unsigned int maxnlp = DFLT_MAX_NLP; // max number of large primes allowed
     unsigned int cmult  = 0;            // count multiplicities in maxlp limit
@@ -99,11 +108,35 @@ int main(int argc, char *argv[]) {
             argc -= 2;
             argv += 2;
 
+        } else if (argc > 2 && strcmp(argv[1], "-tr") == 0) {
+            tdrmax = atoi(argv[2]);
+            if (tdrmax > MAX_X_PIX) {
+                tdrmax = MAX_X_PIX;
+            }
+            argc -= 2;
+            argv += 2;
+
+        } else if (argc > 2 && strcmp(argv[1], "-ta") == 0) {
+            tdamax = atoi(argv[2]);
+            if (tdamax > MAX_X_PIX) {
+                tdamax = MAX_X_PIX;
+            }
+            argc -= 2;
+            argv += 2;
+            
         } else  {
             print_usage(progname);
             return 0;
         }
     }
+    if (tdrmax == 0) {
+        tdrmax = tdmax;
+    }
+    if (tdamax == 0) {
+        tdamax = tdmax;
+    }
+    tdmax = MAX(tdamax, tdrmax);
+    
     nfiles = argc - 1;
     if (nfiles == 0) {
         MSG("Please specify at least one relation file.\n");
@@ -162,6 +195,35 @@ int main(int argc, char *argv[]) {
     }
     primes = realloc(primes, nprimes * sizeof(unsigned long));
     //
+    // Get number of small primes for rational and algebraic side
+    //
+    unsigned long min = 0;
+    unsigned long max = nprimes;
+    
+    min = 0;
+    max = nprimes;
+    while ((max - min) > 1) {
+        i = (max + min) / 2;
+        if (tdamax <= primes[i]) {
+            max = i;
+        } else {
+            min = i;
+        }
+    }
+    npa = i;
+    
+    min = 0;
+    max = nprimes;
+    while ((max - min) > 1) {
+        i = (max + min) / 2;
+        if (tdrmax <= primes[i]) {
+            max = i;
+        } else {
+            min = i;
+        }
+    }
+    npr = i;    
+    //
     // Check and complete relations from each relation file...
     //
     while (argc > 1) {
@@ -184,7 +246,7 @@ int main(int argc, char *argv[]) {
         
         nrels_out += checkrels(
                        argv[1], cpoly, verbose, maxnlp, cmult, mfbr, mfba,
-                       primes, nprimes
+                       primes, npr, npa
                      );
         argc--;
         argv++;
@@ -204,12 +266,13 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 //-----------------------------------------------------------------------------
-unsigned long checkrels(char *f, cado_poly cpoly,
-                        int verbose, unsigned int maxnlp, unsigned int cmult,
+unsigned long checkrels(char *f, cado_poly cpoly, int verbose,
+                        unsigned int maxnlp, unsigned int cmult,
                         size_t mfbr, size_t mfba,
-                        unsigned long *primes, unsigned long nprimes) {
+                        unsigned long *primes,
+                        unsigned long nprimes_rat, unsigned long nprimes_alg) {
     //
-    // primes[0] ... primes[nprimes-1] should be the small primes
+    // primes[0], primes[1], primes[2] ... should be the small primes
     // omitted in relations.
     //
     // _WARNING_: This functions uses and/or modifies the count_* global
@@ -366,7 +429,7 @@ unsigned long checkrels(char *f, cado_poly cpoly,
         //
         // Divide by small primes ommited during sieving.
         //
-        for (unsigned long i = 0; i < nprimes; i++) {
+        for (unsigned long i = 0; i < nprimes_rat; i++) {
             while (mpz_divisible_ui_p(norm, primes[i])) {
                 if (npr == 0) {
                     outlength += sprintf(outrel + outlength, "%lx", primes[i]);
@@ -487,7 +550,7 @@ unsigned long checkrels(char *f, cado_poly cpoly,
         //
         // Divide by small primes ommited during sieving.
         //
-        for (unsigned long i = 0; i < nprimes; i++) {
+        for (unsigned long i = 0; i < nprimes_alg; i++) {
             while (mpz_divisible_ui_p(norm, primes[i])) {
                 if (npr == 0) {
                     outlength += sprintf(outrel + outlength, "%lx", primes[i]);
@@ -831,7 +894,8 @@ void print_usage(char* progname) {
     printf("Usage:\n");
     printf("------\n");
     printf("%14s [-h] [-v] [-cmult]\n", progname);
-    printf("%14s [-maxnlp <num>] [-mfbr <num>] [-mfba <num>] [-t <num>]\n", "");
+    printf("%14s [-maxnlp <num>] [-mfbr <num>] [-mfba <num>]\n", "");
+    printf("%14s [-t <num>] [-tr <num>] [-ta <num>]\n", "");
     printf("%14s -poly <file> <relfile_1> [<relfile_2> ... <relfile_n>]\n\n",
            "");
     printf("Type %s -h for more information.\n", progname);
@@ -841,7 +905,8 @@ void print_help(char* progname) {
     printf("Usage:\n");
     printf("------\n");
     printf("%14s [-h] [-v] [-cmult]\n", progname);
-    printf("%14s [-maxnlp <num>] [-mfbr <num>] [-mfba <num>] [-t <num>]\n", "");
+    printf("%14s [-maxnlp <num>] [-mfbr <num>] [-mfba <num>]\n", "");
+    printf("%14s [-t <num>] [-tr <num>] [-ta <num>]\n", "");
     printf("%14s -poly <file> <relfile_1> [<relfile_2> ... <relfile_n>]\n\n",
            "");
     printf("Mandatory arguments:\n");
@@ -873,6 +938,16 @@ void print_help(char* progname) {
     printf("  -t NUM\n");
     printf("      Bound for largest prime for trial division.\n");
     printf("      Default: %i\n", DFLT_TDMAX);
+    printf("  -tr NUM\n");
+    printf("      Bound for largest prime for trial division on rational "
+           "side.\n");
+    printf("      Overrides generic value given by -t option.\n");
+    printf("      Default: %i or value given by -t option\n", DFLT_TDMAX);
+    printf("  -ta NUM\n");
+    printf("      Bound for largest prime for trial division on algebraic "
+           "side.\n");
+    printf("      Overrides generic value given by -t option.\n");
+    printf("      Default: %i or value given by -t option\n", DFLT_TDMAX);
 }
 //-----------------------------------------------------------------------------
 uint64_t ckn_mu_secs() {
