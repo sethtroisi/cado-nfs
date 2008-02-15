@@ -224,8 +224,11 @@ treatSign(relation_t rel, cado_poly pol)
 // RETURN VALUE: -1 if file exhausted.
 //                0 if product is negative...
 //                1 if product is positive...
+//
+// If check == 0, then we don't need to read purgedfile again and again
+// so we store the interesing values in the vec array (ohhhhhh!).
 int
-treatDep(char *ratname, char *algname, FILE *relfile, FILE *purgedfile, FILE *indexfile, FILE *kerfile, cado_poly pol, int nrows, int ncols, char *small_row_used, int small_nrows, hashtable_t *H, int nlimbs, char *rel_used, int *vec, int rora, int verbose)
+treatDep(char *ratname, char *algname, FILE *relfile, FILE *purgedfile, FILE *indexfile, FILE *kerfile, cado_poly pol, int nrows, int ncols, char *small_row_used, int small_nrows, hashtable_t *H, int nlimbs, char *rel_used, int *vec, int rora, int verbose, int check)
 {
     FILE *ratfile, *algfile;
     relation_t rel;
@@ -281,26 +284,34 @@ treatDep(char *ratname, char *algname, FILE *relfile, FILE *purgedfile, FILE *in
 	fprintf(stderr, "NORM:=1;\n");
     }
 #endif
-    memset(vec, 0, ncols * sizeof(int));
+    if(check)
+	memset(vec, 0, ncols * sizeof(int));
     // FIXME: sg should be removed...
     sg = 1;
     ratfile = fopen(ratname, "w");
     algfile = fopen(algname, "w");
     // now really read the purged matrix in
-    rewind(purgedfile);
-    fgets(str, 1024, purgedfile); // skip first line
+    if(check){
+	rewind(purgedfile);
+	fgets(str, 1024, purgedfile); // skip first line
+    }
     // we assume purgedfile is stored in increasing order of the indices
     // of the real relations, so that one pass in the rels file is needed...!
     rewind(relfile);
     irel = 0; // we are ready to read relation irel
     for(i = 0; i < nrows; i++){
-	fgets(str, 1024, purgedfile);
+	if(check)
+	    fgets(str, 1024, purgedfile);
 	if(rel_used[i]){
-	    sscanf(str, "%d", &nr);
+	    if(check)
+		sscanf(str, "%d", &nr);
+	    else
+		nr = vec[i];
 #if DEBUG >= 1
 	    fprintf(stderr, "Reading in rel %d of index %d\n", i, nr);
 #endif
-	    str2Vec(vec, str);
+	    if(check)
+		str2Vec(vec, str);
 	    jumpToRelation(&rel, relfile, irel, nr);
 	    irel = nr+1;
 	    if((rora == 1) || (rora == 3))
@@ -311,7 +322,7 @@ treatDep(char *ratname, char *algname, FILE *relfile, FILE *purgedfile, FILE *in
 	    clear_relation(&rel);
 	}
     }
-    ASSERT(checkVector(vec, ncols));
+    ASSERT(!check || checkVector(vec, ncols));
     if(sg == -1)
 	fprintf(stderr, "prod(a-b*m) < 0\n");
     else{
@@ -326,9 +337,9 @@ treatDep(char *ratname, char *algname, FILE *relfile, FILE *purgedfile, FILE *in
 }
 
 void
-SqrtWithIndexAll(char *prefix, FILE *relfile, FILE *purgedfile, FILE *indexfile, FILE *kerfile, cado_poly pol, int rora, int ndepmin, int ndepmax, int verbose)
+SqrtWithIndexAll(char *prefix, FILE *relfile, FILE *purgedfile, FILE *indexfile, FILE *kerfile, cado_poly pol, int rora, int ndepmin, int ndepmax, int verbose, int check)
 {
-    char ratname[200], algname[200];
+    char ratname[200], algname[200], str[1024];
     hashtable_t H;
     unsigned long w;
     int i, j, ret, nlimbs, nrows, ncols, small_nrows, small_ncols;
@@ -342,7 +353,18 @@ SqrtWithIndexAll(char *prefix, FILE *relfile, FILE *purgedfile, FILE *indexfile,
     // first read used rows in the small matrix
     small_row_used = (char *)malloc(small_nrows * sizeof(char));
     rel_used = (char *)malloc(nrows * sizeof(char));
-    vec = (int *)malloc(ncols * sizeof(int));
+    if(check)
+	vec = (int *)malloc(ncols * sizeof(int));
+    else{
+	// ohhhhhhhhhhhhh!
+	vec = (int *)malloc(nrows * sizeof(int));
+	// get rid of end of first line
+	fgets(str, 1024, purgedfile);
+	for(i = 0; i < nrows; i++){
+	    fgets(str, 1024, purgedfile);
+	    sscanf(str, "%d", vec+i);
+	}
+    }
 
     // skip first ndepmin-1 relations
     for(j = 0; j < ndepmin; j++)
@@ -356,7 +378,7 @@ SqrtWithIndexAll(char *prefix, FILE *relfile, FILE *purgedfile, FILE *indexfile,
 	    break;
 	sprintf(ratname, "%s.rat.%03d", prefix, ndepmin);
 	sprintf(algname, "%s.alg.%03d", prefix, ndepmin);
-	ret = treatDep(ratname, algname, relfile, purgedfile, indexfile, kerfile, pol, nrows, ncols, small_row_used, small_nrows, &H, nlimbs, rel_used, vec, rora, verbose);
+	ret = treatDep(ratname, algname, relfile, purgedfile, indexfile, kerfile, pol, nrows, ncols, small_row_used, small_nrows, &H, nlimbs, rel_used, vec, rora, verbose, check);
 	if(ret == -1)
 	    break;
 	fprintf(stderr, "# Treated dependency #%d at %2.2lf\n",
@@ -375,7 +397,7 @@ int main(int argc, char *argv[])
     char *relname, *purgedname, *indexname, *kername, *polyname;
     FILE *relfile, *purgedfile, *indexfile, *kerfile;
     cado_poly pol;
-    int verbose = 1, ndepmin, ndepmax, rora, ret, i;
+    int verbose = 1, ndepmin, ndepmax, rora, ret, i, check;
 
     if(argc != 10){
 	fprintf(stderr, "Usage: %s relname purgedname indexname", argv[0]);
@@ -418,7 +440,8 @@ int main(int argc, char *argv[])
         exit (1);
       }
     verbose = 0;
-    SqrtWithIndexAll(argv[9], relfile, purgedfile, indexfile, kerfile, pol, rora, ndepmin, ndepmax, verbose);
+    check = 0;
+    SqrtWithIndexAll(argv[9], relfile, purgedfile, indexfile, kerfile, pol, rora, ndepmin, ndepmax, verbose, check);
 
     fclose(relfile);
     fclose(purgedfile);
