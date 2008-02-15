@@ -29,6 +29,11 @@
 #define TRIALDIV_SKIPFORWARD_DEFAULT
 #endif
 
+#ifndef GUESS_NORM_AFTER_MISSINGPRIME_THRES
+#define GUESS_NORM_AFTER_MISSINGPRIME_THRES 14
+#define GUESS_NORM_AFTER_MISSINGPRIME_THRES_DEFAULT
+#endif
+
 /* We'll use ul_rho() instead of trial division if the size in bits 
    of the missing factor base prime is > UL_RHO_LOGTHRES */
 #ifndef UL_RHO_LOGTHRES
@@ -48,13 +53,7 @@
 #define add_error(a) ((unsigned char) ((a) + SIEVE_PERMISSIBLE_ERROR))
 
 
-unsigned long sumprimes, nrprimes; /* For largest non-report fb primes */
-unsigned long sumprimes2, nrprimes2;  /* For 2nd largest non-report fb prim. */
 unsigned long skipped_ahead_too_far;
-#define missinglog_hist_max 32
-unsigned int missinglog_hist[missinglog_hist_max];
-unsigned long ul_rho_called = 0, ul_rho_called1 = 0, 
-  mpz_rho_called = 0, mpz_rho_called1 = 0;
 unsigned long ul_rho_toolarge_nr, ul_rho_toolarge_sum; 
 long long ul_rho_time;
 
@@ -1376,8 +1375,7 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 		   const fbprime_t *proj_primes,
 		   factorbase_t fb,
 		   const sieve_reportbuffer_t *reports,
-		   size_t report_idx, 
-		   unsigned int *cof_toolarge, unsigned int *lp_toolarge,
+		   size_t report_idx, refactor_stats_t *stats,
 		   const unsigned long fbb, const int lpb, const int mfb, 
 		   const double lambda, const double log_scale)
 {
@@ -1534,6 +1532,9 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
       fbptr = fb_next (fbptr);
     }
 
+  stats->nr_primes2++;
+  stats->sum_primes2 += (unsigned long) fbptr->p;
+
   /* Now at least one of these conditions hold:
      1. add_error (sievelog) <= add_error (finallog)
      2. uc_sub(sievelog, finallog) < 2*fbptr->plog
@@ -1565,16 +1566,54 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 		       norm);
 	  abort ();
 	}
+
+      if (missinglog < missinglog_hist_max)
+	stats->missinglog_hist[missinglog]++;
+
+      /* We know the missing prime p has 
+         round(ln(p) * log_scale) <= missinglog + MAX_SIEVELOG_ERROR
+         ==>
+         ln(p) * log_scale - 0.5 <= missinglog + MAX_SIEVELOG_ERROR
+         ==>
+         p <= floor (exp((missinglog + MAX_SIEVELOG_ERROR + 0.5) / log_scale))
+         Hence after dividing out p, the remaining norm will be >=
+         ceil (norm / floor (...)). If that estimate is >mfb, we can stop
+         immediately and need not find the actual value of p, which saves
+         us a great deal of trial division. 
+	 HOWEVER, the missing prime might appear in a power >1 in norm. 
+	 In that case the norm could be smooth even though this test fails. 
+	 Some (although probably only few) relations may be missed this way! 
+	 Hence we do this test only if missinglog is above some threshold,
+	 since it's mostly small primes that appear in powers, and looking
+	 for the missing prime is cheap anyway if it is small. */
+      
+#ifdef GUESS_NORM_AFTER_MISSINGPRIME_THRES
+      if (missinglog > GUESS_NORM_AFTER_MISSINGPRIME_THRES)
+      {
+        double est_p;
+        mpz_t est_norm;
+        est_p = exp ((missinglog + MAX_SIEVELOG_ERROR + 0.5) / log_scale);
+        if (est_p > (double) fbb)
+          est_p = (double) fbb;
+        mpz_init (est_norm);
+        mpz_tdiv_q_ui (est_norm, norm, (unsigned long) est_p);
+        if (mpz_sizeinbase (est_norm, 2) > (size_t) mfb)
+          {
+            mpz_clear (est_norm);
+            if (missinglog < missinglog_hist_max)
+              stats->missinglog_guessdiscard_hist[missinglog]++;
+	    stats->guessed_cof_toolarge++;
+            return 0; /* Can't become small enough */
+          }
+        mpz_clear (est_norm);
+      }
+#endif
       
       {
         /* Jump ahead in the factor base to primes of approximately 
            the correct size. */
-        nrprimes2++;
-        sumprimes2 += (unsigned long) fbptr->p;
         
 #if TRIALDIV_SKIPFORWARD
-        if (missinglog < missinglog_hist_max)
-          missinglog_hist[missinglog]++;
         /* We know add_error (sievelog) > add_error (finallog), so
            missinglog is positive */
         /* Skip forward to the factor base prime of the right size */
@@ -1600,8 +1639,8 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
           }
         /* This time is must have worked */
         ASSERT_ALWAYS (fbptr->p != 0);
-        nrprimes++;
-        sumprimes += (unsigned long) fbptr->p;
+        stats->nr_missingprimes++;
+        stats->sum_missingprimes += (unsigned long) fbptr->p;
       }
       
       r = trialdiv_one_prime (fbptr->p, norm, nr_primes, primes,
@@ -1640,7 +1679,7 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
     }
   if ((int) log2size > mfb)
     {
-      (*cof_toolarge)++;
+      stats->cof_toolarge++;
       TRACE_A (a, __func__, __LINE__, "log2size %d > mfb %d, discarding "
 	       "relation\n", (int) log2size, (int) mfb);
       return 0;
@@ -1650,6 +1689,7 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
   if (mpz_cmp_ui (norm, 1UL) == 0)
     {
       TRACE_A (a, __func__, __LINE__, "Cofactor is 1, this side is smooth\n");
+      stats->survivors++;
       return 1;
     }
 
@@ -1681,6 +1721,7 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 	  ASSERT (mpz_fits_ulong_p (norm));
 	  add_fbprime_to_list (primes, nr_primes, max_nr_primes, 
 			       (fbprime_t) mpz_get_ui (norm));
+	  stats->survivors++;
 	  return 1;
 	}
       else
@@ -1688,7 +1729,7 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 	  /* Prime and >2^lpb: relation is not smooth */
 	  TRACE_A (a, __func__, __LINE__, "cofactor %Zd is prime and >2^lpb"
 		   " = 2^%d. This side is not smooth.\n", norm, lpb);
-	  (*lp_toolarge)++;
+	  stats->lp_toolarge++;
 	  return 0;
 	}
     }
@@ -1698,9 +1739,56 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 
   /* So the cofactor is not a prime. Later we'll try to factor it somehow,
      for now we just print the relation with the large primes missing. */
+  stats->survivors++;
   return 1;
 }
 
+
+static void
+print_stats (refactor_stats_t *stats)
+{
+  int i, j;
+  printf ("# Nr and average of 2nd largest non-report fb primes: %u, %.2f\n",
+	  stats->nr_primes2, 
+	  (double)(stats->sum_primes2) / (double)(stats->nr_primes2));
+
+  printf ("# Histogram of missinglog: ");
+  for (i = 0, j = 0; i < missinglog_hist_max; i++)
+    {
+      printf ("%u ", stats->missinglog_hist[i]);
+      j += stats->missinglog_hist[i];
+    }
+  printf (", sum = %u\n", j);
+
+#ifdef GUESS_NORM_AFTER_MISSINGPRIME_THRES
+  printf ("# Histogram of missinglog when aborting: ");
+  for (i = 0, j = 0; i < missinglog_hist_max; i++)
+    {
+      printf ("%u ", stats->missinglog_guessdiscard_hist[i]);
+      j += stats->missinglog_guessdiscard_hist[i];
+    }
+  printf (", sum = %u\n", j);
+#endif
+
+  printf ("# Guessed cofactor was > 2^mfb %u times\n", 
+	  stats->guessed_cof_toolarge);
+
+  printf ("# Nr and average of missingprimes we found: %u, %.2f\n",
+	  stats->nr_missingprimes, 
+	  (double)stats->sum_missingprimes / (double)stats->nr_missingprimes);
+
+  printf ("# Actual cofactor was > 2^mfb %u times\n", stats->cof_toolarge);
+  printf ("# There was a large prime > 2^lpb %u times\n", stats->lp_toolarge);
+  printf ("# There were %u survivors\n", stats->survivors);
+#if 0
+  printf ("# Called ul_rho %lu times, mpz_rho %lu times\n",
+	  stats->ul_rho_called, stats->mpz_rho_called);
+  printf ("# %lu cofactors too large for ul_rho and too small for "
+	  "mpz_rho, average %.3f", ul_rho_toolarge_nr, 
+	  (double) ul_rho_toolarge_sum / (double) ul_rho_toolarge_nr);
+  printf ("# Calls to ul_rho() took %llu clocks\n", ul_rho_time);
+#endif
+}
 
 /* return the number of printed relations */
 static unsigned int
@@ -1718,9 +1806,9 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
   fbprime_t primes_a[max_nr_primes], primes_r[max_nr_primes];
   fbprime_t proj_primes_a[max_nr_primes], proj_primes_r[max_nr_primes];
   unsigned int nr_primes_a, nr_primes_r, nr_proj_primes_a, nr_proj_primes_r;
-  unsigned int matching_reports = 0, relations_found = 0;
-  unsigned int lp_a_toolarge = 0, lp_r_toolarge = 0, 
-    cof_a_toolarge = 0, cof_r_toolarge = 0, not_coprime = 0;
+  unsigned int matching_reports = 0, relations_found = 0,
+    not_coprime = 0;
+  refactor_stats_t stats_a, stats_r;
   int ok;
   const int have_a_reports = reports_a->reports != NULL;
   const int have_r_reports = reports_r->reports != NULL;
@@ -1755,12 +1843,12 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
   trialdiv_slow (proj_divisor_r, &nr_proj_primes_r, proj_primes_r, 
 		 max_nr_proj_primes);
 
-  sumprimes = nrprimes = 0;
-  sumprimes2 = nrprimes2 = 0;
   skipped_ahead_too_far = 0;
-  for (i = 0; i < missinglog_hist_max; i++)
-    missinglog_hist[i] = 0;
   ul_rho_toolarge_nr = ul_rho_toolarge_sum = 0;
+
+  /* Set stats to zero */
+  memset (&stats_a, 0, sizeof (stats_a));
+  memset (&stats_r, 0, sizeof (stats_a));
 
   for (i = 0, j = 0; (!have_a_reports || i < reports_a->nr)
 	 && (!have_r_reports || j < reports_r->nr); )
@@ -1788,8 +1876,7 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 					  primes_a, &nr_primes_a, max_nr_primes,
 					  proj_divisor_a, nr_proj_primes_a, 
 					  proj_primes_a, fba, 
-					  reports_a, i,
-					  &cof_a_toolarge, &lp_a_toolarge, 
+					  reports_a, i, &stats_a,
 					  poly->alim, poly->lpba, poly->mfba, 
 					  poly->alambda, log_scale);
 		  if (!ok) 
@@ -1804,8 +1891,7 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 					  primes_r, &nr_primes_r, max_nr_primes,
 					  proj_divisor_r, nr_proj_primes_r, 
 					  proj_primes_r, fbr, 
-					  reports_r, j,
-					  &cof_r_toolarge, &lp_r_toolarge, 
+					  reports_r, j, &stats_r,
 					  poly->rlim, poly->lpbr, poly->mfbr, 
 					  poly->rlambda, log_scale);
 		  if (!ok) 
@@ -1857,24 +1943,10 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
       printf ("# Number of matching reports with a,b coprime: %u\n", 
 	      matching_reports);
       printf ("# Number of relations found: %u\n", relations_found);
-      printf ("# Average of largest non-report fb primes: %.0f\n",
-	      (double)sumprimes / (double)nrprimes);
-      printf ("# Average of 2nd largest non-report fb primes: %.0f\n",
-	      (double)sumprimes2 / (double)nrprimes2);
-      printf ("# We skipped ahead too far in the factor base %lu times\n",
-              skipped_ahead_too_far);
-      printf ("# Histogram of missinglog: ");
-      for (i = 0; i < missinglog_hist_max; i++)
-        printf ("%d ", missinglog_hist[i]);
-      printf ("\n");
-      printf ("# Called ul_rho %lu times with %lu repeats, mpz_rho %lu times "
-	      "with %lu repeats\n",
-	      ul_rho_called, ul_rho_called - ul_rho_called1, 
-	      mpz_rho_called, mpz_rho_called - mpz_rho_called1);
-      printf ("# %lu cofactors too large for ul_rho and too small for "
-	      "mpz_rho, average %.3f", ul_rho_toolarge_nr, 
-	      (double) ul_rho_toolarge_sum / (double) ul_rho_toolarge_nr);
-      printf ("# Calls to ul_rho() took %llu clocks\n", ul_rho_time);
+      printf ("# Stats for algebraic side:\n");
+      print_stats (&stats_a);
+      printf ("# Stats for rational side:\n");
+      print_stats (&stats_r);
     }
   
   for (i = 0; i <= (unsigned)poly->degree; i++)
@@ -1895,10 +1967,6 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 	    " (without REDC)",
 #endif
 	    (long int) (tsc2 - tsc1));
-    printf ("# Too large cofactors (discarded in this order): "
-	    "alg > mfba: %d, alg prp > lpba: %d, "
-	    "rat > mfbr: %d, rat prp > lpbr: %d\n", 
-	    cof_a_toolarge, lp_a_toolarge, cof_r_toolarge, lp_r_toolarge);
   }
 
   return relations_found;
@@ -2101,6 +2169,19 @@ main (int argc, char **argv)
       printf ("# Cannot skip forward in factor base during refactoring");
 #endif
 #ifdef TRIALDIV_SKIPFORWARD_DEFAULT
+      printf (" (using default setting).\n");
+#else
+      printf (".\n");
+#endif
+
+#if GUESS_NORM_AFTER_MISSINGPRIME_THRES
+      printf ("# Can discard relations if missinglog >= %d and cofactor size "
+	      "is too large", GUESS_NORM_AFTER_MISSINGPRIME_THRES);
+#else
+      printf ("# Cannot discard relations if cofactor size - missinglog "
+	      "is too large");
+#endif
+#ifdef GUESS_NORM_AFTER_MISSINGPRIME_THRES_DEFAULT
       printf (" (using default setting).\n");
 #else
       printf (".\n");
@@ -2357,6 +2438,10 @@ main (int argc, char **argv)
       relations_found += trialdiv_and_print (cpoly, b, &reports_a, &reports_r, 
 					     fba, fbr, log_scale, verbose);
     }
+
+  if (verbose)
+    printf ("# We skipped ahead too far in the factor base %lu times\n",
+	    skipped_ahead_too_far);
 
   sieve_time = seconds () - sieve_time;
   fprintf (stderr, "Found %lu relations in %1.0f seconds (%1.2e s/r)",

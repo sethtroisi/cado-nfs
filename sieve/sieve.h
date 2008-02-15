@@ -30,3 +30,27 @@ typedef struct {
   size_t nr;                /* There are currently nr sieve_report_t filled */
 } sieve_reportbuffer_t;
 
+#define missinglog_hist_max 32
+
+typedef struct {
+  unsigned long
+    sum_missingprimes,    /* The sum of missingprimes */
+    sum_primes2;          /* The sum of the 2nd largest non-report FB primes */
+  
+  unsigned int
+    guessed_cof_toolarge, /* Number of times the guessed cofactor after 
+			   dividing out the missing prime would be > mfb */
+    cof_toolarge,         /* Number of times the cofactor after dividing 
+			     out all FB primes was > mfb */
+    lp_toolarge,          /* Number of times there was a large prime > lpb */
+    survivors,            /* Number of surviving candidate relations */
+    nr_missingprimes,     /* The number of times we actually found 
+			     missingprime */
+    nr_primes2,           /* The number of the 2nd largest ... */
+    ul_rho_called,        /* Number of times we called ul_rho () */
+    mpz_rho_called,       /* Number of times we called mpz_rho () */
+    missinglog_hist[missinglog_hist_max], /* The histogram of missinglog */
+    missinglog_guessdiscard_hist[missinglog_hist_max]; /* The histogram of
+			     missinglog when we discard due to guessed 
+			     cofactor > mfb */
+} refactor_stats_t;
