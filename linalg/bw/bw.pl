@@ -91,7 +91,14 @@ sub action { print join(@_,' '), "\n"; system @_; }
 # is a gnu-ism). Not ln -s without caution, because this would require
 # some knowledge about the right path back, which could be quite a bit of
 # a hack. I'm happy with cp --link at the moment.
-sub do_cp { my @x = @_; unshift @x, "cp", "--link"; action @x; }
+sub do_cp { my @x = @_; unshift @x, "cp", "--link"; action @x;
+    if ($? >> 8 != 0) {
+        shift @x;
+        shift @x;
+        unshift @x, "cp";
+        action @x;
+    }
+}
 
 # If we already have a matrix, parse its header to obtain some
 # information.
