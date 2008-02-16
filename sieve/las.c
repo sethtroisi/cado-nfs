@@ -69,7 +69,7 @@ typedef struct {
 /************************** sieve info stuff *********************************/
 
 void
-sieve_info_init (sieve_info_t *si, unsigned int d)
+sieve_info_init (sieve_info_t *si, unsigned int d, int I)
 {
   unsigned int k;
 
@@ -77,6 +77,9 @@ sieve_info_init (sieve_info_t *si, unsigned int d)
   si->fij = malloc ((d + 1) * sizeof (mpz_t));
   for (k = 0; k <= d; k++)
     mpz_init (si->fij[k]);
+  si->logI = I;
+  si->I = 1 << si->logI;
+  si->J = 1 << (si->logI - 1);
 }
 
 void
@@ -989,7 +992,6 @@ init_norms (unsigned char *S, cado_poly cpoly, sieve_info_t si)
   unsigned int i, j, k, l;
   unsigned int d = cpoly->degree;
   mpz_t *t;
-  uint64_t time = cputime ();
 
   /* si.scale = LOG_MAX / log(max |F(a0*i+a1*j, b0*i+b1*j)|) */
   
@@ -1027,8 +1029,6 @@ init_norms (unsigned char *S, cado_poly cpoly, sieve_info_t si)
   for (k = 0; k <= d; k++)
     mpz_clear (t[k]);
   free (t);
-
-  fprintf (stderr, "Computing norms took %lums\n", cputime () - time);
 }
 
 /* check that the double x fits into an int32_t */
@@ -1209,7 +1209,7 @@ static void
 build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
                       unsigned long reports)
 {
-  mpz_t ci, cj, **T, norm;
+  mpz_t ci, cj, **T, norm, norm2;
   int i;
   unsigned int k, j, l;
   unsigned int *lT; /* lT[j] = length of T[j] */
@@ -1234,6 +1234,7 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
   mpz_init (ci); /* ci = g[1]*a0+g[0]*b0 */
   mpz_init (cj); /* cj = g[1]*a1+g[0]*b1 */
   mpz_init (norm);
+  mpz_init (norm2);
 
   mpz_mul_si (ci, cpoly->g[1], si->a0);
   mpz_addmul_si (ci, cpoly->g[0], si->b0);
@@ -1334,15 +1335,18 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
           trial_divide (bufr, norm, cpoly->rlim);
           /* since we divided out large primes, norm should be 1 here */
           ASSERT_ALWAYS(mpz_cmp_ui (norm, 1) == 0);
+
           eval_fij (norm, cpoly->f, cpoly->degree, a, b);
           /* we know that q divides the norm on the algebraic side */
           mpz_divexact_ui (norm, norm, si->q);
           /* FIXME: on the algebraic side, we could restrict to the
              factor base primes */
           trial_divide (bufa, norm, cpoly->alim);
-          large_size = mpz_sizeinbase (norm, 2);
-          if (large_size <= cpoly->mfba &&
-              !(large_size > cpoly->lpba && mpz_probab_prime_p (norm, 1)))
+          mpz_mul_ui (norm2, norm, si->q); /* large primes including q */
+          /* we take q into account for the mfb bound */
+          if (mpz_sizeinbase (norm, 2) <= (size_t) cpoly->mfba &&
+              !(mpz_sizeinbase (norm, 2) > (size_t) cpoly->lpba &&
+                mpz_probab_prime_p (norm, 1)))
             {
               final_reports ++;
               if (strlen (bufa) == 0)
@@ -1369,6 +1373,7 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
   mpz_clear (ci);
   mpz_clear (cj);
   mpz_clear (norm);
+  mpz_clear (norm2);
 }
 
 /* build a list report_list[] of values of k = i + I/2 + I*j where gcd(i,j)=1
@@ -1436,19 +1441,21 @@ factor_rational (cado_poly cpoly, sieve_info_t *si, unsigned char *S)
 static void
 usage (char *argv0)
 {
-  fprintf (stderr, "Usage: %s -poly xxx.poly -fb xxx.roots\n", argv0);
+  fprintf (stderr, "Usage: %s -poly xxx.poly -fb xxx.roots -f q0\n", argv0);
   exit (1);
 }
 
-// this main is just to play with rsa155
-// and run with:
-//   ./las rsa155.roots
-int main(int argc, char ** argv) {
+int
+main (int argc, char *argv[])
+{
     char *argv0 = argv[0];
     sieve_info_t si;
     char *fbfilename = NULL, *polyfilename = NULL;
     cado_poly cpoly;
-    double tm, t0 = seconds ();
+    double t0 = seconds (), tmaxnorm, tfb, ts, tf;
+    uint64_t q0;
+    unsigned long *roots, nroots;
+    unsigned char * S;
 
     while (argc > 1 && argv[1][0] == '-')
       {
@@ -1461,6 +1468,12 @@ int main(int argc, char ** argv) {
         else if (argc > 2 && strcmp (argv[1], "-poly") == 0)
           {
             polyfilename = argv[2];
+            argc -= 2;
+            argv += 2;
+          }
+        else if (argc > 2 && strcmp (argv[1], "-f") == 0)
+          {
+            q0 = strtoul (argv[2], NULL, 10);
             argc -= 2;
             argv += 2;
           }
@@ -1477,46 +1490,58 @@ int main(int argc, char ** argv) {
         exit (EXIT_FAILURE);
       }
 
-    sieve_info_init (&si, cpoly->degree);
+    /* this does not depend on the special-q */
+    sieve_info_init (&si, cpoly->degree, 13);
 
-    /* those values do not depend on q */
-    si.logI = 13;
-    si.I = 1<<si.logI;
-    si.J = 1<<(si.logI-1);
-    
+    // One more is for the garbage during SSE
+    S = (unsigned char *) malloc ((1 +si.I * si.J)*sizeof(unsigned char));
+    ASSERT_ALWAYS(S != NULL);
+
     /* special q (and root rho) */
-    si.q = 16777291;
-    si.rho = 4078255;
+    si.q = q0;
+    roots = (unsigned long*) malloc (cpoly->degree * sizeof (unsigned long));
+    nroots = modul_roots_mod_long (roots, cpoly->f, cpoly->degree, &q0);
+    if (nroots == 0)
+      {
+        fprintf (stderr, "Error, no root for q=%lu\n", q0);
+        exit (1);
+      }
+    si.rho = roots[0];
+    fprintf (stderr, "Sieving q=%lu, rho=%lu\n", si.q, si.rho);
+
+    /* norm computation */
+    tmaxnorm = seconds ();
     SkewGauss (&si, cpoly->skew); /* computes a0, b0, a1, b1 from q, rho, and
                                    the skewness */
     si.scale = LOG_MAX / get_maxnorm (cpoly, si, si.fij);
-
-    unsigned char * S;
-
-    // One more is for the garbage during SSE
-    S = (unsigned char *) malloc ((1+si.I*si.J)*sizeof(unsigned char));
-    ASSERT_ALWAYS(S != NULL);
-
     init_norms (S, cpoly, si);
+    tmaxnorm = seconds () - tmaxnorm;
+    fprintf (stderr, "Initializing norms took %1.1fs\n", tmaxnorm);
 
     factorbase_degn_t * fb;
     /* the logarithm scale is LOG_MAX / log(max norm) */
-    tm = seconds ();
+    tfb = seconds ();
     fb = fb_read (fbfilename, si.scale, 0);
     ASSERT_ALWAYS(fb != NULL);
-    fprintf (stderr, "Reading factor base took %f sec\n", seconds() - tm);
+    tfb = seconds () - tfb;
+    fprintf (stderr, "Reading factor base took %1.1fs\n", tfb);
 
-    tm = seconds ();
+    ts = seconds ();
     //sieve_slow(S, fb, &si);
     sieve_random_access(S, fb, &si);
-    fprintf (stderr, "Done sieving in %f sec\n", seconds()-tm);
+    fprintf (stderr, "Done sieving in %1.1fs\n", ts = seconds () - ts);
 
+    tf = seconds ();
     factor_rational (cpoly, &si, S);
+    tf = seconds () - tf;
 
-    fprintf (stderr, "Total sieving time %f sec\n", seconds() - t0);
+    t0 = seconds() - t0;
+    fprintf (stderr, "Total sieving time %1.1fs [norm %1.1f, fb %1.1f,"
+             " sieving %1.1f, factor %1.1f]\n", t0, tmaxnorm, tfb, ts, tf);
 
     sieve_info_clear (&si);
     clear_polynomial (cpoly);
+    free (roots);
 
     return 0;
 }
