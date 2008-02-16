@@ -7,6 +7,7 @@
 #include "../utils/mod_ul.h"
 #include "fb.h"
 #include "../utils/utils.h"
+#include "basicnt.h" /* for gcd_ul */
 
 #define LOG_SCALE 1.4426950408889634 /* 1/log(2) to 17 digits, rounded to
                                         nearest. This is enough to uniquely
@@ -159,18 +160,18 @@ fb_root_in_qlattice(const fbprime_t p, const fbprime_t R, const sieve_info_t * s
 
 
 static void
-special_case_0() 
+special_case_0 (unsigned long p)
 {
 #ifndef NO_WARNING
-    fprintf(stderr, "Warning: special_case_0() not implemented\n");
+  fprintf(stderr, "Warning: special_case_0(%lu) not implemented\n", p);
 #endif
 }
 
 static void
-special_case_p() 
+special_case_p (unsigned long p)
 {
 #ifndef NO_WARNING
-    fprintf(stderr, "Warning: special_case_p() not implemented\n");
+  fprintf(stderr, "Warning: special_case_p(%lu) not implemented\n", p);
 #endif
 }
 
@@ -195,11 +196,11 @@ sieve_slow (unsigned char *S, const factorbase_degn_t *fb,
             R = fb->roots[nr];
             r = fb_root_in_qlattice(p, R, si);
             if (r == 0) {
-                special_case_0();
+                special_case_0 (p);
                 continue;
             } 
             if (r == p) {
-                special_case_p();
+                special_case_p (p);
                 continue;
             } 
 
@@ -387,11 +388,11 @@ static void line_sieve(unsigned char *S, factorbase_degn_t **fb_ptr,
             R = (*fb_ptr)->roots[nr];
             r = fb_root_in_qlattice(p, R, si);
             if (r == 0) {
-                special_case_0();
+                special_case_0 (p);
                 continue;
             } 
             if (r == p) {
-                special_case_p();
+                special_case_p (p);
                 continue;
             } 
             
@@ -417,7 +418,7 @@ static void line_sieve(unsigned char *S, factorbase_degn_t **fb_ptr,
         }
         (*fb_ptr) = fb_next ((*fb_ptr)); // cannot do fb++, due to variable size !
     }
-    printf("small primes sieved in %f sec\n", seconds()-tm);
+    fprintf (stderr, "small primes sieved in %f sec\n", seconds()-tm);
 }
 
 #ifdef TRY_SSE
@@ -485,10 +486,10 @@ sieve_random_access (unsigned char *S, factorbase_degn_t *fb,
             r[how_many] = fb_root_in_qlattice(p[how_many], R[how_many], si);
             how_many++;
             if (r[how_many-1] == 0) {
-                special_case_0();
+                special_case_0 (fb->p);
                 how_many--;
             } else if (r[how_many-1] == p[how_many-1]) {
-                special_case_p();
+                special_case_p (fb->p);
                 how_many--;
             }
             if (cur_root < fb->nr_roots-1)
@@ -569,11 +570,11 @@ sieve_random_access (unsigned char *S, factorbase_degn_t *fb,
             R = fb->roots[nr];
             r = fb_root_in_qlattice(p, R, si);
             if (r == 0) {
-                special_case_0();
+                special_case_0 (p);
                 continue;
             } 
             if (r == p) {
-                special_case_p();
+                special_case_p (p);
                 continue;
             } 
             
@@ -605,7 +606,7 @@ sieve_random_access (unsigned char *S, factorbase_degn_t *fb,
         }
         fb = fb_next (fb); // cannot do fb++, due to variable size !
     }
-    printf("large primes sieved in %f sec\n", seconds()-tm);
+    fprintf (stderr, "large primes sieved in %f sec\n", seconds()-tm);
 }
 
 // Conversions between different representations for sieve locations:
@@ -634,14 +635,24 @@ IJToAB(int64_t *a, uint64_t *b, int i, int j, sieve_info_t * si)
     *b = i*si->b0 + j*si->b1;
 }
 
+/* Warning: b might be negative, in which case we return (-a,-b) */
 void
 xToAB(int64_t *a, uint64_t *b, int x, sieve_info_t * si)
 {
     int i, j;
+    int64_t c;
+
     i = (x % (si->I)) - (si->I >> 1);
     j = x / si->I;
-    *a = i*si->a0 + j*si->a1;
-    *b = i*si->b0 + j*si->b1;
+    *a = (int64_t) i * (int64_t) si->a0 + (int64_t) j * (int64_t) si->a1;
+    c =  (int64_t) i * (int64_t) si->b0 + (int64_t) j * (int64_t) si->b1;
+    if (c >= 0)
+      *b = c;
+    else
+      {
+        *a = -*a;
+        *b = -c;
+      }
 }
 
 /*********************** norm computation ************************************/
@@ -849,8 +860,10 @@ get_maxnorm (cado_poly cpoly, sieve_info_t si, mpz_t *fij)
     }
 #endif
 
+#ifdef VERBOSE
   fprintf (stderr, "F_q(x,1) = ");
   fprint_polynomial (stderr, fij, d);
+#endif
 
   /* for 0 <= i <= I/2, we have F_q(i,0) = fij[d]*i^d, thus the maximum is
      attained at i=I/2, which is on the right border treated below */
@@ -1015,7 +1028,7 @@ init_norms (unsigned char *S, cado_poly cpoly, sieve_info_t si)
     mpz_clear (t[k]);
   free (t);
 
-  fprintf (stderr, "computing norms took %lums\n", cputime () - time);
+  fprintf (stderr, "Computing norms took %lums\n", cputime () - time);
 }
 
 /* check that the double x fits into an int32_t */
@@ -1078,6 +1091,346 @@ SkewGauss (sieve_info_t *si, double skewness)
     }
 }
 
+/********************* factoring on rational side ****************************/
+
+/* Those routines are a quick-and-dirty implementation which factors remaining
+   norms on the rational side, after sieving on the algebraic side. It will
+   probably become obsolete once sieving is done on the rational side.
+*/
+
+/* return ceil(log(k)/log(2)), assumes k >= 1 */
+static unsigned int
+ceil_log2 (unsigned long k)
+{
+  unsigned long l = 1;
+
+  while (k > 1)
+    {
+      l ++;
+      k = (k + 1) / 2;
+    }
+  return l;
+}
+
+/* Compute gcd(P,t) for all elements of the tree T.
+   T[h][0] is the root of the tree. */
+void
+GcdTree (mpz_t **T, unsigned int *lT, unsigned long h, mpz_t P)
+{
+  mpz_t *G;
+  unsigned long l, m;
+#ifdef VERBOSE
+  double tm = cputime ();
+#endif
+  
+  G = (mpz_t*) malloc (lT[0] * sizeof (mpz_t));
+  for (l = 0; l < lT[0]; l++)
+    mpz_init (G[l]);
+
+  mpz_gcd (G[0], T[h][0], P); /* gcd of the root */
+#ifdef VERBOSE
+  fprintf (stderr, "Tree root has %lu bits, prime product has %lu bits\n",
+           mpz_sizeinbase (T[h][0], 2), mpz_sizeinbase (P, 2));
+  fprintf (stderr, "Root gcd has size %lu bits\n", mpz_sizeinbase (G[0], 2));
+  fprintf (stderr, "Root gcd took %1.0fms\n", cputime () - tm);
+#endif
+  for (l = h; l-- > 0;)
+    { /* level l, we have lT[l] elements, the gcds of the upper level are
+         in G[0...lT[l+1]-1] = G[0..ceil(lT[l]/2)-1] */
+      for (m = lT[l]; m-- > 0;)
+        mpz_gcd (G[m], T[l][m], G[m/2]);
+    }
+#ifdef VERBOSE
+  fprintf (stderr, "Gcd tree took %1.0fms\n", cputime () - tm);
+#endif
+
+  /* now G[l] should divide T[0][l] for 0 <= l < lT[0] */
+  for (l = 0; l < lT[0]; l++)
+    {
+      // ASSERT_ALWAYS (mpz_divisible_p (T[0][l], G[l]));
+      do
+        {
+          mpz_divexact (T[0][l], T[0][l], G[l]);
+          /* primes in G[l] might divide several times T[0][l] */
+          mpz_gcd (G[l], T[0][l], G[l]);
+        }
+      while (mpz_cmp_ui (G[l], 1) != 0);
+    }
+
+  /* FIXME: now that the T[0][l] are smaller, should we recompute the
+     product tree? Maybe from time to time. */
+
+  for (l = 0; l < lT[0]; l++)
+    mpz_clear (G[l]);
+  free (G);
+}
+
+/* divide norm by all primes <= B, and print them in buf */
+void
+trial_divide (char *buf, mpz_t norm, const unsigned long B)
+{
+  unsigned long p, n = 0, P = B;
+  double d;
+
+  mpz_abs (norm, norm);
+  d = sqrt (mpz_get_d (norm));
+  if (d < (double) P)
+    P = (unsigned long) d;
+  for (p = 2; p <= P; p = getprime (p))
+    {
+      while (mpz_divisible_ui_p (norm, p))
+        {
+          mpz_divexact_ui (norm, norm, p);
+          buf += sprintf (buf, "%lx,", p);
+          n ++;
+          d = sqrt (mpz_get_d (norm));
+          if (d < (double) P)
+            P = (unsigned long) d;
+        }
+      /* if norm <= p^2 then norm can only have one remaining prime,
+         thus it suffices to check p <= sqrt(norm) */
+    }
+  if (mpz_cmp_ui (norm, B) <= 0)
+    {
+      buf += sprintf (buf, "%lx,", mpz_get_ui (norm));
+      mpz_set_ui (norm, 1);
+      n ++;
+    }
+  if (n == 0)
+    buf[0] = '\0';
+  else
+    buf[-1] = '\0'; /* replace last ',' by end of string */
+  getprime (0);
+}
+
+/* build a product tree with the rational norms,
+   of height h = ceil(log2(reports)) */
+static void
+build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
+                      unsigned long reports)
+{
+  mpz_t ci, cj, **T, norm;
+  int i;
+  unsigned int k, j, l;
+  unsigned int *lT; /* lT[j] = length of T[j] */
+  unsigned int h = ceil_log2 (reports);
+  unsigned long p;         /* current prime */
+  mpz_t *P = NULL;         /* prime accumulator */
+  unsigned long aP = 0;    /* allocated cells in P[] */
+  unsigned long lP;        /* number of primes in P[] */
+#ifdef VERBOSE
+  double tm = cputime ();
+#endif
+  unsigned long final_reports = 0;
+  int64_t a;
+  uint64_t b;
+  char bufr[256], bufa[256];
+
+  /* on the rational side, we still are in the q-lattice
+     a = a0*i+a1*j, b = b0*i+b1*j, thus we have to consider
+     the values of g[1]*(a0*i+a1*j) + g[0]*(b0*i+b1*j),
+     which are (g[1]*a0+g[0]*b0)*i + (g[1]*a1+g[0]*b1)*j */
+
+  mpz_init (ci); /* ci = g[1]*a0+g[0]*b0 */
+  mpz_init (cj); /* cj = g[1]*a1+g[0]*b1 */
+  mpz_init (norm);
+
+  mpz_mul_si (ci, cpoly->g[1], si->a0);
+  mpz_addmul_si (ci, cpoly->g[0], si->b0);
+  mpz_mul_si (cj, cpoly->g[1], si->a1);
+  mpz_addmul_si (cj, cpoly->g[0], si->b1);
+  // gmp_fprintf (stderr, "ci=%Zd cj=%Zd\n", ci, cj);
+
+  /* builds the product tree */
+  T = (mpz_t**) malloc ((h + 1) * sizeof (mpz_t*));
+  lT = (unsigned int*) malloc ((h + 1) * sizeof (unsigned int));
+  for (l = 0; l <= h; l++)
+    {
+      /* T[0] is the level of the leaves, and T[h] is the root of the tree */
+      lT[l] = 1 + ((reports - 1) >> l);
+      T[l] = (mpz_t*) malloc (lT[l] * sizeof (mpz_t));
+      for (k = 0; k < lT[l]; k++)
+        {
+          mpz_init (T[l][k]);
+          if (l == 0) /* compute rational norms */
+            {
+              xToIJ (&i, &j, report_list[k], si);
+              mpz_mul_si (T[l][k], ci, i);
+              mpz_addmul_ui (T[l][k], cj, j);
+            }
+          else /* multiply two subtrees */
+            {
+              if (2 * k + 1 < lT[l-1])
+                mpz_mul (T[l][k], T[l-1][2*k], T[l-1][2*k+1]);
+              else
+                mpz_set (T[l][k], T[l-1][2*k]);
+            }
+        }
+    }
+#ifdef VERBOSE
+  size_t st;               /* size in bits of root of product tree */
+  fprintf (stderr, "Building the product tree took %1.0fms\n",
+           cputime () - tm);
+  st = mpz_sizeinbase (T[h][0], 2);
+  fprintf (stderr, "Root of product tree has size %lu bits\n", st);
+#endif
+
+  for (p = 2, lP = 0; p <= cpoly->rlim; p = getprime (p))
+    {
+      /* invariant: lP is the number of accumulated primes.
+         At first step we have P=[2] then P=[1, 2*3],
+         then [5, 2*3], then [1, 1, 2*3*5*7] */
+      lP ++;
+      if ((lP & (lP - 1)) == 0) /* lP = 2^m: need one more cell in P[] */
+        {
+          aP ++;
+          P = (mpz_t*) realloc (P, aP * sizeof (mpz_t));
+          mpz_init_set_ui (P[aP - 1], 1);
+        }
+      /* FIXME: accumulate t primes instead of one at a time in P[0] */
+      if (lP & 1)
+        mpz_set_ui (P[0], p);
+      else /* lP even */
+        {
+          mpz_mul_ui (P[0], P[0], p);
+          for (k = 0; ((lP >> k) & 1) == 0; k++)
+            {
+              mpz_mul (P[k+1], P[k+1], P[k]);
+              mpz_set_ui (P[k], 1);
+            }
+          if (lP == (1UL << k))
+            {
+              if (mpz_sizeinbase (P[k], 2) > 65536)
+                {
+                  GcdTree (T, lT, h, P[k]);
+                  mpz_set_ui (P[k], 1);
+                  lP = 0;
+                }
+            }
+        }
+    }
+  getprime (0);
+  if (lP != 0) /* accumulate the remaining primes and call GcdTree() */
+    {
+      for (l = 1; l < aP; l++)
+        mpz_mul (P[l], P[l], P[l-1]);
+      GcdTree (T, lT, h, P[aP-1]);
+    }
+
+  /* check leftover norms that are smaller than the given bound */
+  for (l = 0; l < reports; l++)
+    {
+      int large_size = mpz_sizeinbase (T[0][l], 2);
+      /* if T[0][l] is a prime > 2^lpbr, we can ignore the relation */
+      if (large_size <= cpoly->mfbr &&
+          !(large_size > cpoly->lpbr && mpz_probab_prime_p (T[0][l], 1)))
+        {
+          /* report_list[l] is I/2+i+j*I */
+          xToAB (&a, &b, report_list[l], si);
+          eval_fij (norm, cpoly->g, 1, a, b);
+          /* we know the product of large primes is T[0][l], thus we can
+             divide them out */
+          mpz_divexact (norm, norm, T[0][l]);
+          trial_divide (bufr, norm, cpoly->rlim);
+          /* since we divided out large primes, norm should be 1 here */
+          ASSERT_ALWAYS(mpz_cmp_ui (norm, 1) == 0);
+          eval_fij (norm, cpoly->f, cpoly->degree, a, b);
+          /* we know that q divides the norm on the algebraic side */
+          mpz_divexact_ui (norm, norm, si->q);
+          /* FIXME: on the algebraic side, we could restrict to the
+             factor base primes */
+          trial_divide (bufa, norm, cpoly->alim);
+          large_size = mpz_sizeinbase (norm, 2);
+          if (large_size <= cpoly->mfba &&
+              !(large_size > cpoly->lpba && mpz_probab_prime_p (norm, 1)))
+            {
+              final_reports ++;
+              if (strlen (bufa) == 0)
+                sprintf (bufa, "%lx", si->q);
+              else
+                sprintf (bufa + strlen (bufa), ",%lx", si->q);
+              printf ("%ld,%lu:%s:%s\n", a, b, bufr, bufa);
+            }
+        }
+    }
+  fprintf (stderr, "Final reports: %lu\n", final_reports);
+
+  for (l = 0; l < aP; l++)
+    mpz_clear (P[l]);
+  free (P);
+  for (l = 0; l <= h; l++)
+    {
+      for (k = 0; k < lT[l]; k++)
+        mpz_clear (T[l][k]);
+      free (T[l]);
+    }
+  free (T);
+  free (lT);
+  mpz_clear (ci);
+  mpz_clear (cj);
+  mpz_clear (norm);
+}
+
+/* build a list report_list[] of values of k = i + I/2 + I*j where gcd(i,j)=1
+   and norm is small on algebraic side, then pass it to build_norms_rational */
+static void
+factor_rational (cado_poly cpoly, sieve_info_t *si, unsigned char *S)
+{
+    /* sieve reports are those for which the remaining bit-size is less than
+       lambda * lpb */
+    unsigned char report_bound;
+    unsigned char min=255;
+    int kmin = 0;
+    int i;
+    unsigned int j, k;
+    int *report_list = NULL; /* list of values of k = i + I/2 + I*j
+                                          where norm small on algebraic side */
+    unsigned long reports = 0;
+    int64_t a;
+    uint64_t b;
+
+    report_bound = (unsigned char) (cpoly->alambda * cpoly->lpba
+                                    * (si->scale / LOG_SCALE));
+    // fprintf (stderr, "report_bound=%u\n", report_bound);
+
+    for (k = 0; k < si->I * si->J; ++k)
+      {
+        if (S[k] < min)
+          {
+            kmin = k;
+            min = S[k];
+          }
+        if (S[k] <= report_bound)
+          {
+            xToAB (&a, &b, k, si);
+            if (gcd_ul ((unsigned long) labs(a), b) == 1UL)
+              {
+                reports ++;
+                report_list = realloc (report_list, reports * sizeof (int));
+                report_list[reports - 1] = k;
+              }
+          }
+      }
+    xToIJ(&i, &j, kmin, si);
+    fprintf (stderr, "Min of %d is obtained for (i,j) = (%d,%d)\n", min, i, j);
+    fprintf (stderr, "Number of reports on algebraic side: %lu\n", reports);
+
+#if 0
+    int stat[256];
+    for (k = 0; k < 256; ++k)
+        stat[k]=0;
+    for (k = 0; k < si->I * si->J; ++k)
+        stat[S[k]]++;
+    for (k = 0; k < 256; ++k)
+      fprintf (stderr, "[%d]%d ", k, stat[k]);
+    fprintf (stderr, "\n");
+#endif
+
+    build_norms_rational (cpoly, si, report_list, reports);
+
+    free (report_list);
+}
+
 /*************************** main program ************************************/
 
 static void
@@ -1095,6 +1448,7 @@ int main(int argc, char ** argv) {
     sieve_info_t si;
     char *fbfilename = NULL, *polyfilename = NULL;
     cado_poly cpoly;
+    double tm, t0 = seconds ();
 
     while (argc > 1 && argv[1][0] == '-')
       {
@@ -1147,54 +1501,22 @@ int main(int argc, char ** argv) {
 
     factorbase_degn_t * fb;
     /* the logarithm scale is LOG_MAX / log(max norm) */
-    fb = fb_read (fbfilename, si.scale, 1);
+    tm = seconds ();
+    fb = fb_read (fbfilename, si.scale, 0);
     ASSERT_ALWAYS(fb != NULL);
+    fprintf (stderr, "Reading factor base took %f sec\n", seconds() - tm);
 
-    double tm = seconds();
+    tm = seconds ();
     //sieve_slow(S, fb, &si);
     sieve_random_access(S, fb, &si);
-    printf("Done sieving in %f sec\n", seconds()-tm);
+    fprintf (stderr, "Done sieving in %f sec\n", seconds()-tm);
 
-    /* sieve reports are those for which the remaining bit-size is less than
-       lambda * lpb */
-    unsigned char report_bound;
-    report_bound = (unsigned char) (cpoly->alambda * cpoly->lpba
-                                    * (si.scale / LOG_SCALE));
-    printf ("report_bound=%u\n", report_bound);
+    factor_rational (cpoly, &si, S);
 
-    unsigned char min=255;
-    unsigned long reports = 0;
-    int kmin = 0;
-    int i;
-    unsigned int j, k;
-    for (k = 0; k < si.I*si.J; ++k) 
-      if (k != (si.I / 2))
-        {
-          /* don't consider i=j=0, which corresponds to k=I/2, and is divisible
-             by every prime */
-          if (S[k] < min)
-            {
-              kmin = k;
-              min = S[k];
-            }
-          reports += (S[k] <= report_bound);
-        }
-    xToIJ(&i, &j, kmin, &si);
-    printf("Min of %d is obtained for (i,j) = (%d,%d)\n", min, i, j);
-    printf ("Number of reports on algebraic side: %lu\n", reports);
-
-    int stat[256];
-    for (k = 0; k < 256; ++k)
-        stat[k]=0;
-    for (k = 0; k < si.I*si.J; ++k)
-        stat[S[k]]++;
-    for (k = 0; k < 256; ++k)
-        printf("[%d]%d ", k, stat[k]);
-    printf("\n");
+    fprintf (stderr, "Total sieving time %f sec\n", seconds() - t0);
 
     sieve_info_clear (&si);
     clear_polynomial (cpoly);
 
     return 0;
 }
-
