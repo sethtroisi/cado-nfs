@@ -1515,10 +1515,10 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
       
       if (fbptr->p == 0)
 	{
-	  fprintf (stderr, "Warning, reached end of fb for (%ld, %lu). "
+	  fprintf (stderr, "# Warning, reached end of fb for (%ld, %lu). "
 		   "sievelog = %hhu, finallog = %hhu\n", 
 		   a, b, sievelog, finallog);
-	  gmp_fprintf (stderr, "Remaining norm = %Zd\n", norm);
+	  gmp_fprintf (stderr, "# Remaining norm = %Zd\n", norm);
 	  break;
 	}
       
@@ -2286,7 +2286,7 @@ main (int argc, char **argv)
     {
       if (fb_check (fbr, cpoly, 1) != 0)
 	{
-	  fprintf (stderr, "Error in ratinal factor base\n");
+	  fprintf (stderr, "Error in rational factor base\n");
 	  exit (EXIT_FAILURE);
 	}
       else if (verbose)
@@ -2444,7 +2444,7 @@ main (int argc, char **argv)
 	    skipped_ahead_too_far);
 
   sieve_time = seconds () - sieve_time;
-  fprintf (stderr, "Found %lu relations in %1.0f seconds (%1.2e s/r)",
+  fprintf (stderr, "# Found %lu relations in %1.0f seconds (%1.2e s/r)",
            relations_found, sieve_time, sieve_time / (double) relations_found);
   fprintf (stderr, " [init time = %1.0f seconds]\n", init_time);
 
