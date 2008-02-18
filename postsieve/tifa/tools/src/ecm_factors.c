@@ -146,12 +146,12 @@ static void process_args(factoring_program_t* const program) {
             PRINT_NAN_ERROR(argv[2]);
             exit(-1);
         }
-        params->B1 = strtoul(argv[2], NULL, 10);
+        params->b1 = strtoul(argv[2], NULL, 10);
         if (!is_a_number(argv[3], MAX_NDIGITS)) {
             PRINT_NAN_ERROR(argv[3]);
             exit(-1);
         }
-        params->B2 = strtoul(argv[3], NULL, 10);
+        params->b2 = strtoul(argv[3], NULL, 10);
         if (!is_a_number(argv[4], MAX_NDIGITS)) {
             PRINT_NAN_ERROR(argv[4]);
             exit(-1);
@@ -175,8 +175,8 @@ static void set_params_to_default(factoring_program_t* const program) {
 //------------------------------------------------------------------------------
 static void print_params(factoring_program_t* const program) {
     ecm_params_t* params = (ecm_params_t*) program->params;
-    printf("\tb1      : %"PRIu32"\n", params->B1);
-    printf("\tb2      : %"PRIu32"\n", params->B2);
+    printf("\tb1      : %"PRIu32"\n", params->b1);
+    printf("\tb2      : %"PRIu32"\n", params->b2);
     printf("\tncurves : %"PRIu32"\n", params->ncurves);
 }
 //------------------------------------------------------------------------------
@@ -199,9 +199,9 @@ int main(int argc, char** argv) {
 
     program.algo_name = "ECM";
     program.params    = (void*) &params;
-    //program.mode      = FIND_SOME_FACTORS;
+    program.mode      = FIND_SOME_FACTORS;
     //program.mode      = FIND_COMPLETE_FACTORIZATION;
-    program.mode      = SINGLE_RUN;
+    //program.mode      = SINGLE_RUN;
 
     program.print_usage_func           = print_usage;
     program.print_params_func          = print_params;

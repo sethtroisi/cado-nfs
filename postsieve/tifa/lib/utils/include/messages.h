@@ -100,6 +100,8 @@ extern "C" {
 #define CHOOSED_CURVES_IN_STRING     "choosing curves..."
 #define PHASE_1_IN_STRING            "phase 1 (accumulated)..."
 #define PHASE_2_IN_STRING            "phase 2 (accumulated)..."
+#define UPDATE_MORE_CURVES_STRING    "updating context to try more curves... "
+#define UPDATE_LARGER_BOUNDS_STRING  "updating context to use larger bounds... "
 //
 // Strings pertaining to SQUFOF only
 //
@@ -298,6 +300,8 @@ extern "C" {
 #define PRINT_NCURVES_USED(NCURVES) \
             PRFX_PRINTF("used %"PRIu32" curve(s)\n", (uint32_t)NCURVES)
 
+#define PRINT_UPDATE_MORE_CURVES_MSG   PRINT_MSG(UPDATE_MORE_CURVES_STRING)
+#define PRINT_UPDATE_LARGER_BOUNDS_MSG PRINT_MSG(UPDATE_LARGER_BOUNDS_STRING)
 //
 // Messages pertaining to SQUFOF only
 //

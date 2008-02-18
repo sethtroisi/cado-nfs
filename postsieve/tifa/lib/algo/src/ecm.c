@@ -133,13 +133,215 @@ struct struct_ecm_context_t {
     unsigned int** prime_table;
     mpz_t* SX;
     mpz_t* SZ;
+    //
+    // How many times did we update the context to try more curves (with
+    // the same bounds)?
+    //
+    unsigned int nupdated_more_curves;
+    //
+    // How many times did we update the context to try larger bounds?
+    //
+    unsigned int nupdated_larger_bounds;
 };
 //------------------------------------------------------------------------------
 typedef struct struct_ecm_context_t ecm_context_t;
 //------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
-//                 PROTOTYPES OF NON PUBLIC FUNCTION(S)
+//                      CONSTANT DATA, SYMBOLS AND MACROS
+//------------------------------------------------------------------------------
+//
+// Number of entries in default parameters tables.
+//
+#define NDFLT_ENTRIES 31
+//
+// If default_bitsize[i] <= size(n_to_factor) < default_bitsize[i+1], uses
+// parameters' values given by default_<param>[i]. 
+//
+// _WARNING_: These values were obtained from benchmarks for composites
+//            numbers p1 * p2 in the range 50 bits - 110 bits, where parameters
+//            were choosen to maximize the ratio (time / probabiblity of
+//            success). Values from the benchmark were then fitted and 
+//            extrapolated to cover the whole 50-200 bits range.
+//
+//            We caution that this best parameters determination is _very_
+//            crude! Needless to say, such extrapolations are known for being
+//            "creatively accurate"...
+//
+// _NOTE_: In order to restrict the range of values combination to bench, the
+//         "best" values given in the paper "A Practical Analysis of the 
+//         Elliptic Curve Factoring Algorithm" were used as a starting point.
+//
+// _SEE_: "A Practical Analysis of the Elliptic Curve Factoring Algorithm",
+//        R. D. Silverman and S. S. Wagstaff Jr., Mathematics of Computation,
+//        Vol. 61, No. 203, (July 1993), pp. 445-462.
+//
+static const unsigned int default_bitsizes[NDFLT_ENTRIES] = {
+    50,
+    55,
+    60,
+    65,
+    70,
+    75,
+    80,
+    85,
+    90,
+    95,
+    100,
+    105,
+    110,
+    115,
+    120,
+    125,
+    130,
+    135,
+    140,
+    145,
+    150,
+    155,
+    160,
+    165,
+    170,
+    175,
+    180,
+    185,
+    190,
+    200
+};
+
+//
+// Default values for bound in first phase.
+//
+static const unsigned long int default_b1s[NDFLT_ENTRIES] = {
+    178,
+    201,
+    233,
+    280,
+    346,
+    441,
+    576,
+    769,
+    1046,
+    1441,
+    2005,
+    2005,
+    3963,
+    5609,  
+    7960,
+    11321,
+    16121,
+    22981,
+    32783,
+    46787,
+    66799,
+    95389,
+    136243,
+    194613,
+    278017,
+    397187,
+    567461,
+    810753,
+    1158377,
+    1655073,
+    2364770
+};
+
+//
+// Default values for ratio (bound_second_phase / bound_first_phase).
+//
+static const unsigned int default_ratios[NDFLT_ENTRIES] = {
+    45,
+    44,
+    43,
+    42,
+    41,
+    41,
+    40,
+    39,
+    39,
+    38,
+    37,
+    37,
+    36,
+    35,
+    35,
+    34,
+    34,
+    33,
+    33,
+    32,
+    31,
+    31,
+    30,
+    30,
+    29,
+    29,
+    29,
+    28,
+    28,
+    27,
+    27
+};
+
+//
+// Default values for number of curves to use before giving up (if SINGLE_RUN
+// factoring mode is used).
+//
+static const unsigned int default_ncurves[NDFLT_ENTRIES] = {
+    6,
+    9,
+    12,
+    18,
+    22,
+    30,
+    36,
+    45,
+    54,
+    65,
+    78,
+    92,
+    110,
+    128,
+    150,
+    175,
+    204,
+    237,
+    275,
+    318,
+    368,
+    425,
+    491,
+    566,
+    653,
+    752,
+    866,
+    997,
+    1146,
+    1318,
+    1516
+};
+//
+// Maximum number of times to try more curves to find a factor before definitely
+// giving up and starting again with greater bounds (only if the factorization
+// mode is different than SINGLE_RUN).
+//
+#define MAX_NTRY_MORE_CURVES 4
+
+//
+// Multiply the b1 and b2 bounds by BOUND_MULTIPLIER if the previous
+// MAX_NTRY_MORE_CURVES tentatives failed to find a factor (only if the 
+// factorization mode is different than SINGLE_RUN).
+//
+#define BOUND_MULTIPLIER 2
+
+//
+// Maximum number of times to try more curves with larger bounds (only if the 
+// factorization mode is different than SINGLE_RUN).
+//
+#define MAX_NTRY_LARGER_BOUNDS 4
+
+//------------------------------------------------------------------------------
+//                    PROTOTYPES OF NON PUBLIC FUNCTION(S)
 //------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
@@ -148,6 +350,8 @@ static ecode_t init_ecm_context(factoring_machine_t* const machine);
 static ecode_t clear_ecm_context(factoring_machine_t* const machine);
 //------------------------------------------------------------------------------
 static ecode_t update_ecm_context(factoring_machine_t* const machine);
+//------------------------------------------------------------------------------
+static ecode_t switch_to_larger_bounds(factoring_machine_t* const machine);
 //------------------------------------------------------------------------------
 static ecode_t perform_ecm(factoring_machine_t* const machine);
 //------------------------------------------------------------------------------
@@ -226,17 +430,26 @@ ecode_t ecm(mpz_array_t* const factors, uint32_array_t* const multis,
 void set_ecm_params_to_default(const mpz_t n __attribute__ ((unused)),
                                ecm_params_t* const params) {
     //
-    // _WARNING_: This function does not perform what it is supposed to do,
-    //            i.e. choose sensible parameters according to the size of n.
-    //            I have some "good enough" values for the smallest numbers
-    //            (up to ~115 bits), collecting dust somewhere in the bottom of 
-    //            my drawer. I'll plug these in after finer benchmarks and
-    //            (maybe!) some optimizations. For the time being, you should
-    //            choose your parameters by yourself!.
+    // _WARNING_: See above note about default parameters. In particular they
+    //            were obtained from benchmarking factorization of RSA moduli.
     //
-    params->B1      = 8000;
-    params->B2      = 40 * params->B1;
-    params->ncurves = 30;
+    // _TO_DO_: Modify this function to pass as argument the size of the
+    //          factor we expect to find instead of the number to split.
+    //
+    unsigned int sizen = mpz_sizeinbase(n, 2);
+    unsigned int i = 0;
+    
+    if (sizen < default_bitsizes[0]) {
+        i = 0;
+    } else {
+        i = NDFLT_ENTRIES - 1;
+        while (sizen < default_bitsizes[i]) {
+            i--;
+        }
+    }
+    params->b1      = default_b1s[i];
+    params->b2      = default_ratios[i] * params->b1;
+    params->ncurves = default_ncurves[i];
     return;
 }
 //------------------------------------------------------------------------------
@@ -279,15 +492,17 @@ static ecode_t init_ecm_context(factoring_machine_t* const machine) {
     context->sigma  = 5;
 
     context->precomputations_done = false;
+    context->nupdated_more_curves = 0;
+    
     //
     // Compute context->k = Prod_{pi<=B1} pi^{log(B1)/log(pi)} via a product
     // tree...
     //
     unsigned int ip    = 0;
     unsigned int power = 0;
-    double       logb1 = log(params->B1);
+    double       logb1 = log(params->b1);
     
-    while (first_primes[ip] <= params->B1) {
+    while (first_primes[ip] <= params->b1) {
         ip++;
     }
     context->first_lp_index = ip;
@@ -373,16 +588,113 @@ static ecode_t update_ecm_context(factoring_machine_t* const machine
                                   __attribute__ ((unused))) {
 
     //
-    // No fallback strategy is implemented for the time being although it is
-    // just a matter of choosing larger B1 and B2 bounds.
+    // Strategy:
+    //
+    //     a) We try again with the same number of curves using the same
+    //        bounds.
+    //     b) If we have already tried MAX_NTRY_MORE_CURVES times with the
+    //        same bounds, multiply the bounds by BOUND_MULTIPLIER and try
+    //        again. If we have changed the bounds for larger ones
+    //        MAX_NTRY_LARGER_BOUNDS times, then just admit defeat.
     //
     INIT_TIMER;
     START_TIMER;
-    PRINT_UPDATE_GIVEUP_MSG;
+    
+    ecm_context_t* context = (ecm_context_t*) machine->context;
+    ecode_t ecode = SUCCESS;
+    
+    if (context->nupdated_larger_bounds == MAX_NTRY_LARGER_BOUNDS) {
+        PRINT_UPDATE_GIVEUP_MSG;
+        ecode = GIVING_UP;
+
+    } else {
+        if (context->nupdated_more_curves == MAX_NTRY_MORE_CURVES) {
+            context->nupdated_larger_bounds++;
+            context->nupdated_more_curves = 0;
+            PRINT_UPDATE_LARGER_BOUNDS_MSG;
+                        
+            switch_to_larger_bounds(machine); 
+            
+        } else {
+            context->nupdated_more_curves++;
+            PRINT_UPDATE_MORE_CURVES_MSG;
+        }
+    }
     STOP_TIMER;
     PRINT_TIMING;
 
-    return GIVING_UP;
+    return ecode;
+}
+//------------------------------------------------------------------------------
+static ecode_t switch_to_larger_bounds(factoring_machine_t* const machine) {
+    //
+    // Switch to larger bounds and recompute what needs to be recomputed...
+    //
+    ecm_context_t* context = (ecm_context_t*) machine->context;
+    ecm_params_t*  params  = (ecm_params_t*)  machine->params;
+
+    params->b1      *= BOUND_MULTIPLIER;
+    params->b2      *= BOUND_MULTIPLIER;
+    params->ncurves *= BOUND_MULTIPLIER;
+
+    if (context->precomputations_done) {
+        //
+        // _TO_DO_: Actually these clear_* are not needed here (except for
+        //          prime_table). We can bypass this memory cleaning by
+        //          adding a little bit of logic in perform_precomputations;
+        //
+        for (unsigned int ij = 0; ij < context->njs; ij++) {
+            unsigned int j = context->Js[ij];
+            mpz_clear(context->SX[j]);
+            mpz_clear(context->SZ[j]);
+        }
+        free(context->SX);
+        free(context->SZ);
+
+        unsigned int nrows = context->m_max - context->m_min + 1;
+        for (unsigned int i = 0U; i < nrows; i++) {
+            free(context->prime_table[i]);
+        }
+        free(context->prime_table);
+        free(context->Js);
+        free(context->gcd_table);
+    }
+    context->precomputations_done = false;
+
+    //
+    // Compute context->k = Prod_{pi<=B1} pi^{log(B1)/log(pi)} via a product
+    // tree...
+    //
+    // _NOTE_: This could be done more efficiently by computing 
+    //          Prod_{old_B1 < pi <= B1} pi^{log(B1) / log(pi)}
+    //
+    unsigned int ip    = 0;
+    unsigned int power = 0;
+    double       logb1 = log(params->b1);
+    
+    while (first_primes[ip] <= params->b1) {
+        ip++;
+    }
+    context->first_lp_index = ip;
+
+    uint32_array_t* ppowers = alloc_uint32_array(ip);
+
+    for (uint32_t i = 0; i < ip; i++) {
+        power = (unsigned int) (logb1 / log(first_primes[i]));
+        ppowers->data[i] = pow(first_primes[i], power);
+    }
+    ppowers->length = ip;
+
+    mpz_tree_t* ptree = prod_tree_ui(ppowers);
+
+    mpz_set(context->k, ptree->data[0]);
+
+    clear_mpz_tree(ptree);
+    clear_uint32_array(ppowers);
+    free(ptree);
+    free(ppowers);
+
+    return SUCCESS;
 }
 //------------------------------------------------------------------------------
 static ecode_t perform_ecm(factoring_machine_t* const machine) {
@@ -427,13 +739,13 @@ static ecode_t perform_ecm(factoring_machine_t* const machine) {
         if (exit_code == SOME_FACTORS_FOUND) {
             break;
         }
-        if (params->B2 == 0) {
+        if (params->b2 == 0) {
             //
-            // No second phase is performed if B2 is set to 0.
+            // No second phase is performed if b2 is set to 0.
             //
             continue;
         }
-        if (ncurves == 1) {
+        if (!context->precomputations_done) {
             perform_precomputations(context);
         }
         //
@@ -457,7 +769,7 @@ static ecode_t perform_ecm(factoring_machine_t* const machine) {
     PRINT_NAMED_TIMING(phase_1);
     PRINT_PHASE_2_IN;
     PRINT_NAMED_TIMING(phase_2);
-    
+        
     return exit_code;
 }
 //------------------------------------------------------------------------------
@@ -740,6 +1052,8 @@ static void add_points(mpz_t xc, mpz_t zc,
     // (x0 : z0) = (xa : za) - (xb : zb).
     // Uses the Montgomery representation.
     //
+    // _WARNING_: xc and x0 should point to different memory spaces!
+    //
     mpz_ptr n  = context->n;
 
     mpz_ptr r = context->tmp_add_1;
@@ -861,8 +1175,8 @@ static ecode_t perform_precomputations(ecm_context_t* const context) {
     PRINT_PERFORMING_P2_PRECOMP;
     START_TIMER;
 
-    context->B2 = context->params->B2;
-    context->B1 = context->params->B1;
+    context->B2 = context->params->b2;
+    context->B1 = context->params->b1;
     //
     // _WARNING_: This D value (representing a speed/memory trade-off) is from
     //            the aforementionned paper. Some tests are needed to assess

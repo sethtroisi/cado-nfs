@@ -69,18 +69,19 @@ struct struct_ecm_params_t {
         /**
          * Bound used in the first phase of ECM.
          */
-    uint32_t B1;
+    uint32_t b1;
         /**
          * Bound used in the second phase of ECM. If set to 0, no second phase
          * is performed.
          *
          * \warning Due to a current limitation in the code, it is \c required
-         * than \c B2 == 0 (no second phase) or \c B2 > 105. Failure to assess 
+         * than \c b2 == 0 (no second phase) or \c b2 > 105. Failure to assess 
          * such a condition will lead to unpredictable behaviour.
          */
-    uint32_t B2;
+    uint32_t b2;
         /**
-         * Number of curves to try before giving up the factorization.
+         * Number of curves to try before giving up the factorization when
+         * using the SINGLE_RUN factoring mode.
          */
     uint32_t ncurves;
 };
