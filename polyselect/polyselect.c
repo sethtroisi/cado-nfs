@@ -1165,20 +1165,6 @@ mpz_ndiv_qr (mpz_t q, mpz_t r, mpz_t n, mpz_t d)
     }
 }
 
-/* return a value with the sign of sum(g[i]*s^(2i-d-1), i=0..d) */
-double
-eval_double_poly (double *g, int d, double s)
-{
-  double v;
-  int i;
-
-  /* sum(g[i]*s^(2*i-d-1), i=0..d) = sum(g[i]*s^(2i), i=0..d)/s^(d+1).
-     Since we only need the sign, no need to divide by s^(d+1). */
-  for (v = g[d], i = d - 1; i >= 0; i--)
-    v = s * v + g[i];
-  return v;
-}
-
 /* Return the ***square*** of the value of S that minimizes the expression:
 
                 |p[d]| * S^d + ... + |p[0]| * S^{-d}
@@ -1207,16 +1193,16 @@ skewness (mpz_t *p, int d)
      g[d] that of degree d-1 */
   for (i = 0; i <= d; i++)
     g[i] = (double) (2 * i - d) * fabs (mpz_get_d (p[i]));
-  if (eval_double_poly (g, d, 1.0) > 0) /* g(1.0) > 0 */
+  if (fpoly_eval (g, d, 1.0) > 0) /* g(1.0) > 0 */
     {
       /* search sa < 1 such that g(sa) <= 0 */
-      for (sa = 0.5; eval_double_poly (g, d, sa) > 0; sa *= 0.5);
+      for (sa = 0.5; fpoly_eval (g, d, sa) > 0; sa *= 0.5);
       sb = 2.0 * sa;
     }
   else /* g(1.0) <= 0 */
     {
       /* search sb such that g(sb) >= 0 */
-      for (sb = 2.0; eval_double_poly (g, d, sb) < 0; sb *= 2.0);
+      for (sb = 2.0; fpoly_eval (g, d, sb) < 0; sb *= 2.0);
       sa = 0.5 * sb;
     }
   /* now g(sa) < 0, g(sb) > 0, and sb = 2*sa.
@@ -1225,7 +1211,7 @@ skewness (mpz_t *p, int d)
   for (i = 0; i < 100; i++)
     {
       s = (sa + sb) / 2.0;
-      if (eval_double_poly (g, d, s) < 0)
+      if (fpoly_eval (g, d, s) < 0)
 	sa = s;
       else
 	sb = s;

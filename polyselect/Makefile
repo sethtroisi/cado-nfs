@@ -7,7 +7,7 @@ GMPINCLUDE ?= $(GMP)/include/
 
 OPTCFLAGS ?= -O2 -g -W -Wall
 
-CFLAGS=$(OPTCLFAGS) -std=c99 -I$(GMPINCLUDE) -DREV=\"`svnversion .`\"
+CFLAGS=$(OPTCFLAGS) -std=c99 -I$(GMPINCLUDE) -DREV=\"`svnversion .`\"
 LDFLAGS=../utils/libutils.a $(GMPLIB) -lm
 
 polyselect: polyselect.c ../cado.h
