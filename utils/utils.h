@@ -45,7 +45,10 @@ void clear_polynomial (cado_poly);
 void cado_poly_init (cado_poly);
 void cado_poly_clear (cado_poly);
 void check_polynomials (cado_poly);
+
+  /* fpoly.c */
 double fpoly_eval (const double *, const int, const double);
+double fpoly_dichotomy (double *, int, double, double, double, unsigned int);
 
 // Relation I/O
 extern void copy_rel(relation_t *Rel, relation_t rel);

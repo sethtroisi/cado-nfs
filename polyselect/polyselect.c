@@ -1208,16 +1208,9 @@ skewness (mpz_t *p, int d)
   /* now g(sa) < 0, g(sb) > 0, and sb = 2*sa.
      We use 10 iterations only, which gives a relative precision of
      2^(-10) ~ 0.001, which is enough for our needs. */
-  for (i = 0; i < 100; i++)
-    {
-      s = (sa + sb) / 2.0;
-      if (fpoly_eval (g, d, s) < 0)
-	sa = s;
-      else
-	sb = s;
-    }
+  s = fpoly_dichotomy (g, d, sa, sb, -1.0, 10);
   free (g);
-  return (sa + sb) / 2.0;
+  return s;
 }
 
 /* Returns log(mu(m,S)), with mu(m,S) as defined in reference [2]:

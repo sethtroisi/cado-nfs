@@ -323,20 +323,6 @@ check_polynomials (cado_poly cpoly)
   mpz_clear (q);
 }
 
-/* Evaluate the poynomial f of degree deg at point x */
-double
-fpoly_eval (const double *f, const int deg, const double x)
-{
-  double r;
-  int i;
-
-  r = f[deg];
-  for (i = deg - 1; i >= 0; i--)
-    r = r * x + f[i];
-  
-  return r;
-}
-
 #undef PARSE_MATCH
 #undef PARSE_ERROR
 #undef PARSE_NOMATCH
