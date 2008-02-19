@@ -224,7 +224,7 @@ static const unsigned long int default_b1s[NDFLT_ENTRIES] = {
     1046,
     1441,
     2005,
-    2005,
+    2811,
     3963,
     5609,  
     7960,
