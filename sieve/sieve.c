@@ -185,20 +185,6 @@ mp_poly_print (mpz_t *poly, int deg, const char *name, int homogeneous)
     }
 }
 
-/* Evaluate the poynomial f of degree deg at point x */
-static double
-fpoly_eval (const double *f, const int deg, const double x)
-{
-  double r;
-  int i;
-
-  r = f[deg];
-  for (i = deg - 1; i >= 0; i--)
-    r = r * x + f[i];
-  
-  return r;
-}
-
 #if 0
 /* Print polynomial with floating point coefficients. Assumes f[deg] != 0
    if deg > 0. */
