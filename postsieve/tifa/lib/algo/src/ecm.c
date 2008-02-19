@@ -609,13 +609,19 @@ static ecode_t update_ecm_context(factoring_machine_t* const machine
 
     } else {
         if (context->nupdated_more_curves == MAX_NTRY_MORE_CURVES) {
+            //
+            // Try with larger b1 and b2 bounds.
+            //
             context->nupdated_larger_bounds++;
             context->nupdated_more_curves = 0;
             PRINT_UPDATE_LARGER_BOUNDS_MSG;
-                        
-            switch_to_larger_bounds(machine); 
+            
+            ecode = switch_to_larger_bounds(machine); 
             
         } else {
+            //
+            // Try again with the same number of curves using the same bounds.
+            //
             context->nupdated_more_curves++;
             PRINT_UPDATE_MORE_CURVES_MSG;
         }
@@ -629,9 +635,20 @@ static ecode_t update_ecm_context(factoring_machine_t* const machine
 static ecode_t switch_to_larger_bounds(factoring_machine_t* const machine) {
     //
     // Switch to larger bounds and recompute what needs to be recomputed...
+    // Returns SUCCESS upon... success. Returns GIVING_UP if the bounds are 
+    // already too large, thus aborting the factorization.
     //
     ecm_context_t* context = (ecm_context_t*) machine->context;
     ecm_params_t*  params  = (ecm_params_t*)  machine->params;
+
+    unsigned long int max_bound = TIFA_ULONG_MAX / BOUND_MULTIPLIER;
+
+    if (params->b1 >= max_bound) {
+        return GIVING_UP;
+    }
+    if (params->b2 >= max_bound) {
+        return GIVING_UP;
+    }
 
     params->b1      *= BOUND_MULTIPLIER;
     params->b2      *= BOUND_MULTIPLIER;
@@ -641,7 +658,7 @@ static ecode_t switch_to_larger_bounds(factoring_machine_t* const machine) {
         //
         // _TO_DO_: Actually these clear_* are not needed here (except for
         //          prime_table). We can bypass this memory cleaning by
-        //          adding a little bit of logic in perform_precomputations;
+        //          adding a little bit of logic in perform_precomputations.
         //
         for (unsigned int ij = 0; ij < context->njs; ij++) {
             unsigned int j = context->Js[ij];
@@ -664,9 +681,6 @@ static ecode_t switch_to_larger_bounds(factoring_machine_t* const machine) {
     //
     // Compute context->k = Prod_{pi<=B1} pi^{log(B1)/log(pi)} via a product
     // tree...
-    //
-    // _NOTE_: This could be done more efficiently by computing 
-    //          Prod_{old_B1 < pi <= B1} pi^{log(B1) / log(pi)}
     //
     unsigned int ip    = 0;
     unsigned int power = 0;
