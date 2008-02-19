@@ -88,7 +88,7 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int I, uint64_t q1)
   /* initialize bounds for the norm computation, see lattice.tex */
   si->B = sqrt (2.0 * (double) q1 / (cpoly->skew * sqrt (3.0)));
   si->scale = get_maxnorm (cpoly, si); /* log(max norm) */
-  fprintf (stderr, "log(maxnorm)=%1.2f\n", si->scale);
+  fprintf (stderr, "# log(maxnorm)=%1.2f\n", si->scale);
   si->scale = LOG_MAX / si->scale;
 }
 
@@ -106,7 +106,7 @@ sieve_info_update (sieve_info_t *si, double skew)
   if (s_over_a1 > 1.0)
     s_over_a1 = 1.0;
   si->J = (uint32_t) (s_over_a1 * (double) (si->I >> 1));
-  fprintf (stderr, "J=%u\n", si->J);
+  fprintf (stderr, "# J=%u\n", si->J);
   
 }
 
@@ -194,7 +194,7 @@ static void
 special_case_0 (unsigned long p)
 {
 #ifndef NO_WARNING
-  fprintf(stderr, "Warning: special_case_0(%lu) not implemented\n", p);
+  fprintf(stderr, "# Warning: special_case_0(%lu) not implemented\n", p);
 #endif
 }
 
@@ -202,7 +202,7 @@ static void
 special_case_p (unsigned long p)
 {
 #ifndef NO_WARNING
-  fprintf(stderr, "Warning: special_case_p(%lu) not implemented\n", p);
+  fprintf(stderr, "# Warning: special_case_p(%lu) not implemented\n", p);
 #endif
 }
 
@@ -449,7 +449,7 @@ static void line_sieve(unsigned char *S, factorbase_degn_t **fb_ptr,
         }
         (*fb_ptr) = fb_next ((*fb_ptr)); // cannot do fb++, due to variable size !
     }
-    fprintf (stderr, "small primes sieved in %f sec\n", seconds()-tm);
+    fprintf (stderr, "# small primes sieved in %f sec\n", seconds()-tm);
 }
 
 #ifdef TRY_SSE
@@ -637,7 +637,7 @@ sieve_random_access (unsigned char *S, factorbase_degn_t *fb,
         }
         fb = fb_next (fb); // cannot do fb++, due to variable size !
     }
-    fprintf (stderr, "large primes sieved in %f sec\n", seconds()-tm);
+    fprintf (stderr, "# large primes sieved in %f sec\n", seconds()-tm);
 }
 
 // Conversions between different representations for sieve locations:
@@ -1279,10 +1279,11 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
               else
                 sprintf (bufa + strlen (bufa), ",%lx", si->q);
               printf ("%ld,%lu:%s:%s\n", a, b, bufr, bufa);
+              fflush (stdout);
             }
         }
     }
-  fprintf (stderr, "Final reports: %lu\n", final_reports);
+  fprintf (stderr, "# Final reports: %lu\n", final_reports);
 
   for (l = 0; l < aP; l++)
     mpz_clear (P[l]);
@@ -1355,8 +1356,8 @@ factor_rational (cado_poly cpoly, sieve_info_t *si, unsigned char *S)
           }
       }
     xToIJ(&i, &j, kmin, si);
-    fprintf (stderr, "Min of %d is obtained for (i,j) = (%d,%d)\n", min, i, j);
-    fprintf (stderr, "Number of reports on algebraic side: %lu\n", reports);
+    fprintf (stderr, "# Min of %d is obtained for (i,j) = (%d,%d)\n", min, i, j);
+    fprintf (stderr, "# Number of reports on algebraic side: %lu\n", reports);
 
     reports = build_norms_rational (cpoly, si, report_list, reports);
 
@@ -1439,7 +1440,7 @@ main (int argc, char *argv[])
     fb = fb_read (fbfilename, si.scale, 0);
     ASSERT_ALWAYS(fb != NULL);
     tfb = seconds () - tfb;
-    fprintf (stderr, "Reading factor base took %1.1fs\n", tfb);
+    fprintf (stderr, "# Reading factor base took %1.1fs\n", tfb);
 
     /* special q (and root rho) */
     roots = (unsigned long*) malloc (cpoly->degree * sizeof (unsigned long));
@@ -1454,7 +1455,7 @@ main (int argc, char *argv[])
               goto end;
             si.q = q0;
             nroots = modul_roots_mod_long (roots, cpoly->f, cpoly->degree, &q0);
-            fprintf (stderr, "q=%lu: root(s)", q0);
+            fprintf (stderr, "# q=%lu: root(s)", q0);
             for (i = 1; i <= nroots; i++)
               fprintf (stderr, " %lu", roots[nroots-i]);
             fprintf (stderr, "\n");
@@ -1462,7 +1463,7 @@ main (int argc, char *argv[])
         tq = seconds ();
 
         si.rho = roots[--nroots];
-        fprintf (stderr, "Sieving q=%lu, rho=%lu\n", si.q, si.rho);
+        fprintf (stderr, "# Sieving q=%lu, rho=%lu\n", si.q, si.rho);
 
         /* computes a0, b0, a1, b1 from q, rho, and the skewness */
         SkewGauss (&si, cpoly->skew);
@@ -1476,13 +1477,13 @@ main (int argc, char *argv[])
                     si.b1);
         init_norms (S, cpoly, si);
         tmaxnorm = seconds () - tmaxnorm;
-        fprintf (stderr, "Initializing norms took %1.1fs\n", tmaxnorm);
+        fprintf (stderr, "# Initializing norms took %1.1fs\n", tmaxnorm);
 
         /* sieving on the algebraic side */
         ts = seconds ();
         //sieve_slow(S, fb, &si);
         sieve_random_access(S, fb, &si);
-        fprintf (stderr, "Done sieving in %1.1fs\n", ts = seconds () - ts);
+        fprintf (stderr, "# Done sieving in %1.1fs\n", ts = seconds () - ts);
 
         /* factoring on the rational side */
         tf = seconds ();
@@ -1490,14 +1491,14 @@ main (int argc, char *argv[])
         tf = seconds () - tf;
 
         tq = seconds() - tq;
-        fprintf (stderr, "Sieving time for this (q,rho): %1.1fs [norm %1.1f,"
+        fprintf (stderr, "# Sieving time for this (q,rho): %1.1fs [norm %1.1f,"
                  " sieving %1.1f, factor %1.1f]\n", tq, tmaxnorm, ts, tf);
 
       }
 
  end:
     t0 = seconds () - t0;
-    fprintf (stderr, "Total sieving time %1.1fs for %lu reports [%1.1fs/r]\n",
+    fprintf (stderr, "# Total sieving time %1.1fs for %lu reports [%1.1fs/r]\n",
              t0, reports, t0 / (double) reports);
     
     free (fb);
