@@ -185,41 +185,6 @@ mp_poly_print (mpz_t *poly, int deg, const char *name, int homogeneous)
     }
 }
 
-#if 0
-/* Print polynomial with floating point coefficients. Assumes f[deg] != 0
-   if deg > 0. */
-static void 
-fpoly_print (const double *f, const int deg, char *name)
-{
-  int i;
-
-  printf (name);
-
-  if (deg == 0)
-    printf ("%f", f[0]);
-
-  if (deg == 1)
-    printf ("%f*x", f[1]);
-
-  if (deg > 1)
-    printf ("%f*x^%d", f[deg], deg);
-
-  for (i = deg - 1; i >= 0; i--)
-    {
-      if (f[i] == 0.)
-	continue;
-      if (i == 0)
-	printf (" %s %f", (f[i] > 0) ? "+" : "-", fabs(f[i]));
-      else if (i == 1)
-	printf (" %s %f*x", (f[i] > 0) ? "+" : "-", fabs(f[i]));
-      else 
-	printf (" %s %f*x^%d", (f[i] > 0) ? "+" : "-", fabs(f[i]), i);
-    }
-
-  printf ("\n");
-}
-#endif
-
 /* Used only in compute_norms() and trialdiv_one_side()*/
 static unsigned char
 log_norm (const double *f, const int deg, const double x, 

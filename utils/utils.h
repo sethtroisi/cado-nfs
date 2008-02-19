@@ -49,6 +49,7 @@ void check_polynomials (cado_poly);
   /* fpoly.c */
 double fpoly_eval (const double *, const int, const double);
 double fpoly_dichotomy (double *, int, double, double, double, unsigned int);
+void   fpoly_print (const double *f, const int deg, char *name);
 
 // Relation I/O
 extern void copy_rel(relation_t *Rel, relation_t rel);
@@ -90,6 +91,8 @@ extern unsigned long getprime (unsigned long);
 
 /* gmp_aux */
 void mpz_set_uint64 (mpz_t, uint64_t);
+uint64_t mpz_get_uint64 (mpz_t);
+uint64_t uint64_nextprime (uint64_t);
 
 #ifdef	__cplusplus
 }	// extern "C"

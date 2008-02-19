@@ -35,6 +35,7 @@ typedef struct {
     unsigned int degree;   /* polynomial degree */
     double scale;     /* LOG_MAX / log (max |F(a0*i+a1*j, b0*i+b1*j)|) */
     mpz_t *fij;       /* coefficients of F(a0*i+a1*j, b0*i+b1*j) */
+    double B;         /* bound for the norm computation */
 } sieve_info_t;
 
 /*
@@ -68,9 +69,12 @@ typedef struct {
 
 /************************** sieve info stuff *********************************/
 
-void
-sieve_info_init (sieve_info_t *si, unsigned int d, int I)
+static double get_maxnorm (cado_poly, sieve_info_t *);
+
+static void
+sieve_info_init (sieve_info_t *si, cado_poly cpoly, int I, uint64_t q1)
 {
+  unsigned int d = cpoly->degree;
   unsigned int k;
 
   si->degree = d;
@@ -80,9 +84,33 @@ sieve_info_init (sieve_info_t *si, unsigned int d, int I)
   si->logI = I;
   si->I = 1 << si->logI;
   si->J = 1 << (si->logI - 1);
+
+  /* initialize bounds for the norm computation, see lattice.tex */
+  si->B = sqrt (2.0 * (double) q1 / (cpoly->skew * sqrt (3.0)));
+  si->scale = get_maxnorm (cpoly, si); /* log(max norm) */
+  fprintf (stderr, "log(maxnorm)=%1.2f\n", si->scale);
+  si->scale = LOG_MAX / si->scale;
 }
 
-void
+static void
+sieve_info_update (sieve_info_t *si, double skew)
+{
+  double s_over_a1, one_over_b1;
+
+  /* check J */
+  s_over_a1 = fabs (skew / (double) si->a1);
+  one_over_b1 = fabs (1.0 / (double) si->b1);
+  if (one_over_b1 < s_over_a1)
+    s_over_a1 = one_over_b1; /* min(s/|a1|, 1/|b1|) */
+  s_over_a1 *= si->B;
+  if (s_over_a1 > 1.0)
+    s_over_a1 = 1.0;
+  si->J = (uint32_t) (s_over_a1 * (double) (si->I >> 1));
+  fprintf (stderr, "J=%u\n", si->J);
+  
+}
+
+static void
 sieve_info_clear (sieve_info_t *si)
 {
   unsigned int d = si->degree;
@@ -729,241 +757,136 @@ fij_from_f (mpz_t *fij, mpz_t *f, int d, int32_t a0, int32_t a1,
   free (g);
 }
 
-#if 0
-/* f(x) -> f(x+1) */
-static void
-translate_right (mpz_t *f, int d)
+/* return max |g(x)| for 0 <= x <= s,
+   where g(x) = g[d]*x^d + ... + g[1]*x + g[0] */
+static double
+get_maxnorm_aux (double *g, unsigned int d, double s)
 {
-  int k, l;
+  unsigned int k, l, sign_change, new_sign_change;
+  double **dg;    /* derivatives of g */
+  double a, va, b, vb;
+  double *roots, gmax;
   
-  for (k = d - 1; k >= 0; k--)
+  dg = (double**) malloc (d * sizeof (double*));
+  dg[0] = g;
+  for (k = 1; k < d; k++) /* dg[k] is the k-th derivative, thus has
+                             degree d-k, i.e., d-k+1 coefficients */
+    dg[k] = (double*) malloc ((d - k + 1) * sizeof (double));
+  roots = (double*) malloc (d * sizeof (double*));
+  for (k = 1; k < d; k++)
+    for (l = 0; l <= d - k; l++)
+      dg[k][l] = (l + 1) * dg[k - 1][l + 1];
+  /* now dg[d-1][0]+x*dg[d-1][1] is the (d-1)-th derivative: it can have at
+     most one sign change, iff dg[d-1][0] and dg[d-1][0]+dg[d-1][1] have
+     different signs */
+  if (dg[d-1][0] * (dg[d-1][0] + dg[d-1][1]) < 0)
     {
-      /* if f(x) = h(x)*x + f0, then f(x+1) = h(x+1)*(x+1) + f0:
-         f[d] is unchanged
-         ...
-         f[l] <- f[l] + f[l+1] */
-      for (l = k; l < d; l++)
-        mpz_add (f[l], f[l], f[l + 1]);
+      sign_change = 1;
+      roots[0] = - dg[d-1][0] / dg[d-1][1]; /* root of (d-1)-th derivative */
     }
-}
-#endif
-
-/* f(x) -> f(x-1) */
-static void
-translate_left (mpz_t *f, int d)
-{
-  int k, l;
-  
-  for (k = d - 1; k >= 0; k--)
+  else
+    sign_change = 0;
+  roots[sign_change] = s; /* end of interval */
+  for (k = d - 1; k-- > 1;)
     {
-      /* if f(x) = h(x)*x + f0, then f(x-1) = h(x-1)*(x-1) + f0:
-         f[d] is unchanged
-         ...
-         f[l] <- f[l] - f[l+1] */
-      for (l = k; l < d; l++)
-        mpz_sub (f[l], f[l], f[l + 1]);
+      /* invariant: sign_change is the number of sign changes of the
+         (k+1)-th derivative, with corresponding roots in roots[0]...
+         roots[sign_change-1], and roots[sign_change] = s. */
+      a = 0.0;
+      va = dg[k][0]; /* value of dg[k] at x=0 */
+      new_sign_change = 0;
+      for (l = 0; l <= sign_change; l++)
+        {
+          b = roots[l]; /* root of dg[k+1], or end of interval */
+          vb = fpoly_eval (dg[k], d - k, b);
+          if (va * vb < 0) /* root in interval */
+            roots[new_sign_change++] = fpoly_dichotomy (dg[k], d - k,
+                                                        a, b, va, 20);
+          a = b;
+          va = vb;
+        }
+      roots[new_sign_change] = s; /* end of interval */
+      sign_change = new_sign_change;
     }
-}
-
-/* f(x) -> f(x+2^i) */
-static void
-translate_right_2exp (mpz_t *f, unsigned int d, unsigned long i)
-{
-  unsigned int k;
-
-  for (k = 1; k <= d; k++)
-    mpz_mul_2exp (f[k], f[k], i * k);
-}
-
-/* f(x) -> f(x-2^i) */
-static void
-translate_left_2exp (mpz_t *f, unsigned int d, unsigned long i)
-{
-  unsigned int k;
-
-  for (k = 1; k <= d; k++)
+  /* now all extrema of g are 0, roots[0], ..., roots[sign_change] = s */
+  gmax = fabs (g[0]);
+  for (k = 0; k <= sign_change; k++)
     {
-      mpz_mul_2exp (f[k], f[k], i * k);
-      if (k & 1)
-        mpz_neg (f[k], f[k]);
+      va = fabs (fpoly_eval (g, d, roots[k]));
+      if (va > gmax)
+        gmax = va;
     }
-}
-
-/* f(x) -> f(x+a) */
-static void
-translate_hori_si (mpz_t *f, int d, long a)
-{
-  int k, l;
-  
-  for (k = d - 1; k >= 0; k--)
-    {
-      for (l = k; l < d; l++)
-        mpz_addmul_si (f[l], f[l + 1], a);
-    }
-}
-
-/* f(x,y) -> f(x,y+1) */
-static void
-translate_up (mpz_t *f, int d)
-{
-  int k, l;
-  
-  for (k = 1; k <= d; k++)
-    {
-      /* if f(y) = h(y)*y + c, then f(y+1) = h(y+1)*(y+1) + c:
-         f[0] is unchanged
-         ...
-         f[l] <- f[l] + f[l-1] */
-      for (l = k; l > 0; l--)
-        mpz_add (f[l], f[l], f[l - 1]);
-    }
-}
-
-/* f(x,y) -> f(x,y+a), a positive: up, a negative: down */
-static void
-translate_vert_si (mpz_t *f, int d, long a)
-{
-  int k, l;
-  
-  for (k = 1; k <= d; k++)
-    {
-      for (l = k; l > 0; l--)
-        mpz_addmul_si (f[l], f[l - 1], a);
-    }
+  for (k = 1; k < d; k++)
+    free (dg[k]);
+  free (dg);
+  free (roots);
+  return gmax;
 }
 
 /* returns the maximal value of log |F(a,b)| for 
    a = a0 * i + a1 * j, b = b0 * i + b1 * j,
-   -I/2 <= i <= I/2, 0 <= j <= J */
+   -I/2 <= i <= I/2, 0 <= j <= I/2*min(s*B/|a1|,B/|b1|)
+   where B >= sqrt(2*q/s/sqrt(3)) for all special-q in the current range
+   (s is the skewness, and B = si.B, see lattice.tex).
+
+   Since |a0| <= s*B and |b0| <= B, then
+   |a0 * i + a1 * j| <= s*B*I and |b0 * i + b1 * j| <= B*I,
+   thus it suffices to compute M = max |F(x,y)| in the rectangle
+   -s <= x <= s, 0 <= y <= 1, and to multiply M by (B*I)^deg(F).
+
+   Since F is homogeneous, we know M = max |F(x,y)| is attained on the border
+   of the rectangle, i.e.:
+   (a) either on F(s,y) for 0 <= y <= 1
+   (b) either on F(x,1) for -s <= x <= s
+   (c) either on F(-s,y) for 0 <= y <= 1
+   (d) or on F(x,0) for -s <= x <= s, but this maximum is f[d]*s^d,
+       and is attained in (a) or (c).
+*/
 static double
-get_maxnorm (cado_poly cpoly, sieve_info_t si, mpz_t *fij)
+get_maxnorm (cado_poly cpoly, sieve_info_t *si)
 {
-  mpz_t max_norm, qq;
-  double ret;
-  unsigned int d, k, j0;
-  int i0;
-  uint64_t time = cputime ();
-
-  d = cpoly->degree;
-
-  mpz_init_set_ui (max_norm, 0);
-  mpz_init (qq);
-
-  fij_from_f (fij, cpoly->f, d, si.a0, si.a1, si.b0, si.b1);
-
-  /* do not divide by q, since at the end we must take q into account in the
-     remaining norm */
-#if 0
-  /* divide the coefficients of fij by q */
-  mpz_set_uint64 (qq, si.q);
-  for (k = 0; k <= d; k++)
-    {
-      ASSERT_ALWAYS (mpz_divisible_p (fij[k], qq));
-      mpz_divexact (fij[k], fij[k], qq);
-    }
-#endif
-
-#ifdef VERBOSE
-  fprintf (stderr, "F_q(x,1) = ");
-  fprint_polynomial (stderr, fij, d);
-#endif
-
-  /* for 0 <= i <= I/2, we have F_q(i,0) = fij[d]*i^d, thus the maximum is
-     attained at i=I/2, which is on the right border treated below */
-
-  /* translate to i=I/2 */
-  translate_right_2exp (fij, d, si.logI - 1);
-
-  /* F_q(I/2,0) is the leading coefficient */
-  mpz_abs (max_norm, fij[d]);
-  i0 = si.I / 2;
-  j0 = 0;
-
-  /* now consider the right border i = I/2, 0 < j <= J */
-  for (k = 1; k <= si.J; k++)
-    {
-      translate_up (fij, d);
-      /* now the f[k] are the coefficients of j -> F(I/2, k + j),
-         with f[d] the constant coefficient */
-      if (mpz_cmpabs (fij[d], max_norm) > 0)
-        {
-          mpz_abs (max_norm, fij[d]);
-          i0 = si.I / 2;
-          j0 = k;
-        }
-    }
-
-  translate_vert_si (fij, d, - (long) si.J); /* back in (I/2, 0) */
-
-  /* back in (0,0) */
-  for (k = 1; k <= d; k++)
-    mpz_div_2exp (fij[k], fij[k], (si.logI - 1) * k);
-
-  /* translate in (0,J) */
-  for (k = 0; k < d; k++)
-    {
-      /* multiply fij[k] by J^(d-k) */
-      mpz_ui_pow_ui (qq, si.J, d - k);
-      mpz_mul (fij[k], fij[k], qq);
-    }
-
-  /* translate in (I/2, J) */
-  translate_hori_si (fij, d, si.I / 2);
-
-  /* upper border: -I/2 <= i < I/2, j = J */
-  for (k = 0; k < si.I; k++)
-    {
-      translate_left (fij, d);
-      if (mpz_cmpabs (fij[0], max_norm) > 0)
-        {
-          mpz_abs (max_norm, fij[0]);
-          i0 = (int) si.I / 2 - (k + 1);
-          j0 = si.J;
-        }
-    }
+  unsigned int d = cpoly->degree, k;
+  double *fd; /* double-precision coefficients of f */
+  double norm, max_norm, pows, tmp;
   
-  /* now in (-I/2, J), go back in (0,J) */
-  translate_hori_si (fij, d, si.I / 2);
+  fd = (double*) malloc ((d + 1) * sizeof (double));
+  for (k = 0; k <= d; k++)
+    fd[k] = mpz_get_d (cpoly->f[k]);
 
-  /* now go back in (0,0) */
-  for (k = 0; k < d; k++)
+  /* (b1) determine the maximum of |f(x)| for 0 <= x <= s */
+  max_norm = get_maxnorm_aux (fd, d, cpoly->skew);
+
+  /* (b2) determine the maximum of |f(-x)| for 0 <= x <= s */
+  norm = get_maxnorm_aux (fd, d, -cpoly->skew);
+  if (norm > max_norm)
+    max_norm = norm;
+
+  for (pows = 1.0, k = 0; k <= d; k++)
     {
-      /* divide fij[k] by J^(d-k) */
-      mpz_ui_pow_ui (qq, si.J, d - k);
-      mpz_divexact (fij[k], fij[k], qq);
+      fd[k] *= pows;
+      pows *= cpoly->skew;
+    }
+  /* swap coefficients; if d is odd, we need to go up to k = floor(d/2) */
+  for (k = 0; k <= d / 2; k++)
+    {
+      tmp = fd[k];
+      fd[k] = fd[d - k];
+      fd[d - k] = tmp;
     }
 
-  /* translate to i=-I/2: the coefficients of F(-I/2, j) are f[k]*(-I/2)^k */
-  translate_left_2exp (fij, d, si.logI - 1);
+  /* (a) determine the maximum of |g(y)| for 0 <= y <= 1 */
+  norm = get_maxnorm_aux (fd, d, 1.0);
+  if (norm > max_norm)
+    max_norm = norm;
 
-  /* now consider the left border i = -I/2, 0 <= j <= J */
-  for (k = 0; k < si.J; k++)
-    {
-      /* now the f[k] are the coefficients of j -> F(-I/2, k + j),
-         with f[d] the constant coefficient */
-      if (mpz_cmpabs (fij[d], max_norm) > 0)
-        {
-          mpz_abs (max_norm, fij[d]);
-          i0 = - (int) si.I / 2;
-          j0 = k;
-        }
-      translate_up (fij, d);
-    }
-  ret = log (mpz_get_d (max_norm));
-  fprintf (stderr, "max norm F_q(%d,%u) has %1.2f bits [time=%lums]\n",
-           i0, j0, ret * LOG_SCALE, cputime () - time);
+  /* (c) determine the maximum of |g(-y)| for 0 <= y <= 1 */
+  norm = get_maxnorm_aux (fd, d, -1.0);
+  if (norm > max_norm)
+    max_norm = norm;
+  
+  free (fd);
 
-  translate_vert_si (fij, d, - (int) si.J); /* back to (-I/2, 0) */
-  for (k = 1; k <= d; k++) /* back to (0,0) */
-    {
-      mpz_div_2exp (fij[k], fij[k], (si.logI - 1) * k);
-      if (k & 1)
-        mpz_neg (fij[k], fij[k]);
-    }
-
-  mpz_clear (max_norm);
-  mpz_clear (qq);
-  return ret;
+  return log (max_norm * pow (si->B * (double) si->I, (double) d));
 }
 
 /* v <- f(i,j), where f is of degree d */
@@ -1204,12 +1127,14 @@ trial_divide (char *buf, mpz_t norm, const unsigned long B)
 }
 
 /* build a product tree with the rational norms,
-   of height h = ceil(log2(reports)) */
-static void
+   of height h = ceil(log2(reports)).
+   Return the number of reports.
+*/
+static unsigned long
 build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
                       unsigned long reports)
 {
-  mpz_t ci, cj, **T, norm, norm2;
+  mpz_t ci, cj, **T, norm;
   int i;
   unsigned int k, j, l;
   unsigned int *lT; /* lT[j] = length of T[j] */
@@ -1234,7 +1159,6 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
   mpz_init (ci); /* ci = g[1]*a0+g[0]*b0 */
   mpz_init (cj); /* cj = g[1]*a1+g[0]*b1 */
   mpz_init (norm);
-  mpz_init (norm2);
 
   mpz_mul_si (ci, cpoly->g[1], si->a0);
   mpz_addmul_si (ci, cpoly->g[0], si->b0);
@@ -1342,8 +1266,9 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
           /* FIXME: on the algebraic side, we could restrict to the
              factor base primes */
           trial_divide (bufa, norm, cpoly->alim);
-          mpz_mul_ui (norm2, norm, si->q); /* large primes including q */
-          /* we take q into account for the mfb bound */
+          /* we do not take q into account for the mfb bound: if we want
+             too large primes (lambda = 2, mfb = 2*lpb), then those large
+             primes will come in addition to q */
           if (mpz_sizeinbase (norm, 2) <= (size_t) cpoly->mfba &&
               !(mpz_sizeinbase (norm, 2) > (size_t) cpoly->lpba &&
                 mpz_probab_prime_p (norm, 1)))
@@ -1373,12 +1298,13 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
   mpz_clear (ci);
   mpz_clear (cj);
   mpz_clear (norm);
-  mpz_clear (norm2);
+
+  return final_reports;
 }
 
 /* build a list report_list[] of values of k = i + I/2 + I*j where gcd(i,j)=1
    and norm is small on algebraic side, then pass it to build_norms_rational */
-static void
+static unsigned long
 factor_rational (cado_poly cpoly, sieve_info_t *si, unsigned char *S)
 {
     /* sieve reports are those for which the remaining bit-size is less than
@@ -1389,10 +1315,21 @@ factor_rational (cado_poly cpoly, sieve_info_t *si, unsigned char *S)
     int i;
     unsigned int j, k;
     int *report_list = NULL; /* list of values of k = i + I/2 + I*j
-                                          where norm small on algebraic side */
+                                where norm small on algebraic side */
     unsigned long reports = 0;
     int64_t a;
     uint64_t b;
+
+#if 0
+    int stat[256];
+    for (k = 0; k < 256; ++k)
+        stat[k]=0;
+    for (k = 0; k < si->I * si->J; ++k)
+        stat[S[k]]++;
+    for (k = 0; k < 256; ++k)
+      fprintf (stderr, "[%d]%d ", k, stat[k]);
+    fprintf (stderr, "\n");
+#endif
 
     report_bound = (unsigned char) (cpoly->alambda * cpoly->lpba
                                     * (si->scale / LOG_SCALE));
@@ -1408,7 +1345,8 @@ factor_rational (cado_poly cpoly, sieve_info_t *si, unsigned char *S)
         if (S[k] <= report_bound)
           {
             xToAB (&a, &b, k, si);
-            if (gcd_ul ((unsigned long) labs(a), b) == 1UL)
+            /* (a,b)=(0,0) is divided by all primes, but we don't want it */
+            if (b != 0 && gcd_ul ((unsigned long) labs(a), b) == 1UL)
               {
                 reports ++;
                 report_list = realloc (report_list, reports * sizeof (int));
@@ -1420,20 +1358,11 @@ factor_rational (cado_poly cpoly, sieve_info_t *si, unsigned char *S)
     fprintf (stderr, "Min of %d is obtained for (i,j) = (%d,%d)\n", min, i, j);
     fprintf (stderr, "Number of reports on algebraic side: %lu\n", reports);
 
-#if 0
-    int stat[256];
-    for (k = 0; k < 256; ++k)
-        stat[k]=0;
-    for (k = 0; k < si->I * si->J; ++k)
-        stat[S[k]]++;
-    for (k = 0; k < 256; ++k)
-      fprintf (stderr, "[%d]%d ", k, stat[k]);
-    fprintf (stderr, "\n");
-#endif
-
-    build_norms_rational (cpoly, si, report_list, reports);
+    reports = build_norms_rational (cpoly, si, report_list, reports);
 
     free (report_list);
+
+    return reports;
 }
 
 /*************************** main program ************************************/
@@ -1441,7 +1370,8 @@ factor_rational (cado_poly cpoly, sieve_info_t *si, unsigned char *S)
 static void
 usage (char *argv0)
 {
-  fprintf (stderr, "Usage: %s -poly xxx.poly -fb xxx.roots -f q0\n", argv0);
+  fprintf (stderr, "Usage: %s -poly xxx.poly -fb xxx.roots -q0 q0 -q1 q1\n",
+           argv0);
   exit (1);
 }
 
@@ -1452,10 +1382,11 @@ main (int argc, char *argv[])
     sieve_info_t si;
     char *fbfilename = NULL, *polyfilename = NULL;
     cado_poly cpoly;
-    double t0 = seconds (), tmaxnorm, tfb, ts, tf;
-    uint64_t q0;
-    unsigned long *roots, nroots;
+    double t0 = seconds (), tmaxnorm, tfb, ts, tf, tq;
+    uint64_t q0 = 0, q1 = 0;
+    unsigned long *roots, nroots, reports = 0, i;
     unsigned char * S;
+    factorbase_degn_t * fb;
 
     while (argc > 1 && argv[1][0] == '-')
       {
@@ -1471,9 +1402,15 @@ main (int argc, char *argv[])
             argc -= 2;
             argv += 2;
           }
-        else if (argc > 2 && strcmp (argv[1], "-f") == 0)
+        else if (argc > 2 && strcmp (argv[1], "-q0") == 0)
           {
             q0 = strtoul (argv[2], NULL, 10);
+            argc -= 2;
+            argv += 2;
+          }
+        else if (argc > 2 && strcmp (argv[1], "-q1") == 0)
+          {
+            q1 = strtoul (argv[2], NULL, 10);
             argc -= 2;
             argv += 2;
           }
@@ -1481,7 +1418,7 @@ main (int argc, char *argv[])
           usage (argv0);
       }
 
-    if (polyfilename == NULL || fbfilename == NULL)
+    if (polyfilename == NULL || fbfilename == NULL || q0 == 0 || q1 == 0)
       usage (argv0);
 
     if (!read_polynomial (cpoly, polyfilename))
@@ -1491,34 +1428,12 @@ main (int argc, char *argv[])
       }
 
     /* this does not depend on the special-q */
-    sieve_info_init (&si, cpoly->degree, 13);
+    sieve_info_init (&si, cpoly, 13, q1);
 
     // One more is for the garbage during SSE
-    S = (unsigned char *) malloc ((1 +si.I * si.J)*sizeof(unsigned char));
+    S = (unsigned char *) malloc ((1 + si.I * si.J)*sizeof(unsigned char));
     ASSERT_ALWAYS(S != NULL);
 
-    /* special q (and root rho) */
-    si.q = q0;
-    roots = (unsigned long*) malloc (cpoly->degree * sizeof (unsigned long));
-    nroots = modul_roots_mod_long (roots, cpoly->f, cpoly->degree, &q0);
-    if (nroots == 0)
-      {
-        fprintf (stderr, "Error, no root for q=%lu\n", q0);
-        exit (1);
-      }
-    si.rho = roots[0];
-    fprintf (stderr, "Sieving q=%lu, rho=%lu\n", si.q, si.rho);
-
-    /* norm computation */
-    tmaxnorm = seconds ();
-    SkewGauss (&si, cpoly->skew); /* computes a0, b0, a1, b1 from q, rho, and
-                                   the skewness */
-    si.scale = LOG_MAX / get_maxnorm (cpoly, si, si.fij);
-    init_norms (S, cpoly, si);
-    tmaxnorm = seconds () - tmaxnorm;
-    fprintf (stderr, "Initializing norms took %1.1fs\n", tmaxnorm);
-
-    factorbase_degn_t * fb;
     /* the logarithm scale is LOG_MAX / log(max norm) */
     tfb = seconds ();
     fb = fb_read (fbfilename, si.scale, 0);
@@ -1526,19 +1441,66 @@ main (int argc, char *argv[])
     tfb = seconds () - tfb;
     fprintf (stderr, "Reading factor base took %1.1fs\n", tfb);
 
-    ts = seconds ();
-    //sieve_slow(S, fb, &si);
-    sieve_random_access(S, fb, &si);
-    fprintf (stderr, "Done sieving in %1.1fs\n", ts = seconds () - ts);
+    /* special q (and root rho) */
+    roots = (unsigned long*) malloc (cpoly->degree * sizeof (unsigned long));
+    q0 --; /* so that nextprime gives q0 if q0 is prime */
+    nroots = 0;
+    while (q0 < q1)
+      {
+        while (nroots == 0) /* go to next prime and generate roots */
+          {
+            q0 = uint64_nextprime (q0);
+            if (q0 >= q1)
+              goto end;
+            si.q = q0;
+            nroots = modul_roots_mod_long (roots, cpoly->f, cpoly->degree, &q0);
+            fprintf (stderr, "q=%lu: root(s)", q0);
+            for (i = 1; i <= nroots; i++)
+              fprintf (stderr, " %lu", roots[nroots-i]);
+            fprintf (stderr, "\n");
+          }
+        tq = seconds ();
 
-    tf = seconds ();
-    factor_rational (cpoly, &si, S);
-    tf = seconds () - tf;
+        si.rho = roots[--nroots];
+        fprintf (stderr, "Sieving q=%lu, rho=%lu\n", si.q, si.rho);
 
-    t0 = seconds() - t0;
-    fprintf (stderr, "Total sieving time %1.1fs [norm %1.1f, fb %1.1f,"
-             " sieving %1.1f, factor %1.1f]\n", t0, tmaxnorm, tfb, ts, tf);
+        /* computes a0, b0, a1, b1 from q, rho, and the skewness */
+        SkewGauss (&si, cpoly->skew);
 
+        /* checks the value of J */
+        sieve_info_update (&si, cpoly->skew);
+
+        /* norm computation */
+        tmaxnorm = seconds ();
+        fij_from_f (si.fij, cpoly->f, cpoly->degree, si.a0, si.a1, si.b0,
+                    si.b1);
+        init_norms (S, cpoly, si);
+        tmaxnorm = seconds () - tmaxnorm;
+        fprintf (stderr, "Initializing norms took %1.1fs\n", tmaxnorm);
+
+        /* sieving on the algebraic side */
+        ts = seconds ();
+        //sieve_slow(S, fb, &si);
+        sieve_random_access(S, fb, &si);
+        fprintf (stderr, "Done sieving in %1.1fs\n", ts = seconds () - ts);
+
+        /* factoring on the rational side */
+        tf = seconds ();
+        reports += factor_rational (cpoly, &si, S);
+        tf = seconds () - tf;
+
+        tq = seconds() - tq;
+        fprintf (stderr, "Sieving time for this (q,rho): %1.1fs [norm %1.1f,"
+                 " sieving %1.1f, factor %1.1f]\n", tq, tmaxnorm, ts, tf);
+
+      }
+
+ end:
+    t0 = seconds () - t0;
+    fprintf (stderr, "Total sieving time %1.1fs for %lu reports [%1.1fs/r]\n",
+             t0, reports, t0 / (double) reports);
+    
+    free (fb);
     sieve_info_clear (&si);
     clear_polynomial (cpoly);
     free (roots);

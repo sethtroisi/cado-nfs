@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>   /* for fabs */
 #include "cado.h"
 
 /* Evaluate the poynomial f of degree deg at point x */
@@ -40,3 +41,37 @@ fpoly_dichotomy (double *g, int d, double a, double b, double sa,
   while (n-- > 0);
   return (a + b) * 0.5;
 }
+
+/* Print polynomial with floating point coefficients. Assumes f[deg] != 0
+   if deg > 0. */
+void 
+fpoly_print (const double *f, const int deg, char *name)
+{
+  int i;
+
+  printf (name);
+
+  if (deg == 0)
+    printf ("%f", f[0]);
+
+  if (deg == 1)
+    printf ("%f*x", f[1]);
+
+  if (deg > 1)
+    printf ("%f*x^%d", f[deg], deg);
+
+  for (i = deg - 1; i >= 0; i--)
+    {
+      if (f[i] == 0.)
+	continue;
+      if (i == 0)
+	printf (" %s %f", (f[i] > 0) ? "+" : "-", fabs(f[i]));
+      else if (i == 1)
+	printf (" %s %f*x", (f[i] > 0) ? "+" : "-", fabs(f[i]));
+      else 
+	printf (" %s %f*x^%d", (f[i] > 0) ? "+" : "-", fabs(f[i]), i);
+    }
+
+  printf ("\n");
+}
+
