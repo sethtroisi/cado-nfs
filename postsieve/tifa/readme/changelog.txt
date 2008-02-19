@@ -1,6 +1,12 @@
  TIFA v0.2.0:
  ------------
 
+ - January / February 2008:
+       - Added basic implementation of the Elliptic Curve Method (ECM). This
+         is merely a toy-implementation, focused on small numbers. Nothing
+         standing the comparison with the much more powerful GMP-ECM.
+       - Misc. clean ups (there's always some dust building up).
+
  - December 2007:
        - Misc. clean ups.
        - Added generic tifa_factor functions.

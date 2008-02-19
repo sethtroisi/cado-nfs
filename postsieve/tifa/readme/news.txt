@@ -15,6 +15,7 @@
       - implementation of the Self-Initializing Quadratic Sieve
       - implementation of the Square Form Factorization algorithm (small
         numbers only though, less than double precision) with "fast return"
+      - implementation of the Elliptic Curve Method (ECM)
       - implementation of McKee's speedup of Fermat's factorization algorithm
         (greedy variant) with multiplier race.
       - switched from MPZ to MPN layer of GMP for critical parts of code

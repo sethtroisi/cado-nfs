@@ -35,7 +35,7 @@
 2. Legal
 ------------------------------------------------------------------------------
 
-  The TIFA library is Copyright (C) 2006, 2007  INRIA (French National
+  The TIFA library is Copyright (C) 2006, 2007, 2008  INRIA (French National
   Institute for Research in Computer Science and Control)
 
   The TIFA library is free software; you can redistribute it and/or modify it
@@ -61,11 +61,18 @@
 ------------------------------------------------------------------------------
 
   The TIFA library implements utilities and algorithms to perform integer
-  factorizations. For the time being, only the CFRAC, Fermat's ("fast" McKee's 
-  variation), SQUFOF, basic Quadratic Sieve, and Self-Initializing Quadratic 
-  Sieve algorithms (and... well... the trial division too!) have been 
-  implemented. It should be stressed that the QS and SIQS implementations are 
-  still crude and need to be optimized and fine-tuned.
+  factorizations, with an emphasis on small to medium-sized composites, say
+  from 50 to 200 bits.
+  
+  For the time being, the following factorization algorithms have been
+  implemented:
+
+      - CFRAC   (Continued FRACtion factorization)
+      - ECM     (Elliptic Curve Method)
+      - Fermat  (McKee's "fast" variant of Fermat's algorithm)
+      - QS      (Quadratic Sieve)
+      - SIQS    (Self-Initializing Quadratic Sieve)
+      - SQUFOF  (SQUare FOrm Factorization)
 
 ------------------------------------------------------------------------------
 4. Requirements
@@ -79,14 +86,21 @@
   It will not build if GMP is not installed on your system.
 
   To correctly use the scripts provided in the ./tools directory, you will
-  also need the GMP Perl modules. there are available as part of the GMP
+  also need the GMP Perl modules. There are available as part of the GMP
   distribution but not built per default, so if you did not set up the GMP
   library yourself, chances are that these modules were not generated. In
   this case, you'll have to head over to http://www.swox.com/gmp/ to download
   a whole new distribution and generate the modules. Make sure that the
   distribution you download matches the one installed on your system, otherwise
   the modules could fail to compile.
+  
+  Needless to say, using the Perl scripts requires a distribution of Perl
+  available from:
 
+      http://www.perl.com/download.csp
+  
+  The code has been developed and tested using Perl 5.8.x.
+  
   Documentation is embedded in the code and extracted with the Doxygen tool,
   available from:
 
@@ -104,7 +118,9 @@
       http://www.scons.org/
 
   to compile the TIFA library. Note that you'll also need a distribution of
-  Python version 1.5.2 or (preferably) higher.
+  Python version 1.5.2 or (preferably!) higher. Python is available at:
+  
+      http://www.python.org/download/
 
 ------------------------------------------------------------------------------
 5. How to install?
@@ -210,8 +226,8 @@
             src/
 
     tests/                A few tests of some functions of the library. Not
-                          particularly useful as such...
-        include/
+                          particularly useful as such... These will probably
+        include/          be removed...
         src/
 
     tools/                Factorization programs using the TIFA library
@@ -377,7 +393,7 @@
   verbose enough --help option. They will also be the subject of doxygen
   independent documentation soon.
 
-  Finally the Tifa::* perl modules are documented by man-pages generated from
+  Finally the Tifa::* perl modules are documented by man pages generated from
   embedded comments by pod2man.
 
 ------------------------------------------------------------------------------
@@ -392,21 +408,22 @@
       prompt> scons doc
       prompt> scons install
 
-  There is four programs that you will be likely to use: cfrac_factors,
-  qs_factors, siqs_factors and squfof_factors which as their names imply,
-  factor integers using respectively the Continued FRACtion, Quadratic Sieve,
-  Self-Initializing Quadratic Sieve and SQUare FOrm Factorization algorithms.
-  However, it is recommended to use the provided wrapper script factorize.pl
-  instead of invoking directly these programs. Indeed this perl wrapper
-  provides a more friendly user interface and offers more options than the C
-  programs.
+  There is six programs that you will be likely to use: cfrac_factors,
+  ecm_factors, fermat_factors, qs_factors, siqs_factors and squfof_factors
+  which as their names imply,factor integers using respectively the Continued 
+  FRACtion, Elliptic Curve Method, Fermat, Quadratic Sieve, Self-Initializing
+  Quadratic Sieve and SQUare FOrm Factorization algorithms. However, it is
+  recommended to use the provided wrapper script factorize.pl instead of
+  invoking directly these programs. Indeed this perl wrapper provides a more
+  friendly user interface and offers more options than the C programs.
 
   Using the factorize.pl script: factoring with CFRAC, SQUFOF, QS, etc.
   ---------------------------------------------------------------------
 
-     This script wraps the cfrac_factors, fermat_factors, qs_factors, 
-     siqs_factors and squfof_factors programs. Typing "factorize.pl --help"
-     on the command line gives the list of the available options.
+     This script wraps the cfrac_factors, ecm_factors, fermat_factors, 
+     qs_factors, siqs_factors and squfof_factors programs.
+     Typing "factorize.pl --help" on the command line gives the list of the 
+     available options.
 
      > Example: factor a number with CFRAC using the script default parameter
                 values
@@ -536,7 +553,7 @@
 
       - that the path to the C program is correct. Use the --exe option
         or edit the script's configuration files to set the full path to
-        the cfrac_factors, qs_factors, siqs_factors or squfof_factors programs.
+        the *_factors programs.
 
       - that you indeed have a not too old version of Perl installed on your
         system! :-)
@@ -546,18 +563,18 @@
   
     Maybe. But then again, maybe not. No particular effort was made to ensure
     compatibility with non-unix systems (such as Windows) but our bet is that
-    TIFA should be pretty easy to adapt to non-unix platforms. That said, we
-    do not plan to support non-unix operating systems anyway, so in that case
-    you're pretty much on your own.
+    TIFA should be pretty easy to adapt to non-unix platforms provided that
+    they are POSIX compliant. That said, we do not plan to support non-unix 
+    operating systems anyway, so in that case you're pretty much on your own.
 
   Your factoring programs yield no factor!
   ----------------------------------------
 
-    This can happen when the number of congruences of square obtained is too
-    small. In this case, chances are that only trivial factors were found.
-    Try to run the program again with a larger number of relations
-    using the --nrelations option. In practice 32 should be enough most of the
-    time.
+    For congruences of square methods, this can happen when the number of 
+    congruences of square obtained is too small. In this case, chances are that 
+    only trivial factors were found. Try to run the program again with a larger 
+    number of relations using the --nrelations option. In practice 32 should be 
+    enough most of the time.
 
   What? Do you mean that my program ran for hours for nothing and I have to
   -------------------------------------------------------------------------
@@ -567,5 +584,6 @@
     Unfortunately yes. The solution to this problem is obvious: save the data
     (essentially the matrix and relations) obtained during the course of the
     program and reload it before generating new relations. This will be solved
-    in the next release... or the one after...
-
+    in the next release... or the one after... That said, TIFA focuses on small
+    to medium-sized numbers so factorizations should not take more than a
+    couple of minutes...
