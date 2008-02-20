@@ -17,8 +17,7 @@ OPTCFLAGS ?= -O2 -g -Wall -W
 CFLAGS=$(OPTCFLAGS) -fkeep-inline-functions -DREV=\"`svnversion .`\"
 LDFLAGS=
 
-#all: sieve makefb las
-all: sieve makefb
+all: sieve makefb las
 
 
 Makefile.local:
