@@ -3,7 +3,11 @@
 
 // #define HAVE_MSRH 1
 #define WANT_ASSERT 1
-#define WANT_ASSERT_EXPENSIVE 0
+
+/* don't write #define WANT_ASSERT_EXPENSIVE 0, since it is used as
+   #ifdef WANT_ASSERT_EXPENSIVE */
+// #define WANT_ASSERT_EXPENSIVE 1
+
 #define REDC_ROOTS 1
 
 /* Number of blocking levels for small factor base primes, should
