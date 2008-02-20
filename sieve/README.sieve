@@ -1,13 +1,12 @@
-Create a config.h file with contents like
-
+Create a config.h file with contents as follows (if none exists, a default one
+is created from config_h.in):
 
 /*************************************************/
 #ifndef __CONFIG_H__
 #define __CONFIG_H__
 
-#define HAVE_MSRH 1
 #define WANT_ASSERT 1
-#define WANT_ASSERT_EXPENSIVE 0
+// #define WANT_ASSERT_EXPENSIVE 0
 
 /* Number of blocking levels for small factor base primes, should
    correspond to cache levels. Sieving will be done in SIEVE_BLOCKING + 1
