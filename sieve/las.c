@@ -984,51 +984,47 @@ SkewGauss (sieve_info_t *si, double skewness)
   a[0] = (double) si->q;
   ASSERT_ALWAYS(a[0] < 9007199254740992.0); /* si.q should be less than 2^53
                                                so that a[0] is exact */
-  a[1] = 0.0;
-  b[0] = (double) si->rho;
+  b[0] = 0.0;
+  a[1] = (double) si->rho;
   skewness = rint (skewness);
   b[1] = skewness;
   while (1)
     {
-      q = (a[0] * b[0] + a[1] * b[1]) / (b[0] * b[0] + b[1] * b[1]);
+      /* reduce vector (a[0], b[0]) with respect to (a[1], b[1]) */
+      q = (a[0] * a[1] + b[0] * b[1]) / (a[1] * a[1] + b[1] * b[1]);
       q = rint (q);
       if (q == 0.0)
-        {
-          /* si->a0 and si->a1 should the larger values, in
-             a[0] and b[0] */
-          ASSERT_ALWAYS(fits_int32_t(a[0]));
-          si->a0 = (int32_t) a[0];
-          a[1] /= skewness;
-          ASSERT_ALWAYS(fits_int32_t(a[1]));
-          si->b0 = (int32_t) a[1];
-          ASSERT_ALWAYS(fits_int32_t(b[0]));
-          si->a1 = (int32_t) b[0];
-          b[1] /= skewness;
-          ASSERT_ALWAYS(fits_int32_t(b[1]));
-          si->b1 = (int32_t) b[1];
-          return;
-        }
-      a[0] -= q * b[0];
-      a[1] -= q * b[1];
-      q = (a[0] * b[0] + a[1] * b[1]) / (a[0] * a[0] + a[1] * a[1]);
+        break;
+      a[0] -= q * a[1];
+      b[0] -= q * b[1];
+      /* reduce vector (a[1], b[1]) with respect to (a[0], b[0]) */
+      q = (a[0] * a[1] + b[0] * b[1]) / (a[0] * a[0] + b[0] * b[0]);
       q = rint (q);
       if (q == 0.0)
-        {
-          /* exchange a and b */
-          ASSERT_ALWAYS(fits_int32_t(a[0]));
-          si->a1 = (int32_t) a[0];
-          a[1] /= skewness;
-          ASSERT_ALWAYS(fits_int32_t(a[1]));
-          si->b1 = (int32_t) a[1];
-          ASSERT_ALWAYS(fits_int32_t(b[0]));
-          si->a0 = (int32_t) b[0];
-          b[1] /= skewness;
-          ASSERT_ALWAYS(fits_int32_t(b[1]));
-          si->b0 = (int32_t) b[1];
-          return;
-        }
-      b[0] -= q * a[0];
-      b[1] -= q * a[1];
+        break;
+      a[1] -= q * a[0];
+      b[1] -= q * b[0];
+    }
+  /* put the smallest vector in (a0,b0) */
+  ASSERT_ALWAYS(fits_int32_t(a[0]));
+  ASSERT_ALWAYS(fits_int32_t(b[0]));
+  ASSERT_ALWAYS(fits_int32_t(a[1]));
+  ASSERT_ALWAYS(fits_int32_t(b[1]));
+  b[0] /= skewness;
+  b[1] /= skewness;
+  if (a[0] * a[0] + b[0] * b[0] < a[1] * a[1] + b[1] * b[1])
+    {
+      si->a0 = (int32_t) a[0];
+      si->b0 = (int32_t) b[0];
+      si->a1 = (int32_t) a[1];
+      si->b1 = (int32_t) b[1];
+    }
+  else
+    {
+      si->a0 = (int32_t) a[1];
+      si->b0 = (int32_t) b[1];
+      si->a1 = (int32_t) a[0];
+      si->b1 = (int32_t) b[0];
     }
 }
 
@@ -1388,7 +1384,7 @@ factor_rational (cado_poly cpoly, sieve_info_t *si, unsigned char *S)
 static void
 usage (char *argv0)
 {
-  fprintf (stderr, "Usage: %s -poly xxx.poly -fb xxx.roots -q0 q0 -q1 q1\n",
+  fprintf (stderr, "Usage: %s -poly xxx.poly -fb xxx.roots -q0 q0 [-q1 q1]\n",
            argv0);
   exit (1);
 }
@@ -1441,8 +1437,12 @@ main (int argc, char *argv[])
           usage (argv0);
       }
 
-    if (polyfilename == NULL || fbfilename == NULL || q0 == 0 || q1 == 0)
+    if (polyfilename == NULL || fbfilename == NULL || q0 == 0)
       usage (argv0);
+
+    /* if -q1 is not given, sieve only for q0 */
+    if (q1 == 0)
+      q1 = q0 + 1;
 
     if (!read_polynomial (cpoly, polyfilename))
       {
