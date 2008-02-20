@@ -1301,7 +1301,6 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
             }
         }
     }
-  fprintf (stderr, "# Final reports: %lu\n", final_reports);
 
   for (l = 0; l < aP; l++)
     mpz_clear (P[l]);
@@ -1403,9 +1402,14 @@ main (int argc, char *argv[])
     cado_poly cpoly;
     double t0 = seconds (), tmaxnorm, tfb, ts, tf, tq;
     uint64_t q0 = 0, q1 = 0;
-    unsigned long *roots, nroots, reports = 0, i;
+    unsigned long *roots, nroots, reports, tot_reports = 0, i;
     unsigned char * S;
     factorbase_degn_t * fb;
+
+    fprintf (stderr, "# %s.r%s", argv[0], REV);
+    for (i = 1; i < (unsigned int) argc; i++)
+      fprintf (stderr, " %s", argv[i]);
+    fprintf (stderr, "\n");
 
     while (argc > 1 && argv[1][0] == '-')
       {
@@ -1505,20 +1509,24 @@ main (int argc, char *argv[])
 
         /* factoring on the rational side */
         tf = seconds ();
-        reports += factor_rational (cpoly, &si, S);
+        reports = factor_rational (cpoly, &si, S);
         tf = seconds () - tf;
-
+        tot_reports += reports;
         tq = seconds() - tq;
-        fprintf (stderr, "# Sieving time for this (q,rho): %1.1fs [norm %1.1f,"
+        fprintf (stderr, "# Time for this (q,rho): %1.1fs [norm %1.1f,"
                  " sieving %1.1f, factor %1.1f]\n", tq, tmaxnorm, ts, tf);
+        if (tot_reports != 0)
+          fprintf (stderr, "# Reports for this (q,rho): %lu, total %lu,"
+                   " rate %1.2fs/r\n", reports, tot_reports,
+                   (seconds () - t0) / (double) tot_reports);
 
       }
 
  end:
     t0 = seconds () - t0;
     fprintf (stderr, "# Total sieving time %1.1fs for %lu reports [%1.1fs/r]\n",
-             t0, reports, t0 / (double) reports);
-    
+             t0, tot_reports, t0 / (double) tot_reports);
+
     free (fb);
     sieve_info_clear (&si);
     clear_polynomial (cpoly);
