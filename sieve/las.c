@@ -190,20 +190,38 @@ fb_root_in_qlattice(const fbprime_t p, const fbprime_t R, const sieve_info_t * s
 }
 
 
+// Here, we have i/j == 0 mod p, so that j can be anything, and i is 0
+// mod p.
 static void
-special_case_0 (unsigned long p)
+special_case_0(unsigned char *S, fbprime_t p, unsigned char logp, const sieve_info_t *si)
 {
-#ifndef NO_WARNING
-  fprintf(stderr, "# Warning: special_case_0(%lu) not implemented\n", p);
-#endif
+    long i, i0, j;
+    const uint32_t I = si->I;
+    const long Is2 = (long)(I>>1);
+    unsigned char *S_ptr;
+    i0 = -(long)(I>>1) + ((unsigned long)(Is2) % p);
+    S_ptr = S + (I>>1);
+    for (j = 0; j < si->J; ++j) {
+        for (i = i0; i < Is2; i += p) 
+            S_ptr[i] -= logp;
+        S_ptr += I;
+    }
 }
 
+// Here, we have i/j == oo mod p, so that j is 0 mod p and i can be anything
 static void
-special_case_p (unsigned long p)
+special_case_p(unsigned char *S, fbprime_t p, unsigned char logp, const sieve_info_t *si)
 {
-#ifndef NO_WARNING
-  fprintf(stderr, "# Warning: special_case_p(%lu) not implemented\n", p);
-#endif
+    long i, j;
+    const long Is2 = (long)(si->I>>1);
+    const uint32_t J = si->J;
+    unsigned char *S_ptr;
+    S_ptr = S + Is2;
+    for (j = 0; j < J; j += p) {
+        for (i = -Is2; i < Is2; ++i)
+            S_ptr[i] -= logp;
+        S_ptr += p*si->I;
+    }
 }
 
 #if 0
@@ -419,11 +437,11 @@ static void line_sieve(unsigned char *S, factorbase_degn_t **fb_ptr,
             R = (*fb_ptr)->roots[nr];
             r = fb_root_in_qlattice(p, R, si);
             if (r == 0) {
-                special_case_0 (p);
+                special_case_0(S, p, logp, si);
                 continue;
             } 
             if (r == p) {
-                special_case_p (p);
+                special_case_p(S, p, logp, si);
                 continue;
             } 
             
@@ -601,11 +619,11 @@ sieve_random_access (unsigned char *S, factorbase_degn_t *fb,
             R = fb->roots[nr];
             r = fb_root_in_qlattice(p, R, si);
             if (r == 0) {
-                special_case_0 (p);
+                special_case_0 (S, p, logp, si);
                 continue;
             } 
             if (r == p) {
-                special_case_p (p);
+                special_case_p (S, p, logp, si);
                 continue;
             } 
             
