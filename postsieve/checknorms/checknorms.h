@@ -174,19 +174,21 @@ inline bool coprime(long a, unsigned long b);
 //       f : name of relation file
 //   cpoly : polynomial used
 // verbose : verbosity switch
+// comment : should we copy comments from input file in output file?
 //  maxnlp : maximum number of large prime accepted in norms' residuals.
 //   cmult : if non-null, considers p^m as m large primes instead of just one. 
 //    mfbr : bound for rational  residues is 2^mfbr
 //    mfba : bound for algebraic residues is 2^mfba
 //  primes : small primes used for trial division (should contains primes
 //           omitted in relations)
-//     npa : number of small primes to trial divide by on rational side
+//     npr : number of small primes to trial divide by on rational side
 //     npa : number of small primes to trial divide by on algebraic side
 //
 unsigned long checkrels(
     char *f,
     cado_poly cpoly,
-    int verbose,
+    unsigned int verbose,
+    unsigned int comment,
     unsigned int maxnlp,
     unsigned int cmult,
     size_t mfbr,
@@ -212,6 +214,9 @@ void print_help(char* progname);
 // intervals taking into account CPU time _and_ system time spent on behalf of
 // the calling process. microseconds() from src/utils/timing.c discards system
 // time.
+//
+// _NOTE_: Maintainers / developers of the src/utils code are welcomed to
+//         move this function there (dropping the ckn_ prefix).
 //
 uint64_t ckn_mu_secs();
 //-----------------------------------------------------------------------------

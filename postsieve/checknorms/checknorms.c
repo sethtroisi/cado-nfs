@@ -58,7 +58,8 @@ int main(int argc, char *argv[]) {
     unsigned int maxnlp = DFLT_MAX_NLP; // max number of large primes allowed
     unsigned int cmult  = 0;            // count multiplicities in maxlp limit
 
-    int verbose = 0;
+    unsigned int verbose       = 0; // verbosity switch
+    unsigned int keep_comments = 0; // should we keep comments in output file?
 
     //
     // Parse command line arguments and handle options.
@@ -74,13 +75,17 @@ int main(int argc, char *argv[]) {
             argc--;
             argv++;
 
+        } else if (argc > 1 && strcmp(argv[1], "-com") == 0) {
+            keep_comments++;
+            argc--;
+            argv++;
+        
         } else if (argc > 1 && strcmp(argv[1], "-cmult") == 0) {
             cmult++;
             argc--;
             argv++;
 
-        }
-        else if (argc > 1 && strcmp(argv[1], "-maxnlp") == 0) {
+        } else if (argc > 1 && strcmp(argv[1], "-maxnlp") == 0) {
             maxnlp = atoi(argv[2]);
             argc -= 2;
             argv += 2;
@@ -245,8 +250,8 @@ int main(int argc, char *argv[]) {
         count_larger_mfbr          = 0;
         
         nrels_out += checkrels(
-                       argv[1], cpoly, verbose, maxnlp, cmult, mfbr, mfba,
-                       primes, npr, npa
+                       argv[1], cpoly, verbose, keep_comments, maxnlp, cmult,
+                       mfbr, mfba, primes, npr, npa
                      );
         argc--;
         argv++;
@@ -266,7 +271,8 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 //-----------------------------------------------------------------------------
-unsigned long checkrels(char *f, cado_poly cpoly, int verbose,
+unsigned long checkrels(char *f, cado_poly cpoly,
+                        unsigned int verbose, unsigned int keep_comments,
                         unsigned int maxnlp, unsigned int cmult,
                         size_t mfbr, size_t mfba,
                         unsigned long *primes,
@@ -355,7 +361,9 @@ unsigned long checkrels(char *f, cado_poly cpoly, int verbose,
             //
             // Skip commented lines...
             //
-            printf("%s", line);
+            if (keep_comments) {
+                printf("%s", line);
+            }
             goto next_relation;
         }
         nrels_in++;
@@ -904,7 +912,7 @@ void print_usage(char* progname) {
 void print_help(char* progname) {
     printf("Usage:\n");
     printf("------\n");
-    printf("%14s [-h] [-v] [-cmult]\n", progname);
+    printf("%14s [-h] [-v] [-com] [-cmult]\n", progname);
     printf("%14s [-maxnlp <num>] [-mfbr <num>] [-mfba <num>]\n", "");
     printf("%14s [-t <num>] [-tr <num>] [-ta <num>]\n", "");
     printf("%14s -poly <file> <relfile_1> [<relfile_2> ... <relfile_n>]\n\n",
@@ -920,6 +928,9 @@ void print_help(char* progname) {
     printf("--------\n");
     printf("  -v\n");
     printf("      Turn verbose mode on.\n");
+    printf("  -com\n");
+    printf("      Copy comments from input files to output files.\n");
+    printf("      By default, comments are not copied to output files.\n");
     printf("  -h\n");
     printf("      Print this help.\n");
     printf("  -cmult\n");
