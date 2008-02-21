@@ -45,33 +45,33 @@ fpoly_dichotomy (double *g, int d, double a, double b, double sa,
 /* Print polynomial with floating point coefficients. Assumes f[deg] != 0
    if deg > 0. */
 void 
-fpoly_print (const double *f, const int deg, char *name)
+fpoly_print (FILE *stream, const double *f, const int deg, char *name)
 {
   int i;
 
-  printf (name);
+  fprintf (stream, name);
 
   if (deg == 0)
-    printf ("%f", f[0]);
+    fprintf (stream, "%f", f[0]);
 
   if (deg == 1)
-    printf ("%f*x", f[1]);
+    fprintf (stream, "%f*x", f[1]);
 
   if (deg > 1)
-    printf ("%f*x^%d", f[deg], deg);
+    fprintf (stream, "%f*x^%d", f[deg], deg);
 
   for (i = deg - 1; i >= 0; i--)
     {
       if (f[i] == 0.)
 	continue;
       if (i == 0)
-	printf (" %s %f", (f[i] > 0) ? "+" : "-", fabs(f[i]));
+	fprintf (stream, " %s %f", (f[i] > 0) ? "+" : "-", fabs(f[i]));
       else if (i == 1)
-	printf (" %s %f*x", (f[i] > 0) ? "+" : "-", fabs(f[i]));
+	fprintf (stream, " %s %f*x", (f[i] > 0) ? "+" : "-", fabs(f[i]));
       else 
-	printf (" %s %f*x^%d", (f[i] > 0) ? "+" : "-", fabs(f[i]), i);
+	fprintf (stream, " %s %f*x^%d", (f[i] > 0) ? "+" : "-", fabs(f[i]), i);
     }
 
-  printf ("\n");
+  fprintf (stream, "\n");
 }
 

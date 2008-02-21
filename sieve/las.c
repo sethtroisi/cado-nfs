@@ -14,12 +14,14 @@
                                         identify the corresponding IEEE 754
                                         double precision number */
 
-#define GUARD 3       /* Guard for the logarithms of norms, so that the value
-                         does not wrap around zero due to roundoff errors.
-                         We should have GUARD + LOG_MAX < 256 */
-#define LOG_MAX 252.9 /* GUARD+LOG_MAX should be as near as possible from 256,
-                         to get more accuracy in the norm computations, but not
-                         too much, otherwise a norm might be rounded to zero */
+/* Guard for the logarithms of norms, so that the value does not wrap around
+   zero due to roundoff errors. */
+#define GUARD 4
+
+/* GUARD+LOG_MAX should be as near as possible from 256, to get more accuracy
+   in the norm computations, but not too much, otherwise a norm might be
+   rounded to zero. */
+#define LOG_MAX (255.9 - (double) GUARD)
 
 /* define TRACE_K to -I/2+i+I*j to trace the sieve array entry corresponding
    to (i,j), i.e., a = a0*i+a1*j, b = b0*i+b1*j */
@@ -114,7 +116,7 @@ sieve_info_update (sieve_info_t *si, double skew)
   if (s_over_a1 > 1.0)
     s_over_a1 = 1.0;
   si->J = (uint32_t) (s_over_a1 * (double) (si->I >> 1));
-  fprintf (stderr, "# J=%u\n", si->J);
+  fprintf (stderr, "# I=%u; J=%u\n", si->I, si->J);
   
 }
 
@@ -966,58 +968,49 @@ eval_fij (mpz_t v, mpz_t *f, unsigned int d, long i, unsigned long j)
 static void
 init_norms (unsigned char *S, cado_poly cpoly, sieve_info_t si)
 {
-  unsigned int i, j, k, l;
-  unsigned int d = cpoly->degree;
-  mpz_t *t;
+  int i, halfI;
+  unsigned int j, k, d = cpoly->degree;
+  double *t, *u, invq, powj, norm;
+  unsigned char *S_ptr;
 
   /* si.scale = LOG_MAX / log(max |F(a0*i+a1*j, b0*i+b1*j)|) */
   
-  /* invariant: si.fij is the f(i,j) polynomial at (0, 0) */
+  /* si.fij is the f(i,j) polynomial at (0, 0) */
 
-  /* first divide fij by q */
+  halfI = si.I / 2;
+  invq = 1.0 / (double) si.q;
+
+  t = (double*) malloc ((d + 1) * sizeof (double));
+  u = (double*) malloc ((d + 1) * sizeof (double));
   for (k = 0; k <= d; k++)
+    t[k] = mpz_get_d (si.fij[k]) * invq;
+
+  S_ptr = S + halfI;
+  for (j = 0; j < si.J; j++)
     {
-      ASSERT (mpz_divisible_ui_p (si.fij[k], si.q));
-      mpz_divexact_ui (si.fij[k], si.fij[k], si.q);
-    }
-
-  /* on each row (j fixed), the norms are a polynomial in i of degree d,
-     which we evaluate using a table-of-difference method */
-
-  t = malloc ((d + 1) * sizeof (mpz_t));
-  for (k = 0; k <= d; k++)
-    mpz_init (t[k]);
-
-  for (i = j = 0; j < si.J; j++)
-    {
-      for (k = 0; k <= d; k++)
-        eval_fij (t[k], si.fij, d, - ((long) si.I) / 2 + (long) k, j);
+      /* scale by j^(d-k) the coefficients of fij */
+      for (k = 0, powj = 1.0; k <= d; k++, powj *= (double) j)
+        u[d - k] = t[d - k] * powj;
       
-      /* initialize table of differences */
-      for (k = 1; k <= d; k++)
-        for (l = d; l >= k; l--)
-          mpz_sub (t[l], t[l], t[l - 1]);
-
       /* now compute norms */
-      for (k = 0; k < si.I; k++, i++)
+      for (i = -halfI; i < halfI; i++)
         {
-          /* F_q(-I/2+k, j) is t[0] */
-          S[i] = (unsigned char) (log (fabs (mpz_get_d (t[0]))) * si.scale)
-            + GUARD;
+          norm = fpoly_eval (u, d, (double) i);
+          norm = fabs (norm);
+          norm = log (norm);
+          norm = norm * si.scale;
+          S_ptr[i] = GUARD + (unsigned char) (norm);
 #ifdef TRACE_K
-          if (i == TRACE_K)
-            fprintf (stderr, "S[%u] initialized to %u\n", i, S[i]);
+          if ((S_ptr - S) + i == TRACE_K)
+            fprintf (stderr, "S[%ld] initialized to %u\n", (S_ptr - S) + i,
+                     S_ptr[i]);
 #endif          
-
-          /* update table of differences */
-          for (l = 0; l < d; l++)
-            mpz_add (t[l], t[l], t[l + 1]);
         }
+      S_ptr += si.I;
     }
 
-  for (k = 0; k <= d; k++)
-    mpz_clear (t[k]);
   free (t);
+  free (u);
 }
 
 /* check that the double x fits into an int32_t */

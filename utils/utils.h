@@ -49,7 +49,7 @@ void check_polynomials (cado_poly);
   /* fpoly.c */
 double fpoly_eval (const double *, const int, const double);
 double fpoly_dichotomy (double *, int, double, double, double, unsigned int);
-void   fpoly_print (const double *f, const int deg, char *name);
+void   fpoly_print (FILE *, const double *f, const int deg, char *name);
 
 // Relation I/O
 extern void copy_rel(relation_t *Rel, relation_t rel);

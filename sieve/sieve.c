@@ -232,11 +232,11 @@ compute_norms (unsigned char *sievearray, const long amin, const long amax,
       f[i] = poly[i] * bpow;
       bpow *= (double) b;
     }
-  /* fpoly_print (f, deg, "# compute_norms: f(x) = "); */
+  /* fpoly_print (stdout, f, deg, "# compute_norms: f(x) = "); */
 
   for (i = 1; i <= deg; i++)
     df[i - 1] = f[i] * (double) i;
-  /* fpoly_print (df, deg - 1, "# compute_norms: df(x) = "); */
+  /* fpoly_print (stdout, df, deg - 1, "# compute_norms: df(x) = "); */
   
   n1 = log_norm (f, deg, (double) amin, log_scale, log_proj_roots);
   fsign1 = (fpoly_eval (f, deg, (double) amin) < 0) ? -1 : 1;
