@@ -14,9 +14,16 @@
                                         identify the corresponding IEEE 754
                                         double precision number */
 
-#define LOG_MAX 255.9 /* this should be as near as possible from 256, to
-                         get more accuracy in the norm computations, but not
+#define GUARD 3       /* Guard for the logarithms of norms, so that the value
+                         does not wrap around zero due to roundoff errors.
+                         We should have GUARD + LOG_MAX < 256 */
+#define LOG_MAX 252.9 /* GUARD+LOG_MAX should be as near as possible from 256,
+                         to get more accuracy in the norm computations, but not
                          too much, otherwise a norm might be rounded to zero */
+
+/* define TRACE_K to -I/2+i+I*j to trace the sieve array entry corresponding
+   to (i,j), i.e., a = a0*i+a1*j, b = b0*i+b1*j */
+/* #define TRACE_K 706429 */
 
 // General information about the siever
 typedef struct {
@@ -69,10 +76,10 @@ typedef struct {
 
 /************************** sieve info stuff *********************************/
 
-static double get_maxnorm (cado_poly, sieve_info_t *);
+static double get_maxnorm (cado_poly, sieve_info_t *, uint64_t);
 
 static void
-sieve_info_init (sieve_info_t *si, cado_poly cpoly, int I, uint64_t q1)
+sieve_info_init (sieve_info_t *si, cado_poly cpoly, int I, uint64_t q0)
 {
   unsigned int d = cpoly->degree;
   unsigned int k;
@@ -86,9 +93,10 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int I, uint64_t q1)
   si->J = 1 << (si->logI - 1);
 
   /* initialize bounds for the norm computation, see lattice.tex */
-  si->B = sqrt (2.0 * (double) q1 / (cpoly->skew * sqrt (3.0)));
-  si->scale = get_maxnorm (cpoly, si); /* log(max norm) */
-  fprintf (stderr, "# log(maxnorm)=%1.2f\n", si->scale);
+  si->B = sqrt (2.0 * (double) q0 / (cpoly->skew * sqrt (3.0)));
+  si->scale = get_maxnorm (cpoly, si, q0); /* log(max norm) */
+  fprintf (stderr, "# log(maxnorm)=%1.6f logbase=%1.6f\n", si->scale,
+           exp (si->scale / LOG_MAX));
   si->scale = LOG_MAX / si->scale;
 }
 
@@ -202,8 +210,15 @@ special_case_0(unsigned char *S, fbprime_t p, unsigned char logp, const sieve_in
     i0 = -(long)(I>>1) + ((unsigned long)(Is2) % p);
     S_ptr = S + (I>>1);
     for (j = 0; j < si->J; ++j) {
-        for (i = i0; i < Is2; i += p) 
+        for (i = i0; i < Is2; i += p)
+          {
             S_ptr[i] -= logp;
+#ifdef TRACE_K
+            if ((S_ptr - S) + i == TRACE_K)
+              fprintf (stderr, "Subtracted %u (%u) to S[%ld], remains %u\n",
+                       logp, p, (S_ptr - S) + i, S_ptr[i]);
+#endif
+          }
         S_ptr += I;
     }
 }
@@ -219,7 +234,14 @@ special_case_p(unsigned char *S, fbprime_t p, unsigned char logp, const sieve_in
     S_ptr = S + Is2;
     for (j = 0; j < J; j += p) {
         for (i = -Is2; i < Is2; ++i)
+          {
             S_ptr[i] -= logp;
+#ifdef TRACE_K
+            if ((S_ptr - S) + i  == TRACE_K)
+              fprintf (stderr, "Subtracted %u (%u) to S[%ld], remains %u\n",
+                       logp, p, (S_ptr - S) + i, S_ptr[i]);
+#endif
+          }
         S_ptr += p*si->I;
     }
 }
@@ -456,7 +478,14 @@ static void line_sieve(unsigned char *S, factorbase_degn_t **fb_ptr,
                     S_ptr = S + (j*I + (I>>1));
                     // sieve one j-line
                     for (; i0 < (I>>1); i0 += p)
-                      S_ptr[i0] -= logp;
+                      {
+                        S_ptr[i0] -= logp;
+#ifdef TRACE_K
+                        if ((S_ptr - S) + i0 == TRACE_K)
+                          fprintf (stderr, "Subtracted %u (%u) to S[%ld], remains %u\n",
+                                   logp, p, (S_ptr - S) + i0, S_ptr[i0]);
+#endif
+                      }
                     // update starting point
                     ii0 += r;
                     if (ii0 >= p)
@@ -646,6 +675,11 @@ sieve_random_access (unsigned char *S, factorbase_degn_t *fb,
                 uint32_t i;
                 i = x & maskI;   // x mod I
                 S[x] -= logp;
+#ifdef TRACE_K
+                if (x == TRACE_K)
+                  fprintf (stderr, "Subtracted %u (%u) to S[%u], remains %u\n",
+                           logp, p, x, S[x]);
+#endif
                 if (i >= pli.b1)
                     x += pli.a;
                 if (i < pli.b0)
@@ -841,8 +875,8 @@ get_maxnorm_aux (double *g, unsigned int d, double s)
   return gmax;
 }
 
-/* returns the maximal value of log |F(a,b)| for 
-   a = a0 * i + a1 * j, b = b0 * i + b1 * j,
+/* returns the maximal value of log |F(a,b)/q| for
+   a = a0 * i + a1 * j, b = b0 * i + b1 * j and q >= q0,
    -I/2 <= i <= I/2, 0 <= j <= I/2*min(s*B/|a1|,B/|b1|)
    where B >= sqrt(2*q/s/sqrt(3)) for all special-q in the current range
    (s is the skewness, and B = si.B, see lattice.tex).
@@ -861,7 +895,7 @@ get_maxnorm_aux (double *g, unsigned int d, double s)
        and is attained in (a) or (c).
 */
 static double
-get_maxnorm (cado_poly cpoly, sieve_info_t *si)
+get_maxnorm (cado_poly cpoly, sieve_info_t *si, uint64_t q0)
 {
   unsigned int d = cpoly->degree, k;
   double *fd; /* double-precision coefficients of f */
@@ -904,7 +938,9 @@ get_maxnorm (cado_poly cpoly, sieve_info_t *si)
   
   free (fd);
 
-  return log (max_norm * pow (si->B * (double) si->I, (double) d));
+  /* multiply by (B*I)^d and divide by q0 */
+  return log (max_norm * pow (si->B * (double) si->I, (double) d)
+              / (double) q0);
 }
 
 /* v <- f(i,j), where f is of degree d */
@@ -925,7 +961,7 @@ eval_fij (mpz_t v, mpz_t *f, unsigned int d, long i, unsigned long j)
   mpz_clear (jpow);
 }
 
-/* initialize S[i+I/2+j*I] to round(log(|F_q(i,j)|)/log(rho))
+/* initialize S[i+I/2+j*I] to round(log(|F_q(i,j)|/q)/log(rho))
    where log(maxnorm)/log(rho) = 255, i.e., rho = maxnorm^(1/255) */
 static void
 init_norms (unsigned char *S, cado_poly cpoly, sieve_info_t si)
@@ -937,6 +973,13 @@ init_norms (unsigned char *S, cado_poly cpoly, sieve_info_t si)
   /* si.scale = LOG_MAX / log(max |F(a0*i+a1*j, b0*i+b1*j)|) */
   
   /* invariant: si.fij is the f(i,j) polynomial at (0, 0) */
+
+  /* first divide fij by q */
+  for (k = 0; k <= d; k++)
+    {
+      ASSERT (mpz_divisible_ui_p (si.fij[k], si.q));
+      mpz_divexact_ui (si.fij[k], si.fij[k], si.q);
+    }
 
   /* on each row (j fixed), the norms are a polynomial in i of degree d,
      which we evaluate using a table-of-difference method */
@@ -956,10 +999,15 @@ init_norms (unsigned char *S, cado_poly cpoly, sieve_info_t si)
           mpz_sub (t[l], t[l], t[l - 1]);
 
       /* now compute norms */
-      for (k = 0; k < si.I; k++)
+      for (k = 0; k < si.I; k++, i++)
         {
           /* F_q(-I/2+k, j) is t[0] */
-          S[i++] = (unsigned char) (log (fabs (mpz_get_d (t[0]))) * si.scale);
+          S[i] = (unsigned char) (log (fabs (mpz_get_d (t[0]))) * si.scale)
+            + GUARD;
+#ifdef TRACE_K
+          if (i == TRACE_K)
+            fprintf (stderr, "S[%u] initialized to %u\n", i, S[i]);
+#endif          
 
           /* update table of differences */
           for (l = 0; l < d; l++)
@@ -1006,25 +1054,23 @@ SkewGauss (sieve_info_t *si, double skewness)
       b[1] -= q * b[0];
     }
   /* put the smallest vector in (a0,b0) */
-  ASSERT_ALWAYS(fits_int32_t(a[0]));
-  ASSERT_ALWAYS(fits_int32_t(b[0]));
-  ASSERT_ALWAYS(fits_int32_t(a[1]));
-  ASSERT_ALWAYS(fits_int32_t(b[1]));
-  b[0] /= skewness;
-  b[1] /= skewness;
+  ASSERT(fits_int32_t(a[0]));
+  ASSERT(fits_int32_t(b[0] / skewness));
+  ASSERT(fits_int32_t(a[1]));
+  ASSERT(fits_int32_t(b[1] / skewness));
   if (a[0] * a[0] + b[0] * b[0] < a[1] * a[1] + b[1] * b[1])
     {
       si->a0 = (int32_t) a[0];
-      si->b0 = (int32_t) b[0];
+      si->b0 = (int32_t) (b[0] / skewness);
       si->a1 = (int32_t) a[1];
-      si->b1 = (int32_t) b[1];
+      si->b1 = (int32_t) (b[1] / skewness);
     }
   else
     {
       si->a0 = (int32_t) a[1];
-      si->b0 = (int32_t) b[1];
+      si->b0 = (int32_t) (b[1] / skewness);
       si->a1 = (int32_t) a[0];
-      si->b1 = (int32_t) b[0];
+      si->b1 = (int32_t) (b[0] / skewness);
     }
 }
 
@@ -1084,7 +1130,7 @@ GcdTree (mpz_t **T, unsigned int *lT, unsigned long h, mpz_t P)
   /* now G[l] should divide T[0][l] for 0 <= l < lT[0] */
   for (l = 0; l < lT[0]; l++)
     {
-      // ASSERT_ALWAYS (mpz_divisible_p (T[0][l], G[l]));
+      ASSERT (mpz_divisible_p (T[0][l], G[l]));
       do
         {
           mpz_divexact (T[0][l], T[0][l], G[l]);
@@ -1160,7 +1206,7 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
 #ifdef VERBOSE
   double tm = cputime ();
 #endif
-  unsigned long final_reports = 0;
+  unsigned long final_reports = 0, rat_reports = 0;
   int64_t a;
   uint64_t b;
   char bufr[256], bufa[256];
@@ -1264,6 +1310,10 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
       if (large_size <= cpoly->mfbr &&
           !(large_size > cpoly->lpbr && mpz_probab_prime_p (T[0][l], 1)))
         {
+          rat_reports ++; /* reports such that the algebraic side is
+                             approximately smooth (up to rounding errors),
+                             and the rational leftover norm is < 2^mfbr
+                             and is not a prime > 2^lpbr */
           /* report_list[l] is I/2+i+j*I */
           xToAB (&a, &b, report_list[l], si);
           eval_fij (norm, cpoly->g, 1, a, b);
@@ -1272,7 +1322,7 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
           mpz_divexact (norm, norm, T[0][l]);
           trial_divide (bufr, norm, cpoly->rlim);
           /* since we divided out large primes, norm should be 1 here */
-          ASSERT_ALWAYS(mpz_cmp_ui (norm, 1) == 0);
+          ASSERT(mpz_cmp_ui (norm, 1) == 0);
 
           eval_fij (norm, cpoly->f, cpoly->degree, a, b);
           /* we know that q divides the norm on the algebraic side */
@@ -1313,6 +1363,8 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
   mpz_clear (cj);
   mpz_clear (norm);
 
+  fprintf (stderr, "# Remaining reports on rational side: %lu\n", rat_reports);
+
   return final_reports;
 }
 
@@ -1346,10 +1398,30 @@ factor_rational (cado_poly cpoly, sieve_info_t *si, unsigned char *S)
 #endif
 
     report_bound = (unsigned char) (cpoly->alambda * cpoly->lpba
-                                    * (si->scale / LOG_SCALE));
-    // fprintf (stderr, "report_bound=%u\n", report_bound);
+                                    * (si->scale / LOG_SCALE)) + GUARD;
+#ifdef TRACE_K
+    fprintf (stderr, "report_bound=%u\n", report_bound);
+#endif
 
-    for (k = 0; k < si->I * si->J; ++k)
+    /* for 0 <= k < I, we have j=0, thus a=a0*i and b=b0*i,
+       and it suffices to consider i=1, i.e., k = I/2+1 */
+    k = si->I / 2 + 1;
+    if (S[k] < min)
+      {
+        kmin = k;
+        min = S[k];
+      }
+    if (S[k] <= report_bound)
+      {
+        a = si->a0;
+        b = si->b0;
+        ASSERT_ALWAYS(b != 0);
+        /* gcd(a0,b0)=1, since it divides q */
+        reports ++;
+        report_list = realloc (report_list, reports * sizeof (int));
+        report_list[reports - 1] = k;
+      }
+    for (k = si->I; k < si->I * si->J; ++k)
       {
         if (S[k] < min)
           {
@@ -1384,7 +1456,7 @@ factor_rational (cado_poly cpoly, sieve_info_t *si, unsigned char *S)
 static void
 usage (char *argv0)
 {
-  fprintf (stderr, "Usage: %s -poly xxx.poly -fb xxx.roots -q0 q0 [-q1 q1]\n",
+  fprintf (stderr, "Usage: %s -poly xxx.poly -fb xxx.roots -q0 q0 [-q1 q1] [-rho rho]\n",
            argv0);
   exit (1);
 }
@@ -1397,7 +1469,7 @@ main (int argc, char *argv[])
     char *fbfilename = NULL, *polyfilename = NULL;
     cado_poly cpoly;
     double t0 = seconds (), tmaxnorm, tfb, ts, tf, tq;
-    uint64_t q0 = 0, q1 = 0;
+    uint64_t q0 = 0, q1 = 0, rho = 0;
     unsigned long *roots, nroots, reports, tot_reports = 0, i;
     unsigned char * S;
     factorbase_degn_t * fb;
@@ -1433,12 +1505,25 @@ main (int argc, char *argv[])
             argc -= 2;
             argv += 2;
           }
+        else if (argc > 2 && strcmp (argv[1], "-rho") == 0)
+          {
+            rho = strtoul (argv[2], NULL, 10);
+            argc -= 2;
+            argv += 2;
+          }
         else
           usage (argv0);
       }
 
     if (polyfilename == NULL || fbfilename == NULL || q0 == 0)
       usage (argv0);
+
+    /* if -rho is given, we sieve only for q0, thus -q1 is not allowed */
+    if (rho != 0 && q1 != 0)
+      {
+        fprintf (stderr, "Error, -q1 and -rho are mutually exclusive\n");
+        exit (1);
+      }
 
     /* if -q1 is not given, sieve only for q0 */
     if (q1 == 0)
@@ -1451,7 +1536,7 @@ main (int argc, char *argv[])
       }
 
     /* this does not depend on the special-q */
-    sieve_info_init (&si, cpoly, 13, q1);
+    sieve_info_init (&si, cpoly, 13, q0);
 
     // One more is for the garbage during SSE
     S = (unsigned char *) malloc ((1 + si.I * si.J)*sizeof(unsigned char));
@@ -1484,11 +1569,13 @@ main (int argc, char *argv[])
           }
         tq = seconds ();
 
-        si.rho = roots[--nroots];
-        fprintf (stderr, "# Sieving q=%lu, rho=%lu\n", si.q, si.rho);
-
         /* computes a0, b0, a1, b1 from q, rho, and the skewness */
+        si.rho = roots[--nroots];
+        if (rho != 0 && si.rho != rho)
+          continue;
         SkewGauss (&si, cpoly->skew);
+        fprintf (stderr, "# Sieving q=%lu; rho=%lu; a0=%d; b0=%d; a1=%d; b1=%d\n",
+                 si.q, si.rho, si.a0, si.b0, si.a1, si.b1);
 
         /* checks the value of J */
         sieve_info_update (&si, cpoly->skew);
@@ -1524,7 +1611,7 @@ main (int argc, char *argv[])
 
  end:
     t0 = seconds () - t0;
-    fprintf (stderr, "# Total sieving time %1.1fs for %lu reports [%1.1fs/r]\n",
+    fprintf (stderr, "# Total sieving time %1.1fs for %lu reports [%1.2fs/r]\n",
              t0, tot_reports, t0 / (double) tot_reports);
 
     free (fb);
