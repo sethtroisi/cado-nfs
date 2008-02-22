@@ -32,7 +32,7 @@
    To perform a loop over all primes <= B1, do the following
    (compile this file with -DMAIN to count primes):
 
-      for (p = 2.0; p <= B1; p = getprime (p))
+      for (p = 2; p <= B1; p = getprime (p))
          {
             ...
          }

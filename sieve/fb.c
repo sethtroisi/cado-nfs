@@ -19,7 +19,7 @@
 #define rdtscll(x)
 #include "basicnt.h"
 #include "fb.h"
-#include "utils/mod_ul.h"
+#include "utils/utils.h"
 #include "sieve_aux.h"
 
 /* Some prototypes for functions scattered in various files with no 
@@ -122,14 +122,6 @@ fb_log (double n, double log_scale, double offset)
   return (unsigned char) floor (log (n) * log_scale + offset + 0.5);
 }
 
-/* Returns the smallest prime > p */
-static fbprime_t
-nextprime (fbprime_t p)
-{
-  do {p++;} while (iscomposite (p));
-  return p;
-}
-
 void
 fb_init_firstlog (factorbase_t fb)
 {
@@ -156,8 +148,8 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
   fbprime_t p;
   factorbase_degn_t *fb = NULL, *fb_cur, *fb_new;
   size_t fbsize = 0, fballoc = 0;
-  const size_t allocblocksize = 1<<20;
-
+  const size_t allocblocksize = 1 << 20;
+  
   rdtscll (tsc1);
   fb_cur = (factorbase_degn_t *) malloc (fb_entrysize_uc (1));
   ASSERT (fb_cur != NULL);
@@ -172,8 +164,7 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
       printf ("\n");
     }
 
-  p = 2;
-  for ( ; p <= bound; p = nextprime (p))
+  for (p = 2 ; p <= bound; p = getprime (p))
     {
       modulus_t m;
       residue_t r1, r2;
@@ -246,6 +237,7 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
       
       /* FIXME: handle prime powers */
     }
+  getprime (0); /* free prime iterator */
 
   if (fb != NULL) /* If nothing went wrong so far, put the end-of-fb mark */
     {
@@ -340,6 +332,7 @@ fb_read (const char *filename, const double log_scale, const int verbose)
 	  break;
 	}
 
+#if 0 /* disabled because prime powers are not produced currently by makefb */
       p = iscomposite (fb_cur->p);
       if (p != 0)
         {
@@ -354,6 +347,10 @@ fb_read (const char *filename, const double log_scale, const int verbose)
               break;                       
             }
         }
+#else
+      p = 0;
+#endif
+
       if (p == 0) /* It's a prime, do a normal log */
 	fb_cur->plog = fb_log (fb_cur->p, log_scale, 0.);
       else
