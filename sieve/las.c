@@ -25,7 +25,7 @@
 
 /* define TRACE_K to -I/2+i+I*j to trace the sieve array entry corresponding
    to (i,j), i.e., a = a0*i+a1*j, b = b0*i+b1*j */
-#define TRACE_K 706429 
+/* #define TRACE_K 706429 */
 
 // General information about the siever
 typedef struct {
@@ -43,8 +43,11 @@ typedef struct {
     int bucket_limit;   // maximal number of bucket_reports allowed in one bucket.
     unsigned int degree;   /* polynomial degree */
     double scale;     /* LOG_MAX / log (max |F(a0*i+a1*j, b0*i+b1*j)|) */
+    double scale_rat; /* LOG_MAX / log (max |G(a0*i+a1*j, b0*i+b1*j)|) */
     mpz_t *fij;       /* coefficients of F(a0*i+a1*j, b0*i+b1*j) */
     double B;         /* bound for the norm computation */
+    unsigned char alg_bound; /* report bound on the algebraic side */
+    unsigned char rat_bound; /* report bound on the rational side */
 } sieve_info_t;
 
 /*
@@ -85,6 +88,7 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int I, uint64_t q0)
 {
   unsigned int d = cpoly->degree;
   unsigned int k;
+  double r;
 
   si->degree = d;
   si->fij = malloc ((d + 1) * sizeof (mpz_t));
@@ -97,9 +101,31 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int I, uint64_t q0)
   /* initialize bounds for the norm computation, see lattice.tex */
   si->B = sqrt (2.0 * (double) q0 / (cpoly->skew * sqrt (3.0)));
   si->scale = get_maxnorm (cpoly, si, q0); /* log(max norm) */
-  fprintf (stderr, "# log(maxnorm)=%1.6f logbase=%1.6f\n", si->scale,
-           exp (si->scale / LOG_MAX));
+  fprintf (stderr, "# Alg. side: log(maxnorm)=%1.6f logbase=%1.6f",
+           si->scale, exp (si->scale / LOG_MAX));
   si->scale = LOG_MAX / si->scale;
+  si->alg_bound = (unsigned char) (cpoly->alambda * cpoly->lpba
+                                   * (si->scale / LOG_SCALE)) + GUARD;
+  fprintf (stderr, " bound=%u\n", si->alg_bound);
+
+  /* similar bound on the rational size: |a| <= s*I*B and |b| <= I*B */
+  si->scale_rat = fabs (mpz_get_d (cpoly->g[1])) * cpoly->skew
+                + fabs (mpz_get_d (cpoly->g[0]));
+  si->scale_rat *= si->B * (double) si->I;
+  si->scale_rat = log (si->scale_rat);
+  /* on the rational side, we want that the non-reports on the algebraic
+     side, which are set to 255, remain over the report bound R, even if
+     the rational norm is totally smooth. For this, we simply add R to the
+     maximal lognorm to compute the log base */
+  r = cpoly->rlambda * cpoly->lpbr; /* base-2 logarithm of the report bound */
+  fprintf (stderr, "# Rat. side: log(maxnorm)=%1.6f ", si->scale_rat);
+  si->scale_rat += r / LOG_SCALE;   /* add natural logarithm */
+  fprintf (stderr, "logbase=%1.6f", exp (si->scale_rat / (LOG_MAX - GUARD)));
+  /* we subtract again GUARD to avoid that non-reports overlap the report
+     region due to roundoff errors */
+  si->scale_rat = (LOG_MAX - GUARD) / si->scale_rat;
+  si->rat_bound = (unsigned char) (r * (si->scale_rat / LOG_SCALE)) + GUARD;
+  fprintf (stderr, " bound=%u\n", si->rat_bound);
 }
 
 static void
@@ -209,7 +235,10 @@ special_case_0(unsigned char *S, fbprime_t p, unsigned char logp, const sieve_in
     const uint32_t I = si->I;
     const long Is2 = (long)(I>>1);
     unsigned char *S_ptr;
+
+#ifdef VERBSOE
     fprintf(stderr, "# Entering special_case_0(%u)\n", p);
+#endif
     i0 = -(long)(I>>1) + ((unsigned long)(Is2) % p);
     S_ptr = S + (I>>1);
     for (j = 0; j < si->J; ++j) {
@@ -234,7 +263,10 @@ special_case_p(unsigned char *S, fbprime_t p, unsigned char logp, const sieve_in
     const long Is2 = (long)(si->I>>1);
     const uint32_t J = si->J;
     unsigned char *S_ptr;
+
+#ifdef VERBOSE
     fprintf(stderr, "# Entering special_case_p(%u)\n", p);
+#endif
     S_ptr = S + Is2;
     for (j = 0; j < J; j += p) {
         for (i = -Is2; i < Is2; ++i)
@@ -968,27 +1000,27 @@ eval_fij (mpz_t v, mpz_t *f, unsigned int d, long i, unsigned long j)
 /* initialize S[i+I/2+j*I] to round(log(|F_q(i,j)|/q)/log(rho))
    where log(maxnorm)/log(rho) = 255, i.e., rho = maxnorm^(1/255) */
 static void
-init_norms (unsigned char *S, cado_poly cpoly, sieve_info_t si)
+init_norms_alg (unsigned char *S, cado_poly cpoly, sieve_info_t *si)
 {
   int i, halfI;
   unsigned int j, k, d = cpoly->degree;
   double *t, *u, invq, powj, norm;
   unsigned char *S_ptr;
 
-  /* si.scale = LOG_MAX / log(max |F(a0*i+a1*j, b0*i+b1*j)|) */
+  /* si->scale = LOG_MAX / log(max |F(a0*i+a1*j, b0*i+b1*j)|) */
   
-  /* si.fij is the f(i,j) polynomial at (0, 0) */
+  /* si->fij is the f(i,j) polynomial at (0, 0) */
 
-  halfI = si.I / 2;
-  invq = 1.0 / (double) si.q;
+  halfI = si->I / 2;
+  invq = 1.0 / (double) si->q;
 
   t = (double*) malloc ((d + 1) * sizeof (double));
   u = (double*) malloc ((d + 1) * sizeof (double));
   for (k = 0; k <= d; k++)
-    t[k] = mpz_get_d (si.fij[k]) * invq;
+    t[k] = mpz_get_d (si->fij[k]) * invq;
 
   S_ptr = S + halfI;
-  for (j = 0; j < si.J; j++)
+  for (j = 0; j < si->J; j++)
     {
       /* scale by j^(d-k) the coefficients of fij */
       for (k = 0, powj = 1.0; k <= d; k++, powj *= (double) j)
@@ -1000,7 +1032,7 @@ init_norms (unsigned char *S, cado_poly cpoly, sieve_info_t si)
           norm = fpoly_eval (u, d, (double) i);
           norm = fabs (norm);
           norm = log (norm);
-          norm = norm * si.scale;
+          norm = norm * si->scale;
           S_ptr[i] = GUARD + (unsigned char) (norm);
 #ifdef TRACE_K
           if ((S_ptr - S) + i == TRACE_K)
@@ -1008,7 +1040,7 @@ init_norms (unsigned char *S, cado_poly cpoly, sieve_info_t si)
                      S_ptr[i]);
 #endif          
         }
-      S_ptr += si.I;
+      S_ptr += si->I;
     }
 
   free (t);
@@ -1106,6 +1138,8 @@ GcdTree (mpz_t **T, unsigned int *lT, unsigned long h, mpz_t P)
     mpz_init (G[l]);
 
   mpz_gcd (G[0], T[h][0], P); /* gcd of the root */
+  /* dividing T[h][0] by the gcd does not seem to speed up things,
+     similarly below for gcd(T[0][l], G[l]) for l > 0 */
 #ifdef VERBOSE
   fprintf (stderr, "Tree root has %lu bits, prime product has %lu bits\n",
            mpz_sizeinbase (T[h][0], 2), mpz_sizeinbase (P, 2));
@@ -1219,7 +1253,6 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
   mpz_addmul_si (ci, cpoly->g[0], si->b0);
   mpz_mul_si (cj, cpoly->g[1], si->a1);
   mpz_addmul_si (cj, cpoly->g[0], si->b1);
-  // gmp_fprintf (stderr, "ci=%Zd cj=%Zd\n", ci, cj);
 
   /* builds the product tree */
   T = (mpz_t**) malloc ((h + 1) * sizeof (mpz_t*));
@@ -1241,6 +1274,8 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
           else /* multiply two subtrees */
             {
               if (2 * k + 1 < lT[l-1])
+                /* we might do a lcm instead of a product here,
+                   but this does not seem to speed up things */
                 mpz_mul (T[l][k], T[l-1][2*k], T[l-1][2*k+1]);
               else
                 mpz_set (T[l][k], T[l-1][2*k]);
@@ -1366,12 +1401,12 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
 /* build a list report_list[] of values of k = i + I/2 + I*j where gcd(i,j)=1
    and norm is small on algebraic side, then pass it to build_norms_rational */
 static unsigned long
-factor_rational (cado_poly cpoly, sieve_info_t *si, unsigned char *S)
+factor_survivors (cado_poly cpoly, sieve_info_t *si, unsigned char *S)
 {
     /* sieve reports are those for which the remaining bit-size is less than
        lambda * lpb */
-    unsigned char report_bound;
-    unsigned char min=255;
+    unsigned char report_bound = si->rat_bound;
+    unsigned char min = UCHAR_MAX;
     int kmin = 0;
     int i;
     unsigned int j, k;
@@ -1381,19 +1416,6 @@ factor_rational (cado_poly cpoly, sieve_info_t *si, unsigned char *S)
     int64_t a;
     uint64_t b;
 
-#if 0
-    int stat[256];
-    for (k = 0; k < 256; ++k)
-        stat[k]=0;
-    for (k = 0; k < si->I * si->J; ++k)
-        stat[S[k]]++;
-    for (k = 0; k < 256; ++k)
-      fprintf (stderr, "[%d]%d ", k, stat[k]);
-    fprintf (stderr, "\n");
-#endif
-
-    report_bound = (unsigned char) (cpoly->alambda * cpoly->lpba
-                                    * (si->scale / LOG_SCALE)) + GUARD;
 #ifdef TRACE_K
     fprintf (stderr, "report_bound=%u\n", report_bound);
 #endif
@@ -1437,13 +1459,83 @@ factor_rational (cado_poly cpoly, sieve_info_t *si, unsigned char *S)
       }
     xToIJ(&i, &j, kmin, si);
     fprintf (stderr, "# Min of %d is obtained for (i,j) = (%d,%d)\n", min, i, j);
-    fprintf (stderr, "# Number of reports on algebraic side: %lu\n", reports);
+    fprintf (stderr, "# Number of reports: %lu\n", reports);
 
     reports = build_norms_rational (cpoly, si, report_list, reports);
 
     free (report_list);
 
     return reports;
+}
+
+/* Initialize lognorms on the rational side. We only initialize cells which
+   correspond to sieve reports on the algebraic side, and for which gcd(a,b)=1,
+   and put the maximal value (255) elsewhere. */
+static void
+init_norms_rat (unsigned char *S, cado_poly cpoly, sieve_info_t *si)
+{
+  double g1, g0, gi, gj, norm;
+  int i, halfI = si->I / 2, kmin = 0;
+  unsigned int j, k, reports = 0;
+  unsigned char c, min = UCHAR_MAX;
+
+  /* G_q(i,j) = g1*(a0*i+a1*j)+g0*(b0*i+b1*j)
+              = (g1*a0+g0*b0)*i + (g1*a1+g0*b1)*j */
+
+  g1 = mpz_get_d (cpoly->g[1]);
+  g0 = mpz_get_d (cpoly->g[0]);
+  gi = g1 * (double) si->a0 + g0 * (double) si->b0;
+  gj = g1 * (double) si->a1 + g0 * (double) si->b1;
+
+  /* for j=0, consider only i=1, i.e., k = I/2+1 */
+  k = 0;
+  c = S[si->I/2 + 1]; /* save value */
+  for (i = -halfI; i < halfI; i++, k++)
+    {
+      if (S[k] < min)
+        {
+          kmin = k;
+          min = S[k];
+        }
+      S[k] = UCHAR_MAX;
+    }
+  if (c <= si->alg_bound)
+    {
+      norm = gi;
+      norm = fabs (norm);
+      norm = log (norm);
+      norm = norm * si->scale_rat;
+      S[si->I/2 + 1] = GUARD + (unsigned char) (norm);
+      reports ++;
+    }
+  for (j = 1; j < si->J; j++)
+    {
+      for (i = -halfI; i < halfI; i++, k++)
+        {
+          /* FIXME: we could process i and -i simultaneously, to perform
+             only one gcd */
+          if (S[k] < min)
+            {
+              kmin = k;
+              min = S[k];
+            }
+          if (S[k] <= si->alg_bound && j != 0 &&
+              gcd_ul ((i > 0) ? i : -i, j) == 1)
+            {
+              norm = gi * (double) i + gj * (double) j;
+              norm = fabs (norm);
+              norm = log (norm);
+              norm = norm * si->scale_rat;
+              S[k] = GUARD + (unsigned char) (norm);
+              reports ++;
+            }
+          else
+            S[k] = UCHAR_MAX;
+        }
+    }
+  xToIJ(&i, &j, kmin, si);
+  fprintf (stderr, "# Min of %d is obtained for (i,j) = (%d,%d)\n", min, i, j);
+  fprintf (stderr, "# Number of half-reports: %u\n", reports);
 }
 
 /*************************** main program ************************************/
@@ -1463,11 +1555,11 @@ main (int argc, char *argv[])
     sieve_info_t si;
     char *fbfilename = NULL, *polyfilename = NULL;
     cado_poly cpoly;
-    double t0 = seconds (), tmaxnorm, tfb, ts, tf, tq;
+    double t0 = seconds (), tnorma, tnormr, tfb, ts, tf, tq;
     uint64_t q0 = 0, q1 = 0, rho = 0;
     unsigned long *roots, nroots, reports, tot_reports = 0, i;
     unsigned char * S;
-    factorbase_degn_t * fb, * fb_rat;
+    factorbase_degn_t * fb_alg, * fb_rat;
 
     fprintf (stderr, "# %s.r%s", argv[0], REV);
     for (i = 1; i < (unsigned int) argc; i++)
@@ -1539,16 +1631,17 @@ main (int argc, char *argv[])
 
     /* the logarithm scale is LOG_MAX / log(max norm) */
     tfb = seconds ();
-    fb = fb_read (fbfilename, si.scale, 0);
-    ASSERT_ALWAYS(fb != NULL);
+    fb_alg = fb_read (fbfilename, si.scale, 0);
+    ASSERT_ALWAYS(fb_alg != NULL);
     tfb = seconds () - tfb;
-    fprintf (stderr, "# Reading factor base took %1.1fs\n", tfb);
+    fprintf (stderr, "# Reading algebraic factor base took %1.1fs\n", tfb);
 
     /* Prepare rational factor base */
-#if 0
-    fb_rat = fb_make_linear (cpoly->g, (fbprime_t) cpoly->rlim, si.scale, 0);
-#endif 
-
+    tfb = seconds ();
+    fb_rat = fb_make_linear (cpoly->g, (fbprime_t) cpoly->rlim, si.scale_rat,
+                             0);
+    tfb = seconds () - tfb;
+    fprintf (stderr, "# Creating rational factor base took %1.1fs\n", tfb);
 
     /* special q (and root rho) */
     roots = (unsigned long*) malloc (cpoly->degree * sizeof (unsigned long));
@@ -1582,12 +1675,12 @@ main (int argc, char *argv[])
         sieve_info_update (&si, cpoly->skew);
 
         /* norm computation */
-        tmaxnorm = seconds ();
+        tnorma = seconds ();
         fij_from_f (si.fij, cpoly->f, cpoly->degree, si.a0, si.a1, si.b0,
                     si.b1);
-        init_norms (S, cpoly, si);
-        tmaxnorm = seconds () - tmaxnorm;
-        fprintf (stderr, "# Initializing norms took %1.1fs\n", tmaxnorm);
+        init_norms_alg (S, cpoly, &si);
+        tnorma = seconds () - tnorma;
+        fprintf (stderr, "# Initializing alg. norms took %1.1fs\n", tnorma);
 #ifdef TRACE_K
         {
             int __i; unsigned int __j;
@@ -1598,45 +1691,44 @@ main (int argc, char *argv[])
 
         /* sieving on the algebraic side */
         ts = seconds ();
-        //sieve_slow(S, fb, &si);
-        sieve_random_access(S, fb, &si);
-        fprintf (stderr, "# Done sieving in %1.1fs\n", ts = seconds () - ts);
+        //sieve_slow(S, fb_alg, &si);
+        sieve_random_access(S, fb_alg, &si);
+        fprintf (stderr, "# Alg. sieving in %1.1fs\n", seconds () - ts);
 
         /* Sieving on the rational side */
-#if 0
-        // Prepare norms:
-        //   - Update the array S: for each position, if this is above the
-        //   report bound, replace by 255, otherwise, replace by the
-        //   rational norm.
-        //   Remark: logscale could in principle be different on the two
-        //   sides. However, having a common value should be ok for the
-        //   moment.
-        //   - call the siever:
-        sieve_random_access(S, fb_rat, &si);
-        //   - factorize both side of survivors.
-#endif
+        tnormr = seconds ();
+        init_norms_rat (S, cpoly, &si); /* update the sieve array */
+        tnormr = seconds () - tnormr;
+        fprintf (stderr, "# Initializing rat. norms took %1.1fs\n", tnormr);
 
-        /* factoring on the rational side */
+        /* call the siever */
+        sieve_random_access(S, fb_rat, &si);
+        ts = seconds () - ts;
+        fprintf (stderr, "# Total sieving in %1.1fs\n", ts);
+
+        /* factor survivors */
         tf = seconds ();
-        reports = factor_rational (cpoly, &si, S);
+        reports = factor_survivors (cpoly, &si, S);
         tf = seconds () - tf;
         tot_reports += reports;
         tq = seconds() - tq;
         fprintf (stderr, "# Time for this (q,rho): %1.1fs [norm %1.1f,"
-                 " sieving %1.1f, factor %1.1f]\n", tq, tmaxnorm, ts, tf);
+                 " sieving %1.1f, factor %1.1f]\n", tq, tnorma + tnormr, ts,
+                 tf);
         if (tot_reports != 0)
           fprintf (stderr, "# Reports for this (q,rho): %lu, total %lu,"
                    " rate %1.2fs/r\n", reports, tot_reports,
                    (seconds () - t0) / (double) tot_reports);
 
-      }
+}
 
  end:
     t0 = seconds () - t0;
     fprintf (stderr, "# Total sieving time %1.1fs for %lu reports [%1.2fs/r]\n",
              t0, tot_reports, t0 / (double) tot_reports);
 
-    free (fb);
+    free (fb_alg);
+    free (fb_rat);
     sieve_info_clear (&si);
     clear_polynomial (cpoly);
     free (roots);
