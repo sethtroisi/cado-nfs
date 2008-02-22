@@ -25,7 +25,7 @@
 
 /* define TRACE_K to -I/2+i+I*j to trace the sieve array entry corresponding
    to (i,j), i.e., a = a0*i+a1*j, b = b0*i+b1*j */
-/* #define TRACE_K 706429 */
+#define TRACE_K 706429 
 
 // General information about the siever
 typedef struct {
@@ -145,7 +145,7 @@ push_bucket_report(bucket_t * B, char logp, uint8_t p_low, uint32_t x)
 
 // Compute the root r describing the lattice inside the q-lattice
 // corresponding to the factor base prime (p,R).
-// Formula: r = - (a1-R*b1)/(a0-Rb0) mod p
+// Formula: r = - (a1-R*b1)/(a0-R*b0) mod p
 // In the case where denominator is zero, returns p.
 // Otherwise r in [0,p-1]
 fbprime_t
@@ -155,7 +155,7 @@ fb_root_in_qlattice(const fbprime_t p, const fbprime_t R, const sieve_info_t * s
     residueul_t RR, aa, bb, x, y;
     mod_initmod_ul(m, p);
     modul_initmod_ul(RR, R);  // already reduced
-    // nuemrator
+    // numerator
     if (si->a1 < 0) {
         modul_initmod_ul(aa, ((unsigned long) (-si->a1)) % p);
         modul_neg(aa, aa, m);
@@ -209,6 +209,7 @@ special_case_0(unsigned char *S, fbprime_t p, unsigned char logp, const sieve_in
     const uint32_t I = si->I;
     const long Is2 = (long)(I>>1);
     unsigned char *S_ptr;
+    fprintf(stderr, "# Entering special_case_0(%u)\n", p);
     i0 = -(long)(I>>1) + ((unsigned long)(Is2) % p);
     S_ptr = S + (I>>1);
     for (j = 0; j < si->J; ++j) {
@@ -233,6 +234,7 @@ special_case_p(unsigned char *S, fbprime_t p, unsigned char logp, const sieve_in
     const long Is2 = (long)(si->I>>1);
     const uint32_t J = si->J;
     unsigned char *S_ptr;
+    fprintf(stderr, "# Entering special_case_p(%u)\n", p);
     S_ptr = S + Is2;
     for (j = 0; j < J; j += p) {
         for (i = -Is2; i < Is2; ++i)
@@ -1465,7 +1467,7 @@ main (int argc, char *argv[])
     uint64_t q0 = 0, q1 = 0, rho = 0;
     unsigned long *roots, nroots, reports, tot_reports = 0, i;
     unsigned char * S;
-    factorbase_degn_t * fb;
+    factorbase_degn_t * fb, * fb_rat;
 
     fprintf (stderr, "# %s.r%s", argv[0], REV);
     for (i = 1; i < (unsigned int) argc; i++)
@@ -1542,6 +1544,12 @@ main (int argc, char *argv[])
     tfb = seconds () - tfb;
     fprintf (stderr, "# Reading factor base took %1.1fs\n", tfb);
 
+    /* Prepare rational factor base */
+#if 0
+    fb_rat = fb_make_linear (cpoly->g, (fbprime_t) cpoly->rlim, si.scale, 0);
+#endif 
+
+
     /* special q (and root rho) */
     roots = (unsigned long*) malloc (cpoly->degree * sizeof (unsigned long));
     q0 --; /* so that nextprime gives q0 if q0 is prime */
@@ -1580,12 +1588,33 @@ main (int argc, char *argv[])
         init_norms (S, cpoly, si);
         tmaxnorm = seconds () - tmaxnorm;
         fprintf (stderr, "# Initializing norms took %1.1fs\n", tmaxnorm);
+#ifdef TRACE_K
+        {
+            int __i; unsigned int __j;
+            xToIJ(&__i, &__j, TRACE_K, &si);
+            fprintf(stderr, "Trace: %d, i.e. (i,j) = (%d,%d)\n", TRACE_K, __i, __j);
+        }
+#endif
 
         /* sieving on the algebraic side */
         ts = seconds ();
         //sieve_slow(S, fb, &si);
         sieve_random_access(S, fb, &si);
         fprintf (stderr, "# Done sieving in %1.1fs\n", ts = seconds () - ts);
+
+        /* Sieving on the rational side */
+#if 0
+        // Prepare norms:
+        //   - Update the array S: for each position, if this is above the
+        //   report bound, replace by 255, otherwise, replace by the
+        //   rational norm.
+        //   Remark: logscale could in principle be different on the two
+        //   sides. However, having a common value should be ok for the
+        //   moment.
+        //   - call the siever:
+        sieve_random_access(S, fb_rat, &si);
+        //   - factorize both side of survivors.
+#endif
 
         /* factoring on the rational side */
         tf = seconds ();
