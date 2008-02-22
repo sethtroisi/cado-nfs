@@ -1758,7 +1758,7 @@ static ecode_t init_squfof_racer(squfof_racer_t* const racer, const mpz_t n,
     }
     racer->S = mpf_get_ui(racer->sqrtD);
 
-    if (racer->S > TIFA_ULONG_MAX_DIVIDED_BY_3) {
+    if (racer->S > TIFA_ULONG_MAX_DIVIDED_BY_6) {
         racer->status = STOPPED;
         racer->number_is_too_large = true;
         return SUCCESS;
