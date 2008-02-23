@@ -126,9 +126,7 @@ typedef unsigned long largeprime_t; /* On IA32 they'll only get 32 bit
 /* Factor base entry with (possibly) several roots */
 typedef struct {
   fbprime_t p;            /* A prime or a prime power */
-/* #ifdef REDC_ROOTS */
   unsigned long invp;     /* 1/p (mod 2^wordsize) for REDC */
-/* #endif */
   unsigned char plog;     /* logarithm (to some suitable base) of this prime */
   unsigned char nr_roots; /* how many roots there are for this prime */
   unsigned char size;     /* The length of the struct in bytes */
@@ -163,8 +161,8 @@ typedef struct {
   factorbase_small_inited_t *fbinit[SIEVE_BLOCKING_MAX];
   unsigned int fbsmallsize[SIEVE_BLOCKING_MAX];  /* Number of entries in small
                                                     fb, incl. stop marker */
-  unsigned int fbsmallbound[SIEVE_BLOCKING_MAX]; /* Upper bound on primes in 
-                                                    small fb */
+  fbprime_t fbsmallbound[SIEVE_BLOCKING_MAX]; /* Upper bound on primes in 
+                                                 small fb */
 } factorbase_t[1];
 
 typedef struct {

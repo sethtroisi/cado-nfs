@@ -370,7 +370,7 @@ sieve_small_slow (unsigned char *sievearray, factorbase_small_inited_t *fb,
   unsigned int d;
   unsigned char l;
 
-  for (; fb->p > 0; fb++)
+  for (; fb->p != FB_END; fb++)
     {
       p = fb->p;
       d = fb->loc_and_log & 0xffffff; /* Mask low 24 bits */
@@ -425,7 +425,7 @@ sieve (unsigned char *sievearray, factorbase_degn_t *fb,
 
   /* Do the sieving */
 
-  while (fb->p > 0)
+  while (fb->p != FB_END)
     {
       ASSERT (fb_entrysize (fb) <= fb->size);
       p = fb->p;
@@ -774,7 +774,7 @@ sieve_one_side (unsigned char *sievearray, factorbase_t fb,
 	  printf ("# Finding sieve reports took %ld clocks\n", 
 		  (long int) (tsc2 - tsc1));
 	  printf ("# There were %lu sieve reports after sieving small "
-		  "primes\n", reports->nr);
+		  "primes\n", (unsigned long) reports->nr);
 	}
     }
   
@@ -853,7 +853,7 @@ trialdiv_slow (unsigned long C, unsigned int *nr_primes, fbprime_t *primes,
 /* Functions for finding prime factor of the norm during refactoring */
 
 static inline int
-trialdiv_with_root (factorbase_degn_t *fbptr, const long a, 
+trialdiv_with_root (const factorbase_degn_t *fbptr, const long a, 
 		    const unsigned long b)
 {
   int i;
@@ -1269,31 +1269,31 @@ trialdiv_find_next (factorbase_degn_t *fbptr, const mpz_t norm)
   /* Choose good trial division routine outside of loop over fb primes */
   if (s == 1)
     {
-      for (; fbptr->p != 0; fbptr = fb_next (fbptr))
+      for (; fbptr->p != FB_END; fbptr = fb_next (fbptr))
 	if (trialdiv_with_norm1 (fbptr, norm, add))
 	  break;
     }
   else if (s == 2)
     {
-      for (; fbptr->p != 0; fbptr = fb_next (fbptr))
+      for (; fbptr->p != FB_END; fbptr = fb_next (fbptr))
 	if (trialdiv_with_norm2 (fbptr, norm, add))
 	  break;
     }
   else if (s == 3)
     {
-      for (; fbptr->p != 0; fbptr = fb_next (fbptr))
+      for (; fbptr->p != FB_END; fbptr = fb_next (fbptr))
 	if (trialdiv_with_norm3 (fbptr, norm, add))
 	  break;
     }
   else if (s == 4)
     {
-      for (; fbptr->p != 0; fbptr = fb_next (fbptr))
+      for (; fbptr->p != FB_END; fbptr = fb_next (fbptr))
 	if (trialdiv_with_norm4 (fbptr, norm, add))
 	  break;
     }
   else
     {
-      for (; fbptr->p != 0; fbptr = fb_next (fbptr))
+      for (; fbptr->p != FB_END; fbptr = fb_next (fbptr))
 	if (trialdiv_with_norm (fbptr, norm))
 	  break;
     }
@@ -1464,7 +1464,7 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
     {
       fbptr = trialdiv_find_next (fbptr, norm);
       
-      if (fbptr->p == 0)
+      if (fbptr->p == FB_END)
 	{
 	  fprintf (stderr, "# Warning, reached end of fb for (%ld, %lu). "
 		   "sievelog = %hhu, finallog = %hhu\n", 
@@ -1489,14 +1489,14 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
   /* Now at least one of these conditions hold:
      1. add_error (sievelog) <= add_error (finallog)
      2. uc_sub(sievelog, finallog) < 2*fbptr->plog
-     3. fbptr->p == 0 
+     3. fbptr->p == FB_END 
 
      If 1. or 3. hold, trial division over factor base primes is finished.
      If only 2. holds, there is exactly one more fb prime left in norm.
   */
 
   if (add_error (sievelog) > add_error (finallog) &&
-      fbptr->p != 0)
+      fbptr->p != FB_END)
     {
       factorbase_degn_t *oldfbptr = fbptr;
       const unsigned char missinglog = uc_sub (sievelog, finallog);
@@ -1580,7 +1580,7 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
                  "is " FBPRIME_FORMAT "\n", fbptr->p);
 #endif
         fbptr = trialdiv_find_next (fbptr, norm);
-        if (fbptr->p == (fbprime_t) 0)
+        if (fbptr->p == FB_END)
           {
             /* Reached end of factor base? Maybe sieve was not initialised
                correctly and finallog is one too small, causing us to skip
@@ -1589,7 +1589,7 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
             fbptr = trialdiv_find_next (oldfbptr, norm);
           }
         /* This time is must have worked */
-        ASSERT_ALWAYS (fbptr->p != 0);
+        ASSERT_ALWAYS (fbptr->p != FB_END);
         stats->nr_missingprimes++;
         stats->sum_missingprimes += (unsigned long) fbptr->p;
       }
@@ -1611,10 +1611,7 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
      report prime as well. */
 
 
-  /* Lets try to factor the rest, i.e. remaining fb primes (if report buffer
-     overflowed) and large primes.
-     We still apply the mfb restriction, so this may discard relations 
-     where not all report primes were given */
+  /* Lets examine the rest, i.e. large primes. */
   
   /* 5. Check if the cofactor is small enough */
   log2size = mpz_sizeinbase (norm, 2);
@@ -1645,7 +1642,7 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
     }
 
   p = fbptr->p;
-  if (p == 0)
+  if (p == FB_END)
     p = fbb;
   /* All remaining prime factors of norm should be > p now, hence if 
      norm < p^2, it should be prime. */
@@ -1911,12 +1908,7 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
   tsc2 = clock ();
   if (verbose)
   {
-    printf ("# Trial factoring/printing%s took %ld clocks\n", 
-#ifdef REDC_ROOTS
-	    " (with    REDC)",
-#else
-	    " (without REDC)",
-#endif
+    printf ("# Trial factoring/printing took %ld clocks\n", 
 	    (long int) (tsc2 - tsc1));
   }
 
@@ -2262,7 +2254,8 @@ main (int argc, char **argv)
 
 #if 0
   if (verbose)
-    for (s = 0; fb_skip(fb, s)->p != 0; s += fb_entrysize (fb_skip (fb, s)))
+    for (s = 0; fb_skip(fb, s)->p != FB_END; 
+	 s += fb_entrysize (fb_skip (fb, s)))
       fb_print_entry (fb_skip(fb, s));
 #endif
 

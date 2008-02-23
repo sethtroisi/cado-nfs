@@ -5,6 +5,8 @@
 #include "config.h"
 #include "cado.h"
 
+#define FB_END ((fbprime_t) 1)
+
 void		fb_print_entry (factorbase_degn_t *);
 factorbase_degn_t *fb_add_to (factorbase_degn_t *, size_t *, size_t *, 
                            const size_t, factorbase_degn_t *);

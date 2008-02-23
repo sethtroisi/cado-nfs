@@ -7,8 +7,6 @@
    #ifdef WANT_ASSERT_EXPENSIVE */
 // #define WANT_ASSERT_EXPENSIVE 1
 
-#define REDC_ROOTS 1
-
 /* Number of blocking levels for small factor base primes, should
    correspond to cache levels. Sieving will be done in SIEVE_BLOCKING + 1
    passes: SIEVE_BLOCKING passes updating directly, and one pass with

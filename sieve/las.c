@@ -293,7 +293,7 @@ sieve_slow (unsigned char *S, const factorbase_degn_t *fb,
     unsigned char *S_ptr;
 
     // Loop over all primes in the factor base.
-    while (fb->p > 0) {
+    while (fb->p != FB_END) {
         unsigned char nr;
         p = fb->p;
         logp = fb->plog;
@@ -485,7 +485,7 @@ static void line_sieve(unsigned char *S, factorbase_degn_t **fb_ptr,
     unsigned char *S_ptr;
     fbprime_t p, r, R;
     unsigned char logp;
-    while ((*fb_ptr)->p > 0 && (*fb_ptr)->p <= I) {
+    while ((*fb_ptr)->p != FB_END && (*fb_ptr)->p <= I) {
         unsigned char nr;
         p = (*fb_ptr)->p;
         logp = (*fb_ptr)->plog;
@@ -575,7 +575,7 @@ sieve_random_access (unsigned char *S, factorbase_degn_t *fb,
 
     double tm = seconds();
 #ifdef TRY_SSE
-    if (fb->p == 0)
+    if (fb->p == FB_END)
         return;
     int finished = 0;
     int cur_root = 0;
@@ -611,7 +611,7 @@ sieve_random_access (unsigned char *S, factorbase_degn_t *fb,
             else {
                 cur_root = 0;
                 fb = fb_next (fb);
-                if (fb->p == 0) {
+                if (fb->p == FB_END) {
                     finished = 1;
                     break;
                 }
@@ -674,7 +674,7 @@ sieve_random_access (unsigned char *S, factorbase_degn_t *fb,
 #endif
 
     // Loop over all primes in the factor base > I
-    while (fb->p > 0) {
+    while (fb->p != FB_END) {
         unsigned char nr;
         fbprime_t p = fb->p;
         unsigned char logp = fb->plog;
