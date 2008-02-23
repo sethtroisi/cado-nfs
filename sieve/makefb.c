@@ -174,7 +174,7 @@ makefb_with_powers(FILE *fp, cado_poly cpoly)
 	prune_min_power_ideal(&id, &id_list);
           
 	fprintf (fp, "%lu: %lu", id.pk, id.r[0]);
-	for (i = 1; i < id.nroots; i++)
+	for (i = 1; i < (int) id.nroots; i++)
 	  fprintf (fp, ",%lu", id.r[i]);
 	fprintf (fp, "\n");
 
@@ -185,7 +185,7 @@ makefb_with_powers(FILE *fp, cado_poly cpoly)
       if (long_poly_fits (d, p))
         nroots = roots_mod_long (roots, cpoly->f, d, p);
       else
-        nroots = modul_roots_mod_long (roots, cpoly->f, d, &p);
+        nroots = modul_roots_mod_long ((unsigned long*) roots, cpoly->f, d, &p);
       /* normalize roots in [0, p-1] */
       for (i = 0; i < nroots; i++)
         if (roots[i] < 0)
@@ -258,7 +258,7 @@ makefb (FILE *fp, cado_poly cpoly)
       if (long_poly_fits (d, p))
         nroots = roots_mod_long (roots, cpoly->f, d, p);
       else
-        nroots = modul_roots_mod_long (roots, cpoly->f, d, &p);
+        nroots = modul_roots_mod_long ((unsigned long *) roots, cpoly->f, d, &p);
       /* normalize roots in [0, p-1] */
       for (i = 0; i < nroots; i++)
         if (roots[i] < 0)
@@ -308,9 +308,11 @@ main (int argc, char *argv[])
 	  argv += 2;
 	}
       else if (strcmp(argv[1], "-powers") == 0)
-      {
-	use_powers = 1;
-      }
+        {
+          use_powers = 1;
+          argc --;
+          argv ++;
+        }
       else 
 	{
 	  fprintf (stderr, "Usage: %s [-v] [-powers] -poly <file>\n", argv0[0]);
