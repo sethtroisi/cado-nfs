@@ -491,7 +491,7 @@ find_sieve_reports (const unsigned char *sievearray,
 	{
 	  const long a = sieveidx_to_a (d, amin, odd);
 	  
-	  TRACE_A (a, __func__, __LINE__, "remaining log norm %hhu is small"
+	  TRACE_A (a, __func__, __LINE__, "remaining log norm %hhu is small "
 		   "enough\n", sievearray[d]);
 
 	  /* Testing n%3==0 is quite fast, and eliminates useless reports */
@@ -530,10 +530,6 @@ find_sieve_reports (const unsigned char *sievearray,
 			   "found matching report in other_reports\n");
 		}
 	    }
-
-	  TRACE_A (a, __func__, __LINE__,
-		   "sieve report a = %ld, p = 1, l = %d added to buffer\n", 
-		   a, (int) sievearray[d]);
 
 	  add_sieve_report (reports, a, (fbprime_t) 1, sievearray[d]);
 	}
@@ -1269,33 +1265,28 @@ trialdiv_find_next (factorbase_degn_t *fbptr, const mpz_t norm)
   /* Choose good trial division routine outside of loop over fb primes */
   if (s == 1)
     {
-      for (; fbptr->p != FB_END; fbptr = fb_next (fbptr))
-	if (trialdiv_with_norm1 (fbptr, norm, add))
-	  break;
+      while (! trialdiv_with_norm1 (fbptr, norm, add))
+        fbptr = fb_next (fbptr);
     }
   else if (s == 2)
     {
-      for (; fbptr->p != FB_END; fbptr = fb_next (fbptr))
-	if (trialdiv_with_norm2 (fbptr, norm, add))
-	  break;
+      while (! trialdiv_with_norm2 (fbptr, norm, add))
+        fbptr = fb_next (fbptr);
     }
   else if (s == 3)
     {
-      for (; fbptr->p != FB_END; fbptr = fb_next (fbptr))
-	if (trialdiv_with_norm3 (fbptr, norm, add))
-	  break;
+      while (! trialdiv_with_norm3 (fbptr, norm, add))
+        fbptr = fb_next (fbptr);
     }
   else if (s == 4)
     {
-      for (; fbptr->p != FB_END; fbptr = fb_next (fbptr))
-	if (trialdiv_with_norm4 (fbptr, norm, add))
-	  break;
+      while (! trialdiv_with_norm4 (fbptr, norm, add))
+        fbptr = fb_next (fbptr);
     }
   else
     {
-      for (; fbptr->p != FB_END; fbptr = fb_next (fbptr))
-	if (trialdiv_with_norm (fbptr, norm))
-	  break;
+      while (! trialdiv_with_norm (fbptr, norm))
+        fbptr = fb_next (fbptr);
     }
 
   return fbptr;
