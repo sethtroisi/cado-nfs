@@ -331,7 +331,7 @@ fb_read (const char *filename, const double log_scale, const int verbose)
 	  break;
 	}
 
-#if 0 /* disabled because prime powers are not produced currently by makefb */
+#if 1 /* disabled because prime powers are not produced currently by makefb */
       p = iscomposite (fb_cur->p);
       if (p != 0)
         {
