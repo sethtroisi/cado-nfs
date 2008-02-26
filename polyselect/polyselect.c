@@ -2,7 +2,7 @@
 
 Author: Paul Zimmermann
 
-Copyright 2007 INRIA
+Copyright 2007, 2008 INRIA
 
 This file is part of the CADO project.
 
@@ -35,9 +35,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
        May 2000.
 */
 
-/* if WANT_MONIC is defined, allow only monic linear polynomial x-m */
-#define WANT_MONIC
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -45,16 +42,16 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <limits.h> /* for ULONG_MAX */
 #include <float.h>  /* for DBL_MAX */
 #include <math.h>   /* for log, fabs */
-/* for isblank */
-/* #define _ISOC99_SOURCE */
-/* We use -std=c99 */
 #include <ctype.h>  /* for isspace, islower */
 #include "cado.h"
 #include "utils/utils.h" /* for cputime() */
 
 #define REPS 1 /* number of Miller-Rabin tests in isprime */
 
-#define MAX_ROTATE 16 /* try rotation by k*(x-m) for |k| <= MAX_ROTATE */
+#define MAX_ROTATE 16 /* try rotation by k*(b*x-m) for |k| <= MAX_ROTATE.
+                         FIXME: we should adjust that bound dynamically,
+                         so that the norm of the modified polynomial does
+                         not change much. */
 
 #ifdef DEBUG
 #define ASSERT(x) assert(x)
@@ -74,9 +71,10 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 static void
 usage ()
 {
-  fprintf (stderr, "Usage: polyselect [-v] [-full] [-degree d] [-e nnn] [-m xxx]< in > out\n\n");
+  fprintf (stderr, "Usage: polyselect [-v] [-full] [-b b] [-degree d] [-e nnn] [-m xxx]< in > out\n\n");
   fprintf (stderr, "       -v        - verbose\n");
   fprintf (stderr, "       -full     - also output factor base parameters\n");
+  fprintf (stderr, "       -b b      - linear polynomial bx-m (default 1)\n");
   fprintf (stderr, "       -degree d - use algebraic polynomial of degree d\n");
   fprintf (stderr, "       -e nnn    - use effort nnn\n");
   fprintf (stderr, "       -m xxx    - use decomposition in base xxx\n");
@@ -444,44 +442,6 @@ special_valuation (mpz_t *f, int d, unsigned long p, mpz_t disc)
   mpz_clear (t);
   return v;
 }
-
-#if 0
-/* Estimate the average valuation of p in f(x) for 0 <= x, y < X,
-   with a target accurary of eps. Since the returned value is multiplied
-   by log(p), we need an accurary of eps/log(p) here, i.e., consider about
-   Pi^2/6*log(p)/eps pairs (x,y), since the proportion of coprime (x,y) is
-   6/Pi^2.
-*/
-double
-estimate_valuation (mpz_t *f, int d, double eps, unsigned long p)
-{
-  double s = 0.0, t = 0.0;
-  unsigned long x, y, X;
-  mpz_t v;
-
-  /* 1.645 is an upper approximation of Pi^2/6 */
-  X = (unsigned long) (sqrt (1.645 * log ((double) p) / eps) + 1.0);
-
-  mpz_init (v);
-  for (x = 1; x <= X; x++)
-    for (y = 1; y <= X; y++)
-      if (igcd (x, y) == 1)
-        {
-          eval_poly (v, f, d, x, y);
-          if (mpz_cmp_ui (v, 0) != 0)
-            {
-              t ++;
-              while (mpz_divisible_ui_p (v, p))
-                {
-                  s ++;
-                  mpz_divexact_ui (v, v, p);
-                }
-            }
-        }
-  mpz_clear (v);
-  return s / t;
-}
-#endif
 
 /*****************************************************************************/
 
@@ -1242,55 +1202,86 @@ get_logmu (mpz_t *p, unsigned long degree, mpz_t m, double S2)
   return log((mpz_get_d (m) / S + S) * mu);
 }
 
-/* Decompose p->n in base m, rounding to nearest. */
+/* Decompose p->n in base m/b, rounding to nearest
+   (linear polynomial is b*x-m).
+   For b=1, it suffices to check the coefficient f[d-1] is divisible by b,
+   then all successive coefficients will be.
+   Assumes b^2 fits in an unsigned long.
+ */
 void
-generate_base_m (cado_poly p, mpz_t m)
+generate_base_mb (cado_poly p, mpz_t m, unsigned long b)
 {
-  unsigned long i, g = 1;
+  unsigned long i;
   int d = p->degree;
 
   assert (d >= 0);
 
-#ifdef WANT_MONIC
-  mpz_ndiv_qr (p->f[1], p->f[0], p->n, m);
-  for (i = 1; i < (unsigned long) d; i++)
-    mpz_ndiv_qr (p->f[i+1], p->f[i], p->f[i], m);
-#else
-  {
-    unsigned long mg;
-    long k, im;
-    mpz_t powm;
-  mpz_init (powm);
-  mpz_pow_ui (powm, m, d);
-  mpz_ndiv_qr (p->f[d], p->f[d - 1], p->n, powm);
-  /* N = f[d] * m^d + f[d-1] */
-  g = mpz_gcd_ui (NULL, p->f[d - 1], 232792560);
-  mpz_set_ui (p->f[0], g);
-  mpz_invert (p->f[0], powm, p->f[0]);
-  im = mpz_get_ui (p->f[0]); /* 1/m^d mod g */
-  mg = mpz_fdiv_ui (m, g); /* m mod g */
-  mpz_divexact_ui (p->f[d - 1], p->f[d - 1], g);
-  for (i = d - 1; i >= 1; i--)
+  if (b == 1)
     {
-      /* p->f[i] is the current remainder */
-      mpz_divexact (powm, powm, m); /* m^i */
-      mpz_ndiv_qr (p->f[i], p->f[i - 1], p->f[i], powm);
-      /* f[i] = q * m^i + r: we want to write f[i] = (q+k) * m^i + (r-k*m^i)
-         with r-k*m^i divisible by g, i.e., k = r/m^i mod g */
-      k = mpz_fdiv_ui (p->f[i - 1], g); /* r mod g */
-      im = (im * mg) % g; /* 1/m^i mod g */
-      k = (k * im) % g; /* r/m^i mod g */
-      if (2 * k > g)
-        k -= g;
-      mpz_add_si (p->f[i], p->f[i], k);
-      mpz_submul_si (p->f[i - 1], powm, k);
-      mpz_divexact_ui (p->f[i - 1], p->f[i - 1], g);
+      mpz_ndiv_qr (p->f[1], p->f[0], p->n, m);
+      for (i = 1; i < (unsigned long) d; i++)
+        mpz_ndiv_qr (p->f[i+1], p->f[i], p->f[i], m);
     }
-  mpz_clear (powm);
-  }
-#endif
+  else /* b >= 2 */
+    {
+      unsigned long m_mod_b;
+      long k, im;
+      mpz_t powm;
+      int s;
+
+      mpz_init (powm);
+      
+      /* we need that m is invertible mod b */
+      while (mpz_gcd_ui (powm, m, b) != 1)
+        mpz_add_ui (m, m, 1);
+
+      mpz_pow_ui (powm, m, d);
+
+      mpz_set_ui (p->f[0], b);
+      mpz_invert (p->f[0], powm, p->f[0]);
+      im = mpz_get_ui (p->f[0]); /* 1/m^d mod b */
+
+      mpz_ndiv_qr (p->f[d], p->f[d - 1], p->n, powm);
+      /* N = f[d] * m^d + f[d-1]. We want f[d-1] to be divisible by b,
+         which may need to consider f[d]+k instead of f[d], i.e., we want
+         f[d-1]-k*m^d = 0 (mod b), i.e., k = f[d-1]/m^d (mod b). */
+      k = mpz_fdiv_ui (p->f[d - 1], b); /* f[d-1] mod b */
+      k = (k * im) % b;                 /* k = f[d-1]/m^d (mod b) */
+      if (k != 0)
+        {
+          s = mpz_sgn (p->f[d - 1]);
+          if ((s >= 0 && 2 * k + 1 > (long) b) ||
+              (s < 0 && 2 * k - 1 > (long) b))
+            k = k - (long) b;
+          /* f[d] -> f[d]+l, f[d-1] -> f[d-1]-l*m^d */
+          mpz_add_si (p->f[d], p->f[d], k);
+          mpz_submul_si (p->f[d - 1], powm, k);
+        }
+      /* now N = f[d] * m^d + f[d-1], with f[d-1] divisible by b */
+      m_mod_b = mpz_fdiv_ui (m, b); /* m mod b */
+      mpz_divexact_ui (p->f[d - 1], p->f[d - 1], b);
+      for (i = d - 1; i >= 1; i--)
+        {
+          /* p->f[i] is the current remainder */
+          mpz_divexact (powm, powm, m); /* m^i */
+          mpz_ndiv_qr (p->f[i], p->f[i - 1], p->f[i], powm);
+          /* f[i] = q*m^i + r: we want to write f[i] = (q+k) * m^i + (r-k*m^i)
+             with r-k*m^i divisible by b, i.e., k = r/m^i mod b */
+          k = mpz_fdiv_ui (p->f[i - 1], b); /* r mod b */
+          im = (im * m_mod_b) % b; /* 1/m^i mod b */
+          k = (k * im) % b; /* r/m^i mod b */
+          s = mpz_sgn (p->f[i - 1]);
+          if ((s >= 0 && 2 * k + 1 > (long) b) ||
+              (s < 0 && 2 * k - 1 > (long) b))
+            k = k - (long) b;
+          mpz_add_si (p->f[i], p->f[i], k);
+          mpz_submul_si (p->f[i - 1], powm, k);
+          mpz_divexact_ui (p->f[i - 1], p->f[i - 1], b);
+        }
+      mpz_clear (powm);
+    }
   mpz_neg (p->g[0], m);
-  mpz_set_ui (p->g[1], g);
+  mpz_set_ui (p->g[1], b);
   mpz_set (p->m, m);
   p->skew = skewness (p->f, d);
 }
@@ -1308,15 +1299,16 @@ generate_sieving_parameters (cado_poly out)
   out->alambda = default_alambda (out->n);
 }
 
-/* Return the smallest value of alpha(f + k*(x-m)) for |k| <= K. */
+/* Return the smallest value of alpha(f + k*(b*x-m)) for |k| <= K. */
 double
-rotate (mpz_t *f, int d, unsigned long alim, long K, mpz_t m, long *bestk)
+rotate (mpz_t *f, int d, unsigned long alim, long K, mpz_t m, long *bestk,
+        unsigned long b)
 {
   long k;
   double alpha, best_alpha = 9.0;
 
-  /* compute f - K*(x-m) */
-  mpz_sub_ui (f[1], f[1], K);
+  /* compute f - K*(b*x-m) */
+  mpz_sub_ui (f[1], f[1], b * K);
   mpz_addmul_ui (f[0], m, K);
   for (k = -K; k <= K; k++)
     {
@@ -1326,11 +1318,10 @@ rotate (mpz_t *f, int d, unsigned long alim, long K, mpz_t m, long *bestk)
           best_alpha = alpha;
           *bestk = k;
         }
-      /* f <- f + (x-m) */
-      mpz_add_ui (f[1], f[1], 1);
+      /* f <- f + (b*x-m) */
+      mpz_add_ui (f[1], f[1], b);
       mpz_sub (f[0], f[0], m);
     }
-  /* now we have f + K*(x-m), and we want f + k*(x-m) */
   return best_alpha;
 }
 
@@ -1342,9 +1333,11 @@ rotate (mpz_t *f, int d, unsigned long alim, long K, mpz_t m, long *bestk)
 
    The number of tries T is related to the decrease B by:
    For d=5, T = B^4.5; for d=4, T = B^3.3.
+
+   b is the leading coefficient of the linear polynomial.
 */
 void
-generate_poly (cado_poly out, double T)
+generate_poly (cado_poly out, double T, unsigned long b)
 {
   unsigned long d = out->degree, alim;
   double B, logmu, alpha, E, mB;
@@ -1378,7 +1371,6 @@ generate_poly (cado_poly out, double T)
   mpz_init (t);
   mpz_init (r);
 
-#if 1
   if (d > 7)
     {
       fprintf (stderr, "Error, too large degree in generate_poly\n");
@@ -1387,13 +1379,6 @@ generate_poly (cado_poly out, double T)
   B = pow (T, 1.0 / eff[d]); /* B = T^{1/eff[d]} */
   mpz_root (out->m, out->n, d + 1); /* n^{1/(d+1)} */
   mB = B * mpz_get_d (out->m); /* B^{1/(d-1)} n^{1/(d+1)} */
-#else
-  {
-    double dd = (double) d;
-    mB = pow (mpz_get_d (out->n), 1.0 / (dd + 1.0)) *
-      pow (T, 2.0 * dd / ((dd - 2.0) * (dd - 1.0) * (dd + 1.0)));
-  }
-#endif
   mpz_set_d (out->m, mB);
 
   /* First phase: search for m which give a base-m decomposition with a small
@@ -1415,13 +1400,13 @@ generate_poly (cado_poly out, double T)
       mpz_mul_ui (t, out->f[d], d);
       mpz_fdiv_q (k, out->f[d - 1], t);
       mpz_add (out->m, out->m, k);
-      generate_base_m (out, out->m);
+      generate_base_mb (out, out->m, b);
       logmu = get_logmu (out->f, d, out->m, out->skew);
       Msize = m_logmu_insert (M, Malloc, Msize, out->m, logmu);
       if (T > 0 && mpz_sgn (out->f[d - 1]) > 0)
         { /* try another small f[d-1], avoiding a mpz_pow_ui call */
           mpz_add_ui (out->m, out->m, 1);
-          generate_base_m (out, out->m);
+          generate_base_mb (out, out->m, b);
           T --;
           logmu = get_logmu (out->f, d, out->m, out->skew);
           Msize = m_logmu_insert (M, Malloc, Msize, out->m, logmu);
@@ -1442,7 +1427,7 @@ generate_poly (cado_poly out, double T)
   for (i = 0; i < Msize; i++)
     {
       logmu = M[i].logmu;
-      generate_base_m (out, M[i].m);
+      generate_base_mb (out, M[i].m, b);
       alpha = get_alpha (out->f, d, alim);
       E = logmu + alpha;
       /* the following overwrites the M database */
@@ -1454,9 +1439,9 @@ generate_poly (cado_poly out, double T)
   alim = (unsigned long) sqrt ((double) default_alim (out->n));
   for (i = 0; i < Msize2; i++)
     {
-      generate_base_m (out, M[i].m);
+      generate_base_mb (out, M[i].m, b);
       logmu = get_logmu (out->f, d, out->m, out->skew);
-      alpha = rotate (out->f, d, alim, MAX_ROTATE, out->m, &k0);
+      alpha = rotate (out->f, d, alim, MAX_ROTATE, out->m, &k0, b);
       E = logmu + alpha;
       if (E < best_E)
         {
@@ -1476,11 +1461,11 @@ generate_poly (cado_poly out, double T)
   m_logmu_clear (M, Malloc);
 
  end:
-  generate_base_m (out, best_m);
+  generate_base_mb (out, best_m, b);
   /* rotate */
   if (bestk != 0)
     {
-      mpz_add_si (out->f[1], out->f[1], bestk);
+      mpz_add_si (out->f[1], out->f[1], (long) b * bestk);
       mpz_submul_si (out->f[0], out->m, bestk);
     }
   generate_sieving_parameters (out);
@@ -1519,6 +1504,14 @@ print_poly (FILE *fp, cado_poly p, int argc, char *argv[], int st, int raw)
   mpz_out_str (fp, 10, p->g[0]);
   fprintf (fp, "\n");
   fprintf (fp, "m: ");
+  /* if g[1]<>1, then m = -g[0]/g[1] mod n */
+  if (mpz_cmp_ui (p->g[1], 1) != 0)
+    {
+      mpz_invert (p->m, p->g[1], p->n);
+      mpz_neg (p->m, p->m);
+      mpz_mul (p->m, p->m, p->g[0]);
+      mpz_mod (p->m, p->m, p->n);
+    }
   mpz_out_str (fp, 10, p->m);
   fprintf (fp, "\n");
   fprintf (fp, "type: %s\n", p->type);
@@ -1568,7 +1561,8 @@ main (int argc, char *argv[])
   int argc0 = argc;
   int st = cputime ();
   mpz_t m;
-  int degree = 0; /* if 0, use default values */
+  int degree = 0;      /* if 0, use default values */
+  unsigned long b = 1; /* leading coefficient of linear polynomial */
 
   fprintf (stderr, "# %s.r%s", argv[0], REV);
   for (i = 1; i < argc; i++)
@@ -1610,6 +1604,12 @@ main (int argc, char *argv[])
 	  argv += 2;
 	  argc -= 2;
 	}
+      else if (argc > 2 && strcmp (argv[1], "-b") == 0)
+	{
+          b = atoi (argv[2]);
+	  argv += 2;
+	  argc -= 2;
+	}
       else
 	{
 	  fprintf (stderr, "Unknown option: %s\n", argv[1]);
@@ -1626,6 +1626,21 @@ main (int argc, char *argv[])
       effort = 1.0;
     }
 
+  /* checks b^2 fits in an unsigned long */
+  if (b != 1)
+    {
+      mpz_t bb;
+      
+      mpz_init_set_ui (bb, b);
+      mpz_mul_ui (bb, bb, b);
+      if (mpz_fits_ulong_p (bb) == 0)
+        {
+          fprintf (stderr, "Error, b^2 must fit in an unsigned long\n");
+          exit (1);
+        }
+      mpz_clear (bb);
+    }
+
   init (in);
   parse_input (in);
   if (verbose)
@@ -1636,7 +1651,7 @@ main (int argc, char *argv[])
   mpz_set (out->m, m); /* if non zero, use given value of m */
   clear (in);
 
-  generate_poly (out, effort);
+  generate_poly (out, effort, b);
   print_poly (stdout, out, argc0, argv0, st, raw);
   clear_poly (out);
 
