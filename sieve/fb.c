@@ -115,6 +115,12 @@ fb_sortprimes (fbprime_t *primes, const unsigned int n)
 #endif
 }
 
+double
+fb_log_double (double n, double log_scale, double offset)
+{
+  return floor (log (n) * log_scale + offset + 0.5);
+}
+
 
 unsigned char
 fb_log (double n, double log_scale, double offset)
@@ -254,6 +260,160 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
 
   return fb;
 }
+
+int fb_comp(const void *a, const void *b) {
+  factorbase_degn_t *pa, *pb;
+  pa = (factorbase_degn_t *)a;
+  pb = (factorbase_degn_t *)b;
+  if (pa->p < pb->p) 
+    return -1;
+  if (pa->p > pb->p) 
+    return 1;
+  return 0;
+}
+
+/* Generate a factor base with prime powers <= bound for a linear polynomial */
+
+factorbase_degn_t *
+fb_make_linear_powers (mpz_t *poly, const fbprime_t bound, const double log_scale, 
+		const int verbose)
+{
+  fbprime_t p;
+  factorbase_degn_t *fb = NULL, *fb_cur, *fb_new;
+  size_t fbsize = 0, fballoc = 0;
+  const size_t allocblocksize = 1 << 20;
+  
+  rdtscll (tsc1);
+  fb_cur = (factorbase_degn_t *) malloc (fb_entrysize_uc (1));
+  ASSERT (fb_cur != NULL);
+
+  fb_cur->nr_roots = 1;
+  fb_cur->size = fb_entrysize_uc (1);
+
+  if (verbose)
+    {
+      printf ("# Making factor base for polynomial g(x) = ");
+      //      mp_poly_print (poly, 1, "");
+      printf ("\n");
+    }
+
+  for (p = 2 ; p <= bound; p = getprime (p))
+    {
+      modulus_t m;
+      residue_t r1, r2;
+      uint64_t llq;
+      fbprime_t q;
+      unsigned char old_logpk;
+
+      llq = (uint64_t)p;
+      old_logpk = 0;
+      while (llq <= (uint64_t)bound) {
+	q = (fbprime_t)llq;
+	if (q > p)
+	  break;
+
+	fb_cur->p = q;
+	// TODO: adjust that!
+	if (old_logpk == 0) {
+	  old_logpk = fb_log (fb_cur->p, log_scale, 0.);
+	  fb_cur->plog = old_logpk;
+	} else {
+	  double newlog;
+	  newlog = fb_log_double (fb_cur->p, log_scale, 0.) - (double)old_logpk;
+	  old_logpk = (unsigned char) newlog;
+	  fb_cur->plog = old_logpk;
+	}
+
+	mod_initmod_ul (m, q);
+	mod_init_noset0 (r1, m);
+	mod_init_noset0 (r2, m);
+
+	/* We want f_1 * a + f_0 * b == 0 (mod p^k) 
+	   with a, b coprime and f_1, f_0 coprime
+
+	   p^m = gcd (f_1, p^k)
+
+	   p^k | F(a,b) <=>
+	   ( f_0 * b == 0 (mod p^m) <=> b == 0 (mod p^m)  && 
+	   (f_1/p^m) * a + f_0 * (b/p^m) == 0 (mod p^(k-m)) )
+
+	   p^m = (p^k, f_1) => 
+	   p^k | F(a,b) <=> p^m | b && f(a/b) == 0 (mod p^(k-m))
+
+*/
+
+	mod_set_ul_reduced (r2, mpz_fdiv_ui (poly[1], q), m);
+	/* If p | g1 and !(p | g0), p|G(a,b) <=> p|b and that will be handeled
+	   by the projective roots */
+	if (mod_get_ul (r2, m) == 0)
+	  continue;
+	mod_set_ul_reduced (r1, mpz_fdiv_ui (poly[0], q), m);
+
+	/* We want g_1 * a + g_0 * b == 0 <=> a/b == - g0 / g1 */
+	if (!mod_inv (r2, r2, m)) /* r2 = 1 / g1 */
+	  continue;
+
+	mod_mul (r2, r1, r2, m); /* r2 = g0 / g1 */
+	mod_neg (r2, r2, m); /* r2 = - g0 / g1 */
+
+#ifdef WANT_ASSERT
+	{
+	  residue_t r3;
+	  mod_init_noset0 (r3, m);
+	  mod_set_ul_reduced (r3, mpz_fdiv_ui (poly[1], q), m);
+	  mod_mul (r3, r3, r2, m); /* g1 * (- g0 / g1) */
+	  mod_add (r3, r3, r1, m); /* g1 * (- g0 / g1) + g0 */
+	  ASSERT (mod_get_ul (r3, m) == 0);
+	  mod_clear (r3, m);
+	}
+#endif
+
+	if (p % 2 != 0)
+	  fb_cur->invp = - mod_invmodlong (m);
+	fb_cur->roots[0] = mod_get_ul (r2, m);
+
+	mod_clear (r1, m);
+	mod_clear (r2, m);
+	mod_clearmod (m);
+
+	fb_new = fb_add_to (fb, &fbsize, &fballoc, allocblocksize, fb_cur);
+	if (fb_new == NULL)
+	{
+	  free (fb);
+	  fb = NULL;
+	  break;
+	}
+	/* fb_print_entry (fb_cur); */
+	fb = fb_new;
+
+	/* get next power of p */
+	llq *= (uint64_t)p;
+      }
+    }
+  getprime (0); /* free prime iterator */
+
+  /* Sort the factor base */
+  qsort((void *)fb, fbsize / fb_entrysize_uc(1), fb_entrysize_uc(1), fb_comp);
+
+
+  if (fb != NULL) /* If nothing went wrong so far, put the end-of-fb mark */
+    {
+      fb_cur->p = FB_END;
+      fb_cur->invp = -1L;
+      fb_cur->nr_roots = 0;
+      fb_new = fb_add_to (fb, &fbsize, &fballoc, allocblocksize, fb_cur);
+      if (fb_new == NULL)
+	free (fb);
+      fb = fb_new;
+    }
+
+  free (fb_cur);
+
+  rdtscll (tsc2);
+
+  return fb;
+}
+
 
 
 factorbase_degn_t *
