@@ -8,6 +8,7 @@
 #include "fb.h"
 #include "../utils/utils.h"
 #include "basicnt.h" /* for gcd_ul */
+#include <tifa.h>
 
 #define LOG_SCALE 1.4426950408889634 /* 1/log(2) to 17 digits, rounded to
                                         nearest. This is enough to uniquely
@@ -26,6 +27,30 @@
 /* define TRACE_K to -I/2+i+I*j to trace the sieve array entry corresponding
    to (i,j), i.e., a = a0*i+a1*j, b = b0*i+b1*j */
 /* #define TRACE_K 706429 */
+
+#define MAX_BUF_SIZE 512 /* maximal length of the factorization on each side */
+
+/* concatenate an integer q at the end of s (which might be empty) */
+#define sprintf_cat(s,q)                        \
+  do                                            \
+    {                                           \
+      if (strlen (s) == 0)                      \
+        sprintf (s, "%lx", q);                  \
+      else                                      \
+        sprintf (s + strlen (s), ",%lx", q);    \
+    }                                           \
+  while (0)
+
+/* same with gmp_sprintf */
+#define gmp_sprintf_cat(s,q)                            \
+  do                                                    \
+    {                                                   \
+      if (strlen (s) == 0)                              \
+        gmp_sprintf (s, "%Zx", q);                      \
+      else                                              \
+        gmp_sprintf (s + strlen (s), ",%Zx", q);        \
+    }                                                   \
+  while (0)
 
 // General information about the siever
 typedef struct {
@@ -48,6 +73,8 @@ typedef struct {
     double B;         /* bound for the norm computation */
     unsigned char alg_bound; /* report bound on the algebraic side */
     unsigned char rat_bound; /* report bound on the rational side */
+    int checknorms;          /* if non-zero, completely factor the potential
+                                relations */
 } sieve_info_t;
 
 /*
@@ -1101,6 +1128,80 @@ SkewGauss (sieve_info_t *si, double skewness)
     }
 }
 
+/************************ factoring with TIFA ********************************/
+
+/* FIXME: the value of 20 seems large. Normally, a few Miller-Rabin passes
+   should be enough. See also http://www.trnicely.net/misc/mpzspsp.html */
+#define NMILLER_RABIN 20
+#define IS_PRIME(X)     (0 != mpz_probab_prime_p((X), NMILLER_RABIN))
+#define BITSIZE(X)      (mpz_sizeinbase((X), 2))
+#define NFACTORS        8 /* maximal number of large primes */
+
+/* This function was contributed by Jerome Milan (and bugs were introduced
+   by Paul Zimmermann :-).
+   Input: n - the number to be factored (leftover norm)
+          b - (large) prime bit size bound
+   Return value:
+          0 if n has a prime factor larger than 2^b
+          1 if all prime factors of n are < 2^b
+   Output:
+          the prime factors of n are factors->data[0..factors->length-1],
+          with corresponding multiplicities multis[0..factors->length-1].
+*/          
+int
+factor_leftover_norm (mpz_t n, unsigned int b,
+                      mpz_array_t* const factors, uint32_array_t* const multis)
+{
+  uint32_t i;
+  ecode_t ecode;
+
+  if (mpz_sgn (n) < 0)
+    mpz_neg (n, n);
+
+  /* it seems tifa_factor does not like 1 */
+  if (mpz_cmp_ui (n, 1) == 0)
+    {
+      factors->length = 0;
+      return 1;
+    }
+
+  if (IS_PRIME(n))
+    {
+      if (BITSIZE(n) > b)
+        return 0;
+      else
+        {
+          append_mpz_to_array (factors, n);
+          append_uint32_to_array (multis, 1);
+          return 1;
+        }
+    } 
+
+  ecode = tifa_factor (factors, multis, n, FIND_COMPLETE_FACTORIZATION);
+
+  switch (ecode)
+    {
+    case COMPLETE_FACTORIZATION_FOUND:
+      for (i = 0; i < factors->length; i++)
+        {
+          if (BITSIZE(factors->data[i]) > b)
+            return 0;
+        }
+      return 1;
+
+    case PARTIAL_FACTORIZATION_FOUND:
+    case NO_FACTOR_FOUND:
+    case FATAL_INTERNAL_ERROR:
+    default:
+        //
+        // Should be rare but I cannot give any warranties here... We could
+        // try to use another factoring library...
+        //
+        return 0;
+    }
+  return 0;
+}
+
 /********************* factoring on rational side ****************************/
 
 /* Those routines are a quick-and-dirty implementation which factors remaining
@@ -1258,8 +1359,18 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
   unsigned long final_reports = 0, rat_reports = 0, ngcds = 0;
   int64_t a;
   uint64_t b;
-  char bufr[256], bufa[256];
+  char bufr[MAX_BUF_SIZE], bufa[MAX_BUF_SIZE];
   size_t st; /* size in bits of root of product tree */
+  mpz_array_t *f_r = NULL, *f_a = NULL;    /* large prime factors */
+  uint32_array_t *m_r = NULL, *m_a = NULL; /* corresponding multiplicities */
+
+  if (si->checknorms)
+    {
+      f_r = alloc_mpz_array (NFACTORS);
+      f_a = alloc_mpz_array (NFACTORS);
+      m_r = alloc_uint32_array (NFACTORS);
+      m_a = alloc_uint32_array (NFACTORS);
+    }
 
   /* on the rational side, we still are in the q-lattice
      a = a0*i+a1*j, b = b0*i+b1*j, thus we have to consider
@@ -1421,13 +1532,34 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
               /* since we divided out large primes, norm should be 1 here */
               ASSERT(mpz_cmp_ui (normr, 1) == 0);
 
-              final_reports ++;
-              if (strlen (bufa) == 0)
-                sprintf (bufa, "%lx", si->q);
-              else
-                sprintf (bufa + strlen (bufa), ",%lx", si->q);
-              printf ("%ld,%lu:%s:%s\n", a, b, bufr, bufa);
-              fflush (stdout);
+              if (si->checknorms)
+                {
+                  reset_mpz_array (f_r);
+                  reset_mpz_array (f_a);
+                  m_r->length = 0;
+                  m_a->length = 0;
+                }
+
+              if (si->checknorms == 0 ||
+                  (factor_leftover_norm (T[0][l], cpoly->lpbr, f_r, m_r) &&
+                   factor_leftover_norm (norma, cpoly->lpba, f_a, m_a)))
+                                                               
+                {
+                  final_reports ++;
+                  sprintf_cat (bufa, si->q); /* add large prime on alg. side */
+                  if (si->checknorms)
+                    {
+                      uint32_t i, j;
+                      for (i = 0; i < f_r->length; i++)
+                        for (j = 0; j < m_r->data[i]; j++)
+                          gmp_sprintf_cat (bufr, f_r->data[i]);
+                      for (i = 0; i < f_a->length; i++)
+                        for (j = 0; j < m_a->data[i]; j++)
+                          gmp_sprintf_cat (bufa, f_a->data[i]);
+                    }
+                  printf ("%ld,%lu:%s:%s\n", a, b, bufr, bufa);
+                  fflush (stdout);
+                }
             }
         }
     }
@@ -1450,13 +1582,22 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
   mpz_clear (normr);
   mpz_clear (norma);
 
+  if (si->checknorms)
+    {
+      clear_mpz_array (f_r);
+      clear_mpz_array (f_a);
+      clear_uint32_array (m_r);
+      clear_uint32_array (m_a);
+    }
+
   fprintf (stderr, "# Remaining reports on rational side: %lu\n", rat_reports);
 
   return final_reports;
 }
 
-/* build a list report_list[] of values of k = i + I/2 + I*j where gcd(i,j)=1
-   and norm is small on algebraic side, then pass it to build_norms_rational */
+/* Build a list report_list[] of values of k = i + I/2 + I*j where gcd(i,j)=1
+   and norm is small on algebraic side, then pass it to build_norms_rational.
+*/
 static unsigned long
 factor_survivors (cado_poly cpoly, sieve_info_t *si, unsigned char *S,
                   factorbase_degn_t *fb_alg)
@@ -1598,7 +1739,7 @@ init_norms_rat (unsigned char *S, cado_poly cpoly, sieve_info_t *si)
 static void
 usage (char *argv0)
 {
-  fprintf (stderr, "Usage: %s -poly xxx.poly -fb xxx.roots -q0 q0 [-q1 q1] [-rho rho]\n",
+  fprintf (stderr, "Usage: %s [-checknorms] -poly xxx.poly -fb xxx.roots -q0 q0 [-q1 q1] [-rho rho]\n",
            argv0);
   exit (1);
 }
@@ -1615,6 +1756,7 @@ main (int argc, char *argv[])
     unsigned long *roots, nroots, reports, tot_reports = 0, i;
     unsigned char * S;
     factorbase_degn_t * fb_alg, * fb_rat;
+    int checknorms = 0; /* factor or not the remaining norms */
 
     fprintf (stderr, "# %s.r%s", argv[0], REV);
     for (i = 1; i < (unsigned int) argc; i++)
@@ -1623,7 +1765,13 @@ main (int argc, char *argv[])
 
     while (argc > 1 && argv[1][0] == '-')
       {
-        if (argc > 2 && strcmp (argv[1], "-fb") == 0)
+        if (strcmp (argv[1], "-checknorms") == 0)
+          {
+            checknorms = 1;
+            argc -= 1;
+            argv += 1;
+          }
+        else if (argc > 2 && strcmp (argv[1], "-fb") == 0)
           {
             fbfilename = argv[2];
             argc -= 2;
@@ -1679,6 +1827,7 @@ main (int argc, char *argv[])
 
     /* this does not depend on the special-q */
     sieve_info_init (&si, cpoly, 13, q0);
+    si.checknorms = checknorms;
 
     // One more is for the garbage during SSE
     S = (unsigned char *) malloc ((1 + si.I * si.J)*sizeof(unsigned char));
