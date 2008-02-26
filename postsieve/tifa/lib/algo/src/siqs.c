@@ -20,20 +20,20 @@
 /**
  * \file    siqs.c
  * \author  Jerome Milan
- * \date    Late October / early November 2007
- * \version 1.2
+ * \date    Tue Feb 26 2008
+ * \version 1.3
  */
 
 /*
  * History:
- *
+ * --------
+ * 1.3: Tue Feb 26 2008 by JM
+ *      - Added manual loop unrolling.
  * 1.2: Late October / early November 2007 by JM
  *      - Some performance enhancements (finally!) such as: better size of
  *        sieve chunks, rewritten factor extraction, new multipliers, etc.
- *
  * 1.1: Late March / early April 2007 by JM
  *      - Completely refactored to use a factoring_machine_t.
- *
  * 1.0: Circa late summer/early fall 2006 by JM
  *      - Initial version.
  */
@@ -123,7 +123,11 @@
 // Number of ranges for the size of the number to factor. Each range is
 // define by the "optimal" (read good enough) values of the parameters to use.
 //
-#define NRANGES 21
+#define NRANGES                    21
+//
+// Set to non zero to bypass manual unrolling of the tigh loops.
+//
+#define NO_MANUAL_UNROLLING        0
 //-----------------------------------------------------------------------------
 
 //-----------------------------------------------------------------------------
@@ -579,7 +583,7 @@ static ecode_t init_siqs_context(factoring_machine_t* const machine) {
     // use for the sieving.
     //
     init_startup_data(context);
-    context->ptree  = prod_tree_ui(context->factor_base);
+    context->ptree = prod_tree_ui(context->factor_base);
     //
     // The number of columns is indeed factor_base->length + 1 since the first
     // row is used to keep track of the sign of the residue.
@@ -970,18 +974,7 @@ static ecode_t recurse(mpz_array_t* const factors, uint32_array_t* const multis,
  */
 
 //-----------------------------------------------------------------------------
-static void fill_sieve(siqs_context_t* const context) {
-
-    byte_array_t* const sieve                 = context->sieve;
-    const int32_t sieve_begin                 = context->sieve_begin;
-    const int32_t sieve_end                   = context->sieve_end;
-    const uint32_array_t* const factor_base   = context->factor_base;
-    const byte_array_t* const log_factor_base = context->log_factor_base;
-    const uint32_array_t* const sol1          = context->sol1;
-    const uint32_array_t* const sol2          = context->sol2;
-    const uint32_t a_pmin                     = context->imin;
-    const uint32_t a_pmax                     = context->imax;
-
+static void fill_sieve(siqs_context_t* const context) {                              
     //
     // Fill the sieve array 'sieve'.
     //
@@ -1002,7 +995,18 @@ static void fill_sieve(siqs_context_t* const context) {
     uint32_t cursol   = 0;
     uint32_t sindex   = 0;
 
-    const uint32_t fblength = factor_base->length;
+    byte_array_t* const sieve = context->sieve;
+
+    const uint32_array_t* const factor_base     = context->factor_base;
+    const byte_array_t*   const log_factor_base = context->log_factor_base;
+    const uint32_array_t* const sol1            = context->sol1;
+    const uint32_array_t* const sol2            = context->sol2;
+        
+    const int32_t  sieve_begin = context->sieve_begin;
+    const int32_t  sieve_end   = context->sieve_end;
+    const uint32_t a_pmin      = context->imin;
+    const uint32_t a_pmax      = context->imax;
+    const uint32_t fblength    = factor_base->length;
 
     const uint32_t* const fbdata     = factor_base->data;
     const uint32_t* const sol1data   = sol1->data;
@@ -1094,11 +1098,40 @@ static void fill_sieve(siqs_context_t* const context) {
 
         sindex = cursol + (curprime * imin) - sieve_begin;
 
+#if NO_MANUAL_UNROLLING
         for (int32_t i = imax; i >= imin; i--) {
             sieve_data[sindex] += logp;
             sindex += curprime;
         }
-
+#else
+        int count = (imax - imin + 1);
+        int niter = count >> 3;
+        int ncase = count & 7;
+            
+        switch (ncase) {
+            case 7: sieve_data[sindex] += logp; sindex += curprime;
+            case 6: sieve_data[sindex] += logp; sindex += curprime;
+            case 5: sieve_data[sindex] += logp; sindex += curprime;
+            case 4: sieve_data[sindex] += logp; sindex += curprime;
+            case 3: sieve_data[sindex] += logp; sindex += curprime;
+            case 2: sieve_data[sindex] += logp; sindex += curprime;
+            case 1: sieve_data[sindex] += logp; sindex += curprime;
+            default: break;
+        }
+        
+        while (niter > 0) {
+            sieve_data[sindex]                                      += logp;
+            sieve_data[sindex+curprime]                             += logp;
+            sieve_data[sindex+(curprime<<1)]                        += logp;
+            sieve_data[sindex+(curprime<<1)+curprime]               += logp;
+            sieve_data[sindex+(curprime<<2)]                        += logp;
+            sieve_data[sindex+(curprime<<2)+curprime]               += logp;
+            sieve_data[sindex+(curprime<<2)+(curprime<<1)]          += logp;
+            sieve_data[sindex+(curprime<<2)+(curprime<<1)+curprime] += logp;
+            sindex += (curprime << 3);
+            niter--;
+        }
+#endif
         //
         // Sieve with sol2
         //
@@ -1126,10 +1159,41 @@ static void fill_sieve(siqs_context_t* const context) {
 
         sindex = cursol + (curprime * imin) - sieve_begin;
 
+#if NO_MANUAL_UNROLLING
         for (int32_t i = imax; i >= imin; i--) {
             sieve_data[sindex] += logp;
             sindex += curprime;
         }
+#else
+        count = (imax - imin + 1);
+        niter = count >> 3;
+        ncase = count & 7;
+        
+        switch (ncase) {
+            case 7 :  sieve_data[sindex] += logp; sindex += curprime;
+            case 6 :  sieve_data[sindex] += logp; sindex += curprime;
+            case 5 :  sieve_data[sindex] += logp; sindex += curprime;
+            case 4 :  sieve_data[sindex] += logp; sindex += curprime;
+            case 3 :  sieve_data[sindex] += logp; sindex += curprime;
+            case 2 :  sieve_data[sindex] += logp; sindex += curprime;
+            case 1 :  sieve_data[sindex] += logp; sindex += curprime;
+            default: break;
+        }
+        
+        while (niter > 0) {
+            sieve_data[sindex]                                      += logp;
+            sieve_data[sindex+curprime]                             += logp;
+            sieve_data[sindex+(curprime<<1)]                        += logp;
+            sieve_data[sindex+(curprime<<1)+curprime]               += logp;
+            sieve_data[sindex+(curprime<<2)]                        += logp;
+            sieve_data[sindex+(curprime<<2)+curprime]               += logp;
+            sieve_data[sindex+(curprime<<2)+(curprime<<1)]          += logp;
+            sieve_data[sindex+(curprime<<2)+(curprime<<1)+curprime] += logp;
+            sindex += (curprime << 3);
+            niter--;
+        }
+#endif   
+        
     }
 }
 //-----------------------------------------------------------------------------
@@ -1148,57 +1212,219 @@ static void scan_sieve(siqs_context_t* const context) {
     // and:
     //     sieve_begin <= *scan_begin <= sieve_half_width
     //
-    int32_array_t* const xpool      = context->xpool;
-    const byte_array_t* const sieve = context->sieve;
-    const int32_t sieve_begin       = context->sieve_begin;
-    const uint32_t sieve_half_width = context->params->sieve_half_width;
-    int32_t* scan_begin             = &context->scan_begin;
-    const uint32_t threshold        = context->threshold;
-    const uint32_t xpoolalloced     = xpool->alloced;
-    int32_t* const xpooldata        = xpool->data;
-    const unsigned char* const sievedata = sieve->data;
-
-    int32_t  sieve_end = 0;
-    const uint32_t sievelength = sieve->length;
-
-    if (   (sieve_begin + (int32_t)sievelength - 1)
-         < (int32_t)sieve_half_width) {
-        sieve_end = sieve_begin + (int32_t)sievelength - 1;
-    } else {
-        sieve_end = (int32_t)sieve_half_width;
-    }
-
+    
     //
     // _NOTE_: Use local variables to avoid numerous readings/writings
     //         of pointed data...
     //
-    uint32_t tmp_scan_begin = *scan_begin;
-    uint32_t tmp_length     = xpool->length;
+    const byte_array_t*  const sieve      = context->sieve;
+    const unsigned char* const sieve_data = sieve->data;
+    
+    int32_array_t* const xpool      = context->xpool;
+    int32_t*       const xpool_data = xpool->data;
+    int32_t*       const scan_begin = &context->scan_begin;
+    
+    const uint32_t threshold     = context->threshold;
+    const uint32_t xpool_alloced = xpool->alloced;
+    const uint32_t sieve_hwidth  = context->params->sieve_half_width;
+    const uint32_t sieve_length  = sieve->length;
+    const int32_t  sieve_begin   = context->sieve_begin;
+          int32_t  sieve_end     = 0;
+    
+    if (sieve_begin + (int32_t)sieve_length - 1 < (int32_t)sieve_hwidth) {
+        sieve_end = sieve_begin + (int32_t)sieve_length - 1;
+    } else {
+        sieve_end = (int32_t)sieve_hwidth;
+    }
 
-    uint32_t xsieve     = tmp_scan_begin - sieve_begin;
+    uint32_t tmp_length = xpool->length;
+    uint32_t xsieve     = *scan_begin - sieve_begin;
+    int32_t  xindex     = *scan_begin;
 
-    for (int32_t xindex = tmp_scan_begin; xindex <= sieve_end; xindex++) {
+#if NO_MANUAL_UNROLLING
+    while (xindex <= sieve_end) {
         //
         // _REMINDER_: scan_begin is given as a value in the _global_ conceptual
         //             sieve, and _not_ as a _relative_ value in the given chunk
         //             as that was the case with the QS version of the
         //             scan_sieve function.
         //
-        if (sievedata[xsieve] >= threshold) {
+        if (sieve_data[xsieve] >= threshold) {
             //
             // Check passed: store this x in the xpool array...
             //
-            xpooldata[tmp_length] = (int32_t)xindex;
+            xpool_data[tmp_length] = (int32_t)xindex;
             tmp_length++;
-            if (tmp_length == xpoolalloced) {
+            if (tmp_length == xpool_alloced) {
+                xindex++;
                 break;
             }
         }
+        xindex++;
         xsieve++;
-        tmp_scan_begin++;
     }
-    *scan_begin   = tmp_scan_begin;
-    xpool->length = tmp_length;
+#else
+    int count = (sieve_end - *scan_begin + 1);
+    int niter = count >> 3;
+    int ncase = count & 7;
+    
+    switch (ncase) {
+        case 7:
+            if (sieve_data[xsieve] >= threshold) {
+                xpool_data[tmp_length] = (int32_t)xindex;
+                tmp_length++;
+                if (tmp_length == xpool_alloced) {
+                    xindex++;
+                    goto clean_and_return;
+                }
+            }
+            xindex++;
+            xsieve++;
+        case 6:
+            if (sieve_data[xsieve] >= threshold) {
+                xpool_data[tmp_length] = (int32_t)xindex;
+                tmp_length++;
+                if (tmp_length == xpool_alloced) {
+                    xindex++;
+                    goto clean_and_return;
+                }
+            }
+            xindex++;
+            xsieve++;
+        case 5:
+            if (sieve_data[xsieve] >= threshold) {
+                xpool_data[tmp_length] = (int32_t)xindex;
+                tmp_length++;
+                if (tmp_length == xpool_alloced) {
+                    xindex++;
+                    goto clean_and_return;
+                }
+            }
+            xindex++;
+            xsieve++;
+        case 4:
+            if (sieve_data[xsieve] >= threshold) {
+                xpool_data[tmp_length] = (int32_t)xindex;
+                tmp_length++;
+                if (tmp_length == xpool_alloced) {
+                    xindex++;
+                    goto clean_and_return;
+                }
+            }
+            xindex++;
+            xsieve++;
+        case 3:
+            if (sieve_data[xsieve] >= threshold) {
+                xpool_data[tmp_length] = (int32_t)xindex;
+                tmp_length++;
+                if (tmp_length == xpool_alloced) {
+                    xindex++;
+                    goto clean_and_return;
+                }
+            }
+            xindex++;
+            xsieve++;
+        case 2:
+            if (sieve_data[xsieve] >= threshold) {
+                xpool_data[tmp_length] = (int32_t)xindex;
+                tmp_length++;
+                if (tmp_length == xpool_alloced) {
+                    xindex++;
+                    goto clean_and_return;
+                }
+            }
+            xindex++;
+            xsieve++;
+        case 1:
+            if (sieve_data[xsieve] >= threshold) {
+                xpool_data[tmp_length] = (int32_t)xindex;
+                tmp_length++;
+                if (tmp_length == xpool_alloced) {
+                    xindex++;
+                    goto clean_and_return;
+                }
+            }
+            xindex++;
+            xsieve++;
+        default: break;
+    }
+    
+    while (niter > 0) {
+        if (sieve_data[xsieve] >= threshold) {
+            xpool_data[tmp_length] = (int32_t)xindex;
+            tmp_length++;
+            if (tmp_length == xpool_alloced) {
+                xindex++;
+                break;
+            }
+        }
+        if (sieve_data[xsieve + 1] >= threshold) {
+            xpool_data[tmp_length] = (int32_t)xindex + 1;
+            tmp_length++;
+            if (tmp_length == xpool_alloced) {
+                xindex += 2;
+                break;
+            }
+        }
+        if (sieve_data[xsieve + 2] >= threshold) {
+            xpool_data[tmp_length] = (int32_t)xindex + 2;
+            tmp_length++;
+            if (tmp_length == xpool_alloced) {
+                xindex += 3;
+                break;
+            }
+        }
+        if (sieve_data[xsieve + 3] >= threshold) {
+            xpool_data[tmp_length] = (int32_t)xindex + 3;
+            tmp_length++;
+            if (tmp_length == xpool_alloced) {
+                xindex += 4;
+                break;
+            }
+        }
+        if (sieve_data[xsieve + 4] >= threshold) {
+            xpool_data[tmp_length] = (int32_t)xindex + 4;
+            tmp_length++;
+            if (tmp_length == xpool_alloced) {
+                xindex += 5;
+                break;
+            }
+        }
+        if (sieve_data[xsieve + 5] >= threshold) {
+            xpool_data[tmp_length] = (int32_t)xindex + 5;
+            tmp_length++;
+            if (tmp_length == xpool_alloced) {
+                xindex += 6;
+                break;
+            }
+        }
+        if (sieve_data[xsieve + 6] >= threshold) {
+            xpool_data[tmp_length] = (int32_t)xindex + 6;
+            tmp_length++;
+            if (tmp_length == xpool_alloced) {
+                xindex += 7;
+                break;
+            }
+        }
+        if (sieve_data[xsieve + 7] >= threshold) {
+            xpool_data[tmp_length] = (int32_t)xindex + 7;
+            tmp_length++;
+            if (tmp_length == xpool_alloced) {
+                xindex += 8;
+                break;
+            }
+        }
+        xindex += 8;
+        xsieve += 8;
+        niter--;
+    }
+    
+#endif
+
+  clean_and_return:
+
+    *scan_begin   = xindex;
+    xpool->length = tmp_length;    
 }
 //-----------------------------------------------------------------------------
 
@@ -1218,10 +1444,11 @@ static void init_startup_data(siqs_context_t* const context) {
     // Also precomputes the logarithms of the primes in the factor base and
     // stores them in the array log_factor_base.
     //
-    uint32_array_t* const factor_base   = context->factor_base;
-    byte_array_t* const log_factor_base = context->log_factor_base;
-    uint32_array_t* const sqrtm_pi      = context->sqrtm_pi;
-    const mpz_srcptr kn                 = context->kn;
+    uint32_array_t* const factor_base     = context->factor_base;
+    byte_array_t*   const log_factor_base = context->log_factor_base;
+    uint32_array_t* const sqrtm_pi        = context->sqrtm_pi;
+    
+    const mpz_srcptr kn = context->kn;
     //
     // Always put 2 in the factor base...
     //
@@ -1298,11 +1525,12 @@ static void determine_first_a(siqs_context_t* const context) {
     // Also note that the present implementation requires the 'base' array to
     // be sorted.
     //
-    mpz_ptr approxed                 = context->a;
-    uint32_t* const imin             = &(context->imin);
-    uint32_t* const imax             = &(context->imax);
-    const mpz_ptr to_approx          = context->to_approx;
+          mpz_ptr approxed  = context->a;
+    const mpz_ptr to_approx = context->to_approx;
+    
     const uint32_array_t* const base = context->factor_base;
+          uint32_t*       const imin = &(context->imin);
+          uint32_t*       const imax = &(context->imax);
 
     *imin = 0;
     *imax = 0;
@@ -1383,8 +1611,8 @@ static ecode_t determine_next_a(siqs_context_t* const context) {
     //            to choose 'a'.
     //
     mpz_ptr a                        = context->a;
-    uint32_t* const imin             = &(context->imin);
-    uint32_t* const imax             = &(context->imax);
+    uint32_t*             const imin = &(context->imin);
+    uint32_t*             const imax = &(context->imax);
     const uint32_array_t* const base = context->factor_base;
 
     if ((*imax + 2) < base->length) {
@@ -1488,16 +1716,19 @@ static ecode_t init_first_polynomial(siqs_context_t* const context) {
     //
     const uint32_array_t* factor_base = context->factor_base;
     const uint32_array_t* sqrtm_pi    = context->sqrtm_pi;
-    const uint32_t imin               = context->imin;
-    const uint32_t imax               = context->imax;
-    const mpz_ptr a                   = context->a;
-    mpz_ptr b                         = context->b;
-    mpz_ptr c                         = context->c;
-    mpz_array_t* const Bl             = context->Bl;
-    uint32_t** Bainv2                 = context->Bainv2;
-    uint32_array_t* const sol1        = context->sol1;
-    uint32_array_t* const sol2        = context->sol2;
+    
+    const uint32_t imin = context->imin;
+    const uint32_t imax = context->imax;
+    const mpz_ptr a     = context->a;
+    mpz_ptr b           = context->b;
+    mpz_ptr c           = context->c;
+    
+    mpz_array_t*    const Bl   = context->Bl;
+    uint32_array_t* const sol1 = context->sol1;
+    uint32_array_t* const sol2 = context->sol2;
 
+    uint32_t** Bainv2 = context->Bainv2;
+    
     ecode_t ecode = SUCCESS;
 
     mpz_t inv;
@@ -1650,16 +1881,19 @@ static void init_next_polynomial(siqs_context_t* const context) {
     // The current polynomial is indexed by ipol so we are now initializing
     // the polynomial indexed by (ipol + 1)
     //
-    const uint32_t ipol              = context->polynomial_number;
+    const uint32_t ipol = context->polynomial_number;
+    const uint32_t imin = context->imin;
+    const uint32_t imax = context->imax;
+    mpz_ptr b           = context->b;
+    mpz_ptr c           = context->c;
+    
     const uint32_array_t* const base = context->factor_base;
-    const uint32_t imin              = context->imin;
-    const uint32_t imax              = context->imax;
-    mpz_ptr b                        = context->b;
-    mpz_ptr c                        = context->c;
-    const mpz_array_t* const Bl      = context->Bl;
-    uint32_t** const Bainv2          = context->Bainv2;
-    uint32_array_t* const sol1       = context->sol1;
-    uint32_array_t* const sol2       = context->sol2;
+    const mpz_array_t*    const Bl   = context->Bl;
+    
+    uint32_t**      const Bainv2 = context->Bainv2;
+    uint32_array_t* const sol1   = context->sol1;
+    uint32_array_t* const sol2   = context->sol2;
+    
     //
     // Compute the 'b' coefficient of the next polynomial to use
     //
@@ -1753,10 +1987,10 @@ static void compute_reduced_polynomial_values(siqs_context_t* const context) {
 
     mpz_array_t* const cand_u       = context->cand_u;
     mpz_array_t* const cand_redgx   = context->cand_redgx;
-    const int32_array_t* const x    = context->xpool;
-
     mpz_array_t* const cand_a_array = context->cand_a_array;
-
+    
+    const int32_array_t* const x = context->xpool;
+    
     mpz_t rgx;
     mpz_init(rgx);
 

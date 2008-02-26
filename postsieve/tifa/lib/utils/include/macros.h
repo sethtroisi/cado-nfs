@@ -242,6 +242,48 @@ do {                                                         \
 #define BIT(N, i) ( ((N) & (1<<(i))) ? 1 : 0 )
 
    /**
+    * \def DUFF_DEVICE(COUNT, STATEMENTS)
+    *
+    * Implements the so-called "Duff device" with is a fairly well-known
+    * (and so ugly looking!) loop unrolling technique. \c COUNT is the number
+    * of times to perform the operations given by STATEMENTS.
+    *
+    * \warning \c COUNT should be strictly positive. Using \c COUNT equals to
+    * zero will yield wrong results.
+    *
+    * \note This macro was actually inspired (borrowed? stolen?) from the
+    * example given in the article "A Reusable Duff Device" written by Ralf 
+    * Holly.
+    *
+    * \see Tom Duff's comments about this technique at
+    * http://www.lysator.liu.se/c/duffs-device.html (URL last accessed on
+    * Tue Feb 26 2008)
+    *
+    * \see "A Reusable Duff Device", Ralf Holly, <i>Dr. Dobb's Journal</i>,
+    * August 2005. Available online at 
+    * http://pera-software.com/articles/duff-device.pdf (URL last accessed on
+    * Tue Feb 26 2008)
+    *
+    */
+#define DUFF_DEVICE(COUNT, STATEMENTS)              \
+    do {                                            \
+        long int __count__ = (COUNT);               \
+        long int __niter__ = (__count__ + 7) >> 3;  \
+        switch (__count__ & 7) {                    \
+            case 0: do { STATEMENTS;                \
+            case 7:      STATEMENTS;                \
+            case 6:      STATEMENTS;                \
+            case 5:      STATEMENTS;                \
+            case 4:      STATEMENTS;                \
+            case 3:      STATEMENTS;                \
+            case 2:      STATEMENTS;                \
+            case 1:      STATEMENTS;                \
+            __niter__--;                            \
+                    } while (__niter__ > 0);        \
+        }                                           \
+    } while (0)
+
+   /**
     * \def MPZ_IS_SQUARE(X)
     *
     * Syntaxic sugar macro wrapping a call to <tt>mpz_perfect_square_p </tt>.
@@ -350,7 +392,7 @@ do {                                                         \
     } while (0)
 
    /**
-    * \def MPN_SUB(A, B, C)
+    * \def MPN_SUB_N(A, B, C)
     *
     * Syntaxic sugar macro wrapping a call to <tt>mpn_sub_n</tt>. Performs
     * size normalization on the result but does not take care of the possible
@@ -467,7 +509,7 @@ do {                                                         \
     } while (0)
 
    /**
-    * \def MPN_MUL_CS(A, B, C)
+    * \def MPN_MUL_CS_S(A, B, C)
     *
     * Syntaxic sugar macro wrapping a call to <tt>mpn_mul</tt>. Performs
     * size normalization on the result, and Checks the Sizes and the Signs
@@ -499,7 +541,7 @@ do {                                                         \
     * \def DECLARE_MPZ_SWAP_VARS
     *
     * Macro declaring local variables needed by the \c MPZ_SWAP macro.
-    * Should be called \emph once prior to any use of the \c MPZ_SWAP macro.
+    * Should be called \e once prior to any use of the \c MPZ_SWAP macro.
     *
     * \warning
     * Declares the variables \c __TMPPTR__MACROS_H__a9b3c01__ and
@@ -516,7 +558,7 @@ do {                                                         \
     * Macro swapping the values of the two \c mpz_t \c A and <tt>B</tt>.
     *
     * \warning
-    * The macro \c DECLARE_MPZ_SWAP_VARS should be called \emph once before
+    * The macro \c DECLARE_MPZ_SWAP_VARS should be called \e once before
     * using <tt>MPZ_SWAP</tt>.
     */
 #define MPZ_SWAP(A, B)                                              \
