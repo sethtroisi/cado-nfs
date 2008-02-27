@@ -1992,7 +1992,8 @@ main (int argc, char *argv[])
         fprintf (stderr, "# Initializing rat. norms took %1.1fs\n", tnormr);
 
         /* call the siever */
-        sieve_random_access(S, fb_rat, &si);
+        //sieve_random_access(S, fb_rat, &si);
+        sieve_buckets(S, fb_rat, &si);
         ts = seconds () - ts;
         fprintf (stderr, "# Total sieving in %1.1fs\n", ts);
 
