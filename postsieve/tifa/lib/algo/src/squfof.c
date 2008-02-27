@@ -1112,7 +1112,7 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
         SQUFOF_PRINT("2a)     QQ = %lu\n", QQ);
         SQUFOF_PRINT("2a)     PP = %lu\n", PP);
         SQUFOF_PRINT("2a)     t  = %lu\n", t);
-        SQUFOF_PRINT("2a)     q  = %lu\n", q);fflush(stdout);
+        SQUFOF_PRINT("2a)     q  = %lu\n", q);
         //
         // Step 2 b)
         //
