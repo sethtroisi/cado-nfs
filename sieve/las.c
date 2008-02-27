@@ -471,6 +471,7 @@ reduce_plattice(plattice_info_t *pli, const fbprime_t p, const fbprime_t r, cons
         k++;
     }
     /* k is odd here */
+    ASSERT_ALWAYS (b0 != 0);
     while (a0 <= -I)
       {
         a0 += b0;
