@@ -20,12 +20,14 @@
 /**
  * \file    squfof.c
  * \author  Jerome Milan
- * \date    Wed Dec 19 2007
- * \version 1.3.1
+ * \date    Wed Feb 27 2008
+ * \version 1.3.2
  */
 
  /*
   * History:
+  *   1.3.2: Wed Feb 27 2008 by JM
+  *        - Ugly, ugly hack in LARGE_STEP macro to avoid infinite loop.
   *   1.3.1: Wed Dec 19 2007 by JM
   *        - Fixed two mighty bugs in LARGE_STEP macro.
   *   1.3:   Thu Aug 2 2007 by JM
@@ -135,9 +137,7 @@
 #define DECL_DIVIDE_TRICK_VARS      \
     unsigned long int __D__ = 0;    \
     unsigned long int __N__ = 0
-//
-// Then the division macro strictly speaking...
-//
+
 #define DIVIDE_TRICK(Q, N, D)                                   \
     __D__ = (D) << 1;                                           \
     __N__ = (N);                                                \
@@ -191,7 +191,6 @@
             }                                                   \
         }                                                       \
     }
-
 //
 // Finally a switch toggling this cheap trick on and off
 //
@@ -201,10 +200,10 @@
 // disseminating #if's in the code...
 //
 #if USE_DIVISION_TRICK
-    #define DIVIDE(Q, N, D) DIVIDE_TRICK(Q, N, D)
+    #define DIVIDE(Q, N, D)  DIVIDE_TRICK(Q, N, D)
     #define DECL_DIVIDE_VARS DECL_DIVIDE_TRICK_VARS
 #else
-    #define DIVIDE(Q, N, D) Q = ((N) / (D))
+    #define DIVIDE(Q, N, D)  Q = ((N) / (D))
     #define DECL_DIVIDE_VARS /* intentionally left empty */
 #endif
 
@@ -224,14 +223,16 @@
 //         be used to factor very small integers). The downside of this is that
 //         it makes for a rather ugly and messy code. I plead guilty...
 //
+//         Setting PERFORM_FAST_RETURN to zero (see below) will bypass these
+//         macros and use understandable, plain C code.
+//
 
 //
 // Should we perform the "fast return" variant?
 //
-// _NOTE_: The "fast return" variant is once again disabled since we still
-//         run into occasional infinite loops... Will this bug ever be 
-//         squashed? Also note that in pratice, the "fast return" variant
-//         brings very little improvement so this is not _that_ critical...
+// _NOTE_: The "fast return" variant is still disabled by default even if
+//         the mighty infinite loop bug has been "solved" (but for how long)
+//         by an hideous kludge in the LARGE_STEP macro...
 //
 #define PERFORM_FAST_RETURN 0
 
@@ -343,12 +344,22 @@
 // (-QQA, PA, QA) with the one given by (-QQB, PB, QB) (or a nearby form)
 // and stores the resulting form in (-QQ, P, Q).
 // Notations mostly follow Williams & Wunderlich's with S = sqrt(D).
-// All parameters are unsigned long int, except D, which is a mpz_t.
+// All parameters are unsigned long int, except D and N, which are mpz_t.
 //
 // The macros DECL_SINGLE_STEP_VARS() and DECL_LARGE_STEP_VARS() should be
 // called before using this macro.
 //
-#define LARGE_STEP(P, Q, QQ, PA, QA, QQA, PB, QB, QQB, S, D) do {       \
+// _UPDATE_ (Wed Feb 27 2008 by JM):
+//          If N (the number to factor) is not squarefree we risk to enter
+//          a neverending while loop. This was solved with the ugliest hack
+//          you can imagine, transfering the execution to another part of the
+//          code with a goto (yes, I know...).
+//
+// _TO_DO_: The current large step implementation is a mess. We should convert
+//          the code from macros to functions. The trouble is the improvements
+//          are so small that they may be nullified by the calling overheads...
+//
+#define LARGE_STEP(P, Q, QQ, PA, QA, QQA, PB, QB, QQB, S, D, N) do {       \
     VLS(gcd_ui) = gcd_ulint(QA, QB);                                    \
     while (VLS(gcd_ui) != 1) {                                          \
         SINGLE_STEP(PB, QB, QQB, S);                                    \
@@ -365,10 +376,34 @@
      * Q pairs...                                                       \
      */                                                                 \
     while (mpz_invert(VLS(M), VLS(Q0), D) == 0) {                       \
+        mpz_gcd(VLS(M), VLS(Q0), N);                                    \
+        /*                                                              \
+         * _KLUDGE_: This's got to be the _ugliest_ workaround the world\
+         *           has ever witnessed. If the number to factor is not \
+         *           squarefree the current loop will (most of the time)\
+         *           never terminates! The good news is that we can     \
+         *           quickly extract a factor here, but at what price!  \
+         *           The code in the following conditionnal uses        \
+         *           knowledge from the code including the macro...     \
+         *           There's even a goto statement in there... I feel   \
+         *           soooo dirty from writing that thing!               \
+         */                                                             \
+        if (mpz_cmp_ui(VLS(M), 1) != 0) {                               \
+            factor = mpz_get_ui(VLS(M));                                \
+            CLEAR_DOUBLING_ALGO_VARS();                                 \
+            CLEAR_LARGE_STEP_VARS();                                    \
+            CLEAR_SINGLE_STEP_VARS();                                   \
+            STOP_TIMER;                                                 \
+            PRINT_TIMING;                                               \
+            /*                                                          \
+             * _FUN_: Can you help Bob the maintainer to find the       \
+             *        found_factor tag and understand the code flow?    \
+             */                                                         \
+            goto found_factor;                                          \
+        }                                                               \
         SINGLE_STEP(PA, QA, QQA, S);                                    \
         SINGLE_STEP(PB, QB, QQB, S);                                    \
         VLS(gcd_ui) = gcd_ulint(QA, QB);                                \
-                                                                        \
         while (VLS(gcd_ui) != 1) {                                      \
             SINGLE_STEP(PB, QB, QQB, S);                                \
             VLS(gcd_ui) = gcd_ulint(QA, QB);                            \
@@ -486,11 +521,11 @@
 // The macros DECL_SINGLE_STEP_VARS(), DECL_LARGE_STEP_VARS() and
 // DECL_DOUBLING_ALGO_VARS() should be called before using this macro.
 //
-#define DOUBLING_ALGO(P2, Q2, QQ2, P, Q, QQ, S, D) do {                  \
-    VDA(PB)  = (P);                                                      \
-    VDA(QB)  = (Q);                                                      \
-    VDA(QQB) = (QQ);                                                     \
-    LARGE_STEP(P2, Q2, QQ2, P, Q, QQ, VDA(PB), VDA(QB), VDA(QQB), S, D); \
+#define DOUBLING_ALGO(P2, Q2, QQ2, P, Q, QQ, S, D, N) do {                  \
+    VDA(PB)  = (P);                                                         \
+    VDA(QB)  = (Q);                                                         \
+    VDA(QQB) = (QQ);                                                        \
+    LARGE_STEP(P2, Q2, QQ2, P, Q, QQ, VDA(PB), VDA(QB), VDA(QQB), S, D, N); \
 } while (0)
 
 //
@@ -509,41 +544,41 @@
 // The macros DECL_SINGLE_STEP_VARS(), DECL_LARGE_STEP_VARS() and
 // DECL_DOUBLING_ALGO_VARS() should be called before using this macro.
 //
-#define JUMP_OVER_K_STEPS(P, Q, QQ, P0, Q0, QQ0, S, D, K) do {           \
-    if (K <= MIN_NSTEP_LS) {                                             \
-        /*                                                               \
-         * Just perform K single steps sequentially                      \
-         */                                                              \
-        P  = P0;                                                         \
-        Q  = Q0;                                                         \
-        QQ = QQ0;                                                        \
-        for (uint32_t i = 0; i < K; i++) {                               \
-            SINGLE_STEP(P, Q, QQ, S);                                    \
-        }                                                                \
-    } else {                                                             \
-        unsigned long int PMIN  = P0;                                    \
-        unsigned long int QMIN  = Q0;                                    \
-        unsigned long int QQMIN = QQ0;                                   \
-                                                                         \
-        for (uint32_t i = 0; i < MIN_NSTEP_LS; i++) {                    \
-            SINGLE_STEP(PMIN, QMIN, QQMIN, S);                           \
-        }                                                                \
-        uint32_t n = K / MIN_NSTEP_LS;                                   \
-                                                                         \
-        P  = PMIN;                                                       \
-        Q  = QMIN;                                                       \
-        QQ = QQMIN;                                                      \
-                                                                         \
-        uint32_t f = most_significant_bit(n);                            \
-                                                                         \
-        while (f != 0) {                                                 \
-            f--;                                                         \
-            DOUBLING_ALGO(P, Q, QQ, P, Q, QQ, S, D);                     \
-            if (BIT(n, f) == 1) {                                        \
-                LARGE_STEP(P, Q, QQ, P, Q, QQ, PMIN, QMIN, QQMIN, S, D); \
-            }                                                            \
-        }                                                                \
-    }                                                                    \
+#define JUMP_OVER_K_STEPS(P, Q, QQ, P0, Q0, QQ0, S, D, K, N) do {           \
+    if (K <= MIN_NSTEP_LS) {                                                \
+        /*                                                                  \
+         * Just perform K single steps sequentially                         \
+         */                                                                 \
+        P  = P0;                                                            \
+        Q  = Q0;                                                            \
+        QQ = QQ0;                                                           \
+        for (uint32_t i = 0; i < K; i++) {                                  \
+            SINGLE_STEP(P, Q, QQ, S);                                       \
+        }                                                                   \
+    } else {                                                                \
+        unsigned long int PMIN  = P0;                                       \
+        unsigned long int QMIN  = Q0;                                       \
+        unsigned long int QQMIN = QQ0;                                      \
+                                                                            \
+        for (uint32_t i = 0; i < MIN_NSTEP_LS; i++) {                       \
+            SINGLE_STEP(PMIN, QMIN, QQMIN, S);                              \
+        }                                                                   \
+        uint32_t n = K / MIN_NSTEP_LS;                                      \
+                                                                            \
+        P  = PMIN;                                                          \
+        Q  = QMIN;                                                          \
+        QQ = QQMIN;                                                         \
+                                                                            \
+        uint32_t f = most_significant_bit(n);                               \
+                                                                            \
+        while (f != 0) {                                                    \
+            f--;                                                            \
+            DOUBLING_ALGO(P, Q, QQ, P, Q, QQ, S, D, N);                     \
+            if (BIT(n, f) == 1) {                                           \
+                LARGE_STEP(P, Q, QQ, P, Q, QQ, PMIN, QMIN, QQMIN, S, D, N); \
+            }                                                               \
+        }                                                                   \
+    }                                                                       \
 } while (0)
 
 //
@@ -555,12 +590,12 @@
 // The macros DECL_SINGLE_STEP_VARS(), DECL_LARGE_STEP_VARS() and
 // DECL_DOUBLING_ALGO_VARS() should be called before using this macro.
 //
-#define JUMP_NEAR_SYM_POINT(P, Q, QQ, P0, Q0, QQ0, S, D, K) do { \
-    unsigned long int PH  = 0;                                   \
-    unsigned long int QH  = 0;                                   \
-    unsigned long int QQH = 0;                                   \
-    JUMP_OVER_K_STEPS(PH, QH, QQH, P0, Q0, QQ0, S, D, K);        \
-    LARGE_STEP(P, Q, QQ, P, Q, QQ, PH, QH, QQH, S, D);           \
+#define JUMP_NEAR_SYM_POINT(P, Q, QQ, P0, Q0, QQ0, S, D, K, N) do { \
+    unsigned long int PH  = 0;                                      \
+    unsigned long int QH  = 0;                                      \
+    unsigned long int QQH = 0;                                      \
+    JUMP_OVER_K_STEPS(PH, QH, QQH, P0, Q0, QQ0, S, D, K, N);        \
+    LARGE_STEP(P, Q, QQ, P, Q, QQ, PH, QH, QQH, S, D, N);           \
 } while (0)
 //-----------------------------------------------------------------------------
 
@@ -1061,6 +1096,7 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
         // Compute q  = (S + P)/Q;
         //
         DIVIDE(q, S + P, Q);
+        
         //
         // Compute PP = q*Q - P;
         //
@@ -1076,7 +1112,7 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
         SQUFOF_PRINT("2a)     QQ = %lu\n", QQ);
         SQUFOF_PRINT("2a)     PP = %lu\n", PP);
         SQUFOF_PRINT("2a)     t  = %lu\n", t);
-        SQUFOF_PRINT("2a)     q  = %lu\n", q);
+        SQUFOF_PRINT("2a)     q  = %lu\n", q);fflush(stdout);
         //
         // Step 2 b)
         //
@@ -1258,7 +1294,7 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
         DECL_LARGE_STEP_VARS();
         DECL_SINGLE_STEP_VARS();
 
-        JUMP_NEAR_SYM_POINT(P, Q, QQ, P0, Q0, QQ0, S, D, i / 2);
+        JUMP_NEAR_SYM_POINT(P, Q, QQ, P0, Q0, QQ0, S, D, i / 2, context->n);
 
         CLEAR_DOUBLING_ALGO_VARS();
         CLEAR_LARGE_STEP_VARS();
@@ -1334,6 +1370,8 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
     }
     STOP_TIMER;
     PRINT_TIMING;
+
+  found_factor:
 
     //
     // Step 5: We found a factor of n
@@ -1465,7 +1503,7 @@ static ecode_t perform_squfof_race(factoring_machine_t* const machine) {
     RESET_TIMER;
     START_TIMER;
 
-    unsigned long int factor_ui = 0;
+    unsigned long int factor = 0;
     //
     // Use local variables to bypass readings of a non constant pointer. It is
     // not clear to me if this makes for a measurable difference though...
@@ -1489,7 +1527,7 @@ static ecode_t perform_squfof_race(factoring_machine_t* const machine) {
             PP *= Q;
             PP -= P;
             if (P == PP) {
-                factor_ui = Q;
+                factor = Q;
                 break;
             }
             t   = P;
@@ -1513,7 +1551,8 @@ static ecode_t perform_squfof_race(factoring_machine_t* const machine) {
         DECL_LARGE_STEP_VARS();
         DECL_SINGLE_STEP_VARS();
 
-        JUMP_NEAR_SYM_POINT(P, Q, QQ, P0, Q0, QQ0, S, winner->D, winner->i / 2);
+        JUMP_NEAR_SYM_POINT(P, Q, QQ, P0, Q0, QQ0, S, winner->D, winner->i / 2,
+        context->n);
 
         CLEAR_DOUBLING_ALGO_VARS();
         CLEAR_LARGE_STEP_VARS();
@@ -1536,7 +1575,7 @@ static ecode_t perform_squfof_race(factoring_machine_t* const machine) {
             PP *= Q;
             PP -= P;
             if (P == PP) {
-                factor_ui = Q;
+                factor = Q;
                 break;
             }
             //
@@ -1547,7 +1586,7 @@ static ecode_t perform_squfof_race(factoring_machine_t* const machine) {
             PPR *= QR;
             PPR -= PR;
             if (PR == PPR) {
-                factor_ui = QR;
+                factor = QR;
                 break;
             }
             //
@@ -1574,14 +1613,17 @@ static ecode_t perform_squfof_race(factoring_machine_t* const machine) {
     }
     STOP_TIMER;
     PRINT_TIMING;
+    
+  found_factor:
+    
     //
     // Step 5: We found a factor of n
     //
-    factor_ui /= gcd_ulint(factor_ui, 2 * winner->multiplier);
+    factor /= gcd_ulint(factor, 2 * winner->multiplier);
 
     mpz_t factor_z;
 
-    mpz_init_set_ui(factor_z, factor_ui);
+    mpz_init_set_ui(factor_z, factor);
     append_mpz_to_array(machine->factors, factor_z);
 
     mpz_divexact(factor_z, context->n, factor_z);
@@ -1612,6 +1654,7 @@ static ecode_t cycle_forward(squfof_racer_t* const racer) {
     DECL_DIVIDE_VARS;
     while (true) {
         racer->istep++;
+        
         //
         // Step 2 a)
         //
@@ -1631,6 +1674,7 @@ static ecode_t cycle_forward(squfof_racer_t* const racer) {
         racer->g = racer->Q / gcd_ulint(racer->Q, 2 * racer->multiplier);
 
         if (racer->g <= racer->L) {
+            
             if (racer->queue.length == MAX_QUEUE_ALLOC) {
                 racer->status = STOPPED;
                 return QUEUE_OVERFLOW;
@@ -1665,7 +1709,6 @@ static ecode_t cycle_forward(squfof_racer_t* const racer) {
                 racer->current_pair = (ulint_pair_t*)(racer->current->data);
 
                 if (racer->current_pair->x == racer->r) {
-
                     if (racer->r == 1) {
                         racer->status = STOPPED;
                         return NO_PROPER_FORM_FOUND;
