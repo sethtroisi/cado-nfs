@@ -26,7 +26,7 @@
 
 /* define TRACE_K to -I/2+i+I*j to trace the sieve array entry corresponding
    to (i,j), i.e., a = a0*i+a1*j, b = b0*i+b1*j */
-/* #define TRACE_K 706429 */
+/* #define TRACE_K 11071731 */
 
 #define MAX_BUF_SIZE 512 /* maximal length of the factorization on each side */
 
@@ -77,34 +77,6 @@ typedef struct {
                                 relations */
 } sieve_info_t;
 
-/*
- * Some bucket stuff, for later...
- */
-
-/*
- * For the moment, we will keep the bucket reports aligned by adding an
- * 8-bit field that can contain, for instance, the low bits of p.
- *
- * TODO:
- * If the memory pressure becomes too high with this, we can remove this
- * p_low field and pack the reports as follows:
- *    [ x0 ] [ x1 ] [ x2 ] [ x3 ] [logp0] [logp1] [logp2] [logp3] 
- * in the bucket. 
- * 
- * This will be slightly more tricky to store/load bucket reports, but
- * the additional cost should be negligible.
- */
-
-typedef struct {
-    uint16_t x;
-    char logp;
-    uint8_t p_low;  // to keep alignment and help trial div.
-} bucket_report_t;
-
-typedef struct {
-    bucket_report_t * reports;
-    int nbr;
-} bucket_t;
 
 /************************** sieve info stuff *********************************/
 
@@ -185,16 +157,6 @@ sieve_info_clear (sieve_info_t *si)
 }
 
 /*****************************************************************************/
-
-void
-push_bucket_report(bucket_t * B, char logp, uint8_t p_low, uint32_t x)
-{
-    int nbr = B->nbr;
-    B->reports[nbr].logp = logp;
-    B->reports[nbr].p_low = p_low;
-    B->reports[nbr].x = x;
-    B->nbr++;
-}
 
 // Compute the root r describing the lattice inside the q-lattice
 // corresponding to the factor base prime (p,R).
