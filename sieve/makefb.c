@@ -107,10 +107,10 @@ mp_poly_eval_diff (mpz_t r, mpz_t *poly, int deg, long a)
     }
 }
 
-// return 0 if failed (multiple root).
+// return negative if failed (multiple root).
 //   r <- r - f(r)/f'(r) mod p^k
 // Assuming that r was a root mod p^(k-1) this gives a root mod p^k.
-unsigned long
+long
 lift_root(const cado_poly cpoly, const unsigned long pk, const unsigned long r) {
   unsigned long res;
   mpz_t aux, aux2, mp_p;
@@ -121,7 +121,7 @@ lift_root(const cado_poly cpoly, const unsigned long pk, const unsigned long r) 
   mp_poly_eval_diff(aux, cpoly->f, cpoly->degree, r);
   mpz_mod_ui(aux, aux, pk);
   if (!mpz_invert(aux, aux, mp_p)) {
-    return 0;
+    return -1;
   }
   mp_poly_eval(aux2, cpoly->f, cpoly->degree, r);
   mpz_mod(aux2, aux2, mp_p);
@@ -143,7 +143,7 @@ makefb_with_powers(FILE *fp, cado_poly cpoly)
 {
   unsigned long p;
   int d = cpoly->degree;
-  LONG *roots, r;
+  long *roots, r;
   int nroots, i, j;
   unsigned long power_lim;
 
@@ -214,8 +214,9 @@ makefb_with_powers(FILE *fp, cado_poly cpoly)
 	  id.pk = pk;
 	  id.nroots = 0;
 	  for (i = 0; i < nroots; ++i) {
-	    roots[i] = lift_root(cpoly, pk, roots[i]);
-	    if (roots[i] != 0) {
+	    if (roots[i] >= 0)
+	      roots[i] = lift_root(cpoly, pk, roots[i]);
+	    if (roots[i] >= 0) {
 	      id.r[id.nroots] = roots[i];
 	      id.nroots++;
 	    }
