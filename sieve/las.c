@@ -1752,7 +1752,7 @@ main (int argc, char *argv[])
     sieve_info_t si;
     char *fbfilename = NULL, *polyfilename = NULL;
     cado_poly cpoly;
-    double t0 = seconds (), tnorma, tnormr, tfb, ts, tf, tq;
+    double t0, tnorma, tnormr, tfb, ts, tf, tq;
     uint64_t q0 = 0, q1 = 0, rho = 0;
     unsigned long *roots, nroots, reports, tot_reports = 0, i;
     unsigned char * S;
@@ -1849,6 +1849,7 @@ main (int argc, char *argv[])
     fprintf (stderr, "# Creating rational factor base took %1.1fs\n", tfb);
 
     /* special q (and root rho) */
+    t0 = seconds ();
     roots = (unsigned long*) malloc (cpoly->degree * sizeof (unsigned long));
     q0 --; /* so that nextprime gives q0 if q0 is prime */
     nroots = 0;
