@@ -228,7 +228,12 @@
 //
 // Should we perform the "fast return" variant?
 //
-#define PERFORM_FAST_RETURN 1
+// _NOTE_: The "fast return" variant is once again disabled since we still
+//         run into occasional infinite loops... Will this bug ever be 
+//         squashed? Also note that in pratice, the "fast return" variant
+//         brings very little improvement so this is not _that_ critical...
+//
+#define PERFORM_FAST_RETURN 0
 
 //
 // Only use the large step algorithm if the number of forms to compute (from
