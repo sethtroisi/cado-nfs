@@ -6,6 +6,7 @@
 #include <unistd.h>   // for getpagesize
 #include <stdint.h>
 
+//#define SAFE_BUCKETS
 
 /*
  * This bucket module provides a way to store elements (that are called
@@ -217,7 +218,7 @@ push_bucket_update(bucket_array_t BA, int i, bucket_update_t update)
 {
     *(BA.bucket_write[i])++ = update;
 #ifdef SAFE_BUCKETS
-    if (BA.bucket_start[i] + BA.bucket_size >= BA.bucket_write[i]) {
+    if (BA.bucket_start[i] + BA.bucket_size <= BA.bucket_write[i]) {
         fprintf(stderr, "# Warning: hit end of bucket nb %d\n", i);
         BA.bucket_write[i]--;
     }
@@ -235,7 +236,7 @@ get_next_bucket_update(bucket_array_t BA, int i)
 {
     bucket_update_t rep = *(BA.bucket_read[i])++;
 #ifdef SAFE_BUCKETS
-    if (BA.bucket_read[i] >= BA.bucket_write[i]) {
+    if (BA.bucket_read[i] > BA.bucket_write[i]) {
         fprintf(stderr, "# Warning: reading too many updates in bucket nb %d\n", i);
         BA.bucket_read[i]--;
         return LAST_UPDATE;

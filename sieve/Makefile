@@ -44,7 +44,7 @@ Makefile.local:
 fb.o : fb.c fb.h config.h basicnt.h sieve_aux.h Makefile.local
 	gcc -c -I. -I.. $(CFLAGS) fb.c
 
-sieve.o : sieve.c config.h basicnt.h sieve_aux.h ../cado.h Makefile.local
+sieve.o : sieve.c bucket.h config.h basicnt.h sieve_aux.h ../cado.h Makefile.local
 	gcc -c -I. -I.. $(CFLAGS) sieve.c
 
 makefb.o : makefb.c Makefile.local

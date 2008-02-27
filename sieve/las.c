@@ -9,6 +9,7 @@
 #include "../utils/utils.h"
 #include "basicnt.h" /* for gcd_ul */
 #include <tifa.h>
+#include "bucket.h"
 
 #define LOG_SCALE 1.4426950408889634 /* 1/log(2) to 17 digits, rounded to
                                         nearest. This is enough to uniquely
@@ -63,7 +64,9 @@ typedef struct {
     uint64_t rho;
     int32_t a0, b0, a1, b1;
     // parameters for bucket sieving
-    int bucket_size;    // should be around L1 cache size, and a multiple of I.
+    int bucket_region;    // should be around L1 cache size, a power of 2
+                        // and a multiple of I.
+    int log_bucket_region;    
     int nb_buckets;
     int bucket_limit;   // maximal number of bucket_reports allowed in one bucket.
     unsigned int degree;   /* polynomial degree */
@@ -125,6 +128,17 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int I, uint64_t q0)
   si->scale_rat = (LOG_MAX - GUARD) / si->scale_rat;
   si->rat_bound = (unsigned char) (r * (si->scale_rat / LOG_SCALE)) + GUARD;
   fprintf (stderr, " bound=%u\n", si->rat_bound);
+
+  // bucket info
+  // TODO: be more clever, here.
+  si->log_bucket_region = 15;
+  si->bucket_region = 1<<si->log_bucket_region;
+  si->nb_buckets = 1 + ((si->I*si->J) / si->bucket_region);
+  si->bucket_limit = 5*si->bucket_region; // This factor of 5 is huge!!!
+  fprintf(stderr, "# log_bucket_region = %u\n", si->log_bucket_region);
+  fprintf(stderr, "# bucket_region = %u\n", si->bucket_region);
+  fprintf(stderr, "# nb_buckets = %u\n", si->nb_buckets);
+  fprintf(stderr, "# bucket_limit = %u\n", si->bucket_limit);
 }
 
 static void
@@ -551,6 +565,7 @@ xmm_cmovge(v4si *r, v4si x, v4si y, v4si a, v4si b) {
 }
 #endif
 
+
 // This version of the sieve implements the following:
 //   - naive line-sieving for small p
 //   - Franke-Kleinjung lattice-sieving for large p
@@ -716,6 +731,116 @@ sieve_random_access (unsigned char *S, factorbase_degn_t *fb,
         fb = fb_next (fb); // cannot do fb++, due to variable size !
     }
     fprintf (stderr, "# large primes sieved in %f sec\n", seconds()-tm);
+}
+
+
+// This version of the sieve implements the following:
+//   - naive line-sieving for small p
+//   - Franke-Kleinjung lattice-sieving for large p
+//   - write reports to buckets and then apply them to the sieve-array
+// WARNING: STILL AT WORK!
+static void
+sieve_buckets (unsigned char *S, factorbase_degn_t *fb,
+        const sieve_info_t *si)
+{
+    // Sieve primes <= I.
+    line_sieve(S, &fb, si);
+
+    double tm = seconds();
+    // Init buckets
+    bucket_array_t BA;
+    BA = init_bucket_array(si->nb_buckets, si->bucket_limit);
+
+    // Loop over all primes in the factor base > I
+    while (fb->p != FB_END) {
+        unsigned char nr;
+        fbprime_t p = fb->p;
+        unsigned char logp = fb->plog;
+
+        for (nr = 0; nr < fb->nr_roots; ++nr) {
+            fbprime_t r, R;
+            R = fb->roots[nr];
+            r = fb_root_in_qlattice(p, R, si);
+            // Special cases should be quite rare for primes > I,
+            // so we handle them naively.
+            if (r == 0) {
+                special_case_0 (S, p, logp, si);
+                continue;
+            } 
+            if (r == p) {
+                special_case_p (S, p, logp, si);
+                continue;
+            } 
+            
+            const uint32_t I = si->I;
+            const uint32_t maskI = I-1;
+            const uint32_t maskbucket = si->bucket_region - 1;
+            const int shiftbucket = si->log_bucket_region;
+ 
+            plattice_info_t pli;
+            reduce_plattice(&pli, p, r, si);
+
+            // Start sieving from (0,0) which is I/2 in x-coordinate
+            uint32_t x;
+            x = (I>>1);
+            // Skip (0,0), since this can not be a valid report.
+            {
+                uint32_t i;
+                i = x & maskI;
+                if (i >= pli.b1)
+                    x += pli.a;
+                if (i < pli.b0)
+                    x += pli.c;
+            }
+            // TODO: to gain speed, by aligning the start of the
+            // loop, in assembly.
+            // Besides this small trick, gcc does a good job with
+            // this loop: no branching for the if(), and a dozen of
+            // instructions inside the while().
+            asm("## Inner sieving routine starts here!!!\n");
+            while (x < I*si->J) {
+                uint32_t i;
+                bucket_update_t update;
+                i = x & maskI;   // x mod I
+                // S[x] -= logp;
+                update.x = (uint16_t) (x & maskbucket);
+                update.logp = logp;
+                push_bucket_update(BA, x >> shiftbucket, update);
+#ifdef TRACE_K
+                if (x == TRACE_K)
+                  fprintf (stderr, "Pushed (%u, %u) (%u) to BA[%u]\n",
+                           x & maskbucket, logp, p, x >> shiftbucket);
+#endif
+                if (i >= pli.b1)
+                    x += pli.a;
+                if (i < pli.b0)
+                    x += pli.c;
+            }
+            asm("## Inner sieving routine stops here!!!\n");
+        }
+        fb = fb_next (fb); // cannot do fb++, due to variable size !
+    }
+    fprintf (stderr, "# large primes pushed to buckets in %f sec\n", seconds()-tm);
+
+    // Apply buckets to sieve array
+    tm = seconds();
+    int i;
+    unsigned char * S_ptr = S;
+    for (i = 0; i < si->nb_buckets; ++i) {
+        int j = nb_of_updates(BA, i);
+        for ( ; j > 0 ; --j) {
+            bucket_update_t update = get_next_bucket_update(BA, i);
+            S_ptr[update.x] -= update.logp;
+#ifdef TRACE_K
+            if ((update.x + i*si->bucket_region) == TRACE_K)
+                fprintf (stderr, "Subtract %u to S[%u], from BA[%u]\n",
+                        update.logp, TRACE_K, i);
+#endif
+        }
+        S_ptr += si->bucket_region;
+    }
+    clear_bucket_array(BA);
+    fprintf (stderr, "# buckets applied to sieve array in %f sec\n", seconds()-tm);
 }
 
 // Conversions between different representations for sieve locations:
@@ -1856,7 +1981,8 @@ main (int argc, char *argv[])
         /* sieving on the algebraic side */
         ts = seconds ();
         //sieve_slow(S, fb_alg, &si);
-        sieve_random_access(S, fb_alg, &si);
+        // sieve_random_access(S, fb_alg, &si);
+        sieve_buckets(S, fb_alg, &si);
         fprintf (stderr, "# Alg. sieving in %1.1fs\n", seconds () - ts);
 
         /* Sieving on the rational side */
