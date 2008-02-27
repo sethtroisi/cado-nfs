@@ -1533,14 +1533,6 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
               /* since we divided out large primes, norm should be 1 here */
               ASSERT(mpz_cmp_ui (normr, 1) == 0);
 
-              if (si->checknorms)
-                {
-                  reset_mpz_array (f_r);
-                  reset_mpz_array (f_a);
-                  m_r->length = 0;
-                  m_a->length = 0;
-                }
-
               if (si->checknorms == 0 ||
                   (factor_leftover_norm (T[0][l], cpoly->lpbr, f_r, m_r) &&
                    factor_leftover_norm (norma, cpoly->lpba, f_a, m_a)))
@@ -1557,6 +1549,10 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
                       for (i = 0; i < f_a->length; i++)
                         for (j = 0; j < m_a->data[i]; j++)
                           gmp_sprintf_cat (bufa, f_a->data[i]);
+                      reset_mpz_array (f_r);
+                      reset_mpz_array (f_a);
+                      m_r->length = 0;
+                      m_a->length = 0;
                     }
                   printf ("%ld,%lu:%s:%s\n", a, b, bufr, bufa);
                   fflush (stdout);
