@@ -11,6 +11,9 @@
 #include <tifa.h>
 #include "bucket.h"
 
+/* comment to use classical sieving */
+#define USE_BUCKETS
+
 #define LOG_SCALE 1.4426950408889634 /* 1/log(2) to 17 digits, rounded to
                                         nearest. This is enough to uniquely
                                         identify the corresponding IEEE 754
@@ -138,6 +141,7 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int I, uint64_t q0)
   si->rat_bound = (unsigned char) (r * (si->scale_rat / LOG_SCALE)) + GUARD;
   fprintf (stderr, " bound=%u\n", si->rat_bound);
 
+#ifdef USE_BUCKETS
   // bucket info
   // TODO: be more clever, here.
   si->log_bucket_region = 15;
@@ -148,6 +152,7 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int I, uint64_t q0)
   fprintf(stderr, "# bucket_region = %u\n", si->bucket_region);
   fprintf(stderr, "# nb_buckets = %u\n", si->nb_buckets);
   fprintf(stderr, "# bucket_limit = %u\n", si->bucket_limit);
+#endif
 }
 
 static void
@@ -582,7 +587,7 @@ xmm_cmovge(v4si *r, v4si x, v4si y, v4si a, v4si b) {
 }
 #endif
 
-
+#ifndef USE_BUCKETS
 // This version of the sieve implements the following:
 //   - naive line-sieving for small p
 //   - Franke-Kleinjung lattice-sieving for large p
@@ -749,8 +754,9 @@ sieve_random_access (unsigned char *S, factorbase_degn_t *fb,
     }
     fprintf (stderr, "# large primes sieved in %f sec\n", seconds()-tm);
 }
+#endif
 
-
+#ifdef USE_BUCKETS
 // This version of the sieve implements the following:
 //   - naive line-sieving for small p
 //   - Franke-Kleinjung lattice-sieving for large p
@@ -862,6 +868,7 @@ sieve_buckets (unsigned char *S, factorbase_degn_t *fb,
     clear_bucket_array(BA);
     fprintf (stderr, "# buckets applied to sieve array in %f sec\n", seconds()-tm);
 }
+#endif
 
 // Conversions between different representations for sieve locations:
 //   x          is the index in the sieving array. x in [0,I*J[
@@ -2030,8 +2037,11 @@ main (int argc, char *argv[])
         /* sieving on the algebraic side */
         ts = seconds ();
         //sieve_slow(S, fb_alg, &si);
-        // sieve_random_access(S, fb_alg, &si);
+#ifndef USE_BUCKETS
+        sieve_random_access(S, fb_alg, &si);
+#else
         sieve_buckets(S, fb_alg, &si);
+#endif
         fprintf (stderr, "# Alg. sieving in %1.1fs\n", seconds () - ts);
 
         /* Sieving on the rational side */
@@ -2041,8 +2051,11 @@ main (int argc, char *argv[])
         fprintf (stderr, "# Initializing rat. norms took %1.1fs\n", tnormr);
 
         /* call the siever */
-        //sieve_random_access(S, fb_rat, &si);
+#ifndef USE_BUCKETS
+        sieve_random_access(S, fb_rat, &si);
+#else
         sieve_buckets(S, fb_rat, &si);
+#endif
         ts = seconds () - ts;
         fprintf (stderr, "# Total sieving in %1.1fs\n", ts);
 
