@@ -1297,6 +1297,8 @@ factor_leftover_norm (mpz_t n, unsigned int b,
         }
     } 
 
+  reset_mpz_array (factors);
+  multis->length = 0;
   ecode = tifa_factor (factors, multis, n, FIND_COMPLETE_FACTORIZATION);
 
   switch (ecode)
@@ -1691,10 +1693,6 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
                       for (i = 0; i < f_a->length; i++)
                         for (j = 0; j < m_a->data[i]; j++)
                           gmp_sprintf_cat (bufa, f_a->data[i]);
-                      reset_mpz_array (f_r);
-                      reset_mpz_array (f_a);
-                      m_r->length = 0;
-                      m_a->length = 0;
                     }
                   printf ("%ld,%lu:%s:%s\n", a, b, bufr, bufa);
                   fflush (stdout);
