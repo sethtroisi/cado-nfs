@@ -157,7 +157,7 @@ compute_badprimes (sieve_info_t *si, cado_poly cpoly, factorbase_degn_t *fb)
   unsigned long l; /* number of bad primes */
 
   l = 0;
-  si->abadprimes = malloc (sizeof (uint32_t));
+  si->abadprimes = (uint32_t*) malloc (sizeof (uint32_t));
   fprintf (stderr, "# Bad primes:");
   for (p = 2; p <= cpoly->alim; p = getprime (p))
     {
@@ -417,86 +417,63 @@ typedef struct {
 //    replace a and c by a large value within 32 bits, when they are
 //    larger than 32 bits.
 //
-void
-reduce_plattice(plattice_info_t *pli, const fbprime_t p, const fbprime_t r, const sieve_info_t * si)
+// Return value:
+// * non-zero if everything worked ok
+// * zero when the algorithm failed. This can happen when p is a prime power,
+//   and g, gcd(p,r) >= I, since then the subtractive Euclidean algorithm will
+//   yield (a0=g, b0=0) at some point --- or the converse --- and the loop
+//   while (|a0| >= I) a0 += b0 will loop forever.
+//
+static int
+reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r,
+                 const sieve_info_t * si)
 {
     int64_t a0, a1, b0, b1, I, J;
-    int k = 1;
     I = si->I;
     J = si->J;
     a0 = -((int64_t)p); a1 = 0;
     b0 = r;  b1 = 1;
-#if 0
+
     /* subtractive variant of Euclid's algorithm */
     while ( b0 >= I )
-      {
-        /* a0 < 0, b0 > 0 with |a0| > |b0|: this loop is executed at least
-           once */
-        do
-          {
-            a0 += b0;
-            a1 += b1;
-          }
-        while (a0 + b0 <= 0);
-        /* b0 > 0, a0 < 0 with |b0| > |a0|: since b0 >= I here, this loop is
-           also executed at least once */
-        do
-          {
-            b0 += a0;
-            b1 += a1;
-          }
-        while (b0 + a0 >= 0 && b0 >= I);
-    }
-    while (a0 <= -I)
-      {
-        a0 += b0;
-        a1 += b1;
-      }
-    pli->alpha = a0;
-    pli->beta = a1;
-    pli->gamma = b0;
-    pli->delta = b1;
-#else 
-    /* another subtractive variant of Euclid's algorithm */
-    /* Seems to be faster... */
-    while ( b0 >= I )
     {
-      /* a0 < 0, b0 > 0 with |a0| > |b0| */
+      /* a0 < 0 < b0 < -a0 */
         do {
             a0 += b0;
             a1 += b1;
         } while (a0 + b0 <= 0);
-        k++;
+        /* -b0 < a0 <= 0 < b0 */
         if (-a0 < I)
           {
-            /* b0 > 0, a0 < 0, with |b0| > |a0| */
+            if (a0 == 0)
+              return 0;
             while (b0 >= I)
               {
                 b0 += a0;
                 b1 += a1;
               }
-            goto case_k_even;
+            goto case_even;
           }
-        /* b0 > 0, a0 < 0 with |b0| > |a0| */
+        /* -b0 < a0 < 0 < b0 */
         do {
             b0 += a0;
             b1 += a1;
         } while (b0 + a0 >= 0);
-        k++;
+        /* a0 < 0 <= b0 < -a0 */
     }
-    /* k is odd here */
-    ASSERT_ALWAYS (b0 != 0);
+    if (b0 == 0)
+      return 0;
     while (a0 <= -I)
       {
         a0 += b0;
         a1 += b1;
       }
- case_k_even:
+ case_even:
     pli->alpha = (int32_t) a0;
     pli->beta = (int32_t) a1;
     pli->gamma = (int32_t) b0;
     pli->delta = (int32_t) b1;
-#endif
+
     assert (pli->beta > 0);
     assert (pli->delta > 0);
     assert ((pli->alpha <= 0) && (pli->alpha > -I));
@@ -517,6 +494,8 @@ reduce_plattice(plattice_info_t *pli, const fbprime_t p, const fbprime_t r, cons
         pli->c = (uint32_t)cc;
     pli->b0 = -pli->alpha;
     pli->b1 = I - pli->gamma;
+
+    return 1; /* algorithm was ok */
 }
 
 static void line_sieve(unsigned char *S, factorbase_degn_t **fb_ptr, 
@@ -816,8 +795,10 @@ sieve_buckets (unsigned char *S, factorbase_degn_t *fb,
             const int shiftbucket = si->log_bucket_region;
  
             plattice_info_t pli;
-            reduce_plattice(&pli, p, r, si);
-
+            if (reduce_plattice(&pli, p, r, si) == 0)
+              continue; /* Simply don't consider that (p,r) for now.
+                           FIXME: can we find the locations to sieve? */
+              
             // Start sieving from (0,0) which is I/2 in x-coordinate
             uint32_t x;
             x = (I>>1);
@@ -2076,7 +2057,7 @@ main (int argc, char *argv[])
                  tf);
         if (tot_reports != 0)
           fprintf (stderr, "# Reports for this (q,rho): %lu, total %lu,"
-                   " rate %1.2fs/r\n", reports, tot_reports,
+                   " rate %1.2fs/r\n#\n", reports, tot_reports,
                    (seconds () - t0) / (double) tot_reports);
 
 }
