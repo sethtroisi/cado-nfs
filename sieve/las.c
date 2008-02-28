@@ -14,6 +14,9 @@
 /* comment to use classical sieving */
 #define USE_BUCKETS
 
+/* default sieve region side is 2^DEFAULT_I */
+#define DEFAULT_I 12
+
 #define LOG_SCALE 1.4426950408889634 /* 1/log(2) to 17 digits, rounded to
                                         nearest. This is enough to uniquely
                                         identify the corresponding IEEE 754
@@ -1877,8 +1880,15 @@ init_norms_rat (unsigned char *S, cado_poly cpoly, sieve_info_t *si)
 static void
 usage (char *argv0)
 {
-  fprintf (stderr, "Usage: %s [-checknorms] -poly xxx.poly -fb xxx.roots -q0 q0 [-q1 q1] [-rho rho]\n",
+  fprintf (stderr, "Usage: %s [-checknorms] [-I I] -poly xxx.poly -fb xxx.roots -q0 q0 [-q1 q1] [-rho rho]\n",
            argv0);
+  fprintf (stderr, "          -checknorms     factor leftover norms\n");
+  fprintf (stderr, "          -I i            sieving region has side 2^i [default %u]\n", DEFAULT_I);
+  fprintf (stderr, "          -poly xxx.poly  use polynomial xxx.poly\n");
+  fprintf (stderr, "          -fb xxx.roots   use factor base xxx.roots\n");
+  fprintf (stderr, "          -q0 nnn         left bound of special-q range\n");
+  fprintf (stderr, "          -q1 nnn         right bound of special-q range\n");
+  fprintf (stderr, "          -rho r          sieve only algebraic root r mod q0\n");
   exit (1);
 }
 
@@ -1895,6 +1905,7 @@ main (int argc, char *argv[])
     unsigned char * S;
     factorbase_degn_t * fb_alg, * fb_rat;
     int checknorms = 0; /* factor or not the remaining norms */
+    int I = DEFAULT_I;
 
     fprintf (stderr, "# %s.r%s", argv[0], REV);
     for (i = 1; i < (unsigned int) argc; i++)
@@ -1908,6 +1919,12 @@ main (int argc, char *argv[])
             checknorms = 1;
             argc -= 1;
             argv += 1;
+          }
+        else if (argc > 2 && strcmp (argv[1], "-I") == 0)
+          {
+            I = atoi (argv[2]);
+            argc -= 2;
+            argv += 2;
           }
         else if (argc > 2 && strcmp (argv[1], "-fb") == 0)
           {
@@ -1964,7 +1981,7 @@ main (int argc, char *argv[])
       }
 
     /* this does not depend on the special-q */
-    sieve_info_init (&si, cpoly, 13, q0);
+    sieve_info_init (&si, cpoly, I, q0);
     si.checknorms = checknorms;
 
     // One more is for the garbage during SSE
