@@ -902,7 +902,7 @@ trialdiv_with_norm (factorbase_degn_t *fbptr, const mpz_t norm)
   mod_init (r, m);
   
   for (i = 0; i < mpz_size (norm); i++)
-    modul_addredc_ul (r, r, mpz_getlimbn (norm, i), fbptr->invp, m);
+    modul_addredc_ul (r, r, norm->_mp_d[i], fbptr->invp, m);
 
   j = (mod_get_ul (r, m) == 0);
 
@@ -926,8 +926,7 @@ trialdiv_with_norm1 (factorbase_degn_t *fbptr, const mpz_t norm,
   mod_initmod_ul (m, (unsigned long) fbptr->p);
   mod_init_noset0 (r, m);
 
-  modul_redcsemi_ul_not0 (r, mpz_getlimbn (norm, (mp_size_t) 0), 
-                          fbptr->invp, m);
+  modul_redcsemi_ul_not0 (r, norm->_mp_d[0], fbptr->invp, m);
 
   i = (mod_get_ul (r, m) + add == 0UL || mod_get_ul (r, m) + add == m[0]);
 
@@ -951,10 +950,8 @@ trialdiv_with_norm2 (factorbase_degn_t *fbptr, const mpz_t norm,
   mod_initmod_ul (m, (unsigned long)fbptr->p);
   mod_init_noset0 (r, m);
 
-  modul_redcsemi_ul_not0 (r, mpz_getlimbn (norm, (mp_size_t) 0), 
-                          fbptr->invp, m);
-  modul_addredcsemi_ul (r, r, mpz_getlimbn (norm, (mp_size_t) 1), 
-                        fbptr->invp, m);
+  modul_redcsemi_ul_not0 (r, norm->_mp_d[0], fbptr->invp, m);
+  modul_addredcsemi_ul (r, r, norm->_mp_d[1], fbptr->invp, m);
 
   i = (mod_get_ul (r, m) + add == 0UL || mod_get_ul (r, m) + add == m[0]);
 
@@ -978,12 +975,9 @@ trialdiv_with_norm3 (factorbase_degn_t *fbptr, const mpz_t norm,
   mod_initmod_ul (m, (unsigned long) fbptr->p);
   mod_init_noset0 (r, m);
 
-  modul_redcsemi_ul_not0 (r, mpz_getlimbn (norm, (mp_size_t) 0), 
-                          fbptr->invp, m);
-  modul_addredcsemi_ul (r, r, mpz_getlimbn (norm, (mp_size_t) 1), 
-                        fbptr->invp, m);
-  modul_addredcsemi_ul (r, r, mpz_getlimbn (norm, (mp_size_t) 2), 
-                        fbptr->invp, m);
+  modul_redcsemi_ul_not0 (r, norm->_mp_d[0], fbptr->invp, m);
+  modul_addredcsemi_ul (r, r, norm->_mp_d[1], fbptr->invp, m);
+  modul_addredcsemi_ul (r, r, norm->_mp_d[2], fbptr->invp, m);
 
   i = (mod_get_ul (r, m) + add == 0UL || mod_get_ul (r, m) + add == m[0]);
 
@@ -1007,14 +1001,10 @@ trialdiv_with_norm4 (factorbase_degn_t *fbptr, const mpz_t norm,
   mod_initmod_ul (m, (unsigned long) fbptr->p);
   mod_init_noset0 (r, m);
 
-  modul_redcsemi_ul_not0 (r, mpz_getlimbn (norm, (mp_size_t) 0), 
-                          fbptr->invp, m);
-  modul_addredcsemi_ul (r, r, mpz_getlimbn (norm, (mp_size_t) 1), 
-                        fbptr->invp, m);
-  modul_addredcsemi_ul (r, r, mpz_getlimbn (norm, (mp_size_t) 2), 
-                        fbptr->invp, m);
-  modul_addredcsemi_ul (r, r, mpz_getlimbn (norm, (mp_size_t) 3), 
-                        fbptr->invp, m);
+  modul_redcsemi_ul_not0 (r, norm->_mp_d[0], fbptr->invp, m);
+  modul_addredcsemi_ul (r, r, norm->_mp_d[1], fbptr->invp, m);
+  modul_addredcsemi_ul (r, r, norm->_mp_d[2], fbptr->invp, m);
+  modul_addredcsemi_ul (r, r, norm->_mp_d[3], fbptr->invp, m);
 
   i = (mod_get_ul (r, m) + add == 0UL || mod_get_ul (r, m) + add == m[0]);
 
@@ -1401,7 +1391,7 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
   /* If there was a report prime in the report with the largest log,
      add this prime's log (we want to reach the log the sieve had before
      dividing out this prime). */
-  if (p != 1)
+  if (p != (fbprime_t) 1)
     finallog += fb_log ((double) p, log_scale, 0.);
   TRACE_A (a, __func__, __LINE__, "finallog = %hhu\n", finallog);
 
@@ -1532,25 +1522,50 @@ trialdiv_one_side (mpz_t norm, mpz_t *scaled_poly, int degree,
 #ifdef GUESS_NORM_AFTER_MISSINGPRIME_THRES
       if (missinglog > GUESS_NORM_AFTER_MISSINGPRIME_THRES)
       {
-        double est_p;
-        mpz_t est_norm;
-        est_p = exp ((missinglog + MAX_SIEVELOG_ERROR + 0.5) / log_scale);
-        if (est_p > (double) fbb)
-          est_p = (double) fbb;
-        mpz_init (est_norm);
-        mpz_tdiv_q_ui (est_norm, norm, (unsigned long) est_p);
-        if (mpz_sizeinbase (est_norm, 2) > (size_t) mfb)
+        double est_p_hi;
+
+        est_p_hi = exp (((double) missinglog + MAX_SIEVELOG_ERROR + 0.5) / 
+                        log_scale);
+        if (est_p_hi > (double) fbb)
+          est_p_hi =  (double) fbb;
+        if (mpz_cmp_d (norm, ldexp(est_p_hi, mfb)) > 0)
           {
-            mpz_clear (est_norm);
             if (missinglog < missinglog_hist_max)
               stats->missinglog_guessdiscard_hist[missinglog]++;
 	    stats->guessed_cof_toolarge++;
             return 0; /* Can't become small enough */
           }
-        mpz_clear (est_norm);
+
+      /* If there is one large prime, it must be <= lpb. If there are 
+	 two large primes, their product must be > fbb^2.
+	 Hence if norm after dividing out missingprime is > lpb but <= fbb^2,
+	 we know it cannot be composite. Using bounds on the missing prime
+	 we get a lower and upper bound on the norm and compare that to
+	 lpb and fbb^2.
+      */
+      
+        if (mpz_cmp_d (norm, ldexp(est_p_hi, lpb)) > 0)
+          {
+	    double est_p_lo;
+	    est_p_lo = exp ((missinglog - MAX_SIEVELOG_ERROR - 0.5) / 
+			    log_scale);
+	    if (est_p_lo < (double) fbptr->p)
+		est_p_lo = (double) fbptr->p; 
+	    if (mpz_cmp_d (norm, est_p_lo * (double) fbb * (double) fbb) < 0)
+	    {
+		if (0)
+		    gmp_printf ("# Discarding %Zd with missinglog %hhu\n",
+			    norm, missinglog);
+                if (missinglog < missinglog_hist_max)
+                  stats->missinglog_guessdiscard_hist[missinglog]++;
+                stats->guessed_cof_toolarge++;
+		return 0;
+	    }
+          }
       }
 #endif
       
+
       {
         /* Jump ahead in the factor base to primes of approximately 
            the correct size. */
