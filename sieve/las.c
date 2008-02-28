@@ -78,6 +78,9 @@ typedef struct {
     unsigned char rat_bound; /* report bound on the rational side */
     int checknorms;          /* if non-zero, completely factor the potential
                                 relations */
+    uint32_t *abadprimes;     /* primes which may appear on the algebraic side
+                                 but are not in the factor base (end of list
+                                 is 0) */
 } sieve_info_t;
 
 
@@ -142,6 +145,33 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int I, uint64_t q0)
 }
 
 static void
+compute_badprimes (sieve_info_t *si, cado_poly cpoly, factorbase_degn_t *fb)
+{
+  unsigned long p;
+  unsigned long l = 0; /* number of bad primes */
+
+  si->abadprimes = NULL;
+  fprintf (stderr, "# Bad primes:");
+  for (p = 2; p <= cpoly->alim; p = getprime (p))
+    {
+      if (fb->p != FB_END && fb->p < p)
+        fb = fb_next (fb);
+      /* invariant: p <= fb->p */
+      if (p != fb->p && mpz_divisible_ui_p (cpoly->f[cpoly->degree], p))
+        {
+          l ++;
+          si->abadprimes = (uint32_t*) realloc (si->abadprimes,
+                                                (l + 1) * sizeof (uint32_t));
+          si->abadprimes[l - 1] = p;
+          fprintf (stderr, " %lu", p);
+        }
+    }
+  si->abadprimes[l] = 0; /* end of list marker */
+  fprintf (stderr, "\n");
+  getprime (0);
+}
+
+static void
 sieve_info_update (sieve_info_t *si, double skew)
 {
   double s_over_a1, one_over_b1;
@@ -168,6 +198,7 @@ sieve_info_clear (sieve_info_t *si)
   for (k = 0; k <= d; k++)
     mpz_clear (si->fij[k]);
   free (si->fij);
+  free (si->abadprimes);
 }
 
 /*****************************************************************************/
@@ -1366,10 +1397,30 @@ GcdTree (mpz_t **T, unsigned int *lT, unsigned long h, mpz_t P)
   free (G);
 }
 
+/* Divide norm by all primes in l, and print them in buf.
+   Assumes end of list is 0 in l.
+*/
+static void
+trial_divide_list (char *buf, mpz_t norm, uint32_t *l)
+{
+  unsigned long p = *l;
+
+  while (p != 0)
+    {
+      while (mpz_divisible_ui_p (norm, p))
+        {
+          mpz_divexact_ui (norm, norm, p);
+          buf += sprintf (buf, "%lx,", p);
+        }
+      p = *l++;
+    }
+  buf[0] = '\0';
+}
+
 /* Divide norm by all primes <= B, and print them in buf.
    If fb <> NULL, use only primes in fb.
  */
-void
+static void
 trial_divide (char *buf, mpz_t norm, const unsigned long B,
               factorbase_degn_t *fb)
 {
@@ -1600,7 +1651,10 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
           mpz_divexact_ui (norma, norma, si->q);
           /* on the algebraic side, we restrict to the factor base primes */
           ttriala -= seconds ();
-          trial_divide (bufa, norma, cpoly->alim, fb_alg);
+          /* first divide out the bad primes */
+          trial_divide_list (bufa, norma, si->abadprimes);
+          /* then divide the primes in the algebraic factor base */
+          trial_divide (bufa + strlen (bufa), norma, cpoly->alim, fb_alg);
           ttriala += seconds ();
           /* we do not take q into account for the mfb bound: if we want
              two large primes (lambda = 2, mfb = 2*lpb), then those large
@@ -1923,6 +1977,8 @@ main (int argc, char *argv[])
     ASSERT_ALWAYS(fb_alg != NULL);
     tfb = seconds () - tfb;
     fprintf (stderr, "# Reading algebraic factor base took %1.1fs\n", tfb);
+
+    compute_badprimes (&si, cpoly, fb_alg);
 
     /* Prepare rational factor base */
     tfb = seconds ();
