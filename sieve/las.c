@@ -53,6 +53,12 @@
     }                                                   \
   while (0)
 
+/* check is a "large" prime is really large, i.e., not in the factor base */
+#define CHECK_LARGE_PRIME(p,lim,s)                                      \
+  if (mpz_cmp_ui (p, lim) <= 0)                                         \
+    gmp_fprintf (stderr, "# WARNING: factor base prime %Zd was missed " \
+                 "on %s. side\n", p, s)
+
 // General information about the siever
 typedef struct {
     // sieving area
@@ -148,9 +154,10 @@ static void
 compute_badprimes (sieve_info_t *si, cado_poly cpoly, factorbase_degn_t *fb)
 {
   unsigned long p;
-  unsigned long l = 0; /* number of bad primes */
+  unsigned long l; /* number of bad primes */
 
-  si->abadprimes = NULL;
+  l = 0;
+  si->abadprimes = malloc (sizeof (uint32_t));
   fprintf (stderr, "# Bad primes:");
   for (p = 2; p <= cpoly->alim; p = getprime (p))
     {
@@ -1688,11 +1695,17 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
                     {
                       uint32_t i, j;
                       for (i = 0; i < f_r->length; i++)
-                        for (j = 0; j < m_r->data[i]; j++)
-                          gmp_sprintf_cat (bufr, f_r->data[i]);
+                        {
+                          CHECK_LARGE_PRIME (f_r->data[i], cpoly->rlim, "rat");
+                          for (j = 0; j < m_r->data[i]; j++)
+                            gmp_sprintf_cat (bufr, f_r->data[i]);
+                        }
                       for (i = 0; i < f_a->length; i++)
-                        for (j = 0; j < m_a->data[i]; j++)
-                          gmp_sprintf_cat (bufa, f_a->data[i]);
+                        {
+                          CHECK_LARGE_PRIME (f_a->data[i], cpoly->alim, "alg");
+                          for (j = 0; j < m_a->data[i]; j++)
+                            gmp_sprintf_cat (bufa, f_a->data[i]);
+                        }
                     }
                   printf ("%ld,%lu:%s:%s\n", a, b, bufr, bufa);
                   fflush (stdout);
