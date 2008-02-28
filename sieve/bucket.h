@@ -28,7 +28,7 @@
 
 /********  Data structure for the contents of buckets **************/
 
-/* In principal, the typedef for the bucket_update can be changed without
+/* In principle, the typedef for the bucket_update can be changed without
  * affecting the rest of the code. 
  */
 
@@ -93,11 +93,11 @@ typedef struct {
  * If we can not afford enough buckets (limited by TLB) and we don't want
  * to make the bucket_region larger than L1, we can have a double bucket
  * system: A first level of buckets, that correspond to very large
- * bucket_regions, and a second level of buckets fitting in L1.
+ * bucket_regions, and a second level of bucket regions fitting in L1.
  * We collect all updates in the buckets of the first level, then we
- * process one first level bucket at a time, applying its update to the
- * corresponding second level buckets, and then applying to the L1
- * bucket_regions.
+ * process one first level bucket at a time, copying its updates to the
+ * corresponding second level buckets and processing each second level
+ * bucket by applying its updates to the L1 bucket_regions.
  *
  * 2) Buffered buckets.
  * One can have a buffer that contains one cache-line for each bucket.
@@ -127,7 +127,8 @@ clear_bucket_array(bucket_array_t BA);
  * current implementation!
  */
 static inline void
-push_bucket_update(bucket_array_t BA, int i, bucket_update_t update);
+push_bucket_update(bucket_array_t BA, const int i, 
+                   const bucket_update_t update);
 
 /* Main reading iterator: returns the first unread update in bucket i.
  * If SAFE_BUCKETS is not #defined, there is no checking that you are reading
@@ -140,28 +141,28 @@ push_bucket_update(bucket_array_t BA, int i, bucket_update_t update);
  *   get_next_bucket_update().
  */
 static inline bucket_update_t
-get_next_bucket_update(bucket_array_t BA, int i);
+get_next_bucket_update(bucket_array_t BA, const int i);
 static inline int
-nb_of_updates(bucket_array_t BA, int i);
+nb_of_updates(const bucket_array_t BA, const int i);
 static inline void
-push_sentinel(bucket_array_t BA, int i);
+push_sentinel(bucket_array_t BA, const int i);
 static inline int
-is_end(bucket_array_t BA, int i);
+is_end(const bucket_array_t BA, const int i);
 
 /* If you need to read twice a bucket, you can rewind it: */
 static inline void
-rewind_bucket(bucket_array_t BA, int i);
+rewind_bucket(bucket_array_t BA, const int i);
 
 /* If you want to access updates in a non-sequential way: */
 static inline bucket_update_t
-get_kth_bucket_update(bucket_array_t BA, int i, int k);
+get_kth_bucket_update(const bucket_array_t BA, const int i, const int k);
 
 
 
 /******** Bucket array implementation **************/
 
 static inline void * 
-malloc_check(size_t x) {
+malloc_check(const size_t x) {
     void *p;
     p = malloc(x);
     ASSERT_ALWAYS(p != NULL);
@@ -169,7 +170,7 @@ malloc_check(size_t x) {
 }
 
 static inline void *
-malloc_pagealigned(size_t x) {
+malloc_pagealigned(const size_t x) {
     int sz = getpagesize();
     void *p;
     int ret = posix_memalign(&p, sz, x);
@@ -214,9 +215,10 @@ clear_bucket_array(bucket_array_t BA)
 }
 
 static inline void
-push_bucket_update(bucket_array_t BA, int i, bucket_update_t update)
+push_bucket_update(bucket_array_t BA, const int i, 
+                   const bucket_update_t update)
 {
-    *(BA.bucket_write[i])++ = update;
+    *(BA.bucket_write[i])++ = update; /* Pretty! */
 #ifdef SAFE_BUCKETS
     if (BA.bucket_start[i] + BA.bucket_size <= BA.bucket_write[i]) {
         fprintf(stderr, "# Warning: hit end of bucket nb %d\n", i);
@@ -226,13 +228,13 @@ push_bucket_update(bucket_array_t BA, int i, bucket_update_t update)
 }
 
 static inline void
-rewind_bucket(bucket_array_t BA, int i)
+rewind_bucket(bucket_array_t BA, const int i)
 {
     BA.bucket_read[i] = BA.bucket_start[i];
 }
 
 static inline bucket_update_t
-get_next_bucket_update(bucket_array_t BA, int i)
+get_next_bucket_update(bucket_array_t BA, const int i)
 {
     bucket_update_t rep = *(BA.bucket_read[i])++;
 #ifdef SAFE_BUCKETS
@@ -246,11 +248,11 @@ get_next_bucket_update(bucket_array_t BA, int i)
 }
 
 static inline bucket_update_t
-get_kth_bucket_update(bucket_array_t BA, int i, int k)
+get_kth_bucket_update(const bucket_array_t BA, const int i, const int k)
 {
     bucket_update_t rep = (BA.bucket_start[i])[k];
 #ifdef SAFE_BUCKETS
-    if (k >= BA.bucket_write[i]) {
+    if (BA.bucket_start[i] + k >= BA.bucket_write[i]) {
         fprintf(stderr, "# Warning: reading outside valid updates in bucket nb %d\n", i);
         return LAST_UPDATE;
     }
@@ -259,19 +261,19 @@ get_kth_bucket_update(bucket_array_t BA, int i, int k)
 }
 
 static inline int
-nb_of_updates(bucket_array_t BA, int i)
+nb_of_updates(const bucket_array_t BA, const int i)
 {
     return (BA.bucket_write[i] - BA.bucket_start[i]);
 }
 
 static inline void
-push_sentinel(bucket_array_t BA, int i)
+push_sentinel(bucket_array_t BA, const int i)
 {
     push_bucket_update(BA, i, LAST_UPDATE);
 }
 
 static inline int
-is_end(bucket_array_t BA, int i)
+is_end(const bucket_array_t BA, const int i)
 {
     return (BA.bucket_read[i] == BA.bucket_write[i]);
 }
