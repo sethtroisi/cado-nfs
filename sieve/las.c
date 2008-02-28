@@ -213,20 +213,20 @@ fb_root_in_qlattice(const fbprime_t p, const fbprime_t R, const sieve_info_t * s
 {
     modulus_t m;
     residueul_t RR, aa, bb, x, y;
-    mod_initmod_ul(m, p);
-    modul_initmod_ul(RR, R);  // already reduced
+    modul_initmod_ul(m, p);
+    modul_set_ul_reduced(RR, R, m);  // already reduced
     // numerator
     if (si->a1 < 0) {
-        modul_initmod_ul(aa, ((unsigned long) (-si->a1)) % p);
+        modul_set_ul_reduced(aa, ((uint32_t) (-si->a1)) % (uint32_t) p, m);
         modul_neg(aa, aa, m);
     } else {
-        modul_initmod_ul(aa, ((unsigned long) si->a1) % p);
+        modul_set_ul_reduced(aa, ((uint32_t) si->a1) % (uint32_t) p, m);
     }
     if (si->b1 < 0) {
-        modul_initmod_ul(bb, ((unsigned long) (-si->b1)) % p);
+        modul_set_ul_reduced(bb, ((uint32_t) (-si->b1)) % (uint32_t) p, m);
         modul_neg(bb, bb, m);
     } else {
-        modul_initmod_ul(bb, ((unsigned long) si->b1) % p);
+      modul_set_ul_reduced(bb, ((uint32_t) si->b1) % (uint32_t) p, m);
     }
 
     modul_mul(x, bb, RR, m);
@@ -236,16 +236,16 @@ fb_root_in_qlattice(const fbprime_t p, const fbprime_t R, const sieve_info_t * s
     
     // denominator
     if (si->a0 < 0) {
-        modul_initmod_ul(aa, ((unsigned long) (-si->a0)) % p);
+        modul_set_ul_reduced(aa, ((uint32_t) (-si->a0)) % (uint32_t) p, m);
         modul_neg(aa, aa, m);
     } else {
-        modul_initmod_ul(aa, ((unsigned long) si->a0) % p);
+        modul_set_ul_reduced(aa, ((uint32_t) si->a0) % (uint32_t) p, m);
     }
     if (si->b0 < 0) {
-        modul_initmod_ul(bb, ((unsigned long) (-si->b0)) % p);
+        modul_set_ul_reduced(bb, ((uint32_t) (-si->b0)) % (uint32_t) p, m);
         modul_neg(bb, bb, m);
     } else {
-        modul_initmod_ul(bb, ((unsigned long) si->b0) % p);
+        modul_set_ul_reduced(bb, ((uint32_t) si->b0) % (uint32_t) p, m);
     }
 
     modul_mul(y, bb, RR, m);
@@ -836,6 +836,7 @@ sieve_buckets (unsigned char *S, factorbase_degn_t *fb,
                 // S[x] -= logp;
                 update.x = (uint16_t) (x & maskbucket);
                 update.logp = logp;
+                update.p_low = 0;
                 push_bucket_update(BA, x >> shiftbucket, update);
 #ifdef TRACE_K
                 if (x == TRACE_K)
