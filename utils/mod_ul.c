@@ -175,6 +175,7 @@ modul_powredc_mp (residueul_t r, const residueul_t b, const unsigned long *e,
     }
 }
 
+
 void
 modul_2powredc_mp (residueul_t r, const unsigned long *e, 
                    const int e_nrwords, const unsigned long invm, 
@@ -217,6 +218,70 @@ modul_2powredc_mp (residueul_t r, const unsigned long *e,
           if (e[i] & mask)
             modul_add (r, r, r, m);
           mask >>= 1;            /* (r^2)^(mask/2) * b^e = r^mask * b^e */
+        }
+      mask = ~0UL - (~0UL >> 1);
+    }
+}
+
+
+/* Compute r = V_e(b), with r and b in Montgomery representation. 
+   Here e is a multiple precision integer 
+   sum_{i=0}^{e_nrwords} e[i] * (machine word base)^i */
+
+void
+modul_Vredc_mp (residueul_t r, const residueul_t b, const unsigned long *e, 
+                const int e_nrwords, const unsigned long invm, 
+                const modulusul_t m)
+{
+  unsigned long mask = ~0UL - (~0UL >> 1); /* Only MSB set */
+  int i = e_nrwords - 1;
+  residueul_t r1, two;
+
+  modul_init_noset0 (two, m);
+  modul_set_ul_reduced (two, 2UL, m);
+  modul_tomontgomery (two, two, m);
+
+  if (e_nrwords == 0 || e[i] == 0UL)
+    {
+      modul_set (r, two, m);
+      return;
+    }
+
+  /* Find highest set bit in e. */
+  while ((e[i] & mask) == 0UL)
+    mask >>= 1; /* r = 1, so r^(mask/2) * b^e = r^mask * b^e  */
+
+  /* Exponentiate */
+
+  modul_init (r1, m);
+  modul_set (r, b, m);         /* r = b = V_1 (b) */
+  modul_mulredc (r1, b, b, invm, m);
+  modul_sub (r1, r1, two, m);  /* r1 = b^2 - 2 = V_2 (b) */
+  mask >>= 1;
+
+  /* Here r = V_j (b) and r1 = V_{j+1} (b) for j = 1 */
+
+  for ( ; i >= 0; i--)
+    {
+      while (mask > 0UL)
+        {
+          if (e[i] & mask)
+	    {
+	      /* j -> 2*j+1. Compute V_{2j+1} and V_{2j+2} */
+	      modul_mulredc (r, r, r1, invm, m);
+	      modul_sub (r, r, b, m); /* V_j * V_{j+1} - V_1 = V_{2j+1} */
+	      modul_mulredc (r1, r1, r1, invm, m);
+	      modul_sub (r1, r1, two, m); /* (V_{j+1})^2 - 2 = V_{2j+2} */
+	    }
+	  else
+	    {
+	      /* j -> 2*j. Compute V_{2j} and V_{2j+1} */
+	      modul_mulredc (r1, r1, r, invm, m);
+	      modul_sub (r1, r1, b, m); /* V_j * V_{j+1} - V_1 = V_{2j+1}*/
+	      modul_mulredc (r, r, r, invm, m);
+	      modul_sub (r, r, two, m);
+	    }
+          mask >>= 1;
         }
       mask = ~0UL - (~0UL >> 1);
     }
