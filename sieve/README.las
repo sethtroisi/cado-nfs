@@ -14,7 +14,7 @@ The lattice siever (las) takes the following arguments/options:
 -fb xxx.roots  use factor base xxx.roots (same format as the line siever)
 -q0 nnn        left bound of special-q range
 -q1 nnn        right bound of special-q range (the last special-q is q1-1,
-               assuming q1-1 is prime)
+               assuming q1-1 is prime); if missing, only q0 is sieved
 -rho r         Assuming q0 is prime, sieve only the ideal (q0,r). This is
                mainly for debugging purposes.
 
