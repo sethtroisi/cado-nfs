@@ -154,7 +154,7 @@ void augment_coprime_base(mpz_t f, mpz_array_t* base) {
     uint32_t size_f = mpz_sizeinbase(f, 2);
     uint32_t len    = base->length;
 
-    bool coprime_with_all_others = true;
+    bool coprime_to_all_others = true;
 
     mpz_t cofactor_1;
     mpz_t cofactor_2;
@@ -171,7 +171,7 @@ void augment_coprime_base(mpz_t f, mpz_array_t* base) {
         if ((mpz_cmp_ui(gcd, 1) == 0) ) {
             continue;
         }
-        coprime_with_all_others = false;
+        coprime_to_all_others = false;
         
         if ((mpz_cmp(gcd, f) == 0) ) {
             //
@@ -208,7 +208,7 @@ void augment_coprime_base(mpz_t f, mpz_array_t* base) {
         augment_coprime_base(cofactor_2, base);
         break;
     }
-    if (coprime_with_all_others) {
+    if (coprime_to_all_others) {
         //
         // Add the integer f in the base if it is coprime with all other
         // integers in the base.

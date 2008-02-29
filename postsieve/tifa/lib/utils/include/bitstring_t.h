@@ -25,7 +25,7 @@
  *
  * \brief Preprocessor defines for 'string of bit' type.
  *
- * Defines several preprocessor \c #define symbols related to the type used
+ * Defines several preprocessor \c define symbols related to the type used
  * to represent strings of bit. These symbolss are kept separately to avoid
  * too much namespace pollution.
  */

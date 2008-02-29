@@ -227,7 +227,8 @@ int main(int argc, char** argv) {
 
     program.algo_name = "QS";
     program.params    = (void*) &params;
-    program.mode      = SINGLE_RUN;
+    //program.mode      = SINGLE_RUN;
+    program.mode      = FIND_COMPLETE_FACTORIZATION;
 
     program.print_usage_func           = print_usage;
     program.print_params_func          = print_params;

@@ -71,7 +71,7 @@ extern "C" {
     */
 #define QS_DFLT_NRELATIONS       24
    /**
-    * \def QS_DFLT_LSR_METHOD
+    * \def QS_DFLT_LINALG_METHOD
     * Default linear system resolution method to use.
     */
 #define QS_DFLT_LINALG_METHOD    SMART_GAUSS_ELIM

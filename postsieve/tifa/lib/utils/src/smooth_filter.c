@@ -44,7 +44,7 @@ uint32_t select_res(smooth_filter_t* const filter, unsigned long int step);
 void complete_filter_init(smooth_filter_t* const filter,
                           uint32_array_t*  const base) {   
     
-    switch(filter->method) {
+    switch (filter->method) {
         
     case TDIV:
         filter->nsteps = 0;
@@ -56,25 +56,10 @@ void complete_filter_init(smooth_filter_t* const filter,
         //
         // Allocate the memory space needed by the arrays.
         //
-        mpz_t* xidat;
-        mpz_t* yidat;
-        mpz_t* codat;
-        
         for (unsigned int i = 0; i < filter->nsteps; i++) {
-        
             filter->filtered_xi[i] = alloc_mpz_array(filter->batch_size);
             filter->filtered_yi[i] = alloc_mpz_array(filter->batch_size);
             filter->cofactors[i]   = alloc_mpz_array(filter->batch_size);
-        
-            xidat = filter->filtered_xi[i]->data;
-            yidat = filter->filtered_yi[i]->data;
-            codat = filter->cofactors  [i]->data;
-        
-            for (unsigned int j = 0; j < filter->batch_size; j++) {
-                mpz_init(xidat[j]);
-                mpz_init(yidat[j]);
-                mpz_init(codat[j]);
-            }
         }
         //
         // Compute the various bounds and partial factor base needed for the
@@ -109,30 +94,32 @@ void complete_filter_init(smooth_filter_t* const filter,
         break;
 
     case DJB_BATCH:
+    default:
+        filter->method = DJB_BATCH;
         filter->nsteps = 0;
         mpz_tree_t* ptree = prod_tree_ui(base);
         mpz_init_set(filter->prod_pj[0], ptree->data[0]);
         clear_mpz_tree(ptree);
         free(ptree);
-    
-    default:
-        filter->method = DJB_BATCH;
-        break;        
+        break;
     }
 }
 //------------------------------------------------------------------------------
 void clear_smooth_filter(smooth_filter_t* const filter) {
     
-    if (filter->method == TDIV_EARLY_ABORT) {
+    switch (filter->method) {
+        
+    case TDIV_EARLY_ABORT:
+    
         for (unsigned int i = 0; i < filter->nsteps; i++) {
             mpz_t* const xidat = filter->filtered_xi[i]->data;
             mpz_t* const yidat = filter->filtered_yi[i]->data;
             mpz_t* const codat = filter->cofactors  [i]->data;
             
             for (unsigned int j = 0; j < filter->batch_size; j++) {
-                mpz_init(xidat[j]);
-                mpz_init(yidat[j]);
-                mpz_init(codat[j]);
+                mpz_clear(xidat[j]);
+                mpz_clear(yidat[j]);
+                mpz_clear(codat[j]);
             }
             free(filter->filtered_xi[i]);
             free(filter->filtered_yi[i]);
@@ -150,6 +137,16 @@ void clear_smooth_filter(smooth_filter_t* const filter) {
         for (unsigned int i = 0; i < filter->nsteps; i++) {
             mpz_clear(filter->bounds[i]);
         }
+        free(filter->factor_base[0]);
+        free(filter->factor_base[1]);
+        break;
+        
+    case DJB_BATCH:
+        mpz_clear(filter->prod_pj[0]);
+        break;
+    
+    default:
+        break;
     }
 }
 //------------------------------------------------------------------------------
@@ -158,7 +155,7 @@ void filter_new_relations(smooth_filter_t* const filter) {
     uint32_t used = 0;
     unsigned int step = 1;
         
-    switch(filter->method) {
+    switch (filter->method) {
     
     case TDIV:
     case DJB_BATCH:
@@ -222,7 +219,7 @@ uint32_t select_res(smooth_filter_t* const filter, unsigned long int step) {
     //     Last step. Performs a test where the 'good' relations from the 
     //     last filter->filtered_* arrays are stored in filter->accepted_*.
     //    
-    switch(filter->method) {
+    switch (filter->method) {
     case TDIV:
     case TDIV_EARLY_ABORT:    
         return res_tdiv(filter, step);

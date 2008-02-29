@@ -26,7 +26,7 @@
  * \brief Status / error messages output macros
  *
  * This file defines some macros used to output status or error messages if
- * some of the \c*_VERBOSE and/or \c*_TIMING symbols are set to non-zero.
+ * some of the \c *_VERBOSE and/or \c *_TIMING symbols are set to non-zero.
  *
  * \warning The <tt>__VERBOSE__</tt>, <tt>__TIMING__</tt> and
  * <tt>__PREFIX__</tt> symbols should be defined in the file including this
@@ -166,18 +166,14 @@ extern "C" {
 #define PRINT_UPDATE_MSG           PRINT_MSG(UPDATE_STRING)
 #define PRINT_UPDATE_GIVEUP_MSG    PRINT_MSG(UPDATE_GIVEUP_STRING)
 #define PRINT_CLEAN_MSG            PRINT_MSG(CLEAN_STRING)
-   /**
-    * \def PRINT_SUCCESS_MSG(ECODE)
-    */
+
 #define PRINT_SUCCESS_MSG(ECODE) do {                         \
     char __tmp_str__[64];                                     \
     (void)sprintf(__tmp_str__, FUNC_SUCCEEDED_STRING " (%s)", \
                   ecode_to_str[ECODE]);                       \
     PRINT_MSG(__tmp_str__);                                   \
 } while (0)
-   /**
-    * \def PRINT_FAILURE_MSG(ECODE)
-    */
+
 #define PRINT_FAILURE_MSG(ECODE) do {                         \
     char __tmp_str__[64];                                     \
     (void)sprintf(__tmp_str__, FUNC_FAILED_STRING " (%s)",    \

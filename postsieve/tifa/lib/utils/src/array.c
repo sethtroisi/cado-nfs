@@ -20,18 +20,22 @@
 /**
  * \file    array.c
  * \author  Jerome Milan
- * \date    Wed Oct 17 2007
- * \version 1.1
+ * \date    Fri Feb 29 2008
+ * \version 1.2
  */
 
  /*
-  *  History:
-  *
-  *    1.1: Wed Oct 17 2007 by JM:
-  *         - Added byte_array_t with corresponding functions.
-  *    
-  *    1.0: Wed Mar 1 2006 by JM:
-  *         - Initial version.
+  * History:
+  * --------
+  *   1.2: Fri Feb 29 2008 by JM:
+  *        - WARNING: Semantic of mpz_array_t's length field has changed!.
+  *                   Now length is only the "useful part" of the array, but
+  *                   the data field is completely mpz_init'ed (i.e. up to
+  *                   the alloced field, not longer up to length).
+  *   1.1: Wed Oct 17 2007 by JM:
+  *        - Added byte_array_t with corresponding functions.
+  *   1.0: Wed Mar 1 2006 by JM:
+  *        - Initial version.
   */
 
 #include <stdlib.h>
@@ -624,6 +628,15 @@ mpz_array_t* alloc_mpz_array(uint32_t length) {
     array->alloced = length;
     array->length  = 0U;
     array->data    = malloc(array->alloced * sizeof(mpz_t));
+    
+    //
+    // _WARNING_: Since version 1.2, the mpz_t array given by array->data is
+    //            fully mpz_init'ed once and for all to avoid possible
+    //            memory deallocations and reallocations. 
+    //
+    for (uint32_t i = 0U; i < array->alloced; i++) {
+        mpz_init(array->data[i]);
+    }
 
     return array;
 }
@@ -631,7 +644,13 @@ mpz_array_t* alloc_mpz_array(uint32_t length) {
 void clear_mpz_array(mpz_array_t* const array) {
 
     if (array->alloced != 0U) {
-        for (uint32_t i = 0U; i != array->length; i++) {
+        //
+        // _WARNING_: Since version 1.2, the mpz_t array given by array->data
+        //            is fully mpz_init'ed once and for all. Consequently
+        //            array->data has to be completely mpz_clear'ed (and not 
+        //            just up to array->length as in older versions).
+        //
+        for (uint32_t i = 0U; i < array->alloced; i++) {
             mpz_clear(array->data[i]);
         }
         free(array->data);
@@ -641,12 +660,18 @@ void clear_mpz_array(mpz_array_t* const array) {
 }
 //-----------------------------------------------------------------------------
 void resize_mpz_array(mpz_array_t* const array, uint32_t alloced) {
-    if (alloced < array->length) {
+    if (alloced < array->alloced) {
         //
         // Don't forget to free the memory used by the mpz_t's that will be
         // discarded in case the new size is less than the original!
         //
-        for (uint32_t i = alloced; i < array->length; i++) {
+        // _WARNING_: Since version 1.2, the mpz_t array given by array->data
+        //            is fully mpz_init'ed once and for all. Consequently
+        //            array->data has to be mpz_clear'ed from alloced to
+        //            array->alloced (and not just up to array->length as in 
+        //            older versions).
+        //
+        for (uint32_t i = alloced; i < array->alloced; i++) {
             mpz_clear(array->data[i]);
         }
         array->length = alloced;
@@ -656,6 +681,13 @@ void resize_mpz_array(mpz_array_t* const array, uint32_t alloced) {
     } else {
         array->data = malloc(alloced * sizeof(mpz_t));
     }
+    //
+    // _WARNING_: Since version 1.2, the mpz_t array given by array->data is
+    //            fully mpz_init'ed once and for all!
+    //
+    for (uint32_t i = array->alloced; i < alloced; i++) {
+        mpz_init(array->data[i]);
+    }
     array->alloced = alloced;
 }
 //-----------------------------------------------------------------------------
@@ -663,17 +695,20 @@ void append_mpz_to_array(mpz_array_t* array, const mpz_t to_append) {
     if (array->length >= array->alloced) {
         resize_mpz_array(array, array->length + ELONGATION);
     }
-    mpz_init_set(array->data[array->length], to_append);
+    //
+    // _WARNING_: Since version 1.2, the mpz_t array given by array->data is
+    //            fully mpz_init'ed once and for all!
+    //
+    mpz_set(array->data[array->length], to_append);
     array->length++;
 }
 //-----------------------------------------------------------------------------
-void reset_mpz_array(mpz_array_t* const array) {
-
-    if (array->alloced != 0U) {
-        for (uint32_t i = 0U; i != array->length; i++) {
-            mpz_clear(array->data[i]);
-        }
-    }
+void reset_mpz_array(mpz_array_t* const array) {    
+    //
+    // _WARNING_: Since version 1.2, the mpz_t array given by array->data
+    //            is fully mpz_init'ed once and for all so they are nothing
+    //            to mpz_clear() now!
+    //
     array->length = 0U;
 }
 //-----------------------------------------------------------------------------
@@ -686,7 +721,11 @@ void append_mpz_array(mpz_array_t* const array,
     uint32_t current = array->length;
 
     for (uint32_t i = 0; i < to_append->length; i++ ) {
-        mpz_init_set(array->data[current], to_append->data[i]);
+        //
+        // _WARNING_: Since version 1.2, the mpz_t array given by array->data
+        //            is fully mpz_init'ed once and for all!
+        //
+        mpz_set(array->data[current], to_append->data[i]);
         current++;
     }
     array->length += to_append->length;
@@ -778,8 +817,8 @@ void ins_sort_mpz_array(mpz_array_t* const array) {
     for (uint32_t i = 1; i < array->length; i++) {
         mpz_set(to_insert, array->data[i]);
         j = i;
-        while ((j > 0) && (mpz_cmp(array->data[j-1], to_insert) > 0)) {
-            mpz_set(array->data[j], array->data[j-1]);
+        while ((j > 0) && (mpz_cmp(array->data[j - 1], to_insert) > 0)) {
+            mpz_set(array->data[j], array->data[j - 1]);
             j--;
         }
         mpz_set(array->data[j], to_insert);
@@ -801,11 +840,11 @@ bool is_in_mpz_array(const mpz_t to_find, const mpz_array_t* const array) {
 bool is_in_sorted_mpz_array(const mpz_t to_find,
                             const mpz_array_t* const array) {
     return (NOT_IN_ARRAY != index_in_sorted_mpz_array(
-                              to_find,
-                              array,
-                              0,
-                              array->length - 1
-                          )
+                                to_find,
+                                array,
+                                0,
+                                array->length - 1
+                            )
            );
 }
 //-----------------------------------------------------------------------------

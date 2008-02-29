@@ -41,10 +41,9 @@
 #include "tifa_config.h"
 
 #include <stdlib.h>
-#include <stdio.h>
 #include <math.h>
 
-#if TIFA_VERBOSE_SIQS || TIFA_TIMING_SIQS
+#if TIFA_VERBOSE_SIQS || TIFA_TIMING_SIQS || TIFA_PRINT_ERROR
     #include <stdio.h>
 #endif
 
@@ -625,16 +624,6 @@ static ecode_t init_siqs_context(factoring_machine_t* const machine) {
     context->cand_u        = alloc_mpz_array(context->to_collect);
     context->cand_a_array  = alloc_mpz_array(context->to_collect);
 
-    for (uint32_t i = 0; i < context->to_collect; i++) {
-        //
-        // We fully initialize these arrays since they will be used over
-        // and over again. Of course, we should remember to reset their
-        // lengths to their alloced values before clering them!
-        //
-        mpz_init(context->cand_redgx->data[i]);
-        mpz_init(context->cand_u->data[i]);
-        mpz_init(context->cand_a_array->data[i]);
-    }
     context->smooth_redgx       = alloc_mpz_array(context->matrix_nrows);
     context->a_for_smooth_redgx = alloc_mpz_array(context->matrix_nrows);
     context->u                  = alloc_mpz_array(context->matrix_nrows);
@@ -686,14 +675,6 @@ static ecode_t init_siqs_context(factoring_machine_t* const machine) {
 
     context->Bl = alloc_mpz_array(context->nprimes_in_a);
 
-    for (uint32_t i = 0; i < context->nprimes_in_a; i++) {
-        //
-        // We fully initialize Bl since this array will be used over and over
-        // again. No need to worry when clearing it since its length will always
-        // equals its alloced value.
-        //
-        mpz_init(context->Bl->data[i]);
-    }
     context->threshold = 0;
     context->loga      = 0;
     context->av_x      = 0;
@@ -726,16 +707,7 @@ static ecode_t clear_siqs_context(factoring_machine_t* const machine) {
             free(context->Bainv2[i]);
         }
         free(context->Bainv2);
-        //
-        // Since the folowing arrays were fully initialized, don't forget to
-        // set their current length to their alloced length before clearing
-        // them...
-        //
-        context->xpool->length      = context->xpool->alloced;
-        context->cand_redgx->length = context->cand_redgx->alloced;
-        context->cand_u->length     = context->cand_u->alloced;
 
-        context->cand_a_array->length     = context->cand_a_array->alloced;
         clear_mpz_array(context->cand_a_array);
         free(context->cand_a_array);
 
@@ -828,7 +800,7 @@ static ecode_t perform_siqs(factoring_machine_t* const machine) {
     // Collect congruences relations
     //
     ecode_t ecode = collect_relations(context);
-
+    
     if (ecode != SUCCESS) {
         return ecode;
     }
@@ -949,7 +921,7 @@ static ecode_t perform_siqs(factoring_machine_t* const machine) {
 
     clear_mpz_array(partial_gx_array);
     free(partial_gx_array);
-
+    
     return ecode;
 }
 //------------------------------------------------------------------------------
@@ -957,7 +929,7 @@ static ecode_t recurse(mpz_array_t* const factors, uint32_array_t* const multis,
                        const mpz_t n, factoring_mode_t mode) {
 
     return tifa_factor(factors, multis, n, mode);
-    
+
     //
     // The following code should be used to factor a number using _only_ SIQS.
     //
@@ -974,7 +946,7 @@ static ecode_t recurse(mpz_array_t* const factors, uint32_array_t* const multis,
  */
 
 //-----------------------------------------------------------------------------
-static void fill_sieve(siqs_context_t* const context) {                              
+static void fill_sieve(siqs_context_t* const context) {
     //
     // Fill the sieve array 'sieve'.
     //
@@ -1001,7 +973,7 @@ static void fill_sieve(siqs_context_t* const context) {
     const byte_array_t*   const log_factor_base = context->log_factor_base;
     const uint32_array_t* const sol1            = context->sol1;
     const uint32_array_t* const sol2            = context->sol2;
-        
+
     const int32_t  sieve_begin = context->sieve_begin;
     const int32_t  sieve_end   = context->sieve_end;
     const uint32_t a_pmin      = context->imin;
@@ -1107,7 +1079,7 @@ static void fill_sieve(siqs_context_t* const context) {
         int count = (imax - imin + 1);
         int niter = count >> 3;
         int ncase = count & 7;
-            
+
         switch (ncase) {
             case 7: sieve_data[sindex] += logp; sindex += curprime;
             case 6: sieve_data[sindex] += logp; sindex += curprime;
@@ -1118,7 +1090,7 @@ static void fill_sieve(siqs_context_t* const context) {
             case 1: sieve_data[sindex] += logp; sindex += curprime;
             default: break;
         }
-        
+
         while (niter > 0) {
             sieve_data[sindex]                                      += logp;
             sieve_data[sindex+curprime]                             += logp;
@@ -1168,7 +1140,7 @@ static void fill_sieve(siqs_context_t* const context) {
         count = (imax - imin + 1);
         niter = count >> 3;
         ncase = count & 7;
-        
+
         switch (ncase) {
             case 7 :  sieve_data[sindex] += logp; sindex += curprime;
             case 6 :  sieve_data[sindex] += logp; sindex += curprime;
@@ -1179,7 +1151,7 @@ static void fill_sieve(siqs_context_t* const context) {
             case 1 :  sieve_data[sindex] += logp; sindex += curprime;
             default: break;
         }
-        
+
         while (niter > 0) {
             sieve_data[sindex]                                      += logp;
             sieve_data[sindex+curprime]                             += logp;
@@ -1192,8 +1164,8 @@ static void fill_sieve(siqs_context_t* const context) {
             sindex += (curprime << 3);
             niter--;
         }
-#endif   
-        
+#endif
+
     }
 }
 //-----------------------------------------------------------------------------
@@ -1212,25 +1184,25 @@ static void scan_sieve(siqs_context_t* const context) {
     // and:
     //     sieve_begin <= *scan_begin <= sieve_half_width
     //
-    
+
     //
     // _NOTE_: Use local variables to avoid numerous readings/writings
     //         of pointed data...
     //
     const byte_array_t*  const sieve      = context->sieve;
     const unsigned char* const sieve_data = sieve->data;
-    
+
     int32_array_t* const xpool      = context->xpool;
     int32_t*       const xpool_data = xpool->data;
     int32_t*       const scan_begin = &context->scan_begin;
-    
+
     const uint32_t threshold     = context->threshold;
     const uint32_t xpool_alloced = xpool->alloced;
     const uint32_t sieve_hwidth  = context->params->sieve_half_width;
     const uint32_t sieve_length  = sieve->length;
     const int32_t  sieve_begin   = context->sieve_begin;
           int32_t  sieve_end     = 0;
-    
+
     if (sieve_begin + (int32_t)sieve_length - 1 < (int32_t)sieve_hwidth) {
         sieve_end = sieve_begin + (int32_t)sieve_length - 1;
     } else {
@@ -1267,7 +1239,7 @@ static void scan_sieve(siqs_context_t* const context) {
     int count = (sieve_end - *scan_begin + 1);
     int niter = count >> 3;
     int ncase = count & 7;
-    
+
     switch (ncase) {
         case 7:
             if (sieve_data[xsieve] >= threshold) {
@@ -1348,7 +1320,7 @@ static void scan_sieve(siqs_context_t* const context) {
             xsieve++;
         default: break;
     }
-    
+
     while (niter > 0) {
         if (sieve_data[xsieve] >= threshold) {
             xpool_data[tmp_length] = (int32_t)xindex;
@@ -1418,13 +1390,13 @@ static void scan_sieve(siqs_context_t* const context) {
         xsieve += 8;
         niter--;
     }
-    
+
 #endif
 
   clean_and_return:
 
     *scan_begin   = xindex;
-    xpool->length = tmp_length;    
+    xpool->length = tmp_length;
 }
 //-----------------------------------------------------------------------------
 
@@ -1447,7 +1419,7 @@ static void init_startup_data(siqs_context_t* const context) {
     uint32_array_t* const factor_base     = context->factor_base;
     byte_array_t*   const log_factor_base = context->log_factor_base;
     uint32_array_t* const sqrtm_pi        = context->sqrtm_pi;
-    
+
     const mpz_srcptr kn = context->kn;
     //
     // Always put 2 in the factor base...
@@ -1527,7 +1499,7 @@ static void determine_first_a(siqs_context_t* const context) {
     //
           mpz_ptr approxed  = context->a;
     const mpz_ptr to_approx = context->to_approx;
-    
+
     const uint32_array_t* const base = context->factor_base;
           uint32_t*       const imin = &(context->imin);
           uint32_t*       const imax = &(context->imax);
@@ -1693,9 +1665,6 @@ static ecode_t determine_next_a(siqs_context_t* const context) {
 
         context->Bl = alloc_mpz_array(context->nprimes_in_a);
 
-        for (uint32_t i = 0; i < context->nprimes_in_a; i++) {
-            mpz_init(context->Bl->data[i]);
-        }
         for (uint32_t i = 0; i < context->factor_base->length; i++) {
             free(context->Bainv2[i]);
             context->Bainv2[i] = malloc(
@@ -1716,19 +1685,19 @@ static ecode_t init_first_polynomial(siqs_context_t* const context) {
     //
     const uint32_array_t* factor_base = context->factor_base;
     const uint32_array_t* sqrtm_pi    = context->sqrtm_pi;
-    
+
     const uint32_t imin = context->imin;
     const uint32_t imax = context->imax;
     const mpz_ptr a     = context->a;
     mpz_ptr b           = context->b;
     mpz_ptr c           = context->c;
-    
+
     mpz_array_t*    const Bl   = context->Bl;
     uint32_array_t* const sol1 = context->sol1;
     uint32_array_t* const sol2 = context->sol2;
 
     uint32_t** Bainv2 = context->Bainv2;
-    
+
     ecode_t ecode = SUCCESS;
 
     mpz_t inv;
@@ -1886,14 +1855,14 @@ static void init_next_polynomial(siqs_context_t* const context) {
     const uint32_t imax = context->imax;
     mpz_ptr b           = context->b;
     mpz_ptr c           = context->c;
-    
+
     const uint32_array_t* const base = context->factor_base;
     const mpz_array_t*    const Bl   = context->Bl;
-    
+
     uint32_t**      const Bainv2 = context->Bainv2;
     uint32_array_t* const sol1   = context->sol1;
     uint32_array_t* const sol2   = context->sol2;
-    
+
     //
     // Compute the 'b' coefficient of the next polynomial to use
     //
@@ -1988,9 +1957,9 @@ static void compute_reduced_polynomial_values(siqs_context_t* const context) {
     mpz_array_t* const cand_u       = context->cand_u;
     mpz_array_t* const cand_redgx   = context->cand_redgx;
     mpz_array_t* const cand_a_array = context->cand_a_array;
-    
+
     const int32_array_t* const x = context->xpool;
-    
+
     mpz_t rgx;
     mpz_init(rgx);
 

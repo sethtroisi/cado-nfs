@@ -30,6 +30,10 @@
  */
 
 #if !defined(_TIFA_EXIT_CODES_H_)
+   /**
+    * \def _TIFA_EXIT_CODES_H_
+    * Standard include guard.
+    */
 #define _TIFA_EXIT_CODES_H_
 
 #ifdef __cplusplus

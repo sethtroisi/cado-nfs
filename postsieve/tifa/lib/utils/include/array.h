@@ -20,8 +20,8 @@
 /**
  * \file    array.h
  * \author  Jerome Milan
- * \date    Wed Oct 17 2007
- * \version 1.1
+ * \date    Fri Feb 29 2008
+ * \version 1.2
  *
  * \brief Higher level arrays and associated functions.
  *
@@ -35,14 +35,23 @@
  * \li \c alloced - The maximum number of element the array can accomodate
  * \li \c length - The current number of element in the array
  * \li \c data - A pointer to the allocated memory space of \c alloced elements
+ *
+ * \warning Since version 1.2 memory management for \c mpz_array_t's has
+ * changed. See alloc_mpz_array for more information.
  */
-
+ 
  /*
-  *  History:
-  *    1.1: Wed Oct 17 2007 by JM:
-  *         - Added byte_array_t with corresponding functions.
-  *    1.0: Wed Mar 1 2006 by JM:
-  *         - Initial version.
+  * History:
+  * --------
+  *   1.2: Fri Feb 29 2008 by JM:
+  *        - WARNING: Semantic of mpz_array_t's length field has changed!.
+  *                   Now length is only the "useful part" of the array, but
+  *                   the data field is completely mpz_init'ed (i.e. up to
+  *                   the alloced field, not longer up to length).
+  *   1.1: Wed Oct 17 2007 by JM:
+  *        - Added byte_array_t with corresponding functions.
+  *   1.0: Wed Mar 1 2006 by JM:
+  *        - Initial version.
   */
 
 #if !defined(_TIFA_ARRAY_H_)
@@ -161,7 +170,7 @@ void clear_byte_array(byte_array_t* const array);
     *
     * \param[in] alloced The new maximum length of the \c byte_array_t to
     *                    resize.
-    * \return array A pointer to the \c byte_array_t to resize.
+    * \param[in] array A pointer to the \c byte_array_t to resize.
     */
 void resize_byte_array(byte_array_t* const array, uint32_t alloced);
 
@@ -394,7 +403,7 @@ void clear_uint32_array(uint32_array_t* const array);
     *
     * \param[in] alloced The new maximum length of the \c uint32_array_t to
     *                    resize.
-    * \return array A pointer to the \c uint32_array_t to resize.
+    * \param[in] array A pointer to the \c uint32_array_t to resize.
     */
 void resize_uint32_array(uint32_array_t* const array, uint32_t alloced);
 
@@ -476,7 +485,6 @@ void ins_sort_uint32_array(uint32_array_t* const array);
     * \param[in] array A pointer to the <tt>uint32_array_t</tt> to sort.
     */
 void qsort_uint32_array(uint32_array_t* const array);
-
 
    /**
     * \brief Returns the position of an integer in a <tt>uint32_array_t</tt>.
@@ -629,7 +637,7 @@ void clear_int32_array(int32_array_t* const array);
     *
     * \param[in] alloced The new maximum length of the \c int32_array_t to
     *                    resize.
-    * \return array A pointer to the \c int32_array_t to resize.
+    * \param[in] array A pointer to the \c int32_array_t to resize.
     */
 void resize_int32_array(int32_array_t* const array, uint32_t alloced);
 
@@ -788,8 +796,14 @@ struct struct_mpz_array_t {
         */
     uint32_t alloced;
        /**
-        * Current number of \c mpz_t elements hold in the array pointed by the
-        * structure's \c data field.
+        * Current number of "useful" \c mpz_t elements hold in the array
+        * pointed by the structure's \c data field.
+        *
+        * \warning Prior to version 1.2, the \c length field also indicated
+        * which positions had been \c mpz_init'ed in the \c data field. Since 
+        * version 1.2 this is no longer true. Now all positions in the \c data
+        * array are \c mpz_init'ed and \c length only gives which part of the
+        * array is useful from the client standpoint.
         */
     uint32_t length;
        /**
@@ -806,14 +820,20 @@ typedef struct struct_mpz_array_t mpz_array_t;
 
    /**
     * \brief Allocates and returns a new <tt>mpz_array_t</tt>.
-    *
+    * 
     * Allocates and returns a new <tt>mpz_array_t</tt> such that:
     * \li its \c alloced field is set to the parameter length.
     * \li its \c length field is set to zero.
-    * \li its \c data array is left \e uninitialized.
+    * \li its \c data array is fully \c mpz_init'ed.
     *
     * \param[in] length The maximum length of the \c mpz_array_t to allocate.
     * \return A pointer to the newly allocated \c mpz_array_t structure.
+    *
+    * \warning Since version 1.2, the \c data field is completely
+    * \c mpz_init'ed (from \c data[0] to \c data[\c alloced -1]) whereas
+    * older versions did not \c mpz_init anything. This change in behaviour
+    * was prompted by the need to avoid multiple memory deallocations and
+    * reallocations when using the same \c mpz_array_t repeatedly.
     */
 mpz_array_t* alloc_mpz_array(uint32_t length);
 
@@ -839,21 +859,21 @@ void clear_mpz_array(mpz_array_t* const array);
     *
     * \param[in] alloced The new maximum length of the \c mpz_array_t to
     *                    resize.
-    * \return array A pointer to the \c mpz_array_t to resize.
+    * \param[in] array A pointer to the \c mpz_array_t to resize.
     */
 void resize_mpz_array(mpz_array_t* const array, uint32_t alloced);
 
    /**
     * \brief Resets an <tt>mpz_array_t</tt>.
     *
-    * Resets an <tt>mpz_array_t</tt>, i.e.:
-    *
-    *   \li Clears all of its \c mpz_t elements via \c mpz_clear;
-    *   \li Sets its \c length field to zero.
+    * Resets the \c length field of \c array to zero.
     *
     * Note that its \c alloced field is left unchanged and that memory for
-    * \c alloced \c mpz_t elements is still allocated (even tough the elements
-    * still have to be initialized).
+    * \c alloced \c mpz_t elements is still allocated (all the elements
+    * remaining fully \c mpz_init'ed).
+    *
+    * \warning Prior to 1.2 when the semantic was different, this function used
+    * to \c mpz_clear all positions in \c array->data. This is no longer true.
     *
     * \param[in] array A pointer to the <tt>mpz_array_t</tt> to clear.
     */
@@ -944,7 +964,7 @@ uint32_t index_in_mpz_array(const mpz_t to_find,
     * signed <tt>int32_t</tt>.
     *
     * \param[in] to_find The \c mpz_t integer to find in the \c mpz_array_t.
-    * \param[in] array   A pointer to the \e sorted <tt>mpz_array_t</tt>.
+    * \param[in] sorted_array   A pointer to the \e sorted <tt>mpz_array_t</tt>.
     * \param[in] min_index The beginning of the sorted array portion to
     *                      search in.
     * \param[in] max_index The end of the sorted array portion to search in.
@@ -1092,7 +1112,7 @@ void clear_binary_array(binary_array_t* const array);
     *
     * \param[in] alloced The new maximum length of the \c binary_array_t to
     *                    resize.
-    * \return array A pointer to the \c binary_array_t to resize.
+    * \param[in] array A pointer to the \c binary_array_t to resize.
     */
 void resize_binary_array(binary_array_t* const array, uint32_t alloced);
 

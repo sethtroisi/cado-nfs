@@ -34,8 +34,12 @@
  * more likely to occur.
  */
 
-#if !defined(_TIFA_TIFA_H_)
-#define _TIFA_TIFA_H_
+#if !defined(_TIFA_TIFA_INTERNALS_H_)
+   /**
+    * \def _TIFA_TIFA_INTERNALS_H_
+    * Standard include guard.
+    */
+#define _TIFA_TIFA_INTERNALS_H_
 
 //
 // The following symbols need to be defined before including messages.h

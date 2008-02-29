@@ -110,16 +110,20 @@
 // For positions greater than MAX_X_FOR_FULL_LOG_APPROX, just use the logarithm
 // of g(avx) where avx is the average value of x in the sieve chunk to scan.
 //
-#define MAX_X_FOR_FULL_LOG_APPROX 2048
+#define MAX_X_FOR_FULL_LOG_APPROX  2048
 //
 // Minimum number of candidates for smoothness test
 //
-#define MIN_SIZE_SMOOTHNESS_BATCH 64
+#define MIN_SIZE_SMOOTHNESS_BATCH  64
 //
 // Number of ranges for the size of the number to factor. Each range is
 // define by the optimal value of the factor base's size to use.
 //
 #define NRANGES 18
+//
+// Set to non zero to bypass manual unrolling of the tigh loops.
+//
+#define NO_MANUAL_UNROLLING        0
 //-----------------------------------------------------------------------------
 
 //-----------------------------------------------------------------------------
@@ -339,7 +343,11 @@ static void compute_polynomial_values(
 //-----------------------------------------------------------------------------
 static void fill_sieve(qs_context_t* const sieve);
 //-----------------------------------------------------------------------------
-static void scan_sieve(qs_context_t* const context);
+inline static void scan_sieve(qs_context_t* const context);
+//-----------------------------------------------------------------------------
+static void scan_positive_side(qs_context_t* const context);
+//-----------------------------------------------------------------------------
+static void scan_negative_side(qs_context_t* const context);
 //-----------------------------------------------------------------------------
 inline uint32_t get_sieve_threshold(const uint32_t log_sqrtn, const uint32_t x);
 //-----------------------------------------------------------------------------
@@ -502,15 +510,6 @@ static ecode_t init_qs_context(factoring_machine_t* const machine) {
     context->cand_gx = alloc_mpz_array(context->to_collect);
     context->cand_u  = alloc_mpz_array(context->to_collect);
 
-    for (uint32_t i = 0; i < context->to_collect; i++) {
-        //
-        // We fully initialize these arrays since they will be used over
-        // and over again. Of course, we should remember to reset their
-        // lengths to their alloced values before clearing them!
-        //
-        mpz_init(context->cand_gx->data[i]);
-        mpz_init(context->cand_u->data[i]);
-    }
     context->cand_u->length  = context->cand_u->alloced;
     context->cand_gx->length = context->cand_gx->alloced;
 
@@ -550,14 +549,6 @@ static ecode_t clear_qs_context(factoring_machine_t* const machine) {
     qs_context_t* context = (qs_context_t*) machine->context;
 
     if (context != NULL) {
-        //
-        // Since the folowing arrays were fully initialized, don't forget to
-        // set their current length to their alloced length before clearing
-        // them...
-        //
-        context->cand_u->length  = context->cand_u->alloced;
-        context->cand_gx->length = context->cand_gx->alloced;
-        context->xpool->length   = context->xpool->alloced;
 
         clear_mpz_array(context->cand_u);
         free(context->cand_u);
@@ -849,7 +840,7 @@ static ecode_t recurse(mpz_array_t* const factors, uint32_array_t* const multis,
                        const mpz_t n, factoring_mode_t mode) {
 
     return tifa_factor(factors, multis, n, mode);
-    
+
     //
     // The following code should be used to factor a number using _only_ QS.
     //
@@ -883,23 +874,24 @@ static void fill_sieve(qs_context_t* const context) {
     // _TO_DO_: Also sieve with small powers of the few smallest primes in the
     //          factor base.
     //
-    byte_array_t* const sieve                 = context->sieve;
-    const long int sieve_begin                = context->sieve_begin;
-    const uint32_array_t* const factor_base   = context->factor_base;
-    const byte_array_t* const log_factor_base = context->log_factor_base;
-    const uint32_array_t* const sol1          = context->sol1;
-    const uint32_array_t* const sol2          = context->sol2;
+          byte_array_t*   const sieve           = context->sieve;
+    const uint32_array_t* const factor_base     = context->factor_base;
+    const byte_array_t*   const log_factor_base = context->log_factor_base;
+    const uint32_array_t* const sol1            = context->sol1;
+    const uint32_array_t* const sol2            = context->sol2;
 
-    uint32_t logp     = 0;
+    const long int sieve_begin = context->sieve_begin;
+    const long int sieve_end   = sieve_begin + sieve->length - 1;
+
     long int imax     = 0;
     long int imin     = 0;
-    uint32_t curprime = 0;
-    uint32_t cursol   = 0;
     long int sindex   = 0;
     long int smin     = 0;
     long int smax     = 0;
 
-    const long int sieve_end = sieve_begin + sieve->length - 1;
+    uint32_t logp     = 0;
+    uint32_t curprime = 0;
+    uint32_t cursol   = 0;
 
     //
     // (Re-)initialize the sieve array with zeroes...
@@ -942,7 +934,7 @@ static void fill_sieve(qs_context_t* const context) {
 
     if (smin <= smax) {
         sindex = smin;
-        for (int i = imin; i <= imax; i++) {
+        for (int32_t i = imax; i >= imin; i--) {
             sieve->data[sindex] += 1;
             sindex += 2;
         }
@@ -992,10 +984,43 @@ static void fill_sieve(qs_context_t* const context) {
         }
         if (smin <= smax) {
             sindex = smin;
-            for (int i = imin; i <= imax; i++) {
+
+#if NO_MANUAL_UNROLLING
+            for (int32_t i = imax; i >= imin; i--) {
                 sieve->data[sindex] += logp;
                 sindex += curprime;
             }
+#else
+            int count = (imax - imin + 1);
+            int niter = count >> 3;
+            int ncase = count & 7;
+
+            switch (ncase) {
+                case 7: sieve->data[sindex] += logp; sindex += curprime;
+                case 6: sieve->data[sindex] += logp; sindex += curprime;
+                case 5: sieve->data[sindex] += logp; sindex += curprime;
+                case 4: sieve->data[sindex] += logp; sindex += curprime;
+                case 3: sieve->data[sindex] += logp; sindex += curprime;
+                case 2: sieve->data[sindex] += logp; sindex += curprime;
+                case 1: sieve->data[sindex] += logp; sindex += curprime;
+                default: break;
+            }
+
+            while (niter > 0) {
+                sieve->data[sindex]                             += logp;
+                sieve->data[sindex+curprime]                    += logp;
+                sieve->data[sindex+(curprime<<1)]               += logp;
+                sieve->data[sindex+(curprime<<1)+curprime]      += logp;
+                sieve->data[sindex+(curprime<<2)]               += logp;
+                sieve->data[sindex+(curprime<<2)+curprime]      += logp;
+                sieve->data[sindex+(curprime<<2)+(curprime<<1)] += logp;
+                sieve->data[sindex+(curprime<<2)
+                            +(curprime<<1)+curprime]            += logp;
+                sindex += (curprime << 3);
+                niter--;
+            }
+#endif
+
         }
         //
         // Sieve with sol2
@@ -1027,29 +1052,56 @@ static void fill_sieve(qs_context_t* const context) {
         }
         if (smin <= smax) {
             sindex = smin;
-            for (int i = imin; i <= imax; i++) {
+
+#if NO_MANUAL_UNROLLING
+            for (int32_t i = imax; i >= imin; i--) {
                 sieve->data[sindex] += logp;
                 sindex += curprime;
             }
+#else
+            int count = (imax - imin + 1);
+            int niter = count >> 3;
+            int ncase = count & 7;
+            
+            switch (ncase) {
+                case 7 :  sieve->data[sindex] += logp; sindex += curprime;
+                case 6 :  sieve->data[sindex] += logp; sindex += curprime;
+                case 5 :  sieve->data[sindex] += logp; sindex += curprime;
+                case 4 :  sieve->data[sindex] += logp; sindex += curprime;
+                case 3 :  sieve->data[sindex] += logp; sindex += curprime;
+                case 2 :  sieve->data[sindex] += logp; sindex += curprime;
+                case 1 :  sieve->data[sindex] += logp; sindex += curprime;
+                default: break;
+            }
+            
+            while (niter > 0) {
+                sieve->data[sindex]                             += logp;
+                sieve->data[sindex+curprime]                    += logp;
+                sieve->data[sindex+(curprime<<1)]               += logp;
+                sieve->data[sindex+(curprime<<1)+curprime]      += logp;
+                sieve->data[sindex+(curprime<<2)]               += logp;
+                sieve->data[sindex+(curprime<<2)+curprime]      += logp;
+                sieve->data[sindex+(curprime<<2)+(curprime<<1)] += logp;
+                sieve->data[sindex+(curprime<<2)
+                            +(curprime<<1)+curprime]            += logp;
+                sindex += (curprime << 3);
+                niter--;
+            }
+#endif
+
         }
     }
 }
 //-----------------------------------------------------------------------------
-static void scan_sieve(qs_context_t* const context) {
-    //
-    // _NOTE_: Use local variables to avoid numerous readings of non constant
-    //         pointed data...
-    //
-    int32_array_t* const xpool      = context->xpool;
-    int32_t* const xpool_data       = xpool->data;
-    uint32_t xpool_length           = xpool->length;
-    const byte_array_t* const sieve = context->sieve;
-    const long int sieve_begin      = context->sieve_begin;
-    uint32_t scan_begin             = context->scan_begin;
-    const uint32_t log_sqrtn        = context->log_sqrtn;
-    const uint32_t loglast          = context->loglast;
-    const uint32_t to_collect       = context->to_collect;
-
+inline static void scan_sieve(qs_context_t* const context) {
+    if (context->sieve_negative_side) {
+        scan_negative_side(context);
+    } else {
+        scan_positive_side(context);
+    }
+}
+//-----------------------------------------------------------------------------
+static void scan_negative_side(qs_context_t* const context) {
     //
     // Scans the sieve array 'sieve' beginning at the position 'scan_begin'
     // and stores in 'xpool' only the locations x for which:
@@ -1071,192 +1123,228 @@ static void scan_sieve(qs_context_t* const context) {
     //      much in the sieving interval.
     //
     // _NOTE_: scan_begin is given as a _relative_ value in the given chunk
-    //         i.e. 0 <= scan_begin < sieve->alloced. If we are scanning on
-    //         the positive side (i.e. context->sieve_negative_side==false)
-    //         we start at the beginning of the array (or at the next unscanned
-    //         position) and scan towards +infinity. If we are scanning on the
-    //         negative side, we start at the end of the array and scan towards
-    //         -infinity.
+    //         i.e. 0 <= scan_begin < sieve->alloced. Since we are scanning on
+    //         the negative side, we start at the end (or at the next unscanned
+    //         position) of the array and scan towards -infinity.
     //
+    const byte_array_t*  const sieve      = context->sieve;
+          int32_array_t* const xpool      = context->xpool;
+          int32_t*       const xpool_data = xpool->data;
+
+    const long int sieve_begin = context->sieve_begin;
+
+          uint32_t xpool_length = xpool->length;
+          uint32_t scan_begin   = context->scan_begin;
+    const uint32_t log_sqrtn    = context->log_sqrtn;
+    const uint32_t loglast      = context->loglast;
+    const uint32_t to_collect   = context->to_collect;
+
     context->chunk_fully_scanned = false;
 
-    if (! context->sieve_negative_side) {
-        //
-        // Scanning on the positive side (with x >= 0)
-        //
-        if (scan_begin + sieve_begin <= MAX_X_FOR_FULL_LOG_APPROX) {
+    if (sieve_begin + (long int)scan_begin >= -MAX_X_FOR_FULL_LOG_APPROX) {
+        uint32_t global_x  = -(sieve_begin + (long int)scan_begin);
+        uint32_t threshold = 0;
+        uint32_t scan_end  = MAX(
+                                0,
+                                -sieve_begin - MAX_X_FOR_FULL_LOG_APPROX
+                             );
+        scan_begin++;
 
-            uint32_t global_x  = scan_begin + sieve_begin;
-            uint32_t threshold = 0;
-            uint32_t scan_end  = MIN(
-                                     sieve->length - 1,
-                                     MAX_X_FOR_FULL_LOG_APPROX
-                                 );
-            
-            while (scan_begin <= scan_end) {
-                //
-                // We compute a different 'threshold' for each x as it can
-                // significantly vary for small x values.
-                //
-                threshold = get_sieve_threshold(log_sqrtn, global_x);
-                
-                
-                if (loglast < threshold) {
-                    threshold -= loglast;
-                    threshold  = (uint32_t)(
-                                   (float)threshold * SIEVE_THRESHOLD_MULTIPLIER
-                                 );
-                } else {
-                    threshold = 1;
-                }
-                
-                if (sieve->data[scan_begin] >= threshold) {
-                    //
-                    // Check passed: store this x in the xpool array...
-                    //
-                    xpool_data[xpool_length] = global_x;
-                    xpool_length++;
-                    if (xpool_length == to_collect) {
-                        if (scan_begin == scan_end) {
-                            context->chunk_fully_scanned = true;
-                        }
-                        scan_begin++;
-                        goto update_context_and_return;
-                    }
-                }
-                scan_begin++;
-                global_x++;
-            }
-        }
-
-        if (scan_begin < sieve->length) {
+        while (scan_begin != scan_end) {
+            scan_begin--;
             //
-            // Just compute 'threshold' for the average value of x in the sieve
-            // chunk to scan. In practice, this won't make any difference and
-            // can save a few cycles.
+            // We compute a different 'threshold' for each x as it can
+            // significantly vary for small x values.
             //
-            uint32_t average_x = scan_begin + sieve_begin;
-            average_x         += (sieve->length - scan_begin) / 2;
-
-            uint32_t threshold = get_sieve_threshold(log_sqrtn, average_x);
+            threshold = get_sieve_threshold(log_sqrtn, global_x);
 
             if (loglast < threshold) {
                 threshold -= loglast;
                 threshold  = (uint32_t)(
-                                 (float)threshold
-                               * SIEVE_THRESHOLD_MULTIPLIER
+                               (float)threshold * SIEVE_THRESHOLD_MULTIPLIER
                              );
             } else {
                 threshold = 1;
             }
 
-            while (scan_begin < sieve->length) {
-                if (sieve->data[scan_begin] >= threshold) {
-                    //
-                    // Check passed: store this x in the xpool array...
-                    //
-                    xpool_data[xpool_length] = scan_begin + sieve_begin;
-                    xpool_length++;
-                    if (xpool_length == to_collect) {
-                        if (scan_begin == sieve->length - 1) {
-                            context->chunk_fully_scanned = true;
-                        }
-                        scan_begin++;
-                        goto update_context_and_return;
-                    }
-                }
-                scan_begin++;
-            }
-        }
-        context->chunk_fully_scanned = true;
-
-    } else {
-        //
-        // Scanning on the negative side (with x < 0)
-        //
-        if (sieve_begin + (long int)scan_begin >= -MAX_X_FOR_FULL_LOG_APPROX) {
-            uint32_t global_x  = -(sieve_begin + (long int)scan_begin);
-            uint32_t threshold = 0;
-            uint32_t scan_end  = MAX(
-                                    0,
-                                    -sieve_begin - MAX_X_FOR_FULL_LOG_APPROX
-                                 );
-            scan_begin++;
-
-            while (scan_begin != scan_end) {
-                scan_begin--;
+            if (sieve->data[scan_begin] >= threshold) {
                 //
-                // We compute a different 'threshold' for each x as it can
-                // significantly vary for small x values.
+                // Check passed: store this x in the xpool array...
                 //
-                threshold = get_sieve_threshold(log_sqrtn, global_x);
-
-                if (loglast < threshold) {
-                    threshold -= loglast;
-                    threshold  = (uint32_t)(
-                                   (float)threshold * SIEVE_THRESHOLD_MULTIPLIER
-                                 );
-                } else {
-                    threshold = 1;
-                }
-
-                if (sieve->data[scan_begin] >= threshold) {
-                    //
-                    // Check passed: store this x in the xpool array...
-                    //
-                    xpool_data[xpool_length] = -((long int)global_x);
-                    xpool_length++;
-                    if (xpool_length == to_collect) {
-                        if (scan_begin == 0) {
-                            context->chunk_fully_scanned = true;
-                        }
-                        goto update_context_and_return;
+                xpool_data[xpool_length] = -((long int)global_x);
+                xpool_length++;
+                if (xpool_length == to_collect) {
+                    if (scan_begin == 0) {
+                        context->chunk_fully_scanned = true;
                     }
-                }
-                global_x++;
-            }
-        }
-
-        if (scan_begin != 0) {
-            //
-            // Just compute 'threshold' for the average value of x in the sieve
-            // chunk to scan. In practice, this won't make any difference and
-            // can save a few (not really significant) cycles.
-            //
-            uint32_t average_x = ABS(sieve_begin) - scan_begin / 2;
-            uint32_t threshold = get_sieve_threshold(log_sqrtn, average_x);
-
-            if (loglast < threshold) {
-                threshold -= loglast;
-                threshold  = (uint32_t)(
-                                 (float)threshold
-                               * SIEVE_THRESHOLD_MULTIPLIER
-                             );
-            } else {
-                threshold = 1;
-            }
-            scan_begin++;
-
-            while (scan_begin != 0) {
-                scan_begin--;
-
-                if (sieve->data[scan_begin] >= threshold) {
-                    //
-                    // Check passed: store this x in the xpool array...
-                    //
-                    xpool_data[xpool_length] = scan_begin + sieve_begin;
-                    xpool_length++;
-                    if (xpool_length == to_collect) {
-                        if (scan_begin == 0) {
-                            context->chunk_fully_scanned = true;
-                        }
-                        goto update_context_and_return;
-                    }
+                    goto update_context_and_return;
                 }
             }
+            global_x++;
         }
-        context->chunk_fully_scanned = true;
     }
+
+    if (scan_begin != 0) {
+        //
+        // Just compute 'threshold' for the average value of x in the sieve
+        // chunk to scan. In practice, this won't make any difference and
+        // can save a few (not really significant) cycles.
+        //
+        uint32_t average_x = ABS(sieve_begin) - scan_begin / 2;
+        uint32_t threshold = get_sieve_threshold(log_sqrtn, average_x);
+
+        if (loglast < threshold) {
+            threshold -= loglast;
+            threshold  = (uint32_t)(
+                             (float)threshold * SIEVE_THRESHOLD_MULTIPLIER
+                         );
+        } else {
+            threshold = 1;
+        }
+        scan_begin++;
+
+        int32_t global_x = scan_begin + sieve_begin;
+
+        while (scan_begin != 0) {
+            scan_begin--;
+            global_x--;
+
+            if (sieve->data[scan_begin] >= threshold) {
+                //
+                // Check passed: store this x in the xpool array...
+                //
+                xpool_data[xpool_length] = global_x;
+                xpool_length++;
+                if (xpool_length == to_collect) {
+                    if (scan_begin == 0) {
+                        context->chunk_fully_scanned = true;
+                    }
+                    goto update_context_and_return;
+                }
+            }
+        }
+    }
+    context->chunk_fully_scanned = true;
+
+  update_context_and_return:
+
+    context->scan_begin    = scan_begin;
+    context->xpool->length = xpool_length;
+}
+//-----------------------------------------------------------------------------
+static void scan_positive_side(qs_context_t* const context) {
+    //
+    // Scans the sieve array 'sieve' beginning at the position 'scan_begin'
+    // and stores in 'xpool' only the locations x for which:
+    //
+    //    sieve->data[x] >= 'threshold'
+    //
+    // where 'threshold' is computed as in the scan_negative_side function.
+    //
+    // _NOTE_: scan_begin is given as a _relative_ value in the given chunk
+    //         i.e. 0 <= scan_begin < sieve->alloced. Since we are scanning on
+    //         the positive side we start at the beginning of the array (or at
+    //         the next unscanned position) and scan towards +infinity.
+    //
+    const byte_array_t*  const sieve      = context->sieve;
+          int32_array_t* const xpool      = context->xpool;
+          int32_t*       const xpool_data = xpool->data;
+
+    const long int sieve_begin = context->sieve_begin;
+
+          uint32_t xpool_length = xpool->length;
+          uint32_t scan_begin   = context->scan_begin;
+    const uint32_t log_sqrtn    = context->log_sqrtn;
+    const uint32_t loglast      = context->loglast;
+    const uint32_t to_collect   = context->to_collect;
+
+    context->chunk_fully_scanned = false;
+
+    //
+    // Scanning on the positive side (with x >= 0)
+    //
+    if (scan_begin + sieve_begin <= MAX_X_FOR_FULL_LOG_APPROX) {
+
+        uint32_t global_x  = scan_begin + sieve_begin;
+        uint32_t threshold = 0;
+        uint32_t scan_end  = MIN(sieve->length - 1, MAX_X_FOR_FULL_LOG_APPROX);
+
+        while (scan_begin <= scan_end) {
+            //
+            // We compute a different 'threshold' for each x as it can
+            // significantly vary for small x values.
+            //
+            threshold = get_sieve_threshold(log_sqrtn, global_x);
+
+            if (loglast < threshold) {
+                threshold -= loglast;
+                threshold  = (uint32_t)(
+                               (float)threshold * SIEVE_THRESHOLD_MULTIPLIER
+                             );
+            } else {
+                threshold = 1;
+            }
+
+            if (sieve->data[scan_begin] >= threshold) {
+                //
+                // Check passed: store this x in the xpool array...
+                //
+                xpool_data[xpool_length] = global_x;
+                xpool_length++;
+                if (xpool_length == to_collect) {
+                    if (scan_begin == scan_end) {
+                        context->chunk_fully_scanned = true;
+                    }
+                    scan_begin++;
+                    goto update_context_and_return;
+                }
+            }
+            scan_begin++;
+            global_x++;
+        }
+    }
+
+    if (scan_begin < sieve->length) {
+        //
+        // Just compute 'threshold' for the average value of x in the sieve
+        // chunk to scan. In practice, this won't make any difference and
+        // can save a few cycles.
+        //
+        uint32_t average_x = scan_begin + sieve_begin;
+        average_x         += (sieve->length - scan_begin) / 2;
+
+        uint32_t threshold = get_sieve_threshold(log_sqrtn, average_x);
+
+        if (loglast < threshold) {
+            threshold -= loglast;
+            threshold  = (uint32_t)(
+                             (float)threshold * SIEVE_THRESHOLD_MULTIPLIER
+                         );
+        } else {
+            threshold = 1;
+        }
+        uint32_t global_x  = scan_begin + sieve_begin;
+
+        while (scan_begin < sieve->length) {
+            if (sieve->data[scan_begin] >= threshold) {
+                //
+                // Check passed: store this x in the xpool array...
+                //
+                xpool_data[xpool_length] = global_x;
+                xpool_length++;
+                if (xpool_length == to_collect) {
+                    if (scan_begin == sieve->length - 1) {
+                        context->chunk_fully_scanned = true;
+                    }
+                    scan_begin++;
+                    goto update_context_and_return;
+                }
+            }
+            scan_begin++;
+            global_x++;
+        }
+    }
+    context->chunk_fully_scanned = true;
 
   update_context_and_return:
 

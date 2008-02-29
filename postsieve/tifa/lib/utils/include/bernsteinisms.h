@@ -474,7 +474,7 @@ uint32_t bern_21_pairs_lp(
     * \param[out] xi A pointer to the \c x_i associated to the {p_j}-smooth
     *                \c y_i integer.
     * \param[out] smooth_yi A pointer to the {p_j}-smooth \c y_i integer.
-    * \param[out] a_for_smooth_yi A pointer to the array of the
+    * \param[out] a_for_smooth_gx A pointer to the array of the \c a_i integers.
     * \param[in] cand_xi A pointer to the list of the \c x_i integers.
     * \param[in] cand_yi A pointer to the list of the \c y_i integers.
     * \param[in] cand_a A pointer to the list of the \c a_i integers associated
@@ -540,7 +540,7 @@ uint32_t bern_21_rt_pairs_siqs(
     * \param[out] xi A pointer to the \c x_i associated to the {p_j}-smooth
     *                \c y_i integer.
     * \param[out] smooth_yi A pointer to the {p_j}-smooth \c y_i integer.
-    * \param[out] a_for_smooth_yi A pointer to the array of the
+    * \param[out] a_for_smooth_yi A pointer to the array of the \c a_i integers.
     * \param[in] cand_xi A pointer to the list of the \c x_i integers.
     * \param[in] cand_yi A pointer to the list of the \c y_i integers.
     * \param[in] cand_a A pointer to the list of the \c a_i integers associated
@@ -586,15 +586,15 @@ uint32_t bern_21_rt_pairs_lp_siqs(
     *
     * An early abort strategy is performed.
     *
-    * \li If 1 <= \c step < \c filter->nsteps:<br />
+    * \li If 1 <= \c step < \c filter->nsteps:<br>
     * Relations at step \c step-1 from \c filter,  
     * (\c filter->filtered_*[\c step-1]) are used as "candidate" arrays to
     * populate either \c filter->accepted_* or \c filter->filtered_*[step].
     * 
-    * \li If \c step == 0:<br />
+    * \li If \c step == 0:<br>
     * The candidate relations are taken from \c filter->candidate_*.
     *
-    * \li If \c step == \c filter->nsteps:<br />
+    * \li If \c step == \c filter->nsteps:<br>
     * The candidate relations are taken from
     * \c filter->filtered_*[\c filter->nsteps - 1] and 'good' relations
     * will be stored in \c filter->accepted_*.

@@ -31,6 +31,10 @@
  */
 
 #if !defined(_TIFA_STOPWATCH_H_)
+   /**
+    * \def _TIFA_STOPWATCH_H_
+    * Standard include guard.
+    */
 #define _TIFA_STOPWATCH_H_
 
 #ifdef __cplusplus

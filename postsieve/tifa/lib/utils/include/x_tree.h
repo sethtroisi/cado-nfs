@@ -116,6 +116,7 @@ mpz_tree_t* prod_tree(const mpz_array_t* const array);
     *
     * \param[in] array Pointer to the \c mpz_array_t containing the
     *                  \c mpz_t integers to multiply.
+    * \param[in] n     The positive modulo.
     * \return A pointer to a newly allocated \c mpz_tree_t holding the
     * computed product tree.
     */

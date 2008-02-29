@@ -473,18 +473,15 @@ static ecode_t init_cfrac_context(factoring_machine_t* const machine) {
     // the impact of the batch sizes.
     //
     const uint32_t e = 6;
-
-    context->candidate_yi = alloc_mpz_array(1 << e);
-    context->candidate_xi = alloc_mpz_array(1 << e);
+    
     //
     // _TO_DO_: Since the maximum size of the yi is known we can actually
     //          allocate all the space needed by hand with only one call to
     //          malloc. Fix this is next code revision...
     //
-    for (uint32_t i = 0; i < context->candidate_yi->alloced; i++) {
-        mpz_init(context->candidate_yi->data[i]);
-        mpz_init(context->candidate_xi->data[i]);
-    }
+    context->candidate_yi = alloc_mpz_array(1 << e);
+    context->candidate_xi = alloc_mpz_array(1 << e);
+    
     //
     // Init filter used for smoothness detection.
     //
@@ -529,14 +526,7 @@ static ecode_t clear_cfrac_context(factoring_machine_t* const machine) {
     if (context != NULL) {
         mpz_clear(context->n);
         mpz_clear(context->kn);
-        //
-        // Since the candidate_* arrays were fully initialized, don't forget to
-        // set their current length to their alloced length before clearing
-        // them...
-        //
-        context->candidate_yi->length = context->candidate_yi->alloced;
-        context->candidate_xi->length = context->candidate_xi->alloced;
-
+        
         clear_mpz_array(context->all_accepted_yi);
         free(context->all_accepted_yi);
 

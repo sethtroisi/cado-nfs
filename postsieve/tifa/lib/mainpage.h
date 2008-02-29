@@ -18,6 +18,10 @@
 //
 
 #if !defined(_TIFA_MAINPAGE_H_)
+   /**
+    * \def _TIFA_MAINPAGE_H_
+    * Standard include guard.
+    */
 #define _TIFA_MAINPAGE_H_
 
 /**
@@ -41,9 +45,9 @@
  * distributed implementation of the Number Field Sieve, where it could be used 
  * to factor the numerous smaller-sized by-products. 
  *
- * \section license Licence
+ * \section license License
  *
- * The TIFA library is Copyright 2006-2007
+ * The TIFA library is Copyright 2006-2007-2008
  * <a href="http://www.inria.fr/index.en.html">INRIA</a> (French National
  * Institute for Research in Computer Science and Control). The 
  * <strong>TIFA</strong> library is free software; you can redistribute it 
@@ -71,6 +75,7 @@
  *       following factorization algorithms:
  *     <ul>
  *       <li>CFRAC (Continued FRACtion factorization)</li>
+ *       <li>ECM (Elliptic Curve Method)</li>
  *       <li>Fermat (McKee's "fast" variant of Fermat's algorithm)</li>
  *       <li>QS (Quadratic Sieve)</li>
  *       <li>SIQS (Self-Initializing Quadratic Sieve)</li> 
@@ -81,6 +86,7 @@
  *       implemented:
  *     <ul>
  *       <li><tt>cfrac_factors</tt></li>
+ *       <li><tt>ecm_factors</tt></li>
  *       <li><tt>fermat_factors</tt></li>
  *       <li><tt>qs_factors</tt></li>
  *       <li><tt>siqs_factors</tt></li> 

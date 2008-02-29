@@ -56,6 +56,10 @@ extern "C" {
 //
 #if TIFA_PRINT_ERROR
     #if __VERBOSE__
+            /**
+             * \def __ERR_PRFX__
+             * String prefixed to all error messages.
+             */
         #define __ERR_PRFX__ "ERROR: "
         
             /**
@@ -69,7 +73,7 @@ extern "C" {
         } while (0)
             
             /**
-             * \def PRINTF_ERROR(...)
+             * \def PRINT_ERROR(...)
              * Print on the standard error. Messages are prefixed by
              * the name of running algorithm and the function where
              * the error occured.

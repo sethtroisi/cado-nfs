@@ -38,7 +38,7 @@
 
 #if !defined(_TIFA_FACTORING_MACHINE_H_)
    /**
-    * \def _TIFA_MESSAGES_H_
+    * \def _TIFA_FACTORING_MACHINE_H_
     * Standard include guard.
     */
 #define _TIFA_FACTORING_MACHINE_H_

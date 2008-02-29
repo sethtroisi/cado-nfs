@@ -90,7 +90,7 @@ inline void clear_mpz_pair(mpz_pair_t* pair);
     * Empties a <tt>hashtable_t</tt> holding <tt>mpz_pair_t</tt>'s and clears
     * the memory associated to the keys and their associated data.
     *
-    * \param[in] pair A pointer to the <tt>hashtable_t</tt> to empty.
+    * \param[in] htable A pointer to the <tt>hashtable_t</tt> to empty.
     */
 void empty_mpzpair_htable(hashtable_t* const htable);
 
@@ -101,7 +101,7 @@ void empty_mpzpair_htable(hashtable_t* const htable);
     * the memory associated to the keys, their associated data and the
     * hashtable itself.
     *
-    * \param[in] pair A pointer to the <tt>hashtable_t</tt> to clear.
+    * \param[in] htable A pointer to the <tt>hashtable_t</tt> to clear.
     */
 void clear_mpzpair_htable(hashtable_t* const htable);
 

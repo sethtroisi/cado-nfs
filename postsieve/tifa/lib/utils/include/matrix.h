@@ -83,12 +83,12 @@ struct struct_binary_matrix_t {
        /**
         * Maximum number of columns of the matrix.
         * Since bits are packed in \c TIFA_BITSTRING_T elements, the maximum
-        * number of bits per column is 8 * <tt>sizeof(TIFA_BITSTRING_T)<\tt> *
+        * number of bits per column is 8 * <tt>sizeof(TIFA_BITSTRING_T)</tt> *
         * \c nrows_alloced.
         *
         * Hence the total allocated memory for the \c data field is
-        * <tt>nrows_alloced * ncols_alloced *
-        * <tt>sizeof(TIFA_BITSTRING_T)<\tt> bytes.
+        * <tt>nrows_alloced * ncols_alloced</tt> *
+        * <tt>sizeof(TIFA_BITSTRING_T)</tt> bytes.
         */
     uint32_t ncols_alloced;
        /**
@@ -131,8 +131,8 @@ typedef struct struct_binary_matrix_t binary_matrix_t;
     * \param[in] ncols The maximum number of bits per row of the \c
     *                    binary_matrix_t to allocate.
     * \return A pointer to the newly allocated \c binary_matrix_t structure.
-    * Note that this matrix may hold more that ncols bits per column if
-    * ncols is not a multiple of 8 * <tt>sizeof(TIFA_BITSTRING_T)<\tt>.
+    * Note that this matrix may hold more that \c ncols bits per column if
+    * \c ncols is not a multiple of 8 * <tt>sizeof(TIFA_BITSTRING_T)</tt>.
     */
 binary_matrix_t* alloc_binary_matrix(uint32_t nrows, uint32_t ncols);
 

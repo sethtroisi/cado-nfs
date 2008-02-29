@@ -237,7 +237,6 @@ ecode_t run_program(factoring_program_t* const program) {
         gmp_printf("\t* %Zd (probably prime)\n", n_atd);
         printf("\n");
     }
-
     clear_mpz_array(tdivfactors);
     free(tdivfactors);
 

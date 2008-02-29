@@ -203,6 +203,7 @@ inline uint32_t ceil_log2(uint32_t n);
     * \c n but for different \c factors arrays will build a coprime base for
     * all elements in all the aforementioned \c factors arrays.
     *
+    * \param[in, out] base The found coprime base.
     * \param[in] n A positive integer.
     * \param[in] factors A pointer to an array holding some factors of \c n.
     * \param[in, out] A pointer to the \e unintialized \c mpz_array_t to hold

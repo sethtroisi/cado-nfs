@@ -38,6 +38,10 @@
   */
 
 #if !defined(_TIFA_TIFA_H_)
+   /**
+    * \def _TIFA_TIFA_H_
+    * Standard include guard.
+    */
 #define _TIFA_TIFA_H_
 
 //

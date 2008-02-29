@@ -512,7 +512,7 @@ uint32_t bern_21_rt(mpz_array_t* const smooth,
         //         or not).
         //
         if (0 == mpz_cmp_ui(yk, 0)) {
-            mpz_init_set(smooth->data[smooth->length], xi->data[k]);
+            mpz_set(smooth->data[smooth->length], xi->data[k]);
             smooth->length++;
             if (smooth->length == smooth->alloced) {
                 retval = k + 1;
@@ -527,7 +527,7 @@ uint32_t bern_21_rt(mpz_array_t* const smooth,
         //mpz_init(gcd);
         //mpz_gcd(gcd, yk, xi->data[k]);
         //if (0 == mpz_cmp(xi->data[k], gcd)) {
-        //    mpz_init_set(smooth->data[smooth->length], xi->data[k]);
+        //    mpz_set(smooth->data[smooth->length], xi->data[k]);
         //    smooth->length++;
         //    if (smooth->length == smooth->alloced) {
         //        mpz_clear(gcd);
@@ -578,7 +578,7 @@ uint32_t bern_21(mpz_array_t* const smooth,
         //         or not).
         //
         if (0 == mpz_cmp_ui(yk, 0)) {
-            mpz_init_set(smooth->data[smooth->length], xi->data[k]);
+            mpz_set(smooth->data[smooth->length], xi->data[k]);
             smooth->length++;
             if (smooth->length == smooth->alloced) {
                 retval = k + 1;
@@ -593,7 +593,7 @@ uint32_t bern_21(mpz_array_t* const smooth,
         //mpz_init(gcd);
         //mpz_gcd(gcd, yk, xi->data[k]);
         //if (0 == mpz_cmp(xi->data[k], gcd)) {
-        //    mpz_init_set(smooth->data[smooth->length], xi->data[k]);
+        //    mpz_set(smooth->data[smooth->length], xi->data[k]);
         //    smooth->length++;
         //    if (smooth->length == smooth->alloced) {
         //        mpz_clear(gcd);
@@ -653,8 +653,8 @@ uint32_t bern_21_rt_pairs(mpz_array_t* const xi,
         //         smooth or not).
         //
         if (0 == mpz_sgn(yk)) {
-            mpz_init_set(smooth_yi->data[smooth_yi->length], cand_yi->data[k]);
-            mpz_init_set(xi->data[xi->length], cand_xi->data[k]);
+            mpz_set(smooth_yi->data[smooth_yi->length], cand_yi->data[k]);
+            mpz_set(xi->data[xi->length], cand_xi->data[k]);
 
             smooth_yi->length++;
             xi->length++;
@@ -721,8 +721,8 @@ uint32_t bern_21_pairs(mpz_array_t* const xi,
         //         smooth or not).
         //
         if (0 == mpz_sgn(yk)) {
-            mpz_init_set(smooth_yi->data[smooth_yi->length], cand_yi->data[k]);
-            mpz_init_set(xi->data[xi->length], cand_xi->data[k]);
+            mpz_set(smooth_yi->data[smooth_yi->length], cand_yi->data[k]);
+            mpz_set(xi->data[xi->length], cand_xi->data[k]);
 
             smooth_yi->length++;
             xi->length++;
@@ -795,8 +795,8 @@ uint32_t bern_21_rt_pairs_lp(const mpz_t n,
             // Add cand_yi->data[k] is the smooth_yi array and add
             // cand_xi->data[k] is the xi array.
             //
-            mpz_init_set(smooth_yi->data[smooth_yi->length], cand_yi->data[k]);
-            mpz_init_set(xi->data[xi->length], cand_xi->data[k]);
+            mpz_set(smooth_yi->data[smooth_yi->length], cand_yi->data[k]);
+            mpz_set(xi->data[xi->length], cand_xi->data[k]);
 
             smooth_yi->length++;
             xi->length++;
@@ -852,9 +852,6 @@ uint32_t bern_21_rt_pairs_lp(const mpz_t n,
                         // particular prime number: we can compute a new
                         // pair to add in our arrays xi and smooth_yi
                         //
-                        mpz_init(smooth_yi->data[smooth_yi->length]);
-                        mpz_init(xi->data[xi->length]);
-
                         mpz_mul(smooth_yi->data[smooth_yi->length],
                                 cand_yi->data[k], found->y);
 
@@ -987,8 +984,8 @@ uint32_t bern_21_pairs_lp(const mpz_t n,
             // Add cand_yi->data[k] is the smooth_yi array and add
             // cand_xi->data[k] is the xi array.
             //
-            mpz_init_set(smooth_yi->data[smooth_yi->length], cand_yi->data[k]);
-            mpz_init_set(xi->data[xi->length], cand_xi->data[k]);
+            mpz_set(smooth_yi->data[smooth_yi->length], cand_yi->data[k]);
+            mpz_set(xi->data[xi->length], cand_xi->data[k]);
 
             smooth_yi->length++;
             xi->length++;
@@ -1044,9 +1041,6 @@ uint32_t bern_21_pairs_lp(const mpz_t n,
                         // particular prime number: we can compute a new
                         // pair to add in our arrays xi and smooth_yi
                         //
-                        mpz_init(smooth_yi->data[smooth_yi->length]);
-                        mpz_init(xi->data[xi->length]);
-
                         mpz_mul(smooth_yi->data[smooth_yi->length],
                                 cand_yi->data[k], found->y);
 
@@ -1162,12 +1156,10 @@ uint32_t bern_21_rt_pairs_siqs(mpz_array_t* const xi,
             // Add cand_yi->data[k] is the smooth_yi array and add
             // cand_xi->data[k] is the xi array.
             //
-            mpz_init_set(smooth_yi->data[smooth_yi->length], cand_yi->data[k]);
-            mpz_init_set(xi->data[xi->length], cand_xi->data[k]);
-            mpz_init_set(
-                a_for_smooth_gx->data[a_for_smooth_gx->length],
-                cand_a->data[k]
-            );
+            mpz_set(smooth_yi->data[smooth_yi->length], cand_yi->data[k]);
+            mpz_set(xi->data[xi->length], cand_xi->data[k]);
+            mpz_set(a_for_smooth_gx->data[a_for_smooth_gx->length],
+                    cand_a->data[k]);
             smooth_yi->length++;
             xi->length++;
             a_for_smooth_gx->length++;
@@ -1248,12 +1240,10 @@ uint32_t bern_21_rt_pairs_lp_siqs(const mpz_t n,
             // Add cand_yi->data[k] is the smooth_yi array and add
             // cand_xi->data[k] is the xi array.
             //
-            mpz_init_set(smooth_yi->data[smooth_yi->length], cand_yi->data[k]);
-            mpz_init_set(xi->data[xi->length], cand_xi->data[k]);
-            mpz_init_set(
-                a_for_smooth_gx->data[a_for_smooth_gx->length],
-                cand_a->data[k]
-            );
+            mpz_set(smooth_yi->data[smooth_yi->length], cand_yi->data[k]);
+            mpz_set(xi->data[xi->length], cand_xi->data[k]);
+            mpz_set(a_for_smooth_gx->data[a_for_smooth_gx->length],
+                    cand_a->data[k]);
             smooth_yi->length++;
             xi->length++;
             a_for_smooth_gx->length++;
@@ -1312,10 +1302,7 @@ uint32_t bern_21_rt_pairs_lp_siqs(const mpz_t n,
                         // particular prime number: we can compute a new
                         // pair to add in our arrays xi and smooth_yi
                         //
-                        mpz_init(smooth_yi->data[smooth_yi->length]);
-                        mpz_init(xi->data[xi->length]);
-
-                        mpz_init_set(
+                        mpz_set(
                             a_for_smooth_gx->data[a_for_smooth_gx->length],
                             cand_a->data[k]
                         );
@@ -1473,8 +1460,8 @@ uint32_t djb_batch_rt_no_ea(smooth_filter_t* const filter) {
         //         smooth or not).
         //
         if (0 == mpz_sgn(yk)) {
-            mpz_init_set(acc_yi->data[next], in_yi->data[k]);
-            mpz_init_set(acc_xi->data[next], in_xi->data[k]);
+            mpz_set(acc_yi->data[next], in_yi->data[k]);
+            mpz_set(acc_xi->data[next], in_xi->data[k]);
         
             acc_xi->length++;
             acc_yi->length++;
@@ -1534,9 +1521,6 @@ uint32_t djb_batch_rt_no_ea(smooth_filter_t* const filter) {
                         // particular prime number: we can compute a new
                         // pair to add in our accepted_* arrays.
                         //
-                        mpz_init(acc_yi->data[next]);
-                        mpz_init(acc_xi->data[next]);
-                        
                         mpz_mul(acc_yi->data[next], in_yi->data[k], found->y);
                         mpz_mul(acc_xi->data[next], in_xi->data[k], found->x);
                         
@@ -1683,8 +1667,8 @@ uint32_t djb_batch_rt_step(smooth_filter_t* const filter,
         //
         if (0 == mpz_sgn(yk)) {
 
-            mpz_init_set(acc_yi->data[next_acc], in_yi->data[k]);
-            mpz_init_set(acc_xi->data[next_acc], in_xi->data[k]);
+            mpz_set(acc_yi->data[next_acc], in_yi->data[k]);
+            mpz_set(acc_xi->data[next_acc], in_xi->data[k]);
         
             mpz_mul(
                 acc_yi->data[next_acc],
@@ -1748,9 +1732,6 @@ uint32_t djb_batch_rt_step(smooth_filter_t* const filter,
                         // particular prime number: we can compute a new
                         // pair to add in candidate arrays.
                         //
-                        mpz_init(acc_yi->data[next_acc]);
-                        mpz_init(acc_xi->data[next_acc]);
-                        
                         mpz_mul(
                             acc_yi->data[next_acc],
                             in_yi->data[k],
@@ -1933,8 +1914,8 @@ uint32_t djb_batch_rt_first(smooth_filter_t* const filter) {
         //
         if (0 == mpz_sgn(yk)) {
 
-            mpz_init_set(acc_yi->data[next_acc], in_yi->data[k]);
-            mpz_init_set(acc_xi->data[next_acc], in_xi->data[k]);
+            mpz_set(acc_yi->data[next_acc], in_yi->data[k]);
+            mpz_set(acc_xi->data[next_acc], in_xi->data[k]);
         
             acc_xi->length++;
             acc_yi->length++;
@@ -1993,8 +1974,6 @@ uint32_t djb_batch_rt_first(smooth_filter_t* const filter) {
                         // particular prime number: we can compute a new
                         // pair to add in our accepted_* arrays.
                         //
-                        mpz_init(acc_yi->data[next_acc]);
-                        mpz_init(acc_xi->data[next_acc]);
                         mpz_mul(
                             acc_yi->data[next_acc],
                             in_yi->data[k],
@@ -2164,8 +2143,8 @@ uint32_t djb_batch_rt_last(smooth_filter_t* const filter) {
         //
         if (0 == mpz_sgn(yk)) {
             
-            mpz_init_set(acc_yi->data[next], in_yi->data[k]);
-            mpz_init_set(acc_xi->data[next], in_xi->data[k]);
+            mpz_set(acc_yi->data[next], in_yi->data[k]);
+            mpz_set(acc_xi->data[next], in_xi->data[k]);
         
             mpz_mul(acc_yi->data[next], acc_yi->data[next], cofact->data[k]);
         
@@ -2226,9 +2205,6 @@ uint32_t djb_batch_rt_last(smooth_filter_t* const filter) {
                         // particular prime number: we can compute a new
                         // pair to add in our accepted arrays.
                         //
-                        mpz_init(acc_yi->data[next]);
-                        mpz_init(acc_xi->data[next]);
-                        
                         mpz_mul(acc_yi->data[next], in_yi->data[k], found->y);
                         mpz_mul(acc_xi->data[next], in_xi->data[k], found->x);
                         

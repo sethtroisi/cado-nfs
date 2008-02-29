@@ -56,7 +56,7 @@ void fill_matrix_trial_div(binary_matrix_t* const matrix,
 
     for (uint32_t i = 0; i < nrows_to_add; i++) {
 
-        mpz_init_set(partially_factored->data[i], to_factor->data[i]);
+        mpz_set(partially_factored->data[i], to_factor->data[i]);
 
         if (mpz_sgn(partially_factored->data[i]) == -1) {
             flip_matrix_bit(nrows, 0, matrix);
@@ -105,7 +105,7 @@ void fill_trial_div_decomp(binary_matrix_t* const matrix,
 
     for (uint32_t i = 0; i < nrows_to_add; i++) {
 
-        mpz_init_set(partially_factored->data[i], to_factor->data[i]);
+        mpz_set(partially_factored->data[i], to_factor->data[i]);
 
         if (mpz_sgn(partially_factored->data[i]) == -1) {
             flip_matrix_bit(nrows, 0, matrix);
@@ -434,6 +434,8 @@ ecode_t find_factors_decomp(mpz_array_t*  const factors,
             }
         }
     }
+    free(decomp);
+    
     mpz_clear(x);
     mpz_clear(y);
     mpz_clear(gcd);

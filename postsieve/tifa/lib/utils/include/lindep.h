@@ -147,8 +147,8 @@ void fill_matrix_trial_div(
     * \li In all other cases, the (i-th row, j-th col) position in the matrix
     * contains a 0.
     *
-    * \param[out] matrix A pointer to the binary matrix to fill.
-    * \param[out] matrix A pointer to the byte matrix to fill.
+    * \param[out] matrix        A pointer to the binary matrix to fill.
+    * \param[out] decomp_matrix A pointer to the byte matrix to fill.
     * \param[out] partially_factored A pointer to the partially factored
     *                                integers.
     * \param[in] to_factor A pointer to the array listing the integers to
@@ -228,10 +228,10 @@ void fill_matrix_from_list(
     * \li In all other cases, the (i-th row, j-th col) position in the matrix
     * contains a 0.
     *
-    * \param[out] matrix A pointer to the binary matrix to fill.
-    * \param[out] matrix A pointer to the byte matrix to fill.
-    * \param[out] smooth_array A pointer to the array giving the integers
-    *                          to factor.
+    * \param[out] matrix        A pointer to the binary matrix to fill.
+    * \param[out] decomp_matrix A pointer to the byte matrix to fill.
+    * \param[out] smooth_array  A pointer to the array giving the integers
+    *                           to factor.
     * \param[in] list A pointer to the factor list for each integer to factor.
     * \param[in] factor_base  A pointer to the array listing the integers
     *                         to trial divide by.

@@ -246,8 +246,8 @@ int main(int argc, char** argv) {
     program.algo_name = "CFRAC";
     program.params    = (void*) &params;
     //program.mode      = FIND_SOME_FACTORS;
-    //program.mode      = FIND_COMPLETE_FACTORIZATION;
-    program.mode      = SINGLE_RUN;
+    program.mode      = FIND_COMPLETE_FACTORIZATION;
+    //program.mode      = SINGLE_RUN;
 
     program.print_usage_func           = print_usage;
     program.print_params_func          = print_params;

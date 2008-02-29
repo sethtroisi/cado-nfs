@@ -41,7 +41,7 @@
     * \def _TIFA_GAUSS_ELIM_H_
     * Standard include guard.
     */
-#define _GAUSS_ELIM_H_
+#define _TIFA_GAUSS_ELIM_H_
 
 #ifdef __cplusplus
 extern "C" {

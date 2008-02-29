@@ -74,7 +74,7 @@ extern "C" {
     */
 #define CFRAC_DFLT_NRELATIONS       32
    /**
-    * \def CFRAC_DFLT_LSR_METHOD
+    * \def CFRAC_DFLT_LINALG_METHOD
     * Default linear system resolution method to use.
     */
 #define CFRAC_DFLT_LINALG_METHOD    SMART_GAUSS_ELIM

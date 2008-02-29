@@ -888,7 +888,7 @@ static ecode_t phase_2(factoring_machine_t* const machine) {
         mpz_set(context->SX[1], xq);
         mpz_set(context->SZ[1], zq);
     }
-    double_point(xq, zq, xq, zq, context); // Q = 2.Q0
+    double_point(xq, zq, xq, zq, context); // Q = [2] Q0
 
     mpz_set(xdiff, xq0);
     mpz_set(zdiff, zq0);
