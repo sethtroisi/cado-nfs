@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <inttypes.h> /* for PRIx64 macro */
 #include <math.h>   // for ceiling, floor in cfrac
 #include "cado.h"
 #include "../utils/mod_ul.h"
@@ -38,14 +39,14 @@
 #define MAX_BUF_SIZE 512 /* maximal length of the factorization on each side */
 
 /* concatenate an integer q at the end of s (which might be empty) */
-#define sprintf_cat(s,q)                        \
-  do                                            \
-    {                                           \
-      if (strlen (s) == 0)                      \
-        sprintf (s, "%lx", q);                  \
-      else                                      \
-        sprintf (s + strlen (s), ",%lx", q);    \
-    }                                           \
+#define sprintf_cat(s,q)                                \
+  do                                                    \
+    {                                                   \
+      if (strlen (s) == 0)                              \
+        sprintf (s, "%" PRIx64, q);                     \
+      else                                              \
+        sprintf (s + strlen (s), ",%" PRIx64, q);       \
+    }                                                   \
   while (0)
 
 /* same with gmp_sprintf */
@@ -280,7 +281,8 @@ fb_root_in_qlattice(const fbprime_t p, const fbprime_t R, const sieve_info_t * s
 static void
 special_case_0(unsigned char *S, fbprime_t p, unsigned char logp, const sieve_info_t *si)
 {
-    long i, i0, j;
+    long i, i0;
+    unsigned long j;
     const uint32_t I = si->I;
     const long Is2 = (long)(I>>1);
     unsigned char *S_ptr;
@@ -308,7 +310,8 @@ special_case_0(unsigned char *S, fbprime_t p, unsigned char logp, const sieve_in
 static void
 special_case_p(unsigned char *S, fbprime_t p, unsigned char logp, const sieve_info_t *si)
 {
-    long i, j;
+    long i;
+    unsigned long j;
     const long Is2 = (long)(si->I>>1);
     const uint32_t J = si->J;
     unsigned char *S_ptr;
@@ -542,7 +545,7 @@ static void line_sieve(unsigned char *S, factorbase_degn_t **fb_ptr,
                     i0 = ii0 - (long)(I>>1);
                     S_ptr = S + (j*I + (I>>1));
                     // sieve one j-line
-                    for (; i0 < (I>>1); i0 += p)
+                    for (; i0 < (long) (I>>1); i0 += p)
                       {
                         S_ptr[i0] -= logp;
 #ifdef TRACE_K
@@ -553,7 +556,7 @@ static void line_sieve(unsigned char *S, factorbase_degn_t **fb_ptr,
                       }
                     // update starting point
                     ii0 += r;
-                    if (ii0 >= p)
+                    if (ii0 >= (long) p)
                         ii0 -= p;
 
                 }
@@ -993,7 +996,7 @@ fij_from_f (mpz_t *fij, mpz_t *f, int d, int32_t a0, int32_t a1,
 /* return max |g(x)| for 0 <= x <= s,
    where g(x) = g[d]*x^d + ... + g[1]*x + g[0] */
 static double
-get_maxnorm_aux (double *g, unsigned int d, double s)
+get_maxnorm_aux (double *g, const unsigned int d, double s)
 {
   unsigned int k, l, sign_change, new_sign_change;
   double **dg;    /* derivatives of g */
@@ -1005,7 +1008,7 @@ get_maxnorm_aux (double *g, unsigned int d, double s)
   for (k = 1; k < d; k++) /* dg[k] is the k-th derivative, thus has
                              degree d-k, i.e., d-k+1 coefficients */
     dg[k] = (double*) malloc ((d - k + 1) * sizeof (double));
-  roots = (double*) malloc (d * sizeof (double*));
+  roots = (double*) malloc (d * sizeof (double));
   for (k = 1; k < d; k++)
     for (l = 0; l <= d - k; l++)
       dg[k][l] = (l + 1) * dg[k - 1][l + 1];
@@ -1049,10 +1052,10 @@ get_maxnorm_aux (double *g, unsigned int d, double s)
       if (va > gmax)
         gmax = va;
     }
+  free (roots);
   for (k = 1; k < d; k++)
     free (dg[k]);
   free (dg);
-  free (roots);
   return gmax;
 }
 
@@ -1697,7 +1700,7 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
                             gmp_sprintf_cat (bufa, f_a->data[i]);
                         }
                     }
-                  printf ("%ld,%lu:%s:%s\n", a, b, bufr, bufa);
+                  printf ("%" PRId64 ",%" PRIu64 ":%s:%s\n", a, b, bufr, bufa);
                   fflush (stdout);
                 }
             }
@@ -1941,19 +1944,19 @@ main (int argc, char *argv[])
           }
         else if (argc > 2 && strcmp (argv[1], "-q0") == 0)
           {
-            q0 = strtoul (argv[2], NULL, 10);
+            q0 = strtoull (argv[2], NULL, 10);
             argc -= 2;
             argv += 2;
           }
         else if (argc > 2 && strcmp (argv[1], "-q1") == 0)
           {
-            q1 = strtoul (argv[2], NULL, 10);
+            q1 = strtoull (argv[2], NULL, 10);
             argc -= 2;
             argv += 2;
           }
         else if (argc > 2 && strcmp (argv[1], "-rho") == 0)
           {
-            rho = strtoul (argv[2], NULL, 10);
+            rho = strtoull (argv[2], NULL, 10);
             argc -= 2;
             argv += 2;
           }
@@ -1974,6 +1977,13 @@ main (int argc, char *argv[])
     /* if -q1 is not given, sieve only for q0 */
     if (q1 == 0)
       q1 = q0 + 1;
+
+    /* check that q1 fits into an unsigned long */
+    if (q1 > (uint64_t) ULONG_MAX)
+      {
+        fprintf (stderr, "Error, q1=%" PRIu64 " exceeds ULONG_MAX\n", q1);
+        exit (1);
+      }
 
     if (!read_polynomial (cpoly, polyfilename))
       {
@@ -2015,12 +2025,15 @@ main (int argc, char *argv[])
       {
         while (nroots == 0) /* go to next prime and generate roots */
           {
+            unsigned long q;
+
             q0 = uint64_nextprime (q0);
             if (q0 >= q1)
               goto end;
             si.q = q0;
-            nroots = modul_roots_mod_long (roots, cpoly->f, cpoly->degree, &q0);
-            fprintf (stderr, "# q=%lu: root(s)", q0);
+            q = q0; /* modul_roots_mod_long works on an unsigned long */
+            nroots = modul_roots_mod_long (roots, cpoly->f, cpoly->degree, &q);
+            fprintf (stderr, "# q=%" PRIu64 ": root(s)", q0);
             for (i = 1; i <= nroots; i++)
               fprintf (stderr, " %lu", roots[nroots-i]);
             fprintf (stderr, "\n");
@@ -2032,7 +2045,8 @@ main (int argc, char *argv[])
         if (rho != 0 && si.rho != rho) /* if -rho, wait for wanted root */
           continue;
         SkewGauss (&si, cpoly->skew);
-        fprintf (stderr, "# Sieving q=%lu; rho=%lu; a0=%d; b0=%d; a1=%d; b1=%d\n",
+        fprintf (stderr, "# Sieving q=%" PRIu64 "; rho=%" PRIu64
+                 "; a0=%d; b0=%d; a1=%d; b1=%d\n",
                  si.q, si.rho, si.a0, si.b0, si.a1, si.b1);
         sq ++;
 
