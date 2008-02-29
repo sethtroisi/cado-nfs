@@ -651,7 +651,6 @@ unsigned long checkrels(char *f, cado_poly cpoly,
             printf("%s", line);
             goto next_relation;
         }
-        nrels_in++;
 
         lineptr = line;
 
@@ -660,6 +659,8 @@ unsigned long checkrels(char *f, cado_poly cpoly,
             break;
         }
         lineptr += n;
+
+        nrels_in++;
 
         outlength  = 0;
         outlength += sprintf(outrel, "%ld,%lu:", a, b);

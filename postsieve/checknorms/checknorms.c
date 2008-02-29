@@ -366,8 +366,6 @@ unsigned long checkrels(char *f, cado_poly cpoly,
             }
             goto next_relation;
         }
-        nrels_in++;
-
         lineptr = line;
 
         c = sscanf(lineptr, "%ld,%lu:%n", &a, &b, &n);
@@ -375,7 +373,9 @@ unsigned long checkrels(char *f, cado_poly cpoly,
             break;
         }
         lineptr += n;
-
+        
+        nrels_in++;
+        
         outlength  = 0;
         outlength += sprintf(outrel, "%ld,%lu:", a, b);
 
