@@ -1273,15 +1273,15 @@ factor_leftover_norm (mpz_t n, unsigned int b,
   uint32_t i;
   ecode_t ecode;
 
+  factors->length = 0;
+  multis->length = 0;
+
   if (mpz_sgn (n) < 0)
     mpz_neg (n, n);
 
   /* it seems tifa_factor does not like 1 */
   if (mpz_cmp_ui (n, 1) == 0)
-    {
-      factors->length = 0;
-      return 1;
-    }
+    return 1;
 
   if (IS_PRIME(n))
     {
@@ -1295,8 +1295,6 @@ factor_leftover_norm (mpz_t n, unsigned int b,
         }
     } 
 
-  reset_mpz_array (factors);
-  multis->length = 0;
   ecode = tifa_factor (factors, multis, n, FIND_COMPLETE_FACTORIZATION);
 
   switch (ecode)
@@ -1660,12 +1658,13 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
           /* we do not take q into account for the mfb bound: if we want
              two large primes (lambda = 2, mfb = 2*lpb), then those large
              primes will come in addition to q */
-          if (mpz_sizeinbase (norma, 2) <= (size_t) cpoly->mfba &&
-              !(mpz_sizeinbase (norma, 2) > (size_t) cpoly->lpba &&
-                mpz_probab_prime_p (norma, 1)))
+          large_size = mpz_sizeinbase (norma, 2);
+          if (large_size <= cpoly->mfba &&
+              !(large_size > cpoly->lpba && mpz_probab_prime_p (norma, 1)))
             {
               /* now trial divide the rational norm */
               eval_fij (normr, cpoly->g, 1, a, b);
+
               /* we know the product of large primes is T[0][l], thus we can
                  divide them out */
               mpz_divexact (normr, normr, T[0][l]);
@@ -1899,13 +1898,15 @@ main (int argc, char *argv[])
     sieve_info_t si;
     char *fbfilename = NULL, *polyfilename = NULL;
     cado_poly cpoly;
-    double t0, tnorma, tnormr, tfb, ts, tf, tq;
+    double t0, tnorma, tnormr, tfb, ts, tf, tq, ttn, tts, ttf;
     uint64_t q0 = 0, q1 = 0, rho = 0;
     unsigned long *roots, nroots, reports, tot_reports = 0, i;
     unsigned char * S;
     factorbase_degn_t * fb_alg, * fb_rat;
     int checknorms = 0; /* factor or not the remaining norms */
     int I = DEFAULT_I;
+    unsigned long sq = 0;
+    double totJ = 0.0;
 
     fprintf (stderr, "# %s.r%s", argv[0], REV);
     for (i = 1; i < (unsigned int) argc; i++)
@@ -2009,6 +2010,7 @@ main (int argc, char *argv[])
     roots = (unsigned long*) malloc (cpoly->degree * sizeof (unsigned long));
     q0 --; /* so that nextprime gives q0 if q0 is prime */
     nroots = 0;
+    ttn = tts = ttf = 0.0;
     while (q0 < q1)
       {
         while (nroots == 0) /* go to next prime and generate roots */
@@ -2027,14 +2029,16 @@ main (int argc, char *argv[])
 
         /* computes a0, b0, a1, b1 from q, rho, and the skewness */
         si.rho = roots[--nroots];
-        if (rho != 0 && si.rho != rho)
+        if (rho != 0 && si.rho != rho) /* if -rho, wait for wanted root */
           continue;
         SkewGauss (&si, cpoly->skew);
         fprintf (stderr, "# Sieving q=%lu; rho=%lu; a0=%d; b0=%d; a1=%d; b1=%d\n",
                  si.q, si.rho, si.a0, si.b0, si.a1, si.b1);
+        sq ++;
 
         /* checks the value of J */
         sieve_info_update (&si, cpoly->skew);
+        totJ += (double) si.J;
 
         /* norm computation */
         tnorma = seconds ();
@@ -2085,6 +2089,9 @@ main (int argc, char *argv[])
         fprintf (stderr, "# Time for this (q,rho): %1.1fs [norm %1.1f,"
                  " sieving %1.1f, factor %1.1f]\n", tq, tnorma + tnormr, ts,
                  tf);
+        ttn = ttn + tnorma + tnormr;
+        tts = tts + ts;
+        ttf = ttf + tf;
         if (tot_reports != 0)
           fprintf (stderr, "# Reports for this (q,rho): %lu, total %lu,"
                    " rate %1.2fs/r\n#\n", reports, tot_reports,
@@ -2094,8 +2101,11 @@ main (int argc, char *argv[])
 
  end:
     t0 = seconds () - t0;
-    fprintf (stderr, "# Total sieving time %1.1fs for %lu reports [%1.2fs/r]\n",
-             t0, tot_reports, t0 / (double) tot_reports);
+    fprintf (stderr, "# Average J = %1.0f\n", totJ / (double) sq);
+    fprintf (stderr, "# Total time %1.1fs [norm %1.1f, sieving %1.1f,"
+             " factor %1.1f]\n", t0, ttn, tts, ttf);
+    fprintf (stderr, "# Total %lu reports [%1.2fs/r]\n",
+             tot_reports, t0 / (double) tot_reports);
 
     free (fb_alg);
     free (fb_rat);
