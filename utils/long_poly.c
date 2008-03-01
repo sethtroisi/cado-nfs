@@ -8,7 +8,7 @@
    Assumes that (p-1)+deg(f)*(p-1)^2 fits in a long [for long_poly_div_r],
    where f is the algebraic polynomial. This gives the following bounds:
 
-   deg(f)      32-bit machine      64-bit machine
+   deg(f)      LONG=int32_t        LONG=int64_t
      2         p <= 32749          p <= 2147483647
      3         p <= 26737          p <= 1753413037
      4         p <= 23167          p <= 1518500213
@@ -21,12 +21,18 @@
 #include <limits.h>
 #include "utils.h"
 
-/* return non-zero if (p-1)+d*(p-1)^2 fits in a long */
+/* return non-zero if (p-1)+d*(p-1)^2 fits in type LONG (defined in utils.h) */
 int
-long_poly_fits (unsigned int d, long p)
+long_poly_fits (unsigned int d, LONG p)
 {
-  long max;
+  LONG max = 0;
 
+  if (sizeof (LONG) == sizeof (int32_t))
+    max = INT32_MAX;
+  else if (sizeof (LONG) == sizeof (int64_t))
+    max = INT64_MAX;
+  ASSERT_ALWAYS (max != 0);
+      
   max = LONG_MAX - (p - 1); /* > 0 since p <= LONG_MAX */
 
   /* computes floor(max/d) */

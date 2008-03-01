@@ -143,7 +143,7 @@ makefb_with_powers(FILE *fp, cado_poly cpoly)
 {
   unsigned long p;
   int d = cpoly->degree;
-  long *roots, r;
+  LONG *roots, r;
   int nroots, i, j;
   unsigned long power_lim;
 
@@ -185,7 +185,7 @@ makefb_with_powers(FILE *fp, cado_poly cpoly)
       if (long_poly_fits (d, p))
         nroots = roots_mod_long (roots, cpoly->f, d, p);
       else
-        nroots = modul_roots_mod_long ((unsigned long*) roots, cpoly->f, d, &p);
+        nroots = modul_roots_mod_int64 (roots, cpoly->f, d, &p);
       /* normalize roots in [0, p-1] */
       for (i = 0; i < nroots; i++)
         if (roots[i] < 0)
@@ -259,7 +259,7 @@ makefb (FILE *fp, cado_poly cpoly)
       if (long_poly_fits (d, p))
         nroots = roots_mod_long (roots, cpoly->f, d, p);
       else
-        nroots = modul_roots_mod_long ((unsigned long *) roots, cpoly->f, d, &p);
+        nroots = modul_roots_mod_int64 (roots, cpoly->f, d, &p);
       /* normalize roots in [0, p-1] */
       for (i = 0; i < nroots; i++)
         if (roots[i] < 0)

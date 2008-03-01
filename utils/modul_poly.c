@@ -592,6 +592,25 @@ modul_roots_mod_long (LONG *r, mpz_t *f, int d, modulus_t p)
   return df;
 }
 
+int
+modul_roots_mod_int64 (int64_t *r, mpz_t *f, int d, modulus_t p)
+{
+  if (r == NULL && sizeof (LONG) == sizeof (int64_t))
+    return modul_roots_mod_long ((LONG*) r, f, d, p);
+  else
+    {
+      LONG* roots;
+      int i, nroots;
+
+      roots = (LONG*) malloc (d * sizeof (LONG));
+      nroots = modul_roots_mod_long (roots, f, d, p);
+      for (i = 0; i < nroots; i++)
+          r[i] = (int64_t) roots[i];
+      free (roots);
+      return nroots;
+    }
+}
+
 int modul_isirreducible_mod_long(modul_poly_t fp, modulus_t p)
 {
   modul_poly_t g, gmx, h;

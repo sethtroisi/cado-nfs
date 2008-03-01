@@ -81,10 +81,11 @@ void long_poly_init (long_poly_t f, int d);
 void long_poly_clear (long_poly_t f);
 int long_poly_set_mod (long_poly_t fp, mpz_t *f, int d, LONG p);
 int isirreducible_mod_long(long_poly_t fp, const LONG p);
-int long_poly_fits (unsigned int, long);
+int long_poly_fits (unsigned int, LONG);
 
 /* modul_poly */
-int modul_roots_mod_long (unsigned long*, mpz_t*, int, modulus_t);
+int modul_roots_mod_long  (unsigned long*, mpz_t*, int, modulus_t);
+int modul_roots_mod_int64 (int64_t*,       mpz_t*, int, modulus_t);
 
 /* getprime */
 extern unsigned long getprime (unsigned long);
