@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include <inttypes.h> /* for PRIx64 macro */
+#include <inttypes.h> /* for PRIx64 macro and strtoumax */
 #include <math.h>   // for ceiling, floor in cfrac
 #include "cado.h"
 #include "../utils/mod_ul.h"
@@ -59,6 +59,9 @@
         gmp_sprintf (s + strlen (s), ",%Zx", q);        \
     }                                                   \
   while (0)
+
+/* uintmax_t is guaranteed to be larger or equal to uint64_t */
+#define strtouint64(nptr,endptr,base) (uint64_t) strtoumax(nptr,endptr,base)
 
 /* check is a "large" prime is really large, i.e., not in the factor base */
 #define CHECK_LARGE_PRIME(p,lim,s)                                      \
@@ -1944,19 +1947,20 @@ main (int argc, char *argv[])
           }
         else if (argc > 2 && strcmp (argv[1], "-q0") == 0)
           {
-            q0 = strtoull (argv[2], NULL, 10);
+            /* uintmax_t is guaranteed to be larger or equal to uint64_t */
+            q0 = strtouint64 (argv[2], NULL, 10);
             argc -= 2;
             argv += 2;
           }
         else if (argc > 2 && strcmp (argv[1], "-q1") == 0)
           {
-            q1 = strtoull (argv[2], NULL, 10);
+            q1 = strtouint64 (argv[2], NULL, 10);
             argc -= 2;
             argv += 2;
           }
         else if (argc > 2 && strcmp (argv[1], "-rho") == 0)
           {
-            rho = strtoull (argv[2], NULL, 10);
+            rho = strtouint64 (argv[2], NULL, 10);
             argc -= 2;
             argv += 2;
           }
