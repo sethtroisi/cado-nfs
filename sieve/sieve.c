@@ -58,6 +58,9 @@ unsigned long ul_rho_toolarge_nr, ul_rho_toolarge_sum;
 long long ul_rho_time;
 
 #ifdef TRACE_RELATION_A
+
+static void * trace_sieve_location;
+
 static void 
 TRACE_A (long a, const char *fn, const int line, const char *s, ...)
 {
@@ -378,6 +381,14 @@ sieve_small_slow (unsigned char *sievearray, factorbase_small_inited_t *fb,
       while (d < arraylen)
 	{
 	  sievearray[d] -= l;
+#ifdef TRACE_RELATION_A
+          if (sievearray + d == trace_sieve_location)
+            {
+              TRACE_A (TRACE_RELATION_A, __func__, __LINE__, "sieved out "
+                       "prime " FBPRIME_FORMAT ", new normlog is %hhu\n", 
+                       p, sievearray[d]);
+            }
+#endif
 	  d += p;
 	}
       d -= arraylen;
@@ -718,6 +729,14 @@ sieve_one_side (unsigned char *sievearray, factorbase_t fb,
 	  startidx = endidx + 1;
 	}
     }
+
+#ifdef TRACE_RELATION_A
+  if (odd == 0 || TRACE_RELATION_A % 2 == 1)
+    trace_sieve_location = sievearray + 
+                           a_to_sieveidx (TRACE_RELATION_A, amin, odd);
+  else
+    trace_sieve_location = NULL;
+#endif
 
   /* Init small primes for sieving this line */
   tsc1 = clock ();
@@ -1255,27 +1274,27 @@ trialdiv_find_next (factorbase_degn_t *fbptr, const mpz_t norm)
   /* Choose good trial division routine outside of loop over fb primes */
   if (s == 1)
     {
-      while (! trialdiv_with_norm1 (fbptr, norm, add))
+      while (fbptr->p != FB_END && ! trialdiv_with_norm1 (fbptr, norm, add))
         fbptr = fb_next (fbptr);
     }
   else if (s == 2)
     {
-      while (! trialdiv_with_norm2 (fbptr, norm, add))
+      while (fbptr->p != FB_END && ! trialdiv_with_norm2 (fbptr, norm, add))
         fbptr = fb_next (fbptr);
     }
   else if (s == 3)
     {
-      while (! trialdiv_with_norm3 (fbptr, norm, add))
+      while (fbptr->p != FB_END && ! trialdiv_with_norm3 (fbptr, norm, add))
         fbptr = fb_next (fbptr);
     }
   else if (s == 4)
     {
-      while (! trialdiv_with_norm4 (fbptr, norm, add))
+      while (fbptr->p != FB_END && ! trialdiv_with_norm4 (fbptr, norm, add))
         fbptr = fb_next (fbptr);
     }
   else
     {
-      while (! trialdiv_with_norm (fbptr, norm))
+      while (fbptr->p != FB_END && ! trialdiv_with_norm (fbptr, norm))
         fbptr = fb_next (fbptr);
     }
 
