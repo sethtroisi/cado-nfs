@@ -44,8 +44,10 @@ public:
                     npack = slice.i1 - i;
                     next = slice.i1;
                 }
+                /*
                 std::cout << "Packing " << npack << " rows from " << i
                     << " to " << next << std::endl;
+                    */
                 typedef std::vector<std::pair<uint32_t, uint32_t> > L_t;
                 typedef L_t::const_iterator Lci_t;
                 L_t L;
