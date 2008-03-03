@@ -339,8 +339,14 @@ struct polmat { /* {{{ */
         mp_size_t sw = k / GMP_LIMB_BITS;
         mp_size_t sb = k & (GMP_LIMB_BITS - 1);
         unsigned int input_length = BITS_TO_WORDS(k + ncoef2, ULONG_BITS) - sw;
+
+        /* sb might equal zero here, in which case sw >0. So k is
+         * sw * ULONG_BITS, and input_length == newstride
+         */
+
         /* We know that input_length <= stride */
         if (newstride < input_length) {
+            ASSERT(sb && sb < GMP_LIMB_BITS);
             /* {{{ In this case we're encumbered by the fact that
              * mpn_rshift might land outside our main area for the last
              * cell. So we'll use an ugly hack */
@@ -351,7 +357,6 @@ struct polmat { /* {{{ */
             for(j = 0 ; j < ncols-1 ; j++) {
                 const unsigned long * src = poly(0,j);
                 for(i = 0 ; i < nrows ; i++) {
-                    ASSERT(sb && sb < GMP_LIMB_BITS);
                     mpn_rshift(dst, src + sw, input_length, sb);
                     dst += newstride;
                     src += stride();
@@ -361,14 +366,12 @@ struct polmat { /* {{{ */
             {
                 const unsigned long * src = poly(0,j);
                 for(i = 0 ; i < nrows - 1 ; i++) {
-                    ASSERT(sb && sb < GMP_LIMB_BITS);
                     mpn_rshift(dst, src + sw, input_length, sb);
                     dst += newstride;
                     src += stride();
                 }
 
                 unsigned long * tmp = new unsigned long[input_length];
-                ASSERT(sb && sb < GMP_LIMB_BITS);
                 mpn_rshift(tmp, src + sw, input_length, sb);
                 memcpy(dst, tmp, newstride * sizeof(unsigned long));
                 delete[] tmp;
@@ -376,13 +379,26 @@ struct polmat { /* {{{ */
             /*}}}*/
         } else {
             unsigned long * dst = n.poly(0,0);
-            for(unsigned int j = 0 ; j < ncols ; j++) {
-                const unsigned long * src = poly(0,j);
-                for(unsigned int i = 0 ; i < nrows ; i++) {
-                    ASSERT(sb && sb < GMP_LIMB_BITS);
-                    mpn_rshift(dst, src + sw, input_length, sb);
-                    dst += newstride;
-                    src += stride();
+            if (sb == 0) {
+                ASSERT(input_length == newstride);
+                for(unsigned int j = 0 ; j < ncols ; j++) {
+                    const unsigned long * src = poly(0,j);
+                    for(unsigned int i = 0 ; i < nrows ; i++) {
+                        memcpy(dst, src + sw,
+                                newstride * sizeof(unsigned long));
+                        dst += newstride;
+                        src += stride();
+                    }
+                }
+            } else {
+                ASSERT(sb && sb < GMP_LIMB_BITS);
+                for(unsigned int j = 0 ; j < ncols ; j++) {
+                    const unsigned long * src = poly(0,j);
+                    for(unsigned int i = 0 ; i < nrows ; i++) {
+                        mpn_rshift(dst, src + sw, input_length, sb);
+                        dst += newstride;
+                        src += stride();
+                    }
                 }
             }
         }
