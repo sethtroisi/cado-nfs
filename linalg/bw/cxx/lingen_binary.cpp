@@ -1578,7 +1578,7 @@ void block_wiedemann(void)
 
 void usage()
 {
-    die("Usage: ./bw-lingen-binary --subdir <dir> -t <threshold> <matrix name> <m> <n>\n",1);
+    die("Usage: ./bw-lingen-binary --subdir <dir> -t <threshold>\n",1);
 }
 
 int main(int argc, char *argv[])
