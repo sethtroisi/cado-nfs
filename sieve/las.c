@@ -8,6 +8,7 @@
 #include "../utils/mod_ul.h"
 #include "fb.h"
 #include "../utils/utils.h"
+#include "../utils/manu.h"   /* for ctzl */
 #include "basicnt.h" /* for gcd_ul */
 #include <tifa.h>
 #include "bucket.h"
@@ -222,6 +223,45 @@ sieve_info_clear (sieve_info_t *si)
 
 /*****************************************************************************/
 
+
+unsigned long invmod(unsigned long a, unsigned long b) {
+  unsigned long u, v, fix;
+  int t, lsh;
+
+  fix = (b+1)>>1;
+
+  assert (a < b);
+
+  u = 1; v = 0; t = 0;
+  do {
+    do {
+      b -= a; v += u;
+      lsh = ctzl(b);
+      b >>= lsh;
+      t += lsh;
+      u <<= lsh;
+    } while (a<b);
+    if (a == b)
+      break;
+    do {
+      a -= b; u += v;
+      lsh = ctzl(a);
+      a >>= lsh;
+      t += lsh;
+      v <<= lsh;
+    } while (b < a);
+  } while (a != b);
+
+  while (t>0) {
+    unsigned long sig = u & 1UL;
+    u >>= 1;
+    if (sig)
+      u += fix;
+    --t;
+  }
+  return u;
+}
+
 // Compute the root r describing the lattice inside the q-lattice
 // corresponding to the factor base prime (p,R).
 // Formula: r = - (a1-R*b1)/(a0-R*b0) mod p
@@ -230,52 +270,37 @@ sieve_info_clear (sieve_info_t *si)
 fbprime_t
 fb_root_in_qlattice(const fbprime_t p, const fbprime_t R, const sieve_info_t * si)
 {
-    modulus_t m;
-    residueul_t RR, aa, bb, x, y;
-    modul_initmod_ul(m, p);
-    modul_set_ul_reduced(RR, R, m);  // already reduced
+    int64_t aux;
+    uint64_t num, den;
+
     // numerator
-    if (si->a1 < 0) {
-        modul_set_ul_reduced(aa, ((uint32_t) (-si->a1)) % (uint32_t) p, m);
-        modul_neg(aa, aa, m);
-    } else {
-        modul_set_ul_reduced(aa, ((uint32_t) si->a1) % (uint32_t) p, m);
+    aux = ((int64_t)R)*((int64_t)si->b1) - ((int64_t)si->a1); 
+    if (aux >= 0)
+        num = ((uint64_t)aux) % ((uint64_t)p);
+    else {
+        num = ((uint64_t)(-aux)) % ((uint64_t)p);
+        num = (uint64_t)p - num;
     }
-    if (si->b1 < 0) {
-        modul_set_ul_reduced(bb, ((uint32_t) (-si->b1)) % (uint32_t) p, m);
-        modul_neg(bb, bb, m);
-    } else {
-      modul_set_ul_reduced(bb, ((uint32_t) si->b1) % (uint32_t) p, m);
-    }
-
-    modul_mul(x, bb, RR, m);
-    modul_sub(x, aa, x, m);
-    if (modul_is0(x, m))
+    if (num == 0)
         return 0;
-    
-    // denominator
-    if (si->a0 < 0) {
-        modul_set_ul_reduced(aa, ((uint32_t) (-si->a0)) % (uint32_t) p, m);
-        modul_neg(aa, aa, m);
-    } else {
-        modul_set_ul_reduced(aa, ((uint32_t) si->a0) % (uint32_t) p, m);
-    }
-    if (si->b0 < 0) {
-        modul_set_ul_reduced(bb, ((uint32_t) (-si->b0)) % (uint32_t) p, m);
-        modul_neg(bb, bb, m);
-    } else {
-        modul_set_ul_reduced(bb, ((uint32_t) si->b0) % (uint32_t) p, m);
-    }
 
-    modul_mul(y, bb, RR, m);
-    modul_sub(y, y, aa, m);
-    if (modul_is0(y, m))
-        return p;
+    // denominator
+    aux = ((int64_t)si->a0) - ((int64_t)R)*((int64_t)si->b0); 
+    if (aux >= 0) {
+        den = ((uint64_t)aux) % ((uint64_t)p);
+        if (den == 0)
+            return p;
+    } else {
+        den = ((uint64_t)(-aux)) % ((uint64_t)p);
+        if (den == 0)
+            return p;
+        den = (uint64_t)p - den;
+    }
 
     // divide
-    modul_inv(y, y, m);
-    modul_mul(x, x, y, m);
-    return modul_get_ul(x, m);
+    den = invmod(den, p);
+    num = num*den;
+    return (fbprime_t)(num % ((uint64_t) p));
 }
 
 
