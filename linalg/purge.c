@@ -840,10 +840,16 @@ main(int argc, char **argv)
 	Hsize = nprimes;
     else{
 	// estimating the number of primes
+#if 1
+	Hsizer = maxpr / ((int)log((double)maxpr));
+	Hsizea = maxpa / ((int)log((double)maxpa));
+	Hsize = Hsizer + Hsizea;
+#else
 	// TODO: use maxpr and maxpa
 	Hsizer = (1<<pol[0].lpbr)/((int)(pol[0].lpbr * log(2.0)));
 	Hsizea = (1<<pol[0].lpba)/((int)(pol[0].lpba * log(2.0)));
 	Hsize = (Hsizer > Hsizea ? Hsizer : Hsizea);
+#endif
     }
     fprintf(stderr, "initializing hash tables with Hsize=%d...\n", Hsize);
     hashInit(&H, Hsize);
