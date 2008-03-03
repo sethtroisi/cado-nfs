@@ -73,7 +73,7 @@ typedef modulusul_t modulus_t;
 /* Initialises a residue_t type and sets it to zero */
 __GNUC_ATTRIBUTE_UNUSED__
 static inline void
-modul_init (residueul_t r, modulusul_t m __GNUC_ATTRIBUTE_UNUSED__)
+modul_init (residueul_t r, const modulusul_t m __GNUC_ATTRIBUTE_UNUSED__)
 {
   r[0] = 0UL;
   return;
