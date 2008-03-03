@@ -1,4 +1,8 @@
 
+# Sorry, this makefile is kind of ugly, so pending a choice for an
+# appropriate building tool, we'll simply avoid make -j for this one.
+.NOTPARALLEL:
+
 CFLAGS:=-g -O2 -W -Wall -std=c99
 
 ifeq ($(shell arch),i686)
