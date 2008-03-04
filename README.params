@@ -49,6 +49,10 @@ nrel=9501689, nprimes=8801163; excess=700526:
 c130    0.1    50      500      200  133m18  1964206x1964046 W=117322977
 nrel=12893761, nprimes=10951467; excess=1942294:
 c130    0.1    50      500      200   12m24  1855736x1855592 W=102399098
+c130 nrel=4618330, nprimes=4572024; excess=46306                         [1]
+        1.0    40      300      300          1282960x1282800 W=144093260 [1]
+
+[1] with purge -maxpr 80000000 -maxpa 80000000 -keep 500000
 
 For new parameters, some fiddling is needed, with respect to the final
 weight of the small matrix and/or the number of rows/columns depending on

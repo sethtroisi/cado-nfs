@@ -49,5 +49,3 @@ uint64_nextprime (uint64_t q)
   mpz_clear (p);
   return q;
 }
-
-
