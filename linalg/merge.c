@@ -2326,7 +2326,7 @@ mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 		printf("BWCOST: %lu\n", bwcost);
 	}
 	// to be cleaned one day...
-	if(!forbw){
+	if(forbw == 0){
 	    double r = ((double)bwcost)/((double)bwcostmin);
 	    if((r > 1.1) && (mat->rem_nrows-mat->rem_ncols <= mat->delta)){
 		fprintf(stderr, "cN too high, stopping [%2.2lf]\n", r);
@@ -2483,8 +2483,8 @@ main(int argc, char *argv[])
 	    argc -= 1;
 	    argv += 1;
 	}
-	else if (argc > 1 && strcmp (argv[1], "-forbw") == 0){
-	    forbw = 1;
+	else if (argc > 2 && strcmp (argv[1], "-forbw") == 0){
+	    forbw = atoi(argv[2]);
 	    argc -= 1;
 	    argv += 1;
 	}
