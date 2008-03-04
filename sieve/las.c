@@ -19,6 +19,9 @@
 /* default sieve region side is 2^DEFAULT_I */
 #define DEFAULT_I 12
 
+/* optimal bit-size of the product of norms in Bernstein's algorithm */
+#define BERNSTEIN_THRESHOLD 1000000
+
 #define LOG_SCALE 1.4426950408889634 /* 1/log(2) to 17 digits, rounded to
                                         nearest. This is enough to uniquely
                                         identify the corresponding IEEE 754
@@ -99,7 +102,6 @@ typedef struct {
                                  but are not in the factor base (end of list
                                  is 0) */
 } sieve_info_t;
-
 
 /************************** sieve info stuff *********************************/
 
@@ -219,6 +221,107 @@ sieve_info_clear (sieve_info_t *si)
     mpz_clear (si->fij[k]);
   free (si->fij);
   free (si->abadprimes);
+}
+
+/************************** sieve reports stuff ******************************/
+
+static void eval_fij (mpz_t, mpz_t *, unsigned int, long, unsigned long);
+
+/* sieve reports */
+typedef struct {
+  int64_t a;
+  uint64_t b;
+  uint64_t q;          /* special-q (algebraic side for now) */
+  mpz_t normr;         /* norm on rational side */
+  mpz_t norma;         /* norm on algebraic side (after dividing by q) */
+} sieve_report_t;
+
+static void
+sieve_report_init (sieve_report_t *r)
+{
+  mpz_init (r->normr);
+  mpz_init (r->norma);
+}
+
+static void
+sieve_report_clear (sieve_report_t *r)
+{
+  mpz_clear (r->normr);
+  mpz_clear (r->norma);
+}
+
+static void
+sieve_report_set (sieve_report_t *r, int64_t a, uint64_t b, uint64_t q,
+                  cado_poly cpoly)
+{
+  r->a = a;
+  r->b = b;
+  r->q = q;
+  eval_fij (r->norma, cpoly->f, cpoly->degree, a, b);
+  if (q <= (uint64_t) ULONG_MAX)
+    mpz_divexact_ui (r->norma, r->norma, q);
+  else
+    {
+      mpz_set_uint64 (r->normr, q);
+      mpz_divexact (r->norma, r->norma, r->normr);
+    }
+  eval_fij (r->normr, cpoly->g, 1, a, b);
+}
+
+typedef struct {
+  unsigned long alloc;        /* number of allocated entries */
+  unsigned long size;         /* number of sieve reports (size <= alloc) */
+  unsigned long r_bitsize;    /* cumulated bit-size on rational side */
+  unsigned long a_bitsize;    /* cumulated bit-size on algebraic side */
+  sieve_report_t *report;     /* pointer to sieve reports */
+} sieve_report_list_t;
+
+static void
+sieve_report_list_init (sieve_report_list_t *L)
+{
+  L->report = NULL;
+  L->alloc = 0;
+  L->size = 0;
+  L->r_bitsize = 0;
+  L->a_bitsize = 0;
+}
+
+static void
+sieve_report_list_clear (sieve_report_list_t *L)
+{
+  unsigned long i;
+
+  for (i = 0; i < L->size; i++)
+    sieve_report_clear (L->report + i);
+  free (L->report);
+}
+
+static void
+sieve_report_list_reset (sieve_report_list_t *L)
+{
+  L->size = 0;
+  L->r_bitsize = 0;
+  L->a_bitsize = 0;
+}
+
+static void
+sieve_report_list_add (sieve_report_list_t *L, int64_t a, uint64_t b,
+                       uint64_t q, cado_poly cpoly)
+{
+  sieve_report_t *r;
+
+  if (L->size == L->alloc)
+    {
+      L->alloc ++;
+      L->report = (sieve_report_t*) realloc (L->report,
+                                           L->alloc * sizeof (sieve_report_t));
+      sieve_report_init (L->report + L->size);
+    }
+  r = L->report + L->size;
+  sieve_report_set (r, a, b, q, cpoly);
+  L->r_bitsize += mpz_sizeinbase (r->normr, 2);
+  L->a_bitsize += mpz_sizeinbase (r->norma, 2);
+  L->size ++;
 }
 
 /*****************************************************************************/
@@ -1351,12 +1454,55 @@ factor_leftover_norm (mpz_t n, unsigned int b,
   return 0;
 }
 
-/********************* factoring on rational side ****************************/
+/************************ Bernstein's algorithm ******************************/
 
-/* Those routines are a quick-and-dirty implementation which factors remaining
-   norms on the rational side, after sieving on the algebraic side. It will
-   probably become obsolete once sieving is done on the rational side.
-*/
+typedef struct {
+  mpz_t *part;       /* each part[i] is a product of primes */
+  unsigned long len; /* number of elements in part[] */
+} acc_prime_t;
+
+/* put in P all primes in fb, in product of size about BERNSTEIN_THRESHOLD */
+static void
+acc_primes_init (acc_prime_t *P, factorbase_degn_t *fb)
+{
+  unsigned long p, i;
+
+  p = fb->p;
+  P->part = (mpz_t*) malloc (sizeof (mpz_t));
+  P->len = 1;
+  mpz_init_set_ui (P->part[0], 1);
+  i = 0;
+  while (p != FB_END)
+    {
+      mpz_mul_ui (P->part[i], P->part[i], p);
+      /* the threshold BT / 12 was determined by trial and error */
+      if (mpz_sizeinbase (P->part[i], 2) >= BERNSTEIN_THRESHOLD / 12)
+        {
+          P->len = P->len + 1;
+          P->part = (mpz_t*) realloc (P->part, P->len * sizeof (mpz_t));
+          i = i + 1;
+          mpz_init_set_ui (P->part[i], 1);
+        }
+      fb = fb_next (fb);
+      p = fb->p;
+    }
+  if (mpz_cmp_ui (P->part[i], 1) == 0)
+    {
+      mpz_clear (P->part[i]);
+      P->len = P->len - 1;
+      P->part = (mpz_t*) realloc (P->part, P->len * sizeof (mpz_t));
+    }
+}
+
+static void
+acc_primes_clear (acc_prime_t *P)
+{
+  unsigned long i;
+
+  for (i = 0; i < P->len; i++)
+    mpz_clear (P->part[i]);
+  free (P->part);
+}
 
 /* return ceil(log(k)/log(2)), assumes k >= 1 */
 static unsigned int
@@ -1371,6 +1517,54 @@ ceil_log2 (unsigned long k)
     }
   return l;
 }
+
+/* we want a to be multiple of all primes in b anc c */
+static void
+combine_norms (mpz_t a, mpz_t b, mpz_t c)
+{
+  mpz_lcm (a, b, c);
+}
+
+static mpz_t**
+BuildProductTree (sieve_report_t *report, unsigned int **lT0,
+                  unsigned int *h0, unsigned long nreports)
+{
+  mpz_t **T;
+  unsigned int *lT, h, l, k;
+
+  h = ceil_log2 (nreports);
+  T = (mpz_t**) malloc ((h + 1) * sizeof (mpz_t*));
+  lT = (unsigned int*) malloc ((h + 1) * sizeof (unsigned int));
+  for (l = 0; l <= h; l++)
+    {
+      /* T[0] is the level of the leaves, and T[h] is the root of the tree */
+      lT[l] = 1 + ((nreports - 1) >> l);
+      T[l] = (mpz_t*) malloc (lT[l] * sizeof (mpz_t));
+      for (k = 0; k < lT[l]; k++)
+        {
+          mpz_init (T[l][k]);
+          if (l == 0) /* compute rational norms */
+            mpz_set (T[l][k], (report + k)->normr);
+          else /* combine two subtrees */
+            {
+              if (2 * k + 1 < lT[l-1])
+                combine_norms (T[l][k], T[l-1][2*k], T[l-1][2*k+1]);
+              else
+                mpz_set (T[l][k], T[l-1][2*k]);
+            }
+        }
+    }
+  *lT0 = lT;
+  *h0 = h;
+  return T;
+}
+
+/********************* factoring on rational side ****************************/
+
+/* Those routines are a quick-and-dirty implementation which factors remaining
+   norms on the rational side, after sieving on the algebraic side. It will
+   probably become obsolete once sieving is done on the rational side.
+*/
 
 /* Compute gcd(P,t) for all elements of the tree T.
    T[h][0] is the root of the tree. */
@@ -1500,30 +1694,21 @@ trial_divide (char *buf, mpz_t norm, const unsigned long B,
     getprime (0);
 }
 
-/* we want a to be multiple of all primes in b anc c */
-static void
-combine_norms (mpz_t a, mpz_t b, mpz_t c)
-{
-  mpz_lcm (a, b, c);
-}
-
-/* build a product tree with the rational norms,
+/* Build a product tree with the rational norms,
    of height h = ceil(log2(reports)).
    Return the number of reports.
 */
 static unsigned long
-build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
-                      unsigned long reports, factorbase_degn_t *fb_alg)
+build_norms_rational (cado_poly cpoly, sieve_info_t *si,
+                      sieve_report_list_t *Reports, acc_prime_t *P_rat,
+                      acc_prime_t *P_alg, factorbase_degn_t *fb_alg)
 {
-  mpz_t ci, cj, **T, normr, norma;
-  int i;
-  unsigned int k, j, l;
+  mpz_t **T, normr, norma;
+  unsigned int k, l, h, delta;
   unsigned int *lT; /* lT[j] = length of T[j] */
-  unsigned int h = ceil_log2 (reports);
-  unsigned long p;         /* current prime */
+  unsigned int nreports = Reports->size;
   mpz_t *P = NULL;         /* prime accumulator */
   unsigned long aP = 0;    /* allocated cells in P[] */
-  unsigned long lP;        /* number of primes in P[] */
   double tm = seconds (), ttrialr = 0, ttriala = 0, tt, tg = 0;
   unsigned long final_reports = 0, rat_reports = 0, ngcds = 0;
   int64_t a;
@@ -1541,127 +1726,37 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
       m_a = alloc_uint32_array (NFACTORS);
     }
 
-  /* on the rational side, we still are in the q-lattice
-     a = a0*i+a1*j, b = b0*i+b1*j, thus we have to consider
-     the values of g[1]*(a0*i+a1*j) + g[0]*(b0*i+b1*j),
-     which are (g[1]*a0+g[0]*b0)*i + (g[1]*a1+g[0]*b1)*j */
-
-  mpz_init (ci); /* ci = g[1]*a0+g[0]*b0 */
-  mpz_init (cj); /* cj = g[1]*a1+g[0]*b1 */
   mpz_init (normr);
   mpz_init (norma);
 
-  mpz_mul_si (ci, cpoly->g[1], si->a0);
-  mpz_addmul_si (ci, cpoly->g[0], si->b0);
-  mpz_mul_si (cj, cpoly->g[1], si->a1);
-  mpz_addmul_si (cj, cpoly->g[0], si->b1);
+  /* we consider only the last reports whose product of rational norms
+     has about BERNSTEIN_THRESHOLD bits */
+  for (l = 0, k = nreports; l < BERNSTEIN_THRESHOLD && k > 0;)
+    l += mpz_sizeinbase ((Reports->report + --k)->normr, 2);
+  nreports = nreports - k;
+  delta = k;               /* the first delta reports are ignored */
 
-  /* Build the product tree.
-     FIXME: instead of building one (huge) product tree with the norms, and
-     processing it with many (say k) prime trees, we could build k
-     norm-product-trees of about the same size as the prime trees.
-     Conversely, with a subquadratic gcd, we might want to combine the norms
-     of several special-q's together.
-  */
   tt = seconds ();
-  T = (mpz_t**) malloc ((h + 1) * sizeof (mpz_t*));
-  lT = (unsigned int*) malloc ((h + 1) * sizeof (unsigned int));
-  for (l = 0; l <= h; l++)
-    {
-      /* T[0] is the level of the leaves, and T[h] is the root of the tree */
-      lT[l] = 1 + ((reports - 1) >> l);
-      T[l] = (mpz_t*) malloc (lT[l] * sizeof (mpz_t));
-      for (k = 0; k < lT[l]; k++)
-        {
-          mpz_init (T[l][k]);
-          if (l == 0) /* compute rational norms */
-            {
-              xToIJ (&i, &j, report_list[k], si);
-              mpz_mul_si (T[l][k], ci, i);
-              mpz_addmul_ui (T[l][k], cj, j);
-            }
-          else /* combine two subtrees */
-            {
-              if (2 * k + 1 < lT[l-1])
-                combine_norms (T[l][k], T[l-1][2*k], T[l-1][2*k+1]);
-              else
-                mpz_set (T[l][k], T[l-1][2*k]);
-            }
-        }
-    }
+  T = BuildProductTree (Reports->report + delta, &lT, &h, nreports);
   st = mpz_sizeinbase (T[h][0], 2);
   tt = seconds () - tt;
 
-#ifdef VERBOSE
-  fprintf (stderr, "Building the product tree took %1.6fs\n", tt);
-  fprintf (stderr, "Root of product tree has size %lu bits\n", st);
-#endif
-
-  /* FIXME: since the prime trees are invariant, we could compute them
-     once and for all. */
-  for (p = 2, lP = 0; p <= cpoly->rlim; p = getprime (p))
-    {
-      /* invariant: lP is the number of accumulated primes.
-         At first step we have P=[2] then P=[1, 2*3],
-         then [5, 2*3], then [1, 1, 2*3*5*7] */
-      lP ++;
-      if ((lP & (lP - 1)) == 0) /* lP = 2^m: need one more cell in P[] */
-        {
-          aP ++;
-          P = (mpz_t*) realloc (P, aP * sizeof (mpz_t));
-          mpz_init_set_ui (P[aP - 1], 1);
-        }
-      /* FIXME: accumulate t primes instead of one at a time in P[0] */
-      if (lP & 1)
-        mpz_set_ui (P[0], p);
-      else /* lP even */
-        {
-          mpz_mul_ui (P[0], P[0], p);
-          for (k = 0; ((lP >> k) & 1) == 0; k++)
-            {
-              mpz_mul (P[k+1], P[k+1], P[k]);
-              mpz_set_ui (P[k], 1);
-            }
-          if (lP == (1UL << k))
-            {
-              /* The value st / 16 seems to be near to optimal on some
-                 examples; its value depends on the efficiency of the
-                 gcd implementation, which is currently O(n^2) in GMP.
-                 With a subquadratic GCD, we might choose a larger threshold.
-              */
-              if (mpz_sizeinbase (P[k], 2) > st / 16)
-                {
-                  ngcds ++;
-                  tg -= seconds ();
-                  GcdTree (T, lT, h, P[k]);
-                  tg += seconds ();
-                  mpz_set_ui (P[k], 1);
-                  lP = 0;
-                }
-            }
-        }
-    }
-  getprime (0);
-  if (lP != 0) /* accumulate the remaining primes and call GcdTree() */
-    {
-      for (l = 1; l < aP; l++)
-        mpz_mul (P[l], P[l], P[l-1]);
-      ngcds ++;
-      tg -= seconds ();
-      GcdTree (T, lT, h, P[aP-1]);
-      tg += seconds ();
-    }
+  tg -= seconds ();
+  for (k = 0; k < P_rat->len; k++, ngcds ++)
+    GcdTree (T, lT, h, P_rat->part[k]);
+  tg += seconds ();
 
   tm = seconds () - tm;
   fprintf (stderr, "# Bernstein's algo on rat. side took %1.1fs\n", tm);
   fprintf (stderr, "#   (norm tree %1.1f, prime tree %1.1f, %lu gcds %1.1f)\n",
-           tt, tm - tg, ngcds, tg);
+           tt, tm - tt - tg, ngcds, tg);
 
   tm = seconds ();
   /* check leftover norms that are smaller than the given bound */
-  for (l = 0; l < reports; l++)
+  for (l = 0; l < nreports; l++)
     {
       int large_size = mpz_sizeinbase (T[0][l], 2);
+
       /* if T[0][l] is a prime > 2^lpbr, we can ignore the relation */
       if (large_size <= cpoly->mfbr &&
           !(large_size > cpoly->lpbr && mpz_probab_prime_p (T[0][l], 1)))
@@ -1671,14 +1766,12 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
                              and the rational leftover norm is < 2^mfbr
                              and is not a prime > 2^lpbr */
           /* report_list[l] is I/2+i+j*I */
-          xToAB (&a, &b, report_list[l], si);
 
           /* since we know the norm is anyway smooth on the rational side, 
              we delay the trial division after testing the algebraic side */
 
-          eval_fij (norma, cpoly->f, cpoly->degree, a, b);
           /* we know that q divides the norm on the algebraic side */
-          mpz_divexact_ui (norma, norma, si->q);
+          mpz_swap (norma, (Reports->report + delta + l)->norma);
           /* on the algebraic side, we restrict to the factor base primes */
           ttriala -= seconds ();
           /* first divide out the bad primes */
@@ -1694,11 +1787,10 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
               !(large_size > cpoly->lpba && mpz_probab_prime_p (norma, 1)))
             {
               /* now trial divide the rational norm */
-              eval_fij (normr, cpoly->g, 1, a, b);
-
               /* we know the product of large primes is T[0][l], thus we can
                  divide them out */
-              mpz_divexact (normr, normr, T[0][l]);
+              mpz_divexact (normr, (Reports->report + delta + l)->normr,
+                            T[0][l]);
               ttrialr -= seconds ();
               trial_divide (bufr, normr, cpoly->rlim, NULL);
               ttrialr += seconds ();
@@ -1711,7 +1803,8 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
                                                                
                 {
                   final_reports ++;
-                  sprintf_cat (bufa, si->q); /* add large prime on alg. side */
+                  /* add large prime on alg. side */
+                  sprintf_cat (bufa, (Reports->report + delta + l)->q);
                   if (si->checknorms)
                     {
                       uint32_t i, j;
@@ -1728,6 +1821,8 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
                             gmp_sprintf_cat (bufa, f_a->data[i]);
                         }
                     }
+                  a = (Reports->report + delta + l)->a;
+                  b = (Reports->report + delta + l)->b;
                   printf ("%" PRId64 ",%" PRIu64 ":%s:%s\n", a, b, bufr, bufa);
                   fflush (stdout);
                 }
@@ -1748,8 +1843,6 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
     }
   free (T);
   free (lT);
-  mpz_clear (ci);
-  mpz_clear (cj);
   mpz_clear (normr);
   mpz_clear (norma);
 
@@ -1763,15 +1856,18 @@ build_norms_rational (cado_poly cpoly, sieve_info_t *si, int *report_list,
 
   fprintf (stderr, "# Remaining reports on rational side: %lu\n", rat_reports);
 
+  /* update number of reports */
+  Reports->size -= nreports;
+
   return final_reports;
 }
 
-/* Build a list report_list[] of values of k = i + I/2 + I*j where gcd(i,j)=1
-   and norm is small on algebraic side, then pass it to build_norms_rational.
+/* Add to report_list L values of k = i + I/2 + I*j where gcd(i,j)=1
+   and norm is small on rational side.
 */
-static unsigned long
-factor_survivors (cado_poly cpoly, sieve_info_t *si, unsigned char *S,
-                  factorbase_degn_t *fb_alg)
+static void
+sieve_report_list_accumulate (sieve_report_list_t *L, cado_poly cpoly,
+                              sieve_info_t *si, unsigned char *S)
 {
     /* sieve reports are those for which the remaining bit-size is less than
        lambda * lpb */
@@ -1780,9 +1876,6 @@ factor_survivors (cado_poly cpoly, sieve_info_t *si, unsigned char *S,
     int kmin = 0;
     int i;
     unsigned int j, k;
-    int *report_list = NULL; /* list of values of k = i + I/2 + I*j
-                                where norm small on algebraic side */
-    unsigned long reports = 0;
     int64_t a;
     uint64_t b;
 
@@ -1804,9 +1897,7 @@ factor_survivors (cado_poly cpoly, sieve_info_t *si, unsigned char *S,
         b = si->b0;
         ASSERT_ALWAYS(b != 0);
         /* gcd(a0,b0)=1, since it divides q */
-        reports ++;
-        report_list = realloc (report_list, reports * sizeof (int));
-        report_list[reports - 1] = k;
+        sieve_report_list_add (L, a, b, si->q, cpoly);
       }
     for (k = si->I; k < si->I * si->J; ++k)
       {
@@ -1819,20 +1910,12 @@ factor_survivors (cado_poly cpoly, sieve_info_t *si, unsigned char *S,
           {
             /* we already checked gcd(i,j)=1 before, thus necessarily a and
                b are coprime here */
-            reports ++;
-            report_list = realloc (report_list, reports * sizeof (int));
-            report_list[reports - 1] = k;
+            xToAB (&a, &b, k, si);
+            sieve_report_list_add (L, a, b, si->q, cpoly);
           }
       }
     xToIJ(&i, &j, kmin, si);
     fprintf (stderr, "# Min of %d is obtained for (i,j) = (%d,%d)\n", min, i, j);
-    fprintf (stderr, "# Number of reports: %lu\n", reports);
-
-    reports = build_norms_rational (cpoly, si, report_list, reports, fb_alg);
-
-    free (report_list);
-
-    return reports;
 }
 
 /* Initialize lognorms on the rational side. We only initialize cells which
@@ -1929,7 +2012,7 @@ main (int argc, char *argv[])
     sieve_info_t si;
     char *fbfilename = NULL, *polyfilename = NULL;
     cado_poly cpoly;
-    double t0, tnorma, tnormr, tfb, ts, tf, tq, ttn, tts, ttf;
+    double t0, tnorma, tnormr, tfb, ts, tf, tq, ttn, tts, ttf, tp;
     uint64_t q0 = 0, q1 = 0, rho = 0;
     unsigned long *roots, nroots, reports, tot_reports = 0, i;
     unsigned char * S;
@@ -1938,6 +2021,8 @@ main (int argc, char *argv[])
     int I = DEFAULT_I;
     unsigned long sq = 0;
     double totJ = 0.0;
+    sieve_report_list_t Reports[1];
+    acc_prime_t P_rat, P_alg;
 
     fprintf (stderr, "# %s.r%s", argv[0], REV);
     for (i = 1; i < (unsigned int) argc; i++)
@@ -2044,6 +2129,16 @@ main (int argc, char *argv[])
     tfb = seconds () - tfb;
     fprintf (stderr, "# Creating rational factor base took %1.1fs\n", tfb);
 
+    tp = seconds ();
+    acc_primes_init (&P_rat, fb_rat);
+    acc_primes_init (&P_alg, fb_alg);
+    tp = seconds () - tp;
+    fprintf (stderr, "# Initializing %lu+%lu prime products took %1.1fs\n",
+             P_rat.len, P_alg.len, tp);
+
+    /* initialize sieve report list */
+    sieve_report_list_init (Reports);
+
     /* special q (and root rho) */
     t0 = seconds ();
     roots = (unsigned long*) malloc (cpoly->degree * sizeof (unsigned long));
@@ -2123,9 +2218,22 @@ main (int argc, char *argv[])
         ts = seconds () - ts;
         fprintf (stderr, "# Total sieving in %1.1fs\n", ts);
 
+        /* add reports to list */
+        tf = seconds ();
+        sieve_report_list_accumulate (Reports, cpoly, &si, S);
+        tf = seconds () - tf;
+
+        fprintf (stderr, "# Number of reports: %lu", Reports->size);
+        fprintf (stderr, " (rat. bit size %lu, alg. bit size %lu)\n",
+                 Reports->r_bitsize, Reports->a_bitsize);
+
         /* factor survivors */
         tf = seconds ();
-        reports = factor_survivors (cpoly, &si, S, fb_alg);
+        reports = 0;
+        while (Reports->size > 0)
+          reports += build_norms_rational (cpoly, &si, Reports, &P_rat, &P_alg,
+                                           fb_alg);
+        sieve_report_list_reset (Reports);
         tf = seconds () - tf;
         tot_reports += reports;
         tq = seconds() - tq;
@@ -2139,7 +2247,6 @@ main (int argc, char *argv[])
           fprintf (stderr, "# Reports for this (q,rho): %lu, total %lu,"
                    " rate %1.2fs/r\n#\n", reports, tot_reports,
                    (seconds () - t0) / (double) tot_reports);
-
 }
 
  end:
@@ -2155,6 +2262,9 @@ main (int argc, char *argv[])
     sieve_info_clear (&si);
     clear_polynomial (cpoly);
     free (roots);
+    sieve_report_list_clear (Reports);
+    acc_primes_clear (&P_rat);
+    acc_primes_clear (&P_alg);
 
     return 0;
 }
