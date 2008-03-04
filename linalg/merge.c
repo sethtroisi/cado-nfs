@@ -2485,8 +2485,8 @@ main(int argc, char *argv[])
 	}
 	else if (argc > 2 && strcmp (argv[1], "-forbw") == 0){
 	    forbw = atoi(argv[2]);
-	    argc -= 1;
-	    argv += 1;
+	    argc -= 2;
+	    argv += 2;
 	}
 	else 
 	    break;
