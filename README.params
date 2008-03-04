@@ -42,6 +42,14 @@ rsa130  1.0   150      300      300   77m    1318137x1318009 27.5h
 rsa130  1.0   150      300      300   84m    1263362x1263234 15.8h [mt=4]
 (krylov 28195s, gather 96s, mksol 20148s, lingen 7944s, prep 536s, io 35s)
 
+c130    38 134+
+nrel=12893761, nprimes=10951467; excess=1942294:
+c130    1.0   150      300      300   14m02  2055303x2055159 W=116858859
+nrel=9501689, nprimes=8801163; excess=700526:
+c130    0.1    50      500      200  133m18  1964206x1964046 W=117322977
+nrel=12893761, nprimes=10951467; excess=1942294:
+c130    0.1    50      500      200   12m24  1855736x1855592 W=102399098
+
 For new parameters, some fiddling is needed, with respect to the final
 weight of the small matrix and/or the number of rows/columns depending on
 the linear algebra algorithm used.
