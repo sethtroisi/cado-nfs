@@ -101,6 +101,9 @@ typedef struct {
     uint32_t *abadprimes;     /* primes which may appear on the algebraic side
                                  but are not in the factor base (end of list
                                  is 0) */
+    uint32_t *rbadprimes;     /* primes which may appear on the rational side
+                                 but are not in the factor base (end of list
+                                 is 0) */
 } sieve_info_t;
 
 /************************** sieve info stuff *********************************/
@@ -166,20 +169,21 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int I, uint64_t q0)
 }
 
 static void
-compute_badprimes (sieve_info_t *si, cado_poly cpoly, factorbase_degn_t *fb)
+compute_badprimes (sieve_info_t *si, cado_poly cpoly,
+                   factorbase_degn_t *fb_alg, factorbase_degn_t *fb_rat)
 {
   unsigned long p;
   unsigned long l; /* number of bad primes */
 
   l = 0;
   si->abadprimes = (uint32_t*) malloc (sizeof (uint32_t));
-  fprintf (stderr, "# Bad primes:");
+  fprintf (stderr, "# Alg. bad primes:");
   for (p = 2; p <= cpoly->alim; p = getprime (p))
     {
-      if (fb->p != FB_END && fb->p < p)
-        fb = fb_next (fb);
-      /* invariant: p <= fb->p */
-      if (p != fb->p && mpz_divisible_ui_p (cpoly->f[cpoly->degree], p))
+      if (fb_alg->p != FB_END && fb_alg->p < p)
+        fb_alg = fb_next (fb_alg);
+      /* invariant: p <= fb_alg->p */
+      if (p != fb_alg->p && mpz_divisible_ui_p (cpoly->f[cpoly->degree], p))
         {
           l ++;
           si->abadprimes = (uint32_t*) realloc (si->abadprimes,
@@ -189,6 +193,27 @@ compute_badprimes (sieve_info_t *si, cado_poly cpoly, factorbase_degn_t *fb)
         }
     }
   si->abadprimes[l] = 0; /* end of list marker */
+  fprintf (stderr, "\n");
+  getprime (0);
+
+  l = 0;
+  si->rbadprimes = (uint32_t*) malloc (sizeof (uint32_t));
+  fprintf (stderr, "# Rat. bad primes:");
+  for (p = 2; p <= cpoly->rlim; p = getprime (p))
+    {
+      if (fb_rat->p != FB_END && fb_rat->p < p)
+        fb_rat = fb_next (fb_rat);
+      /* invariant: p <= fb_rat->p */
+      if (p != fb_rat->p && mpz_divisible_ui_p (cpoly->g[1], p))
+        {
+          l ++;
+          si->rbadprimes = (uint32_t*) realloc (si->rbadprimes,
+                                                (l + 1) * sizeof (uint32_t));
+          si->rbadprimes[l - 1] = p;
+          fprintf (stderr, " %lu", p);
+        }
+    }
+  si->rbadprimes[l] = 0; /* end of list marker */
   fprintf (stderr, "\n");
   getprime (0);
 }
@@ -1429,7 +1454,9 @@ factor_leftover_norm (mpz_t n, unsigned int b,
         }
     } 
 
+  //  gmp_fprintf (stderr, "enter tifa_factor, n=%Zd\n", n);
   ecode = tifa_factor (factors, multis, n, FIND_COMPLETE_FACTORIZATION);
+  // gmp_fprintf (stderr, "   exit tifa_factor\n");
 
   switch (ecode)
     {
@@ -1461,17 +1488,21 @@ typedef struct {
   unsigned long len; /* number of elements in part[] */
 } acc_prime_t;
 
-/* put in P all primes in fb, in product of size about BERNSTEIN_THRESHOLD */
+/* put in P all primes in fb and bp (badprimes), in products of size about 
+   BERNSTEIN_THRESHOLD bits */
 static void
-acc_primes_init (acc_prime_t *P, factorbase_degn_t *fb)
+acc_primes_init (acc_prime_t *P, factorbase_degn_t *fb, uint32_t *bp)
 {
   unsigned long p, i;
 
-  p = fb->p;
   P->part = (mpz_t*) malloc (sizeof (mpz_t));
   P->len = 1;
   mpz_init_set_ui (P->part[0], 1);
+  for (; bp[0] != 0; bp++)
+    mpz_mul_ui (P->part[0], P->part[0], bp[0]);
+
   i = 0;
+  p = fb->p;
   while (p != FB_END)
     {
       mpz_mul_ui (P->part[i], P->part[i], p);
@@ -2120,8 +2151,6 @@ main (int argc, char *argv[])
     tfb = seconds () - tfb;
     fprintf (stderr, "# Reading algebraic factor base took %1.1fs\n", tfb);
 
-    compute_badprimes (&si, cpoly, fb_alg);
-
     /* Prepare rational factor base */
     tfb = seconds ();
     fb_rat = fb_make_linear (cpoly->g, (fbprime_t) cpoly->rlim, si.scale_rat,
@@ -2129,9 +2158,11 @@ main (int argc, char *argv[])
     tfb = seconds () - tfb;
     fprintf (stderr, "# Creating rational factor base took %1.1fs\n", tfb);
 
+    compute_badprimes (&si, cpoly, fb_alg, fb_rat);
+
     tp = seconds ();
-    acc_primes_init (&P_rat, fb_rat);
-    acc_primes_init (&P_alg, fb_alg);
+    acc_primes_init (&P_rat, fb_rat, si.rbadprimes);
+    acc_primes_init (&P_alg, fb_alg, si.abadprimes);
     tp = seconds () - tp;
     fprintf (stderr, "# Initializing %lu+%lu prime products took %1.1fs\n",
              P_rat.len, P_alg.len, tp);
