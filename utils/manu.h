@@ -182,7 +182,10 @@ extern "C" {
 #endif
 
 
-#ifdef  __GNUC__
+/* FIXME: (PG)
+ * I am not 100% sure that those appeared at version 4 of gcc
+ */ 
+#if defined(__GNUC__) && __GNUC__ >= 4
 #define clzl(x)         __builtin_clzl(x)
 #define ctzl(x)         __builtin_ctzl(x)
 #define parityl(x)      __builtin_parityl(x)
