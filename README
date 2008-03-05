@@ -71,6 +71,47 @@ postsieve/checknorms/checknorms -poly $tmp/$name.poly $tmp/$name.rels_raw \
 /bin/rm -fr $tmp/$name.*
 
 ##############################################################################
+Using merge_linalg_sqrt2.sh
+----------------------------
+
+Since we are having zillions of parameters (and more to come), 
+this script takes as input a configuration file for the filtering phase.
+At the same time, it is designed to handle zillions of relation files if
+needed.
+
+	./merge_linalg_sqrt2.sh name.params rel1 rel2 ... relk
+
+will read files relation files rel1 to relk to form the name.nodup first big
+(as yet) intermediate file. When just 'name.params' is given, the script looks
+for files beginning rels.* and uses them.
+
+A param file consists of lines, as in:
+
+root: Examples/c59b/c59b
+prune: 1.0
+maxlevel: 5
+cwmax: 10
+rwmax: 40
+mt: 4
+bwstrat: 1
+
+mt means multithreading to 4, bwstrat to 1 means use merge and stop when
+cN is "minimal".
+
+Parameters that are not found in the file received default
+values. For instance, you can override the choice of the 'name' parameter
+which defauts to $root.$prune"x"$maxlevel"x"$cwmax"x"$rwmax and can be
+boring for some users. Just put:
+
+name: toto_likes_his_tata
+
+as directory files for intermediate computations if you like.
+
+The param file can contain more parameters that can be deduced from the
+parsing phase of the script. For instance, desperate purge computations
+might use 'maxpr' and 'maxpa', or you can use a different bw-merge strategy.
+
+##############################################################################
 
 (for CACAO members) How to use the files in /net/tiramisu/cado1/cado/Examples:
 ------------------------------------------------------------------------------
