@@ -1379,15 +1379,18 @@ static ecode_t perform_squfof_no_race(factoring_machine_t* const machine) {
     if (IS_EVEN(factor)) {
         factor >>= 1;
     }
-    mpz_t factor_z;
-
-    mpz_init_set_ui(factor_z, factor);
-    append_mpz_to_array(machine->factors, factor_z);
-
-    mpz_divexact(factor_z, context->n, factor_z);
-    append_mpz_to_array(machine->factors, factor_z);
-
-    mpz_clear(factor_z);
+    if (factor != 1) {
+        mpz_t factor_z;
+        
+        mpz_init_set_ui(factor_z, factor);
+        append_mpz_to_array(machine->factors, factor_z);
+        mpz_divexact(factor_z, context->n, factor_z);
+        append_mpz_to_array(machine->factors, factor_z);
+        
+        mpz_clear(factor_z);
+    } else {
+        ecode = NO_FACTOR_FOUND;
+    }
 
   clean_and_return:
 
@@ -1408,7 +1411,7 @@ static ecode_t perform_squfof_race(factoring_machine_t* const machine) {
     bool winner_found      = false;
     squfof_racer_t *winner = NULL;
 
-    ecode_t rcode = 0;
+    ecode_t ecode = 0;
 
     DECL_DIVIDE_VARS;
 
@@ -1452,9 +1455,9 @@ static ecode_t perform_squfof_race(factoring_machine_t* const machine) {
 
             if (RUNNING == context->racers[iracer].status) {
 
-                rcode = cycle_forward(&context->racers[iracer]);
+                ecode = cycle_forward(&context->racers[iracer]);
 
-                if (rcode == SUCCESS) {
+                if (ecode == SUCCESS) {
                     winner       = &context->racers[iracer];
                     winner_found = true;
                     break;
@@ -1472,7 +1475,7 @@ static ecode_t perform_squfof_race(factoring_machine_t* const machine) {
             // failing racer in the race...
             //
             PRINT_FAILURE_NL;
-            return rcode;
+            return ecode;
         }
     }
     
@@ -1615,21 +1618,24 @@ static ecode_t perform_squfof_race(factoring_machine_t* const machine) {
     PRINT_TIMING;
     
   found_factor:
-    
     //
     // Step 5: We found a factor of n
     //
     factor /= gcd_ulint(factor, 2 * winner->multiplier);
-
-    mpz_t factor_z;
-
-    mpz_init_set_ui(factor_z, factor);
-    append_mpz_to_array(machine->factors, factor_z);
-
-    mpz_divexact(factor_z, context->n, factor_z);
-    append_mpz_to_array(machine->factors, factor_z);
-
-    mpz_clear(factor_z);
+        
+    if (factor != 1) {
+        mpz_t factor_z;
+        
+        mpz_init_set_ui(factor_z, factor);
+        append_mpz_to_array(machine->factors, factor_z);
+        
+        mpz_divexact(factor_z, context->n, factor_z);
+        append_mpz_to_array(machine->factors, factor_z);
+        
+        mpz_clear(factor_z);
+    } else {
+        return NO_FACTOR_FOUND;
+    }
 
     return SOME_FACTORS_FOUND;
 }
