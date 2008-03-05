@@ -18,10 +18,18 @@ params=$1; shift
 root=`grep "root: " $params | awk '{print $NF}'`
 if [ "X$root" = "X" ]; then echo "I need at least a name..."; exit; fi
 
+maxpr=`grep "maxpr: " $params | awk '{print $NF}'`
+if [ "X$maxpr" = "X" ]; then maxpr=0; fi
+maxpa=`grep "maxpa: " $params | awk '{print $NF}'`
+if [ "X$maxpa" = "X" ]; then maxpa=0; fi
+keep_purge=`grep "keep: " $params | awk '{print $NF}'`
+if [ "X$keep_purge" = "X" ]; then keep_purge=0; fi
+
 nkermax=`grep "nkermax: " $params | awk '{print $NF}'`
 if [ "X$nkermax" = "X" ]; then nkermax=30; fi
 nchar=`grep "nchar: " $params | awk '{print $NF}'`
 if [ "X$nchar" = "X" ]; then nchar=50; fi
+
 prune=`grep "prune: " $params | awk '{print $NF}'`
 if [ "X$prune" = "X" ]; then prune=1.0; fi
 maxlevel=`grep "maxlevel: " $params | awk '{print $NF}'`
@@ -30,13 +38,17 @@ cwmax=`grep "cwmax: " $params | awk '{print $NF}'`
 if [ "X$cwmax" = "X" ]; then cwmax=10; fi
 rwmax=`grep "rwmax: " $params | awk '{print $NF}'`
 if [ "X$rwmax" = "X" ]; then rwmax=100; fi
-skip=`grep "skip: " $params | awk '{print $NF}'`
-if [ "X$skip" = "X" ]; then skip=32; fi
-##### multithreading in bw
-mt=`grep "mt: " $params | awk '{print $NF}'`
-if [ "X$mt" = "X" ]; then mt=0; fi
+
 verbose=`grep "verbose: " $params | awk '{print $NF}'`
 if [ "X$verbose" = "X" ]; then verbose="-v"; fi
+##### linalg params
+skip=`grep "skip: " $params | awk '{print $NF}'`
+if [ "X$skip" = "X" ]; then skip=32; fi
+bwstrat=`grep "bwstrat: " $params | awk '{print $NF}'`
+if [ "X$bwstrat" = "X" ]; then bwstrat=1; fi
+########## multithreading in bw
+mt=`grep "mt: " $params | awk '{print $NF}'`
+if [ "X$mt" = "X" ]; then mt=0; fi
 
 name=`grep "name: " $params | awk '{print $NF}'`
 if [ "X$name" = "X" ]; then name=$root.$prune"x"$maxlevel"x"$cwmax"x"$rwmax; fi
@@ -64,7 +76,8 @@ then
   echo "File $purged already exists and is newer than $nodup"
 else
   nrels=`wc -l $nodup | awk '{print $1}'`
-  time $linalg/purge -poly $poly -nrels $nrels $nodup > $purged
+  args="-poly $poly -maxpr $maxpr -maxpa $maxpa -keep $keep_purge"
+  time $linalg/purge $args -nrels $nrels $nodup > $purged
   if [ ! -s $purged ]; then echo "zero file $purged"; exit; fi
   excess=`head -1 $purged | awk '{nrows=$1; ncols=$2; print (nrows-ncols)}'`
   echo "excess = $excess"
@@ -88,7 +101,8 @@ fi
 
 nb_merge_max=1000000
 keep=`expr 128 '+' $skip`
-argsa="-forbw -prune $prune -merge $nb_merge_max -mat $purged -keep $keep"
+argsa="-forbw $bwstrat"
+argsa="$argsa -prune $prune -merge $nb_merge_max -mat $purged -keep $keep"
 argsa="$argsa -maxlevel $maxlevel -cwmax $cwmax -rwmax $rwmax $verbose"
 time $linalg/merge $argsa > $name/merge.his # 2> $name.merge.err
 echo "SIZE(merge.his): `ls -s $name/merge.his`"
