@@ -20,11 +20,18 @@
 /**
  * \file    factoring_program.c
  * \author  Jerome Milan
- * \date    Circa February (March?) 2007
- * \version 1.0
+ * \date    Wed Mar 5 2008
+ * \version 1.1
  */
 
-#include <tifa_config.h>
+/*
+ * History:
+ * --------
+ *   1.1: Wed Mar 5 2008 by JM:
+ *        - Rewritten and simplified since tdiv(...) changed.
+ *   1.0: Circa February (March?) 2007 by JM:
+ *        - Initial version.
+ */
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -33,18 +40,26 @@
 #include <stdbool.h>
 #include <string.h>
 
-#include "tool_utils.h"
+#include "tifa_config.h"
+#include "funcs.h"
+#include "macros.h"
 #include "tdiv.h"
 #include "factoring_program.h"
-#include "funcs.h"
-#include "common_funcs.h"
 
+#include "tool_utils.h"
+#include "common_funcs.h"
 
 #define __TIMING__ 1
 #include "../../lib/utils/include/timer.h"
 
-//------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+#define PROG_DFLT_ARRAY_LENGTH 12
+//-----------------------------------------------------------------------------
+void print_factors(mpz_array_t* const, uint32_array_t* const);
+//-----------------------------------------------------------------------------
 ecode_t run_program(factoring_program_t* const program) {
+    
+    ecode_t rcode = NO_FACTOR_FOUND;
     //
     // Reads arguments given on the command line (if any) and initializes
     // all the needed parameters.
@@ -54,198 +69,198 @@ ecode_t run_program(factoring_program_t* const program) {
     //
     // Of course, check if program->n is prime before proceeding.
     //
-    uint32_t is_prime = mpz_probab_prime_p(program->n, NTRIES_MILLER_RABIN);
-    if (2 == is_prime) {
-        gmp_printf("\nOOPS: %Zd is prime!\n", program->n);
+    if (MPZ_IS_PRIME(program->n)) {
+        gmp_printf("\nOOPS: %Zd is (probably) prime!\n", program->n);
         return 0;
     }
-    if (1 == is_prime) {
-        gmp_printf("\nOOPS: %Zd is probably prime!\n", program->n);
-        return 0;
-    }
-
+    
+    //
+    // Prints program's parameters.
+    //
     printf("Parameters used:\n");
     printf("----------------\n");
     program->print_params_func(program);
 
-    printf("\n");
-    printf("Integer to factor:\n");
+    printf("\nInteger to factor:\n");
     printf("------------------\n");
-    gmp_printf("\t%Zd\n", program->n);
-    printf("\n");
+    gmp_printf("\t%Zd\n\n", program->n);
 
     //
-    // The remaining part of program->n (a)fter the (t)rial (d)ivisions.
+    // Factors & multiplicities for program->n.
     //
-    mpz_t n_atd;
-    mpz_init(n_atd);
-
-    //
-    // mpz_array_t holding the factors to find via trial divisions.
-    //
-    mpz_array_t* tdivfactors = alloc_mpz_array(program->nprimes_tdiv);
-
-    //
-    // uint32_array_t holding the multiplicities to find via trial divisions.
-    //
-    uint32_array_t* tdivmultis = alloc_uint32_array(program->nprimes_tdiv);
+    mpz_array_t*    factors = alloc_mpz_array(PROG_DFLT_ARRAY_LENGTH);
+    uint32_array_t* multis  = alloc_uint32_array(PROG_DFLT_ARRAY_LENGTH);
 
     //
     // Proceed with the trial divisions...
     //
-    tdiv(n_atd, tdivfactors, tdivmultis, program->n, program->nprimes_tdiv);
+    ecode_t ecode = tdiv(factors, multis, program->n, program->nprimes_tdiv);
 
-    ecode_t ecode = NO_FACTOR_FOUND;
-
-    if (   (0 != mpz_cmp_ui(n_atd, 1))
-        && (0 == mpz_probab_prime_p(n_atd, NTRIES_MILLER_RABIN)) ) {
+    if (ecode == COMPLETE_FACTORIZATION_FOUND) {
+        printf("\n");
+        print_factors(factors, multis);
+        rcode = COMPLETE_FACTORIZATION_FOUND;
+        goto clear_tdiv_and_return;
+    }
+    
+    //
+    // Some factors were found but they cannot account for the complete
+    // factorization of program->n.
+    //
+    mpz_t unfactored;
+    mpz_init(unfactored);
+    
+    if (ecode == NO_FACTOR_FOUND) {
+        mpz_init_set(unfactored, program->n);
+    } else {
+        mpz_init_set(unfactored, factors->data[factors->length - 1]);
+        factors->length--;
+        multis->length--;
+        rcode = PARTIAL_FACTORIZATION_FOUND;
+    }
+    
+    printf("\n");
+    printf("Integer to factor after trial division:\n");
+    printf("---------------------------------------\n");
+    gmp_printf("\t%Zd\n\n", unfactored);
+    
+    unsigned int shift = 0;
+    //
+    // First, check if the unfactored part is not a perfect square.
+    //
+    while (MPZ_IS_SQUARE(unfactored)) {
+        mpz_sqrt(unfactored, unfactored);
+        shift++;
+        if (mpz_cmp_ui(unfactored, 1) == 0) {
+            break;
+        }
+    }
+    
+    if (MPZ_IS_PRIME(unfactored)) {
         //
-        // After trial division, n_atd is still not prime.
-        // First, check if n_atd is not a perfect square.
+        // We have found the complete factorization!
         //
-        if (0 != mpz_perfect_square_p(n_atd)) {
-            mpz_t sqroot;
-            mpz_init(sqroot);
-            mpz_sqrt(sqroot, n_atd);
-
-            printf("\n");
-            printf("Found %2u Factors:\n", tdivfactors->length + 1);
-            printf("-----------------\n");
-            gmp_printf("%Zd = \n", program->n);
-            if (tdivfactors->length != 0) {
-                gmp_printf("\t  %Zd",        tdivfactors->data[0]);
-                gmp_printf(" ^ %"PRIu32"\n", tdivmultis->data[0]);
-                for (uint32_t i = 1; i < tdivfactors->length; i++) {
-                    gmp_printf("\t* %Zd",        tdivfactors->data[i]);
-                    gmp_printf(" ^ %"PRIu32"\n", tdivmultis->data[i]);
-                }
-                gmp_printf("\t* %Zd ^ 2\n\n", sqroot);
-            } else {
-                gmp_printf("\t %Zd ^ 2\n\n", sqroot);
-            }
-            mpz_clear(sqroot);
-
-        } else {
-            //
-            // Not a square: continue factorization using the given algorithm.
-            //
-            printf("\n");
-            printf("Integer to factor after trial division:\n");
-            printf("---------------------------------------\n");
-            gmp_printf("\t%Zd\n\n", n_atd);
-
-            if (program->verbose || program->timing) {
-                printf("%s trace:\n", program->algo_name);
-                int len = strlen(program->algo_name);
-                for (int i=0; i < len; i++) {
-                    printf("-");
-                }
-                printf("-------\n\n");
-            }
-            mpz_array_t*    progfactors = alloc_mpz_array(program->nfactors);
-            uint32_array_t* progmultis  = alloc_uint32_array(program->nfactors);
-            
-            ecode = program->factoring_algo_func(
-                progfactors,
-                progmultis,
-                n_atd,
+        append_mpz_to_array(factors, unfactored);
+        append_uint32_to_array(multis, 1 << shift);
+        
+        print_factors(factors, multis);
+        rcode = COMPLETE_FACTORIZATION_FOUND;
+        goto clear_sqt_and_return;
+    }
+    //
+    // Factors & multiplicities for the unfactored part of program->n.
+    //
+    mpz_array_t*    progfa = alloc_mpz_array(PROG_DFLT_ARRAY_LENGTH);
+    uint32_array_t* progmu = alloc_uint32_array(PROG_DFLT_ARRAY_LENGTH);
+    
+    if (program->verbose || program->timing) {
+        printf("%s trace:\n", program->algo_name);
+        int len = strlen(program->algo_name);
+        for (int i=0; i < len; i++) {
+            printf("-");
+        }
+        printf("-------\n\n");
+    }
+    
+    ecode = program->factoring_algo_func(
+                progfa,
+                progmu,
+                unfactored,
                 program->params,
                 program->mode
             );
-            
-            if (program->mode != FIND_COMPLETE_FACTORIZATION) {
-                //
-                // Simplify the list of found factors by computing and
-                // keeping only coprime factors.
-                //
-                uint32_t aflen    = (tdivfactors->length + progfactors->length);
-                mpz_array_t* base = alloc_mpz_array(aflen * (aflen + 1));
-
-                find_coprime_base(base, program->n, tdivfactors);
-                find_coprime_base(base, program->n, progfactors);
-                ins_sort_mpz_array(base);
-
-                if (program->verbose || program->timing) {
-                    printf("\n");
-                }
-
-                printf("Found %2u Factors:\n", base->length);
-                printf("-----------------\n");
-                print_mpz_array(base);
-                printf("\n");
-
-                clear_mpz_array(base);
-                free(base);
-
-            } else {
-                if (program->verbose || program->timing) {
-                    printf("\n");
-                }
-
-                printf("Found %2u Factors:\n",
-                       tdivfactors->length + progfactors->length);
-                printf("-----------------\n");
-
-                if (tdivfactors->length > 0) {
-
-                    gmp_printf("%Zd = \n", program->n);
-                    gmp_printf("\t  %Zd",        tdivfactors->data[0]);
-                    gmp_printf(" ^ %"PRIu32"\n", tdivmultis->data[0]);
-
-                    for (uint32_t i = 1; i < tdivfactors->length; i++) {
-                        gmp_printf("\t* %Zd",        tdivfactors->data[i]);
-                        gmp_printf(" ^ %"PRIu32"\n", tdivmultis->data[i]);
-                    }
-                    for (uint32_t i = 0; i < progfactors->length; i++) {
-                        gmp_printf("\t* %Zd",        progfactors->data[i]);
-                        gmp_printf(" ^ %"PRIu32"\n", progmultis->data[i]);
-                    }
-                } else {
-                    gmp_printf("%Zd = \n", program->n);
-                    gmp_printf("\t  %Zd",        progfactors->data[0]);
-                    gmp_printf(" ^ %"PRIu32"\n", progmultis->data[0]);
-                    for (uint32_t i = 1; i < progfactors->length; i++) {
-                        gmp_printf("\t* %Zd",        progfactors->data[i]);
-                        gmp_printf(" ^ %"PRIu32"\n", progmultis->data[i]);
-                    }
-                }
-                printf("\n");
-            }
-            clear_mpz_array(progfactors);
-            free(progfactors);
-
-            clear_uint32_array(progmultis);
-            free(progmultis);
-        }
-    } else {
-        //
-        // Trial divisions were (probably!) enough to completely factor the
-        // number.
-        //
-        printf("\n");
-        printf("Found %2u Factors:\n", tdivfactors->length + 1);
-        printf("-----------------\n");
-
-        gmp_printf("%Zd = \n", program->n);
-        gmp_printf("\t  %Zd",        tdivfactors->data[0]);
-        gmp_printf(" ^ %"PRIu32"\n", tdivmultis->data[0]);
-
-        for (uint32_t i = 1; i < tdivfactors->length; i++) {
-            gmp_printf("\t* %Zd",        tdivfactors->data[i]);
-            gmp_printf(" ^ %"PRIu32"\n", tdivmultis->data[i]);
-        }
-        gmp_printf("\t* %Zd (probably prime)\n", n_atd);
+    
+    if (program->verbose || program->timing) {
         printf("\n");
     }
-    clear_mpz_array(tdivfactors);
-    free(tdivfactors);
+        
+    switch (ecode) {
+        case COMPLETE_FACTORIZATION_FOUND:
+            append_mpz_array(factors, progfa);
+            append_uint32_array(multis, progmu);
+            print_factors(factors, multis);
+            rcode = COMPLETE_FACTORIZATION_FOUND;
+            break;
+        case SOME_FACTORS_FOUND:
+        case SOME_COPRIME_FACTORS_FOUND:
+        case PARTIAL_FACTORIZATION_FOUND: {
+            //
+            // Simplify the list of found factors by computing and
+            // keeping only coprime factors.
+            //
+            uint32_t     blen = progfa->length;
+            mpz_array_t* base = alloc_mpz_array(blen * (blen + 1));
 
-    clear_uint32_array(tdivmultis);
-    free(tdivmultis);
+            find_coprime_base(base, unfactored, progfa);
+            ins_sort_mpz_array(base);
 
-    mpz_clear(program->n);
-    mpz_clear(n_atd);
-
-    return ecode;
+            append_mpz_array(factors, base);
+            
+            print_factors(factors, multis);
+            
+            clear_mpz_array(base);
+            free(base);
+            rcode = PARTIAL_FACTORIZATION_FOUND;
+            break;
+        }
+        default:
+            break;
+    }
+    
+    clear_mpz_array(progfa);
+    clear_uint32_array(progmu);
+    
+  clear_sqt_and_return:
+    
+    mpz_clear(unfactored);
+    
+  clear_tdiv_and_return:
+    
+    clear_mpz_array(factors);
+    clear_uint32_array(multis);
+    
+    switch (rcode) {
+        case COMPLETE_FACTORIZATION_FOUND:
+            printf("Factorization is complete.\n\n");
+            break;
+        case PARTIAL_FACTORIZATION_FOUND:
+            printf("Factorization is (potentially) not complete.\n\n");
+            break;
+        case NO_FACTOR_FOUND:
+        default:
+            printf("Factorization failed.\n\n");
+            break;
+    }
+    
+    return rcode;   
 }
-//------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------
+void print_factors(mpz_array_t* const factors, uint32_array_t* const multis) {
+    printf("Found %2u factor(s):\n", (unsigned int)factors->length); 
+    printf("-------------------\n");
+    
+    uint32_t nmult = 0;
+    if (multis == NULL) {
+        nmult = 0;
+    } else {
+        nmult = multis->length;
+    }
+    
+    for (uint32_t i = 0; i != nmult; i++) {
+        //
+        // _WARNING_: The multis array can be shorter than the factors array 
+        //            since the factors obtained by trial divisions always come 
+        //            with their corresponding multiplicities. This assumes
+        //            that these factors are given at the beginning of the
+        //            factors array.
+        //
+        gmp_printf("\t%Zd ^ %"PRIu32"\n", factors->data[i], multis->data[i]);
+        fflush(stdout);
+    }
+    for (uint32_t i = nmult; i != factors->length; i++) {
+        gmp_printf("\t%Zd\n", factors->data[i]);
+        fflush(stdout);
+    }
+    printf("\n");
+}
+//-----------------------------------------------------------------------------

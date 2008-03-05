@@ -53,27 +53,42 @@ extern "C" {
 #include "exit_codes.h"
 
    /**
+    * \def TDIV_DFLT_NPRIMES_TDIV
+    * Default number of the first primes to use for trial division.
+    */
+#define TDIV_DFLT_NPRIMES_TDIV     (NFIRST_PRIMES/32)
+   
+   /**
     * \brief Integer factorization via trial division (TDIV).
     *
-    * Attempts to factor the integer \c n via trial division by
-    * the first \c nprimes primes. Found factors are then stored in
-    * \c factors and the remaining unfactored part of \c n is stored in
-    * \c <tt>n_atd</tt>. Additionally, multiplicities are stored in
-    * the array <tt>multis</tt>.
+    * Attempts to factor the integer \c n via trial division by the first
+    * \c nprimes primes. Found factors are then stored in the array \c factors 
+    * and multiplicities are stored in <tt>multis</tt>.
+    * 
+    * Returns:    
+    * \li \c COMPLETE_FACTORIZATION_FOUND if the complete factorization of
+    *                                     \c n was found.
     *
-    * \warning The prime numbers are not computed but read from a
-    * table. Consequently the number of primes \c nprimes should be
-    * less than or equal to <tt>NFIRST_PRIMES</tt> defined in
-    * \link array.h \endlink .
+    * \li \c SOME_FACTORS_FOUND if some factors were found but could not
+    *                           account for the complete factorization of \c n.
+    *                           In that case, the unfactored part of \c n is
+    *                           stored in
+    *                           \c factors->data[\c factors->lenth - 1].
     *
-    * \param[out] n_atd   The unfactored part of \c n.
+    * \li \c NO_FACTOR_FOUND if no factor were found.
+    *
+    * \warning The prime numbers are not computed but read from a table. 
+    * Consequently the number of primes \c nprimes should be less than or equal 
+    * to \c NFIRST_PRIMES (defined in \link array.h \endlink). If \c nprimes is
+    * zero, then the default value \c DFLT_TDIV_NPRIMES will be used instead.
+    *
     * \param[out] factors Pointer to the found factors of <tt>n</tt>.
     * \param[out] multis  Pointer to the multiplicities of the found factors.
     * \param[in]  n       The integer to factor.
     * \param[in]  nprimes The number of primes to trial divide \c n by.
+    * \return     An exit code.
     */
 ecode_t tdiv(
-    mpz_t n_atd,
     mpz_array_t* const factors,
     uint32_array_t* const multis,
     const mpz_t n,
