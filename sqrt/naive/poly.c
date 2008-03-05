@@ -186,15 +186,12 @@ void poly_eval_mod_mpz(mpz_t res, const poly_t f, const mpz_t x, const mpz_t m)
 
 void poly_mul(poly_t f, const poly_t g, const poly_t h) {
   int i, j, maxdeg;
-  mpz_t z;
   poly_t prd;
 
   if ((g->deg == -1) || (h->deg == -1)) {
     f->deg = -1;
     return;
   }
-
-  mpz_init(z);
 
   maxdeg = g->deg+h->deg;
   poly_alloc(prd, maxdeg);
@@ -204,8 +201,6 @@ void poly_mul(poly_t f, const poly_t g, const poly_t h) {
   for (i = 0; i <= g->deg; ++i)
     for (j = 0; j <= h->deg; ++j)
       mpz_addmul(prd->coeff[i+j], g->coeff[i], h->coeff[j]);
-
-  mpz_clear(z);
 
   for (i = maxdeg; i >= 0; --i) 
     poly_setcoeff(f, i, prd->coeff[i]);
