@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <gmp.h>
 #include <string.h>
+#include <math.h>
 
 #define WANT_ASSERT
 
@@ -2231,6 +2232,20 @@ merge(sparse_mat_t *mat, /*int nb_merge_max,*/ int maxlevel, int verbose, int fo
     }
 }
 
+static unsigned long
+my_cost(unsigned long N, unsigned long c, int forbw)
+{
+    if(forbw == 1)
+	return (N*c);
+    else if(forbw == 2){
+	double K1 = .19e-9, K2 = 3.4e-05, K3 = 1.4e-10; // kinda average
+	double dN = (double)N, dc = (double)c;
+
+	return (unsigned long)((K1+K3)*dN*dc+K2*dN*log(dN)*log(dN));
+    }
+    return 0;
+}
+
 void
 mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 {
@@ -2287,7 +2302,8 @@ mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 	    if((m > maxlevel) || (m <= 0))
 		break;
 	}
-	bwcost=((unsigned long)mat->rem_ncols) * ((unsigned long)mat->weight);
+	bwcost = my_cost((unsigned long)mat->rem_ncols,
+			 (unsigned long)mat->weight, forbw);
 	if(njproc >= target){ // somewhat arbitrary...!
 	    int kappa = (mat->rem_nrows-mat->rem_ncols) / mat->delta, ni2rem;
 
@@ -2310,7 +2326,10 @@ mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 		    mmax,
 		    mat->rem_nrows, mat->rem_ncols, 
 		    mat->rem_nrows - mat->rem_ncols);
-	    fprintf(stderr, " cN=%lu", bwcost);
+	    if(forbw <= 1)
+		fprintf(stderr, " cN=%lu", bwcost);
+	    else
+		fprintf(stderr, " bw=%lu", bwcost);
 	    fprintf(stderr, " c/N=%2.2lf\n", 
 		    ((double)mat->weight)/((double)mat->rem_ncols));
 	    // njrem=%d at %2.2lf\n",
