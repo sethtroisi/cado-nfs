@@ -3,7 +3,7 @@ include Makefile.local
 # Set default filenames/paths if not already set.
 GMP ?= /usr/local/
 GMPINCLUDE ?= $(GMP)/include/
-OPTCFLAGS ?= -g -O2 -W -Wall
+OPTCFLAGS ?= -g -O2 -DNDEBUG -W -Wall
 
 CFLAGS = $(OPTCFLAGS)
 

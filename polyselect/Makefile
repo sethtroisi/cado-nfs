@@ -5,7 +5,7 @@ GMP ?= /usr/local/
 GMPLIB ?= -L $(GMP)/lib -lgmp
 GMPINCLUDE ?= $(GMP)/include/
 
-OPTCFLAGS ?= -O2 -g -W -Wall
+OPTCFLAGS ?= -O2 -DNDEBUG -g -W -Wall
 
 CFLAGS=$(OPTCFLAGS) -std=c99 -I$(GMPINCLUDE) -DREV=\"`svnversion .`\"
 LDFLAGS=../utils/libutils.a $(GMPLIB) -lm

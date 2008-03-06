@@ -1,5 +1,5 @@
 GMPBUILD=
-CFLAGS=-g -O2 -Wall -W -Wmissing-prototypes -Wconversion -pedantic
+CFLAGS=-g -O2 -DNDEBUG -Wall -W -Wmissing-prototypes -Wconversion -pedantic
 CC=gcc
 
 find_primes_hit: find_primes_hit.c

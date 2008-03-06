@@ -3,7 +3,7 @@ include Makefile.local
 GMP ?= /usr/local/
 GMPLIB ?= $(GMP)/lib/libgmp.a
 GMPINCLUDE ?= $(GMP)/include/
-CFLAGS ?= -g -O2 -W -Wall
+CFLAGS ?= -g -O2 -DNDEBUG -W -Wall
 
 targets:=convert_poly convert_rels
 

@@ -29,7 +29,7 @@ else
     TIFAINCFLAGS ?= $(TIFA)/include/tifa
 endif
 
-OPTCFLAGS ?= -O2 -g -Wall -W
+OPTCFLAGS ?= -O2 -DNDEBUG -g -Wall -W
 INCFLAGS=-I$(GMPINCLUDE) $(TIFAINCFLAGS)
 CFLAGS=$(INCFLAGS) $(OPTCFLAGS) -fkeep-inline-functions -DREV=\"`svnversion .`\"
 LDFLAGS=$(TIFALIB) $(GMPLIB)

@@ -3,7 +3,7 @@
 # appropriate building tool, we'll simply avoid make -j for this one.
 .NOTPARALLEL:
 
-CFLAGS:=-g -O2 -W -Wall -std=c99
+CFLAGS:=-g -O2 -DNDEBUG -W -Wall -std=c99
 
 ifeq ($(shell arch),i686)
 w:=32

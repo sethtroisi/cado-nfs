@@ -33,7 +33,7 @@ endif
 UTILSLIB ?= ../../utils/libutils.a
 UTILSINCLUDE ?= ../../utils
 
-OPTFLAGS ?= -std=c99 -O2 -g -fkeep-inline-functions -Wall -W
+OPTFLAGS ?= -std=c99 -O2 -DNDEBUG -g -fkeep-inline-functions -Wall -W
 CFLAGS=$(OPTFLAGS) -DREV=\"`svnversion .`\"
 LDFLAGS ?= -lm
 INCFLAGS ?= -I. -I.. -I../.. -I$(GMPINCLUDE) $(TIFAINCFLAGS) -I$(UTILSINCLUDE)
