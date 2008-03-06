@@ -4,7 +4,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 #include <gmp.h>
 #include <string.h>
 
@@ -58,7 +57,7 @@ readmat (FILE *file, sparse_mat_t *mat)
   int nc, x;
 
   ret = fscanf (file, "%d %d", &(mat->nrows), &(mat->ncols));
-  assert (ret == 2);
+  ASSERT (ret == 2);
 
   fprintf (stderr, "Reading matrix of %d rows and %d columns: excess is %d\n",
            mat->nrows, mat->ncols, mat->nrows - mat->ncols);
@@ -74,18 +73,18 @@ readmat (FILE *file, sparse_mat_t *mat)
   for (i = 0; i < mat->nrows; i++)
     {
       ret = fscanf (file, "%ld %lu", &a, &b);
-      assert (ret == 2);
+      ASSERT (ret == 2);
       mat->data[i].a = a;
       mat->data[i].b = b;
       ret = fscanf (file, "%d", &nc);
-      assert (ret == 1);
+      ASSERT (ret == 1);
       mat->data[i].len = nc;
       mat->data[i].val = (int*) malloc (nc * sizeof (int));
       for (j = 0; j < nc; j++)
         {
           ret = fscanf(file, "%d", &x);
-          assert (ret == 1);
-          assert (0 <= x && x < mat->ncols);
+          ASSERT (ret == 1);
+          ASSERT (0 <= x && x < mat->ncols);
           mat->data[i].val[j] = x;
           mat->wt[x] ++;
           mat->ad[x] += i; /* computed mod 2^32 or 2^64 */
@@ -190,7 +189,7 @@ compute_components (sparse_mat_t *mat)
     if (mat->nodes[i] == 0)
       {
         visit (i, mat);
-        assert ((mat->edges[i] & 1) == 0);
+        ASSERT ((mat->edges[i] & 1) == 0);
         mat->edges[i] >>= 1;
         if (mat->ncomps >= mat->alloc)
           {
@@ -306,7 +305,7 @@ renumber_cols (sparse_mat_t *mat)
   for (j = s = 0; j < mat->ncols; j++)
     if (mat->wt[j] >= 2)
       perm[j] = s++;
-  assert (s == mat->rem_ncols);
+  ASSERT (s == mat->rem_ncols);
 }
 
 void
@@ -360,7 +359,7 @@ main (int argc, char *argv[])
   else if (argc == 2)
     {
       file = fopen (argv[1], "r");
-      assert (file != NULL);
+      ASSERT (file != NULL);
     }
   else
     {

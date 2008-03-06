@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 #include <gmp.h>
 #include <string.h>
 
@@ -11,8 +10,6 @@
 
 #define DEBUG 0
 #define MAPLE 0
-
-#define WANT_ASSERT
 
 int
 checkVector(int *vec, int ncols)

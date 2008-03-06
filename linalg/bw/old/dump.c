@@ -8,7 +8,6 @@
 #include <string.h>
 #include <unistd.h>
 #include "params.h"
-#include <assert.h>
 #include "types.h"
 #include "macros.h"
 #include "old-endian.h"

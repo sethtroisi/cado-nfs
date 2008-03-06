@@ -8,7 +8,6 @@
 #include <string.h>
 #include <unistd.h>
 #include "params.h"
-#include <assert.h>
 #include "types.h"
 #include "macros.h"
 #include "old-endian.h"
@@ -151,7 +150,7 @@ void give_info_after(void)
 		/* We don't want to work on the family [0]. Therefore, we
 		 * can give_details only for g=divisor of the
 		 * opt_chain[1] */
-		assert(flow>0);
+		ASSERT(flow>0);
 		
 		order=malloc(family[flow].np * sizeof(int));
 		for(k=n=0;k<family[IMBRICATED_OPTS-1].np;k++) {
@@ -245,8 +244,8 @@ void read_single_lines(void)
 			i++;
 			break;
 		}
-		assert(idx * sizeof(stype32) < isize);
-		assert(val * sizeof(stype32) < vsize);
+		ASSERT(idx * sizeof(stype32) < isize);
+		ASSERT(val * sizeof(stype32) < vsize);
 
 		if (r==0) {
 			printf("Blank line before end of file\n");
@@ -507,7 +506,7 @@ int main(int argc, char *argv[])
 	for(j=0;j<family[IMBRICATED_OPTS-1].np;j++) {
 		flatten_lines(IMBRICATED_OPTS-1,j);
 	}
-	assert(nflattened==nlines);
+	ASSERT(nflattened==nlines);
 	fixup_x_files();
 	final_flush(num);
 	unmap_files();

@@ -4,7 +4,6 @@
 #include <gmp.h>
 #include "lingen_params.h"
 #include "params.h"
-#include <assert.h>
 #include "types.h"
 #include "macros.h"
 #include "auxfuncs.h"
@@ -18,6 +17,7 @@
 #include "field_quad.h"
 #include "field_complex.h"
 #include "field_usage.h"
+#include "manu.h"
 
 struct field * field_k,* field_l;
 
@@ -39,7 +39,7 @@ void extend_scalars(mp_limb_t * dest, mp_limb_t * src)
 #define QNR_LIMIT	128
 #define ROOT_LIMIT	128
 
-void prepare_fields_for_fft(int root_order UNUSED_VARIABLE, int enable_cplx)
+void prepare_fields_for_fft(int root_order MAYBE_UNUSED, int enable_cplx)
 {
 	mpz_t a;
 	mp_limb_t * d;
@@ -102,7 +102,7 @@ mp_limb_t * fetch_primitive_root(int root_order)
 	max_order=mpz_scan1(mgorder,0);
 	mpz_tdiv_q_2exp(mgorder,mgorder,max_order);
 
-	assert(mgorder[0]._mp_size>0);
+	ASSERT(mgorder[0]._mp_size>0);
 
 	printf("The biggest possible order (among powers of 2) is 2^%d\n",
 		       max_order);
@@ -135,7 +135,7 @@ mp_limb_t * fetch_primitive_root(int root_order)
 		l_mul(t,r,r);
 		l_set(r,t);
 	}
-	assert(j<=max_order);
+	ASSERT(j<=max_order);
 
 	printf("Found a root on the %d-th try (its actual 2-order was %d)\n",
 			i,j);

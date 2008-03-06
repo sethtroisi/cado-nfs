@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 #include <gmp.h>
 #include <string.h>
+#include "cado.h"
 
 static void
 printVec (int *vec, int ncols)
@@ -33,7 +33,7 @@ checkSparse (FILE *matfile, FILE *kerfile, int ncols, int nlimbs, int *vec,
 	ret = fscanf(kerfile, "%lx", &w);
 	if(ret == -1)
 	    break;
-	assert (ret == 1);
+	ASSERT (ret == 1);
 	if(verbose)
 	    fprintf(stderr, "w=%lx\n", w);
 	for(j = 0; j < GMP_NUMB_BITS; ++j){
@@ -134,7 +134,7 @@ checkWithIndex (FILE *purgedfile, FILE *indexfile, FILE *kerfile, int verbose,
 	    free(small_row_used);
 	    return ret;
 	}
-	assert (ret == 1);
+	ASSERT (ret == 1);
 	if(verbose)
 	    fprintf(stderr, "w=%lx\n", w);
 	for(j = 0; j < GMP_NUMB_BITS; ++j){

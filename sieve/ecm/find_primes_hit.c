@@ -5,14 +5,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
-#include <assert.h>
 #include "getprime.c"
-
-#ifdef WANT_ASSERT
-#define ASSERT(x) assert(x)
-#else
-#define ASSERT(x)
-#endif
 
 #undef MODTRACE
 #include "mod_ul.c"
@@ -604,7 +597,7 @@ ell_pointorder (const unsigned long m_par, const unsigned long sigma_par)
 	  return 0UL;
       }
 
-#ifdef WANT_ASSERT
+#ifndef NDEBUG
       /* Check that this is the correct order */
       setmod (xi, x1);
       setmod (yi, y1);
@@ -702,7 +695,7 @@ ell_curveorder (const unsigned long m_par, const unsigned long sigma_par,
   }
   order = ellM_curveorderjacobi (A, X, m);
 
-#ifdef WANT_ASSERT
+#ifndef NDEBUG
   ASSERT (parameterization != BRENT12 || order == ell_pointorder (m, sigma));
 #endif
 

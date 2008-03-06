@@ -3,6 +3,12 @@
 #include "config.h"
 #include "cado.h"
 
+#ifdef  WANT_ASSERT_EXPENSIVE
+#define ASSERT_EXPENSIVE(x)     ASSERT_ALWAYS(x)
+#else
+#define ASSERT_EXPENSIVE(x)     /**/
+#endif
+
 static inline fbroot_t
 first_sieve_loc (const fbprime_t p, const fbroot_t r, 
                  const fbroot_t amin_p, const unsigned long b, const int odd)

@@ -1,10 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <gmp.h>
-#include <assert.h>
 #include "cado.h"
 #include "utils/utils.h"
 #include "poly.h"
+
+#error "dead code"
 
 #define DEBUG 0
 
@@ -28,13 +29,13 @@ int main(int argc, char **argv)
     int i, ret, nab;
 
     ret = read_polynomial(pol, argv[1]);
-    assert (ret == 1);
+    ASSERT (ret == 1);
 
     abfile = fopen(argv[3], "r");
-    assert (abfile != NULL);
+    ASSERT (abfile != NULL);
 
     algfile = fopen(algside, "w");
-    assert (algfile != NULL);
+    ASSERT (algfile != NULL);
 
     // Init F to be the algebraic polynomial
     poly_alloc(F, pol->degree);

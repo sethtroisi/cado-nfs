@@ -1,0 +1,73 @@
+Here are the useful macros that are defined by cado.h and their
+semantics:
+
+ASSERT(x)       
+        The condition x is checked unless NDEBUG is defined, just like
+        the standard assert() in assert.h .
+ASSERT_ALWAYS(x)
+        The condition x is always checked, whatever you define. In case
+        of failure, it aborts, and gives the line, function, and so on
+        information.
+
+Usage of asserts:
+        Put ASSERTs to checks things during a non-production mode. These
+        should not be too expensive, so that in development mode they can
+        be activated without the code being too slow to be executed on
+        typical data.
+        If in your code you need to do some computations before checking
+        the condition, you can encapsulate this code in #ifndef NDEBUG
+        ... #endif
+        WARNING: the use of WANT_ASSERT is deprecated!
+
+        You are of course allowed to add your own additional assert
+        variants in a specific file, (like ASSERT_EXPENSIVE), but they
+        should not go to cado.h. 
+
+
+ABS(x)
+MIN(x,y)
+MAX(x,y)
+        As usual. Please don't redefine your own.
+
+
+MAYBE_UNUSED
+        This corresponds to gcc's unused attribute. Probably other
+        compilers also have it, but for the moment, this works only for
+        gcc.
+        The goal is to tag some function or some parameter to be possibly
+        unused, in order to avoid the corresponding warning at compile
+        time (-W -Wall). Here is an example:
+                int first_arg(int x, int y MAYBE_UNUSED) {
+                #ifndef NDEBUG
+                        fprintf(stderr, "entering first_arg(%d,%d)\n", x, y);
+                #endif
+                        return x;
+                }
+        When compiled with #define NDEBUG, the compiler would complain
+        without y tagged MAYBE_UNUSED.
+        The same macro can be used for a variable:
+            int n MAYBE_UNUSED;
+        or for a static function:
+            MAYBE_UNUSED static inline void foo() { print("Foo\n"); }
+
+LIKELY(x)
+UNLIKELY(x)
+        These correspond to gcc's __builtin_expect() function.
+        In a critical loop, if you have a conditional for which there is
+        a big bias, you can tell the compiler which branch is likely. The
+        compiler will try to pass this information to the processor
+        (usually, a proc assumes that a backward jump is likely, and a
+        forward jump is unlikely).
+        In practice, do as in this example:
+                while (!finished()) {
+                        x = get_next_data();
+                        if (LIKELY(x != 0))
+                                deal_with_data(x);
+                        else
+                                special_case();
+                }
+        Don't use it for non-critical parts of the code. It does not hurt
+        the compiler, but still can make it harder for a human to read
+        the code.
+
+

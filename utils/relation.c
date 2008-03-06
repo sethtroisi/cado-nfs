@@ -247,17 +247,17 @@ fprint_relation(FILE *file, relation_t rel) {
   for (i = 0; i < rel.nb_rp-1; ++i)
     {
       fprintf (file, "%lx,", rel.rp[i].p);
-      assert (rel.rp[i].e == 1);
+      ASSERT (rel.rp[i].e == 1);
     }
   fprintf (file, "%lx:", rel.rp[rel.nb_rp-1].p);
-  assert (rel.rp[rel.nb_rp-1].e == 1);
+  ASSERT (rel.rp[rel.nb_rp-1].e == 1);
   for (i = 0; i < rel.nb_ap-1; ++i)
     {
       fprintf (file, "%lx,", rel.ap[i].p);
-      assert (rel.ap[i].e == 1);
+      ASSERT (rel.ap[i].e == 1);
     }
   fprintf (file, "%lx\n", rel.ap[rel.nb_ap-1].p);
-  assert (rel.ap[rel.nb_ap-1].e == 1);
+  ASSERT (rel.ap[rel.nb_ap-1].e == 1);
 }
 
 /* reduces exponents mod 2, and discards primes with even exponent */

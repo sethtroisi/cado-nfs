@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <gmp.h>
 #include <errno.h>
-#include <assert.h>
 #include <unistd.h>
 
 #include "lingen_common.h"
@@ -13,6 +12,7 @@
 #include "field_prime.h"
 #include "field_quad.h"
 #include "field_usage.h"
+#include "manu.h"
 
 const char *a_meta_filename = "A-%02d-%02d";
 const char *valu_meta_filename = "val-%02d";
@@ -145,7 +145,7 @@ compute_rank(bw_mnmat a)
         }
         if (i == m_param)
             continue;
-        assert(rank < m_param);
+        ASSERT(rank < m_param);
 	rank++;
         k_inv(inv,mnmat_scal(ax,i,j));
         /* Cancel this coeff in all other columns. */

@@ -10,10 +10,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 #include <string.h>
-
-//#define WANT_ASSERT
 
 #include "cado.h"
 

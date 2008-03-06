@@ -25,9 +25,9 @@ extern inline c128_t c128_alloc(const c128_info_t p, int n)
     return (c128_t) malloc((n << p->k) * sizeof(mpfq_2_128_elt));
 }
 extern inline void c128_free(
-        const c128_info_t p UNUSED_VARIABLE,
+        const c128_info_t p MAYBE_UNUSED,
         c128_t x,
-        int n UNUSED_VARIABLE)
+        int n MAYBE_UNUSED)
 {
     free(x);
 }

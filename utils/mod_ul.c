@@ -1,21 +1,11 @@
 #include "mod_ul.h"
 
-#ifndef ASSERT
- #ifdef WANT_ASSERT
-  #include <assert.h>
-  #define ASSERT(x) assert(x)
- #else
-  #define ASSERT(x)
- #endif
-#define MOD_UL_ASSERT
-#endif
-
 void
 modul_div3 (residueul_t r, residueul_t a, modulusul_t m)
 {
   const unsigned long a3 = a[0] % 3UL;
   const unsigned long m3 = m[0] % 3UL;
-#ifdef WANT_ASSERT
+#ifndef NDEBUG
   residueul_t t;
 #endif
 
@@ -30,10 +20,10 @@ modul_div3 (residueul_t r, residueul_t a, modulusul_t m)
 	r[0] = m[0] - (m[0] - a[0]) / 3UL;
     }
 
-#ifdef WANT_ASSERT
+#ifndef NDEBUG
   modul_add (t, r, r, m);
   modul_add (t, t, r, m);
-  assert (t[0] == a[0]);
+  ASSERT (t[0] == a[0]);
 #endif
 }
 
@@ -94,7 +84,7 @@ modul_powredc_ul (residueul_t r, const residueul_t b, const unsigned long e,
                   const unsigned long invm, const modulusul_t m)
 {
   unsigned long mask = ~0UL - (~0UL >> 1); /* Only MSB set */
-#ifdef WANT_ASSERT
+#ifndef NDEBUG
   unsigned long e1 = e;
 #endif
   if (e == 0UL)
@@ -114,7 +104,7 @@ modul_powredc_ul (residueul_t r, const residueul_t b, const unsigned long e,
   /* Exponentiate */
 
   modul_set (r, b, m);       /* (r*b)^mask * b^(e-mask) = r^mask * b^e */
-#ifdef WANT_ASSERT
+#ifndef NDEBUG
   e1 -= mask;
 #endif
 
@@ -125,7 +115,7 @@ modul_powredc_ul (residueul_t r, const residueul_t b, const unsigned long e,
       if (e & mask)
         {
 	  modul_mulredc (r, r, b, invm, m);
-#ifdef WANT_ASSERT
+#ifndef NDEBUG
           e1 -= mask;
 #endif
         }
@@ -432,7 +422,7 @@ modul_inv (residueul_t r, residueul_t s, modulusul_t t)
   if (u1 < 0L)
     u1 = u1 - t[0] * (-u1 / t[0] - 1L);
 
-#ifdef WANT_ASSERT
+#ifndef NDEBUG
   modul_mul (&u2, (unsigned long *)&u1, s, t);
   ASSERT(u2 == 1UL);
 #endif

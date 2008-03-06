@@ -30,6 +30,22 @@
 #error "define	WORDSIZE"
 #endif
 
+/**********************************************************************/
+#include <assert.h>
+#ifndef ASSERT
+#define ASSERT(x)	assert(x)
+#endif
+
+/*********************************************************************/
+/* Helper macros */
+#ifndef	MAYBE_UNUSED
+#if defined(__GNUC__)
+#define MAYBE_UNUSED __attribute__ ((unused))
+#else
+#define MAYBE_UNUSED
+#endif
+#endif
+
 #include <stdlib.h>
 
 #include "thresholds.h"

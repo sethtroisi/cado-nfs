@@ -5,7 +5,6 @@
 #include <gmp.h>
 #include "lingen_params.h"
 #include "params.h"
-#include <assert.h>
 #include "types.h"
 #include "macros.h"
 #include "auxfuncs.h"
@@ -121,7 +120,7 @@ void quad_field_inv(mp_limb_t * a,
 	u=FAST_ALLOC(f->size*sizeof(mp_limb_t));
 	quad_field_conjugate(u,b,f);
 	quad_field_mul(t,u,b,f);
-	assert(f->base_field->is_int(t+pl,0,f->base_field));
+	ASSERT(f->base_field->is_int(t+pl,0,f->base_field));
 	f->base_field->inv(t+pl,t,f->base_field);
 	f->base_field->mul(a,u,t+pl,f->base_field);
 	f->base_field->mul(a+pl,u+pl,t+pl,f->base_field);

@@ -27,20 +27,71 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "gmp.h"
 
+/**********************************************************************/
 /* Common asserting/debugging defines */
+/* See README.macro_usage */
+
 #include <assert.h>
-#define ASSERT_ALWAYS(x) assert(x)
-#ifdef WANT_ASSERT
-  #define ASSERT(x) assert(x)
-#else
-  #define ASSERT(x)
+#include <stdio.h>
+#include <stdlib.h>
+
+#define ASSERT(x)	assert(x)
+
+#define croak__(x,y) do {						\
+                fprintf(stderr,"%s in %s at %s:%d -- %s\n",		\
+                        (x),__func__,__FILE__,__LINE__,(y));		\
+            } while (0)
+
+#define ASSERT_ALWAYS(x)						\
+            do {							\
+                if (!(x)) {						\
+                    croak__("code BUG() : condition " #x " failed",	\
+                            "Abort");					\
+                    abort();						\
+                }							\
+            } while (0)
+
+/*********************************************************************/
+/* Helper macros */
+/* See README.macro_usage */
+
+#ifndef ABS
+#define ABS(x) ((x) >= 0 ? (x) : -(x))
 #endif
-#ifdef WANT_ASSERT_EXPENSIVE
-  #define ASSERT_EXPENSIVE(x) assert(x)
-#else
-  #define ASSERT_EXPENSIVE(x)
+	
+#ifndef MIN
+#define MIN(l,o) ((l) < (o) ? (l) : (o))
 #endif
 
+#ifndef MAX
+#define MAX(h,i) ((h) > (i) ? (h) : (i))
+#endif
+
+#if defined(__GNUC__)
+#ifndef	MAYBE_UNUSED
+#define MAYBE_UNUSED __attribute__ ((unused))
+#endif
+#ifndef EXPECT
+#define EXPECT(x,val)	__builtin_expect(x,val)
+#endif
+#else
+#ifndef	MAYBE_UNUSED
+#define MAYBE_UNUSED
+#endif
+#ifndef EXPECT
+#define	EXPECT(x,val)	(x)
+#endif
+#endif
+
+#ifndef	LIKELY
+#define LIKELY(x)	EXPECT(x,1)
+#endif
+#ifndef	UNLIKELY
+#define UNLIKELY(x)	EXPECT(x,0)
+#endif
+
+
+/*********************************************************************/
 /* The maximum degree of polynomials supported. Used for statically 
    allocating storage (i.e. "mpz_t poly[MAXDEGREE]") */
 #define MAXDEGREE 10

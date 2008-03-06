@@ -11,23 +11,24 @@
   different modulus sizes can be used simply by #including different mod_*.c
   files, but without changing anything else in the source code. */
 
-#ifndef __MOD_UL_H__
+#ifndef MOD_UL_H__
 
-#define __MOD_UL_H__
+#define MOD_UL_H__
 
+/**********************************************************************/
+#include <assert.h>
 #ifndef ASSERT
- #ifdef WANT_ASSERT
-  #include <assert.h>
-  #define ASSERT(x) assert(x)
- #else
-  #define ASSERT(x)
- #endif
-#define MOD_UL_ASSERT
+#define ASSERT(x)	assert(x)
 #endif
 
-#ifndef __GNUC_ATTRIBUTE_UNUSED__
-#define __GNUC_ATTRIBUTE_UNUSED__ __attribute__ ((unused))
-#define MOD_UL_GNUC_ATTRIBUTE_UNUSED
+/*********************************************************************/
+/* Helper macros */
+#ifndef	MAYBE_UNUSED
+#if defined(__GNUC__)
+#define MAYBE_UNUSED __attribute__ ((unused))
+#else
+#define MAYBE_UNUSED
+#endif
 #endif
 
 /* Define the default names and types for arithmetic with these functions */
@@ -71,9 +72,9 @@ typedef residueul_t residue_t;
 typedef modulusul_t modulus_t;
 
 /* Initialises a residue_t type and sets it to zero */
-__GNUC_ATTRIBUTE_UNUSED__
+MAYBE_UNUSED
 static inline void
-modul_init (residueul_t r, const modulusul_t m __GNUC_ATTRIBUTE_UNUSED__)
+modul_init (residueul_t r, const modulusul_t m MAYBE_UNUSED)
 {
   r[0] = 0UL;
   return;
@@ -82,34 +83,34 @@ modul_init (residueul_t r, const modulusul_t m __GNUC_ATTRIBUTE_UNUSED__)
 
 /* Initialises a residue_t type, but does not set it to zero. For fixed length
    residue_t types, that leaves nothing to do at all. */
-__GNUC_ATTRIBUTE_UNUSED__
+MAYBE_UNUSED
 static inline void
-modul_init_noset0 (residueul_t r __GNUC_ATTRIBUTE_UNUSED__, 
-                   const modulusul_t m __GNUC_ATTRIBUTE_UNUSED__)
+modul_init_noset0 (residueul_t r MAYBE_UNUSED, 
+                   const modulusul_t m MAYBE_UNUSED)
 {
   return;
 }
 
 
-__GNUC_ATTRIBUTE_UNUSED__
+MAYBE_UNUSED
 static inline void
-modul_clear (residueul_t r __GNUC_ATTRIBUTE_UNUSED__, 
-             const modulusul_t m __GNUC_ATTRIBUTE_UNUSED__)
+modul_clear (residueul_t r MAYBE_UNUSED, 
+             const modulusul_t m MAYBE_UNUSED)
 {
   return;
 }
 
 
-__GNUC_ATTRIBUTE_UNUSED__
+MAYBE_UNUSED
 static inline void
 modul_set (residueul_t r, const residueul_t s, const 
-	   modulusul_t m __GNUC_ATTRIBUTE_UNUSED__)
+	   modulusul_t m MAYBE_UNUSED)
 {
   r[0] = s[0];
 }
 
 
-__GNUC_ATTRIBUTE_UNUSED__
+MAYBE_UNUSED
 static inline void
 modul_set_ul (residueul_t r, const unsigned long s, const modulusul_t m)
 {
@@ -119,53 +120,53 @@ modul_set_ul (residueul_t r, const unsigned long s, const modulusul_t m)
 /* Sets the residue_t to the class represented by the integer s. Assumes that
    s is reduced (mod m), i.e. 0 <= s < m */
 
-__GNUC_ATTRIBUTE_UNUSED__
+MAYBE_UNUSED
 static inline void
 modul_set_ul_reduced (residueul_t r, const unsigned long s, 
-                      const modulusul_t m __GNUC_ATTRIBUTE_UNUSED__)
+                      const modulusul_t m MAYBE_UNUSED)
 {
   ASSERT (s < m[0]);
   r[0] = s;
 }
 
-__GNUC_ATTRIBUTE_UNUSED__
+MAYBE_UNUSED
 static inline void
 modul_initmod_ul (modulusul_t r, const unsigned long s)
 {
   r[0] = s;
 }
 
-__GNUC_ATTRIBUTE_UNUSED__
+MAYBE_UNUSED
 static inline void
-modul_clearmod (modulusul_t m __GNUC_ATTRIBUTE_UNUSED__)
+modul_clearmod (modulusul_t m MAYBE_UNUSED)
 {
   return;
 }
 
-__GNUC_ATTRIBUTE_UNUSED__
+MAYBE_UNUSED
 static inline unsigned long
 modul_get_ul (const residueul_t s, 
-	      const modulusul_t m __GNUC_ATTRIBUTE_UNUSED__)
+	      const modulusul_t m MAYBE_UNUSED)
 {
   return s[0];
 }
 
-__GNUC_ATTRIBUTE_UNUSED__
+MAYBE_UNUSED
 static inline int
 modul_cmp (const residueul_t a, const residueul_t b, 
-	   const modulusul_t m __GNUC_ATTRIBUTE_UNUSED__)
+	   const modulusul_t m MAYBE_UNUSED)
 {
   return (a[0] < b[0]) ? -1 : ((a[0] == b[0]) ? 0 : 1);
 }
 
-__GNUC_ATTRIBUTE_UNUSED__
+MAYBE_UNUSED
 static inline int
-modul_is0 (const residueul_t a, const modulusul_t m __GNUC_ATTRIBUTE_UNUSED__)
+modul_is0 (const residueul_t a, const modulusul_t m MAYBE_UNUSED)
 {
   return (a[0] == 0UL);
 }
 
-__GNUC_ATTRIBUTE_UNUSED__
+MAYBE_UNUSED
 static inline void
 modul_add (residueul_t r, const residueul_t a, const residueul_t b, 
 	   const modulusul_t m)
@@ -183,7 +184,7 @@ modul_add (residueul_t r, const residueul_t a, const residueul_t b,
 }
 
 /* FIXME: This function is really modul_add_ul_reduced */
-__GNUC_ATTRIBUTE_UNUSED__
+MAYBE_UNUSED
 static inline void
 modul_add_ul (residueul_t r, const residueul_t a, const unsigned long b, 
 	      const modulusul_t m)
@@ -198,7 +199,7 @@ modul_add_ul (residueul_t r, const residueul_t a, const unsigned long b,
 #endif
 }
 
-__GNUC_ATTRIBUTE_UNUSED__
+MAYBE_UNUSED
 static inline void
 modul_sub (residueul_t r, const residueul_t a, const residueul_t b, 
 	   const modulusul_t m)
@@ -215,7 +216,7 @@ modul_sub (residueul_t r, const residueul_t a, const residueul_t b,
 
 
 /* FIXME: This function is really modul_sub_ul_reduced */
-__GNUC_ATTRIBUTE_UNUSED__
+MAYBE_UNUSED
 static inline void
 modul_sub_ul (residueul_t r, const residueul_t a, const unsigned long b, 
 	      const modulusul_t m)
@@ -230,7 +231,7 @@ modul_sub_ul (residueul_t r, const residueul_t a, const unsigned long b,
 #endif
 }
 
-__GNUC_ATTRIBUTE_UNUSED__
+MAYBE_UNUSED
 static inline void
 modul_neg (residueul_t r, const residueul_t a, const modulusul_t m)
 {
@@ -356,7 +357,7 @@ div_2ul_ul_ul_r (unsigned long *r, unsigned long a1,
 #endif
 }
 
-__GNUC_ATTRIBUTE_UNUSED__
+MAYBE_UNUSED
 static inline void
 modul_mul (residueul_t r, const residueul_t a, const residueul_t b, 
            const modulusul_t m)
@@ -376,7 +377,7 @@ modul_mul (residueul_t r, const residueul_t a, const residueul_t b,
 }
 
 /* Computes (a * 2^wordsize) % m */
-__GNUC_ATTRIBUTE_UNUSED__
+MAYBE_UNUSED
 static inline void
 modul_tomontgomery (residueul_t r, const residueul_t a, const modulusul_t m)
 {
@@ -386,7 +387,7 @@ modul_tomontgomery (residueul_t r, const residueul_t a, const modulusul_t m)
 
 
 /* Computes (a / 2^wordsize) % m */
-__GNUC_ATTRIBUTE_UNUSED__
+MAYBE_UNUSED
 static inline void
 modul_frommontgomery (residueul_t r, const residueul_t a, 
                       const unsigned long invm, const modulusul_t m)
@@ -400,7 +401,7 @@ modul_frommontgomery (residueul_t r, const residueul_t a,
 
 /* Computes (a / 2^wordsize) % m, but result can be r = m. 
    Input a must not be equal 0 */
-__GNUC_ATTRIBUTE_UNUSED__
+MAYBE_UNUSED
 static inline void
 modul_redcsemi_ul_not0 (residueul_t r, const unsigned long a, 
                         const unsigned long invm, const modulusul_t m)
@@ -416,7 +417,7 @@ modul_redcsemi_ul_not0 (residueul_t r, const unsigned long a,
 
 
 /* Computes ((a + b) / 2^wordsize) % m. a <= m is permissible */
-__GNUC_ATTRIBUTE_UNUSED__
+MAYBE_UNUSED
 static inline void
 modul_addredc_ul (residueul_t r, const residueul_t a, const unsigned long b, 
                   const unsigned long invm, const modulusul_t m)
@@ -447,7 +448,7 @@ modul_addredc_ul (residueul_t r, const residueul_t a, const unsigned long b,
 
 /* Computes ((a + b) / 2^wordsize) % m, but result can be == m.
    a <= m is permissible */
-__GNUC_ATTRIBUTE_UNUSED__
+MAYBE_UNUSED
 static inline void
 modul_addredcsemi_ul (residueul_t r, const residueul_t a, 
                       const unsigned long b, const unsigned long invm, 
@@ -495,7 +496,7 @@ modul_addredcsemi_ul (residueul_t r, const residueul_t a,
 }
 
 
-__GNUC_ATTRIBUTE_UNUSED__
+MAYBE_UNUSED
 static inline void
 modul_mulredc (residueul_t r, const residueul_t a, const residueul_t b,
                const unsigned long invm, const modulusul_t m)
@@ -528,7 +529,7 @@ modul_mulredc (residueul_t r, const residueul_t a, const residueul_t b,
 }
                          
 /* FIXME: check for overflow if b > m */
-__GNUC_ATTRIBUTE_UNUSED__
+MAYBE_UNUSED
 static inline void
 modul_mulredc_ul (residueul_t r, const residueul_t a, const unsigned long b,
                   const unsigned long invm, const modulusul_t m)
@@ -555,7 +556,7 @@ modul_mulredc_ul (residueul_t r, const residueul_t a, const unsigned long b,
 /* Computes (a * b + c)/ 2^wordsize % m. Requires that 
    a * b + c < 2^wordsize * m */
 
-__GNUC_ATTRIBUTE_UNUSED__
+MAYBE_UNUSED
 static inline void
 modul_muladdredc_ul (residueul_t r, const residueul_t a, const unsigned long b,
                      const unsigned long c, const unsigned long invm, 
@@ -581,7 +582,7 @@ modul_muladdredc_ul (residueul_t r, const residueul_t a, const unsigned long b,
 }
                          
 
-__GNUC_ATTRIBUTE_UNUSED__
+MAYBE_UNUSED
 static inline void
 modul_div2 (residueul_t r, residueul_t a, modulusul_t m)
 {
@@ -608,14 +609,4 @@ int modul_sprp (const residueul_t, const unsigned long, const modulusul_t);
 int modul_inv (residueul_t, residueul_t, modulusul_t);
 int modul_jacobi (residueul_t, modulusul_t);
 
-/* Try to restore the macro defines to the same state they had been in */
-#ifdef MOD_UL_ASSERT
-#undef ASSERT
-#undef MOD_UL_ASSERT
-#endif
-#ifdef MOD_UL_GNUC_ATTRIBUTE_UNUSED
-#undef __GNUC_ATTRIBUTE_UNUSED__
-#undef MOD_UL_GNUC_ATTRIBUTE_UNUSED
-#endif
-
-#endif
+#endif  /* MOD_UL_H__ */

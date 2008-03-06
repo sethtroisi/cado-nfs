@@ -19,18 +19,9 @@
   02111-1307, USA.
 */
 
-#include <assert.h>
 #include <limits.h>
 #include <string.h>
 #include "gf2x.h"
-
-// #define DEBUG
-
-#ifdef DEBUG
-#define ASSERT(x) assert(x)
-#else
-#define ASSERT(x)
-#endif
 
 short best_tab[TOOM_TUNING_LIMIT] = BEST_TOOM_TABLE;
 short best_utab[TOOM_TUNING_LIMIT] = BEST_UTOOM_TABLE;
@@ -519,7 +510,7 @@ void mul_tc3(unsigned long *c, const unsigned long *a,
     Add(W2 + 2, W2 + 2, W4 + 2, k);
     W2[k + 2] = W4[k + 2];	/* b0 + (x+1)b1 + (x^2+1)b2 */
     /* since we use W2[k+2], we need k+3 words in W2, i.e., 3 <= k */
-    //  assert (k >= 3);
+    //  ASSERT (k >= 3);
 
     /* {c, k+1}: x*a1+x^2*a2, {c+k+1, k+1}: a0+(1+x)*a1+(1+x^2)*a2,
        {c+2k+2,k+1}: b0+(1+x)*b1+(1+x^2)*b2,
@@ -1251,14 +1242,6 @@ void mul_tc3w(ulong * c, const ulong * a, const ulong * b,
 #error "MUL_TOOMW_THRESHOLD should be at least 8"
 #endif
 
-// #define CHECK_ASSERT
-
-#ifdef CHECK_ASSERT  
-#define ASSERT assert
-#else
-#define ASSERT(x)
-#endif
-
 /*
   c must have space for 2n words and should not overlap the inputs.
   stk must have space for sp(n) = toomspace(n) words
@@ -1790,7 +1773,7 @@ void mul_tc4(ulong * c, const ulong * a, const ulong * b,
 /* W4 = W1 +(W0 + U3*(x+1))*x; W3 = W2 +(W6 + V3*(x+1))*x */
     cy = AddLsh1(W4 + 2, W0, a + 3 * k, r);	/* W0 + x U3 */
     cy = Add1(W4 + 2 + r, W0 + r, k + 1 - r, cy);	/* cy == 0 */
-    assert(cy == 0);
+    ASSERT(cy == 0);
     Add(W4 + 2, W4 + 2, a + 3 * k, r);	/* W0 + x U3 + U3 */
     W4[k + 2] = (W4[k + 2] << 1) ^ AddLsh1(W4 + 2, W1, W4 + 2, k);	/* W1+x(W0 +(x+1) U3) */
     cy = AddLsh1(W3 + 2, W6 + 2, b + 3 * k, r);	/* W6 + x V3 */

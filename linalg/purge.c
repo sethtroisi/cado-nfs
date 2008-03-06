@@ -11,11 +11,8 @@
 #include "mod_ul.c"
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 #include <math.h>
 #include <string.h>
-
-#define WANT_ASSERT
 
 #include "utils/utils.h"
 

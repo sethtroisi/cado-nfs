@@ -5,7 +5,6 @@
 #include <gmp.h>
 #include "lingen_params.h"
 #include "params.h"
-#include <assert.h>
 #include "types.h"
 #include "macros.h"
 #include "bw_scalar.h"
@@ -101,9 +100,9 @@ void addmul(mp_limb_t * dest, mp_limb_t * s1, mp_limb_t * s2)
 					bw_allocsize+1,
 			mp_bits_per_limb-(order_of_2 % mp_bits_per_limb));
 		tmp[bw_allocsize-1] = carry0;
-		assert(carry1==0);
+		ASSERT(carry1==0);
 		carry1=mpn_add_n(tmp,tmp,tmp+bw_allocsize,bw_allocsize);
-		assert(carry1==0);
+		ASSERT(carry1==0);
 		/* overflow is at most 1bit . Since we know we have at
 		 * least 1bit free space in the limb, it's ok */
 				
@@ -192,9 +191,9 @@ OUT 					tmp+bw_allocsize-1,
 OUT 					bw_allocsize+1,
 OUT 			mp_bits_per_limb-(order_of_2 % mp_bits_per_limb));
 OUT 		tmp[bw_allocsize-1] = carry0;
-OUT 		assert(carry1==0);
+OUT 		ASSERT(carry1==0);
 OUT 		carry1=mpn_add_n(tmp,tmp,tmp+bw_allocsize,bw_allocsize);
-OUT 		assert(carry1==0);
+OUT 		ASSERT(carry1==0);
 OUT 		/* overflow is at most 1bit . Since we know we have at
 OUT 		 * least 1bit free space in the limb, it's ok */
 OUT 				
@@ -255,7 +254,7 @@ inverse(mp_limb_t * dest, mp_limb_t * src)
 	tmp1[bw_allocsize]=mpn_add_n(tmp1,tmp1,tmp2,bw_allocsize);
 
 	s3=mpn_gcdext(tmp3,tmp4,&s4,tmp1,bw_allocsize,tmp2,bw_allocsize);
-	assert(s3==1 && tmp3[0]==1);
+	ASSERT(s3==1 && tmp3[0]==1);
 	if (s4<0) {
 		s4=-s4;
 		mpn_tdiv_qr(	tmp1+bw_allocsize,tmp1,0,

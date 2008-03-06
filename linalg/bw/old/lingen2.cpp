@@ -11,7 +11,6 @@
 
 #include "lingen_params.h"
 #include "params.h"
-#include <assert.h>
 #include "types.h"
 #include "macros.h"
 #include "auxfuncs.h"
@@ -602,14 +601,14 @@ bw_gauss_onestep(bw_mbmat e,
         }
         if (i == m_param)
             continue;
-        assert(rank < m_param);
+        ASSERT(rank < m_param);
         pivots_list[rank++] = j;
         k_inv(inv,mbmat_scal(e,i,jr));
         /* Cancel this coeff in all other columns. */
         for(k = j + 1 ; k < bigdim ; k++) {
             k_mul(lambda,mbmat_scal(e,i,pi->clist[k]),inv);
             k_neg(lambda,lambda);
-            assert(delta[j]<=delta[k]);
+            ASSERT(delta[j]<=delta[k]);
             if (!pivlist)
                 ec_transvec(ec,j,k,i,lambda);
             else
@@ -754,7 +753,7 @@ bw_traditional_algo_1(struct e_coeff * ec, int * delta,
     mbmat_alloc(e);
     mbmat_zero(e);
 
-    assert(!ec_is_twisted(ec));
+    ASSERT(!ec_is_twisted(ec));
     last=0.0;
 
     for(t=0;t<=ec->degree;t++) {
@@ -788,7 +787,7 @@ bw_traditional_algo_2(struct e_coeff * ec, int * delta,
 
     perm=(unsigned int *) malloc(bigdim*sizeof(unsigned int));
 
-    assert(!ec_is_twisted(ec));
+    ASSERT(!ec_is_twisted(ec));
 
     deg=ec->degree;
     last=0.0;
@@ -908,7 +907,7 @@ bw_recursive_algorithm(struct e_coeff * ec,
     ldeg=(deg   /2)+1;
     rdeg=(deg+1)/2;
 
-    assert(ldeg && rdeg && ldeg + rdeg == deg + 1);
+    ASSERT(ldeg && rdeg && ldeg + rdeg == deg + 1);
 
     /* We aim at computing ec * pi / X^ldeg. The degree of this
      * product will be
@@ -1017,7 +1016,7 @@ bw_recursive_algorithm(struct e_coeff * ec,
     dft_mb_free(dft_e_middle);
     dft_mb_free(dft_e_left);
 
-    assert(ec->degree==rdeg-1);
+    ASSERT(ec->degree==rdeg-1);
 
     t_sub+=bw_lingen(ec,delta,&pi_right);
     printf("deg(pi_r)=%d, bound is %d\n",pi_right->degree,expected_pi_deg);
@@ -1026,7 +1025,7 @@ bw_recursive_algorithm(struct e_coeff * ec,
     core_if_null(*p_pi,"*p_pi");
 
     printf("deg(pi_prod)=%d (order %d)\n",(*p_pi)->degree, so_i);
-    assert(sub_order.fits((*p_pi)->degree + 1));
+    ASSERT(sub_order.fits((*p_pi)->degree + 1));
 
     dft_pi_right	= fft_tp_dft(pi_right, sub_order, &t_dft_pi_r);
     reclevel_prolog();

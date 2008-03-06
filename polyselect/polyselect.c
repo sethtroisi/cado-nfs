@@ -38,7 +38,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 #include <limits.h> /* for ULONG_MAX */
 #include <float.h>  /* for DBL_MAX */
 #include <math.h>   /* for log, fabs */
@@ -52,12 +51,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
                          FIXME: we should adjust that bound dynamically,
                          so that the norm of the modified polynomial does
                          not change much. */
-
-#ifdef DEBUG
-#define ASSERT(x) assert(x)
-#else
-#define ASSERT(x)
-#endif
 
 #define mpz_add_si(a,b,c)                       \
   if (c >= 0) mpz_add_ui (a, b, c);             \
@@ -194,7 +187,7 @@ poly_shift_divp (mpz_t *h, int d, long r, unsigned long p)
   for (i = 1; i <= d; i++)
     for (k = d - i; k < d; k++)
       { /* h[k] <- h[k] + r/p h[k+1] */
-        assert (mpz_divisible_ui_p (h[k+1], p) != 0);
+        ASSERT (mpz_divisible_ui_p (h[k+1], p) != 0);
         mpz_divexact_ui (t, h[k+1], p);
 	if (r >= 0)
 	  mpz_addmul_ui (h[k], t, r);
@@ -330,7 +323,7 @@ special_val0 (mpz_t *f, int d, unsigned long p)
       mpz_mul_ui (c, c, p);
     }
   /* Search for roots of g mod p */
-  assert (d > 0);
+  ASSERT (d > 0);
   roots = (LONG*) malloc (d * sizeof (LONG));
   if (roots == NULL)
     {
@@ -338,7 +331,7 @@ special_val0 (mpz_t *f, int d, unsigned long p)
       exit (1);
     }
   nroots = roots_mod_long (roots, g, d, p);
-  assert (nroots <= d);
+  ASSERT (nroots <= d);
   for (r0 = 0, i = 0; i < nroots; i++)
     {
       r = roots[i];
@@ -1214,7 +1207,7 @@ generate_base_mb (cado_poly p, mpz_t m, unsigned long b)
   unsigned long i;
   int d = p->degree;
 
-  assert (d >= 0);
+  ASSERT (d >= 0);
 
   if (b == 1)
     {
@@ -1354,7 +1347,7 @@ generate_poly (cado_poly out, double T, unsigned long b)
   int st;
   long k0, bestk = 0;
 
-  assert (T <= 9007199254740992.0); /* if T > 2^53, T-- will loop */
+  ASSERT (T <= 9007199254740992.0); /* if T > 2^53, T-- will loop */
 
   mpz_init (best_m);
 

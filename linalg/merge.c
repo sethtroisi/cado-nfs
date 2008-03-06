@@ -16,8 +16,6 @@
 #include <string.h>
 #include <math.h>
 
-#define WANT_ASSERT
-
 #include "utils/utils.h"
 #include "files.h"
 #include "sparse.h"
@@ -1809,10 +1807,12 @@ addFatherToSonsRec(sparse_mat_t *mat, int m, int *ind,
     reportn(tab, itab);
 }
 
+/* FIXME: Maybe height and hmax should go ? */
 void
 addFatherToSons(sparse_mat_t *mat, int m, int *ind,
 		int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX],
-		int *father, int *height, int hmax,
+               int *father,
+                int *height MAYBE_UNUSED, int hmax MAYBE_UNUSED,
 		int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1])
 {
 #if 0
@@ -2251,7 +2251,7 @@ mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 {
     double tt, totopt = 0.0, totfill = 0.0, totMST = 0.0, totdel = 0.0;
     double tfill, tMST;
-    unsigned long bwcostmin = 0, oldbwcost = 0, bwcost;
+    unsigned long bwcostmin = 0, oldbwcost = 0, bwcost = 0;
     dclist dcl;
     int old_nrows, old_ncols, m = 2, njrem = 0, ncost = 0, ncostmax, j, njproc;
     int mmax = 0, target = 10000;

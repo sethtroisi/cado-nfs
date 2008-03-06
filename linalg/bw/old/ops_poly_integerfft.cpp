@@ -2,7 +2,6 @@
 #include <cstring>
 #include <cstdlib>
 #include <cstdio>
-#include <cassert>
 
 #include "ops_poly_integerfft.hpp"
 #include "bw_scalar.h"
@@ -12,6 +11,7 @@
 #include "field_prime.h"
 #include "field_usage.h"
 #include "variables.h"
+#include "manu.h"
 
 using namespace std;
 
@@ -128,7 +128,7 @@ void ops_poly_ifft::itransform(
 {
 	mp_limb_t * tmp;
 	int i;
-	assert((deg+1) <= ncoeffs);
+	ASSERT((deg+1) <= ncoeffs);
 	tmp = (mp_limb_t *) malloc((p[0]->n+1) * sizeof(mp_limb_t));
 	memset(tmp, 0, (p[0]->n+1) * sizeof(mp_limb_t));
 	mpn_fft_itransform(tmp, p[0]);
@@ -151,7 +151,7 @@ void ops_poly_ifft::transform(
 	mp_limb_t * tmp;
 	int i;
 	mp_size_t nlimbs = (deg + 1) * limbs_per_coeff;
-	assert((deg+1) <= ncoeffs);
+	ASSERT((deg+1) <= ncoeffs);
 	tmp = (mp_limb_t *) malloc(nlimbs * sizeof(mp_limb_t));
 	memset(tmp, 0, nlimbs * sizeof(mp_limb_t));
 	for(i = 0 ; i <= deg ; i++) {

@@ -45,6 +45,9 @@ merge: merge.c merge.h ../utils/libutils.a sparse.o prune.o
 replay: replay.c ../utils/libutils.a sparse.o
 	gcc $(CFLAGS) $(INC) $< sparse.o $(LDFLAGS) -o $@
 
+checkdep: checkdep.c
+	gcc $(CFLAGS) $(INC) $< -o $@
+
 linalg: linalg.o gauss.o readmat.o
 	gcc $(CFLAGS) $^ $(LDFLAGS) -o $@
 

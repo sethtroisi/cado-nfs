@@ -2,7 +2,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <assert.h>
 #include "field_def.h"
 #include "field_prime.h"
 #include "field_quad.h"
@@ -11,6 +10,7 @@
 #include "fft_core.h"
 #include "auxfuncs.h"
 #include "ops_poly_fft.hpp"
+#include "manu.h"
 
 int ops_poly_fft::coeff_stride;
 
@@ -81,7 +81,7 @@ void ops_poly_fft::itransform(mp_limb_t * dst, ptrdiff_t stride, int deg,
          * restrict_scalars. But there's some more to do.
          */
 #ifndef HAS_NATIVE_FFT
-        assert(k_is_zero(p + k * coeff_stride + k_size));
+        ASSERT(k_is_zero(p + k * coeff_stride + k_size));
 #endif
         k_mul(dst + k * stride, p + k * coeff_stride, one_over_n);
     }

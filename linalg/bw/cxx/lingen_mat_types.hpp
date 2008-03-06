@@ -2,6 +2,7 @@
 #define LINGEN_MAT_TYPES_HPP_
 
 #include "manu.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <gmp.h>

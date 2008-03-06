@@ -8,7 +8,6 @@
 #include <string.h>
 #include <unistd.h>
 #include "params.h"
-#include <assert.h>
 #include "types.h"
 #include "macros.h"
 #include "old-endian.h"
@@ -200,7 +199,7 @@ int main(int argc, char *argv[])
 	last_j=(type32)-1;
 	ii=(type32)-1;
 
-	assert(present_coeffs);
+	ASSERT(present_coeffs);
 
 	for(k=0;k<present_coeffs;k++) {
 		if (vec_coeff_tab[k].j!=last_j) {

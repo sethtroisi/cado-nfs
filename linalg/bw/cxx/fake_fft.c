@@ -1,7 +1,6 @@
 #include "fake_fft.h"
 #include "gf2x.h"
 #include "manu.h"
-#include <assert.h>
 
 void fake_setup(fake_info_t p, int dF, int dG)
 {
@@ -16,12 +15,12 @@ void fake_setup(fake_info_t p, int dF, int dG)
 }
 
 void fake_dft(const fake_info_t p, fake_t dst, unsigned long * src, int n) {
-    assert(n <= p->d1 || n <= p->d2);
+    ASSERT(n <= p->d1 || n <= p->d2);
     int s = BITS_TO_WORDS(n + 1, ULONG_BITS);
     memcpy(dst, src, s * sizeof(ulong));
 }
 void fake_ift(const fake_info_t p, unsigned long * dst, int n, fake_src_t src) {
-    assert(n <= p->d3);
+    ASSERT(n <= p->d3);
     int t = BITS_TO_WORDS(n + 1, ULONG_BITS);
     memcpy(dst, src, t * sizeof(ulong));
 }

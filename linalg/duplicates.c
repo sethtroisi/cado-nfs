@@ -8,15 +8,12 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 #include <math.h>
 #include <string.h>
 #include <ctype.h>
 
 #include <gmp.h>
 #include "mod_ul.c"
-
-#define WANT_ASSERT
 
 #include "utils/utils.h"
 

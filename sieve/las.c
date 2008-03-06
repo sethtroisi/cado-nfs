@@ -578,19 +578,20 @@ fill_in_buckets(bucket_array_t BA, factorbase_degn_t *fb, const sieve_info_t * s
     fprintf (stderr, "# medium primes pushed to buckets in %f sec\n", seconds()-tm);
 }
 
-void apply_one_bucket(unsigned char *S, bucket_array_t BA, int i, sieve_info_t *si) {
+void apply_one_bucket(unsigned char *S, bucket_array_t BA, int i,
+                     sieve_info_t * si MAYBE_UNUSED)
+{
     int j = nb_of_updates(BA, i);
-    for ( ; j > 0 ; --j) {
-        bucket_update_t update = get_next_bucket_update(BA, i);
-        S[update.x] -= update.logp;
+    for (; j > 0; --j) {
+       bucket_update_t update = get_next_bucket_update(BA, i);
+       S[update.x] -= update.logp;
 #ifdef TRACE_K
-        if ((update.x + i*si->bucket_region) == TRACE_K)
-            fprintf (stderr, "Subtract %u to S[%u], from BA[%u]\n",
-                    update.logp, TRACE_K, i);
+       if ((update.x + i * si->bucket_region) == TRACE_K)
+           fprintf(stderr, "Subtract %u to S[%u], from BA[%u]\n",
+                   update.logp, TRACE_K, i);
 #endif
     }
 }
-
 /* Initialize lognorms on the rational side for the bucket_region
  * number N.
  * For the moment, nothing clever, wrt discarding (a,b) pairs that are

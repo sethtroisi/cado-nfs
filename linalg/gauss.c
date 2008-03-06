@@ -39,7 +39,6 @@ If just the dimension of kernel is wanted, set ker=NULL.
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 #include "gmp.h"   /* only used for setting a random matrix */
 #include "utils.h"  /* for seconds() */
 #include "gauss.h"
@@ -189,12 +188,12 @@ static void check_soundness(){
 #ifndef NDEBUG
   mp_limb_t x = 2342326;
   int i;
-  assert (LIMBS_PER_ROW*MACHINE_WORD_SIZE >= NCOLS);
+  ASSERT (LIMBS_PER_ROW*MACHINE_WORD_SIZE >= NCOLS);
   /* touch everywhere in the matrix to look for SEGV's */
   for (i = 0; i < NROWS; ++i) 
     x += matrix[LIMBS_PER_ROW*i];
   if (x == matrix[LIMBS_PER_ROW*NROWS-1])
-    assert(0);  /* very unlikely to happen, but forces no optimizations */
+    ASSERT(0);  /* very unlikely to happen, but forces no optimizations */
 #endif
 }
 

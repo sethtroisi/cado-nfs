@@ -4,7 +4,6 @@
 #include <gmp.h>
 #include "lingen_params.h"
 #include "params.h"
-#include <assert.h>
 #include "types.h"
 #include "macros.h"
 #include "auxfuncs.h"

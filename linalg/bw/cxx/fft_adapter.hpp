@@ -13,8 +13,8 @@ struct visible {							\
 	visible() {}							\
 	visible(int d1, int d2) { CAT(Z,setup)(o, d1, d2); }		\
 	visible(int d1, int d2,					\
-			int d3 UNUSED_VARIABLE,				\
-			int acc UNUSED_VARIABLE)			\
+			int d3 MAYBE_UNUSED,				\
+			int acc MAYBE_UNUSED)			\
 	{								\
 		CAT(Z,setup)(o, d1, d2);				\
 	}								\

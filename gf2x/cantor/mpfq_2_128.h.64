@@ -155,32 +155,32 @@ void mpfq_2_128_print(mpfq_2_128_field_ptr, FILE *, mpfq_2_128_src_elt);
 
 /* Implementations for inlines */
 static inline
-void mpfq_2_128_set(mpfq_2_128_field_ptr K UNUSED_VARIABLE, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s)
+void mpfq_2_128_set(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s)
 {
 	memcpy(r, s, sizeof(mpfq_2_128_elt));
 }
 
 static inline
-void mpfq_2_128_set_ui(mpfq_2_128_field_ptr K UNUSED_VARIABLE, mpfq_2_128_dst_elt r, unsigned long x)
+void mpfq_2_128_set_ui(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt r, unsigned long x)
 {
 	mpfq_2_128_set_uipoly(K, r, x & 1UL);
 }
 
 static inline
-unsigned long mpfq_2_128_get_ui(mpfq_2_128_field_ptr K UNUSED_VARIABLE, mpfq_2_128_src_elt r)
+unsigned long mpfq_2_128_get_ui(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_src_elt r)
 {
 	return r[0] & 1UL;
 }
 
 static inline
-void mpfq_2_128_set_uipoly(mpfq_2_128_field_ptr K UNUSED_VARIABLE, mpfq_2_128_dst_elt r, unsigned long x)
+void mpfq_2_128_set_uipoly(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt r, unsigned long x)
 {
 	memset(r, 0, sizeof(mpfq_2_128_elt));
 	r[0] = x;
 }
 
 static inline
-void mpfq_2_128_set_uipoly_wide(mpfq_2_128_field_ptr K UNUSED_VARIABLE, mpfq_2_128_dst_elt r, const unsigned long * x, unsigned int n)
+void mpfq_2_128_set_uipoly_wide(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt r, const unsigned long * x, unsigned int n)
 {
 	unsigned int i;
 	memset(r, 0, sizeof(mpfq_2_128_elt));
@@ -189,13 +189,13 @@ void mpfq_2_128_set_uipoly_wide(mpfq_2_128_field_ptr K UNUSED_VARIABLE, mpfq_2_1
 }
 
 static inline
-unsigned long mpfq_2_128_get_uipoly(mpfq_2_128_field_ptr K UNUSED_VARIABLE, mpfq_2_128_src_elt r)
+unsigned long mpfq_2_128_get_uipoly(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_src_elt r)
 {
 	return r[0];
 }
 
 static inline
-void mpfq_2_128_get_uipoly_wide(mpfq_2_128_field_ptr K UNUSED_VARIABLE, unsigned long * r, unsigned int n, mpfq_2_128_src_elt x)
+void mpfq_2_128_get_uipoly_wide(mpfq_2_128_field_ptr K MAYBE_UNUSED, unsigned long * r, unsigned int n, mpfq_2_128_src_elt x)
 {
 	unsigned int i;
 	for(i = 0 ; i < 2 && i < n; i++) r[i] = x[i];
@@ -203,19 +203,19 @@ void mpfq_2_128_get_uipoly_wide(mpfq_2_128_field_ptr K UNUSED_VARIABLE, unsigned
 }
 
 static inline
-void mpfq_2_128_random(mpfq_2_128_field_ptr K UNUSED_VARIABLE, mpfq_2_128_dst_elt r)
+void mpfq_2_128_random(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt r)
 {
 	mpn_random(r, 2);
 }
 
 static inline
-void mpfq_2_128_random2(mpfq_2_128_field_ptr K UNUSED_VARIABLE, mpfq_2_128_dst_elt r)
+void mpfq_2_128_random2(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt r)
 {
 	mpn_random2(r, 2);
 }
 
 static inline
-void mpfq_2_128_add(mpfq_2_128_field_ptr K UNUSED_VARIABLE, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s1, mpfq_2_128_src_elt s2)
+void mpfq_2_128_add(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s1, mpfq_2_128_src_elt s2)
 {
 	int i;
 	for(i = 0 ; i < 2 ; i++)
@@ -223,7 +223,7 @@ void mpfq_2_128_add(mpfq_2_128_field_ptr K UNUSED_VARIABLE, mpfq_2_128_dst_elt r
 }
 
 static inline
-void mpfq_2_128_mul(mpfq_2_128_field_ptr K UNUSED_VARIABLE, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s1, mpfq_2_128_src_elt s2)
+void mpfq_2_128_mul(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s1, mpfq_2_128_src_elt s2)
 {
 	mpfq_2_128_elt_ur t;
 	mpfq_2_128_mul_ur(K, t, s1, s2);
@@ -231,7 +231,7 @@ void mpfq_2_128_mul(mpfq_2_128_field_ptr K UNUSED_VARIABLE, mpfq_2_128_dst_elt r
 }
 
 static inline
-void mpfq_2_128_sqr(mpfq_2_128_field_ptr K UNUSED_VARIABLE, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s)
+void mpfq_2_128_sqr(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s)
 {
 	mpfq_2_128_elt_ur t;
 	mpfq_2_128_sqr_ur(K, t, s);
@@ -329,14 +329,14 @@ void mpfq_2_128_sqrt(mpfq_2_128_field_ptr K, mpfq_2_128_dst_elt r, mpfq_2_128_sr
 }
 
 static inline
-void mpfq_2_128_add_ui(mpfq_2_128_field_ptr K UNUSED_VARIABLE, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s, unsigned long x)
+void mpfq_2_128_add_ui(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s, unsigned long x)
 {
 	mpfq_2_128_set(K, r, s);
 	r[0] ^= (x & 1UL);
 }
 
 static inline
-void mpfq_2_128_mul_ui(mpfq_2_128_field_ptr K UNUSED_VARIABLE, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s, unsigned long x)
+void mpfq_2_128_mul_ui(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s, unsigned long x)
 {
 	if (x & 1UL) {
 		mpfq_2_128_set(K, r, s);
@@ -346,7 +346,7 @@ void mpfq_2_128_mul_ui(mpfq_2_128_field_ptr K UNUSED_VARIABLE, mpfq_2_128_dst_el
 }
 
 static inline
-int mpfq_2_128_inv(mpfq_2_128_field_ptr K UNUSED_VARIABLE, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s)
+int mpfq_2_128_inv(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s)
 {
 	mp_limb_t a[3] = { 0x8000000000000000UL, 0x43UL, 0x8000000000000000UL, };
 	mp_limb_t b[3];
@@ -595,7 +595,7 @@ void mpfq_2_128_as_solve(mpfq_2_128_field_ptr K, mpfq_2_128_dst_elt r, mpfq_2_12
 }
 
 static inline
-unsigned long mpfq_2_128_trace(mpfq_2_128_field_ptr K UNUSED_VARIABLE, mpfq_2_128_src_elt s)
+unsigned long mpfq_2_128_trace(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_src_elt s)
 {
 	return ((s[1]>>63) ^ (s[1]>>57)) & 1;
 }
@@ -700,13 +700,13 @@ void mpfq_2_128_mul2_interleave3(mpfq_2_128_dst_elt t, mpfq_2_128_src_elt s1, mp
 }
 
 static inline
-void mpfq_2_128_mul_ur(mpfq_2_128_field_ptr K UNUSED_VARIABLE, mpfq_2_128_dst_elt_ur t, mpfq_2_128_src_elt s1, mpfq_2_128_src_elt s2)
+void mpfq_2_128_mul_ur(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt_ur t, mpfq_2_128_src_elt s1, mpfq_2_128_src_elt s2)
 {
 	mpfq_2_128_mul2_interleave3(t,s1,s2);
 }
 
 static inline
-void mpfq_2_128_sqr_ur(mpfq_2_128_field_ptr K UNUSED_VARIABLE, mpfq_2_128_dst_elt_ur t, mpfq_2_128_src_elt s)
+void mpfq_2_128_sqr_ur(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt_ur t, mpfq_2_128_src_elt s)
 {
 	static const mp_limb_t g[256] = {
 		0, 1, 4, 5, 16, 17, 20, 21,
@@ -780,7 +780,7 @@ void mpfq_2_128_sqr_ur(mpfq_2_128_field_ptr K UNUSED_VARIABLE, mpfq_2_128_dst_el
 }
 
 static inline
-void mpfq_2_128_reduce(mpfq_2_128_field_ptr K UNUSED_VARIABLE, mpfq_2_128_dst_elt r, mpfq_2_128_dst_elt_ur t)
+void mpfq_2_128_reduce(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mpfq_2_128_dst_elt_ur t)
 {
 	{
 		mp_limb_t s[3];
@@ -836,13 +836,13 @@ void mpfq_2_128_reduce(mpfq_2_128_field_ptr K UNUSED_VARIABLE, mpfq_2_128_dst_el
 }
 
 static inline
-int mpfq_2_128_cmp(mpfq_2_128_field_ptr K UNUSED_VARIABLE, mpfq_2_128_src_elt a, mpfq_2_128_src_elt b)
+int mpfq_2_128_cmp(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_src_elt a, mpfq_2_128_src_elt b)
 {
 	return mpn_cmp(a, b, 2);
 }
 
 static inline
-int mpfq_2_128_cmp_ui(mpfq_2_128_field_ptr K UNUSED_VARIABLE, mpfq_2_128_src_elt r, unsigned long x)
+int mpfq_2_128_cmp_ui(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_src_elt r, unsigned long x)
 {
 	int i;
 	if (r[0] < (x & 1UL)) return -1;

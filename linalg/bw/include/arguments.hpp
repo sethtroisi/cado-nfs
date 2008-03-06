@@ -13,7 +13,7 @@
 
 #include <vector>
 
-#include "manu.h"	/* for UNUSED_VARIABLE */
+#include "manu.h"	/* for MAYBE_UNUSED */
 
 namespace argparser {
 class situation {
@@ -90,13 +90,13 @@ class situation {
 }	/* namespace argparser */
 
 struct no_arguments {
-	bool parse(argparser::situation& s UNUSED_VARIABLE) { return false; }
+	bool parse(argparser::situation& s MAYBE_UNUSED) { return false; }
 	void doc(std::ostream& o) const {
 		o
 		<< "Accepted options:\n"
 		<< "--help\t\tshow this help\n";
 	}
-	bool check(std::ostream& o UNUSED_VARIABLE) { return true; }
+	bool check(std::ostream& o MAYBE_UNUSED) { return true; }
 	void trigger() const {}
 };
 

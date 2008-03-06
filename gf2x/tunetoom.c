@@ -42,7 +42,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>		/* for LONG_MAX */
-#include <assert.h>
 #include <string.h>
 #include <time.h>
 #include <ctype.h>

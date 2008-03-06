@@ -1,9 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 #include <gmp.h>
-
-#define WANT_ASSERT
 
 #include "cado.h"
 #include "readmat.h"
@@ -99,7 +96,7 @@ int main(int argc, char **argv)
 	exit(1);
     }
     file = fopen(argv[1], "r");
-    assert(file != NULL);
+    ASSERT(file != NULL);
     compact = atoi(argv[2]);
 
     sparse_mat_init(mat);
@@ -136,5 +133,3 @@ int main(int argc, char **argv)
 
     return 0;
 }
-
-/* vim: set sw=4 sta et: */

@@ -39,8 +39,8 @@ extern "C" {
 #define clzl(x)         __builtin_clzl(x)
 #define ctzl(x)         __builtin_ctzl(x)
 #define parityl(x)      __builtin_parityl(x)
-#ifndef	UNUSED_VARIABLE
-#define	UNUSED_VARIABLE	__attribute__((unused))
+#ifndef	MAYBE_UNUSED
+#define	MAYBE_UNUSED	__attribute__((unused))
 #endif
 
 #ifndef __cplusplus
@@ -68,8 +68,8 @@ extern "C" {
 
 #else
 
-#ifndef	UNUSED_VARIABLE
-#define	UNUSED_VARIABLE	/**/
+#ifndef	MAYBE_UNUSED
+#define	MAYBE_UNUSED	/**/
 #endif
 
 /* provide slow fallbacks */

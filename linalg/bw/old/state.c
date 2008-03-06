@@ -7,7 +7,6 @@
 
 #include "slave_params.h"
 #include "params.h"
-#include <assert.h>
 #include "macros.h"
 #include "auxfuncs.h"
 #include "types.h"

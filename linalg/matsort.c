@@ -10,7 +10,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 #include <gmp.h>
 #include "readmat.h"
 
@@ -34,7 +33,7 @@ readmat (FILE *file, sparse_mat_t *mat)
   int i, j;
 
   ret = fscanf (file, "%d %d", &(mat->nrows), &(mat->ncols));
-  assert (ret == 2);
+  ASSERT (ret == 2);
   alloced = mat->nrows * 10;
   mat->data = (unsigned int *) malloc (alloced * sizeof (unsigned int));
   for (i = 0; i < mat->nrows; ++i) {
@@ -42,11 +41,11 @@ readmat (FILE *file, sparse_mat_t *mat)
     unsigned long b;
     int nc;
     ret = fscanf (file, "%d %d", &a, &b);
-    assert (ret == 2);
+    ASSERT (ret == 2);
     mat->data[used++] = a;
     mat->data[used++] = b;
     ret = fscanf (file, "%d", &nc);
-    assert (ret == 1);
+    ASSERT (ret == 1);
     if (used + nc + 3 >= alloced)
       {
         alloced += 1000;
@@ -58,9 +57,9 @@ readmat (FILE *file, sparse_mat_t *mat)
       {
         int x;
         ret = fscanf(file, "%d", &x);
-        assert (ret == 1);
+        ASSERT (ret == 1);
         mat->data[used++] = x;
-        assert (0 <= x && x < mat->ncols);
+        ASSERT (0 <= x && x < mat->ncols);
       }
   }
 }
@@ -158,7 +157,7 @@ main (int argc, char *argv[])
   else if (argc == 2)
     {
       file = fopen (argv[1], "r");
-      assert (file != NULL);
+      ASSERT (file != NULL);
     }
   else
     {

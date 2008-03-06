@@ -9,13 +9,6 @@
 #include <string.h>
 #include <math.h>
 #include <ctype.h>
-#include <assert.h>
-#define ASSERT_ALWAYS(x) assert(x)
-#ifdef WANT_ASSERT
-  #define ASSERT(x) assert(x)
-#else
-  #define ASSERT(x)
-#endif
 #define rdtscll(x)
 #include "basicnt.h"
 #include "fb.h"
@@ -109,7 +102,7 @@ fb_sortprimes (fbprime_t *primes, const unsigned int n)
 	  primes[k + 1] = t;
 	  m = k + 1;
 	}
-#ifdef WANT_ASSERT
+#ifndef NDEBUG
   for (k = 1; k < n; k++)
     ASSERT(primes[k - 1] <= primes[k]);
 #endif
@@ -209,7 +202,7 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
       mod_mul (r2, r1, r2, m); /* r2 = g0 / g1 */
       mod_neg (r2, r2, m); /* r2 = - g0 / g1 */
 
-#ifdef WANT_ASSERT
+#ifndef NDEBUG
       {
 	residue_t r3;
 	mod_init_noset0 (r3, m);
@@ -356,7 +349,7 @@ fb_make_linear_powers (mpz_t *poly, const fbprime_t bound, const double log_scal
 	mod_mul (r2, r1, r2, m); /* r2 = g0 / g1 */
 	mod_neg (r2, r2, m); /* r2 = - g0 / g1 */
 
-#ifdef WANT_ASSERT
+#ifndef NDEBUG
 	{
 	  residue_t r3;
 	  mod_init_noset0 (r3, m);

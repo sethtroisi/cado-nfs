@@ -11,7 +11,6 @@
 
 #include "lingen_params.h"
 #include "params.h"
-#include <assert.h>
 #include "macros.h"
 #include "types.h"
 #include "auxfuncs.h"
@@ -23,6 +22,7 @@
 #include "modulus_hacks.h"
 /* #include "version.h" */
 #include "lingen_common.h"
+#include "manu.h"
 
 #define	xxxVERY_VERBOSE
 /* Warning ! ; the (pos) field here is only used from within the gauss
@@ -460,7 +460,7 @@ bw_gauss(struct bw_iterator * it)
 		}
 		if (i == m_param)
 			continue;
-		assert(rank<m_param);
+		ASSERT(rank<m_param);
 		it->pivots_list[rank++] = j;
 		col_normalizer(norm,it->ctaf,i,jr);
 		/* Cancel this coeff in all other columns. */

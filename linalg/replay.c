@@ -10,7 +10,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 #include <string.h>
 
 #include "utils/utils.h"
@@ -180,7 +179,7 @@ flushSparse(char *sparsename, int **sparsemat, int small_nrows, int small_ncols,
 	fprintf(ofile, "%d", sparsemat[i][0]);
 	for(j = 1; j <= sparsemat[i][0]; j++){
 #if DEBUG >= 1
-	    assert(code[sparsemat[i][j]] > 0);
+	    ASSERT(code[sparsemat[i][j]] > 0);
 #endif
 	    fprintf(ofile, " %d", code[sparsemat[i][j]]-1); // FIXME
 	}
@@ -365,10 +364,10 @@ main(int argc, char *argv[])
 	bwcostmin = 0;
     
     purgedfile = fopen(argv[1], "r");
-    assert(purgedfile != NULL);
+    ASSERT(purgedfile != NULL);
     // read parameters that should be the same as in purgedfile!
     hisfile = fopen(argv[2], "r");
-    assert(hisfile != NULL);
+    ASSERT(hisfile != NULL);
     fgets(str, STRLENMAX, hisfile);
     sscanf(str, "%d %d", &nrows, &ncols);
     fprintf(stderr, "Original matrix has size %d x %d\n", nrows, ncols);

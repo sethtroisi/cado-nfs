@@ -1,8 +1,8 @@
 #include <gmp.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include "cado.h"
 #include "poly.h"
-#include <assert.h>
 
 // allocate a polynomial that can contain d+1 coeffs, and set to zero.
 void poly_alloc(poly_t f, int d) {
@@ -10,7 +10,7 @@ void poly_alloc(poly_t f, int d) {
   f->alloc = d+1;
   f->deg = -1;
   f->coeff = (mpz_t *)malloc((d+1)*sizeof(mpz_t));
-  assert (f->coeff != NULL);
+  ASSERT (f->coeff != NULL);
   for (i = 0; i <= d; ++i)
     mpz_init(f->coeff[i]);
 }
@@ -49,7 +49,7 @@ void poly_setcoeff(poly_t f, int i, const mpz_t z) {
   int j;
   if (i >= f->alloc) {
     f->coeff = (mpz_t *)realloc(f->coeff, (i+1)*sizeof(mpz_t));
-    assert (f->coeff != NULL);
+    ASSERT (f->coeff != NULL);
     for (j = f->alloc; j <= i; ++j)
       mpz_init(f->coeff[j]);
     f->alloc = i+1;

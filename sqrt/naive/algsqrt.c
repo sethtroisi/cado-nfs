@@ -10,7 +10,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <gmp.h>
-#include <assert.h>
 #include "cado.h"
 #include "utils/utils.h"
 #include "poly.h"

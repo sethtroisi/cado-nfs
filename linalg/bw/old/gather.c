@@ -7,7 +7,6 @@
 #include <stdlib.h>
 #include "slave_params.h"
 #include "params.h"
-#include <assert.h>
 #include "types.h"
 #include "old-endian.h"
 #include "macros.h"

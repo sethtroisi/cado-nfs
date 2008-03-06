@@ -6,7 +6,6 @@
 #include <gmp.h>
 #include "lingen_params.h"
 #include "params.h"
-#include <assert.h>
 #include "types.h"
 #include "macros.h"
 #include "auxfuncs.h"
@@ -310,7 +309,7 @@ void
 tp_transvec(struct t_poly * tp,
 	       	int o_j1,
 	       	int o_j2,
-		int ikill UNUSED_VARIABLE,
+		int ikill MAYBE_UNUSED,
 	       	bw_scalar lambda)
 {
 	int i,t;
@@ -322,7 +321,7 @@ tp_transvec(struct t_poly * tp,
 	j2=tp->clist[o_j2];
 
 #if 0
-	assert(tp->degnom[j1] <= tp->degnom[j2]);
+	ASSERT(tp->degnom[j1] <= tp->degnom[j2]);
 #endif
 
 	/* Apparently this might happen, and rightfully. One thing is
@@ -362,7 +361,7 @@ tp_x_multiply(struct t_poly * tp, int o_j)
 
 	j=tp->clist[o_j];
 
-	assert(tp->degnom[j] + 1 < tp->alloc);
+	ASSERT(tp->degnom[j] + 1 < tp->alloc);
 
 	for(i=0;i<bigdim;i++) {
 		d=degtable_entry(tp,i,j);

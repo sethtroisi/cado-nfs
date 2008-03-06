@@ -23,20 +23,12 @@
 */
 
 #include "gf2x.h"
-#include "assert.h"
 
-// #define CHECK_ASSERT
 // #define DEBUG
 // #define DEBUG_LSHIFT
 // #define DEBUG_MULMOD
 // #define VERBOSE
 // #define TIMING
-
-#ifdef CHECK_ASSERT
-#define ASSERT assert
-#else
-#define ASSERT(x)
-#endif
 
 /* The check in tunefft finds that FFTMul does not work correctly for
    balanced operands of size <= 13 words.  Hence this threshhold. */

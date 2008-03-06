@@ -2,8 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include "params.h"
-#include <assert.h>
-#include <alloca.h>
 #define _PROTO(x) x
 #include <gmp.h>
 #include "macros.h"

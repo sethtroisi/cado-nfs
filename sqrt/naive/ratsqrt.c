@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <gmp.h>
-#include <assert.h>
 #include "cado.h"
 #include "utils/utils.h"
 
@@ -86,12 +85,12 @@ main (int argc, char **argv)
   }
 
   matfile = fopen(argv[1], "r");
-  assert (matfile != NULL);
+  ASSERT (matfile != NULL);
   kerfile = fopen(argv[2], "r");
-  assert (kerfile != NULL);
+  ASSERT (kerfile != NULL);
 
   ret = read_polynomial(pol, argv[3]);
-  assert (ret);
+  ASSERT (ret);
   mpz_init(m);
   mpz_neg(m, pol->g[0]);
 
@@ -108,7 +107,7 @@ main (int argc, char **argv)
   {
     int nrows, ncols;
     ret = fscanf(matfile, "%d %d", &nrows, &ncols);
-    assert (ret == 2);
+    ASSERT (ret == 2);
     fgets(str, 1024, matfile); // read end of first line
     nlimbs = (nrows / GMP_NUMB_BITS) + 1;
   }
@@ -132,12 +131,12 @@ main (int argc, char **argv)
 
   for (i = 0; i < nlimbs; ++i) {
     ret = fscanf(kerfile, "%lx", &w);
-    assert (ret == 1);
+    ASSERT (ret == 1);
     for (j = 0; j < GMP_NUMB_BITS; ++j) {
       if (fgets(str, 1024, matfile)) {
 	if (w & 1UL) {
 	  ret = gmp_sscanf(str, "%Zd %Zd", a, b);
-	  assert (ret == 2);
+	  ASSERT (ret == 2);
 	  mpz_mul (c, b, m);
 	  mpz_sub (c, a, c);
 #ifndef FAST

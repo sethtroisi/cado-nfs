@@ -16,8 +16,6 @@
 #include "basicnt.h"
 #include "../utils/utils.h"
 
-#define MIN(a,b) ((a)<(b)?(a):(b))
-#define MAX(a,b) ((a)>(b)?(a):(b))
 #define LOG2 0.69314718055994530941723212145817656808
 #define INVLOG2 1.4426950408889634073599246810018921374
 
@@ -51,6 +49,12 @@
 #define uc_add(a,b) ((unsigned char) ((a)+(b)))
 #define uc_sub(a,b) ((unsigned char) ((a)-(b)))
 #define add_error(a) ((unsigned char) ((a) + SIEVE_PERMISSIBLE_ERROR))
+
+#ifdef  WANT_ASSERT_EXPENSIVE
+#define ASSERT_EXPENSIVE(x)     ASSERT_ALWAYS(x)
+#else
+#define ASSERT_EXPENSIVE(x)     /**/
+#endif
 
 
 unsigned long skipped_ahead_too_far;
@@ -617,7 +621,7 @@ sort_sieve_reports_recurse (sieve_report_t *r, const size_t l)
   /* Here, r[i].a <= p for 0 <= i < b, r[i].a == p for b <= i < h,
      r[i].a > p for h <= i < l */
 
-#ifdef WANT_ASSERT
+#ifndef NDEBUG
   {
     unsigned long i;
     for (i = 0; i < b; i++)
@@ -638,7 +642,7 @@ sort_sieve_reports_recurse (sieve_report_t *r, const size_t l)
   sort_sieve_reports_recurse (r, b);
   sort_sieve_reports_recurse (r + h, l - h);
 
-#ifdef WANT_ASSERT
+#ifndef NDEBUG
   {
     unsigned long i;
     for (i = 0; i < l - 1; i++)
@@ -2108,7 +2112,7 @@ main (int argc, char **argv)
     {
       printf ("# CADO line siever " REV "\n");
       printf ("# Compiled in parameters:\n");
-#ifdef WANT_ASSERT
+#ifndef NDEBUG
       printf ("# Assertions enabled\n");
 #else
       printf ("# Assertions disabled\n");
@@ -2236,7 +2240,7 @@ main (int argc, char **argv)
 	fb_extract_small (fbr, CACHESIZES[i], i, verbose);
     }
   
-#ifdef WANT_ASSERT
+#ifndef NDEBUG
   /* Check the factor bases for correctness */
   
   if (sieve_a)

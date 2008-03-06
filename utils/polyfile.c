@@ -16,17 +16,17 @@ static const char *get_rhs(const char *line, const char *tag, int *have)
     if (strncmp(line, tag, len) != 0)
 	return NULL;
     if (!separator(line[len]))
-        return NULL;
+	return NULL;
 
     if (have != NULL && *have != 0) {
 	fprintf(stderr, "parse error in get_rhs: %s appears twice\n", tag);
 	exit(EXIT_FAILURE);
     }
     if (have) {
-        *have = 1;
+	*have = 1;
     }
 
-    for (; !line[len] || separator(line[len]);len++);
+    for (; !line[len] || separator(line[len]); len++);
 
     return line + len;
 }
@@ -190,7 +190,7 @@ int read_polynomial(cado_poly poly, char *filename)
 	    continue;
 
 	ok += parse_string(poly->name, sizeof(poly->name),
-                line, "name", &have_name);
+			   line, "name", &have_name);
 	ok += parse_mpz(poly->n, line, "n", &have_n);
 	ok += parse_double(&(poly->skew), line, "skew", NULL);
 	for (i = 0; i < (MAXDEGREE + 1); i++) {
@@ -200,7 +200,8 @@ int read_polynomial(cado_poly poly, char *filename)
 	    snprintf(tag, sizeof(tag), "Y%d", i);
 	    ok += parse_mpz(poly->g[i], line, tag, &have_g[i]);
 	}
-	ok += parse_string(poly->type, sizeof(poly->type), line, "type", NULL);
+	ok +=
+	    parse_string(poly->type, sizeof(poly->type), line, "type", NULL);
 	ok += parse_ulong(&(poly->rlim), line, "rlim", NULL);
 	ok += parse_ulong(&(poly->alim), line, "alim", NULL);
 	ok += parse_int(&(poly->lpbr), line, "lpbr", NULL);
@@ -212,7 +213,7 @@ int read_polynomial(cado_poly poly, char *filename)
 	ok += parse_int(&(poly->qintsize), line, "qintsize", NULL);
 	ok += parse_mpz(poly->m, line, "m", NULL);
 
-        ASSERT_ALWAYS(ok < 2);
+	ASSERT_ALWAYS(ok < 2);
 	if (ok == 0) {
 	    fprintf(stderr,
 		    "read_polynomial: Cannot parse line %s\nIgnoring.\n",
@@ -232,21 +233,21 @@ int read_polynomial(cado_poly poly, char *filename)
     poly->degree = degf;
     // compute m, the common root of f and g mod n
     if (degg != -1) {
-        mpz_t tmp;
-        mpz_init(tmp);
+	mpz_t tmp;
+	mpz_init(tmp);
 	mpz_invert(tmp, poly->g[1], poly->n);
 	mpz_mul(tmp, tmp, poly->g[0]);
 	mpz_mod(tmp, tmp, poly->n);
 	mpz_sub(tmp, poly->n, tmp);
 	mpz_mod(tmp, tmp, poly->n);
-        if (mpz_cmp_ui(poly->m, 0) != 0) {
-            if (mpz_cmp(poly->m, tmp) != 0) {
-                fprintf(stderr, "m is not a root of g mod N\n");
-                exit(EXIT_FAILURE);
-            }
-        }
-        mpz_set(poly->m, tmp);
-        mpz_clear(tmp);
+	if (mpz_cmp_ui(poly->m, 0) != 0) {
+	    if (mpz_cmp(poly->m, tmp) != 0) {
+		fprintf(stderr, "m is not a root of g mod N\n");
+		exit(EXIT_FAILURE);
+	    }
+	}
+	mpz_set(poly->m, tmp);
+	mpz_clear(tmp);
     } else {
 	ASSERT_ALWAYS(mpz_cmp_ui(poly->m, 0) != 0);
 	mpz_set_ui(poly->g[1], 1);
@@ -294,33 +295,30 @@ void fprint_polynomial(FILE * fp, mpz_t * f, const int d)
 }
 
 /* check that n divides b^d*f(m/d), where g = b*x-m */
-void
-check_polynomials (cado_poly cpoly)
+void check_polynomials(cado_poly cpoly)
 {
-  mpz_t r, q;
-  int k;
-  int d = cpoly->degree;
+    mpz_t r, q;
+    int k;
+    int d = cpoly->degree;
 
-  mpz_init_set (r, cpoly->f[d]);
-  mpz_init_set_ui (q, 1);
+    mpz_init_set(r, cpoly->f[d]);
+    mpz_init_set_ui(q, 1);
 
-  for (k = d - 1; k >= 0; k--)
-    {
-      mpz_mul (q, q, cpoly->g[1]);
-      /* invariant: q = b^(d-k) */
-      mpz_mul (r, r, cpoly->g[0]);
-      mpz_neg (r, r);
-      mpz_addmul (r, q, cpoly->f[k]);
+    for (k = d - 1; k >= 0; k--) {
+	mpz_mul(q, q, cpoly->g[1]);
+	/* invariant: q = b^(d-k) */
+	mpz_mul(r, r, cpoly->g[0]);
+	mpz_neg(r, r);
+	mpz_addmul(r, q, cpoly->f[k]);
     }
 
-  if (mpz_divisible_p (r, cpoly->n) == 0)
-    {
-      fprintf (stderr, "Error, n does does divide Res(f,g)\n");
-      exit (EXIT_FAILURE);
+    if (mpz_divisible_p(r, cpoly->n) == 0) {
+	fprintf(stderr, "Error, n does does divide Res(f,g)\n");
+	exit(EXIT_FAILURE);
     }
 
-  mpz_clear (r);
-  mpz_clear (q);
+    mpz_clear(r);
+    mpz_clear(q);
 }
 
 #undef PARSE_MATCH

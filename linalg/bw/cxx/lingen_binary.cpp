@@ -13,9 +13,7 @@
 #include <stdio.h>
 #include <gmp.h>
 #include <errno.h>
-#include <assert.h>
 #include <unistd.h>
-#include <assert.h>
 #include <utility>
 #include <vector>
 #include <set>
@@ -25,8 +23,6 @@
 #include <iomanip>
 
 #include "cado.h"
-#undef  ASSERT
-#undef  ASSERT_ALWAYS
 #include "utils.h"
 
 #define Lmacro(N, m, n) (iceildiv((N)+2*(n),(m))+iceildiv((N)+2*(n),(n))+10)
@@ -718,7 +714,7 @@ static bool gauss(unsigned int piv[], polmat& PI)/*{{{*/
         i = e0.ffs(j);
         if (i == UINT_MAX)
             continue;
-        assert(rank < e0.nrows && rank < e0.ncols);
+        ASSERT(rank < e0.nrows && rank < e0.ncols);
         // std::cout << fmt("col % is the %-th pivot\n") % j % rank;
         piv[rank++] = j;
         /* Cancel this coeff in all other columns. */
@@ -1008,7 +1004,7 @@ static void bw_traditional_algo_1(struct e_coeff * ec, int * delta,
     mbmat_alloc(e);
     mbmat_zero(e);
 
-    assert(!ec_is_twisted(ec));
+    ASSERT(!ec_is_twisted(ec));
     last=0.0;
 
     for(t=0;t<=ec->degree;t++) {
@@ -1041,7 +1037,7 @@ static void bw_traditional_algo_2(struct e_coeff * ec, int * delta,
 
     perm=(unsigned int *) malloc((m+n)*sizeof(unsigned int));
 
-    assert(!ec_is_twisted(ec));
+    ASSERT(!ec_is_twisted(ec));
 
     deg=ec->degree;
     last=0.0;
@@ -1227,7 +1223,7 @@ static bool go_recursive(polmat& pi)
     unsigned int rdeg = deg / 2;
     unsigned int ldeg = deg - rdeg;
 
-    assert(ldeg && rdeg && ldeg + rdeg == deg);
+    ASSERT(ldeg && rdeg && ldeg + rdeg == deg);
 
     unsigned int expected_pi_deg = pi_deg_bound(ldeg);
     unsigned int kill;

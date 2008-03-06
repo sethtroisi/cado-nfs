@@ -58,7 +58,7 @@
 /* Vector allocation functions */
 
 /* Input/output functions */
-void mpfq_2_128_print(mpfq_2_128_field_ptr K UNUSED_VARIABLE, FILE * f, mpfq_2_128_src_elt s)
+void mpfq_2_128_print(mpfq_2_128_field_ptr K MAYBE_UNUSED, FILE * f, mpfq_2_128_src_elt s)
 {
 	unsigned int j;
 	int sth = 0;

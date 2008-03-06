@@ -9,8 +9,6 @@
 #include <string.h>
 #include <limits.h> /* for INT_MAX */
 
-#define WANT_ASSERT
-
 #define DEBUG 0
 
 #include "utils/utils.h"

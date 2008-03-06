@@ -169,7 +169,7 @@ int barrier_wait (barrier_t *barrier, double * pwait, int (*all_in)(int))
 #include "macros.h"
 #include "barrier.h"
 
-int barrier_wait(barrier_t * p UNUSED_VARIABLE,
+int barrier_wait(barrier_t * p MAYBE_UNUSED,
 		double * pwait,
 		int (*code)(int))
 {
@@ -181,14 +181,14 @@ int barrier_wait(barrier_t * p UNUSED_VARIABLE,
 		return 1;
 }
 
-int barrier_init (barrier_t *barrier UNUSED_VARIABLE,
+int barrier_init (barrier_t *barrier MAYBE_UNUSED,
 		int count,
-		int *p UNUSED_VARIABLE)
+		int *p MAYBE_UNUSED)
 {
 	return (count==1);
 }
 
-int barrier_destroy (barrier_t *barrier UNUSED_VARIABLE)
+int barrier_destroy (barrier_t *barrier MAYBE_UNUSED)
 {
 	return 0;
 }

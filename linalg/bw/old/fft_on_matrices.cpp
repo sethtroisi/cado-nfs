@@ -7,7 +7,6 @@
 #include <gmp.h>
 #include "lingen_params.h"
 #include "params.h"
-#include <assert.h>
 #include "types.h"
 #include "macros.h"
 #include "auxfuncs.h"
@@ -25,11 +24,7 @@
 #include "field_quad.h"
 #include "field_usage.h"
 #include "timer.h"
-
-#ifndef NDEBUG
-#include <stdio.h>
-/* ... */
-#endif
+#include "manu.h"
 
 /**********************************************************************/
 /**********************************************************************/
@@ -140,7 +135,7 @@ struct dft_mb *fft_mbb_conv_sp(struct dft_mb *p,
     if (res == NULL)
 	return res;
     res->degree = p->degree + q->degree - dg_kill;
-    assert(p->order == q->order);;
+    ASSERT(p->order == q->order);;
     res->order = p->order;
     if (!(res->order.mat_mb_alloc(res->p))) {
 	free(res);
@@ -187,7 +182,7 @@ struct dft_mb *fft_mbb_conv(struct dft_mb *p,
     if (res == NULL)
 	return res;
     res->degree = p->degree + q->degree;
-    assert(p->order == q->order);;
+    ASSERT(p->order == q->order);;
     res->order = p->order;
     if (!(res->order.mat_mb_alloc(res->p))) {
 	free(res);
@@ -226,7 +221,7 @@ struct dft_bb *fft_bbb_conv(struct dft_bb *p, struct dft_bb *q, double *tm)
     if (res == NULL)
 	return res;
     res->degree = 0;		/* we don't care, this is meaningless anyway */
-    assert(p->order == q->order);;
+    ASSERT(p->order == q->order);;
     res->order = p->order;
     if (!(res->order.mat_bb_alloc(res->p))) {
 	free(res);
@@ -261,7 +256,7 @@ void fft_mb_invdft(bw_mbpoly dest,
 
     timer_r(&tv, TIMER_SET);
 
-    assert(p->order.fits(deg + 1));
+    ASSERT(p->order.fits(deg + 1));
 
     for (i = 0; i < m_param; i++) {
 	for (j = 0; j < bigdim; j++) {

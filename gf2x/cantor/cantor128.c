@@ -475,7 +475,7 @@ void decomposeK(Kelt * f, unsigned long * F, int Fl, int k)
     memset(f + i, 0, ((1 << k) - Fl) * sizeof(Kelt));
 }
 
-void recomposeK(unsigned long * F, Kelt * f, int Fl, int k UNUSED_VARIABLE)
+void recomposeK(unsigned long * F, Kelt * f, int Fl, int k MAYBE_UNUSED)
 {
     int i;
 
@@ -508,7 +508,7 @@ void decomposeK(Kelt * f, unsigned long * F, int Fl, int k)
     }
 }
 
-void recomposeK(unsigned long * F, Kelt * f, int Fl, int k UNUSED_VARIABLE)
+void recomposeK(unsigned long * F, Kelt * f, int Fl, int k MAYBE_UNUSED)
 {
     int i;
 

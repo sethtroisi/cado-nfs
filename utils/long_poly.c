@@ -77,7 +77,7 @@ realloc_long_array (LONG *f, int d)
 void
 long_poly_init (long_poly_t f, int d)
 {
-  assert (d >= 0);
+  ASSERT (d >= 0);
   f->degree = -1; /* initialize to 0 */
   f->coeff = alloc_long_array (d + 1);
   f->alloc = d + 1;
@@ -111,7 +111,7 @@ invert_si (LONG s, LONG t)
   LONG u1, v1, q;
   LONG u2, v2;
 
-  assert (t > 0);
+  ASSERT (t > 0);
  
   u1 = 1;
   v1 = 0;
@@ -265,7 +265,7 @@ long_poly_sqr (long_poly_t h, const long_poly_t g, LONG p)
   int i, j, dg = g->degree;
   LONG *gc, *hc;
 
-  assert (dg >= -1);
+  ASSERT (dg >= -1);
   if (dg == -1) /* g is zero */
     {
       h->degree = -1;
@@ -410,9 +410,9 @@ long_poly_divexact (long_poly_t q, long_poly_t h, const long_poly_t f, LONG p)
   int i, d = f->degree, dh = h->degree, monic;
   LONG *hc = h->coeff, t = 1;
 
-  assert (d >= 0);
-  assert (dh >= 0);
-  assert (dh >= d);
+  ASSERT (d >= 0);
+  ASSERT (dh >= 0);
+  ASSERT (dh >= d);
   long_poly_realloc (q, dh + 1 - d);
   q->degree = dh - d;
   monic = f->coeff[d] == 1;
@@ -475,7 +475,7 @@ long_poly_eval (long_poly_t f, LONG x, LONG p)
   int i, d = f->degree;
   LONG v;
   
-  assert (d >= 0);
+  ASSERT (d >= 0);
   v = f->coeff[d];
   for (i = d - 1; i >= 0; i--)
     v = (v * x + f->coeff[i]) % p;
@@ -524,7 +524,7 @@ long_poly_powmod_ui (long_poly_t g, long_poly_t fp, long_poly_t h, LONG a,
   /* initialize g to x */
   long_poly_set_linear (g, 1, a);
 
-  assert (e > 0);
+  ASSERT (e > 0);
   for (k -= 2; k >= 0; k--)
     {
       long_poly_sqr (h, g, p);             /* h <- g^2 */
@@ -552,7 +552,7 @@ long_poly_general_powmod_ui (long_poly_t g, long_poly_t fp, long_poly_t h,
 
   long_poly_make_monic (fp, p);
 
-  assert (e > 0);
+  ASSERT (e > 0);
   for (k -= 2; k >= 0; k--)
     {
       long_poly_sqr (h, g, p);             /* h <- g^2 */
@@ -576,8 +576,8 @@ long_poly_cantor_zassenhaus (LONG *r, long_poly_t f, LONG p, int depth)
   long_poly_t q, h, ff;
   int d = f->degree, dq, n, m;
 
-  assert (p & 1);
-  assert (d >= 1);
+  ASSERT (p & 1);
+  ASSERT (d >= 1);
 
   if (d == 1) /* easy case: linear factor x + a ==> root -a mod p */
     {
@@ -599,15 +599,15 @@ long_poly_cantor_zassenhaus (LONG *r, long_poly_t f, LONG p, int depth)
       long_poly_set (h, f);
       long_poly_gcd (q, h, p);
       dq = q->degree;
-      assert (dq >= 0);
+      ASSERT (dq >= 0);
       if (0 < dq && dq < d)
 	{
 	  n = long_poly_cantor_zassenhaus (r, q, p, depth + 1);
-	  assert (n == dq);
+	  ASSERT (n == dq);
 	  long_poly_set (ff, f); /* long_poly_divexact clobbers its 2nd arg */
 	  long_poly_divexact (h, ff, q, p);
 	  m = long_poly_cantor_zassenhaus (r + n, h, p, depth + 1);
-	  assert (m == h->degree);
+	  ASSERT (m == h->degree);
 	  n += m;
           break;
 	}
@@ -667,7 +667,7 @@ roots_mod_long (LONG *r, mpz_t *f, int d, const LONG p)
       goto clear_fp;
     }
 
-  assert (d > 0);
+  ASSERT (d > 0);
 
   if ((r == NULL && p <= ROOTS_MOD_THRESHOLD) ||
       (r != NULL && p <= ROOTS_MOD_THRESHOLD2))
@@ -695,12 +695,12 @@ roots_mod_long (LONG *r, mpz_t *f, int d, const LONG p)
   /* now fp contains gcd(x^p-x, f) */
 
   df = fp->degree;
-  assert (df >= 0);
+  ASSERT (df >= 0);
   
   if (r != NULL && df > 0)
     {
       n = long_poly_cantor_zassenhaus (r, fp, p, 0);
-      assert (n == df);
+      ASSERT (n == df);
     }
 
   long_poly_clear (g);
@@ -723,7 +723,7 @@ int isirreducible_mod_long(long_poly_t fp, const LONG p) {
   if (d == 0)
     return 1;
 
-  assert (d > 0);
+  ASSERT (d > 0);
 
   long_poly_init (g, 2 * d - 1);
   long_poly_init (gmx, 2 * d - 1);

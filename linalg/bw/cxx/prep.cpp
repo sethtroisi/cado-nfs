@@ -173,7 +173,7 @@ unsigned int compute_rank(mpz_class * a, unsigned int nrows, unsigned int ncols,
         }
         if (j == ncols)
             continue;
-        assert(rank < nrows && rank < ncols);
+        ASSERT(rank < nrows && rank < ncols);
         rank++;
         // std::cout << fmt("row % is the %-th pivot\n") % i % rank;
         /* Cancel this coeff in all other rows. */

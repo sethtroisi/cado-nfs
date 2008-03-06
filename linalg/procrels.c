@@ -3,7 +3,6 @@
 #include "mod_ul.c"
 #include <stdio.h>
 #include <stdlib.h>
-#include <assert.h>
 #include "utils/utils.h"
 
 
@@ -57,7 +56,7 @@ add_alg_rootprime (tab_rootprime_t *table, tab_prime_t *bad_primes,
     if (table->allocated == table->length) {
       table->allocated += 100;
       table->tab = (rootprime_t *)realloc((void *)table->tab, (table->allocated)*sizeof(rootprime_t));
-      assert (table->tab != NULL);
+      ASSERT (table->tab != NULL);
     }
     table->tab[table->length].prime = p;
     table->tab[table->length].root = r;
@@ -66,7 +65,7 @@ add_alg_rootprime (tab_rootprime_t *table, tab_prime_t *bad_primes,
     if (bad_primes->allocated == bad_primes->length) {
       bad_primes->allocated += 100;
       bad_primes->tab = (unsigned long *)realloc((void *)bad_primes->tab, (bad_primes->allocated)*sizeof(unsigned long));
-      assert (bad_primes->tab != NULL);
+      ASSERT (bad_primes->tab != NULL);
     }
     bad_primes->tab[bad_primes->length] = p;
     bad_primes->length++;
@@ -79,10 +78,10 @@ add_rat_prime (tab_prime_t *table, rat_prime_t p) {
   if (table->allocated == table->length) {
     table->allocated += 100;
     table->tab = (unsigned long *)realloc(table->tab, (table->allocated)*sizeof(unsigned long));
-    assert (table->tab != NULL);
+    ASSERT (table->tab != NULL);
   }
   table->tab[table->length] = p.p;
-  assert (p.e == 1);
+  ASSERT (p.e == 1);
   table->length++;
 }
 
@@ -596,7 +595,7 @@ main (int argc, char **argv)
 
   fprintf(stderr, "reading file of relations...\n");
   ret = fread_relations(file, &rel_table);
-  assert (ret);
+  ASSERT (ret);
 
   fprintf(stderr, "creating tables of primes...\n");
   update_tables(&rel_table, &alg_table, &rat_table, &bad_primes);

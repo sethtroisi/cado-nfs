@@ -14,7 +14,6 @@
 #include <unistd.h>
 #include "slave_params.h"
 #include "params.h"
-#include <assert.h>
 #include "types.h"
 #include "macros.h"
 #include "old-endian.h"
