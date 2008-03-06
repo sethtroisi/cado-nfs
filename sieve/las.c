@@ -309,8 +309,8 @@ invmod(unsigned long *pa, unsigned long b) {
 
   fix = (b+1)>>1;
 
-  assert (a < b);
-  assert (b & 1UL);
+  ASSERT (a < b);
+  ASSERT (b & 1UL);
 
   u = 1; v = 0; t = 0;
   do {
@@ -476,11 +476,11 @@ reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r,
     pli->gamma = (int32_t) b0;
     pli->delta = (int32_t) b1;
 
-    assert (pli->beta > 0);
-    assert (pli->delta > 0);
-    assert ((pli->alpha <= 0) && (pli->alpha > -I));
-    assert ((pli->gamma >= 0) && (pli->gamma < I));
-    assert (pli->gamma-pli->alpha >= I);
+    ASSERT (pli->beta > 0);
+    ASSERT (pli->delta > 0);
+    ASSERT ((pli->alpha <= 0) && (pli->alpha > -I));
+    ASSERT ((pli->gamma >= 0) && (pli->gamma < I));
+    ASSERT (pli->gamma-pli->alpha >= I);
 
     // WARNING: Here, we assume a lot on a bound on I,J
     // TODO: clean these bound problems
