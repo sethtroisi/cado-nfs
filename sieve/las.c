@@ -505,7 +505,6 @@ reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r,
 
 void
 fill_in_buckets(bucket_array_t BA, factorbase_degn_t *fb, const sieve_info_t * si) {
-    double tm = seconds();
     // Loop over all primes in the factor base > I
     while (fb->p < si->I)     
         fb = fb_next (fb); // cannot do fb++, due to variable size !
@@ -574,7 +573,6 @@ fill_in_buckets(bucket_array_t BA, factorbase_degn_t *fb, const sieve_info_t * s
         }
         fb = fb_next (fb); // cannot do fb++, due to variable size !
     }
-    fprintf (stderr, "# medium primes pushed to buckets in %f sec\n", seconds()-tm);
 }
 
 static void
@@ -779,8 +777,8 @@ void init_small_sieve(small_sieve_data_t *ssd, factorbase_degn_t *fb,
 
 // Sieve small primes (up to p < I) of the factor base fb in the sieve
 // region number N.
-void sieve_small_bucket_region(unsigned char *S, factorbase_degn_t *fb,
-        int N, small_sieve_data_t ssd, sieve_info_t *si)
+void sieve_small_bucket_region(unsigned char *S, int N,
+        small_sieve_data_t ssd, sieve_info_t *si)
 {
     const uint32_t I = si->I;
     unsigned char *S_ptr;
@@ -797,7 +795,7 @@ void sieve_small_bucket_region(unsigned char *S, factorbase_degn_t *fb,
         r = ssd.nice_p[n].r;
         logp = ssd.nice_p[n].logp;
         x = ssd.nice_p[n].next_position;
-        int i, i0;
+        unsigned int i, i0;
         S_ptr = S;
         i0 = x & ((1<<si->log_bucket_region) - 1);
         ASSERT(i0 < p);
@@ -1395,7 +1393,7 @@ main (int argc, char *argv[])
     sieve_info_t si;
     char *fbfilename = NULL, *polyfilename = NULL;
     cado_poly cpoly;
-    double t0, tfb, tq, ttn, tts, ttf;
+    double t0, tfb, tq, ttn, tts, ttsm, ttf;
     uint64_t q0 = 0, q1 = 0, rho = 0;
     unsigned long *roots, nroots, tot_reports = 0, survivors0, survivors1;
     factorbase_degn_t * fb_alg, * fb_rat;
@@ -1510,7 +1508,7 @@ main (int argc, char *argv[])
     q0 --; /* so that nextprime gives q0 if q0 is prime */
     nroots = 0;
     tot_reports = 0;
-    ttn = tts = ttf = 0.0;
+    ttn = tts = ttsm = ttf = 0.0;
     t0 = seconds ();
     fprintf (stderr, "#\n");
     while (q0 < q1)
@@ -1553,6 +1551,7 @@ main (int argc, char *argv[])
         totJ += (double) si.J;
 
         /* Allocate alg buckets */
+        ttsm -= seconds();
         bucket_array_t alg_BA;
         alg_BA = init_bucket_array(si.nb_buckets, si.bucket_limit);
 
@@ -1565,6 +1564,7 @@ main (int argc, char *argv[])
 
         /* Fill in rational buckets */
         fill_in_buckets(rat_BA, fb_rat, &si);
+        ttsm += seconds();
 
         /* Initialize data for sieving small primes */
         small_sieve_data_t ssd_alg, ssd_rat;
@@ -1582,18 +1582,22 @@ main (int argc, char *argv[])
             init_rat_norms_bucket_region(S, i, cpoly, &si);
             ttn += seconds ();
             /* Apply rational bucket */
+            ttsm -= seconds();
             apply_one_bucket(S, rat_BA, i, &si);
+            ttsm += seconds();
             /* Sieve small rational primes */
-            sieve_small_bucket_region(S, fb_rat, i, ssd_rat, &si);
+            sieve_small_bucket_region(S, i, ssd_rat, &si);
 
             /* Init algebraic norms */
             ttn -= seconds ();
             survivors0 += init_alg_norms_bucket_region(S, i, cpoly, &si);
             ttn += seconds ();
             /* Apply algebraic bucket */
+            ttsm -= seconds();
             apply_one_bucket(S, alg_BA, i, &si);
+            ttsm += seconds();
             /* Sieve small algebraic primes */
-            sieve_small_bucket_region(S, fb_alg, i, ssd_alg, &si);
+            sieve_small_bucket_region(S, i, ssd_alg, &si);
 
             /* Factor survivors */
             ttf -= seconds ();
@@ -1618,8 +1622,9 @@ main (int argc, char *argv[])
     t0 = seconds () - t0;
     fprintf (stderr, "# Average J = %1.0f\n", totJ / (double) sq);
     tts = t0 - (ttn + ttf);
-    fprintf (stderr, "# Total time %1.1fs [norm %1.1f, sieving %1.1f,"
-             " factor %1.1f]\n", t0, ttn, tts, ttf);
+    fprintf (stderr, "# Total time %1.1fs [norm %1.1f, sieving %1.1f"
+            " (%1.1f + %1.1f),"
+            " factor %1.1f]\n", t0, ttn, tts, ttsm, tts-ttsm, ttf);
     fprintf (stderr, "# Total %lu reports [%1.3fs/r]\n",
              tot_reports, t0 / (double) tot_reports);
 
