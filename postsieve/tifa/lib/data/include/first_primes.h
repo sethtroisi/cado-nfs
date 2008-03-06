@@ -39,6 +39,7 @@
 #include <inttypes.h>
 
 #include "array.h"
+#include "tifa_config.h"
 
 /**
  * \def NFIRST_PRIMES
@@ -50,12 +51,12 @@
  * The \c first_primes array is a global array of \c uint32_t elements
  * containing the first \c NFIRST_PRIMES prime numbers (from 2 and beyond).
  */
-extern const uint32_t first_primes[NFIRST_PRIMES] __attribute__ ((unused));
+extern const uint32_t first_primes[NFIRST_PRIMES] MAYBE_UNUSED;
 
 /**
  * The largest prime in the \c first_primes array.
  */
-extern const uint32_t LARGEST_PRIME __attribute__ ((unused));
+extern const uint32_t LARGEST_PRIME MAYBE_UNUSED;
 
 /**
  * \c first_primes_array is a \c uint32_array_t wrapper to the array
@@ -67,7 +68,7 @@ extern const uint32_t LARGEST_PRIME __attribute__ ((unused));
  * \c first_primes_array.alloced to 0 will prevent errors
  * if \c clear_mpz_array is inadvertently called on \c first_primes_array.
  */
-extern const uint32_array_t first_primes_array __attribute__ ((unused));
+extern const uint32_array_t first_primes_array MAYBE_UNUSED;
 
 #endif
 

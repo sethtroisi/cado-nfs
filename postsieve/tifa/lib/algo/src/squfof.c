@@ -425,7 +425,7 @@ void print_queue(linked_list_t* queue);
 
 //-----------------------------------------------------------------------------
 void set_squfof_params_to_default(squfof_params_t* const params
-                                  __attribute__ ((unused))) {
+                                  MAYBE_UNUSED) {
     //
     // While there is no user parameters for this SQUFOF implementation, this
     // function is kept as a placeholder: it might be needed in future code

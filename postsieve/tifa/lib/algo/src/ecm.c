@@ -427,7 +427,7 @@ ecode_t ecm(mpz_array_t* const factors, uint32_array_t* const multis,
     return ecode;
 }
 //------------------------------------------------------------------------------
-void set_ecm_params_to_default(const mpz_t n __attribute__ ((unused)),
+void set_ecm_params_to_default(const mpz_t n MAYBE_UNUSED,
                                ecm_params_t* const params) {
     //
     // _WARNING_: See above note about default parameters. In particular they
@@ -585,7 +585,7 @@ static ecode_t clear_ecm_context(factoring_machine_t* const machine) {
 }
 //------------------------------------------------------------------------------
 static ecode_t update_ecm_context(factoring_machine_t* const machine
-                                  __attribute__ ((unused))) {
+                                  MAYBE_UNUSED) {
 
     //
     // Strategy:

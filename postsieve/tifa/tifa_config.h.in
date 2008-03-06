@@ -149,4 +149,14 @@
 /* Define to 1 to turn on timing messages for the tdiv function */
 #define TIFA_TIMING_TDIV %TIMING_TDIV%
 
+/* Other symbols not configuration related but that don't fit elsewhere */
+#if defined(__GNUC__)
+    #ifndef MAYBE_UNUSED
+        #define MAYBE_UNUSED __attribute__ ((unused))
+    #endif
+#else
+    #define MAYBE_UNUSED /* intentionally left empty */
 #endif
+
+#endif
+

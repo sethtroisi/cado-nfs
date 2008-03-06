@@ -98,7 +98,6 @@ ecode_t run_program(factoring_program_t* const program) {
 
     if (ecode == COMPLETE_FACTORIZATION_FOUND) {
         printf("\n");
-        print_factors(factors, multis);
         rcode = COMPLETE_FACTORIZATION_FOUND;
         goto clear_tdiv_and_return;
     }
@@ -143,7 +142,6 @@ ecode_t run_program(factoring_program_t* const program) {
         append_mpz_to_array(factors, unfactored);
         append_uint32_to_array(multis, 1 << shift);
         
-        print_factors(factors, multis);
         rcode = COMPLETE_FACTORIZATION_FOUND;
         goto clear_sqt_and_return;
     }
@@ -156,7 +154,7 @@ ecode_t run_program(factoring_program_t* const program) {
     if (program->verbose || program->timing) {
         printf("%s trace:\n", program->algo_name);
         int len = strlen(program->algo_name);
-        for (int i=0; i < len; i++) {
+        for (int i = 0; i < len; i++) {
             printf("-");
         }
         printf("-------\n\n");
@@ -173,12 +171,11 @@ ecode_t run_program(factoring_program_t* const program) {
     if (program->verbose || program->timing) {
         printf("\n");
     }
-        
+    
     switch (ecode) {
         case COMPLETE_FACTORIZATION_FOUND:
             append_mpz_array(factors, progfa);
             append_uint32_array(multis, progmu);
-            print_factors(factors, multis);
             rcode = COMPLETE_FACTORIZATION_FOUND;
             break;
         case SOME_FACTORS_FOUND:
@@ -196,14 +193,21 @@ ecode_t run_program(factoring_program_t* const program) {
 
             append_mpz_array(factors, base);
             
-            print_factors(factors, multis);
-            
             clear_mpz_array(base);
             free(base);
             rcode = PARTIAL_FACTORIZATION_FOUND;
             break;
         }
         default:
+            if (factors->length != 0) {
+                //
+                // We found some factors via trial divisions. Add the 
+                // unfactored part in the list of factors so that it will be
+                // printed.
+                //
+                append_mpz_to_array(factors, unfactored);
+                append_uint32_to_array(multis, 1);
+            }
             break;
     }
     
@@ -216,8 +220,7 @@ ecode_t run_program(factoring_program_t* const program) {
     
   clear_tdiv_and_return:
     
-    clear_mpz_array(factors);
-    clear_uint32_array(multis);
+    print_factors(factors, multis);
     
     switch (rcode) {
         case COMPLETE_FACTORIZATION_FOUND:
@@ -231,6 +234,8 @@ ecode_t run_program(factoring_program_t* const program) {
             printf("Factorization failed.\n\n");
             break;
     }
+    clear_mpz_array(factors);
+    clear_uint32_array(multis);
     
     return rcode;   
 }

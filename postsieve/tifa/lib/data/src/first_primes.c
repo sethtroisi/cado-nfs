@@ -31,7 +31,7 @@
 
 #include "first_primes.h"
 
-uint32_t const first_primes[NFIRST_PRIMES] __attribute__ ((unused)) = {
+uint32_t const first_primes[NFIRST_PRIMES] MAYBE_UNUSED = {
 	2,
 	3,
 	5,
@@ -65570,7 +65570,7 @@ uint32_t const first_primes[NFIRST_PRIMES] __attribute__ ((unused)) = {
 	821641
 };
 
-const uint32_t LARGEST_PRIME __attribute__ ((unused)) = 821641;
+const uint32_t LARGEST_PRIME MAYBE_UNUSED = 821641;
 
 //
 // _NOTE_: first_primes_array is merely a uint32_array_t wrapper for
@@ -65578,7 +65578,7 @@ const uint32_t LARGEST_PRIME __attribute__ ((unused)) = 821641;
 //         Setting first_primes_array.alloced to 0 will prevent errors
 //         if clear_uint32_array is called on first_primes_array.
 //
-const uint32_array_t first_primes_array __attribute__ ((unused)) = {
+const uint32_array_t first_primes_array MAYBE_UNUSED = {
     .alloced = 0,
     .length  = NFIRST_PRIMES,
     .data    = (uint32_t*)first_primes

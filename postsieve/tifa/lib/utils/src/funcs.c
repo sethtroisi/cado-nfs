@@ -393,7 +393,7 @@ uint32_t sqrtm(uint32_t a, uint32_t p) {
     }
 }
 //-----------------------------------------------------------------------------
-static const unsigned short qres_mod_315[315] = {
+const unsigned short qres_mod_315[315] = {
     1, 1, 0, 0, 1, 0, 0, 0, 0, 1,
     0, 0, 0, 0, 0, 0, 1, 0, 0, 0,
     0, 0, 0, 0, 0, 1, 0, 0, 0, 0,
@@ -427,7 +427,7 @@ static const unsigned short qres_mod_315[315] = {
     0, 1, 0, 0, 0, 0, 0, 0, 0, 0,
     1, 0, 0, 0, 0
 };
-static const unsigned short qres_mod_256[256] = {
+const unsigned short qres_mod_256[256] = {
     1, 1, 0, 0, 1, 0, 0, 0, 0, 1,
     0, 0, 0, 0, 0, 0, 1, 1, 0, 0,
     0, 0, 0, 0, 0, 1, 0, 0, 0, 0,
@@ -455,7 +455,7 @@ static const unsigned short qres_mod_256[256] = {
     0, 1, 0, 0, 0, 0, 0, 0, 0, 1,
     0, 0, 0, 0, 0, 0
 };
-static const unsigned short qres_mod_221[221] = {
+const unsigned short qres_mod_221[221] = {
     1, 1, 0, 0, 1, 0, 0, 0, 0, 1,
     0, 0, 0, 1, 0, 0, 1, 1, 0, 0,
     0, 0, 0, 0, 0, 1, 1, 0, 0, 0,
@@ -480,42 +480,7 @@ static const unsigned short qres_mod_221[221] = {
     0, 0, 1, 0, 0, 0, 0, 1, 0, 0,
     1
 };
-//-----------------------------------------------------------------------------
-unsigned long int is_square(unsigned long int x) {
-    //
-    // Basic perfect square detection test.
-    //
-    // See for example algorithm 1.7.3 from the book "A Course in Computational
-    // Algebraic Number Theory" by Henri Cohen, Springer-Verlag 1993.
-    //
-    // The description given in this book has been adapted to use larger
-    // tables in exchange of a slight performance boost (about 30% on
-    // Opteron 250).
-    //
-    if (qres_mod_256[x & 255] == 0) {
-        //
-        // Get rid of about 82.8% of non squares
-        //
-        return 0;
-    }
-    if (qres_mod_315[x % 315] == 0) {
-        //
-        // Get rid of about 84.8% of non squares
-        //
-        return 0;
-    }
-    if (qres_mod_221[x % 221] == 0) {
-        //
-        // Get rid of about 71.5% of non squares
-        //
-        return 0;
-    }
-    unsigned long int root = (unsigned long int)sqrt(x);
-    if ((root * root) == x) {
-        return root;
-    }
-    return 0;
-}
+extern unsigned long int is_square(unsigned long int x);
 //-----------------------------------------------------------------------------
 //
 // The following threshold values were experimentally determined on a

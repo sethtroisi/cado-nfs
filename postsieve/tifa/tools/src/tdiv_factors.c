@@ -121,7 +121,7 @@ static void process_args(factoring_program_t* const program) {
 }
 //------------------------------------------------------------------------------
 static void set_params_to_default(factoring_program_t* const program
-                                  __attribute__ ((unused))) {
+                                  MAYBE_UNUSED) {
     return;
 }
 //------------------------------------------------------------------------------
@@ -129,11 +129,11 @@ static void print_params(factoring_program_t* const program) {
     printf("\tnprimes_tdiv: %u\n", program->nprimes_tdiv);
 }
 //------------------------------------------------------------------------------
-static ecode_t tdiv_func(mpz_array_t* const factors   __attribute__ ((unused)),
-                         uint32_array_t* const multis __attribute__ ((unused)),
-                         const mpz_t n              __attribute__ ((unused)),
-                         const void* const params   __attribute__ ((unused)),
-                         factoring_mode_t mode      __attribute__ ((unused))) {
+static ecode_t tdiv_func(mpz_array_t* const factors   MAYBE_UNUSED,
+                         uint32_array_t* const multis MAYBE_UNUSED,
+                         const mpz_t n                MAYBE_UNUSED,
+                         const void* const params     MAYBE_UNUSED,
+                         factoring_mode_t mode        MAYBE_UNUSED) {
 
 #if TIFA_VERBOSE_TDIV || TIFA_TIMING_TDIV
     printf("See above trace\n");

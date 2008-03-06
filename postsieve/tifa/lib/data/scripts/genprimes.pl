@@ -154,7 +154,7 @@ $long_license
 
 #include "$name_inc"
 
-const uint32_t first_primes[NFIRST_PRIMES] __attribute__ ((unused)) = {
+const uint32_t first_primes[NFIRST_PRIMES] MAYBE_UNUSED = {
 EOF
 
 my $step  = 0;
@@ -212,7 +212,7 @@ if ($input_file) {
 print(OF "};\n\n");
 
 print OF << "EOF";
-const uint32_t LARGEST_PRIME __attribute__ ((unused)) = $prime;
+const uint32_t LARGEST_PRIME MAYBE_UNUSED = $prime;
 
 //
 // _NOTE_: first_primes_array is merely an uint32_array_t wrapper for
@@ -220,7 +220,7 @@ const uint32_t LARGEST_PRIME __attribute__ ((unused)) = $prime;
 //         Setting first_primes_array.alloced to 0 will prevent errors
 //         if clear_uint32_array is called on first_primes_array.
 //
-const uint32_array_t first_primes_array __attribute__ ((unused)) = {
+const uint32_array_t first_primes_array MAYBE_UNUSED = {
     .alloced = 0,
     .length  = NFIRST_PRIMES,
     .data    = (uint32_t*)first_primes
@@ -265,6 +265,7 @@ $long_license
 #include <inttypes.h>
 
 #include "array.h"
+#include "tifa_config.h"
 
 /**
  * \\def NFIRST_PRIMES
@@ -276,12 +277,12 @@ $long_license
  * The \\c first_primes array is a global array of \\c uint32_t elements
  * containing the first \\c NFIRST_PRIMES prime numbers (from 2 and beyond).
  */
-extern const uint32_t first_primes[NFIRST_PRIMES] __attribute__ ((unused));
+extern const uint32_t first_primes[NFIRST_PRIMES] MAYBE_UNUSED;
 
 /**
  * The largest prime in the \\c first_primes array.
  */
-extern const uint32_t LARGEST_PRIME __attribute__ ((unused));
+extern const uint32_t LARGEST_PRIME MAYBE_UNUSED;
 
 /**
  * \\c first_primes_array is a \\c uint32_array_t wrapper to the array
@@ -293,7 +294,7 @@ extern const uint32_t LARGEST_PRIME __attribute__ ((unused));
  * \\c first_primes_array.alloced to 0 will prevent errors
  * if \\c clear_mpz_array is inadvertently called on \\c first_primes_array.
  */
-extern const uint32_array_t first_primes_array __attribute__ ((unused));
+extern const uint32_array_t first_primes_array MAYBE_UNUSED;
 
 #endif
 

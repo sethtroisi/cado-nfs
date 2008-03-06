@@ -54,9 +54,11 @@ extern "C" {
 
 #include <limits.h>
 #include <inttypes.h>
+#include <math.h>
 #include <gmp.h>
 
 #include "array.h"
+#include "tifa_config.h"
 
    /**
     * \def LARGEST_MULTIPLIER
@@ -281,6 +283,25 @@ uint32_t powm(uint32_t base, uint32_t power, uint32_t modulus);
 uint32_t sqrtm(uint32_t a, uint32_t p);
 
    /**
+    * \brief Quadratic residues mod 221
+    *
+    * \c x is a square mod 221 if <tt>qres_mod_221[x % 221] == 1</tt>.
+    */
+extern const unsigned short qres_mod_221[221] MAYBE_UNUSED;
+   /**
+    * \brief Quadratic residues mod 256
+    *
+    * \c x is a square mod 256 if <tt>qres_mod_256[x % 256] == 1</tt>.
+    */
+extern const unsigned short qres_mod_256[256] MAYBE_UNUSED;
+   /**
+    * \brief Quadratic residues mod 315
+    *
+    * \c x is a square mod 315 if <tt>qres_mod_315[x % 315] == 1</tt>.
+    */
+extern const unsigned short qres_mod_315[315] MAYBE_UNUSED;
+
+   /**
     * \brief Perfect square detection test
     *
     * Returns sqrt(\c x) if and only if \c x is a perfect square.
@@ -289,7 +310,41 @@ uint32_t sqrtm(uint32_t a, uint32_t p);
     * \param[in] x The integer to test.
     * \returns sqrt(\c x) if \c x is a perfect square. 0 otherwise.
     */
-unsigned long int is_square(unsigned long int x);
+inline static unsigned long int is_square(unsigned long int x) {
+    //
+    // Basic perfect square detection test.
+    //
+    // See for example algorithm 1.7.3 from the book "A Course in Computational
+    // Algebraic Number Theory" by Henri Cohen, Springer-Verlag 1993.
+    //
+    // The description given in this book has been adapted to use larger
+    // tables in exchange of a slight performance boost (about 30% on
+    // Opteron 250).
+    //
+    if (qres_mod_256[x & 255] == 0) {
+        //
+        // Get rid of about 82.8% of non squares
+        //
+        return 0;
+    }
+    if (qres_mod_315[x % 315] == 0) {
+        //
+        // Get rid of about 84.8% of non squares
+        //
+        return 0;
+    }
+    if (qres_mod_221[x % 221] == 0) {
+        //
+        // Get rid of about 71.5% of non squares
+        //
+        return 0;
+    }
+    unsigned long int root = (unsigned long int)sqrt(x);
+    if ((root * root) == x) {
+        return root;
+    }
+    return 0;
+}
 
    /**
     * \brief Composition test for \c uint32_t integers

@@ -253,7 +253,7 @@ static ecode_t perform_fermat_mpz(factoring_machine_t* const machine);
 
 //-----------------------------------------------------------------------------
 void set_fermat_params_to_default(fermat_params_t* const params
-                                  __attribute__ ((unused))) {
+                                  MAYBE_UNUSED) {
     //
     // While there is no user parameters for this Fermat implementation, this
     // function is kept as a placeholder: it might be needed in future code
@@ -387,7 +387,7 @@ static ecode_t clear_fermat_context(factoring_machine_t* const machine) {
 }
 //-----------------------------------------------------------------------------
 static ecode_t update_fermat_context(factoring_machine_t* const machine
-                                     __attribute__ ((unused))) {
+                                     MAYBE_UNUSED) {
 
     INIT_TIMER;
     START_TIMER;

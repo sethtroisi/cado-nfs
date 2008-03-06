@@ -147,6 +147,7 @@ int main(int argc, char** argv) {
 
     program.algo_name = "SQUFOF";
     program.params    = (void*) &params;
+    //program.mode      = SINGLE_RUN;
     //program.mode      = FIND_SOME_FACTORS;
     program.mode      = FIND_COMPLETE_FACTORIZATION;
     program.nfactors  = 2;
