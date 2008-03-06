@@ -838,7 +838,7 @@ sieve_random_access (unsigned char *S, factorbase_degn_t *fb,
         v4si vec_maskI = { maskI, maskI, maskI, maskI };
         v4si vec_IJ = { IJ, IJ, IJ, IJ };
         v4si vec_zero = { 0, 0, 0, 0};
-        asm("## Inner sieving routine starts here!!!\n");
+        __asm__("## Inner sieving routine starts here!!!\n");
         while (x0 < IJ) {
             uint32_t i;
             v4si vec_i, vec_tmp;
@@ -858,7 +858,7 @@ sieve_random_access (unsigned char *S, factorbase_degn_t *fb,
             x2 = ((uint32_t *)(&vec_x))[2];
             x3 = ((uint32_t *)(&vec_x))[3];
         }
-        asm("## Inner sieving routine stops here!!!\n");
+        __asm__("## Inner sieving routine stops here!!!\n");
     }
 #endif
 
@@ -895,7 +895,7 @@ sieve_random_access (unsigned char *S, factorbase_degn_t *fb,
             // Besides this small trick, gcc does a good job with
             // this loop: no branching for the if(), and a dozen of
             // instructions inside the while().
-            asm("## Inner sieving routine starts here!!!\n");
+            __asm__("## Inner sieving routine starts here!!!\n");
             while (x < I*si->J) {
                 uint32_t i;
                 i = x & maskI;   // x mod I
@@ -910,7 +910,7 @@ sieve_random_access (unsigned char *S, factorbase_degn_t *fb,
                 if (i < pli.b0)
                     x += pli.c;
             }
-            asm("## Inner sieving routine stops here!!!\n");
+            __asm__("## Inner sieving routine stops here!!!\n");
         }
         fb = fb_next (fb); // cannot do fb++, due to variable size !
     }
@@ -984,7 +984,7 @@ sieve_buckets (unsigned char *S, factorbase_degn_t *fb,
             // Besides this small trick, gcc does a good job with
             // this loop: no branching for the if(), and a dozen of
             // instructions inside the while().
-            asm("## Inner sieving routine starts here!!!\n");
+            __asm__("## Inner sieving routine starts here!!!\n");
             while (x < I*si->J) {
                 uint32_t i;
                 bucket_update_t update;
@@ -1004,7 +1004,7 @@ sieve_buckets (unsigned char *S, factorbase_degn_t *fb,
                 if (i < pli.b0)
                     x += pli.c;
             }
-            asm("## Inner sieving routine stops here!!!\n");
+            __asm__("## Inner sieving routine stops here!!!\n");
         }
         fb = fb_next (fb); // cannot do fb++, due to variable size !
     }
