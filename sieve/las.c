@@ -1,3 +1,7 @@
+#define _XOPEN_SOURCE 600       // should be defined before others
+                                // in order to have posix_memalign
+                                // on old systems.
+                                // This is used in bucket.h
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
