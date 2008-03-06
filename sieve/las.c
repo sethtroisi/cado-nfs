@@ -702,27 +702,53 @@ init_alg_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly, sieve_in
   return report;
 }
 
-
-// Sieve small primes (up to p < I) of the factor base fb in the sieve
-// region number N.
-void sieve_small_bucket_region(unsigned char *S, factorbase_degn_t *fb, int N, sieve_info_t *si)
-{
-    const uint32_t I = si->I;
-    unsigned char *S_ptr;
-    fbprime_t p, r, R;
+typedef struct {
+    fbprime_t p;
+    fbprime_t r;        // in ] 0, p [
+    int next_position;  // start of the sieve for next bucket_region 
     unsigned char logp;
-    unsigned long startj, lastj;
-    startj = (N*si->bucket_region) >> si->logI;
-    lastj = startj + (si->bucket_region >> si->logI);
-    while (fb->p != FB_END && fb->p <= I) {
-        unsigned char nr;
-        p = fb->p;
-        logp = fb->plog;
-        unsigned long Is2modp = (unsigned long)(I>>1) % p;
+} small_typical_prime_data_t;
 
+typedef struct {
+    // nice primes
+    small_typical_prime_data_t *nice_p;
+    int nb_nice_p;
+    // primes to sieve horizontally (r = oo)
+    // ...
+    // primes to sieve vertically (r = 0)
+    // ...
+} small_sieve_data_t;
+
+void clear_small_sieve(small_sieve_data_t ssd) {
+    free(ssd.nice_p);
+}
+
+// Prepare sieving of small primes: initialize a small_sieve_data_t
+// structure to be used thereafter during sieving each region.
+void init_small_sieve(small_sieve_data_t *ssd, factorbase_degn_t *fb,
+        sieve_info_t *si)
+{
+    factorbase_degn_t *fb_sav = fb;
+    int n = 0;
+    unsigned int I = si->I;
+
+    // Count prime ideals.
+    while (fb->p != FB_END && fb->p <= I) {
+        n += fb->nr_roots;
+        fb = fb_next (fb); // cannot do fb++, due to variable size !
+    }
+    fb = fb_sav;
+    // allocate space for these. n is an upper bound, since some of the
+    // ideals might become special ones.
+    ssd->nice_p = (small_typical_prime_data_t *)malloc(n*sizeof(small_typical_prime_data_t));
+    n = 0;
+    // Do another pass on fb, to fill in the data
+    while (fb->p != FB_END && fb->p <= I) {
+        int nr;
+        fbprime_t p = fb->p;
         for (nr = 0; nr < fb->nr_roots; ++nr) {
-            R = fb->roots[nr];
-            r = fb_root_in_qlattice(p, R, si);
+            fbprime_t r;
+            r = fb_root_in_qlattice(p, fb->roots[nr], si);
             if (r == 0) {
                 // TODO: doit!
                 // special_case_0(S, p, logp, si);
@@ -733,31 +759,58 @@ void sieve_small_bucket_region(unsigned char *S, factorbase_degn_t *fb, int N, s
                 // special_case_p(S, p, logp, si);
                 continue;
             } 
-            
-            { 
-                // line sieving
-                unsigned long j;
-                long ii0 = Is2modp; // this will be (rj+I/2) mod p
-                ii0 = (ii0 + r*startj) %p;
-                S_ptr = S + (I>>1);
-                for (j = startj; j < lastj; ++j) {
-                    long i0;
-                    // init i0 = -I/2 + ( (rj+I/2) mod p)
-                    i0 = ii0 - (long)(I>>1);
-                    // sieve one j-line
-                    for (; i0 < (long) (I>>1); i0 += p)
-                      {
-                        S_ptr[i0] -= logp;
-                      }
-                    // update starting point
-                    ii0 += r;
-                    if (ii0 >= (long) p)
-                        ii0 -= p;
-                    S_ptr += I;
-                }
+            if (r == p+1) {
+                // TODO:
+                // Do something with those???
+                continue;
             }
+
+            // Fill in data for this nice prime
+            ssd->nice_p[n].p = p;
+            ssd->nice_p[n].r = r;
+            ssd->nice_p[n].logp = fb->plog;
+            ssd->nice_p[n].next_position = (I>>1)%p;
+            n++;
         }
         fb = fb_next (fb); // cannot do fb++, due to variable size !
+    }
+    ssd->nb_nice_p = n;
+}
+
+// Sieve small primes (up to p < I) of the factor base fb in the sieve
+// region number N.
+void sieve_small_bucket_region(unsigned char *S, factorbase_degn_t *fb,
+        int N, small_sieve_data_t ssd, sieve_info_t *si)
+{
+    const uint32_t I = si->I;
+    unsigned char *S_ptr;
+    unsigned long j, nj;
+    int n;
+
+    nj = (si->bucket_region >> si->logI);
+
+    for (n = 0; n < ssd.nb_nice_p; ++n) {
+        fbprime_t p, r;
+        unsigned char logp;
+        int x;
+        p = ssd.nice_p[n].p;
+        r = ssd.nice_p[n].r;
+        logp = ssd.nice_p[n].logp;
+        x = ssd.nice_p[n].next_position;
+        int i, i0;
+        S_ptr = S;
+        i0 = x & ((1<<si->log_bucket_region) - 1);
+        ASSERT(i0 < p);
+        for (j = 0; j < nj; ++j) {
+            for (i = i0 ; i < I; i += p) {
+                S_ptr[i] -= logp;
+            }
+            i0 += r;
+            if (i0 >= p)
+                i0 -= p;
+            S_ptr += I;
+        }
+        ssd.nice_p[n].next_position = (N+1)*si->bucket_region + i0;
     }
 }
 
@@ -1492,6 +1545,8 @@ main (int argc, char *argv[])
                  "; a0=%d; b0=%d; a1=%d; b1=%d\n",
                  si.q, si.rho, si.a0, si.b0, si.a1, si.b1);
         sq ++;
+        /* precompute the skewed polynomial */
+        fij_from_f (si.fij, cpoly->f, cpoly->degree, si.a0, si.a1, si.b0, si.b1);
 
         /* checks the value of J */
         sieve_info_update (&si, cpoly->skew);
@@ -1511,8 +1566,12 @@ main (int argc, char *argv[])
         /* Fill in rational buckets */
         fill_in_buckets(rat_BA, fb_rat, &si);
 
+        /* Initialize data for sieving small primes */
+        small_sieve_data_t ssd_alg, ssd_rat;
+        init_small_sieve(&ssd_rat, fb_rat, &si);
+        init_small_sieve(&ssd_alg, fb_alg, &si);
+
         /* Process each bucket region, one after the other */
-        fij_from_f (si.fij, cpoly->f, cpoly->degree, si.a0, si.a1, si.b0, si.b1);
         unsigned char *S;
         S = (unsigned char *)malloc(si.bucket_region*sizeof(unsigned char));
         int reports = 0;
@@ -1525,7 +1584,7 @@ main (int argc, char *argv[])
             /* Apply rational bucket */
             apply_one_bucket(S, rat_BA, i, &si);
             /* Sieve small rational primes */
-            sieve_small_bucket_region(S, fb_rat, i, &si);
+            sieve_small_bucket_region(S, fb_rat, i, ssd_rat, &si);
 
             /* Init algebraic norms */
             ttn -= seconds ();
@@ -1534,7 +1593,7 @@ main (int argc, char *argv[])
             /* Apply algebraic bucket */
             apply_one_bucket(S, alg_BA, i, &si);
             /* Sieve small algebraic primes */
-            sieve_small_bucket_region(S, fb_alg, i, &si);
+            sieve_small_bucket_region(S, fb_alg, i, ssd_alg, &si);
 
             /* Factor survivors */
             ttf -= seconds ();
@@ -1542,11 +1601,13 @@ main (int argc, char *argv[])
                                             fb_alg, cpoly, &si, &survivors1);
             ttf += seconds ();
         }
+        clear_small_sieve(ssd_rat);
+        clear_small_sieve(ssd_alg);
         tot_reports += reports;
         fprintf (stderr, "# %lu survivors after rational side,", survivors0);
         fprintf (stderr, " %lu after algebraic side\n", survivors1);
         fprintf (stderr, "# %d relation(s) for (%" PRIu64 ",%" PRIu64
-                 "), total %lu [%1.2fs/r]\n#\n", reports, si.q, si.rho,
+                 "), total %lu [%1.3fs/r]\n#\n", reports, si.q, si.rho,
                  tot_reports, (seconds () - t0) / (double) tot_reports);
         clear_bucket_array(alg_BA);
         clear_bucket_array(rat_BA);
@@ -1559,7 +1620,7 @@ main (int argc, char *argv[])
     tts = t0 - (ttn + ttf);
     fprintf (stderr, "# Total time %1.1fs [norm %1.1f, sieving %1.1f,"
              " factor %1.1f]\n", t0, ttn, tts, ttf);
-    fprintf (stderr, "# Total %lu reports [%1.2fs/r]\n",
+    fprintf (stderr, "# Total %lu reports [%1.3fs/r]\n",
              tot_reports, t0 / (double) tot_reports);
 
     free (fb_alg);
