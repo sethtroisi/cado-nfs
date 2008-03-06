@@ -49,30 +49,18 @@
  * the additional cost should be negligible.
  */
 
-#ifndef PG_TRY
 typedef struct {
     uint16_t x;
     char logp;
     uint8_t p_low;  // to keep alignment and help trial div.
+    uint32_t p;   // TODO: Is 32 better than 64, here ?????
 } bucket_update_t;
-#else
-typedef struct {
-    uint16_t x;
-    char logp;
-    uint8_t p_low;  // to keep alignment and help trial div.
-    uint64_t p;   // TODO: Could we put 32, here??????
-} bucket_update_t;
-#endif
 
 
 /*
  * will be used as a sentinel
  */
-#ifndef PG_TRY
-static const bucket_update_t LAST_UPDATE = {0,0,0};
-#else
 static const bucket_update_t LAST_UPDATE = {0,0,0,0};
-#endif
 
 /******** Bucket array typedef **************/
 

@@ -59,7 +59,7 @@ makefb: makefb.o ../utils/libutils.a
 config.h: config_h.in
 	cp config_h.in config.h
 
-las: las.c fb.o
+las: las.c fb.o bucket.h
 	gcc $(CFLAGS) -o las -I.. las.c fb.o ../utils/libutils.a $(LDFLAGS) -lm
 
 clean:
