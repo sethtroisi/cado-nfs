@@ -762,8 +762,10 @@ typedef struct {
     int n;
 } factor_list_t;
 
+#define FL_MAX_SIZE 200
+
 void factor_list_init(factor_list_t *fl) {
-    fl->fac = (uint64_t *)malloc(200*sizeof(uint64_t));
+    fl->fac = (uint64_t *) malloc (FL_MAX_SIZE * sizeof(uint64_t));
     ASSERT_ALWAYS(fl->fac != NULL);
     fl->n = 0;
 }
@@ -788,6 +790,7 @@ void trial_div(factor_list_t *fl, mpz_t norm, bucket_array_t BA, int N, int x,
         while (mpz_divisible_ui_p (norm, fb->p)) {
             fl->fac[fl->n] = fb->p;
             fl->n++;
+            ASSERT_ALWAYS(fl->n <= FL_MAX_SIZE);
             mpz_divexact_ui (norm, norm, fb->p);
         }
         fb = fb_next (fb); // cannot do fb++, due to variable size !
@@ -804,6 +807,7 @@ void trial_div(factor_list_t *fl, mpz_t norm, bucket_array_t BA, int N, int x,
             while (mpz_divisible_ui_p (norm, p)) {
                 fl->fac[fl->n] = p;
                 fl->n++;
+                ASSERT_ALWAYS(fl->n <= FL_MAX_SIZE);
                 mpz_divexact_ui (norm, norm, p);
             }
         }
@@ -846,6 +850,8 @@ factor_survivors(unsigned char *S, int N, bucket_array_t rat_BA, bucket_array_t 
         surv++;
         // Compute algebraic and rational norms.
         xToAB(&a, &b, x + N*si->bucket_region, si);
+        if (a == 0 && b == 0)
+          continue;
         eval_fij(alg_norm, cpoly->f, cpoly->degree, a, b);
         mpz_divexact_ui(alg_norm, alg_norm, si->q);
         eval_fij(rat_norm, cpoly->g, 1, a, b);
