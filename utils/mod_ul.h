@@ -38,6 +38,7 @@
 #define mod_set              modul_set
 #define mod_set_ul           modul_set_ul
 #define mod_set_ul_reduced   modul_set_ul_reduced
+#define mod_swap             modul_swap
 #define mod_initmod_ul       modul_initmod_ul
 #define mod_clearmod         modul_clearmod
 #define mod_get_ul           modul_get_ul
@@ -61,6 +62,7 @@
 #define mod_powredc_ul       modul_powredc_ul
 #define mod_powredc_mp       modul_powredc_mp
 #define mod_2powredc_mp      modul_2powredc_mp
+#define mod_Vredc_mp         modul_Vredc_mp
 #define mod_sprp             modul_sprp
 #define mod_gcd              modul_gcd
 #define mod_inv              modul_inv
@@ -129,6 +131,21 @@ modul_set_ul_reduced (residueul_t r, const unsigned long s,
   r[0] = s;
 }
 
+
+/* Exchanges the values of the two arguments */
+
+MAYBE_UNUSED
+static inline void
+modul_swap (residueul_t a, residueul_t b, 
+            const modulusul_t m MAYBE_UNUSED)
+{
+  unsigned long t;
+  t = a[0];
+  a[0] = b[0];
+  b[0] = t;
+}
+                          
+
 MAYBE_UNUSED
 static inline void
 modul_initmod_ul (modulusul_t r, const unsigned long s)
@@ -176,7 +193,27 @@ modul_add (residueul_t r, const residueul_t a, const residueul_t b,
   printf ("modul_add: a = %lu, b = %lu", a[0], b[0]);
 #endif
 
+#if 0
+  /* Turns out to be slower */
+  {
+    unsigned long t = 0, tr = a[0];
+    
+    __asm__ (
+      "addq %2, %0\n\t"   /* tr += b */
+      "cmovc %3, %1\n\t"  /* if (cy) t = m */
+      "cmpq %0, %3\n\t"
+      "cmovbe %3, %1\n\t" /* it (m <= tr) t = m */
+      "subq %1, %0\n"     /* tr -= t */
+      : "+&r" (tr), "+&r" (t)
+      : "rm" (b[0]), "rm" (m[0])
+      : "cc"
+    );
+    ASSERT (tr == (a[0] >= m[0] - b[0]) ? (a[0] - (m[0] - b[0])) : (a[0] + b[0]));
+    r[0] = tr;
+  }
+#else
   r[0] = (a[0] >= m[0] - b[0]) ? (a[0] - (m[0] - b[0])) : (a[0] + b[0]);
+#endif
 
 #ifdef MODTRACE
   printf (", r = %lu\n", r[0]);
@@ -208,7 +245,47 @@ modul_sub (residueul_t r, const residueul_t a, const residueul_t b,
 #ifdef MODTRACE
   printf ("submod_ul: a = %lu, b = %lu", a[0], b[0]);
 #endif
-  r[0] = (a[0] < b[0]) ? (a[0] + (m[0] - b[0])) : (a[0] - b[0]);
+
+#if defined(__x86_64__) && defined(__GNUC__)
+  {
+    unsigned long t = 0, tr = a[0];
+    __asm__ (
+      "subq %2, %0\n\t"  /* tr -= b */
+      "cmovc %3, %1\n\t" /* if (a < b) t = m */
+      "addq %1, %0\n"    /* tr += t. Moving this out of the asm block results
+                            in slowdown!?! */
+      : "+&r" (tr), "+&r" (t)
+      : "rm" (b[0]), "rm" (m[0])
+      : "cc"
+    );
+    r[0] = tr;
+  }
+#elif defined(__i386__) && defined(__GNUC__)
+  {
+    unsigned long t = 0, tr = a[0];
+    __asm__ (
+      "subl %2, %0\n\t"  /* tr -= b */
+      "cmovc %3, %1\n\t" /* if (a < b) t = m */
+      "addl %1, %0\n"    /* tr += t */
+      : "+&r" (tr), "+&r" (t)
+      : "rm" (b[0]), "rm" (m[0])
+      : "cc"
+    );
+    r[0] = tr;
+  }
+#elif 1
+  /* Seems to be faster than the one below */
+  {
+    unsigned long t;
+    t = a[0] - b[0];
+    if (a[0] < b[0])
+      t += m[0];
+    r[0] = t;
+  }
+#else
+  r[0] = (a[0] < b[0]) ? (a[0] - b[0] + m[0]) : (a[0] - b[0]);
+#endif
+
 #ifdef MODTRACE
   printf (", r = %lu\n", r[0]);
 #endif
@@ -521,8 +598,8 @@ modul_mulredc (residueul_t r, const residueul_t a, const residueul_t b,
      adding 1 to phigh is safe */
   phigh += (plow != 0UL);
 
-  r[0] = (phigh >= m[0] - thigh) ? (phigh - (m[0] - thigh)) : (phigh + thigh);
-  
+  modul_add (r, &phigh, &thigh, m);
+
 #if defined(MODTRACE)
   printf (" == %lu /* PARI */ \n", r[0]);
 #endif
@@ -605,6 +682,8 @@ void modul_powredc_mp (residueul_t, const residueul_t, const unsigned long *,
                        const int, const unsigned long, const modulusul_t);
 void modul_2powredc_mp (residueul_t, const unsigned long *, const int, 
                         const unsigned long, const modulusul_t);
+void modul_Vredc_mp (residueul_t, const residueul_t, const unsigned long *,
+                     const int, const unsigned long, const modulusul_t);
 int modul_sprp (const residueul_t, const unsigned long, const modulusul_t);
 int modul_inv (residueul_t, residueul_t, modulusul_t);
 int modul_jacobi (residueul_t, modulusul_t);
