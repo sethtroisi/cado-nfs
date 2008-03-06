@@ -1440,6 +1440,7 @@ main (int argc, char *argv[])
     q0 --; /* so that nextprime gives q0 if q0 is prime */
     nroots = 0;
     ttn = tts = ttf = 0.0;
+    tot_reports = 0;
     while (q0 < q1)
       {
         while (nroots == 0) /* go to next prime and generate roots */
@@ -1492,7 +1493,6 @@ main (int argc, char *argv[])
         unsigned char *S;
         S = (unsigned char *)malloc(si.bucket_region*sizeof(unsigned char));
         int reports = 0;
-        tot_reports = 0;
         survivors = 0;
         for (i = 0; i < si.nb_buckets; ++i) {
             /* Init rational norms */
