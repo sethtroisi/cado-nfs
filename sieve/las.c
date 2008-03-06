@@ -101,11 +101,10 @@ static double get_maxnorm (cado_poly, sieve_info_t *, uint64_t);
    The large prime bound is L = 2^l.
 */
 static void
-sieve_info_init_lognorm (unsigned char *C, unsigned char threshold
-#ifdef COFACTOR_TRICK
-                         , unsigned long B, unsigned long l, double scale
-#endif
-)
+sieve_info_init_lognorm (unsigned char *C, unsigned char threshold,
+                         unsigned long B MAYBE_UNUSED,
+                         unsigned long l MAYBE_UNUSED,
+                         double scale MAYBE_UNUSED)
 {
   unsigned long k;
 
@@ -157,11 +156,8 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int I, uint64_t q0)
   alg_bound = (unsigned char) (cpoly->alambda * (double) cpoly->lpba * scale)
             + GUARD;
   fprintf (stderr, " bound=%u\n", alg_bound);
-  sieve_info_init_lognorm (si->alg_Bound, alg_bound
-#ifdef COFACTOR_TRICK
-                           , cpoly->alim, cpoly->lpba, scale
-#endif
-                           );
+  sieve_info_init_lognorm (si->alg_Bound, alg_bound, cpoly->alim, cpoly->lpba,
+                           scale);
 
   //TODO: put back a clean, simple bound for rational side
 
@@ -191,11 +187,8 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int I, uint64_t q0)
   scale = si->scale_rat / LOG_SCALE;
   rat_bound = (unsigned char) (r*scale) + GUARD;
   fprintf (stderr, " bound=%u\n", rat_bound);
-  sieve_info_init_lognorm (si->rat_Bound, rat_bound
-#ifdef COFACTOR_TRICK
-                           , cpoly->rlim, cpoly->lpbr, scale
-#endif
-                           );
+  sieve_info_init_lognorm (si->rat_Bound, rat_bound, cpoly->rlim, cpoly->lpbr,
+                           scale);
 
   // bucket info
   // TODO: be more clever, here.
@@ -578,7 +571,8 @@ fill_in_buckets(bucket_array_t BA, factorbase_degn_t *fb, const sieve_info_t * s
     fprintf (stderr, "# medium primes pushed to buckets in %f sec\n", seconds()-tm);
 }
 
-void apply_one_bucket(unsigned char *S, bucket_array_t BA, int i,
+static void
+apply_one_bucket (unsigned char *S, bucket_array_t BA, int i,
                      sieve_info_t * si MAYBE_UNUSED)
 {
     int j = nb_of_updates(BA, i);
@@ -704,7 +698,6 @@ init_alg_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly, sieve_in
 void sieve_small_bucket_region(unsigned char *S, factorbase_degn_t *fb, int N, sieve_info_t *si)
 {
     const uint32_t I = si->I;
-    double tm = seconds();
     unsigned char *S_ptr;
     fbprime_t p, r, R;
     unsigned char logp;
@@ -783,11 +776,25 @@ void factor_list_fprint(FILE *f, factor_list_t fl) {
     fprintf(f, "%" PRIx64, fl.fac[fl.n-1]);
 }
 
-void trial_div(factor_list_t *fl, mpz_t norm, bucket_array_t BA, int N, int x,
-        factorbase_degn_t *fb, sieve_info_t * si)
+/* L is a list of bad primes (ended with 0) */
+static void
+trial_div (factor_list_t *fl, mpz_t norm, bucket_array_t BA, int N, int x,
+           factorbase_degn_t *fb, uint32_t I, uint32_t *L)
 {
+  /* remove bad primes */
+  while (L[0] != 0)
+    {
+      while (mpz_divisible_ui_p (norm, L[0])) {
+        fl->fac[fl->n] = L[0];
+        fl->n++;
+        ASSERT_ALWAYS(fl->n <= FL_MAX_SIZE);
+        mpz_divexact_ui (norm, norm, L[0]);
+      }
+      L ++;
+    }
+
     // remove primes in fb_alg that are less than I
-    while (fb->p != FB_END && fb->p <= si->I) {
+    while (fb->p != FB_END && fb->p <= I) {
         while (mpz_divisible_ui_p (norm, fb->p)) {
             fl->fac[fl->n] = fb->p;
             fl->n++;
@@ -852,19 +859,19 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
             continue;
         // Compute algebraic and rational norms.
         xToAB(&a, &b, x + N*si->bucket_region, si);
-        if (a == 0 && b == 0)
+        if (UNLIKELY(a == 0 && b == 0))
           continue;
         surv++;
         eval_fij(alg_norm, cpoly->f, cpoly->degree, a, b);
         mpz_divexact_ui(alg_norm, alg_norm, si->q);
-        eval_fij(rat_norm, cpoly->g, 1, a, b);
         // Trial divide algebraic norm
-        trial_div(&alg_factors, alg_norm, alg_BA, N, x, fb_alg, si);
-        // TODO: handle algebraic bad primes
+        trial_div(&alg_factors, alg_norm, alg_BA, N, x, fb_alg, si->I,
+                  si->abadprimes);
         if (factor_leftover_norm(alg_norm, cpoly->lpba, f_a, m_a)) {
+            eval_fij(rat_norm, cpoly->g, 1, a, b);
             // Trial divide rational norm
-            trial_div(&rat_factors, rat_norm, rat_BA, N, x, fb_rat, si);
-            // TODO: handle rational bad primes (are there any?)
+            trial_div(&rat_factors, rat_norm, rat_BA, N, x, fb_rat, si->I,
+                      si->rbadprimes);
             if (factor_leftover_norm(rat_norm, cpoly->lpbr, f_r, m_r)) {
                 unsigned int i, j;
                 printf ("%" PRId64 ",%" PRIu64 ":", a, b);
@@ -1325,17 +1332,17 @@ main (int argc, char *argv[])
     sieve_info_t si;
     char *fbfilename = NULL, *polyfilename = NULL;
     cado_poly cpoly;
-    double t0, tnorma, tnormr, tfb, ts, tf, tq, ttn, tts, ttf, tp;
+    double t0, tfb, tq, ttn, tts, ttf;
     uint64_t q0 = 0, q1 = 0, rho = 0;
-    unsigned long *roots, nroots, reports, tot_reports = 0, i, survivors;
+    unsigned long *roots, nroots, tot_reports = 0, survivors0, survivors1;
     factorbase_degn_t * fb_alg, * fb_rat;
     int checknorms = 0; /* factor or not the remaining norms */
-    int I = DEFAULT_I;
+    int I = DEFAULT_I, i;
     unsigned long sq = 0;
     double totJ = 0.0;
 
     fprintf (stderr, "# %s.r%s", argv[0], REV);
-    for (i = 1; i < (unsigned int) argc; i++)
+    for (i = 1; i < argc; i++)
       fprintf (stderr, " %s", argv[i]);
     fprintf (stderr, "\n");
 
@@ -1436,12 +1443,13 @@ main (int argc, char *argv[])
     compute_badprimes (&si, cpoly, fb_alg, fb_rat);
 
     /* special q (and root rho) */
-    t0 = seconds ();
     roots = (unsigned long*) malloc (cpoly->degree * sizeof (unsigned long));
     q0 --; /* so that nextprime gives q0 if q0 is prime */
     nroots = 0;
-    ttn = tts = ttf = 0.0;
     tot_reports = 0;
+    ttn = tts = ttf = 0.0;
+    t0 = seconds ();
+    fprintf (stderr, "#\n");
     while (q0 < q1)
       {
         while (nroots == 0) /* go to next prime and generate roots */
@@ -1454,10 +1462,14 @@ main (int argc, char *argv[])
             si.q = q0;
             q = q0; /* modul_roots_mod_long works on an unsigned long */
             nroots = modul_roots_mod_long (roots, cpoly->f, cpoly->degree, &q);
-            fprintf (stderr, "# q=%" PRIu64 ": root(s)", q0);
-            for (i = 1; i <= nroots; i++)
-              fprintf (stderr, " %lu", roots[nroots-i]);
-            fprintf (stderr, "\n");
+            if (nroots > 0)
+              {
+                fprintf (stderr, "### q=%" PRIu64 ": root%s", q0,
+                         (nroots == 1) ? "" : "s");
+                for (i = 1; i <= (int) nroots; i++)
+                  fprintf (stderr, " %lu", roots[nroots-i]);
+                fprintf (stderr, "\n");
+              }
           }
         tq = seconds ();
 
@@ -1494,35 +1506,47 @@ main (int argc, char *argv[])
         unsigned char *S;
         S = (unsigned char *)malloc(si.bucket_region*sizeof(unsigned char));
         int reports = 0;
-        survivors = 0;
+        survivors0 = survivors1 = 0;
         for (i = 0; i < si.nb_buckets; ++i) {
             /* Init rational norms */
-            init_rat_norms_bucket_region(S, i, cpoly, &si); 
+            ttn -= seconds ();
+            init_rat_norms_bucket_region(S, i, cpoly, &si);
+            ttn += seconds ();
             /* Apply rational bucket */
             apply_one_bucket(S, rat_BA, i, &si);
             /* Sieve small rational primes */
             sieve_small_bucket_region(S, fb_rat, i, &si);
 
             /* Init algebraic norms */
-            reports += init_alg_norms_bucket_region(S, i, cpoly, &si); 
+            ttn -= seconds ();
+            survivors0 += init_alg_norms_bucket_region(S, i, cpoly, &si);
+            ttn += seconds ();
             /* Apply algebraic bucket */
             apply_one_bucket(S, alg_BA, i, &si);
             /* Sieve small algebraic primes */
             sieve_small_bucket_region(S, fb_alg, i, &si);
 
             /* Factor survivors */
-            tot_reports += factor_survivors(S, i, rat_BA, alg_BA, fb_rat,
-                                            fb_alg, cpoly, &si, &survivors);
+            ttf -= seconds ();
+            reports += factor_survivors (S, i, rat_BA, alg_BA, fb_rat,
+                                            fb_alg, cpoly, &si, &survivors1);
+            ttf += seconds ();
         }
-        fprintf(stderr, "# %d survivors after rational side,", reports);
-        fprintf(stderr, " %d after algebraic side\n", survivors);
+        tot_reports += reports;
+        fprintf (stderr, "# %lu survivors after rational side,", survivors0);
+        fprintf (stderr, " %lu after algebraic side\n", survivors1);
+        fprintf (stderr, "# %d relation(s) for (%" PRIu64 ",%" PRIu64
+                 "), total %lu [%1.2fs/r]\n#\n", reports, si.q, si.rho,
+                 tot_reports, (seconds () - t0) / (double) tot_reports);
         clear_bucket_array(alg_BA);
         clear_bucket_array(rat_BA);
         free(S);
       } // end of loop over special q ideals.
+
  end:
     t0 = seconds () - t0;
     fprintf (stderr, "# Average J = %1.0f\n", totJ / (double) sq);
+    tts = t0 - (ttn + ttf);
     fprintf (stderr, "# Total time %1.1fs [norm %1.1f, sieving %1.1f,"
              " factor %1.1f]\n", t0, ttn, tts, ttf);
     fprintf (stderr, "# Total %lu reports [%1.2fs/r]\n",
