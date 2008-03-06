@@ -17,6 +17,12 @@
 #include <tifa.h>
 #include "bucket.h"
 
+/* As its name says, this is a ugly hack that initializes all lognorms to the
+   maximal value (255) on the rational side. But it seems to work well, and to
+   miss only about 5% relations wrt a more accurate estimation, thus we enable
+   it until we have a fast lognorm computation. */
+#define UGLY_HACK
+
 /* Trick to discard lognorms that will probably lead to non L-smooth
    cofactors. Disabled for now since it requires accurate sieving
    (in particular by prime powers and bad primes). */
@@ -594,8 +600,8 @@ apply_one_bucket (unsigned char *S, bucket_array_t BA, int i,
 static void
 init_rat_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly, sieve_info_t *si)
 {
-    double g1, g0, gi, gj, norm;
-    int i, halfI = si->I / 2;
+    double g1, g0, gi, gj, norm MAYBE_UNUSED;
+    int i MAYBE_UNUSED, halfI MAYBE_UNUSED;
     unsigned int j, lastj;
 
     /* G_q(i,j) = g1*(a0*i+a1*j)+g0*(b0*i+b1*j)
@@ -609,8 +615,12 @@ init_rat_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly, sieve_in
     /* bucket_region is a multiple of I. Let's find the starting j
      * corresponding to N and the last j.
      */
+    halfI = si->I / 2;
     j = (N*si->bucket_region) >> si->logI;
     lastj = j + (si->bucket_region >> si->logI);
+#ifdef UGLY_HACK
+    memset (S, 255, (lastj - j) * si->I);
+#else
     for (; j < lastj; ++j) {
         if (j == 0) {
             // compute only the norm for i = 1. Everybody else is 255.
@@ -631,6 +641,7 @@ init_rat_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly, sieve_in
             }
         }
     }
+#endif
 }
 
 /* Initialize lognorms on the algebraic side for the bucket_region
@@ -664,7 +675,7 @@ init_alg_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly, sieve_in
    */
   j = (N*si->bucket_region) >> si->logI;
   lastj = j + (si->bucket_region >> si->logI);
-  S += halfI; 
+  S += halfI;
   for (; j < lastj; j++) {
       /* scale by j^(d-k) the coefficients of fij */
       for (k = 0, powj = 1.0; k <= d; k++, powj *= (double) j)
@@ -672,8 +683,7 @@ init_alg_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly, sieve_in
       
       /* now compute norms */
       for (i = -halfI; i < halfI; i++) {
-          if (si->rat_Bound[S[i]] && (j!=0) &&
-                  gcd_ul((i>0)?i:-i, j) == 1) {
+        if (si->rat_Bound[S[i]]) {
               norm = fpoly_eval (u, d, (double) i);
               norm = fabs (norm);
               norm = log (norm);
@@ -859,7 +869,7 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
             continue;
         // Compute algebraic and rational norms.
         xToAB(&a, &b, x + N*si->bucket_region, si);
-        if (UNLIKELY(a == 0 && b == 0))
+        if (b == 0 || gcd_ul ((a > 0) ? a : -a, b) != 1)
           continue;
         surv++;
         eval_fij(alg_norm, cpoly->f, cpoly->degree, a, b);
