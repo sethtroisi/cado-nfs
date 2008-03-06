@@ -52,7 +52,7 @@
 typedef struct {
     uint16_t x;
     char logp;
-    uint8_t p_low;  // to keep alignment and help trial div.
+    // uint8_t p_low;  // keeping alignment seems to slow down the code.
     uint32_t p;   // TODO: Is 32 better than 64, here ?????
 } bucket_update_t;
 
@@ -60,7 +60,7 @@ typedef struct {
 /*
  * will be used as a sentinel
  */
-static const bucket_update_t LAST_UPDATE = {0,0,0,0};
+static const bucket_update_t LAST_UPDATE = {0,0,0};
 
 /******** Bucket array typedef **************/
 

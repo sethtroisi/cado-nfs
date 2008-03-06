@@ -521,7 +521,7 @@ fill_in_buckets(bucket_array_t BA, factorbase_degn_t *fb, const sieve_info_t * s
             // so we ignore them.
             // TODO: should be line sieved in the non-bucket phase?
             // Or should we have a bucket line siever?
-            if (r == 0 || r == p)
+            if (r == 0 || r >= p)
                 continue;
             
             const uint32_t I = si->I;
@@ -548,16 +548,14 @@ fill_in_buckets(bucket_array_t BA, factorbase_degn_t *fb, const sieve_info_t * s
             }
             // TODO: check the generated assembly, in particular, the
             // push function should be reduced to a very simple step.
-            asm("## Inner bucket sieving loop starts here!!!\n");
+            bucket_update_t update;
+            update.p = p;
+            update.logp = logp;
+            __asm__("## Inner bucket sieving loop starts here!!!\n");
             while (x < I*si->J) {
                 uint32_t i;
-                bucket_update_t update;
-                update.p = p;
                 i = x & maskI;   // x mod I
-                // S[x] -= logp;
                 update.x = (uint16_t) (x & maskbucket);
-                update.logp = logp;
-                update.p_low = 0;
                 push_bucket_update(BA, x >> shiftbucket, update);
 #ifdef TRACE_K
                 if (x == TRACE_K)
@@ -569,7 +567,7 @@ fill_in_buckets(bucket_array_t BA, factorbase_degn_t *fb, const sieve_info_t * s
                 if (i < pli.b0)
                     x += pli.c;
             }
-            asm("## Inner bucket sieving loop stops here!!!\n");
+            __asm__("## Inner bucket sieving loop stops here!!!\n");
         }
         fb = fb_next (fb); // cannot do fb++, due to variable size !
     }
@@ -775,9 +773,10 @@ void init_small_sieve(small_sieve_data_t *ssd, factorbase_degn_t *fb,
     ssd->nb_nice_p = n;
 }
 
-// Sieve small primes (up to p < I) of the factor base fb in the sieve
-// region number N.
-void sieve_small_bucket_region(unsigned char *S, int N,
+// Sieve small primes (up to p < I) of the factor base fb in the 
+// next sieve region S.
+// Information about where we are is in ssd.
+void sieve_small_bucket_region(unsigned char *S, 
         small_sieve_data_t ssd, sieve_info_t *si)
 {
     const uint32_t I = si->I;
@@ -790,14 +789,12 @@ void sieve_small_bucket_region(unsigned char *S, int N,
     for (n = 0; n < ssd.nb_nice_p; ++n) {
         fbprime_t p, r;
         unsigned char logp;
-        int x;
+        unsigned int i, i0;
         p = ssd.nice_p[n].p;
         r = ssd.nice_p[n].r;
         logp = ssd.nice_p[n].logp;
-        x = ssd.nice_p[n].next_position;
-        unsigned int i, i0;
+        i0 = ssd.nice_p[n].next_position;
         S_ptr = S;
-        i0 = x & ((1<<si->log_bucket_region) - 1);
         ASSERT(i0 < p);
         for (j = 0; j < nj; ++j) {
             for (i = i0 ; i < I; i += p) {
@@ -808,7 +805,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                 i0 -= p;
             S_ptr += I;
         }
-        ssd.nice_p[n].next_position = (N+1)*si->bucket_region + i0;
+        ssd.nice_p[n].next_position = i0;
     }
 }
 
@@ -1586,7 +1583,7 @@ main (int argc, char *argv[])
             apply_one_bucket(S, rat_BA, i, &si);
             ttsm += seconds();
             /* Sieve small rational primes */
-            sieve_small_bucket_region(S, i, ssd_rat, &si);
+            sieve_small_bucket_region(S, ssd_rat, &si);
 
             /* Init algebraic norms */
             ttn -= seconds ();
@@ -1597,7 +1594,7 @@ main (int argc, char *argv[])
             apply_one_bucket(S, alg_BA, i, &si);
             ttsm += seconds();
             /* Sieve small algebraic primes */
-            sieve_small_bucket_region(S, i, ssd_alg, &si);
+            sieve_small_bucket_region(S, ssd_alg, &si);
 
             /* Factor survivors */
             ttf -= seconds ();
