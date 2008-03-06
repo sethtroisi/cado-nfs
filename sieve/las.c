@@ -820,9 +820,11 @@ int factor_leftover_norm (mpz_t n, unsigned int b,
 static void
 eval_fij (mpz_t v, mpz_t *f, unsigned int d, long i, unsigned long j);
 
-int
-factor_survivors(unsigned char *S, int N, bucket_array_t rat_BA, bucket_array_t alg_BA,
-        factorbase_degn_t *fb_rat, factorbase_degn_t *fb_alg, cado_poly cpoly, sieve_info_t *si)
+static int
+factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
+                  bucket_array_t alg_BA, factorbase_degn_t *fb_rat,
+                  factorbase_degn_t *fb_alg, cado_poly cpoly, sieve_info_t *si,
+                  unsigned long *survivors)
 {
     int x;
     int64_t a;
@@ -847,11 +849,11 @@ factor_survivors(unsigned char *S, int N, bucket_array_t rat_BA, bucket_array_t 
     for (x = 0; x < si->bucket_region; ++x) {
         if (!(si->alg_Bound[S[x]]))
             continue;
-        surv++;
         // Compute algebraic and rational norms.
         xToAB(&a, &b, x + N*si->bucket_region, si);
         if (a == 0 && b == 0)
           continue;
+        surv++;
         eval_fij(alg_norm, cpoly->f, cpoly->degree, a, b);
         mpz_divexact_ui(alg_norm, alg_norm, si->q);
         eval_fij(rat_norm, cpoly->g, 1, a, b);
@@ -882,7 +884,7 @@ factor_survivors(unsigned char *S, int N, bucket_array_t rat_BA, bucket_array_t 
         }
         alg_factors.n = 0;
     }
-//    fprintf(stderr, "# Got %d survivors to study\n", surv);
+    survivors[0] += surv;
     mpz_clear(alg_norm);
     mpz_clear(rat_norm);
     factor_list_clear(&alg_factors);
@@ -1324,7 +1326,7 @@ main (int argc, char *argv[])
     cado_poly cpoly;
     double t0, tnorma, tnormr, tfb, ts, tf, tq, ttn, tts, ttf, tp;
     uint64_t q0 = 0, q1 = 0, rho = 0;
-    unsigned long *roots, nroots, reports, tot_reports = 0, i;
+    unsigned long *roots, nroots, reports, tot_reports = 0, i, survivors;
     factorbase_degn_t * fb_alg, * fb_rat;
     int checknorms = 0; /* factor or not the remaining norms */
     int I = DEFAULT_I;
@@ -1491,6 +1493,7 @@ main (int argc, char *argv[])
         S = (unsigned char *)malloc(si.bucket_region*sizeof(unsigned char));
         int reports = 0;
         tot_reports = 0;
+        survivors = 0;
         for (i = 0; i < si.nb_buckets; ++i) {
             /* Init rational norms */
             init_rat_norms_bucket_region(S, i, cpoly, &si); 
@@ -1507,9 +1510,11 @@ main (int argc, char *argv[])
             sieve_small_bucket_region(S, fb_alg, i, &si);
 
             /* Factor survivors */
-            tot_reports += factor_survivors(S, i, rat_BA, alg_BA, fb_rat, fb_alg, cpoly, &si);
+            tot_reports += factor_survivors(S, i, rat_BA, alg_BA, fb_rat,
+                                            fb_alg, cpoly, &si, &survivors);
         }
-        fprintf(stderr, "# %d survivors after rational side \n", reports);
+        fprintf(stderr, "# %d survivors after rational side,", reports);
+        fprintf(stderr, " %d after algebraic side\n", survivors);
         clear_bucket_array(alg_BA);
         clear_bucket_array(rat_BA);
         free(S);
