@@ -203,27 +203,42 @@ int fread_relation (FILE *file, relation_t *rel)
 
 unsigned long
 findroot(long a, unsigned long b, unsigned long p) {
-  unsigned long r, t;
-  unsigned long pa;
   int sig, inv;
+  unsigned long root;
+  modulusul_t m;
+  residueul_t r, t, pa, br;
+
+  modul_initmod_ul (m, p);
+  modul_init (pa, m);
 
   if (a >= 0) {
-    pa = (unsigned long)a;
+    modul_set_ul (pa, (unsigned long)a, m); /* Does reduction mod p */
     sig = 1;
   } else {
-    pa = (unsigned long)(-a);
+    modul_set_ul (pa, (unsigned long)(-a), m); /* Does reduction mod p */
     sig = -1;
   }
 
-  inv = modul_inv(&t, &b, &p);
+  modul_init (r, m);
+  modul_init (t, m);
+  modul_init (br, m);
+  modul_set_ul (br, b, m); /* Does reduction mod p */
+  inv = modul_inv(t, br, m);
   if (inv) {
-    modul_mul(&r, &t, &pa, &p);
+    modul_mul(r, t, pa, m);
     if (sig == -1)
-      modul_neg(&r, &r, &p);
-    return r;
+      modul_neg(r, r, m);
+    root = modul_get_ul (r, m);
   } else {
-    return -1;
+    root = (unsigned long) -1L;
   }
+  
+  mod_clear (pa, m); /* No-ops. Here for the sake of pedantry */
+  mod_clear (r, m);
+  mod_clear (t, m);
+  mod_clear (br, m);
+  mod_clearmod (m);
+  return root;
 }
 
 // root = -1 if we don't know the result (p divides leading coeff)
