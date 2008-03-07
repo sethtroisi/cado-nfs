@@ -8,7 +8,7 @@
 #include "getprime.c"
 
 #undef MODTRACE
-#include "mod_ul.c"
+#include "mod_ul.h"
 
 #define BRENT12 0
 #define MONTY12 1
@@ -21,28 +21,28 @@ int verbose = 0;
      - b : (a+2)/4 mod n
 */
 static void
-ellM_duplicate (residue x2, residue z2, residue x1, residue z1, 
-                modulus m, residue b)
+ellM_duplicate (residue_t x2, residue_t z2, residue_t x1, residue_t z1, 
+                modulus_t m, residue_t b)
 {
-  residue u, v, w;
+  residue_t u, v, w;
 
-  initmod (u);
-  initmod (v);
-  initmod (w);
+  mod_init_noset0 (u, m);
+  mod_init_noset0 (v, m);
+  mod_init_noset0 (w, m);
 
-  addmod (u, x1, z1, m);
-  mulmod (u, u, u, m);   /* u = (x1 + z1)^2 */
-  submod (v, x1, z1, m);
-  mulmod (v, v, v, m);   /* v = (x1 - z1)^2 */
-  mulmod (x2, u, v, m);  /* x2 = (x1^2 - z1^2)^2 */
-  submod (w, u, v, m);   /* w = 4 * x1 * z1 */
-  mulmod (u, w, b, m);   /* u = x1 * z1 * (A + 2) */
-  addmod (u, u, v, m);
-  mulmod (z2, w, u, m);
+  mod_add (u, x1, z1, m);
+  mod_mul (u, u, u, m);   /* u = (x1 + z1)^2 */
+  mod_sub (v, x1, z1, m);
+  mod_mul (v, v, v, m);   /* v = (x1 - z1)^2 */
+  mod_mul (x2, u, v, m);  /* x2 = (x1^2 - z1^2)^2 */
+  mod_sub (w, u, v, m);   /* w = 4 * x1 * z1 */
+  mod_mul (u, w, b, m);   /* u = x1 * z1 * (A + 2) */
+  mod_add (u, u, v, m);
+  mod_mul (z2, w, u, m);
 
-  clearmod (w);
-  clearmod (v);
-  clearmod (u);
+  mod_clear (w, m);
+  mod_clear (v, m);
+  mod_clear (u, m);
 }
 
 
@@ -50,39 +50,39 @@ ellM_duplicate (residue x2, residue z2, residue x1, residue z1,
    0 if the result is point at infinity */
 
 static int
-ellW_duplicate (residue x3, residue y3, residue x1, residue y1,
-	        residue a, modulus m)
+ellW_duplicate (residue_t x3, residue_t y3, residue_t x1, residue_t y1,
+	        residue_t a, modulus_t m)
 {
-  residue lambda, u, v;
+  residue_t lambda, u, v;
 
-  initmod (lambda);
-  initmod (u);
-  initmod (v);
+  mod_init_noset0 (lambda, m);
+  mod_init_noset0 (u, m);
+  mod_init_noset0 (v, m);
 
-  mulmod (u, x1, x1, m);
-  addmod (v, u, u, m);
-  addmod (v, v, u, m);
-  addmod (v, v, a, m); /* 3x^2 + a */
-  addmod (u, y1, y1, m);
-  if (invmod (u, u, m) == 0)    /* 1/(2*y) */
+  mod_mul (u, x1, x1, m);
+  mod_add (v, u, u, m);
+  mod_add (v, v, u, m);
+  mod_add (v, v, a, m); /* 3x^2 + a */
+  mod_add (u, y1, y1, m);
+  if (mod_inv (u, u, m) == 0)    /* 1/(2*y) */
   {
-      clearmod (v);
-      clearmod (u);
-      clearmod (lambda);
+      mod_clear (v, m);
+      mod_clear (u, m);
+      mod_clear (lambda, m);
       return 0; /* y was 0  =>  result is point at infinity */
   }
-  mulmod (lambda, u, v, m);
-  mulmod (u, lambda, lambda, m);
-  submod (u, u, x1, m);
-  submod (u, u, x1, m);    /* x3 = u = lambda^2 - 2*x */
-  submod (v, x1, u, m);
-  mulmod (v, v, lambda, m);
-  submod (y3, v, y1, m);
-  setmod (x3, u);
+  mod_mul (lambda, u, v, m);
+  mod_mul (u, lambda, lambda, m);
+  mod_sub (u, u, x1, m);
+  mod_sub (u, u, x1, m);    /* x3 = u = lambda^2 - 2*x */
+  mod_sub (v, x1, u, m);
+  mod_mul (v, v, lambda, m);
+  mod_sub (y3, v, y1, m);
+  mod_set (x3, u, m);
   
-  clearmod (v);
-  clearmod (u);
-  clearmod (lambda);
+  mod_clear (v, m);
+  mod_clear (u, m);
+  mod_clear (lambda, m);
   return 1;
 }
 
@@ -96,48 +96,48 @@ ellW_duplicate (residue x3, residue y3, residue x1, residue y1,
 */
 
 static void
-ellM_add3 (residue x3, residue z3, residue x2, residue z2, 
-           residue x1, residue z1, residue x, residue z, 
-           residue b __attribute__ ((unused)), modulus m)
+ellM_add3 (residue_t x3, residue_t z3, residue_t x2, residue_t z2, 
+           residue_t x1, residue_t z1, residue_t x, residue_t z, 
+           residue_t b __attribute__ ((unused)), modulus_t m)
 {
-  residue u, v, w;
+  residue_t u, v, w;
 
-  initmod (u);
-  initmod (v);
-  initmod (w);
+  mod_init_noset0 (u, m);
+  mod_init_noset0 (v, m);
+  mod_init_noset0 (w, m);
 
-  if (is0mod (z1)) /* (x1,z1) is at infinity */
+  if (mod_is0 (z1, m)) /* (x1,z1) is at infinity */
     {
-      setmod (x3, x2);
-      setmod (z3, z2);
+      mod_set (x3, x2, m);
+      mod_set (z3, z2, m);
       return;
     }
-  else if (is0mod (z2)) /* (x2, z2) is at infinity */
+  else if (mod_is0 (z2, m)) /* (x2, z2) is at infinity */
     {
-      setmod (x3, x1);
-      setmod (z3, z1);
+      mod_set (x3, x1, m);
+      mod_set (z3, z1, m);
       return;
     }
   else
   {
-      submod (u, x2, z2, m);
-      addmod (v, x1, z1, m);
-      mulmod (u, u, v, m);
-      addmod (w, x2, z2, m);
-      submod (v, x1, z1, m);
-      mulmod (v, w, v, m);
-      addmod (w, u, v, m);
-      submod (v, u, v, m);
-      mulmod (w, w, w, m);
-      mulmod (v, v, v, m);
-      setmod (u, x); /* save x */
-      mulmod (x3, w, z, m);
-      mulmod (z3, u, v, m);
+      mod_sub (u, x2, z2, m);
+      mod_add (v, x1, z1, m);
+      mod_mul (u, u, v, m);
+      mod_add (w, x2, z2, m);
+      mod_sub (v, x1, z1, m);
+      mod_mul (v, w, v, m);
+      mod_add (w, u, v, m);
+      mod_sub (v, u, v, m);
+      mod_mul (w, w, w, m);
+      mod_mul (v, v, v, m);
+      mod_set (u, x, m); /* save x */
+      mod_mul (x3, w, z, m);
+      mod_mul (z3, u, v, m);
   }
 
-  clearmod (w);
-  clearmod (v);
-  clearmod (u);
+  mod_clear (w, m);
+  mod_clear (v, m);
+  mod_clear (u, m);
 }
 
 /* Adds two points (x2, y2) and (x1, y1) on the curve y^2 = x^3 + a*x + b
@@ -146,42 +146,42 @@ ellM_add3 (residue x3, residue z3, residue x2, residue z2,
    and 0 otherwise (resulting point is point at infinity) */
 
 static int
-ellW_add3 (residue x3, residue y3, residue x2, residue y2, 
-           residue x1, residue y1, residue a, modulus m)
+ellW_add3 (residue_t x3, residue_t y3, residue_t x2, residue_t y2, 
+           residue_t x1, residue_t y1, residue_t a, modulus_t m)
 {
-  residue lambda, u, v;
+  residue_t lambda, u, v;
   int r;
 
-  initmod (u);
-  initmod (v);
+  mod_init_noset0 (u, m);
+  mod_init_noset0 (v, m);
 
-  submod (u, y2, y1, m);
-  submod (v, x2, x1, m);
-  r = invmod (v, v, m);
+  mod_sub (u, y2, y1, m);
+  mod_sub (v, x2, x1, m);
+  r = mod_inv (v, v, m);
   if (r == 0)
   {
       /* Maybe we were trying to add two identical points? If so,
          use the duplicateW() function instead */
-      if (cmpmod (x1, x2) == 0 && cmpmod (y1, y2) == 0)
+      if (mod_equal (x1, x2, m) && mod_equal (y1, y2, m))
 	  r = ellW_duplicate (x3, y3, x1, y1, a, m);
       else
 	  r = 0; /* No, the points were negatives of each other */
   }
   else
   {
-      mulmod (lambda, u, v, m);
-      mulmod (u, lambda, lambda, m);
-      submod (u, u, x1, m);
-      submod (u, u, x2, m);    /* x3 = u = lambda^2 - x1 - x2 */
-      submod (v, x1, u, m);
-      mulmod (v, v, lambda, m);
-      submod (y3, v, y1, m);
-      setmod (x3, u);
+      mod_mul (lambda, u, v, m);
+      mod_mul (u, lambda, lambda, m);
+      mod_sub (u, u, x1, m);
+      mod_sub (u, u, x2, m);    /* x3 = u = lambda^2 - x1 - x2 */
+      mod_sub (v, x1, u, m);
+      mod_mul (v, v, lambda, m);
+      mod_sub (y3, v, y1, m);
+      mod_set (x3, u, m);
       r = 1;
   }
 
-  clearmod (v);
-  clearmod (u);
+  mod_clear (v, m);
+  mod_clear (u, m);
   return r;
 }
 
@@ -190,16 +190,16 @@ ellW_add3 (residue x3, residue y3, residue x2, residue y2,
    Assumes e >= 5.
 */
 static void
-ellM_mul_ui (residue x, residue z, unsigned long e, 
-	     modulus m, residue b)
+ellM_mul_ui (residue_t x, residue_t z, unsigned long e, 
+	     modulus_t m, residue_t b)
 {
   unsigned long l, n;
-  residue x1, z1, x2, z2;
+  residue_t x1, z1, x2, z2;
 
-  initmod (x1);
-  initmod (z1);
-  initmod (x2);
-  initmod (z2);
+  mod_init_noset0 (x1, m);
+  mod_init_noset0 (z1, m);
+  mod_init_noset0 (x2, m);
+  mod_init_noset0 (z2, m);
 
   e --;
 
@@ -208,8 +208,8 @@ ellM_mul_ui (residue x, residue z, unsigned long e,
   for (l = e, n = 0; l > 1; n ++, l /= 2);
 
   /* start from P1=P, P2=2P */
-  setmod (x1, x);
-  setmod (z1, z);
+  mod_set (x1, x, m);
+  mod_set (z1, z, m);
   ellM_duplicate (x2, z2, x1, z1, m, b);
 
   while (n--)
@@ -228,36 +228,36 @@ ellM_mul_ui (residue x, residue z, unsigned long e,
         }
     }
   
-  setmod (x, x2);
-  setmod (z, z2);
+  mod_set (x, x2, m);
+  mod_set (z, z2, m);
 
-  clearmod (z2);
-  clearmod (x2);
-  clearmod (z1);
-  clearmod (x1);
+  mod_clear (z2, m);
+  mod_clear (x2, m);
+  mod_clear (z1, m);
+  mod_clear (x1, m);
 }
 
 static int
-ellW_mul_ui (residue x, residue y, unsigned long e, residue a, 
-	     modulus m)
+ellW_mul_ui (residue_t x, residue_t y, unsigned long e, residue_t a, 
+	     modulus_t m)
 {
   unsigned long i;
-  residue xt, yt;
+  residue_t xt, yt;
   int tfinite; /* Nonzero iff (xt, yt) is NOT point at infinity */
 
   if (e == 0)
     return 0; /* signal point at infinity */
 
-  initmod (xt);
-  initmod (yt);
+  mod_init_noset0 (xt, m);
+  mod_init_noset0 (yt, m);
 
   i = ~(0UL);
   i -= i/2;   /* Now the most significant bit of i is set */
   while ((i & e) == 0)
     i >>= 1;
 
-  setmod (xt, x);
-  setmod (yt, y);
+  mod_set (xt, x, m);
+  mod_set (yt, y, m);
   tfinite = 1;
   i >>= 1;
 
@@ -271,8 +271,8 @@ ellW_mul_ui (residue x, residue y, unsigned long e, residue a,
 	      tfinite = ellW_add3 (xt, yt, x, y, xt, yt, a, m);
 	  else
 	  {
-	      setmod (xt, x);
-	      setmod (yt, y);
+	      mod_set (xt, x, m);
+	      mod_set (yt, y, m);
 	      tfinite = 1;
 	  }
       }
@@ -281,11 +281,11 @@ ellW_mul_ui (residue x, residue y, unsigned long e, residue a,
 
   if (tfinite)
   {
-      setmod (x, xt);
-      setmod (y, yt);
+      mod_set (x, xt, m);
+      mod_set (y, yt, m);
   }
-  clearmod (yt);
-  clearmod (xt);
+  mod_clear (yt, m);
+  mod_clear (xt, m);
 
   return tfinite;
 }
@@ -294,55 +294,55 @@ ellW_mul_ui (residue x, residue y, unsigned long e, residue a,
    Return 1 if it worked, 0 if a modular inverse failed */
 
 static int
-Brent12_curve_from_sigma (residue A, residue x, residue sigma, modulus m)
+Brent12_curve_from_sigma (residue_t A, residue_t x, residue_t sigma, modulus_t m)
 {
-  residue u, v, t, b, z;
+  residue_t u, v, t, b, z;
   int r;
 
-  initmod (u);
-  initmod (v);
-  initmod (t);
-  initmod (b);
-  initmod (z);
+  mod_init_noset0 (u, m);
+  mod_init_noset0 (v, m);
+  mod_init_noset0 (t, m);
+  mod_init_noset0 (b, m);
+  mod_init_noset0 (z, m);
 
   /* compute b, x */
-  addmod (v, sigma, sigma, m);
-  addmod (v, v, v, m); /* v = 4*sigma */
-  mulmod (u, sigma, sigma, m);
-  setmod_ul (t, 5UL, m);
-  submod (u, u, t, m); /* u = sigma^2 - 5 */
-  mulmod (t, u, u, m);
-  mulmod (x, t, u, m);
-  mulmod (t, v, v, m);
-  mulmod (z, t, v, m);
-  mulmod (t, x, v, m);
-  addmod (b, t, t, m);
-  addmod (b, b, b, m); /* b = 4 * t */
-  addmod (t, u, u, m);
-  addmod (t, t, u, m); /* t = 3 * u */
-  submod (u, v, u, m);
-  addmod (v, t, v, m);
-  mulmod (t, u, u, m);
-  mulmod (u, t, u, m);
-  mulmod (A, u, v, m);
-  mulmod (v, b, z, m);
+  mod_add (v, sigma, sigma, m);
+  mod_add (v, v, v, m); /* v = 4*sigma */
+  mod_mul (u, sigma, sigma, m);
+  mod_set_ul (t, 5UL, m);
+  mod_sub (u, u, t, m); /* u = sigma^2 - 5 */
+  mod_mul (t, u, u, m);
+  mod_mul (x, t, u, m);
+  mod_mul (t, v, v, m);
+  mod_mul (z, t, v, m);
+  mod_mul (t, x, v, m);
+  mod_add (b, t, t, m);
+  mod_add (b, b, b, m); /* b = 4 * t */
+  mod_add (t, u, u, m);
+  mod_add (t, t, u, m); /* t = 3 * u */
+  mod_sub (u, v, u, m);
+  mod_add (v, t, v, m);
+  mod_mul (t, u, u, m);
+  mod_mul (u, t, u, m);
+  mod_mul (A, u, v, m);
+  mod_mul (v, b, z, m);
 
-  r = invmod (u, v, m);
+  r = mod_inv (u, v, m);
   if (r) /* non trivial gcd */
   {
-      mulmod (v, u, b, m);
-      mulmod (x, x, v, m);
-      mulmod (v, u, z, m);
-      mulmod (t, A, v, m);
-      setmod_ul (u, 2UL, m);
-      submod (A, t, u, m);
+      mod_mul (v, u, b, m);
+      mod_mul (x, x, v, m);
+      mod_mul (v, u, z, m);
+      mod_mul (t, A, v, m);
+      mod_set_ul (u, 2UL, m);
+      mod_sub (A, t, u, m);
   }
 
-  clearmod (z);
-  clearmod (b);
-  clearmod (t);
-  clearmod (v);
-  clearmod (u);
+  mod_clear (z, m);
+  mod_clear (b, m);
+  mod_clear (t, m);
+  mod_clear (v, m);
+  mod_clear (u, m);
 
   return r;
 }
@@ -352,81 +352,81 @@ Brent12_curve_from_sigma (residue A, residue x, residue sigma, modulus m)
    Return 1 if it worked, 0 if a modular inverse failed */
 
 static int
-Monty12_curve_from_k (residue A, residue x, unsigned long n, modulus m)
+Monty12_curve_from_k (residue_t A, residue_t x, unsigned long n, modulus_t m)
 {
-  residue u, v, u0, v0, a, t2;
+  residue_t u, v, u0, v0, a, t2;
   
   /* We want a multiple of the point (-2,4) on the curve Y^2=X^3-12*X */
-  initmod_set0 (a);
-  initmod_set0 (u);
-  initmod (v);
-  initmod_set0 (u0);
-  initmod_set0 (v0);
+  mod_init (a, m);
+  mod_init (u, m);
+  mod_init_noset0 (v, m);
+  mod_init (u0, m);
+  mod_init (v0, m);
 
-  submod_ul (a, a, 12UL, m);
-  submod_ul (u, u, 2UL, m);
-  setmod_ul (v, 4UL, m);
+  mod_sub_ul (a, a, 12UL, m);
+  mod_sub_ul (u, u, 2UL, m);
+  mod_set_ul (v, 4UL, m);
   ellW_mul_ui (u, v, n/2, a, m);
   if (n % 2 == 1)
     ellW_add3 (u, v, u, v, u0, v0, a, m);
   /* Now we have a $u$ so that $u^3-12u$ is a square */
-  clearmod (u0);
-  clearmod (v0);
-  /* printf ("Monty12_curve_from_k: u = %lu\n", getmod_ul (u)); */
+  mod_clear (u0, m);
+  mod_clear (v0, m);
+  /* printf ("Monty12_curve_from_k: u = %lu\n", mod_get_ul (u)); */
   
-  initmod (t2);
-  div2mod (v, u, m);
-  mulmod (t2, v, v, m); /* u^2/4 */
-  submod_ul (t2, t2, 3UL, m);
-  if (invmod (u, u, m) == 0)
+  mod_init_noset0 (t2, m);
+  mod_div2 (v, u, m);
+  mod_mul (t2, v, v, m); /* u^2/4 */
+  mod_sub_ul (t2, t2, 3UL, m);
+  if (mod_inv (u, u, m) == 0)
   {
     fprintf (stderr, "Monty12_curve_from_k: u = 0\n");
-    clearmod (t2);
-    clearmod (v);
-    clearmod (u);
-    clearmod (a);
+    mod_clear (t2, m);
+    mod_clear (v, m);
+    mod_clear (u, m);
+    mod_clear (a, m);
     return 0;
   }
-  mulmod (t2, t2, u, m); /* t^2 = (u^2/4 - 3)/u = (u^2 - 12)/4u */
+  mod_mul (t2, t2, u, m); /* t^2 = (u^2/4 - 3)/u = (u^2 - 12)/4u */
 
-  submod_ul (u, t2, 1UL, m);
-  addmod_ul (v, t2, 3UL, m);
-  mulmod (a, u, v, m);
-  if (invmod (a, a, m) == 0) /* a  = 1/(uv), I want u/v and v/u */
+  mod_sub_ul (u, t2, 1UL, m);
+  mod_add_ul (v, t2, 3UL, m);
+  mod_mul (a, u, v, m);
+  if (mod_inv (a, a, m) == 0) /* a  = 1/(uv), I want u/v and v/u */
   {
     fprintf (stderr, "Monty12_curve_from_k: (t^2 - 1)(t^2 + 3) = 0\n");
-    clearmod (t2);
-    clearmod (v);
-    clearmod (u);
-    clearmod (a);
+    mod_clear (t2, m);
+    mod_clear (v, m);
+    mod_clear (u, m);
+    mod_clear (a, m);
     return 0;
   }
-  mulmod (u, u, u, m); /* u^2 */
-  mulmod (v, v, v, m); /* v^2 */
-  mulmod (v, v, a, m); /* v^2 * (1/(uv)) = v/u = 1/a*/
-  mulmod (a, a, u, m); /* u^2 * (1/(uv)) = u/v = a*/
+  mod_mul (u, u, u, m); /* u^2 */
+  mod_mul (v, v, v, m); /* v^2 */
+  mod_mul (v, v, a, m); /* v^2 * (1/(uv)) = v/u = 1/a*/
+  mod_mul (a, a, u, m); /* u^2 * (1/(uv)) = u/v = a*/
 
-  mulmod (u, a, a, m); /* a^2 */
-  addmod_ul (A, u, 2UL, m); /* a^2 + 2 */
-  addmod (t2, A, A, m);
-  addmod (A, A, t2, m); /* 3*(a^2 + 2) */
-  mulmod (t2, A, a, m);
-  setmod (A, v);
-  submod (A, A, t2, m); /* 1/a - 3 a (a^2 + 2) */
-  div2mod (v, v, m); /* v = 1/(2a) */
-  mulmod (t2, v, v, m); /* t2 = 1/(2a)^2 */
-  mulmod (A, A, t2, m);
+  mod_mul (u, a, a, m); /* a^2 */
+  mod_add_ul (A, u, 2UL, m); /* a^2 + 2 */
+  mod_add (t2, A, A, m);
+  mod_add (A, A, t2, m); /* 3*(a^2 + 2) */
+  mod_mul (t2, A, a, m);
+  mod_set (A, v, m);
+  mod_sub (A, A, t2, m); /* 1/a - 3 a (a^2 + 2) */
+  mod_div2 (v, v, m); /* v = 1/(2a) */
+  mod_mul (t2, v, v, m); /* t2 = 1/(2a)^2 */
+  mod_mul (A, A, t2, m);
 
-  addmod (x, u, u, m);
-  addmod (x, x, u, m); /* 3*a^2 */
-  addmod_ul (x, x, 1UL, m); /* 3*a^2 + 1 */
-  div2mod (v, v, m); /* v = 1/(4a) */
-  mulmod (x, x, v, m);
+  mod_add (x, u, u, m);
+  mod_add (x, x, u, m); /* 3*a^2 */
+  mod_add_ul (x, x, 1UL, m); /* 3*a^2 + 1 */
+  mod_div2 (v, v, m); /* v = 1/(4a) */
+  mod_mul (x, x, v, m);
   
-  clearmod (t2);
-  clearmod (v);
-  clearmod (u);
-  clearmod (a);
+  mod_clear (t2, m);
+  mod_clear (v, m);
+  mod_clear (u, m);
+  mod_clear (a, m);
   return 1;
 }
 
@@ -437,40 +437,40 @@ Monty12_curve_from_k (residue A, residue x, unsigned long n, modulus m)
    x and X may be the same variable. */
 
 static int
-curveW_from_Montgomery (residue a, residue x, residue y,
-			residue X, residue A, modulus m)
+curveW_from_Montgomery (residue_t a, residue_t x, residue_t y,
+			residue_t X, residue_t A, modulus_t m)
 {
-  residue g, one;
+  residue_t g, one;
   int r;
 
-  initmod (g);
-  initmod (one);
+  mod_init_noset0 (g, m);
+  mod_init_noset0 (one, m);
 
-  setmod_ul (one, 1UL, m);
-  addmod (g, X, A, m);
-  mulmod (g, g, X, m);
-  addmod_ul (g, g, 1UL, m);
-  mulmod (g, g, X, m); /* G = X^3 + A*X^2 + X */
+  mod_set_ul (one, 1UL, m);
+  mod_add (g, X, A, m);
+  mod_mul (g, g, X, m);
+  mod_add_ul (g, g, 1UL, m);
+  mod_mul (g, g, X, m); /* G = X^3 + A*X^2 + X */
   /* printf ("curveW_from_Montgomery: Y^2 = %lu\n", g[0]); */
 
   /* Now (x,1) is on the curve G*Y^2 = X^3 + A*X^2 + X. */
-  r = invmod (g, g, m);
+  r = mod_inv (g, g, m);
   if (r != 0)
   {
-      setmod (y, g);       /* y = 1/G */
-      div3mod (a, A, m);
-      addmod (x, X, a, m);
-      mulmod (x, x, g, m); /* x = (X + A/3)/G */
-      mulmod (a, a, A, m);
-      submod (a, one, a, m);
-      mulmod (a, a, g, m);
-      mulmod (a, a, g, m); /* a = (1 - (A^2)/3)/G^2 */
+      mod_set (y, g, m);       /* y = 1/G */
+      mod_div3 (a, A, m);
+      mod_add (x, X, a, m);
+      mod_mul (x, x, g, m); /* x = (X + A/3)/G */
+      mod_mul (a, a, A, m);
+      mod_sub (a, one, a, m);
+      mod_mul (a, a, g, m);
+      mod_mul (a, a, g, m); /* a = (1 - (A^2)/3)/G^2 */
   }
   else
     fprintf (stderr, "curveW_from_Montgomery: r = 0\n");
 
-  clearmod (one);
-  clearmod (g);
+  mod_clear (one, m);
+  mod_clear (g, m);
 
   return r;
 }
@@ -481,12 +481,12 @@ ecm (unsigned long p_par, double B1, unsigned long sigma_par,
 {
   /* small primes */
   static double primes[] = {5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151, 157, 163, 167, 173, 179, 181, 191, 193, 197, 199, 211, 223, 227, 229, 233, 239, 241, 251, 257, 263, 269, 271, 277, 281, 283, 293, 307, 311, 313, 317, 331, 337, 347, 349, 353, 359, 367, 373, 379, 383, 389, 397, 401, 409, 419, 421, 431, 433, 439, 443, 449, 457, 461, 463, 467, 479, 487, 491, 499, 503, 509, 521, 523, 541, 0};
-  residue u, A, b, x, z, xB, zB, sigma;
-  modulus p;
+  residue_t u, A, b, x, z, xB, zB, sigma;
+  modulus_t p;
   double r, *s;
 
-  setmodulus_ul (p, p_par);
-  setmod_ul (sigma, sigma_par, p);
+  mod_initmod_ul (p, p_par);
+  mod_set_ul (sigma, sigma_par, p);
 
   if (parameterization == BRENT12)
   {
@@ -504,22 +504,22 @@ ecm (unsigned long p_par, double B1, unsigned long sigma_par,
     abort();
   }
 
-  addmod_ul (b, A, 2UL, p);
-  div2mod (b, b, p);
-  div2mod (b, b, p);
+  mod_add_ul (b, A, 2UL, p);
+  mod_div2 (b, b, p);
+  mod_div2 (b, b, p);
 
 
   /* now start ecm */
-  setmod_ul (z, 1UL, p);
+  mod_set_ul (z, 1UL, p);
 
-  /* printf ("p=%lu, x=%lu b=%lu\n", p_par, getmod_ul(x), 
-           getmod_ul(b)); */
+  /* printf ("p=%lu, x=%lu b=%lu\n", p_par, mod_get_ul(x), 
+           mod_get_ul(b)); */
 
   /* prime 2 */
   for (r = 2.0; r <= B1; r *= 2.0)
     ellM_duplicate (x, z, x, z, p, b);
 
-  /* printf ("2: x=%lu z=%lu\n", getmod_ul(x) , getmod_ul(z)); */
+  /* printf ("2: x=%lu z=%lu\n", mod_get_ul(x) , mod_get_ul(z)); */
 
   /* prime 3 */
   for (r = 3.0; r <= B1; r *= 3.0)
@@ -528,7 +528,7 @@ ecm (unsigned long p_par, double B1, unsigned long sigma_par,
       ellM_add3 (x, z, x, z, xB, zB, x, z, b, p);
     }
 
-  /* printf ("3: x=%lu z=%lu\n", getmod_ul(x), getmod_ul(z)); */
+  /* printf ("3: x=%lu z=%lu\n", mod_get_ul(x), mod_get_ul(z)); */
 
   /* other primes */
   for (s = primes; s[0] <= B1; s++)
@@ -542,7 +542,7 @@ ecm (unsigned long p_par, double B1, unsigned long sigma_par,
         ellM_mul_ui (x, z, (unsigned long) s[0], p, b);
     }
 
-  return (invmod (u, z, p) == 0); /* return 1 if non-trivial gcd is found */
+  return (mod_inv (u, z, p) == 0); /* return 1 if non-trivial gcd is found */
 }
 
 /* Determine order of a point P on a curve, both defined by the sigma value
@@ -552,12 +552,12 @@ ecm (unsigned long p_par, double B1, unsigned long sigma_par,
 unsigned long
 ell_pointorder (const unsigned long m_par, const unsigned long sigma_par)
 {
-  residue sigma, A, X, a, xi, yi, x1, y1;
-  modulus m;
+  residue_t sigma, A, X, a, xi, yi, x1, y1;
+  modulus_t m;
   unsigned long min, max, i, order, p;
 
-  setmodulus_ul (m, m_par);
-  setmod_ul (sigma, sigma_par, m);
+  mod_initmod_ul (m, m_par);
+  mod_set_ul (sigma, sigma_par, m);
 
   if (Brent12_curve_from_sigma (A, X, sigma, m) == 0)
     return 0;
@@ -576,8 +576,8 @@ ell_pointorder (const unsigned long m_par, const unsigned long sigma_par)
   i = 2 * (unsigned long) sqrt((double) m_par);
   min = m_par - i + 1;
   max = m_par + i + 1;
-  setmod (xi, x1);
-  setmod (yi, y1);
+  mod_set (xi, x1, m);
+  mod_set (yi, y1, m);
   if (ellW_mul_ui (xi, yi, min, a, m) == 0)
   {
       i = min;
@@ -599,13 +599,13 @@ ell_pointorder (const unsigned long m_par, const unsigned long sigma_par)
 
 #ifndef NDEBUG
       /* Check that this is the correct order */
-      setmod (xi, x1);
-      setmod (yi, y1);
+      mod_set (xi, x1, m);
+      mod_set (yi, y1, m);
       if (ellW_mul_ui (xi, yi, i, a, m) != 0)
       {
 	  fprintf (stderr, "ell_order: Error, %ld*(%ld, %ld) (mod %ld) is "
 		   "not the point at infinity\n", 
-		   i, getmod_ul (x1), getmod_ul (y1), m_par);
+		   i, mod_get_ul (x1), mod_get_ul (y1), m_par);
 	  return 0UL;
       }
 #endif
@@ -617,8 +617,8 @@ ell_pointorder (const unsigned long m_par, const unsigned long sigma_par)
   order = i;
   for (p = 2; p * p <= order; p++)
   {
-      setmod (xi, x1);
-      setmod (yi, y1);
+      mod_set (xi, x1, m);
+      mod_set (yi, y1, m);
       while (order % p == 0 && ellW_mul_ui (xi, yi, order / p, a, m) == 0)
 	  order /= p;
   }
@@ -630,39 +630,39 @@ ell_pointorder (const unsigned long m_par, const unsigned long sigma_par)
 /* Count points on curve using the Jacobi symbol. This has complexity O(m). */
 
 unsigned long 
-ellM_curveorderjacobi (residue A, residue X, modulus m)
+ellM_curveorderjacobi (residue_t A, residue_t X, modulus_t m)
 {
-  residue t;
+  residue_t t;
   unsigned long order, i;
   int bchar;
 
-  initmod (t);
+  mod_init_noset0 (t, m);
 
   /* Compute X^3 + A*X^2 + X and see if it is a square */
-  setmod (t, X);
-  addmod (t, t, A, m);
-  mulmod (t, t, X, m);
-  addmod_ul (t, t, 1UL, m);
-  mulmod (t, t, X, m);
-  bchar = jacobimod (t, m);
+  mod_set (t, X, m);
+  mod_add (t, t, A, m);
+  mod_mul (t, t, X, m);
+  mod_add_ul (t, t, 1UL, m);
+  mod_mul (t, t, X, m);
+  bchar = mod_jacobi (t, m);
   ASSERT (bchar != 0);
 
   order = 2; /* One for (0, 0, 1), one for the point at infinity */
-  for (i = 1; i < getmod_ul(m); i++)
+  for (i = 1; i < mod_getmod_ul(m); i++)
     {
-      setmod_ul (X, i, m);
-      setmod (t, X);
-      addmod (t, t, A, m);
-      mulmod (t, t, X, m);
-      addmod_ul (t, t, 1UL, m);
-      mulmod (t, t, X, m);
+      mod_set_ul (X, i, m);
+      mod_set (t, X, m);
+      mod_add (t, t, A, m);
+      mod_mul (t, t, X, m);
+      mod_add_ul (t, t, 1UL, m);
+      mod_mul (t, t, X, m);
       if (bchar == 1) 
-	order = order + 1 + jacobimod (t, m);
+	order = order + 1 + mod_jacobi (t, m);
       else
-	order = order + 1 - jacobimod (t, m);
+	order = order + 1 - mod_jacobi (t, m);
     }
 
-  clearmod (t);
+  mod_clear (t, m);
   
   return order;
 }
@@ -671,12 +671,12 @@ unsigned long
 ell_curveorder (const unsigned long m_par, const unsigned long sigma_par,
                 int parameterization)
 {
-  residue sigma, A, X;
-  modulus m;
+  residue_t sigma, A, X;
+  modulus_t m;
   unsigned long order;
 
-  setmodulus_ul (m, m_par);
-  setmod_ul (sigma, sigma_par, m);
+  mod_initmod_ul (m, m_par);
+  mod_set_ul (sigma, sigma_par, m);
 
   if (parameterization == BRENT12)
   {
