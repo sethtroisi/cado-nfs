@@ -284,6 +284,52 @@ sieve_info_clear (sieve_info_t *si)
 
 /*****************************************************************************/
 
+// Redc_32 based on 64-bit arithmetic
+// Assume:
+//   * p is an odd prime < 2^32.
+//   * invp is -1/p mod 2^32.
+//   * x is some integer in [0, 2^32*p[
+// Compute:
+//   * x/2^32 mod p as an integer in [0, p[
+static inline uint32_t
+redc_u32(const uint64_t x, const uint32_t p, const uint32_t invp)
+{
+    uint32_t t = x*invp;
+    uint32_t y = (x + (uint64_t)t*(uint64_t)p) >> 32;
+    if ((int32_t)y >= p)
+        y -= p;
+    ASSERT(y<p);
+    return y;
+}
+
+// Signed redc_32 based on 64-bit arithmetic
+// Assume:
+//   * p is an odd prime < 2^32.
+//   * invp is -1/p mod 2^32.
+//   * x is some signed integer in ]-2^32*p, 2^32*p[
+// Compute:
+//   * x/2^32 mod p as an integer in [0, p[
+static inline uint32_t
+redc_32(const int64_t x, const uint32_t p, const uint32_t invp)
+{
+    uint32_t t = ((uint64_t)x)*invp;
+    uint32_t y = (x + (uint64_t)t*(uint64_t)p) >> 32;
+    // might be too large by p, or too small by p.
+    if ((int32_t)y < 0)
+        y += p;
+    else if ((int32_t)y >= p) 
+        y -= p;
+#ifndef NDEBUG
+    if (y >= p) {
+        fprintf(stderr, "BUG in redc_32. x = %" PRId64
+                " p = %u, invp = %u, y = %d\n", x, p, invp, y);
+        ASSERT(0);
+    }
+#endif
+
+    return y;
+}
+
 // binary gcd for unsigned long
 
 static inline unsigned long
@@ -341,7 +387,7 @@ invmod(unsigned long *pa, unsigned long b) {
   a = *pa;
 
   // FIXME: here, we rely on internal representation of the modul module.
-  if ((b & 1UL)==0)
+  if (UNLIKELY(((b & 1UL)==0)))
       return modul_inv(pa, pa, &b);
 
   fix = (b+1)>>1;
@@ -350,6 +396,14 @@ invmod(unsigned long *pa, unsigned long b) {
   ASSERT (b & 1UL);
 
   u = 1; v = 0; t = 0;
+
+  // make a odd
+  lsh = ctzl(a);
+  a >>= lsh;
+  t += lsh;
+  v <<= lsh;
+
+  // Here a and b are odd, and a < b
   do {
     do {
       b -= a; v += u;
@@ -358,7 +412,7 @@ invmod(unsigned long *pa, unsigned long b) {
       t += lsh;
       u <<= lsh;
     } while (a<b);
-    if (a == b)
+    if (UNLIKELY(a == b))
       break;
     do {
       a -= b; u += v;
@@ -389,8 +443,9 @@ invmod(unsigned long *pa, unsigned long b) {
 // In the case where denominator is zero, returns p.
 // In the case where denominator is non-invertible mod p, returns p+1.
 // Otherwise r in [0,p-1]
+
 static inline fbprime_t
-fb_root_in_qlattice(const fbprime_t p, const fbprime_t R, const sieve_info_t * si)
+simple_fb_root_in_qlattice(const fbprime_t p, const fbprime_t R, const sieve_info_t * si)
 {
     int64_t aux;
     uint64_t num, den;
@@ -425,6 +480,41 @@ fb_root_in_qlattice(const fbprime_t p, const fbprime_t R, const sieve_info_t * s
     num = num*den;
     return (fbprime_t)(num % ((uint64_t) p));
 }
+
+
+static inline fbprime_t
+fb_root_in_qlattice(const fbprime_t p, const fbprime_t R,
+        const uint32_t invp, const sieve_info_t * si)
+{
+    int64_t aux;
+    uint64_t num, den;
+
+    if (UNLIKELY(p == 2))
+        return simple_fb_root_in_qlattice(p, R, si);
+
+    // Use Signed Redc for the computation:
+    // Numerator and denominator will get divided by 2^32, but this does
+    // not matter, since we take their quotient.
+
+    // numerator
+    aux = ((int64_t)R)*((int64_t)si->b1) - ((int64_t)si->a1); 
+    num = redc_32(aux, p, invp);
+    if (num == 0)
+        return 0;
+
+    // denominator
+    aux = ((int64_t)si->a0) - ((int64_t)R)*((int64_t)si->b0); 
+    den = redc_32(aux, p, invp);
+    if (den == 0)
+        return p;
+
+    // divide
+    if (!invmod(&den, p))
+        return p+1;
+    num = num*den;
+    return (fbprime_t)(num % ((uint64_t) p));
+}
+
 
 
 /*
@@ -554,7 +644,7 @@ fill_in_buckets(bucket_array_t BA, factorbase_degn_t *fb, const sieve_info_t * s
         for (nr = 0; nr < fb->nr_roots; ++nr) {
             fbprime_t r, R;
             R = fb->roots[nr];
-            r = fb_root_in_qlattice(p, R, si);
+            r = fb_root_in_qlattice(p, R, fb->invp, si);
             // Special cases should be quite rare for primes > I,
             // so we ignore them.
             // TODO: should be line sieved in the non-bucket phase?
@@ -822,7 +912,7 @@ void init_small_sieve(small_sieve_data_t *ssd, factorbase_degn_t *fb,
         fbprime_t p = fb->p;
         for (nr = 0; nr < fb->nr_roots; ++nr) {
             fbprime_t r;
-            r = fb_root_in_qlattice(p, fb->roots[nr], si);
+            r = fb_root_in_qlattice(p, fb->roots[nr], fb->invp, si);
             if (r == 0) {
                 // TODO: doit!
                 // special_case_0(S, p, logp, si);
