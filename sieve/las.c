@@ -286,7 +286,7 @@ sieve_info_clear (sieve_info_t *si)
 
 // Redc_32 based on 64-bit arithmetic
 // Assume:
-//   * p is an odd prime < 2^32.
+//   * p is an odd prime < 2^32. FIXME: p < 2^31? (see below)
 //   * invp is -1/p mod 2^32.
 //   * x is some integer in [0, 2^32*p[
 // Compute:
@@ -294,9 +294,11 @@ sieve_info_clear (sieve_info_t *si)
 static inline uint32_t
 redc_u32(const uint64_t x, const uint32_t p, const uint32_t invp)
 {
-    uint32_t t = x*invp;
-    uint32_t y = (x + (uint64_t)t*(uint64_t)p) >> 32;
-    if ((int32_t)y >= p)
+    uint32_t t = x*invp;                            /* t = x * invp mod 2^32 */
+    uint32_t y = (x + (uint64_t)t*(uint64_t)p) >> 32; /* x + t*p is bounded
+            by 2^32*p-1+(2^32-1)*p < 2*2^32*p: we might want p < 2^31 so that
+            there is no overflow */
+    if (y >= p)
         y -= p;
     ASSERT(y<p);
     return y;
@@ -317,7 +319,7 @@ redc_32(const int64_t x, const uint32_t p, const uint32_t invp)
     // might be too large by p, or too small by p.
     if ((int32_t)y < 0)
         y += p;
-    else if ((int32_t)y >= p) 
+    else if (y >= p) 
         y -= p;
 #ifndef NDEBUG
     if (y >= p) {
@@ -1601,7 +1603,7 @@ main (int argc, char *argv[])
     sieve_info_t si;
     char *fbfilename = NULL, *polyfilename = NULL;
     cado_poly cpoly;
-    double t0, tfb, tq, ttn, tts, ttsm, ttf;
+    double t0, tfb, tq, tn_rat, tn_alg, tts, ttsm, ttf;
     uint64_t q0 = 0, q1 = 0, rho = 0;
     unsigned long *roots, nroots, tot_reports = 0, survivors0, survivors1;
     factorbase_degn_t * fb_alg, * fb_rat;
@@ -1716,7 +1718,7 @@ main (int argc, char *argv[])
     q0 --; /* so that nextprime gives q0 if q0 is prime */
     nroots = 0;
     tot_reports = 0;
-    ttn = tts = ttsm = ttf = 0.0;
+    tn_rat = tn_alg = tts = ttsm = ttf = 0.0;
     t0 = seconds ();
     fprintf (stderr, "#\n");
     while (q0 < q1)
@@ -1786,9 +1788,9 @@ main (int argc, char *argv[])
         survivors0 = survivors1 = 0;
         for (i = 0; i < si.nb_buckets; ++i) {
             /* Init rational norms */
-            ttn -= seconds ();
+            tn_rat -= seconds ();
             init_rat_norms_bucket_region(S, i, cpoly, &si);
-            ttn += seconds ();
+            tn_rat += seconds ();
             /* Apply rational bucket */
             ttsm -= seconds();
             apply_one_bucket(S, rat_BA, i, &si);
@@ -1797,9 +1799,9 @@ main (int argc, char *argv[])
             sieve_small_bucket_region(S, ssd_rat, &si);
 
             /* Init algebraic norms */
-            ttn -= seconds ();
+            tn_alg -= seconds ();
             survivors0 += init_alg_norms_bucket_region(S, i, cpoly, &si);
-            ttn += seconds ();
+            tn_alg += seconds ();
             /* Apply algebraic bucket */
             ttsm -= seconds();
             apply_one_bucket(S, alg_BA, i, &si);
@@ -1829,10 +1831,10 @@ main (int argc, char *argv[])
  end:
     t0 = seconds () - t0;
     fprintf (stderr, "# Average J = %1.0f\n", totJ / (double) sq);
-    tts = t0 - (ttn + ttf);
-    fprintf (stderr, "# Total time %1.1fs [norm %1.1f, sieving %1.1f"
+    tts = t0 - (tn_rat + tn_alg + ttf);
+    fprintf (stderr, "# Total time %1.1fs [norm %1.1f+%1.1f, sieving %1.1f"
             " (%1.1f + %1.1f),"
-            " factor %1.1f]\n", t0, ttn, tts, ttsm, tts-ttsm, ttf);
+             " factor %1.1f]\n", t0, tn_rat, tn_alg, tts, ttsm, tts-ttsm, ttf);
     fprintf (stderr, "# Total %lu reports [%1.3fs/r]\n",
              tot_reports, t0 / (double) tot_reports);
 
