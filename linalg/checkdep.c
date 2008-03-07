@@ -72,12 +72,12 @@ checkSparse (FILE *matfile, FILE *kerfile, int ncols, int nlimbs, int *vec,
 }
 
 static void
-checkVector (int *vec, int ncols)
+checkVector (int *vec, int ncols, int skip)
 {
     int ok, i;
 
     ok = 1;
-    for(i = 0; i < ncols; i++)
+    for(i = skip; i < ncols; i++)
 	if(vec[i] & 1){
 	    ok = 0;
 	    break;
@@ -89,7 +89,7 @@ checkVector (int *vec, int ncols)
 }
 
 static void
-checkSparseAll (char *matname, char *kername, int compact, int verbose)
+checkSparseAll (char *matname, char *kername, int compact, int skip, int verbose)
 {
     FILE *matfile, *kerfile;
     int nrows, ncols, nlimbs, *vec, ndep, ret;
@@ -108,7 +108,7 @@ checkSparseAll (char *matname, char *kername, int compact, int verbose)
 	    break;
 	if(verbose >= 2)
 	    printVec(vec, ncols);
-	checkVector(vec, ncols);
+	checkVector(vec, ncols, skip);
     }
     fprintf(stderr, "\n");
     free(vec);
@@ -177,7 +177,7 @@ checkWithIndex (FILE *purgedfile, FILE *indexfile, FILE *kerfile, int verbose,
 
 static void
 checkWithIndexAll (char *purgedname, char *indexname, char *kername,
-                   int verbose)
+		   int skip, int verbose)
 {
     FILE *purgedfile = fopen(purgedname, "r");
     FILE *indexfile = fopen(indexname, "r");
@@ -194,7 +194,7 @@ checkWithIndexAll (char *purgedname, char *indexname, char *kername,
         ret = checkWithIndex(purgedfile,indexfile,kerfile,verbose,nrows,ncols,small_nrows, vec);
 	if(ret == -1)
 	    break;
-	checkVector(vec, ncols);
+	checkVector(vec, ncols, skip);
     }
     fprintf(stderr, "\n");
     free(vec);
@@ -216,7 +216,7 @@ main (int argc, char *argv[])
 {
     char *matname = NULL, *indexname = NULL, *purgedname = NULL;
     char *kername = NULL;
-    int verbose = 0, compact = 0;
+    int verbose = 0, compact = 0, skip = 0;
 
     while(argc > 1 && argv[1][0] == '-'){
         if(argc > 2 && strcmp (argv[1], "-mat") == 0){
@@ -239,6 +239,11 @@ main (int argc, char *argv[])
             argc -= 2;
             argv += 2;
         }
+        else if(argc > 2 && strcmp (argv[1], "-skip") == 0){
+	    skip = atoi(argv[2]);
+            argc -= 2;
+            argv += 2;
+        }
 	else if(argc > 1 && strcmp (argv[1], "-compact") == 0){
 	    compact = 1;
 	    argc -= 1;
@@ -255,13 +260,13 @@ main (int argc, char *argv[])
       {
         if (purgedname == NULL || kername == NULL)
           usage ();
-	checkWithIndexAll (purgedname, indexname, kername, verbose);
+	checkWithIndexAll (purgedname, indexname, kername, skip, verbose);
       }
     else
       {
         if (matname == NULL || kername == NULL)
           usage ();
-	checkSparseAll (matname, kername, compact, verbose);
+	checkSparseAll (matname, kername, compact, skip, verbose);
       }
     return 0;
 }
