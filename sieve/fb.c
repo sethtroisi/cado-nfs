@@ -407,7 +407,22 @@ fb_make_linear_powers (mpz_t *poly, const fbprime_t bound, const double log_scal
   return fb;
 }
 
+/* Assume q is a prime power p^k with k>=1, return p if k > 1, 0 otherwise. */
+static uint32_t
+is_prime_power (uint32_t q)
+{
+  unsigned int maxk, k;
+  uint32_t p;
 
+  for (maxk = 0, p = q; p > 1; p /= 2, maxk ++);
+  for (k = maxk; k >= 2; k--)
+    {
+      p = (uint32_t) (pow ((double) q, 1.0 / (double) k) + 0.5);
+      if (q % p == 0)
+        return p;
+    }
+  return 0;
+}
 
 factorbase_degn_t *
 fb_read (const char *filename, const double log_scale, const int verbose)
@@ -484,8 +499,8 @@ fb_read (const char *filename, const double log_scale, const int verbose)
 	  break;
 	}
 
-#if 1 /* disabled because prime powers are not produced currently by makefb */
-      p = iscomposite (fb_cur->p);
+      /* we assume p is a prime or a prime power */
+      p = is_prime_power (fb_cur->p);
       if (p != 0)
         {
           fbprime_t q = fb_cur->p;
@@ -499,9 +514,6 @@ fb_read (const char *filename, const double log_scale, const int verbose)
               break;                       
             }
         }
-#else
-      p = 0;
-#endif
 
       if (p == 0) /* It's a prime, do a normal log */
 	fb_cur->plog = fb_log (fb_cur->p, log_scale, 0.);
