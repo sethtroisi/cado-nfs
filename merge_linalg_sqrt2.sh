@@ -15,42 +15,29 @@ params=$1; shift
 # default parameters (see README.params)
 
 #####
-root=`grep "root: " $params | awk '{print $NF}'`
+. $params
+
 if [ "X$root" = "X" ]; then echo "I need at least a name..."; exit; fi
 
-maxpr=`grep "maxpr: " $params | awk '{print $NF}'`
 if [ "X$maxpr" = "X" ]; then maxpr=0; fi
-maxpa=`grep "maxpa: " $params | awk '{print $NF}'`
 if [ "X$maxpa" = "X" ]; then maxpa=0; fi
-keep_purge=`grep "keep: " $params | awk '{print $NF}'`
 if [ "X$keep_purge" = "X" ]; then keep_purge=0; fi
 
-nkermax=`grep "nkermax: " $params | awk '{print $NF}'`
 if [ "X$nkermax" = "X" ]; then nkermax=30; fi
-nchar=`grep "nchar: " $params | awk '{print $NF}'`
 if [ "X$nchar" = "X" ]; then nchar=50; fi
 
-prune=`grep "prune: " $params | awk '{print $NF}'`
 if [ "X$prune" = "X" ]; then prune=1.0; fi
-maxlevel=`grep "maxlevel: " $params | awk '{print $NF}'`
 if [ "X$maxlevel" = "X" ]; then maxlevel=6; fi
-cwmax=`grep "cwmax: " $params | awk '{print $NF}'`
 if [ "X$cwmax" = "X" ]; then cwmax=10; fi
-rwmax=`grep "rwmax: " $params | awk '{print $NF}'`
 if [ "X$rwmax" = "X" ]; then rwmax=100; fi
 
-verbose=`grep "verbose: " $params | awk '{print $NF}'`
 if [ "X$verbose" = "X" ]; then verbose="-v"; fi
 ##### linalg params
-skip=`grep "skip: " $params | awk '{print $NF}'`
 if [ "X$skip" = "X" ]; then skip=32; fi
-bwstrat=`grep "bwstrat: " $params | awk '{print $NF}'`
 if [ "X$bwstrat" = "X" ]; then bwstrat=1; fi
 ########## multithreading in bw
-mt=`grep "mt: " $params | awk '{print $NF}'`
 if [ "X$mt" = "X" ]; then mt=0; fi
 
-name=`grep "name: " $params | awk '{print $NF}'`
 if [ "X$name" = "X" ]; then name=$root.$prune"x"$maxlevel"x"$cwmax"x"$rwmax; fi
 
 dir=`dirname $root`

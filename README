@@ -87,13 +87,13 @@ for files beginning rels.* and uses them.
 
 A param file consists of lines, as in:
 
-root: Examples/c59b/c59b
-prune: 1.0
-maxlevel: 5
-cwmax: 10
-rwmax: 40
-mt: 4
-bwstrat: 1
+root=Examples/c59b/c59b
+prune=1.0
+maxlevel=5
+cwmax=10
+rwmax=40
+mt=4
+bwstrat=1
 
 mt means multithreading to 4, bwstrat to 1 means use merge and stop when
 cN is "minimal".
@@ -103,7 +103,7 @@ values. For instance, you can override the choice of the 'name' parameter
 which defauts to $root.$prune"x"$maxlevel"x"$cwmax"x"$rwmax and can be
 boring for some users. Just put:
 
-name: toto_likes_his_tata
+name=toto_likes_his_tata
 
 as directory files for intermediate computations if you like.
 
