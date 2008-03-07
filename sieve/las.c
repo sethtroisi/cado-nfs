@@ -868,7 +868,7 @@ void factor_list_fprint(FILE *f, factor_list_t fl) {
 }
 
 
-/* Function stollen to sieve.c (AK) */
+/* Function stolen to sieve.c (AK) */
 /* Returns 1 if fbptr->p divides norm, 0 otherwise */
 static inline int
 trialdiv_with_norm (factorbase_degn_t *fbptr, const mpz_t norm)
@@ -1029,8 +1029,12 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
     factor_list_clear(&rat_factors);
     clear_mpz_array (f_r);
     clear_mpz_array (f_a);
+    free (f_r);
+    free (f_a);
     clear_uint32_array (m_r);
     clear_uint32_array (m_a);
+    free (m_r);
+    free (m_a);
     return cpt;
 }
 
