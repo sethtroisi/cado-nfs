@@ -867,26 +867,65 @@ void factor_list_fprint(FILE *f, factor_list_t fl) {
     fprintf(f, "%" PRIx64, fl.fac[fl.n-1]);
 }
 
+
+/* Function stollen to sieve.c (AK) */
+/* Returns 1 if fbptr->p divides norm, 0 otherwise */
+static inline int
+trialdiv_with_norm (factorbase_degn_t *fbptr, const mpz_t norm)
+{
+  modulus_t m;
+  residue_t r;
+  size_t i;
+  int j;
+
+  mod_initmod_ul (m, (unsigned long) fbptr->p);
+  mod_init (r, m);
+
+  for (i = 0; i < mpz_size (norm); i++)
+    modul_addredc_ul (r, r, norm->_mp_d[i], fbptr->invp, m);
+
+  j = (mod_get_ul (r, m) == 0);
+
+  mod_clear (r, m);
+  mod_clearmod (m);
+  return j;
+}
+
+
+
 /* L is a list of bad primes (ended with 0) */
 static void
 trial_div (factor_list_t *fl, mpz_t norm, bucket_array_t BA, int N, int x,
            factorbase_degn_t *fb, uint32_t I, uint32_t *L)
 {
-  /* remove bad primes */
-  while (L[0] != 0)
+    /* remove bad primes */
+    while (L[0] != 0)
     {
-      while (mpz_divisible_ui_p (norm, L[0])) {
-        fl->fac[fl->n] = L[0];
-        fl->n++;
-        ASSERT_ALWAYS(fl->n <= FL_MAX_SIZE);
-        mpz_divexact_ui (norm, norm, L[0]);
-      }
-      L ++;
+        while (mpz_divisible_ui_p (norm, L[0])) {
+            fl->fac[fl->n] = L[0];
+            fl->n++;
+            ASSERT_ALWAYS(fl->n <= FL_MAX_SIZE);
+            mpz_divexact_ui (norm, norm, L[0]);
+        }
+        L ++;
     }
 
-    // remove primes in fb_alg that are less than I
+    // handle 2 separately, if it is in fb
+    if (fb->p == 2) {
+        int bit = mpz_scan1(norm, 0);
+        int i;
+        for (i = 0; i < bit; ++i) {
+            fl->fac[fl->n] = 2;
+            fl->n++;
+        }
+        mpz_tdiv_q_2exp(norm, norm, bit);
+        fb = fb_next (fb); // cannot do fb++, due to variable size !
+    }
+
+    // remove primes in fb that are less than I
     while (fb->p != FB_END && fb->p <= I) {
-        while (mpz_divisible_ui_p (norm, fb->p)) {
+        while (trialdiv_with_norm(fb, norm) == 1) {
+        //while (mpz_divisible_ui_p (norm, fb->p)) {
             fl->fac[fl->n] = fb->p;
             fl->n++;
             ASSERT_ALWAYS(fl->n <= FL_MAX_SIZE);
