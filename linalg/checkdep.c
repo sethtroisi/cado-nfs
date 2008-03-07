@@ -206,8 +206,8 @@ checkWithIndexAll (char *purgedname, char *indexname, char *kername,
 static void
 usage (void)
 {
-  fprintf (stderr, "Usage: checkdep [-verbose] -purged file -index file -ker file\n");
-  fprintf (stderr, "       checkdep [-verbose] [-compact] -mat file -ker file\n");
+  fprintf (stderr, "Usage: checkdep [-verbose] [-skip n] -purged file -index file -ker file\n");
+  fprintf (stderr, "       checkdep [-verbose] [-compact] [-skip n] -mat file -ker file\n");
   exit (1);
 }
 
