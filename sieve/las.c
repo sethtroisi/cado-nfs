@@ -284,6 +284,51 @@ sieve_info_clear (sieve_info_t *si)
 
 /*****************************************************************************/
 
+// binary gcd for unsigned long
+
+static inline unsigned long
+bingcd(unsigned long a, unsigned long b) {
+    int t, lsh;
+    
+    if (UNLIKELY(a == 0))
+        return b;
+    if (UNLIKELY(b == 0))
+        return a;
+
+    t = ctzl(a);
+    a >>= t;
+    lsh = ctzl(b);
+    b >>= lsh;
+    t = MIN(t, lsh);
+
+    // now a and b are odd, and the 2-part of the gcd is 2^t.
+    // make a < b.
+    if (UNLIKELY(a == b))
+        return a<<t;
+    if (a > b) {
+        unsigned long tmp = a;
+        a = b;
+        b = tmp;
+    }
+    // a<b, both odd. Let's go!
+    do {
+        do {
+            b -= a; 
+            lsh = ctzl(b);
+            b >>= lsh;
+        } while (a<b);
+        if (a == b)
+            break;
+        do {
+            a -= b; 
+            lsh = ctzl(a);
+            a >>= lsh;
+        } while (b < a);
+    } while (a != b);
+    return a<<t;
+}
+
+
 
 // Compute the inverse of a modulo b, by binary xgcd.
 // a must be less than b.
@@ -989,7 +1034,7 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
             continue;
         // Compute algebraic and rational norms.
         xToAB(&a, &b, x + N*si->bucket_region, si);
-        if (b == 0 || gcd_ul ((a > 0) ? a : -a, b) != 1)
+        if (b == 0 || bingcd ((a > 0) ? a : -a, b) != 1)
           continue;
         surv++;
         eval_fij(alg_norm, cpoly->f, cpoly->degree, a, b);
