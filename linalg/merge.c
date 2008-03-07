@@ -2235,7 +2235,7 @@ merge(sparse_mat_t *mat, /*int nb_merge_max,*/ int maxlevel, int verbose, int fo
 static unsigned long
 my_cost(unsigned long N, unsigned long c, int forbw)
 {
-    if(forbw == 1)
+    if(forbw <= 1)
 	return (N*c);
     else if(forbw == 2){
 	double K1 = .19e-9, K2 = 3.4e-05, K3 = 1.4e-10; // kinda average
@@ -2345,10 +2345,13 @@ mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 		printf("BWCOST: %lu\n", bwcost);
 	}
 	// to be cleaned one day...
-	if(forbw == 0){
+	if((forbw == 0) || (forbw == 2)){
 	    double r = ((double)bwcost)/((double)bwcostmin);
 	    if((r > 1.1) && (mat->rem_nrows-mat->rem_ncols <= mat->delta)){
-		fprintf(stderr, "cN too high, stopping [%2.2lf]\n", r);
+		if(forbw == 0)
+		    fprintf(stderr, "cN too high, stopping [%2.2lf]\n", r);
+		else
+		    fprintf(stderr, "bw too high, stopping [%2.2lf]\n", r);
 		break;
 	    }
 	}
