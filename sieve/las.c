@@ -279,6 +279,7 @@ sieve_info_clear (sieve_info_t *si)
     mpz_clear (si->fij[k]);
   free (si->fij);
   free (si->abadprimes);
+  free (si->rbadprimes);
 }
 
 /*****************************************************************************/

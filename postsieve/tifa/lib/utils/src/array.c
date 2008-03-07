@@ -280,6 +280,8 @@ void clear_uint32_array(uint32_array_t* const array) {
     }
     array->alloced = 0U;
     array->length  = 0U;
+    /* since the array was allocated by alloc_uint32_array, we clear it too */
+    free (array);
 }
 //-----------------------------------------------------------------------------
 void resize_uint32_array(uint32_array_t* array, uint32_t alloced) {
@@ -657,6 +659,8 @@ void clear_mpz_array(mpz_array_t* const array) {
     }
     array->alloced = 0U;
     array->length  = 0U;
+    /* since the array was allocated by alloc_mpz_array, we clear it too */
+    free (array);
 }
 //-----------------------------------------------------------------------------
 void resize_mpz_array(mpz_array_t* const array, uint32_t alloced) {
