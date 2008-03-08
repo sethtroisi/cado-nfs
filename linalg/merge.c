@@ -2302,7 +2302,7 @@ mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 	    if((m > maxlevel) || (m <= 0))
 		break;
 	}
-	bwcost = my_cost((unsigned long)mat->rem_ncols,
+	bwcost = my_cost((unsigned long)mat->rem_nrows,
 			 (unsigned long)mat->weight, forbw);
 	if(njproc >= target){ // somewhat arbitrary...!
 	    int kappa = (mat->rem_nrows-mat->rem_ncols) / mat->delta, ni2rem;
