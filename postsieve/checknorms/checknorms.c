@@ -256,7 +256,7 @@ int main(int argc, char *argv[]) {
         argc--;
         argv++;
     }
-    free (primes);
+    free(primes);
     
     if (nfiles > 1) {
         MSG("\n");

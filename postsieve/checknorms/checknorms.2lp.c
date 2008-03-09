@@ -346,7 +346,6 @@ unsigned long factor(mpz_t p1, mpz_t p2,
   clear_and_return:
 
     clear_mpz_array(norm_factors);
-    free(norm_factors);
 
     return retval;
 
@@ -534,8 +533,6 @@ unsigned long factor_completely(mpz_t p1, mpz_t p2,
 
     clear_mpz_array(factors);
     clear_uint32_array(multis);
-    free(factors);
-    free(multis);
 
     return retval;
 }
