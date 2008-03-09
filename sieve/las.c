@@ -19,9 +19,11 @@
 
 /* As its name says, this is a ugly hack that initializes all lognorms to the
    maximal value (255) on the rational side. But it seems to work well, and to
-   miss only about 5% relations wrt a more accurate estimation, thus we enable
-   it until we have a fast lognorm computation. */
-#define UGLY_HACK
+   miss only about 7% to 8% relations wrt a more accurate estimation. */
+// #define UGLY_HACK
+
+/* number of bits used to estimate the norms */
+#define NORM_BITS 10
 
 /* Trick to discard lognorms that will probably lead to non L-smooth
    cofactors. Disabled for now since it requires accurate sieving
@@ -82,9 +84,13 @@ typedef struct {
     int nb_buckets;
     int bucket_limit;   // maximal number of bucket_reports allowed in one bucket.
     unsigned int degree;   /* polynomial degree */
-    double scale_alg; /* LOG_MAX / log2 (max |F(a0*i+a1*j, b0*i+b1*j)|) */
-    double scale_rat; /* LOG_MAX / log2 (max |G(a0*i+a1*j, b0*i+b1*j)|) */
+    double scale_alg;      /* norm scale used on the algebraic side */
+    double scale_rat;      /* norm scale used on the rational side */
+    double logmax_alg;     /* norms on the alg. side are < 2^logmax_alg */
+    double logmax_rat;     /* norms on the rat. side are < 2^logmax_rat */
     mpz_t *fij;       /* coefficients of F(a0*i+a1*j, b0*i+b1*j) */
+    double *fijd;     /* coefficients of F_q/q */
+    double *tmpd;     /* temporary array */
     double B;         /* bound for the norm computation */
     unsigned char alg_Bound[256]; /* non-zero for good lognorms */
     unsigned char rat_Bound[256]; /* non-zero for good lognorms */
@@ -96,7 +102,8 @@ typedef struct {
     uint32_t *rbadprimes;     /* primes which may appear on the rational side
                                  but are not in the factor base (end of list
                                  is 0) */
-    unsigned char S_rat[1024];
+    unsigned char S_rat[1 << NORM_BITS];
+    unsigned char S_alg[1 << NORM_BITS];
 } sieve_info_t;
 
 /************************** sieve info stuff *********************************/
@@ -140,7 +147,9 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int I, uint64_t q0)
   unsigned char alg_bound, rat_bound;
 
   si->degree = d;
-  si->fij = malloc ((d + 1) * sizeof (mpz_t));
+  si->fij = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
+  si->fijd = (double*) malloc ((d + 1) * sizeof (double));
+  si->tmpd = (double*) malloc ((d + 1) * sizeof (double));
   for (k = 0; k <= d; k++)
     mpz_init (si->fij[k]);
   si->logI = I;
@@ -149,11 +158,11 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int I, uint64_t q0)
 
   /* initialize bounds for the norm computation, see lattice.tex */
   si->B = sqrt (2.0 * (double) q0 / (cpoly->skew * sqrt (3.0)));
-  scale = get_maxnorm (cpoly, si, q0); /* log2(max norm) */
+  si->logmax_alg = get_maxnorm (cpoly, si, q0); /* log2(max norm) */
   
   /* We want some margin, (see below), so that we can set 255 to discard
    * non-survivors.*/
-  scale += cpoly->alambda * (double) cpoly->lpba;
+  scale = si->logmax_alg + cpoly->alambda * (double) cpoly->lpba;
 
   fprintf (stderr, "# Alg. side: log2(maxnorm)=%1.2f logbase=%1.6f",
            scale, exp2 (scale / LOG_MAX));
@@ -167,22 +176,21 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int I, uint64_t q0)
   si->scale_alg = scale;
 
   /* similar bound on the rational size: |a| <= s*I*B and |b| <= I*B */
-  si->scale_rat = fabs (mpz_get_d (cpoly->g[1])) * cpoly->skew
-                + fabs (mpz_get_d (cpoly->g[0]));
-  si->scale_rat *= si->B * (double) si->I;
-  si->scale_rat = log2 (si->scale_rat);
+  scale = fabs (mpz_get_d (cpoly->g[1])) * cpoly->skew
+        + fabs (mpz_get_d (cpoly->g[0]));
+  scale *= si->B * (double) si->I;
+  si->logmax_rat = scale = log2 (scale);
   /* on the rational side, we want that the non-reports on the algebraic
      side, which are set to 255, remain over the report bound R, even if
      the rational norm is totally smooth. For this, we simply add R to the
      maximal lognorm to compute the log base */
   r = cpoly->rlambda * (double) cpoly->lpbr; /* base-2 logarithm of the
                                                 report bound */
-  fprintf (stderr, "# Rat. side: log2(maxnorm)=%1.2f ", si->scale_rat);
-  ASSERT_ALWAYS(si->scale_rat < 128.0);
-  fprintf (stderr, "logbase=%1.6f", exp2 (si->scale_rat / LOG_MAX ));
+  fprintf (stderr, "# Rat. side: log2(maxnorm)=%1.2f ", scale);
+  fprintf (stderr, "logbase=%1.6f", exp2 (scale / LOG_MAX ));
   /* we subtract again GUARD to avoid that non-reports overlap the report
      region due to roundoff errors */
-  si->scale_rat = LOG_MAX / si->scale_rat;
+  si->scale_rat = LOG_MAX / scale;
   rat_bound = (unsigned char) (r * si->scale_rat) + GUARD;
   fprintf (stderr, " bound=%u\n", rat_bound);
   sieve_info_init_lognorm (si->rat_Bound, rat_bound, cpoly->rlim, cpoly->lpbr,
@@ -278,6 +286,8 @@ sieve_info_clear (sieve_info_t *si)
   for (k = 0; k <= d; k++)
     mpz_clear (si->fij[k]);
   free (si->fij);
+  free (si->fijd);
+  free (si->tmpd);
   free (si->abadprimes);
   free (si->rbadprimes);
 }
@@ -719,30 +729,59 @@ apply_one_bucket (unsigned char *S, bucket_array_t BA, int i,
     }
 }
 
-/* assuming the norm on the rational side is bounded by 2^128,
-   compute lognorms approximations for 7 bits of exponent + 3 bits
+/* Knowing the norm on the rational side is bounded by 2^(2^k), compute
+   lognorms approximations for k bits of exponent + NORM_BITS-k bits
    of mantissa */
 static void
-init_rat_norms (sieve_info_t *si, cado_poly cpoly)
+init_rat_norms (sieve_info_t *si)
 {
-  double e, m, norm;
-  double g1, g0, gi, gj;
-  int i, j;
+  double e, m, norm, h;
+  int i, j, k, l, K, L;
   unsigned char *S = si->S_rat;
 
-  g1 = mpz_get_d (cpoly->g[1]);
-  g0 = mpz_get_d (cpoly->g[0]);
-  gi = g1 * (double) si->a0 + g0 * (double) si->b0;
-  gj = g1 * (double) si->a1 + g0 * (double) si->b1;
+  k = (int) ceil (log2 (si->logmax_rat));
+  K = 1 << k;
+  l = NORM_BITS - k;
+  L = 1 << l;
 
-  for (e = 1.0, i = 0; i < 128; i++, e *= 2.0)
+  /* extract k bits from the exponent, and l bits from the mantissa */
+  h = 1.0 / (double) L;
+  for (e = 1.0, i = 0; i < K; i++, e *= 2.0)
     {
-      for (m = 1.0, j = 0; j < 8; j++, m += 0.125)
+      for (m = 1.0, j = 0; j < L; j++, m += h)
         {
           norm = m * e;
           norm = log2 (norm);
           norm = norm * si->scale_rat;
-          S[(i << 3) + j] = GUARD + (unsigned char) norm;
+          S[(i << l) + j] = GUARD + (unsigned char) norm;
+        }
+    }
+}
+
+/* idem as init_rat_norms, but for the algebraic side */
+static void
+init_alg_norms (sieve_info_t *si)
+{
+  double e, m, norm, h;
+  int i, j, k, l, K, L;
+  unsigned char *S = si->S_alg;
+
+  k = (int) ceil (log2 (si->logmax_alg));
+  K = 1 << k;
+  ASSERT_ALWAYS(NORM_BITS >= k);
+  l = NORM_BITS - k;
+  L = 1 << l;
+
+  /* extract k bits from the exponent, and l bits from the mantissa */
+  h = 1.0 / (double) L;
+  for (e = 1.0, i = 0; i < K; i++, e *= 2.0)
+    {
+      for (m = 1.0, j = 0; j < L; j++, m += h)
+        {
+          norm = m * e;
+          norm = log2 (norm);
+          norm = norm * si->scale_alg;
+          S[(i << l) + j] = GUARD + (unsigned char) norm;
         }
     }
 }
@@ -757,8 +796,11 @@ init_rat_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly,
                               sieve_info_t *si)
 {
     double g1, g0, gi, gj, norm MAYBE_UNUSED;
-    int i MAYBE_UNUSED, halfI MAYBE_UNUSED;
+    int i MAYBE_UNUSED, halfI MAYBE_UNUSED, l;
     unsigned int j, lastj;
+    uint64_t mask = (1 << NORM_BITS) - 1;
+
+    l = NORM_BITS - (int) ceil (log2 (si->logmax_rat));
 
     /* G_q(i,j) = g1 * (a0*i+a1*j) + g0 * (b0*i+b1*j)
        = (g1*a0+g0*b0) * i + (g1*a1+g0*b1) * j
@@ -792,17 +834,13 @@ init_rat_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly,
             union { double z; uint64_t x; } zx[1];
             zx->z = gjj - gi * (double) halfI;
             for (i = -halfI; i < halfI; i++) {
-#if 0
-                norm = log2 (fabs (zx->z));
-                norm = norm * si->scale_rat;
-                *S++ = GUARD + (unsigned char) norm;
-#else
                 /* the double precision number 1.0 has high bit 0 (sign),
                    then 11-bit biased exponent 1023, and 52-bit mantissa 0 */
                 uint64_t y;
-                y = (zx->x >> 49) - (1023UL << 3);
-                *S++ = si->S_rat[y & 1023];
-#endif
+                /* the magic constant here is simply 1023*2^52, where
+                   1023 is the exponent bias in binary64 */
+                y = (zx->x - (uint64_t) 4607182418800017408) >> (52 - l);
+                *S++ = si->S_rat[y & mask];
                 zx->z += gi;
             }
         }
@@ -820,51 +858,47 @@ static int
 init_alg_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly,
                               sieve_info_t *si)
 {
-  int i, halfI;
   unsigned int j, lastj, k, d = cpoly->degree;
-  double *t, *u, invq, powj, norm;
-  int report = 0;
-
-  /* si->scale = LOG_MAX / log2(max |F(a0*i+a1*j, b0*i+b1*j)|) */
+  double *t, *u, powj, i, halfI;
+  int report = 0, l;
+  uint64_t mask = (1 << NORM_BITS) - 1;
+  union { double z; uint64_t x; } zx[1];
+  uint64_t y;
+  unsigned char *T = si->S_alg;
   
-  /* si->fij is the f(i,j) polynomial at (0, 0) */
+  l = NORM_BITS - (int) ceil (log2 (si->logmax_alg));
+  halfI = (double) (si->I >> 1);
 
-  halfI = si->I >> 1;
-  invq = 1.0 / (double) si->q;
-
-  t = (double*) malloc ((d + 1) * sizeof (double));
-  u = (double*) malloc ((d + 1) * sizeof (double));
-  for (k = 0; k <= d; k++)
-    t[k] = mpz_get_d (si->fij[k]) * invq;
+  t = si->fijd;
+  u = si->tmpd;
     
   /* bucket_region is a multiple of I. Let's find the starting j
    * corresponding to N and the last j.
    */
   j = (N*si->bucket_region) >> si->logI;
   lastj = j + (si->bucket_region >> si->logI);
-  S += halfI;
-  for (; j < lastj; j++) {
+  for (; j < lastj; j++)
+    {
       /* scale by j^(d-k) the coefficients of fij */
       for (k = 0, powj = 1.0; k <= d; k++, powj *= (double) j)
-          u[d - k] = t[d - k] * powj;
+        u[d - k] = t[d - k] * powj;
       
       /* now compute norms */
-      for (i = -halfI; i < halfI; i++) {
-        if (si->rat_Bound[S[i]]) {
-              norm = fpoly_eval (u, d, (double) i);
-              norm = log2 (fabs (norm));
-              norm = norm * si->scale_alg;
-              S[i] = GUARD + (unsigned char) (norm);
+      for (i = -halfI; i < halfI; i += 1.0)
+        {
+          if (si->rat_Bound[*S])
+            {
+              zx->z = fpoly_eval (u, d, i);
+              /* 4607182418800017408 = 1023*2^52 */
+              y = (zx->x - (uint64_t) 4607182418800017408) >> (52 - l);
               report++;
-          } else {
-              S[i] = UCHAR_MAX;
-          }
-      }
-      S += si->I;
+              *S++ = T[y & mask];
+            }
+          else
+            *S++ = UCHAR_MAX;
+        }
     }
 
-  free (t);
-  free (u);
   return report;
 }
 
@@ -1226,15 +1260,18 @@ xToAB(int64_t *a, uint64_t *b, int x, sieve_info_t * si)
 
 /*********************** norm computation ************************************/
 
-/* Puts in fij[] the coefficients of f'(i) = F(a0*i+a1, b0*i+b1).
-   Assumes the coefficients of fij[] are initialized. */
+/* Put in fij[] the coefficients of f'(i) = F(a0*i+a1, b0*i+b1).
+   Assumes the coefficients of fij[] are initialized.
+   Put in fijd[] a double-precision approximation of fij[]/q.
+*/
 static void
-fij_from_f (mpz_t *fij, mpz_t *f, int d, int32_t a0, int32_t a1,
-            int32_t b0, int32_t b1)
+fij_from_f (sieve_info_t *si, mpz_t *f, int d)
 {
   int k, l;
   mpz_t *g; /* will contain the coefficients of (b0*i+b1)^l */
   mpz_t f0;
+  mpz_t *fij = si->fij;
+  double invq;
 
   for (k = 0; k <= d; k++)
     mpz_set (fij[k], f[k]);
@@ -1261,13 +1298,13 @@ fij_from_f (mpz_t *fij, mpz_t *f, int d, int32_t a0, int32_t a1,
          ...
          f[d] <- a0*f[d] */
       mpz_swap (f0, fij[k]); /* save the new constant coefficient */
-      mpz_mul_si (fij[k], fij[k + 1], a1);
+      mpz_mul_si (fij[k], fij[k + 1], si->a1);
       for (l = k + 1; l < d; l++)
         {
-          mpz_mul_si (fij[l], fij[l], a0);
-          mpz_addmul_si (fij[l], fij[l + 1], a1);
+          mpz_mul_si (fij[l], fij[l], si->a0);
+          mpz_addmul_si (fij[l], fij[l + 1], si->a1);
         }
-      mpz_mul_si (fij[d], fij[d], a0);
+      mpz_mul_si (fij[d], fij[d], si->a0);
 
       /* now compute (b0*i+b1)^(d-k) from the previous (b0*i+b1)^(d-k-1):
          g[d-k] = b0*g[d-k-1]
@@ -1276,18 +1313,22 @@ fij_from_f (mpz_t *fij, mpz_t *f, int d, int32_t a0, int32_t a1,
          ...
          g[0] = b1*g[0]
       */
-      mpz_mul_si (g[d - k], g[d - k - 1], b0);
+      mpz_mul_si (g[d - k], g[d - k - 1], si->b0);
       for (l = d - k - 1; l > 0; l--)
         {
-          mpz_mul_si (g[l], g[l], b1);
-          mpz_addmul_si (g[l], g[l-1], b0);
+          mpz_mul_si (g[l], g[l], si->b1);
+          mpz_addmul_si (g[l], g[l-1], si->b0);
         }
-      mpz_mul_si (g[0], g[0], b1);
+      mpz_mul_si (g[0], g[0], si->b1);
 
       /* now g has degree d-k, and we add f0*g */
       for (l = k; l <= d; l++)
         mpz_addmul (fij[l], g[l - k], f0);
     }
+
+  invq = 1.0 / (double) si->q;
+  for (k = 0; k <= d; k++)
+    si->fijd[k] = mpz_get_d (fij[k]) * invq;
 
   mpz_clear (f0);
   for (k = 0; k <= d; k++)
@@ -1711,7 +1752,8 @@ main (int argc, char *argv[])
     fprintf (stderr, "# Creating rational factor base took %1.1fs\n", tfb);
 
     compute_badprimes (&si, cpoly, fb_alg, fb_rat);
-    init_rat_norms (&si, cpoly);
+    init_rat_norms (&si);
+    init_alg_norms (&si);
 
     /* special q (and root rho) */
     roots = (unsigned long*) malloc (cpoly->degree * sizeof (unsigned long));
@@ -1754,7 +1796,7 @@ main (int argc, char *argv[])
                  si.q, si.rho, si.a0, si.b0, si.a1, si.b1);
         sq ++;
         /* precompute the skewed polynomial */
-        fij_from_f (si.fij, cpoly->f, cpoly->degree, si.a0, si.a1, si.b0, si.b1);
+        fij_from_f (&si, cpoly->f, cpoly->degree);
 
         /* checks the value of J */
         sieve_info_update (&si, cpoly->skew);
