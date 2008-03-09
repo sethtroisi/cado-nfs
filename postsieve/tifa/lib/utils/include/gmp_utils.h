@@ -103,7 +103,7 @@ void empty_mpzpair_htable(hashtable_t* const htable);
     *
     * \param[in] htable A pointer to the <tt>hashtable_t</tt> to clear.
     */
-void clear_mpzpair_htable(hashtable_t* const htable);
+void clear_mpzpair_htable(hashtable_t* htable);
 
 
 #ifdef __cplusplus

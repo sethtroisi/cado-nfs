@@ -830,23 +830,23 @@ subst_dict['%BITSTRING_T_BITSIZE%'] = str(env['BITSTRING_T_BITSIZE'])
 
 subst_dict['%SIZEOF_ULONG_T%']         = str(env['SIZEOF_ULONG_T'])
 subst_dict['%ULONG_T_BITSIZE%']        = str(env['ULONG_T_BITSIZE'])
-subst_dict['%ULONG_MAX%']              = env['ULONG_MAX']
-subst_dict['%ULONG_MAX_DIVIDED_BY_2%'] = str(env['ULONG_MAX_DIVIDED_BY_2'])
-subst_dict['%ULONG_MAX_DIVIDED_BY_3%'] = str(env['ULONG_MAX_DIVIDED_BY_3'])
-subst_dict['%ULONG_MAX_DIVIDED_BY_4%'] = str(env['ULONG_MAX_DIVIDED_BY_4'])
-subst_dict['%ULONG_MAX_DIVIDED_BY_5%'] = str(env['ULONG_MAX_DIVIDED_BY_5'])
-subst_dict['%ULONG_MAX_DIVIDED_BY_6%'] = str(env['ULONG_MAX_DIVIDED_BY_6'])
-subst_dict['%SQRT_ULONG_MAX%']         = str(env['SQRT_ULONG_MAX'])
+subst_dict['%ULONG_MAX%']              = env['ULONG_MAX'] + "UL"
+subst_dict['%ULONG_MAX_DIVIDED_BY_2%'] = str(env['ULONG_MAX_DIVIDED_BY_2'])+"UL"
+subst_dict['%ULONG_MAX_DIVIDED_BY_3%'] = str(env['ULONG_MAX_DIVIDED_BY_3'])+"UL"
+subst_dict['%ULONG_MAX_DIVIDED_BY_4%'] = str(env['ULONG_MAX_DIVIDED_BY_4'])+"UL"
+subst_dict['%ULONG_MAX_DIVIDED_BY_5%'] = str(env['ULONG_MAX_DIVIDED_BY_5'])+"UL"
+subst_dict['%ULONG_MAX_DIVIDED_BY_6%'] = str(env['ULONG_MAX_DIVIDED_BY_6'])+"UL"
+subst_dict['%SQRT_ULONG_MAX%']         = str(env['SQRT_ULONG_MAX'])+"UL"
 
 subst_dict['%SIZEOF_LONG_T%']         = str(env['SIZEOF_LONG_T'])
 subst_dict['%LONG_T_BITSIZE%']        = str(env['LONG_T_BITSIZE'])
-subst_dict['%LONG_MAX%']              = env['LONG_MAX']
-subst_dict['%LONG_MAX_DIVIDED_BY_2%'] = str(env['LONG_MAX_DIVIDED_BY_2'])
-subst_dict['%LONG_MAX_DIVIDED_BY_3%'] = str(env['LONG_MAX_DIVIDED_BY_3'])
-subst_dict['%LONG_MAX_DIVIDED_BY_4%'] = str(env['LONG_MAX_DIVIDED_BY_4'])
-subst_dict['%LONG_MAX_DIVIDED_BY_5%'] = str(env['LONG_MAX_DIVIDED_BY_5'])
-subst_dict['%LONG_MAX_DIVIDED_BY_6%'] = str(env['LONG_MAX_DIVIDED_BY_6'])
-subst_dict['%SQRT_LONG_MAX%']          = str(env['SQRT_LONG_MAX'])
+subst_dict['%LONG_MAX%']              = env['LONG_MAX'] + "L"
+subst_dict['%LONG_MAX_DIVIDED_BY_2%'] = str(env['LONG_MAX_DIVIDED_BY_2']) + "L"
+subst_dict['%LONG_MAX_DIVIDED_BY_3%'] = str(env['LONG_MAX_DIVIDED_BY_3']) + "L"
+subst_dict['%LONG_MAX_DIVIDED_BY_4%'] = str(env['LONG_MAX_DIVIDED_BY_4']) + "L"
+subst_dict['%LONG_MAX_DIVIDED_BY_5%'] = str(env['LONG_MAX_DIVIDED_BY_5']) + "L"
+subst_dict['%LONG_MAX_DIVIDED_BY_6%'] = str(env['LONG_MAX_DIVIDED_BY_6']) + "L"
+subst_dict['%SQRT_LONG_MAX%']         = str(env['SQRT_LONG_MAX']) + "L"
 
 subst_dict['%PRINT_ERROR%']    = str(int(env['PRINT_ERROR']))
 subst_dict['%VERBOSE_CFRAC%']  = str(int(env['VERBOSE_CFRAC']))

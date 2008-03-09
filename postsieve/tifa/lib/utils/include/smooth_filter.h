@@ -40,6 +40,7 @@
   //
   // Fill the with the smooth_filter_t with our parameters...
   //
+  smooth_filter_t filter;
   filter.n          = n;    // number to factor
   filter.kn         = kn;   // number to factor x multiplier
   filter.batch_size = 1024; // number of relations to perform a batch
@@ -78,6 +79,11 @@
       //
       filter_new_relations(&filter);
   }
+  //
+  // This clears _only_ the memory allocated by complete_init_filter.
+  //
+  clear_smooth_filter(&filter);
+  
  \endverbatim
  *
  */

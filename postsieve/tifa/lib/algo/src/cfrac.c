@@ -406,7 +406,7 @@ static ecode_t init_cfrac_context(factoring_machine_t* const machine) {
     // after updating the context.
     //
     context->matrix_nrows  = context->matrix_ncols;
-    context->matrix_nrows += MAX_NFIND_MORE_RELS * params->nrelations;
+    context->matrix_nrows += (MAX_NFIND_MORE_RELS + 1) * params->nrelations;
     context->matrix        = alloc_binary_matrix(
                                  context->matrix_nrows,
                                  context->matrix_ncols
@@ -528,39 +528,27 @@ static ecode_t clear_cfrac_context(factoring_machine_t* const machine) {
         mpz_clear(context->kn);
         
         clear_mpz_array(context->all_accepted_yi);
-        free(context->all_accepted_yi);
-
         clear_mpz_array(context->all_accepted_xi);
-        free(context->all_accepted_xi);
-
         clear_mpz_array(context->candidate_yi);
-        free(context->candidate_yi);
-
         clear_mpz_array(context->candidate_xi);
-        free(context->candidate_xi);
-
         clear_uint32_array(context->factor_base);
-        free(context->factor_base);
-
+        
         clear_binary_matrix(context->matrix);
         free(context->matrix);
 
         clear_mpz_array(context->partial_yi_array);
-        free(context->partial_yi_array);
-
+        
         clear_cont_frac_state(context->cfstate);
         free(context->cfstate);
 
         clear_mpz_tree(context->ptree);
-        free(context->ptree);
-
+        
         free(context->mult_data);
         
         clear_smooth_filter(&(context->filter));
 
         if (context->htable != NULL) {
             clear_mpzpair_htable(context->htable);
-            free(context->htable);
         }
         free(context);
     }
@@ -632,7 +620,6 @@ static ecode_t update_cfrac_context(factoring_machine_t* const machine) {
             compute_factor_base(context->factor_base, context->kn);
 
             clear_mpz_tree(context->ptree);
-            free(context->ptree);
             context->ptree = prod_tree_ui(context->factor_base);
 
             clear_cont_frac_state(context->cfstate);
@@ -641,18 +628,8 @@ static ecode_t update_cfrac_context(factoring_machine_t* const machine) {
             //
             // We forget everything done so far. A shame, really...
             //
-            uint32_t len = context->all_accepted_xi->length;
-
-            for (uint32_t i = 0U; i != len; i++) {
-                if (context->all_accepted_xi->data[i] != NULL) {
-                    mpz_clear(context->all_accepted_xi->data[i]);
-                }
-                if (context->all_accepted_yi->data[i] != NULL) {
-                    mpz_clear(context->all_accepted_yi->data[i]);
-                }
-            }
-            context->all_accepted_yi->length = 0;
-            context->all_accepted_xi->length = 0;
+            reset_mpz_array(context->all_accepted_xi);
+            reset_mpz_array(context->all_accepted_yi);
         }
     } else {
         PRINT_UPDATE_MORE_RELS_MSG;
@@ -728,7 +705,6 @@ static ecode_t perform_cfrac(factoring_machine_t* const machine) {
             context->factor_base
         );
         clear_uint32_array_list(decomp_list);
-        free(decomp_list);
     }
     STOP_TIMER;
     PRINT_TIMING;
@@ -777,7 +753,6 @@ static ecode_t perform_cfrac(factoring_machine_t* const machine) {
                         relations
                     );
     clear_uint32_array_list(relations);
-    free(relations);
 
     STOP_TIMER;
     PRINT_TIMING;

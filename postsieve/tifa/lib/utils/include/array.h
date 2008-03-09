@@ -20,8 +20,8 @@
 /**
  * \file    array.h
  * \author  Jerome Milan
- * \date    Fri Feb 29 2008
- * \version 1.2
+ * \date    Fri Mar 7 2008
+ * \version 1.2.1
  *
  * \brief Higher level arrays and associated functions.
  *
@@ -36,13 +36,16 @@
  * \li \c length - The current number of element in the array
  * \li \c data - A pointer to the allocated memory space of \c alloced elements
  *
- * \warning Since version 1.2 memory management for \c mpz_array_t's has
- * changed. See alloc_mpz_array for more information.
+ * \warning Since version 1.2.1 memory management changed. See the
+ * \c alloc_*_array and \c clear_*_array functions for more information.
  */
  
  /*
   * History:
   * --------
+  * 1.2.1: Fri Mar 7 2008 by JM:
+  *        - WARNING: Changed memory managment. clear_*_array functions now
+  *                   frees the pointer to the array (that's more logical).
   *   1.2: Fri Feb 29 2008 by JM:
   *        - WARNING: Semantic of mpz_array_t's length field has changed!.
   *                   Now length is only the "useful part" of the array, but
@@ -90,7 +93,7 @@ extern "C" {
    /**
     * \def ARRAY_IS_FULL
     * Returns true if the \c *_array_t pointed by \c ARRAY_PTR is full (i.e.
-    * no more element can be added to the array).
+    * no more element can be added to the array without resizing it).
     *
     * Returns false otherwise.
     */
@@ -151,14 +154,29 @@ byte_array_t* alloc_byte_array(uint32_t length);
    /**
     * \brief Clears a <tt>byte_array_t</tt>.
     *
-    * Clears a <tt>byte_array_t</tt>, or, more precisely, clears the memory
-    * space used by the array pointed by the \c data field of a
-    * <tt>byte_array_t</tt>. Also set its \c alloced and \c length fields
-    * to zero.
+    * Clears the <tt>byte_array_t</tt> pointed to by \c array, \e i.e.
+    * clears the memory space used by the C-style array pointed by 
+    * <tt>array->data</tt> and frees the \c array pointer.
+    *
+    * \warning Before version 1.2.1, the \c array pointer was not freed which
+    *          required explicit calls to \c free(...) in client code.
     *
     * \param[in] array A pointer to the <tt>byte_array_t</tt> to clear.
     */
-void clear_byte_array(byte_array_t* const array);
+void clear_byte_array(byte_array_t* array);
+
+   /**
+    * \def reset_byte_array(ARRAY)
+    * \brief Resets a <tt>byte_array_t</tt>.
+    *
+    * Resets the \c length field of \c array to zero.
+    *
+    * Note that its \c alloced field is left unchanged and that memory for
+    * \c alloced \c byte_t elements is still allocated.
+    *
+    * \param[in] array A pointer to the <tt>byte_array_t</tt> to reset.
+    */
+#define reset_byte_array(ARRAY) do {(ARRAY)->length = 0;} while (0)
 
    /**
     * \brief Resizes the allocated memory of a <tt>byte_array_t</tt>.
@@ -384,14 +402,29 @@ uint32_array_t* alloc_uint32_array(uint32_t length);
    /**
     * \brief Clears a <tt>uint32_array_t</tt>.
     *
-    * Clears a <tt>uint32_array_t</tt>, or, more precisely, clears the memory
-    * space used by the array pointed by the \c data field of a
-    * <tt>uint32_array_t</tt>. Also set its \c alloced and \c length fields
-    * to zero.
+    * Clears the <tt>uint32_array_t</tt> pointed to by \c array, \e i.e.
+    * clears the memory space used by the C-style array pointed by 
+    * <tt>array->data</tt> and frees the \c array pointer.
+    *
+    * \warning Before version 1.2.1, the \c array pointer was not freed which
+    *          required explicit calls to \c free(...) in client code.
     *
     * \param[in] array A pointer to the <tt>uint32_array_t</tt> to clear.
     */
-void clear_uint32_array(uint32_array_t* const array);
+void clear_uint32_array(uint32_array_t* array);
+
+   /**
+    * \def reset_uint32_array(ARRAY)
+    * \brief Resets a <tt>uint32_array_t</tt>.
+    *
+    * Resets the \c length field of \c array to zero.
+    *
+    * Note that its \c alloced field is left unchanged and that memory for
+    * \c alloced \c uint32_t elements is still allocated.
+    *
+    * \param[in] array A pointer to the <tt>uint32_array_t</tt> to reset.
+    */
+#define reset_uint32_array(ARRAY) do {(ARRAY)->length = 0;} while (0)
 
    /**
     * \brief Resizes the allocated memory of an <tt>uint32_array_t</tt>.
@@ -618,14 +651,29 @@ int32_array_t* alloc_int32_array(uint32_t length);
    /**
     * \brief Clears a <tt>int32_array_t</tt>.
     *
-    * Clears a <tt>int32_array_t</tt>, or, more precisely, clears the memory
-    * space used by the array pointed by the \c data field of a
-    * <tt>int32_array_t</tt>. Also set its \c alloced and \c length fields
-    * to zero.
+    * Clears the <tt>int32_array_t</tt> pointed to by \c array, \e i.e.
+    * clears the memory space used by the C-style array pointed by 
+    * <tt>array->data</tt> and frees the \c array pointer.
+    *
+    * \warning Before version 1.2.1, the \c array pointer was not freed which
+    *          required explicit calls to \c free(...) in client code.
     *
     * \param[in] array A pointer to the <tt>int32_array_t</tt> to clear.
     */
-void clear_int32_array(int32_array_t* const array);
+void clear_int32_array(int32_array_t* array);
+
+   /**
+    * \def reset_int32_array(ARRAY)
+    * \brief Resets an <tt>int32_array_t</tt>.
+    *
+    * Resets the \c length field of \c array to zero.
+    *
+    * Note that its \c alloced field is left unchanged and that memory for
+    * \c alloced \c int32_t elements is still allocated.
+    *
+    * \param[in] array A pointer to the <tt>int32_array_t</tt> to reset.
+    */
+#define reset_int32_array(ARRAY) do {(ARRAY)->length = 0;} while (0)
 
    /**
     * \brief Resizes the allocated memory of an <tt>int32_array_t</tt>.
@@ -840,28 +888,16 @@ mpz_array_t* alloc_mpz_array(uint32_t length);
    /**
     * \brief Clears a <tt>mpz_array_t</tt>.
     *
-    * Clears a <tt>mpz_array_t</tt>, or, more precisely, clears the memory
-    * space used by the array pointed by the \c data field of a
-    * <tt>mpz_array_t</tt>. Also set its \c alloced and \c length fields
-    * to zero.
+    * Clears the <tt>mpz_array_t</tt> pointed to by \c array, \e i.e.
+    * clears the memory space used by the C-style array pointed by 
+    * <tt>array->data</tt> and frees the \c array pointer.
+    *
+    * \warning Before version 1.2.1, the \c array pointer was not freed which
+    *          required explicit calls to \c free(...) in client code.
     *
     * \param[in] array A pointer to the <tt>mpz_array_t</tt> to clear.
     */
-void clear_mpz_array(mpz_array_t* const array);
-
-   /**
-    * \brief Resizes the allocated memory of an <tt>mpz_array_t</tt>.
-    *
-    * Resizes the storage available to an <tt>mpz_array_t</tt> to make room
-    * for \c alloced integers, while preserving its content. If \c alloced is
-    * less than the length of the array, then obviously some of its content
-    * will be freed and lost.
-    *
-    * \param[in] alloced The new maximum length of the \c mpz_array_t to
-    *                    resize.
-    * \param[in] array A pointer to the \c mpz_array_t to resize.
-    */
-void resize_mpz_array(mpz_array_t* const array, uint32_t alloced);
+void clear_mpz_array(mpz_array_t* array);
 
    /**
     * \brief Resets an <tt>mpz_array_t</tt>.
@@ -877,7 +913,21 @@ void resize_mpz_array(mpz_array_t* const array, uint32_t alloced);
     *
     * \param[in] array A pointer to the <tt>mpz_array_t</tt> to clear.
     */
-void reset_mpz_array(mpz_array_t* const array);
+#define reset_mpz_array(ARRAY) do {(ARRAY)->length = 0;} while (0)
+
+   /**
+    * \brief Resizes the allocated memory of an <tt>mpz_array_t</tt>.
+    *
+    * Resizes the storage available to an <tt>mpz_array_t</tt> to make room
+    * for \c alloced integers, while preserving its content. If \c alloced is
+    * less than the length of the array, then obviously some of its content
+    * will be freed and lost.
+    *
+    * \param[in] alloced The new maximum length of the \c mpz_array_t to
+    *                    resize.
+    * \param[in] array A pointer to the \c mpz_array_t to resize.
+    */
+void resize_mpz_array(mpz_array_t* const array, uint32_t alloced);
 
    /**
     * \brief Swaps two <tt>mpz_array_t</tt>'s contents.
@@ -1093,14 +1143,29 @@ binary_array_t* alloc_binary_array(uint32_t length);
    /**
     * \brief Clears a <tt>binary_array_t</tt>.
     *
-    * Clears a <tt>binary_array_t</tt>, or, more precisely, clears the memory
-    * space used by the array pointed by the \c data field of a
-    * <tt>binary_array_t</tt>. Also set its \c alloced and \c length fields
-    * to zero.
+    * Clears the <tt>binary_array_t</tt> pointed to by \c array, \e i.e.
+    * clears the memory space used by the C-style array pointed by 
+    * <tt>array->data</tt> and frees the \c array pointer.
+    *
+    * \warning Before version 1.2.1, the \c array pointer was not freed which
+    *          required explicit calls to \c free(...) in client code.
     *
     * \param[in] array A pointer to the <tt>binary_array_t</tt> to clear.
     */
-void clear_binary_array(binary_array_t* const array);
+void clear_binary_array(binary_array_t* array);
+
+   /**
+    * \brief Resets a <tt>binary_array_t</tt>.
+    *
+    * Resets the \c length field of \c array to zero.
+    *
+    * Note that its \c alloced field is left unchanged and that memory for
+    * <tt>alloced * CHAR_BIT * sizeof(TIFA_BITSTRING_T)</tt> bits is still 
+    * allocated.
+    *
+    * \param[in] array A pointer to the <tt>binary_array_t</tt> to reset.
+    */
+#define reset_binary_array(ARRAY) do {(ARRAY)->length = 0;} while (0)
 
    /**
     * \brief Resizes the allocated memory of a <tt>binary_array_t</tt>.

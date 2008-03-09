@@ -78,7 +78,7 @@ void empty_mpzpair_htable(hashtable_t* const htable) {
     }
 }
 //------------------------------------------------------------------------------
-void clear_mpzpair_htable(hashtable_t* const htable) {
+void clear_mpzpair_htable(hashtable_t* htable) {
     empty_mpzpair_htable(htable);
     clear_hashtable(htable);
 }

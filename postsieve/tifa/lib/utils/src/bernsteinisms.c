@@ -368,7 +368,6 @@ void bern_71(uint32_array_list_t* const decomp_list,
                 x, 0);
 
     clear_mpz_tree(x);
-    free(x);
 }
 //------------------------------------------------------------------------------
 void bern_71_rec(uint32_array_list_t* const decomp_list,
@@ -421,9 +420,7 @@ void bern_71_rec(uint32_array_list_t* const decomp_list,
             }
         }
         clear_uint32_array(P);
-        free(P);
         clear_mpz_tree(T);
-        free(T);
 
         return;
     }
@@ -443,7 +440,6 @@ void bern_71_rec(uint32_array_list_t* const decomp_list,
             (*nb_int_to_factor)--;
         } else {
             clear_uint32_array(P);
-            free(P);
         }
     } else {
         //
@@ -453,10 +449,8 @@ void bern_71_rec(uint32_array_list_t* const decomp_list,
         bern_71_rec(decomp_list, nb_int_to_factor, P, x, 2*curnode+2);
 
         clear_uint32_array(P);
-        free(P);
     }
     clear_mpz_tree(T);
-    free(T);
 }
 //------------------------------------------------------------------------------
 
@@ -489,7 +483,6 @@ uint32_t bern_21_rt(mpz_array_t* const smooth,
     mpz_tree_t* rtree   = rem_tree(z, pxitree);
 
     clear_mpz_tree(pxitree);
-    free(pxitree);
     //
     // Step 3
     //
@@ -539,7 +532,6 @@ uint32_t bern_21_rt(mpz_array_t* const smooth,
     mpz_clear(yk);
 
     clear_mpz_tree(rtree);
-    free(rtree);
 
     return retval;
 }
@@ -560,7 +552,7 @@ uint32_t bern_21(mpz_array_t* const smooth,
     //
     // Step 3 (no step 2 as we don't use a remainder tree)
     //
-    uint32_t e = 0U;
+    uint32_t e   = 0U;
     uint32_t msb = 0U;
     mpz_t yk;
     mpz_init(yk);
@@ -631,11 +623,10 @@ uint32_t bern_21_rt_pairs(mpz_array_t* const xi,
     mpz_tree_t* rtree   = rem_tree(z, pyitree);
 
     clear_mpz_tree(pyitree);
-    free(pyitree);
     //
     // Step 3
     //
-    uint32_t e = 0U;
+    uint32_t e   = 0U;
     uint32_t msb = 0U;
 
     mpz_t yk;
@@ -668,7 +659,6 @@ uint32_t bern_21_rt_pairs(mpz_array_t* const xi,
     mpz_clear(yk);
 
     clear_mpz_tree(rtree);
-    free(rtree);
 
     return retval;
 }
@@ -761,11 +751,10 @@ uint32_t bern_21_rt_pairs_lp(const mpz_t n,
     mpz_tree_t* rtree   = rem_tree(z, pyitree);
 
     clear_mpz_tree(pyitree);
-    free(pyitree);
     //
     // Step 3
     //
-    uint32_t e = 0U;
+    uint32_t e   = 0U;
     uint32_t msb = 0U;
 
     mpz_t yk;
@@ -917,7 +906,6 @@ uint32_t bern_21_rt_pairs_lp(const mpz_t n,
     mpz_clear(nsp_inv);
 
     clear_mpz_tree(rtree);
-    free(rtree);
 
     return retval;
 }
@@ -952,7 +940,7 @@ uint32_t bern_21_pairs_lp(const mpz_t n,
     //
     // Step 3 (no step 2 as we don't use a remainder tree)
     //
-    uint32_t e = 0U;
+    uint32_t e   = 0U;
     uint32_t msb = 0U;
 
     mpz_t yk;
@@ -1131,11 +1119,10 @@ uint32_t bern_21_rt_pairs_siqs(mpz_array_t* const xi,
     mpz_tree_t* rtree   = rem_tree(z, pyitree);
 
     clear_mpz_tree(pyitree);
-    free(pyitree);
     //
     // Step 3
     //
-    uint32_t e = 0U;
+    uint32_t e   = 0U;
     uint32_t msb = 0U;
 
     mpz_t yk;
@@ -1173,7 +1160,6 @@ uint32_t bern_21_rt_pairs_siqs(mpz_array_t* const xi,
     mpz_clear(yk);
     
     clear_mpz_tree(rtree);
-    free(rtree);
     
     return retval;
 }
@@ -1206,11 +1192,10 @@ uint32_t bern_21_rt_pairs_lp_siqs(const mpz_t n,
     mpz_tree_t* rtree   = rem_tree(z, pyitree);
 
     clear_mpz_tree(pyitree);
-    free(pyitree);
     //
     // Step 3
     //
-    uint32_t e = 0U;
+    uint32_t e   = 0U;
     uint32_t msb = 0U;
 
     mpz_t yk;
@@ -1373,7 +1358,6 @@ uint32_t bern_21_rt_pairs_lp_siqs(const mpz_t n,
     mpz_clear(nsp_inv);
 
     clear_mpz_tree(rtree);
-    free(rtree);
 
     return retval;
 }
@@ -1427,11 +1411,10 @@ uint32_t djb_batch_rt_no_ea(smooth_filter_t* const filter) {
     mpz_tree_t* const rtree   = rem_tree(filter->prod_pj[0], pyitree);
     
     clear_mpz_tree(pyitree);
-    free(pyitree);
     //
     // Step 3
     //
-    uint32_t e = 0U;
+    uint32_t e   = 0U;
     uint32_t msb = 0U;
 
     mpz_t yk;
@@ -1446,7 +1429,7 @@ uint32_t djb_batch_rt_no_ea(smooth_filter_t* const filter) {
     mpz_t nsp_inv;
     mpz_init(nsp_inv);
 
-    for (uint32_t k = 0U; k < in_yi->length; k++) {
+    for (uint32_t k = in_yi->length - 1; k != UINT32_MAX; k--) {
         msb = mpz_sizeinbase(in_yi->data[k], 2) - 1;
         e   = most_significant_bit(msb) + 1;
             
@@ -1460,6 +1443,7 @@ uint32_t djb_batch_rt_no_ea(smooth_filter_t* const filter) {
         //         smooth or not).
         //
         if (0 == mpz_sgn(yk)) {
+
             mpz_set(acc_yi->data[next], in_yi->data[k]);
             mpz_set(acc_xi->data[next], in_xi->data[k]);
         
@@ -1596,7 +1580,6 @@ uint32_t djb_batch_rt_no_ea(smooth_filter_t* const filter) {
     mpz_clear(nsp_inv);
 
     clear_mpz_tree(rtree);
-    free(rtree);
 
     return retval;   
 }
@@ -1632,11 +1615,10 @@ uint32_t djb_batch_rt_step(smooth_filter_t* const filter,
     mpz_tree_t* rtree   = rem_tree(filter->prod_pj[step + 1], pyitree);
 
     clear_mpz_tree(pyitree);
-    free(pyitree);
     //
     // Step 3
     //
-    uint32_t e = 0U;
+    uint32_t e   = 0U;
     uint32_t msb = 0U;
 
     mpz_t yk;
@@ -1651,7 +1633,8 @@ uint32_t djb_batch_rt_step(smooth_filter_t* const filter,
     mpz_t nsp_inv;
     mpz_init(nsp_inv);
 
-    for (uint32_t k = 0U; k < in_yi->length; k++) {
+    for (uint32_t k = in_yi->length - 1; k != UINT32_MAX; k--) {
+
         msb = mpz_sizeinbase(in_yi->data[k], 2) - 1;
         e   = most_significant_bit(msb) + 1;
 
@@ -1845,7 +1828,6 @@ uint32_t djb_batch_rt_step(smooth_filter_t* const filter,
     mpz_clear(nsp_inv);
 
     clear_mpz_tree(rtree);
-    free(rtree);
 
     return retval;
 }
@@ -1879,11 +1861,10 @@ uint32_t djb_batch_rt_first(smooth_filter_t* const filter) {
     mpz_tree_t* rtree   = rem_tree(filter->prod_pj[0], pyitree);
 
     clear_mpz_tree(pyitree);
-    free(pyitree);
     //
     // Step 3
     //
-    uint32_t e = 0U;
+    uint32_t e   = 0U;
     uint32_t msb = 0U;
 
     mpz_t yk;
@@ -1898,7 +1879,7 @@ uint32_t djb_batch_rt_first(smooth_filter_t* const filter) {
     mpz_t nsp_inv;
     mpz_init(nsp_inv);
 
-    for (uint32_t k = 0U; k < in_yi->length; k++) {
+    for (uint32_t k = in_yi->length - 1; k != UINT32_MAX; k--) {
         msb = mpz_sizeinbase(in_yi->data[k], 2) - 1;
         e   = most_significant_bit(msb) + 1;
 
@@ -2077,7 +2058,6 @@ uint32_t djb_batch_rt_first(smooth_filter_t* const filter) {
     mpz_clear(nsp_inv);
 
     clear_mpz_tree(rtree);
-    free(rtree);
 
     return retval;   
 }
@@ -2109,11 +2089,10 @@ uint32_t djb_batch_rt_last(smooth_filter_t* const filter) {
     mpz_tree_t* rtree   = rem_tree(filter->prod_pj[step + 1], pyitree);
 
     clear_mpz_tree(pyitree);
-    free(pyitree);
     //
     // Step 3
     //
-    uint32_t e = 0U;
+    uint32_t e   = 0U;
     uint32_t msb = 0U;
 
     mpz_t yk;
@@ -2128,7 +2107,7 @@ uint32_t djb_batch_rt_last(smooth_filter_t* const filter) {
     mpz_t nsp_inv;
     mpz_init(nsp_inv);
 
-    for (uint32_t k = 0U; k < in_yi->length; k++) {
+    for (uint32_t k = in_yi->length - 1; k != UINT32_MAX; k--) {
         msb = mpz_sizeinbase(in_yi->data[k], 2) - 1;
         e   = most_significant_bit(msb) + 1;
 
@@ -2285,7 +2264,6 @@ uint32_t djb_batch_rt_last(smooth_filter_t* const filter) {
     mpz_clear(nsp_inv);
 
     clear_mpz_tree(rtree);
-    free(rtree);
 
     return retval;
 }

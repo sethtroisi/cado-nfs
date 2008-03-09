@@ -113,8 +113,8 @@ ecode_t tifa_factor(mpz_array_t* const factors, uint32_array_t* const multis,
     //         all TIFA's factoring algorithms with RSA moduli (i.e. numbers
     //         that factors in two primes of equal size). For more general
     //         numbers, things can be somewhat different, particularly for 
-    //         SQUFOF whose theoretical complexity directly depends on the
-    //         number of prime factors.
+    //         SQUFOF or ECM whose theoretical complexity directly depend on
+    //         the number of prime factors or the size of the smaller one.
     //
     if (sizen <= TFACTOR_TDIV_THRESH) {
         return tdiv(factors, multis, n, TFACTOR_NPRIMES_TDIV);

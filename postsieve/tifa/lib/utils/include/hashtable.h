@@ -20,13 +20,23 @@
 /**
  * \file    hashtable.h
  * \author  Jerome Milan
- * \date    Thu Mar 30 2006
- * \version 1.0
+ * \date    Sun Mar 9 2008
+ * \version 1.0.1
  *
  * \brief Generic hashtable.
  *
  * Yet another implementation of a generic hashtable.
  */
+ 
+ /*
+  * History:
+  * --------
+  * 1.0.1: Sun Mar 9 2008 by JM:
+  *        - WARNING: Changed memory managment. clear_hashtable function now
+  *                   frees the pointer to the hastable.
+  *   1.0: Thu Mar 30 2006 by JM:
+  *        - Initial version.
+  */
 
 #if !defined(_TIFA_HASHTABLE_H_)
    /**
@@ -153,9 +163,11 @@ hashtable_t* alloc_init_hashtable(
     * lists but \e does \e not frees the memory space used by the \c key
     * and \c data pointers of the <tt>hashtable_entry_t</tt>.
     *
+    * Since version 1.0.1, also frees the pointer \c htable.
+    *
     * \param[in] htable A pointer to the <tt>hashtable_t</tt> to clear.
     */
-void clear_hashtable(hashtable_t* const htable);
+void clear_hashtable(hashtable_t* htable);
 
    /**
     * \brief Adds an entry in a <tt>hashtable_t</tt>.

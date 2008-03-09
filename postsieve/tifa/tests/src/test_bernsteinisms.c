@@ -138,7 +138,6 @@ void do_test_71() {
 
     gmp_randclear(rstate);
     clear_uint32_array_list(list);
-    free(list);
     clear_uint32_array(&primes);
     clear_mpz_array(&int_to_fact);
 }
@@ -191,8 +190,6 @@ void do_test_63() {
     clear_mpz_tree(tree);
     clear_uint32_array(divs);
     clear_uint32_array(&primes);
-    free(tree);
-    free(divs);
 }
 //------------------------------------------------------------------------------
 void do_test_53() {
@@ -321,7 +318,5 @@ void do_test_21() {
     clear_uint32_array(&primes);
     clear_mpz_array(smooth);
     clear_mpz_tree(ptree);
-    free(smooth);
-    free(ptree);
 }
 //------------------------------------------------------------------------------

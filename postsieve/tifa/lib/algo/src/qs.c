@@ -551,48 +551,29 @@ static ecode_t clear_qs_context(factoring_machine_t* const machine) {
     if (context != NULL) {
 
         clear_mpz_array(context->cand_u);
-        free(context->cand_u);
-
         clear_mpz_array(context->u);
-        free(context->u);
-
         clear_mpz_array(context->cand_gx);
-        free(context->cand_gx);
-
         clear_mpz_array(context->smooth_gx);
-        free(context->smooth_gx);
-
+        
         clear_mpz_tree(context->ptree);
-        free(context->ptree);
-
-        clear_int32_array(context->xpool);
-        free(context->xpool);
-
-        clear_uint32_array(context->factor_base);
-        free(context->factor_base);
-
+        
+        clear_byte_array(context->sieve);
         clear_byte_array(context->log_factor_base);
-        free(context->log_factor_base);
-
+        
+        clear_int32_array(context->xpool);
+        clear_uint32_array(context->factor_base);
         clear_uint32_array(context->sol1);
-        free(context->sol1);
-
         clear_uint32_array(context->sol2);
-        free(context->sol2);
-
+        
         clear_binary_matrix(context->matrix);
         free(context->matrix);
-
-        clear_byte_array(context->sieve);
-        free(context->sieve);
-
+        
         mpz_clear(context->b);
         mpz_clear(context->n);
         mpz_clear(context->kn);
 
         if (context->htable != NULL) {
             clear_mpzpair_htable(context->htable);
-            free(context->htable);
         }
         free(context);
     }
@@ -788,7 +769,6 @@ static ecode_t perform_qs(factoring_machine_t* const machine) {
         );
 
         clear_uint32_array_list(decomp_list);
-        free(decomp_list);
     }
     STOP_TIMER;
     PRINT_TIMING;
@@ -828,10 +808,8 @@ static ecode_t perform_qs(factoring_machine_t* const machine) {
     free(decomp_matrix);
 
     clear_uint32_array_list(relations);
-    free(relations);
 
     clear_mpz_array(partial_gx_array);
-    free(partial_gx_array);
 
     return ecode;
 }

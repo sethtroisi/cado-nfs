@@ -332,7 +332,7 @@ static const unsigned int default_ncurves[NDFLT_ENTRIES] = {
 // MAX_NTRY_MORE_CURVES tentatives failed to find a factor (only if the 
 // factorization mode is different than SINGLE_RUN).
 //
-#define BOUND_MULTIPLIER 2
+#define BOUND_MULTIPLIER 2UL
 
 //
 // Maximum number of times to try more curves with larger bounds (only if the 
@@ -521,9 +521,7 @@ static ecode_t init_ecm_context(factoring_machine_t* const machine) {
 
     clear_mpz_tree(ptree);
     clear_uint32_array(ppowers);
-    free(ptree);
-    free(ppowers);
-
+    
     STOP_TIMER;
     PRINT_TIMING;
 
@@ -705,8 +703,6 @@ static ecode_t switch_to_larger_bounds(factoring_machine_t* const machine) {
 
     clear_mpz_tree(ptree);
     clear_uint32_array(ppowers);
-    free(ptree);
-    free(ppowers);
 
     return SUCCESS;
 }

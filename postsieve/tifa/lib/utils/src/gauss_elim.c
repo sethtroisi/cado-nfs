@@ -133,8 +133,5 @@ void gaussian_elim(uint32_array_list_t* relations,
     }
     clear_binary_array(used);
     clear_uint32_array(pivot);
-
-    free(used);
-    free(pivot);
 }
 //-----------------------------------------------------------------------------

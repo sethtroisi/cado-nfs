@@ -5,6 +5,6 @@ Here are some short term objectives (as of November 2007):
     change multiplier, etc.) to make them more robust. This is currently done
     for CFRAC and SQUFOF only and needs to be extended to QS and SIQS.
 
-  - Improve QS and SIQS implementations (still below par performance-wise).
+  - Improve QS and SIQS implementations (still below par performance-wise?).
     This is a work in progress, even if these implementations were vastly
     improved recently.

@@ -67,9 +67,7 @@ void do_test() {
     print_mpz_tree(rtree);
 
     clear_mpz_array(ptree);
-    free(ptree);
     clear_mpz_array(rtree);
-    free(rtree);
     mpz_clear(z);
 }
 //------------------------------------------------------------------------------

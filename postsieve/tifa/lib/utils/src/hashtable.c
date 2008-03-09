@@ -20,9 +20,19 @@
 /**
  * \file    hashtable.c
  * \author  Jerome Milan
- * \date    Thu Mar 30 2006
- * \version 1.0
+ * \date    Sun Mar 9 2008
+ * \version 1.0.1
  */
+ 
+ /*
+  * History:
+  * --------
+  * 1.0.1: Sun Mar 9 2008 by JM:
+  *        - WARNING: Changed memory managment. clear_hashtable function now
+  *                   frees the pointer to the hastable.
+  *   1.0: Thu Mar 30 2006 by JM:
+  *        - Initial version.
+  */
 
 #include <stdlib.h>
 #include <inttypes.h>
@@ -66,7 +76,7 @@ hashtable_t* alloc_init_hashtable(
     return htable;
 }
 //-----------------------------------------------------------------------------
-void clear_hashtable(hashtable_t* const htable) {
+void clear_hashtable(hashtable_t* htable) {
     //
     // _WARNING_: For the time being, clear_linked_list may not clear
     //            completely the memory used by the list's node. See
@@ -78,7 +88,13 @@ void clear_hashtable(hashtable_t* const htable) {
     }
     free(htable->buckets);
     htable->alloced    = 0;
-    htable->nentries = 0;
+    htable->nentries   = 0;
+    //
+    // _WARNING_: Since version 1.0.1, also frees the pointer htable which
+    //            makes more sense since malloc is called within the 
+    //            alloc_init_hashtable function.
+    //
+    free(htable);
 }
 //-----------------------------------------------------------------------------
 void add_entry_in_hashtable(hashtable_t* const htable,

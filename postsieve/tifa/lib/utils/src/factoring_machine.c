@@ -212,7 +212,6 @@ ecode_t find_some_coprime_factors(factoring_machine_t* machine) {
         swap_mpz_array(machine->factors, base);
 
         clear_mpz_array(base);
-        free(base);
 
         exit_code = SOME_COPRIME_FACTORS_FOUND;
         machine->success = true;
@@ -276,7 +275,6 @@ ecode_t find_some_prime_factors(factoring_machine_t* machine) {
         swap_mpz_array(machine->factors, base);
 
         clear_mpz_array(base);
-        free(base);
 
         if (are_all_prime(machine->factors)) {
             exit_code = SOME_PRIME_FACTORS_FOUND;
@@ -337,7 +335,6 @@ ecode_t find_complete_factorization(factoring_machine_t* machine) {
     swap_mpz_array(machine->factors, base);
     
     clear_mpz_array(base);
-    free(base);
     
     exit_code = compute_multiplicities(
                     machine->multis,
@@ -435,8 +432,6 @@ ecode_t find_complete_factorization(factoring_machine_t* machine) {
             }
             clear_mpz_array(morefactors);
             clear_uint32_array(moremultis);
-            free(morefactors);
-            free(moremultis);
         }
     }
     swap_mpz_array(machine->factors, all_factors);
@@ -444,8 +439,6 @@ ecode_t find_complete_factorization(factoring_machine_t* machine) {
 
     clear_mpz_array(all_factors);
     clear_uint32_array(all_multis);
-    free(all_factors);
-    free(all_multis);
 
     if (factorization_is_partial) {
         return PARTIAL_FACTORIZATION_FOUND;

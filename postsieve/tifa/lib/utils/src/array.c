@@ -20,13 +20,16 @@
 /**
  * \file    array.c
  * \author  Jerome Milan
- * \date    Fri Feb 29 2008
- * \version 1.2
+ * \date    Fri Mar 7 2008
+ * \version 1.2.1
  */
 
  /*
   * History:
   * --------
+  * 1.2.1: Fri Mar 7 2008 by JM:
+  *        - WARNING: Changed memory managment. clear_*_array functions now
+  *                   frees the pointer to the array (that's more logical).
   *   1.2: Fri Feb 29 2008 by JM:
   *        - WARNING: Semantic of mpz_array_t's length field has changed!.
   *                   Now length is only the "useful part" of the array, but
@@ -79,12 +82,11 @@ byte_array_t* alloc_byte_array(uint32_t length) {
     return array;
 }
 //-----------------------------------------------------------------------------
-void clear_byte_array(byte_array_t* const array) {
+void clear_byte_array(byte_array_t* array) {
     if (array->alloced != 0U) {
         free(array->data);
+        free(array);
     }
-    array->alloced = 0U;
-    array->length  = 0U;
 }
 //-----------------------------------------------------------------------------
 void resize_byte_array(byte_array_t* array, uint32_t alloced) {
@@ -274,12 +276,11 @@ uint32_array_t* alloc_uint32_array(uint32_t length) {
     return array;
 }
 //-----------------------------------------------------------------------------
-void clear_uint32_array(uint32_array_t* const array) {
+void clear_uint32_array(uint32_array_t* array) {
     if (array->alloced != 0U) {
         free(array->data);
+        free(array);
     }
-    array->alloced = 0U;
-    array->length  = 0U;
 }
 //-----------------------------------------------------------------------------
 void resize_uint32_array(uint32_array_t* array, uint32_t alloced) {
@@ -469,12 +470,11 @@ int32_array_t* alloc_int32_array(uint32_t length) {
     return array;
 }
 //-----------------------------------------------------------------------------
-void clear_int32_array(int32_array_t* const array) {
+void clear_int32_array(int32_array_t* array) {
     if (array->alloced != 0U) {
         free(array->data);
+        free(array);
     }
-    array->alloced = 0U;
-    array->length  = 0U;
 }
 //-----------------------------------------------------------------------------
 void resize_int32_array(int32_array_t* array, uint32_t alloced) {
@@ -641,8 +641,7 @@ mpz_array_t* alloc_mpz_array(uint32_t length) {
     return array;
 }
 //-----------------------------------------------------------------------------
-void clear_mpz_array(mpz_array_t* const array) {
-
+void clear_mpz_array(mpz_array_t* array) {
     if (array->alloced != 0U) {
         //
         // _WARNING_: Since version 1.2, the mpz_t array given by array->data
@@ -654,9 +653,8 @@ void clear_mpz_array(mpz_array_t* const array) {
             mpz_clear(array->data[i]);
         }
         free(array->data);
+        free(array);
     }
-    array->alloced = 0U;
-    array->length  = 0U;
 }
 //-----------------------------------------------------------------------------
 void resize_mpz_array(mpz_array_t* const array, uint32_t alloced) {
@@ -701,15 +699,6 @@ void append_mpz_to_array(mpz_array_t* array, const mpz_t to_append) {
     //
     mpz_set(array->data[array->length], to_append);
     array->length++;
-}
-//-----------------------------------------------------------------------------
-void reset_mpz_array(mpz_array_t* const array) {    
-    //
-    // _WARNING_: Since version 1.2, the mpz_t array given by array->data
-    //            is fully mpz_init'ed once and for all so they are nothing
-    //            to mpz_clear() now!
-    //
-    array->length = 0U;
 }
 //-----------------------------------------------------------------------------
 void append_mpz_array(mpz_array_t* const array,
@@ -885,12 +874,11 @@ binary_array_t* alloc_binary_array(uint32_t length) {
     return array;
 }
 //-----------------------------------------------------------------------------
-void clear_binary_array(binary_array_t* const array) {
+void clear_binary_array(binary_array_t* array) {
     if (array->alloced != 0U) {
         free(array->data);
+        free(array);
     }
-    array->alloced = 0U;
-    array->length  = 0U;
 }
 //-----------------------------------------------------------------------------
 void resize_binary_array(binary_array_t* array, uint32_t alloced) {

@@ -62,22 +62,14 @@ inline void add_entry_in_uint32_array_list(uint32_array_t* const entry,
     list->length++;
 }
 //-----------------------------------------------------------------------------
-void empty_uint32_array_list(uint32_array_list_t* const list) {
+void clear_uint32_array_list(uint32_array_list_t* const list) {
     for (uint32_t i = 0U; i < list->length; i++) {
         if (list->data[i] != NULL) {
             clear_uint32_array(list->data[i]);
-            free(list->data[i]);
         }
     }
-    list->length = 0;
-}
-//-----------------------------------------------------------------------------
-void clear_uint32_array_list(uint32_array_list_t* const list) {
-    empty_uint32_array_list(list);
-    if (list->alloced != 0U) {
-        free(list->data);
-    }
-    list->alloced = 0U;
+    free(list->data);
+    free(list);
 }
 //-----------------------------------------------------------------------------
 void print_uint32_array_list(const uint32_array_list_t* const list) {
@@ -126,20 +118,14 @@ inline void add_entry_in_mpz_array_list(mpz_array_t* const entry,
     list->length++;
 }
 //-----------------------------------------------------------------------------
-void empty_mpz_array_list(mpz_array_list_t* const list) {
+void clear_mpz_array_list(mpz_array_list_t* const list) {
     for (uint32_t i = 0U; i != list->length; i++) {
         if (list->data[i] != NULL) {
             clear_mpz_array(list->data[i]);
         }
     }
-    list->length = 0U;
-}
-//-----------------------------------------------------------------------------
-void clear_mpz_array_list(mpz_array_list_t* const list) {
-    empty_mpz_array_list(list);
-    if (list->alloced != 0U) {
-        free(list->data);
-    }
+    free(list->data);
+    free(list);
 }
 //-----------------------------------------------------------------------------
 void print_mpz_array_list(const mpz_array_list_t* const list) {

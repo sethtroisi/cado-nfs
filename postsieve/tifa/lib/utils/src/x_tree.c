@@ -979,7 +979,7 @@ mpz_tree_t* rem_tree(const mpz_t z, const mpz_tree_t* const ptree) {
 void clear_mpz_tree(mpz_tree_t* tree) {
     free(PTR(tree->data[0]));
     free(tree->data);
-    return;
+    free(tree);
 }
 //-----------------------------------------------------------------------------
 void print_mpz_tree(const mpz_tree_t* const tree) {

@@ -53,7 +53,14 @@
 #include "../../lib/utils/include/timer.h"
 
 //-----------------------------------------------------------------------------
-#define PROG_DFLT_ARRAY_LENGTH 12
+//
+// Default size of arrays.
+//
+#define PROG_DFLT_ARRAY_LENGTH 8
+//
+// Set to non-zero to perform benchmarks averaged over 100 iterations.
+//
+#define DO_AVERAGED_BENCHMARK  0
 //-----------------------------------------------------------------------------
 void print_factors(mpz_array_t* const, uint32_array_t* const);
 //-----------------------------------------------------------------------------
@@ -159,7 +166,25 @@ ecode_t run_program(factoring_program_t* const program) {
         }
         printf("-------\n\n");
     }
+
+#if DO_AVERAGED_BENCHMARK
+    unsigned int niterations = 100;
     
+    INIT_TIMER;
+    for (unsigned int i = 1; i < niterations; i++) {
+        START_TIMER;
+        ecode = program->factoring_algo_func(
+                    progfa,
+                    progmu,
+                    unfactored,
+                    program->params,
+                    program->mode
+                );
+        STOP_TIMER;
+        reset_mpz_array(progfa);
+        reset_uint32_array(progmu);
+    }
+    START_TIMER;
     ecode = program->factoring_algo_func(
                 progfa,
                 progmu,
@@ -167,11 +192,26 @@ ecode_t run_program(factoring_program_t* const program) {
                 program->params,
                 program->mode
             );
-    
+    STOP_TIMER;    
+    printf("\nAveraged time: %8.4f seconds\n", (GET_TIMING/(float)niterations));
+#else
+    INIT_TIMER;
+    START_TIMER;
+    ecode = program->factoring_algo_func(
+                progfa,
+                progmu,
+                unfactored,
+                program->params,
+                program->mode
+            );
+    STOP_TIMER;
+    printf("\nTime: %8.4f seconds\n", GET_TIMING);
+#endif
+
     if (program->verbose || program->timing) {
         printf("\n");
     }
-    
+        
     switch (ecode) {
         case COMPLETE_FACTORIZATION_FOUND:
             append_mpz_array(factors, progfa);
@@ -190,11 +230,10 @@ ecode_t run_program(factoring_program_t* const program) {
 
             find_coprime_base(base, unfactored, progfa);
             ins_sort_mpz_array(base);
-
             append_mpz_array(factors, base);
             
             clear_mpz_array(base);
-            free(base);
+            
             rcode = PARTIAL_FACTORIZATION_FOUND;
             break;
         }

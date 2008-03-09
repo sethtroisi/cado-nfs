@@ -1,6 +1,10 @@
  TIFA v0.2.0:
  ------------
 
+ - March 2008:
+       - Bug fixes and minor optimizations.
+       - Some changes in memory management.
+ 
  - January / February 2008:
        - Added basic implementation of the Elliptic Curve Method (ECM). This
          is merely a toy-implementation, focused on small numbers. Nothing

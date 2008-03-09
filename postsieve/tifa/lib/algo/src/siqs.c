@@ -709,50 +709,25 @@ static ecode_t clear_siqs_context(factoring_machine_t* const machine) {
         free(context->Bainv2);
 
         clear_mpz_array(context->cand_a_array);
-        free(context->cand_a_array);
-
         clear_mpz_array(context->cand_u);
-        free(context->cand_u);
-
         clear_mpz_array(context->u);
-        free(context->u);
-
         clear_mpz_array(context->cand_redgx);
-        free(context->cand_redgx);
-
         clear_mpz_array(context->smooth_redgx);
-        free(context->smooth_redgx);
-
         clear_mpz_array(context->a_for_smooth_redgx);
-        free(context->a_for_smooth_redgx);
-
         clear_mpz_array(context->Bl);
-        free(context->Bl);
-
+        
         clear_mpz_tree(context->ptree);
-        free(context->ptree);
-
-        clear_int32_array(context->xpool);
-        free(context->xpool);
-
-        clear_uint32_array(context->factor_base);
-        free(context->factor_base);
-
-        clear_byte_array(context->log_factor_base);
-        free(context->log_factor_base);
-
+    
         clear_uint32_array(context->sol1);
-        free(context->sol1);
-
         clear_uint32_array(context->sol2);
-        free(context->sol2);
-
-        clear_byte_array(context->sieve);
-        free(context->sieve);
-
+        clear_uint32_array(context->factor_base);
         clear_uint32_array(context->sqrtm_pi);
-        free(context->sqrtm_pi);
-
+        
+        clear_int32_array(context->xpool);
+        
+        clear_byte_array(context->sieve);
+        clear_byte_array(context->log_factor_base);
+        
         clear_binary_matrix(context->matrix);
         free(context->matrix);
 
@@ -765,7 +740,6 @@ static ecode_t clear_siqs_context(factoring_machine_t* const machine) {
 
         if (context->htable != NULL) {
             clear_mpzpair_htable(context->htable);
-            free(context->htable);
         }
         free(context);
     }
@@ -876,7 +850,6 @@ static ecode_t perform_siqs(factoring_machine_t* const machine) {
             context->factor_base
         );
         clear_uint32_array_list(decomp_list);
-        free(decomp_list);
     }
     STOP_TIMER;
     PRINT_TIMING;
@@ -917,10 +890,8 @@ static ecode_t perform_siqs(factoring_machine_t* const machine) {
     free(decomp_matrix);
 
     clear_uint32_array_list(relations);
-    free(relations);
-
+    
     clear_mpz_array(partial_gx_array);
-    free(partial_gx_array);
     
     return ecode;
 }
@@ -1661,7 +1632,6 @@ static ecode_t determine_next_a(siqs_context_t* const context) {
         // _FIX_ME_: Clear and allocate again... Very inefficient...
         //
         clear_mpz_array(context->Bl);
-        free(context->Bl);
 
         context->Bl = alloc_mpz_array(context->nprimes_in_a);
 

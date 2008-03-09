@@ -100,7 +100,6 @@ void complete_filter_init(smooth_filter_t* const filter,
         mpz_tree_t* ptree = prod_tree_ui(base);
         mpz_init_set(filter->prod_pj[0], ptree->data[0]);
         clear_mpz_tree(ptree);
-        free(ptree);
         break;
     }
 }
@@ -221,7 +220,7 @@ uint32_t select_res(smooth_filter_t* const filter, unsigned long int step) {
     //    
     switch (filter->method) {
     case TDIV:
-    case TDIV_EARLY_ABORT:    
+    case TDIV_EARLY_ABORT: 
         return res_tdiv(filter, step);
         break;
     
