@@ -795,10 +795,11 @@ static void
 init_rat_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly,
                               sieve_info_t *si)
 {
-    double g1, g0, gi, gj, norm MAYBE_UNUSED;
+    double g1, g0, gi, gj, norm MAYBE_UNUSED, gjj;
     int i MAYBE_UNUSED, halfI MAYBE_UNUSED, l;
     unsigned int j, lastj;
-    uint64_t mask = (1 << NORM_BITS) - 1;
+    uint64_t y, mask = (1 << NORM_BITS) - 1;
+    union { double z; uint64_t x; } zx[1];
 
     l = NORM_BITS - (int) ceil (log2 (si->logmax_rat));
 
@@ -821,30 +822,31 @@ init_rat_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly,
 #ifdef UGLY_HACK
     memset (S, 255, (lastj - j) * si->I);
 #else
-    for (; j < lastj; ++j) {
-        if (j == 0) {
-            // compute only the norm for i = 1. Everybody else is 255.
-            norm = log2 (fabs (gi));
-            norm = norm * si->scale_rat;
-            for (i = -halfI; i < halfI; i++) 
-                *S++ = UCHAR_MAX;
-            S[-halfI + 1] = GUARD + (unsigned char) (norm);
-        } else {
-            double gjj = gj * (double) j;
-            union { double z; uint64_t x; } zx[1];
-            zx->z = gjj - gi * (double) halfI;
-            for (i = -halfI; i < halfI; i++) {
-                /* the double precision number 1.0 has high bit 0 (sign),
-                   then 11-bit biased exponent 1023, and 52-bit mantissa 0 */
-                uint64_t y;
-                /* the magic constant here is simply 1023*2^52, where
-                   1023 is the exponent bias in binary64 */
-                y = (zx->x - (uint64_t) 4607182418800017408) >> (52 - l);
-                *S++ = si->S_rat[y & mask];
-                zx->z += gi;
-            }
+    /* if j = 0, it will be the first value */
+    if (j == 0)
+      {
+        // compute only the norm for i = 1. Everybody else is 255.
+        norm = log2 (fabs (gi));
+        norm = norm * si->scale_rat;
+        for (i = -halfI; i < halfI; i++) 
+          *S++ = UCHAR_MAX;
+        S[-halfI + 1] = GUARD + (unsigned char) (norm);
+        ++j;
+      } 
+    for (; j < lastj; ++j)
+      {
+        gjj = gj * (double) j;
+        zx->z = gjj - gi * (double) halfI;
+        for (i = -halfI; i < halfI; i++) {
+          /* the double precision number 1.0 has high bit 0 (sign),
+             then 11-bit biased exponent 1023, and 52-bit mantissa 0 */
+          /* the magic constant here is simply 1023*2^52, where
+             1023 is the exponent bias in binary64 */
+          y = (zx->x - (uint64_t) 4607182418800017408) >> (52 - l);
+          *S++ = si->S_rat[y & mask];
+          zx->z += gi;
         }
-    }
+      }
 #endif
 }
 
@@ -1200,12 +1202,9 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
     factor_list_clear(&rat_factors);
     clear_mpz_array (f_r);
     clear_mpz_array (f_a);
-    free (f_r);
-    free (f_a);
     clear_uint32_array (m_r);
     clear_uint32_array (m_a);
-    free (m_r);
-    free (m_a);
+
     return cpt;
 }
 
@@ -1872,7 +1871,8 @@ main (int argc, char *argv[])
 
  end:
     t0 = seconds () - t0;
-    fprintf (stderr, "# Average J = %1.0f\n", totJ / (double) sq);
+    fprintf (stderr, "# Average J=%1.0f for %lu special-q's\n",
+             totJ / (double) sq, sq);
     tts = t0 - (tn_rat + tn_alg + ttf);
     fprintf (stderr, "# Total time %1.1fs [norm %1.1f+%1.1f, sieving %1.1f"
             " (%1.1f + %1.1f),"
