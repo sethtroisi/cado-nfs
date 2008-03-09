@@ -15,13 +15,13 @@ obj:=$(patsubst %,%.o,$(names))
 all: libutils.a cache cachesize
 
 %.o: %.c
-	gcc $(CFLAGS) -c $< -I.. -I$(GMPINCLUDE)
+	$(CC) $(CFLAGS) -c $< -I.. -I$(GMPINCLUDE)
 
 cache: cache.c timing.o
-	gcc $(CFLAGS) $< timing.c -I.. -o $@
+	$(CC) $(CFLAGS) $< timing.c -I.. -o $@
 
 cachesize: cachesize.c
-	gcc $(CFLAGS) $< -o $@
+	$(CC) $(CFLAGS) $< -o $@
 
 libutils.a: $(obj)
 	ar r libutils.a $(obj)

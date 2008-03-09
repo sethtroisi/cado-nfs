@@ -42,25 +42,25 @@ Makefile.local:
 	ln -s ../Makefile.local .
 
 fb.o : fb.c fb.h config.h basicnt.h sieve_aux.h Makefile.local
-	gcc -c -I. -I.. $(CFLAGS) fb.c
+	$(CC) -c -I. -I.. $(CFLAGS) fb.c
 
 sieve.o : sieve.c bucket.h config.h basicnt.h sieve_aux.h ../cado.h Makefile.local
-	gcc -c -I. -I.. $(CFLAGS) sieve.c
+	$(CC) -c -I. -I.. $(CFLAGS) sieve.c
 
 makefb.o : makefb.c Makefile.local
-	gcc -c -I. -I.. $(CFLAGS) makefb.c
+	$(CC) -c -I. -I.. $(CFLAGS) makefb.c
 
 sieve: sieve.o fb.o ../utils/libutils.a
-	gcc $(CFLAGS) -o $@ sieve.o fb.o ../utils/libutils.a $(GMPLIB) -lm
+	$(CC) $(CFLAGS) -o $@ sieve.o fb.o ../utils/libutils.a $(GMPLIB) -lm
 
 makefb: makefb.o ../utils/libutils.a
-	gcc $(CFLAGS) -o $@ makefb.o ../utils/libutils.a $(GMPLIB) -lm
+	$(CC) $(CFLAGS) -o $@ makefb.o ../utils/libutils.a $(GMPLIB) -lm
 
 config.h: config_h.in
 	cp config_h.in config.h
 
 las: las.c fb.o bucket.h $(TIFALIB)
-	gcc $(CFLAGS) -o las -I.. las.c fb.o ../utils/libutils.a $(LDFLAGS) -lm
+	$(CC) $(CFLAGS) -o las -I.. las.c fb.o ../utils/libutils.a $(LDFLAGS) -lm
 
 clean:
 	rm -f sieve makefb las *.o *~

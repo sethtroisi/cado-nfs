@@ -45,7 +45,7 @@ int main(int argc, char **argv)
     printf("\n");
 
     //for (i = 0; i < 10; ++i) 
-    mulCantor128(h, f, N, g, N);
+    mulCantor128((unsigned long *) h, (unsigned long *) f, N, (unsigned long *) g, N);
 
     printf("fg := [\n");
     for (i = 0; i < 2 * N - 1; ++i)

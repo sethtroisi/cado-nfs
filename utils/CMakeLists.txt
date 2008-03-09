@@ -1,5 +1,7 @@
 
 SET (sources 
+    modul_poly.c
+    fpoly.c
     polyfile.c
     relation.c
     timing.c

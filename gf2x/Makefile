@@ -28,24 +28,24 @@ libgf2x.a: $(patsubst %.c,%.o,$(LIBGF2X_FILES))
 	ar qcv $@ $^
 
 gen_bb_mul_code:	gen_bb_mul_code.c
-	gcc $(CFLAGS) $< -o $@
+	$(CC) $(CFLAGS) $< -o $@
 
 mul-inlines-k%.c:	gen_bb_mul_code
 	@./gen_bb_mul_code $(w) $* > $@
 
 tuneup-k%: mul-inlines-k%.c mul-small.c
-	@gcc $(CFLAGS) \
+	@$(CC) $(CFLAGS) \
 		-DTUNE_MUL1 -DWORDSIZE=$(w)				\
 		-DINLINES_FILE=\"mul-inlines-k$*.c\"			\
 		-Wno-unused						\
 		tuneup.c -o $@
 
 tune1-k%: tuneup-k%
-	@echo -n $* " : " ; ./tuneup-k$* -nokara 1
+	@echo $* " : "`./tuneup-k$* -nokara 1`
 
-tune1_files:= $(patsubst %,mul-inlines-k%.c,$(shell seq 1 8))
-tune1_progs:= $(addprefix tuneup-k,$(shell seq 1 8))
-tune1_actions:= $(addprefix tune1-k,$(shell seq 1 8))
+tune1_files:= $(patsubst %,mul-inlines-k%.c,1 2 3 4 5 6 7 8)
+tune1_progs:= $(addprefix tuneup-k,1 2 3 4 5 6 7 8)
+tune1_actions:= $(addprefix tune1-k,1 2 3 4 5 6 7 8)
 
 mul-inlines.c:
 	-rm -f tune1.log
@@ -57,13 +57,13 @@ tune1:	mul-inlines.c
 
 TUNETOOM_FILES:=$(LIBGF2X_FILES) tunetoom.c timing.c replace.c
 tunetoom: $(patsubst %.c,%.o,$(TUNETOOM_FILES))
-	gcc $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^
 TUNEFFT_FILES:=$(LIBGF2X_FILES) tunefft.c timing.c mulfft-bit.c replace.c
 tunefft: $(patsubst %.c,%.o,$(TUNEFFT_FILES))
-	gcc $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^
 TEST_FILES:=$(LIBGF2X_FILES) test.c timing.c
 test: $(patsubst %.c,%.o,$(TEST_FILES))
-	gcc $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^
 
 factor.o: factor.c
 	g++ -g -o $@ -c $<
