@@ -1,9 +1,16 @@
 #!/bin/sh -
-# We assume that a directory $name exists
+# We assume that a directory $outdir exists
 #
-# Typical use: ./merge_linalg_sqrt.sh params rels1 rels2 ... relsk
+# Typical use: ./merge_linalg_sqrt2.sh params [rels1 rels2 ... relsk]
 #
-# If no relation files are given, used $root/rels.*
+# $root=$dir/name is the rootname of the number to be factored, which
+#                 tells us that we expect $root.{N,poly} to exist; from
+#                 which we will build $root.{nodup,purged}.
+# $outdir is the directory where all "temporary" files created by merge et al.
+#         together with the files needed for the squareroots. If this variable
+#         is not set, it defaults to $root + some suffix, see below.
+#
+# If no relation files are given, use $dir/rels.*
 #
 linalg=linalg
 sqrt=sqrt/naive
@@ -19,26 +26,26 @@ params=$1; shift
 
 if [ "X$root" = "X" ]; then echo "I need at least a name..."; exit; fi
 
-if [ "X$maxpr" = "X" ]; then maxpr=0; fi
-if [ "X$maxpa" = "X" ]; then maxpa=0; fi
-if [ "X$keep_purge" = "X" ]; then keep_purge=0; fi
+maxpr=${maxpr-0}
+maxpa=${maxpa-0}
+keep_purge=${keep_purge-0}
 
-if [ "X$nkermax" = "X" ]; then nkermax=30; fi
-if [ "X$nchar" = "X" ]; then nchar=50; fi
+nkermax=${nkermax-30}
+nchar=${nchar-50}
 
-if [ "X$prune" = "X" ]; then prune=1.0; fi
-if [ "X$maxlevel" = "X" ]; then maxlevel=6; fi
-if [ "X$cwmax" = "X" ]; then cwmax=10; fi
-if [ "X$rwmax" = "X" ]; then rwmax=100; fi
+prune=${prune-1.0}
+maxlevel=${maxlevel-6}
+cwmax=${cwmax-10}
+rwmax=${rwmax-100}
 
-if [ "X$verbose" = "X" ]; then verbose="-v"; fi
+verbose=${verbose-"-v"}
 ##### linalg params
-if [ "X$skip" = "X" ]; then skip=32; fi
-if [ "X$bwstrat" = "X" ]; then bwstrat=1; fi
+skip=${skip-32}
+bwstrat=${bwstrat-1}
 ########## multithreading in bw
-if [ "X$mt" = "X" ]; then mt=0; fi
+mt=${mt-0}
 
-if [ "X$name" = "X" ]; then name=$root.$prune"x"$maxlevel"x"$cwmax"x"$rwmax; fi
+outdir=${outdir-$root.$prune"x"$maxlevel"x"$cwmax"x"$rwmax}
 
 dir=`dirname $root`
 if [ $# -eq 0 ]; then allrels=`ls $dir/rels.*`; else allrels="$*"; fi
@@ -78,12 +85,12 @@ fi
 
 echo "Performing merges"
 
-if [ -d $name ]
+if [ -d $outdir ]
 then
-    echo "Directory $name already exists"
+    echo "Directory $outdir already exists"
 else
-    echo "Creating directory $name"
-    mkdir $name
+    echo "Creating directory $outdir"
+    mkdir $outdir
 fi
 
 nb_merge_max=1000000
@@ -91,54 +98,54 @@ keep=`expr 128 '+' $skip`
 argsa="-forbw $bwstrat"
 argsa="$argsa -prune $prune -merge $nb_merge_max -mat $purged -keep $keep"
 argsa="$argsa -maxlevel $maxlevel -cwmax $cwmax -rwmax $rwmax $verbose"
-time $linalg/merge $argsa > $name/merge.his # 2> $name.merge.err
-echo "SIZE(merge.his): `ls -s $name/merge.his`"
+time $linalg/merge $argsa > $outdir/merge.his # 2> $outdir.merge.err
+echo "SIZE(merge.his): `ls -s $outdir/merge.his`"
 
 echo "Replaying merges"
 
-bwcostmin=`tail $name/merge.his | grep "BWCOSTMIN:" | awk '{print $NF}'`
-argsr="$purged $name/merge.his $name/small $name/index"
-time $linalg/replay $argsr $bwcostmin # 2> $name.replay.err
+bwcostmin=`tail $outdir/merge.his | grep "BWCOSTMIN:" | awk '{print $NF}'`
+argsr="$purged $outdir/merge.his $outdir/small $outdir/index"
+time $linalg/replay $argsr $bwcostmin # 2> $outdir.replay.err
 
-if [ ! -s $name/index ]
+if [ ! -s $outdir/index ]
 then
-    echo "Index file $name/index does not exist, stopping"
+    echo "Index file $outdir/index does not exist, stopping"
     exit
 fi
-echo "SIZE(index): `ls -s $name/index`"
+echo "SIZE(index): `ls -s $outdir/index`"
 
-if [ ! -s $name/small ]
+if [ ! -s $outdir/small ]
 then
-    echo "Small matrix $name/small does not exist, stopping"
+    echo "Small matrix $outdir/small does not exist, stopping"
     exit
 fi
 
 echo "Performing the linear algebra phase"
 
-./linalg.sh $name $skip $mt
+./linalg.sh $outdir $skip $mt
 
-if [ ! -s $name/ker_raw ]; then echo "Zerodim kernel, stopping"; exit; fi
+if [ ! -s $outdir/ker_raw ]; then echo "Zerodim kernel, stopping"; exit; fi
 
-nker=`wc -l < $name/ker_raw`
+nker=`wc -l < $outdir/ker_raw`
 if [ $nker -lt $nkermax ]; then nkermax=$nker; fi
 
 echo "Adding characters"
 
-args0="-purged $purged -ker $name/ker_raw -poly $poly -index $name/index"
-args0="$args0 -rel $nodup -small $name/small"
+args0="-purged $purged -ker $outdir/ker_raw -poly $poly -index $outdir/index"
+args0="$args0 -rel $nodup -small $outdir/small"
 args0="$args0 -nker $nker -nchar $nchar -skip $skip"
-time $linalg/characters $args0 > $name/ker
+time $linalg/characters $args0 > $outdir/ker
 
-ndepmax=`wc -l $name/ker | awk '{print $1}'`
+ndepmax=`wc -l $outdir/ker | awk '{print $1}'`
 if [ $ndepmax -ge 30 ]; then ndepmax=30; fi
 
 echo "Preparing $ndepmax squareroots"
 
-args1="$nodup $purged $name/index $name/ker $poly"
-time $linalg/allsqrt $args1 0 $ndepmax ar $name/dep
+args1="$nodup $purged $outdir/index $outdir/ker $poly"
+time $linalg/allsqrt $args1 0 $ndepmax ar $outdir/dep
 
 echo "Entering the last phase"
 
-./newsqrtonly.sh $root $name 0 $ndepmax
+./newsqrtonly.sh $root $outdir 0 $ndepmax
 ## If this fails, use the backup version, based on magma:
-##   ./sqrtonly.sh $root $name 0 $ndepmax
+##   ./sqrtonly.sh $root $outdir 0 $ndepmax
