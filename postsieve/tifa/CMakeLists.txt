@@ -22,6 +22,7 @@ SET (utils_sources
     lib/utils/src/res_tdiv.c
     lib/utils/src/smooth_filter.c
     lib/utils/src/sqrt_cont_frac.c
+    lib/utils/src/stopwatch.c
     lib/utils/src/x_array_list.c
     lib/utils/src/x_tree.c)
 
