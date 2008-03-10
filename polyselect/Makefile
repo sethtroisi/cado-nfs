@@ -8,7 +8,7 @@ GMPINCLUDE ?= $(GMP)/include/
 OPTCFLAGS ?= -O2 -DNDEBUG -g -W -Wall
 
 CFLAGS=$(OPTCFLAGS) -std=c99 -I$(GMPINCLUDE) -DREV=\"`svnversion .`\"
-LDFLAGS=-L../utils $(GMPLIB) -lutils -lm
+LDFLAGS=-L../utils -lutils $(GMPLIB) -lm
 
 all: polyselect
 
