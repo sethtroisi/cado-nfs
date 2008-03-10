@@ -169,20 +169,25 @@ void poly_sub(poly_t f, const poly_t g, const poly_t h) {
   cleandeg(f, maxdeg);
 }
 
-void poly_sub_mod_mpz(poly_t f, const poly_t g, const poly_t h, const mpz_t m) {
+/* f <- g - h mod m */
+void
+poly_sub_mod_mpz (poly_t f, const poly_t g, const poly_t h, const mpz_t m)
+{
   int i, maxdeg;
+  int gdeg = g->deg; /* save in case f=g */
+  int hdeg = h->deg; /* save in case f=h */
   mpz_t z;
 
   mpz_init(z);
 
-  maxdeg = max(g->deg, h->deg);
+  maxdeg = max(gdeg, hdeg);
   f->deg = maxdeg;
   for (i = maxdeg; i >= 0; --i) {
-    if (i <= g->deg)
+    if (i <= gdeg)
       mpz_set(z, g->coeff[i]);
     else
       mpz_set_ui(z, 0);
-    if (i <= h->deg)
+    if (i <= hdeg)
       mpz_sub(z, z, h->coeff[i]);
     poly_setcoeff(f, i, z);
   }
@@ -203,6 +208,17 @@ void poly_mul_ui(poly_t f, const poly_t g, unsigned long a) {
     mpz_mul_ui(aux, g->coeff[i], a);
     poly_setcoeff(f, i, aux);
   }
+  mpz_clear(aux);
+}
+
+/* f <- f - a */
+void
+poly_sub_ui (poly_t f, unsigned long a)
+{
+  mpz_t aux;
+  mpz_init(aux);
+  mpz_sub_ui(aux, f->coeff[0], a);
+  poly_setcoeff(f, 0, aux);
   mpz_clear(aux);
 }
 
@@ -313,9 +329,17 @@ poly_reducemodF(polymodF_t P, poly_t p, const poly_t F) {
     const int d = F->deg;
     int i;
 
-    v++;
-    for (i = 0; i < k; ++i)
-      mpz_mul(p->coeff[i], p->coeff[i], F->coeff[d]);
+    /* We compute F[d]*p - p[k]*F. In case F[d] divides p[k],
+       we can simply compute p - p[k]/F[d]*F */
+
+    if (mpz_divisible_p (p->coeff[k], F->coeff[d]))
+      mpz_divexact (p->coeff[k], p->coeff[k], F->coeff[d]);
+    else
+      {
+        v++; /* we consider p/F[d]^v */
+        for (i = 0; i < k; ++i)
+          mpz_mul(p->coeff[i], p->coeff[i], F->coeff[d]);
+      }
 
     for (i = 0; i < d; ++i) 
       mpz_submul(p->coeff[k-d+i], p->coeff[k], F->coeff[i]);
@@ -371,7 +395,25 @@ poly_reduce_mod_mpz (poly_t Q, const poly_t P, const mpz_t m)
   mpz_clear(aux);
 }
 
-/* Q <- P mod p^k, where S contains the base-p representation of P */
+/* Q <- P mod p^k, where S contains the base-p representation of P
+   
+   FIXME: a better way would be the following:
+   store in P[0] the value of P mod p
+            P[1] the value of (P div p) mod p
+            P[2] the value of (P div p^2) mod p^2
+            P[3] the value of (P div p^4) mod p^4
+                         ...
+            P[i+1] the value of (P div p^(2^i)) mod p^(2^i)
+   Those values can be computed by first computing p, p^2, p^4, ...
+   then assuming P = T[i+1] + P[i+2]*p^(2^(i+1)) + P[i+3]*p^(2^(i+2)) + ...
+   with T[i+1] = 0 mod p^(2^(i+1)),
+   we get by division by p^(2^i): T[i+1] = T[i] + P[i+1]*p^(2^i). (**)
+   (This is like a remainder tree, but we recurse only in the left branch,
+    thus the total cost if O(M(n)) instead of O(M(n) log n).)
+
+    To reconstruct T[i+1] = P mod p^(2^(i+1)), we use (**) the other way,
+    namely T[i+1] = T[i] + P[i+1]*p^(2^i).
+ */
 void     
 poly_reduce_mod_mpz_fast (poly_t Q, const mpz_t m, poly_base_t S, int p, int k)
 {

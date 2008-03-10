@@ -43,6 +43,7 @@ void poly_add(poly_t f, const poly_t g, const poly_t h);
 void poly_sub(poly_t f, const poly_t g, const poly_t h);
 void poly_sub_mod_mpz(poly_t f, const poly_t g, const poly_t h, const mpz_t m);
 void poly_mul_ui(poly_t f, const poly_t g, unsigned long a);
+void poly_sub_ui(poly_t f, unsigned long a);
 // void poly_div_ui_mod_mpz(poly_t f, const poly_t g, unsigned long a, const mpz_t m);
 void poly_div_2_mod_mpz(poly_t f, const poly_t g, const mpz_t m);
 void poly_eval_mod_mpz(mpz_t res, const poly_t f, const mpz_t x, const mpz_t m);

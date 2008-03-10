@@ -226,13 +226,16 @@ void polymodF_sqrt(polymodF_t res, polymodF_t AA, poly_t F, unsigned long p) {
   int expo = 1;
   do {
     double st;
+
+    /* invariant: invsqrtA = 1/sqrt(A) bmod p^k */
+
     mpz_mul(pk, pk, pk);	// double the current precision
     k *= 2;
     barrett_init (invpk, pk);
     expo <<= 1;
     fprintf(stderr, "lifting mod p^%d at %2.2lf\n", expo, seconds());
-    // compute F,A modulo the new modulus.
-    poly_reduce_makemonic_mod_mpz(f, F, pk);
+    // compute F,A modulo the new modulus p^k
+    poly_reduce_makemonic_mod_mpz(f, F, pk); /* f = F/lc(F) mod p^k */
     st = seconds ();
     if (p <= 62)
       poly_reduce_mod_mpz_fast (a, pk, S, p, k);
@@ -244,28 +247,42 @@ void polymodF_sqrt(polymodF_t res, polymodF_t AA, poly_t F, unsigned long p) {
 
     // now, do the Newton operation x <- 1/2(3*x-a*x^3)
     st = seconds ();
-    poly_sqr_mod_f_mod_mpz(tmp, invsqrtA, f, pk, invpk);
+    poly_sqr_mod_f_mod_mpz(tmp, invsqrtA, f, pk, invpk); /* tmp = invsqrtA^2 */
 #ifdef VERBOSE
     fprintf (stderr, "   poly_sqr_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
 #endif
+
+#if 0
     st = seconds ();
     poly_mul_mod_f_mod_mpz(tmp, tmp, invsqrtA, f, pk, invpk);
+    /* tmp = invsqrtA^3 mod p^k */
 #ifdef VERBOSE
     fprintf (stderr, "   poly_mul_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
 #endif
     st = seconds ();
     poly_mul_mod_f_mod_mpz(tmp, tmp, a, f, pk, invpk);
+    /* tmp = a*invsqrtA^3 mod p^k */
 #ifdef VERBOSE
     fprintf (stderr, "   poly_mul_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
 #endif
-    poly_mul_ui(tmp2, invsqrtA, 3);
-    poly_sub_mod_mpz(tmp, tmp2, tmp, pk);
-    //poly_div_ui_mod_mpz(invsqrtA, tmp, 2, pk); 
-    poly_div_2_mod_mpz(invsqrtA, tmp, pk);
+    poly_mul_ui (tmp2, invsqrtA, 3); /* tmp2 = 3*invsqrtA */
+    poly_sub_mod_mpz (tmp, tmp2, tmp, pk); /* tmp = 3*invsqrtA-a*invsqrtA^3 */
+    poly_div_2_mod_mpz (invsqrtA, tmp, pk); 
+#else
+    /* Faster version which computes x <- x + x/2*(1-a*x^2).
+       However I don't see how to use the fact that the coefficients
+       if 1-a*x^2 are divisible by p^(k/2). */
+    poly_mul_mod_f_mod_mpz (tmp, tmp, a, f, pk, invpk); /* tmp=a*invsqrtA^2 */
+    poly_sub_ui (tmp, 1); /* a*invsqrtA^2-1 */
+    poly_div_2_mod_mpz (tmp, tmp, pk); /* (a*invsqrtA^2-1)/2 */
+    poly_mul_mod_f_mod_mpz (tmp, tmp, invsqrtA, f, pk, invpk);
+    /* tmp = invsqrtA/2 * (a*invsqrtA^2-1) */
+    poly_sub_mod_mpz (invsqrtA, invsqrtA, tmp, pk);
+#endif
 
     // multiply by a, to check if rational reconstruction succeeds
     st = seconds ();
-    poly_mul_mod_f_mod_mpz(tmp, invsqrtA, a, f, pk, invpk);
+    poly_mul_mod_f_mod_mpz (tmp, invsqrtA, a, f, pk, invpk);
 #ifdef VERBOSE
     fprintf (stderr, "   poly_mul_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
 #endif
