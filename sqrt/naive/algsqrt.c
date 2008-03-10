@@ -2,8 +2,19 @@
  * Program: algsqrt
  * Author : P. Gaudry
  * Purpose: computing the squareroots and finishing the factorization
- * 
  *
+ Possible easy improvements:
+ * check the precisions in Hensel lifting (and adjust them if needed)
+ * use Kronecker's substitution for polynomial multiplications
+ * predict a bound for the required precision, and build a corresponding
+   optimal sequence of precisions in Hensel lifting
+ Harder improvements:
+ * improve the reduction modulo f (what is the best strategy?)
+ * cache FFT transforms wherever possible
+ * use Karp-Markstein trick to incorporate in the last Hensel iteration for
+   1/sqrt(x) the value of x to get an approximation of sqrt(x)
+ * use the trick that multiplies p(x) by f'(x)^2 [see Crandall & Pomerance,
+   Prime Numbers, A Computational Perspective, Sections 6.2.4, 6.2.5, 6.2.6]
  */
 
 #include <stdio.h>
@@ -14,6 +25,7 @@
 #include "utils/utils.h"
 #include "poly.h"
 
+// #define VERBOSE
 
 void polymodF_from_ab(polymodF_t tmp, long a, unsigned long b) {
   tmp->v = 0;
@@ -105,7 +117,7 @@ void TonelliShanks(poly_t res, const poly_t a, const poly_t f, unsigned long p) 
     poly_power_mod_f_mod_ui(D, delta, f, t, p);
     for (i = 0; i <= s-1; ++i) {
       poly_power_mod_f_mod_ui(auxpol, D, f, m, p);
-      poly_mul_mod_f_mod_mpz(auxpol, auxpol, A, f, myp);
+      poly_mul_mod_f_mod_mpz(auxpol, auxpol, A, f, myp, NULL);
       mpz_ui_pow_ui(aux, 2, (s-1-i));
       poly_power_mod_f_mod_ui(auxpol, auxpol, f, aux, p);
       if ((auxpol->deg == 0) && (mpz_cmp_ui(auxpol->coeff[0], p-1)== 0))
@@ -117,7 +129,7 @@ void TonelliShanks(poly_t res, const poly_t a, const poly_t f, unsigned long p) 
     mpz_divexact_ui(m, m, 2);
     poly_power_mod_f_mod_ui(auxpol, D, f, m, p);
 
-    poly_mul_mod_f_mod_mpz(res, res, auxpol, f, myp);
+    poly_mul_mod_f_mod_mpz(res, res, auxpol, f, myp, NULL);
     poly_free(D);
     poly_free(A);
     mpz_clear(m);
@@ -130,12 +142,13 @@ void TonelliShanks(poly_t res, const poly_t a, const poly_t f, unsigned long p) 
   mpz_clear(myp);
 }
 
-
 // compute Sqrt(A) mod F, using p-adic lifting, at prime p.
 void polymodF_sqrt(polymodF_t res, polymodF_t AA, poly_t F, unsigned long p) {
   poly_t A;
+  poly_base_t S; /* will store the base p^k representation of A */
   int v;
   int d = F->deg;
+  int k;
 
   poly_alloc(A, d-1);
   // Clean up the mess with denominator: if it is an odd power of fd,
@@ -160,13 +173,23 @@ void polymodF_sqrt(polymodF_t res, polymodF_t AA, poly_t F, unsigned long p) {
   poly_alloc(a, d-1);
   poly_alloc(f, d);
   // variable for the current pk
-  mpz_t pk;
-  mpz_init(pk);
+  mpz_t pk, invpk;
+  mpz_init (pk);
+  mpz_init (invpk);
 
   // Initialize things modulo p:
   mpz_set_ui(pk, p);
+  k = 1; /* invariant: pk = p^k */
   poly_reduce_makemonic_mod_mpz(f, F, pk);
-  poly_reduce_mod_mpz(a, A, pk);
+  if (p <= 62)
+    {
+      poly_base_init_set (S, A, p);
+      fprintf (stderr, "Converted coefficients of F to base p at %2.2lf\n",
+               seconds ());
+      poly_reduce_mod_mpz_fast (a, pk, S, p, k);
+    }
+  else
+    poly_reduce_mod_mpz (a, A, pk);
 
   // First compute the inverse square root modulo p
   { 
@@ -202,30 +225,59 @@ void polymodF_sqrt(polymodF_t res, polymodF_t AA, poly_t F, unsigned long p) {
   poly_alloc(tmp2, 2*d-1);
   int expo = 1;
   do {
+    double st;
     mpz_mul(pk, pk, pk);	// double the current precision
+    k *= 2;
+    barrett_init (invpk, pk);
     expo <<= 1;
     fprintf(stderr, "lifting mod p^%d at %2.2lf\n", expo, seconds());
     // compute F,A modulo the new modulus.
-    poly_reduce_makemonic_mod_mpz(f, F, pk);  
-    poly_reduce_mod_mpz(a, A, pk);
+    poly_reduce_makemonic_mod_mpz(f, F, pk);
+    st = seconds ();
+    if (p <= 62)
+      poly_reduce_mod_mpz_fast (a, pk, S, p, k);
+    else
+      poly_reduce_mod_mpz (a, A, pk);
+#ifdef VERBOSE    
+    fprintf (stderr, "   poly_reduce_mod_mpz took %2.2lf\n", seconds () - st);
+#endif
 
     // now, do the Newton operation x <- 1/2(3*x-a*x^3)
-    poly_sqr_mod_f_mod_mpz(tmp, invsqrtA, f, pk);
-    poly_mul_mod_f_mod_mpz(tmp, tmp, invsqrtA, f, pk);
-    poly_mul_mod_f_mod_mpz(tmp, tmp, a, f, pk);
+    st = seconds ();
+    poly_sqr_mod_f_mod_mpz(tmp, invsqrtA, f, pk, invpk);
+#ifdef VERBOSE
+    fprintf (stderr, "   poly_sqr_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
+#endif
+    st = seconds ();
+    poly_mul_mod_f_mod_mpz(tmp, tmp, invsqrtA, f, pk, invpk);
+#ifdef VERBOSE
+    fprintf (stderr, "   poly_mul_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
+#endif
+    st = seconds ();
+    poly_mul_mod_f_mod_mpz(tmp, tmp, a, f, pk, invpk);
+#ifdef VERBOSE
+    fprintf (stderr, "   poly_mul_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
+#endif
     poly_mul_ui(tmp2, invsqrtA, 3);
     poly_sub_mod_mpz(tmp, tmp2, tmp, pk);
-    poly_div_ui_mod_mpz(invsqrtA, tmp, 2, pk); 
+    //poly_div_ui_mod_mpz(invsqrtA, tmp, 2, pk); 
+    poly_div_2_mod_mpz(invsqrtA, tmp, pk);
 
     // multiply by a, to check if rational reconstruction succeeds
-    poly_mul_mod_f_mod_mpz(tmp, invsqrtA, a, f, pk);
+    st = seconds ();
+    poly_mul_mod_f_mod_mpz(tmp, invsqrtA, a, f, pk, invpk);
+#ifdef VERBOSE
+    fprintf (stderr, "   poly_mul_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
+#endif
   } while (!poly_integer_reconstruction(tmp, tmp, pk));
 
   poly_copy(res->p, tmp);
   res->v = v;
 
-
-  mpz_clear(pk);
+  if (p <= 62)
+    poly_base_clear (S);
+  mpz_clear (pk);
+  mpz_clear (invpk);
   poly_free(tmp);
   poly_free(tmp2);
   poly_free(f);
@@ -365,13 +417,16 @@ int main(int argc, char **argv) {
     mpz_set_ui(prd_tab[0]->p->coeff[0], 1);
     prd_tab[0]->p->deg = 0;
     prd_tab[0]->v = 0;
+    double st = 0.0;
     while(fscanf(depfile, "%ld %lu", &a, &b) != EOF){
       if(!(nab % 100000))
-	fprintf(stderr, "# Reading ab pair #%d at %2.2lf\n",nab,seconds());
+	fprintf(stderr, "# Reading ab pair #%d at %2.2lf\n", nab, seconds());
       if((a == 0) && (b == 0))
 	break;
       polymodF_from_ab(tmp, a, b);
+      st -= seconds ();
       prd_tab = accumulate_fast (prd_tab, tmp, F, &lprd, nprd++);
+      st += seconds ();
       nab++;
       if(b == 0)
 	  nfree++;
