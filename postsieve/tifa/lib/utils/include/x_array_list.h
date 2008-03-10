@@ -119,8 +119,16 @@ uint32_array_list_t* alloc_uint32_array_list(uint32_t alloced);
     * \param[in] list A pointer to the <tt>uint32_array_list_t</tt>.
     * \return A pointer to the newly allocated \c uint32_array_list_t structure.
     */
-inline void add_entry_in_uint32_array_list(uint32_array_t* const entry,
-                                           uint32_array_list_t* const list);
+inline static void
+add_entry_in_uint32_array_list(uint32_array_t* const entry,
+                               uint32_array_list_t* const list) {
+    //
+    // _WARNING_: Ownership of the uint32_array_t pointed by entry is
+    //            transfered to the uint32_array_list_t
+    //
+    list->data[list->length] = entry;
+    list->length++;
+}
 
    /**
     * \brief Clears a <tt>uint32_array_list_t</tt>.
@@ -217,8 +225,16 @@ mpz_array_list_t* alloc_mpz_array_list(uint32_t alloced);
     * \param[in] list A pointer to the <tt>mpz_array_list_t</tt>.
     * \return A pointer to the newly allocated \c mpz_array_list_t structure.
     */
-inline void add_entry_in_mpz_array_list(mpz_array_t* const entry,
-                                        mpz_array_list_t* const list);
+inline static void
+add_entry_in_mpz_array_list(mpz_array_t* const entry,
+                            mpz_array_list_t* const list) {
+    //
+    // _WARNING_: Ownership of the mpz_array_t pointed by entry is
+    //            transfered to the mpz_array_list_t
+    //
+    list->data[list->length] = entry;
+    list->length++;
+}
 
    /**
     * \brief Clears a <tt>mpz_array_list_t</tt>.

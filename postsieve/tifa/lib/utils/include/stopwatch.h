@@ -84,7 +84,7 @@ typedef struct struct_stopwatch_t stopwatch_t;
     *
     * \param watch The \c stopwatch_t to init.
     */
-inline void init_stopwatch(stopwatch_t* const watch);
+void init_stopwatch(stopwatch_t* const watch);
 
    /**
     * \brief Starts a \c stopwatch_t.
@@ -95,7 +95,7 @@ inline void init_stopwatch(stopwatch_t* const watch);
     *
     * \param watch The \c stopwatch_t to start.
     */
-inline void start_stopwatch(stopwatch_t* const watch);
+void start_stopwatch(stopwatch_t* const watch);
 
    /**
     * \brief Stop a \c stopwatch_t.
@@ -111,7 +111,7 @@ inline void start_stopwatch(stopwatch_t* const watch);
     *
     * \param watch The \c stopwatch_t to stop.
     */
-inline void stop_stopwatch(stopwatch_t* const watch);
+void stop_stopwatch(stopwatch_t* const watch);
 
    /**
     * \brief Reset a \c stopwatch_t.
@@ -121,7 +121,7 @@ inline void stop_stopwatch(stopwatch_t* const watch);
     *
     * \param watch The \c stopwatch_t to reset.
     */
-inline void reset_stopwatch(stopwatch_t* const watch);
+void reset_stopwatch(stopwatch_t* const watch);
 
    /**
     * \brief Returns the elapsed time measured.
@@ -134,7 +134,7 @@ inline void reset_stopwatch(stopwatch_t* const watch);
     *
     * \param[in] watch The \c stopwatch_t used for timing.
     */
-inline double get_stopwatch_elapsed(stopwatch_t* const watch);
+double get_stopwatch_elapsed(stopwatch_t* const watch);
 
 #ifdef __cplusplus
 }

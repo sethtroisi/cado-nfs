@@ -52,16 +52,6 @@ uint32_array_list_t* alloc_uint32_array_list(uint32_t alloced) {
     return list;
 }
 //-----------------------------------------------------------------------------
-inline void add_entry_in_uint32_array_list(uint32_array_t* const entry,
-                                           uint32_array_list_t* const list) {
-    //
-    // _WARNING_: Ownership of the uint32_array_t pointed by entry is
-    //            transfered to the uint32_array_list_t
-    //
-    list->data[list->length] = entry;
-    list->length++;
-}
-//-----------------------------------------------------------------------------
 void clear_uint32_array_list(uint32_array_list_t* const list) {
     for (uint32_t i = 0U; i < list->length; i++) {
         if (list->data[i] != NULL) {
@@ -106,16 +96,6 @@ mpz_array_list_t* alloc_mpz_array_list(uint32_t alloced) {
     list->data    = malloc(list->alloced*sizeof(mpz_array_t*));
 
     return list;
-}
-//-----------------------------------------------------------------------------
-inline void add_entry_in_mpz_array_list(mpz_array_t* const entry,
-                                        mpz_array_list_t* const list) {
-    //
-    // _WARNING_: Ownership of the mpz_array_t pointed by entry is
-    //            transfered to the mpz_array_list_t
-    //
-    list->data[list->length] = entry;
-    list->length++;
 }
 //-----------------------------------------------------------------------------
 void clear_mpz_array_list(mpz_array_list_t* const list) {

@@ -611,7 +611,7 @@ uint32_t bern_21_rt_pairs_lp_siqs(
     * \param step the step number in the early abort strategy
     * \return The number of relations used from the "candidate" arrays.
     */
-inline uint32_t djb_batch_rt(
+uint32_t djb_batch_rt(
     smooth_filter_t* const filter,
     unsigned long int step
 );

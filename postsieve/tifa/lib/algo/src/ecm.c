@@ -206,6 +206,7 @@ static const unsigned int default_bitsizes[NDFLT_ENTRIES] = {
     180,
     185,
     190,
+    195,
     200
 };
 
@@ -226,7 +227,7 @@ static const unsigned long int default_b1s[NDFLT_ENTRIES] = {
     2005,
     2811,
     3963,
-    5609,  
+    5609,
     7960,
     11321,
     16121,
@@ -446,7 +447,7 @@ void set_ecm_params_to_default(const mpz_t n MAYBE_UNUSED,
         while (sizen < default_bitsizes[i]) {
             i--;
         }
-    }
+    }    
     params->b1      = default_b1s[i];
     params->b2      = default_ratios[i] * params->b1;
     params->ncurves = default_ncurves[i];

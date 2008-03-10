@@ -20,8 +20,8 @@
 /**
  * \file    sqrt_cont_frac.h
  * \author  Jerome Milan
- * \date    Mon Dec  4 2006
- * \version 1.0.1
+ * \date    Mon Mar 10 2008
+ * \version 1.0.2
  *
  * \brief Continued fraction expansion for square root of integers.
  *
@@ -40,16 +40,16 @@
  * root.
  */
 
- /*
-  *  License: GNU Lesser General Public License (LGPL)
-  *  History:
-  *
-  *  1.0.1: Mon Dec  4 2006 by JM:
-  *         - Got rid of useless variables in the struct_cont_state_t structure.
-  *
-  *  1.0.0: Thu Mar 2 2006 by JM:
-  *         - Initial version.
-  */
+/*
+ * History:
+ * --------
+ *  1.0.2: Mon Mar 10 2008 by JM:
+ *         - Inlined step_cont_frac_state(...) function.
+ *  1.0.1: Mon Dec  4 2006 by JM:
+ *         - Got rid of useless variables in the struct_cont_state_tstructure.
+ *    1.0: Thu Mar 2 2006 by JM:
+ *         - Initial version.
+ */
 
 #if !defined(_TIFA_SQRT_CONT_FRAC_H_)
    /**
@@ -201,8 +201,10 @@ void clear_cont_frac_state(cont_frac_state_t* const state);
     * \param[in] state A pointer to the <tt>cont_frac_state_t</tt>.
     * \param[in] nsteps Number of steps to perfom.
     */
-inline void step_cont_frac_state(cont_frac_state_t* const state,
-                                 uint32_t nsteps);
+inline static void step_cont_frac_state(cont_frac_state_t* const state,
+                                        uint32_t nsteps) {
+    state->step_function(state, nsteps);
+}
 
 #ifdef __cplusplus
 }

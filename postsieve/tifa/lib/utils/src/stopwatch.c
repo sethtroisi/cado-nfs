@@ -34,12 +34,12 @@
 #include "stopwatch.h"
 
 //----------------------------------------------------------------------------
-inline void init_stopwatch(stopwatch_t* const watch) {    
+void init_stopwatch(stopwatch_t* const watch) {    
     watch->elapsed_usec = 0;
     watch->is_running   = false;
 }
 //----------------------------------------------------------------------------
-inline void start_stopwatch(stopwatch_t* const watch) {    
+void start_stopwatch(stopwatch_t* const watch) {    
     if (! watch->is_running) {
         getrusage(RUSAGE_SELF, watch->rsg);
         
@@ -53,7 +53,7 @@ inline void start_stopwatch(stopwatch_t* const watch) {
     }
 }
 //----------------------------------------------------------------------------
-inline void stop_stopwatch(stopwatch_t* const watch) {
+void stop_stopwatch(stopwatch_t* const watch) {
     if (watch->is_running) {
         getrusage(RUSAGE_SELF, watch->rsg);
         
@@ -68,7 +68,7 @@ inline void stop_stopwatch(stopwatch_t* const watch) {
     }
 }
 //----------------------------------------------------------------------------
-inline void reset_stopwatch(stopwatch_t* const watch) {
+void reset_stopwatch(stopwatch_t* const watch) {
     watch->elapsed_usec = 0;
     if (watch->is_running) {
         getrusage(RUSAGE_SELF, watch->rsg);
@@ -81,7 +81,7 @@ inline void reset_stopwatch(stopwatch_t* const watch) {
     }
 }
 //----------------------------------------------------------------------------
-inline double get_stopwatch_elapsed(stopwatch_t* const watch) {
+double get_stopwatch_elapsed(stopwatch_t* const watch) {
     return  (watch->elapsed_usec / 1000000.0);
 }
 //----------------------------------------------------------------------------

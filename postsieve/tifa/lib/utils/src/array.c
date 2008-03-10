@@ -20,13 +20,15 @@
 /**
  * \file    array.c
  * \author  Jerome Milan
- * \date    Fri Mar 7 2008
- * \version 1.2.1
+ * \date    Mon Mar 10 2008
+ * \version 1.2.2
  */
 
  /*
   * History:
   * --------
+  * 1.2.2: Mon Mar 10 2008 by JM:
+  *        - Inlined is_in_sorted_*_array(...) functions.
   * 1.2.1: Fri Mar 7 2008 by JM:
   *        - WARNING: Changed memory managment. clear_*_array functions now
   *                   frees the pointer to the array (that's more logical).
@@ -234,21 +236,6 @@ uint32_t index_in_sorted_byte_array(unsigned char to_find,
     }
 }
 //-----------------------------------------------------------------------------
-bool is_in_byte_array(unsigned char to_find, const byte_array_t* const array) {
-    return (NOT_IN_ARRAY != index_in_byte_array(to_find, array));
-}
-//-----------------------------------------------------------------------------
-inline bool is_in_sorted_byte_array(unsigned char to_find,
-                                    const byte_array_t* const array) {
-    return (NOT_IN_ARRAY != index_in_sorted_byte_array(
-                                to_find,
-                                array,
-                                0,
-                                array->length - 1
-                            )
-            );
-}
-//-----------------------------------------------------------------------------
 
 /*
  *-----------------------------------------------------------------------------
@@ -428,21 +415,6 @@ uint32_t index_in_sorted_uint32_array(uint32_t to_find,
     }
 }
 //-----------------------------------------------------------------------------
-bool is_in_uint32_array(uint32_t to_find, const uint32_array_t* const array) {
-    return (NOT_IN_ARRAY != index_in_uint32_array(to_find, array));
-}
-//-----------------------------------------------------------------------------
-bool is_in_sorted_uint32_array(uint32_t to_find,
-                               const uint32_array_t* const array) {
-    return (NOT_IN_ARRAY != index_in_sorted_uint32_array(
-                                to_find,
-                                array,
-                                0,
-                                array->length - 1
-                            )
-            );
-}
-//-----------------------------------------------------------------------------
 
 /*
  *-----------------------------------------------------------------------------
@@ -596,21 +568,6 @@ uint32_t index_in_sorted_int32_array(int32_t to_find,
         //
         return NOT_IN_ARRAY;
     }
-}
-//-----------------------------------------------------------------------------
-bool is_in_int32_array(int32_t to_find, const int32_array_t* const array) {
-    return (NOT_IN_ARRAY != index_in_int32_array(to_find, array));
-}
-//-----------------------------------------------------------------------------
-bool is_in_sorted_int32_array(int32_t to_find,
-                              const int32_array_t* const array) {
-    return (NOT_IN_ARRAY != index_in_sorted_int32_array(
-                                to_find,
-                                array,
-                                0,
-                                array->length - 1
-                            )
-            );
 }
 //-----------------------------------------------------------------------------
 
@@ -820,21 +777,6 @@ void qsort_mpz_array(mpz_array_t* const array) {
     // Quick sort using the qsort function from the standard C library...
     //
     qsort(array->data, array->length, sizeof(mpz_t), mpz_cmp_func);
-}
-//-----------------------------------------------------------------------------
-bool is_in_mpz_array(const mpz_t to_find, const mpz_array_t* const array) {
-    return (NOT_IN_ARRAY != index_in_mpz_array(to_find, array));
-}
-//-----------------------------------------------------------------------------
-bool is_in_sorted_mpz_array(const mpz_t to_find,
-                            const mpz_array_t* const array) {
-    return (NOT_IN_ARRAY != index_in_sorted_mpz_array(
-                                to_find,
-                                array,
-                                0,
-                                array->length - 1
-                            )
-           );
 }
 //-----------------------------------------------------------------------------
 

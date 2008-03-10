@@ -71,7 +71,7 @@ ecode_t compute_multiplicities(
 //------------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
-inline ecode_t run_machine(factoring_machine_t* machine) {
+ecode_t run_machine(factoring_machine_t* machine) {
     switch (machine->mode) {
         case SINGLE_RUN:
             return single_run(machine);

@@ -1362,8 +1362,7 @@ uint32_t bern_21_rt_pairs_lp_siqs(const mpz_t n,
     return retval;
 }
 //------------------------------------------------------------------------------
-inline uint32_t djb_batch_rt(smooth_filter_t* const filter,
-                             unsigned long int step) {
+uint32_t djb_batch_rt(smooth_filter_t* const filter, unsigned long int step) {
     //
     // Combining smoothness batches with early abort-like strategies
     // certainly makes no sense. Right now it is not used (filter->nsteps

@@ -124,8 +124,9 @@ ecode_t run_program(factoring_program_t* const program) {
         multis->length--;
         rcode = PARTIAL_FACTORIZATION_FOUND;
     }
-    
-    printf("\n");
+    if (program->verbose || program->timing) {
+        printf("\n");
+    }
     printf("Integer to factor after trial division:\n");
     printf("---------------------------------------\n");
     gmp_printf("\t%Zd\n\n", unfactored);
@@ -193,7 +194,10 @@ ecode_t run_program(factoring_program_t* const program) {
                 program->mode
             );
     STOP_TIMER;    
-    printf("\nAveraged time: %8.4f seconds\n", (GET_TIMING/(float)niterations));
+    if (program->verbose || program->timing) {
+        printf("\n");
+    }
+    printf("Averaged time: %8.4f seconds\n\n", (GET_TIMING/(float)niterations));
 #else
     INIT_TIMER;
     START_TIMER;
@@ -205,12 +209,11 @@ ecode_t run_program(factoring_program_t* const program) {
                 program->mode
             );
     STOP_TIMER;
-    printf("\nTime: %8.4f seconds\n", GET_TIMING);
-#endif
-
     if (program->verbose || program->timing) {
         printf("\n");
     }
+    printf("Time: %8.4f seconds\n\n", GET_TIMING);
+#endif
         
     switch (ecode) {
         case COMPLETE_FACTORIZATION_FOUND:

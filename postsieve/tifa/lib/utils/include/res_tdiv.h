@@ -67,7 +67,7 @@ extern "C" {
     * \param[in] filter a pointer to the \c smooth_filter_t to use.
     * \param[in] step the step in the early abort strategy to perform.
     */
-inline uint32_t res_tdiv(smooth_filter_t* const filter, unsigned long int step);
+uint32_t res_tdiv(smooth_filter_t* const filter, unsigned long int step);
 
 #ifdef __cplusplus
 }

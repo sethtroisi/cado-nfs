@@ -229,7 +229,7 @@ typedef struct factoring_machine_struct factoring_machine_t;
     *
     * \param machine A pointer to the \c factoring_machine_t to use.
     */
-inline ecode_t run_machine(factoring_machine_t* machine);
+ecode_t run_machine(factoring_machine_t* machine);
 
 #ifdef __cplusplus
 }

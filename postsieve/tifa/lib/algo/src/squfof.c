@@ -135,7 +135,7 @@
     #define divide(N, D)  ((N) / (D))
 #endif
 //-----------------------------------------------------------------------------
-static inline unsigned long int
+inline static unsigned long int
 divide_trick(const unsigned long int N, const unsigned long int D);  
 //-----------------------------------------------------------------------------
 
@@ -215,7 +215,7 @@ doubling_algo(
     const mpz_t N
 );
 //-----------------------------------------------------------------------------
-static inline unsigned long int
+inline static unsigned long int
 jump_over_k_steps(
     unsigned long int* const P,
     unsigned long int* const Q,
@@ -1569,7 +1569,7 @@ void print_queue(linked_list_t* queue) {
  *-----------------------------------------------------------------------------
  */
 
-static inline unsigned long int divide_trick(const unsigned long int N,
+inline static unsigned long int divide_trick(const unsigned long int N,
                                              const unsigned long int D) {
     //
     // A really quick and dirty trick to (hopefully) speed up divisions if
@@ -1873,7 +1873,7 @@ inline static unsigned long int doubling_algo(unsigned long int* const P2,
     return large_step(P2, Q2, QQ2, P, Q, QQ, PB, QB, QQB, S, D, N);
 }
 //-----------------------------------------------------------------------------
-static inline unsigned long int jump_over_k_steps(unsigned long int* const P,
+inline static unsigned long int jump_over_k_steps(unsigned long int* const P,
                                                   unsigned long int* const Q,
                                                   unsigned long int* const QQ,
                                                   unsigned long int P0,

@@ -20,35 +20,26 @@
 /**
  * \file    gmp_utils.c
  * \author  Jerome Milan
- * \date    Wed Mar 7 2007
- * \version 1.0.1
+ * \date    Mon Mar 10 2008
+ * \version 1.0.2
  */
 
- /*
-  *  Copyright (C) 2006, 2007 INRIA
-  *  License: GNU Lesser General Public License (LGPL)
-  *  History:
-  *    1.0.1: Wed Mar 7 2007 by JM
-  *        - added *_mpzpair_htable functions
-  *    1.0: Wed Mar 1 2006 by JM
-  *        - initial version
-  */
+/*
+ * History:
+ * --------
+ *    1.0.2: Mon Mar 10 2008 by JM
+ *        - Inlined some functions.
+ *    1.0.1: Wed Mar 7 2007 by JM
+ *        - Added *_mpzpair_htable functions.
+ *    1.0: Wed Mar 1 2006 by JM
+ *        - Initial version.
+ */
 
 #include <stdlib.h>
 #include <gmp.h>
 
 #include "gmp_utils.h"
 
-//-----------------------------------------------------------------------------
-inline void init_mpz_pair(mpz_pair_t* pair) {
-    mpz_init(pair->x);
-    mpz_init(pair->y);
-}
-//-----------------------------------------------------------------------------
-inline void clear_mpz_pair(mpz_pair_t* pair) {
-    mpz_clear(pair->x);
-    mpz_clear(pair->y);
-}
 //------------------------------------------------------------------------------
 void empty_mpzpair_htable(hashtable_t* const htable) {
     //
@@ -76,10 +67,5 @@ void empty_mpzpair_htable(hashtable_t* const htable) {
         htable->buckets[i].tail   = NULL;
         htable->buckets[i].length = 0;
     }
-}
-//------------------------------------------------------------------------------
-void clear_mpzpair_htable(hashtable_t* htable) {
-    empty_mpzpair_htable(htable);
-    clear_hashtable(htable);
 }
 //------------------------------------------------------------------------------

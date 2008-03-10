@@ -20,8 +20,8 @@
 /**
  * \file    funcs.h
  * \author  Jerome Milan
- * \date    Wed Jan 30 2008
- * \version 1.2
+ * \date    Mon Mar 10 2008
+ * \version 1.2.1
  *
  * \brief Number theoretical, hash and comparison functions.
  *
@@ -30,7 +30,10 @@
  */
 
  /*
-  *  History:
+  * History:
+  * --------
+  *  1.2.1: Mon Mar 10 2008 by JM
+  *          - Inlined some functions.
   *    1.2: Wed Jan 30 2008 by JM:
   *          - Added is_prime function (composition test).
   *    1.1: Tue Sep 4 2007 by JM:
@@ -57,6 +60,7 @@ extern "C" {
 #include <math.h>
 #include <gmp.h>
 
+#include "macros.h"
 #include "array.h"
 #include "tifa_config.h"
 
@@ -157,7 +161,9 @@ uint32_t most_significant_bit(uint32_t n);
     * \param[in] n A positive integer.
     * \returns Floor of log(<tt>n</tt>) in base 2.
     */
-inline uint32_t floor_log2(uint32_t n);
+inline static uint32_t floor_log2(uint32_t n) {
+    return most_significant_bit(n);
+}
 
    /**
     * \brief Ceil of logarithm in base 2 of a positive integer.
@@ -169,7 +175,13 @@ inline uint32_t floor_log2(uint32_t n);
     * \param[in] n A positive integer.
     * \returns Ceil of log(<tt>n</tt>) in base 2.
     */
-inline uint32_t ceil_log2(uint32_t n);
+inline static uint32_t ceil_log2(uint32_t n) {
+    uint32_t e = most_significant_bit(n);
+    if (! IS_POWER_OF_2_UI(n)) {
+        e++;
+    }
+    return e;
+}
 
    /**
     * \brief Find a coprime base from a list of factors.

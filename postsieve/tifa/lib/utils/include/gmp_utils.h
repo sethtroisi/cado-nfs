@@ -20,12 +20,23 @@
 /**
  * \file    gmp_utils.h
  * \author  Jerome Milan
- * \date    Wed Mar 1 2006
- * \version 1.0
+ * \date    Mon Mar 10 2008
+ * \version 1.0.2
  *
  * \brief Various GMP small utilities.
  *
  * GMP small utilities' definitions should go here.
+ */
+
+/*
+ * History:
+ * --------
+ *    1.0.2: Mon Mar 10 2008 by JM
+ *        - Inlined some functions.
+ *    1.0.1: Wed Mar 7 2007 by JM
+ *        - Added *_mpzpair_htable functions.
+ *    1.0: Wed Mar 1 2006 by JM
+ *        - Initial version.
  */
 
 #if !defined(_TIFA_GMP_UTILS_H_)
@@ -73,7 +84,10 @@ typedef struct struct_mpz_pair_t mpz_pair_t;
     *
     * \param[in] pair A pointer to the <tt>mpz_pair_t</tt> to init.
     */
-inline void init_mpz_pair(mpz_pair_t* pair);
+inline static void init_mpz_pair(mpz_pair_t* pair) {
+    mpz_init(pair->x);
+    mpz_init(pair->y);
+}
 
    /**
     * \brief Clears a <tt>mpz_pair_t</tt>.
@@ -82,7 +96,10 @@ inline void init_mpz_pair(mpz_pair_t* pair);
     *
     * \param[in] pair A pointer to the <tt>mpz_pair_t</tt> to clear.
     */
-inline void clear_mpz_pair(mpz_pair_t* pair);
+inline static void clear_mpz_pair(mpz_pair_t* pair) {
+    mpz_clear(pair->x);
+    mpz_clear(pair->y);
+}
 
    /**
     * \brief Empties a <tt>hashtable_t</tt> holding <tt>mpz_pair_t</tt>'s.
@@ -103,7 +120,10 @@ void empty_mpzpair_htable(hashtable_t* const htable);
     *
     * \param[in] htable A pointer to the <tt>hashtable_t</tt> to clear.
     */
-void clear_mpzpair_htable(hashtable_t* htable);
+inline static void clear_mpzpair_htable(hashtable_t* htable) {
+    empty_mpzpair_htable(htable);
+    clear_hashtable(htable);
+}
 
 
 #ifdef __cplusplus

@@ -20,33 +20,30 @@
 /**
  * \file    sqrt_cont_frac.c
  * \author  Jerome Milan
- * \date    Wed July 4 2007
- * \version 1.1
+ * \date    Mon Mar 10 2008
+ * \version 1.1.1
  */
 
- /*
-  *  Copyright (C) 2006, 2007 INRIA
-  *  License: GNU Lesser General Public License (LGPL)
-  *  History:
-  *
-  *  1.1: Wed July 4 2007 by JM:
-  *         - Partly rewrote the step functions to add minor optimizations.
-  *
-  *  1.0.2: Tue Dec 19 2006 by JM:
-  *         - Choose the step function according to the size of n, the number
-  *           whose square root has to be expanded. Also added an mpn version
-  *           of the general case step function.
-  *
-  *  1.0.1: Mon Dec  4 2006 by JM:
-  *         - Got rid of the floating-point operations (how did I make such
-  *           a blunder?) This is not only performance-related though. Indeed,
-  *           floating point operations gave wrong results if the precision
-  *           wasn't set high enough. /me still wonders how he could have been
-  *           so stupid to use completely useless floating-point operations...
-  *
-  *  1.0.0: Thu Mar 2 2006 by JM:
-  *         - Initial version.
-  */
+/*
+ * History:
+ * --------
+ *  1.1.1: Mon Mar 10 2008 by JM:
+ *         - Inlined step_cont_frac_state(...) function.
+ *  1.1: Wed July 4 2007 by JM:
+ *         - Partly rewrote the step functions to add minor optimizations.
+ *  1.0.2: Tue Dec 19 2006 by JM:
+ *         - Choose the step function according to the size of n, the number
+ *           whose square root has to be expanded. Also added an mpn version
+ *           of the general case step function.
+ *  1.0.1: Mon Dec  4 2006 by JM:
+ *         - Got rid of the floating-point operations (how did I make such
+ *           a blunder?) This is not only performance-related though. Indeed,
+ *           floating point operations gave wrong results if the precision
+ *           wasn't set high enough. /me still wonders how he could have been
+ *           so stupid to use completely useless floating-point operations...
+ *  1.0.0: Thu Mar 2 2006 by JM:
+ *         - Initial version.
+ */
 
 #include <stdlib.h>
 
@@ -198,15 +195,12 @@ void clear_cont_frac_state(cont_frac_state_t* const state) {
     return;
 }
 //------------------------------------------------------------------------------
-inline void
-step_cont_frac_state(cont_frac_state_t* const state, uint32_t nsteps) {
-    state->step_function(state, nsteps);
-}
-//------------------------------------------------------------------------------
 
-    //
-    //                     "Private" functions
-    //
+/*
+ *-----------------------------------------------------------------------------
+ *                            "Private" functions
+ *-----------------------------------------------------------------------------
+ */
 
 //------------------------------------------------------------------------------
 void step_function_mpz(cont_frac_state_t* const state, uint32_t nsteps) {

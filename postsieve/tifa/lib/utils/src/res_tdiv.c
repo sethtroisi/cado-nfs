@@ -63,7 +63,7 @@ uint32_t res_tdiv_last(smooth_filter_t* const filter);
 //-----------------------------------------------------------------------------
 
 //------------------------------------------------------------------------------
-inline uint32_t res_tdiv(smooth_filter_t* const filter,unsigned long int step) {
+uint32_t res_tdiv(smooth_filter_t* const filter,unsigned long int step) {
 
     if (filter->method == TDIV) {
         return res_tdiv_no_ea(filter);

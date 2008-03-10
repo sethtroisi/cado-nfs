@@ -20,12 +20,15 @@
 /**
  * \file    funcs.c
  * \author  Jerome Milan
- * \date    Wed Jan 30 2008
- * \version 1.2
+ * \date    Mon Mar 10 2008
+ * \version 1.2.1
  */
 
  /*
-  *  History:
+  * History:
+  * --------
+  *  1.2.1: Mon Mar 10 2008 by JM
+  *          - Inlined some functions.
   *    1.2: Wed Jan 30 2008 by JM:
   *          - Added is_prime function (composition test).
   *    1.1: Tue Sep 4 2007 by JM:
@@ -104,18 +107,6 @@ uint32_t most_significant_bit(uint32_t n) {
             return log2table[n];
         }
     }
-}
-//-----------------------------------------------------------------------------
-inline uint32_t floor_log2(uint32_t n) {
-    return most_significant_bit(n);
-}
-//-----------------------------------------------------------------------------
-inline uint32_t ceil_log2(uint32_t n) {
-    uint32_t e = most_significant_bit(n);
-    if (! IS_POWER_OF_2_UI(n)) {
-        e++;
-    }
-    return e;
 }
 //-----------------------------------------------------------------------------
 void augment_coprime_base(mpz_t f, mpz_array_t* base) {
