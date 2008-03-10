@@ -20,7 +20,7 @@
 /* As its name says, this is a ugly hack that initializes all lognorms to the
    maximal value (255) on the rational side. But it seems to work well, and to
    miss only about 7% to 8% relations wrt a more accurate estimation. */
-// #define UGLY_HACK
+//#define UGLY_HACK
 
 /* number of bits used to estimate the norms */
 #define NORM_BITS 10
@@ -788,6 +788,11 @@ init_alg_norms (sieve_info_t *si)
     }
 }
 
+#ifdef SSE_NORM_INIT
+typedef double v2df __attribute__ ((vector_size (16)));
+typedef uint64_t v2di __attribute__ ((vector_size (16)));
+#endif
+
 /* Initialize lognorms on the rational side for the bucket_region
  * number N.
  * For the moment, nothing clever, wrt discarding (a,b) pairs that are
@@ -839,18 +844,72 @@ init_rat_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly,
       {
         gjj = gj * (double) j;
         zx->z = gjj - gi * (double) halfI;
-        for (i = -halfI; i < halfI; i++) {
+        __asm__("### Begin rational norm loop\n");
+#ifndef SSE_NORM_INIT
+        for (i = 0; i < si->I; i++) {
           /* the double precision number 1.0 has high bit 0 (sign),
              then 11-bit biased exponent 1023, and 52-bit mantissa 0 */
           /* the magic constant here is simply 1023*2^52, where
              1023 is the exponent bias in binary64 */
-          y = (zx->x - (uint64_t) 4607182418800017408) >> (52 - l);
+          y = (zx->x - (uint64_t) 0x3FF0000000000000) >> (52 - l);
           *S++ = si->S_rat[y & mask];
           zx->z += gi;
         }
+#else
+        union { v2df dble;
+            v2di intg;
+            struct {uint64_t y0; uint64_t y1; } intpair;
+        } y_vec;
+        
+        v2df gi_vec = { 2*gi, 2*gi };
+        v2di mask_vec = { mask, mask };
+        v2di cst_vec = { (uint64_t) 0x3FF0000000000000,
+            (uint64_t) 0x3FF0000000000000 };
+        v2di shift_value = { (uint64_t)(52 - l), (uint64_t)(52 - l) };
+        v2df z_vec = { zx->z, zx->z+gi };
+
+        for (i = 0; i < halfI; ++i) {
+            y_vec.dble = z_vec;
+            y_vec.intg -= cst_vec;
+            y_vec.intg = __builtin_ia32_psrlq128(y_vec.intg, shift_value);
+            y_vec.intg &= mask_vec;
+//            *S++ = si->S_rat[((uint32_t *)(&y_vec.intg))[0]];
+//             *S++ = si->S_rat[((uint32_t *)(&y_vec.intg))[2]];
+            *S++ = si->S_rat[y_vec.intpair.y0];
+            *S++ = si->S_rat[y_vec.intpair.y1];
+            z_vec += gi_vec;
+        }
+#endif
+        __asm__("### End rational norm loop\n");
       }
 #endif
 }
+
+#ifdef SSE_NORM_INIT
+static inline void
+init_fpoly_v2df(v2df *F, const double *f, const int deg)
+{
+    int i;
+    for (i = 0; i <= deg; ++i) {
+        v2df tmp = { f[i], f[i] };
+        F[i] = tmp;
+    }
+}
+
+
+static inline v2df
+fpoly_eval_v2df_deg5(const v2df *f, const v2df x) 
+{
+    v2df r;
+    r = f[5];
+    r = r * x + f[4];
+    r = r * x + f[3];
+    r = r * x + f[2];
+    r = r * x + f[1];
+    r = r * x + f[0];
+    return r;
+}
+#endif
 
 /* Initialize lognorms on the algebraic side for the bucket_region
  * number N.
@@ -886,21 +945,62 @@ init_alg_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly,
       /* scale by j^(d-k) the coefficients of fij */
       for (k = 0, powj = 1.0; k <= d; k++, powj *= (double) j)
         u[d - k] = t[d - k] * powj;
-      
+
+#ifdef SSE_NORM_INIT
+      v2df u_vec[d];
+      init_fpoly_v2df(u_vec, u, d);
+      double i0 = 0.0 ;
+      unsigned char *S_ptr0 = NULL;
+      int cpt = 0;
+#endif
       /* now compute norms */
       for (i = -halfI; i < halfI; i += 1.0)
         {
           if (si->rat_Bound[*S])
             {
+#ifndef SSE_NORM_INIT
               zx->z = fpoly_eval (u, d, i);
               /* 4607182418800017408 = 1023*2^52 */
-              y = (zx->x - (uint64_t) 4607182418800017408) >> (52 - l);
+              y = (zx->x - (uint64_t) 0x3FF0000000000000) >> (52 - l);
               report++;
               *S++ = T[y & mask];
+#else
+              ASSERT(d == 5);
+              v2di mask_vec = { mask, mask };
+              v2di cst_vec = { (uint64_t) 0x3FF0000000000000,
+                  (uint64_t) 0x3FF0000000000000 };
+              v2di shift_value = { (uint64_t)(52 - l), (uint64_t)(52 - l) };
+              report++;
+              if (cpt == 0) {
+                  i0 = i;
+                  cpt++;
+                  S_ptr0 = S++;
+              } else if (cpt == 1) {
+                  cpt--;
+                  v2df i_vec = {i0, i};
+                  union { v2df dble;
+                      v2di intg;
+                      struct {uint64_t y0; uint64_t y1; } intpair;
+                  } fi_vec;
+                  fi_vec.dble = fpoly_eval_v2df_deg5(u_vec, i_vec);
+                  fi_vec.intg -= cst_vec;
+                  fi_vec.intg = __builtin_ia32_psrlq128(fi_vec.intg, shift_value);
+                  fi_vec.intg &= mask_vec;
+                  *S_ptr0 = T[fi_vec.intpair.y0];
+                  *S++ = T[fi_vec.intpair.y1];
+              }
+#endif
             }
           else
             *S++ = UCHAR_MAX;
         }
+#ifdef SSE_NORM_INIT
+      if (cpt == 1) { // odd number of computations
+          zx->z = fpoly_eval (u, d, i0);
+          y = (zx->x - (uint64_t) 0x3FF0000000000000) >> (52 - l);
+          *S_ptr0 = T[y & mask];
+      }
+#endif
     }
 
   return report;
@@ -1876,7 +1976,7 @@ main (int argc, char *argv[])
     fprintf (stderr, "# Average J=%1.0f for %lu special-q's\n",
              totJ / (double) sq, sq);
     tts = t0 - (tn_rat + tn_alg + ttf);
-    fprintf (stderr, "# Total time %1.1fs [norm %1.1f+%1.1f, sieving %1.1f"
+    fprintf (stderr, "# Total time %1.1fs [norm %1.2f+%1.1f, sieving %1.1f"
             " (%1.1f + %1.1f),"
              " factor %1.1f]\n", t0, tn_rat, tn_alg, tts, ttsm, tts-ttsm, ttf);
     fprintf (stderr, "# Total %lu reports [%1.3fs/r]\n",
