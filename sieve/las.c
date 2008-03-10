@@ -201,7 +201,7 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int I, uint64_t q0)
   si->log_bucket_region = BUCKET_REGION;
   ASSERT_ALWAYS(si->log_bucket_region >= si->logI);
   si->bucket_region = 1<<si->log_bucket_region;
-  si->nb_buckets = 1 + ((si->I*si->J) / si->bucket_region);
+  si->nb_buckets = 1 + (si->I * si->J - 1) / si->bucket_region;
   si->bucket_limit = (BUCKET_LIMIT_FACTOR)*si->bucket_region;
   fprintf(stderr, "# log_bucket_region = %u\n", si->log_bucket_region);
   fprintf(stderr, "# bucket_region = %u\n", si->bucket_region);
@@ -270,11 +270,13 @@ sieve_info_update (sieve_info_t *si, double skew)
   if (one_over_b1 < s_over_a1)
     s_over_a1 = one_over_b1; /* min(s/|a1|, 1/|b1|) */
   s_over_a1 *= si->B;
-  if (s_over_a1 > 1.0)
+  if (s_over_a1 > 1.0) /* ensures that J <= I/2 */
     s_over_a1 = 1.0;
   si->J = (uint32_t) (s_over_a1 * (double) (si->I >> 1));
   fprintf (stderr, "# I=%u; J=%u\n", si->I, si->J);
-  
+
+  /* update number of buckets */
+  si->nb_buckets = 1 + (si->I * si->J - 1) / si->bucket_region;
 }
 
 static void
