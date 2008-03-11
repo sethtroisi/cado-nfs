@@ -94,11 +94,32 @@
 #-------------------------------------------------------------------------------
 
 #
-# Project wide C compiler flags.
+# The C compiler.
+# Default: determined by SCons.
+#-------------------------------------------------------------------------------
+#CC = 'gcc'
+
 #
+# General options passed to the C and C++ compilers.
 # Default: '-O3'
 #-------------------------------------------------------------------------------
-#CCFLAGS = '-g -Wall -Wextra'
+#CCFLAGS = '-m64 -fast'
+
+#
+# The linker.
+# Default: determined by SCons.
+#-------------------------------------------------------------------------------
+#LINK = 'gcc'
+
+#
+# General options passed to the linker.
+# Excerpt from the manual:
+#     "Note that this variable should not contain -l (or similar) options for
+#      linking with the libraries listed in $LIBS, nor -L (or similar) library
+#      search path options that scons generates automatically from $LIBPATH."
+# Default: None
+#-------------------------------------------------------------------------------
+#LINKFLAGS = '-m64'
 
 #
 # Build the TIFA library and programs in the BUILDDIR directory (or in a

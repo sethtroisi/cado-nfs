@@ -229,9 +229,21 @@ opts.Add(
 # Build options
 #
 opts.Add(
+    'CC',
+    'The C compiler'
+)
+opts.Add(
     'CCFLAGS',
-    'Project wide C compiler flags',
+    'General options passed to the C and C++ compilers',
     '-O3'
+)
+opts.Add(
+    'LINK',
+    'The linker'
+)
+opts.Add(
+    'LINKFLAGS',
+    'General options passed to the linker'
 )
 opts.Add(
     'BUILDDIR',
