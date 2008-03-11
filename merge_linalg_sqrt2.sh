@@ -46,6 +46,7 @@ bwstrat=${bwstrat-1}
 mt=${mt-0}
 
 outdir=${outdir-$root.$prune"x"$maxlevel"x"$cwmax"x"$rwmax}
+linalg_out=${linalg_out-$outdir}
 
 dir=`dirname $root`
 if [ $# -eq 0 ]; then allrels=`ls $dir/rels.*`; else allrels="$*"; fi
@@ -122,30 +123,31 @@ fi
 
 echo "Performing the linear algebra phase"
 
-./linalg.sh $outdir $skip $mt
+./linalg.sh $outdir/small $skip $linalg_out $mt
 
-if [ ! -s $outdir/ker_raw ]; then echo "Zerodim kernel, stopping"; exit; fi
+if [ ! -s $linalg_out/ker_raw ]; then echo "Zerodim kernel, stopping"; exit; fi
 
-nker=`wc -l < $outdir/ker_raw`
+nker=`wc -l < $linalg_out/ker_raw`
 if [ $nker -lt $nkermax ]; then nkermax=$nker; fi
 
 echo "Adding characters"
 
-args0="-purged $purged -ker $outdir/ker_raw -poly $poly -index $outdir/index"
+args0="-purged $purged -ker $linalg_out/ker_raw"
+args0="$args0 -poly $poly -index $outdir/index"
 args0="$args0 -rel $nodup -small $outdir/small"
 args0="$args0 -nker $nker -nchar $nchar -skip $skip"
-time $linalg/characters $args0 > $outdir/ker
+time $linalg/characters $args0 > $linalg_out/ker
 
-ndepmax=`wc -l $outdir/ker | awk '{print $1}'`
+ndepmax=`wc -l $linalg_out/ker | awk '{print $1}'`
 if [ $ndepmax -ge 30 ]; then ndepmax=30; fi
 
 echo "Preparing $ndepmax squareroots"
 
-args1="$nodup $purged $outdir/index $outdir/ker $poly"
-time $linalg/allsqrt $args1 0 $ndepmax ar $outdir/dep
+args1="$nodup $purged $outdir/index $linalg_out/ker $poly"
+time $linalg/allsqrt $args1 0 $ndepmax ar $linalg_out/dep
 
 echo "Entering the last phase"
 
-./newsqrtonly.sh $root $outdir 0 $ndepmax
+./newsqrtonly.sh $root $linalg_out 0 $ndepmax
 ## If this fails, use the backup version, based on magma:
 ##   ./sqrtonly.sh $root $outdir 0 $ndepmax

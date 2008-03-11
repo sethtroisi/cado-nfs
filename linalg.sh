@@ -2,15 +2,15 @@
 linalg=linalg
 
 # parameter from merge_linalg_sqrt.sh: 
-# $1 is $name
+# $1 is $mat
 # $2 is $skip
-# [optional] $3 is $mt
+# $3 is $outdir
+# [optional] $4 is $mt
 
-name=$1; skip=$2
-if [ $# -ge 3 ]; then mt=$3; else mt=0; fi
+mat=$1; skip=$2; outdir=$3
+if [ $# -ge 4 ]; then mt=$4; else mt=0; fi
 
-mat=$name/small
-ker=$name/ker_raw
+ker=$outdir/ker_raw
 
 if false ; then
    echo "Calling Gauss"
@@ -18,17 +18,25 @@ if false ; then
 else
    # use Block-Wiedemann (recommended for large matrices)
    echo "Transposing the matrix"
-   time $linalg/transpose -in $mat -out $mat.tr -skip $skip
-
-   echo "Calling Block-Wiedemann"
-   if [ ! -e $name/bw ] ; then
-      mkdir $name/bw
+   if [ -s $mat.tr -a $mat.tr -nt $mat ]
+   then
+       echo "File $mat.tr exists and is newer than $mat";
+   else
+       time $linalg/transpose -in $mat -out $mat.tr -skip $skip
    fi
 
-   time $linalg/bw/bw.pl mt=$mt matrix=$mat.tr mn=64 vectoring=64 multisols=1 wdir=$name/bw solution=$name/W
+   echo "Calling Block-Wiedemann"
+   wdir=$outdir/bw
+   solution=$outdir/W
+
+   if [ ! -e $wdir ] ; then
+      mkdir $wdir
+   fi
+
+   time $linalg/bw/bw.pl mt=$mt matrix=$mat.tr mn=64 vectoring=64 multisols=1 wdir=$wdir solution=$solution
 
    echo "Converting dependencies to CADO format"
    # bw.pl puts the dependency file W in the directory where the matrix was
-   time $linalg/bw/mkbitstrings $name/W > $ker
+   time $linalg/bw/mkbitstrings $solution > $ker
 
 fi
