@@ -18,8 +18,17 @@
 #define	WBITS	(CHAR_BIT * sizeof(unsigned long))
 
 
+/* FIXME !!! Get rid of jumbo functions */
 
-
+/* function passed to sub-processes */
+static void MyXORfunction(unsigned long *invec, unsigned long *inoutvec,
+			  int *len, MPI_Datatype * dtype)
+{
+    unsigned long i;
+    for (i = 0; i < *len; ++i) {
+	inoutvec[i] ^= invec[i];
+    }
+};
 
 /*
 
@@ -69,14 +78,6 @@ unsigned long *LanczosIterations(unsigned long *a, unsigned long *Y,
 
 
 // To all Processes
-
-    void MyXORfunction(unsigned long *invec, unsigned long *inoutvec,
-		       int *len, MPI_Datatype * dtype) {
-	unsigned long i;
-	for (i = 0; i < *len; ++i) {
-	    inoutvec[i] ^= invec[i];
-	}
-    };
 
 
 
@@ -852,14 +853,6 @@ unsigned long *KernelSparse(unsigned long *a, unsigned long *R,
 
 
 // To all Processes
-
-    void MyXORfunction(unsigned long *invec, unsigned long *inoutvec,
-		       int *len, MPI_Datatype * dtype) {
-	unsigned long i;
-	for (i = 0; i < *len; ++i) {
-	    inoutvec[i] ^= invec[i];
-	}
-    };
 
 
 
