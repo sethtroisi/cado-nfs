@@ -1,10 +1,11 @@
+CC ?= gcc
 
 .PHONY: clean all
 
 all: Makefile.local
 	$(MAKE) -C utils
 	$(MAKE) -C polyselect
-	(cd postsieve/tifa; scons)
+	(cd postsieve/tifa; scons CC=$(CC))
 	$(MAKE) -C sieve
 	$(MAKE) -C postsieve/checknorms
 	$(MAKE) -C linalg
