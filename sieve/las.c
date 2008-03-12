@@ -805,7 +805,7 @@ init_rat_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly,
     double g1, g0, gi, gj, norm MAYBE_UNUSED, gjj;
     int i MAYBE_UNUSED, halfI MAYBE_UNUSED, l;
     unsigned int j, lastj;
-    uint64_t y, mask = (1 << NORM_BITS) - 1;
+    uint64_t mask = (1 << NORM_BITS) - 1;
     union { double z; uint64_t x; } zx[1];
 
     l = NORM_BITS - (int) ceil (log2 (si->logmax_rat));
@@ -846,6 +846,7 @@ init_rat_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly,
         zx->z = gjj - gi * (double) halfI;
         __asm__("### Begin rational norm loop\n");
 #ifndef SSE_NORM_INIT
+        uint64_t y;
         for (i = 0; i < si->I; i++) {
           /* the double precision number 1.0 has high bit 0 (sign),
              then 11-bit biased exponent 1023, and 52-bit mantissa 0 */
@@ -1280,15 +1281,19 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
             if (factor_leftover_norm(rat_norm, cpoly->lpbr, f_r, m_r)) {
                 unsigned int i, j;
                 printf ("%" PRId64 ",%" PRIu64 ":", a, b);
-                factor_list_fprint(stdout, rat_factors);
+                factor_list_fprint (stdout, rat_factors);
                 for (i = 0; i < f_r->length; ++i)
                     for (j = 0; j < m_r->data[i]; j++)
-                        gmp_printf(",%Zx", f_r->data[i]);
+                        gmp_printf (",%Zx", f_r->data[i]);
                 printf (":");
-                factor_list_fprint(stdout, alg_factors);
+                factor_list_fprint (stdout, alg_factors);
+                if (alg_factors.n != 0)
+                  printf (",");
                 for (i = 0; i < f_a->length; ++i)
                     for (j = 0; j < m_a->data[i]; j++)
-                        gmp_printf(",%Zx", f_a->data[i]);
+                        gmp_printf ("%Zx,", f_a->data[i]);
+                /* print special q */
+                printf ("%" PRIx64 "", si->q);
                 printf ("\n");
                 fflush (stdout);
                 cpt++;
