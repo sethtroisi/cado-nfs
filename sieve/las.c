@@ -789,8 +789,7 @@ init_alg_norms (sieve_info_t *si)
 }
 
 #ifdef SSE_NORM_INIT
-typedef double v2df __attribute__ ((vector_size (16)));
-typedef uint64_t v2di __attribute__ ((vector_size (16)));
+#include "sse_macros.h"
 #endif
 
 /* Initialize lognorms on the rational side for the bucket_region
@@ -872,7 +871,8 @@ init_rat_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly,
         for (i = 0; i < halfI; ++i) {
             y_vec.dble = z_vec;
             y_vec.intg -= cst_vec;
-            y_vec.intg = __builtin_ia32_psrlq128(y_vec.intg, shift_value);
+            // y_vec.intg = __builtin_ia32_psrlq128(y_vec.intg, shift_value);
+            y_vec.intg = cado_psrlq128(y_vec.intg, shift_value);
             y_vec.intg &= mask_vec;
 //            *S++ = si->S_rat[((uint32_t *)(&y_vec.intg))[0]];
 //             *S++ = si->S_rat[((uint32_t *)(&y_vec.intg))[2]];
