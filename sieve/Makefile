@@ -59,7 +59,7 @@ makefb: makefb.o ../utils/libutils.a
 config.h: config_h.in
 	cp config_h.in config.h
 
-las: las.c fb.o bucket.h $(TIFALIB)
+las: las.c fb.o bucket.h sse_macros.h $(TIFALIB)
 	$(CC) $(CFLAGS) -o las -I.. las.c fb.o ../utils/libutils.a $(LDFLAGS) -lm
 
 clean:
