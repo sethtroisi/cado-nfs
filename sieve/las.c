@@ -985,7 +985,8 @@ init_alg_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly,
                   } fi_vec;
                   fi_vec.dble = fpoly_eval_v2df_deg5(u_vec, i_vec);
                   fi_vec.intg -= cst_vec;
-                  fi_vec.intg = __builtin_ia32_psrlq128(fi_vec.intg, shift_value);
+                  // fi_vec.intg = __builtin_ia32_psrlq128(fi_vec.intg, shift_value);
+                  fi_vec.intg = cado_psrlq128(fi_vec.intg, shift_value);
                   fi_vec.intg &= mask_vec;
                   *S_ptr0 = T[fi_vec.intpair.y0];
                   *S++ = T[fi_vec.intpair.y1];
