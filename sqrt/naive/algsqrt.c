@@ -41,6 +41,7 @@ void polymodF_from_ab(polymodF_t tmp, long a, unsigned long b) {
 int poly_integer_reconstruction(poly_t Q, const poly_t R, const mpz_t m) {
   int i;
   mpz_t aux;
+
   mpz_init(aux);
   for (i=0; i <= R->deg; ++i) {
     mpz_mul_ui(aux, R->coeff[i], 1000000);
@@ -50,7 +51,10 @@ int poly_integer_reconstruction(poly_t Q, const poly_t R, const mpz_t m) {
       mpz_sub(aux, m, R->coeff[i]);
       mpz_mul_ui(aux, aux, 1000000);
       if (mpz_cmp(aux, m) > 0)
-	return 0;
+        {
+          mpz_clear (aux);
+          return 0;
+        }
       else {
 	mpz_sub(aux, m, R->coeff[i]);
 	mpz_neg(aux, aux);
@@ -58,6 +62,7 @@ int poly_integer_reconstruction(poly_t Q, const poly_t R, const mpz_t m) {
       }
     }
   }
+  mpz_clear (aux);
   return 1;
 }
 
@@ -103,6 +108,7 @@ void TonelliShanks(poly_t res, const poly_t a, const poly_t f, unsigned long p) 
       // raise it to power (q-1)/2
       poly_power_mod_f_mod_ui(auxpol, delta, f, aux, p);
     } while ((auxpol->deg != 0) || (mpz_cmp_ui(auxpol->coeff[0], p-1)!= 0));
+    gmp_randclear (state);
   }
 
   // follow the description of Crandall-Pomerance, page 94
@@ -140,15 +146,15 @@ void TonelliShanks(poly_t res, const poly_t a, const poly_t f, unsigned long p) 
   mpz_clear(q);
   mpz_clear(aux);
   mpz_clear(myp);
+  mpz_clear (t);
 }
 
 // compute Sqrt(A) mod F, using p-adic lifting, at prime p.
 void polymodF_sqrt(polymodF_t res, polymodF_t AA, poly_t F, unsigned long p) {
-  poly_t A;
-  poly_base_t S; /* will store the base p^k representation of A */
+  poly_t A, *P;
   int v;
   int d = F->deg;
-  int k;
+  int k, lk;
 
   poly_alloc(A, d-1);
   // Clean up the mess with denominator: if it is an odd power of fd,
@@ -165,11 +171,10 @@ void polymodF_sqrt(polymodF_t res, polymodF_t AA, poly_t F, unsigned long p) {
   // divide by fd^v.
 
   // Variables for the lifted values
-  poly_t invsqrtA, sqrtA;
+  poly_t invsqrtA;
   // variables for A and F modulo pk
   poly_t a, f;
   poly_alloc(invsqrtA, d-1);
-  poly_alloc(sqrtA, d-1);
   poly_alloc(a, d-1);
   poly_alloc(f, d);
   // variable for the current pk
@@ -180,16 +185,13 @@ void polymodF_sqrt(polymodF_t res, polymodF_t AA, poly_t F, unsigned long p) {
   // Initialize things modulo p:
   mpz_set_ui(pk, p);
   k = 1; /* invariant: pk = p^k */
+  lk = 0; /* k = 2^lk */
   poly_reduce_makemonic_mod_mpz(f, F, pk);
-  if (p <= 62)
-    {
-      poly_base_init_set (S, A, p);
-      fprintf (stderr, "Converted coefficients of F to base p at %2.2lf\n",
-               seconds ());
-      poly_reduce_mod_mpz_fast (a, pk, S, p, k);
-    }
-  else
-    poly_reduce_mod_mpz (a, A, pk);
+  double st = seconds ();
+  P = poly_base_modp_init (A, p);
+  fprintf (stderr, "poly_base_modp_init took %2.2lf\n", seconds () - st);
+
+  poly_copy (a, P[0]);
 
   // First compute the inverse square root modulo p
   { 
@@ -223,27 +225,24 @@ void polymodF_sqrt(polymodF_t res, polymodF_t AA, poly_t F, unsigned long p) {
   poly_t tmp, tmp2;
   poly_alloc(tmp, 2*d-1);
   poly_alloc(tmp2, 2*d-1);
-  int expo = 1;
   do {
     double st;
 
     /* invariant: invsqrtA = 1/sqrt(A) bmod p^k */
 
+    st = seconds ();
+    poly_base_modp_lift (a, P, ++lk, pk);
+    st = seconds () - st;
+
     mpz_mul(pk, pk, pk);	// double the current precision
     k *= 2;
-    barrett_init (invpk, pk);
-    expo <<= 1;
-    fprintf(stderr, "lifting mod p^%d at %2.2lf\n", expo, seconds());
+    barrett_init (invpk, pk); /* FIXME: we could lift 1/p^k also */
+    fprintf(stderr, "lifting mod p^%d at %2.2lf\n", k, seconds());
+#ifdef VERBOSE
+    fprintf (stderr, "   poly_base_modp_lift took %2.2lf\n", st);
+#endif
     // compute F,A modulo the new modulus p^k
     poly_reduce_makemonic_mod_mpz(f, F, pk); /* f = F/lc(F) mod p^k */
-    st = seconds ();
-    if (p <= 62)
-      poly_reduce_mod_mpz_fast (a, pk, S, p, k);
-    else
-      poly_reduce_mod_mpz (a, A, pk);
-#ifdef VERBOSE    
-    fprintf (stderr, "   poly_reduce_mod_mpz took %2.2lf\n", seconds () - st);
-#endif
 
     // now, do the Newton operation x <- 1/2(3*x-a*x^3)
     st = seconds ();
@@ -252,33 +251,23 @@ void polymodF_sqrt(polymodF_t res, polymodF_t AA, poly_t F, unsigned long p) {
     fprintf (stderr, "   poly_sqr_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
 #endif
 
-#if 0
-    st = seconds ();
-    poly_mul_mod_f_mod_mpz(tmp, tmp, invsqrtA, f, pk, invpk);
-    /* tmp = invsqrtA^3 mod p^k */
-#ifdef VERBOSE
-    fprintf (stderr, "   poly_mul_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
-#endif
-    st = seconds ();
-    poly_mul_mod_f_mod_mpz(tmp, tmp, a, f, pk, invpk);
-    /* tmp = a*invsqrtA^3 mod p^k */
-#ifdef VERBOSE
-    fprintf (stderr, "   poly_mul_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
-#endif
-    poly_mul_ui (tmp2, invsqrtA, 3); /* tmp2 = 3*invsqrtA */
-    poly_sub_mod_mpz (tmp, tmp2, tmp, pk); /* tmp = 3*invsqrtA-a*invsqrtA^3 */
-    poly_div_2_mod_mpz (invsqrtA, tmp, pk); 
-#else
     /* Faster version which computes x <- x + x/2*(1-a*x^2).
        However I don't see how to use the fact that the coefficients
        if 1-a*x^2 are divisible by p^(k/2). */
+    st = seconds ();
     poly_mul_mod_f_mod_mpz (tmp, tmp, a, f, pk, invpk); /* tmp=a*invsqrtA^2 */
+#ifdef VERBOSE
+    fprintf (stderr, "   poly_mul_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
+#endif
     poly_sub_ui (tmp, 1); /* a*invsqrtA^2-1 */
     poly_div_2_mod_mpz (tmp, tmp, pk); /* (a*invsqrtA^2-1)/2 */
+    st = seconds ();
     poly_mul_mod_f_mod_mpz (tmp, tmp, invsqrtA, f, pk, invpk);
+#ifdef VERBOSE
+    fprintf (stderr, "   poly_mul_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
+#endif
     /* tmp = invsqrtA/2 * (a*invsqrtA^2-1) */
     poly_sub_mod_mpz (invsqrtA, invsqrtA, tmp, pk);
-#endif
 
     // multiply by a, to check if rational reconstruction succeeds
     st = seconds ();
@@ -288,16 +277,19 @@ void polymodF_sqrt(polymodF_t res, polymodF_t AA, poly_t F, unsigned long p) {
 #endif
   } while (!poly_integer_reconstruction(tmp, tmp, pk));
 
+  poly_base_modp_clear (P);
+
   poly_copy(res->p, tmp);
   res->v = v;
 
-  if (p <= 62)
-    poly_base_clear (S);
   mpz_clear (pk);
   mpz_clear (invpk);
   poly_free(tmp);
   poly_free(tmp2);
   poly_free(f);
+  poly_free (A);
+  poly_free (invsqrtA);
+  poly_free (a);
 }
 
 unsigned long FindSuitableModP(poly_t F) {
@@ -319,6 +311,8 @@ unsigned long FindSuitableModP(poly_t F) {
       break;
   }
   long_poly_clear(fp);
+  getprime (0);
+
   return p;
 }
 
@@ -331,10 +325,11 @@ unsigned long FindSuitableModP(poly_t F) {
 */
 // Products are computed modulo the polynomial F.
 polymodF_t*
-accumulate_fast (polymodF_t *prd, const polymodF_t a, const poly_t F, unsigned long *lprd,
-    unsigned long nprd)
+accumulate_fast (polymodF_t *prd, const polymodF_t a, const poly_t F,
+                 unsigned long *lprd, unsigned long nprd)
 {
   unsigned long i;
+  static double st = 0.0;
 
   polymodF_mul(prd[0], prd[0], a, F);
   nprd ++;
@@ -351,7 +346,9 @@ accumulate_fast (polymodF_t *prd, const polymodF_t a, const poly_t F, unsigned l
 	  prd[i+1]->p->deg = 0;
 	  prd[i+1]->v = 0;
         }
+      st -= seconds ();
       polymodF_mul(prd[i+1], prd[i+1], prd[i], F);
+      st += seconds ();
       mpz_set_ui(prd[i]->p->coeff[0], 1);
       prd[i]->p->deg = 0;
       prd[i]->v = 0;
@@ -434,16 +431,13 @@ int main(int argc, char **argv) {
     mpz_set_ui(prd_tab[0]->p->coeff[0], 1);
     prd_tab[0]->p->deg = 0;
     prd_tab[0]->v = 0;
-    double st = 0.0;
     while(fscanf(depfile, "%ld %lu", &a, &b) != EOF){
       if(!(nab % 100000))
-	fprintf(stderr, "# Reading ab pair #%d at %2.2lf\n", nab, seconds());
+	fprintf(stderr, "# Reading ab pair #%d at %2.2lf\n", nab, seconds ());
       if((a == 0) && (b == 0))
 	break;
       polymodF_from_ab(tmp, a, b);
-      st -= seconds ();
       prd_tab = accumulate_fast (prd_tab, tmp, F, &lprd, nprd++);
-      st += seconds ();
       nab++;
       if(b == 0)
 	  nfree++;
@@ -538,11 +532,13 @@ int main(int argc, char **argv) {
   if (!found)
     printf("Failed\n");
 
+  cado_poly_clear (pol);
   mpz_clear(aux);
   mpz_clear(algsqrt);
   poly_free(F);
   poly_free(prd->p);
   poly_free(tmp->p);
+
   return 0;
 }
 
