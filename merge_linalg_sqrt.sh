@@ -89,7 +89,7 @@ fi
 
 echo "Performing the linear algebra phase"
 
-./linalg.sh $name $skip
+./linalg.sh $name/small $skip $name
 
 if [ ! -s $name/ker_raw ]; then echo "Zerodim kernel, stopping"; exit; fi
 
