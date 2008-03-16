@@ -87,6 +87,7 @@ for files beginning rels.* and uses them.
 
 A param file consists of lines, as in:
 
+cado=where_cado_is
 root=Examples/c59b/c59b
 prune=1.0
 maxlevel=5
