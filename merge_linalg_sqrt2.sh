@@ -12,9 +12,6 @@
 #
 # If no relation files are given, use $dir/rels.*
 #
-linalg=linalg
-sqrt=sqrt/naive
-
 echo "Args: $*"
 
 params=$1; shift
@@ -25,6 +22,11 @@ params=$1; shift
 . $params
 
 if [ "X$root" = "X" ]; then echo "I need at least a name..."; exit; fi
+
+cado=${cado-.} # where we can find linalg/, sqrt/, etc.
+
+linalg=$cado/linalg
+sqrt=$cado/sqrt/naive
 
 maxpr=${maxpr-0}
 maxpa=${maxpa-0}
@@ -123,7 +125,7 @@ fi
 
 echo "Performing the linear algebra phase"
 
-./linalg.sh $outdir/small $skip $linalg_out $mt
+$cado/linalg.sh $outdir/small $skip $linalg_out $mt
 
 if [ ! -s $linalg_out/ker_raw ]; then echo "Zerodim kernel, stopping"; exit; fi
 
@@ -148,6 +150,6 @@ time $linalg/allsqrt $args1 0 $ndepmax ar $linalg_out/dep
 
 echo "Entering the last phase"
 
-./newsqrtonly.sh $root $linalg_out 0 $ndepmax
+$cado/newsqrtonly.sh $root $linalg_out 0 $ndepmax
 ## If this fails, use the backup version, based on magma:
 ##   ./sqrtonly.sh $root $outdir 0 $ndepmax
