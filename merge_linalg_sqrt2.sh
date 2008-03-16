@@ -59,9 +59,25 @@ poly=$root.poly
 nodup=$root.nodup
 purged=$root.purged
 
-if [ -s $nodup ]
+if [ ! -s $nodup ]
 then
-  echo "File $nodup already exists"
+  newrels=1
+else
+  echo "File $nodup already exists, checking for new relations"
+  newrels=0
+  for f in $allrels
+  do
+    if [ $f -nt $nodup ]
+    then
+	echo "File $f is newer than $nodup"
+	newrels=1
+	break
+    fi
+  done
+fi
+if [ $newrels -ne 1 ]
+then
+  echo "No need to rebuild $nodup"
 else
   nrels=`wc -l $allrels | tail -1 | awk '{print $1}'`
   time $linalg/duplicates -nrels $nrels $allrels > $nodup
