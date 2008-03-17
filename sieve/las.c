@@ -1124,7 +1124,7 @@ typedef struct {
     int n;
 } factor_list_t;
 
-#define FL_MAX_SIZE 200
+#define FL_MAX_SIZE 250
 
 void factor_list_init(factor_list_t *fl) {
     fl->fac = (uint64_t *) malloc (FL_MAX_SIZE * sizeof(uint64_t));
@@ -1229,6 +1229,22 @@ trial_div (factor_list_t *fl, mpz_t norm, bucket_array_t BA, int N, int x,
     }
 }
 
+/* Return 0 if the leftover norm n cannot yield a relation:
+   (a) if n > 2^mfb
+   (b) if L < n < B^2
+
+   FIXME: need to check L^k < n < B^(k+1) too.
+*/
+int
+check_leftover_norm (mpz_t n, size_t lpb, mpz_t BB, size_t mfb)
+{
+  size_t s = mpz_sizeinbase (n, 2);
+
+  if (s > mfb || ((lpb < s) && (mpz_cmp (n, BB) < 0)))
+    return 0;
+  return 1;
+}
+
 void xToAB(int64_t *a, uint64_t *b, int x, sieve_info_t * si);
 int factor_leftover_norm (mpz_t n, unsigned int b,
         mpz_array_t* const factors, uint32_array_t* const multis);
@@ -1246,7 +1262,7 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
     uint64_t b;
     int cpt = 0;
     int surv = 0;
-    mpz_t alg_norm, rat_norm;
+    mpz_t alg_norm, rat_norm, BBalg, BBrat;
     factor_list_t alg_factors, rat_factors;
     mpz_array_t *f_r = NULL, *f_a = NULL;    /* large prime factors */
     uint32_array_t *m_r = NULL, *m_a = NULL; /* corresponding multiplicities */
@@ -1258,52 +1274,74 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
 
     factor_list_init(&alg_factors);
     factor_list_init(&rat_factors);
-    mpz_init(alg_norm);
-    mpz_init(rat_norm);
+    mpz_init (alg_norm);
+    mpz_init (rat_norm);
+    mpz_init (BBalg);
+    mpz_init (BBrat);
+    mpz_ui_pow_ui (BBalg, cpoly->alim, 2);
+    mpz_ui_pow_ui (BBrat, cpoly->rlim, 2);
 
-    for (x = 0; x < si->bucket_region; ++x) {
+    for (x = 0; x < si->bucket_region; ++x)
+      {
+        unsigned int i, j;
+
         if (!(si->alg_Bound[S[x]]))
-            continue;
+          continue;
+
         // Compute algebraic and rational norms.
-        xToAB(&a, &b, x + N*si->bucket_region, si);
+        xToAB (&a, &b, x + N*si->bucket_region, si);
         if (b == 0 || bingcd ((a > 0) ? a : -a, b) != 1)
           continue;
+
         surv++;
-        eval_fij(alg_norm, cpoly->f, cpoly->degree, a, b);
-        mpz_divexact_ui(alg_norm, alg_norm, si->q);
+
+        // Trial divide rational norm
+        eval_fij (rat_norm, cpoly->g, 1, a, b);
+        trial_div (&rat_factors, rat_norm, rat_BA, N, x, fb_rat, si->I,
+                   si->rbadprimes);
+        
+        if (!check_leftover_norm (rat_norm, cpoly->lpbr, BBrat, cpoly->mfbr))
+          continue;
+
         // Trial divide algebraic norm
-        trial_div(&alg_factors, alg_norm, alg_BA, N, x, fb_alg, si->I,
-                  si->abadprimes);
-        if (factor_leftover_norm(alg_norm, cpoly->lpba, f_a, m_a)) {
-            eval_fij(rat_norm, cpoly->g, 1, a, b);
-            // Trial divide rational norm
-            trial_div(&rat_factors, rat_norm, rat_BA, N, x, fb_rat, si->I,
-                      si->rbadprimes);
-            if (factor_leftover_norm(rat_norm, cpoly->lpbr, f_r, m_r)) {
-                unsigned int i, j;
-                printf ("%" PRId64 ",%" PRIu64 ":", a, b);
-                factor_list_fprint (stdout, rat_factors);
-                for (i = 0; i < f_r->length; ++i)
-                    for (j = 0; j < m_r->data[i]; j++)
-                        gmp_printf (",%Zx", f_r->data[i]);
-                printf (":");
-                factor_list_fprint (stdout, alg_factors);
-                if (alg_factors.n != 0)
-                  printf (",");
-                for (i = 0; i < f_a->length; ++i)
-                    for (j = 0; j < m_a->data[i]; j++)
-                        gmp_printf ("%Zx,", f_a->data[i]);
-                /* print special q */
-                printf ("%" PRIx64 "", si->q);
-                printf ("\n");
-                fflush (stdout);
-                cpt++;
-            }
-            rat_factors.n = 0;
-        }
+        eval_fij (alg_norm, cpoly->f, cpoly->degree, a, b);
+        mpz_divexact_ui (alg_norm, alg_norm, si->q);
+        trial_div (&alg_factors, alg_norm, alg_BA, N, x, fb_alg, si->I,
+                   si->abadprimes);
+
+        if (!check_leftover_norm (alg_norm, cpoly->lpba, BBalg, cpoly->mfba))
+          continue;
+
+        if (factor_leftover_norm (rat_norm, cpoly->lpbr, f_r, m_r) == 0)
+          continue;
+
+        if (factor_leftover_norm (alg_norm, cpoly->lpba, f_a, m_a) == 0)
+          continue;
+
+        printf ("%" PRId64 ",%" PRIu64 ":", a, b);
+        factor_list_fprint (stdout, rat_factors);
+        for (i = 0; i < f_r->length; ++i)
+          for (j = 0; j < m_r->data[i]; j++)
+            gmp_printf (",%Zx", f_r->data[i]);
+        printf (":");
+        factor_list_fprint (stdout, alg_factors);
+        if (alg_factors.n != 0)
+          printf (",");
+        for (i = 0; i < f_a->length; ++i)
+          for (j = 0; j < m_a->data[i]; j++)
+            gmp_printf ("%Zx,", f_a->data[i]);
+        /* print special q */
+        printf ("%" PRIx64 "", si->q);
+        printf ("\n");
+        fflush (stdout);
+        cpt++;
+        
+        rat_factors.n = 0;
         alg_factors.n = 0;
-    }
+      }
     survivors[0] += surv;
+    mpz_clear (BBalg);
+    mpz_clear (BBrat);
     mpz_clear(alg_norm);
     mpz_clear(rat_norm);
     factor_list_clear(&alg_factors);
@@ -1577,7 +1615,7 @@ get_maxnorm (cado_poly cpoly, sieve_info_t *si, uint64_t q0)
                / (double) q0);
 }
 
-/* v <- f(i,j), where f is of degree d */
+/* v <- |f(i,j)|, where f is of degree d */
 static void
 eval_fij (mpz_t v, mpz_t *f, unsigned int d, long i, unsigned long j)
 {
@@ -1592,6 +1630,7 @@ eval_fij (mpz_t v, mpz_t *f, unsigned int d, long i, unsigned long j)
       mpz_mul_ui (jpow, jpow, j);
       mpz_addmul (v, f[k], jpow);
     }
+  mpz_abs (v, v); /* avoids problems with negative norms */
   mpz_clear (jpow);
 }
 
