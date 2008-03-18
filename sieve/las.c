@@ -1692,24 +1692,28 @@ SkewGauss (sieve_info_t *si, double skewness)
 
 /* FIXME: the value of 20 seems large. Normally, a few Miller-Rabin passes
    should be enough. See also http://www.trnicely.net/misc/mpzspsp.html */
-#define NMILLER_RABIN 20
-#define IS_PRIME(X)     (0 != mpz_probab_prime_p((X), NMILLER_RABIN))
+#define NMILLER_RABIN 1 /* in the worst case, what can happen is that a
+                           composite number is declared as prime, thus
+                           a relation might be missed, but this will not
+                           affect correctness */
+#define IS_PROBAB_PRIME(X) (0 != mpz_probab_prime_p((X), NMILLER_RABIN))
 #define BITSIZE(X)      (mpz_sizeinbase((X), 2))
 #define NFACTORS        8 /* maximal number of large primes */
 
 /* This function was contributed by Jerome Milan (and bugs were introduced
    by Paul Zimmermann :-).
    Input: n - the number to be factored (leftover norm)
-          b - (large) prime bit size bound
+          l - (large) prime bit size bound is L=2^l
+   Assumes n > 0.
    Return value:
-          0 if n has a prime factor larger than 2^b
-          1 if all prime factors of n are < 2^b
+          0 if n has a prime factor larger than 2^l
+          1 if all prime factors of n are < 2^l
    Output:
           the prime factors of n are factors->data[0..factors->length-1],
           with corresponding multiplicities multis[0..factors->length-1].
 */          
 int
-factor_leftover_norm (mpz_t n, unsigned int b,
+factor_leftover_norm (mpz_t n, unsigned int l,
                       mpz_array_t* const factors, uint32_array_t* const multis)
 {
   uint32_t i;
@@ -1718,16 +1722,16 @@ factor_leftover_norm (mpz_t n, unsigned int b,
   factors->length = 0;
   multis->length = 0;
 
-  if (mpz_sgn (n) < 0)
-    mpz_neg (n, n);
-
-  /* it seems tifa_factor does not like 1 */
+  /* tifa_factor does not like 1 */
   if (mpz_cmp_ui (n, 1) == 0)
     return 1;
 
-  if (IS_PRIME(n))
+  /* FIXME: If n < L, we know that n is prime, since all primes < B have been
+     removed, and L < B^2 in general, where B is the factor base bound, thus
+     we only need a primality test when n > L. */
+  if (IS_PROBAB_PRIME(n))
     {
-      if (BITSIZE(n) > b)
+      if (BITSIZE(n) > l)
         return 0;
       else
         {
@@ -1737,16 +1741,14 @@ factor_leftover_norm (mpz_t n, unsigned int b,
         }
     } 
 
-  //  gmp_fprintf (stderr, "enter tifa_factor, n=%Zd\n", n);
   ecode = tifa_factor (factors, multis, n, FIND_COMPLETE_FACTORIZATION);
-  // gmp_fprintf (stderr, "   exit tifa_factor\n");
 
   switch (ecode)
     {
     case COMPLETE_FACTORIZATION_FOUND:
       for (i = 0; i < factors->length; i++)
         {
-          if (BITSIZE(factors->data[i]) > b)
+          if (BITSIZE(factors->data[i]) > l)
             return 0;
         }
       return 1;
