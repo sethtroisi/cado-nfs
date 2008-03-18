@@ -1124,7 +1124,7 @@ typedef struct {
     int n;
 } factor_list_t;
 
-#define FL_MAX_SIZE 250
+#define FL_MAX_SIZE 200
 
 void factor_list_init(factor_list_t *fl) {
     fl->fac = (uint64_t *) malloc (FL_MAX_SIZE * sizeof(uint64_t));
@@ -1175,6 +1175,8 @@ static void
 trial_div (factor_list_t *fl, mpz_t norm, bucket_array_t BA, int N, int x,
            factorbase_degn_t *fb, uint32_t I, uint32_t *L)
 {
+    fl->n = 0; /* reset factor list */
+
     /* remove bad primes */
     while (L[0] != 0)
     {
@@ -1335,9 +1337,6 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
         printf ("\n");
         fflush (stdout);
         cpt++;
-        
-        rat_factors.n = 0;
-        alg_factors.n = 0;
       }
     survivors[0] += surv;
     mpz_clear (BBalg);
