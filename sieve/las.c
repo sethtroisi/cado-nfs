@@ -648,7 +648,7 @@ reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r,
 void
 fill_in_buckets(bucket_array_t BA, factorbase_degn_t *fb, const sieve_info_t * si) {
     // Loop over all primes in the factor base > I
-    while (fb->p < si->I)     
+    while (fb->p < si->I)
         fb = fb_next (fb); // cannot do fb++, due to variable size !
     while (fb->p != FB_END) {
         unsigned char nr;
@@ -1203,7 +1203,7 @@ trial_div (factor_list_t *fl, mpz_t norm, bucket_array_t BA, int N, int x,
 
     // remove primes in fb that are less than I
     while (fb->p != FB_END && fb->p <= I) {
-        while (trialdiv_with_norm(fb, norm) == 1) {
+      while (trialdiv_with_norm(fb, norm) == 1) {
         //while (mpz_divisible_ui_p (norm, fb->p)) {
             fl->fac[fl->n] = fb->p;
             fl->n++;
@@ -1282,6 +1282,9 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
     mpz_init (BBrat);
     mpz_ui_pow_ui (BBalg, cpoly->alim, 2);
     mpz_ui_pow_ui (BBrat, cpoly->rlim, 2);
+
+    purge_bucket (rat_BA, N, S, si->alg_Bound);
+    purge_bucket (alg_BA, N, S, si->alg_Bound);
 
     for (x = 0; x < si->bucket_region; ++x)
       {

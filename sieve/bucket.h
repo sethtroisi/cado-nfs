@@ -283,3 +283,17 @@ is_end(const bucket_array_t BA, const int i)
     return (BA.bucket_read[i] == BA.bucket_write[i]);
 }
 
+/* Delete the updates whose values of x do not yield a report.
+   This will speed up the trial division, since we will loop
+   over less entries. */
+void
+purge_bucket (bucket_array_t BA, const int i, unsigned char *S,
+              unsigned char *tst)
+{
+  bucket_update_t *u, *v;
+
+  for (u = v = BA.bucket_start[i]; u < BA.bucket_write[i]; u++)
+    if (tst[S[u->x]])
+      *v++ = *u;
+  BA.bucket_write[i] = v;
+}
