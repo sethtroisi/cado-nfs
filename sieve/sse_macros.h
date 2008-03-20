@@ -24,7 +24,10 @@ static inline v2di cado_psrlq128(v2di x, v2di sh)
     // Let's stick to "x,x" constraint, which might be slightly worse
     // in cases where the shift value changes frequently (this is not the
     // case in our application).
-    // __asm__("psrlq %2,%0" : "=x,x"(x) : "0,0"(x), "x,m"(sh));
-    __asm__("psrlq %2,%0" : "=x"(x) : "0"(x), "x"(sh));
+    // __asm__("psrlq %2,%0" : "+x,x"(x) : "0,0"(x), "x,m"(sh));
+
+    __asm__("psrlq %1,%0" : "+x,x"(x) : "x,m"(sh));
+    
+    //__asm__("psrlq %2,%0" : "=x"(x) : "0"(x), "x"(sh));
     return x;
 }
