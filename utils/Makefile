@@ -32,6 +32,6 @@ Makefile.local:
 	ln -s ../Makefile.local .
 
 clean:
-	-rm -f *~ *.bak $(obj) libutils.a cache
+	-rm -f *~ *.bak $(obj) libutils.a cache cachesize
 
 
