@@ -40,7 +40,8 @@ maxlevel=${maxlevel-6}
 cwmax=${cwmax-10}
 rwmax=${rwmax-100}
 
-verbose=${verbose-"-v"}
+# don't be verbose by default!
+verbose=${verbose-""}
 ##### linalg params
 skip=${skip-32}
 bwstrat=${bwstrat-1}
