@@ -802,7 +802,7 @@ init_rat_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly,
                               sieve_info_t *si)
 {
     double g1, g0, gi, gj, norm MAYBE_UNUSED, gjj;
-    int i MAYBE_UNUSED, halfI MAYBE_UNUSED, l;
+    uint32_t i MAYBE_UNUSED, halfI MAYBE_UNUSED, l;
     unsigned int j, lastj;
     uint64_t mask = (1 << NORM_BITS) - 1;
     union { double z; uint64_t x; } zx[1];
