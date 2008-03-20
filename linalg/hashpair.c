@@ -38,6 +38,14 @@ hashInit(hashtable_t *H, unsigned int n)
     H->hashcount = (int *)malloc(H->hashmod * sizeof(int));
     H->hashtab_p = (long *)malloc(H->hashmod * sizeof(long));
     H->hashtab_r = (unsigned long *)malloc(H->hashmod * sizeof(unsigned long));
+    if(sizeof(unsigned long) == 8){
+	H->HC0 = 314159265358979323UL;
+	H->HC1 = 271828182845904523UL;
+    }
+    else{
+	H->HC0 = 3141592653UL;
+	H->HC1 = 2718281828UL;
+    }
     hashClear(H);
 }
 
@@ -86,7 +94,7 @@ getHashAddrAux(hashtable_t *H, long p, unsigned long r, unsigned int h)
 int
 getHashAddr(hashtable_t *H, long p, unsigned long r)
 {
-    unsigned int h = getInitialAddress((unsigned long)p, r, H->hashmod);
+    unsigned int h = getInitialAddress((unsigned long)p, r, H->HC0, H->HC1, H->hashmod);
 
     return getHashAddrAux(H, p, r, h);
 }

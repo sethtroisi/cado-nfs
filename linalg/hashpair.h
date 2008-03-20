@@ -6,16 +6,13 @@ extern "C" {
 #endif
 
 typedef struct {
-    unsigned long hashmod;
+    unsigned long hashmod, HC0, HC1;
     int *hashcount;
     long *hashtab_p;
     unsigned long *hashtab_r;
 } hashtable_t;
 
-#define HC0 314159265358979323UL
-#define HC1 271828182845904523UL
-
-#define getInitialAddress(a, b, M) ((unsigned int)((HC0*(a)+HC1*(b)) % M))
+#define getInitialAddress(a, b, HC0, HC1, M) ((unsigned int)(((HC0)*(a)+(HC1)*(b)) % M))
 
 extern unsigned long getHashMod(unsigned long n);
 extern void hashClear(hashtable_t *H);

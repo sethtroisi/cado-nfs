@@ -113,7 +113,7 @@ is_ab_new(hashtable_t *Hab, long a, unsigned long b, unsigned int h)
 int
 is_ab_new(smallhash_t *Hab, long a, unsigned long b)
 {
-    int hab = getInitialAddress((unsigned long)a, b, Hab->hashmod);
+    int hab = getInitialAddress((unsigned long)a, b, Hab->HC0, Hab->HC1, Hab->hashmod);
     int i0, i1;
 
     i0 = hab / NBITS;
@@ -151,7 +151,7 @@ remove_duplicates_from_file(int *irel, unsigned int *nrels, smallhash_t *Hab, in
 	    fprintf(stderr, "nrel = %d fdup = %lu at %2.2lf\n",
 		    *irel, file_duplicates, seconds());
 	get_ab(&a, &b, str);
-	hab = getInitialAddress((unsigned long)a, b, Hab->hashmod);
+	hab = getInitialAddress((unsigned long)a, b, Hab->HC0, Hab->HC1, Hab->hashmod);
 	if((slice > 0) && ((hab & mask) != (unsigned)slice0))
 	    continue;
 	if(is_ab_new(Hab, a, b, hab)){
