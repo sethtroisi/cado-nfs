@@ -430,7 +430,9 @@ fb_read (const char *filename, const double log_scale, const int verbose)
   factorbase_degn_t *fb = NULL, *fb_cur, *fb_new;
   FILE *fbfile;
   size_t fbsize = 0, fballoc = 0;
-  const size_t linesize = 255;
+  // too small linesize led to a problem with rsa768;
+  // it would probably be a good idea to get rid of fgets
+  const size_t linesize = 1000;
   size_t linelen;
   char line[linesize];
   char *lineptr;
