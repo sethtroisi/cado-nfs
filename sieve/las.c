@@ -802,7 +802,7 @@ init_rat_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly,
                               sieve_info_t *si)
 {
     double g1, g0, gi, gj, norm MAYBE_UNUSED, gjj;
-    uint32_t i MAYBE_UNUSED, halfI MAYBE_UNUSED, l;
+    int i MAYBE_UNUSED, halfI MAYBE_UNUSED, l;
     unsigned int j, lastj;
     uint64_t mask = (1 << NORM_BITS) - 1;
     union { double z; uint64_t x; } zx[1];
@@ -846,7 +846,7 @@ init_rat_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly,
         __asm__("### Begin rational norm loop\n");
 #ifndef SSE_NORM_INIT
         uint64_t y;
-        for (i = 0; i < si->I; i++) {
+        for (i = 0; i < (int) si->I; i++) {
           /* the double precision number 1.0 has high bit 0 (sign),
              then 11-bit biased exponent 1023, and 52-bit mantissa 0 */
           /* the magic constant here is simply 1023*2^52, where
