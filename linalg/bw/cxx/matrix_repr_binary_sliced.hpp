@@ -37,13 +37,14 @@ public:
 	    mtx.seekg(slice.pos);
 	    std::istream_iterator<matrix_line> mit(mtx);
             unsigned int npack = 3072;
+            unsigned int nslices = iceildiv(slice.i1-slice.i0, npack);
             data.push_back(0);
-            for(unsigned int i = slice.i0 ; i < slice.i1 ; i += npack) {
-                unsigned int next = i + npack;
-                if (next > slice.i1) {
-                    npack = slice.i1 - i;
-                    next = slice.i1;
-                }
+            unsigned int i;
+            unsigned int next = slice.i0;
+            for(unsigned int slicenum = 0 ; slicenum < nslices ; slicenum++) {
+                i = next;
+                npack = iceildiv(slice.i1-i, nslices-slicenum);
+                next = i + npack;
                 /*
                 std::cout << "Packing " << npack << " rows from " << i
                     << " to " << next << std::endl;

@@ -371,7 +371,7 @@ if ($mt) {
     action "${bindir}bw-balance --subdir $wdir --nbuckets $mt"
             unless ($resume && -f "$wdir/matrix.txt.old");
 } else {
-    print STDERR "FIXME: This serves only to make the matrix square, which is perfectly ridiculous\n";
+    print STDERR "FIXME: bw-balance in non-mt mode serves only to make the matrix square, which is perfectly ridiculous\n";
     action "${bindir}bw-balance --subdir $wdir --nbuckets 1"
             unless ($resume && -f "$wdir/matrix.txt.old");
 }
