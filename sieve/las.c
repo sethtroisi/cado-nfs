@@ -347,8 +347,21 @@ redc_32(const int64_t x, const uint32_t p, const uint32_t invp)
 // binary gcd for unsigned long
 
 static inline unsigned long
+adjust_right_drop1 (unsigned long a)
+{
+  __asm__ ("1: shr $1, %0 # adjust_right_drop1\n\t"
+	   "jc 2f\n\t"
+	   "shr $1, %0\n\t"
+	   "jnc 1b\n\t"
+	   "2:"
+	   : "+r" (a)::"cc");
+  return a;
+}
+
+static inline unsigned long
 bingcd(unsigned long a, unsigned long b) {
     int t, lsh;
+    unsigned long A, B;
     
     if (UNLIKELY(a == 0))
         return b;
@@ -356,36 +369,32 @@ bingcd(unsigned long a, unsigned long b) {
         return a;
 
     t = ctzl(a);
-    a >>= t;
+    A = a >> (t + 1);
     lsh = ctzl(b);
-    b >>= lsh;
+    B = b >> (lsh + 1);
     t = MIN(t, lsh);
 
     // now a and b are odd, and the 2-part of the gcd is 2^t.
     // make a < b.
-    if (UNLIKELY(a == b))
-        return a<<t;
-    if (a > b) {
-        unsigned long tmp = a;
-        a = b;
-        b = tmp;
+    if (UNLIKELY(A == B))
+      return (2 * A + 1)<<t;
+    if (A > B) {
+        unsigned long tmp = A;
+        A = B;
+        B = tmp;
     }
-    // a<b, both odd. Let's go!
+    
     do {
         do {
-            b -= a; 
-            lsh = ctzl(b);
-            b >>= lsh;
-        } while (a<b);
-        if (a == b)
-            break;
+	    B = adjust_right_drop1 (B - A);
+        } while (B > A);
+        if (A == B)
+	    break;
         do {
-            a -= b; 
-            lsh = ctzl(a);
-            a >>= lsh;
-        } while (b < a);
-    } while (a != b);
-    return a<<t;
+	    A = adjust_right_drop1 (A - B);
+        } while (B < A);
+    } while (A != B);
+    return (2*A+1)<<t;
 }
 
 
@@ -415,7 +424,7 @@ invmod(unsigned long *pa, unsigned long b) {
   lsh = ctzl(a);
   a >>= lsh;
   t += lsh;
-  v <<= lsh;
+  /* v <<= lsh; ??? v is 0 here */
 
   // Here a and b are odd, and a < b
   do {
@@ -522,11 +531,12 @@ fb_root_in_qlattice(const fbprime_t p, const fbprime_t R,
     if (den == 0)
         return p;
 
+    den = redc_32 (den, p, invp); /* Divide by 2^32 (mod p) */
     // divide
-    if (!invmod(&den, p))
+    if (UNLIKELY(!invmod(&den, p)))
         return p+1;
     num = num*den;
-    return (fbprime_t)(num % ((uint64_t) p));
+    return (fbprime_t) redc_32 (num, p, invp);
 }
 
 
