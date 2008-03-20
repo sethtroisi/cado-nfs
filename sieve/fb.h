@@ -8,27 +8,18 @@
 #define FB_END ((fbprime_t) 1)
 
 void		fb_print_entry (factorbase_degn_t *);
-factorbase_degn_t *fb_add_to (factorbase_degn_t *, size_t *, size_t *, 
-                           const size_t, factorbase_degn_t *);
-factorbase_degn_t *	fb_find_p (factorbase_degn_t *, const fbprime_t);
 void            fb_sortprimes (fbprime_t *, const unsigned int);
 unsigned char	fb_log (double, double, double);
 void            fb_init_firstlog (factorbase_t);
 factorbase_degn_t * 	fb_make_linear (mpz_t *, const fbprime_t, const double, 
-                                const int);
-factorbase_degn_t * 	fb_make_linear_powers (mpz_t *, const fbprime_t, const double, 
                                 const int);
 factorbase_degn_t *	fb_read (const char *, const double, const int);
 void		fb_disable_roots (factorbase_degn_t *, const unsigned long, 
                                   const int);
 void		fb_restore_roots (factorbase_degn_t *, const unsigned long, 
                                   const int);
-fbprime_t       fb_maxprime (factorbase_degn_t *);
 void 		fb_extract_small (factorbase_t, const unsigned int, const int,
                                   const int);
-void		fb_initloc_small (factorbase_small_inited_t *,
-                                  factorbase_small_t *, const long, 
-                                  const unsigned long, const int);
 int             fb_check (factorbase_t, cado_poly, int);
 void            fb_clear (factorbase_t);
 

@@ -101,6 +101,7 @@ signed_mod_longto32 (long a, uint32_t p)
 }
 
 
+#if 0
 /* Square root. Returns the largest integer x so that x^2 <= n.
    If e != NULL, stores n - x^2 in *e. Should be compiled with 
    -funroll-loops for best performance. */
@@ -142,5 +143,4 @@ sqrtint_ul (const unsigned long n, unsigned long *e)
     *e = d;
   return xs;
 }
-
-
+#endif

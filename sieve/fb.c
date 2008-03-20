@@ -13,11 +13,10 @@
 #include "basicnt.h"
 #include "fb.h"
 #include "utils/utils.h"
-#include "sieve_aux.h"
 
 /* Some prototypes for functions scattered in various files with no 
    corresponding header files. FIXME: clean this up!*/
-void mp_poly_print (mpz_t *, int, const char *);
+//void mp_poly_print (mpz_t *, int, const char *);
 
 void 
 fb_print_entry (factorbase_degn_t *fb)
@@ -38,7 +37,7 @@ fb_print_entry (factorbase_degn_t *fb)
 /* Add fb_add to (void *)fb + fbsize. If a realloc failed, returns NULL.
    fb_add->size need not be set by caller, this function does it */
 
-factorbase_degn_t *
+static factorbase_degn_t *
 fb_add_to (factorbase_degn_t *fb, size_t *fbsize, size_t *fballoc,
 	   const size_t allocblocksize, factorbase_degn_t *fb_add)
 {
@@ -69,7 +68,7 @@ fb_add_to (factorbase_degn_t *fb, size_t *fbsize, size_t *fballoc,
   return newfb;
 }
 
-factorbase_degn_t *
+static factorbase_degn_t *
 fb_find_p (factorbase_degn_t *fb, const fbprime_t p)
 {
   while (fb->p != FB_END && fb->p < p) /* Assumes fb is sorted in asc. order */
@@ -108,12 +107,13 @@ fb_sortprimes (fbprime_t *primes, const unsigned int n)
 #endif
 }
 
-double
+#if 0
+static double
 fb_log_double (double n, double log_scale, double offset)
 {
   return floor (log (n) * log_scale + offset + 0.5);
 }
-
+#endif
 
 unsigned char
 fb_log (double n, double log_scale, double offset)
@@ -254,7 +254,8 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
   return fb;
 }
 
-int fb_comp(const void *a, const void *b) {
+#if 0
+static int fb_comp(const void *a, const void *b) {
   factorbase_degn_t *pa, *pb;
   pa = (factorbase_degn_t *)a;
   pb = (factorbase_degn_t *)b;
@@ -264,10 +265,11 @@ int fb_comp(const void *a, const void *b) {
     return 1;
   return 0;
 }
+#endif
 
+#if 0
 /* Generate a factor base with prime powers <= bound for a linear polynomial */
-
-factorbase_degn_t *
+static factorbase_degn_t *
 fb_make_linear_powers (mpz_t *poly, const fbprime_t bound, const double log_scale, 
 		const int verbose)
 {
@@ -406,6 +408,7 @@ fb_make_linear_powers (mpz_t *poly, const fbprime_t bound, const double log_scal
 
   return fb;
 }
+#endif
 
 /* Assume q is a prime power p^k with k>=1, return p if k > 1, 0 otherwise. */
 static uint32_t
@@ -695,7 +698,8 @@ fb_restore_roots (factorbase_degn_t *fb, const unsigned long b, const int verbos
   rdtscll (tsc2);
 }
 
-fbprime_t
+#if 0
+static fbprime_t
 fb_maxprime (factorbase_degn_t *fb)
 {
     fbprime_t maxp = 0;
@@ -709,6 +713,7 @@ fb_maxprime (factorbase_degn_t *fb)
     
     return maxp;
 }
+#endif
 
 /* Extracts primes < bound from fb->fblarge and store them in
    factorbase_small_t format. fb->fblarge gets updated to point
@@ -772,46 +777,6 @@ fb_extract_small (factorbase_t fb, const fbprime_t bound,
   if (verbose)
     printf ("# There are %u entries in the level %d small factor base\n", 
             j, lvl + 1);
-}
-
-void
-fb_initloc_small (factorbase_small_inited_t *initfb,
-		  factorbase_small_t *smallfb, 
-		  const long amin, const unsigned long b, const int odd)
-{
-  uint32_t amin_p;
-  fbprime_t p; 
-  fbroot_t root;
-  uint32_t d;
-  unsigned char plog;
-  
-  for ( ; smallfb->p != FB_END; smallfb++)
-    {
-      p = smallfb->p;
-      ASSERT (p < 0xffffff);
-      root = smallfb->root_and_log & 0xffffff;
-      ASSERT (root < p);
-      plog = smallfb->root_and_log >> 24;
-
-      if (gcd_ul (p, b) == 1UL) /* FIXME: Speed up this gcd */
-	{
-	  amin_p = signed_mod_longto32 (amin, p);
-	  /* Replace low 24 bits by first sieve location */
-          d = first_sieve_loc (p, root, amin_p, b, odd);
-	  initfb->p = p;
-	  initfb->loc_and_log = (plog << 24) | d;
-#if 0
-	  printf ("F(%ld, %lu) %% %d == 0 /* PARI fb_initloc_small */\n",
-		  amin + ((fb_inited->loc_and_log & 0xffffff) << odd), b, 
-		  fb_inited->p);
-#endif
-	  initfb ++;
-	}
-    }
-
-  /* Place stop marker */
-  initfb->p = FB_END;
-  initfb->loc_and_log = 0;
 }
 
 /* Test if the data in factorbase is correct. If side == 0, checks the roots

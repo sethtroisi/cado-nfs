@@ -41,10 +41,10 @@ Makefile.local:
 	echo "Makefile.local does not exist. Making a link to parent dir's one."
 	ln -s ../Makefile.local .
 
-fb.o : fb.c fb.h config.h basicnt.h sieve_aux.h Makefile.local
+fb.o : fb.c fb.h config.h basicnt.h Makefile.local
 	$(CC) -c -I. -I.. $(CFLAGS) fb.c
 
-sieve.o : sieve.c bucket.h config.h basicnt.h sieve_aux.h ../cado.h Makefile.local
+sieve.o : sieve.c bucket.h config.h basicnt.h ../cado.h Makefile.local
 	$(CC) -c -I. -I.. $(CFLAGS) sieve.c
 
 makefb.o : makefb.c Makefile.local

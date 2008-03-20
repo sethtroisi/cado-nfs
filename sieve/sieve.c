@@ -12,7 +12,6 @@
 #include "sieve.h"
 #include "../utils/mod_ul.h"
 #include "fb.h"
-#include "sieve_aux.h"
 #include "basicnt.h"
 #include "../utils/utils.h"
 
@@ -60,6 +59,91 @@
 unsigned long skipped_ahead_too_far;
 unsigned long ul_rho_toolarge_nr, ul_rho_toolarge_sum; 
 long long ul_rho_time;
+
+static inline fbroot_t
+      first_sieve_loc (const fbprime_t p, const fbroot_t r, 
+                       const fbroot_t amin_p, const unsigned long b, const int odd)
+{
+   modulus_t m;
+   residue_t r1, r2;
+   fbroot_t d;
+
+  /* Find first index d in sievearray where p on this root divides.
+   So we want a/b == r (mod p) <=> a == br (mod p). Then we want
+   d so that amin + d * (1 + odd) == a (mod p) 
+   <=> d == (a - amin) / (1 + odd) (mod p) 
+   == (br - amin) / (1 + odd) (mod p) */
+
+   ASSERT (odd == 0 || odd == 1);
+   ASSERT (!odd || (b & 1) == 0);
+   ASSERT (r < p);
+   ASSERT (amin_p < p);
+   ASSERT_EXPENSIVE (b % p != 0);
+
+   /* Most of the mod_*() calls are no-ops */
+   mod_initmod_ul (m, (unsigned long) p);
+   mod_init_noset0 (r1, m);
+   mod_init_noset0 (r2, m);
+   mod_set_ul_reduced (r2, (unsigned long) r, m);
+   mod_set_ul (r1, b, m); /* Modular reduction */
+   mod_mul (r1, r1, r2, m); /* Multiply and mod reduction. */
+   mod_sub_ul (r1, r1, (unsigned long) amin_p, m);
+   if (odd)
+      mod_div2 (r1, r1, m);
+   d = mod_get_ul (r1, m); 
+   ASSERT (d < p);
+   mod_clear (r1, m);
+   mod_clear (r2, m);
+   mod_clearmod (m);
+
+#ifdef PARI
+  printf ("(" FBROOT_FORMAT " + " FBROOT_FORMAT " * (1 + %d)) %% " FBPRIME_FORMAT
+          " == (%lu * " FBROOT_FORMAT ") %% " FBPRIME_FORMAT " /* PARI */\n",
+          amin_p, d, odd, p, b, r, p);
+#endif
+
+  return d;
+}
+
+static void
+      fb_initloc_small (factorbase_small_inited_t *initfb,
+                        factorbase_small_t *smallfb, 
+                        const long amin, const unsigned long b, const int odd)
+{
+   uint32_t amin_p;
+   fbprime_t p; 
+   fbroot_t root;
+   uint32_t d;
+   unsigned char plog;
+  
+   for ( ; smallfb->p != FB_END; smallfb++)
+   {
+      p = smallfb->p;
+      ASSERT (p < 0xffffff);
+      root = smallfb->root_and_log & 0xffffff;
+      ASSERT (root < p);
+      plog = smallfb->root_and_log >> 24;
+
+      if (gcd_ul (p, b) == 1UL) /* FIXME: Speed up this gcd */
+      {
+         amin_p = signed_mod_longto32 (amin, p);
+         /* Replace low 24 bits by first sieve location */
+         d = first_sieve_loc (p, root, amin_p, b, odd);
+         initfb->p = p;
+         initfb->loc_and_log = (plog << 24) | d;
+#if 0
+     printf ("F(%ld, %lu) %% %d == 0 /* PARI fb_initloc_small */\n",
+        amin + ((fb_inited->loc_and_log & 0xffffff) << odd), b, 
+        fb_inited->p);
+#endif
+     initfb ++;
+      }
+   }
+
+   /* Place stop marker */
+   initfb->p = FB_END;
+   initfb->loc_and_log = 0;
+}
 
 #ifdef TRACE_RELATION_A
 
