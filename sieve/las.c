@@ -581,14 +581,15 @@ static int
 reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r,
                  const sieve_info_t * si)
 {
-    int64_t a0, a1, b0, b1, I, J;
+    int32_t a0, a1, b0, b1, I, J, k;
+
     I = si->I;
     J = si->J;
-    a0 = -((int64_t)p); a1 = 0;
+    a0 = -((int32_t)p); a1 = 0;
     b0 = r;  b1 = 1;
 
     /* subtractive variant of Euclid's algorithm */
-    while ( b0 >= I )
+    while (b0 >= I)
     {
       /* a0 < 0 < b0 < -a0 */
         do {
@@ -598,13 +599,16 @@ reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r,
         /* -b0 < a0 <= 0 < b0 */
         if (-a0 < I)
           {
-            if (a0 == 0)
+            if (UNLIKELY(a0 == 0))
               return 0;
-            while (b0 >= I)
-              {
-                b0 += a0;
-                b1 += a1;
-              }
+            /* Now that |a0| < I, we switch to classical division, since
+               if say |a0|=1 and b0 is large, the subtractive variant
+               will be very expensive.
+               We want b0 + k*a0 < I, i.e., b0 - I + 1 <= k*(-a0),
+               i.e., k = ceil((b0-I+1)/a0). */
+            k = 1 + (b0 - I) / (-a0);
+            b0 += k * a0;
+            b1 += k * a1;
             goto case_even;
           }
         /* -b0 < a0 < 0 < b0 */
@@ -614,18 +618,18 @@ reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r,
         } while (b0 + a0 >= 0);
         /* a0 < 0 <= b0 < -a0 */
     }
-    if (b0 == 0)
+    if (UNLIKELY(b0 == 0))
       return 0;
-    while (a0 <= -I)
-      {
-        a0 += b0;
-        a1 += b1;
-      }
+    /* we switch to the classical algorithm here too */
+    k = 1 + (-a0 - I) / b0;
+    a0 += k * b0;
+    a1 += k * b1;
+
  case_even:
-    pli->alpha = (int32_t) a0;
-    pli->beta = (int32_t) a1;
-    pli->gamma = (int32_t) b0;
-    pli->delta = (int32_t) b1;
+    pli->alpha = a0;
+    pli->beta =  a1;
+    pli->gamma = b0;
+    pli->delta = b1;
 
     ASSERT (pli->beta > 0);
     ASSERT (pli->delta > 0);
