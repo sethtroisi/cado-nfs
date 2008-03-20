@@ -112,6 +112,14 @@ The param file can contain more parameters that can be deduced from the
 parsing phase of the script. For instance, desperate purge computations
 might use 'maxpr' and 'maxpa', or you can use a different bw-merge strategy.
 
+Another trick: since we spend so much time using wc, the variable
+
+nrels_dup=37832829
+
+can be put in the param file. If set, when one knows that the dup file is
+stable, we do not need to recompute the number of relations in it. It is very
+useful when trying a lot of parameters in the purge phase.
+
 ##############################################################################
 
 (for CACAO members) How to use the files in /net/tiramisu/cado1/cado/Examples:

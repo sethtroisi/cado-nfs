@@ -89,9 +89,14 @@ if [ -s $purged -a $purged -nt $nodup ]
 then
   echo "File $purged already exists and is newer than $nodup"
 else
-  nrels=`wc -l $nodup | awk '{print $1}'`
+  if [ "X$nrels_dup" != "X" ]
+  then
+    echo "I use nrels_dup=$nrels_dup"
+  else
+    nrels_dup=`wc -l < $nodup`
+  fi
   args="-poly $poly -maxpr $maxpr -maxpa $maxpa -keep $keep_purge"
-  time $linalg/purge $args -nrels $nrels $nodup > $purged
+  time $linalg/purge $args -nrels $nrels_dup $nodup > $purged
   if [ ! -s $purged ]; then echo "zero file $purged"; exit; fi
   excess=`head -1 $purged | awk '{nrows=$1; ncols=$2; print (nrows-ncols)}'`
   echo "excess = $excess"
