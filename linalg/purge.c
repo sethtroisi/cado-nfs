@@ -809,7 +809,7 @@ main(int argc, char **argv)
 	    argv++;
 	}
     }
-    if(keep == -1)
+    if(keep <= 0)
 	keep = nrelmax;
 
     if (polyname == NULL)
