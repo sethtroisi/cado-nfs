@@ -740,6 +740,18 @@ reduce(char **ficname, unsigned int nbfic, hashtable_t *H, char *rel_used,
     fprintf(stderr, "-nrels %d -nprimes %d\n", newnrels, newnprimes);
 }
 
+static void
+usage (char *argv[])
+{
+  fprintf (stderr, "Usage: %s [options] -poly polyfile -nrels nnn file1 ... filen\n", argv[0]);
+  fprintf (stderr, "Options:\n");
+  fprintf (stderr, "       -nonfinal    - perform only one singleton pass\n");
+  fprintf (stderr, "       -keep    nnn - stop when excess <= nnn (default -1)\n");
+  fprintf (stderr, "       -maxpa   nnn - keep only alg. primes <= nnn (default 2^lpba)\n");
+  fprintf (stderr, "       -maxpr   nnn - keep only rat. primes <= nnn (default 2^lpbr)\n");
+  fprintf (stderr, "       -nprimes nnn - number of prime ideals\n");
+}
+
 int
 main(int argc, char **argv)
 {
@@ -756,17 +768,6 @@ main(int argc, char **argv)
     long maxpr = 0, maxpa = 0, keep = -1; // maximum value for nrows-ncols
     cado_poly pol;
     
-    if (argc == 1) {
-	fprintf(stderr, "usage: %s [filename]\n", argv[0]);
-	fprintf(stderr, "  stdin input is not yet available, sorry.\n");
-	exit(1);
-    } 
-    if (argc < 4) {
-	fprintf(stderr, "usage: %s poly nrel file1 ... filen\n", argv[0]);
-	fprintf(stderr, "  if no filename is given, takes input on stdin\n");
-	exit(1);
-    }
-
     fprintf (stderr, "%s.r%s", argv[0], REV);
     for (k = 1; k < argc; k++)
       fprintf (stderr, " %s", argv[k]);
@@ -811,6 +812,11 @@ main(int argc, char **argv)
     }
     if(keep <= 0)
 	keep = nrelmax;
+
+    if (argc == 1) {
+        usage (argv);
+	exit(1);
+    } 
 
     if (polyname == NULL)
       {
