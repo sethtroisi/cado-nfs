@@ -317,6 +317,8 @@ struct thread:public traits {
             % m0_estim % (pcpu * 100.0)
             % pdelta(tw)
             % eta << endl;
+
+        mat.report();
         thread_unlock(&globals::console_lock);
     }
 

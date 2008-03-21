@@ -77,6 +77,8 @@ class matrix_repr_binary {
 	    }
             asm("# end of multiplication code\n");
 	}
+
+        void report() const {}
     };	/* matrix_rowset */
 };
 

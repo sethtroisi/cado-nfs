@@ -49,6 +49,7 @@ MKBITSTRINGS_SOURCES:=mkbitstrings.c
 #
 BW_PREP_SOURCES:=					\
 		auxfuncs.c				\
+		cxx/ticks.cpp				\
 		cxx/prep.cpp cxx/files.cpp		\
 		cxx/matrix_header.cpp cxx/matrix.cpp	\
 		cxx/preconditioner.cpp			\
@@ -210,6 +211,7 @@ BENCH_POLMATMUL_LIBS:=-lgmp -lutils -lgf2x ../../gf2x/cantor/cantor128.o
 BW_GATHER_SOURCES:=					\
 		auxfuncs.c				\
 		cxx/config_file.cpp			\
+		cxx/ticks.cpp				\
 		cxx/gather.cpp				\
 		cxx/matrix.cpp	cxx/matrix_line.cpp	\
 		cxx/files.cpp cxx/matrix_header.cpp	\
