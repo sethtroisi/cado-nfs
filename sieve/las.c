@@ -401,6 +401,10 @@ bingcd(unsigned long a, unsigned long b) {
 }
 
 
+/* Define to 0 or 1. Table lookup seems to be slightly faster than
+   ctzl() on Opteron and slightly slower on Core2, but doesn't really
+   make much difference in either case. */
+#define LOOKUP_TRAILING_ZEROS 1
 
 // Compute the inverse of a modulo b, by binary xgcd.
 // a must be less than b.
@@ -408,6 +412,17 @@ bingcd(unsigned long a, unsigned long b) {
 // return 1 on succes, 0 on failure
 static inline int
 invmod(unsigned long *pa, unsigned long b) {
+#if LOOKUP_TRAILING_ZEROS
+  static const unsigned char trailing_zeros[256] = 
+    {0,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,4,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,
+     5,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,4,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,
+     6,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,4,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,
+     5,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,4,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,
+     7,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,4,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,
+     5,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,4,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,
+     6,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,4,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,
+     5,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,4,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0};
+#endif
   unsigned long a, u, v, fix;
   int t, lsh;
   a = *pa;
@@ -453,19 +468,37 @@ invmod(unsigned long *pa, unsigned long b) {
   do {
     do {
       b -= a; v += u;
+#if LOOKUP_TRAILING_ZEROS
+      do {
+	lsh = trailing_zeros [(unsigned char) b];
+	b >>= lsh;
+	t += lsh;
+	u <<= lsh;
+      } while (lsh == 8);
+#else
       lsh = ctzl(b);
       b >>= lsh;
       t += lsh;
       u <<= lsh;
+#endif
     } while (a<b);
     if (UNLIKELY(a == b))
       break;
     do {
       a -= b; u += v;
+#if LOOKUP_TRAILING_ZEROS
+      do {
+	lsh = trailing_zeros [(unsigned char) a];
+	a >>= lsh;
+	t += lsh;
+	v <<= lsh;
+      } while (lsh == 8);
+#else
       lsh = ctzl(a);
       a >>= lsh;
       t += lsh;
       v <<= lsh;
+#endif
     } while (b < a);
   } while (a != b);
   if (a != 1)
