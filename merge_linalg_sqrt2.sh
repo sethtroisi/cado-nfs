@@ -24,6 +24,7 @@ params=$1; shift
 if [ "X$root" = "X" ]; then echo "I need at least a name..."; exit; fi
 
 cado=${cado-.} # where we can find linalg/, sqrt/, etc.
+export cado
 
 linalg=$cado/linalg
 sqrt=$cado/sqrt/naive

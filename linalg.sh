@@ -1,5 +1,6 @@
 #!/bin/sh -
-linalg=linalg
+cado=${cado-.}
+linalg=$cado/linalg
 
 # parameter from merge_linalg_sqrt.sh: 
 # $1 is $mat
