@@ -374,8 +374,9 @@ bingcd(unsigned long a, unsigned long b) {
     B = b >> (lsh + 1);
     t = MIN(t, lsh);
 
-    // now a and b are odd, and the 2-part of the gcd is 2^t.
-    // make a < b.
+    // now a>>t and b>>t are odd, and the 2-part of the gcd is 2^t.
+    // A = (a-1)/2, B = (b-1)/2
+    // make A < B.
     if (UNLIKELY(A == B))
       return (2 * A + 1)<<t;
     if (A > B) {
@@ -383,6 +384,8 @@ bingcd(unsigned long a, unsigned long b) {
         A = B;
         B = tmp;
     }
+    if (UNLIKELY(A == 0))
+      return 1<<t;
     
     do {
         do {
@@ -410,8 +413,28 @@ invmod(unsigned long *pa, unsigned long b) {
   a = *pa;
 
   // FIXME: here, we rely on internal representation of the modul module.
+  // Not any more. Code is now 11 times as long... - Alex
   if (UNLIKELY(((b & 1UL)==0)))
-      return modul_inv(pa, pa, &b);
+    {
+      modulusul_t m;
+      residueul_t r;
+      modul_initmod_ul (m, b);
+      modul_init (r, m); /* With mod reduction */
+      modul_set_ul (r, *pa, m);
+      if (modul_inv(r, r, m))
+      {
+        *pa = modul_get_ul (r, m);
+        modul_clear (r, m);
+        modul_clearmod (m);
+        return 1;
+      }
+      else
+      {
+        modul_clear (r, m);
+        modul_clearmod (m);
+        return 0;
+      }
+    }
 
   fix = (b+1)>>1;
 
