@@ -144,3 +144,23 @@ sqrtint_ul (const unsigned long n, unsigned long *e)
   return xs;
 }
 #endif
+
+/* Binary gcd. Assumes a is odd, b can be zero. */
+static inline int64_t
+bin_gcd (int64_t a, int64_t b)
+{
+  ASSERT(a & 1);
+  while (b != 0)
+    {
+      /* reduce a wrt b, i.e., cancel the two low bits of a, so that
+         a + q*b = 0 (mod 4) */
+      b >>= ctzl (b);
+      a = ((a ^ b) & 2) ? a + b : a - b;
+      if (a == 0)
+        return (b > 0) ? b : -b;
+      /* reduce b wrt a */
+      a >>= ctzl (a);
+      b = ((b ^ a) & 2) ? b + a : b - a;
+    }
+  return (a > 0) ? a : -a;
+}

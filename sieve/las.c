@@ -346,6 +346,7 @@ redc_32(const int64_t x, const uint32_t p, const uint32_t invp)
 
 // binary gcd for unsigned long
 
+#if 0
 static inline unsigned long
 adjust_right_drop1 (unsigned long a)
 {
@@ -399,6 +400,7 @@ bingcd(unsigned long a, unsigned long b) {
     } while (A != B);
     return (2*A+1)<<t;
 }
+#endif
 
 
 /* Define to 0 or 1. Table lookup seems to be slightly faster than
@@ -1365,7 +1367,9 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
 
         // Compute algebraic and rational norms.
         xToAB (&a, &b, x + N*si->bucket_region, si);
-        if (b == 0 || bingcd ((a > 0) ? a : -a, b) != 1)
+        /* bin_gcd assumes that its first operand is odd: we first discard
+           the case where both a and b are even, then a+b is odd */
+        if (((a | b) & 1) == 0 || bin_gcd (a + b, b) != 1)
           continue;
 
         surv++;
