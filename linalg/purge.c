@@ -617,10 +617,12 @@ remove_singletons(int *nrel, int nrelmax, int *nprimes, hashtable_t *H, char *re
     do{
 	old = newnrel;
 	deleteHeavierRows(H,&newnrel,&newnprimes,rel_used,rel_compact,nrelmax,keep);
-	fprintf(stderr,"dHR: %d %d at %2.2lf\n",newnrel,newnprimes,seconds());
+	if(newnrel != old)
+	    fprintf(stderr,"dHR: %d %d at %2.2lf\n",
+		    newnrel,newnprimes,seconds());
 	onepass_singleton_removal(nrelmax, &newnrel, &newnprimes, H, rel_used, rel_compact /*, keep*/);
-	fprintf(stderr, "new/old = %d/%d; newnprimes=%d at %2.2lf\n",
-		newnrel, old, newnprimes, seconds());
+	fprintf(stderr, "new_nrows=%d new_ncols=%d (%d) at %2.2lf\n",
+		newnrel, newnprimes, newnrel-newnprimes, seconds());
     } while(newnrel != old);
     // clean empty rows
     for(i = 0; i < nrelmax; i++){
