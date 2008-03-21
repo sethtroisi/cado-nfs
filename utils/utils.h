@@ -16,9 +16,6 @@
  */
 #define	ULONG_BITS	((int) (sizeof(unsigned long) * CHAR_BIT))
 
-/* Number of words holding B bits ; better naming sought. */
-#define	BITS_TO_WORDS(B,W)	(((B)+(W)-1)/(W))
-
 /* the following function is missing in GMP */
 #ifndef mpz_addmul_si
 #define mpz_addmul_si(a, b, c)                  \
