@@ -59,9 +59,9 @@ public:
             data.push_back(0);
             unsigned int packbase = (slice.i1-slice.i0) / nslices;
             /* How many slices of size packbase+1 */
-            unsigned nslices1 = (slice.i1-slice.i0) % npack;
+            unsigned int nslices1 = (slice.i1-slice.i0) % nslices;
             /* How many slices of size packbase */
-            unsigned nslices0 = nslices - nslices1;
+            unsigned int nslices0 = nslices - nslices1;
 
             unsigned int i;
             unsigned int next = slice.i0;
