@@ -23,7 +23,7 @@ else
    then
        echo "File $mat.tr exists and is newer than $mat";
    else
-       time $linalg/transpose -in $mat -out $mat.tr -skip $skip
+       time $linalg/transpose -T $outdir -in $mat -out $mat.tr -skip $skip
    fi
 
    echo "Calling Block-Wiedemann"
