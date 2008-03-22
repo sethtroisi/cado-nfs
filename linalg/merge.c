@@ -2512,7 +2512,7 @@ main(int argc, char *argv[])
 	    argv += 2;
 	}
 	else if (argc > 2 && strcmp (argv[1], "-ratio") == 0){
-	    ratio = atol(argv[2]);
+	    ratio = strtod(argv[2], NULL);
 	    argc -= 2;
 	    argv += 2;
 	}
