@@ -408,7 +408,8 @@ bingcd(unsigned long a, unsigned long b) {
    make much difference in either case. */
 #define LOOKUP_TRAILING_ZEROS 1
 
-// Compute the inverse of a modulo b, by binary xgcd.
+// Compute the 2^32/a mod b for b odd, 
+// and 1/a mod b for b even, by binary xgcd.
 // a must be less than b.
 // a is modified in place
 // return 1 on succes, 0 on failure
@@ -425,7 +426,7 @@ invmod(unsigned long *pa, unsigned long b) {
      6,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,4,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,
      5,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,4,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0};
 #endif
-  unsigned long a, u, v, fix;
+  unsigned long a, u, v, fix, p = b;
   int t, lsh;
   a = *pa;
 
@@ -507,13 +508,20 @@ invmod(unsigned long *pa, unsigned long b) {
     return 0;
 
   // Here, the inverse of a is u/2^t mod b.
-  while (t>0) {
+  while (t>32) {
     unsigned long sig = u & 1UL;
     u >>= 1;
     if (sig)
       u += fix;
     --t;
   }
+  while (t < 32)
+    {
+      u <<= 1;
+      if (u >= p)
+        u -= p;
+      t ++;
+    }
   *pa = u;
   return 1;
 }
@@ -557,7 +565,7 @@ simple_fb_root_in_qlattice(const fbprime_t p, const fbprime_t R, const sieve_inf
 
     // divide
     if (!invmod(&den, p))
-        return p+1;
+      return p+1;
     num = num*den;
     return (fbprime_t)(num % ((uint64_t) p));
 }
@@ -589,10 +597,9 @@ fb_root_in_qlattice(const fbprime_t p, const fbprime_t R,
     if (den == 0)
         return p;
 
-    den = redc_32 (den, p, invp); /* Divide by 2^32 (mod p) */
-    // divide
+    // divide: for p odd, invmod computes 2^32/den (mod p)
     if (UNLIKELY(!invmod(&den, p)))
-        return p+1;
+      return p+1;
     num = num*den;
     return (fbprime_t) redc_32 (num, p, invp);
 }
