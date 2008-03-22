@@ -40,6 +40,7 @@ prune=${prune-1.0}
 maxlevel=${maxlevel-6}
 cwmax=${cwmax-10}
 rwmax=${rwmax-100}
+ratio=${ratio-1.1}
 
 # don't be verbose by default!
 verbose=${verbose-""}
@@ -121,7 +122,7 @@ fi
 
 nb_merge_max=1000000
 keep=`expr 128 '+' $skip`
-argsa="-forbw $bwstrat"
+argsa="-forbw $bwstrat -ratio $ratio"
 argsa="$argsa -prune $prune -merge $nb_merge_max -mat $purged -keep $keep"
 argsa="$argsa -maxlevel $maxlevel -cwmax $cwmax -rwmax $rwmax $verbose"
 time $linalg/merge $argsa > $outdir/merge.his # 2> $outdir.merge.err
