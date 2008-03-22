@@ -2247,7 +2247,7 @@ my_cost(unsigned long N, unsigned long c, int forbw)
 }
 
 void
-mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
+mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw, double ratio)
 {
     double tt, totopt = 0.0, totfill = 0.0, totMST = 0.0, totdel = 0.0;
     double tfill, tMST;
@@ -2347,7 +2347,7 @@ mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 	// to be cleaned one day...
 	if((forbw == 0) || (forbw == 2)){
 	    double r = ((double)bwcost)/((double)bwcostmin);
-	    if((r > 1.1) && (mat->rem_nrows-mat->rem_ncols <= mat->delta)){
+	    if((r > ratio) && (mat->rem_nrows-mat->rem_ncols <= mat->delta)){
 		if(forbw == 0)
 		    fprintf(stderr, "cN too high, stopping [%2.2lf]\n", r);
 		else
@@ -2449,6 +2449,7 @@ main(int argc, char *argv[])
     int verbose = 0; /* default verbose level */
     double tt;
     double kprune = 1.0; /* prune keeps kprune * (initial excess) */
+    double ratio = 1.1; /* bound on cN_new/cN to stop the computation */
     int i, forbw = 0;
     
 #if TEX
@@ -2507,6 +2508,11 @@ main(int argc, char *argv[])
 	}
 	else if (argc > 2 && strcmp (argv[1], "-forbw") == 0){
 	    forbw = atoi(argv[2]);
+	    argc -= 2;
+	    argv += 2;
+	}
+	else if (argc > 2 && strcmp (argv[1], "-ratio") == 0){
+	    ratio = atol(argv[2]);
 	    argc -= 2;
 	    argv += 2;
 	}
@@ -2570,7 +2576,7 @@ main(int argc, char *argv[])
 #if M_STRATEGY <= 2
     merge(&mat, /*nb_merge_max,*/ maxlevel, verbose, forbw);
 #else
-    mergeOneByOne(&mat, maxlevel, verbose, forbw);
+    mergeOneByOne(&mat, maxlevel, verbose, forbw, ratio);
 #endif
     fprintf(stderr, "Final matrix has w(M)=%lu, ncols*w(M)=%lu\n",
 	    mat.weight, ((unsigned long)mat.rem_ncols) * mat.weight);
