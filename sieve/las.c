@@ -206,7 +206,8 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int logI, uint64_t q0)
   // bucket info
   // TODO: be more clever, here.
   si->log_bucket_region = BUCKET_REGION;
-  ASSERT_ALWAYS(si->log_bucket_region >= si->logI);
+  ASSERT_ALWAYS(si->log_bucket_region > si->logI); /* so that we sieve an even
+                                                      number of rows */
   si->bucket_region = 1<<si->log_bucket_region;
   si->nb_buckets = 1 + (si->I * si->J - 1) / si->bucket_region;
   si->bucket_limit = (BUCKET_LIMIT_FACTOR)*si->bucket_region;
@@ -1204,26 +1205,36 @@ void sieve_small_bucket_region(unsigned char *S,
     int n;
 
     nj = (si->bucket_region >> si->logI);
+    ASSERT ((nj & 1) == 0);
 
     for (n = 0; n < ssd.nb_nice_p; ++n) {
-        fbprime_t p, r;
+        fbprime_t p, r, twop;
         unsigned char logp;
         unsigned int i, i0;
         p = ssd.nice_p[n].p;
+        twop = p + p;
         r = ssd.nice_p[n].r;
         logp = ssd.nice_p[n].logp;
         i0 = ssd.nice_p[n].next_position;
         S_ptr = S;
         ASSERT(i0 < p);
-        for (j = 0; j < nj; ++j) {
-          for (i = i0 ; i < I; i += p) {
-                S_ptr[i] -= logp;
-            }
+        for (j = 0; j < nj; j += 2)
+          {
+            /* for j even, we sieve only odd i */
+            for (i = (i0 & 1) ? i0 : i0 + p; i < I; i += twop)
+              S_ptr[i] -= logp;
             i0 += r;
             if (i0 >= p)
-                i0 -= p;
+              i0 -= p;
             S_ptr += I;
-        }
+            /* j odd */
+            for (i = i0 ; i < I; i += p)
+              S_ptr[i] -= logp;
+            i0 += r;
+            if (i0 >= p)
+              i0 -= p;
+            S_ptr += I;
+          }
         ssd.nice_p[n].next_position = i0;
     }
 }
