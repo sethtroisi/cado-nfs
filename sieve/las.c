@@ -273,7 +273,9 @@ sieve_info_update (sieve_info_t *si, double skew)
   if (s_over_a1 > 1.0) /* ensures that J <= I/2 */
     s_over_a1 = 1.0;
   si->J = (uint32_t) (s_over_a1 * (double) (si->I >> 1));
+#ifdef VERBOSE
   fprintf (stderr, "# I=%u; J=%u\n", si->I, si->J);
+#endif
 
   /* update number of buckets */
   si->nb_buckets = 1 + (si->I * si->J - 1) / si->bucket_region;
@@ -746,6 +748,7 @@ fill_in_buckets(bucket_array_t BA, factorbase_degn_t *fb, const sieve_info_t * s
                 continue;
             
             const uint32_t I = si->I;
+            const uint32_t logI = si->logI;
             const uint32_t maskI = I-1;
             const uint32_t maskbucket = si->bucket_region - 1;
             const int shiftbucket = si->log_bucket_region;
@@ -776,8 +779,13 @@ fill_in_buckets(bucket_array_t BA, factorbase_degn_t *fb, const sieve_info_t * s
             while (x < I*si->J) {
                 uint32_t i;
                 i = x & maskI;   // x mod I
-                update.x = (uint16_t) (x & maskbucket);
-                push_bucket_update(BA, x >> shiftbucket, update);
+                /* if both i = x % I and j = x / I are even, then
+                   both a, b are even, thus we can't have a valid relation */
+                if ((x | (x >> logI)) & 1)
+                  {
+                    update.x = (uint16_t) (x & maskbucket);
+                    push_bucket_update(BA, x >> shiftbucket, update);
+                  }
 #ifdef TRACE_K
                 if (x == TRACE_K)
                   fprintf (stderr, "Pushed (%u, %u) (%u) to BA[%u]\n",
@@ -2094,8 +2102,10 @@ main (int argc, char *argv[])
         clear_small_sieve(ssd_rat);
         clear_small_sieve(ssd_alg);
         tot_reports += reports;
+#ifdef VERBOSE
         fprintf (stderr, "# %lu survivors after rational side,", survivors0);
         fprintf (stderr, " %lu after algebraic side\n", survivors1);
+#endif
         fprintf (stderr, "# %d relation(s) for (%" PRIu64 ",%" PRIu64
                  "), total %lu [%1.3fs/r]\n#\n", reports, si.q, si.rho,
                  tot_reports, (seconds () - t0) / (double) tot_reports);
