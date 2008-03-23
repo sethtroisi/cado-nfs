@@ -587,21 +587,21 @@ fb_root_in_qlattice(const fbprime_t p, const fbprime_t R,
 
     // numerator
     aux = ((int64_t)R)*((int64_t)si->b1) - ((int64_t)si->a1); 
-    num = redc_32(aux, p, invp);
+    num = redc_32(aux, p, invp); /* 0 <= num < p */
     if (num == 0)
         return 0;
 
     // denominator
     aux = ((int64_t)si->a0) - ((int64_t)R)*((int64_t)si->b0); 
-    den = redc_32(aux, p, invp);
+    den = redc_32(aux, p, invp); /* 0 <= den < p */
     if (den == 0)
         return p;
 
     // divide: for p odd, invmod computes 2^32/den (mod p)
     if (UNLIKELY(!invmod(&den, p)))
       return p+1;
-    num = num*den;
-    return (fbprime_t) redc_32 (num, p, invp);
+    num = num * den; /* 0 < num < p^2 */
+    return (fbprime_t) redc_u32 (num, p, invp);
 }
 
 
