@@ -106,6 +106,13 @@ typedef struct {
     unsigned char S_alg[1 << NORM_BITS];
 } sieve_info_t;
 
+/* A "const sieve_info_t *" tells the compiler only that the pointer value
+   is constant, not that the data in the referenced memory is constant,
+   which can prevent important optimizations by making the generated code
+   read from memory every time. To fix that, one must define a "const" 
+   variant of the data type, and pass a pointer to that */
+typedef const sieve_info_t const_sieve_info_t;
+
 /************************** sieve info stuff *********************************/
 
 static double get_maxnorm (cado_poly, sieve_info_t *, uint64_t);
@@ -415,7 +422,10 @@ bingcd(unsigned long a, unsigned long b) {
 // a must be less than b.
 // a is modified in place
 // return 1 on succes, 0 on failure
-static inline int
+#ifndef PROFILE 
+inline static
+#endif
+int
 invmod(unsigned long *pa, unsigned long b) {
 #if LOOKUP_TRAILING_ZEROS
   static const unsigned char trailing_zeros[256] = 
@@ -573,7 +583,10 @@ simple_fb_root_in_qlattice(const fbprime_t p, const fbprime_t R, const sieve_inf
 }
 
 
-static inline fbprime_t
+#ifndef PROFILE 
+inline static
+#endif
+fbprime_t
 fb_root_in_qlattice(const fbprime_t p, const fbprime_t R,
         const uint32_t invp, const sieve_info_t * si)
 {
@@ -644,7 +657,10 @@ typedef struct {
 //   yield (a0=g, b0=0) at some point --- or the converse --- and the loop
 //   while (|a0| >= I) a0 += b0 will loop forever.
 //
-static int
+#ifndef PROFILE 
+inline static
+#endif
+int
 reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r,
                  const sieve_info_t * si)
 {
@@ -727,7 +743,8 @@ reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r,
 /********        Main bucket sieving functions                    **********/
 
 void
-fill_in_buckets(bucket_array_t BA, factorbase_degn_t *fb, const sieve_info_t * si) {
+fill_in_buckets(bucket_array_t BA, factorbase_degn_t *fb, 
+		const const_sieve_info_t * si) {
     // Loop over all primes in the factor base > I
     while (fb->p < si->I)
         fb = fb_next (fb); // cannot do fb++, due to variable size !
@@ -784,8 +801,13 @@ fill_in_buckets(bucket_array_t BA, factorbase_degn_t *fb, const sieve_info_t * s
                 if ((x | (x >> logI)) & 1)
                   {
                     update.x = (uint16_t) (x & maskbucket);
-                    push_bucket_update(BA, x >> shiftbucket, update);
+#if PROFILE
+		    /* To make it visible in profiler */
+		    *(BA.bucket_write[x >> shiftbucket])++ = update;
+#else
+		    push_bucket_update(BA, x >> shiftbucket, update);
                   }
+#endif
 #ifdef TRACE_K
                 if (x == TRACE_K)
                   fprintf (stderr, "Pushed (%u, %u) (%u) to BA[%u]\n",
