@@ -13,7 +13,7 @@
 #include "fb.h"
 #include "../utils/utils.h"
 #include "../utils/manu.h"   /* for ctzl */
-#include "basicnt.h" /* for gcd_ul */
+#include "basicnt.h"         /* for bin_gcd */
 #include <tifa.h>
 #include "bucket.h"
 
@@ -139,7 +139,7 @@ sieve_info_init_lognorm (unsigned char *C, unsigned char threshold,
 }
 
 static void
-sieve_info_init (sieve_info_t *si, cado_poly cpoly, int I, uint64_t q0)
+sieve_info_init (sieve_info_t *si, cado_poly cpoly, int logI, uint64_t q0)
 {
   unsigned int d = cpoly->degree;
   unsigned int k;
@@ -152,7 +152,7 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int I, uint64_t q0)
   si->tmpd = (double*) malloc ((d + 1) * sizeof (double));
   for (k = 0; k <= d; k++)
     mpz_init (si->fij[k]);
-  si->logI = I;
+  si->logI = logI;
   si->I = 1 << si->logI;
   si->J = 1 << (si->logI - 1);
 
@@ -1326,7 +1326,7 @@ check_leftover_norm (mpz_t n, size_t lpb, mpz_t BB, size_t mfb)
   return 1;
 }
 
-void xToAB(int64_t *a, uint64_t *b, int x, sieve_info_t * si);
+static void xToAB(int64_t *a, uint64_t *b, unsigned int x, sieve_info_t *si);
 int factor_leftover_norm (mpz_t n, unsigned int b,
         mpz_array_t* const factors, uint32_array_t* const multis);
 static void
@@ -1446,35 +1446,38 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
 //                                                   j in [0,J[
 //   (a,b)      is the original coordinates. a is signed, b is unsigned.
 
-void 
+#if 0
+static void 
 xToIJ(int *i, unsigned int *j, int x, sieve_info_t * si)
 {
     *i = (x % (si->I)) - (si->I >> 1);
     *j = x / si->I;
 }
 
-void
+static void
 IJTox(int *x, int i, int j, sieve_info_t * si)
 {
     *x = i + (si->I)*j + (si->I>>1);
 }
 
-void
+static void
 IJToAB(int64_t *a, uint64_t *b, int i, int j, sieve_info_t * si)
 {
     *a = i*si->a0 + j*si->a1;
     *b = i*si->b0 + j*si->b1;
 }
+#endif
 
 /* Warning: b might be negative, in which case we return (-a,-b) */
-void
-xToAB(int64_t *a, uint64_t *b, int x, sieve_info_t * si)
+static void
+xToAB(int64_t *a, uint64_t *b, unsigned int x, sieve_info_t *si)
 {
     int i, j;
     int64_t c;
+    uint32_t I = si->I;
 
-    i = (x % (si->I)) - (si->I >> 1);
-    j = x / si->I;
+    i = (x & (I - 1)) - (I >> 1);
+    j = x >> si->logI;
     *a = (int64_t) i * (int64_t) si->a0 + (int64_t) j * (int64_t) si->a1;
     c =  (int64_t) i * (int64_t) si->b0 + (int64_t) j * (int64_t) si->b1;
     if (c >= 0)
