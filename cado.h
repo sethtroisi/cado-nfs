@@ -189,7 +189,7 @@ typedef struct {
 /* Factorbase entry with prime < 2^24 and exactly 1 root */
 typedef struct {
   fbprime_t p;            /* A prime or a prime power < 2^24 */
-  fbroot_t root_and_log;  /* The root and approxomate log (upper 8 bits) */
+  fbroot_t root_and_log;  /* The root and approximate log (upper 8 bits) */
 } factorbase_small_t;
 
 /* Factorbase entry with prime < 2^24 and index to next sieve array
@@ -197,7 +197,7 @@ typedef struct {
 typedef struct {
   fbprime_t p;            /* A prime or a prime power < 2^24 */
   fbprime_t loc_and_log;  /* Next location in sieve array where this prime
-			     will divide (low 24 bits) and approxomate log
+			     will divide (low 24 bits) and approximate log
 			     (upper 8 bits) */
 } factorbase_small_inited_t;
 
