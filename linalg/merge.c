@@ -2266,6 +2266,10 @@ mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw, double ra
 	m = minColWeight(mat);
 	if(m > mmax)
 	    mmax = m;
+	if(mmax > maxlevel){
+	    fprintf(stderr, "maxlevel reached, stopping!\n");
+	    break;
+	}
 	if(m == -1){
 	    fprintf(stderr, "All stacks empty, stopping!\n");
 	    break;
@@ -2299,6 +2303,7 @@ mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw, double ra
 	njproc += old_ncols - mat->rem_ncols;
 	deleteEmptyColumns(mat);
 	if((old_nrows == mat->rem_nrows) && (old_ncols == mat->rem_ncols)){
+	    // is this supposed to be activated at some point? Really?
 	    if((m > maxlevel) || (m <= 0))
 		break;
 	}
