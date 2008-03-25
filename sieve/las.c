@@ -770,6 +770,7 @@ fill_in_buckets(bucket_array_t BA, factorbase_degn_t *fb,
             const uint32_t maskI = I-1;
             const uint32_t maskbucket = si->bucket_region - 1;
             const int shiftbucket = si->log_bucket_region;
+            const uint32_t IJ = si->I * si->J;
  
             plattice_info_t pli;
             if (reduce_plattice(&pli, p, r, si) == 0)
@@ -794,7 +795,7 @@ fill_in_buckets(bucket_array_t BA, factorbase_degn_t *fb,
             update.p = p;
             update.logp = logp;
             __asm__("## Inner bucket sieving loop starts here!!!\n");
-            while (x < I*si->J) {
+             while (x < IJ) {
                 uint32_t i;
                 i = x & maskI;   // x mod I
                 /* if both i = x % I and j = x / I are even, then
@@ -1413,11 +1414,13 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
         if (!(si->alg_Bound[S[x]]))
           continue;
 
+        /* since a,b both even were not sieved, either a or b should be odd */
+        ASSERT((a | b) & 1);
+
         // Compute algebraic and rational norms.
         xToAB (&a, &b, x + N*si->bucket_region, si);
-        /* bin_gcd assumes that its first operand is odd: we first discard
-           the case where both a and b are even, then a+b is odd */
-        if (((a | b) & 1) == 0 || bin_gcd (a + b, b) != 1)
+        /* bin_gcd assumes that its first operand is odd */
+        if (bin_gcd (a + b, b) != 1)
           continue;
 
         surv++;
@@ -2129,7 +2132,7 @@ main (int argc, char *argv[])
             /* Factor survivors */
             ttf -= seconds ();
             reports += factor_survivors (S, i, rat_BA, alg_BA, fb_rat,
-                                            fb_alg, cpoly, &si, &survivors1);
+                                         fb_alg, cpoly, &si, &survivors1);
             ttf += seconds ();
         }
         clear_small_sieve(ssd_rat);
