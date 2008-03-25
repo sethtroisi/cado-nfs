@@ -11,7 +11,7 @@
 #include <string.h>
 #include "gmp.h"
 
-#define MAX_DEGREE 5
+#define MAX_DEGREE 6
 
 void
 read_franke (mpz_t N, mpz_t *X, mpz_t Y1, mpz_t Y0, mpz_t M)
