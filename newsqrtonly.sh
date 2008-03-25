@@ -5,7 +5,8 @@
 root=$1; name=$2; ndepmin=$3; ndepmax=$4
 poly=$root.poly
 
-sqrt=sqrt/naive
+cado=${cado-.}
+sqrt=$cado/sqrt/naive
 ndep=$ndepmin
 while [ $ndep -lt $ndepmax ]
 do
