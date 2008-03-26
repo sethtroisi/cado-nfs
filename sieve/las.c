@@ -808,8 +808,8 @@ fill_in_buckets(bucket_array_t BA, factorbase_degn_t *fb,
 		    *(BA.bucket_write[x >> shiftbucket])++ = update;
 #else
 		    push_bucket_update(BA, x >> shiftbucket, update);
-                  }
 #endif
+                  }
 #ifdef TRACE_K
                 if (x == TRACE_K)
                   fprintf (stderr, "Pushed (%u, %u) (%u) to BA[%u]\n",
