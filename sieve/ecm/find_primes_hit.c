@@ -605,7 +605,7 @@ ell_pointorder (const unsigned long m_par, const unsigned long sigma_par)
       {
 	  fprintf (stderr, "ell_order: Error, %ld*(%ld, %ld) (mod %ld) is "
 		   "not the point at infinity\n", 
-		   i, mod_get_ul (x1), mod_get_ul (y1), m_par);
+		   i, mod_get_ul (x1, m), mod_get_ul (y1, m), m_par);
 	  return 0UL;
       }
 #endif
@@ -696,7 +696,7 @@ ell_curveorder (const unsigned long m_par, const unsigned long sigma_par,
   order = ellM_curveorderjacobi (A, X, m);
 
 #ifndef NDEBUG
-  ASSERT (parameterization != BRENT12 || order == ell_pointorder (m, sigma));
+  ASSERT (parameterization != BRENT12 || order == ell_pointorder (m_par, sigma_par));
 #endif
 
   return order;
