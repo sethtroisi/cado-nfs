@@ -15,6 +15,7 @@ char *len; /* len[i] is the length of the best chain found for i so far */
 unsigned long *prev; /* Stores next-to-last element of chain for i */
 static unsigned long chain[255];
 static unsigned long pracbest[255];
+static int beat_prac = 0;
 
 /* Table of multipliers for PRAC. prac_mul[i], i>0, has continued fraction 
    sequence of all ones but with a 2 in the i-th place, and 
@@ -41,6 +42,46 @@ int isprime (unsigned long n)
       return 0;
 
   return 1;
+}
+
+void print_chain (unsigned long *chain, int len)
+{
+  int i, j, k, l;
+  unsigned long d;
+
+  if (len == 0)
+    return;
+
+  printf ("%lu ", chain[0]);
+
+  for (i = 1; i <= len; i++)
+    {
+      /* First see if we can get chain[i] by a doubling */
+      for (j = 0; j < i; j++)
+	if (2 * chain[j] == chain[i])
+	  {
+	    k = j;
+	    goto found;
+	  }
+      /* Now we look for j, k, l so that chain[i] == chain[j] + chain[k]
+	 and chain[j] - chain[k] == chain[l] */
+      for (j = 0; j < i; j++)
+	for (k = 0; k < i; k++)
+	  {
+	    if (chain[i] != chain[j] + chain[k])
+	      continue;
+	    assert (j != k);
+	    d = chain[j] - chain[k];
+	    for (l = 0; l < i; l++)
+	      if (chain[l] == d)
+		goto found;
+	  }
+    found:
+      if (j == k) /* Doubling step */
+	printf ("(%d, %d, -) %lu ", i-1-j, i-1-j, chain[i]);
+      else
+	printf ("(%d, %d, %d) %lu ", i-1-j, i-1-k, i-1-l, chain[i]);
+    }
 }
 
 /* The cost of the binary addition chain */
@@ -319,11 +360,23 @@ void chain_extend (int curlen)
   /* If the sequence so far is a new optimum for its current end value,
      remember the new optimal length for that value */
   s = chain[curlen];
-  if (len[s] == 0 || len[s] > curlen)
+  if (beat_prac)
+    {
+      if (len[s] > curlen)
+	{
+	  printf ("Optimal chain for %lu beats PRAC:", s);
+	  for (i = 0; i <= curlen; i++)
+	    printf (" %lu", chain[i]);
+	  printf ("\n");
+	  print_chain (chain, curlen);
+	  printf ("\n");
+	}
+    }
+  else if (len[s] == 0 || len[s] > curlen)
     {
       len[s] = curlen;
       if (curlen >= 1)
-        prev[s] = chain[curlen - 1];
+	prev[s] = chain[curlen - 1];
     }
 
   if (curlen >= maxlen)
@@ -395,11 +448,30 @@ void find_opt_chain ()
   prev = malloc (maxn * sizeof (unsigned long));
   chain[0] = 1;
   chain[1] = 2;
+  chain[2] = 3; /* If chain[2] == 4, then all following chain elements are 
+		   even, and want chains only for odd multipliers - even
+		   ones are trivially reduced */
   len[1] = 0;
   len[2] = 1;
   for (i = 3; i < maxn; i++)
     len[i] = 0;
-  chain_extend (1);
+
+  /* If we look for cases where the optimal chain beats PRAC, init the
+     lengths to the best length PRAC can find */
+  if (beat_prac)
+    {
+      for (i = 3; i < maxn; i += 2)
+	if (isprime (i))
+	  len[i] = prac_best (i, PRAC_NR, NULL);
+      printf ("Histogram of optimal prac multiplier over all primes < %lu: ",
+	      maxn);
+      for (i = 0; i < 255; i++)
+	if (pracbest[i] != 0)
+	  printf ("%d:%d ", (int) i, (int) pracbest[i]);
+      printf ("\n");
+    }
+
+  chain_extend (2);
   
   nr_primes = 0; /* The number of primes in the search interval */
   sum_prac_primes = 0; /* Sum of lengths of PRAC chains for all primes */
@@ -522,7 +594,8 @@ void usage()
   printf ("-o [maxlen [maxn]]  Find optimal addition chains up to length maxlen for\n"
           "                    integers up to maxn\n");
   printf ("-p [B1 [oldB1]]     Print pseudo-code for addition chain for stage 1 with\n"
-	  "B1 and possibly oldB1 (i.e. for extending stage 1)\n");
+	  "                    B1 and possibly oldB1 (i.e. for extending stage 1)\n");
+  printf ("-b                  Find optimal chains that beat PRAC\n");
 }
 
 
@@ -537,6 +610,22 @@ int main (int argc, char ** argv)
   if (strcmp (argv[1], "-o") == 0)
     {
       /* Find optimal chains */
+      if (argc > 2)
+	{
+	  maxlen = atoi (argv[2]);
+	  maxn = 1UL << maxlen;
+	}
+      
+      if (argc > 3)
+	{
+	  maxn = atoi (argv[3]);
+	}
+      find_opt_chain ();
+    }
+  else if (strcmp (argv[1], "-b") == 0)
+    {
+      /* Try to beat PRAC */
+      beat_prac = 1;
       if (argc > 2)
 	{
 	  maxlen = atoi (argv[2]);
