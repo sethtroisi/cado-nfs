@@ -21,6 +21,14 @@
 #define ASSERT(x)	assert(x)
 #endif
 
+/* Even simple assertions are relatively expensive in very simple functions.
+   If we want them anyway to hunt a bug, define WANT_ASSERT_EXPENSIVE */
+#ifdef WANT_ASSERT_EXPENSIVE
+#define ASSERT_EXPENSIVE(x) ASSERT(x)
+#else
+#define ASSERT_EXPENSIVE(x)
+#endif
+
 /*********************************************************************/
 /* Helper macros */
 #ifndef	MAYBE_UNUSED
@@ -40,9 +48,10 @@
 #define mod_set_ul_reduced   modul_set_ul_reduced
 #define mod_swap             modul_swap
 #define mod_initmod_ul       modul_initmod_ul
+#define mod_getmod_ul        modul_getmod_ul
 #define mod_clearmod         modul_clearmod
 #define mod_get_ul           modul_get_ul
-#define mod_cmp              modul_cmp
+#define mod_equal            modul_equal
 #define mod_is0              modul_is0
 #define mod_add              modul_add
 #define mod_add_ul           modul_add_ul
@@ -108,6 +117,7 @@ static inline void
 modul_set (residueul_t r, const residueul_t s, const 
 	   modulusul_t m MAYBE_UNUSED)
 {
+  ASSERT_EXPENSIVE (s[0] < m[0]);
   r[0] = s[0];
 }
 
@@ -140,6 +150,7 @@ modul_swap (residueul_t a, residueul_t b,
             const modulusul_t m MAYBE_UNUSED)
 {
   unsigned long t;
+  ASSERT_EXPENSIVE (a[0] < m[0] && b[0] < m[0]);
   t = a[0];
   a[0] = b[0];
   b[0] = t;
@@ -154,6 +165,13 @@ modul_initmod_ul (modulusul_t r, const unsigned long s)
 }
 
 MAYBE_UNUSED
+static inline unsigned long
+modul_getmod_ul (modulusul_t m)
+{
+  return m[0];
+}
+
+MAYBE_UNUSED
 static inline void
 modul_clearmod (modulusul_t m MAYBE_UNUSED)
 {
@@ -165,21 +183,24 @@ static inline unsigned long
 modul_get_ul (const residueul_t s, 
 	      const modulusul_t m MAYBE_UNUSED)
 {
+  ASSERT_EXPENSIVE (s[0] < m[0]);
   return s[0];
 }
 
 MAYBE_UNUSED
 static inline int
-modul_cmp (const residueul_t a, const residueul_t b, 
-	   const modulusul_t m MAYBE_UNUSED)
+modul_equal (const residueul_t a, const residueul_t b, 
+             const modulusul_t m MAYBE_UNUSED)
 {
-  return (a[0] < b[0]) ? -1 : ((a[0] == b[0]) ? 0 : 1);
+  ASSERT_EXPENSIVE (a[0] < m[0] && b[0] < m[0]);
+  return (a[0] == b[0]);
 }
 
 MAYBE_UNUSED
 static inline int
 modul_is0 (const residueul_t a, const modulusul_t m MAYBE_UNUSED)
 {
+  ASSERT_EXPENSIVE (a[0] < m[0]);
   return (a[0] == 0UL);
 }
 
@@ -188,27 +209,23 @@ static inline void
 modul_add (residueul_t r, const residueul_t a, const residueul_t b, 
 	   const modulusul_t m)
 {
-  ASSERT(a[0] < m[0] && b[0] < m[0]);
+  ASSERT_EXPENSIVE (a[0] < m[0] && b[0] < m[0]);
 #ifdef MODTRACE
   printf ("modul_add: a = %lu, b = %lu", a[0], b[0]);
 #endif
 
-#if 0
-  /* Turns out to be slower */
+#if (defined(__i386__) || defined(__x86_64__)) && defined(__GNUC__)
   {
-    unsigned long t = 0, tr = a[0];
+    unsigned long t = a[0] - m[0], tr = a[0] + b[0];
     
     __asm__ (
-      "addq %2, %0\n\t"   /* tr += b */
-      "cmovc %3, %1\n\t"  /* if (cy) t = m */
-      "cmpq %0, %3\n\t"
-      "cmovbe %3, %1\n\t" /* it (m <= tr) t = m */
-      "subq %1, %0\n"     /* tr -= t */
-      : "+&r" (tr), "+&r" (t)
-      : "rm" (b[0]), "rm" (m[0])
+      "add %2, %1\n\t"   /* t += b */
+      "cmovc %1, %0\n\t"  /* if (cy) tr = t */
+      : "+r" (tr), "+&r" (t)
+      : "g" (b[0])
       : "cc"
     );
-    ASSERT (tr == (a[0] >= m[0] - b[0]) ? (a[0] - (m[0] - b[0])) : (a[0] + b[0]));
+    ASSERT_EXPENSIVE (tr == (a[0] >= m[0] - b[0]) ? (a[0] - (m[0] - b[0])) : (a[0] + b[0]));
     r[0] = tr;
   }
 #else
@@ -218,6 +235,7 @@ modul_add (residueul_t r, const residueul_t a, const residueul_t b,
 #ifdef MODTRACE
   printf (", r = %lu\n", r[0]);
 #endif
+  ASSERT_EXPENSIVE (r[0] < m[0]);
 }
 
 /* FIXME: This function is really modul_add_ul_reduced */
@@ -226,7 +244,7 @@ static inline void
 modul_add_ul (residueul_t r, const residueul_t a, const unsigned long b, 
 	      const modulusul_t m)
 {
-  ASSERT(a[0] < m[0] && b < m[0]);
+  ASSERT_EXPENSIVE (a[0] < m[0] && b < m[0]);
 #ifdef MODTRACE
   printf ("modul_add_ul: a = %lu, b = %lu", a[0], b);
 #endif
@@ -241,34 +259,21 @@ static inline void
 modul_sub (residueul_t r, const residueul_t a, const residueul_t b, 
 	   const modulusul_t m)
 {
-  ASSERT(a[0] < m[0] && b[0] < m[0]);
+  ASSERT_EXPENSIVE (a[0] < m[0] && b[0] < m[0]);
 #ifdef MODTRACE
   printf ("submod_ul: a = %lu, b = %lu", a[0], b[0]);
 #endif
 
-#if defined(__x86_64__) && defined(__GNUC__)
+#if (defined(__i386__) || defined(__x86_64__)) && defined(__GNUC__)
   {
     unsigned long t = 0, tr = a[0];
     __asm__ (
-      "subq %2, %0\n\t"  /* tr -= b */
+      "sub %2, %0\n\t"  /* tr -= b */
       "cmovc %3, %1\n\t" /* if (a < b) t = m */
-      "addq %1, %0\n"    /* tr += t. Moving this out of the asm block results
+      "add %1, %0\n"    /* tr += t. Moving this out of the asm block results
                             in slowdown!?! */
       : "+&r" (tr), "+&r" (t)
-      : "rm" (b[0]), "rm" (m[0])
-      : "cc"
-    );
-    r[0] = tr;
-  }
-#elif defined(__i386__) && defined(__GNUC__)
-  {
-    unsigned long t = 0, tr = a[0];
-    __asm__ (
-      "subl %2, %0\n\t"  /* tr -= b */
-      "cmovc %3, %1\n\t" /* if (a < b) t = m */
-      "addl %1, %0\n"    /* tr += t */
-      : "+&r" (tr), "+&r" (t)
-      : "rm" (b[0]), "rm" (m[0])
+      : "g" (b[0]), "rm" (m[0])
       : "cc"
     );
     r[0] = tr;
@@ -289,6 +294,7 @@ modul_sub (residueul_t r, const residueul_t a, const residueul_t b,
 #ifdef MODTRACE
   printf (", r = %lu\n", r[0]);
 #endif
+  ASSERT_EXPENSIVE (r[0] < m[0]);
 }
 
 
@@ -298,7 +304,8 @@ static inline void
 modul_sub_ul (residueul_t r, const residueul_t a, const unsigned long b, 
 	      const modulusul_t m)
 {
-  ASSERT(a[0] < m[0] && b < m[0]);
+  ASSERT_EXPENSIVE (a[0] < m[0]);
+  ASSERT(b < m[0]);
 #ifdef MODTRACE
   printf ("modul_sub_ul: a = %lu, b = %lu", a[0], b);
 #endif
@@ -312,6 +319,7 @@ MAYBE_UNUSED
 static inline void
 modul_neg (residueul_t r, const residueul_t a, const modulusul_t m)
 {
+  ASSERT_EXPENSIVE (a[0] < m[0]);
   if (a[0] == 0UL)
     r[0] = a[0];
   else
@@ -444,7 +452,7 @@ modul_mul (residueul_t r, const residueul_t a, const residueul_t b,
   printf ("mulmod_ul: a = %lu, b = %lu", a[0], b[0]);
 #endif
   
-  ASSERT (a[0] < m[0] && b[0] < m[0]);
+  ASSERT_EXPENSIVE (a[0] < m[0] && b[0] < m[0]);
   mul_ul_ul_2ul (&t1, &t2, a[0], b[0]);
   div_2ul_ul_ul (&dummy, r, t1, t2, m[0]);
   
@@ -458,7 +466,7 @@ MAYBE_UNUSED
 static inline void
 modul_tomontgomery (residueul_t r, const residueul_t a, const modulusul_t m)
 {
-  ASSERT (a[0] < m[0]);
+  ASSERT_EXPENSIVE (a[0] < m[0]);
   div_2ul_ul_ul_r (r, 0UL, a[0], m[0]);
 }
 
@@ -501,14 +509,14 @@ modul_addredc_ul (residueul_t r, const residueul_t a, const unsigned long b,
 {
   unsigned long slow, shigh, tlow, thigh;
   
-  ASSERT (a[0] <= m[0]);
+  ASSERT_EXPENSIVE (a[0] <= m[0]);
   slow = b;
   shigh = 0UL;
   modul_add_ul_2ul (&slow, &shigh, a[0]);
   
   tlow = slow * invm;
   mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
-  ASSERT (slow + tlow == 0UL);
+  ASSERT_EXPENSIVE (slow + tlow == 0UL);
   r[0] = thigh + shigh + (slow != 0UL);
   
   /* r = ((a+b) + (((a+b)%2^w * invm) % 2^w) * m) / 2^w  Use a<=m-1, b<=2^w-1
@@ -534,7 +542,7 @@ modul_addredcsemi_ul (residueul_t r, const residueul_t a,
   unsigned long slow, shigh, tlow;
   unsigned char sb;
   
-  ASSERT(a[0] <= m[0]);
+  ASSERT_EXPENSIVE(a[0] <= m[0]);
   slow = b;
 #if defined(__x86_64__) && defined(__GNUC__)
    __asm__ ( "addq %2, %0\n\t"
@@ -560,7 +568,7 @@ modul_addredcsemi_ul (residueul_t r, const residueul_t a,
 
   tlow = slow * invm;
   mul_ul_ul_2ul (&tlow, r, tlow, m[0]);
-  ASSERT (slow + tlow == 0UL);
+  ASSERT_EXPENSIVE (slow + tlow == 0UL);
   r[0] += shigh;
 
   /* r = ((a+b) + (((a+b)%2^w * invm) % 2^w) * m) / 2^w
@@ -580,8 +588,8 @@ modul_mulredc (residueul_t r, const residueul_t a, const residueul_t b,
 {
   unsigned long plow, phigh, tlow, thigh;
 
-  ASSERT(m[0] % 2 != 0);
-  ASSERT(a[0] < m[0] && b[0] < m[0]);
+  ASSERT_EXPENSIVE (m[0] % 2 != 0);
+  ASSERT_EXPENSIVE (a[0] < m[0] && b[0] < m[0]);
 #if defined(MODTRACE)
   printf ("(%lu * %lu / 2^%ld) %% %lu", 
           a[0], b[0], 8 * sizeof(unsigned long), m[0]);
@@ -596,7 +604,12 @@ modul_mulredc (residueul_t r, const residueul_t a, const residueul_t b,
      phigh + thigh */
   /* Since a <= p-1 and b <= p-1, and p <= w-1, a*b <= w^2 - 4*w + 4, so
      adding 1 to phigh is safe */
+#if 0
+  /* Slower? */
+  modul_add_ul_2ul (&plow, &phigh, tlow);
+#else
   phigh += (plow != 0UL);
+#endif
 
   modul_add (r, &phigh, &thigh, m);
 
@@ -612,7 +625,7 @@ modul_mulredc_ul (residueul_t r, const residueul_t a, const unsigned long b,
                   const unsigned long invm, const modulusul_t m)
 {
   unsigned long plow, phigh, tlow, thigh;
-  ASSERT(m[0] % 2 != 0);
+  ASSERT_EXPENSIVE (m[0] % 2 != 0);
 #if defined(MODTRACE)
   printf ("(%lu * %lu / 2^%ld) %% %lu", 
           a[0], b, 8 * sizeof(unsigned long), m[0]);
@@ -640,7 +653,7 @@ modul_muladdredc_ul (residueul_t r, const residueul_t a, const unsigned long b,
                      const modulusul_t m)
 {
   unsigned long plow, phigh, tlow, thigh;
-  ASSERT(m[0] % 2 != 0);
+  ASSERT_EXPENSIVE (m[0] % 2 != 0);
 #if defined(MODTRACE)
   printf ("(%lu * %lu / 2^%ld) %% %lu", 
           a[0], b, 8 * sizeof(unsigned long), m[0]);
