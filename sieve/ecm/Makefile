@@ -27,14 +27,17 @@ pp1.o: pp1.c pp1.h chain_50.c chain_50_100.c chain_100_150.c chain_150_200.c \
         chain_200_300.c chain_300_400.c chain_400_500.c ../../utils/mod_ul.h
 	$(CC) $(CFLAGS) $(INCLUDE) -c -o $@ $<
 
+ecm.o: ecm.c ../../utils/mod_ul.h  ../../utils/mod_ul.c
+	$(CC) $(CFLAGS) $(INCLUDE) -c -o $@ $< -lm
+
 find_primes_hit: find_primes_hit.c ../../utils/mod_ul.h  ../../utils/mod_ul.c
 	$(CC) $(CFLAGS) $(GMPBUILD) $(INCLUDE) $< -lgmp ../../utils/mod_ul.c -lm -o $@
 
 addchain: addchain.c ../../utils/mod_ul.h ../../utils/mod_ul.c
 	$(CC) $(CFLAGS) $(INCLUDE) $< ../../utils/mod_ul.c -lm -o $@
 
-testbench: testbench.c pp1.o ../../utils/mod_ul.h ../../utils/mod_ul.c $(PRIMEGEN)
-	$(CC) $(CFLAGS) $(INCLUDE) $< ../../utils/mod_ul.c pp1.o -o $@ -lgmp $(PRIMEGEN)
+testbench: testbench.c pp1.h pp1.o ecm.h ecm.o ../../utils/mod_ul.h ../../utils/mod_ul.c $(PRIMEGEN)
+	$(CC) $(CFLAGS) $(INCLUDE) $< ../../utils/mod_ul.c pp1.o ecm.o -o $@ -lgmp $(PRIMEGEN) -lm
 
 clean:
 	rm $(TARGETS) 

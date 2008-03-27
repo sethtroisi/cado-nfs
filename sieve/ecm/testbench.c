@@ -5,6 +5,7 @@
 #include <primegen.h>
 #include "mod_ul.h"
 #include "pp1.h"
+#include "ecm.h"
 
 void print_help (char *programname)
 {
@@ -15,6 +16,7 @@ void print_help (char *programname)
   printf ("-ecm     Run ECM (not implemented yet)\n");
   printf ("-f       Run fast P+1 (code generated, unrolled code)\n");
   printf ("-c       Run both fast and slow P+1 and compare results\n");
+  printf ("-m12     Use Montgomery parameterization with 12 torsion for ECM\n");
   printf ("-p       Try only primes in [<start>, <stop>] (default: all odd "
 	  "numbers)\n");
   printf ("-v       More verbose output. Once: print parameters. Twice: print "
@@ -23,11 +25,12 @@ void print_help (char *programname)
 
 int main (int argc, char **argv)
 {
-  unsigned long start = 999, stop = 1001, x0 = 5UL, i, B1, p;
+  unsigned long start = 999, stop = 1001, x0 = 7UL, i, B1, p;
   unsigned long hits = 0, total = 0;
   mpz_t E;
   int fast = 0, compare = 0;
   int method = 0; /* 0 = P-1, 1 = P+1, 2 = ECM */
+  int parameterization = 0;
   int only_primes = 0, verbose = 0;
   primegen pg[1];
 
@@ -60,6 +63,12 @@ int main (int argc, char **argv)
       else if (argc > 1 && strcmp (argv[1], "-f") == 0)
 	{
 	  fast = 1;
+	  argc--;
+	  argv++;
+	}
+      else if (argc > 1 && strcmp (argv[1], "-m12") == 0)
+	{
+	  parameterization = 1;
 	  argc--;
 	  argv++;
 	}
@@ -173,8 +182,14 @@ int main (int argc, char **argv)
           if (mod_get_ul (r, m) == 2UL)
             hits++;
 	}
-      else /* ECM not implemented yet */
+      else
 	{
+	  mod_set_ul_reduced (b, x0, m);
+	  if (ecm_stage1 (r, (int) B1, b, parameterization, m))
+	    hits++;
+	  else if (verbose >= 2)
+	    printf ("Sigma = %lu, x1 = %lu\n", 
+		    mod_get_ul (b, m), mod_get_ul (r, m));
 	}
       
       mod_clear (r, m);
