@@ -20,12 +20,12 @@
 /**
  * \file    array.h
  * \author  Jerome Milan
- * \date    Mon Mar 10
- * \version 1.2.2
+ * \date    Circa Fri Mar 29 2008
+ * \version 1.2.3
  *
  * \brief Higher level arrays and associated functions.
  *
- * This file defines higher level arrays together with some associated 
+ * This file defines higher level arrays together with some associated
  * functions.
  *
  * The <tt>*_array_t</tt> types and their associated functions are quite
@@ -39,12 +39,14 @@
  * \warning Since version 1.2.1 memory management changed. See the
  * \c alloc_*_array and \c clear_*_array functions for more information.
  */
- 
+
  /*
   * History:
   * --------
+  * 1.2.3: Fri Mar 29 (?) 2008 by JM:
+  *        - Inlined functions pertaining to binary_array_t's.
   * 1.2.2: Mon Mar 10 2008 by JM:
-  *        - Inlined is_in_sorted_*_array(...) functions.  
+  *        - Inlined is_in_sorted_*_array(...) functions.
   * 1.2.1: Fri Mar 7 2008 by JM:
   *        - WARNING: Changed memory managment. clear_*_array functions now
   *                   frees the pointer to the array (that's more logical).
@@ -71,6 +73,8 @@
 #include <inttypes.h>
 #include <stdbool.h>
 #include <gmp.h>
+
+#include "bitstring_t.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -103,7 +107,7 @@ extern "C" {
 
 /*
  *-----------------------------------------------------------------------------
- *              byte_array_t and associated functions 
+ *              byte_array_t and associated functions
  *-----------------------------------------------------------------------------
  */
 
@@ -157,7 +161,7 @@ byte_array_t* alloc_byte_array(uint32_t length);
     * \brief Clears a <tt>byte_array_t</tt>.
     *
     * Clears the <tt>byte_array_t</tt> pointed to by \c array, \e i.e.
-    * clears the memory space used by the C-style array pointed by 
+    * clears the memory space used by the C-style array pointed by
     * <tt>array->data</tt> and frees the \c array pointer.
     *
     * \warning Before version 1.2.1, the \c array pointer was not freed which
@@ -277,7 +281,7 @@ void qsort_byte_array(byte_array_t* const array);
     *
     * Returns the position of the byte \c to_find in the
     * <tt>byte_array_t</tt> pointed to by \c array. If the byte \c to_find
-    * is not found in the <tt>byte_array_t</tt>, returns 
+    * is not found in the <tt>byte_array_t</tt>, returns
     * <tt>NOT_IN_ARRAY</tt>.
     *
     * \note The <tt>NOT_IN_ARRAY</tt> value is actually -1 if interpreted as a
@@ -417,7 +421,7 @@ uint32_array_t* alloc_uint32_array(uint32_t length);
     * \brief Clears a <tt>uint32_array_t</tt>.
     *
     * Clears the <tt>uint32_array_t</tt> pointed to by \c array, \e i.e.
-    * clears the memory space used by the C-style array pointed by 
+    * clears the memory space used by the C-style array pointed by
     * <tt>array->data</tt> and frees the \c array pointer.
     *
     * \warning Before version 1.2.1, the \c array pointer was not freed which
@@ -538,7 +542,7 @@ void qsort_uint32_array(uint32_array_t* const array);
     *
     * Returns the position of the integer \c to_find in the
     * <tt>uint32_array_t</tt> pointed to by \c array. If the integer \c to_find
-    * is not found in the <tt>uint32_array_t</tt>, returns 
+    * is not found in the <tt>uint32_array_t</tt>, returns
     * <tt>NOT_IN_ARRAY</tt>.
     *
     * \note The <tt>NOT_IN_ARRAY</tt> value is actually -1 if interpreted as a
@@ -677,7 +681,7 @@ int32_array_t* alloc_int32_array(uint32_t length);
     * \brief Clears a <tt>int32_array_t</tt>.
     *
     * Clears the <tt>int32_array_t</tt> pointed to by \c array, \e i.e.
-    * clears the memory space used by the C-style array pointed by 
+    * clears the memory space used by the C-style array pointed by
     * <tt>array->data</tt> and frees the \c array pointer.
     *
     * \warning Before version 1.2.1, the \c array pointer was not freed which
@@ -884,7 +888,7 @@ struct struct_mpz_array_t {
         * pointed by the structure's \c data field.
         *
         * \warning Prior to version 1.2, the \c length field also indicated
-        * which positions had been \c mpz_init'ed in the \c data field. Since 
+        * which positions had been \c mpz_init'ed in the \c data field. Since
         * version 1.2 this is no longer true. Now all positions in the \c data
         * array are \c mpz_init'ed and \c length only gives which part of the
         * array is useful from the client standpoint.
@@ -904,7 +908,7 @@ typedef struct struct_mpz_array_t mpz_array_t;
 
    /**
     * \brief Allocates and returns a new <tt>mpz_array_t</tt>.
-    * 
+    *
     * Allocates and returns a new <tt>mpz_array_t</tt> such that:
     * \li its \c alloced field is set to the parameter length.
     * \li its \c length field is set to zero.
@@ -925,7 +929,7 @@ mpz_array_t* alloc_mpz_array(uint32_t length);
     * \brief Clears a <tt>mpz_array_t</tt>.
     *
     * Clears the <tt>mpz_array_t</tt> pointed to by \c array, \e i.e.
-    * clears the memory space used by the C-style array pointed by 
+    * clears the memory space used by the C-style array pointed by
     * <tt>array->data</tt> and frees the \c array pointer.
     *
     * \warning Before version 1.2.1, the \c array pointer was not freed which
@@ -1191,7 +1195,7 @@ binary_array_t* alloc_binary_array(uint32_t length);
     * \brief Clears a <tt>binary_array_t</tt>.
     *
     * Clears the <tt>binary_array_t</tt> pointed to by \c array, \e i.e.
-    * clears the memory space used by the C-style array pointed by 
+    * clears the memory space used by the C-style array pointed by
     * <tt>array->data</tt> and frees the \c array pointer.
     *
     * \warning Before version 1.2.1, the \c array pointer was not freed which
@@ -1207,7 +1211,7 @@ void clear_binary_array(binary_array_t* array);
     * Resets the \c length field of \c array to zero.
     *
     * Note that its \c alloced field is left unchanged and that memory for
-    * <tt>alloced * CHAR_BIT * sizeof(TIFA_BITSTRING_T)</tt> bits is still 
+    * <tt>alloced * CHAR_BIT * sizeof(TIFA_BITSTRING_T)</tt> bits is still
     * allocated.
     *
     * \param[in] array A pointer to the <tt>binary_array_t</tt> to reset.
@@ -1262,7 +1266,22 @@ void print_binary_array(const binary_array_t* const array);
     * \param[in] array A pointer to the <tt>binary_array_t</tt>.
     * \return The value of the <tt>index</tt>-th bit: either 0 or 1.
     */
-uint8_t get_array_bit(uint32_t index, const binary_array_t* const array);
+inline static uint8_t
+get_array_bit(uint32_t index, const binary_array_t* const array) {
+#if BITSTRING_T_SIZE_IS_POW_OF_TWO
+    uint32_t offset = index & (BITSTRING_T_BITSIZE - 1);
+    index >>= POW_TWO_BITSTRING_T_SIZE;
+#else
+    uint32_t offset = index % BITSTRING_T_BITSIZE;
+    index /= BITSTRING_T_BITSIZE;
+#endif
+    offset = BITSTRING_T_BITSIZE - 1 - offset;
+    if (0 == ((((TIFA_BITSTRING_T)1)<<offset) & array->data[index])) {
+        return 0;
+    } else {
+        return 1;
+    }
+}
 
    /**
     * \brief Sets a given bit to one in a <tt>binary_array_t</tt>.
@@ -1273,7 +1292,18 @@ uint8_t get_array_bit(uint32_t index, const binary_array_t* const array);
     * \param[in] index The position of the bit to set.
     * \param[in] array A pointer to the <tt>binary_array_t</tt>.
     */
-void set_array_bit_to_one(uint32_t index, binary_array_t* const array);
+inline static void
+set_array_bit_to_one(uint32_t index, binary_array_t* const array) {
+#if BITSTRING_T_SIZE_IS_POW_OF_TWO
+    uint32_t offset = index & (BITSTRING_T_BITSIZE - 1);
+    index >>= POW_TWO_BITSTRING_T_SIZE;
+#else
+    uint32_t offset = index % BITSTRING_T_BITSIZE;
+    index /= BITSTRING_T_BITSIZE;
+#endif
+    offset = BITSTRING_T_BITSIZE - 1 - offset;
+    array->data[index] |= (((TIFA_BITSTRING_T)1)<<offset);
+}
 
    /**
     * \brief Sets a given bit to zero in a <tt>binary_array_t</tt>.
@@ -1284,7 +1314,18 @@ void set_array_bit_to_one(uint32_t index, binary_array_t* const array);
     * \param[in] index The position of the bit to set.
     * \param[in] array A pointer to the <tt>binary_array_t</tt>.
     */
-void set_array_bit_to_zero(uint32_t index, binary_array_t* const array);
+inline static void
+set_array_bit_to_zero(uint32_t index, binary_array_t* const array) {
+#if BITSTRING_T_SIZE_IS_POW_OF_TWO
+    uint32_t offset = index & (BITSTRING_T_BITSIZE - 1);
+    index >>= POW_TWO_BITSTRING_T_SIZE;
+#else
+    uint32_t offset = index % BITSTRING_T_BITSIZE;
+    index /= BITSTRING_T_BITSIZE;
+#endif
+    offset = BITSTRING_T_BITSIZE - 1 - offset;
+    array->data[index] &= !(((TIFA_BITSTRING_T)1)<<offset);
+}
 
    /**
     * \brief Flips a given bit to zero in a <tt>binary_array_t</tt>.
@@ -1295,7 +1336,18 @@ void set_array_bit_to_zero(uint32_t index, binary_array_t* const array);
     * \param[in] index The position of the bit to flip.
     * \param[in] array A pointer to the <tt>binary_array_t</tt>.
     */
-void flip_array_bit(uint32_t index, binary_array_t* const array);
+inline static void
+flip_array_bit(uint32_t index, binary_array_t* const array) {
+#if BITSTRING_T_SIZE_IS_POW_OF_TWO
+    uint32_t offset = index & (BITSTRING_T_BITSIZE - 1);
+    index >>= POW_TWO_BITSTRING_T_SIZE;
+#else
+    uint32_t offset = index % BITSTRING_T_BITSIZE;
+    index /= BITSTRING_T_BITSIZE;
+#endif
+    offset = BITSTRING_T_BITSIZE - 1 - offset;
+    array->data[index] ^= (((TIFA_BITSTRING_T)1)<<offset);
+}
 
 #ifdef __cplusplus
 }

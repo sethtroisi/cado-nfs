@@ -20,8 +20,8 @@
 /**
  * \file    matrix.h
  * \author  Jerome Milan
- * \date    Tue Jun 19 2007
- * \version 1.1
+ * \date    Circa Fri Mar 29 2008
+ * \version 1.1.1
  *
  * \brief Matrices over GF(2) and associated functions.
  *
@@ -31,6 +31,8 @@
 
  /*
   *  History:
+  *  1.1.1: Fri Mar 29 (?) 2008 by JM:
+  *        - Inlined functions pertaining to binary_matrix_t's.
   *    1.1: Tue Jun 19 2007 by JM:
   *          - Added clone_binary_matrix function.
   *    1.0: Wed Mar 1 2006 by JM:
@@ -51,6 +53,8 @@ extern "C" {
 #include "tifa_config.h"
 
 #include <inttypes.h>
+
+#include "bitstring_t.h"
 
    /**
     * \def NO_SUCH_ROW
@@ -190,9 +194,23 @@ void print_binary_matrix(const binary_matrix_t* const matrix);
     * \return The value of the bit at the (<tt>row</tt>,<tt>col</tt>)
     *         position: either 0 or 1.
     */
-uint8_t get_matrix_bit(uint32_t row, uint32_t col,
-                       const binary_matrix_t* const matrix);
-
+inline static uint8_t get_matrix_bit(uint32_t row, uint32_t col,
+                                     const binary_matrix_t* const matrix) {
+#if BITSTRING_T_SIZE_IS_POW_OF_TWO
+    uint32_t col_offset = col & (BITSTRING_T_BITSIZE - 1);
+    col_offset = BITSTRING_T_BITSIZE - 1 - col_offset;
+    col        = col >> POW_TWO_BITSTRING_T_SIZE;
+#else
+    uint32_t col_offset = col % BITSTRING_T_BITSIZE;
+    col_offset = BITSTRING_T_BITSIZE - 1 - col_offset;
+    col       /= BITSTRING_T_BITSIZE;
+#endif
+    if (0 == ((((TIFA_BITSTRING_T)1)<<col_offset) & matrix->data[row][col])) {
+        return 0;
+    } else {
+        return 1;
+    }
+}
    /**
     * \brief Sets to one the value of a given bit in a <tt>binary_matrix_t</tt>.
     *
@@ -204,8 +222,19 @@ uint8_t get_matrix_bit(uint32_t row, uint32_t col,
     * \param[in] col The column of the bit to set.
     * \param[in] matrix A pointer to the <tt>binary_matrix_t</tt>.
     */
-void set_matrix_bit_to_one(uint32_t row, uint32_t col,
-                           binary_matrix_t* const matrix);
+inline static void set_matrix_bit_to_one(uint32_t row, uint32_t col,
+                                         binary_matrix_t* const matrix) {
+#if BITSTRING_T_SIZE_IS_POW_OF_TWO
+    uint32_t col_offset = col & (BITSTRING_T_BITSIZE - 1);
+    col_offset = BITSTRING_T_BITSIZE - 1 - col_offset;
+    col        = col >> POW_TWO_BITSTRING_T_SIZE;
+#else
+    uint32_t col_offset = col % BITSTRING_T_BITSIZE;
+    col_offset = BITSTRING_T_BITSIZE - 1 - col_offset;
+    col       /= BITSTRING_T_BITSIZE;
+#endif
+    matrix->data[row][col] |= ((TIFA_BITSTRING_T)1<<col_offset);
+}
 
    /**
     * \brief Sets to zero the value of a given bit in a
@@ -219,8 +248,19 @@ void set_matrix_bit_to_one(uint32_t row, uint32_t col,
     * \param[in] col The column of the bit to set.
     * \param[in] matrix A pointer to the <tt>binary_matrix_t</tt>.
     */
-void set_matrix_bit_to_zero(uint32_t row, uint32_t col,
-                            binary_matrix_t* const matrix);
+inline static void set_matrix_bit_to_zero(uint32_t row, uint32_t col,
+                                          binary_matrix_t* const matrix) {
+#if BITSTRING_T_SIZE_IS_POW_OF_TWO
+    uint32_t col_offset = col & (BITSTRING_T_BITSIZE - 1);
+    col_offset = BITSTRING_T_BITSIZE - 1 - col_offset;
+    col        = col >> POW_TWO_BITSTRING_T_SIZE;
+#else
+    uint32_t col_offset = col % BITSTRING_T_BITSIZE;
+    col_offset = BITSTRING_T_BITSIZE - 1 - col_offset;
+    col       /= BITSTRING_T_BITSIZE;
+#endif
+    matrix->data[row][col] &= !(((TIFA_BITSTRING_T)1)<<col_offset);
+}
 
    /**
     * \brief Flips the value of a given bit in a <tt>binary_matrix_t</tt>.
@@ -233,8 +273,19 @@ void set_matrix_bit_to_zero(uint32_t row, uint32_t col,
     * \param[in] col The column of the bit to flip.
     * \param[in] matrix A pointer to the <tt>binary_matrix_t</tt>.
     */
-void flip_matrix_bit(uint32_t row, uint32_t col, binary_matrix_t* const matrix);
-
+inline static void flip_matrix_bit(uint32_t row, uint32_t col,
+                                   binary_matrix_t* const matrix){
+#if BITSTRING_T_SIZE_IS_POW_OF_TWO
+    uint32_t col_offset = col & (BITSTRING_T_BITSIZE - 1);
+    col_offset = BITSTRING_T_BITSIZE - 1 - col_offset;
+    col        = col >> POW_TWO_BITSTRING_T_SIZE;
+#else
+    uint32_t col_offset = col % BITSTRING_T_BITSIZE;
+    col_offset = BITSTRING_T_BITSIZE - 1 - col_offset;
+    col       /= BITSTRING_T_BITSIZE;
+#endif
+    matrix->data[row][col] ^= (((TIFA_BITSTRING_T)1)<<col_offset);
+}
    /**
     * \brief Returns the index of the first row of a <tt>binary_matrix_t</tt>
     *        with a one in a given column.
@@ -273,8 +324,24 @@ void flip_matrix_bit(uint32_t row, uint32_t col, binary_matrix_t* const matrix);
     * right thing to do though. Unless when facing a real bottleneck, let's try
     * to keep the "programmer's omniscience" to a manageable level...
     */
-uint32_t first_row_with_one_on_col(uint32_t col,
-                                   const binary_matrix_t* const matrix);
+inline static uint32_t first_row_with_one_on_col(uint32_t col,
+                                   const binary_matrix_t* const matrix) {
+#if BITSTRING_T_SIZE_IS_POW_OF_TWO
+    uint32_t col_offset = col & (BITSTRING_T_BITSIZE - 1);
+    col_offset = BITSTRING_T_BITSIZE - 1 - col_offset;
+    col        = col >> POW_TWO_BITSTRING_T_SIZE;
+#else
+    uint32_t col_offset = col % BITSTRING_T_BITSIZE;
+    col_offset = BITSTRING_T_BITSIZE - 1 - col_offset;
+    col       /= BITSTRING_T_BITSIZE;
+#endif
+    for (uint32_t irow = 0; irow < matrix->nrows; irow++) {
+        if ((((TIFA_BITSTRING_T)1)<<col_offset) & matrix->data[irow][col]) {
+            return irow;
+        }
+    }
+    return NO_SUCH_ROW;
+}
 
 /*
  *-----------------------------------------------------------------------------

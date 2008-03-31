@@ -20,17 +20,20 @@
 /**
  * \file    matrix.c
  * \author  Jerome Milan
- * \date    Tue Jun 19 2007
- * \version 1.1
+ * \date    Circa Fri Mar 29 2008
+ * \version 1.1.1
  */
 
- /*
-  *  History:
-  *    1.1: Tue Jun 19 2007 by JM:
-  *          - Added clone_binary_matrix function.
-  *    1.0: Wed Mar 1 2006 by JM:
-  *          - Initial version.
-  */
+/*
+ *  History:
+ *  1.1.1: Fri Mar 29 (?) 2008 by JM:
+ *        - Inlined functions pertaining to binary_matrix_t's in matrix.h and
+ *          removed them from this file.
+ *    1.1: Tue Jun 19 2007 by JM:
+ *          - Added clone_binary_matrix function.
+ *    1.0: Wed Mar 1 2006 by JM:
+ *          - Initial version.
+ */
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -97,13 +100,13 @@ binary_matrix_t* alloc_binary_matrix(uint32_t nrows, uint32_t ncols) {
 }
 //-----------------------------------------------------------------------------
 binary_matrix_t* clone_binary_matrix(const binary_matrix_t * const matrix) {
-    
+
     binary_matrix_t* clone = malloc(sizeof(binary_matrix_t));
-    
+
     clone->nrows_alloced = matrix->nrows_alloced;
     clone->ncols_alloced = matrix->ncols_alloced;
     clone->nrows = matrix->nrows;
-    clone->ncols = matrix->ncols;    
+    clone->ncols = matrix->ncols;
     clone->data  = malloc(clone->nrows_alloced * sizeof(TIFA_BITSTRING_T*));
 
     size_t rowsize = clone->ncols_alloced * SIZEOF_BITSTRING_T;
@@ -144,114 +147,6 @@ void print_binary_matrix(const binary_matrix_t* const matrix) {
     }
 }
 //-----------------------------------------------------------------------------
-uint8_t get_matrix_bit(uint32_t row, uint32_t col,
-                       const binary_matrix_t* const matrix) {
-
-#if BITSTRING_T_SIZE_IS_POW_OF_TWO
-    uint32_t col_offset = col & (BITSTRING_T_BITSIZE - 1);
-
-    col_offset = BITSTRING_T_BITSIZE - 1 - col_offset;
-    col        = col >> POW_TWO_BITSTRING_T_SIZE;
-#else
-    uint32_t col_offset = col % BITSTRING_T_BITSIZE;
-
-    col_offset = BITSTRING_T_BITSIZE - 1 - col_offset;
-    col       /= BITSTRING_T_BITSIZE;
-#endif
-
-    if (0 == ((((TIFA_BITSTRING_T)1)<<col_offset) & matrix->data[row][col])) {
-        return 0;
-    } else {
-        return 1;
-    }
-}
-//-----------------------------------------------------------------------------
-void set_matrix_bit_to_one(uint32_t row, uint32_t col,
-                           binary_matrix_t* const matrix) {
-
-#if BITSTRING_T_SIZE_IS_POW_OF_TWO
-    uint32_t col_offset = col & (BITSTRING_T_BITSIZE - 1);
-
-    col_offset = BITSTRING_T_BITSIZE - 1 - col_offset;
-    col        = col >> POW_TWO_BITSTRING_T_SIZE;
-#else
-    uint32_t col_offset = col % BITSTRING_T_BITSIZE;
-
-    col_offset = BITSTRING_T_BITSIZE - 1 - col_offset;
-    col       /= BITSTRING_T_BITSIZE;
-#endif
-
-    matrix->data[row][col] |= ((TIFA_BITSTRING_T)1<<col_offset);
-}
-//-----------------------------------------------------------------------------
-void set_matrix_bit_to_zero(uint32_t row, uint32_t col,
-                            binary_matrix_t* const matrix) {
-
-#if BITSTRING_T_SIZE_IS_POW_OF_TWO
-    uint32_t col_offset = col & (BITSTRING_T_BITSIZE - 1);
-
-    col_offset = BITSTRING_T_BITSIZE - 1 - col_offset;
-    col        = col >> POW_TWO_BITSTRING_T_SIZE;
-#else
-    uint32_t col_offset = col % BITSTRING_T_BITSIZE;
-
-    col_offset = BITSTRING_T_BITSIZE - 1 - col_offset;
-    col       /= BITSTRING_T_BITSIZE;
-#endif
-
-    matrix->data[row][col] &= !(((TIFA_BITSTRING_T)1)<<col_offset);
-}
-//-----------------------------------------------------------------------------
-void flip_matrix_bit(uint32_t row, uint32_t col,
-                     binary_matrix_t* const matrix){
-
-#if BITSTRING_T_SIZE_IS_POW_OF_TWO
-    uint32_t col_offset = col & (BITSTRING_T_BITSIZE - 1);
-
-    col_offset = BITSTRING_T_BITSIZE - 1 - col_offset;
-    col        = col >> POW_TWO_BITSTRING_T_SIZE;
-#else
-    uint32_t col_offset = col % BITSTRING_T_BITSIZE;
-
-    col_offset = BITSTRING_T_BITSIZE - 1 - col_offset;
-    col       /= BITSTRING_T_BITSIZE;
-#endif
-
-    matrix->data[row][col] ^= (((TIFA_BITSTRING_T)1)<<col_offset);
-}
-//-----------------------------------------------------------------------------
-uint32_t first_row_with_one_on_col(uint32_t col,
-                                   const binary_matrix_t* const matrix) {
-    //
-    // This function returns the index of the first row which has a 1 in
-    // its col-th column. It returns NOT_IN_ARRAY if no such row is found.
-    //
-#if BITSTRING_T_SIZE_IS_POW_OF_TWO
-    uint32_t col_offset = col & (BITSTRING_T_BITSIZE - 1);
-
-    col_offset = BITSTRING_T_BITSIZE - 1 - col_offset;
-    col        = col >> POW_TWO_BITSTRING_T_SIZE;
-#else
-    uint32_t col_offset = col % BITSTRING_T_BITSIZE;
-
-    col_offset = BITSTRING_T_BITSIZE - 1 - col_offset;
-    col       /= BITSTRING_T_BITSIZE;
-#endif
-
-    for (uint32_t irow = 0; irow < matrix->nrows; irow++) {
-        if (0 != ((((TIFA_BITSTRING_T)1)<<col_offset) & matrix->data[irow][col])
-           ) {
-            return irow;
-        }
-    }
-    //
-    // _KLUDGE_: If no row with a one on column col is found, returns -1 or
-    //           rather NOT_IN_ARRAY (i.e. UINT32_MAX) which, in a signed 
-    //           context, is indeed -1.
-    //
-    return NO_SUCH_ROW;
-}
-//-----------------------------------------------------------------------------
 
 /*
  *-----------------------------------------------------------------------------
@@ -282,10 +177,10 @@ byte_matrix_t* alloc_byte_matrix(uint32_t nrows, uint32_t ncols) {
 
     matrix->nrows_alloced = nrows;
     matrix->ncols_alloced = ncols;
-    
+
     matrix->nrows = nrows;
     matrix->ncols = ncols;
-    
+
     matrix->data  = malloc(matrix->nrows_alloced * sizeof(unsigned char*));
 
     for (uint32_t i = 0U; i < matrix->nrows_alloced; i++) {
@@ -306,13 +201,13 @@ byte_matrix_t* alloc_byte_matrix(uint32_t nrows, uint32_t ncols) {
 }
 //-----------------------------------------------------------------------------
 byte_matrix_t* clone_byte_matrix(const byte_matrix_t * const matrix) {
-    
+
     byte_matrix_t* clone = malloc(sizeof(byte_matrix_t));
-    
+
     clone->nrows_alloced = matrix->nrows_alloced;
     clone->ncols_alloced = matrix->ncols_alloced;
     clone->nrows = matrix->nrows;
-    clone->ncols = matrix->ncols;    
+    clone->ncols = matrix->ncols;
     clone->data  = malloc(clone->nrows_alloced * sizeof(unsigned char));
 
     size_t rowsize = clone->ncols_alloced * sizeof(unsigned char);
@@ -343,7 +238,7 @@ void print_byte_matrix(const byte_matrix_t* const matrix) {
     for (uint32_t i = 0U; i < matrix->nrows; i++) {
         printf("row %4u : ", i);
         for (uint32_t j = 0U; j < matrix->ncols; j++) {
-            printf("%4u", (unsigned int)matrix->data[i][j]);            
+            printf("%4u", (unsigned int)matrix->data[i][j]);
         }
         printf("\n");
     }

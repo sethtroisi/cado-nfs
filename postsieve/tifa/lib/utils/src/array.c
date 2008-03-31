@@ -20,28 +20,31 @@
 /**
  * \file    array.c
  * \author  Jerome Milan
- * \date    Mon Mar 10 2008
- * \version 1.2.2
+ * \date    Circa Fri Mar 29 2008
+ * \version 1.2.3
  */
 
- /*
-  * History:
-  * --------
-  * 1.2.2: Mon Mar 10 2008 by JM:
-  *        - Inlined is_in_sorted_*_array(...) functions.
-  * 1.2.1: Fri Mar 7 2008 by JM:
-  *        - WARNING: Changed memory managment. clear_*_array functions now
-  *                   frees the pointer to the array (that's more logical).
-  *   1.2: Fri Feb 29 2008 by JM:
-  *        - WARNING: Semantic of mpz_array_t's length field has changed!.
-  *                   Now length is only the "useful part" of the array, but
-  *                   the data field is completely mpz_init'ed (i.e. up to
-  *                   the alloced field, not longer up to length).
-  *   1.1: Wed Oct 17 2007 by JM:
-  *        - Added byte_array_t with corresponding functions.
-  *   1.0: Wed Mar 1 2006 by JM:
-  *        - Initial version.
-  */
+/*
+ * History:
+ * --------
+ * 1.2.3: Fri Mar 29 (?) 2008 by JM:
+ *        - Inlined functions pertaining to binary_array_t's in array.h and
+ *          removed them from this file.
+ * 1.2.2: Mon Mar 10 2008 by JM:
+ *        - Inlined is_in_sorted_*_array(...) functions.
+ * 1.2.1: Fri Mar 7 2008 by JM:
+ *        - WARNING: Changed memory managment. clear_*_array functions now
+ *                   frees the pointer to the array (that's more logical).
+ *   1.2: Fri Feb 29 2008 by JM:
+ *        - WARNING: Semantic of mpz_array_t's length field has changed!.
+ *                   Now length is only the "useful part" of the array, but
+ *                   the data field is completely mpz_init'ed (i.e. up to
+ *                   the alloced field, not longer up to length).
+ *   1.1: Wed Oct 17 2007 by JM:
+ *        - Added byte_array_t with corresponding functions.
+ *   1.0: Wed Mar 1 2006 by JM:
+ *        - Initial version.
+ */
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -877,69 +880,5 @@ void print_binary_array(const binary_array_t* const array) {
         printf("%d", get_array_bit(i, array));
     }
     printf("\n");
-}
-//-----------------------------------------------------------------------------
-uint8_t get_array_bit(uint32_t index, const binary_array_t* const array) {
-
-#if BITSTRING_T_SIZE_IS_POW_OF_TWO
-    uint32_t offset = index & (BITSTRING_T_BITSIZE - 1);
-    index >>= POW_TWO_BITSTRING_T_SIZE;
-#else
-    uint32_t offset = index % BITSTRING_T_BITSIZE;
-    index /= BITSTRING_T_BITSIZE;
-#endif
-
-    offset = BITSTRING_T_BITSIZE - 1 - offset;
-
-    if (0 == ((((TIFA_BITSTRING_T)1)<<offset) & array->data[index])) {
-        return 0;
-    } else {
-        return 1;
-    }
-}
-//-----------------------------------------------------------------------------
-void set_array_bit_to_one(uint32_t index, binary_array_t* const array) {
-
-#if BITSTRING_T_SIZE_IS_POW_OF_TWO
-    uint32_t offset = index & (BITSTRING_T_BITSIZE - 1);
-    index >>= POW_TWO_BITSTRING_T_SIZE;
-#else
-    uint32_t offset = index % BITSTRING_T_BITSIZE;
-    index /= BITSTRING_T_BITSIZE;
-#endif
-
-    offset = BITSTRING_T_BITSIZE - 1 - offset;
-
-    array->data[index] |= (((TIFA_BITSTRING_T)1)<<offset);
-}
-//-----------------------------------------------------------------------------
-void set_array_bit_to_zero(uint32_t index, binary_array_t* const array) {
-
-#if BITSTRING_T_SIZE_IS_POW_OF_TWO
-    uint32_t offset = index & (BITSTRING_T_BITSIZE - 1);
-    index >>= POW_TWO_BITSTRING_T_SIZE;
-#else
-    uint32_t offset = index % BITSTRING_T_BITSIZE;
-    index /= BITSTRING_T_BITSIZE;
-#endif
-
-    offset = BITSTRING_T_BITSIZE - 1 - offset;
-
-    array->data[index] &= !(((TIFA_BITSTRING_T)1)<<offset);
-}
-//-----------------------------------------------------------------------------
-void flip_array_bit(uint32_t index, binary_array_t* const array) {
-
-#if BITSTRING_T_SIZE_IS_POW_OF_TWO
-    uint32_t offset = index & (BITSTRING_T_BITSIZE - 1);
-    index >>= POW_TWO_BITSTRING_T_SIZE;
-#else
-    uint32_t offset = index % BITSTRING_T_BITSIZE;
-    index /= BITSTRING_T_BITSIZE;
-#endif
-
-    offset = BITSTRING_T_BITSIZE - 1 - offset;
-
-    array->data[index] ^= (((TIFA_BITSTRING_T)1)<<offset);
 }
 //-----------------------------------------------------------------------------
