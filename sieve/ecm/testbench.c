@@ -7,6 +7,8 @@
 #include "pp1.h"
 #include "ecm.h"
 
+const char *method_name[] = {"P-1", "P+1", "ECM"};
+
 void print_help (char *programname)
 {
   printf ("%s [options] <start> <stop> <B1>\n", programname);
@@ -21,6 +23,8 @@ void print_help (char *programname)
 	  "numbers)\n");
   printf ("-v       More verbose output. Once: print parameters. Twice: print "
 	  "residues\n");
+  printf ("-x0 <n>  Use <n> as starting value for P-1/P+1, or as sigma "
+           "value for ECM\n");
 }
 
 int main (int argc, char **argv)
@@ -90,6 +94,12 @@ int main (int argc, char **argv)
 	  argc -= 1;
 	  argv += 1;
 	}
+      else if (argc > 2 && strcmp (argv[1], "-x0") == 0)
+	{
+	  x0 = strtoul (argv[2], NULL, 10);;
+	  argc -= 2;
+	  argv += 2;
+	}
     }
   
   if (argc < 4)
@@ -106,6 +116,14 @@ int main (int argc, char **argv)
     start = (x0 + 1UL) | 1UL;
   stop = strtoul (argv[2], NULL, 10);
   B1 = strtoul (argv[3], NULL, 10);
+  if (verbose)
+    {
+      printf ("Running %s on %s in [%lu, %lu] with B1 = %lu, %s=%lu\n",
+              method_name[method], 
+              (only_primes) ? "primes" : "odd numbers", 
+              start, stop, B1, 
+              (method == 2) ? "sigma" : "x0", x0);
+    }
 
 
   /* Compute exponent (a.k.a. multiplier for P+1/ECM) for stage 1 */
@@ -186,7 +204,11 @@ int main (int argc, char **argv)
 	{
 	  mod_set_ul_reduced (b, x0, m);
 	  if (ecm_stage1 (r, (int) B1, b, parameterization, m))
-	    hits++;
+	    {
+	      if (verbose >= 2)
+		printf ("Found %lu\n", mod_gcd (r, m));
+	      hits++;
+	    }
 	  else if (verbose >= 2)
 	    printf ("Sigma = %lu, x1 = %lu\n", 
 		    mod_get_ul (b, m), mod_get_ul (r, m));
