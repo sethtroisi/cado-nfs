@@ -28,6 +28,34 @@ static const double prac_mul[PRAC_NR] =
    1.62018198080741576482 /* 6 */, 1.61721461653440386266 /* 7 */, 
    1.61834711965622805798 /* 8 */, 1.61791440652881789386 /* 9 */};
 
+/* One more than the highest code number the byte code generator can produce */
+#define MAXCODE 32
+typedef unsigned char literal_t;
+int lastcode = 255;
+int compress = 0;
+/* Stores in codehist2[prev*MAXCODE+i] the frequency of the "prev, i" byte 
+   combination */
+unsigned char codehist[MAXCODE];
+unsigned char codehist2[MAXCODE*MAXCODE];
+#define CODER_HISTLEN 10
+literal_t coder_history[CODER_HISTLEN];
+int coder_nrstored = 0;
+int nr_literals = 0, nr_outputcodes = 0;
+
+#if 1
+#define DICT_NRENTRIES 9
+const int dict_len[DICT_NRENTRIES] = {2, 2, 2, 3, 3, 3, 4, 4, 6};
+const literal_t *dict_entry[DICT_NRENTRIES] = 
+  {"\xB\xA", "\x3\x0", "\x3\x3", "\xB\xA\x3", "\x0\x3\x0","\x3\x3\x0",
+   "\x3\x0\x3\x0", "\x3\xB\xA\x3", "\x3\x0\x3\x0\x3\x0"};
+const int dict_code[DICT_NRENTRIES] = {13, 14, 15, 16, 17, 18, 19, 20, 21};
+#else
+#define DICT_NRENTRIES 0
+const int dict_len[DICT_NRENTRIES] = {};
+const literal_t *dict_entry[DICT_NRENTRIES] = {};
+const int dict_code[DICT_NRENTRIES] = {};
+#endif
+
 /* Simple primality test by trial division */
 int isprime (unsigned long n)
 {
@@ -228,33 +256,197 @@ static unsigned int prac_best (unsigned long n, int m, int *mul)
   return bestcost;
 }
 
+static void 
+bytecoder_output (int c)
+{
+  assert (c < MAXCODE);
+  printf ("%d,", c);
+  codehist[c]++;
+  if (lastcode != 255)
+    codehist2[lastcode*MAXCODE+c]++;
+  lastcode = c;
+  nr_outputcodes++;
+}
+
+
+/* Returns the length of the matching part of "buf" (with "len" valid bytes)
+   and the dictionary entry "entry" */
+
+static int 
+dict_matchlen (const literal_t *buf, const int len, const int entry)
+{
+  int i;
+
+  if (entry == -1)
+    return 0;
+
+  assert (0 <= entry && entry < DICT_NRENTRIES);
+
+  for (i = 0; i < len && i < dict_len[entry]; i++)
+    if (buf[i] != dict_entry[entry][i])
+      break;
+  
+  return i;
+}
+
+
+/* Returns the index of the dictionary entry that has the longest match with
+   "buf", where "buf" contains "len" valid bytes. If "partial" is != 0, 
+   then matches that don't match the complete dictionary entry are accepted,
+   otherwise only matches with complete dictionary entries are accepted.
+   Return -1 if nothing matched at all */
+
+static int
+dict_longestmatch (const literal_t *buf, const int len, const int partial)
+{
+  int i, t, matchlen = 0, matchidx = -1;
+  
+  for (i = 0; i < DICT_NRENTRIES; i++)
+    {
+      t = dict_matchlen (buf, len, i);
+      if (t > matchlen && (partial || t == dict_len[i]))
+	{
+	  matchlen = t;
+	  matchidx = i;
+	}
+    }
+  
+  return matchidx;
+}
+
+
+/* Adds a literal to the coder_history[] FIFO buffer */
+
+static void 
+coder_histadd (const literal_t c)
+{
+  coder_history[coder_nrstored++] = c;
+  assert (coder_nrstored < CODER_HISTLEN);
+  nr_literals++;
+}
+
+
+/* Removes n literals from the coder_history[] FIFO buffer */
+
+static void
+coder_histremove (int n)
+{
+  int i;
+  if (n > coder_nrstored)
+    abort();
+
+  for (i = 0; i + n < coder_nrstored; i++)
+    coder_history[i] = coder_history[i + n];
+
+  coder_nrstored -= n;
+}
+
+
+/* Output the best dictionary match we have at the moment, or a literal
+   if coder_history[] matches no complete dictionary entry */
+
+static void
+coder_outputbest ()
+{
+  int best, bestlen;
+  
+  assert (coder_nrstored > 0);
+  
+  /* Find longest complete match */
+  best = dict_longestmatch (coder_history, coder_nrstored, 0);
+  bestlen = dict_matchlen (coder_history, coder_nrstored, best);
+  
+  /* If there was a complete dictionary match, output that, 
+     otherwise output the first entry in coder_history[] as a literal */
+  if (best != -1 && bestlen == dict_len[best])
+    {
+      bytecoder_output (dict_code[best]);
+      coder_histremove (bestlen);
+    }
+  else
+    {
+      bytecoder_output ((int) (coder_history[0]));
+      coder_histremove (1);
+    }
+}
+
+static void 
+bytecoder (const literal_t c)
+{
+  /* At this point, the first coder_nrstored literals (posibly 0!) of
+     coder_history[] agree with some dictionary entry */
+  
+  /* Now add the new literal */
+  coder_histadd (c);
+  
+  if (compress)
+    {
+      /* See if coder_history[] still matches one of the dictionary entries */
+      
+      int best, bestlen = 0;
+      
+      /* If all coder_history[] matches some dictionary entry, we do nothing */
+      /* Otherwise we repeatedly output the longest complete dictionary match 
+	 or literal code until all of coder_history[] (then possibly empty!) 
+	 matches some dictionary entry again */
+      
+      while (1)
+	{
+	  best = dict_longestmatch (coder_history, coder_nrstored, 1);
+	  bestlen = dict_matchlen (coder_history, coder_nrstored, best);
+	  if (bestlen == coder_nrstored)
+	    break;
+	  coder_outputbest ();
+	}
+    }
+  else
+    {
+      /* No compression: flush the stored code */
+      bytecoder_output (coder_history[0]);
+      coder_nrstored = 0;
+    }
+}
+
+static void bytecoder_flush ()
+{
+  while (coder_nrstored > 0)
+    coder_outputbest ();
+}
 
 /* Print an addition chain for k. Mostly copied from GMP-ECM */
-static void prac_printchain (unsigned long k)
+static void prac_printchain (unsigned long k, int bytecode)
 {
   unsigned long d, e, r;
   int m;
-
+  
   if (k == 2)
     {
-      printf ("dup (A, A) /* Start for k = 2 */\n");
+      if (bytecode)
+	bytecoder ((literal_t) 12);
+      else
+	printf ("dup (A, A) /* Start for k = 2 */\n");
       return;
     }
-
+  
   assert (k % 2 == 1);
-
+  
   /* Find the best multiplier for this k */
   prac_best (k, PRAC_NR, &m);
   
   d = k;
   r = (unsigned long) ((double) d / prac_mul[m] + 0.5);
-
+  
   d = k - r;
   e = 2 * r - k;
-  printf ("set (B, A) /* Start for k=%lu, multiplier %f: init and double */\n",
-	  k, prac_mul[m]);
-  printf ("set (C, A)\n");
-  printf ("dup (A, A)\n");
+  if (bytecode)
+    bytecoder ((literal_t) 10);
+  else
+    {
+      printf ("set (B, A) /* Start for k=%lu, multiplier %f: init and "
+	      "double */\n", k, prac_mul[m]);
+      printf ("set (C, A)\n");
+      printf ("dup (A, A)\n");
+    }
   
   while (d != e)
     {
@@ -263,77 +455,128 @@ static void prac_printchain (unsigned long k)
           r = d;
           d = e;
           e = r;
-	  printf ("swap (A, B) /* Rule 0: swap */\n");
+	  if (bytecode)
+	    bytecoder ((literal_t) 0);
+	  else
+	    printf ("swap (A, B) /* Rule 0: swap */\n");
         }
       /* do the first line of Table 4 whose condition qualifies */
       if (4 * d <= 5 * e && ((d + e) % 3) == 0)
         { /* condition 1 */
           d = (2 * d - e) / 3;
           e = (e - d) / 2;
-	  printf ("add (t, A, B, C) /* Rule 1 */\n");
-	  printf ("add (t2, t, A, B)\n");
-	  printf ("add (B, B, t, A)\n");
-	  printf ("set (A, t2)\n");
+	  if (bytecode)
+	    bytecoder ((literal_t) 1);
+	  else
+	    {
+	      printf ("add (t, A, B, C) /* Rule 1 */\n");
+	      printf ("add (t2, t, A, B)\n");
+	      printf ("add (B, B, t, A)\n");
+	      printf ("set (A, t2)\n");
+	    }
         }
       else if (4 * d <= 5 * e && (d - e) % 6 == 0)
         { /* condition 2 */
           d = (d - e) / 2;
-	  printf ("add (B, A, B, C) /* Rule 2 */\n");
-	  printf ("dup (A, A)\n");
+	  if (bytecode)
+	    bytecoder ((literal_t) 2);
+	  else
+	    {
+	      printf ("add (B, A, B, C) /* Rule 2 */\n");
+	      printf ("dup (A, A)\n");
+	    }
         }
       else if (d <= (4 * e))
         { /* condition 3 */
           d -= e;
-	  printf ("adds (C, B, A, C) /* Rule 3 */\n");
-	  printf ("swap (B, C)\n");
+	  if (bytecode)
+	    bytecoder ((literal_t) 3);
+	  else
+	    {
+	      printf ("adds (C, B, A, C) /* Rule 3 */\n");
+	      printf ("swap (B, C)\n");
+	    }
         }
       else if ((d + e) % 2 == 0)
         { /* condition 4 */
           d = (d - e) / 2;
-	  printf ("add (B, B, A, C) /* Rule 4 */\n");
-	  printf ("dup (A, A)\n");
+	  if (bytecode)
+	    bytecoder ((literal_t) 4);
+	  else
+	    {
+	      printf ("add (B, B, A, C) /* Rule 4 */\n");
+	      printf ("dup (A, A)\n");
+	    }
         }
       else if (d % 2 == 0) /* d+e is now odd */
         { /* condition 5 */
           d /= 2;
-	  printf ("add (C, C, A, B) /* Rule 5 */\n");
-	  printf ("dup (A, A)\n");
+	  if (bytecode)
+	    bytecoder ((literal_t) 5);
+	  else
+	    {
+	      printf ("add (C, C, A, B) /* Rule 5 */\n");
+	      printf ("dup (A, A)\n");
+	    }
         }
       else if (d % 3 == 0) /* d is odd, e even */
         { /* condition 6 */
           d = d / 3 - e;
-	  printf ("dup (t, A) /* Rule 6 */\n");
-	  printf ("add (t2, A, B, C)\n");
-	  printf ("adds (A,  t, A, A)\n");
-	  printf ("adds (C,  t, t2, C)\n");
-	  printf ("swap (B, C)\n");
+	  if (bytecode)
+	    bytecoder ((literal_t) 6);
+	  else
+	    {
+	      printf ("dup (t, A) /* Rule 6 */\n");
+	      printf ("add (t2, A, B, C)\n");
+	      printf ("adds (A,  t, A, A)\n");
+	      printf ("adds (C,  t, t2, C)\n");
+	      printf ("swap (B, C)\n");
+	    }
         }
       else if ((d + e) % 3 == 0)
         { /* condition 7 */
           d = (d - 2 * e) / 3;
-	  printf ("add (t, A, B, C) /* Rule 7 */\n");
-	  printf ("adds (B, t, A, B)\n");
-	  printf ("dup (t, A)\n");
-	  printf ("adds (A, A, t, A)\n");
+	  if (bytecode)
+	    bytecoder ((literal_t) 7);
+	  else
+	    {
+	      printf ("add (t, A, B, C) /* Rule 7 */\n");
+	      printf ("adds (B, t, A, B)\n");
+	      printf ("dup (t, A)\n");
+	      printf ("adds (A, A, t, A)\n");
+	    }
         }
       else if ((d - e) % 3 == 0)
         { /* condition 8: never happens? */
           d = (d - e) / 3;
-	  printf ("add (T, A, B, C) /* Rule 8 */\n");
-	  printf ("add (C, C, A, B)\n");
-	  printf ("swap (B, t)\n");
-	  printf ("dup (t, A)\n");
-	  printf ("adds (A, A, T, A)\n");
+	  if (bytecode)
+	    bytecoder ((literal_t) 8);
+	  else
+	    {
+	      printf ("add (t, A, B, C) /* Rule 8 */\n");
+	      printf ("add (C, C, A, B)\n");
+	      printf ("swap (B, t)\n");
+	      printf ("dup (t, A)\n");
+	      printf ("adds (A, A, t, A)\n");
+	    }
         }
       else /* necessarily e is even */
         { /* condition 9: never happens? */
           e /= 2;
-	  printf ("add (C, C, B, A)\n");
-	  printf ("dup (B, B)\n");
+	  if (bytecode)
+	    bytecoder ((literal_t) 9);
+	  else
+	    {
+	      printf ("add (C, C, B, A)\n");
+	      printf ("dup (B, B)\n");
+	    }
         }
     }
   
-  printf ("add (A, A, B, C) /* Final add */\n");
+  if (bytecode)
+    bytecoder ((literal_t) 11);
+  else
+    printf ("add (A, A, B, C) /* Final add */\n");
   assert (d == 1);
 }
 
@@ -573,18 +816,35 @@ void find_opt_chain ()
 */
 
 void 
-generate_stage1 (unsigned long B1, unsigned long oldB1)
+generate_stage1 (unsigned long B1, unsigned long oldB1, int bytecode)
 {
   unsigned long p, pp;
   
+  for (p = 0; p < MAXCODE; p++)
+    codehist[p] = 0;
+  for (p = 0; p < MAXCODE*MAXCODE; p++)
+    codehist2[p] = 0;
+
   p = 2;
   while (p <= B1)
     {
       for (pp = p; pp <= B1; pp *= p)
 	if (pp > oldB1)
-	  prac_printchain (p);
+	  prac_printchain (p, bytecode);
 
       for (p++; ! isprime(p); p++); /* Find next prime (slow) */
+    }
+
+  if (bytecode)
+    {
+      bytecoder_flush ();
+      printf ("\n");
+      for (p = 0; p < MAXCODE; p++)
+	printf ("%lu: %d\n", p, (int) codehist[p]);
+      for (p = 0; p < MAXCODE*MAXCODE; p++)
+	if (codehist2[p] != 0)
+	  printf ("%lu,%lu: %d\n", p / MAXCODE, p % MAXCODE, (int)codehist2[p]);
+      printf ("%d literals, %d output codes\n", nr_literals, nr_outputcodes);
     }
 }
 
@@ -648,7 +908,31 @@ int main (int argc, char ** argv)
       if (argc > 3)
 	  oldB1 = atoi (argv[3]);
 
-      generate_stage1 (B1, oldB1);
+      generate_stage1 (B1, oldB1, 0);
+    }
+  else if (strcmp (argv[1], "-pb") == 0)
+    {
+      /* Print bytecode for stage 1 */
+      unsigned long B1 = 100, oldB1 = 1;
+
+      if (argc > 2)
+	  B1 = atoi (argv[2]);
+      if (argc > 3)
+	  oldB1 = atoi (argv[3]);
+
+      generate_stage1 (B1, oldB1, 1);
+    }
+  else if (strcmp (argv[1], "-pbc") == 0)
+    {
+      /* Print bytecode for stage 1 */
+      unsigned long B1 = 100, oldB1 = 1;
+
+      if (argc > 2)
+	  B1 = atoi (argv[2]);
+      if (argc > 3)
+	  oldB1 = atoi (argv[3]);
+      compress = 1;
+      generate_stage1 (B1, oldB1, 1);
     }
   else
     {
