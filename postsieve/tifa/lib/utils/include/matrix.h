@@ -335,8 +335,7 @@ inline static uint32_t first_row_with_one_on_col(uint32_t col,
     col_offset = BITSTRING_T_BITSIZE - 1 - col_offset;
     col       /= BITSTRING_T_BITSIZE;
 #endif
-    uint32_t irow;
-    for (irow = 0; irow < matrix->nrows; irow++) {
+    for (uint32_t irow = 0; irow < matrix->nrows; irow++) {
         if ((((TIFA_BITSTRING_T)1)<<col_offset) & matrix->data[irow][col]) {
             return irow;
         }

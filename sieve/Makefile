@@ -31,7 +31,8 @@ endif
 
 OPTCFLAGS ?= -O2 -DNDEBUG -g -Wall -W -DSSE_NORM_INIT
 INCFLAGS=-I$(GMPINCLUDE) $(TIFAINCFLAGS)
-CFLAGS=$(INCFLAGS) $(OPTCFLAGS) -fkeep-inline-functions -DREV=\"`svnversion .`\"
+# -std=c99 is needed for TIFA's inline functions
+CFLAGS=$(INCFLAGS) $(OPTCFLAGS) -std=c99 -fkeep-inline-functions -DREV=\"`svnversion .`\"
 LDFLAGS=$(TIFALIB) $(GMPLIB)
 
 all: sieve makefb las
