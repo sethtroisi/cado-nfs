@@ -3,16 +3,81 @@
 #include <math.h>
 #include "ecm.h"
 
-static int primes[] = {5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151, 157, 163, 167, 173, 179, 181, 191, 193, 197, 199, 211, 223, 227, 229, 233, 239, 241, 251, 257, 263, 269, 271, 277, 281, 283, 293, 307, 311, 313, 317, 331, 337, 347, 349, 353, 359, 367, 373, 379, 383, 389, 397, 401, 409, 419, 421, 431, 433, 439, 443, 449, 457, 461, 463, 467, 479, 487, 491, 499, 503, 509, 521, 523, 541, 0};
+typedef struct {residue_t x, z;} __ellM_point_t;
+typedef __ellM_point_t ellM_point_t[1];
 
-/* computes 2P=(x2:z2) from P=(x1:z1), with 5 muls (3 muls and 2 squares)
-   and 4 add/sub.
-     - p : number to factor
+static int primes[] = {5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 
+  59, 61, 67, 71, 73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131, 137, 
+  139, 149, 151, 157, 163, 167, 173, 179, 181, 191, 193, 197, 199, 211, 223, 
+  227, 229, 233, 239, 241, 251, 257, 263, 269, 271, 277, 281, 283, 293, 307, 
+  311, 313, 317, 331, 337, 347, 349, 353, 359, 367, 373, 379, 383, 389, 397, 
+  401, 409, 419, 421, 431, 433, 439, 443, 449, 457, 461, 463, 467, 479, 487, 
+  491, 499, 503, 509, 521, 523, 541, 0};
+
+static unsigned char bytecode50[] = {
+#include "bc_50.h"
+};
+
+static unsigned char bytecode100[] = {
+#include "bc_100.h"
+};
+
+static unsigned char bytecode150[] = {
+#include "bc_150.h"
+};
+
+static unsigned char bytecode200[] = {
+#include "bc_200.h"
+};
+
+static unsigned char bytecode300[] = {
+#include "bc_300.h"
+};
+
+static unsigned char bytecode400[] = {
+#include "bc_400.h"
+};
+
+static unsigned char bytecode500[] = {
+#include "bc_500.h"
+};
+
+static inline void
+ellM_init (ellM_point_t P, const modulus_t m)
+{
+  mod_init (P->x, m);
+  mod_init (P->z, m);
+}
+
+static inline void
+ellM_clear (ellM_point_t P, const modulus_t m)
+{
+  mod_clear (P->x, m);
+  mod_clear (P->z, m);
+}
+
+static inline void
+ellM_set (ellM_point_t Q, const ellM_point_t P, const modulus_t m)
+{
+  mod_set (Q->x, P->x, m);
+  mod_set (Q->z, P->z, m);
+}
+
+static inline void
+ellM_swap (ellM_point_t Q, ellM_point_t P, const modulus_t m)
+{
+  mod_swap (Q->x, P->x, m);
+  mod_swap (Q->z, P->z, m);
+}
+
+/* computes Q=2P, with 5 muls (3 muls and 2 squares) and 4 add/sub.
+     - m : number to factor
      - b : (a+2)/4 mod n
-*/
+  It is permissible to let x1, z1 and x2, z2 use the same memory. */
+
 static void
-ellM_duplicate (residue_t x2, residue_t z2, residue_t x1, residue_t z1, 
-                const modulus_t m, residue_t b)
+ellM_double (ellM_point_t Q, const ellM_point_t P, const unsigned long invm, 
+	     const modulus_t m, const residue_t b)
 {
   residue_t u, v, w;
 
@@ -20,15 +85,15 @@ ellM_duplicate (residue_t x2, residue_t z2, residue_t x1, residue_t z1,
   mod_init_noset0 (v, m);
   mod_init_noset0 (w, m);
 
-  mod_add (u, x1, z1, m);
-  mod_mul (u, u, u, m);   /* u = (x1 + z1)^2 */
-  mod_sub (v, x1, z1, m);
-  mod_mul (v, v, v, m);   /* v = (x1 - z1)^2 */
-  mod_mul (x2, u, v, m);  /* x2 = (x1^2 - z1^2)^2 */
+  mod_add (u, P->x, P->z, m);
+  mod_mulredc (u, u, u, invm, m);   /* u = (x1 + z1)^2 */
+  mod_sub (v, P->x, P->z, m);
+  mod_mulredc (v, v, v, invm, m);   /* v = (x1 - z1)^2 */
+  mod_mulredc (Q->x, u, v, invm, m);  /* x2 = (x1^2 - z1^2)^2 */
   mod_sub (w, u, v, m);   /* w = 4 * x1 * z1 */
-  mod_mul (u, w, b, m);   /* u = x1 * z1 * (A + 2) */
+  mod_mulredc (u, w, b, invm, m);   /* u = x1 * z1 * (A + 2) */
   mod_add (u, u, v, m);
-  mod_mul (z2, w, u, m);
+  mod_mulredc (Q->z, w, u, invm, m);
 
   mod_clear (w, m);
   mod_clear (v, m);
@@ -40,8 +105,8 @@ ellM_duplicate (residue_t x2, residue_t z2, residue_t x1, residue_t z1,
    0 if the result is point at infinity */
 
 static int
-ellW_duplicate (residue_t x3, residue_t y3, residue_t x1, residue_t y1,
-	        residue_t a, const modulus_t m)
+ellW_double (residue_t x3, residue_t y3, residue_t x1, residue_t y1,
+	     residue_t a, const modulus_t m)
 {
   residue_t lambda, u, v;
 
@@ -77,18 +142,18 @@ ellW_duplicate (residue_t x3, residue_t y3, residue_t x1, residue_t y1,
 }
 
 
-/* adds Q=(x2:z2) and R=(x1:z1) and puts the result in (x3:z3),
+/* adds P and Q and puts the result in R,
      using 6 muls (4 muls and 2 squares), and 6 add/sub.
-   One assumes that Q-R=P or R-Q=P where P=(x:z).
-     - n : number to factor
-   Modifies: x3, z3, u, v, w.
-   (x3,z3) may be identical to (x2,z2) and to (x,z)
-*/
+   One assumes that Q-R=D or R-Q=D.
+   This function assumes that P !~= Q, i.e. that there is 
+   no t!=0 so that P->x = t*Q->x and P->z = t*Q->z, for otherwise the result 
+   is the Not-a-Point (0:0) (which actually is good for factoring!).
+
+   R may be identical to P, Q and/or D. */
 
 static void
-ellM_add3 (residue_t x3, residue_t z3, residue_t x2, residue_t z2, 
-           residue_t x1, residue_t z1, residue_t x, residue_t z, 
-           residue_t b __attribute__ ((unused)), const modulus_t m)
+ellM_add (ellM_point_t R, const ellM_point_t P, const ellM_point_t Q, 
+          const ellM_point_t D, const unsigned long invm, const modulus_t m)
 {
   residue_t u, v, w;
 
@@ -96,34 +161,19 @@ ellM_add3 (residue_t x3, residue_t z3, residue_t x2, residue_t z2,
   mod_init_noset0 (v, m);
   mod_init_noset0 (w, m);
 
-  if (mod_is0 (z1, m)) /* (x1,z1) is at infinity */
-    {
-      mod_set (x3, x2, m);
-      mod_set (z3, z2, m);
-      return;
-    }
-  else if (mod_is0 (z2, m)) /* (x2, z2) is at infinity */
-    {
-      mod_set (x3, x1, m);
-      mod_set (z3, z1, m);
-      return;
-    }
-  else
-    {
-      mod_sub (u, x2, z2, m);
-      mod_add (v, x1, z1, m);
-      mod_mul (u, u, v, m);
-      mod_add (w, x2, z2, m);
-      mod_sub (v, x1, z1, m);
-      mod_mul (v, w, v, m);
-      mod_add (w, u, v, m);
-      mod_sub (v, u, v, m);
-      mod_mul (w, w, w, m);
-      mod_mul (v, v, v, m);
-      mod_set (u, x, m); /* save x */
-      mod_mul (x3, w, z, m);
-      mod_mul (z3, u, v, m);
-    }
+  mod_sub (u, P->x, P->z, m);
+  mod_add (v, Q->x, Q->z, m);
+  mod_mulredc (u, u, v, invm, m);
+  mod_add (w, P->x, P->z, m);
+  mod_sub (v, Q->x, Q->z, m);
+  mod_mulredc (v, w, v, invm, m);
+  mod_add (w, u, v, m);
+  mod_sub (v, u, v, m);
+  mod_mulredc (w, w, w, invm, m);
+  mod_mulredc (v, v, v, invm, m);
+  mod_set (u, D->x, m); /* save D->x */
+  mod_mulredc (R->x, w, D->z, invm, m);
+  mod_mulredc (R->z, u, v, invm, m);
 
   mod_clear (w, m);
   mod_clear (v, m);
@@ -152,9 +202,9 @@ ellW_add3 (residue_t x3, residue_t y3, residue_t x2, residue_t y2,
   if (r == 0)
   {
       /* Maybe we were trying to add two identical points? If so,
-         use the duplicateW() function instead */
+         use the ellW_double() function instead */
       if (mod_equal (x1, x2, m) && mod_equal (y1, y2, m))
-	  r = ellW_duplicate (x3, y3, x1, y1, a, m);
+	  r = ellW_double (x3, y3, x1, y1, a, m);
       else
 	  r = 0; /* No, the points were negatives of each other */
   }
@@ -181,16 +231,14 @@ ellW_add3 (residue_t x3, residue_t y3, residue_t x2, residue_t y2,
    Assumes e >= 5.
 */
 static void
-ellM_mul_ui (residue_t x, residue_t z, unsigned long e, 
-	     const modulus_t m, residue_t b)
+ellM_mul_ui (ellM_point_t P, unsigned long e, const unsigned long invm,
+	     const modulus_t m, const residue_t b)
 {
   unsigned long l, n;
-  residue_t x1, z1, x2, z2;
+  ellM_point_t t1, t2;
 
-  mod_init_noset0 (x1, m);
-  mod_init_noset0 (z1, m);
-  mod_init_noset0 (x2, m);
-  mod_init_noset0 (z2, m);
+  ellM_init (t1, m);
+  ellM_init (t2, m);
 
   e --;
 
@@ -199,33 +247,29 @@ ellM_mul_ui (residue_t x, residue_t z, unsigned long e,
   for (l = e, n = 0; l > 1; n ++, l /= 2);
 
   /* start from P1=P, P2=2P */
-  mod_set (x1, x, m);
-  mod_set (z1, z, m);
-  ellM_duplicate (x2, z2, x1, z1, m, b);
+  ellM_set (t1, P, m);
+  ellM_double (t2, t1, invm, m, b);
 
   while (n--)
     {
       if ((e >> n) & 1) /* (i,i+1) -> (2i+1,2i+2) */
         {
           /* printf ("(i,i+1) -> (2i+1,2i+2)\n"); */
-          ellM_add3 (x1, z1, x2, z2, x1, z1, x, z, b, m);
-          ellM_duplicate (x2, z2, x2, z2, m, b);
+          ellM_add (t1, t1, t2, P, invm, m);
+          ellM_double (t2, t2, invm, m, b);
         }
       else /* (i,i+1) -> (2i,2i+1) */
         {
           /* printf ("(i,i+1) -> (2i,2i+1)\n"); */
-          ellM_add3 (x2, z2, x1, z1, x2, z2, x, z, b, m);
-          ellM_duplicate (x1, z1, x1, z1, m, b);
+          ellM_add (t2, t1, t2, P, invm, m);
+          ellM_double (t1, t1, invm, m, b);
         }
     }
   
-  mod_set (x, x2, m);
-  mod_set (z, z2, m);
+  ellM_set (P, t2, m);
 
-  mod_clear (z2, m);
-  mod_clear (x2, m);
-  mod_clear (z1, m);
-  mod_clear (x1, m);
+  ellM_clear (t1, m);
+  ellM_clear (t2, m);
 }
 
 static int
@@ -255,7 +299,7 @@ ellW_mul_ui (residue_t x, residue_t y, const unsigned long e, residue_t a,
   while (i > 0)
   {
       if (tfinite)
-        tfinite = ellW_duplicate (xt, yt, xt, yt, a, m);
+        tfinite = ellW_double (xt, yt, xt, yt, a, m);
       if (e & i)
       {
 	  if (tfinite)
@@ -279,6 +323,104 @@ ellW_mul_ui (residue_t x, residue_t y, const unsigned long e, residue_t a,
   mod_clear (xt, m);
 
   return tfinite;
+}
+
+
+/* Interpret the "l" bytes of bytecode located at "code" and do the 
+   corresponding elliptic curve operations on (x::z) */
+
+static void
+ellM_interpret_bytecode (ellM_point_t P, const unsigned char *code,
+			 const unsigned long l, const unsigned long invm,
+			 const modulus_t m, const residue_t b)
+{
+  unsigned long i;
+  ellM_point_t A, B, C, t, t2;
+  
+  ellM_init (A, m);
+  ellM_init (B, m);
+  ellM_init (C, m);
+  ellM_init (t, m);
+  ellM_init (t2, m);
+
+  ellM_set (A, P, m);
+
+  for (i = 0; i < l; i++)
+    {
+      switch (code[i])
+        {
+          case 10: /* Init of subchain, B=A, C=A, A=2*A */
+            ellM_set (B, A, m);
+            ellM_set (C, A, m);
+            ellM_double (A, A, invm, m, b);
+            break;
+          case 0: /* Swap A, B */
+            ellM_swap (A, B, m);
+            break;
+          case 1:
+            ellM_add (t, A, B, C, invm, m);
+            ellM_add (t2, t, A, B, invm, m);
+            ellM_add (B, B, t, A, invm, m);
+            ellM_set (A, t2, m);
+            break;
+          case 2:
+            ellM_add (B, A, B, C, invm, m);
+            ellM_double (A, A, invm, m, b);
+            break;
+          case 3:
+            ellM_add (C, B, A, C, invm, m);
+            ellM_swap (B, C, m);
+            break;
+          case 4:
+            ellM_add (B, B, A, C, invm, m);
+            ellM_double (A, A, invm, m, b);
+            break;
+          case 5:
+            ellM_add (C, C, A, B, invm, m);
+            ellM_double (A, A, invm, m, b);
+            break;
+          case 6:
+            ellM_double (t, A, invm, m, b);
+            ellM_add (t2, A, B, C, invm, m);
+            ellM_add (A, t, A, A, invm, m);
+            ellM_add (C, t, t2, C, invm, m);
+            ellM_swap (B, C, m);
+            break;
+          case 7:
+            ellM_add (t, A, B, C, invm, m);
+            ellM_add (B, t, A, B, invm, m);
+            ellM_double (t, A, invm, m, b);
+            ellM_add (A, A, t, A, invm, m);
+            break;
+          case 8:
+            ellM_add (t, A, B, C, invm, m);
+            ellM_add (C, C, A, B, invm, m);
+            ellM_swap (B, t, m);
+            ellM_double (t, A, invm, m, b);
+            ellM_add (A, A, t, A, invm, m);
+            break;
+          case 9:
+            ellM_add (C, C, B, A, invm, m);
+            ellM_double (B, B, invm, m, b);
+            break;
+          case 11:
+            ellM_add (A, A, B, C, invm, m); /* Final add */
+            break;
+          case 12:
+            ellM_double (A, A, invm, m, b); /* For p=2 */
+            break;
+          default:
+            abort ();
+        }
+    }
+
+  ellM_set (P, A, m);
+
+  ellM_clear (A, m);
+  ellM_clear (B, m);
+  ellM_clear (C, m);
+  ellM_clear (t, m);
+  ellM_clear (t2, m);
 }
 
 
@@ -475,29 +617,31 @@ curveW_from_Montgomery (residue_t a, residue_t x, residue_t y,
 
 int
 ecm_stage1 (residue_t x1, const int B1, const residue_t sigma, 
-	    const int parameterization, const modulus_t m)
+	    const int parameterization, const unsigned long invm, 
+	    const modulus_t m, const int verbose)
 {
-  residue_t u, A, b, x, z, xB, zB;
+  residue_t u, A, b;
+  ellM_point_t P, Pt;
   int r, *s;
   int ret;
 
   mod_init (u, m);
   mod_init (A, m);
   mod_init (b, m);
-  mod_init (x, m);
-  mod_init (z, m);
-  mod_init (xB, m);
-  mod_init (zB, m);
+  ellM_init (P, m);
+  ellM_init (Pt, m);
 
   if (parameterization == BRENT12)
   {
-    if (Brent12_curve_from_sigma (A, x, sigma, m) == 0)
+    if (Brent12_curve_from_sigma (A, P->x, sigma, m) == 0)
       return 1;
+    mod_set_ul (P->z, 1UL, m);
   }
   else if (parameterization == MONTY12)
   {
-    if (Monty12_curve_from_k (A, x, mod_get_ul (sigma, m), m) == 0)
+    if (Monty12_curve_from_k (A, P->x, mod_get_ul (sigma, m), m) == 0)
       return 1;
+    mod_set_ul (P->z, 1UL, m);
   }
   else
   {
@@ -505,58 +649,86 @@ ecm_stage1 (residue_t x1, const int B1, const residue_t sigma,
     abort();
   }
 
+  if (verbose)
+    {
+      printf ("starting point: (%lu::%lu)\n", 
+	      mod_get_ul (P->x, m), mod_get_ul (P->z, m));
+    }
+
   mod_add_ul (b, A, 2UL, m);
   mod_div2 (b, b, m);
   mod_div2 (b, b, m);
 
   /* now start ecm */
-  mod_set_ul (z, 1UL, m);
 
-  /* prime 2 */
-  for (r = 2.0; r <= B1; r *= 2.0)
-    ellM_duplicate (x, z, x, z, m, b);
-
-  /* printf ("2: x=%lu z=%lu\n", mod_get_ul(x) , mod_get_ul(z)); */
-
-  /* prime 3 */
-  for (r = 3.0; r <= B1; r *= 3.0)
+  /* Use the byte code if we can */
+  if (B1 == 50)
+    ellM_interpret_bytecode (P, bytecode50, sizeof (bytecode50), invm, m, b);
+  else if (B1 == 100)
+    ellM_interpret_bytecode (P, bytecode100, sizeof (bytecode100), invm, m, b);
+  else if (B1 == 150)
+    ellM_interpret_bytecode (P, bytecode150, sizeof (bytecode150), invm, m, b);
+  else if (B1 == 200)
+    ellM_interpret_bytecode (P, bytecode200, sizeof (bytecode200), invm, m, b);
+  else if (B1 == 300)
+    ellM_interpret_bytecode (P, bytecode300, sizeof (bytecode300), invm, m, b);
+  else if (B1 == 400)
+    ellM_interpret_bytecode (P, bytecode400, sizeof (bytecode400), invm, m, b);
+  else if (B1 == 500)
+    ellM_interpret_bytecode (P, bytecode500, sizeof (bytecode500), invm, m, b);
+  else
     {
-      ellM_duplicate (xB, zB, x, z, m, b);
-      ellM_add3 (x, z, x, z, xB, zB, x, z, b, m);
+      /* None of the prepared byte codes work. Do a generic stage 1 with
+	 binary chain */
+
+      /* prime 2 */
+      /* printf ("start: x=%lu z=%lu\n", 
+	       mod_get_ul(P->x, m) , mod_get_ul(P->z, m)); */
+      for (r = 2.0; r <= B1; r *= 2.0)
+	{
+	  ellM_double (P, P, invm, m, b);
+	  /* printf ("2: x=%lu z=%lu\n", 
+                   mod_get_ul(P->x, m) , mod_get_ul(P->z, m)); */
+	}
+
+      /* prime 3 */
+      for (r = 3.0; r <= B1; r *= 3.0)
+	{
+	  ellM_double (Pt, P, invm, m, b);
+	  ellM_add (P, P, Pt, P, invm, m);
+	}
+      
+      /* printf ("3: x=%lu z=%lu\n", mod_get_ul(P->x), mod_get_ul(P->z)); */
+
+      /* other primes */
+      for (s = primes; s[0] <= B1; s++)
+	{
+	  if (s[0] == 0)
+	    {
+	      fprintf (stderr, "Error, not enough small primes\n");
+	      exit (1);
+	    }
+	  for (r = s[0]; r <= B1; r *= s[0])
+	    ellM_mul_ui (P, (unsigned long) s[0], invm, m, b);
+	}
     }
 
-  /* printf ("3: x=%lu z=%lu\n", mod_get_ul(x), mod_get_ul(z)); */
-
-  /* other primes */
-  for (s = primes; s[0] <= B1; s++)
+  if (!mod_inv (u, P->z, m))
     {
-      if (s[0] == 0)
-        {
-          fprintf (stderr, "Error, not enough small primes\n");
-          exit (1);
-        }
-      for (r = s[0]; r <= B1; r *= s[0])
-        ellM_mul_ui (x, z, (unsigned long) s[0], m, b);
-    }
-
-  if (!mod_inv (u, z, m))
-    {
-      mod_set (x1, z, m);
+      mod_set (x1, P->z, m);
       ret = 1;  /* return 1 if non-trivial gcd is found */
     }
   else
     {
-      mod_mul (x1, x, u, m); /* No factor. Set x1 to normalized point */
+      mod_mul (x1, P->x, u, m); /* No factor. Set x1 to normalized point */
       ret = 0;
     }
   
   mod_clear (u, m);
   mod_clear (A, m);
   mod_clear (b, m);
-  mod_clear (x, m);
-  mod_clear (z, m);
-  mod_clear (xB, m);
-  mod_clear (zB, m);
+  ellM_clear (P, m);
+  ellM_clear (Pt, m);
 
   return ret;
 }

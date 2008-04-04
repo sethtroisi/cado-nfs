@@ -203,7 +203,8 @@ int main (int argc, char **argv)
       else
 	{
 	  mod_set_ul_reduced (b, x0, m);
-	  if (ecm_stage1 (r, (int) B1, b, parameterization, m))
+	  if (ecm_stage1 (r, (int) B1, b, parameterization, invm, m, 
+			  (verbose >= 2)))
 	    {
 	      if (verbose >= 2)
 		printf ("Found %lu\n", mod_gcd (r, m));
