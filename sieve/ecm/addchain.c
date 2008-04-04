@@ -16,6 +16,7 @@ unsigned long *prev; /* Stores next-to-last element of chain for i */
 static unsigned long chain[255];
 static unsigned long pracbest[255];
 static int beat_prac = 0;
+static int firstcode = 1;
 
 /* Table of multipliers for PRAC. prac_mul[i], i>0, has continued fraction 
    sequence of all ones but with a 2 in the i-th place, and 
@@ -30,7 +31,7 @@ static const double prac_mul[PRAC_NR] =
 
 /* One more than the highest code number the byte code generator can produce */
 #define MAXCODE 32
-typedef unsigned char literal_t;
+typedef char literal_t;
 int lastcode = 255;
 int compress = 0;
 /* Stores in codehist2[prev*MAXCODE+i] the frequency of the "prev, i" byte 
@@ -55,6 +56,7 @@ const int dict_len[DICT_NRENTRIES] = {};
 const literal_t *dict_entry[DICT_NRENTRIES] = {};
 const int dict_code[DICT_NRENTRIES] = {};
 #endif
+
 
 /* Simple primality test by trial division */
 int isprime (unsigned long n)
@@ -88,8 +90,8 @@ void print_chain (unsigned long *chain, int len)
       for (j = 0; j < i; j++)
 	if (2 * chain[j] == chain[i])
 	  {
-	    k = j;
-	    goto found;
+	    printf ("(%d, %d, -) %lu ", i-1-j, i-1-j, chain[i]);
+	    goto cont_i;
 	  }
       /* Now we look for j, k, l so that chain[i] == chain[j] + chain[k]
 	 and chain[j] - chain[k] == chain[l] */
@@ -102,13 +104,13 @@ void print_chain (unsigned long *chain, int len)
 	    d = chain[j] - chain[k];
 	    for (l = 0; l < i; l++)
 	      if (chain[l] == d)
-		goto found;
+		{
+		  printf ("(%d, %d, %d) %lu ", i-1-j, i-1-k, i-1-l, chain[i]);
+		  goto cont_i;
+		}
 	  }
-    found:
-      if (j == k) /* Doubling step */
-	printf ("(%d, %d, -) %lu ", i-1-j, i-1-j, chain[i]);
-      else
-	printf ("(%d, %d, %d) %lu ", i-1-j, i-1-k, i-1-l, chain[i]);
+      abort (); /* Could not generate chain[i] ?!? */
+    cont_i: ;
     }
 }
 
@@ -260,7 +262,11 @@ static void
 bytecoder_output (int c)
 {
   assert (c < MAXCODE);
-  printf ("%d,", c);
+  if (firstcode)
+    printf ("%d", c);
+  else
+    printf (",%d", c);
+  firstcode = 0;
   codehist[c]++;
   if (lastcode != 255)
     codehist2[lastcode*MAXCODE+c]++;
@@ -318,9 +324,9 @@ dict_longestmatch (const literal_t *buf, const int len, const int partial)
 /* Adds a literal to the coder_history[] FIFO buffer */
 
 static void 
-coder_histadd (const literal_t c)
+coder_histadd (const int c)
 {
-  coder_history[coder_nrstored++] = c;
+  coder_history[coder_nrstored++] = (literal_t) c;
   assert (coder_nrstored < CODER_HISTLEN);
   nr_literals++;
 }
@@ -371,7 +377,7 @@ coder_outputbest ()
 }
 
 static void 
-bytecoder (const literal_t c)
+bytecoder (const int c)
 {
   /* At this point, the first coder_nrstored literals (posibly 0!) of
      coder_history[] agree with some dictionary entry */
@@ -855,6 +861,8 @@ void usage()
           "                    integers up to maxn\n");
   printf ("-p [B1 [oldB1]]     Print pseudo-code for addition chain for stage 1 with\n"
 	  "                    B1 and possibly oldB1 (i.e. for extending stage 1)\n");
+  printf ("-pb [B1 [oldB1]]    Print bytecode for addition chain\n");
+  printf ("-pbc [B1 [oldB1]]   Print bytecode with dictionary compression\n");
   printf ("-b                  Find optimal chains that beat PRAC\n");
 }
 
