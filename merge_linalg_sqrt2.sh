@@ -98,6 +98,7 @@ else
     nrels_dup=`wc -l < $nodup`
   fi
   args="-poly $poly -maxpr $maxpr -maxpa $maxpa -keep $keep_purge"
+  if [ "X$sos" != "X" ]; then args="$args -sos $sos"; fi
   time $linalg/purge $args -nrels $nrels_dup $nodup > $purged
   if [ ! -s $purged ]; then echo "zero file $purged"; exit; fi
   excess=`head -1 $purged | awk '{nrows=$1; ncols=$2; print (nrows-ncols)}'`
