@@ -640,11 +640,16 @@ remove_singletons(int *nrel, int nrelmax, int *nprimes, hashtable_t *H, char *re
 // weight, since this will probably be done later on.
 // All rows will be 1 more that needed -> subtract 1 in fprint...!
 void
-renumber(int *nprimes, /*tab_prime_t bad_primes,*/ hashtable_t *H)
+renumber(int *nprimes, /*tab_prime_t bad_primes,*/ hashtable_t *H, char *sos)
 {
-  unsigned int i;
-  int nb;
+    FILE *fsos = NULL;
+    unsigned int i;
+    int nb;
 
+    if(sos != NULL){
+	fprintf(stderr, "Outputting renumber table in file %s\n", sos);
+	fsos = fopen(sos, "w");
+    }
     for(i = 0, nb = 1; i < H->hashmod; i++)
       if(isBadPrime(/*H->hashtab_p[i], bad_primes*/) || (H->hashcount[i] == 0))
 	    H->hashcount[i] = -1;
@@ -656,9 +661,15 @@ renumber(int *nprimes, /*tab_prime_t bad_primes,*/ hashtable_t *H)
 #else
 	    ASSERT(H->hashcount[i] > 1);
 #endif
-	    if(H->hashcount[i] > 0)
+	    if(H->hashcount[i] > 0){
 		H->hashcount[i] = nb++;
+		if(fsos != NULL)
+		    fprintf(fsos, "%d %lx %lx\n",
+			    H->hashcount[i]-1,H->hashtab_p[i],H->hashtab_r[i]);
+	    }
 	}
+    if(fsos != NULL)
+	fclose(fsos);
     nb--;
     fprintf(stderr, "nb = %d\n", nb);
     *nprimes = nb;
@@ -752,6 +763,7 @@ usage (char *argv[])
   fprintf (stderr, "       -maxpa   nnn - keep only alg. primes <= nnn (default 2^lpba)\n");
   fprintf (stderr, "       -maxpr   nnn - keep only rat. primes <= nnn (default 2^lpbr)\n");
   fprintf (stderr, "       -nprimes nnn - number of prime ideals\n");
+  fprintf (stderr, "       -sos sosfile - to keep track of the renumbering\n");
 }
 
 int
@@ -759,7 +771,7 @@ main(int argc, char **argv)
 {
     tab_prime_t bad_primes;
     hashtable_t H;
-    char **fic, *polyname = NULL;
+    char **fic, *polyname = NULL, *sos = NULL;
     unsigned int nfic;
     char *rel_used;
     int **rel_compact = NULL;
@@ -810,6 +822,11 @@ main(int argc, char **argv)
 	    final = 0;
 	    argc--;
 	    argv++;
+	}
+	else if(argc > 1 && strcmp (argv[1], "-sos") == 0){
+	    sos = argv[2];
+	    argc -= 2;
+	    argv += 2;
 	}
     }
     if(keep <= 0)
@@ -903,8 +920,8 @@ main(int argc, char **argv)
 	if(nrel_new < nprimes_new)
 	    exit(1);
 	
-	// we have to renumber the primes in increasing weight order
-	renumber(&nprimes_new, /*bad_primes,*/ &H);
+	// we renumber the primes in order of apparition in the hashtable
+	renumber(&nprimes_new, /*bad_primes,*/ &H, sos);
 	
 #if DEBUG >= 2
 	hashCheck(nprimes_new);
