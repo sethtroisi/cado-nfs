@@ -280,9 +280,7 @@ struct thread:public traits {
         /* the matrix rowset is deleted by the dtor */
     }
 
-    void display_stats(bool sync = true) {
-        if (!display_decision(done, go_mark))
-            return;
+    void display_stats() {
 
         double ticks_diff = thread_ticks() - ticks_ref;
         double wct_now = wallclock_ticks();
@@ -292,6 +290,8 @@ struct thread:public traits {
         double tw;
         double rem;
         double pcpu;
+
+        thread_lock(&globals::console_lock);
 
         pcpu = ticks_diff / wct_diff;
         av = ticks_diff / (double) (done - go_mark);
@@ -312,14 +312,42 @@ struct thread:public traits {
             eta = fmt("% .. %") % e1 % e2;
         }
 
-        thread_lock(&globals::console_lock);
-        cout << fmt("T% N=% av=% M0=%[F.1]ns %[F.1]%% tw=% eta=<%>")
+        cout << fmt("T% N=% av=% M0=%[F.1]ns %[F.1]%% tw=% eta=<%>\n")
             % t % done % pdelta(av)
             % m0_estim % (pcpu * 100.0)
             % pdelta(tw)
-            % eta << endl;
+            % eta;
+
+        if (mine.task == "krylov") {
+            double rem_full;
+            /* Time remaining for the complete algorithm */
+
+            /* assume that mksol iterations are 50% more expensive */
+            /* lingen is not counted, this is only a very gross
+             * estimation. */
+            rem_full = av * (globals::nb_iter - go_mark)
+                + av * 1.5 * iceildiv(globals::nc, globals::n);
+
+            string e1_complete = pdate(wct_ref + rem_full);
+            string e2_complete = pdate(wct_ref + rem_full / pcpu);
+            string eta_complete;
+            if (e1_complete == e2_complete) {
+                eta_complete = e1_complete;
+            } else {
+                if (e1_complete.compare(0, 7, e2_complete, 0, 7) == 0) {
+                    e2_complete.erase(0, 7);
+                }
+                eta_complete = fmt("% .. %") % e1_complete % e2_complete;
+            }
+
+            cout << fmt("T% eta_including_mksol=<%>\n")
+                % t % eta_complete;
+        }
 
         mat.report();
+
+        cout << flush;
+
         thread_unlock(&globals::console_lock);
     }
 
@@ -405,7 +433,8 @@ struct thread:public traits {
 
         ((Derived &) * this).use_vector(dst);
 
-        display_stats();
+        if (display_decision(done, go_mark))
+            display_stats();
     }
 
     void loop() {
@@ -501,8 +530,14 @@ struct krylov_thread:public thread < traits, krylov_thread < traits > > {
         /* writeout w ; this must be done by only
          * one thread. It's quite silly to use barrier_wait for
          * this, a simpler concept would clearly do, but that's
-         * what we have at hand for lowest pain... */
+         * what we have at hand for lowest pain... Note that we're here
+         * only at checkpoint time, i.e. very rarely.
+         */
         int rc = barrier_wait(&globals::main_loop_barrier, NULL, NULL);
+
+        /* Display stats at checkpoint time */
+        super::display_stats();
+
         if (rc == 1) {
                 std::string nm = files::v % globals::col % r;
 
@@ -612,6 +647,10 @@ struct mksol_thread:public thread < traits, mksol_thread < traits > > {
         /* One thread is responsible for writing to disk the
          * accumulated sum up to this cp value */
         int rc = barrier_wait(&globals::main_loop_barrier, NULL, NULL);
+
+        /* Display stats at checkpoint time */
+        super::display_stats();
+
         if (rc == 1) {
             std::string nm = files::fxy % globals::col % r;
             cout << fmt("T% writes %") % super::t % nm << endl;
