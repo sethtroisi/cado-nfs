@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <string.h>
-#include "struct.h"
+//#include "struct.h"
 #include "basic.h"
 #include "random.h"
 #include "alloc.h"
@@ -30,6 +30,7 @@ int main(int argc, char *argv[])
     Fl = malloc(3 * sizeof(unsigned long));
     Fl = argv[1];
 
+   
     unsigned long Tm1, Tm2;
     float DiffTime;
 
@@ -53,7 +54,7 @@ int main(int argc, char *argv[])
 
     MPI_Comm_size(MPI_COMM_WORLD, &size);	//get the number of processes (size=1 if not using MPI)
     MPI_Comm_rank(MPI_COMM_WORLD, &p);	//get the process ranks (p=0 if not using MPI)
-
+    MPI_Status status;
 
 
 // Get the sparce matrix from file 
@@ -65,7 +66,7 @@ int main(int argc, char *argv[])
     M.Nrows = Num[0];
     M.Ncols = Num[1];
     M.Weight = Num[2];
-
+ //printf("%s \n",Fl2);
 
 // For MPI  Number of Lines of the matrix to read in each process
 
@@ -81,49 +82,86 @@ int main(int argc, char *argv[])
 	       sizeof(unsigned long));
     ReadSMatrixFileBlockNew(Fl, M.Data, p * (M.Nrows / size), BlockSize);
 
-//printf("Number of Coeffs = %lu \n",NumbCoeffSMatrix(M.Data,M.Nrows));   
+if (size==1) {printf("Number of Coeffs = %lu \n",NumbCoeffSMatrix(M.Data,M.Nrows)); }
 
 // end Get the sparce matrix from file
 
+   struct DenseMatrix Result;
+   Result.Data=Allocmn(M.Nrows,Block);
 
-
-    Ker.Data = Allocmn(M.Ncols, Block);
-
-
-//Ker.Ncols=Block;
-//Ker.Nrows=M.Ncols;
-
-
+   Ker.Data = Allocmn(M.Ncols, Block);
+ 
 
     if (p == 0) {
 	Tm1 = microseconds();
     }
 
-    Ker = Lanczos(M, Block);
+    Lanczos(Ker,M, Block);
 
+
+    Ker.Nrows=M.Ncols;
+
+   //displayMatrix(Ker.Data,M.Ncols,Block,'c');
+
+/*
+    FILE *File1;
+    File1 = fopen(Fl2, "w");
+    unsigned long i;
+    for (i = 0; i < Ker.Nrows; i++) {
+        printf("%lu \n", Ker.Data[i]);
+	fprintf(File1, "%lu \n", Ker.Data[i]);
+
+    }
+    fclose(File1);
+*/
+   
 
     if (p == 0) {
 	Tm2 = microseconds();
 	DiffTime = Tm2 - Tm1;
 	printf
 	    ("Total Time for Lanczos = %f s   Size of block in kernel is %lu\n",
-	     DiffTime / 1000000, Ker.Ncols);
+	     DiffTime / 1000000, Block);
     }
 
+
+Result=SMatrix_Vector(M,Ker);
+
+//printf("%lu \n",M.Nrows);
+
+if (p==0){  if (TestZero(M.Nrows,Block,Result.Data)){printf("There were NO errors During the process. The vectors are in the kernel of the matrix  \n");} else {printf("There was an error in the process \n");}}
+
+
+if ((p==0) & (argc == 3)) {
+
+ char *Fl2;
+
+    Fl2 = malloc(3 * sizeof(unsigned long));
+    Fl2 = argv[2];
+    WriteBlockMatrix(Ker,Fl2);
+}
+
+
+
+
+//FILE *File1;
+//  File1 = fopen(Fl2, "w");
+
+
+
 /*
+    unsigned long i;
+    for (i = 0; i < Ker.Nrows; i++) {
+        printf("%lu \n", Ker.Data[i]);
+	fprintf(File1, "%lu \n", Ker.Data[i]);
 
-Test Kernel
-
+    }
+    fclose(File1);
 */
 
-    unsigned long *d;
-    d = Allocmn(M.Ncols, Ker.Ncols);
-//SMultDmatrixBit(M.Nrows,M.Ncols,Ker.Ncols,M.Data,Ker.Data,d,0,M.Nrows);
-    displayMatrix(Ker.Data, Ker.Nrows, Ker.Ncols, 'd');
-    displaySMatrixNew(M.Data, M.Nrows, M.Ncols, 'M');
 
 
 
-    MPI_Finalize();
+
     return 0;
 }

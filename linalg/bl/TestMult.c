@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <string.h>
-#include "struct.h"
+//#include "struct.h"
 #include "basic.h"
 #include "random.h"
 #include "alloc.h"

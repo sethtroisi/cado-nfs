@@ -45,7 +45,6 @@ unsigned long TestZero(unsigned long m, unsigned long n, unsigned long *a)
     for (i = 0; i < iceildiv(n, WBITS) * m; ++i)
 	if (a[i] != 0)
 	    return 0;
-
     return 1;
 
 }

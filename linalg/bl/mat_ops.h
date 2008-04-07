@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include "struct.h"
 
 extern void DMatrixSumBit(unsigned long m, unsigned long n,
 			  const unsigned long *A, const unsigned long *B,
@@ -52,10 +53,6 @@ extern unsigned long InverseList(unsigned long N, unsigned long Lengm,
 				 const unsigned long *m, unsigned long *b);
 
 
-
-
-
-
 extern void DMultBitOld(unsigned long N, unsigned long m, unsigned long n,
 			const unsigned long *A, const unsigned long *B,
 			unsigned long *C);
@@ -89,10 +86,25 @@ extern unsigned long MultiplyRow(unsigned long m, unsigned long n,
 
 
 extern unsigned long NumbCoeffSMatrix(unsigned long *a, unsigned long m);
-extern void TVUBit(unsigned long m, unsigned long n, const unsigned long *A,
+extern void TVUBit_v2(unsigned long m, unsigned long n, const unsigned long *A,
 		   const unsigned long *B, unsigned long *C);
-extern void VUBit(unsigned long m, unsigned long n, const unsigned long *A,
+
+//extern void VUBit(unsigned long m, unsigned long n, const unsigned long *A,
+//		  const unsigned long *B, unsigned long *C);
+
+extern void VUBit(unsigned long m,unsigned long n,uint64_t *a,uint64_t *b,uint64_t *w);
+
+
+extern void VUBit_v2(unsigned long m, unsigned long n, const unsigned long *A,
 		  const unsigned long *B, unsigned long *C);
-extern void TVUBit_v2(unsigned long m, unsigned long n, uint64_t * A,
-		      uint64_t * B, uint64_t * C);
-extern inline void addmul(uint64_t a, uint64_t b, uint64_t * w);
+
+extern void TVUBit(unsigned long m, unsigned long n, unsigned long * A,unsigned long * B, unsigned long * C);
+
+extern inline void addmul(unsigned long a, unsigned long b, unsigned long * w);
+
+extern unsigned long Pivot(unsigned long m, unsigned long n, unsigned long *a,unsigned long Row ,unsigned long Col);
+
+
+extern struct DenseMatrix SMatrix_Vector(struct SparseMatrix M, struct DenseMatrix V);
+
+extern struct DenseMatrix STSMatrix_Vector(struct SparseMatrix M, struct DenseMatrix V);
