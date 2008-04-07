@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <ctype.h>
 #include "manu.h"
+#include "utils.h"
 
 unsigned int read_hexstring(FILE *f, unsigned long * ptr, unsigned int n)
 {

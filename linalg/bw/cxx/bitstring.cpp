@@ -1,6 +1,7 @@
 #include <iomanip>
 #include "bitstring.hpp"
 #include "manu.h"
+#include "utils.h"
 
 using namespace std;
 unsigned int read_hexstring(std::istream& is, unsigned long * ptr, unsigned int n)

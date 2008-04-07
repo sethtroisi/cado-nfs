@@ -1,6 +1,7 @@
 #include "fake_fft.h"
 #include "gf2x.h"
 #include "manu.h"
+#include "utils.h"
 
 void fake_setup(fake_info_t p, int dF, int dG)
 {

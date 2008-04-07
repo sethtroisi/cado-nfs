@@ -94,16 +94,13 @@ extern "C" {
 #endif
 
 /**********************************************************************/
-/* That's dirty, but I really don't want to link libm in */
-#define iceildiv(x,y)	(((x)+(y)-1)/(y))
 
-/* unfortunate -- does not take into account the possibility of having
- * padding bits */
-#ifndef ULONG_BITS
-#define	ULONG_BITS	((int) (sizeof(unsigned long) * CHAR_BIT))
+/* Handy, and does not require libm */
+#ifndef iceildiv
+#define iceildiv(x,y)	(((x)+(y)-1)/(y))
 #endif
 
-/* Number of W-bits words that hold B bits */
+/* Number of words holding B bits ; better naming sought. */
 #ifndef  BITS_TO_WORDS
 #define	BITS_TO_WORDS(B,W)	iceildiv((B),(W))
 #endif
