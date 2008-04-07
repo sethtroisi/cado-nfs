@@ -41,6 +41,7 @@
  * necessary.
  */
 
+common_arguments common;
 krylov_arguments mine;
 
 using namespace std;
@@ -506,14 +507,20 @@ struct krylov_thread:public thread < traits, krylov_thread < traits > > {
                 std::string nm = files::v % globals::col % r;
 
                 thread_lock(&globals::console_lock);
-                cout << fmt("T% writes %") % super::t % nm << endl;
+                cout << fmt("T% writes %") % super::t % nm;
+                if (!common.checkpoints) {
+                    cout << " (checkpoints disabled)";
+                }
+                cout << endl;
                 thread_unlock(&globals::console_lock);
-
-                ofstream v;
-                must_open(v, nm);
-                for (unsigned int j = 0; j < globals::nc; j++) {
-                    traits::print(v,dst[j]);
-                    v << "\n";
+                
+                if (common.checkpoints) {
+                    ofstream v;
+                    must_open(v, nm);
+                    for (unsigned int j = 0; j < globals::nc; j++) {
+                        traits::print(v,dst[j]);
+                        v << "\n";
+                    }
                 }
         }
 
@@ -800,8 +807,6 @@ int main(int argc, char *argv[])
     cerr.tie(&cout);
     cout.rdbuf()->pubsetbuf(0, 0);
     cerr.rdbuf()->pubsetbuf(0, 0);
-
-    common_arguments common;
 
     std::cout << "// This is bw-krylov, version " VERSION << std::endl;
 

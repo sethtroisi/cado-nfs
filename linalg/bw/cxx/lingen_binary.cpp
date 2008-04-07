@@ -28,6 +28,7 @@
 #define Lmacro(N, m, n) (iceildiv((N)+2*(n),(m))+iceildiv((N)+2*(n),(n))+10)
 
 unsigned int rec_threshold = 0;
+bool checkpoints = false;
 
 /* This disables cantor for the time being */
 unsigned int cantor_threshold = UINT_MAX;
@@ -1201,7 +1202,8 @@ static bool go_quadratic(polmat& pi)/*{{{*/
         // write_polmat(tmp_pi,std::string(fmt("pi-%-%") % tstart % t).c_str());
     }
     pi.swap(tmp_pi);
-    write_polmat(pi,std::string(fmt("pi-%-%") % tstart % t).c_str());
+    if (checkpoints)
+        write_polmat(pi,std::string(fmt("pi-%-%") % tstart % t).c_str());
     print_deltas();
 
     return finished;
@@ -1612,6 +1614,11 @@ int main(int argc, char *argv[])
             if (argc <= 1) usage();
             argv++, argc--;
             cantor_threshold = atoi(argv[0]);
+            argv++, argc--;
+            continue;
+        }
+        if (strcmp(argv[0], "--checkpoints") == 0) {
+            checkpoints = 1;
             argv++, argc--;
             continue;
         }

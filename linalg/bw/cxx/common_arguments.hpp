@@ -17,11 +17,14 @@ struct common_arguments {
 	std::string subdir;
 	bool core_ok;
 	bool skip_lim_check;
+        bool checkpoints;
 	common_arguments() {
 		core_ok = skip_lim_check = false;
+                checkpoints = false;
 	}
 	bool parse(argparser::situation& s) {
 		if (s("--subdir", subdir)) return true;
+		if (s("--checkpoints", checkpoints)) return true;
 		if (s("--core-ok", core_ok)) return true;
 		if (s("--skip-limits-check", skip_lim_check)) return true;
 		return false;
@@ -29,6 +32,7 @@ struct common_arguments {
 	void doc(std::ostream& o) {
 		o << "Accepted options:\n";
 		o << "--help\t\tshow this help\n";
+		o << "--checkpoints\tsave checkpoints\n";
 		o << "--subdir <dir>\tdirectory of work files\n";
 		o << "--core-ok\t\tallow core dumps\n";
 		o << "--skip-limits-check\tdo not check OS limits\n";
