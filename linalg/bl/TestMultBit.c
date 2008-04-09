@@ -27,8 +27,8 @@ int main(int argc, char *argv[])
 
     unsigned long m = atoi(argv[1]);;
 
-    unsigned long T3,T1, T2,i;
-    float DiffTime2,DiffTime1;
+    unsigned long T3, T1, T2, i;
+    float DiffTime2, DiffTime1;
 
 
 
@@ -37,57 +37,57 @@ int main(int argc, char *argv[])
     unsigned long Block = WBITS;
 
 
-    unsigned long *d1, *c1,*c2;
+    unsigned long *d1, *c1, *c2;
     // unsigned long *e;
     uint64_t *Y, *c, *d;
-    Y = Allocmn(Block,m + 1);
-    c = Allocmn(m+1,Block);
-    c2 = Allocmn(m+1,Block);
-    c1 = Allocmn( Block,m + 1);
-   // e = Allocmn(Block, m + 1);
-    d = Allocmn(Block,Block);
+    Y = Allocmn(Block, m + 1);
+    c = Allocmn(m + 1, Block);
+    c2 = Allocmn(m + 1, Block);
+    c1 = Allocmn(Block, m + 1);
+    // e = Allocmn(Block, m + 1);
+    d = Allocmn(Block, Block);
     d1 = Allocmn(Block, Block);
 
     RandomDMatrixBitTest(Block, m, Y);
     RandomDMatrixBitTest(Block, Block, d);
 
-DiffTime1=0;
-DiffTime2=0;
+    DiffTime1 = 0;
+    DiffTime2 = 0;
 
-unsigned long **V;
+    unsigned long **V;
     V = Allocmn3(m, Block);
 
-for (i = 0; i < m * iceildiv(Block, WBITS); ++i) {
+    for (i = 0; i < m * iceildiv(Block, WBITS); ++i) {
 	V[0][i] = Y[i];
 	V[1][i] = Y[i];
 	V[2][i] = Y[i];
     }
 
 
-for (i=0; i<1; i++) {
+    for (i = 0; i < 1; i++) {
 
-T1=microseconds();
+	T1 = microseconds();
 
-    VUBit(m, Block, Y, d, c);
+	VUBit(m, Block, Y, d, c);
 
-    //DMultBit(m,Block, 1, Y, d, c2);
+	//DMultBit(m,Block, 1, Y, d, c2);
 
-  // TransposeBit(Block,Block,d,d1);
+	// TransposeBit(Block,Block,d,d1);
 
-T2=microseconds();
+	T2 = microseconds();
 
-   d1=Allocmn(Block,Block);
-   TransposeBit(Block,Block,d,d1);
+	d1 = Allocmn(Block, Block);
+	TransposeBit(Block, Block, d, d1);
 
-   //   Refresh_ArrayBit(m, Block, V, Y);
+	//   Refresh_ArrayBit(m, Block, V, Y);
 
- //   TVUBit(m, Block, Y, Y, c);
-  //   VUBit_v2(m, Block, Y, d, c2);
+	//   TVUBit(m, Block, Y, Y, c);
+	//   VUBit_v2(m, Block, Y, d, c2);
 
-T3=microseconds();
+	T3 = microseconds();
 
-DiffTime1+=T2-T1;
-DiffTime2+=T3-T2;
+	DiffTime1 += T2 - T1;
+	DiffTime2 += T3 - T2;
 
 
 /*
@@ -120,11 +120,12 @@ printf("Paridade de %lu ^ %lu=%lu",r[0],r[1],__builtin_parity(r[0]^r[1]));
 
 //displayMatrixScreen(c2,m,Block);
 
-}
+    }
 
-printf("Time for alg1 VxBolck is = %f s Time for alg2 TVxV is = %f s\n",DiffTime1/1000000,DiffTime2/1000000 );
+    printf("Time for alg1 VxBolck is = %f s Time for alg2 TVxV is = %f s\n",
+	   DiffTime1 / 1000000, DiffTime2 / 1000000);
 
-return 0;
+    return 0;
 }
 
 
@@ -135,7 +136,7 @@ return 0;
 //    for (t = 0; t < m; ++t) {
 
 
- 
+
 //printf("Position of Pivot at column %lu  is  %lu s\n",t,Pivot(Block,m,Y,2,t));
 
 
@@ -155,19 +156,19 @@ return 0;
 
 //displayMatrix(Y,m,Block,'Y');
 
-//	Tm1 = clock();
+//      Tm1 = clock();
 
 //TransposeBit(m, Block, Y, e);
-//	DMultBit(m, Block, Block, Y, d, c1);
+//      DMultBit(m, Block, Block, Y, d, c1);
 
-//	VUBit(m, Block, Y, d, c);
+//      VUBit(m, Block, Y, d, c);
 
 
 
-//	Tm2 = clock();
-//	DiffTime = Tm2 - Tm1;
-//	printf("Total Time for TVU = %f s\n",
-//	       DiffTime / 1.0 / CLOCKS_PER_SEC);
+//      Tm2 = clock();
+//      DiffTime = Tm2 - Tm1;
+//      printf("Total Time for TVU = %f s\n",
+//             DiffTime / 1.0 / CLOCKS_PER_SEC);
 
 
 //    }
@@ -176,4 +177,3 @@ return 0;
 //    displayMatrix(c1, m, Block, 'e');
 
 //displayMatrix(d,Block,Block,'d');
-

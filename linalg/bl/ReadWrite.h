@@ -34,6 +34,6 @@ extern void ReadSMatrixFileBlockNew(char *f, unsigned long *M,
 extern unsigned long SizeBlock(unsigned long Nproc, unsigned long proc,
 			       unsigned long m);
 extern void displayMatrixScreen(const unsigned long *matrix,
-		   unsigned long m, unsigned long n);
+				unsigned long m, unsigned long n);
 
 extern void WriteBlockMatrix(struct DenseMatrix Ker, char *f);

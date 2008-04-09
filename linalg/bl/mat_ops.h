@@ -86,25 +86,31 @@ extern unsigned long MultiplyRow(unsigned long m, unsigned long n,
 
 
 extern unsigned long NumbCoeffSMatrix(unsigned long *a, unsigned long m);
-extern void TVUBit_v2(unsigned long m, unsigned long n, const unsigned long *A,
-		   const unsigned long *B, unsigned long *C);
+extern void TVUBit_v2(unsigned long m, unsigned long n,
+		      const unsigned long *A, const unsigned long *B,
+		      unsigned long *C);
 
 //extern void VUBit(unsigned long m, unsigned long n, const unsigned long *A,
-//		  const unsigned long *B, unsigned long *C);
+//                const unsigned long *B, unsigned long *C);
 
-extern void VUBit(unsigned long m,unsigned long n,uint64_t *a,uint64_t *b,uint64_t *w);
+extern void VUBit(unsigned long m, unsigned long n, uint64_t * a,
+		  uint64_t * b, uint64_t * w);
 
 
 extern void VUBit_v2(unsigned long m, unsigned long n, const unsigned long *A,
-		  const unsigned long *B, unsigned long *C);
+		     const unsigned long *B, unsigned long *C);
 
-extern void TVUBit(unsigned long m, unsigned long n, unsigned long * A,unsigned long * B, unsigned long * C);
+extern void TVUBit(unsigned long m, unsigned long n, unsigned long *A,
+		   unsigned long *B, unsigned long *C);
 
-extern inline void addmul(unsigned long a, unsigned long b, unsigned long * w);
+extern inline void addmul(unsigned long a, unsigned long b, unsigned long *w);
 
-extern unsigned long Pivot(unsigned long m, unsigned long n, unsigned long *a,unsigned long Row ,unsigned long Col);
+extern unsigned long Pivot(unsigned long m, unsigned long n, unsigned long *a,
+			   unsigned long Row, unsigned long Col);
 
 
-extern struct DenseMatrix SMatrix_Vector(struct SparseMatrix M, struct DenseMatrix V);
+extern struct DenseMatrix SMatrix_Vector(struct SparseMatrix M,
+					 struct DenseMatrix V);
 
-extern struct DenseMatrix STSMatrix_Vector(struct SparseMatrix M, struct DenseMatrix V);
+extern struct DenseMatrix STSMatrix_Vector(struct SparseMatrix M,
+					   struct DenseMatrix V);

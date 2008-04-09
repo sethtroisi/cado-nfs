@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
     Fl = malloc(3 * sizeof(unsigned long));
     Fl = argv[1];
 
-   
+
     unsigned long Tm1, Tm2;
     float DiffTime;
 
@@ -66,7 +66,7 @@ int main(int argc, char *argv[])
     M.Nrows = Num[0];
     M.Ncols = Num[1];
     M.Weight = Num[2];
- //printf("%s \n",Fl2);
+    //printf("%s \n",Fl2);
 
 // For MPI  Number of Lines of the matrix to read in each process
 
@@ -82,26 +82,28 @@ int main(int argc, char *argv[])
 	       sizeof(unsigned long));
     ReadSMatrixFileBlockNew(Fl, M.Data, p * (M.Nrows / size), BlockSize);
 
-if (size==1) {printf("Number of Coeffs = %lu \n",NumbCoeffSMatrix(M.Data,M.Nrows)); }
-
+    if (size == 1) {
+	printf("Number of Coeffs = %lu \n",
+	       NumbCoeffSMatrix(M.Data, M.Nrows));
+    }
 // end Get the sparce matrix from file
 
-   struct DenseMatrix Result;
-   Result.Data=Allocmn(M.Nrows,Block);
+    struct DenseMatrix Result;
+    Result.Data = Allocmn(M.Nrows, Block);
 
-   Ker.Data = Allocmn(M.Ncols, Block);
- 
+    Ker.Data = Allocmn(M.Ncols, Block);
+
 
     if (p == 0) {
 	Tm1 = microseconds();
     }
 
-    Lanczos(Ker,M, Block);
+    Lanczos(Ker, M, Block);
 
 
-    Ker.Nrows=M.Ncols;
+    Ker.Nrows = M.Ncols;
 
-   //displayMatrix(Ker.Data,M.Ncols,Block,'c');
+    //displayMatrix(Ker.Data,M.Ncols,Block,'c');
 
 /*
     FILE *File1;
@@ -114,7 +116,7 @@ if (size==1) {printf("Number of Coeffs = %lu \n",NumbCoeffSMatrix(M.Data,M.Nrows
     }
     fclose(File1);
 */
-   
+
 
     if (p == 0) {
 	Tm2 = microseconds();
@@ -125,22 +127,28 @@ if (size==1) {printf("Number of Coeffs = %lu \n",NumbCoeffSMatrix(M.Data,M.Nrows
     }
 
 
-Result=SMatrix_Vector(M,Ker);
+    Result = SMatrix_Vector(M, Ker);
 
 //printf("%lu \n",M.Nrows);
 
-if (p==0){  if (TestZero(M.Nrows,Block,Result.Data)){printf("There were NO errors During the process. The vectors are in the kernel of the matrix  \n");} else {printf("There was an error in the process \n");}}
+    if (p == 0) {
+	if (TestZero(M.Nrows, Block, Result.Data)) {
+	    printf
+		("There were NO errors During the process. The vectors are in the kernel of the matrix  \n");
+	} else {
+	    printf("There was an error in the process \n");
+	}
+    }
 
 
-if ((p==0) & (argc == 3)) {
+    if ((p == 0) & (argc == 3)) {
 
- char *Fl2;
+	char *Fl2;
 
-    Fl2 = malloc(3 * sizeof(unsigned long));
-    Fl2 = argv[2];
-    WriteBlockMatrix(Ker,Fl2);
-}
-
+	Fl2 = malloc(3 * sizeof(unsigned long));
+	Fl2 = argv[2];
+	WriteBlockMatrix(Ker, Fl2);
+    }
 
 
 

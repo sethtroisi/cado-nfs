@@ -71,12 +71,12 @@ void displayMatrix(const unsigned long *matrix,
 
 
 void displayMatrixScreen(const unsigned long *matrix,
-		   unsigned long m, unsigned long n)
+			 unsigned long m, unsigned long n)
 {
     unsigned long i;
     unsigned long width = iceildiv(n, WBITS);
 
-    
+
     for (i = 0; i < m; i++) {
 	unsigned int j;
 	unsigned int bit;
@@ -85,7 +85,7 @@ void displayMatrixScreen(const unsigned long *matrix,
 	    bit &= 1;
 	    printf("%d ", bit);
 	}
-        printf("\n");
+	printf("\n");
     }
     printf("\n");
 
@@ -675,7 +675,7 @@ void WriteBlockMatrix(struct DenseMatrix K, char *f)
     File = fopen(f, "w");
     unsigned long i;
     for (i = 0; i < K.Nrows; i++) {
-        //printf("%lu \n", K.Data[i]);
+	//printf("%lu \n", K.Data[i]);
 	fprintf(File, "%lu \n", K.Data[i]);
 
     }

@@ -48,8 +48,8 @@ Remark: Needs MPI installed and running
 
 #if  0
 
-void *LanczosIterations(struct DenseMatrix *Resultado,struct SparseMatrix M,
-		      struct DenseMatrix Y)
+void *LanczosIterations(struct DenseMatrix *Resultado, struct SparseMatrix M,
+			struct DenseMatrix Y)
 {
 
     float SumTimeSD = 0;
@@ -148,7 +148,7 @@ void *LanczosIterations(struct DenseMatrix *Resultado,struct SparseMatrix M,
     struct DenseMatrix ATAC;
     ATAC.Data = Allocmn(a.Ncols, Y.Ncols);
 
-    ATAC=STSMatrix_Vector(a,Y);
+    ATAC = STSMatrix_Vector(a, Y);
 
 
     for (i = 0; i < n * iceildiv(Block, WBITS); ++i) {
@@ -324,7 +324,6 @@ void *LanczosIterations(struct DenseMatrix *Resultado,struct SparseMatrix M,
 	       SizeS[0], size);
 
     }
-
 // To all processes
 
     unsigned long Step = 0;
@@ -354,7 +353,6 @@ void *LanczosIterations(struct DenseMatrix *Resultado,struct SparseMatrix M,
 	TVUBit(n, N, AVi1, AVi1, Vi1A2Vi1);
 
     }
-
 
 //Desalloc 
 
@@ -392,7 +390,7 @@ void *LanczosIterations(struct DenseMatrix *Resultado,struct SparseMatrix M,
     unsigned long *ResnN;
     ResnN = Allocmn(n, N);
 
-    unsigned long T00,T0;
+    unsigned long T00, T0;
 
     t1 = microseconds();
 
@@ -402,11 +400,10 @@ void *LanczosIterations(struct DenseMatrix *Resultado,struct SparseMatrix M,
 
     while (((TestZero(N, N, ViAVi) == 0) || (p != dest)) && (Final[0] == 0)) {
 
-	
+
 	T00 = microseconds();
 
-	if (p == 0)
-	{
+	if (p == 0) {
 
 	    for (i = 1; i <= Set0[0]; ++i)
 		UseSet[i] = Set[0][i];
@@ -445,7 +442,7 @@ void *LanczosIterations(struct DenseMatrix *Resultado,struct SparseMatrix M,
 
 	    for (i = 0; i < iceildiv(N, WBITS) * n; ++i)
 		V1i[i] = ResnN[i];
-	
+
 
 // end for V1i
 
@@ -532,10 +529,9 @@ void *LanczosIterations(struct DenseMatrix *Resultado,struct SparseMatrix M,
 
 
 	}
-
 // To All Processes
 
-	unsigned long T1, T2, T3, T4,  T5;
+	unsigned long T1, T2, T3, T4, T5;
 
 	T0 = microseconds();
 #if 1
@@ -571,7 +567,7 @@ void *LanczosIterations(struct DenseMatrix *Resultado,struct SparseMatrix M,
 
 #endif
 
-        
+
 
 
 	T4 = microseconds();
@@ -623,11 +619,11 @@ void *LanczosIterations(struct DenseMatrix *Resultado,struct SparseMatrix M,
 
 
 
-//	    unsigned long tnNN0 = microseconds();
+//          unsigned long tnNN0 = microseconds();
 
 	    TVUBit(n, N, V[0], ATAC, ViTV0);
 
-//	    unsigned long tnNN1 = microseconds();
+//          unsigned long tnNN1 = microseconds();
 
 	    VUBit(n, N, V[0], Winv[0], ViWiinv);
 
@@ -658,8 +654,9 @@ void *LanczosIterations(struct DenseMatrix *Resultado,struct SparseMatrix M,
 
 	    printf
 		("Step= %lu      SumRank= %lu    TimeSD=%f s  TimeTSD=%f s   TSLAlgebra=%f s   TITime=%f s \n",
-		 Step, SumRank, SD / 1000000, TSD / 1000000, (BCalc / 1000000)+ (ACalc1 / 1000000),
-		 TIteration / 1000000 );
+		 Step, SumRank, SD / 1000000, TSD / 1000000,
+		 (BCalc / 1000000) + (ACalc1 / 1000000),
+		 TIteration / 1000000);
 
 	    //sleep(5);
 
@@ -668,7 +665,6 @@ void *LanczosIterations(struct DenseMatrix *Resultado,struct SparseMatrix M,
 
 	    free(ResNn);
 	}
-
 //Stop criteria for all processes
 
 	if (p == 0) {
@@ -884,14 +880,14 @@ unsigned long *LanczosIterations(unsigned long *a, unsigned long *Y,
     MPI_Reduce(ATAC_Dist, ATAC, iceildiv(Block, WBITS) * n, MPI_UNSIGNED_LONG,
 	       newop, 0, MPI_COMM_WORLD);
 
-    MPI_Bcast(ATAC, n * iceildiv(Block,WBITS), MPI_UNSIGNED_LONG, 0,
+    MPI_Bcast(ATAC, n * iceildiv(Block, WBITS), MPI_UNSIGNED_LONG, 0,
 	      MPI_COMM_WORLD);
 
     free(ResmN_Dist);
     free(ATAC_Dist);
 
 
-  
+
 
 
 
@@ -1077,7 +1073,6 @@ unsigned long *LanczosIterations(unsigned long *a, unsigned long *Y,
 	       SizeS[0], size);
 
     }
-
 // To all processes
 
     unsigned long Step = 1;
@@ -1107,7 +1102,6 @@ unsigned long *LanczosIterations(unsigned long *a, unsigned long *Y,
 	TVUBit(n, N, AVi1, AVi1, Vi1A2Vi1);
 
     }
-
 
 //Desalloc 
 
@@ -1145,7 +1139,7 @@ unsigned long *LanczosIterations(unsigned long *a, unsigned long *Y,
     unsigned long *ResnN;
     ResnN = Allocmn(n, N);
 
-    unsigned long T00,T0;
+    unsigned long T00, T0;
 
     t1 = microseconds();
 
@@ -1155,11 +1149,10 @@ unsigned long *LanczosIterations(unsigned long *a, unsigned long *Y,
 
     while (((TestZero(N, N, ViAVi) == 0) || (p != dest)) && (Final[0] == 0)) {
 
-	
+
 	T00 = microseconds();
 
-	if (p == 0)
-	{
+	if (p == 0) {
 
 	    for (i = 1; i <= Set0[0]; ++i)
 		UseSet[i] = Set[0][i];
@@ -1198,7 +1191,7 @@ unsigned long *LanczosIterations(unsigned long *a, unsigned long *Y,
 
 	    for (i = 0; i < iceildiv(N, WBITS) * n; ++i)
 		V1i[i] = ResnN[i];
-	
+
 
 // end for V1i
 
@@ -1285,10 +1278,9 @@ unsigned long *LanczosIterations(unsigned long *a, unsigned long *Y,
 
 
 	}
-
 // To All Processes
 
-	unsigned long T1, T2, T3, T4,  T5;
+	unsigned long T1, T2, T3, T4, T5;
 
 	T0 = microseconds();
 #if 1
@@ -1324,7 +1316,7 @@ unsigned long *LanczosIterations(unsigned long *a, unsigned long *Y,
 
 #endif
 
-        
+
 
 
 	T4 = microseconds();
@@ -1374,11 +1366,11 @@ unsigned long *LanczosIterations(unsigned long *a, unsigned long *Y,
 	    Xi = Allocmn(n, N);
 	    ResNnX = Allocmn(N, n);
 
-//	    unsigned long tnNN0 = microseconds();
+//          unsigned long tnNN0 = microseconds();
 
 	    TVUBit(n, N, V[0], ATAC, ViTV0);
 
-//	    unsigned long tnNN1 = microseconds();
+//          unsigned long tnNN1 = microseconds();
 
 	    VUBit(n, N, V[0], Winv[0], ViWiinv);
 
@@ -1409,8 +1401,9 @@ unsigned long *LanczosIterations(unsigned long *a, unsigned long *Y,
 
 	    printf
 		("Step= %lu      SumRank= %lu    TimeSD=%f s  TimeTSD=%f s   TSLAlgebra=%f s   TITime=%f s \n",
-		 Step, SumRank, SD / 1000000, TSD / 1000000, (BCalc / 1000000)+ (ACalc1 / 1000000),
-		 TIteration / 1000000 );
+		 Step, SumRank, SD / 1000000, TSD / 1000000,
+		 (BCalc / 1000000) + (ACalc1 / 1000000),
+		 TIteration / 1000000);
 
 	    //sleep(5);
 
@@ -1419,7 +1412,6 @@ unsigned long *LanczosIterations(unsigned long *a, unsigned long *Y,
 
 	    free(ResNn);
 	}
-
 //Stop criteria for all processes
 
 	if (p == 0) {
@@ -1547,12 +1539,12 @@ unsigned long *LanczosIterations(unsigned long *a, unsigned long *Y,
 
 
 void KernelSparse(unsigned long *a, unsigned long *R,
-			    unsigned long m, unsigned long n,
-			    unsigned long Block, struct DenseMatrix Ker)
+		  unsigned long m, unsigned long n,
+		  unsigned long Block, struct DenseMatrix Ker)
 {
 
 
-    unsigned long SizeABlock,Sizea;
+    unsigned long SizeABlock, Sizea;
     int size, p;
 
     MPI_Comm_size(MPI_COMM_WORLD, &size);
@@ -1564,7 +1556,7 @@ void KernelSparse(unsigned long *a, unsigned long *R,
     } else {
 	SizeABlock = m / size;
     }
-	
+
 
 
 
@@ -1584,20 +1576,21 @@ void KernelSparse(unsigned long *a, unsigned long *R,
     unsigned long *ATAR_Dist;
     unsigned long *ResmN_Dist;
     unsigned long *ResVn2, *ResNN, *E, *Aout, *ResnN, *ResNn, *ResNn2,
-	     *ListLines, *LengListLines,*ResVn3;
+	*ListLines, *LengListLines, *ResVn3;
     unsigned long *ResnV3;
-	ResnV3=Allocmn(n,Block);
-	ResNn = Allocmn(Block, n);
-	ResNn2 = Allocmn(Block, n);
-	ResnN = Allocmn(n, Block);
-	ResNN = Allocmn(Block, Block);
-    	ResVn3=Allocmn(Block,n);
-    	Aout=Allocmn(Block,n);
-    	E=Allocmn(Block,Block);
-    	ListLines = malloc((N + 1) * sizeof(unsigned long));
-    	LengListLines = malloc(sizeof(unsigned long));
+    ResnV3 = Allocmn(n, Block);
+    ResNn = Allocmn(Block, n);
+    ResNn2 = Allocmn(Block, n);
+    ResnN = Allocmn(n, Block);
+    ResNN = Allocmn(Block, Block);
+    ResVn3 = Allocmn(Block, n);
+    Aout = Allocmn(Block, n);
+    E = Allocmn(Block, Block);
+    ListLines = malloc((N + 1) * sizeof(unsigned long));
+    LengListLines = malloc(sizeof(unsigned long));
 
-	unsigned long *NC;NC=Allocmn(1, 1);
+    unsigned long *NC;
+    NC = Allocmn(1, 1);
 
 // To do Transpose(a)*a*R
 
@@ -1617,7 +1610,7 @@ void KernelSparse(unsigned long *a, unsigned long *R,
     free(ResmN_Dist);
     free(ATAR_Dist);
 
- 	
+
 
 
 
@@ -1631,114 +1624,128 @@ void KernelSparse(unsigned long *a, unsigned long *R,
 
 	TransposeBit(n, N, R, ResNn);
 
-	 DMultBit(N, N, n, E, ResNn, ResNn2);
+	DMultBit(N, N, n, E, ResNn, ResNn2);
 
 
 /*  small gauss in Result to obtain independent vectors  */
 
-     
 
-	ResVn2 = Allocmn(Block- LengListLines[0], n);
 
-     
+	ResVn2 = Allocmn(Block - LengListLines[0], n);
 
-        SelectLinesListBit(n, ResNn2, ListLines, Block - LengListLines[0],
+
+
+	SelectLinesListBit(n, ResNn2, ListLines, Block - LengListLines[0],
 			   ResVn2);
 
 
-        unsigned long Size1=Block - LengListLines[0];
+	unsigned long Size1 = Block - LengListLines[0];
 
 	GaussElimBit(Size1, n, ResVn2, Aout, E, ListLines, LengListLines);
 
-	Sizea=LengListLines[0];
+	Sizea = LengListLines[0];
 
-	unsigned long *NC;NC=Allocmn(1, 1);
+	unsigned long *NC;
+	NC = Allocmn(1, 1);
 
-        NC[0]=LengListLines[0];
-      
-	
-	TransposeBit(NC[0],n, Aout, ResnV3);
+	NC[0] = LengListLines[0];
+
+
+	TransposeBit(NC[0], n, Aout, ResnV3);
+
+    }
+    //To make A*R
+
+    unsigned long *ResmN_Dist1;
+    ResmN_Dist1 = Allocmn(SizeABlock, Block);
+
+    unsigned long j, i, *d;
+    d = malloc(m * sizeof(unsigned long));
+
+
+    MPI_Bcast(ResnV3, n, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
+
+
+    MPI_Bcast(NC, 1, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
+
+
+    SMultDmatrixBit(m, n, Block, a, ResnV3, ResmN_Dist, p * (m / size),
+		    SizeBlock(size, p, m));
+
+    //   displayMatrix(ResmN_Dist,m,Block,'r');
+
+    if (p != 0) {
+	MPI_Send(ResmN_Dist, SizeBlock(size, p, m), MPI_UNSIGNED_LONG, 0, 1,
+		 MPI_COMM_WORLD);
+    };
+
+    if (p == 0) {
+
+	for (i = 0; i < SizeBlock(size, 0, m); i++) {
+	    d[i] = ResmN_Dist[i];
+	}
+
+	unsigned long Bg = SizeABlock;
+
+	for (i = 1; i < size; i++) {
+
+
+	    MPI_Recv(ResmN_Dist, SizeBlock(size, i, m), MPI_UNSIGNED_LONG, i,
+		     1, MPI_COMM_WORLD, &status);
+
+	    for (j = 0; j < SizeBlock(size, i, m); j++) {
+		d[j + Bg] = ResmN_Dist[j];
+	    }
+
+	    Bg += SizeBlock(size, i, m);
 
 	}
 
-	//To make A*R
+	if (TestZero(m, Block, d)) {
+	    for (i = 0; i < n; i++) {
+		Ker.Data[i] = ResnV3[i];
+	    };
+	    Ker.Nrows = n;
+	    Ker.Ncols = Sizea;
+	    printf("\n No second Small Lin Alg  \n");
+	} else {
+	    printf("\n With second Small Lin Alg  \n");
 
-	unsigned long *ResmN_Dist1;
-	ResmN_Dist1 = Allocmn(SizeABlock,Block);
+	    TransposeBit(m, Block, d, ResVn3);
 
-	unsigned long j,i,*d;
-	d=malloc(m*sizeof(unsigned long));
+	    GaussElimBit(Block, m, ResVn3, Aout, E, ListLines, LengListLines);
 
+	    TransposeBit(n, Block, ResnV3, ResNn);
 
-	MPI_Bcast(ResnV3, n, MPI_UNSIGNED_LONG, 0,
-	      MPI_COMM_WORLD);
+	    DMultBit(Block, Block, n, E, ResNn, ResNn2);
 
-
-         MPI_Bcast(NC,1, MPI_UNSIGNED_LONG, 0,
-	      MPI_COMM_WORLD);
-        
-
-	SMultDmatrixBit(m, n,Block,a,ResnV3, ResmN_Dist, p * (m / size), SizeBlock(size, p, m));
-
-     //   displayMatrix(ResmN_Dist,m,Block,'r');
-
-if (p!=0) {MPI_Send(ResmN_Dist,SizeBlock(size,p,m), MPI_UNSIGNED_LONG,0,1, MPI_COMM_WORLD);};
-
-if (p==0) {
-
-	for (i=0;i<SizeBlock(size,0, m); i++) {d[i]=ResmN_Dist[i];}
-
-	unsigned long Bg=SizeABlock;
-
-	for (i=1; i<size; i++)	{
-  
-
-	    	MPI_Recv(ResmN_Dist,SizeBlock(size,i,m), MPI_UNSIGNED_LONG, i, 1, MPI_COMM_WORLD, &status);
-
-	    	for (j=0;j<SizeBlock(size, i, m); j++) {d[j+Bg]=ResmN_Dist[j];}
-
-	    	Bg+=SizeBlock(size, i, m);
-
-	    	}
-
-	if (TestZero(m,Block,d)) {for (i=0; i<n; i++) {Ker.Data[i]=ResnV3[i];};  Ker.Nrows = n;
-	Ker.Ncols= Sizea;printf("\n No second Small Lin Alg  \n");}
-        else
-        {
-        printf("\n With second Small Lin Alg  \n");
-
-	TransposeBit(m,Block, d, ResVn3);
-
-	GaussElimBit(Block, m, ResVn3, Aout, E, ListLines, LengListLines);
-
-	TransposeBit(n, Block, ResnV3, ResNn);
-
-        DMultBit(Block, Block, n, E, ResNn, ResNn2); 
-
-        for (i=LengListLines[0]; i<Sizea; i++){ListLines[i]=i;};
+	    for (i = LengListLines[0]; i < Sizea; i++) {
+		ListLines[i] = i;
+	    };
 
 
-        SelectLinesListBit(n,ResNn2,ListLines,Block,
-			   ResVn3);
+	    SelectLinesListBit(n, ResNn2, ListLines, Block, ResVn3);
 
-        GaussElimBit(Sizea-LengListLines[0], n, ResVn3, Aout, E, ListLines, LengListLines);
+	    GaussElimBit(Sizea - LengListLines[0], n, ResVn3, Aout, E,
+			 ListLines, LengListLines);
 
 
-	for (i=0; i<LengListLines[0]; i++){ListLines[i]=i;};
+	    for (i = 0; i < LengListLines[0]; i++) {
+		ListLines[i] = i;
+	    };
 
-        SelectLinesListBit(n,Aout,ListLines,Block,
-			   ResVn3);
+	    SelectLinesListBit(n, Aout, ListLines, Block, ResVn3);
 
-	TransposeBit(LengListLines[0], n, ResVn3, Ker.Data);
-	
-        Ker.Nrows = n;
-	Ker.Ncols = LengListLines[0];
+	    TransposeBit(LengListLines[0], n, ResVn3, Ker.Data);
+
+	    Ker.Nrows = n;
+	    Ker.Ncols = LengListLines[0];
 
 
 
-        }
+	}
 
-        free(ResVn3);
+	free(ResVn3);
 	free(ResNN);
 	free(E);
 	free(Aout);
@@ -1748,7 +1755,6 @@ if (p==0) {
 	free(ListLines);
 	free(LengListLines);
     }
-
 //printf(" %lu \n",Ker.Ncols);
 
 
@@ -1768,7 +1774,8 @@ The function Lanczos returns in "Kernel", "Block" independent vectors in the ker
 */
 
 
-void  Lanczos(struct DenseMatrix Kernel,struct SparseMatrix M, unsigned long Block)
+void Lanczos(struct DenseMatrix Kernel, struct SparseMatrix M,
+	     unsigned long Block)
 {
 
     int size, p;
@@ -1811,14 +1818,13 @@ void  Lanczos(struct DenseMatrix Kernel,struct SparseMatrix M, unsigned long Blo
 
 
     KernelSparse(M.Data, Result, M.Nrows, M.Ncols, Block, Kernel);
-    MPI_Bcast(Index, 2, MPI_UNSIGNED_LONG, 0,
-	      MPI_COMM_WORLD);
+    MPI_Bcast(Index, 2, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
 
-   // Kernel.Nrows = Index[0];
-   // Kernel.Ncols = Index[1];
+    // Kernel.Nrows = Index[0];
+    // Kernel.Ncols = Index[1];
 
 
-   
+
 
 //    displayMatrixScreen(Kernel.Data,M.Ncols,Block);
 //    displaySMatrixNew(M.Data,M.Nrows,M.Ncols,'M');
@@ -1826,7 +1832,7 @@ void  Lanczos(struct DenseMatrix Kernel,struct SparseMatrix M, unsigned long Blo
     free(Y);
     free(Result);
 
- }
+}
 
 
 

@@ -356,7 +356,6 @@ unsigned long *LanczosIterations(unsigned long *a, unsigned long *Y,
 
 
     }
-
 //Desalloc 
 
     free(AVi1);
