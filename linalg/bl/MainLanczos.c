@@ -54,10 +54,10 @@ int main(int argc, char *argv[])
 
     MPI_Comm_size(MPI_COMM_WORLD, &size);	//get the number of processes (size=1 if not using MPI)
     MPI_Comm_rank(MPI_COMM_WORLD, &p);	//get the process ranks (p=0 if not using MPI)
-    MPI_Status status;
+    // MPI_Status status;
 
 
-// Get the sparce matrix from file 
+// Get the sparse matrix from file 
 
 
     unsigned long *Num;
@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
 
 // For MPI  Number of Lines of the matrix to read in each process
 
-    unsigned long BlockSize, t;
+    unsigned long BlockSize;
     BlockSize = SizeBlock(size, p, M.Nrows);
 
 // end for MPI   Number of Lines of the matrix to read in each process   

@@ -882,7 +882,7 @@ dense plus dense matrix
 void DSumBit(unsigned long m, unsigned long n, unsigned long *a,
 	     unsigned long *b, unsigned long *c)
 {
-    unsigned long k, j, SizeRowA;
+    unsigned long k, SizeRowA;
     SizeRowA = iceildiv(n, WBITS);
 
     for (k = 0; k < m; ++k){

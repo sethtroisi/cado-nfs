@@ -37,7 +37,8 @@ int main(int argc, char *argv[])
     unsigned long Block = WBITS;
 
 
-    unsigned long *e, t, *d1, *c1,*c2;
+    unsigned long *d1, *c1,*c2;
+    // unsigned long *e;
     uint64_t *Y, *c, *d;
     Y = Allocmn(Block,m + 1);
     c = Allocmn(m+1,Block);
