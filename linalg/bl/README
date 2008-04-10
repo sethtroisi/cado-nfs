@@ -9,7 +9,7 @@ Output: A Block (size 64) of independent vectors in the kernel of the sparse mat
 NOTE: In the end of the process it is checked that there where no errors during the process and the obtained vectors are in fact in the kernel (if an error is produced please report).
 
 VERY IMPORTANT: You must have OpenMPI installed on your machine (or machines) even if you want to use it in monoprocessor mode.
-		If you don't have it you can try the fake MPI version (not working) use the command     make OFLAGS="-g -DFAKEMPI"  to compile 
+		If you don't have it, you can try the fake MPI version,  use the command     make FAKE=1  to compile 
 
 
 To use it as it is:

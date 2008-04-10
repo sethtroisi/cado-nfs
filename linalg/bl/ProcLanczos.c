@@ -1462,7 +1462,7 @@ unsigned long *LanczosIterations(unsigned long *a, unsigned long *Y,
 
 	fclose(File);
 
-
+        free(f);
 
 	for (i = 0; i < iceildiv(Block, WBITS) * n; ++i) {
 	    Resultado[i] = X[i] ^ Y[i];
@@ -1516,7 +1516,7 @@ unsigned long *LanczosIterations(unsigned long *a, unsigned long *Y,
     FreeAllocmn3(Winv);
     FreeAllocmn3(Set);
     FreeAllocmn3(S);
-    // free(f);
+
     // free(f1);
 
     return 0;
@@ -1587,10 +1587,11 @@ void KernelSparse(unsigned long *a, unsigned long *R,
     ListLines = malloc((N + 1) * sizeof(unsigned long));
     LengListLines = malloc(sizeof(unsigned long));
 
+
     unsigned long *NC;
     NC = Allocmn(1, 1);
 
-// To do Transpose(a)*a*R
+// To Make Transpose(A)*A*R
 
 
     ATAR = Allocmn(n, N);
@@ -1667,20 +1668,20 @@ void KernelSparse(unsigned long *a, unsigned long *R,
     MPI_Bcast(NC, 1, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
 
 
-    SMultDmatrixBit(m, n, Block, a, ResnV3, ResmN_Dist, p * (m / size),
+    SMultDmatrixBit(m, n, Block, a, ResnV3, ResmN_Dist1, p * (m / size),
 		    SizeBlock(size, p, m));
 
     //   displayMatrix(ResmN_Dist,m,Block,'r');
 
     if (p != 0) {
-	MPI_Send(ResmN_Dist, SizeBlock(size, p, m), MPI_UNSIGNED_LONG, 0, 1,
+	MPI_Send(ResmN_Dist1, SizeBlock(size, p, m), MPI_UNSIGNED_LONG, 0, 1,
 		 MPI_COMM_WORLD);
     };
 
     if (p == 0) {
 
 	for (i = 0; i < SizeBlock(size, 0, m); i++) {
-	    d[i] = ResmN_Dist[i];
+	    d[i] = ResmN_Dist1[i];
 	}
 
 	unsigned long Bg = SizeABlock;
@@ -1688,16 +1689,18 @@ void KernelSparse(unsigned long *a, unsigned long *R,
 	for (i = 1; i < size; i++) {
 
 
-	    MPI_Recv(ResmN_Dist, SizeBlock(size, i, m), MPI_UNSIGNED_LONG, i,
+	    MPI_Recv(ResmN_Dist1, SizeBlock(size, i, m), MPI_UNSIGNED_LONG, i,
 		     1, MPI_COMM_WORLD, &status);
 
 	    for (j = 0; j < SizeBlock(size, i, m); j++) {
-		d[j + Bg] = ResmN_Dist[j];
+		d[j + Bg] = ResmN_Dist1[j];
 	    }
 
 	    Bg += SizeBlock(size, i, m);
 
 	}
+
+       //free(ResmN_Dist1);
 
 	if (TestZero(m, Block, d)) {
 	    for (i = 0; i < n; i++) {
@@ -1739,10 +1742,16 @@ void KernelSparse(unsigned long *a, unsigned long *R,
 	    Ker->Nrows = n;
 	    Ker->Ncols = LengListLines[0];
 
-
+           
 
 	}
 
+        if (size==1) {free(ResmN_Dist1);}
+
+        if  (size==1) {free(d);} 
+       
+        free(ATAR);
+        free(NC);
 	free(ResVn3);
 	free(ResNN);
 	free(E);
@@ -1753,8 +1762,6 @@ void KernelSparse(unsigned long *a, unsigned long *R,
 	free(ListLines);
 	free(LengListLines);
     }
-//printf(" %lu \n",Ker->Ncols);
-
 
 }
 
@@ -1817,10 +1824,11 @@ void Lanczos(struct DenseMatrix * Kernel, struct SparseMatrix M,
 
 
     KernelSparse(M.Data, Result, M.Nrows, M.Ncols, Block, Kernel);
+
     // MPI_Bcast(Index, 2, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
 
-    // Kernel->Nrows = Index[0];
-    // Kernel->Ncols = Index[1];
+    Kernel->Nrows = M.Ncols;
+    Kernel->Ncols = Block;
 
 
 

@@ -66,6 +66,9 @@ int main(int argc, char *argv[])
     M.Nrows = Num[0];
     M.Ncols = Num[1];
     M.Weight = Num[2];
+
+    free(Num);
+
     //printf("%s \n",Fl2);
 
 // For MPI  Number of Lines of the matrix to read in each process
@@ -89,8 +92,8 @@ int main(int argc, char *argv[])
 // end Get the sparce matrix from file
 
     struct DenseMatrix Result;
-    Result.Data = Allocmn(M.Nrows, Block);
 
+    Result.Data = Allocmn(M.Nrows, Block);
     Ker.Data = Allocmn(M.Ncols, Block);
 
 
@@ -99,22 +102,6 @@ int main(int argc, char *argv[])
     }
 
     Lanczos(&Ker, M, Block);
-
-    // Ker.Nrows = M.Ncols;
-
-    //displayMatrix(Ker.Data,M.Ncols,Block,'c');
-
-/*
-    FILE *File1;
-    File1 = fopen(Fl2, "w");
-    unsigned long i;
-    for (i = 0; i < Ker.Nrows; i++) {
-        printf("%lu \n", Ker.Data[i]);
-	fprintf(File1, "%lu \n", Ker.Data[i]);
-
-    }
-    fclose(File1);
-*/
 
 
     if (p == 0) {
@@ -126,9 +113,10 @@ int main(int argc, char *argv[])
     }
 
 
-    Result = SMatrix_Vector(M, Ker);
+     Result = SMatrix_Vector(M,Ker);
 
-//printf("%lu \n",M.Nrows);
+    free(M.Data);
+    //free(Ker.Data);
 
     if (p == 0) {
 	if (TestZero(M.Nrows, Block, Result.Data)) {
@@ -137,37 +125,35 @@ int main(int argc, char *argv[])
 	} else {
 	    printf("There was an error in the process \n");
 	}
+        
     }
 
+   
 
     if ((p == 0) & (argc == 3)) {
+
+        
 
 	char *Fl2;
 
 	Fl2 = malloc(3 * sizeof(unsigned long));
+
+        if (Fl2==NULL) {printf("out of memory\n");}
+
 	Fl2 = argv[2];
-	WriteBlockMatrix(Ker, Fl2);
+
+	WriteBlockMatrix(Ker,Fl2);
+
+        printf("Kernel written to file %s\n",Fl2);
+
+        //free(Fl2);
     }
 
 
-//FILE *File1;
-//  File1 = fopen(Fl2, "w");
 
-
-
-/*
-    unsigned long i;
-    for (i = 0; i < Ker.Nrows; i++) {
-        printf("%lu \n", Ker.Data[i]);
-	fprintf(File1, "%lu \n", Ker.Data[i]);
-
-    }
-    fclose(File1);
-*/
-
-
-
-
+ 
+   
+   //free(Ker.Data); 
 
     return 0;
 }
