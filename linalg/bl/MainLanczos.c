@@ -100,8 +100,7 @@ int main(int argc, char *argv[])
 
     Lanczos(&Ker, M, Block);
 
-
-    Ker.Nrows = M.Ncols;
+    // Ker.Nrows = M.Ncols;
 
     //displayMatrix(Ker.Data,M.Ncols,Block,'c');
 

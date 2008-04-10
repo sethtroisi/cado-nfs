@@ -1801,9 +1801,10 @@ void Lanczos(struct DenseMatrix * Kernel, struct SparseMatrix M,
 
 // The Lanczos iteration
 
-    unsigned long *Result, *Index;
+    unsigned long *Result;
+    // , *Index;
     Result = Allocmn(M.Ncols, Block);
-    Index = malloc(2 * sizeof(unsigned long));
+    // Index = malloc(2 * sizeof(unsigned long));
 
     T0 = microseconds();
 
@@ -1816,10 +1817,10 @@ void Lanczos(struct DenseMatrix * Kernel, struct SparseMatrix M,
 
 
     KernelSparse(M.Data, Result, M.Nrows, M.Ncols, Block, Kernel);
-    MPI_Bcast(Index, 2, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
+    // MPI_Bcast(Index, 2, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
 
-    Kernel->Nrows = Index[0];
-    Kernel->Ncols = Index[1];
+    // Kernel->Nrows = Index[0];
+    // Kernel->Ncols = Index[1];
 
 
 
