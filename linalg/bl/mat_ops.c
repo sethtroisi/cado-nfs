@@ -699,7 +699,7 @@ void VUBit_v2(unsigned long m,
 inline void addmul(uint64_t a, uint64_t b, uint64_t * w)
 {
     unsigned int i;
-#if 0
+#if 1
     /* Dans un sens */
     for (i = 0; i < 64; i++) {
 	*w++ ^= b & -(a & 1);
@@ -726,7 +726,7 @@ inline void addmul(uint64_t a, uint64_t b, uint64_t * w)
 	a >>= 2;
     }
 #endif
-#if 1
+#if 0
     /* Avec des sse-2 */
     typedef uint64_t sse2_t __attribute__ ((vector_size(16)));
     sse2_t mb[4] = {
