@@ -1,4 +1,4 @@
-#include <mpi.h>
+#include "mpi_select.h"
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
@@ -353,7 +353,6 @@ void *LanczosIterations(struct DenseMatrix *Resultado, struct SparseMatrix M,
 	TVUBit(n, N, AVi1, AVi1, Vi1A2Vi1);
 
     }
-
 //Desalloc 
 
     free(AVi1);
@@ -1102,7 +1101,6 @@ unsigned long *LanczosIterations(unsigned long *a, unsigned long *Y,
 	TVUBit(n, N, AVi1, AVi1, Vi1A2Vi1);
 
     }
-
 //Desalloc 
 
     free(AVi1);
@@ -1540,7 +1538,7 @@ unsigned long *LanczosIterations(unsigned long *a, unsigned long *Y,
 
 void KernelSparse(unsigned long *a, unsigned long *R,
 		  unsigned long m, unsigned long n,
-		  unsigned long Block, struct DenseMatrix Ker)
+		  unsigned long Block, struct DenseMatrix * Ker)
 {
 
 
@@ -1703,10 +1701,10 @@ void KernelSparse(unsigned long *a, unsigned long *R,
 
 	if (TestZero(m, Block, d)) {
 	    for (i = 0; i < n; i++) {
-		Ker.Data[i] = ResnV3[i];
+		Ker->Data[i] = ResnV3[i];
 	    };
-	    Ker.Nrows = n;
-	    Ker.Ncols = Sizea;
+	    Ker->Nrows = n;
+	    Ker->Ncols = Sizea;
 	    printf("\n No second Small Lin Alg  \n");
 	} else {
 	    printf("\n With second Small Lin Alg  \n");
@@ -1736,10 +1734,10 @@ void KernelSparse(unsigned long *a, unsigned long *R,
 
 	    SelectLinesListBit(n, Aout, ListLines, Block, ResVn3);
 
-	    TransposeBit(LengListLines[0], n, ResVn3, Ker.Data);
+	    TransposeBit(LengListLines[0], n, ResVn3, Ker->Data);
 
-	    Ker.Nrows = n;
-	    Ker.Ncols = LengListLines[0];
+	    Ker->Nrows = n;
+	    Ker->Ncols = LengListLines[0];
 
 
 
@@ -1755,7 +1753,7 @@ void KernelSparse(unsigned long *a, unsigned long *R,
 	free(ListLines);
 	free(LengListLines);
     }
-//printf(" %lu \n",Ker.Ncols);
+//printf(" %lu \n",Ker->Ncols);
 
 
 }
@@ -1774,7 +1772,7 @@ The function Lanczos returns in "Kernel", "Block" independent vectors in the ker
 */
 
 
-void Lanczos(struct DenseMatrix Kernel, struct SparseMatrix M,
+void Lanczos(struct DenseMatrix * Kernel, struct SparseMatrix M,
 	     unsigned long Block)
 {
 
@@ -1786,7 +1784,7 @@ void Lanczos(struct DenseMatrix Kernel, struct SparseMatrix M,
     MPI_Comm_rank(MPI_COMM_WORLD, &p);	//get the process ranks
 
     //struct DenseMatrix Kernel;
-    //Kernel.Data = Allocmn(M.Ncols, Block);
+    //Kernel->Data = Allocmn(M.Ncols, Block);
 
     unsigned long *Y;
     Y = Allocmn(M.Ncols + 1, Block);
@@ -1820,13 +1818,13 @@ void Lanczos(struct DenseMatrix Kernel, struct SparseMatrix M,
     KernelSparse(M.Data, Result, M.Nrows, M.Ncols, Block, Kernel);
     MPI_Bcast(Index, 2, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
 
-    // Kernel.Nrows = Index[0];
-    // Kernel.Ncols = Index[1];
+    Kernel->Nrows = Index[0];
+    Kernel->Ncols = Index[1];
 
 
 
 
-//    displayMatrixScreen(Kernel.Data,M.Ncols,Block);
+//    displayMatrixScreen(Kernel->Data,M.Ncols,Block);
 //    displaySMatrixNew(M.Data,M.Nrows,M.Ncols,'M');
 
     free(Y);
@@ -1893,11 +1891,11 @@ unsigned long Lanczos(struct SparseMatrix M, unsigned long Block,
 // Small linear algebra to compute the  elements of the Kernel 
 
 
-    KernelSparse(M.Data, Result, M.Nrows, M.Ncols, Block, Kernel.Data, Index);
-    Kernel.Nrows = Index[0];
-    Kernel.Ncols = Index[1];
+    KernelSparse(M.Data, Result, M.Nrows, M.Ncols, Block, Kernel->Data, Index);
+    Kernel->Nrows = Index[0];
+    Kernel->Ncols = Index[1];
 
-    //displayMatrix(Kernel.Data,Index[0],Index[1],'d');
+    //displayMatrix(Kernel->Data,Index[0],Index[1],'d');
     //displaySMatrixNew(M.Data,M.Nrows,M.Ncols,'M');
 
     free(Y);

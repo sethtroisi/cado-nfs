@@ -1,5 +1,5 @@
 #include <stdint.h>
-#include <mpi.h>
+#include "mpi_select.h"
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>

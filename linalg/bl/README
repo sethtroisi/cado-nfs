@@ -1,0 +1,28 @@
+How to on the (Main)Lanczos function (very messy and in an urgent need of clean up but usable).
+
+
+Input: A file containing a sparse matrix (first line is "Number of lines" "Number of columns" "Weight", in each line the first integer is the number of coeffs in that line then it contains the position of that coeff)
+
+Output: A Block (size 64) of independent vectors in the kernel of the sparse matrix. These vectors are written in matrix form as its columns, each line being represented by an integer (unsigned long).
+
+
+NOTE: In the end of the process it is checked that there where no errors during the process and the obtained vectors are in fact in the kernel (if an error is produced please report).
+
+VERY IMPORTANT: You must have OpenMPI installed on your machine (or machines) even if you want to use it in monoprocessor mode.
+		If you don't have it you can try the fake MPI version (not working) use the command     make OFLAGS="-g -DFAKEMPI"  to compile 
+
+
+To use it as it is:
+
+
+
+Compile it.
+
+To use one job in one machine:  MainLanczos "Sparse matrix file" (optional an output file to write the integers corresponding to the lines of kernel matrix)
+
+To use multiple jobs in one machine:  orterun -np  "number of jobs"  MainLanczos  "Sparse matrix file" (optional an output file)
+
+NOTE: For the next one, be sure that the sparse matrix file is accessible to every machine.
+NOTE1: For nodes having k connections (ethernet addresses) use each one as a different machine to improve communication between the jobs.
+
+To use multiple jobs in multiple machines: orterun -np "number of jobs" --host  "Machine1","Machine2",etc MainLanczos  "Sparse matrix file" (optional an output file)

@@ -9,8 +9,8 @@ extern unsigned long *LanczosIterations(unsigned long *a, unsigned long *Y,
 
 extern void KernelSparse(unsigned long *a, unsigned long *R,
 			 unsigned long m, unsigned long n,
-			 unsigned long Block, struct DenseMatrix Ker);
+			 unsigned long Block, struct DenseMatrix * Ker);
 
 
-extern void Lanczos(struct DenseMatrix Kernel, struct SparseMatrix M,
+extern void Lanczos(struct DenseMatrix * Kernel, struct SparseMatrix M,
 		    unsigned long Block);

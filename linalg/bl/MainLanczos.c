@@ -1,5 +1,5 @@
 #include <stdint.h>
-#include <mpi.h>
+#include "mpi_select.h"
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
@@ -98,7 +98,7 @@ int main(int argc, char *argv[])
 	Tm1 = microseconds();
     }
 
-    Lanczos(Ker, M, Block);
+    Lanczos(&Ker, M, Block);
 
 
     Ker.Nrows = M.Ncols;
@@ -149,7 +149,6 @@ int main(int argc, char *argv[])
 	Fl2 = argv[2];
 	WriteBlockMatrix(Ker, Fl2);
     }
-
 
 
 //FILE *File1;

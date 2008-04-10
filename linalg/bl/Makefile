@@ -87,10 +87,6 @@ LANCZOSMPIOPTCOMPLETE_LIBS:=
 #-include .toto.mkf
 
 
-#MAINLANCZOSTESTS_SOURCES:=MainLanczosTestes.c ProcLanczosTestes.c basic.c echelon.c mat_ops.c random.c alloc.c ReadWrite.c timing.c struct.c
-#MAINLANCZOSTESTS_LIBS:=
-#-include .MainLanczosTestes.mkf
-
 ######################################################################
 
 ifneq ($(ALLDEPS),)
