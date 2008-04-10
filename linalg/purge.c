@@ -242,7 +242,7 @@ void
 insertNormalRelation(char *rel_used, int **rel_compact, int irel, int *nprimes,
                      /* tab_prime_t *bad_primes, */ hashtable_t *H,
                      relation_t *rel, unsigned long rlim, unsigned long alim,
-                     long maxpr, long maxpa, int final)
+                     long maxpr, long maxpa, long minpr, long minpa, int final)
 {
     int *tmp = NULL, ltmp = 0, itmp, j, h, ok = 1;
 
@@ -255,13 +255,15 @@ insertNormalRelation(char *rel_used, int **rel_compact, int irel, int *nprimes,
 	// first count number of "large" primes
 	for(j = 0; j < rel->nb_rp; j++)
 	    if(rel->rp[j].p > rlim){
-              if (rel->rp[j].p > (unsigned long) maxpr)
+		if((rel->rp[j].p > (unsigned long) maxpr)
+		   || (rel->rp[j].p < (unsigned long) minpr))
 		    ok = 0;
 		ltmp++;
 	    }
 	for(j = 0; j < rel->nb_ap; j++)
 	    if(rel->ap[j].p > alim){
-              if(rel->ap[j].p > (unsigned long) maxpa)
+		if((rel->ap[j].p > (unsigned long) maxpa)
+		   || (rel->ap[j].p <  (unsigned long) minpa))
 		    ok = 0;
 		ltmp++;
 	    }
@@ -408,7 +410,8 @@ scan_relations_from_file (int *irel, int *nrel, char *rel_used,
                           int **rel_compact, int *nprimes,
                           /* tab_prime_t *bad_primes, */ hashtable_t *H,
                           FILE *file, unsigned long rlim,
-                          unsigned long alim, long maxpr, long maxpa,
+                          unsigned long alim, 
+			  long maxpr, long maxpa, long minpr, long minpa,
                           int final)
 {
     relation_t rel;
@@ -425,7 +428,7 @@ scan_relations_from_file (int *irel, int *nrel, char *rel_used,
 	if(rel.b > 0)
           insertNormalRelation (rel_used, rel_compact, *irel, nprimes,
                                 /*bad_primes,*/ H, &rel, rlim, alim,
-                                maxpr, maxpa, final);
+                                maxpr, maxpa, minpr, minpa, final);
 	else
 	    insertFreeRelation(rel_used,rel_compact,*irel,nprimes,H,&rel,final);
 	if(rel_used[*irel] <= 0)
@@ -441,7 +444,8 @@ int
 scan_relations (char *ficname[], int nbfic, int *nrel, int *nprimes,
                 /*tab_prime_t *bad_primes,*/ hashtable_t *H,
                 char *rel_used, int **rel_compact, unsigned long rlim,
-                unsigned long alim, long maxpr, long maxpa, int final)
+                unsigned long alim, long maxpr, long maxpa, 
+		long minpr, long minpa, int final)
 {
     FILE *relfile;
     int ret, irel = -1;
@@ -460,7 +464,8 @@ scan_relations (char *ficname[], int nbfic, int *nrel, int *nprimes,
 	fprintf(stderr, "Adding file %s\n", ficname[i]);
 	ret = scan_relations_from_file (&irel, nrel, rel_used, rel_compact,
                                         nprimes, /* bad_primes,*/ H,
-                                        relfile, rlim, alim, maxpr, maxpa,
+                                        relfile, rlim, alim, 
+					maxpr, maxpa, minpr, minpa,
                                         final);
 	if (ret == 0) {
 	    fprintf(stderr, "Warning: error when reading file %s\n", ficname[i]);
@@ -665,7 +670,8 @@ renumber(int *nprimes, /*tab_prime_t bad_primes,*/ hashtable_t *H, char *sos)
 		H->hashcount[i] = nb++;
 		if(fsos != NULL)
 		    fprintf(fsos, "%d %lx %lx\n",
-			    H->hashcount[i]-1,H->hashtab_p[i],H->hashtab_r[i]);
+			    H->hashcount[i]-1,H->hashtab_p[i],
+			    (long)H->hashtab_r[i]);
 	    }
 	}
     if(fsos != NULL)
@@ -762,6 +768,8 @@ usage (char *argv[])
   fprintf (stderr, "       -keep    nnn - stop when excess <= nnn (default -1)\n");
   fprintf (stderr, "       -maxpa   nnn - keep only alg. primes <= nnn (default 2^lpba)\n");
   fprintf (stderr, "       -maxpr   nnn - keep only rat. primes <= nnn (default 2^lpbr)\n");
+  fprintf (stderr, "       -minpa   nnn - keep only alg. primes >= nnn (default 0)\n");
+  fprintf (stderr, "       -minpr   nnn - keep only rat. primes >= nnn (default 0)\n");
   fprintf (stderr, "       -nprimes nnn - number of prime ideals\n");
   fprintf (stderr, "       -sos sosfile - to keep track of the renumbering\n");
 }
@@ -780,6 +788,7 @@ main(int argc, char **argv)
     unsigned int nrelmax = 0, i;
     int nrel_new, nprimes_new, Hsize, Hsizer, Hsizea;
     long maxpr = 0, maxpa = 0, keep = -1; // maximum value for nrows-ncols
+    long minpr = 0, minpa = 0;
     cado_poly pol;
     
     fprintf (stderr, "%s.r%s", argv[0], REV);
@@ -810,6 +819,16 @@ main(int argc, char **argv)
 	}
 	else if(argc > 2 && strcmp (argv[1], "-maxpa") == 0){
 	    maxpa = atol(argv[2]);
+	    argc -= 2;
+	    argv += 2;
+	}
+	else if(argc > 2 && strcmp (argv[1], "-minpr") == 0){
+	    minpr = atol(argv[2]);
+	    argc -= 2;
+	    argv += 2;
+	}
+	else if(argc > 2 && strcmp (argv[1], "-minpa") == 0){
+	    minpa = atol(argv[2]);
 	    argc -= 2;
 	    argv += 2;
 	}
@@ -861,17 +880,11 @@ main(int argc, char **argv)
     if(nprimes > 0)
 	Hsize = nprimes;
     else{
-	// estimating the number of primes
-#if 1
+	// over-estimating the number of primes
+	// TODO: use minpr and minpa also
 	Hsizer = maxpr / ((int)log((double)maxpr));
 	Hsizea = maxpa / ((int)log((double)maxpa));
 	Hsize = Hsizer + Hsizea;
-#else
-	// TODO: use maxpr and maxpa
-	Hsizer = (1<<pol[0].lpbr)/((int)(pol[0].lpbr * log(2.0)));
-	Hsizea = (1<<pol[0].lpba)/((int)(pol[0].lpba * log(2.0)));
-	Hsize = (Hsizer > Hsizea ? Hsizer : Hsizea);
-#endif
     }
     fprintf(stderr, "initializing hash tables with Hsize=%d...\n", Hsize);
     hashInit(&H, Hsize);
@@ -888,7 +901,7 @@ main(int argc, char **argv)
     nrel = nrelmax;
     ret = scan_relations (fic, nfic, &nrel, &nprimes, /*&bad_primes,*/ &H,
                           rel_used, rel_compact, pol[0].rlim,
-                          pol[0].alim, maxpr, maxpa, final);
+                          pol[0].alim, maxpr, maxpa, minpr, minpa, final);
     ASSERT (ret);
     
     fprintf(stderr, "nrel(useful)=%d, nprimes=%d (%d)\n",nrel,nprimes,Hsize);
