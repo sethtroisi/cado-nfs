@@ -1143,7 +1143,7 @@ void SMatrix_Vector(DenseMatrix Result, SparseMatrix M, DenseMatrix V)
 	}
 
     }
-//free(ResmN_Dist);
+    free(ResmN_Dist);
     Result->Nrows = M->Nrows;
     Result->Ncols = V->Ncols;
 }

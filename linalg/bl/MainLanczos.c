@@ -27,17 +27,11 @@ int main(int argc, char *argv[])
     DenseMatrix Ker;
     char *Fl;
 
-    Fl = malloc(3 * sizeof(unsigned long));
     Fl = argv[1];
 
 
     unsigned long Tm1, Tm2;
     float DiffTime;
-
-
-
-    // Definition of Block size 
-
     unsigned long Block = WBITS;
 
 // Test if MPI is initialized if not initializes it 
@@ -51,6 +45,7 @@ int main(int argc, char *argv[])
 // end Test if MPI is initialized if not initializes it 
 
 
+    init_random();
 
     MPI_Comm_size(MPI_COMM_WORLD, &size);	//get the number of processes (size=1 if not using MPI)
     MPI_Comm_rank(MPI_COMM_WORLD, &p);	//get the process ranks (p=0 if not using MPI)
@@ -71,17 +66,14 @@ int main(int argc, char *argv[])
 
     //printf("%s \n",Fl2);
 
-// For MPI  Number of Lines of the matrix to read in each process
-
+    // For MPI  Number of Lines of the matrix to read in each process
     unsigned long BlockSize;
     BlockSize = SizeBlock(size, p, M->Nrows);
-
-// end for MPI   Number of Lines of the matrix to read in each process   
+    // end for MPI   Number of Lines of the matrix to read in each process   
 
 
     M->Data =
-	malloc((M->Nrows / size + M->Nrows % size) * (M->Weight +
-						    1) *
+	malloc((M->Nrows / size + M->Nrows % size) * (M->Weight + 1) *
 	       sizeof(unsigned long));
     ReadSMatrixFileBlockNew(Fl, M->Data, p * (M->Nrows / size), BlockSize);
 
@@ -113,10 +105,9 @@ int main(int argc, char *argv[])
     }
 
 
-    SMatrix_Vector(Result,M,Ker);
+    SMatrix_Vector(Result, M, Ker);
 
     free(M->Data);
-    //free(Ker->Data);
 
     if (p == 0) {
 	if (TestZero(M->Nrows, Block, Result->Data)) {
@@ -125,35 +116,19 @@ int main(int argc, char *argv[])
 	} else {
 	    printf("There was an error in the process \n");
 	}
-        
-    }
 
-   
+    }
 
     if ((p == 0) && (argc == 3)) {
-
-        
-
-	char *Fl2;
-
-	Fl2 = malloc(3 * sizeof(unsigned long));
-
-        if (Fl2==NULL) {printf("out of memory\n");}
-
-	Fl2 = argv[2];
-
-	WriteBlockMatrix(Ker,Fl2);
-
-        printf("Kernel written to file %s\n",Fl2);
-
-        //free(Fl2);
+	char *Fl2 = argv[2];
+	WriteBlockMatrix(Ker, Fl2);
+	printf("Kernel written to file %s\n", Fl2);
     }
 
+    free(Result->Data);
+    free(Ker->Data);
 
-
- 
-   
-   //free(Ker.Data); 
+    close_random();
 
     return 0;
 }

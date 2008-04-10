@@ -1479,6 +1479,7 @@ unsigned long *LanczosIterations(unsigned long *a, unsigned long *Y,
     free(ResmN_Dist);
     //free(C);
     //free(Y);
+    free(X);
     free(ATAC);
 
     //free(a);
@@ -1576,6 +1577,8 @@ void KernelSparse(unsigned long *a, unsigned long *R,
     unsigned long *ResVn2, *ResNN, *E, *Aout, *ResnN, *ResNn, *ResNn2,
 	*ListLines, *LengListLines, *ResVn3;
     unsigned long *ResnV3;
+
+
     ResnV3 = Allocmn(n, Block);
     ResNn = Allocmn(Block, n);
     ResNn2 = Allocmn(Block, n);
@@ -1614,44 +1617,21 @@ void KernelSparse(unsigned long *a, unsigned long *R,
 
 
     if (p == 0) {
-
-
-
 	TransposeBit(n, N, ATAR, ResNn);
-
 	GaussElimBit(Block, n, ResNn, Aout, E, ListLines, LengListLines);
-
 	TransposeBit(n, N, R, ResNn);
-
 	DMultBit(N, N, n, E, ResNn, ResNn2);
 
 
 /*  small gauss in Result to obtain independent vectors  */
 
-
-
 	ResVn2 = Allocmn(Block - LengListLines[0], n);
-
-
-
 	SelectLinesListBit(n, ResNn2, ListLines, Block - LengListLines[0],
 			   ResVn2);
-
-
 	unsigned long Size1 = Block - LengListLines[0];
-
 	GaussElimBit(Size1, n, ResVn2, Aout, E, ListLines, LengListLines);
-
 	Sizea = LengListLines[0];
-
-	unsigned long *NC;
-	NC = Allocmn(1, 1);
-
-	NC[0] = LengListLines[0];
-
-
-	TransposeBit(NC[0], n, Aout, ResnV3);
-
+	TransposeBit(LengListLines[0], n, Aout, ResnV3);
     }
     //To make A*R
 
@@ -1752,7 +1732,9 @@ void KernelSparse(unsigned long *a, unsigned long *R,
        
         free(ATAR);
         free(NC);
+	free(ResnV3);
 	free(ResVn3);
+	free(ResVn2);
 	free(ResNN);
 	free(E);
 	free(Aout);
