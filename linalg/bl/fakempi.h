@@ -6,18 +6,21 @@ typedef int MPI_Datatype;
 typedef int MPI_Comm;
 typedef int MPI_Op;
 typedef int MPI_User_function;
-typedef MPI_Datatype MPI_UNSIGNED_LONG;
+
+#define MPI_UNSIGNED_LONG       0
 
 #define MPI_COMM_WORLD	0
 
-extern inline int MPI_Comm_Rank(int s, int  * p) { *p=0; return 0;}
-extern inline int MPI_Comm_Size(int s, int  * p) { *p=1; return 0;}
-extern inline int MPI_Op_create( MPI_User_function *function, int commute, MPI_Op *op ){return 0;}
-
-extern inline int MPI_Send( void *buf, int count, MPI_Datatype datatype, int dest,int tag, MPI_Comm comm ){return 0;}
-extern inline int MPI_Recv( void *buf, int count, MPI_Datatype datatype, int source,int tag, MPI_Comm comm, MPI_Status *status ){return 0;}
-extern inline int MPI_Bcast( void *buffer, int count, MPI_Datatype datatype, int root, MPI_Comm comm){return 0;}
-extern inline int MPI_Reduce ( void *sendbuf, void *recvbuf, int count,MPI_Datatype datatype, MPI_Op op, int root, MPI_Comm comm ){return 0;}
+static inline int MPI_Comm_rank(int s, int  * p) { *p=0; return 0;}
+static inline int MPI_Comm_size(int s, int  * p) { *p=1; return 0;}
+static inline int MPI_Initialized(int  * p) { *p=1; return 0; }
+static inline int MPI_Init(int * argc, char *** argv) { return 0; }
+static inline int MPI_Finalize() {return 0;}
+static inline int MPI_Op_create( MPI_User_function *function, int commute, MPI_Op *op ){return 0;}
+static inline int MPI_Send( void *buf, int count, MPI_Datatype datatype, int dest,int tag, MPI_Comm comm ){return 0;}
+static inline int MPI_Recv( void *buf, int count, MPI_Datatype datatype, int source,int tag, MPI_Comm comm, MPI_Status *status ){return 0;}
+static inline int MPI_Bcast( void *buffer, int count, MPI_Datatype datatype, int root, MPI_Comm comm){return 0;}
+static inline int MPI_Reduce ( void *sendbuf, void *recvbuf, int count,MPI_Datatype datatype, MPI_Op op, int root, MPI_Comm comm ){return 0;}
 
 
 

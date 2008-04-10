@@ -15,6 +15,12 @@ PFLAGS:=
 IFLAGS:=
 LFLAGS:=
 
+ifneq ($(FAKE),)
+OFLAGS+=-DFAKEMPI
+CC:=gcc
+CXX:=g++
+endif
+
 include $(TOPPATH)/util/main.mki
 
 ######################################################################
