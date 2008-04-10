@@ -16,7 +16,7 @@ IFLAGS:=
 LFLAGS:=
 
 ifneq ($(FAKE),)
-OFLAGS+=-DFAKEMPI
+IFLAGS+=-DFAKEMPI
 CC:=gcc
 CXX:=g++
 endif
