@@ -23,8 +23,8 @@
 
 int main(int argc, char *argv[])
 {
-    struct SparseMatrix M;
-    struct DenseMatrix Ker;
+    SparseMatrix M;
+    DenseMatrix Ker;
     char *Fl;
 
     Fl = malloc(3 * sizeof(unsigned long));
@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
 
 
 
-// Definition of Block size 
+    // Definition of Block size 
 
     unsigned long Block = WBITS;
 
@@ -63,9 +63,9 @@ int main(int argc, char *argv[])
     unsigned long *Num;
     Num = malloc(3 * sizeof(unsigned long));
     ReadSMatrixFileData(Fl, Num);
-    M.Nrows = Num[0];
-    M.Ncols = Num[1];
-    M.Weight = Num[2];
+    M->Nrows = Num[0];
+    M->Ncols = Num[1];
+    M->Weight = Num[2];
 
     free(Num);
 
@@ -74,34 +74,34 @@ int main(int argc, char *argv[])
 // For MPI  Number of Lines of the matrix to read in each process
 
     unsigned long BlockSize;
-    BlockSize = SizeBlock(size, p, M.Nrows);
+    BlockSize = SizeBlock(size, p, M->Nrows);
 
 // end for MPI   Number of Lines of the matrix to read in each process   
 
 
-    M.Data =
-	malloc((M.Nrows / size + M.Nrows % size) * (M.Weight +
+    M->Data =
+	malloc((M->Nrows / size + M->Nrows % size) * (M->Weight +
 						    1) *
 	       sizeof(unsigned long));
-    ReadSMatrixFileBlockNew(Fl, M.Data, p * (M.Nrows / size), BlockSize);
+    ReadSMatrixFileBlockNew(Fl, M->Data, p * (M->Nrows / size), BlockSize);
 
     if (size == 1) {
 	printf("Number of Coeffs = %lu \n",
-	       NumbCoeffSMatrix(M.Data, M.Nrows));
+	       NumbCoeffSMatrix(M->Data, M->Nrows));
     }
 // end Get the sparce matrix from file
 
-    struct DenseMatrix Result;
+    DenseMatrix Result;
 
-    Result.Data = Allocmn(M.Nrows, Block);
-    Ker.Data = Allocmn(M.Ncols, Block);
+    Result->Data = Allocmn(M->Nrows, Block);
+    Ker->Data = Allocmn(M->Ncols, Block);
 
 
     if (p == 0) {
 	Tm1 = microseconds();
     }
 
-    Lanczos(&Ker, M, Block);
+    Lanczos(Ker, M, Block);
 
 
     if (p == 0) {
@@ -113,13 +113,13 @@ int main(int argc, char *argv[])
     }
 
 
-     Result = SMatrix_Vector(M,Ker);
+    SMatrix_Vector(Result,M,Ker);
 
-    free(M.Data);
-    //free(Ker.Data);
+    free(M->Data);
+    //free(Ker->Data);
 
     if (p == 0) {
-	if (TestZero(M.Nrows, Block, Result.Data)) {
+	if (TestZero(M->Nrows, Block, Result->Data)) {
 	    printf
 		("There were NO errors During the process. The vectors are in the kernel of the matrix  \n");
 	} else {
@@ -130,7 +130,7 @@ int main(int argc, char *argv[])
 
    
 
-    if ((p == 0) & (argc == 3)) {
+    if ((p == 0) && (argc == 3)) {
 
         
 

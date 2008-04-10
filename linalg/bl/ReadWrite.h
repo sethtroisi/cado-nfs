@@ -1,4 +1,9 @@
+#ifndef BL_READWRITE_H_
+#define BL_READWRITE_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 extern void displayMatrixV(unsigned long **M, unsigned long m,
 			   unsigned long n, char c);
@@ -36,4 +41,10 @@ extern unsigned long SizeBlock(unsigned long Nproc, unsigned long proc,
 extern void displayMatrixScreen(const unsigned long *matrix,
 				unsigned long m, unsigned long n);
 
-extern void WriteBlockMatrix(struct DenseMatrix Ker, char *f);
+extern void WriteBlockMatrix(DenseMatrix Ker, char *f);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif	/* BL_READWRITE_H_ */

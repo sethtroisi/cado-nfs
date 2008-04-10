@@ -670,7 +670,7 @@ void ReadDMatrixFile(char *f, unsigned long n, unsigned long *M)
 
 
 
-void WriteBlockMatrix(struct DenseMatrix K, char *f)
+void WriteBlockMatrix(DenseMatrix K, char *f)
 {
 
 int size,p;
@@ -685,9 +685,9 @@ if (p==0){
     FILE *File;
     File = fopen(f, "w");
     unsigned long i;
-    for (i = 0; i < K.Nrows; i++) {
+    for (i = 0; i < K->Nrows; i++) {
 	
-	fprintf(File, "%lu \n", K.Data[i]);
+	fprintf(File, "%lu \n", K->Data[i]);
 
     }
     fclose(File);

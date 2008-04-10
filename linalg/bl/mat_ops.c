@@ -699,7 +699,7 @@ void VUBit_v2(unsigned long m,
 inline void addmul(uint64_t a, uint64_t b, uint64_t * w)
 {
     unsigned int i;
-#if 1
+#if 0
     /* Dans un sens */
     for (i = 0; i < 64; i++) {
 	*w++ ^= b & -(a & 1);
@@ -726,7 +726,7 @@ inline void addmul(uint64_t a, uint64_t b, uint64_t * w)
 	a >>= 2;
     }
 #endif
-#if 0
+#if 1
     /* Avec des sse-2 */
     typedef uint64_t sse2_t __attribute__ ((vector_size(16)));
     sse2_t mb[4] = {
@@ -1092,12 +1092,8 @@ Multiplication functions for "sparse matrix times vector" and "Transpose sparse 
 
 */
 
-struct DenseMatrix SMatrix_Vector(struct SparseMatrix M, struct DenseMatrix V)
+void SMatrix_Vector(DenseMatrix Result, SparseMatrix M, DenseMatrix V)
 {
-
-    struct DenseMatrix Result;
-    Result.Data = Allocmn(M.Nrows, V.Ncols);
-
     int size, p;
 
     MPI_Comm_size(MPI_COMM_WORLD, &size);
@@ -1105,60 +1101,57 @@ struct DenseMatrix SMatrix_Vector(struct SparseMatrix M, struct DenseMatrix V)
     MPI_Status status;
 
     unsigned long *ResmN_Dist;
-    ResmN_Dist = Allocmn(SizeBlock(size, p, M.Nrows), V.Ncols);
+    ResmN_Dist = Allocmn(SizeBlock(size, p, M->Nrows), V->Ncols);
 
     unsigned long j, i;
 
 
-    MPI_Bcast(V.Data, V.Nrows, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
+    MPI_Bcast(V->Data, V->Nrows, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
 
 
-    SMultDmatrixBit(M.Nrows, M.Ncols, V.Ncols, M.Data, V.Data, ResmN_Dist,
-		    p * (M.Nrows / size), SizeBlock(size, p, M.Nrows));
+    SMultDmatrixBit(M->Nrows, M->Ncols, V->Ncols, M->Data, V->Data, ResmN_Dist,
+		    p * (M->Nrows / size), SizeBlock(size, p, M->Nrows));
 
     //   displayMatrix(ResmN_Dist,m,Block,'r');
 
 
     if (p != 0) {
-	MPI_Send(ResmN_Dist, SizeBlock(size, p, M.Nrows), MPI_UNSIGNED_LONG,
+	MPI_Send(ResmN_Dist, SizeBlock(size, p, M->Nrows), MPI_UNSIGNED_LONG,
 		 0, 1, MPI_COMM_WORLD);
     };
 
     if (p == 0) {
 
-	for (i = 0; i < SizeBlock(size, 0, M.Nrows); i++) {
-	    Result.Data[i] = ResmN_Dist[i];
+	for (i = 0; i < SizeBlock(size, 0, M->Nrows); i++) {
+	    Result->Data[i] = ResmN_Dist[i];
 	}
 
-	unsigned long Bg = SizeBlock(size, 0, M.Nrows);
+	unsigned long Bg = SizeBlock(size, 0, M->Nrows);
 
 	for (i = 1; i < size; i++) {
 
 
-	    MPI_Recv(ResmN_Dist, SizeBlock(size, i, M.Nrows),
+	    MPI_Recv(ResmN_Dist, SizeBlock(size, i, M->Nrows),
 		     MPI_UNSIGNED_LONG, i, 1, MPI_COMM_WORLD, &status);
 
-	    for (j = 0; j < SizeBlock(size, i, M.Nrows); j++) {
-		Result.Data[j + Bg] = ResmN_Dist[j];
+	    for (j = 0; j < SizeBlock(size, i, M->Nrows); j++) {
+		Result->Data[j + Bg] = ResmN_Dist[j];
 	    }
 
-	    Bg += SizeBlock(size, i, M.Nrows);
+	    Bg += SizeBlock(size, i, M->Nrows);
 
 	}
 
     }
 //free(ResmN_Dist);
-    Result.Nrows = M.Nrows;
-    Result.Ncols = V.Ncols;
-    return Result;
-
+    Result->Nrows = M->Nrows;
+    Result->Ncols = V->Ncols;
 }
 
 
 
 
-struct DenseMatrix STSMatrix_Vector(struct SparseMatrix M,
-				    struct DenseMatrix V)
+void STSMatrix_Vector(DenseMatrix Result, SparseMatrix M, DenseMatrix V)
 {
     int size, p;
     unsigned long *ResmN_Dist, *ATAR_Dist;
@@ -1168,53 +1161,28 @@ struct DenseMatrix STSMatrix_Vector(struct SparseMatrix M,
     MPI_Op newop;
     MPI_Op_create((MPI_User_function *) MyXORfunction, 0, &newop);
 
-    struct DenseMatrix Result;
-    Result.Data = Allocmn(M.Ncols, V.Ncols);
-    ResmN_Dist = Allocmn(M.Nrows, V.Ncols);
-    ATAR_Dist = Allocmn(M.Ncols, V.Ncols);
+    /* XXX */
+    Result->Data = Allocmn(M->Ncols, V->Ncols);
+    ResmN_Dist = Allocmn(M->Nrows, V->Ncols);
+    ATAR_Dist = Allocmn(M->Ncols, V->Ncols);
 
-    MPI_Bcast(V.Data, V.Nrows, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
+    MPI_Bcast(V->Data, V->Nrows, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
 
 
-    SMultDmatrixBit(M.Nrows, M.Ncols, V.Ncols, M.Data, V.Data, ResmN_Dist,
-		    p * (M.Nrows / size), SizeBlock(size, p, M.Nrows));
-    TSMultDmatrixBit(SizeBlock(size, p, M.Nrows), M.Ncols, V.Ncols, M.Data,
-		     ResmN_Dist, ATAR_Dist, p * (M.Nrows / size),
-		     SizeBlock(size, p, M.Nrows));
-    MPI_Reduce(ATAR_Dist, Result.Data, M.Ncols, MPI_UNSIGNED_LONG, newop, 0,
+    SMultDmatrixBit(M->Nrows, M->Ncols, V->Ncols, M->Data, V->Data, ResmN_Dist,
+		    p * (M->Nrows / size), SizeBlock(size, p, M->Nrows));
+    TSMultDmatrixBit(SizeBlock(size, p, M->Nrows), M->Ncols, V->Ncols, M->Data,
+		     ResmN_Dist, ATAR_Dist, p * (M->Nrows / size),
+		     SizeBlock(size, p, M->Nrows));
+    MPI_Reduce(ATAR_Dist, Result->Data, M->Ncols, MPI_UNSIGNED_LONG, newop, 0,
 	       MPI_COMM_WORLD);
 
     free(ResmN_Dist);
     free(ATAR_Dist);
 
-    Result.Nrows = M.Ncols;
-    Result.Ncols = V.Ncols;
-    return Result;
-
+    Result->Nrows = M->Ncols;
+    Result->Ncols = V->Ncols;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 /*

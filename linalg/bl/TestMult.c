@@ -22,8 +22,8 @@
 
 int main(int argc, char *argv[])
 {
-    struct SparseMatrix M;
-    struct DenseMatrix Ker;
+    SparseMatrix M;
+    DenseMatrix Ker;
     char *Fl;
 
     Fl = malloc(3 * sizeof(unsigned long));
@@ -61,39 +61,39 @@ int main(int argc, char *argv[])
     unsigned long *Num;
     Num = malloc(3 * sizeof(unsigned long));
     ReadSMatrixFileData(Fl, Num);
-    M.Nrows = Num[0];
-    M.Ncols = Num[1];
-    M.Weight = Num[2];
+    M->Nrows = Num[0];
+    M->Ncols = Num[1];
+    M->Weight = Num[2];
 
 
 // For MPI  Number of Lines of the matrix to read in each process
 
     unsigned long BlockSize, t;
-    BlockSize = SizeBlock(size, p, M.Nrows);
+    BlockSize = SizeBlock(size, p, M->Nrows);
 
 // end for MPI   Number of Lines of the matrix to read in each process   
 
 
-    M.Data =
-	malloc((M.Nrows / size + M.Nrows % size) * (M.Weight +
+    M->Data =
+	malloc((M->Nrows / size + M->Nrows % size) * (M->Weight +
 						    1) *
 	       sizeof(unsigned long));
-    ReadSMatrixFileBlockNew(Fl, M.Data, p * (M.Nrows / size), BlockSize);
+    ReadSMatrixFileBlockNew(Fl, M->Data, p * (M->Nrows / size), BlockSize);
 
-    printf("Number of Coeffs = %lu \n", NumbCoeffSMatrix(M.Data, M.Nrows));
+    printf("Number of Coeffs = %lu \n", NumbCoeffSMatrix(M->Data, M->Nrows));
 
 // end Get the sparce matrix from file
 
 
     unsigned long *Y, *c;
-    Y = Allocmn(M.Ncols + 1, Block);
-    c = Allocmn(M.Ncols + 1, Block);
+    Y = Allocmn(M->Ncols + 1, Block);
+    c = Allocmn(M->Ncols + 1, Block);
 
 
 
-    Ker.Data = Allocmn(M.Ncols, Block);
-    Ker.Ncols = Block;
-    Ker.Nrows = M.Ncols;
+    Ker->Data = Allocmn(M->Ncols, Block);
+    Ker->Ncols = Block;
+    Ker->Nrows = M->Ncols;
 
     for (t = 0; t < 10; ++t) {
 
@@ -105,21 +105,21 @@ int main(int argc, char *argv[])
 //Testes a multiplicacao
 
 
-//memset(c,0,(M.Ncols+1)*sizeof(unsigned long));
+//memset(c,0,(M->Ncols+1)*sizeof(unsigned long));
 
-	RandomDMatrixBitTest(M.Ncols, Block, Y);
+	RandomDMatrixBitTest(M->Ncols, Block, Y);
 
-//displaySMatrixNew(M.Data,M.Nrows,M.Ncols,'a');
+//displaySMatrixNew(M->Data,M->Nrows,M->Ncols,'a');
 
-//displayMatrix(Y,M.Ncols,Block,'Y');
+//displayMatrix(Y,M->Ncols,Block,'Y');
 
 	if (p == 0) {
 	    Tm1 = wallclock_microseconds();
 	}
 
-	SMultDmatrixBit(M.Nrows, M.Ncols, Block, M.Data, Y, c, 0, M.Nrows);
+	SMultDmatrixBit(M->Nrows, M->Ncols, Block, M->Data, Y, c, 0, M->Nrows);
 
-//displayMatrix(c,M.Ncols,Block,'c');
+//displayMatrix(c,M->Ncols,Block,'c');
 
 
 	if (p == 0) {

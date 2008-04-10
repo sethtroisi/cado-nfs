@@ -1,3 +1,6 @@
+#ifndef  BL_MAT_OPS_H_
+#define  BL_MAT_OPS_H_
+
 #include <stdint.h>
 #include "struct.h"
 
@@ -109,8 +112,7 @@ extern unsigned long Pivot(unsigned long m, unsigned long n, unsigned long *a,
 			   unsigned long Row, unsigned long Col);
 
 
-extern struct DenseMatrix SMatrix_Vector(struct SparseMatrix M,
-					 struct DenseMatrix V);
+extern void SMatrix_Vector(DenseMatrix, SparseMatrix, DenseMatrix);
+extern void STSMatrix_Vector(DenseMatrix, SparseMatrix, DenseMatrix);
 
-extern struct DenseMatrix STSMatrix_Vector(struct SparseMatrix M,
-					   struct DenseMatrix V);
+#endif  /* BL_MAT_OPS_H_ */
