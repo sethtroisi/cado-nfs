@@ -264,6 +264,10 @@ BW_BALANCE_SOURCES:=				\
 BW_BALANCE_LIBS:=
 -include .bw-balance.mkf
 
+BAL2_SOURCES:=	cxx/bal2.c
+BAL2_LIBS:=
+-include .bal2.mkf
+
 BW_SECURE_SOURCES:=						\
 		auxfuncs.c cxx/files.cpp cxx/matrix_header.cpp	\
 		cxx/matrix_line.cpp cxx/secure.cpp
