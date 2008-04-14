@@ -1,0 +1,17 @@
+# Default paths.
+# Valid for lines that are below, until new default are set.
+tmpdir=/localdisk/tmp
+cadodir=$HOME/Recherche/cado/trunk/dist/src
+
+# Each line of the following form:
+#
+#   hostname    nb_cores   tmpdir  cadodir        
+#
+# If tmpdir or cadodir are '_', they take the default value
+# given at the begining of file.
+
+pasta     2     /tmp/truc       _
+achille   2     /tmp/truc       _
+hecube    2     /tmp/truc       _
+helene    2     /tmp/truc       _
+

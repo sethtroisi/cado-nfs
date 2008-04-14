@@ -1,0 +1,92 @@
+###########################################################################
+#     Parameter file for Cado-NFS
+###########################################################################
+
+# Anything after a # is a comment, until end of line.
+# Any empty line is ignored
+#
+#
+# Each parameter should be on an individual line, like
+#   param0=42.17
+#
+
+###########################################################################
+# General parameters
+###########################################################################
+
+wdir=/tmp/noise         # directory where temporary files are put
+name=c59                # basename for temporary files
+#cadodir=$HOME/cado      # where to find cado binaries
+parallel=true           # do we use parallel computation?
+
+machines=mach_desc      # file describing available computers for parallel
+                        # computation
+
+n=71641520761751435455133616475667090434063332228247871795429
+
+###########################################################################
+# Polynomial selection
+###########################################################################
+
+degree=3                # degree of the algebraic polynomial
+# Try linear polynomials of the form b*x-m, with b in [bmin-bmax]
+bmin=1
+bmax=4
+# Effort to be done for each b
+e=1e5
+
+###########################################################################
+# Sieve
+###########################################################################
+
+# (r,a) means rational or algebraic side
+# rlim/alim is the bound for sieving
+# lpbr/lpba is the (base 2 log of the) large prime bound
+# mfbr/mfba is the (base 2 log of the) limit for the cofactor we try to
+#                                      split into large primes.
+# rlambda/alambda is the early-abort ratio: if after sieving the
+#                                      approximate norm is more than
+#                                      lambda times lpb, we reject.
+rlim=200000
+alim=200000
+lpbr=23
+lpba=23
+mfbr=26
+mfba=26
+rlambda=1.2
+alambda=1.2
+
+I=12                    # Sieving range in lattice siever
+qmin=400000             # Start of the special-q range
+qrange=10000             
+checkrange=30000
+
+###########################################################################
+# Filtering
+###########################################################################
+
+prune=1.0               # les brunes comptent pas pour des...
+merge=1000000           # mergeons, mergeons!
+keep=160                # keep euh le plus
+maxlevel=15             # ???
+cwmax=200               # ???
+rwmax=200               # ???
+ratio=1.5               # ???
+bwstrat=1
+#  maxpr=???
+#  maxpa=???
+#  nrels_dup=???
+#  keep_purge=???
+
+###########################################################################
+# Linear algebra
+###########################################################################
+
+bwmt=2                  # Multithreading level of Block-Wiedemann
+
+###########################################################################
+# Characters
+###########################################################################
+
+nkermax=30              # maximal size of computed kernel
+nchar=50                # number of characters
