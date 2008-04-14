@@ -322,15 +322,15 @@ struct thread:public traits {
         label << fmt("T% N=%") % t % done << flush;
         string pad(label.str().size(), ' ');
 
-        cout << fmt("% matmul=% wait=%[F.2]s M0=%[F.1]ns\n")
+        cout << fmt("% matmul=% wait=%[F.2]s M0=%[F.1]ns totalwork=%\n")
             % label.str()
             % pdelta(av)
             % (totwait / done)
-            % m0_estim;
-        cout << fmt("% %[F.1]%% totalwork=% eta=<%>\n")
+            % m0_estim
+            % pdelta(tw);
+        cout << fmt("% %[F.1]%% eta=<%>")
             % pad
             % (pcpu * 100.0)
-            % pdelta(tw)
             % eta;
 
         if (mine.task == "krylov") {
@@ -355,9 +355,10 @@ struct thread:public traits {
                 eta_complete = fmt("% .. %") % e1_complete % e2_complete;
             }
 
-            cout << fmt("% eta_including_mksol=<%>\n")
-                % pad % eta_complete;
+            cout << fmt(" +mksol=<%>")
+                % eta_complete;
         }
+        cout << "\n";
 
         mat.report();
 

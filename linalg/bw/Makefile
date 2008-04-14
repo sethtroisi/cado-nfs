@@ -256,17 +256,9 @@ BW_RANDOM_LIBS:=-lgmpxx -lgmp
 # NFSFORGE_LIBS:=-lgmpxx -lgmp
 # -include .nfsforge.mkf
 # 
-BW_BALANCE_SOURCES:=				\
-		auxfuncs.c			\
-		cxx/balance.cpp cxx/files.cpp	\
-		cxx/matrix_header.cpp		\
-		cxx/matrix_line.cpp
+BW_BALANCE_SOURCES:=cxx/balance.c
 BW_BALANCE_LIBS:=
 -include .bw-balance.mkf
-
-BAL2_SOURCES:=	cxx/bal2.c
-BAL2_LIBS:=
--include .bal2.mkf
 
 BW_SECURE_SOURCES:=						\
 		auxfuncs.c cxx/files.cpp cxx/matrix_header.cpp	\
