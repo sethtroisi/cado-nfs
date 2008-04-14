@@ -495,52 +495,64 @@ void ReadSMatrixFileBlockNew(char *f, unsigned long *M, unsigned long k,
 Count the number of coeff to be read for each block and broadcast the output.
 
 */
-void CoeffperBlock( unsigned long *NumberCoeffBlocks, char *f)
+void CoeffperBlock(unsigned long *NumberCoeffBlocks, char *f)
 {
 
-    int p,size;
+    int p, size;
 
     MPI_Comm_size(MPI_COMM_WORLD, &size);	//get the number of processes
     MPI_Comm_rank(MPI_COMM_WORLD, &p);	//get the process ranks
 
-if (p==0){
+    if (p == 0) {
 
-    unsigned long Nrows,l, q, i, j, i1,*LengthBlocks;
-    
-    memset(NumberCoeffBlocks, 0, size * sizeof(unsigned long));
+	unsigned long Nrows, l, q, i, j, i1, *LengthBlocks;
 
-    LengthBlocks=malloc(size*sizeof(unsigned long));
+	memset(NumberCoeffBlocks, 0, size * sizeof(unsigned long));
 
-    memset(LengthBlocks, 0, size * sizeof(unsigned long));
-    FILE *File;
-    File = fopen(f, "r");
+	LengthBlocks = malloc(size * sizeof(unsigned long));
 
-    for (i = 0; i < 3; ++i) {
-	fscanf(File, "%lu", &q);
-        if (i==0) {Nrows=q;}
-    }
+	memset(LengthBlocks, 0, size * sizeof(unsigned long));
+	FILE *File;
+	File = fopen(f, "r");
 
-    for (j = 0; j < size; ++j){if (j==0) {LengthBlocks[j]+=SizeBlock(size,j,Nrows);} else {LengthBlocks[j]+=(LengthBlocks[j-1]+SizeBlock(size,j,Nrows));} printf("Size blocks is %lu \n",LengthBlocks[j]);}  
-
-    for (j = 0; j < size; ++j){NumberCoeffBlocks[j]+=SizeBlock(size,j,Nrows);}
-   
-    unsigned long Block=0;
-
-    for (j = 0; j < Nrows; ++j) {
-	fscanf(File, "%lu", &l);
-        if (j<LengthBlocks[Block]){
-            NumberCoeffBlocks[Block]+=l;
-        } else {
-        Block++;
-        NumberCoeffBlocks[Block]+=(l);
-	}	
-	for (i1 = 0; i1 < l; ++i1) {
+	for (i = 0; i < 3; ++i) {
 	    fscanf(File, "%lu", &q);
+	    if (i == 0) {
+		Nrows = q;
+	    }
 	}
+
+	for (j = 0; j < size; ++j) {
+	    if (j == 0) {
+		LengthBlocks[j] += SizeBlock(size, j, Nrows);
+	    } else {
+		LengthBlocks[j] +=
+		    (LengthBlocks[j - 1] + SizeBlock(size, j, Nrows));
+	    }
+	    printf("Size blocks is %lu \n", LengthBlocks[j]);
+	}
+
+	for (j = 0; j < size; ++j) {
+	    NumberCoeffBlocks[j] += SizeBlock(size, j, Nrows);
+	}
+
+	unsigned long Block = 0;
+
+	for (j = 0; j < Nrows; ++j) {
+	    fscanf(File, "%lu", &l);
+	    if (j < LengthBlocks[Block]) {
+		NumberCoeffBlocks[Block] += l;
+	    } else {
+		Block++;
+		NumberCoeffBlocks[Block] += (l);
+	    }
+	    for (i1 = 0; i1 < l; ++i1) {
+		fscanf(File, "%lu", &q);
+	    }
+	}
+	fclose(File);
     }
-    fclose(File);
-   }
-   MPI_Bcast(NumberCoeffBlocks, size, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
+    MPI_Bcast(NumberCoeffBlocks, size, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
 }
 
 
@@ -658,7 +670,7 @@ void WriteSMatrixSparseNew(unsigned long *A,
 
 //    fprintf(File, "%lu %lu %lu \n", m, n, w);
 
-     fprintf(File, "%lu %lu \n", m, n);
+    fprintf(File, "%lu %lu \n", m, n);
 
     for (i = 0; i < m; i++) {
 	unsigned int j;
@@ -741,26 +753,21 @@ void ReadDMatrixFile(char *f, unsigned long n, unsigned long *M)
 void WriteBlockMatrix(DenseMatrix K, char *f)
 {
 
-int size,p;
+    int size, p;
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &p);
-    
 
-if (p==0){
 
-   
-
-    FILE *File;
-    File = fopen(f, "w");
-    unsigned long i;
-    for (i = 0; i < K->Nrows; i++) {
-	
-	fprintf(File, "%lu \n", K->Data[i]);
-
+    if (p == 0) {
+	FILE *File;
+	File = fopen(f, "w");
+	unsigned long i;
+	for (i = 0; i < K->Nrows; i++) {
+	    fprintf(File, "%016lx \n", K->Data[i]);
+	}
+	fclose(File);
     }
-    fclose(File);
-}
-    
+
 }
 
 
