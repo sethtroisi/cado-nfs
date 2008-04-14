@@ -43,6 +43,9 @@ extern void displayMatrixScreen(const unsigned long *matrix,
 
 extern void WriteBlockMatrix(DenseMatrix Ker, char *f);
 
+extern void CoeffperBlock( unsigned long *NumberCoeffBlocks, char *f);
+
+
 #ifdef __cplusplus
 }
 #endif

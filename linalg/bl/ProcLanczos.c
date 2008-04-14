@@ -1431,10 +1431,12 @@ unsigned long *LanczosIterations(unsigned long *a, unsigned long *Y,
     }
 
 
+    
+
 
     if (p == 0) {
 
-
+     
 	char *f;
 	f = malloc(10 * sizeof(unsigned long));
 
@@ -1461,6 +1463,8 @@ unsigned long *LanczosIterations(unsigned long *a, unsigned long *Y,
 	fprintf(File, "TPTime = %lu ms  ", (t1 - t0) / 1000);
 
 	fclose(File);
+         
+       
 
         free(f);
 
@@ -1471,6 +1475,7 @@ unsigned long *LanczosIterations(unsigned long *a, unsigned long *Y,
     } else {
 
     }
+
 
 
 //Desalloc 
@@ -1633,6 +1638,9 @@ void KernelSparse(unsigned long *a, unsigned long *R,
 	Sizea = LengListLines[0];
 	TransposeBit(LengListLines[0], n, Aout, ResnV3);
     }
+
+
+
     //To make A*R
 
     unsigned long *ResmN_Dist1;
@@ -1651,7 +1659,6 @@ void KernelSparse(unsigned long *a, unsigned long *R,
     SMultDmatrixBit(m, n, Block, a, ResnV3, ResmN_Dist1, p * (m / size),
 		    SizeBlock(size, p, m));
 
-    //   displayMatrix(ResmN_Dist,m,Block,'r');
 
     if (p != 0) {
 	MPI_Send(ResmN_Dist1, SizeBlock(size, p, m), MPI_UNSIGNED_LONG, 0, 1,
@@ -1726,15 +1733,17 @@ void KernelSparse(unsigned long *a, unsigned long *R,
 
 	}
 
-        if (size==1) {free(ResmN_Dist1);}
+        //free(ResmN_Dist1);
+        //free(d);
+        //if (size==1) {}
 
-        if  (size==1) {free(d);} 
+        //if  (size==1) {free(d);} 
        
         free(ATAR);
         free(NC);
 	free(ResnV3);
 	free(ResVn3);
-	free(ResVn2);
+	//free(ResVn2);
 	free(ResNN);
 	free(E);
 	free(Aout);
@@ -1797,13 +1806,18 @@ void Lanczos(DenseMatrix Kernel, SparseMatrix M,
 
     T0 = microseconds();
 
+   
+
     LanczosIterations(M->Data, Y, M->Nrows, M->Ncols, Block, Result);
+
+    
 
     T1 = microseconds();
 
 
 // Small linear algebra to compute the  elements of the Kernel 
 
+    
 
     KernelSparse(M->Data, Result, M->Nrows, M->Ncols, Block, Kernel);
 
@@ -1815,7 +1829,7 @@ void Lanczos(DenseMatrix Kernel, SparseMatrix M,
 
 
 
-//    displayMatrixScreen(Kernel->Data,M->Ncols,Block);
+//    displayMatrixScreen(Kernel->Data,M->Ncols,Kernel->Ncols);
 //    displaySMatrixNew(M->Data,M->Nrows,M->Ncols,'M');
 
     free(Y);

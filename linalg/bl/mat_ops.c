@@ -1105,9 +1105,7 @@ void SMatrix_Vector(DenseMatrix Result, SparseMatrix M, DenseMatrix V)
 
     unsigned long j, i;
 
-
     MPI_Bcast(V->Data, V->Nrows, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
-
 
     SMultDmatrixBit(M->Nrows, M->Ncols, V->Ncols, M->Data, V->Data, ResmN_Dist,
 		    p * (M->Nrows / size), SizeBlock(size, p, M->Nrows));
@@ -1143,7 +1141,7 @@ void SMatrix_Vector(DenseMatrix Result, SparseMatrix M, DenseMatrix V)
 	}
 
     }
-    free(ResmN_Dist);
+    //free(ResmN_Dist);
     Result->Nrows = M->Nrows;
     Result->Ncols = V->Ncols;
 }
@@ -1534,6 +1532,8 @@ unsigned long SelectLines(unsigned long n, unsigned long **a, unsigned long m,
 Count the exact number of coeffs in sparce matrix 
 
 */
+
+
 
 unsigned long NumbCoeffSMatrix(unsigned long *a, unsigned long m)
 {

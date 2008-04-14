@@ -60,27 +60,35 @@ int main(int argc, char *argv[])
     ReadSMatrixFileData(Fl, Num);
     M->Nrows = Num[0];
     M->Ncols = Num[1];
-    M->Weight = Num[2];
+    //M->Weight = Num[2];
 
     free(Num);
 
     //printf("%s \n",Fl2);
 
     // For MPI  Number of Lines of the matrix to read in each process
-    unsigned long BlockSize;
+    unsigned long BlockSize,i;
     BlockSize = SizeBlock(size, p, M->Nrows);
+
     // end for MPI   Number of Lines of the matrix to read in each process   
+    
+    unsigned long *NumberCoeffBlocks=malloc(size*sizeof(unsigned long));
+
+    CoeffperBlock(NumberCoeffBlocks,Fl);
 
 
-    M->Data =
-	malloc((M->Nrows / size + M->Nrows % size) * (M->Weight + 1) *
-	       sizeof(unsigned long));
-    ReadSMatrixFileBlockNew(Fl, M->Data, p * (M->Nrows / size), BlockSize);
+    if (p==0) {for (i=0; i<size; i++) {printf("Job %lu Block  %lu  has size %lu \n",p,i,NumberCoeffBlocks[i]);}}
 
-    if (size == 1) {
-	printf("Number of Coeffs = %lu \n",
-	       NumbCoeffSMatrix(M->Data, M->Nrows));
-    }
+ //   M->Data =
+//	malloc((M->Nrows / size + M->Nrows % size) * (M->Weight + 1) *
+//	       sizeof(unsigned long));
+
+	M->Data =
+	malloc(NumberCoeffBlocks[p]*sizeof(unsigned long));
+
+
+    ReadSMatrixFileBlockNew(Fl, M->Data, p * (M->Nrows / size),BlockSize);
+
 // end Get the sparce matrix from file
 
     DenseMatrix Result;
@@ -96,16 +104,17 @@ int main(int argc, char *argv[])
     Lanczos(Ker, M, Block);
 
 
+
     if (p == 0) {
 	Tm2 = microseconds();
 	DiffTime = Tm2 - Tm1;
 	printf
 	    ("Total Time for Lanczos = %f s   Size of block in kernel is %lu\n",
-	     DiffTime / 1000000, Block);
+	     DiffTime / 1000000, Ker->Ncols);
     }
 
-
-    SMatrix_Vector(Result, M, Ker);
+    
+    SMatrix_Vector(Result,M, Ker);
 
     free(M->Data);
 
@@ -125,8 +134,8 @@ int main(int argc, char *argv[])
 	printf("Kernel written to file %s\n", Fl2);
     }
 
-    free(Result->Data);
-    free(Ker->Data);
+   // free(Result->Data);
+   // free(Ker->Data);
 
     close_random();
 
