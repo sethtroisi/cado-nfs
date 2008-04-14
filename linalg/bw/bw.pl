@@ -85,7 +85,10 @@ while (defined(my $x = shift(@args))) {
 	}
 }
 
-sub action { print join(@_,' '), "\n"; system @_; }
+sub action {
+    print scalar join(' ',@_), "\n";
+    system @_;
+}
 
 # We could possibly do cp --symlink just as well, or maybe ln (cp --link
 # is a gnu-ism). Not ln -s without caution, because this would require
@@ -657,6 +660,7 @@ MKSOL : {
                 $sol = "$d/$solution";
             }
             if (-f "$wdir/W") {
+                unlink $sol;
                 do_cp "$wdir/W", $sol;
                 push @solfiles, $sol;
             }
