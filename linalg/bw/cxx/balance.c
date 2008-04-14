@@ -26,10 +26,11 @@ void usage()
 struct row {
     uint32_t    i;
     int         w;
-    off_t       o;
 };
 
 struct row * row_table;
+off_t * offsets;
+int * dispatch;
 uint32_t nr;
 
 char * legacy_header_modulus;
@@ -105,11 +106,13 @@ int read_matrix(const char * filename)
      * we'll pad with zeroes
      */
 
-    row_table = malloc((nc+1) * sizeof(struct row));
+    row_table = malloc(nc * sizeof(struct row));
     if (row_table == NULL) abort();
+    offsets = malloc((nc+1) * sizeof(off_t));
+    if (offsets == NULL) abort();
 
     fprintf(stderr, "Row table: %"PRIu32" entries, %lu MB\n",
-            nc, (nc * sizeof(struct row)) >> 20);
+            nc, (nc * (sizeof(off_t) + sizeof(struct row))) >> 20);
     fprintf(stderr, "Reading row table...");
     fflush(stderr);
 
@@ -123,15 +126,15 @@ int read_matrix(const char * filename)
         }
         row_table[i].i = i;
         row_table[i].w = w;
-        row_table[i].o = o;
+        offsets[i] = o;
         GOBBLE_LONG_LINE();
     }
     for( ; i < nc ; i++) {
         row_table[i].i = i;
         row_table[i].w = 0;
-        row_table[i].o = o;
+        offsets[i] = o;
     }
-    row_table[nc].o = ftello(f);
+    offsets[nc] = ftello(f);
 
     fprintf(stderr, "done\n");
     fflush(stderr);
@@ -155,9 +158,6 @@ int row_compare_index(const struct row * a, const struct row * b)
 
 typedef int (*sortfunc_t)(const void *, const void *);
 
-
-struct row ** slices;
-uint32_t * slice_sizes;
 
 
 /* We'll arrange our slices in a priority heap, so that we'll always
@@ -271,6 +271,9 @@ make_heap(struct bucket * __first, struct bucket * __last)
 
 void do_sorting()
 {
+    struct row ** slices;
+    uint32_t * slice_sizes;
+
     fprintf(stderr, "sorting...");
     fflush(stderr);
 
@@ -327,6 +330,21 @@ void do_sorting()
                 (sortfunc_t) row_compare_index);
         fprintf(stderr, "done\n");fflush(stderr);
     }
+
+    dispatch = malloc(nr * sizeof(int));
+    for(i = 0 ; i < nslices ; i++) {
+        int k;
+        for(k = 0 ; k < slice_sizes[i] ; k++) {
+            dispatch[slices[i][k].i]=i;
+        }
+    }
+
+    free(slice_sizes);
+    for(i = 0 ; i < nslices ; i++) {
+        free(slices[i]);
+    }
+    free(slices);
+    free(heap);
 }
 
 
@@ -335,7 +353,6 @@ void shipout(const char * filename)
 {
     uint32_t i;
     int j;
-    struct row ** ptr;
     char ** chunks;
     FILE ** g;
     FILE * f;
@@ -360,11 +377,9 @@ void shipout(const char * filename)
         exit(1);
     }
 
-    ptr = malloc(nslices * sizeof(struct row *));
     chunks = malloc(nslices * sizeof(char *));
     g = malloc(nslices * sizeof(FILE *));
     for(j = 0 ; j < nslices ; j++) {
-        ptr[j] = slices[j];
         chunks[j] = malloc(strlen(filename) + 20);
         snprintf(chunks[j], strlen(filename) + 20, "%s.slice%d", filename, j);
         g[j] = fopen(chunks[j], "w");
@@ -373,41 +388,20 @@ void shipout(const char * filename)
             exit(1);
         }
     }
-    j = 0;
-    off_t previous = 0;
-    off_t next;
+    fseeko(f, offsets[0], SEEK_SET);
     for(i = 0 ; i < nr ; i++) {
-        assert(i == 0 || ftello(f) == previous);
-        /* pain. If I weren't tired enough of C++-to-C, I'd do some more
-         * heap stuff here */
-        for(j = 0 ; j < nslices && ptr[j]->i != i ; j++);
-        if (j == nslices) {
-            abort();
-        }
-        next = ptr[j]->o;
-        ptr[j]++;
-        if (i == 0) {
-            previous = next;
-            fseeko(f, previous, SEEK_SET);
-            continue;
-        }
-        ENSURE(next - previous);
-        if (next == previous) {
+        assert(ftello(f) == offsets[i]);
+        j = dispatch[i];
+        off_t sz = offsets[i+1]-offsets[i];
+        ENSURE(sz);
+        if (sz == 0) {
             /* special provision for writing zero rows */
             fprintf(g[j], "0\n");
             continue;
         }
-        fread(tbuf, next - previous, 1, f);
-        fwrite(tbuf, next - previous, 1, g[j]);
-        previous = next;
+        fread(tbuf, 1, sz, f);
+        fwrite(tbuf, 1, sz, g[j]);
     }
-
-    /* Do not forget the last line */
-    next = row_table[nr].o;
-    ENSURE(next - previous);
-    if (next == previous) { fprintf(g[j], "0\n"); }
-    fread(tbuf, next - previous, 1, f);
-    fwrite(tbuf, next - previous, 1, g[j]);
 
     for(j = 0 ; j < nslices ; j++) {
         fclose(g[j]);
@@ -483,22 +477,16 @@ void shipout(const char * filename)
         /* ptr[j] is really only a pointer */
     }
     free(g);
-    free(ptr);
     free(chunks);
     free(tbuf);
 }
 
 void cleanup()
 {
-    int i;
-    free(slice_sizes);
-    for(i = 0 ; i < nslices ; i++) {
-        free(slices[i]);
-    }
-    free(slices);
-    free(heap);
     free(row_table);
+    free(offsets);
     free(legacy_header_modulus);
+    free(dispatch);
 }
 
 int main(int argc, char * argv[])
@@ -522,7 +510,7 @@ int main(int argc, char * argv[])
             if (!argc) usage();
             matrix_filename = argv[0];
         } else if (strcmp(argv[0], "--nbuckets") == 0 ||
-                strcmp(argv[0], "--nslices")) {
+                strcmp(argv[0], "--nslices") == 0) {
             argv++,argc--;
             if (!argc) usage();
             nslices = atoi(argv[0]);
@@ -533,6 +521,14 @@ int main(int argc, char * argv[])
 
     if (matrix_filename == NULL) {
         fprintf(stderr, "which matrix whall I read ?\n");
+        exit(1);
+    }
+
+    /* 10 is overestimated here. I think 4 suffices: 0,1,2, and f.
+     */
+    if (sysconf(_SC_OPEN_MAX) <= nslices + 10) {
+        fprintf(stderr, "Not enough open files allowed (%ld)\n", 
+                sysconf(_SC_OPEN_MAX));
         exit(1);
     }
 
