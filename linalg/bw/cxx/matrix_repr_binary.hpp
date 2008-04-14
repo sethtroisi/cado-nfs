@@ -52,6 +52,8 @@ class matrix_repr_binary {
 	    BUG_ON(i != slice.i1);
 	}
 
+        void info() const {}
+
 	template<typename traits>
 	void mul(
 		typename traits::wide_scalar_t * dst,

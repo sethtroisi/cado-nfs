@@ -46,6 +46,10 @@ public:
 
         mutable std::vector<slice_info> slices_info;
 #endif
+        unsigned int nslices0;
+        unsigned int nslices1;
+        unsigned int nslices;
+        unsigned int packbase;
 
         public:
 
@@ -55,13 +59,13 @@ public:
 	    mtx.seekg(slice.pos);
 	    std::istream_iterator<matrix_line> mit(mtx);
             unsigned int npack = 3072;
-            unsigned int nslices = iceildiv(slice.i1-slice.i0, npack);
+            nslices = iceildiv(slice.i1-slice.i0, npack);
             data.push_back(0);
-            unsigned int packbase = (slice.i1-slice.i0) / nslices;
+            packbase = (slice.i1-slice.i0) / nslices;
             /* How many slices of size packbase+1 */
-            unsigned int nslices1 = (slice.i1-slice.i0) % nslices;
+            nslices1 = (slice.i1-slice.i0) % nslices;
             /* How many slices of size packbase */
-            unsigned int nslices0 = nslices - nslices1;
+            nslices0 = nslices - nslices1;
 
             unsigned int i;
             unsigned int next = slice.i0;
@@ -161,22 +165,27 @@ public:
                 slices_info[s].dj_avg = sumdj / slices_info[s].ncoeffs;
 #endif
             }
-            cout
+        }
+
+        void info() const {
+            std::cout
                 << "// " << nslices1
-                << " slices of " << (packbase+1) << "rows\n";
+                << " sub-slices of " << (packbase+1) << " rows\n";
             if (nslices0) {
-                cout
+                std::cout
                     << "// " << nslices0
-                    << " slices of " << packbase << "rows\n";
+                    << " sub-slices of " << packbase << " rows\n";
             }
 #ifdef  SLICE_STATS
-            cout << "dj per slice:";
+            std::cout << "dj per sub-slice:";
             for(unsigned int s = 0 ; s < nslices ; s++) {
-                cout << " " << slices_info[s].dj_avg;
+                std::cout << " " << slices_info[s].dj_avg;
             }
-            cout << "\n";
+            std::cout << "\n";
 #endif
+            std::cout << std::flush;
 	}
+
 	template<typename traits>
 	void mul(
 		typename traits::wide_scalar_t * dst,

@@ -63,18 +63,22 @@ struct thread_starter_info {
 	std::pair<double, double> ticks;
 };
 
+thread_lock_t local_console_lock = THREAD_LOCK_INITIALIZER;
+
 static void *thread_starter(struct thread_starter_info *p)
 {
 	pthread_once(&id_alloc_once, &id_alloc);
 	pthread_setspecific(id_alloc_key, malloc(sizeof(unsigned int)));
 	*(unsigned int *) pthread_getspecific(id_alloc_key) = p->i;
 
+        thread_lock(&local_console_lock);
 	cout << fmt("// thread % : tid 0x%[h]")
 		% p->i % pthread_self()
 #ifdef	__linux__
 		<< " ltid " << linux_tid()
 #endif
 		<< "\n";
+        thread_unlock(&local_console_lock);
 
 	barrier_wait(&thread_group_barrier, NULL, NULL);
 	p->ticks.first  = -thread_ticks();

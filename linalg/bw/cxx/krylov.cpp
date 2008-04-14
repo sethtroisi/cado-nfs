@@ -1,8 +1,7 @@
-
-/* The norm requires that UINT16_MAX be defined only when this is on. It
- * is used in matrix_repr_binary_sliced.hpp */
-
+/* The norm requires that UINT16_MAX be defined only when this flag is
+ * on. It is used in matrix_repr_binary_sliced.hpp */
 #define __STDC_LIMIT_MACROS
+
 #include <stdint.h>
 
 #include <cstdio>
@@ -200,6 +199,7 @@ struct thread:public traits {
     int32_t *check_x0;
     int32_t *check_m0;
     double maxwait;
+    double totwait;
     unsigned int done;
     vector < mpz_class > dot_part;
     /* reference timing */
@@ -224,6 +224,7 @@ struct thread:public traits {
         i0 = (t * nr) / mine.nt;
         i1 = ((t + 1) * nr) / mine.nt;
         maxwait = 0.1;
+        totwait = 0;
 
         v = new scalar_t[nc];
         w = new scalar_t[nc];
@@ -244,9 +245,14 @@ struct thread:public traits {
             mat.fill(mtx, slices[t]);
         }
         thread_lock(&globals::console_lock);
+        mat.info();
+        thread_unlock(&globals::console_lock);
+
+        thread_lock(&globals::console_lock);
         cout << fmt("T% reading % and %")
             % t % files::x0 % files::m0 << endl;
         thread_unlock(&globals::console_lock);
+
         fill_check_vector(i0, i1, check_x0, files::x0);
         fill_check_vector(i0, i1, check_m0, files::m0);
 
@@ -312,9 +318,18 @@ struct thread:public traits {
             eta = fmt("% .. %") % e1 % e2;
         }
 
-        cout << fmt("T% N=% av=% M0=%[F.1]ns %[F.1]%% tw=% eta=<%>\n")
-            % t % done % pdelta(av)
-            % m0_estim % (pcpu * 100.0)
+        ostringstream label;
+        label << fmt("T% N=%") % t % done << flush;
+        string pad(label.str().size(), ' ');
+
+        cout << fmt("% matmul=% wait=%[F.2]s M0=%[F.1]ns\n")
+            % label.str()
+            % pdelta(av)
+            % (totwait / done)
+            % m0_estim;
+        cout << fmt("% %[F.1]%% totalwork=% eta=<%>\n")
+            % pad
+            % (pcpu * 100.0)
             % pdelta(tw)
             % eta;
 
@@ -340,8 +355,8 @@ struct thread:public traits {
                 eta_complete = fmt("% .. %") % e1_complete % e2_complete;
             }
 
-            cout << fmt("T% eta_including_mksol=<%>\n")
-                % t % eta_complete;
+            cout << fmt("% eta_including_mksol=<%>\n")
+                % pad % eta_complete;
         }
 
         mat.report();
@@ -374,9 +389,14 @@ struct thread:public traits {
     }
 
     void note_waited(double twait) {
+        totwait += twait;
         if (twait > maxwait) {
-            cerr << fmt("// thread % : waited %[F.2]s")
-                % t % (maxwait = twait) << endl;
+            thread_lock(&globals::console_lock);
+            cerr << fmt("// T% max waited %[F.2]s ; avg %[F.2]s")
+                % t % (maxwait = twait)
+                % (totwait / done)
+                << endl;
+            thread_unlock(&globals::console_lock);
         }
     }
 
@@ -747,17 +767,24 @@ unsigned int set_f_coeffs(typename traits::scalar_t * f, unsigned int c,  unsign
 }
 
 
-    template < template < typename > class X, typename traits >
+template < template < typename > class X, typename traits >
 void *thread_program(void *ptr)
 {
     cout.flush();
     cerr.flush();
 
-    cout << fmt("// thread % : setting up temporaries\n") % tseqid();
+    thread_lock(&globals::console_lock);
+    cout << fmt("// T% : setting up temporaries\n") % tseqid();
     cout << flush;
+    thread_unlock(&globals::console_lock);
+
     X < traits > blah(ptr);
     barrier_wait(&globals::main_loop_barrier, NULL, NULL);
-    cout << fmt("// thread % : go\n") % tseqid() << flush;
+
+    thread_lock(&globals::console_lock);
+    cout << fmt("// T% : go\n") % tseqid() << flush;
+    thread_unlock(&globals::console_lock);
+
     blah.loop();
     blah.flush();
     barrier_wait(&globals::main_loop_barrier, NULL, NULL);
@@ -784,7 +811,7 @@ template < typename traits > int program()
     globals::vdata < traits > v0_and_f;
     std::vector < void *>targs(mine.nt, (void *) &v0_and_f);
 
-        v0_and_f.v0 = new scalar_t[nc];
+    v0_and_f.v0 = new scalar_t[nc];
 
     if (mine.task == "krylov") {
 
@@ -918,7 +945,7 @@ int main(int argc, char *argv[])
     cout << "// counting coefficients\n" << flush;
 
     for (int j = 0; j < mine.nt; j++) {
-        cout << fmt("// thread % : % rows % coeffs from pos %\n")
+        cout << fmt("// T% : % rows % coeffs from pos %\n")
             % j % (slices[j].i1 - slices[j].i0)
             % slices[j].ncoeffs
             % slices[j].pos;
