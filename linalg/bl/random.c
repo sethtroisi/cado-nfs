@@ -98,6 +98,19 @@ unsigned long *RandomDMatrixBitTest(unsigned long m,
 }
 
 
+#if 0
+void RandomDMatrixS(DenseMatrix a, unsigned long m,unsigned long n)
+{
+    int j;
+    for (j = 0; j < iceildiv(n, WBITS) * m; ++j) {
+	a->Data[j] = random_coeff2();
+    }
+    a->Nrows=m;
+    a->Ncols=n;
+}
+
+#endif
+
 
 
 void CreateRandomMatrixFile(char *f, unsigned long N, unsigned long m,

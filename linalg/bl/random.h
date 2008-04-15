@@ -1,3 +1,5 @@
+
+
 extern void init_random();
 extern void close_random();
 extern unsigned long random_coeff();
@@ -23,3 +25,6 @@ extern unsigned long *CreateRandomSymmetricMatrixTest(unsigned long m,
 						      unsigned long k);
 extern unsigned long *RandomDMatrixBitTest(unsigned long m, unsigned long n,
 					   unsigned long *a);
+
+
+

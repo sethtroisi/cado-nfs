@@ -24,106 +24,173 @@
 
 int main(int argc, char *argv[])
 {
+    SparseMatrix M;
+    DenseMatrix Ker;
+    
+    char *Fl;
 
-    unsigned long m = atoi(argv[1]);;
-
-    unsigned long T3, T1, T2, i;
-    float DiffTime2, DiffTime1;
+    Fl = argv[1];
 
 
-
-// Definition of Block size 
-
+    unsigned long Tm1, Tm2;
+    float DiffTime;
     unsigned long Block = WBITS;
 
+// Test if MPI is initialized if not initializes it 
 
-    unsigned long *d1, *c1, *c2;
-    // unsigned long *e;
-    uint64_t *Y, *c, *d;
-    Y = Allocmn(Block, m + 1);
-    c = Allocmn(m + 1, Block);
-    c2 = Allocmn(m + 1, Block);
-    c1 = Allocmn(Block, m + 1);
-    // e = Allocmn(Block, m + 1);
-    d = Allocmn(Block, Block);
-    d1 = Allocmn(Block, Block);
-
-    RandomDMatrixBitTest(Block, m, Y);
-    RandomDMatrixBitTest(Block, Block, d);
-
-    DiffTime1 = 0;
-    DiffTime2 = 0;
-
-    unsigned long **V;
-    V = Allocmn3(m, Block);
-
-    for (i = 0; i < m * iceildiv(Block, WBITS); ++i) {
-	V[0][i] = Y[i];
-	V[1][i] = Y[i];
-	V[2][i] = Y[i];
+    int size, p, flag;
+    flag = 0;
+    MPI_Initialized(&flag);
+    if (!flag) {
+	MPI_Init(&argc, &argv);	//MPI initialize 
     }
+// end Test if MPI is initialized if not initializes it 
 
 
-    for (i = 0; i < 1; i++) {
+    init_random();
 
-	T1 = microseconds();
+    MPI_Comm_size(MPI_COMM_WORLD, &size);	//get the number of processes (size=1 if not using MPI)
+    MPI_Comm_rank(MPI_COMM_WORLD, &p);	//get the process ranks (p=0 if not using MPI)
+     MPI_Status status;
 
-	VUBit(m, Block, Y, d, c);
 
-	//DMultBit(m,Block, 1, Y, d, c2);
+// Get the sparse matrix from file 
 
-	// TransposeBit(Block,Block,d,d1);
 
-	T2 = microseconds();
+    unsigned long *Num;
+    Num = malloc(3 * sizeof(unsigned long));
+    ReadSMatrixFileData(Fl, Num);
+    M->Nrows = Num[0];
+    M->Ncols = Num[1];
+    //M->Weight = Num[2];
 
-	d1 = Allocmn(Block, Block);
-	TransposeBit(Block, Block, d, d1);
+    free(Num);
 
-	//   Refresh_ArrayBit(m, Block, V, Y);
+    //printf("%s \n",Fl2);
 
-	//   TVUBit(m, Block, Y, Y, c);
-	//   VUBit_v2(m, Block, Y, d, c2);
+    // For MPI  Number of Lines of the matrix to read in each process
+    unsigned long BlockSize,i;
+    BlockSize = SizeBlock(size, p, M->Nrows);
 
-	T3 = microseconds();
+    // end for MPI   Number of Lines of the matrix to read in each process   
+    
+    unsigned long *NumberCoeffBlocks=malloc(size*sizeof(unsigned long));
 
-	DiffTime1 += T2 - T1;
-	DiffTime2 += T3 - T2;
+    CoeffperBlock(NumberCoeffBlocks,Fl);
+
+
+    if (p==0) {for (i=0; i<size; i++) {printf("Job %lu Block  %lu  has size %lu \n",p,i,NumberCoeffBlocks[i]);}}
+
+ //   M->Data =
+//	malloc((M->Nrows / size + M->Nrows % size) * (M->Weight + 1) *
+//	       sizeof(unsigned long));
+
+	M->Data =
+	malloc(NumberCoeffBlocks[p]*sizeof(unsigned long));
+
+
+    ReadSMatrixFileBlockNew(Fl, M->Data, p * (M->Nrows / size),BlockSize);
+
+
+//  if (p==0) {displaySMatrixNew(M->Data,SizeBlock(size, 0, M->Nrows),M->Ncols,'a');}
+
+
+// end Get the sparce matrix from file
+
+    DenseMatrix Result;
+    
+
+    Result->Data = Allocmn(M->Nrows, Block);
+    Ker->Data = Allocmn(M->Ncols, Block);
+
+
+
+//for tests
+
+RandomDMatrixBitTest(M->Ncols,Block, Ker->Data);
+
+
+Ker->Nrows=M->Ncols;
+Ker->Ncols=Block;
+
+unsigned long *KerPar;
+KerPar=malloc(2*sizeof(unsigned long));
+KerPar[0]=Ker->Nrows;
+KerPar[1]=Ker->Ncols;
+
+unsigned long m=M->Nrows;
+unsigned long n=M->Ncols;
+
+//printf("p = %lu   m = %lu   n = %lu!!\n",p,m,n);
+
+
+//printf("p=%lu  m  %lu   n %lu \n",p,m,n);
+
+ 
+
+SMatrix_Vector(Result,M,Ker);
+
+printf("Multiplication done in %lu!!\n",p);
+
+
+free(NumberCoeffBlocks);
+free(KerPar);
+//free(Result->Data);
+//free(Ker->Data);
+//free(M->Data);
 
 
 /*
-displayMatrix(Y,m,Block,'Y');
-displayMatrix(d,Block,Block,'d');
-
-displayMatrix(c,m,Block,'c');
-*/
-//displayMatrix(c2,m,Block,'C');
-/*
-unsigned long *r;r=Allocmn(3,Block);r[0]=10;r[1]=99;r[2]=0;
+  unsigned long *ResmN_Dist1;
+    ResmN_Dist1 = Allocmn(SizeBlock(size, p, m), Block);
 
 
-for (i = 0; i <WBITS; i++) {
-            r[2]^=((__builtin_parity(r[0]^d[i]) & 1UL) << i);
-	    displayMatrixScreen(&r[2],1,Block);
+printf("p=  %lu Toto\n",p);
 
+    unsigned long j, *d;
+    d = malloc(m * sizeof(unsigned long));
+
+
+    MPI_Bcast(Ker->Data, n, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
+
+
+    //MPI_Bcast(NC, 1, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
+
+
+    SMultDmatrixBit(m, n, Block, M->Data, Ker->Data, ResmN_Dist1, p * (m / size),
+		    SizeBlock(size, p, m));
+
+
+    if (p != 0) {
+	MPI_Send(ResmN_Dist1, SizeBlock(size, p, m), MPI_UNSIGNED_LONG, 0, 1,
+		 MPI_COMM_WORLD);
+    };
+
+    if (p == 0) {
+
+	for (i = 0; i < SizeBlock(size, 0, m); i++) {
+	    d[i] = ResmN_Dist1[i];
 	}
 
-displayMatrix(&r[0],1,Block,'v');
-displayMatrix(d,Block,Block,'B');
-displayMatrix(&r[2],1,Block,'p');
+	unsigned long Bg = SizeBlock(size, p, m);
+
+	for (i = 1; i < size; i++) {
 
 
-//displayMatrixScreen(r,3,Block);
+	    MPI_Recv(ResmN_Dist1, SizeBlock(size, i, m), MPI_UNSIGNED_LONG, i,
+		     1, MPI_COMM_WORLD, &status);
 
-printf("Paridade de %lu ^ %lu=%lu",r[0],r[1],__builtin_parity(r[0]^r[1]));
-*/
-//printf("-----------------------------------------------------------------------------------------------------\n");
+	    for (j = 0; j < SizeBlock(size, i, m); j++) {
+		d[j + Bg] = ResmN_Dist1[j];
+	    }
 
-//displayMatrixScreen(c2,m,Block);
+	    Bg += SizeBlock(size, i, m);
 
+	}
     }
 
-    printf("Time for alg1 VxBolck is = %f s Time for alg2 TVxV is = %f s\n",
-	   DiffTime1 / 1000000, DiffTime2 / 1000000);
+*/
+    close_random();
 
     return 0;
 }

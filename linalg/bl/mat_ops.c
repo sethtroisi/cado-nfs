@@ -1099,23 +1099,202 @@ void SMatrix_Vector(DenseMatrix Result, SparseMatrix M, DenseMatrix V)
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &p);
     MPI_Status status;
+ 
+  // printf("p= %lu  %lu  %lu\n",p,V->Ncols,SizeBlock(size, p, M->Nrows));
+
+  
+    unsigned long j, i;
+
+    //MPI_Bcast( V->Data, M->Ncols, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
+    
+    
+
+if (p==0){
+    for (i=1; i<size; i++) {
+      MPI_Send(V->Data, M->Ncols , MPI_UNSIGNED_LONG,
+		 i, 12, MPI_COMM_WORLD);
+   
+       }
+    }
+    else
+    {
+    MPI_Recv(V->Data,M->Ncols,
+		     MPI_UNSIGNED_LONG,0, 12, MPI_COMM_WORLD, &status);
+    }
+
+ 
+
+    unsigned long *Prod_Dist;
+    Prod_Dist = Allocmn(SizeBlock(size, p, M->Nrows), sizeof(unsigned long));
+
+    SMultDmatrixBit(M->Nrows, M->Ncols, sizeof(unsigned long), M->Data, V->Data, Prod_Dist,
+		    p * (M->Nrows / size), SizeBlock(size, p, M->Nrows));
+
+    
+
+    if (p != 0) {
+	MPI_Send(Prod_Dist, SizeBlock(size, p, M->Nrows), MPI_UNSIGNED_LONG,
+		 0, 123, MPI_COMM_WORLD);
+        
+    }
+
+
+    //MPI_Barrier(MPI_COMM_WORLD);
+  //  printf("in sub p = %lu   m = %lu   n = %lu!!\n",p,M->Nrows,M->Ncols);
+
+    if (p == 0) {
+	for (i = 0; i < SizeBlock(size, 0, M->Nrows); i++) {
+	    Result->Data[i] = Prod_Dist[i];
+	}
+	unsigned long Bg = SizeBlock(size, 0, M->Nrows);
+        
+
+	for (i = 1; i < size; i++) {
+
+	    MPI_Recv(Prod_Dist, SizeBlock(size, i, M->Nrows),
+		     MPI_UNSIGNED_LONG, i, 123, MPI_COMM_WORLD, &status);
+
+	    for (j = 0; j < SizeBlock(size, i, M->Nrows); j++) {
+		Result->Data[j + Bg] = Prod_Dist[j];
+	    }
+
+                        
+
+	    Bg += SizeBlock(size, i, M->Nrows);
+
+	}
+
+    }
+    
+    
+    free(Prod_Dist);
+    Result->Nrows = M->Nrows;
+    Result->Ncols = V->Ncols;
+}
+
+
+
+#if 0
+
+
+void Test_SMatrix_Vector(unsigned long *Result, unsigned long *M, unsigned long *V,unsigned long m,unsigned long n)
+{
+    int size, p;
+
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &p);
+    MPI_Status status;
+ 
+    printf("p= %lu  %lu  %lu\n",p,V->Ncols,SizeBlock(size, p, M->Nrows));
+
+  
+    unsigned long j, i;
+
+    //MPI_Bcast( V->Data, M->Ncols, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
+    
+    
+
+if (p==0){
+    for (i=1; i<size; i++) {
+      MPI_Send(V->Data, M->Ncols , MPI_UNSIGNED_LONG,
+		 i, 12, MPI_COMM_WORLD);
+   
+       }
+    }
+    else
+    {
+    MPI_Recv(V->Data,M->Ncols,
+		     MPI_UNSIGNED_LONG,0, 12, MPI_COMM_WORLD, &status);
+    }
+
+ 
+
+    unsigned long *Prod_Dist;
+    Prod_Dist = Allocmn(SizeBlock(size, p, M->Nrows), sizeof(unsigned long));
+
+    SMultDmatrixBit(M->Nrows, M->Ncols, sizeof(unsigned long), M->Data, V->Data, Prod_Dist,
+		    p * (M->Nrows / size), SizeBlock(size, p, M->Nrows));
+
+    
+
+    if (p != 0) {
+	MPI_Send(Prod_Dist, SizeBlock(size, p, M->Nrows), MPI_UNSIGNED_LONG,
+		 0, 123, MPI_COMM_WORLD);
+        
+    }
+
+
+    //MPI_Barrier(MPI_COMM_WORLD);
+    printf("in sub p = %lu   m = %lu   n = %lu!!\n",p,M->Nrows,M->Ncols);
+
+    if (p == 0) {
+	for (i = 0; i < SizeBlock(size, 0, M->Nrows); i++) {
+	    Result->Data[i] = Prod_Dist[i];
+	}
+	unsigned long Bg = SizeBlock(size, 0, M->Nrows);
+        
+
+	for (i = 1; i < size; i++) {
+
+	    MPI_Recv(Prod_Dist, SizeBlock(size, i, M->Nrows),
+		     MPI_UNSIGNED_LONG, i, 123, MPI_COMM_WORLD, &status);
+
+	    for (j = 0; j < SizeBlock(size, i, M->Nrows); j++) {
+		Result->Data[j + Bg] = Prod_Dist[j];
+	    }
+
+                        
+
+	    Bg += SizeBlock(size, i, M->Nrows);
+
+	}
+
+    }
+    
+    // MPI_Barrier(MPI_COMM_WORLD);
+    //free(Prod_Dist);
+    Result->Nrows = M->Nrows;
+    Result->Ncols = V->Ncols;
+}
+
+#endif
+
+
+
+
+
+#if 0
+
+void SMatrix_Vector(DenseMatrix Result, SparseMatrix M, DenseMatrix V)
+{
+    int size, p;
+
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &p);
+    MPI_Status status;
 
     unsigned long *ResmN_Dist;
     ResmN_Dist = Allocmn(SizeBlock(size, p, M->Nrows), V->Ncols);
 
+    
     unsigned long j, i;
+
+
+    
 
     MPI_Bcast(V->Data, V->Nrows, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
 
+ 
     SMultDmatrixBit(M->Nrows, M->Ncols, V->Ncols, M->Data, V->Data, ResmN_Dist,
 		    p * (M->Nrows / size), SizeBlock(size, p, M->Nrows));
 
-    //   displayMatrix(ResmN_Dist,m,Block,'r');
+    //if(p==0) {displayMatrix(ResmN_Dist,SizeBlock(size, 0, M->Nrows),V->Ncols,'r');}
 
+  
 
     if (p != 0) {
 	MPI_Send(ResmN_Dist, SizeBlock(size, p, M->Nrows), MPI_UNSIGNED_LONG,
-		 0, 1, MPI_COMM_WORLD);
+		 0, 123, MPI_COMM_WORLD);
     };
 
     if (p == 0) {
@@ -1128,9 +1307,8 @@ void SMatrix_Vector(DenseMatrix Result, SparseMatrix M, DenseMatrix V)
 
 	for (i = 1; i < size; i++) {
 
-
 	    MPI_Recv(ResmN_Dist, SizeBlock(size, i, M->Nrows),
-		     MPI_UNSIGNED_LONG, i, 1, MPI_COMM_WORLD, &status);
+		     MPI_UNSIGNED_LONG, i, 123, MPI_COMM_WORLD, &status);
 
 	    for (j = 0; j < SizeBlock(size, i, M->Nrows); j++) {
 		Result->Data[j + Bg] = ResmN_Dist[j];
@@ -1141,10 +1319,16 @@ void SMatrix_Vector(DenseMatrix Result, SparseMatrix M, DenseMatrix V)
 	}
 
     }
+    
     //free(ResmN_Dist);
     Result->Nrows = M->Nrows;
     Result->Ncols = V->Ncols;
 }
+
+
+
+
+#endif
 
 
 

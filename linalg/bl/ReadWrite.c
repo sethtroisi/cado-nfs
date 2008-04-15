@@ -456,7 +456,7 @@ void ReadSMatrixFileBlockNew(char *f, unsigned long *M, unsigned long k,
 
     File = fopen(f, "r");
 
-    for (i = 0; i < 3; ++i) {
+    for (i = 0; i < 2; ++i) {
 	fscanf(File, "%lu", &q);
     }
 
@@ -515,7 +515,7 @@ void CoeffperBlock(unsigned long *NumberCoeffBlocks, char *f)
 	FILE *File;
 	File = fopen(f, "r");
 
-	for (i = 0; i < 3; ++i) {
+	for (i = 0; i < 2; ++i) {
 	    fscanf(File, "%lu", &q);
 	    if (i == 0) {
 		Nrows = q;
@@ -550,6 +550,8 @@ void CoeffperBlock(unsigned long *NumberCoeffBlocks, char *f)
 		fscanf(File, "%lu", &q);
 	    }
 	}
+        if (p==0) {free(LengthBlocks);}
+
 	fclose(File);
     }
     MPI_Bcast(NumberCoeffBlocks, size, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);

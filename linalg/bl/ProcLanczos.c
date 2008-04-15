@@ -1576,7 +1576,7 @@ void KernelSparse(unsigned long *a, unsigned long *R,
 
     SizeRowV = iceildiv(N, WBITS);
 
-    unsigned long *ATAR;
+    
     unsigned long *ATAR_Dist;
     unsigned long *ResmN_Dist;
     unsigned long *ResVn2, *ResNN, *E, *Aout, *ResnN, *ResNn, *ResNn2,
@@ -1595,14 +1595,20 @@ void KernelSparse(unsigned long *a, unsigned long *R,
     ListLines = malloc((N + 1) * sizeof(unsigned long));
     LengListLines = malloc(sizeof(unsigned long));
 
+    ResVn2 = Allocmn(Block, n);
+
 
     unsigned long *NC;
     NC = Allocmn(1, 1);
 
 // To Make Transpose(A)*A*R
 
+    
 
+    unsigned long *ATAR;
     ATAR = Allocmn(n, N);
+    
+
     ResmN_Dist = Allocmn(m, N);
     ATAR_Dist = Allocmn(n, N);
 
@@ -1618,7 +1624,7 @@ void KernelSparse(unsigned long *a, unsigned long *R,
     free(ATAR_Dist);
 
 
-
+   
 
 
     if (p == 0) {
@@ -1630,25 +1636,32 @@ void KernelSparse(unsigned long *a, unsigned long *R,
 
 /*  small gauss in Result to obtain independent vectors  */
 
-	ResVn2 = Allocmn(Block - LengListLines[0], n);
+	
 	SelectLinesListBit(n, ResNn2, ListLines, Block - LengListLines[0],
 			   ResVn2);
 	unsigned long Size1 = Block - LengListLines[0];
 	GaussElimBit(Size1, n, ResVn2, Aout, E, ListLines, LengListLines);
 	Sizea = LengListLines[0];
 	TransposeBit(LengListLines[0], n, Aout, ResnV3);
+        
     }
 
 
 
     //To make A*R
 
+
+    unsigned long *d;
+    d = malloc(m * sizeof(unsigned long));
+
     unsigned long *ResmN_Dist1;
     ResmN_Dist1 = Allocmn(SizeABlock, Block);
 
-    unsigned long j, i, *d;
-    d = malloc(m * sizeof(unsigned long));
+    unsigned long j, i;
 
+    if (p==0) {
+           
+    }
 
     MPI_Bcast(ResnV3, n, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
 
@@ -1666,6 +1679,8 @@ void KernelSparse(unsigned long *a, unsigned long *R,
     };
 
     if (p == 0) {
+
+        
 
 	for (i = 0; i < SizeBlock(size, 0, m); i++) {
 	    d[i] = ResmN_Dist1[i];
@@ -1687,12 +1702,13 @@ void KernelSparse(unsigned long *a, unsigned long *R,
 
 	}
 
-       //free(ResmN_Dist1);
+       
 
 	if (TestZero(m, Block, d)) {
 	    for (i = 0; i < n; i++) {
 		Ker->Data[i] = ResnV3[i];
 	    };
+           
 	    Ker->Nrows = n;
 	    Ker->Ncols = Sizea;
 	    printf("\n No second Small Lin Alg  \n");
@@ -1700,6 +1716,8 @@ void KernelSparse(unsigned long *a, unsigned long *R,
 	    printf("\n With second Small Lin Alg  \n");
 
 	    TransposeBit(m, Block, d, ResVn3);
+
+            
 
 	    GaussElimBit(Block, m, ResVn3, Aout, E, ListLines, LengListLines);
 
@@ -1732,18 +1750,23 @@ void KernelSparse(unsigned long *a, unsigned long *R,
            
 
 	}
-
-        //free(ResmN_Dist1);
+        
         //free(d);
-        //if (size==1) {}
-
-        //if  (size==1) {free(d);} 
+        free(ResVn2);
        
-        free(ATAR);
+
+    }
+
+
+// See where to put them here is good for one proc
+ 
+free(ResmN_Dist1);
+free(ATAR);
+free(d);
+        
         free(NC);
 	free(ResnV3);
 	free(ResVn3);
-	//free(ResVn2);
 	free(ResNN);
 	free(E);
 	free(Aout);
@@ -1752,7 +1775,7 @@ void KernelSparse(unsigned long *a, unsigned long *R,
 	free(ResNn2);
 	free(ListLines);
 	free(LengListLines);
-    }
+
 
 }
 
@@ -1817,14 +1840,14 @@ void Lanczos(DenseMatrix Kernel, SparseMatrix M,
 
 // Small linear algebra to compute the  elements of the Kernel 
 
-    
+    Kernel->Nrows = M->Ncols;
+    Kernel->Ncols = Block;
 
     KernelSparse(M->Data, Result, M->Nrows, M->Ncols, Block, Kernel);
 
     // MPI_Bcast(Index, 2, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
 
-    Kernel->Nrows = M->Ncols;
-    Kernel->Ncols = Block;
+    
 
 
 

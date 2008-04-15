@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
 
 
     unsigned long *Num;
-    Num = malloc(3 * sizeof(unsigned long));
+    Num = malloc(2 * sizeof(unsigned long));
     ReadSMatrixFileData(Fl, Num);
     M->Nrows = Num[0];
     M->Ncols = Num[1];
@@ -103,8 +103,6 @@ int main(int argc, char *argv[])
 
     Lanczos(Ker, M, Block);
 
-
-
     if (p == 0) {
 	Tm2 = microseconds();
 	DiffTime = Tm2 - Tm1;
@@ -113,8 +111,8 @@ int main(int argc, char *argv[])
 	     DiffTime / 1000000, Ker->Ncols);
     }
 
-    
-    SMatrix_Vector(Result,M, Ker);
+
+    SMatrix_Vector(Result,M,Ker);
 
     free(M->Data);
 
@@ -134,10 +132,24 @@ int main(int argc, char *argv[])
 	printf("Kernel written to file %s\n", Fl2);
     }
 
-   // free(Result->Data);
-   // free(Ker->Data);
+    free(Result->Data);
+    free(Ker->Data);
+    free(NumberCoeffBlocks);
 
     close_random();
 
     return 0;
 }
+
+
+
+
+
+
+//    printf("P= %lu   Ker %lu\n",p,Ker->Nrows);
+    
+
+//if (p==0) {displayMatrix(Ker->Data,Ker->Nrows,Block,'K');}
+
+//if (p==0) {displaySMatrixNew(M->Data,M->Nrows,M->Ncols,'M');}
+
