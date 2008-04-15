@@ -13,6 +13,7 @@ all: Makefile.local
 	$(MAKE) -C gf2x
 	$(MAKE) -C gf2x/cantor
 	$(MAKE) -C linalg/bw
+	$(MAKE) -C linalg/bl	FAKE=1
 
 clean:
 	$(MAKE) -C utils		clean
@@ -25,6 +26,7 @@ clean:
 	$(MAKE) -C gf2x			clean
 	$(MAKE) -C gf2x/cantor		clean
 	$(MAKE) -C linalg/bw		clean
+	$(MAKE) -C linalg/bl		clean
 
 Makefile.local:
 	@echo "Makefile.local does not exist. Let's create an empty one."
