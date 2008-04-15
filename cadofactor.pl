@@ -41,6 +41,7 @@ my $default_param = {
     qmin=>12000000,
     qrange=>1000000,
     checkrange=>1000000,
+    sievenice=>19,
     prune=>1.0,
     merge=>1000000,
     keep=>160,
@@ -49,6 +50,7 @@ my $default_param = {
     rwmax=>200,
     ratio=>1.5,
     bwmt=>2,
+    linalg=>'bw',
     nkermax=>30,
     nchar=>50,
 };
@@ -89,6 +91,7 @@ sub read_param {
         if (/^qmin=(.*)$/)     { $param->{qmin}=$1; shift @args; next; }
         if (/^qrange=(.*)$/)   { $param->{qrange}=$1; shift @args; next; }
         if (/^checkrange=(.*)$/){ $param->{checkrange}=$1; shift @args; next; }
+        if (/^sievenice=(.*)$/){ $param->{sievenice}=$1; shift @args; next; }
         if (/^prune=(.*)$/)    { $param->{prune}=$1; shift @args; next; }
         if (/^merge=(.*)$/)    { $param->{merge}=$1; shift @args; next; }
         if (/^keep=(.*)$/)     { $param->{keep}=$1; shift @args; next; }
@@ -98,6 +101,7 @@ sub read_param {
         if (/^ratio=(.*)$/)    { $param->{ratio}=$1; shift @args; next; }
         if (/^bwstrat=(.*)$/)  { $param->{bwstrat}=$1; shift @args; next; }
         if (/^bwmt=(.*)$/)     { $param->{bwmt}=$1; shift @args; next; }
+        if (/^linalg=(.*)$/)   { $param->{linalg}=$1; shift @args; next; }
         if (/^nkermax=(.*)$/)  { $param->{nkermax}=$1; shift @args; next; }
         if (/^nchar=(.*)$/)    { $param->{nchar}=$1; shift @args; next; }
         if (/^wdir=(.*)$/)     { $param->{wdir}=$1; shift @args; next; }
@@ -174,6 +178,34 @@ sub my_system {
         die "$cmd exited unexpectedly: $!\n";
     }
 }
+
+# Execute the given $cmd using backticks, allowing $timeout time for it
+# to finish. 
+# Returns a pair ( $t, $ret )
+#   where $t is a 0 or 1 depending whether the timout was reached (0
+#   means timeout, 1 means success).
+#   and $ret is the returned value (empty string if timeout).
+#
+# For timeout, we use the alarm mechanism. See perldoc -f alarm.
+sub my_system_timeout {
+    my ($cmd, $timeout) = @_;
+    my $ret = "";
+    eval {
+        local $SIG{ALRM} = sub { die "alarm\n" }; # NB: \n required
+        alarm $timeout;
+        $ret = `$cmd`;
+        alarm 0;
+    };
+    if ($@) {
+        die unless $@ eq "alarm\n";   # propagate unexpected errors
+        print "WARNING! The command $cmd timed out.\n";
+        return (0, "");
+    }
+    else {
+        return (1, $ret);
+    }
+}
+
 
 # returns -1, 0 or 1, depending is the last modification date of 
 # $f1 is less, equal or more than the modif date of $f2.
@@ -323,15 +355,31 @@ sub check_running_task {
     my $wdir = $host_data[1];
     my $cadodir = $host_data[2];
     # First check if the last line corresponds to finished job:
-    my $lastline = `ssh $host tail -1 $wdir/$name.rels.$q0-$q1`;
+    my ($t, $lastline) = my_system_timeout(
+        "ssh $host tail -1 $wdir/$name.rels.$q0-$q1", 30);
+    if (! $t) {
+        print "      Assume task is still running...\n";
+        return 1;
+    }
     $_ = $lastline;
     if (/# Total/) {
         print "      finished!\n";
         return 0;
     }
     # If file is partial check its last modification time:
-    my $date=`ssh $host date +%s`;
-    my $modifdate=`ssh $host stat -c %Y $wdir/$name.rels.$q0-$q1`;
+    my $date;
+    ($t, $date) = my_system_timeout("ssh $host date +%s", 30);
+    if (! $t) {
+        print "      Assume task is still running...\n";
+        return 1;
+    }
+    my $modifdate;
+    ($t, $modifdate) = my_system_timeout(
+        "ssh $host stat -c %Y $wdir/$name.rels.$q0-$q1", 30);
+    if (! $t) {
+        print "      Assume task is still running...\n";
+        return 1;
+    }
     ## If didn't move for 10 minutes, assume it's dead
     if ($date > ($modifdate + 600)) {
         print "      dead ?!?\n";
@@ -354,7 +402,7 @@ sub import_task_result {
     my @host_data=@{$mach_desc->{$host}};
     my $rwdir = $host_data[1];
     my $lwdir = $param->{wdir};
-    my $cmd = "rsync $host:$rwdir/$name.rels.$q0-$q1 $lwdir/";
+    my $cmd = "rsync --timeout=30 $host:$rwdir/$name.rels.$q0-$q1 $lwdir/";
     my $ret = system($cmd);
     if ($ret != 0) {
         print STDERR "Problem when importing file $name.rels.$q0-$q1 from $host.\n";
@@ -400,18 +448,23 @@ sub push_files {
     my ($mach, $wdir, $param) = @_;
     my $name = $param->{name};
     my $ldir = $param->{wdir};
-    system ("ssh $mach mkdir -p $wdir");
-    my $ret = `ssh $mach ls $wdir/$name.poly`;
+    my $t;
+    my $ret;
+    ($t, $ret) = my_system_timeout("ssh $mach mkdir -p $wdir", 60);
+    if (! $t) { die "Connection to $mach timeout\n"; }
+    ($t, $ret) = my_system_timeout("ssh $mach ls $wdir/$name.poly", 120);
+    if (! $t) { die "Connection to $mach timeout\n"; }
     chomp $ret;
     if ($ret eq "") {
         print "    Pushing $name.poly to $mach.\n";
-        system("rsync $ldir/$name.poly $mach:$wdir/");
+        system("rsync --timeout=120 $ldir/$name.poly $mach:$wdir/");
     }
-    $ret = `ssh $mach ls $wdir/$name.roots`;
+    ($t, $ret) = my_system_timeout("ssh $mach ls $wdir/$name.roots", 120);
+    if (! $t) { die "Connection to $mach timeout\n"; }
     chomp $ret;
     if ($ret eq "") {
         print "    Pushing $name.roots to $mach.\n";
-        system("rsync $ldir/$name.roots $mach:$wdir/");
+        system("rsync --timeout=120 $ldir/$name.roots $mach:$wdir/");
     }
 }    
 
@@ -450,6 +503,7 @@ sub restart_tasks {
     my $running = shift @_;
     my $mach_desc = shift @_;
     my $name = $param->{name};
+    my $nice = $param->{sievenice};
 
     my $q_curr = get_next_q($param, $running);
 
@@ -473,13 +527,16 @@ sub restart_tasks {
             my $wdir = $desc[1];
             my $bindir = $desc[2];
             push_files($mach, $wdir, $param);
-            my $cmd = "$bindir/sieve/las -checknorms" .
+            my $cmd = "/bin/nice -$nice $bindir/sieve/las -checknorms" .
               " -I " . $param->{I} .
               " -poly $wdir/$name.poly" .
               " -fb $wdir/$name.roots" .
               " -q0 $q_curr -q1 $qend";
-            my $ret = `ssh $mach "$cmd &> $wdir/$name.rels.$q_curr-$qend&"`;
+            my $ret = `ssh $mach "$cmd >& $wdir/$name.rels.$q_curr-$qend&"`;
             print "    Starting $mach $q_curr-$qend.\n";
+            open FH, ">> " . $param->{wdir} . "/$name.cmd";
+            print FH "ssh $mach \"$cmd >& $wdir/$name.rels.$q_curr-$qend&\"\n";
+            close FH;
             push @$running, $t;
             $q_curr = $qend;
         }
@@ -588,7 +645,7 @@ sub sieve {
               " -fb $prefix.roots" .
               " -q0 $qcurr -q1 $qend";
             print "Running lattice siever for q in [$qcurr,$qend]...\n";
-            my_system($cmd . " &> $filename", "$prefix.cmd");
+            my_system($cmd . " >& $filename", "$prefix.cmd");
         } else {
             print "Found an existing relation file!\n";
         }
@@ -706,16 +763,29 @@ MAIN: {
     $cmd = $param->{cadodir} . "/linalg/transpose" .
       "  -in $prefix.small -out $prefix.small.tr";
     my_system($cmd, "$prefix.cmd");
-    print "Calling Block-Wiedemann...\n";
-    $cmd = $param->{cadodir} . "/linalg/bw/bw.pl" .
-      " mt=" . $param->{bwmt} .
-      " matrix=$prefix.small.tr" .
-      " mn=64" .
-      " vectoring=64" .
-      " multisols=1" .
-      " wdir=" . $param->{wdir} . "/bw" .
-      " solution=$prefix.W";
-    my_system($cmd . " >& $prefix.bw.stderr", "$prefix.cmd");
+    if ($param->{linalg} eq 'bw') { 
+        print "Calling Block-Wiedemann...\n";
+        $cmd = $param->{cadodir} . "/linalg/bw/bw.pl" .
+        " mt=" . $param->{bwmt} .
+        " matrix=$prefix.small.tr" .
+        " mn=64" .
+        " vectoring=64" .
+        " multisols=1" .
+        " wdir=" . $param->{wdir} . "/bw" .
+        " solution=$prefix.W";
+        my_system($cmd . " >& $prefix.bw.stderr", "$prefix.cmd");
+    } else {
+        if ($param->{linalg} ne 'bl') {
+            print "WARNING: I don't know linalg=" . $param->{linalg} .
+              ". Use bl as default.\n";
+        }
+        print "Calling Block-Lanczos...\n";
+        $cmd = $param->{cadodir} . "/linalg/bl/bl.pl" .
+        " matrix=$prefix.small.tr" .
+        " wdir=" . $param->{wdir} . "/bl" .
+        " solution=$prefix.W";
+        my_system($cmd . " >& $prefix.bl.stderr", "$prefix.cmd");
+    }
     print "Converting dependencies to CADO format...\n";
     $cmd = $param->{cadodir} . "/linalg/bw/mkbitstrings " .
       " $prefix.W";

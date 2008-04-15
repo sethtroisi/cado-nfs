@@ -58,8 +58,8 @@ alambda=1.2
 
 I=12                    # Sieving range in lattice siever
 qmin=400000             # Start of the special-q range
-qrange=10000             
-checkrange=30000
+qrange=5000             
+checkrange=50000
 
 ###########################################################################
 # Filtering
