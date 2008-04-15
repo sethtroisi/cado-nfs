@@ -1230,6 +1230,7 @@ static bool go_recursive(polmat& pi)
     unsigned int expected_pi_deg = pi_deg_bound(ldeg);
     unsigned int kill;
     unsigned int tstart = t;
+    unsigned int tmiddle;
     bool finished_early;
 
 #ifdef	HAS_CONVOLUTION_SPECIAL
@@ -1260,6 +1261,8 @@ static bool go_recursive(polmat& pi)
         pi.swap(pi_left);
         return true;
     }
+
+    tmiddle = t;
 
     printf("deg(pi_l)=%d, bound is %d\n",pi_l_deg,expected_pi_deg);
 
@@ -1343,7 +1346,18 @@ static bool go_recursive(polmat& pi)
 
     itransform(pi, pi_hat, o, pi_l_deg + pi_r_deg);
 
-    write_polmat(pi,std::string(fmt("pi-%-%") % tstart % t).c_str());
+    if (checkpoints) {
+        write_polmat(pi,std::string(fmt("pi-%-%") % tstart % t).c_str());
+        {
+            std::string lpi = fmt("pi-%-%") % tstart % tmiddle;
+            std::string rpi = fmt("pi-%-%") % tmiddle % t;
+            if (unlink(lpi.c_str()) < 0)
+                std::cerr << fmt("unlink(%): %\n") % lpi % strerror(errno);
+            if (unlink(rpi.c_str()) < 0)
+                std::cerr << fmt("unlink(%): %\n") % rpi % strerror(errno);
+        }
+    }
+
 
     if (finished_early) {
         printf("Exceptional situation:\n"

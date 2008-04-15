@@ -577,6 +577,12 @@ struct krylov_thread:public thread < traits, krylov_thread < traits > > {
                         traits::print(v,dst[j]);
                         v << "\n";
                     }
+                    v.close();
+
+                    if (r) {
+                        std::string old = files::v % globals::col % (r-1);
+                        unlink(old.c_str());
+                    }
                 }
         }
 

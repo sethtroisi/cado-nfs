@@ -491,6 +491,8 @@ KRYLOV : {
 	}
 	$exe .= " --task krylov --subdir $wdir";
 
+        $exe .= " --checkpoints";
+
 
 	my @krylovjobs = ();
 	
