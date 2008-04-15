@@ -63,7 +63,7 @@ Import('tests_dir')
 #
 # New environement
 #
-testenv = env.Copy()
+testenv = env.Clone()
 
 #
 # Current working directory

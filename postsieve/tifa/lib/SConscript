@@ -76,7 +76,7 @@ import SubstInFile
 #
 # Make a new environment to avoid polluting the imported environement
 #
-libenv = env.Copy()
+libenv = env.Clone()
 
 #
 # Current working directory
@@ -322,7 +322,7 @@ doc_bld = Builder(
 #
 # Make a new environment
 #
-docenv = libenv.Copy(['default', SubstInFile.TOOL_SUBST])
+docenv = libenv.Clone(['default', SubstInFile.TOOL_SUBST])
 docenv.Append(BUILDERS = {'MakeDoc' : doc_bld})
 
 #

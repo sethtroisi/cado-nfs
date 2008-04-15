@@ -65,7 +65,7 @@ Import('tools_dir')
 #
 # New environement
 #
-progenv = env.Copy()
+progenv = env.Clone()
 
 #
 # Current working directory
