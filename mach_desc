@@ -15,3 +15,7 @@ achille   2     /tmp/truc       _
 hecube    2     /tmp/truc       _
 helene    2     /tmp/truc       _
 
+
+# WARNING: $HOME is substitued locally!
+beaufort  2     /tmp/truc       /users/crypto/gaudry/cado
+

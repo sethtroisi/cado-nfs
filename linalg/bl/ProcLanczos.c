@@ -1435,38 +1435,13 @@ unsigned long *LanczosIterations(unsigned long *a, unsigned long *Y,
 
 
     if (p == 0) {
-
-     
-	char *f;
-	f = malloc(10 * sizeof(unsigned long));
-
-	sprintf(f, "ControlFile_%lu_%lu_%lu.txt", m, n, Block);
-
-	FILE *File;
-	File = fopen(f, "a");
-
 	printf("ACompT = %f ms AComT = %f ms ",
 	       SumTimeOper / (Step - 1) / 1000,
 	       SumTimeCom / (Step - 1) / 1000);
-	fprintf(File, "ACompT = %f ms AComT = %f ms ",
-		SumTimeOper / (Step - 1) / 1000,
-		SumTimeCom / (Step - 1) / 1000);
-
 	printf("ABcastT = %f ms  ARedT= %f ms  ",
 	       SumTimeComBcast / (Step - 1) / 1000,
 	       SumTimeComRed / (Step - 1) / 1000);
-	fprintf(File, "ABcastT = %f ms  ARedT= %f ms  ",
-		SumTimeComBcast / (Step - 1) / 1000,
-		SumTimeComRed / (Step - 1) / 1000);
 	printf("TPTime = %lu ms  ", (t1 - t0) / 1000);
-
-	fprintf(File, "TPTime = %lu ms  ", (t1 - t0) / 1000);
-
-	fclose(File);
-         
-       
-
-        free(f);
 
 	for (i = 0; i < iceildiv(Block, WBITS) * n; ++i) {
 	    Resultado[i] = X[i] ^ Y[i];
