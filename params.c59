@@ -58,15 +58,15 @@ alambda=1.2
 
 I=12                    # Sieving range in lattice siever
 qmin=400000             # Start of the special-q range
-qrange=5000             
-checkrange=50000
+qrange=5000             # The size of an elementary sieving task
+checkrange=50000        # We check if we have enough after each step
+                        # of that many relations found.
 
 ###########################################################################
 # Filtering
 ###########################################################################
 
 prune=1.0               # les brunes comptent pas pour des...
-merge=1000000           # mergeons, mergeons!
 keep=160                # keep euh le plus
 maxlevel=15             # ???
 cwmax=200               # ???
@@ -83,6 +83,7 @@ bwstrat=1
 ###########################################################################
 
 bwmt=2                  # Multithreading level of Block-Wiedemann
+linlag=bl               # Choose linalg algorithm: bl or bw
 
 ###########################################################################
 # Characters

@@ -43,7 +43,6 @@ my $default_param = {
     checkrange=>1000000,
     sievenice=>19,
     prune=>1.0,
-    merge=>1000000,
     keep=>160,
     maxlevel=>15,
     cwmax=>200,
@@ -93,7 +92,6 @@ sub read_param {
         if (/^checkrange=(.*)$/){ $param->{checkrange}=$1; shift @args; next; }
         if (/^sievenice=(.*)$/){ $param->{sievenice}=$1; shift @args; next; }
         if (/^prune=(.*)$/)    { $param->{prune}=$1; shift @args; next; }
-        if (/^merge=(.*)$/)    { $param->{merge}=$1; shift @args; next; }
         if (/^keep=(.*)$/)     { $param->{keep}=$1; shift @args; next; }
         if (/^maxlevel=(.*)$/) { $param->{maxlevel}=$1; shift @args; next; }
         if (/^cwmax=(.*)$/)    { $param->{cwmax}=$1; shift @args; next; }
@@ -742,7 +740,6 @@ MAIN: {
       " -mat $prefix.purged" .
       " -forbw " . $param->{bwstrat} .
       " -prune " . $param->{prune} .
-      " -merge " . $param->{merge} .
       " -keep "  . $param->{keep} .
       " -maxlevel " . $param->{maxlevel} .
       " -cwmax " . $param->{cwmax} .
