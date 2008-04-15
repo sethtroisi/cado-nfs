@@ -77,7 +77,12 @@ int main(int argc, char *argv[])
     CoeffperBlock(NumberCoeffBlocks,Fl);
 
 
-    if (p==0) {for (i=0; i<size; i++) {printf("Job %lu Block  %lu  has size %lu \n",p,i,NumberCoeffBlocks[i]);}}
+    if (p==0) {
+        for (i=0; i<size; i++) {
+            printf("Job %d Block  %lu  has size %lu \n",
+                    p, i, NumberCoeffBlocks[i]);
+        }
+    }
 
  //   M->Data =
 //	malloc((M->Nrows / size + M->Nrows % size) * (M->Weight + 1) *

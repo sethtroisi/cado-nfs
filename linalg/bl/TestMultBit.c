@@ -32,8 +32,8 @@ int main(int argc, char *argv[])
     Fl = argv[1];
 
 
-    unsigned long Tm1, Tm2;
-    float DiffTime;
+    // unsigned long Tm1, Tm2;
+    // float DiffTime;
     unsigned long Block = WBITS;
 
 // Test if MPI is initialized if not initializes it 
@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
 
     MPI_Comm_size(MPI_COMM_WORLD, &size);	//get the number of processes (size=1 if not using MPI)
     MPI_Comm_rank(MPI_COMM_WORLD, &p);	//get the process ranks (p=0 if not using MPI)
-     MPI_Status status;
+    // MPI_Status status;
 
 
 // Get the sparse matrix from file 
@@ -79,7 +79,12 @@ int main(int argc, char *argv[])
     CoeffperBlock(NumberCoeffBlocks,Fl);
 
 
-    if (p==0) {for (i=0; i<size; i++) {printf("Job %lu Block  %lu  has size %lu \n",p,i,NumberCoeffBlocks[i]);}}
+    if (p==0) {
+        for (i=0; i<size; i++) {
+            printf("Job %d Block  %lu  has size %lu \n",
+                    p, i, NumberCoeffBlocks[i]);
+        }
+    }
 
  //   M->Data =
 //	malloc((M->Nrows / size + M->Nrows % size) * (M->Weight + 1) *
@@ -118,8 +123,8 @@ KerPar=malloc(2*sizeof(unsigned long));
 KerPar[0]=Ker->Nrows;
 KerPar[1]=Ker->Ncols;
 
-unsigned long m=M->Nrows;
-unsigned long n=M->Ncols;
+// unsigned long m=M->Nrows;
+// unsigned long n=M->Ncols;
 
 //printf("p = %lu   m = %lu   n = %lu!!\n",p,m,n);
 
@@ -130,7 +135,7 @@ unsigned long n=M->Ncols;
 
 SMatrix_Vector(Result,M,Ker);
 
-printf("Multiplication done in %lu!!\n",p);
+printf("Multiplication done in %d!!\n",p);
 
 
 free(NumberCoeffBlocks);
