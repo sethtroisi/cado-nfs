@@ -22,6 +22,7 @@ unsigned long *Allocmn(unsigned long m, unsigned long n)
     unsigned long *a;
 
     limbs_per_matrix = iceildiv(n, WBITS) * m;
+    limbs_per_matrix += limbs_per_matrix&1;
 
     a = malloc(limbs_per_matrix * sizeof(unsigned long));
 
