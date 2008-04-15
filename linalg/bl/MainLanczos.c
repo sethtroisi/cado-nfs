@@ -119,6 +119,8 @@ int main(int argc, char *argv[])
 
     SMatrix_Vector(Result,M,Ker);
 
+//    Test_SMatrix_Vector(Result->Data, M->Data, Ker->Data,M->Nrows,M->Ncols);
+
     free(M->Data);
 
     if (p == 0) {

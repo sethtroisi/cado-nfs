@@ -58,15 +58,12 @@ int main(int argc, char *argv[])
 
 
     unsigned long *Num;
-    Num = malloc(3 * sizeof(unsigned long));
+    Num = malloc(2 * sizeof(unsigned long));
     ReadSMatrixFileData(Fl, Num);
     M->Nrows = Num[0];
     M->Ncols = Num[1];
-    //M->Weight = Num[2];
-
-    free(Num);
-
-    //printf("%s \n",Fl2);
+    
+   free(Num);
 
     // For MPI  Number of Lines of the matrix to read in each process
     unsigned long BlockSize,i;
@@ -86,28 +83,18 @@ int main(int argc, char *argv[])
         }
     }
 
- //   M->Data =
-//	malloc((M->Nrows / size + M->Nrows % size) * (M->Weight + 1) *
-//	       sizeof(unsigned long));
-
-	M->Data =
-	malloc(NumberCoeffBlocks[p]*sizeof(unsigned long));
+   M->Data =malloc(NumberCoeffBlocks[p]*sizeof(unsigned long));
 
 
     ReadSMatrixFileBlockNew(Fl, M->Data, p * (M->Nrows / size),BlockSize);
-
-
-//  if (p==0) {displaySMatrixNew(M->Data,SizeBlock(size, 0, M->Nrows),M->Ncols,'a');}
 
 
 // end Get the sparce matrix from file
 
     DenseMatrix Result;
     
-
     Result->Data = Allocmn(M->Nrows, Block);
     Ker->Data = Allocmn(M->Ncols, Block);
-
 
 
 //for tests
@@ -133,13 +120,16 @@ KerPar[1]=Ker->Ncols;
 
  
 
-SMatrix_Vector(Result,M,Ker);
-
-printf("Multiplication done in %d!!\n",p);
+//SMatrix_Vector(Result,M,Ker);
 
 
-free(NumberCoeffBlocks);
-free(KerPar);
+//Test_SMatrix_Vector(Result->Data, M->Data, Ker->Data,m,n);
+
+printf("Multiplication done in %lu!!\n",p);
+
+
+//free(NumberCoeffBlocks);
+//free(KerPar);
 //free(Result->Data);
 //free(Ker->Data);
 //free(M->Data);
@@ -195,7 +185,7 @@ printf("p=  %lu Toto\n",p);
     }
 
 */
-    close_random();
+    
 
     return 0;
 }

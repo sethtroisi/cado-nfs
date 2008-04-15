@@ -1759,11 +1759,11 @@ void KernelSparse(unsigned long *a, unsigned long *R,
 
 
 // See where to put them here is good for one proc
- 
+
 free(ResmN_Dist1);
 free(ATAR);
 free(d);
-        
+       
         free(NC);
 	free(ResnV3);
 	free(ResVn3);
@@ -1775,7 +1775,7 @@ free(d);
 	free(ResNn2);
 	free(ListLines);
 	free(LengListLines);
-
+ 
 
 }
 

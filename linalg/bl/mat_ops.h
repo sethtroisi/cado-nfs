@@ -115,4 +115,7 @@ extern unsigned long Pivot(unsigned long m, unsigned long n, unsigned long *a,
 extern void SMatrix_Vector(DenseMatrix, SparseMatrix, DenseMatrix);
 extern void STSMatrix_Vector(DenseMatrix, SparseMatrix, DenseMatrix);
 
+
+extern void Test_SMatrix_Vector(unsigned long *Result, unsigned long *M, unsigned long *V,unsigned long m,unsigned long n);
+
 #endif  /* BL_MAT_OPS_H_ */

@@ -1174,7 +1174,7 @@ if (p==0){
 
 
 
-#if 0
+#if 1
 
 
 void Test_SMatrix_Vector(unsigned long *Result, unsigned long *M, unsigned long *V,unsigned long m,unsigned long n)
@@ -1185,7 +1185,7 @@ void Test_SMatrix_Vector(unsigned long *Result, unsigned long *M, unsigned long 
     MPI_Comm_rank(MPI_COMM_WORLD, &p);
     MPI_Status status;
  
-    printf("p= %lu  %lu  %lu\n",p,V->Ncols,SizeBlock(size, p, M->Nrows));
+    //printf("p= %lu  %lu  %lu\n",p,V->Ncols,SizeBlock(size, p, M->Nrows));
 
   
     unsigned long j, i;
@@ -1193,68 +1193,64 @@ void Test_SMatrix_Vector(unsigned long *Result, unsigned long *M, unsigned long 
     //MPI_Bcast( V->Data, M->Ncols, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
     
     
-
 if (p==0){
     for (i=1; i<size; i++) {
-      MPI_Send(V->Data, M->Ncols , MPI_UNSIGNED_LONG,
-		 i, 12, MPI_COMM_WORLD);
+      MPI_Send(V,n , MPI_UNSIGNED_LONG,i, 12, MPI_COMM_WORLD);
    
        }
     }
-    else
+
+if (p!=0)    
     {
-    MPI_Recv(V->Data,M->Ncols,
-		     MPI_UNSIGNED_LONG,0, 12, MPI_COMM_WORLD, &status);
+    MPI_Recv(V,n,MPI_UNSIGNED_LONG,0, 12, MPI_COMM_WORLD, &status);
     }
 
  
 
     unsigned long *Prod_Dist;
-    Prod_Dist = Allocmn(SizeBlock(size, p, M->Nrows), sizeof(unsigned long));
+    Prod_Dist = Allocmn(SizeBlock(size, p, m), sizeof(unsigned long));
 
-    SMultDmatrixBit(M->Nrows, M->Ncols, sizeof(unsigned long), M->Data, V->Data, Prod_Dist,
-		    p * (M->Nrows / size), SizeBlock(size, p, M->Nrows));
+    SMultDmatrixBit(m, n, sizeof(unsigned long),M, V, Prod_Dist,
+		    p * (m / size), SizeBlock(size, p, m));
 
     
 
     if (p != 0) {
-	MPI_Send(Prod_Dist, SizeBlock(size, p, M->Nrows), MPI_UNSIGNED_LONG,
+	MPI_Send(Prod_Dist, SizeBlock(size, p, m), MPI_UNSIGNED_LONG,
 		 0, 123, MPI_COMM_WORLD);
         
     }
 
 
     //MPI_Barrier(MPI_COMM_WORLD);
-    printf("in sub p = %lu   m = %lu   n = %lu!!\n",p,M->Nrows,M->Ncols);
+    //printf("in sub p = %lu   m = %lu   n = %lu!!\n",p,M->Nrows,M->Ncols);
 
     if (p == 0) {
-	for (i = 0; i < SizeBlock(size, 0, M->Nrows); i++) {
-	    Result->Data[i] = Prod_Dist[i];
+	for (i = 0; i < SizeBlock(size, 0, m); i++) {
+	    Result[i] = Prod_Dist[i];
 	}
-	unsigned long Bg = SizeBlock(size, 0, M->Nrows);
+	unsigned long Bg = SizeBlock(size, 0, m);
         
 
 	for (i = 1; i < size; i++) {
 
-	    MPI_Recv(Prod_Dist, SizeBlock(size, i, M->Nrows),
+	    MPI_Recv(Prod_Dist, SizeBlock(size, i, m),
 		     MPI_UNSIGNED_LONG, i, 123, MPI_COMM_WORLD, &status);
 
-	    for (j = 0; j < SizeBlock(size, i, M->Nrows); j++) {
-		Result->Data[j + Bg] = Prod_Dist[j];
+	    for (j = 0; j < SizeBlock(size, i, m); j++) {
+		Result[j + Bg] = Prod_Dist[j];
 	    }
-
-                        
-
-	    Bg += SizeBlock(size, i, M->Nrows);
+            
+	    Bg += SizeBlock(size, i, m);
 
 	}
-
+ free(Prod_Dist);
     }
     
     // MPI_Barrier(MPI_COMM_WORLD);
-    //free(Prod_Dist);
-    Result->Nrows = M->Nrows;
-    Result->Ncols = V->Ncols;
+   
+    //Result->Nrows = M->Nrows;
+    //Result->Ncols = V->Ncols;
 }
 
 #endif
