@@ -35,6 +35,9 @@ else
    fi
 
    time $linalg/bw/bw.pl mt=$mt matrix=$mat.tr mn=64 vectoring=64 multisols=1 wdir=$wdir solution=$solution
+# to use block Lanczos instead of block Wiedemann, just comment the above line
+# and uncomment the following one
+#   time $linalg/bl/bl.pl matrix=$mat.tr wdir=$wdir solution=$solution
 
    echo "Converting dependencies to CADO format"
    # bw.pl puts the dependency file W in the directory where the matrix was
