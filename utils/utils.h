@@ -62,7 +62,9 @@ extern void reduce_exponents_mod2 (relation_t *rel);
 extern uint64_t microseconds();
 
 /* cputime */
-static inline int cputime(void) { return (int) microseconds() / 1000; }
+static inline int cputime(void) {
+  return (int) (microseconds() / (uint64_t)1000);
+}
 static inline double seconds(void) { return (double) microseconds() /1.0e6; }
 
 /* long_poly: long_poly arithmetic */
