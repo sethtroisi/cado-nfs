@@ -1507,35 +1507,25 @@ unsigned long *LanczosIterations(unsigned long *a, unsigned long *Y,
 
 
 /*
-
 "Small" Linear algebra to get a 64 block of vectors in the Kernel of MTM
-
 */
 
-
-
-
-
-
-void KernelSparse(unsigned long *a, unsigned long *R,
-		  unsigned long m, unsigned long n,
+void KernelSparse(SparseMatrix M, unsigned long *R,
 		  unsigned long Block, DenseMatrix Ker)
 {
+    unsigned long * a = M->Data;
+    unsigned long m = M->Nrows;
+    unsigned long n = M->Ncols;
 
-
-    unsigned long SizeABlock, Sizea;
+    unsigned long Sizea;
     int size, p;
 
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &p);
     MPI_Status status;
 
-    if (p == size - 1) {
-	SizeABlock = m / size + (m % size);
-    } else {
-	SizeABlock = m / size;
-    }
 
+    unsigned long SizeABlock = M->slices[p]->i1 - M->slices[p]->i0;
 
 
 
@@ -1589,9 +1579,9 @@ void KernelSparse(unsigned long *a, unsigned long *R,
 
 
 
-    SMultDmatrixBit(m, n, N, a, R, ResmN_Dist, p * (m / size), SizeABlock);
+    SMultDmatrixBit(m, n, N, a, R, ResmN_Dist, M->slices[p]->i0, SizeABlock);
     TSMultDmatrixBit(SizeABlock, n, N, a, ResmN_Dist, ATAR_Dist,
-		     p * (m / size), SizeABlock);
+		     M->slices[p]->i0, SizeABlock);
     MPI_Reduce(ATAR_Dist, ATAR, iceildiv(Block, WBITS) * n, MPI_UNSIGNED_LONG,
 	       newop, 0, MPI_COMM_WORLD);
 
@@ -1644,37 +1634,30 @@ void KernelSparse(unsigned long *a, unsigned long *R,
     MPI_Bcast(NC, 1, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
 
 
-    SMultDmatrixBit(m, n, Block, a, ResnV3, ResmN_Dist1, p * (m / size),
-		    SizeBlock(size, p, m));
+    SMultDmatrixBit(m, n, Block, a, ResnV3, ResmN_Dist1, M->slices[p]->i0,
+		    SizeABlock);
 
 
     if (p != 0) {
-	MPI_Send(ResmN_Dist1, SizeBlock(size, p, m), MPI_UNSIGNED_LONG, 0, 1,
+	MPI_Send(ResmN_Dist1, SizeABlock, MPI_UNSIGNED_LONG, 0, 1,
 		 MPI_COMM_WORLD);
     };
 
     if (p == 0) {
-
-        
-
-	for (i = 0; i < SizeBlock(size, 0, m); i++) {
+	for (i = 0; i < SizeABlock ; i++) {
 	    d[i] = ResmN_Dist1[i];
 	}
 
-	unsigned long Bg = SizeABlock;
-
 	for (i = 1; i < size; i++) {
 
-
-	    MPI_Recv(ResmN_Dist1, SizeBlock(size, i, m), MPI_UNSIGNED_LONG, i,
+	    MPI_Recv(ResmN_Dist1,
+                    M->slices[i]->i1 - M->slices[i]->i0,
+                    MPI_UNSIGNED_LONG, i,
 		     1, MPI_COMM_WORLD, &status);
 
-	    for (j = 0; j < SizeBlock(size, i, m); j++) {
-		d[j + Bg] = ResmN_Dist1[j];
+	    for (j = M->slices[i]->i0; j < M->slices[i]->i1 ; j++) {
+		d[j] = ResmN_Dist1[j - M->slices[i]->i0];
 	    }
-
-	    Bg += SizeBlock(size, i, m);
-
 	}
 
        
@@ -1818,7 +1801,7 @@ void Lanczos(DenseMatrix Kernel, SparseMatrix M,
     Kernel->Nrows = M->Ncols;
     Kernel->Ncols = Block;
 
-    KernelSparse(M->Data, Result, M->Nrows, M->Ncols, Block, Kernel);
+    KernelSparse(M, Result, Block, Kernel);
 
     // MPI_Bcast(Index, 2, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
 

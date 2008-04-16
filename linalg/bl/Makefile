@@ -75,17 +75,17 @@ GETDATAFILES_LIBS:=
 #LANCZOSMPIOPTCOMPLETE_LIBS:=
 #-include .LanczosMPIOptComplete.mkf
 
-MAINLANCZOS_SOURCES:=MainLanczos.c ProcLanczos.c basic.c echelon.c mat_ops.c random.c alloc.c ReadWrite.c timing.c struct.c
+MAINLANCZOS_SOURCES:=MainLanczos.c ProcLanczos.c basic.c echelon.c mat_ops.c random.c alloc.c ReadWrite.c timing.c
 LANCZOSMPIOPTCOMPLETE_LIBS:=
 -include .MainLanczos.mkf
 
-TESTMULT_SOURCES:=TestMult.c ProcLanczos.c basic.c echelon.c mat_ops.c random.c alloc.c ReadWrite.c timing.c struct.c
+TESTMULT_SOURCES:=TestMult.c ProcLanczos.c basic.c echelon.c mat_ops.c random.c alloc.c ReadWrite.c timing.c
 LANCZOSMPIOPTCOMPLETE_LIBS:=
--include .TestMult.mkf
+# -include .TestMult.mkf
 
-TESTMULTBIT_SOURCES:=TestMultBit.c ProcLanczos.c basic.c echelon.c mat_ops.c random.c alloc.c ReadWrite.c timing.c struct.c
+TESTMULTBIT_SOURCES:=TestMultBit.c ProcLanczos.c basic.c echelon.c mat_ops.c random.c alloc.c ReadWrite.c timing.c
 LANCZOSMPIOPTCOMPLETE_LIBS:=
--include .TestMultBit.mkf
+# -include .TestMultBit.mkf
 
 
 #TESTMULTBIT_SOURCES:=toto.c 

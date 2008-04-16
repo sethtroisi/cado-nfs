@@ -1,3 +1,10 @@
+#ifndef BL_BASIC_H_
+#define BL_BASIC_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 extern unsigned long Refresh_Array(unsigned long m, unsigned long n,
 				   unsigned long ***A, unsigned long **a);
 extern unsigned long Mult_TV_A_V(unsigned long n, unsigned long N,
@@ -16,3 +23,9 @@ extern unsigned long Refresh_ArrayBit(unsigned long m, unsigned long n,
 				      unsigned long **A, unsigned long *a);
 extern unsigned long TestZero(unsigned long m, unsigned long n,
 			      unsigned long *a);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif	/* BL_BASIC_H_ */

@@ -4,6 +4,10 @@
 #include <stdint.h>
 #include "struct.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 extern void DMatrixSumBit(unsigned long m, unsigned long n,
 			  const unsigned long *A, const unsigned long *B,
 			  unsigned long *C);
@@ -115,7 +119,10 @@ extern unsigned long Pivot(unsigned long m, unsigned long n, unsigned long *a,
 extern void SMatrix_Vector(DenseMatrix, SparseMatrix, DenseMatrix);
 extern void STSMatrix_Vector(DenseMatrix, SparseMatrix, DenseMatrix);
 
-
 extern void Test_SMatrix_Vector(unsigned long *Result, unsigned long *M, unsigned long *V,unsigned long m,unsigned long n);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif  /* BL_MAT_OPS_H_ */

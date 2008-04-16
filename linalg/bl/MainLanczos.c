@@ -20,14 +20,45 @@
 #define	iceildiv(x,y)	(((x)+(y)-1)/(y))
 #define	WBITS	(CHAR_BIT * sizeof(unsigned long))
 
+void usage()
+{
+    fprintf(stderr, "Usage: MainLanczos [options] <matrix> [<kernel>]\n"
+            "Accepted options:\n"
+            "--column-dependency\tCompute a column dependency (default)\n"
+            "--row-dependency\tCompute a row dependency\n");
+    exit(1);
+}
 
 int main(int argc, char *argv[])
 {
     SparseMatrix M;
     DenseMatrix Ker;
-    char *Fl;
+    char *matrix_file_name = NULL;
+    char *kernel_file_name = NULL;
 
-    Fl = argv[1];
+    argc--,argv++;
+    for( ; argc ; argc--,argv++) {
+        if (strcmp(argv[0], "--column-dependency") == 0) {
+            /* do nothing, column dep. is the default */
+        } else if (strcmp(argv[0], "--row-dependency") == 0) {
+            // transpose_mat = 1;
+        } else if (matrix_file_name == NULL) {
+            matrix_file_name = argv[0];
+        } else if (kernel_file_name == NULL) {
+            kernel_file_name = argv[0];
+        } else {
+            fprintf(stderr, "Unexpected command line argument: %s\n", argv[0]);
+            usage();
+        }
+    }
+    if (matrix_file_name == NULL) {
+        usage();
+    }
+
+
+
+
+
 
 
     unsigned long Tm1, Tm2;
@@ -36,7 +67,7 @@ int main(int argc, char *argv[])
 
 // Test if MPI is initialized if not initializes it 
 
-    int size, p, flag;
+    int nb_processes, p, flag;
     flag = 0;
     MPI_Initialized(&flag);
     if (!flag) {
@@ -47,7 +78,7 @@ int main(int argc, char *argv[])
 
     init_random();
 
-    MPI_Comm_size(MPI_COMM_WORLD, &size);	//get the number of processes (size=1 if not using MPI)
+    MPI_Comm_size(MPI_COMM_WORLD, &nb_processes);	//get the number of processes (nb_processes=1 if not using MPI)
     MPI_Comm_rank(MPI_COMM_WORLD, &p);	//get the process ranks (p=0 if not using MPI)
     // MPI_Status status;
 
@@ -55,46 +86,25 @@ int main(int argc, char *argv[])
 // Get the sparse matrix from file 
 
 
-    unsigned long *Num;
-    Num = malloc(2 * sizeof(unsigned long));
-    ReadSMatrixFileData(Fl, Num);
-    M->Nrows = Num[0];
-    M->Ncols = Num[1];
-    //M->Weight = Num[2];
+     {
+         unsigned long Num[2];
+         ReadSMatrixDimensions(matrix_file_name, Num);
+         M->Nrows = Num[0];
+         M->Ncols = Num[1];
+     }
 
-    free(Num);
-
-    //printf("%s \n",Fl2);
-
-    // For MPI  Number of Lines of the matrix to read in each process
-    unsigned long BlockSize,i;
-    BlockSize = SizeBlock(size, p, M->Nrows);
-
-    // end for MPI   Number of Lines of the matrix to read in each process   
+    unsigned long i;
     
-    unsigned long *NumberCoeffBlocks=malloc(size*sizeof(unsigned long));
+    PrepareMatrixSlices(M, matrix_file_name);
 
-    CoeffperBlock(NumberCoeffBlocks,Fl);
-
-
-    if (p==0) {
-        for (i=0; i<size; i++) {
-            printf("Job %d Block  %lu  has size %lu \n",
-                    p, i, NumberCoeffBlocks[i]);
+    if (p == 0) {
+        for (i = 0; i < nb_processes; i++) {
+            printf("Job %d Block %lu has size %lu coeffs, %lu rows\n", p, i,
+                    M->slices[i]->nbcoeffs, M->slices[i]->i1 - M->slices[i]->i0);
         }
     }
 
- //   M->Data =
-//	malloc((M->Nrows / size + M->Nrows % size) * (M->Weight + 1) *
-//	       sizeof(unsigned long));
-
-	M->Data =
-	malloc(NumberCoeffBlocks[p]*sizeof(unsigned long));
-
-
-    ReadSMatrixFileBlockNew(Fl, M->Data, p * (M->Nrows / size),BlockSize);
-
-// end Get the sparce matrix from file
+    ReadSMatrixSlice(M, matrix_file_name);
 
     DenseMatrix Result;
 
@@ -112,16 +122,12 @@ int main(int argc, char *argv[])
 	Tm2 = microseconds();
 	DiffTime = Tm2 - Tm1;
 	printf
-	    ("Total Time for Lanczos = %f s   Size of block in kernel is %lu\n",
+	    ("Total Time for Lanczos = %f s   nb_processes of block in kernel is %lu\n",
 	     DiffTime / 1000000, Ker->Ncols);
     }
 
 
     SMatrix_Vector(Result,M,Ker);
-
-//    Test_SMatrix_Vector(Result->Data, M->Data, Ker->Data,M->Nrows,M->Ncols);
-
-    free(M->Data);
 
     if (p == 0) {
 	if (TestZero(M->Nrows, Block, Result->Data)) {
@@ -133,15 +139,16 @@ int main(int argc, char *argv[])
 
     }
 
-    if ((p == 0) && (argc == 3)) {
-	char *Fl2 = argv[2];
-	WriteBlockMatrix(Ker, Fl2);
-	printf("Kernel written to file %s\n", Fl2);
+    if ((p == 0) && kernel_file_name) {
+	WriteBlockMatrix(Ker, kernel_file_name);
+	printf("Kernel written to file %s\n", kernel_file_name);
     }
 
     free(Result->Data);
     free(Ker->Data);
-    free(NumberCoeffBlocks);
+    free(M->Data);
+    free(M->slices);
+
 
     close_random();
 

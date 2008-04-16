@@ -57,13 +57,14 @@ int main(int argc, char *argv[])
 // Get the sparse matrix from file 
 
 
-    unsigned long *Num;
-    Num = malloc(2 * sizeof(unsigned long));
-    ReadSMatrixFileData(Fl, Num);
-    M->Nrows = Num[0];
-    M->Ncols = Num[1];
-    
-   free(Num);
+     {
+         unsigned long Num[2];
+         ReadSMatrixDimensions(Fl, Num);
+         M->Nrows = Num[0];
+         M->Ncols = Num[1];
+     }
+
+    //printf("%s \n",Fl2);
 
     // For MPI  Number of Lines of the matrix to read in each process
     unsigned long BlockSize,i;

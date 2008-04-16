@@ -1,29 +1,21 @@
 #include "mpi_select.h"
+#include <assert.h>
 #include <stdio.h>
 #include <math.h>
+#include <stdint.h>
+#include <inttypes.h>
 #include <stdlib.h>
 #include <limits.h>
 #include <string.h>
+#include <errno.h>
 #include "struct.h"
 #include "ReadWrite.h"
+#include "mat_ops.h"
 
 
 #define	iceildiv(x,y)	(((x)+(y)-1)/(y))
 #define	WBITS	(CHAR_BIT * sizeof(unsigned long))
 
-
-
-unsigned long SizeBlock(unsigned long Nproc, unsigned long proc,
-			unsigned long m)
-{
-    unsigned long SizeABlock;
-    if (proc == Nproc - 1) {
-	SizeABlock = m / Nproc + (m % Nproc);
-    } else {
-	SizeABlock = m / Nproc;
-    }
-    return SizeABlock;
-}
 
 void displayMatrixV(unsigned long **M,
 		    unsigned long m, unsigned long n, char c)
@@ -347,36 +339,25 @@ void ReadSMatrixFile(char *f, unsigned long *M)
 
 
 
-void ReadSMatrixFileData(char *f, unsigned long *data)
+void ReadSMatrixDimensions(char *filename, unsigned long *data)
 {
-    int i;
-    char c;
-    FILE *File;
-    static char str[128];
+    FILE *f = fopen(filename, "r");
+    if (f == NULL) {
+        fprintf(stderr, "Cannot open %s: %s\n", filename, strerror(errno));
+        exit(1);
+    }
 
-    File = fopen(f, "r");
+    if (fscanf(f, "%lu %lu", &(data[0]), &(data[1])) != 2) {
+        fprintf(stderr, "Parse error while reading matrix header\n");
+        exit(1);
+    }
 
-    memset(str, 0, 4);
-    i = 0;
-    do {
-	c = fgetc(File);
-
-	if (c != ' ') {
-	    strncat(str, &c, 1);
-	} else {
-	    data[i] = atoi(str);
-	    i++;
-	    memset(str, 0, 4);
-	}
-    } while (i < 2);
-//printf("Sum=%d \n",i);
-    fclose(File);
-//free(str);
-
+    fclose(f);
 }
 
 
 
+#if 0
 void ReadSMatrixFileNew(char *f, unsigned long *M)
 {
     int i;
@@ -404,10 +385,8 @@ void ReadSMatrixFileNew(char *f, unsigned long *M)
 //printf("Sum=%d \n",i);
     fclose(File);
 //free(str);
-
 }
-
-
+#endif
 
 void ReadSMatrixFileBlock(char *f, unsigned long *M, unsigned long k,
 			  unsigned long size)
@@ -446,7 +425,7 @@ void ReadSMatrixFileBlock(char *f, unsigned long *M, unsigned long k,
 
 
 
-
+#if 0
 void ReadSMatrixFileBlockNew(char *f, unsigned long *M, unsigned long k,
 			     unsigned long size)
 {
@@ -484,88 +463,193 @@ void ReadSMatrixFileBlockNew(char *f, unsigned long *M, unsigned long k,
 //free(File);
 
 }
+#endif
 
-
-
-
-
-
-/*
-
-Count the number of coeff to be read for each block and broadcast the output.
-
-*/
-void CoeffperBlock(unsigned long *NumberCoeffBlocks, char *f)
+void ReadSMatrixSlice(SparseMatrix M, char *filename)
 {
+    FILE * f = fopen(filename, "r");
+    unsigned long i;
+    unsigned long * ptr;
+    int j;
+    MPI_Comm_rank(MPI_COMM_WORLD, &j);
+    matrix_slice_ptr s = M->slices[j];
 
-    int p, size;
 
-    MPI_Comm_size(MPI_COMM_WORLD, &size);	//get the number of processes
-    MPI_Comm_rank(MPI_COMM_WORLD, &p);	//get the process ranks
-
-    if (p == 0) {
-
-	unsigned long Nrows, l, q, i, j, i1, *LengthBlocks;
-
-	memset(NumberCoeffBlocks, 0, size * sizeof(unsigned long));
-
-	LengthBlocks = malloc(size * sizeof(unsigned long));
-
-	memset(LengthBlocks, 0, size * sizeof(unsigned long));
-	FILE *File;
-	File = fopen(f, "r");
-
-	for (i = 0; i < 2; ++i) {
-	    fscanf(File, "%lu", &q);
-	    if (i == 0) {
-		Nrows = q;
-	    }
-	}
-
-	for (j = 0; j < size; ++j) {
-	    if (j == 0) {
-		LengthBlocks[j] += SizeBlock(size, j, Nrows);
-	    } else {
-		LengthBlocks[j] +=
-		    (LengthBlocks[j - 1] + SizeBlock(size, j, Nrows));
-	    }
-	    printf("Size blocks is %lu \n", LengthBlocks[j]);
-	}
-
-	for (j = 0; j < size; ++j) {
-	    NumberCoeffBlocks[j] += SizeBlock(size, j, Nrows);
-	}
-
-	unsigned long Block = 0;
-
-	for (j = 0; j < Nrows; ++j) {
-	    fscanf(File, "%lu", &l);
-	    if (j < LengthBlocks[Block]) {
-		NumberCoeffBlocks[Block] += l;
-	    } else {
-		Block++;
-		NumberCoeffBlocks[Block] += (l);
-	    }
-	    for (i1 = 0; i1 < l; ++i1) {
-		fscanf(File, "%lu", &q);
-	    }
-	}
-        if (p==0) {free(LengthBlocks);}
-
-	fclose(File);
+    if (f == NULL) {
+        fprintf(stderr, "%s: %s\n", filename, strerror(errno));
+        exit(1);
     }
-    MPI_Bcast(NumberCoeffBlocks, size, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
+    if (fseeko(f, s->start, SEEK_SET) < 0) {
+        fprintf(stderr, "fseek(%s,%ld): %s\n",
+                filename, s->start, strerror(errno));
+    }
+
+    M->Data = malloc((s->nbcoeffs + s->i1 - s->i0) * sizeof(unsigned long));
+
+    ptr = M->Data;
+
+    for(i = s->i0 ; i < s->i1 ; i++) {
+        unsigned long l;
+        fscanf(f, "%lu", &l);
+        *ptr++ = l;
+        for( ; l-- ; ) {
+            fscanf(f, "%lu", ptr++);
+        }
+    }
+
+    assert(ptr - M->Data == (s->nbcoeffs + s->i1 - s->i0));
+
+    fclose(f);
+}
+
+
+/* imported from bw/cxx/balance.c ; this reads a table of row weights. */
+struct row {
+    int         w;
+    off_t       o;
+};
+
+static struct row * read_matrix(unsigned long * p_nr, const char * filename)
+{
+    char buf[1024];
+
+    FILE * f = fopen(filename, "r");
+    if (f == NULL) {
+        fprintf(stderr, "%s: %s\n", filename, strerror(errno));
+        exit(1);
+    }
+
+    char * ptr;
+    int siz;
+    off_t o;
+
+#define READ_LINE() do {						\
+        o = ftello(f);                                                  \
+        ptr = fgets(buf, sizeof(buf), f);				\
+        if (ptr == NULL) {						\
+            fprintf(stderr, "Unexpected %s at position %ld in %s\n",    \
+                    feof(f) ? "EOF" : "error", o, filename);            \
+            exit(1);							\
+        }								\
+        siz = strlen(ptr);						\
+    } while (0)
+
+#define GOBBLE_LONG_LINE() do {                                         \
+    while (!(siz < (sizeof(buf)-1) || buf[sizeof(buf)-2] == '\n')) {	\
+        ptr = fgets(buf, sizeof(buf), f);				\
+        if (ptr == NULL) {						\
+            fprintf(stderr, "Unexpected %s at position %ld in %s\n",    \
+                    feof(f) ? "EOF" : "error", ftello(f), filename);    \
+            exit(1);							\
+        }								\
+        siz = strlen(ptr);						\
+    }                                                                   \
+    } while (0)								\
+
+    
+    uint32_t nr, nc;
+    uint32_t i;
+
+    /* Read matrix header */
+    READ_LINE();
+    if (sscanf(buf, "%" SCNu32 " %" SCNu32, &nr, &nc) != 2) {
+        fprintf(stderr, "Parse error while reading header: %s\n", buf);
+        exit(1);
+    }
+    GOBBLE_LONG_LINE();
+
+    struct row * row_table = malloc((nr+1) * sizeof(struct row));
+    if (row_table == NULL) abort();
+
+    fprintf(stderr, "Reading row table...");
+    fflush(stderr);
+
+    for(i = 0 ; i < nr ; i++) {
+        int w;
+        READ_LINE();
+        if (sscanf(buf, "%d", &w) != 1) {
+            fprintf(stderr, "Parse error while reading line %"PRIu32" of %s\n",
+                    i+1, filename);
+            exit(1);
+        }
+        row_table[i].w = w;
+        row_table[i].o = o;
+        GOBBLE_LONG_LINE();
+    }
+    row_table[nr].o = ftello(f);
+
+    fprintf(stderr, "done\n");
+    fflush(stderr);
+
+    fclose(f);
+
+    *p_nr = nr;
+
+    return row_table;
 }
 
 
 
 
 
+/* Count the number of coeff to be read for each block and broadcast the
+ * output.
+ */
+void PrepareMatrixSlices(SparseMatrix M, char *filename)
+{
+    int p, nb_processes;
+    int i;
+    unsigned long * offsets;
+    unsigned long * weights;
+    unsigned long * indices;
+
+    MPI_Comm_size(MPI_COMM_WORLD, &nb_processes);
+    MPI_Comm_rank(MPI_COMM_WORLD, &p);
+
+    offsets = malloc((nb_processes+1) * sizeof(unsigned long));
+    weights = malloc( nb_processes * sizeof(unsigned long));
+    indices = malloc((nb_processes+1) * sizeof(unsigned long));
 
 
+    /* Only one thread reads the matrix */
+    if (p == 0) {
+        unsigned long nrows;
+        struct row * row_table = read_matrix(&nrows, filename);
+        int j;
+	for (j = 0; j < nb_processes + 1; ++j) {
+            unsigned long i0 = (j * nrows) / nb_processes;
+            indices[j] = i0;
+            offsets[j] = row_table[i0].o;
+            /* Count all the coeffs of the previous slice */
+            if (j) {
+                unsigned long i;
+                weights[j-1] = 0;
+                for(i = indices[j-1] ; i < i0 ; i++) {
+                    weights[j-1] += row_table[i].w;
+                }
+            }
+        }
+    }
+    MPI_Bcast(offsets, nb_processes + 1, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
+    MPI_Bcast(weights, nb_processes, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
+    MPI_Bcast(indices, nb_processes, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
 
+    /* reconstruct the nice data */
 
+    M->slices = malloc(nb_processes*sizeof(matrix_slice));
+    for(i = 0 ; i < nb_processes ; i++) {
+        M->slices[i]->i0 = indices[i];
+        M->slices[i]->i1 = indices[i+1];
+        M->slices[i]->start = offsets[i];
+        M->slices[i]->end = offsets[i+1];
+        M->slices[i]->nbcoeffs = weights[i];
+    }
 
+    /* Dispose the scrap paper */
+    free(offsets);
+    free(weights);
+    free(indices);
+}
 
 void WriteSMatrix(unsigned long *A,
 		  unsigned long m, unsigned long n, char c, char *f)
@@ -714,7 +798,6 @@ void WriteMatrixDense(const unsigned long *matrix,
 
 }
 
-
 void ReadDMatrixFile(char *f, unsigned long n, unsigned long *M)
 {
     int i, j, L;
@@ -747,7 +830,6 @@ void ReadDMatrixFile(char *f, unsigned long n, unsigned long *M)
 //printf("Sum=%d \n",i);
     fclose(File);
 }
-
 
 
 

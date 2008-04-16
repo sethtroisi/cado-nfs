@@ -1,6 +1,9 @@
 #ifndef BL_READWRITE_H_
 #define BL_READWRITE_H_
 
+#include <stdio.h>
+#include "struct.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -32,7 +35,7 @@ extern void WriteFileSMatrixNew(const unsigned long *matrix, unsigned long m,
 				unsigned long n, char c);
 extern void WriteFileMatrix(const unsigned long *matrix, unsigned long m,
 			    unsigned long n, char c);
-extern void ReadSMatrixFileData(char *f, unsigned long *data);
+extern void ReadSMatrixDimensions(char *f, unsigned long *data);
 extern void ReadSMatrixFileNew(char *f, unsigned long *M);
 extern void ReadSMatrixFileBlockNew(char *f, unsigned long *M,
 				    unsigned long k, unsigned long size);
@@ -43,8 +46,8 @@ extern void displayMatrixScreen(const unsigned long *matrix,
 
 extern void WriteBlockMatrix(DenseMatrix Ker, char *f);
 
-extern void CoeffperBlock( unsigned long *NumberCoeffBlocks, char *f);
-
+extern void ReadSMatrixSlice(SparseMatrix M, char *filename);
+extern void PrepareMatrixSlices(SparseMatrix, char *);
 
 #ifdef __cplusplus
 }

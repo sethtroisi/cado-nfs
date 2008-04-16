@@ -21,9 +21,6 @@
 #include <string.h>
 #include <time.h>
 
-
-
-
 #define	WBITS	(CHAR_BIT * sizeof(unsigned long))
 #define	iceildiv(x,y)	(((x)+(y)-1)/(y))
 
@@ -1094,13 +1091,13 @@ Multiplication functions for "sparse matrix times vector" and "Transpose sparse 
 
 void SMatrix_Vector(DenseMatrix Result, SparseMatrix M, DenseMatrix V)
 {
-    int size, p;
+    int nb_processes, p;
 
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_size(MPI_COMM_WORLD, &nb_processes);
     MPI_Comm_rank(MPI_COMM_WORLD, &p);
     MPI_Status status;
  
-  // printf("p= %lu  %lu  %lu\n",p,V->Ncols,SizeBlock(size, p, M->Nrows));
+  // printf("p= %lu  %lu  %lu\n",p,V->Ncols,SizeBlock(nb_processes, p, M->Nrows));
 
   
     unsigned long j, i;
@@ -1110,7 +1107,7 @@ void SMatrix_Vector(DenseMatrix Result, SparseMatrix M, DenseMatrix V)
     
 
 if (p==0){
-    for (i=1; i<size; i++) {
+    for (i=1; i<nb_processes; i++) {
       MPI_Send(V->Data, M->Ncols , MPI_UNSIGNED_LONG,
 		 i, 12, MPI_COMM_WORLD);
    
@@ -1123,17 +1120,18 @@ if (p==0){
     }
 
  
+    unsigned long my_nrows = M->slices[p]->i1 - M->slices[p]->i0;
 
     unsigned long *Prod_Dist;
-    Prod_Dist = Allocmn(SizeBlock(size, p, M->Nrows), sizeof(unsigned long));
+    Prod_Dist = Allocmn(my_nrows, sizeof(unsigned long));
 
     SMultDmatrixBit(M->Nrows, M->Ncols, sizeof(unsigned long), M->Data, V->Data, Prod_Dist,
-		    p * (M->Nrows / size), SizeBlock(size, p, M->Nrows));
+		    p * (M->Nrows / nb_processes), my_nrows);
 
     
 
     if (p != 0) {
-	MPI_Send(Prod_Dist, SizeBlock(size, p, M->Nrows), MPI_UNSIGNED_LONG,
+	MPI_Send(Prod_Dist, my_nrows, MPI_UNSIGNED_LONG,
 		 0, 123, MPI_COMM_WORLD);
         
     }
@@ -1143,27 +1141,20 @@ if (p==0){
   //  printf("in sub p = %lu   m = %lu   n = %lu!!\n",p,M->Nrows,M->Ncols);
 
     if (p == 0) {
-	for (i = 0; i < SizeBlock(size, 0, M->Nrows); i++) {
+	for (i = 0; i < my_nrows; i++) {
 	    Result->Data[i] = Prod_Dist[i];
 	}
-	unsigned long Bg = SizeBlock(size, 0, M->Nrows);
-        
 
-	for (i = 1; i < size; i++) {
+	for (i = 1; i < nb_processes; i++) {
 
-	    MPI_Recv(Prod_Dist, SizeBlock(size, i, M->Nrows),
+	    MPI_Recv(Prod_Dist,
+                    M->slices[i]->i1 - M->slices[i]->i0,
 		     MPI_UNSIGNED_LONG, i, 123, MPI_COMM_WORLD, &status);
 
-	    for (j = 0; j < SizeBlock(size, i, M->Nrows); j++) {
-		Result->Data[j + Bg] = Prod_Dist[j];
+	    for (j = M->slices[i]->i0 ; j < M->slices[i]->i1; j++) {
+		Result->Data[j] = Prod_Dist[j - M->slices[i]->i0];
 	    }
-
-                        
-
-	    Bg += SizeBlock(size, i, M->Nrows);
-
 	}
-
     }
     
     
@@ -1346,12 +1337,13 @@ void STSMatrix_Vector(DenseMatrix Result, SparseMatrix M, DenseMatrix V)
 
     MPI_Bcast(V->Data, V->Nrows, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
 
+    matrix_slice_ptr me = M->slices[p];
 
     SMultDmatrixBit(M->Nrows, M->Ncols, V->Ncols, M->Data, V->Data, ResmN_Dist,
-		    p * (M->Nrows / size), SizeBlock(size, p, M->Nrows));
-    TSMultDmatrixBit(SizeBlock(size, p, M->Nrows), M->Ncols, V->Ncols, M->Data,
-		     ResmN_Dist, ATAR_Dist, p * (M->Nrows / size),
-		     SizeBlock(size, p, M->Nrows));
+            me->i0, me->i1 - me->i0);
+    TSMultDmatrixBit(me->i1 - me->i0, M->Ncols, V->Ncols, M->Data,
+		     ResmN_Dist, ATAR_Dist,
+                     me->i0, me->i1 - me->i0);
     MPI_Reduce(ATAR_Dist, Result->Data, M->Ncols, MPI_UNSIGNED_LONG, newop, 0,
 	       MPI_COMM_WORLD);
 

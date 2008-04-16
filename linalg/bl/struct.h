@@ -5,10 +5,24 @@
 extern "C" { 
 #endif
     
+struct matrix_slice_s {
+    unsigned long i0;
+    unsigned long i1;
+    unsigned long nbcoeffs;
+    off_t start;
+    off_t end;
+};
+
+typedef struct matrix_slice_s matrix_slice[1];
+typedef struct matrix_slice_s * matrix_slice_ptr;
+
 struct SparseMatrix_s {
+    /* This is the _global_ info */
     unsigned long Nrows;
     unsigned long Ncols;
-    unsigned long Weight;
+    // unsigned long Weight;
+    /* This gives the info on all the matrix slices */
+    matrix_slice * slices;
     unsigned long *Data;
 };
 

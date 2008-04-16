@@ -60,10 +60,11 @@ int main(int argc, char *argv[])
 
     unsigned long *Num;
     Num = malloc(3 * sizeof(unsigned long));
-    ReadSMatrixFileData(Fl, Num);
+    ReadSMatrixDimensions(Fl, Num);
     M->Nrows = Num[0];
     M->Ncols = Num[1];
-    M->Weight = Num[2];
+    // M->Weight = Num[2];
+    abort();
 
 
 // For MPI  Number of Lines of the matrix to read in each process
@@ -75,7 +76,7 @@ int main(int argc, char *argv[])
 
 
     M->Data =
-	malloc((M->Nrows / size + M->Nrows % size) * (M->Weight +
+	malloc((M->Nrows / size + M->Nrows % size) * (/* M->Weight + */
 						    1) *
 	       sizeof(unsigned long));
     ReadSMatrixFileBlockNew(Fl, M->Data, p * (M->Nrows / size), BlockSize);
