@@ -78,10 +78,15 @@ int main(int argc, char *argv[])
 
     if (p == 0) {
         for (i = 0; i < nb_processes; i++) {
-            printf("Job %d Block %lu has size %lu coeffs, %lu rows\n", p, i,
-                    M->slices[i]->nbcoeffs, M->slices[i]->i1 - M->slices[i]->i0);
+            printf("Job %d Block %lu has size %lu coeffs,"
+                    " %lu rows ; i0=%lu, i1=%lu\n",
+                    p, i, M->slices[i]->nbcoeffs,
+                    M->slices[i]->i1 - M->slices[i]->i0,
+                    M->slices[i]->i0,
+                    M->slices[i]->i1);
         }
     }
+
 
     ReadSMatrixSlice(M, matrix_file_name);
 

@@ -479,6 +479,7 @@ void ReadSMatrixSlice(SparseMatrix M, char *filename)
         fprintf(stderr, "%s: %s\n", filename, strerror(errno));
         exit(1);
     }
+
     if (fseeko(f, s->start, SEEK_SET) < 0) {
         fprintf(stderr, "fseek(%s,%ld): %s\n",
                 filename, s->start, strerror(errno));
@@ -497,7 +498,7 @@ void ReadSMatrixSlice(SparseMatrix M, char *filename)
         }
     }
 
-    assert(ptr - M->Data == (s->nbcoeffs + s->i1 - s->i0));
+    assert(ptr - M->Data == s->nbcoeffs + s->i1 - s->i0);
 
     fclose(f);
 }
@@ -631,8 +632,8 @@ void PrepareMatrixSlices(SparseMatrix M, char *filename)
         }
     }
     MPI_Bcast(offsets, nb_processes + 1, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
-    MPI_Bcast(weights, nb_processes, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
-    MPI_Bcast(indices, nb_processes, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
+    MPI_Bcast(weights, nb_processes    , MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
+    MPI_Bcast(indices, nb_processes + 1, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
 
     /* reconstruct the nice data */
 
