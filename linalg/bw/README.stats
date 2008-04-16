@@ -1,0 +1,41 @@
+
+Running lines for lingen:
+
+[ 5] t=[1599..1732[ (dt=133)    0.36+3.23       (total 65.94)
+      est: [5]: 11.58 (40.6%) [2..7]: 175.20 (37.6%)
+
+Breakdown of information:
+
+[ 5]
+    current level of the computation. The algorithm is recursive.
+    Highest levels are leaves of the tree. Level x involves 2^x tree nodes.
+t=[1599..1732[ (dt=133)
+    range of values of t concerned by this sub-computation.
+0.36+3.23
+    time spent in this sub-tree ; first the time for this node of
+    the tree only, then the time spent in children nodes.
+(total 65.94)
+    total time spent so far
+est:
+    this line marks _estimations_ about the complete computation time.
+[5]: 11.58 (40.6%)
+    estimation for the proper time to be spent in tree nodes
+    _at this level only_
+[2..7]: 175.20 (37.6%)
+    estimation for the time to be spent in tree nodes at levels 2 to 7.
+    The broader the difference between outermost and innermost levels in
+    this estimation, the more precise it is.
+
+Don't be misled by this, for instance:
+
+[ 2] t=[1067..2131[ (dt=1064)   6.70+37.10      (total 87.60)
+      est: [2]: 26.78 (50.0%) [2..7]: 175.20 (50.0%)
+[ 1] t=[2..2131[ (dt=2129)      23.38+87.60     (total 110.98)
+      est: [1]: 46.76 (50.0%) [1..7]: 221.96 (50.0%)
+
+Estimation [2..7] was off by a fair bit, because the program had no idea
+by that time of how long the computation at level 1 would take. Therefore
+it is not accounted for in the first estimation, hence the difference.
+
+IOW, the percentage is monotonic, but not completely linear.
+

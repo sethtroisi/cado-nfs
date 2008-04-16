@@ -705,8 +705,6 @@ static bool gauss(unsigned int piv[], polmat& PI)/*{{{*/
      */
     unsigned int i,j,k;
     unsigned int rank;
-    bool finished = false;
-
     rank = 0 ;
 
     using namespace globals;
@@ -715,6 +713,8 @@ static bool gauss(unsigned int piv[], polmat& PI)/*{{{*/
     std::cout << "Input matrix\n";
     dbmat(&e0);
     */
+
+    std::vector<unsigned int> overflowed;
 
     for(j = 0 ; j < e0.ncols ; j++) {
         /* Find the pivot inside the column. */
@@ -742,10 +742,7 @@ static bool gauss(unsigned int piv[], polmat& PI)/*{{{*/
         // E.xmul_col(j);
         delta[j]++;
         if (PI.deg(j) >= (int) PI.ncoef - 1) {
-            std::cout << fmt("Column % exceeds max deg % at step %"
-                    " (normal at the end)\n")
-                %j%(PI.ncoef - 1)%t;
-            finished = true;
+            overflowed.push_back(j);
         }
     }
     BUG_ON (rank != m);
@@ -753,7 +750,24 @@ static bool gauss(unsigned int piv[], polmat& PI)/*{{{*/
     /* Normally our bound is set up so that we're assured to have at
      * least one generator found.
      */
-    if (finished) {
+    if (!overflowed.empty()) {
+        std::ostringstream cset;
+        for(unsigned int i = 0 ; i < overflowed.size() ; ) {
+            unsigned int j;
+            for(j = i ; j < overflowed.size() ; j++) {
+                if (overflowed[j]-overflowed[i] != j-i) break;
+            }
+            if (i) cset << ',';
+            if (j-i == 1) {
+                cset << i;
+            } else {
+                cset << fmt("%-%") % i % (j-1);
+            }
+            i = j;
+        }
+        std::cout << fmt("**** t=% ; % cols (%) exceed maxdeg=%"
+                " (normal at the end)\n")
+            % t % overflowed.size() % cset.str() % (PI.ncoef - 1);
         unsigned ctot = 0;
         for (unsigned int j = 0; j < m + n; j++) {
             ctot += chance_list[j];
@@ -761,7 +775,7 @@ static bool gauss(unsigned int piv[], polmat& PI)/*{{{*/
         BUG_ON(!ctot);
     }
 
-    return finished;
+    return !overflowed.empty();
     /*
     std::cout << "Invertible e0 matrix\n";
     for(unsigned int i = 0 ; i < m ; i++) {
@@ -1278,9 +1292,9 @@ static bool go_recursive(polmat& pi, unsigned int level)
         ASSERT(finished_early);
     }
     if (finished_early) {
-        printf("Exceptional situation ; "
-                "generator (l) of degree %d ; escaping\n",
-                pi_l_deg);
+        printf("[%2d] Exceptional situation ; "
+                "deg(pi_l) = %d ; escaping\n",
+                level, pi_l_deg);
         pi.swap(pi_left);
         return true;
     }
@@ -1383,14 +1397,21 @@ static bool go_recursive(polmat& pi, unsigned int level)
 
 
     if (finished_early) {
-        printf("Exceptional situation ; "
-                "generator (r) of degree %d ; escaping\n",
-                pi.maxdeg());
+        printf("[%2d] Exceptional situation ; "
+                "deg(pi_r) = %d ; escaping\n",
+                level, pi.maxdeg());
     }
     return finished_early;
 }
 
-std::vector<std::pair<unsigned int, double> > spent;
+struct spent_time {
+    unsigned int step;
+    double total;
+    double proper;
+    spent_time() : step(0), total(0), proper(0) {}
+};
+
+std::vector<spent_time> spent;
 
 static bool compute_lingen(polmat& pi, unsigned int level)
 {
@@ -1400,12 +1421,17 @@ static bool compute_lingen(polmat& pi, unsigned int level)
     using namespace globals;
     unsigned int deg = E.ncoef - 1;
 
-    double st = seconds();
     bool b;
 
     if (spent.size() <= level) {
         assert(spent.size() == level);
-        spent.push_back(std::make_pair(0,0));
+        spent.push_back(spent_time());
+    }
+
+    double st = seconds();
+    double children = 0;
+    if (spent.size() >= level + 1) {
+        children = -spent[level+1].total;
     }
 
     unsigned int t0 = t;
@@ -1425,26 +1451,56 @@ static bool compute_lingen(polmat& pi, unsigned int level)
     unsigned int t1 = t;
     double dtime = seconds() - st;
 
-    spent[level].first += t1 - t0;
-    spent[level].second += dtime;
+    if (spent.size() >= level + 1) {
+        children += spent[level+1].total;
+    }
 
-    double pct_loc = 100.0 * spent[level].first / (double) total_work;
+    spent[level].step++;
+    spent[level].total += dtime;
+
+    double ptime = dtime - children;
+
+    spent[level].proper += ptime;
+
+    double pct_loc = spent[level].step / (double) (1 << level);
 
     /* make up some guess about the total time of all levels */
-    /*
-    unsigned int outermost;
+    unsigned int outermost = level;
     for(unsigned int back = 0 ; back <= level ; back++) {
-        if (spent[level-back].first == 0)
+        if (spent[level-back].step == 0)
             break;
         outermost = level-back;
     }
     unsigned int innermost = spent.size() - 1;
-    */
+    double estim_tot = 0;
+    double spent_tot = 0;
+    for(unsigned int i = outermost ; i <= innermost ; i++) {
+        estim_tot += spent[i].proper * (1 << i) / (double) spent[i].step;
+        spent_tot += spent[i].proper;
+    }
 
-    printf("[%2d] t=[%u..%u[ (dt=%u) %.2f s ; %.1f%% of level %d\n",
-            level, t0,t1,t1-t0, dtime,
-            pct_loc, level);
+    printf("[%2d] t=[%u..%u[ (dt=%u)\t%.2f+%.2f\t(total %.2f)\n",
+            level, t0,t1,t1-t0,
+            ptime, children,
+            spent_tot);
+    printf("      est: [%d]: %.2f (%.1f%%) [%d..%d]: %.2f (%.1f%%)\n",
+            level, spent[level].proper / pct_loc, 100.0 * pct_loc,
+            outermost, innermost,
+            estim_tot, 100.0 * spent_tot/estim_tot);
     return b;
+}
+
+void timing_info()
+{
+    for(unsigned int i = 0 ; i < spent.size() ; i++) {
+        printf("[%d] spent %.2f",
+                i, spent[i].proper);
+        if (i < spent.size() - 1) {
+            printf(" (%.2f counting children)",
+                    spent[i].total);
+        }
+        printf("\n");
+    }
 }
 
 
@@ -1574,6 +1630,7 @@ void block_wiedemann(void)
     // E.resize(deg + 1);
     polmat pi_left;
     compute_lingen(pi_left, 0);
+    timing_info();
 
     polmat F;
     compute_final_F_from_PI(F, pi_left);
