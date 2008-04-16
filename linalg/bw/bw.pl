@@ -90,11 +90,7 @@ sub action {
     system @_;
 }
 
-# We could possibly do cp --symlink just as well, or maybe ln (cp --link
-# is a gnu-ism). Not ln -s without caution, because this would require
-# some knowledge about the right path back, which could be quite a bit of
-# a hack. I'm happy with cp --link at the moment.
-sub do_cp { my @x = @_; unshift @x, "cp", "--link"; action @x;
+sub do_cp { my @x = @_; unshift @x, "cp"; action @x;
     if ($? >> 8 != 0) {
         shift @x;
         shift @x;

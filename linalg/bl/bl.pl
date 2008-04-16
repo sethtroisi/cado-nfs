@@ -53,11 +53,7 @@ sub action {
     system @_;
 }
 
-# We could possibly do cp --symlink just as well, or maybe ln (cp --link
-# is a gnu-ism). Not ln -s without caution, because this would require
-# some knowledge about the right path back, which could be quite a bit of
-# a hack. I'm happy with cp --link at the moment.
-sub do_cp { my @x = @_; unshift @x, "cp", "--link"; action @x;
+sub do_cp { my @x = @_; unshift @x, "cp"; action @x;
     if ($? >> 8 != 0) {
         shift @x;
         shift @x;
@@ -161,15 +157,15 @@ sub rsync_pull {
 
 do_cp $matrix, "$wdir/matrix.txt";
 
-rsync_push "--delete";
 my @cmdline=();
 if (@mlist) {
     @cmdline=('orterun', '-np', $njobs, '--host', scalar join(',',@mlist));
 }
 
 if ($njobs) {
-    action "${bwbindir}/bw-balance --matrix $matrix --nslices $njobs";
+    action "${bwbindir}/bw-balance --matrix $wdir/matrix.txt --nslices $njobs";
 }
+rsync_push "--delete";
 
 account 'io';
 

@@ -1293,8 +1293,7 @@ static bool go_recursive(polmat& pi, unsigned int level)
         ASSERT(finished_early);
     }
     if (finished_early) {
-        printf("%-8u "
-                "deg(pi_l) = %d ; escaping\n",
+        printf("%-8u" "deg(pi_l) = %d ; escaping\n",
                 t, pi_l_deg);
         pi.swap(pi_left);
         return true;
@@ -1398,8 +1397,7 @@ static bool go_recursive(polmat& pi, unsigned int level)
 
 
     if (finished_early) {
-        printf("%-8u "
-                "deg(pi_r) = %d ; escaping\n",
+        printf("%-8u" "deg(pi_r) = %d ; escaping\n",
                 t, pi.maxdeg());
     }
     return finished_early;
