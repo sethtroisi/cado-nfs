@@ -669,7 +669,7 @@ void VUBit(unsigned long m,
 
 
 #if 0
-void VUBit_v2(unsigned long m,
+void VUBit(unsigned long m,
 	      unsigned long n,
 	      const unsigned long *A, const unsigned long *B,
 	      unsigned long *C)
@@ -983,6 +983,7 @@ void SMultDmatrixBit(unsigned long m, unsigned long n, unsigned long p,
 
     //assert(SizeRowsb == 1);
 
+
     memset(c, 0, m * sizeof(unsigned long));
 
     i = 0;
@@ -1120,12 +1121,18 @@ if (p==0){
     unsigned long my_nrows = M->slices[p]->i1 - M->slices[p]->i0;
 
     unsigned long *Prod_Dist;
-    Prod_Dist = Allocmn(my_nrows, sizeof(unsigned long));
+    Prod_Dist = Allocmn(M->Nrows, sizeof(unsigned long));
 
-    SMultDmatrixBit(M->Nrows, M->Ncols, sizeof(unsigned long), M->Data, V->Data, Prod_Dist,
-		    p * (M->Nrows / nb_processes), my_nrows);
+//    SMultDmatrixBit(M->Nrows, M->Ncols, sizeof(unsigned long), M->Data, V->Data, Prod_Dist,
+//		    p * (M->Nrows / nb_processes), my_nrows);
+
 
     
+
+    SMultDmatrixBit(M->Nrows, M->Ncols, sizeof(unsigned long), M->Data, V->Data, Prod_Dist,
+		    M->slices[p]->i0, my_nrows);
+    
+//    printf("p=%lu  %lu   %lu %lu\n",p,p * (M->Nrows / nb_processes),M->slices[p]->i0,my_nrows);
 
     if (p != 0) {
 	MPI_Send(Prod_Dist, my_nrows, MPI_UNSIGNED_LONG,
@@ -1133,6 +1140,8 @@ if (p==0){
         
     }
 
+
+   
 
     //MPI_Barrier(MPI_COMM_WORLD);
   //  printf("in sub p = %lu   m = %lu   n = %lu!!\n",p,M->Nrows,M->Ncols);
@@ -1162,9 +1171,9 @@ if (p==0){
 
 
 
-#if 0
+#if 1
 
-void Test_SMatrix_Vector(unsigned long *Result, unsigned long *M, unsigned long *V,unsigned long m,unsigned long n)
+void Test_SMatrix_Vector(unsigned long *Result, SparseMatrix M, unsigned long *V,unsigned long m,unsigned long n)
 {
     int size, p;
 
@@ -1195,15 +1204,15 @@ if (p!=0)
  
 
     unsigned long *Prod_Dist;
-    Prod_Dist = Allocmn(SizeBlock(size, p, m), sizeof(unsigned long));
+    Prod_Dist = Allocmn(M->slices[p]->i1 - M->slices[p]->i0, sizeof(unsigned long));
 
-    SMultDmatrixBit(m, n, sizeof(unsigned long),M, V, Prod_Dist,
-		    p * (m / size), SizeBlock(size, p, m));
+    SMultDmatrixBit(m, n, sizeof(unsigned long),M->Data, V, Prod_Dist,
+		    p * (m / size), M->slices[p]->i1 - M->slices[p]->i0);
 
     
 
     if (p != 0) {
-	MPI_Send(Prod_Dist, SizeBlock(size, p, m), MPI_UNSIGNED_LONG,
+	MPI_Send(Prod_Dist, M->slices[p]->i1 - M->slices[p]->i0, MPI_UNSIGNED_LONG,
 		 0, 123, MPI_COMM_WORLD);
         
     }
@@ -1213,22 +1222,22 @@ if (p!=0)
     //printf("in sub p = %lu   m = %lu   n = %lu!!\n",p,M->Nrows,M->Ncols);
 
     if (p == 0) {
-	for (i = 0; i < SizeBlock(size, 0, m); i++) {
+	for (i = 0; i < M->slices[0]->i1 - M->slices[0]->i0; i++) {
 	    Result[i] = Prod_Dist[i];
 	}
-	unsigned long Bg = SizeBlock(size, 0, m);
+	unsigned long Bg = M->slices[0]->i1 - M->slices[0]->i0;
         
 
 	for (i = 1; i < size; i++) {
 
-	    MPI_Recv(Prod_Dist, SizeBlock(size, i, m),
+	    MPI_Recv(Prod_Dist, M->slices[i]->i1 - M->slices[i]->i0,
 		     MPI_UNSIGNED_LONG, i, 123, MPI_COMM_WORLD, &status);
 
-	    for (j = 0; j < SizeBlock(size, i, m); j++) {
+	    for (j = 0; j < M->slices[i]->i1 - M->slices[i]->i0; j++) {
 		Result[j + Bg] = Prod_Dist[j];
 	    }
             
-	    Bg += SizeBlock(size, i, m);
+	    Bg += M->slices[i]->i1 - M->slices[i]->i0;
 
 	}
  free(Prod_Dist);

@@ -630,6 +630,7 @@ void PrepareMatrixSlices(SparseMatrix M, char *filename)
                 }
             }
         }
+        free(row_table);  
     }
     MPI_Bcast(offsets, nb_processes + 1, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
     MPI_Bcast(weights, nb_processes    , MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);

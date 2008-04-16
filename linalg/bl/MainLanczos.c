@@ -114,11 +114,12 @@ int main(int argc, char *argv[])
     if (p == 0) {
 	Tm2 = microseconds();
 	DiffTime = Tm2 - Tm1;
+        
 	printf
 	    ("Total Time for Lanczos = %f s   nb_processes of block in kernel is %lu\n",
 	     DiffTime / 1000000, Ker->Ncols);
+        printf("\n");
     }
-
 
     SMatrix_Vector(Result,M,Ker);
 

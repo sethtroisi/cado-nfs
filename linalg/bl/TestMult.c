@@ -95,40 +95,30 @@ int main(int argc, char *argv[])
     Y = Allocmn(M->Ncols + 1, Block);
     c = Allocmn(M->Ncols + 1, Block);
 
+    DenseMatrix Result,W;
 
-
-    // Ker->Data = Allocmn(M->Ncols, Block);
-    // Ker->Ncols = Block;
-    // Ker->Nrows = M->Ncols;
-
-    for (t = 0; t < 10; ++t) {
-
-//if (p==0) {Tm1=wallclock_microseconds();}
-
-//Lanczos(M,Block,Ker);
+    Result->Data=Allocmn(M->Nrows + 1, Block);
+    W->Data=Allocmn(M->Ncols + 1, Block);
 
 
 //Testes a multiplicacao
 
 
-//memset(c,0,(M->Ncols+1)*sizeof(unsigned long));
 
 	RandomDMatrixBitTest(M->Ncols, Block, Y);
 
-//displaySMatrixNew(M->Data,M->Nrows,M->Ncols,'a');
+        for (t=1; t<M->Ncols; t++) {W->Data[t]=Y[t];}
 
-//displayMatrix(Y,M->Ncols,Block,'Y');
+
 
 	if (p == 0) {
 	    Tm1 = wallclock_microseconds();
 	}
 
-        matrix_slice_ptr me = M->slices[p];
-        SMultDmatrixBit(M->Nrows, M->Ncols, Block, M->Data, Y, c,
-            me->i0, me->i1 - me->i0);
 
-//displayMatrix(c,M->Ncols,Block,'c');
+//Test_SMatrix_Vector(c,M, Y,M->Nrows,M->Ncols);
 
+SMatrix_Vector(Result,M, W);
 
 	if (p == 0) {
 	    Tm2 = wallclock_microseconds();
@@ -136,8 +126,40 @@ int main(int argc, char *argv[])
 	    printf("matrix multiplication = %.2f s\n", DiffTime / 1000000);
 	}
 
-    }
+   // }
 
-    MPI_Finalize();
+
+
+
+free(M->slices);
+free(M->Data);
+free(Result->Data);
+free(W->Data);
+free(Y);
+free(c);
+
+
+close_random();
+MPI_Finalize();
     return 0;
 }
+
+
+
+//displayMatrix(W->Data,M->Ncols,Block,'c');
+//displaySMatrixNew(M->Data,M->Nrows,M->Ncols,'a');
+//displayMatrix(Result->Data,M->Nrows,Block,'r');
+
+
+//        matrix_slice_ptr me = M->slices[p];
+
+//        SMultDmatrixBit(M->Nrows, M->Ncols, Block, M->Data, Y, c,me->i0, me->i1 - me->i0);
+
+
+
+
+//displayMatrix(c,M->Ncols,Block,'c');
+//displaySMatrixNew(M->Data,M->Nrows,M->Ncols,'a');
+
+//displayMatrix(Y,M->Ncols,Block,'Y');
+

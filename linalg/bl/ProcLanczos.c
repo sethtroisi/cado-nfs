@@ -821,6 +821,18 @@ unsigned long *LanczosIterations(unsigned long *a, unsigned long *Y,
     MPI_Comm_size(MPI_COMM_WORLD, &size);	//get the number of processes
     MPI_Comm_rank(MPI_COMM_WORLD, &p);	//get the process ranks
 
+// Displaying some information of whats happening
+
+if (p==0){
+   printf("\n");
+   printf("Rank - It will increase until reaches Rank of Transposed sparse times sparse  \n");
+   printf("TSD - Time for sparse matrix times block  \n");
+   printf("TTSD - Time for transposed sparse matrix times block   \n");
+   printf("TSLA - Time for small linear algebra   \n");
+   printf("TI - Time per iteration\n");
+   printf("\n");}
+
+
 
 
     if (p == size - 1) {
@@ -1398,7 +1410,7 @@ unsigned long *LanczosIterations(unsigned long *a, unsigned long *Y,
 	    //float tnNN = tnNN1 - tnNN0;
 
 	    printf
-		("Step= %lu      SumRank= %lu    TimeSD=%f s  TimeTSD=%f s   TSLAlgebra=%f s   TITime=%f s \n",
+		("Step= %lu Rank= %lu  TSD=%.3f s  TTSD=%.3f s   TSLA=%.3f s   TI=%.3f s \n",
 		 Step, SumRank, SD / 1000000, TSD / 1000000,
 		 (BCalc / 1000000) + (ACalc1 / 1000000),
 		 TIteration / 1000000);
@@ -1435,6 +1447,7 @@ unsigned long *LanczosIterations(unsigned long *a, unsigned long *Y,
 
 
     if (p == 0) {
+        printf("\n");
 	printf("ACompT = %f ms AComT = %f ms ",
 	       SumTimeOper / (Step - 1) / 1000,
 	       SumTimeCom / (Step - 1) / 1000);
@@ -1442,7 +1455,7 @@ unsigned long *LanczosIterations(unsigned long *a, unsigned long *Y,
 	       SumTimeComBcast / (Step - 1) / 1000,
 	       SumTimeComRed / (Step - 1) / 1000);
 	printf("TPTime = %lu ms  ", (t1 - t0) / 1000);
-
+        printf("\n");
 	for (i = 0; i < iceildiv(Block, WBITS) * n; ++i) {
 	    Resultado[i] = X[i] ^ Y[i];
 	}
@@ -1568,7 +1581,7 @@ void KernelSparse(SparseMatrix M, unsigned long *R,
 
 // To Make Transpose(A)*A*R
 
-    
+
 
     unsigned long *ATAR;
     ATAR = Allocmn(n, N);
@@ -1577,7 +1590,7 @@ void KernelSparse(SparseMatrix M, unsigned long *R,
     ResmN_Dist = Allocmn(m, N);
     ATAR_Dist = Allocmn(n, N);
 
-
+     
 
     SMultDmatrixBit(m, n, N, a, R, ResmN_Dist, M->slices[p]->i0, SizeABlock);
     TSMultDmatrixBit(SizeABlock, n, N, a, ResmN_Dist, ATAR_Dist,
@@ -1611,7 +1624,7 @@ void KernelSparse(SparseMatrix M, unsigned long *R,
         
     }
 
-
+    
 
     //To make A*R
 
@@ -1620,7 +1633,8 @@ void KernelSparse(SparseMatrix M, unsigned long *R,
     d = malloc(m * sizeof(unsigned long));
 
     unsigned long *ResmN_Dist1;
-    ResmN_Dist1 = Allocmn(SizeABlock, Block);
+   ResmN_Dist1 = Allocmn(m, Block);
+
 
     unsigned long j, i;
 
@@ -1641,7 +1655,10 @@ void KernelSparse(SparseMatrix M, unsigned long *R,
     if (p != 0) {
 	MPI_Send(ResmN_Dist1, SizeABlock, MPI_UNSIGNED_LONG, 0, 1,
 		 MPI_COMM_WORLD);
-    };
+
+  };
+
+    
 
     if (p == 0) {
 	for (i = 0; i < SizeABlock ; i++) {
@@ -1660,7 +1677,7 @@ void KernelSparse(SparseMatrix M, unsigned long *R,
 	    }
 	}
 
-       
+      
 
 	if (TestZero(m, Block, d)) {
 	    for (i = 0; i < n; i++) {
@@ -1669,9 +1686,9 @@ void KernelSparse(SparseMatrix M, unsigned long *R,
            
 	    Ker->Nrows = n;
 	    Ker->Ncols = Sizea;
-	    printf("\n No second Small Lin Alg  \n");
+	    //printf("\n No second Small Lin Alg  \n");
 	} else {
-	    printf("\n With second Small Lin Alg  \n");
+	    //printf("\n With second Small Lin Alg  \n");
 
 	    TransposeBit(m, Block, d, ResVn3);
 
@@ -1734,7 +1751,7 @@ free(d);
 	free(ListLines);
 	free(LengListLines);
  
-
+    
 }
 
 
