@@ -220,6 +220,9 @@ void read_data_for_series(polmat& A, int & rc)/*{{{*/
 
     for (j = 0; j < n; j++) { nbys[j] = 0; }
 
+    printf("Reading A files:\n");
+    fflush(stdout);
+
     for (i = 0; i < m; i++) {
         for (j = 0; j < n;) {
             unsigned int y = 0;
@@ -231,7 +234,6 @@ void read_data_for_series(polmat& A, int & rc)/*{{{*/
                 die("fopen(%s) : %s", errno, filename.c_str(),
                         strerror(errno));
             }
-            printf("Reading file %s", filename.c_str());
 
             /* NOTE : we drop the first coefficient, because
              * we mean to work with the sequence generated
@@ -251,10 +253,12 @@ void read_data_for_series(polmat& A, int & rc)/*{{{*/
                         filename.c_str(), row);
                 abort();
             }
-            if (y > 1) {
-                printf(" [ %d values per row ]", y);
+            if (y > 1 && nbys[j] == 0) {
+                printf("[ %d values per row ]\n", y);
+                fflush(stdout);
             }
-            printf("\n");
+            putchar('.');
+            fflush(stdout);
             if (nbys[j] != 0) {
                 BUG_ON(y != nbys[j]);
             }
@@ -262,6 +266,8 @@ void read_data_for_series(polmat& A, int & rc)/*{{{*/
             j += y;
         }
     }
+    printf("\n");
+    fflush(stdout);
 
     unsigned int read_coeffs = 0;       /* please gcc */
 
@@ -310,8 +316,8 @@ void read_data_for_series(polmat& A, int & rc)/*{{{*/
         }
     }
 
-    printf("Stopped after reading %u coefficients (not counting 1st)"
-            " -- total work was %u\n",
+    printf("I have read %u coefficients (not counting 1st)"
+            " -- total work %u\n",
             read_coeffs, total_work);
 
     rc = read_coeffs;
@@ -418,10 +424,10 @@ void bw_commit_f(polmat& F) /*{{{*/
     using namespace globals;
     using namespace std;
 
+    cout << "Writing F files" << endl;
     for (unsigned int j = 0; j < m + n ; j++) {
         std::string filename = files::f % j;
         ofstream f(filename.c_str());
-        cout << "Writing " << filename << endl;
         if (!f.is_open()) {
             perror("writing f");
             die("ugh",1);
@@ -1118,17 +1124,35 @@ static void extract_coeff_degree_t(unsigned int tstart, unsigned int dt, unsigne
         for(unsigned int i = 0 ; i < z.size() ; i++) {
             ++ncha[z[i]];
         }
-        std::cout << fmt("Step %, zero cols:") % (tstart + dt);
+
+        /* resets the global chance_list counter */
         for(unsigned int i = 0 ; i < m + n ; i++) {
             if (ncha[i] == 0) {
                 chance_list[i] = 0;
             } else {
-                unsigned int w = chance_list[i] += ncha[i];
-                std::cout << " " << i;
-                if (w >= 2) {
-                    std::cout << fmt("[%]") %w;
-                }
+                chance_list[i] += ncha[i];
             }
+        }
+
+        std::cout << fmt("Step %, % zero cols:") % (tstart + dt) % z.size();
+
+        vector<pair<unsigned int, unsigned int> > zz;
+        for(unsigned int i = 0 ; i < z.size() ; i++) {
+            zz.push_back(make_pair(z[i], chance_list[z[i]]));
+        }
+
+        // Now print this out more nicely.
+        for(unsigned int i = 0 ; i < zz.size() ; ) {
+            unsigned int j;
+            for(j = i; j < zz.size() ; j++) {
+                if (zz[j].first-zz[i].first != j-i) break;
+                if (zz[j].second != zz[i].second) break;
+            }
+            cout << fmt(" [%..%]") % zz[i].first % zz[j-1].first;
+            if (zz[i].second > 1) {
+                cout << fmt("*%") % zz[i].second;
+            }
+            i = j;
         }
         std::cout << "\n";
     }
@@ -1180,20 +1204,17 @@ static bool go_quadratic(polmat& pi)/*{{{*/
     unsigned int tstart = t;
     bool finished = false;
     for (unsigned int dt = 0; !finished && dt <= deg ; dt++) {
+#ifdef  VERBOSE
         double delta;
         delta = seconds() - start_time;
-
         double percent = (double) dt / (deg + 1);
         percent = percent * percent;
-
         double estim_final = delta / percent;
-
         percent *= 100.0;
-            
         printf("%5.0f / est %-7.0f (%2.0f%%) ",
                 delta, estim_final, percent);
-
         print_deltas();
+#endif
 	extract_coeff_degree_t(tstart, dt, dt ? piv : NULL, tmp_pi);
         finished = gauss(piv, tmp_pi);
         rearrange_ordering(tmp_pi, piv);
@@ -1204,16 +1225,18 @@ static bool go_quadratic(polmat& pi)/*{{{*/
     pi.swap(tmp_pi);
     if (checkpoints)
         write_polmat(pi,std::string(fmt("pi-%-%") % tstart % t).c_str());
+#ifdef  VERBOSE
     print_deltas();
+#endif
 
     return finished;
 }/*}}}*/
 
 
-static bool compute_lingen(polmat& pi);
+static bool compute_lingen(polmat& pi, unsigned int);
 
 template<typename fft_type>
-static bool go_recursive(polmat& pi)
+static bool go_recursive(polmat& pi, unsigned int level)
 {
     using namespace globals;
 
@@ -1239,7 +1262,7 @@ static bool go_recursive(polmat& pi)
     kill=0;
 #endif
 
-    std::cout << "Recursive call, degree " << deg << std::endl;
+    // std::cout << "Recursive call, degree " << deg << std::endl;
     fft_type o(deg, expected_pi_deg, deg + expected_pi_deg - kill, m + n);
 
     tpolmat<fft_type> E_hat;
@@ -1247,7 +1270,7 @@ static bool go_recursive(polmat& pi)
 
     E.resize(ldeg);
     polmat pi_left;
-    finished_early = compute_lingen(pi_left);
+    finished_early = compute_lingen(pi_left, level+1);
     E.clear();
     int pi_l_deg = pi_left.maxdeg();
 
@@ -1255,7 +1278,7 @@ static bool go_recursive(polmat& pi)
         ASSERT(finished_early);
     }
     if (finished_early) {
-        printf("Exceptional situation:\n"
+        printf("Exceptional situation ; "
                 "generator (l) of degree %d ; escaping\n",
                 pi_l_deg);
         pi.swap(pi_left);
@@ -1264,7 +1287,7 @@ static bool go_recursive(polmat& pi)
 
     tmiddle = t;
 
-    printf("deg(pi_l)=%d, bound is %d\n",pi_l_deg,expected_pi_deg);
+    // printf("deg(pi_l)=%d, bound is %d\n",pi_l_deg,expected_pi_deg);
 
     /* Since we break early now, this should no longer occur except in
      * VERY pathological cases. Two uneven increases might go unnoticed
@@ -1331,7 +1354,7 @@ static bool go_recursive(polmat& pi)
     E.xdiv_resize(ldeg - kill, rdeg);
 
     polmat pi_right;
-    finished_early = compute_lingen(pi_right);
+    finished_early = compute_lingen(pi_right, level+1);
     int pi_r_deg = pi_right.maxdeg();
     E.clear();
 
@@ -1360,14 +1383,16 @@ static bool go_recursive(polmat& pi)
 
 
     if (finished_early) {
-        printf("Exceptional situation:\n"
+        printf("Exceptional situation ; "
                 "generator (r) of degree %d ; escaping\n",
                 pi.maxdeg());
     }
     return finished_early;
 }
 
-static bool compute_lingen(polmat& pi)
+std::vector<std::pair<unsigned int, double> > spent;
+
+static bool compute_lingen(polmat& pi, unsigned int level)
 {
     /* reads the data in the global thing, E and delta. ;
      * compute the linear generator from this.
@@ -1378,18 +1403,47 @@ static bool compute_lingen(polmat& pi)
     double st = seconds();
     bool b;
 
+    if (spent.size() <= level) {
+        assert(spent.size() == level);
+        spent.push_back(std::make_pair(0,0));
+    }
+
+    unsigned int t0 = t;
+
+
     if (deg <= rec_threshold) {
         b = go_quadratic(pi);
     } else if (deg < cantor_threshold) {
         /* The bound is such that deg + deg/4 is 64 words or less */
-        b = go_recursive<fake_fft>(pi);
+        b = go_recursive<fake_fft>(pi, level);
     } else {
         /* Presently, c128 requires input polynomials that are large
          * enough.
          */
-        b = go_recursive<cantor_fft>(pi);
+        b = go_recursive<cantor_fft>(pi, level);
     }
-    printf("lingen(deg=%d) took %f s\n", deg, seconds() - st);
+    unsigned int t1 = t;
+    double dtime = seconds() - st;
+
+    spent[level].first += t1 - t0;
+    spent[level].second += dtime;
+
+    double pct_loc = 100.0 * spent[level].first / (double) total_work;
+
+    /* make up some guess about the total time of all levels */
+    /*
+    unsigned int outermost;
+    for(unsigned int back = 0 ; back <= level ; back++) {
+        if (spent[level-back].first == 0)
+            break;
+        outermost = level-back;
+    }
+    unsigned int innermost = spent.size() - 1;
+    */
+
+    printf("[%2d] t=[%u..%u[ (dt=%u) %.2f s ; %.1f%% of level %d\n",
+            level, t0,t1,t1-t0, dtime,
+            pct_loc, level);
     return b;
 }
 
@@ -1519,7 +1573,7 @@ void block_wiedemann(void)
 
     // E.resize(deg + 1);
     polmat pi_left;
-    compute_lingen(pi_left);
+    compute_lingen(pi_left, 0);
 
     polmat F;
     compute_final_F_from_PI(F, pi_left);
