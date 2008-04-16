@@ -991,9 +991,6 @@ void SMultDmatrixBit(unsigned long m, unsigned long n, unsigned long p,
 	    c[i] ^= b[*a++];
 	}
     }
-
-
-
 }
 
 
@@ -1165,8 +1162,7 @@ if (p==0){
 
 
 
-#if 1
-
+#if 0
 
 void Test_SMatrix_Vector(unsigned long *Result, unsigned long *M, unsigned long *V,unsigned long m,unsigned long n)
 {

@@ -19,71 +19,71 @@
 #define	iceildiv(x,y)	(((x)+(y)-1)/(y))
 #define	WBITS	(CHAR_BIT * sizeof(unsigned long))
 
+void usage()
+{
+    fprintf(stderr, "Usage: TestMult <matrix>\n");
+    exit(1);
+}
+
 
 int main(int argc, char *argv[])
 {
     SparseMatrix M;
-    DenseMatrix Ker;
-    char *Fl;
+    // DenseMatrix Ker;
+    char *matrix_file_name = NULL;
 
-    Fl = malloc(3 * sizeof(unsigned long));
-    Fl = argv[1];
+    argc--,argv++;
+    for( ; argc ; argc--,argv++) {
+        if (matrix_file_name == NULL) {
+            matrix_file_name = argv[0];
+        } else {
+            fprintf(stderr, "Unexpected command line argument: %s\n", argv[0]);
+            usage();
+        }
+    }
+    if (matrix_file_name == NULL) {
+        usage();
+    }
 
     unsigned long Tm1, Tm2;
     float DiffTime;
-
-
-
-// Definition of Block size 
-
     unsigned long Block = WBITS;
 
-// Test if MPI is initialized if not initializes it 
-
-    int size, p, flag;
+    int nb_processes, p, flag;
     flag = 0;
     MPI_Initialized(&flag);
     if (!flag) {
-	MPI_Init(&argc, &argv);	//MPI initialize 
+	MPI_Init(&argc, &argv);
     }
-// end Test if MPI is initialized if not initializes it 
+
+    init_random();
+
+    MPI_Comm_size(MPI_COMM_WORLD, &nb_processes);
+    MPI_Comm_rank(MPI_COMM_WORLD, &p);
 
 
+// Get the sparse matrix from file 
 
-    MPI_Comm_size(MPI_COMM_WORLD, &size);	//get the number of processes (size=1 if not using MPI)
-    MPI_Comm_rank(MPI_COMM_WORLD, &p);	//get the process ranks (p=0 if not using MPI)
+     {
+         unsigned long Num[2];
+         ReadSMatrixDimensions(matrix_file_name, Num);
+         M->Nrows = Num[0];
+         M->Ncols = Num[1];
+     }
 
+    unsigned long i;
+    int t;
+    
+    PrepareMatrixSlices(M, matrix_file_name);
 
+    if (p == 0) {
+        for (i = 0; i < nb_processes; i++) {
+            printf("Job %d Block %lu has size %lu coeffs, %lu rows\n", p, i,
+                    M->slices[i]->nbcoeffs, M->slices[i]->i1 - M->slices[i]->i0);
+        }
+    }
 
-// Get the sparce matrix from file 
-
-
-    unsigned long *Num;
-    Num = malloc(3 * sizeof(unsigned long));
-    ReadSMatrixDimensions(Fl, Num);
-    M->Nrows = Num[0];
-    M->Ncols = Num[1];
-    // M->Weight = Num[2];
-    abort();
-
-
-// For MPI  Number of Lines of the matrix to read in each process
-
-    unsigned long BlockSize, t;
-    BlockSize = SizeBlock(size, p, M->Nrows);
-
-// end for MPI   Number of Lines of the matrix to read in each process   
-
-
-    M->Data =
-	malloc((M->Nrows / size + M->Nrows % size) * (/* M->Weight + */
-						    1) *
-	       sizeof(unsigned long));
-    ReadSMatrixFileBlockNew(Fl, M->Data, p * (M->Nrows / size), BlockSize);
-
-    printf("Number of Coeffs = %lu \n", NumbCoeffSMatrix(M->Data, M->Nrows));
-
-// end Get the sparce matrix from file
+    ReadSMatrixSlice(M, matrix_file_name);
 
 
     unsigned long *Y, *c;
@@ -92,9 +92,9 @@ int main(int argc, char *argv[])
 
 
 
-    Ker->Data = Allocmn(M->Ncols, Block);
-    Ker->Ncols = Block;
-    Ker->Nrows = M->Ncols;
+    // Ker->Data = Allocmn(M->Ncols, Block);
+    // Ker->Ncols = Block;
+    // Ker->Nrows = M->Ncols;
 
     for (t = 0; t < 10; ++t) {
 
@@ -118,7 +118,9 @@ int main(int argc, char *argv[])
 	    Tm1 = wallclock_microseconds();
 	}
 
-	SMultDmatrixBit(M->Nrows, M->Ncols, Block, M->Data, Y, c, 0, M->Nrows);
+        matrix_slice_ptr me = M->slices[p];
+        SMultDmatrixBit(M->Nrows, M->Ncols, Block, M->Data, Y, c,
+            me->i0, me->i1 - me->i0);
 
 //displayMatrix(c,M->Ncols,Block,'c');
 
@@ -126,7 +128,7 @@ int main(int argc, char *argv[])
 	if (p == 0) {
 	    Tm2 = wallclock_microseconds();
 	    DiffTime = Tm2 - Tm1;
-	    printf("Total Time for Lanczos = %f s\n", DiffTime / 1000000);
+	    printf("matrix multiplication = %.2f s\n", DiffTime / 1000000);
 	}
 
     }

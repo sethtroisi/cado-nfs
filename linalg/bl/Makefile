@@ -81,7 +81,7 @@ LANCZOSMPIOPTCOMPLETE_LIBS:=
 
 TESTMULT_SOURCES:=TestMult.c ProcLanczos.c basic.c echelon.c mat_ops.c random.c alloc.c ReadWrite.c timing.c
 LANCZOSMPIOPTCOMPLETE_LIBS:=
-# -include .TestMult.mkf
+-include .TestMult.mkf
 
 TESTMULTBIT_SOURCES:=TestMultBit.c ProcLanczos.c basic.c echelon.c mat_ops.c random.c alloc.c ReadWrite.c timing.c
 LANCZOSMPIOPTCOMPLETE_LIBS:=

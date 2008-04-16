@@ -55,32 +55,21 @@ int main(int argc, char *argv[])
         usage();
     }
 
-
-
-
-
-
-
     unsigned long Tm1, Tm2;
     float DiffTime;
     unsigned long Block = WBITS;
-
-// Test if MPI is initialized if not initializes it 
 
     int nb_processes, p, flag;
     flag = 0;
     MPI_Initialized(&flag);
     if (!flag) {
-	MPI_Init(&argc, &argv);	//MPI initialize 
+	MPI_Init(&argc, &argv);
     }
-// end Test if MPI is initialized if not initializes it 
-
 
     init_random();
 
-    MPI_Comm_size(MPI_COMM_WORLD, &nb_processes);	//get the number of processes (nb_processes=1 if not using MPI)
-    MPI_Comm_rank(MPI_COMM_WORLD, &p);	//get the process ranks (p=0 if not using MPI)
-    // MPI_Status status;
+    MPI_Comm_size(MPI_COMM_WORLD, &nb_processes);
+    MPI_Comm_rank(MPI_COMM_WORLD, &p);
 
 
 // Get the sparse matrix from file 
