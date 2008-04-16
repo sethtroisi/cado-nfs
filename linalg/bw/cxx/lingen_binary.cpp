@@ -761,12 +761,12 @@ static bool gauss(unsigned int piv[], polmat& PI)/*{{{*/
             if (j-i == 1) {
                 cset << i;
             } else {
-                cset << fmt("%-%") % i % (j-1);
+                cset << fmt("%-%") % overflowed[i] % overflowed[j-1];
             }
             i = j;
         }
         std::cout << fmt("**** t=% ; % cols (%) exceed maxdeg=%"
-                " (normal at the end)\n")
+                " (normal at the end) ****\n")
             % t % overflowed.size() % cset.str() % (PI.ncoef - 1);
         unsigned ctot = 0;
         for (unsigned int j = 0; j < m + n; j++) {
