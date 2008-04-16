@@ -83,16 +83,6 @@ TESTMULT_SOURCES:=TestMult.c ProcLanczos.c basic.c echelon.c mat_ops.c random.c 
 LANCZOSMPIOPTCOMPLETE_LIBS:=
 -include .TestMult.mkf
 
-TESTMULTBIT_SOURCES:=TestMultBit.c ProcLanczos.c basic.c echelon.c mat_ops.c random.c alloc.c ReadWrite.c timing.c
-LANCZOSMPIOPTCOMPLETE_LIBS:=
-# -include .TestMultBit.mkf
-
-
-#TESTMULTBIT_SOURCES:=toto.c 
-#LANCZOSMPIOPTCOMPLETE_LIBS:=
-#-include .toto.mkf
-
-
 ######################################################################
 
 ifneq ($(ALLDEPS),)
