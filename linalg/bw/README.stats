@@ -2,7 +2,7 @@
 Running lines for lingen:
 
 [ 5] t=[1599..1732[ (dt=133)    0.36+3.23       (total 65.94)
-      est: [5]: 11.58 (40.6%) [2..7]: 175.20 (37.6%)
+      est: [5]: 11.58 (40.6%) [5..7]: 114.75 (40.6%) [2..7]: 175.20 (37.6%)
 
 Breakdown of information:
 
@@ -21,6 +21,9 @@ est:
 [5]: 11.58 (40.6%)
     estimation for the proper time to be spent in tree nodes
     _at this level only_
+[5..7]: 114.75 (40.6%)
+    estimation for the time to be spent in tree nodes at this level and
+    above
 [2..7]: 175.20 (37.6%)
     estimation for the time to be spent in tree nodes at levels 2 to 7.
     The broader the difference between outermost and innermost levels in
@@ -39,3 +42,12 @@ it is not accounted for in the first estimation, hence the difference.
 
 IOW, the percentage is monotonic, but not completely linear.
 
+
+Tuning the threshold (-t argument) could be done as follows:
+
+- run with a first guess threshold (e.g. 64).
+- notice some of the first estimations printed ; the second one is the
+  most interesting here.
+- try again with double or half threshold, see what it gets. If, say,
+  estimations _above_ level 5 increase, then the selection was
+  sub-optimal.

@@ -1478,15 +1478,27 @@ static bool compute_lingen(polmat& pi, unsigned int level)
         estim_tot += spent[i].proper * (1 << i) / (double) spent[i].step;
         spent_tot += spent[i].proper;
     }
+    double estim_above = 0;
+    double spent_above = 0;
+    for(unsigned int i = level ; i <= innermost ; i++) {
+        estim_above += spent[i].proper * (1 << i) / (double) spent[i].step;
+        spent_above += spent[i].proper;
+    }
 
     printf("[%2d] t=[%u..%u[ (dt=%u)\t%.2f+%.2f\t(total %.2f)\n",
             level, t0,t1,t1-t0,
             ptime, children,
             spent_tot);
-    printf("      est: [%d]: %.2f (%.1f%%) [%d..%d]: %.2f (%.1f%%)\n",
-            level, spent[level].proper / pct_loc, 100.0 * pct_loc,
+    printf("      est:");
+    printf(" [%d]: %.2f (%.1f%%)",
+            level, spent[level].proper / pct_loc, 100.0 * pct_loc);
+    printf(" [%d..%d]: %.2f (%.1f%%)",
+            level, innermost,
+            estim_above, 100.0 * spent_above/estim_above);
+    printf(" [%d..%d]: %.2f (%.1f%%)",
             outermost, innermost,
             estim_tot, 100.0 * spent_tot/estim_tot);
+    printf("\n");
     return b;
 }
 
@@ -1501,6 +1513,8 @@ void timing_info()
         }
         printf("\n");
     }
+
+    printf("Total computation took %.2f\n", spent[0].total);
 }
 
 
