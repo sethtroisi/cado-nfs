@@ -19,6 +19,7 @@
  * <letter> <argument> <effect>
  *     f      char     setfill
  *     w      uint     setw
+ *     .      uint     setprecision
  *
  * Extensions can come easily, of course.
  */
@@ -89,6 +90,9 @@ class fmt {
 					break;
 				case  'F':
 					m << std::fixed;
+					break;
+				case  '-':
+					m << std::left;
 					break;
 				case '.':
 					oldpos = f.tellg();

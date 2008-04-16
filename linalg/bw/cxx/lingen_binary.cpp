@@ -21,6 +21,7 @@
 #include <fstream>
 #include <functional>
 #include <iomanip>
+#include <sstream>
 
 #include "cado.h"
 #include "utils.h"
@@ -765,7 +766,7 @@ static bool gauss(unsigned int piv[], polmat& PI)/*{{{*/
             }
             i = j;
         }
-        std::cout << fmt("**** t=% ; % cols (%) exceed maxdeg=%"
+        std::cout << fmt("%[w8-]**** % cols (%) exceed maxdeg=%"
                 " (normal at the end) ****\n")
             % t % overflowed.size() % cset.str() % (PI.ncoef - 1);
         unsigned ctot = 0;
@@ -1148,7 +1149,7 @@ static void extract_coeff_degree_t(unsigned int tstart, unsigned int dt, unsigne
             }
         }
 
-        std::cout << fmt("Step %, % zero cols:") % (tstart + dt) % z.size();
+        std::cout << fmt("%[w8-]% zero cols:") % (tstart + dt) % z.size();
 
         vector<pair<unsigned int, unsigned int> > zz;
         for(unsigned int i = 0 ; i < z.size() ; i++) {
@@ -1292,9 +1293,9 @@ static bool go_recursive(polmat& pi, unsigned int level)
         ASSERT(finished_early);
     }
     if (finished_early) {
-        printf("[%2d] Exceptional situation ; "
+        printf("%-8u "
                 "deg(pi_l) = %d ; escaping\n",
-                level, pi_l_deg);
+                t, pi_l_deg);
         pi.swap(pi_left);
         return true;
     }
@@ -1397,9 +1398,9 @@ static bool go_recursive(polmat& pi, unsigned int level)
 
 
     if (finished_early) {
-        printf("[%2d] Exceptional situation ; "
+        printf("%-8u "
                 "deg(pi_r) = %d ; escaping\n",
-                level, pi.maxdeg());
+                t, pi.maxdeg());
     }
     return finished_early;
 }
@@ -1434,7 +1435,7 @@ static bool compute_lingen(polmat& pi, unsigned int level)
         children = -spent[level+1].total;
     }
 
-    unsigned int t0 = t;
+    // unsigned int t0 = t;
 
 
     if (deg <= rec_threshold) {
@@ -1448,7 +1449,7 @@ static bool compute_lingen(polmat& pi, unsigned int level)
          */
         b = go_recursive<cantor_fft>(pi, level);
     }
-    unsigned int t1 = t;
+    // unsigned int t1 = t;
     double dtime = seconds() - st;
 
     if (spent.size() >= level + 1) {
@@ -1485,19 +1486,39 @@ static bool compute_lingen(polmat& pi, unsigned int level)
         spent_above += spent[i].proper;
     }
 
-    printf("[%2d] t=[%u..%u[ (dt=%u)\t%.2f+%.2f\t(total %.2f)\n",
-            level, t0,t1,t1-t0,
-            ptime, children,
-            spent_tot);
-    printf("      est:");
-    printf(" [%d]: %.2f (%.1f%%)",
-            level, spent[level].proper / pct_loc, 100.0 * pct_loc);
-    printf(" [%d..%d]: %.2f (%.1f%%)",
-            level, innermost,
-            estim_above, 100.0 * spent_above/estim_above);
-    printf(" [%d..%d]: %.2f (%.1f%%)",
-            outermost, innermost,
-            estim_tot, 100.0 * spent_tot/estim_tot);
+    bool leaf = level == spent.size() - 1;
+
+    printf("%-8u", t);
+    /*
+    if (leaf) {
+        printf(" %.2f", ptime);
+    } else {
+        printf(" %.2f+%.2f", ptime, children);
+    }
+    */
+    // printf(" (total %.2f)\n", spent_tot);
+    // printf("      est:");
+    {
+        std::ostringstream buf;
+        if (leaf) {
+            buf << fmt("[%]: %[F.1]/%[F.1]") % level %
+                spent[level].proper % (spent[level].proper / pct_loc);
+        } else {
+            buf << fmt("[%,%+]: %[F.1]/%[F.1],%[F.1]")
+                % level % level % spent[level].proper %
+                (spent[level].proper / pct_loc) % estim_above;
+        }
+        printf("%-36s", buf.str().c_str());
+    }
+
+    {
+        std::ostringstream buf;
+        buf << fmt("[%+]: %[F.1]/%[F.1] (%[F.0]%%)")
+                % outermost % spent_tot % estim_tot %
+                (100.0 * spent_tot/estim_tot);
+        printf("%-27s", buf.str().c_str());
+    }
+
     printf("\n");
     return b;
 }
