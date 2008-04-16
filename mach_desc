@@ -1,21 +1,43 @@
-# Default paths.
-# Valid for lines that are below, until new default are set.
+# Machine description file.
+#
+# This file is split into several sections [cluster_name].
+# The sections are indepedent.
+#
+# Each section is read in order.
+# Leading white space is not significant.
+# Lines starting with ``something='' affect the variable ``something''.
+# Lines starting with a word without ``='' denote a machine name.
+# A machine name may be followed by variable assignments which are specific to
+# the machine.
+#
+# Some info on accepted variables:
+# tmpdir and cadodir are mandatory.
+# cores defaults to 1.
+# group is planned for use in linear algebra.
+
+[cacao]
+# WARNING: $HOME is substitued locally!
 tmpdir=/localdisk/tmp
 cadodir=$HOME/Recherche/cado/trunk/dist/src
 
-# Each line of the following form:
-#
-#   hostname    nb_cores   tmpdir  cadodir        
-#
-# If tmpdir or cadodir are '_', they take the default value
-# given at the begining of file.
+cores=2
+group=0
+    pasta
+    tiramisu cores=4
 
-pasta     2     /tmp/truc       _
-achille   2     /tmp/truc       _
-hecube    2     /tmp/truc       _
-helene    2     /tmp/truc       _
+group=1
+    achille
+    hecube
+    helene
 
 
+[lix]
 # WARNING: $HOME is substitued locally!
-beaufort  2     /tmp/truc       /users/crypto/gaudry/cado
+cadodir=/users/crypto/gaudry/cado
+tmpdir=/localdisk/tmp
 
+cores=2
+    beaufort
+
+
+# vim: set tw=0:
