@@ -130,6 +130,11 @@ SMatrix_Vector(Result,M, W);
 
 
 
+char *f=TimeConvert(360000000.45);
+
+printf("%s \n",f);
+
+
 
 free(M->slices);
 free(M->Data);

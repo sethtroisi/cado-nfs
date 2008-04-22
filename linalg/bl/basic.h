@@ -24,6 +24,8 @@ extern unsigned long Refresh_ArrayBit(unsigned long m, unsigned long n,
 extern unsigned long TestZero(unsigned long m, unsigned long n,
 			      unsigned long *a);
 
+extern char * TimeConvert(float a);
+
 #ifdef __cplusplus
 }
 #endif

@@ -7,6 +7,7 @@
 #include "mat_ops.h"
 #include "echelon.h"
 #include "basic.h"
+#include "stdio.h"
 
 #define	iceildiv(x,y)	(((x)+(y)-1)/(y))
 #define	WBITS	(CHAR_BIT * sizeof(unsigned long))
@@ -76,6 +77,75 @@ void InnerProducts(unsigned long m, unsigned long n, unsigned long N,
 }
 
 
+
+
+
+char * TimeConvert(float a)
+{ 
+
+char *f;
+f=malloc(10*sizeof(unsigned long));
+
+unsigned long years,minutes,hours,days;
+float seconds;
+
+if (a>=60) {  
+
+	if ((a/60)>=60) {
+
+        	if ((a/3600)>=24) {
+			if (a/(86400)>=365) {
+					years=a/31536000;
+                                        days=a/86400-years*365;
+                        		hours=a/3600-years*365*24-days*24;
+                        		minutes=a/60-years*365*24*60-days*24*60-hours*60;
+					seconds=a-years*365*86400-days*86400-hours*3600-minutes*60;
+					sprintf(f, "%luy%lud%luh%lum%.3fs",years,days,hours,minutes,seconds);
+				
+			}
+			else
+			{
+                        days=a/(86400);
+                        hours=a/3600-days*24;
+                        minutes=a/60-days*24*60-hours*60;
+			seconds=a-days*86400-hours*3600-minutes*60;
+			sprintf(f, "%lud%luh%lum%.3fs",days,hours,minutes,seconds);
+			}		
+
+
+		}
+		else
+		{
+                 hours=a/3600;
+                 minutes=a/60-hours*60;
+		 seconds=a-hours*3600-minutes*60;
+		 sprintf(f, "%luh%lum%.3fs",hours,minutes,seconds);
+		}
+
+	}
+	else
+	{
+        minutes=a/60;
+        seconds=a-minutes*60;
+	sprintf(f, "%lum%.3fs",minutes,seconds);
+	}
+
+
+
+}
+
+else
+
+{
+
+sprintf(f, "%.3fs",a);
+
+ 
+}
+
+return f;
+
+}
 
 
 

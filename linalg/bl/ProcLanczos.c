@@ -830,7 +830,10 @@ if (p==0){
    printf("TTSD - Time for transposed sparse matrix times block   \n");
    printf("TSLA - Time for small linear algebra   \n");
    printf("TI - Time per iteration\n");
-   printf("\n");}
+   printf("ETT - Estimated total time to the end of process\n");
+   printf("\n");
+   printf("Detailed information will be displayed the first 50 steps and when completed 5 percent of total work\n");
+}
 
 
 
@@ -1080,8 +1083,7 @@ if (p==0){
 
 // end construct X0
 
-	printf("Step= %d      SizeWi=  %lu     Number of processes= %d\n", 0,
-	       SizeS[0], size);
+	printf("Step= %d Rank= %lu  Number of processes= %d \n", 0,SizeS[0], size);
 
     }
 // To all processes
@@ -1150,6 +1152,8 @@ if (p==0){
     ResnN = Allocmn(n, N);
 
     unsigned long T00, T0;
+
+    float TTI=0;
 
     t1 = microseconds();
 
@@ -1405,17 +1409,21 @@ if (p==0){
 	    float TIteration = T5 - T00;
 	    float BCalc = T0 - T00;
 	    float ACalc1 = T5 - T4;
+            TTI+=TIteration;
 	    //float ACalc2 = T4 - T3;
 	    //float tNnN=tnNN1-tNnN0;
 	    //float tnNN = tnNN1 - tnNN0;
 
+
+if ((Step<=50) || ((Step>50) &&  (Step % (m/(SumRank/(Step+1)*20)))==0)){
+            float SR=SumRank;
+            float ST=Step+1;
 	    printf
-		("Step= %lu Rank= %lu  TSD=%.3f s  TTSD=%.3f s   TSLA=%.3f s   TI=%.3f s \n",
+		("Step= %lu Rank= %lu TSD=%.3fs TTSD=%.3fs TSLA=%.3fs TI=%.3fs ETT=%s\n",
 		 Step, SumRank, SD / 1000000, TSD / 1000000,
 		 (BCalc / 1000000) + (ACalc1 / 1000000),
-		 TIteration / 1000000);
-
-	    //sleep(5);
+		 TIteration / 1000000,TimeConvert((m/(SR/ST)-(Step+1))*(TTI/(Step+1)/ 1000000)));
+	    }
 
 	    Step += 1;
 
@@ -1437,9 +1445,6 @@ if (p==0){
 		     &status);
 	}
 
-
-
-
     }
 
 
@@ -1447,14 +1452,27 @@ if (p==0){
 
 
     if (p == 0) {
+       
+
         printf("\n");
-	printf("ACompT = %f ms AComT = %f ms ",
-	       SumTimeOper / (Step - 1) / 1000,
-	       SumTimeCom / (Step - 1) / 1000);
-	printf("ABcastT = %f ms  ARedT= %f ms  ",
-	       SumTimeComBcast / (Step - 1) / 1000,
-	       SumTimeComRed / (Step - 1) / 1000);
-	printf("TPTime = %lu ms  ", (t1 - t0) / 1000);
+ //       printf("Computation times\n");
+        printf("\n");
+	printf("Total Computation Time = %f s \n",SumTimeOper / 1000000);
+        printf("Average Computation Time = %f ms \n",SumTimeOper / (Step-1) / 1000);
+        printf("\n");
+  //      printf("Comunication times\n");
+        printf("\n");
+        printf("Total Comunication Time = %f s \n",SumTimeCom /1000000);
+        printf("Average Comunication Time = %f ms \n",SumTimeCom / (Step-1) / 1000);
+	printf("Average Broadcasting Time = %f ms \n",SumTimeComBcast / (Step-1) / 1000);
+        printf("Average Reducing Time= %f ms  \n",SumTimeComRed / (Step-1) / 1000);
+
+printf("\n");
+//printf("Preparation and iterative process times\n");
+printf("\n");
+
+	printf("Total Preparation Time before iterative process = %lu ms\n",(t1 - t0) / 1000); 
+        printf("Average Iteration Time = %.3f s \n",TTI/1000000/(Step-1));
         printf("\n");
 	for (i = 0; i < iceildiv(Block, WBITS) * n; ++i) {
 	    Resultado[i] = X[i] ^ Y[i];
@@ -1785,7 +1803,7 @@ void Lanczos(DenseMatrix Kernel, SparseMatrix M,
     unsigned long *Y;
     Y = Allocmn(M->Ncols + 1, Block);
 
-    unsigned long T0, T1;
+    unsigned long T0, T1,T2;
 
     if (p == 0) {
 	RandomDMatrixBitTest(M->Ncols, Block, Y);
@@ -1820,13 +1838,21 @@ void Lanczos(DenseMatrix Kernel, SparseMatrix M,
 
     KernelSparse(M, Result, Block, Kernel);
 
+
+   
     // MPI_Bcast(Index, 2, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
 
     
+    T2 = microseconds();
 
-
-
-
+if (p==0) {
+    float T10=(T1-T0);
+    float T21=(T2-T1);
+printf("\n");
+printf("Total time for iterated process = %f s \n",T10/1000000);
+printf("Time for post processing data = %f s \n",T21/1000000);
+printf("\n");
+}
 //    displayMatrixScreen(Kernel->Data,M->Ncols,Kernel->Ncols);
 //    displaySMatrixNew(M->Data,M->Nrows,M->Ncols,'M');
 

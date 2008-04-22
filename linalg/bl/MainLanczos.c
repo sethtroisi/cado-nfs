@@ -116,7 +116,7 @@ int main(int argc, char *argv[])
 	DiffTime = Tm2 - Tm1;
         
 	printf
-	    ("Total Time for Lanczos = %f s   nb_processes of block in kernel is %lu\n",
+	    ("Total Time for Lanczos = %f s   Size of block in kernel is %lu\n",
 	     DiffTime / 1000000, Ker->Ncols);
         printf("\n");
     }
