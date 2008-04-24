@@ -12,7 +12,7 @@ names:=polyfile relation timing long_poly getprime mod_ul modul_poly gmp_aux \
 src:=$(patsubst %,%.c,$(names))
 obj:=$(patsubst %,%.o,$(names))
 
-all: libutils.a cache cachesize
+all: libutils.a cache cachesize check_rels
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -I.. -I$(GMPINCLUDE)
@@ -22,6 +22,9 @@ cache: cache.c timing.o
 
 cachesize: cachesize.c
 	$(CC) $(CFLAGS) $< -o $@
+
+check_rels: check_rels.o libutils.a
+	$(CC) $(CFLAGS) $^ -o $@ -lgmp
 
 libutils.a: $(obj)
 	ar r libutils.a $(obj)
