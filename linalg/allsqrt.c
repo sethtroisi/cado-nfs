@@ -151,7 +151,11 @@ finishRationalSqrt(FILE *ratfile, hashtable_t *H, cado_poly pol)
 	if(H->hashcount[i] > 0){
 	    if(H->hashtab_r[i] != ((unsigned long)-2))
 		continue;
-	    ASSERT(!(H->hashcount[i] & 1));
+	    if ((H->hashcount[i] & 1)) {
+	        fprintf(stderr, "  Odd valuation! At rational prime %lu\n",
+		    H->hashtab_p[i]);
+		exit(1);
+	    }
 #if MAPLE >= 1
 	    fprintf(stderr, "R:=R*%ld^%d:\n",
 		    H->hashtab_p[i], H->hashcount[i]>>1);
@@ -182,9 +186,13 @@ finishAlgebraicSqrt(FILE *algfile, hashtable_t *H /*, cado_poly pol*/)
 #endif
     for(i = 0; i < H->hashmod; i++)
 	if(H->hashcount[i] > 0){
-	    ASSERT(!(H->hashcount[i] & 1));
 	    if(H->hashtab_r[i] == ((unsigned long)-2))
 		continue;
+	    if ((H->hashcount[i] & 1)) {
+	        fprintf(stderr, "  Odd valuation! At algebraic prime %lu %lu\n",
+		                        H->hashtab_p[i], H->hashtab_r[i]);
+		exit(1);
+	    }
 	    fprintf(algfile, "%ld %ld %d\n", 
 		    H->hashtab_p[i], H->hashtab_r[i], H->hashcount[i]>>1);
 #if DEBUG >= 1
