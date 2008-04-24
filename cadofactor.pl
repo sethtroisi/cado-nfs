@@ -40,10 +40,14 @@ my $default_param = {
     excess=>100,
     qmin=>12000000,
     qrange=>1000000,
+    delay=>120,
     checkrange=>1000000,
     sievenice=>19,
+    keeprelfiles=>'false',
+    selectnice=>10,
     prune=>1.0,
     keep=>160,
+    keeppurge=>100000,
     maxlevel=>15,
     cwmax=>200,
     rwmax=>200,
@@ -90,9 +94,13 @@ sub read_param {
         if (/^qmin=(.*)$/)     { $param->{qmin}=$1; shift @args; next; }
         if (/^qrange=(.*)$/)   { $param->{qrange}=$1; shift @args; next; }
         if (/^checkrange=(.*)$/){ $param->{checkrange}=$1; shift @args; next; }
+        if (/^keeprelfiles=(.*)$/){ $param->{keeprelfiles}=$1; shift @args; next; }
+        if (/^delay=(.*)$/)    { $param->{delay}=$1; shift @args; next; }
         if (/^sievenice=(.*)$/){ $param->{sievenice}=$1; shift @args; next; }
+        if (/^selectnice=(.*)$/){ $param->{selectnice}=$1; shift @args; next; }
         if (/^prune=(.*)$/)    { $param->{prune}=$1; shift @args; next; }
         if (/^keep=(.*)$/)     { $param->{keep}=$1; shift @args; next; }
+        if (/^keeppurge=(.*)$/){ $param->{keeppurge}=$1; shift @args; next; }
         if (/^maxlevel=(.*)$/) { $param->{maxlevel}=$1; shift @args; next; }
         if (/^cwmax=(.*)$/)    { $param->{cwmax}=$1; shift @args; next; }
         if (/^rwmax=(.*)$/)    { $param->{rwmax}=$1; shift @args; next; }
@@ -116,7 +124,7 @@ sub read_param {
                 $line = $_;
                 if (/^\s*#/) { next; }
                 if (/^\s*$/) { next; }
-                if (/^\s*(\w*)=([a-zA-Z0-9_\.\/\$]*)\s*(#|$)/) {
+                if (/^\s*(\w*)=([a-zA-Z0-9_+\.\/\$]*)\s*(#|$)/) {
                     push @newargs, "$1=$2";
                     next;
                 }
@@ -219,6 +227,280 @@ sub cmp_filedate {
         return 1;
     }
 }
+# Read a selection status file:
+# Each line is of the form
+#   hostname b
+# Any empty line is ignored.
+# any line that starts with # is ignored
+sub read_select_status_file {
+    my $param = shift @_;
+    my $prefix = $param->{wdir} . "/" . $param->{name};
+    my $statfile = "$prefix.selectstatus";
+    if (! -f $statfile) {
+        print "No status file found. Creating an empty one...\n";
+        open GRR, ">$statfile" or die "$statfile: $!\n";
+        close GRR;
+        return ();
+    }
+    my @status;
+    open SF, "<$statfile" or die "$statfile: $!\n";
+    while (<SF>) {
+        if (/^\s*\n$/) { next; }
+        if (/^#/) { next; }
+        if (/^\s*(\w*)\s+(\d+)/) {
+            push @status, [$1, $2];
+            next;
+        }
+        die "Could not parse status file: $_\n";
+    }
+    close SF;
+    return @status;
+}
+
+sub write_select_status_file {
+    my $param = shift @_;
+    my $status = shift @_;
+    my $prefix = $param->{wdir} . "/" . $param->{name};
+    my $statfile = "$prefix.selectstatus";
+    open GRR, ">$statfile" or die "$statfile: $!\n";
+    foreach my $t (@$status) {
+        my @tt = @$t;
+        print GRR "" . $tt[0] . " " . $tt[1] . "\n";
+    }
+    close GRR;
+}
+
+# A task is a pair (hostname b)
+# This function ssh to hostname, and tests if the task is still alive,
+# dead or finished.
+# 1 means running
+# 0 means finished
+# -1 means (probably dead)
+sub check_running_select_task {
+    my $param = shift @_;
+    my $name = $param->{name};
+    my $mach_desc = shift @_;
+    my ($host, $b) = @_;
+    print "    $host \t$b:\n";
+    my %host_data=%{$mach_desc->{$host}};
+    my $wdir = $host_data{tmpdir};
+    my $cadodir = $host_data{cadodir};
+    # First check if the last line corresponds to finished job:
+    my ($t, $lastline) = my_system_timeout(
+        "ssh $host tail -1 $wdir/$name.poly.$b", 30);
+    if (! $t) {
+        print "      Assume task is still running...\n";
+        return 1;
+    }
+    $_ = $lastline;
+    if (/# generated/) {
+        print "      finished!\n";
+        return 0;
+    }
+    # If file is partial check its last modification time:
+    my $date;
+    ($t, $date) = my_system_timeout("ssh $host date +%s", 30);
+    if (! $t) {
+        print "      Assume task is still running...\n";
+        return 1;
+    }
+    my $modifdate;
+    ($t, $modifdate) = my_system_timeout(
+        "ssh $host stat -c %Y $wdir/$name.poly.$b", 30);
+    if (! $t) {
+        print "      Assume task is still running...\n";
+        return 1;
+    }
+    ## If didn't move for 10 minutes, assume it's dead
+    if ($date > ($modifdate + 600)) {
+        print "      dead ?!?\n";
+        return -1;
+    }
+    # otherwise it's running:
+    print "      running...\n";
+    return 1;
+}
+
+sub push_select_files {
+    my ($mach, $wdir, $param) = @_;
+    my $name = $param->{name};
+    my $ldir = $param->{wdir};
+    my $t;
+    my $ret;
+    ($t, $ret) = my_system_timeout("ssh $mach mkdir -p $wdir", 60);
+    if (! $t) { die "Connection to $mach timeout\n"; }
+    ($t, $ret) = my_system_timeout("ssh $mach ls $wdir/$name.n", 120);
+    if (! $t) { die "Connection to $mach timeout\n"; }
+    chomp $ret;
+    if ($ret eq "") {
+        print "    Pushing $name.n to $mach.\n";
+        system("rsync --timeout=120 $ldir/$name.n $mach:$wdir/");
+    }
+}
+
+sub restart_select_tasks {
+    my $param = shift @_;
+    my $running = shift @_;
+    my $mach_desc = shift @_;
+    my $name = $param->{name};
+    my $nice = $param->{selectnice};
+
+    my %doneb;
+    my $prefix = $param->{wdir} . "/" . $param->{name};
+    my $wdir = $param->{wdir};
+    opendir(DIR, $wdir) or die "can't opendir $wdir: $!";
+    my @files = readdir(DIR);
+    close DIR;
+    foreach my $f (@files) {
+        if ($f =~ /$name\.poly\.(\d+)/) {
+            $doneb{$1}=1;
+        }
+    }
+    foreach my $t (@$running) {
+        $doneb{${$t}[1]}=1;
+    }
+
+    my @setb;
+    for ($b = $param->{bmin}; $b <= $param->{bmax}; $b++) {
+        if (! $doneb{$b}) {
+            push @setb, $b;
+        }
+    }
+    if (scalar @$running == 0 && scalar @setb == 0) {
+        # finished!
+        return 1;
+    }
+
+    for my $m (keys %$mach_desc) {
+        my $cpt = 0;
+        my $t;
+        my %desc = %{$mach_desc->{$m}};
+        for $t (@$running) {
+            if (${$t}[0] eq $m) { $cpt++; }
+        }
+        if ($cpt >= $desc{cores}) {
+            # already enough tasks running on $m
+            next;
+        }
+        # Number of new tasks to run is:
+        $cpt = $desc{cores} - $cpt;
+        for (my $i = 0; $i < $cpt; $i++) {
+            if (! scalar @setb) { last; }
+            $b = shift @setb;
+            $t = [$m, $b ];
+            my $mach = $m;
+            my $wdir = $desc{tmpdir};
+            my $bindir = $desc{cadodir};
+            push_select_files($mach, $wdir, $param);
+            my $cmd = "/bin/nice -$nice $bindir/polyselect/polyselect" .
+              " -b $b" .
+              " -e " . $param->{e} .
+              " -degree " . $param->{degree} .
+              " < $wdir/$name.n";
+            my $ret = `ssh $mach "$cmd >& $wdir/$name.poly.$b&"`;
+            print "    Starting $mach $b.\n";
+            open FH, ">> " . $param->{wdir} . "/$name.cmd";
+            print FH "ssh $mach \"$cmd >& $wdir/$name.poly.$b&\"\n";
+            close FH;
+            push @$running, $t;
+        }
+    }
+    return 0;
+}
+
+sub get_logmualpha_value {
+    my $filename = shift @_;
+    open FILE, "< $filename";
+    my @lines = readline(FILE);
+    close FILE;
+    @lines = grep (/logmu\+alpha/, @lines);
+    $_ = $lines[0];
+    if (/logmu\+alpha=([0-9]*.[0-9]*)/) {
+        my $E = $1;
+        return $E;
+    } else {
+        print STDERR "Can not parse output of $filename for geting logmu+alpha\n";
+        return 0;
+    }
+}
+
+
+# rsync a finished / dead task to the local working dir.
+# return the logmu+alpha value.
+sub import_select_task_result {
+    my $param = shift @_;
+    my $name = $param->{name};
+    my $mach_desc = shift @_;
+    my ($host, $b) = @_;
+    my %host_data=%{$mach_desc->{$host}};
+    my $rwdir = $host_data{tmpdir};
+    my $lwdir = $param->{wdir};
+    my $cmd = "rsync --timeout=30 $host:$rwdir/$name.poly.$b $lwdir/";
+    my $ret = system($cmd);
+    if ($ret != 0) {
+        print STDERR "Problem when importing file $name.poly.$b from $host.\n";
+        return 0;
+    }
+
+    return get_logmualpha_value("$lwdir/$name.poly.$b");
+}
+
+
+sub parallel_polyselect {
+    my $param = shift @_;
+    my $prefix = $param->{wdir} . "/" . $param->{name};
+    my $b;
+    my $t;
+    my $bestb=0;
+    my $effort=$param->{e};
+    my $degree=$param->{degree};
+    my $finished = 0;
+    while (! $finished) {
+        my %mach_desc = read_machine_description($param);
+        my @status = read_select_status_file($param);
+        my @newstatus;
+        print "  Check all running tasks:\n";
+        foreach $t (@status) {
+            my $running = check_running_select_task($param, \%mach_desc, @$t);
+            if ($running == 1) {
+                push @newstatus, $t;
+            } elsif ($running == 0) {
+                import_select_task_result($param, \%mach_desc, @$t);
+            } else { # dead task!
+                # do nothing, this will be restarted soon...
+            }
+        }
+        print "  Start new tasks.\n";
+        $finished = restart_select_tasks($param, \@newstatus, \%mach_desc);
+        write_select_status_file($param, \@newstatus);
+        if (!$finished) {
+            my $delay = $param->{delay};
+            print "Wait for $delay seconds before checking again.\n";
+            sleep($delay);
+        }
+    }
+    # Choose best according to logmu+alpha
+    my $Emin;
+    for ($b = $param->{bmin}; $b <= $param->{bmax}; $b++) { 
+        if (! -f "$prefix.poly.$b") {
+            die "Hey! Where is $prefix.poly.$b ????\n";
+        }
+        my $E = get_logmualpha_value("$prefix.poly.$b");
+        if ((!$Emin) || $E < $Emin) {
+            $Emin = $E;
+            $bestb = $b;
+        }
+    }
+
+    # choose best.
+    # For the moment, we do it according to logmu+alpha
+    print "Best polynomial is for b = $bestb\n";
+    copy("$prefix.poly.$bestb" , "$prefix.poly");
+}
+
+
+
+
 
 sub polyselect {
     my $param = shift @_;
@@ -275,8 +557,9 @@ sub try_singleton {
 
     # Singleton removal
     print "Singleton removal...\n";
+    my $keep = $param->{keeppurge};
     $cmd = $param->{cadodir} .
-      "/linalg/purge -poly $prefix.poly -nrels $nrels_dup $prefix.nodup > $prefix.purged 2> $prefix.purge.stderr";
+      "/linalg/purge -poly $prefix.poly -keep $keep -nrels $nrels_dup $prefix.nodup > $prefix.purged 2> $prefix.purge.stderr";
     my_system($cmd, "$prefix.cmd", "no_kill");
     if (-z "$prefix.purged") {
         printf "Not enough relations!\n";
@@ -288,7 +571,7 @@ sub try_singleton {
         close FH;
         print "Nrows = $nrows , Ncols = $ncols";
         print "Excess = " . ($nrows - $ncols) . "\n";
-        if ($nrows - $ncols <= 0) {
+        if ($nrows - $ncols <= $param->{excess}) {
             print "Not enough relations!\n";
             return 0;
         }
@@ -348,10 +631,10 @@ sub check_running_task {
     my $name = $param->{name};
     my $mach_desc = shift @_;
     my ($host, $q0, $q1) = @_;
-    print "    $host $q0-$q1:\n";
-    my @host_data=@{$mach_desc->{$host}};
-    my $wdir = $host_data[1];
-    my $cadodir = $host_data[2];
+    print "    $host \t$q0-$q1:\n";
+    my %host_data=%{$mach_desc->{$host}};
+    my $wdir = $host_data{tmpdir};
+    my $cadodir = $host_data{cadodir};
     # First check if the last line corresponds to finished job:
     my ($t, $lastline) = my_system_timeout(
         "ssh $host tail -1 $wdir/$name.rels.$q0-$q1", 30);
@@ -397,8 +680,8 @@ sub import_task_result {
     my $name = $param->{name};
     my $mach_desc = shift @_;
     my ($host, $q0, $q1) = @_;
-    my @host_data=@{$mach_desc->{$host}};
-    my $rwdir = $host_data[1];
+    my %host_data=%{$mach_desc->{$host}};
+    my $rwdir = $host_data{tmpdir};
     my $lwdir = $param->{wdir};
     my $cmd = "rsync --timeout=30 $host:$rwdir/$name.rels.$q0-$q1 $lwdir/";
     my $ret = system($cmd);
@@ -406,6 +689,22 @@ sub import_task_result {
         print STDERR "Problem when importing file $name.rels.$q0-$q1 from $host.\n";
         return 0;
     }
+    $cmd = $param->{cadodir} . "/utils/check_rels -poly $lwdir/$name.poly $lwdir/$name.rels.$q0-$q1";
+    $ret = system($cmd);
+    if ($ret != 0) {
+        print STDERR "Buggy relation in file $name.rels.$q0-$q1 from $host.\n";
+        print STDERR "Moving it to FIXME.$name.rels.$q0-$q1 .\n";
+        print STDERR "If you fix it, should remove the prefix and it will "
+          . "be taken into account in the computation";
+        rename "$lwdir/$name.rels.$q0-$q1", "$lwdir/FIXME.$name.rels.$q0-$q1"
+            or die "Failed rename: $!\n";
+        return 0;
+    }
+    # Import succeeded, so we can remove the remote file.
+    if ($param->{keeprelfiles} eq 'false') {
+        my_system_timeout("ssh $host rm $rwdir/$name.rels.$q0-$q1", 30);
+    }
+
     return `grep -v "^#" $lwdir/$name.rels.$q0-$q1 | wc -l`;
 }
 
@@ -413,32 +712,46 @@ sub read_machine_description {
     my $param = shift @_;
     my $machine_file = $param->{machines};
     my %mach_desc;
-    my $default_tmpdir='/tmp';
-    my $default_cadodir='$HOME';
+    my %vars = ();
     open MACH, "< $machine_file";
     while (<MACH>) {
-        if (/^#/) { next; }
-        if (/^\s*$/) { next; }
-        if (/^tmpdir=([a-zA-Z0-9_\.\/\$]*)/) {
-            $default_tmpdir = $1;
+        next if /^\s*#/ || /^\s*$/;
+
+        s/^\s*//;
+
+        if (/^(\w+)=(\S*)\s*$/) {
+            $vars{$1}=$2;
             next;
         }
-        if (/^cadodir=([a-zA-Z0-9_\.\/\$]*)/) {
-            $default_cadodir = $1;
+
+        if (/^\[(\S+)\]\s*$/) {
+            %vars = ( cluster=>$1 );
             next;
         }
-        if (/^(\w*)\s+(\d*)\s+([a-zA-Z0-9_\.\/\$]*)\s+([a-zA-Z0-9_\.\/\$]*)/) {
-            my @m = ($2, $3, $4);
-            if ($m[1] eq '_') { $m[1] = $default_tmpdir; }
-            if ($m[2] eq '_') { $m[2] = $default_cadodir; }
-            $mach_desc{$1} = \@m;
+
+        if (s/^([\w\.]+)\s*(.*)/$2/) {
+            my $m = $1;
+            my $opts = $2;
+            my %h = %vars;
+            while ($opts =~ s/^(\w+)=(\S*)\s*//) {
+                $h{$1}=$2;
+            }
+            die "$opts" if $opts;
+            # Check mandatory args and complete with defaults.
+            if (! $h{tmpdir}) { die "No tmpdir given for machine $m\n"; }
+            if (! $h{cadodir}) { die "No cadodir given for machine $m\n"; }
+            if (! $h{cores}) { $h{cores}=1; }
+            $mach_desc{$m}=\%h;
             next;
         }
-        die "Could not parse line: $_ in file $machine_file\n";
+
+        die "Could not parse: $_ in file $machine_file\n";
     }
     close MACH;
     return %mach_desc;
 }
+
+
 
 # Check whether .poly and .roots files are present in the remote working
 # directory. Otherwise push them.
@@ -508,22 +821,22 @@ sub restart_tasks {
     for my $m (keys %$mach_desc) {
         my $cpt = 0;
         my $t;
-        my @desc = @{$mach_desc->{$m}};
+        my %desc = %{$mach_desc->{$m}};
         for $t (@$running) {
             if (${$t}[0] eq $m) { $cpt++; }
         }
-        if ($cpt >= $desc[0]) {
+        if ($cpt >= $desc{cores}) {
             # already enough tasks running on $m
             next;
         }
         # Number of new tasks to run is:
-        $cpt = $desc[0] - $cpt;
+        $cpt = $desc{cores} - $cpt;
         for (my $i = 0; $i < $cpt; $i++) {
             my $qend = $q_curr + $param->{qrange};
             $t = [$m, $q_curr, $qend ];
             my $mach = $m;
-            my $wdir = $desc[1];
-            my $bindir = $desc[2];
+            my $wdir = $desc{tmpdir};
+            my $bindir = $desc{cadodir};
             push_files($mach, $wdir, $param);
             my $cmd = "/bin/nice -$nice $bindir/sieve/las -checknorms" .
               " -I " . $param->{I} .
@@ -613,7 +926,8 @@ sub parallel_sieve {
             }
         }
         if (! $finished) { 
-            my $delay = 120;
+            my $delay = $param->{delay};
+            print "Number of relations is $nrels.\n";
             print "Wait for $delay seconds before checking again.\n";
             sleep($delay);
         }
@@ -680,7 +994,6 @@ MAIN: {
     if (-f $param->{wdir} . "/" . $param->{name} . ".n") {
         print STDERR "Warning: there is already some data relative to " .
         "this name in this directory.\n";
-#        die "Recovering partial computation is not implemented.\n";
     }
 
     # Read n if not given on command line
@@ -700,7 +1013,11 @@ MAIN: {
     print_param($param,$fh);
 
     # Polynomial selection
-    polyselect($param);
+    if ($param->{parallel} eq 'true') {
+        parallel_polyselect($param);
+    } else {
+        polyselect($param);
+    }
 
     # Appending some parameters to the poly file
     open FILE, ">> $prefix.poly";
@@ -713,11 +1030,17 @@ MAIN: {
     print FILE "rlambda: " . $param->{rlambda}. "\n";
     print FILE "alambda: " . $param->{alambda}. "\n";
 
+    my $cmd;
     # Creating the factor base
-    print "Creating the factor base...\n";
-    my $cmd = "" . $param->{cadodir} .
-      "/sieve/makefb -poly $prefix.poly > $prefix.roots";
-    my_system($cmd, "$prefix.cmd");
+    if (-e "$prefix.roots" && 
+        cmp_filedate("$prefix.poly", "$prefix.roots") < 1) {
+            print "A Factor base file exists... Let's trust it!\n";
+    } else {
+        print "Creating the factor base...\n";
+        $cmd = "" . $param->{cadodir} .
+          "/sieve/makefb -poly $prefix.poly > $prefix.roots";
+        my_system($cmd, "$prefix.cmd");
+    }
 
     # Computing free relations
     print "Computing free relations...\n";
@@ -745,7 +1068,7 @@ MAIN: {
       " -cwmax " . $param->{cwmax} .
       " -rwmax " . $param->{rwmax} .
       " -ratio " . $param->{ratio};
-    my_system($cmd . "> $prefix.merge.his 2> $prefix.merge.stderr",
+      my_system($cmd . "> $prefix.merge.his 2> $prefix.merge.stderr",
         "$prefix.cmd");
     my $bwcostmin=`tail $prefix.merge.his | grep "BWCOSTMIN:" | awk '{print \$NF}'`;
     chomp $bwcostmin;
@@ -758,7 +1081,8 @@ MAIN: {
     # Linear algebra
     print "Transposing...\n";
     $cmd = $param->{cadodir} . "/linalg/transpose" .
-      "  -in $prefix.small -out $prefix.small.tr";
+      " -T " . $param->{wdir} .
+      " -in $prefix.small -out $prefix.small.tr";
     my_system($cmd, "$prefix.cmd");
     if ($param->{linalg} eq 'bw') { 
         print "Calling Block-Wiedemann...\n";
