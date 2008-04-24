@@ -5,7 +5,7 @@ GMPLIB ?= $(GMP)/lib/libgmp.a
 GMPINCLUDE ?= $(GMP)/include/
 CFLAGS ?= -g -O2 -DNDEBUG -W -Wall
 
-targets:=convert_poly convert_rels
+targets:=convert_poly convert_rels contains_zerochar 
 
 all: $(targets)
 
