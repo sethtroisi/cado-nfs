@@ -1387,7 +1387,7 @@ generate_poly (cado_poly out, double T, unsigned long b)
       mpz_fdiv_qr (out->f[d], out->f[d - 1], t, out->m); /* f[d]*m+f[d-1]*/
       if (mpz_cmp_ui (out->f[d], 0) == 0)
         {
-          gmp_fprintf (stderr, "Stopping selection at m=%Zd since leading coefficient is zero\n", out->m);
+          gmp_fprintf (stderr, "# Stopping selection at m=%Zd since leading coefficient is zero\n", out->m);
           break;
         }
       mpz_mul_ui (t, out->f[d], d);
