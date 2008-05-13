@@ -123,6 +123,8 @@ print_relation_cado (relation_t *rel, int32_t *rfb, int32_t *afb)
       putchar ((rel->afb_entries + rel->sp_entries == 0) ? ':' : ',');
       printf ("%x", rel->large_aprimes[i]);
     }
+  if (rel->afb_entries + rel->sp_entries + rel->num_lap == 0)
+    putchar (':');
   printf ("\n");
 }
 
@@ -269,7 +271,7 @@ read_relation_cwi (FILE *fp, relation_t *rel)
   unsigned int j; /* number of entries <= i (if multiplicities) */
   char c;
 
-  ret = fscanf (fp, "%d %d %d", &flag, &(rel->a), &(rel->b));
+  ret = fscanf (fp, "%x %d %d", &flag, &(rel->a), &(rel->b));
   if (ret != 3)
     {
       if (feof (fp))
@@ -285,16 +287,16 @@ read_relation_cwi (FILE *fp, relation_t *rel)
     }
 
   /* check flag=01xy */
-  if (flag / 100 != 01)
+  if (flag / 256 != 01)
     {
-      fprintf (stderr, "Error, flag differs from 01xy: %d\n", flag);
+      fprintf (stderr, "Error, flag differs from 01xy: %x\n", flag);
       exit (1);
     }
 
-  rel->rfb_entries = (flag % 100) / 10;
+  rel->rfb_entries = (flag & 0xFF) >> 4;
   for (i = j = 0; i < rel->rfb_entries; i++) /* new rational prime */
     {
-      if (fscanf (fp, " %lx", &p) != 1)
+      if (fscanf (fp, " %ld", &p) != 1)
         {
           fprintf (stderr, "Error, can't read next rational prime\n");
           exit (1);
@@ -308,12 +310,13 @@ read_relation_cwi (FILE *fp, relation_t *rel)
           j ++;
         }
     }
+  rel->rfb_entries = j;
   rel->num_lrp = 0;
 
-  rel->afb_entries = flag % 10;
+  rel->afb_entries = flag & 0xF;
   for (i = j = 0; i < rel->afb_entries; i++) /* new algebraic prime */
     {
-      if (fscanf (fp, " %lx", &p) != 1)
+      if (fscanf (fp, " %ld", &p) != 1)
         {
           fprintf (stderr, "Error, can't read next algebraic prime\n");
           exit (1);
@@ -327,6 +330,7 @@ read_relation_cwi (FILE *fp, relation_t *rel)
           j ++;
         }
     }
+  rel->afb_entries = j;
   rel->sp_entries = 0;
   rel->num_lap = 0;
 
