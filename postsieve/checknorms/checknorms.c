@@ -780,7 +780,7 @@ unsigned long factor_completely(mpz_array_t*    const factors,
             if (mtot > maxnlp) {
                 count_too_many_factors++;
                 if (count_too_many_factors <= MAXNMSG) {
-                    WARNING("Residue %Zd has too much prime factors\n", norm);
+                    WARNING("Residue %Zd has too many prime factors\n", norm);
                 }
                 retval = NORM_IS_REJECTED;
                 goto clean_and_return;
@@ -791,7 +791,7 @@ unsigned long factor_completely(mpz_array_t*    const factors,
         } else if (factors->length > maxnlp) {
             count_too_many_factors++;
             if (count_too_many_factors <= MAXNMSG) {
-                WARNING("Residue %Zd has too much prime factors\n", norm);
+                WARNING("Residue %Zd has too many prime factors\n", norm);
             }
             retval = NORM_IS_REJECTED;
             goto clean_and_return;

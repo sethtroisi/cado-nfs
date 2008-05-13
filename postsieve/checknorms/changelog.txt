@@ -1,6 +1,11 @@
 Recent changes:
 ---------------
 
+  - Tue May 13 2008 by JM:
+      - Corrected severe grammar error in output messages (thanks Paul!).
+        Will now go through http://www.better-english.com/grammar/toomuch.htm
+        as a punishment...
+
   - Fri Jan 25 2008 by JM:
       - Renamed the previous checknorms.c version to checknorms.2lp.c ("2lp" 
         standing for "2 large primes")
