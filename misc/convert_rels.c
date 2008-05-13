@@ -7,6 +7,7 @@
 #define FORMAT_CADO 0  /* CADO format (default output format) */
 #define FORMAT_FK   1  /* Franke-Kleinjung's format */
 #define FORMAT_GGNFS 2 /* GGNFS format (default input format) */
+#define FORMAT_CWI   3 /* CWI format */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -87,7 +88,11 @@ print_relation_cado (relation_t *rel, int32_t *rfb, int32_t *afb)
     for (j = 0; j < rel->rexp[i]; j++)
       {
 	putchar ((i + j == 0) ? ':' : ',');
-	printf ("%x", rfb[rel->rprimes[i]]);
+        if (rfb == NULL) /* primes are given directly */
+          printf ("%lx", rel->rprimes[i]);
+        else /* primes are given by their index */
+          printf ("%x", rfb[rel->rprimes[i]]);
+        fflush (stdout);
       }
   for (i = 0; i < rel->num_lrp; i++)
     {
@@ -99,7 +104,10 @@ print_relation_cado (relation_t *rel, int32_t *rfb, int32_t *afb)
     for (j = 0; j < rel->aexp[i]; j++)
       {
 	putchar ((i + j == 0) ? ':' : ',');
-	printf ("%x", afb[rel->aprimes[i]]);
+        if (afb == NULL) /* primes are given directly */
+          printf ("%lx", rel->aprimes[i]);
+        else /* primes are given by their index */
+          printf ("%x", afb[rel->aprimes[i]]);
       }
   for (i = 0; i < rel->sp_entries; i++)
     {
@@ -246,6 +254,89 @@ read_relation_cado (FILE *fp, relation_t *rel)
   rel->afb_entries = i;
   rel->sp_entries = 0;
   rel->num_lap = 0;
+
+  return 1;
+}
+
+/* Read one relation in CWI format from fp, and put it in rel.
+   Return 1 if relation is valid, 0 if invalid, -1 if end of file. */
+int
+read_relation_cwi (FILE *fp, relation_t *rel)
+{
+  int flag, ret;
+  unsigned long p;
+  unsigned int i; /* number of given primes */
+  unsigned int j; /* number of entries <= i (if multiplicities) */
+  char c;
+
+  ret = fscanf (fp, "%d %d %d", &flag, &(rel->a), &(rel->b));
+  if (ret != 3)
+    {
+      if (feof (fp))
+        return 0;
+      fprintf (stderr, "Error, invalid relation: ");
+      do
+        {
+          c = getc (fp);
+          fputc (c, stderr);
+        }
+      while (c != '\n');
+      exit (1);
+    }
+
+  /* check flag=01xy */
+  if (flag / 100 != 01)
+    {
+      fprintf (stderr, "Error, flag differs from 01xy: %d\n", flag);
+      exit (1);
+    }
+
+  rel->rfb_entries = (flag % 100) / 10;
+  for (i = j = 0; i < rel->rfb_entries; i++) /* new rational prime */
+    {
+      if (fscanf (fp, " %lx", &p) != 1)
+        {
+          fprintf (stderr, "Error, can't read next rational prime\n");
+          exit (1);
+        }
+      if (j > 0 && p == rel->rprimes[j-1])
+        rel->rexp[j-1] ++;
+      else
+        {
+          rel->rprimes[j] = p;
+          rel->rexp[j] = 1;
+          j ++;
+        }
+    }
+  rel->num_lrp = 0;
+
+  rel->afb_entries = flag % 10;
+  for (i = j = 0; i < rel->afb_entries; i++) /* new algebraic prime */
+    {
+      if (fscanf (fp, " %lx", &p) != 1)
+        {
+          fprintf (stderr, "Error, can't read next algebraic prime\n");
+          exit (1);
+        }
+      if (j > 0 && p == rel->aprimes[j-1])
+        rel->aexp[j-1] ++;
+      else
+        {
+          rel->aprimes[j] = p;
+          rel->aexp[j] = 1;
+          j ++;
+        }
+    }
+  rel->sp_entries = 0;
+  rel->num_lap = 0;
+
+  ret = fscanf (fp, "%c\n", &c);
+  if (ret != 1 || (c != ';' && c != ':'))
+    {
+      fprintf (stderr, "Error, invalid relation for a=%d b=%d\n",
+               rel->a, rel->b);
+      exit (1);
+    }
 
   return 1;
 }
@@ -404,6 +495,8 @@ convert_relations (char *rels, int32_t *rfb, int32_t *afb, mpz_t *f, int degf,
         ok = read_relation_ggnfs (fp, rel, norm, f, degf, afb);
       else if (iformat == FORMAT_CADO)
         ok = read_relation_cado (fp, rel);
+      else if (iformat == FORMAT_CWI)
+        ok = read_relation_cwi (fp, rel);
       else
         {
           fprintf (stderr, "Error, unknown format %d\n", iformat);
@@ -604,6 +697,8 @@ main (int argc, char *argv[])
             iformat = FORMAT_FK;
           else if (strcmp (argv[2], "ggnfs") == 0)
             iformat = FORMAT_GGNFS;
+          else if (strcmp (argv[2], "cwi") == 0)
+            iformat = FORMAT_CWI;
           else
             {
               fprintf (stderr, "Unknown format: %s\n", argv[2]);
@@ -664,7 +759,8 @@ main (int argc, char *argv[])
 
   fprintf (stderr, "Convert relations from %s to %s format\n",
            (iformat == FORMAT_CADO) ? "CADO" :
-           ((iformat == FORMAT_FK) ? "Franke-Kleinjung" : "GGNFS"),
+           ((iformat == FORMAT_FK) ? "Franke-Kleinjung" :
+            ((iformat == FORMAT_CWI) ? "CWI" : "GGNFS")),
            (oformat == FORMAT_CADO) ? "CADO" :
            ((oformat == FORMAT_FK) ? "Franke-Kleinjung" : "GGNFS"));
 
@@ -677,6 +773,12 @@ main (int argc, char *argv[])
   if (oformat == FORMAT_GGNFS)
     {
       fprintf (stderr, "Error, GGNFS output format not yet implemented\n");
+      exit (1);
+    }
+
+  if (oformat == FORMAT_CWI)
+    {
+      fprintf (stderr, "Error, CWI output format not yet implemented\n");
       exit (1);
     }
 
