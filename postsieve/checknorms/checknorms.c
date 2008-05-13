@@ -695,7 +695,7 @@ unsigned long checkrels(char *f, cado_poly cpoly,
             count_no_factor_found);
     }
     if (count_too_many_factors != 0) {
-        MSG("    > %lu relations because norm had too much prime factors\n",
+        MSG("    > %lu relations because norm had too many prime factors\n",
             count_too_many_factors);
     }
     if (count_too_large_factor != 0) {
