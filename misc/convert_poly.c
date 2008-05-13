@@ -232,6 +232,72 @@ read_ggnfs (mpz_t N, mpz_t *X, mpz_t Y1, mpz_t Y0, mpz_t M)
 }
 
 void
+read_cwi (mpz_t N, mpz_t *X, mpz_t Y1, mpz_t Y0, mpz_t M)
+{
+  int npoly; /* number of polynomials */
+  int degree, i;
+
+  if (mpz_inp_str (N, stdin, 0) == 0)
+    {
+      fprintf (stderr, "Error, can't read number to factor N\n");
+      exit (1);
+    }
+  if (mpz_inp_str (M, stdin, 0) == 0)
+    {
+      fprintf (stderr, "Error, can't read common root M\n");
+      exit (1);
+    }
+  if (scanf ("%d\n", &npoly) != 1)
+    {
+      fprintf (stderr, "Error, can't read number of polynomials\n");
+      exit (1);
+    }
+  if (npoly != 2)
+    {
+      fprintf (stderr, "Error, case of >=3 polynomials not yet implemented\n");
+      exit (1);
+    }
+  if (scanf ("%d\n", &degree) != 1)
+    {
+      fprintf (stderr, "Error, can't read degree of 1st polynomial\n");
+      exit (1);
+    }
+  if (degree != 1)
+    {
+      fprintf (stderr, "Error, first polynomial must be linear\n");
+      exit (1);
+    }
+  if (mpz_inp_str (Y0, stdin, 0) == 0)
+    {
+      fprintf (stderr, "Error, can't read coefficient Y0\n");
+      exit (1);
+    }
+  if (mpz_inp_str (Y1, stdin, 0) == 0)
+    {
+      fprintf (stderr, "Error, can't read coefficient Y1\n");
+      exit (1);
+    }
+  if (scanf ("%d\n", &degree) != 1)
+    {
+      fprintf (stderr, "Error, can't read degree of 2nd polynomial\n");
+      exit (1);
+    }
+  if (degree > MAX_DEGREE)
+    {
+      fprintf (stderr, "Error, too large degree\n");
+      exit (1);
+    }
+  for (i = 0; i <= degree; i++)
+    {
+      if (mpz_inp_str (X[i], stdin, 0) == 0)
+        {
+          fprintf (stderr, "Error, can't read coefficient X[%d]\n", i);
+          exit (1);
+        }
+    }
+}
+
+void
 out_cwi (mpz_t N, mpz_t *X, int deg, mpz_t Y1, mpz_t Y0, mpz_t M)
 {
   int i;
@@ -269,6 +335,31 @@ out_franke (mpz_t N, mpz_t *X, int deg, mpz_t Y1, mpz_t Y0, mpz_t M)
   printf ("M ");  mpz_out_str (stdout, 10, M);  printf ("\n");
   printf ("0 2000000 2.7 27 54\n");
   printf ("0 4000000 2.7 27 54\n");
+}
+
+void
+out_cado (mpz_t N, mpz_t *X, int deg, mpz_t Y1, mpz_t Y0, mpz_t M)
+{
+  int i;
+
+  printf ("n: ");
+  mpz_out_str (stdout, 10, N);
+  printf ("\n");
+  for (i = deg; i >= 0; i--)
+    {
+      printf ("c%d: ", i);
+      mpz_out_str (stdout, 10, X[i]);
+      printf ("\n");
+    }
+  printf ("Y1: ");
+  mpz_out_str (stdout, 10, Y1);
+  printf ("\n");
+  printf ("Y0: ");
+  mpz_out_str (stdout, 10, Y0);
+  printf ("\n");
+  printf ("m: ");
+  mpz_out_str (stdout, 10, M);
+  printf ("\n");
 }
 
 void
@@ -355,6 +446,8 @@ main (int argc, char *argv[])
     read_franke (N, X, Y1, Y0, M);
   else if (iformat == FORMAT_GGNFS || iformat == FORMAT_CADO)
     read_ggnfs (N, X, Y1, Y0, M);
+  else if (iformat == FORMAT_CWI)
+    read_cwi (N, X, Y1, Y0, M);
   else
     {
       fprintf (stderr, "Input format not yet implemented\n");
@@ -367,6 +460,8 @@ main (int argc, char *argv[])
     out_cwi (N, X, deg, Y1, Y0, M);
   else if (oformat == FORMAT_FK)
     out_franke (N, X, deg, Y1, Y0, M);
+  else if (oformat == FORMAT_CADO)
+    out_cado (N, X, deg, Y1, Y0, M);
   else
     {
       fprintf (stderr, "Output format not yet implemented\n");
