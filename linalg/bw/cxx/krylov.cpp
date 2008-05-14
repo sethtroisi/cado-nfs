@@ -28,7 +28,7 @@
 #include "ticks.hpp"
 #include "preconditioner.hpp"
 
-#include <boost/cstdint.hpp>
+#include <stdint.h>
 #include <iterator>
 
 #include "traits_globals.hpp"
@@ -44,7 +44,7 @@ common_arguments common;
 krylov_arguments mine;
 
 using namespace std;
-using namespace boost;
+// using namespace boost;
 
 void load_x_vectors(vector < vector<uint32_t> > &bw_x) /*{{{ */
 {

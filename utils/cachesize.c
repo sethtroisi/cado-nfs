@@ -28,9 +28,13 @@ static inline uint32_t byte3(uint32_t x) {
 
 void cpuid(uint32_t res[4], uint32_t op) {
   uint32_t eax, ebx, ecx, edx;
-  asm ("cpuid"
+#ifdef	__GNUC__
+  __asm__ ("cpuid"
       : "=a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx)
       : "a" (op));
+#else
+#error "Please teach your compiler how to call cpuid"
+#endif
   res[0] = eax;
   res[1] = ebx;
   res[2] = ecx;

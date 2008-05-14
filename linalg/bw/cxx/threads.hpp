@@ -1,7 +1,7 @@
 #ifndef THREADS_HPP_
 #define THREADS_HPP_
 
-#include <boost/cstdint.hpp>
+#include <stdint.h>
 #include <gmp.h>
 #include <gmpxx.h>
 #include <vector>
@@ -13,8 +13,8 @@
 
 
 #if 0
-	boost::uint32_t	idx_off;
-	boost::uint32_t	val_off;
+	uint32_t	idx_off;
+	uint32_t	val_off;
 	scalar		src;
 	scalar		dst;
 	int		iter;

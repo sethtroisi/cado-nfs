@@ -5,12 +5,12 @@
 #include <ostream>
 #include <utility>
 #include <vector>
-#include <boost/cstdint.hpp>
+#include <stdint.h>
 
 /* These structures have to do with I/O on matrices -- they are NOT
  * critical
  */
-struct matrix_line : public std::vector<std::pair<boost::uint32_t, boost::int32_t> > {
+struct matrix_line : public std::vector<std::pair<uint32_t, int32_t> > {
 };
 
 namespace std {

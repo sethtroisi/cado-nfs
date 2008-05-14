@@ -3,7 +3,11 @@
 # appropriate building tool, we'll simply avoid make -j for this one.
 .NOTPARALLEL:
 
-CFLAGS:=-g -O2 -DNDEBUG -W -Wall -std=c99
+GMP?=/usr/local/
+GMPINC?=$(GMP)/include
+GMPLIB?=$(GMP)/lib
+
+CFLAGS:=-g -O2 -DNDEBUG -W -Wall -std=c99 -I$(GMPINC)
 
 ifeq ($(shell arch),i686)
 w:=32
@@ -69,7 +73,7 @@ factor.o: factor.c
 	g++ -g -o $@ -c $<
 
 factor: factor.o libgf2x.a
-	g++ -g factor.o -L. -lntl -lgmp -lgf2x -o $@
+	g++ -g factor.o -L. -L$(GMPLIB) -lntl -lgmp -lgf2x -o $@
 
 tune-all:
 	$(MAKE) tune1

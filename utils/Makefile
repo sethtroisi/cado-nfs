@@ -3,9 +3,11 @@ include Makefile.local
 # Set default filenames/paths if not already set.
 GMP ?= /usr/local/
 GMPINCLUDE ?= $(GMP)/include/
+GMPLIB ?= -L$(GMP)/lib -lgmp
 OPTCFLAGS ?= -g -O2 -DNDEBUG -W -Wall
 
-CFLAGS = $(OPTCFLAGS)
+CFLAGS=$(OPTCFLAGS) -std=c99 -I$(GMPINCLUDE) -DREV=\"`svnversion .`\"
+LDFLAGS=$(GMPLIB)
 
 names:=polyfile relation timing long_poly getprime mod_ul modul_poly gmp_aux \
        fpoly
@@ -15,7 +17,7 @@ obj:=$(patsubst %,%.o,$(names))
 all: libutils.a cache cachesize check_rels
 
 %.o: %.c
-	$(CC) $(CFLAGS) -c $< -I.. -I$(GMPINCLUDE)
+	$(CC) $(CFLAGS) -c $< -I..
 
 cache: cache.c timing.o
 	$(CC) $(CFLAGS) $< timing.c -I.. -o $@
@@ -24,7 +26,7 @@ cachesize: cachesize.c
 	$(CC) $(CFLAGS) $< -o $@
 
 check_rels: check_rels.o libutils.a
-	$(CC) $(CFLAGS) $^ -o $@ -lgmp
+	$(CC) $(CFLAGS) $^ -o $@ $(GMPLIB)
 
 libutils.a: $(obj)
 	ar r libutils.a $(obj)

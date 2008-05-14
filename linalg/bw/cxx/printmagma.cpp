@@ -18,7 +18,7 @@
 #include "bitstring.hpp"
 
 using namespace std;
-using namespace boost;
+// using namespace boost;
 
 std::string& sanitize(std::string& s)
 {

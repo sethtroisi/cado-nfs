@@ -1,7 +1,7 @@
 #ifndef TRAITS_GLOBALS_HPP_
 #define TRAITS_GLOBALS_HPP_
 
-#include <boost/cstdint.hpp>
+#include <stdint.h>
 #include <gmp.h>
 #include <gmpxx.h>
 #include <istream>

@@ -7,7 +7,7 @@
 
 bool preconditioner_base::init(uint i0, uint i1, std::string const& fn)
 {
-	using namespace boost;
+	// using namespace boost;
 	using namespace std;
 	ifstream is(fn.c_str());
 	if (!is.is_open()) {

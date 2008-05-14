@@ -1,7 +1,7 @@
 #ifndef PRECONDITIONER_HPP_
 #define PRECONDITIONER_HPP_
 
-#include <boost/cstdint.hpp>
+#include <stdint.h>
 #include <fstream>
 #include <string>
 #include <vector>

@@ -11,7 +11,7 @@
 #include "parsing_tools.hpp"
 #include "transpose_arguments.hpp"
 
-#include <boost/cstdint.hpp>
+#include <stdint.h>
 #include <iterator>
 #include <vector>
 #include <deque>

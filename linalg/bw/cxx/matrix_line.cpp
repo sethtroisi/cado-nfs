@@ -54,8 +54,8 @@ std::istream& std::operator>>(std::istream& is, matrix_line& m)
 	m.reserve(n);
 
 	for( ; !st.eof() ; st >> ws) {
-		boost::uint32_t idx;
-		boost::int32_t val;
+		uint32_t idx;
+		int32_t val;
 		
 		if (!(st >> idx)) {
 			is.setstate(ios::failbit);

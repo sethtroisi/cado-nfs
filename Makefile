@@ -2,23 +2,31 @@ CC ?= gcc
 
 .PHONY: clean all
 
+-include Makefile.local
+SCONS?=scons
+GMP ?= /usr/local/
+GMPLIB ?= $(GMP)/lib
+GMPINCLUDE ?= $(GMP)/include/
+
+SCONS+=CC=$(CC) GMP_LIBDIR=$(GMPLIB) GMP_INCDIR=$(GMPINCLUDE)
+
 all: Makefile.local
 	$(MAKE) -C utils
 	$(MAKE) -C polyselect
-	(cd postsieve/tifa; scons CC=$(CC))
+	(cd postsieve/tifa; $(SCONS))
 	$(MAKE) -C sieve
 	$(MAKE) -C postsieve/checknorms
 	$(MAKE) -C linalg
 	$(MAKE) -C sqrt/naive
-	$(MAKE) -C gf2x
-	$(MAKE) -C gf2x/cantor
-	$(MAKE) -C linalg/bw
+	$(MAKE) -C gf2x GMP=$(GMP)
+	$(MAKE) -C gf2x/cantor GMP=$(GMP)
+	$(MAKE) -C linalg/bw GMP=$(GMP)
 	$(MAKE) -C linalg/bl	FAKE=1
 
 clean:
 	$(MAKE) -C utils		clean
 	$(MAKE) -C polyselect		clean
-	(cd postsieve/tifa; scons -c)
+	(cd postsieve/tifa; $(SCONS) -c)
 	$(MAKE) -C sieve		clean
 	$(MAKE) -C postsieve/checknorms	clean
 	$(MAKE) -C linalg		clean

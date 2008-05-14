@@ -28,13 +28,13 @@
 #include "matmul_toy.hpp"
 #include "bitstring.hpp"
 
-#include <boost/cstdint.hpp>
+#include <stdint.h>
 #include <iterator>
 
 no_arguments mine;
 
 using namespace std;
-using namespace boost;
+// using namespace boost;
 using namespace core_ops;
 
 typedef unsigned int uint;

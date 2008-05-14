@@ -38,7 +38,7 @@ TARGET_LINK_LIBRARIES(merge ${LIBS})
 ADD_EXECUTABLE(purge purge.c files.c hashpair.c)
 TARGET_LINK_LIBRARIES(purge ${LIBS})
 
-ADD_EXECUTABLE(freerel freerel.c ../sieve/fb.c)
+ADD_EXECUTABLE(freerel freerel.c ../sieve/fb.c hashpair.c)
 TARGET_LINK_LIBRARIES(freerel ${LIBS})
 
 ADD_EXECUTABLE(linalg linalg.c gauss.c readmat.c)

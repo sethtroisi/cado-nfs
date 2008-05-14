@@ -20,7 +20,7 @@
 #include "ticks.hpp"
 #include "traits.hpp"
 
-#include <boost/cstdint.hpp>
+#include <stdint.h>
 #include <iterator>
 
 /* This is a standalone program that performs an example matrix
@@ -29,7 +29,7 @@
 mul_arguments mine;
 
 using namespace std;
-using namespace boost;
+// using namespace boost;
 using namespace core_ops;
 
 typedef unsigned int uint;

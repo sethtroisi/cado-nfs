@@ -11,7 +11,7 @@
 #include "must_open.hpp"
 #include "parsing_tools.hpp"
 
-#include <boost/cstdint.hpp>
+#include <stdint.h>
 #include <iterator>
 #include <vector>
 #include <deque>
@@ -48,13 +48,13 @@ using namespace std;
 
 const int extra = 64;
 
-void reduce_mline(matrix_line& v, boost::int32_t p)
+void reduce_mline(matrix_line& v, int32_t p)
 {
 	matrix_line::iterator dst;
 	matrix_line::const_iterator src;
 	dst = v.begin();
 	for(src = v.begin() ; src != v.end() ; src++) {
-		boost::int32_t pm;
+		int32_t pm;
 		pm = src->second % p;
 		if (pm < -(p/2)) {
 			pm+=p;

@@ -10,7 +10,7 @@
 #include "must_open.hpp"
 #include "parsing_tools.hpp"
 
-#include <boost/cstdint.hpp>
+#include <stdint.h>
 #include <iterator>
 #include <vector>
 #include <deque>
