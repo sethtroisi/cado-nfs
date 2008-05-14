@@ -83,6 +83,7 @@ print_relation_cado (relation_t *rel, int32_t *rfb, int32_t *afb)
   unsigned int i, j;
 
   printf ("%d,%d", rel->a, rel->b);
+
   /* rational side */
   for (i = 0; i < rel->rfb_entries; i++)
     for (j = 0; j < rel->rexp[i]; j++)
@@ -99,6 +100,9 @@ print_relation_cado (relation_t *rel, int32_t *rfb, int32_t *afb)
       putchar ((rel->rfb_entries + i == 0) ? ':' : ',');
       printf ("%x", rel->large_rprimes[i]);
     }
+  if (rel->rfb_entries + rel->num_lrp == 0)
+    putchar (':');
+
   /* algebraic side */
   for (i = 0; i < rel->afb_entries; i++)
     for (j = 0; j < rel->aexp[i]; j++)
