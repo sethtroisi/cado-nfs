@@ -189,6 +189,15 @@ int main(int argc, char * argv[])
     }
 #endif
 
+    {
+      int i;
+      /* print the command line */
+      fprintf (stderr, "%s.r%s", argv[0], REV);
+      for (i = 1; i < argc; i++)
+        fprintf (stderr, " %s", argv[i]);
+      fprintf (stderr, "\n");
+    }
+
     tmpdir = "/tmp";
     while(argc > 1 && argv[1][0] == '-'){
         if(argc > 2 && strcmp (argv[1], "-in") == 0){
