@@ -169,7 +169,7 @@ int main(int argc, char *argv[]) {
     // Check that n divides Res(f,g) (might be useful to factor n)
     //
     check_polynomials(cpoly);
-    
+
     //
     // Default residue bounds are those from the polynomial file, if not
     // overridden by command line parameters.
@@ -399,7 +399,7 @@ unsigned long checkrels(char *f, cado_poly cpoly,
         //
         // Read primes on rational side.
         //
-        while (sscanf(lineptr, "%x%n", &p, &n) != 0) {
+        while (sscanf(lineptr, "%x%n", &p, &n) != 0) {          
             npr++;
             //
             // Check that p divides the norm. Otherwise discard the relation.
@@ -426,6 +426,9 @@ unsigned long checkrels(char *f, cado_poly cpoly,
             }
             lineptr += n;
             if (lineptr[0] == ':') {
+                //
+                // Last factor on the rational side
+                //
                 outlength += sprintf(outrel + outlength, "%x", p);
                 lineptr++;
                 break;
@@ -434,6 +437,13 @@ unsigned long checkrels(char *f, cado_poly cpoly,
                 lineptr++;
             }
         }
+        if (npr == 0) {
+            //
+            // Handle special case: no factor on the rational side
+            //
+            lineptr++;
+        }
+        
         //
         // Divide by small primes ommited during sieving.
         //
@@ -548,6 +558,9 @@ unsigned long checkrels(char *f, cado_poly cpoly,
             }
             lineptr += n;
             if (lineptr[0] != ',') {
+                //
+                // Last factor on the rational side
+                //
                 outlength += sprintf(outrel + outlength, "%x", p);
                 break;
             } else {
@@ -568,7 +581,7 @@ unsigned long checkrels(char *f, cado_poly cpoly,
                 mpz_divexact_ui(norm, norm, primes[i]);
                 npr++;
             }
-        }
+        }        
         //
         // Check that the residue is smaller than 2^mfba and factor it.
         // Otherwise discard relation.
