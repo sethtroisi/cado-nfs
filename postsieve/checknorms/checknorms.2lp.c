@@ -71,7 +71,6 @@
 #define NFACTORS        8    /* (initial) size of array for norm's factors */
 #define MAXNMSG         10   /* max number of warning messages             */
 #define REL_MAXLENGTH   1024 /* max length in characters of a relation     */
-#define NMILLER_RABIN   20   /* number of iterations in composition test   */
 //------------------------------------------------------------------------------
 #define IS_PRIME(X)     (0 != mpz_probab_prime_p((X), NMILLER_RABIN))
 #define IS_COMPOSITE(X) (0 == mpz_probab_prime_p((X), NMILLER_RABIN))
@@ -138,7 +137,8 @@ void get_algebraic_norm(mpz_t norm, mpz_t *f, int d, long a, unsigned long b) {
     mpz_abs(norm, norm);
 }
 //-----------------------------------------------------------------------------
-inline void check_prime(mpz_t p, unsigned long sb, long a, unsigned long b) {
+static inline void
+check_prime(mpz_t p, unsigned long sb, long a, unsigned long b) {
     //
     // Prints a warning message if p <= sb
     //
@@ -714,6 +714,13 @@ unsigned long checkrels(char *f, cado_poly cpoly,
                 lineptr++;
             }
         }
+        if (npr == 0) {
+            //
+            // Handle special case: no factor on the rational side
+            //
+            lineptr++;
+        }
+        
         //
         // Divide by small primes
         //

@@ -882,7 +882,8 @@ void get_algebraic_norm(mpz_t norm, mpz_t *f, int d, long a, unsigned long b) {
     mpz_abs(norm, norm);
 }
 //-----------------------------------------------------------------------------
-inline void check_prime(mpz_t p, unsigned long sb, long a, unsigned long b) {
+static inline void
+check_prime(mpz_t p, unsigned long sb, long a, unsigned long b) {
     //
     // _WARNING_: Uses and modifies the following global variable:
     //            - count_check_prime

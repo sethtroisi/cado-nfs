@@ -29,6 +29,9 @@ extern "C" {
 #include "cado.h"   // For cado_poly type
 #include "tifa.h"   // For TIFA's *_array_t types.
 
+#if defined(NMILLER_RABIN)
+    #undef NMILLER_RABIN
+#endif
 //------------------------------------------------------------------------------
 #define VERBOSE             1    // to print warnings
 #define PERFORM_CHECK_PRIME 1    // to check size of prime
@@ -138,7 +141,8 @@ void get_algebraic_norm(mpz_t norm, mpz_t *f, int d, long a, unsigned long b);
 //
 // Prints a warning message if p <= sb
 //
-inline void check_prime(mpz_t p, unsigned long sb, long a, unsigned long b);
+static inline void
+check_prime(mpz_t p, unsigned long sb, long a, unsigned long b);
 //-----------------------------------------------------------------------------
 //
 // Attempts to factor norm and stores the found factors in the array

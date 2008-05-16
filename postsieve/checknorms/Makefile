@@ -8,6 +8,8 @@
 
 include Makefile.local
 
+CC ?= gcc
+
 # Set default filenames/paths for GMP if not already set.
 GMP ?= /usr/local
 GMPLIB ?= $(GMP)/lib/libgmp.a
@@ -45,10 +47,10 @@ Makefile.local:
 	ln -s ../../Makefile.local .
 
 checknorms: checknorms.c checknorms.h Makefile.local $(TIFALIB) $(UTILSLIB)
-	gcc $(INCFLAGS) $(CFLAGS) -o $@ $< $(UTILSLIB) $(TIFALIB) $(GMPLIB) $(LDFLAGS)
+	$(CC) $(INCFLAGS) $(CFLAGS) -o $@ $< $(UTILSLIB) $(TIFALIB) $(GMPLIB) $(LDFLAGS)
 
 checknorms.2lp: checknorms.2lp.c Makefile.local $(TIFALIB) $(UTILSLIB)
-	gcc $(INCFLAGS) $(CFLAGS) -o $@ $< $(UTILSLIB) $(TIFALIB) $(GMPLIB) $(LDFLAGS)
+	$(CC) $(INCFLAGS) $(CFLAGS) -o $@ $< $(UTILSLIB) $(TIFALIB) $(GMPLIB) $(LDFLAGS)
 
 config.h: config_h.in
 	cp config_h.in config.h
