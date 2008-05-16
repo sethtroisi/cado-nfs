@@ -12,6 +12,9 @@
 /* Rows processed simultaneously when outputting the result */
 #define NROWS_CORE      20
 
+/* Maximal length of temporary file names */
+#define TEMP_FILE_LENGTH 256
+
 unsigned int nfiles = 0;
 
 const char * tmpdir;
@@ -68,7 +71,8 @@ void vec_uint_push_back(vec_uint_t ptr, unsigned int x)
 
 void transpose_and_save(unsigned int i0, unsigned int i1)
 {
-    char dstfile[80];
+    char dstfile[TEMP_FILE_LENGTH];
+    unsigned int ret;
 
     const unsigned int * src = mat->data;
     unsigned int i, j, c;
@@ -83,8 +87,9 @@ void transpose_and_save(unsigned int i0, unsigned int i1)
         }
     }
 
-    snprintf(dstfile, sizeof(dstfile), "%s/temp.%u.%04d",
+    ret = snprintf(dstfile, sizeof(dstfile), "%s/temp.%u.%04d",
             tmpdir, getpid(), nfiles);
+    BUG_ON_MSG(ret >= sizeof(dstfile), "Too long temp. file name");
 
     FILE * out;
     out = fopen(dstfile, "w"); BUG_ON_MSG(!out, "cannot open temp file");
@@ -121,9 +126,11 @@ void rebuild(int skip)
 
     fin_vchunks = malloc(nfiles * sizeof(FILE *));
     for(i = 0 ; i < nfiles ; i++) {
-        char dstfile[80];
-        snprintf(dstfile, sizeof(dstfile), "%s/temp.%u.%04d",
-                tmpdir, getpid(), i);
+        char dstfile[TEMP_FILE_LENGTH];
+        unsigned int ret;
+        ret = snprintf(dstfile, sizeof(dstfile), "%s/temp.%u.%04d",
+                       tmpdir, getpid(), i);
+        BUG_ON_MSG(ret >= sizeof(dstfile), "Too long temp. file name");
         fin_vchunks[i] = fopen(dstfile, "r");
         BUG_ON_MSG(fin_vchunks[i] == NULL, "Cannot reopen temp file");
     }
@@ -168,9 +175,11 @@ void rebuild(int skip)
     vec_uint_clear_array(&rows, NROWS_CORE);
     for(i = 0 ; i < nfiles ; i++) {
         fclose(fin_vchunks[i]);
-        char dstfile[80];
-        snprintf(dstfile, sizeof(dstfile), "%s/temp.%u.%04d",
+        char dstfile[TEMP_FILE_LENGTH];
+        unsigned int ret;
+        ret = snprintf(dstfile, sizeof(dstfile), "%s/temp.%u.%04d",
                 tmpdir, getpid(), i);
+        BUG_ON_MSG(ret >= sizeof(dstfile), "Too long temp. file name");
         unlink(dstfile);
     }
     free(fin_vchunks);
