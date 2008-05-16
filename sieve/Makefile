@@ -35,8 +35,19 @@ INCFLAGS=-I$(GMPINCLUDE) $(TIFAINCFLAGS)
 CFLAGS=$(INCFLAGS) $(OPTCFLAGS) -std=c99 -fkeep-inline-functions -DREV=\"`svnversion .`\"
 LDFLAGS=$(TIFALIB) $(GMPLIB)
 
-all: sieve makefb las
+# posix_memalign is not available everywhere... For the time being there is no
+# automatic detection. HAVE_POSIX_MEMALIGN is set to one by default. If this
+# fails, try to set it to zero.
 
+HAVE_POSIX_MEMALIGN ?= 1
+
+ifneq ($(HAVE_POSIX_MEMALIGN), 0)
+    EXTRA_CPPFLAGS = -DHAVE_POSIX_MEMALIGN=1
+else
+    EXTRA_CPPFLAGS = -DHAVE_POSIX_MEMALIGN=0
+endif
+
+all: sieve makefb las
 
 Makefile.local:
 	echo "Makefile.local does not exist. Making a link to parent dir's one."
@@ -46,7 +57,7 @@ fb.o : fb.c fb.h config.h basicnt.h Makefile.local
 	$(CC) -c -I. -I.. $(CFLAGS) fb.c
 
 sieve.o : sieve.c bucket.h config.h basicnt.h ../cado.h Makefile.local
-	$(CC) -c -I. -I.. $(CFLAGS) sieve.c
+	$(CC) -c -I. -I.. $(CFLAGS) $(EXTRA_CPPFLAGS) sieve.c
 
 makefb.o : makefb.c Makefile.local
 	$(CC) -c -I. -I.. $(CFLAGS) makefb.c
@@ -61,7 +72,7 @@ config.h: config_h.in
 	cp config_h.in config.h
 
 las: las.c fb.o bucket.h sse_macros.h $(TIFALIB)
-	$(CC) $(CFLAGS) -o las -I.. las.c fb.o ../utils/libutils.a $(LDFLAGS) -lm
+	$(CC) $(CFLAGS) $(EXTRA_CPPFLAGS) -o las -I.. las.c fb.o ../utils/libutils.a $(LDFLAGS) -lm
 
 clean:
 	rm -f sieve makefb las *.o *~
