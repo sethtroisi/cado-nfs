@@ -3,7 +3,7 @@ GMPINC?=$(GMP)/include
 GMPLIB?=$(GMP)/lib
 
 CC:=gcc
-CFLAGS:=-W -Wall -O4 -DNDEBUG -std=c99 -I$(GMPINC)
+CFLAGS:=-W -Wall -msse2 -O4 -DNDEBUG -std=c99 -I$(GMPINC)
 
 all: cantor bench
 

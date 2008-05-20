@@ -12,7 +12,7 @@ extern gmp_randstate_t  __gmp_rands;
 int main(int argc, char **argv)
 {
     int i, N;
-    uint64_t *f, *g, *h;
+    unsigned long *f, *g, *h;
 
     if (argc != 2) {
 	fprintf(stderr, "usage: %s N\n", argv[0]);
@@ -22,35 +22,37 @@ int main(int argc, char **argv)
     }
     N = atoi(argv[1]);
 
-    f = (uint64_t *) malloc(N * sizeof(uint64_t));
-    g = (uint64_t *) malloc(N * sizeof(uint64_t));
-    h = (uint64_t *) malloc(2 * N * sizeof(uint64_t));
+    f = (unsigned long *) malloc(N * sizeof(unsigned long));
+    g = (unsigned long *) malloc(N * sizeof(unsigned long));
+    h = (unsigned long *) malloc(2 * N * sizeof(unsigned long));
 
     __gmp_rands_initialized = 1;
     gmp_randinit_default (__gmp_rands);
-    gmp_randseed_ui(__gmp_rands, time(NULL));
+    // gmp_randseed_ui(__gmp_rands, time(NULL));
+    gmp_randseed_ui(__gmp_rands, 0); //time(NULL));
 
-    mpn_random((mp_limb_t *) f, (sizeof(uint64_t) / sizeof(mp_limb_t)) * N);
-    mpn_random((mp_limb_t *) g, (sizeof(uint64_t) / sizeof(mp_limb_t)) * N);
+    mpn_random((mp_limb_t *) f, (sizeof(unsigned long) / sizeof(mp_limb_t)) * N);
+    mpn_random((mp_limb_t *) g, (sizeof(unsigned long) / sizeof(mp_limb_t)) * N);
 
+    printf("w := %u;\n", GMP_LIMB_BITS);
     printf("f := [\n");
     for (i = 0; i < N - 1; ++i)
-	printf("%" PRIu64 ", ", f[i]);
-    printf("%" PRIu64 "\n];\n", f[N - 1]);
+	printf("%lu, ", f[i]);
+    printf("%lu\n];\n", f[N - 1]);
     printf("\n");
     printf("g := [\n");
     for (i = 0; i < N - 1; ++i)
-	printf("%" PRIu64 ", ", g[i]);
-    printf("%" PRIu64 "\n];\n", g[N - 1]);
+	printf("%lu, ", g[i]);
+    printf("%lu\n];\n", g[N - 1]);
     printf("\n");
 
     //for (i = 0; i < 10; ++i) 
-    mulCantor128((unsigned long *) h, (unsigned long *) f, N, (unsigned long *) g, N);
+    mulCantor128(h,f,N,g,N);
 
     printf("fg := [\n");
     for (i = 0; i < 2 * N - 1; ++i)
-	printf("%" PRIu64 ", ", h[i]);
-    printf("%" PRIu64 "\n];\n", h[2 * N - 1]);
+	printf("%lu, ", h[i]);
+    printf("%lu\n];\n", h[2 * N - 1]);
 
     free(h);
     free(g);

@@ -1,6 +1,6 @@
 /* Magma code that checks the cantor_main output: */
 
-w := 64;
+// w := 64;
 
 load "/tmp/toto";
 PP := PolynomialRing(GF(2));
@@ -9,23 +9,25 @@ G := PP!Intseq(Seqint(g, 2^w), 2);
 FG := PP!Intseq(Seqint(fg, 2^w), 2);
 
 FG eq F*G;
+if FG ne F*G then
+    exit;
+end if;
 
 
-w := 64;
+// w := 64;
 load "/tmp/toto";
 PP := PolynomialRing(GF(2));
 x := PP.1;
-F128 := ext<GF(2) | x^128 + x^7 + x^2 + x + 1>;
+F128<z> := ext<GF(2) | x^128 + x^7 + x^2 + x + 1>;
 P128<x> := PolynomialRing(F128);
 
-function convertF128(F128, x0, x1)
-  X0 := PP!Intseq(x0, 2);
-  X1 := PP!Intseq(x1, 2);
-  return F128!(X0 + PP.1^w*X1);
+
+function convertF128(F128, x)
+  return F128!PP!Intseq(x, 2);
 end function;
 
-function convertP128(P128, F128, f)
-  return P128! [ convertF128(F128, f[2*i-1], f[2*i]) : i in [1..(#f div 2)] ];
+function convertP128(F128, f)
+  return Polynomial([ convertF128(F128, z): z in Intseq(Seqint(f, 2^w), 2^64)]);
 end function;
 
 ffi := convertP128(P128,F128,fi);
@@ -43,11 +45,18 @@ beta5 := F128!Intseq((5568895992531017964 +2^64*5316835906050072984 ), 2);
 beta6 := F128!Intseq((11619261390503595532+2^64*377604546732988956  ), 2);
 beta7 := F128!Intseq((6679137017075335448 +2^64*5571574281931689094 ), 2);
 
-s4 := x^16+x;
-s5 := x^32+x^16+x^2+x;
-s6 := x^64+x^16+x^4+x;
-s7 := x^128+x^64+x^32+x^16+x^8+x^4+x^2+x;
+s1:=x^2+x;
+s2:=Evaluate(s1,s1);
+s3:=Evaluate(s2,s1);
+s4:=Evaluate(s2,s2);
+s5:=Evaluate(s1,s4);
+s6:=Evaluate(s3,s3);
+s7:=Evaluate(s3,s4);
 
+
+function split(fi)
+    return [Intseq(Seqint(ChangeUniverse(Eltseq(Coefficient(fi,k)),Integers()),2),2^w) : k in [0..Degree(fi)] ];
+end function;
 
 ///////////////////////////////////////////////////////////////////////////
 

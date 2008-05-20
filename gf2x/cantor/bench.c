@@ -53,7 +53,7 @@ int main(int argc, char **argv)
     int step = 1;
     double factor = 1.0;
     int additive = 1;
-    uint64_t *f, *g, *h;
+    unsigned long *f, *g, *h;
 
     if ((argc < 3) || (argc > 5)) {
 	usage_and_die(argv);
@@ -85,14 +85,14 @@ int main(int argc, char **argv)
 	}
     }
 
-    f = (uint64_t *) malloc(nmax * sizeof(uint64_t));
-    g = (uint64_t *) malloc(nmax * sizeof(uint64_t));
-    h = (uint64_t *) malloc(2 * nmax * sizeof(uint64_t));
+    f = (unsigned long *) malloc(nmax * sizeof(unsigned long));
+    g = (unsigned long *) malloc(nmax * sizeof(unsigned long));
+    h = (unsigned long *) malloc(2 * nmax * sizeof(unsigned long));
 
     mpn_random((mp_limb_t *) f,
-	       (sizeof(uint64_t) / sizeof(mp_limb_t)) * nmax);
+	       (sizeof(unsigned long) / sizeof(mp_limb_t)) * nmax);
     mpn_random((mp_limb_t *) g,
-	       (sizeof(uint64_t) / sizeof(mp_limb_t)) * nmax);
+	       (sizeof(unsigned long) / sizeof(mp_limb_t)) * nmax);
 
 
     n = nmin;

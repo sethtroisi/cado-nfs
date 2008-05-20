@@ -20,24 +20,14 @@ typedef mpfq_2_128_elt * c128_t;
 typedef mpfq_2_128_elt * c128_src_t;
 
 extern void c128_setup(c128_info_t p, int dF, int dG);
-extern inline c128_t c128_alloc(const c128_info_t p, int n)
-{
-    return (c128_t) malloc((n << p->k) * sizeof(mpfq_2_128_elt));
-}
-extern inline void c128_free(
+extern c128_t c128_alloc(const c128_info_t p, int n);
+extern void c128_free(
         const c128_info_t p MAYBE_UNUSED,
         c128_t x,
-        int n MAYBE_UNUSED)
-{
-    free(x);
-}
-extern inline c128_t c128_get(const c128_info_t p, c128_t x, int k) {
-	return x + (k << p->k);
-}
-extern inline void c128_zero(const c128_info_t p, c128_t x, int n)
-{
-	memset(x, 0, n * (1 << p->k) * sizeof(mpfq_2_128_elt));
-}
+        int n MAYBE_UNUSED);
+extern c128_t c128_get(const c128_info_t p, c128_t x, int k);
+extern void c128_zero(const c128_info_t p, c128_t x, int n);
+
 extern void c128_dft(const c128_info_t p, c128_t x, unsigned long * F, int dF);
 extern void c128_compose(const c128_info_t p,
 		c128_t y, c128_src_t x1, c128_src_t x2);
