@@ -1,0 +1,12 @@
+* improve the use of free relations: currently we generate free relations
+  up to the algebraic factor base bound (alim). We can do much better:
+
+  (a) after the purge phase (removal of singletons), find all remaining
+      primes on the algebraic side
+  (b) determine those primes for which the algebraic polynomial completely
+      splits into linear factors
+  (c) add free relations for those primes
+
+  In particular when using the lattice siever, all special-q's for which f(x)
+  completely splits should appear in (b).
+  
