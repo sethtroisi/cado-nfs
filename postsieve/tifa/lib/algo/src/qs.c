@@ -121,7 +121,7 @@
 //
 #define NRANGES 18
 //
-// Set to non zero to bypass manual unrolling of the tigh loops.
+// Set to non zero to bypass manual unrolling of the tight loops.
 //
 #define NO_MANUAL_UNROLLING        0
 //-----------------------------------------------------------------------------
