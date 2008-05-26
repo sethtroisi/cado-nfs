@@ -19,14 +19,14 @@ struct preconditioner_base {
 
     comblist_t combinations;
 
-    bool init(uint i0, uint i1, std::string const& fn);
+    bool init(unsigned int i0, unsigned int i1, std::string const& fn);
 };
 
 template<typename traits> class preconditioner : public preconditioner_base
 {
-    uint i0,i1;
+    unsigned int i0,i1;
     public:
-    bool init(uint xi0, uint xi1, std::string const& fn) {
+    bool init(unsigned int xi0, unsigned int xi1, std::string const& fn) {
         i0 = xi0;
         i1 = xi1;
         return preconditioner_base::init(i0, i1, fn);

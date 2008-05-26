@@ -28,15 +28,30 @@
 
 #include <stdint.h>
 
+#ifndef DEFINED_SSE2_HELPERS
+#define DEFINED_SSE2_HELPERS
+typedef uint64_t v2di __attribute__ ((vector_size (16)));
+static inline v2di SHL(v2di x_, unsigned int r_) {
+    __asm__("psllq %1,%0" : "+x"(x_) : "K"(r_));
+    return x_;
+}
+static inline v2di SHR(v2di x_, unsigned int r_) {
+    __asm__("psrlq %1,%0" : "+x"(x_) : "K"(r_));
+    return x_;
+}
+static inline v2di SHLD(v2di x_, unsigned int r_) {
+    __asm__("pslldq %1,%0" : "+x"(x_) : "K"(r_ >> 3));
+    return x_;
+}
+static inline v2di SHRD(v2di x_, unsigned int r_) {
+    __asm__("psrldq %1,%0" : "+x"(x_) : "K"(r_ >> 3));
+    return x_;
+}
+#endif
 static inline
 void mul2(ulong * t, ulong const * s1, ulong const * s2)
 {
-	typedef uint64_t v2di __attribute__ ((vector_size (16)));
 	typedef union { v2di s; ulong x[2]; } v2di_proxy;
-#define SHL(x,r) (v2di)__builtin_ia32_psllqi128   ((x),(r))
-#define SHR(x,r) (v2di)__builtin_ia32_psrlqi128   ((x),(r))
-#define SHLD(x,r) (v2di)__builtin_ia32_pslldqi128 ((x),(r))
-#define SHRD(x,r) (v2di)__builtin_ia32_psrldqi128 ((x),(r))
 	v2di u;
 	v2di t0;
 	v2di t1;
@@ -121,8 +136,4 @@ void mul2(ulong * t, ulong const * s1, ulong const * s2)
 		t[2] = r.x[0];
 		t[3] = r.x[1];
 	}
-#undef SHL
-#undef SHR
-#undef SHLD
-#undef SHRD
 }

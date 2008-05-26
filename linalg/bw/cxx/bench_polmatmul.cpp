@@ -1,6 +1,8 @@
 #include <stdio.h>
+#include <cstdio>
 #include <stdlib.h>
 #include <string.h>
+#include <ctime>
 #include <gmp.h>
 #include "utils.h"
 #include "gf2x.h"

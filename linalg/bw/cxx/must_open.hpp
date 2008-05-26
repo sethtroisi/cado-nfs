@@ -11,6 +11,7 @@
 #include <istream>
 #include <ostream>
 #include <string>
+#include <cstring>
 
 #include "files.hpp"
 

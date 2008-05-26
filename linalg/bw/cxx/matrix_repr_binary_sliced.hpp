@@ -5,6 +5,7 @@
 #include <istream>
 #include <iostream>
 #include <fstream>
+#include <algorithm>
 
 #include "matrix.hpp"
 #include "matrix_line.hpp"

@@ -10,7 +10,7 @@
 #include <unistd.h>
 #include <list>
 #include <string.h>
-#include <stdio.h>
+#include <cstdio>
 #include <gmp.h>
 #include <errno.h>
 #include <unistd.h>

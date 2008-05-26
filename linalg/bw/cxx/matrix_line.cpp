@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <sstream>
+#include <algorithm>
 #include "parsing_tools.hpp"
 #include "matrix_line.hpp"
 

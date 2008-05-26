@@ -12,6 +12,7 @@
 #include <cstdlib>	/* for exit() in process_arguments */
 
 #include <vector>
+#include <cstring>
 
 #include "manu.h"	/* for MAYBE_UNUSED */
 

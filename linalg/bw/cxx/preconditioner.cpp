@@ -5,7 +5,7 @@
 #include <iostream>
 
 
-bool preconditioner_base::init(uint i0, uint i1, std::string const& fn)
+bool preconditioner_base::init(unsigned int i0, unsigned int i1, std::string const& fn)
 {
 	// using namespace boost;
 	using namespace std;
@@ -40,7 +40,7 @@ bool preconditioner_base::init(uint i0, uint i1, std::string const& fn)
 			is.setstate(ios::failbit);
 			break;
 		}
-		uint some_dst = 0;
+		unsigned int some_dst = 0;
 		for(st >> skipws ; st ; st >> ws) {
 			uint32_t idx;
 			if (!(st >> idx)) {

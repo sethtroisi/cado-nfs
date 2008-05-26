@@ -24,6 +24,7 @@
 #include <iterator>
 #include <string>
 #include <sstream>
+#include <algorithm>
 
 using namespace std;
 
