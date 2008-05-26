@@ -23,15 +23,27 @@
  */
 #define xxxSLICE_STATS
 
+/* Use this whenever you encounter the dreader "x > UINT16_MAX" bug. It
+ * has a non-trivial negative impact on the program's speed and memory
+ * requirements.
+ */
+#define xxxUSE_32BIT_MATRIX_INDICES
+
 class matrix_repr_binary_sliced {
 public:
     struct matrix_rowset {
+#ifdef  USE_32BIT_MATRIX_INDICES
+        typedef std::vector<uint32_t> data_t;
+#else
         typedef std::vector<uint16_t> data_t;
+#endif
         typedef data_t::iterator ptr;
         typedef data_t::const_iterator const_ptr;
         data_t data;
         inline void push(uint32_t x) {
+#ifndef  USE_32BIT_MATRIX_INDICES
             BUG_ON(x > UINT16_MAX);
+#endif
             data.push_back(x);
         }
 
@@ -130,8 +142,12 @@ public:
                 L.clear();
 
                 push(npack);
+#ifdef  USE_32BIT_MATRIX_INDICES
+                push(C.size());
+#else
                 push(C.size() & ((1u << 16) - 1));
                 push(C.size() >> 16);
+#endif
                 uint32_t j = 0;
                 for(C_t::const_iterator cp = C.begin() ; cp != C.end() ; ++cp) {
                     push(cp->first - j);
@@ -145,8 +161,12 @@ public:
                 }
 #else
                 push(npack);
+#ifdef  USE_32BIT_MATRIX_INDICES
+                push(L.size());
+#else
                 push(L.size() & ((1u << 16) - 1));
                 push(L.size() >> 16);
+#endif
                 uint32_t j = 0;
 #ifdef  SLICE_STATS
                 double sumdj=0;
@@ -208,8 +228,12 @@ public:
                 asm("# critical loop\n");
 #ifdef  TETRACAPILLECTOMY
                 uint32_t ncols_used;
+#ifdef  USE_32BIT_MATRIX_INDICES
+                ncols_used = *q++;
+#else
                 ncols_used = *q++;
                 ncols_used |= ((uint32_t) *q++) << 16;
+#endif
                 for(uint32_t c = 0 ; c < ncols_used ; c++) {
                     j += *q++;
                     typename traits::scalar_t x = src[j];
@@ -221,8 +245,12 @@ public:
                 }
 #else
                 uint32_t ncoeffs_slice;
+#ifdef  USE_32BIT_MATRIX_INDICES
+                ncoeffs_slice = *q++;
+#else
                 ncoeffs_slice = *q++;
                 ncoeffs_slice |= ((uint32_t) *q++) << 16;
+#endif
                 for(uint32_t c = 0 ; c < ncoeffs_slice ; c++) {
                     j += *q++;
                     typename traits::scalar_t x = src[j];
