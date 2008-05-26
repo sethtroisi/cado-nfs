@@ -349,7 +349,10 @@ static void scan_positive_side(qs_context_t* const context);
 //-----------------------------------------------------------------------------
 static void scan_negative_side(qs_context_t* const context);
 //-----------------------------------------------------------------------------
-inline uint32_t get_sieve_threshold(const uint32_t log_sqrtn, const uint32_t x);
+inline static uint32_t get_sieve_threshold(
+    const uint32_t log_sqrtn,
+    const uint32_t x
+);
 //-----------------------------------------------------------------------------
 
 //-----------------------------------------------------------------------------
@@ -1473,8 +1476,8 @@ static void compute_polynomial_values(mpz_array_t* const cand_u,
     cand_gx->length = x->length;
 }
 //-----------------------------------------------------------------------------
-inline uint32_t get_sieve_threshold(const uint32_t log_sqrtn,
-                                    const uint32_t x) {
+inline static uint32_t get_sieve_threshold(const uint32_t log_sqrtn,
+                                           const uint32_t x) {
     //
     // Returns the threshold to be used as a criterion (before applying
     // a correction factor) during the sieve scanning phase. It is more or less
