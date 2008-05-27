@@ -281,6 +281,7 @@ sieve_info_update (sieve_info_t *si, double skew)
   if (s_over_a1 > 1.0) /* ensures that J <= I/2 */
     s_over_a1 = 1.0;
   si->J = (uint32_t) (s_over_a1 * (double) (si->I >> 1));
+
 #ifdef VERBOSE
   fprintf (stderr, "# I=%u; J=%u\n", si->I, si->J);
 #endif
@@ -418,7 +419,7 @@ bingcd(unsigned long a, unsigned long b) {
    make much difference in either case. */
 #define LOOKUP_TRAILING_ZEROS 1
 
-// Compute the 2^32/a mod b for b odd, 
+// Compute 2^32/a mod b for b odd, 
 // and 1/a mod b for b even, by binary xgcd.
 // a must be less than b.
 // a is modified in place
@@ -545,6 +546,7 @@ invmod(unsigned long *pa, unsigned long b) {
 // In the case where denominator is zero, returns p.
 // In the case where denominator is non-invertible mod p, returns p+1.
 // Otherwise r in [0,p-1]
+// Assumes p < 2^32
 
 static inline fbprime_t
 simple_fb_root_in_qlattice(const fbprime_t p, const fbprime_t R, const sieve_info_t * si)
@@ -1819,6 +1821,16 @@ SkewGauss (sieve_info_t *si, double skewness)
     }
 }
 
+/* return max(|a0|,|a1|)/min(|a0|,|a1|) */
+double
+skewness (sieve_info_t *si)
+{
+  double a0 = fabs ((double) si->a0);
+  double a1 = fabs ((double) si->a1);
+  
+  return (a0 > a1) ? a0 / a1 : a1 / a0;
+}
+
 /************************ factoring with TIFA ********************************/
 
 /* FIXME: the value of 20 seems large. Normally, a few Miller-Rabin passes
@@ -2069,6 +2081,11 @@ main (int argc, char *argv[])
         if (rho != 0 && si.rho != rho) /* if -rho, wait for wanted root */
           continue;
         SkewGauss (&si, cpoly->skew);
+        /* FIXME: maybe we can discard some special q's if a1/a0 is too large,
+           see http://www.mersenneforum.org/showthread.php?p=130478 */
+        /* if (skewness (&si) > 32.0)
+           continue; */
+
         fprintf (stderr, "# Sieving q=%" PRIu64 "; rho=%" PRIu64
                  "; a0=%d; b0=%d; a1=%d; b1=%d\n",
                  si.q, si.rho, si.a0, si.b0, si.a1, si.b1);
