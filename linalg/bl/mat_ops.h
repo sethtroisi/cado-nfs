@@ -121,6 +121,49 @@ extern void STSMatrix_Vector(DenseMatrix, SparseMatrix, DenseMatrix);
 
 extern void Test_SMatrix_Vector(unsigned long *Result, SparseMatrix M, unsigned long *V,unsigned long m,unsigned long n);
 
+extern void STMatrix_Vector(DenseMatrix Result, SparseMatrix M, DenseMatrix V);
+
+
+
+
+//new funtions
+
+extern void TVUBit_new(DenseMatrix A, DenseMatrix B, DenseMatrix C);
+
+extern void SelectColumn_new(DenseMatrix V, unsigned long k, DenseMatrix C);
+
+extern void DMultBit_new(DenseMatrix A,DenseMatrix B, DenseMatrix C);
+
+extern void SwapRowsBit_new(DenseMatrix a,
+			  unsigned long i, unsigned long j);
+
+extern void MultiplyRowBit_new(DenseMatrix a, unsigned long u,
+			     unsigned long j);
+
+extern void AddRowBit_new(DenseMatrix a,
+			unsigned long u, unsigned long i, unsigned long j);
+
+extern void VUBit_new(DenseMatrix a,DenseMatrix b,DenseMatrix w);
+
+extern void DMatrixSumBit_new(DenseMatrix A,
+		   DenseMatrix B,DenseMatrix C);
+
+extern void SelectLinesBit_new(DenseMatrix a,
+			     unsigned long m,DenseMatrix b);
+
+extern void TransposeBit_new(DenseMatrix a,
+		  DenseMatrix b);
+
+extern unsigned long Pivot_new(DenseMatrix a,
+		    unsigned long Row, unsigned long Col);
+
+extern void GaussElimBit_new(DenseMatrix a,DenseMatrix b,DenseMatrix c,
+			   unsigned long *d, unsigned long *Lend);
+
+extern void SelectLinesListBit_new(DenseMatrix a,unsigned long *m, unsigned long Lengm,
+				 DenseMatrix b);
+
+
 #ifdef __cplusplus
 }
 #endif

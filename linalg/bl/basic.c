@@ -36,6 +36,20 @@ unsigned long Refresh_ArrayBit(unsigned long m, unsigned long n,
 }
 
 
+void Refresh_ArrayBit_new(DenseMatrix A[3], DenseMatrix a)
+{
+    unsigned long m=a->Nrows;
+    unsigned long n=a->Ncols;
+    unsigned long j;
+    // if (n%N==0) SizeA=n/N*m; else SizeA=n/N*m+m;
+    for (j = 0; j < iceildiv(n, WBITS) * m; ++j) {
+	A[2]->Data[j] = A[1]->Data[j];
+	A[1]->Data[j] = A[0]->Data[j];
+	A[0]->Data[j] = a->Data[j];
+    }
+}
+
+
 
 
 
@@ -50,6 +64,16 @@ unsigned long TestZero(unsigned long m, unsigned long n, unsigned long *a)
 
 }
 
+unsigned long TestZero_new(DenseMatrix a)
+{
+    unsigned long m=a->Nrows;
+    unsigned long n=a->Ncols;
+    unsigned long i;
+    for (i = 0; i < iceildiv(n, WBITS) * m; ++i)
+	if (a->Data[i] != 0)
+	    return 0;
+    return 1;
+}
 
 
 
@@ -80,11 +104,8 @@ void InnerProducts(unsigned long m, unsigned long n, unsigned long N,
 
 
 
-char * TimeConvert(float a)
+void TimeConvert(char *f, float a)
 { 
-
-char *f;
-f=malloc(10*sizeof(unsigned long));
 
 unsigned long years,minutes,hours,days;
 float seconds;
@@ -143,9 +164,15 @@ sprintf(f, "%.3fs",a);
  
 }
 
-return f;
-
 }
+
+
+
+
+
+
+
+
 
 
 

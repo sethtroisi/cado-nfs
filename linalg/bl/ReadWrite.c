@@ -581,8 +581,9 @@ static struct row * read_matrix(unsigned long * p_nr, const char * filename)
 
     fprintf(stderr, "done\n");
     fflush(stderr);
-
+    
     fclose(f);
+    
 
     *p_nr = nr;
 
@@ -630,11 +631,15 @@ void PrepareMatrixSlices(SparseMatrix M, char *filename)
                 }
             }
         }
+        
         free(row_table);  
     }
-    MPI_Bcast(offsets, nb_processes + 1, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
+    
+
     MPI_Bcast(weights, nb_processes    , MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
+    MPI_Bcast(offsets, nb_processes + 1, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
     MPI_Bcast(indices, nb_processes + 1, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
+    
 
     /* reconstruct the nice data */
 

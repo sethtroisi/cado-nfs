@@ -1,6 +1,11 @@
 #ifndef BL_BASIC_H_
 #define BL_BASIC_H_
 
+#include <stdint.h>
+#include "struct.h"
+
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -24,7 +29,15 @@ extern unsigned long Refresh_ArrayBit(unsigned long m, unsigned long n,
 extern unsigned long TestZero(unsigned long m, unsigned long n,
 			      unsigned long *a);
 
-extern char * TimeConvert(float a);
+extern void TimeConvert(char *f, float a);
+
+
+
+extern unsigned long TestZero_new(DenseMatrix a);
+
+extern void Refresh_ArrayBit_new(DenseMatrix A[3], DenseMatrix a);
+
+
 
 #ifdef __cplusplus
 }

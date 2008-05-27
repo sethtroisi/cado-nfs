@@ -65,15 +65,15 @@ int main(int argc, char *argv[])
 // Get the sparse matrix from file 
 
      {
-         unsigned long Num[2];
-         ReadSMatrixDimensions(matrix_file_name, Num);
-         M->Nrows = Num[0];
-         M->Ncols = Num[1];
+//         unsigned long Num[2];
+//         ReadSMatrixDimensions(matrix_file_name, Num);
+//         M->Nrows = Num[0];
+//         M->Ncols = Num[1];
      }
 
     unsigned long i;
     int t;
-    
+/*    
     PrepareMatrixSlices(M, matrix_file_name);
 
     if (p == 0) {
@@ -90,27 +90,83 @@ int main(int argc, char *argv[])
 
     ReadSMatrixSlice(M, matrix_file_name);
 
-
-    unsigned long *Y, *c;
-    Y = Allocmn(M->Ncols + 1, Block);
-    c = Allocmn(M->Ncols + 1, Block);
-
+*/
+    DenseMatrix  Y, c,R;
+    Y->Data = Allocmn(100, Block);Y->Nrows=100;Y->Ncols=Block;
+    c->Data = Allocmn(Block, Block);c->Nrows=Block;c->Ncols=Block;
+    R->Data = Allocmn(Block, Block);R->Nrows=Block;R->Ncols=Block;
+/*
     DenseMatrix Result,W;
 
-    Result->Data=Allocmn(M->Nrows + 1, Block);
+    Result->Data=Allocmn(M->Ncols + 1, Block);
     W->Data=Allocmn(M->Ncols + 1, Block);
 
+
+    unsigned long *V;
+    V=Allocmn(3,1);
+    DenseMatrix V[0],V[1],V[2];
+    V[0]->Data=Allocmn(M->Ncols + 1, Block);
+    V[1]->Data=Allocmn(M->Ncols + 1, Block);
+    V[2]->Data=Allocmn(M->Ncols + 1, Block);
+
+
+    struct ArrayMatrix {
+    struct DenseMatrix_s p0;
+    struct DenseMatrix_s p1;
+    struct DenseMatrix_s p2; 
+    }
+
+    struct ArrayMatrix V;
+
+    V.p0->Data=Allocmn(M->Ncols + 1, Block);
+    V.p1->Data=Allocmn(M->Ncols + 1, Block);
+    V.p2->Data=Allocmn(M->Ncols + 1, Block);
+
+
+    DenseMatrix V[3];
+    V[0]->Data=Allocmn(M->Ncols + 1, Block);
+    V[1]->Data=Allocmn(M->Ncols + 1, Block);
+    V[2]->Data=Allocmn(M->Ncols + 1, Block);
+
+*/
 
 //Testes a multiplicacao
 
 
 
-	RandomDMatrixBitTest(M->Ncols, Block, Y);
+ReadDMatrixFile(matrix_file_name, Block, c->Data);
+
+
+displayMatrix(c->Data,Block,Block,'T');   
+
+
+
+
+//	RandomDMatrixBitTest(100, Block, Y->Data);
+//        RandomDMatrixBitTest(Block, Block, c->Data);
+
+        //DMultBit_new(Y,c,R);
+//        TVUBit_new(Y,Y,R);
+
+//        displayMatrix(Y->Data,Y->Nrows,Y->Ncols,'Y');
+       //  displayMatrix(c->Data,Block,Block,'c');        
+ //        displayMatrix(R->Data,R->Nrows,R->Ncols,'R');    
+
+/*
+        for (t=1; t<M->Ncols; t++) {V[0]->Data[t]=Y[t];V[1]->Data[t]=Y[t];V[2]->Data[t]=Y[t];}
+
+         displayMatrix(V[0]->Data,20,Block,'c');
+         displayMatrix(V[1]->Data,20,Block,'d');        
+         displayMatrix(V[2]->Data,20,Block,'e');        
+
+   free(V[0]->Data);
+   free(V[1]->Data);
+   free(V[2]->Data);
 
         for (t=1; t<M->Ncols; t++) {W->Data[t]=Y[t];}
-
-
-
+        W->Ncols=Block;
+        W->Nrows=M->Ncols;
+*/
 	if (p == 0) {
 	    Tm1 = wallclock_microseconds();
 	}
@@ -118,31 +174,46 @@ int main(int argc, char *argv[])
 
 //Test_SMatrix_Vector(c,M, Y,M->Nrows,M->Ncols);
 
-SMatrix_Vector(Result,M, W);
+//for (i=0; i<10; i++){
 
+//STMatrix_Vector(Result,M,W);
+
+//STSMatrix_Vector(Result,M,W);
+
+//}
+/*
 	if (p == 0) {
 	    Tm2 = wallclock_microseconds();
 	    DiffTime = Tm2 - Tm1;
-	    printf("matrix multiplication = %.2f s\n", DiffTime / 1000000);
+	    printf("matrix multiplication = %.2f s\n", DiffTime / 10000000);
 	}
+
+*/
 
    // }
 
 
 
-char *f=TimeConvert(360000000.45);
+//char *f=TimeConvert(360000000.45);
 
-printf("%s \n",f);
+//printf("%s \n",f);
 
 
 
-free(M->slices);
-free(M->Data);
-free(Result->Data);
-free(W->Data);
-free(Y);
-free(c);
+//displayMatrix(W->Data,M->Nrows,Block,'c');
+//displaySMatrixNew(M->Data,M->Nrows,M->Ncols,'a');
+//displayMatrix(Result->Data,M->Ncols,Block,'r');
 
+
+
+
+//free(M->slices);
+//free(M->Data);
+//free(Result->Data);
+//free(W->Data);
+//free(Y->Data);
+//free(c->Data);
+//free(R->Data);
 
 close_random();
 MPI_Finalize();

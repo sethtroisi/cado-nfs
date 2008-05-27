@@ -38,6 +38,9 @@ struct DenseMatrix_s {
 
 typedef struct DenseMatrix_s DenseMatrix[1];
 
+
+
+
 #ifdef __cplusplus
 }
 #endif

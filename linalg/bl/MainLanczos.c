@@ -83,7 +83,7 @@ int main(int argc, char *argv[])
      }
 
     unsigned long i;
-    
+
     PrepareMatrixSlices(M, matrix_file_name);
 
     if (p == 0) {
@@ -97,8 +97,9 @@ int main(int argc, char *argv[])
         }
     }
 
+    
     ReadSMatrixSlice(M, matrix_file_name);
-
+    
     DenseMatrix Result;
 
     Result->Data = Allocmn(M->Nrows, Block);
@@ -109,7 +110,9 @@ int main(int argc, char *argv[])
 	Tm1 = microseconds();
     }
 
-    Lanczos(Ker, M, Block);
+    Lanczos_new(Ker, M, Block);
+
+   // Lanczos(M, Block,Ker);
 
     if (p == 0) {
 	Tm2 = microseconds();
@@ -124,7 +127,7 @@ int main(int argc, char *argv[])
     SMatrix_Vector(Result,M,Ker);
 
     if (p == 0) {
-	if (TestZero(M->Nrows, Block, Result->Data)) {
+	if (TestZero_new(Result)) {
 	    printf
 		("There were NO errors During the process. The vectors are in the kernel of the matrix  \n");
 	} else {

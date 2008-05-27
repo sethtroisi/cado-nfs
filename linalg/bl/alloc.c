@@ -55,6 +55,15 @@ void FreeAllocmn3(unsigned long **a)
     free(a);
 }
 
+void FreeAllocmn3_new(DenseMatrix a[3])
+{
+    unsigned long i;
+
+    for (i = 0; i < 3; ++i){
+	free(a[i]->Data);}
+    
+}
+
 
 ///////////////////////////////////////////
 //

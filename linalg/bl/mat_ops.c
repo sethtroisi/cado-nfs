@@ -26,6 +26,7 @@
 
 
 /* function passed to sub-processes */
+
 static void MyXORfunction(unsigned long *invec, unsigned long *inoutvec,
 			  int *len, MPI_Datatype * dtype)
 {
@@ -48,25 +49,16 @@ static void MyXORfunction(unsigned long *invec, unsigned long *inoutvec,
 
 
 
-
-///////////////////////////////////////////////////////////////////////
-//
-//  Matrix operations on lines in Bit notation
-//    
-//
-//////////////////////////////////////////////////////////////////
-
-
-
-unsigned long Pivot(unsigned long m, unsigned long n, unsigned long *a,
+unsigned long Pivot_new(DenseMatrix a,
 		    unsigned long Row, unsigned long Col)
 {
-
+    unsigned long m=a->Nrows;
+    unsigned long n=a->Ncols;
     unsigned long PosPiv, SizeRowA, i;
     SizeRowA = iceildiv(n, WBITS);
     PosPiv = -1;
     for (i = Row; i < m; i++) {
-	if (((a[i * SizeRowA + Col / WBITS] >> (Col % WBITS)) & 1UL) == 1) {
+	if (((a->Data[i * SizeRowA + Col / WBITS] >> (Col % WBITS)) & 1UL) == 1) {
 	    PosPiv = i;
 	    break;
 	}
@@ -78,19 +70,21 @@ unsigned long Pivot(unsigned long m, unsigned long n, unsigned long *a,
 
 
 
-#if 1
-unsigned long GaussElimBit(unsigned long m, unsigned long n, unsigned long *a,
-			   unsigned long *b, unsigned long *c,
+
+void GaussElimBit_new(DenseMatrix a,
+			   DenseMatrix b,DenseMatrix c,
 			   unsigned long *d, unsigned long *Lend)
 {
     unsigned long bit, Piv, SizeRowA, i, j, k;
+    unsigned long m=a->Nrows;
+    unsigned long n=a->Ncols;
     SizeRowA = iceildiv(n, WBITS);
     for (i = 0; i < m; ++i) {
-	c[i * iceildiv(m, WBITS) + i / WBITS] = (1UL << i % WBITS);
+	c->Data[i * iceildiv(m, WBITS) + i / WBITS] = (1UL << i % WBITS);
 
     }
     for (i = 0; i < m * (SizeRowA); i++) {
-	b[i] = a[i];
+	b->Data[i] = a->Data[i];
     };
 
     // displayMatrixScreen(b,m,n);
@@ -101,7 +95,7 @@ unsigned long GaussElimBit(unsigned long m, unsigned long n, unsigned long *a,
 
 	do {
 	    j++;
-	    Piv = Pivot(m, n, b, i, j);
+	    Piv = Pivot_new(b, i, j);
 	}
 	while (((Piv == -1) & (j < n)));
 
@@ -110,17 +104,17 @@ unsigned long GaussElimBit(unsigned long m, unsigned long n, unsigned long *a,
 	    break;
 	};
 
-	SwapRowsBit(m, n, b, i, Piv);
-	SwapRowsBit(m, m, c, i, Piv);
+	SwapRowsBit_new(b, i, Piv);
+	SwapRowsBit_new(c, i, Piv);
 
 	for (k = i + 1; k < m; k++) {
-	    bit = ((b[k * SizeRowA + j / WBITS] >> (j % WBITS)) & 1UL);
+	    bit = ((b->Data[k * SizeRowA + j / WBITS] >> (j % WBITS)) & 1UL);
 
 	    if (bit != 0) {
-		AddRowBit(m, n, b, 1, i, k);
+		AddRowBit_new(b, 1, i, k);
 	    };
 	    if (bit != 0) {
-		AddRowBit(m, m, c, 1, i, k);
+		AddRowBit_new(c, 1, i, k);
 	    };
 
 	}
@@ -136,203 +130,100 @@ unsigned long GaussElimBit(unsigned long m, unsigned long n, unsigned long *a,
 	d[i] = i + Lend[0];
     }
 
-
-
-    return 0;
-}
-#endif
-
-
-
-
-
-
-
-#if 0
-unsigned long GaussElimBit(unsigned long m, unsigned long n, unsigned long *a,
-			   unsigned long *b, unsigned long *c,
-			   unsigned long *d, unsigned long *Lend)
-{
-    unsigned long teste, Count, SizeRowA, i, j, k, t, Posji, Poskt, Pivotit;
-    SizeRowA = iceildiv(n, WBITS);
-    unsigned long *p;
-    p = Allocmn(m, m);
-    unsigned long *Resnm;
-    Resnm = Allocmn(n, m);
-    teste = 0;
-    memset(c, 0, m * iceildiv(m, WBITS) * sizeof(unsigned long));
-    //memset(c1,0,m*iceildiv(m,WBITS)*sizeof(unsigned long));
-
-    for (i = 0; i < m; ++i) {
-	c[i * iceildiv(m, WBITS) + i / WBITS] = (1UL << i % WBITS);
-	//c1[i*iceildiv(m,WBITS)+i/WBITS]=(1UL<<i%WBITS);
-    }
-    for (i = 0; i < m * SizeRowA; i++) {
-	b[i] = a[i];
-    }
-
-    Count = 0;
-    for (i = 0; i < m; ++i) {
-	t = i;
-	do {
-	    Pivotit = ((b[i * SizeRowA + t / WBITS] >> (t % WBITS)) & 1UL);
-	    k = 0;
-	    if (Pivotit == 0) {
-		for (k = i + 1; k < m; ++k) {
-		    Poskt =
-			((b[k * SizeRowA + t / WBITS] >> (t % WBITS)) & 1UL);
-		    if (Poskt == 1) {
-			SwapRowsBit(m, n, b, i, k);
-			SwapRowsBit(m, m, c, i, k);
-			break;
-		    }
-		}
-	    }
-	    if (k == m) {
-		t++;
-	    }
-	    //printf("toto %lu %lu\n",t,k);
-	} while (k == m);
-	if (t > n && teste == 0) {
-	    Lend[0] = i;
-	    teste = 1;
-	}
-	for (j = i + 1; j < m; ++j) {
-	    Posji = ((b[j * SizeRowA + i / WBITS] >> (i % WBITS)) & 1UL);
-	    if (Posji == 1) {
-		AddRowBit(m, n, b, 1, i, j);
-		AddRowBit(m, m, c, 1, i, j);
-	    }
-
-	}
-    }
-    k = 0;
-    for (i = 0; i < m - Lend[0]; i++) {
-
-	d[i] = i + Lend[0];
-    }
-    free(p);
-    free(Resnm);
-    return 0;
-}
-#endif
-
-
-/*
-
-Sparse matrix vector multiplication with MPI
-
-*/
-
-
-
-
-
-
-
-
-unsigned long InverseList(unsigned long N, unsigned long Lengm,
-			  const unsigned long *m, unsigned long *b)
-{
-    unsigned long j, i;
-    unsigned long k = 0;
-    for (i = 0; i < N; i++) {
-	for (j = 0; j < Lengm; j++) {
-	    if (m[j] == i) {
-		break;
-	    }
-	}
-	if (j >= Lengm) {
-	    b[k] = i;
-	    k++;
-	}
-    }
-    return 0;
-}
-
-unsigned long SelectLinesBit(unsigned long n, const unsigned long *a,
-			     unsigned long m, unsigned long *b)
-{
-    unsigned long SizeRowA, i, j;
-
-    SizeRowA = iceildiv(n, WBITS);
-
-    for (i = 0; i < m; ++i)
-	for (j = 0; j < SizeRowA; ++j)
-	    b[i * SizeRowA + j] = a[i * SizeRowA + j];
-    return 0;
-}
-
-unsigned long SelectLinesListBit(unsigned long n, const unsigned long *a,
-				 unsigned long *m, unsigned long Lengm,
-				 unsigned long *b)
-{
-    unsigned long SizeRowA, i, j;
-
-    SizeRowA = iceildiv(n, WBITS);
-
-    for (i = 0; i < Lengm; ++i) {
-	for (j = 0; j < SizeRowA; ++j)
-	    b[i * SizeRowA + j] = a[m[i] * SizeRowA + j];
-    }
-    return 0;
+    
 }
 
 
 
 
-
-unsigned long AddRowBit(unsigned long m, unsigned long n, unsigned long *a,
-			unsigned long u, unsigned long i, unsigned long j)
-{
-    unsigned long p, SizeRowA;
-    SizeRowA = iceildiv(n, WBITS);
-
-    if (u != 0) {
-
-
-	for (p = 0; p < SizeRowA; ++p) {
-	    a[j * SizeRowA + p] ^= a[i * SizeRowA + p];
-	}
-    }
-    return 0;
-}
-
-
-
-unsigned long SwapRowsBit(unsigned long m, unsigned long n, unsigned long *a,
-			  unsigned long i, unsigned long j)
-{
-    unsigned long k, p, SizeRowA;
-
-    SizeRowA = iceildiv(n, WBITS);
-
-    for (p = 0; p < SizeRowA; ++p) {
-	k = a[i * SizeRowA + p];
-	a[i * SizeRowA + p] = a[j * SizeRowA + p];
-	a[j * SizeRowA + p] = k;
-    }
-    return 0;
-}
-
-
-
-
-
-unsigned long MultiplyRowBit(unsigned long m, unsigned long n,
-			     unsigned long *a, unsigned long u,
+void MultiplyRowBit_new(DenseMatrix a, unsigned long u,
 			     unsigned long j)
 {
     unsigned long p, SizeRowA;
+
+    unsigned long n=a->Ncols;
 
     SizeRowA = iceildiv(n, WBITS);
 
     if (u == 0) {
 	for (p = 0; p < SizeRowA; ++p) {
-	    a[j * SizeRowA + p] = 0;
+	    a->Data[j * SizeRowA + p] = 0;
 	}
     }
-    return 0;
+}
+
+
+void AddRowBit_new(DenseMatrix a,
+			unsigned long u, unsigned long i, unsigned long j)
+{
+    unsigned long p, SizeRowA;
+
+    unsigned long n=a->Ncols;
+    SizeRowA = iceildiv(n, WBITS);
+    
+
+    if (u != 0) {
+
+
+	for (p = 0; p < SizeRowA; ++p) {
+	    a->Data[j * SizeRowA + p] ^= a->Data[i * SizeRowA + p];
+	}
+    }
+}
+
+
+
+void SwapRowsBit_new(DenseMatrix a,
+			  unsigned long i, unsigned long j)
+{
+    unsigned long k, p, SizeRowA;
+
+    unsigned long n=a->Ncols;
+
+
+    SizeRowA = iceildiv(n, WBITS);
+
+    for (p = 0; p < SizeRowA; ++p) {
+	k = a->Data[i * SizeRowA + p];
+	a->Data[i * SizeRowA + p] = a->Data[j * SizeRowA + p];
+	a->Data[j * SizeRowA + p] = k;
+    }
+
+}
+
+
+
+void SelectLinesBit_new(DenseMatrix a,
+			     unsigned long m,DenseMatrix b)
+{
+    unsigned long SizeRowA, i, j;
+    unsigned long n=a->Ncols;
+
+    SizeRowA = iceildiv(n, WBITS);
+
+    for (i = 0; i < m; ++i)
+	for (j = 0; j < SizeRowA; ++j)
+	    b->Data[i * SizeRowA + j] = a->Data[i * SizeRowA + j];
+    
+
+    b->Nrows=m;
+    b->Ncols=n;
+}
+
+
+void SelectLinesListBit_new(DenseMatrix a,
+				 unsigned long *m, unsigned long Lengm,
+				 DenseMatrix b)
+{
+    unsigned long SizeRowA, i, j;
+    unsigned long n=a->Ncols;
+
+    SizeRowA = iceildiv(n, WBITS);
+
+    for (i = 0; i < Lengm; ++i) {
+	for (j = 0; j < SizeRowA; ++j)
+	    b->Data[i * SizeRowA + j] = a->Data[m[i] * SizeRowA + j];
+    }
 }
 
 
@@ -344,19 +235,24 @@ Dense Matrix + Dense Matrix = Dense Matrix
 
 */
 
-void DMatrixSumBit(unsigned long m,
-		   unsigned long n,
-		   const unsigned long *A,
-		   const unsigned long *B, unsigned long *C)
+
+
+void DMatrixSumBit_new(DenseMatrix A,
+		   DenseMatrix B,DenseMatrix C)
 {
     unsigned long i, SizeA;
+    unsigned long m=A->Nrows;
+    unsigned long n=A->Ncols;
 
     SizeA = iceildiv(n, WBITS) * m;
 
     for (i = 0; i < SizeA; i++) {
-	C[i] = A[i] ^ B[i];
+	C->Data[i] = A->Data[i] ^ B->Data[i];
     }
+    C->Nrows=A->Nrows;
+    C->Ncols=A->Ncols;
 }
+
 
 
 /*
@@ -367,39 +263,40 @@ Dense Matrix x Dense Matrix = Dense Matrix
 
 
 
-void DMultBit(unsigned long m,
-	      unsigned long n,
-	      unsigned long p,
-	      const unsigned long *A,
-	      const unsigned long *B, unsigned long *C)
+
+
+
+
+
+void DMultBit_new(DenseMatrix A,
+	      DenseMatrix B, DenseMatrix C)
 {
     unsigned long i, j, t;
     unsigned long LrowA, LrowB;
-
+    unsigned long m=A->Nrows;
+    unsigned long n=A->Ncols;
+    unsigned long p=B->Ncols;
     LrowA = iceildiv(n, WBITS);
     LrowB = iceildiv(p, WBITS);
+    memset(C->Data, 0, WBITS * sizeof(unsigned long));
 
-    const unsigned long *A1 = A;
-
+    const unsigned long *A1=A->Data;    
+    
     for (i = 0; i < m; i++) {
-
 	unsigned long P;
 	unsigned int k, count;
-
 	for (t = 0; t < LrowB; t++) {
-
-	    const unsigned long *sptr = B;
+	    const unsigned long *sptr = B->Data;
 	    count = 0;
-	    C[i * LrowB + t] = 0;
+	    C->Data[i * LrowB + t] = 0;
 	    sptr += t;
 	    for (j = 0; j < n / WBITS; j++) {
 		P = A1[j];
+           
 		for (k = 0; k < WBITS; k++) {
 
 		    if (P & 1UL)
-			C[i * LrowB + t] ^= *sptr;
-
-
+			C->Data[i * LrowB + t] ^= *sptr;
 
 		    sptr += LrowB;
 		    P >>= 1UL;
@@ -408,154 +305,20 @@ void DMultBit(unsigned long m,
 
 	    if (n % WBITS) {
 		P = A1[j];
+                
 		for (k = 0; k < n % WBITS; k++) {
 		    if (P & 1UL)
-			C[i * LrowB + t] ^= *sptr;
-
-
+			C->Data[i * LrowB + t] ^= *sptr;
 
 		    sptr += LrowB;
 		    P >>= 1UL;
 		}
 	    }
-
 	}
-
-	A1 += LrowA;
+	A1 += LrowA;        
     }
-}
-
-
-
-
-void TVUBit_v2(unsigned long m,
-	       unsigned long n,
-	       const unsigned long *A, const unsigned long *B,
-	       unsigned long *C)
-{
-    unsigned long i, P, k;
-
-    memset(C, 0, WBITS * sizeof(unsigned long));
-
-    for (i = 0; i < m; i++) {
-
-	P = *A++;
-	for (k = 0; k < WBITS; k++) {
-
-	    //if (P & 1UL) C[k] ^= B[i];
-
-	    C[k] ^= (B[i] & -(P & 1UL));
-
-	    P >>= 1UL;
-	}
-
-    }
-
 
 }
-
-
-#if 1
-void VUBit_v2(unsigned long m,
-	      unsigned long n,
-	      const unsigned long *A, const unsigned long *B,
-	      unsigned long *C)
-{
-    unsigned long i, P, k;
-    memset(C, 0, m * sizeof(unsigned long));
-    for (i = 0; i < m; i++) {
-	P = *A++;
-	for (k = 0; k < n; k++) {
-	    C[i] ^= (B[k] & -(P & 1UL));
-	    P >>= 1UL;
-	}
-
-    }
-
-
-}
-#endif
-
-
-#if 1
-
-unsigned long VecMat(unsigned long a, const unsigned long *b)
-{
-#if 1
-    unsigned int i;
-    unsigned long c = 0;
-    for (i = 0; i < WBITS; i++) {
-	c ^= (b[i] & -(a & 1UL));
-	a >>= 1UL;
-    }
-    return c;
-#endif
-
-
-#if 0				// Uses not optimized __builtin function maybe with gcc 4.3 is beter
-
-    unsigned long j, i;
-    unsigned long c = 0;
-    for (i = 0; i < WBITS; i++) {
-	c ^= ((__builtin_parityl(a & b[i]) & 1UL) << i);
-    }
-    return c;
-
-#endif
-
-}
-
-
-
-
-
-
-
-
-
-
-#if 0
-
-
-void VUBit(unsigned long m,
-	   unsigned long n,
-	   const unsigned long *A, const unsigned long *B, unsigned long *C)
-{
-
-#if 1
-
-    unsigned long i;
-    memset(C, 0, m * sizeof(unsigned long));
-    for (i = 0; i < m; i++) {
-	*C++ = VecMat(*A++, B);
-    }
-
-
-
-#endif
-
-
-#if 0
-    unsigned long i, P, *Tb;
-    memset(C, 0, m * sizeof(unsigned long));
-
-    Tb = Allocmn(n, n);
-    TransposeBit(n, n, B, Tb);
-
-    for (i = 0; i < m; i++) {
-	*C++ = VecMat(*A++, Tb);
-    }
-
-#endif
-}
-
-
-
-
-#endif
-
-#endif
-
 
 
 
@@ -653,40 +416,18 @@ void mul_vec_mat(unsigned long *C,
 
 
 
-#if 1
 
-void VUBit(unsigned long m,
-	   unsigned long n, uint64_t * a, uint64_t * b, uint64_t * w)
+void VUBit_new(DenseMatrix a,DenseMatrix b,DenseMatrix w)
 {
+    unsigned long m=a->Nrows;
 
-    mul_vec_mat(w, a, b, m);
+    mul_vec_mat(w->Data, a->Data, b->Data, m);
 
 }
 
-#endif
 
 
 
-
-#if 0
-void VUBit(unsigned long m,
-	      unsigned long n,
-	      const unsigned long *A, const unsigned long *B,
-	      unsigned long *C)
-{
-    unsigned long i, P, k, j;
-    memset(C, 0, m * sizeof(unsigned long));
-    for (i = 0; i < m; i++) {
-	P = *A++;
-	j = C[i];
-	for (k = 0; k < n; k++) {
-	    j ^= (B[k] & -(P & 1UL));
-	    P >>= 1UL;
-	}
-	C[i] = j;
-    }
-}
-#endif
 
 
 
@@ -744,6 +485,846 @@ inline void addmul(uint64_t a, uint64_t b, uint64_t * w)
 
 
 
+void TVUBit_new(DenseMatrix A, DenseMatrix B, DenseMatrix C)
+{
+    unsigned long i;
+    unsigned long m=A->Nrows;
+    
+    memset(C->Data, 0, WBITS * sizeof(uint64_t));
+    for (i = 0; i < m; i++) {
+	addmul(A->Data[i], B->Data[i], C->Data);
+    }
+    
+
+}
+
+
+/*
+
+Select column k from dense matrix V
+
+*/
+
+
+
+void SelectColumn_new(DenseMatrix V, unsigned long k, DenseMatrix C)
+{
+    unsigned long i, step, L;
+    unsigned long m=V->Nrows;
+    unsigned long n=V->Ncols;
+
+    L = iceildiv(m, WBITS);
+
+    step = 0;
+    memset(C->Data, 0, L * sizeof(unsigned long));
+    for (i = 0; i < m; ++i) {
+	if (n % WBITS == 0) {
+	    if (((V->Data[(n / WBITS) * i + k / WBITS] >> (k % WBITS)) & 1) != 0) {
+		C->Data[i / WBITS] |= (1UL << step);
+
+	    }
+	} else {
+	    if (((V->Data[(n / WBITS + 1) * i + k / WBITS] >> (k % WBITS)) & 1) !=
+		0) {
+		C->Data[i / WBITS] |= (1UL << step);
+	    }
+	}
+	if (((i + 1) / WBITS) > (i / WBITS))
+
+	    step = 0;
+
+	else
+	    step++;
+    }
+
+}
+
+
+
+
+/*
+
+Transpose dense matrix
+
+*/
+
+
+
+void TransposeBit_new(DenseMatrix a,
+		  DenseMatrix b)
+{
+    unsigned long i, j, SizeColumnB;
+    unsigned long m=a->Nrows;
+    unsigned long n=a->Ncols;    
+
+    SizeColumnB = iceildiv(m, WBITS);
+
+    DenseMatrix C;
+    C->Data = malloc(SizeColumnB * sizeof(unsigned long));
+
+    for (i = 0; i < n; ++i) {
+
+	SelectColumn_new(a,i, C);
+	for (j = 0; j < SizeColumnB; ++j) {
+	    b->Data[i * SizeColumnB + j] = C->Data[j];
+	}
+    }
+    free(C->Data);
+    b->Nrows=n;
+    b->Ncols=m;
+}
+
+
+
+
+/*
+
+Transpose sparse times sparse times dense block
+
+*/
+
+
+void SMultDmatrixBit(unsigned long m, unsigned long n, unsigned long p,
+		     unsigned long *a, unsigned long *b, unsigned long *c,
+		     unsigned long start, unsigned long size)
+{
+
+    unsigned long k, i;
+    memset(c, 0, m * sizeof(unsigned long));
+
+    i = 0;
+    for (i = start; i < start + size; ++i) {
+	for (k = *a++; k--;) {
+	    c[i] ^= b[*a++];
+	}
+    }
+}
+
+
+
+
+void TSMultDmatrixBit(unsigned long m, unsigned long n, unsigned long p,
+		      unsigned long *a, unsigned long *b, unsigned long *c,
+		      unsigned long start, unsigned long size)
+{
+    
+    unsigned long k, i;
+    memset(c, 0, n * sizeof(unsigned long));
+
+    i = 0;
+    for (i = start; i < start + size; ++i) {
+	for (k = *a++; k--;) {
+	    c[*a++] ^= b[i];
+	}
+    }
+
+
+
+
+}
+
+
+
+
+
+/*
+
+Multiplication functions for "sparse matrix times vector" and "Transpose sparse matrix times sparse matrix times vector"
+
+*/
+
+void SMatrix_Vector(DenseMatrix Result, SparseMatrix M, DenseMatrix V)
+{
+    int nb_processes, p;
+
+    MPI_Comm_size(MPI_COMM_WORLD, &nb_processes);
+    MPI_Comm_rank(MPI_COMM_WORLD, &p);
+    MPI_Status status;
+  
+    unsigned long j, i;
+       
+
+if (p==0){
+    for (i=1; i<nb_processes; i++) {
+      MPI_Send(V->Data, M->Ncols , MPI_UNSIGNED_LONG,
+		 i, 12, MPI_COMM_WORLD);
+   
+       }
+    }
+    else
+    {
+    MPI_Recv(V->Data,M->Ncols,
+		     MPI_UNSIGNED_LONG,0, 12, MPI_COMM_WORLD, &status);
+    }
+
+ 
+    unsigned long my_nrows = M->slices[p]->i1 - M->slices[p]->i0;
+
+    unsigned long *Prod_Dist;
+    Prod_Dist = Allocmn(M->Nrows, sizeof(unsigned long));
+
+    SMultDmatrixBit(M->Nrows, M->Ncols, sizeof(unsigned long), M->Data, V->Data, Prod_Dist,
+		    M->slices[p]->i0, my_nrows);
+
+    if (p != 0) {
+	MPI_Send(Prod_Dist, my_nrows, MPI_UNSIGNED_LONG,
+		 0, 123, MPI_COMM_WORLD);
+        
+    }
+
+
+    if (p == 0) {
+	for (i = 0; i < my_nrows; i++) {
+	    Result->Data[i] = Prod_Dist[i];
+	}
+
+	for (i = 1; i < nb_processes; i++) {
+
+	    MPI_Recv(Prod_Dist,
+                    M->slices[i]->i1 - M->slices[i]->i0,
+		     MPI_UNSIGNED_LONG, i, 123, MPI_COMM_WORLD, &status);
+
+	    for (j = M->slices[i]->i0 ; j < M->slices[i]->i1; j++) {
+		Result->Data[j] = Prod_Dist[j - M->slices[i]->i0];
+	    }
+	}
+    }
+    
+    
+    free(Prod_Dist);
+    Result->Nrows = M->Nrows;
+    Result->Ncols = V->Ncols;
+}
+
+
+
+void STMatrix_Vector(DenseMatrix Result, SparseMatrix M, DenseMatrix V)
+{
+    int size, p;
+    unsigned long  *ATAR_Dist;
+
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &p);
+    MPI_Op newop;
+    MPI_Op_create((MPI_User_function *) MyXORfunction, 0, &newop);
+
+    Result->Data = Allocmn(M->Ncols, V->Ncols);
+    ATAR_Dist = Allocmn(M->Ncols, V->Ncols);
+
+    MPI_Bcast(V->Data, V->Nrows, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
+
+    matrix_slice_ptr me = M->slices[p];
+
+   
+    TSMultDmatrixBit(me->i1 - me->i0, M->Ncols, V->Ncols, M->Data,
+		     V->Data, ATAR_Dist,
+                     me->i0, me->i1 - me->i0);
+
+    MPI_Reduce(ATAR_Dist, Result->Data, M->Ncols, MPI_UNSIGNED_LONG, newop, 0,
+	       MPI_COMM_WORLD);
+
+   
+    free(ATAR_Dist);
+
+    Result->Nrows = M->Ncols;
+    Result->Ncols = V->Ncols;
+}
+
+
+
+void STSMatrix_Vector(DenseMatrix Result, SparseMatrix M, DenseMatrix V)
+{
+    int size, p;
+    unsigned long *ResmN_Dist, *ATAR_Dist;
+
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &p);
+    MPI_Op newop;
+    MPI_Op_create((MPI_User_function *) MyXORfunction, 0, &newop);
+
+    //Result->Data = Allocmn(M->Ncols, V->Ncols);
+    ResmN_Dist = Allocmn(M->Nrows, V->Ncols);
+    ATAR_Dist = Allocmn(M->Ncols, V->Ncols);
+
+   
+
+    MPI_Bcast(V->Data, V->Nrows, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
+
+    matrix_slice_ptr me = M->slices[p];
+
+    SMultDmatrixBit(M->Nrows, M->Ncols, V->Ncols, M->Data, V->Data, ResmN_Dist,
+            me->i0, me->i1 - me->i0);
+    TSMultDmatrixBit(me->i1 - me->i0, M->Ncols, V->Ncols, M->Data,
+		     ResmN_Dist, ATAR_Dist,
+                     me->i0, me->i1 - me->i0);
+    MPI_Reduce(ATAR_Dist, Result->Data, M->Ncols, MPI_UNSIGNED_LONG, newop, 0,
+	       MPI_COMM_WORLD);
+
+    free(ResmN_Dist);
+    free(ATAR_Dist);
+
+    Result->Nrows = M->Ncols;
+    Result->Ncols = V->Ncols;
+}
+
+
+
+
+
+////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////
+
+
+
+
+
+
+unsigned long InverseList(unsigned long N, unsigned long Lengm,
+			  const unsigned long *m, unsigned long *b)
+{
+    unsigned long j, i;
+    unsigned long k = 0;
+    for (i = 0; i < N; i++) {
+	for (j = 0; j < Lengm; j++) {
+	    if (m[j] == i) {
+		break;
+	    }
+	}
+	if (j >= Lengm) {
+	    b[k] = i;
+	    k++;
+	}
+    }
+    return 0;
+}
+
+
+
+
+
+
+
+
+
+
+
+unsigned long Pivot(unsigned long m, unsigned long n, unsigned long *a,
+		    unsigned long Row, unsigned long Col)
+{
+
+    unsigned long PosPiv, SizeRowA, i;
+    SizeRowA = iceildiv(n, WBITS);
+    PosPiv = -1;
+    for (i = Row; i < m; i++) {
+	if (((a[i * SizeRowA + Col / WBITS] >> (Col % WBITS)) & 1UL) == 1) {
+	    PosPiv = i;
+	    break;
+	}
+    }
+
+    return PosPiv;
+}
+
+
+
+
+#if 1
+unsigned long GaussElimBit(unsigned long m, unsigned long n, unsigned long *a,
+			   unsigned long *b, unsigned long *c,
+			   unsigned long *d, unsigned long *Lend)
+{
+    unsigned long bit, Piv, SizeRowA, i, j, k;
+    SizeRowA = iceildiv(n, WBITS);
+    for (i = 0; i < m; ++i) {
+	c[i * iceildiv(m, WBITS) + i / WBITS] = (1UL << i % WBITS);
+
+    }
+    for (i = 0; i < m * (SizeRowA); i++) {
+	b[i] = a[i];
+    };
+
+    // displayMatrixScreen(b,m,n);
+
+    for (i = 0; i < m; i++) {
+	j = i - 1;
+	Piv = -1;
+
+	do {
+	    j++;
+	    Piv = Pivot(m, n, b, i, j);
+	}
+	while (((Piv == -1) & (j < n)));
+
+	if (j == n) {
+	    Lend[0] = i;
+	    break;
+	};
+
+	SwapRowsBit(m, n, b, i, Piv);
+	SwapRowsBit(m, m, c, i, Piv);
+
+	for (k = i + 1; k < m; k++) {
+	    bit = ((b[k * SizeRowA + j / WBITS] >> (j % WBITS)) & 1UL);
+
+	    if (bit != 0) {
+		AddRowBit(m, n, b, 1, i, k);
+	    };
+	    if (bit != 0) {
+		AddRowBit(m, m, c, 1, i, k);
+	    };
+
+	}
+
+    };
+    if (i == m) {
+	Lend[0] = i;
+    };
+
+
+    for (i = 0; i < m - Lend[0]; i++) {
+
+	d[i] = i + Lend[0];
+    }
+
+
+
+    return 0;
+}
+#endif
+
+
+
+
+
+
+
+
+
+#if 0
+unsigned long GaussElimBit(unsigned long m, unsigned long n, unsigned long *a,
+			   unsigned long *b, unsigned long *c,
+			   unsigned long *d, unsigned long *Lend)
+{
+    unsigned long teste, Count, SizeRowA, i, j, k, t, Posji, Poskt, Pivotit;
+    SizeRowA = iceildiv(n, WBITS);
+    unsigned long *p;
+    p = Allocmn(m, m);
+    unsigned long *Resnm;
+    Resnm = Allocmn(n, m);
+    teste = 0;
+    memset(c, 0, m * iceildiv(m, WBITS) * sizeof(unsigned long));
+    //memset(c1,0,m*iceildiv(m,WBITS)*sizeof(unsigned long));
+
+    for (i = 0; i < m; ++i) {
+	c[i * iceildiv(m, WBITS) + i / WBITS] = (1UL << i % WBITS);
+	//c1[i*iceildiv(m,WBITS)+i/WBITS]=(1UL<<i%WBITS);
+    }
+    for (i = 0; i < m * SizeRowA; i++) {
+	b[i] = a[i];
+    }
+
+    Count = 0;
+    for (i = 0; i < m; ++i) {
+	t = i;
+	do {
+	    Pivotit = ((b[i * SizeRowA + t / WBITS] >> (t % WBITS)) & 1UL);
+	    k = 0;
+	    if (Pivotit == 0) {
+		for (k = i + 1; k < m; ++k) {
+		    Poskt =
+			((b[k * SizeRowA + t / WBITS] >> (t % WBITS)) & 1UL);
+		    if (Poskt == 1) {
+			SwapRowsBit(m, n, b, i, k);
+			SwapRowsBit(m, m, c, i, k);
+			break;
+		    }
+		}
+	    }
+	    if (k == m) {
+		t++;
+	    }
+	    //printf("toto %lu %lu\n",t,k);
+	} while (k == m);
+	if (t > n && teste == 0) {
+	    Lend[0] = i;
+	    teste = 1;
+	}
+	for (j = i + 1; j < m; ++j) {
+	    Posji = ((b[j * SizeRowA + i / WBITS] >> (i % WBITS)) & 1UL);
+	    if (Posji == 1) {
+		AddRowBit(m, n, b, 1, i, j);
+		AddRowBit(m, m, c, 1, i, j);
+	    }
+
+	}
+    }
+    k = 0;
+    for (i = 0; i < m - Lend[0]; i++) {
+
+	d[i] = i + Lend[0];
+    }
+    free(p);
+    free(Resnm);
+    return 0;
+}
+#endif
+
+
+
+
+
+
+unsigned long SelectLinesBit(unsigned long n, const unsigned long *a,
+			     unsigned long m, unsigned long *b)
+{
+    unsigned long SizeRowA, i, j;
+
+    SizeRowA = iceildiv(n, WBITS);
+
+    for (i = 0; i < m; ++i)
+	for (j = 0; j < SizeRowA; ++j)
+	    b[i * SizeRowA + j] = a[i * SizeRowA + j];
+    return 0;
+}
+
+unsigned long SelectLinesListBit(unsigned long n, const unsigned long *a,
+				 unsigned long *m, unsigned long Lengm,
+				 unsigned long *b)
+{
+    unsigned long SizeRowA, i, j;
+
+    SizeRowA = iceildiv(n, WBITS);
+
+    for (i = 0; i < Lengm; ++i) {
+	for (j = 0; j < SizeRowA; ++j)
+	    b[i * SizeRowA + j] = a[m[i] * SizeRowA + j];
+    }
+    return 0;
+}
+
+
+
+
+
+unsigned long AddRowBit(unsigned long m, unsigned long n, unsigned long *a,
+			unsigned long u, unsigned long i, unsigned long j)
+{
+    unsigned long p, SizeRowA;
+    SizeRowA = iceildiv(n, WBITS);
+
+    if (u != 0) {
+
+
+	for (p = 0; p < SizeRowA; ++p) {
+	    a[j * SizeRowA + p] ^= a[i * SizeRowA + p];
+	}
+    }
+    return 0;
+}
+
+
+
+unsigned long SwapRowsBit(unsigned long m, unsigned long n, unsigned long *a,
+			  unsigned long i, unsigned long j)
+{
+    unsigned long k, p, SizeRowA;
+
+    SizeRowA = iceildiv(n, WBITS);
+
+    for (p = 0; p < SizeRowA; ++p) {
+	k = a[i * SizeRowA + p];
+	a[i * SizeRowA + p] = a[j * SizeRowA + p];
+	a[j * SizeRowA + p] = k;
+    }
+    return 0;
+}
+
+
+
+
+
+unsigned long MultiplyRowBit(unsigned long m, unsigned long n,
+			     unsigned long *a, unsigned long u,
+			     unsigned long j)
+{
+    unsigned long p, SizeRowA;
+
+    SizeRowA = iceildiv(n, WBITS);
+
+    if (u == 0) {
+	for (p = 0; p < SizeRowA; ++p) {
+	    a[j * SizeRowA + p] = 0;
+	}
+    }
+    return 0;
+}
+
+
+
+void DMatrixSumBit(unsigned long m,
+		   unsigned long n,
+		   const unsigned long *A,
+		   const unsigned long *B, unsigned long *C)
+{
+    unsigned long i, SizeA;
+
+    SizeA = iceildiv(n, WBITS) * m;
+
+    for (i = 0; i < SizeA; i++) {
+	C[i] = A[i] ^ B[i];
+    }
+}
+
+
+
+
+
+
+void DMultBit(unsigned long m,
+	      unsigned long n,
+	      unsigned long p,
+	      const unsigned long *A,
+	      const unsigned long *B, unsigned long *C)
+{
+    unsigned long i, j, t;
+    unsigned long LrowA, LrowB;
+
+    LrowA = iceildiv(n, WBITS);
+    LrowB = iceildiv(p, WBITS);
+
+    const unsigned long *A1 = A;
+
+    for (i = 0; i < m; i++) {
+
+	unsigned long P;
+	unsigned int k, count;
+
+	for (t = 0; t < LrowB; t++) {
+
+	    const unsigned long *sptr = B;
+	    count = 0;
+	    C[i * LrowB + t] = 0;
+	    sptr += t;
+	    for (j = 0; j < n / WBITS; j++) {
+		P = A1[j];
+		for (k = 0; k < WBITS; k++) {
+
+		    if (P & 1UL)
+			C[i * LrowB + t] ^= *sptr;
+
+
+
+		    sptr += LrowB;
+		    P >>= 1UL;
+		}
+	    }
+
+	    if (n % WBITS) {
+		P = A1[j];
+		for (k = 0; k < n % WBITS; k++) {
+		    if (P & 1UL)
+			C[i * LrowB + t] ^= *sptr;
+
+
+
+		    sptr += LrowB;
+		    P >>= 1UL;
+		}
+	    }
+
+	}
+
+	A1 += LrowA;
+    }
+}
+
+
+
+
+
+
+void TVUBit_v2(unsigned long m,
+	       unsigned long n,
+	       const unsigned long *A, const unsigned long *B,
+	       unsigned long *C)
+{
+    unsigned long i, P, k;
+
+    memset(C, 0, WBITS * sizeof(unsigned long));
+
+    for (i = 0; i < m; i++) {
+
+	P = *A++;
+	for (k = 0; k < WBITS; k++) {
+
+	    //if (P & 1UL) C[k] ^= B[i];
+
+	    C[k] ^= (B[i] & -(P & 1UL));
+
+	    P >>= 1UL;
+	}
+
+    }
+
+
+}
+
+
+#if 1
+void VUBit_v2(unsigned long m,
+	      unsigned long n,
+	      const unsigned long *A, const unsigned long *B,
+	      unsigned long *C)
+{
+    unsigned long i, P, k;
+    memset(C, 0, m * sizeof(unsigned long));
+    for (i = 0; i < m; i++) {
+	P = *A++;
+	for (k = 0; k < n; k++) {
+	    C[i] ^= (B[k] & -(P & 1UL));
+	    P >>= 1UL;
+	}
+
+    }
+
+
+}
+#endif
+
+
+
+
+
+
+
+
+
+
+#if 1
+
+unsigned long VecMat(unsigned long a, const unsigned long *b)
+{
+#if 1
+    unsigned int i;
+    unsigned long c = 0;
+    for (i = 0; i < WBITS; i++) {
+	c ^= (b[i] & -(a & 1UL));
+	a >>= 1UL;
+    }
+    return c;
+#endif
+
+
+#if 0				// Uses not optimized __builtin function maybe with gcc 4.3 is beter
+
+    unsigned long j, i;
+    unsigned long c = 0;
+    for (i = 0; i < WBITS; i++) {
+	c ^= ((__builtin_parityl(a & b[i]) & 1UL) << i);
+    }
+    return c;
+
+#endif
+
+}
+
+
+
+#endif
+
+
+
+
+#if 0
+
+
+void VUBit(unsigned long m,
+	   unsigned long n,
+	   const unsigned long *A, const unsigned long *B, unsigned long *C)
+{
+
+#if 1
+
+    unsigned long i;
+    memset(C, 0, m * sizeof(unsigned long));
+    for (i = 0; i < m; i++) {
+	*C++ = VecMat(*A++, B);
+    }
+
+
+
+#endif
+
+
+#if 0
+    unsigned long i, P, *Tb;
+    memset(C, 0, m * sizeof(unsigned long));
+
+    Tb = Allocmn(n, n);
+    TransposeBit(n, n, B, Tb);
+
+    for (i = 0; i < m; i++) {
+	*C++ = VecMat(*A++, Tb);
+    }
+
+#endif
+}
+
+
+
+
+#endif
+
+
+
+
+
+#if 1
+
+void VUBit(unsigned long m,
+	   unsigned long n, uint64_t * a, uint64_t * b, uint64_t * w)
+{
+
+    mul_vec_mat(w, a, b, m);
+
+}
+
+#endif
+
+
+
+
+
+
+
+#if 0
+void VUBit(unsigned long m,
+	      unsigned long n,
+	      const unsigned long *A, const unsigned long *B,
+	      unsigned long *C)
+{
+    unsigned long i, P, k, j;
+    memset(C, 0, m * sizeof(unsigned long));
+    for (i = 0; i < m; i++) {
+	P = *A++;
+	j = C[i];
+	for (k = 0; k < n; k++) {
+	    j ^= (B[k] & -(P & 1UL));
+	    P >>= 1UL;
+	}
+	C[i] = j;
+    }
+}
+#endif
+
+
+
+
+
+
+
+
 
 void TVUBit(unsigned long m,
 	    unsigned long n, uint64_t * A, uint64_t * B, uint64_t * C)
@@ -761,64 +1342,27 @@ void TVUBit(unsigned long m,
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-/*
-
-Sparse Matrix x Dense Matrix = Dense Matrix
-
-*/
-
-
-
-
-
-/*
-void SMultDmatrixBitNew(unsigned long NrLines,unsigned long NrCols_b, unsigned long *a, unsigned long *b, unsigned long *c)
+void TransposeBit(unsigned long m, unsigned long n, const unsigned long *a,
+		  unsigned long *b)
 {
-	unsigned long k, j, i, s,count,BgLine,SizeRowsb,t;
-         
-       
-        SizeRowsb=iceildiv(NrCols_b,WBITS);
-        memset(c,0,NrLines*SizeRowsb*sizeof(unsigned long));
-        
-        BgLine=0;count=0;
-        i=0;
-        for (i=0;i<NrLines; ++i)
-	{k=a[BgLine];
-            s = 0;
-	      for (j = 1; j <= k; ++j)
-		{for (t = 0; t < SizeRowsb; ++t)
-			c[i*SizeRowsb+t]^=b[a[BgLine+j]*SizeRowsb+t];count++;
-		}
-              BgLine+=k+1;
-             
-          } 
+    unsigned long i, j, SizeColumnB;
+
+
+    SizeColumnB = iceildiv(m, WBITS);
+
+    unsigned long *C;
+    C = malloc(SizeColumnB * sizeof(unsigned long));
+
+    for (i = 0; i < n; ++i) {
+
+	SelectColumn(m, n, a, i, C);
+	for (j = 0; j < SizeColumnB; ++j) {
+	    b[i * SizeColumnB + j] = C[j];
+	}
+    }
+    free(C);
 }
 
-*/
-
-
-
-
-/*
-
-Select column k from dense matrix V
-
-*/
 
 
 
@@ -858,32 +1402,10 @@ void SelectColumn(unsigned long m,
 
 
 
-/*
-
-Transpose dense matrix
-
-*/
-
-void TransposeBit(unsigned long m, unsigned long n, const unsigned long *a,
-		  unsigned long *b)
-{
-    unsigned long i, j, SizeColumnB;
 
 
-    SizeColumnB = iceildiv(m, WBITS);
 
-    unsigned long *C;
-    C = malloc(SizeColumnB * sizeof(unsigned long));
 
-    for (i = 0; i < n; ++i) {
-
-	SelectColumn(m, n, a, i, C);
-	for (j = 0; j < SizeColumnB; ++j) {
-	    b[i * SizeColumnB + j] = C[j];
-	}
-    }
-    free(C);
-}
 
 /*
 
@@ -906,11 +1428,9 @@ void DSumBit(unsigned long m, unsigned long n, unsigned long *a,
 
 }
 
-/*
 
-Transpose sparse times sparse times dense block
 
-*/
+
 
 
 void TSSMultDmatrix(unsigned long m, unsigned long n, unsigned long p,
@@ -956,43 +1476,18 @@ void TSSMultDmatrix(unsigned long m, unsigned long n, unsigned long p,
 
 
 
-void SMultDmatrixBit(unsigned long m, unsigned long n, unsigned long p,
-		     unsigned long *a, unsigned long *b, unsigned long *c,
-		     unsigned long start, unsigned long size)
-{
-/*	unsigned long k, j, i, s,BgLine,SizeRowsb,t;
-	       
-        SizeRowsb=iceildiv(p,WBITS);
-        
-        memset(c,0,m*SizeRowsb*sizeof(unsigned long));
-        
-        BgLine=0;
-        i=0;
-        for (i=start;i<start+size; ++i)
-	{k=a[BgLine];
-            s = 0;
-	      for (j = 1; j <= k; ++j)
-		{for (t = 0; t < SizeRowsb; ++t)
-			c[i*SizeRowsb+t]^=b[a[BgLine+j]*SizeRowsb+t];
-		}
-              BgLine+=k+1;  
-         }
-       
- */
-    unsigned long k, i;
-
-    //assert(SizeRowsb == 1);
 
 
-    memset(c, 0, m * sizeof(unsigned long));
 
-    i = 0;
-    for (i = start; i < start + size; ++i) {
-	for (k = *a++; k--;) {
-	    c[i] ^= b[*a++];
-	}
-    }
-}
+
+
+
+
+
+
+
+
+
 
 
 void SMultDmatrixBitNew(unsigned long NrLines, unsigned long NrCols_b,
@@ -1034,140 +1529,6 @@ void SMultDmatrixBitNew(unsigned long NrLines, unsigned long NrCols_b,
 
 
 
-
-
-
-
-void TSMultDmatrixBit(unsigned long m, unsigned long n, unsigned long p,
-		      unsigned long *a, unsigned long *b, unsigned long *c,
-		      unsigned long start, unsigned long size)
-{
-    /*unsigned long k, j, i, s,BgLine,SizeRowsb,t;
-
-       SizeRowsb=iceildiv(p,WBITS);
-
-       memset(c,0,n*SizeRowsb*sizeof(unsigned long));
-
-
-       BgLine=0;
-       i=0;
-       for (i=start;i<start+size; ++i)
-       {k=a[BgLine];
-       s = 0;
-       for (j = 1; j <= k; ++j)
-       {for (t = 0; t < SizeRowsb; ++t)
-       c[a[BgLine+j]*SizeRowsb+t]^=b[i*SizeRowsb+t];
-       }
-       BgLine+=k+1;  
-       }
-     */
-
-    unsigned long k, i;
-    memset(c, 0, n * sizeof(unsigned long));
-
-    i = 0;
-    for (i = start; i < start + size; ++i) {
-	for (k = *a++; k--;) {
-	    c[*a++] ^= b[i];
-	}
-    }
-
-
-
-
-}
-
-
-
-
-
-/*
-
-Multiplication functions for "sparse matrix times vector" and "Transpose sparse matrix times sparse matrix times vector"
-
-*/
-
-void SMatrix_Vector(DenseMatrix Result, SparseMatrix M, DenseMatrix V)
-{
-    int nb_processes, p;
-
-    MPI_Comm_size(MPI_COMM_WORLD, &nb_processes);
-    MPI_Comm_rank(MPI_COMM_WORLD, &p);
-    MPI_Status status;
- 
-  // printf("p= %lu  %lu  %lu\n",p,V->Ncols,SizeBlock(nb_processes, p, M->Nrows));
-
-  
-    unsigned long j, i;
-
-    //MPI_Bcast( V->Data, M->Ncols, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
-    
-    
-
-if (p==0){
-    for (i=1; i<nb_processes; i++) {
-      MPI_Send(V->Data, M->Ncols , MPI_UNSIGNED_LONG,
-		 i, 12, MPI_COMM_WORLD);
-   
-       }
-    }
-    else
-    {
-    MPI_Recv(V->Data,M->Ncols,
-		     MPI_UNSIGNED_LONG,0, 12, MPI_COMM_WORLD, &status);
-    }
-
- 
-    unsigned long my_nrows = M->slices[p]->i1 - M->slices[p]->i0;
-
-    unsigned long *Prod_Dist;
-    Prod_Dist = Allocmn(M->Nrows, sizeof(unsigned long));
-
-//    SMultDmatrixBit(M->Nrows, M->Ncols, sizeof(unsigned long), M->Data, V->Data, Prod_Dist,
-//		    p * (M->Nrows / nb_processes), my_nrows);
-
-
-    
-
-    SMultDmatrixBit(M->Nrows, M->Ncols, sizeof(unsigned long), M->Data, V->Data, Prod_Dist,
-		    M->slices[p]->i0, my_nrows);
-    
-//    printf("p=%lu  %lu   %lu %lu\n",p,p * (M->Nrows / nb_processes),M->slices[p]->i0,my_nrows);
-
-    if (p != 0) {
-	MPI_Send(Prod_Dist, my_nrows, MPI_UNSIGNED_LONG,
-		 0, 123, MPI_COMM_WORLD);
-        
-    }
-
-
-   
-
-    //MPI_Barrier(MPI_COMM_WORLD);
-  //  printf("in sub p = %lu   m = %lu   n = %lu!!\n",p,M->Nrows,M->Ncols);
-
-    if (p == 0) {
-	for (i = 0; i < my_nrows; i++) {
-	    Result->Data[i] = Prod_Dist[i];
-	}
-
-	for (i = 1; i < nb_processes; i++) {
-
-	    MPI_Recv(Prod_Dist,
-                    M->slices[i]->i1 - M->slices[i]->i0,
-		     MPI_UNSIGNED_LONG, i, 123, MPI_COMM_WORLD, &status);
-
-	    for (j = M->slices[i]->i0 ; j < M->slices[i]->i1; j++) {
-		Result->Data[j] = Prod_Dist[j - M->slices[i]->i0];
-	    }
-	}
-    }
-    
-    
-    free(Prod_Dist);
-    Result->Nrows = M->Nrows;
-    Result->Ncols = V->Ncols;
-}
 
 
 
@@ -1255,6 +1616,17 @@ if (p!=0)
 
 
 
+
+
+
+
+
+
+
+
+
+
+
 #if 0
 
 void SMatrix_Vector(DenseMatrix Result, SparseMatrix M, DenseMatrix V)
@@ -1325,39 +1697,24 @@ void SMatrix_Vector(DenseMatrix Result, SparseMatrix M, DenseMatrix V)
 
 
 
-void STSMatrix_Vector(DenseMatrix Result, SparseMatrix M, DenseMatrix V)
-{
-    int size, p;
-    unsigned long *ResmN_Dist, *ATAR_Dist;
 
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-    MPI_Comm_rank(MPI_COMM_WORLD, &p);
-    MPI_Op newop;
-    MPI_Op_create((MPI_User_function *) MyXORfunction, 0, &newop);
 
-    /* XXX */
-    Result->Data = Allocmn(M->Ncols, V->Ncols);
-    ResmN_Dist = Allocmn(M->Nrows, V->Ncols);
-    ATAR_Dist = Allocmn(M->Ncols, V->Ncols);
 
-    MPI_Bcast(V->Data, V->Nrows, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
 
-    matrix_slice_ptr me = M->slices[p];
 
-    SMultDmatrixBit(M->Nrows, M->Ncols, V->Ncols, M->Data, V->Data, ResmN_Dist,
-            me->i0, me->i1 - me->i0);
-    TSMultDmatrixBit(me->i1 - me->i0, M->Ncols, V->Ncols, M->Data,
-		     ResmN_Dist, ATAR_Dist,
-                     me->i0, me->i1 - me->i0);
-    MPI_Reduce(ATAR_Dist, Result->Data, M->Ncols, MPI_UNSIGNED_LONG, newop, 0,
-	       MPI_COMM_WORLD);
 
-    free(ResmN_Dist);
-    free(ATAR_Dist);
 
-    Result->Nrows = M->Ncols;
-    Result->Ncols = V->Ncols;
-}
+
+
+
+
+
+
+
+
+
+
+
 
 
 /*
@@ -1393,7 +1750,7 @@ void    TSMultDmatrixBit(unsigned long m,unsigned long n,unsigned long p, unsign
 
 /*
 
-Sparse to Dense marix convertion
+Sparse to Dense matrix convertion
 
 */
 

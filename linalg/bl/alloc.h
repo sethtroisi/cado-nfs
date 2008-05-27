@@ -1,3 +1,13 @@
+#ifndef BL_ALLOC_H_
+#define BL_ALLOC_H_
+
+#include <stdint.h>
+#include "struct.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 
 extern unsigned long ***Alloc3Test(unsigned long ***a, unsigned long nrows,
 				   unsigned long ncolumns);
@@ -10,3 +20,14 @@ extern unsigned long **Alloc2(unsigned long nrows, unsigned long ncolumns);
 extern unsigned long **Allocmn3(unsigned long m, unsigned long n);
 extern unsigned long *Allocmn(unsigned long m, unsigned long n);
 extern void FreeAllocmn3(unsigned long **a);
+
+extern void FreeAllocmn3_new(DenseMatrix a[3]);
+
+
+
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif	/* BL_ALLOC_H_ */
