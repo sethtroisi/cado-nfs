@@ -121,10 +121,9 @@ else
     mkdir $outdir
 fi
 
-nb_merge_max=1000000
 keep=`expr 128 '+' $skip`
 argsa="-forbw $bwstrat -ratio $ratio"
-argsa="$argsa -prune $prune -merge $nb_merge_max -mat $purged -keep $keep"
+argsa="$argsa -prune $prune -mat $purged -keep $keep"
 argsa="$argsa -maxlevel $maxlevel -cwmax $cwmax -rwmax $rwmax $verbose"
 time $linalg/merge $argsa > $outdir/merge.his # 2> $outdir.merge.err
 echo "SIZE(merge.his): `ls -s $outdir/merge.his`"

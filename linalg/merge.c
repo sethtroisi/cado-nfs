@@ -2024,7 +2024,7 @@ merge_m(sparse_mat_t *mat, int m, int verbose)
 
 // TODO: use mergemax?
 int
-mergeGe2(sparse_mat_t *mat, int m, /*int nb_merge_max,*/ int verbose)
+mergeGe2(sparse_mat_t *mat, int m, int verbose)
 {
 #if USE_MERGE_FAST == 0
     int j, nbm;
@@ -2137,7 +2137,7 @@ deleteSuperfluousRows(sparse_mat_t *mat, int keep, int niremmax)
 }
 
 void
-merge(sparse_mat_t *mat, /*int nb_merge_max,*/ int maxlevel, int verbose, int forbw)
+merge(sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 {
     unsigned long bwcostmin = 0, oldcost = 0, cost;
     int old_nrows, old_ncols, m, mm, njrem = 0, ncost = 0, ncostmax;
@@ -2185,7 +2185,7 @@ merge(sparse_mat_t *mat, /*int nb_merge_max,*/ int maxlevel, int verbose, int fo
 	if(m == 1)
 	    njrem += removeSingletons(mat);
 	else
-            njrem += mergeGe2(mat, m, /*nb_merge_max,*/ verbose);
+            njrem += mergeGe2(mat, m, verbose);
 #if DEBUG >= 1
 	checkData(mat);
 #endif
@@ -2449,7 +2449,7 @@ main(int argc, char *argv[])
     FILE *purgedfile;
     sparse_mat_t mat;
     char *purgedname = NULL, *hisname = NULL;
-    int nb_merge_max = 0, nrows, ncols;
+    int nrows, ncols;
     int cwmax = 20, rwmax = 1000000, maxlevel = 2, iprune = 0, keep = 128;
     int verbose = 0; /* default verbose level */
     double tt;
@@ -2466,12 +2466,7 @@ main(int argc, char *argv[])
     fprintf (stderr, "\n");
     
     while(argc > 1 && argv[1][0] == '-'){
-	if(argc > 2 && strcmp (argv[1], "-merge") == 0){
-	    nb_merge_max = atoi(argv[2]);
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if (argc > 2 && strcmp (argv[1], "-mat") == 0){
+        if (argc > 2 && strcmp (argv[1], "-mat") == 0){
 	    purgedname = argv[2];
 	    argc -= 2;
 	    argv += 2;
@@ -2579,7 +2574,7 @@ main(int argc, char *argv[])
 #endif
 
 #if M_STRATEGY <= 2
-    merge(&mat, /*nb_merge_max,*/ maxlevel, verbose, forbw);
+    merge(&mat, maxlevel, verbose, forbw);
 #else
     mergeOneByOne(&mat, maxlevel, verbose, forbw, ratio);
 #endif
