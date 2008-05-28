@@ -63,7 +63,13 @@ static ulong mul_1_n (ulong *cp, const ulong *bp, long sb, ulong a);
 static ulong addmul_1_n (ulong *dp, const ulong *cp, const ulong* bp, long sb,ulong a);
 */
 
-static void mul2(ulong *c, const ulong *a, const ulong *b) MAYBE_UNUSED;
+#if (WORDSIZE == 64)
+#define INLINE_mul2	inline
+#else
+#define INLINE_mul2	/**/
+#endif
+
+static INLINE_mul2 void mul2(ulong *c, const ulong *a, const ulong *b) MAYBE_UNUSED;
 
 /* Declare prototypes that build directly on top of mul1 and mul2 */
 static void mul3 (ulong *c, const ulong *a, const ulong *b) MAYBE_UNUSED;
