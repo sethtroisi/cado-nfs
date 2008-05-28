@@ -9,8 +9,8 @@ struct matrix_slice_s {
     unsigned long i0;
     unsigned long i1;
     unsigned long nbcoeffs;
-    off_t start;
-    off_t end;
+    long start;
+    long end;
 };
 
 typedef struct matrix_slice_s matrix_slice[1];

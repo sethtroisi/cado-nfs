@@ -16,7 +16,7 @@
 
 using namespace std;
 
-void configure_threads(int n)
+void configure_threads(int n MAYBE_UNUSED)
 {
 #ifndef	ENABLE_PTHREADS
 	BUG_ON(n > 1);

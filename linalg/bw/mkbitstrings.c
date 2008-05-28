@@ -69,7 +69,8 @@ unsigned int write_hexstring(FILE * f, const unsigned long * ptr, unsigned int n
 int main(int argc, char * argv[])
 {
     FILE * f;
-    int i, j, k;
+    int i, j;
+    unsigned long k;
     unsigned long * x;
     unsigned int size = 0;
     unsigned int alloc = 0;
@@ -78,6 +79,10 @@ int main(int argc, char * argv[])
 
     /* read all data in memory */
     alloc = 1024; x = malloc(alloc * sizeof(unsigned long));
+    if (argc != 2) {
+        fprintf(stderr, "missing input file\n");
+        exit(1);
+    }
     f = fopen(argv[1], "r");
     BUG_ON(f == NULL);
     fprintf(stderr, "reading %s...", argv[1]); fflush(stderr);

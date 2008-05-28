@@ -3,9 +3,18 @@
 #include <sys/time.h>
 #include <errno.h>
 #include <pthread.h>
+#include <time.h>
 
 #include "timer.h"
 #include "barrier.h"
+
+#ifdef  __GNUC__
+#pragma GCC diagnostic ignored "-Wempty-body"
+/* It turns out that the newer pthread.h header from Fedora F9
+ * glibc-headers-2.8-3 has a wonderful ``do; while (0)'' statement for
+ * the definition of pthread_cleanup_pop
+ */
+#endif
 
 int barrier_init (barrier_t *barrier, int count, int *cstate)
 {
@@ -81,12 +90,13 @@ void barrier_cleanup_handler(void *b)
 int barrier_wait (barrier_t *barrier, double * pwait, int (*all_in)(int))
 {
 	struct timeval tv;
-	int result = 0, status, cancel, tmp, cycle;
+	int result = 0, cancel, tmp;
+        volatile int status;
+        unsigned int cycle;
 	int func_retcode=0; /* Avoid see gcc moaning because it might
 			       be used unintialized (no, it won't) */
-	struct timezone tz;	/* dummy */
 
-	if (pwait) gettimeofday(&tv,&tz);
+	if (pwait) gettimeofday(&tv,NULL);
 
 	if (barrier->valid != BARRIER_VALID)
 		return -EINVAL;
@@ -144,7 +154,7 @@ int barrier_wait (barrier_t *barrier, double * pwait, int (*all_in)(int))
 	/* See how long we have been waiting */
 	if (pwait) {
 		struct timeval now;
-		gettimeofday(&now,&tz);
+		gettimeofday(&now,NULL);
 		*pwait = (now.tv_sec - tv.tv_sec) +
 			(now.tv_usec - tv.tv_usec) / 1.0e6;
 	}

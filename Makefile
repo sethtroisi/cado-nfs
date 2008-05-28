@@ -2,25 +2,36 @@ CC ?= gcc
 
 .PHONY: clean all
 
--include Makefile.local
-SCONS?=scons
-GMP ?= /usr/local/
-GMPLIB ?= $(GMP)/lib
-GMPINCLUDE ?= $(GMP)/include/
+include Makefile.common
 
-SCONS+=CC=$(CC) GMP_LIBDIR=$(GMPLIB) GMP_INCDIR=$(GMPINCLUDE)
+export CC
+export CXX
+export SCONS
+export GMP_LIBDIR
+export GMP_INCDIR
 
-all: Makefile.local
+# Pass down these overrides to scons
+ifneq ($(CC),)
+SCONS_FLAGS+=CC=$(CC)
+endif
+ifneq ($(GMP_LIBDIR),)
+SCONS_FLAGS+=GMP_LIBDIR=$(GMP_LIBDIR)
+endif
+ifneq ($(GMP_INCDIR),)
+SCONS_FLAGS+=GMP_INCDIR=$(GMP_INCDIR)
+endif
+
+all:
 	$(MAKE) -C utils
 	$(MAKE) -C polyselect
-	(cd postsieve/tifa; $(SCONS))
+	(cd postsieve/tifa; $(SCONS) $(SCONS_FLAGS))
 	$(MAKE) -C sieve
 	$(MAKE) -C postsieve/checknorms
 	$(MAKE) -C linalg
 	$(MAKE) -C sqrt/naive
-	$(MAKE) -C gf2x GMP=$(GMP)
-	$(MAKE) -C gf2x/cantor GMP=$(GMP)
-	$(MAKE) -C linalg/bw GMP=$(GMP)
+	$(MAKE) -C gf2x
+	$(MAKE) -C gf2x/cantor
+	$(MAKE) -C linalg/bw
 	$(MAKE) -C linalg/bl	FAKE=1
 
 clean:
@@ -35,8 +46,4 @@ clean:
 	$(MAKE) -C gf2x/cantor		clean
 	$(MAKE) -C linalg/bw		clean
 	$(MAKE) -C linalg/bl		clean
-
-Makefile.local:
-	@echo "Makefile.local does not exist. Let's create an empty one."
-	touch Makefile.local
 

@@ -1,42 +1,31 @@
-include Makefile.local
+TOP:=..
+include $(TOP)/Makefile.common
 
-# Set default filenames/paths if not already set.
-GMP ?= /usr/local/
-GMPINCLUDE ?= $(GMP)/include/
-GMPLIB ?= -L$(GMP)/lib -lgmp
-OPTCFLAGS ?= -g -O2 -DNDEBUG -W -Wall
+# All parts of libutils.
+names:=	polyfile relation timing long_poly \
+	getprime mod_ul modul_poly gmp_aux \
+	fpoly
 
-CFLAGS=$(OPTCFLAGS) -std=c99 -I$(GMPINCLUDE) -DREV=\"`svnversion .`\"
-LDFLAGS=$(GMPLIB)
-
-names:=polyfile relation timing long_poly getprime mod_ul modul_poly gmp_aux \
-       fpoly
 src:=$(patsubst %,%.c,$(names))
 obj:=$(patsubst %,%.o,$(names))
 
 all: libutils.a cache cachesize check_rels
 
-%.o: %.c
-	$(CC) $(CFLAGS) -c $< -I..
+cache: cache.o timing.o
+	$(CC) $(MY_LFLAGS) $^ -o $@
 
-cache: cache.c timing.o
-	$(CC) $(CFLAGS) $< timing.c -I.. -o $@
+cachesize: cachesize.o
+	$(CC) $(MY_LFLAGS) $^ -o $@
 
-cachesize: cachesize.c
-	$(CC) $(CFLAGS) $< -o $@
+check_rels: check_rels.o
+	$(CC) $(MY_LFLAGS) $^ -o $@ -L. -lutils -lgmp
 
-check_rels: check_rels.o libutils.a
-	$(CC) $(CFLAGS) $^ -o $@ $(GMPLIB)
+check_rels: libutils.a
 
 libutils.a: $(obj)
 	ar r libutils.a $(obj)
 
-
-Makefile.local:
-	echo "Makefile.local does not exist. Making a link to parent dir's one."
-	ln -s ../Makefile.local .
-
 clean:
-	-rm -f *~ *.bak $(obj) libutils.a cache cachesize
+	-rm -f *~ *.bak *.o libutils.a cache cachesize
 
 

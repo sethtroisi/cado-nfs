@@ -1,9 +1,7 @@
 #ifndef BARRIER_H_
 #define BARRIER_H_
 
-#ifdef	__cplusplus
-extern "C" {
-#endif
+#include "manu.h"
 
 /* This is the interface to barrier synchronization waits.
  *
@@ -64,9 +62,16 @@ typedef pthread_mutex_t thread_lock_t;
     {PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER, \
     BARRIER_VALID, cnt, cnt, 0}
 #define	THREAD_LOCK_INITIALIZER	PTHREAD_MUTEX_INITIALIZER
+#ifdef	__cplusplus
+extern "C" {
+#endif
 static inline int thread_lock(thread_lock_t * x) { return pthread_mutex_lock(x); }
 static inline int thread_unlock(thread_lock_t * x) { return pthread_mutex_unlock(x); }
 static inline int thread_trylock(thread_lock_t * x) { return pthread_mutex_trylock(x); }
+#ifdef	__cplusplus
+}
+#endif
+
 
 #else	/* ENABLE_PTHREADS */
 
@@ -75,12 +80,22 @@ typedef void * barrier_t;
 typedef void * thread_lock_t;
 #define BARRIER_INITIALIZER(n)	NULL
 #define	THREAD_LOCK_INITIALIZER	NULL
-static inline int thread_lock(thread_lock_t * x) { return 0; }
-static inline int thread_unlock(thread_lock_t * x) { return 0; }
-static inline int thread_trylock(thread_lock_t * x) { return 0; }
+#ifdef	__cplusplus
+extern "C" {
+#endif
+static inline int thread_lock(thread_lock_t * x MAYBE_UNUSED) { return 0; }
+static inline int thread_unlock(thread_lock_t * x MAYBE_UNUSED) { return 0; }
+static inline int thread_trylock(thread_lock_t * x MAYBE_UNUSED) { return 0; }
+#ifdef	__cplusplus
+}
+#endif
+
 
 #endif	/* ENABLE_PTHREADS */
 
+#ifdef	__cplusplus
+extern "C" {
+#endif
 extern int barrier_init (barrier_t *, int, int *);
 extern int barrier_destroy (barrier_t *);
 extern int barrier_wait (barrier_t *, double *, int (*)(int));

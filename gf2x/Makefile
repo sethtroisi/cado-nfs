@@ -3,15 +3,42 @@
 # appropriate building tool, we'll simply avoid make -j for this one.
 .NOTPARALLEL:
 
-GMP?=/usr/local/
-GMPINC?=$(GMP)/include
-GMPLIB?=$(GMP)/lib
+# Default flags
+CFLAGS:=-O2 -DNDEBUG
 
-CFLAGS:=-g -O2 -DNDEBUG -W -Wall -std=c99 -I$(GMPINC)
+ALWAYS_CFLAGS:=-std=c99 -g -W -Wall
+ALWAYS_CXXFLAGS:=-g -W -Wall
+
+# Start with defaults that should never be overridden
+MY_CFLAGS=$(ALWAYS_CFLAGS)
+MY_CXXFLAGS=$(ALWAYS_CXXFLAGS)
+MY_LFLAGS=
+
+# Add the possibly overridden variables.
+MY_CFLAGS+=$(CFLAGS)
+MY_CXXFLAGS+=$(CXXFLAGS)
+MY_LFLAGS+=$(LDFLAGS)
+ifneq ($(GMP),)
+GMP_LIBDIR ?= $(GMP)/lib
+GMP_INCDIR ?= $(GMP)/include
+endif
+ifneq ($(GMP_LIBDIR),)
+GMP_LFLAGS ?= $(addprefix -L,$(GMP_LIBDIR))
+endif
+ifneq ($(GMP_INCDIR),)
+GMP_CFLAGS ?= $(addprefix -I,$(GMP_INCDIR))
+GMP_CXXFLAGS ?= $(addprefix -I,$(GMP_INCDIR))
+endif
+MY_CFLAGS+=$(GMP_CFLAGS)
+MY_CXXFLAGS+=$(GMP_CXXFLAGS)
+MY_LFLAGS+=$(GMP_LFLAGS)
+.c.o:
+	$(CC) $(MY_CFLAGS) $< -c -o $@
 
 ifeq ($(shell arch),i686)
 w:=32
-OFLAGS:=-msse2
+CFLAGS+=-msse2
+CXXFLAGS+=-msse2
 endif
 
 ifeq ($(shell arch),x86_64)
@@ -32,13 +59,13 @@ libgf2x.a: $(patsubst %.c,%.o,$(LIBGF2X_FILES))
 	ar qcv $@ $^
 
 gen_bb_mul_code:	gen_bb_mul_code.c
-	$(CC) $(CFLAGS) $< -o $@
+	$(CC) $(MY_CFLAGS) $< -o $@
 
 mul-inlines-k%.c:	gen_bb_mul_code
 	@./gen_bb_mul_code $(w) $* > $@
 
 tuneup-k%: mul-inlines-k%.c mul-small.c
-	@$(CC) $(CFLAGS) \
+	@$(CC) $(MY_CFLAGS) \
 		-DTUNE_MUL1 -DWORDSIZE=$(w)				\
 		-DINLINES_FILE=\"mul-inlines-k$*.c\"			\
 		-Wno-unused						\
@@ -61,19 +88,21 @@ tune1:	mul-inlines.c
 
 TUNETOOM_FILES:=$(LIBGF2X_FILES) tunetoom.c timing.c replace.c
 tunetoom: $(patsubst %.c,%.o,$(TUNETOOM_FILES))
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(MY_CFLAGS) -o $@ $^
 TUNEFFT_FILES:=$(LIBGF2X_FILES) tunefft.c timing.c mulfft-bit.c replace.c
 tunefft: $(patsubst %.c,%.o,$(TUNEFFT_FILES))
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(MY_CFLAGS) -o $@ $^
 TEST_FILES:=$(LIBGF2X_FILES) test.c timing.c
 test: $(patsubst %.c,%.o,$(TEST_FILES))
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(MY_CFLAGS) -o $@ $^
 
 factor.o: factor.c
-	g++ -g -o $@ -c $<
+	$(CXX) $(MY_CXXFLAGS) -o $@ -c $^
 
-factor: factor.o libgf2x.a
-	g++ -g factor.o -L. -L$(GMPLIB) -lntl -lgmp -lgf2x -o $@
+factor: factor.o
+	$(CXX) $(MY_LFLAGS) -o $@ -lntl -lgmp -lgf2x
+
+factor: libgf2x.a
 
 tune-all:
 	$(MAKE) tune1

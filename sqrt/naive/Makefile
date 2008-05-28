@@ -1,33 +1,23 @@
-include Makefile.local
+TOP:=../..
+include $(TOP)/Makefile.common
 
-# Set default filenames/paths if not already set.
-GMP ?= /usr/local/
-GMPLIB ?= $(GMP)/lib/libgmp.a
-GMPINCLUDE ?= $(GMP)/include/
-
-OPTCFLAGS ?= -O2 -DNDEBUG -g -W -Wall
-
-CFLAGS=$(OPTCFLAGS) -I $(GMPINCLUDE) -DREV=\"`svnversion .`\"
-
-LDFLAGS=../../utils/libutils.a $(GMPLIB)
+# We require the cado utils library
+MY_LFLAGS+=-L$(TOP)/utils
+MY_CFLAGS+=-I$(TOP)/utils
 
 all: algsqrt
 
-Makefile.local:
-	@echo "Makefile.local does not exist. Making a link to parent dir's one."
-	ln -s ../../Makefile.local .
-
-.c.o:
-	gcc $(CFLAGS) -I../.. -o $@ -c $<
-
 algsqrt: algsqrt.o poly.o
-	gcc -o $@ $^ $(LDFLAGS) 
+	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lgmp
 
-#fmalgsqrt: fmalgsqrt.o poly.o
-#	gcc -o $@ $^ $(LDFLAGS)
-#
+fmalgsqrt: fmalgsqrt.o poly.o
+	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lgmp
+
 ratsqrt: ratsqrt.o
-	gcc -o $@ $^ $(LDFLAGS)
+	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lgmp
+
+# Add some dependencies
+algsqrt fmalgsqrt ratsqrt: $(TOP)/utils/libutils.a
 
 clean:
 	-rm -f poly algsqrt ratsqrt fmalgsqrt *.o *~

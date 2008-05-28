@@ -1,3 +1,4 @@
+#define _BSD_SOURCE     /* strdup */
 #include <stddef.h>     /* ptrdiff_t */
 #include <stdio.h>
 #include <unistd.h>
@@ -9,7 +10,7 @@
 #include <assert.h>
 #include <limits.h>
 
-int nslices = 1;
+unsigned int nslices = 1;
 
 void usage()
 {
@@ -29,7 +30,7 @@ struct row {
 };
 
 struct row * row_table;
-off_t * offsets;
+long * offsets;
 int * dispatch;
 uint32_t nr;
 
@@ -47,11 +48,11 @@ int read_matrix(const char * filename)
     }
 
     char * ptr;
-    int siz;
-    off_t o;
+    unsigned int siz;
+    long o;
 
 #define READ_LINE() do {						\
-        o = ftello(f);                                                  \
+        o = ftell(f);                                                  \
         ptr = fgets(buf, sizeof(buf), f);				\
         if (ptr == NULL) {						\
             fprintf(stderr, "Unexpected %s at position %ld in %s\n",    \
@@ -66,7 +67,7 @@ int read_matrix(const char * filename)
         ptr = fgets(buf, sizeof(buf), f);				\
         if (ptr == NULL) {						\
             fprintf(stderr, "Unexpected %s at position %ld in %s\n",    \
-                    feof(f) ? "EOF" : "error", ftello(f), filename);    \
+                    feof(f) ? "EOF" : "error", ftell(f), filename);    \
             exit(1);							\
         }								\
         siz = strlen(ptr);						\
@@ -108,11 +109,11 @@ int read_matrix(const char * filename)
 
     row_table = malloc(nc * sizeof(struct row));
     if (row_table == NULL) abort();
-    offsets = malloc((nc+1) * sizeof(off_t));
+    offsets = malloc((nc+1) * sizeof(long));
     if (offsets == NULL) abort();
 
     fprintf(stderr, "Row table: %"PRIu32" entries, %lu MB\n",
-            nc, (nc * (sizeof(off_t) + sizeof(struct row))) >> 20);
+            nc, (nc * (sizeof(long) + sizeof(struct row))) >> 20);
     fprintf(stderr, "Reading row table...");
     fflush(stderr);
 
@@ -134,7 +135,7 @@ int read_matrix(const char * filename)
         row_table[i].w = 0;
         offsets[i] = o;
     }
-    offsets[nc] = ftello(f);
+    offsets[nc] = ftell(f);
 
     fprintf(stderr, "done\n");
     fflush(stderr);
@@ -283,7 +284,7 @@ void do_sorting()
     fflush(stderr);
 
     slices = malloc(nslices * sizeof(struct row *));
-    int i;
+    unsigned int i;
 
     uint32_t slice_min_size = nr / nslices;
 
@@ -333,7 +334,7 @@ void do_sorting()
 
     dispatch = malloc(nr * sizeof(int));
     for(i = 0 ; i < nslices ; i++) {
-        int k;
+        unsigned int k;
         for(k = 0 ; k < slice_sizes[i] ; k++) {
             dispatch[slices[i][k].i]=i;
         }
@@ -352,7 +353,7 @@ void do_sorting()
 void shipout(const char * filename)
 {
     uint32_t i;
-    int j;
+    unsigned int j;
     char ** chunks;
     FILE ** g;
     FILE * f;
@@ -388,11 +389,11 @@ void shipout(const char * filename)
             exit(1);
         }
     }
-    fseeko(f, offsets[0], SEEK_SET);
+    fseek(f, offsets[0], SEEK_SET);
     for(i = 0 ; i < nr ; i++) {
-        assert(ftello(f) == offsets[i]);
+        assert(ftell(f) == offsets[i]);
         j = dispatch[i];
-        off_t sz = offsets[i+1]-offsets[i];
+        long sz = offsets[i+1]-offsets[i];
         ENSURE(sz);
         if (sz == 0) {
             /* special provision for writing zero rows */

@@ -269,7 +269,7 @@ struct polmat { /* {{{ */
         _deg = NULL;
     }
     private:
-    polmat(polmat const& a) { }
+    polmat(polmat const& a MAYBE_UNUSED) { }
     polmat& operator=(polmat const&){ return *this;}
     public:
     ~polmat() {

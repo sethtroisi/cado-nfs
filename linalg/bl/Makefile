@@ -1,94 +1,78 @@
-# Default flags ; can be overriden by methods specified in main.mkf,
-# like:
-#
-# STATIC=yes --> adds -static
-# GMP=<path> --> uses GMP as in path
-# MPFR=<path> --> uses MPFR as in path
 
-TOPPATH:=.
-
+# For a static build, say LDFLAGS=-static
 CC:=mpicc
-CXX:=mpicc    #g++
-ARQCV:=ar qcv
-OFLAGS:=
-PFLAGS:=
-IFLAGS:=
-LFLAGS:=
+CXX:=mpic++
+
+TOP:=../..
+include $(TOP)/Makefile.common
+
+# We require the cado utils library
+MY_LFLAGS+=-L$(TOP)/utils
+MY_CFLAGS+=-I$(TOP)/utils
 
 ifneq ($(FAKE),)
-IFLAGS+=-DFAKEMPI
-CC:=gcc
-CXX:=g++
+CFLAGS+=-DFAKEMPI
 endif
 
-include $(TOPPATH)/util/main.mki
+binaries:=GenerateDataFiles GetDataFiles MainLanczos TestMult
+all: $(binaries)
 
-######################################################################
+#Test: Test.o basic.o echelon.o mat_ops.o random.o alloc.o ReadWrite.o
+#	$(CC) $(MY_LFLAGS) -o $@ $^
+#Test2: test2.o basic.o echelon.o mat_ops.o random.o alloc.o ReadWrite.o
+#	$(CC) $(MY_LFLAGS) -o $@ $^
+#Test4: test4.o 
+#	$(CC) $(MY_LFLAGS) -o $@ $^
+#LanczosTest: LanczosTest.o basic.o echelon.o mat_ops.o random.o alloc.o ReadWrite.o
+#	$(CC) $(MY_LFLAGS) -o $@ $^
+#Lanczos2Core: Lanczos2Core.o basic.o echelon.o mat_ops.o random.o alloc.o ReadWrite.o timing.o
+#	$(CC) $(MY_LFLAGS) -o $@ $^
+#Lanczos: Lanczos.o basic.o echelon.o mat_ops.o random.o alloc.o ReadWrite.o
+#	$(CC) $(MY_LFLAGS) -o $@ $^
+#LanczosMPI: LanczosMPI.o basic.o echelon.o mat_ops.o random.o alloc.o ReadWrite.o timing.o
+#	$(CC) $(MY_LFLAGS) -o $@ $^
+#LanczosMPIOpt: LanczosMPIOpt.o basic.o echelon.o mat_ops.o random.o alloc.o ReadWrite.o timing.o
+#	$(CC) $(MY_LFLAGS) -o $@ $^
+#LanczosMPIOptComplete: LanczosMPIOptComplete.o basic.o echelon.o mat_ops.o random.o alloc.o ReadWrite.o timing.o
+#	$(CC) $(MY_LFLAGS) -o $@ $^
+GenerateDataFiles: GenerateDataFiles.o basic.o echelon.o mat_ops.o random.o alloc.o ReadWrite.o
+	$(CC) $(MY_LFLAGS) -o $@ $^
+GetDataFiles: GetDataFiles.o basic.o echelon.o mat_ops.o random.o alloc.o ReadWrite.o
+	$(CC) $(MY_LFLAGS) -o $@ $^
+MainLanczos: MainLanczos.o ProcLanczos.o basic.o echelon.o mat_ops.o random.o alloc.o ReadWrite.o timing.o
+	$(CC) $(MY_LFLAGS) -o $@ $^
+TestMult: TestMult.o ProcLanczos.o basic.o echelon.o mat_ops.o random.o alloc.o ReadWrite.o timing.o
+	$(CC) $(MY_LFLAGS) -o $@ $^
 
+alloc.o: alloc.c alloc.h 
+basic.o: basic.c alloc.h random.h mat_ops.h struct.h \
+  echelon.h basic.h
+echelon.o: echelon.c alloc.h mat_ops.h struct.h \
+  echelon.h
+GenerateDataFiles.o: GenerateDataFiles.c \
+  basic.h random.h alloc.h mat_ops.h struct.h echelon.h ReadWrite.h
+GetDataFiles.o: GetDataFiles.c basic.h random.h \
+  alloc.h mat_ops.h struct.h echelon.h ReadWrite.h
+MainLanczos.o: MainLanczos.c mpi_select.h \
+  basic.h random.h alloc.h mat_ops.h \
+  struct.h echelon.h ReadWrite.h timing.h ProcLanczos.h
+mat_ops.o: mat_ops.c mpi_select.h \
+   mat_ops.h struct.h alloc.h \
+  ReadWrite.h timing.h
+ProcLanczos.o: ProcLanczos.c mpi_select.h \
+   basic.h random.h alloc.h mat_ops.h \
+  struct.h echelon.h ReadWrite.h timing.h
+random.o: random.c random.h alloc.h 
+ReadWrite.o: ReadWrite.c mpi_select.h \
+   struct.h ReadWrite.h mat_ops.h
+struct.o: struct.c
+TestMultBit.o: TestMultBit.c mpi_select.h fakempi.h \
+  basic.h random.h alloc.h mat_ops.h struct.h echelon.h ReadWrite.h \
+  timing.h ProcLanczos.h
+TestMult.o: TestMult.c mpi_select.h \
+   basic.h random.h alloc.h mat_ops.h \
+  struct.h echelon.h ReadWrite.h timing.h ProcLanczos.h
+timing.o: timing.c timing.h
 
-#TEST_SOURCES:=Test.c basic.c echelon.c mat_ops.c random.c alloc.c ReadWrite.c
-#TEST_LIBS:=
-#-include .Test.mkf
-
-#TEST2_SOURCES:=test2.c basic.c echelon.c mat_ops.c random.c alloc.c ReadWrite.c
-#TEST2_LIBS:=
-#-include .test2.mkf
-
-#TEST4_SOURCES:=test4.c 
-#TEST4_LIBS:=
-#-include .test4.mkf
-
-#LANCZOSTEST_SOURCES:=LanczosTest.c basic.c echelon.c mat_ops.c random.c alloc.c ReadWrite.c
-#LANCZOSTEST_LIBS:=
-#-include .LanczosTest.mkf
-
-
-#LANCZOS2CORE_SOURCES:=Lanczos2Core.c basic.c echelon.c mat_ops.c random.c alloc.c ReadWrite.c timing.c
-#LANCZOS2CORE_LIBS:=
-#-include .Lanczos2Core.mkf
-
-
-#LANCZOS_SOURCES:=Lanczos.c basic.c echelon.c mat_ops.c random.c alloc.c ReadWrite.c
-#LANCZOS_LIBS:=
-#-include .Lanczos.mkf
-
-
-GENERATEDATAFILES_SOURCES:=GenerateDataFiles.c basic.c echelon.c mat_ops.c random.c alloc.c ReadWrite.c
-GENERATEDATAFILES_LIBS:=
--include .GenerateDataFiles.mkf
-
-
-GETDATAFILES_SOURCES:=GetDataFiles.c basic.c echelon.c mat_ops.c random.c alloc.c ReadWrite.c
-GETDATAFILES_LIBS:=
--include .GetDataFiles.mkf
-
-#LANCZOSMPI_SOURCES:=LanczosMPI.c basic.c echelon.c mat_ops.c random.c alloc.c ReadWrite.c timing.c
-#LANCZOSMPI_LIBS:=
-#-include .LanczosMPI.mkf
-
-
-#LANCZOSMPIOPT_SOURCES:=LanczosMPIOpt.c basic.c echelon.c mat_ops.c random.c alloc.c ReadWrite.c timing.c
-#LANCZOSMPIOPT_LIBS:=
-#-include .LanczosMPIOpt.mkf
-
-#LANCZOSMPIOPTCOMPLETE_SOURCES:=LanczosMPIOptComplete.c basic.c echelon.c mat_ops.c random.c alloc.c ReadWrite.c timing.c
-#LANCZOSMPIOPTCOMPLETE_LIBS:=
-#-include .LanczosMPIOptComplete.mkf
-
-MAINLANCZOS_SOURCES:=MainLanczos.c ProcLanczos.c basic.c echelon.c mat_ops.c random.c alloc.c ReadWrite.c timing.c
-LANCZOSMPIOPTCOMPLETE_LIBS:=
--include .MainLanczos.mkf
-
-TESTMULT_SOURCES:=TestMult.c ProcLanczos.c basic.c echelon.c mat_ops.c random.c alloc.c ReadWrite.c timing.c
-LANCZOSMPIOPTCOMPLETE_LIBS:=
--include .TestMult.mkf
-
-######################################################################
-
-ifneq ($(ALLDEPS),)
--include $(ALLDEPS)
-endif
-
-late_all: $(BIN_TARGETS) $(LIB_TARGETS)
-
-dep: $(ALLDEPS)
+clean:
+	-rm -f $(binaries) *.o *~ *.bak

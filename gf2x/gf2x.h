@@ -57,28 +57,28 @@ extern "C" {
 #endif
 
 /* Declare prototypes for basic routines */
-static inline void mul1 (ulong *c, ulong a, ulong b);
+static inline void mul1 (ulong *c, ulong a, ulong b) MAYBE_UNUSED;
 /*
 static ulong mul_1_n (ulong *cp, const ulong *bp, long sb, ulong a);
 static ulong addmul_1_n (ulong *dp, const ulong *cp, const ulong* bp, long sb,ulong a);
 */
 
-static void mul2(ulong *c, const ulong *a, const ulong *b);
+static void mul2(ulong *c, const ulong *a, const ulong *b) MAYBE_UNUSED;
 
 /* Declare prototypes that build directly on top of mul1 and mul2 */
-static void mul3 (ulong *c, const ulong *a, const ulong *b);
-static void mul4 (ulong *c, const ulong *a, const ulong *b);
-static void mul5 (ulong *c, const ulong *a, const ulong *b);
-static void mul6 (ulong *c, const ulong *a, const ulong *b);
-static void mul7 (ulong *c, const ulong *a, const ulong *b);
-static void mul8 (ulong *c, const ulong *a, const ulong *b);
-static void mul9 (ulong *c, const ulong *a, const ulong *b);
+static void mul3 (ulong *c, const ulong *a, const ulong *b) MAYBE_UNUSED;
+static void mul4 (ulong *c, const ulong *a, const ulong *b) MAYBE_UNUSED;
+static void mul5 (ulong *c, const ulong *a, const ulong *b) MAYBE_UNUSED;
+static void mul6 (ulong *c, const ulong *a, const ulong *b) MAYBE_UNUSED;
+static void mul7 (ulong *c, const ulong *a, const ulong *b) MAYBE_UNUSED;
+static void mul8 (ulong *c, const ulong *a, const ulong *b) MAYBE_UNUSED;
+static void mul9 (ulong *c, const ulong *a, const ulong *b) MAYBE_UNUSED;
 
 static void mul_basecase(ulong * c, const ulong * a,
-			 long na, const ulong * b, long nb);
+			 long na, const ulong * b, long nb) MAYBE_UNUSED;
 
 
-inline void mul_toom(unsigned long *c, const unsigned long *a,
+void mul_toom(unsigned long *c, const unsigned long *a,
 			const unsigned long *b, long n, unsigned long *stk);
 void mul_kara(ulong *c, const ulong *a, const ulong *b,
 			long n, ulong *stk);

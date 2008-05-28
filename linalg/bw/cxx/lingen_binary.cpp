@@ -1537,7 +1537,7 @@ void timing_info()
 }
 
 
-void recycle_old_pi(polmat& pi)
+void recycle_old_pi(polmat& pi MAYBE_UNUSED)
 {
 #if 0/*{{{*/
     if (pi_left!=NULL && !(!check_input && ec->degree<new_t-t_counter)) {

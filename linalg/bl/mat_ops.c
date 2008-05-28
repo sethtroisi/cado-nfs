@@ -21,6 +21,8 @@
 #include <string.h>
 #include <time.h>
 
+#include "sse2.h"       /* from ../../utils, just because gcc 4.3.0 annoys us */
+
 #define	WBITS	(CHAR_BIT * sizeof(unsigned long))
 #define	iceildiv(x,y)	(((x)+(y)-1)/(y))
 
@@ -30,7 +32,7 @@
 static void MyXORfunction(unsigned long *invec, unsigned long *inoutvec,
 			  int *len, MPI_Datatype * dtype)
 {
-    unsigned long i;
+    int i;
     for (i = 0; i < *len; ++i) {
 	inoutvec[i] ^= invec[i];
     }
@@ -361,7 +363,6 @@ void mul_vec_mat(unsigned long *C,
 
 	sse2_t one = { 1, 1, };
 #if 1
-#define SHR(x,r) (sse2_t)__builtin_ia32_psrlqi128   ((x),(r))
 	for (i = 0; i < 64; i++) {
 	    sse2_t bw = { B[i], B[i], };
 

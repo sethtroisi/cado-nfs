@@ -14,6 +14,10 @@ typedef int MPI_User_function;
 
 #define MPI_COMM_WORLD	0
 
+#ifdef  __GNUC__
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#endif
+
 static inline int MPI_Comm_rank(int s, int  * p) { *p=0; return 0;}
 static inline int MPI_Comm_size(int s, int  * p) { *p=1; return 0;}
 static inline int MPI_Initialized(int  * p) { *p=1; return 0; }

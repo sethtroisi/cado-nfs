@@ -480,7 +480,7 @@ void ReadSMatrixSlice(SparseMatrix M, char *filename)
         exit(1);
     }
 
-    if (fseeko(f, s->start, SEEK_SET) < 0) {
+    if (fseek(f, s->start, SEEK_SET) < 0) {
         fprintf(stderr, "fseek(%s,%ld): %s\n",
                 filename, s->start, strerror(errno));
     }
@@ -507,7 +507,7 @@ void ReadSMatrixSlice(SparseMatrix M, char *filename)
 /* imported from bw/cxx/balance.c ; this reads a table of row weights. */
 struct row {
     int         w;
-    off_t       o;
+    long       o;
 };
 
 static struct row * read_matrix(unsigned long * p_nr, const char * filename)
@@ -522,10 +522,10 @@ static struct row * read_matrix(unsigned long * p_nr, const char * filename)
 
     char * ptr;
     int siz;
-    off_t o;
+    long o;
 
 #define READ_LINE() do {						\
-        o = ftello(f);                                                  \
+        o = ftell(f);                                                  \
         ptr = fgets(buf, sizeof(buf), f);				\
         if (ptr == NULL) {						\
             fprintf(stderr, "Unexpected %s at position %ld in %s\n",    \
@@ -540,7 +540,7 @@ static struct row * read_matrix(unsigned long * p_nr, const char * filename)
         ptr = fgets(buf, sizeof(buf), f);				\
         if (ptr == NULL) {						\
             fprintf(stderr, "Unexpected %s at position %ld in %s\n",    \
-                    feof(f) ? "EOF" : "error", ftello(f), filename);    \
+                    feof(f) ? "EOF" : "error", ftell(f), filename);    \
             exit(1);							\
         }								\
         siz = strlen(ptr);						\
@@ -577,7 +577,7 @@ static struct row * read_matrix(unsigned long * p_nr, const char * filename)
         row_table[i].o = o;
         GOBBLE_LONG_LINE();
     }
-    row_table[nr].o = ftello(f);
+    row_table[nr].o = ftell(f);
 
     fprintf(stderr, "done\n");
     fflush(stderr);

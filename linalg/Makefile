@@ -1,78 +1,60 @@
-include Makefile.local
+TOP:=..
+include $(TOP)/Makefile.common
 
-# Set default filenames/paths if not already set.
-GMP ?= /usr/local/
-GMPLIB ?= $(GMP)/lib/libgmp.a
-GMPINCLUDE ?= $(GMP)/include/
-OPTCFLAGS ?= -g -W -Wall -O2 -DNDEBUG
-
-SVNVER:=$(shell svnversion .)
-CFLAGS=$(OPTCFLAGS) -DREV=\"$(SVNVER)\"
-
-LDFLAGS=../utils/libutils.a $(GMPLIB) -lm# -lefence
-INC=-I $(GMPINCLUDE) -I.. -I../utils
+# We require the cado utils library
+MY_LFLAGS+=-L$(TOP)/utils
+MY_CFLAGS+=-I$(TOP)/utils
 
 binaries:=allsqrt replay merge purge freerel linalg characters duplicates \
 	  transpose checkdep
-
 all:	$(binaries)
 
-Makefile.local:
-	@echo "Makefile.local does not exist. Making a link to parent dir's one."
-	ln -s ../Makefile.local
+procrels: procrels.o
+	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils
+hashpair: hashpair.o
+	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils
 
-procrels: procrels.c ../utils/libutils.a
-	gcc $(CFLAGS) $(INC) $< $(LDFLAGS) -o $@
+hashpair.o: hashpair.h
+prune.o: prune.h
 
-hashpair: hashpair.c hashpair.h
-	gcc $(CFLAGS) $(INC) $< $(LDFLAGS) -o $@
-
-prune.o: prune.c prune.h
-	gcc -c $(CFLAGS) $(INC) $< -o $@
-
-freerel: freerel.c ../utils/libutils.a ../sieve/fb.o hashpair.o
-	gcc $(CFLAGS) $(INC) $< ../sieve/fb.o hashpair.o $(LDFLAGS) -o $@
-
-duplicates: duplicates.c ../utils/libutils.a hashpair.o files.o
-	gcc $(CFLAGS) $(INC) $< hashpair.o files.o $(LDFLAGS) -o $@
-
-purge: purge.c ../utils/libutils.a hashpair.o files.o
-	gcc $(CFLAGS) $(INC) $< hashpair.o files.o $(LDFLAGS) -o $@
-
-merge: merge.c merge.h ../utils/libutils.a sparse.o prune.o
-	gcc $(CFLAGS) $(INC) $< sparse.o prune.o $(LDFLAGS) -o $@
-
-replay: replay.c ../utils/libutils.a sparse.o
-	gcc $(CFLAGS) $(INC) $< sparse.o $(LDFLAGS) -o $@
-
-checkdep: checkdep.c
-	gcc $(CFLAGS) $(INC) $< -o $@
-
+freerel: freerel.o ../sieve/fb.o hashpair.o
+	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lgmp -lm
+duplicates: duplicates.o hashpair.o files.o
+	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils
+purge: purge.o hashpair.o files.o
+	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lgmp -lm
+merge: merge.o sparse.o prune.o
+	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lm
+replay: replay.o sparse.o
+	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils
+checkdep: checkdep.o
+	$(CC) $(MY_LFLAGS) -o $@ $^
 linalg: linalg.o gauss.o readmat.o
-	gcc $(CFLAGS) $^ $(LDFLAGS) -o $@
+	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils
 
-gauss.o: gauss.c gauss.h
-	gcc -c $(CFLAGS) -DMULTI_ROW=3 -DNO_MAIN $(INC) $< -o $@
+merge.o: merge.h
 
-.c.o: merge.h sparse.h readmat.h ../utils/utils.h
-	gcc -c $(CFLAGS) $(INC) $< -o $@
+gauss.o: gauss.c
+	$(CC) $(MY_CFLAGS) -DMULTI_ROW=3 -DNO_MAIN $< -c -o $@
+gauss.o: gauss.h
 
 transpose: transpose.o readmat.o
-	gcc $(CFLAGS) $(INC) $^ $(LDFLAGS) -o $@
+	$(CC) $(MY_LFLAGS) -o $@ $^
 
-characters: characters.c files.o gauss.o
-	gcc $(CFLAGS) $(INC) $< files.o gauss.o $(LDFLAGS) -o $@
+characters: characters.o files.o gauss.o
+	$(CC) $(MY_LFLAGS) -o $@ $^ -lgmp
 
-allsqrt: allsqrt.c files.o hashpair.o
-	gcc $(CFLAGS) $(INC) $< files.o hashpair.o $(LDFLAGS) -o $@
+allsqrt: allsqrt.o files.o hashpair.o
+	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lgmp
 
 matsort: matsort.o gauss.o readmat.o
-	gcc $(CFLAGS) $^ $(LDFLAGS) -o $@
+	$(CC) $(MY_LFLAGS) -o $@ $^
 
 matprune: matprune.c
-	gcc $(CFLAGS) $(INC) $< $(LDFLAGS) -o $@
+	$(CC) $(MY_LFLAGS) -o $@ $^
 
 
+$(binaries): $(TOP)/utils/libutils.a
 
 clean:
 	-rm -f $(binaries) *.o *~ *.bak

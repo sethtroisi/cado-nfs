@@ -28,7 +28,7 @@ double oncpu_ticks()
 	return now.ru_utime.tv_sec + now.ru_utime.tv_usec / 1.0e6;
 }
 
-double thread_ticks(int nt)
+double thread_ticks(int nt MAYBE_UNUSED)
 {
 #ifdef	__linux__
 	std::ostringstream s;

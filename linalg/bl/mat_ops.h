@@ -110,8 +110,6 @@ extern void VUBit_v2(unsigned long m, unsigned long n, const unsigned long *A,
 extern void TVUBit(unsigned long m, unsigned long n, unsigned long *A,
 		   unsigned long *B, unsigned long *C);
 
-extern inline void addmul(unsigned long a, unsigned long b, unsigned long *w);
-
 extern unsigned long Pivot(unsigned long m, unsigned long n, unsigned long *a,
 			   unsigned long Row, unsigned long Col);
 
