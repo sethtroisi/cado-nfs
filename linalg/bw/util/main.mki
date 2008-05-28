@@ -22,7 +22,7 @@ endif
 CFLAGS:=-O2 -DNDEBUG
 CXXFLAGS:=$(CFLAGS)
 ALWAYS_CFLAGS:=-std=c99 -g -W -Wall
-ALWAYS_CXXFLAGS:=-g -W -Wall -Wno-empty-body
+ALWAYS_CXXFLAGS:=-g -W -Wall
 
 # Start with defaults that should never be overridden
 # These flags have late expansion, on purpose.
@@ -49,7 +49,7 @@ GMP_INCDIR ?= $(GMP)/include
 endif
 ifneq ($(GMP_LIBDIR),)
 GMP_LFLAGS ?= $(addprefix -L,$(GMP_LIBDIR))	\
-	      $(addprefix -Xlinker rpath -Xlinker,$(GMP_LIBDIR))
+	      $(addprefix -Xlinker -rpath -Xlinker ,$(GMP_LIBDIR))
 endif
 ifneq ($(GMP_INCDIR),)
 GMP_CFLAGS ?= $(addprefix -I,$(GMP_INCDIR))
@@ -156,6 +156,8 @@ MODEL_MT_LXXFLAGS:=$(MODEL_MT_LFLAGS)
 define	MODEL_TEMPLATE
 MODEL_$(2)_CFLAGS+=$(MY_CFLAGS)
 MODEL_$(2)_CXXFLAGS+=$(MY_CXXFLAGS)
+MODEL_$(2)_LFLAGS+=$(MY_LFLAGS)
+MODEL_$(2)_LXXFLAGS+=$(MY_LFLAGS)
 PMODEL_$(2):=$$(if $(2),[$(2)] ,)
 $(DEPDIR)%.c$(1).d: %.c
 	@mkdir -p $$$$(dirname $$@) ; :
