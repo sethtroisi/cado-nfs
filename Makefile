@@ -3,9 +3,11 @@
 TOP:=.
 include $(TOP)/Makefile.common
 
+# It's useful to pass these down to sub-makefiles if we do have the
+# information. Some of the code base does not (yet) explicitly load
+# Makefile.local becase it's got a life outside cado
 export CC
 export CXX
-export SCONS
 export GMP_LIBDIR
 export GMP_INCDIR
 
@@ -24,7 +26,7 @@ endif
 all:
 	$(MAKE) -C utils
 	$(MAKE) -C polyselect
-	(cd postsieve/tifa; $(SCONS) $(SCONS_FLAGS))
+	(cd postsieve/tifa; $(SCONS_BINARY) $(SCONS_FLAGS))
 	$(MAKE) -C sieve
 	$(MAKE) -C postsieve/checknorms
 	$(MAKE) -C linalg
@@ -37,7 +39,7 @@ all:
 clean:
 	$(MAKE) -C utils		clean
 	$(MAKE) -C polyselect		clean
-	(cd postsieve/tifa; $(SCONS) $(SCONS_FLAGS) -c)
+	(cd postsieve/tifa; $(SCONS_BINARY) $(SCONS_FLAGS) -c)
 	$(MAKE) -C sieve		clean
 	$(MAKE) -C postsieve/checknorms	clean
 	$(MAKE) -C linalg		clean

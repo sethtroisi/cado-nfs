@@ -46,7 +46,7 @@ MY_LFLAGS+=$(GMP_LFLAGS)
 
 CC?=gcc
 CXX?=g++
-SCONS?=scons
+SCONS_BINARY?=scons
 
 
 
