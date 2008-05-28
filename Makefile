@@ -1,8 +1,7 @@
-CC ?= gcc
-
 .PHONY: clean all
 
-include Makefile.common
+TOP:=.
+include $(TOP)/Makefile.common
 
 export CC
 export CXX
@@ -21,6 +20,7 @@ ifneq ($(GMP_INCDIR),)
 SCONS_FLAGS+=GMP_INCDIR=$(GMP_INCDIR)
 endif
 
+
 all:
 	$(MAKE) -C utils
 	$(MAKE) -C polyselect
@@ -37,7 +37,7 @@ all:
 clean:
 	$(MAKE) -C utils		clean
 	$(MAKE) -C polyselect		clean
-	(cd postsieve/tifa; $(SCONS) -c)
+	(cd postsieve/tifa; $(SCONS) $(SCONS_FLAGS) -c)
 	$(MAKE) -C sieve		clean
 	$(MAKE) -C postsieve/checknorms	clean
 	$(MAKE) -C linalg		clean

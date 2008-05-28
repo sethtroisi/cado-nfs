@@ -20,6 +20,10 @@ MY_LFLAGS+=$(LDFLAGS)
 # While we're at it, add support for includes in the parent directory.
 MY_CFLAGS+=-I$(TOP)
 
+
+# dash include does not complain if the file is missing.
+include $(TOP)/Makefile.local
+
 # Support a library (GMP)
 # Within Makefile.local, or on the command line, either put
 # GMP=/some/prefix/, and/or GMP_LIBDIR=/some/directory and
@@ -51,7 +55,5 @@ SCONS?=scons
 
 default-target: all
 
-# dash include does not complain if the file is missing.
--include $(TOP)/Makefile.local
 
 

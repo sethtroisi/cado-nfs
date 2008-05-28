@@ -26,7 +26,7 @@ all: sieve makefb las
 sieve: sieve.o fb.o ; 
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -ltifa -lgmp -lm
 makefb: makefb.o
-	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -ltifa -lgmp
+	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -ltifa -lgmp -lm
 las: las.o fb.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -ltifa -lgmp -lm
 
