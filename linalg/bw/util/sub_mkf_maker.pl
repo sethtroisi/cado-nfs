@@ -86,8 +86,8 @@ EOF
 	my $link_addxx = "\$(MODEL__LXXFLAGS)";
 	my $link_add = "\$(MODEL__LFLAGS)";
 	if ($model) {
-		my $link_addxx = "\$(MODEL${modext_caps}_LXXFLAGS)";
-		my $link_add = "\$(MODEL${modext_caps}_LFLAGS)";
+		$link_addxx = "\$(MODEL${modext_caps}_LXXFLAGS)";
+		$link_add = "\$(MODEL${modext_caps}_LFLAGS)";
 	}
 	print <<EOF;
 ifndef	${sstem}_BASE

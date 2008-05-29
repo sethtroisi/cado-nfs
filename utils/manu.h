@@ -146,6 +146,19 @@ static inline int parityl(unsigned long x)
 }
 #endif
 
+#ifdef  __cplusplus
+#define LEXGE2(X,Y,A,B) (X>A || (X == A && Y >= B))
+#define LEXGE3(X,Y,Z,A,B,C) (X>A || (X == A && LEXGE2(Y,Z,B,C)))
+
+#if (defined(__GNUC__) && LEXGE2(__GNUC__,__GNUC_MINOR__,4,3))
+/* Starting with gcc 4.3, -Wempty-body moans for loops like
+ * for(;(x=x->next)!=NULL;y++);
+ * It must shut up.
+ */
+#pragma GCC diagnostic ignored "-Wempty-body"
+#endif 
+#endif
+
 #ifdef	__cplusplus
 }
 #endif
