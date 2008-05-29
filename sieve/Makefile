@@ -46,4 +46,4 @@ config.h: config_h.in
 	cp config_h.in config.h
 
 clean:
-	rm -f sieve makefb las *.o *~
+	rm -f sieve makefb las *.o *~ config.h
