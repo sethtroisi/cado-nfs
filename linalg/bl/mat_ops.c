@@ -21,7 +21,7 @@
 #include <string.h>
 #include <time.h>
 
-#include "sse2.h"       /* from ../../utils, just because gcc 4.3.0 annoys us */
+#include <emmintrin.h>
 
 #define	WBITS	(CHAR_BIT * sizeof(unsigned long))
 #define	iceildiv(x,y)	(((x)+(y)-1)/(y))
@@ -352,22 +352,20 @@ void mul_vec_mat(unsigned long *C,
 #if 1				/* a la main */
 
 #if 1				/* sse */
-    typedef uint64_t sse2_t __attribute__ ((vector_size(16)));
-
-    sse2_t *Cw = (sse2_t *) C;
-    sse2_t *Aw = (sse2_t *) A;
+    __v2di *Cw = (__v2di *) C;
+    __v2di *Aw = (__v2di *) A;
 
     for (j = 0; j < m; j += 2) {
-	sse2_t c = { 0, 0 };
-	sse2_t a = *Aw++;
+	__v2di c = { 0, 0 };
+	__v2di a = *Aw++;
 
-	sse2_t one = { 1, 1, };
+	__v2di one = { 1, 1, };
 #if 1
 	for (i = 0; i < 64; i++) {
-	    sse2_t bw = { B[i], B[i], };
+	    __v2di bw = { B[i], B[i], };
 
 	    c ^= (bw & -(a & one));
-	    a = SHR(a, 1);
+	    a = _mm_slli_epi64(a, 1);
 	}
 #else
 #endif
@@ -467,14 +465,13 @@ inline void addmul(uint64_t a, uint64_t b, uint64_t * w)
 #endif
 #if 1
     /* Avec des sse-2 */
-    typedef uint64_t sse2_t __attribute__ ((vector_size(16)));
-    sse2_t mb[4] = {
-	(sse2_t) {0, 0},
-	(sse2_t) {b, 0},
-	(sse2_t) {0, b},
-	(sse2_t) {b, b},
+    __v2di mb[4] = {
+	(__v2di) {0, 0},
+	(__v2di) {b, 0},
+	(__v2di) {0, b},
+	(__v2di) {b, b},
     };
-    sse2_t *sw = (sse2_t *) w;
+    __v2di *sw = (__v2di *) w;
     for (i = 0; i < 64; i += 2) {
 	*sw++ ^= mb[a & 3];
 	a >>= 2;
