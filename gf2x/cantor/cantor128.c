@@ -34,13 +34,13 @@
 #include "cantor128.h"
 #include "mpfq_2_128.h"
 
-#define Kelt    MPFQ_(elt)
-#define Kdst_elt        MPFQ_(dst_elt)
-#define Ksrc_elt        MPFQ_(src_elt)
-#define Kadd(a0,a1,a2)  MPFQ_(add) (NULL,a0,a1,a2)
-#define Kmul(a0,a1,a2)  MPFQ_(mul) (NULL,a0,a1,a2)
-#define Kset_ui(a0,a1)  MPFQ_(set_ui) (NULL,a0,a1)
-#define Ksqr(a0,a1)     MPFQ_(sqr) (NULL,a0,a1)
+#define Kelt            mpfq_2_128_elt
+#define Kdst_elt        mpfq_2_128_dst_elt
+#define Ksrc_elt        mpfq_2_128_src_elt
+#define Kadd(a0,a1,a2)  mpfq_2_128_add (NULL,a0,a1,a2)
+#define Kmul(a0,a1,a2)  mpfq_2_128_mul (NULL,a0,a1,a2)
+#define Kset_ui(a0,a1)  mpfq_2_128_set_ui (NULL,a0,a1)
+#define Ksqr(a0,a1)     mpfq_2_128_sqr (NULL,a0,a1)
 
 // Some constants related to Cantor's algorithm
 // Beta_i are such that Beta_{i-1} = Beta_i^2 + Beta_i

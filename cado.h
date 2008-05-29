@@ -90,6 +90,20 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #define UNLIKELY(x)	EXPECT(x,0)
 #endif
 
+#define LEXGE2(X,Y,A,B) (X>A || (X == A && Y >= B))
+#define LEXGE3(X,Y,Z,A,B,C) (X>A || (X == A && LEXGE2(Y,Z,B,C)))
+#define LEXLE2(X,Y,A,B) LEXGE2(A,B,X,Y)
+#define LEXLE3(X,Y,Z,A,B,C) LEXGE3(A,B,C,X,Y,Z)
+
+#define GNUC_VERSION(X,Y,Z)     \
+    defined(__GNUC__) &&        \
+    (__GNUC__ == X && __GNUC_MINOR__ == Y && __GNUC_PATCHLEVEL == Z)
+#define GNUC_VERSION_ATLEAST(X,Y,Z)     \
+    defined(__GNUC__) &&        \
+    LEXGE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z)
+#define GNUC_VERSION_ATMOST(X,Y,Z)     \
+    defined(__GNUC__) &&        \
+    LEXLE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z)
 
 /*********************************************************************/
 /* The maximum degree of polynomials supported. Used for statically 
@@ -238,5 +252,6 @@ typedef struct {
   rat_prime_t *rp;	/* array of rational primes */
   alg_prime_t *ap;	/* array of algebraic primes */
 } relation_t;
+
 
 #endif

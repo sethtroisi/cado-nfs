@@ -31,7 +31,7 @@ las: las.o fb.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -ltifa -lgmp -lm
 
 # Some dependencies on headers.
-las.o: bucket.h sse_macros.h
+las.o: bucket.h
 fb.o : fb.c fb.h config.h basicnt.h
 sieve.o : sieve.c bucket.h config.h basicnt.h $(TOP)/cado.h
 makefb.o : makefb.c

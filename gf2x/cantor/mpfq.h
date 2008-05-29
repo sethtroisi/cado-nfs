@@ -1,9 +1,10 @@
 #ifndef MPFQ_H_
 #define MPFQ_H_
+
 /*
   This file is part of the MPFQ library
 
-  Copyright 2007 Pierrick Gaudry and Emmanuel Thomé
+  Copyright 2007 Pierrick Gaudry and Emmanuel Thome'
 
   This program is free software; you can redistribute it and/or modify it
   under the terms of the GNU General Public License as published by the
@@ -21,7 +22,6 @@
   02111-1307, USA.
 */
 
-
 /* This header contains common declarations used by mpfq modules */
 
 #include <gmp.h>
@@ -29,6 +29,23 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+
+
+/*** Constants for field_specify ***/
+
+#define MPFQ_PRIME 1
+#define MPFQ_POLYNOMIAL 2
+#define MPFQ_DEGREE 3
+#define MPFQ_IO_TYPE 4 /* for setopt */
+
+/***  Some useful macros ***/
+
+#define MALLOC_FAILED()                                                 \
+        do {                                                            \
+                fprintf(stderr, "malloc failed in %s\n", __func__);     \
+                abort();                                                \
+        } while (0)
 
 #define BUILD_BITMASK(x) ((x) == GMP_LIMB_BITS ? ((mp_limb_t) - 1) : (~ - ((mp_limb_t) 1 << (x))))
 
@@ -43,27 +60,26 @@ extern "C" {
 #define	MAYBE_UNUSED	__attribute__((unused))
 #endif
 
-#ifndef __cplusplus
-#ifndef max
-#define max(a,b) \
-       ({ typeof (a) _a = (a); \
-           typeof (b) _b = (b); \
-         _a > _b ? _a : _b; })
+#ifndef MAX
+#define MAX(h,i) ((h) > (i) ? (h) : (i))
 #endif
 
-#ifndef min
-#define min(a,b) \
-       ({ typeof (a) _a = (a); \
-           typeof (b) _b = (b); \
-         _a > _b ? _b : _a; })
+#ifndef MIN
+#define MIN(l,o) ((l) < (o) ? (l) : (o))
 #endif
-#endif	/* __cplusplus */
 
-#ifndef	EXPECT_FALSE
-#define	EXPECT_FALSE(x)	__builtin_expect(x, 0)
+#ifndef ABS
+#define ABS(x) ((x) >= 0 ? (x) : -(x))
 #endif
-#ifndef	EXPECT_TRUE
-#define	EXPECT_TRUE(x)	__builtin_expect(x, 1)
+
+#ifndef EXPECT
+#define EXPECT(x,val)   __builtin_expect(x,val)
+#endif
+#ifndef	UNLIKELY
+#define	UNLIKELY(x)	EXPECT(x,0)
+#endif
+#ifndef	LIKELY
+#define	LIKELY(x)	EXPECT(x, 1)
 #endif
 
 #else
@@ -114,11 +130,14 @@ static inline int parityl(unsigned long x)
 #endif
 #endif	/* __cplusplus */
 
-#ifndef	EXPECT_FALSE
-#define	EXPECT_FALSE(x)	(x)
+#ifndef EXPECT
+#define EXPECT(x,val)   (x)
 #endif
-#ifndef	EXPECT_TRUE
-#define	EXPECT_TRUE(x)	(x)
+#ifndef	UNLIKELY
+#define	UNLIKELY(x)	(x)
+#endif
+#ifndef	LIKELY
+#define	LIKELY(x)	(x)
 #endif
 
 #endif	/* __GNUC__ */
@@ -126,7 +145,7 @@ static inline int parityl(unsigned long x)
 static inline int clzlx(unsigned long * x, int n)
 {
 	int r = 0;
-	for( ; n > 0 && EXPECT_FALSE(!x[n-1]) ; --n) r+=GMP_LIMB_BITS;
+	for( ; n > 0 && UNLIKELY(!x[n-1]) ; --n) r+=GMP_LIMB_BITS;
 	if (n == 0) return r;
 	r += clzl(x[n-1]);
 	return r;
@@ -134,7 +153,7 @@ static inline int clzlx(unsigned long * x, int n)
 static inline int ctzlx(unsigned long * x, int n)
 {
 	int r = 0;
-	for( ; n > 0 && EXPECT_FALSE(!*x) ; --n,++x) r+=GMP_LIMB_BITS;
+	for( ; n > 0 && UNLIKELY(!*x) ; --n,++x) r+=GMP_LIMB_BITS;
 	if (n == 0) return r;
 	r += ctzl(*x);
 	return r;

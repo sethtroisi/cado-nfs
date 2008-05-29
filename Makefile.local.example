@@ -33,4 +33,4 @@
 #
 # CC=           (C compiler)
 # CXX=          (C++ compiler)
-# SCONS=        (scons binary)
+# SCONS_BINARY=        (scons binary)

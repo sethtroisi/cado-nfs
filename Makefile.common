@@ -22,7 +22,8 @@ MY_CFLAGS+=-I$(TOP)
 
 
 # dash include does not complain if the file is missing.
-include $(TOP)/Makefile.local
+-include $(TOP)/Makefile.local
+-include ./Makefile.local
 
 # Support a library (GMP)
 # Within Makefile.local, or on the command line, either put
@@ -54,6 +55,4 @@ SCONS_BINARY?=scons
 	$(CC) $(MY_CFLAGS) $< -c -o $@
 
 default-target: all
-
-
 

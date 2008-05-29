@@ -1,9 +1,10 @@
 #ifndef MPFQ_2_128_H_
 #define MPFQ_2_128_H_
+
 /*
   This file is part of the MPFQ library
 
-  Copyright 2007 Pierrick Gaudry and Emmanuel Thomé
+  Copyright 2007 Pierrick Gaudry and Emmanuel Thome'
 
   This program is free software; you can redistribute it and/or modify it
   under the terms of the GNU General Public License as published by the
@@ -22,25 +23,28 @@
 */
 
 
-/* MPFQ generated file -- do not edit */
-
 #include "mpfq.h"
+#include "mpfq_gf2n_common.h"
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <assert.h>
 #include <stdint.h>
+#include <ctype.h>
 #include <emmintrin.h>
 
-#ifdef	MPFQ_
-#undef	MPFQ_
+#ifdef	MPFQ_LAST_GENERATED_TAG
+#undef	MPFQ_LAST_GENERATED_TAG
 #endif
-#define MPFQ_(X)	mpfq_2_128_ ## X
+#define MPFQ_LAST_GENERATED_TAG      2_128
 
 #ifndef GMP_LIMB_BITS
 #error "Please arrange so that GMP_LIMB_BITS is defined before including this file"
 #endif
 
-#if GMP_LIMB_BITS == 32
+#if !(GMP_LIMB_BITS == 32)
+#error "Constraints not met for this file: GMP_LIMB_BITS == 32"
+#endif
 /* Active handler: field */
 /* Automatically generated code for GF(2^128) */
 /* Definition polynomial P = X^128 + X^7 + X^2 + X + 1 */
@@ -49,11 +53,11 @@
 /* Active handler: linearops */
 /* Active handler: inversion */
 /* Active handler: reduction */
-/* Active handler: plain_c */
-/* Options used: sqrslice=4 mul_ur=sb_aligned_sse2 slice=4 */
+/* Active handler: mul */
+/* Options used: w=32 n=128 helper=/tmp/mpfq/gf2n/helper/helper output_path=/tmp/mpfq/gf2n tag=2_128 slice=4 coeffs=[128, 7, 2, 1, 0] */
 
-typedef void * mpfq_2_128_field;
-typedef void * mpfq_2_128_field_ptr;
+typedef mpfq_2_field mpfq_2_128_field;
+typedef mpfq_2_dst_field mpfq_2_128_dst_field;
 
 typedef unsigned long mpfq_2_128_elt[4];
 typedef unsigned long * mpfq_2_128_dst_elt;
@@ -65,11 +69,14 @@ typedef const unsigned long * mpfq_2_128_src_elt_ur;
 
 
 /* Functions operating on the field structure */
+#define mpfq_2_128_field_characteristic(f, x)	mpz_set_ui(x,2);
 #define mpfq_2_128_field_degree(f)	128
-#define mpfq_2_128_field_init(f)	/**/
+static inline
+void mpfq_2_128_field_init(mpfq_2_128_dst_field);
 #define mpfq_2_128_field_clear(f)	/**/
 #define mpfq_2_128_field_specify(f, x, y)	/**/
-#define mpfq_2_128_field_setopt(f, x, y)	/**/
+static inline
+void mpfq_2_128_field_setopt(mpfq_2_128_dst_field, unsigned long, void *);
 
 /* Element allocation functions */
 #define mpfq_2_128_init(f, px)	/**/
@@ -77,711 +84,835 @@ typedef const unsigned long * mpfq_2_128_src_elt_ur;
 
 /* Elementary assignment functions */
 static inline
-void mpfq_2_128_set(mpfq_2_128_field_ptr, mpfq_2_128_dst_elt, mpfq_2_128_src_elt);
+void mpfq_2_128_set(mpfq_2_128_dst_field, mpfq_2_128_dst_elt, mpfq_2_128_src_elt);
 static inline
-void mpfq_2_128_set_ui(mpfq_2_128_field_ptr, mpfq_2_128_dst_elt, unsigned long);
+void mpfq_2_128_set_ui(mpfq_2_128_dst_field, mpfq_2_128_dst_elt, unsigned long);
 static inline
-unsigned long mpfq_2_128_get_ui(mpfq_2_128_field_ptr, mpfq_2_128_src_elt);
-/* missing set_mpn */
-/* missing set_mpz */
-/* missing get_mpn */
-/* missing get_mpz */
+unsigned long mpfq_2_128_get_ui(mpfq_2_128_dst_field, mpfq_2_128_src_elt);
 static inline
-void mpfq_2_128_set_uipoly(mpfq_2_128_field_ptr, mpfq_2_128_dst_elt, unsigned long);
+void mpfq_2_128_set_mpn(mpfq_2_128_dst_field, mpfq_2_128_dst_elt, mp_limb_t *, size_t);
 static inline
-void mpfq_2_128_set_uipoly_wide(mpfq_2_128_field_ptr, mpfq_2_128_dst_elt, const unsigned long *, unsigned int);
+void mpfq_2_128_set_mpz(mpfq_2_128_dst_field, mpfq_2_128_dst_elt, mpz_t);
 static inline
-unsigned long mpfq_2_128_get_uipoly(mpfq_2_128_field_ptr, mpfq_2_128_src_elt);
+void mpfq_2_128_get_mpn(mpfq_2_128_dst_field, mp_limb_t *, mpfq_2_128_src_elt);
 static inline
-void mpfq_2_128_get_uipoly_wide(mpfq_2_128_field_ptr, unsigned long *, unsigned int, mpfq_2_128_src_elt);
+void mpfq_2_128_get_mpz(mpfq_2_128_dst_field, mpz_t, mpfq_2_128_src_elt);
+static inline
+void mpfq_2_128_set_uipoly(mpfq_2_128_dst_field, mpfq_2_128_dst_elt, unsigned long);
+static inline
+void mpfq_2_128_set_uipoly_wide(mpfq_2_128_dst_field, mpfq_2_128_dst_elt, const unsigned long *, unsigned int);
+static inline
+unsigned long mpfq_2_128_get_uipoly(mpfq_2_128_dst_field, mpfq_2_128_src_elt);
+static inline
+void mpfq_2_128_get_uipoly_wide(mpfq_2_128_dst_field, unsigned long *, mpfq_2_128_src_elt);
 
 /* Assignment of random values */
 static inline
-void mpfq_2_128_random(mpfq_2_128_field_ptr, mpfq_2_128_dst_elt);
+void mpfq_2_128_random(mpfq_2_128_dst_field, mpfq_2_128_dst_elt);
 static inline
-void mpfq_2_128_random2(mpfq_2_128_field_ptr, mpfq_2_128_dst_elt);
+void mpfq_2_128_random2(mpfq_2_128_dst_field, mpfq_2_128_dst_elt);
 
 /* Arithmetic operations on elements */
 static inline
-void mpfq_2_128_add(mpfq_2_128_field_ptr, mpfq_2_128_dst_elt, mpfq_2_128_src_elt, mpfq_2_128_src_elt);
+void mpfq_2_128_add(mpfq_2_128_dst_field, mpfq_2_128_dst_elt, mpfq_2_128_src_elt, mpfq_2_128_src_elt);
 #define mpfq_2_128_sub(K, r, s1, s2)	mpfq_2_128_add(K,r,s1,s2)
+#define mpfq_2_128_neg(K, r, s)	mpfq_2_128_set(K,r,s)
 static inline
-void mpfq_2_128_mul(mpfq_2_128_field_ptr, mpfq_2_128_dst_elt, mpfq_2_128_src_elt, mpfq_2_128_src_elt);
+void mpfq_2_128_mul(mpfq_2_128_dst_field, mpfq_2_128_dst_elt, mpfq_2_128_src_elt, mpfq_2_128_src_elt);
 static inline
-void mpfq_2_128_sqr(mpfq_2_128_field_ptr, mpfq_2_128_dst_elt, mpfq_2_128_src_elt);
+void mpfq_2_128_sqr(mpfq_2_128_dst_field, mpfq_2_128_dst_elt, mpfq_2_128_src_elt);
+#define mpfq_2_128_is_sqr(f, p)	1
 static inline
-void mpfq_2_128_sqrt(mpfq_2_128_field_ptr, mpfq_2_128_dst_elt, mpfq_2_128_src_elt);
+int mpfq_2_128_sqrt(mpfq_2_128_dst_field, mpfq_2_128_dst_elt, mpfq_2_128_src_elt);
+static inline
+void mpfq_2_128_pow(mpfq_2_128_dst_field, mpfq_2_128_dst_elt, mpfq_2_128_src_elt, unsigned long *, size_t);
 #define mpfq_2_128_frobenius(K, r, s)	mpfq_2_128_sqr(K,r,s)
 static inline
-void mpfq_2_128_add_ui(mpfq_2_128_field_ptr, mpfq_2_128_dst_elt, mpfq_2_128_src_elt, unsigned long);
+void mpfq_2_128_add_ui(mpfq_2_128_dst_field, mpfq_2_128_dst_elt, mpfq_2_128_src_elt, unsigned long);
 #define mpfq_2_128_sub_ui(K, r, s1, s2)	mpfq_2_128_add_ui(K,r,s1,s2)
 static inline
-void mpfq_2_128_mul_ui(mpfq_2_128_field_ptr, mpfq_2_128_dst_elt, mpfq_2_128_src_elt, unsigned long);
+void mpfq_2_128_mul_ui(mpfq_2_128_dst_field, mpfq_2_128_dst_elt, mpfq_2_128_src_elt, unsigned long);
 static inline
-int mpfq_2_128_inv(mpfq_2_128_field_ptr, mpfq_2_128_dst_elt, mpfq_2_128_src_elt);
+void mpfq_2_128_add_uipoly(mpfq_2_128_dst_field, mpfq_2_128_dst_elt, mpfq_2_128_src_elt, unsigned long);
+#define mpfq_2_128_sub_uipoly(K, r, s1, s2)	mpfq_2_128_add_uipoly(K,r,s1,s2)
+static inline
+void mpfq_2_128_mul_uipoly(mpfq_2_128_dst_field, mpfq_2_128_dst_elt, mpfq_2_128_src_elt, unsigned long);
+static inline
+int mpfq_2_128_inv(mpfq_2_128_dst_field, mpfq_2_128_dst_elt, mpfq_2_128_src_elt);
 static inline
 void mpfq_2_128_longaddshift_left(unsigned long *, const unsigned long *, int, int);
 static inline
 void mpfq_2_128_longshift_left(unsigned long *, const unsigned long *, int, int);
 static inline
-void mpfq_2_128_as_solve(mpfq_2_128_field_ptr, mpfq_2_128_dst_elt, mpfq_2_128_src_elt);
+void mpfq_2_128_as_solve(mpfq_2_128_dst_field, mpfq_2_128_dst_elt, mpfq_2_128_src_elt);
 static inline
-unsigned long mpfq_2_128_trace(mpfq_2_128_field_ptr, mpfq_2_128_src_elt);
+unsigned long mpfq_2_128_trace(mpfq_2_128_dst_field, mpfq_2_128_src_elt);
 
 /* Operations involving unreduced elements */
-/* missing elt_ur_init */
-/* missing elt_ur_clear */
+#define mpfq_2_128_elt_ur_init(f, px)	/**/
+#define mpfq_2_128_elt_ur_clear(f, px)	/**/
 static inline
-void mpfq_2_128_mul_ur(mpfq_2_128_field_ptr, mpfq_2_128_dst_elt_ur, mpfq_2_128_src_elt, mpfq_2_128_src_elt);
+void mpfq_2_128_elt_ur_set(mpfq_2_128_dst_field, mpfq_2_128_dst_elt_ur, mpfq_2_128_src_elt_ur);
 static inline
-void mpfq_2_128_sqr_ur(mpfq_2_128_field_ptr, mpfq_2_128_dst_elt_ur, mpfq_2_128_src_elt);
+void mpfq_2_128_elt_ur_add(mpfq_2_128_dst_field, mpfq_2_128_dst_elt_ur, mpfq_2_128_src_elt_ur, mpfq_2_128_src_elt_ur);
+#define mpfq_2_128_elt_ur_neg(K, r, s)	mpfq_2_128_elt_ur_set(K,r,s)
+#define mpfq_2_128_elt_ur_sub(K, r, s1, s2)	mpfq_2_128_elt_ur_add(K,r,s1,s2)
 static inline
-void mpfq_2_128_reduce(mpfq_2_128_field_ptr, mpfq_2_128_dst_elt, mpfq_2_128_dst_elt_ur);
+void mpfq_2_128_mul_ur(mpfq_2_128_dst_field, mpfq_2_128_dst_elt_ur, mpfq_2_128_src_elt, mpfq_2_128_src_elt);
+static inline
+void mpfq_2_128_sqr_ur(mpfq_2_128_dst_field, mpfq_2_128_dst_elt_ur, mpfq_2_128_src_elt);
+static inline
+void mpfq_2_128_reduce(mpfq_2_128_dst_field, mpfq_2_128_dst_elt, mpfq_2_128_dst_elt_ur);
 
 /* Comparison functions */
 static inline
-int mpfq_2_128_cmp(mpfq_2_128_field_ptr, mpfq_2_128_src_elt, mpfq_2_128_src_elt);
+int mpfq_2_128_cmp(mpfq_2_128_dst_field, mpfq_2_128_src_elt, mpfq_2_128_src_elt);
 static inline
-int mpfq_2_128_cmp_ui(mpfq_2_128_field_ptr, mpfq_2_128_src_elt, unsigned long);
+int mpfq_2_128_cmp_ui(mpfq_2_128_dst_field, mpfq_2_128_src_elt, unsigned long);
 
 /* Vector allocation functions */
 #define mpfq_2_128_vec_init(f, px, n)	/**/
 #define mpfq_2_128_vec_clear(f, px, n)	/**/
 
+/* Montgomery representation conversion functions */
+
 /* Input/output functions */
-void mpfq_2_128_print(mpfq_2_128_field_ptr, FILE *, mpfq_2_128_src_elt);
+void mpfq_2_128_asprint(mpfq_2_128_dst_field, char * *, mpfq_2_128_src_elt);
+void mpfq_2_128_fprint(mpfq_2_128_dst_field, FILE *, mpfq_2_128_src_elt);
+#define mpfq_2_128_print(k, x)	mpfq_2_128_fprint(k,stdout,x)
+int mpfq_2_128_sscan(mpfq_2_128_dst_field, mpfq_2_128_dst_elt, const char *);
+int mpfq_2_128_fscan(mpfq_2_128_dst_field, FILE *, mpfq_2_128_dst_elt);
+#define mpfq_2_128_scan(k, x)	mpfq_2_128_fscan(k,stdout,x)
 
 /* Implementations for inlines */
 static inline
-void mpfq_2_128_set(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s)
+void mpfq_2_128_field_init(mpfq_2_128_dst_field f)
 {
-	memcpy(r, s, sizeof(mpfq_2_128_elt));
+    f->io_type=16;
 }
 
 static inline
-void mpfq_2_128_set_ui(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt r, unsigned long x)
+void mpfq_2_128_field_setopt(mpfq_2_128_dst_field f, unsigned long x, void * y)
 {
-	mpfq_2_128_set_uipoly(K, r, x & 1UL);
+    assert(x == MPFQ_IO_TYPE);
+    f->io_type=((unsigned long*)y)[0];
 }
 
 static inline
-unsigned long mpfq_2_128_get_ui(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_src_elt r)
+void mpfq_2_128_set(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s)
 {
-	return r[0] & 1UL;
+    memcpy(r, s, sizeof(mpfq_2_128_elt));
 }
 
 static inline
-void mpfq_2_128_set_uipoly(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt r, unsigned long x)
+void mpfq_2_128_set_ui(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt r, unsigned long x)
 {
-	memset(r, 0, sizeof(mpfq_2_128_elt));
-	r[0] = x;
+    r[0] = x & 1UL;
+    memset(r + 1, 0, sizeof(mpfq_2_128_elt) - sizeof(unsigned long));
 }
 
 static inline
-void mpfq_2_128_set_uipoly_wide(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt r, const unsigned long * x, unsigned int n)
+unsigned long mpfq_2_128_get_ui(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_src_elt r)
 {
-	unsigned int i;
-	memset(r, 0, sizeof(mpfq_2_128_elt));
-	for (i = 0 ; i < n && i < 4 ; i++)
-		r[i] = x[i];
+    return r[0] & 1UL;
 }
 
 static inline
-unsigned long mpfq_2_128_get_uipoly(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_src_elt r)
+void mpfq_2_128_set_mpn(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mp_limb_t * x, size_t n)
 {
-	return r[0];
+    r[0] = LIKELY(n > 0) ? (x[0] & 1UL) : 0;
+    memset(r + 1, 0, sizeof(mpfq_2_128_elt) - sizeof(unsigned long));
 }
 
 static inline
-void mpfq_2_128_get_uipoly_wide(mpfq_2_128_field_ptr K MAYBE_UNUSED, unsigned long * r, unsigned int n, mpfq_2_128_src_elt x)
+void mpfq_2_128_set_mpz(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mpz_t z)
 {
-	unsigned int i;
-	for(i = 0 ; i < 4 && i < n; i++) r[i] = x[i];
-	for(      ; i < n ; i++) r[i] = 0;
+    r[0] = mpz_getlimbn(z,0) & 1UL;
+    memset(r + 1, 0, sizeof(mpfq_2_128_elt) - sizeof(unsigned long));
 }
 
 static inline
-void mpfq_2_128_random(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt r)
+void mpfq_2_128_get_mpn(mpfq_2_128_dst_field K MAYBE_UNUSED, mp_limb_t * p, mpfq_2_128_src_elt r)
 {
-	mpn_random(r, 4);
+    p[0] = r[0] & 1UL;
+    memset(p + 1, 0, (4 - 1) * sizeof(mp_limb_t));
 }
 
 static inline
-void mpfq_2_128_random2(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt r)
+void mpfq_2_128_get_mpz(mpfq_2_128_dst_field K MAYBE_UNUSED, mpz_t z, mpfq_2_128_src_elt r)
 {
-	mpn_random2(r, 4);
+    mpz_set_ui(z, r[0] & 1UL);
 }
 
 static inline
-void mpfq_2_128_add(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s1, mpfq_2_128_src_elt s2)
+void mpfq_2_128_set_uipoly(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt r, unsigned long x)
 {
-	int i;
-	for(i = 0 ; i < 4 ; i++)
-		r[i] = s1[i] ^ s2[i];
+    r[0] = x;
+    memset(r + 1, 0, sizeof(mpfq_2_128_elt) - sizeof(unsigned long));
 }
 
 static inline
-void mpfq_2_128_mul(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s1, mpfq_2_128_src_elt s2)
+void mpfq_2_128_set_uipoly_wide(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt r, const unsigned long * x, unsigned int n)
 {
-	mpfq_2_128_elt_ur t;
-	mpfq_2_128_mul_ur(K, t, s1, s2);
-	mpfq_2_128_reduce(K, r, t);
+    unsigned int i;
+    for (i = 0 ; i < n && i < 4 ; i++)
+        r[i] = x[i];
 }
 
 static inline
-void mpfq_2_128_sqr(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s)
+unsigned long mpfq_2_128_get_uipoly(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_src_elt r)
 {
-	mpfq_2_128_elt_ur t;
-	mpfq_2_128_sqr_ur(K, t, s);
-	mpfq_2_128_reduce(K, r, t);
+    return r[0];
 }
 
 static inline
-void mpfq_2_128_sqrt(mpfq_2_128_field_ptr K, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s)
+void mpfq_2_128_get_uipoly_wide(mpfq_2_128_dst_field K MAYBE_UNUSED, unsigned long * r, mpfq_2_128_src_elt x)
 {
-	static const mp_limb_t shuffle_table[256] = {
-		0, 1, 16, 17, 2, 3, 18, 19,
-		32, 33, 48, 49, 34, 35, 50, 51,
-		4, 5, 20, 21, 6, 7, 22, 23,
-		36, 37, 52, 53, 38, 39, 54, 55,
-		64, 65, 80, 81, 66, 67, 82, 83,
-		96, 97, 112, 113, 98, 99, 114, 115,
-		68, 69, 84, 85, 70, 71, 86, 87,
-		100, 101, 116, 117, 102, 103, 118, 119,
-		8, 9, 24, 25, 10, 11, 26, 27,
-		40, 41, 56, 57, 42, 43, 58, 59,
-		12, 13, 28, 29, 14, 15, 30, 31,
-		44, 45, 60, 61, 46, 47, 62, 63,
-		72, 73, 88, 89, 74, 75, 90, 91,
-		104, 105, 120, 121, 106, 107, 122, 123,
-		76, 77, 92, 93, 78, 79, 94, 95,
-		108, 109, 124, 125, 110, 111, 126, 127,
-		128, 129, 144, 145, 130, 131, 146, 147,
-		160, 161, 176, 177, 162, 163, 178, 179,
-		132, 133, 148, 149, 134, 135, 150, 151,
-		164, 165, 180, 181, 166, 167, 182, 183,
-		192, 193, 208, 209, 194, 195, 210, 211,
-		224, 225, 240, 241, 226, 227, 242, 243,
-		196, 197, 212, 213, 198, 199, 214, 215,
-		228, 229, 244, 245, 230, 231, 246, 247,
-		136, 137, 152, 153, 138, 139, 154, 155,
-		168, 169, 184, 185, 170, 171, 186, 187,
-		140, 141, 156, 157, 142, 143, 158, 159,
-		172, 173, 188, 189, 174, 175, 190, 191,
-		200, 201, 216, 217, 202, 203, 218, 219,
-		232, 233, 248, 249, 234, 235, 250, 251,
-		204, 205, 220, 221, 206, 207, 222, 223,
-		236, 237, 252, 253, 238, 239, 254, 255,
-	};
-	
-	mpfq_2_128_elt sqrt_t ={ 0xb6db6da4UL, 0x6db6db6dUL, 0x92492492UL, 0x24924924UL, }
-	;
-	
-	mpfq_2_128_elt odd, even;
-	mpfq_2_128_elt_ur odd_t;
-	mp_limb_t t;
+    unsigned int i;
+    for(i = 0 ; i < 4 ; i++) r[i] = x[i];
+}
+
+static inline
+void mpfq_2_128_random(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt r)
+{
+    mpn_random(r, 4);
+}
+
+static inline
+void mpfq_2_128_random2(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt r)
+{
+    mpn_random2(r, 4);
+}
+
+static inline
+void mpfq_2_128_add(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s1, mpfq_2_128_src_elt s2)
+{
+    int i;
+    for(i = 0 ; i < 4 ; i++)
+        r[i] = s1[i] ^ s2[i];
+}
+
+static inline
+void mpfq_2_128_mul(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s1, mpfq_2_128_src_elt s2)
+{
+    mpfq_2_128_elt_ur t;
+    mpfq_2_128_mul_ur(K, t, s1, s2);
+    mpfq_2_128_reduce(K, r, t);
+}
+
+static inline
+void mpfq_2_128_sqr(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s)
+{
+    mpfq_2_128_elt_ur t;
+    mpfq_2_128_sqr_ur(K, t, s);
+    mpfq_2_128_reduce(K, r, t);
+}
+
+static inline
+int mpfq_2_128_sqrt(mpfq_2_128_dst_field K, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s)
+{
+    static const mp_limb_t shuffle_table[256] = {
+        0, 1, 16, 17, 2, 3, 18, 19,
+        32, 33, 48, 49, 34, 35, 50, 51,
+        4, 5, 20, 21, 6, 7, 22, 23,
+        36, 37, 52, 53, 38, 39, 54, 55,
+        64, 65, 80, 81, 66, 67, 82, 83,
+        96, 97, 112, 113, 98, 99, 114, 115,
+        68, 69, 84, 85, 70, 71, 86, 87,
+        100, 101, 116, 117, 102, 103, 118, 119,
+        8, 9, 24, 25, 10, 11, 26, 27,
+        40, 41, 56, 57, 42, 43, 58, 59,
+        12, 13, 28, 29, 14, 15, 30, 31,
+        44, 45, 60, 61, 46, 47, 62, 63,
+        72, 73, 88, 89, 74, 75, 90, 91,
+        104, 105, 120, 121, 106, 107, 122, 123,
+        76, 77, 92, 93, 78, 79, 94, 95,
+        108, 109, 124, 125, 110, 111, 126, 127,
+        128, 129, 144, 145, 130, 131, 146, 147,
+        160, 161, 176, 177, 162, 163, 178, 179,
+        132, 133, 148, 149, 134, 135, 150, 151,
+        164, 165, 180, 181, 166, 167, 182, 183,
+        192, 193, 208, 209, 194, 195, 210, 211,
+        224, 225, 240, 241, 226, 227, 242, 243,
+        196, 197, 212, 213, 198, 199, 214, 215,
+        228, 229, 244, 245, 230, 231, 246, 247,
+        136, 137, 152, 153, 138, 139, 154, 155,
+        168, 169, 184, 185, 170, 171, 186, 187,
+        140, 141, 156, 157, 142, 143, 158, 159,
+        172, 173, 188, 189, 174, 175, 190, 191,
+        200, 201, 216, 217, 202, 203, 218, 219,
+        232, 233, 248, 249, 234, 235, 250, 251,
+        204, 205, 220, 221, 206, 207, 222, 223,
+        236, 237, 252, 253, 238, 239, 254, 255,
+    };
+    
+    mpfq_2_128_elt sqrt_t ={ 0xb6db6da4UL, 0x6db6db6dUL, 0x92492492UL, 0x24924924UL, }
+    ;
+    
+    mpfq_2_128_elt odd, even;
+    mpfq_2_128_elt_ur odd_t;
+    mp_limb_t t;
 #define	EVEN_MASK	(((mp_limb_t)-1)/3UL)
 #define	ODD_MASK	((EVEN_MASK)<<1)
-	unsigned int i;
-	for(i = 0 ; i < 4 ; i++) {
-		even[i] = s[i] & EVEN_MASK;
-	}
-	for(i = 0 ; i < 2 ; i++) {
-		t = even[2*i];   t |= t >> 7;
-			  even[i]  = shuffle_table[t & 255];
-		t >>= 16; even[i] |= shuffle_table[t & 255] << 8;
-		t = even[2*i+1]; t |= t >> 7;
-			  even[i] |= shuffle_table[t & 255] << 16;
-		t >>= 16; even[i] |= shuffle_table[t & 255] << 24;
-	}
-	memset(even + 2, 0, 2 * sizeof(mp_limb_t));
-	for(i = 0 ; i < 4 ; i++) {
-		odd[i] = (s[i] & ODD_MASK) >> 1;
-	}
-	for(i = 0 ; i < 2 ; i++) {
-		t = odd[2*i];   t |= t >> 7;
-			  odd[i]  = shuffle_table[t & 255];
-		t >>= 16; odd[i] |= shuffle_table[t & 255] << 8;
-		t = odd[2*i+1]; t |= t >> 7;
-			  odd[i] |= shuffle_table[t & 255] << 16;
-		t >>= 16; odd[i] |= shuffle_table[t & 255] << 24;
-	}
-	memset(odd + 2, 0, 2 * sizeof(mp_limb_t));
-	mpfq_2_128_mul_ur(K, odd_t, odd, sqrt_t);
-	for(i = 0 ; i < (4+1)/2 ; i++) {
-		odd_t[i] ^= even[i];
-	}
-	/* mpfq_2_128_print(K, stdout, odd_t); */
-	mpfq_2_128_reduce(K, r, odd_t);
-	/* mpfq_2_128_print(K, stdout, r); */
-	/* fprintf(stdout, "\n"); */
-	/* fflush(stdout); */
+    unsigned int i;
+    for(i = 0 ; i < 4 ; i++) {
+        even[i] = s[i] & EVEN_MASK;
+    }
+    for(i = 0 ; i < 2 ; i++) {
+        t = even[2*i];   t |= t >> 7;
+              even[i]  = shuffle_table[t & 255];
+        t >>= 16; even[i] |= shuffle_table[t & 255] << 8;
+        t = even[2*i+1]; t |= t >> 7;
+              even[i] |= shuffle_table[t & 255] << 16;
+        t >>= 16; even[i] |= shuffle_table[t & 255] << 24;
+    }
+    memset(even + 2, 0, 2 * sizeof(mp_limb_t));
+    for(i = 0 ; i < 4 ; i++) {
+        odd[i] = (s[i] & ODD_MASK) >> 1;
+    }
+    for(i = 0 ; i < 2 ; i++) {
+        t = odd[2*i];   t |= t >> 7;
+              odd[i]  = shuffle_table[t & 255];
+        t >>= 16; odd[i] |= shuffle_table[t & 255] << 8;
+        t = odd[2*i+1]; t |= t >> 7;
+              odd[i] |= shuffle_table[t & 255] << 16;
+        t >>= 16; odd[i] |= shuffle_table[t & 255] << 24;
+    }
+    memset(odd + 2, 0, 2 * sizeof(mp_limb_t));
+    mpfq_2_128_mul_ur(K, odd_t, odd, sqrt_t);
+    for(i = 0 ; i < (4+1)/2 ; i++) {
+        odd_t[i] ^= even[i];
+    }
+    /* mpfq_2_128_print(K, stdout, odd_t); */
+    mpfq_2_128_reduce(K, r, odd_t);
+    /* mpfq_2_128_print(K, stdout, r); */
+    /* fprintf(stdout, "\n"); */
+    /* fflush(stdout); */
 }
 
 static inline
-void mpfq_2_128_add_ui(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s, unsigned long x)
+void mpfq_2_128_pow(mpfq_2_128_dst_field k, mpfq_2_128_dst_elt res, mpfq_2_128_src_elt r, unsigned long * x, size_t n)
 {
-	mpfq_2_128_set(K, r, s);
-	r[0] ^= (x & 1UL);
+    mpfq_2_128_elt u, a;
+    long i, j, lead;     /* it is a signed type */
+    unsigned long mask;
+    
+    assert (n>0);
+    
+    /* get the correct (i,j) position of the most significant bit in x */
+    for(i = n-1; i>=0 && x[i]==0; i--)
+        ;
+    if (i < 0) {
+        mpfq_2_128_set_ui(k, res, 0);
+        return;
+    }
+    j = 32 - 1;
+    mask = (1UL<<j);
+    for( ; (x[i]&mask)==0 ;j--, mask>>=1)
+        ;
+    lead = i*32+j;      /* Ensured. */
+    
+    mpfq_2_128_init(k, &u);
+    mpfq_2_128_init(k, &a);
+    mpfq_2_128_set(k, a, r);
+    for( ; lead > 0; lead--) {
+        if (j-- == 0) {
+            i--;
+            j = 32-1;
+            mask = (1UL<<j);
+        } else {
+            mask >>= 1;
+        }
+        if (x[i]&mask) {
+            mpfq_2_128_sqr(k, u, a);
+            mpfq_2_128_mul(k, a, u, r);
+        } else {
+            mpfq_2_128_sqr(k, a,a);
+        }
+    }
+    mpfq_2_128_set(k, res, a);
+    mpfq_2_128_clear(k, &u);
+    mpfq_2_128_clear(k, &a);
 }
 
 static inline
-void mpfq_2_128_mul_ui(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s, unsigned long x)
+void mpfq_2_128_add_ui(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s, unsigned long x)
 {
-	if (x & 1UL) {
-		mpfq_2_128_set(K, r, s);
-	} else {
-		memset(r, 0, sizeof(mpfq_2_128_elt));
-	}
+    mpfq_2_128_set(K, r, s);
+    r[0] ^= x & 1UL;
 }
 
 static inline
-int mpfq_2_128_inv(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s)
+void mpfq_2_128_mul_ui(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s, unsigned long x)
 {
-	mp_limb_t a[5] = { 0x80000000UL, 0x43UL, 0x0UL, 0x0UL, 0x80000000UL, };
-	mp_limb_t b[5];
-	mp_limb_t u[5] = { 0, };
-	mp_limb_t v[5] = { 1, 0, };
-	mp_limb_t x;
-	mp_size_t ia, ib;
-	int i,d;
-	
-	if (mpfq_2_128_cmp_ui(K, s, 0UL) == 0)
-	    return 0;
-	{
-		mp_limb_t z;
-		z = s[0] << 31;
-		b[0] = z;
-		z = s[0] >>  1 ^ s[1] << 31;
-		b[1] = z;
-		z = s[1] >>  1 ^ s[2] << 31;
-		b[2] = z;
-		z = s[2] >>  1 ^ s[3] << 31;
-		b[3] = z;
-		z = s[3] >>  1;
-		b[4] = z;
-	}
-	ib = clzlx(b, 5);
-	ia = 0;
-	
-	mpfq_2_128_longshift_left(b,b,5,ib);
-	
-	for(d = ib - ia ; ; ) {
-	        if (d == 0) {
-	                for(i = 0 ; i < 5 ; i++) v[i] ^= u[i];
-			b[0] ^= a[0]; x = b[0];
-			b[1] ^= a[1]; x |= b[1];
-			b[2] ^= a[2]; x |= b[2];
-			b[3] ^= a[3]; x |= b[3];
-			b[4] ^= a[4]; x |= b[4];
-	                if (!x) { memcpy(r,u,5 * sizeof(mp_limb_t)); return 1; }
-	                mp_limb_t t = clzlx(b,5);
-	                ib += t;
-	                d += t;
-	                mpfq_2_128_longshift_left(b,b,5,t);
-	        }
-	        for(;d > 0;) {
-	                mpfq_2_128_longaddshift_left(u,v,5,d);
-			a[0] ^= b[0]; x = a[0];
-			a[1] ^= b[1]; x |= a[1];
-			a[2] ^= b[2]; x |= a[2];
-			a[3] ^= b[3]; x |= a[3];
-			a[4] ^= b[4]; x |= a[4];
-	                if (!x) { memcpy(r,v,5 * sizeof(mp_limb_t)); return 1; }
-	                mp_limb_t t = clzlx(a,5);
-	                ia += t;
-	                d -= t;
-	                mpfq_2_128_longshift_left(a,a,5,t);
-	        } 
-	        if (d == 0) {
-	                for(i = 0 ; i < 5 ; i++) u[i] ^= v[i];
-			a[0] ^= b[0]; x = a[0];
-			a[1] ^= b[1]; x |= a[1];
-			a[2] ^= b[2]; x |= a[2];
-			a[3] ^= b[3]; x |= a[3];
-			a[4] ^= b[4]; x |= a[4];
-	                if (!x) { memcpy(r,v,5 * sizeof(mp_limb_t)); return 1; }
-	                mp_limb_t t = clzlx(a,5);
-	                ia += t;
-	                d -= t;
-	                mpfq_2_128_longshift_left(a,a,5,t);
-	        }
-	        for(;d < 0;) {
-	                mpfq_2_128_longaddshift_left(v,u,5,-d);
-			b[0] ^= a[0]; x = b[0];
-			b[1] ^= a[1]; x |= b[1];
-			b[2] ^= a[2]; x |= b[2];
-			b[3] ^= a[3]; x |= b[3];
-			b[4] ^= a[4]; x |= b[4];
-	                if (!x) { memcpy(r,u,5 * sizeof(mp_limb_t)); return 1; }
-	                mp_limb_t t = clzlx(b,5);
-	                ib += t;
-	                d += t;
-	                mpfq_2_128_longshift_left(b,b,5,t);
-	        }
-	}
+    if (x & 1UL) {
+        mpfq_2_128_set(K, r, s);
+    } else {
+        memset(r, 0, sizeof(mpfq_2_128_elt));
+    }
+}
+
+static inline
+void mpfq_2_128_add_uipoly(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s, unsigned long x)
+{
+    mpfq_2_128_set(K, r, s);
+    r[0] ^= x;
+}
+
+static inline
+void mpfq_2_128_mul_uipoly(mpfq_2_128_dst_field k, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s, unsigned long x)
+{
+    mpfq_2_128_elt xx;
+    mpfq_2_128_init(k, &xx);
+    mpfq_2_128_set_uipoly(k, xx, x);
+    mpfq_2_128_mul(k, r, s, xx);
+    mpfq_2_128_clear(k, &xx);
+}
+
+static inline
+int mpfq_2_128_inv(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s)
+{
+    mp_limb_t a[5] = { 0x80000000UL, 0x43UL, 0x0UL, 0x0UL, 0x80000000UL, };
+    mp_limb_t b[5];
+    mp_limb_t u[5] = { 0, };
+    mp_limb_t v[5] = { 1, 0, };
+    mp_limb_t x;
+    mp_size_t ia, ib;
+    int i,d;
+    
+    if (mpfq_2_128_cmp_ui(K, s, 0UL) == 0)
+        return 0;
+    {
+        unsigned long z;
+        z = s[0] << 31;
+        b[0] = z;
+        z = s[0] >>  1 ^ s[1] << 31;
+        b[1] = z;
+        z = s[1] >>  1 ^ s[2] << 31;
+        b[2] = z;
+        z = s[2] >>  1 ^ s[3] << 31;
+        b[3] = z;
+        z = s[3] >>  1;
+        b[4] = z;
+    }
+    ib = clzlx(b, 5);
+    ia = 0;
+    
+    mpfq_2_128_longshift_left(b,b,5,ib);
+    
+    for(d = ib - ia ; ; ) {
+            if (d == 0) {
+                    for(i = 0 ; i < 5 ; i++) v[i] ^= u[i];
+            b[0] ^= a[0]; x = b[0];
+            b[1] ^= a[1]; x |= b[1];
+            b[2] ^= a[2]; x |= b[2];
+            b[3] ^= a[3]; x |= b[3];
+            b[4] ^= a[4]; x |= b[4];
+                    if (!x) { memcpy(r,u,4 * sizeof(mp_limb_t)); return 1; }
+                    mp_limb_t t = clzlx(b,5);
+                    ib += t;
+                    d += t;
+                    mpfq_2_128_longshift_left(b,b,5,t);
+            }
+            for(;d > 0;) {
+                    mpfq_2_128_longaddshift_left(u,v,5,d);
+            a[0] ^= b[0]; x = a[0];
+            a[1] ^= b[1]; x |= a[1];
+            a[2] ^= b[2]; x |= a[2];
+            a[3] ^= b[3]; x |= a[3];
+            a[4] ^= b[4]; x |= a[4];
+                    if (!x) { memcpy(r,v,4 * sizeof(mp_limb_t)); return 1; }
+                    mp_limb_t t = clzlx(a,5);
+                    ia += t;
+                    d -= t;
+                    mpfq_2_128_longshift_left(a,a,5,t);
+            } 
+            if (d == 0) {
+                    for(i = 0 ; i < 5 ; i++) u[i] ^= v[i];
+            a[0] ^= b[0]; x = a[0];
+            a[1] ^= b[1]; x |= a[1];
+            a[2] ^= b[2]; x |= a[2];
+            a[3] ^= b[3]; x |= a[3];
+            a[4] ^= b[4]; x |= a[4];
+                    if (!x) { memcpy(r,v,4 * sizeof(mp_limb_t)); return 1; }
+                    mp_limb_t t = clzlx(a,5);
+                    ia += t;
+                    d -= t;
+                    mpfq_2_128_longshift_left(a,a,5,t);
+            }
+            for(;d < 0;) {
+                    mpfq_2_128_longaddshift_left(v,u,5,-d);
+            b[0] ^= a[0]; x = b[0];
+            b[1] ^= a[1]; x |= b[1];
+            b[2] ^= a[2]; x |= b[2];
+            b[3] ^= a[3]; x |= b[3];
+            b[4] ^= a[4]; x |= b[4];
+                    if (!x) { memcpy(r,u,4 * sizeof(mp_limb_t)); return 1; }
+                    mp_limb_t t = clzlx(b,5);
+                    ib += t;
+                    d += t;
+                    mpfq_2_128_longshift_left(b,b,5,t);
+            }
+    }
 }
 
 static inline
 void mpfq_2_128_longaddshift_left(unsigned long * dst, const unsigned long * src, int n, int s)
 {
-	int m = s / 32;
-	int i;
-	s %= 32;
-	dst[m] ^= src[0] << s;
-	for(i = 1 ; i < n-m ; i++) {
-	    dst[m+i] ^= src[i] << s ^ src[i-1] >> (32-s);
-	}
+    int m = s / 32;
+    int i;
+    s %= 32;
+    if (s>0) {
+        for(i = n-m-1 ; i > 0 ; i--) {
+            dst[m+i] ^= src[i] << s ^ src[i-1] >> (32-s);
+        }
+        dst[m] ^= src[0] << s;
+    } else {
+        for(i = n-m-1 ; i > 0 ; i--) {
+            dst[m+i] ^= src[i];
+        }
+        dst[m] ^= src[0];
+    }
 }
 
 static inline
 void mpfq_2_128_longshift_left(unsigned long * dst, const unsigned long * src, int n, int s)
 {
-	int m = s / 32;
-	int i;
-	s %= 32;
-	for(i = n-m-1 ; i > 0 ; i--) {
-	    dst[m+i] = src[i] << s ^ src[i-1] >> (32-s);
-	}
-	dst[m] = src[0] << s;
-	for(i = m-1 ; i>= 0 ; i--) {
-	    dst[i] = 0UL;
-	}
+    int m = s / 32;
+    int i;
+    s %= 32;
+    if (s > 0) {
+        for(i = n-m-1 ; i > 0 ; i--) {
+            dst[m+i] = src[i] << s ^ src[i-1] >> (32-s);
+        }
+        dst[m] = src[0] << s;
+    } else {
+        for(i = n-m-1 ; i > 0 ; i--) {
+            dst[m+i] = src[i];
+        }
+        dst[m] = src[0];
+    }
+    for(i = m-1 ; i>= 0 ; i--) {
+        dst[i] = 0UL;
+    }
+    
 }
 
 static inline
-void mpfq_2_128_as_solve(mpfq_2_128_field_ptr K, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s)
+void mpfq_2_128_as_solve(mpfq_2_128_dst_field K, mpfq_2_128_dst_elt r, mpfq_2_128_src_elt s)
 {
-	static const mpfq_2_128_elt t[128] = {
-		{ 0xa4b20b08UL, 0x676aac9fUL, 0xf4731af9UL, 0x295ac0b1UL, },
-		{ 0x766af404UL, 0x929959afUL, 0xee970b89UL, 0xe5da5595UL, },
-		{ 0x766af406UL, 0x929959afUL, 0xee970b89UL, 0xe5da5595UL, },
-		{ 0x3404a20cUL, 0x7783f733UL, 0x4350bfe6UL, 0x4e9826c7UL, },
-		{ 0x766af402UL, 0x929959afUL, 0xee970b89UL, 0xe5da5595UL, },
-		{ 0x83074e6aUL, 0x7dc714cbUL, 0xd7da34b0UL, 0x2aaea79aUL, },
-		{ 0x3404a204UL, 0x7783f733UL, 0x4350bfe6UL, 0x4e9826c7UL, },
-		{ 0xd2d9fe18UL, 0xf5f3f531UL, 0x1ae41171UL, 0xcc809524UL, },
-		{ 0x766af412UL, 0x929959afUL, 0xee970b89UL, 0xe5da5595UL, },
-		{ 0x8ac85b44UL, 0x77cb862eUL, 0xd159ce96UL, 0x4e983687UL, },
-		{ 0x83074e4aUL, 0x7dc714cbUL, 0xd7da34b0UL, 0x2aaea79aUL, },
-		{ 0x6aaff56UL, 0xf73fcb3cUL, 0xaf144aafUL, 0xaae2ab6aUL, },
-		{ 0x3404a244UL, 0x7783f733UL, 0x4350bfe6UL, 0x4e9826c7UL, },
-		{ 0x40603f62UL, 0x893fe9caUL, 0xcd5792ddUL, 0xe62f327cUL, },
-		{ 0xd2d9fe98UL, 0xf5f3f531UL, 0x1ae41171UL, 0xcc809524UL, },
-		{ 0xd453b626UL, 0xe1336bc7UL, 0x3f47c90bUL, 0xab52f032UL, },
-		{ 0x766af512UL, 0x929959afUL, 0xee970b89UL, 0xe5da5595UL, },
-		{ 0xabf4573aUL, 0x79a6a089UL, 0xd75338b4UL, 0x2abe34baUL, },
-		{ 0x8ac85944UL, 0x77cb862eUL, 0xd159ce96UL, 0x4e983687UL, },
-		{ 0x232562fcUL, 0x1a9cbef8UL, 0xdcc72f2eUL, 0x1e8ccb9UL, },
-		{ 0x83074a4aUL, 0x7dc714cbUL, 0xd7da34b0UL, 0x2aaea79aUL, },
-		{ 0x4a80e48cUL, 0xce869b2UL, 0x21f3dc1aUL, 0x2442c32UL, },
-		{ 0x6aaf756UL, 0xf73fcb3cUL, 0xaf144aafUL, 0xaae2ab6aUL, },
-		{ 0xdd9aa228UL, 0xeb3ff936UL, 0x39c4323dUL, 0xcf64612fUL, },
-		{ 0x3404b244UL, 0x7783f733UL, 0x4350bfe6UL, 0x4e9826c7UL, },
-		{ 0x57572458UL, 0xf0d5382aUL, 0x880d4909UL, 0xcc911696UL, },
-		{ 0x40601f62UL, 0x893fe9caUL, 0xcd5792ddUL, 0xe62f327cUL, },
-		{ 0xe5db2834UL, 0x697f6478UL, 0x29d28cf2UL, 0x4d7cd7ccUL, },
-		{ 0xd2d9be98UL, 0xf5f3f531UL, 0x1ae41171UL, 0xcc809524UL, },
-		{ 0x1a5b86a4UL, 0xfc0956caUL, 0x569146a7UL, 0xccc99127UL, },
-		{ 0xd4533626UL, 0xe1336bc7UL, 0x3f47c90bUL, 0xab52f032UL, },
-		{ 0x1eeb82UL, 0x14f5986bUL, 0xdacd5b1cUL, 0x65cece94UL, },
-		{ 0x766bf512UL, 0x929959afUL, 0xee970b89UL, 0xe5da5595UL, },
-		{ 0xc7c3e73aUL, 0x6fe27169UL, 0xd509ca74UL, 0x2b0e7fa2UL, },
-		{ 0xabf6573aUL, 0x79a6a089UL, 0xd75338b4UL, 0x2abe34baUL, },
-		{ 0x85980142UL, 0x11d35538UL, 0x48241324UL, 0x65df4d26UL, },
-		{ 0x8acc5944UL, 0x77cb862eUL, 0xd159ce96UL, 0x4e983687UL, },
-		{ 0x2af671a4UL, 0xef6fd21dUL, 0x70ef2af7UL, 0xcf74f70eUL, },
-		{ 0x232d62fcUL, 0x1a9cbef8UL, 0xdcc72f2eUL, 0x1e8ccb9UL, },
-		{ 0x99490f58UL, 0xf91a9d84UL, 0x3b16cdf9UL, 0xcec4b917UL, },
-		{ 0x83174a4aUL, 0x7dc714cbUL, 0xd7da34b0UL, 0x2aaea79aUL, },
-		{ 0x6b513bdcUL, 0x99a6cf20UL, 0x175f6247UL, 0x83f16f99UL, },
-		{ 0x4aa0e48cUL, 0xce869b2UL, 0x21f3dc1aUL, 0x2442c32UL, },
-		{ 0xe84671c0UL, 0x1b9e27ebUL, 0x6a2aa908UL, 0x3f562a9UL, },
-		{ 0x6eaf756UL, 0xf73fcb3cUL, 0xaf144aafUL, 0xaae2ab6aUL, },
-		{ 0xcddeebd4UL, 0xfcd6d526UL, 0xe11bcce3UL, 0xccc9c07aUL, },
-		{ 0xdd1aa228UL, 0xeb3ff936UL, 0x39c4323dUL, 0xcf64612fUL, },
-		{ 0xe8467196UL, 0xe461dfebUL, 0xc09556f7UL, 0xa95fc803UL, },
-		{ 0x3504b244UL, 0x7783f733UL, 0x4350bfe6UL, 0x4e9826c7UL, },
-		{ 0xc15c7384UL, 0x7b20ee03UL, 0xf0ab5b2eUL, 0x4cdc1ab0UL, },
-		{ 0x55572458UL, 0xf0d5382aUL, 0x880d4909UL, 0xcc911696UL, },
-		{ 0xfe68cf6aUL, 0xfb48c8c7UL, 0x1da11d79UL, 0xaaba6896UL, },
-		{ 0x44601f62UL, 0x893fe9caUL, 0xcd5792ddUL, 0xe62f327cUL, },
-		{ 0x638d3beeUL, 0x938b5c70UL, 0xee209847UL, 0xe5db5416UL, },
-		{ 0xeddb2834UL, 0x697f6478UL, 0x29d28cf2UL, 0x4d7cd7ccUL, },
-		{ 0xa7e512ceUL, 0xb49fa26UL, 0x95e2e76eUL, 0x6437818bUL, },
-		{ 0xc2d9be98UL, 0xf5f3f531UL, 0x1ae41171UL, 0xcc809524UL, },
-		{ 0x22ddf34UL, 0x7868a299UL, 0x46184ba2UL, 0x4cd90207UL, },
-		{ 0x3a5b86a4UL, 0xfc0956caUL, 0x569146a7UL, 0xccc99127UL, },
-		{ 0x7e8e76cUL, 0x8f1d24e4UL, 0xefbe4a8bUL, 0x824171dcUL, },
-		{ 0x94533626UL, 0xe1336bc7UL, 0x3f47c90bUL, 0xab52f032UL, },
-		{ 0x2cdc3b5eUL, 0x88711e20UL, 0x1f6bf32bUL, 0xe62e22afUL, },
-		{ 0x801eeb82UL, 0x14f5986bUL, 0xdacd5b1cUL, 0x65cece94UL, },
-		{ 0x27b54520UL, 0x9aadb854UL, 0x23a92e49UL, 0x83f4672bUL, },
-		{ 0x766bf512UL, 0x929959aeUL, 0xee970b89UL, 0xe5da5595UL, },
-		{ 0xbeccf94cUL, 0x48711dUL, 0x92097172UL, 0x1040UL, },
-		{ 0xc7c3e73aUL, 0x6fe2716bUL, 0xd509ca74UL, 0x2b0e7fa2UL, },
-		{ 0xd0d7976cUL, 0x99d6b267UL, 0x7a7437cbUL, 0x81edd40aUL, },
-		{ 0xabf6573aUL, 0x79a6a08dUL, 0xd75338b4UL, 0x2abe34baUL, },
-		{ 0x1a5d4462UL, 0x84dd884dUL, 0xeccdf96dUL, 0xe46a1e8dUL, },
-		{ 0x85980142UL, 0x11d35530UL, 0x48241324UL, 0x65df4d26UL, },
-		{ 0x3a605920UL, 0x8ab1aeebUL, 0xeac70f69UL, 0x804c1cb1UL, },
-		{ 0x8acc5944UL, 0x77cb863eUL, 0xd159ce96UL, 0x4e983687UL, },
-		{ 0x7dbd55aaUL, 0xe0451437UL, 0x52499e01UL, 0xa94f4b32UL, },
-		{ 0x2af671a4UL, 0xef6fd23dUL, 0x70ef2af7UL, 0xcf74f70eUL, },
-		{ 0xf56f619eUL, 0x978a93f3UL, 0x831189d3UL, 0xe7d77da5UL, },
-		{ 0x232d62fcUL, 0x1a9cbeb8UL, 0xdcc72f2eUL, 0x1e8ccb9UL, },
-		{ 0xb0a16ef4UL, 0x7a5109eaUL, 0x2b68e52aUL, 0x4cdd0f36UL, },
-		{ 0x99490f58UL, 0xf91a9d04UL, 0x3b16cdf9UL, 0xcec4b917UL, },
-		{ 0x88d05912UL, 0x8830781eUL, 0x7bf23369UL, 0xe4329c3dUL, },
-		{ 0x83174a4aUL, 0x7dc715cbUL, 0xd7da34b0UL, 0x2aaea79aUL, },
-		{ 0xcff334e0UL, 0x8618bcbfUL, 0x59738741UL, 0x82082082UL, },
-		{ 0x6b513bdcUL, 0x99a6cd20UL, 0x175f6247UL, 0x83f16f99UL, },
-		{ 0xf4adcc3aUL, 0x6297e291UL, 0xd1181a84UL, 0x294b124eUL, },
-		{ 0x4aa0e48cUL, 0xce86db2UL, 0x21f3dc1aUL, 0x2442c32UL, },
-		{ 0x6550119eUL, 0x9b696b66UL, 0x14466493UL, 0xe78fff41UL, },
-		{ 0xe84671c0UL, 0x1b9e2febUL, 0x6a2aa908UL, 0x3f562a9UL, },
-		{ 0x63d55a14UL, 0xeb568d9eUL, 0x54a1436bUL, 0xcd78dbfdUL, },
-		{ 0x6eaf756UL, 0xf73fdb3cUL, 0xaf144aafUL, 0xaae2ab6aUL, },
-		{ 0xed722b64UL, 0xfacabbbeUL, 0x1ce38d0fUL, 0xccdd4e7bUL, },
-		{ 0xcddeebd4UL, 0xfcd6f526UL, 0xe11bcce3UL, 0xccc9c07aUL, },
-		{ 0xa43bbf3cUL, 0x1fb4754fUL, 0xb1bf89c6UL, 0x3e5e1ccUL, },
-		{ 0xdd1aa228UL, 0xeb3fb936UL, 0x39c4323dUL, 0xcf64612fUL, },
-		{ 0x172caea2UL, 0x926f68f4UL, 0x3461b455UL, 0xe5da0089UL, },
-		{ 0xe8467196UL, 0xe4615febUL, 0xc09556f7UL, 0xa95fc803UL, },
-		{ 0xcb9d1fd2UL, 0x981cf1dcUL, 0x7b3e87b1UL, 0xe78ae2a7UL, },
-		{ 0x3504b244UL, 0x7782f733UL, 0x4350bfe6UL, 0x4e9826c7UL, },
-		{ 0xc15f72c6UL, 0x6fd777b6UL, 0x2a675b0aUL, 0x2912d422UL, },
-		{ 0xc15c7384UL, 0x7b22ee03UL, 0xf0ab5b2eUL, 0x4cdc1ab0UL, },
-		{ 0x85956fd2UL, 0x96f8740fUL, 0x58d237f1UL, 0xe7d6682eUL, },
-		{ 0x55572458UL, 0xf0d1382aUL, 0x880d4909UL, 0xcc911696UL, },
-		{ 0x33474626UL, 0xe46143c9UL, 0x764a0b4bUL, 0xab4366b0UL, },
-		{ 0xfe68cf6aUL, 0xfb40c8c7UL, 0x1da11d79UL, 0xaaba6896UL, },
-		{ 0xf7de0d9eUL, 0x97849bb7UL, 0x8378aeb3UL, 0xe7d77d71UL, },
-		{ 0x44601f62UL, 0x892fe9caUL, 0xcd5792ddUL, 0xe62f327cUL, },
-		{ 0x382e380eUL, 0xd13f9bdUL, 0xfb5729d6UL, 0x64231d9eUL, },
-		{ 0x638d3beeUL, 0x93ab5c70UL, 0xee209847UL, 0xe5db5416UL, },
-		{ 0x9a557220UL, 0x959811bdUL, 0xa5fe1499UL, 0x81b51ab7UL, },
-		{ 0xeddb2834UL, 0x693f6478UL, 0x29d28cf2UL, 0x4d7cd7ccUL, },
-		{ 0x75a08406UL, 0x678a4ee9UL, 0x43072c12UL, 0x295ab4bbUL, },
-		{ 0xa7e512ceUL, 0xbc9fa26UL, 0x95e2e76eUL, 0x6437818bUL, },
-		{ 0x25989a26UL, 0xef9e1acdUL, 0x8eb165ebUL, 0xab0eead3UL, },
-		{ 0xc2d9be98UL, 0xf4f3f531UL, 0x1ae41171UL, 0xcc809524UL, },
-		{ 0x29b00000UL, 0x10185b9bUL, 0xdb230c00UL, 0x3ba7996UL, },
-		{ 0x22ddf34UL, 0x7a68a299UL, 0x46184ba2UL, 0x4cd90207UL, },
-		{ 0x38765990UL, 0x8261f453UL, 0x10890d05UL, 0x82109320UL, },
-		{ 0x3a5b86a4UL, 0xf80956caUL, 0x569146a7UL, 0xccc99127UL, },
-		{ 0x3db361faUL, 0x7f14722eUL, 0xb92f0c2cUL, 0x2a88e0fbUL, },
-		{ 0x7e8e76cUL, 0x871d24e4UL, 0xefbe4a8bUL, 0x824171dcUL, },
-		{ 0x7d17578aUL, 0x6fb067f4UL, 0xb8989fd8UL, 0x29b11e87UL, },
-		{ 0x94533626UL, 0xf1336bc7UL, 0x3f47c90bUL, 0xab52f032UL, },
-		{ 0x3891e6faUL, 0xdb7ed8cUL, 0xfae1613cUL, 0x38b21c09UL, },
-		{ 0x2cdc3b5eUL, 0xa8711e20UL, 0x1f6bf32bUL, 0xe62e22afUL, },
-		{ 0x2cdc3b6cUL, 0xa8711e20UL, 0x1f6bf32bUL, 0x862e22afUL, },
-		{ 0x801eeb82UL, 0x54f5986bUL, 0xdacd5b1cUL, 0x65cece94UL, },
-		{ 0xc270bdacUL, 0xb1ef36f7UL, 0x770aef73UL, 0x8e8cbdc6UL, },
-		{ 0x27b54520UL, 0x1aadb854UL, 0x23a92e49UL, 0x83f4672bUL, },
-		{ 0x0UL, 0x0UL, 0x0UL, 0x0UL, },
-	};
-	const mpfq_2_128_elt * ptr = t;
-	unsigned int i,j;
-	memset(r, 0, sizeof(mpfq_2_128_elt));
-	for(i = 0 ; i < 4 ; i++) {
-		mp_limb_t a = s[i];
-		for(j = 0 ; j < 32 && ptr != &t[128]; j++, ptr++) {
-			if (a & 1UL) {
-				mpfq_2_128_add(K, r, r, *ptr);
-			}
-			a >>= 1;
-		}
-	}
+    static const mpfq_2_128_elt t[128] = {
+        { 0xa4b20b08UL, 0x676aac9fUL, 0xf4731af9UL, 0x295ac0b1UL, },
+        { 0x766af404UL, 0x929959afUL, 0xee970b89UL, 0xe5da5595UL, },
+        { 0x766af406UL, 0x929959afUL, 0xee970b89UL, 0xe5da5595UL, },
+        { 0x3404a20cUL, 0x7783f733UL, 0x4350bfe6UL, 0x4e9826c7UL, },
+        { 0x766af402UL, 0x929959afUL, 0xee970b89UL, 0xe5da5595UL, },
+        { 0x83074e6aUL, 0x7dc714cbUL, 0xd7da34b0UL, 0x2aaea79aUL, },
+        { 0x3404a204UL, 0x7783f733UL, 0x4350bfe6UL, 0x4e9826c7UL, },
+        { 0xd2d9fe18UL, 0xf5f3f531UL, 0x1ae41171UL, 0xcc809524UL, },
+        { 0x766af412UL, 0x929959afUL, 0xee970b89UL, 0xe5da5595UL, },
+        { 0x8ac85b44UL, 0x77cb862eUL, 0xd159ce96UL, 0x4e983687UL, },
+        { 0x83074e4aUL, 0x7dc714cbUL, 0xd7da34b0UL, 0x2aaea79aUL, },
+        { 0x6aaff56UL, 0xf73fcb3cUL, 0xaf144aafUL, 0xaae2ab6aUL, },
+        { 0x3404a244UL, 0x7783f733UL, 0x4350bfe6UL, 0x4e9826c7UL, },
+        { 0x40603f62UL, 0x893fe9caUL, 0xcd5792ddUL, 0xe62f327cUL, },
+        { 0xd2d9fe98UL, 0xf5f3f531UL, 0x1ae41171UL, 0xcc809524UL, },
+        { 0xd453b626UL, 0xe1336bc7UL, 0x3f47c90bUL, 0xab52f032UL, },
+        { 0x766af512UL, 0x929959afUL, 0xee970b89UL, 0xe5da5595UL, },
+        { 0xabf4573aUL, 0x79a6a089UL, 0xd75338b4UL, 0x2abe34baUL, },
+        { 0x8ac85944UL, 0x77cb862eUL, 0xd159ce96UL, 0x4e983687UL, },
+        { 0x232562fcUL, 0x1a9cbef8UL, 0xdcc72f2eUL, 0x1e8ccb9UL, },
+        { 0x83074a4aUL, 0x7dc714cbUL, 0xd7da34b0UL, 0x2aaea79aUL, },
+        { 0x4a80e48cUL, 0xce869b2UL, 0x21f3dc1aUL, 0x2442c32UL, },
+        { 0x6aaf756UL, 0xf73fcb3cUL, 0xaf144aafUL, 0xaae2ab6aUL, },
+        { 0xdd9aa228UL, 0xeb3ff936UL, 0x39c4323dUL, 0xcf64612fUL, },
+        { 0x3404b244UL, 0x7783f733UL, 0x4350bfe6UL, 0x4e9826c7UL, },
+        { 0x57572458UL, 0xf0d5382aUL, 0x880d4909UL, 0xcc911696UL, },
+        { 0x40601f62UL, 0x893fe9caUL, 0xcd5792ddUL, 0xe62f327cUL, },
+        { 0xe5db2834UL, 0x697f6478UL, 0x29d28cf2UL, 0x4d7cd7ccUL, },
+        { 0xd2d9be98UL, 0xf5f3f531UL, 0x1ae41171UL, 0xcc809524UL, },
+        { 0x1a5b86a4UL, 0xfc0956caUL, 0x569146a7UL, 0xccc99127UL, },
+        { 0xd4533626UL, 0xe1336bc7UL, 0x3f47c90bUL, 0xab52f032UL, },
+        { 0x1eeb82UL, 0x14f5986bUL, 0xdacd5b1cUL, 0x65cece94UL, },
+        { 0x766bf512UL, 0x929959afUL, 0xee970b89UL, 0xe5da5595UL, },
+        { 0xc7c3e73aUL, 0x6fe27169UL, 0xd509ca74UL, 0x2b0e7fa2UL, },
+        { 0xabf6573aUL, 0x79a6a089UL, 0xd75338b4UL, 0x2abe34baUL, },
+        { 0x85980142UL, 0x11d35538UL, 0x48241324UL, 0x65df4d26UL, },
+        { 0x8acc5944UL, 0x77cb862eUL, 0xd159ce96UL, 0x4e983687UL, },
+        { 0x2af671a4UL, 0xef6fd21dUL, 0x70ef2af7UL, 0xcf74f70eUL, },
+        { 0x232d62fcUL, 0x1a9cbef8UL, 0xdcc72f2eUL, 0x1e8ccb9UL, },
+        { 0x99490f58UL, 0xf91a9d84UL, 0x3b16cdf9UL, 0xcec4b917UL, },
+        { 0x83174a4aUL, 0x7dc714cbUL, 0xd7da34b0UL, 0x2aaea79aUL, },
+        { 0x6b513bdcUL, 0x99a6cf20UL, 0x175f6247UL, 0x83f16f99UL, },
+        { 0x4aa0e48cUL, 0xce869b2UL, 0x21f3dc1aUL, 0x2442c32UL, },
+        { 0xe84671c0UL, 0x1b9e27ebUL, 0x6a2aa908UL, 0x3f562a9UL, },
+        { 0x6eaf756UL, 0xf73fcb3cUL, 0xaf144aafUL, 0xaae2ab6aUL, },
+        { 0xcddeebd4UL, 0xfcd6d526UL, 0xe11bcce3UL, 0xccc9c07aUL, },
+        { 0xdd1aa228UL, 0xeb3ff936UL, 0x39c4323dUL, 0xcf64612fUL, },
+        { 0xe8467196UL, 0xe461dfebUL, 0xc09556f7UL, 0xa95fc803UL, },
+        { 0x3504b244UL, 0x7783f733UL, 0x4350bfe6UL, 0x4e9826c7UL, },
+        { 0xc15c7384UL, 0x7b20ee03UL, 0xf0ab5b2eUL, 0x4cdc1ab0UL, },
+        { 0x55572458UL, 0xf0d5382aUL, 0x880d4909UL, 0xcc911696UL, },
+        { 0xfe68cf6aUL, 0xfb48c8c7UL, 0x1da11d79UL, 0xaaba6896UL, },
+        { 0x44601f62UL, 0x893fe9caUL, 0xcd5792ddUL, 0xe62f327cUL, },
+        { 0x638d3beeUL, 0x938b5c70UL, 0xee209847UL, 0xe5db5416UL, },
+        { 0xeddb2834UL, 0x697f6478UL, 0x29d28cf2UL, 0x4d7cd7ccUL, },
+        { 0xa7e512ceUL, 0xb49fa26UL, 0x95e2e76eUL, 0x6437818bUL, },
+        { 0xc2d9be98UL, 0xf5f3f531UL, 0x1ae41171UL, 0xcc809524UL, },
+        { 0x22ddf34UL, 0x7868a299UL, 0x46184ba2UL, 0x4cd90207UL, },
+        { 0x3a5b86a4UL, 0xfc0956caUL, 0x569146a7UL, 0xccc99127UL, },
+        { 0x7e8e76cUL, 0x8f1d24e4UL, 0xefbe4a8bUL, 0x824171dcUL, },
+        { 0x94533626UL, 0xe1336bc7UL, 0x3f47c90bUL, 0xab52f032UL, },
+        { 0x2cdc3b5eUL, 0x88711e20UL, 0x1f6bf32bUL, 0xe62e22afUL, },
+        { 0x801eeb82UL, 0x14f5986bUL, 0xdacd5b1cUL, 0x65cece94UL, },
+        { 0x27b54520UL, 0x9aadb854UL, 0x23a92e49UL, 0x83f4672bUL, },
+        { 0x766bf512UL, 0x929959aeUL, 0xee970b89UL, 0xe5da5595UL, },
+        { 0xbeccf94cUL, 0x48711dUL, 0x92097172UL, 0x1040UL, },
+        { 0xc7c3e73aUL, 0x6fe2716bUL, 0xd509ca74UL, 0x2b0e7fa2UL, },
+        { 0xd0d7976cUL, 0x99d6b267UL, 0x7a7437cbUL, 0x81edd40aUL, },
+        { 0xabf6573aUL, 0x79a6a08dUL, 0xd75338b4UL, 0x2abe34baUL, },
+        { 0x1a5d4462UL, 0x84dd884dUL, 0xeccdf96dUL, 0xe46a1e8dUL, },
+        { 0x85980142UL, 0x11d35530UL, 0x48241324UL, 0x65df4d26UL, },
+        { 0x3a605920UL, 0x8ab1aeebUL, 0xeac70f69UL, 0x804c1cb1UL, },
+        { 0x8acc5944UL, 0x77cb863eUL, 0xd159ce96UL, 0x4e983687UL, },
+        { 0x7dbd55aaUL, 0xe0451437UL, 0x52499e01UL, 0xa94f4b32UL, },
+        { 0x2af671a4UL, 0xef6fd23dUL, 0x70ef2af7UL, 0xcf74f70eUL, },
+        { 0xf56f619eUL, 0x978a93f3UL, 0x831189d3UL, 0xe7d77da5UL, },
+        { 0x232d62fcUL, 0x1a9cbeb8UL, 0xdcc72f2eUL, 0x1e8ccb9UL, },
+        { 0xb0a16ef4UL, 0x7a5109eaUL, 0x2b68e52aUL, 0x4cdd0f36UL, },
+        { 0x99490f58UL, 0xf91a9d04UL, 0x3b16cdf9UL, 0xcec4b917UL, },
+        { 0x88d05912UL, 0x8830781eUL, 0x7bf23369UL, 0xe4329c3dUL, },
+        { 0x83174a4aUL, 0x7dc715cbUL, 0xd7da34b0UL, 0x2aaea79aUL, },
+        { 0xcff334e0UL, 0x8618bcbfUL, 0x59738741UL, 0x82082082UL, },
+        { 0x6b513bdcUL, 0x99a6cd20UL, 0x175f6247UL, 0x83f16f99UL, },
+        { 0xf4adcc3aUL, 0x6297e291UL, 0xd1181a84UL, 0x294b124eUL, },
+        { 0x4aa0e48cUL, 0xce86db2UL, 0x21f3dc1aUL, 0x2442c32UL, },
+        { 0x6550119eUL, 0x9b696b66UL, 0x14466493UL, 0xe78fff41UL, },
+        { 0xe84671c0UL, 0x1b9e2febUL, 0x6a2aa908UL, 0x3f562a9UL, },
+        { 0x63d55a14UL, 0xeb568d9eUL, 0x54a1436bUL, 0xcd78dbfdUL, },
+        { 0x6eaf756UL, 0xf73fdb3cUL, 0xaf144aafUL, 0xaae2ab6aUL, },
+        { 0xed722b64UL, 0xfacabbbeUL, 0x1ce38d0fUL, 0xccdd4e7bUL, },
+        { 0xcddeebd4UL, 0xfcd6f526UL, 0xe11bcce3UL, 0xccc9c07aUL, },
+        { 0xa43bbf3cUL, 0x1fb4754fUL, 0xb1bf89c6UL, 0x3e5e1ccUL, },
+        { 0xdd1aa228UL, 0xeb3fb936UL, 0x39c4323dUL, 0xcf64612fUL, },
+        { 0x172caea2UL, 0x926f68f4UL, 0x3461b455UL, 0xe5da0089UL, },
+        { 0xe8467196UL, 0xe4615febUL, 0xc09556f7UL, 0xa95fc803UL, },
+        { 0xcb9d1fd2UL, 0x981cf1dcUL, 0x7b3e87b1UL, 0xe78ae2a7UL, },
+        { 0x3504b244UL, 0x7782f733UL, 0x4350bfe6UL, 0x4e9826c7UL, },
+        { 0xc15f72c6UL, 0x6fd777b6UL, 0x2a675b0aUL, 0x2912d422UL, },
+        { 0xc15c7384UL, 0x7b22ee03UL, 0xf0ab5b2eUL, 0x4cdc1ab0UL, },
+        { 0x85956fd2UL, 0x96f8740fUL, 0x58d237f1UL, 0xe7d6682eUL, },
+        { 0x55572458UL, 0xf0d1382aUL, 0x880d4909UL, 0xcc911696UL, },
+        { 0x33474626UL, 0xe46143c9UL, 0x764a0b4bUL, 0xab4366b0UL, },
+        { 0xfe68cf6aUL, 0xfb40c8c7UL, 0x1da11d79UL, 0xaaba6896UL, },
+        { 0xf7de0d9eUL, 0x97849bb7UL, 0x8378aeb3UL, 0xe7d77d71UL, },
+        { 0x44601f62UL, 0x892fe9caUL, 0xcd5792ddUL, 0xe62f327cUL, },
+        { 0x382e380eUL, 0xd13f9bdUL, 0xfb5729d6UL, 0x64231d9eUL, },
+        { 0x638d3beeUL, 0x93ab5c70UL, 0xee209847UL, 0xe5db5416UL, },
+        { 0x9a557220UL, 0x959811bdUL, 0xa5fe1499UL, 0x81b51ab7UL, },
+        { 0xeddb2834UL, 0x693f6478UL, 0x29d28cf2UL, 0x4d7cd7ccUL, },
+        { 0x75a08406UL, 0x678a4ee9UL, 0x43072c12UL, 0x295ab4bbUL, },
+        { 0xa7e512ceUL, 0xbc9fa26UL, 0x95e2e76eUL, 0x6437818bUL, },
+        { 0x25989a26UL, 0xef9e1acdUL, 0x8eb165ebUL, 0xab0eead3UL, },
+        { 0xc2d9be98UL, 0xf4f3f531UL, 0x1ae41171UL, 0xcc809524UL, },
+        { 0x29b00000UL, 0x10185b9bUL, 0xdb230c00UL, 0x3ba7996UL, },
+        { 0x22ddf34UL, 0x7a68a299UL, 0x46184ba2UL, 0x4cd90207UL, },
+        { 0x38765990UL, 0x8261f453UL, 0x10890d05UL, 0x82109320UL, },
+        { 0x3a5b86a4UL, 0xf80956caUL, 0x569146a7UL, 0xccc99127UL, },
+        { 0x3db361faUL, 0x7f14722eUL, 0xb92f0c2cUL, 0x2a88e0fbUL, },
+        { 0x7e8e76cUL, 0x871d24e4UL, 0xefbe4a8bUL, 0x824171dcUL, },
+        { 0x7d17578aUL, 0x6fb067f4UL, 0xb8989fd8UL, 0x29b11e87UL, },
+        { 0x94533626UL, 0xf1336bc7UL, 0x3f47c90bUL, 0xab52f032UL, },
+        { 0x3891e6faUL, 0xdb7ed8cUL, 0xfae1613cUL, 0x38b21c09UL, },
+        { 0x2cdc3b5eUL, 0xa8711e20UL, 0x1f6bf32bUL, 0xe62e22afUL, },
+        { 0x2cdc3b6cUL, 0xa8711e20UL, 0x1f6bf32bUL, 0x862e22afUL, },
+        { 0x801eeb82UL, 0x54f5986bUL, 0xdacd5b1cUL, 0x65cece94UL, },
+        { 0xc270bdacUL, 0xb1ef36f7UL, 0x770aef73UL, 0x8e8cbdc6UL, },
+        { 0x27b54520UL, 0x1aadb854UL, 0x23a92e49UL, 0x83f4672bUL, },
+        { 0x0UL, 0x0UL, 0x0UL, 0x0UL, },
+    };
+    const mpfq_2_128_elt * ptr = t;
+    unsigned int i,j;
+    memset(r, 0, sizeof(mpfq_2_128_elt));
+    for(i = 0 ; i < 4 ; i++) {
+        mp_limb_t a = s[i];
+        for(j = 0 ; j < 32 && ptr != &t[128]; j++, ptr++) {
+            if (a & 1UL) {
+                mpfq_2_128_add(K, r, r, *ptr);
+            }
+            a >>= 1;
+        }
+    }
 }
 
 static inline
-unsigned long mpfq_2_128_trace(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_src_elt s)
+unsigned long mpfq_2_128_trace(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_src_elt s)
 {
-	return ((s[3]>>31) ^ (s[3]>>25)) & 1;
+    return ((s[3]>>31) ^ (s[3]>>25)) & 1;
 }
 
 static inline
-void mpfq_2_128_mul_ur(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt_ur t, mpfq_2_128_src_elt s1, mpfq_2_128_src_elt s2)
+void mpfq_2_128_elt_ur_set(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt_ur r, mpfq_2_128_src_elt_ur s)
 {
-	/* basecase e1=128 e2=128 slice=4 sse2=64x2 */
-	typedef uint64_t v2di __attribute__ ((vector_size (16)));
-	typedef union { v2di s; mp_limb_t x[4]; } v2di_proxy;
-	typedef uint32_t v4si __attribute__ ((vector_size (16)));
-#define SHL(x,r) (v2di)__builtin_ia32_psllqi128   ((x),(r))
-#define SHR(x,r) (v2di)__builtin_ia32_psrlqi128   ((x),(r))
-#define SHLD(x,r) (v2di)__builtin_ia32_pslldqi128 ((x),(r))
-#define SHRD(x,r) (v2di)__builtin_ia32_psrldqi128 ((x),(r))
-	v2di u;
-	v2di t0;
-	v2di t1;
-	v2di t2;
-	
-	v2di g[16];
-	/* gray code walk */
-	v2di b0 = (v2di) (v4si) { s2[0], s2[1], s2[2], s2[3], };
-	v2di b1 = SHL(b0, 1);
-	v2di b2 = SHL(b0, 2);
-	v2di b3 = SHL(b0, 3);
-	v2di y = (v2di) { 0, };
-	g[ 0] = y; y  = b0;
-	g[ 1] = y; y ^= b1;
-	g[ 3] = y; y  = b1;
-	g[ 2] = y; y ^= b2;
-	g[ 6] = y; y ^= b0;
-	g[ 7] = y; y ^= b1;
-	g[ 5] = y; y  = b2;
-	g[ 4] = y; y ^= b3;
-	g[12] = y; y ^= b0;
-	g[13] = y; y ^= b1;
-	g[15] = y; y ^= b0;
-	g[14] = y; y ^= b2;
-	g[10] = y; y ^= b0;
-	g[11] = y; y ^= b1;
-	g[ 9] = y; y  = b3;
-	g[ 8] = y;
-	
-	/* round 0 */
-	/* writing 64 at 0+0 from 64 */
-	u = g[s1[0]       & 15];
-	t0  = u;
-	/* writing 64 at 0+4 from 64 */
-	u = g[s1[0] >>  4 & 15];
-	t0 ^= SHL(u,  4); t1  = SHR(u, 60);
-	/* writing 64 at 0+8 from 64 */
-	u = g[s1[0] >>  8 & 15];
-	t0 ^= SHL(u,  8); t1 ^= SHR(u, 56);
-	/* writing 64 at 0+12 from 64 */
-	u = g[s1[0] >> 12 & 15];
-	t0 ^= SHL(u, 12); t1 ^= SHR(u, 52);
-	/* writing 64 at 0+16 from 64 */
-	u = g[s1[0] >> 16 & 15];
-	t0 ^= SHL(u, 16); t1 ^= SHR(u, 48);
-	/* writing 64 at 0+20 from 64 */
-	u = g[s1[0] >> 20 & 15];
-	t0 ^= SHL(u, 20); t1 ^= SHR(u, 44);
-	/* writing 64 at 0+24 from 64 */
-	u = g[s1[0] >> 24 & 15];
-	t0 ^= SHL(u, 24); t1 ^= SHR(u, 40);
-	/* writing 64 at 0+28 from 64 */
-	u = g[s1[0] >> 28 & 15];
-	t0 ^= SHL(u, 28); t1 ^= SHR(u, 36);
-	/* writing 64 at 0+32 from 64 */
-	u = g[s1[1]       & 15];
-	t0 ^= SHL(u, 32); t1 ^= SHR(u, 32);
-	/* writing 64 at 0+36 from 64 */
-	u = g[s1[1] >>  4 & 15];
-	t0 ^= SHL(u, 36); t1 ^= SHR(u, 28);
-	/* writing 64 at 0+40 from 64 */
-	u = g[s1[1] >>  8 & 15];
-	t0 ^= SHL(u, 40); t1 ^= SHR(u, 24);
-	/* writing 64 at 0+44 from 64 */
-	u = g[s1[1] >> 12 & 15];
-	t0 ^= SHL(u, 44); t1 ^= SHR(u, 20);
-	/* writing 64 at 0+48 from 64 */
-	u = g[s1[1] >> 16 & 15];
-	t0 ^= SHL(u, 48); t1 ^= SHR(u, 16);
-	/* writing 64 at 0+52 from 64 */
-	u = g[s1[1] >> 20 & 15];
-	t0 ^= SHL(u, 52); t1 ^= SHR(u, 12);
-	/* writing 64 at 0+56 from 64 */
-	u = g[s1[1] >> 24 & 15];
-	t0 ^= SHL(u, 56); t1 ^= SHR(u,  8);
-	/* writing 64 at 0+60 from 64 */
-	u = g[s1[1] >> 28 & 15];
-	t0 ^= SHL(u, 60); t1 ^= SHR(u,  4);
-	
-	/* round 1 */
-	/* writing 64 at 64+0 from 64 */
-	u = g[s1[2]       & 15];
-	t1 ^= u;
-	/* writing 64 at 64+4 from 64 */
-	u = g[s1[2] >>  4 & 15];
-	t1 ^= SHL(u,  4); t2  = SHR(u, 60);
-	/* writing 64 at 64+8 from 64 */
-	u = g[s1[2] >>  8 & 15];
-	t1 ^= SHL(u,  8); t2 ^= SHR(u, 56);
-	/* writing 64 at 64+12 from 64 */
-	u = g[s1[2] >> 12 & 15];
-	t1 ^= SHL(u, 12); t2 ^= SHR(u, 52);
-	/* writing 64 at 64+16 from 64 */
-	u = g[s1[2] >> 16 & 15];
-	t1 ^= SHL(u, 16); t2 ^= SHR(u, 48);
-	/* writing 64 at 64+20 from 64 */
-	u = g[s1[2] >> 20 & 15];
-	t1 ^= SHL(u, 20); t2 ^= SHR(u, 44);
-	/* writing 64 at 64+24 from 64 */
-	u = g[s1[2] >> 24 & 15];
-	t1 ^= SHL(u, 24); t2 ^= SHR(u, 40);
-	/* writing 64 at 64+28 from 64 */
-	u = g[s1[2] >> 28 & 15];
-	t1 ^= SHL(u, 28); t2 ^= SHR(u, 36);
-	/* writing 64 at 64+32 from 64 */
-	u = g[s1[3]       & 15];
-	t1 ^= SHL(u, 32); t2 ^= SHR(u, 32);
-	/* writing 64 at 64+36 from 64 */
-	u = g[s1[3] >>  4 & 15];
-	t1 ^= SHL(u, 36); t2 ^= SHR(u, 28);
-	/* writing 64 at 64+40 from 64 */
-	u = g[s1[3] >>  8 & 15];
-	t1 ^= SHL(u, 40); t2 ^= SHR(u, 24);
-	/* writing 64 at 64+44 from 64 */
-	u = g[s1[3] >> 12 & 15];
-	t1 ^= SHL(u, 44); t2 ^= SHR(u, 20);
-	/* writing 64 at 64+48 from 64 */
-	u = g[s1[3] >> 16 & 15];
-	t1 ^= SHL(u, 48); t2 ^= SHR(u, 16);
-	/* writing 64 at 64+52 from 64 */
-	u = g[s1[3] >> 20 & 15];
-	t1 ^= SHL(u, 52); t2 ^= SHR(u, 12);
-	/* writing 64 at 64+56 from 64 */
-	u = g[s1[3] >> 24 & 15];
-	t1 ^= SHL(u, 56); t2 ^= SHR(u,  8);
-	/* writing 64 at 64+60 from 64 */
-	u = g[s1[3] >> 28 & 15];
-	t1 ^= SHL(u, 60); t2 ^= SHR(u,  4);
-	/* end */
-	
-	/* repair steps */
-	v2di v1 = (v2di) (v4si) { s1[0], s1[1], s1[0], s1[1], };
-	v2di v2 = (v2di) (v4si) { s1[2], s1[3], s1[2], s1[3], };
-	v2di w;
-	v2di m = (v2di) (v4si) { 0xeeeeeeeeUL, 0xeeeeeeeeUL, 0xeeeeeeeeUL, 0xeeeeeeeeUL, };
-	w = -SHR(b0,63);
-	v1 = SHR(v1 & m, 1);
-	t1 ^= v1 & w;
-	v2 = SHR(v2 & m, 1);
-	t2 ^= v2 & w;
-	w = -SHR(b1,63);
-	v1 = SHR(v1 & m, 1);
-	t1 ^= v1 & w;
-	v2 = SHR(v2 & m, 1);
-	t2 ^= v2 & w;
-	w = -SHR(b2,63);
-	v1 = SHR(v1 & m, 1);
-	t1 ^= v1 & w;
-	v2 = SHR(v2 & m, 1);
-	t2 ^= v2 & w;
-	
-	/* store result */
-	{
-		v2di_proxy r;
-		r.s = t0 ^ SHLD(t1, 64);
-		t[0] = r.x[0];
-		t[1] = r.x[1];
-		t[2] = r.x[2];
-		t[3] = r.x[3];
-	}
-	
-	{
-		v2di_proxy r;
-		r.s = t2 ^ SHRD(t1, 64);
-		t[4] = r.x[0];
-		t[5] = r.x[1];
-		t[6] = r.x[2];
-		t[7] = r.x[3];
-	}
+    memcpy(r, s, sizeof(mpfq_2_128_elt_ur));
+}
+
+static inline
+void mpfq_2_128_elt_ur_add(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt_ur r, mpfq_2_128_src_elt_ur s1, mpfq_2_128_src_elt_ur s2)
+{
+    int i;
+    for(i = 0 ; i < 8 ; i++)
+        r[i] = s1[i] ^ s2[i];
+}
+
+static inline
+void mpfq_2_128_mul_ur(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt_ur t, mpfq_2_128_src_elt s1, mpfq_2_128_src_elt s2)
+{
+    /* default mul 128x128 */
+    typedef union { __v2di s;
+    unsigned long x[4];
+    uint64_t x64[2];
+     } __v2di_proxy;
+#define SHL(x, r) _mm_slli_epi64((x), (r))
+#define SHR(x, r) _mm_srli_epi64((x), (r))
+#define SHLD(x, r) _mm_slli_si128((x), (r) >> 3)
+#define SHRD(x, r) _mm_srli_si128((x), (r) >> 3)
+    __v2di u;
+    __v2di t0;
+    __v2di t1;
+    __v2di t2;
+    
+    __v2di g[16];
+    /* sequence update walk */
+    g[0] = (__v2di) { 0, };
+    g[1] = (__v2di) (__v4si) { s2[0], s2[1], s2[2], s2[3], };
+    g[2] = SHL(g[1], 1);
+    g[3] = g[2] ^ g[1];
+    g[4] = SHL(g[2], 1);
+    g[5] = g[4] ^ g[1];
+    g[6] = SHL(g[3], 1);
+    g[7] = g[6] ^ g[1];
+    g[8] = SHL(g[4], 1);
+    g[9] = g[8] ^ g[1];
+    g[10] = SHL(g[5], 1);
+    g[11] = g[10] ^ g[1];
+    g[12] = SHL(g[6], 1);
+    g[13] = g[12] ^ g[1];
+    g[14] = SHL(g[7], 1);
+    g[15] = g[14] ^ g[1];
+    
+    /* round 0 */
+    u = g[s1[0]       & 15];
+    t0  = u;
+    u = g[s1[0] >>  4 & 15];
+    t0 ^= SHL(u,  4); t1  = SHR(u, 60);
+    u = g[s1[0] >>  8 & 15];
+    t0 ^= SHL(u,  8); t1 ^= SHR(u, 56);
+    u = g[s1[0] >> 12 & 15];
+    t0 ^= SHL(u, 12); t1 ^= SHR(u, 52);
+    u = g[s1[0] >> 16 & 15];
+    t0 ^= SHL(u, 16); t1 ^= SHR(u, 48);
+    u = g[s1[0] >> 20 & 15];
+    t0 ^= SHL(u, 20); t1 ^= SHR(u, 44);
+    u = g[s1[0] >> 24 & 15];
+    t0 ^= SHL(u, 24); t1 ^= SHR(u, 40);
+    u = g[s1[0] >> 28 & 15];
+    t0 ^= SHL(u, 28); t1 ^= SHR(u, 36);
+    u = g[s1[1]       & 15];
+    t0 ^= SHL(u, 32); t1 ^= SHR(u, 32);
+    u = g[s1[1] >>  4 & 15];
+    t0 ^= SHL(u, 36); t1 ^= SHR(u, 28);
+    u = g[s1[1] >>  8 & 15];
+    t0 ^= SHL(u, 40); t1 ^= SHR(u, 24);
+    u = g[s1[1] >> 12 & 15];
+    t0 ^= SHL(u, 44); t1 ^= SHR(u, 20);
+    u = g[s1[1] >> 16 & 15];
+    t0 ^= SHL(u, 48); t1 ^= SHR(u, 16);
+    u = g[s1[1] >> 20 & 15];
+    t0 ^= SHL(u, 52); t1 ^= SHR(u, 12);
+    u = g[s1[1] >> 24 & 15];
+    t0 ^= SHL(u, 56); t1 ^= SHR(u,  8);
+    u = g[s1[1] >> 28 & 15];
+    t0 ^= SHL(u, 60); t1 ^= SHR(u,  4);
+    
+    /* round 1 */
+    u = g[s1[2]       & 15];
+    t1 ^= u;
+    u = g[s1[2] >>  4 & 15];
+    t1 ^= SHL(u,  4); t2  = SHR(u, 60);
+    u = g[s1[2] >>  8 & 15];
+    t1 ^= SHL(u,  8); t2 ^= SHR(u, 56);
+    u = g[s1[2] >> 12 & 15];
+    t1 ^= SHL(u, 12); t2 ^= SHR(u, 52);
+    u = g[s1[2] >> 16 & 15];
+    t1 ^= SHL(u, 16); t2 ^= SHR(u, 48);
+    u = g[s1[2] >> 20 & 15];
+    t1 ^= SHL(u, 20); t2 ^= SHR(u, 44);
+    u = g[s1[2] >> 24 & 15];
+    t1 ^= SHL(u, 24); t2 ^= SHR(u, 40);
+    u = g[s1[2] >> 28 & 15];
+    t1 ^= SHL(u, 28); t2 ^= SHR(u, 36);
+    u = g[s1[3]       & 15];
+    t1 ^= SHL(u, 32); t2 ^= SHR(u, 32);
+    u = g[s1[3] >>  4 & 15];
+    t1 ^= SHL(u, 36); t2 ^= SHR(u, 28);
+    u = g[s1[3] >>  8 & 15];
+    t1 ^= SHL(u, 40); t2 ^= SHR(u, 24);
+    u = g[s1[3] >> 12 & 15];
+    t1 ^= SHL(u, 44); t2 ^= SHR(u, 20);
+    u = g[s1[3] >> 16 & 15];
+    t1 ^= SHL(u, 48); t2 ^= SHR(u, 16);
+    u = g[s1[3] >> 20 & 15];
+    t1 ^= SHL(u, 52); t2 ^= SHR(u, 12);
+    u = g[s1[3] >> 24 & 15];
+    t1 ^= SHL(u, 56); t2 ^= SHR(u,  8);
+    u = g[s1[3] >> 28 & 15];
+    t1 ^= SHL(u, 60); t2 ^= SHR(u,  4);
+    /* end */
+    
+    /* repair steps */
+    /* repair section 200711-200803 */
+    __v2di v1 = (__v2di) (__v4si) { s1[0], s1[1], s1[0], s1[1], };
+    v1 = SHR(v1, 1);
+    __v2di v2 = (__v2di) (__v4si) { s1[2], s1[3], s1[2], s1[3], };
+    v2 = SHR(v2, 1);
+    __v2di w;
+    __v2di m = (__v2di) (__v4si) { 0x77777777UL, 0x77777777UL, 0x77777777UL, 0x77777777UL, };
+    w = -SHR(g[1],63);
+    v1 = v1 & m;
+    t1 ^= v1 & w;
+    v2 = v2 & m;
+    t2 ^= v2 & w;
+    w = -SHR(g[2],63);
+    v1 = SHR(v1, 1) & m;
+    t1 ^= v1 & w;
+    v2 = SHR(v2, 1) & m;
+    t2 ^= v2 & w;
+    w = -SHR(g[4],63);
+    v1 = SHR(v1, 1) & m;
+    t1 ^= v1 & w;
+    v2 = SHR(v2, 1) & m;
+    t2 ^= v2 & w;
+    
+    /* store result */
+    {
+        {
+        __v2di_proxy r;
+        r.s = t0 ^ SHLD(t1, 64);
+        t[0] = r.x[0];
+        t[1] = r.x[1];
+        t[2] = r.x[2];
+        t[3] = r.x[3];
+    }
+        {
+        __v2di_proxy r;
+        r.s = t2 ^ SHRD(t1, 64);
+        t[4] = r.x[0];
+        t[5] = r.x[1];
+        t[6] = r.x[2];
+        t[7] = r.x[3];
+    }
+    }
 #undef SHL
 #undef SHR
 #undef SHLD
@@ -789,188 +920,186 @@ void mpfq_2_128_mul_ur(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt_u
 }
 
 static inline
-void mpfq_2_128_sqr_ur(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt_ur t, mpfq_2_128_src_elt s)
+void mpfq_2_128_sqr_ur(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt_ur t, mpfq_2_128_src_elt s)
 {
-	static const mp_limb_t g[16] = {
-		0, 1, 4, 5, 16, 17, 20, 21,
-		64, 65, 68, 69, 80, 81, 84, 85,
-	};
-	{
-		mp_limb_t u;
-		u = g[s[0]       & 15];
-	t[0]  = u;
-		u = g[s[0] >>  4 & 15];
-	t[0] ^= u <<  8;
-		u = g[s[0] >>  8 & 15];
-	t[0] ^= u << 16;
-		u = g[s[0] >> 12 & 15];
-	t[0] ^= u << 24;
-		u = g[s[0] >> 16 & 15];
-	t[1]  = u;
-		u = g[s[0] >> 20 & 15];
-	t[1] ^= u <<  8;
-		u = g[s[0] >> 24 & 15];
-	t[1] ^= u << 16;
-		u = g[s[0] >> 28 & 15];
-	t[1] ^= u << 24;
-		u = g[s[1]       & 15];
-	t[2]  = u;
-		u = g[s[1] >>  4 & 15];
-	t[2] ^= u <<  8;
-		u = g[s[1] >>  8 & 15];
-	t[2] ^= u << 16;
-		u = g[s[1] >> 12 & 15];
-	t[2] ^= u << 24;
-		u = g[s[1] >> 16 & 15];
-	t[3]  = u;
-		u = g[s[1] >> 20 & 15];
-	t[3] ^= u <<  8;
-		u = g[s[1] >> 24 & 15];
-	t[3] ^= u << 16;
-		u = g[s[1] >> 28 & 15];
-	t[3] ^= u << 24;
-		u = g[s[2]       & 15];
-	t[4]  = u;
-		u = g[s[2] >>  4 & 15];
-	t[4] ^= u <<  8;
-		u = g[s[2] >>  8 & 15];
-	t[4] ^= u << 16;
-		u = g[s[2] >> 12 & 15];
-	t[4] ^= u << 24;
-		u = g[s[2] >> 16 & 15];
-	t[5]  = u;
-		u = g[s[2] >> 20 & 15];
-	t[5] ^= u <<  8;
-		u = g[s[2] >> 24 & 15];
-	t[5] ^= u << 16;
-		u = g[s[2] >> 28 & 15];
-	t[5] ^= u << 24;
-		u = g[s[3]       & 15];
-	t[6]  = u;
-		u = g[s[3] >>  4 & 15];
-	t[6] ^= u <<  8;
-		u = g[s[3] >>  8 & 15];
-	t[6] ^= u << 16;
-		u = g[s[3] >> 12 & 15];
-	t[6] ^= u << 24;
-		u = g[s[3] >> 16 & 15];
-	t[7]  = u;
-		u = g[s[3] >> 20 & 15];
-	t[7] ^= u <<  8;
-		u = g[s[3] >> 24 & 15];
-	t[7] ^= u << 16;
-		u = g[s[3] >> 28 & 15];
-	t[7] ^= u << 24;
-	}
+    static const mp_limb_t g[16] = {
+        0, 1, 4, 5, 16, 17, 20, 21,
+        64, 65, 68, 69, 80, 81, 84, 85,
+    };
+    {
+        mp_limb_t u;
+        u = g[s[0]       & 15];
+    t[0]  = u;
+        u = g[s[0] >>  4 & 15];
+    t[0] ^= u <<  8;
+        u = g[s[0] >>  8 & 15];
+    t[0] ^= u << 16;
+        u = g[s[0] >> 12 & 15];
+    t[0] ^= u << 24;
+        u = g[s[0] >> 16 & 15];
+    t[1]  = u;
+        u = g[s[0] >> 20 & 15];
+    t[1] ^= u <<  8;
+        u = g[s[0] >> 24 & 15];
+    t[1] ^= u << 16;
+        u = g[s[0] >> 28 & 15];
+    t[1] ^= u << 24;
+        u = g[s[1]       & 15];
+    t[2]  = u;
+        u = g[s[1] >>  4 & 15];
+    t[2] ^= u <<  8;
+        u = g[s[1] >>  8 & 15];
+    t[2] ^= u << 16;
+        u = g[s[1] >> 12 & 15];
+    t[2] ^= u << 24;
+        u = g[s[1] >> 16 & 15];
+    t[3]  = u;
+        u = g[s[1] >> 20 & 15];
+    t[3] ^= u <<  8;
+        u = g[s[1] >> 24 & 15];
+    t[3] ^= u << 16;
+        u = g[s[1] >> 28 & 15];
+    t[3] ^= u << 24;
+        u = g[s[2]       & 15];
+    t[4]  = u;
+        u = g[s[2] >>  4 & 15];
+    t[4] ^= u <<  8;
+        u = g[s[2] >>  8 & 15];
+    t[4] ^= u << 16;
+        u = g[s[2] >> 12 & 15];
+    t[4] ^= u << 24;
+        u = g[s[2] >> 16 & 15];
+    t[5]  = u;
+        u = g[s[2] >> 20 & 15];
+    t[5] ^= u <<  8;
+        u = g[s[2] >> 24 & 15];
+    t[5] ^= u << 16;
+        u = g[s[2] >> 28 & 15];
+    t[5] ^= u << 24;
+        u = g[s[3]       & 15];
+    t[6]  = u;
+        u = g[s[3] >>  4 & 15];
+    t[6] ^= u <<  8;
+        u = g[s[3] >>  8 & 15];
+    t[6] ^= u << 16;
+        u = g[s[3] >> 12 & 15];
+    t[6] ^= u << 24;
+        u = g[s[3] >> 16 & 15];
+    t[7]  = u;
+        u = g[s[3] >> 20 & 15];
+    t[7] ^= u <<  8;
+        u = g[s[3] >> 24 & 15];
+    t[7] ^= u << 16;
+        u = g[s[3] >> 28 & 15];
+    t[7] ^= u << 24;
+    }
 }
 
 static inline
-void mpfq_2_128_reduce(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mpfq_2_128_dst_elt_ur t)
+void mpfq_2_128_reduce(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt r, mpfq_2_128_dst_elt_ur t)
 {
-	{
-		mp_limb_t s[5];
-		/* 127 excess bits */
-		{
-			mp_limb_t z;
-			z = t[0];
-			s[0] = z;
-			z = t[1];
-			s[1] = z;
-			z = t[2];
-			s[2] = z;
-			z = t[3];
-			s[3] = z;
-		}
-		memset(s + 4, 0, 1 * sizeof(mp_limb_t));
-		{
-			mp_limb_t z;
-			z = t[4];
-			s[0]^= z <<  7;
-			s[0]^= z <<  2;
-			s[0]^= z <<  1;
-			s[0]^= z;
-			z >>= 25;
-			z^= t[5] <<  7;
-			s[1]^= z;
-			z >>= 5;
-			z^= t[5] >> 25 << 27;
-			s[1]^= z;
-			z >>= 1;
-			z^= t[5] >> 30 << 31;
-			s[1]^= z;
-			z >>= 1;
-			z^= (t[5] & ~0x7fffffffUL);
-			s[1]^= z;
-			z >>= 25;
-			z^= t[6] <<  7;
-			s[2]^= z;
-			z >>= 5;
-			z^= t[6] >> 25 << 27;
-			s[2]^= z;
-			z >>= 1;
-			z^= t[6] >> 30 << 31;
-			s[2]^= z;
-			z >>= 1;
-			z^= (t[6] & ~0x7fffffffUL);
-			s[2]^= z;
-			z >>= 25;
-			z^= t[7] <<  7;
-			s[3]^= z;
-			z >>= 5;
-			z^= t[7] >> 25 << 27;
-			s[3]^= z;
-			z >>= 1;
-			z^= t[7] >> 30 << 31;
-			s[3]^= z;
-			z >>= 1;
-			s[3]^= z;
-			z >>= 25;
-			s[4]^= z;
-			z >>= 5;
-			s[4]^= z;
-		}
-		/* 6 excess bits */
-		{
-			mp_limb_t z;
-			z = s[0];
-			r[0] = z;
-			z = s[1];
-			r[1] = z;
-			z = s[2];
-			r[2] = z;
-			z = s[3];
-			r[3] = z;
-		}
-		{
-			mp_limb_t z;
-			z = s[4];
-			r[0]^= z <<  7;
-			r[0]^= z <<  2;
-			r[0]^= z <<  1;
-			r[0]^= z;
-		}
-	}
+    {
+        mp_limb_t s[5];
+        /* 127 excess bits */
+        {
+            unsigned long z;
+            z = t[0];
+            s[0] = z;
+            z = t[1];
+            s[1] = z;
+            z = t[2];
+            s[2] = z;
+            z = t[3];
+            s[3] = z;
+        }
+        memset(s + 4, 0, 1 * sizeof(mp_limb_t));
+        {
+            unsigned long z;
+            z = t[4];
+            s[0]^= z <<  7;
+            s[0]^= z <<  2;
+            s[0]^= z <<  1;
+            s[0]^= z;
+            z >>= 25;
+            z^= t[5] <<  7;
+            s[1]^= z;
+            z >>= 5;
+            z^= t[5] >> 25 << 27;
+            s[1]^= z;
+            z >>= 1;
+            z^= t[5] >> 30 << 31;
+            s[1]^= z;
+            z >>= 1;
+            z^= (t[5] & ~0x7fffffffUL);
+            s[1]^= z;
+            z >>= 25;
+            z^= t[6] <<  7;
+            s[2]^= z;
+            z >>= 5;
+            z^= t[6] >> 25 << 27;
+            s[2]^= z;
+            z >>= 1;
+            z^= t[6] >> 30 << 31;
+            s[2]^= z;
+            z >>= 1;
+            z^= (t[6] & ~0x7fffffffUL);
+            s[2]^= z;
+            z >>= 25;
+            z^= t[7] <<  7;
+            s[3]^= z;
+            z >>= 5;
+            z^= t[7] >> 25 << 27;
+            s[3]^= z;
+            z >>= 1;
+            z^= t[7] >> 30 << 31;
+            s[3]^= z;
+            z >>= 1;
+            s[3]^= z;
+            z >>= 25;
+            s[4]^= z;
+            z >>= 5;
+            s[4]^= z;
+        }
+        /* 6 excess bits */
+        {
+            unsigned long z;
+            z = s[0];
+            r[0] = z;
+            z = s[1];
+            r[1] = z;
+            z = s[2];
+            r[2] = z;
+            z = s[3];
+            r[3] = z;
+        }
+        {
+            unsigned long z;
+            z = s[4];
+            r[0]^= z <<  7;
+            r[0]^= z <<  2;
+            r[0]^= z <<  1;
+            r[0]^= z;
+        }
+    }
 }
 
 static inline
-int mpfq_2_128_cmp(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_src_elt a, mpfq_2_128_src_elt b)
+int mpfq_2_128_cmp(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_src_elt a, mpfq_2_128_src_elt b)
 {
-	return mpn_cmp(a, b, 4);
+    return mpn_cmp(a, b, 4);
 }
 
 static inline
-int mpfq_2_128_cmp_ui(mpfq_2_128_field_ptr K MAYBE_UNUSED, mpfq_2_128_src_elt r, unsigned long x)
+int mpfq_2_128_cmp_ui(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_src_elt r, unsigned long x)
 {
-	int i;
-	if (r[0] < (x & 1UL)) return -1;
-	if (r[0] > (x & 1UL)) return 1;
-	for(i = 1 ; i < 4 ; i++) {
-		if (r[i]) return 1;
-	}
-	return 0;
+    int i;
+    if (r[0] < (x & 1UL)) return -1;
+    if (r[0] > (x & 1UL)) return 1;
+    for(i = 1 ; i < 4 ; i++) {
+        if (r[i]) return 1;
+    }
+    return 0;
 }
-
-#endif      /* GMP_LIMB_BITS == 32 */
 
 
 #endif  /* MPFQ_2_128_H_ */

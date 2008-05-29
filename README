@@ -3,16 +3,27 @@ Required software tools:
 
 *) SCONS (http://www.scons.org/)
 *) GMP (http://gmplib.org): usually installed in most Linux distributions
+*) The GCC compiler works ; some others might, but it is untested.
+*) GNU make for building
 
 [Configure]
 =====================)
 
-cp Makefile.local.example Makefile.local
-Edit according to your local settings and your taste
+if your site needs tweaks:
 
-You can have specific Makefile.local in each subdir, if you want.
-Otherwise a link to your main Makefile.local is automatically created
-during compilation.
+cp Makefile.local.example Makefile.local
+Edit according to your local settings and your taste. You may have things
+such as:
+
+GMP:=$$HOME/gmp-4.2.2-install-tree/
+SCONS_BINARY:=$$HOME/scons-0.98-install-tree/bin/scons
+CFLAGS:=-O2 -funroll-loops
+CC:=/usr/local/bin/gcc-4.2.4/bin/gcc
+
+In each sub-directory (*), the top-level Makefile.local is read if it
+exists. Then the Makefile.local present in the directory is read if it
+exists (thereby overriding settings from the top-level file).
+
 
 Compile:
 =======

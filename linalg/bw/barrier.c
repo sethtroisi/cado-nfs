@@ -7,11 +7,9 @@
 
 #include "timer.h"
 #include "barrier.h"
+#include "manu.h"
 
-#define LEXGE2(X,Y,A,B) (X>A || (X == A && Y >= B))
-#define LEXGE3(X,Y,Z,A,B,C) (X>A || (X == A && LEXGE2(Y,Z,B,C)))
-
-#if (defined(__GNUC__) && LEXGE2(__GNUC__,__GNUC_MINOR__,4,3))
+#if GNUC_VERSION_ATLEAST(4,3,0)
 #pragma GCC diagnostic ignored "-Wempty-body"
 /* It turns out that the newer pthread.h header from Fedora F9
  * glibc-headers-2.8-3 has a wonderful ``do; while (0)'' statement for

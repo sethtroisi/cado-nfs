@@ -27,46 +27,31 @@
 */
 
 #include <stdint.h>
+#include <emmintrin.h>
 
-#ifndef DEFINED_SSE2_HELPERS
-#define DEFINED_SSE2_HELPERS
-typedef uint64_t v2di __attribute__ ((vector_size (16)));
-static inline v2di SHL(v2di x_, unsigned int r_) {
-    __asm__("psllq %1,%0" : "+x"(x_) : "K"(r_));
-    return x_;
-}
-static inline v2di SHR(v2di x_, unsigned int r_) {
-    __asm__("psrlq %1,%0" : "+x"(x_) : "K"(r_));
-    return x_;
-}
-static inline v2di SHLD(v2di x_, unsigned int r_) {
-    __asm__("pslldq %1,%0" : "+x"(x_) : "K"(r_ >> 3));
-    return x_;
-}
-static inline v2di SHRD(v2di x_, unsigned int r_) {
-    __asm__("psrldq %1,%0" : "+x"(x_) : "K"(r_ >> 3));
-    return x_;
-}
-#endif
 static inline
 void mul2(ulong * t, ulong const * s1, ulong const * s2)
 {
-	typedef union { v2di s; ulong x[2]; } v2di_proxy;
-	v2di u;
-	v2di t0;
-	v2di t1;
-	v2di t2;
+	typedef union { __v2di s; ulong x[2]; } v2di_proxy;
+#define SHL(x, r) _mm_slli_epi64((x), (r))
+#define SHR(x, r) _mm_srli_epi64((x), (r))
+#define SHLD(x, r) _mm_slli_si128((x), (r) >> 3)
+#define SHRD(x, r) _mm_srli_si128((x), (r) >> 3)
+	__v2di u;
+	__v2di t0;
+	__v2di t1;
+	__v2di t2;
 
-	v2di g[16];
-	v2di w;
-	v2di m = (v2di) { 0xeeeeeeeeeeeeeeeeUL, 0xeeeeeeeeeeeeeeeeUL, };
+	__v2di g[16];
+	__v2di w;
+	__v2di m = (__v2di) { 0xeeeeeeeeeeeeeeeeUL, 0xeeeeeeeeeeeeeeeeUL, };
 	/* sequence update walk */
-	g[ 0] = (v2di) { 0, };
-	v2di b0 = (v2di) { s2[0], s2[1], };
+	g[ 0] = (__v2di) { 0, };
+	__v2di b0 = (__v2di) { s2[0], s2[1], };
 	g[ 1] = b0;
-	v2di v1 = (v2di) { s1[0], s1[0], };
+	__v2di v1 = (__v2di) { s1[0], s1[0], };
 	w = -SHR(b0,63);
-	v2di v2 = (v2di) { s1[1], s1[1], };
+	__v2di v2 = (__v2di) { s1[1], s1[1], };
 	v1 = SHR(v1 & m, 1); t1 = v1 & w;
 	g[ 2] = SHL(b0, 1); g[ 3] = g[ 2] ^ b0;
 	v2 = SHR(v2 & m, 1); t2 = v2 & w;

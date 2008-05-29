@@ -71,3 +71,8 @@ UNLIKELY(x)
         the code.
 
 
+GNUC_VERSION(x,y,z)
+        Enables a given block only for version x.y.z of the GNU C Compiler
+GNUC_VERSION_ATLEAST(x,y,z)
+GNUC_VERSION_ATMOST(x,y,z)
+        Same for version >= x.y.z, or <= x.y.z
