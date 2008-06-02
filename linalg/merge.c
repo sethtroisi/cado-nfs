@@ -2235,19 +2235,21 @@ merge(sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 static unsigned long
 my_cost(unsigned long N, unsigned long c, int forbw)
 {
-    if(forbw <= 1)
-	return (N*c);
-    else if(forbw == 2){
+    if(forbw == 2){
 	double K1 = .19e-9, K2 = 3.4e-05, K3 = 1.4e-10; // kinda average
 	double dN = (double)N, dc = (double)c;
 
 	return (unsigned long)((K1+K3)*dN*dc+K2*dN*log(dN)*log(dN));
     }
+    else if(forbw == 3)
+	return c/N;
+    else if(forbw <= 1)
+	return (N*c);
     return 0;
 }
 
 void
-mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw, double ratio)
+mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw, double ratio, int coverNmax)
 {
     double tt, totopt = 0.0, totfill = 0.0, totMST = 0.0, totdel = 0.0;
     double tfill, tMST;
@@ -2331,21 +2333,25 @@ mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw, double ra
 		    mmax,
 		    mat->rem_nrows, mat->rem_ncols, 
 		    mat->rem_nrows - mat->rem_ncols);
-	    if(forbw <= 1)
-		fprintf(stderr, " cN=%lu", bwcost);
-	    else
+	    if(forbw == 2)
 		fprintf(stderr, " bw=%lu", bwcost);
+	    else if(forbw == 3)
+		fprintf(stderr, " cN=%lu", 
+			((unsigned long)mat->rem_nrows)
+			*((unsigned long)mat->weight));
+	    else if(forbw <= 1)
+		fprintf(stderr, " cN=%lu", bwcost);
 	    fprintf(stderr, " c/N=%2.2lf\n", 
 		    ((double)mat->weight)/((double)mat->rem_ncols));
 	    // njrem=%d at %2.2lf\n",
-	    if(forbw)
+	    if((forbw != 0) && (forbw != 3))
 		// what a trick!!!!
 		printf("BWCOST: %lu\n", bwcost);
 	    target = njproc + 10000;
 	}
 	if((bwcostmin == 0) || (bwcost < bwcostmin)){
 	    bwcostmin = bwcost;
-	    if(forbw)
+	    if((forbw != 0) && (forbw != 3))
 		// what a trick!!!!
 		printf("BWCOST: %lu\n", bwcost);
 	}
@@ -2360,7 +2366,13 @@ mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw, double ra
 		break;
 	    }
 	}
-	if(forbw && (oldbwcost != 0) && (bwcost > oldbwcost)){
+	else if(forbw == 3){
+	    if(bwcost > (unsigned long)coverNmax){
+		fprintf(stderr, "c/N too high, stopping [%lu]\n", bwcost);
+		break;
+	    }
+	}
+	if((forbw != 0) && (oldbwcost != 0) && (bwcost > oldbwcost)){
 	    ncost++;
 #if 0
 	    fprintf(stderr, "New cost > old cost (%2.6e) [%d/%d]\n",
@@ -2389,7 +2401,7 @@ mergeOneByOne(sparse_mat_t *mat, int maxlevel, int verbose, int forbw, double ra
     }
     deleteSuperfluousRows(mat, mat->delta, 
 			  mat->rem_nrows-mat->rem_ncols+mat->delta);
-    if(forbw){
+    if((forbw != 0) && (forbw != 3)){
 	printf("BWCOSTMIN: %lu\n", bwcostmin);
 	fprintf(stderr, "Minimal bwcost found: %lu\n", bwcostmin);
     }
@@ -2455,7 +2467,7 @@ main(int argc, char *argv[])
     double tt;
     double kprune = 1.0; /* prune keeps kprune * (initial excess) */
     double ratio = 1.1; /* bound on cN_new/cN to stop the computation */
-    int i, forbw = 0;
+    int i, forbw = 0, coverNmax = 0;
     
 #if TEX
     fprintf(stderr, "\\begin{verbatim}\n");
@@ -2513,6 +2525,11 @@ main(int argc, char *argv[])
 	}
 	else if (argc > 2 && strcmp (argv[1], "-ratio") == 0){
 	    ratio = strtod(argv[2], NULL);
+	    argc -= 2;
+	    argv += 2;
+	}
+	else if (argc > 2 && strcmp (argv[1], "-coverNmax") == 0){
+	    coverNmax = atoi(argv[2]);
 	    argc -= 2;
 	    argv += 2;
 	}
@@ -2576,7 +2593,7 @@ main(int argc, char *argv[])
 #if M_STRATEGY <= 2
     merge(&mat, maxlevel, verbose, forbw);
 #else
-    mergeOneByOne(&mat, maxlevel, verbose, forbw, ratio);
+    mergeOneByOne(&mat, maxlevel, verbose, forbw, ratio, coverNmax);
 #endif
     fprintf(stderr, "Final matrix has w(M)=%lu, ncols*w(M)=%lu\n",
 	    mat.weight, ((unsigned long)mat.rem_ncols) * mat.weight);
