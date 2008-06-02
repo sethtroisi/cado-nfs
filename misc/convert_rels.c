@@ -38,7 +38,8 @@ get_int32 (FILE *fp)
 
 typedef struct
 {
-  int32_t a, b;
+  int64_t a;
+  uint32_t b;
   unsigned int rfb_entries;
   unsigned int afb_entries;
   unsigned int sp_entries;
@@ -82,7 +83,7 @@ print_relation_cado (relation_t *rel, int32_t *rfb, int32_t *afb)
 {
   unsigned int i, j;
 
-  printf ("%d,%d", rel->a, rel->b);
+  printf ("%ld,%u", rel->a, rel->b);
 
   /* rational side */
   for (i = 0; i < rel->rfb_entries; i++)
@@ -146,9 +147,9 @@ print_relation_fk (relation_t *rel, int32_t *rfb, int32_t *afb, int iformat)
   unsigned int i, j;
 
   if (rel->a > 0)
-    printf ("W %x %x\n", rel->a, rel->b);
+    printf ("W %lx %x\n", rel->a, rel->b);
   else
-    printf ("W -%x %x\n", -rel->a, rel->b);
+    printf ("W -%lx %x\n", -rel->a, rel->b);
   /* algebraic side */
   printf ("X");
   for (i = 0; i < rel->afb_entries; i++)
@@ -198,7 +199,7 @@ read_relation_cado (FILE *fp, relation_t *rel)
   unsigned long p;
   unsigned int i;
 
-  if (fscanf (fp, "%d,%d:", &(rel->a), &(rel->b)) != 2)
+  if (fscanf (fp, "%ld,%u:", &(rel->a), &(rel->b)) != 2)
     {
       if (feof (fp))
         return 0;
@@ -275,7 +276,7 @@ read_relation_cwi (FILE *fp, relation_t *rel)
   unsigned int j; /* number of entries <= i (if multiplicities) */
   char c;
 
-  ret = fscanf (fp, "%x %d %d", &flag, &(rel->a), &(rel->b));
+  ret = fscanf (fp, "%x %ld %u", &flag, &(rel->a), &(rel->b));
   if (ret != 3)
     {
       if (feof (fp))
@@ -341,7 +342,7 @@ read_relation_cwi (FILE *fp, relation_t *rel)
   ret = fscanf (fp, "%c\n", &c);
   if (ret != 1 || (c != ';' && c != ':'))
     {
-      fprintf (stderr, "Error, invalid relation for a=%d b=%d\n",
+      fprintf (stderr, "Error, invalid relation for a=%ld b=%u\n",
                rel->a, rel->b);
       exit (1);
     }
@@ -385,7 +386,7 @@ read_relation_ggnfs (FILE *fp, relation_t *rel, mpz_t norm, mpz_t *f,
             {
               static unsigned int count = 0;
               if (count++ < 10)
-                fprintf (stderr, "Warning, f(%d,%d) not divisible by factor base prime %d\n", rel->a, rel->b, p);
+                fprintf (stderr, "Warning, f(%ld,%u) not divisible by factor base prime %d\n", rel->a, rel->b, p);
             }
           mpz_divexact_ui (norm, norm, p);
         }
@@ -414,7 +415,7 @@ read_relation_ggnfs (FILE *fp, relation_t *rel, mpz_t norm, mpz_t *f,
       get_uint32 (fp); /* corresponding root, not used here */
       p = rel->large_aprimes[i];
       if (!mpz_divisible_ui_p (norm, p))
-        fprintf (stderr, "Warning, f(%d,%d) not divisible by large prime %d\n",
+        fprintf (stderr, "Warning, f(%ld,%u) not divisible by large prime %d\n",
                  rel->a, rel->b, p);
       else
         mpz_divexact_ui (norm, norm, p);
