@@ -9,4 +9,13 @@
 
   In particular when using the lattice siever, all special-q's for which f(x)
   completely splits should appear in (b).
+
+* portability: we should check improve portability on Win64, where
+  long has 32 bits (http://technet.microsoft.com/en-us/library/bb496995.aspx).
+  See http://gmplib.org/list-archives/gmp-discuss/2008-June/003243.html and
+  the 3 possible models (most C programs in CADO-NFS assume LP64):
+  * LP64 defines "int" as 32 bits and "long" as 64 bits.
+  * LLP64 defines "int" and "long" as 32 bits, and an additional type
+    (usually called "long long") as 64 bits.
+  * ILP64 defines "int" and "long" as 64 bits.
   
