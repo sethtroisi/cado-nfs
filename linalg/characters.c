@@ -150,10 +150,10 @@ computeAllCharacters(char **charbig, int i, int k, rootprime_t * tabchar,
 static void
 buildCharacterMatrix(char **charmat, int k, rootprime_t * tabchar,
 		     FILE * purgedfile, FILE * indexfile, FILE * relfile,
-		     cado_poly pol)
+		     cado_poly pol, int small_nrows)
 {
     relation_t rel;
-    int i, j, r, small_nrows, nr, nrows, ncols, irel, kk;
+    int i, j, r, nr, nrows, ncols, irel, kk;
     char str[1024];
     char **charbig;
 
@@ -179,9 +179,6 @@ buildCharacterMatrix(char **charmat, int k, rootprime_t * tabchar,
 	clear_relation(&rel);
     }
     fprintf(stderr, "Reading index file to reconstruct the characters\n");
-    rewind(indexfile);
-    // skip small_nrows, small_ncols
-    fscanf(indexfile, "%d %d", &small_nrows, &r);
     // read all relation-sets and update charmat accordingly
     for (i = 0; i < small_nrows; i++) {
 	if (!(i % 10000))
@@ -292,7 +289,7 @@ handleKer(dense_mat_t * mat, rootprime_t * tabchar, FILE * purgedfile,
 	    charmat[i][j] = 1;
     }
     buildCharacterMatrix(charmat, k - skip, tabchar,
-			 purgedfile, indexfile, relfile, pol);
+			 purgedfile, indexfile, relfile, pol, small_nrows);
     if (skip > 0)
 	addHeavyBlock(charmat, smallfile, k - skip, skip);
 #ifndef NDEBUG
