@@ -216,7 +216,8 @@ read_ggnfs (mpz_t N, mpz_t *X, mpz_t Y1, mpz_t Y0, mpz_t M)
               exit (1);
             }
         }
-      else if (strcmp (s, "#") == 0 && scanf ("%s ", s) == 1 &&
+      else if ((strcmp (s, "#") == 0 && scanf ("%s ", s) == 1 &&
+                (strcmp (s, "M") == 0 || strcmp (s, "m:") == 0)) ||
                (strcmp (s, "M") == 0 || strcmp (s, "m:") == 0))
         {
           mpz_inp_str (M, stdin, 0);
