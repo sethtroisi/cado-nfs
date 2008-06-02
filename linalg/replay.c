@@ -16,6 +16,7 @@
 #include "files.h"
 
 #include "sparse.h"
+#include "gzip.h"
 
 #define DEBUG 0
 
@@ -162,6 +163,9 @@ makeSparse(int **sparsemat, int *colweight, FILE *purgedfile,
 	// participates
 	for(k = 1; k <= oldrows[ind][0]; k++)
 	    addrel(sparsemat, colweight, buf, ibuf, oldrows[ind][k]);
+	// free space just in case
+	free(oldrows[ind]);
+	oldrows[ind] = NULL;
 	ind++;
     }
 }
@@ -169,10 +173,11 @@ makeSparse(int **sparsemat, int *colweight, FILE *purgedfile,
 void
 flushSparse(char *sparsename, int **sparsemat, int small_nrows, int small_ncols, int *code)
 {
-    FILE *ofile = fopen(sparsename, "w");
+    FILE *ofile;
     unsigned long W = 0;
     int i, j;
 
+    ofile = gzip_open(sparsename, "w");
     fprintf(ofile, "%d %d\n", small_nrows, small_ncols);
     for(i = 0; i < small_nrows; i++){
 	W += sparsemat[i][0];
@@ -185,7 +190,7 @@ flushSparse(char *sparsename, int **sparsemat, int small_nrows, int small_ncols,
 	}
 	fprintf(ofile, "\n");
     }
-    fclose(ofile);
+    gzip_close(ofile, sparsename);
     fprintf(stderr, "# Weight(M_small) = %lu\n", W);
 }
 
@@ -229,7 +234,7 @@ makeIndexFile(char *indexname, int nrows, int **newrows, int small_nrows, int sm
     FILE *indexfile;
     int i, j;
 
-    indexfile = fopen(indexname, "w");
+    indexfile = gzip_open(indexname, "w");
     fprintf(indexfile, "%d %d\n", small_nrows, small_ncols);
     for(i = 0; i < nrows; i++)
 	if(newrows[i] != NULL){
@@ -238,7 +243,7 @@ makeIndexFile(char *indexname, int nrows, int **newrows, int small_nrows, int sm
 		fprintf(indexfile, " %d", newrows[i][j]);
 	    fprintf(indexfile, "\n");
 	}
-    fclose(indexfile);
+    gzip_close(indexfile, indexname);
 }
 
 // on input, colweight[j] contains the weight; on exit, colweight[j]
@@ -343,6 +348,12 @@ main(int argc, char *argv[])
     int ind, small_nrows, small_ncols, **sparsemat;
     char str[STRLENMAX];
     int verbose = 0;
+
+    // printing the arguments as everybody does these days
+    fprintf (stderr, "%s.r%s", argv[0], REV);
+    for (i = 1; i < argc; i++)
+      fprintf (stderr, " %s", argv[i]);
+    fprintf (stderr, "\n");
 
     if(argc > 1 && strcmp (argv[1], "-v") == 0){
         verbose ++;
@@ -459,14 +470,19 @@ main(int argc, char *argv[])
 
     fprintf(stderr, "small_nrows=%d small_ncols=%d\n",small_nrows,small_ncols);
 
+    double tt = seconds();
     fprintf(stderr, "Writing sparse representation to file\n");
     flushSparse(argv[3], sparsemat, small_nrows, small_ncols, colweight);
+    fprintf(stderr, "#T# writing sparse: %2.2lf\n", seconds()-tt);
 
+    tt = seconds();
+    fprintf(stderr, "Writing index file\n");
 #if 0
     makeabFile(argv[4], argv[1], nrows, newrows, small_nrows, small_ncols);
 #else
     makeIndexFile(argv[4], nrows, newrows, small_nrows, small_ncols);
 #endif
+    fprintf(stderr, "#T# writing index file: %2.2lf\n", seconds()-tt);
 
     for(i = 0; i < small_nrows; i++)
 	if(sparsemat[i] != NULL)
