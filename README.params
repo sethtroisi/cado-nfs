@@ -53,9 +53,10 @@ c130 nrel=4618330, nprimes=4572024; excess=46306                         [1]
         1.0    40      300      300          1282960x1282800 W=144093260 [1]
 
 c155 2_2286M nrel=36641684, nprimes=35641685; excess=999999
-c155    1.0    50      300      300          8307691x8307531 W=2500617311
+c155    1.0    50      300      300          8307691x8307531 W=2500617311 [2]
 
 [1] with purge -maxpr 80000000 -maxpa 80000000 -keep 500000
+[2] with -coverNmax 300 -forbw 3 (ratio unused)
 
 For new parameters, some fiddling is needed, with respect to the final
 weight of the small matrix and/or the number of rows/columns depending on
