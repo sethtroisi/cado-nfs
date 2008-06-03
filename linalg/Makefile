@@ -11,7 +11,7 @@ all:	$(binaries)
 
 procrels: procrels.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils
-hashpair: hashpair.o
+hashpair: hashpair.o gzip.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils
 
 hashpair.o: hashpair.h
@@ -29,7 +29,6 @@ replay: replay.o sparse.o gzip.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils
 checkdep: checkdep.o
 	$(CC) $(MY_LFLAGS) -o $@ $^
-
 linalg: linalg.o gauss.o readmat.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils
 
@@ -44,6 +43,7 @@ transpose: transpose.o readmat.o
 
 characters: characters.o files.o gauss.o gzip.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lgmp
+
 allsqrt: allsqrt.o files.o hashpair.o gzip.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lgmp
 
