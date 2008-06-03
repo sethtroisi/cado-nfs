@@ -41,6 +41,7 @@ maxlevel=${maxlevel-6}
 cwmax=${cwmax-10}
 rwmax=${rwmax-100}
 ratio=${ratio-1.1}
+coverNmax=${coverNmax-0}
 
 # don't be verbose by default!
 verbose=${verbose-""}
@@ -60,7 +61,15 @@ echo $allrels
 
 poly=$root.poly
 nodup=$root.nodup
-purged=$root.purged
+purged=$root.purged.gz
+tmp=$root.tmp$$
+
+fc155=false
+
+if $fc155
+then
+  echo "WARNING: special case of c155!!!!!!!!!!!!"
+else ####TMP
 
 if [ ! -s $nodup ]
 then
@@ -83,7 +92,7 @@ then
   echo "No need to rebuild $nodup"
 else
   nrels=`wc -l $allrels | tail -1 | awk '{print $1}'`
-  time $linalg/duplicates -nrels $nrels $allrels > $nodup
+  time $linalg/duplicates -nrels $nrels -out $nodup $allrels
   if [ ! -s $nodup ]; then echo "zero file $nodup"; exit; fi
 fi
 
@@ -95,13 +104,15 @@ else
   then
     echo "I use nrels_dup=$nrels_dup"
   else
-    nrels_dup=`wc -l < $nodup`
+    nrels_dup=`wc -l < $nodup` ## TODO: what if nodup is gzipped?????
   fi
   args="-poly $poly -maxpr $maxpr -maxpa $maxpa -keep $keep_purge"
   if [ "X$sos" != "X" ]; then args="$args -sos $sos"; fi
-  time $linalg/purge $args -nrels $nrels_dup $nodup > $purged
+  time $linalg/purge $args -nrels $nrels_dup -purged $purged $nodup > $tmp
   if [ ! -s $purged ]; then echo "zero file $purged"; exit; fi
-  excess=`head -1 $purged | awk '{nrows=$1; ncols=$2; print (nrows-ncols)}'`
+#  excess=`head -1 $purged | awk '{nrows=$1; ncols=$2; print (nrows-ncols)}'`
+  excess=`grep EXCESS $tmp | awk '{print $NF}'`
+  /bin/rm -f $tmp
   echo "excess = $excess"
   if [ $excess -le 0 ]
   then 
@@ -110,6 +121,8 @@ else
       exit
   fi
 fi
+
+fi #######fc155
 
 echo "Performing merges"
 
@@ -122,7 +135,7 @@ else
 fi
 
 keep=`expr 128 '+' $skip`
-argsa="-forbw $bwstrat -ratio $ratio"
+argsa="-forbw $bwstrat -ratio $ratio -coverNmax $coverNmax"
 argsa="$argsa -prune $prune -mat $purged -keep $keep"
 argsa="$argsa -maxlevel $maxlevel -cwmax $cwmax -rwmax $rwmax $verbose"
 time $linalg/merge $argsa > $outdir/merge.his # 2> $outdir.merge.err
