@@ -9,6 +9,7 @@
 #include "utils/utils.h"
 
 #include "files.h"
+#include "gzip.h"
 
 #define DEBUG 0
 
@@ -158,7 +159,7 @@ buildCharacterMatrix(char **charmat, int k, rootprime_t * tabchar,
     char **charbig;
 
     // let's dump purgedfile which is a nrows x ncols matrix
-    rewind(purgedfile);
+    //    rewind(purgedfile);
     fgets(str, 1024, purgedfile);
     sscanf(str, "%d %d", &nrows, &ncols);
     fprintf(stderr, "Reading indices in purgedfile\n");
@@ -394,7 +395,7 @@ int main(int argc, char **argv)
 
     while (argc > 1 && argv[1][0] == '-') {
 	if (argc > 2 && strcmp(argv[1], "-purged") == 0) {
-	    purgedfile = fopen(argv[2], "r");
+	    purgedfile = gzip_open(argv[2], "r");
 	    argc -= 2;
 	    argv += 2;
 	}

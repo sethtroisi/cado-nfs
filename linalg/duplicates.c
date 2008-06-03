@@ -19,6 +19,7 @@
 
 #include "hashpair.h"
 #include "files.h"
+#include "gzip.h"
 
 #define STR_LEN_MAX 1024
 
@@ -128,10 +129,10 @@ is_ab_new(smallhash_t *Hab, long a, unsigned long b)
 // We implement a trick suggested by PZ.
 #if AGRESSIVE_MODE == 0
 int
-remove_duplicates_from_file(int *irel, unsigned int *nrels, hashtable_t *Hab, int slice, int slice0, FILE *file)
+remove_duplicates_from_file(FILE *out, int *irel, unsigned int *nrels, hashtable_t *Hab, int slice, int slice0, FILE *file)
 #else
 int
-remove_duplicates_from_file(int *irel, unsigned int *nrels, smallhash_t *Hab, int slice, int slice0, FILE *file)
+remove_duplicates_from_file(FILE *out, int *irel, unsigned int *nrels, smallhash_t *Hab, int slice, int slice0, FILE *file)
 #endif
 {
     int ret;
@@ -156,7 +157,7 @@ remove_duplicates_from_file(int *irel, unsigned int *nrels, smallhash_t *Hab, in
 	    continue;
 	if(is_ab_new(Hab, a, b, hab)){
 	    *nrels += 1;
-	    printf("%s", str);
+	    fprintf(out, "%s", str);
 	}
 	else{
 	    if(file_duplicates ++ < 10)
@@ -172,10 +173,10 @@ remove_duplicates_from_file(int *irel, unsigned int *nrels, smallhash_t *Hab, in
 // Read all relations from file.
 #if AGRESSIVE_MODE == 0
 int
-remove_duplicates(char *ficname[], int nbfic, unsigned int *nrels, hashtable_t *Hab, int slice, int slice0)
+remove_duplicates(FILE *out, char *ficname[], int nbfic, unsigned int *nrels, hashtable_t *Hab, int slice, int slice0)
 #else
 int
-remove_duplicates(char *ficname[], int nbfic, unsigned int *nrels, smallhash_t *Hab, int slice, int slice0)
+remove_duplicates(FILE *out, char *ficname[], int nbfic, unsigned int *nrels, smallhash_t *Hab, int slice, int slice0)
 #endif
 {
     FILE *relfile;
@@ -190,7 +191,7 @@ remove_duplicates(char *ficname[], int nbfic, unsigned int *nrels, smallhash_t *
 	    exit(1);
 	}
 	fprintf(stderr, "Adding file %s\n", ficname[i]);
-	ret = remove_duplicates_from_file(&irel, nrels, Hab, slice, slice0, relfile);
+	ret = remove_duplicates_from_file(out, &irel, nrels, Hab, slice, slice0, relfile);
 	if(ret == 0) {
 	    fprintf(stderr, "Warning: error when reading file %s\n", ficname[i]);
 	    break;
@@ -205,12 +206,14 @@ remove_duplicates(char *ficname[], int nbfic, unsigned int *nrels, smallhash_t *
 int
 main(int argc, char **argv)
 {
+    FILE *outfile = NULL;
 #if AGRESSIVE_MODE == 0
     hashtable_t Hab;
 #else
     smallhash_t Hab;
 #endif
     char **fic;
+    char *outname = NULL;
     unsigned int nfic;
     int ret, k, slice = 0, slice0;
     unsigned int nrelsmax = 0, nrels, Hsize;
@@ -242,6 +245,11 @@ main(int argc, char **argv)
 	    argc -= 2;
 	    argv += 2;
 	}
+	if(argc > 2 && strcmp(argv[1], "-out") == 0){
+	    outname = argv[2];
+	    argc -= 2;
+	    argv += 2;
+	}
     }
 
     if(nrelsmax == 0)
@@ -269,6 +277,7 @@ main(int argc, char **argv)
     memset(Hab.tab, 0, Hab.len * sizeof(unsigned long));
 #endif
 
+    outfile = gzip_open(outname, "w");
     fprintf(stderr, "reading files of relations...\n");
     nrels = 0;
     for(slice0 = 0; slice0 < (1<<slice); slice0++){
@@ -276,8 +285,9 @@ main(int argc, char **argv)
 	    hashClear(&Hab);
 	if(slice)
 	    fprintf(stderr, "Performing slice0=%d\n", slice0);
-	ret = remove_duplicates(fic, nfic, &nrels, &Hab, slice, slice0);
+	ret = remove_duplicates(outfile, fic, nfic, &nrels, &Hab, slice, slice0);
     }
+    gzip_close(outfile, outname);
     fprintf(stderr, "Number of relations left: %u\n", nrels);
 
     return 0;

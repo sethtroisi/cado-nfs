@@ -18,6 +18,7 @@
 
 #include "utils/utils.h"
 #include "files.h"
+#include "gzip.h"
 #include "sparse.h"
 #include "merge.h"
 #include "prune.h"
@@ -2537,7 +2538,7 @@ main(int argc, char *argv[])
 	    break;
     }
     
-    purgedfile = fopen(purgedname, "r");
+    purgedfile = gzip_open(purgedname, "r");
     ASSERT_ALWAYS(purgedfile != NULL);
     fscanf(purgedfile, "%d %d", &nrows, &ncols);
 
@@ -2557,10 +2558,12 @@ main(int argc, char *argv[])
     fillSWAR(&mat);
     fprintf(stderr, "Time for fillSWAR: %2.2lf\n", seconds()-tt);
     
-    rewind(purgedfile);
+    gzip_close(purgedfile, purgedname);
+    purgedfile = gzip_open(purgedname, "r");
+    ASSERT_ALWAYS(purgedfile != NULL);
     readmat(&mat, purgedfile);
 
-    fclose(purgedfile);
+    gzip_close(purgedfile, purgedname);
 #if DEBUG >= 3
     checkmat(&mat);
 #endif

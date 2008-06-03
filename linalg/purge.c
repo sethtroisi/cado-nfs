@@ -18,6 +18,7 @@
 
 #include "hashpair.h"
 #include "files.h"
+#include "gzip.h"
 
 #define DEBUG 1
 #define LP_ONLY 0
@@ -448,7 +449,7 @@ scan_relations (char *ficname[], int nbfic, int *nrel, int *nprimes,
 		long minpr, long minpa, int final)
 {
     FILE *relfile;
-    int ret, irel = -1;
+    int ret = 0, irel = -1;
     int i;
     
     *nprimes = 0;
@@ -682,7 +683,8 @@ renumber(int *nprimes, /*tab_prime_t bad_primes,*/ hashtable_t *H, char *sos)
 }
 
 void
-reread(char *ficname[], unsigned int nbfic, /*tab_prime_t bad_primes,*/
+reread(FILE *ofile, char *ficname[], unsigned int nbfic,
+       /*tab_prime_t bad_primes,*/
        hashtable_t *H, char *rel_used, int nrows /*, int cols*/)
 {
     FILE *file;
@@ -708,7 +710,7 @@ reread(char *ficname[], unsigned int nbfic, /*tab_prime_t bad_primes,*/
 			reduce_exponents_mod2 (&rel);
 			computeroots (&rel);
 		    }
-		    fprint_rel_row(stdout, irel, rel, /*bad_primes,*/ H);
+		    fprint_rel_row(ofile, irel, rel, /*bad_primes,*/ H);
 		    nr++;
 		    if(nr >= nrows){
 			ret = 0;
@@ -777,9 +779,10 @@ usage (char *argv[])
 int
 main(int argc, char **argv)
 {
+    FILE *purgedfile = NULL;
     tab_prime_t bad_primes;
     hashtable_t H;
-    char **fic, *polyname = NULL, *sos = NULL;
+    char **fic, *polyname = NULL, *sos = NULL, *purgedname = NULL;
     unsigned int nfic;
     char *rel_used;
     int **rel_compact = NULL;
@@ -844,6 +847,11 @@ main(int argc, char **argv)
 	}
 	else if(argc > 1 && strcmp (argv[1], "-sos") == 0){
 	    sos = argv[2];
+	    argc -= 2;
+	    argv += 2;
+	}
+	else if(argc > 1 && strcmp (argv[1], "-purged") == 0){
+	    purgedname = argv[2];
 	    argc -= 2;
 	    argv += 2;
 	}
@@ -947,11 +955,14 @@ main(int argc, char **argv)
 	free(rel_compact);
     
 	// now, we reread the file of relations and convert it to the new coding...
-	printf("%d %d\n", nrel_new, nprimes_new);
-	reread(fic, nfic, /*bad_primes,*/ &H, rel_used, nrel_new
+	purgedfile = gzip_open(purgedname, "w");
+	fprintf(purgedfile, "%d %d\n", nrel_new, nprimes_new);
+	reread(purgedfile, fic, nfic, /*bad_primes,*/ &H, rel_used, nrel_new
                /*, nprimes_new*/);
+	gzip_close(purgedfile, purgedname);
     }
-
+    // write excess to stdout
+    printf("EXCESS: %d\n", nrel_new - nprimes_new);
     free(bad_primes.tab);
     free(rel_used);
 

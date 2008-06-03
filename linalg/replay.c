@@ -140,7 +140,6 @@ makeSparse(int **sparsemat, int *colweight, FILE *purgedfile,
     buf_len = 100;
     buf = (int *)malloc(buf_len * sizeof(int));
     fprintf(stderr, "Reading and treating relations from purged file\n");
-    rewind(purgedfile);
     fscanf(purgedfile, "%d %d", &i, &j); // skip first line; check?
     ind = 0;
     while(fscanf(purgedfile, "%d %d", &i, &nj) != EOF){
@@ -194,11 +193,12 @@ flushSparse(char *sparsename, int **sparsemat, int small_nrows, int small_ncols,
     fprintf(stderr, "# Weight(M_small) = %lu\n", W);
 }
 
+#if 0
 // Do we have enough space for this approach?
 void
 makeabFile(char *abname, char *purgedname, int nrows, int **newrows, int small_nrows, int small_ncols)
 {
-    FILE *purgedfile = fopen(purgedname, "r"), *abfile;
+    FILE *purgedfile = gzip_open(purgedname, "r"), *abfile;
     long *ta = (long *)malloc(nrows * sizeof(long));
     unsigned long *tb = (unsigned long *)malloc(nrows * sizeof(unsigned long));
     int i, j, ind;
@@ -214,7 +214,7 @@ makeabFile(char *abname, char *purgedname, int nrows, int **newrows, int small_n
 	while((c = getc(purgedfile)) != '\n');
 	ind++;
     }
-    fclose(purgedfile);
+    gzipclose(purgedfile, purgedname);
     fprintf(stderr, "Building ab file\n");
     abfile = fopen(abname, "w");
     fprintf(abfile, "%d %d\nmultiab\n", small_nrows, small_ncols);
@@ -226,6 +226,7 @@ makeabFile(char *abname, char *purgedname, int nrows, int **newrows, int small_n
 	}
     fclose(abfile);
 }
+#endif
 
 // Do we have enough space for this approach?
 void
@@ -342,6 +343,7 @@ int
 main(int argc, char *argv[])
 {
     FILE *hisfile, *purgedfile;
+    char *purgedname = NULL;
     unsigned long bwcost, bwcostmin = 0, addread = 0;
     int nrows, ncols;
     int **newrows, i, j, nb, *nbrels, **oldrows, *colweight;
@@ -374,7 +376,8 @@ main(int argc, char *argv[])
     else
 	bwcostmin = 0;
     
-    purgedfile = fopen(argv[1], "r");
+    purgedname = argv[1];
+    purgedfile = gzip_open(purgedname, "r");
     ASSERT(purgedfile != NULL);
     // read parameters that should be the same as in purgedfile!
     hisfile = fopen(argv[2], "r");
@@ -463,7 +466,7 @@ main(int argc, char *argv[])
 	sparsemat[i] = NULL;
     makeSparse(sparsemat, colweight, purgedfile, /*nrows, ncols,*/ oldrows,
                verbose);
-    fclose(purgedfile);
+    gzip_close(purgedfile, purgedname);
 
     fprintf(stderr, "Renumbering columns (including sorting w.r.t. weight)\n");
     renumber(&small_ncols, colweight, ncols);

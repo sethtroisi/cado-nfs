@@ -6,6 +6,8 @@
 #include "cado.h"
 #include "utils/utils.h"
 #include "files.h"
+#include "gzip.h"
+
 #include "hashpair.h"
 
 #define DEBUG 0
@@ -233,9 +235,9 @@ treatSign(relation_t rel, cado_poly pol)
 // If check == 0, then we don't need to read purgedfile again and again
 // so we store the interesing values in the vec array (ohhhhhh!).
 int
-treatDep(char *ratname, char *algname, FILE *relfile, FILE *purgedfile, FILE *indexfile, FILE *kerfile, cado_poly pol, int nrows, int ncols, char *small_row_used, int small_nrows, hashtable_t *H, int nlimbs, char *rel_used, int *vec, int rora, int verbose, int check)
+treatDep(char *ratname, char *algname, char *relname, char *purgedname, char *indexname, FILE *kerfile, cado_poly pol, int nrows, int ncols, char *small_row_used, int small_nrows, hashtable_t *H, int nlimbs, char *rel_used, int *vec, int rora, int verbose, int check)
 {
-    FILE *ratfile, *algfile;
+    FILE *ratfile, *algfile, *relfile, *indexfile, *purgedfile = NULL;
     relation_t rel;
     unsigned long w;
     int ret, i, j, nrel, r, irel, nr, sg, ind;
@@ -262,7 +264,7 @@ treatDep(char *ratname, char *algname, FILE *relfile, FILE *purgedfile, FILE *in
     }
     // now map to the rels of the purged matrix
     memset(rel_used, 0, nrows * sizeof(char));
-    rewind(indexfile);
+    indexfile = gzip_open(indexname, "r");
     fscanf(indexfile, "%d %d", &i, &j); // skip first line
     for(i = 0; i < small_nrows; i++){
 	fscanf(indexfile, "%d", &nrel);
@@ -280,6 +282,7 @@ treatDep(char *ratname, char *algname, FILE *relfile, FILE *purgedfile, FILE *in
 	    }
 	}
     }
+    gzip_close(indexfile, indexname);
 #if MAPLE >= 1
     if((rora == 1) || (rora == 3))
 	fprintf(stderr, "R2:=1; P:=1;\n");
@@ -297,12 +300,12 @@ treatDep(char *ratname, char *algname, FILE *relfile, FILE *purgedfile, FILE *in
     algfile = fopen(algname, "w");
     // now really read the purged matrix in
     if(check){
-	rewind(purgedfile);
+	purgedfile = gzip_open(purgedname, "r");
 	fgets(str, 1024, purgedfile); // skip first line
     }
     // we assume purgedfile is stored in increasing order of the indices
     // of the real relations, so that one pass in the rels file is needed...!
-    rewind(relfile);
+    relfile = gzip_open(relname, "r");
     irel = 0; // we are ready to read relation irel
     for(i = 0; i < nrows; i++){
 	if(check)
@@ -327,6 +330,7 @@ treatDep(char *ratname, char *algname, FILE *relfile, FILE *purgedfile, FILE *in
 	    clear_relation(&rel);
 	}
     }
+    gzip_close(relfile, relname);
     ASSERT(!check || checkVector(vec, ncols));
     if(sg == -1)
 	fprintf(stderr, "prod(a-b*m) < 0\n");
@@ -338,12 +342,15 @@ treatDep(char *ratname, char *algname, FILE *relfile, FILE *purgedfile, FILE *in
     }
     fclose(ratfile);
     fclose(algfile);
+    if(check)
+	gzip_close(purgedfile, purgedname);
     return (sg == -1 ? 0 : 1);
 }
 
 void
-SqrtWithIndexAll(char *prefix, FILE *relfile, FILE *purgedfile, FILE *indexfile, FILE *kerfile, cado_poly pol, int rora, int ndepmin, int ndepmax, int verbose, int check)
+SqrtWithIndexAll(char *prefix, char *relname, char *purgedname, char *indexname, FILE *kerfile, cado_poly pol, int rora, int ndepmin, int ndepmax, int verbose, int check)
 {
+    FILE *indexfile, *purgedfile;
     char ratname[200], algname[200], str[1024];
     hashtable_t H;
     unsigned long w;
@@ -351,8 +358,12 @@ SqrtWithIndexAll(char *prefix, FILE *relfile, FILE *purgedfile, FILE *indexfile,
     char *small_row_used, *rel_used;
     int *vec; // useful to check dependency relation in the purged matrix
 
+    purgedfile = gzip_open(purgedname, "r");
     fscanf(purgedfile, "%d %d", &nrows, &ncols);
+
+    indexfile = gzip_open(indexname, "r");
     fscanf(indexfile, "%d %d", &small_nrows, &small_ncols);
+    gzip_close(indexfile, indexname);
 
     nlimbs = (small_nrows / GMP_NUMB_BITS) + 1;
     // first read used rows in the small matrix
@@ -370,6 +381,7 @@ SqrtWithIndexAll(char *prefix, FILE *relfile, FILE *purgedfile, FILE *indexfile,
 	    sscanf(str, "%d", vec+i);
 	}
     }
+    gzip_close(purgedfile, purgedname);
 
     // skip first ndepmin-1 relations
     for(j = 0; j < ndepmin; j++)
@@ -383,7 +395,7 @@ SqrtWithIndexAll(char *prefix, FILE *relfile, FILE *purgedfile, FILE *indexfile,
 	    break;
 	sprintf(ratname, "%s.rat.%03d", prefix, ndepmin);
 	sprintf(algname, "%s.alg.%03d", prefix, ndepmin);
-	ret = treatDep(ratname, algname, relfile, purgedfile, indexfile, kerfile, pol, nrows, ncols, small_row_used, small_nrows, &H, nlimbs, rel_used, vec, rora, verbose, check);
+	ret = treatDep(ratname, algname, relname, purgedname, indexname, kerfile, pol, nrows, ncols, small_row_used, small_nrows, &H, nlimbs, rel_used, vec, rora, verbose, check);
 	if(ret == -1)
 	    break;
 	fprintf(stderr, "# Treated dependency #%d at %2.2lf\n",
@@ -400,7 +412,7 @@ SqrtWithIndexAll(char *prefix, FILE *relfile, FILE *purgedfile, FILE *indexfile,
 int main(int argc, char *argv[])
 {
     char *relname, *purgedname, *indexname, *kername, *polyname;
-    FILE *relfile, *purgedfile, *indexfile, *kerfile;
+    FILE *kerfile;
     cado_poly pol;
     int verbose = 1, ndepmin, ndepmax, rora, ret, i, check;
 
@@ -425,9 +437,6 @@ int main(int argc, char *argv[])
     ndepmin = atoi(argv[6]);
     ndepmax = atoi(argv[7]);
     
-    relfile = fopen(relname, "r");
-    purgedfile = fopen(purgedname, "r");
-    indexfile = fopen(indexname, "r");
     kerfile = fopen(kername, "r");
 
     ret = read_polynomial(pol, polyname);
@@ -446,11 +455,8 @@ int main(int argc, char *argv[])
       }
     verbose = 0;
     check = 0;
-    SqrtWithIndexAll(argv[9], relfile, purgedfile, indexfile, kerfile, pol, rora, ndepmin, ndepmax, verbose, check);
+    SqrtWithIndexAll(argv[9], relname, purgedname, indexname, kerfile, pol, rora, ndepmin, ndepmax, verbose, check);
 
-    fclose(relfile);
-    fclose(purgedfile);
-    fclose(indexfile);
     fclose(kerfile);
 
     return 0;
