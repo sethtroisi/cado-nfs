@@ -11,7 +11,7 @@ all:	$(binaries)
 
 procrels: procrels.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils
-hashpair: hashpair.o gzip.o
+hashpair: hashpair.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils
 
 hashpair.o: hashpair.h
