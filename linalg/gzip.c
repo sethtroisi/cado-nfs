@@ -1,3 +1,10 @@
+/* popen() and pclose() are POSIX, not C99. So we have to rely on the
+ * libc's specifics to enable this function. For glibc, it's the
+ * following macro. For other support libraries, it might be something
+ * else. See also popen(3) and feature_test_macros(7)
+ */
+#define _POSIX_C_SOURCE 200112L
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
