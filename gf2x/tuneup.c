@@ -27,6 +27,10 @@
 
 #include "gf2x.h"
 
+#ifdef TUNE_MUL1
+#include INLINES_FILE
+#endif
+
 #define N 2000000
 
 int cputime()

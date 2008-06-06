@@ -26,6 +26,7 @@
 #include <NTL/GF2XFactoring.h>
 #include <NTL/ZZXFactoring.h>
 #include <signal.h>
+#include <string.h>
 
 NTL_CLIENT
 

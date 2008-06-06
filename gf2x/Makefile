@@ -96,7 +96,7 @@ TEST_FILES:=$(LIBGF2X_FILES) test.c timing.c
 test: $(patsubst %.c,%.o,$(TEST_FILES))
 	$(CC) $(MY_CFLAGS) -o $@ $^
 
-factor.o: factor.c
+factor.o: factor.cpp
 	$(CXX) $(MY_CXXFLAGS) -o $@ -c $^
 
 factor: factor.o

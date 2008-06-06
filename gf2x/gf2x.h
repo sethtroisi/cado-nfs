@@ -143,9 +143,12 @@ void mul_gf2x_r(unsigned long *c,
 #endif
 
 /* mul1 -- the INLINES_FILE trick is used by the tuning code. */
-#ifdef	INLINES_FILE
-#include INLINES_FILE
-#else
+
+static inline void mul1 (ulong *c, ulong a, ulong b);
+static ulong mul_1_n (ulong *cp, const ulong *bp, long sb, ulong a);
+static ulong addmul_1_n (ulong *dp, const ulong *cp, const ulong* bp, long sb, ulong a);
+
+#ifndef	TUNE_MUL1
 #include "mul-inlines.c"
 #endif
 
