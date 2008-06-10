@@ -61,7 +61,7 @@ echo $allrels
 
 poly=$root.poly
 nodup=$root.nodup
-purged=$root.purged.gz
+purged=$root.purged #.gz
 tmp=$root.tmp$$
 
 fc155=false
@@ -134,17 +134,18 @@ else
     mkdir $outdir
 fi
 
+mergehis=$outdir/merge.his
 keep=`expr 128 '+' $skip`
 argsa="-forbw $bwstrat -ratio $ratio -coverNmax $coverNmax"
 argsa="$argsa -prune $prune -mat $purged -keep $keep"
 argsa="$argsa -maxlevel $maxlevel -cwmax $cwmax -rwmax $rwmax $verbose"
-time $linalg/merge $argsa > $outdir/merge.his # 2> $outdir.merge.err
-echo "SIZE(merge.his): `ls -s $outdir/merge.his`"
+time $linalg/merge $argsa -out $mergehis # 2> $outdir.merge.err
+echo "SIZE(merge.his): `ls -s $mergehis`"
 
 echo "Replaying merges"
 
-bwcostmin=`tail $outdir/merge.his | grep "BWCOSTMIN:" | awk '{print $NF}'`
-argsr="$purged $outdir/merge.his $outdir/small $outdir/index"
+bwcostmin=`tail $mergehis | grep "BWCOSTMIN:" | awk '{print $NF}'`
+argsr="$purged $mergehis $outdir/small $outdir/index"
 time $linalg/replay $argsr $bwcostmin # 2> $outdir.replay.err
 
 if [ ! -s $outdir/index ]
