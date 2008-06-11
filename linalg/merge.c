@@ -2461,6 +2461,62 @@ dumpSparse(FILE *ofile, sparse_mat_t *mat)
 	}
 }
 
+#ifdef USE_MPI
+/*
+  MPI section
+ */
+
+#define ERROR_TAG -1
+#define DIE_TAG    1
+
+#define BUF_SIZE 1000
+
+// slave j, 1 <= j < mpi_size will treat columns in [jmin..jmax[
+// TODO: balance the load between processors
+void mpi_slave(int mpi_rank, int mpi_size, sparse_mat_t *mat)
+{
+    int jmin, jmax, kappa;
+    unsigned int buf[BUF_SIZE];
+    MPI_Status status;
+
+    // let kappa = ncols/(mpi_size-1)
+    kappa = mat->ncols/(mpi_size-1);
+    // slave_j for j < mpi_size-1 will have to treat [jmin..jmax[
+    // jmin = (j-1)*kappa, jmax = j*kappa-1;
+    // for j = mpi_size-1, this will be jmax = ncols
+    jmin = (mpi_rank-1) * kappa;
+    jmax = (mpi_rank == (mpi_size-1) ? mat->ncols : mpi_rank * kappa);
+    fprintf(stderr, "A slave does not need to do too much things...\n");
+    fprintf(stderr, "... but has to treat C[%d..%d[\n", jmin, jmax);
+    fflush(stderr);
+    // here, wait for dieing signal
+    while(1){
+	MPI_Recv(buf, BUF_SIZE, MPI_UNSIGNED, 0,
+		 MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+	switch(status.MPI_TAG){
+	case DIE_TAG:
+	    printf("MPI#%d# I was asked to die...\n", mpi_rank);
+	    break;
+	}
+	if(status.MPI_TAG == DIE_TAG)
+	    break;
+    }
+}
+
+void mpi_kill_slaves()
+{
+    unsigned int imsg[1];
+    int nprocs, rank;
+    
+    printf("MPI# Stopping everybody\n");
+    MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
+    imsg[0] = 0;
+    for(rank = 1; rank < nprocs; ++rank)
+	MPI_Send(imsg, 1, MPI_UNSIGNED, rank, DIE_TAG, MPI_COMM_WORLD);
+    printf("MPI# I sent everybody the die signal\n");
+}
+#endif
+
 int
 main(int argc, char *argv[])
 {
@@ -2475,7 +2531,7 @@ main(int argc, char *argv[])
     double ratio = 1.1; /* bound on cN_new/cN to stop the computation */
     int i, forbw = 0, coverNmax = 0;
 #if USE_MPI
-    int mpi_rank, mpi_size;
+    int mpi_rank, mpi_size; // 0 <= mpi_rank < mpi_size
 #endif
     
 #if TEX
@@ -2576,13 +2632,12 @@ main(int argc, char *argv[])
 
 #ifdef USE_MPI
     if(mpi_rank != 0){
-	fprintf(stderr, "A slave does not need to do too much things...\n");
-	fflush(stderr);
+	mpi_slave(mpi_rank, mpi_size, &mat);
 	// TODO: clean the mat data structure for a slave also
-	// TODO: actually, the master does not need to do other things
-	// like reading a piece of the matrix...
     }
     else{ // for the master only...!
+	// TODO: actually, the master does not need to do other things
+	// like reading a piece of the matrix...
 #endif    
     tt = seconds();
     initWeightFromFile(&mat, purgedfile);
@@ -2610,11 +2665,7 @@ main(int argc, char *argv[])
 #endif
 
 #ifdef USE_MPI
-    if(mpi_rank != 0){
-	fprintf(stderr, "Sleeping, I am not the master\n");
-	while(1);
-    }
-    else{
+    if(mpi_rank == 0){
 #endif
     outfile = gzip_open(outname, "w");
     report2(outfile, mat.nrows, mat.ncols);
@@ -2626,7 +2677,7 @@ main(int argc, char *argv[])
     /* only call prune if the current excess is larger than iprune */
     if (iprune < mat.nrows - mat.ncols){
 	double tt = seconds();
-	prune(&mat, iprune);
+	prune(outfile, &mat, iprune);
 	fprintf(stderr, "Pruning: nrows=%d ncols=%d %2.2lf\n",
 		mat.rem_nrows, mat.rem_ncols, seconds()-tt);
     }
@@ -2658,6 +2709,7 @@ main(int argc, char *argv[])
 #endif
     closeSWAR(/*&mat*/);
 #ifdef USE_MPI
+    mpi_kill_slaves(mpi_size);
     }
     MPI_Finalize();
 #endif
