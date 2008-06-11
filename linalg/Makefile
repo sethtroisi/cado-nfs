@@ -6,7 +6,7 @@ MY_LFLAGS+=-L$(TOP)/utils
 MY_CFLAGS+=-I$(TOP)/utils
 
 binaries:=allsqrt replay merge purge freerel linalg characters duplicates \
-	  transpose checkdep
+	  transpose checkdep balance
 all:	$(binaries)
 
 procrels: procrels.o
@@ -31,6 +31,8 @@ checkdep: checkdep.o
 	$(CC) $(MY_LFLAGS) -o $@ $^
 linalg: linalg.o gauss.o readmat.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils
+balance: balance.o
+	$(CC) $(MY_LFLAGS) -o $@ $^ -lm
 
 merge.o: merge.h
 
