@@ -139,7 +139,9 @@ keep=`expr 128 '+' $skip`
 argsa="-forbw $bwstrat -ratio $ratio -coverNmax $coverNmax"
 argsa="$argsa -prune $prune -mat $purged -keep $keep"
 argsa="$argsa -maxlevel $maxlevel -cwmax $cwmax -rwmax $rwmax $verbose"
-time $linalg/merge $argsa -out $mergehis # 2> $outdir.merge.err
+argsa="$argsa -out $mergehis"
+#time $linalg/merge $argsa # 2> $outdir.merge.err
+time ./merge.sh $argsa
 echo "SIZE(merge.his): `ls -s $mergehis`"
 
 echo "Replaying merges"
