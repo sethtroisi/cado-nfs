@@ -55,8 +55,14 @@ typedef struct {
 #define SPARSE_ITERATE(mat, i, k) for((k)=1; (k)<=lengthRow((mat),(i)); (k)++)
 #endif
 
-extern void report1(INT i);
+extern void report1(FILE *outfile, INT i);
 extern void removeCellSWAR(sparse_mat_t *mat, int i, INT j);
 extern void destroyRow(sparse_mat_t *mat, int i);
-extern int removeSingletons(sparse_mat_t *mat);
+extern int removeSingletons(FILE *outfile, sparse_mat_t *mat);
 extern int deleteEmptyColumns(sparse_mat_t *mat);
+
+#ifdef USE_MPI
+extern void mpi_send_inactive_cols(int i);
+extern void mpi_add_rows(sparse_mat_t *mat, int m, INT j, INT *ind);
+extern void mpi_load_rows_for_j(sparse_mat_t *mat, int m, INT j);
+#endif

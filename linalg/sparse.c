@@ -28,6 +28,15 @@ fprintRow(FILE *file, INT *row)
 	fprintf(file, " %d", row[i]);
 }
 
+// row[0..row[0]] is of lenfth row[0]+1.
+INT * copyRow(INT *row)
+{
+    INT *tmp = (INT *)malloc((1+row[0]) * sizeof(INT));
+    
+    memcpy(tmp, row, (1+row[0]) * sizeof(INT));
+    return tmp;
+}
+
 // i1 += i2
 // A row is row[0..max] where row[0] = max and the real components are
 // row[1..max].
