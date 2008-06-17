@@ -152,3 +152,33 @@ postsieve/checknorms/checknorms -poly $tmp/$name.poly $d/$name/$name.rels \
    >> $tmp/$name.rels
 ./merge_linalg_sqrt.sh $tmp/$name <parameters> [see README.params]
 /bin/rm -fr $tmp/$name.*
+
+##############################################################################
+Using openMPI
+-------------
+1. compile openmpi and install it. Make sure you updated your PATH and
+LD_PATH. Add MPI_DIR to your Makefile.local
+
+2. go to linalg and compile:
+
+cd linalg; make mpimerge
+
+3. edit the merge.sh script to be able to use the mpi version.
+
+4. It should work. Here is an example of file 'mpi.hosts':
+
+emmental
+parmesan 	slots=2
+tomme 		slots=2
+abondance 	slots=2
+ambiorix 	slots=2
+appenzeller	slots=2
+gruyere		slots=2
+comte		slots=2
+beaufort	slots=2
+
+meaning that two processes can be launched on some machines (default slot
+value is 1). See the README in the openmpi distrib for more.
+
+WARNING: the numerical results of mpimerge cannot be the same as the
+single proc execution of merge.
