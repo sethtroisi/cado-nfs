@@ -1,21 +1,20 @@
 #!/bin/sh -
 cado=$HOME/CADO-src
 mpidir=/share/stymphale/lix/morain/openmpi-1.2.6
-if false
+hosts="painvin,parmesan,tomme,emmental,abondance,ambiorix,appenzeller"
+hosts="emmental,parmesan,tomme,abondance,ambiorix,appenzeller"
+np=6; mpiargs="--host $hosts --np $np"
+np=11; mpiargs="-hostfile mpi.hosts --np $np"
+if true
 then
     echo "##### Using mpi version"
-    np=3; hosts="painvin,parmesan,tomme"
-    np=4; hosts="painvin,parmesan,tomme,emmental"
-    mpirun -v --prefix $mpidir --np $np --host $hosts \
-	$cado/linalg/mpimerge $*
+    mpirun -v --prefix $mpidir $mpiargs $cado/linalg/mpimerge $*
     root=`echo $* | awk '{print $NF}'` #### humffffff
     echo ""
     echo "Rebuilding $root from the partial files..."
-    $cado/linalg/hismerge $root `expr $np '-' 1` > $root
-    echo "... done"
-    echo ""
+    time $cado/linalg/hismerge $root `expr $np '-' 1` > $root
 else
-    $cado/linalg/merge $*
+    time $cado/linalg/merge $*
 fi
 
 

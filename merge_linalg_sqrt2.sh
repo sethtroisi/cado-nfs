@@ -141,7 +141,7 @@ argsa="$argsa -prune $prune -mat $purged -keep $keep"
 argsa="$argsa -maxlevel $maxlevel -cwmax $cwmax -rwmax $rwmax $verbose"
 argsa="$argsa -out $mergehis"
 #time $linalg/merge $argsa # 2> $outdir.merge.err
-time ./merge.sh $argsa
+./merge.sh $argsa
 echo "SIZE(merge.his): `ls -s $mergehis`"
 
 echo "Replaying merges"
