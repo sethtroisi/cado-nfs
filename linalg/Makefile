@@ -16,6 +16,7 @@ hashpair: hashpair.o
 
 hashpair.o: hashpair.h
 prune.o: prune.h
+merge.o: merge.h
 
 freerel: freerel.o ../sieve/fb.o hashpair.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lgmp -lm
@@ -33,8 +34,6 @@ linalg: linalg.o gauss.o readmat.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils
 balance: balance.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lm
-
-merge.o: merge.h
 
 gauss.o: gauss.c
 	$(CC) $(MY_CFLAGS) -DMULTI_ROW=3 -DNO_MAIN $< -c -o $@
@@ -55,6 +54,23 @@ matsort: matsort.o gauss.o readmat.o
 matprune: matprune.c
 	$(CC) $(MY_LFLAGS) -o $@ $^
 
+######################################################################
+## MPI section
+######################################################################
+MPI_LIB=$(MPI_DIR)/lib
+MPI_INC=-I$(MPI_DIR)/include
+MPI_CC=mpicc
+
+mpimerge.o: merge.c
+	$(MPI_CC) -DUSE_MPI $(MPI_INC) $(MY_CFLAGS) $< -c -o $@
+
+mpimerge: mpimerge.o sparse.o prune.o gzip.o
+	$(MPI_CC) -DUSE_MPI $(MPI_INC) $(MY_LFLAGS) -L$(MPI_LIB) -o $@ $^ -lutils -lm
+
+hismerge: hismerge.o
+	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils
+
+######################################################################
 
 $(binaries): $(TOP)/utils/libutils.a
 
