@@ -386,7 +386,6 @@ report2(FILE *outfile, INT i1, INT i2)
 /* compute the weight mat->wt[j] of each column j, for the set of relations
    in file purgedfile.
 */
-// TODO_MPI: do this for jmin <= x < jmax (?).
 void
 initWeightFromFile(sparse_mat_t *mat, FILE *purgedfile, int jmin, int jmax)
 {
@@ -2785,6 +2784,17 @@ mpi_inactivate_rows(FILE *outfile, sparse_mat_t *mat, unsigned int *tab, int nta
     }
 }
 
+int
+mpi_get_number_of_active_colums(sparse_mat_t *mat, INT jmin, INT jmax)
+{
+    INT j;
+    int nb = 0;
+
+    for(j = jmin; j < jmax; j++)
+	nb += (mat->wt[j] != 0);
+    return nb;
+}
+
 // Sending rows to add; get new weight in return; rows are sent to all
 // procs except the current one and the master. At the end, the new weights
 // are sent to the master for update.
@@ -2869,7 +2879,9 @@ mpi_add_rows(sparse_mat_t *mat, int m, INT j, INT *ind)
 	buf[ibuf++] = new_weight[k];
     }
     MPI_Send(buf, ibuf, MPI_UNSIGNED, 0, MPI_SEND_W_TAG, MPI_COMM_WORLD);
+#if DEBUG >= 1
     mpi_err("Exiting from mpi_add_rows\n");
+#endif
     free(done);
 }
 
@@ -2895,10 +2907,14 @@ mpi_slave(int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char *purgedname,
     outfile = gzip_open(str, "w");
     // loop forever
     while(1){
+#if DEBUG >= 1
 	mpi_err("Waiting...\n");
+#endif
 	MPI_Recv(buf, MPI_BUF_SIZE, MPI_UNSIGNED, MPI_ANY_SOURCE,
 		 MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+#if DEBUG >= 1
 	mpi_err2("Received %d from %d\n", status.MPI_TAG, status.MPI_SOURCE);
+#endif
 	// FIXME: sometimes, only 0 has the right to send things
 	switch(status.MPI_TAG){
 	case MPI_DIE_TAG:
@@ -2908,12 +2924,15 @@ mpi_slave(int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char *purgedname,
 	    // buf = [index]
 	    if(buf[0] >= mpi_index){
 		mpi_index = buf[0];
-		fprintf(stderr, "New mpi_index = %d\n", mpi_index);
+#if DEBUG >= 1
+		mpi_err1("New mpi_index = %d\n", mpi_index);
+#endif
 	    }
 	    // buf <- [index, m_min]
 	    m = minColWeight(mat);
 	    buf[1] = m;
-	    MPI_Send(buf, 2, MPI_UNSIGNED, 0, MPI_MIN_M, MPI_COMM_WORLD);
+	    buf[2] = mpi_get_number_of_active_colums(mat, jmin, jmax);
+	    MPI_Send(buf, 3, MPI_UNSIGNED, 0, MPI_MIN_M, MPI_COMM_WORLD);
 	    break;
 	case MPI_DO_M:
 	    // buf = [index, m]
@@ -2924,8 +2943,9 @@ mpi_slave(int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char *purgedname,
 		       &totdel, m, verbose);
 	    deleteEmptyColumns(mat);
 	    fflush(outfile);
+#if DEBUG >= 1
 	    mpi_err2("nrows=%d ncols=%d\n", mat->rem_nrows, mat->rem_ncols);
-	    mpi_err("Sending done ack back to the master\n");
+#endif
 	    MPI_Send(buf, 1, MPI_UNSIGNED, 0, MPI_M_DONE, MPI_COMM_WORLD);
 	    break;
 	case MPI_J_TAG:
@@ -2943,15 +2963,16 @@ mpi_slave(int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char *purgedname,
 	    // buf = [index, m, j, i1, l1, i2, l2, ..., ir, lr]
 	    // TODO_MPI: receive length of r1+r2???? Perhaps pbs with MST
 	    MPI_Get_count(&status, MPI_UNSIGNED, &cnt);
+#if DEBUG >= 1
 	    fprintf(stderr, "From proc=%d, I received %d values:",
 		    status.MPI_SOURCE, cnt);
 	    fprintf(stderr, " index=%d m=%d j=%d", buf[0], buf[1], buf[2]);
 	    for(k = 3; k < cnt; k++)
 		fprintf(stderr, " %d", (int)buf[k]);
 	    fprintf(stderr, "\n");
+#endif
 	    // if buf[3] is non null, we must add it to all buf[k > 3]
 	    i0 = (int)buf[3];
-	    fprintf(stderr, "mat[i0] = %p\n", mat->rows[i0]);
 	    // humffffff
 	    if(!isRowNull(mat, i0)){
 		for(k = 5; k < cnt; k += 2){
@@ -2980,8 +3001,10 @@ mpi_slave(int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char *purgedname,
 		    buf[i+1] = 0;
 		else
 		    buf[i+1] = (unsigned)lengthRow(mat, (int)buf[i]);
+#if DEBUG >= 1
 		fprintf(stderr, "index=%u, m=%u j=%u", buf[0], buf[1], buf[2]);
 		fprintf(stderr, " i=%u => w=%u\n", buf[i], buf[i+1]);
+#endif
 	    }
 	    // back to the current sub-master
 	    // buf = [index, m, j, i1, 0, i2, new_l2, ..., ir, newlr]
@@ -3034,6 +3057,7 @@ mpi_start_slaves(int mpi_size, sparse_mat_t *mat)
 		break;
 	}
 #endif
+	mpi_err3("Weight[%d..%d[ = %d\n", jmin, jmax, kappa);
 	mpi_tab_j[rk-1] = jmin;
 	buf[0] = (unsigned)jmin;
 	buf[1] = (unsigned)jmax;
@@ -3046,12 +3070,12 @@ mpi_start_slaves(int mpi_size, sparse_mat_t *mat)
     fprintf(stderr, "\n");
 }
 
-void
+int
 mpi_get_minimal_m_proc(int *m, int *proc, int mpi_size, unsigned int index)
 {
     MPI_Status status;
     unsigned int buf[MPI_BUF_SIZE];
-    int k, nrecv;
+    int k, nrecv, curr_ncols = 0;
 
     *m = MERGE_LEVEL_MAX, nrecv;
     buf[0] = index;
@@ -3078,10 +3102,12 @@ mpi_get_minimal_m_proc(int *m, int *proc, int mpi_size, unsigned int index)
 		*proc = status.MPI_SOURCE;
 		*m = (int)buf[1];
 	    }
+	    curr_ncols += (int)buf[2];
 	    if(nrecv == (mpi_size-1))
 		break;
 	}
     }
+    return curr_ncols;
 }
 
 void
@@ -3090,7 +3116,7 @@ mpi_master(FILE *outfile, sparse_mat_t *mat, int mpi_size)
     MPI_Status status;
     unsigned int buf[MPI_BUF_SIZE];
     int ibuf, m, proc, cnt, k, done, maxm = 0;
-    int *row_weight;
+    int *row_weight, curr_ncols;
 
 #if 0
     mat->mergelevelmax = 2;
@@ -3104,11 +3130,15 @@ mpi_master(FILE *outfile, sparse_mat_t *mat, int mpi_size)
 	    row_weight[k] = lengthRow(mat, k);
     while(1){
 	mpi_index++;
-	if((mpi_index % 10000) == 0)
-	    fprintf(stderr, "Entering round %d at %2.2lf; maxm=%d\n",
-		    mpi_index, seconds(), maxm);
+	curr_ncols = mpi_get_minimal_m_proc(&m, &proc, mpi_size, mpi_index);
+	if((mpi_index == 1) || ((mpi_index % 10000) == 0))
+	    fprintf(stderr, 
+		    "Round %d (%2.2lf): maxm=%d nrows=%d ncols=%d[%d] (%d)\n",
+		    mpi_index, seconds(), maxm, 
+		    mat->rem_nrows, mat->rem_ncols, curr_ncols,
+		    mat->rem_nrows - mat->rem_ncols);
 	// look for minimal m for index
-	mpi_get_minimal_m_proc(&m, &proc, mpi_size, mpi_index);
+	//	mat->rem_ncols = curr_ncols;
 #if DEBUG >= 1	
 	mpi_err2("Minimal m is %d for proc=%d\n", m, proc);
 #endif
@@ -3162,8 +3192,6 @@ mpi_master(FILE *outfile, sparse_mat_t *mat, int mpi_size)
 			    row_weight[buf[k]] = 0;
 			    report1(outfile, (int)buf[k]);
 			    mat->rem_nrows--;
-			    // TODO_MPI: send #of inactives columns from
-			    // time to time
 			}
 		    }
 		}
@@ -3182,6 +3210,8 @@ mpi_master(FILE *outfile, sparse_mat_t *mat, int mpi_size)
 		break;
 	}
     }
+    fprintf(stderr, "Finally (%d -- %2.2lf): nrows=%d ncols=%d\n",
+		    mpi_index, seconds(), mat->rem_nrows, mat->rem_ncols);
 }
 
 void
