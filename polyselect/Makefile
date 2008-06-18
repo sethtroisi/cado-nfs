@@ -6,13 +6,18 @@ include $(TOP)/Makefile.common
 MY_LFLAGS+=-L$(TOP)/utils
 MY_CFLAGS+=-I$(TOP)/utils
 
-all: polyselect
+all: polyselect kleinjung
 
 polyselect: polyselect.o
+	$(CC) $(MY_LFLAGS) $^ -o $@ -lutils -lgmp -lm
+
+kleinjung: kleinjung.o
 	$(CC) $(MY_LFLAGS) $^ -o $@ -lutils -lgmp -lm
 
 # Some more dependencies
 polyselect.o: polyselect.c $(TOP)/cado.h
 
+kleinjung.o: kleinjung.c $(TOP)/cado.h
+
 clean:
-	-rm -f polyselect *~ *.o
+	-rm -f polyselect kleinjung *~ *.o
