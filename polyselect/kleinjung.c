@@ -13,13 +13,62 @@
 
 #include "aux.c"
 
-/* Outputs all (mu_1, ..., mu_l), 0 <= mu_i < d, such that S is at distance
+/* Outputs all (mu[0], ..., mu[l-1]), 0 <= mu_i < d, such that S is at distance
    less than eps from an integer, with
-   S = f0 + f[1][mu_1] + ... + f[l][mu_l].
+   S = f0 + f[0][mu[0]] + ... + f[l-1][mu[l-1]].
 */
 void
-naive_search (double f0, double **f, int l, int d, double eps)
+naive_search (double f0, double **f, int l, int d, double eps, mpz_t ad,
+	      mpz_t P, mpz_t **m)
 {
+  int *mu, i;
+  double *s, fr;
+  mpz_t t;
+
+  eps = 1e-7;
+  //  printf ("enter naive_search, eps=%e\n", eps);
+
+  mu = (int*) malloc (l * sizeof (int));
+  s = (double*) malloc ((l + 1) * sizeof (double));
+  /* s[i] contains f0 + f[0][mu[0]] + ... + f[i-1][mu[i-1]] */
+
+  /* initializes mu[] to (0,...,0) */
+  for (i = 0; i < l; i++)
+    mu[i] = 0;
+  s[0] = f0;
+  for (i = 1; i <= l; i++)
+    s[i] = s[i-1] + f[i-1][mu[i-1]];
+  mpz_init (t);
+
+  while (1)
+    {
+      /* check current sum */
+      fr = fabs (s[l] - round (s[l]));
+      if (fr <= eps)
+	{
+	  mpz_set (t, m[0][mu[0]]);
+	  for (i = 1; i < l; i++)
+	    mpz_add (t, t, m[i][mu[i]]);
+	  gmp_printf ("ad=%Zd p=%Zd m=%Zd eps=%e\n", ad, P, t, fr);
+	}
+      
+      /* go to next combination */
+      for (i = l - 1; i >= 0 && mu[i] == d - 1; i--);
+      /* now either i < 0 and we are done, or mu[i] < d-1 */
+      if (i < 0)
+	break;
+      mu[i] ++;
+      s[i+1] = s[i] + f[i][mu[i]];
+      while (++i < l)
+	{
+	  mu[i] = 0;
+	  s[i+1] = s[i] + f[i][mu[i]];
+	}
+    }
+
+  mpz_clear (t);
+  free (mu);
+  free (s);
 }
 
 /* enumerates all subsets of kk elements of Q, where Q has lQ elements,
@@ -75,11 +124,13 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
 
       if (mpz_get_d (P) <= max_adm1)
         {
+#if 0
           /* print current subset */
           gmp_printf ("%Zd", ad);
           for (k = 0; k < l; k++)
             printf (" %u", Q[p[k]]);
           printf (": %e\n", mpz_get_d (P));
+#endif
 
           /* compute 1/N mod P */
           mpz_invert (invN, N, P);
@@ -197,7 +248,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
               }
 
           /* now search for a small combination */
-          naive_search (f0, f, l, d, eps);
+          naive_search (f0, f, l, d, eps, ad, P, m);
         }
       
       /* go to next subset */
@@ -260,7 +311,7 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb)
             P[lP - 1] = r;
           }
       }
-  fprintf (stderr, "P has %u primes\n", lP);
+  //  fprintf (stderr, "P has %u primes\n", lP);
 
   a = alloc_mpz_array (d + 1);
   g = alloc_mpz_array (d + 1);
@@ -272,7 +323,7 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb)
   Nd = mpz_get_d (N);
 
   max_ad = pow(pow (M, (double) (2 * d - 2)) / Nd, 1.0 / (double) (d - 3));
-  fprintf (stderr, "max a[d]=%e\n", max_ad);
+  //  fprintf (stderr, "max a[d]=%e\n", max_ad);
 
   mpz_set_ui (a[d], 1);
 
@@ -331,7 +382,7 @@ main (int argc, char *argv[])
   init (in);
 
   parse_input (in);
-  gmp_printf ("N=%Zd\n", in->n);
+  //  gmp_printf ("N=%Zd\n", in->n);
 
   /* for Elie: d=5, M=1e21, l=8, pb=256 */
   Algo36 (in->n, 5, 1e21, 7, 256);
