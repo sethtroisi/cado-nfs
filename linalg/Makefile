@@ -16,7 +16,7 @@ hashpair: hashpair.o
 
 hashpair.o: hashpair.h
 prune.o: prune.h
-merge.o: merge.h
+merge_mono.o: merge_mono.h
 
 freerel: freerel.o ../sieve/fb.o hashpair.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lgmp -lm
@@ -24,7 +24,7 @@ duplicates: duplicates.o hashpair.o files.o gzip.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils
 purge: purge.o hashpair.o files.o gzip.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lgmp -lm
-merge: merge.o sparse.o prune.o gzip.o
+merge: merge.o merge_mono.o sparse.o prune.o gzip.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lm
 replay: replay.o sparse.o gzip.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils
@@ -61,10 +61,10 @@ MPI_LIB=$(MPI_DIR)/lib
 MPI_INC=-I$(MPI_DIR)/include
 MPI_CC=mpicc
 
-mpimerge.o: merge.c
+mpimerge.o: merge_mono.c merge_mpi.c
 	$(MPI_CC) -DUSE_MPI $(MPI_INC) $(MY_CFLAGS) $< -c -o $@
 
-mpimerge: mpimerge.o sparse.o prune.o gzip.o
+mpimerge: mpimerge.o merge_mono.o sparse.o prune.o gzip.o
 	$(MPI_CC) -DUSE_MPI $(MPI_INC) $(MY_LFLAGS) -L$(MPI_LIB) -o $@ $^ -lutils -lm
 
 hismerge: hismerge.o
