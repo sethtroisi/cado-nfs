@@ -13,7 +13,7 @@
 
 #include "utils/utils.h"
 #include "sparse.h"
-#include "merge.h"
+#include "merge_mono.h"
 #include "prune.h"
 
 double removeCellSWAR_time = 0.0;

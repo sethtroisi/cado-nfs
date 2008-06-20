@@ -1616,9 +1616,6 @@ deleteAllColsFromStack(FILE *outfile, sparse_mat_t *mat, int iS)
 # endif
 		    remove_j_from_row(mat, mat->R[j][k], j);
 		    removeRowDefinitely(outfile, mat, mat->R[j][k], 1);
-#ifdef USE_MPI
-		    mpi_send_inactive_rows(mat->R[j][k]);
-#endif
 		    mat->rem_ncols--;
 		}
 	    mat->wt[j] = 0;
@@ -1695,15 +1692,7 @@ tryAllCombinations(FILE *outfile, sparse_mat_t *mat, int m, INT *ind)
 {
     int i, k;
 
-#ifdef USE_MPI
-    // naive strategy, where the pivot is the row of smallest weight
-    i = 0;
-    for(k = 1; k < m; k++)
-	if(lengthRow(mat, ind[k]) < lengthRow(mat, ind[i]))
-	    i = k;
-#else
     i = findBestIndex(mat, m, ind);
-#endif
 #if DEBUG >= 1
     fprintf(stderr, "Minimal is i=%d (%d %d)\n", i, ind[0], ind[1]);
 #endif
@@ -1818,25 +1807,17 @@ void
 findOptimalCombination(FILE *outfile, sparse_mat_t *mat, int m, INT j,
 		       INT *ind, double *tfill, double *tMST)
 {
-#ifdef USE_MPI
-    // tmp??!?!?!?
-    *tfill = 0.0;
-    *tMST = 0.0;
-    tryAllCombinations(outfile, mat, m, ind);
-    mpi_add_rows(mat, m, j, ind);
-#else
     if(m <= 2){
 	*tfill = *tMST = 0;
 	tryAllCombinations(outfile, mat, m, ind);
     }
     else{
-# if 0
+#if 0
 	tryAllCombinations(outfile, mat, m, ind);
-# else
+#else
 	useMinimalSpanningTree(outfile, mat, m, ind, tfill, tMST);
-# endif
-    }
 #endif
+    }
 }
 
 void

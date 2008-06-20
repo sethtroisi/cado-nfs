@@ -36,11 +36,9 @@ main(int argc, char *argv[])
     double kprune = 1.0; /* prune keeps kprune * (initial excess) */
     double ratio = 1.1; /* bound on cN_new/cN to stop the computation */
     int i, forbw = 0, coverNmax = 0;
-#if USE_MPI
-    int mpi_rank, mpi_size; // 0 <= mpi_rank < mpi_size
-#endif
-    
 #ifdef USE_MPI
+    int mpi_rank, mpi_size; // 0 <= mpi_rank < mpi_size
+
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
     MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
