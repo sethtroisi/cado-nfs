@@ -4,6 +4,7 @@
 
 unsigned int mpi_index = 0;
 
+#include "gzip.h"
 #include "merge_mono.h"
 #include "mpi.h"
 #include "merge_mpi.h"
@@ -754,6 +755,9 @@ mpi_master(FILE *outfile, sparse_mat_t *mat, int mpi_size, FILE *purgedfile)
 		}
 		memcpy(send_buf, buf, cnt);
 		ibuf = 1;
+		// TODO: here, it is not the master who might decide
+		// but all procs at the same time by sharing the
+		// row_weight info???????????
 		if((mat->rem_nrows - mat->rem_ncols) > mat->delta){
 		    // look for too heavy rows
 		    for(k = 3; k < cnt; k += 2){

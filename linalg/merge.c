@@ -23,11 +23,19 @@
 #include "merge_mpi.h"
 #endif
 
+void
+init_rep(report_t *rep, char *outname, sparse_mat_t *mat)
+{
+    rep->type = 0; // classical one: output to a file
+    rep->outfile = gzip_open(outname, "w");
+}
+
 int
 main(int argc, char *argv[])
 {
-    FILE *purgedfile, *outfile;
+    FILE *purgedfile;
     sparse_mat_t mat;
+    report_t rep;
     char *purgedname = NULL, *hisname = NULL, *outname = NULL;
     int nrows, ncols;
     int cwmax = 20, rwmax = 1000000, maxlevel = 2, iprune = 0, keep = 128;
@@ -176,8 +184,8 @@ main(int argc, char *argv[])
     checkmat(&mat);
 #endif
 
-    outfile = gzip_open(outname, "w");
-    report2(outfile, mat.nrows, mat.ncols);
+    init_rep(&rep, outname, &mat);
+    report2(&rep, mat.nrows, mat.ncols);
 
     /* iprune is the excess we want at the end of prune */
     iprune = (mat.nrows-mat.ncols) * kprune;
@@ -186,7 +194,7 @@ main(int argc, char *argv[])
     /* only call prune if the current excess is larger than iprune */
     if (iprune < mat.nrows - mat.ncols){
 	double tt = seconds();
-	prune(outfile, &mat, iprune);
+	prune(&rep, &mat, iprune);
 	fprintf(stderr, "Pruning: nrows=%d ncols=%d %2.2lf\n",
 		mat.rem_nrows, mat.rem_ncols, seconds()-tt);
     }
@@ -201,9 +209,9 @@ main(int argc, char *argv[])
 #if M_STRATEGY <= 2
     merge(&mat, maxlevel, verbose, forbw);
 #else
-    mergeOneByOne(outfile, &mat, maxlevel, verbose, forbw, ratio, coverNmax);
+    mergeOneByOne(&rep, &mat, maxlevel, verbose, forbw, ratio, coverNmax);
 #endif
-    gzip_close(outfile, outname);
+    gzip_close(rep.outfile, outname);
     fprintf(stderr, "Final matrix has w(M)=%lu, ncols*w(M)=%lu\n",
 	    mat.weight, ((unsigned long)mat.rem_ncols) * mat.weight);
 #if TEX

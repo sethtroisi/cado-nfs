@@ -62,7 +62,7 @@ visit (int i, int *nodes, int *edges, sparse_mat_t *mat, unsigned int *rsum)
    removed (i.e. which have become of weight 0).
 */
 int
-delete (FILE *outfile, int i, int *nodes, sparse_mat_t *mat, unsigned int *rsum)
+delete (report_t *rep, int i, int *nodes, sparse_mat_t *mat, unsigned int *rsum)
 {
     INT j;
     int k, v, nd = 0;
@@ -87,11 +87,11 @@ delete (FILE *outfile, int i, int *nodes, sparse_mat_t *mat, unsigned int *rsum)
 	if(mat->wt[j] == 1){
             v = rsum[j]; /* other row containing j */
 	    if (nodes[v] >= 0)
-		nd += delete (outfile, v, nodes, mat, rsum);
+		nd += delete (rep, v, nodes, mat, rsum);
 	}
     }
     destroyRow(mat, i);
-    report1(outfile, i);
+    report1(rep, i);
     mat->rem_nrows--;
     return nd;
 }
@@ -207,7 +207,7 @@ compute_components (component_t **comps, int *ncomps, int *alloc, int *nodes,
      end function
 */
 void
-prune (FILE *outfile, sparse_mat_t *mat, int keep)
+prune (report_t *rep, sparse_mat_t *mat, int keep)
 {
     int i, j, k, t, excess, old_nrows, old_ncols, mid;
     int *nodes, *edges, alloc, ncomps;
@@ -269,7 +269,7 @@ prune (FILE *outfile, sparse_mat_t *mat, int keep)
 	if (nodes[i] >= 0){ /* it was not deleted */
 	    old_nrows = mat->rem_nrows;
 	    old_ncols = mat->rem_ncols;
-	    mat->rem_ncols -= delete (outfile, i, nodes, mat, rsum);
+	    mat->rem_ncols -= delete (rep, i, nodes, mat, rsum);
             deleted_component ++;
             cur_nodes = old_nrows - mat->rem_nrows;
             if (cur_nodes < min_size)

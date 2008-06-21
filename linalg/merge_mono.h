@@ -61,6 +61,15 @@ typedef struct {
                         R[j]=NULL for weight(j) > cwmax. */
 } sparse_mat_t;
 
+// data structure for reporting actions during the merge; in standard mode
+// (say mono proc), this is just a wrap around for a FILE; otherwise,
+// it can be used to register things in an array that will be examined and
+// flushed from time to time. See the MPI version for more.
+typedef struct{
+    FILE *outfile;
+    char type; // '0' for the standard stuff
+} report_t;
+
 #if USE_TAB == 0
 #define isRowNull(mat, i) ((mat)->data[(i)].val == NULL)
 #define lengthRow(mat, i) (mat)->data[(i)].len
@@ -79,12 +88,12 @@ extern void fillSWAR(sparse_mat_t *mat, INT jmin, INT jmax);
 extern void closeSWAR(/*sparse_mat_t *mat*/);
 
 extern void readmat(sparse_mat_t *mat, FILE *file, int jmin, int jmax);
-extern void report1(FILE *outfile, INT i);
-extern void report2(FILE *outfile, INT i1, INT i2);
+extern void report1(report_t *rep, INT i);
+extern void report2(report_t *rep, INT i1, INT i2);
 extern void removeCellSWAR(sparse_mat_t *mat, int i, INT j);
 extern void destroyRow(sparse_mat_t *mat, int i);
-extern int removeSingletons(FILE *outfile, sparse_mat_t *mat);
+extern int removeSingletons(report_t *rep, sparse_mat_t *mat);
 extern int deleteEmptyColumns(sparse_mat_t *mat);
 
-extern void merge(FILE *outfile, sparse_mat_t *mat, int maxlevel, int verbose, int forbw);
-extern void mergeOneByOne(FILE *outfile, sparse_mat_t *mat, int maxlevel, int verbose, int forbw, double ratio, int coverNmax);
+extern void merge(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int forbw);
+extern void mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int forbw, double ratio, int coverNmax);

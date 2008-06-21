@@ -315,58 +315,62 @@ texSWAR(sparse_mat_t *mat)
 }
 
 void
-reporthis(FILE *outfile, INT tab[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1], int i0)
+reporthis(report_t *rep, INT tab[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1], int i0)
 {
     int k;
 
 #if DEBUG >= 1
     fprintf(stderr, "Reporting for tab[%d]\n", i0);
 #endif
+    if(rep->type == 0){
 #ifdef USE_MPI
-    fprintf(outfile, "REPORT %d ", mpi_index);
+	fprintf(rep->outfile, "REPORT %d ", mpi_index);
 #endif
-    for(k = 1; k <= tab[i0][0]; k++){
-	fprintf(outfile, "%ld", (long int) tab[i0][k]);
-	if(k <= tab[i0][0]-1)
-	    fprintf(outfile, " ");
+	for(k = 1; k <= tab[i0][0]; k++){
+	    fprintf(rep->outfile, "%ld", (long int) tab[i0][k]);
+	    if(k <= tab[i0][0]-1)
+		fprintf(rep->outfile, " ");
+	}
+	fprintf(rep->outfile, "\n");
     }
-    fprintf(outfile, "\n");
 }
 
 // terrific hack: everybody on the same line
 // the first is to be destroyed in replay!!!
 void
-reportn(FILE *outfile, INT *ind, int n)
+reportn(report_t *rep, INT *ind, int n)
 {
     int i;
 
 #if DEBUG >= 1
     fprintf(stderr, "Reporting for n=%d\n", n);
 #endif
+    if(rep->type == 0){
 #ifdef USE_MPI
-    fprintf(outfile, "REPORT %d ", mpi_index);
+	fprintf(rep->outfile, "REPORT %d ", mpi_index);
 #endif
-    for(i = 0; i < n; i++){
-	fprintf(outfile, "%ld", (long int) ind[i]);
-	if(i < n-1)
-	    fprintf(outfile, " ");
+	for(i = 0; i < n; i++){
+	    fprintf(rep->outfile, "%ld", (long int) ind[i]);
+	    if(i < n-1)
+		fprintf(rep->outfile, " ");
+	}
+	fprintf(rep->outfile, "\n");
     }
-    fprintf(outfile, "\n");
 }
 
 void
-report1(FILE *outfile, INT i)
+report1(report_t *rep, INT i)
 {
-    reportn(outfile, &i, 1);
+    reportn(rep, &i, 1);
 }
 
 void
-report2(FILE *outfile, INT i1, INT i2)
+report2(report_t *rep, INT i1, INT i2)
 {
     INT tmp[2];
     tmp[0] = i1;
     tmp[1] = i2;
-    reportn(outfile, tmp, 2);
+    reportn(rep, tmp, 2);
 }
 
 /* compute the weight mat->wt[j] of each column j, for the set of relations
@@ -1052,7 +1056,7 @@ findBestIndex(sparse_mat_t *mat, int m, INT *ind)
 }
 
 void
-merge_m_slow(FILE *outfile, sparse_mat_t *mat, int m, int verbose)
+merge_m_slow(report_t *rep, sparse_mat_t *mat, int m, int verbose)
 {
     int totfindrows = 0, totfindbest = 0, totadd = 0, tt;
     int j, k, i, njproc = 0;
@@ -1113,7 +1117,7 @@ merge_m_slow(FILE *outfile, sparse_mat_t *mat, int m, int verbose)
                 ind[k] = ind[k-1];
 	    ind[0] = itmp;
 	}
-	reportn(outfile, ind, m);
+	reportn(rep, ind, m);
 	totadd += (cputime()-tt);
 	removeWeightFromRow(mat, ind[0]);
 	destroyRow(mat, ind[0]);
@@ -1568,20 +1572,20 @@ remove_j_from_row(sparse_mat_t *mat, int i, int j)
 }
 
 void
-removeRowDefinitely(FILE *outfile, sparse_mat_t *mat, INT i, int doreport)
+removeRowDefinitely(report_t *rep, sparse_mat_t *mat, INT i, int doreport)
 {
     removeRowSWAR(mat, i);
     destroyRow(mat, i);
     if(doreport)
 	// TODO_MPI: when reporting, we should report to all other procs?
-	report1(outfile, i);
+	report1(rep, i);
     mat->rem_nrows--;
 }
 
 // These columns are simply removed from the current squeleton matrix, but
 // not from the small matrix.
 int
-deleteAllColsFromStack(FILE *outfile, sparse_mat_t *mat, int iS)
+deleteAllColsFromStack(report_t *rep, sparse_mat_t *mat, int iS)
 {
     dclist dcl;
     INT j;
@@ -1615,7 +1619,7 @@ deleteAllColsFromStack(FILE *outfile, sparse_mat_t *mat, int iS)
 			fprintf(stderr, "deleteAllCols: row is %d\n",mat->R[j][k]);
 # endif
 		    remove_j_from_row(mat, mat->R[j][k], j);
-		    removeRowDefinitely(outfile, mat, mat->R[j][k], 1);
+		    removeRowDefinitely(rep, mat, mat->R[j][k], 1);
 		    mat->rem_ncols--;
 		}
 	    mat->wt[j] = 0;
@@ -1634,9 +1638,9 @@ deleteAllColsFromStack(FILE *outfile, sparse_mat_t *mat, int iS)
 }
 
 int
-deleteHeavyColumns(FILE *outfile, sparse_mat_t *mat)
+deleteHeavyColumns(report_t *rep, sparse_mat_t *mat)
 {
-    return deleteAllColsFromStack(outfile, mat, mat->cwmax+1);
+    return deleteAllColsFromStack(rep, mat, mat->cwmax+1);
 }
 
 int
@@ -1665,7 +1669,7 @@ deleteEmptyColumns(sparse_mat_t *mat)
 }
 
 int
-removeSingletons(FILE *outfile, sparse_mat_t *mat)
+removeSingletons(report_t *rep, sparse_mat_t *mat)
 {
 #if USE_MERGE_FAST == 0
     INT i, j;
@@ -1679,16 +1683,16 @@ removeSingletons(FILE *outfile, sparse_mat_t *mat)
 	    ASSERT(i < mat->nrows);
 	    removeWeightFromRow(mat, i);
 	    destroyRow(mat, i);
-	    report1(outfile, i); // signal to replay...!
+	    report1(rep, i); // signal to replay...!
 	}
 #else
-    return deleteAllColsFromStack(outfile, mat, 1);
+    return deleteAllColsFromStack(rep, mat, 1);
 #endif
 }
 
 // try all combinations to find the smaller one
 void
-tryAllCombinations(FILE *outfile, sparse_mat_t *mat, int m, INT *ind)
+tryAllCombinations(report_t *rep, sparse_mat_t *mat, int m, INT *ind)
 {
     int i, k;
 
@@ -1715,7 +1719,7 @@ tryAllCombinations(FILE *outfile, sparse_mat_t *mat, int m, INT *ind)
 #if DEBUG >= 1
     fprintf(stderr, "=> new_ind: %d %d\n", ind[0], ind[1]);
 #endif
-    reportn(outfile, ind, m);
+    reportn(rep, ind, m);
     removeRowSWAR(mat, ind[0]);
     destroyRow(mat, ind[0]);
 }
@@ -1767,7 +1771,7 @@ addFatherToSons(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 }
 
 void
-useMinimalSpanningTree(FILE *outfile, sparse_mat_t *mat, int m,
+useMinimalSpanningTree(report_t *rep, sparse_mat_t *mat, int m,
 		       INT *ind, double *tfill, double *tMST)
 {
     int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX];
@@ -1798,24 +1802,24 @@ useMinimalSpanningTree(FILE *outfile, sparse_mat_t *mat, int m,
 #endif
     hmax = addFatherToSons(history, mat, m, ind, A, father, height, hmax,sons);
     for(i = hmax; i >= 0; i--)
-	reporthis(outfile, history, i);
+	reporthis(rep, history, i);
     removeRowSWAR(mat, ind[0]);
     destroyRow(mat, ind[0]);
 }
 
 void
-findOptimalCombination(FILE *outfile, sparse_mat_t *mat, int m, INT j,
+findOptimalCombination(report_t *rep, sparse_mat_t *mat, int m, INT j,
 		       INT *ind, double *tfill, double *tMST)
 {
     if(m <= 2){
 	*tfill = *tMST = 0;
-	tryAllCombinations(outfile, mat, m, ind);
+	tryAllCombinations(rep, mat, m, ind);
     }
     else{
 #if 0
-	tryAllCombinations(outfile, mat, m, ind);
+	tryAllCombinations(rep, mat, m, ind);
 #else
-	useMinimalSpanningTree(outfile, mat, m, ind, tfill, tMST);
+	useMinimalSpanningTree(rep, mat, m, ind, tfill, tMST);
 #endif
     }
 }
@@ -1850,7 +1854,7 @@ checkMatrixWeight(sparse_mat_t *mat)
 
 // j has weight m.
 void
-mergeForColumn(FILE *outfile, double *tt, double *tfill, double *tMST,
+mergeForColumn(report_t *rep, double *tt, double *tfill, double *tMST,
 	       sparse_mat_t *mat, int m, INT j)
 {
     INT ind[MERGE_LEVEL_MAX];
@@ -1890,7 +1894,7 @@ mergeForColumn(FILE *outfile, double *tt, double *tfill, double *tMST,
     fprintf(stderr, "\n");
 #endif
     *tt = seconds();
-    findOptimalCombination(outfile, mat, m, j, ind, tfill, tMST);
+    findOptimalCombination(rep, mat, m, j, ind, tfill, tMST);
     *tt = seconds()-(*tt);
     mat->rem_nrows--;
     mat->rem_ncols--;
@@ -1900,7 +1904,7 @@ mergeForColumn(FILE *outfile, double *tt, double *tfill, double *tMST,
 // doloop is 0 if we just want to perform 1 merge for m only; 1 otherwise.
 // Default for the monoproc version is 1; 0 is mostly used in the MPI version.
 int
-merge_m_fast(FILE *outfile, sparse_mat_t *mat, int m, int doloop, int verbose)
+merge_m_fast(report_t *rep, sparse_mat_t *mat, int m, int doloop, int verbose)
 {
     double totopt=0, tot=seconds(), tt, totfill=0, totMST=0, tfill, tMST;
     double totdel = 0;
@@ -1929,7 +1933,7 @@ merge_m_fast(FILE *outfile, sparse_mat_t *mat, int m, int doloop, int verbose)
 	if(!(njproc % report))
 	    fprintf(stderr, "# %d columns of weight %d processed at %2.2lf\n",
 		    njproc, m, seconds());
-	mergeForColumn(outfile, &tt, &tfill, &tMST, mat, m, j);
+	mergeForColumn(rep, &tt, &tfill, &tMST, mat, m, j);
 #if TRACE_COL >= 0
 	fprintf(stderr, "wt[%d]=%d after findOptimalCombination\n",
 		TRACE_COL, mat->wt[TRACE_COL]);
@@ -1938,7 +1942,7 @@ merge_m_fast(FILE *outfile, sparse_mat_t *mat, int m, int doloop, int verbose)
 	totfill += tfill;
 	totMST += tMST;
 	tt = seconds();
-	njrem += deleteHeavyColumns(outfile, mat);
+	njrem += deleteHeavyColumns(rep, mat);
 	totdel += (seconds()-tt);
 #if TRACE_COL >= 0
         fprintf(stderr, "wt[%d]=%d after deleteHeavyColumns\n",
@@ -1961,18 +1965,18 @@ merge_m_fast(FILE *outfile, sparse_mat_t *mat, int m, int doloop, int verbose)
 }
 
 int
-merge_m(FILE *outfile, sparse_mat_t *mat, int m, int doloop, int verbose)
+merge_m(report_t *rep, sparse_mat_t *mat, int m, int doloop, int verbose)
 {
 #if USE_MERGE_FAST >= 1
-    return merge_m_fast(outfile, mat, m, doloop, verbose);
+    return merge_m_fast(rep, mat, m, doloop, verbose);
 #else
-  return merge_m_slow(outfile, mat, m, verbose);
+  return merge_m_slow(rep, mat, m, verbose);
 #endif
 }
 
 // TODO: use mergemax?
 int
-mergeGe2(FILE *outfile, sparse_mat_t *mat, int m, int doloop, int verbose)
+mergeGe2(report_t *rep, sparse_mat_t *mat, int m, int doloop, int verbose)
 {
 #if USE_MERGE_FAST == 0
     int j, nbm;
@@ -1988,7 +1992,7 @@ mergeGe2(FILE *outfile, sparse_mat_t *mat, int m, int doloop, int verbose)
     fprintf(stderr, "There are %d column(s) of weight %d\n", nbm, m);
     if(nbm)
 #endif
-	return merge_m(outfile, mat, m, doloop, verbose);
+	return merge_m(rep, mat, m, doloop, verbose);
 #if DEBUG >= 1
     matrix2tex(mat);
 #endif
@@ -2016,7 +2020,7 @@ minColWeight(sparse_mat_t *mat)
 }
 
 int
-inspectRowWeight(FILE *outfile, sparse_mat_t *mat)
+inspectRowWeight(report_t *rep, sparse_mat_t *mat)
 {
     //    double tt = seconds();
     int i, maxw = 0, nirem = 0, niremmax = 128;
@@ -2035,7 +2039,7 @@ inspectRowWeight(FILE *outfile, sparse_mat_t *mat)
 				"TRACE_ROW: removing too heavy row[%d]: %d\n", 
 				i, lengthRow(mat, i));
 #endif
-		    removeRowDefinitely(outfile, mat, i, 1);
+		    removeRowDefinitely(rep, mat, i, 1);
 		    nirem++;
 		    if(!(nirem % 10000))
 			fprintf(stderr, "#removed_rows=%d at %2.2lf\n",
@@ -2060,7 +2064,7 @@ inspectRowWeight(FILE *outfile, sparse_mat_t *mat)
 // rows of smallest value of sf?
 // For the time being, remove heaviest rows.
 int
-deleteSuperfluousRows(FILE *outfile, sparse_mat_t *mat, int keep, int niremmax)
+deleteSuperfluousRows(report_t *rep, sparse_mat_t *mat, int keep, int niremmax)
 {
     int nirem = 0, *tmp, ntmp, itmp, i;
 
@@ -2077,7 +2081,7 @@ deleteSuperfluousRows(FILE *outfile, sparse_mat_t *mat, int keep, int niremmax)
     for(i = ntmp-1; i >= 0; i -= 2){
 	if((nirem >= niremmax) || (mat->rem_nrows - mat->rem_ncols) <= keep)
 	    break;
-	removeRowDefinitely(outfile, mat, tmp[i], 1);
+	removeRowDefinitely(rep, mat, tmp[i], 1);
 	nirem++;
     }
     free(tmp);
@@ -2085,7 +2089,7 @@ deleteSuperfluousRows(FILE *outfile, sparse_mat_t *mat, int keep, int niremmax)
 }
 
 void
-merge(FILE *outfile, sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
+merge(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 {
     unsigned long bwcostmin = 0, oldcost = 0, cost;
     int old_nrows, old_ncols, m, mm, njrem = 0, ncost = 0, ncostmax;
@@ -2101,7 +2105,7 @@ merge(FILE *outfile, sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 	    bwcostmin = cost;
 	if(forbw)
 	    // what a trick!!!!
-	    fprintf(outfile, "BWCOST: %lu\n", cost);
+	    fprintf(rep->outfile, "BWCOST: %lu\n", cost);
 	if(forbw && (oldcost != 0) && (cost > oldcost)){
 	    ncost++;
 	    fprintf(stderr, "WARNING: New cost > old cost (%2.6e) [%d/%d]\n",
@@ -2112,7 +2116,7 @@ merge(FILE *outfile, sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 		fprintf(stderr, "WARNING: New cost > old cost %d times",
                         ncost);
 		fprintf(stderr, " in a row:");
-		nirem = deleteSuperfluousRows(outfile, mat, mat->delta, 128);
+		nirem = deleteSuperfluousRows(rep, mat, mat->delta, 128);
 		if(nirem == 0){
 		    fprintf(stderr, " stopping\n");
 		    break;
@@ -2131,9 +2135,9 @@ merge(FILE *outfile, sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 	old_nrows = mat->rem_nrows;
 	old_ncols = mat->rem_ncols;
 	if(m == 1)
-	    njrem += removeSingletons(outfile, mat);
+	    njrem += removeSingletons(rep, mat);
 	else
-            njrem += mergeGe2(outfile, mat, m, 1, verbose);
+            njrem += mergeGe2(rep, mat, m, 1, verbose);
 #if DEBUG >= 1
 	checkData(mat);
 #endif
@@ -2150,7 +2154,7 @@ merge(FILE *outfile, sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 	fprintf(stderr, "=> nrows=%d ncols=%d (%d) njrem=%d\n",
 		mat->rem_nrows, mat->rem_ncols, 
 		mat->rem_nrows - mat->rem_ncols, njrem);
-	inspectRowWeight(outfile, mat);
+	inspectRowWeight(rep, mat);
 	deleteEmptyColumns(mat);
 	mm = minColWeight(mat);
 	fprintf(stderr, "Min col weight = %d\n", mm);
@@ -2175,7 +2179,7 @@ merge(FILE *outfile, sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 #endif
     }
     if(forbw){
-	fprintf(outfile, "BWCOSTMIN: %lu\n", bwcostmin);
+	fprintf(rep->outfile, "BWCOSTMIN: %lu\n", bwcostmin);
 	fprintf(stderr, "Minimal bwcost found: %lu\n", bwcostmin);
     }
 }
@@ -2198,7 +2202,7 @@ my_cost(unsigned long N, unsigned long c, int forbw)
 
 // njrem is the number of columns removed.
 void
-doOneMerge(FILE *outfile, sparse_mat_t *mat, int *njrem, double *totopt, double *totfill, double *totMST, double *totdel, int m, int doloop, int verbose)
+doOneMerge(report_t *rep, sparse_mat_t *mat, int *njrem, double *totopt, double *totfill, double *totMST, double *totdel, int m, int doloop, int verbose)
 {
     dclist dcl;
     double tt, tfill, tMST;
@@ -2206,7 +2210,7 @@ doOneMerge(FILE *outfile, sparse_mat_t *mat, int *njrem, double *totopt, double 
 
     if(m == 1){
 	// do all of these
-	*njrem += removeSingletons(outfile, mat);
+	*njrem += removeSingletons(rep, mat);
 	fprintf(stderr, "T=%d after m=1\n", (int)(seconds()));
     }
     else if(m == 2){
@@ -2214,18 +2218,18 @@ doOneMerge(FILE *outfile, sparse_mat_t *mat, int *njrem, double *totopt, double 
 	fprintf(stderr, "Performing all merges for m=%d at %2.2lf\n",
 		m, seconds());
 #endif
-	*njrem += mergeGe2(outfile, mat, m, doloop, verbose);
+	*njrem += mergeGe2(rep, mat, m, doloop, verbose);
     }
     else{
 	//	    fprintf(stderr, "Performing one merge for m=%d\n", m);
 	dcl = mat->S[m]->next;
 	j = dcl->j;
-	mergeForColumn(outfile, &tt, &tfill, &tMST, mat, m, j);
+	mergeForColumn(rep, &tt, &tfill, &tMST, mat, m, j);
 	*totopt += tt;
 	*totfill += tfill;
 	*totMST += tMST;
 	tt = seconds();
-	*njrem += deleteHeavyColumns(outfile, mat);
+	*njrem += deleteHeavyColumns(rep, mat);
 	*totdel += (seconds()-tt);
     }
 }
@@ -2251,7 +2255,7 @@ number_of_superfluous_rows(sparse_mat_t *mat)
 }
 
 void
-mergeOneByOne(FILE *outfile, sparse_mat_t *mat, int maxlevel, int verbose, int forbw, double ratio, int coverNmax)
+mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int forbw, double ratio, int coverNmax)
 {
     double totopt = 0.0, totfill = 0.0, totMST = 0.0, totdel = 0.0;
     unsigned long bwcostmin = 0, oldbwcost = 0, bwcost = 0;
@@ -2276,7 +2280,7 @@ mergeOneByOne(FILE *outfile, sparse_mat_t *mat, int maxlevel, int verbose, int f
 	    fprintf(stderr, "All stacks empty, stopping!\n");
 	    break;
 	}
-	doOneMerge(outfile, mat, &njrem, &totopt, &totfill, &totMST, &totdel,
+	doOneMerge(rep, mat, &njrem, &totopt, &totfill, &totMST, &totdel,
 		   m, 1, verbose);
 	// number of columns removed
 	njproc += old_ncols - mat->rem_ncols;
@@ -2290,8 +2294,8 @@ mergeOneByOne(FILE *outfile, sparse_mat_t *mat, int maxlevel, int verbose, int f
 			 (unsigned long)mat->weight, forbw);
 	if(njproc >= target){ // somewhat arbitrary...!
 	    ni2rem = number_of_superfluous_rows(mat);
-	    deleteSuperfluousRows(outfile, mat, mat->delta, ni2rem);
-	    inspectRowWeight(outfile, mat);
+	    deleteSuperfluousRows(rep, mat, mat->delta, ni2rem);
+	    inspectRowWeight(rep, mat);
 	    fprintf(stderr, "T=%d mmax=%d nr=%d N=%d (%d)",
 		    (int)seconds(),
 		    mmax,
@@ -2310,14 +2314,14 @@ mergeOneByOne(FILE *outfile, sparse_mat_t *mat, int maxlevel, int verbose, int f
 	    // njrem=%d at %2.2lf\n",
 	    if((forbw != 0) && (forbw != 3))
 		// what a trick!!!!
-		fprintf(outfile, "BWCOST: %lu\n", bwcost);
+		fprintf(rep->outfile, "BWCOST: %lu\n", bwcost);
 	    target = njproc + 10000;
 	}
 	if((bwcostmin == 0) || (bwcost < bwcostmin)){
 	    bwcostmin = bwcost;
 	    if((forbw != 0) && (forbw != 3))
 		// what a trick!!!!
-		fprintf(outfile, "BWCOST: %lu\n", bwcost);
+		fprintf(rep->outfile, "BWCOST: %lu\n", bwcost);
 	}
 	// to be cleaned one day...
 	if((forbw == 0) || (forbw == 2)){
@@ -2347,7 +2351,7 @@ mergeOneByOne(FILE *outfile, sparse_mat_t *mat, int maxlevel, int verbose, int f
 
 		fprintf(stderr, "New cost > old cost %d times", ncost);
 		fprintf(stderr, " in a row:");
-		nirem = deleteSuperfluousRows(outfile, mat, mat->delta, 128);
+		nirem = deleteSuperfluousRows(rep, mat, mat->delta, 128);
 		if(nirem == 0){
 		    fprintf(stderr, " stopping\n");
 		    break;
@@ -2363,10 +2367,10 @@ mergeOneByOne(FILE *outfile, sparse_mat_t *mat, int maxlevel, int verbose, int f
 	else
 	    ncost = 0;
     }
-    deleteSuperfluousRows(outfile, mat, mat->delta, 
+    deleteSuperfluousRows(rep, mat, mat->delta, 
 			  mat->rem_nrows-mat->rem_ncols+mat->delta);
     if((forbw != 0) && (forbw != 3)){
-	fprintf(outfile, "BWCOSTMIN: %lu\n", bwcostmin);
+	fprintf(rep->outfile, "BWCOSTMIN: %lu\n", bwcostmin);
 	fprintf(stderr, "Minimal bwcost found: %lu\n", bwcostmin);
     }
 }
