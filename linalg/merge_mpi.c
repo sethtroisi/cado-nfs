@@ -2,12 +2,22 @@
   MPI section
  */
 
-unsigned int mpi_index = 0;
+#include <stdio.h>
+#include <stdlib.h>
+#include <gmp.h>
+#include <string.h>
+#include <math.h>
+#include <unistd.h>
 
+#include "utils/utils.h"
+#include "files.h"
 #include "gzip.h"
+#include "sparse.h"
 #include "merge_mono.h"
 #include "mpi.h"
 #include "merge_mpi.h"
+
+#define DEBUG 1
 
 #define MPI_ERROR_TAG         -1
 #define MPI_DIE_TAG            1
@@ -22,8 +32,11 @@ unsigned int mpi_index = 0;
 #define MPI_INACTIVATE_ROWS   10
 #define MPI_ASK_MST           11
 #define MPI_SEND_MST          12
+#define MPI_SEND_HIS_TAG      13
 
-#define MPI_BUF_SIZE 1000
+#define MPI_BUF_SIZE 10000
+
+unsigned int mpi_index = 0;
 
 int *mpi_tab_j;
 
@@ -72,6 +85,23 @@ mpi_err3(char *format, int i1, int i2, int i3)
     fprintf(out, "MPI#%d[%d]# ", mpi_rank, mpi_index);
     fprintf(out, format, i1, i2, i3);
     fflush(out);
+}
+
+void
+fprint_report(report_t *rep)
+{
+    int i, k;
+
+#if DEBUG >= 1
+    mpi_err1("Report[0..%d]\n", rep->mark);
+#endif
+    for(i = 0; i <= rep->mark; i++){
+	fprintf(rep->outfile, "%d", mpi_index);
+	for(k = 1; k <= rep->history[i][0]; k++)
+	    fprintf(rep->outfile, " %d", rep->history[i][k]);
+	fprintf(rep->outfile, "\n");
+    }
+    fflush(rep->outfile);
 }
 
 int
@@ -148,6 +178,7 @@ mpi_check_rows(sparse_mat_t *mat, INT i, INT *tab, int ntab)
 
 #define MAX_ROW_LENGTH 1000 // who cares, really?
 
+#if 0 // useful???
 void
 mpi_load_rows_for_j(sparse_mat_t *mat, int m, INT j)
 {
@@ -191,24 +222,24 @@ mpi_load_rows_for_j(sparse_mat_t *mat, int m, INT j)
     nrecv = 0;
     // waiting for the rows to come back from the slaves
     while(1){
-# if DEBUG >= 1
+#if DEBUG >= 1
 	fprintf(stderr, "[m_l_r] Master waiting... nrecv=%d\n", nrecv);
 	fflush(stderr);
-# endif
+#endif
 	MPI_Recv(buf, MPI_BUF_SIZE, MPI_UNSIGNED, MPI_ANY_SOURCE,
                  MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-# if DEBUG >= 1
+#if DEBUG >= 1
 	fprintf(stderr, "Something received: %d\n", status.MPI_TAG);
 	fflush(stderr);
-# endif
+#endif
 	if(status.MPI_TAG == MPI_SEND_ROW_BACK_TAG){
 	    MPI_Get_count(&status, MPI_UNSIGNED, &cnt);
-# if DEBUG >= 1
+#if DEBUG >= 1
 	    fprintf(stderr, "[m_l_r] source=%u:", status.MPI_SOURCE);
 	    for(k = 0; k < cnt; k++)
 		fprintf(stderr, " %u", buf[k]);
 	    fprintf(stderr, "\n");
-# endif
+#endif
 	    // buf = [m, j, i, j_1, ..., j_r] where the indices j_s
 	    // are positions in mat->rows[i]
 	    i = (INT)buf[2];
@@ -246,6 +277,7 @@ mpi_load_rows_for_j(sparse_mat_t *mat, int m, INT j)
 	free(newrows[k]);
     free(newrows);
 }
+#endif
 
 void
 mpi_send_inactive_rows(int i)
@@ -276,7 +308,7 @@ mpi_get_number_of_active_colums(sparse_mat_t *mat, INT jmin, INT jmax)
 }
 
 void
-mpi_inactivate_rows(FILE *outfile, sparse_mat_t *mat, unsigned int *tab, int ntab)
+mpi_inactivate_rows(report_t *rep, sparse_mat_t *mat, unsigned int *tab, int ntab)
 {
     int k, i;
 
@@ -286,14 +318,14 @@ mpi_inactivate_rows(FILE *outfile, sparse_mat_t *mat, unsigned int *tab, int nta
 	if(isRowNull(mat, i))
 	    mpi_err1("Row[%d] already nulled!!!\n", i);
 	else
-	    removeRowDefinitely(outfile, mat, i, 0);
+	    removeRowDefinitely(rep, mat, i);
     }
 }
 
 // Sending rows to add; get new weight in return; rows are sent to all
 // procs except the current one and the master. At the end, the new weights
 // are sent to the master for update.
-// the slave *has* to collect the weights itself, since otherwise the
+// the submaster *has* to collect the weights itself, since otherwise the
 // master would be receiving a lot of suborders in a probably random order.
 void
 mpi_add_rows(sparse_mat_t *mat, int m, INT j, INT *ind)
@@ -304,10 +336,10 @@ mpi_add_rows(sparse_mat_t *mat, int m, INT j, INT *ind)
     int mpi_rank, mpi_size, ibuf, cnt, k, nrecv, finished;
     char *done;
     
-# if DEBUG >= 1
+#if DEBUG >= 1
     fprintf(stderr, "Column %d is for processor %d (m=%d)\n",
 	    j, mpi_get_proc_for_j(j), m);
-# endif
+#endif
     ibuf = 0;
     buf[ibuf++] = mpi_index;
     buf[ibuf++] = m;
@@ -334,10 +366,10 @@ mpi_add_rows(sparse_mat_t *mat, int m, INT j, INT *ind)
     finished = 0;
     while(!finished){
 	// we loop until we receive all new weights and then we exit
-# if DEBUG >= 1
+#if DEBUG >= 1
 	fprintf(stdout, "[m_a_r] Proc %d waiting... nrecv=%d\n", 
 		mpi_rank, nrecv);
-# endif
+#endif
 	MPI_Recv(buf, MPI_BUF_SIZE, MPI_UNSIGNED, MPI_ANY_SOURCE,
                  MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 	switch(status.MPI_TAG){
@@ -380,27 +412,134 @@ mpi_add_rows(sparse_mat_t *mat, int m, INT j, INT *ind)
     free(done);
 }
 
+// broadcast current history to other procs, so that they perform the same
+// operations. Let's remind that this history can be rather large, so that
+// some care is needed.
 void
-mpi_slave(int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char *purgedname,
-	  char *outname)
+mpi_broadcast_history(report_t *rep, int mpi_rank)
 {
-    char *str;
-    FILE *outfile;
+    unsigned int buf[MPI_BUF_SIZE];
+    int mpi_size, i, k, ibuf = 0;
+    char *done;
+
+    MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+    // feed the buffer
+    buf[ibuf++] = mpi_index;
+    for(i = 0; i <= rep->mark; i++){
+	if((ibuf + rep->history[i][0]) >= MPI_BUF_SIZE){
+	    mpi_err("Too many lines in history\n");
+	}
+	for(k = 0; k <= rep->history[i][0]; k++)
+	    buf[ibuf++] = rep->history[i][k];
+    }
+    // now send it
+    done = (char *)malloc(mpi_size * sizeof(char));
+    done[mpi_rank] = 2;
+    for(k = 1; k < mpi_size; k++)
+	if(k != mpi_rank){
+	    MPI_Send(buf,ibuf,MPI_UNSIGNED,k,MPI_SEND_HIS_TAG,MPI_COMM_WORLD);
+	    done[k] = 1;
+	}
+    free(done);
+}
+
+int
+mpi_doOneMerge(report_t *rep, sparse_mat_t *mat, unsigned int *buf, int mpi_rank)
+{
+    double totopt = 0.0, totfill = 0.0, totMST = 0.0, totdel = 0.0;
+    int m, njdel, njrem = 0, verbose = 1;
+
+    // buf = [index, m]
+    m = (int)buf[1];
+    // the local part
+#if DEBUG >= 1
+    mpi_err1("doOneMerge(%d)\n", m);
+#endif
+    doOneMerge(rep, mat, &njrem, &totopt, &totfill, &totMST,
+	       &totdel, m, 10, verbose); // 10 is rather arbitrary...!
+    njdel = deleteEmptyColumns(mat);
+    if(njdel > 0)
+	// rare event, I would suggest
+	mpi_err1("I deleted %d empty columns\n", njdel);
+    // the sub-master must store its history file...
+    fprint_report(rep);
+    // ... and must force other procs to perform the operations
+    mpi_broadcast_history(rep, mpi_rank);
+#if DEBUG >= 1
+    mpi_err2("nrows=%d ncols=%d\n", mat->rem_nrows, mat->rem_ncols);
+#endif
+    // FIXME: one day, add njdel??
+    return njrem;
+}
+
+int
+mpi_replay_history(report_t *rep, sparse_mat_t *mat, unsigned int *send_buf, unsigned int *buf, int cnt)
+{
+    int r = 0, ind, k, kmax, i, i0, isb = 0;
+
+#if DEBUG >= 1
+    fprintf(stderr, "DUMP_BEGIN [cnt=%d]\n", cnt);
+    ind = buf[r++];
+    while(1){
+        kmax = buf[r++];
+	fprintf(stderr, "%d", kmax);
+	for(k = 0; k < kmax; k++)
+	    fprintf(stderr, " %d", buf[r++]);
+	fprintf(stderr, "\n");
+	if(r >= cnt)
+	    break;
+    }
+    fprintf(stderr, "DUMP_END\n");
+#endif
+    rep->mark = -1;
+    send_buf[isb++] = buf[0]; // index
+    r = 0;
+    ind = buf[r++];
+    while(1){
+	kmax = buf[r++];
+	i0 = (int)buf[r++];
+	if(isRowNull(mat, i0))
+	    for(k = 1; k < kmax; k++){
+		send_buf[isb++] = buf[r++];
+		send_buf[isb++] = (isRowNull(mat, buf[r-1]) ? 0 :
+				   lengthRow(mat,  buf[r-1]));
+	    }
+	else{
+	    for(k = 1; k < kmax; k++){
+		i = (int)buf[r++];
+		send_buf[isb++] = buf[r-1];
+#if DEBUG >= 1
+		mpi_err2("R[%d] += R[%d]\n", i, i0);
+#endif
+		if(isRowNull(mat, i)){
+		    fprintf(stderr, "Row %d is null -- %p!!!!!\n", 
+			    i, mat->rows[i]);
+		    // just copy
+		    mat->rows[i] = copyRow(mat->rows[3]);
+		    addRowSWAR(mat, i);
+		}
+		else
+		    addRowsSWAR(mat, i, i0, -1);
+		send_buf[isb++] = lengthRow(mat, i);
+	    }
+	    // i0 is no longer needed...!
+	    removeRowSWAR(mat, i0);
+	    destroyRow(mat, i0);
+	}
+	if(r >= cnt)
+	    break;
+    }
+    return isb;
+}
+
+void
+mpi_slave(report_t *rep, int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char *purgedname)
+{
     unsigned int buf[MPI_BUF_SIZE];
     unsigned int send_buf[MPI_BUF_SIZE];
     MPI_Status status;
-    double totopt = 0.0, totfill = 0.0, totMST = 0.0, totdel = 0.0;
-    int jmin, jmax, cnt, i, k, m, verbose = 1, njrem = 0, i0, njdel;
+    int jmin, jmax, cnt, i, k, m, njrem = 0, i0;
 
-    str = (char *)malloc(strlen(outname)+3);
-    if(is_gzip(outname)){
-	printf("Case of gz file NYI\n");
-	exit(0);
-    }
-    else
-	sprintf(str, "%s%03d", outname, mpi_rank);
-    fprintf(stderr, "Slave outfile will be %s\n", str);
-    outfile = gzip_open(str, "w");
     // loop forever
     while(1){
 #if DEBUG >= 1
@@ -416,6 +555,17 @@ mpi_slave(int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char *purgedname,
 	switch(status.MPI_TAG){
 	case MPI_DIE_TAG:
 	    mpi_err("I was asked to die...\n");
+	    break;
+	case MPI_J_TAG:
+	    jmin = (int)buf[0];
+	    jmax = (int)buf[1];
+	    mpi_err2("A slave does not need to do too much things...\n... but has to treat C[%d..%d[\n", jmin, jmax);
+	    initWeightFromFile(mat, purgedfile, jmin, jmax);
+	    gzip_close(purgedfile, purgedname);
+	    fillSWAR(mat, jmin, jmax);
+	    purgedfile = gzip_open(purgedname, "r");
+	    readmat(mat, purgedfile, jmin, jmax);
+	    gzip_close(purgedfile, purgedname);
 	    break;
 	case MPI_MIN_M:
 	    // buf = [index]
@@ -433,37 +583,12 @@ mpi_slave(int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char *purgedname,
 	    MPI_Send(send_buf, 3, MPI_UNSIGNED, 0, MPI_MIN_M, MPI_COMM_WORLD);
 	    break;
 	case MPI_DO_M:
-	    // buf = [index, m]
-	    m = (int)buf[1];
-	    // the local part
-#if DEBUG >= 1
-	    mpi_err1("doOneMerge(%d)\n", m);
-#endif
-	    doOneMerge(outfile, mat, &njrem, &totopt, &totfill, &totMST,
-		       &totdel, m, verbose);
-	    njdel = deleteEmptyColumns(mat);
-	    if(njdel > 0)
-		// rare event, I would suggest
-		mpi_err1("I deleted %d empty columns\n", njdel);
-	    fflush(outfile);
-#if DEBUG >= 1
-	    mpi_err2("nrows=%d ncols=%d\n", mat->rem_nrows, mat->rem_ncols);
-#endif
+	    njrem = mpi_doOneMerge(rep, mat, buf, mpi_rank);
+	    rep->mark = -1;
 	    send_buf[0] = buf[0];
 	    send_buf[1] = buf[1];
-	    send_buf[2] = njrem; // FIXME: one day, add njdel??
+	    send_buf[2] = njrem;
 	    MPI_Send(send_buf, 3, MPI_UNSIGNED, 0, MPI_M_DONE, MPI_COMM_WORLD);
-	    break;
-	case MPI_J_TAG:
-	    jmin = (int)buf[0];
-	    jmax = (int)buf[1];
-	    mpi_err2("A slave does not need to do too much things...\n... but has to treat C[%d..%d[\n", jmin, jmax);
-	    initWeightFromFile(mat, purgedfile, jmin, jmax);
-	    gzip_close(purgedfile, purgedname);
-	    fillSWAR(mat, jmin, jmax);
-	    purgedfile = gzip_open(purgedname, "r");
-	    readmat(mat, purgedfile, jmin, jmax);
-	    gzip_close(purgedfile, purgedname);
 	    break;
 	case MPI_ADD_TAG:
 	    // buf = [index, m, j, i1, l1, i2, l2, ..., ir, lr]
@@ -520,7 +645,11 @@ mpi_slave(int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char *purgedname,
 	    break;
 	case MPI_INACTIVATE_ROWS:
 	    MPI_Get_count(&status, MPI_UNSIGNED, &cnt);
-	    mpi_inactivate_rows(outfile, mat, buf, cnt);
+	    mpi_inactivate_rows(rep, mat, buf, cnt);
+	    break;
+	case MPI_SEND_HIS_TAG:
+	    MPI_Get_count(&status, MPI_UNSIGNED, &cnt);
+	    cnt = mpi_replay_history(rep, mat, send_buf, buf, cnt);
 	    break;
 	default:
 	    mpi_err1("Unknown tag: %d\n", status.MPI_TAG);
@@ -529,7 +658,6 @@ mpi_slave(int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char *purgedname,
 	if(status.MPI_TAG == MPI_DIE_TAG)
 	    break;
     }
-    gzip_close(outfile, str);
 }
 
 void
@@ -673,7 +801,7 @@ mpi_delete_superfluous_rows(sparse_mat_t *mat, int *row_weight, int mpi_size)
 // actually, mat is rather empty, since it does not use too much fancy things.
 // So we just need to init the row weights.
 void
-mpi_master(FILE *outfile, sparse_mat_t *mat, int mpi_size, FILE *purgedfile)
+mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile)
 {
     MPI_Status status;
     unsigned int buf[MPI_BUF_SIZE];
@@ -681,7 +809,8 @@ mpi_master(FILE *outfile, sparse_mat_t *mat, int mpi_size, FILE *purgedfile)
     int ibuf, m, proc, cnt, k, done, maxm = 0;
     int *row_weight, curr_ncols;
 
-#if 0
+#if 1
+    mpi_err("WARNING: maxm=2\n");
     mat->mergelevelmax = 2;
 #endif
     // let's initialize a new simpler array with the weights of the rows
@@ -713,8 +842,10 @@ mpi_master(FILE *outfile, sparse_mat_t *mat, int mpi_size, FILE *purgedfile)
 #if DEBUG >= 1
 	mpi_err2("Minimal m is %d for proc=%d\n", m, proc);
 #endif
-	if(m > mat->mergelevelmax)
+	if(m > mat->mergelevelmax){
+	    mpi_err("Breaking\n");
 	    break;
+	}
 	if(m > maxm)
 	    maxm = m;
 	// ask the proc to execute one step
@@ -768,7 +899,7 @@ mpi_master(FILE *outfile, sparse_mat_t *mat, int mpi_size, FILE *purgedfile)
 #endif
 			    send_buf[ibuf++] = buf[k]; // ohhhhhhhhhh!
 			    row_weight[buf[k]] = 0;
-			    report1(outfile, (int)buf[k]);
+			    report1(rep, (int)buf[k]);
 			    mat->rem_nrows--;
 			}
 		    }
@@ -794,29 +925,42 @@ mpi_master(FILE *outfile, sparse_mat_t *mat, int mpi_size, FILE *purgedfile)
 		break;
 	}
     }
+    fprint_report(rep);
     fprintf(stderr, "Finally (%d -- %2.2lf): nrows=%d ncols=%d[%d]\n",
 	    mpi_index, seconds(), mat->rem_nrows, mat->rem_ncols, curr_ncols);
+    fflush(stderr);
+    free(row_weight);
 }
 
 void
-mpi_start_master(char *outname, int mpi_size, sparse_mat_t *mat, FILE *purgedfile)
+mpi_start_proc(char *outname, int mpi_rank, int mpi_size, sparse_mat_t *mat, FILE *purgedfile, char *purgedname)
 {
-    FILE *outfile;
+    report_t rep;
     char *str;
+    char mpitmp[1024];
 
+    // redirecting stderr
+    sprintf(mpitmp, "%s%03d.err", outname, mpi_rank);
+    freopen(mpitmp, "w", stderr);
+    // treat the .gz case
     str = (char *)malloc(strlen(outname)+3);
     if(is_gzip(outname)){
 	printf("Case of gz file NYI\n");
 	exit(0);
     }
     else
-	sprintf(str, "%s%03d", outname, 0);
-    fprintf(stderr, "Master outfile will be %s\n", str);
+	sprintf(str, "%s%03d", outname, mpi_rank);
+    fprintf(stderr, "Outfile for proc=%d will be %s\n", mpi_rank, str);
     mpi_index = 0;
-    outfile = gzip_open(str, "w");
-    report2(outfile, mat->nrows, mat->ncols);
-    mpi_start_slaves(mpi_size, mat);
-    mpi_master(outfile, mat, mpi_size, purgedfile);
-    gzip_close(outfile, str);
+    init_rep(&rep, str, mat, 1);
+    if(mpi_rank == 0){
+	fprintf(rep.outfile, "0 %d %d\n", mat->nrows, mat->ncols);
+	mpi_start_slaves(mpi_size, mat);
+	mpi_master(&rep, mat, mpi_size, purgedfile);
+	mpi_kill_slaves();
+    }
+    else
+	mpi_slave(&rep, mpi_rank, mat, purgedfile, purgedname);
+    gzip_close(rep.outfile, str);
     free(str);
 }

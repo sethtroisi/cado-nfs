@@ -20,15 +20,9 @@
 #include "prune.h"
 
 #ifdef USE_MPI
+#include "mpi.h"
 #include "merge_mpi.h"
 #endif
-
-void
-init_rep(report_t *rep, char *outname, sparse_mat_t *mat)
-{
-    rep->type = 0; // classical one: output to a file
-    rep->outfile = gzip_open(outname, "w");
-}
 
 int
 main(int argc, char *argv[])
@@ -140,32 +134,15 @@ main(int argc, char *argv[])
     mat.rwmax = rwmax;
     mat.mergelevelmax = maxlevel;
     
-#ifdef USE_MPI
-    if(mpi_rank == 0){
-	mpi_start_master(outname, mpi_size, &mat, purgedfile);
-	gzip_close(purgedfile, purgedname);
-	mpi_kill_slaves(mpi_size);
-	MPI_Finalize();
-	return 0;
-    }
-    else{
-	char mpitmp[1024];
-	sprintf(mpitmp, "%s%03d.err", outname, mpi_rank);
-	freopen(mpitmp, "w", stderr);
-    }
-#endif
-
     tt = seconds();
     initMat(&mat);
     fprintf(stderr, "Time for initMat: %2.2lf\n", seconds()-tt);
 
 #ifdef USE_MPI
-    if(mpi_rank != 0){
-	mpi_slave(mpi_rank, &mat, purgedfile, purgedname, outname);
-	// TODO: clean the mat data structure for a slave also
-	MPI_Finalize();
-	return 0;
-    }
+    mpi_start_proc(outname, mpi_rank, mpi_size, &mat, purgedfile, purgedname);
+    // TODO: clean the mat data structure (?)
+    MPI_Finalize();
+    return 0;
 #endif    
     tt = seconds();
     initWeightFromFile(&mat, purgedfile, 0, mat.ncols);
@@ -184,7 +161,7 @@ main(int argc, char *argv[])
     checkmat(&mat);
 #endif
 
-    init_rep(&rep, outname, &mat);
+    init_rep(&rep, outname, &mat, 0);
     report2(&rep, mat.nrows, mat.ncols);
 
     /* iprune is the excess we want at the end of prune */

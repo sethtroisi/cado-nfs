@@ -23,16 +23,13 @@
 
 #define USE_CONNECT 0
 
-#define MERGE_LEVEL_MAX 256 // maximum level for a merge; such a large value
-                            // is only useful when not using BW
-
 typedef struct {
   int len;    /* number of non-zero entries */
   INT *val;   /* array of size len containing column indices of non-zero
                  entries */
 } rel_t;
 
-static int 
+int 
 cmp(const void *p, const void *q) {
     int x = *((int *)p);
     int y = *((int *)q);
@@ -104,6 +101,30 @@ dclistConnect(dclist S, dclist dcl)
     dcl->next = S->next;
     dcl->prev = S;
     S->next = dcl;
+}
+
+void
+init_rep(report_t *rep, char *outname, sparse_mat_t *mat, int type)
+{
+    INT** tmp, i;
+
+    rep->type = type;
+    rep->outfile = gzip_open(outname, "w");
+    switch(type){
+    case 0:
+	// classical one: output to a file
+	break;
+    case 1:
+	// mostly for MPI
+	tmp = (INT **)malloc(mat->nrows * sizeof(INT *));
+	for(i = 0; i < mat->nrows; i++)
+	    tmp[i] = NULL;
+	rep->history = tmp;
+	rep->mark = -1;
+	break;
+    default:
+	fprintf(stderr, "Unknown type: %d\n", type);
+    }
 }
 
 // TODO: ncols could be a new renumbered ncols...
@@ -323,15 +344,16 @@ reporthis(report_t *rep, INT tab[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1], int i0)
     fprintf(stderr, "Reporting for tab[%d]\n", i0);
 #endif
     if(rep->type == 0){
-#ifdef USE_MPI
-	fprintf(rep->outfile, "REPORT %d ", mpi_index);
-#endif
 	for(k = 1; k <= tab[i0][0]; k++){
 	    fprintf(rep->outfile, "%ld", (long int) tab[i0][k]);
 	    if(k <= tab[i0][0]-1)
 		fprintf(rep->outfile, " ");
 	}
 	fprintf(rep->outfile, "\n");
+    }
+    else{
+	fprintf(stderr, "reporthis for type==1: NYI\n");
+	exit(0);
     }
 }
 
@@ -346,15 +368,21 @@ reportn(report_t *rep, INT *ind, int n)
     fprintf(stderr, "Reporting for n=%d\n", n);
 #endif
     if(rep->type == 0){
-#ifdef USE_MPI
-	fprintf(rep->outfile, "REPORT %d ", mpi_index);
-#endif
 	for(i = 0; i < n; i++){
 	    fprintf(rep->outfile, "%ld", (long int) ind[i]);
 	    if(i < n-1)
 		fprintf(rep->outfile, " ");
 	}
 	fprintf(rep->outfile, "\n");
+    }
+    else if(rep->type == 1){
+	rep->mark += 1;
+	if(rep->history[rep->mark] == NULL)
+	    rep->history[rep->mark] = 
+		(INT *)malloc((MERGE_LEVEL_MAX+1)*sizeof(INT));
+	rep->history[rep->mark][0] = n;
+	for(i = 0; i < n; i++)
+	    rep->history[rep->mark][i+1] = ind[i];
     }
 }
 
@@ -1572,13 +1600,11 @@ remove_j_from_row(sparse_mat_t *mat, int i, int j)
 }
 
 void
-removeRowDefinitely(report_t *rep, sparse_mat_t *mat, INT i, int doreport)
+removeRowDefinitely(report_t *rep, sparse_mat_t *mat, INT i)
 {
     removeRowSWAR(mat, i);
     destroyRow(mat, i);
-    if(doreport)
-	// TODO_MPI: when reporting, we should report to all other procs?
-	report1(rep, i);
+    report1(rep, i);
     mat->rem_nrows--;
 }
 
@@ -1619,7 +1645,7 @@ deleteAllColsFromStack(report_t *rep, sparse_mat_t *mat, int iS)
 			fprintf(stderr, "deleteAllCols: row is %d\n",mat->R[j][k]);
 # endif
 		    remove_j_from_row(mat, mat->R[j][k], j);
-		    removeRowDefinitely(rep, mat, mat->R[j][k], 1);
+		    removeRowDefinitely(rep, mat, mat->R[j][k]);
 		    mat->rem_ncols--;
 		}
 	    mat->wt[j] = 0;
@@ -1901,10 +1927,11 @@ mergeForColumn(report_t *rep, double *tt, double *tfill, double *tMST,
     remove_j_from_SWAR(mat, j);
 }
 
-// doloop is 0 if we just want to perform 1 merge for m only; 1 otherwise.
-// Default for the monoproc version is 1; 0 is mostly used in the MPI version.
+// maxdo is 0 if we want to perform a non-bounded number of operations; 
+// an integer >= 1 otherwise.
+// Default for the monoproc version is 0.
 int
-merge_m_fast(report_t *rep, sparse_mat_t *mat, int m, int doloop, int verbose)
+merge_m_fast(report_t *rep, sparse_mat_t *mat, int m, int maxdo, int verbose)
 {
     double totopt=0, tot=seconds(), tt, totfill=0, totMST=0, tfill, tMST;
     double totdel = 0;
@@ -1948,7 +1975,9 @@ merge_m_fast(report_t *rep, sparse_mat_t *mat, int m, int doloop, int verbose)
         fprintf(stderr, "wt[%d]=%d after deleteHeavyColumns\n",
                 TRACE_COL, mat->wt[TRACE_COL]);
 #endif
-	if(doloop)
+	maxdo--;
+	if(maxdo == 0)
+	    // what a trick: maxdo = 0 => never == 0 until infinity
 	    return njrem;
     }
     tot = seconds()-tot;
@@ -1965,10 +1994,10 @@ merge_m_fast(report_t *rep, sparse_mat_t *mat, int m, int doloop, int verbose)
 }
 
 int
-merge_m(report_t *rep, sparse_mat_t *mat, int m, int doloop, int verbose)
+merge_m(report_t *rep, sparse_mat_t *mat, int m, int maxdo, int verbose)
 {
 #if USE_MERGE_FAST >= 1
-    return merge_m_fast(rep, mat, m, doloop, verbose);
+    return merge_m_fast(rep, mat, m, maxdo, verbose);
 #else
   return merge_m_slow(rep, mat, m, verbose);
 #endif
@@ -1976,7 +2005,7 @@ merge_m(report_t *rep, sparse_mat_t *mat, int m, int doloop, int verbose)
 
 // TODO: use mergemax?
 int
-mergeGe2(report_t *rep, sparse_mat_t *mat, int m, int doloop, int verbose)
+mergeGe2(report_t *rep, sparse_mat_t *mat, int m, int maxdo, int verbose)
 {
 #if USE_MERGE_FAST == 0
     int j, nbm;
@@ -1992,7 +2021,7 @@ mergeGe2(report_t *rep, sparse_mat_t *mat, int m, int doloop, int verbose)
     fprintf(stderr, "There are %d column(s) of weight %d\n", nbm, m);
     if(nbm)
 #endif
-	return merge_m(rep, mat, m, doloop, verbose);
+	return merge_m(rep, mat, m, maxdo, verbose);
 #if DEBUG >= 1
     matrix2tex(mat);
 #endif
@@ -2039,7 +2068,7 @@ inspectRowWeight(report_t *rep, sparse_mat_t *mat)
 				"TRACE_ROW: removing too heavy row[%d]: %d\n", 
 				i, lengthRow(mat, i));
 #endif
-		    removeRowDefinitely(rep, mat, i, 1);
+		    removeRowDefinitely(rep, mat, i);
 		    nirem++;
 		    if(!(nirem % 10000))
 			fprintf(stderr, "#removed_rows=%d at %2.2lf\n",
@@ -2081,7 +2110,7 @@ deleteSuperfluousRows(report_t *rep, sparse_mat_t *mat, int keep, int niremmax)
     for(i = ntmp-1; i >= 0; i -= 2){
 	if((nirem >= niremmax) || (mat->rem_nrows - mat->rem_ncols) <= keep)
 	    break;
-	removeRowDefinitely(rep, mat, tmp[i], 1);
+	removeRowDefinitely(rep, mat, tmp[i]);
 	nirem++;
     }
     free(tmp);
@@ -2137,7 +2166,7 @@ merge(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 	if(m == 1)
 	    njrem += removeSingletons(rep, mat);
 	else
-            njrem += mergeGe2(rep, mat, m, 1, verbose);
+            njrem += mergeGe2(rep, mat, m, 0, verbose);
 #if DEBUG >= 1
 	checkData(mat);
 #endif
@@ -2202,7 +2231,7 @@ my_cost(unsigned long N, unsigned long c, int forbw)
 
 // njrem is the number of columns removed.
 void
-doOneMerge(report_t *rep, sparse_mat_t *mat, int *njrem, double *totopt, double *totfill, double *totMST, double *totdel, int m, int doloop, int verbose)
+doOneMerge(report_t *rep, sparse_mat_t *mat, int *njrem, double *totopt, double *totfill, double *totMST, double *totdel, int m, int maxdo, int verbose)
 {
     dclist dcl;
     double tt, tfill, tMST;
@@ -2218,7 +2247,7 @@ doOneMerge(report_t *rep, sparse_mat_t *mat, int *njrem, double *totopt, double 
 	fprintf(stderr, "Performing all merges for m=%d at %2.2lf\n",
 		m, seconds());
 #endif
-	*njrem += mergeGe2(rep, mat, m, doloop, verbose);
+	*njrem += mergeGe2(rep, mat, m, maxdo, verbose);
     }
     else{
 	//	    fprintf(stderr, "Performing one merge for m=%d\n", m);
@@ -2281,7 +2310,7 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
 	    break;
 	}
 	doOneMerge(rep, mat, &njrem, &totopt, &totfill, &totMST, &totdel,
-		   m, 1, verbose);
+		   m, 0, verbose);
 	// number of columns removed
 	njproc += old_ncols - mat->rem_ncols;
 	deleteEmptyColumns(mat);

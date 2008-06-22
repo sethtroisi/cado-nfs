@@ -61,10 +61,11 @@ MPI_LIB=$(MPI_DIR)/lib
 MPI_INC=-I$(MPI_DIR)/include
 MPI_CC=mpicc
 
-mpimerge.o: merge_mono.c merge_mpi.c
+merge_mpi.o: merge_mpi.c merge.c
+	$(MPI_CC) -DUSE_MPI $(MPI_INC) $(MY_CFLAGS) merge.c -c -o merge.o
 	$(MPI_CC) -DUSE_MPI $(MPI_INC) $(MY_CFLAGS) $< -c -o $@
 
-mpimerge: mpimerge.o merge_mono.o sparse.o prune.o gzip.o
+mpimerge: merge_mpi.o merge_mono.o merge.o sparse.o prune.o gzip.o
 	$(MPI_CC) -DUSE_MPI $(MPI_INC) $(MY_LFLAGS) -L$(MPI_LIB) -o $@ $^ -lutils -lm
 
 hismerge: hismerge.o

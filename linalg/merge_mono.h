@@ -1,5 +1,8 @@
 #define USE_TAB 1 // 1 for compact rows...
 
+#define MERGE_LEVEL_MAX 256 // maximum level for a merge; such a large value
+                            // is only useful when not using BW
+
 #define M_STRATEGY 3 // 0: finish that mergelevel
                      // 1: change if min weight < mergelevel
                      // 2: jump to minimal possible mergelevel
@@ -66,8 +69,12 @@ typedef struct {
 // it can be used to register things in an array that will be examined and
 // flushed from time to time. See the MPI version for more.
 typedef struct{
+    char type;
+    // '0' for the standard stuff
     FILE *outfile;
-    char type; // '0' for the standard stuff
+    // '1' for MPI
+    INT **history;
+    int mark;
 } report_t;
 
 #if USE_TAB == 0
@@ -82,6 +89,7 @@ typedef struct{
 #define SPARSE_ITERATE(mat, i, k) for((k)=1; (k)<=lengthRow((mat),(i)); (k)++)
 #endif
 
+extern void init_rep(report_t *rep, char *outname, sparse_mat_t *mat, int type);
 extern void initMat(sparse_mat_t *mat);
 extern void initWeightFromFile(sparse_mat_t *mat, FILE *purgedfile, int jmin, int jmax);
 extern void fillSWAR(sparse_mat_t *mat, INT jmin, INT jmax);
@@ -91,9 +99,17 @@ extern void readmat(sparse_mat_t *mat, FILE *file, int jmin, int jmax);
 extern void report1(report_t *rep, INT i);
 extern void report2(report_t *rep, INT i1, INT i2);
 extern void removeCellSWAR(sparse_mat_t *mat, int i, INT j);
+extern void addRowSWAR(sparse_mat_t *mat, int i);
+extern void addRowsSWAR(sparse_mat_t *mat, int i1, int i2, int len);
+extern void removeRowSWAR(sparse_mat_t *mat, int i);
 extern void destroyRow(sparse_mat_t *mat, int i);
 extern int removeSingletons(report_t *rep, sparse_mat_t *mat);
 extern int deleteEmptyColumns(sparse_mat_t *mat);
+extern void removeRowDefinitely(report_t *rep, sparse_mat_t *mat, INT i);
+extern int minColWeight(sparse_mat_t *mat);
 
+extern int cmp(const void *p, const void *q);
+extern int number_of_superfluous_rows(sparse_mat_t *mat);
 extern void merge(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int forbw);
 extern void mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int forbw, double ratio, int coverNmax);
+extern void doOneMerge(report_t *rep, sparse_mat_t *mat, int *njrem, double *totopt, double *totfill, double *totMST, double *totdel, int m, int maxdo, int verbose);
