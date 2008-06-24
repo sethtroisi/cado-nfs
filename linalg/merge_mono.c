@@ -1835,19 +1835,14 @@ useMinimalSpanningTree(report_t *rep, sparse_mat_t *mat, int m,
 
 void
 findOptimalCombination(report_t *rep, sparse_mat_t *mat, int m, INT j,
-		       INT *ind, double *tfill, double *tMST)
+		       INT *ind, double *tfill, double *tMST, int useMST)
 {
-    if(m <= 2){
+    if((m <= 2) || !useMST){
 	*tfill = *tMST = 0;
 	tryAllCombinations(rep, mat, m, ind);
     }
-    else{
-#if 0
-	tryAllCombinations(rep, mat, m, ind);
-#else
+    else
 	useMinimalSpanningTree(rep, mat, m, ind, tfill, tMST);
-#endif
-    }
 }
 
 void
@@ -1881,7 +1876,7 @@ checkMatrixWeight(sparse_mat_t *mat)
 // j has weight m.
 void
 mergeForColumn(report_t *rep, double *tt, double *tfill, double *tMST,
-	       sparse_mat_t *mat, int m, INT j)
+	       sparse_mat_t *mat, int m, INT j, int useMST)
 {
     INT ind[MERGE_LEVEL_MAX];
     int ni, k;
@@ -1920,7 +1915,7 @@ mergeForColumn(report_t *rep, double *tt, double *tfill, double *tMST,
     fprintf(stderr, "\n");
 #endif
     *tt = seconds();
-    findOptimalCombination(rep, mat, m, j, ind, tfill, tMST);
+    findOptimalCombination(rep, mat, m, j, ind, tfill, tMST, useMST);
     *tt = seconds()-(*tt);
     mat->rem_nrows--;
     mat->rem_ncols--;
@@ -1960,7 +1955,7 @@ merge_m_fast(report_t *rep, sparse_mat_t *mat, int m, int maxdo, int verbose)
 	if(!(njproc % report))
 	    fprintf(stderr, "# %d columns of weight %d processed at %2.2lf\n",
 		    njproc, m, seconds());
-	mergeForColumn(rep, &tt, &tfill, &tMST, mat, m, j);
+	mergeForColumn(rep, &tt, &tfill, &tMST, mat, m, j, 1);
 #if TRACE_COL >= 0
 	fprintf(stderr, "wt[%d]=%d after findOptimalCombination\n",
 		TRACE_COL, mat->wt[TRACE_COL]);
@@ -2231,7 +2226,7 @@ my_cost(unsigned long N, unsigned long c, int forbw)
 
 // njrem is the number of columns removed.
 void
-doOneMerge(report_t *rep, sparse_mat_t *mat, int *njrem, double *totopt, double *totfill, double *totMST, double *totdel, int m, int maxdo, int verbose)
+doOneMerge(report_t *rep, sparse_mat_t *mat, int *njrem, double *totopt, double *totfill, double *totMST, double *totdel, int m, int maxdo, int useMST, int verbose)
 {
     dclist dcl;
     double tt, tfill, tMST;
@@ -2244,8 +2239,8 @@ doOneMerge(report_t *rep, sparse_mat_t *mat, int *njrem, double *totopt, double 
     }
     else if(m == 2){
 #if 0
-	fprintf(stderr, "Performing all merges for m=%d at %2.2lf\n",
-		m, seconds());
+	fprintf(stderr, "Performing %d merges for m=%d at %2.2lf\n",
+		maxdo, m, seconds());
 #endif
 	*njrem += mergeGe2(rep, mat, m, maxdo, verbose);
     }
@@ -2253,7 +2248,7 @@ doOneMerge(report_t *rep, sparse_mat_t *mat, int *njrem, double *totopt, double 
 	//	    fprintf(stderr, "Performing one merge for m=%d\n", m);
 	dcl = mat->S[m]->next;
 	j = dcl->j;
-	mergeForColumn(rep, &tt, &tfill, &tMST, mat, m, j);
+	mergeForColumn(rep, &tt, &tfill, &tMST, mat, m, j, useMST);
 	*totopt += tt;
 	*totfill += tfill;
 	*totMST += tMST;
@@ -2310,7 +2305,7 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
 	    break;
 	}
 	doOneMerge(rep, mat, &njrem, &totopt, &totfill, &totMST, &totdel,
-		   m, 0, verbose);
+		   m, 0, 1, verbose);
 	// number of columns removed
 	njproc += old_ncols - mat->rem_ncols;
 	deleteEmptyColumns(mat);
