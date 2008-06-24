@@ -121,3 +121,27 @@ val0 := proc(P0,p) local v, r, P, Q, P2;
    v
 end:
 
+##############################################################################
+
+# the following procedure decomposes N in base (m,p)
+# cf Lemma 2.1 of Kleinjung's paper "On polynomial selection for the
+# general number field sieve"
+# Example:
+# N:=10941738641570527421809707322040357612003732945449205990913842131476349984288934784717997257891267332497625752899781833797076537244027146743531593354333897
+# Lemma21(N, 5, 102406, 1197773395291, 639369899891975567556774664501);
+Lemma21 := proc(N, d, ad, p, m) local a, r, i, mu;
+   a := table();
+   r := N;
+   a[d] := ad;
+   for i from d-1 by -1 to 0 do
+      r := (r - a[i+1]*m^(i+1))/p;
+      if not type(r, integer) then ERROR("r is not an integer") fi;
+      # find 0 <= mu < p*m^i such that r + mu is divisible by m^i
+      # and mu = 0 (mod p), thus mu=lambda*p where lambda = -r/p mod m^i
+      mu := (-r/p mod (m^i))*p;
+      a[i] := (r + mu) / m^i;
+      if not type(a[i], integer) then ERROR("a[i] is not an integer") fi;
+   od;
+   add(a[i]*x^i, i=0..d)
+end:
+
