@@ -136,12 +136,38 @@ Lemma21 := proc(N, d, ad, p, m) local a, r, i, mu;
    for i from d-1 by -1 to 0 do
       r := (r - a[i+1]*m^(i+1))/p;
       if not type(r, integer) then ERROR("r is not an integer") fi;
-      # find 0 <= mu < p*m^i such that r + mu is divisible by m^i
+      # find -p*m^i/2 <= mu < p*m^i/2 such that r + mu is divisible by m^i
       # and mu = 0 (mod p), thus mu=lambda*p where lambda = -r/p mod m^i
-      mu := (-r/p mod (m^i))*p;
+      mu := (-r/p mod (m^i));
+      if mu >= m^i/2 then mu:=mu-m^i fi;
+      mu := mu*p;
       a[i] := (r + mu) / m^i;
       if not type(a[i], integer) then ERROR("a[i] is not an integer") fi;
    od;
    add(a[i]*x^i, i=0..d)
 end:
 
+# compute the sup-norm as in Definition 3.1 of Kleinjung's paper
+norme := proc(f) local d, i, j, k, s, ai, ok, n, minn, mins;
+   minn := infinity;
+   d := degree(f);
+   for i from 0 to d do
+      ai := abs(coeff(f,x,i));
+      if ai=0 then next fi;
+      for j from i+1 to d do
+         # solve |a_i|*s^(i-d/2) = |a_j|*s^(j-d/2)
+         s := evalf(abs(coeff(f,x,j)/ai)^(1/(i-j)));
+         n := evalf(ai*s^(i-d/2));
+         ok := true;
+         for k in {$0..d} minus {i,j} while ok do
+            ok := evalb(abs(coeff(f,x,k))*s^(k-d/2) < n);
+         od;
+         if ok and n<minn then minn:=n; mins:=s fi;
+      od
+   od;
+   mins, minn
+end:
+
+sup_norm := proc(f, s) local i;
+   seq(evalf(abs(coeff(f,x,i))*s^(i-degree(f)/2)), i=0..degree(f))
+end:

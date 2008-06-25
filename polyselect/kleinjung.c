@@ -8,25 +8,100 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <values.h> /* for DBL_MAX */
 #include "cado.h"
 #include "utils/utils.h"
 
 #include "aux.c"
 
+/* Compute the sup-norm of f(x) = A[d]*x^d + ... + A[0]
+   as in Definition 3.1 of Kleinjung's paper
+*/
+double
+sup_norm (mpz_t *A, int d)
+{
+  double norm, min_norm, *a, s, t;
+  int i, j, k;
+
+  min_norm = DBL_MAX;
+  a = (double*) malloc ((d + 1) * sizeof (double));
+  for (i = 0; i <= d; i++)
+    a[i] = fabs (mpz_get_d (A[i]));
+  for (i = 0; i <= d; i++)
+    {
+      if (a[i] == 0.0)
+        continue;
+      for (j = i + 1; j <= d; j++)
+        {
+          s = pow (a[j] / a[i], 1.0 / (double) (i - j));
+          norm = a[i] * pow (s, (double) i - (double) d / 2.0);
+          for (k = 0; norm < min_norm && k <= d; k++)
+            if (k != i && k != j)
+              {
+                t = a[k] * pow (s, (double) k - (double) d / 2.0);
+                if (t > norm)
+                  norm = min_norm; /* will exit the loop */
+              }
+          if (norm < min_norm)
+            min_norm = norm;
+        }
+    }
+  free (a);
+  return min_norm; 
+}
+
+/* Implements Lemma 2.1 from Kleinjung's paper, assumes a[d] is already set. */
+void
+Lemma21 (mpz_t *a, mpz_t N, int d, mpz_t p, mpz_t m)
+{
+  mpz_t r, mi;
+  int i;
+
+  mpz_init (r);
+  mpz_init (mi);
+  mpz_set (r, N);
+  mpz_pow_ui (mi, m, d);
+  for (i = d - 1; i >= 0; i--)
+    {
+      /* invariant: mi = m^(i+1) */
+      mpz_mul (a[i], a[i+1], mi);
+      mpz_sub (r, r, a[i]);
+      ASSERT_ALWAYS (mpz_divisible_p (r, p));
+      mpz_divexact (r, r, p);
+      mpz_divexact (mi, mi, m); /* now mi = m^i */
+      mpz_invert (a[i], p, mi); /* 1/p mod m^i */
+      mpz_mul (a[i], a[i], r);
+      mpz_neg (a[i], a[i]);
+      mpz_mod (a[i], a[i], mi); /* -r/p mod m^i */
+      mpz_mul_2exp (a[i], a[i], 1);
+      if (mpz_cmp (a[i], mi) >= 0)
+        {
+          mpz_div_2exp (a[i], a[i], 1);
+          mpz_sub (a[i], a[i], mi);
+        }
+      else
+        mpz_div_2exp (a[i], a[i], 1);
+      mpz_mul (a[i], a[i], p);
+      mpz_add (a[i], a[i], r);
+      ASSERT_ALWAYS (mpz_divisible_p (a[i], mi));
+      mpz_divexact (a[i], a[i], mi);
+    }
+  mpz_clear (r);
+  mpz_clear (mi);
+}
+
 /* Outputs all (mu[0], ..., mu[l-1]), 0 <= mu_i < d, such that S is at distance
    less than eps from an integer, with
    S = f0 + f[0][mu[0]] + ... + f[l-1][mu[l-1]].
+   Assumes a[d] is set to the current search value.
 */
 void
-naive_search (double f0, double **f, int l, int d, double eps, mpz_t ad,
-	      mpz_t P, mpz_t **m)
+naive_search (double f0, double **f, int l, int d, double eps, mpz_t *a,
+	      mpz_t P, mpz_t **m, mpz_t N, double M)
 {
   int *mu, i;
-  double *s, fr;
+  double *s, fr, norm;
   mpz_t t;
-
-  eps = 1e-7;
-  //  printf ("enter naive_search, eps=%e\n", eps);
 
   mu = (int*) malloc (l * sizeof (int));
   s = (double*) malloc ((l + 1) * sizeof (double));
@@ -49,7 +124,14 @@ naive_search (double f0, double **f, int l, int d, double eps, mpz_t ad,
 	  mpz_set (t, m[0][mu[0]]);
 	  for (i = 1; i < l; i++)
 	    mpz_add (t, t, m[i][mu[i]]);
-	  gmp_printf ("ad=%Zd p=%Zd m=%Zd eps=%e\n", ad, P, t, fr);
+          Lemma21 (a, N, d, P, t);
+          norm = sup_norm (a, d);
+          if (norm <= M)
+            {
+              gmp_printf ("p=%Zd m=%Zd norm=%1.2e\n", P, t, norm);
+              fprint_polynomial (stdout, a, d);
+              printf ("\n");
+            }
 	}
       
       /* go to next combination */
@@ -71,11 +153,13 @@ naive_search (double f0, double **f, int l, int d, double eps, mpz_t ad,
   free (s);
 }
 
-/* enumerates all subsets of kk elements of Q, where Q has lQ elements,
-   such that the product does not exceed max_adm1 */
+/* Enumerates all subsets of kk elements of Q, where Q has lQ elements,
+   such that the product does not exceed max_adm1.
+   Assumes a[d] is set to the current search value.
+*/
 void
 enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
-           mpz_t ad, mpz_t N, int d, mpz_t *g, double mtilde)
+           mpz_t *a, mpz_t N, int d, mpz_t *g, mpz_t mtilde, double M)
 {
   int *p, k, i, j;
   mpz_t **x, **m, **e, t, u, P, P_over_pi, m0, invN, M0;
@@ -126,7 +210,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
         {
 #if 0
           /* print current subset */
-          gmp_printf ("%Zd", ad);
+          gmp_printf ("%Zd", a[d]);
           for (k = 0; k < l; k++)
             printf (" %u", Q[p[k]]);
           printf (": %e\n", mpz_get_d (P));
@@ -137,8 +221,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
 
           /* m0 is the smallest integer bigger than mtilde and divisible by P:
              m0 = s*P, where s = ceil(mtilde/P) = floor((mtilde + P - 1)/P) */
-          mpz_set_d (t, mtilde);
-          mpz_add (t, t, P);
+          mpz_add (t, mtilde, P);
           mpz_sub_ui (t, t, 1);
           mpz_tdiv_q (t, t, P);
           mpz_mul (m0, t, P);
@@ -146,7 +229,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
 
           /* compute f0 */
           mpz_pow_ui (t, m0, d);
-          mpz_mul (t, t, ad);
+          mpz_mul (t, t, a[d]);
           mpz_sub (t, N, t); /* N - a[d]*m0^d */
           f0 = mpz_get_d (t);
           mpz_pow_ui (t, m0, d - 1);
@@ -160,7 +243,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
               /* put in x[i][0..d-1] the d roots of x^d = N/a[d] mod Q[p[i]] */
               pi = Q[p[i]];
               mpz_set_ui (u, pi);
-              mpz_invert (t, ad, u);
+              mpz_invert (t, a[d], u);
               mpz_mul (t, t, N);
               mpz_mod_ui (t, t, pi);
               mpz_ui_sub (g[0], pi, t);
@@ -180,6 +263,14 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
                   mpz_mul (x[i][j], x[i][j], P_over_pi);
                 }
             }
+
+#if 0
+          /* check 0 <= x[i][j] < P */
+          for (i = 0; i < l; i++)
+            for (j = 0; j < d; j++)
+              ASSERT_ALWAYS(mpz_cmp_ui (x[i][j], 0) >= 0 &&
+                            mpz_cmp (x[i][j], P) < 0);
+#endif
 
           /* compute the m[i][j] from (3.3): we only need to compute m[0][j],
              since m[i][j] = x[i][j] for i > 0 */
@@ -202,12 +293,12 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
                   mpz_add (t, t, x[0][j]);
                 }
               mpz_pow_ui (u, t, d);
-              mpz_mul (u, u, ad);
+              mpz_mul (u, u, a[d]);
               mpz_sub (u, N, u);
-              ASSERT (mpz_divisible_p (u, P));
+              ASSERT_ALWAYS (mpz_divisible_p (u, P));
               mpz_divexact (u, u, P);
               mpz_mul (u, u, invN);
-              mpz_mul (u, u, ad);
+              mpz_mul (u, u, a[d]);
               mpz_mul (u, u, t);
               mpz_mod (e[0][j], u, P);
             }
@@ -223,12 +314,12 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
                   /* now t = m_{(1,...,j,...,1)} where the j is at the
                      ith place */
                   mpz_pow_ui (u, t, d);
-                  mpz_mul (u, u, ad);
+                  mpz_mul (u, u, a[d]);
                   mpz_sub (u, N, u);
-                  ASSERT (mpz_divisible_p (u, P));
+                  ASSERT_ALWAYS (mpz_divisible_p (u, P));
                   mpz_divexact (u, u, P);
                   mpz_mul (u, u, invN);
-                  mpz_mul (u, u, ad);
+                  mpz_mul (u, u, a[d]);
                   mpz_mul (e[i][j], u, t);
                   mpz_sub (e[i][j], e[i][j], e[0][0]);
                   mpz_mod (e[i][j], e[i][j], P);
@@ -236,7 +327,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
             }
 
           /* finally compute the f[i][j] */
-          mpz_mul_ui (t, ad, d);
+          mpz_mul_ui (t, a[d], d);
           one_over_P2 = mpz_get_d (P);
           one_over_P2 = -1.0 / (one_over_P2 * one_over_P2);
           for (i = 0; i < l; i++)
@@ -248,7 +339,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
               }
 
           /* now search for a small combination */
-          naive_search (f0, f, l, d, eps, ad, P, m);
+          naive_search (f0, f, l, d, eps, a, P, m, N, M);
         }
       
       /* go to next subset */
@@ -293,10 +384,10 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb)
   unsigned int *P = NULL, lP = 0;
   unsigned int *Q = NULL, lQ = 0;
   unsigned int r, i;
-  mpz_t *a, *g, t;
-  double Nd, max_ad, mtilde, max_adm1, max_adm2;
+  mpz_t *a, *g, t, mtilde;
+  double Nd, max_ad, max_adm1, max_adm2;
 
-  ASSERT(d >= 4);
+  ASSERT_ALWAYS (d >= 4);
 
   /* step 1 */
   for (r = 1; r < pb; r += d)
@@ -323,12 +414,13 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb)
   Nd = mpz_get_d (N);
 
   max_ad = pow(pow (M, (double) (2 * d - 2)) / Nd, 1.0 / (double) (d - 3));
-  //  fprintf (stderr, "max a[d]=%e\n", max_ad);
+  fprintf (stderr, "M=%1.0e, max ad=%1.2e\n", M, max_ad);
 
   mpz_set_ui (a[d], 1);
 
   Q = (unsigned int*) malloc (lP * sizeof (unsigned int));
   mpz_init (t);
+  mpz_init (mtilde);
 
   /* step 2 */
   do
@@ -351,16 +443,18 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb)
       if (lQ < l)
         goto next_ad;
 
-      mtilde = pow (Nd / mpz_get_d (a[d]), 1.0 / (double) d);
-      max_adm1 = M * M / mtilde;
+      mpz_tdiv_q (mtilde, N, a[d]);
+      mpz_root (mtilde, mtilde, d);
+      max_adm1 = M * M / mpz_get_d (mtilde);
       max_adm2 = pow (pow (M, (double) (2 * d - 6)) /
-                      pow (mtilde, (double) (d - 4)), 1.0 / (double) (d - 2));
+                      pow (mpz_get_d (mtilde), (double) (d - 4)),
+                      1.0 / (double) (d - 2));
 
       /* enumerate all subsets Pprime of at least l elements of Q such that
          prod(r, r in Pprime) <= max_adm1 */
       //      fprintf (stderr, "max_adm1=%e\n", max_adm1);
       for (i = l; i <= lQ; i++)
-        enumerate (Q, lQ, i, max_adm1, max_adm2, a[d], N, d, g, mtilde);
+        enumerate (Q, lQ, i, max_adm1, max_adm2, a, N, d, g, mtilde, M);
 
     next_ad:
       mpz_add_ui (a[d], a[d], 1);
@@ -372,6 +466,7 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb)
   clear_mpz_array (a, d + 1);
   clear_mpz_array (g, d + 1);
   mpz_clear (t);
+  mpz_clear (mtilde);
 }
 
 int
@@ -385,7 +480,7 @@ main (int argc, char *argv[])
   //  gmp_printf ("N=%Zd\n", in->n);
 
   /* for Elie: d=5, M=1e21, l=8, pb=256 */
-  Algo36 (in->n, 5, 1e21, 7, 256);
+  Algo36 (in->n, 5, 2e23, 7, 256);
   
   clear (in);
   return 0;
