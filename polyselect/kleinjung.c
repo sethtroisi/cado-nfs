@@ -131,6 +131,7 @@ naive_search (double f0, double **f, int l, int d, double eps, mpz_t *a,
               gmp_printf ("p=%Zd m=%Zd norm=%1.2e\n", P, t, norm);
               fprint_polynomial (stdout, a, d);
               printf ("\n");
+              fflush (stdout);
             }
 	}
       
