@@ -13,7 +13,6 @@
 #include <ctype.h>
 
 #include <gmp.h>
-#include "mod_ul.c"
 
 #include "utils/utils.h"
 
@@ -277,7 +276,10 @@ main(int argc, char **argv)
     memset(Hab.tab, 0, Hab.len * sizeof(unsigned long));
 #endif
 
-    outfile = gzip_open(outname, "w");
+    if (outname != NULL)
+      outfile = gzip_open(outname, "w");
+    else
+      outfile = stdout;
     fprintf(stderr, "reading files of relations...\n");
     nrels = 0;
     for(slice0 = 0; slice0 < (1<<slice); slice0++){
@@ -287,7 +289,8 @@ main(int argc, char **argv)
 	    fprintf(stderr, "Performing slice0=%d\n", slice0);
 	ret = remove_duplicates(outfile, fic, nfic, &nrels, &Hab, slice, slice0);
     }
-    gzip_close(outfile, outname);
+    if (outname != NULL)
+      gzip_close(outfile, outname);
     fprintf(stderr, "Number of relations left: %u\n", nrels);
 
     return 0;
