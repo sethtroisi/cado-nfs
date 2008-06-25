@@ -343,7 +343,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
         }
       
       /* go to next subset */
-      for (k = l - 1; p[k] == lQ - l + k; k--);
+      for (k = l - 1; k >= 0 && p[k] == lQ - l + k; k--);
       if (k < 0)
         break;
       p[k] ++;
@@ -365,6 +365,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
   for (j = 0; j < d; j++)
     mpz_clear (m[0][j]);
   free (x);
+  free (m[0]);
   free (m);
   free (e);
   free (f);
@@ -376,6 +377,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
   mpz_clear (M0);
   mpz_clear (invN);
   free (roots);
+  free (p);
 }
 
 void
@@ -477,10 +479,8 @@ main (int argc, char *argv[])
   init (in);
 
   parse_input (in);
-  //  gmp_printf ("N=%Zd\n", in->n);
 
-  /* for Elie: d=5, M=1e21, l=8, pb=256 */
-  Algo36 (in->n, 5, 2e23, 7, 256);
+  Algo36 (in->n, 5, 1e23, 7, 256);
   
   clear (in);
   return 0;
