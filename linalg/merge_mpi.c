@@ -34,7 +34,7 @@
 #define MPI_SEND_MST              12
 #define MPI_SEND_HIS_TAG          13
 
-#define MPI_BUF_SIZE 10000
+#define MPI_BUF_SIZE 20000
 
 unsigned int mpi_index = 0;
 
@@ -566,8 +566,7 @@ mpi_doOneMerge(report_t *rep, sparse_mat_t *mat, unsigned int *buf, int mpi_rank
 #if DEBUG >= 1
     mpi_err2("nrows=%d ncols=%d\n", mat->rem_nrows, mat->rem_ncols);
 #endif
-    // FIXME: one day, add njdel??
-    return njrem;
+    return njdel;
 }
 
 int
@@ -644,7 +643,7 @@ mpi_slave(report_t *rep, int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char
     unsigned int buf[MPI_BUF_SIZE];
     unsigned int send_buf[MPI_BUF_SIZE];
     MPI_Status status;
-    int jmin, jmax, cnt, i, k, m, njrem = 0, i0, submaster;
+    int jmin, jmax, cnt, i, k, m, njdel = 0, i0, submaster;
 
     // loop forever
     while(1){
@@ -660,7 +659,7 @@ mpi_slave(report_t *rep, int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char
 	// FIXME: sometimes, only 0 has the right to send things
 	switch(status.MPI_TAG){
 	case MPI_DIE_TAG:
-	    mpi_err("I was asked to die...\n");
+	    mpi_err1("I was asked to die at %d...\n", (int)seconds());
 	    break;
 	case MPI_J_TAG:
 	    jmin = (int)buf[0];
@@ -690,10 +689,10 @@ mpi_slave(report_t *rep, int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char
 	    break;
 	case MPI_DO_M_TAG:
 	    rep->mark = -1;
-	    njrem = mpi_doOneMerge(rep, mat, buf, mpi_rank);
+	    njdel = mpi_doOneMerge(rep, mat, buf, mpi_rank);
 	    send_buf[0] = buf[0];
 	    send_buf[1] = buf[1];
-	    send_buf[2] = njrem;
+	    send_buf[2] = njdel;
 	    MPI_Send(send_buf, 3, MPI_UNSIGNED, 0, MPI_M_DONE_TAG, MPI_COMM_WORLD);
 	    break;
 	case MPI_ADD_TAG:
@@ -892,12 +891,21 @@ mpi_feed(int *row_weight, sparse_mat_t *mat, FILE *purgedfile)
 }
 
 void
-mpi_delete_superfluous_rows(sparse_mat_t *mat, int *row_weight, int mpi_size)
+mpi_delete_superfluous_rows(report_t *rep, sparse_mat_t *mat, int *row_weight, int mpi_size)
 {
+    MPI_Status status;
     unsigned int send_buf[MPI_BUF_SIZE];
-    int k, r, ni2rem = number_of_superfluous_rows(mat), *tmp, ntmp;
+    int k, r, ni2rem = number_of_superfluous_rows(mat), *tmp, ntmp, nrecv;
 
+    if((mat->rem_nrows - mat->rem_ncols) <= mat->delta)
+	return;
+    if(ni2rem > MPI_BUF_SIZE-1)
+	ni2rem = MPI_BUF_SIZE-1;
+    rep->mark = -1;
+    mpi_index++;
+#if DEBUG >= 0
     mpi_err1("We should drop %d rows\n", ni2rem);
+#endif
     tmp = (int *)malloc((mat->nrows << 1) * sizeof(int));
     for(k = 0, ntmp = 0; k < mat->nrows; k++)
 	if(row_weight[k] > 0){
@@ -908,10 +916,13 @@ mpi_delete_superfluous_rows(sparse_mat_t *mat, int *row_weight, int mpi_size)
     for(k = ntmp-1, r = 1; k >= 0; k -= 2){
 	send_buf[r++] = tmp[k];
 	row_weight[tmp[k]] = 0;
+	report1(rep, tmp[k]);
 	mat->rem_nrows--;
-	if(r >= ni2rem)
+	if((r >= ni2rem) || ((mat->rem_nrows - mat->rem_ncols) < mat->delta))
 	    break;
     }
+    free(tmp);
+    fprint_report(rep);
     for(k = 1; k < mpi_size; k++){
 	mpi_index++;
 	send_buf[0] = mpi_index;
@@ -920,6 +931,17 @@ mpi_delete_superfluous_rows(sparse_mat_t *mat, int *row_weight, int mpi_size)
 #endif
 	MPI_Send(send_buf, r, MPI_UNSIGNED, k, 
 		 MPI_INACTIVATE_ROWS_TAG, MPI_COMM_WORLD);
+    }
+    // this is kinda wait, no?
+    nrecv = 0;
+    while(nrecv != (mpi_size-1)){
+#if DEBUG >= 1
+	mpi_err1("Waiting in superfluous, nrecv=%d\n", nrecv);
+#endif
+	MPI_Recv(send_buf, MPI_BUF_SIZE, MPI_UNSIGNED, MPI_ANY_SOURCE,
+		 MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+	if(status.MPI_TAG == MPI_INACTIVATE_ROWS_TAG)
+	    nrecv++;
     }
 }
 
@@ -932,7 +954,7 @@ mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile)
     unsigned int buf[MPI_BUF_SIZE];
     unsigned int send_buf[MPI_BUF_SIZE];
     int ibuf, m, proc, cnt, k, done, maxm = 0, nrecv;
-    int *row_weight, curr_ncols;
+    int *row_weight, curr_ncols, threshold = 0;
 
 #if 0
     mpi_err("WARNING: maxm=2\n");
@@ -944,7 +966,7 @@ mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile)
     while(1){
 	mpi_index++;
 	curr_ncols = mpi_get_minimal_m_proc(&m, &proc, mpi_size, mpi_index);
-#if 1
+#if DEBUG >= 1
 	if(curr_ncols != mat->rem_ncols){
 	    fprintf(stderr, "index=%d cur=%d ncols=%d\n", 
 		    mpi_index, curr_ncols, mat->rem_ncols);
@@ -956,13 +978,14 @@ mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile)
 # endif
 	}
 #endif
-	if((mpi_index == 1) || ((mpi_index % 10000) == 0)){
+	if(mpi_index >= threshold){
+	    threshold += 10000;
 	    fprintf(stderr, 
 		    "Round %d (%2.2lf): maxm=%d nrows=%d ncols=%d[%d] (%d)\n",
 		    mpi_index, seconds(), maxm, 
 		    mat->rem_nrows, mat->rem_ncols, curr_ncols,
 		    mat->rem_nrows - mat->rem_ncols);
-	    //	    mpi_delete_superfluous_rows(mat, row_weight, mpi_size);
+	    mpi_delete_superfluous_rows(rep, mat, row_weight, mpi_size);
 	}
 	// look for minimal m for index
 	//	mat->rem_ncols = curr_ncols;
@@ -988,12 +1011,12 @@ mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile)
 		     MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 	    switch(status.MPI_TAG){
 	    case MPI_M_DONE_TAG:
-		// buf = [index, m, njrem]
+		// buf = [index, m, njdel]
 #if DEBUG >= 1
-		mpi_err2("We stop here: m=%d njrem=%d\n",
+		mpi_err2("We stop here: m=%d njdel=%d\n",
 			 (int)buf[1], (int)buf[2]);
 #endif
-		//		mat->rem_ncols -= (int)buf[2];
+		mat->rem_ncols -= (int)buf[2];
 		done = 1;
 		break;
 	    case MPI_SEND_W_TAG:
