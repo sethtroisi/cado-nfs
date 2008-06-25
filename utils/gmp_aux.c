@@ -49,3 +49,18 @@ uint64_nextprime (uint64_t q)
   mpz_clear (p);
   return q;
 }
+
+#define REPS 1 /* number of Miller-Rabin tests in isprime */
+
+int
+isprime (unsigned long p)
+{
+  mpz_t P;
+  int res;
+  
+  mpz_init_set_ui (P, p);
+  res = mpz_probab_prime_p (P, REPS);
+  mpz_clear (P);
+  return res;
+}
+

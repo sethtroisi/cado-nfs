@@ -93,6 +93,7 @@ extern unsigned long getprime (unsigned long);
 void mpz_set_uint64 (mpz_t, uint64_t);
 uint64_t mpz_get_uint64 (mpz_t);
 uint64_t uint64_nextprime (uint64_t);
+int isprime (unsigned long);
 
 #ifdef	__cplusplus
 }	// extern "C"
