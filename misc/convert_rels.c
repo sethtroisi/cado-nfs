@@ -17,7 +17,7 @@
 
 #define MAX_PRIMES 255 /* maximal number of factor base primes */
 #define MAX_LPRIMES 3  /* maximal number of large primes */
-#define DEGF_MAX 5
+#define DEGF_MAX 6
 #define REPS 10
 
 uint32_t
@@ -265,6 +265,127 @@ read_relation_cado (FILE *fp, relation_t *rel)
   return 1;
 }
 
+int 
+fk_read_line (char *lp, const int maxlen, FILE *fp)
+{
+  int i;
+  do {
+    if (fgets (lp, maxlen, fp) == NULL)
+      return 0; /* Possibly EOF */
+    
+    i = strlen (lp); /* fgets() always puts a '\0' so this is safe */
+    if (i == maxlen - 1 && lp[i] != '\n')
+      {
+	fprintf (stderr, "Error, input line too long\n");
+	exit(1);
+      }
+    if (i == 0 || lp[i - 1] != '\n')
+      {
+	fprintf (stderr, "Error, incomplete line\n");
+	exit(1);
+      }
+  } while (lp[0] == '#' || strncmp (lp, "F 0 X", 5) == 0);
+  /* Lines beginning with '#' are comments and are skipped over. Each file
+     begins with "F 0 X", but the input may be several files concatenated,
+     so we allow (and ignore) "F 0 X" anywhere */
+  return 1;
+}
+
+int 
+fk_read_primes (char **lp, unsigned long *exponent, unsigned long *primes)
+{
+  int i;
+
+  i = 0; /* number of primes */
+  while ((*lp)[0] != '\n')
+    {
+      char *nlp;
+      unsigned long p;
+      
+      p = strtoul (*lp, &nlp, 16);
+      if (nlp == *lp)
+	{
+	  fprintf (stderr, "Error, could not parse prime\n");
+	  exit (1);
+	}
+      *lp = nlp;
+      
+      if (i > 0 && primes[i - 1] == p)
+        /* assumes identical primes are consecutive */
+        exponent[i - 1] ++;
+      else /* i = 0 or rel->rprimes[i - 1] <> p */
+        {
+          primes[i] = p;
+          exponent[i] = 1;
+          i ++;
+        }
+    }
+  
+  return i;
+}
+
+int
+read_relation_fk (FILE *fp, relation_t *rel)
+{
+  char line[512];
+  char *lp;
+
+  /* Read the "W" line with the a and b values */
+  if (fk_read_line (line, 512, fp) == 0)
+    return -1; /* Signal EOF */
+  
+  if (line[0] != 'W' || line[1] != ' ')
+    {
+      fprintf (stderr, "Error, no W line at start of relation\n");
+      exit (1);
+    }
+  lp = line + 2;
+
+  /* Read a and b values */
+  rel->a = strtol (lp, &lp, 16);
+  rel->b = strtoul (lp, &lp, 16);
+  if (lp[0] != '\n')
+    {
+      fprintf (stderr, "Error, could not read a and/or b value\n");
+      exit (1);
+    }
+  
+  /* Read the "X" line, which has the rational primes */
+  if (fk_read_line (line, 512, fp) != 1)
+    {
+      fprintf (stderr, "Error, incomplete relation at end of file\n");
+      exit (1);
+    }
+  if (line[0] != 'X' || line[1] != ' ')
+    {
+      fprintf (stderr, "Error, no X line after W line\n");
+      exit (1);
+    }
+  lp = line + 2;
+
+  rel->rfb_entries = fk_read_primes (&lp, rel->rexp, rel->rprimes);
+  rel->num_lrp = 0;
+
+  /* Read the "Y" line, which has the algebraic primes */
+  if (fk_read_line (line, 512, fp) != 1)
+    {
+      fprintf (stderr, "Error, incomplete relations at end of file\n");
+      exit (1);
+    }
+  if (line[0] != 'Y' || line[1] != ' ')
+    {
+      fprintf (stderr, "Error, no Y line after X line\n");
+      exit (1);
+    }
+  lp = line + 2;
+
+  rel->afb_entries = fk_read_primes (&lp, rel->aexp, rel->aprimes);
+  rel->sp_entries = 0;
+  rel->num_lap = 0;
+
+  return 1;
+}
+
 /* Read one relation in CWI format from fp, and put it in rel.
    Return 1 if relation is valid, 0 if invalid, -1 if end of file. */
 int
@@ -504,6 +625,8 @@ convert_relations (char *rels, int32_t *rfb, int32_t *afb, mpz_t *f, int degf,
         ok = read_relation_ggnfs (fp, rel, norm, f, degf, afb);
       else if (iformat == FORMAT_CADO)
         ok = read_relation_cado (fp, rel);
+      else if (iformat == FORMAT_FK)
+        ok = read_relation_fk (fp, rel);
       else if (iformat == FORMAT_CWI)
         ok = read_relation_cwi (fp, rel);
       else
@@ -772,12 +895,6 @@ main (int argc, char *argv[])
             ((iformat == FORMAT_CWI) ? "CWI" : "GGNFS")),
            (oformat == FORMAT_CADO) ? "CADO" :
            ((oformat == FORMAT_FK) ? "Franke-Kleinjung" : "GGNFS"));
-
-  if (iformat == FORMAT_FK)
-    {
-      fprintf (stderr, "Error, Franke-Kleinjung input format not yet implemented\n");
-      exit (1);
-    }
 
   if (oformat == FORMAT_GGNFS)
     {
