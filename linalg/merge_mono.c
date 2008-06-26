@@ -335,28 +335,6 @@ texSWAR(sparse_mat_t *mat)
     }
 }
 
-void
-reporthis(report_t *rep, INT tab[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1], int i0)
-{
-    int k;
-
-#if DEBUG >= 1
-    fprintf(stderr, "Reporting for tab[%d]\n", i0);
-#endif
-    if(rep->type == 0){
-	for(k = 1; k <= tab[i0][0]; k++){
-	    fprintf(rep->outfile, "%ld", (long int) tab[i0][k]);
-	    if(k <= tab[i0][0]-1)
-		fprintf(rep->outfile, " ");
-	}
-	fprintf(rep->outfile, "\n");
-    }
-    else{
-	fprintf(stderr, "reporthis for type==1: NYI\n");
-	exit(0);
-    }
-}
-
 // terrific hack: everybody on the same line
 // the first is to be destroyed in replay!!!
 void
@@ -383,6 +361,30 @@ reportn(report_t *rep, INT *ind, int n)
 	rep->history[rep->mark][0] = n;
 	for(i = 0; i < n; i++)
 	    rep->history[rep->mark][i+1] = ind[i];
+    }
+}
+
+// Same as reportn, but with another input type.
+// TODO: destroy this, since a workaround is found using pointers.
+void
+reporthis(report_t *rep, INT tab[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1], int i0)
+{
+    int k;
+
+#if DEBUG >= 1
+    fprintf(stderr, "Reporting for tab[%d]\n", i0);
+#endif
+    if(rep->type == 0){
+	for(k = 1; k <= tab[i0][0]; k++){
+	    fprintf(rep->outfile, "%ld", (long int) tab[i0][k]);
+	    if(k <= tab[i0][0]-1)
+		fprintf(rep->outfile, " ");
+	}
+	fprintf(rep->outfile, "\n");
+    }
+    else{
+	fprintf(stderr, "I told you this is useless\n");
+	exit(0);
     }
 }
 
@@ -667,18 +669,21 @@ addRowsWithWeight(sparse_mat_t *mat, int i1, int i2)
 #endif
 }
 
-// what is the weight of the sum of Ra and Rb?
+// what is the weight of the sum of Ra and Rb? Works even in the partial
+// scenario of MPI.
 int
 weightSum(sparse_mat_t *mat, int i1, int i2)
 {
-    int k1, k2, w = 0;
+    int k1, k2, w = 0, len1, len2;
 
+    len1 = (isRowNull(mat, i1) ? 0 : lengthRow(mat, i1));
+    len2 = (isRowNull(mat, i2) ? 0 : lengthRow(mat, i2));
 #if USE_TAB == 0
     k1 = k2 = 0;
-    while((k1 < lengthRow(mat, i1)) && (k2 < lengthRow(mat, i2))){
+    while((k1 < len1) && (k2 < len2)){
 #else
     k1 = k2 = 1;
-    while((k1 <= lengthRow(mat, i1)) && (k2 <= lengthRow(mat, i2))){
+    while((k1 <= len1) && (k2 <= len2)){
 #endif
 	if(cell(mat, i1, k1) < cell(mat, i2, k2)){
 	    k1++;
@@ -692,8 +697,8 @@ weightSum(sparse_mat_t *mat, int i1, int i2)
 	    k1++; k2++;
 	}
     }
-    w += (k1 > lengthRow(mat, i1) ? 0 : lengthRow(mat, i1)-k1+1);
-    w += (k2 > lengthRow(mat, i2) ? 0 : lengthRow(mat, i2)-k2+1);
+    w += (k1 > len1 ? 0 : len1-k1+1);
+    w += (k2 > len2 ? 0 : len2-k2+1);
     return w;
 }
 
@@ -1797,17 +1802,13 @@ addFatherToSons(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 }
 
 void
-useMinimalSpanningTree(report_t *rep, sparse_mat_t *mat, int m,
-		       INT *ind, double *tfill, double *tMST)
+MSTWithA(report_t *rep, sparse_mat_t *mat, int m, INT *ind, double *tMST,
+	 int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX])
 {
-    int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX];
     int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1];
     int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1];
     int father[MERGE_LEVEL_MAX], height[MERGE_LEVEL_MAX], hmax, i;
 
-    *tfill = seconds();
-    fillRowAddMatrix(A, mat, m, ind);
-    *tfill = seconds()-*tfill;
     *tMST = seconds();
     hmax = minimalSpanningTree(father, height, sons, m, A);
     *tMST = seconds()-*tMST;
@@ -1828,9 +1829,25 @@ useMinimalSpanningTree(report_t *rep, sparse_mat_t *mat, int m,
 #endif
     hmax = addFatherToSons(history, mat, m, ind, A, father, height, hmax,sons);
     for(i = hmax; i >= 0; i--)
+#if 0
 	reporthis(rep, history, i);
+#else
+        reportn(rep, history[i]+1, history[i][0]);
+#endif
     removeRowSWAR(mat, ind[0]);
     destroyRow(mat, ind[0]);
+}
+
+void
+useMinimalSpanningTree(report_t *rep, sparse_mat_t *mat, int m,
+		       INT *ind, double *tfill, double *tMST)
+{
+    int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX];
+
+    *tfill = seconds();
+    fillRowAddMatrix(A, mat, m, ind);
+    *tfill = seconds()-*tfill;
+    MSTWithA(rep, mat, m, ind, tMST, A);
 }
 
 void

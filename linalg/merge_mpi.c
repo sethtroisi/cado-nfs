@@ -88,6 +88,20 @@ mpi_err3(char *format, int i1, int i2, int i3)
 }
 
 void
+mpi_err_tab(char *str, unsigned int *buf, int ibuf)
+{
+    FILE *out = stderr;
+    int mpi_rank, i;
+
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+    fprintf(out, "MPI#%d[%d]# %s", mpi_rank, mpi_index, str);
+    for(i = 0; i < ibuf; i++)
+	fprintf(out, " %u", buf[i]);
+    fprintf(out, "\n");
+    fflush(out);
+}
+
+void
 fprint_report_aux(FILE *out, report_t *rep)
 {
     int i, k;
@@ -446,20 +460,79 @@ mpi_broadcast_history(report_t *rep, int mpi_rank)
     return ibuf;
 }
 
+#define FULL_MONTY 0
+
+// buf = [index, m, ...] and surely, we have m > 2.
 void
-mpi_MST(report_t *rep, sparse_mat_t *mat, int *njrem, unsigned int *buf, int m, int mpi_rank, int mpi_size)
+mpi_MST(report_t *rep, sparse_mat_t *mat, int *njrem, unsigned int *buf, int mpi_rank, int mpi_size)
 {
+#if FULL_MONTY
     MPI_Status status;
-    int k;
+    int nrecv, cnt;
+#endif
+    dclist dcl;
+    double tMST;
+    INT j, ind[MERGE_LEVEL_MAX];
+    int k, ni, m, A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], r, s;
 
     // first, we need the rows
-    // second, we have to ask all procs for their share
+    m = (int)buf[1];
+    dcl = mat->S[m]->next;
+    j = dcl->j;
+    ni = 0;
+    for(k = 1; k <= mat->R[j][0]; k++){
+	if(mat->R[j][k] != -1){
+	    ind[ni++] = (INT)mat->R[j][k];
+	    if(ni == m)
+		break;
+	}
+    }
+#if FULL_MONTY
+    // second, we have to ask all procs for their shares
+    for(r = 0; r < m; r++)
+	buf[r+2] = (unsigned int)ind[r];
     for(k = 1; k < mpi_size; k++)
 	if(k != mpi_rank)
-	    MPI_Send(buf, m+1, MPI_UNSIGNED, k, 
+	    MPI_Send(buf, m+2, MPI_UNSIGNED, k, 
 		     MPI_ASK_MST_TAG, MPI_COMM_WORLD);
+#endif // FULL_MONTY
+    // now, compute my own share
+    fillRowAddMatrix(A, mat, m, ind);
+#if DEBUG >= 0
+    mpi_err("Here is my MST submaster share:");
+    for(r = 0; r < m; r++)
+	for(s = r+1; s < m; s++)
+	    fprintf(stderr, " %d", A[r][s]);
+    fprintf(stderr, "\n");
+#endif
+#if FULL_MONTY
+    // now, wait for the other shares
+    nrecv = 0;
+    while(nrecv != (mpi_size-2)){
+	MPI_Recv(buf, MPI_BUF_SIZE, MPI_UNSIGNED, MPI_ANY_SOURCE,
+                 MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+	if(status.MPI_TAG == MPI_ASK_MST_TAG){
+	    // buf = [index, m, A1, A2, ...]
+	    nrecv++;
+	    MPI_Get_count(&status, MPI_UNSIGNED, &cnt);
+#if DEBUG >= 0
+	    fprintf(stderr, "MST received from %d:", status.MPI_SOURCE);
+	    mpi_err_tab("", buf, cnt);
+#endif
+	    k = 2;
+	    for(r = 0; r < m; r++)
+		for(s = r+1; s < m; s++)
+		    A[r][s] += (int)buf[k++];
+	}
+    }
+#endif // FULL_MONTY
     // then, we have to finish the MST business
-    // and then, we report
+    rep->mark = -1;
+    MSTWithA(rep, mat, m, ind, &tMST, A);
+    mat->rem_nrows--;
+    mat->rem_ncols--;
+    remove_j_from_SWAR(mat, j);
+    *njrem = deleteHeavyColumns(rep, mat);
 }
 
 int
@@ -480,15 +553,16 @@ mpi_doOneMerge(report_t *rep, sparse_mat_t *mat, unsigned int *buf, int mpi_rank
 #if DEBUG >= 1
     mpi_err1("doOneMerge(%d)\n", m);
 #endif
-    if((m <= 2) || 1) // TODO: tmp
+    if((m <= 2) || 0) // TODO: tmp
 	doOneMerge(rep, mat, &njrem, &totopt, &totfill, &totMST,
 		   &totdel, m, 10, 0, verbose); // 10 is rather arbitrary...!
     else
-	mpi_MST(rep, mat, &njrem, buf, m, mpi_rank, mpi_size);
+	mpi_MST(rep, mat, &njrem, buf, mpi_rank, mpi_size);
     njdel = deleteEmptyColumns(mat);
+#if DEBUG >= 1
     if(njdel > 0)
-	// rare event, I would suggest
 	mpi_err1("I deleted %d empty columns\n", njdel);
+#endif
     // the sub-master must store its history file...
     fprint_report(rep);
     // ... and must force other procs to perform the operations
@@ -572,7 +646,7 @@ mpi_doOneMerge(report_t *rep, sparse_mat_t *mat, unsigned int *buf, int mpi_rank
 int
 mpi_replay_history(report_t *rep, sparse_mat_t *mat, unsigned int *send_buf, unsigned int *buf, int cnt)
 {
-    int r = 0, ind, k, kmax, i, i0, isb = 0;
+    int r = 0, ind, k, kmax, i, i0, isb = 0, sgi0;
 
 #if DEBUG >= 1
     fprintf(stderr, "DUMP_BEGIN [cnt=%d]\n", cnt);
@@ -581,7 +655,7 @@ mpi_replay_history(report_t *rep, sparse_mat_t *mat, unsigned int *send_buf, uns
         kmax = buf[r++];
 	fprintf(stderr, "%d", kmax);
 	for(k = 0; k < kmax; k++)
-	    fprintf(stderr, " %d", buf[r++]);
+	    fprintf(stderr, " %d", (int)buf[r++]);
 	fprintf(stderr, "\n");
 	if(r >= cnt)
 	    break;
@@ -595,14 +669,18 @@ mpi_replay_history(report_t *rep, sparse_mat_t *mat, unsigned int *send_buf, uns
     while(1){
 	kmax = buf[r++];
 	i0 = (int)buf[r++];
-	if(i0 < 0){
-	    mpi_err("I told you to program this, man!\n");
-	    exit(0);
+	// R[i0] should be added to R[1..kmax[
+	if(i0 >= 0){
+	    // and destroyed
+	    sgi0 = 1;
+	    send_buf[isb++] = i0;
+	    send_buf[isb++] = 0;
 	}
-	// R[i0] should be added to R[1..kmax[ and
-	// destroyed <- TODO_MPI: take care where MST is activated...!
-	send_buf[isb++] = i0;
-	send_buf[isb++] = 0;
+	else{
+	    // not destroyed
+	    sgi0 = -1;
+	    i0 = -i0-1;
+	}
 	if(isRowNull(mat, i0))
 	    for(k = 1; k < kmax; k++){
 		send_buf[isb++] = buf[r++];
@@ -627,9 +705,11 @@ mpi_replay_history(report_t *rep, sparse_mat_t *mat, unsigned int *send_buf, uns
 		    addRowsSWAR(mat, i, i0, -1);
 		send_buf[isb++] = lengthRow(mat, i);
 	    }
-	    // i0 is no longer needed...!
-	    removeRowSWAR(mat, i0);
-	    destroyRow(mat, i0);
+	    if(sgi0 >= 0){
+		// i0 is no longer needed...!
+		removeRowSWAR(mat, i0);
+		destroyRow(mat, i0);
+	    }
 	}
 	if(r >= cnt)
 	    break;
@@ -637,9 +717,32 @@ mpi_replay_history(report_t *rep, sparse_mat_t *mat, unsigned int *send_buf, uns
     return isb;
 }
 
+// buf = [index, m, i1, ..., im]. Compute the partial sum of all possible
+// row additions to be used later in the real MST stuff performed by the
+// submaster. A priori, we will be sending A[r][s] for r < s only, so that
+// we can gain on the communication load.
+int
+mpi_mst_share(unsigned int *send_buf, sparse_mat_t *mat, unsigned int *buf)
+{
+    INT ind[MERGE_LEVEL_MAX];
+    int m = (int)buf[1], r, s, A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], ibuf;
+
+    for(r = 0; r < m; r++)
+	ind[r] = (INT)buf[r+2];
+    fillRowAddMatrix(A, mat, m, ind);
+    ibuf = 0;
+    send_buf[ibuf++] = buf[0];
+    send_buf[ibuf++] = buf[1];
+    for(r = 0; r < m; r++)
+	for(s = r+1; s < m; s++)
+	    send_buf[ibuf++] = A[r][s];
+    return ibuf;
+}
+
 void
 mpi_slave(report_t *rep, int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char *purgedname)
 {
+    double totwait = 0.0, tt;
     unsigned int buf[MPI_BUF_SIZE];
     unsigned int send_buf[MPI_BUF_SIZE];
     MPI_Status status;
@@ -647,11 +750,13 @@ mpi_slave(report_t *rep, int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char
 
     // loop forever
     while(1){
+	tt = seconds();
 #if DEBUG >= 1
 	mpi_err("Waiting...\n");
 #endif
 	MPI_Recv(buf, MPI_BUF_SIZE, MPI_UNSIGNED, MPI_ANY_SOURCE,
 		 MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+	totwait += (seconds()-tt);
 #if DEBUG >= 1
 	mpi_err3("Received %d from %d [index=%d]\n",
 		 status.MPI_TAG, status.MPI_SOURCE, (int)buf[0]);
@@ -659,7 +764,8 @@ mpi_slave(report_t *rep, int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char
 	// FIXME: sometimes, only 0 has the right to send things
 	switch(status.MPI_TAG){
 	case MPI_DIE_TAG:
-	    mpi_err1("I was asked to die at %d...\n", (int)seconds());
+	    mpi_err2("I was asked to die at %d: wait=%d\n", 
+		     (int)seconds(), (int)totwait);
 	    break;
 	case MPI_J_TAG:
 	    jmin = (int)buf[0];
@@ -671,6 +777,7 @@ mpi_slave(report_t *rep, int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char
 	    purgedfile = gzip_open(purgedname, "r");
 	    readmat(mat, purgedfile, jmin, jmax);
 	    gzip_close(purgedfile, purgedname);
+	    MPI_Send(buf, 1, MPI_UNSIGNED, 0, MPI_J_TAG, MPI_COMM_WORLD);
 	    break;
 	case MPI_MIN_M_TAG:
 	    // buf = [index]
@@ -768,12 +875,21 @@ mpi_slave(report_t *rep, int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char
 	    // send_buf = [index, i1, w(i1), i2, w(i2), ..., ir, w(ir)]
 #if DEBUG >= 1
 	    fprintf(stderr, "I have to send %d items:", cnt);
-	    for(i = 0; i < cnt; i++)
-		fprintf(stderr, " %u", send_buf[i]);
-	    fprintf(stderr, "\n");
+	    mpi_err_tab("", send_buf, cnt);
 #endif
 	    MPI_Send(send_buf, cnt, MPI_UNSIGNED, submaster,
                      MPI_SEND_W_TAG, MPI_COMM_WORLD);
+	    break;
+	case MPI_ASK_MST_TAG:
+	    MPI_Get_count(&status, MPI_UNSIGNED, &cnt);
+            submaster = status.MPI_SOURCE;
+	    // buf = [index, m, i1, ..., im]
+	    cnt = mpi_mst_share(send_buf, mat, buf);
+#if DEBUG >= 0
+	    mpi_err_tab("MST share:", send_buf, cnt);
+#endif
+	    MPI_Send(send_buf, cnt, MPI_UNSIGNED, submaster,
+                     MPI_ASK_MST_TAG, MPI_COMM_WORLD);
 	    break;
 	default:
 	    mpi_err1("Unknown tag: %d\n", status.MPI_TAG);
@@ -787,6 +903,7 @@ mpi_slave(report_t *rep, int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char
 void
 mpi_start_slaves(int mpi_size, sparse_mat_t *mat)
 {
+    MPI_Status status;
     unsigned int buf[MPI_BUF_SIZE];
     int jmin, jmax, kappa;
     int rk;
@@ -824,6 +941,13 @@ mpi_start_slaves(int mpi_size, sparse_mat_t *mat)
 	buf[0] = (unsigned)jmin;
 	buf[1] = (unsigned)jmax;
         MPI_Send(buf, 2, MPI_UNSIGNED, rk, MPI_J_TAG, MPI_COMM_WORLD);
+	while(1){
+	    MPI_Recv(buf, MPI_BUF_SIZE, MPI_UNSIGNED, rk,
+		     MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+	    if(status.MPI_TAG == MPI_J_TAG)
+		break;
+	}
+	mpi_err2("#T# started processor %d at %d\n", rk, (int)seconds());
     }
     mpi_tab_j[mpi_size-1] = jmax;
     fprintf(stderr, "# mpi_tab_j:");
@@ -951,10 +1075,12 @@ void
 mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile)
 {
     MPI_Status status;
+    double totwait = 0.0, tt;
     unsigned int buf[MPI_BUF_SIZE];
     unsigned int send_buf[MPI_BUF_SIZE];
+    unsigned int threshold = 0;
     int ibuf, m, proc, cnt, k, done, maxm = 0, nrecv;
-    int *row_weight, curr_ncols, threshold = 0;
+    int *row_weight, curr_ncols;
 
 #if 0
     mpi_err("WARNING: maxm=2\n");
@@ -965,7 +1091,9 @@ mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile)
     mpi_feed(row_weight, mat, purgedfile);
     while(1){
 	mpi_index++;
+	tt = seconds();
 	curr_ncols = mpi_get_minimal_m_proc(&m, &proc, mpi_size, mpi_index);
+	totwait += (seconds()-tt);
 #if DEBUG >= 1
 	if(curr_ncols != mat->rem_ncols){
 	    fprintf(stderr, "index=%d cur=%d ncols=%d\n", 
@@ -1007,8 +1135,10 @@ mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile)
 	    mpi_err("Waiting...\n");
 #endif
 	    done = 0;
+	    tt = seconds();
 	    MPI_Recv(buf, MPI_BUF_SIZE, MPI_UNSIGNED, MPI_ANY_SOURCE,
 		     MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+	    totwait += (seconds()-tt);
 	    switch(status.MPI_TAG){
 	    case MPI_M_DONE_TAG:
 		// buf = [index, m, njdel]
@@ -1088,8 +1218,10 @@ mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile)
 	}
     }
     //    fprint_report(rep);// what for?
-    fprintf(stderr, "Finally (%d -- %2.2lf): nrows=%d ncols=%d[%d]\n",
-	    mpi_index, seconds(), mat->rem_nrows, mat->rem_ncols, curr_ncols);
+    fprintf(stderr, "Finally (%d -- %2.2lf -- wait=%2.2lf):",
+	    mpi_index, seconds(), totwait);
+    fprintf(stderr, " nrows=%d ncols=%d[%d]\n",
+	    mat->rem_nrows, mat->rem_ncols, curr_ncols);
     fflush(stderr);
     free(row_weight);
 }
