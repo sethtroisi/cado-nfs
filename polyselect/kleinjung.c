@@ -417,7 +417,8 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb)
   Nd = mpz_get_d (N);
 
   max_ad = pow(pow (M, (double) (2 * d - 2)) / Nd, 1.0 / (double) (d - 3));
-  fprintf (stderr, "M=%1.0e, max ad=%1.2e\n", M, max_ad);
+  fprintf (stderr, "max ad=%1.2e\n", max_ad);
+  fflush (stderr);
 
   mpz_set_ui (a[d], 1);
 
@@ -472,16 +473,91 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb)
   mpz_clear (mtilde);
 }
 
+static void
+usage ()
+{
+  fprintf (stderr, "Usage: kleinjung [-v] [-e nnn] [-degree d] [-M M] < in\n\n");
+  fprintf (stderr, "       -v        - verbose\n");
+  fprintf (stderr, "       -degree d - use algebraic polynomial of degree d (default 5)\n");
+  fprintf (stderr, "       -e nnn    - use effort nnn (default 1e6)\n");
+  fprintf (stderr, "       -l xxx    - leading coefficient of g(x) has xxx prime factors (default 7)\n");
+  fprintf (stderr, "       -M xxx    - keep polynomials with sup-norm <= xxx (default 1e25)\n");
+  fprintf (stderr, "       -pb xxx   - prime factors are bounded by xxx (default 256)\n");
+  fprintf (stderr, "       in        - input file (n:...)\n");
+  exit (1);
+}
+
 int
 main (int argc, char *argv[])
 {
   cado_input in;
+  int degree = 5;
+  int verbose = 0;
+  double effort = 1e6;
+  double M = 1e25;
+  int l = 7;
+  int pb = 256;
+  int i;
 
+  /* print command line */
+  fprintf (stderr, "# %s.r%s", argv[0], REV);
+  for (i = 1; i < argc; i++)
+    fprintf (stderr, " %s", argv[i]);
+  fprintf (stderr, "\n");
   init (in);
+
+  /* parse options */
+  while (argc > 1 && argv[1][0] == '-')
+    {
+      if (strcmp (argv[1], "-v") == 0)
+	{
+	  verbose ++;
+	  argv ++;
+	  argc --;
+	}
+      else if (argc > 2 && strcmp (argv[1], "-e") == 0)
+	{
+	  effort = atof (argv[2]);
+	  argv += 2;
+	  argc -= 2;
+	}
+      else if (argc > 2 && strcmp (argv[1], "-degree") == 0)
+	{
+          degree = atoi (argv[2]);
+	  argv += 2;
+	  argc -= 2;
+	}
+      else if (argc > 2 && strcmp (argv[1], "-l") == 0)
+	{
+          l = atoi (argv[2]);
+	  argv += 2;
+	  argc -= 2;
+	}
+      else if (argc > 2 && strcmp (argv[1], "-M") == 0)
+	{
+          M = atof (argv[2]);
+	  argv += 2;
+	  argc -= 2;
+	}
+      else if (argc > 2 && strcmp (argv[1], "-pb") == 0)
+	{
+          pb = atoi (argv[2]);
+	  argv += 2;
+	  argc -= 2;
+	}
+      else
+	{
+	  fprintf (stderr, "Unknown option: %s\n", argv[1]);
+	  usage ();
+	}
+    }
+
+  if (argc != 1)
+    usage ();
 
   parse_input (in);
 
-  Algo36 (in->n, 5, 1e23, 7, 256);
+  Algo36 (in->n, degree, M, l, pb);
   
   clear (in);
   return 0;
