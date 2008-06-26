@@ -381,8 +381,16 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
   free (p);
 }
 
+/* N is the number to factor
+   d is the wanted degree
+   M is the sup-norm bound
+   l is the number of primes = 1 mod d in p
+   pb is the prime bound for those primes
+   incr is the increment for a[d]
+*/
 void
-Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb)
+Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
+        int incr)
 {
   unsigned int *P = NULL, lP = 0;
   unsigned int *Q = NULL, lQ = 0;
@@ -420,7 +428,7 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb)
   fprintf (stderr, "max ad=%1.2e\n", max_ad);
   fflush (stderr);
 
-  mpz_set_ui (a[d], 1);
+  mpz_set_ui (a[d], incr);
 
   Q = (unsigned int*) malloc (lP * sizeof (unsigned int));
   mpz_init (t);
@@ -461,7 +469,7 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb)
         enumerate (Q, lQ, i, max_adm1, max_adm2, a, N, d, g, mtilde, M);
 
     next_ad:
-      mpz_add_ui (a[d], a[d], 1);
+      mpz_add_ui (a[d], a[d], incr);
     }
   while (mpz_cmp_d (a[d], max_ad) <= 0);
 
@@ -476,13 +484,14 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb)
 static void
 usage ()
 {
-  fprintf (stderr, "Usage: kleinjung [-v] [-e nnn] [-degree d] [-M M] < in\n\n");
+  fprintf (stderr, "Usage: kleinjung [-v] [-degree d] [-e e] [-incr i] [-l l] [-M M] [-pb p] < in\n\n");
   fprintf (stderr, "       -v        - verbose\n");
   fprintf (stderr, "       -degree d - use algebraic polynomial of degree d (default 5)\n");
-  fprintf (stderr, "       -e nnn    - use effort nnn (default 1e6)\n");
-  fprintf (stderr, "       -l xxx    - leading coefficient of g(x) has xxx prime factors (default 7)\n");
-  fprintf (stderr, "       -M xxx    - keep polynomials with sup-norm <= xxx (default 1e25)\n");
-  fprintf (stderr, "       -pb xxx   - prime factors are bounded by xxx (default 256)\n");
+  fprintf (stderr, "       -e e      - use effort e (default 1e6)\n");
+  fprintf (stderr, "       -incr i   - ad is incremented by i (default 1)\n");
+  fprintf (stderr, "       -l l      - leading coefficient of g(x) has l prime factors (default 7)\n");
+  fprintf (stderr, "       -M M      - keep polynomials with sup-norm <= M (default 1e25)\n");
+  fprintf (stderr, "       -pb p   - prime factors are bounded by p (default 256)\n");
   fprintf (stderr, "       in        - input file (n:...)\n");
   exit (1);
 }
@@ -497,6 +506,7 @@ main (int argc, char *argv[])
   double M = 1e25;
   int l = 7;
   int pb = 256;
+  int incr = 1;
   int i;
 
   /* print command line */
@@ -524,6 +534,12 @@ main (int argc, char *argv[])
       else if (argc > 2 && strcmp (argv[1], "-degree") == 0)
 	{
           degree = atoi (argv[2]);
+	  argv += 2;
+	  argc -= 2;
+	}
+      else if (argc > 2 && strcmp (argv[1], "-incr") == 0)
+	{
+          incr = atoi (argv[2]);
 	  argv += 2;
 	  argc -= 2;
 	}
@@ -557,7 +573,7 @@ main (int argc, char *argv[])
 
   parse_input (in);
 
-  Algo36 (in->n, degree, M, l, pb);
+  Algo36 (in->n, degree, M, l, pb, incr);
   
   clear (in);
   return 0;
