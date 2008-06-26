@@ -350,7 +350,7 @@ read_relation_fk (FILE *fp, relation_t *rel)
       exit (1);
     }
   
-  /* Read the "X" line, which has the rational primes */
+  /* Read the "X" line, which has the algebraic primes */
   if (fk_read_line (line, 512, fp) != 1)
     {
       fprintf (stderr, "Error, incomplete relation at end of file\n");
@@ -363,10 +363,10 @@ read_relation_fk (FILE *fp, relation_t *rel)
     }
   lp = line + 2;
 
-  rel->rfb_entries = fk_read_primes (&lp, rel->rexp, rel->rprimes);
-  rel->num_lrp = 0;
+  rel->afb_entries = fk_read_primes (&lp, rel->aexp, rel->aprimes);
+  rel->num_lap = 0;
 
-  /* Read the "Y" line, which has the algebraic primes */
+  /* Read the "Y" line, which has the rational primes */
   if (fk_read_line (line, 512, fp) != 1)
     {
       fprintf (stderr, "Error, incomplete relations at end of file\n");
@@ -379,9 +379,9 @@ read_relation_fk (FILE *fp, relation_t *rel)
     }
   lp = line + 2;
 
-  rel->afb_entries = fk_read_primes (&lp, rel->aexp, rel->aprimes);
+  rel->rfb_entries = fk_read_primes (&lp, rel->rexp, rel->rprimes);
+  rel->num_lrp = 0;
   rel->sp_entries = 0;
-  rel->num_lap = 0;
 
   return 1;
 }
