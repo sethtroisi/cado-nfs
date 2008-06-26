@@ -420,8 +420,10 @@ scan_relations_from_file (int *irel, int *nrel, char *rel_used,
 
     while(1){
 	ret = fread_relation (file, &rel);
-	if(ret != 1)
+	if(ret != 1){
+	    fprintf(stderr, "Pb with relation %d\n", *irel);
 	    break;
+	}
 	*irel += 1;
 	if(!(*irel % 100000))
 	    fprintf(stderr, "nrel = %d at %2.2lf\n", *irel, seconds());
@@ -719,6 +721,8 @@ reread(FILE *ofile, char *ficname[], unsigned int nbfic,
 		}
 		clear_relation(&rel);
 	    }
+	    else
+		fprintf(stderr, "Pb with relation %d\n", irel);
 	} while(ret == 1);
 	fclose(file);
     }
@@ -960,9 +964,9 @@ main(int argc, char **argv)
 	reread(purgedfile, fic, nfic, /*bad_primes,*/ &H, rel_used, nrel_new
                /*, nprimes_new*/);
 	gzip_close(purgedfile, purgedname);
+	// write excess to stdout
+	fprintf(stderr, "EXCESS: %d\n", nrel_new - nprimes_new);
     }
-    // write excess to stdout
-    printf("EXCESS: %d\n", nrel_new - nprimes_new);
     free(bad_primes.tab);
     free(rel_used);
 
