@@ -742,11 +742,11 @@ mpi_mst_share(unsigned int *send_buf, sparse_mat_t *mat, unsigned int *buf)
 void
 mpi_slave(report_t *rep, int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char *purgedname)
 {
-    double totwait = 0.0, tt;
+    double totwait = 0.0, tt, wctstart = MPI_Wtime();
     unsigned int buf[MPI_BUF_SIZE];
     unsigned int send_buf[MPI_BUF_SIZE];
     MPI_Status status;
-    int jmin, jmax, cnt, i, k, m, njdel = 0, i0, submaster;
+    int jmin, jmax, cnt, i, k, m, njdel = 0, i0, submaster, nbminm = 0;
 
     // loop forever
     while(1){
@@ -764,8 +764,8 @@ mpi_slave(report_t *rep, int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char
 	// FIXME: sometimes, only 0 has the right to send things
 	switch(status.MPI_TAG){
 	case MPI_DIE_TAG:
-	    mpi_err2("I was asked to die at %d: wait=%d\n", 
-		     (int)seconds(), (int)totwait);
+	    mpi_err3("I was asked to die at %d: wct=%d wait=%d\n", 
+		     (int)seconds(),(int)(MPI_Wtime()-wctstart),(int)totwait);
 	    break;
 	case MPI_J_TAG:
 	    jmin = (int)buf[0];
@@ -787,6 +787,9 @@ mpi_slave(report_t *rep, int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char
 		mpi_err1("New mpi_index = %d\n", mpi_index);
 #endif
 	    }
+	    nbminm++;
+	    if((nbminm % 10000) == 0)
+		mpi_err2("WCT[%d]: %d\n", nbminm, (int)(MPI_Wtime()-wctstart));
 	    // buf <- [index, m_min]
 	    m = minColWeight(mat);
 	    send_buf[0] = buf[0];
@@ -904,6 +907,7 @@ void
 mpi_start_slaves(int mpi_size, sparse_mat_t *mat)
 {
     MPI_Status status;
+    double wctstart = MPI_Wtime();
     unsigned int buf[MPI_BUF_SIZE];
     int jmin, jmax, kappa;
     int rk;
@@ -947,7 +951,8 @@ mpi_start_slaves(int mpi_size, sparse_mat_t *mat)
 	    if(status.MPI_TAG == MPI_J_TAG)
 		break;
 	}
-	mpi_err2("#T# started processor %d at %d\n", rk, (int)seconds());
+	mpi_err3("#T# started processor %d at %d [wct=%d]\n", 
+		 rk, (int)seconds(), (int)(MPI_Wtime()-wctstart));
     }
     mpi_tab_j[mpi_size-1] = jmax;
     fprintf(stderr, "# mpi_tab_j:");
@@ -1075,7 +1080,7 @@ void
 mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile)
 {
     MPI_Status status;
-    double totwait = 0.0, tt;
+    double totwait = 0.0, tt, wctstart = MPI_Wtime();
     unsigned int buf[MPI_BUF_SIZE];
     unsigned int send_buf[MPI_BUF_SIZE];
     unsigned int threshold = 0;
@@ -1109,8 +1114,8 @@ mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile)
 	if(mpi_index >= threshold){
 	    threshold += 10000;
 	    fprintf(stderr, 
-		    "Round %d (%2.2lf): maxm=%d nrows=%d ncols=%d[%d] (%d)\n",
-		    mpi_index, seconds(), maxm, 
+		    "Round %d (%2.2lf; wct=%2.2lf): maxm=%d nrows=%d ncols=%d[%d] (%d)\n",
+		    mpi_index, seconds(), MPI_Wtime()-wctstart, maxm, 
 		    mat->rem_nrows, mat->rem_ncols, curr_ncols,
 		    mat->rem_nrows - mat->rem_ncols);
 	    mpi_delete_superfluous_rows(rep, mat, row_weight, mpi_size);

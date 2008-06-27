@@ -421,7 +421,6 @@ scan_relations_from_file (int *irel, int *nrel, char *rel_used,
     while(1){
 	ret = fread_relation (file, &rel);
 	if(ret != 1){
-	    fprintf(stderr, "Pb with relation %d\n", *irel);
 	    break;
 	}
 	*irel += 1;
@@ -721,8 +720,6 @@ reread(FILE *ofile, char *ficname[], unsigned int nbfic,
 		}
 		clear_relation(&rel);
 	    }
-	    else
-		fprintf(stderr, "Pb with relation %d\n", irel);
 	} while(ret == 1);
 	fclose(file);
     }
@@ -768,7 +765,7 @@ reduce(char **ficname, unsigned int nbfic, hashtable_t *H, char *rel_used,
 static void
 usage (char *argv[])
 {
-  fprintf (stderr, "Usage: %s [options] -poly polyfile -nrels nnn file1 ... filen\n", argv[0]);
+  fprintf (stderr, "Usage: %s [options] -poly polyfile -purged purgedfile -nrels nnn file1 ... filen\n", argv[0]);
   fprintf (stderr, "Options:\n");
   fprintf (stderr, "       -nonfinal    - perform only one singleton pass\n");
   fprintf (stderr, "       -keep    nnn - stop when excess <= nnn (default -1)\n");
@@ -965,7 +962,7 @@ main(int argc, char **argv)
                /*, nprimes_new*/);
 	gzip_close(purgedfile, purgedname);
 	// write excess to stdout
-	fprintf(stderr, "EXCESS: %d\n", nrel_new - nprimes_new);
+	printf("EXCESS: %d\n", nrel_new - nprimes_new);
     }
     free(bad_primes.tab);
     free(rel_used);
