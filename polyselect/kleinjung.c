@@ -14,6 +14,8 @@
 
 #include "aux.c"
 
+double search_time = 0.0;
+
 /* Compute the sup-norm of f(x) = A[d]*x^d + ... + A[0]
    as in Definition 3.1 of Kleinjung's paper
 */
@@ -94,8 +96,9 @@ Lemma21 (mpz_t *a, mpz_t N, int d, mpz_t p, mpz_t m)
    less than eps from an integer, with
    S = f0 + f[0][mu[0]] + ... + f[l-1][mu[l-1]].
    Assumes a[d] is set to the current search value.
+   Returns then number of polynomials checked.
 */
-void
+double
 naive_search (double f0, double **f, int l, int d, double eps, mpz_t *a,
 	      mpz_t P, mpz_t N, double M, mpz_t **x, mpz_t m0)
 {
@@ -117,14 +120,16 @@ naive_search (double f0, double **f, int l, int d, double eps, mpz_t *a,
 
   while (1)
     {
-      /* check current sum */
-      fr = fabs (s[l] - round (s[l]));
-      if (fr <= eps)
+      /* check current sum, the following is a trick to avoid a call to
+         the round() function, which is slow */
+      fr = s[l] + 6755399441055744.0;
+      fr = fr - 6755399441055744.0; /* fr = round(s[l]) */
+      fr = fabs (fr - s[l]);
+      if (UNLIKELY(fr <= eps)) /* Prob ~ 4e-7 on RSA155 with l=7, degree 5,
+                                  M=5e24, pb=256, even less for smaller M */
 	{
-	  //mpz_set (t, m[0][mu[0]]);
           mpz_add (t, m0, x[0][mu[0]]);
 	  for (i = 1; i < l; i++)
-	    // mpz_add (t, t, m[i][mu[i]]);
             mpz_add (t, t, x[i][mu[i]]);
           Lemma21 (a, N, d, P, t);
           norm = sup_norm (a, d);
@@ -140,7 +145,7 @@ naive_search (double f0, double **f, int l, int d, double eps, mpz_t *a,
       /* go to next combination */
       for (i = l - 1; i >= 0 && mu[i] == d - 1; i--);
       /* now either i < 0 and we are done, or mu[i] < d-1 */
-      if (i < 0)
+      if (UNLIKELY(i < 0))
 	break;
       mu[i] ++;
       s[i+1] = s[i] + f[i][mu[i]];
@@ -154,41 +159,42 @@ naive_search (double f0, double **f, int l, int d, double eps, mpz_t *a,
   mpz_clear (t);
   free (mu);
   free (s);
+
+  return pow ((double) d, (double) l);
 }
 
 /* Enumerates all subsets of kk elements of Q, where Q has lQ elements,
    such that the product does not exceed max_adm1.
    Assumes a[d] is set to the current search value.
+   Returns the number of polynomials checked.
 */
-void
+double
 enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
            mpz_t *a, mpz_t N, int d, mpz_t *g, mpz_t mtilde, double M)
 {
   int *p, k, i, j;
-  mpz_t **x, **e, t, u, P, P_over_pi, m0, invN, M0;
+  mpz_t **x, t, u, dad, ee, e00, P, P_over_pi, m0, invN, M0;
   unsigned int pi;
   LONG *roots;
-  double eps, f0, **f, one_over_P2;
+  double eps, f0, **f, one_over_P2, checked = 0.0, Pd;
 
   p = (int*) malloc (l * sizeof (int));
   for (k = 0; k < l; k++)
     p[k] = k;
   x = (mpz_t**) malloc (l * sizeof(mpz_t*));
-  e = (mpz_t**) malloc (l * sizeof(mpz_t*));
   f = (double**) malloc (l * sizeof(double*));
   for (i = 0; i < l; i++)
     {
       x[i] = (mpz_t*) malloc (d * sizeof(mpz_t));
-      e[i] = (mpz_t*) malloc (d * sizeof(mpz_t));
       f[i] = (double*) malloc (d * sizeof(double));
       for (j = 0; j < d; j++)
-        {
-          mpz_init (x[i][j]);
-          mpz_init (e[i][j]);
-        }
+        mpz_init (x[i][j]);
     }
   mpz_init (t);
   mpz_init (u);
+  mpz_init (dad);
+  mpz_init (ee);
+  mpz_init (e00);
   mpz_init (P_over_pi);
   mpz_init (P);
   mpz_init (m0);
@@ -198,20 +204,13 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
   do
     {
       /* compute product of current subset */
-      mpz_set_ui (P, 1);
-      for (k = 0; k < l; k++)
+      mpz_set_ui (P, Q[p[0]]);
+      for (k = 1; k < l; k++)
         mpz_mul_ui (P, P, Q[p[k]]);
 
-      if (mpz_get_d (P) <= max_adm1)
+      Pd = mpz_get_d (P);
+      if (Pd <= max_adm1)
         {
-#if 0
-          /* print current subset */
-          gmp_printf ("%Zd", a[d]);
-          for (k = 0; k < l; k++)
-            printf (" %u", Q[p[k]]);
-          printf (": %e\n", mpz_get_d (P));
-#endif
-
           /* compute 1/N mod P */
           mpz_invert (invN, N, P);
 
@@ -239,7 +238,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
               /* put in x[i][0..d-1] the d roots of x^d = N/a[d] mod Q[p[i]] */
               pi = Q[p[i]];
               mpz_set_ui (u, pi);
-              mpz_invert (t, a[d], u);
+              mpz_invert (t, a[d], u);            /* 1/a[d] mod pi */
               mpz_mul (t, t, N);
               mpz_mod_ui (t, t, pi);
               mpz_ui_sub (g[0], pi, t);
@@ -262,6 +261,9 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
 
           /* The m[i][j], cf (3.3) are not needed, since m[i][j] = x[i][j]
              for i >= 1, and m[0][j] = m0 + x[0][j] */
+
+          mpz_mul_ui (dad, a[d], d);
+          one_over_P2 = -1.0 / (Pd * Pd);
 
           /* compute the e[i][j] from (3.6) */
           /* first compute e[0][j] = a_{d-1, (j,...,1)} */
@@ -286,12 +288,20 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
               mpz_mul (u, u, invN);
               mpz_mul (u, u, a[d]);
               mpz_mul (u, u, t);
-              mpz_mod (e[0][j], u, P);
+              mpz_mod (ee, u, P);
+              if (j == 0)
+                mpz_set (e00, ee);
+              /* compute f[0][j] from x[0][j] and e[0][j] */
+              mpz_mul (u, dad, x[0][j]);
+              mpz_addmul (u, ee, P);
+              f[0][j] = mpz_get_d (u) * one_over_P2;
             }
-          /* now compute e[i][j] for i > 0 */
+          /* now compute e[i][j] and deduce f[i][j] for i > 0 */
           for (i = 1; i < l; i++)
             {
-              mpz_set_ui (e[i][0], 0); /* e_{i,1} = 0 */
+              /* since e[i][0] = e_{i,1} = 0, f[i][0] = -d a[d] x[i][0]/p^2 */
+              mpz_mul (u, dad, x[i][0]);
+              f[i][0] = mpz_get_d (u) * one_over_P2;
               mpz_set (t, M0);         /* m_{(1,...,1)} */
               for (j = 1; j < d; j++)
                 {
@@ -307,26 +317,20 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
                   mpz_divexact (u, u, P);
                   mpz_mul (u, u, invN);
                   mpz_mul (u, u, a[d]);
-                  mpz_mul (e[i][j], u, t);
-                  mpz_sub (e[i][j], e[i][j], e[0][0]);
-                  mpz_mod (e[i][j], e[i][j], P);
+                  mpz_mul (ee, u, t);
+                  mpz_sub (ee, ee, e00);
+                  mpz_mod (ee, ee, P);
+                  /* compute f[i][j] from x[i][j] and e[i][j] */
+                  mpz_mul (u, dad, x[i][j]);
+                  mpz_addmul (u, ee, P);
+                  f[i][j] = mpz_get_d (u) * one_over_P2;
                 }
             }
 
-          /* finally compute the f[i][j] */
-          mpz_mul_ui (t, a[d], d);
-          one_over_P2 = mpz_get_d (P);
-          one_over_P2 = -1.0 / (one_over_P2 * one_over_P2);
-          for (i = 0; i < l; i++)
-            for (j = 0; j < d; j++)
-              {
-                mpz_mul (u, t, x[i][j]);
-                mpz_addmul (u, e[i][j], P);
-                f[i][j] = mpz_get_d (u) * one_over_P2;
-              }
-
           /* now search for a small combination */
-          naive_search (f0, f, l, d, eps, a, P, N, M, x, m0);
+          search_time -= seconds ();
+          checked += naive_search (f0, f, l, d, eps, a, P, N, M, x, m0);
+          search_time += seconds ();
         }
       
       /* go to next subset */
@@ -341,19 +345,17 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
   for (i = 0; i < l; i++)
     {
       for (j = 0; j < d; j++)
-        {
-          mpz_clear (x[i][j]);
-          mpz_clear (e[i][j]);
-        }
+        mpz_clear (x[i][j]);
       free (x[i]);
-      free (e[i]);
       free (f[i]);
     }
   free (x);
-  free (e);
   free (f);
   mpz_clear (t);
   mpz_clear (u);
+  mpz_clear (dad);
+  mpz_clear (ee);
+  mpz_clear (e00);
   mpz_clear (P_over_pi);
   mpz_clear (P);
   mpz_clear (m0);
@@ -361,6 +363,8 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
   mpz_clear (invN);
   free (roots);
   free (p);
+
+  return checked;
 }
 
 /* N is the number to factor
@@ -369,8 +373,9 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
    l is the number of primes = 1 mod d in p
    pb is the prime bound for those primes
    incr is the increment for a[d]
+   Returns the number of polynomials checked.
 */
-void
+double
 Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
         int incr)
 {
@@ -378,7 +383,7 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
   unsigned int *Q = NULL, lQ = 0;
   unsigned int r, i;
   mpz_t *a, *g, t, mtilde;
-  double Nd, max_ad, max_adm1, max_adm2;
+  double Nd, max_ad, max_adm1, max_adm2, checked = 0.0;
 
   ASSERT_ALWAYS (d >= 4);
 
@@ -448,7 +453,8 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
          prod(r, r in Pprime) <= max_adm1 */
       //      fprintf (stderr, "max_adm1=%e\n", max_adm1);
       for (i = l; i <= lQ; i++)
-        enumerate (Q, lQ, i, max_adm1, max_adm2, a, N, d, g, mtilde, M);
+        checked +=
+          enumerate (Q, lQ, i, max_adm1, max_adm2, a, N, d, g, mtilde, M);
 
     next_ad:
       mpz_add_ui (a[d], a[d], incr);
@@ -461,6 +467,8 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
   clear_mpz_array (g, d + 1);
   mpz_clear (t);
   mpz_clear (mtilde);
+
+  return checked;
 }
 
 static void
@@ -491,6 +499,7 @@ main (int argc, char *argv[])
   int incr = 1; /* Implements remark (1) following Algorithm 3.6:
                    try a[d]=incr, then 2*incr, 3*incr, ... */
   int i;
+  double checked, st = seconds ();
 
   /* print command line */
   fprintf (stderr, "# %s.r%s", argv[0], REV);
@@ -556,7 +565,12 @@ main (int argc, char *argv[])
 
   parse_input (in);
 
-  Algo36 (in->n, degree, M, l, pb, incr);
+  checked = Algo36 (in->n, degree, M, l, pb, incr);
+
+  st = seconds () - st;
+  fprintf (stderr, "Checked %1.0f polynomials in %1.1fs (%1.1es/p,", checked,
+           st, st / checked);
+  fprintf (stderr, " naive_search took %1.1fs)\n", search_time);
   
   clear (in);
   return 0;
