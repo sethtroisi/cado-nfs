@@ -951,8 +951,8 @@ mpi_start_slaves(int mpi_size, sparse_mat_t *mat)
 	    if(status.MPI_TAG == MPI_J_TAG)
 		break;
 	}
-	mpi_err3("#T# started processor %d at %d [wct=%d]\n", 
-		 rk, (int)seconds(), (int)(MPI_Wtime()-wctstart));
+	mpi_err2("#T# started processor %d at wct=%d\n", 
+		 rk, (int)(MPI_Wtime()-wctstart));
     }
     mpi_tab_j[mpi_size-1] = jmax;
     fprintf(stderr, "# mpi_tab_j:");
@@ -1008,6 +1008,7 @@ mpi_feed(int *row_weight, sparse_mat_t *mat, FILE *purgedfile)
 
     mat->rem_nrows = mat->nrows;
     mat->rem_ncols = mat->ncols;
+    mat->weight = 0;
     for(i = 0; i < mat->nrows; i++){
 	ret = fscanf(purgedfile, "%d", &j); // unused index to rels file
 	ASSERT_ALWAYS (ret == 1);
@@ -1016,6 +1017,7 @@ mpi_feed(int *row_weight, sparse_mat_t *mat, FILE *purgedfile)
 	for(j = 0; j < nc; j++)
 	    ret = fscanf(purgedfile, PURGE_INT_FORMAT, &x);
 	row_weight[i] = nc;
+	mat->weight += nc;
     }
 }
 
@@ -1044,6 +1046,7 @@ mpi_delete_superfluous_rows(report_t *rep, sparse_mat_t *mat, int *row_weight, i
     qsort(tmp, ntmp>>1, 2 * sizeof(int), cmp);
     for(k = ntmp-1, r = 1; k >= 0; k -= 2){
 	send_buf[r++] = tmp[k];
+	mat->weight -= row_weight[tmp[k]];
 	row_weight[tmp[k]] = 0;
 	report1(rep, tmp[k]);
 	mat->rem_nrows--;
@@ -1074,10 +1077,28 @@ mpi_delete_superfluous_rows(report_t *rep, sparse_mat_t *mat, int *row_weight, i
     }
 }
 
+int
+mpi_stop_it(sparse_mat_t *mat, int forbw, double ratio, int coverNmax, int m)
+{
+    if(m > mat->mergelevelmax){
+	// a stopping criterion whatever forbw is...!
+	mpi_err("Breaking, since m > mergelevelmax\n");
+	return 1;
+    }
+    else if(forbw == 3){
+	double coverN = ((double)mat->weight)/((double)mat->rem_nrows);
+	if(((int)coverN) > coverNmax){
+	    mpi_err("Breaking, since c/N > c/N_max\n");
+	    return 1;
+	}
+    }
+    return 0;
+}
+
 // actually, mat is rather empty, since it does not use too much fancy things.
 // So we just need to init the row weights.
 void
-mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile)
+mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile, int forbw, double ratio, int coverNmax)
 {
     MPI_Status status;
     double totwait = 0.0, tt, wctstart = MPI_Wtime();
@@ -1112,12 +1133,18 @@ mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile)
 	}
 #endif
 	if(mpi_index >= threshold){
+	    // cautious check!!!
+	    if(curr_ncols != mat->rem_ncols)
+		fprintf(stderr, "index=%d cur=%d ncols=%d\n",
+			mpi_index, curr_ncols, mat->rem_ncols);
 	    threshold += 10000;
-	    fprintf(stderr, 
-		    "R%d (wct=%2.2lf): maxm=%d nrows=%d ncols=%d[%d] (%d)\n",
-		    mpi_index, MPI_Wtime()-wctstart, maxm, 
-		    mat->rem_nrows, mat->rem_ncols, curr_ncols,
-		    mat->rem_nrows - mat->rem_ncols);
+	    fprintf(stderr, "R%d: wct=%2.2lf ",mpi_index,MPI_Wtime()-wctstart);
+	    fprintf(stderr,"maxm=%d nr=%d nc=%d [%d] c=%ld c/N=%d\n",
+		    maxm, 
+		    mat->rem_nrows, mat->rem_ncols,
+		    mat->rem_nrows - mat->rem_ncols,
+		    mat->weight, 
+		    (int)(((double)mat->weight)/((double)mat->rem_nrows)));
 	    mpi_delete_superfluous_rows(rep, mat, row_weight, mpi_size);
 	}
 	// look for minimal m for index
@@ -1125,10 +1152,8 @@ mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile)
 #if DEBUG >= 1
 	mpi_err2("Minimal m is %d for proc=%d\n", m, proc);
 #endif
-	if(m > mat->mergelevelmax){
-	    mpi_err("Breaking\n");
+	if(mpi_stop_it(mat, forbw, ratio, coverNmax, m))
 	    break;
-	}
 	if(m > maxm)
 	    maxm = m;
 	// ask the proc to execute one step
@@ -1163,6 +1188,7 @@ mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile)
 		    mpi_err3("New row %d has now weight %d instead of %d\n",
 			     buf[k], buf[k+1], row_weight[buf[k]]);
 #endif
+		    mat->weight += ((int)buf[k+1]) - row_weight[buf[k]];
 		    row_weight[buf[k]] = buf[k+1];
 		    if(buf[k+1] == 0){
 			mat->rem_nrows--;
@@ -1186,6 +1212,7 @@ mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile)
 				     buf[k], row_weight[buf[k]], mat->rwmax);
 #endif
 			    send_buf[ibuf++] = buf[k];
+			    mat->weight -= row_weight[buf[k]];
 			    row_weight[buf[k]] = 0;
 			    report1(rep, (int)buf[k]);
 			    mat->rem_nrows--;
@@ -1232,7 +1259,7 @@ mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile)
 }
 
 void
-mpi_start_proc(char *outname, int mpi_rank, int mpi_size, sparse_mat_t *mat, FILE *purgedfile, char *purgedname)
+mpi_start_proc(char *outname, int mpi_rank, int mpi_size, sparse_mat_t *mat, FILE *purgedfile, char *purgedname, int forbw, double ratio, int coverNmax)
 {
     report_t rep;
     char *str;
@@ -1257,7 +1284,11 @@ mpi_start_proc(char *outname, int mpi_rank, int mpi_size, sparse_mat_t *mat, FIL
     if(mpi_rank == 0){
 	fprintf(rep.outfile, "0 %d %d\n", mat->nrows, mat->ncols);
 	mpi_start_slaves(mpi_size, mat);
-	mpi_master(&rep, mat, mpi_size, purgedfile);
+	if(coverNmax == 0){
+	    mpi_err("#W# Forcing forbw=4: stopping when m too large\n");
+	    forbw = 4;
+	}
+	mpi_master(&rep, mat, mpi_size, purgedfile, forbw, ratio, coverNmax);
 	mpi_kill_slaves();
     }
     else

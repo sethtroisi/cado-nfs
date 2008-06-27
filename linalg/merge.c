@@ -139,7 +139,8 @@ main(int argc, char *argv[])
     fprintf(stderr, "Time for initMat: %2.2lf\n", seconds()-tt);
 
 #ifdef USE_MPI
-    mpi_start_proc(outname, mpi_rank, mpi_size, &mat, purgedfile, purgedname);
+    mpi_start_proc(outname, mpi_rank, mpi_size, &mat, purgedfile, purgedname,
+		   forbw, ratio, coverNmax);
     // TODO: clean the mat data structure (?)
     MPI_Finalize();
     return 0;

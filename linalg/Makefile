@@ -57,6 +57,7 @@ matprune: matprune.c
 ######################################################################
 ## MPI section
 ######################################################################
+# MPI_DIR should have been defined in Makefile.local
 MPI_LIB=$(MPI_DIR)/lib
 MPI_INC=-I$(MPI_DIR)/include
 MPI_CC=mpicc
@@ -65,8 +66,12 @@ merge_mpi.o: merge_mpi.c merge.c
 	$(MPI_CC) -DUSE_MPI $(MPI_INC) $(MY_CFLAGS) merge.c -c -o merge.o
 	$(MPI_CC) -DUSE_MPI $(MPI_INC) $(MY_CFLAGS) $< -c -o $@
 
-mpimerge: merge_mpi.o merge_mono.o merge.o sparse.o prune.o gzip.o
-	$(MPI_CC) -DUSE_MPI $(MPI_INC) $(MY_LFLAGS) -L$(MPI_LIB) -o $@ $^ -lutils -lm
+# for xterm debug, thanks ET: gore, isn't it? But we need to export somehow
+# the path for the libraries
+MPI_CC2:=$(shell $(MPI_CC) -showme | sed -e 's/-I/-isystem /g')
+MPI_CC2:=$(MPI_CC2) -Wl,-rpath,$(MPI_LIB)
+mpimerge: merge.o merge_mpi.o merge_mono.o sparse.o prune.o gzip.o
+	$(MPI_CC2) -DUSE_MPI $(MPI_INC) $(MY_LFLAGS) -L$(MPI_LIB) -o $@ $^ -lutils -lm
 
 hismerge: hismerge.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils
