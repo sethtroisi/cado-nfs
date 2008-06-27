@@ -1114,8 +1114,8 @@ mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile)
 	if(mpi_index >= threshold){
 	    threshold += 10000;
 	    fprintf(stderr, 
-		    "Round %d (%2.2lf; wct=%2.2lf): maxm=%d nrows=%d ncols=%d[%d] (%d)\n",
-		    mpi_index, seconds(), MPI_Wtime()-wctstart, maxm, 
+		    "R%d (wct=%2.2lf): maxm=%d nrows=%d ncols=%d[%d] (%d)\n",
+		    mpi_index, MPI_Wtime()-wctstart, maxm, 
 		    mat->rem_nrows, mat->rem_ncols, curr_ncols,
 		    mat->rem_nrows - mat->rem_ncols);
 	    mpi_delete_superfluous_rows(rep, mat, row_weight, mpi_size);
