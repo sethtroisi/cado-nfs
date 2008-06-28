@@ -14,6 +14,8 @@
 
 #include "aux.c"
 
+#define P0_MAX 1000
+
 double search_time = 0.0;
 
 /* Compute the sup-norm of f(x) = A[d]*x^d + ... + A[0]
@@ -163,6 +165,30 @@ naive_search (double f0, double **f, int l, int d, double eps, mpz_t *a,
   return pow ((double) d, (double) l);
 }
 
+/* return rho if ad*x^d = N has exactly one root rho mod p0,
+   otherwise returns 0. */
+unsigned int
+has_one_root (mpz_t ad, int d, mpz_t N, unsigned int p0)
+{
+  unsigned int rho = 0, x, nroots = 0;
+  mpz_t t;
+
+  mpz_init (t);
+  for (x = 1; nroots < 2 && x < p0; x ++)
+    {
+      mpz_ui_pow_ui (t, x, d);
+      mpz_mul (t, t, ad);
+      mpz_sub (t, t, N);
+      if (mpz_divisible_ui_p (t, p0))
+        {
+          nroots ++;
+          rho = (nroots == 1) ? x : 0;
+        }
+    }
+  mpz_clear (t);
+  return rho;
+}
+
 /* Enumerates all subsets of kk elements of Q, where Q has lQ elements,
    such that the product does not exceed max_adm1.
    Assumes a[d] is set to the current search value.
@@ -173,7 +199,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
            mpz_t *a, mpz_t N, int d, mpz_t *g, mpz_t mtilde, double M)
 {
   int *p, k, i, j;
-  mpz_t **x, t, u, dad, ee, e00, P, P_over_pi, m0, invN, M0;
+  mpz_t **x, t, u, dad, e, e00, P, P_over_pi, m0, invN, M0;
   unsigned int pi;
   LONG *roots;
   double eps, f0, **f, one_over_P2, checked = 0.0, Pd;
@@ -193,7 +219,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
   mpz_init (t);
   mpz_init (u);
   mpz_init (dad);
-  mpz_init (ee);
+  mpz_init (e);
   mpz_init (e00);
   mpz_init (P_over_pi);
   mpz_init (P);
@@ -288,12 +314,12 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
               mpz_mul (u, u, invN);
               mpz_mul (u, u, a[d]);
               mpz_mul (u, u, t);
-              mpz_mod (ee, u, P);
+              mpz_mod (e, u, P);
               if (j == 0)
-                mpz_set (e00, ee);
+                mpz_set (e00, e);
               /* compute f[0][j] from x[0][j] and e[0][j] */
               mpz_mul (u, dad, x[0][j]);
-              mpz_addmul (u, ee, P);
+              mpz_addmul (u, e, P);
               f[0][j] = mpz_get_d (u) * one_over_P2;
             }
           /* now compute e[i][j] and deduce f[i][j] for i > 0 */
@@ -317,12 +343,12 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
                   mpz_divexact (u, u, P);
                   mpz_mul (u, u, invN);
                   mpz_mul (u, u, a[d]);
-                  mpz_mul (ee, u, t);
-                  mpz_sub (ee, ee, e00);
-                  mpz_mod (ee, ee, P);
+                  mpz_mul (e, u, t);
+                  mpz_sub (e, e, e00);
+                  mpz_mod (e, e, P);
                   /* compute f[i][j] from x[i][j] and e[i][j] */
                   mpz_mul (u, dad, x[i][j]);
-                  mpz_addmul (u, ee, P);
+                  mpz_addmul (u, e, P);
                   f[i][j] = mpz_get_d (u) * one_over_P2;
                 }
             }
@@ -331,6 +357,19 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
           search_time -= seconds ();
           checked += naive_search (f0, f, l, d, eps, a, P, N, M, x, m0);
           search_time += seconds ();
+
+#if 0
+          unsigned int p0, p0_max, rho;
+
+          /* p_0 idea */
+          p0_max = (unsigned int) (max_adm1 / Pd);
+          if (p0_max > P0_MAX)
+            p0_max = P0_MAX;
+          for (p0 = 2; p0 <= p0_max; p0++)
+            {
+              rho = has_one_root (a[d], d, N, p0);
+            }
+#endif
         }
       
       /* go to next subset */
@@ -354,7 +393,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
   mpz_clear (t);
   mpz_clear (u);
   mpz_clear (dad);
-  mpz_clear (ee);
+  mpz_clear (e);
   mpz_clear (e00);
   mpz_clear (P_over_pi);
   mpz_clear (P);
@@ -411,7 +450,7 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
 
   Nd = mpz_get_d (N);
 
-  max_ad = pow(pow (M, (double) (2 * d - 2)) / Nd, 1.0 / (double) (d - 3));
+  max_ad = pow (pow (M, (double) (2 * d - 2)) / Nd, 1.0 / (double) (d - 3));
   fprintf (stderr, "max ad=%1.2e\n", max_ad);
   fflush (stderr);
 
