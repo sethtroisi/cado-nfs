@@ -43,7 +43,7 @@ visit (int i, int *nodes, int *edges, sparse_mat_t *mat, unsigned int *rsum)
     for(m = 1; m <= lengthRow(mat, i); m++){
 #endif
 	j = cell(mat, i, m);
-	if(mat->wt[j] == 2){
+	if(mat->wt[GETJ(mat, j)] == 2){
 	    edges[i]++;
             k = rsum[j] - i;
 	    if(nodes[k] == 0){
@@ -82,9 +82,9 @@ delete (report_t *rep, int i, int *nodes, sparse_mat_t *mat, unsigned int *rsum)
         removeCellSWAR_time -= seconds ();
 	removeCellSWAR(mat, i, j); /* defined in merge.c */
         removeCellSWAR_time += seconds ();
-	if(mat->wt[j] == 0)
+	if(mat->wt[GETJ(mat, j)] == 0)
 	    nd++;
-	if(mat->wt[j] == 1){
+	if(mat->wt[GETJ(mat, j)] == 1){
             v = rsum[j]; /* other row containing j */
 	    if (nodes[v] >= 0)
 		nd += delete (rep, v, nodes, mat, rsum);

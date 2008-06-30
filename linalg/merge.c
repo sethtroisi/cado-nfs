@@ -38,22 +38,13 @@ main(int argc, char *argv[])
     double kprune = 1.0; /* prune keeps kprune * (initial excess) */
     double ratio = 1.1; /* bound on cN_new/cN to stop the computation */
     int i, forbw = 0, coverNmax = 0;
-#ifdef USE_MPI
-    int mpi_rank, mpi_size; // 0 <= mpi_rank < mpi_size
 
-    MPI_Init(&argc, &argv);
-    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
-    fprintf(stderr, "Hello, world, I am %d of %d\n", mpi_rank, mpi_size);
-    if(mpi_rank == 0){
-	// I don't want this to appear many times
-#endif
     fprintf (stderr, "%s.r%s", argv[0], REV);
     for (i = 1; i < argc; i++)
       fprintf (stderr, " %s", argv[i]);
     fprintf (stderr, "\n");
 #ifdef USE_MPI
-    }
+    MPI_Init(&argc, &argv);
 #endif
 
 #if TEX
@@ -134,29 +125,28 @@ main(int argc, char *argv[])
     mat.rwmax = rwmax;
     mat.mergelevelmax = maxlevel;
     
-    tt = seconds();
-    initMat(&mat);
-    fprintf(stderr, "Time for initMat: %2.2lf\n", seconds()-tt);
-
 #ifdef USE_MPI
-    mpi_start_proc(outname, mpi_rank, mpi_size, &mat, purgedfile, purgedname,
-		   forbw, ratio, coverNmax);
+    mpi_start_proc(outname,&mat,purgedfile,purgedname,forbw,ratio,coverNmax);
     // TODO: clean the mat data structure (?)
     MPI_Finalize();
     return 0;
 #endif    
     tt = seconds();
-    initWeightFromFile(&mat, purgedfile, 0, mat.ncols);
+    initMat(&mat, 0, ncols);
+    fprintf(stderr, "Time for initMat: %2.2lf\n", seconds()-tt);
+
+    tt = seconds();
+    initWeightFromFile(&mat, purgedfile);
     fprintf(stderr, "Time for initWeightFromFile: %2.2lf\n", seconds()-tt);
     gzip_close(purgedfile, purgedname);
     
     tt = seconds();
-    fillSWAR(&mat, 0, mat.ncols);
+    fillSWAR(&mat);
     fprintf(stderr, "Time for fillSWAR: %2.2lf\n", seconds()-tt);
     
     purgedfile = gzip_open(purgedname, "r");
     ASSERT_ALWAYS(purgedfile != NULL);
-    readmat(&mat, purgedfile, 0, mat.ncols);
+    readmat(&mat, purgedfile);
     gzip_close(purgedfile, purgedname);
 #if DEBUG >= 3
     checkmat(&mat);

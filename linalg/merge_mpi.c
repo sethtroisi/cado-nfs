@@ -2,6 +2,8 @@
   MPI section
  */
 
+#define _BSD_SOURCE // to have gethostname... [thanks to ET]
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <gmp.h>
@@ -317,13 +319,13 @@ mpi_send_inactive_rows(int i)
 }
 
 int
-mpi_get_number_of_active_colums(sparse_mat_t *mat, INT jmin, INT jmax)
+mpi_get_number_of_active_colums(sparse_mat_t *mat)
 {
     INT j;
     int nb = 0;
 
-    for(j = jmin; j < jmax; j++)
-	nb += (mat->wt[j] == 0 ? 0 : 1);
+    for(j = mat->jmin; j < mat->jmax; j++)
+	nb += (mat->wt[GETJ(mat, j)] == 0 ? 0 : 1);
     return nb;
 }
 
@@ -479,10 +481,18 @@ mpi_MST(report_t *rep, sparse_mat_t *mat, int *njrem, unsigned int *buf, int mpi
     m = (int)buf[1];
     dcl = mat->S[m]->next;
     j = dcl->j;
+    if(!((j >= mat->jmin) && (j < mat->jmax)))
+	fprintf(stderr, "mpi_MST: j=%d, jmin=%d, jmax=%d\n",
+		j, mat->jmin, mat->jmax);
     ni = 0;
     for(k = 1; k <= mat->R[j][0]; k++){
 	if(mat->R[j][k] != -1){
 	    ind[ni++] = (INT)mat->R[j][k];
+#if DEBUG >= 1
+	    fprintf(stderr, "ind[%d]=%d -> len=%d\n",
+		    ni-1, ind[ni-1], 
+		    (isRowNull(mat,ind[ni-1]) ? 0 : lengthRow(mat,ind[ni-1])));
+#endif
 	    if(ni == m)
 		break;
 	}
@@ -499,7 +509,7 @@ mpi_MST(report_t *rep, sparse_mat_t *mat, int *njrem, unsigned int *buf, int mpi
     // now, compute my own share
     fillRowAddMatrix(A, mat, m, ind);
 #if DEBUG >= 0
-    mpi_err("Here is my MST submaster share:");
+    mpi_err1("Here is my MST submaster share [m=%d]:", m);
     for(r = 0; r < m; r++)
 	for(s = r+1; s < m; s++)
 	    fprintf(stderr, " %d", A[r][s]);
@@ -746,7 +756,8 @@ mpi_slave(report_t *rep, int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char
     unsigned int buf[MPI_BUF_SIZE];
     unsigned int send_buf[MPI_BUF_SIZE];
     MPI_Status status;
-    int jmin, jmax, cnt, i, k, m, njdel = 0, i0, submaster, nbminm = 0;
+    INT jmin, jmax;
+    int cnt, i, k, m, njdel = 0, i0, submaster, nbminm = 0, ok;
 
     // loop forever
     while(1){
@@ -768,16 +779,23 @@ mpi_slave(report_t *rep, int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char
 		     (int)seconds(),(int)(MPI_Wtime()-wctstart),(int)totwait);
 	    break;
 	case MPI_J_TAG:
-	    jmin = (int)buf[0];
-	    jmax = (int)buf[1];
+	    jmin = (INT)buf[0];
+	    jmax = (INT)buf[1];
 	    mpi_err2("A slave does not need to do too much things...\n... but has to treat C[%d..%d[\n", jmin, jmax);
-	    initWeightFromFile(mat, purgedfile, jmin, jmax);
+	    tt = seconds();
+	    initMat(mat, jmin, jmax);
+	    initWeightFromFile(mat, purgedfile);
 	    gzip_close(purgedfile, purgedname);
-	    fillSWAR(mat, jmin, jmax);
+	    fillSWAR(mat);
+	    mpi_err1("time for initializing the matrix: %d\n",
+		     (int)(seconds()-tt));
+	    tt = seconds();
 	    purgedfile = gzip_open(purgedname, "r");
-	    readmat(mat, purgedfile, jmin, jmax);
+	    ok = readmat(mat, purgedfile);
 	    gzip_close(purgedfile, purgedname);
-	    MPI_Send(buf, 1, MPI_UNSIGNED, 0, MPI_J_TAG, MPI_COMM_WORLD);
+	    mpi_err1("time for reading the matrix: %d\n", (int)(seconds()-tt));
+	    buf[1] = ok;
+	    MPI_Send(buf, 2, MPI_UNSIGNED, 0, MPI_J_TAG, MPI_COMM_WORLD);
 	    break;
 	case MPI_MIN_M_TAG:
 	    // buf = [index]
@@ -794,7 +812,7 @@ mpi_slave(report_t *rep, int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char
 	    m = minColWeight(mat);
 	    send_buf[0] = buf[0];
 	    send_buf[1] = m;
-	    send_buf[2] = mpi_get_number_of_active_colums(mat, jmin, jmax);
+	    send_buf[2] = mpi_get_number_of_active_colums(mat);
 	    MPI_Send(send_buf, 3, MPI_UNSIGNED, 0, MPI_MIN_M_TAG, MPI_COMM_WORLD);
 	    break;
 	case MPI_DO_M_TAG:
@@ -929,9 +947,10 @@ mpi_start_slaves(int mpi_size, sparse_mat_t *mat)
 	jmax = jmin;
 	kappa = 0;
 	for(jmax = jmin; jmax < mat->ncols; jmax++){
-	    kappa += abs(mat->wt[jmax]);
+	    kappa += abs(mat->wt[GETJ(mat, jmax)]);
 # if DEBUG >= 1
-	    fprintf(stderr, "wt=%d kappa=%d\n", mat->wt[jmax], kappa);
+	    fprintf(stderr, "wt=%d kappa=%d\n", 
+		    mat->wt[GETJ(mat, jmax)], kappa);
 # endif
 	    if(((unsigned long)kappa) > (mat->weight / ((unsigned long)((mpi_size-1)))))
 		break;
@@ -948,8 +967,13 @@ mpi_start_slaves(int mpi_size, sparse_mat_t *mat)
 	while(1){
 	    MPI_Recv(buf, MPI_BUF_SIZE, MPI_UNSIGNED, rk,
 		     MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+	    // TODO: use buf[1] containing the return status
 	    if(status.MPI_TAG == MPI_J_TAG)
 		break;
+	}
+	if(buf[1] != 1){
+	    mpi_err1("Pb while reading matrix by processor %d\n", rk);
+	    exit(0); // TODO: one day, kill/restart procs?
 	}
 	mpi_err2("#T# started processor %d at wct=%d\n", 
 		 rk, (int)(MPI_Wtime()-wctstart));
@@ -1030,6 +1054,7 @@ mpi_delete_superfluous_rows(report_t *rep, sparse_mat_t *mat, int *row_weight, i
 
     if((mat->rem_nrows - mat->rem_ncols) <= mat->delta)
 	return;
+    ni2rem = (ni2rem > 1024 ? 1024 : ni2rem);
     if(ni2rem > MPI_BUF_SIZE-1)
 	ni2rem = MPI_BUF_SIZE-1;
     rep->mark = -1;
@@ -1114,6 +1139,7 @@ mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile, int
 #endif
     // let's initialize a new simpler array with the weights of the rows
     row_weight = (int *)malloc(mat->nrows * sizeof(int));
+    initMat(mat, 0, mat->ncols); // FIXME: really useful???
     mpi_feed(row_weight, mat, purgedfile);
     while(1){
 	mpi_index++;
@@ -1139,7 +1165,7 @@ mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile, int
 			mpi_index, curr_ncols, mat->rem_ncols);
 	    threshold += 10000;
 	    fprintf(stderr, "R%d: wct=%2.2lf ",mpi_index,MPI_Wtime()-wctstart);
-	    fprintf(stderr,"maxm=%d nr=%d nc=%d [%d] c=%ld c/N=%d\n",
+	    fprintf(stderr,"maxm=%d N=%d nc=%d [%d] c=%ld c/N=%d\n",
 		    maxm, 
 		    mat->rem_nrows, mat->rem_ncols,
 		    mat->rem_nrows - mat->rem_ncols,
@@ -1259,12 +1285,24 @@ mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile, int
 }
 
 void
-mpi_start_proc(char *outname, int mpi_rank, int mpi_size, sparse_mat_t *mat, FILE *purgedfile, char *purgedname, int forbw, double ratio, int coverNmax)
+mpi_start_proc(char *outname, sparse_mat_t *mat, FILE *purgedfile, char *purgedname, int forbw, double ratio, int coverNmax)
 {
     report_t rep;
     char *str;
     char mpitmp[1024];
+    int mpi_rank, mpi_size; // 0 <= mpi_rank < mpi_size
+#if 1
+    char host[512];
+    gethostname(host, 512);
+#else
+    char *host;
+    host = getenv("HOST");
+#endif
 
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+    MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+    fprintf(stderr, "Hello, world, I am %d of [0..%d[, aka %s\n",
+	    mpi_rank, mpi_size, host);
     if(mpi_rank != 0){
 	// redirecting stderr; one day, redirect the master?
 	sprintf(mpitmp, "%s%03d.err", outname, mpi_rank);
