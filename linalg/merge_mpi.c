@@ -36,7 +36,7 @@
 #define MPI_SEND_MST              12
 #define MPI_SEND_HIS_TAG          13
 
-#define MPI_BUF_SIZE 20000
+#define MPI_BUF_SIZE 10000
 
 unsigned int mpi_index = 0;
 
@@ -214,9 +214,9 @@ mpi_load_rows_for_j(sparse_mat_t *mat, int m, INT j)
     buf[0] = (unsigned)m;
     buf[1] = (unsigned)j;
     ibuf = 2;
-    for(k = 1; k <= mat->R[j][0]; k++)
-        if(mat->R[j][k] != -1)
-	    buf[ibuf++] = (unsigned)mat->R[j][k];
+    for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
+        if(mat->R[GETJ(mat, j)][k] != -1)
+	    buf[ibuf++] = (unsigned)mat->R[GETJ(mat, j)][k];
     // at this point, we should have ibuf-2 == m...!
     if((ibuf-2) != m){
 	fprintf(stderr, "#!# ibuf-2 != m in mpi_load_rows_for_j\n");
@@ -224,7 +224,7 @@ mpi_load_rows_for_j(sparse_mat_t *mat, int m, INT j)
     }
 #if DEBUG >= 1
     fprintf(stderr, "Ready to send R[%d]=%d // #i=%d\n", j, 
-	    mat->R[j][0], ibuf-2);
+	    mat->R[GETJ(mat, j)][0], ibuf-2);
     fflush(stderr);
 #endif
     // asking for the rows referenced by mat->R[j]
@@ -466,16 +466,16 @@ mpi_broadcast_history(report_t *rep, int mpi_rank)
 
 // buf = [index, m, ...] and surely, we have m > 2.
 void
-mpi_MST(report_t *rep, sparse_mat_t *mat, int *njrem, unsigned int *buf, int mpi_rank, int mpi_size)
+mpi_MST(report_t *rep, sparse_mat_t *mat, int *njrem, unsigned int *buf)
 {
 #if FULL_MONTY
     MPI_Status status;
-    int nrecv, cnt;
+    int nrecv, cnt, r, s, mpi_rank, mpi_size;
 #endif
     dclist dcl;
     double tMST;
     INT j, ind[MERGE_LEVEL_MAX];
-    int k, ni, m, A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], r, s;
+    int k, ni, m, A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX];
 
     // first, we need the rows
     m = (int)buf[1];
@@ -485,9 +485,9 @@ mpi_MST(report_t *rep, sparse_mat_t *mat, int *njrem, unsigned int *buf, int mpi
 	fprintf(stderr, "mpi_MST: j=%d, jmin=%d, jmax=%d\n",
 		j, mat->jmin, mat->jmax);
     ni = 0;
-    for(k = 1; k <= mat->R[j][0]; k++){
-	if(mat->R[j][k] != -1){
-	    ind[ni++] = (INT)mat->R[j][k];
+    for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++){
+	if(mat->R[GETJ(mat, j)][k] != -1){
+	    ind[ni++] = (INT)mat->R[GETJ(mat, j)][k];
 #if DEBUG >= 1
 	    fprintf(stderr, "ind[%d]=%d -> len=%d\n",
 		    ni-1, ind[ni-1], 
@@ -498,6 +498,8 @@ mpi_MST(report_t *rep, sparse_mat_t *mat, int *njrem, unsigned int *buf, int mpi
 	}
     }
 #if FULL_MONTY
+    MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
     // second, we have to ask all procs for their shares
     for(r = 0; r < m; r++)
 	buf[r+2] = (unsigned int)ind[r];
@@ -508,7 +510,7 @@ mpi_MST(report_t *rep, sparse_mat_t *mat, int *njrem, unsigned int *buf, int mpi
 #endif // FULL_MONTY
     // now, compute my own share
     fillRowAddMatrix(A, mat, m, ind);
-#if DEBUG >= 0
+#if DEBUG >= 1
     mpi_err1("Here is my MST submaster share [m=%d]:", m);
     for(r = 0; r < m; r++)
 	for(s = r+1; s < m; s++)
@@ -567,7 +569,7 @@ mpi_doOneMerge(report_t *rep, sparse_mat_t *mat, unsigned int *buf, int mpi_rank
 	doOneMerge(rep, mat, &njrem, &totopt, &totfill, &totMST,
 		   &totdel, m, 10, 0, verbose); // 10 is rather arbitrary...!
     else
-	mpi_MST(rep, mat, &njrem, buf, mpi_rank, mpi_size);
+	mpi_MST(rep, mat, &njrem, buf);
     njdel = deleteEmptyColumns(mat);
 #if DEBUG >= 1
     if(njdel > 0)
@@ -967,7 +969,6 @@ mpi_start_slaves(int mpi_size, sparse_mat_t *mat)
 	while(1){
 	    MPI_Recv(buf, MPI_BUF_SIZE, MPI_UNSIGNED, rk,
 		     MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-	    // TODO: use buf[1] containing the return status
 	    if(status.MPI_TAG == MPI_J_TAG)
 		break;
 	}
@@ -1102,18 +1103,44 @@ mpi_delete_superfluous_rows(report_t *rep, sparse_mat_t *mat, int *row_weight, i
     }
 }
 
+// forbw = 0: cN and stop when cN/cNmin too high
+//         1: cN and fprints BWCOST from time to time to locate the min (NYI)
+//         2: strange function (NYI)
+//         3: c/N and stop when > coverNmax
+//         4: just stop when m > mergelevelmax
+//
+// TODO: when debugged, transfer this to merge_mono.c
+//
 int
-mpi_stop_it(sparse_mat_t *mat, int forbw, double ratio, int coverNmax, int m)
+stop_merge(sparse_mat_t *mat, int forbw, double ratio, int coverNmax, int m)
 {
     if(m > mat->mergelevelmax){
 	// a stopping criterion whatever forbw is...!
-	mpi_err("Breaking, since m > mergelevelmax\n");
+	fprintf(stderr, "Breaking, since m > mergelevelmax\n");
 	return 1;
+    }
+    else if(forbw == 0){
+
+	// TODO: test this, man!
+
+	// using c*N and stopping when too high
+	static unsigned long cNmin = 0;
+	unsigned long cN = 
+	    ((unsigned long)mat->nrows) * ((unsigned long)mat->weight);
+	if(cNmin == 0)
+	    cNmin = cN;
+	else{
+	    double r = ((double)cN)/((double)cNmin);
+	    if(r > ratio){
+		fprintf(stderr, "Stopping, since cN too high: %2.2lf\n", r);
+		return 1;
+	    }
+	}
     }
     else if(forbw == 3){
 	double coverN = ((double)mat->weight)/((double)mat->rem_nrows);
 	if(((int)coverN) > coverNmax){
-	    mpi_err("Breaking, since c/N > c/N_max\n");
+	    fprintf(stderr, "Breaking, since c/N > c/N_max\n");
 	    return 1;
 	}
     }
@@ -1139,7 +1166,7 @@ mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile, int
 #endif
     // let's initialize a new simpler array with the weights of the rows
     row_weight = (int *)malloc(mat->nrows * sizeof(int));
-    initMat(mat, 0, mat->ncols); // FIXME: really useful???
+    //    initMat(mat, 0, mat->ncols); // FIXME: really useful???
     mpi_feed(row_weight, mat, purgedfile);
     while(1){
 	mpi_index++;
@@ -1178,7 +1205,7 @@ mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile, int
 #if DEBUG >= 1
 	mpi_err2("Minimal m is %d for proc=%d\n", m, proc);
 #endif
-	if(mpi_stop_it(mat, forbw, ratio, coverNmax, m))
+	if(stop_merge(mat, forbw, ratio, coverNmax, m))
 	    break;
 	if(m > maxm)
 	    maxm = m;

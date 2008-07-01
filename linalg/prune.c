@@ -237,10 +237,10 @@ prune (report_t *rep, sparse_mat_t *mat, int keep)
     for (j = 0; j < mat->ncols; j++)
       {
         rsum[j] = 0;
-        if (mat->R[j] != NULL)
-          for (k = 1; k <= mat->R[j][0]; k++)
+        if (mat->R[GETJ(mat, j)] != NULL)
+          for (k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
             /* no R[j][k] should be -1 here, since we just read the matrix */
-            rsum[j] += mat->R[j][k];
+            rsum[j] += mat->R[GETJ(mat, j)][k];
       }
     rsum_time = seconds () - rsum_time;
     fprintf (stderr, "Computing rsum took %1.2e seconds\n", rsum_time);

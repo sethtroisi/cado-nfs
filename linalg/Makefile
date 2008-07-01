@@ -62,7 +62,8 @@ MPI_LIB=$(MPI_DIR)/lib
 MPI_INC=-I$(MPI_DIR)/include
 MPI_CC=mpicc
 
-merge_mpi.o: merge_mpi.c merge.c
+merge_mpi.o: merge_mpi.c merge_mono.c merge.c
+	$(MPI_CC) -DUSE_MPI $(MPI_INC) $(MY_CFLAGS) merge_mono.c -c -o merge_mono.o
 	$(MPI_CC) -DUSE_MPI $(MPI_INC) $(MY_CFLAGS) merge.c -c -o merge.o
 	$(MPI_CC) -DUSE_MPI $(MPI_INC) $(MY_CFLAGS) $< -c -o $@
 

@@ -134,10 +134,12 @@ initMat(sparse_mat_t *mat, INT jmin, INT jmax)
 #if USE_MERGE_FAST
     // mat->cwmax+2 to prevent bangs
     dclist *S = (dclist *)malloc((mat->cwmax+2) * sizeof(dclist));
-    // TODO_MPI: that A could well be reduced to A[jmin..jmax[
-    dclist *A = (dclist *)malloc(mat->ncols * sizeof(dclist));
+    dclist *A = (dclist *)malloc((jmax-jmin) * sizeof(dclist));
     INT **R;
     int k;
+
+    ASSERT_ALWAYS(S != NULL);
+    ASSERT_ALWAYS(A != NULL);
 #endif
 
     mat->jmin = jmin;
@@ -156,7 +158,7 @@ initMat(sparse_mat_t *mat, INT jmin, INT jmax)
     for(k = 0; k <= mat->cwmax+1; k++)
 	S[k] = dclistCreate(-1);
     // TODO_MPI: that R could well be reduced to R[jmin..jmax[
-    R = (INT **)malloc(mat->ncols * sizeof(INT *));
+    R = (INT **)malloc((mat->jmax-mat->jmin) * sizeof(INT *));
     ASSERT_ALWAYS(R != NULL);
     mat->S = S;
     mat->A = A;
@@ -183,7 +185,7 @@ fillSWAR(sparse_mat_t *mat)
 	fprintf(stderr, "Treating column %d\n", j);
 #  endif
 	if(mat->wt[GETJ(mat, j)] <= mat->cwmax){
-	    mat->A[j] = dclistInsert (mat->S[mat->wt[GETJ(mat, j)]], j);
+	    mat->A[GETJ(mat, j)] = dclistInsert (mat->S[mat->wt[GETJ(mat, j)]], j);
 #  if DEBUG >= 1
 	    fprintf(stderr, "Inserting %d in S[%d]:", j, mat->wt[GETJ(mat, j)]);
 	    dclistPrint(stderr, mat->S[mat->wt[GETJ(mat, j)]]->next);
@@ -191,7 +193,7 @@ fillSWAR(sparse_mat_t *mat)
 #  endif
 	    Rj = (INT *)malloc((mat->wt[GETJ(mat, j)]+1) * sizeof(INT));
 	    Rj[0] = 0; // last index used
-	    mat->R[j] = Rj;
+	    mat->R[GETJ(mat, j)] = Rj;
 	}
 	else{
 #if USE_MERGE_FAST <= 1
@@ -199,8 +201,8 @@ fillSWAR(sparse_mat_t *mat)
 #else
 	    mat->wt[GETJ(mat, j)] = -mat->wt[GETJ(mat, j)]; // trick!!!
 #endif
-	    mat->A[j] = NULL; // TODO: renumber j's?????
-	    mat->R[j] = NULL;
+	    mat->A[GETJ(mat, j)] = NULL; // TODO: renumber j's?????
+	    mat->R[GETJ(mat, j)] = NULL;
 	}
     }
 }
@@ -253,11 +255,11 @@ printSWAR(sparse_mat_t *mat, int ncols)
 	fprintf(stderr, "  Wj[%d]=%d\n", j, mat->wt[GETJ(mat, j)]);
     fprintf(stderr, "===== R is\n");
     for(j = 0; j < ncols; j++){
-	if(mat->R[j] == NULL)
+	if(mat->R[GETJ(mat, j)] == NULL)
 	    continue;
 	fprintf(stderr, "  R[%d]=", j);
-	for(k = 1; k <= mat->R[j][0]; k++)
-          fprintf(stderr, " %ld", (long int) mat->R[j][k]);
+	for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
+          fprintf(stderr, " %ld", (long int) mat->R[GETJ(mat, j)][k]);
 	fprintf(stderr, "\n");
     }
 }
@@ -329,11 +331,11 @@ texSWAR(sparse_mat_t *mat)
     fprintf(stderr, "\\\\\\hline\n\\end{array}$$\n");
     fprintf(stderr, "\\begin{verbatim}\n");
     for(j = 0; j < mat->ncols; j++){
-	if(mat->R[j] == NULL)
+	if(mat->R[GETJ(mat, j)] == NULL)
 	    continue;
 	fprintf(stderr, "  R[%d]=", j);
-	for(k = 1; k <= mat->R[j][0]; k++)
-          fprintf(stderr, " %ld", (long int) mat->R[j][k]);
+	for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
+          fprintf(stderr, " %ld", (long int) mat->R[GETJ(mat, j)][k]);
 	fprintf(stderr, "\n");
     }
 }
@@ -495,13 +497,13 @@ readmat(sparse_mat_t *mat, FILE *file)
 		    // this will be the weight in the current slice
 		    mat->weight++; 
 		    if(mat->wt[GETJ(mat, j)] > 0){ // redundant test?
-			mat->R[j][0]++;
-			mat->R[j][mat->R[j][0]] = i;
+			mat->R[GETJ(mat, j)][0]++;
+			mat->R[GETJ(mat, j)][mat->R[GETJ(mat, j)][0]] = i;
 		    }
 #if DEBUG >= 1
 		    if(j == 15054){
 			fprintf(stderr, "i=%d, j=%d (ind/nc=%d) mat->%d\n", 
-				i, j, k, mat->R[j][0]);
+				i, j, k, mat->R[GETJ(mat, j)][0]);
 			fflush(stderr);
 		    }
 #endif
@@ -1191,15 +1193,15 @@ checkCoherence(sparse_mat_t *mat, int m, int j)
 {
     int nchk = 0, k;
 
-    for(k = 1; k <= mat->R[j][0]; k++)
-	if(mat->R[j][k] != -1)
+    for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
+	if(mat->R[GETJ(mat, j)][k] != -1)
 	    nchk++;
     ASSERT(nchk == (mat->wt[GETJ(mat, j)] >= 0 ? mat->wt[GETJ(mat, j)] : -mat->wt[GETJ(mat, j)]));
     if(m != -1){
 	if(nchk != m){
 	    fprintf(stderr, "HYPERCHECK:");
 	    fprintf(stderr, "mat->R[%d][0]=%ld, m=%d\n", j,
-                    (long int) mat->R[j][0], m);
+                    (long int) mat->R[GETJ(mat, j)][0], m);
 	    fprintf(stderr, "Gasp: nchk=%d\n", nchk);
 	}
 	ASSERT(nchk == m);
@@ -1229,10 +1231,10 @@ incorporateColumn(sparse_mat_t *mat, INT j, int i0)
     fprintf(stderr, "iC: %d %d\n", j, ni);
 #endif
     Rj[0] = ni-1;
-    mat->R[j] = Rj;
+    mat->R[GETJ(mat, j)] = Rj;
     mat->wt[GETJ(mat, j)] = wj;
     ASSERT(wj == Rj[0]);
-    mat->A[j] = dclistInsert (mat->S[wj], j);
+    mat->A[GETJ(mat, j)] = dclistInsert (mat->S[wj], j);
 }
 
 int
@@ -1253,7 +1255,7 @@ getNextj(dclist dcl)
 void
 remove_j_from_S(sparse_mat_t *mat, int j)
 {
-    dclist dcl = mat->A[j], foo;
+    dclist dcl = mat->A[GETJ(mat, j)], foo;
 
     if(dcl == NULL){
 	fprintf(stderr, "Column %d already removed?\n", j);
@@ -1283,8 +1285,8 @@ remove_j_from_S(sparse_mat_t *mat, int j)
 void
 destroyRj(sparse_mat_t *mat, int j)
 {
-    free(mat->R[j]);
-    mat->R[j] = NULL;
+    free(mat->R[GETJ(mat, j)]);
+    mat->R[GETJ(mat, j)] = NULL;
 }
 
 void
@@ -1292,9 +1294,9 @@ remove_j_from_SWAR(sparse_mat_t *mat, int j)
 {
     remove_j_from_S(mat, j);
 #if USE_CONNECT
-    free(mat->A[j]);
+    free(mat->A[GETJ(mat, j)]);
 #endif
-    mat->A[j] = NULL;
+    mat->A[GETJ(mat, j)] = NULL;
     mat->wt[GETJ(mat, j)] = 0;
     destroyRj(mat, j);
 }
@@ -1306,16 +1308,16 @@ remove_i_from_Rj(sparse_mat_t *mat, int i, int j)
     // be dumb for a while
     int k;
 
-    if(mat->R[j] == NULL){
+    if(mat->R[GETJ(mat, j)] == NULL){
 	fprintf(stderr, "Row %d already empty\n", j);
 	return;
     }
-    for(k = 1; k <= mat->R[j][0]; k++)
-	if(mat->R[j][k] == i){
+    for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
+	if(mat->R[GETJ(mat, j)][k] == i){
 #if DEBUG >= 1
 	    fprintf(stderr, "Removing row %d from R[%d]\n", i, j);
 #endif
-	    mat->R[j][k] = -1;
+	    mat->R[GETJ(mat, j)][k] = -1;
 	    break;
 	}
 }
@@ -1329,21 +1331,21 @@ add_i_to_Rj(sparse_mat_t *mat, int i, int j)
 #if DEBUG >= 1
     fprintf(stderr, "Adding row %d to R[%d]\n", i, j);
 #endif
-    for(k = 1; k <= mat->R[j][0]; k++)
-	if(mat->R[j][k] == -1)
+    for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
+	if(mat->R[GETJ(mat, j)][k] == -1)
 	    break;
-    if(k <= mat->R[j][0]){
+    if(k <= mat->R[GETJ(mat, j)][0]){
 	// we have found a place where it is -1
-	mat->R[j][k] = i;
+	mat->R[GETJ(mat, j)][k] = i;
     }
     else{
 #if DEBUG >= 1
 	fprintf(stderr, "WARNING: reallocing things in add_i_to_Rj for R[%d]\n", j);
 #endif
-	int l = mat->R[j][0]+2;
-	mat->R[j] = (INT *)realloc(mat->R[j], l * sizeof(INT));
-	mat->R[j][l-1] = i;
-	mat->R[j][0] = l-1;
+	int l = mat->R[GETJ(mat, j)][0]+2;
+	mat->R[GETJ(mat, j)] = (INT *)realloc(mat->R[GETJ(mat, j)], l * sizeof(INT));
+	mat->R[GETJ(mat, j)][l-1] = i;
+	mat->R[GETJ(mat, j)][0] = l-1;
     }
 }
 
@@ -1421,9 +1423,9 @@ removeCellSWAR(sparse_mat_t *mat, int i, INT j)
 #endif
     // TODO: replace this with a move of pointers...!
 #if USE_CONNECT == 0
-    mat->A[j] = dclistInsert(mat->S[ind], j);
+    mat->A[GETJ(mat, j)] = dclistInsert(mat->S[ind], j);
 #else
-    dclistConnect(mat->S[ind], mat->A[j]);
+    dclistConnect(mat->S[ind], mat->A[GETJ(mat, j)]);
 #endif
 #if DEBUG >= 2
     fprintf(stderr, "S[%d]_a=", ind);
@@ -1488,9 +1490,9 @@ addCellSWAR(sparse_mat_t *mat, int i, INT j)
     }
     // update A[j]
 #if USE_CONNECT == 0
-    mat->A[j] = dclistInsert(mat->S[ind], j);
+    mat->A[GETJ(mat, j)] = dclistInsert(mat->S[ind], j);
 #else
-    dclistConnect(mat->S[ind], mat->A[j]);
+    dclistConnect(mat->S[ind], mat->A[GETJ(mat, j)]);
 #endif
     // update R[j] by adding i
     add_i_to_Rj(mat, i, j);
@@ -1665,14 +1667,14 @@ deleteAllColsFromStack(report_t *rep, sparse_mat_t *mat, int iS)
 	if(iS == 0)
 	    mat->rem_ncols--;
 	if(iS == 1){
-	    for(k = 1; k <= mat->R[j][0]; k++)
-		if(mat->R[j][k] != -1){
+	    for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
+		if(mat->R[GETJ(mat, j)][k] != -1){
 # if TRACE_COL >= 0
 		    if(j == TRACE_COL)
-			fprintf(stderr, "deleteAllCols: row is %d\n",mat->R[j][k]);
+			fprintf(stderr, "deleteAllCols: row is %d\n",mat->R[GETJ(mat, j)][k]);
 # endif
-		    remove_j_from_row(mat, mat->R[j][k], j);
-		    removeRowDefinitely(rep, mat, mat->R[j][k]);
+		    remove_j_from_row(mat, mat->R[GETJ(mat, j)][k], j);
+		    removeRowDefinitely(rep, mat, mat->R[GETJ(mat, j)][k]);
 		    mat->rem_ncols--;
 		}
 	    mat->wt[GETJ(mat, j)] = 0;
@@ -1712,7 +1714,7 @@ deleteEmptyColumns(sparse_mat_t *mat)
 	dcl->next = foo->next;
 	free(foo);
 	njrem++;
-	mat->A[j] = NULL;
+	mat->A[GETJ(mat, j)] = NULL;
 	mat->wt[GETJ(mat, j)] = 0;
 	destroyRj(mat, j);
     }
@@ -1873,7 +1875,7 @@ useMinimalSpanningTree(report_t *rep, sparse_mat_t *mat, int m,
 }
 
 void
-findOptimalCombination(report_t *rep, sparse_mat_t *mat, int m, INT j,
+findOptimalCombination(report_t *rep, sparse_mat_t *mat, int m,
 		       INT *ind, double *tfill, double *tMST, int useMST)
 {
     if((m <= 2) || !useMST){
@@ -1936,9 +1938,9 @@ mergeForColumn(report_t *rep, double *tt, double *tfill, double *tMST,
     checkCoherence(mat, m, j);
 #endif
     ni = 0;
-    for(k = 1; k <= mat->R[j][0]; k++){
-	if(mat->R[j][k] != -1){
-	    ind[ni++] = mat->R[j][k];
+    for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++){
+	if(mat->R[GETJ(mat, j)][k] != -1){
+	    ind[ni++] = mat->R[GETJ(mat, j)][k];
 	    if(ni == m)
 		break;
 	}
@@ -1954,7 +1956,7 @@ mergeForColumn(report_t *rep, double *tt, double *tfill, double *tMST,
     fprintf(stderr, "\n");
 #endif
     *tt = seconds();
-    findOptimalCombination(rep, mat, m, j, ind, tfill, tMST, useMST);
+    findOptimalCombination(rep, mat, m, ind, tfill, tMST, useMST);
     *tt = seconds()-(*tt);
     mat->rem_nrows--;
     mat->rem_ncols--;
@@ -2137,11 +2139,28 @@ deleteSuperfluousRows(report_t *rep, sparse_mat_t *mat, int keep, int niremmax)
     tmp = (int *)malloc(ntmp * sizeof(int));
     for(i = 0, itmp = 0; i < mat->nrows; i++)
         if(!isRowNull(mat, i)){
+#if 1
+	    // plain weight
 	    tmp[itmp++] = lengthRow(mat, i);
+#else
+	    // let's try that sum of wt
+	    int k;
+	    tmp[itmp] = 0;
+	    for(k = 1; k <= lengthRow(mat, i); k++)
+		tmp[itmp] += mat->wt[GETJ(mat, mat->rows[i][k])];
+	    itmp++;
+#endif
 	    tmp[itmp++] = i;
 	}
+    // heaviest rows will be at the end
     qsort(tmp, ntmp>>1, 2 * sizeof(int), cmp);
+#if 1
+    // remove heaviest rows
     for(i = ntmp-1; i >= 0; i -= 2){
+#else
+    // remove lightest rows
+    for(i = 1; i < ntmp; i += 2){
+#endif
 	if((nirem >= niremmax) || (mat->rem_nrows - mat->rem_ncols) <= keep)
 	    break;
 	removeRowDefinitely(rep, mat, tmp[i]);
