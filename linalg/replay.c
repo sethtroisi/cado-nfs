@@ -170,7 +170,7 @@ makeSparse(int **sparsemat, int *colweight, FILE *purgedfile,
 }
 
 void
-flushSparse(char *sparsename, int **sparsemat, int small_nrows, int small_ncols, int *code)
+flushSparse(char *sparsename, int **sparsemat, int small_nrows, int small_ncols, int *code, int nonfinal)
 {
     FILE *ofile;
     unsigned long W = 0;
@@ -180,12 +180,18 @@ flushSparse(char *sparsename, int **sparsemat, int small_nrows, int small_ncols,
     fprintf(ofile, "%d %d\n", small_nrows, small_ncols);
     for(i = 0; i < small_nrows; i++){
 	W += sparsemat[i][0];
+	if(nonfinal)
+	    fprintf(ofile, "0 ");
 	fprintf(ofile, "%d", sparsemat[i][0]);
 	for(j = 1; j <= sparsemat[i][0]; j++){
 #if DEBUG >= 1
 	    ASSERT(code[sparsemat[i][j]] > 0);
 #endif
-	    fprintf(ofile, " %d", code[sparsemat[i][j]]-1); // FIXME
+	    fprintf(ofile, " ");
+	    if(nonfinal)
+		fprintf(ofile, PURGE_INT_FORMAT, code[sparsemat[i][j]]-1);
+	    else
+		fprintf(ofile, "%d", code[sparsemat[i][j]]-1); // FIXME
 	}
 	fprintf(ofile, "\n");
     }
@@ -343,13 +349,14 @@ int
 main(int argc, char *argv[])
 {
     FILE *hisfile, *purgedfile;
-    char *purgedname = NULL;
+    char *purgedname = NULL, *sparsename = NULL, *indexname = NULL;
+    char *hisname = NULL;
     unsigned long bwcost, bwcostmin = 0, addread = 0;
     int nrows, ncols;
     int **newrows, i, j, nb, *nbrels, **oldrows, *colweight;
     int ind, small_nrows, small_ncols, **sparsemat;
     char str[STRLENMAX];
-    int verbose = 0;
+    int verbose = 0, nonfinal = 0;
 
     // printing the arguments as everybody does these days
     fprintf (stderr, "%s.r%s", argv[0], REV);
@@ -357,30 +364,49 @@ main(int argc, char *argv[])
       fprintf (stderr, " %s", argv[i]);
     fprintf (stderr, "\n");
 
-    if(argc > 1 && strcmp (argv[1], "-v") == 0){
-        verbose ++;
-        argv ++;
-        argc --;
+    while(argc > 1 && argv[1][0] == '-'){
+        if (argc > 2 && strcmp (argv[1], "-purged") == 0){
+	    purgedname = argv[2];
+	    argc -= 2;
+	    argv += 2;
+	}
+	else if (argc > 2 && strcmp (argv[1], "-his") == 0){
+	    hisname = argv[2];
+	    argc -= 2;
+	    argv += 2;
+	}
+	else if (argc > 2 && strcmp (argv[1], "-out") == 0){
+	    sparsename = argv[2];
+	    argc -= 2;
+	    argv += 2;
+	}
+	else if (argc > 2 && strcmp (argv[1], "-index") == 0){
+	    indexname = argv[2];
+	    argc -= 2;
+	    argv += 2;
+	}
+	else if (argc > 2 && strcmp (argv[1], "-costmin") == 0){
+	    sscanf(argv[2], "%lu", &bwcostmin);
+	    fprintf(stderr, "Read bwcostmin=%lu\n", bwcostmin);
+	    argc -= 2;
+	    argv += 2;
+	}
+	else if (argc > 1 && strcmp (argv[1], "-v") == 0){
+            verbose ++;
+	    argc -= 1;
+	    argv += 1;
+	}
+	else if (argc > 1 && strcmp (argv[1], "-nonfinal") == 0){
+            nonfinal = 1;
+	    argc -= 1;
+	    argv += 1;
+	}
     }
 
-    if(argc < 5){
-	fprintf(stderr, "Usage: %s", argv[0]);
-	fprintf(stderr, " purgedfile hisfile sparsefile abfile [bwcostmin]\n");
-	return 0;
-    }
-
-    if(argc == 6){
-	sscanf(argv[5], "%lu", &bwcostmin);
-	fprintf(stderr, "Read bwcostmin=%lu\n", bwcostmin);
-    }
-    else
-	bwcostmin = 0;
-    
-    purgedname = argv[1];
     purgedfile = gzip_open(purgedname, "r");
     ASSERT(purgedfile != NULL);
     // read parameters that should be the same as in purgedfile!
-    hisfile = fopen(argv[2], "r");
+    hisfile = fopen(hisname, "r");
     ASSERT(hisfile != NULL);
     fgets(str, STRLENMAX, hisfile);
     sscanf(str, "%d %d", &nrows, &ncols);
@@ -475,7 +501,8 @@ main(int argc, char *argv[])
 
     double tt = seconds();
     fprintf(stderr, "Writing sparse representation to file\n");
-    flushSparse(argv[3], sparsemat, small_nrows, small_ncols, colweight);
+    flushSparse(sparsename, sparsemat, small_nrows, small_ncols,
+		colweight, nonfinal);
     fprintf(stderr, "#T# writing sparse: %2.2lf\n", seconds()-tt);
 
     tt = seconds();
@@ -483,7 +510,7 @@ main(int argc, char *argv[])
 #if 0
     makeabFile(argv[4], argv[1], nrows, newrows, small_nrows, small_ncols);
 #else
-    makeIndexFile(argv[4], nrows, newrows, small_nrows, small_ncols);
+    makeIndexFile(indexname, nrows, newrows, small_nrows, small_ncols);
 #endif
     fprintf(stderr, "#T# writing index file: %2.2lf\n", seconds()-tt);
 

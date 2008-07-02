@@ -157,7 +157,6 @@ initMat(sparse_mat_t *mat, INT jmin, INT jmax)
     // S[0] has a meaning at least for temporary reasons
     for(k = 0; k <= mat->cwmax+1; k++)
 	S[k] = dclistCreate(-1);
-    // TODO_MPI: that R could well be reduced to R[jmin..jmax[
     R = (INT **)malloc((mat->jmax-mat->jmin) * sizeof(INT *));
     ASSERT_ALWAYS(R != NULL);
     mat->S = S;
@@ -447,6 +446,9 @@ readmat(sparse_mat_t *mat, FILE *file)
     int ret;
     int i, k;
     int nc, buf[BUF_LEN];
+#if USE_MERGE_FAST < 3
+    int nh = 0;
+#endif
     INT ibuf, j, jmin = mat->jmin, jmax = mat->jmax;
 
     ret = fscanf (file, "%d %d", &(mat->nrows), &(mat->ncols));
@@ -480,6 +482,9 @@ readmat(sparse_mat_t *mat, FILE *file)
 	    mat->rem_nrows--;
 	}
 	else{
+#if USE_MERGE_FAST < 3
+	    int nb_heavy_j = 0;
+#endif
 	    for(k = 0, ibuf = 0; k < nc; k++){
 		ret = fscanf(file, PURGE_INT_FORMAT, &j);
 		if(ret != 1){
@@ -487,6 +492,10 @@ readmat(sparse_mat_t *mat, FILE *file)
 		    return 0;
 		}
 		ASSERT_ALWAYS (0 <= j && j < mat->ncols);
+#if USE_MERGE_FAST < 3
+		if(mat->wt[GETJ(mat, j)] < 0)
+		    nb_heavy_j++;
+#endif
 #if USE_MERGE_FAST <= 1
 		if(mat->wt[GETJ(mat, j)] > 0)
 		    buf[ibuf++] = j;
@@ -500,17 +509,27 @@ readmat(sparse_mat_t *mat, FILE *file)
 			mat->R[GETJ(mat, j)][0]++;
 			mat->R[GETJ(mat, j)][mat->R[GETJ(mat, j)][0]] = i;
 		    }
-#if DEBUG >= 1
+# if DEBUG >= 1
 		    if(j == 15054){
 			fprintf(stderr, "i=%d, j=%d (ind/nc=%d) mat->%d\n", 
 				i, j, k, mat->R[GETJ(mat, j)][0]);
 			fflush(stderr);
 		    }
-#endif
+# endif
 		}
 #endif
 	    }
+#if USE_MERGE_FAST < 3	   
+	    if(nb_heavy_j == nc){
+		// all the columns are heavy and thus will never participate
+		mat->rows[i] = NULL;
+		nh++;
+		continue;
+	    }
+#endif
 	    ASSERT_ALWAYS(ibuf <= BUF_LEN);
+	    // TODO: do not store rows not having at least one light
+	    // column, but do not decrease mat->nrows!
 #if USE_TAB == 0
 	    lengthRow(mat, i) = ibuf;
 	    mat->data[i].val = (int*) malloc (ibuf * sizeof (int));
@@ -526,6 +545,9 @@ readmat(sparse_mat_t *mat, FILE *file)
 #endif
 	}
     }
+#if USE_MERGE_FAST < 3
+    fprintf(stderr, "Number of heavy rows: %d\n", nh);
+#endif
     // we need to keep informed of what really happens; this will be an upper
     // bound on the number of active columns, I guess
     mat->rem_ncols = mat->ncols;
@@ -2122,12 +2144,42 @@ inspectRowWeight(report_t *rep, sparse_mat_t *mat)
     return nirem;
 }
 
-// Delete superfluous rows s.t. nrows-ncols >= keep.
 // It could be fun to find rows s.t. at least one j is of small weight.
 // Or components of rows with some sharing?
 // We could define sf(row) = sum_{j in row} w(j) and remove the
 // rows of smallest value of sf?
 // For the time being, remove heaviest rows.
+int
+deleteScore(sparse_mat_t *mat, INT i)
+{
+#if 0
+    // plain weight to remove heaviest rows
+    return lengthRow(mat, i);
+#endif
+#if 0
+    // -plain weight to remove lightest rows
+    return -lengthRow(mat, i);
+#endif
+#if 1
+    // not using rows with too many heavy column part
+    int k, s = 0;
+
+    for(k = 1; k <= lengthRow(mat, i); k++)
+	s += abs(mat->wt[GETJ(mat, mat->rows[i][k])]);
+    return s;
+#endif
+#if 0
+    // return the weight of the lightest column
+    int k, s = abs(mat->wt[GETJ(mat, mat->rows[i][1])]);
+
+    for(k = 2; k <= lengthRow(mat, i); k++)
+	if(abs(mat->wt[GETJ(mat, mat->rows[i][k])]) > s)
+	    s = abs(mat->wt[GETJ(mat, mat->rows[i][k])]);
+    return s;
+#endif
+}
+
+// Delete superfluous rows s.t. nrows-ncols >= keep.
 int
 deleteSuperfluousRows(report_t *rep, sparse_mat_t *mat, int keep, int niremmax)
 {
@@ -2139,28 +2191,13 @@ deleteSuperfluousRows(report_t *rep, sparse_mat_t *mat, int keep, int niremmax)
     tmp = (int *)malloc(ntmp * sizeof(int));
     for(i = 0, itmp = 0; i < mat->nrows; i++)
         if(!isRowNull(mat, i)){
-#if 1
-	    // plain weight
-	    tmp[itmp++] = lengthRow(mat, i);
-#else
-	    // let's try that sum of wt
-	    int k;
-	    tmp[itmp] = 0;
-	    for(k = 1; k <= lengthRow(mat, i); k++)
-		tmp[itmp] += mat->wt[GETJ(mat, mat->rows[i][k])];
-	    itmp++;
-#endif
+	    tmp[itmp++] = deleteScore(mat, i);
 	    tmp[itmp++] = i;
 	}
-    // heaviest rows will be at the end
+    // rows with largest score will be at the end
     qsort(tmp, ntmp>>1, 2 * sizeof(int), cmp);
-#if 1
-    // remove heaviest rows
+    // remove rows with largest score
     for(i = ntmp-1; i >= 0; i -= 2){
-#else
-    // remove lightest rows
-    for(i = 1; i < ntmp; i += 2){
-#endif
 	if((nirem >= niremmax) || (mat->rem_nrows - mat->rem_ncols) <= keep)
 	    break;
 	removeRowDefinitely(rep, mat, tmp[i]);
