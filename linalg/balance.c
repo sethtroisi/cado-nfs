@@ -92,6 +92,7 @@ void usage()
             "--in <path>\tinput matrix filename\n"
             "--out <path>\toutput matrix filename\n"
             "--nslices <n1>[x<n2>]\toptimize for <n1>x<n2> strips\n"
+            "--square\tpad matrix with zeroes to obtain square size\n"
         );
     fprintf(stderr, 
             "More advanced:\n"
@@ -1778,6 +1779,11 @@ int main(int argc, char * argv[])
         } else if (strcmp(argv[0], "--remove-input") == 0) {
             argv++,argc--;
             remove_input = 1;
+        } else if (strcmp(argv[0], "--pad") == 0
+                || strcmp(argv[0], "--square") == 0)
+        {
+            argv++,argc--;
+            pad_to_square = 1;
         } else if (strcmp(argv[0], "--keep-temps") == 0) {
             argv++,argc--;
             keep_temps = 1;
@@ -1795,21 +1801,22 @@ int main(int argc, char * argv[])
                 default:
                 if (*eptr != '\0') usage();
             }
-        } else if (strcmp(argv[0], "--output-name") == 0 ||
-                strcmp(argv[0], "--out") == 0)
+        } else if (strcmp(argv[0], "--output-name") == 0
+                || strcmp(argv[0], "--out") == 0)
         {
             argv++,argc--;
             if (!argc) usage();
             working_filename = argv[0];
-        } else if (strcmp(argv[0], "--matrix") == 0 ||
-                strcmp(argv[0], "--in") == 0)
+        } else if (strcmp(argv[0], "--matrix") == 0
+                || strcmp(argv[0], "--in") == 0)
         {
             argv++,argc--;
             if (!argc) usage();
             pristine_filename = argv[0];
-        } else if (strcmp(argv[0], "--nbuckets") == 0 ||
-                strcmp(argv[0], "--nslices") == 0 ||
-                strcmp(argv[0], "--slices") == 0) {
+        } else if (strcmp(argv[0], "--nbuckets") == 0
+                || strcmp(argv[0], "--nslices") == 0
+                || strcmp(argv[0], "--slices") == 0)
+        {
             /* We accept a sole argument to mean n hslices and one
              * vslice, or an argument of the form MMMxNNN
              */
