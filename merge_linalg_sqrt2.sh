@@ -147,8 +147,12 @@ echo "SIZE(merge.his): `ls -s $mergehis`"
 echo "Replaying merges"
 
 bwcostmin=`tail $mergehis | grep "BWCOSTMIN:" | awk '{print $NF}'`
-argsr="$purged $mergehis $outdir/small $outdir/index"
-time $linalg/replay $argsr $bwcostmin # 2> $outdir.replay.err
+argsr="-purged $purged -his $mergehis -out $outdir/small -index $outdir/index"
+if [ "X$bwcostmin" != "X" ]
+then
+    argsr="$argsr -costmin $bwcostmin"
+fi
+time $linalg/replay $argsr # 2> $outdir.replay.err
 
 if [ ! -s $outdir/index ]
 then
