@@ -735,7 +735,7 @@ push_heap0(struct bucket * __first,
     *(__first + hole) = *__value;
 }
 
-inline void
+static inline void
 push_heap(struct bucket * __first, struct bucket * __last)
 {
     struct bucket ref = __last[-1];
@@ -765,7 +765,7 @@ adjust_heap(struct bucket * __first, ptrdiff_t hole,
     push_heap0(__first, hole, __topIndex, __value);
 }
 
-inline void
+static inline void
 pop_heap(struct bucket * __first, struct bucket * __last)
 {
     struct bucket ref = __last[-1];
@@ -773,7 +773,7 @@ pop_heap(struct bucket * __first, struct bucket * __last)
     adjust_heap(__first, 0, __last - __first, & ref);
 }
 
-inline void
+static inline void
 make_heap(struct bucket * __first, struct bucket * __last)
 {
     if (__last - __first < 2)
@@ -865,7 +865,7 @@ struct slice * shuffle_rtable(
 
     for(i = 0 ; i < ns ; i++) {
         int j = heap[i].i;
-        assert(heap[i].i == i);
+        assert(heap[i].i == (int) i);
         printf("%s slice %d, span=%ld, weight=%ld\n",
                 text,
                 i, slices[j].nrows - heap[i].room,
@@ -1468,7 +1468,7 @@ void weight_sort_hslice(sink datasink, fileset fs, unsigned int ii)
 
     if (split->n > 1) {
         fileset fstmp;
-        fileset_init_transfer(fstmp, split->n, "sort", fs, 0, TEMP);
+        fileset_init_transfer(fstmp, split->n, "sort", fs, ii, TEMP);
         dispatcher(fstmp, fs_local, nbytes, dispatch, nrs);
         fileset_swap(fs_local, fstmp);
         fileset_clear(fstmp);
@@ -1552,7 +1552,7 @@ void weight_sort_hslice(sink datasink, fileset fs, unsigned int ii)
             fread(cb->buf, 1, sz, g);
             assert(cb->buf[sz-1] == '\n');
             assert(poking_place[i] >= 0);
-            assert(poking_place[i] + sz <= sc->sz);
+            assert(poking_place[i] + sz <= (off_t) sc->sz);
             memcpy(inmem + poking_place[i], cb->buf, sz);
         }
         fileset_close_one(fs_local, s, g);
