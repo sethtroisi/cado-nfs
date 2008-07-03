@@ -1306,7 +1306,8 @@ void sink_hook(sink s, unsigned int i0, unsigned int i1)
         s->curr = fileset_open(s->fv, "w");
         for(i = 0 ; i < nvslices ; i++) {
             /* Print a header which could help for transposing */
-            fprintf(s->curr[i], "%u %u\n", row_slices[s->hnum].nrows, col_slices[i].nrows);
+            fprintf(s->curr[i], "%u %u\n", row_slices[s->hnum].nrows,
+                    col_slices ? col_slices[i].nrows : nc);
             final_file_info[nvslices*s->hnum + i]->s = strdup(s->fv->names[i]);
         }
     }
