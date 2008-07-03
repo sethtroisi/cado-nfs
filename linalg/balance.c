@@ -57,6 +57,7 @@ unsigned int nvslices = 1;
 
 int keep_temps = 0;
 int remove_input = 0;
+int pad_to_square = 0;
 
 int permute_rows = 0;
 int permute_cols = 0;
@@ -80,16 +81,24 @@ int cols_are_weight_sorted = 1;
 const char * pristine_filename;
 
 /* basename of the resulting matrix filename */
-const char * working_filename = "mat";
+const char * working_filename = "matrix.txt";
 /*}}}*/
 
 void usage()
 {
-    fprintf(stderr, "Usage: ./bw-balance <options>\n"
-            "Options:\n"
-            "--hslices <n>\toptimize for <n> horizontal strides\n"
-            "--subdir <d>\tfetch data in directory <d>\n"
-            "--matrix <m>\tmatrix filename\n"
+    fprintf(stderr, "Usage: ./bw-balance <options>\n");
+    fprintf(stderr, 
+            "Typical options:\n"
+            "--in <path>\tinput matrix filename\n"
+            "--out <path>\toutput matrix filename\n"
+            "--nslices <n1>[x<n2>]\toptimize for <n1>x<n2> strips\n"
+        );
+    fprintf(stderr, 
+            "More advanced:\n"
+            "--remove-input\tremove the input file as soon as possible\n"
+            "--ram-limit <nnn>[kmgKMG]\tfix maximum memory usage\n"
+            "--keep-temps\tkeep all temporary files\n"
+            "--subdir <d>\tchdir to <d> beforehand\n"
            );
     exit(1);
 }
@@ -338,6 +347,61 @@ void fileset_clear(fileset x)
     memset(x, 0, sizeof(fileset));
 }
 
+/* Fixup things such as tmp-/some/dir/matrix.txt into
+ * /some/dir/tmp-matrix.txt */
+void prefix_fixup(char * s, const char * pfx)
+{
+    size_t s1,s2;
+    char * last_slash;
+
+    s1 = strlen(pfx);
+
+    if (s1 == 0)
+        return;
+    assert(strncmp(s, pfx, s1) == 0);
+    last_slash = strrchr(s, '/');
+    if (last_slash == NULL)
+        return;
+    last_slash++;
+    s2 = last_slash - s;
+
+    memmove(s, s+s1, s2-s1);
+    strncpy(s+s2-s1, pfx, s1);
+}
+
+#if 0
+int has_prefix(const char * s, const char * pfx)
+{
+    size_t s1;
+    const char * last_slash;
+    s1 = strlen(pfx);
+    if (s1 == 0)
+        return 1;
+    last_slash = strrchr(s, '/');
+    if (last_slash == NULL)
+        last_slash = s;
+    else
+        last_slash++;
+    return strncmp(last_slash, pfx, s1) == 0;
+}
+#endif
+
+void remove_prefix(char * s, const char * pfx)
+{
+    size_t s1;
+    char * last_slash;
+    s1 = strlen(pfx);
+    if (s1 == 0)
+        return;
+    last_slash = strrchr(s, '/');
+    if (last_slash == NULL)
+        last_slash = s;
+    else
+        last_slash++;
+    ASSERT_ALWAYS(strncmp(last_slash, pfx, s1) == 0);
+    memcpy(last_slash, last_slash + s1, strlen(last_slash + s1) + 1);
+}
+
 void fileset_name(fileset x, const char * name, const char * key)
 {
     unsigned int i;
@@ -347,9 +411,11 @@ void fileset_name(fileset x, const char * name, const char * key)
     const char * prefix = x->status == TEMP ? "tmp-" : "";
     if (x->n == 1) {
         asprintf(&(x->names[0]), "%s%s", prefix, name);
+        prefix_fixup(x->names[0], prefix);
     } else {
         for(i = 0 ; i < x->n ; i++) {
             asprintf(&(x->names[i]), "%s%s.%s%u", prefix, name, key, i);
+            prefix_fixup(x->names[i], prefix);
         }
     }
 }
@@ -367,12 +433,10 @@ void fileset_init_transfer(fileset y,
     } else {
         assert(x->status == TEMP);
         const char * v = x->names[i];
-        if (strncmp(v, "tmp-", 4) == 0) {
-            v += 4;
-        } else {
-            abort();
-        }
-        fileset_name(y, v, key);
+        char * vv = strdup(v);
+        remove_prefix(vv, "tmp-");
+        fileset_name(y, vv, key);
+        free(vv);
     }
 }
 
@@ -534,11 +598,13 @@ int read_matrix()
     header_bytes = b->o;
     header = strndup(b->buf, b->o);
 
-    /* nmax is the largest dimension. We're going to work with a matrix of
-     * size nmax * nmax. If nr is specified as being smaller than this, then 
-     * we'll pad with zeroes
+    /* nmax is the largest dimension. If we pad to square size, we will
+     * work with a matrix of size nmax * nmax.
      */
     uint32_t nmax = nc < nr ? nr : nc;
+
+    fprintf(stderr, "Matrix has %"PRIu32" rows, %"PRIu32" columns\n",
+            nr, nc);
 
     /* Make this only a warning now -- it's actually going to disappear,
      * as this program is meant to become completely generic. */
@@ -665,8 +731,14 @@ int read_matrix()
     }
 
 
-    nr = nmax;
-    nc = nmax;
+    if (pad_to_square) {
+        nr = nmax;
+        nc = nmax;
+        fprintf(stderr, "Output matrix will be padded to"
+                " %"PRIu32" rows,"
+                " %"PRIu32" columns\n",
+                nr, nc);
+    }
 
     return 0;
 }
@@ -1723,11 +1795,15 @@ int main(int argc, char * argv[])
                 default:
                 if (*eptr != '\0') usage();
             }
-        } else if (strcmp(argv[0], "--output-name") == 0) {
+        } else if (strcmp(argv[0], "--output-name") == 0 ||
+                strcmp(argv[0], "--out") == 0)
+        {
             argv++,argc--;
             if (!argc) usage();
             working_filename = argv[0];
-        } else if (strcmp(argv[0], "--matrix") == 0) {
+        } else if (strcmp(argv[0], "--matrix") == 0 ||
+                strcmp(argv[0], "--in") == 0)
+        {
             argv++,argc--;
             if (!argc) usage();
             pristine_filename = argv[0];
