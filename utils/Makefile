@@ -27,4 +27,4 @@ libutils.a: $(obj)
 	ar r libutils.a $(obj)
 
 clean:
-	-rm -f *~ *.bak *.o libutils.a $(bins)
+	-rm -f *.bak *.o libutils.a $(bins)
