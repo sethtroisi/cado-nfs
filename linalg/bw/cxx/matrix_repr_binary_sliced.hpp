@@ -24,11 +24,14 @@
  */
 #define xxxSLICE_STATS
 
-/* Use this whenever you encounter the dreader "x > UINT16_MAX" bug. It
+/* Use this whenever you encounter the dreaded "x > UINT16_MAX" bug. It
  * has a non-trivial negative impact on the program's speed and memory
  * requirements.
  */
 #define xxxUSE_32BIT_MATRIX_INDICES
+#ifdef  SLICE_STATS
+#include <cmath>
+#endif
 
 class matrix_repr_binary_sliced {
 public:
@@ -55,6 +58,10 @@ public:
             double spent_time;
             unsigned int npasses;
             double dj_avg;
+            double dj_sdev;
+            double di_avg;
+            double di_sdev;
+            int32_t di_max;
         };
 
         mutable std::vector<slice_info> slices_info;
@@ -83,18 +90,16 @@ public:
             unsigned int i;
             unsigned int next = slice.i0;
 
-#ifdef  SLICE_STATS
-            slices_info.assign(nslices, slice_info());
-#endif
-
+            /* There we're handling the horizontal strips */
             for(unsigned int s = 0 ; s < nslices ; s++) {
                 i = next;
                 npack = packbase + (s < nslices1);
                 next = i + npack;
 
 #ifdef  SLICE_STATS
-                memset(&(slices_info[s]),0,sizeof(slices_info));
-                slices_info[s].nrows = npack;
+                slice_info si;
+                memset(&si,0,sizeof(si));
+                si.nrows = npack;
 #endif
 
                 /*
@@ -115,52 +120,6 @@ public:
                  * coefficients in the current horizontal slice */
                 std::sort(L.begin(), L.end());
 
-                /* Tetracapillectomy is the fact of having a separate
-                 * array for each column ; in most cases it's a bad idea,
-                 * since the corresponding array will be rather small,
-                 * and its size will be quite erratic. Hence we will have
-                 * many mispredictions.
-                 *
-                 * So it's not expected to be a smart move.
-                 */
-#ifdef TETRACAPILLECTOMY
-                /* Now L is sorted by column. Group together the blocks
-                 * corresponding to one given column. */
-
-                typedef std::vector<uint32_t> touchedrows_t;
-                typedef std::vector<std::pair<uint32_t, touchedrows_t > > C_t;
-                C_t C;
-                Lci_t k0,k1;
-                for(k0 = L.begin() ; k0 != L.end() ; k0 = k1) {
-                    k1 = k0;
-                    uint32_t j = k0->first;
-                    touchedrows_t touched;
-                    for( ; k1 != L.end() && k1->first == j ; ++k1) {
-                        touched.push_back(k1->second);
-                    }
-                    C.push_back(make_pair(j, touched));
-                }
-                L.clear();
-
-                push(npack);
-#ifdef  USE_32BIT_MATRIX_INDICES
-                push(C.size());
-#else
-                push(C.size() & ((1u << 16) - 1));
-                push(C.size() >> 16);
-#endif
-                uint32_t j = 0;
-                for(C_t::const_iterator cp = C.begin() ; cp != C.end() ; ++cp) {
-                    push(cp->first - j);
-                    j = cp->first;
-                    push(cp->second.size());
-                    /* Take it easy for this one -- we know that values
-                     * are bounded by npack anyway */
-                    data.insert(data.end(),
-                            cp->second.begin(),
-                            cp->second.end());
-                }
-#else
                 push(npack);
 #ifdef  USE_32BIT_MATRIX_INDICES
                 push(L.size());
@@ -169,21 +128,46 @@ public:
                 push(L.size() >> 16);
 #endif
                 uint32_t j = 0;
+                uint32_t i = 0;
 #ifdef  SLICE_STATS
+                int32_t di_max = 0;
                 double sumdj=0;
+                double sumdj2=0;
+                double sumdi=0;
+                double sumdi2=0;
 #endif
                 for(Lci_t lp = L.begin() ; lp != L.end() ; ++lp) {
+                    uint32_t dj = lp->first - j; j += dj;
+                    int32_t di = lp->second - i; i += di;
 #ifdef  SLICE_STATS
-                    slices_info[s].ncoeffs++;
-                    sumdj+=lp->first - j;
+                    si.ncoeffs++;
+
+                    if (di<0) di = -di;
+                    if (di > di_max) di_max = di;
+
+                    double ddj = dj;
+                    double ddi = di;
+                    sumdj+=ddj;
+                    sumdj2+=ddj*ddj;
+                    sumdi+=ddi;
+                    sumdi2+=ddi*ddi;
 #endif
-                    push(lp->first - j); j = lp->first;
-                    push(lp->second);
+                    push(dj); push(i);
                 }
                 data[0]++;
-#endif
 #ifdef  SLICE_STATS
-                slices_info[s].dj_avg = sumdj / slices_info[s].ncoeffs;
+                double dj2_avg = sumdj2 / slices_info[s].ncoeffs;
+                double dj_avg = sumdj / slices_info[s].ncoeffs;
+                double dj_sdev = std::sqrt(dj2_avg-dj_avg*dj_avg);
+                double di2_avg = sumdi2 / slices_info[s].ncoeffs;
+                double di_avg = sumdi / slices_info[s].ncoeffs;
+                double di_sdev = std::sqrt(di2_avg-di_avg*di_avg);
+                si.dj_avg = dj_avg;
+                si.dj_sdev = dj_sdev;
+                si.di_avg = di_avg;
+                si.di_sdev = di_sdev;
+
+                slices_info.push_back(si);
 #endif
             }
         }
@@ -198,11 +182,17 @@ public:
                     << " sub-slices of " << packbase << " rows\n";
             }
 #ifdef  SLICE_STATS
-            std::cout << "dj per sub-slice:";
-            for(unsigned int s = 0 ; s < nslices ; s++) {
-                std::cout << " " << slices_info[s].dj_avg;
+            std::cout << "info per sub-slice:";
+            typedef std::vector<slice_info>::const_iterator si_t;
+            for(si_t s = slices_info.begin() ; s != slices_info.end() ; s++) {
+                std::cout
+                    << (s-slices_info.begin())
+                    << " " << s->dj_avg << " " << s->dj_sdev
+                    << " " << s->di_avg << " " << s->di_sdev
+                    << " " << s->di_max
+                    << "\n";
             }
-            std::cout << "\n";
+            // std::cout << "\n";
 #endif
             std::cout << std::flush;
 	}
@@ -227,24 +217,6 @@ public:
                     traits::zero(dst[i+di]);
                 }
                 asm("# critical loop\n");
-#ifdef  TETRACAPILLECTOMY
-                uint32_t ncols_used;
-#ifdef  USE_32BIT_MATRIX_INDICES
-                ncols_used = *q++;
-#else
-                ncols_used = *q++;
-                ncols_used |= ((uint32_t) *q++) << 16;
-#endif
-                for(uint32_t c = 0 ; c < ncols_used ; c++) {
-                    j += *q++;
-                    typename traits::scalar_t x = src[j];
-                    uint16_t nrows_touched_bycol = *q++;
-                    for(uint16_t r = 0 ; r < nrows_touched_bycol ; r++) {
-                        uint32_t di = *q++;
-                        traits::addmul(dst[i + di], x);
-                    }
-                }
-#else
                 uint32_t ncoeffs_slice;
 #ifdef  USE_32BIT_MATRIX_INDICES
                 ncoeffs_slice = *q++;
@@ -258,7 +230,6 @@ public:
                     uint32_t di = *q++;
                     traits::addmul(dst[i + di], x);
                 }
-#endif
                 i += nrows_packed;
                 asm("# end of critical loop\n");
 #ifdef  SLICE_STATS
@@ -285,6 +256,10 @@ public:
                     << " " << t.npasses
                     << " " << t.spent_time
                     << " " << (t.spent_time/t.npasses/t.ncoeffs * 1.0e9)
+                    << " " << t.dj_sdev
+                    << " " << t.di_avg
+                    << " " << t.di_sdev
+                    << " " << t.di_max
                     << "\n";
             }
             o << std::flush;
