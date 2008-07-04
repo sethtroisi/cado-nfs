@@ -23,3 +23,17 @@ NOTE: For the next one, be sure that the sparse matrix file is accessible to eve
 NOTE1: For nodes having k connections (ethernet addresses) use each one as a different machine to improve communication between the jobs.
 
 To use multiple jobs in multiple machines: orterun -np "number of jobs" --host  "Machine1","Machine2",etc MainLanczos  "Sparse matrix file" (optional an output file)
+
+
+
+To use with bl.pl:
+
+./bl.pl [options]
+options: (* : mandatory)
+* matrix=<matrix_file>
+* solution=<solution_file_to_write_to>
+wdir=<working_directory>
+tidy=[01] ; 0 means: do not purge working directory upon exit.
+machines='machine1 machine2 machine3'
+    runs in mpi mode. One job per machine. Put the machine several times
+    if several jobs per machine are desired.
