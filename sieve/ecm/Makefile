@@ -1,12 +1,14 @@
 GMPBUILD=
 #NDEBUG=-DNDEBUG
-CFLAGS=-g -O2 $(NDEBUG) -Wall -W -Wconversion -pedantic
-INCLUDE=-I ../../utils/
+CFLAGS=-g -O2 $(NDEBUG) -Wall -W # -Wconversion -pedantic
+INCLUDE=-I ../../utils/ -I ../../
 CC=gcc
-TARGETS=addchain ecm.o pp1.o testbench # find_primes_hit 
+TARGETS=addchain ecm.o pm1.o pp1.o # find_primes_hit 
+TARGETS_TEST=testbench test_pm1s2
 PRIMEGEN=~/lib/primegen.a
 
 all: $(TARGETS)
+tests: $(TARGETS_TEST)
 
 chain_50.c: addchain
 	./addchain -p 50 > $@
@@ -38,6 +40,9 @@ bc_400.h: addchain
 bc_500.h: addchain
 	./addchain -pb 500 | head -n 1 > $@
 
+pm1.o: pm1.c pm1.h ../../utils/mod_ul.h
+	$(CC) $(CFLAGS) $(INCLUDE) -c -o $@ $<
+
 pp1.o: pp1.c pp1.h chain_50.c chain_50_100.c chain_100_150.c chain_150_200.c \
         chain_200_300.c chain_300_400.c chain_400_500.c ../../utils/mod_ul.h
 	$(CC) $(CFLAGS) $(INCLUDE) -c -o $@ $<
@@ -52,8 +57,10 @@ find_primes_hit: find_primes_hit.c ../../utils/mod_ul.h  ../../utils/mod_ul.c
 addchain: addchain.c ../../utils/mod_ul.h ../../utils/mod_ul.c
 	$(CC) $(CFLAGS) $(INCLUDE) $< ../../utils/mod_ul.c -lm -o $@
 
-testbench: testbench.c pp1.h pp1.o ecm.h ecm.o ../../utils/mod_ul.h ../../utils/mod_ul.c $(PRIMEGEN)
-	$(CC) $(CFLAGS) $(INCLUDE) $< ../../utils/mod_ul.c pp1.o ecm.o -o $@ -lgmp $(PRIMEGEN) -lm
+testbench: testbench.c pm1.h pm1.o pp1.h pp1.o ecm.h ecm.o ../../utils/mod_ul.h ../../utils/mod_ul.c $(PRIMEGEN)
+	$(CC) $(CFLAGS) $(INCLUDE) $< ../../utils/mod_ul.c pm1.o pp1.o ecm.o ../../utils/getprime.o -o $@ -lgmp $(PRIMEGEN) -lm
 
+test_pm1s2: test_pm1s2.c pm1.h pm1.o ../../utils/mod_ul.h ../../utils/mod_ul.c ../../utils/getprime.o
+	$(CC) $(CFLAGS) $(INCLUDE) $< ../../utils/mod_ul.c ../../utils/getprime.o pm1.o -o $@ -lgmp
 clean:
 	rm -f $(TARGETS) 

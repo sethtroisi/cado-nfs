@@ -142,13 +142,12 @@ int bincost (unsigned long e)
    modified here
 ************************************************************************/
 
-#define ADD 1
-#define DUP 1
-static unsigned int
+#define ADD 1U
+#define DUP 1U
+static unsigned long
 lucas_cost_pp1 (unsigned long n, double v)
 {
-  unsigned int c;
-  unsigned long d, e, r;
+  unsigned long c, d, e, r;
 
   d = n;
   r = (unsigned long) ((double) d / v + 0.5);
@@ -169,7 +168,7 @@ lucas_cost_pp1 (unsigned long n, double v)
         { /* condition 1 */
           d = (2 * d - e) / 3;
           e = (e - d) / 2;
-          c += 3 * ADD; /* 3 additions */
+          c += 3U * ADD; /* 3 additions */
         }
       else if (4 * d <= 5 * e && (d - e) % 6 == 0)
         { /* condition 2 */
@@ -196,17 +195,17 @@ lucas_cost_pp1 (unsigned long n, double v)
       else if (d % 3 == 0)
         { /* condition 6 */
           d = d / 3 - e;
-          c += 3 * ADD + DUP; /* three additions, one duplicate */
+          c += 3U * ADD + DUP; /* three additions, one duplicate */
         }
       else if ((d + e) % 3 == 0)
         { /* condition 7 */
           d = (d - 2 * e) / 3;
-          c += 3 * ADD + DUP; /* three additions, one duplicate */
+          c += 3U * ADD + DUP; /* three additions, one duplicate */
         }
       else if ((d - e) % 3 == 0)
         { /* condition 8 */
           d = (d - e) / 3;
-          c += 3 * ADD + DUP; /* three additions, one duplicate */
+          c += 3U * ADD + DUP; /* three additions, one duplicate */
         }
       else /* necessarily e is even */
         { /* condition 9 */
@@ -224,10 +223,11 @@ lucas_cost_pp1 (unsigned long n, double v)
    stores the index of the first multiplier that produced such a short
    chain */
 
-static unsigned int prac_best (unsigned long n, int m, int *mul)
+static unsigned long 
+prac_best (unsigned long n, int m, int *mul)
 {
   int i, bestmul;
-  unsigned int bestcost, plaincost, c;
+  unsigned long bestcost, plaincost, c;
 
   if (m > PRAC_NR)
     m = PRAC_NR;
@@ -739,12 +739,12 @@ void find_opt_chain ()
 	  {
 	    if (isprime (i))
 	      {
-		unsigned int prac_cost = prac_best (i, PRAC_NR, NULL);
+		unsigned long prac_cost = prac_best (i, PRAC_NR, NULL);
 		nr_primes++;
 		sum_prac_primes += prac_cost;
-		sum_optimal_primes += len[i];
+		sum_optimal_primes += (unsigned long) len[i];
 		
-		assert ((unsigned int) len[i] <= prac_cost);
+		assert ((unsigned long) len[i] <= prac_cost);
 
 		/* For each k print k, the length l of the optimal chain 
 		   for k, k^(1/l) (i.e. the average multiplier in each 
@@ -752,7 +752,7 @@ void find_opt_chain ()
 		   cost of the best chain found by PRAC. If the best PRAC 
 		   chain is worse than the optimal chain, print an asterisk */
 		   
-		printf ("%lu p: %d, r=%lu, radix %f, bin: %d, prac: %u%s\n", 
+		printf ("%lu p: %d, r=%lu, radix %f, bin: %d, prac: %lu%s\n", 
 			i, (int) len[i], prev[i], 
 			exp(log((double) (i)) / (double) (len[i])),
 			bincost (i), prac_cost,
@@ -886,7 +886,7 @@ int main (int argc, char ** argv)
       
       if (argc > 3)
 	{
-	  maxn = atoi (argv[3]);
+	  maxn = strtoul (argv[3], NULL, 10);
 	}
       find_opt_chain ();
     }
@@ -902,7 +902,7 @@ int main (int argc, char ** argv)
       
       if (argc > 3)
 	{
-	  maxn = atoi (argv[3]);
+	  maxn = strtoul (argv[3], NULL, 10);
 	}
       find_opt_chain ();
     }
@@ -912,9 +912,9 @@ int main (int argc, char ** argv)
       unsigned long B1 = 100, oldB1 = 1;
 
       if (argc > 2)
-	  B1 = atoi (argv[2]);
+	  B1 = strtoul (argv[2], NULL, 10);
       if (argc > 3)
-	  oldB1 = atoi (argv[3]);
+	  oldB1 = strtoul (argv[3], NULL, 10);
 
       generate_stage1 (B1, oldB1, 0);
     }
@@ -924,9 +924,9 @@ int main (int argc, char ** argv)
       unsigned long B1 = 100, oldB1 = 1;
 
       if (argc > 2)
-	  B1 = atoi (argv[2]);
+	  B1 = strtoul (argv[2], NULL, 10);
       if (argc > 3)
-	  oldB1 = atoi (argv[3]);
+	  oldB1 = strtoul (argv[3], NULL, 10);
 
       generate_stage1 (B1, oldB1, 1);
     }
@@ -936,9 +936,9 @@ int main (int argc, char ** argv)
       unsigned long B1 = 100, oldB1 = 1;
 
       if (argc > 2)
-	  B1 = atoi (argv[2]);
+	  B1 = strtoul (argv[2], NULL, 10);
       if (argc > 3)
-	  oldB1 = atoi (argv[3]);
+	  oldB1 = strtoul (argv[3], NULL, 10);
       compress = 1;
       generate_stage1 (B1, oldB1, 1);
     }

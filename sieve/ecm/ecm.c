@@ -237,6 +237,8 @@ ellM_mul_ui (ellM_point_t P, unsigned long e, const unsigned long invm,
   unsigned long l, n;
   ellM_point_t t1, t2;
 
+  ASSERT (e >= 5UL);
+
   ellM_init (t1, m);
   ellM_init (t2, m);
 
@@ -684,7 +686,7 @@ ecm_stage1 (residue_t x1, const int B1, const residue_t sigma,
       /* prime 2 */
       /* printf ("start: x=%lu z=%lu\n", 
 	       mod_get_ul(P->x, m) , mod_get_ul(P->z, m)); */
-      for (r = 2.0; r <= B1; r *= 2.0)
+      for (r = 2; r <= B1; r *= 2)
 	{
 	  ellM_double (P, P, invm, m, b);
 	  /* printf ("2: x=%lu z=%lu\n", 
@@ -692,7 +694,7 @@ ecm_stage1 (residue_t x1, const int B1, const residue_t sigma,
 	}
 
       /* prime 3 */
-      for (r = 3.0; r <= B1; r *= 3.0)
+      for (r = 3; r <= B1; r *= 3)
 	{
 	  ellM_double (Pt, P, invm, m, b);
 	  ellM_add (P, P, Pt, P, invm, m);
@@ -857,9 +859,10 @@ ellM_curveorderjacobi (residue_t A, residue_t x, modulus_t m)
       mod_add_ul (t, t, 1UL, m);
       mod_mul (t, t, x, m);
       if (bchar == 1) 
-	order = order + 1 + mod_jacobi (t, m);
+	order = order + (unsigned long) (1L + (long) mod_jacobi (t, m));
       else
-	order = order + 1 - mod_jacobi (t, m);
+	order = order + (unsigned long) (1L - (long) mod_jacobi (t, m));
+	/* Brackets put like this to avoid signedness warning */
     }
 
   mod_clear (t, m);

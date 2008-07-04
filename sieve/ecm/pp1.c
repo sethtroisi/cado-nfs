@@ -9,8 +9,8 @@
 #define swap(a,b) mod_swap(a,b,m);
 
 static void
-pp1_range_50 (residue_t r, residue_t b, residue_t two, unsigned long invm, 
-              residue_t m)
+pp1_range_50 (residue_t r, const residue_t b, const residue_t two, 
+              const unsigned long invm, const modulus_t m)
 {
   residue_t A, B, C, t, t2, t3;
 
@@ -33,12 +33,11 @@ pp1_range_50 (residue_t r, residue_t b, residue_t two, unsigned long invm,
   mod_clear (t, m);
   mod_clear (t2, m);
   mod_clear (t3, m);
-  mod_clear (two, m);
 }
 
 static void
-pp1_range_50_100 (residue_t r, residue_t b, residue_t two, unsigned long invm, 
-                  residue_t m)
+pp1_range_50_100 (residue_t r, const residue_t b, const residue_t two, 
+                  const unsigned long invm, const residue_t m)
 {
   residue_t A, B, C, t, t2, t3;
 
@@ -61,12 +60,11 @@ pp1_range_50_100 (residue_t r, residue_t b, residue_t two, unsigned long invm,
   mod_clear (t, m);
   mod_clear (t2, m);
   mod_clear (t3, m);
-  mod_clear (two, m);
 }
 
 static void
-pp1_range_100_150 (residue_t r, residue_t b, residue_t two, unsigned long invm, 
-                   residue_t m)
+pp1_range_100_150 (residue_t r, const residue_t b, const residue_t two, 
+                   const unsigned long invm, const residue_t m)
 {
   residue_t A, B, C, t, t2, t3;
 
@@ -89,12 +87,11 @@ pp1_range_100_150 (residue_t r, residue_t b, residue_t two, unsigned long invm,
   mod_clear (t, m);
   mod_clear (t2, m);
   mod_clear (t3, m);
-  mod_clear (two, m);
 }
 
 static void
-pp1_range_150_200 (residue_t r, residue_t b, residue_t two, unsigned long invm, 
-                   residue_t m)
+pp1_range_150_200 (residue_t r, const residue_t b, const residue_t two, 
+                   const unsigned long invm, const residue_t m)
 {
   residue_t A, B, C, t, t2, t3;
 
@@ -117,12 +114,11 @@ pp1_range_150_200 (residue_t r, residue_t b, residue_t two, unsigned long invm,
   mod_clear (t, m);
   mod_clear (t2, m);
   mod_clear (t3, m);
-  mod_clear (two, m);
 }
 
 static void
-pp1_range_200_300 (residue_t r, residue_t b, residue_t two, unsigned long invm, 
-                   residue_t m)
+pp1_range_200_300 (residue_t r, const residue_t b, const residue_t two, 
+                   const unsigned long invm, const residue_t m)
 {
   residue_t A, B, C, t, t2, t3;
 
@@ -145,12 +141,11 @@ pp1_range_200_300 (residue_t r, residue_t b, residue_t two, unsigned long invm,
   mod_clear (t, m);
   mod_clear (t2, m);
   mod_clear (t3, m);
-  mod_clear (two, m);
 }
 
 static void
-pp1_range_300_400 (residue_t r, residue_t b, residue_t two, unsigned long invm, 
-                   residue_t m)
+pp1_range_300_400 (residue_t r, const residue_t b, const residue_t two, 
+                   const unsigned long invm, const residue_t m)
 {
   residue_t A, B, C, t, t2, t3;
 
@@ -173,12 +168,11 @@ pp1_range_300_400 (residue_t r, residue_t b, residue_t two, unsigned long invm,
   mod_clear (t, m);
   mod_clear (t2, m);
   mod_clear (t3, m);
-  mod_clear (two, m);
 }
 
 static void
-pp1_range_400_500 (residue_t r, residue_t b, residue_t two, unsigned long invm, 
-                   residue_t m)
+pp1_range_400_500 (residue_t r, const residue_t b, const residue_t two, 
+                   const unsigned long invm, const residue_t m)
 {
   residue_t A, B, C, t, t2, t3;
 
@@ -201,19 +195,12 @@ pp1_range_400_500 (residue_t r, residue_t b, residue_t two, unsigned long invm,
   mod_clear (t, m);
   mod_clear (t2, m);
   mod_clear (t3, m);
-  mod_clear (two, m);
 }
 
 void
-pp1_stage1 (residue_t r, residue_t save, residue_t b, int B1, 
-	    unsigned long invm, residue_t m)
+pp1_stage1 (residue_t r, residue_t save, const residue_t b, const int B1, 
+	    const residue_t two, const unsigned long invm, const residue_t m)
 {
-  residue_t two;
-
-  mod_init_noset0 (two, m);
-  mod_set_ul_reduced (two, 2UL, m);
-  mod_tomontgomery (two, two, m);
-
   if (B1 >= 50)
     {
       pp1_range_50 (r, b, two, invm, m);
@@ -263,25 +250,24 @@ pp1_stage1 (residue_t r, residue_t save, residue_t b, int B1,
     }
 
  end:
-  mod_clear (two, m);
+ ;
 }
 
-unsigned long
-pp1 (unsigned long N, int B1, int B2)
+void
+pp1 (residue_t f, const modulus_t m, const unsigned long invm, const int B1, 
+     const int B2)
 {
-  modulus_t m;
   residue_t b, two, save;
-  unsigned long invm, f;
 
-  mod_initmod_ul (m, N);
   mod_init_noset0 (b, m);
   mod_init_noset0 (two, m);
   mod_init_noset0 (save, m);
   mod_set_ul_reduced (two, 2UL, m);
   mod_tomontgomery (two, two, m);
-  invm = -modul_invmodlong(m);
   
   /* Compute 2/7 (mod N) */
+#if 0
+  /* Faster method, but uses N of type unsigned long */
   if (N % 7 == 0)
     {
       f = 7;
@@ -294,21 +280,26 @@ pp1 (unsigned long N, int B1, int B2)
     static const unsigned char inv7[7] = {0,1,4,5,2,3,6};
     /* kl1[l] stores (k*l-1)/7 for kl==1 (mod 7) and k,l < 7 */
     static const unsigned char kl1[7] = {0,0,1,2,1,2,5};
-    a = N - inv7[l]*n - kl1[l];
+    a = inv7[l]*n + kl1[l];
     mod_set_ul_reduced (b, a, m);
+    mod_neg (b, b, m);
+    mod_add (b, b, b, m);
   }
+#else
+  /* Slow method, but works for any modulus_t type */
+  mod_set_ul_reduced (b, 7UL, m);
+  mod_inv (b, b, m);
+  mod_tomontgomery (b, b, m);
   mod_add (b, b, b, m);
+#endif
 
-  pp1_stage1 (b, save, b, B1, invm, m);
+  pp1_stage1 (b, save, b, B1, two, invm, m);
   mod_sub (b, b, two, m);
-  f = mod_gcd (b, m);
+  mod_gcd (f, b, m);
   mod_add (b, b, two, m);
 
- end:
   mod_clear (b, m);
   mod_clear (save, m);
   mod_clear (two, m);
-  mod_clearmod (m);
-
-  return f;
 }
+
