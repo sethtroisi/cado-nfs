@@ -15,8 +15,6 @@
 
 #define MOD_UL_H__
 
-#include <gmp.h>
-
 /**********************************************************************/
 #include <assert.h>
 
@@ -74,12 +72,12 @@
 #define mod_powredc_ul       modul_powredc_ul
 #define mod_powredc_mp       modul_powredc_mp
 #define mod_2powredc_mp      modul_2powredc_mp
+#define mod_Vredc_ul         modul_Vredc_ul
 #define mod_Vredc_mp         modul_Vredc_mp
 #define mod_sprp             modul_sprp
 #define mod_gcd              modul_gcd
 #define mod_inv              modul_inv
 #define mod_jacobi           modul_jacobi
-#define mod_set_mpz          modul_set_mpz
 #define mod_set0          modul_set0
 #define mod_set1          modul_set1
 #define mod_next          modul_next
@@ -149,17 +147,24 @@ modul_set_ul_reduced (residueul_t r, const unsigned long s,
   r[0] = s;
 }
 
-/* These two are so trivial that we don't even require p in the
- * interface.
+/* These two are so trivial that we don't really require m in the
+ * interface. For 1 we might, as the internal representation might 
+ * not use "1" for 1 (e.g. when using Montgomery's REDC.)
+ * For interface homogeneity we make even modul_set0 take the m parameter.
  */
-MAYBE_UNUSED static inline void modul_set0 (residueul_t r) { r[0] = 0; }
-MAYBE_UNUSED static inline void modul_set1 (residueul_t r) { r[0] = 1; }
+MAYBE_UNUSED 
+static inline void 
+modul_set0 (residueul_t r, MAYBE_UNUSED const modulusul_t m) 
+{ 
+  r[0] = 0UL; 
+}
 
-MAYBE_UNUSED
-static inline void
-modul_set_mpz (residueul_t r, mpz_t s, const modulusul_t m)
-{
-  r[0] =  mpz_fdiv_ui (s, m[0]);
+
+MAYBE_UNUSED 
+static inline void 
+modul_set1 (residueul_t r, MAYBE_UNUSED const modulusul_t m) 
+{ 
+  r[0] = 1UL; 
 }
 
 
@@ -187,7 +192,7 @@ modul_initmod_ul (modulusul_t r, const unsigned long s)
 
 MAYBE_UNUSED
 static inline unsigned long
-modul_getmod_ul (modulusul_t m)
+modul_getmod_ul (const modulusul_t m)
 {
   return m[0];
 }
@@ -509,7 +514,7 @@ modul_frommontgomery (residueul_t r, const residueul_t a,
   unsigned long tlow, thigh;
   mul_ul_ul_2ul (&tlow, &thigh, a[0], invm);
   mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
-  r[0] = thigh + (a[0] != 0UL);
+  r[0] = thigh + (a[0] != 0UL ? 1UL : 0UL);
 }
 
 
@@ -524,9 +529,14 @@ modul_redcsemi_ul_not0 (residueul_t r, const unsigned long a,
 
   ASSERT (a != 0);
 
-  tlow = a * invm;
+  tlow = a * invm; /* tlow <= 2^w-1 */
   mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
-  r[0] = thigh + 1UL;
+  /* thigh:tlow <= (2^w-1) * m */
+  r[0] = thigh + 1UL; 
+  /* (thigh+1):tlow <= 2^w + (2^w-1) * m  <= 2^w + 2^w*m - m 
+                    <= 2^w * (m + 1) - m */
+  /* r <= floor ((2^w * (m + 1) - m) / 2^w) <= floor((m + 1) - m/2^w)
+       <= m */
 }
 
 
@@ -546,7 +556,7 @@ modul_addredc_ul (residueul_t r, const residueul_t a, const unsigned long b,
   tlow = slow * invm;
   mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
   ASSERT_EXPENSIVE (slow + tlow == 0UL);
-  r[0] = thigh + shigh + (slow != 0UL);
+  r[0] = thigh + shigh + (slow != 0UL ? 1UL : 0UL);
   
   /* r = ((a+b) + (((a+b)%2^w * invm) % 2^w) * m) / 2^w  Use a<=m-1, b<=2^w-1
      r <= (m + 2^w - 1 + (2^w - 1) * m) / 2^w
@@ -574,9 +584,9 @@ modul_addredcsemi_ul (residueul_t r, const residueul_t a,
   ASSERT_EXPENSIVE(a[0] <= m[0]);
   slow = b;
 #if defined(__x86_64__) && defined(__GNUC__)
-   __asm__ ( "addq %2, %0\n\t"
-            "setne %1\n\t"
-            "adcb $0, %1\n"
+   __asm__ ( "addq %2, %0\n\t" /* cy * 2^w + slow = a + b */
+            "setne %1\n\t"     /* if (slow != 0) sb = 1 */
+            "adcb $0, %1\n"    /* sb += cy */
             : "+&r" (slow), "=qm" (sb)
             : "rm" (a[0])
             : "cc");
@@ -592,7 +602,7 @@ modul_addredcsemi_ul (residueul_t r, const residueul_t a,
 #else
   shigh = 0UL;
   modul_add_ul_2ul (&slow, &shigh, a[0]);
-  shigh += (slow != 0UL);
+  shigh += (slow != 0UL ? 1UL : 0UL);
 #endif
 
   tlow = slow * invm;
@@ -637,7 +647,7 @@ modul_mulredc (residueul_t r, const residueul_t a, const residueul_t b,
   /* Slower? */
   modul_add_ul_2ul (&plow, &phigh, tlow);
 #else
-  phigh += (plow != 0UL);
+  phigh += (plow != 0UL ? 1UL : 0UL);
 #endif
 
   modul_add (r, &phigh, &thigh, m);
@@ -663,7 +673,7 @@ modul_mulredc_ul (residueul_t r, const residueul_t a, const unsigned long b,
   mul_ul_ul_2ul (&plow, &phigh, a[0], b);
   tlow = plow * invm;
   mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
-  phigh += (plow != 0UL);
+  phigh += (plow != 0UL ? 1UL : 0UL);
   r[0] = (phigh >= m[0] - thigh) ? (phigh - (m[0] - thigh)) : (phigh + thigh);
   
 #if defined(MODTRACE)
@@ -692,7 +702,7 @@ modul_muladdredc_ul (residueul_t r, const residueul_t a, const unsigned long b,
   modul_add_ul_2ul (&plow, &phigh, c);
   tlow = plow * invm;
   mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
-  phigh += (plow != 0UL);
+  phigh += (plow != 0UL ? 1UL : 0UL);
   r[0] = (phigh >= m[0] - thigh) ? (phigh - (m[0] - thigh)) : (phigh + thigh);
   
 #if defined(MODTRACE)
@@ -703,7 +713,7 @@ modul_muladdredc_ul (residueul_t r, const residueul_t a, const unsigned long b,
 
 MAYBE_UNUSED
 static inline void
-modul_div2 (residueul_t r, residueul_t a, modulusul_t m)
+modul_div2 (residueul_t r, const residueul_t a, const modulusul_t m)
 {
   if (a[0] % 2UL == 0UL)
     r[0] = a[0] / 2UL;
@@ -729,19 +739,22 @@ modul_finished(residueul_t r, modulus_t p)
 }
 
 /* prototypes of non-inline functions */
-void modul_div3 (residueul_t, residueul_t, modulusul_t);
-unsigned long modul_gcd (residueul_t, modulusul_t);
+void modul_div3 (residueul_t, const residueul_t, const modulusul_t);
+void modul_gcd (residueul_t, const residueul_t, const modulusul_t);
 unsigned long modul_invmodlong (modulusul_t);
 void modul_powredc_ul (residueul_t, const residueul_t, const unsigned long, 
 		       const unsigned long, const modulusul_t);
 void modul_powredc_mp (residueul_t, const residueul_t, const unsigned long *,
                        const int, const unsigned long, const modulusul_t);
-void modul_2powredc_mp (residueul_t, const unsigned long *, const int, 
-                        const unsigned long, const modulusul_t);
+void modul_2powredc_mp (residueul_t, const residueul_t, const unsigned long *, 
+                        const int, const unsigned long, const unsigned long, 
+                        const modulusul_t);
+void modul_Vredc_ul (residueul_t, const residueul_t, const unsigned long, 
+                     const unsigned long, const modulusul_t);
 void modul_Vredc_mp (residueul_t, const residueul_t, const unsigned long *,
                      const int, const unsigned long, const modulusul_t);
 int modul_sprp (const residueul_t, const unsigned long, const modulusul_t);
-int modul_inv (residueul_t, residueul_t, modulusul_t);
-int modul_jacobi (residueul_t, modulusul_t);
+int modul_inv (residueul_t, const residueul_t, const modulusul_t);
+int modul_jacobi (const residueul_t, const modulusul_t);
 
 #endif  /* MOD_UL_H__ */

@@ -98,7 +98,7 @@ modul_poly_make_monic (modul_poly_t f, modulus_t p)
   modul_inv(ilc, f->coeff[d], p);
   for (i = 0; i < d; i++)
       modul_mul(f->coeff[i], f->coeff[i], ilc, p);
-  modul_set1(f->coeff[d]);
+  modul_set1(f->coeff[d], p);
 }
 
 /* fp <- f/lc(f) mod p. Return degree of fp (-1 if fp=0). */
@@ -107,14 +107,14 @@ modul_poly_set_mod (modul_poly_t fp, mpz_t *f, int d, modulus_t p)
 {
   int i;
 
-  while (d >= 0 && mpz_divisible_ui_p (f[d], p[0]))
+  while (d >= 0 && mpz_divisible_ui_p (f[d], mod_getmod_ul (p)))
     d --;
   ASSERT (d >= 0); /* f is 0 mod p: should not happen in the CADO-NFS context
                       since otherwise p would divide N, indeed f(m)=N */
   modul_poly_realloc (fp, d + 1);
   fp->degree = d;
   for (i = 0; i <= d; i++)
-    modul_set_mpz(fp->coeff[i], f[i], p);
+    modul_set_ul (fp->coeff[i], mpz_fdiv_ui (f[i], mod_getmod_ul (p)), p);
   modul_poly_make_monic (fp, p);
 
   return d;
@@ -159,7 +159,7 @@ modul_poly_mul(modul_poly_t h, const modul_poly_t f, const modul_poly_t g, modul
 
   modul_poly_init(res, df+dg);
   for (i = 0; i <= df+dg; ++i)
-    modul_set0(res->coeff[i]);
+    modul_set0(res->coeff[i], p);
   for (i = 0; i <= df; ++i)
     for (j = 0; j <= dg; ++j) {
         modul_mul(aux, f->coeff[i], g->coeff[j], p);
@@ -249,7 +249,7 @@ modul_poly_sub_x (modul_poly_t h, const modul_poly_t g, modulus_t p)
   for (i = 0; i <= d; i++)
     modul_set(h->coeff[i], g->coeff[i], p);
   for (i = d + 1; i <= 1; i++)
-    modul_set0(h->coeff[i]);
+    modul_set0(h->coeff[i], p);
   modul_sub_ul(h->coeff[1], h->coeff[1], 1, p);
   h->degree = (d < 1) ? 1 : d;
   modul_poly_normalize (h);
@@ -266,7 +266,7 @@ modul_poly_sub_1 (modul_poly_t h, const modul_poly_t g, modulus_t p)
   for (i = 0; i <= d; i++)
     modul_set(h->coeff[i], g->coeff[i], p);
   for (i = d + 1; i <= 0; i++)
-    modul_set0(h->coeff[i]);
+    modul_set0(h->coeff[i], p);
   modul_sub_ul(h->coeff[0], h->coeff[0], 1, p);
   h->degree = (d < 0) ? 0 : d;
   modul_poly_normalize (h);
@@ -279,7 +279,7 @@ modul_poly_div_r (modul_poly_t h, const modul_poly_t f, modulus_t p)
   int i, d = f->degree, dh = h->degree, monic;
   residueul_t *hc = h->coeff, t;
   residueul_t aux;
-  modul_set1(t);
+  modul_set1(t, p);
 
   monic = modul_is1(f->coeff[d], p);
   if (!monic)
@@ -307,7 +307,7 @@ modul_poly_divexact (modul_poly_t q, modul_poly_t h, const modul_poly_t f, modul
   int i, d = f->degree, dh = h->degree, monic;
   residueul_t *hc = h->coeff, t;
   residueul_t aux;
-  modul_set1(t);
+  modul_set1(t, p);
 
   ASSERT (d >= 0);
   ASSERT (dh >= 0);
@@ -383,7 +383,7 @@ modul_poly_roots_naive (residueul_t *r, modul_poly_t f, modulus_t p)
 {
   int n = 0;
   residueul_t x;
-  modul_set0(x);
+  modul_set0(x, p);
   for ( ; !modul_finished(x, p) ; modul_next(x, p) ) {
       residueul_t v;
     modul_poly_eval (v, f, x, p);
@@ -407,7 +407,7 @@ modul_poly_powmod_ui (modul_poly_t g, modul_poly_t fp, modul_poly_t h, residueul
   modul_poly_make_monic (fp, p);
 
   residueul_t one;
-  modul_set1(one);
+  modul_set1(one, p);
   /* initialize g to x */
   modul_poly_set_linear (g, one, a, p);
 
@@ -500,7 +500,7 @@ modul_poly_cantor_zassenhaus (residueul_t *r, modul_poly_t f, modulus_t p, int d
 	}
       modul_next(a, p);
       if (modul_finished(a, p))
-          modul_set0(a);
+          modul_set0(a, p);
     }
   modul_poly_clear (q);
   modul_poly_clear (h);

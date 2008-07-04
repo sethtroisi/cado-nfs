@@ -1,7 +1,7 @@
 #include "mod_ul.h"
 
 void
-modul_div3 (residueul_t r, residueul_t a, modulusul_t m)
+modul_div3 (residueul_t r, const residueul_t a, const modulusul_t m)
 {
   const unsigned long a3 = a[0] % 3UL;
   const unsigned long m3 = m[0] % 3UL;
@@ -14,7 +14,7 @@ modul_div3 (residueul_t r, residueul_t a, modulusul_t m)
   else 
     {
       ASSERT(m3 != 0UL);
-      if (a3 + m3 == 3UL) /* Hence a3 == 1, m3 == 2 or a3 == 3, m3 == 1 */
+      if (a3 + m3 == 3UL) /* Hence a3 == 1, m3 == 2 or a3 == 2, m3 == 1 */
 	r[0] = a[0] / 3UL + m[0] / 3UL + 1UL;
       else /* a3 == 1, m3 == 1 or a3 == 2, m3 == 2 */
 	r[0] = m[0] - (m[0] - a[0]) / 3UL;
@@ -56,11 +56,12 @@ modul_invmodlong (modulusul_t m)
 }
 
 
-unsigned long
-modul_gcd (residueul_t r, modulusul_t m)
+void 
+modul_gcd (residueul_t g, const residueul_t r, const modulusul_t m)
 {
   unsigned long a = r[0], b = m[0], t;
 
+  /* ASSERT (a < b); Should we require this? */
   ASSERT (b > 0UL);
   
   if (a >= b)
@@ -74,7 +75,7 @@ modul_gcd (residueul_t r, modulusul_t m)
       a = t;
     }
 
-  return b;
+  g[0] = b;
 }
 
 
@@ -166,51 +167,101 @@ modul_powredc_mp (residueul_t r, const residueul_t b, const unsigned long *e,
 }
 
 
+/* Computes 2^e (mod m), where e is a multiple precision integer.
+   Requires e != 0. The value of 2 in Montgomery representation 
+   (i.e. 2*2^w (mod m) must be passed. */
+
 void
-modul_2powredc_mp (residueul_t r, const unsigned long *e, 
-                   const int e_nrwords, const unsigned long invm, 
-                   const modulusul_t m)
+modul_2powredc_mp (residueul_t r, const residue_t two, const unsigned long *e, 
+                   const int e_nrwords, const unsigned long e_mask,
+                   const unsigned long invm, const modulusul_t m)
 {
-  unsigned long mask = ~0UL - (~0UL >> 1); /* Only MSB set */
+  residueul_t t;
+  unsigned long mask = e_mask;
   int i = e_nrwords - 1;
 
-  if (e_nrwords == 0 || e[i] == 0UL)
-    {
-      const residueul_t one = {1UL};
-      modul_tomontgomery (r, one, m);
-      return;
-    }
+  ASSERT (e_nrwords != 0 && e[e_nrwords - 1] != 0);
+  ASSERT ((e[e_nrwords - 1] & e_mask) == e_mask);
 
-  /* Find highest set bit in e. */
-  while ((e[i] & mask) == 0UL)
-    mask >>= 1; /* r = 1, so r^(mask/2) * b^e = r^mask * b^e  */
-
-  /* Set r to 2 in Montgomery representation. We use the fact that
-     (m*invm + 1)/w == 1/w (mod m) */
-  {
-    unsigned long dummy;
-    mul_ul_ul_2ul (r , &dummy, m[0], invm);
-    r[0]++;
-  }
-
-  /* Exponentiate */
-  {
-    const residueul_t two = {2UL};
-    modul_tomontgomery (r, two, m);  
-  }
+  modul_init (t, m);
+  modul_set (t, two, m);
   mask >>= 1;
 
   for ( ; i >= 0; i--)
     {
       while (mask > 0UL)
         {
-          modul_mulredc (r, r, r, invm, m);
+          modul_mulredc (t, t, t, invm, m);
           if (e[i] & mask)
-            modul_add (r, r, r, m);
+            modul_add (t, t, t, m);
           mask >>= 1;            /* (r^2)^(mask/2) * b^e = r^mask * b^e */
         }
       mask = ~0UL - (~0UL >> 1);
     }
+    
+  mod_set (r, t, m);
+  mod_clear (t, m);
+}
+
+
+/* Compute r = V_e(b), with r and b in Montgomery representation. 
+   Here e is an unsigned long. */
+
+void
+modul_Vredc_ul (residueul_t r, const residueul_t b, const unsigned long e, 
+                const unsigned long invm, const modulusul_t m)
+{
+  unsigned long mask = ~0UL - (~0UL >> 1); /* Only MSB set */
+  residueul_t r1, two;
+
+  modul_init_noset0 (two, m);
+  modul_set_ul_reduced (two, 2UL, m);
+  modul_tomontgomery (two, two, m);
+
+  if (e == 0UL)
+    {
+      modul_set (r, two, m);
+      modul_clear (two, m);
+      return;
+    }
+
+  /* Find highest set bit in e. */
+  while ((e & mask) == 0UL)
+    mask >>= 1; /* r = 1, so r^(mask/2) * b^e = r^mask * b^e  */
+
+  /* Exponentiate */
+
+  modul_init_noset0 (r1, m);
+  modul_set (r, b, m);         /* r = b = V_1 (b) */
+  modul_mulredc (r1, b, b, invm, m);
+  modul_sub (r1, r1, two, m);  /* r1 = b^2 - 2 = V_2 (b) */
+  mask >>= 1;
+
+  /* Here r = V_j (b) and r1 = V_{j+1} (b) for j = 1 */
+
+  while (mask > 0UL)
+    {
+      if (e & mask)
+        {
+          /* j -> 2*j+1. Compute V_{2j+1} and V_{2j+2} */
+          modul_mulredc (r, r, r1, invm, m);
+          modul_sub (r, r, b, m); /* V_j * V_{j+1} - V_1 = V_{2j+1} */
+          modul_mulredc (r1, r1, r1, invm, m);
+          modul_sub (r1, r1, two, m); /* (V_{j+1})^2 - 2 = V_{2j+2} */
+        }
+      else
+        {
+          /* j -> 2*j. Compute V_{2j} and V_{2j+1} */
+          modul_mulredc (r1, r1, r, invm, m);
+          modul_sub (r1, r1, b, m); /* V_j * V_{j+1} - V_1 = V_{2j+1}*/
+          modul_mulredc (r, r, r, invm, m);
+          modul_sub (r, r, two, m);
+        }
+      mask >>= 1;
+    }
+
+  modul_clear (two, m);
+  modul_clear (r1, m);
 }
 
 
@@ -234,6 +285,7 @@ modul_Vredc_mp (residueul_t r, const residueul_t b, const unsigned long *e,
   if (e_nrwords == 0 || e[i] == 0UL)
     {
       modul_set (r, two, m);
+      modul_clear (two, m);
       return;
     }
 
@@ -243,7 +295,7 @@ modul_Vredc_mp (residueul_t r, const residueul_t b, const unsigned long *e,
 
   /* Exponentiate */
 
-  modul_init (r1, m);
+  modul_init_noset0 (r1, m);
   modul_set (r, b, m);         /* r = b = V_1 (b) */
   modul_mulredc (r1, b, b, invm, m);
   modul_sub (r1, r1, two, m);  /* r1 = b^2 - 2 = V_2 (b) */
@@ -275,6 +327,8 @@ modul_Vredc_mp (residueul_t r, const residueul_t b, const unsigned long *e,
         }
       mask = ~0UL - (~0UL >> 1);
     }
+  modul_clear (two, m);
+  modul_clear (r1, m);
 }
 
 
@@ -350,10 +404,10 @@ modul_sprp (const residueul_t b, const unsigned long invn,
 
 
 /* Put 1/s (mod t) in r and return 1 if s is invertible, 
-   or return 0 if s is not invertible */
+   or set r to 0 and return 0 if s is not invertible */
 
 int
-modul_inv (residueul_t r, residueul_t s, modulusul_t t)
+modul_inv (residueul_t r, const residueul_t s, const modulusul_t t)
 {
   long u1, v1;
   unsigned long q, u2, v2;
@@ -390,7 +444,7 @@ modul_inv (residueul_t r, residueul_t s, modulusul_t t)
 
   u1 = 1L;
   u2 = s[0];
-  v1 = - (t[0] / s[0]); /* No overflow, since s >= 2 */
+  v1 = (long) (- (t[0] / s[0])); /* No overflow, since s >= 2 */
   v2 = t[0] % s[0];
 
   while (v2 != 0UL)
@@ -420,7 +474,7 @@ modul_inv (residueul_t r, residueul_t s, modulusul_t t)
     }
 
   if (u1 < 0L)
-    u1 = u1 - t[0] * (-u1 / t[0] - 1L);
+    u1 = u1 - (long) t[0] * (-u1 / (long) t[0] - 1L);
 
 #ifndef NDEBUG
   modul_mul (&u2, (unsigned long *)&u1, s, t);
@@ -432,7 +486,7 @@ modul_inv (residueul_t r, residueul_t s, modulusul_t t)
 }
 
 int
-modul_jacobi (residueul_t a_par, modulusul_t m_par)
+modul_jacobi (const residueul_t a_par, const modulusul_t m_par)
 {
   unsigned long a, m, s;
   int t = 1;
