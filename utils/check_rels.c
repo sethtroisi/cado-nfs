@@ -1,4 +1,7 @@
 #include <stdlib.h>
+/* Withot __USE_POSIX2, stdio.h does not declare popen()/pclose() if 
+   -std=c99, -pedantic or -ansi is given to gcc */
+#define __USE_POSIX2
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
