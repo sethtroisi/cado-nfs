@@ -1,0 +1,92 @@
+#ifndef THRESHOLDS_H_
+#define THRESHOLDS_H_
+
+/* This file contains sensible defaults to start with, which are updated
+ * by the tuning program */
+
+/* If you read "placeholder" here, it means that the tuning program has
+ * not been run (or has not completed) */
+#define TOOM_TUNING_INFO		"tunetoom.c (2048 2048) run on nougatine.loria.fr on Tue May 20 17:41:37 2008"
+#define FFT_TUNING_INFO		"tunefft.c (100000) run on nougatine.loria.fr on Tue May 20 18:14:34 2008"
+
+/* First size for which KARA is used. Essentially hard-coded, since the
+ * sizes up to 9 words are already karatsuba, unrolled. The unrolled
+ * routines handle their own temporary storage on the stack.
+ */
+#define MUL_KARA_THRESHOLD	10
+
+/* First size for which TC3W is used. It is assumed that TC3W is used
+ * before TC3 kicks in. */
+/* must be >= 8 */
+#define MUL_TOOMW_THRESHOLD		18
+
+/* First size for which TC3 is used. This threshold is informative, it is
+ * not used in the code */
+/* must be >= 17 */
+#define MUL_TOOM_THRESHOLD		21
+
+/* First size for which TC4 is used. This threshold is informative, it is
+ * not used in the code */
+/* must be >= 30 */
+#define MUL_TOOM4_THRESHOLD		159
+
+/* Size above which TC4 is the only TC variant used. */
+#define MUL_TOOM4_ALWAYS_THRESHOLD		159
+
+/* First size for which TC3U is used */
+/* must be >= 33 */
+#define MUL_TOOMU_THRESHOLD		49
+
+/* Size above which TC3U is the only TCU variant used. */
+#define MUL_TOOMU_ALWAYS_THRESHOLD		49
+
+/* The default values here are appropriate for the tuning program.
+ * Appropriate values are substituted later on. Note that the tuning
+ * table is always created with this size, to that re-tuning is possible
+ * at any time. */
+#define	TOOM_TUNING_LIMIT	2048
+#define BEST_TOOM_TABLE		{	\
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 	\
+	1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 2, 	\
+	2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 	\
+	0, 0, 0, 0, 2, 2, 2, 2, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 	\
+	2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1, 1, 1, 2, 2, 1, 2, 	\
+	2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 	\
+	2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 	\
+	1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, }
+
+
+#define BEST_UTOOM_TABLE		{	\
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 	\
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 	\
+	0, 0, 0, 0, 0, 0, 0, 0, 1, }
+
+
+/* This macro is not what you think, and does not completely belong here.
+ * It merely recalls that the FFT code *DOES NOT WORK* below this size.
+ * So MUL_FFT_TABLE should not wander in this bleak range.
+ */
+#define MUL_FFT_THRESHOLD 28
+
+/* {n, K} means use FFT(|K|) up from n words, */
+/* where |K|<3 stands for Toom-Cook 3, K < 0 means use FFT2 */
+#define MUL_FFT_TABLE		{	\
+	{ 1, 1 }, { 1607, -81 }, { 1812, 1 }, { 2324, -81 }, 	\
+	{ 2563, 243 }, { 2768, 1 }, { 3076, -243 }, { 3691, 243 }, 	\
+	{ 3845, -243 }, { 5492, 729 }, { 5536, -243 }, { 7689, 729 }, 	\
+	{ 8304, -243 }, { 10150, -729 }, { 11072, -243 }, { 11841, -729 }, 	\
+	{ 13840, 729 }, { 15224, -729 }, { 16608, -243 }, { 16916, -729 }, 	\
+	{ 22144, 2187 }, { 24912, -729 }, { 35983, 2187 }, { 37367, -729 }, 	\
+	{ 44287, 2187 }, { 45174, -2187 }, { 49823, -729 }, { 55359, 2187 }, 	\
+	{ 62279, -729 }, { 63663, -2187 }, { 99646, 6561 }, { 9223372036854775807, 0 }, }
+
+
+/* These flags are for internal use */
+#define	GF2X_SELECT_KARA	0	/* do not change ! */
+#define	GF2X_SELECT_TC3		1
+#define	GF2X_SELECT_TC3W	2
+#define	GF2X_SELECT_TC4		3
+#define	GF2X_SELECT_UNB_DFLT	0
+#define	GF2X_SELECT_UNB_TC3U	1	/* do not change ! */
+
+#endif	/* THRESHOLDS_H_ */
