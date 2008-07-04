@@ -31,6 +31,7 @@ main(int argc, char *argv[])
     sparse_mat_t mat;
     report_t rep;
     char *purgedname = NULL, *hisname = NULL, *outname = NULL;
+    char *resumename = NULL;
     int nrows, ncols;
     int cwmax = 20, rwmax = 1000000, maxlevel = 2, iprune = 0, keep = 128;
     int verbose = 0; /* default verbose level */
@@ -111,6 +112,11 @@ main(int argc, char *argv[])
 	    argc -= 2;
 	    argv += 2;
 	}
+	else if (argc > 2 && strcmp (argv[1], "-resume") == 0){
+	    resumename = argv[2];
+	    argc -= 2;
+	    argv += 2;
+	}
 	else 
 	    break;
     }
@@ -167,6 +173,9 @@ main(int argc, char *argv[])
 		mat.rem_nrows, mat.rem_ncols, seconds()-tt);
     }
 
+    if(resumename != NULL)
+	resume(&rep, &mat, resumename);
+
     // ouhhhhhhhhhh
     // we do not have a clear idea of which function to minimize...!
 #if 0
@@ -180,8 +189,10 @@ main(int argc, char *argv[])
     mergeOneByOne(&rep, &mat, maxlevel, verbose, forbw, ratio, coverNmax);
 #endif
     gzip_close(rep.outfile, outname);
-    fprintf(stderr, "Final matrix has w(M)=%lu, ncols*w(M)=%lu\n",
-	    mat.weight, ((unsigned long)mat.rem_ncols) * mat.weight);
+    fprintf(stderr, "Final matrix has N=%d nc=%d (%d) w(M)=%lu N*w(M)=%lu\n",
+	    mat.rem_nrows, mat.rem_ncols, mat.rem_nrows-mat.rem_ncols,
+	    mat.weight,
+	    ((unsigned long)mat.rem_nrows) * mat.weight);
 #if TEX
     fprintf(stderr, "\\end{verbatim}\n");
 #endif

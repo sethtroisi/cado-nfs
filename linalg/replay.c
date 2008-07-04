@@ -170,7 +170,7 @@ makeSparse(int **sparsemat, int *colweight, FILE *purgedfile,
 }
 
 void
-flushSparse(char *sparsename, int **sparsemat, int small_nrows, int small_ncols, int *code, int nonfinal)
+flushSparse(char *sparsename, int **sparsemat, int small_nrows, int small_ncols, int *code)
 {
     FILE *ofile;
     unsigned long W = 0;
@@ -180,18 +180,12 @@ flushSparse(char *sparsename, int **sparsemat, int small_nrows, int small_ncols,
     fprintf(ofile, "%d %d\n", small_nrows, small_ncols);
     for(i = 0; i < small_nrows; i++){
 	W += sparsemat[i][0];
-	if(nonfinal)
-	    fprintf(ofile, "0 ");
 	fprintf(ofile, "%d", sparsemat[i][0]);
 	for(j = 1; j <= sparsemat[i][0]; j++){
 #if DEBUG >= 1
 	    ASSERT(code[sparsemat[i][j]] > 0);
 #endif
-	    fprintf(ofile, " ");
-	    if(nonfinal)
-		fprintf(ofile, PURGE_INT_FORMAT, code[sparsemat[i][j]]-1);
-	    else
-		fprintf(ofile, "%d", code[sparsemat[i][j]]-1); // FIXME
+	    fprintf(ofile, " %d", code[sparsemat[i][j]]-1); // FIXME
 	}
 	fprintf(ofile, "\n");
     }
@@ -356,7 +350,7 @@ main(int argc, char *argv[])
     int **newrows, i, j, nb, *nbrels, **oldrows, *colweight;
     int ind, small_nrows, small_ncols, **sparsemat;
     char str[STRLENMAX];
-    int verbose = 0, nonfinal = 0;
+    int verbose = 0;
 
     // printing the arguments as everybody does these days
     fprintf (stderr, "%s.r%s", argv[0], REV);
@@ -393,11 +387,6 @@ main(int argc, char *argv[])
 	}
 	else if (argc > 1 && strcmp (argv[1], "-v") == 0){
             verbose ++;
-	    argc -= 1;
-	    argv += 1;
-	}
-	else if (argc > 1 && strcmp (argv[1], "-nonfinal") == 0){
-            nonfinal = 1;
 	    argc -= 1;
 	    argv += 1;
 	}
@@ -501,8 +490,7 @@ main(int argc, char *argv[])
 
     double tt = seconds();
     fprintf(stderr, "Writing sparse representation to file\n");
-    flushSparse(sparsename, sparsemat, small_nrows, small_ncols,
-		colweight, nonfinal);
+    flushSparse(sparsename, sparsemat, small_nrows, small_ncols, colweight);
     fprintf(stderr, "#T# writing sparse: %2.2lf\n", seconds()-tt);
 
     tt = seconds();

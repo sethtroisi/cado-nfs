@@ -15,6 +15,8 @@
 #include "merge_mono.h"
 #include "prune.h"
 
+#define STR_LEN_MAX 1024
+
 #define DEBUG 0
 #define TEX 0
 
@@ -1703,7 +1705,7 @@ deleteAllColsFromStack(report_t *rep, sparse_mat_t *mat, int iS)
 	}
 	k = mat->wt[GETJ(mat, j)]; // make a copy of the weight
 	remove_j_from_SWAR(mat, j);
-	// mat->wt[j] is put to 0...
+	// mat->wt[j] was put to 0...
 	mat->wt[GETJ(mat, j)] = -k; // restore and update
 #endif
     }
@@ -2112,6 +2114,8 @@ inspectRowWeight(report_t *rep, sparse_mat_t *mat)
     //    double tt = seconds();
     int i, maxw = 0, nirem = 0, niremmax = 128;
 
+    if((mat->rem_nrows - mat->rem_ncols) <= mat->delta)
+	return 0;
     for(i = 0; i < mat->nrows; i++){
 	if(!isRowNull(mat, i)){
 	    if(lengthRow(mat, i) > mat->rwmax){
@@ -2139,7 +2143,7 @@ inspectRowWeight(report_t *rep, sparse_mat_t *mat)
 		maxw = lengthRow(mat, i);
 	}
     }
-    //    fprintf(stderr, "nirem=%d; nrows=%d; max row weight is %d (%2.2lf)\n", 
+    // fprintf(stderr, "nirem=%d; nrows=%d; max row weight is %d (%2.2lf)\n", 
     //	    nirem, mat->rem_nrows, maxw, seconds()-tt);
     return nirem;
 }
@@ -2152,7 +2156,7 @@ inspectRowWeight(report_t *rep, sparse_mat_t *mat)
 int
 deleteScore(sparse_mat_t *mat, INT i)
 {
-#if 0
+#if 1
     // plain weight to remove heaviest rows
     return lengthRow(mat, i);
 #endif
@@ -2160,7 +2164,7 @@ deleteScore(sparse_mat_t *mat, INT i)
     // -plain weight to remove lightest rows
     return -lengthRow(mat, i);
 #endif
-#if 1
+#if 0
     // not using rows with too many heavy column part
     int k, s = 0;
 
@@ -2179,29 +2183,73 @@ deleteScore(sparse_mat_t *mat, INT i)
 #endif
 }
 
-// Delete superfluous rows s.t. nrows-ncols >= keep.
+// locate columns of weight 3 and delete one of the rows, but just one!
 int
-deleteSuperfluousRows(report_t *rep, sparse_mat_t *mat, int keep, int niremmax)
+findSuperfluousRowsFor2(int *tmp, int ntmp, sparse_mat_t *mat)
 {
-    int nirem = 0, *tmp, ntmp, itmp, i;
+    dclist dcl;
+    INT *Rj;
+    int itmp = 0, j, k, kmin;
 
-    if((mat->rem_nrows - mat->rem_ncols) <= keep)
-	return 0;
-    ntmp = mat->rem_nrows << 1;
-    tmp = (int *)malloc(ntmp * sizeof(int));
+    for(dcl = mat->S[3]->next; dcl != NULL; dcl = dcl->next){
+	j = dcl->j;
+	Rj = mat->R[GETJ(mat, j)];
+	// be semi-stupid
+	for(kmin = 1; Rj[kmin] == -1; kmin++); // should stop at some point...!
+	for(k = kmin+1; k <= mat->R[GETJ(mat, j)][0]; k++)
+	    if(Rj[k] != -1)
+		if(lengthRow(mat, Rj[k]) > lengthRow(mat, Rj[kmin]))
+		    kmin = k;
+	tmp[itmp++] = 0; // horrible trick not to change things elsewhere...!
+	tmp[itmp++] = Rj[kmin];
+	if(itmp >= ntmp)
+	    // should not happen, but...
+	    break;
+    }
+    return itmp;
+}
+
+int
+findSuperfluousRows(int *tmp, int ntmp, sparse_mat_t *mat, int m)
+{
+    int i, itmp;
+
+    if(m == 2){
+	itmp = findSuperfluousRowsFor2(tmp, ntmp, mat);
+	if(itmp != 0)
+	    return itmp;
+    }
     for(i = 0, itmp = 0; i < mat->nrows; i++)
         if(!isRowNull(mat, i)){
 	    tmp[itmp++] = deleteScore(mat, i);
 	    tmp[itmp++] = i;
 	}
     // rows with largest score will be at the end
-    qsort(tmp, ntmp>>1, 2 * sizeof(int), cmp);
+    qsort(tmp, itmp>>1, 2 * sizeof(int), cmp);
+    return itmp;
+}
+
+// Delete superfluous rows s.t. nrows-ncols >= keep.
+// Let's say we are at "step" m.
+int
+deleteSuperfluousRows(report_t *rep, sparse_mat_t *mat, int keep, int niremmax, int m)
+{
+    int nirem = 0, *tmp, ntmp, i;
+
+    if((mat->rem_nrows - mat->rem_ncols) <= keep)
+	return 0;
+    ntmp = mat->rem_nrows << 1;
+    tmp = (int *)malloc(ntmp * sizeof(int));
+    ntmp = findSuperfluousRows(tmp, ntmp, mat, m);
+    fprintf(stderr, "Number of removable rows[%d]: %d\n", m, ntmp>>1);
     // remove rows with largest score
     for(i = ntmp-1; i >= 0; i -= 2){
 	if((nirem >= niremmax) || (mat->rem_nrows - mat->rem_ncols) <= keep)
 	    break;
-	removeRowDefinitely(rep, mat, tmp[i]);
-	nirem++;
+	if(mat->rows[tmp[i]] != NULL){
+	    removeRowDefinitely(rep, mat, tmp[i]);
+	    nirem++;
+	}
     }
     free(tmp);
     return nirem;
@@ -2235,7 +2283,7 @@ merge(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 		fprintf(stderr, "WARNING: New cost > old cost %d times",
                         ncost);
 		fprintf(stderr, " in a row:");
-		nirem = deleteSuperfluousRows(rep, mat, mat->delta, 128);
+		nirem = deleteSuperfluousRows(rep, mat, mat->delta, 128, m);
 		if(nirem == 0){
 		    fprintf(stderr, " stopping\n");
 		    break;
@@ -2413,7 +2461,7 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
 			 (unsigned long)mat->weight, forbw);
 	if(njproc >= target){ // somewhat arbitrary...!
 	    ni2rem = number_of_superfluous_rows(mat);
-	    deleteSuperfluousRows(rep, mat, mat->delta, ni2rem);
+	    deleteSuperfluousRows(rep, mat, mat->delta, ni2rem, m);
 	    inspectRowWeight(rep, mat);
 	    fprintf(stderr, "T=%d mmax=%d N=%d nc=%d (%d)",
 		    (int)seconds(),
@@ -2470,7 +2518,7 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
 
 		fprintf(stderr, "New cost > old cost %d times", ncost);
 		fprintf(stderr, " in a row:");
-		nirem = deleteSuperfluousRows(rep, mat, mat->delta, 128);
+		nirem = deleteSuperfluousRows(rep, mat, mat->delta, 128, m);
 		if(nirem == 0){
 		    fprintf(stderr, " stopping\n");
 		    break;
@@ -2487,7 +2535,7 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
 	    ncost = 0;
     }
     deleteSuperfluousRows(rep, mat, mat->delta, 
-			  mat->rem_nrows-mat->rem_ncols+mat->delta);
+			  mat->rem_nrows-mat->rem_ncols+mat->delta, -1);
     if((forbw != 0) && (forbw != 3)){
 	fprintf(rep->outfile, "BWCOSTMIN: %lu\n", bwcostmin);
 	fprintf(stderr, "Minimal bwcost found: %lu\n", bwcostmin);
@@ -2540,4 +2588,155 @@ dumpSparse(FILE *ofile, sparse_mat_t *mat)
 	    if(abs(mat->wt[GETJ(mat, j)]) <= mat->mergelevelmax)
 		fprintf(stderr, "Gasp: %d %d\n", j, mat->wt[GETJ(mat, j)]);
 	}
+}
+
+//////////////////////////////////////////////////////////////////////
+// 
+// Resume section: very much inspired by replay.c, of course...!
+//
+//////////////////////////////////////////////////////////////////////
+
+// A line is "i i1 ... ik".
+int
+indicesFromString(INT *ind, char *str)
+{
+    int ni = 0;
+    char *tok = strtok(str, " ");
+
+    while(tok != NULL){
+	ind[ni++] = atoi(tok);
+	tok = strtok(NULL, " ");
+    }
+    return ni;
+}
+
+// We want to recover the column j which intersects everybody
+static int
+intersect(sparse_mat_t *mat, INT *ind, int ni)
+{
+    INT i0, *tmp1, *tmp2, *foo, j;
+    int k, itmp1, itmp2, r, s, ok;
+
+    if(ind[0] < 0)
+	i0 = -ind[0]-1;
+    else
+	i0 = ind[0];
+    tmp1 = (INT *)malloc(lengthRow(mat, i0) * sizeof(INT));
+    tmp2 = (INT *)malloc(lengthRow(mat, i0) * sizeof(INT));
+    for(k = 1, itmp1 = 0; k <= lengthRow(mat, i0); k++)
+	if(cell(mat, i0, k) != -1)
+	    tmp1[itmp1++] = cell(mat, i0, k);
+    for(k = 1; k < ni; k++){
+	fprintf(stderr, "k=%d:", k);
+	for(r = 0; r < itmp1; r++)
+	    fprintf(stderr, " %d", tmp1[r]);
+	fprintf(stderr, "\n");
+	itmp2 = 0;
+	for(r = 1; r <= lengthRow(mat, ind[k]); r++){
+	    j = cell(mat, ind[k], r);
+	    if(j != -1){
+		ok = 0;
+		for(s = 0; s < itmp1; s++)
+		    if(tmp1[s] == j){
+			ok = 1;
+			break;
+		    }
+		if(ok){
+		    fprintf(stderr, "adding j=%d\n", j);
+		    tmp2[itmp2++] = j;
+		}
+	    }
+	}
+	foo = tmp1; tmp1 = tmp2; tmp2 = foo;
+	itmp1 = itmp2;
+    }
+    j = tmp1[0];
+    free(tmp1);
+    free(tmp2);
+    if(itmp1 != 1){
+	fprintf(stderr, "GASP in intersect: #j=%d\n", itmp2);
+	return -1;
+    }
+    return j;
+}
+
+// A line is "i i1 ... ik".
+// If i >= 0 then
+//     row[i] is to be added to rows i1...ik and destroyed at the end of
+//     the process.
+//     Works also is i is alone (hence: destroyed row).
+// If i < 0 then
+//     row[-i-1] is to be added to rows i1...ik and NOT destroyed.
+//
+void
+doAllAdds(report_t *rep, sparse_mat_t *mat, char *str)
+{
+    INT ind[MERGE_LEVEL_MAX], j, i0;
+    int ni, sg, k;
+
+    ni = indicesFromString(ind, str);
+    if(ind[0] < 0){
+	i0 = -ind[0]-1;
+	sg = -1;
+    }
+    else{
+	i0 = ind[0];
+	sg = 1;
+	// we must find that j...
+	//	j = intersect(mat, ind, ni);
+    }
+    for(k = 1; k < ni; k++)
+	addRowsSWAR(mat, ind[k], i0, -1);
+    reportn(rep, ind, ni);
+    if(sg > 0){
+	// when ni == 1, then the corresponding row was too heavy and dropped
+	// unless m = 1 was used, in which case S[1] will contain j and
+	// can dispensed of next time (?) In the case of S[0], it'll be done
+	// later on also (?)
+	removeRowSWAR(mat, i0);
+	destroyRow(mat, i0);
+	mat->rem_nrows--;
+	// the number of active j's is recomputed, anyway, later on
+    }
+}
+
+// resumename is a file of the type mergehis.
+void
+resume(report_t *rep, sparse_mat_t *mat, char *resumename)
+{
+    FILE *resumefile = fopen(resumename, "r");
+    char str[STR_LEN_MAX];
+    unsigned long addread = 0;
+    int nactivej;
+    INT j;
+
+    fprintf(stderr, "Resuming computations from %s\n", resumename);
+    // skip first line containing nrows ncols
+    fgets(str, STR_LEN_MAX, resumefile);
+    fprintf(stderr, "Reading row additions\n");
+    while(fgets(str, STR_LEN_MAX, resumefile)){
+	addread++;
+	if((addread % 100000) == 0)
+	    fprintf(stderr, "%lu lines read at %2.2lf\n", addread, seconds());
+	if(str[strlen(str)-1] != '\n'){
+	    fprintf(stderr, "Gasp: not a complete a line!");
+	    fprintf(stderr, " I stop reading and go to the next phase\n");
+	    break;
+	}
+	if(strncmp(str, "BWCOST", 6) != 0)
+	    doAllAdds(rep, mat, str);
+    }
+    fclose(resumefile);
+    for(j = mat->jmin; j < mat->jmax; j++)
+	if((mat->wt[GETJ(mat, j)] == 0) && (mat->A[GETJ(mat, j)] != NULL))
+	    // be sure j was removed...
+	    remove_j_from_SWAR(mat, j);
+    nactivej = 0;
+    for(j = mat->jmin; j < mat->jmax; j++)
+	if(mat->wt[GETJ(mat, j)] != 0)
+	    nactivej++;
+    mat->rem_ncols = nactivej;
+    fprintf(stderr, "At the end of resume, we have");
+    fprintf(stderr, " nrows=%d ncols=%d (%d)\n",
+	    mat->rem_nrows, mat->rem_ncols, mat->rem_nrows-mat->rem_ncols);
 }
