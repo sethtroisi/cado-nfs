@@ -45,8 +45,8 @@
 
 /* This version of tunefft uses the midpoint of each stair */
 
-/* Must be at least 28, but it saves time to set larger */
-#define MUL_FFT_THRESHOLD 1000
+/* Must be at least >=MUL_FFT_THRESHOLD (28), but it saves time to set larger */
+#define MUL_FFT_BEGIN_TUNE 1000
 
 #define STEPMAX 50
 
@@ -180,9 +180,9 @@ int main(int argc, char *argv[])
     random_wordstring(a, maxn);
     random_wordstring(b, maxn);
 
-/* Skip n if (2*n < MUL_FFT_THRESHOLD) as this is too small for the FFT */
+/* Skip n if (2*n < MUL_FFT_BEGIN_TUNE) as this is too small for the FFT */
 
-    for (n = MUL_FFT_THRESHOLD / 2 + 1; n <= maxn;) {
+    for (n = MUL_FFT_BEGIN_TUNE / 2 + 1; n <= maxn;) {
 	n2 = next_step(n, 3 * K0);	// End of interval
 	if (n2 > maxn)		// Only go as far
 	    n2 = maxn;		// as maxn.
@@ -227,7 +227,7 @@ int main(int argc, char *argv[])
 	fflush(stdout);
 
 	if (bestK != oldbestK)
-	    n1 = (n == MUL_FFT_THRESHOLD / 2 + 1) ? 1 : n;
+	    n1 = (n == MUL_FFT_BEGIN_TUNE / 2 + 1) ? 1 : n;
 
 	if (T[3] < T[1] && T[3] < T[2])
 	    K0 *= 3;
