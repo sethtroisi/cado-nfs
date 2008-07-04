@@ -2,14 +2,15 @@ TOP:=..
 include $(TOP)/Makefile.common
 
 # All parts of libutils.
-names:=	polyfile relation timing long_poly \
+names:=	cado_poly relation timing plain_poly \
 	getprime mod_ul modul_poly gmp_aux \
-	fpoly
+	fpoly rootfinder
 
 src:=$(patsubst %,%.c,$(names))
 obj:=$(patsubst %,%.o,$(names))
 
-all: libutils.a cache cachesize check_rels
+bins:=cache cachesize check_rels
+all: libutils.a $(bins)
 
 cache: cache.o timing.o
 	$(CC) $(MY_LFLAGS) $^ -o $@
@@ -26,6 +27,4 @@ libutils.a: $(obj)
 	ar r libutils.a $(obj)
 
 clean:
-	-rm -f *~ *.bak *.o libutils.a cache cachesize
-
-
+	-rm -f *~ *.bak *.o libutils.a $(bins)

@@ -201,7 +201,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
   int *p, k, i, j;
   mpz_t **x, t, u, dad, e, e00, P, P_over_pi, m0, invN, M0;
   unsigned int pi;
-  LONG *roots;
+  unsigned long *roots;
   double eps, f0, **f, one_over_P2, checked = 0.0, Pd;
 
   p = (int*) malloc (l * sizeof (int));
@@ -226,7 +226,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
   mpz_init (m0);
   mpz_init (M0);
   mpz_init (invN);
-  roots = (LONG*) malloc (d * sizeof(LONG));
+  roots = (unsigned long*) malloc (d * sizeof(unsigned long));
   do
     {
       /* compute product of current subset */
@@ -268,7 +268,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
               mpz_mul (t, t, N);
               mpz_mod_ui (t, t, pi);
               mpz_ui_sub (g[0], pi, t);
-              if (roots_mod_long (roots, g, d, pi) != d)
+              if (poly_roots_ulong(roots, g, d, pi) != d)
                 {
                   fprintf (stderr, "Error, d roots expected\n");
                   exit (1);
@@ -279,7 +279,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
                 {
                   /* we want x[i][j] = c*(P/pi) and x[i][j] = roots[j] mod pi,
                      thus c = roots[j] / (P/pi) mod pi */
-                  mpz_mul_si (x[i][j], t, roots[j]);
+                  mpz_mul_ui (x[i][j], t, roots[j]);
                   mpz_mod_ui (x[i][j], x[i][j], pi);
                   mpz_mul (x[i][j], x[i][j], P_over_pi);
                 }
@@ -474,7 +474,7 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
           if (mpz_cmp_ui (t, 0) != 0)
             {
               mpz_set_si (g[0], - mpz_get_si (t));
-              if (roots_mod_long (NULL, g, d, r) > 0)
+              if (poly_roots_ulong (NULL, g, d, r) > 0)
                 Q[lQ++] = r;
             }
         }

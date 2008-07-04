@@ -15,8 +15,11 @@
 
 #define MOD_UL_H__
 
+#include <gmp.h>
+
 /**********************************************************************/
 #include <assert.h>
+
 #ifndef ASSERT
 #define ASSERT(x)	assert(x)
 #endif
@@ -76,6 +79,11 @@
 #define mod_gcd              modul_gcd
 #define mod_inv              modul_inv
 #define mod_jacobi           modul_jacobi
+#define mod_set_mpz          modul_set_mpz
+#define mod_set0          modul_set0
+#define mod_set1          modul_set1
+#define mod_next          modul_next
+#define mod_finished          modul_finished
 
 typedef unsigned long residueul_t[1];
 typedef unsigned long modulusul_t[1];
@@ -141,6 +149,19 @@ modul_set_ul_reduced (residueul_t r, const unsigned long s,
   r[0] = s;
 }
 
+/* These two are so trivial that we don't even require p in the
+ * interface.
+ */
+MAYBE_UNUSED static inline void modul_set0 (residueul_t r) { r[0] = 0; }
+MAYBE_UNUSED static inline void modul_set1 (residueul_t r) { r[0] = 1; }
+
+MAYBE_UNUSED
+static inline void
+modul_set_mpz (residueul_t r, mpz_t s, const modulusul_t m)
+{
+  r[0] =  mpz_fdiv_ui (s, m[0]);
+}
+
 
 /* Exchanges the values of the two arguments */
 
@@ -202,6 +223,14 @@ modul_is0 (const residueul_t a, const modulusul_t m MAYBE_UNUSED)
 {
   ASSERT_EXPENSIVE (a[0] < m[0]);
   return (a[0] == 0UL);
+}
+
+MAYBE_UNUSED
+static inline int
+modul_is1 (const residueul_t a, const modulusul_t m MAYBE_UNUSED)
+{
+  ASSERT_EXPENSIVE (a[0] < m[0]);
+  return (a[0] == 1UL);
 }
 
 MAYBE_UNUSED
@@ -683,6 +712,20 @@ modul_div2 (residueul_t r, residueul_t a, modulusul_t m)
       ASSERT(m[0] % 2UL != 0UL);
       r[0] = a[0] / 2UL + m[0] / 2UL + 1UL;
     }
+}
+
+MAYBE_UNUSED
+static inline int
+modul_next(residueul_t r, modulus_t p)
+{
+    return (++r[0] == p[0]);
+}
+
+MAYBE_UNUSED
+static inline int
+modul_finished(residueul_t r, modulus_t p)
+{
+    return (r[0] == p[0]);
 }
 
 /* prototypes of non-inline functions */

@@ -8,6 +8,9 @@ ASSERT_ALWAYS(x)
         The condition x is always checked, whatever you define. In case
         of failure, it aborts, and gives the line, function, and so on
         information.
+FATAL_ERROR_CHECK(x, msg)
+        The condition x is always check. The program aborts if it does
+        not hold. It's a more gentle version of ASSERT_ALWAYS
 
 Usage of asserts:
         Put ASSERTs to checks things during a non-production mode. These

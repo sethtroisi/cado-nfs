@@ -23,7 +23,9 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include "getprime.h"
 
+/* provided for in cado.h, but we want getprime.c to be standalone */
 #ifndef ASSERT
 #define ASSERT(x)
 #endif
@@ -42,6 +44,8 @@
    It is slightly less efficient (1.5 to 2 times) than Dan Bernstein's
    primegen library (http://cr.yp.to/primegen.html), however it is
    fast enough for our usage here.
+
+   FIXME: An MT-safe version would be nice (and easy).
 */
 
 unsigned long

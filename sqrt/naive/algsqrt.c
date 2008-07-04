@@ -23,6 +23,13 @@
 #include <gmp.h>
 #include "cado.h"
 #include "utils/utils.h"
+
+/* Although the functions in plain_poly are not readily available in the
+ * publicized interface of utils.h, it's ok to use them if we explicitly
+ * include the corresponding header.
+ */
+#include "utils/plain_poly.h"
+
 #include "poly.h"
 
 // #define VERBOSE
@@ -296,21 +303,21 @@ unsigned long FindSuitableModP(poly_t F) {
   unsigned long p = 2;
   int dF = F->deg;
   
-  long_poly_t fp;
-  long_poly_init(fp, dF);
+  plain_poly_t fp;
+  plain_poly_init(fp, dF);
   while (1) {
     int d;
     // select prime congruent to 3 mod 4 to have easy sqrt.
   //  do {
       p = getprime(p);
   //  } while ((p%4)!= 3);
-    d = long_poly_set_mod (fp, F->coeff, dF, p);
+    d = plain_poly_set_mod (fp, F->coeff, dF, p);
     if (d!=dF)
       continue;
-    if (isirreducible_mod_long(fp, p))
+    if (plain_poly_is_irreducible(fp, p))
       break;
   }
-  long_poly_clear(fp);
+  plain_poly_clear(fp);
   getprime (0);
 
   return p;
@@ -390,7 +397,7 @@ int main(int argc, char **argv) {
 
   depfile = fopen(argv[1], "r");
   ASSERT_ALWAYS(depfile != NULL);
-  ret = read_polynomial(pol, argv[3]);
+  ret = cado_poly_read(pol, argv[3]);
   ASSERT_ALWAYS(ret == 1);
 
   // Init F to be the algebraic polynomial

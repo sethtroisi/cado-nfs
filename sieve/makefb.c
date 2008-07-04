@@ -138,13 +138,16 @@ lift_root(const cado_poly cpoly, const unsigned long pk, const unsigned long r) 
   return res;
 }
 
+/* This assumes that factor base primes always fit within a
+ * long. If they ever grow beyond, then getprime() mmust be changed, and
+ * the rootfinding routines must be expanded. */
 void
 makefb_with_powers(FILE *fp, cado_poly cpoly)
 {
   unsigned long p;
   int d = cpoly->degree;
-  LONG *roots, r;
-  int nroots, i, j;
+  long *roots;
+  int nroots, i;
   unsigned long power_lim;
 
   power_lim = (unsigned long)(floor(sqrt((double)(cpoly->alim))));
@@ -156,7 +159,7 @@ makefb_with_powers(FILE *fp, cado_poly cpoly)
 
   fprintf (fp, "# DEGREE: %d\n", d);
 
-  roots = (LONG*) malloc (d * sizeof (LONG));
+  roots = (long*) malloc (d * sizeof (long));
 
   ideal_heap_t id_list;
   id_list.len = 0;
@@ -180,24 +183,8 @@ makefb_with_powers(FILE *fp, cado_poly cpoly)
 
 	q = get_min_power_ideal(&id_list);
       }
+      nroots = poly_roots_long(roots, cpoly->f, d, p);
 
-      /* Deal with p */
-      if (long_poly_fits (d, p))
-        nroots = roots_mod_long (roots, cpoly->f, d, p);
-      else
-        nroots = modul_roots_mod_int64 (roots, cpoly->f, d, &p);
-      /* normalize roots in [0, p-1] */
-      for (i = 0; i < nroots; i++)
-        if (roots[i] < 0)
-          roots[i] += p;
-      /* sort roots by insertion sort */
-      for (i = 1; i < nroots; i++)
-        {
-          /* assume roots[0]...roots[i-1] are already sorted */
-          for (j = i, r = roots[j]; j > 0 && r < roots[j - 1]; j--)
-            roots[j] = roots[j - 1];
-          roots[j] = r;
-        }
       if (nroots != 0)
         {
           fprintf (fp, "%lu: %lld", p, (long long int) roots[0]);
@@ -207,6 +194,9 @@ makefb_with_powers(FILE *fp, cado_poly cpoly)
         }
 
       /* Create prime powers, if relevant */
+      /* Note that lift_root sets the root to -1 when it's done. So
+       * because of this behaviour, we need signed longs.
+       */
       if (nroots != 0 && p <= power_lim) {
 	uint64_t pk = (uint64_t)(p*p);
 	power_ideal_t id;
@@ -242,8 +232,8 @@ makefb (FILE *fp, cado_poly cpoly)
 {
   unsigned long p;
   int d = cpoly->degree;
-  LONG *roots, r;
-  int nroots, i, j;
+  unsigned long *roots;
+  int nroots, i;
 
   check_polynomials (cpoly);
 
@@ -252,26 +242,11 @@ makefb (FILE *fp, cado_poly cpoly)
 
   fprintf (fp, "# DEGREE: %d\n", d);
 
-  roots = (LONG*) malloc (d * sizeof (LONG));
+  roots = (unsigned long*) malloc (d * sizeof (unsigned long));
 
   for (p = 2; p <= cpoly->alim; p = getprime (p))
     {
-      if (long_poly_fits (d, p))
-        nroots = roots_mod_long (roots, cpoly->f, d, p);
-      else
-        nroots = modul_roots_mod_int64 (roots, cpoly->f, d, &p);
-      /* normalize roots in [0, p-1] */
-      for (i = 0; i < nroots; i++)
-        if (roots[i] < 0)
-          roots[i] += p;
-      /* sort roots by insertion sort */
-      for (i = 1; i < nroots; i++)
-        {
-          /* assume roots[0]...roots[i-1] are already sorted */
-          for (j = i, r = roots[j]; j > 0 && r < roots[j - 1]; j--)
-            roots[j] = roots[j - 1];
-          roots[j] = r;
-        }
+        nroots = poly_roots_ulong(roots, cpoly->f, d, p);
       if (nroots != 0)
         {
           fprintf (fp, "%lu: %lld", p, (long long int) roots[0]);
@@ -327,7 +302,7 @@ main (int argc, char *argv[])
       exit (EXIT_FAILURE);
     }
 
-  if (!read_polynomial (cpoly, polyfilename))
+  if (!cado_poly_read (cpoly, polyfilename))
     {
       fprintf (stderr, "Error reading polynomial file\n");
       exit (EXIT_FAILURE);

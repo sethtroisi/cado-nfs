@@ -85,22 +85,20 @@ static void create_characters(rootprime_t * tabchar, int k, cado_poly pol)
     int ret;
     int i = 0;
     mpz_t pp;
-    LONG *roots;
+    unsigned long *roots;
 
     mpz_init_set_ui(pp, 1 << (pol->lpba + 1));
-    roots = malloc(pol->degree * sizeof(LONG));
+    roots = malloc(pol->degree * sizeof(unsigned long));
 
     do {
 	mpz_nextprime(pp, pp);
 	p = mpz_get_ui(pp);
-	ret = roots_mod_long(roots, pol->f, pol->degree, p);
+	ret = poly_roots_ulong(roots, pol->f, pol->degree, p);
 	if (ret == 0)
 	    continue;
 	tabchar[i].prime = p;
-	if (roots[0] > 0)
-	    tabchar[i].root = roots[0];
-	else
-	    tabchar[i].root = p - (-roots[0]);
+        /* FIXME: Why do we take only one root per prime ??? */
+	tabchar[i].root = roots[0];
 	i++;
     }
     while (i < k);
@@ -405,7 +403,7 @@ int main(int argc, char **argv)
 	    argv += 2;
 	}
 	if (argc > 2 && strcmp(argv[1], "-poly") == 0) {
-	    read_polynomial(pol, argv[2]);
+	    cado_poly_read(pol, argv[2]);
 	    argc -= 2;
 	    argv += 2;
 	}

@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>   /* for fabs */
-#include "cado.h"
+#include "fpoly.h"
 
 /* Evaluate the poynomial f of degree deg at point x */
 double

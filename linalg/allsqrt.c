@@ -439,7 +439,7 @@ int main(int argc, char *argv[])
     
     kerfile = fopen(kername, "r");
 
-    ret = read_polynomial(pol, polyname);
+    ret = cado_poly_read(pol, polyname);
     ASSERT (ret);
 
     if(!strcmp(argv[8], "r"))

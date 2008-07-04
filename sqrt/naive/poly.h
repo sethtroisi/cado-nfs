@@ -1,5 +1,11 @@
 #include <gmp.h>
 
+/* FIXME [ET]: Someday, this should me moved to utils/ ; other polynomial
+ * libraries are there (admittedly different, since geared towards tiny
+ * moduli), and we could perhaps fint it useful to adapt the interface
+ * here for rootfinding code above ULONG_MAX
+ */
+
 // deg = -1 means P=0
 // otherwise, one should have coeff[deg] != 0
 // Warning: a polynomial of degree d needs d+1 allocation.

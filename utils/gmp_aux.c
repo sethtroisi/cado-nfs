@@ -1,6 +1,7 @@
 /* auxiliary routines on GMP data-types */
 
 #include <stdint.h>
+#include "gmp_aux.h"
 #include "cado.h"
 
 /* Set z to q. Warning: on 32-bit machines, we cannot use mpz_set_ui! */
@@ -62,5 +63,14 @@ isprime (unsigned long p)
   res = mpz_probab_prime_p (P, REPS);
   mpz_clear (P);
   return res;
+}
+
+/* return the number of bits of p, counting from the least significant end */
+int nbits (uintmax_t p)
+{
+  int k;
+
+  for (k = 0; p != 0; p >>= 1, k ++);
+  return k;
 }
 

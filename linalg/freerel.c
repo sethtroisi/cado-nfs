@@ -258,7 +258,7 @@ main(int argc, char *argv[])
     if (polyfilename == NULL || ((fbfilename == NULL) && (nfic == 0)))
       usage (argv0);
 
-    if (!read_polynomial (cpoly, polyfilename))
+    if (!cado_poly_read (cpoly, polyfilename))
       {
         fprintf (stderr, "Error reading polynomial file\n");
         exit (EXIT_FAILURE);
@@ -281,7 +281,7 @@ main(int argc, char *argv[])
     else
 	largeFreeRelations(cpoly, fic, nfic);
 
-    clear_polynomial (cpoly);
+    cado_poly_clear (cpoly);
 
     return 0;
 }

@@ -159,7 +159,7 @@ void cado_poly_clear(cado_poly poly)
 }
 
 // returns 0 on failure, 1 on success.
-int read_polynomial(cado_poly poly, char *filename)
+int cado_poly_read(cado_poly poly, char *filename)
 {
     FILE *file;
     const int linelen = 512;
@@ -261,11 +261,6 @@ int read_polynomial(cado_poly poly, char *filename)
     return 1;
 }
 
-void clear_polynomial(cado_poly poly)
-{
-    cado_poly_clear(poly);
-}
-
 void fprint_polynomial(FILE * fp, mpz_t * f, const int d)
 {
     int i, s, first = 1;
@@ -320,7 +315,3 @@ void check_polynomials(cado_poly cpoly)
     mpz_clear(r);
     mpz_clear(q);
 }
-
-#undef PARSE_MATCH
-#undef PARSE_ERROR
-#undef PARSE_NOMATCH

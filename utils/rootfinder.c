@@ -1,0 +1,95 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include <limits.h>
+#include <gmp.h>
+
+#include "macros.h"
+#include "rootfinder.h"
+#include "plain_poly.h"
+#include "modul_poly.h"
+
+int poly_roots_ulong(unsigned long * r, mpz_t * f, int d, unsigned long p)
+{
+    int n;
+    if (plain_poly_fits(d, p)) {
+        plain_poly_coeff_t * rr;
+        int i;
+
+        rr = (plain_poly_coeff_t *) malloc(d * sizeof(plain_poly_coeff_t));
+        n = plain_poly_roots(rr, f, d, p);
+        for(i = 0 ; i < n ; i++) {
+            r[i] = rr[i];
+        }
+        free(rr);
+    } else {
+        residueul_t * rr;
+        modulus_t pp;
+        modul_initmod_ul(pp, p);
+        int i;
+        rr = (residueul_t *) malloc(d * sizeof(residueul_t));
+        for(i = 0 ; i < d ; i++) {
+            modul_init_noset0(rr[i], pp);
+        }
+        n = modul_poly_roots(rr, f, d, pp);
+        for(int i = 0 ; i < n ; i++) {
+            /* The assumption is that p fits within an unsigned long
+             * anyway. So the roots do as well.
+             */
+            r[i] = modul_get_ul(rr[i], pp);
+        }
+        for(i = 0 ; i < d ; i++) {
+            modul_clear(rr[i], pp);
+        }
+        free(rr);
+        modul_clearmod(pp);
+    }
+    return n;
+}
+
+int poly_roots_long(long * r, mpz_t * f, int d, unsigned long p)
+{
+    FATAL_ERROR_CHECK(p >= LONG_MAX, "Cannot use poly_roots_long here");
+    return poly_roots_ulong((unsigned long *) r, f, d, p);
+}
+
+int poly_roots_uint64(uint64_t * r, mpz_t * f, int d, uint64_t p)
+{
+    FATAL_ERROR_CHECK(p >= ULONG_MAX, "poly_roots_uint64 is a stub");
+    unsigned long * rr;
+    int i,n;
+    rr = (unsigned long *) malloc(d * sizeof(unsigned long));
+    n = poly_roots_ulong((unsigned long *) r, f, d, p);
+    for(i = 0 ; i < n ; i++) {
+        r[i] = rr[i];
+    }
+    free(rr);
+    return n;
+}
+
+
+int poly_roots(mpz_t * r, mpz_t * f, int d, mpz_t p)
+{
+    if (mpz_cmp_ui(p, ULONG_MAX) <= 0) {
+        /* There's a chance of using one of our layers. */
+        unsigned long pp = mpz_get_ui(p);
+        unsigned long * rr;
+        int i;
+        int n;
+
+        rr = (unsigned long *) malloc(d * sizeof(unsigned long));
+        n = poly_roots_ulong(rr,  f, d, pp);
+
+        for(i = 0 ; i < n ; i++) {
+            /* The assumption is that p fits within an unsigned long
+             * anyway. So the roots do as well.
+             */
+            mpz_set_ui(r[i], rr[i]);
+        }
+        free(rr);
+        return n;
+    } else {
+        fprintf(stderr, "Cannot compute roots of polynomial (p too large)\n");
+        exit(1);
+    }
+}
+

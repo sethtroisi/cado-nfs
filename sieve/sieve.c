@@ -2259,7 +2259,7 @@ main (int argc, char **argv)
      }
 
   /* Read polynomial from file */
-  if (!read_polynomial (cpoly, polyfilename))
+  if (!cado_poly_read (cpoly, polyfilename))
     {
       fprintf (stderr, "Error reading polynomial file\n");
       exit (EXIT_FAILURE);
@@ -2505,7 +2505,7 @@ main (int argc, char **argv)
            relations_found, sieve_time, sieve_time / (double) relations_found);
   fprintf (stderr, " [init time = %1.0f seconds]\n", init_time);
 
-  clear_polynomial (cpoly);
+  cado_poly_clear (cpoly);
   if (sieve_a)
     {
       fb_clear (fba);

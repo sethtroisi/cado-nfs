@@ -161,7 +161,7 @@ int main(int argc, char *argv[]) {
         MSG("Please specify a polynomial file with -poly.\n");
         exit(EXIT_FAILURE);
     }
-    if (!read_polynomial(cpoly, polyfilename)) {
+    if (!cado_poly_read(cpoly, polyfilename)) {
         ERROR("Could not read polynomial file %s.\n", polyfilename);
         exit(EXIT_FAILURE);
     }

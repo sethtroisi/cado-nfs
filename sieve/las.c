@@ -1938,7 +1938,8 @@ main (int argc, char *argv[])
     cado_poly cpoly;
     double t0, tfb, tq, tn_rat, tn_alg, tts, ttsm, ttf;
     uint64_t q0 = 0, q1 = 0, rho = 0;
-    unsigned long *roots, nroots, tot_reports = 0, survivors0, survivors1;
+    uint64_t *roots;
+    unsigned long nroots, tot_reports = 0, survivors0, survivors1;
     factorbase_degn_t * fb_alg, * fb_rat;
     int checknorms = 0; /* factor or not the remaining norms */
     int I = DEFAULT_I, i;
@@ -2020,7 +2021,7 @@ main (int argc, char *argv[])
         exit (1);
       }
 
-    if (!read_polynomial (cpoly, polyfilename))
+    if (!cado_poly_read (cpoly, polyfilename))
       {
         fprintf (stderr, "Error reading polynomial file\n");
         exit (EXIT_FAILURE);
@@ -2048,7 +2049,7 @@ main (int argc, char *argv[])
     init_alg_norms (&si);
 
     /* special q (and root rho) */
-    roots = (unsigned long*) malloc (cpoly->degree * sizeof (unsigned long));
+    roots = (uint64_t *) malloc (cpoly->degree * sizeof (uint64_t));
     q0 --; /* so that nextprime gives q0 if q0 is prime */
     nroots = 0;
     tot_reports = 0;
@@ -2059,20 +2060,17 @@ main (int argc, char *argv[])
       {
         while (nroots == 0) /* go to next prime and generate roots */
           {
-            unsigned long q;
-
             q0 = uint64_nextprime (q0);
             if (q0 >= q1)
               goto end;
             si.q = q0;
-            q = q0; /* modul_roots_mod_long works on an unsigned long */
-            nroots = modul_roots_mod_long (roots, cpoly->f, cpoly->degree, &q);
+            nroots = poly_roots_uint64 (roots, cpoly->f, cpoly->degree, q0);
             if (nroots > 0)
               {
                 fprintf (stderr, "### q=%" PRIu64 ": root%s", q0,
                          (nroots == 1) ? "" : "s");
                 for (i = 1; i <= (int) nroots; i++)
-                  fprintf (stderr, " %lu", roots[nroots-i]);
+                  fprintf (stderr, " %" PRIu64, roots[nroots-i]);
                 fprintf (stderr, "\n");
               }
           }
@@ -2183,7 +2181,7 @@ main (int argc, char *argv[])
     free (fb_alg);
     free (fb_rat);
     sieve_info_clear (&si);
-    clear_polynomial (cpoly);
+    cado_poly_clear (cpoly);
     free (roots);
 
     return 0;

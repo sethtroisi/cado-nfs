@@ -258,7 +258,7 @@ special_val0 (mpz_t *f, int d, unsigned long p)
   double v;
   mpz_t c, *g, *h;
   int alloc, i, r0, nroots;
-  LONG *roots, r;
+  unsigned long *roots, r;
 
   mpz_init (c);
   content_poly (c, f, d);
@@ -286,13 +286,11 @@ special_val0 (mpz_t *f, int d, unsigned long p)
     }
   /* Search for roots of g mod p */
   ASSERT (d > 0);
-  roots = (LONG*) malloc (d * sizeof (LONG));
-  if (roots == NULL)
-    {
-      fprintf (stderr, "Error, not enough memory\n");
-      exit (1);
-    }
-  nroots = roots_mod_long (roots, g, d, p);
+  roots = (unsigned long*) malloc (d * sizeof (unsigned long));
+  FATAL_ERROR_CHECK(roots == NULL, "not enough memory");
+
+
+  nroots = poly_roots_ulong (roots, g, d, p);
   ASSERT (nroots <= d);
   for (r0 = 0, i = 0; i < nroots; i++)
     {
@@ -370,7 +368,7 @@ special_valuation (mpz_t *f, int d, unsigned long p, mpz_t disc)
     {
       int e;
       v = (double) p;
-      e = roots_mod_long (NULL, f, d, p);
+      e = poly_roots_ulong (NULL, f, d, p);
       v = (v * (double) e - 1.0) / (v * v - 1.0);
     }
   else

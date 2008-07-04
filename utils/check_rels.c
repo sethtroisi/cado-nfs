@@ -1,6 +1,4 @@
-/* Without _POSIX_C_SOURCE, stdio.h does not declare popen()/pclose() if 
-   -std=c99, -pedantic or -ansi is given to gcc */
-#define _POSIX_C_SOURCE 2
+#define _POSIX_C_SOURCE 2  /* popen/pclose with -std=c99, -pedantic or -ansi */
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -11,8 +9,6 @@
 #include <gmp.h>
 #include "cado.h"
 #include "utils.h"
-
-
 
 void norm(mpz_t *f, int deg, mpz_t r, long a, unsigned long b)
 {
@@ -131,7 +127,7 @@ int main(int argc, char * argv[])
     if (argc < 4 || strcmp(argv[1], "-poly") != 0) {
         usage_and_die(argv[0]);
     }
-    if (!read_polynomial(cpoly, argv[2])) 
+    if (!cado_poly_read(cpoly, argv[2])) 
         return 1;
 
     for(i = 3 ; i < argc ; i++) {
