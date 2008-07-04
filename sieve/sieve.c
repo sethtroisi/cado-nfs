@@ -1126,7 +1126,8 @@ ul_rho (const unsigned long N, const unsigned long cparm)
 {
   modulusul_t m;
   residueul_t r1, r2, c, diff, accu;
-  unsigned long invm, g;
+  residueul_t g;
+  unsigned long invm;
   int i;
   unsigned int iterations = 0;
   const int iterations_between_gcd = 32;
@@ -1142,6 +1143,7 @@ ul_rho (const unsigned long N, const unsigned long cparm)
   modul_init_noset0 (r1, m);
   modul_init_noset0 (r2, m);
   modul_init_noset0 (c, m);
+  modul_init_noset0 (g, m);
   modul_init_noset0 (accu, m);
   modul_init_noset0 (diff, m);
   invm = -modul_invmodlong (m);
@@ -1169,11 +1171,13 @@ ul_rho (const unsigned long N, const unsigned long cparm)
 	modul_mulredc (accu, accu, diff, invm, m);
       }
     iterations += iterations_between_gcd;
-  } while ((g = modul_gcd (accu, m)) == 1);
+    modul_gcd (g, accu, m);
+  } while (modul_is1(g, m));
 
   modul_clear (r1, m);
   modul_clear (r2, m);
   modul_clear (c, m);
+  modul_clear (g, m);
   modul_clear (accu, m);
   modul_clear (diff, m);
   modul_clearmod (m);
@@ -1183,7 +1187,7 @@ ul_rho (const unsigned long N, const unsigned long cparm)
 
   /* printf ("ul_rho: took %u iterations to find %lu\n", iterations, g); */
 
-  return g;
+  return modul_get_ul(g, m);
 }
 
 
