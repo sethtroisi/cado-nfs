@@ -1157,7 +1157,7 @@ mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile, int
     double totwait = 0.0, tt, wctstart = MPI_Wtime();
     unsigned int buf[MPI_BUF_SIZE];
     unsigned int send_buf[MPI_BUF_SIZE];
-    unsigned int threshold = 0;
+    unsigned int threshold = mpi_index - 10000;
     int ibuf, m, proc, cnt, k, done, maxm = 0, nrecv;
     int *row_weight, curr_ncols;
 
