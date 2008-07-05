@@ -136,10 +136,10 @@ fi
 
 mergehis=$outdir/merge.his
 keep=`expr 128 '+' $skip`
-argsa="-forbw $bwstrat -ratio $ratio -coverNmax $coverNmax"
-argsa="$argsa -prune $prune -mat $purged -keep $keep"
-argsa="$argsa -maxlevel $maxlevel -cwmax $cwmax -rwmax $rwmax $verbose"
-argsa="$argsa -out $mergehis"
+##### warning: first two arguments must be -out <outfile>
+argsa="-out $mergehis -maxlevel $maxlevel -cwmax $cwmax -rwmax $rwmax"
+argsa="$argsa $verbose -prune $prune -mat $purged -keep $keep"
+argsa="$argsa -forbw $bwstrat -ratio $ratio -coverNmax $coverNmax"
 #time $linalg/merge $argsa # 2> $outdir.merge.err
 ./merge.sh $argsa
 echo "SIZE(merge.his): `ls -s $mergehis`"
