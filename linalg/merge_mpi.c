@@ -49,7 +49,7 @@ mpi_err(char *str)
     int mpi_rank;
 
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-    fprintf(out, "MPI#%d[%d]# %s", mpi_rank, mpi_index, str);
+    fprintf(out, "MPI#%d[%u]# %s", mpi_rank, mpi_index, str);
     fflush(out);
 }
 
@@ -60,7 +60,7 @@ mpi_err1(char *format, int i)
     int mpi_rank;
 
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-    fprintf(out, "MPI#%d[%d]# ", mpi_rank, mpi_index);
+    fprintf(out, "MPI#%d[%u]# ", mpi_rank, mpi_index);
     fprintf(out, format, i);
     fflush(out);
 }
@@ -72,7 +72,7 @@ mpi_err2(char *format, int i1, int i2)
     int mpi_rank;
 
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-    fprintf(out, "MPI#%d[%d]# ", mpi_rank, mpi_index);
+    fprintf(out, "MPI#%d[%u]# ", mpi_rank, mpi_index);
     fprintf(out, format, i1, i2);
     fflush(out);
 }
@@ -84,7 +84,7 @@ mpi_err3(char *format, int i1, int i2, int i3)
     int mpi_rank;
 
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-    fprintf(out, "MPI#%d[%d]# ", mpi_rank, mpi_index);
+    fprintf(out, "MPI#%d[%u]# ", mpi_rank, mpi_index);
     fprintf(out, format, i1, i2, i3);
     fflush(out);
 }
@@ -96,7 +96,7 @@ mpi_err_tab(char *str, unsigned int *buf, int ibuf)
     int mpi_rank, i;
 
     MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
-    fprintf(out, "MPI#%d[%d]# %s", mpi_rank, mpi_index, str);
+    fprintf(out, "MPI#%d[%u]# %s", mpi_rank, mpi_index, str);
     for(i = 0; i < ibuf; i++)
 	fprintf(out, " %u", buf[i]);
     fprintf(out, "\n");
@@ -112,7 +112,7 @@ fprint_report_aux(FILE *out, report_t *rep)
     mpi_err1("Report[0..%d]\n", rep->mark);
 #endif
     for(i = 0; i <= rep->mark; i++){
-	fprintf(out, "%d", mpi_index);
+	fprintf(out, "%u", mpi_index);
 	for(k = 1; k <= rep->history[i][0]; k++)
 	    fprintf(out, " %d", rep->history[i][k]);
 	fprintf(out, "\n");
@@ -752,7 +752,7 @@ mpi_mst_share(unsigned int *send_buf, sparse_mat_t *mat, unsigned int *buf)
 }
 
 void
-mpi_slave(report_t *rep, int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char *purgedname)
+mpi_slave(report_t *rep, int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char *purgedname, char *resumename)
 {
     double totwait = 0.0, tt, wctstart = MPI_Wtime();
     unsigned int buf[MPI_BUF_SIZE];
@@ -798,13 +798,16 @@ mpi_slave(report_t *rep, int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char
 	    mpi_err1("time for reading the matrix: %d\n", (int)(seconds()-tt));
 	    buf[1] = ok;
 	    MPI_Send(buf, 2, MPI_UNSIGNED, 0, MPI_J_TAG, MPI_COMM_WORLD);
+	    if(resumename != NULL)
+		// resume, but never print...!
+		resume(rep, mat, resumename);
 	    break;
 	case MPI_MIN_M_TAG:
 	    // buf = [index]
 	    if(buf[0] >= mpi_index){
 		mpi_index = buf[0];
 #if DEBUG >= 1
-		mpi_err1("New mpi_index = %d\n", mpi_index);
+		mpi_err1("New mpi_index = %u\n", mpi_index);
 #endif
 	    }
 	    nbminm++;
@@ -1031,8 +1034,6 @@ mpi_feed(int *row_weight, sparse_mat_t *mat, FILE *purgedfile)
 {
     int i, j, nc, ret, x;
 
-    mat->rem_nrows = mat->nrows;
-    mat->rem_ncols = mat->ncols;
     mat->weight = 0;
     for(i = 0; i < mat->nrows; i++){
 	ret = fscanf(purgedfile, "%d", &j); // unused index to rels file
@@ -1150,7 +1151,7 @@ stop_merge(sparse_mat_t *mat, int forbw, double ratio, int coverNmax, int m)
 // actually, mat is rather empty, since it does not use too much fancy things.
 // So we just need to init the row weights.
 void
-mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile, int forbw, double ratio, int coverNmax)
+mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile, int forbw, double ratio, int coverNmax, int first)
 {
     MPI_Status status;
     double totwait = 0.0, tt, wctstart = MPI_Wtime();
@@ -1172,10 +1173,14 @@ mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile, int
 	mpi_index++;
 	tt = seconds();
 	curr_ncols = mpi_get_minimal_m_proc(&m, &proc, mpi_size, mpi_index);
+	if(first){
+	    first = 0;
+	    mat->rem_ncols = curr_ncols;
+	}
 	totwait += (seconds()-tt);
 #if DEBUG >= 1
 	if(curr_ncols != mat->rem_ncols){
-	    fprintf(stderr, "index=%d cur=%d ncols=%d\n", 
+	    fprintf(stderr, "index=%u cur=%d ncols=%d\n", 
 		    mpi_index, curr_ncols, mat->rem_ncols);
 # if 0
 	    sleep(5);
@@ -1188,10 +1193,10 @@ mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile, int
 	if(mpi_index >= threshold){
 	    // cautious check!!!
 	    if(curr_ncols != mat->rem_ncols)
-		fprintf(stderr, "index=%d cur=%d ncols=%d\n",
+		fprintf(stderr, "index=%u cur=%d ncols=%d\n",
 			mpi_index, curr_ncols, mat->rem_ncols);
 	    threshold += 10000;
-	    fprintf(stderr, "R%d: wct=%2.2lf ",mpi_index,MPI_Wtime()-wctstart);
+	    fprintf(stderr, "R%u: wct=%2.2lf ",mpi_index,MPI_Wtime()-wctstart);
 	    fprintf(stderr,"maxm=%d N=%d nc=%d [%d] c=%ld c/N=%d\n",
 		    maxm, 
 		    mat->rem_nrows, mat->rem_ncols,
@@ -1303,7 +1308,7 @@ mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile, int
 	}
     }
     //    fprint_report(rep);// what for?
-    fprintf(stderr, "Finally (%d -- %2.2lf -- wait=%2.2lf):",
+    fprintf(stderr, "Finally (%u -- %2.2lf -- wait=%2.2lf):",
 	    mpi_index, seconds(), totwait);
     fprintf(stderr, " nrows=%d ncols=%d[%d]\n",
 	    mat->rem_nrows, mat->rem_ncols, curr_ncols);
@@ -1312,7 +1317,7 @@ mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile, int
 }
 
 void
-mpi_start_proc(char *outname, sparse_mat_t *mat, FILE *purgedfile, char *purgedname, int forbw, double ratio, int coverNmax)
+mpi_start_proc(char *outname, sparse_mat_t *mat, FILE *purgedfile, char *purgedname, int forbw, double ratio, int coverNmax, char *resumename)
 {
     report_t rep;
     char *str;
@@ -1348,16 +1353,33 @@ mpi_start_proc(char *outname, sparse_mat_t *mat, FILE *purgedfile, char *purgedn
     init_rep(&rep, str, mat, 1);
     if(mpi_rank == 0){
 	fprintf(rep.outfile, "0 %d %d\n", mat->nrows, mat->ncols);
+	mat->rem_nrows = mat->nrows;
+	mat->rem_ncols = mat->ncols;
+	if(resumename != NULL){
+	    // copy into outfile
+	    FILE *resumefile = fopen(resumename, "r");
+	    char buf[1024];
+
+	    fgets(buf, 1024, resumefile);
+	    while(fgets(buf, 1024, resumefile)){
+		mpi_index++;
+		fprintf(rep.outfile, "%u %s", mpi_index, buf);
+		if(buf[0] != '-')
+		    mat->rem_nrows--;
+	    }
+	    fclose(resumefile);
+	}
 	mpi_start_slaves(mpi_size, mat);
 	if(coverNmax == 0){
 	    mpi_err("#W# Forcing forbw=4: stopping when m too large\n");
 	    forbw = 4;
 	}
-	mpi_master(&rep, mat, mpi_size, purgedfile, forbw, ratio, coverNmax);
+	mpi_master(&rep, mat, mpi_size, purgedfile, forbw, ratio, coverNmax,
+		   resumename != NULL);
 	mpi_kill_slaves();
     }
     else
-	mpi_slave(&rep, mpi_rank, mat, purgedfile, purgedname);
+	mpi_slave(&rep, mpi_rank, mat, purgedfile, purgedname, resumename);
     gzip_close(rep.outfile, str);
     free(str);
 }

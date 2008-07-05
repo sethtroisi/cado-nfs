@@ -132,7 +132,8 @@ main(int argc, char *argv[])
     mat.mergelevelmax = maxlevel;
     
 #ifdef USE_MPI
-    mpi_start_proc(outname,&mat,purgedfile,purgedname,forbw,ratio,coverNmax);
+    mpi_start_proc(outname,&mat,purgedfile,purgedname,forbw,ratio,coverNmax,
+		   resumename);
     // TODO: clean the mat data structure (?)
     MPI_Finalize();
     return 0;

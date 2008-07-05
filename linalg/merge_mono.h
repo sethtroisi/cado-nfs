@@ -124,3 +124,5 @@ extern int number_of_superfluous_rows(sparse_mat_t *mat);
 extern void merge(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int forbw);
 extern void mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int forbw, double ratio, int coverNmax);
 extern void doOneMerge(report_t *rep, sparse_mat_t *mat, int *njrem, double *totopt, double *totfill, double *totMST, double *totdel, int m, int maxdo, int useMST, int verbose);
+
+extern void resume(report_t *rep, sparse_mat_t *mat, char *resumename);

@@ -448,7 +448,7 @@ readmat(sparse_mat_t *mat, FILE *file)
     int ret;
     int i, k;
     int nc, buf[BUF_LEN];
-#if USE_MERGE_FAST < 3
+#if (USE_MERGE_FAST < 3) && !defined(USE_MPI)
     int nh = 0;
 #endif
     INT ibuf, j, jmin = mat->jmin, jmax = mat->jmax;
@@ -484,7 +484,7 @@ readmat(sparse_mat_t *mat, FILE *file)
 	    mat->rem_nrows--;
 	}
 	else{
-#if USE_MERGE_FAST < 3
+#if (USE_MERGE_FAST < 3) && !defined(USE_MPI)
 	    int nb_heavy_j = 0;
 #endif
 	    for(k = 0, ibuf = 0; k < nc; k++){
@@ -494,7 +494,7 @@ readmat(sparse_mat_t *mat, FILE *file)
 		    return 0;
 		}
 		ASSERT_ALWAYS (0 <= j && j < mat->ncols);
-#if USE_MERGE_FAST < 3
+#if (USE_MERGE_FAST < 3) && !defined(USE_MPI)
 		if(mat->wt[GETJ(mat, j)] < 0)
 		    nb_heavy_j++;
 #endif
@@ -521,7 +521,7 @@ readmat(sparse_mat_t *mat, FILE *file)
 		}
 #endif
 	    }
-#if USE_MERGE_FAST < 3	   
+#if (USE_MERGE_FAST < 3) && !defined(USE_MPI)
 	    if(nb_heavy_j == nc){
 		// all the columns are heavy and thus will never participate
 		mat->rows[i] = NULL;
@@ -547,7 +547,7 @@ readmat(sparse_mat_t *mat, FILE *file)
 #endif
 	}
     }
-#if USE_MERGE_FAST < 3
+#if (USE_MERGE_FAST < 3) && !defined(USE_MPI)
     fprintf(stderr, "Number of heavy rows: %d\n", nh);
 #endif
     // we need to keep informed of what really happens; this will be an upper
@@ -2610,56 +2610,6 @@ indicesFromString(INT *ind, char *str)
     return ni;
 }
 
-// We want to recover the column j which intersects everybody
-static int
-intersect(sparse_mat_t *mat, INT *ind, int ni)
-{
-    INT i0, *tmp1, *tmp2, *foo, j;
-    int k, itmp1, itmp2, r, s, ok;
-
-    if(ind[0] < 0)
-	i0 = -ind[0]-1;
-    else
-	i0 = ind[0];
-    tmp1 = (INT *)malloc(lengthRow(mat, i0) * sizeof(INT));
-    tmp2 = (INT *)malloc(lengthRow(mat, i0) * sizeof(INT));
-    for(k = 1, itmp1 = 0; k <= lengthRow(mat, i0); k++)
-	if(cell(mat, i0, k) != -1)
-	    tmp1[itmp1++] = cell(mat, i0, k);
-    for(k = 1; k < ni; k++){
-	fprintf(stderr, "k=%d:", k);
-	for(r = 0; r < itmp1; r++)
-	    fprintf(stderr, " %d", tmp1[r]);
-	fprintf(stderr, "\n");
-	itmp2 = 0;
-	for(r = 1; r <= lengthRow(mat, ind[k]); r++){
-	    j = cell(mat, ind[k], r);
-	    if(j != -1){
-		ok = 0;
-		for(s = 0; s < itmp1; s++)
-		    if(tmp1[s] == j){
-			ok = 1;
-			break;
-		    }
-		if(ok){
-		    fprintf(stderr, "adding j=%d\n", j);
-		    tmp2[itmp2++] = j;
-		}
-	    }
-	}
-	foo = tmp1; tmp1 = tmp2; tmp2 = foo;
-	itmp1 = itmp2;
-    }
-    j = tmp1[0];
-    free(tmp1);
-    free(tmp2);
-    if(itmp1 != 1){
-	fprintf(stderr, "GASP in intersect: #j=%d\n", itmp2);
-	return -1;
-    }
-    return j;
-}
-
 // A line is "i i1 ... ik".
 // If i >= 0 then
 //     row[i] is to be added to rows i1...ik and destroyed at the end of
@@ -2671,7 +2621,7 @@ intersect(sparse_mat_t *mat, INT *ind, int ni)
 void
 doAllAdds(report_t *rep, sparse_mat_t *mat, char *str)
 {
-    INT ind[MERGE_LEVEL_MAX], j, i0;
+    INT ind[MERGE_LEVEL_MAX], i0;
     int ni, sg, k;
 
     ni = indicesFromString(ind, str);
@@ -2682,8 +2632,6 @@ doAllAdds(report_t *rep, sparse_mat_t *mat, char *str)
     else{
 	i0 = ind[0];
 	sg = 1;
-	// we must find that j...
-	//	j = intersect(mat, ind, ni);
     }
     for(k = 1; k < ni; k++)
 	addRowsSWAR(mat, ind[k], i0, -1);
