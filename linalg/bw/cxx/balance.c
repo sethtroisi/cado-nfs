@@ -107,6 +107,13 @@ char * header /* = NULL */;
 struct slice * row_slices;
 struct slice * col_slices;
 
+struct file_info_s {
+    uint32_t coeffs;
+    char * s;
+};
+typedef struct file_info_s file_info[1];
+file_info * final_file_info;
+
 /* {{{ Several data types */
 /* {{{ Datatype containing description for slices of the matrix */
 struct slice {
@@ -892,6 +899,8 @@ void compute_permutation()
         row_slices[0].i0 = 0;
         row_slices[0].nrows = nr;
     }
+    final_file_info = malloc(nhslices*nvslices*sizeof(file_info));
+    memset(final_file_info, 0, nhslices*nvslices*sizeof(file_info));
 }
 
 
@@ -1277,8 +1286,14 @@ void sink_hook(sink s, unsigned int i0, unsigned int i1)
         return;
     }
     if (i0 == row_slices[s->hnum].i0) {
+        unsigned int i;
         fileset_init_transfer(s->fv, nvslices, "v", s->fh, s->hnum, OUTPUT);
         s->curr = fileset_open(s->fv, "w");
+        for(i = 0 ; i < nvslices ; i++) {
+            /* Print a header which could help for transposing */
+            fprintf(s->curr[i], "%u %u\n", row_slices[s->hnum].nrows, col_slices[i].nrows);
+            final_file_info[nvslices*s->hnum + i]->s = strdup(s->fv->names[i]);
+        }
     }
 }
 
@@ -1342,6 +1357,7 @@ void sink_feed_row(sink s,
             data = ndata;
         }
         s->cp->w[w]++;
+        final_file_info[nvslices*s->hnum + w]->coeffs++;
     }
     assert(*data == '\n');
     data=NULL;
@@ -1610,12 +1626,45 @@ cat /tmp/mat.h0.debug* | (n=0; while read x ; do echo "row $n" >&2 ; echo $x | (
 
 }
 
+void write_info_file()
+{
+    char * info;
+    FILE * f;
+    unsigned int i,j;
+    asprintf(&info, "%s.info", working_filename);
+    f = fopen(info, "w");
+    DIE_ERRNO_DIAG(f == NULL, "fopen", info);
+    fprintf(f, "%s", header);
+    for(i = 0 ; i < nhslices ; i++) {
+        for(j = 0 ; j < nvslices ; j++) {
+            fprintf(f, "%u %u"  /* total i, j */
+                    " %"PRIu32" %"PRIu32        /* i0 j0 for this block */
+                    " %"PRIu32" %"PRIu32        /* nr nc for this block */
+                    " %"PRIu32  /* ncoeffs */
+                    " %s\n",    /* filename */
+                    i,j,
+                    row_slices ? row_slices[i].i0 : 0,
+                    col_slices ? col_slices[j].i0 : 0,
+                    row_slices ? row_slices[i].nrows : nr,
+                    col_slices ? col_slices[j].nrows : nc,
+                    final_file_info[i*nvslices+j]->coeffs,
+                    final_file_info[i*nvslices+j]->s);
+        }
+    }
+    fclose(f);
+    free(info);
+}
 void cleanup()
 {
+    unsigned int i;
     if (row_slices)     free_slices(row_slices, nhslices);
     if (col_slices)     free_slices(col_slices, nvslices);
-    if (header) free(header);
+    free(header);
     free(line_bytes);
+    for(i = 0 ; i < nhslices * nvslices ; i++) {
+        free(final_file_info[i]->s);
+    }
+    free(final_file_info);
 }
 
 int main(int argc, char * argv[])
@@ -1767,32 +1816,10 @@ int main(int argc, char * argv[])
     sink_clear(datasink);
     fileset_clear(work);
 
+    write_info_file();
+
     fprintf(stderr, "Done\n");
 
     cleanup();
     return 0;
 }
-#if 0
-    if (header) {
-        char * newfile = malloc(strlen(dst) + 20);
-        snprintf(newfile, strlen(dst) + 20, "%s.%sslices", dst);
-
-        f = fopen(newfile, "w");
-        DIE_ERRNO_DIAG(f == NULL, "fopen", newfile);
-        fwrite(header, 1, header_bytes, f);
-        fprintf(f, "%d\n", nhslices);
-
-        i = 0;
-        for(ii = 0 ; ii < nhslices ; ii++) {
-            /* Want I J i0 ncoeffs filename */
-            fprintf(f, "%u %u %"PRIu32" %"PRIu32 " %" PRIu32 " %s\n",
-                    ii, 0,
-                    i,
-                    i+row_slices[ii].nrows, row_slices[ii].coeffs, chunks[ii]);
-            i += row_slices[ii].nrows;
-        }
-        fclose(f);
-        free(newfile);
-        free(header);
-    }
-#endif
