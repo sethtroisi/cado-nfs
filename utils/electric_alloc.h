@@ -1,10 +1,25 @@
+#ifndef CADO_UTILS_ELECTRIC_ALLOC_H_
+#define CADO_UTILS_ELECTRIC_ALLOC_H_
 
-/* undefine to protect underruns instead */
+/* This file is a debugging aid. It carries good chances of working on
+ * POSIX system, but I wouldn't bet much on it, since mmap is kind of
+ * strongly tied to the OS.
+ *
+ * To use, simply include this .h file, and use electric_alloc and
+ * electric_free for for allocation/free routines.
+ *
+ * The vanilla electric_free needs the size of the allocated area. If
+ * this is an inconvenient, try the _nosize versions below. Never tested.
+ */
+
+/* By default we protect overruns. Undefine this macro to protect
+ * underruns instead */
 #define PROTECT_OVERRUN
 
 #include <fcntl.h>
 #include <sys/mman.h>
 
+static inline
 void * electric_alloc(size_t s)
 {
     /* Use the method of the good old days from electric fence. */
@@ -26,6 +41,7 @@ void * electric_alloc(size_t s)
     return (void *) p;
 }
 
+static inline
 void electric_free(void * p0, size_t s)
 {
     char * p = (char *) p0;
@@ -43,3 +59,20 @@ void electric_free(void * p0, size_t s)
     // actually unmapping crashes, I don't know why.
 }
 
+static inline
+void * electric_alloc_nosize(size_t s)
+{
+    void * ptr = electric_alloc(s + sizeof(s));
+    *(size_t *)ptr = s;
+    return (void *) (((size_t *) ptr) + 1);
+}
+
+static inline
+void electric_free_nosize(void * p0)
+{
+    p0 = (void*) (((size_t *)p0)-1);
+    size_t s = * (size_t *) p0;
+    electric_free(p0, s + sizeof(s));
+}
+
+#endif  /* CADO_UTILS_ELECTRIC_ALLOC_H_ */
