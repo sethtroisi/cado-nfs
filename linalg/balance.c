@@ -58,6 +58,7 @@ unsigned int nvslices = 1;
 int keep_temps = 0;
 int remove_input = 0;
 int pad_to_square = 0;
+int legacy = 0;
 
 int permute_rows = 0;
 int permute_cols = 0;
@@ -100,6 +101,7 @@ void usage()
             "--ram-limit <nnn>[kmgKMG]\tfix maximum memory usage\n"
             "--keep-temps\tkeep all temporary files\n"
             "--subdir <d>\tchdir to <d> beforehand\n"
+            "--legacy\tproduce only one jumbo matrix file\n"
            );
     exit(1);
 }
@@ -1314,6 +1316,7 @@ struct sink_s {
     fileset_ptr fh;
     fileset fv;
     FILE ** curr;
+    FILE * f;   /* only for legacy jumbo output */
     /* Which row slice is being processed ? */
     unsigned int hnum;
     /* Only if we do column manipulation */
@@ -1364,16 +1367,28 @@ void sink_hook(sink s, unsigned int i0, unsigned int i1)
         ASSERT_ALWAYS(i0 == nr);
         return;
     }
+    if (legacy) {
+        if (i0 == 0) {
+            s->f = fopen(working_filename, "w");
+            fprintf(s->f, "%s", header);
+        }
+        if (i0 == nr) {
+            fclose(s->f);
+            s->f = NULL;
+        }
+    }
     if (i0 == row_slices[s->hnum].i0 + row_slices[s->hnum].nrows) {
-        fileset_close(s->fv, s->curr);
-        fileset_clear(s->fv);
+        if (!legacy) {
+            fileset_close(s->fv, s->curr);
+            fileset_clear(s->fv);
+        }
         s->hnum++;
     }
     if (s->hnum == nhslices) {
         ASSERT_ALWAYS(i0 == i1);
         return;
     }
-    if (i0 == row_slices[s->hnum].i0) {
+    if (i0 == row_slices[s->hnum].i0 && !legacy) {
         unsigned int i;
         fileset_init_transfer(s->fv, nvslices, "v", s->fh, s->hnum, OUTPUT);
         s->curr = fileset_open(s->fv, "w");
@@ -1413,7 +1428,7 @@ void sink_feed_row(sink s,
         const char * data0,
         size_t sz)
 {
-    unsigned int nj;
+    unsigned int nj = 0;
     unsigned int jj;
     const char * data = data0;
     char * ndata;
@@ -1436,7 +1451,7 @@ void sink_feed_row(sink s,
             char scrap[10];
             w = which_slice(col_slices, nvslices, s->cdirect[j]);
             snprintf(scrap, sizeof(scrap), " %u",
-                    s->cdirect[j]-col_slices[w].i0);
+                    s->cdirect[j]-(legacy?0:col_slices[w].i0));
             cperm_append(s->cp, w, scrap, strlen(scrap));
             if (*data == ':') {
                 int e;
@@ -1455,10 +1470,18 @@ void sink_feed_row(sink s,
         data=NULL;
     }
 
-    for(jj = 0 ; jj < nvslices ; jj++) {
-        fprintf(s->curr[jj], "%u", s->cp->w[jj]);
-        fwrite(s->cp->bufs[jj]->buf, 1, s->cp->pos[jj], s->curr[jj]);
-        fputc('\n', s->curr[jj]);
+    if (legacy) {
+        fprintf(s->f, "%u", nj);
+        for(jj = 0 ; jj < nvslices ; jj++) {
+            fwrite(s->cp->bufs[jj]->buf, 1, s->cp->pos[jj], s->f);
+        }
+        fputc('\n', s->f);
+    } else {
+        for(jj = 0 ; jj < nvslices ; jj++) {
+            fprintf(s->curr[jj], "%u", s->cp->w[jj]);
+            fwrite(s->cp->bufs[jj]->buf, 1, s->cp->pos[jj], s->curr[jj]);
+            fputc('\n', s->curr[jj]);
+        }
     }
 #if 0
     if (nvslices > 1) {
@@ -1492,7 +1515,11 @@ void sink_feed_memory(sink s,
         }
     } else {
         assert(nvslices == 1);
-        fwrite(inmem, 1, sc->sz, s->curr[0]);
+        if (legacy) {
+            fwrite(inmem, 1, sc->sz, s->f);
+        } else {
+            fwrite(inmem, 1, sc->sz, s->curr[0]);
+        }
         s->last = row_slices[ii].i0 + sc->i1;
     }
 }
@@ -1776,16 +1803,15 @@ int main(int argc, char * argv[])
             if (!argc) usage();
             rc = chdir(argv[0]);
             DIE_ERRNO_DIAG(rc < 0, "chdir", argv[0]);
+        } else if (strcmp(argv[0], "--legacy") == 0) {
+            legacy = 1;
         } else if (strcmp(argv[0], "--remove-input") == 0) {
-            argv++,argc--;
             remove_input = 1;
         } else if (strcmp(argv[0], "--pad") == 0
                 || strcmp(argv[0], "--square") == 0)
         {
-            argv++,argc--;
             pad_to_square = 1;
         } else if (strcmp(argv[0], "--keep-temps") == 0) {
-            argv++,argc--;
             keep_temps = 1;
         } else if (strcmp(argv[0], "--ram-limit") == 0) {
             argv++,argc--;
@@ -1852,6 +1878,7 @@ int main(int argc, char * argv[])
             usage();
         }
     }
+
 
     if (pristine_filename == NULL) {
         fprintf(stderr, "which matrix whall I read ?\n");
@@ -1925,7 +1952,9 @@ int main(int argc, char * argv[])
     sink_clear(datasink);
     fileset_clear(work);
 
-    write_info_file();
+    if (!legacy) {
+        write_info_file();
+    }
 
     fprintf(stderr, "Done\n");
 

@@ -256,7 +256,7 @@ BW_RANDOM_LIBS:=-lgmpxx -lgmp
 # NFSFORGE_LIBS:=-lgmpxx -lgmp
 # -include .nfsforge.mkf
 # 
-BW_BALANCE_SOURCES:=cxx/balance.c
+BW_BALANCE_SOURCES:=../balance.c
 BW_BALANCE_LIBS:=
 -include .bw-balance.mkf
 

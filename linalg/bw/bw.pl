@@ -195,6 +195,7 @@ my $maxload =	$param->{'maxload'};	dumpvar 'maxload';
 my $seed =	$param->{'seed'};	dumpvar 'seed';
 my $precond =	$param->{'precond'};	dumpvar 'precond';
 my $dimk =	$param->{'dimk'};	dumpvar 'dimk';
+my $remove_input =	$param->{'remove_input'};	dumpvar 'remove_input';
 
 if ($param->{'dumpcfg'}) {
 	print $dumped;
@@ -351,11 +352,13 @@ if ($resume) {
 	$param->{'modulus'} = $h->{'modulus'};
 } else {
 	if ($matrix) {
-		do_cp $matrix, "$wdir/matrix.txt";
+            # do_cp $matrix, "$wdir/matrix.txt";
+            # We no longer copy
 	} else {
 		# If no matrix parameter is set at this moment, then surely it
 		# means we're playing with a random sample: create it !
-		action "${bindir}bw-random $seeding --dimk $dimk $nrows $ncols $modulus $dens > $wdir/matrix.txt";
+		action "${bindir}bw-random $seeding --dimk $dimk $nrows $ncols $modulus $dens > $wdir/random_matrix.txt";
+                $matrix="$wdir/random_matrix.txt";
 	}
 }
 
@@ -366,14 +369,17 @@ if ($modulus eq '2' && $multisols == 0) {
 
 account 'io';
 
+my $balance = "${bindir}bw-balance --legacy --subdir $wdir --pad-square";
+$balance .= " --in $matrix --out matrix.txt";
+$balance .= " --remove-input" if $remove_input;
+
 if ($mt) {
-    action "${bindir}bw-balance --subdir $wdir --nbuckets $mt"
-            unless ($resume && -f "$wdir/matrix.txt.old");
+    $balance .= " --nhslices $mt";
 } else {
+    $balance .= " --nhslices 1";
     print STDERR "FIXME: bw-balance in non-mt mode serves only to make the matrix square, which is perfectly ridiculous\n";
-    action "${bindir}bw-balance --subdir $wdir --nbuckets 1"
-            unless ($resume && -f "$wdir/matrix.txt.old");
 }
+action $balance unless ($resume && -f "$wdir/matrix.txt");
 action "${bindir}bw-secure --subdir $wdir"
 	unless ($resume && -f "$wdir/X0-vector");
 
