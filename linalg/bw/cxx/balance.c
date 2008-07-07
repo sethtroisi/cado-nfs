@@ -1449,7 +1449,7 @@ void weight_sort_hslice(sink datasink, fileset fs, unsigned int ii)
 
     if (split->n > 1) {
         fileset fstmp;
-        fileset_init_transfer(fstmp, split->n, "sort", fs, 0, TEMP);
+        fileset_init_transfer(fstmp, split->n, "sort", fs, ii, TEMP);
         dispatcher(fstmp, fs_local, nbytes, dispatch, nrs);
         fileset_swap(fs_local, fstmp);
         fileset_clear(fstmp);
