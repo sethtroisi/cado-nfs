@@ -29,9 +29,6 @@
  * requirements.
  */
 #define xxxUSE_32BIT_MATRIX_INDICES
-#ifdef  SLICE_STATS
-#include <cmath>
-#endif
 
 class matrix_repr_binary_sliced {
 public:
