@@ -12,17 +12,17 @@
 #include <assert.h>
 #include <limits.h>
 #include <ctype.h>
+#include <math.h>       /* XXX could probably remove it */
 
 
-#include <math.h>       /* XXX probably best to remove it */
-
+/*{{{ macros */
 #ifdef  __cplusplus
 using namespace std;
 #endif
 
 /* I'd prefer the program to stay completely standalone */
 #ifndef ASSERT_ALWAYS
-#define ASSERT_ALWAYS(x) do { if (!(x)) abort(); } while (0)
+#define ASSERT_ALWAYS(x) do { if (!(x)) { fprintf(stderr, "Assertion " #x " failed\n"); abort(); } } while (0)
 #endif
 
 #define DIE_ERRNO_DIAG(tst, func, arg) do {				\
@@ -38,8 +38,11 @@ using namespace std;
         exit(1);							\
     }									\
 } while (0)
+/*}}}*/
 
+typedef int (*sortfunc_t)(const void *, const void *);
 
+/*{{{ globals ; flags, mostly */
 unsigned int nhslices = 1;
 unsigned int nvslices = 1;
 
@@ -69,6 +72,7 @@ const char * pristine_filename;
 
 /* basename of the resulting matrix filename */
 const char * working_filename = "mat";
+/*}}}*/
 
 void usage()
 {
@@ -100,6 +104,70 @@ size_t * line_bytes;
 size_t header_bytes;
 char * header /* = NULL */;
 
+struct slice * row_slices;
+struct slice * col_slices;
+
+/* {{{ Several data types */
+/* {{{ Datatype containing description for slices of the matrix */
+struct slice {
+    uint32_t * r;
+    uint32_t nrows;
+    uint32_t coeffs;
+    uint32_t i0;
+};
+
+int slice_finding_helper(const uint32_t * key, const struct slice * elem)
+{
+    if (*key < elem->i0) {
+        return -1;
+    } else if (*key >= elem->i0 + elem->nrows) {
+        return 1;
+    }
+    return 0;
+}
+
+unsigned int which_slice(const struct slice * slices, unsigned int ns, uint32_t k)
+{
+    const struct slice * found = (const struct slice *) bsearch(
+            (const void *) &k, (const void *) slices,
+            ns, sizeof(struct slice),
+            (sortfunc_t) &slice_finding_helper);
+    if (found == NULL) {
+        return UINT_MAX;
+    } else {
+        return found - slices;
+    }
+}
+
+
+void free_slices(struct slice * slices, unsigned int n)
+{
+    unsigned int i;
+    for(i = 0 ; i < n ; i++) {
+        free(slices[i].r);
+    }
+    free(slices);
+}
+
+
+
+struct slice * alloc_slices(unsigned int water, unsigned int n)
+{
+    struct slice * res;
+    unsigned int i;
+
+    res = (struct slice*) malloc(n * sizeof(struct slice));
+
+    uint32_t min_size = water / n;
+
+    for(i = 0 ; i < n ; i++) {
+        res[i].nrows = min_size + (i < (water % n));
+        res[i].r = (uint32_t *) malloc(res[i].nrows * sizeof(uint32_t));
+    }
+
+    return res;
+}
+/* }}} */
 /* {{{ reading buffer stuff */
 struct reading_buffer_s {
     char buf[1024];
@@ -177,6 +245,215 @@ void rb_feed_buffer_again_if_lowwater(reading_buffer b,
     b->siz += strlen(b->buf + b->siz);
 }
 /* }}} */
+/* {{{ copy buffers -- useful for copying large chunks of data when there
+ * is no parsing involved at all
+ */
+struct copybuf_s {
+    char * buf;
+    size_t siz;
+};
+
+typedef struct copybuf_s copybuf[1];
+
+void cb_init(copybuf cb) {
+    memset(cb, 0, sizeof(copybuf));
+}
+void cb_clear(copybuf cb) {
+    free(cb->buf);
+}
+void cb_ensure(copybuf cb, size_t amount__)
+{
+    if (cb->siz >= (amount__)) return;
+    if (cb->siz == 0) cb->siz=1024;
+    assert(amount__ < (1 << 30));
+    for( ; cb->siz < (amount__) ; cb->siz <<= 1);
+    cb->buf = (char *) realloc(cb->buf, cb->siz);
+}
+/* }}} */
+/* {{{ A data type for managing sets of files */
+enum fileset_status { INPUT, TEMP, OUTPUT };
+struct fileset_s {
+    char ** names;
+    unsigned int n;
+    enum fileset_status status;
+};
+
+typedef struct fileset_s fileset[1];
+typedef struct fileset_s * fileset_ptr;
+
+void fileset_init(fileset x, unsigned int n)
+{
+    x->names = (char **) malloc(n * sizeof(char *));
+    memset(x->names, 0, n * sizeof(char *)); 
+    x->n = n;
+}
+
+/* This possibly unlinks one of the files within an file set, but only
+ * if the flags keep_temps, remove_input are in accordance with the
+ * status of this particular input set.
+ */
+void fileset_dispose(fileset x, unsigned int i)
+{
+    int yes=0;
+    switch(x->status) {
+        case INPUT:
+            assert(x->n == 1 && i == 0);
+            yes = remove_input;
+            break;
+        case TEMP:
+            yes = !keep_temps;
+            break;
+        case OUTPUT:
+        default:
+            break;
+    }
+    if (yes) {
+        unlink(x->names[i]);
+    }
+}
+
+void fileset_clear(fileset x)
+{
+    unsigned int i;
+    for(i = 0 ; i < x->n ; i++) {
+        free(x->names[i]);
+    }
+    free(x->names);
+    memset(x, 0, sizeof(fileset));
+}
+
+void fileset_name(fileset x, const char * name, const char * key)
+{
+    unsigned int i;
+    for(i = 0 ; i < x->n ; i++) {
+        free(x->names[i]);
+    }
+    const char * prefix = x->status == TEMP ? "tmp-" : "";
+    if (x->n == 1) {
+        asprintf(&(x->names[0]), "%s%s", prefix, name);
+    } else {
+        for(i = 0 ; i < x->n ; i++) {
+            asprintf(&(x->names[i]), "%s%s.%s%u", prefix, name, key, i);
+        }
+    }
+}
+
+void fileset_init_transfer(fileset y,
+        unsigned int n, const char * key,
+        fileset x,
+        unsigned int i,
+        enum fileset_status s)
+{
+    fileset_init(y,n);
+    y->status = s;
+    if (x->status == INPUT) {
+        fileset_name(y, working_filename, key);
+    } else {
+        assert(x->status == TEMP);
+        const char * v = x->names[i];
+        if (strncmp(v, "tmp-", 4) == 0) {
+            v += 4;
+        } else {
+            abort();
+        }
+        fileset_name(y, v, key);
+    }
+}
+
+FILE ** fileset_open(fileset x, const char * mode)
+{
+    unsigned int i;
+    FILE ** res = (FILE **) malloc(x->n * sizeof(FILE *));
+    for(i = 0 ; i < x->n ; i++) {
+        res[i] = fopen(x->names[i], mode);
+        DIE_ERRNO_DIAG(res[i] == NULL, "fopen", x->names[i]);
+    }
+    return res;
+}
+void fileset_close(fileset x, FILE ** f)
+{
+    unsigned int i;
+    for(i = 0 ; i < x->n ; i++) {
+        fclose(f[i]);
+    }
+    free(f);
+}
+void fileset_swap(fileset x, fileset y)
+{
+    fileset z;
+    memcpy(z,x,sizeof(fileset));
+    memcpy(x,y,sizeof(fileset));
+    memcpy(y,z,sizeof(fileset));
+}
+void fileset_init_isolate(fileset y, fileset x, unsigned int i)
+{
+    y->status = x->status;
+    y->n = 1;
+    y->names=(char **) malloc(sizeof(char*));
+    y->names[0] = strdup(x->names[i]);
+}
+FILE * fileset_open_one(fileset x, unsigned int i, const char * mode)
+{
+    FILE * res = fopen(x->names[i], mode);
+    DIE_ERRNO_DIAG(res == NULL, "fopen", x->names[i]);
+    if (x->status == INPUT) {
+        fseek(res, header_bytes, SEEK_SET);
+    }
+    return res;
+}
+void fileset_close_one(fileset x, unsigned int i, FILE * f)
+{
+    fclose(f);
+}
+
+/* }}} */
+/* {{{ column permutation buffers */
+struct cperm_buf_s {
+    copybuf * bufs;
+    unsigned int * pos;
+    unsigned int * w;
+    unsigned int n;
+};
+typedef struct cperm_buf_s cperm_buf[1];
+/* This merely does a reset for later reuse. */
+void cperm_reset(cperm_buf cp)
+{
+    unsigned int i;
+    for(i = 0 ; i < cp->n ; i++) {
+        cp->pos[i] = cp->w[i] = 0;
+    }
+}
+void cperm_init(cperm_buf cp, unsigned int n)
+{
+    unsigned int i;
+    cp->n=n;
+    cp->w = (unsigned int *) malloc(n * sizeof(unsigned int));
+    cp->pos = (unsigned int *) malloc(n * sizeof(unsigned int));
+    cp->bufs = (copybuf *) malloc(n * sizeof(copybuf));
+    for(i = 0 ; i < cp->n ; i++) {
+        cb_init(cp->bufs[i]);
+    }
+    cperm_reset(cp);
+}
+void cperm_clear(cperm_buf cp)
+{
+    unsigned int i;
+    for(i = 0 ; i < cp->n ; i++) {
+        cb_clear(cp->bufs[i]);
+    }
+    free(cp->bufs);
+    free(cp->w);
+    free(cp->pos);
+}
+void cperm_append(cperm_buf cp, unsigned int i, const char * text, unsigned int sz)
+{
+    cb_ensure(cp->bufs[i], cp->pos[i] + sz);
+    memcpy(cp->bufs[i]->buf + cp->pos[i], text, sz);
+    cp->pos[i] += sz;
+}
+/* }}} */
+/* }}} */
+
 
 // {{{ give mean, std dev and so on
 void give_stats(const char * text, const struct row * data, unsigned int n)
@@ -213,6 +490,7 @@ void give_stats(const char * text, const struct row * data, unsigned int n)
 }
 // }}}
 
+/* {{{ read the matrix */
 int read_matrix()
 {
     reading_buffer b;
@@ -370,20 +648,20 @@ int read_matrix()
 
     return 0;
 }
+/* }}} */
 
+/*{{{ utilities for shuffle_rtable */
 int decr_weight_cmp(const struct row * a, const struct row * b)
 {
     return b->w - a->w;
 }
 
+#if 0
 int row_compare_index(const struct row * a, const struct row * b)
 {
     return a->i - b->i;
 }
-
-typedef int (*sortfunc_t)(const void *, const void *);
-
-
+#endif
 
 /* {{{ Data type for buckets used in the priority queue stuff (w/ tests) */
 /* We'll arrange our slices in a priority heap, so that we'll always
@@ -492,73 +770,10 @@ make_heap(struct bucket * __first, struct bucket * __last)
 /* end of heap code */
 /* }}} */
 
-/* {{{ Datatype containing description for slices of the matrix */
-struct slice {
-    struct row * data;
-    uint32_t nrows;
-    uint32_t coeffs;
-    uint32_t i0;
-};
+/*}}}*/
 
-int slice_finding_helper(const uint32_t * key, const struct slice * elem)
-{
-    if (*key < elem->i0) {
-        return -1;
-    } else if (*key >= elem->i0 + elem->nrows) {
-        return 1;
-    }
-    return 0;
-}
-
-unsigned int which_slice(const struct slice * slices, unsigned int ns, uint32_t k)
-{
-    const struct slice * found = (const struct slice *) bsearch(
-            (const void *) &k, (const void *) slices,
-            ns, sizeof(struct slice),
-            (sortfunc_t) &slice_finding_helper);
-    if (found == NULL) {
-        return UINT_MAX;
-    } else {
-        return found - slices;
-    }
-}
-
-
-void free_slices(struct slice * slices, unsigned int n)
-{
-    unsigned int i;
-    for(i = 0 ; i < n ; i++) {
-        free(slices[i].data);
-    }
-    free(slices);
-}
-
-
-
-struct slice * alloc_slices(unsigned int water, unsigned int n)
-{
-    struct slice * res;
-    unsigned int i;
-
-    res = (struct slice*) malloc(n * sizeof(struct slice));
-
-    uint32_t min_size = water / n;
-
-    for(i = 0 ; i < n ; i++) {
-        res[i].nrows = min_size + (i < (water % n));
-        res[i].data = (struct row *) malloc((res[i].nrows + 1)
-                    * sizeof(struct row));
-        /* This is a safeguard for what we're doing in shipout() */
-        // XXX still used ?
-        res[i].data[res[i].nrows].i = UINT_MAX;
-    }
-
-    return res;
-}
-/* }}} */
-
-/* This is the basic procedure which dispatches rows (or columns) in
- * buckets according to our preferred strategy
+/* {{{ shuffle_rtable: This is the basic procedure which dispatches rows
+ * (or columns) in buckets according to our preferred strategy
  */
 struct slice * shuffle_rtable(
         const char * text,
@@ -603,7 +818,7 @@ struct slice * shuffle_rtable(
                 for(l = 0 ; l < chunk && heap[k].room ; l++) {
                     int j = heap[k].i;
                     int pos = slices[j].nrows-heap[k].room;
-                    slices[j].data[pos]=rt[i];
+                    slices[j].r[pos]=rt[i].i;
                     heap[k].s += rt[i].w;
                     heap[k].room--;
                     i++;
@@ -616,7 +831,7 @@ struct slice * shuffle_rtable(
         for( ; i < ni ; i++) {
             int j = heap[0].i;
             int pos = slices[j].nrows-heap[0].room;
-            slices[j].data[pos] = rt[i];
+            slices[j].r[pos] = rt[i].i;
             heap[0].s += rt[i].w;
             heap[0].room--;
             pop_heap(heap, heap + ns);
@@ -657,11 +872,10 @@ struct slice * shuffle_rtable(
 
     return slices;
 }
+/* }}} */
 
-struct slice * row_slices;
-struct slice * col_slices;
 
-void do_sorting()
+void compute_permutation()
 {
     if (permute_rows) {
         row_slices = shuffle_rtable("horizontal", row_table, nr, nhslices);
@@ -669,80 +883,19 @@ void do_sorting()
     if (permute_cols) {
         col_slices = shuffle_rtable("vertical", col_table, nc, nvslices);
     }
-}
-
-/* {{{ copy buffers -- useful for copying large chunks of data when there
- * is no parsing involved at all
- */
-struct copybuf_s {
-    char * buf;
-    size_t siz;
-};
-
-typedef struct copybuf_s copybuf[1];
-
-void cb_init(copybuf cb) {
-    memset(cb, 0, sizeof(copybuf));
-}
-void cb_clear(copybuf cb) {
-    free(cb->buf);
-}
-void cb_ensure(copybuf cb, size_t amount__)
-{
-    if (cb->siz >= (amount__)) return;
-    if (cb->siz == 0) cb->siz=1024;
-    assert(amount__ < (1 << 30));
-    for( ; cb->siz < (amount__) ; cb->siz <<= 1);
-    cb->buf = (char *) realloc(cb->buf, cb->siz);
-}
-/* }}} */
-
-/* {{{ column permutation buffers */
-struct cperm_buf_s {
-    copybuf * bufs;
-    unsigned int * pos;
-    unsigned int * w;
-    unsigned int n;
-};
-typedef struct cperm_buf_s cperm_buf[1];
-/* This merely does a reset for later reuse. */
-void cperm_reset(cperm_buf cp)
-{
-    unsigned int i;
-    for(i = 0 ; i < cp->n ; i++) {
-        cp->pos[i] = cp->w[i] = 0;
+    if (nhslices == 1 && !permute_rows && permute_cols) {
+        row_slices = alloc_slices(nr, nhslices);
+        unsigned int i;
+        for(i = 0 ; i < nr ; i++) {
+            row_slices[0].r[i]=i;
+        }
+        row_slices[0].i0 = 0;
+        row_slices[0].nrows = nr;
     }
 }
-void cperm_init(cperm_buf cp, unsigned int n)
-{
-    unsigned int i;
-    cp->n=n;
-    cp->w = (unsigned int *) malloc(n * sizeof(unsigned int));
-    cp->pos = (unsigned int *) malloc(n * sizeof(unsigned int));
-    cp->bufs = (copybuf *) malloc(n * sizeof(copybuf));
-    for(i = 0 ; i < cp->n ; i++) {
-        cb_init(cp->bufs[i]);
-    }
-    cperm_reset(cp);
-}
-void cperm_clear(cperm_buf cp)
-{
-    unsigned int i;
-    for(i = 0 ; i < cp->n ; i++) {
-        cb_clear(cp->bufs[i]);
-    }
-    free(cp->bufs);
-    free(cp->w);
-    free(cp->pos);
-}
-void cperm_append(cperm_buf cp, unsigned int i, const char * text, unsigned int sz)
-{
-    cb_ensure(cp->bufs[i], cp->pos[i] + sz);
-    memcpy(cp->bufs[i]->buf + cp->pos[i], text, sz);
-    cp->pos[i] += sz;
-}
-/* }}} */
 
+
+#if 0 /* {{{ old hslices code */
 void open_hslices_files(const char * oname, const char * wname,
         const char * key,
         char *** pnames, FILE *** g,
@@ -798,19 +951,20 @@ void close_hslices_files(char *** names, FILE *** g, int n)
         free(*names);
     }
 }
+#endif /* }}} */
 
 void dispatcher(
-        const char * dst, const char * key, unsigned int n,
-        const char * src,
-        size_t hdr, size_t * sizes,
+        fileset dst, fileset src, 
+        size_t * sizes,
         unsigned int *dispatch,
         unsigned int nr)
 {
-    char ** chunks;
     FILE ** g;
     unsigned int ii;
     FILE * f;
     int i;
+
+    assert(src->n == 1);
 
     copybuf cb;
 
@@ -818,14 +972,8 @@ void dispatcher(
 #define BIGCHUNK        16384
     cb_ensure(cb, BIGCHUNK);
 
-    f = fopen(src, "r");
-    DIE_ERRNO_DIAG(f == NULL, "fopen", src);
-
-    open_hslices_files(src, dst, key, &chunks, &g, n, "w");
-
-    if (hdr) {
-        fseek(f, hdr, SEEK_SET);
-    }
+    f = fileset_open_one(src, 0, "r");
+    g = fileset_open(dst, "w");
 
     for(i = 0 ; i < nr ; i++) {
         ii = dispatch[i];
@@ -843,15 +991,18 @@ void dispatcher(
     fclose(f);
     cb_clear(cb);
 
+    /* We've now done the dispatching, so the input file may be removed
+     * if it's a temporary */
+    fileset_dispose(src, 0);
 
-    close_hslices_files(&chunks, &g, n);
+    fileset_close(dst, g);
 }
 
 
 /* We're only doing this if nhslices > 1 or if we are asked to size-sort
  * rows
  */
-void dispatch_row_slices()
+void dispatch_row_slices(fileset fs)
 {
     uint32_t i;
     unsigned int * dispatch;
@@ -860,37 +1011,44 @@ void dispatch_row_slices()
     for(i = 0 ; i < nhslices ; i++) {
         uint32_t k;
         for(k = 0 ; k < row_slices[i].nrows ; k++) {
-            dispatch[row_slices[i].data[k].i]=i;
+            dispatch[row_slices[i].r[k]]=i;
         }
     }
 
-    dispatcher(working_filename, "h", nhslices,
-            pristine_filename, header_bytes, line_bytes,
-            dispatch, nr);
+    fileset fstmp;
+    fileset_init_transfer(fstmp, nhslices, "h", fs, 0, TEMP);
+
+    dispatcher(fstmp, fs, line_bytes, dispatch, nr);
+
+    fileset_swap(fs, fstmp);
+    fileset_clear(fstmp);
 
     free(dispatch);
 }
 
+/*{{{ write_permutation */
 void write_permutation(const char * filename,
-        struct slice * slice, int already_sorted)
+        struct slice * slice, unsigned int ns, int already_sorted)
 {
     FILE * f;
     uint32_t i,ii;
     f = fopen(filename, "w");
     i = 0;
 
-    for(ii = 0 ; ii < nhslices ; ii++) {
+    for(ii = 0 ; ii < ns ; ii++) {
         const struct slice * r = &(slice[ii]);
         for(i = 0 ; i < r->nrows ; i++) {
             if (already_sorted && i) {
-                ASSERT_ALWAYS(r->data[i].i > r->data[i-1].i);
+                ASSERT_ALWAYS(r->r[i] > r->r[i-1]);
             }
-            fprintf(f, "%" PRIu32 "\n", r->data[i].i);
+            fprintf(f, "%" PRIu32 "\n", r->r[i]);
         }
     }
     fclose(f);
 }
+/*}}}*/
 
+/* {{{ comparison functions for weight_sort_hslice */
 struct idxpair {
     unsigned int x;
     unsigned int y;
@@ -905,412 +1063,558 @@ int idxcmp2(const struct idxpair * a, const struct idxpair * b)
     }
     return 0;
 }
+/* }}} */
 
+/* {{{ logic for deciding how the split into RAM-sized chunk goes for
+ * sorting */
+struct chunk_info_s {
+    unsigned int i0;
+    unsigned int i1;
+    size_t sz;
+};
+typedef struct chunk_info_s chunk_info[1];
+typedef struct chunk_info_s * chunk_info_ptr;
+struct chunk_splitting_s {
+    chunk_info * c;
+    unsigned int n;
+};
+typedef struct chunk_splitting_s chunk_splitting[1];
 
-void do_per_hslice_stuff()
+void clear_splitting(chunk_splitting s)
 {
-    char ** chunks;
-    uint32_t i, ii;
-    copybuf cb;
-    uint32_t * cdirect;
-    cperm_buf cp;
+    free(s->c);
+}
 
-    if (permute_cols) {
-        cperm_init(cp, nvslices);
-        cdirect = (uint32_t *) malloc(nc * sizeof(uint32_t));
-        memset(cdirect, 0, nc * sizeof(uint32_t));
-        for(ii = 0 ; ii < nvslices ; ii++) {
-            const struct slice * r = &(col_slices[ii]);
-            for(i = 0 ; i < r->nrows ; i++) {
-                cdirect[r->data[i].i]=r->i0+i;
-            }
+/* Decide in how many chunks we would have to split a slice in order to
+ * perform sorting. This depends on the RAM limit which has been set.
+ */
+void compute_chunk_splitting(chunk_splitting s, unsigned int ii)
+{
+    size_t tot = 0;
+    unsigned int i;
+    unsigned int nrs = row_slices[ii].nrows;
+
+    /* Split the file into RAM-sized chunks */
+    for(i = 0 ; i < nrs ; i++) {
+        tot += line_bytes[row_slices[ii].r[i]];
+    }
+
+    unsigned int nsubchunks = ((tot+ram_limit-1)/ram_limit);
+    unsigned int nsc_max = (2*nsubchunks+1); // allow round-off error.
+
+    s->c = (chunk_info *) malloc(nsc_max*sizeof(chunk_info));
+    s->n = nsubchunks;
+
+    if (nsubchunks == 1) {
+        printf("Sorting hslice %u directly into memory\n", ii);
+        s->c[0]->i0 = 0;
+        s->c[0]->sz = tot;
+        s->c[0]->i1 = nrs;
+        return;
+    }
+
+    /* The 1024 here should be sufficient to avoid round-off
+     * misses. They would not be catastrophic anyway. It's
+     * just a pain to have nsubchunks+1 cuts instead of
+     * nsubchunks (especially when the last one really is so
+     * tiny). */
+    size_t my_ram_limit = 1024 + (tot+nsubchunks-1) / nsubchunks;
+    unsigned int ram_chunk=0;
+    s->c[0]->i0 = 0;
+    tot=0;
+    for(i = 0 ; i < nrs ; i++) {
+        size_t d = line_bytes[row_slices[ii].r[i]];
+        if (tot + d >= my_ram_limit) {
+            s->c[ram_chunk]->i1 = i;
+            s->c[ram_chunk]->sz = tot;
+            ram_chunk++;
+            ASSERT_ALWAYS(ram_chunk < nsc_max);
+            s->c[ram_chunk]->i0 = i;
+            tot = 0;
+        }
+        tot += d;
+    }
+    s->c[ram_chunk]->i1 = i;
+    s->c[ram_chunk]->sz = tot;
+    s->n = ram_chunk + 1;
+    s->c = realloc(s->c, s->n * sizeof(chunk_info));
+
+    printf("Splitting hslice %u into %u intermediary files for sorting\n",
+            ii, s->n);
+}
+/* }}} */
+
+unsigned int * compute_dispatch_from_splitting(
+        chunk_splitting s,
+        unsigned int * shuffle,
+        unsigned int nrs)
+{
+    unsigned int * dispatch;
+    unsigned int k;
+
+    if (s->n == 0)
+        return NULL;
+    dispatch = (unsigned int *) malloc(nrs * sizeof(unsigned int));
+    for(k = 0 ; k < s->n ; k++) {
+        unsigned int i;
+        for(i = s->c[k]->i0 ; i < s->c[k]->i1 ; i++) {
+            dispatch[shuffle[i]]=k;
         }
     }
 
-    cb_init(cb);
+    return dispatch;
+}
 
-    open_hslices_files(pristine_filename, working_filename, "h", 
-            &chunks, NULL, nhslices, "r");
 
-    for(ii = 0 ; ii < nhslices ; ii++) {
-        if (weight_sort_in_cells && !rows_are_weight_sorted) {
-            const char * writable_name;
-            if (nhslices == 1) {
-                writable_name=working_filename;
-            } else {
-                writable_name=chunks[ii];
+/* This function returns the exact permutation of rows which is presently
+ * relected in the horizontal slices (there could be only one such slice,
+ * in which case it's the identity permutation).
+ */
+uint32_t * rowperm_after_dispatch(unsigned int ii)
+{
+    uint32_t nrs = row_slices[ii].nrows;
+    unsigned int i;
+
+    /* At this moment, we know that rows indexed within
+     * row_slices[ii].data[] are effectively in fs->names[ii].
+     * However, row at position k in this file is just the
+     * k-earliest row from the input file that actually goes to
+     * this slice.
+     *
+     * We need to fix this. Therefore we need to re-establish a
+     * proper mapping that will give us information about the
+     * rows currently in the slice, and where they will go.
+     */
+
+    struct idxpair * wherefrom;
+    wherefrom = (struct idxpair *) malloc(nrs*sizeof(struct idxpair));
+    for(i = 0 ; i < nrs ; i++) {
+        wherefrom[i].x=i;
+        wherefrom[i].y=row_slices[ii].r[i];
+    }
+    qsort(wherefrom, nrs, sizeof(struct idxpair), (sortfunc_t) idxcmp2);
+    /* now wherefrom[kk].x is the index in the current file of the row
+     * that will go to position [kk] eventually.
+     * wherefrom[kk].y is the index of that same row in the
+     * original big file */
+
+    uint32_t * shuffle = malloc(nrs * sizeof(uint32_t));
+    for(i = 0 ; i < nrs ; i++) {
+        shuffle[wherefrom[i].x]=i;
+    }
+    free(wherefrom); wherefrom = NULL;
+
+    return shuffle;
+}
+
+/* {{{ sink -- the way we eventually process the final data that will go
+ * to the output files */
+
+struct sink_s {
+    fileset out;
+    unsigned int last;
+    /* fileset for final repartition of output files */
+    fileset_ptr fh;
+    fileset fv;
+    FILE ** curr;
+    /* Which row slice is being processed ? */
+    unsigned int hnum;
+    /* Only if we do column manipulation */
+    uint32_t * cdirect;
+    cperm_buf cp;
+    /* this boolean triggers configuration, to happen as late as possible
+     */
+    int configured;
+};
+typedef struct sink_s * sink_ptr;
+typedef struct sink_s sink[1];
+
+void sink_configure(sink s)
+{
+    unsigned int jj;
+    if (s->configured)
+        return;
+    if (permute_cols) {
+        cperm_init(s->cp, nvslices);
+        s->cdirect = (uint32_t *) malloc(nc * sizeof(uint32_t));
+        memset(s->cdirect, 0, nc * sizeof(uint32_t));
+        for(jj = 0 ; jj < nvslices ; jj++) {
+            const struct slice * r = &(col_slices[jj]);
+            unsigned int i;
+            for(i = 0 ; i < r->nrows ; i++) {
+                s->cdirect[r->r[i]]=r->i0+i;
             }
-            cb_ensure(cb, BIGCHUNK);
-            /* We have to do the sorting */
-            uint32_t nrs = row_slices[ii].nrows;
-            /* At this moment, we know that rows indexed within
-             * row_slices[ii].data[] are effectively in chunks[ii].
-             * However, row at position k in this file is just the
-             * k-earliest row from the input file that actually goes to
-             * this slice.
-             *
-             * We need to fix this. Therefore we need to re-establish a
-             * proper mapping that will give us information about the
-             * rows currently in the slice, and where they will go.
-             */
-            struct idxpair * wherefrom;
-            wherefrom = (struct idxpair *) malloc(nrs*sizeof(struct idxpair));
-            for(i = 0 ; i < nrs ; i++) {
-                wherefrom[i].x=i;
-                wherefrom[i].y=row_slices[ii].data[i].i;
-            }
-            qsort(wherefrom, nrs, sizeof(struct idxpair), (sortfunc_t) idxcmp2);
-            /* now wherefrom[kk].x is the index in the current file of the row
-             * that will go to position [kk] eventually.
-             * wherefrom[kk].y is the index of that same row in the
-             * original big file */
+        }
+    }
+    s->configured = 1;
+}
 
-            /* So we need to decide who goes where. Of course we could
-             * invert again the wherefrom array, but we'll pay too much
-             * for this, and anyway this array will become cumbersome. So
-             * let's rebuild the data in a more tidy way.
-             *
-             * We store the inverse permutation in shuffle[]
-             */
-            uint32_t * shuffle = malloc(nrs * sizeof(uint32_t));
-            for(i = 0 ; i < nrs ; i++) {
-                shuffle[wherefrom[i].x]=i;
-            }
-            free(wherefrom); wherefrom = NULL;
-            /* We now know that row shuffle[j] in the file chunks[ii] is in fact
-             * the one whose real index is
-             * row_slices[ii].data[j].i
-             *
-             * our purpose is to make it go to position j in
-             * that same file
-             */
+void sink_init(sink s, fileset_ptr fh)
+{
+    memset(s, 0, sizeof(sink));
+    s->fh = fh;
+}
+
+void sink_hook(sink s, unsigned int i0, unsigned int i1)
+{
+    ASSERT_ALWAYS(i0 == s->last);
+
+    if (i0 == 0) {
+        sink_configure(s);
+    }
+    if (s->hnum == nhslices) {
+        ASSERT_ALWAYS(i0 == i1);
+        ASSERT_ALWAYS(i0 == nr);
+        return;
+    }
+    if (i0 == row_slices[s->hnum].i0 + row_slices[s->hnum].nrows) {
+        fileset_close(s->fv, s->curr);
+        fileset_clear(s->fv);
+        s->hnum++;
+    }
+    if (s->hnum == nhslices) {
+        ASSERT_ALWAYS(i0 == i1);
+        return;
+    }
+    if (i0 == row_slices[s->hnum].i0) {
+        fileset_init_transfer(s->fv, nvslices, "v", s->fh, s->hnum, OUTPUT);
+        s->curr = fileset_open(s->fv, "w");
+    }
+}
+
+void sink_shunt(sink s)
+{
+    s->last = nr;
+    s->hnum = nhslices;
+}
+
+void sink_clear(sink s)
+{
+    assert(s->configured);
+    if (permute_cols) {
+        cperm_clear(s->cp);
+        free(s->cdirect);
+    }
+    ASSERT_ALWAYS(s->last == nr);
+    sink_hook(s, nr, nr);
+    ASSERT_ALWAYS(s->hnum == nhslices);
+}
 
 
-            /* To use the dispatcher() routine, we must create a
-             * dispatch[] array, and an nbytes[] one.
-             * Note that while both are available, one could do without
-             * if needed:
-             * nbytes[] could be obtained on the fly
-             * dispatch[] is really so trivial (mere index comparison)...
-             */
+/* }}} */
 
-            /* nbytes[] gives the size in bytes of the rows found in the
-             * chunk
-             */
-            size_t * nbytes = malloc(nrs * sizeof(size_t));
+/* This sink version is eventually used when column manipulation is
+ * performed */
+void sink_feed_row(sink s,
+        const char * data0,
+        size_t sz)
+{
+    unsigned int nj;
+    unsigned int jj;
+    const char * data = data0;
+    char * ndata;
+    cperm_reset(s->cp);
+    /* Don't use sscanf here. Its complexity is
+     * linear in strlen() of its argument */
+    nj=strtoul(data, &ndata, 10);
+    PARSE_CHECK(data==ndata, "row", strndup(data0,sz));
+    data=ndata;
+    for(jj = 0 ; jj < nj ; jj++) {
+        unsigned int j;
+        assert(*data == ' ');
+        data++;
+        j=strtoul(data, &ndata, 10);
+        PARSE_CHECK(data==ndata, "row", strndup(data0, sz));
+        data=ndata;
+        unsigned int w;
+        char scrap[10];
+        w = which_slice(col_slices, nvslices, s->cdirect[j]);
+        snprintf(scrap, sizeof(scrap), " %u",
+                s->cdirect[j]-col_slices[w].i0);
+        cperm_append(s->cp, w, scrap, strlen(scrap));
+        if (*data == ':') {
+            int e;
+            data++;
+            e=strtol(data, &ndata, 10);
+            PARSE_CHECK(data==ndata, "row",
+                    strndup(data0,sz));
+            cperm_append(s->cp, w, data-1, ndata-data+1);
+            data = ndata;
+        }
+        s->cp->w[w]++;
+    }
+    assert(*data == '\n');
+    data=NULL;
 
-            uint32_t tot = 0;
-            for(i = 0 ; i < nrs ; i++) {
-                nbytes[shuffle[i]]=line_bytes[row_slices[ii].data[i].i];
-            }
-
-            /* Split the file into RAM-sized chunks */
-            for(i = 0 ; i < nrs ; i++) {
-                tot += nbytes[i];
-            }
-            /* Decide exactly which will be the chunk size ; otherwise
-             * we'll do some ridiculous cuts */
-            unsigned int nsubchunks = ((tot+ram_limit-1)/ram_limit);
-            unsigned int nsc_max = (2*nsubchunks+1); // allow round-off err.
-            struct chunk_info_s {
-                unsigned int i0;
-                unsigned int i1;
-                size_t sz;
-            };
-            typedef struct chunk_info_s chunk_info[1];
-            chunk_info * sc_inf = (chunk_info *) malloc(nsc_max*sizeof(chunk_info));
-
-            unsigned int * dispatch = malloc(nrs * sizeof(unsigned int));
-            /* We're not going to split over many files if there's only
-             * one such file */
-            if (nsubchunks > 1) {
-                /* The 1024 here should be sufficient to avoid round-off
-                 * misses. They would not be catastrophic anyway. It's
-                 * just a pain to have nsubchunks+1 cuts instead of
-                 * nsubchunks (especially when the last one really is so
-                 * tiny). */
-                size_t my_ram_limit = 1024 + (tot+nsubchunks-1) / nsubchunks;
-                unsigned int ram_chunk=0;
-                sc_inf[0]->i0 = 0;
-                tot=0;
-                for(i = 0 ; i < nrs ; i++) {
-                    size_t d = nbytes[shuffle[i]];
-                    if (tot + d >= my_ram_limit) {
-                        sc_inf[ram_chunk]->i1 = i;
-                        sc_inf[ram_chunk]->sz = tot;
-                        ram_chunk++;
-                        ASSERT_ALWAYS(ram_chunk < nsc_max);
-                        sc_inf[ram_chunk]->i0 = i;
-                        tot = 0;
-                    }
-                    tot += d;
-                    dispatch[shuffle[i]] = ram_chunk;
-                }
-                sc_inf[ram_chunk]->i1 = i;
-                sc_inf[ram_chunk]->sz = tot;
-                nsubchunks = ram_chunk + 1;
-                printf("Splitting %s into %d intermediary files for sorting\n",
-                        chunks[ii], nsubchunks);
-                dispatcher(writable_name, "sort", nsubchunks,
-                        chunks[ii], nhslices == 1 ? header_bytes : 0,
-                        nbytes,
-                        dispatch, nrs);
-
-                if (remove_input && nhslices == 1) {
-                    unlink(pristine_filename);
-                }
-            } else {
-                printf("Sorting %s directly into memory\n", chunks[ii]);
-                sc_inf[0]->i0 = 0;
-                sc_inf[0]->sz = tot;
-                sc_inf[0]->i1 = nrs;
-            }
-
-            /* We'll now need something else: an array indicating the
-             * offsets at which the input rows in the sub-chunks must be
-             * put. This array, at first, is indexed by destination row.
-             */
-            off_t * poking_in_ordered_file;
-            poking_in_ordered_file = (off_t *) malloc(nrs * sizeof(off_t));
-            tot=0;
-            for(i = 0 ; i < nrs ; i++) {
-                size_t d = nbytes[shuffle[i]];
-                poking_in_ordered_file[i]=tot;
-                tot += d;
-            }
-
-            off_t * poking_place;
-            poking_place = (off_t *) malloc(nrs * sizeof(off_t));
-
-            int * tmp;
-            tmp = (int *) malloc(nsubchunks*sizeof(int));
-            unsigned int s;
-            for(s = 0 ; s < nsubchunks ; s++) tmp[s] = sc_inf[s]->i0;
-            tot=0;
-            /* Hard to avoid for the computation to come */
-            int * direct = (int*) malloc(nrs * sizeof(int));
-            for(i = 0 ; i < nrs ; i++) {
-                direct[shuffle[i]]=i;
-            }
-            /* We'll now change the use of the nbytes[] array. Instead of
-             * being previously indexed by row numbers in the source
-             * file, it's now indexed by row number in the concatenation
-             * of the sub-chunks. This means that if the input file has
-             * row r4,r2,r1,r3, and that the sub-chunks are (r4,r1) and
-             * then (r2,r3), then the new nbytes will be s4,s1,s2,s3
-             * instead of s4,s2,s1,s3 (s_i is the byte size of r_i).
-             */
-            /* To do so, we look at rows starting from the ordered
-             * version. We'll maintain one ``current index'' for each
-             * sub-chunk. This amounts to emulating the dispatching
-             * again, but only in-memory. */
-
+    for(jj = 0 ; jj < nvslices ; jj++) {
+        fprintf(s->curr[jj], "%u", s->cp->w[jj]);
+        fwrite(s->cp->bufs[jj]->buf, 1, s->cp->pos[jj], s->curr[jj]);
+        fputc('\n', s->curr[jj]);
+    }
 #if 0
-            for(i = 0 ; i < 100 ; i++) {
-                printf("%u(%lu) %u\n", direct[i], nbytes[i], dispatch[i]);
-            }
+    if (nvslices > 1) {
+        for(jj = 0 ; jj < nvslices ; jj++) {
+            fprintf(fv[jj], "%u", s->cp->w[jj]);
+            fwrite(s->cp->bufs[jj]->buf, 1, s->cp->pos[jj], fv[jj]);
+            fputc('\n', fv[jj]);
+        }
+    } else {
+        fprintf(f, "%u", nj);
+        fwrite(s->cp->bufs[0]->buf, 1, s->cp->pos[0], f);
+        fputc('\n', f);
+    }
 #endif
-            for(s = 0 ; s < nsubchunks ; s++) tmp[s] = sc_inf[s]->i0;
+    s->last++;
+}
+
+void sink_feed_memory(sink s,
+        const char * inmem,
+        unsigned int ii,
+        chunk_info_ptr sc)
+{
+    sink_hook(s, row_slices[ii].i0 + sc->i0, row_slices[ii].i0 + sc->i1);
+    ASSERT_ALWAYS(s->hnum == ii);
+    if (permute_cols) {
+        unsigned int i;
+        for(i = sc->i0 ; i < sc->i1 ; i++) {
+            size_t sz = line_bytes[row_slices[s->hnum].r[i]];
+            sink_feed_row(s, inmem, sz);
+            inmem += sz;
+        }
+    } else {
+        assert(nvslices == 1);
+        fwrite(inmem, 1, sc->sz, s->curr[0]);
+        s->last = row_slices[ii].i0 + sc->i1;
+    }
+}
+
+
+void weight_sort_hslice(sink datasink, fileset fs, unsigned int ii)
+{
+    copybuf cb;
+    cb_init(cb);
+    cb_ensure(cb, BIGCHUNK);
+
+
+    uint32_t nrs = row_slices[ii].nrows;
+    uint32_t * shuffle = rowperm_after_dispatch(ii);
+    unsigned int i;
+
+    /* We now know that row shuffle[j] in the hslice number ii is in fact
+     * the one whose real index is row_slices[ii].r[j]
+     *
+     * our purpose is to make it go to position j in that same file
+     */
+
+    chunk_splitting split;
+
+    compute_chunk_splitting(split, ii);
+
+
+    /* To use the dispatcher() routine, we must create a
+     * dispatch[] array, and an nbytes[] one.
+     * Note that while both are available, one could do without
+     * if needed:
+     * nbytes[] could be obtained on the fly
+     * dispatch[] is really so trivial (mere index comparison)...
+     */
+
+    size_t * nbytes = malloc(nrs * sizeof(size_t));
+    uint32_t tot = 0;
+    for(i = 0 ; i < nrs ; i++) {
+        nbytes[shuffle[i]]=line_bytes[row_slices[ii].r[i]];
+    }
+
+    unsigned int * dispatch;
+    dispatch = compute_dispatch_from_splitting(split, shuffle, nrs);
+
+    fileset fs_local;
+    fileset_init_isolate(fs_local, fs, ii);
+
+    if (split->n > 1) {
+        fileset fstmp;
+        fileset_init_transfer(fstmp, split->n, "sort", fs, 0, TEMP);
+        dispatcher(fstmp, fs_local, nbytes, dispatch, nrs);
+        fileset_swap(fs_local, fstmp);
+        fileset_clear(fstmp);
+    }
+
+    /* We'll now need something else: an array indicating the
+     * offsets at which the input rows in the sub-chunks must be
+     * put. This array, at first, is indexed by destination row.
+     */
+    off_t * poking_in_ordered_file;
+    poking_in_ordered_file = (off_t *) malloc(nrs * sizeof(off_t));
+    tot=0;
+    for(i = 0 ; i < nrs ; i++) {
+        size_t d = nbytes[shuffle[i]];
+        poking_in_ordered_file[i]=tot;
+        tot += d;
+    }
+
+    off_t * poking_place = (off_t *) malloc(nrs * sizeof(off_t));
+    int * tmp = (int *) malloc(split->n*sizeof(int));
+    unsigned int s;
+    for(s = 0 ; s < split->n ; s++) tmp[s] = split->c[s]->i0;
+    tot=0;
+    /* Hard to avoid for the computation to come */
+    unsigned int * direct = (unsigned int*) malloc(nrs * sizeof(unsigned int));
+    for(i = 0 ; i < nrs ; i++) {
+        direct[shuffle[i]]=i;
+    }
+    /* We'll now change the use of the nbytes[] array. Instead of
+     * being previously indexed by row numbers in the source
+     * file, it's now indexed by row number in the concatenation
+     * of the sub-chunks. This means that if the input file has
+     * row r4,r2,r1,r3, and that the sub-chunks are (r4,r1) and
+     * then (r2,r3), then the new nbytes will be s4,s1,s2,s3
+     * instead of s4,s2,s1,s3 (s_i is the byte size of r_i).
+     */
+    /* To do so, we look at rows starting from the ordered
+     * version. We'll maintain one ``current index'' for each
+     * sub-chunk. This amounts to emulating the dispatching
+     * again, but only in-memory. */
+
+    for(s = 0 ; s < split->n ; s++) tmp[s] = split->c[s]->i0;
+    for(i = 0 ; i < nrs ; i++) {
+        int which = split->n > 1 ? dispatch[i] : 0;
+        ASSERT_ALWAYS(which < split->n);
+        /* This row is in sub chunk-[[which]] */
+        /* The next unassigned byte-size from that sub-chunk is
+         * nbytes[tmp[which]].
+         */
+        size_t sz = line_bytes[row_slices[ii].r[direct[i]]];
+        /* Note that it is
+         * important that we process this array in direct order.
+         */
+        nbytes[tmp[which]] = sz;
+        poking_place[tmp[which]]=
+            poking_in_ordered_file[direct[i]] -
+            poking_in_ordered_file[split->c[which]->i0];
+        tmp[which]++;
+    }
+
+    /* Free as much as we can before doing the large-mem stuff */
+    free(tmp); tmp=NULL;
+    free(direct); direct = NULL;
+    free(poking_in_ordered_file); poking_in_ordered_file = NULL;
+    free(shuffle); shuffle = NULL;
+    free(dispatch); dispatch = NULL;
+
+    for(s = 0 ; s < split->n ; s++) {
+        FILE * g = fileset_open_one(fs_local, s, "r");
+        chunk_info_ptr sc = split->c[s];
+        char * inmem = malloc(sc->sz);
+        for(i = sc->i0 ; i < sc->i1 ; i++) {
+            off_t sz = nbytes[i];
+            ASSERT_ALWAYS(sz != 0);
+            cb_ensure(cb, sz);
+            fread(cb->buf, 1, sz, g);
+            assert(cb->buf[sz-1] == '\n');
+            assert(poking_place[i] >= 0);
+            assert(poking_place[i] + sz <= sc->sz);
+            memcpy(inmem + poking_place[i], cb->buf, sz);
+        }
+        fileset_close_one(fs_local, s, g);
+        /* At this point, we have a sorted part of an horizontal hslice
+         * available. We are now ready for producing the final output
+         * file, but this could mean several different things.
+         *
+         * - If a column splitting is expected, then all rows must go in
+         *   order towards the final files.
+         *
+         * - If only a column sort is wanted, then there's hardly any
+         *   difference. Only the naming of the output file eventually
+         *   changes.
+         *
+         * - In case we're not going to do anything with columns, then
+         *   the whole bunch of data can be treated in one go.
+         */
+        fileset_dispose(fs_local, s);
+        /* It's important to call fileset_dispose _before_ the sink is
+         * activated, because doing the converse could lead to late
+         * deletion of a file which should actually not be deleted.
+         */
+
+        sink_feed_memory(datasink, inmem, ii, sc);
+        free(inmem);
+    }
+
+    clear_splitting(split);
+    free(poking_place); poking_place = NULL;
+    free(nbytes);
+}
+
+void do_per_hslice_stuff(sink datasink, fileset fs)
+{
+    if (weight_sort_in_cells && !rows_are_weight_sorted) {
+        unsigned int ii;
+        for(ii = 0 ; ii < nhslices ; ii++) {
+            weight_sort_hslice(datasink, fs, ii);
+        }
+    } else if (permute_cols) {
+        unsigned int ii;
+        // (nvslices > 1 || (weight_sort_in_cells && !cols_are_weight_sorted)
+        for(ii = 0 ; ii < nhslices ; ii++) {
+            /* Then we'll go linearly, but this will imply column work
+             * (hence row by row).
+             */
+            uint32_t * shuffle = rowperm_after_dispatch(ii);
+            unsigned int nrs = row_slices[ii].nrows;
+            size_t * nbytes = malloc(nrs * sizeof(size_t));
+            FILE * f = fileset_open_one(fs, ii, "r");
+            unsigned int i;
+
+            struct slice * sl = &(row_slices[ii]);
+
+            copybuf cb;
+            cb_init(cb);
+            cb_ensure(cb, BIGCHUNK);
+
             for(i = 0 ; i < nrs ; i++) {
-                int which = nsubchunks > 1 ? dispatch[i] : 0;
-                /* This row is in sub chunk-[[which]] */
-                /* The next unassigned byte-size from that sub-chunk is
-                 * nbytes[tmp[which]].
-                 */
-                size_t sz = line_bytes[row_slices[ii].data[direct[i]].i];
-                /* Note that it is
-                 * important that we process this array in direct order.
-                 */
-                nbytes[tmp[which]] = sz;
-                poking_place[tmp[which]]=
-                    poking_in_ordered_file[direct[i]] -
-                    poking_in_ordered_file[sc_inf[which]->i0];
-                tmp[which]++;
+                nbytes[shuffle[i]]=line_bytes[sl->r[i]];
             }
-            char ** subchunks;
-            open_hslices_files(chunks[ii], writable_name, "sort",
-                    &subchunks, NULL, nsubchunks, "r");
-
-            /* Free as much as we can before doing the large-mem stuff */
-            free(dispatch); dispatch=NULL;
-            free(tmp); tmp=NULL;
-            free(direct); direct = NULL;
-            free(poking_in_ordered_file); poking_in_ordered_file = NULL;
-            free(shuffle); shuffle = NULL;
-
-            FILE * f;
-            FILE ** fv;
-            char ** vchunks;
-            
-            if (nvslices > 1) {
-                open_hslices_files(chunks[ii], writable_name, "v",
-                        &vchunks, &fv, nvslices, "w");
-                f = NULL;
-            } else if (nhslices > 1) {
-                /* Only one vslice, but several hslices. Each hslice ends
-                 * up in a different file. */
-                /* writable_name is chunks[ii] in this case */
-                assert(writable_name == chunks[ii]);
-                f = fopen(writable_name, "w");
-                DIE_ERRNO_DIAG(f == NULL, "fopen", writable_name);
-            } else {
-                /* Well, we're only doing sorting here. So we'll create a
-                 * new copy of the matrix.  Notice that chunks[ii] is
-                 * actually the source matrix. We should not overwerite
-                 * it ! */
-                /* writable_name is working_filename in this case */
-                assert(writable_name == working_filename);
-                assert(strcmp(chunks[ii], pristine_filename) == 0);
-                assert(permute_rows || permute_cols);
-                f = fopen(writable_name, "w");
-                DIE_ERRNO_DIAG(f == NULL, "fopen", writable_name);
-                /* We need to recover the header !!! */
-                fwrite(header, 1, header_bytes, f);
-            }
-
-
-            for(s = 0 ; s < nsubchunks ; s++) {
-                FILE * g = fopen(subchunks[s],"r");
-                DIE_ERRNO_DIAG(g == NULL, "fopen", subchunks[s]);
-                struct chunk_info_s * sc = sc_inf[s];
-                char * inmem = malloc(sc->sz);
-                if (nhslices == 1 && nsubchunks == 1) {
-                    fseek(g, header_bytes, SEEK_SET);
-                }
-                for(i = sc->i0 ; i < sc->i1 ; i++) {
-                    off_t sz = nbytes[i];
-                    ASSERT_ALWAYS(sz != 0);
+            sink_hook(datasink, sl->i0, sl->i0 + sl->nrows);
+            for(i = 0 ; i < nrs ; i++) {
+                size_t sz = nbytes[i];
+                cb_ensure(cb, sz);
+                if (sz == 0) {
+                    const char zrow[] = "0\n";
+                    sz = strlen(zrow);
                     cb_ensure(cb, sz);
-                    fread(cb->buf, 1, sz, g);
-                    assert(cb->buf[sz-1] == '\n');
-                    assert(poking_place[i] >= 0);
-                    assert(poking_place[i] + sz <= sc->sz);
-                    memcpy(inmem + poking_place[i], cb->buf, sz);
+                    strcpy(cb->buf, zrow);
+                } else {
+                    fread(cb->buf, 1, sz, f);
                 }
-                fclose(g);
-                if (remove_input && nhslices == 1 && nsubchunks == 1) {
-                    /* last corner case in which we might have actually
-                     * needed the source file until here. */
-                    assert(strcmp(subchunks[s], pristine_filename) == 0);
-                    unlink(pristine_filename);
-                }
-                /* Here we go ; copy the file in correct order now */
-                if (permute_cols) {
-#if 0
-                    {
-                        char * x;
-                        asprintf(&x, "%s.debug%d", chunks[ii], s);
-                        f =fopen(x,"w");
-                        fwrite(inmem, 1, sc->sz, f);
-                        fclose(f);
-                    }
+                assert(cb->buf[sz-1] == '\n');
+                sink_feed_row(datasink, cb->buf, sz);
+            }
+            fileset_close_one(fs, ii, f);
+            fileset_dispose(fs, ii);
+            cb_clear(cb);
+            free(shuffle);
+            free(nbytes);
+        }
+    } else {
+        /* Well, easy !  */
+        sink_shunt(datasink);
+    }
 
     /* Just for fun, here's the (zsh) shell loop that I used to check
-     * that this program is not completely nuts
+     * that this program is not completely nuts (on an older version
+     * which did not subtract an offset in column indices within
+     * vslices).
 cat /tmp/mat.h0.debug* | (n=0; while read x ; do echo "row $n" >&2 ; echo $x | (read n a ; for x in ${=a} ; do grep -n '^'$x'$' /tmp/col_perm.txt | cut -d: -f1 | (read z ; expr $z - 1); done) | sort >! /tmp/orig-$n ; for i in {5..8} ; do read a b <&$i ; echo $b | xargs -n 1 echo ; done | sort >! /tmp/sorted-$n ; diff -u /tmp/orig-$n /tmp/sorted-$n ;  let n+=1; done 5</tmp/mat.h0.v0 6</tmp/mat.h0.v1 7</tmp/mat.h0.v2 8</tmp/mat.h0.v3)
      * (well, actually, _who_ is nuts ?)
      */
 
-#endif
-
-                    /* We have to parse now :-( */
-                    off_t pos = 0;
-                    for(i = sc->i0 ; i < sc->i1 ; i++) {
-                        /* FIXME */
-                        size_t sz = line_bytes[row_slices[ii].data[i].i];
-                        unsigned int nj;
-                        unsigned int jj;
-                        const char * data = inmem+pos;
-                        const char * data0 = data;
-                        char * ndata;
-                        cperm_reset(cp);
-                        /* Don't use sscanf here. Its complexity is
-                         * linear in strlen() of its argument */
-                        nj=strtoul(data, &ndata, 10);
-                        PARSE_CHECK(data==ndata, "row", strndup(data0,sz));
-                        data=ndata;
-                        for(jj = 0 ; jj < nj ; jj++) {
-                            unsigned int j;
-                            assert(*data == ' ');
-                            data++;
-                            j=strtoul(data, &ndata, 10);
-                            PARSE_CHECK(data==ndata, "row", strndup(data0, sz));
-                            data=ndata;
-                            unsigned int w;
-                            char scrap[10];
-                            w = which_slice(col_slices, nvslices, cdirect[j]);
-                            snprintf(scrap, sizeof(scrap), " %u",
-                                    cdirect[j]-col_slices[w].i0);
-                            cperm_append(cp, w, scrap, strlen(scrap));
-                            if (*data == ':') {
-                                int e;
-                                data++;
-                                e=strtol(data, &ndata, 10);
-                                PARSE_CHECK(data==ndata, "row",
-                                        strndup(data0,sz));
-                                cperm_append(cp, w, data-1, ndata-data+1);
-                                data = ndata;
-                                /* OK, we're at the innermost block, 8
-                                 * levels below earth. Shame on me. */
-                            }
-                            cp->w[w]++;
-                        }
-                        assert(*data == '\n');
-                        data=NULL;
-                        pos+=sz;
-                        if (nvslices > 1) {
-                            for(jj = 0 ; jj < nvslices ; jj++) {
-                                fprintf(fv[jj], "%u", cp->w[jj]);
-                                fwrite(cp->bufs[jj]->buf, 1, cp->pos[jj], fv[jj]);
-                                fputc('\n', fv[jj]);
-                            }
-                        } else {
-                            fprintf(f, "%u", nj);
-                            fwrite(cp->bufs[0]->buf, 1, cp->pos[0], f);
-                            fputc('\n', f);
-                        }
-                    }
-                } else {
-                    fwrite(inmem, 1, sc->sz, f);
-                }
-                free(inmem);
-                if (!keep_temps && nsubchunks > 1) unlink(subchunks[s]);
-            }
-            if (nvslices > 1) {
-                close_hslices_files(&vchunks, &fv, nvslices);
-                if (!keep_temps) unlink(writable_name);
-            } else {
-                fclose(f);
-            }
-
-            free(sc_inf); sc_inf = NULL;
-            free(poking_place); poking_place = NULL;
-            close_hslices_files(&subchunks, NULL, nsubchunks);
-            
-            free(nbytes);
-        }
-    }
-
-    close_hslices_files(&chunks, NULL, nhslices);
-
-    cb_clear(cb);
-
-    if (permute_cols) {
-        cperm_clear(cp);
-        free(cdirect);
-    }
 }
 
 void cleanup()
 {
-    /* free() only based on pointer, because we might have put off the
-     * flag midway in case we noticed that the input was sorted already
-     */
     if (row_slices)     free_slices(row_slices, nhslices);
-    if (row_table)      free(row_table);
     if (col_slices)     free_slices(col_slices, nvslices);
-    if (col_table)      free(col_table);
-
+    if (header) free(header);
     free(line_bytes);
 }
 
@@ -1426,28 +1730,42 @@ int main(int argc, char * argv[])
     read_matrix(pristine_filename);
 
     fprintf(stderr, "Computing permutation\n");
-    do_sorting();
+    compute_permutation();
+
+    if (row_table) free(row_table);
+    if (col_table) free(col_table);
 
     if (permute_rows) {
-        write_permutation("row_perm.txt", row_slices, rows_are_weight_sorted);
+        write_permutation("row_perm.txt",
+                row_slices, nhslices, rows_are_weight_sorted);
     }
     if (permute_cols) {
-        write_permutation("col_perm.txt", col_slices, cols_are_weight_sorted);
+        write_permutation("col_perm.txt",
+                col_slices, nvslices, cols_are_weight_sorted);
     }
+
+    fileset work;
+    fileset_init(work, 1);
+    work->names[0] = strdup(pristine_filename);
+    work->status = INPUT;
 
     if (nhslices > 1) {
         fprintf(stderr, "Dispatching matrix in row slices\n");
-        dispatch_row_slices();
-        if (remove_input) {
-            unlink(pristine_filename);
-        }
+        dispatch_row_slices(work);
     }
+
+    sink datasink;
+
+    sink_init(datasink, work);
 
     /* Now we're going to handle all the horizontal slices in turn. We'll
      * eventually take this opportunity to do actual sorting by weight if
      * required. But prior to that, we'll also split slices vertically
      * first. */
-    do_per_hslice_stuff();
+    do_per_hslice_stuff(datasink, work);
+
+    sink_clear(datasink);
+    fileset_clear(work);
 
     fprintf(stderr, "Done\n");
 
