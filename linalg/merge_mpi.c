@@ -759,7 +759,7 @@ mpi_slave(report_t *rep, int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char
     unsigned int send_buf[MPI_BUF_SIZE];
     MPI_Status status;
     INT jmin, jmax;
-    int cnt, i, k, m, njdel = 0, i0, submaster, nbminm = 0, ok;
+    int cnt, i, k, m, njdel = 0, i0, submaster, nbminm = 0, ok, nbac;
 
     // loop forever
     while(1){
@@ -796,14 +796,20 @@ mpi_slave(report_t *rep, int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char
 	    ok = readmat(mat, purgedfile);
 	    gzip_close(purgedfile, purgedname);
 	    mpi_err1("time for reading the matrix: %d\n", (int)(seconds()-tt));
+	    if(resumename != NULL){
+		// resume, but never print...!
+		tt = seconds();
+		rep->mark = -2; // we don't need another hero
+		resume(rep, mat, resumename);
+		mpi_err1("time for reading resume file: %d\n",
+			 (int)(seconds()-tt));
+		rep->mark = -1;
+	    }
 	    buf[1] = ok;
 	    MPI_Send(buf, 2, MPI_UNSIGNED, 0, MPI_J_TAG, MPI_COMM_WORLD);
-	    if(resumename != NULL)
-		// resume, but never print...!
-		resume(rep, mat, resumename);
 	    break;
 	case MPI_MIN_M_TAG:
-	    // buf = [index]
+	    // buf = [index, asknbac]
 	    if(buf[0] >= mpi_index){
 		mpi_index = buf[0];
 #if DEBUG >= 1
@@ -811,13 +817,18 @@ mpi_slave(report_t *rep, int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char
 #endif
 	    }
 	    nbminm++;
-	    if((nbminm % 10000) == 0)
+	    if((nbminm % 10000) == 0){
 		mpi_err2("WCT[%d]: %d\n", nbminm, (int)(MPI_Wtime()-wctstart));
+	    }
+	    if(buf[1])
+		nbac = mpi_get_number_of_active_colums(mat);
+	    else
+		nbac = 0;
 	    // buf <- [index, m_min]
 	    m = minColWeight(mat);
 	    send_buf[0] = buf[0];
 	    send_buf[1] = m;
-	    send_buf[2] = mpi_get_number_of_active_colums(mat);
+	    send_buf[2] = nbac;
 	    MPI_Send(send_buf, 3, MPI_UNSIGNED, 0, MPI_MIN_M_TAG, MPI_COMM_WORLD);
 	    break;
 	case MPI_DO_M_TAG:
@@ -979,7 +990,7 @@ mpi_start_slaves(int mpi_size, sparse_mat_t *mat)
 	    mpi_err1("Pb while reading matrix by processor %d\n", rk);
 	    exit(0); // TODO: one day, kill/restart procs?
 	}
-	mpi_err2("#T# started processor %d at wct=%d\n", 
+	mpi_err2("started processor %d at wct=%d\n", 
 		 rk, (int)(MPI_Wtime()-wctstart));
     }
     mpi_tab_j[mpi_size-1] = jmax;
@@ -990,7 +1001,7 @@ mpi_start_slaves(int mpi_size, sparse_mat_t *mat)
 }
 
 int
-mpi_get_minimal_m_proc(int *m, int *proc, int mpi_size, unsigned int index)
+mpi_get_minimal_m_proc(int *m, int *proc, int mpi_size, unsigned int index, int asknbac)
 {
     MPI_Status status;
     unsigned int buf[MPI_BUF_SIZE];
@@ -998,8 +1009,9 @@ mpi_get_minimal_m_proc(int *m, int *proc, int mpi_size, unsigned int index)
 
     *m = MERGE_LEVEL_MAX, nrecv;
     buf[0] = index;
+    buf[1] = asknbac;
     for(k = 1; k < mpi_size; k++)
-	MPI_Send(buf, 1, MPI_UNSIGNED, k, MPI_MIN_M_TAG, MPI_COMM_WORLD);
+	MPI_Send(buf, 2, MPI_UNSIGNED, k, MPI_MIN_M_TAG, MPI_COMM_WORLD);
     *proc = -1;
     nrecv = 0;
     while(1){
@@ -1157,9 +1169,9 @@ mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile, int
     double totwait = 0.0, tt, wctstart = MPI_Wtime();
     unsigned int buf[MPI_BUF_SIZE];
     unsigned int send_buf[MPI_BUF_SIZE];
-    unsigned int threshold = mpi_index - 10000;
+    unsigned int threshold = mpi_index;
     int ibuf, m, proc, cnt, k, done, maxm = 0, nrecv;
-    int *row_weight, curr_ncols;
+    int *row_weight, curr_ncols, asknbac = 1;
 
 #if 0
     mpi_err("WARNING: maxm=2\n");
@@ -1172,10 +1184,20 @@ mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile, int
     while(1){
 	mpi_index++;
 	tt = seconds();
-	curr_ncols = mpi_get_minimal_m_proc(&m, &proc, mpi_size, mpi_index);
-	if(first){
-	    first = 0;
-	    mat->rem_ncols = curr_ncols;
+	curr_ncols = mpi_get_minimal_m_proc(&m, &proc, mpi_size, mpi_index,
+					    asknbac);
+	if(asknbac){
+	    asknbac = 0;
+	    if(first){
+		first = 0;
+		mat->rem_ncols = curr_ncols;
+	    }
+	    else{
+		// cautious check!!!
+		if(curr_ncols != mat->rem_ncols)
+		    fprintf(stderr, "index=%u cur=%d ncols=%d\n",
+			    mpi_index, curr_ncols, mat->rem_ncols);
+	    }
 	}
 	totwait += (seconds()-tt);
 #if DEBUG >= 1
@@ -1191,10 +1213,7 @@ mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile, int
 	}
 #endif
 	if(mpi_index >= threshold){
-	    // cautious check!!!
-	    if(curr_ncols != mat->rem_ncols)
-		fprintf(stderr, "index=%u cur=%d ncols=%d\n",
-			mpi_index, curr_ncols, mat->rem_ncols);
+	    asknbac = 1;
 	    threshold += 10000;
 	    fprintf(stderr, "R%u: wct=%2.2lf ",mpi_index,MPI_Wtime()-wctstart);
 	    fprintf(stderr,"maxm=%d N=%d nc=%d [%d] c=%ld c/N=%d\n",

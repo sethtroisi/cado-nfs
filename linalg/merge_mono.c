@@ -359,7 +359,9 @@ reportn(report_t *rep, INT *ind, int n)
 	}
 	fprintf(rep->outfile, "\n");
     }
-    else if(rep->type == 1){
+    else if((rep->type == 1) && (rep->mark != -2)){
+	// mark == -2 => we are probably resuming and we don't care
+	// to consume a lot of memory that will not be used, anyway.
 	rep->mark += 1;
 	if(rep->history[rep->mark] == NULL)
 	    rep->history[rep->mark] = 
@@ -2108,43 +2110,69 @@ minColWeight(sparse_mat_t *mat)
 #endif
 }
 
+#if (USE_MERGE_FAST < 3) && !defined(USE_MPI)
+int
+isRowToBeDeleted(sparse_mat_t *mat, int i)
+{
+    int heavy = 0;
+
+    int k;
+
+    heavy = 1;
+    for(k = 1; k <= lengthRow(mat, i); k++)
+	if((cell(mat,i,k) != -1) && (mat->wt[GETJ(mat, cell(mat,i,k))] >= 0)){
+	    heavy = 0;
+	    break;
+	}
+    return heavy;
+}
+#endif
+
 int
 inspectRowWeight(report_t *rep, sparse_mat_t *mat)
 {
-    //    double tt = seconds();
-    int i, maxw = 0, nirem = 0, niremmax = 128;
+    int i, nirem = 0, niremmax = 128;
+#if (USE_MERGE_FAST < 3) && !defined(USE_MPI)
+    int useless = 0;
+#endif
 
-    if((mat->rem_nrows - mat->rem_ncols) <= mat->delta)
-	return 0;
     for(i = 0; i < mat->nrows; i++){
+	if((mat->rem_nrows - mat->rem_ncols) <= mat->delta)
+	    return nirem;
 	if(!isRowNull(mat, i)){
 	    if(lengthRow(mat, i) > mat->rwmax){
-		if((mat->rem_nrows - mat->rem_ncols) > mat->delta){
 #if DEBUG >= 1
-		    fprintf(stderr, "Removing too heavy row[%d]: %d\n", 
-			    i, lengthRow(mat, i));
+		fprintf(stderr, "Removing too heavy row[%d]: %d\n", 
+			i, lengthRow(mat, i));
 #endif
 #if TRACE_ROW >= 0
-		    if(i == TRACE_ROW)
-			fprintf(stderr, 
-				"TRACE_ROW: removing too heavy row[%d]: %d\n", 
-				i, lengthRow(mat, i));
+		if(i == TRACE_ROW)
+		    fprintf(stderr, 
+			    "TRACE_ROW: removing too heavy row[%d]: %d\n", 
+			    i, lengthRow(mat, i));
 #endif
-		    removeRowDefinitely(rep, mat, i);
-		    nirem++;
-		    if(!(nirem % 10000))
-			fprintf(stderr, "#removed_rows=%d at %2.2lf\n",
-				nirem, seconds());
-		    if(nirem > niremmax)
-			break;
-		}
+		removeRowDefinitely(rep, mat, i);
+		nirem++;
+		if(!(nirem % 10000))
+		    fprintf(stderr, "#removed_rows=%d at %2.2lf\n",
+			    nirem, seconds());
+		if(nirem > niremmax)
+		    break;
 	    }
-	    if(!isRowNull(mat, i) && (lengthRow(mat, i) > maxw))
-		maxw = lengthRow(mat, i);
 	}
     }
-    // fprintf(stderr, "nirem=%d; nrows=%d; max row weight is %d (%2.2lf)\n", 
-    //	    nirem, mat->rem_nrows, maxw, seconds()-tt);
+#if (USE_MERGE_FAST < 3) && !defined(USE_MPI)
+    for(i = 0; i < mat->nrows; i++)
+	if(!isRowNull(mat, i) && isRowToBeDeleted(mat, i)){
+# if DEBUG >= 1
+	    fprintf(stderr, "Row %d is no longer useful in merge\n", i);
+# endif
+	    removeRowSWAR(mat, i);
+	    destroyRow(mat, i);
+	    useless++;
+	}
+    fprintf(stderr, "#useless rows=%d\n", useless);
+#endif
     return nirem;
 }
 

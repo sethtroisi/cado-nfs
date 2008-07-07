@@ -2,7 +2,7 @@
    most applications!
 */
 #include <stdint.h>
-#define INT int32_t
+#define INT int32_t // please, do not use an unsigned type!
 
 extern void fprintRow(FILE *file, INT *row);
 extern INT * copyRow(INT *row);
