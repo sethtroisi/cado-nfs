@@ -1,16 +1,15 @@
-#include "mod_ul.h"
 #include "pp1.h"
 
-#define dup(a,b) mod_mulredc(a,b,b,invm,m);mod_sub(a,a,two,m);
-#define add(a,b,c,d) mod_mulredc(a,b,c,invm,m);mod_sub(a,a,d,m);
+#define dup(a,b) mod_mul(a,b,b,m);mod_sub(a,a,two,m);
+#define add(a,b,c,d) mod_mul(a,b,c,m);mod_sub(a,a,d,m);
 /* Safe version of add that can be used if "a" and "d" are identical */
-#define adds(a,b,c,d) mod_set(t3,d,m);mod_mulredc(a,b,c,invm,m);mod_sub(a,a,t3,m);
+#define adds(a,b,c,d) mod_set(t3,d,m);mod_mul(a,b,c,m);mod_sub(a,a,t3,m);
 #define set(a,b) mod_set(a,b,m);
 #define swap(a,b) mod_swap(a,b,m);
 
 static void
 pp1_range_50 (residue_t r, const residue_t b, const residue_t two, 
-              const unsigned long invm, const modulus_t m)
+              const modulus_t m)
 {
   residue_t A, B, C, t, t2, t3;
 
@@ -37,7 +36,7 @@ pp1_range_50 (residue_t r, const residue_t b, const residue_t two,
 
 static void
 pp1_range_50_100 (residue_t r, const residue_t b, const residue_t two, 
-                  const unsigned long invm, const residue_t m)
+                  const modulus_t m)
 {
   residue_t A, B, C, t, t2, t3;
 
@@ -64,7 +63,7 @@ pp1_range_50_100 (residue_t r, const residue_t b, const residue_t two,
 
 static void
 pp1_range_100_150 (residue_t r, const residue_t b, const residue_t two, 
-                   const unsigned long invm, const residue_t m)
+                   const modulus_t m)
 {
   residue_t A, B, C, t, t2, t3;
 
@@ -91,7 +90,7 @@ pp1_range_100_150 (residue_t r, const residue_t b, const residue_t two,
 
 static void
 pp1_range_150_200 (residue_t r, const residue_t b, const residue_t two, 
-                   const unsigned long invm, const residue_t m)
+                   const modulus_t m)
 {
   residue_t A, B, C, t, t2, t3;
 
@@ -118,7 +117,7 @@ pp1_range_150_200 (residue_t r, const residue_t b, const residue_t two,
 
 static void
 pp1_range_200_300 (residue_t r, const residue_t b, const residue_t two, 
-                   const unsigned long invm, const residue_t m)
+                   const modulus_t m)
 {
   residue_t A, B, C, t, t2, t3;
 
@@ -145,7 +144,7 @@ pp1_range_200_300 (residue_t r, const residue_t b, const residue_t two,
 
 static void
 pp1_range_300_400 (residue_t r, const residue_t b, const residue_t two, 
-                   const unsigned long invm, const residue_t m)
+                   const modulus_t m)
 {
   residue_t A, B, C, t, t2, t3;
 
@@ -172,7 +171,7 @@ pp1_range_300_400 (residue_t r, const residue_t b, const residue_t two,
 
 static void
 pp1_range_400_500 (residue_t r, const residue_t b, const residue_t two, 
-                   const unsigned long invm, const residue_t m)
+                   const modulus_t m)
 {
   residue_t A, B, C, t, t2, t3;
 
@@ -199,51 +198,51 @@ pp1_range_400_500 (residue_t r, const residue_t b, const residue_t two,
 
 void
 pp1_stage1 (residue_t r, residue_t save, const residue_t b, const int B1, 
-	    const residue_t two, const unsigned long invm, const residue_t m)
+	    const residue_t two, const modulus_t m)
 {
   if (B1 >= 50)
     {
-      pp1_range_50 (r, b, two, invm, m);
+      pp1_range_50 (r, b, two, m);
       mod_set (save, r, m);
     }
   if (B1 >= 100)
     {
-      pp1_range_50_100 (r, r, two, invm, m);
+      pp1_range_50_100 (r, r, two, m);
       if (mod_equal (r, two, m))
 	goto end;
       mod_set (save, r, m);
     }
   if (B1 >= 150)
     {
-      pp1_range_100_150 (r, r, two, invm, m);
+      pp1_range_100_150 (r, r, two, m);
       if (mod_equal (r, two, m))
 	  goto end;
       mod_set (save, r, m);
     }
   if (B1 >= 200)
     {
-      pp1_range_150_200 (r, r, two, invm, m);
+      pp1_range_150_200 (r, r, two, m);
       if (mod_equal (r, two, m))
 	goto end;
       mod_set (save, r, m);
     }
   if (B1 >= 300)
     {
-      pp1_range_200_300 (r, r, two, invm, m);
+      pp1_range_200_300 (r, r, two, m);
       if (mod_equal (r, two, m))
 	goto end;
       mod_set (save, r, m);
     }
   if (B1 >= 400)
     {
-      pp1_range_300_400 (r, r, two, invm, m);
+      pp1_range_300_400 (r, r, two, m);
       if (mod_equal (r, two, m))
 	goto end;
       mod_set (save, r, m);
     }
   if (B1 >= 500)
     {
-      pp1_range_400_500 (r, r, two, invm, m);
+      pp1_range_400_500 (r, r, two, m);
       if (mod_equal (r, two, m))
 	goto end;
       mod_set (save, r, m);
@@ -254,8 +253,7 @@ pp1_stage1 (residue_t r, residue_t save, const residue_t b, const int B1,
 }
 
 void
-pp1 (residue_t f, const modulus_t m, const unsigned long invm, const int B1, 
-     const int B2)
+pp1 (residue_t f, const modulus_t m, const int B1, const int B2)
 {
   residue_t b, two, save;
 
@@ -263,7 +261,6 @@ pp1 (residue_t f, const modulus_t m, const unsigned long invm, const int B1,
   mod_init_noset0 (two, m);
   mod_init_noset0 (save, m);
   mod_set_ul_reduced (two, 2UL, m);
-  mod_tomontgomery (two, two, m);
   
   /* Compute 2/7 (mod N) */
 #if 0
@@ -289,11 +286,10 @@ pp1 (residue_t f, const modulus_t m, const unsigned long invm, const int B1,
   /* Slow method, but works for any modulus_t type */
   mod_set_ul_reduced (b, 7UL, m);
   mod_inv (b, b, m);
-  mod_tomontgomery (b, b, m);
   mod_add (b, b, b, m);
 #endif
 
-  pp1_stage1 (b, save, b, B1, two, invm, m);
+  pp1_stage1 (b, save, b, B1, two, m);
   mod_sub (b, b, two, m);
   mod_gcd (f, b, m);
   mod_add (b, b, two, m);

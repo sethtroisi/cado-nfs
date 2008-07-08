@@ -2,40 +2,23 @@
 #include <stdio.h>
 #include <string.h>
 #include <gmp.h>
-#include "mod_ul.h"
-#include "pm1.h"
 #include "utils.h"
 #include "../basicnt.h"
+#include "pm1.h"
 
 /* #define PARI */
 
 void
 pm1_stage1 (residue_t x, const unsigned long *E, const int E_nrwords, 
-            const unsigned long invm, const modulus_t m)
+            const modulus_t m)
 {
-  modul_powredc_mp (x, x, E, E_nrwords, invm, m);
+  mod_pow_mp (x, x, E, E_nrwords, m);
 }
-
-
-#ifdef PARI
-static unsigned long
-mod_getredc_ul (const residueul_t a, const unsigned long invm, 
-		const modulusul_t m)
-{
-  unsigned long s;
-  residueul_t t;
-  modul_init_noset0 (t, m);
-  modul_frommontgomery (t, a, invm, m);
-  s = modul_get_ul (t, m);
-  modul_clear (t, m);
-  return s;
-}
-#endif
 
 
 unsigned long 
 pm1_stage2 (residue_t r, const residue_t X, const pm1_plan_t *plan, 
-	    const residue_t two, const unsigned long invm, const modulus_t m)
+	    const residue_t two, const modulus_t m)
 {
   residue_t Xd, Xid, Xid1, a, t;
   residue_t *Xj;
@@ -53,26 +36,26 @@ pm1_stage2 (residue_t r, const residue_t X, const pm1_plan_t *plan,
   mod_init_noset0 (t, m);
 
   /* Compute Xd = V_d(X) */
-  mod_Vredc_ul (Xd, X, plan->d, invm, m);
+  mod_V_ul (Xd, X, two, plan->d, m);
 
 #ifdef PARI
       printf ("d = %u; Xd = V(d, X); Xd == %lu /* PARI */\n",
-	      plan->d, mod_getredc_ul (Xd, invm, m));
+	      plan->d, mod_get_ul (Xd, m));
 #endif
   
 #define FAST_XJ_INIT
 #ifndef FAST_XJ_INIT
-  /* Compute V_j(X) for j in S_1. FIXME: really slow, use common addition 
-     chain instead */
+  /* Compute V_j(X) for j in S_1. Really slow, use common addition 
+     chain below instead */
   Xj = malloc (plan->s1 * sizeof(residue_t));
   ASSERT (Xj != NULL);
   for (k = 0; k < plan->s1; k++)
     {
       mod_init_noset0 (Xj[k], m);
-      mod_Vredc_ul (Xj[k], X, plan->S1[k], invm, m);
+      mod_V_ul (Xj[k], X, two, plan->S1[k], m);
 #ifdef PARI
       printf ("V(%u, X) == %lu /* = Xj[%d] */ /* PARI */\n",
-	      plan->S1[k], mod_getredc_ul (Xj[k], invm, m), k);
+	      plan->S1[k], mod_get_ul (Xj[k], m), k);
 #endif
     }
 #else /* if FAST_XJ_INIT */
@@ -91,34 +74,30 @@ pm1_stage2 (residue_t r, const residue_t X, const pm1_plan_t *plan,
     mod_init_noset0 (ap5_1, m);
     mod_init_noset0 (X6, m);
     mod_init_noset0 (X2, m);
-
+    
     /* Init ap1_0 = V_1(X), ap1_1 = V_7(X), ap5_0 = V_5(X), ap5_1 = V_11(X)
        and X6 = V_6(X) */
     mod_set (ap1_0, X, m); /* ap1_0 = V_1(X) = X */
-    mod_mulredc (X2, X, X, invm, m);
+    mod_mul (X2, X, X, m);
     mod_sub (X2, X2, two, m); /* X2 = V_2(X) = X^2 - 2 */
-    mod_mulredc (X6, X2, X, invm, m);
+    mod_mul (X6, X2, X, m);
     mod_sub (X6, X6, X, m); /* V_3(X) = V_2(X) * V_1(X) - V_1(X) */
-    mod_mulredc (ap5_0, X6, X2, invm, m);
+    mod_mul (ap5_0, X6, X2, m);
     mod_sub (ap5_0, ap5_0, X, m); /* V_5(X) = V_3(X) * V_2(X) - V_1(X) */
-    mod_mulredc (X6, X6, X6, invm, m);
+    mod_mul (X6, X6, X6, m);
     mod_sub (X6, X6, two, m); /* V_6(X) = V_3(X)*V_3(X) - 2 */
-    mod_mulredc (ap1_1, X6, X, invm, m);
+    mod_mul (ap1_1, X6, X, m);
     mod_sub (ap1_1, ap1_1, ap5_0, m); /* V_7(X) = V_6(X) * V_1(X) - V_5(X) */
-    mod_mulredc (ap5_1, X6, ap5_0, invm, m);
+    mod_mul (ap5_1, X6, ap5_0, m);
     mod_sub (ap5_1, ap5_1, X, m); /* V_11(X) = V_6(X) * V_5(X) - V_1(X) */
     
     mod_clear (X2, m);
-
+    
 #ifdef PARI
-    printf ("V(1, X) == %lu /* PARI */\n",
-	    mod_getredc_ul (ap1_0, invm, m));
-    printf ("V(5, X) == %lu /* PARI */\n",
-	    mod_getredc_ul (ap5_0, invm, m));
-    printf ("V(7, X) == %lu /* PARI */\n",
-	    mod_getredc_ul (ap1_1, invm, m));
-    printf ("V(11, X) == %lu /* PARI */\n",
-	    mod_getredc_ul (ap5_1, invm, m));
+    printf ("V(1, X) == %lu /* PARI */\n", mod_get_ul (ap1_0, m));
+    printf ("V(5, X) == %lu /* PARI */\n", mod_get_ul (ap5_0, m));
+    printf ("V(7, X) == %lu /* PARI */\n", mod_get_ul (ap1_1, m));
+    printf ("V(11, X) == %lu /* PARI */\n", mod_get_ul (ap5_1, m));
 #endif
     
     /* Now we generate all the V_j(X) for j in S_1 */
@@ -149,7 +128,7 @@ pm1_stage2 (residue_t r, const residue_t X, const pm1_plan_t *plan,
             mod_set (Xj[k], ap1_1, m);
 #ifdef PARI
 	    printf ("V(%u, X) == %lu /* = Xj[%d] */ /* PARI */\n",
-                i1, mod_getredc_ul (Xj[k], invm, m), k);
+                i1, mod_get_ul (Xj[k], m), k);
 #endif
 	    k++;
 	    continue;
@@ -160,28 +139,28 @@ pm1_stage2 (residue_t r, const residue_t X, const pm1_plan_t *plan,
             mod_set (Xj[k], ap5_1, m);
 #ifdef PARI
 	    printf ("V(%u, X) == %lu /* = Xj[%d] */ /* PARI */\n",
-		    i5, mod_getredc_ul (Xj[k], invm, m), k);
+		    i5, mod_get_ul (Xj[k], m), k);
 #endif
 	    k++;
 	    continue;
           }
 	
-        mod_mulredc (t, ap1_1, X6, invm, m);
+        mod_mul (t, ap1_1, X6, m);
         mod_sub (t, t, ap1_0, m);
         mod_set (ap1_0, ap1_1, m);
         mod_set (ap1_1, t, m);
         i1 += 6;
 	
-        mod_mulredc (t, ap5_1, X6, invm, m);
+        mod_mul (t, ap5_1, X6, m);
         mod_sub (t, t, ap5_0, m);
         mod_set (ap5_0, ap5_1, m);
         mod_set (ap5_1, t, m);
         i5 += 6;
 #ifdef PARI
 	printf ("V(%u, X) == %lu /* new ap1_1 */ /* PARI */\n",
-		i1, mod_getredc_ul (ap1_1, invm, m));
+		i1, mod_get_ul (ap1_1, m));
 	printf ("V(%u, X) == %lu /* new ap5_1 */ /* PARI */\n",
-		i5, mod_getredc_ul (ap5_1, invm, m));
+		i5, mod_get_ul (ap5_1, m));
 #endif
       }
     
@@ -206,14 +185,14 @@ pm1_stage2 (residue_t r, const residue_t X, const pm1_plan_t *plan,
 	 compute the remaining V_{S[k]+id}(X) via an arithmetic progression.
 	 TODO: init both with the same binary chain. */
       
-      mod_Vredc_ul (Xid, X, plan->S2[k], invm, m);
-      mod_Vredc_ul (Xid1, X, plan->S2[k] + plan->d, invm, m);
+      mod_V_ul (Xid, X, two, plan->S2[k], m);
+      mod_V_ul (Xid1, X, two, plan->S2[k] + plan->d, m);
 #ifdef PARI
       id = plan->S2[k];
       printf ("V(%u, X) == %lu /* PARI */\n",
-	      plan->S2[k], mod_getredc_ul (Xid, invm, m));
+	      plan->S2[k], mod_get_ul (Xid, m));
       printf ("V(%u, X) == %lu /* PARI */\n",
-	      plan->S2[k] + plan->d, mod_getredc_ul (Xid1, invm, m));
+	      plan->S2[k] + plan->d, mod_get_ul (Xid1, m));
 #endif
       
       while (plan->pairs[l] != NEXT_PASS) 
@@ -221,14 +200,14 @@ pm1_stage2 (residue_t r, const residue_t X, const pm1_plan_t *plan,
 	  while (plan->pairs[l] < NEXT_D && plan->pairs[l] < NEXT_PASS)
 	    {
 	      mod_sub (t, Xid, Xj[plan->pairs[l]], m);
-	      mod_mulredc (a, a, t, invm, m);
+	      mod_mul (a, a, t, m);
 	      l++;
 	    }
 	  
 	  /* Advance i by 1 */
 	  if (plan->pairs[l] == NEXT_D)
 	    {
-	      mod_mulredc (t, Xid1, Xd, invm, m);
+	      mod_mul (t, Xid1, Xd, m);
 	      mod_sub (t, t, Xid, m);
 	      mod_set (Xid, Xid1, m);
 	      mod_set (Xid1, t, m);
@@ -236,9 +215,9 @@ pm1_stage2 (residue_t r, const residue_t X, const pm1_plan_t *plan,
 #ifdef PARI
 	      id += plan->d;
 	      printf ("V(%u, X) == %lu /* PARI */\n",
-		      id, mod_getredc_ul (Xid, invm, m));
+		      id, mod_get_ul (Xid, m));
 	      printf ("V(%u, X) == %lu /* PARI */\n",
-		      id + plan->d, mod_getredc_ul (Xid1, invm, m));
+		      id + plan->d, mod_get_ul (Xid1, m));
 #endif
 	    }
 	}
@@ -271,50 +250,50 @@ pm1_stage2 (residue_t r, const residue_t X, const pm1_plan_t *plan,
    resumed, if desired. */
 
 unsigned long
-pm1 (residue_t x, const unsigned long invm, const modulus_t m, 
-     const pm1_plan_t *plan)
+pm1 (residue_t x, const modulus_t m, const pm1_plan_t *plan)
 {
-  residue_t t, X, two;
+  residue_t t, X, one, two;
   unsigned long f;
   
-  mod_init (two, m);
-  mod_set_ul_reduced (two, 2UL, m);
-  mod_tomontgomery (two, two, m);
+  mod_init_noset0 (one, m);
+  mod_init_noset0 (two, m);
+  mod_set_ul_reduced (one, 1UL, m);
+  mod_add (two, one, one, m);
   
   /* Stage 1, a simple exponentiation */
-  mod_2powredc_mp (x, two, plan->E, plan->E_nrwords, plan->E_mask, invm, m);
+  mod_2pow_mp (x, two, plan->E, plan->E_nrwords, plan->E_mask, m);
   
+#ifdef PARI
+  printf ("E = B1_exponent (%u); x = Mod(2, %lu)^E; x == %lu /* PARI */\n", 
+          plan->B1, mod_getmod_ul (m), mod_get_ul (x, m));
+#endif
+
   mod_init_noset0 (t, m);
-  /* TODO: recompute 1 in Montgomery form, subtract that instead of 
-     converting out of Montgomery form */
-  mod_frommontgomery (t, x, invm, m);
-  mod_sub_ul (t, t, 1UL, m);
-  mod_gcd (t, t, m);
-  f = mod_get_ul (t, m);
+  mod_sub (t, x, one, m);
+  mod_gcd (&f, t, m);
 
   if (f > 1UL)
     {
+      mod_clear (one, m);
+      mod_clear (two, m);
       mod_clear (t, m);
       return f;
     }
 
   /* Compute X = x + 1/x. TODO: Speed this up, use precomputed 2^{3w} % m? */
   mod_init_noset0 (X, m);
-  mod_frommontgomery (X, x, invm, m);
-  mod_inv (X, X, m);
-  mod_tomontgomery (X, X, m);
+  mod_inv (X, x, m);
   mod_add (X, X, x, m);
 
 #ifdef PARI
-      printf ("x = Mod(%lu, %lu); X = x+1/x; X == %lu /* PARI */\n",
-	      mod_getredc_ul (x, invm, m), mod_getmod_ul (m), 
-	      mod_getredc_ul (X, invm, m));
+      printf ("X = x+1/x; X == %lu /* PARI */\n", mod_get_ul (X, m));
 #endif
   
-  pm1_stage2 (t, X, plan, two, invm, m);
-  mod_gcd (t, t, m);
-  f = mod_get_ul (t, m);
+  pm1_stage2 (t, X, plan, two, m);
+  mod_gcd (&f, t, m);
   
+  mod_clear (one, m);
+  mod_clear (two, m);
   mod_clear (t, m);
   mod_clear (X, m);
   return f;
@@ -376,6 +355,7 @@ pm1_make_plan (pm1_plan_t *plan, const unsigned int B1, const unsigned int B2,
   int need_NEXT_D;
   
   /* Generate the exponent for stage 1 */
+  plan->B1 = B1;
   mpz_init (E);
   mpz_set_ui (E, 1UL);
   for (p = 2; p <= B1; p = (unsigned int) getprime (p))
@@ -583,5 +563,6 @@ pm1_clear_plan (pm1_plan_t *plan)
   free (plan->E);
   plan->E = NULL;
   plan->E_nrwords = 0;
+  plan->B1 = 0;
   plan->d = 0;
 }

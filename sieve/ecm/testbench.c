@@ -172,22 +172,19 @@ int main (int argc, char **argv)
     {
       modulus_t m;
       residue_t b, r, r2;
-      unsigned long invm;
 
       total++;
 
       /* Init the modulus */
       mod_initmod_ul (m, i);
       mod_init_noset0 (r, m);
-      invm = -mod_invmodlong (m);
       mod_init_noset0 (b, m);
 
       if (method == 0) /* P-1 */
 	{
 	  unsigned long f;
-	  f = pm1 (r, invm, m, &pm1plan);
+	  f = pm1 (r, m, &pm1plan);
 
-	  mod_frommontgomery (r, r, invm, m);
 	  if (f > 1UL && verbose >= 1)
 	    printf ("%lu\n", f);
 	  if (verbose >= 2)
@@ -199,26 +196,23 @@ int main (int argc, char **argv)
         {
 	  residue_t two;
           mod_set_ul_reduced (b, x0, m);
-          mod_tomontgomery (b, b, m);
 	  mod_init_noset0 (two, m);
 	  mod_set_ul_reduced (two, 2UL, m);
-	  mod_tomontgomery (two, two, m);
 	  
           if (fast)
-            pp1_stage1 (r, r, b, (int) B1, two, invm, m);
+            pp1_stage1 (r, r, b, (int) B1, two, m);
           else if (compare)
             {
 	      mod_init_noset0 (r2, m);
-              pp1_stage1 (r, r, b, (int) B1, two, invm, m);
-              mod_Vredc_mp (r2, b, E->_mp_d, E->_mp_size, invm, m);
+              pp1_stage1 (r, r, b, (int) B1, two, m);
+              mod_V_mp (r2, b, E->_mp_d, E->_mp_size, m);
               if (!mod_equal (r, r2, m))
                 printf ("Error, pp1_stage1() and mod_Vredc_mp() differ for "
                         "modulus %lu\n", i);
 	      mod_clear (r2, m);
             }
           else
-            mod_Vredc_mp (r, b, E->_mp_d, E->_mp_size, invm, m);
-          mod_frommontgomery (r, r, invm, m);
+            mod_V_mp (r, b, E->_mp_d, E->_mp_size, m);
 
 	  if (verbose >= 2)
 	    printf ("V(E, Mod(%lu, %lu) == %lu\n", x0, i, mod_get_ul (r, m));
@@ -230,8 +224,7 @@ int main (int argc, char **argv)
       else
 	{
 	  mod_set_ul_reduced (b, x0, m);
-	  if (ecm_stage1 (r, (int) B1, b, parameterization, invm, m, 
-			  (verbose >= 2)))
+	  if (ecm_stage1 (r, (int) B1, b, parameterization, m, (verbose >= 2)))
 	    {
 	      residue_t f;
 	      mod_init (f, m);

@@ -57,10 +57,10 @@ find_primes_hit: find_primes_hit.c ../../utils/mod_ul.h  ../../utils/mod_ul.c
 addchain: addchain.c ../../utils/mod_ul.h ../../utils/mod_ul.c
 	$(CC) $(CFLAGS) $(INCLUDE) $< ../../utils/mod_ul.c -lm -o $@
 
-testbench: testbench.c pm1.h pm1.o pp1.h pp1.o ecm.h ecm.o ../../utils/mod_ul.h ../../utils/mod_ul.c $(PRIMEGEN)
-	$(CC) $(CFLAGS) $(INCLUDE) $< ../../utils/mod_ul.c pm1.o pp1.o ecm.o ../../utils/getprime.o -o $@ -lgmp $(PRIMEGEN) -lm
+testbench: testbench.c pm1.h pm1.o pp1.h pp1.o ecm.h ecm.o ../../utils/mod_ul.h ../../utils/modredc_ul.c $(PRIMEGEN)
+	$(CC) $(CFLAGS) $(INCLUDE) $< ../../utils/modredc_ul.c pm1.o pp1.o ecm.o ../../utils/getprime.o -o $@ -lgmp $(PRIMEGEN) -lm
 
-test_pm1s2: test_pm1s2.c pm1.h pm1.o ../../utils/mod_ul.h ../../utils/mod_ul.c ../../utils/getprime.o
-	$(CC) $(CFLAGS) $(INCLUDE) $< ../../utils/mod_ul.c ../../utils/getprime.o pm1.o -o $@ -lgmp
+test_pm1s2: test_pm1s2.c pm1.h pm1.o ../../utils/mod_ul.h ../../utils/modredc_ul.c ../../utils/getprime.o
+	$(CC) $(CFLAGS) $(INCLUDE) $< ../../utils/modredc_ul.c ../../utils/getprime.o pm1.o -o $@ -lgmp
 clean:
 	rm -f $(TARGETS) 
