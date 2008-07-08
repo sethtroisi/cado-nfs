@@ -391,6 +391,14 @@ mod_inv (residue_t r, const residue_t sp, const modulus_t tp)
 {
   long u1, v1;
   unsigned long u2, v2, s, t;
+#ifndef NDEBUG
+  residue_t tmp;
+#endif
+
+#ifndef NDEBUG
+  mod_init_noset0 (tmp, tp);
+  mod_set (tmp, sp, tp);
+#endif
 
   s = mod_get_ul (sp, tp);
   t = mod_getmod_ul (tp);
@@ -457,13 +465,9 @@ mod_inv (residue_t r, const residue_t sp, const modulus_t tp)
   mod_set_ul (r, (unsigned long) u1, tp);
 
 #ifndef NDEBUG
-  {
-    residue_t tmp;
-    mod_init_noset0 (tmp, tp);
-    mod_mul (tmp, r, sp, tp);
-    ASSERT(mod_get_ul (tmp, tp) == 1UL);
-    mod_clear (tmp, tp);
-  }
+  mod_mul (tmp, tmp, r, tp);
+  ASSERT(mod_get_ul (tmp, tp) == 1UL);
+  mod_clear (tmp, tp);
 #endif
 
   return 1;

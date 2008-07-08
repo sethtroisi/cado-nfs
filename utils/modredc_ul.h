@@ -42,6 +42,46 @@
 #endif
 
 /* Define the default names and types for arithmetic with these functions */
+#undef mod_init
+#undef mod_init_noset0
+#undef mod_clear
+#undef mod_set
+#undef mod_set_ul
+#undef mod_set_ul_reduced
+#undef mod_swap
+#undef mod_initmod_ul
+#undef mod_getmod_ul
+#undef mod_clearmod
+#undef mod_get_ul
+#undef mod_equal
+#undef mod_is0
+#undef mod_add
+#undef mod_add_ul
+#undef mod_sub
+#undef mod_sub_ul
+#undef mod_neg
+#undef mod_mul
+#undef mod_addredc_ul
+#undef mod_mulredc_ul
+#undef mod_muladdredc_ul
+#undef mod_div2
+#undef mod_div3
+#undef mod_pow_ul
+#undef mod_pow_mp
+#undef mod_2pow_mp
+#undef mod_V_ul
+#undef mod_V_mp
+#undef mod_sprp
+#undef mod_gcd
+#undef mod_inv
+#undef mod_jacobi
+#undef mod_set0
+#undef mod_set1
+#undef mod_next
+#undef mod_finished
+#undef residue_t
+#undef modulus_t
+
 #define mod_init             modredcul_init
 #define mod_init_noset0      modredcul_init_noset0
 #define mod_clear            modredcul_clear
@@ -86,8 +126,8 @@ typedef struct {
   unsigned long invm;
 } __modulusredcul_t;
 typedef __modulusredcul_t modulusredcul_t[1];
-typedef residueredcul_t residue_t;
-typedef modulusredcul_t modulus_t;
+#define residue_t residueredcul_t
+#define modulus_t modulusredcul_t
 
 
 static inline void 
@@ -329,6 +369,23 @@ modredcul_add (residueredcul_t r, const residueredcul_t a,
 
 MAYBE_UNUSED
 static inline void
+modredcul_add_ul (residueredcul_t r, const residueredcul_t a,
+                  const unsigned long b, const modulusredcul_t m)
+{
+  residueredcul_t t;
+
+  /* TODO: speed up */
+  ASSERT_EXPENSIVE (a[0] < m[0]);
+  ASSERT(b < m[0].m);
+  modredcul_init_noset0 (t, m);
+  modredcul_set_ul (t, b, m);
+  modredcul_add (r, a, t, m);
+  modredcul_clear (t, m);
+}
+
+
+MAYBE_UNUSED
+static inline void
 modredcul_sub (residueredcul_t r, const residueredcul_t a, 
                const residueredcul_t b, const modulusredcul_t m)
 {
@@ -373,6 +430,23 @@ modredcul_sub (residueredcul_t r, const residueredcul_t a,
 
 MAYBE_UNUSED
 static inline void
+modredcul_sub_ul (residueredcul_t r, const residueredcul_t a,
+                  const unsigned long b, const modulusredcul_t m)
+{
+  residueredcul_t t;
+
+  /* TODO: speed up */
+  ASSERT_EXPENSIVE (a[0] < m[0]);
+  ASSERT(b < m[0].m);
+  modredcul_init_noset0 (t, m);
+  modredcul_set_ul (t, b, m);
+  modredcul_sub (r, a, t, m);
+  modredcul_clear (t, m);
+}
+
+
+MAYBE_UNUSED
+static inline void
 modredcul_neg (residueredcul_t r, const residueredcul_t a, 
                const modulusredcul_t m)
 {
@@ -388,7 +462,7 @@ modredcul_neg (residueredcul_t r, const residueredcul_t a,
    low word to high word. Any carry out from high word is lost. */
 
 static inline void
-add_ul_2ul (unsigned long *r1, unsigned long *r2, const unsigned long a)
+modredcul_add_ul_2ul (unsigned long *r1, unsigned long *r2, const unsigned long a)
 {
 #if defined(__x86_64__) && defined(__GNUC__)
   __asm__ ( "addq %2, %0\n\t"
@@ -412,7 +486,7 @@ add_ul_2ul (unsigned long *r1, unsigned long *r2, const unsigned long a)
    low word to high word. Any carry out from high word is lost. */
 
 static inline void
-add_2ul_2ul (unsigned long *r1, unsigned long *r2, 
+modredcul_add_2ul_2ul (unsigned long *r1, unsigned long *r2, 
              const unsigned long a1, const unsigned long a2)
 {
 #if defined(__x86_64__) && defined(__GNUC__)
@@ -437,7 +511,7 @@ add_2ul_2ul (unsigned long *r1, unsigned long *r2,
    r2:r1 (r2 being the high word) */
 
 static inline void
-mul_ul_ul_2ul (unsigned long *r1, unsigned long *r2, const unsigned long a,
+modredcul_mul_ul_ul_2ul (unsigned long *r1, unsigned long *r2, const unsigned long a,
                const unsigned long b)
 {
 #if defined(__x86_64__) && defined(__GNUC__)
@@ -460,7 +534,7 @@ mul_ul_ul_2ul (unsigned long *r1, unsigned long *r2, const unsigned long a,
    quotient and remainder. */
 
 static inline void
-div_2ul_ul_ul (unsigned long *q, unsigned long *r, const unsigned long a1,
+modredcul_div_2ul_ul_ul (unsigned long *q, unsigned long *r, const unsigned long a1,
                const unsigned long a2, const unsigned long b)
 {
   ASSERT(a2 < b); /* Or there will be quotient overflow */
@@ -484,7 +558,7 @@ div_2ul_ul_ul (unsigned long *q, unsigned long *r, const unsigned long a1,
    only remainder. */
 
 static inline void
-div_2ul_ul_ul_r (unsigned long *r, unsigned long a1,
+modredcul_div_2ul_ul_ul_r (unsigned long *r, unsigned long a1,
                  const unsigned long a2, const unsigned long b)
 {
   ASSERT(a2 < b); /* Or there will be quotient overflow */
@@ -511,7 +585,7 @@ modredcul_tomontgomery (residueredcul_t r, const residueredcul_t a,
                         const modulusredcul_t m)
 {
   ASSERT_EXPENSIVE (a[0] < m[0].m);
-  div_2ul_ul_ul_r (r, 0UL, a[0], m[0].m);
+  modredcul_div_2ul_ul_ul_r (r, 0UL, a[0], m[0].m);
 }
 
 
@@ -523,7 +597,7 @@ modredcul_frommontgomery (residueredcul_t r, const residueredcul_t a,
 {
   unsigned long tlow, thigh;
   tlow = a[0] * m[0].invm;
-  mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
+  modredcul_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
   r[0] = thigh + ((a[0] != 0UL) ? 1UL : 0UL);
 }
 
@@ -540,7 +614,7 @@ modredcul_redcsemi_ul_not0 (residueredcul_t r, const unsigned long a,
   ASSERT (a != 0);
 
   tlow = a * m[0].invm; /* tlow <= 2^w-1 */
-  mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
+  modredcul_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
   /* thigh:tlow <= (2^w-1) * m */
   r[0] = thigh + 1UL; 
   /* (thigh+1):tlow <= 2^w + (2^w-1) * m  <= 2^w + 2^w*m - m 
@@ -561,10 +635,10 @@ modredcul_addredc_ul (residueredcul_t r, const residueredcul_t a,
   ASSERT_EXPENSIVE (a[0] <= m[0].m);
   slow = b;
   shigh = 0UL;
-  add_ul_2ul (&slow, &shigh, a[0]);
+  modredcul_add_ul_2ul (&slow, &shigh, a[0]);
   
   tlow = slow * m[0].invm;
-  mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
+  modredcul_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
   ASSERT_EXPENSIVE (slow + tlow == 0UL);
   r[0] = thigh + shigh + ((slow != 0UL) ? 1UL : 0UL);
   
@@ -610,12 +684,12 @@ modredcul_addredcsemi_ul (residueredcul_t r, const residueredcul_t a,
   shigh = sb;
 #else
   shigh = 0UL;
-  add_ul_2ul (&slow, &shigh, a[0]);
+  modredcul_add_ul_2ul (&slow, &shigh, a[0]);
   shigh += (slow != 0UL) ? 1UL : 0UL;
 #endif
 
   tlow = slow * m[0].invm;
-  mul_ul_ul_2ul (&tlow, r, tlow, m[0].m);
+  modredcul_mul_ul_ul_2ul (&tlow, r, tlow, m[0].m);
   ASSERT_EXPENSIVE (slow + tlow == 0UL);
   r[0] += shigh;
 
@@ -643,9 +717,9 @@ modredcul_mul (residueredcul_t r, const residueredcul_t a,
           a[0], b[0], 8 * sizeof(unsigned long), m[0].m);
 #endif
   
-  mul_ul_ul_2ul (&plow, &phigh, a[0], b[0]);
+  modredcul_mul_ul_ul_2ul (&plow, &phigh, a[0], b[0]);
   tlow = plow * m[0].invm;
-  mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
+  modredcul_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
   /* Let w = 2^wordsize. We know (phigh * w + plow) + (thigh * w + tlow) 
      == 0 (mod w) so either plow == tlow == 0, or plow !=0 and tlow != 0. 
      In the former case we want phigh + thigh + 1, in the latter 
@@ -654,7 +728,7 @@ modredcul_mul (residueredcul_t r, const residueredcul_t a,
      adding 1 to phigh is safe */
 #if 0
   /* Slower? */
-  modul_add_ul_2ul (&plow, &phigh, tlow);
+  modredcul_add_ul_2ul (&plow, &phigh, tlow);
 #else
   phigh += (plow != 0UL) ? 1UL : 0UL;
 #endif
