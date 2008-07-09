@@ -3,7 +3,6 @@
 
 #include <stddef.h>     /* ptrdiff_t */
 #include <stdio.h>
-#include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -13,6 +12,11 @@
 #include <limits.h>
 #include <ctype.h>
 #include <math.h>       /* XXX could probably remove it */
+
+/* platform headers */
+#include <sys/stat.h>   /* mkdir */
+#include <sys/types.h>  /* mkdir */
+#include <unistd.h>     /* chdir */
 
 
 /*{{{ macros */
@@ -100,7 +104,7 @@ void usage()
             "--remove-input\tremove the input file as soon as possible\n"
             "--ram-limit <nnn>[kmgKMG]\tfix maximum memory usage\n"
             "--keep-temps\tkeep all temporary files\n"
-            "--subdir <d>\tchdir to <d> beforehand\n"
+            "--subdir <d>\tchdir to <d> beforehand (mkdir if not found)\n"
             "--legacy\tproduce only one jumbo matrix file\n"
            );
     exit(1);
@@ -1802,7 +1806,12 @@ int main(int argc, char * argv[])
             argv++,argc--;
             if (!argc) usage();
             rc = chdir(argv[0]);
-            DIE_ERRNO_DIAG(rc < 0, "chdir", argv[0]);
+            if (rc < 0 && errno == ENOENT) {
+                rc = mkdir(argv[0], 0777);
+                DIE_ERRNO_DIAG(rc < 0, "mkdir", argv[0]);
+                rc = chdir(argv[0]);
+                DIE_ERRNO_DIAG(rc < 0, "chdir", argv[0]);
+            }
         } else if (strcmp(argv[0], "--legacy") == 0) {
             legacy = 1;
         } else if (strcmp(argv[0], "--remove-input") == 0) {
