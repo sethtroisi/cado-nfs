@@ -132,7 +132,7 @@ cmp(const void *p, const void *q) {
 
 static void
 makeSparse(int **sparsemat, int *colweight, FILE *purgedfile,
-           /*int nrows, int ncols,*/ int **oldrows, int verbose)
+           int jmin, int jmax, int **oldrows, int verbose, int nslices)
 {
     int i, j, nj, *buf, buf_len, ibuf, ind, k;
     int report = (verbose == 0) ? 100000 : 10000;
@@ -151,25 +151,31 @@ makeSparse(int **sparsemat, int *colweight, FILE *purgedfile,
 	    buf = (int *)realloc(buf, nj * sizeof(int));
 	    buf_len = nj;
 	}
-	// take everybody, clean later...!
+	// take everybody and clean
 	ibuf = 0;
 	for(i = 0; i < nj; i++){
 	    fscanf(purgedfile, PURGE_INT_FORMAT, buf+ibuf);
-	    ibuf++;
+	    // what a trick!!!!
+	    if((buf[ibuf] >= jmin) && (buf[ibuf] < jmax))
+		ibuf++;
 	}
-	qsort(buf, ibuf, sizeof(int), cmp);
-	// now, we "add" relation [a, b] in all new relations in which it
-	// participates
-	for(k = 1; k <= oldrows[ind][0]; k++)
-	    addrel(sparsemat, colweight, buf, ibuf, oldrows[ind][k]);
-	// free space just in case
-	free(oldrows[ind]);
-	oldrows[ind] = NULL;
+	if(ibuf > 0){
+	    qsort(buf, ibuf, sizeof(int), cmp);
+	    // now, we "add" relation [a, b] in all new relations in which it
+	    // participates
+	    for(k = 1; k <= oldrows[ind][0]; k++)
+		addrel(sparsemat, colweight, buf, ibuf, oldrows[ind][k]);
+	}
+	if(nslices == 0){
+	    // free space just in case
+	    free(oldrows[ind]);
+	    oldrows[ind] = NULL;
+	}
 	ind++;
     }
 }
 
-void
+unsigned long
 flushSparse(char *sparsename, int **sparsemat, int small_nrows, int small_ncols, int *code)
 {
     FILE *ofile;
@@ -179,18 +185,41 @@ flushSparse(char *sparsename, int **sparsemat, int small_nrows, int small_ncols,
     ofile = gzip_open(sparsename, "w");
     fprintf(ofile, "%d %d\n", small_nrows, small_ncols);
     for(i = 0; i < small_nrows; i++){
-	W += sparsemat[i][0];
-	fprintf(ofile, "%d", sparsemat[i][0]);
-	for(j = 1; j <= sparsemat[i][0]; j++){
+	if(sparsemat[i] == NULL)
+	    fprintf(ofile, "0");
+	else{
+	    W += sparsemat[i][0];
+	    fprintf(ofile, "%d", sparsemat[i][0]);
+	    for(j = 1; j <= sparsemat[i][0]; j++){
 #if DEBUG >= 1
-	    ASSERT(code[sparsemat[i][j]] > 0);
+		ASSERT(code[sparsemat[i][j]] > 0);
 #endif
-	    fprintf(ofile, " %d", code[sparsemat[i][j]]-1); // FIXME
+		fprintf(ofile, " %d", code[sparsemat[i][j]]-1); // FIXME
+	    }
 	}
 	fprintf(ofile, "\n");
     }
     gzip_close(ofile, sparsename);
-    fprintf(stderr, "# Weight(M_small) = %lu\n", W);
+    return W;
+}
+
+void
+infos4Manu(char *name, char *sparsename, int small_nrows, int small_ncols, int nvslices, int *tabnc, unsigned long *Wslice)
+{
+    FILE *ofile;
+    int j;
+
+    sprintf(name, "%s.infos", sparsename);
+    fprintf(stderr, "Creating file %s\n", name);
+    ofile = fopen(name, "w");
+    fprintf(ofile, "%d %d\n", small_nrows, small_ncols);
+    fprintf(ofile, "%d %d\n", 1, nvslices);
+    for(j = 0; j < nvslices; j++){
+	sprintf(name, "%s.%02d", sparsename, j);
+	fprintf(ofile, "%d %d %d %d", 0, j, 0, tabnc[j]);
+	fprintf(ofile, " %d %d %lu %s\n",small_nrows,tabnc[j],Wslice[j],name);
+    }
+    fclose(ofile);
 }
 
 #if 0
@@ -333,6 +362,90 @@ doAllAdds(int **newrows, char *str)
 
 #define STRLENMAX 2048
 
+int
+oneFile(char *sparsename, int **sparsemat, int *colweight, char *purgedname, FILE *purgedfile, int **oldrows, int ncols, int small_nrows, int verbose)
+{
+    unsigned long W;
+    int small_ncols;
+
+    makeSparse(sparsemat, colweight, purgedfile, 0, ncols, oldrows, verbose,0);
+    gzip_close(purgedfile, purgedname);
+
+    fprintf(stderr, "Renumbering columns (including sorting w.r.t. weight)\n");
+    renumber(&small_ncols, colweight, ncols);
+
+    fprintf(stderr, "small_nrows=%d small_ncols=%d\n",small_nrows,small_ncols);
+
+    double tt = seconds();
+    fprintf(stderr, "Writing sparse representation to file\n");
+    W = flushSparse(sparsename, sparsemat, small_nrows, small_ncols, colweight);
+    fprintf(stderr, "#T# writing sparse: %2.2lf\n", seconds()-tt);
+    fprintf(stderr, "# Weight(M_small) = %lu\n", W);
+
+    return small_ncols;
+}
+
+int
+manyFiles(char *sparsename, int **sparsemat, int *colweight, char *purgedname, FILE *purgedfile, int **oldrows, int ncols, int small_nrows, int verbose, int nslices)
+{
+    char *name;
+    int small_ncols = 1; // always the +1 trick
+    int slice, i, jmin, jmax, jstep, j, *tabnc;
+    unsigned long *Wslice;
+
+    // to add ".00" or to add ".infos"
+    name = (char *)malloc((strlen(sparsename)+7) * sizeof(char));
+    jmin = jmax = 0;
+    // tabnc[slice] = number of columns in slice
+    tabnc = (int *)malloc(nslices * sizeof(int));
+    Wslice = (unsigned long *)malloc(nslices * sizeof(unsigned long));
+    // we want nslices always
+    if((ncols % nslices) == 0)
+	jstep = ncols/nslices;
+    else
+	jstep = ncols/(nslices-1);
+    for(slice = 0; slice < nslices; slice++){
+	// we operate on [jmin..jmax[
+	jmin = jmax;
+	jmax += jstep;
+	if(slice == (nslices-1))
+	    jmax = ncols;
+	sprintf(name, "%s.%02d", sparsename, slice);
+	fprintf(stderr, "Dealing with M[%d..%d[ -> %s\n", jmin, jmax, name);
+	makeSparse(sparsemat,colweight,purgedfile,jmin,jmax,oldrows,verbose,
+		   nslices);
+	gzip_close(purgedfile, purgedname);
+	// colweight[jmin..jmax[ contains the new weights of the
+	// corresponding columns
+	tabnc[slice] = 0;
+	for(j = jmin; j < jmax; j++)
+	    if(colweight[j] > 0){
+		colweight[j] = small_ncols++;
+		tabnc[slice]++;
+	    }
+	// warning: take care to the +1 trick
+	Wslice[slice] = flushSparse(name, sparsemat, small_nrows, small_ncols,
+				    colweight);
+	// do not forget to clean the rows in sparsemat to be ready for
+	// next time if any
+	if(slice < nslices-1){
+	    for(i = 0; i < small_nrows; i++)
+		if(sparsemat[i] != NULL){
+		    free(sparsemat[i]);
+		    sparsemat[i] = NULL;
+		}
+	    purgedfile = gzip_open(purgedname, "r");
+	    ASSERT(purgedfile != NULL);
+	}
+    }
+    small_ncols--; // undoing the +1 trick
+    infos4Manu(name,sparsename,small_nrows,small_ncols,nslices,tabnc,Wslice);
+    free(name);
+    free(tabnc);
+    free(Wslice);
+    return small_ncols;
+}
+
 // We start from M_purged which is nrows x ncols;
 // we build M_small which is small_nrows x small_ncols.
 // newrows[i] if != NULL, contains a list of the indices of the rows in
@@ -346,7 +459,7 @@ main(int argc, char *argv[])
     char *purgedname = NULL, *sparsename = NULL, *indexname = NULL;
     char *hisname = NULL;
     unsigned long bwcost, bwcostmin = 0, addread = 0;
-    int nrows, ncols;
+    int nrows, ncols, nslices = 0;
     int **newrows, i, j, nb, *nbrels, **oldrows, *colweight;
     int ind, small_nrows, small_ncols, **sparsemat;
     char str[STRLENMAX];
@@ -376,6 +489,11 @@ main(int argc, char *argv[])
 	}
 	else if (argc > 2 && strcmp (argv[1], "-index") == 0){
 	    indexname = argv[2];
+	    argc -= 2;
+	    argv += 2;
+	}
+	else if (argc > 2 && strcmp (argv[1], "-nslices") == 0){
+	    nslices = atoi(argv[2]);
 	    argc -= 2;
 	    argv += 2;
 	}
@@ -479,21 +597,19 @@ main(int argc, char *argv[])
     sparsemat = (int **)malloc(small_nrows * sizeof(int *));
     for(i = 0; i < small_nrows; i++)
 	sparsemat[i] = NULL;
-    makeSparse(sparsemat, colweight, purgedfile, /*nrows, ncols,*/ oldrows,
-               verbose);
-    gzip_close(purgedfile, purgedname);
-
-    fprintf(stderr, "Renumbering columns (including sorting w.r.t. weight)\n");
-    renumber(&small_ncols, colweight, ncols);
-
-    fprintf(stderr, "small_nrows=%d small_ncols=%d\n",small_nrows,small_ncols);
-
+    if(nslices == 0)
+	small_ncols = oneFile(sparsename, sparsemat, colweight, 
+			      purgedname, purgedfile,
+			      oldrows, ncols, small_nrows, verbose);
+    else{
+	small_ncols = manyFiles(sparsename, sparsemat, colweight, 
+				purgedname, purgedfile,
+				oldrows, ncols, small_nrows, verbose,
+				nslices);
+	exit(0);
+    }
+    // this part depends on newrows only
     double tt = seconds();
-    fprintf(stderr, "Writing sparse representation to file\n");
-    flushSparse(sparsename, sparsemat, small_nrows, small_ncols, colweight);
-    fprintf(stderr, "#T# writing sparse: %2.2lf\n", seconds()-tt);
-
-    tt = seconds();
     fprintf(stderr, "Writing index file\n");
 #if 0
     makeabFile(argv[4], argv[1], nrows, newrows, small_nrows, small_ncols);

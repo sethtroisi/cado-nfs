@@ -9,7 +9,8 @@
  * merge stuff.  */
 
 // please, do not use an unsigned type!
-// XXX [ET] Why ?
+// XXX [ET] Why ? 
+// [FM] because of some trick on negative numbers in MST related stuff!
 #define INT int32_t
 
 extern void fprintRow(FILE *file, INT *row);
