@@ -40,27 +40,33 @@ bc_400.h: addchain
 bc_500.h: addchain
 	./addchain -pb 500 | head -n 1 > $@
 
-pm1.o: pm1.c pm1.h ../../utils/mod_ul.h
+pm1.o: pm1.c pm1.h stage2.h ../../utils/mod_ul.h
 	$(CC) $(CFLAGS) $(INCLUDE) -c -o $@ $<
 
 pp1.o: pp1.c pp1.h chain_50.c chain_50_100.c chain_100_150.c chain_150_200.c \
         chain_200_300.c chain_300_400.c chain_400_500.c ../../utils/mod_ul.h
 	$(CC) $(CFLAGS) $(INCLUDE) -c -o $@ $<
 
-ecm.o: ecm.c ../../utils/mod_ul.h  ../../utils/mod_ul.c bc_50.h bc_100.h \
+ecm.o: ecm.c ecm.h ../../utils/mod_ul.h  ../../utils/mod_ul.h bc_50.h bc_100.h \
         bc_150.h bc_200.h bc_300.h bc_400.h bc_500.h
 	$(CC) $(CFLAGS) $(INCLUDE) -c -o $@ $<
+
+stage2.o: stage2.c stage2.h ../basicnt.h ../../utils/utils.h
+	$(CC) $(CFLAGS) $(INCLUDE) -c -o $@ $<
+
+prac_bc.o: prac_bc.c prac_bc.h
+	 $(CC) $(CFLAGS) -c -o $@ $<
 
 find_primes_hit: find_primes_hit.c ../../utils/mod_ul.h  ../../utils/mod_ul.c
 	$(CC) $(CFLAGS) $(GMPBUILD) $(INCLUDE) $< -lgmp ../../utils/mod_ul.c -lm -o $@
 
-addchain: addchain.c ../../utils/mod_ul.h ../../utils/mod_ul.c
-	$(CC) $(CFLAGS) $(INCLUDE) $< ../../utils/mod_ul.c -lm -o $@
+addchain: addchain.c prac_bc.o ../../utils/mod_ul.h ../../utils/mod_ul.c
+	$(CC) $(CFLAGS) $(INCLUDE) $< prac_bc.o ../../utils/mod_ul.c -lm -o $@
 
-testbench: testbench.c pm1.h pm1.o pp1.h pp1.o ecm.h ecm.o ../../utils/mod_ul.h ../../utils/modredc_ul.c $(PRIMEGEN)
-	$(CC) $(CFLAGS) $(INCLUDE) $< ../../utils/modredc_ul.c pm1.o pp1.o ecm.o ../../utils/getprime.o -o $@ -lgmp $(PRIMEGEN) -lm
+testbench: testbench.c pm1.o pp1.o ecm.o stage2.o ../../utils/mod_ul.h ../../utils/modredc_ul.c $(PRIMEGEN)
+	$(CC) $(CFLAGS) $(INCLUDE) $< ../../utils/modredc_ul.c pm1.o pp1.o ecm.o stage2.o ../../utils/getprime.o -o $@ -lgmp $(PRIMEGEN) -lm
 
-test_pm1s2: test_pm1s2.c pm1.h pm1.o ../../utils/mod_ul.h ../../utils/modredc_ul.c ../../utils/getprime.o
-	$(CC) $(CFLAGS) $(INCLUDE) $< ../../utils/modredc_ul.c ../../utils/getprime.o pm1.o -o $@ -lgmp
+test_pm1s2: test_pm1s2.c pm1.o stage2.o ../../utils/mod_ul.h ../../utils/modredc_ul.c ../../utils/getprime.o
+	$(CC) $(CFLAGS) $(INCLUDE) $< ../../utils/modredc_ul.c ../../utils/getprime.o pm1.o stage2.o -o $@ -lgmp
 clean:
 	rm -f $(TARGETS) 
