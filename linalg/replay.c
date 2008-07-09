@@ -208,16 +208,27 @@ infos4Manu(char *name, char *sparsename, int small_nrows, int small_ncols, int n
 {
     FILE *ofile;
     int j;
+    int jtotal;
 
-    sprintf(name, "%s.infos", sparsename);
+    sprintf(name, "%s.info", sparsename);
     fprintf(stderr, "Creating file %s\n", name);
     ofile = fopen(name, "w");
     fprintf(ofile, "%d %d\n", small_nrows, small_ncols);
     fprintf(ofile, "%d %d\n", 1, nvslices);
+    const char * sparse_basename;
+    sparse_basename = strrchr(sparsename, '/');
+    if (sparse_basename == NULL) {
+        sparse_basename = sparsename;
+    } else {
+        sparse_basename++;
+    }
+
+    jtotal=0;
     for(j = 0; j < nvslices; j++){
-	sprintf(name, "%s.%02d", sparsename, j);
-	fprintf(ofile, "%d %d %d %d", 0, j, 0, tabnc[j]);
+	sprintf(name, "%s.%02d", sparse_basename, j);
+	fprintf(ofile, "%d %d %d %d", 0, j, 0, jtotal);
 	fprintf(ofile, " %d %d %lu %s\n",small_nrows,tabnc[j],Wslice[j],name);
+        jtotal += tabnc[j];
     }
     fclose(ofile);
 }
