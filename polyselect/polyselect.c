@@ -351,51 +351,65 @@ always returns 0 in val(f,p).
 
 Assumes p divides disc = disc(f), d is the degree of f.
 */
-double
-special_valuation (mpz_t *f, int d, unsigned long p, mpz_t disc)
+double special_valuation(mpz_t * f, int d, unsigned long p, mpz_t disc)
 {
-  mpz_t t;
-  double v;
-  int p_divides_lc;
+    double v;
+    int p_divides_lc;
+    int pvaluation_disc = 0;
+    double pd = (double) p;
 
-  /*  ASSERT (mpz_divisible_ui_p (disc, p)); */
-  mpz_init (t);
-  /* first try special case where p^2 does not divide disc and p does not
-     divide lc(f) */
-  mpz_divexact_ui (t, disc, p);
-  p_divides_lc = mpz_divisible_ui_p (f[d], p);
-  if ((mpz_divisible_ui_p (t, p) == 0) && (p_divides_lc == 0))
-    {
-      int e;
-      v = (double) p;
-      e = poly_roots_ulong (NULL, f, d, p);
-      v = (v * (double) e - 1.0) / (v * v - 1.0);
+    if (mpz_divisible_ui_p(disc, p)) {
+	mpz_t t;
+	pvaluation_disc++;
+	mpz_init(t);
+	mpz_divexact_ui(t, disc, p);
+	if (mpz_divisible_ui_p(t, p))
+	    pvaluation_disc++;
+	mpz_clear(t);
     }
-  else
-    {
-      v = special_val0 (f, d, p) * (double) p;
-      if (p_divides_lc != 0)
-        {
-          /* compute g(x) = f(1/(px))*(px)^d, i.e., g[i] = f[d-i]*p^i */
-          mpz_t *g;
-          int i;
 
-          g = alloc_mpz_array (d + 1);
-          mpz_set_ui (t, 1); /* will contains p^i */
-          for (i = 0; i <= d; i++)
-            {
-              mpz_mul (g[i], f[d - i], t);
-              mpz_mul_ui (t, t, p);
-            }
-          v += special_val0 (g, d, p);
-          clear_mpz_array (g, d + 1);
-        }
-      v /= (double) (p + 1);
+    p_divides_lc = mpz_divisible_ui_p(f[d], p);
+
+    if (pvaluation_disc == 0) {
+	/* easy ! */
+	int e;
+	e = poly_roots_ulong(NULL, f, d, p);
+	if (p_divides_lc) {
+	    /* Or the discriminant would have valuation 1 at least */
+	    ASSERT(mpz_divisible_ui_p(f[d - 1], p) == 0);
+	    e++;
+	}
+	return (pd * e) / (pd * pd - 1);
+    } else if (pvaluation_disc == 1 && (p_divides_lc == 0)) {
+	/* special case where p^2 does not divide disc and p does not
+	   divide lc(f) */
+	int e;
+	e = poly_roots_ulong(NULL, f, d, p);
+	// something special here.
+	return (pd * e - 1) / (pd * pd - 1);
+    } else {
+	v = special_val0(f, d, p) * (double) p;
+	if (p_divides_lc) {
+	    /* compute g(x) = f(1/(px))*(px)^d, i.e., g[i] = f[d-i]*p^i */
+	    /* IOW, the reciprocal polynomial evaluated at px */
+	    mpz_t *g;
+	    mpz_t t;
+	    int i;
+
+	    g = alloc_mpz_array(d + 1);
+	    mpz_init_set_ui(t, 1);	/* will contains p^i */
+	    for (i = 0; i <= d; i++) {
+		mpz_mul(g[i], f[d - i], t);
+		mpz_mul_ui(t, t, p);
+	    }
+	    v += special_val0(g, d, p);
+	    clear_mpz_array(g, d + 1);
+            mpz_clear(t);
+	}
+	v /= (double) (p + 1);
     }
-  mpz_clear (t);
-  return v;
+    return v;
 }
-
 /*****************************************************************************/
 
 typedef struct {
@@ -1016,7 +1030,7 @@ get_logmu (mpz_t *p, unsigned long degree, mpz_t m, double S2)
     mu = mu * S2 + fabs (mpz_get_d (p[i]));
   for (i = 0; (unsigned long) i < degree; i += 2)
     mu /= S2;
-  if ((unsigned long) i < degree)
+  if ((unsigned long) i > degree)
     mu /= S;
   return log((mpz_get_d (m) / S + S) * mu);
 }
