@@ -11,9 +11,13 @@
 int poly_roots_ulong(unsigned long * r, mpz_t * f, int d, unsigned long p)
 {
     int n;
+
     if (plain_poly_fits(d, p)) {
         plain_poly_coeff_t * rr;
         int i;
+
+        if (r == NULL)
+            return plain_poly_roots(NULL, f, d, p);
 
         rr = (plain_poly_coeff_t *) malloc(d * sizeof(plain_poly_coeff_t));
         n = plain_poly_roots(rr, f, d, p);
@@ -26,6 +30,10 @@ int poly_roots_ulong(unsigned long * r, mpz_t * f, int d, unsigned long p)
         modulus_t pp;
         modul_initmod_ul(pp, p);
         int i;
+
+        if (r == NULL)
+            return modul_poly_roots(NULL, f, d, pp);
+
         rr = (residueul_t *) malloc(d * sizeof(residueul_t));
         for(i = 0 ; i < d ; i++) {
             modul_init_noset0(rr[i], pp);
@@ -57,6 +65,10 @@ int poly_roots_uint64(uint64_t * r, mpz_t * f, int d, uint64_t p)
     FATAL_ERROR_CHECK(p >= ULONG_MAX, "poly_roots_uint64 is a stub");
     unsigned long * rr;
     int i,n;
+
+    if (r == NULL)
+        return poly_roots_ulong(NULL, f, d, p);
+
     rr = (unsigned long *) malloc(d * sizeof(unsigned long));
     n = poly_roots_ulong((unsigned long *) r, f, d, p);
     for(i = 0 ; i < n ; i++) {
@@ -75,6 +87,9 @@ int poly_roots(mpz_t * r, mpz_t * f, int d, mpz_t p)
         unsigned long * rr;
         int i;
         int n;
+
+        if (r == NULL)
+            return poly_roots_ulong(NULL, f, d, pp);
 
         rr = (unsigned long *) malloc(d * sizeof(unsigned long));
         n = poly_roots_ulong(rr,  f, d, pp);
