@@ -39,6 +39,7 @@ int main (int argc, char **argv)
   int only_primes = 0, verbose = 0;
   primegen pg[1];
   pm1_plan_t pm1plan;
+  pp1_plan_t pp1plan;
 
   /* Parse options */
   while (argc > 1 && argv[1][0] == '-')
@@ -122,9 +123,9 @@ int main (int argc, char **argv)
   B1 = strtoul (argv[3], NULL, 10);
   B2 = strtoul (argv[4], NULL, 10);
 
-  if (method != 0 && B2 > B1)
+  if (method == 2 && B2 > B1)
     {
-      fprintf (stderr, "Stage 2 not implemented for P+1, ECM\n");
+      fprintf (stderr, "Stage 2 not implemented for ECM\n");
       exit (EXIT_FAILURE);
     }
 
@@ -140,9 +141,9 @@ int main (int argc, char **argv)
 
 
   if (method == 0)
-    {
-      pm1_make_plan (&pm1plan, B1, B2, (verbose >= 2));
-    }
+    pm1_make_plan (&pm1plan, B1, B2, (verbose >= 2));
+  if (method == 1)
+    pp1_make_plan (&pp1plan, B1, B2, (verbose >= 2));
 
   /* Compute exponent (a.k.a. multiplier for P+1/ECM) for stage 1 */
   mpz_init (E);
@@ -194,32 +195,30 @@ int main (int argc, char **argv)
 	}
       else if (method == 1) /* P+1 */
         {
-	  residue_t two;
-          mod_set_ul_reduced (b, x0, m);
-	  mod_init_noset0 (two, m);
-	  mod_set_ul_reduced (two, 2UL, m);
+	  unsigned long f;
+
+	  f = pp1 (m, &pp1plan);
 	  
-          if (fast)
-            pp1_stage1 (r, r, b, (int) B1, two, m);
-          else if (compare)
+          if (0 && compare) /* FIXME: pp1() should return end-of-stage1 
+			       residue */
             {
 	      mod_init_noset0 (r2, m);
-              pp1_stage1 (r, r, b, (int) B1, two, m);
+	      mod_set_ul (b, 7UL, m);
+	      mod_inv (b, b, m);
+	      mod_add (b, b, b, m); /* b = 2/7 (mod m) */
               mod_V_mp (r2, b, E->_mp_d, E->_mp_size, m);
               if (!mod_equal (r, r2, m))
-                printf ("Error, pp1_stage1() and mod_Vredc_mp() differ for "
+                printf ("Error, pp1() and mod_V_mp() differ for "
                         "modulus %lu\n", i);
 	      mod_clear (r2, m);
             }
-          else
-            mod_V_mp (r, b, E->_mp_d, E->_mp_size, m);
 
+	  if (f > 1UL && verbose >= 1)
+	    printf ("%lu\n", f);
 	  if (verbose >= 2)
 	    printf ("V(E, Mod(%lu, %lu) == %lu\n", x0, i, mod_get_ul (r, m));
-
-          if (mod_get_ul (r, m) == 2UL)
-            hits++;
-	  mod_clear (two, m);
+	  if (f > 1UL)
+	    hits++;
 	}
       else
 	{
@@ -250,9 +249,9 @@ int main (int argc, char **argv)
     }
 
   if (method == 0)
-    {
-      pm1_clear_plan (&pm1plan);
-    }
+    pm1_clear_plan (&pm1plan);
+  if (method == 1)
+    pp1_clear_plan (&pp1plan);
   mpz_clear (E);
   printf ("Of %lu %s in [%lu, %lu] there were %lu with smooth order\n", 
 	  total, (only_primes) ? "primes" : "odd numbers", start, stop, hits);

@@ -63,10 +63,10 @@ find_primes_hit: find_primes_hit.c ../../utils/mod_ul.h  ../../utils/mod_ul.c
 addchain: addchain.c prac_bc.o ../../utils/mod_ul.h ../../utils/mod_ul.c
 	$(CC) $(CFLAGS) $(INCLUDE) $< prac_bc.o ../../utils/mod_ul.c -lm -o $@
 
-testbench: testbench.c pm1.o pp1.o ecm.o stage2.o ../../utils/mod_ul.h ../../utils/modredc_ul.c $(PRIMEGEN)
-	$(CC) $(CFLAGS) $(INCLUDE) $< ../../utils/modredc_ul.c pm1.o pp1.o ecm.o stage2.o ../../utils/getprime.o -o $@ -lgmp $(PRIMEGEN) -lm
+testbench: testbench.c pm1.o pp1.o ecm.o stage2.o prac_bc.o ../../utils/mod_ul.h ../../utils/modredc_ul.c $(PRIMEGEN)
+	$(CC) $(CFLAGS) $(INCLUDE) $< ../../utils/modredc_ul.c pm1.o pp1.o ecm.o stage2.o prac_bc.o ../../utils/getprime.o -o $@ -lgmp $(PRIMEGEN) -lm
 
-test_pm1s2: test_pm1s2.c pm1.o stage2.o ../../utils/mod_ul.h ../../utils/modredc_ul.c ../../utils/getprime.o
-	$(CC) $(CFLAGS) $(INCLUDE) $< ../../utils/modredc_ul.c ../../utils/getprime.o pm1.o stage2.o -o $@ -lgmp
+test_pm1s2: test_pm1s2.c pm1.o stage2.o prac_bc.o ../../utils/mod_ul.h ../../utils/modredc_ul.c ../../utils/getprime.o
+	$(CC) $(CFLAGS) $(INCLUDE) $< ../../utils/modredc_ul.c ../../utils/getprime.o pm1.o stage2.o prac_bc.o -o $@ -lgmp
 clean:
 	rm -f $(TARGETS) 

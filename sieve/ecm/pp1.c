@@ -1,3 +1,8 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include "utils.h"
+#include "prac_bc.h"
+#include "pm1.h"
 #include "pp1.h"
 
 #define dup(a,b) mod_mul(a,b,b,m);mod_sub(a,a,two,m);
@@ -252,14 +257,16 @@ pp1_stage1 (residue_t r, residue_t save, const residue_t b, const int B1,
  ;
 }
 
-void
-pp1 (residue_t f, const modulus_t m, const int B1, const int B2)
+unsigned long 
+pp1 (const modulus_t m, const pp1_plan_t *plan)
 {
-  residue_t b, two, save;
+  residue_t b, two, save, t;
+  unsigned long f;
 
   mod_init_noset0 (b, m);
   mod_init_noset0 (two, m);
   mod_init_noset0 (save, m);
+  mod_init_noset0 (t, m);
   mod_set_ul_reduced (two, 2UL, m);
   
   /* Compute 2/7 (mod N) */
@@ -289,13 +296,69 @@ pp1 (residue_t f, const modulus_t m, const int B1, const int B2)
   mod_add (b, b, b, m);
 #endif
 
-  pp1_stage1 (b, save, b, B1, two, m);
-  mod_sub (b, b, two, m);
-  mod_gcd (f, b, m);
-  mod_add (b, b, two, m);
+  pp1_stage1 (b, save, b, plan->B1, two, m);
+  mod_sub (t, b, two, m);
+  mod_gcd (&f, t, m);
+
+  if (f == 1UL)
+    {
+      pm1_stage2 (t, b, &(plan->stage2), two, m);
+      mod_gcd (&f, t, m);
+    }
 
   mod_clear (b, m);
   mod_clear (save, m);
   mod_clear (two, m);
+  mod_clear (t, m);
+
+  return f;
 }
 
+
+/* Make byte code for addition chain for stage 1, and the parameters for 
+   stage 2 */
+
+void 
+pp1_make_plan (pp1_plan_t *plan, const unsigned int B1, const unsigned int B2,
+	       int verbose)
+{
+  unsigned int p;
+  const unsigned int addcost = 1, doublecost = 1;
+  
+  /* Make bytecode for stage 1 */
+  plan->B1 = B1;
+  bytecoder_init (0);
+  for (p = 2; p <= B1; p = (unsigned int) getprime (p))
+    {
+      unsigned long q;
+      for (q = p; q <= B1; q *= p)
+	prac_bytecode (p, addcost, doublecost);
+    }
+  bytecoder_flush ();
+  plan->bc_len = bytecoder_size ();
+  plan->bc = (char *) malloc (plan->bc_len);
+  ASSERT (plan->bc);
+  bytecoder_read (plan->bc);
+  bytecoder_clear ();
+
+  if (verbose)
+    {
+      printf ("Byte code for stage 1: ");
+      for (p = 0; p < plan->bc_len; p++)
+	printf ("%s%d", (p == 0) ? "" : ", ", (int) (plan->bc[p]));
+      printf ("\n");
+    }
+    
+  /* Make stage 2 plan */
+  stage2_make_plan (&(plan->stage2), B1, B2, verbose);
+}
+
+void 
+pp1_clear_plan (pp1_plan_t *plan)
+{
+  stage2_clear_plan (&(plan->stage2));
+  free (plan->bc);
+  plan->bc = NULL;
+  plan->bc_len = 0;
+  plan->B1 = 0;
+}
