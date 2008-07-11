@@ -7,6 +7,7 @@
 #define NEXT_PASS 255
 
 typedef struct {
+  unsigned int B2;
   unsigned int d;          /* The d parameter for stage 2 */
   unsigned int s1;
   unsigned int s2;         /* s2|eulerphi(d), we do stage 2 in s2 passes. 

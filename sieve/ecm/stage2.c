@@ -58,6 +58,18 @@ stage2_make_plan (stage2_plan_t *plan, unsigned int B2min, unsigned int B2,
   unsigned char *primes;
   int need_NEXT_D;
 
+  plan->B2 = B2;
+  if (B2 <= B2min)
+    {
+      plan->d = 0;
+      plan->s1 = 0;
+      plan->S1 = NULL;
+      plan->s2 = 0;
+      plan->S2 = NULL;
+      plan->pairs = NULL;
+      return;
+    }
+
   /* Choose stage 2 parameters */
   for (p = 2; p <= B2min; p = (unsigned int) getprime (p));
   /* Now p is smallest prime > B2min */

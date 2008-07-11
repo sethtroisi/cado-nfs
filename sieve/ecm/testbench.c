@@ -3,7 +3,7 @@
 #include <string.h>
 #include <gmp.h>
 #include <primegen.h>
-#include "mod_ul.h"
+#include "modredc_ul.h"
 #include "pm1.h"
 #include "pp1.h"
 #include "ecm.h"
@@ -17,8 +17,7 @@ void print_help (char *programname)
   printf ("-pm1     Run P-1 (default)\n");
   printf ("-pp1     Run P+1\n");
   printf ("-ecm     Run ECM\n");
-  printf ("-f       Run fast P+1 (code generated, unrolled code)\n");
-  printf ("-c       Run both fast and slow P+1 and compare results\n");
+  printf ("-c       Run both bytecode and binary chain P+1 and compare results\n");
   printf ("-m12     Use Montgomery parameterization with 12 torsion for ECM\n");
   printf ("-p       Try only primes in [<start>, <stop>] (default: all odd "
 	  "numbers)\n");
@@ -33,7 +32,7 @@ int main (int argc, char **argv)
   unsigned long start, stop, x0 = 2UL, i, B1, B2, p;
   unsigned long hits = 0, total = 0;
   mpz_t E;
-  int fast = 0, compare = 0;
+  int compare = 0;
   int method = 0; /* 0 = P-1, 1 = P+1, 2 = ECM */
   int parameterization = 0;
   int only_primes = 0, verbose = 0;
@@ -66,12 +65,6 @@ int main (int argc, char **argv)
 	{
 	  method = 2;
 	  x0 = 7;
-	  argc--;
-	  argv++;
-	}
-      else if (argc > 1 && strcmp (argv[1], "-f") == 0)
-	{
-	  fast = 1;
 	  argc--;
 	  argv++;
 	}
@@ -197,10 +190,17 @@ int main (int argc, char **argv)
         {
 	  unsigned long f;
 
-	  f = pp1 (m, &pp1plan);
+	  if (1)
+	    f = pp1 (r, m, &pp1plan);
+	  else
+	    {
+	      mod_set_ul (b, 7UL, m);
+	      mod_inv (b, b, m);
+	      mod_add (b, b, b, m); /* b = 2/7 (mod m) */
+	      mod_V_mp (r, b, E->_mp_d, E->_mp_size, m);
+	    }
 	  
-          if (0 && compare) /* FIXME: pp1() should return end-of-stage1 
-			       residue */
+          if (compare)
             {
 	      mod_init_noset0 (r2, m);
 	      mod_set_ul (b, 7UL, m);
@@ -210,6 +210,9 @@ int main (int argc, char **argv)
               if (!mod_equal (r, r2, m))
                 printf ("Error, pp1() and mod_V_mp() differ for "
                         "modulus %lu\n", i);
+	      else if (verbose >= 2)
+		printf ("pp1() and mod_V_mp() agree for modulus %lu\n", i);
+
 	      mod_clear (r2, m);
             }
 

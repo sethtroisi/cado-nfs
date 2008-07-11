@@ -11,12 +11,20 @@ static char *buffer;
 static size_t bufalloc, buffull; /* Allocated size and current number of 
 				    codes in buffer */
 
+#if 0
 #define DICT_NRENTRIES 9
 const int dict_len[DICT_NRENTRIES] = {2, 2, 2, 3, 3, 3, 4, 4, 6};
 const literal_t *dict_entry[DICT_NRENTRIES] = 
   {"\xB\xA", "\x3\x0", "\x3\x3", "\xB\xA\x3", "\x0\x3\x0","\x3\x3\x0",
    "\x3\x0\x3\x0", "\x3\xB\xA\x3", "\x3\x0\x3\x0\x3\x0"};
 const int dict_code[DICT_NRENTRIES] = {13, 14, 15, 16, 17, 18, 19, 20, 21};
+#else
+#define DICT_NRENTRIES 4
+const int dict_len[DICT_NRENTRIES] = {2, 2, 3, 4};
+const literal_t *dict_entry[DICT_NRENTRIES] = 
+  {"\xB\xA", "\x3\x0", "\x3\xB\xA", "\x3\x0\x3\x0"};
+const int dict_code[DICT_NRENTRIES] = {13, 14, 15, 16};
+#endif
 
 /* Table of multipliers for PRAC. prac_mul[i], i>0, has continued fraction 
    sequence of all ones but with a 2 in the i-th place, and 

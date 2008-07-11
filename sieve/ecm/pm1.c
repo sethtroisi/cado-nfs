@@ -270,7 +270,7 @@ pm1 (residue_t x, const modulus_t m, const pm1_plan_t *plan)
   mod_sub (t, x, one, m);
   mod_gcd (&f, t, m);
 
-  if (f > 1UL)
+  if (f > 1UL || plan->B1 >= plan->stage2.B2)
     {
       mod_clear (one, m);
       mod_clear (two, m);
