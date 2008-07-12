@@ -25,14 +25,10 @@ pm1_stage2 (residue_t r, const residue_t X, const stage2_plan_t *plan,
   unsigned int id;
 #endif
   
-  if (plan->s2 != 1)
-    {
-      fprintf (stderr, "Stage 2 with more than 1 pass not implemented yet\n");
-      return 1UL;
-    }
-  
   mod_init_noset0 (t, m);
 
+#define FAST_XJ_INIT
+#ifndef FAST_XJ_INIT
   /* Compute Xd = V_d(X) */
   mod_V_ul (Xd, X, two, plan->d, m);
 
@@ -41,8 +37,6 @@ pm1_stage2 (residue_t r, const residue_t X, const stage2_plan_t *plan,
 	      plan->d, mod_get_ul (Xd, m));
 #endif
   
-#define FAST_XJ_INIT
-#ifndef FAST_XJ_INIT
   /* Compute V_j(X) for j in S_1. Really slow, use common addition 
      chain below instead */
   Xj = malloc (plan->s1 * sizeof(residue_t));
@@ -162,6 +156,14 @@ pm1_stage2 (residue_t r, const residue_t X, const stage2_plan_t *plan,
 #endif
       }
     
+    /* Also compute Xd = V_d(X) while we've got V_6(X) */
+    mod_V_ul (Xd, X6, two, plan->d / 6, m);
+
+#ifdef PARI
+    printf ("d = %u; Xd = V(d, X); Xd == %lu /* PARI */\n",
+	    plan->d, mod_get_ul (Xd, m));
+#endif
+    
     mod_clear (ap1_0, m);
     mod_clear (ap1_1, m);
     mod_clear (ap5_0, m);
@@ -171,57 +173,55 @@ pm1_stage2 (residue_t r, const residue_t X, const stage2_plan_t *plan,
   }
 #endif /* if FAST_XJ_INIT */
   
-  /* Do all the passes */
   mod_init_noset0 (Xid, m);
   mod_init_noset0 (Xid1, m);
   mod_init_noset0 (a, m);
-  mod_set_ul (a, 1UL, m);
+  mod_set_ul_reduced (a, 1UL, m);
   l = 0;
-  for (k = 0; k < plan->s2; k++)
-    {
-      /* For each pass, compute V_{S[k]}(X) and V_{S[k]+d}(X) so we can
-	 compute the remaining V_{S[k]+id}(X) via an arithmetic progression.
-	 TODO: init both with the same binary chain. */
-      
-      mod_V_ul (Xid, X, two, plan->S2[k], m);
-      mod_V_ul (Xid1, X, two, plan->S2[k] + plan->d, m);
+  
+  {
+    /* Compute V_{i0 * d}(X) and V_{(i0 + 1) * d}(X) so we can
+       compute the remaining V_{id}(X) via an arithmetic progression.
+       TODO: init both with the same binary chain. */
+    
+    mod_V_ul (Xid, Xd, two, plan->i0, m);
+    mod_V_ul (Xid1, Xd, two, plan->i0 + 1, m);
 #ifdef PARI
-      id = plan->S2[k];
-      printf ("V(%u, X) == %lu /* PARI */\n",
-	      plan->S2[k], mod_get_ul (Xid, m));
-      printf ("V(%u, X) == %lu /* PARI */\n",
-	      plan->S2[k] + plan->d, mod_get_ul (Xid1, m));
+    printf ("V(%u, X) == %lu /* PARI */\n",
+	    plan->d * plan->i0, mod_get_ul (Xid, m));
+    printf ("V(%u, X) == %lu /* PARI */\n",
+	    plan->d * (plan->i0 + 1), mod_get_ul (Xid1, m));
 #endif
-      
-      while (plan->pairs[l] != NEXT_PASS) 
-	{
-	  while (plan->pairs[l] < NEXT_D && plan->pairs[l] < NEXT_PASS)
-	    {
-	      mod_sub (t, Xid, Xj[plan->pairs[l]], m);
-	      mod_mul (a, a, t, m);
-	      l++;
-	    }
-	  
-	  /* Advance i by 1 */
-	  if (plan->pairs[l] == NEXT_D)
-	    {
-	      mod_mul (t, Xid1, Xd, m);
-	      mod_sub (t, t, Xid, m);
-	      mod_set (Xid, Xid1, m);
-	      mod_set (Xid1, t, m);
-	      l++; /* Skip over NEXT_D */
+    
+    while (plan->pairs[l] != NEXT_PASS) 
+      {
+	while (plan->pairs[l] < NEXT_D && plan->pairs[l] < NEXT_PASS)
+	  {
+	    mod_sub (t, Xid, Xj[plan->pairs[l]], m);
+	    mod_mul (a, a, t, m);
+	    l++;
+	  }
+	
+	/* Advance i by 1 */
+	if (plan->pairs[l] == NEXT_D)
+	  {
+	    mod_mul (t, Xid1, Xd, m);
+	    mod_sub (t, t, Xid, m);
+	    mod_set (Xid, Xid1, m);
+	    mod_set (Xid1, t, m);
+	    l++; /* Skip over NEXT_D */
 #ifdef PARI
-	      id += plan->d;
-	      printf ("V(%u, X) == %lu /* PARI */\n",
-		      id, mod_get_ul (Xid, m));
-	      printf ("V(%u, X) == %lu /* PARI */\n",
-		      id + plan->d, mod_get_ul (Xid1, m));
+	    id += plan->d;
+	    printf ("V(%u, X) == %lu /* PARI */\n",
+		    id, mod_get_ul (Xid, m));
+	    printf ("V(%u, X) == %lu /* PARI */\n",
+		    id + plan->d, mod_get_ul (Xid1, m));
 #endif
-	    }
-	}
-      l++; /* Skip over NEXT_PASS */
-    }
-
+	  }
+      }
+    l++; /* Skip over NEXT_PASS */
+  }
+  
   mod_set (r, a, m);
 
   for (k = 0; k < plan->s1; k++)

@@ -23,6 +23,7 @@ void print_help (char *programname)
 	  "numbers)\n");
   printf ("-v       More verbose output. Once: print parameters. Twice: print "
 	  "residues\n");
+  printf ("-vf      Print factors that are found\n");
   printf ("-x0 <n>  Use <n> as starting value for P-1/P+1, or as sigma "
            "value for ECM\n");
 }
@@ -36,9 +37,11 @@ int main (int argc, char **argv)
   int method = 0; /* 0 = P-1, 1 = P+1, 2 = ECM */
   int parameterization = 0;
   int only_primes = 0, verbose = 0;
+  int printfactors = 0;
   primegen pg[1];
   pm1_plan_t pm1plan;
   pp1_plan_t pp1plan;
+  ecm_plan_t ecmplan;
 
   /* Parse options */
   while (argc > 1 && argv[1][0] == '-')
@@ -92,6 +95,12 @@ int main (int argc, char **argv)
 	  argc -= 1;
 	  argv += 1;
 	}
+      else if (argc > 1 && strcmp (argv[1], "-vf") == 0)
+	{
+	  printfactors = 1;
+	  argc -= 1;
+	  argv += 1;
+	}
       else if (argc > 2 && strcmp (argv[1], "-x0") == 0)
 	{
 	  x0 = strtoul (argv[2], NULL, 10);;
@@ -116,12 +125,6 @@ int main (int argc, char **argv)
   B1 = strtoul (argv[3], NULL, 10);
   B2 = strtoul (argv[4], NULL, 10);
 
-  if (method == 2 && B2 > B1)
-    {
-      fprintf (stderr, "Stage 2 not implemented for ECM\n");
-      exit (EXIT_FAILURE);
-    }
-
   if (verbose)
     {
       printf ("Running %s on %s in [%lu, %lu] with B1 = %lu, B2 = %lu, "
@@ -137,6 +140,8 @@ int main (int argc, char **argv)
     pm1_make_plan (&pm1plan, B1, B2, (verbose >= 2));
   if (method == 1)
     pp1_make_plan (&pp1plan, B1, B2, (verbose >= 2));
+  if (method == 2)
+    ecm_make_plan (&ecmplan, B1, B2, BRENT12, x0, (verbose >= 2));
 
   /* Compute exponent (a.k.a. multiplier for P+1/ECM) for stage 1 */
   mpz_init (E);
@@ -166,6 +171,7 @@ int main (int argc, char **argv)
     {
       modulus_t m;
       residue_t b, r, r2;
+      unsigned long f;
 
       total++;
 
@@ -176,10 +182,9 @@ int main (int argc, char **argv)
 
       if (method == 0) /* P-1 */
 	{
-	  unsigned long f;
 	  f = pm1 (r, m, &pm1plan);
 
-	  if (f > 1UL && verbose >= 1)
+	  if (printfactors && f > 1UL)
 	    printf ("%lu\n", f);
 	  if (verbose >= 2)
 	    printf ("Mod(%lu, %lu)^E == %lu\n", x0, i, mod_get_ul (r, m));
@@ -188,9 +193,7 @@ int main (int argc, char **argv)
 	}
       else if (method == 1) /* P+1 */
         {
-	  unsigned long f;
-
-	  if (1)
+	  if (1) /* Switch between byte code interpreter and mod_V_mp() */
 	    f = pp1 (r, m, &pp1plan);
 	  else
 	    {
@@ -216,7 +219,7 @@ int main (int argc, char **argv)
 	      mod_clear (r2, m);
             }
 
-	  if (f > 1UL && verbose >= 1)
+	  if (printfactors && f > 1UL)
 	    printf ("%lu\n", f);
 	  if (verbose >= 2)
 	    printf ("V(E, Mod(%lu, %lu) == %lu\n", x0, i, mod_get_ul (r, m));
@@ -225,20 +228,11 @@ int main (int argc, char **argv)
 	}
       else
 	{
-	  mod_set_ul_reduced (b, x0, m);
-	  if (ecm_stage1 (r, (int) B1, b, parameterization, m, (verbose >= 2)))
-	    {
-	      residue_t f;
-	      mod_init (f, m);
-	      mod_gcd (f, r, m);
-	      if (verbose >= 2)
-		printf ("Found %lu\n", mod_get_ul (f, m));
-	      hits++;
-	      mod_clear (f, m);
-	    }
-	  else if (verbose >= 2)
-	    printf ("Sigma = %lu, x1 = %lu\n", 
-		    mod_get_ul (b, m), mod_get_ul (r, m));
+	  f = ecm (r, m, &ecmplan);
+	  if (f > 1UL)
+	    hits++;
+	  if (printfactors && f > 1UL)
+	    printf ("%lu\n", f);
 	}
       
       mod_clear (r, m);
@@ -255,6 +249,9 @@ int main (int argc, char **argv)
     pm1_clear_plan (&pm1plan);
   if (method == 1)
     pp1_clear_plan (&pp1plan);
+  if (method == 2)
+    ecm_clear_plan (&ecmplan);
+
   mpz_clear (E);
   printf ("Of %lu %s in [%lu, %lu] there were %lu with smooth order\n", 
 	  total, (only_primes) ? "primes" : "odd numbers", start, stop, hits);

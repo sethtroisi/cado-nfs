@@ -1,46 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include "utils.h"
+#include "prac_bc.h"
 #include "ecm.h"
 
 typedef struct {residue_t x, z;} __ellM_point_t;
 typedef __ellM_point_t ellM_point_t[1];
-
-static int primes[] = {5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 
-  59, 61, 67, 71, 73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131, 137, 
-  139, 149, 151, 157, 163, 167, 173, 179, 181, 191, 193, 197, 199, 211, 223, 
-  227, 229, 233, 239, 241, 251, 257, 263, 269, 271, 277, 281, 283, 293, 307, 
-  311, 313, 317, 331, 337, 347, 349, 353, 359, 367, 373, 379, 383, 389, 397, 
-  401, 409, 419, 421, 431, 433, 439, 443, 449, 457, 461, 463, 467, 479, 487, 
-  491, 499, 503, 509, 521, 523, 541, 0};
-
-static unsigned char bytecode50[] = {
-#include "bc_50.h"
-};
-
-static unsigned char bytecode100[] = {
-#include "bc_100.h"
-};
-
-static unsigned char bytecode150[] = {
-#include "bc_150.h"
-};
-
-static unsigned char bytecode200[] = {
-#include "bc_200.h"
-};
-
-static unsigned char bytecode300[] = {
-#include "bc_300.h"
-};
-
-static unsigned char bytecode400[] = {
-#include "bc_400.h"
-};
-
-static unsigned char bytecode500[] = {
-#include "bc_500.h"
-};
 
 static inline void
 ellM_init (ellM_point_t P, const modulus_t m)
@@ -332,7 +298,7 @@ ellW_mul_ui (residue_t x, residue_t y, const unsigned long e, residue_t a,
    corresponding elliptic curve operations on (x::z) */
 
 static void
-ellM_interpret_bytecode (ellM_point_t P, const unsigned char *code,
+ellM_interpret_bytecode (ellM_point_t P, const char *code,
 			 const unsigned long l, const modulus_t m, 
 			 const residue_t b)
 {
@@ -426,7 +392,7 @@ ellM_interpret_bytecode (ellM_point_t P, const unsigned char *code,
 }
 
 
-/* Produces curve in Montgomery parameterization from sigma value.
+/* Produces curve in Montgomery form from sigma value.
    Return 1 if it worked, 0 if a modular inverse failed */
 
 static int
@@ -614,17 +580,15 @@ curveW_from_Montgomery (residue_t a, residue_t x, residue_t y,
 }
 
 
-/* Returns 1 if a factor was found and a residue that's a multiple of 
-   that factor in x1. Otherwise returns 0 and end-of-stage-1 residue in x1. */
+/* If a factor is found it is returned and x1 is unchanged, otherwise 
+   1 is returned and the end-of-stage-1 residue is stored in x1. */
 
-int
-ecm_stage1 (residue_t x1, const int B1, const residue_t sigma, 
-	    const int parameterization, const modulus_t m, const int verbose)
+unsigned long
+ecm (residue_t x1, const modulus_t m, const ecm_plan_t *plan)
 {
   residue_t u, A, b;
   ellM_point_t P, Pt;
-  int r, *s;
-  int ret;
+  unsigned long f = 1;
 
   mod_init (u, m);
   mod_init (A, m);
@@ -632,15 +596,27 @@ ecm_stage1 (residue_t x1, const int B1, const residue_t sigma,
   ellM_init (P, m);
   ellM_init (Pt, m);
 
-  if (parameterization == BRENT12)
+  if (plan->parameterization == BRENT12)
   {
-    if (Brent12_curve_from_sigma (A, P->x, sigma, m) == 0)
-      return 1;
+    residue_t s;
+    mod_init_noset0 (s, m);
+    mod_set_ul (s, plan->sigma, m);
+    if (Brent12_curve_from_sigma (A, P->x, s, m) == 0)
+      {
+	mod_clear (u, m);
+	mod_clear (A, m);
+	mod_clear (b, m);
+	ellM_clear (P, m);
+	ellM_clear (Pt, m);
+	mod_clear (s, m);
+	return 1;
+      }
+    mod_clear (s, m);
     mod_set_ul (P->z, 1UL, m);
   }
-  else if (parameterization == MONTY12)
+  else if (plan->parameterization == MONTY12)
   {
-    if (Monty12_curve_from_k (A, P->x, mod_get_ul (sigma, m), m) == 0)
+    if (Monty12_curve_from_k (A, P->x, plan->sigma, m) == 0)
       return 1;
     mod_set_ul (P->z, 1UL, m);
   }
@@ -650,11 +626,10 @@ ecm_stage1 (residue_t x1, const int B1, const residue_t sigma,
     abort();
   }
 
-  if (verbose)
-    {
-      printf ("starting point: (%lu::%lu)\n", 
-	      mod_get_ul (P->x, m), mod_get_ul (P->z, m));
-    }
+#ifdef TRACE
+  printf ("starting point: (%lu::%lu)\n", 
+	  mod_get_ul (P->x, m), mod_get_ul (P->z, m));
+#endif
 
   mod_add_ul (b, A, 2UL, m);
   mod_div2 (b, b, m);
@@ -662,68 +637,13 @@ ecm_stage1 (residue_t x1, const int B1, const residue_t sigma,
 
   /* now start ecm */
 
-  /* Use the byte code if we can */
-  if (B1 == 50)
-    ellM_interpret_bytecode (P, bytecode50, sizeof (bytecode50), m, b);
-  else if (B1 == 100)
-    ellM_interpret_bytecode (P, bytecode100, sizeof (bytecode100), m, b);
-  else if (B1 == 150)
-    ellM_interpret_bytecode (P, bytecode150, sizeof (bytecode150), m, b);
-  else if (B1 == 200)
-    ellM_interpret_bytecode (P, bytecode200, sizeof (bytecode200), m, b);
-  else if (B1 == 300)
-    ellM_interpret_bytecode (P, bytecode300, sizeof (bytecode300), m, b);
-  else if (B1 == 400)
-    ellM_interpret_bytecode (P, bytecode400, sizeof (bytecode400), m, b);
-  else if (B1 == 500)
-    ellM_interpret_bytecode (P, bytecode500, sizeof (bytecode500), m, b);
-  else
-    {
-      /* None of the prepared byte codes work. Do a generic stage 1 with
-	 binary chain */
-
-      /* prime 2 */
-      /* printf ("start: x=%lu z=%lu\n", 
-	       mod_get_ul(P->x, m) , mod_get_ul(P->z, m)); */
-      for (r = 2; r <= B1; r *= 2)
-	{
-	  ellM_double (P, P, m, b);
-	  /* printf ("2: x=%lu z=%lu\n", 
-                   mod_get_ul(P->x, m) , mod_get_ul(P->z, m)); */
-	}
-
-      /* prime 3 */
-      for (r = 3; r <= B1; r *= 3)
-	{
-	  ellM_double (Pt, P, m, b);
-	  ellM_add (P, P, Pt, P, m);
-	}
-      
-      /* printf ("3: x=%lu z=%lu\n", mod_get_ul(P->x), mod_get_ul(P->z)); */
-
-      /* other primes */
-      for (s = primes; s[0] <= B1; s++)
-	{
-	  if (s[0] == 0)
-	    {
-	      fprintf (stderr, "Error, not enough small primes\n");
-	      exit (1);
-	    }
-	  for (r = s[0]; r <= B1; r *= s[0])
-	    ellM_mul_ui (P, (unsigned long) s[0], m, b);
-	}
-    }
+  /* Do stage 1 */
+  ellM_interpret_bytecode (P, plan->bc, plan->bc_len, m, b);
 
   if (!mod_inv (u, P->z, m))
-    {
-      mod_set (x1, P->z, m);
-      ret = 1;  /* return 1 if non-trivial gcd is found */
-    }
+    mod_gcd (&f, P->z, m);
   else
-    {
-      mod_mul (x1, P->x, u, m); /* No factor. Set x1 to normalized point */
-      ret = 0;
-    }
+    mod_mul (x1, P->x, u, m); /* No factor. Set x1 to normalized point */
   
   mod_clear (u, m);
   mod_clear (A, m);
@@ -731,8 +651,63 @@ ecm_stage1 (residue_t x1, const int B1, const residue_t sigma,
   ellM_clear (P, m);
   ellM_clear (Pt, m);
 
-  return ret;
+  return f;
 }
+
+
+/* Make byte code for addition chain for stage 1, and the parameters for 
+   stage 2 */
+
+void 
+ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
+	       const int parameterization, const unsigned long sigma, 
+	       const int verbose)
+{
+  unsigned int p;
+  const unsigned int addcost = 6, doublecost = 5; /* TODO: find good ratio */
+  const unsigned int compress = 0;
+  
+  /* Make bytecode for stage 1 */
+  plan->B1 = B1;
+  plan->parameterization = parameterization;
+  plan->sigma = sigma;
+  bytecoder_init (compress);
+  for (p = 2; p <= B1; p = (unsigned int) getprime (p))
+    {
+      unsigned long q;
+      for (q = p; q <= B1; q *= p)
+	prac_bytecode (p, addcost, doublecost);
+    }
+  bytecoder_flush ();
+  plan->bc_len = bytecoder_size ();
+  plan->bc = (char *) malloc (plan->bc_len);
+  ASSERT (plan->bc);
+  bytecoder_read (plan->bc);
+  bytecoder_clear ();
+  getprime (0);
+
+  if (verbose)
+    {
+      printf ("Byte code for stage 1 (length %d): ", plan->bc_len);
+      for (p = 0; p < plan->bc_len; p++)
+	printf ("%s%d", (p == 0) ? "" : ", ", (int) (plan->bc[p]));
+      printf ("\n");
+    }
+    
+  /* Make stage 2 plan */
+  stage2_make_plan (&(plan->stage2), B1, B2, verbose);
+}
+
+void 
+ecm_clear_plan (ecm_plan_t *plan)
+{
+  stage2_clear_plan (&(plan->stage2));
+  free (plan->bc);
+  plan->bc = NULL;
+  plan->bc_len = 0;
+  plan->B1 = 0;
+}
+
 
 /* Determine order of a point P on a curve, both defined by the sigma value
    as in ECM. Looks for i in Hasse interval so that i*P = O, has complexity
