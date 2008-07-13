@@ -22,7 +22,7 @@ int poly_roots_ulong(unsigned long * r, mpz_t * f, int d, unsigned long p)
         rr = (plain_poly_coeff_t *) malloc(d * sizeof(plain_poly_coeff_t));
         n = plain_poly_roots(rr, f, d, p);
         for(i = 0 ; i < n ; i++) {
-            r[i] = rr[i];
+            r[i] = rr[i] < 0 ? (rr[i]+(plain_poly_coeff_t) p) : rr[i];
         }
         free(rr);
     } else {
