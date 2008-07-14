@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <time.h>
 #include <values.h> /* for DBL_MAX */
 #include "cado.h"
 #include "utils/utils.h"
@@ -16,6 +17,8 @@
 
 #define P0_MAX 1000
 
+int verbose = 0;
+int index = 0;
 double search_time = 0.0;
 
 /* Compute the sup-norm of f(x) = A[d]*x^d + ... + A[0]
@@ -94,6 +97,395 @@ Lemma21 (mpz_t *a, mpz_t N, int d, mpz_t p, mpz_t m)
   mpz_clear (mi);
 }
 
+/* utility stuff for the searching algorithm */
+
+typedef int (*sortfunc_t) (const void *a, const void * b);
+
+int cmp(uint64_t * a, uint64_t * b)
+{
+    if (*a < *b) return -1;
+    if (*b < *a) return 1;
+    return 0;
+}
+
+void save_all_sums(uint64_t * dst, uint64_t ** g, int d, int l)
+{
+    int *mu, i;
+    uint64_t *s;
+    mu = (int*) malloc (l * sizeof (int));
+    s = (uint64_t*) malloc ((l + 1) * sizeof (uint64_t));
+    uint64_t * d0 = dst;
+
+    for (i = 0; i < l; i++)
+        mu[i] = 0;
+    s[0] = 0;
+    for (i = 1; i <= l; i++)
+        s[i] = s[i-1] + g[i-1][mu[i-1]];
+
+    while (1)
+    {
+        *dst++ = s[l];
+
+        /* go to next combination */
+        for (i = l - 1; i >= 0 && mu[i] == d - 1; i--);
+        /* now either i < 0 and we are done, or mu[i] < d-1 */
+        if (UNLIKELY(i < 0))
+            break;
+        mu[i] ++;
+        s[i+1] = s[i] + g[i][mu[i]];
+        while (++i < l)
+        {
+            mu[i] = 0;
+            s[i+1] = s[i] + g[i][mu[i]];
+        }
+    }
+
+    qsort(d0, dst-d0, sizeof(uint64_t), (sortfunc_t) cmp);
+
+    free(s);
+    free(mu);
+}
+
+/* Our second pass will be given a list of target sums to be matched.
+ * We'lr first to a dumb hash to make the tight loop just as fast as
+ * above, and then search (later bsearch) through the list of targets.
+ *
+ * Results are given per target as a list (possibly with several
+ * elements) of vectors mu. Those vectors are to be properly freed by the
+ * caller.
+ */
+
+int * mu_dup(int * mu, int l)
+{
+    int * nmu = malloc(l * sizeof(int));
+    int i;
+    for(i = 0 ; i < l ; i++) nmu[i]=mu[i];
+    return nmu;
+}
+
+struct mu_llist;
+struct mu_llist {
+    int * mu;
+    struct mu_llist * next;
+};
+
+/* TODO: as we do the stuff, duplicates in the list of targets would have
+ * the corresponding results list populated twice.
+ */
+void retrieve_sums(uint64_t * targets, struct mu_llist ** res, int ntargets,
+        uint64_t ** g, int d, int l)
+{
+    /* we could even do a bitmap, but then we would have to do shifts in
+     * the tight loop, which is probably not worth it. */
+    unsigned char hash[256] = {0,};
+    int i;
+    for(i = 0 ; i < ntargets ; i++) {
+        hash[targets[i] & 0xff]=1;
+        res[i]=(struct mu_llist *) NULL;
+    }
+    int *mu;
+    uint64_t *s;
+    mu = (int*) malloc (l * sizeof (int));
+    s = (uint64_t*) malloc ((l + 1) * sizeof (uint64_t));
+
+    for (i = 0; i < l; i++)
+        mu[i] = 0;
+    s[0] = 0;
+    for (i = 1; i <= l; i++)
+        s[i] = s[i-1] + g[i-1][mu[i-1]];
+
+    while (1) {
+        uint64_t v = s[l];
+        if (UNLIKELY(hash[v&0xff])) {
+            int j;
+            for(j = 0 ; j < ntargets ; j++) {
+                if (v == targets[j]) {
+                    /* fond someone to populate ! */
+                    struct mu_llist * kid;
+                    kid = malloc(sizeof(struct mu_llist));
+                    kid->next = res[j];
+                    kid->mu = mu_dup(mu,l);
+                    res[j] = kid;
+                    /* loop again because we're not sorting targets yet
+                     */
+                }
+            }
+            /* if we arrive here without finding anybody, too bad ; it's
+             * a normal condition anyway since our only guard is the
+             * one-byte hash above.
+             */
+        }
+
+        /* go to next combination */
+        for (i = l - 1; i >= 0 && mu[i] == d - 1; i--);
+        /* now either i < 0 and we are done, or mu[i] < d-1 */
+        if (UNLIKELY(i < 0))
+            break;
+        mu[i] ++;
+        s[i+1] = s[i] + g[i][mu[i]];
+        while (++i < l)
+        {
+            mu[i] = 0;
+            s[i+1] = s[i] + g[i][mu[i]];
+        }
+    }
+
+    free(s);
+    free(mu);
+}
+
+void possible_candidate(int * mu, int l, int d, mpz_t *a,
+                      mpz_t P, mpz_t N, double M, mpz_t **x, mpz_t m0)
+{
+    mpz_t t;
+    int i;
+    double norm;
+
+    mpz_init(t);
+    mpz_add (t, m0, x[0][mu[0]]);
+    for (i = 1; i < l; i++)
+        mpz_add (t, t, x[i][mu[i]]);
+
+    Lemma21 (a, N, d, P, t);
+    norm = sup_norm (a, d);
+
+    if (norm <= M) {
+        gmp_printf ("p=%Zd m=%Zd norm=%1.2e t=%u index=%u\n",
+                P, t, norm,
+                clock()/CLOCKS_PER_SEC,
+                index);
+        index++;
+        if (verbose) {
+            /* terse output does not need the polynomial */
+            fprint_polynomial (stdout, a, d);
+            printf ("\n");
+        }
+        fflush (stdout);
+    }
+    mpz_clear(t);
+}
+
+struct expanding_list_s {
+    uint64_t * v;
+    size_t alloc;
+    size_t size;
+};
+typedef struct expanding_list_s expanding_list[1];
+
+void expanding_list_init(expanding_list l)
+{
+    l->alloc=16;
+    l->size=0;
+    l->v = malloc(l->alloc * sizeof(uint64_t));
+}
+void expanding_list_clear(expanding_list l)
+{
+    free(l->v);
+    l->v=NULL;
+    l->alloc=0;
+    l->size=0;
+}
+void expanding_list_push(expanding_list l, uint64_t v)
+{
+    if (LIKELY(l->size < l->alloc)) {
+        l->v[l->size++]=v;
+    } else {
+        l->alloc += l->alloc >> 1;
+        l->v = realloc(l->v, l->alloc * sizeof(uint64_t));
+    }
+}
+
+double quick_search(double f0, double **f, int l, int d, double eps, mpz_t *a,
+	      mpz_t P, mpz_t N, double M, mpz_t **x, mpz_t m0)
+{
+    uint64_t ** g;
+    double two_64 = pow(2,64);
+    uint64_t lim = 2 * eps * two_64;
+    int found = 0;
+    int i,j;
+    unsigned int dlr, dll;
+    unsigned int u;
+    double t0=clock();
+
+    // double delta;
+
+    /* We do integer arithmetic, scaled by 2^64 so that the wraparound of
+     * the ALU exactly matches the integer wraparound we're looking for.
+     */
+    g = malloc(l * sizeof(uint64_t*));
+    for(i = 0 ; i < l ; i++) {
+        g[i] = malloc(d * sizeof(uint64_t));
+    }
+
+    /* Offset by epsilon, and add f0. */
+    for(j = 0 ; j < d ; j++) {
+        /* Beware -- conversion from double can yield _MIN or _MAX ! */
+        double t;
+        for(t = f0 + f[0][j] + eps ; t < 0 ; t += 1);
+        for( ; t >= 1 ; t -= 1);
+        g[0][j] = t * two_64;
+    }
+    for(i = 1 ; i < l ; i++) {
+        for(j = 0 ; j < d ; j++) {
+            double t;
+            for(t = f[i][j] ; t < 0 ; t += 1);
+            for( ; t >= 1 ; t -= 1);
+            g[i][j] = t * two_64;
+        }
+    }
+
+    int lcut = l - l/2;
+    int rcut = l/2;
+
+    /* l == lcut + rcut */
+
+    dll = (long) pow(d, lcut);
+    uint64_t * all_l = malloc(dll * sizeof(uint64_t));
+
+    dlr = (long) pow(d, rcut);
+
+
+    /* This ``extra'' value is some replicated data after the all_r
+     * array, so that we can avoid having to wrap around in the tight
+     * pointer loop. We want to have all_l[0] matched with values which,
+     * besides the positions all_r[0..x[, are also found in
+     * all_r[dlr..dlr+x[ for some x. Afterwards, the pointers within
+     * all_r merely have to go downwards while the pointer within all_l
+     * goes upward.
+     */
+    /* We need to look ahead to see how far we will have to go to find
+     * some value such that all_r[x]+all_l[0] > lim */
+    unsigned int extra0 = 1 + 5.0 * eps * dlr;
+    uint64_t * all_r = malloc((dlr + extra0) * sizeof(uint64_t));
+
+    // delta = -clock();
+
+    save_all_sums(all_l, g, d, lcut);
+    save_all_sums(all_r, g + lcut, d, rcut);
+
+    unsigned int extra;
+    unsigned int badluck = 1000 + 100 * eps * dlr;
+    for(extra = eps * dlr ; extra < badluck && extra < dlr; extra++) {
+        if (all_l[0] + all_r[extra] >= lim) {
+            extra++;
+            break;
+        }
+    }
+    ASSERT_ALWAYS(!(extra == badluck || extra == dlr));
+    ASSERT_ALWAYS(all_l[0] + all_r[extra-1] >= lim);
+
+    if (extra > extra0) {
+        /* unlikely to occur. */
+        all_r = realloc(all_r, (dlr + extra) * sizeof(uint64_t));
+    }
+
+    ASSERT_ALWAYS(all_l[0] + all_r[extra-1] >= lim);
+    /* wrap around, so that we can simplify the
+     * inner loop */
+    for(u = 0 ; u < extra ; u++) {
+        all_r[dlr+u]=all_r[u];
+    }
+
+    /* This integer stores the difference between the two pointers within
+     * all_r
+     */
+    unsigned int pd = 0;
+    unsigned int rx = dlr + extra - 1;
+
+    ASSERT_ALWAYS(all_l[0] + all_r[rx] >= lim);
+
+
+    expanding_list ltargets;
+    expanding_list rtargets;
+
+    expanding_list_init(ltargets);
+    expanding_list_init(rtargets);
+
+    for(unsigned int lx = 0 ; lx < dll ; lx++) {
+        unsigned int k = 0;
+        /* arrange so that *rv is the furthermost value with sum < 0 */
+        for( ; rx ; rx--, pd++) {
+            if (((int64_t) (all_l[lx] + all_r[rx])) < 0)
+                break;
+        }
+        /* arrange so that rv[pd] is the furthermost value with sum >=0
+         * and < lim, but no further than rv */
+        for( ; pd && all_l[lx] + all_r[rx+pd] >= lim ; pd--);
+        /* The difference between the two pointers is exactly the number
+         * of solutions. The exact solutions are those whose right part
+         * is at [1]...[pd]
+         */
+        for(k = 0 ; k < pd ; k++) {
+            /* l[lx] and r[rx+k+1] match together ! */
+            expanding_list_push(ltargets, all_l[lx]);
+            expanding_list_push(rtargets, all_r[rx+k+1]);
+        }
+
+        found += pd;
+    }
+
+    // delta += clock();
+
+    if (verbose >= 3) {
+        printf("# Found %d matches\n", found);
+    }
+
+    struct mu_llist ** lres;
+    struct mu_llist ** rres;
+
+    lres = malloc(ltargets->size  * sizeof(struct mu_llist));
+    rres = malloc(rtargets->size  * sizeof(struct mu_llist));
+    memset(lres, 0, ltargets->size  * sizeof(struct mu_llist));
+    memset(rres, 0, rtargets->size  * sizeof(struct mu_llist));
+
+    ASSERT(ltargets->size == rtargets->size);
+
+    retrieve_sums(ltargets->v, lres, ltargets->size, g,d,lcut);
+    retrieve_sums(rtargets->v, rres, rtargets->size, g+lcut,d,rcut);
+
+    for(i = 0 ; i < l ; i++) {
+        free(g[i]);
+    }
+    free(g);
+
+    for(u = 0 ; u < ltargets->size ; u++) {
+        struct mu_llist * ll;
+        struct mu_llist * rr;
+        int * mu = malloc(l*sizeof(int));
+        for(ll = lres[u] ; ll ; ll = ll->next) {
+            for(i = 0 ; i < lcut ; i++) {
+                mu[i]=ll->mu[i];
+            }
+            for(rr = rres[u] ; rr ; rr = rr->next) {
+                for(i = 0 ; i < rcut ; i++) {
+                    mu[lcut+i]=rr->mu[i];
+                }
+                possible_candidate(mu,l,d,a,P,N,M,x,m0);
+            }
+        }
+        struct mu_llist * q;
+        for(ll = lres[u] ; ll ; ll = q) {
+            free(ll->mu);
+            q=ll->next;
+            free(ll);
+        }
+        for(rr = rres[u] ; rr ; rr = q) {
+            free(rr->mu);
+            q=rr->next;
+            free(rr);
+        }
+        free(mu);
+
+    }
+
+    expanding_list_clear(ltargets);
+    expanding_list_clear(rtargets);
+    free(lres);
+    free(rres);
+
+    // return found;
+    return clock()-t0;
+}
 /* Outputs all (mu[0], ..., mu[l-1]), 0 <= mu_i < d, such that S is at distance
    less than eps from an integer, with
    S = f0 + f[0][mu[0]] + ... + f[l-1][mu[l-1]].
@@ -105,9 +497,11 @@ naive_search (double f0, double **f, int l, int d, double eps, mpz_t *a,
 	      mpz_t P, mpz_t N, double M, mpz_t **x, mpz_t m0)
 {
   int *mu, i;
-  double *s, fr, norm;
+  double *s, fr;
+  // double norm;
   mpz_t t;
 
+  if (verbose >= 3) printf("In naive_search()\n");
   mu = (int*) malloc (l * sizeof (int));
   s = (double*) malloc ((l + 1) * sizeof (double));
   /* s[i] contains f0 + f[0][mu[0]] + ... + f[i-1][mu[i-1]] */
@@ -130,6 +524,8 @@ naive_search (double f0, double **f, int l, int d, double eps, mpz_t *a,
       if (UNLIKELY(fr <= eps)) /* Prob ~ 4e-7 on RSA155 with l=7, degree 5,
                                   M=5e24, pb=256, even less for smaller M */
 	{
+                possible_candidate(mu,l,d,a,P,N,M,x,m0);
+#if 0
           mpz_add (t, m0, x[0][mu[0]]);
 	  for (i = 1; i < l; i++)
             mpz_add (t, t, x[i][mu[i]]);
@@ -137,11 +533,19 @@ naive_search (double f0, double **f, int l, int d, double eps, mpz_t *a,
           norm = sup_norm (a, d);
           if (norm <= M)
             {
-              gmp_printf ("p=%Zd m=%Zd norm=%1.2e\n", P, t, norm);
-              fprint_polynomial (stdout, a, d);
-              printf ("\n");
+              gmp_printf ("p=%Zd m=%Zd norm=%1.2e t=%u index=%u\n",
+                      P, t, norm,
+                      clock()/CLOCKS_PER_SEC,
+                      index);
+              index++;
+              if (verbose) {
+                  /* terse output does not need the polynomial */
+                  fprint_polynomial (stdout, a, d);
+                  printf ("\n");
+              }
               fflush (stdout);
             }
+#endif
 	}
       
       /* go to next combination */
@@ -237,6 +641,12 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
       Pd = mpz_get_d (P);
       if (Pd <= max_adm1)
         {
+            if (verbose >= 2) {
+                printf("# subset");
+                for (k = 0; k < l; k++)
+                    printf(" %u",Q[p[k]]);
+                printf("\n");
+            }
           /* compute 1/N mod P */
           mpz_invert (invN, N, P);
 
@@ -258,6 +668,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
           mpz_mul (t, t, P);
           f0 = f0 / mpz_get_d (t);
           
+          if (verbose >= 2) printf("# xij...");
           /* compute the x[i][j] from (3.2) */
           for (i = 0; i < l; i++)
             {
@@ -284,6 +695,15 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
                   mpz_mul (x[i][j], x[i][j], P_over_pi);
                 }
             }
+          if (verbose >= 2) printf("done\n");
+          if (verbose >= 3) {
+              for (i = 0; i < l; i++) {
+                  for (j = 0; j < d; j++) {
+                      gmp_printf("%Zd, ",x[i][j]);
+                  }
+                  gmp_printf("\n");
+              }
+          }
 
           /* The m[i][j], cf (3.3) are not needed, since m[i][j] = x[i][j]
              for i >= 1, and m[0][j] = m0 + x[0][j] */
@@ -355,7 +775,11 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
 
           /* now search for a small combination */
           search_time -= seconds ();
+#ifdef  QUICK_SEARCH
+          checked += quick_search (f0, f, l, d, eps, a, P, N, M, x, m0);
+#else
           checked += naive_search (f0, f, l, d, eps, a, P, N, M, x, m0);
+#endif
           search_time += seconds ();
 
 #if 0
@@ -426,6 +850,7 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
 
   ASSERT_ALWAYS (d >= 4);
 
+  if (verbose) printf("# Step 1\n");
   /* step 1 */
   for (r = 1; r < pb; r += d)
     if (isprime (r))
@@ -481,6 +906,10 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
       if (lQ < l)
         goto next_ad;
 
+      if (verbose >= 2) {
+          gmp_printf("# ad=%Zd\n", a[d]);
+      }
+
       mpz_tdiv_q (mtilde, N, a[d]);
       mpz_root (mtilde, mtilde, d);
       max_adm1 = M * M / mpz_get_d (mtilde);
@@ -530,7 +959,6 @@ main (int argc, char *argv[])
 {
   cado_input in;
   int degree = 5;
-  int verbose = 0;
   double effort = 1e6;
   double M = 1e25;
   int l = 7;
