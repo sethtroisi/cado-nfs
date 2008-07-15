@@ -13,6 +13,21 @@ skew2 := proc(f, x, m, s0) local absf, g, i, S;
    fsolve(g, S=s0)
 end:
 
+supnorm := proc(f, s) local d;
+   d := degree(f,x);
+   max(seq(abs(coeff(f,x,i)*s^(i-d/2)),i=0..d))
+end:
+
+norm1 := proc(f, s) local d;
+   d := degree(f,x);
+   add(abs(coeff(f,x,i)*s^(i-d/2)),i=0..d)
+end:
+
+norm2 := proc(f, s) local d;
+   d := degree(f,x);
+   sqrt(add(coeff(f,x,i)^2*s^(2*i-d),i=0..d))
+end:
+
 get_alpha := proc(f, B) local s, p, e, q, disc;
    s := 0;
    p := 2;
@@ -143,6 +158,18 @@ Lemma21 := proc(N, d, ad, p, m) local a, r, i, mu;
       mu := mu*p;
       a[i] := (r + mu) / m^i;
       if not type(a[i], integer) then ERROR("a[i] is not an integer") fi;
+   od;
+   add(a[i]*x^i, i=0..d)
+end:
+
+basem := proc(N, d, m) local a, r, i, mu;
+   a := table();
+   r := N;
+   Digits:=length(N);
+   a[d] := round(N/m^d);
+   for i from d-1 by -1 to 0 do
+      r := r - a[i+1]*m^(i+1);
+      a[i] := round(r/m^i);
    od;
    add(a[i]*x^i, i=0..d)
 end:
