@@ -26,7 +26,7 @@
     } while (0)
 #define FATAL_ERROR_CHECK(cond, msg)					\
     do {								\
-        if (UNLIKELY(!(cond))) {					\
+      if (UNLIKELY((cond))) {                                           \
             croak__("Fatal error", msg);				\
         }								\
     } while (0)
