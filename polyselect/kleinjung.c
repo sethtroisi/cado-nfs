@@ -13,6 +13,8 @@
 #include "cado.h"
 #include "utils/utils.h"
 
+#define QUICK_SEARCH
+
 #include "aux.c"
 
 #define P0_MAX 1000
@@ -147,7 +149,7 @@ void save_all_sums(uint64_t * dst, uint64_t ** g, int d, int l)
 }
 
 /* Our second pass will be given a list of target sums to be matched.
- * We'lr first to a dumb hash to make the tight loop just as fast as
+ * We'll first do a dumb hash to make the tight loop just as fast as
  * above, and then search (later bsearch) through the list of targets.
  *
  * Results are given per target as a list (possibly with several
@@ -295,6 +297,9 @@ void expanding_list_push(expanding_list l, uint64_t v)
     }
 }
 
+/* Same as naive_search, but in O~(d^(l/2)) instead of O(d^l).
+   Returns the number of polynomials checked, i.e., d^l.
+*/
 double quick_search(double f0, double **f, int l, int d, double eps, mpz_t *a,
 	      mpz_t P, mpz_t N, double M, mpz_t **x, mpz_t m0)
 {
@@ -305,7 +310,7 @@ double quick_search(double f0, double **f, int l, int d, double eps, mpz_t *a,
     int i,j;
     unsigned int dlr, dll;
     unsigned int u;
-    double t0=clock();
+    //    double t0=clock();
 
     // double delta;
 
@@ -484,8 +489,10 @@ double quick_search(double f0, double **f, int l, int d, double eps, mpz_t *a,
     free(rres);
 
     // return found;
-    return clock()-t0;
+    // return clock()-t0;
+    return pow ((double) d, (double) l);
 }
+
 /* Outputs all (mu[0], ..., mu[l-1]), 0 <= mu_i < d, such that S is at distance
    less than eps from an integer, with
    S = f0 + f[0][mu[0]] + ... + f[l-1][mu[l-1]].
@@ -1037,7 +1044,11 @@ main (int argc, char *argv[])
   st = seconds () - st;
   fprintf (stderr, "Checked %1.0f polynomials in %1.1fs (%1.1es/p,", checked,
            st, st / checked);
+#ifdef  QUICK_SEARCH
+  fprintf (stderr, " quick_search took %1.1fs)\n", search_time);
+#else
   fprintf (stderr, " naive_search took %1.1fs)\n", search_time);
+#endif
   
   clear (in);
   return 0;
