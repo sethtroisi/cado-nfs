@@ -387,7 +387,7 @@ double special_valuation(mpz_t * f, int d, unsigned long p, mpz_t disc)
 	   divide lc(f) */
 	int e;
 	e = poly_roots_ulong(NULL, f, d, p);
-	// something special here.
+	/* something special here. */
 	return (pd * e - 1) / (pd * pd - 1);
     } else {
 	v = special_val0(f, d, p) * (double) p;
@@ -638,8 +638,6 @@ roots_mod (mpz_t *f, int d, const long p)
 {
   mpz_poly_t fp, g, h;
   int k, df;
-
-  //  printf ("enter roots_mod, p=%d, f=", p); fprint_polynomial (stdout, f, d);
 
   /* the number of roots is the degree of gcd(x^p-x,f) */
 
@@ -1020,7 +1018,7 @@ skewness (mpz_t *p, int d, int prec)
    We want mu(m,S) as small as possible.
 */
 double
-get_logmu (mpz_t *p, unsigned long degree, mpz_t m, double S)
+get_logmu (mpz_t *p, unsigned long degree, double S)
 {
   double mu;
   long i;
@@ -1137,12 +1135,12 @@ generate_sieving_parameters (cado_poly out)
   out->alambda = default_alambda (out->n);
 }
 
-/* Return the smallest value of alpha(f + k*(b*x-m)) for |k| <= K. */
+/* Return the smallest value of alpha(f + k*(b*x-m)) for |k| <= K,
+   and modify f[] accordingly. */
 double
-rotate (mpz_t *f, int d, unsigned long alim, long K, mpz_t m, long *bestk,
-        unsigned long b)
+rotate (mpz_t *f, int d, unsigned long alim, long K, mpz_t m, unsigned long b)
 {
-  long k;
+  long k, k0 = 0;
   double alpha, best_alpha = 9.0;
 
   /* compute f - K*(b*x-m) */
@@ -1154,13 +1152,94 @@ rotate (mpz_t *f, int d, unsigned long alim, long K, mpz_t m, long *bestk,
       if (alpha < best_alpha)
         {
           best_alpha = alpha;
-          *bestk = k;
+          k0 = k;
         }
       /* f <- f + (b*x-m) */
       mpz_add_ui (f[1], f[1], b);
       mpz_sub (f[0], f[0], m);
     }
+  /* we now have f + (K+1)*(bx-m) and we want f + k0*(bx-m), thus we have
+     to subtract (K+1-k0)*(bx-m) */
+  mpz_sub_ui (f[1], f[1], b * (K + 1 - k0));
+  mpz_addmul_ui (f[0], m, K + 1 - k0);
+
   return best_alpha;
+}
+
+/* Returns k such that f(x+k) has the smallest 1-norm, with the corresponding
+   1-skewness.
+   The coefficients f[] are modified to those of f(x+k).
+
+   The linear polynomial b*x-m is changed into b*(x+k)-m, thus m is
+   changed into m-k*b.
+*/
+long
+translate (mpz_t *f, int d, mpz_t m, unsigned long b)
+{
+  double logmu0, logmu;
+  int i, j, dir;
+  long k;
+
+  logmu0 = get_logmu (f, d, skewness (f, d, SKEWNESS_DEFAULT_PREC));
+
+  /* first compute f(x+1) */
+  /* define f_i(x) = f[i] + f[i+1]*x + ... + f[d]*x^(d-i)
+     then f_i(x+1) = f[i] + (x+1)*f_{i+1}(x+1) */
+  for (i = d - 1; i >= 0; i--)
+    {
+      /* invariant: f[i+1], ..., f[d] are the coefficients of f_{i+1}(x+1),
+         thus we have to do: f[i] <- f[i] + f[i+1], f[i+1] <- f[i+1] + f[i+2],
+         ..., f[d-1] <- f[d-1] + f[d] */
+      for (j = i; j < d; j++)
+        mpz_add (f[j], f[j], f[j+1]);
+    }
+  mpz_sub_ui (m, m, b);
+  k = 1;
+
+  /* invariant: the coefficients are those of f(x+k) */
+  logmu = get_logmu (f, d, skewness (f, d, SKEWNESS_DEFAULT_PREC));
+
+  if (logmu < logmu0)
+    dir = 1;
+  else
+    dir = -1;
+  logmu0 = logmu;
+
+  while (1)
+    {
+      /* translate from f(x+k) to f(x+k+dir) */
+      for (i = d - 1; i >= 0; i--)
+        for (j = i; j < d; j++)
+          if (dir == 1)
+            mpz_add (f[j], f[j], f[j+1]);
+          else
+            mpz_sub (f[j], f[j], f[j+1]);
+      if (dir == 1)
+        mpz_sub_ui (m, m, b);
+      else
+        mpz_add_ui (m, m, b);
+      k = k + dir;
+      logmu = get_logmu (f, d, skewness (f, d, SKEWNESS_DEFAULT_PREC));
+      if (logmu < logmu0)
+        logmu0 = logmu;
+      else
+        break;
+    }
+
+  /* go back one step */
+  for (i = d - 1; i >= 0; i--)
+    for (j = i; j < d; j++)
+      if (dir == 1)
+        mpz_sub (f[j], f[j], f[j+1]);
+      else
+        mpz_add (f[j], f[j], f[j+1]);
+  if (dir == 1)
+    mpz_add_ui (m, m, b);
+  else
+    mpz_sub_ui (m, m, b);
+  k = k - dir;
+
+  return k;
 }
 
 /* Method described in reference [2], slide 8
@@ -1190,11 +1269,12 @@ generate_poly (cado_poly out, double T, unsigned long b)
   unsigned long Malloc2;
   unsigned long Msize2, i;
   double st;
-  long k0, bestk = 0;
 
   ASSERT (T <= 9007199254740992.0); /* if T > 2^53, T-- will loop */
 
   mpz_init (best_m);
+
+  alim = (unsigned long) cbrt ((double) default_alim (out->n));
 
   given_m = mpz_cmp_ui (out->m, 0) != 0;
   if (given_m) /* use given value of m */
@@ -1239,19 +1319,19 @@ generate_poly (cado_poly out, double T, unsigned long b)
       mpz_fdiv_q (k, out->f[d - 1], t);
       mpz_add (out->m, out->m, k);
       generate_base_mb (out, out->m, b);
-      logmu = get_logmu (out->f, d, out->m, out->skew);
+      logmu = get_logmu (out->f, d, out->skew);
       Msize = m_logmu_insert (M, Malloc, Msize, out->m, logmu);
       if (T > 0 && mpz_sgn (out->f[d - 1]) > 0)
         { /* try another small f[d-1], avoiding a mpz_pow_ui call */
           mpz_add_ui (out->m, out->m, 1);
           generate_base_mb (out, out->m, b);
           T --;
-          logmu = get_logmu (out->f, d, out->m, out->skew);
+          logmu = get_logmu (out->f, d, out->skew);
           Msize = m_logmu_insert (M, Malloc, Msize, out->m, logmu);
         }
       mpz_add_ui (out->m, out->m, 1);
     }
-  fprintf (stderr, "# First phase took %fs and kept %lu candidates\n",
+  fprintf (stderr, "# First phase took %.2fs and kept %lu candidates\n",
            (seconds () - st), Msize);
 
   /* Second phase: loop over entries in M database. We do this in two
@@ -1261,7 +1341,6 @@ generate_poly (cado_poly out, double T, unsigned long b)
   Malloc2 = (unsigned long) sqrt ((double) Malloc);
   Msize2 = 0;
   st = seconds ();
-  alim = (unsigned long) cbrt ((double) default_alim (out->n));
   for (i = 0; i < Msize; i++)
     {
       logmu = M[i].logmu;
@@ -1278,26 +1357,23 @@ generate_poly (cado_poly out, double T, unsigned long b)
   for (i = 0; i < Msize2; i++)
     {
       generate_base_mb (out, M[i].m, b);
-      logmu = get_logmu (out->f, d, out->m, out->skew);
-      alpha = rotate (out->f, d, alim, MAX_ROTATE, out->m, &k0, b);
-      if (k0 != 0) /* we need to recompute skewness and norm */
-        {
-          mpz_add_si (out->f[1], out->f[1], (long) b * bestk);
-          mpz_submul_si (out->f[0], out->m, bestk);
-          out->skew = skewness (out->f, out->degree, SKEWNESS_DEFAULT_PREC);
-          logmu = get_logmu (out->f, d, out->m, out->skew);
-        }
+      translate (out->f, d, out->m, b);
+      logmu = get_logmu (out->f, d, out->skew);
+      alpha = rotate (out->f, d, alim, MAX_ROTATE, out->m, b);
+      /* if there was some translation or rotation, we need to recompute
+         skewness and norm */
+      out->skew = skewness (out->f, out->degree, SKEWNESS_DEFAULT_PREC);
+      logmu = get_logmu (out->f, d, out->skew);
       E = logmu + alpha;
       if (E < best_E)
         {
           best_E = E;
-          bestk = k0;
-          gmp_fprintf (stderr, "# m=%Zd rot(%ld) skew=%1.2f logmu=%1.2f alpha~%1.2f E=%1.2f\n",
-                       out->m, k0, out->skew, logmu, alpha, E);
+          gmp_fprintf (stderr, "# m=%Zd skew=%1.2f logmu=%1.2f alpha~%1.2f E=%1.2f\n",
+                       out->m, out->skew, logmu, alpha, E);
           mpz_set (best_m, out->m);
         }
     }
-  fprintf (stderr, "# Second phase took %fs for %lu candidates\n",
+  fprintf (stderr, "# Second phase took %.2fs for %lu candidates\n",
            (seconds () - st), Msize);
 
   mpz_clear (k);
@@ -1308,11 +1384,9 @@ generate_poly (cado_poly out, double T, unsigned long b)
  end:
   generate_base_mb (out, best_m, b);
   /* rotate */
-  if (bestk != 0)
-    {
-      mpz_add_si (out->f[1], out->f[1], (long) b * bestk);
-      mpz_submul_si (out->f[0], out->m, bestk);
-    }
+  rotate (out->f, d, alim, MAX_ROTATE, out->m, b);
+  /* translate */
+  translate (out->f, d, out->m, b);
   /* recompute skewness, since it might differ from the original
      polynomial with no rotation */
   out->skew = skewness (out->f, out->degree, 20);
@@ -1333,7 +1407,7 @@ print_poly (FILE *fp, cado_poly p, int argc, char *argv[], double st, int raw)
   mpz_out_str (fp, 10, p->n);
   fprintf (fp, "\n");
   fprintf (fp, "skew: %1.3f\n", p->skew);
-  logmu = get_logmu (p->f, p->degree, p->m, p->skew);
+  logmu = get_logmu (p->f, p->degree, p->skew);
   alpha = get_alpha (p->f, p->degree, (p->alim > 1000) ? 1000 : p->alim);
   fprintf (fp, "# logmu: %1.2f, alpha: %1.2f logmu+alpha=%1.2f\n", logmu,
 	   alpha, logmu + alpha);
@@ -1377,7 +1451,7 @@ print_poly (FILE *fp, cado_poly p, int argc, char *argv[], double st, int raw)
   fprintf (fp, "# generated by polyselect.r%s", REV);
   for (i = 1; i < argc; i++)
     fprintf (fp, " %s", argv[i]);
-  fprintf (fp, " in %fs\n", (seconds () - st));
+  fprintf (fp, " in %.2fs\n", (seconds () - st));
 }
 
 /* return L_{1/3}(n,c) = exp(c log(n)^{1/3} log(log(n))^{2/3})

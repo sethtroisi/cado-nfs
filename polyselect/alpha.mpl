@@ -1,8 +1,10 @@
-skew := proc(f, x, s0) local absf, g, i, S;
-   absf := add(abs(coeff(f,x,i))*x^i, i=0..degree(f,x));
-   g := expand(subs(x=S, absf)/S^(degree(f)/2));
-   g := diff(g,S);
-   fsolve(g, S=s0)
+# return skewness for 1-norm and corresponding 1-norm
+skew := proc(f, x, s0) local d, absf, g, h, i, s;
+   d := degree (f);
+   g := add(abs(coeff(f,x,i))*S^(i-d/2), i=0..d);
+   h := diff(g,S);
+   s := fsolve(h, S=s0);
+   s, subs(S=s, g)
 end:
 
 # takes also into account the linear polynomial x-m
