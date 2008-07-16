@@ -50,6 +50,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
                          so that the norm of the modified polynomial does
                          not change much. */
 
+#define SKEWNESS_DEFAULT_PREC 10
+
 #define mpz_add_si(a,b,c)                       \
   if (c >= 0) mpz_add_ui (a, b, c);             \
   else mpz_sub_ui (a, b, -c)
@@ -974,9 +976,11 @@ mpz_ndiv_qr (mpz_t q, mpz_t r, mpz_t n, mpz_t d)
    exactly one root on [0, +Inf[. We search it by dichotomy.
    There is one difference with respect to Definition 3.1 in [1]:
    we consider the L1 norm instead of the Linf norm.
+
+   prec is the relative precision of the result.
 */
 double
-skewness (mpz_t *p, int d)
+skewness (mpz_t *p, int d, int prec)
 {
   double *g, sa, sb, s;
   int i;
@@ -1001,38 +1005,39 @@ skewness (mpz_t *p, int d)
   /* now g(sa) < 0, g(sb) > 0, and sb = 2*sa.
      We use 10 iterations only, which gives a relative precision of
      2^(-10) ~ 0.001, which is enough for our needs. */
-  s = fpoly_dichotomy (g, d, sa, sb, -1.0, 10);
+  s = fpoly_dichotomy (g, d, sa, sb, -1.0, prec);
   free (g);
   return s;
 }
 
-/* Returns log(mu(m,S)), with mu(m,S) as defined in reference [2]:
+/* Returns log(mu(m,S)), with mu(m,S) defined as follows:
    
-   mu(m,S) = (m/S+S)*(|a_d S^d| + ... + |a_0 S^{-d}|)
+   mu(m,S) = |a_d S^{d/2}| + ... + |a_0 S^{-d/2}|
 
    It gives an estimate of *value* of the numbers to be sieved (to be
    multiplied by the sieving region).
 
    We want mu(m,S) as small as possible.
-   
-   Note: since we follow the convention from [1] for the definition of the
-   'skewness', the argument S2 is the square of what is denoted S in [1].
 */
 double
-get_logmu (mpz_t *p, unsigned long degree, mpz_t m, double S2)
+get_logmu (mpz_t *p, unsigned long degree, mpz_t m, double S)
 {
   double mu;
-  double S = sqrt (S2);
   long i;
 
   mu = fabs (mpz_get_d (p[degree]));
   for (i = degree - 1; i >= 0; i--)
-    mu = mu * S2 + fabs (mpz_get_d (p[i]));
+    mu = mu * S + fabs (mpz_get_d (p[i]));
+  /* divide by S^(d/2) */
   for (i = 0; (unsigned long) i < degree; i += 2)
-    mu /= S2;
-  if ((unsigned long) i > degree)
     mu /= S;
-  return log((mpz_get_d (m) / S + S) * mu);
+  /* If the degree is even, say d = 2k, we divided by S for i=0, 2, ..., 2k-2,
+     thus k = d/2 times.
+     If the degree is odd, say d = 2k+1, we divided by S for i=0, 2, ..., 2k,
+     thus k+1 times = (d+1)/2, thus we have to multiply back by sqrt(S). */
+  if ((unsigned long) i > degree)
+    mu *= sqrt (S);
+  return log (mu);
 }
 
 /* Decompose p->n in base m/b, rounding to nearest
@@ -1116,7 +1121,7 @@ generate_base_mb (cado_poly p, mpz_t m, unsigned long b)
   mpz_neg (p->g[0], m);
   mpz_set_ui (p->g[1], b);
   mpz_set (p->m, m);
-  p->skew = skewness (p->f, d);
+  p->skew = skewness (p->f, d, SKEWNESS_DEFAULT_PREC);
 }
 
 void
@@ -1275,6 +1280,13 @@ generate_poly (cado_poly out, double T, unsigned long b)
       generate_base_mb (out, M[i].m, b);
       logmu = get_logmu (out->f, d, out->m, out->skew);
       alpha = rotate (out->f, d, alim, MAX_ROTATE, out->m, &k0, b);
+      if (k0 != 0) /* we need to recompute skewness and norm */
+        {
+          mpz_add_si (out->f[1], out->f[1], (long) b * bestk);
+          mpz_submul_si (out->f[0], out->m, bestk);
+          out->skew = skewness (out->f, out->degree, SKEWNESS_DEFAULT_PREC);
+          logmu = get_logmu (out->f, d, out->m, out->skew);
+        }
       E = logmu + alpha;
       if (E < best_E)
         {
@@ -1301,6 +1313,9 @@ generate_poly (cado_poly out, double T, unsigned long b)
       mpz_add_si (out->f[1], out->f[1], (long) b * bestk);
       mpz_submul_si (out->f[0], out->m, bestk);
     }
+  /* recompute skewness, since it might differ from the original
+     polynomial with no rotation */
+  out->skew = skewness (out->f, out->degree, 20);
   generate_sieving_parameters (out);
   mpz_clear (best_m);
 }
