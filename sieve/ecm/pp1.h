@@ -10,7 +10,7 @@ typedef struct {
 
 
 unsigned long pp1 (residue_t x, const modulus_t, const pp1_plan_t *);
-void pp1_stage1 (residue_t, const char *, const unsigned int, 
-		 const residue_t, const modulus_t);
 void pp1_make_plan (pp1_plan_t *, const unsigned int, const unsigned int, int);
 void pp1_clear_plan (pp1_plan_t *);
+void pp1_stage2 (residue_t, const residue_t, const stage2_plan_t *, 
+	         const residue_t, const modulus_t);

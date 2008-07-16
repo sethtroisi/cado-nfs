@@ -16,8 +16,6 @@ typedef struct {
 } ecm_plan_t;
 
 
-int ecm_stage1 (residue_t, const int, const residue_t, const int, 
-		const modulus_t, const int);
 void ecm_make_plan (ecm_plan_t *, const unsigned int, const unsigned int, 
 		    const int, const unsigned long, const int);
 void ecm_clear_plan (ecm_plan_t *);

@@ -197,17 +197,49 @@ ellW_add3 (residue_t x3, residue_t y3, residue_t x2, residue_t y2,
    Assumes e >= 5.
 */
 static void
-ellM_mul_ui (ellM_point_t P, unsigned long e, const modulus_t m, 
-             const residue_t b)
+ellM_mul_ul (ellM_point_t R, const ellM_point_t P, unsigned long e, 
+             const modulus_t m, const residue_t b)
 {
   unsigned long l, n;
   ellM_point_t t1, t2;
 
-  ASSERT (e >= 5UL);
+  if (e == 0UL)
+    {
+      mod_set_ul (R[0].x, 0UL, m);
+      mod_set_ul (R[0].z, 0UL, m);
+      return;
+    }
+
+  if (e == 1UL)
+    {
+      ellM_set (R, P, m);
+      return;
+    }
+  
+  if (e == 2UL)
+    {
+      ellM_double (R, P, m, b);
+      return;
+    }
+
+  if (e == 4UL)
+    {
+      ellM_double (R, P, m, b);
+      ellM_double (R, R, m, b);
+      return;
+    }
 
   ellM_init (t1, m);
-  ellM_init (t2, m);
 
+  if (e == 3UL)
+    {
+      ellM_double (t1, P, m, b);
+      ellM_add (R, t1, P, P, m);
+      ellM_clear (t1, m);
+      return;
+    }
+
+  ellM_init (t2, m);
   e --;
 
   /* compute number of steps needed: we start from (1,2) and go from
@@ -234,7 +266,7 @@ ellM_mul_ui (ellM_point_t P, unsigned long e, const modulus_t m,
         }
     }
   
-  ellM_set (P, t2, m);
+  ellM_set (R, t2, m);
 
   ellM_clear (t1, m);
   ellM_clear (t2, m);
@@ -579,6 +611,312 @@ curveW_from_Montgomery (residue_t a, residue_t x, residue_t y,
   return r;
 }
 
+static void 
+ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan, 
+	    const residue_t b, const modulus_t m)
+{
+  ellM_point_t Pd, Pt; /* d*P, i*d*P, (i+1)*d*P and a temp */
+  residue_t *Pid_x, *Pid_z, *Pj_x, *Pj_z; /* saved i*d*P, i0 <= i < i1, 
+              and jP, j in S_1, x and z coordinate stored separately */
+  residue_t a, t;
+  unsigned int i, k, l;
+  
+  ellM_init (Pt, m);
+  mod_init_noset0 (t, m);
+  mod_init_noset0 (a, m);
+  Pj_x = malloc (plan->s1 * sizeof(residue_t));
+  ASSERT (Pj_x != NULL);
+  Pj_z = malloc (plan->s1 * sizeof(residue_t));
+  ASSERT (Pj_z != NULL);
+  ASSERT(plan->i0 < plan->i1);
+  Pid_x = malloc ((plan->i1 - plan->i0) * sizeof(residue_t));
+  ASSERT (Pid_x != NULL);
+  Pid_z = malloc ((plan->i1 - plan->i0) * sizeof(residue_t));
+  ASSERT (Pid_z != NULL);
+  for (i = 0; i < plan->s1; i++)
+    {
+      mod_init_noset0 (Pj_x[i], m);
+      mod_init_noset0 (Pj_z[i], m);
+    }
+  for (i = 0; i < plan->i1 - plan->i0; i++)
+    {
+      mod_init_noset0 (Pid_x[i], m);
+      mod_init_noset0 (Pid_z[i], m);
+    }
+  
+  /* Compute jP for j in S_1. Compute all the j, 1 <= j < d/2, gcd(j,d)=1 
+     with two arithmetic progressions 1+6k and 5+6k (this assumes 6|d).
+     We need two values of each progression (1, 7 and 5, 11) and the 
+     common difference 6. These can be computed with the Lucas chain
+     1, 2, 3, 5, 6, 7, 11 at the cost of 6 multiplies. */
+  
+  ASSERT (plan->d % 6 == 0);
+  {
+    ellM_point_t ap1_0, ap1_1, ap5_0, ap5_1, P2, P6;
+    int i1, i5;
+    ellM_init (ap1_0, m);
+    ellM_init (ap1_1, m);
+    ellM_init (ap5_0, m);
+    ellM_init (ap5_1, m);
+    ellM_init (P6, m);
+    ellM_init (P2, m);
+
+    /* Init ap1_0 = 1P, ap1_1 = 7P, ap5_0 = 5P, ap5_1 = 11P
+       and P6 = 6P */
+    ellM_set (ap1_0, P, m);         /* ap1_0 = 1*P */
+    ellM_double (P2, P, m, b);      /* P2 = 2*P */
+    ellM_add (P6, P2, P, P, m);     /* P6 = 3*P (for now) */
+    ellM_add (ap5_0, P6, P2, P, m); /* 5*P = 3*P + 2*P */
+    ellM_double (P6, P6, m, b);     /* P6 = 6*P = 2*(3*P) */
+    ellM_add (ap1_1, P6, P, ap5_0, m); /* 7*P = 6*P + P */
+    ellM_add (ap5_1, P6, ap5_0, P, m); /* 11*P = 6*P + 5*P */
+    
+    ellM_clear (P2, m);
+
+    /* Now we generate all the j*P for j in S_1 */
+    /* We treat the first two manually because those might correspond 
+       to ap1_0 = 1*P and ap5_0 = 5*P */
+    k = 0;
+    if (plan->s1 > k && plan->S1[k] == 1)
+      {
+        mod_set (Pj_x[k], ap1_0[0].x, m);
+        mod_set (Pj_z[k], ap1_0[0].z, m);
+        k++;
+      }
+    if (plan->s1 > k && plan->S1[k] == 5)
+      {
+        mod_set (Pj_x[k], ap5_0[0].x, m);
+        mod_set (Pj_z[k], ap5_0[0].z, m);
+        k++;
+      }
+    
+    i1 = 7;
+    i5 = 11;
+    while (k < plan->s1)
+      {
+        if (plan->S1[k] == i1)
+          {
+            mod_set (Pj_x[k], ap1_1[0].x, m);
+            mod_set (Pj_z[k], ap1_1[0].z, m);
+	    k++;
+	    continue;
+          }
+        if (plan->S1[k] == i5)
+          {
+            mod_set (Pj_x[k], ap5_1[0].x, m);
+            mod_set (Pj_z[k], ap5_1[0].z, m);
+	    k++;
+	    continue;
+          }
+	
+        ellM_add (Pt, ap1_1, P6, ap1_0, m);
+        ellM_set (ap1_0, ap1_1, m);
+        ellM_set (ap1_1, Pt, m);
+        i1 += 6;
+	
+        ellM_add (Pt, ap5_1, P6, ap5_0, m);
+        ellM_set (ap5_0, ap5_1, m);
+        ellM_set (ap5_1, Pt, m);
+        i5 += 6;
+      }
+    
+    /* Also compute Pd = d*P while we've got 6*P */
+    ellM_mul_ul (Pd, P6, plan->d / 6, m, b);
+
+    ellM_clear (ap1_0, m);
+    ellM_clear (ap1_1, m);
+    ellM_clear (ap5_0, m);
+    ellM_clear (ap5_1, m);
+    ellM_clear (P6, m);
+    ellM_clear (P2, m);
+
+#if 0
+    printf ("Pj = [");
+    for (i = 0; i < plan->s1; i++)
+      printf ("%s(%lu:%lu)", (i>0) ? ", " : "", 
+	      mod_get_ul (Pj_x[i], m), mod_get_ul (Pj_z[i], m));
+    printf ("]\n");
+#endif
+  }
+  
+  /* Compute idP for i0 <= i < i1 */
+  {
+    ellM_point_t Pid, Pid1;
+    
+    ellM_init (Pid, m);
+    ellM_init (Pid1, m);
+    k = 0; i = plan->i0;
+
+    /* Todo: do both Pid and Pid1 with one addition chain */
+    ellM_mul_ul (Pid, Pd, i, m, b); /* Pid = i_0 d * P */
+    mod_set (Pid_x[k], Pid[0].x, m);
+    mod_set (Pid_z[k], Pid[0].z, m);
+    k++; i++;
+    if (i < plan->i1)
+      {
+        ellM_mul_ul (Pid1, Pd, i, m, b); /* Pid = (i_0 + 1) d * P */
+        mod_set (Pid_x[k], Pid1[0].x, m);
+        mod_set (Pid_z[k], Pid1[0].z, m);
+        k++; i++;
+      }
+    while (i < plan->i1)
+      {
+        ellM_add (Pt, Pid1, Pd, Pid, m);
+        ellM_set (Pid, Pid1, m);
+        ellM_set (Pid1, Pt, m);
+        mod_set (Pid_x[k], Pt[0].x, m);
+        mod_set (Pid_z[k], Pt[0].z, m);
+        k++; i++;
+      }
+
+    ellM_clear (Pid, m);
+    ellM_clear (Pid1, m);
+#if 0
+    printf ("Pid = [");
+    for (i = 0; i < plan->i1 - plan->i0; i++)
+      printf ("%s(%lu:%lu)", (i>0) ? ", " : "", 
+	      mod_get_ul (Pid_x[i], m), mod_get_ul (Pid_z[i], m));
+    printf ("]\n");
+#endif
+  }
+
+  /* Now we've computed all the points we need, so normalize them,
+     using Montgomery's batch inversion trick */
+  {
+    /* Let a_0, ..., a_n = Pj_z[0], ..., Pj_z[s1 - 1], 
+                           Pid_z[0], ..., Pid_z[i1 - i0 - 1]
+       be the list of residues we want to invert. */
+    const unsigned long n = plan->s1 + plan->i1 - plan->i0;
+    residue_t *invarray;
+    invarray = malloc (n * sizeof (residue_t));
+    ASSERT (invarray != NULL);
+    for (i = 0; i < n; i++)
+      mod_init (invarray[i], m);
+    /* Set invarray[k] = prod_{j=0}^{k} a_j */
+    mod_set (invarray[0], Pj_z[0], m);
+    for (i = 1, k = 1; i < plan->s1; i++, k++)
+      mod_mul (invarray[k], invarray[k - 1], Pj_z[i], m);
+    for (i = 0; i < plan->i1 - plan->i0; i++, k++)
+      mod_mul (invarray[k], invarray[k - 1], Pid_z[i], m);
+    
+    /* Set a_n := 1 / (a_0, ..., a_n) */
+    if (! mod_inv (a, invarray[k - 1], m))
+      {
+        mod_set (r, invarray[k - 1], m);
+	for (i = 0; i < n; i++)
+	  mod_clear (invarray[i], m);
+	free (invarray);
+	invarray = NULL;
+	goto clear_and_exit;
+      }
+
+    /* Compute 1/a_i and normalize the Pid points */
+    mod_set (invarray[k - 1], a, m);
+    for (i = plan->i1 - plan->i0; i > 0; i--, k--)
+      {
+	/* Here, invarray[k - 1] = 1 / (a_0, ..., a_{k-1}) and
+	   invarray[k - 2] = (a_0, ..., a_{k-2}) */
+	mod_mul (a, invarray[k - 1], invarray[k - 2], m);
+	/* a = 1/a_{k-1} = 1/Pid_z[i - 1] */
+#ifdef WANT_ASSERT_EXPENSIVE
+	mod_mul (a, a, Pid_z[i - 1], m);
+	ASSERT (mod_get_ul (a, m) == 1UL);
+	mod_mul (a, invarray[k - 1], invarray[k - 2], m);
+#endif
+	/* Normalize point */
+	mod_mul (Pid_x[i - 1], Pid_x[i - 1], a, m);
+	/* Set invarray[k - 2] = 1 / (a_0, ..., a_{k-2}) = 
+	   1 / (a_0, ..., a_{k-1}) * a_{k-1} */
+	mod_mul (invarray[k - 2], invarray[k - 1],  Pid_z[i - 1], m);
+      }
+    
+    /* Compute 1/a_i and normalize the Pj points */
+    for (i = plan->s1; i > 1; i--, k--)
+      {
+	/* Here, invarray[k - 1] = 1 / (a_0, ..., a_{k-1}) and
+	   invarray[k - 2] = (a_0, ..., a_{k-2}) */
+	mod_mul (a, invarray[k - 1], invarray[k - 2], m);
+	/* a = 1/a_{k-1} = 1/Pj_z[i - 1] */
+#ifdef WANT_ASSERT_EXPENSIVE
+	mod_mul (a, a, Pj_z[i - 1], m);
+	ASSERT (mod_get_ul (a, m) == 1UL);
+	mod_mul (a, invarray[k - 1], invarray[k - 2], m);
+#endif
+	/* Normalize point */
+	mod_mul (Pj_x[i - 1], Pj_x[i - 1], a, m);
+	/* Set invarray[k - 2] = 1 / (a_0, ..., a_{k-2}) = 
+	   1 / (a_0, ..., a_{k-1}) * a_{k-1} */
+	mod_mul (invarray[k - 2], invarray[k - 1],  Pj_z[i - 1], m);
+      }
+    /* Do the first Pj point. Here k = 1 and invarray[k] = 1/a_1 */
+    ASSERT (k == 1);
+#ifdef WANT_ASSERT_EXPENSIVE
+    mod_mul (a, invarray[k - 1], Pj_z[i - 1], m);
+    ASSERT (mod_get_ul (a, m) == 1UL);
+#endif
+    /* Normalize point */
+    mod_mul (Pj_x[i - 1], Pj_x[i - 1], invarray[k - 1], m);
+
+    for (i = 0; i < n; i++)
+      mod_clear (invarray[i], m);
+    free (invarray);
+    invarray = NULL;
+  }
+  
+  /* Now process all the primes p = id - j, B1 < p <= B2 and multiply
+     (id*P)_x - (j*P)_x to the accumulator */
+  mod_set_ul_reduced (a, 1UL, m);
+  i = 0;
+  l = 0;
+  while (plan->pairs[l] != NEXT_PASS) 
+    {
+      while (plan->pairs[l] < NEXT_D && plan->pairs[l] < NEXT_PASS)
+	{
+	  mod_sub (t, Pid_x[i], Pj_x[plan->pairs[l]], m);
+	  mod_mul (a, a, t, m);
+	  l++;
+	}
+      
+      if (plan->pairs[l] == NEXT_D)
+	{
+	  i++; l++;
+	  ASSERT (i < plan->i1 - plan->i0);
+	}
+    }
+  
+  mod_set (r, a, m);
+  
+  /* At end of stage 2 */
+
+ clear_and_exit:
+  /* Clear everything */
+  for (i = 0; i < plan->s1; i++)
+    mod_clear (Pj_z[i], m);
+  free (Pj_z);
+  Pj_z = NULL;
+  for (i = 0; i < plan->i1 - plan->i0; i++)
+    mod_clear (Pid_z[i], m);
+  free (Pid_z);
+  Pid_z = NULL;
+  
+   for (i = 0; i < plan->s1; i++)
+    {
+      mod_clear (Pj_x[k], m);
+      mod_clear (Pj_z[k], m);
+    }
+ for (i = 0; i < plan->i1 - plan->i0; i++)
+    {
+      mod_clear (Pid_x[k], m);
+      mod_clear (Pid_z[k], m);
+    }
+  free (Pj_x);
+  free (Pid_x);
+  
+  ellM_clear (Pt, m);
+  mod_clear (t, m);
+  mod_clear (a, m);
+  return;
+}
 
 /* If a factor is found it is returned and x1 is unchanged, otherwise 
    1 is returned and the end-of-stage-1 residue is stored in x1. */
@@ -586,13 +924,14 @@ curveW_from_Montgomery (residue_t a, residue_t x, residue_t y,
 unsigned long
 ecm (residue_t x1, const modulus_t m, const ecm_plan_t *plan)
 {
-  residue_t u, A, b;
+  residue_t u, A, b, r;
   ellM_point_t P, Pt;
   unsigned long f = 1;
 
   mod_init (u, m);
   mod_init (A, m);
   mod_init (b, m);
+  mod_init (r, m);
   ellM_init (P, m);
   ellM_init (Pt, m);
 
@@ -640,14 +979,24 @@ ecm (residue_t x1, const modulus_t m, const ecm_plan_t *plan)
   /* Do stage 1 */
   ellM_interpret_bytecode (P, plan->bc, plan->bc_len, m, b);
 
-  if (!mod_inv (u, P->z, m))
-    mod_gcd (&f, P->z, m);
-  else
-    mod_mul (x1, P->x, u, m); /* No factor. Set x1 to normalized point */
+  mod_gcd (&f, P->z, m);
+  if (f == 1 && plan->B1 < plan->stage2.B2)
+    {
+      ecm_stage2 (r, P, &(plan->stage2), b, m);
+      mod_gcd (&f, r, m);
+    }
+  
+  if (f == 1)
+    {
+      /* No factor. Set x1 to normalized point */
+      mod_inv (u, P->z, m);
+      mod_mul (x1, P->x, u, m);
+    }
   
   mod_clear (u, m);
   mod_clear (A, m);
   mod_clear (b, m);
+  mod_clear (r, m);
   ellM_clear (P, m);
   ellM_clear (Pt, m);
 
