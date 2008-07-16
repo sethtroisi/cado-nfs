@@ -41,10 +41,13 @@ get_alpha := proc(f, B) local s, p, e, q, disc;
 #         lprint(p," divides disc(f)", evalf(e,3));
          s := s + evalf((1/(p-1)-e)*log(p));
       else
-         q := 0;
+         # q is the number of roots of f(x) and projective roots, i.e.,
+         # zeros of the reciprocal polynomial mod p
+         q := degree(f) - degree(f mod p);
          for e in Roots(f) mod p do
             q:=q+1
          od;
+         # formula for \alpha(F) on page 49 of Murphy's thesis
          s := s + evalf((1-q*p/(p+1))*log(p)/(p-1))
       fi;
       p := nextprime(p);

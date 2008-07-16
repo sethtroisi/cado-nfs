@@ -687,15 +687,14 @@ roots_mod (mpz_t *f, int d, const long p)
 
 /* Compute the value alpha(F) from Murphy's thesis, page 49:
    alpha(F) = sum(prime p <= B, (1 - q_p*p/(p+1)) log(p)/(p-1))
-   where q_p is the number of roots of F mod p.
+   where q_p is the number of roots of F mod p, including the number of
+   projective roots (i.e., the zeros of the reciprocal polynomial mod p).
 
    alpha(F) is an estimate of the average logarithm of the part removed
    from sieving, compared to a random integer.
 
    We want alpha as small as possible, i.e., alpha negative with a large
    absolute value. Typical good values are alpha=-4, -5, ...
-
-   eps is the target accuracy for the "bad-behaved primes".
 */
 double
 get_alpha (mpz_t *f, const int d, unsigned long B)
@@ -706,6 +705,10 @@ get_alpha (mpz_t *f, const int d, unsigned long B)
 
   mpz_init (disc);
   discriminant (disc, f, d);
+
+  /* special_valuation returns the expected average exponent of p in F(a,b)
+     for coprime a, b, i.e., e = q_p*p/(p^2-1), thus the contribution for p
+     is (1/(p-1) - e) * log(p) */
 
   /* prime p=2 */
   e = special_valuation (f, d, 2, disc);
