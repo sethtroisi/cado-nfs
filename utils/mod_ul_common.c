@@ -386,8 +386,16 @@ mod_sprp (const residue_t b, const modulus_t m)
 /* Put 1/s (mod t) in r and return 1 if s is invertible, 
    or set r to 0 and return 0 if s is not invertible */
 
+/* We apply REDC twice on the input.
+   Let sp = a*w (mod m), i.e. sp is $a$ in Montgomery representation.
+   Then REDC(REDC(sp)) = a/w, and the inverse of that is w/a, which
+   is the inverse we want in Montgomery representation. The extra REDC
+   is faster than computing 1/a (mod m) first, then w/a (mod m) which 
+   takes an integer divide instruction to get the remainder w*(1/a) (mod m). 
+*/
+
 int
-mod_inv (residue_t r, const residue_t sp, const modulus_t tp)
+mod_inv (residue_t r, const residue_t sp, const modulus_t m)
 {
   long u1, v1;
   unsigned long u2, v2, s, t;
@@ -396,12 +404,14 @@ mod_inv (residue_t r, const residue_t sp, const modulus_t tp)
 #endif
 
 #ifndef NDEBUG
-  mod_init_noset0 (tmp, tp);
-  mod_set (tmp, sp, tp);
+  /* Remember input in case r overwrites it */
+  mod_init_noset0 (tmp, m);
+  mod_set (tmp, sp, m);
 #endif
 
-  s = mod_get_ul (sp, tp);
-  t = mod_getmod_ul (tp);
+  s = mod_get_ul (sp, m);
+  s = mod_get_ul (&s, m); /* If we use REDC, do REDC again */
+  t = mod_getmod_ul (m);
 
   ASSERT (t > 0UL);
   ASSERT (s < t);
@@ -409,12 +419,18 @@ mod_inv (residue_t r, const residue_t sp, const modulus_t tp)
   if (s == 0UL)
     {
       r[0] = 0UL; /* Not invertible */
+#ifndef NDEBUG
+      mod_clear (tmp, m);
+#endif
       return 0;
     }
 
   if (s == 1UL)
     {
-      mod_set_ul (r, 1UL, tp);
+      r[0] = 1UL;
+#ifndef NDEBUG
+      mod_clear (tmp, m);
+#endif
       return 1;
     }
 
@@ -455,19 +471,24 @@ mod_inv (residue_t r, const residue_t sp, const modulus_t tp)
 	{
 	  /* printf ("s=%lu t=%lu found %lu\n", s[0], t[0], u2); */
 	  r[0] = 0UL; /* non-trivial gcd */
+#ifndef NDEBUG
+          mod_clear (tmp, m);
+#endif
 	  return 0;
 	}
 
       if (u1 < 0L)
-	u1 = u1 - (long) t * (-u1 / (long) t - 1L);
+        u1 = u1 + t;
     }
 
-  mod_set_ul (r, (unsigned long) u1, tp);
+    ASSERT ((unsigned long) u1 < t);
+    
+  r[0] = (unsigned long) u1;
 
 #ifndef NDEBUG
-  mod_mul (tmp, tmp, r, tp);
-  ASSERT(mod_get_ul (tmp, tp) == 1UL);
-  mod_clear (tmp, tp);
+  mod_mul (tmp, tmp, r, m);
+  ASSERT(mod_get_ul (tmp, m) == 1UL);
+  mod_clear (tmp, m);
 #endif
 
   return 1;
