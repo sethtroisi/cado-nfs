@@ -30,26 +30,42 @@ norm2 := proc(f, s) local d;
    sqrt(add(coeff(f,x,i)^2*s^(2*i-d),i=0..d))
 end:
 
+# mimics code in polyselect.c
+special_valuation := proc(f, p)
+local disc, d, t, pvaluation_disc, p_divides_lc, e, v, g;
+   disc := discrim (f, x);
+   d := degree (f);
+   pvaluation_disc := 0;
+   if disc mod p = 0 then
+      pvaluation_disc := 1;
+      t := disc / p;
+      if t mod p = 0 then pvaluation_disc := 2 fi
+   fi;
+   p_divides_lc := evalb(coeff(f, x, d) mod p = 0);
+   if pvaluation_disc = 0 then
+      e := nops(Roots(f) mod p);
+      if p_divides_lc then e:=e+1 fi;
+      p*e/(p^2-1)
+   elif pvaluation_disc = 1 and p_divides_lc = false then
+      e := nops(Roots(f) mod p);
+      (p*e-1)/(p^2-1)
+   else
+      v := val0 (f, p) * p;
+      if p_divides_lc then
+         g := expand(subs(x=1/(p*x), f)*(p*x)^d);
+         v := v + val0 (g, p);
+      fi;
+      v/(p+1)
+   fi
+end:
+
 get_alpha := proc(f, B) local s, p, e, q, disc;
    s := 0;
    p := 2;
    disc := discrim(f,x);
    while p <= B do
-      if disc mod p = 0 then
-         # e := est_valuation (f, p, 1, 99, 1, 99);
-         e := val (f, p);
-#         lprint(p," divides disc(f)", evalf(e,3));
-         s := s + evalf((1/(p-1)-e)*log(p));
-      else
-         # q is the number of roots of f(x) and projective roots, i.e.,
-         # zeros of the reciprocal polynomial mod p
-         q := degree(f) - degree(f mod p);
-         for e in Roots(f) mod p do
-            q:=q+1
-         od;
-         # formula for \alpha(F) on page 49 of Murphy's thesis
-         s := s + evalf((1-q*p/(p+1))*log(p)/(p-1))
-      fi;
+      e := special_valuation (f, p);
+      s := s + (1.0 / (p - 1) - e) * log(p * 1.0);
       p := nextprime(p);
    od;
    s;
