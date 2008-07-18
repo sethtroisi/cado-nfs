@@ -375,7 +375,7 @@ modredcul_add_ul (residueredcul_t r, const residueredcul_t a,
   residueredcul_t t;
 
   /* TODO: speed up */
-  ASSERT_EXPENSIVE (a[0] < m[0]);
+  ASSERT_EXPENSIVE (a[0] < m[0].m);
   ASSERT(b < m[0].m);
   modredcul_init_noset0 (t, m);
   modredcul_set_ul (t, b, m);
@@ -436,7 +436,7 @@ modredcul_sub_ul (residueredcul_t r, const residueredcul_t a,
   residueredcul_t t;
 
   /* TODO: speed up */
-  ASSERT_EXPENSIVE (a[0] < m[0]);
+  ASSERT_EXPENSIVE (a[0] < m[0].m);
   ASSERT(b < m[0].m);
   modredcul_init_noset0 (t, m);
   modredcul_set_ul (t, b, m);
@@ -459,10 +459,11 @@ modredcul_neg (residueredcul_t r, const residueredcul_t a,
 
 
 /* Add an unsigned long to two unsigned longs with carry propagation from 
-   low word to high word. Any carry out from high word is lost. */
+   low word (r1) to high word (r2). Any carry out from high word is lost. */
 
 static inline void
-modredcul_add_ul_2ul (unsigned long *r1, unsigned long *r2, const unsigned long a)
+modredcul_add_ul_2ul (unsigned long *r1, unsigned long *r2, 
+                      const unsigned long a)
 {
 #if defined(__x86_64__) && defined(__GNUC__)
   __asm__ ( "addq %2, %0\n\t"
@@ -735,6 +736,35 @@ modredcul_mul (residueredcul_t r, const residueredcul_t a,
 
   modredcul_add (r, &phigh, &thigh, m);
 
+#if defined(MODTRACE)
+  printf (" == %lu /* PARI */ \n", r[0]);
+#endif
+}
+                         
+
+/* Computes (a * b + c)/ 2^wordsize % m. Requires that 
+   a * b + c < 2^wordsize * m */
+
+MAYBE_UNUSED
+static inline void
+modredcul_muladdredc (residueredcul_t r, const residueredcul_t a, 
+		      const residueredcul_t b, const residueredcul_t c, 
+		      const modulusredcul_t m)
+{
+  unsigned long plow, phigh, tlow, thigh;
+  ASSERT_EXPENSIVE (m[0].m % 2 != 0);
+#if defined(MODTRACE)
+  printf ("(%lu * %lu / 2^%ld) %% %lu", 
+          a[0], b, 8 * sizeof(unsigned long), m[0]);
+#endif
+  
+  modredcul_mul_ul_ul_2ul (&plow, &phigh, a[0], b[0]);
+  modredcul_add_ul_2ul (&plow, &phigh, c[0]);
+  tlow = plow * m[0].invm;
+  modredcul_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
+  phigh += (plow != 0UL ? 1UL : 0UL);
+  modredcul_add (r, &phigh, &thigh, m);
+  
 #if defined(MODTRACE)
   printf (" == %lu /* PARI */ \n", r[0]);
 #endif
