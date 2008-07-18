@@ -1,11 +1,19 @@
+#define _XOPEN_SOURCE 1
+#include <limits.h>
 #include "modredc_ul.h"
-
 #include "mod_ul_common.c"
 
+#if defined(__GNUC__) && (__GNUC__ >= 4 || __GNUC__ >= 3 && __GNUC_MINOR__ >= 4)
 /* Opteron prefers LOOKUP_TRAILING_ZEROS 1, 
    Core2 prefers LOOKUP_TRAILING_ZEROS 0 */
+#ifndef LOOKUP_TRAILING_ZEROS
 #define LOOKUP_TRAILING_ZEROS 1
-#define ctzl(x)         __builtin_ctzl(x)
+#endif
+#define ctzl(x) __builtin_ctzl(x)
+#else
+/* If we have no ctzl(), we always use the table lookup */
+#define LOOKUP_TRAILING_ZEROS 1
+#endif
 
 int
 modredcul_inv (residue_t r, const residue_t A, const modulusredcul_t m) 
@@ -96,33 +104,32 @@ modredcul_inv (residue_t r, const residue_t A, const modulusredcul_t m)
     return 0;
 
   /* TODO: prove that t<128 */
-  ASSERT (t < 128);
+  ASSERT (t < 2 * LONG_BIT);
 
   /* Here, the inverse of a is u/2^t mod b. To do the division by t,
      we use a variable-width REDC. We want to add a multiple of m to u
      so that the low t bits of the sum are 0 and we can right-shift by t
      with impunity. */
-  if (t >= 64)
+  if (t >= LONG_BIT)
     {
       unsigned long tlow, thigh;
       tlow = u * m[0].invm; /* tlow <= 2^w-1 */
       modredcul_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m); /* thigh:tlow <= (2^w-1)*m */
       u = thigh + ((u != 0UL) ? 1UL : 0UL);
       /* thigh:tlow + u < (2^w-1)*m + m < 2^w*m. No correction necesary */
-      t -= 64;
+      t -= LONG_BIT;
     }
 
   if (t > 0)
     {
       unsigned long tlow, thigh;
-      /* Necessarily t < 64, so the shift is ok */
+      /* Necessarily t < LONG_BIT, so the shift is ok */
       tlow = ((u * m[0].invm) & ((1UL << t) - 1UL)); /* tlow <= 2^t-1 */
       modredcul_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m); /* thigh:tlow <= m*(2^t-1) */
       modredcul_add_ul_2ul (&tlow, &thigh, u); /* thigh:tlow <= m*2^t-1 (since u<m) */
       /* Now the low t bits of tlow are 0 */
       ASSERT_EXPENSIVE ((tlow & ((1UL << t) - 1UL)) == 0UL);
-      __asm__ ("#invmod shrq here\n\t"
-               "shrdq %1, %0\n": 
+      __asm__ ("shrd %1, %0\n": 
                "+r" (tlow), "+r" (thigh) :
                "c" (t)
               ); /* tlow <= (m*2^t-1) / 2^t <= m-1 */
