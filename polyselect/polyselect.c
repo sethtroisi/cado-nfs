@@ -45,20 +45,25 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "aux.c"
 
+/* define LOGNORM as l1_lognorm, SKEWNESS as l1_skewness to get the 1-norm
+   on coefficients */
+#define LOGNORM  L2_lognorm
+#define SKEWNESS L2_skewness
+
+#define SKEWNESS_DEFAULT_PREC 10
+
 #define MAX_ROTATE 16 /* try rotation by k*(b*x-m) for |k| <= MAX_ROTATE.
                          FIXME: we should adjust that bound dynamically,
                          so that the norm of the modified polynomial does
                          not change much. */
 
-#define SKEWNESS_DEFAULT_PREC 10
-
 #define mpz_add_si(a,b,c)                       \
   if (c >= 0) mpz_add_ui (a, b, c);             \
-  else mpz_sub_ui (a, b, -c)
+  else mpz_sub_ui (a, b, -(c))
 
 #define mpz_submul_si(a,b,c)                    \
   if (c >= 0) mpz_submul_ui (a, b, c);          \
-  else mpz_addmul_ui (a, b, -c)
+  else mpz_addmul_ui (a, b, -(c))
   
 
 static void
@@ -961,9 +966,11 @@ mpz_ndiv_qr (mpz_t q, mpz_t r, mpz_t n, mpz_t d)
     }
 }
 
-/* Return the ***square*** of the value of S that minimizes the expression:
+/************************* norm and skewness *********************************/
 
-                |p[d]| * S^d + ... + |p[0]| * S^{-d}
+/* Return an approximation of the value of S that minimizes the expression:
+
+                |p[d]| * S^{d/2} + ... + |p[0]| * S^{-d/2}
 
    S is a zero of g(S) = d |p[d]| S^{d-1} + ... - d |p[0]| S^{-d-1},
    thus S^2 is a zero of d |p[d]| x^d + ... - d |p[0]|.
@@ -981,7 +988,7 @@ mpz_ndiv_qr (mpz_t q, mpz_t r, mpz_t n, mpz_t d)
    prec is the relative precision of the result.
 */
 double
-skewness (mpz_t *p, int d, int prec)
+l1_skewness (mpz_t *p, int d, int prec)
 {
   double *g, sa, sb, s;
   int i;
@@ -1011,17 +1018,18 @@ skewness (mpz_t *p, int d, int prec)
   return s;
 }
 
-/* Returns log(mu(m,S)), with mu(m,S) defined as follows:
+/* Returns the logarithm of the 1-norm related to the coefficients,
+   log(mu(f,S)), with mu(f,S) defined as follows:
    
-   mu(m,S) = |a_d S^{d/2}| + ... + |a_0 S^{-d/2}|
+   mu(f,S) = |a_d S^{d/2}| + ... + |a_0 S^{-d/2}|
 
    It gives an estimate of *value* of the numbers to be sieved (to be
    multiplied by the sieving region).
 
-   We want mu(m,S) as small as possible.
+   We want mu(f,S) as small as possible.
 */
 double
-get_logmu (mpz_t *p, unsigned long degree, double S)
+l1_lognorm (mpz_t *p, unsigned long degree, double S)
 {
   double mu;
   long i;
@@ -1040,6 +1048,127 @@ get_logmu (mpz_t *p, unsigned long degree, double S)
     mu *= sqrt (S);
   return log (mu);
 }
+
+/* same as L2_lognorm, but takes 'double' instead of 'mpz_t' as coefficients */
+double
+L2_lognorm_d (double *a, unsigned long d, double s)
+{
+  double n;
+
+  if (d == 4)
+    {
+      double a4, a3, a2, a1, a0;
+
+      a4 = a[4] * s * s * s * s;
+      a3 = a[3] * s * s * s;
+      a2 = a[2] * s * s;
+      a1 = a[1] * s;
+      a0 = a[0];
+      n = 4.0 / 9.0 * (a4 * a4 + a0 * a0) + 8.0 / 21.0 * (a4 * a2 + a2 * a0)
+        + 4.0 / 21.0 * (a3 * a3 + a1 * a1) + 8.0 / 25.0 * (a4 * a0 + a3 * a1)
+        + 4.0 / 25.0 * a2 * a2;
+      return 0.5 * log(n / (s * s * s * s));
+    }
+  else if (d == 5)
+    {
+      double a5, a4, a3, a2, a1, a0;
+
+      a5 = a[5] * s * s * s * s * s;
+      a4 = a[4] * s * s * s * s;
+      a3 = a[3] * s * s * s;
+      a2 = a[2] * s * s;
+      a1 = a[1] * s;
+      a0 = a[0];
+      n = 4.0 / 11.0 * (a5 * a5 + a0 * a0) + 8.0 / 27.0 * (a5 * a3 + a2 * a0)
+        + 4.0 / 27.0 * (a4 * a4 + a1 * a1) + 4.0 / 35.0 * (a3 * a3 + a2 * a2)
+        + 8.0 / 35.0 * (a5 * a1 + a4 * a2 + a4 * a0 + a3 * a1);
+      return 0.5 * log(n / (s * s * s * s * s));
+    }
+  else if (d == 6)
+    {
+      double a6, a5, a4, a3, a2, a1, a0;
+
+      a6 = a[6] * s * s * s * s * s * s;
+      a5 = a[5] * s * s * s * s * s;
+      a4 = a[4] * s * s * s * s;
+      a3 = a[3] * s * s * s;
+      a2 = a[2] * s * s;
+      a1 = a[1] * s;
+      a0 = a[0];
+      n = 4.0 / 13.0 * (a6 * a6 + a0 * a0) + 8.0 / 33.0 * (a6 * a4 + a2 * a0)
+        + 4.0 / 33.0 * (a5 * a5 + a1 * a1) + 4.0 / 45.0 * (a4 * a4 + a2 * a2)
+        + 8.0 / 45.0 * (a6 * a2 + a5 * a3 + a4 * a0 + a3 * a1)
+        + 8.0 / 49.0 * (a6 * a0 + a5 * a1 + a4 * a2) + 4.0 / 49.0 * a3 * a3;
+      return 0.5 * log(n / (s * s * s * s * s * s));
+    }
+  else
+    {
+      fprintf (stderr, "L2norm not yet implemented for degree %lu\n", d);
+      exit (1);
+    }
+}
+
+/* Returns the logarithm of the L2-norm as defined by Kleinjung, i.e.,
+   log(1/2 sqrt(int(int((F(sx,y)/s^(d/2))^2, x=-1..1), y=-1..1))).
+   Since we only want to compare norms, we don't consider the log(1/2) term,
+   and compute only 1/2 log(int(int(...))) [here the 1/2 factor is important,
+   since it is added to the alpha root property term].
+*/
+double
+L2_lognorm (mpz_t *f, unsigned long d, double s)
+{
+  double a[7];
+  unsigned long i;
+
+  for (i = 0; i <= d; i++)
+    a[i] = mpz_get_d (f[i]);
+  return L2_lognorm_d (a, d, s);
+}
+
+/* returns the optimal skewness corresponding to L2_lognorm */
+double
+L2_skewness (mpz_t *f, int deg, int prec)
+{
+  double s, n0, n1, a, b, c, d, nc, nd, fd[7];
+  int i;
+
+  /* convert once for all to double's to avoid expensive mpz_get_d() */
+  for (i = 0; i <= deg; i++)
+    fd[i] = mpz_get_d (f[i]);
+
+  /* first isolate the minimum in an interval [s, 2s] by dichotomy */
+  
+  s = 1.0;
+  n0 = L2_lognorm_d (fd, deg, s);
+  while ((n1 = L2_lognorm_d (fd, deg, 2 * s)) < n0)
+    {
+      s = 2.0 * s;
+      n0 = n1;
+    }
+
+  /* We have L2(s/2) > L2(s) <= L2(2s)
+     Assuming L2(s) is first decreasing, then increasing, the minimum is
+     attained in [s/2, 2s]. */
+  a = (s == 1.0) ? 1.0 : 0.5 * s;
+  b = 2.0 * s;
+
+  /* use trichotomy */
+  while (prec--)
+    {
+      c = (2.0 * a + b) / 3.0;
+      d = (a + 2.0 * b) / 3.0;
+      nc = L2_lognorm_d (fd, deg, c);
+      nd = L2_lognorm_d (fd, deg, d);
+      if (nc < nd) /* the minimum should be in [a,d] */
+        b = d;
+      else /* L2(c) > L2(d): the minimum should be in [c, b] */
+        a = c;
+    }
+
+  return (a + b) * 0.5;
+}
+
+/*****************************************************************************/
 
 /* Decompose p->n in base m/b, rounding to nearest
    (linear polynomial is b*x-m).
@@ -1122,7 +1251,7 @@ generate_base_mb (cado_poly p, mpz_t m, unsigned long b)
   mpz_neg (p->g[0], m);
   mpz_set_ui (p->g[1], b);
   mpz_set (p->m, m);
-  p->skew = skewness (p->f, d, SKEWNESS_DEFAULT_PREC);
+  p->skew = SKEWNESS (p->f, d, SKEWNESS_DEFAULT_PREC);
 }
 
 void
@@ -1141,36 +1270,52 @@ generate_sieving_parameters (cado_poly out)
 /* Return the smallest value of alpha(f + k*(b*x-m)) for |k| <= K,
    and modify f[] accordingly. */
 double
-rotate (mpz_t *f, int d, unsigned long alim, long K, mpz_t m, unsigned long b)
+rotate (mpz_t *f, int d, unsigned long alim, long K, mpz_t m, unsigned long b,
+        int verbose)
 {
-  long k, k0 = 0;
-  double alpha, best_alpha = 9.0;
+  long k, k0, kmin = 0, K0, K1;
+  double alpha, alpha0 = 0.0, best_alpha = 9.0;
 
-  /* compute f - K*(b*x-m) */
-  mpz_sub_ui (f[1], f[1], b * K);
-  mpz_addmul_ui (f[0], m, K);
-  for (k = -K; k <= K; k++)
+  K0 = -K;
+  K1 = K;
+
+  ASSERT_ALWAYS(K0 <= 0);
+  ASSERT_ALWAYS(K1 >= 0);
+
+  k0 = 0; /* the coefficients f[] correspond to f+k*g */
+
+  /* search for the smallest alpha[k] */
+  for (k = K0; k <= K1; k++)
     {
+      /* we now have f + k0*(bx-m) and we want f + k*(bx-m), thus we have
+         to add (k-k0)*(bx-m) */
+      mpz_add_si (f[1], f[1], (long) b * (k - k0));
+      mpz_submul_si (f[0], m, k - k0);
+      k0 = k;
       alpha = get_alpha (f, d, alim);
+      if (k == 0)
+        alpha0 = alpha;
       if (alpha < best_alpha)
         {
           best_alpha = alpha;
-          k0 = k;
+          kmin = k;
         }
-      /* f <- f + (b*x-m) */
-      mpz_add_ui (f[1], f[1], b);
-      mpz_sub (f[0], f[0], m);
     }
-  /* we now have f + (K+1)*(bx-m) and we want f + k0*(bx-m), thus we have
-     to subtract (K+1-k0)*(bx-m) */
-  mpz_sub_ui (f[1], f[1], b * (K + 1 - k0));
-  mpz_addmul_ui (f[0], m, K + 1 - k0);
+
+  /* we now have f + k0*(bx-m) and we want f + kmin*(bx-m), thus we have
+     to add (kmin-k0)*(bx-m) */
+  mpz_add_si (f[1], f[1], (long) b * (kmin - k0));
+  mpz_submul_si (f[0], m, kmin - k0);
+
+  if (verbose)
+    printf ("# Rotate by %ld: alpha improved from %f to %f\n", kmin,
+            alpha0, best_alpha);
 
   return best_alpha;
 }
 
 /* Returns k such that f(x+k) has the smallest 1-norm, with the corresponding
-   1-skewness.
+   skewness.
    The coefficients f[] are modified to those of f(x+k).
 
    The linear polynomial b*x-m is changed into b*(x+k)-m, thus m is
@@ -1183,7 +1328,7 @@ translate (mpz_t *f, int d, mpz_t m, unsigned long b)
   int i, j, dir;
   long k;
 
-  logmu0 = get_logmu (f, d, skewness (f, d, SKEWNESS_DEFAULT_PREC));
+  logmu0 = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
 
   /* first compute f(x+1) */
   /* define f_i(x) = f[i] + f[i+1]*x + ... + f[d]*x^(d-i)
@@ -1200,7 +1345,7 @@ translate (mpz_t *f, int d, mpz_t m, unsigned long b)
   k = 1;
 
   /* invariant: the coefficients are those of f(x+k) */
-  logmu = get_logmu (f, d, skewness (f, d, SKEWNESS_DEFAULT_PREC));
+  logmu = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
 
   if (logmu < logmu0)
     dir = 1;
@@ -1222,7 +1367,7 @@ translate (mpz_t *f, int d, mpz_t m, unsigned long b)
       else
         mpz_add_ui (m, m, b);
       k = k + dir;
-      logmu = get_logmu (f, d, skewness (f, d, SKEWNESS_DEFAULT_PREC));
+      logmu = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
       if (logmu < logmu0)
         logmu0 = logmu;
       else
@@ -1322,14 +1467,14 @@ generate_poly (cado_poly out, double T, unsigned long b)
       mpz_fdiv_q (k, out->f[d - 1], t);
       mpz_add (out->m, out->m, k);
       generate_base_mb (out, out->m, b);
-      logmu = get_logmu (out->f, d, out->skew);
+      logmu = LOGNORM (out->f, d, out->skew);
       Msize = m_logmu_insert (M, Malloc, Msize, out->m, logmu);
       if (T > 0 && mpz_sgn (out->f[d - 1]) > 0)
         { /* try another small f[d-1], avoiding a mpz_pow_ui call */
           mpz_add_ui (out->m, out->m, 1);
           generate_base_mb (out, out->m, b);
           T --;
-          logmu = get_logmu (out->f, d, out->skew);
+          logmu = LOGNORM (out->f, d, out->skew);
           Msize = m_logmu_insert (M, Malloc, Msize, out->m, logmu);
         }
       mpz_add_ui (out->m, out->m, 1);
@@ -1357,16 +1502,17 @@ generate_poly (cado_poly out, double T, unsigned long b)
      up to the algebraic factor base bound alim, but since it is too expensive,
      we use the heuristic of using sqrt(alim). */
   alim = (unsigned long) sqrt ((double) default_alim (out->n));
+  alim = 100;
   for (i = 0; i < Msize2; i++)
     {
       generate_base_mb (out, M[i].m, b);
       translate (out->f, d, out->m, b);
-      logmu = get_logmu (out->f, d, out->skew);
-      alpha = rotate (out->f, d, alim, MAX_ROTATE, out->m, b);
+      logmu = LOGNORM (out->f, d, out->skew);
+      alpha = rotate (out->f, d, alim, MAX_ROTATE, out->m, b, 0);
       /* if there was some translation or rotation, we need to recompute
          skewness and norm */
-      out->skew = skewness (out->f, out->degree, SKEWNESS_DEFAULT_PREC);
-      logmu = get_logmu (out->f, d, out->skew);
+      out->skew = SKEWNESS (out->f, out->degree, SKEWNESS_DEFAULT_PREC);
+      logmu = LOGNORM (out->f, d, out->skew);
       E = logmu + alpha;
       if (E < best_E)
         {
@@ -1387,12 +1533,12 @@ generate_poly (cado_poly out, double T, unsigned long b)
  end:
   generate_base_mb (out, best_m, b);
   /* rotate */
-  rotate (out->f, d, alim, MAX_ROTATE, out->m, b);
+  rotate (out->f, d, alim, MAX_ROTATE, out->m, b, 1);
   /* translate */
   translate (out->f, d, out->m, b);
   /* recompute skewness, since it might differ from the original
      polynomial with no rotation */
-  out->skew = skewness (out->f, out->degree, 20);
+  out->skew = SKEWNESS (out->f, out->degree, 20);
   generate_sieving_parameters (out);
   mpz_clear (best_m);
 }
@@ -1410,7 +1556,7 @@ print_poly (FILE *fp, cado_poly p, int argc, char *argv[], double st, int raw)
   mpz_out_str (fp, 10, p->n);
   fprintf (fp, "\n");
   fprintf (fp, "skew: %1.3f\n", p->skew);
-  logmu = get_logmu (p->f, p->degree, p->skew);
+  logmu = LOGNORM (p->f, p->degree, p->skew);
   alpha = get_alpha (p->f, p->degree, (p->alim > 1000) ? 1000 : p->alim);
   fprintf (fp, "# logmu: %1.2f, alpha: %1.2f logmu+alpha=%1.2f\n", logmu,
 	   alpha, logmu + alpha);
