@@ -747,6 +747,16 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
     ellM_init (Pid1, m);
     k = 0; i = plan->i0;
 
+    /* If i0 == 0, we simply leave the first point at (0::0) which is the
+       point at infinity */
+    if (plan->i0 == 0)
+      {
+	mod_set0 (Pid_x[k], m);
+	mod_set0 (Pid_z[k], m);
+	k++;
+	i++;
+      }
+
     /* Todo: do both Pid and Pid1 with one addition chain */
     ellM_mul_ul (Pid, Pd, i, m, b); /* Pid = i_0 d * P */
     mod_set (Pid_x[k], Pid[0].x, m);
@@ -783,11 +793,14 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
   /* Now we've computed all the points we need, so normalize them,
      using Montgomery's batch inversion trick */
   {
+    /* If i0 == 0, we skip that point in the inversion */
     /* Let a_0, ..., a_n = Pj_z[0], ..., Pj_z[s1 - 1], 
                            Pid_z[0], ..., Pid_z[i1 - i0 - 1]
        be the list of residues we want to invert. */
-    const unsigned long n = plan->s1 + plan->i1 - plan->i0;
+    const unsigned int skip_i0 = (plan->i0 == 0) ? 1 : 0;
+    const unsigned long n = plan->s1 + plan->i1 - plan->i0 - skip_i0;
     residue_t *invarray;
+
     invarray = malloc (n * sizeof (residue_t));
     ASSERT (invarray != NULL);
     for (i = 0; i < n; i++)
@@ -796,7 +809,7 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
     mod_set (invarray[0], Pj_z[0], m);
     for (i = 1, k = 1; i < plan->s1; i++, k++)
       mod_mul (invarray[k], invarray[k - 1], Pj_z[i], m);
-    for (i = 0; i < plan->i1 - plan->i0; i++, k++)
+    for (i = skip_i0; i < plan->i1 - plan->i0; i++, k++)
       mod_mul (invarray[k], invarray[k - 1], Pid_z[i], m);
     
     /* Set a_n := 1 / (a_0, ..., a_n) */
@@ -812,7 +825,7 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
 
     /* Compute 1/a_i and normalize the Pid points */
     mod_set (invarray[k - 1], a, m);
-    for (i = plan->i1 - plan->i0; i > 0; i--, k--)
+    for (i = plan->i1 - plan->i0; i > skip_i0; i--, k--)
       {
 	/* Here, invarray[k - 1] = 1 / (a_0, ..., a_{k-1}) and
 	   invarray[k - 2] = (a_0, ..., a_{k-2}) */
