@@ -45,17 +45,21 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "aux.c"
 
-/* define LOGNORM as l1_lognorm, SKEWNESS as l1_skewness to get the 1-norm
-   on coefficients */
+#if 1 /* use L2-norm with integral over whole sieving region */
 #define LOGNORM  L2_lognorm
 #define SKEWNESS L2_skewness
+#else /* use 1-norm relative to coefficients */
+#define LOGNORM  l1_lognorm
+#define SKEWNESS l1_skewness
+#endif
 
 #define SKEWNESS_DEFAULT_PREC 10
 
-#define MAX_ROTATE 16 /* try rotation by k*(b*x-m) for |k| <= MAX_ROTATE.
-                         FIXME: we should adjust that bound dynamically,
-                         so that the norm of the modified polynomial does
-                         not change much. */
+#define MAX_ROTATE 2147483647 /* bound on rotation, to avoid overflow
+                                 (but this should not happen in practice) */
+
+/* prime bounds for the computation of alpha */
+#define ALPHA_BOUND 2000
 
 #define mpz_add_si(a,b,c)                       \
   if (c >= 0) mpz_add_ui (a, b, c);             \
@@ -1165,7 +1169,9 @@ L2_skewness (mpz_t *f, int deg, int prec)
         a = c;
     }
 
-  return (a + b) * 0.5;
+  s = (a + b) * 0.5;
+
+  return s;
 }
 
 /*****************************************************************************/
@@ -1267,20 +1273,46 @@ generate_sieving_parameters (cado_poly out)
   out->alambda = default_alambda (out->n);
 }
 
-/* Return the smallest value of alpha(f + k*(b*x-m)) for |k| <= K,
-   and modify f[] accordingly. */
+/* Compute bounds for rotation: given f(x) = a[d]*x^d + ... + a[0],
+   and g(x) = b*x-m, we want that the 1-norm of f+k*g increases at
+   most by a factor 2. Namely, if s is the 1-skewness of f, and n
+   the corresponding norm, then K0 and K1 are defined by
+   (a[0] - k*m)*s^(-d/2) = +/-n.
+*/
+void
+rotate_bounds (mpz_t *f, int d, mpz_t m, long *K0, long *K1)
+{
+  double s, n, k0, k1, a0, md;
+
+  s = l1_skewness (f, d, SKEWNESS_DEFAULT_PREC);
+  n = exp (l1_lognorm (f, d, s)) * pow (s, (double) d / 2.0);
+  a0 = mpz_get_d (f[0]);
+  md = mpz_get_d (m);
+  k0 = (a0 - n) / md;
+  k1 = (a0 + n) / md;
+  ASSERT_ALWAYS (k0 <= k1);
+  if (k0 < - (double) MAX_ROTATE)
+    k0 = - (double) MAX_ROTATE;
+  if (k1 > (double) MAX_ROTATE)
+    k1 = (double) MAX_ROTATE;
+  *K0 = (long) k0;
+  *K1 = (long) k1;
+}
+
+/* Return the smallest value of alpha(f + k*(b*x-m)) for k small enough such
+   that the norm does not increase too much, and modify f[] accordingly. */
 double
-rotate (mpz_t *f, int d, unsigned long alim, long K, mpz_t m, unsigned long b,
+rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, unsigned long b,
         int verbose)
 {
   long k, k0, kmin = 0, K0, K1;
-  double alpha, alpha0 = 0.0, best_alpha = 9.0;
+  double alpha, alpha0 = 0.0, best_alpha = 9.0, best_lognorm, lognorm;
 
-  K0 = -K;
-  K1 = K;
+  rotate_bounds (f, d, m, &K0, &K1);
 
-  ASSERT_ALWAYS(K0 <= 0);
-  ASSERT_ALWAYS(K1 >= 0);
+  ASSERT_ALWAYS(K0 <= K1);
+
+  best_lognorm = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
 
   k0 = 0; /* the coefficients f[] correspond to f+k*g */
 
@@ -1297,8 +1329,14 @@ rotate (mpz_t *f, int d, unsigned long alim, long K, mpz_t m, unsigned long b,
         alpha0 = alpha;
       if (alpha < best_alpha)
         {
-          best_alpha = alpha;
-          kmin = k;
+          /* check lognorm + alpha < best_lognorm + best_alpha */
+          lognorm = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
+          if (lognorm + alpha < best_lognorm + best_alpha)
+            {
+              best_lognorm = lognorm;
+              best_alpha = alpha;
+              kmin = k;
+            }
         }
     }
 
@@ -1322,7 +1360,7 @@ rotate (mpz_t *f, int d, unsigned long alim, long K, mpz_t m, unsigned long b,
    changed into m-k*b.
 */
 long
-translate (mpz_t *f, int d, mpz_t m, unsigned long b)
+translate (mpz_t *f, int d, mpz_t *g, mpz_t m, unsigned long b)
 {
   double logmu0, logmu;
   int i, j, dir;
@@ -1387,6 +1425,9 @@ translate (mpz_t *f, int d, mpz_t m, unsigned long b)
     mpz_sub_ui (m, m, b);
   k = k - dir;
 
+  /* change linear polynomial */
+  mpz_neg (g[0], m);
+
   return k;
 }
 
@@ -1414,8 +1455,7 @@ generate_poly (cado_poly out, double T, unsigned long b)
   m_logmu_t *M; /* stores values of m and log(mu) found in 1st phase */
   unsigned long Malloc; /* number of allocated entries in M */
   unsigned long Msize;  /* number of stored entries in M */
-  unsigned long Malloc2;
-  unsigned long Msize2, i;
+  unsigned long i;
   double st;
 
   ASSERT (T <= 9007199254740992.0); /* if T > 2^53, T-- will loop */
@@ -1431,7 +1471,7 @@ generate_poly (cado_poly out, double T, unsigned long b)
       goto end;
     }
   
-  Malloc = (unsigned long) sqrt (T);
+  Malloc = (unsigned long) pow (T, 0.28);
   M = m_logmu_init (Malloc);
   mpz_init (k);
   mpz_init (t);
@@ -1451,13 +1491,13 @@ generate_poly (cado_poly out, double T, unsigned long b)
      norm. When going from m to m+k, f[d-1] goes to f[d-1] - k d f[d] */
   st = seconds ();
   Msize = 0;
-  while (T-- > 0)
+  while (T > 0)
     {
       mpz_pow_ui (t, out->m, d - 1); /* m^(d-1) */
       mpz_ndiv_qr (t, r, out->n, t); /* t = round (N / m^(d-1)) */
       /* we use mpz_fdiv_qr here (round towards -infinity) to ensure
          f[d-1] >= 0, which in turn ensures f[d-1]/(d f[d]) >= 0 */
-      mpz_fdiv_qr (out->f[d], out->f[d - 1], t, out->m); /* f[d]*m+f[d-1]*/
+      mpz_fdiv_qr (out->f[d], out->f[d - 1], t, out->m); /* t=f[d]*m+f[d-1] */
       if (mpz_cmp_ui (out->f[d], 0) == 0)
         {
           gmp_fprintf (stderr, "# Stopping selection at m=%Zd since leading coefficient is zero\n", out->m);
@@ -1466,14 +1506,15 @@ generate_poly (cado_poly out, double T, unsigned long b)
       mpz_mul_ui (t, out->f[d], d);
       mpz_fdiv_q (k, out->f[d - 1], t);
       mpz_add (out->m, out->m, k);
+      T--; /* T counts the number of calls to generate_base_mb */
       generate_base_mb (out, out->m, b);
       logmu = LOGNORM (out->f, d, out->skew);
       Msize = m_logmu_insert (M, Malloc, Msize, out->m, logmu);
       if (T > 0 && mpz_sgn (out->f[d - 1]) > 0)
         { /* try another small f[d-1], avoiding a mpz_pow_ui call */
           mpz_add_ui (out->m, out->m, 1);
+          T--;
           generate_base_mb (out, out->m, b);
-          T --;
           logmu = LOGNORM (out->f, d, out->skew);
           Msize = m_logmu_insert (M, Malloc, Msize, out->m, logmu);
         }
@@ -1482,35 +1523,20 @@ generate_poly (cado_poly out, double T, unsigned long b)
   fprintf (stderr, "# First phase took %.2fs and kept %lu candidates\n",
            (seconds () - st), Msize);
 
-  /* Second phase: loop over entries in M database. We do this in two
-     subphases: first compute an estimate of alpha(F) up to alim^(1/3),
-     and keep only the Malloc^(1/2) best values, then compute a more
-     accurate estimate of alpha(F) on the remaining candidates. */
-  Malloc2 = (unsigned long) sqrt ((double) Malloc);
-  Msize2 = 0;
+  /* Second phase: loop over entries in M database, and try to find the best
+     rotation for each one. In principle we should compute the contribution
+     to alpha(F) for primes up to the algebraic factor base bound alim,
+     but since it is too expensive, we use the fixed bound ALPHA_BOUND. */
   st = seconds ();
   for (i = 0; i < Msize; i++)
     {
-      logmu = M[i].logmu;
       generate_base_mb (out, M[i].m, b);
-      alpha = get_alpha (out->f, d, alim);
-      E = logmu + alpha;
-      /* the following overwrites the M database */
-      Msize2 = m_logmu_insert (M, Malloc2, Msize2, out->m, E);
-    }
-  /* In principle we should compute the contribution to alpha(F) for primes
-     up to the algebraic factor base bound alim, but since it is too expensive,
-     we use the heuristic of using sqrt(alim). */
-  alim = (unsigned long) sqrt ((double) default_alim (out->n));
-  alim = 100;
-  for (i = 0; i < Msize2; i++)
-    {
-      generate_base_mb (out, M[i].m, b);
-      translate (out->f, d, out->m, b);
-      logmu = LOGNORM (out->f, d, out->skew);
-      alpha = rotate (out->f, d, alim, MAX_ROTATE, out->m, b, 0);
-      /* if there was some translation or rotation, we need to recompute
-         skewness and norm */
+      /* we do not use translation here, since it has little effect on the
+         norm, and moreover it does not permute with the base-m generation,
+         thus we would need to save M[i].m, and redo all steps in the same
+         order below */
+      alpha = rotate (out->f, d, ALPHA_BOUND, out->m, b, 0);
+      /* compute skewness and norm */
       out->skew = SKEWNESS (out->f, out->degree, SKEWNESS_DEFAULT_PREC);
       logmu = LOGNORM (out->f, d, out->skew);
       E = logmu + alpha;
@@ -1531,13 +1557,16 @@ generate_poly (cado_poly out, double T, unsigned long b)
   m_logmu_clear (M, Malloc);
 
  end:
+  /* Warning: we must restart from M[i].m here, and follow exactly the same
+     steps as above, to find the same polynomial. In particular, the base-m
+     generation does not permute with the translation. */
   generate_base_mb (out, best_m, b);
   /* rotate */
-  rotate (out->f, d, alim, MAX_ROTATE, out->m, b, 1);
+  rotate (out->f, d, ALPHA_BOUND, out->m, b, 1);
   /* translate */
-  translate (out->f, d, out->m, b);
+  translate (out->f, d, out->g, out->m, b);
   /* recompute skewness, since it might differ from the original
-     polynomial with no rotation */
+     polynomial with no rotation or translation */
   out->skew = SKEWNESS (out->f, out->degree, 20);
   generate_sieving_parameters (out);
   mpz_clear (best_m);
@@ -1557,7 +1586,7 @@ print_poly (FILE *fp, cado_poly p, int argc, char *argv[], double st, int raw)
   fprintf (fp, "\n");
   fprintf (fp, "skew: %1.3f\n", p->skew);
   logmu = LOGNORM (p->f, p->degree, p->skew);
-  alpha = get_alpha (p->f, p->degree, (p->alim > 1000) ? 1000 : p->alim);
+  alpha = get_alpha (p->f, p->degree, ALPHA_BOUND);
   fprintf (fp, "# logmu: %1.2f, alpha: %1.2f logmu+alpha=%1.2f\n", logmu,
 	   alpha, logmu + alpha);
   for (i = p->degree; i >= 0; i--)
