@@ -70,7 +70,7 @@ int poly_roots_uint64(uint64_t * r, mpz_t * f, int d, uint64_t p)
         return poly_roots_ulong(NULL, f, d, p);
 
     rr = (unsigned long *) malloc(d * sizeof(unsigned long));
-    n = poly_roots_ulong((unsigned long *) r, f, d, p);
+    n = poly_roots_ulong((unsigned long *) rr, f, d, p);
     for(i = 0 ; i < n ; i++) {
         r[i] = rr[i];
     }
