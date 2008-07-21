@@ -107,27 +107,27 @@ mp_poly_eval_diff (mpz_t r, mpz_t *poly, int deg, long a)
     }
 }
 
-// return negative if failed (multiple root).
+// return 1 if ok, 0 if failed (multiple root).
 //   r <- r - f(r)/f'(r) mod p^k
 // Assuming that r was a root mod p^(k-1) this gives a root mod p^k.
-long
-lift_root(const cado_poly cpoly, const unsigned long pk, const unsigned long r) {
+int
+lift_root(const cado_poly cpoly, const unsigned long pk, unsigned long * r) {
   unsigned long res;
   mpz_t aux, aux2, mp_p;
 
   mpz_init(aux);
   mpz_init(aux2);
   mpz_init_set_ui(mp_p, pk);
-  mp_poly_eval_diff(aux, cpoly->f, cpoly->degree, r);
+  mp_poly_eval_diff(aux, cpoly->f, cpoly->degree, *r);
   mpz_mod_ui(aux, aux, pk);
   if (!mpz_invert(aux, aux, mp_p)) {
-    return -1;
+    return 0;
   }
-  mp_poly_eval(aux2, cpoly->f, cpoly->degree, r);
+  mp_poly_eval(aux2, cpoly->f, cpoly->degree, *r);
   mpz_mod(aux2, aux2, mp_p);
   mpz_mul(aux2, aux2, aux);
   mpz_neg(aux2, aux2);
-  mpz_add_ui(aux2, aux2, r);
+  mpz_add_ui(aux2, aux2, *r);
   mpz_mod(aux2, aux2, mp_p);
 
   res = mpz_get_ui(aux2);
@@ -135,7 +135,8 @@ lift_root(const cado_poly cpoly, const unsigned long pk, const unsigned long r) 
   mpz_clear(aux2);
   mpz_clear(mp_p);
 
-  return res;
+  *r = res;
+  return 1;
 }
 
 /* This assumes that factor base primes always fit within a
@@ -146,7 +147,7 @@ makefb_with_powers(FILE *fp, cado_poly cpoly)
 {
   unsigned long p;
   int d = cpoly->degree;
-  long *roots;
+  unsigned long *roots;
   int nroots, i;
   unsigned long power_lim;
 
@@ -159,7 +160,7 @@ makefb_with_powers(FILE *fp, cado_poly cpoly)
 
   fprintf (fp, "# DEGREE: %d\n", d);
 
-  roots = (long*) malloc (d * sizeof (long));
+  roots = (unsigned long*) malloc (d * sizeof (long));
 
   ideal_heap_t id_list;
   id_list.len = 0;
@@ -183,20 +184,17 @@ makefb_with_powers(FILE *fp, cado_poly cpoly)
 
 	q = get_min_power_ideal(&id_list);
       }
-      nroots = poly_roots_long(roots, cpoly->f, d, p);
+      nroots = poly_roots_ulong(roots, cpoly->f, d, p);
 
       if (nroots != 0)
         {
-          fprintf (fp, "%lu: %lld", p, (long long int) roots[0]);
+          fprintf (fp, "%lu: %lu", p, roots[0]);
           for (i = 1; i < nroots; i++)
-            fprintf (fp, ",%lld", (long long int) roots[i]);
+            fprintf (fp, ",%lu", roots[i]);
           fprintf (fp, "\n");
         }
 
       /* Create prime powers, if relevant */
-      /* Note that lift_root sets the root to -1 when it's done. So
-       * because of this behaviour, we need signed longs.
-       */
       if (nroots != 0 && p <= power_lim) {
 	uint64_t pk = (uint64_t)(p*p);
 	power_ideal_t id;
@@ -204,9 +202,7 @@ makefb_with_powers(FILE *fp, cado_poly cpoly)
 	  id.pk = pk;
 	  id.nroots = 0;
 	  for (i = 0; i < nroots; ++i) {
-	    if (roots[i] >= 0)
-	      roots[i] = lift_root(cpoly, pk, roots[i]);
-	    if (roots[i] >= 0) {
+	    if (lift_root(cpoly, pk, &(roots[i]))) {
 	      id.r[id.nroots] = roots[i];
 	      id.nroots++;
 	    }
