@@ -312,6 +312,8 @@ double quick_search(double f0, double **f, int l, int d, double eps, mpz_t *a,
     unsigned int u;
     //    double t0=clock();
 
+    // ASSERT_ALWAYS(0 <= eps && eps < 1);
+
     // double delta;
 
     /* We do integer arithmetic, scaled by 2^64 so that the wraparound of
@@ -346,6 +348,7 @@ double quick_search(double f0, double **f, int l, int d, double eps, mpz_t *a,
 
     dll = (long) pow(d, lcut);
     uint64_t * all_l = malloc(dll * sizeof(uint64_t));
+    FATAL_ERROR_CHECK(all_l == NULL, "Not enough memory");
 
     dlr = (long) pow(d, rcut);
 
@@ -362,6 +365,7 @@ double quick_search(double f0, double **f, int l, int d, double eps, mpz_t *a,
      * some value such that all_r[x]+all_l[0] > lim */
     unsigned int extra0 = 1 + 5.0 * eps * dlr;
     uint64_t * all_r = malloc((dlr + extra0) * sizeof(uint64_t));
+    FATAL_ERROR_CHECK(all_r == NULL, "Not enough memory");
 
     // delta = -clock();
 
@@ -440,6 +444,8 @@ double quick_search(double f0, double **f, int l, int d, double eps, mpz_t *a,
 
     lres = malloc(ltargets->size  * sizeof(struct mu_llist));
     rres = malloc(rtargets->size  * sizeof(struct mu_llist));
+    FATAL_ERROR_CHECK(lres == NULL, "Not enough memory");
+    FATAL_ERROR_CHECK(rres == NULL, "Not enough memory");
     memset(lres, 0, ltargets->size  * sizeof(struct mu_llist));
     memset(rres, 0, rtargets->size  * sizeof(struct mu_llist));
 
@@ -507,6 +513,8 @@ naive_search (double f0, double **f, int l, int d, double eps, mpz_t *a,
   double *s, fr;
   // double norm;
   mpz_t t;
+
+    // ASSERT_ALWAYS(0 <= eps && eps < 1);
 
   if (verbose >= 3) printf("In naive_search()\n");
   mu = (int*) malloc (l * sizeof (int));
@@ -664,6 +672,12 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
           mpz_tdiv_q (t, t, P);
           mpz_mul (m0, t, P);
           eps = max_adm2 / mpz_get_d (m0);
+          if (eps >= 1.0) {
+              fprintf(stderr, "Warning, epsilon > 1, restricting to 1."
+                      " M should be below %e\n",
+                      pow(pow(mpz_get_d(mtilde),d-4)*pow(mpz_get_d(m0),d-2),1.0/(double)(2*d-6)));
+              eps = 1.0;
+          }
 
           /* compute f0 */
           mpz_pow_ui (t, m0, d);
@@ -920,8 +934,8 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
       mpz_tdiv_q (mtilde, N, a[d]);
       mpz_root (mtilde, mtilde, d);
       max_adm1 = M * M / mpz_get_d (mtilde);
-      max_adm2 = pow (pow (M, (double) (2 * d - 6)) /
-                      pow (mpz_get_d (mtilde), (double) (d - 4)),
+      max_adm2 = pow ((pow (M, (double) (2 * d - 6)) /
+                      pow (mpz_get_d (mtilde), (double) (d - 4))),
                       1.0 / (double) (d - 2));
 
       /* enumerate all subsets Pprime of at least l elements of Q such that
