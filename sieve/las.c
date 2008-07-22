@@ -449,28 +449,19 @@ invmod(unsigned long *pa, unsigned long b) {
   int t, lsh;
   a = *pa;
 
-  // FIXME: here, we rely on internal representation of the modul module.
-  // Not any more. Code is now 11 times as long... - Alex
   if (UNLIKELY(((b & 1UL)==0)))
     {
       modulusul_t m;
       residueul_t r;
+      int rc;
       modul_initmod_ul (m, b);
       modul_init (r, m); /* With mod reduction */
       modul_set_ul (r, *pa, m);
-      if (modul_inv(r, r, m))
-      {
+      if ((rc = modul_inv(r, r, m)))
         *pa = modul_get_ul (r, m);
-        modul_clear (r, m);
-        modul_clearmod (m);
-        return 1;
-      }
-      else
-      {
-        modul_clear (r, m);
-        modul_clearmod (m);
-        return 0;
-      }
+      modul_clear (r, m);
+      modul_clearmod (m);
+      return rc;
     }
 
   fix = (b+1)>>1;
@@ -1418,13 +1409,12 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
         if (!(si->alg_Bound[S[x]]))
           continue;
 
-        /* since a,b both even were not sieved, either a or b should be odd */
-        ASSERT((a | b) & 1);
-
         // Compute algebraic and rational norms.
         xToAB (&a, &b, x + N*si->bucket_region, si);
+        /* since a,b both even were not sieved, either a or b should be odd */
+        ASSERT((a | b) & 1);
         /* bin_gcd assumes that its first operand is odd */
-        if (bin_gcd (a + b, b) != 1)
+        if (bin_gcd ((a&1) == 0 ? a + b : a, b) != 1)
           continue;
 
         surv++;
