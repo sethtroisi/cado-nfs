@@ -1059,7 +1059,20 @@ L2_lognorm_d (double *a, unsigned long d, double s)
 {
   double n;
 
-  if (d == 4)
+  // the following maple lines give the coefficients:
+  // d:=4:p:=x->a0+a1*x+a2*x^2+a3*x^3+a4*x^4:
+  // lprint(int(int((y^d*p(x/y))^2,x=-1..1),y=-1..1));
+  if (d == 3)
+    {
+      double a3, a2, a1, a0;
+      a3 = a[3] * s * s * s;
+      a2 = a[2] * s * s;
+      a1 = a[1] * s;
+      a0 = a[0];
+      n=4.0/7.0*(a3*a3+a0*a0)+8.0/15.0*(a1*a3+a0*a2)+4.0/15.0*(a2*a2+a1*a1);
+      return 0.5 * log(n / (s * s * s));
+    }
+  else if (d == 4)
     {
       double a4, a3, a2, a1, a0;
 
