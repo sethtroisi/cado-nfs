@@ -36,6 +36,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include <limits.h> /* for ULONG_MAX */
 #include <float.h>  /* for DBL_MAX */
@@ -69,7 +70,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
   if (c >= 0) mpz_submul_ui (a, b, c);          \
   else mpz_addmul_ui (a, b, -(c))
   
-
 static void
 usage ()
 {
@@ -804,6 +804,11 @@ m_logmu_insert (m_logmu_t* M, unsigned long alloc, unsigned long size,
 
 /*****************************************************************************/
 
+struct sd {
+  size_t s;
+  unsigned long d;
+};
+
 static struct sd default_degrees[DEFAULT_DEGREES_LENGTH] = DEFAULT_DEGREES;
 
 /* default degree, when not given by user */
@@ -920,36 +925,6 @@ default_alambda (mpz_t n)
 
   for (i = 0; s > default_alambda_table[i].s; i++);
   return default_alambda_table[i].f;
-}
-
-static void
-init_poly (cado_poly p, cado_input in)
-{
-  /* strcpy (p->name, ""); */
-  p->name[0] = '\0';
-  mpz_init_set (p->n, in->n);
-  p->degree = in->degree;
-  if (p->degree == 0)
-    p->degree = default_degree (p->n);
-  p->f = alloc_mpz_array (p->degree + 1);
-  p->g = alloc_mpz_array (3);
-  mpz_init (p->m);
-  strncpy (p->type, "gnfs", sizeof(p->type));
-}
-
-static void
-clear_poly (cado_poly p)
-{
-  int i;
-
-  mpz_clear (p->n);
-  for (i = 0; i <= p->degree; i++)
-    mpz_clear (p->f[i]);
-  free (p->f);
-  mpz_clear (p->g[0]);
-  mpz_clear (p->g[1]);
-  free (p->g);
-  mpz_clear (p->m);
 }
 
 /* round to nearest, assume d > 0 */
@@ -1666,74 +1641,79 @@ L (mpz_t n)
 int
 main (int argc, char *argv[])
 {
-  cado_input in;
-  cado_poly out;
+  param_list pl;
+  cado_poly poly;
   int verbose = 0, raw = 1, i;
   double effort = 1.0;
   char **argv0 = argv;
   int argc0 = argc;
   double st = seconds ();
-  mpz_t m;
-  int degree = 0;      /* if 0, use default values */
   unsigned long b = 1; /* leading coefficient of linear polynomial */
+  FILE *f;
 
   fprintf (stderr, "# %s.r%s", argv[0], REV);
   for (i = 1; i < argc; i++)
     fprintf (stderr, " %s", argv[i]);
   fprintf (stderr, "\n");
 
-  mpz_init (m);
+  param_list_init(pl);
+  cado_poly_init(poly);
 
-  /* parse options */
-  while (argc > 1 && argv[1][0] == '-')
-    {
-      if (strcmp (argv[1], "-v") == 0)
-	{
-	  verbose ++;
-	  argv ++;
-	  argc --;
-	}
-      else if (strcmp (argv[1], "-full") == 0)
-	{
-	  raw = 0;
-	  argv ++;
-	  argc --;
-	}
-      else if (argc > 2 && strcmp (argv[1], "-e") == 0)
-	{
-	  effort = atof (argv[2]);
-	  argv += 2;
-	  argc -= 2;
-	}
-      else if (argc > 2 && strcmp (argv[1], "-m") == 0)
-	{
-          mpz_set_str (m, argv[2], 0);
-	  argv += 2;
-	  argc -= 2;
-	}
-      else if (argc > 2 && strcmp (argv[1], "-degree") == 0)
-	{
-          degree = atoi (argv[2]);
-	  argv += 2;
-	  argc -= 2;
-	}
-      else if (argc > 2 && strcmp (argv[1], "-b") == 0)
-	{
-          b = atoi (argv[2]);
-	  argv += 2;
-	  argc -= 2;
-	}
-      else
-	{
-	  fprintf (stderr, "Unknown option: %s\n", argv[1]);
-	  usage ();
-	}
-    }
+  argv++, argc--;
+  for( ; argc ; ) {
+      /* knobs first */
+      if (strcmp(argv[0], "-v") == 0) { verbose++; argv++,argc--; continue; }
+      if (strcmp(argv[0], "-full") == 0) { raw=0; argv++,argc--; continue; }
+      /* Then aliases */
+      if (param_list_update_cmdline_alias(pl, "effort", "-e", &argc, &argv))
+          continue;
+      /* Pick just everything from the rest that looks like a parameter */
+      if (param_list_update_cmdline(pl, NULL, &argc, &argv)) { continue; }
 
-  if (argc != 1)
-    usage ();
+      /* Now last resort measures */
+      if (strspn(argv[0], "0123456789") == strlen(argv[0])) {
+          param_list_add_key(pl, "n", argv[0], PARAMETER_FROM_CMDLINE);
+          argv++,argc--;
+          continue;
+      }
+      /* If something remains, then it could be an input file */
+      if ((f = fopen(argv[0], "r")) != NULL) {
+          param_list_read_stream(pl, f);
+          fclose(f);
+          argv++,argc--;
+          continue;
+      }
+      /* bail out */
+      fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
+      usage();
+  }
 
-  if (mpz_cmp_ui (m, 0) != 0 && effort != 1.0)
+  int have_n = param_list_parse_mpz(pl, "n", poly->n);
+
+  if (!have_n) {
+      if (verbose) {
+          fprintf(stderr, "Reading n from stdin\n");
+      }
+      param_list_read_stream(pl, stdin);
+      have_n = param_list_parse_mpz(pl, "n", poly->n);
+  }
+
+  if (!have_n) {
+      fprintf(stderr, "No n defined ; sorry.\n");
+      exit(1);
+  }
+
+  param_list_parse_double(pl, "effort", &effort);
+  param_list_parse_mpz(pl, "m", poly->m);
+  param_list_parse_int(pl, "degree", &(poly->degree));
+  param_list_parse_ulong(pl, "b", &b);
+
+  if (param_list_warn_unused(pl)) {
+      usage();
+  }
+  param_list_clear(pl);
+
+  if (mpz_cmp_ui (poly->m, 0) != 0 && effort != 1.0)
     {
       fprintf (stderr, "Warning: option -m xxx implies -e 1\n");
       effort = 1.0;
@@ -1754,21 +1734,19 @@ main (int argc, char *argv[])
       mpz_clear (bb);
     }
 
-  init (in);
-  parse_input (in);
   if (verbose)
-    fprintf (stderr, "L[1/3,(64/9)^(1/3)](n)=%1.2e\n", L (in->n));
-  if (degree != 0)
-    in->degree = degree;
-  init_poly (out, in);
-  mpz_set (out->m, m); /* if non zero, use given value of m */
-  clear (in);
+    fprintf (stderr, "L[1/3,(64/9)^(1/3)](n)=%1.2e\n", L (poly->n));
 
-  generate_poly (out, effort, b);
-  print_poly (stdout, out, argc0, argv0, st, raw);
-  clear_poly (out);
+  if (poly->degree <= 0)
+    poly->degree = default_degree (poly->n);
+  poly->name[0] = '\0';
+  strncpy (poly->type, "gnfs", sizeof(poly->type));
 
-  mpz_clear (m);
+  generate_poly (poly, effort, b);
+
+  print_poly (stdout, poly, argc0, argv0, st, raw);
+
+  cado_poly_clear (poly);
 
   return 0;
 }

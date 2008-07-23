@@ -2082,7 +2082,7 @@ main (int argc, char **argv)
   unsigned long bmin, bmax, b;
   sieve_reportbuffer_t reports_a, reports_r;
   factorbase_t fba, fbr;
-  char *fbfilename = NULL, *polyfilename = NULL;
+  char fbfilename[FILENAME_MAX] = "";
   unsigned char *sievearray;
   unsigned int reports_a_len = 0, reports_r_len = 0;
   int verbose = 0;
@@ -2095,99 +2095,79 @@ main (int argc, char **argv)
   unsigned long relations_found = 0;
   double init_time = seconds (), sieve_time;
   int sieve_a = 1, sieve_r = 1;
+  FILE * f;
 
-  while (argc > 1 && argv[1][0] == '-')
-    {
-      if (argc > 1 && strcmp (argv[1], "-v") == 0)
-	{
-	  verbose++;
-	  argc--;
-	  argv++;
-	}
-      else if (argc > 2 && strcmp (argv[1], "-fb") == 0)
-	{
-	  fbfilename = argv[2];
-	  argc -= 2;
-	  argv += 2;
-	}
-      else if (argc > 2 && strcmp (argv[1], "-poly") == 0)
-	{
-	  polyfilename = argv[2];
-	  argc -= 2;
-	  argv += 2;
-	}
-      else if (argc > 2 && strcmp (argv[1], "-reports_a_len") == 0)
-	{
-	  reports_a_len = atoi (argv[2]);
-	  argc -= 2;
-	  argv += 2;
-	}
-      else if (argc > 2 && strcmp (argv[1], "-reports_r_len") == 0)
-	{
-	  reports_r_len = atoi (argv[2]);
-	  argc -= 2;
-	  argv += 2;
-	}
-      else  if (argc > 1 && strcmp (argv[1], "-rhotiming") == 0)
-	{
-	  rho_timing();
-	  argc--;
-	  argv++;
-	}
-      else  if (argc > 1 && strcmp (argv[1], "-skip_a") == 0)
-	{
-	  sieve_a = 0;
-	  argc--;
-	  argv++;
-	}
-      else  if (argc > 1 && strcmp (argv[1], "-skip_r") == 0)
-	{
-	  sieve_r = 0;
-	  argc--;
-	  argv++;
-	}
-      else
-	break;
-    }
+  int wild = 0;
+  const char * wild_name[4] = { "amin", "amax", "bmin", "bmax", };
 
-  if (argc < 5)
-    {
-      usage ();
-      exit (EXIT_FAILURE);
-    }
+  param_list pl;
 
+  param_list_init(pl);
+  cado_poly_init(cpoly);
 
-  amin = atol (argv[1]);
-  amax = atol (argv[2]);
-  bmin = strtoul (argv[3], NULL, 10);
-  bmax = strtoul (argv[4], NULL, 10);
+  argv++, argc--;
+  for( ; argc ; ) {
+      /* knobs first */
+      if (strcmp(argv[0], "-v") == 0) { verbose++; argv++,argc--; continue; }
+      if (strcmp(argv[0], "-rhotiming") == 0) {
+          rho_timing();
+          argv++,argc--;
+          continue;
+      }
+      if (strcmp(argv[0], "-skip_a") == 0) {
+          sieve_a=0;
+          argv++,argc--;
+          continue;
+      }
+      if (strcmp(argv[0], "-skip_r") == 0) {
+          sieve_r=0;
+          argv++,argc--;
+          continue;
+      }
+      if (argc >= 2 && strcmp (argv[0], "-poly") == 0) {
+          param_list_read_file(pl, argv[1]);
+          argv++,argc--;
+          argv++,argc--;
+          continue;
+      }
+      /* Pick just everything from the rest that looks like a parameter */
+      if (param_list_update_cmdline(pl, NULL, &argc, &argv)) { continue; }
 
-  /* Check command line parameters for sanity */
+      if (wild < 4 && strspn(argv[0], "-0123456789") == strlen(argv[0])) {
+          param_list_add_key(pl, wild_name[wild], argv[0],
+                  PARAMETER_FROM_CMDLINE);
+          argv++,argc--;
+          wild++;
+          continue;
+      }
 
-  if (amin >= amax)
-    {
-      fprintf (stderr, "amin must be less than amax\n");
-      exit (EXIT_FAILURE);
-    }
+      /* Could also be a file */
+      if ((f = fopen(argv[0], "r")) != NULL) {
+          param_list_read_stream(pl, f);
+          fclose(f);
+          argv++,argc--;
+          continue;
+      }
 
-  if (bmin > bmax)
-    {
-      fprintf (stderr, "bmin must be less than or equal to bmax\n");
-      exit (EXIT_FAILURE);
-    }
+      fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
+      usage();
+  }
 
-  if (polyfilename == NULL)
-    {
-      fprintf (stderr, "Please specify a polynomial file with -poly\n");
-      exit (EXIT_FAILURE);
-    }
-
-  if (fbfilename == NULL)
-    {
+  if (!param_list_parse_string(pl, "fb", fbfilename, sizeof(fbfilename))) {
       fprintf (stderr, 
 	       "Please specify a factor base file with the -fb option\n");
-      exit (EXIT_FAILURE);
-    }
+      exit(1);
+  }
+
+  param_list_parse_uint(pl, "reports_a_len", &reports_a_len);
+  param_list_parse_uint(pl, "reports_r_len", &reports_r_len);
+  param_list_parse_long(pl, "amin", &amin);
+  param_list_parse_long(pl, "amax", &amax);
+  param_list_parse_ulong(pl, "bmin", &bmin);
+  param_list_parse_ulong(pl, "bmax", &bmax);
+
+  /* sanity check */
+  ASSERT_ALWAYS(amin < amax && bmin <= bmax);
 
   if (! sieve_a && ! sieve_r)
     {
@@ -2263,7 +2243,7 @@ main (int argc, char **argv)
      }
 
   /* Read polynomial from file */
-  if (!cado_poly_read (cpoly, polyfilename))
+  if (!cado_poly_set_plist (cpoly, pl))
     {
       fprintf (stderr, "Error reading polynomial file\n");
       exit (EXIT_FAILURE);
@@ -2274,7 +2254,6 @@ main (int argc, char **argv)
 
   if (verbose)
   {
-      printf ("# Read polynomial file %s\n", polyfilename);
       printf ("# Polynomials are:\n");
       mp_poly_print (cpoly->f, cpoly->degree, "# f(x) =", 0);
       printf ("\n");

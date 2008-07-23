@@ -2011,6 +2011,7 @@ main (int argc, char *argv[])
         exit (1);
       }
 
+    cado_poly_init(cpoly);
     if (!cado_poly_read (cpoly, polyfilename))
       {
         fprintf (stderr, "Error reading polynomial file\n");

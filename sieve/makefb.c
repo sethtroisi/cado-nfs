@@ -256,58 +256,65 @@ makefb (FILE *fp, cado_poly cpoly)
   free (roots);
 }
 
+static void usage()
+{
+    fprintf (stderr, "Usage: makefb [-v] [-powers] [-poly file]\n");
+    exit (1);
+}
+
 int
 main (int argc, char *argv[])
 {
-  char **argv0 = argv;
   int verbose = 0;
   int use_powers = 0;
-  char *polyfilename = NULL;
+  param_list pl;
   cado_poly cpoly;
+  FILE * f;
 
-  while (argc > 1 && argv[1][0] == '-')
-    {
-      if (argc > 1 && strcmp (argv[1], "-v") == 0)
-	{
-	  verbose ++;
-	  argc --;
-	  argv ++;
-	}
-      else if (argc > 2 && strcmp (argv[1], "-poly") == 0)
-	{
-	  polyfilename = argv[2];
-	  argc -= 2;
-	  argv += 2;
-	}
-      else if (strcmp(argv[1], "-powers") == 0)
-        {
-          use_powers = 1;
-          argc --;
-          argv ++;
-        }
-      else 
-	{
-	  fprintf (stderr, "Usage: %s [-v] [-powers] -poly <file>\n", argv0[0]);
-	  exit (EXIT_FAILURE);
-	}
-    }
+  param_list_init(pl);
+  cado_poly_init(cpoly);
 
-  if (polyfilename == NULL)
-    {
-      fprintf (stderr, "Please specify a polynomial file with -poly\n");
-      exit (EXIT_FAILURE);
-    }
+  argv++, argc--;
+  for( ; argc ; ) {
+      /* knobs first */
+      if (strcmp(argv[0], "-v") == 0) { verbose++; argv++,argc--; continue; }
+      if (strcmp(argv[0], "-powers") == 0)
+        { use_powers=1; argv++,argc--; continue; }
+      if (argc >= 2 && strcmp (argv[0], "-poly") == 0) {
+          param_list_read_file(pl, argv[1]);
+          argv++,argc--;
+          argv++,argc--;
+          continue;
+      }
+      /* Then aliases -- no aliases for makefb */
+      /* Pick just everything from the rest that looks like a parameter */
+      if (param_list_update_cmdline(pl, NULL, &argc, &argv)) { continue; }
 
-  if (!cado_poly_read (cpoly, polyfilename))
+      /* Could also be a file */
+      if ((f = fopen(argv[0], "r")) != NULL) {
+          param_list_read_stream(pl, f);
+          fclose(f);
+          argv++,argc--;
+          continue;
+      }
+
+      fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
+      usage();
+  }
+
+  if (!cado_poly_set_plist (cpoly, pl))
     {
       fprintf (stderr, "Error reading polynomial file\n");
       exit (EXIT_FAILURE);
     }
+  param_list_clear(pl);
 
   if (use_powers)
     makefb_with_powers (stdout, cpoly);
   else
     makefb (stdout, cpoly);
+
+  cado_poly_clear (cpoly);
 
   return 0;
 }

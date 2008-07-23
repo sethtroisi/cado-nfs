@@ -880,6 +880,7 @@ main(int argc, char **argv)
     fic = argv+1;
     nfic = argc-1;
     //	fic = extractFic(&nfic, &nrelmax, argv[3]);
+    cado_poly_init(pol);
     cado_poly_read(pol, polyname);
     if(maxpr == 0)
 	maxpr = 1L << pol[0].lpbr;

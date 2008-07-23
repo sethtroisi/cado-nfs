@@ -22,5 +22,6 @@
 #include "gmp_aux.h"
 #include "cado_poly.h"
 #include "rootfinder.h"
+#include "params.h"
 
 #endif	/* CADO_UTILS_H_ */

@@ -258,6 +258,7 @@ main(int argc, char *argv[])
     if (polyfilename == NULL || ((fbfilename == NULL) && (nfic == 0)))
       usage (argv0);
 
+    cado_poly_init(cpoly);
     if (!cado_poly_read (cpoly, polyfilename))
       {
         fprintf (stderr, "Error reading polynomial file\n");

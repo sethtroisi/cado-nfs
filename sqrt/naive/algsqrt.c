@@ -397,6 +397,7 @@ int main(int argc, char **argv) {
 
   depfile = fopen(argv[1], "r");
   ASSERT_ALWAYS(depfile != NULL);
+  cado_poly_init(pol);
   ret = cado_poly_read(pol, argv[3]);
   ASSERT_ALWAYS(ret == 1);
 

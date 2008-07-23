@@ -1038,6 +1038,7 @@ int main(int argc, char *argv[]) {
         MSG("Please specify a polynomial file with -poly\n");
         exit(EXIT_FAILURE);
     }
+    cado_poly_init(cpoly);
     if (!cado_poly_read(cpoly, polyfilename)) {
         MSG("Error reading polynomial file\n");
         exit(EXIT_FAILURE);

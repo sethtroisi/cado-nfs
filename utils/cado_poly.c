@@ -1,142 +1,23 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <ctype.h>		/* for isdigit */
 #include "cado.h"
-
-static int separator(char x)
-{
-    return x == ':' || x == '=' || isspace(x);
-}
-
-/* gives a pointer to the config file info behind the key */
-static const char *get_rhs(const char *line, const char *tag, int *have)
-{
-    unsigned int len = strlen(tag);
-    if (strncmp(line, tag, len) != 0)
-	return NULL;
-    if (!separator(line[len]))
-	return NULL;
-
-    if (have != NULL && *have != 0) {
-	fprintf(stderr, "parse error in get_rhs: %s appears twice\n", tag);
-	exit(EXIT_FAILURE);
-    }
-    if (have) {
-	*have = 1;
-    }
-
-    for (; !line[len] || separator(line[len]); len++);
-
-    return line + len;
-}
-
-/* parse_string wants the size of the destination string */
-static int parse_string(char *dst, unsigned int n,
-			const char *line, const char *tag, int *have)
-{
-    const char *ptr = get_rhs(line, tag, have);
-    if (ptr == NULL)
-	return 0;
-    strncpy(dst, ptr, n);
-    return 1;
-}
-
-static void forbidden_garbage(const char *p, const char *line)
-{
-    for (; *p && isspace(*p); p++);
-    if (*p) {
-	fprintf(stderr, "parse error: garbage at end of line:\n%s\n", line);
-	exit(EXIT_FAILURE);
-    }
-}
-
-static int parse_ulong(unsigned long *dst,
-		       const char *line, const char *tag, int *have)
-{
-    const char *ptr = get_rhs(line, tag, have);
-    if (ptr == NULL)
-	return 0;
-    char *eptr;
-    unsigned long res;
-    res = strtoul(ptr, &eptr, 0);
-    forbidden_garbage(eptr, line);
-    if (dst)
-	*dst = res;
-    return 1;
-}
-static int parse_long(long *dst, const char *line, const char *tag, int *have)
-{
-    const char *ptr = get_rhs(line, tag, have);
-    if (ptr == NULL)
-	return 0;
-    char *eptr;
-    long res;
-    res = strtol(ptr, &eptr, 0);
-    forbidden_garbage(eptr, line);
-    if (dst)
-	*dst = res;
-    return 1;
-}
-static int parse_int(int *dst, const char *line, const char *tag, int *have)
-{
-    long r;
-    if (parse_long(&r, line, tag, have) == 0) {
-	return 0;
-    }
-    if (dst)
-	*dst = r;
-    return 1;
-}
-static int parse_double(double *dst,
-			const char *line, const char *tag, int *have)
-{
-    const char *ptr = get_rhs(line, tag, have);
-    if (ptr == NULL)
-	return 0;
-    char *eptr;
-    double res;
-    res = strtod(ptr, &eptr);
-    forbidden_garbage(eptr, line);
-    if (dst)
-	*dst = res;
-    return 1;
-}
-static int parse_mpz(mpz_ptr dst,
-		     const char *line, const char *tag, int *have)
-{
-    int rc;
-    unsigned int nread;
-    const char *ptr = get_rhs(line, tag, have);
-
-    if (ptr == NULL)
-	return 0;
-    if (dst) {
-	rc = gmp_sscanf(ptr, "%Zd%n", dst, &nread);
-    } else {
-	/* scan even when the result is not wanted */
-	rc = gmp_sscanf(ptr, "%*Zd%n", &nread);
-    }
-    if (rc != 1) {
-	fprintf(stderr, "parse error in parse_mpz while parsing:\n%s", line);
-	exit(EXIT_FAILURE);
-    }
-    forbidden_garbage(ptr + nread, line);
-    return 1;
-}
+#include "params.h"
 
 void cado_poly_init(cado_poly poly)
 {
     int i;
 
+    /* ALL fields are zero upon init, EXCEPT the degree field (which is -1) */
     memset(poly, 0, sizeof(poly));
     poly->f = (mpz_t *) malloc((MAXDEGREE + 1) * sizeof(mpz_t));
     poly->g = (mpz_t *) malloc((MAXDEGREE + 1) * sizeof(mpz_t));
+    /* mpzs as well are zero */
     for (i = 0; i < (MAXDEGREE + 1); i++) {
 	mpz_init_set_ui(poly->f[i], 0);
 	mpz_init_set_ui(poly->g[i], 0);
     }
-    mpz_init(poly->n);
+    mpz_init_set_ui(poly->n, 0);
     poly->name[0] = '\0';
     poly->degree = -1;
     poly->type[0] = '\0';
@@ -158,69 +39,36 @@ void cado_poly_clear(cado_poly poly)
     memset(poly, 0, sizeof(poly));
 }
 
-// returns 0 on failure, 1 on success.
-int cado_poly_read(cado_poly poly, char *filename)
+int cado_poly_set_plist(cado_poly poly, param_list pl)
 {
-    FILE *file;
-    const int linelen = 512;
-    char line[linelen];
-    int have_name = 0, have_n = 0;
-    int i;
-
-    file = fopen(filename, "r");
-    if (file == NULL) {
-	fprintf(stderr, "read_polynomial: could not open %s\n", filename);
-	return 0;
-    }
-
-    /* We used to init the cado structure here, although it's only
-     * vaguely the place to do so.
-     */
-    cado_poly_init(poly);
-
+    int have_n = 0;
     int have_f[(MAXDEGREE + 1)] = { 0, };
     int have_g[(MAXDEGREE + 1)] = { 0, };
     int degf, degg;
+    int i;
 
-    while (!feof(file)) {
-	int ok = 0;
-	if (fgets(line, linelen, file) == NULL)
-	    break;
-	if (line[0] == '#')
-	    continue;
+    param_list_parse_string(pl, "name", poly->name, sizeof(poly->name));
 
-	ok += parse_string(poly->name, sizeof(poly->name),
-			   line, "name", &have_name);
-	ok += parse_mpz(poly->n, line, "n", &have_n);
-	ok += parse_double(&(poly->skew), line, "skew", NULL);
-	for (i = 0; i < (MAXDEGREE + 1); i++) {
-	    char tag[4];
-	    snprintf(tag, sizeof(tag), "c%d", i);
-	    ok += parse_mpz(poly->f[i], line, tag, &have_f[i]);
-	    snprintf(tag, sizeof(tag), "Y%d", i);
-	    ok += parse_mpz(poly->g[i], line, tag, &have_g[i]);
-	}
-	ok +=
-	    parse_string(poly->type, sizeof(poly->type), line, "type", NULL);
-	ok += parse_ulong(&(poly->rlim), line, "rlim", NULL);
-	ok += parse_ulong(&(poly->alim), line, "alim", NULL);
-	ok += parse_int(&(poly->lpbr), line, "lpbr", NULL);
-	ok += parse_int(&(poly->lpba), line, "lpba", NULL);
-	ok += parse_int(&(poly->mfbr), line, "mfbr", NULL);
-	ok += parse_int(&(poly->mfba), line, "mfba", NULL);
-	ok += parse_double(&(poly->rlambda), line, "rlambda", NULL);
-	ok += parse_double(&(poly->alambda), line, "alambda", NULL);
-	ok += parse_int(&(poly->qintsize), line, "qintsize", NULL);
-	ok += parse_mpz(poly->m, line, "m", NULL);
-
-	ASSERT_ALWAYS(ok < 2);
-	if (ok == 0) {
-	    fprintf(stderr,
-		    "read_polynomial: Cannot parse line %s\nIgnoring.\n",
-		    line);
-	    continue;
-	}
+    have_n = param_list_parse_mpz(pl, "n", poly->n);
+    param_list_parse_double(pl, "skew", &(poly->skew));
+    for (i = 0; i < (MAXDEGREE + 1); i++) {
+        char tag[4];
+        snprintf(tag, sizeof(tag), "c%d", i);
+        have_f[i] = param_list_parse_mpz(pl, tag, poly->f[i]);
+        snprintf(tag, sizeof(tag), "Y%d", i);
+        have_g[i] = param_list_parse_mpz(pl, tag, poly->g[i]);
     }
+    param_list_parse_string(pl, "type", poly->type, sizeof(poly->type));
+    param_list_parse_ulong(pl, "rlim", &(poly->rlim));
+    param_list_parse_ulong(pl, "alim", &(poly->alim));
+    param_list_parse_int(pl, "lpbr", &(poly->lpbr));
+    param_list_parse_int(pl, "lpba", &(poly->lpba));
+    param_list_parse_int(pl, "mfbr", &(poly->mfbr));
+    param_list_parse_int(pl, "mfba", &(poly->mfba));
+    param_list_parse_double(pl, "rlambda", &(poly->rlambda));
+    param_list_parse_double(pl, "alambda", &(poly->alambda));
+    param_list_parse_int(pl, "qintsize", &(poly->qintsize));
+    param_list_parse_mpz(pl, "m", poly->m);
 
     for (degf = MAXDEGREE; degf >= 0 && !have_f[degf]; degf--) {
 	if (have_f[degf] && mpz_cmp_ui(poly->f[degf], 0) != 0)
@@ -230,6 +78,9 @@ int cado_poly_read(cado_poly poly, char *filename)
 	if (have_g[degg] && mpz_cmp_ui(poly->g[degg], 0) != 0)
 	    break;
     }
+
+    ASSERT_ALWAYS(have_n);
+
     poly->degree = degf;
     // compute m, the common root of f and g mod n
     if (degg != -1) {
@@ -254,12 +105,35 @@ int cado_poly_read(cado_poly poly, char *filename)
 	mpz_neg(poly->g[0], poly->m);
     }
 
-    ASSERT_ALWAYS(have_n);
-
-    fclose(file);
-
     return 1;
 }
+
+// returns 0 on failure, 1 on success.
+int cado_poly_read_stream(cado_poly poly, FILE * f)
+{
+    param_list pl;
+    param_list_init(pl);
+    param_list_read_stream(pl, f);
+    int r = cado_poly_set_plist(poly, pl);
+    param_list_clear(pl);
+    return r;
+}
+
+// returns 0 on failure, 1 on success.
+int cado_poly_read(cado_poly poly, char *filename)
+{
+    FILE *file;
+    int r;
+    file = fopen(filename, "r");
+    if (file == NULL) {
+	fprintf(stderr, "read_polynomial: could not open %s\n", filename);
+	return 0;
+    }
+    r = cado_poly_read_stream(poly, file);
+    fclose(file);
+    return r;
+}
+
 
 void fprint_polynomial(FILE * fp, mpz_t * f, const int d)
 {

@@ -439,6 +439,7 @@ int main(int argc, char *argv[])
     
     kerfile = fopen(kername, "r");
 
+    cado_poly_init(pol);
     ret = cado_poly_read(pol, polyname);
     ASSERT (ret);
 

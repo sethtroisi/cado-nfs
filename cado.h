@@ -71,14 +71,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 typedef struct
 {
-  mpz_t n;    /* number to factor */
-  int degree; /* (optional) wanted degree */
-} __cado_input_struct;
-
-typedef __cado_input_struct cado_input[1];
-
-typedef struct
-{
   char name[256]; /* name */
   mpz_t n;        /* number to factor */
   double skew;    /* skewness */

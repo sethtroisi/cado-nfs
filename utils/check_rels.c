@@ -127,6 +127,7 @@ int main(int argc, char * argv[])
     if (argc < 4 || strcmp(argv[1], "-poly") != 0) {
         usage_and_die(argv[0]);
     }
+    cado_poly_init(cpoly);
     if (!cado_poly_read(cpoly, argv[2])) 
         return 1;
 

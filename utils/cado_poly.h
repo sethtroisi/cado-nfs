@@ -5,7 +5,8 @@
 #include <gmp.h>
 
 /* cado_poly is defined in cado.h */
-#include <cado.h>
+#include "cado.h"
+#include "params.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -17,6 +18,8 @@ extern void fprint_polynomial (FILE *, mpz_t *, const int);
 // accordingly. Return 1 if success, 0 if failure (and diagnostic on
 // stderr)
 extern int cado_poly_read (cado_poly, char *filename);
+extern int cado_poly_read_stream (cado_poly, FILE *);
+extern int cado_poly_set_plist(cado_poly poly, param_list pl);
 
 extern void cado_poly_init (cado_poly);
 extern void cado_poly_clear (cado_poly);
@@ -24,11 +27,18 @@ extern void cado_poly_clear (cado_poly);
 /* sanity check */
 extern void check_polynomials (cado_poly);
 
+
+// extern int cado_poly_read(cado_poly, char *filename) __attribute__((deprecated));
+// extern int cado_poly_read_stream(cado_poly, FILE *f) __attribute__((deprecated));
+
 /* legacy -- to be removed */
 static inline int read_polynomial(cado_poly c, char *f)
     __attribute__((deprecated));
 static inline int read_polynomial(cado_poly c, char *f)
-{ return cado_poly_read(c,f); }
+{
+    cado_poly_init(c);
+    return cado_poly_read(c,f);
+}
 
 
 #ifdef __cplusplus

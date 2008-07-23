@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
 #include <time.h>
 #include <values.h> /* for DBL_MAX */
 #include "cado.h"
@@ -978,7 +979,6 @@ usage ()
 int
 main (int argc, char *argv[])
 {
-  cado_input in;
   int degree = 5;
   double effort = 1e6;
   double M = 1e25;
@@ -988,72 +988,85 @@ main (int argc, char *argv[])
                    try a[d]=incr, then 2*incr, 3*incr, ... */
   int i;
   double checked, st = seconds ();
+  FILE * f = NULL;
 
   /* print command line */
   fprintf (stderr, "# %s.r%s", argv[0], REV);
   for (i = 1; i < argc; i++)
     fprintf (stderr, " %s", argv[i]);
   fprintf (stderr, "\n");
-  init (in);
 
-  /* parse options */
-  while (argc > 1 && argv[1][0] == '-')
-    {
-      if (strcmp (argv[1], "-v") == 0)
-	{
-	  verbose ++;
-	  argv ++;
-	  argc --;
-	}
-      else if (argc > 2 && strcmp (argv[1], "-e") == 0)
-	{
-	  effort = atof (argv[2]);
-	  argv += 2;
-	  argc -= 2;
-	}
-      else if (argc > 2 && strcmp (argv[1], "-degree") == 0)
-	{
-          degree = atoi (argv[2]);
-	  argv += 2;
-	  argc -= 2;
-	}
-      else if (argc > 2 && strcmp (argv[1], "-incr") == 0)
-	{
-          incr = atoi (argv[2]);
-	  argv += 2;
-	  argc -= 2;
-	}
-      else if (argc > 2 && strcmp (argv[1], "-l") == 0)
-	{
-          l = atoi (argv[2]);
-	  argv += 2;
-	  argc -= 2;
-	}
-      else if (argc > 2 && strcmp (argv[1], "-M") == 0)
-	{
-          M = atof (argv[2]);
-	  argv += 2;
-	  argc -= 2;
-	}
-      else if (argc > 2 && strcmp (argv[1], "-pb") == 0)
-	{
-          pb = atoi (argv[2]);
-	  argv += 2;
-	  argc -= 2;
-	}
-      else
-	{
-	  fprintf (stderr, "Unknown option: %s\n", argv[1]);
-	  usage ();
-	}
-    }
+  param_list pl;
+  mpz_t n;
 
-  if (argc != 1)
-    usage ();
+  param_list_init(pl);
+  mpz_init_set_ui(n,0);
 
-  parse_input (in);
+  argv++, argc--;
+  for( ; argc ; ) {
+      /* knobs first */
+      if (strcmp(argv[0], "-v") == 0) { verbose++; argv++,argc--; continue; }
+      /* Then aliases */
+      if (param_list_update_cmdline_alias(pl, "effort", "-e", &argc, &argv))
+          continue;
+      if (param_list_update_cmdline_alias(pl, "degree", "-d", &argc, &argv))
+          continue;
+      if (param_list_update_cmdline_alias(pl, "degree", "d=", &argc, &argv))
+          continue;
+      if (param_list_update_cmdline_alias(pl, "incr", "-i", &argc, &argv))
+          continue;
+      /* Pick just everything from the rest that looks like a parameter */
+      if (param_list_update_cmdline(pl, NULL, &argc, &argv)) { continue; }
 
-  checked = Algo36 (in->n, degree, M, l, pb, incr);
+      /* Now last resort measures */
+      if (strspn(argv[0], "0123456789") == strlen(argv[0])) {
+          param_list_add_key(pl, "n", argv[0], PARAMETER_FROM_CMDLINE);
+          argv++,argc--;
+          continue;
+      }
+      /* If something remains, then it could be an input file */
+      if ((f = fopen(argv[0], "r")) != NULL) {
+          param_list_read_stream(pl, f);
+          fclose(f);
+          argv++,argc--;
+          continue;
+      }
+      /* bail out */
+      fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
+      usage();
+  }
+  int have_n = param_list_parse_mpz(pl, "n", n);
+
+  if (!have_n) {
+      if (verbose) {
+          fprintf(stderr, "Reading n from stdin\n");
+      }
+      param_list_read_stream(pl, stdin);
+      have_n = param_list_parse_mpz(pl, "n", n);
+  }
+
+  if (!have_n) {
+      fprintf(stderr, "No n defined ; sorry.\n");
+      exit(1);
+  }
+
+  param_list_parse_double(pl, "effort", &effort);
+  param_list_parse_int(pl, "incr", &incr);
+  param_list_parse_int(pl, "l", &l);
+  param_list_parse_int(pl, "pb", &pb);
+  param_list_parse_double(pl, "M", &M);
+  param_list_parse_int(pl, "degree", &degree);
+
+  if (verbose) {
+      param_list_display(pl, stdout);
+  }
+
+  if (param_list_warn_unused(pl)) {
+      usage();
+  }
+  param_list_clear(pl);
+
+  checked = Algo36 (n, degree, M, l, pb, incr);
 
   st = seconds () - st;
   fprintf (stderr, "Checked %1.0f polynomials in %1.1fs (%1.1es/p,", checked,
@@ -1064,6 +1077,5 @@ main (int argc, char *argv[])
   fprintf (stderr, " naive_search took %1.1fs)\n", search_time);
 #endif
   
-  clear (in);
   return 0;
 }

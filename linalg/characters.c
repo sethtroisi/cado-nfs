@@ -391,6 +391,7 @@ int main(int argc, char **argv)
 
     n = UINT_MAX;
 
+    cado_poly_init(pol);
     while (argc > 1 && argv[1][0] == '-') {
 	if (argc > 2 && strcmp(argv[1], "-purged") == 0) {
 	    purgedfile = gzip_open(argv[2], "r");
@@ -403,7 +404,7 @@ int main(int argc, char **argv)
 	    argv += 2;
 	}
 	if (argc > 2 && strcmp(argv[1], "-poly") == 0) {
-	    cado_poly_read(pol, argv[2]);
+            cado_poly_read(pol, argv[2]);
 	    argc -= 2;
 	    argv += 2;
 	}
