@@ -100,9 +100,6 @@ void gaussian_elim(uint32_array_list_t* relations,
     // Stage 2: Find dependencies
     //
     for (uint32_t irow = 0U; irow < nrows; irow++) {
-        if (relations->length == relations->alloced) {
-            break;
-        }
         if (0U == get_array_bit(irow, used)) {
             //
             // Computes the size of the uint32_array_t to hold the relation
@@ -129,6 +126,10 @@ void gaussian_elim(uint32_array_list_t* relations,
             }
             rel->data[nrows_in_rel] = irow;
             add_entry_in_uint32_array_list(rel, relations);
+        
+            if (relations->length == relations->alloced) {
+                break;
+            }
         }
     }
     clear_binary_array(used);

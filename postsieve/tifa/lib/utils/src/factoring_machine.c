@@ -507,7 +507,7 @@ ecode_t compute_multiplicities(uint32_array_t* const multis,
     if (mpz_cmp_ui(cofactor, 1) != 0) {
         //
         // This should not happen since 'n' is supposed to be
-        // smooth of the coprime base given by 'factors'! We could return
+        // smooth on the coprime base given by 'factors'! We could return
         // the found factors and multiplities but that would mask a potential 
         // nasty bug in the code, so let's be convervative and return an error.
         //

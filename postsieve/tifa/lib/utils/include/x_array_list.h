@@ -106,8 +106,12 @@ uint32_array_list_t* alloc_uint32_array_list(uint32_t alloced);
    /**
     * \brief Adds an entry to a <tt>uint32_array_list_t</tt>.
     *
-    * Adds the \c entry pointer to \c list and increments its
-    * \c length field.
+    * Adds the \c entry pointer to \c list and increments the list's \c length 
+    * field.
+    *
+    * \warning If \c list has not enough room to accomodate the new entry,
+    * the function will be without effect: the list will <em>not</em> be
+    * resized.
     *
     * \warning This function tranfers the ownership of the \c uint32_array_t
     * pointed to by \c entry to <tt>list</tt>. This means that any client code
@@ -126,8 +130,10 @@ add_entry_in_uint32_array_list(uint32_array_t* const entry,
     // _WARNING_: Ownership of the uint32_array_t pointed by entry is
     //            transfered to the uint32_array_list_t
     //
-    list->data[list->length] = entry;
-    list->length++;
+    if (list->length != list->alloced) {
+        list->data[list->length] = entry;
+        list->length++;
+    }
 }
 
    /**

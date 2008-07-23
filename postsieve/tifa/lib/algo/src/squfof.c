@@ -154,8 +154,8 @@ divide_trick(const unsigned long int N, const unsigned long int D);
 //
 // Should we perform the "fast return" variant?
 //
-// _NOTE_: The "fast return" variant is still disabled by default even if
-//         the mighty infinite loop bug has been "solved" (but for how long?).
+// _NOTE_: The "fast return" variant is now enabled by default since the
+//         mighty infinite loop bug has been solved (hopefully for good!).
 //
 #define PERFORM_FAST_RETURN 1
 
