@@ -17,7 +17,7 @@ kleinjung: kleinjung.o
 # Some more dependencies
 polyselect.o: polyselect.c aux.c $(TOP)/cado.h
 
-kleinjung.o: kleinjung.c $(TOP)/cado.h
+kleinjung.o: kleinjung.c aux.c $(TOP)/cado.h
 
 clean:
 	-rm -f polyselect kleinjung *~ *.o
