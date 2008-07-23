@@ -9,6 +9,7 @@ alloc_mpz_array (int d)
   int i;
 
   f = (mpz_t*) malloc (d * sizeof (mpz_t));
+  ASSERT_ALWAYS(f != NULL);
   for (i = 0; i < d; i++)
     mpz_init (f[i]);
   return f;
