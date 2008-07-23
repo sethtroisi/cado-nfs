@@ -30,6 +30,13 @@ norm2 := proc(f, s) local d;
    sqrt(add(coeff(f,x,i)^2*s^(2*i-d),i=0..d))
 end:
 
+Norm2 := proc(f, s) local d, F;
+   d := degree(f,x);
+   F := y^d*subs(x=x/y, f);
+   F := subs(x=s*x, F)/s^(d/2);
+   sqrt(int(int(F^2, x=-1..1),y=-1..1))
+end:
+
 # mimics code in polyselect.c
 special_valuation := proc(f, p)
 local disc, d, t, pvaluation_disc, p_divides_lc, e, v, g;
