@@ -60,7 +60,8 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
                                  (but this should not happen in practice) */
 
 /* prime bounds for the computation of alpha */
-#define ALPHA_BOUND 2000
+#define ALPHA_BOUND_SMALL  100
+#define ALPHA_BOUND       2000
 
 #define mpz_add_si(a,b,c)                       \
   if (c >= 0) mpz_add_ui (a, b, c);             \
@@ -226,6 +227,87 @@ discriminant (mpz_t D, mpz_t *f0, const int d)
   mpz_clear (den);
   clear_mpz_array (f, d + 1);
   clear_mpz_array (g, d);
+}
+
+/* D <- discriminant (f+k*g), which has degree d */
+void
+discriminant_k (mpz_t *D, mpz_t *f, int d, mpz_t m, unsigned long b)
+{
+  int i, j, k;
+  uint32_t **M, pivot;
+
+  ASSERT_ALWAYS(d <= 9);
+
+  /* we first put in D[i] the value of disc(f + i*g) for 0 <= i <= d,
+     thus if disc(f + k*g) = a[d]*k^d + ... + a[0], then
+          D[0] = a[0]
+          D[1] = a[0] + a[1] + ... + a[d]
+          ...
+          D[d] = a[0] + a[1]*d + ... + a[d]*d^d */
+
+  discriminant (D[0], f, d); /* a[0] */
+  for (i = 1; i <= d; i++)
+    {
+      /* add b*x - m */
+      mpz_add_ui (f[1], f[1], b);
+      mpz_sub (f[0], f[0], m);
+      discriminant (D[i], f, d);
+    }
+
+  /* initialize matrix coefficients */
+  M = (uint32_t**) malloc ((d + 1) * sizeof(uint32_t*));
+  for (i = 0; i <= d; i++)
+    {
+      M[i] = (uint32_t*) malloc ((d + 1) * sizeof(uint32_t));
+      M[i][0] = 1;
+      for (j = 1; j <= d; j++)
+        M[i][j] = i * M[i][j-1];
+    }
+
+  for (j = 0; j < d; j++)
+    {
+      /* invariant: D[i] = M[i][0] * a[0] + ... + M[i][d] * a[d]
+         with M[i][k] = 0 for k < j and k < i */
+      for (i = j + 1; i <= d; i++)
+        {
+          /* eliminate M[i][j] */
+          pivot = M[i][j] / M[j][j];
+          mpz_submul_ui (D[i], D[j], pivot);
+          for (k = j; k <= d; k++)
+            M[i][k] -= pivot * M[j][k];
+        }
+    }
+
+  /* now we have an upper triangular matrix */
+  for (j = d; j > 0; j--)
+    {
+      for (k = j + 1; k <= d; k++)
+        mpz_submul_ui (D[j], D[k], M[j][k]);
+      ASSERT_ALWAYS(mpz_divisible_ui_p (D[j], M[j][j]));
+      mpz_divexact_ui (D[j], D[j], M[j][j]);
+    }
+
+  /* restore the original f[] */
+  mpz_sub_ui (f[1], f[1], b * d);
+  mpz_addmul_ui (f[0], m, d);
+
+  for (i = 0; i <= d; i++)
+    free (M[i]);
+  free (M);
+}
+
+/* res <- f(k) */
+void
+mpz_poly_eval_si (mpz_t res, mpz_t *f, int d, long k)
+{
+  int i;
+  
+  mpz_set (res, f[d]);
+  for (i = d - 1; i >= 0; i--)
+    {
+      mpz_mul_si (res, res, k);
+      mpz_add (res, res, f[i]);
+    }
 }
 
 /*************************** root properties *********************************/
@@ -796,7 +878,7 @@ m_logmu_insert (m_logmu_t* M, unsigned long alloc, unsigned long size,
           mpz_set (M[size].m, m);
           M[size].logmu = logmu;
           if (size == 0)
-            gmp_fprintf (stderr, "# m=%Zd logmu=%1.2f\n", m, logmu);
+            gmp_fprintf (stderr, "# m=%Zd lognorm=%1.2f\n", m, logmu);
         }
       return alloc;
     }
@@ -1287,37 +1369,114 @@ rotate_bounds (mpz_t *f, int d, mpz_t m, long *K0, long *K1)
   *K1 = (long) k1;
 }
 
-/* Return the smallest value of alpha(f + k*(b*x-m)) for k small enough such
-   that the norm does not increase too much, and modify f[] accordingly. */
+/* Return the smallest value of lognorm + alpha(f + k*(b*x-m)) for k small
+   enough such that the norm does not increase too much, and modify f[]
+   accordingly. */
 double
 rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, unsigned long b,
         int verbose)
 {
-  long k, k0, kmin = 0, K0, K1;
-  double alpha, alpha0 = 0.0, best_alpha = 9.0, best_lognorm, lognorm;
+  mpz_t *D, v;
+  long K0, K1, k0, k, j, l, kmin = 0;
+  double *A, alpha, lognorm, best_alpha = DBL_MAX, best_lognorm = DBL_MAX;
+  double alpha0, e;
+  unsigned long p, pp;
 
+  /* first compute D(k) = disc(f + k*g, x) */
+  D = alloc_mpz_array (d + 1);
+  discriminant_k (D, f, d, m, b);
+  mpz_init (v);
+
+  /* compute range for k */
   rotate_bounds (f, d, m, &K0, &K1);
+  ASSERT_ALWAYS(K0 <= 0 && 0 <= K1);
 
-  ASSERT_ALWAYS(K0 <= K1);
-
-  best_lognorm = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
+  A = (double*) malloc ((K1 + 1 - K0) * sizeof(double));
+  for (k = K0; k <= K1; k++)
+    A[k - K0] = 0.0; /* A[k - K0] will store the value alpha(f + k*g) */
 
   k0 = 0; /* the coefficients f[] correspond to f+k*g */
 
-  /* search for the smallest alpha[k] */
+  for (p = 2; p <= alim; p += 1 + (p & 1))
+    if (isprime (p))
+      {
+        pp = p * p;
+        for (k = K0; (k < K0 + (long) p) && (k <= K1); k++)
+          {
+            /* translate from k0 to k */
+            mpz_add_si (f[1], f[1], (long) b * (k - k0));
+            mpz_submul_si (f[0], m, k - k0);
+            k0 = k;
+
+            /* compute contribution for k */
+            mpz_poly_eval_si (v, D, d, k);
+            e = special_valuation (f, d, p, v);
+            alpha = (1.0 / (double) (p - 1) - e) * log ((double) p);
+            A[k - K0] += alpha;
+
+            if (!mpz_divisible_ui_p (v, p))
+              {
+                /* then any k + t*p has the same contribution */
+                for (j = k + p; j <= K1; j += p)
+                  A[j - K0] += alpha;
+              }
+            else
+              {
+                /* consider classes mod p^2 */
+                for (j = k;;)
+                  {
+                    /* invariant: v = disc (f + j*g), and alpha is the
+                       contribution for j */
+                    A[j - K0] += alpha;
+                    if (!mpz_divisible_ui_p (v, pp) &&
+                        !mpz_divisible_ui_p (f[d], p))
+                      {
+                        /* then any j + t*p^2 has the same contribution */
+                        for (l = j + pp; l <= K1; l += pp)
+                          A[l - K0] += alpha;
+                      }
+                    else
+                      {
+                        for (l = j + pp; l <= K1; l += pp)
+                          {
+                            mpz_poly_eval_si (v, D, d, l);
+                            /* translate from k0 to l */
+                            mpz_add_si (f[1], f[1], (long) b * (l - k0));
+                            mpz_submul_si (f[0], m, l - k0);
+                            k0 = l;
+                            e = special_valuation (f, d, p, v);
+                            alpha = (1.0 / (double) (p - 1) - e) * log ((double) p);
+                            A[l - K0] += alpha;
+                          }
+                      }
+                    j += p;
+                    if (j >= k + (long) pp || j > K1)
+                      break;
+                    mpz_poly_eval_si (v, D, d, j);
+                    /* translate from k0 to j */
+                    mpz_add_si (f[1], f[1], (long) b * (j - k0));
+                    mpz_submul_si (f[0], m, j - k0);
+                    k0 = j;
+                    e = special_valuation (f, d, p, v);
+                  }
+              }
+          }
+      }
+
+  alpha0 = A[0 - K0];
+
+  /* now finds the best lognorm+alpha */
   for (k = K0; k <= K1; k++)
     {
-      /* we now have f + k0*(bx-m) and we want f + k*(bx-m), thus we have
-         to add (k-k0)*(bx-m) */
-      mpz_add_si (f[1], f[1], (long) b * (k - k0));
-      mpz_submul_si (f[0], m, k - k0);
-      k0 = k;
-      alpha = get_alpha (f, d, alim);
-      if (k == 0)
-        alpha0 = alpha;
+      alpha = A[k - K0];
       if (alpha < best_alpha)
         {
           /* check lognorm + alpha < best_lognorm + best_alpha */
+
+          /* translate from k0 to k */
+          mpz_add_si (f[1], f[1], (long) b * (k - k0));
+          mpz_submul_si (f[0], m, k - k0);
+          k0 = k;
           lognorm = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
           if (lognorm + alpha < best_lognorm + best_alpha)
             {
@@ -1337,7 +1496,12 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, unsigned long b,
     printf ("# Rotate by %ld: alpha improved from %f to %f\n", kmin,
             alpha0, best_alpha);
 
-  return best_alpha;
+  free (A);
+
+  clear_mpz_array (D, d + 1);
+  mpz_clear (v);
+
+  return best_lognorm + best_alpha;
 }
 
 /* Returns k such that f(x+k) has the smallest 1-norm, with the corresponding
@@ -1433,8 +1597,8 @@ translate (mpz_t *f, int d, mpz_t *g, mpz_t m, unsigned long b)
 void
 generate_poly (cado_poly out, double T, unsigned long b)
 {
-  unsigned long d = out->degree, alim;
-  double B, logmu, alpha, E, mB;
+  unsigned long d = out->degree;
+  double B, logmu, E, mB;
   double best_E = DBL_MAX;
   mpz_t best_m, k, t, r;
   /* value of T = B^eff[d] for d <= 7 */
@@ -1445,12 +1609,11 @@ generate_poly (cado_poly out, double T, unsigned long b)
   unsigned long Msize;  /* number of stored entries in M */
   unsigned long i;
   double st;
-
+  unsigned long Malloc2, Msize2;
+  
   ASSERT (T <= 9007199254740992.0); /* if T > 2^53, T-- will loop */
 
   mpz_init (best_m);
-
-  alim = (unsigned long) cbrt ((double) default_alim (out->n));
 
   given_m = mpz_cmp_ui (out->m, 0) != 0;
   if (given_m) /* use given value of m */
@@ -1459,7 +1622,7 @@ generate_poly (cado_poly out, double T, unsigned long b)
       goto end;
     }
   
-  Malloc = (unsigned long) pow (T, 0.28);
+  Malloc = (unsigned long) pow (T, 0.4);
   M = m_logmu_init (Malloc);
   mpz_init (k);
   mpz_init (t);
@@ -1508,13 +1671,19 @@ generate_poly (cado_poly out, double T, unsigned long b)
         }
       mpz_add_ui (out->m, out->m, 1);
     }
-  fprintf (stderr, "# First phase took %.2fs and kept %lu candidates\n",
-           (seconds () - st), Msize);
+  fprintf (stderr, "# First phase took %.2fs and kept %lu candidate(s)\n",
+           seconds () - st, Msize);
 
-  /* Second phase: loop over entries in M database, and try to find the best
-     rotation for each one. In principle we should compute the contribution
-     to alpha(F) for primes up to the algebraic factor base bound alim,
-     but since it is too expensive, we use the fixed bound ALPHA_BOUND. */
+  /* Second/third phases: loop over entries in M database, and try to find the
+     best rotation for each one. In principle we should compute the
+     contribution to alpha(F) for primes up to the algebraic factor base bound,
+     but since it is too expensive, we use a fixed bound.
+     To speed up things we first compute an approximation of alpha(F) by
+     considering small primes only, and keep only the best polynomials, for
+     which we compute an approximation of alpha(F) up to a larger prime bound.
+  */
+  Malloc2 = (unsigned long) sqrt ((double) Malloc);
+  Msize2 = 0;
   st = seconds ();
   for (i = 0; i < Msize; i++)
     {
@@ -1523,21 +1692,25 @@ generate_poly (cado_poly out, double T, unsigned long b)
          norm, and moreover it does not permute with the base-m generation,
          thus we would need to save M[i].m, and redo all steps in the same
          order below */
-      alpha = rotate (out->f, d, ALPHA_BOUND, out->m, b, 0);
-      /* compute skewness and norm */
-      out->skew = SKEWNESS (out->f, out->degree, SKEWNESS_DEFAULT_PREC);
-      logmu = LOGNORM (out->f, d, out->skew);
-      E = logmu + alpha;
+      E = rotate (out->f, d, ALPHA_BOUND_SMALL, out->m, b, 0);
+      Msize2 = m_logmu_insert (M, Malloc2, Msize2, out->m, E);
+    }
+  fprintf (stderr, "# Second phase took %.2fs and kept %lu candidate(s)\n",
+           seconds () - st, Msize2);
+
+  st = seconds ();
+  for (i = 0; i < Msize2; i++)
+    {
+      generate_base_mb (out, M[i].m, b);
+      E = rotate (out->f, d, ALPHA_BOUND, out->m, b, 0);
       if (E < best_E)
         {
           best_E = E;
-          gmp_fprintf (stderr, "# m=%Zd skew=%1.2f logmu=%1.2f alpha~%1.2f E=%1.2f\n",
-                       out->m, out->skew, logmu, alpha, E);
+          gmp_fprintf (stderr, "# m=%Zd E=%1.2f\n", out->m, E);
           mpz_set (best_m, out->m);
         }
     }
-  fprintf (stderr, "# Second phase took %.2fs for %lu candidates\n",
-           (seconds () - st), Msize);
+  fprintf (stderr, "# Third phase took %.2fs\n", seconds () - st);
 
   mpz_clear (k);
   mpz_clear (t);
@@ -1575,8 +1748,8 @@ print_poly (FILE *fp, cado_poly p, int argc, char *argv[], double st, int raw)
   fprintf (fp, "skew: %1.3f\n", p->skew);
   logmu = LOGNORM (p->f, p->degree, p->skew);
   alpha = get_alpha (p->f, p->degree, ALPHA_BOUND);
-  fprintf (fp, "# logmu: %1.2f, alpha: %1.2f logmu+alpha=%1.2f\n", logmu,
-	   alpha, logmu + alpha);
+  fprintf (fp, "# lognorm: %1.2f, alpha: %1.2f E=%1.2f\n", logmu, alpha,
+           logmu + alpha);
   for (i = p->degree; i >= 0; i--)
     {
       fprintf (fp, "c%d: ", i);
