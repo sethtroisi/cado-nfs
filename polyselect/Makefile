@@ -15,7 +15,7 @@ kleinjung: kleinjung.o
 	$(CC) $(MY_LFLAGS) $^ -o $@ -lutils -lgmp -lm
 
 # Some more dependencies
-polyselect.o: polyselect.c $(TOP)/cado.h
+polyselect.o: polyselect.c aux.c $(TOP)/cado.h
 
 kleinjung.o: kleinjung.c $(TOP)/cado.h
 
