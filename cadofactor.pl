@@ -74,49 +74,48 @@ sub splitpath {
 sub read_param {
     my @args = @_;
     my $param = $default_param;
-    while (scalar @args) {
-        $_ = $args[0];
-        if (/^parallel=(.*)$/) { $param->{parallel}=$1; shift @args; next; }
-        if (/^degree=(.*)$/)   { $param->{degree}=$1; shift @args; next; }
-        if (/^bmin=(.*)$/)     { $param->{bmin}=$1; shift @args; next; }
-        if (/^bmax=(.*)$/)     { $param->{bmax}=$1; shift @args; next; }
-        if (/^e=(.*)$/)        { $param->{e}=$1; shift @args; next; }
-        if (/^rlim=(.*)$/)     { $param->{rlim}=$1; shift @args; next; }
-        if (/^alim=(.*)$/)     { $param->{alim}=$1; shift @args; next; }
-        if (/^lpbr=(.*)$/)     { $param->{lpbr}=$1; shift @args; next; }
-        if (/^lpba=(.*)$/)     { $param->{lpba}=$1; shift @args; next; }
-        if (/^mfbr=(.*)$/)     { $param->{mfbr}=$1; shift @args; next; }
-        if (/^mfba=(.*)$/)     { $param->{mfba}=$1; shift @args; next; }
-        if (/^rlambda=(.*)$/)  { $param->{rlambda}=$1; shift @args; next; }
-        if (/^alambda=(.*)$/)  { $param->{alambda}=$1; shift @args; next; }
-        if (/^I=(.*)$/)        { $param->{I}=$1; shift @args; next; }
-        if (/^excess=(.*)$/)   { $param->{excess}=$1; shift @args; next; }
-        if (/^qmin=(.*)$/)     { $param->{qmin}=$1; shift @args; next; }
-        if (/^qrange=(.*)$/)   { $param->{qrange}=$1; shift @args; next; }
-        if (/^checkrange=(.*)$/){ $param->{checkrange}=$1; shift @args; next; }
-        if (/^keeprelfiles=(.*)$/){ $param->{keeprelfiles}=$1; shift @args; next; }
-        if (/^delay=(.*)$/)    { $param->{delay}=$1; shift @args; next; }
-        if (/^sievenice=(.*)$/){ $param->{sievenice}=$1; shift @args; next; }
-        if (/^selectnice=(.*)$/){ $param->{selectnice}=$1; shift @args; next; }
-        if (/^prune=(.*)$/)    { $param->{prune}=$1; shift @args; next; }
-        if (/^keep=(.*)$/)     { $param->{keep}=$1; shift @args; next; }
-        if (/^keeppurge=(.*)$/){ $param->{keeppurge}=$1; shift @args; next; }
-        if (/^maxlevel=(.*)$/) { $param->{maxlevel}=$1; shift @args; next; }
-        if (/^cwmax=(.*)$/)    { $param->{cwmax}=$1; shift @args; next; }
-        if (/^rwmax=(.*)$/)    { $param->{rwmax}=$1; shift @args; next; }
-        if (/^ratio=(.*)$/)    { $param->{ratio}=$1; shift @args; next; }
-        if (/^bwstrat=(.*)$/)  { $param->{bwstrat}=$1; shift @args; next; }
-        if (/^bwmt=(.*)$/)     { $param->{bwmt}=$1; shift @args; next; }
-        if (/^linalg=(.*)$/)   { $param->{linalg}=$1; shift @args; next; }
-        if (/^nkermax=(.*)$/)  { $param->{nkermax}=$1; shift @args; next; }
-        if (/^nchar=(.*)$/)    { $param->{nchar}=$1; shift @args; next; }
-        if (/^wdir=(.*)$/)     { $param->{wdir}=$1; shift @args; next; }
-        if (/^name=(.*)$/)     { $param->{name}=$1; shift @args; next; }
-        if (/^cadodir=(.*)$/)  { $param->{cadodir}=$1; shift @args; next; }
-        if (/^machines=(.*)$/) { $param->{machines}=$1; shift @args; next; }
-        if (/^n=(.*)$/) { $param->{n}=$1; shift @args; next; }
-        if (/^param=(.*)$/) { 
-            my $file = $1; shift @args;
+    while (defined($_=shift @args)) {
+        if (/^parallel=(.*)$/) { $param->{'parallel'}=$1; next; }
+        if (/^degree=(.*)$/)   { $param->{'degree'}=$1; next; }
+        if (/^bmin=(.*)$/)     { $param->{'bmin'}=$1; next; }
+        if (/^bmax=(.*)$/)     { $param->{'bmax'}=$1; next; }
+        if (/^e=(.*)$/)        { $param->{'e'}=$1; next; }
+        if (/^rlim=(.*)$/)     { $param->{'rlim'}=$1; next; }
+        if (/^alim=(.*)$/)     { $param->{'alim'}=$1; next; }
+        if (/^lpbr=(.*)$/)     { $param->{'lpbr'}=$1; next; }
+        if (/^lpba=(.*)$/)     { $param->{'lpba'}=$1; next; }
+        if (/^mfbr=(.*)$/)     { $param->{'mfbr'}=$1; next; }
+        if (/^mfba=(.*)$/)     { $param->{'mfba'}=$1; next; }
+        if (/^rlambda=(.*)$/)  { $param->{'rlambda'}=$1; next; }
+        if (/^alambda=(.*)$/)  { $param->{'alambda'}=$1; next; }
+        if (/^I=(.*)$/)        { $param->{'I'}=$1; next; }
+        if (/^excess=(.*)$/)   { $param->{'excess'}=$1; next; }
+        if (/^qmin=(.*)$/)     { $param->{'qmin'}=$1; next; }
+        if (/^qrange=(.*)$/)   { $param->{'qrange'}=$1; next; }
+        if (/^checkrange=(.*)$/){ $param->{'checkrange'}=$1; next; }
+        if (/^keeprelfiles=(.*)$/){ $param->{'keeprelfiles'}=$1; next; }
+        if (/^delay=(.*)$/)    { $param->{'delay'}=$1; next; }
+        if (/^sievenice=(.*)$/){ $param->{'sievenice'}=$1; next; }
+        if (/^selectnice=(.*)$/){ $param->{'selectnice'}=$1; next; }
+        if (/^prune=(.*)$/)    { $param->{'prune'}=$1; next; }
+        if (/^keep=(.*)$/)     { $param->{'keep'}=$1; next; }
+        if (/^keeppurge=(.*)$/){ $param->{'keeppurge'}=$1; next; }
+        if (/^maxlevel=(.*)$/) { $param->{'maxlevel'}=$1; next; }
+        if (/^cwmax=(.*)$/)    { $param->{'cwmax'}=$1; next; }
+        if (/^rwmax=(.*)$/)    { $param->{'rwmax'}=$1; next; }
+        if (/^ratio=(.*)$/)    { $param->{'ratio'}=$1; next; }
+        if (/^bwstrat=(.*)$/)  { $param->{'bwstrat'}=$1; next; }
+        if (/^bwmt=(.*)$/)     { $param->{'bwmt'}=$1; next; }
+        if (/^linalg=(.*)$/)   { $param->{'linalg'}=$1; next; }
+        if (/^nkermax=(.*)$/)  { $param->{'nkermax'}=$1; next; }
+        if (/^nchar=(.*)$/)    { $param->{'nchar'}=$1; next; }
+        if (/^wdir=(.*)$/)     { $param->{'wdir'}=$1; next; }
+        if (/^name=(.*)$/)     { $param->{'name'}=$1; next; }
+        if (/^cadodir=(.*)$/)  { $param->{'cadodir'}=$1; next; }
+        if (/^machines=(.*)$/) { $param->{'machines'}=$1; next; }
+        if (/^n=(.*)$/)        { $param->{'n'}=$1; next; }
+        if (/^params?=(.*)$/) {
+            my $file = $1;
             open FILE, "<$file" or die "$file: $!\n";
             my @newargs;
             my $line;
@@ -124,26 +123,27 @@ sub read_param {
                 $line = $_;
                 if (/^\s*#/) { next; }
                 if (/^\s*$/) { next; }
-                if (/^\s*(\w*)=([a-zA-Z0-9_+\.\/\$]*)\s*(#|$)/) {
+                if (/^\s*(\w+)=([\w\.\/\$]*)\s*(?:#.*)?$/) {
                     push @newargs, "$1=$2";
                     next;
                 }
                 die "Could not parse line: $_ in file $file\n";
             }
             close FILE;
-            @args = (@newargs, @args);
+            unshift @args, @newargs;
             next;
         }
+        if (-f $_) { unshift @args, "param=$_"; next; }
         die "Unknwon argument: $_\n";
     }
     # checking mandatory parameters:
-    if (!$param->{wdir}) { die "I need a wdir argument!\n"; }
-    if (!$param->{name}) { die "I need a name argument!\n"; }
-    if (!$param->{machines} && $param->{parallel} eq "true") {
+    if (!$param->{'wdir'}) { die "I need a wdir argument!\n"; }
+    if (!$param->{'name'}) { die "I need a name argument!\n"; }
+    if (!$param->{'machines'} && $param->{'parallel'} eq "true") {
         die "With parallel, I need a machines argument!\n"; }
-    if (!$param->{cadodir}) {
+    if (!$param->{'cadodir'}) {
         print STDERR "Warning: taking current script's basedir as cadodir\n";
-        ($param->{cadodir}) =  splitpath($0);
+        ($param->{'cadodir'}) =  splitpath($0);
     }
     return $param;
 }
@@ -197,7 +197,7 @@ sub my_system_timeout {
     my ($cmd, $timeout) = @_;
     my $ret = "";
     eval {
-        local $SIG{ALRM} = sub { die "alarm\n" }; # NB: \n required
+        local $SIG{'ALRM'} = sub { die "alarm\n" }; # NB: \n required
         alarm $timeout;
         $ret = `$cmd`;
         alarm 0;
@@ -234,7 +234,7 @@ sub cmp_filedate {
 # any line that starts with # is ignored
 sub read_select_status_file {
     my $param = shift @_;
-    my $prefix = $param->{wdir} . "/" . $param->{name};
+    my $prefix = $param->{'wdir'} . "/" . $param->{'name'};
     my $statfile = "$prefix.selectstatus";
     if (! -f $statfile) {
         print "No status file found. Creating an empty one...\n";
@@ -260,7 +260,7 @@ sub read_select_status_file {
 sub write_select_status_file {
     my $param = shift @_;
     my $status = shift @_;
-    my $prefix = $param->{wdir} . "/" . $param->{name};
+    my $prefix = $param->{'wdir'} . "/" . $param->{'name'};
     my $statfile = "$prefix.selectstatus";
     open GRR, ">$statfile" or die "$statfile: $!\n";
     foreach my $t (@$status) {
@@ -278,13 +278,13 @@ sub write_select_status_file {
 # -1 means (probably dead)
 sub check_running_select_task {
     my $param = shift @_;
-    my $name = $param->{name};
+    my $name = $param->{'name'};
     my $mach_desc = shift @_;
     my ($host, $b) = @_;
     print "    $host \t$b:\n";
     my %host_data=%{$mach_desc->{$host}};
-    my $wdir = $host_data{tmpdir};
-    my $cadodir = $host_data{cadodir};
+    my $wdir = $host_data{'tmpdir'};
+    my $cadodir = $host_data{'cadodir'};
     # First check if the last line corresponds to finished job:
     my ($t, $lastline) = my_system_timeout(
         "ssh $host tail -1 $wdir/$name.poly.$b", 30);
@@ -323,8 +323,8 @@ sub check_running_select_task {
 
 sub push_select_files {
     my ($mach, $wdir, $param) = @_;
-    my $name = $param->{name};
-    my $ldir = $param->{wdir};
+    my $name = $param->{'name'};
+    my $ldir = $param->{'wdir'};
     my $t;
     my $ret;
     ($t, $ret) = my_system_timeout("ssh $mach mkdir -p $wdir", 60);
@@ -342,12 +342,12 @@ sub restart_select_tasks {
     my $param = shift @_;
     my $running = shift @_;
     my $mach_desc = shift @_;
-    my $name = $param->{name};
-    my $nice = $param->{selectnice};
+    my $name = $param->{'name'};
+    my $nice = $param->{'selectnice'};
 
     my %doneb;
-    my $prefix = $param->{wdir} . "/" . $param->{name};
-    my $wdir = $param->{wdir};
+    my $prefix = $param->{'wdir'} . "/" . $param->{'name'};
+    my $wdir = $param->{'wdir'};
     opendir(DIR, $wdir) or die "can't opendir $wdir: $!";
     my @files = readdir(DIR);
     close DIR;
@@ -361,7 +361,7 @@ sub restart_select_tasks {
     }
 
     my @setb;
-    for ($b = $param->{bmin}; $b <= $param->{bmax}; $b++) {
+    for ($b = $param->{'bmin'}; $b <= $param->{'bmax'}; $b++) {
         if (! $doneb{$b}) {
             push @setb, $b;
         }
@@ -378,28 +378,28 @@ sub restart_select_tasks {
         for $t (@$running) {
             if (${$t}[0] eq $m) { $cpt++; }
         }
-        if ($cpt >= $desc{cores}) {
+        if ($cpt >= $desc{'cores'}) {
             # already enough tasks running on $m
             next;
         }
         # Number of new tasks to run is:
-        $cpt = $desc{cores} - $cpt;
+        $cpt = $desc{'cores'} - $cpt;
         for (my $i = 0; $i < $cpt; $i++) {
             if (! scalar @setb) { last; }
             $b = shift @setb;
             $t = [$m, $b ];
             my $mach = $m;
-            my $wdir = $desc{tmpdir};
-            my $bindir = $desc{cadodir};
+            my $wdir = $desc{'tmpdir'};
+            my $bindir = $desc{'cadodir'};
             push_select_files($mach, $wdir, $param);
             my $cmd = "/bin/nice -$nice $bindir/polyselect/polyselect" .
               " -b $b" .
-              " -e " . $param->{e} .
-              " -degree " . $param->{degree} .
+              " -e " . $param->{'e'} .
+              " -degree " . $param->{'degree'} .
               " < $wdir/$name.n";
             my $ret = `ssh $mach "$cmd >& $wdir/$name.poly.$b&"`;
             print "    Starting $mach $b.\n";
-            open FH, ">> " . $param->{wdir} . "/$name.cmd";
+            open FH, ">> " . $param->{'wdir'} . "/$name.cmd";
             print FH "ssh $mach \"$cmd >& $wdir/$name.poly.$b&\"\n";
             close FH;
             push @$running, $t;
@@ -429,12 +429,12 @@ sub get_logmualpha_value {
 # return the logmu+alpha value.
 sub import_select_task_result {
     my $param = shift @_;
-    my $name = $param->{name};
+    my $name = $param->{'name'};
     my $mach_desc = shift @_;
     my ($host, $b) = @_;
     my %host_data=%{$mach_desc->{$host}};
-    my $rwdir = $host_data{tmpdir};
-    my $lwdir = $param->{wdir};
+    my $rwdir = $host_data{'tmpdir'};
+    my $lwdir = $param->{'wdir'};
     my $cmd = "rsync --timeout=30 $host:$rwdir/$name.poly.$b $lwdir/";
     my $ret = system($cmd);
     if ($ret != 0) {
@@ -448,12 +448,12 @@ sub import_select_task_result {
 
 sub parallel_polyselect {
     my $param = shift @_;
-    my $prefix = $param->{wdir} . "/" . $param->{name};
+    my $prefix = $param->{'wdir'} . "/" . $param->{'name'};
     my $b;
     my $t;
     my $bestb=0;
-    my $effort=$param->{e};
-    my $degree=$param->{degree};
+    my $effort=$param->{'e'};
+    my $degree=$param->{'degree'};
     my $finished = 0;
     while (! $finished) {
         my %mach_desc = read_machine_description($param);
@@ -474,14 +474,14 @@ sub parallel_polyselect {
         $finished = restart_select_tasks($param, \@newstatus, \%mach_desc);
         write_select_status_file($param, \@newstatus);
         if (!$finished) {
-            my $delay = $param->{delay};
+            my $delay = $param->{'delay'};
             print "Wait for $delay seconds before checking again.\n";
             sleep($delay);
         }
     }
     # Choose best according to logmu+alpha
     my $Emin;
-    for ($b = $param->{bmin}; $b <= $param->{bmax}; $b++) { 
+    for ($b = $param->{'bmin'}; $b <= $param->{'bmax'}; $b++) { 
         if (! -f "$prefix.poly.$b") {
             die "Hey! Where is $prefix.poly.$b ????\n";
         }
@@ -504,18 +504,18 @@ sub parallel_polyselect {
 
 sub polyselect {
     my $param = shift @_;
-    my $prefix = $param->{wdir} . "/" . $param->{name};
+    my $prefix = $param->{'wdir'} . "/" . $param->{'name'};
     my $b;
     my $bestb=0;
     my $Emin;
-    for ($b = $param->{bmin}; $b <= $param->{bmax}; $b++) {
+    for ($b = $param->{'bmin'}; $b <= $param->{'bmax'}; $b++) {
         print "Running polynomial selection with b=$b...\n";
-        my $effort=$param->{e};
-        my $degree=$param->{degree};
+        my $effort=$param->{'e'};
+        my $degree=$param->{'degree'};
         if (-f "$prefix.poly.$b") {
             print "Result file is already there. Skip the computation!\n";
         } else {
-            my $cmd = $param->{cadodir}."/polyselect/polyselect " .
+            my $cmd = $param->{'cadodir'}."/polyselect/polyselect " .
               "-b $b -e $effort -degree $degree < $prefix.n";
             my_system($cmd . "> $prefix.poly.$b", "$prefix.cmd");  
         }
@@ -543,11 +543,11 @@ sub polyselect {
 sub try_singleton {
     my $param = shift @_;
     my $nrels = shift @_;
-    my $prefix = $param->{wdir} . "/" . $param->{name};
+    my $prefix = $param->{'wdir'} . "/" . $param->{'name'};
 
     # Remove duplicates
     print "Removing duplicates...\n";
-    my $cmd = $param->{cadodir} .
+    my $cmd = $param->{'cadodir'} .
       "/linalg/duplicates -nrels $nrels $prefix.rels.* > $prefix.nodup 2> $prefix.duplicates.stderr";
     my_system($cmd, "$prefix.cmd");
     my @grouik = split(/ /, `tail -1 $prefix.duplicates.stderr`);
@@ -557,8 +557,8 @@ sub try_singleton {
 
     # Singleton removal
     print "Singleton removal...\n";
-    my $keep = $param->{keeppurge};
-    $cmd = $param->{cadodir} .
+    my $keep = $param->{'keeppurge'};
+    $cmd = $param->{'cadodir'} .
       "/linalg/purge -poly $prefix.poly -keep $keep -nrels $nrels_dup $prefix.nodup > $prefix.purged 2> $prefix.purge.stderr";
     my_system($cmd, "$prefix.cmd", "no_kill");
     if (-z "$prefix.purged") {
@@ -571,7 +571,7 @@ sub try_singleton {
         close FH;
         print "Nrows = $nrows , Ncols = $ncols";
         print "Excess = " . ($nrows - $ncols) . "\n";
-        if ($nrows - $ncols <= $param->{excess}) {
+        if ($nrows - $ncols <= $param->{'excess'}) {
             print "Not enough relations!\n";
             return 0;
         }
@@ -586,7 +586,7 @@ sub try_singleton {
 # any line that starts with # is ignored
 sub read_status_file {
     my $param = shift @_;
-    my $prefix = $param->{wdir} . "/" . $param->{name};
+    my $prefix = $param->{'wdir'} . "/" . $param->{'name'};
     my $statfile = "$prefix.status";
     if (! -f $statfile) {
         print "No status file found. Creating an empty one...\n";
@@ -612,7 +612,7 @@ sub read_status_file {
 sub write_status_file {
     my $param = shift @_;
     my $status = shift @_;
-    my $prefix = $param->{wdir} . "/" . $param->{name};
+    my $prefix = $param->{'wdir'} . "/" . $param->{'name'};
     my $statfile = "$prefix.status";
     open GRR, ">$statfile" or die "$statfile: $!\n";
     foreach my $t (@$status) {
@@ -628,13 +628,13 @@ sub write_status_file {
 # dead or finished.
 sub check_running_task {
     my $param = shift @_;
-    my $name = $param->{name};
+    my $name = $param->{'name'};
     my $mach_desc = shift @_;
     my ($host, $q0, $q1) = @_;
     print "    $host \t$q0-$q1:\n";
     my %host_data=%{$mach_desc->{$host}};
-    my $wdir = $host_data{tmpdir};
-    my $cadodir = $host_data{cadodir};
+    my $wdir = $host_data{'tmpdir'};
+    my $cadodir = $host_data{'cadodir'};
     # First check if the last line corresponds to finished job:
     my ($t, $lastline) = my_system_timeout(
         "ssh $host tail -1 $wdir/$name.rels.$q0-$q1", 30);
@@ -677,19 +677,19 @@ sub check_running_task {
 # Return the number of relations in the imported file.
 sub import_task_result {
     my $param = shift @_;
-    my $name = $param->{name};
+    my $name = $param->{'name'};
     my $mach_desc = shift @_;
     my ($host, $q0, $q1) = @_;
     my %host_data=%{$mach_desc->{$host}};
-    my $rwdir = $host_data{tmpdir};
-    my $lwdir = $param->{wdir};
+    my $rwdir = $host_data{'tmpdir'};
+    my $lwdir = $param->{'wdir'};
     my $cmd = "rsync --timeout=30 $host:$rwdir/$name.rels.$q0-$q1 $lwdir/";
     my $ret = system($cmd);
     if ($ret != 0) {
         print STDERR "Problem when importing file $name.rels.$q0-$q1 from $host.\n";
         return 0;
     }
-    $cmd = $param->{cadodir} . "/utils/check_rels -poly $lwdir/$name.poly $lwdir/$name.rels.$q0-$q1";
+    $cmd = $param->{'cadodir'} . "/utils/check_rels -poly $lwdir/$name.poly $lwdir/$name.rels.$q0-$q1";
     $ret = system($cmd);
     if ($ret != 0) {
         print STDERR "Buggy relation in file $name.rels.$q0-$q1 from $host.\n";
@@ -701,7 +701,7 @@ sub import_task_result {
         return 0;
     }
     # Import succeeded, so we can remove the remote file.
-    if ($param->{keeprelfiles} eq 'false') {
+    if ($param->{'keeprelfiles'} eq 'false') {
         my_system_timeout("ssh $host rm $rwdir/$name.rels.$q0-$q1", 30);
     }
 
@@ -710,7 +710,7 @@ sub import_task_result {
 
 sub read_machine_description {
     my $param = shift @_;
-    my $machine_file = $param->{machines};
+    my $machine_file = $param->{'machines'};
     my %mach_desc;
     my %vars = ();
     open MACH, "< $machine_file";
@@ -738,9 +738,9 @@ sub read_machine_description {
             }
             die "$opts" if $opts;
             # Check mandatory args and complete with defaults.
-            if (! $h{tmpdir}) { die "No tmpdir given for machine $m\n"; }
-            if (! $h{cadodir}) { die "No cadodir given for machine $m\n"; }
-            if (! $h{cores}) { $h{cores}=1; }
+            if (! $h{'tmpdir'}) { die "No tmpdir given for machine $m\n"; }
+            if (! $h{'cadodir'}) { die "No cadodir given for machine $m\n"; }
+            if (! $h{'cores'}) { $h{'cores'}=1; }
             $mach_desc{$m}=\%h;
             next;
         }
@@ -757,8 +757,8 @@ sub read_machine_description {
 # directory. Otherwise push them.
 sub push_files {
     my ($mach, $wdir, $param) = @_;
-    my $name = $param->{name};
-    my $ldir = $param->{wdir};
+    my $name = $param->{'name'};
+    my $ldir = $param->{'wdir'};
     my $t;
     my $ret;
     ($t, $ret) = my_system_timeout("ssh $mach mkdir -p $wdir", 60);
@@ -786,8 +786,8 @@ sub push_files {
 sub get_next_q {
     my ($param, $running) = @_;
     my $maxq = 0;
-    my $wdir = $param->{wdir};
-    my $name = $param->{name};
+    my $wdir = $param->{'wdir'};
+    my $name = $param->{'name'};
     opendir(DIR, $wdir) or die "can't opendir $wdir: $!";
     my @files = readdir(DIR);
     close DIR;
@@ -803,8 +803,8 @@ sub get_next_q {
             $maxq = ${$t}[2];
         }
     }
-    if ($maxq < $param->{qmin}) {
-        $maxq = $param->{qmin};
+    if ($maxq < $param->{'qmin'}) {
+        $maxq = $param->{'qmin'};
     }
     return $maxq;
 }
@@ -813,8 +813,8 @@ sub restart_tasks {
     my $param = shift @_;
     my $running = shift @_;
     my $mach_desc = shift @_;
-    my $name = $param->{name};
-    my $nice = $param->{sievenice};
+    my $name = $param->{'name'};
+    my $nice = $param->{'sievenice'};
 
     my $q_curr = get_next_q($param, $running);
 
@@ -825,27 +825,27 @@ sub restart_tasks {
         for $t (@$running) {
             if (${$t}[0] eq $m) { $cpt++; }
         }
-        if ($cpt >= $desc{cores}) {
+        if ($cpt >= $desc{'cores'}) {
             # already enough tasks running on $m
             next;
         }
         # Number of new tasks to run is:
-        $cpt = $desc{cores} - $cpt;
+        $cpt = $desc{'cores'} - $cpt;
         for (my $i = 0; $i < $cpt; $i++) {
-            my $qend = $q_curr + $param->{qrange};
+            my $qend = $q_curr + $param->{'qrange'};
             $t = [$m, $q_curr, $qend ];
             my $mach = $m;
-            my $wdir = $desc{tmpdir};
-            my $bindir = $desc{cadodir};
+            my $wdir = $desc{'tmpdir'};
+            my $bindir = $desc{'cadodir'};
             push_files($mach, $wdir, $param);
             my $cmd = "/bin/nice -$nice $bindir/sieve/las -checknorms" .
-              " -I " . $param->{I} .
+              " -I " . $param->{'I'} .
               " -poly $wdir/$name.poly" .
               " -fb $wdir/$name.roots" .
               " -q0 $q_curr -q1 $qend";
             my $ret = `ssh $mach "$cmd >& $wdir/$name.rels.$q_curr-$qend&"`;
             print "    Starting $mach $q_curr-$qend.\n";
-            open FH, ">> " . $param->{wdir} . "/$name.cmd";
+            open FH, ">> " . $param->{'wdir'} . "/$name.cmd";
             print FH "ssh $mach \"$cmd >& $wdir/$name.rels.$q_curr-$qend&\"\n";
             close FH;
             push @$running, $t;
@@ -859,7 +859,7 @@ sub restart_tasks {
 # returns whether some new completed file has been imported.
 sub parallel_sieve_update {
     my $param = shift @_;
-    my $prefix = $param->{wdir} . "/" . $param->{name};
+    my $prefix = $param->{'wdir'} . "/" . $param->{'name'};
     print "  Reading machine description file.\n";
     my %mach_desc = read_machine_description($param);
     print "  Reading status file.\n";
@@ -891,8 +891,8 @@ sub parallel_sieve_update {
 
 sub count_rels {
     my $param = shift @_;
-    my $name = $param->{name};
-    my $wdir = $param->{wdir};
+    my $name = $param->{'name'};
+    my $wdir = $param->{'wdir'};
     my $nrels = 0;
     opendir(DIR, $wdir) or return 0;
     my @files = readdir(DIR);
@@ -919,14 +919,14 @@ sub parallel_sieve {
         if ($new_rels) {
             $nrels += $new_rels;
             print "We have now $nrels relations\n";
-            if ($nrels-$prev_check > $param->{checkrange}) {
+            if ($nrels-$prev_check > $param->{'checkrange'}) {
                 print "Trying singleton removal...\n";
                 $finished = try_singleton($param, $nrels);
                 $prev_check = $nrels;
             }
         }
         if (! $finished) { 
-            my $delay = $param->{delay};
+            my $delay = $param->{'delay'};
             print "Number of relations is $nrels.\n";
             print "Wait for $delay seconds before checking again.\n";
             sleep($delay);
@@ -937,22 +937,22 @@ sub parallel_sieve {
 
 sub sieve {
     my $param = shift @_;
-    my $prefix = $param->{wdir} . "/" . $param->{name};
+    my $prefix = $param->{'wdir'} . "/" . $param->{'name'};
     my $finished=0;
-    my $qcurr = $param->{qmin};
+    my $qcurr = $param->{'qmin'};
     my $nrels = 0;
     # taking (pi(2^lpba) + pi(2^lpbr)) / 3   as limit
-    my $wantedrels = exp($param->{lpba}*log(2)) / ($param->{lpba}*log(2))
-      + exp($param->{lpbr}*log(2)) / ($param->{lpbr}*log(2));
+    my $wantedrels = exp($param->{'lpba'}*log(2)) / ($param->{'lpba'}*log(2))
+      + exp($param->{'lpbr'}*log(2)) / ($param->{'lpbr'}*log(2));
     $wantedrels = ceil($wantedrels/3);
 
     print "Sieving for $wantedrels relations\n";
     while (!$finished) {
-        my $qend = $qcurr+$param->{qrange};
+        my $qend = $qcurr+$param->{'qrange'};
         my $filename = "$prefix.rels.$qcurr-$qend";
         if (! -f $filename) {
-            my $cmd = $param->{cadodir} . "/sieve/las -checknorms" .
-              " -I " . $param->{I} .
+            my $cmd = $param->{'cadodir'} . "/sieve/las -checknorms" .
+              " -I " . $param->{'I'} .
               " -poly $prefix.poly" .
               " -fb $prefix.roots" .
               " -q0 $qcurr -q1 $qend";
@@ -983,37 +983,37 @@ MAIN: {
     my $param = read_param(@ARGV);
 
     # Create working directory if not there
-    if (!-d $param->{wdir}) {
-        my $wdir = $param->{wdir};
+    if (!-d $param->{'wdir'}) {
+        my $wdir = $param->{'wdir'};
         mkdir $wdir or die "Cannot create $wdir: $!\n";
     }
     
     # Check if there is already some stuff relative to $name in $wdir
     # First thing is $name.n. If it is not there, we consider that
     # everything is obsolete, anyway.
-    if (-f $param->{wdir} . "/" . $param->{name} . ".n") {
+    if (-f $param->{'wdir'} . "/" . $param->{'name'} . ".n") {
         print STDERR "Warning: there is already some data relative to " .
         "this name in this directory.\n";
     }
 
     # Read n if not given on command line
-    if (!$param->{n}) {
+    if (!$param->{'n'}) {
         print "'n' is not given in parameters, please enter the number to factor:\n";
-        $param->{n} = <STDIN>;
-        chomp ($param->{n});
+        $param->{'n'} = <STDIN>;
+        chomp ($param->{'n'});
     }
 
     # Create $name.n and $name.param in wdir.
-    my $prefix = $param->{wdir} . "/" . $param->{name};
+    my $prefix = $param->{'wdir'} . "/" . $param->{'name'};
     open FN, ">$prefix.n";
-    print FN "n:" . $param->{n} . "\n";
+    print FN "n:" . $param->{'n'} . "\n";
     close FN;
     my $fh;
     open $fh, ">$prefix.param";
     print_param($param,$fh);
 
     # Polynomial selection
-    if ($param->{parallel} eq 'true') {
+    if ($param->{'parallel'} eq 'true') {
         parallel_polyselect($param);
     } else {
         polyselect($param);
@@ -1021,14 +1021,14 @@ MAIN: {
 
     # Appending some parameters to the poly file
     open FILE, ">> $prefix.poly";
-    print FILE "rlim: " . $param->{rlim}. "\n";
-    print FILE "alim: " . $param->{alim}. "\n";
-    print FILE "lpbr: " . $param->{lpbr}. "\n";
-    print FILE "lpba: " . $param->{lpba}. "\n";
-    print FILE "mfbr: " . $param->{mfbr}. "\n";
-    print FILE "mfba: " . $param->{mfba}. "\n";
-    print FILE "rlambda: " . $param->{rlambda}. "\n";
-    print FILE "alambda: " . $param->{alambda}. "\n";
+    print FILE "rlim: " . $param->{'rlim'}. "\n";
+    print FILE "alim: " . $param->{'alim'}. "\n";
+    print FILE "lpbr: " . $param->{'lpbr'}. "\n";
+    print FILE "lpba: " . $param->{'lpba'}. "\n";
+    print FILE "mfbr: " . $param->{'mfbr'}. "\n";
+    print FILE "mfba: " . $param->{'mfba'}. "\n";
+    print FILE "rlambda: " . $param->{'rlambda'}. "\n";
+    print FILE "alambda: " . $param->{'alambda'}. "\n";
 
     my $cmd;
     # Creating the factor base
@@ -1037,21 +1037,21 @@ MAIN: {
             print "A Factor base file exists... Let's trust it!\n";
     } else {
         print "Creating the factor base...\n";
-        $cmd = "" . $param->{cadodir} .
+        $cmd = "" . $param->{'cadodir'} .
           "/sieve/makefb -poly $prefix.poly > $prefix.roots";
         my_system($cmd, "$prefix.cmd");
     }
 
     # Computing free relations
     print "Computing free relations...\n";
-    $cmd = "" . $param->{cadodir} .
+    $cmd = "" . $param->{'cadodir'} .
       "/linalg/freerel -poly $prefix.poly -fb $prefix.roots > $prefix.freerels";
     my_system($cmd, "$prefix.cmd");
 
     # Sieving, removing duplicates, singleton removal
     # This is the same command, since we continue sieving until it works.
     my $nrels;
-    if ($param->{parallel} eq 'true') {
+    if ($param->{'parallel'} eq 'true') {
         $nrels = parallel_sieve($param);
     } else {
         $nrels = sieve($param);
@@ -1059,56 +1059,56 @@ MAIN: {
 
     # Merge
     print "Merging...\n";
-    $cmd = $param->{cadodir} . "/linalg/merge".
+    $cmd = $param->{'cadodir'} . "/linalg/merge".
       " -mat $prefix.purged" .
-      " -forbw " . $param->{bwstrat} .
-      " -prune " . $param->{prune} .
-      " -keep "  . $param->{keep} .
-      " -maxlevel " . $param->{maxlevel} .
-      " -cwmax " . $param->{cwmax} .
-      " -rwmax " . $param->{rwmax} .
-      " -ratio " . $param->{ratio};
+      " -forbw " . $param->{'bwstrat'} .
+      " -prune " . $param->{'prune'} .
+      " -keep "  . $param->{'keep'} .
+      " -maxlevel " . $param->{'maxlevel'} .
+      " -cwmax " . $param->{'cwmax'} .
+      " -rwmax " . $param->{'rwmax'} .
+      " -ratio " . $param->{'ratio'};
       my_system($cmd . "> $prefix.merge.his 2> $prefix.merge.stderr",
         "$prefix.cmd");
     my $bwcostmin=`tail $prefix.merge.his | grep "BWCOSTMIN:" | awk '{print \$NF}'`;
     chomp $bwcostmin;
     print "Bwcostmin = $bwcostmin\n";
-    $cmd = $param->{cadodir} . "/linalg/replay" .
+    $cmd = $param->{'cadodir'} . "/linalg/replay" .
       " $prefix.purged $prefix.merge.his" .
       " $prefix.small $prefix.index $bwcostmin";
     my_system($cmd . " 2> $prefix.replay.stderr", "$prefix.cmd");
 
     # Linear algebra
     print "Transposing...\n";
-    $cmd = $param->{cadodir} . "/linalg/transpose" .
-      " -T " . $param->{wdir} .
+    $cmd = $param->{'cadodir'} . "/linalg/transpose" .
+      " -T " . $param->{'wdir'} .
       " -in $prefix.small -out $prefix.small.tr";
     my_system($cmd, "$prefix.cmd");
-    if ($param->{linalg} eq 'bw') { 
+    if ($param->{'linalg'} eq 'bw') { 
         print "Calling Block-Wiedemann...\n";
-        $cmd = $param->{cadodir} . "/linalg/bw/bw.pl" .
-        " mt=" . $param->{bwmt} .
+        $cmd = $param->{'cadodir'} . "/linalg/bw/bw.pl" .
+        " mt=" . $param->{'bwmt'} .
         " matrix=$prefix.small.tr" .
         " mn=64" .
         " vectoring=64" .
         " multisols=1" .
-        " wdir=" . $param->{wdir} . "/bw" .
+        " wdir=" . $param->{'wdir'} . "/bw" .
         " solution=$prefix.W";
         my_system($cmd . " >& $prefix.bw.stderr", "$prefix.cmd");
     } else {
-        if ($param->{linalg} ne 'bl') {
-            print "WARNING: I don't know linalg=" . $param->{linalg} .
+        if ($param->{'linalg'} ne 'bl') {
+            print "WARNING: I don't know linalg=" . $param->{'linalg'} .
               ". Use bl as default.\n";
         }
         print "Calling Block-Lanczos...\n";
-        $cmd = $param->{cadodir} . "/linalg/bl/bl.pl" .
+        $cmd = $param->{'cadodir'} . "/linalg/bl/bl.pl" .
         " matrix=$prefix.small.tr" .
-        " wdir=" . $param->{wdir} . "/bl" .
+        " wdir=" . $param->{'wdir'} . "/bl" .
         " solution=$prefix.W";
         my_system($cmd . " >& $prefix.bl.stderr", "$prefix.cmd");
     }
     print "Converting dependencies to CADO format...\n";
-    $cmd = $param->{cadodir} . "/linalg/bw/mkbitstrings " .
+    $cmd = $param->{'cadodir'} . "/linalg/bw/mkbitstrings " .
       " $prefix.W";
     my_system($cmd . " > $prefix.ker_raw", "$prefix.cmd");
     my $nker = `wc -l < $prefix.ker_raw`;
@@ -1117,7 +1117,7 @@ MAIN: {
 
     # Characters
     print "Adding characters...\n";
-    $cmd = $param->{cadodir} . "/linalg/characters" .
+    $cmd = $param->{'cadodir'} . "/linalg/characters" .
       " -poly $prefix.poly" .
       " -purged $prefix.purged" .
       " -ker $prefix.ker_raw" .
@@ -1125,20 +1125,20 @@ MAIN: {
       " -rel $prefix.nodup" .
       " -small $prefix.small" .
       " -nker $nker" .
-      " -nchar " . $param->{nchar};
+      " -nchar " . $param->{'nchar'};
     my_system($cmd . " > $prefix.ker 2> $prefix.characters.stderr",
         "$prefix.cmd");
 
     my $ndepmax=`wc -l $prefix.ker | awk '{print \$1}'`;
     chomp $ndepmax;
     print "We have $ndepmax remaining after characters.\n";
-    if ($ndepmax > $param->{nkermax}) {
-        $ndepmax = $param->{nkermax};
+    if ($ndepmax > $param->{'nkermax'}) {
+        $ndepmax = $param->{'nkermax'};
     }
 
     # Sqrt
     print "Preparing $ndepmax squareroots...\n";
-    $cmd = $param->{cadodir} . "/linalg/allsqrt" .
+    $cmd = $param->{'cadodir'} . "/linalg/allsqrt" .
       " $prefix.nodup $prefix.purged $prefix.index $prefix.ker" .
       " $prefix.poly" .
       " 0 $ndepmax ar $prefix.dep";
@@ -1148,7 +1148,7 @@ MAIN: {
     for ($i = 0; $i < $ndepmax; $i++) {
         my $suf = sprintf("%03d", $i);
         print "Testing dependency numnber $i...\n";
-        $cmd = $param->{cadodir} . "/sqrt/naive/algsqrt" .
+        $cmd = $param->{'cadodir'} . "/sqrt/naive/algsqrt" .
           "  $prefix.dep.alg.$suf $prefix.dep.rat.$suf $prefix.poly";
         my_system($cmd . "> $prefix.fact.$suf 2>> $prefix.algsqrt.stderr",
             "$prefix.cmd");
