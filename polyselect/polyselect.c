@@ -43,8 +43,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #include <math.h>   /* for log, fabs */
 #include "cado.h"
 #include "utils/utils.h" /* for cputime() */
-
-#include "aux.c"
+#include "aux.h" /* for common routines with kleinjung.c */
 
 #if 1 /* use L2-norm with integral over whole sieving region */
 #define LOGNORM  L2_lognorm

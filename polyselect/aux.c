@@ -1,3 +1,8 @@
+/* common routines to polyselect and kleinjung */
+
+#include <stdlib.h>
+#include "gmp.h"
+#include "macros.h" /* for ASSERT_ALWAYS */
 
 /************************ arrays of mpz_t ************************************/
 

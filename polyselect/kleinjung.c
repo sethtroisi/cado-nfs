@@ -13,10 +13,9 @@
 #include <values.h> /* for DBL_MAX */
 #include "cado.h"
 #include "utils/utils.h"
+#include "aux.h" /* for common routines with polyselect.c */
 
 #define QUICK_SEARCH
-
-#include "aux.c"
 
 #define P0_MAX 1000
 
