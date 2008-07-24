@@ -166,7 +166,7 @@ void
 pp1_stage2 (residue_t r, const residue_t X, const stage2_plan_t *plan, 
 	    const residue_t two, const modulus_t m)
 {
-  residue_t Xd, Xid, Xid1, a, t;
+  residue_t Xd, Xid, Xid1, a, a_bk, t;
   residue_t *Xj;
   unsigned int k, l;
 #ifdef PARI
@@ -316,7 +316,9 @@ pp1_stage2 (residue_t r, const residue_t X, const stage2_plan_t *plan,
   mod_init_noset0 (Xid, m);
   mod_init_noset0 (Xid1, m);
   mod_init_noset0 (a, m);
+  mod_init_noset0 (a_bk, m);
   mod_set_ul_reduced (a, 1UL, m);
+  mod_set (a_bk, a, m);
   l = 0;
   
   {
@@ -342,6 +344,15 @@ pp1_stage2 (residue_t r, const residue_t X, const stage2_plan_t *plan,
 	    mod_mul (a, a, t, m);
 	    l++;
 	  }
+	
+	/* See if we got a == 0. If yes, restore previous a value and
+	   end stage 2 */
+	if (mod_is0 (a, m))
+	  {
+	    mod_set (a, a_bk, m);
+	    break;
+	  }
+	mod_set (a_bk, a, m); /* Save new a value */
 	
 	/* Advance i by 1 */
 	if (plan->pairs[l] == NEXT_D)
@@ -374,6 +385,7 @@ pp1_stage2 (residue_t r, const residue_t X, const stage2_plan_t *plan,
   mod_clear (Xid, m);
   mod_clear (Xid1, m);
   mod_clear (a, m);
+  mod_clear (a_bk, m);
   mod_clear (t, m);
 }
 

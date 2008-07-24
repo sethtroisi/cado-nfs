@@ -113,7 +113,7 @@ ellW_double (residue_t x3, residue_t y3, residue_t x1, residue_t y1,
    One assumes that Q-R=D or R-Q=D.
    This function assumes that P !~= Q, i.e. that there is 
    no t!=0 so that P->x = t*Q->x and P->z = t*Q->z, for otherwise the result 
-   is the Not-a-Point (0:0) (which actually is good for factoring!).
+   is (0:0) although it shouldn't be (which actually is good for factoring!).
 
    R may be identical to P, Q and/or D. */
 
@@ -406,9 +406,12 @@ ellM_interpret_bytecode (ellM_point_t P, const char *code,
           case 11:
             ellM_add (A, A, B, C, m); /* Final add */
             break;
+#if 0
+	    /* p=2 is handled outside of the byte code interpreter now */
           case 12:
             ellM_double (A, A, m, b); /* For p=2 */
             break;
+#endif
           default:
             abort ();
         }
@@ -618,7 +621,7 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
   ellM_point_t Pd, Pt; /* d*P, i*d*P, (i+1)*d*P and a temp */
   residue_t *Pid_x, *Pid_z, *Pj_x, *Pj_z; /* saved i*d*P, i0 <= i < i1, 
               and jP, j in S_1, x and z coordinate stored separately */
-  residue_t a, t;
+  residue_t a, a_bk, t;
   unsigned int i, k, l;
   
   ellM_init (Pt, m);
@@ -648,7 +651,10 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
      with two arithmetic progressions 1+6k and 5+6k (this assumes 6|d).
      We need two values of each progression (1, 7 and 5, 11) and the 
      common difference 6. These can be computed with the Lucas chain
-     1, 2, 3, 5, 6, 7, 11 at the cost of 6 multiplies. */
+     1, 2, 3, 5, 6, 7, 11 at the cost of 6 additions and 1 doubling. 
+     For d=210, generating all 24 desired values 1 <= j < 210/2, gcd(j,d)=1, 
+     takes 6+16+15=37 point additions. If d=30, we could use 
+     1,2,3,4,6,7,11,13 which has 5 additions and 2 doublings */
   
   ASSERT (plan->d % 6 == 0);
   {
@@ -879,6 +885,8 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
   /* Now process all the primes p = id - j, B1 < p <= B2 and multiply
      (id*P)_x - (j*P)_x to the accumulator */
   mod_set_ul_reduced (a, 1UL, m);
+  mod_init (a_bk, m); /* Backup value of a, in case we get a == 0 */
+  mod_set (a_bk, a, m);
   i = 0;
   l = 0;
   while (plan->pairs[l] != NEXT_PASS) 
@@ -889,6 +897,16 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
 	  mod_mul (a, a, t, m);
 	  l++;
 	}
+      
+      /* See if we got a == 0. If yes, restore previous a value and
+	 end stage 2. Let's hope not all factors were found since
+	 the last d increase. */
+      if (mod_is0 (a, m))
+	{
+	  mod_set (a, a_bk, m);
+	  break;
+	}
+      mod_set (a_bk, a, m); /* Save new a value */
       
       if (plan->pairs[l] == NEXT_D)
 	{
@@ -928,6 +946,7 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
   ellM_clear (Pt, m);
   mod_clear (t, m);
   mod_clear (a, m);
+  mod_clear (a_bk, m);
   return;
 }
 
@@ -940,6 +959,7 @@ ecm (residue_t x1, const modulus_t m, const ecm_plan_t *plan)
   residue_t u, A, b, r;
   ellM_point_t P, Pt;
   unsigned long f = 1;
+  unsigned int i;
 
   mod_init (u, m);
   mod_init (A, m);
@@ -992,7 +1012,21 @@ ecm (residue_t x1, const modulus_t m, const ecm_plan_t *plan)
   /* Do stage 1 */
   ellM_interpret_bytecode (P, plan->bc, plan->bc_len, m, b);
 
-  mod_gcd (&f, P->z, m);
+  /* Add prime 2 in the desired power. If a zero residue for the Z-coordinate 
+     is encountered, we go back to previous point and stop */
+  ellM_set (Pt, P, m);
+  for (i = 0; i < plan->exp2; i++)
+    {
+      ellM_double (P, P, m, b);
+      if (mod_is0 (P[0].z, m))
+	{
+	  ellM_set (P, Pt, m);
+	  break;
+	}
+      ellM_set (Pt, P, m);
+    }
+
+  mod_gcd (&f, P[0].z, m);
   if (f == 1 && plan->B1 < plan->stage2.B2)
     {
       ecm_stage2 (r, P, &(plan->stage2), b, m);
@@ -1002,8 +1036,8 @@ ecm (residue_t x1, const modulus_t m, const ecm_plan_t *plan)
   if (f == 1)
     {
       /* No factor. Set x1 to normalized point */
-      mod_inv (u, P->z, m);
-      mod_mul (x1, P->x, u, m);
+      mod_inv (u, P[0].z, m);
+      mod_mul (x1, P[0].x, u, m);
     }
   
   mod_clear (u, m);
@@ -1025,19 +1059,24 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
 	       const int parameterization, const unsigned long sigma, 
 	       const int verbose)
 {
-  unsigned int p;
+  unsigned int p, q;
   const unsigned int addcost = 6, doublecost = 5; /* TODO: find good ratio */
   const unsigned int compress = 0;
+  
+  plan->exp2 = 0;
+  for (q = 1; q <= B1 / 2; q *= 2)
+    plan->exp2++;
   
   /* Make bytecode for stage 1 */
   plan->B1 = B1;
   plan->parameterization = parameterization;
   plan->sigma = sigma;
   bytecoder_init (compress);
-  for (p = 2; p <= B1; p = (unsigned int) getprime (p))
+  p = (unsigned int) getprime (2UL);
+  ASSERT (p == 3);
+  for ( ; p <= B1; p = (unsigned int) getprime (p))
     {
-      unsigned long q;
-      for (q = p; q <= B1; q *= p)
+      for (q = 1; q <= B1 / p; q *= p)
 	prac_bytecode (p, addcost, doublecost);
     }
   bytecoder_flush ();
