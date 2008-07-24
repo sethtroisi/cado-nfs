@@ -4,7 +4,7 @@ GMPBUILD=
 CFLAGS=-g -O2 $(NDEBUG) $(EXPENSIVE) -Wall -W # -Wconversion -pedantic
 INCLUDE=-I ../../utils/ -I ../../
 CC=gcc
-TARGETS=addchain ecm.o pm1.o pp1.o stage2.o prac_bc.o # find_primes_hit 
+TARGETS=addchain ecm.o pm1.o pp1.o stage2.o prac_bc.o facul.o facul.a
 TARGETS_TEST=testbench test_pm1s2
 PRIMEGEN=~/lib/primegen.a
 
@@ -25,6 +25,12 @@ stage2.o: stage2.c stage2.h ../basicnt.h ../../utils/utils.h
 
 prac_bc.o: prac_bc.c prac_bc.h
 	 $(CC) $(CFLAGS) -c -o $@ $<
+
+facul.o : facul.c facul.h pm1.h pp1.h ecm.h
+	$(CC) $(CFLAGS) $(INCLUDE) -c -o $@ $<
+	
+facul.a: ecm.o pm1.o pp1.o stage2.o prac_bc.o facul.o
+	ar r $@ $^
 
 find_primes_hit: find_primes_hit.c ../../utils/modredc_ul.h  ../../utils/modredc_ul.c
 	$(CC) $(CFLAGS) $(GMPBUILD) $(INCLUDE) $< -lgmp ../../utils/modredc_ul.c -lm -o $@
