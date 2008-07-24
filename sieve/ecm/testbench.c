@@ -26,12 +26,15 @@ void print_help (char *programname)
   printf ("-vf      Print factors that are found\n");
   printf ("-x0 <n>  Use <n> as starting value for P-1/P+1, or as sigma "
            "value for ECM\n");
+  printf ("-cof <n> Multiply numbers from search interval by <num> before "
+	  "calling\n"
+	  "         factoring routine\n");
 }
 
 int main (int argc, char **argv)
 {
-  unsigned long start, stop, x0 = 2UL, i, B1, B2, p;
-  unsigned long hits = 0, total = 0;
+  unsigned long start, stop, x0 = 2UL, i, B1, B2, p, cof = 1UL;
+  unsigned long hits = 0, hits_input = 0, total = 0;
   mpz_t E;
   int compare = 0;
   int method = 0; /* 0 = P-1, 1 = P+1, 2 = ECM */
@@ -103,7 +106,13 @@ int main (int argc, char **argv)
 	}
       else if (argc > 2 && strcmp (argv[1], "-x0") == 0)
 	{
-	  x0 = strtoul (argv[2], NULL, 10);;
+	  x0 = strtoul (argv[2], NULL, 10);
+	  argc -= 2;
+	  argv += 2;
+	}
+      else if (argc > 2 && strcmp (argv[1], "-cof") == 0)
+	{
+	  cof = strtoul (argv[2], NULL, 10);
 	  argc -= 2;
 	  argv += 2;
 	}
@@ -171,12 +180,12 @@ int main (int argc, char **argv)
     {
       modulus_t m;
       residue_t b, r, r2;
-      unsigned long f;
+      unsigned long f, ic = i * cof;
 
       total++;
 
       /* Init the modulus */
-      mod_initmod_ul (m, i);
+      mod_initmod_ul (m, ic);
       mod_init_noset0 (r, m);
       mod_init_noset0 (b, m);
 
@@ -184,12 +193,8 @@ int main (int argc, char **argv)
 	{
 	  f = pm1 (r, m, &pm1plan);
 
-	  if (printfactors && f > 1UL)
-	    printf ("%lu\n", f);
 	  if (verbose >= 2)
-	    printf ("Mod(%lu, %lu)^E == %lu\n", x0, i, mod_get_ul (r, m));
-	  if (f > 1UL)
-	    hits++;
+	    printf ("Mod(%lu, %lu)^E == %lu\n", x0, ic, mod_get_ul (r, m));
 	}
       else if (method == 1) /* P+1 */
         {
@@ -219,22 +224,25 @@ int main (int argc, char **argv)
 	      mod_clear (r2, m);
             }
 
-	  if (printfactors && f > 1UL)
-	    printf ("%lu\n", f);
 	  if (verbose >= 2)
-	    printf ("V(E, Mod(%lu, %lu) == %lu\n", x0, i, mod_get_ul (r, m));
-	  if (f > 1UL)
-	    hits++;
+	    printf ("V(E, Mod(%lu, %lu) == %lu\n", x0, ic, mod_get_ul (r, m));
 	}
       else
 	{
 	  f = ecm (r, m, &ecmplan);
-	  if (f > 1UL)
-	    hits++;
-	  if (printfactors && f > 1UL)
-	    printf ("%lu\n", f);
+	  if (verbose >= 2)
+	    printf ("x-coordinate after stage 1 is Mod(%lu, %lu)\n",
+		    mod_get_ul (r, m), ic);
 	}
       
+      if (printfactors && f > 1UL)
+	printf ("%lu\n", f);
+
+      if (f > 1UL && (cof == 1 || f != ic))
+	hits++;
+      if (cof != 1 && f == ic)
+	hits_input++;
+
       mod_clear (r, m);
       mod_clear (b, m);
       mod_clearmod (m);
@@ -256,5 +264,10 @@ int main (int argc, char **argv)
   printf ("Of %lu %s in [%lu, %lu] there were %lu with smooth order\n", 
 	  total, (only_primes) ? "primes" : "odd numbers", start, stop, hits);
   printf ("Ratio: %f\n", (double)hits / (double)total);
+  if (cof > 1)
+    {
+      printf ("Input number was found %lu times\n", hits_input);
+    }
+
   return 0;
 }
