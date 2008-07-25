@@ -3,7 +3,7 @@ include $(TOP)/Makefile.common
 
 # All parts of libutils.
 names:=	cado_poly relation timing plain_poly \
-	getprime mod_ul modul_poly gmp_aux \
+	getprime mod_ul modredc_ul modul_poly gmp_aux \
 	fpoly rootfinder params
 
 src:=$(patsubst %,%.c,$(names))
