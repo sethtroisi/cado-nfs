@@ -15,6 +15,7 @@
 #include "../utils/manu.h"   /* for ctzl */
 #include "basicnt.h"         /* for bin_gcd */
 #include <tifa.h>
+#include "ecm/facul.h"
 #include "bucket.h"
 
 #ifdef SSE_NORM_INIT
@@ -109,6 +110,7 @@ typedef struct {
                                  is 0) */
     unsigned char S_rat[1 << NORM_BITS];
     unsigned char S_alg[1 << NORM_BITS];
+    facul_strategy_t *strategy;
 } sieve_info_t;
 
 /* A "const sieve_info_t *" tells the compiler only that the pointer value
@@ -801,7 +803,7 @@ fill_in_buckets(bucket_array_t BA, factorbase_degn_t *fb,
                 if ((x | (x >> logI)) & 1)
                   {
                     update.x = (uint16_t) (x & maskbucket);
-#if PROFILE
+#ifdef PROFILE
 		    /* To make it visible in profiler */
 		    *(BA.bucket_write[x >> shiftbucket])++ = update;
 #else
@@ -1364,8 +1366,9 @@ check_leftover_norm (mpz_t n, size_t lpb, mpz_t BB, size_t mfb)
 }
 
 static void xToAB(int64_t *a, uint64_t *b, unsigned int x, sieve_info_t *si);
-int factor_leftover_norm (mpz_t n, unsigned int b,
-        mpz_array_t* const factors, uint32_array_t* const multis);
+int factor_leftover_norm (mpz_t n, unsigned int b, mpz_array_t* const factors, 
+			  uint32_array_t* const multis, 
+			  facul_strategy_t *strategy);
 static void
 eval_fij (mpz_t v, mpz_t *f, unsigned int d, long i, unsigned long j);
 
@@ -1414,7 +1417,7 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
         /* since a,b both even were not sieved, either a or b should be odd */
         ASSERT((a | b) & 1);
         /* bin_gcd assumes that its first operand is odd */
-        if (bin_gcd ((a&1) == 0 ? a + b : a, b) != 1)
+        if (bin_gcd ((a&1) == 0 ? a + (int64_t) b : a, b) != 1)
           continue;
 
         surv++;
@@ -1436,10 +1439,12 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
         if (!check_leftover_norm (alg_norm, cpoly->lpba, BBalg, cpoly->mfba))
           continue;
 
-        if (factor_leftover_norm (rat_norm, cpoly->lpbr, f_r, m_r) == 0)
+        if (factor_leftover_norm (rat_norm, cpoly->lpbr, f_r, m_r, 
+				  si->strategy) == 0)
           continue;
 
-        if (factor_leftover_norm (alg_norm, cpoly->lpba, f_a, m_a) == 0)
+        if (factor_leftover_norm (alg_norm, cpoly->lpba, f_a, m_a, 
+				  si->strategy) == 0)
           continue;
 
         printf ("%" PRId64 ",%" PRIu64 ":", a, b);
@@ -1849,10 +1854,12 @@ skewness (sieve_info_t *si)
 */          
 int
 factor_leftover_norm (mpz_t n, unsigned int l,
-                      mpz_array_t* const factors, uint32_array_t* const multis)
+                      mpz_array_t* const factors, uint32_array_t* const multis,
+		      facul_strategy_t *strategy)
 {
-  uint32_t i;
+  uint32_t i, nr_factors;
   ecode_t ecode;
+  unsigned long ul_factors[16];
 
   factors->length = 0;
   multis->length = 0;
@@ -1876,6 +1883,44 @@ factor_leftover_norm (mpz_t n, unsigned int l,
         }
     } 
 
+#if 1
+  nr_factors = facul (ul_factors, n, strategy);
+  
+  ASSERT (nr_factors == 0 || mpz_cmp_ui (n, ul_factors[0]) != 0);
+  
+  if (nr_factors > 0)
+    {
+      for (i = 0; i < nr_factors; i++)
+	{
+	  unsigned long r;
+	  mpz_t t;
+	  if (ul_factors[i] > (1UL << l)) /* Larger than large prime bound? */
+	    return 0;
+	  r = mpz_tdiv_q_ui (n, n, ul_factors[i]);
+	  ASSERT_ALWAYS (r == 0UL);
+	  mpz_init (t);
+	  mpz_set_ui (t, ul_factors[i]);
+	  append_mpz_to_array (factors, t);
+	  mpz_clear (t);
+	  append_uint32_to_array (multis, 1);
+	}
+      
+      if (mpz_cmp_ui (n, 1UL) == 0)
+	return 1;
+      if (IS_PROBAB_PRIME(n))
+	{
+	  if (BITSIZE(n) > l)
+	    return 0;
+	  else
+	    {
+	      append_mpz_to_array (factors, n);
+	      append_uint32_to_array (multis, 1);
+	      return 1;
+	    }
+	} 
+    }
+#endif
+  
   ecode = tifa_factor (factors, multis, n, FIND_COMPLETE_FACTORIZATION);
 
   switch (ecode)
@@ -2039,6 +2084,8 @@ main (int argc, char *argv[])
     init_rat_norms (&si);
     init_alg_norms (&si);
 
+    si.strategy = facul_make_strategy (15);
+
     /* special q (and root rho) */
     roots = (uint64_t *) malloc (cpoly->degree * sizeof (uint64_t));
     q0 --; /* so that nextprime gives q0 if q0 is prime */
@@ -2168,7 +2215,10 @@ main (int argc, char *argv[])
              " factor %1.1f]\n", t0, tn_rat, tn_alg, tts, ttsm, tts-ttsm, ttf);
     fprintf (stderr, "# Total %lu reports [%1.3fs/r]\n",
              tot_reports, t0 / (double) tot_reports);
+    facul_print_stats (stderr);
 
+    facul_clear_strategy (si.strategy);
+    si.strategy = NULL;
     free (fb_alg);
     free (fb_rat);
     sieve_info_clear (&si);
