@@ -11,7 +11,7 @@
     if (c >= 0)                                 \
       mpz_addmul_ui (a, b, c);                  \
     else                                        \
-      mpz_submul_ui (a, b, -c);                 \
+      mpz_submul_ui (a, b, -(c));               \
   }                                             \
   while (0)
 #endif
