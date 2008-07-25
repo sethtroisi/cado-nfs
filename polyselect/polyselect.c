@@ -230,7 +230,7 @@ discriminant (mpz_t D, mpz_t *f0, const int d)
 
 /* D <- discriminant (f+k*g), which has degree d */
 void
-discriminant_k (mpz_t *D, mpz_t *f, int d, mpz_t m, unsigned long b)
+discriminant_k (mpz_t *D, mpz_t *f, int d, mpz_t m, mpz_t b)
 {
   int i, j, k;
   uint32_t **M, pivot;
@@ -248,7 +248,7 @@ discriminant_k (mpz_t *D, mpz_t *f, int d, mpz_t m, unsigned long b)
   for (i = 1; i <= d; i++)
     {
       /* add b*x - m */
-      mpz_add_ui (f[1], f[1], b);
+      mpz_add (f[1], f[1], b);
       mpz_sub (f[0], f[0], m);
       discriminant (D[i], f, d);
     }
@@ -287,7 +287,7 @@ discriminant_k (mpz_t *D, mpz_t *f, int d, mpz_t m, unsigned long b)
     }
 
   /* restore the original f[] */
-  mpz_sub_ui (f[1], f[1], b * d);
+  mpz_submul_ui (f[1], b, d);
   mpz_addmul_ui (f[0], m, d);
 
   for (i = 0; i <= d; i++)
@@ -1252,14 +1252,14 @@ L2_skewness (mpz_t *f, int deg, int prec)
    Assumes b^2 fits in an unsigned long.
  */
 void
-generate_base_mb (cado_poly p, mpz_t m, unsigned long b)
+generate_base_mb (cado_poly p, mpz_t m, mpz_t b)
 {
   unsigned long i;
   int d = p->degree;
 
   ASSERT (d >= 0);
 
-  if (b == 1)
+  if (mpz_cmp_ui (b, 1) == 0)
     {
       mpz_ndiv_qr (p->f[1], p->f[0], p->n, m);
       for (i = 1; i < (unsigned long) d; i++)
@@ -1267,42 +1267,60 @@ generate_base_mb (cado_poly p, mpz_t m, unsigned long b)
     }
   else /* b >= 2 */
     {
-      unsigned long m_mod_b;
-      long k, im;
-      mpz_t powm;
-      int s;
+      mpz_t powm, im, k, m_mod_b;
+      int s, tst;
 
       mpz_init (powm);
+      mpz_init (im);
+      mpz_init (k);
+      mpz_init (m_mod_b);
       
       /* we need that m is invertible mod b */
-      while (mpz_gcd_ui (powm, m, b) != 1)
-        mpz_add_ui (m, m, 1);
+      do
+        {
+          mpz_gcd (powm, m, b);
+          if (mpz_cmp_ui (powm, 1) == 0)
+            break;
+          mpz_add_ui (m, m, 1);
+        }
+      while (1);
 
       mpz_pow_ui (powm, m, d);
-
-      mpz_set_ui (p->f[0], b);
-      mpz_invert (p->f[0], powm, p->f[0]);
-      im = mpz_get_ui (p->f[0]); /* 1/m^d mod b */
+      mpz_invert (im, powm, b); /* 1/m^d mod b */
 
       mpz_ndiv_qr (p->f[d], p->f[d - 1], p->n, powm);
       /* N = f[d] * m^d + f[d-1]. We want f[d-1] to be divisible by b,
          which may need to consider f[d]+k instead of f[d], i.e., we want
          f[d-1]-k*m^d = 0 (mod b), i.e., k = f[d-1]/m^d (mod b). */
-      k = mpz_fdiv_ui (p->f[d - 1], b); /* f[d-1] mod b */
-      k = (k * im) % b;                 /* k = f[d-1]/m^d (mod b) */
-      if (k != 0)
+      mpz_fdiv_r (k, p->f[d - 1], b);   /* f[d-1] mod b */
+      mpz_mul (k, k, im);
+      mpz_mod (k, k, b);                /* k = f[d-1]/m^d (mod b) */
+      if (mpz_cmp_ui (k, 0) != 0)
         {
+          int tst;
+
           s = mpz_sgn (p->f[d - 1]);
-          if ((s >= 0 && 2 * k + 1 > (long) b) ||
-              (s < 0 && 2 * k - 1 > (long) b))
-            k = k - (long) b;
+          /* if (s >= 0 and 2k >= b) or (s < 0 and 2k-2 >= b) then k <- k-b */
+          mpz_mul_2exp (k, k, 1);
+          if (s >= 0)
+            tst = mpz_cmp (k, b) >= 0;
+          else
+            {
+              mpz_sub_ui (k, k, 2);
+              tst = mpz_cmp (k, b) >= 0;
+              mpz_add_ui (k, k, 2);
+            }
+          mpz_div_2exp (k, k, 1);
+          if (tst)
+            mpz_sub (k, k, b);
+
           /* f[d] -> f[d]+l, f[d-1] -> f[d-1]-l*m^d */
-          mpz_add_si (p->f[d], p->f[d], k);
-          mpz_submul_si (p->f[d - 1], powm, k);
+          mpz_add (p->f[d], p->f[d], k);
+          mpz_submul (p->f[d - 1], powm, k);
         }
       /* now N = f[d] * m^d + f[d-1], with f[d-1] divisible by b */
-      m_mod_b = mpz_fdiv_ui (m, b); /* m mod b */
-      mpz_divexact_ui (p->f[d - 1], p->f[d - 1], b);
+      mpz_fdiv_r (m_mod_b, m, b); /* m mod b */
+      mpz_divexact (p->f[d - 1], p->f[d - 1], b);
       for (i = d - 1; i >= 1; i--)
         {
           /* p->f[i] is the current remainder */
@@ -1310,21 +1328,36 @@ generate_base_mb (cado_poly p, mpz_t m, unsigned long b)
           mpz_ndiv_qr (p->f[i], p->f[i - 1], p->f[i], powm);
           /* f[i] = q*m^i + r: we want to write f[i] = (q+k) * m^i + (r-k*m^i)
              with r-k*m^i divisible by b, i.e., k = r/m^i mod b */
-          k = mpz_fdiv_ui (p->f[i - 1], b); /* r mod b */
-          im = (im * m_mod_b) % b; /* 1/m^i mod b */
-          k = (k * im) % b; /* r/m^i mod b */
+          mpz_fdiv_r (k, p->f[i - 1], b); /* r mod b */
+          mpz_mul (im, im, m_mod_b);
+          mpz_mod (im, im, b); /* 1/m^i mod b */
+          mpz_mul (k, k, im);
+          mpz_mod (k, k, b); /* r/m^i mod b */
+
           s = mpz_sgn (p->f[i - 1]);
-          if ((s >= 0 && 2 * k + 1 > (long) b) ||
-              (s < 0 && 2 * k - 1 > (long) b))
-            k = k - (long) b;
-          mpz_add_si (p->f[i], p->f[i], k);
-          mpz_submul_si (p->f[i - 1], powm, k);
-          mpz_divexact_ui (p->f[i - 1], p->f[i - 1], b);
+          mpz_mul_2exp (k, k, 1);
+          if (s >= 0)
+            tst = mpz_cmp (k, b) >= 0;
+          else
+            {
+              mpz_sub_ui (k, k, 2);
+              tst = mpz_cmp (k, b) >= 0;
+              mpz_add_ui (k, k, 2);
+            }
+          mpz_div_2exp (k, k, 1);
+          if (tst)
+            mpz_sub (k, k, b);
+          mpz_add (p->f[i], p->f[i], k);
+          mpz_submul (p->f[i - 1], powm, k);
+          mpz_divexact (p->f[i - 1], p->f[i - 1], b);
         }
       mpz_clear (powm);
+      mpz_clear (im);
+      mpz_clear (k);
+      mpz_clear (m_mod_b);
     }
   mpz_neg (p->g[0], m);
-  mpz_set_ui (p->g[1], b);
+  mpz_set (p->g[1], b);
   mpz_set (p->m, m);
   p->skew = SKEWNESS (p->f, d, SKEWNESS_DEFAULT_PREC);
 }
@@ -1368,12 +1401,21 @@ rotate_bounds (mpz_t *f, int d, mpz_t m, long *K0, long *K1)
   *K1 = (long) k1;
 }
 
+/* replace f[1] by f[1] + b * (k - k0), f[0] by f[0] - m * (k - k0),
+   and return k */
+long
+rotate_aux (mpz_t *f, mpz_t b, mpz_t m, long k0, long k)
+{
+  mpz_addmul_si (f[1], b, k - k0);
+  mpz_submul_si (f[0], m, k - k0);
+  return k;
+}
+
 /* Return the smallest value of lognorm + alpha(f + k*(b*x-m)) for k small
    enough such that the norm does not increase too much, and modify f[]
    accordingly. */
 double
-rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, unsigned long b,
-        int verbose)
+rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b, int verbose)
 {
   mpz_t *D, v;
   long K0, K1, k0, k, j, l, kmin = 0;
@@ -1403,9 +1445,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, unsigned long b,
         for (k = K0; (k < K0 + (long) p) && (k <= K1); k++)
           {
             /* translate from k0 to k */
-            mpz_add_si (f[1], f[1], (long) b * (k - k0));
-            mpz_submul_si (f[0], m, k - k0);
-            k0 = k;
+            k0 = rotate_aux (f, b, m, k0, k);
 
             /* compute contribution for k */
             mpz_poly_eval_si (v, D, d, k);
@@ -1440,9 +1480,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, unsigned long b,
                           {
                             mpz_poly_eval_si (v, D, d, l);
                             /* translate from k0 to l */
-                            mpz_add_si (f[1], f[1], (long) b * (l - k0));
-                            mpz_submul_si (f[0], m, l - k0);
-                            k0 = l;
+                            k0 = rotate_aux (f, b, m, k0, l);
                             e = special_valuation (f, d, p, v);
                             alpha = (1.0 / (double) (p - 1) - e) * log ((double) p);
                             A[l - K0] += alpha;
@@ -1453,9 +1491,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, unsigned long b,
                       break;
                     mpz_poly_eval_si (v, D, d, j);
                     /* translate from k0 to j */
-                    mpz_add_si (f[1], f[1], (long) b * (j - k0));
-                    mpz_submul_si (f[0], m, j - k0);
-                    k0 = j;
+                    k0 = rotate_aux (f, b, m, k0, j);
                     e = special_valuation (f, d, p, v);
                   }
               }
@@ -1473,9 +1509,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, unsigned long b,
           /* check lognorm + alpha < best_lognorm + best_alpha */
 
           /* translate from k0 to k */
-          mpz_add_si (f[1], f[1], (long) b * (k - k0));
-          mpz_submul_si (f[0], m, k - k0);
-          k0 = k;
+          k0 = rotate_aux (f, b, m, k0, k);
           lognorm = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
           if (lognorm + alpha < best_lognorm + best_alpha)
             {
@@ -1488,8 +1522,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, unsigned long b,
 
   /* we now have f + k0*(bx-m) and we want f + kmin*(bx-m), thus we have
      to add (kmin-k0)*(bx-m) */
-  mpz_add_si (f[1], f[1], (long) b * (kmin - k0));
-  mpz_submul_si (f[0], m, kmin - k0);
+  rotate_aux (f, b, m, k0, kmin);
 
   if (verbose)
     printf ("# Rotate by %ld: alpha improved from %f to %f\n", kmin,
@@ -1511,7 +1544,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, unsigned long b,
    changed into m-k*b.
 */
 long
-translate (mpz_t *f, int d, mpz_t *g, mpz_t m, unsigned long b)
+translate (mpz_t *f, int d, mpz_t *g, mpz_t m, mpz_t b)
 {
   double logmu0, logmu;
   int i, j, dir;
@@ -1530,7 +1563,7 @@ translate (mpz_t *f, int d, mpz_t *g, mpz_t m, unsigned long b)
       for (j = i; j < d; j++)
         mpz_add (f[j], f[j], f[j+1]);
     }
-  mpz_sub_ui (m, m, b);
+  mpz_sub (m, m, b);
   k = 1;
 
   /* invariant: the coefficients are those of f(x+k) */
@@ -1552,9 +1585,9 @@ translate (mpz_t *f, int d, mpz_t *g, mpz_t m, unsigned long b)
           else
             mpz_sub (f[j], f[j], f[j+1]);
       if (dir == 1)
-        mpz_sub_ui (m, m, b);
+        mpz_sub (m, m, b);
       else
-        mpz_add_ui (m, m, b);
+        mpz_add (m, m, b);
       k = k + dir;
       logmu = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
       if (logmu < logmu0)
@@ -1571,9 +1604,9 @@ translate (mpz_t *f, int d, mpz_t *g, mpz_t m, unsigned long b)
       else
         mpz_add (f[j], f[j], f[j+1]);
   if (dir == 1)
-    mpz_add_ui (m, m, b);
+    mpz_add (m, m, b);
   else
-    mpz_sub_ui (m, m, b);
+    mpz_sub (m, m, b);
   k = k - dir;
 
   /* change linear polynomial */
@@ -1591,10 +1624,10 @@ translate (mpz_t *f, int d, mpz_t *g, mpz_t m, unsigned long b)
    The number of tries T is related to the decrease B by:
    For d=5, T = B^4.5; for d=4, T = B^3.3.
 
-   b is the leading coefficient of the linear polynomial.
+   b is the leading coefficient of the linear polynomial (default is 1).
 */
 void
-generate_poly (cado_poly out, double T, unsigned long b)
+generate_poly (cado_poly out, double T, mpz_t b)
 {
   unsigned long d = out->degree;
   double B, logmu, E, mB;
@@ -1820,7 +1853,7 @@ main (int argc, char *argv[])
   char **argv0 = argv;
   int argc0 = argc;
   double st = seconds ();
-  unsigned long b = 1; /* leading coefficient of linear polynomial */
+  mpz_t b;
   FILE *f;
 
   fprintf (stderr, "# %s.r%s", argv[0], REV);
@@ -1830,6 +1863,7 @@ main (int argc, char *argv[])
 
   param_list_init(pl);
   cado_poly_init(poly);
+  mpz_init_set_ui (b, 1); /* leading coefficient of linear polynomial */
 
   argv++, argc--;
   for( ; argc ; ) {
@@ -1878,7 +1912,7 @@ main (int argc, char *argv[])
   param_list_parse_double(pl, "effort", &effort);
   param_list_parse_mpz(pl, "m", poly->m);
   param_list_parse_int(pl, "degree", &(poly->degree));
-  param_list_parse_ulong(pl, "b", &b);
+  param_list_parse_mpz(pl, "b", b);
 
   if (param_list_warn_unused(pl)) {
       usage();
@@ -1890,20 +1924,12 @@ main (int argc, char *argv[])
       fprintf (stderr, "Warning: option -m xxx implies -e 1\n");
       effort = 1.0;
     }
-
-  /* checks b^2 fits in an unsigned long */
-  if (b != 1)
+  
+  /* check b >= 1 */
+  if (mpz_cmp_ui (b, 1) < 0)
     {
-      mpz_t bb;
-      
-      mpz_init_set_ui (bb, b);
-      mpz_mul_ui (bb, bb, b);
-      if (mpz_fits_ulong_p (bb) == 0)
-        {
-          fprintf (stderr, "Error, b^2 must fit in an unsigned long\n");
-          exit (1);
-        }
-      mpz_clear (bb);
+      fprintf (stderr, "Error, b should be greater or equal to 1\n");
+      exit (1);
     }
 
   if (verbose)
@@ -1919,6 +1945,7 @@ main (int argc, char *argv[])
   print_poly (stdout, poly, argc0, argv0, st, raw);
 
   cado_poly_clear (poly);
+  mpz_clear (b);
 
   return 0;
 }
