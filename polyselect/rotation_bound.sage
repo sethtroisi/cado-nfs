@@ -334,6 +334,35 @@ def lognorm_plus_alpha_rot_scons_linear(f,g,normfunc,skew,w):
     alpha=eval_dichotomy(reduced_alpha_affine_table,10.0*(w))
     return float(lognorm+alpha[0]+alpha[1])
 
+def lognorm_plus_alpha_rot_linear(f,g,normfunc,skew,w):
+    s=flog(skew)
+    logb=(w*flog(10)+s)/2
+    loga=(w*flog(10)-s)/2
+    RP=PolynomialRing(RealField(),'z');
+    z=RP.gen()
+    Ea=fexp(loga); Eb=fexp(logb)
+    E=[ Ea*z+Eb, Ea*z-Eb, -Ea*z+Eb, -Ea*z-Eb ];
+    lognorm=min([flog(normfunc(RP(f)+e*RP(g))) for e in E])
+    alpha=eval_dichotomy(reduced_alpha_affine_table,10.0*(w))
+    return float(lognorm+alpha[0]+alpha[1])
+
+def lognorm_plus_alpha_rot_linear_sopt(f,g,normfunc,w):
+    cands=[]
+    nsteps=20
+    RP=PolynomialRing(RealField(),'z');
+    z=RP.gen()
+    for s in [(k+1)/nsteps for k in range(nsteps)]:
+        #+ [ flog(skew_l2norm_tk(f)) ]:
+        # Try skewness A0/A1 = exp(1/s)
+        # That's kind of silly, since we should probably try some
+        # variation around the original skewness.
+        loga=(w*flog(10)-1/s)/2; Ea=fexp(loga)
+        logb=(w*flog(10)+1/s)/2; Eb=fexp(logb)
+        E=[ Ea*z+Eb, Ea*z-Eb, -Ea*z+Eb, -Ea*z-Eb ];
+        lognorm=min([flog(normfunc(RP(f)+e*RP(g))) for e in E])
+        cands.append(lognorm)
+    alpha=eval_dichotomy(reduced_alpha_affine_table,10.0*(w))
+    return float(min(cands)+alpha[0]+alpha[1])
 
 def rotatebound_dichotomy_sbest(f,g):
     """ this can be used to plot optimal-skew choices, for degree 0 rotation"""
@@ -370,14 +399,28 @@ def rotatebound_choices(f,g):
     def sclmine(c,s,t):
         tx = t + " (constant skew, degree 1)"
         return (lambda v: lognorm_plus_alpha_rot_scons_linear(f,g,c,s,v), tx)
+    def lmine(c,s,t):
+        tx = t + " (degree 1)"
+        return (lambda v: lognorm_plus_alpha_rot_linear(f,g,c,s,v), tx)
     l=[]
     l.append(mine(best_l2norm_tk, "L2-int"))
     l.append(scmine(l2norm_tk, skew_l2norm_tk(f), "L2-int"))
     l.append(sclmine(l2norm_tk, skew_l2norm_tk(f), "L2-int"))
+    l.append(lmine(best_l2norm_tk, skew_l2norm_tk(f), "L2-int"))
+    return l
+
+def rotatebound_choices_all(f,g):
+    # Includes expensive computations.
+    l=rotatebound_choices(f,g)
+    tx="L2-int (degree 1, optimal skew)"
+    c=best_l2norm_tk
+    l.append((lambda v: lognorm_plus_alpha_rot_linear_sopt(f,g,c,v), tx))
+
     return l
 
 # Try this:
 #               myplot(rotatebound_choices(f,g), 5, 10, 100)
+#               myplot(rotatebound_choices_all(f,g), 6, 9, 20)
 
 # This shows that degree-1 rotation, as soon as some work margin is
 # available, give a very clear win over constant rotation, as expected.
