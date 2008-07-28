@@ -1115,9 +1115,23 @@ L2_lognorm_d (double *a, unsigned long d, double s)
 {
   double n;
 
-  // the following maple lines give the coefficients:
-  // d:=4:p:=x->a0+a1*x+a2*x^2+a3*x^3+a4*x^4:
-  // lprint(int(int((y^d*p(x/y))^2,x=-1..1),y=-1..1));
+  /* coefficients for degree 2 to 10:
+    sage: [[4/(2*i+1)/(2*(d-i)+1) for i in [0..d]] for d in [2..10]]
+
+    [[4/5, 4/9, 4/5],
+     [4/7, 4/15, 4/15, 4/7],
+     [4/9, 4/21, 4/25, 4/21, 4/9],
+     [4/11, 4/27, 4/35, 4/35, 4/27, 4/11],
+     [4/13, 4/33, 4/45, 4/49, 4/45, 4/33, 4/13],
+     [4/15, 4/39, 4/55, 4/63, 4/63, 4/55, 4/39, 4/15],
+     [4/17, 4/45, 4/65, 4/77, 4/81, 4/77, 4/65, 4/45, 4/17],
+     [4/19, 4/51, 4/75, 4/91, 4/99, 4/99, 4/91, 4/75, 4/51, 4/19],
+     [4/21, 4/57, 4/85, 4/105, 4/117, 4/121, 4/117, 4/105, 4/85, 4/57, 4/21]]
+
+     (to be multiplied by the coefficients of the even part of the square
+     of the de-skewed polynomial)
+   */
+
   if (d == 3)
     {
       double a3, a2, a1, a0;
