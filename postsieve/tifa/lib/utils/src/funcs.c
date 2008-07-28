@@ -331,9 +331,10 @@ uint32_t sqrtm(uint32_t a, uint32_t p) {
     //
     // Find n such that p = q.2^n + 1 with q odd
     //
-    uint32_t n = ffs(p - 1) - 1;
+    int n = ffs(p - 1) - 1;
+    int k = n;
+    
     uint32_t q = (p - 1) >> n;
-    uint32_t k = n;
     //
     // Find u, a quadratic non-residue mod p.
     //
@@ -345,26 +346,33 @@ uint32_t sqrtm(uint32_t a, uint32_t p) {
     //         should not make any significant difference so we follow here the
     //         path of least resistance.
     //
-    uint32_t u = 1;
+    int u = 1;
     while (kronecker_ui(u, p) != -1) {
         u++;
     }
-    uint32_t z   = powm(u, q, p);
-    uint32_t x   = powm(a, (q + 1) / 2, p);
-    uint32_t b   = powm(a, q, p);
-    uint32_t m   = 0;
-    uint32_t t   = 0;
-    uint32_t b2m = 0;
+    uint64_t t   = 0;
+    uint64_t b2m = 0;
 
+    uint64_t z   = powm(u, q, p);
+    uint64_t x   = powm(a, q / 2, p);
+    uint64_t b   = (x * x) % p;
+
+    if (IS_ODD(q)) {
+        b = (b * a) % p;
+        x = (x * a) % p;
+    }
+    //
+    // Now x = powm(a, (q + 1) / 2, p) and b = powm(a, q, p)
+    //
     while (1) {
-        b2m = b;
-        m   = 0;
+        int m = 0;
+        b2m   = b;
         //
         // Find the least integer m such that b^(2^m) = 1 (mod p).
         //
         while (b2m != 1) {
             m++;
-            b2m = (uint32_t)( ((uint64_t)b2m * (uint64_t)b2m) % p);
+            b2m = (b2m * b2m) % p;
         }
         if (m == k) {
             //
@@ -373,12 +381,12 @@ uint32_t sqrtm(uint32_t a, uint32_t p) {
             return NO_SQRT_MOD_P;
         }
         t = powm(z, 1 << (k - m - 1), p);
-        z = (uint32_t)( ((uint64_t)t * (uint64_t)t) % p);
-        b = (uint32_t)( ((uint64_t)b * (uint64_t)z) % p);
-        x = (uint32_t)( ((uint64_t)x * (uint64_t)t) % p);
+        z = (t * t) % p;
+        b = (b * z) % p;
+        x = (x * t) % p;
 
         if (b == 1) {
-            return x;
+            return (uint32_t)x;
         }
         k = m;
     }
