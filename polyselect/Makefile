@@ -15,11 +15,11 @@ kleinjung: kleinjung.o aux.o
 	$(CC) $(MY_LFLAGS) $^ -o $@ -lutils -lgmp -lm
 
 # Some more dependencies
-polyselect.o: polyselect.c $(TOP)/cado.h
+polyselect.o: polyselect.c aux.o $(TOP)/cado.h
 
-kleinjung.o: kleinjung.c $(TOP)/cado.h
+kleinjung.o: kleinjung.c aux.o $(TOP)/cado.h
 
-aux.o: aux.c $(TOP)/cado.h
+aux.o: aux.c aux.h $(TOP)/cado.h
 
 clean:
 	-rm -f polyselect kleinjung *~ *.o

@@ -7,10 +7,9 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
 #include <string.h>
 #include <time.h>
-#include <values.h> /* for DBL_MAX */
+#include <math.h> /* for log, pow, fabs */
 #include "cado.h"
 #include "utils/utils.h"
 #include "aux.h" /* for common routines with polyselect.c */
@@ -20,46 +19,14 @@
 #define P0_MAX 1000
 
 int verbose = 0;
-int index = 0;
 double search_time = 0.0;
+m_logmu_t *Mt; /* stores values of m, b and log(mu) found in 1st phase */
+unsigned long Malloc, Msize, Malloc2, Msize2;
 
-/* Compute the sup-norm of f(x) = A[d]*x^d + ... + A[0]
-   as in Definition 3.1 of Kleinjung's paper
+/* Implements Lemma 2.1 from Kleinjung's paper.
+   If a[d] is non-zero, it is assumed it is already set, otherwise it is
+   determined as a[d] = N/m^d (mod p).
 */
-double
-sup_norm (mpz_t *A, int d)
-{
-  double norm, min_norm, *a, s, t;
-  int i, j, k;
-
-  min_norm = DBL_MAX;
-  a = (double*) malloc ((d + 1) * sizeof (double));
-  for (i = 0; i <= d; i++)
-    a[i] = fabs (mpz_get_d (A[i]));
-  for (i = 0; i <= d; i++)
-    {
-      if (a[i] == 0.0)
-        continue;
-      for (j = i + 1; j <= d; j++)
-        {
-          s = pow (a[j] / a[i], 1.0 / (double) (i - j));
-          norm = a[i] * pow (s, (double) i - (double) d / 2.0);
-          for (k = 0; norm < min_norm && k <= d; k++)
-            if (k != i && k != j)
-              {
-                t = a[k] * pow (s, (double) k - (double) d / 2.0);
-                if (t > norm)
-                  norm = min_norm; /* will exit the loop */
-              }
-          if (norm < min_norm)
-            min_norm = norm;
-        }
-    }
-  free (a);
-  return min_norm; 
-}
-
-/* Implements Lemma 2.1 from Kleinjung's paper, assumes a[d] is already set. */
 void
 Lemma21 (mpz_t *a, mpz_t N, int d, mpz_t p, mpz_t m)
 {
@@ -70,6 +37,12 @@ Lemma21 (mpz_t *a, mpz_t N, int d, mpz_t p, mpz_t m)
   mpz_init (mi);
   mpz_set (r, N);
   mpz_pow_ui (mi, m, d);
+  if (mpz_cmp_ui (a[d], 0) == 0)
+    {
+      mpz_invert (a[d], mi, p); /* 1/m^d mod p */
+      mpz_mul (a[d], a[d], N);
+      mpz_mod (a[d], a[d], p);
+    }
   for (i = d - 1; i >= 0; i--)
     {
       /* invariant: mi = m^(i+1) */
@@ -236,12 +209,14 @@ void retrieve_sums(uint64_t * targets, struct mu_llist ** res, int ntargets,
     free(mu);
 }
 
-void possible_candidate(int * mu, int l, int d, mpz_t *a,
-                      mpz_t P, mpz_t N, double M, mpz_t **x, mpz_t m0)
+/* checks a possible candidate */
+void
+possible_candidate (int * mu, int l, int d, mpz_t *a, mpz_t P, mpz_t N,
+                    double M, mpz_t **x, mpz_t m0)
 {
     mpz_t t;
     int i;
-    double norm;
+    double lognorm, logM = log (M);
 
     mpz_init(t);
     mpz_add (t, m0, x[0][mu[0]]);
@@ -249,20 +224,23 @@ void possible_candidate(int * mu, int l, int d, mpz_t *a,
         mpz_add (t, t, x[i][mu[i]]);
 
     Lemma21 (a, N, d, P, t);
-    norm = sup_norm (a, d);
+    // norm = sup_norm (a, d);
+    lognorm = LOGNORM (a, d, SKEWNESS (a, d, SKEWNESS_DEFAULT_PREC));
 
-    if (norm <= M) {
-        gmp_printf ("p=%Zd m=%Zd norm=%1.2e t=%u index=%u\n",
-                P, t, norm,
-                clock()/CLOCKS_PER_SEC,
-                index);
-        index++;
-        if (verbose) {
+    if (lognorm <= logM) {
+        if (verbose)
+          {
+            gmp_printf ("p=%Zd m=%Zd norm=%1.2e time=%us\n",
+                        P, t, exp (lognorm), seconds ());
             /* terse output does not need the polynomial */
-            fprint_polynomial (stdout, a, d);
-            printf ("\n");
+            if (verbose > 1)
+              {
+                fprint_polynomial (stdout, a, d);
+                printf ("\n");
+              }
+            fflush (stdout);
         }
-        fflush (stdout);
+        m_logmu_insert (Mt, Malloc, &Msize, P, t, lognorm, "lognorm=");
     }
     mpz_clear(t);
 }
@@ -538,30 +516,7 @@ naive_search (double f0, double **f, int l, int d, double eps, mpz_t *a,
       fr = fabs (fr - s[l]);
       if (UNLIKELY(fr <= eps)) /* Prob ~ 4e-7 on RSA155 with l=7, degree 5,
                                   M=5e24, pb=256, even less for smaller M */
-	{
-                possible_candidate(mu,l,d,a,P,N,M,x,m0);
-#if 0
-          mpz_add (t, m0, x[0][mu[0]]);
-	  for (i = 1; i < l; i++)
-            mpz_add (t, t, x[i][mu[i]]);
-          Lemma21 (a, N, d, P, t);
-          norm = sup_norm (a, d);
-          if (norm <= M)
-            {
-              gmp_printf ("p=%Zd m=%Zd norm=%1.2e t=%u index=%u\n",
-                      P, t, norm,
-                      clock()/CLOCKS_PER_SEC,
-                      index);
-              index++;
-              if (verbose) {
-                  /* terse output does not need the polynomial */
-                  fprint_polynomial (stdout, a, d);
-                  printf ("\n");
-              }
-              fflush (stdout);
-            }
-#endif
-	}
+        possible_candidate (mu, l, d, a, P, N, M, x, m0);
       
       /* go to next combination */
       for (i = l - 1; i >= 0 && mu[i] == d - 1; i--);
@@ -859,9 +814,9 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
    incr is the increment for a[d]
    Returns the number of polynomials checked.
 */
-double
+static double
 Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
-        int incr)
+        int incr, unsigned int keep)
 {
   unsigned int *P = NULL, lP = 0;
   unsigned int *Q = NULL, lQ = 0;
@@ -897,7 +852,7 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
   Nd = mpz_get_d (N);
 
   max_ad = pow (pow (M, (double) (2 * d - 2)) / Nd, 1.0 / (double) (d - 3));
-  fprintf (stderr, "max ad=%1.2e\n", max_ad);
+  fprintf (stderr, "# max ad=%1.2e\n", max_ad);
   fflush (stderr);
 
   mpz_set_ui (a[d], incr);
@@ -907,7 +862,8 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
   mpz_init (mtilde);
 
   /* step 2 */
-  do
+  Msize = 0;
+  while (Msize < keep && mpz_cmp_d (a[d], max_ad) <= 0)
     {
       for (i = lQ = 0; i < lP; i++)
         {
@@ -948,7 +904,8 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
     next_ad:
       mpz_add_ui (a[d], a[d], incr);
     }
-  while (mpz_cmp_d (a[d], max_ad) <= 0);
+
+  gmp_fprintf (stderr, "# stopped at ad=%Zd\n", a[d]);
 
   free (P);
   free (Q);
@@ -963,11 +920,12 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
 static void
 usage ()
 {
-  fprintf (stderr, "Usage: kleinjung [-v] [-degree d] [-e e] [-incr i] [-l l] [-M M] [-pb p] < in\n\n");
+  fprintf (stderr, "Usage: kleinjung [-v] [-degree d] [-keep k] [-incr i] [-l l] [-M M] [-pb p] < in\n\n");
   fprintf (stderr, "       -v        - verbose\n");
+  fprintf (stderr, "       -full     - also output factor base parameters\n");
   fprintf (stderr, "       -degree d - use algebraic polynomial of degree d (default 5)\n");
-  fprintf (stderr, "       -e e      - use effort e (default 1e6)\n");
-  fprintf (stderr, "       -incr i   - ad is incremented by i (default 1)\n");
+  fprintf (stderr, "       -keep k   - keep k smallest polynomials (default 100)\n");
+  fprintf (stderr, "       -incr i   - ad is incremented by i (default 60)\n");
   fprintf (stderr, "       -l l      - leading coefficient of g(x) has l prime factors (default 7)\n");
   fprintf (stderr, "       -M M      - keep polynomials with sup-norm <= M (default 1e25)\n");
   fprintf (stderr, "       -pb p   - prime factors are bounded by p (default 256)\n");
@@ -978,20 +936,25 @@ usage ()
 int
 main (int argc, char *argv[])
 {
+  int argc0 = argc;
+  char **argv0 = argv;
   int degree = 5;
-  double effort = 1e6;
+  unsigned int keep = 100;
   double M = 1e25;
   int l = 7;
   int pb = 256;
-  int incr = 1; /* Implements remark (1) following Algorithm 3.6:
-                   try a[d]=incr, then 2*incr, 3*incr, ... */
-  int i;
-  double checked, st = seconds ();
+  int incr = 60; /* Implements remark (1) following Algorithm 3.6:
+                    try a[d]=incr, then 2*incr, 3*incr, ... */
+  unsigned int i, best_i = -1;
+  double checked, st0 = seconds (), st = st0;
   FILE * f = NULL;
+  cado_poly poly;
+  double E, best_E = DBL_MAX;
+  int raw = 1;
 
   /* print command line */
   fprintf (stderr, "# %s.r%s", argv[0], REV);
-  for (i = 1; i < argc; i++)
+  for (i = 1; i < (unsigned int) argc; i++)
     fprintf (stderr, " %s", argv[i]);
   fprintf (stderr, "\n");
 
@@ -1005,9 +968,8 @@ main (int argc, char *argv[])
   for( ; argc ; ) {
       /* knobs first */
       if (strcmp(argv[0], "-v") == 0) { verbose++; argv++,argc--; continue; }
+      if (strcmp(argv[0], "-full") == 0) { raw=0; argv++,argc--; continue; }
       /* Then aliases */
-      if (param_list_update_cmdline_alias(pl, "effort", "-e", &argc, &argv))
-          continue;
       if (param_list_update_cmdline_alias(pl, "degree", "-d", &argc, &argv))
           continue;
       if (param_list_update_cmdline_alias(pl, "degree", "d=", &argc, &argv))
@@ -1049,7 +1011,7 @@ main (int argc, char *argv[])
       exit(1);
   }
 
-  param_list_parse_double(pl, "effort", &effort);
+  param_list_parse_uint(pl, "keep", &keep);
   param_list_parse_int(pl, "incr", &incr);
   param_list_parse_int(pl, "l", &l);
   param_list_parse_int(pl, "pb", &pb);
@@ -1065,16 +1027,73 @@ main (int argc, char *argv[])
   }
   param_list_clear(pl);
 
-  checked = Algo36 (n, degree, M, l, pb, incr);
+  Malloc = 100; /* for Kleinjung's algorithm, keeping the 100 polynomials
+                   of smallest norm is enough for the first phase */
+  Mt = m_logmu_init (Malloc);
+  cado_poly_init (poly);
 
-  st = seconds () - st;
-  fprintf (stderr, "Checked %1.0f polynomials in %1.1fs (%1.1es/p,", checked,
-           st, st / checked);
-#ifdef  QUICK_SEARCH
-  fprintf (stderr, " quick_search took %1.1fs)\n", search_time);
-#else
-  fprintf (stderr, " naive_search took %1.1fs)\n", search_time);
-#endif
-  
+  checked = Algo36 (n, degree, M, l, pb, incr, keep);
+
+  fprintf (stderr, "# First phase took %.2fs, checked %1.0f and kept %lu polynomial(s)\n",
+           seconds () - st, checked, Msize);
+
+  /* Second/third phases: loop over entries in M database, and try to find the
+     best rotation for each one. In principle we should compute the
+     contribution to alpha(F) for primes up to the algebraic factor base bound,
+     but since it is too expensive, we use a fixed bound.
+     To speed up things we first compute an approximation of alpha(F) by
+     considering small primes only, and keep only the best polynomials, for
+     which we compute an approximation of alpha(F) up to a larger prime bound.
+  */
+  Malloc2 = 10; /* we keep the best 10 polynomials only */
+  Msize2 = 0;
+  st = seconds ();
+  for (i = 0; i < Msize; i++)
+    {
+      mpz_set_ui (poly->f[degree], 0);
+      Lemma21 (poly->f, n, degree, Mt[i].b, Mt[i].m);
+      /* we do not use translation here, since it has little effect on the
+         norm, and moreover it does not permute with the base-m generation,
+         thus we would need to save Mt[i].m, and redo all steps in the same
+         order below */
+      E = rotate (poly->f, degree, ALPHA_BOUND_SMALL, Mt[i].m, Mt[i].b, 0);
+      m_logmu_insert (Mt, Malloc2, &Msize2, Mt[i].b, Mt[i].m, E, "E~");
+    }
+  fprintf (stderr, "# Second phase took %.2fs and kept %lu candidate(s)\n",
+           seconds () - st, Msize2);
+
+  st = seconds ();
+  for (i = 0; i < Msize2; i++)
+    {
+      mpz_set_ui (poly->f[degree], 0);
+      Lemma21 (poly->f, n, degree, Mt[i].b, Mt[i].m);
+      E = rotate (poly->f, degree, ALPHA_BOUND, Mt[i].m, Mt[i].b, 0);
+      if (E < best_E)
+        {
+          best_E = E;
+          gmp_fprintf (stderr, "# p=%Zd m=%Zd E=%1.2f\n", Mt[i].b, Mt[i].m, E);
+          best_i = i;
+        }
+    }
+  fprintf (stderr, "# Third phase took %.2fs\n", seconds () - st);
+
+  /* regenerate best polynomial */
+  mpz_set_ui (poly->f[degree], 0);
+  i = best_i;
+  Lemma21 (poly->f, n, degree, Mt[i].b, Mt[i].m);
+  E = rotate (poly->f, degree, ALPHA_BOUND, Mt[i].m, Mt[i].b, 1);
+
+  mpz_set (poly->n, n);
+  poly->degree = degree;
+  mpz_set (poly->g[1], Mt[i].b);
+  mpz_neg (poly->g[0], Mt[i].m);
+  poly->skew = SKEWNESS (poly->f, degree, SKEWNESS_DEFAULT_PREC);
+  strncpy (poly->type, "gnfs", sizeof (poly->type));
+  print_poly (stdout, poly, argc0, argv0, st0, raw);
+
+  m_logmu_clear (Mt, Malloc);
+
+  cado_poly_clear (poly);
+
   return 0;
 }
