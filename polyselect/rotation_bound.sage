@@ -24,6 +24,10 @@ attach gnuplot_stuff.sage
 # Note that the table has indices scaled by 10.
 reduced_alpha_affine_table=build_reduced_minimum_normal_table(0.571,0.851,0.05)
 
+# Note however that the affine contribution is not independent from the
+# projective contribution. Hence for rotation starting from a given
+# polynomial f, the answer is not at all clear.
+
 
 # Indicates how far we hope to be from the expected value for the best
 # alpha. 0 means exactly on the mean, hence 50% chances. +1 means 1
@@ -298,9 +302,9 @@ def sconstant_or_optimal(f,g):
 def logsupnorm_plus_alpha_rot(f,g,w,h):
     """
     Gives the expected log(sup norm) + alpha value with rotation bounded
-    by w. The result takes into account the alpha value that we have at
-    least 84% chances finding (at worst 1 standard deviation above the
-    mean).
+    by 10^w. The result takes into account an alpha value that is
+    separated from the mean by as many standard deviations as given by
+    the global ``deviation'' parameter.
     """
     lf0=flog(f[0])
     lm=flog(g[0])
@@ -311,9 +315,9 @@ def logsupnorm_plus_alpha_rot(f,g,w,h):
 def lognorm_plus_alpha_rot(f,g,normfunc,w):
     """
     Gives the expected log(chosen norm) + alpha value with rotation bounded
-    by 10^w. The result takes into account the alpha value that we have at
-    least 84% chances finding (at worst 1 standard deviation above the
-    mean).
+    by 10^w. The result takes into account an alpha value that is
+    separated from the mean by as many standard deviations as given by
+    the global ``deviation'' parameter.
     """
     RP=PolynomialRing(RealField(),'z');
     E=[fexp10(w), -fexp10(w)]
@@ -322,14 +326,28 @@ def lognorm_plus_alpha_rot(f,g,normfunc,w):
     return float(lognorm+alpha[0]+deviation*alpha[1])
 
 def lognorm_plus_alpha_rot_scons(f,g,normfunc,skew,w):
+    """
+    Does the same as lognorm_plus_alpha_rot, except that we assume that
+    the skewness does not change.
+    Gives the expected log(chosen norm) + alpha value with rotation bounded
+    by 10^w. The result takes into account an alpha value that is
+    separated from the mean by as many standard deviations as given by
+    the global ``deviation'' parameter.
+    """
     RP=PolynomialRing(RealField(),'z');
     E=[fexp10(w), -fexp10(w)]
     lognorm=min([flog(normfunc(RP(f)+e*RP(g), skew)) for e in E])
     alpha=eval_dichotomy(reduced_alpha_affine_table,10.0*(w))
     return float(lognorm+alpha[0]+deviation*alpha[1])
 
-# returns expected value of lognorm + alpha for a rotation range of 10^w
 def lognorm_plus_alpha_rot_scons_linear(f,g,normfunc,skew,w):
+    """
+    Gives the expected log(chosen norm) + alpha value with degree-1
+    rotation bounded by 10^w. The result takes into account an alpha
+    value that is separated from the mean by as many standard deviations
+    as given by the global ``deviation'' parameter.
+    This code assumes that the skewness does not change.
+    """
     s=flog(skew)
     logb=(w*flog(10)+s)/2
     loga=(w*flog(10)-s)/2
@@ -342,6 +360,15 @@ def lognorm_plus_alpha_rot_scons_linear(f,g,normfunc,skew,w):
     return float(lognorm+alpha[0]+deviation*alpha[1])
 
 def lognorm_plus_alpha_rot_linear(f,g,normfunc,skew,w):
+    """
+    Gives the expected log(chosen norm) + alpha value with degree-1
+    rotation bounded by 10^w. The result takes into account an alpha
+    value that is separated from the mean by as many standard deviations
+    as given by the global ``deviation'' parameter.
+    This code re-computes the optimal skewness from the corner polynomial
+    pairs. However, the constant intitial skewness is used for the linear
+    polynomial coefficients.
+    """
     s=flog(skew)
     logb=(w*flog(10)+s)/2
     loga=(w*flog(10)-s)/2
@@ -354,6 +381,16 @@ def lognorm_plus_alpha_rot_linear(f,g,normfunc,skew,w):
     return float(lognorm+alpha[0]+deviation*alpha[1])
 
 def lognorm_plus_alpha_rot_linear_sopt(f,g,normfunc,w):
+    """
+    Gives the expected log(chosen norm) + alpha value with degree-1
+    rotation bounded by 10^w. The result takes into account an alpha
+    value that is separated from the mean by as many standard deviations
+    as given by the global ``deviation'' parameter.
+    This code re-computes the optimal skewness from the corner polynomial
+    pairs. The ratio of the coefficients of the linear multiplier is
+    chosen dynamically.
+    This is D-O-G S-L-O-W !!!
+    """
     cands=[]
     nsteps=20
     RP=PolynomialRing(RealField(),'z');
@@ -370,6 +407,10 @@ def lognorm_plus_alpha_rot_linear_sopt(f,g,normfunc,w):
         cands.append(lognorm)
     alpha=eval_dichotomy(reduced_alpha_affine_table,10.0*(w))
     return float(min(cands)+alpha[0]+deviation*alpha[1])
+
+
+##########################################################################
+# PLOTS
 
 def rotatebound_dichotomy_sbest(f,g):
     """ this can be used to plot optimal-skew choices, for degree 0 rotation"""

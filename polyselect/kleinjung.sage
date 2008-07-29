@@ -50,6 +50,9 @@ def lemme_21(n,d,ad,p,m):
 # (f-f0)/g
 
 # Do for instance:
+# c136=3835722565249558322197842586047190634357074639921908543369929770877061053472916307274359341359614012333625966961056935597194003176666977
+# n=c136
+# d=5 
 # tuples=import_kleinjung_dot_res(n,d,"/net/tiramisu/cado1/cado/Examples/35_143+_c136/kleinjung.res", RR('1.0e+19'))
 def import_kleinjung_dot_res(n,d,filename,normbound):
     """This function reads and parses the kleinjung.res file. Only
@@ -81,11 +84,12 @@ def optimize_tuple(f,g):
     s=skew_l2norm_tk(f)
     a0=alpha_projective(f,2000)
     a1=alpha_affine(f,2000)
+    y0=flog(best_l2norm_tk(f))+a0+a1
     toto=lognorm_plus_alpha_rot_scons_linear
     c=[(a0+toto(f,g,l2norm_tk,s,i),i) for i in [0..14]]
     cm=min(c)
     s0= "p=%r m=%r"%(p,m)
-    s1= "%.2f -> %.2f [10^%d]" %(flog(best_l2norm_tk(f))+a0+a1,cm[0],cm[1])
+    s1= "%.2f -> %.2f [10^%d]" % (y0,cm[0],cm[1])
     print s0 + " " + s1
     return cm
 
@@ -102,45 +106,60 @@ def optimize_tuples(l):
     print "min: [#%d] p=%r m=%r %.2f [10^%d]" % (i,p,m,y,w)
 
 def rotation (n,d,p,m):
-   """Computes optimal rotation for degree-d polynomial for integer n with
-      linear polynomial p*x-m"""
-   B = 2000
-   ad = n/m^d % p
-   f = lemme_21(n,d,ad,p,m)[0]
-   g = parent(f)(p*x-m)
-   s = skew_l2norm_tk (f)
-   lognorm = flog (l2norm_tk (f, s))
-   alp = alpha (f, B)
-   E = lognorm + alp
-   print "original polynomial: lognorm=", lognorm, " alpha=", alp, " E=", E
-   w = 2
-   r = lognorm_plus_alpha_rot_scons_linear (f, g, l2norm_tk, s, flog10(w))
-   oldr = 2 * r
-   while r < oldr:
-      oldr = r
-      w = 2 * w
-      r = lognorm_plus_alpha_rot_scons_linear (f, g, l2norm_tk, s, flog10(w))
-   # the constant polynomial varies up to V = sqrt(w*s), and the linear
-   # polynomial up to U = sqrt(w/s)
-   U = ceil(sqrt(w/s))
-   V  = ceil(sqrt(w*s))
-   Emin = E
-   umin = 0
-   vmin = 0
-   print "rotation bounds:", U, V
-   sys.stdout.flush()
-   for u in range(-U,U+1):
-      print "u=", u
-      for v in range(-V,V+1):
-         frot = f + parent(f)(u*x+v)*g
-         lognorm = flog (best_l2norm_tk (frot))
-         alp = alpha (frot, B)
-         E = lognorm + alp
-         if E < Emin:
-            Emin = E
-            umin = u
-            vmin = v
-            print "u=", umin, "v=", vmin, "lognorm=", lognorm, "alpha=", alp, "E=", Emin
-            sys.stdout.flush()
-   return p, m, umin*x+vmin, Emin
+    """Computes optimal rotation for degree-d polynomial for integer n with
+       linear polynomial p*x-m"""
+    B = 2000
+    f,g = lemme_21(n,d,0,p,m)
+    x = f.parent().gen()
+    s = skew_l2norm_tk (f)
+    w = 2
+    r = lognorm_plus_alpha_rot_scons_linear (f, g, l2norm_tk, s, flog10(w))
+    oldr = Infinity
+    while r < oldr:
+        oldr = r
+        w = 2 * w
+        r = lognorm_plus_alpha_rot_scons_linear (f, g, l2norm_tk, s, flog10(w))
+    # the constant polynomial varies up to V = sqrt(w*s), and the linear
+    # polynomial up to U = sqrt(w/s)
+    U = ceil(sqrt(w/s))
+    V = ceil(sqrt(w*s))
+    print "rotation bounds:", U, V
+    sys.stdout.flush()
+    rotation_inner(f,g,range(-U,U+1),range(-V,V+1))
+
+def rotation_inner(f,g,u_range, v_range):
+    """returns the multiplier lambda=u*x+v giving the best yield for
+    f+lambda*g ; u and v are prescribed to the ranges u_range and
+    v_range"""
+    B=2000
+    lognorm = flog (best_l2norm_tk(f))
+    a0=alpha_projective(f,B)
+    a1=alpha_affine(f,B)
+    a=a0+a1
+    E = lognorm + a
+    print "original polynomial: lognorm=%.2f alpha=%.2f E=%.2f" % (lognorm,a,E)
+    Emin = E
+    umin = 0
+    vmin = 0
+    suma1=0
+    suma1_squares=0
+    for u in u_range:
+        for v in v_range:
+            frot = f + (u*x+v)*g
+            lognorm = flog (best_l2norm_tk (frot))
+            a1 = alpha_affine (frot, B)
+            a = a0 + a1
+            E = lognorm + a
+            suma1+=a1
+            suma1_squares+=a1*a1
+            if E < Emin:
+                Emin = E
+                umin = u
+                vmin = v
+                print "u=%r v=%r lognorm=%.2f alpha=%.2f E=%.2f" % (u,v,lognorm,a,E)
+                sys.stdout.flush()
+    me=suma1/(2*V+1)/(2*U+1)
+    sd=sqrt(suma1_squares/(2*V+1)/(2*U+1)-me^2)
+    print "Observed alpha_affine: mean=%.2f, sdev=%.2f" % (me,sd)
+    return p, m, umin*x+vmin, Emin
 
