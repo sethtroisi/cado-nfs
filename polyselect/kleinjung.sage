@@ -159,8 +159,8 @@ def rotation_inner(f,g,u_range, v_range):
                 vmin = v
                 print "u=%r v=%r lognorm=%.2f alpha=%.2f E=%.2f" % (u,v,lognorm,a,E)
                 sys.stdout.flush()
-    me=suma1/(2*V+1)/(2*U+1)
-    sd=sqrt(suma1_squares/(2*V+1)/(2*U+1)-me^2)
+    me=suma1/len(u_range)/len(v_range)
+    sd=sqrt(suma1_squares/len(u_range)/len(v_range)-me^2)
     print "Observed alpha_affine: mean=%.2f, sdev=%.2f" % (me,sd)
     return p, m, umin*x+vmin, Emin
 
