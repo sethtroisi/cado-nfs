@@ -45,7 +45,7 @@ def deskew_polynomial(f,s):
         g.append(float(f[i])*ss)
         ss*=float(s)
     g.append(f[d]*ss)
-    return PolynomialRing(RealField(),'x')(g), ss
+    return RealField()['x'](g), ss
 
 def supnorm(f,s):
     g,ss=deskew_polynomial(f,s)
@@ -169,6 +169,58 @@ def best_l2norm(f):
 
 def best_l2norm_tk(f):
     return l2norm_tk(f, skew_l2norm_tk(f))
+
+def square_l2norm_tk_sym(f,s):
+    d=f.degree()
+    g=[]
+    ss=1
+    for i in range(d):
+        g.append(f[i]*ss)
+        ss*=float(s)
+    g.append(f[d]*ss)
+    g2=square_evenpart(f.parent()(g))
+    d=f.degree()
+    coeffs=[4/(2*i+1)/(2*(d-i)+1) for i in [0..d]]
+    return 1/4*vector(g2.coefficients())*vector(coeffs)/ss
+
+
+def bounds_l2norm_tk(f,g,multiplier):
+    """Given a polynomial pair, computes eight points on the boundary of
+    the area given by Norm(f+lambda*g)/Norm(f)<multiplier, where Norm is
+    the L2 integral norm, and lambda is at most linear. Then return
+    the largest enclosing rectangle."""
+    s=skew_l2norm_tk(f)
+    RP2.<x,u>=RR['x','u']
+    RP1.<uu>=RR['u']
+    r=RP1(square_l2norm_tk_sym((f(x)+u*g(x)).polynomial(x),s))
+    r=r/r(0)-multiplier^2
+    haxis=r.roots()
+    r=RP1(square_l2norm_tk_sym((f(x)+u*x*g(x)).polynomial(x),s))
+    r=r/r(0)-multiplier^2
+    vaxis=r.roots()
+    r=RP1(square_l2norm_tk_sym((f(x)+(u*(x+s))*g(x)).polynomial(x),s))
+    r=r/r(0)-multiplier^2
+    d1axis=r.roots()
+    r=RP1(square_l2norm_tk_sym((f(x)+(u*(x-s))*g(x)).polynomial(x),s))
+    r=r/r(0)-multiplier^2
+    d2axis=r.roots()
+    haxis=[(ra[0],0) for ra in haxis]
+    vaxis=[(0,ra[0]) for ra in vaxis]
+    d1axis=[(ra[0]*s,ra[0]) for ra in d1axis]
+    d2axis=[(ra[0]*s,ra[0]) for ra in d2axis]
+    # So what's the largest enclosing rectangle ?
+    all=haxis+vaxis+d1axis+d2axis
+    vmin=min([x[0] for x in all])
+    vmax=max([x[0] for x in all])
+    umin=min([x[1] for x in all])
+    umax=max([x[1] for x in all])
+    res=(vmin,vmax,umin,umax)
+    volume=(umax-umin)*(vmax-vmin)
+    # print "[%.2f..%.2f]x[%.2f..%.2f]"%res
+    # print "vol=%.2f"%volume
+    return res
+
+
 
 
 ### We can thus plot the norm with respect to the chosen skew:
