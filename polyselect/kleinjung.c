@@ -1077,6 +1077,12 @@ main (int argc, char *argv[])
     }
   fprintf (stderr, "# Third phase took %.2fs\n", seconds () - st);
 
+  if (best_E == DBL_MAX)
+    {
+      fprintf (stderr, "No polynomial found, please increase M\n");
+      exit (1);
+    }
+
   /* regenerate best polynomial */
   mpz_set_ui (poly->f[degree], 0);
   i = best_i;
