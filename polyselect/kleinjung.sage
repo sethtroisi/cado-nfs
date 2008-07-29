@@ -47,7 +47,7 @@ def rotation (n,d,p,m):
    f = lemme_21(n,d,ad,p,m)[0]
    g = parent(f)(p*x-m)
    s = skew_l2norm_tk (f)
-   lognorm = log (l2norm_tk (f, s))
+   lognorm = flog (l2norm_tk (f, s))
    alp = alpha (f, B)
    E = lognorm + alp
    print "original polynomial: lognorm=", lognorm, " alpha=", alp, " E=", E
@@ -71,7 +71,7 @@ def rotation (n,d,p,m):
       print "u=", u
       for v in range(-V,V+1):
          frot = f + parent(f)(u*x+v)*g
-         lognorm = log (best_l2norm_tk (frot))
+         lognorm = flog (best_l2norm_tk (frot))
          alp = alpha (frot, B)
          E = lognorm + alp
          if E < Emin:
