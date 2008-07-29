@@ -1050,6 +1050,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b, int verbose)
                     /* translate from k0 to j */
                     k0 = rotate_aux (f, b, m, k0, j);
                     e = special_valuation (f, d, p, v);
+                    alpha = (1.0 / (double) (p - 1) - e) * log ((double) p);
                   }
               }
           }
