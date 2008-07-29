@@ -471,9 +471,10 @@ double quick_search(double f0, double **f, int l, int d, double eps, mpz_t *a,
     expanding_list_clear(rtargets);
     free(lres);
     free(rres);
+    free (all_l);
+    free (all_r);
 
-    // return found;
-    // return clock()-t0;
+    /* return the number of checked polynomials, i.e., d^l */
     return pow ((double) d, (double) l);
 }
 
@@ -1036,6 +1037,7 @@ main (int argc, char *argv[])
 
   fprintf (stderr, "# First phase took %.2fs, checked %1.0f and kept %lu polynomial(s)\n",
            seconds () - st, checked, Msize);
+  fflush (stderr);
 
   /* Second/third phases: loop over entries in M database, and try to find the
      best rotation for each one. In principle we should compute the
@@ -1059,8 +1061,9 @@ main (int argc, char *argv[])
       E = rotate (poly->f, degree, ALPHA_BOUND_SMALL, Mt[i].m, Mt[i].b, 0);
       m_logmu_insert (Mt, Malloc2, &Msize2, Mt[i].b, Mt[i].m, E, "E~");
     }
-  fprintf (stderr, "# Second phase took %.2fs and kept %lu candidate(s)\n",
+  fprintf (stderr, "# Second phase took %.2fs and kept %lu polynomial(s)\n",
            seconds () - st, Msize2);
+  fflush (stderr);
 
   st = seconds ();
   for (i = 0; i < Msize2; i++)
@@ -1076,6 +1079,7 @@ main (int argc, char *argv[])
         }
     }
   fprintf (stderr, "# Third phase took %.2fs\n", seconds () - st);
+  fflush (stderr);
 
   if (best_E == DBL_MAX)
     {
@@ -1098,8 +1102,8 @@ main (int argc, char *argv[])
   print_poly (stdout, poly, argc0, argv0, st0, raw);
 
   m_logmu_clear (Mt, Malloc);
-
   cado_poly_clear (poly);
+  mpz_clear (n);
 
   return 0;
 }

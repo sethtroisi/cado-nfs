@@ -672,8 +672,9 @@ generate_poly (cado_poly out, double T, mpz_t b)
         }
       mpz_add_ui (out->m, out->m, 1);
     }
-  fprintf (stderr, "# First phase took %.2fs and kept %lu candidate(s)\n",
+  fprintf (stderr, "# First phase took %.2fs and kept %lu polynomial(s)\n",
            seconds () - st, Msize);
+  fflush (stderr);
 
   /* Second/third phases: loop over entries in M database, and try to find the
      best rotation for each one. In principle we should compute the
@@ -696,8 +697,9 @@ generate_poly (cado_poly out, double T, mpz_t b)
       E = rotate (out->f, d, ALPHA_BOUND_SMALL, M[i].m, M[i].b, 0);
       m_logmu_insert (M, Malloc2, &Msize2, M[i].b, M[i].m, E, "E~");
     }
-  fprintf (stderr, "# Second phase took %.2fs and kept %lu candidate(s)\n",
+  fprintf (stderr, "# Second phase took %.2fs and kept %lu polynomial(s)\n",
            seconds () - st, Msize2);
+  fflush (stderr);
 
   st = seconds ();
   for (i = 0; i < Msize2; i++)
@@ -712,6 +714,7 @@ generate_poly (cado_poly out, double T, mpz_t b)
         }
     }
   fprintf (stderr, "# Third phase took %.2fs\n", seconds () - st);
+  fflush (stderr);
 
   mpz_clear (k);
   mpz_clear (t);
