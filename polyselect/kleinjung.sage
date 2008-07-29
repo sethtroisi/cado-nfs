@@ -85,7 +85,7 @@ def optimize_tuple(f,g):
     c=[(a0+toto(f,g,l2norm_tk,s,i),i) for i in [0..14]]
     cm=min(c)
     s0= "p=%r m=%r"%(p,m)
-    s1= "%.2f -> %.2f [10^%d]" %(flog(best_l2norm_tk(f))+a1,cm[0],cm[1])
+    s1= "%.2f -> %.2f [10^%d]" %(flog(best_l2norm_tk(f))+a0+a1,cm[0],cm[1])
     print s0 + " " + s1
     return cm
 
