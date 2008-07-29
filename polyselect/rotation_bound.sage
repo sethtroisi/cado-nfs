@@ -24,6 +24,12 @@ attach gnuplot_stuff.sage
 # Note that the table has indices scaled by 10.
 reduced_alpha_affine_table=build_reduced_minimum_normal_table(0.571,0.851,0.05)
 
+
+# Indicates how far we hope to be from the expected value for the best
+# alpha. 0 means exactly on the mean, hence 50% chances. +1 means 1
+# standard deviation above, hence 84% chances. -1 means 16% chances.
+deviation=0
+
 ##### Norm computations.
 
 def deskew_polynomial(f,s):
@@ -300,7 +306,7 @@ def logsupnorm_plus_alpha_rot(f,g,w,h):
     lm=flog(g[0])
     lognorm=log_best_supnorm_from_log_a_quick(h,max(lf0,w*flog(10)+lm))
     alpha=eval_dichotomy(reduced_alpha_affine_table,10.0*w)
-    return float(lognorm+alpha[0]+alpha[1])
+    return float(lognorm+alpha[0]+deviation*alpha[1])
 
 def lognorm_plus_alpha_rot(f,g,normfunc,w):
     """
@@ -313,14 +319,14 @@ def lognorm_plus_alpha_rot(f,g,normfunc,w):
     E=[fexp10(w), -fexp10(w)]
     lognorm=min([flog(normfunc(RP(f)+e*RP(g))) for e in E])
     alpha=eval_dichotomy(reduced_alpha_affine_table,10.0*(w))
-    return float(lognorm+alpha[0]+alpha[1])
+    return float(lognorm+alpha[0]+deviation*alpha[1])
 
 def lognorm_plus_alpha_rot_scons(f,g,normfunc,skew,w):
     RP=PolynomialRing(RealField(),'z');
     E=[fexp10(w), -fexp10(w)]
     lognorm=min([flog(normfunc(RP(f)+e*RP(g), skew)) for e in E])
     alpha=eval_dichotomy(reduced_alpha_affine_table,10.0*(w))
-    return float(lognorm+alpha[0]+alpha[1])
+    return float(lognorm+alpha[0]+deviation*alpha[1])
 
 # returns expected value of lognorm + alpha for a rotation range of 10^w
 def lognorm_plus_alpha_rot_scons_linear(f,g,normfunc,skew,w):
@@ -333,7 +339,7 @@ def lognorm_plus_alpha_rot_scons_linear(f,g,normfunc,skew,w):
     E=[ Ea*z+Eb, Ea*z-Eb, -Ea*z+Eb, -Ea*z-Eb ];
     lognorm=min([flog(normfunc(RP(f)+e*RP(g), skew)) for e in E])
     alpha=eval_dichotomy(reduced_alpha_affine_table,10.0*(w))
-    return float(lognorm+alpha[0]+alpha[1])
+    return float(lognorm+alpha[0]+deviation*alpha[1])
 
 def lognorm_plus_alpha_rot_linear(f,g,normfunc,skew,w):
     s=flog(skew)
@@ -345,7 +351,7 @@ def lognorm_plus_alpha_rot_linear(f,g,normfunc,skew,w):
     E=[ Ea*z+Eb, Ea*z-Eb, -Ea*z+Eb, -Ea*z-Eb ];
     lognorm=min([flog(normfunc(RP(f)+e*RP(g))) for e in E])
     alpha=eval_dichotomy(reduced_alpha_affine_table,10.0*(w))
-    return float(lognorm+alpha[0]+alpha[1])
+    return float(lognorm+alpha[0]+deviation*alpha[1])
 
 def lognorm_plus_alpha_rot_linear_sopt(f,g,normfunc,w):
     cands=[]
@@ -363,7 +369,7 @@ def lognorm_plus_alpha_rot_linear_sopt(f,g,normfunc,w):
         lognorm=min([flog(normfunc(RP(f)+e*RP(g))) for e in E])
         cands.append(lognorm)
     alpha=eval_dichotomy(reduced_alpha_affine_table,10.0*(w))
-    return float(min(cands)+alpha[0]+alpha[1])
+    return float(min(cands)+alpha[0]+deviation*alpha[1])
 
 def rotatebound_dichotomy_sbest(f,g):
     """ this can be used to plot optimal-skew choices, for degree 0 rotation"""
