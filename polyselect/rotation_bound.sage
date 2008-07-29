@@ -322,6 +322,7 @@ def lognorm_plus_alpha_rot_scons(f,g,normfunc,skew,w):
     alpha=eval_dichotomy(reduced_alpha_affine_table,10.0*(w))
     return float(lognorm+alpha[0]+alpha[1])
 
+# returns expected value of lognorm + alpha for a rotation range of 10^w
 def lognorm_plus_alpha_rot_scons_linear(f,g,normfunc,skew,w):
     s=flog(skew)
     logb=(w*flog(10)+s)/2

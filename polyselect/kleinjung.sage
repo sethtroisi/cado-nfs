@@ -1,3 +1,5 @@
+attach "alpha.sage"
+attach "rotation_bound.sage"
 
 def lemme_21(n,d,ad,p,m):
     """Implements Kleinjung's lemma 2.1"""
@@ -36,5 +38,48 @@ def lemme_21(n,d,ad,p,m):
 # g=ZZ['x']([-1291187456580021223163547791574810881,34661003550492501851445829])
 # f0,ds,rs=lemme_21(n,6,f[6],g[1],-g[0])
 # (f-f0)/g
+
+def rotation (n,d,p,m):
+   """Computes optimal rotation for degree-d polynomial for integer n with
+      linear polynomial p*x-m"""
+   B = 2000
+   ad = n/m^d % p
+   f = lemme_21(n,d,ad,p,m)[0]
+   g = parent(f)(p*x-m)
+   s = skew_l2norm_tk (f)
+   lognorm = log (l2norm_tk (f, s))
+   alp = alpha (f, B)
+   E = lognorm + alp
+   print "original polynomial: lognorm=", lognorm, " alpha=", alp, " E=", E
+   w = 2
+   r = lognorm_plus_alpha_rot_scons_linear (f, g, l2norm_tk, s, flog10(w))
+   oldr = 2 * r
+   while r < oldr:
+      oldr = r
+      w = 2 * w
+      r = lognorm_plus_alpha_rot_scons_linear (f, g, l2norm_tk, s, flog10(w))
+   # the constant polynomial varies up to V = sqrt(w*s), and the linear
+   # polynomial up to U = sqrt(w/s)
+   U = ceil(sqrt(w/s))
+   V  = ceil(sqrt(w*s))
+   Emin = E
+   umin = 0
+   vmin = 0
+   print "rotation bounds:", U, V
+   sys.stdout.flush()
+   for u in range(-U,U+1):
+      print "u=", u
+      for v in range(-V,V+1):
+         frot = f + parent(f)(u*x+v)*g
+         lognorm = log (best_l2norm_tk (frot))
+         alp = alpha (frot, B)
+         E = lognorm + alp
+         if E < Emin:
+            Emin = E
+            umin = u
+            vmin = v
+            print "u=", umin, "v=", vmin, "lognorm=", lognorm, "alpha=", alp, "E=", Emin
+            sys.stdout.flush()
+   return p, m, umin*x+vmin, Emin
 
 
