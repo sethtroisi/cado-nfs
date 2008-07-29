@@ -6,9 +6,10 @@
 #include <math.h>
 #include <string.h>
 #include "getprime.c"
+#include "ecm.h"
 
 #undef MODTRACE
-#include "mod_ul.h"
+// #include "mod_ul.h"
 
 #define BRENT12 0
 #define MONTY12 1

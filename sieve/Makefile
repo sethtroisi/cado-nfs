@@ -18,8 +18,8 @@ endif
 include $(TOP)/Makefile.tifa-support
 
 # We require the cado utils library
-MY_LFLAGS+=-L$(TOP)/utils
-MY_CFLAGS+=-I$(TOP)/utils
+MY_LFLAGS+=-L$(TOP)/utils -Lecm
+MY_CFLAGS+=-I$(TOP)/utils -Iecm
 
 all: sieve makefb las
 
@@ -28,10 +28,10 @@ sieve: sieve.o fb.o ;
 makefb: makefb.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -ltifa -lgmp -lm
 las: las.o fb.o
-	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -ltifa -lgmp -lm
+	$(CC) $(MY_LFLAGS) -o $@ $^ -lfacul -lutils -ltifa -lgmp -lm
 
 # Some dependencies on headers.
-las.o: bucket.h
+las.o: bucket.h ecm/facul.h
 fb.o : fb.c fb.h config.h basicnt.h
 sieve.o : sieve.c bucket.h config.h basicnt.h $(TOP)/cado.h
 makefb.o : makefb.c

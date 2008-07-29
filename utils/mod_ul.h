@@ -40,7 +40,51 @@
 #endif
 #endif
 
+#ifdef  mod_init
+#warning "mod_ul.h included after modredc_ul.h ; bindings overwritten"
+#endif
+
 /* Define the default names and types for arithmetic with these functions */
+#undef mod_init
+#undef mod_init_noset0
+#undef mod_clear
+#undef mod_set
+#undef mod_set_ul
+#undef mod_set_ul_reduced
+#undef mod_swap
+#undef mod_initmod_ul
+#undef mod_getmod_ul
+#undef mod_clearmod
+#undef mod_get_ul
+#undef mod_equal
+#undef mod_is0
+#undef mod_add
+#undef mod_add_ul
+#undef mod_sub
+#undef mod_sub_ul
+#undef mod_neg
+#undef mod_mul
+#undef mod_addredc_ul
+#undef mod_mulredc_ul
+#undef mod_muladdredc_ul
+#undef mod_div2
+#undef mod_div3
+#undef mod_pow_ul
+#undef mod_pow_mp
+#undef mod_2pow_mp
+#undef mod_V_ul
+#undef mod_V_mp
+#undef mod_sprp
+#undef mod_gcd
+#undef mod_inv
+#undef mod_jacobi
+#undef mod_set0
+#undef mod_set1
+#undef mod_next
+#undef mod_finished
+#undef residue_t
+#undef modulus_t
+
 #define mod_init             modul_init
 #define mod_init_noset0      modul_init_noset0
 #define mod_clear            modul_clear

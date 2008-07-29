@@ -27,6 +27,7 @@ all:
 	$(MAKE) -C utils
 	$(MAKE) -C polyselect
 	(cd postsieve/tifa; $(SCONS_BINARY) $(SCONS_FLAGS))
+	$(MAKE) -C sieve/ecm
 	$(MAKE) -C sieve
 	$(MAKE) -C postsieve/checknorms
 	$(MAKE) -C linalg
@@ -40,6 +41,7 @@ clean:
 	$(MAKE) -C utils		clean
 	$(MAKE) -C polyselect		clean
 	(cd postsieve/tifa; $(SCONS_BINARY) $(SCONS_FLAGS) -c)
+	$(MAKE) -C sieve/ecm		clean
 	$(MAKE) -C sieve		clean
 	$(MAKE) -C postsieve/checknorms	clean
 	$(MAKE) -C linalg		clean

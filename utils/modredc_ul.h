@@ -41,6 +41,10 @@
 #endif
 #endif
 
+#ifdef  mod_init
+#warning "modredc_ul.h included after mod_ul.h ; bindings overwritten"
+#endif
+
 /* Define the default names and types for arithmetic with these functions */
 #undef mod_init
 #undef mod_init_noset0
