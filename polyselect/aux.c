@@ -331,6 +331,12 @@ m_logmu_insert (m_logmu_t* M, unsigned long alloc, unsigned long *psize,
       mpz_set (M[size].m, m);
       M[size].logmu = logmu;
       *psize = size + 1;
+      if (size == 0)
+        fprintf (stderr, "# ");
+      fprintf (stderr, ".");
+      if (*psize == alloc)
+        fprintf (stderr, "\n");
+      fflush (stderr);
       return 1;
     }
   else /* size=alloc: database is full, remove entry with smallest logmu */
