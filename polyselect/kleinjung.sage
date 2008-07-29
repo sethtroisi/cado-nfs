@@ -132,6 +132,7 @@ def rotation_inner(f,g,u_range, v_range):
     f+lambda*g ; u and v are prescribed to the ranges u_range and
     v_range"""
     B=2000
+    x = f.parent().gen()
     lognorm = flog (best_l2norm_tk(f))
     a0=alpha_projective(f,B)
     a1=alpha_affine(f,B)
