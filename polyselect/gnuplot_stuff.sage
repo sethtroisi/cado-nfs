@@ -1,4 +1,5 @@
 
+import time
 
 # Maybe it's just me, but frankly the native sage plot interface sucks.
 # This is a wrapper around gnuplot, requiring the gnuplotpy sage package.
