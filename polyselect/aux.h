@@ -55,5 +55,5 @@ typedef struct {
 m_logmu_t* m_logmu_init (unsigned long);
 void m_logmu_clear (m_logmu_t*, unsigned long);
 int m_logmu_insert (m_logmu_t*, unsigned long, unsigned long*, mpz_t, mpz_t,
-                    double, char*);
+                    double, char*, int);
 

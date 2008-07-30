@@ -230,8 +230,8 @@ possible_candidate (int * mu, int l, int d, mpz_t *a, mpz_t P, mpz_t N,
     if (lognorm <= logM) {
         if (verbose)
           {
-            gmp_printf ("p=%Zd m=%Zd norm=%1.2e time=%us\n",
-                        P, t, exp (lognorm), seconds ());
+            gmp_printf ("p=%Zd m=%Zd norm=%1.2e (log %1.2f)\n",
+                        P, t, exp (lognorm), lognorm);
             /* terse output does not need the polynomial */
             if (verbose > 1)
               {
@@ -240,7 +240,7 @@ possible_candidate (int * mu, int l, int d, mpz_t *a, mpz_t P, mpz_t N,
               }
             fflush (stdout);
         }
-        m_logmu_insert (Mt, Malloc, &Msize, P, t, lognorm, "lognorm=");
+        m_logmu_insert (Mt, Malloc, &Msize, P, t, lognorm, "lognorm=", verbose);
     }
     mpz_clear(t);
 }
@@ -817,7 +817,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
 */
 static double
 Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
-        int incr, unsigned int keep)
+        mpz_t incr, unsigned int keep)
 {
   unsigned int *P = NULL, lP = 0;
   unsigned int *Q = NULL, lQ = 0;
@@ -856,7 +856,7 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
   fprintf (stderr, "# max ad=%1.2e\n", max_ad);
   fflush (stderr);
 
-  mpz_set_ui (a[d], incr);
+  mpz_set (a[d], incr);
 
   Q = (unsigned int*) malloc (lP * sizeof (unsigned int));
   mpz_init (t);
@@ -903,7 +903,7 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
           enumerate (Q, lQ, i, max_adm1, max_adm2, a, N, d, g, mtilde, M);
 
     next_ad:
-      mpz_add_ui (a[d], a[d], incr);
+      mpz_add (a[d], a[d], incr);
     }
 
   gmp_fprintf (stderr, "# stopped at ad=%Zd\n", a[d]);
@@ -944,8 +944,8 @@ main (int argc, char *argv[])
   double M = 1e25;
   int l = 7;
   int pb = 256;
-  int incr = 60; /* Implements remark (1) following Algorithm 3.6:
-                    try a[d]=incr, then 2*incr, 3*incr, ... */
+  mpz_t incr; /* Implements remark (1) following Algorithm 3.6:
+                 try a[d]=incr, then 2*incr, 3*incr, ... */
   unsigned int i, best_i = -1;
   double checked, st0 = seconds (), st = st0;
   FILE * f = NULL;
@@ -964,6 +964,7 @@ main (int argc, char *argv[])
 
   param_list_init(pl);
   mpz_init_set_ui(n,0);
+  mpz_init_set_ui (incr, 60);
 
   argv++, argc--;
   for( ; argc ; ) {
@@ -1013,7 +1014,7 @@ main (int argc, char *argv[])
   }
 
   param_list_parse_uint(pl, "keep", &keep);
-  param_list_parse_int(pl, "incr", &incr);
+  param_list_parse_mpz(pl, "incr", incr);
   param_list_parse_int(pl, "l", &l);
   param_list_parse_int(pl, "pb", &pb);
   param_list_parse_double(pl, "M", &M);
@@ -1059,7 +1060,7 @@ main (int argc, char *argv[])
          thus we would need to save Mt[i].m, and redo all steps in the same
          order below */
       E = rotate (poly->f, degree, ALPHA_BOUND_SMALL, Mt[i].m, Mt[i].b, 0);
-      m_logmu_insert (Mt, Malloc2, &Msize2, Mt[i].b, Mt[i].m, E, "E~");
+      m_logmu_insert (Mt, Malloc2, &Msize2, Mt[i].b, Mt[i].m, E, "E~", verbose);
     }
   fprintf (stderr, "# Second phase took %.2fs and kept %lu polynomial(s)\n",
            seconds () - st, Msize2);
@@ -1104,6 +1105,7 @@ main (int argc, char *argv[])
   m_logmu_clear (Mt, Malloc);
   cado_poly_clear (poly);
   mpz_clear (n);
+  mpz_clear (incr);
 
   return 0;
 }
