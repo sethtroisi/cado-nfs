@@ -1008,12 +1008,12 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b, int verbose)
             mpz_poly_eval_si (v, D, d, k);
             e = special_valuation (f, d, p, v);
             alpha = (1.0 / (double) (p - 1) - e) * log ((double) p);
-            A[k - K0] += alpha;
 
+            /* and alpha is the contribution for k */
             if (!mpz_divisible_ui_p (v, p))
               {
                 /* then any k + t*p has the same contribution */
-                for (j = k + p; j <= K1; j += p)
+                for (j = k; j <= K1; j += p)
                   A[j - K0] += alpha;
               }
             else
@@ -1083,7 +1083,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b, int verbose)
   rotate_aux (f, b, m, k0, kmin);
 
   if (verbose)
-    printf ("# Rotate by %ld: alpha improved from %f to %f\n", kmin,
+    printf ("# Rotate by %ld: alpha improved from %1.2f to %1.2f\n", kmin,
             alpha0, best_alpha);
 
   free (A);
