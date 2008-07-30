@@ -9,14 +9,18 @@
 
 def number_of_roots(f,p):
     """
-    Counts the roots of f mod p, with multiplicities. Projective roots
-    are also counted (with multiplicities).
+    Counts the roots of f mod p, without multiplicities. Projective roots
+    are also counted (without multiplicities).
     """
     fp= GF(p)['x'](f)
     if fp != 0:
-        s=sum([r[1] for r in fp.roots()])
-        s+=f.degree()-fp.degree()
+        s=len([r[1] for r in fp.roots()])
+        if (f.degree()>fp.degree()):
+            s+=1
     else:
+        # f reducing to zero mod p is a degenerate case. Not clear what
+        # we should return...
+        print "Warning, counting roots of zero polynomial\n"
         s=f.degree()
     return s
 
@@ -37,6 +41,23 @@ def average_valuation_affine(f,p):
             v += average_valuation_affine(f2, p)/p
     return v
 
+#def ava_deviation(f,p):
+#    """
+#    discrepancy wrt the simplistic estimate (for the simplistic
+#    estimates, roots are counted only once)
+#    """
+#    v = valuation (f.content(), p)
+#    ZP= f.parent()
+#    x = ZP.gen()
+#    fv = ZP(f/p^v)
+#    Q = GF(p)['x'](fv.derivative())
+#    for r in fv.roots(GF(p)):
+#        if Q(r[0]) == 0:
+#            f2 = fv(Integers()(r[0])+p*x)
+#            v -= 1/(p-1)
+#            v += average_valuation_affine(f2, p)/p
+#    return v
+#
 def average_valuation_homogeneous_coprime(f,p):
     """
     returns the average p-valuation of f(a,b) for a,b coprime. Projective
@@ -68,6 +89,17 @@ def alpha_p(f,disc,p):
         s = float((1-number_of_roots(f,p)*p/(p+1))*log(p)/(p-1))
     return s
 
+#def alpha_p_affine_deviation(f,disc,p):
+#    """
+#    Computes the contribution at p of the alpha value of f, as a
+#    deviation in comparison to the simplistic estimate.
+#    """
+#    if disc % p == 0:
+#        s = float(-ava_deviation(f,p)*p/(p+1)*log(p))
+#    else:
+#        s = 0
+#    return s
+#
 def alpha_p_affine(f,disc,p):
     """
     Computes the contribution at p of the alpha value of f (affine part
@@ -93,8 +125,19 @@ def alpha_p_projective(f,disc,p):
     else:
         fp= GF(p)['x'](f)
         assert(fp != 0)
+        assert(f.degree()-fp.degree() <= 1)
         s = float((-(f.degree()-fp.degree())*p/(p+1))*log(p)/(p-1))
     return s
+
+#def alpha_p_projective_deviation(f,disc,p):
+#    x=f.parent().gen()
+#    q=f.reverse()(p*x)
+#    if disc % p == 0:
+#        s = float((-ava_deviation(f,p)/(p+1))*log(p))
+#    else:
+#        s = 0
+#    return s
+#
 
 def alpha(f,B):
     """
@@ -153,8 +196,14 @@ def estimate_alpha_p(f, p, nt):
     return float(s*l/n) if n > 0 else Infinity
 
 # auxiliary
+def alpha_p_simplistic(f,p):
+    """
+    This ignores the multiple roots altogether.
+    """
+    return float((1-number_of_roots(f,p)*p/(p+1))*log(p)/(p-1))
+# auxiliary
 def alpha_simplistic(f,B):
     """
     This ignores the multiple roots altogether.
     """
-    return sum([float((1-number_of_roots(f,p)*p/(p+1))*log(p)/(p-1)) for p in prime_range(2,B)])
+    return sum([alpha_p_simplistic(f,p) for p in prime_range(2,B)])
