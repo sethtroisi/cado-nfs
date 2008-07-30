@@ -27,7 +27,7 @@ sieve: sieve.o fb.o ;
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -ltifa -lgmp -lm
 makefb: makefb.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -ltifa -lgmp -lm
-las: las.o fb.o
+las: las.o fb.o ecm/facul.h ecm/facul.a
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lfacul -lutils -ltifa -lgmp -lm
 
 # Some dependencies on headers.
@@ -46,4 +46,4 @@ config.h: config_h.in
 	cp config_h.in config.h
 
 clean:
-	rm -f sieve makefb las *.o *~ config.h
+	rm -f sieve makefb las *.o
