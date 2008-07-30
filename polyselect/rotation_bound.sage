@@ -124,13 +124,16 @@ def skew_supnorm(f):
     m=min(h)
     return m[1]
 
-def unique_positive_real_root(f):
-    """Utility function. Assuming f has only one real root > 0, return
-    it. Fail if the assumption does not hold."""
+def unique_positive_real_root(f,e):
+    """Utility function. Amongst the positive real roots r of f (presumably
+    there's only one), return the one giving the smallest value e(r)"""
     r=f.real_roots()
-    sqrt_root_pos=[s for s in r if s > 0]
-    assert(len(sqrt_root_pos)==1)
-    return sqrt_root_pos[0]
+    root_pos=[s for s in r if s > 0]
+    if len(root_pos)==1:
+        return root_pos[0]
+    else:
+        ev=[(e(r),r) for r in root_pos]
+        return min(ev)[1]
 
 def skew_l1norm(f):
     d=f.degree()
@@ -138,7 +141,7 @@ def skew_l1norm(f):
     # This is not the derivative, but rather 2s^(d/2+1) times the
     # derivative.
     g=ZP([abs(f[i])*(2*i-d) for i in [0..d]])
-    return unique_positive_real_root(g)
+    return unique_positive_real_root(g,lambda s:l1norm(f,s))
 
 def skew_l2norm(f):
     d=f.degree()
@@ -146,7 +149,7 @@ def skew_l2norm(f):
     # This is not the derivative. It's rather, once evaluated at s^2,
     # s^(d+1) times the derivative of the square.
     g=ZP([f[i]^2*(2*i-d) for i in [0..d]])
-    return sqrt(unique_positive_real_root(g))
+    return sqrt(unique_positive_real_root(g,lambda s:l2norm(f,sqrt(s))))
 
 def skew_l2norm_tk(f):
     """Gives the optimal skew for the L2 norm of a polynomial f"""
@@ -155,7 +158,7 @@ def skew_l2norm_tk(f):
     x=ZP.gen()
     coeffs=[4*(2*i-d)*x^i/(2*i+1)/(2*(d-i)+1) for i in [0..d]]
     dd=vector(square_evenpart(f).coefficients())*vector(coeffs)
-    return sqrt(unique_positive_real_root(dd))
+    return sqrt(unique_positive_real_root(dd,lambda s:l2norm_tk(f,sqrt(s))))
 
 # Return the best chosen norm
 def best_supnorm(f):
