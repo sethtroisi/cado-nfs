@@ -1416,8 +1416,7 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
         xToAB (&a, &b, x + N*si->bucket_region, si);
         /* since a,b both even were not sieved, either a or b should be odd */
         ASSERT((a | b) & 1);
-        /* bin_gcd assumes that its first operand is odd */
-        if (bin_gcd ((a&1) == 0 ? a + (int64_t) b : a, b) != 1)
+        if (bin_gcd (a, b) != 1)
           continue;
 
         surv++;
