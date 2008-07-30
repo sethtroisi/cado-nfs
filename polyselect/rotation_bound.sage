@@ -22,7 +22,8 @@ attach gnuplot_stuff.sage
 # approximately this shape. The projective contribution is disregarded
 # because rotation leaves it unaffected.
 # Note that the table has indices scaled by 10.
-reduced_alpha_affine_table=build_reduced_minimum_normal_table(0.571,0.851,0.05)
+#reduced_alpha_affine_table=build_reduced_minimum_normal_table(0.571,0.851,0.05)
+reduced_alpha_affine_table=build_reduced_minimum_normal_table(1.14,0.75,0.005)
 
 # Note however that the affine contribution is not independent from the
 # projective contribution. Hence for rotation starting from a given
@@ -68,16 +69,16 @@ def square_evenpart(f):
 
 def l2norm_tk(f,s):
     """
-    This norm gives the half-square-root of the integral of f^2 over the
+    This norm gives the square-root of the integral of f^2 over the
     square [-1,1]^2, taking into account the given skewness.
-    Taking half the square root is not really correct, but that's what TK
+    Note: We no longer take the half-sqrt here, which is what TK
     does (out of a mistake, apparently).
     """
     g,ss=deskew_polynomial(f,s)
     g2=square_evenpart(g)
     d=f.degree()
     coeffs=[4/(2*i+1)/(2*(d-i)+1) for i in [0..d]]
-    return 1/2*sqrt(vector(g2.coefficients())*vector(coeffs)/ss)
+    return sqrt(vector(g2.coefficients())*vector(coeffs)/ss)
 
 
 
