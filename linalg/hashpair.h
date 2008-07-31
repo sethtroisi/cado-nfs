@@ -14,9 +14,9 @@ typedef struct {
 
 #define getInitialAddress(a, b, HC0, HC1, M) ((unsigned int)(((HC0)*(a)+(HC1)*(b)) % M))
 
-extern unsigned long getHashMod(unsigned long n);
+extern unsigned long getHashMod(unsigned long n, int verbose);
 extern void hashClear(hashtable_t *H);
-extern void hashInit(hashtable_t *H, unsigned int n);
+extern void hashInit(hashtable_t *H, unsigned int n, int verbose);
 extern void hashFree(hashtable_t *H);
 extern int getHashAddrAux(hashtable_t *H, long p, unsigned long r, unsigned int h);
 extern int getHashAddr(hashtable_t *H, long p, unsigned long r);

@@ -13,7 +13,7 @@ hashClear(hashtable_t *H)
 }
 
 unsigned long
-getHashMod(unsigned long n)
+getHashMod(unsigned long n, int verbose)
 {
     int ntab = 20, i;
     unsigned long tab[] = {500009, 750019, 
@@ -27,14 +27,15 @@ getHashMod(unsigned long n)
 	if(n < tab[i])
 	    break;
     //    ASSERT(i <= ntab);
-    fprintf(stderr, "# hashmod[%d] = %lu\n", i, tab[i]);
+    if (verbose)
+      fprintf (stderr, "# hashmod[%d] = %lu\n", i, tab[i]);
     return tab[i];
 }
 
 void
-hashInit(hashtable_t *H, unsigned int n)
+hashInit(hashtable_t *H, unsigned int n, int verbose)
 {
-    H->hashmod = getHashMod((3*n)/2);
+    H->hashmod = getHashMod((3*n)/2, verbose);
     H->hashcount = (int *)malloc(H->hashmod * sizeof(int));
     H->hashtab_p = (long *)malloc(H->hashmod * sizeof(long));
     H->hashtab_r = (unsigned long *)malloc(H->hashmod * sizeof(unsigned long));

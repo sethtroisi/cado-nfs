@@ -267,10 +267,10 @@ main(int argc, char **argv)
     //	fic = extractFic(&nfic, &nrelsmax, argv[3]);
     fprintf(stderr, "Number of relations is %u\n", nrelsmax);
 #if AGRESSIVE_MODE == 0
-    hashInit(&Hab, Hsize);
+    hashInit(&Hab, Hsize, 1);
 #else
     fprintf(stderr, "AGRESSIVE_MODE used\n");
-    Hab.hashmod = getHashMod(((unsigned long)nrelsmax) * 10);
+    Hab.hashmod = getHashMod(((unsigned long)nrelsmax) * 10, 1);
     Hab.len = 1 + (Hab.hashmod / NBITS);
     Hab.tab = (unsigned long *)malloc(Hab.len * sizeof(unsigned long));
     memset(Hab.tab, 0, Hab.len * sizeof(unsigned long));

@@ -11,6 +11,8 @@ TOPPATH:=.
 CC:=gcc
 CXX:=g++
 ARQCV:=ar qcv
+# add -DUSE_32BIT_MATRIX_INDICES to OFLAGS if you encounter the bug in bw
+# saying that 16-bit entries are not enough
 OFLAGS:=-O2 -DNDEBUG
 PFLAGS:=
 IFLAGS:=-I ../.. -I ../../utils -I ../../gf2x -I ../../gf2x/cantor -I $(TOPPATH)/include -I . -I old
