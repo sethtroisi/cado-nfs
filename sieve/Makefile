@@ -3,8 +3,12 @@ TOP:=..
 include $(TOP)/Makefile.common
 
 # Some compilation defaults specific to this directory
-CFLAGS+=-DSSE_NORM_INIT
-CFLAGS+=-fkeep-inline-functions
+# The following flags are specific to gcc, and fix a regression in gcc 4.3.0
+CFLAGS+=-fno-ivopts -fno-regmove -fno-tree-copy-prop -fno-tree-sra -fno-tree-ter -fno-tree-vrp
+# using -DSSE_NORM_INIT seems to be slower (about 3% with gcc 4.3.0)
+# CFLAGS+=-DSSE_NORM_INIT
+# -fkeep-inline-functions does not yield any speedup, is it useful?
+# CFLAGS+=-fkeep-inline-functions
 # posix_memalign is not available everywhere... For the time being there is no
 # automatic detection. HAVE_POSIX_MEMALIGN is set to one by default. If this
 # fails, try to set it to zero.
