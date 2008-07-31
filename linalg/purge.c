@@ -897,7 +897,7 @@ main(int argc, char **argv)
 	Hsize = Hsizer + Hsizea;
     }
     fprintf(stderr, "initializing hash tables with Hsize=%d...\n", Hsize);
-    hashInit(&H, Hsize);
+    hashInit(&H, Hsize, 1);
 
     rel_used = (char *)malloc(nrelmax * sizeof(char));
     if (final)

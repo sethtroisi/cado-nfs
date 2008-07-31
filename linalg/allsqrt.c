@@ -389,7 +389,7 @@ SqrtWithIndexAll(char *prefix, char *relname, char *purgedname, char *indexname,
 	    ret = fscanf(kerfile, "%lx", &w);
 
     // use a hash table to rebuild P2
-    hashInit(&H, nrows);
+    hashInit(&H, nrows, 1);
     while(1){
 	if(ndepmin >= ndepmax)
 	    break;
