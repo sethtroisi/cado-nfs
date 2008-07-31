@@ -197,10 +197,10 @@ bin_gcd (int64_t a, int64_t b)
       /* if a was even, then since b is now odd, the new a is odd */
       if (a == 0)
         return (b > 0) ? b : -b;
+      a >>= ctzl (a);
       /* from here on, a and b are odd (or zero) */
       ASSERT(a & 1);
       /* reduce b wrt a */
-      a >>= ctzl (a);
       b = ((b ^ a) & 2) ? b + a : b - a;
     }
   return (a > 0) ? a : -a;
