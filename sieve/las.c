@@ -1882,7 +1882,7 @@ factor_leftover_norm (mpz_t n, unsigned int l,
         }
     } 
 
-#if 1
+#if 1 /* use the facul library */
   nr_factors = facul (ul_factors, n, strategy);
   
   ASSERT (nr_factors == 0 || mpz_cmp_ui (n, ul_factors[0]) != 0);
@@ -1918,6 +1918,8 @@ factor_leftover_norm (mpz_t n, unsigned int l,
 	    }
 	} 
     }
+
+  /* if facul found no factor, call TIFA, which never fails */
 #endif
   
   ecode = tifa_factor (factors, multis, n, FIND_COMPLETE_FACTORIZATION);
@@ -1951,9 +1953,9 @@ factor_leftover_norm (mpz_t n, unsigned int l,
 static void
 usage (char *argv0)
 {
-  fprintf (stderr, "Usage: %s [-checknorms] [-I I] -poly xxx.poly -fb xxx.roots -q0 q0 [-q1 q1] [-rho rho]\n",
+  fprintf (stderr, "Usage: %s [-no-checknorms] [-I I] -poly xxx.poly -fb xxx.roots -q0 q0 [-q1 q1] [-rho rho]\n",
            argv0);
-  fprintf (stderr, "          -checknorms     factor leftover norms\n");
+  fprintf (stderr, "          -no-checknorms  don't factor leftover norms\n");
   fprintf (stderr, "          -I i            sieving region has side 2^i [default %u]\n", DEFAULT_I);
   fprintf (stderr, "          -poly xxx.poly  use polynomial xxx.poly\n");
   fprintf (stderr, "          -fb xxx.roots   use factor base xxx.roots\n");
@@ -1975,7 +1977,7 @@ main (int argc, char *argv[])
     uint64_t *roots;
     unsigned long nroots, tot_reports = 0, survivors0, survivors1;
     factorbase_degn_t * fb_alg, * fb_rat;
-    int checknorms = 0; /* factor or not the remaining norms */
+    int checknorms = 1; /* factor or not the remaining norms */
     int I = DEFAULT_I, i;
     unsigned long sq = 0;
     double totJ = 0.0;
@@ -1987,9 +1989,9 @@ main (int argc, char *argv[])
 
     while (argc > 1 && argv[1][0] == '-')
       {
-        if (strcmp (argv[1], "-checknorms") == 0)
+        if (strcmp (argv[1], "-no-checknorms") == 0)
           {
-            checknorms = 1;
+            checknorms = 0;
             argc -= 1;
             argv += 1;
           }
