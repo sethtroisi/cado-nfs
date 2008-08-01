@@ -102,7 +102,7 @@ void facul_print_stats (FILE *stream)
   int i, notfirst;
   unsigned long sum;
 
-  fprintf (stream, "facul statistics.\nhistogram of methods called: ");
+  fprintf (stream, "# facul statistics.\n# histogram of methods called: ");
   notfirst = 0;
   sum = 0;
   for (i = 0; i < STATS_LEN; i++)
@@ -114,7 +114,7 @@ void facul_print_stats (FILE *stream)
     }
   fprintf (stream, ". Total: %lu\n", sum);
 
-  fprintf (stream, "histogram of input numbers found: ");
+  fprintf (stream, "# histogram of input numbers found: ");
   notfirst = 0;
   sum = 0;
   for (i = 0; i < STATS_LEN; i++)
