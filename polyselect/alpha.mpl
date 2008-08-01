@@ -53,8 +53,11 @@ local disc, d, t, pvaluation_disc, p_divides_lc, e, v, g;
       e := nops(Roots(f) mod p);
       if p_divides_lc then e:=e+1 fi;
       p*e/(p^2-1)
-   elif pvaluation_disc = 1 and p_divides_lc = false then
+   elif pvaluation_disc = 1 then # and p_divides_lc = false
+      # the condition p_divides_lc = false does not seem mandatory
+      # but we have to add 1 to e of p divides lc(f)
       e := nops(Roots(f) mod p);
+      if p_divides_lc then e:=e+1 fi;
       (p*e-1)/(p^2-1)
    else
       v := val0 (f, p) * p;

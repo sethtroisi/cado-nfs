@@ -723,11 +723,12 @@ special_valuation (mpz_t * f, int d, unsigned long p, mpz_t disc)
 	    e++;
 	}
 	return (pd * e) / (pd * pd - 1);
-    } else if (pvaluation_disc == 1 && (p_divides_lc == 0)) {
-	/* special case where p^2 does not divide disc and p does not
-	   divide lc(f) */
+    } else if (pvaluation_disc == 1) {
+      /* special case where p^2 does not divide disc */
 	int e;
 	e = poly_roots_ulong(NULL, f, d, p);
+        if (p_divides_lc)
+          e ++;
 	/* something special here. */
 	return (pd * e - 1) / (pd * pd - 1);
     } else {
