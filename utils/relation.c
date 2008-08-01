@@ -60,7 +60,7 @@ read_relation (relation_t *rel, const char *str)
   ret = sscanf (str, "%ld,%lu:", &(rel->a), &(rel->b));
   if (ret != 2)
     {
-      fprintf (stderr, "warning: failed reading a,b\n");
+      fprintf (stderr, "warning: failed reading a,b in relation '%s'\n", str);
       return 0;
     }
   while (str[0] != ':')
