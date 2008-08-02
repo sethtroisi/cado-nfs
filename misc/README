@@ -21,6 +21,10 @@
       A4  <etc>
       A5  <etc>
 
+      This can be done with:
+
+      $ ./convert_poly -of msieve < cxxx.poly > msieve.fb
+
    b) create a file msieve.dat, which contains:
 
       N <number to be factored>
