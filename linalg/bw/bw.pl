@@ -369,7 +369,7 @@ if ($modulus eq '2' && $multisols == 0) {
 
 account 'io';
 
-my $balance = "${bindir}bw-balance --legacy --subdir $wdir --pad-square";
+my $balance = "${bindir}bw-balance --legacy --subdir $wdir --square";
 $balance .= " --in $matrix --out matrix.txt";
 $balance .= " --remove-input" if $remove_input;
 
