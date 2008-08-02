@@ -18,6 +18,10 @@
 
 #define P0_MAX 1000
 
+/* if NEAREST is defined, round m0 and the x[i][j] to nearest, instead of
+   towards +infinity as in the original Algorithm 3.6 */
+#define NEAREST
+
 int verbose = 0;
 double search_time = 0.0;
 m_logmu_t *Mt; /* stores values of m, b and log(mu) found in 1st phase */
@@ -230,8 +234,8 @@ possible_candidate (int * mu, int l, int d, mpz_t *a, mpz_t P, mpz_t N,
     if (lognorm <= logM) {
         if (verbose)
           {
-            gmp_printf ("p=%Zd m=%Zd norm=%1.2e (log %1.2f)\n",
-                        P, t, exp (lognorm), lognorm);
+            gmp_printf ("ad=%Zd p=%Zd m=%Zd norm=%1.2e (log %1.2f)\n",
+                        a[d], P, t, exp (lognorm), lognorm);
             /* terse output does not need the polynomial */
             if (verbose > 1)
               {
@@ -574,7 +578,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
            mpz_t *a, mpz_t N, int d, mpz_t *g, mpz_t mtilde, double M)
 {
   int *p, k, i, j;
-  mpz_t **x, t, u, dad, e, e00, P, P_over_pi, m0, invN, M0;
+  mpz_t **x, t, u, dad, e, e00, P, P_over_pi, m0, invN, M0, P_over_2;
   unsigned int pi;
   unsigned long *roots;
   double eps, f0, **f, one_over_P2, checked = 0.0, Pd;
@@ -597,6 +601,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
   mpz_init (e);
   mpz_init (e00);
   mpz_init (P_over_pi);
+  mpz_init (P_over_2);
   mpz_init (P);
   mpz_init (m0);
   mpz_init (M0);
@@ -621,10 +626,15 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
           /* compute 1/N mod P */
           mpz_invert (invN, N, P);
 
+          mpz_div_2exp (P_over_2, P, 1); /* floor(P/2) */
+#ifndef NEAREST
           /* m0 is the smallest integer bigger than mtilde and divisible by P:
              m0 = s*P, where s = ceil(mtilde/P) = floor((mtilde + P - 1)/P) */
           mpz_add (t, mtilde, P);
           mpz_sub_ui (t, t, 1);
+#else /* we round to nearest instead */
+          mpz_add (t, mtilde, P_over_2);
+#endif
           mpz_tdiv_q (t, t, P);
           mpz_mul (m0, t, P);
           eps = max_adm2 / mpz_get_d (m0);
@@ -670,6 +680,11 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
                   mpz_mul_ui (x[i][j], t, roots[j]);
                   mpz_mod_ui (x[i][j], x[i][j], pi);
                   mpz_mul (x[i][j], x[i][j], P_over_pi);
+#ifdef NEAREST
+                  /* round the x[i][j] to nearest */
+                  if (mpz_cmp (x[i][j], P_over_2) > 0)
+                    mpz_sub (x[i][j], x[i][j], P);
+#endif
                 }
             }
           if (verbose >= 2) printf("done\n");
@@ -797,6 +812,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
   mpz_clear (e);
   mpz_clear (e00);
   mpz_clear (P_over_pi);
+  mpz_clear (P_over_2);
   mpz_clear (P);
   mpz_clear (m0);
   mpz_clear (M0);
