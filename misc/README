@@ -31,5 +31,6 @@
       <all the relations in GGNFS/CADO format>
 
    c) then run "msieve -nc -v <number to be factored>"
+      The msieve output goes into msieve.log.
+      You can add the "-t 4" option to use 4 threads.   
 
-   (The msieve output goes into msieve.log.)
