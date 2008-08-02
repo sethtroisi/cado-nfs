@@ -1028,8 +1028,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b, int verbose)
                     /* invariant: v = disc (f + j*g), and alpha is the
                        contribution for j */
                     A[j - K0] += alpha;
-                    if (!mpz_divisible_ui_p (v, pp) &&
-                        !mpz_divisible_ui_p (f[d], p))
+                    if (!mpz_divisible_ui_p (v, pp))
                       {
                         /* then any j + t*p^2 has the same contribution */
                         for (l = j + pp; l <= K1; l += pp)
