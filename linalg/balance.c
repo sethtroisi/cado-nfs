@@ -1884,6 +1884,7 @@ int main(int argc, char * argv[])
             if (!argc) usage();
             nvslices = atoi(argv[0]);
         } else {
+          fprintf (stderr, "Unknown option: %s\n", argv[0]);
             usage();
         }
     }
