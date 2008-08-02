@@ -13,7 +13,17 @@
 
 #define MAX_DEGREE 6
 
-void
+/************************** input routines ***********************************/
+
+static void
+readline (void)
+{
+  int c;
+
+  while ((c = getchar ()) != '\n');
+}
+
+static void
 read_franke (mpz_t N, mpz_t *X, mpz_t Y1, mpz_t Y0, mpz_t M)
 {
   int c;
@@ -134,33 +144,7 @@ read_franke (mpz_t N, mpz_t *X, mpz_t Y1, mpz_t Y0, mpz_t M)
     }
 }
 
-void
-readline (void)
-{
-  int c;
-
-  while ((c = getchar ()) != '\n');
-}
-
-void
-readstring (char *s)
-{
-  int i, n;
-  char *t;
-  
-  n = strlen (s);
-  t = malloc (n * sizeof (char));
-  for (i = 0; i < n; i++)
-    t[i] = getchar ();
-  if (strncmp (s, t, n) != 0)
-    {
-      fprintf (stderr, "Error, expected %s, got %s\n", s, t);
-      exit (1);
-    }
-  free (t);
-}
-
-void
+static void
 read_ggnfs (mpz_t N, mpz_t *X, mpz_t Y1, mpz_t Y0, mpz_t M)
 {
   int i, ret;
@@ -232,7 +216,7 @@ read_ggnfs (mpz_t N, mpz_t *X, mpz_t Y1, mpz_t Y0, mpz_t M)
     }
 }
 
-void
+static void
 read_cwi (mpz_t N, mpz_t *X, mpz_t Y1, mpz_t Y0, mpz_t M)
 {
   int npoly; /* number of polynomials */
@@ -298,7 +282,9 @@ read_cwi (mpz_t N, mpz_t *X, mpz_t Y1, mpz_t Y0, mpz_t M)
     }
 }
 
-void
+/************************** output routines **********************************/
+
+static void
 out_cwi (mpz_t N, mpz_t *X, int deg, mpz_t Y1, mpz_t Y0, mpz_t M)
 {
   int i;
@@ -319,7 +305,7 @@ out_cwi (mpz_t N, mpz_t *X, int deg, mpz_t Y1, mpz_t Y0, mpz_t M)
   printf ("\n\n10000000\n");
 }
 
-void
+static void
 out_franke (mpz_t N, mpz_t *X, int deg, mpz_t Y1, mpz_t Y0, mpz_t M)
 {
   int i;
@@ -338,7 +324,7 @@ out_franke (mpz_t N, mpz_t *X, int deg, mpz_t Y1, mpz_t Y0, mpz_t M)
   printf ("0 4000000 2.7 27 54\n");
 }
 
-void
+static void
 out_cado (mpz_t N, mpz_t *X, int deg, mpz_t Y1, mpz_t Y0, mpz_t M)
 {
   int i;
@@ -363,7 +349,19 @@ out_cado (mpz_t N, mpz_t *X, int deg, mpz_t Y1, mpz_t Y0, mpz_t M)
   printf ("\n");
 }
 
-void
+static void
+out_msieve (mpz_t N, mpz_t *X, int deg, mpz_t Y1, mpz_t Y0)
+{
+  int i;
+
+  gmp_printf ("N %Zd\n", N);
+  gmp_printf ("R0 %Zd\n", Y0);
+  gmp_printf ("R1 %Zd\n", Y1);
+  for (i = 0; i <= deg; i++)
+    gmp_printf ("A%d %Zd\n", i, X[i]);
+}
+
+static void
 usage (char *argv0)
 {
   fprintf (stderr, "Usage: %s [options] < file1 > file2\n", argv0);
@@ -371,16 +369,18 @@ usage (char *argv0)
   fprintf (stderr, "        -if xxx - specify input format\n");
   fprintf (stderr, "        -of yyy - specify output format\n");
   fprintf (stderr, "Available formats:\n");
-  fprintf (stderr, "        cado  - CADO-NFS format (default)\n");
-  fprintf (stderr, "        fk    - Franke-Kleinjung format\n");
-  fprintf (stderr, "        ggnfs - GGNFS format\n");
-  fprintf (stderr, "        cwi - CWI format\n");
+  fprintf (stderr, "        cado   - CADO-NFS format (default)\n");
+  fprintf (stderr, "        fk     - Franke-Kleinjung format\n");
+  fprintf (stderr, "        ggnfs  - GGNFS format\n");
+  fprintf (stderr, "        cwi    - CWI format\n");
+  fprintf (stderr, "        msieve - msieve format\n");
 }
 
-#define FORMAT_CADO  0
-#define FORMAT_FK    1
-#define FORMAT_GGNFS 2
-#define FORMAT_CWI   3
+#define FORMAT_CADO   0
+#define FORMAT_FK     1
+#define FORMAT_GGNFS  2
+#define FORMAT_CWI    3
+#define FORMAT_MSIEVE 4
 
 int
 main (int argc, char *argv[])
@@ -402,6 +402,8 @@ main (int argc, char *argv[])
             iformat = FORMAT_GGNFS;
           else if (strcmp (argv[2], "cwi") == 0)
             iformat = FORMAT_CWI;
+          else if (strcmp (argv[2], "msieve") == 0)
+            iformat = FORMAT_MSIEVE;
           else
             {
               fprintf (stderr, "Error, invalid format: %s\n", argv[2]);
@@ -420,6 +422,8 @@ main (int argc, char *argv[])
             oformat = FORMAT_GGNFS;
           else if (strcmp (argv[2], "cwi") == 0)
             oformat = FORMAT_CWI;
+          else if (strcmp (argv[2], "msieve") == 0)
+            oformat = FORMAT_MSIEVE;
           else
             {
               fprintf (stderr, "Error, invalid format: %s\n", argv[2]);
@@ -463,6 +467,8 @@ main (int argc, char *argv[])
     out_franke (N, X, deg, Y1, Y0, M);
   else if (oformat == FORMAT_CADO)
     out_cado (N, X, deg, Y1, Y0, M);
+  else if (oformat == FORMAT_MSIEVE)
+    out_msieve (N, X, deg, Y1, Y0);
   else
     {
       fprintf (stderr, "Output format not yet implemented\n");
