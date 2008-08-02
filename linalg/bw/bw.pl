@@ -374,9 +374,9 @@ $balance .= " --in $matrix --out matrix.txt";
 $balance .= " --remove-input" if $remove_input;
 
 if ($mt) {
-    $balance .= " --nhslices $mt";
+    $balance .= " --nslices $mt";
 } else {
-    $balance .= " --nhslices 1";
+    $balance .= " --nslices 1";
     print STDERR "FIXME: bw-balance in non-mt mode serves only to make the matrix square, which is perfectly ridiculous\n";
 }
 action $balance unless ($resume && -f "$wdir/matrix.txt");
