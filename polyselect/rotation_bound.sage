@@ -78,7 +78,7 @@ def l2norm_tk(f,s):
     g2=square_evenpart(g)
     d=f.degree()
     coeffs=[4/(2*i+1)/(2*(d-i)+1) for i in [0..d]]
-    return sqrt(vector(g2.coefficients())*vector(coeffs)/ss)
+    return sqrt(vector(g2.coeffs())*vector(coeffs)/ss)
 
 
 
@@ -158,7 +158,7 @@ def skew_l2norm_tk(f):
     ZP=f.parent()
     x=ZP.gen()
     coeffs=[4*(2*i-d)*x^i/(2*i+1)/(2*(d-i)+1) for i in [0..d]]
-    dd=vector(square_evenpart(f).coefficients())*vector(coeffs)
+    dd=vector(square_evenpart(f).coeffs())*vector(coeffs)
     return sqrt(unique_positive_real_root(dd,lambda s:l2norm_tk(f,sqrt(s))))
 
 # Return the best chosen norm
@@ -185,7 +185,7 @@ def square_l2norm_tk_sym(f,s):
     g2=square_evenpart(f.parent()(g))
     d=f.degree()
     coeffs=[4/(2*i+1)/(2*(d-i)+1) for i in [0..d]]
-    return 1/4*vector(g2.coefficients())*vector(coeffs)/ss
+    return 1/4*vector(g2.coeffs())*vector(coeffs)/ss
 
 
 def bounds_l2norm_tk(f,g,multiplier):
