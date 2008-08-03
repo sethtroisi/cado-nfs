@@ -940,7 +940,7 @@ main(int argc, char **argv)
 	fprintf(stderr, "nrel=%d, nprimes=%d; excess=%d\n", 
 		nrel_new, nprimes_new, nrel_new - nprimes_new);
 
-	if(nrel_new < nprimes_new)
+	if (nrel_new <= nprimes_new) /* covers the case nrel = nprimes = 0 */
 	    exit(1);
 	
 	// we renumber the primes in order of apparition in the hashtable
