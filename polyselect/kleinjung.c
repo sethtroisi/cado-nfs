@@ -568,7 +568,7 @@ has_one_root (mpz_t ad, int d, mpz_t N, unsigned int p0)
   return rho;
 }
 
-/* Enumerates all subsets of kk elements of Q, where Q has lQ elements,
+/* Enumerates all subsets of exactly l elements of Q, where Q has lQ elements,
    such that the product does not exceed max_adm1.
    Assumes a[d] is set to the current search value.
    Returns the number of polynomials checked.
@@ -585,7 +585,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
 
   p = (int*) malloc (l * sizeof (int));
   for (k = 0; k < l; k++)
-    p[k] = k;
+    p[k] = k; /* p[] stores the current indices in [0, lQ-1] we consider */
   x = (mpz_t**) malloc (l * sizeof(mpz_t*));
   f = (double**) malloc (l * sizeof(double*));
   for (i = 0; i < l; i++)
@@ -617,7 +617,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
       Pd = mpz_get_d (P);
       if (Pd <= max_adm1)
         {
-            if (verbose >= 2) {
+            if (verbose >= 3) {
                 printf("# subset");
                 for (k = 0; k < l; k++)
                     printf(" %u",Q[p[k]]);
@@ -655,7 +655,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
           mpz_mul (t, t, P);
           f0 = f0 / mpz_get_d (t);
           
-          if (verbose >= 2) printf("# xij...");
+          if (verbose >= 3) printf("# xij...");
           /* compute the x[i][j] from (3.2) */
           for (i = 0; i < l; i++)
             {
@@ -687,8 +687,8 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
 #endif
                 }
             }
-          if (verbose >= 2) printf("done\n");
-          if (verbose >= 3) {
+          if (verbose >= 3) printf("done\n");
+          if (verbose >= 4) {
               for (i = 0; i < l; i++) {
                   for (j = 0; j < d; j++) {
                       gmp_printf("%Zd, ",x[i][j]);
@@ -900,10 +900,6 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
       if (lQ < l)
         goto next_ad;
 
-      if (verbose >= 2) {
-          gmp_printf("# ad=%Zd\n", a[d]);
-      }
-
       mpz_tdiv_q (mtilde, N, a[d]);
       mpz_root (mtilde, mtilde, d);
       max_adm1 = M * M / mpz_get_d (mtilde);
@@ -911,9 +907,12 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
                       pow (mpz_get_d (mtilde), (double) (d - 4))),
                       1.0 / (double) (d - 2));
 
+      if (verbose >= 2)
+        gmp_printf ("# try ad=%Zd max_adm1=%e max_adm2=%e\n",
+                    a[d], max_adm1, max_adm2);
+
       /* enumerate all subsets Pprime of at least l elements of Q such that
          prod(r, r in Pprime) <= max_adm1 */
-      //      fprintf (stderr, "max_adm1=%e\n", max_adm1);
       for (i = l; i <= lQ; i++)
         checked +=
           enumerate (Q, lQ, i, max_adm1, max_adm2, a, N, d, g, mtilde, M);
