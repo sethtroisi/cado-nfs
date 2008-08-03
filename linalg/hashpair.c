@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "hashpair.h"
+#include "../utils/utils.h"
 
 void
 hashClear(hashtable_t *H)
@@ -15,21 +16,10 @@ hashClear(hashtable_t *H)
 unsigned long
 getHashMod(unsigned long n, int verbose)
 {
-    int ntab = 20, i;
-    unsigned long tab[] = {500009, 750019, 
-			   1000003, 5000011, 7500013,
-			   10000019, 20000003, 30000001, 40000003, 50000017, 
-			   60000011, 70000027, 80000023, 90000049,
-			   100000007, 200000033, 300000007, 400000009,
-			   500000003, 1000000007};
-
-    for(i = 0; i < ntab; i++)
-	if(n < tab[i])
-	    break;
-    //    ASSERT(i <= ntab);
-    if (verbose)
-      fprintf (stderr, "# hashmod[%d] = %lu\n", i, tab[i]);
-    return tab[i];
+  n = ulong_nextprime (n);
+  if (verbose)
+    fprintf (stderr, "# hashmod = %lu\n", n);
+  return n;
 }
 
 void
@@ -39,6 +29,14 @@ hashInit(hashtable_t *H, unsigned int n, int verbose)
     H->hashcount = (int *)malloc(H->hashmod * sizeof(int));
     H->hashtab_p = (long *)malloc(H->hashmod * sizeof(long));
     H->hashtab_r = (unsigned long *)malloc(H->hashmod * sizeof(unsigned long));
+    if (verbose)
+      {
+        unsigned long alloc_hashcount = H->hashmod * sizeof(int);
+        unsigned long alloc_hashtab_p = H->hashmod * sizeof(long);
+        unsigned long alloc_hashtab_r = H->hashmod * sizeof(unsigned long);
+        fprintf (stderr, "Allocated hash table of %lu bytes\n",
+                 alloc_hashcount + alloc_hashtab_p + alloc_hashtab_r);
+      }
     if(sizeof(unsigned long) == 8){
 	H->HC0 = 314159265358979323UL;
 	H->HC1 = 271828182845904523UL;
@@ -85,7 +83,7 @@ getHashAddrAux(hashtable_t *H, long p, unsigned long r, unsigned int h)
     if(cpt >= 50)
 	printf("#W# cpt = %u >= 50\n", cpt);
 #endif
-    if(cpt >= cptmax){
+    if(cpt > cptmax){
 	cptmax = cpt;
 	if(cptmax > 100) fprintf(stderr, "HASH: cptmax = %u\n", cptmax);
     }
@@ -113,7 +111,8 @@ hashInsert(hashtable_t *H, long p, unsigned long r)
     return h;
 }
 
-void hashCheck(hashtable_t *H, int nprimes)
+void
+hashCheck (hashtable_t *H)
 {
     int nb = 0;
     unsigned int i;
@@ -121,6 +120,7 @@ void hashCheck(hashtable_t *H, int nprimes)
     for(i = 0; i < H->hashmod; i++)
 	if(H->hashcount[i] > 0)
 	    nb++;
-    fprintf(stderr, "// #[hash>0]=%d vs. nprimes=%d\n", nb, nprimes);
+    fprintf(stderr, "Hash table %1.1f%% full (%u entries vs size %lu)\n",
+            100.0 * (double) nb / (double) H->hashmod, nb, H->hashmod);
 }
 

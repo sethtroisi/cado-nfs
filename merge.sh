@@ -6,7 +6,7 @@
 usempi=false
 resume=false
 
-cado=$HOME/CADO-src
+cado=$CADO
 mpidir=/share/stymphale/lix/morain/openmpi-1.2.6
 
 hosts="painvin,parmesan,tomme,emmental,abondance,ambiorix,appenzeller"

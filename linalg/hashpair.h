@@ -21,6 +21,7 @@ extern void hashFree(hashtable_t *H);
 extern int getHashAddrAux(hashtable_t *H, long p, unsigned long r, unsigned int h);
 extern int getHashAddr(hashtable_t *H, long p, unsigned long r);
 extern int hashInsert(hashtable_t *H, long p, unsigned long r);
+extern void hashCheck (hashtable_t *H);
 
 #ifdef	__cplusplus
 }	/* extern "C" */

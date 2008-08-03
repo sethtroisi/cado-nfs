@@ -51,6 +51,21 @@ uint64_nextprime (uint64_t q)
   return q;
 }
 
+/* same as above, for an unsigned long */
+unsigned long
+ulong_nextprime (unsigned long q)
+{
+  mpz_t p;
+
+  mpz_init (p);
+  mpz_set_ui (p, q);
+  mpz_nextprime (p, p);
+  ASSERT_ALWAYS (mpz_fits_ulong_p (p));
+  q = mpz_get_ui (p);
+  mpz_clear (p);
+  return q;
+}
+
 #define REPS 1 /* number of Miller-Rabin tests in isprime */
 
 int

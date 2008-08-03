@@ -131,16 +131,22 @@ largeFreeRelations (cado_poly pol, char **fic, int nfic, int verbose)
     int Hsizea, nprimes_alg = 0, nfree = 0, i;
 
     ASSERT(fic != NULL);
-    Hsizea = (1<<pol[0].lpba)/((int)(pol[0].lpba * log(2.0)));
+    /* The number of algebraic large primes is about 1/2*L/log(L)
+       where L is the algebraic large prime bound, i.e., L=2^lpba.
+       However since we store separately primes p and the corresponding root r
+       of f mod p, the number of (p,r) pairs is about L/log(L). */
+    Hsizea = (1 << pol[0].lpba) / ((int)((double) pol[0].lpba * log(2.0)));
     hashInit (&H, Hsizea, verbose);
     if (verbose)
       fprintf (stderr, "Scanning relations\n");
     for(i = 0; i < nfic; i++){
       if (verbose)
-	fprintf(stderr, "Adding file %s\n", fic[i]);
+	fprintf (stderr, "Adding file %s\n", fic[i]);
       file = fopen(fic[i], "r");
       scan_relations (file, &nprimes_alg, &H, verbose);
       fclose(file);
+      if (verbose)
+        hashCheck (&H);
     }
     if (verbose)
       fprintf (stderr, "nprimes_alg = %d\n", nprimes_alg);
