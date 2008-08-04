@@ -15,12 +15,15 @@
 
 /************************** input routines ***********************************/
 
-static void
-readline (void)
+static int
+readline (char *s)
 {
   int c;
 
-  while ((c = getchar ()) != '\n');
+  while ((c = getchar ()) != '\n' && c != EOF)
+    *s++ = c;
+  *s = '\0';
+  return c;
 }
 
 static void
@@ -144,27 +147,29 @@ read_franke (mpz_t N, mpz_t *X, mpz_t Y1, mpz_t Y0, mpz_t M)
     }
 }
 
+#define MAX_BUF 4096
+
 static void
 read_ggnfs (mpz_t N, mpz_t *X, mpz_t Y1, mpz_t Y0, mpz_t M)
 {
   int i, ret;
-  char s[100]; /* input buffer */
+  char s[MAX_BUF]; /* input buffer */
 
   while (feof (stdin) == 0)
     {
-      ret = scanf ("%s ", s);
-      if (ret != 1)
+      ret = readline (s);
+      if (ret == EOF)
         break;
-      if (strcmp (s, "n:") == 0) /* n: input number */
+      if (strlen (s) + 1 >= MAX_BUF)
         {
-          if (mpz_inp_str (N, stdin, 0) == 0)
+          fprintf (stderr, "Error, buffer overflow\n");
+          exit (1);
+        }
+      if (strncmp (s, "n:", 2) == 0) /* n: input number */
+        {
+          if (mpz_set_str (N, s + 2, 0) != 0)
             {
-              fprintf (stderr, "Error while reading N: ");
-              exit (1);
-            }
-          if (getchar () != '\n')
-            {
-              fprintf (stderr, "Error: end of line expected after N\n");
+              fprintf (stderr, "Error while reading N");
               exit (1);
             }
         }
@@ -175,44 +180,38 @@ read_ggnfs (mpz_t N, mpz_t *X, mpz_t Y1, mpz_t Y0, mpz_t M)
               fprintf (stderr, "Error, too large degree %d\n", i);
               exit (1);
             }
-          mpz_inp_str (X[i], stdin, 0);
-          if (getchar () != '\n')
+          if (mpz_set_str (X[i], s + 3, 0) != 0)
             {
-              fprintf (stderr, "Error: end of line expected after c%d\n", i);
+              fprintf (stderr, "Error while reading X[%d]", i);
               exit (1);
             }
         }
-      else if (strcmp (s, "Y1:") == 0)
+      else if (strncmp (s, "Y1:", 3) == 0)
         {
-          mpz_inp_str (Y1, stdin, 0);
-          if (getchar () != '\n')
+          if (mpz_set_str (Y1, s + 3, 0) != 0)
             {
-              fprintf (stderr, "Error: end of line expected after Y1\n");
+              fprintf (stderr, "Error while reading Y1");
               exit (1);
             }
         }
-      else if (strcmp (s, "Y0:") == 0)
+      else if (strncmp (s, "Y0:", 3) == 0)
         {
-          mpz_inp_str (Y0, stdin, 0);
-          if (getchar () != '\n')
+          if (mpz_set_str (Y0, s + 3, 0) != 0)
             {
-              fprintf (stderr, "Error: end of line expected after Y0\n");
+              fprintf (stderr, "Error while reading Y0");
               exit (1);
             }
         }
-      else if ((strcmp (s, "#") == 0 && scanf ("%s ", s) == 1 &&
-                (strcmp (s, "M") == 0 || strcmp (s, "m:") == 0)) ||
-               (strcmp (s, "M") == 0 || strcmp (s, "m:") == 0))
+      else if (strncmp (s, "# M", 3) == 0 || strncmp (s, "m:", 2) == 0)
         {
-          mpz_inp_str (M, stdin, 0);
-          if (getchar () != '\n')
+          if (mpz_set_str (M, s + 2 + (s[0] == '#'), 0) != 0)
             {
-              fprintf (stderr, "Error: end of line expected after M\n");
+              fprintf (stderr, "Error while reading M or m");
               exit (1);
             }
         }
       else
-        readline ();
+        readline (s);
     }
 }
 
@@ -319,7 +318,9 @@ out_franke (mpz_t N, mpz_t *X, int deg, mpz_t Y1, mpz_t Y0, mpz_t M)
     }
   printf ("Y1 "); mpz_out_str (stdout, 10, Y1); printf ("\n");
   printf ("Y0 "); mpz_out_str (stdout, 10, Y0); printf ("\n");
-  printf ("M ");  mpz_out_str (stdout, 10, M);  printf ("\n");
+  if (mpz_cmp_ui (M, 0) != 0)
+    gmp_printf ("M %Zd\n", M);
+  printf ("# parameters for the linear and algebraic polynomials:\n");
   printf ("0 2000000 2.7 27 54\n");
   printf ("0 4000000 2.7 27 54\n");
 }
@@ -460,6 +461,30 @@ main (int argc, char *argv[])
     }
 
   for (deg = MAX_DEGREE; deg > 0 && mpz_cmp_ui (X[deg], 0) == 0; deg --);
+
+  if (mpz_cmp_ui (M, 0) == 0)
+    {
+      mpz_t t;
+      /* M = -Y0/Y1 mod N */
+      mpz_invert (M, Y1, N);
+      mpz_neg (M, M);
+      mpz_mul (M, M, Y0);
+      mpz_mod (M, M, N);
+      /* check M is also a root of the algebraic polynomial mod N */
+      mpz_init_set (t, X[deg]);
+      for (i = deg - 1; i >= 0; i --)
+        {
+          mpz_mul (t, t, M);
+          mpz_add (t, t, X[i]);
+          mpz_mod (t, t, N);
+        }
+      if (mpz_cmp_ui (t, 0) != 0)
+        {
+          fprintf (stderr, "Polynomials have no common root mod N\n");
+          exit (1);
+        }
+      mpz_clear (t);
+    }
 
   if (oformat == FORMAT_CWI)
     out_cwi (N, X, deg, Y1, Y0, M);
