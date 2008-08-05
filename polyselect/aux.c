@@ -922,6 +922,25 @@ discriminant_k (mpz_t *D, mpz_t *f, int d, mpz_t m, mpz_t b)
   free (M);
 }
 
+/* replace f + k0 * (b*x - m) by f + k * (b*x - m), and return k */
+long
+rotate_aux (mpz_t *f, mpz_t b, mpz_t m, long k0, long k)
+{
+  mpz_addmul_si (f[1], b, k - k0);
+  mpz_submul_si (f[0], m, k - k0);
+  return k;
+}
+
+/* replace f + j0 * x * (b*x - m) by f + j * x * (b*x - m), and return j */
+long
+rotate_aux1 (mpz_t *f, mpz_t b, mpz_t m, long j0, long j)
+{
+  mpz_addmul_si (f[2], b, j - j0);
+  mpz_submul_si (f[1], m, j - j0);
+  return j;
+}
+
+#if 0
 /* Compute bounds for rotation: given f(x) = a[d]*x^d + ... + a[0],
    and g(x) = b*x-m, we want that the 1-norm of f+k*g increases at
    most by a factor 2. Namely, if s is the 1-skewness of f, and n
@@ -929,7 +948,7 @@ discriminant_k (mpz_t *D, mpz_t *f, int d, mpz_t m, mpz_t b)
    (a[0] - k*m)*s^(-d/2) = +/-n.
 */
 static void
-rotate_bounds (mpz_t *f, int d, mpz_t m, long *K0, long *K1)
+rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1)
 {
   double s, n, k0, k1, a0, md;
 
@@ -947,16 +966,113 @@ rotate_bounds (mpz_t *f, int d, mpz_t m, long *K0, long *K1)
   *K0 = (long) k0;
   *K1 = (long) k1;
 }
+#else
+/* Use Emmanuel Thome's idea: assuming alpha(f + k*g) admits a Gaussian
+   distribution with mean 'm' and standard deviation 's', then the probability
+   that one polynomial has a value of alpha >= A is
+   1/2*(1 - erf((A-m)/s/sqrt(2))), thus the probability that K polynomials
+   have all their alpha values >= A is [1/2*(1 - erf((A-m)/s/sqrt(2)))]^K.
+   For 'm' and 's' fixed, and a given K, we define the value of A for which
+   this probability is 1/2 to be the expected value of A for K polynomials.
 
-/* replace f[1] by f[1] + b * (k - k0), f[0] by f[0] - m * (k - k0),
-   and return k */
-static long
-rotate_aux (mpz_t *f, mpz_t b, mpz_t m, long k0, long k)
+   We assume lognorm(f + k*g) + E(alpha(f + k*g)) is first decreasing, then
+   increasing, then the optimal K corresponds to the minimum of that function.
+*/
+static void
+rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1,
+               long *J0, long *J1)
 {
-  mpz_addmul_si (f[1], b, k - k0);
-  mpz_submul_si (f[0], m, k - k0);
-  return k;
+  /* exp_alpha[i] corresponds to K=2^i polynomials for m=0, s=1
+     f := x -> 1/2*(1 - erf(x/sqrt(2)));
+     seq(fsolve(f(x)^(2^k) = 1/2, x=-log[2](1.0+k)), k=0..30);
+   */
+  double exp_alpha[] = {0.0 /* K=1 */, -0.5449521356 /* 2 */,
+                        -0.9981488825 /* 4 */, -1.385198061 /* 8 */,
+                        -1.723526050 /* 16 */, -2.025111894 /* 32 */,
+                        -2.298313131 /* 64 */, -2.549067054 /* 128 */,
+                        -2.781676726 /* 256 */, -2.999326227 /* 512 */,
+                        -3.204420841 /* 1024 */, -3.398814100 /* 2048 */,
+                        -3.583961388 /* 4096 */, -3.761025425 /* 8192 */,
+                        -3.930949902 /* 16384 */, -4.094511733 /* 32768 */,
+                        -4.252358774 /* 65536 */, -4.405037486 /* 131072 */,
+                        -4.553013560 /* 262144 */, -4.696687518 /* 524288 */,
+                        -4.836406692 /* 2^20 */, -4.972474538 /* 2^21 */,
+                        -5.105157963 /* 2^22 */, -5.234693169 /* 2^23 */,
+                        -5.361290351 /* 2^24 */, -5.485137511 /* 2^25 */,
+                        -5.606403590 /* 2^26 */, -5.725241052 /* 2^27 */,
+                        -5.841788041 /* 2^27 */, -5.956170181 /* 2^29 */,
+                        DBL_MAX};
+  int i;
+  long k, k0 = 0, j, j0 = 0;
+  double lognorm, alpha, E0, E, best_E;
+
+  E0 = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
+  /* look for negative k */
+  best_E = E0;
+#define MAX_k 20
+  for (i = 1, k = -2; i < MAX_k; i++, k *= 2)
+    {
+      k0 = rotate_aux (f, b, m, k0, k);
+      lognorm = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
+      alpha = exp_alpha[i];
+      E = lognorm + alpha;
+      if (E < best_E)
+        best_E = E;
+      else
+        break;
+    }
+  *K0 = k;
+  /* now try negative j */
+  for (j = -1; exp_alpha[i] != DBL_MAX; i++, j *= 2)
+    {
+      j0 = rotate_aux1 (f, b, m, j0, j);
+      lognorm = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
+      alpha = exp_alpha[i];
+      E = lognorm + alpha;
+      if (E < best_E)
+        best_E = E;
+      else
+        break;
+    }
+  *J0 = j;
+  /* go back to j=0 */
+  j0 = rotate_aux1 (f, b, m, j0, 0);
+  /* look for positive k */
+  best_E = E0;
+  for (i = 1, k = 2; i < MAX_k; i++, k *= 2)
+    {
+      k0 = rotate_aux (f, b, m, k0, k);
+      lognorm = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
+      alpha = exp_alpha[i];
+      E = lognorm + alpha;
+      if (E < best_E)
+        best_E = E;
+      else
+        break;
+    }
+  *K1 = k;
+  /* now try positive j */
+  for (j = 1; exp_alpha[i] != DBL_MAX; i++, j *= 2)
+    {
+      j0 = rotate_aux1 (f, b, m, j0, j);
+      lognorm = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
+      alpha = exp_alpha[i];
+      E = lognorm + alpha;
+      if (E < best_E)
+        best_E = E;
+      else
+        break;
+    }
+  *J1 = j;
+#if 0
+  printf ("# Rotate bounds: %ld <= j <= %ld, %ld <= k <= %ld\n", *J0, *J1,
+          *K0, *K1);
+#endif
+  /* rotate back to j=k=0 */
+  rotate_aux (f, b, m, k0, 0);
+  rotate_aux1 (f, b, m, j0, 0);
 }
+#endif
 
 /* res <- f(k) */
 static void
@@ -976,28 +1092,39 @@ mpz_poly_eval_si (mpz_t res, mpz_t *f, int d, long k)
    enough such that the norm does not increase too much, and modify f[]
    accordingly. */
 double
-rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b, int verbose)
+rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
+        long *jmin, long *kmin, int verbose)
 {
   mpz_t *D, v;
-  long K0, K1, k0, k, j, l, kmin = 0;
+  long K0, K1, J0, J1, k0, k, i, j, j0, l;
   double *A, alpha, lognorm, best_alpha = DBL_MAX, best_lognorm = DBL_MAX;
-  double alpha0, e;
+  double alpha0 = 0.0, e;
   unsigned long p, pp;
 
   /* first compute D(k) = disc(f + k*g, x) */
   D = alloc_mpz_array (d + 1);
-  discriminant_k (D, f, d, m, b);
   mpz_init (v);
 
   /* compute range for k */
-  rotate_bounds (f, d, m, &K0, &K1);
+  rotate_bounds (f, d, b, m, &K0, &K1, &J0, &J1);
   ASSERT_ALWAYS(K0 <= 0 && 0 <= K1);
 
   A = (double*) malloc ((K1 + 1 - K0) * sizeof(double));
+  j0 = k0 = 0; /* the current coefficients f[] correspond to f+(j*x+k)*g */
+  
+  *jmin = *kmin = 0;
+
+  ASSERT_ALWAYS(J0 < 0 && 0 < J1);
+  for (j = 0;;)
+    {
+      /* we consider j=0, 1, ..., J1, then J0, J0+1, ..., -1 */
+      j0 = rotate_aux1 (f, b, m, j0, j);
+      /* go back to k=0 for the discriminant */
+      k0 = rotate_aux (f, b, m, k0, 0);
+      discriminant_k (D, f, d, m, b);
+
   for (k = K0; k <= K1; k++)
     A[k - K0] = 0.0; /* A[k - K0] will store the value alpha(f + k*g) */
-
-  k0 = 0; /* the coefficients f[] correspond to f+k*g */
 
   for (p = 2; p <= alim; p += 1 + (p & 1))
     if (isprime (p))
@@ -1017,26 +1144,26 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b, int verbose)
             if (!mpz_divisible_ui_p (v, p))
               {
                 /* then any k + t*p has the same contribution */
-                for (j = k; j <= K1; j += p)
-                  A[j - K0] += alpha;
+                for (i = k; i <= K1; i += p)
+                  A[i - K0] += alpha;
               }
             else
               {
                 /* consider classes mod p^2 */
-                for (j = k;;)
+                for (i = k;;)
                   {
-                    /* invariant: v = disc (f + j*g), and alpha is the
-                       contribution for j */
-                    A[j - K0] += alpha;
+                    /* invariant: v = disc (f + i*g), and alpha is the
+                       contribution for i */
+                    A[i - K0] += alpha;
                     if (!mpz_divisible_ui_p (v, pp))
                       {
-                        /* then any j + t*p^2 has the same contribution */
-                        for (l = j + pp; l <= K1; l += pp)
+                        /* then any i + t*p^2 has the same contribution */
+                        for (l = i + pp; l <= K1; l += pp)
                           A[l - K0] += alpha;
                       }
                     else
                       {
-                        for (l = j + pp; l <= K1; l += pp)
+                        for (l = i + pp; l <= K1; l += pp)
                           {
                             mpz_poly_eval_si (v, D, d, l);
                             /* translate from k0 to l */
@@ -1046,12 +1173,12 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b, int verbose)
                             A[l - K0] += alpha;
                           }
                       }
-                    j += p;
-                    if (j >= k + (long) pp || j > K1)
+                    i += p;
+                    if (i >= k + (long) pp || i > K1)
                       break;
-                    mpz_poly_eval_si (v, D, d, j);
-                    /* translate from k0 to j */
-                    k0 = rotate_aux (f, b, m, k0, j);
+                    mpz_poly_eval_si (v, D, d, i);
+                    /* translate from k0 to i */
+                    k0 = rotate_aux (f, b, m, k0, i);
                     e = special_valuation (f, d, p, v);
                     alpha = (1.0 / (double) (p - 1) - e) * log ((double) p);
                   }
@@ -1059,7 +1186,8 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b, int verbose)
           }
       }
 
-  alpha0 = A[0 - K0];
+  if (j == 0)
+    alpha0 = A[0 - K0];
 
   /* now finds the best lognorm+alpha */
   for (k = K0; k <= K1; k++)
@@ -1076,18 +1204,38 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b, int verbose)
             {
               best_lognorm = lognorm;
               best_alpha = alpha;
-              kmin = k;
+              *kmin = k;
+              *jmin = j;
             }
         }
     }
 
+     j++;
+     if (j > J1)
+       j = J0;
+     else if (j == 0)
+       break;
+    }
+
   /* we now have f + k0*(bx-m) and we want f + kmin*(bx-m), thus we have
      to add (kmin-k0)*(bx-m) */
-  rotate_aux (f, b, m, k0, kmin);
+  rotate_aux (f, b, m, k0, *kmin);
+  rotate_aux1 (f, b, m, j0, *jmin);
 
   if (verbose)
-    printf ("# Rotate by %ld: alpha improved from %1.2f to %1.2f\n", kmin,
-            alpha0, best_alpha);
+    {
+      printf ("# Rotate by ");
+      if (*jmin != 0)
+        {
+          if (*jmin != 1)
+            printf ("%ld*", *jmin);
+          printf ("x");
+          if (*kmin >= 0)
+            printf ("+");
+        }
+      printf ("%ld: alpha improved from %1.2f to %1.2f\n", *kmin,
+              alpha0, best_alpha);
+    }
 
   free (A);
 

@@ -34,11 +34,12 @@ unsigned long Malloc, Msize, Malloc2, Msize2;
 void
 Lemma21 (mpz_t *a, mpz_t N, int d, mpz_t p, mpz_t m)
 {
-  mpz_t r, mi;
+  mpz_t r, mi, invp;
   int i;
 
   mpz_init (r);
   mpz_init (mi);
+  mpz_init (invp);
   mpz_set (r, N);
   mpz_pow_ui (mi, m, d);
   if (mpz_cmp_ui (a[d], 0) == 0)
@@ -55,10 +56,16 @@ Lemma21 (mpz_t *a, mpz_t N, int d, mpz_t p, mpz_t m)
       ASSERT (mpz_divisible_p (r, p));
       mpz_divexact (r, r, p);
       mpz_divexact (mi, mi, m); /* now mi = m^i */
-      mpz_invert (a[i], p, mi); /* 1/p mod m^i */
-      mpz_mul (a[i], a[i], r);
-      mpz_neg (a[i], a[i]);
+      if (i == d - 1)
+        {
+          mpz_invert (invp, p, mi); /* 1/p mod m^i */
+          mpz_sub (invp, mi, invp); /* -1/p mod m^i */
+        }
+      else
+        mpz_mod (invp, invp, mi);
+      mpz_mul (a[i], invp, r);
       mpz_mod (a[i], a[i], mi); /* -r/p mod m^i */
+      /* round to nearest in [-m^i/2, m^i/2] */
       mpz_mul_2exp (a[i], a[i], 1);
       if (mpz_cmp (a[i], mi) >= 0)
         {
@@ -74,6 +81,7 @@ Lemma21 (mpz_t *a, mpz_t N, int d, mpz_t p, mpz_t m)
     }
   mpz_clear (r);
   mpz_clear (mi);
+  mpz_clear (invp);
 }
 
 /* utility stuff for the searching algorithm */
@@ -965,8 +973,9 @@ main (int argc, char *argv[])
   double checked, st0 = seconds (), st = st0;
   FILE * f = NULL;
   cado_poly poly;
-  double E, best_E = DBL_MAX;
+  double E, best_E;
   int raw = 1;
+  long jmin, kmin, bestj = 0, bestk = 0;
 
   /* print command line */
   fprintf (stderr, "# %s.r%s", argv[0], REV);
@@ -1066,7 +1075,7 @@ main (int argc, char *argv[])
   Malloc2 = 10; /* we keep the best 10 polynomials only */
   Msize2 = 0;
   st = seconds ();
-  for (i = 0; i < Msize; i++)
+  for (i = 0, best_E = DBL_MAX; i < Msize; i++)
     {
       mpz_set_ui (poly->f[degree], 0);
       Lemma21 (poly->f, n, degree, Mt[i].b, Mt[i].m);
@@ -1074,7 +1083,14 @@ main (int argc, char *argv[])
          norm, and moreover it does not permute with the base-m generation,
          thus we would need to save Mt[i].m, and redo all steps in the same
          order below */
-      E = rotate (poly->f, degree, ALPHA_BOUND_SMALL, Mt[i].m, Mt[i].b, 0);
+      E = rotate (poly->f, degree, ALPHA_BOUND_SMALL, Mt[i].m, Mt[i].b, &jmin,
+                  &kmin, 0);
+      if (E < best_E)
+        {
+          best_E = E;
+          gmp_fprintf (stderr, "# p=%Zd m=%Zd E~%1.2f\n", Mt[i].b, Mt[i].m, E);
+          best_i = i;
+        }
       m_logmu_insert (Mt, Malloc2, &Msize2, Mt[i].b, Mt[i].m, E, "E~", verbose);
     }
   fprintf (stderr, "# Second phase took %.2fs and kept %lu polynomial(s)\n",
@@ -1082,16 +1098,19 @@ main (int argc, char *argv[])
   fflush (stderr);
 
   st = seconds ();
-  for (i = 0; i < Msize2; i++)
+  for (i = 0, best_E = DBL_MAX; i < Msize2; i++)
     {
       mpz_set_ui (poly->f[degree], 0);
       Lemma21 (poly->f, n, degree, Mt[i].b, Mt[i].m);
-      E = rotate (poly->f, degree, ALPHA_BOUND, Mt[i].m, Mt[i].b, 0);
+      E = rotate (poly->f, degree, ALPHA_BOUND, Mt[i].m, Mt[i].b, &jmin,
+                  &kmin, 1);
       if (E < best_E)
         {
           best_E = E;
           gmp_fprintf (stderr, "# p=%Zd m=%Zd E=%1.2f\n", Mt[i].b, Mt[i].m, E);
           best_i = i;
+          bestj = jmin;
+          bestk = kmin;
         }
     }
   fprintf (stderr, "# Third phase took %.2fs\n", seconds () - st);
@@ -1107,7 +1126,8 @@ main (int argc, char *argv[])
   mpz_set_ui (poly->f[degree], 0);
   i = best_i;
   Lemma21 (poly->f, n, degree, Mt[i].b, Mt[i].m);
-  E = rotate (poly->f, degree, ALPHA_BOUND, Mt[i].m, Mt[i].b, 1);
+  rotate_aux (poly->f, Mt[i].b, Mt[i].m, 0, bestk);
+  rotate_aux1 (poly->f, Mt[i].b, Mt[i].m, 0, bestj);
 
   mpz_set (poly->n, n);
   poly->degree = degree;

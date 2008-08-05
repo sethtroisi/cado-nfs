@@ -229,3 +229,35 @@ end:
 sup_norm := proc(f, s) local i;
    seq(evalf(abs(coeff(f,x,i))*s^(i-degree(f)/2)), i=0..degree(f))
 end:
+
+# given a positive quadratic form q, and a variable v appearing in q,
+# returns the largest lambda such that q - lambda*v^2 is still positive
+# Example:
+# q:=1/9*a0^2+2/21*a0*a2+1/21*a1^2+2/25*a0*a4+2/25*a1*a3+1/25*a2^2+2/21*a2*a4+1/21*a3^2+1/9*a4^2:
+# QFoptimize (q, a3); gives 184/13125
+QFoptimize := proc (q, v) local vars, A, i, n, ind, t, l, c, j;
+   vars := indets (q);
+   if not member (v, vars) then ERROR("q does not contain", v) fi;
+   n := nops (vars);
+   vars := [op(vars minus {v}), v];
+   for i to n do ind[op(i,vars)]:=i od;
+   # form the matrix A
+   A := matrix(n,n,0);
+   if type (q, `+`) then l:=convert(q,list) else l:=[q] fi;
+   for t in l do
+      # t = c*ai*aj or c*ai^2
+      c := icontent (t);
+      t := t/c;
+      if type (t, name^2) then
+         i := ind[op(1,t)];
+         A[i,i] := c;
+      elif type (t, `*`) and type ([op(t)], [name, name]) then
+         i := ind[op(1,t)];
+         j := ind[op(2,t)];
+         A[i,j] := c/2;
+         A[j,i] := c/2;
+      else ERROR ("unexpected term:", t)
+      fi
+   od;
+   linalg[det](A)/linalg[det](linalg[submatrix](A, 1..n-1, 1..n-1))
+end:

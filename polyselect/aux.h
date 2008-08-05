@@ -40,7 +40,9 @@ double L2_skewness (mpz_t*, int, int);
 /* rotation */
 double get_alpha (mpz_t*, const int, unsigned long);
 void discriminant (mpz_t, mpz_t*, const int);
-double rotate (mpz_t*, int, unsigned long, mpz_t, mpz_t, int);
+long rotate_aux (mpz_t *f, mpz_t b, mpz_t m, long k0, long k);
+long rotate_aux1 (mpz_t *f, mpz_t b, mpz_t m, long j0, long j);
+double rotate (mpz_t*, int, unsigned long, mpz_t, mpz_t, long*, long*, int);
 void print_poly (FILE*, cado_poly, int, char**, double, int);
 
 /********************* data structures for first phase ***********************/
