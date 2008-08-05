@@ -34,8 +34,8 @@ hashInit(hashtable_t *H, unsigned int n, int verbose)
         unsigned long alloc_hashcount = H->hashmod * sizeof(int);
         unsigned long alloc_hashtab_p = H->hashmod * sizeof(long);
         unsigned long alloc_hashtab_r = H->hashmod * sizeof(unsigned long);
-        fprintf (stderr, "Allocated hash table of %lu bytes\n",
-                 alloc_hashcount + alloc_hashtab_p + alloc_hashtab_r);
+        fprintf (stderr, "Allocated hash tables of total size %luMb\n",
+                 (alloc_hashcount + alloc_hashtab_p + alloc_hashtab_r) / 1000000);
       }
     if(sizeof(unsigned long) == 8){
 	H->HC0 = 314159265358979323UL;
