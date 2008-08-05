@@ -210,8 +210,6 @@ read_ggnfs (mpz_t N, mpz_t *X, mpz_t Y1, mpz_t Y0, mpz_t M)
               exit (1);
             }
         }
-      else
-        readline (s);
     }
 }
 
