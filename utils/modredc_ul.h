@@ -17,7 +17,20 @@
 #define MODREDC_UL_H__
 
 /**********************************************************************/
+#include <limits.h>
 #include <assert.h>
+
+/* <limits.h> defines LONG_BIT only with _XOPEN_SOURCE defined, but if 
+   another header (such as <stdio.h>) already included <features.h> before 
+   _XOPEN_SOURCE was set to 1, future includes of <features.h> are
+   short-circuited and _XOPEN_SOURCE is ignored. */
+
+#ifndef CHAR_BIT
+#define CHAR_BIT 8
+#endif
+#ifndef LONG_BIT
+#define LONG_BIT	((int) sizeof(long) * CHAR_BIT)
+#endif
 
 #ifndef ASSERT
 #define ASSERT(x)	assert(x)
@@ -582,6 +595,29 @@ modredcul_div_2ul_ul_ul_r (unsigned long *r, unsigned long a1,
 #endif
 }
 
+
+/* Shift *r right by i bits, filling in the low bits from a into the high
+   bits of *r */
+MAYBE_UNUSED
+static inline void
+modredcul_shrd (unsigned long *r, const unsigned long a, const int i)
+{
+#if defined(__x86_64__) && defined(__GNUC__)
+  __asm__ ("shrdq %1, %0\n": 
+           "+g" (*r) :
+           "r" (a), "c" (i) :
+           "cc"
+          );
+#elif defined(__i386__) && defined(__GNUC__)
+  __asm__ ("shrdl %1, %0\n": 
+           "+g" (*r) :
+           "r" (a), "c" (i) :
+           "cc"
+          );
+#else
+  *r = (*r >> i) | (a << (LONG_BIT - i));
+#endif
+}
 
 /* Computes (a * 2^wordsize) % m */
 MAYBE_UNUSED
