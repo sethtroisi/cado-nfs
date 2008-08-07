@@ -940,33 +940,6 @@ rotate_aux1 (mpz_t *f, mpz_t b, mpz_t m, long j0, long j)
   return j;
 }
 
-#if 0
-/* Compute bounds for rotation: given f(x) = a[d]*x^d + ... + a[0],
-   and g(x) = b*x-m, we want that the 1-norm of f+k*g increases at
-   most by a factor 2. Namely, if s is the 1-skewness of f, and n
-   the corresponding norm, then K0 and K1 are defined by
-   (a[0] - k*m)*s^(-d/2) = +/-n.
-*/
-static void
-rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1)
-{
-  double s, n, k0, k1, a0, md;
-
-  s = l1_skewness (f, d, SKEWNESS_DEFAULT_PREC);
-  n = exp (l1_lognorm (f, d, s)) * pow (s, (double) d / 2.0);
-  a0 = mpz_get_d (f[0]);
-  md = mpz_get_d (m);
-  k0 = (a0 - n) / md;
-  k1 = (a0 + n) / md;
-  ASSERT_ALWAYS (k0 <= k1);
-  if (k0 < - (double) MAX_ROTATE)
-    k0 = - (double) MAX_ROTATE;
-  if (k1 > (double) MAX_ROTATE)
-    k1 = (double) MAX_ROTATE;
-  *K0 = (long) k0;
-  *K1 = (long) k1;
-}
-#else
 /* Use Emmanuel Thome's idea: assuming alpha(f + k*g) admits a Gaussian
    distribution with mean 'm' and standard deviation 's', then the probability
    that one polynomial has a value of alpha >= A is
@@ -980,7 +953,7 @@ rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1)
 */
 static void
 rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1,
-               long *J0, long *J1)
+               long *J0, long *J1, int verbose)
 {
   /* exp_alpha[i] corresponds to K=2^i polynomials for m=0, s=1
      f := x -> 1/2*(1 - erf(x/sqrt(2)));
@@ -1064,15 +1037,13 @@ rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1,
         break;
     }
   *J1 = j;
-#if 0
-  printf ("# Rotate bounds: %ld <= j <= %ld, %ld <= k <= %ld\n", *J0, *J1,
-          *K0, *K1);
-#endif
+  if (verbose)
+    fprintf (stderr, "# Rotate bounds: %ld <= j <= %ld, %ld <= k <= %ld\n",
+             *J0, *J1, *K0, *K1);
   /* rotate back to j=k=0 */
   rotate_aux (f, b, m, k0, 0);
   rotate_aux1 (f, b, m, j0, 0);
 }
-#endif
 
 /* res <- f(k) */
 static void
@@ -1106,7 +1077,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
   mpz_init (v);
 
   /* compute range for k */
-  rotate_bounds (f, d, b, m, &K0, &K1, &J0, &J1);
+  rotate_bounds (f, d, b, m, &K0, &K1, &J0, &J1, verbose);
   ASSERT_ALWAYS(K0 <= 0 && 0 <= K1);
 
   A = (double*) malloc ((K1 + 1 - K0) * sizeof(double));
@@ -1227,7 +1198,9 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
       printf ("# Rotate by ");
       if (*jmin != 0)
         {
-          if (*jmin != 1)
+          if (*jmin == -1)
+            printf ("-");
+          else if (*jmin != 1)
             printf ("%ld*", *jmin);
           printf ("x");
           if (*kmin >= 0)

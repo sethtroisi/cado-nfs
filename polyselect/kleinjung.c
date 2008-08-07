@@ -1077,6 +1077,11 @@ main (int argc, char *argv[])
   st = seconds ();
   for (i = 0, best_E = DBL_MAX; i < Msize; i++)
     {
+      if (Msize <= Malloc2) /* skip second phase */
+        {
+          Msize2 = Msize;
+          break;
+        }
       mpz_set_ui (poly->f[degree], 0);
       Lemma21 (poly->f, n, degree, Mt[i].b, Mt[i].m);
       /* we do not use translation here, since it has little effect on the

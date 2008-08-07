@@ -13,9 +13,6 @@
 
 #define SKEWNESS_DEFAULT_PREC 10
 
-#define MAX_ROTATE 65536 /* bound on rotation, to avoid overflow
-                            (but this should not happen in practice) */
-
 /* prime bounds for the computation of alpha */
 #define ALPHA_BOUND_SMALL  100
 #define ALPHA_BOUND       2000
