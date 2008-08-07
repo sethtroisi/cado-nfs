@@ -2,6 +2,12 @@
    where X, Y are in {CADO, Franke/Kleinjung, GGNFS}.
    
    Run with no argument to get usage.
+
+   TODO: msieve uses the same format as CADO-NFS, except for free relations,
+   which should be converted to single lines like:
+
+   p,0:
+
 */
 
 #define FORMAT_CADO 0  /* CADO format (default output format) */
