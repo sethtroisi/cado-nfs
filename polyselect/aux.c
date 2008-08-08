@@ -1070,7 +1070,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
   long K0, K1, J0, J1, k0, k, i, j, j0, l;
   double *A, alpha, lognorm, best_alpha = DBL_MAX, best_lognorm = DBL_MAX;
   double alpha0 = 0.0, e;
-  unsigned long p, pp;
+  unsigned long p;
 
   /* first compute D(k) = disc(f + k*g, x) */
   D = alloc_mpz_array (d + 1);
@@ -1100,7 +1100,10 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
   for (p = 2; p <= alim; p += 1 + (p & 1))
     if (isprime (p))
       {
-        pp = p * p;
+        double logp = log ((double) p);
+        double one_over_pm1 = 1.0 / (double) (p - 1);
+        unsigned long pp = p * p;
+
         for (k = K0; (k < K0 + (long) p) && (k <= K1); k++)
           {
             /* translate from k0 to k */
@@ -1109,7 +1112,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
             /* compute contribution for k */
             mpz_poly_eval_si (v, D, d, k);
             e = special_valuation (f, d, p, v);
-            alpha = (1.0 / (double) (p - 1) - e) * log ((double) p);
+            alpha = (one_over_pm1 - e) * logp;
 
             /* and alpha is the contribution for k */
             if (!mpz_divisible_ui_p (v, p))
@@ -1140,7 +1143,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
                             /* translate from k0 to l */
                             k0 = rotate_aux (f, b, m, k0, l);
                             e = special_valuation (f, d, p, v);
-                            alpha = (1.0 / (double) (p - 1) - e) * log ((double) p);
+                            alpha = (one_over_pm1 - e) * logp;
                             A[l - K0] += alpha;
                           }
                       }
@@ -1151,7 +1154,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
                     /* translate from k0 to i */
                     k0 = rotate_aux (f, b, m, k0, i);
                     e = special_valuation (f, d, p, v);
-                    alpha = (1.0 / (double) (p - 1) - e) * log ((double) p);
+                    alpha = (one_over_pm1 - e) * logp;
                   }
               }
           }
@@ -1164,7 +1167,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
   for (k = K0; k <= K1; k++)
     {
       alpha = A[k - K0];
-      if (alpha < best_alpha)
+      if (alpha < best_alpha + 1.0)
         {
           /* check lognorm + alpha < best_lognorm + best_alpha */
 
