@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <emmintrin.h>
 
 inline void addmul(uint64_t a, uint64_t b, uint64_t * w)
 {
@@ -15,14 +16,14 @@ inline void addmul(uint64_t a, uint64_t b, uint64_t * w)
     }
 #endif
 #if 0
-    /* Dans l'autre -- va plus vite. */
+    /* Dans l'autre -- va un poil plus vite. */
     for (i = 0; i < 64; i++) {
 	*w++ ^= b & (((int64_t) a) >> 63);
 	a <<= 1;
     }
 #endif
 #if 0
-    /* Ã€ peu prÃ¨s comme la mÃ©thode 1, mais pas mieux */
+    /* À peu près comme la méthode 1, mais pas mieux */
     typedef uint64_t mvec_t[2];
     mvec_t mb[4] = {
 	{0, 0}, {b, 0}, {0, b}, {b, b},
@@ -36,14 +37,13 @@ inline void addmul(uint64_t a, uint64_t b, uint64_t * w)
 #endif
 #if 1
     /* Avec des sse-2 */
-    typedef uint64_t sse2_t __attribute__ ((vector_size(16)));
-    sse2_t mb[4] = {
-	(sse2_t) {0, 0},
-	(sse2_t) {b, 0},
-	(sse2_t) {0, b},
-	(sse2_t) {b, b},
+    __v2di mb[4] = {
+	(__v2di) {0, 0},
+	(__v2di) {b, 0},
+	(__v2di) {0, b},
+	(__v2di) {b, b},
     };
-    sse2_t *sw = (sse2_t *) w;
+    __v2di *sw = (__v2di *) w;
     for (i = 0; i < 64; i += 2) {
 	*sw++ ^= mb[a & 3];
 	a >>= 2;
@@ -75,20 +75,18 @@ void mul_vec_mat(unsigned long *C,
 #if 1				/* a la main */
 
 #if 1				/* sse */
-    typedef uint64_t sse2_t __attribute__ ((vector_size(16)));
-
-    sse2_t *Cw = (sse2_t *) C;
-    sse2_t *Aw = (sse2_t *) A;
+    __v2di *Cw = (__v2di *) C;
+    __v2di *Aw = (__v2di *) A;
 
     for (j = 0; j < m; j += 2) {
-	sse2_t c = { 0, 0 };
-	sse2_t a = *Aw++;
+	__v2di c = { 0, 0 };
+	__v2di a = *Aw++;
 
-	sse2_t one = { 1, 1, };
+	__v2di one = { 1, 1, };
 #if 1
-#define SHR(x,r) (sse2_t)__builtin_ia32_psrlqi128   ((x),(r))
+#define SHR(x,r) _mm_srli_epi64((x),(r))
 	for (i = 0; i < 64; i++) {
-	    sse2_t bw = { B[i], B[i], };
+	    __v2di bw = { B[i], B[i], };
 
 	    c ^= (bw & -(a & one));
 	    a = SHR(a, 1);
@@ -138,6 +136,22 @@ void mul_vec_mat(unsigned long *C,
 #endif
 }
 
+void blah(uint64_t * b, uint32_t * A, uint64_t * x, unsigned int ncol)
+{
+    uint32_t idx, i, rA;
+    uint64_t rx;
+
+    memset(b, 0, 32 * sizeof(uint64_t));
+    for(idx = 0; idx < ncol; idx++) {
+        rA = A[idx];
+        rx = x[idx];
+        for(i = 0; i < 32; i++) {
+            b[i] ^= rx & -(rA & 1);
+            rA >>= 1;
+        }
+    }
+}
+
 int main()
 {
     clock_t t0, t1;
@@ -146,7 +160,7 @@ int main()
     uint64_t *b;
     uint64_t *w;
 
-    unsigned int n = 2 * 1000 * 1000;
+    unsigned int n = 66 * 1000 * 1000;
 
     int j;
 
@@ -154,34 +168,47 @@ int main()
     a = (uint64_t *) malloc(n * sizeof(uint64_t));
     b = (uint64_t *) malloc(n * sizeof(uint64_t));
 
-#if 0
-    t0 = clock();
+    clock_t measuring_time = 10 * CLOCKS_PER_SEC;
 
-    for (j = 0; j < 4; j++) {
+    t0 = clock();
+    for (j = 0; ; j++) {
+	unsigned int i;
+	memset(w, 0, 64 * sizeof(uint64_t));
+        blah(w, (uint32_t *) a, b, n);
+        t1 = clock() - t0;
+        if (t1 > measuring_time)
+            break;
+    }
+    printf("(32 * %u) times (%u * 64), %d times in %.4f s each\n",
+            n, n, j, t1 * 1.0 / CLOCKS_PER_SEC / j);
+
+    t0 = clock();
+    for (j = 0; ; j++) {
 	unsigned int i;
 	memset(w, 0, 64 * sizeof(uint64_t));
 	for (i = 0; i < n; i++) {
 	    addmul(a[i], b[i], w);
 	}
+        t1 = clock() - t0;
+        if (t1 > measuring_time)
+            break;
     }
-
-    t1 = clock() - t0;
-
-    printf("%d times in %.4f s each\n", j, t1 * 1.0 / CLOCKS_PER_SEC / j);
-#endif
+    printf("(64 * %u) times (%u * 64), %d times in %.4f s each\n",
+            n, n, j, t1 * 1.0 / CLOCKS_PER_SEC / j);
 
 
 
     t0 = clock();
 
-    for (j = 0; j < 16; j++) {
+    for (j = 0; ; j++) {
 	mul_vec_mat(a, b, w, n);
+        t1 = clock() - t0;
+        if (t1 > measuring_time)
+            break;
     }
 
-    t1 = clock() - t0;
-
-    printf("mul_vec_mat : %d times in %.4f s each\n", j,
-	   t1 * 1.0 / CLOCKS_PER_SEC / j);
+    printf("(64 * %u) times (64 * 64), %d times in %.4f s each\n",
+            n, j, t1 * 1.0 / CLOCKS_PER_SEC / j);
 
     free(w);
     free(a);
