@@ -43,7 +43,6 @@ namespace globals {
     unsigned int m,n;
     unsigned int nr;
     std::set<uint32_t> zrows;
-    std::set<uint32_t> zcols;
     std::vector<std::vector<uint32_t> > xvecs;
 }
 
@@ -93,7 +92,6 @@ void setup_x(unsigned int v = 1)
     using namespace globals;
     using namespace std;
 
-    bool zcols_still_to_be_hit = !zcols.empty();
     ofstream o;
     must_open(o, files::x);
     xvecs.clear();
@@ -101,22 +99,7 @@ void setup_x(unsigned int v = 1)
         unsigned int idx;
         if (v == 1) {
             for(;;) {
-                bool testing_zcol=false;
-                if (!zcols.empty()) {
-                    idx = * zcols.begin();
-                    cout << fmt("// Testing zero col %\n")%idx;
-                    zcols.erase(zcols.begin());
-                    testing_zcol=true;
-                } else {
-                    idx= ((myrand()) % nr);
-                }
-                if (zrows.find(idx) != zrows.end()) {
-                    cout << fmt("// Avoiding zero row %\n") % idx;
-                    continue;
-                }
-
-                if (testing_zcol)
-                    zcols_still_to_be_hit=false;
+                idx= ((myrand()) % nr);
                 break;
             }
             o << "e" << idx << "\n";
@@ -124,14 +107,7 @@ void setup_x(unsigned int v = 1)
         } else {
             set<uint32_t> vs;
             for (unsigned int j = 0 ; j < v ; j++) {
-                if (zcols_still_to_be_hit) {
-                    idx = * zcols.begin();
-                    cout << fmt("// Testing zero col %\n")%idx;
-                    zcols.erase(zcols.begin());
-                    zcols_still_to_be_hit = false;
-                } else {
-                    idx= ((myrand()) % nr);
-                }
+                idx= ((myrand()) % nr);
                 vs.insert(idx);
             }
             vector<uint32_t> xs;
@@ -143,10 +119,6 @@ void setup_x(unsigned int v = 1)
             o << "\n";
             xvecs.push_back(xs);
         }
-    }
-    if (zcols_still_to_be_hit) {
-        die("Could not find starting x vectors."
-                " This matrix is too weird\n", 1);
     }
 }
 
@@ -347,7 +319,6 @@ int main(int argc, char *argv[])
 
     matrix_stats stats;
     stats.need_zrows(&globals::zrows);
-    stats.need_zcols(&globals::zcols);
 
     stats(files::matrix);
 
