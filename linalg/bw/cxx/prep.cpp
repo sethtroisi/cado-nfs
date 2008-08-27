@@ -82,7 +82,7 @@ static void myseed(unsigned long int x)
  * not) then the coordinate in question must be chosen amongst those --
  * at least one of them, that is.
  *
- * The y vectors must not be im the image of M. More specifically, the
+ * The y vectors must not be in the image of M. More specifically, the
  * intersection of the span of y's and Image(M) must be of dimension n.
  * Again, the image is not know, but if zero rows are known then the
  * projection must have full rank.
@@ -106,7 +106,7 @@ void setup_x(unsigned int v = 1)
                     idx = * zcols.begin();
                     cout << fmt("// Testing zero col %\n")%idx;
                     zcols.erase(zcols.begin());
-                     testing_zcol=true;
+                    testing_zcol=true;
                 } else {
                     idx= ((myrand()) % nr);
                 }
