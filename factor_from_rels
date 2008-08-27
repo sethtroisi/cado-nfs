@@ -6,7 +6,7 @@
 d=/net/tiramisu/cado1/cado/Examples
 tmp=/localdisk/tmp
 # $cado should point to the ../dist/src directory
-cado=$CADO
+cado="`dirname $0`"
 
 name=$1
 
