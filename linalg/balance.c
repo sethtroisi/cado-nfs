@@ -126,7 +126,7 @@ struct row * col_table /* = NULL */;
  * reuse.
  */
 size_t * line_bytes;
-size_t header_bytes;
+size_t header_bytes;    // used for seeking in the input file
 char * header /* = NULL */;
 
 struct slice * row_slices;
@@ -745,6 +745,21 @@ int read_matrix()
                 " %"PRIu32" rows,"
                 " %"PRIu32" columns\n",
                 nr, nc);
+        /* update the header accordingly ; it's no longer correct to copy
+         * the old header verbatim */
+        header = realloc(header, header_bytes + 10);
+        if (strncmp(header, "//", 2) == 0) {
+            /* untested ! */
+            int pos;
+            sscanf(header, "// %*" SCNu32 " ROWS %*" SCNu32 "%n", &pos);
+            char * trailer = strdup(header + pos);
+            snprintf(header, header_bytes + 10,
+                    "// %" PRIu32 " ROWS %" PRIu32 "%s", nr, nc, trailer);
+            free(trailer);
+        } else {
+            snprintf(header, header_bytes + 10,
+                    "%" PRIu32 " %" PRIu32 "\n", nr, nc);
+        }
     }
 
     return 0;
