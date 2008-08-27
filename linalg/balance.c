@@ -551,9 +551,16 @@ void give_stats(const char * text, const struct row * data, unsigned int n)
     double sumcf2 = 0;
     uint32_t k;
     unsigned int nz = 0;
+#define STORE_ZEROES    10
+    unsigned int zz[STORE_ZEROES];
+
     for(k = 0 ; k < n ; k++) {
         uint32_t cf = data[k].w;
-        if (data[k].w == 0) nz++;
+        if (data[k].w == 0) {
+            if (nz < STORE_ZEROES)
+                zz[nz]=k;
+            nz++;
+        }
         double dcf = cf;
         if (cf < dmin) dmin = cf;
         if (cf > dmax) dmax = cf;
@@ -572,7 +579,15 @@ void give_stats(const char * text, const struct row * data, unsigned int n)
             text, dmin, dmax, mean, wmean, sdev);
 
     if (nz) {
-        printf("%u zero %s\n", nz, text);
+        unsigned int i;
+        printf("%u zero %s:", nz, text);
+        for(i = 0 ; i < nz && i < STORE_ZEROES ; i++) {
+            printf(" %u", zz[i]);
+        }
+        if (i < nz) {
+            printf(" ...");
+        }
+        printf("\n");
     }
     /*
        for(k = 0 ; k < nc ; k++) {
