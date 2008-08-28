@@ -105,7 +105,7 @@ ${lstem}_OBJS:=\\
 	\$(patsubst %.c,\$(BINARY_DIR)%${modext}.o,\$(${sstem}_CSOURCES))
 ALLDEPS+=\$(${lstem}_DEPS)
 \$(${lstem}_BIN):: \$(${lstem}_OBJS) \$(${lstem}_XDEPENDS)
-	\$(call INFORM,LINK,\$(${sstem}_BASE)$modext\$(PMODEL $model))\$(CXX) $link_addxx \$(PFLAGS) \$(OFLAGS) -o \$@ \$(${lstem}_OBJS) \$(LFLAGS) \$(${lstem}_LIBS)
+	\$(call INFORM,LINK,\$(${sstem}_BASE)$modext\$(PMODEL $model))\$(CXX) $link_addxx \$(PFLAGS) \$(OFLAGS) -o \$@ \$(${lstem}_OBJS) \$(LFLAGS) \$(${lstem}_LFLAGS) \$(${lstem}_LIBS)
 ifneq (\$(BINARY_DIR),)
 .PHONY:	\$(${sstem}_TARGET)
 \$(${sstem}_TARGET):

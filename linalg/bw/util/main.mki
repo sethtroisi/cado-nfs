@@ -20,7 +20,10 @@ LFLAGS+=-static
 endif
 
 CFLAGS:=-O2 -DNDEBUG
-CXXFLAGS:=$(CFLAGS)
+
+# Late-expand CXXFLAGS to CFLAGS.
+CXXFLAGS=$(CFLAGS)
+
 ALWAYS_CFLAGS:=-std=c99 -g -W -Wall
 ALWAYS_CXXFLAGS:=-g -W -Wall
 
@@ -30,7 +33,22 @@ MY_CFLAGS=$(ALWAYS_CFLAGS)
 MY_CXXFLAGS=$(ALWAYS_CXXFLAGS)
 MY_LFLAGS=
 
-# Add the possibly overridden variables.
+# Add the variables that also belong to the ``always included'' set.
+MY_CFLAGS+=$(IFLAGS)
+MY_CXXFLAGS+=$(IFLAGS)
+
+
+# Now add the possibly overridden variables. Note that since MY_*FLAGS
+# expand late, we have two possible cases:
+# 1 - easy case. No command-line override is done. In this case, CFLAGS
+#     ultimately contains what is found in the default CFLAGS above.
+# 2 - There is a command-line override. In this case, the ultimate
+#     expansion fo CFLAGS is of course the one forced by the user.
+#     Eventually, it therefore takes the place of the default
+#     CFLAGS as found here. Note that
+#     IFLAGS is still passed, on purpose.
+CFLAGS+=$(PFLAGS) $(OFLAGS)
+CXXFLAGS+=$(PFLAGS) $(OFLAGS)
 MY_CFLAGS+=$(CFLAGS)
 MY_CXXFLAGS+=$(CXXFLAGS)
 MY_LFLAGS+=$(LDFLAGS)
@@ -61,8 +79,6 @@ MY_CXXFLAGS+=$(GMP_CFLAGS)
 MY_LFLAGS+=$(GMP_LFLAGS)
 
 
-CFLAGS+=$(PFLAGS) $(OFLAGS) $(IFLAGS)
-CXXFLAGS+=$(PFLAGS) $(OFLAGS) $(IFLAGS)
 
 # MY_CFLAGS+=-DCFLAGS='"$(CFLAGS)"'
 # MY_CXXFLAGS+=-DCXXFLAGS='"$(CFXXLAGS)"'

@@ -11,8 +11,13 @@ else
     commit=`git-show --pretty=format:%h 2>/dev/null | head -1`
     if [ $commit != "" ] ; then
         ver=`git svn log | head -n2 | tail -n1 | cut -d\  -f1`
-        echo "svn $ver -- git $commit"
-        git-diff --name-status
+        echo -n "svn $ver -- git $commit"
+        # git-diff --name-status is svn status -q
+        if [ "`git-diff --name-status`" != "" ] ; then
+            echo " +mods"
+        else
+            echo
+        fi
     else
         echo "exported"
     fi
