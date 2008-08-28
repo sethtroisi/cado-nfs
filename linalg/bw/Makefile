@@ -261,6 +261,9 @@ BW_RANDOM_LIBS:=-lgmpxx -lgmp
 BW_BALANCE_SOURCES:=../balance.c
 BW_BALANCE_LIBS:=
 -include .bw-balance.mkf
+BW_APPLY_PERM_SOURCES:=../apply_perm.cpp
+BW_APPLY_PERM_LIBS:=
+-include .bw-apply-perm.mkf
 
 BW_SECURE_SOURCES:=						\
 		auxfuncs.c cxx/files.cpp cxx/matrix_header.cpp	\

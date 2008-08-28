@@ -6,7 +6,7 @@ MY_LFLAGS+=-L$(TOP)/utils
 MY_CFLAGS+=-I$(TOP)/utils
 
 binaries:=allsqrt replay merge purge freerel linalg characters duplicates \
-	  transpose checkdep balance
+	  transpose checkdep balance apply_perm
 all:	$(binaries)
 
 procrels: procrels.o
@@ -51,8 +51,11 @@ allsqrt: allsqrt.o files.o hashpair.o gzip.o
 matsort: matsort.o gauss.o readmat.o
 	$(CC) $(MY_LFLAGS) -o $@ $^
 
-matprune: matprune.c
+matprune: matprune.o
 	$(CC) $(MY_LFLAGS) -o $@ $^
+
+apply_perm: apply_perm.o
+	$(CXX) $(MY_LXXFLAGS) -o $@ $^
 
 ######################################################################
 ## MPI section

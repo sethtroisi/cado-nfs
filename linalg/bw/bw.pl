@@ -99,6 +99,15 @@ sub do_cp { my @x = @_; unshift @x, "cp"; action @x;
     }
 }
 
+sub do_mv { my @x = @_; unshift @x, "mv"; action @x;
+    if ($? >> 8 != 0) {
+        shift @x;
+        shift @x;
+        unshift @x, "mv";
+        action @x;
+    }
+}
+
 # If we already have a matrix, parse its header to obtain some
 # information.
 sub parse_matrix_header {
@@ -665,7 +674,12 @@ MKSOL : {
             }
             if (-f "$wdir/W") {
                 unlink $sol;
-                do_cp "$wdir/W", $sol;
+                if (-f "$wdir/col_perm.txt") {
+                    do_mv "$wdir/W", "$wdir/W.twisted";
+                    action "${bindir}bw-apply-perm $wdir/col_perm.txt $wdir/W.twisted > $sol";
+                } else {
+                    do_cp "$wdir/W", $sol;
+                }
                 push @solfiles, $sol;
             }
         }
