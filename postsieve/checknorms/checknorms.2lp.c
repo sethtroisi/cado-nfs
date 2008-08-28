@@ -537,7 +537,7 @@ unsigned long factor_completely(mpz_t p1, mpz_t p2,
     return retval;
 }
 //-----------------------------------------------------------------------------
-inline bool coprime(long a, unsigned long b) {
+static inline bool coprime(long a, unsigned long b) {
     //
     // Returns true iff a and b are coprime.
     //

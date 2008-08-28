@@ -898,7 +898,7 @@ check_prime(mpz_t p, unsigned long sb, long a, unsigned long b) {
     }
 }
 //-----------------------------------------------------------------------------
-inline bool coprime(long a, unsigned long b) {
+static inline bool coprime(long a, unsigned long b) {
     if (a < 0) {
         a = -a;
     }

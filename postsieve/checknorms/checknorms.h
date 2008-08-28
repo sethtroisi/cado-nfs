@@ -169,7 +169,7 @@ unsigned long factor_completely(
 //
 // Returns true iff a and b are coprime.
 //
-inline bool coprime(long a, unsigned long b);
+static inline bool coprime(long a, unsigned long b);
 //-----------------------------------------------------------------------------
 //
 // Checks, filters, completes relations read from a relation file and prints

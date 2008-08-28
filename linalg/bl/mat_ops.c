@@ -433,7 +433,7 @@ void VUBit_new(DenseMatrix a,DenseMatrix b,DenseMatrix w)
 
 
 
-inline void addmul(uint64_t a, uint64_t b, uint64_t * w)
+static inline void addmul(uint64_t a, uint64_t b, uint64_t * w)
 {
     unsigned int i;
 #if 0
