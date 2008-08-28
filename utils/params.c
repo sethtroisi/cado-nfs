@@ -98,13 +98,17 @@ void param_list_consolidate(param_list pl)
     free(intermediate);
 
     // now remove duplicates. The sorting has priorities right.
-    int j = 0;
+    unsigned int j = 0;
     for(unsigned int i = 0 ; i < pl->size ; i++) {
         if (i + 1 < pl->size && strcmp(pl->p[i]->key, pl->p[i+1]->key) == 0) {
             free(pl->p[i]->key);
             free(pl->p[i]->value);
         } else {
-            memcpy(pl->p[j], pl->p[i], sizeof(parameter));
+            // I can't see why there could conceivably be a problem if i == j,
+            // but valgrind complains...
+            if (i != j) {
+                memcpy(pl->p[j], pl->p[i], sizeof(parameter));
+            }
             j++;
         }
     }
