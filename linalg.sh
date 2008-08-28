@@ -34,7 +34,8 @@ else
       mkdir $wdir
    fi
 
-   time $linalg/bw/bw.pl mt=$mt matrix=$mat.tr mn=64 vectoring=64 multisols=1 wdir=$wdir solution=$solution remove_input=1
+   # time $linalg/bw/bw.pl mt=$mt matrix=$mat.tr mn=64 vectoring=64 multisols=1 wdir=$wdir solution=$solution remove_input=1
+   time $linalg/bw/bw.pl mt=$mt matrix=$mat.tr mn=64 vectoring=64 multisols=1 wdir=$wdir solution=$solution tidy=0
 # to use block Lanczos instead of block Wiedemann, just comment the above line
 # and uncomment the following one
 #   time $linalg/bl/bl.pl matrix=$mat.tr wdir=$wdir solution=$solution

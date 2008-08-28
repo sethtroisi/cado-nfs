@@ -4,7 +4,7 @@
 #
 # usage:
 #    cadofactor.pl param=<paramfile> wdir=<...> ...
-# Parameters passed in arguments *after* para=... will override choices
+# Parameters passed in arguments *after* param=... will override choices
 # that are made in paramfile.
 
 # If the parameter n=<n> is given, then n is factored. Otherwise, it is
@@ -17,17 +17,33 @@
 
 use strict;
 use warnings;
+
+use Data::Dumper;
+
 use File::Copy;
 use POSIX qw(ceil floor);
 
 # Default parameters
 
-my $default_param = {
-    parallel=>'false',
+# This list gives:
+#  - The preferred ordering for parameters.
+#  - The default values (if any).
+my @parameter_defaults = (
+    # global
+    wdir=>undef,
+    cadodir=>undef,
+    name=>undef,
+    machines=>undef,
+    n=>undef,
+    parallel=>0,
+
+    # polyselect
     degree=>5,
     bmin=>1,
     bmax=>20,
     e=>1e8,
+
+    # sieve
     rlim=>8000000,
     alim=>8000000,
     lpbr=>29,
@@ -40,11 +56,14 @@ my $default_param = {
     excess=>100,
     qmin=>12000000,
     qrange=>1000000,
-    delay=>120,
     checkrange=>1000000,
+
+    delay=>120,
     sievenice=>19,
-    keeprelfiles=>'false',
+    keeprelfiles=>0,
     selectnice=>10,
+
+    # filtering
     prune=>1.0,
     keep=>160,
     keeppurge=>100000,
@@ -52,12 +71,26 @@ my $default_param = {
     cwmax=>200,
     rwmax=>200,
     ratio=>1.5,
-    bwmt=>2,
+    bwstrat=>1,
+
+    # linalg
     linalg=>'bw',
+    bwmt=>2,
+
+    # characters
     nkermax=>30,
     nchar=>50,
-};
+);
 
+my @official_param_list=();
+# Build the ordered list of parameters.
+for(my $i = 0 ; $i < $#parameter_defaults ; $i+=2) {
+    push @official_param_list, $parameter_defaults[$i];
+}
+
+my $default_param = {};
+# Build the list of default parameters
+%$default_param = @parameter_defaults;
 
 sub splitpath {
     # Returns dirname and basename. 
@@ -74,46 +107,10 @@ sub splitpath {
 sub read_param {
     my @args = @_;
     my $param = $default_param;
-    while (defined($_=shift @args)) {
-        if (/^parallel=(.*)$/) { $param->{'parallel'}=$1; next; }
-        if (/^degree=(.*)$/)   { $param->{'degree'}=$1; next; }
-        if (/^bmin=(.*)$/)     { $param->{'bmin'}=$1; next; }
-        if (/^bmax=(.*)$/)     { $param->{'bmax'}=$1; next; }
-        if (/^e=(.*)$/)        { $param->{'e'}=$1; next; }
-        if (/^rlim=(.*)$/)     { $param->{'rlim'}=$1; next; }
-        if (/^alim=(.*)$/)     { $param->{'alim'}=$1; next; }
-        if (/^lpbr=(.*)$/)     { $param->{'lpbr'}=$1; next; }
-        if (/^lpba=(.*)$/)     { $param->{'lpba'}=$1; next; }
-        if (/^mfbr=(.*)$/)     { $param->{'mfbr'}=$1; next; }
-        if (/^mfba=(.*)$/)     { $param->{'mfba'}=$1; next; }
-        if (/^rlambda=(.*)$/)  { $param->{'rlambda'}=$1; next; }
-        if (/^alambda=(.*)$/)  { $param->{'alambda'}=$1; next; }
-        if (/^I=(.*)$/)        { $param->{'I'}=$1; next; }
-        if (/^excess=(.*)$/)   { $param->{'excess'}=$1; next; }
-        if (/^qmin=(.*)$/)     { $param->{'qmin'}=$1; next; }
-        if (/^qrange=(.*)$/)   { $param->{'qrange'}=$1; next; }
-        if (/^checkrange=(.*)$/){ $param->{'checkrange'}=$1; next; }
-        if (/^keeprelfiles=(.*)$/){ $param->{'keeprelfiles'}=$1; next; }
-        if (/^delay=(.*)$/)    { $param->{'delay'}=$1; next; }
-        if (/^sievenice=(.*)$/){ $param->{'sievenice'}=$1; next; }
-        if (/^selectnice=(.*)$/){ $param->{'selectnice'}=$1; next; }
-        if (/^prune=(.*)$/)    { $param->{'prune'}=$1; next; }
-        if (/^keep=(.*)$/)     { $param->{'keep'}=$1; next; }
-        if (/^keeppurge=(.*)$/){ $param->{'keeppurge'}=$1; next; }
-        if (/^maxlevel=(.*)$/) { $param->{'maxlevel'}=$1; next; }
-        if (/^cwmax=(.*)$/)    { $param->{'cwmax'}=$1; next; }
-        if (/^rwmax=(.*)$/)    { $param->{'rwmax'}=$1; next; }
-        if (/^ratio=(.*)$/)    { $param->{'ratio'}=$1; next; }
-        if (/^bwstrat=(.*)$/)  { $param->{'bwstrat'}=$1; next; }
-        if (/^bwmt=(.*)$/)     { $param->{'bwmt'}=$1; next; }
-        if (/^linalg=(.*)$/)   { $param->{'linalg'}=$1; next; }
-        if (/^nkermax=(.*)$/)  { $param->{'nkermax'}=$1; next; }
-        if (/^nchar=(.*)$/)    { $param->{'nchar'}=$1; next; }
-        if (/^wdir=(.*)$/)     { $param->{'wdir'}=$1; next; }
-        if (/^name=(.*)$/)     { $param->{'name'}=$1; next; }
-        if (/^cadodir=(.*)$/)  { $param->{'cadodir'}=$1; next; }
-        if (/^machines=(.*)$/) { $param->{'machines'}=$1; next; }
-        if (/^n=(.*)$/)        { $param->{'n'}=$1; next; }
+    READ_ARGS: while (defined($_=shift @args)) {
+        for my $p (@official_param_list) {
+            if (/^$p=(.*)$/) { $param->{$p}=$1; next READ_ARGS; }
+        }
         if (/^params?=(.*)$/) {
             my $file = $1;
             open FILE, "<$file" or die "$file: $!\n";
@@ -134,12 +131,18 @@ sub read_param {
             next;
         }
         if (-f $_) { unshift @args, "param=$_"; next; }
-        die "Unknwon argument: $_\n";
+        die "Unknown argument: $_\n";
+    }
+    # sanity check ; old config files may still have true/false values
+    while (my ($k,$v) = each %$param) {
+        next unless defined $v;
+        if ($v eq 'false') { $param->{$k}=0; }
+        if ($v eq 'true') { $param->{$k}=1; }
     }
     # checking mandatory parameters:
     if (!$param->{'wdir'}) { die "I need a wdir argument!\n"; }
     if (!$param->{'name'}) { die "I need a name argument!\n"; }
-    if (!$param->{'machines'} && $param->{'parallel'} eq "true") {
+    if (!$param->{'machines'} && $param->{'parallel'}) {
         die "With parallel, I need a machines argument!\n"; }
     if (!$param->{'cadodir'}) {
         print STDERR "Warning: taking current script's basedir as cadodir\n";
@@ -148,37 +151,32 @@ sub read_param {
     return $param;
 }
 
-# Todo: print w.r.t some order...
 sub print_param {
     my $param = shift @_;
-    my $fh;
-    if ($_[0]) {
-        $fh = $_[0];
+    my $fh = *STDOUT{IO};
+    if (scalar @_) {
+        $fh = shift @_;
     }
-    my $k;
-    my $v;
-    while ( ($k,$v) = each %$param ) {
-        if ($fh) {
+    for my $k (@official_param_list) {
+        if (my $v = $param->{$k}) {
             print $fh "$k=$v\n";
-        } else {
-            print "$k=$v\n";
         }
     }
 }
 
-# Run $cmd, and echo it to $file.
+# This is a filename, or possibly undef.
+my $cmdlog;
+
+# Run $cmd
 # In case the return code of the command is not 0, we die, unless 
-# a 3rd argument 'no_kill' is passed.
+# a 2rd argument 'no_kill' is passed.
 sub my_system {
     my $cmd = shift @_;
-    my $file = shift @_;
     my $nokill=0;
     if ($_[0] && $_[0] eq 'no_kill') {
         $nokill=1;
     }
-    open FH, ">> $file";
-    print FH $cmd . "\n";
-    close FH;
+    system "echo $cmd >> $cmdlog" if $cmdlog;
     my $ret = system($cmd);
     if ($ret != 0 && !$nokill) {
         die "$cmd exited unexpectedly: $!\n";
@@ -212,6 +210,10 @@ sub my_system_timeout {
     }
 }
 
+sub banner {
+    print STDERR "#" x 70, "\n";
+    print STDERR "## $_[0]\n";
+}
 
 # returns -1, 0 or 1, depending is the last modification date of 
 # $f1 is less, equal or more than the modif date of $f2.
@@ -410,12 +412,12 @@ sub restart_select_tasks {
 
 sub get_logmualpha_value {
     my $filename = shift @_;
-    open FILE, "< $filename";
+    open FILE, "$filename";
     my @lines = readline(FILE);
     close FILE;
-    @lines = grep (/logmu\+alpha/, @lines);
+    @lines = grep (/E=/, @lines);
     $_ = $lines[0];
-    if (/logmu\+alpha=([0-9]*.[0-9]*)/) {
+    if (/E=(\d+\.\d*)/) {
         my $E = $1;
         return $E;
     } else {
@@ -496,6 +498,7 @@ sub parallel_polyselect {
     # For the moment, we do it according to logmu+alpha
     print "Best polynomial is for b = $bestb\n";
     copy("$prefix.poly.$bestb" , "$prefix.poly");
+    system("echo cp $prefix.poly.$bestb $prefix.poly >> $prefix.cmd");
 }
 
 
@@ -504,6 +507,12 @@ sub parallel_polyselect {
 
 sub polyselect {
     my $param = shift @_;
+    banner("polynomial selection");
+
+    if ($param->{'parallel'}) {
+        parallel_polyselect($param, @_);
+        return;
+    }
     my $prefix = $param->{'wdir'} . "/" . $param->{'name'};
     my $b;
     my $bestb=0;
@@ -517,26 +526,20 @@ sub polyselect {
         } else {
             my $cmd = $param->{'cadodir'}."/polyselect/polyselect " .
               "-b $b -e $effort -degree $degree < $prefix.n";
-            my_system($cmd . "> $prefix.poly.$b", "$prefix.cmd");  
+            my_system "$cmd > $prefix.poly.$b";
         }
-        open FILE, "< $prefix.poly.$b";
-        my @lines = readline(FILE);
-        close FILE;
-        $_ = $lines[2];
-        if (/logmu\+alpha=([0-9]*.[0-9]*)/) {
-            my $E = $1;
-            if ((!$Emin) || $E < $Emin) {
-                $Emin = $E;
-                $bestb = $b;
-            }
-        } else {
-            die "Can not parse output of poly.$b for geting logmu+alpha\n";
+
+        my $E = get_logmualpha_value "$prefix.poly.$b";
+        if ((!$Emin) || $E < $Emin) {
+            $Emin = $E;
+            $bestb = $b;
         }
     }
     # choose best.
     # For the moment, we do it according to logmu+alpha
     print "Best polynomial is for b = $bestb\n";
     copy("$prefix.poly.$bestb" , "$prefix.poly");
+    system("echo cp $prefix.poly.$bestb $prefix.poly >> $prefix.cmd");
 }
 
 
@@ -545,23 +548,21 @@ sub try_singleton {
     my $nrels = shift @_;
     my $prefix = $param->{'wdir'} . "/" . $param->{'name'};
 
-    # Remove duplicates
-    print "Removing duplicates...\n";
+    banner("Removing duplicates");
     my $cmd = $param->{'cadodir'} .
       "/linalg/duplicates -nrels $nrels $prefix.rels.* > $prefix.nodup 2> $prefix.duplicates.stderr";
-    my_system($cmd, "$prefix.cmd");
+    my_system $cmd;
     my @grouik = split(/ /, `tail -1 $prefix.duplicates.stderr`);
     my $nrels_dup = $grouik[(scalar @grouik)-1];
     chomp $nrels_dup;
     print "We have $nrels_dup relations left after removing duplicates\n";
 
-    # Singleton removal
-    print "Singleton removal...\n";
+    banner("Singleton removal");
     my $keep = $param->{'keeppurge'};
     $cmd = $param->{'cadodir'} .
-      "/linalg/purge -poly $prefix.poly -keep $keep -nrels $nrels_dup $prefix.nodup > $prefix.purged 2> $prefix.purge.stderr";
-    my_system($cmd, "$prefix.cmd", "no_kill");
-    if (-z "$prefix.purged") {
+      "/linalg/purge -poly $prefix.poly -keep $keep -nrels $nrels_dup -purged $prefix.purged $prefix.nodup  2> $prefix.purge.stderr";
+    my_system $cmd, "no_kill";
+    if (-z "$prefix.purged" || ! -f "$prefix.purged") {
         printf "Not enough relations!\n";
         return 0;
     } else {
@@ -701,7 +702,7 @@ sub import_task_result {
         return 0;
     }
     # Import succeeded, so we can remove the remote file.
-    if ($param->{'keeprelfiles'} eq 'false') {
+    unless ($param->{'keeprelfiles'}) {
         my_system_timeout("ssh $host rm $rwdir/$name.rels.$q0-$q1", 30);
     }
 
@@ -838,7 +839,7 @@ sub restart_tasks {
             my $wdir = $desc{'tmpdir'};
             my $bindir = $desc{'cadodir'};
             push_files($mach, $wdir, $param);
-            my $cmd = "/bin/nice -$nice $bindir/sieve/las -checknorms" .
+            my $cmd = "/bin/nice -$nice $bindir/sieve/las" .
               " -I " . $param->{'I'} .
               " -poly $wdir/$name.poly" .
               " -fb $wdir/$name.roots" .
@@ -937,6 +938,10 @@ sub parallel_sieve {
 
 sub sieve {
     my $param = shift @_;
+    banner("Sieve");
+    if ($param->{'parallel'}) {
+        return parallel_sieve($param, @_);
+    }
     my $prefix = $param->{'wdir'} . "/" . $param->{'name'};
     my $finished=0;
     my $qcurr = $param->{'qmin'};
@@ -947,51 +952,74 @@ sub sieve {
     $wantedrels = ceil($wantedrels/3);
 
     print "Sieving for $wantedrels relations\n";
-    while (!$finished) {
+
+    # Look for finished files.
+    my @done=();
+    while (1) {
         my $qend = $qcurr+$param->{'qrange'};
         my $filename = "$prefix.rels.$qcurr-$qend";
+        last unless -f $filename;
+        $qcurr = $qend;
+        print "Found file $filename...";
+        my $lines = `grep -v "^#" $filename | wc -l`;
+        chomp $lines;
+        print "$lines rels\n";
+        push @done, $filename;
+        $nrels += $lines;
+    }
+
+    while (1) {
+        if ($nrels >= $wantedrels) {
+            last if try_singleton($param, $nrels);
+        }
+        # Sieve another range.
+        my $qend = $qcurr+$param->{'qrange'};
+        my $filename = "$prefix.rels.$qcurr-$qend";
+        my $las = "$param->{'cadodir'}/sieve/las";
         if (! -f $filename) {
-            my $cmd = $param->{'cadodir'} . "/sieve/las -checknorms" .
-              " -I " . $param->{'I'} .
+            my $cmd = $las .
+              " -I $param->{'I'}" .
               " -poly $prefix.poly" .
               " -fb $prefix.roots" .
               " -q0 $qcurr -q1 $qend";
             print "Running lattice siever for q in [$qcurr,$qend]...\n";
-            my_system($cmd . " >& $filename", "$prefix.cmd");
+            my_system "$cmd >& $filename";
         } else {
             print "Found an existing relation file!\n";
         }
-        print "Counting relations...\n";
-        my $grouik = 'grep -v "^#" ' . "$filename | wc -l |";
-        open WC, $grouik;
-        my $lines = readline(WC);
-        close WC;
+        print "Counting relations...";
+        my $lines = `grep -v "^#" $filename | wc -l`;
         chomp $lines;
-        print "  got $lines\n";
+        print "$lines\n";
         $nrels += $lines;
         print "We have now $nrels relations; need $wantedrels\n";
-        $finished = try_singleton($param, $nrels);
         $qcurr=$qend;
     }
     return $nrels;
 }
 
-
-
-
 MAIN: {
+    select(STDOUT); $|=1; # flush stdout always.
+
     my $param = read_param(@ARGV);
 
+    my $wdir = $param->{'wdir'};
+
+    if ($param->{'wdir'} =~ /%s/) {
+        # substitute $name.
+        $param->{'wdir'}=sprintf($param->{'wdir'}, $param->{'name'});
+        $wdir = $param->{'wdir'};
+    }
+
     # Create working directory if not there
-    if (!-d $param->{'wdir'}) {
-        my $wdir = $param->{'wdir'};
+    if (!-d $wdir) {
         mkdir $wdir or die "Cannot create $wdir: $!\n";
     }
     
     # Check if there is already some stuff relative to $name in $wdir
     # First thing is $name.n. If it is not there, we consider that
     # everything is obsolete, anyway.
-    if (-f $param->{'wdir'} . "/" . $param->{'name'} . ".n") {
+    if (-f "$wdir/$param->{'name'}.n") {
         print STDERR "Warning: there is already some data relative to " .
         "this name in this directory.\n";
     }
@@ -1004,120 +1032,121 @@ MAIN: {
     }
 
     # Create $name.n and $name.param in wdir.
-    my $prefix = $param->{'wdir'} . "/" . $param->{'name'};
+    my $prefix = "$wdir/$param->{'name'}";
     open FN, ">$prefix.n";
-    print FN "n:" . $param->{'n'} . "\n";
+    print FN "n:$param->{'n'}\n";
     close FN;
     my $fh;
     open $fh, ">$prefix.param";
     print_param($param,$fh);
 
+    $cmdlog = "$prefix.cmd";
+
     # Polynomial selection
-    if ($param->{'parallel'} eq 'true') {
-        parallel_polyselect($param);
-    } else {
+    if (! -f "$prefix.poly") {
         polyselect($param);
+        # Appending some parameters to the poly file
+        open FILE, ">> $prefix.poly";
+        print FILE "rlim: $param->{'rlim'}\n";
+        print FILE "alim: $param->{'alim'}\n";
+        print FILE "lpbr: $param->{'lpbr'}\n";
+        print FILE "lpba: $param->{'lpba'}\n";
+        print FILE "mfbr: $param->{'mfbr'}\n";
+        print FILE "mfba: $param->{'mfba'}\n";
+        print FILE "rlambda: $param->{'rlambda'}\n";
+        print FILE "alambda: $param->{'alambda'}\n";
     }
 
-    # Appending some parameters to the poly file
-    open FILE, ">> $prefix.poly";
-    print FILE "rlim: " . $param->{'rlim'}. "\n";
-    print FILE "alim: " . $param->{'alim'}. "\n";
-    print FILE "lpbr: " . $param->{'lpbr'}. "\n";
-    print FILE "lpba: " . $param->{'lpba'}. "\n";
-    print FILE "mfbr: " . $param->{'mfbr'}. "\n";
-    print FILE "mfba: " . $param->{'mfba'}. "\n";
-    print FILE "rlambda: " . $param->{'rlambda'}. "\n";
-    print FILE "alambda: " . $param->{'alambda'}. "\n";
-
-    my $cmd;
     # Creating the factor base
+    my $cmd;
     if (-e "$prefix.roots" && 
         cmp_filedate("$prefix.poly", "$prefix.roots") < 1) {
-            print "A Factor base file exists... Let's trust it!\n";
+            print "A factor base file exists... Let's trust it!\n";
     } else {
-        print "Creating the factor base...\n";
-        $cmd = "" . $param->{'cadodir'} .
-          "/sieve/makefb -poly $prefix.poly > $prefix.roots";
-        my_system($cmd, "$prefix.cmd");
+        banner("Factor base");
+        my $makefb = "$param->{'cadodir'}/sieve/makefb";
+        $cmd = "$makefb -poly $prefix.poly > $prefix.roots";
+        my_system $cmd;
     }
 
     # Computing free relations
-    print "Computing free relations...\n";
-    $cmd = "" . $param->{'cadodir'} .
-      "/linalg/freerel -poly $prefix.poly -fb $prefix.roots > $prefix.freerels";
-    my_system($cmd, "$prefix.cmd");
+    if (! -f "$prefix.freerels") {
+        banner("Free relations");
+        my $freerel = "$param->{'cadodir'}/linalg/freerel";
+        $cmd = "$freerel -poly $prefix.poly -fb $prefix.roots > $prefix.freerels";
+        my_system $cmd;
+    }
 
     # Sieving, removing duplicates, singleton removal
     # This is the same command, since we continue sieving until it works.
     my $nrels;
-    if ($param->{'parallel'} eq 'true') {
-        $nrels = parallel_sieve($param);
-    } else {
-        $nrels = sieve($param);
-    }
+    $nrels = sieve($param);
 
     # Merge
     print "Merging...\n";
-    $cmd = $param->{'cadodir'} . "/linalg/merge".
+    $cmd = "$param->{'cadodir'}/linalg/merge".
+      " -out  $prefix.merge.his" .
       " -mat $prefix.purged" .
-      " -forbw " . $param->{'bwstrat'} .
-      " -prune " . $param->{'prune'} .
+      " -forbw $param->{'bwstrat'}" .
+      " -prune $param->{'prune'}" .
       " -keep "  . $param->{'keep'} .
-      " -maxlevel " . $param->{'maxlevel'} .
-      " -cwmax " . $param->{'cwmax'} .
-      " -rwmax " . $param->{'rwmax'} .
-      " -ratio " . $param->{'ratio'};
-      my_system($cmd . "> $prefix.merge.his 2> $prefix.merge.stderr",
-        "$prefix.cmd");
+      " -maxlevel $param->{'maxlevel'}" .
+      " -cwmax $param->{'cwmax'}" .
+      " -rwmax $param->{'rwmax'}" .
+      " -ratio $param->{'ratio'}";
+      my_system "$cmd 2> $prefix.merge.stderr";
     my $bwcostmin=`tail $prefix.merge.his | grep "BWCOSTMIN:" | awk '{print \$NF}'`;
     chomp $bwcostmin;
     print "Bwcostmin = $bwcostmin\n";
-    $cmd = $param->{'cadodir'} . "/linalg/replay" .
-      " $prefix.purged $prefix.merge.his" .
-      " $prefix.small $prefix.index $bwcostmin";
-    my_system($cmd . " 2> $prefix.replay.stderr", "$prefix.cmd");
+    my $replay="$param->{'cadodir'}/linalg/replay";
+    $cmd = $replay .
+        " -his $prefix.merge.his" .
+        " -index $prefix.index" .
+        " -costmin $bwcostmin" .
+        " -purged $prefix.purged" .
+        " -out $prefix.small";
+    my_system "$cmd 2> $prefix.replay.stderr";
 
     # Linear algebra
     print "Transposing...\n";
-    $cmd = $param->{'cadodir'} . "/linalg/transpose" .
-      " -T " . $param->{'wdir'} .
+    $cmd = "$param->{'cadodir'}/linalg/transpose" .
+      " -T $param->{'wdir'}" .
       " -in $prefix.small -out $prefix.small.tr";
-    my_system($cmd, "$prefix.cmd");
+    my_system $cmd;
     if ($param->{'linalg'} eq 'bw') { 
         print "Calling Block-Wiedemann...\n";
-        $cmd = $param->{'cadodir'} . "/linalg/bw/bw.pl" .
-        " mt=" . $param->{'bwmt'} .
+        $cmd = "$param->{'cadodir'}/linalg/bw/bw.pl" .
+        " mt=$param->{'bwmt'}" .
         " matrix=$prefix.small.tr" .
         " mn=64" .
         " vectoring=64" .
         " multisols=1" .
-        " wdir=" . $param->{'wdir'} . "/bw" .
+        " wdir=$wdir/bw" .
         " solution=$prefix.W";
-        my_system($cmd . " >& $prefix.bw.stderr", "$prefix.cmd");
+        my_system "$cmd >& $prefix.bw.stderr";
     } else {
         if ($param->{'linalg'} ne 'bl') {
-            print "WARNING: I don't know linalg=" . $param->{'linalg'} .
+            print "WARNING: I don't know linalg=$param->{'linalg'}" .
               ". Use bl as default.\n";
         }
         print "Calling Block-Lanczos...\n";
-        $cmd = $param->{'cadodir'} . "/linalg/bl/bl.pl" .
+        $cmd = "$param->{'cadodir'}/linalg/bl/bl.pl" .
         " matrix=$prefix.small.tr" .
-        " wdir=" . $param->{'wdir'} . "/bl" .
+        " wdir=$wdir/bl" .
         " solution=$prefix.W";
-        my_system($cmd . " >& $prefix.bl.stderr", "$prefix.cmd");
+        my_system "$cmd >& $prefix.bl.stderr";
     }
     print "Converting dependencies to CADO format...\n";
-    $cmd = $param->{'cadodir'} . "/linalg/bw/mkbitstrings " .
+    $cmd = "$param->{'cadodir'}/linalg/bw/mkbitstrings " .
       " $prefix.W";
-    my_system($cmd . " > $prefix.ker_raw", "$prefix.cmd");
+    my_system "$cmd > $prefix.ker_raw";
     my $nker = `wc -l < $prefix.ker_raw`;
     chomp $nker;
     print "We have computed $nker vectors of the Kernel.\n";
 
     # Characters
     print "Adding characters...\n";
-    $cmd = $param->{'cadodir'} . "/linalg/characters" .
+    $cmd = "$param->{'cadodir'}/linalg/characters" .
       " -poly $prefix.poly" .
       " -purged $prefix.purged" .
       " -ker $prefix.ker_raw" .
@@ -1125,9 +1154,8 @@ MAIN: {
       " -rel $prefix.nodup" .
       " -small $prefix.small" .
       " -nker $nker" .
-      " -nchar " . $param->{'nchar'};
-    my_system($cmd . " > $prefix.ker 2> $prefix.characters.stderr",
-        "$prefix.cmd");
+      " -nchar $param->{'nchar'}";
+    my_system "$cmd > $prefix.ker 2> $prefix.characters.stderr";
 
     my $ndepmax=`wc -l $prefix.ker | awk '{print \$1}'`;
     chomp $ndepmax;
@@ -1138,20 +1166,19 @@ MAIN: {
 
     # Sqrt
     print "Preparing $ndepmax squareroots...\n";
-    $cmd = $param->{'cadodir'} . "/linalg/allsqrt" .
+    $cmd = "$param->{'cadodir'}/linalg/allsqrt" .
       " $prefix.nodup $prefix.purged $prefix.index $prefix.ker" .
       " $prefix.poly" .
       " 0 $ndepmax ar $prefix.dep";
-    my_system($cmd, "$prefix.cmd");
+    my_system $cmd;
     
     my $i;
     for ($i = 0; $i < $ndepmax; $i++) {
         my $suf = sprintf("%03d", $i);
         print "Testing dependency numnber $i...\n";
-        $cmd = $param->{'cadodir'} . "/sqrt/naive/algsqrt" .
+        $cmd = "$param->{'cadodir'}/sqrt/naive/algsqrt" .
           "  $prefix.dep.alg.$suf $prefix.dep.rat.$suf $prefix.poly";
-        my_system($cmd . "> $prefix.fact.$suf 2>> $prefix.algsqrt.stderr",
-            "$prefix.cmd");
+        my_system "$cmd> $prefix.fact.$suf 2>> $prefix.algsqrt.stderr";
         open FH, "< $prefix.fact.$suf";
         my $line = <FH>; chomp $line;
         if ($line ne 'Failed') {
