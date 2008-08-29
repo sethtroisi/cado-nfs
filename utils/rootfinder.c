@@ -27,7 +27,7 @@ int poly_roots_ulong(unsigned long * r, mpz_t * f, int d, unsigned long p)
         free(rr);
     } else {
         residueul_t * rr;
-        modulus_t pp;
+        modulusul_t pp;
         modul_initmod_ul(pp, p);
         int i;
 

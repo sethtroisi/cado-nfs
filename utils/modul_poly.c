@@ -75,7 +75,7 @@ modul_poly_realloc (modul_poly_t f, int n)
 
 /* f <- g */
 void
-modul_poly_set (modul_poly_t f, const modul_poly_t g, modulus_t p)
+modul_poly_set (modul_poly_t f, const modul_poly_t g, modulusul_t p)
 {
   int i, d = g->degree;
 
@@ -87,7 +87,7 @@ modul_poly_set (modul_poly_t f, const modul_poly_t g, modulus_t p)
 
 /* f <- f/lc(f) mod p */
 void
-modul_poly_make_monic (modul_poly_t f, modulus_t p)
+modul_poly_make_monic (modul_poly_t f, modulusul_t p)
 {
   int d = f->degree, i;
   residueul_t ilc;
@@ -103,18 +103,18 @@ modul_poly_make_monic (modul_poly_t f, modulus_t p)
 
 /* fp <- f/lc(f) mod p. Return degree of fp (-1 if fp=0). */
 int
-modul_poly_set_mod (modul_poly_t fp, mpz_t *f, int d, modulus_t p)
+modul_poly_set_mod (modul_poly_t fp, mpz_t *f, int d, modulusul_t p)
 {
   int i;
 
-  while (d >= 0 && mpz_divisible_ui_p (f[d], mod_getmod_ul (p)))
+  while (d >= 0 && mpz_divisible_ui_p (f[d], modul_getmod_ul (p)))
     d --;
   ASSERT (d >= 0); /* f is 0 mod p: should not happen in the CADO-NFS context
                       since otherwise p would divide N, indeed f(m)=N */
   modul_poly_realloc (fp, d + 1);
   fp->degree = d;
   for (i = 0; i <= d; i++)
-    modul_set_ul (fp->coeff[i], mpz_fdiv_ui (f[i], mod_getmod_ul (p)), p);
+    modul_set_ul (fp->coeff[i], mpz_fdiv_ui (f[i], modul_getmod_ul (p)), p);
   modul_poly_make_monic (fp, p);
 
   return d;
@@ -122,7 +122,7 @@ modul_poly_set_mod (modul_poly_t fp, mpz_t *f, int d, modulus_t p)
 
 /* f <- a*x+b, a <> 0 */
 void
-modul_poly_set_linear (modul_poly_t f, residueul_t a, residueul_t b, modulus_t p)
+modul_poly_set_linear (modul_poly_t f, residueul_t a, residueul_t b, modulusul_t p)
 {
   modul_poly_realloc (f, 2);
   f->degree = 1;
@@ -150,7 +150,7 @@ modul_poly_swap (modul_poly_t f, modul_poly_t g)
 
 /* h <- f*g mod p */
 void
-modul_poly_mul(modul_poly_t h, const modul_poly_t f, const modul_poly_t g, modulus_t p) {
+modul_poly_mul(modul_poly_t h, const modul_poly_t f, const modul_poly_t g, modulusul_t p) {
   int df = f->degree;
   int dg = g->degree;
   int i, j;
@@ -173,7 +173,7 @@ modul_poly_mul(modul_poly_t h, const modul_poly_t f, const modul_poly_t g, modul
 
 /* h <- g^2 mod p, g and h must differ */
 void
-modul_poly_sqr (modul_poly_t h, const modul_poly_t g, modulus_t p)
+modul_poly_sqr (modul_poly_t h, const modul_poly_t g, modulusul_t p)
 {
   int i, j, dg = g->degree;
   residueul_t *gc, *hc;
@@ -220,7 +220,7 @@ modul_poly_normalize (modul_poly_t h)
 
 /* h <- (x+a)*h mod p */
 void
-modul_poly_mul_x (modul_poly_t h, residueul_t a, modulus_t p)
+modul_poly_mul_x (modul_poly_t h, residueul_t a, modulusul_t p)
 {
   int i, d = h->degree;
   residueul_t *hc;
@@ -239,7 +239,7 @@ modul_poly_mul_x (modul_poly_t h, residueul_t a, modulus_t p)
 
 /* h <- g - x mod p */
 void
-modul_poly_sub_x (modul_poly_t h, const modul_poly_t g, modulus_t p)
+modul_poly_sub_x (modul_poly_t h, const modul_poly_t g, modulusul_t p)
 {
   int i, d = g->degree;
 
@@ -257,7 +257,7 @@ modul_poly_sub_x (modul_poly_t h, const modul_poly_t g, modulus_t p)
 
 /* h <- g - 1 mod p */
 void
-modul_poly_sub_1 (modul_poly_t h, const modul_poly_t g, modulus_t p)
+modul_poly_sub_1 (modul_poly_t h, const modul_poly_t g, modulusul_t p)
 {
   int i, d = g->degree;
 
@@ -274,7 +274,7 @@ modul_poly_sub_1 (modul_poly_t h, const modul_poly_t g, modulus_t p)
 
 /* h <- rem(h, f) mod p, f not necessarily monic */
 void
-modul_poly_div_r (modul_poly_t h, const modul_poly_t f, modulus_t p)
+modul_poly_div_r (modul_poly_t h, const modul_poly_t f, modulusul_t p)
 {
   int i, d = f->degree, dh = h->degree, monic;
   residueul_t *hc = h->coeff, t;
@@ -302,7 +302,7 @@ modul_poly_div_r (modul_poly_t h, const modul_poly_t f, modulus_t p)
 
 /* q <- divexact(h, f) mod p, f not necessarily monic. Clobbers h. */
 void
-modul_poly_divexact (modul_poly_t q, modul_poly_t h, const modul_poly_t f, modulus_t p)
+modul_poly_divexact (modul_poly_t q, modul_poly_t h, const modul_poly_t f, modulusul_t p)
 {
   int i, d = f->degree, dh = h->degree, monic;
   residueul_t *hc = h->coeff, t;
@@ -336,7 +336,7 @@ modul_poly_divexact (modul_poly_t q, modul_poly_t h, const modul_poly_t f, modul
 
 /* fp <- gcd (fp, g), clobbers g */
 void
-modul_poly_gcd (modul_poly_t fp, modul_poly_t g, modulus_t p)
+modul_poly_gcd (modul_poly_t fp, modul_poly_t g, modulusul_t p)
 {
   while (g->degree >= 0)
     {
@@ -348,7 +348,7 @@ modul_poly_gcd (modul_poly_t fp, modul_poly_t g, modulus_t p)
 }
 
 void
-modul_poly_out (FILE *fp, modul_poly_t f, modulus_t p)
+modul_poly_out (FILE *fp, modul_poly_t f, modulusul_t p)
 {
   if (f->degree < 0)
     fprintf (fp, "0\n");
@@ -363,7 +363,7 @@ modul_poly_out (FILE *fp, modul_poly_t f, modulus_t p)
 }
 
 /* returns f(x) mod p */
-void modul_poly_eval (residueul_t r, modul_poly_t f, residueul_t x, modulus_t p)
+void modul_poly_eval (residueul_t r, modul_poly_t f, residueul_t x, modulusul_t p)
 {
   int i, d = f->degree;
   residueul_t aux;
@@ -379,7 +379,7 @@ void modul_poly_eval (residueul_t r, modul_poly_t f, residueul_t x, modulus_t p)
 /* Return the number n of roots of f mod p using a naive algorithm.
    If r is not NULL, put the roots in r[0], ..., r[n-1]. */
 int
-modul_poly_roots_naive (residueul_t *r, modul_poly_t f, modulus_t p)
+modul_poly_roots_naive (residueul_t *r, modul_poly_t f, modulusul_t p)
 {
   int n = 0;
   residueul_t x;
@@ -400,7 +400,7 @@ modul_poly_roots_naive (residueul_t *r, modul_poly_t f, modulus_t p)
 /* g <- (x+a)^e mod (fp, p), using auxiliary polynomial h */
 void
 modul_poly_powmod_ui (modul_poly_t g, modul_poly_t fp, modul_poly_t h, residueul_t a,
-		     unsigned long e, modulus_t p)
+		     unsigned long e, modulusul_t p)
 {
   int k = nbits (e);
 
@@ -426,7 +426,7 @@ modul_poly_powmod_ui (modul_poly_t g, modul_poly_t fp, modul_poly_t h, residueul
 /* g <- g^e mod (fp, p), using auxiliary polynomial h */
 void
 modul_poly_general_powmod_ui (modul_poly_t g, modul_poly_t fp, modul_poly_t h,
-		     unsigned long e, modulus_t p)
+		     unsigned long e, modulusul_t p)
 {
   int k = nbits (e);
   modul_poly_t g_sav;
@@ -455,7 +455,7 @@ modul_poly_general_powmod_ui (modul_poly_t g, modul_poly_t fp, modul_poly_t h,
    Assumes p is odd, and deg(f) >= 1.
 */
 int
-modul_poly_cantor_zassenhaus (residueul_t *r, modul_poly_t f, modulus_t p, int depth)
+modul_poly_cantor_zassenhaus (residueul_t *r, modul_poly_t f, modulusul_t p, int depth)
 {
   residueul_t a;
   modul_poly_t q, h, ff;
@@ -543,7 +543,7 @@ int coeff_cmp(
    which has lower degree? Warning: if f has root -a, we might miss it.]
 */
 int
-modul_poly_roots(residueul_t *r, mpz_t *f, int d, modulus_t p)
+modul_poly_roots(residueul_t *r, mpz_t *f, int d, modulusul_t p)
 {
   modul_poly_t fp, g, h;
   int df, n;
@@ -614,7 +614,7 @@ modul_poly_roots(residueul_t *r, mpz_t *f, int d, modulus_t p)
 }
 
 int
-modul_poly_roots_ulong (unsigned long *r, mpz_t *f, int d, modulus_t p)
+modul_poly_roots_ulong (unsigned long *r, mpz_t *f, int d, modulusul_t p)
 {
     residueul_t * pr;
     int i, n;
@@ -629,7 +629,7 @@ modul_poly_roots_ulong (unsigned long *r, mpz_t *f, int d, modulus_t p)
 }
 
 int
-modul_poly_roots_int64 (int64_t *r, mpz_t *f, int d, modulus_t p)
+modul_poly_roots_int64 (int64_t *r, mpz_t *f, int d, modulusul_t p)
 {
     residueul_t * pr;
     int i, n;
@@ -644,7 +644,7 @@ modul_poly_roots_int64 (int64_t *r, mpz_t *f, int d, modulus_t p)
 }
 
 
-int modul_poly_is_irreducible(modul_poly_t fp, modulus_t p)
+int modul_poly_is_irreducible(modul_poly_t fp, modulusul_t p)
 {
   modul_poly_t g, gmx, h;
   int d, i;

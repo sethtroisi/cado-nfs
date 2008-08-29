@@ -233,11 +233,11 @@ findroot(long a, unsigned long b, unsigned long p) {
     root = (unsigned long) -1L;
   }
   
-  mod_clear (pa, m); /* No-ops. Here for the sake of pedantry */
-  mod_clear (r, m);
-  mod_clear (t, m);
-  mod_clear (br, m);
-  mod_clearmod (m);
+  modul_clear (pa, m); /* No-ops. Here for the sake of pedantry */
+  modul_clear (r, m);
+  modul_clear (t, m);
+  modul_clear (br, m);
+  modul_clearmod (m);
   return root;
 }
 
