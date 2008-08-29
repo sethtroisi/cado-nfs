@@ -327,7 +327,7 @@ pp1_stage2 (residue_t r, const residue_t X, const stage2_plan_t *plan,
   mod_init_noset0 (Xid1, m);
   mod_init_noset0 (a, m);
   mod_init_noset0 (a_bk, m);
-  mod_set_ul_reduced (a, 1UL, m);
+  mod_set1 (a, m);
   mod_set (a_bk, a, m);
   l = 0;
   
@@ -409,34 +409,12 @@ pp1 (modint_t f, const modulus_t m, const pp1_plan_t *plan)
   mod_init_noset0 (two, m);
   mod_init_noset0 (save, m);
   mod_init_noset0 (t, m);
-  mod_set_ul_reduced (two, 2UL, m);
+  mod_set1 (two, m);
+  mod_add (two, two, two, m);
   
   /* Compute 2/7 (mod N) */
-#if 0
-  /* Faster method, but uses N of type unsigned long without REDC */
-  if (N % 7 == 0)
-    {
-      f = 7;
-      goto end;
-    }
-  
-  {
-    unsigned long a, n = N / 7UL, l = N % 7UL;
-    /* inv7[i] stores 1/i (mod 7) */ 
-    static const unsigned char inv7[7] = {0,1,4,5,2,3,6};
-    /* kl1[l] stores (k*l-1)/7 for kl==1 (mod 7) and k,l < 7 */
-    static const unsigned char kl1[7] = {0,0,1,2,1,2,5};
-    a = inv7[l]*n + kl1[l];
-    mod_set_ul_reduced (b, a, m);
-    mod_neg (b, b, m);
-    mod_add (b, b, b, m);
-  }
-#else
-  /* Slow method, but works for any modulus_t type */
-  mod_set_ul_reduced (b, 7UL, m);
-  mod_inv (b, b, m);
-  mod_add (b, b, b, m);
-#endif
+  mod_set (b, two, m);
+  mod_div7 (b, b, m);
   
   pp1_stage1 (b, plan->bc, plan->bc_len, two, m);
   mod_sub (t, b, two, m);
