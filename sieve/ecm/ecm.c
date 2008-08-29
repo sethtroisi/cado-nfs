@@ -1,9 +1,24 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include "utils.h"
-#include "prac_bc.h"
 #include "ecm.h"
+#if defined(MODREDCUL)
+#include "modredc_ul.h"
+#include "modredc_ul_default.h"
+#define ecm ecm_ul
+#define ell_pointorder ell_pointorder_ul
+#define ellM_curveorder_jacobi ellM_curveorder_jacobi_ul
+#define ell_curveorder ell_curveorder_ul
+#elif defined(MODREDC15UL)
+#include "modredc_15ul.h"
+#include "modredc_15ul_default.h"
+#define ecm ecm_15ul
+#define ell_pointorder ell_pointorder_15ul
+#define ellM_curveorder_jacobi ellM_curveorder_jacobi_15ul
+#define ell_curveorder ell_curveorder_15ul
+#else
+#error Please define MODREDCUL or MODREDC15UL
+#endif
 
 typedef struct {residue_t x, z;} __ellM_point_t;
 typedef __ellM_point_t ellM_point_t[1];
@@ -244,7 +259,7 @@ ellM_mul_ul (ellM_point_t R, const ellM_point_t P, unsigned long e,
 
   /* compute number of steps needed: we start from (1,2) and go from
      (i,i+1) to (2i,2i+1) or (2i+1,2i+2) */
-  for (l = e, n = 0; l > 1; n ++, l /= 2);
+  for (l = e, n = 0; l > 1; n ++, l /= 2) ;
 
   /* start from P1=P, P2=2P */
   ellM_set (t1, P, m);
@@ -614,7 +629,7 @@ curveW_from_Montgomery (residue_t a, residue_t x, residue_t y,
   return r;
 }
 
-static void 
+static int 
 ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan, 
 	    const residue_t b, const modulus_t m)
 {
@@ -623,18 +638,19 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
               and jP, j in S_1, x and z coordinate stored separately */
   residue_t a, a_bk, t;
   unsigned int i, k, l;
+  int bt = 0;
   
   ellM_init (Pt, m);
   mod_init_noset0 (t, m);
   mod_init_noset0 (a, m);
-  Pj_x = malloc (plan->s1 * sizeof(residue_t));
+  Pj_x = (residue_t *) malloc (plan->s1 * sizeof(residue_t));
   ASSERT (Pj_x != NULL);
-  Pj_z = malloc (plan->s1 * sizeof(residue_t));
+  Pj_z = (residue_t *) malloc (plan->s1 * sizeof(residue_t));
   ASSERT (Pj_z != NULL);
   ASSERT(plan->i0 < plan->i1);
-  Pid_x = malloc ((plan->i1 - plan->i0) * sizeof(residue_t));
+  Pid_x = (residue_t *) malloc ((plan->i1 - plan->i0) * sizeof(residue_t));
   ASSERT (Pid_x != NULL);
-  Pid_z = malloc ((plan->i1 - plan->i0) * sizeof(residue_t));
+  Pid_z = (residue_t *) malloc ((plan->i1 - plan->i0) * sizeof(residue_t));
   ASSERT (Pid_z != NULL);
   for (i = 0; i < plan->s1; i++)
     {
@@ -807,7 +823,7 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
     const unsigned long n = plan->s1 + plan->i1 - plan->i0 - skip_i0;
     residue_t *invarray;
 
-    invarray = malloc (n * sizeof (residue_t));
+    invarray = (residue_t *) malloc (n * sizeof (residue_t));
     ASSERT (invarray != NULL);
     for (i = 0; i < n; i++)
       mod_init (invarray[i], m);
@@ -904,6 +920,7 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
       if (mod_is0 (a, m))
 	{
 	  mod_set (a, a_bk, m);
+	  bt = 1;
 	  break;
 	}
       mod_set (a_bk, a, m); /* Save new a value */
@@ -947,19 +964,19 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
   mod_clear (t, m);
   mod_clear (a, m);
   mod_clear (a_bk, m);
-  return;
+  return bt;
 }
 
-/* If a factor is found it is returned and x1 is unchanged, otherwise 
-   1 is returned and the end-of-stage-1 residue is stored in x1. */
+/* Stores any factor found in f_out (1 if no factor found).
+   If back-tracking was used, returns 1, otherwise returns 0. */
 
-unsigned long
-ecm (residue_t x1, const modulus_t m, const ecm_plan_t *plan)
+int 
+ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 {
   residue_t u, A, b, r;
   ellM_point_t P, Pt;
-  unsigned long f = 1;
   unsigned int i;
+  int bt = 0;
 
   mod_init (u, m);
   mod_init (A, m);
@@ -967,6 +984,8 @@ ecm (residue_t x1, const modulus_t m, const ecm_plan_t *plan)
   mod_init (r, m);
   ellM_init (P, m);
   ellM_init (Pt, m);
+
+  mod_intset_ul (f, 1UL);
 
   if (plan->parameterization == BRENT12)
   {
@@ -981,7 +1000,7 @@ ecm (residue_t x1, const modulus_t m, const ecm_plan_t *plan)
 	ellM_clear (P, m);
 	ellM_clear (Pt, m);
 	mod_clear (s, m);
-	return 1;
+	return 0;
       }
     mod_clear (s, m);
     mod_set_ul (P->z, 1UL, m);
@@ -989,7 +1008,14 @@ ecm (residue_t x1, const modulus_t m, const ecm_plan_t *plan)
   else if (plan->parameterization == MONTY12)
   {
     if (Monty12_curve_from_k (A, P->x, plan->sigma, m) == 0)
-      return 1;
+      {
+	mod_clear (u, m);
+	mod_clear (A, m);
+	mod_clear (b, m);
+	ellM_clear (P, m);
+	ellM_clear (Pt, m);
+	return 0;
+      }
     mod_set_ul (P->z, 1UL, m);
   }
   else
@@ -1003,7 +1029,7 @@ ecm (residue_t x1, const modulus_t m, const ecm_plan_t *plan)
 	  mod_get_ul (P->x, m), mod_get_ul (P->z, m));
 #endif
 
-  mod_add_ul (b, A, 2UL, m);
+  mod_add_ul (b, A, 2UL, m); /* TODO: precompute 1? */
   mod_div2 (b, b, m);
   mod_div2 (b, b, m);
 
@@ -1021,23 +1047,18 @@ ecm (residue_t x1, const modulus_t m, const ecm_plan_t *plan)
       if (mod_is0 (P[0].z, m))
 	{
 	  ellM_set (P, Pt, m);
+	  bt = 1;
 	  break;
 	}
       ellM_set (Pt, P, m);
     }
 
-  mod_gcd (&f, P[0].z, m);
-  if (f == 1 && plan->B1 < plan->stage2.B2)
+  mod_gcd (f, P[0].z, m); /* FIXME: skip this gcd and let the extgcd
+			     in stage 2 init find factors? */
+  if (bt == 0 && f[0] == 1UL && plan->B1 < plan->stage2.B2)
     {
-      ecm_stage2 (r, P, &(plan->stage2), b, m);
-      mod_gcd (&f, r, m);
-    }
-  
-  if (f == 1)
-    {
-      /* No factor. Set x1 to normalized point */
-      mod_inv (u, P[0].z, m);
-      mod_mul (x1, P[0].x, u, m);
+      bt = ecm_stage2 (r, P, &(plan->stage2), b, m);
+      mod_gcd (f, r, m);
     }
   
   mod_clear (u, m);
@@ -1047,66 +1068,7 @@ ecm (residue_t x1, const modulus_t m, const ecm_plan_t *plan)
   ellM_clear (P, m);
   ellM_clear (Pt, m);
 
-  return f;
-}
-
-
-/* Make byte code for addition chain for stage 1, and the parameters for 
-   stage 2 */
-
-void 
-ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
-	       const int parameterization, const unsigned long sigma, 
-	       const int verbose)
-{
-  unsigned int p, q;
-  const unsigned int addcost = 6, doublecost = 5; /* TODO: find good ratio */
-  const unsigned int compress = 0;
-  
-  plan->exp2 = 0;
-  for (q = 1; q <= B1 / 2; q *= 2)
-    plan->exp2++;
-  
-  /* Make bytecode for stage 1 */
-  plan->B1 = B1;
-  plan->parameterization = parameterization;
-  plan->sigma = sigma;
-  bytecoder_init (compress);
-  p = (unsigned int) getprime (2UL);
-  ASSERT (p == 3);
-  for ( ; p <= B1; p = (unsigned int) getprime (p))
-    {
-      for (q = 1; q <= B1 / p; q *= p)
-	prac_bytecode (p, addcost, doublecost);
-    }
-  bytecoder_flush ();
-  plan->bc_len = bytecoder_size ();
-  plan->bc = (char *) malloc (plan->bc_len);
-  ASSERT (plan->bc);
-  bytecoder_read (plan->bc);
-  bytecoder_clear ();
-  getprime (0);
-
-  if (verbose)
-    {
-      printf ("Byte code for stage 1 (length %d): ", plan->bc_len);
-      for (p = 0; p < plan->bc_len; p++)
-	printf ("%s%d", (p == 0) ? "" : ", ", (int) (plan->bc[p]));
-      printf ("\n");
-    }
-    
-  /* Make stage 2 plan */
-  stage2_make_plan (&(plan->stage2), B1, B2, verbose);
-}
-
-void 
-ecm_clear_plan (ecm_plan_t *plan)
-{
-  stage2_clear_plan (&(plan->stage2));
-  free (plan->bc);
-  plan->bc = NULL;
-  plan->bc_len = 0;
-  plan->B1 = 0;
+  return bt;
 }
 
 
@@ -1208,7 +1170,7 @@ ell_pointorder (const residue_t sigma, const int parameterization,
 /* Count points on curve using the Jacobi symbol. This has complexity O(m). */
 
 unsigned long 
-ellM_curveorderjacobi (residue_t A, residue_t x, modulus_t m)
+ellM_curveorder_jacobi (residue_t A, residue_t x, modulus_t m)
 {
   residue_t t;
   unsigned long order, i;
@@ -1272,7 +1234,7 @@ ell_curveorder (const unsigned long sigma_par, int parameterization,
     fprintf (stderr, "ell_curveorder: Unknown parameterization\n");
     abort();
   }
-  order = ellM_curveorderjacobi (A, X, m);
+  order = ellM_curveorder_jacobi (A, X, m);
 
 #ifndef NDEBUG
   ASSERT (parameterization != BRENT12 || order == ell_pointorder (sigma, parameterization, m, 0));

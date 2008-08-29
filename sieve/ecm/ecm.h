@@ -1,4 +1,5 @@
 #include "modredc_ul.h"
+#include "modredc_15ul.h"
 #include "stage2.h"
 
 #define BRENT12 0
@@ -16,11 +17,17 @@ typedef struct {
 } ecm_plan_t;
 
 
+int ecm_ul (modintredcul_t, const modulusredcul_t, const ecm_plan_t *);
+
+unsigned long ell_pointorder_ul (const residueredcul_t, const int, 
+                                 const modulusredcul_t, const int);
+unsigned long ellM_curveorder_jacobi_ul (residueredcul_t, residueredcul_t, 
+                                         modulusredcul_t);
+int ecm_15ul (modintredc15ul_t, const modulusredc15ul_t, const ecm_plan_t *);
+unsigned long ell_pointorder_15ul (const residueredc15ul_t, const int, 
+                                   const modulusredc15ul_t, const int);
+unsigned long ellM_curveorder_jacobi_15ul (residueredc15ul_t, residueredc15ul_t, 
+                                           modulusredc15ul_t);
 void ecm_make_plan (ecm_plan_t *, const unsigned int, const unsigned int, 
 		    const int, const unsigned long, const int);
 void ecm_clear_plan (ecm_plan_t *);
-unsigned long ecm (residue_t, const modulus_t, const ecm_plan_t *);
-
-unsigned long ell_pointorder (const residue_t, const int, const modulus_t, 
-			      const int);
-unsigned long ellM_curveorder_jacobi (residue_t, residue_t, modulus_t);

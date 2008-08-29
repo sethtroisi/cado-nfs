@@ -4,26 +4,21 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include "pm1.h"
 #include "pp1.h"
 #include "ecm.h"
-#include "modredc_ul.h"
 #include "facul.h"
-
-#define PM1_METHOD 1
-#define PP1_METHOD 2
-#define EC_METHOD 3
+#include "facul_doit.h"
 
 
-#define STATS_LEN 128
-
-static unsigned long stats_called[STATS_LEN] = {
+unsigned long stats_called[STATS_LEN] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 };
-static unsigned long stats_found_n[STATS_LEN] = {
+unsigned long stats_found_n[STATS_LEN] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -39,52 +34,66 @@ static unsigned long stats_found_n[STATS_LEN] = {
 */
 
 facul_strategy_t *
-facul_make_strategy (const int n)
+facul_make_strategy (const int n, const unsigned long fbb, 
+		     const unsigned long lpb)
 {
   facul_strategy_t *strategy;
+  facul_method_t *methods;
   int i;
-  strategy = malloc ((n + 4) * sizeof (facul_strategy_t));
   
-  strategy[0].method = PM1_METHOD;
-  strategy[0].plan = malloc (sizeof (pm1_plan_t));
-  pm1_make_plan (strategy[0].plan, 315, 2205, 0);
+  strategy = malloc (sizeof (facul_strategy_t));
+  strategy->lpb = lpb;
+  /* Store fbb^2 in fbb2 */
+  ularith_mul_ul_ul_2ul (&(strategy->fbb2[0]), &(strategy->fbb2[1]), fbb, fbb);
+
+  methods = malloc ((n + 4) * sizeof (facul_method_t));
+  strategy->methods = methods;
   
-  strategy[1].method = PP1_METHOD;
-  strategy[1].plan = malloc (sizeof (pp1_plan_t));
-  pp1_make_plan (strategy[1].plan, 525, 3255, 0);
+  methods[0].method = PM1_METHOD;
+  methods[0].plan = malloc (sizeof (pm1_plan_t));
+  pm1_make_plan (methods[0].plan, 315, 2205, 0);
   
-  strategy[2].method = EC_METHOD;
-  strategy[2].plan = malloc (sizeof (ecm_plan_t));
-  ecm_make_plan (strategy[2].plan, 105, 3255, BRENT12, 10, 0);
+  methods[1].method = PP1_METHOD;
+  methods[1].plan = malloc (sizeof (pp1_plan_t));
+  pp1_make_plan (methods[1].plan, 525, 3255, 0);
+  
+  methods[2].method = EC_METHOD;
+  methods[2].plan = malloc (sizeof (ecm_plan_t));
+  ecm_make_plan (methods[2].plan, 105, 3255, BRENT12, 10, 0);
   
   for (i = 3; i < n + 3; i++)
     {
-      strategy[i].method = EC_METHOD;
-      strategy[i].plan = malloc (sizeof (ecm_plan_t));
-      ecm_make_plan (strategy[i].plan, 315, 5355, BRENT12, i + 8, 0);
+      methods[i].method = EC_METHOD;
+      methods[i].plan = malloc (sizeof (ecm_plan_t));
+      ecm_make_plan (methods[i].plan, 315, 5355, BRENT12, i + 8, 0);
     }
 
-  strategy[n + 3].method = 0;
-  strategy[n + 3].plan = NULL;
+  methods[n + 3].method = 0;
+  methods[n + 3].plan = NULL;
 
   return strategy;
 }
 
+
 void 
 facul_clear_strategy (facul_strategy_t *strategy)
 {
+  facul_method_t *methods = strategy->methods;
   int i = 0;
-  for (i = 0; strategy[i].method != 0; i++)
+
+  for (i = 0; methods[i].method != 0; i++)
     {
-      if (strategy[i].method == PM1_METHOD)
-	pm1_clear_plan (strategy[i].plan);
-      else if (strategy[i].method == PP1_METHOD)
-	pp1_clear_plan (strategy[i].plan);
-      else if (strategy[i].method == EC_METHOD)
-	ecm_clear_plan (strategy[i].plan);
-      strategy[i].method = 0;
-      strategy[i].plan = NULL;
+      if (methods[i].method == PM1_METHOD)
+	pm1_clear_plan (methods[i].plan);
+      else if (methods[i].method == PP1_METHOD)
+	pp1_clear_plan (methods[i].plan);
+      else if (methods[i].method == EC_METHOD)
+	ecm_clear_plan (methods[i].plan);
+      methods[i].method = 0;
+      methods[i].plan = NULL;
     }
+  free (methods);
+  methods = NULL;
   free (strategy);
 }
 
@@ -131,83 +140,64 @@ void facul_print_stats (FILE *stream)
 int
 facul (unsigned long *factors, const mpz_t N, facul_strategy_t *strategy)
 {
-  unsigned long n, f;
-  modulusredcul_t m;
-  residueredcul_t r;
+  modintredc15ul_t n;
   int i, found = 0;
+  
+#ifdef PARI
+  gmp_fprintf (stderr, "%Zd", N);
+#endif
 
   if (mpz_sgn (N) <= 0)
     return -1;
   if (mpz_cmp_ui (N, 1UL) == 0)
     return 0;
   
-  /* Right now we can only deal with moduli that are 1 unsigned long in size.
-     Need to write arithmetic for larger moduli. */
-  if (!mpz_fits_ulong_p (N))
+  /* If the composite does not fit into our modular arithmetic, return
+     no factor */
+  if (mpz_sizeinbase (N, 2) > MODREDC15UL_MAXBITS)
     return 0;
-
-  n = mpz_get_ui (N);
-
-  modredcul_initmod_ul (m, n);
-  modredcul_init (r, m);
   
-  i = 0;
-  while (strategy[i].method != 0)
+  {
+    size_t written;
+    mpz_export (n, &written, -1, sizeof(unsigned long), 0, 0, N);
+    for (i = written; i < MODREDC15UL_SIZE; i++)
+      n[i] = 0UL;
+  }
+  
+  /* Use the fastest modular arithmetic that's large enough for this input */
+  if (modredc15ul_intbits (n) <= MODREDCUL_MAXBITS)
     {
-      if (i < STATS_LEN)
-	  stats_called[i]++;
-      
-      if (strategy[i].method == PM1_METHOD)
-	f = pm1 (r, m, (pm1_plan_t *) (strategy[i].plan));
-      else if (strategy[i].method == PP1_METHOD)
-	f = pp1 (r, m, (pp1_plan_t *) (strategy[i].plan));
-      else if (strategy[i].method == EC_METHOD)
-	f = ecm (r, m, (ecm_plan_t *) (strategy[i].plan));
-      else 
-	{
-	  /* A method value we don't know about. Something's wrong, bail out */
-	  modredcul_clear (r, m);
-	  modredcul_clearmod (m);
-	  return -1;
-	}
-      
-      if (f == n)
-	{
-	  if (i < STATS_LEN)
-	    stats_found_n[i]++;
-	}
-      else if (f > 1)
-	{
-	  factors[found++] = f;
-	  modredcul_clear (r, m);
-	  modredcul_clearmod (m);
-	  n /= f;
-	  modredcul_initmod_ul (m, n);
-	  modredcul_init (r, m);
-	  modredcul_set_ul (r, 2UL, m);
-	  if (mod_sprp (r, m))
-	    {
-	      modredcul_set_ul (r, 3UL, m);
-	      if (mod_sprp (r, m))
-		{
-		  // fprintf (stderr, "facul(): %lu is a prp, exiting\n", n);
-		  factors[found++] = n;
-		  break;
-		}
-	    }
-	}
-      i++;
+      modulusredcul_t m;
+      modredcul_initmod_uls (m, n);
+      found = facul_doit_ul (factors, m, strategy, 0);
+      modredcul_clearmod (m);
     }
-  modredcul_clear (r, m);
-  modredcul_clearmod (m);
-
+  else
+    {
+      modulusredc15ul_t m;
+      modredc15ul_initmod_uls (m, n);
+      found = facul_doit_15ul (factors, m, strategy, 0);
+      modredc15ul_clearmod (m);
+    }
+  
   if (found > 1)
     {
       /* Sort the factors we found */
       qsort (factors, found, sizeof (unsigned long), 
 	     (int (*)(const void *, const void *)) &cmp_ul);
-      /* Typecasts like this are what C is all about */
     }
+
+#ifdef PARI
+  if (found > 1)
+    {
+      fprintf (stderr, " == ");
+      for (i = 0; i < found; i++)
+	fprintf (stderr, "%lu%s", factors[i], 
+		 (i+1 < found) ? " * " : " /* PARI */\n");
+    }
+  else
+    fprintf (stderr, "; /* PARI */\n");
+#endif
 
   return found;
 }

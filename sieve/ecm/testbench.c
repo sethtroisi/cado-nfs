@@ -3,10 +3,12 @@
 #include <string.h>
 #include <gmp.h>
 #include <primegen.h>
-#include "modredc_ul.h"
 #include "pm1.h"
 #include "pp1.h"
 #include "ecm.h"
+#include "modredc_ul.h"
+#include "modredc_ul_default.h"
+
 
 const char *method_name[] = {"P-1", "P+1", "ECM"};
 
@@ -152,7 +154,9 @@ int main (int argc, char **argv)
   if (method == 2)
     ecm_make_plan (&ecmplan, B1, B2, BRENT12, x0, (verbose >= 2));
 
-  /* Compute exponent (a.k.a. multiplier for P+1/ECM) for stage 1 */
+  /* Compute exponent (a.k.a. multiplier for P+1/ECM) for stage 1.
+     This is currently only used for comparing speed/results of
+     P+1 byte code and binary chain. */
   mpz_init (E);
   mpz_set_ui (E, 1UL);
   primegen_init (pg);
@@ -191,7 +195,7 @@ int main (int argc, char **argv)
 
       if (method == 0) /* P-1 */
 	{
-	  f = pm1 (r, m, &pm1plan);
+	  f = pm1_15 (r, m, &pm1plan);
 
 	  if (verbose >= 2)
 	    printf ("Mod(%lu, %lu)^E == %lu\n", x0, ic, mod_get_ul (r, m));
