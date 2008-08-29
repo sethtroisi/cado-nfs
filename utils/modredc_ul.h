@@ -731,6 +731,8 @@ modredcul_finished (const residueredcul_t r, const modulusredcul_t m)
 /* prototypes of non-inline functions */
 void modredcul_div3 (residueredcul_t, const residueredcul_t, 
                      const modulusredcul_t);
+void modredcul_div7 (residueredcul_t, const residueredcul_t, 
+                     const modulusredcul_t);
 void modredcul_gcd (unsigned long *, const residueredcul_t, 
                     const modulusredcul_t);
 void modredcul_pow_ul (residueredcul_t, const residueredcul_t, 

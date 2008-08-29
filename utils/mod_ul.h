@@ -306,7 +306,7 @@ static inline void
 modul_get_uls (modintul_t r, const residueul_t s, 
 		   const modulusul_t m MAYBE_UNUSED)
 {
-  ASSERT_EXPENSIVE (s[0] < m[0].m);
+  ASSERT_EXPENSIVE (s[0] < m[0]);
   r[0] = s[0];
 }
 
@@ -717,6 +717,7 @@ modul_finished (const residueul_t r, const modulusul_t m)
 
 /* prototypes of non-inline functions */
 void modul_div3 (residueul_t, const residueul_t, const modulusul_t);
+void modul_div7 (residueul_t, const residueul_t, const modulusul_t);
 void modul_gcd (modintul_t, const residueul_t, const modulusul_t);
 void modul_pow_ul (residueul_t, const residueul_t, const unsigned long, 
 		   const modulusul_t);

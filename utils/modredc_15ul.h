@@ -732,6 +732,8 @@ modredc15ul_finished (const residueredc15ul_t r, const modulusredc15ul_t m)
 /* prototypes of non-inline functions */
 void modredc15ul_div3 (residueredc15ul_t, const residueredc15ul_t, 
 		       const modulusredc15ul_t);
+void modredc15ul_div7 (residueredc15ul_t, const residueredc15ul_t, 
+		       const modulusredc15ul_t);
 void modredc15ul_gcd (unsigned long *, const residueredc15ul_t, 
 		      const modulusredc15ul_t);
 int modredc15ul_inv (residueredc15ul_t, const residueredc15ul_t, 

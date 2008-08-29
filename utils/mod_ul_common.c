@@ -31,7 +31,7 @@ mod_div3 (residue_t r, const residue_t a, const modulus_t m)
 	t[0] = t[0] + 2UL * ml;
     }
 
-  /* Now r[0] == a+k*m (mod 2^w) so that a+k*m is divisible by 3.
+  /* Now t[0] == a+k*m (mod 2^w) so that a+k*m is divisible by 3.
      (a+k*m)/3 < 2^w, so doing a division (mod 2^w) produces the 
      correct result. */
   
@@ -42,6 +42,56 @@ mod_div3 (residue_t r, const residue_t a, const modulus_t m)
   
 #ifdef WANT_ASSERT_EXPENSIVE
   mod_sub (r, a, t, m);
+  mod_sub (r, r, t, m);
+  mod_sub (r, r, t, m);
+  ASSERT_EXPENSIVE (mod_is0 (r, m));
+#endif
+
+  mod_set (r, t, m);
+  mod_clear (t, m);
+}
+
+
+void
+mod_div7 (residue_t r, const residue_t a, const modulus_t m)
+{
+  unsigned long ml, m7, k;
+  residue_t t;
+  const unsigned long a7 = a[0] % 7UL;
+  const unsigned long inv7[7] = {0,6,3,2,5,4,1}; /* inv7[i] = -1/i (mod 7) */
+
+  ASSERT_EXPENSIVE (a[0] < mod_getmod_ul (m));
+
+  mod_init_noset0 (t, m);
+  mod_set (t, a, m);
+  if (a7 != 0UL)
+    {
+      ml = mod_getmod_ul (m);
+      m7 = ml % 7UL;
+      ASSERT (m7 != 0UL);
+      
+      /* We want a+km == 0 (mod 7), so k = -a*m^{-1} (mod 7) */
+      k = (a7 * inv7[m7]) % 7UL;
+      ASSERT_EXPENSIVE ((k*m7 + a7) % 7UL == 0UL);
+      t[0] = a[0] + k * ml;
+    }
+
+  /* Now t[0] == a+k*m (mod 2^w) so that a+k*m is divisible by 7.
+     (a+k*m)/7 < 2^w, so doing a division (mod 2^w) produces the 
+     correct result. */
+  
+  if (sizeof (unsigned long) == 4)
+    t[0] *= 0xb6db6db7UL; /* 1/7 (mod 2^32) */
+  else
+    t[0] *= 0x6db6db6db6db6db7UL; /* 1/7 (mod 2^64) */
+  
+#ifdef WANT_ASSERT_EXPENSIVE
+  ASSERT_EXPENSIVE (t[0] < mod_getmod_ul (m));
+  mod_sub (r, a, t, m);
+  mod_sub (r, r, t, m);
+  mod_sub (r, r, t, m);
+  mod_sub (r, r, t, m);
+  mod_sub (r, r, t, m);
   mod_sub (r, r, t, m);
   mod_sub (r, r, t, m);
   ASSERT_EXPENSIVE (mod_is0 (r, m));

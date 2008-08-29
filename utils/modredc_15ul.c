@@ -60,36 +60,16 @@ modredc15ul_div3 (residueredc15ul_t r, const residueredc15ul_t a,
       ASSERT_EXPENSIVE ((t[0] % 3UL + t[1] % 3UL) % 3UL == 0UL);
     }
   
-  /* Cute trick: 
-     t0d = t0 div 3, t0r = t1 % 3 <= 2
-     t1d = t1 div 3, t1r = t1 % 3 <= 2
-     wd = 2^w div 3, wr = 2^w % 3 = 1
-     Then (t1*w+t0)/3 = ((t1d*3 + t1r)*w + t0d*3 + t0r)/3 =
-     (t1d*3*w + t1r*(wd*3+wr) + t0d*3 + t0r)/3 =
-     t1d*w + t0d + t1r*wd + (t1r*wr + t0r)/3 =
-     t1d*w + t0d + t1r*wd + (t1r + t0r)/3
-     
-     We know:
-     (t1r + t0r)/3 = 0 or 1
-     t0d == (2^w-1)/3 && t0r == 0, or t0d < (2^w-1)/3 && t0r <= 2
-     wd = (2^w-1)/3, because for even w, 3 | 2^w-1
-     t1r*wd <= 2/3 * (2^w-1)
-     
-     Hence if t0d == (2^w-1)/3, t0r == 0, so (t1r + t0r)/3 == 0 
-     and so t1r == 0, therefore 
-     t0d + t1r*wd + (t1r + t0r)/3 <= (2^w-1)/3 + 0 * (2^w-1) + 0
-                                        < 2^w
-     
-     If t0d <= (2^w-1)/3 - 1, then
-     t0d + t1r*wd + (t1r + t0r)/3 <= (2^w-1)/3 - 1 + 2/3 * (2^w-1) + 1
-                                   = 2^w-1
-     
-     So t0d + t1r*wd + (t1r + t0r)/3 < 2^w, hence the high word of the result
-     is always simply equal to t1 / 3. We can get the correct value for the
-     low word by doing arithmetic modulo 2^w, i.e. by a multiplication by
-     3^{-1} (mod 2^w).
+  /* a = a1 * 2^w + a0, 3|a
+     Let a = a' * 3 * 2^w + a'', a'' < 3 * 2^w. 
+     3 | a'', a'' / 3 < 2^w
+     So a / 3 = a' * w + a'' / 3
+     a' = trunc(a1 / 3)
+     a'' = a0 * 3^{-1} (mod 2^w)
+     Hence we get the correct result with one one-word multiplication
+     and one one-word truncating division by a small constant.
   */
-
+  
   t[1] = t[1] / 3UL;
   if (sizeof (unsigned long) == 4)
     t[0] *= 0xaaaaaaabUL; /* 1/3 (mod 2^32) */
@@ -98,6 +78,65 @@ modredc15ul_div3 (residueredc15ul_t r, const residueredc15ul_t a,
 
 #ifdef WANT_ASSERT_EXPENSIVE
   modredc15ul_sub (r, a, t, m);
+  modredc15ul_sub (r, r, t, m);
+  modredc15ul_sub (r, r, t, m);
+  ASSERT_EXPENSIVE (modredc15ul_is0 (r, m));
+#endif
+  r[0] = t[0];
+  r[1] = t[1];
+  modredc15ul_clear (t, m);
+}
+
+
+void
+modredc15ul_div7 (residueredc15ul_t r, const residueredc15ul_t a, 
+		  const modulusredc15ul_t m)
+{
+  const unsigned long w_mod_7 = (sizeof (unsigned long) == 4) ? 4UL : 2UL;
+  const unsigned long a7 = ((a[1] % 7UL) * w_mod_7 + a[0] % 7UL) % 7UL;
+  const unsigned long inv7[7] = {0,6,3,2,5,4,1}; /* inv7[i] = -1/i (mod 7) */
+  unsigned long m7 = ((m[0].m[0] % 7UL) * w_mod_7 + m[0].m[1] % 7UL) % 7UL;
+  residueredc15ul_t t;
+  
+  ASSERT(m7 != 0UL);
+  
+  modredc15ul_init_noset0 (t, m);
+  t[1] = a[1];
+  t[0] = a[0];
+  
+  /* Make t[1]:t[0] divisible by 7 */
+  if (a7 != 0UL)
+    {
+      /* We want a+km == 0 (mod 7), so k = -a*m^{-1} (mod 7) */
+      m7 = (inv7[m7] * a7) % 7UL;
+      
+      switch (m7) 
+	{
+	case 6: ularith_add_2ul_2ul (&(t[0]), &(t[1]), m[0].m[0], m[0].m[1]);
+	case 5: ularith_add_2ul_2ul (&(t[0]), &(t[1]), m[0].m[0], m[0].m[1]);
+	case 4: ularith_add_2ul_2ul (&(t[0]), &(t[1]), m[0].m[0], m[0].m[1]);
+	case 3: ularith_add_2ul_2ul (&(t[0]), &(t[1]), m[0].m[0], m[0].m[1]);
+	case 2: ularith_add_2ul_2ul (&(t[0]), &(t[1]), m[0].m[0], m[0].m[1]);
+	case 1: ularith_add_2ul_2ul (&(t[0]), &(t[1]), m[0].m[0], m[0].m[1]);
+	case 0: ;
+	}
+      
+      /* Now t[1]:t[0] is divisible by 7 */
+      ASSERT_EXPENSIVE (((t[1] % 7UL) * w_mod_7 + t[0] % 7UL) % 7UL == 0UL);
+    }
+  
+  t[1] = t[1] / 7UL;
+  if (sizeof (unsigned long) == 4)
+    t[0] *= 0xb6db6db7UL; /* 1/7 (mod 2^32) */
+  else
+    t[0] *= 0x6db6db6db6db6db7UL; /* 1/7 (mod 2^64) */
+
+#ifdef WANT_ASSERT_EXPENSIVE
+  modredc15ul_sub (r, a, t, m);
+  modredc15ul_sub (r, r, t, m);
+  modredc15ul_sub (r, r, t, m);
+  modredc15ul_sub (r, r, t, m);
+  modredc15ul_sub (r, r, t, m);
   modredc15ul_sub (r, r, t, m);
   modredc15ul_sub (r, r, t, m);
   ASSERT_EXPENSIVE (modredc15ul_is0 (r, m));
