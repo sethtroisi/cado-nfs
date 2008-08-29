@@ -260,6 +260,13 @@ rewind_bucket(bucket_array_t BA, const int i)
     BA.bucket_read[i] = BA.bucket_start[i];
 }
 
+static inline void
+rewind_bucket_by_1 (bucket_array_t BA, const int i)
+{
+  if (BA.bucket_read[i] > BA.bucket_start[i])
+    BA.bucket_read[i]--;
+}
+
 static inline bucket_update_t
 get_next_bucket_update(bucket_array_t BA, const int i)
 {
@@ -308,7 +315,7 @@ is_end(const bucket_array_t BA, const int i)
 /* Delete the updates whose values of x do not yield a report.
    This will speed up the trial division, since we will loop
    over less entries. */
-void
+static void
 purge_bucket (bucket_array_t BA, const int i, unsigned char *S,
               unsigned char *tst)
 {
@@ -318,4 +325,23 @@ purge_bucket (bucket_array_t BA, const int i, unsigned char *S,
     if (tst[S[u->x]])
       *v++ = *u;
   BA.bucket_write[i] = v;
+}
+
+/* A compare function suitable for sorting updates in order of ascending x
+   with qsort() */
+static int
+bucket_cmp_update (bucket_update_t *a, bucket_update_t *b)
+{
+  if (a->x < b->x)
+    return -1;
+  if (a->x == b->x)
+    return 0;
+  return 1;
+}
+
+static void
+bucket_sortbucket (bucket_array_t BA, const int i)
+{
+  qsort (BA.bucket_start[i], nb_of_updates (BA, i), sizeof (bucket_update_t), 
+	 (int(*)(const void *, const void *)) &bucket_cmp_update);
 }

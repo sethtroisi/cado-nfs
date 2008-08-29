@@ -1319,6 +1319,26 @@ trial_div (factor_list_t *fl, mpz_t norm, bucket_array_t BA, int N, int x,
         fb = fb_next (fb); // cannot do fb++, due to variable size !
     }
 
+    // remove primes in BA that map to x
+    bucket_update_t update;
+    while (!is_end (BA, N)) {
+        update = get_next_bucket_update(BA, N);
+	if (update.x > x)
+	  {
+	    rewind_bucket_by_1 (BA, N);
+	    break;
+	  }
+        if (update.x == x) {
+            unsigned long p = update.p;
+            while (mpz_divisible_ui_p (norm, p)) {
+                fl->fac[fl->n] = p;
+                fl->n++;
+                ASSERT_ALWAYS(fl->n <= FL_MAX_SIZE);
+                mpz_divexact_ui (norm, norm, p);
+            }
+        }
+    }
+    
     // remove primes in fb that are less than I
     while (fb->p != FB_END && fb->p <= I) {
       while (trialdiv_with_norm(fb, norm) == 1) {
@@ -1329,23 +1349,6 @@ trial_div (factor_list_t *fl, mpz_t norm, bucket_array_t BA, int N, int x,
             mpz_divexact_ui (norm, norm, fb->p);
         }
         fb = fb_next (fb); // cannot do fb++, due to variable size !
-    }
-
-    // remove primes in BA that map to x
-    rewind_bucket(BA, N);
-    int nb;
-    bucket_update_t update;
-    for (nb = nb_of_updates(BA, N); nb > 0; --nb) {
-        update = get_next_bucket_update(BA, N);
-        if (update.x == x) {
-            unsigned long p = update.p;
-            while (mpz_divisible_ui_p (norm, p)) {
-                fl->fac[fl->n] = p;
-                fl->n++;
-                ASSERT_ALWAYS(fl->n <= FL_MAX_SIZE);
-                mpz_divexact_ui (norm, norm, p);
-            }
-        }
     }
 }
 
@@ -1403,7 +1406,11 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
     mpz_ui_pow_ui (BBrat, cpoly->rlim, 2);
 
     purge_bucket (rat_BA, N, S, si->alg_Bound);
+    bucket_sortbucket (rat_BA, N);
+    rewind_bucket (rat_BA, N);
     purge_bucket (alg_BA, N, S, si->alg_Bound);
+    bucket_sortbucket (alg_BA, N);
+    rewind_bucket (alg_BA, N);
 
     for (x = 0; x < si->bucket_region; ++x)
       {
