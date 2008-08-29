@@ -1,36 +1,21 @@
 /* Some functions for modular arithmetic with residues and modulus in
    unsigned long variables. Residues are stored in Montgomery form,
-   rediction after multiplication is done with REDC. Due to inlining, 
+   reduction after multiplication is done with REDC. Due to inlining, 
    this file must be included in the caller's source code with #include */
 
 /* Naming convention: all function start with modredcul, for 
    MODulus REDC Unsigned Long, followed by underscore, functionality of 
    function (add, mul, etc), and possibly underscore and specification of 
-   what argument types the function takes (_ul, etc).
-   There are typedef's that rename all functions to mod_* instead of 
-   modredcul_*, which one day might become an automatic renaming scheme so 
-   that different modulus sizes can be used simply by #including different 
-   mod_*.h files, but without changing anything else in the source code. */
+   what argument types the function takes (_ul, etc). */
 
-#ifndef MODREDC_UL_H__
+#ifndef __MODREDC_UL_H
 
-#define MODREDC_UL_H__
+#define __MODREDC_UL_H
 
 /**********************************************************************/
-#include <limits.h>
 #include <assert.h>
-
-/* <limits.h> defines LONG_BIT only with _XOPEN_SOURCE defined, but if 
-   another header (such as <stdio.h>) already included <features.h> before 
-   _XOPEN_SOURCE was set to 1, future includes of <features.h> are
-   short-circuited and _XOPEN_SOURCE is ignored. */
-
-#ifndef CHAR_BIT
-#define CHAR_BIT 8
-#endif
-#ifndef LONG_BIT
-#define LONG_BIT	((int) sizeof(long) * CHAR_BIT)
-#endif
+#include <limits.h>
+#include "ularith.h"
 
 #ifndef ASSERT
 #define ASSERT(x)	assert(x)
@@ -54,106 +39,203 @@
 #endif
 #endif
 
-#ifdef  mod_init
-#warning "modredc_ul.h included after mod_ul.h ; bindings overwritten"
-#endif
+#define MODREDCUL_SIZE 1
+#define MODREDCUL_MAXBITS LONG_BIT
 
-/* Define the default names and types for arithmetic with these functions */
-#undef mod_init
-#undef mod_init_noset0
-#undef mod_clear
-#undef mod_set
-#undef mod_set_ul
-#undef mod_set_ul_reduced
-#undef mod_swap
-#undef mod_initmod_ul
-#undef mod_getmod_ul
-#undef mod_clearmod
-#undef mod_get_ul
-#undef mod_equal
-#undef mod_is0
-#undef mod_add
-#undef mod_add_ul
-#undef mod_sub
-#undef mod_sub_ul
-#undef mod_neg
-#undef mod_mul
-#undef mod_addredc_ul
-#undef mod_mulredc_ul
-#undef mod_muladdredc_ul
-#undef mod_div2
-#undef mod_div3
-#undef mod_pow_ul
-#undef mod_pow_mp
-#undef mod_2pow_mp
-#undef mod_V_ul
-#undef mod_V_mp
-#undef mod_sprp
-#undef mod_gcd
-#undef mod_inv
-#undef mod_jacobi
-#undef mod_set0
-#undef mod_set1
-#undef mod_next
-#undef mod_finished
-#undef residue_t
-#undef modulus_t
-
-#define mod_init             modredcul_init
-#define mod_init_noset0      modredcul_init_noset0
-#define mod_clear            modredcul_clear
-#define mod_set              modredcul_set
-#define mod_set_ul           modredcul_set_ul
-#define mod_set_ul_reduced   modredcul_set_ul_reduced
-#define mod_swap             modredcul_swap
-#define mod_initmod_ul       modredcul_initmod_ul
-#define mod_getmod_ul        modredcul_getmod_ul
-#define mod_clearmod         modredcul_clearmod
-#define mod_get_ul           modredcul_get_ul
-#define mod_equal            modredcul_equal
-#define mod_is0              modredcul_is0
-#define mod_add              modredcul_add
-#define mod_add_ul           modredcul_add_ul
-#define mod_sub              modredcul_sub
-#define mod_sub_ul           modredcul_sub_ul
-#define mod_neg              modredcul_neg
-#define mod_mul              modredcul_mul
-#define mod_addredc_ul       modredcul_addredc_ul
-#define mod_mulredc_ul       modredcul_mulredc_ul
-#define mod_muladdredc_ul    modredcul_muladdredc_ul
-#define mod_div2             modredcul_div2
-#define mod_div3             modredcul_div3
-#define mod_pow_ul           modredcul_pow_ul
-#define mod_pow_mp           modredcul_pow_mp
-#define mod_2pow_mp          modredcul_2pow_mp
-#define mod_V_ul             modredcul_V_ul
-#define mod_V_mp             modredcul_V_mp
-#define mod_sprp             modredcul_sprp
-#define mod_gcd              modredcul_gcd
-#define mod_inv              modredcul_inv
-#define mod_jacobi           modredcul_jacobi
-#define mod_set0             modredcul_set0
-#define mod_set1             modredcul_set1
-#define mod_next             modredcul_next
-#define mod_finished         modredcul_finished
-
-typedef unsigned long residueredcul_t[1];
+typedef unsigned long residueredcul_t[MODREDCUL_SIZE];
+typedef unsigned long modintredcul_t[MODREDCUL_SIZE];
 typedef struct { 
   unsigned long m;
   unsigned long invm;
 } __modulusredcul_t;
 typedef __modulusredcul_t modulusredcul_t[1];
-#define residue_t residueredcul_t
-#define modulus_t modulusredcul_t
 
 
-static inline void 
-modredcul_tomontgomery (residueredcul_t, const residueredcul_t, 
-                        const modulusredcul_t m);
+/* ==================== Functions used internally ==================== */
+
+/* Computes (a * 2^wordsize) % m */
+MAYBE_UNUSED
 static inline void
-modredcul_frommontgomery (residueredcul_t, const residueredcul_t, 
-                          const modulusredcul_t);
+modredcul_tomontgomery (residueredcul_t r, const residueredcul_t a, 
+                        const modulusredcul_t m)
+{
+  ASSERT_EXPENSIVE (a[0] < m[0].m);
+  ularith_div_2ul_ul_ul_r (r, 0UL, a[0], m[0].m);
+}
 
+
+/* Computes (a / 2^wordsize) % m */
+MAYBE_UNUSED
+static inline void
+modredcul_frommontgomery (residueredcul_t r, const residueredcul_t a, 
+                          const modulusredcul_t m)
+{
+  unsigned long tlow, thigh;
+  tlow = a[0] * m[0].invm;
+  ularith_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
+  r[0] = thigh + ((a[0] != 0UL) ? 1UL : 0UL);
+}
+
+
+/* Compute 1/n (mod 2^wordsize) */
+MAYBE_UNUSED
+static inline unsigned long
+modredcul_invmodul (unsigned long n)
+{
+  unsigned long r;
+
+  ASSERT (n % 2UL != 0UL);
+  
+  /* The square of an odd integer is always 1 (mod 8). So by
+     initing r = m, the low three bits in the approximate inverse
+     are correct. 
+     When r = 1/m (mod 16), the 4th bit of r happens to be the
+     XOR of bits 2, 3 and 4 of m. This gives us an approximate 
+     inverse with the 4 lowest bits correct, so 3 (for 32 bit) or
+     4 (for 64 bit) Newton iterations are enough. */
+  r = n ^ ((n & 4UL) << 1) ^ ((n & 2UL) << 2);
+  r = 2UL * r - r * r * n; /* Newton iteration */
+  r = 2UL * r - r * r * n;
+  r = 2UL * r - r * r * n;
+  if (sizeof (unsigned long) > 4)
+    r = 2UL * r - r * r * n;
+
+  ASSERT_EXPENSIVE (r * n == 1UL);
+
+  return r;
+}
+
+
+
+/* ================= Functions that are part of the API ================= */
+
+/* Some functions for integers of the same width as the modulus */
+
+MAYBE_UNUSED
+static inline void
+modredcul_intset (modintredcul_t r, const modintredcul_t s)
+{
+  r[0] = s[0];
+}
+
+
+MAYBE_UNUSED
+static inline void
+modredcul_intset_ul (modintredcul_t r, const unsigned long s)
+{
+  r[0] = s;
+}
+
+
+MAYBE_UNUSED
+static inline int
+modredcul_intequal (const modintredcul_t a, const modintredcul_t b)
+{
+  return (a[0] == b[0]);
+}
+
+
+MAYBE_UNUSED
+static inline int
+modredcul_intequal_ul (const modintredcul_t a, const unsigned long b)
+{
+  return (a[0] == b);
+}
+
+
+MAYBE_UNUSED
+static inline int
+modredcul_intcmp (const modintredcul_t a, const modintredcul_t b)
+{
+  return (a[0] < b[0]) ? -1 : (a[0] == b[0]) ? 0 : 1;
+}
+
+
+MAYBE_UNUSED
+static inline int
+modredcul_intcmp_ul (const modintredcul_t a, const unsigned long b)
+{
+  return (a[0] < b) ? -1 : (a[0] == b) ? 0 : 1;
+}
+
+MAYBE_UNUSED
+static inline int
+modredcul_intfits_ul (const modintredcul_t a MAYBE_UNUSED)
+{
+  return 1;
+}
+
+/* Returns the number of bits in a, that is, floor(log_2(n))+1. 
+   For n==0 returns 0. */
+MAYBE_UNUSED
+static inline int
+modredcul_intbits (const modintredcul_t a)
+{
+  int bits = 0;
+  unsigned long n = a[0];
+  while (n > 0UL) /* TODO: use clzl */
+    {
+      bits++;
+      n >>= 1;
+    }
+  return bits;
+}
+
+/* r = n/d. We require d|n */
+MAYBE_UNUSED
+static inline void
+modredcul_intdivexact (modintredcul_t r, const modintredcul_t n, 
+                       const modintredcul_t d)
+{
+  r[0] = n[0] / d[0]; 
+}
+
+
+/* Functions for the modulus */
+
+MAYBE_UNUSED
+static inline void
+modredcul_initmod_ul (modulusredcul_t m, const unsigned long s)
+{
+  m[0].m = s;
+  m[0].invm = -modredcul_invmodul (s);
+}
+
+
+MAYBE_UNUSED
+static inline void
+modredcul_initmod_uls (modulusredcul_t m, const modintredcul_t s)
+{
+  m[0].m = s[0];
+  m[0].invm = -modredcul_invmodul (s[0]);
+}
+
+
+MAYBE_UNUSED
+static inline unsigned long
+modredcul_getmod_ul (const modulusredcul_t m)
+{
+  return m[0].m;
+}
+
+
+MAYBE_UNUSED
+static inline void
+modredcul_getmod_uls (modintredcul_t r, const modulusredcul_t m)
+{
+  r[0] = m[0].m;
+}
+
+
+MAYBE_UNUSED
+static inline void
+modredcul_clearmod (modulusredcul_t m MAYBE_UNUSED)
+{
+  return;
+}
+
+
+/* Functions for residues */
 
 /* Initialises a residue_t type and sets it to zero */
 MAYBE_UNUSED
@@ -161,7 +243,6 @@ static inline void
 modredcul_init (residueredcul_t r, const modulusredcul_t m MAYBE_UNUSED)
 {
   r[0] = 0UL;
-  return;
 }
 
 
@@ -219,6 +300,27 @@ modredcul_set_ul_reduced (residueredcul_t r, const unsigned long s,
 }
 
 
+MAYBE_UNUSED
+static inline void
+modredcul_set_uls (residueredcul_t r, const modintredcul_t s, 
+		   const modulusredcul_t m)
+{
+  r[0] = s[0] % m[0].m;
+  modredcul_tomontgomery (r, r, m);
+}
+
+
+MAYBE_UNUSED
+static inline void
+modredcul_set_uls_reduced (residueredcul_t r, const modintredcul_t s, 
+			   const modulusredcul_t m)
+{
+  ASSERT (s[0] < m[0].m);
+  r[0] = s[0];
+  modredcul_tomontgomery (r, r, m);
+}
+
+
 /* This one is so trivial that we don't really require m in the
  * interface. For interface homogeneity we make it take the m parameter 
  * anyway.
@@ -227,7 +329,7 @@ MAYBE_UNUSED
 static inline void 
 modredcul_set0 (residueredcul_t r, const modulusredcul_t m MAYBE_UNUSED) 
 { 
-  r[0] = 0UL; 
+  r[0] = 0UL;
 }
 
 
@@ -253,60 +355,6 @@ modredcul_swap (residueredcul_t a, residueredcul_t b,
   a[0] = b[0];
   b[0] = t;
 }
-                          
-
-/* Compute 1/t (mod 2^wordsize) */
-MAYBE_UNUSED
-static inline unsigned long
-modredcul_invmodul (unsigned long n)
-{
-  unsigned long r;
-
-  ASSERT (n % 2UL != 0UL);
-  
-  /* The square of an odd integer is always 1 (mod 8). So by
-     initing r = m, the low three bits in the approximate inverse
-     are correct. 
-     When r = 1/m (mod 16), the 4th bit of r happens to be the
-     XOR of bits 2, 3 and 4 of m. This gives us an approximate 
-     inverse with the 4 lowest bits correct, so 3 (for 32 bit) or
-     4 (for 64 bit) Newton iterations are enough. */
-  r = n ^ ((n & 4UL) << 1) ^ ((n & 2UL) << 2);
-  r = 2UL * r - r * r * n; /* Newton iteration */
-  r = 2UL * r - r * r * n;
-  r = 2UL * r - r * r * n;
-  if (sizeof (unsigned long) > 4)
-    r = 2UL * r - r * r * n;
-
-  ASSERT (r * n == 1UL);
-
-  return r;
-}
-
-
-MAYBE_UNUSED
-static inline void
-modredcul_initmod_ul (modulusredcul_t m, const unsigned long s)
-{
-  m[0].m = s;
-  m[0].invm = -modredcul_invmodul (s);
-}
-
-
-MAYBE_UNUSED
-static inline unsigned long
-modredcul_getmod_ul (const modulusredcul_t m)
-{
-  return m[0].m;
-}
-
-
-MAYBE_UNUSED
-static inline void
-modredcul_clearmod (modulusredcul_t m MAYBE_UNUSED)
-{
-  return;
-}
 
 
 MAYBE_UNUSED
@@ -318,6 +366,16 @@ modredcul_get_ul (const residueredcul_t s,
   ASSERT_EXPENSIVE (s[0] < m[0].m);
   modredcul_frommontgomery (&t, s, m);
   return t;
+}
+
+
+MAYBE_UNUSED
+static inline void
+modredcul_get_uls (modintredcul_t r, const residueredcul_t s, 
+		   const modulusredcul_t m MAYBE_UNUSED)
+{
+  ASSERT_EXPENSIVE (s[0] < m[0].m);
+  modredcul_frommontgomery (r, s, m);
 }
 
 
@@ -393,7 +451,6 @@ modredcul_add_ul (residueredcul_t r, const residueredcul_t a,
 
   /* TODO: speed up */
   ASSERT_EXPENSIVE (a[0] < m[0].m);
-  ASSERT(b < m[0].m);
   modredcul_init_noset0 (t, m);
   modredcul_set_ul (t, b, m);
   modredcul_add (r, a, t, m);
@@ -454,7 +511,6 @@ modredcul_sub_ul (residueredcul_t r, const residueredcul_t a,
 
   /* TODO: speed up */
   ASSERT_EXPENSIVE (a[0] < m[0].m);
-  ASSERT(b < m[0].m);
   modredcul_init_noset0 (t, m);
   modredcul_set_ul (t, b, m);
   modredcul_sub (r, a, t, m);
@@ -475,174 +531,6 @@ modredcul_neg (residueredcul_t r, const residueredcul_t a,
 }
 
 
-/* Add an unsigned long to two unsigned longs with carry propagation from 
-   low word (r1) to high word (r2). Any carry out from high word is lost. */
-
-static inline void
-modredcul_add_ul_2ul (unsigned long *r1, unsigned long *r2, 
-                      const unsigned long a)
-{
-#if defined(__x86_64__) && defined(__GNUC__)
-  __asm__ ( "addq %2, %0\n\t"
-            "adcq $0, %1\n"
-            : "+&r" (*r1), "+r" (*r2)
-            : "rm" (a)
-            : "cc");
-#elif defined(__i386__) && defined(__GNUC__)
-  __asm__ ( "addl %2, %0\n\t"
-            "adcl $0, %1\n"
-            : "+&r" (*r1), "+r" (*r2)
-            : "rm" (a)
-            : "cc");
-#else
-  abort ();
-#endif
-}
-
-
-/* Add two unsigned longs to two unsigned longs with carry propagation from 
-   low word to high word. Any carry out from high word is lost. */
-
-static inline void
-modredcul_add_2ul_2ul (unsigned long *r1, unsigned long *r2, 
-             const unsigned long a1, const unsigned long a2)
-{
-#if defined(__x86_64__) && defined(__GNUC__)
-  __asm__ ( "addq %2, %0\n\t"
-            "adcq %3, %1\n"
-            : "+&r" (*r1), "+r" (*r2)
-            : "rm" (a1), "rm" (a2)
-            : "cc");
-#elif defined(__i386__) && defined(__GNUC__)
-  __asm__ ( "addl %2, %0\n\t"
-            "adcl %3, %1\n"
-            : "+&r" (*r1), "+r" (*r2)
-            : "rm" (a1), "rm" (a2)
-            : "cc");
-#else
-  abort ();
-#endif
-}
-
-
-/* Multiply two unsigned long "a" and "b" and put the result as 
-   r2:r1 (r2 being the high word) */
-
-static inline void
-modredcul_mul_ul_ul_2ul (unsigned long *r1, unsigned long *r2, const unsigned long a,
-               const unsigned long b)
-{
-#if defined(__x86_64__) && defined(__GNUC__)
-  __asm__ ( "mulq %3"
-	    : "=a" (*r1), "=d" (*r2)
-	    : "%0" (a), "rm" (b)
-	    : "cc");
-#elif defined(__i386__) && defined(__GNUC__)
-  __asm__ ( "mull %3"
-	    : "=a" (*r1), "=d" (*r2)
-	    : "%0" (a), "rm" (b)
-	    : "cc");
-#else
-  abort ();
-#endif
-}
-
-
-/* Integer division of a two ulong value a2:a1 by a ulong divisor. Returns
-   quotient and remainder. */
-
-static inline void
-modredcul_div_2ul_ul_ul (unsigned long *q, unsigned long *r, const unsigned long a1,
-               const unsigned long a2, const unsigned long b)
-{
-  ASSERT(a2 < b); /* Or there will be quotient overflow */
-#if defined(__x86_64__) && defined(__GNUC__)
-  __asm__ ( "divq %4"
-            : "=a" (*q), "=d" (*r)
-            : "0" (a1), "1" (a2), "rm" (b)
-            : "cc");
-#elif defined(__i386__) && defined(__GNUC__)
-  __asm__ ( "divl %4"
-            : "=a" (*q), "=d" (*r)
-            : "0" (a1), "1" (a2), "rm" (b)
-            : "cc");
-#else
-  abort ();
-#endif
-}
-
-
-/* Integer division of a two longint value by a longint divisor. Returns
-   only remainder. */
-
-static inline void
-modredcul_div_2ul_ul_ul_r (unsigned long *r, unsigned long a1,
-                 const unsigned long a2, const unsigned long b)
-{
-  ASSERT(a2 < b); /* Or there will be quotient overflow */
-#if defined(__x86_64__) && defined(__GNUC__)
-  __asm__ ( "divq %3"
-            : "+a" (a1), "=d" (*r)
-            : "1" (a2), "rm" (b)
-            : "cc");
-#elif defined(__i386__) && defined(__GNUC__)
-  __asm__ ( "divl %3"
-            : "+a" (a1), "=d" (*r)
-            : "1" (a2), "rm" (b)
-            : "cc");
-#else
-  abort ();
-#endif
-}
-
-
-/* Shift *r right by i bits, filling in the low bits from a into the high
-   bits of *r */
-MAYBE_UNUSED
-static inline void
-modredcul_shrd (unsigned long *r, const unsigned long a, const int i)
-{
-#if defined(__x86_64__) && defined(__GNUC__)
-  __asm__ ("shrdq %1, %0\n": 
-           "+g" (*r) :
-           "r" (a), "c" (i) :
-           "cc"
-          );
-#elif defined(__i386__) && defined(__GNUC__)
-  __asm__ ("shrdl %1, %0\n": 
-           "+g" (*r) :
-           "r" (a), "c" (i) :
-           "cc"
-          );
-#else
-  *r = (*r >> i) | (a << (LONG_BIT - i));
-#endif
-}
-
-/* Computes (a * 2^wordsize) % m */
-MAYBE_UNUSED
-static inline void
-modredcul_tomontgomery (residueredcul_t r, const residueredcul_t a, 
-                        const modulusredcul_t m)
-{
-  ASSERT_EXPENSIVE (a[0] < m[0].m);
-  modredcul_div_2ul_ul_ul_r (r, 0UL, a[0], m[0].m);
-}
-
-
-/* Computes (a / 2^wordsize) % m */
-MAYBE_UNUSED
-static inline void
-modredcul_frommontgomery (residueredcul_t r, const residueredcul_t a, 
-                          const modulusredcul_t m)
-{
-  unsigned long tlow, thigh;
-  tlow = a[0] * m[0].invm;
-  modredcul_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
-  r[0] = thigh + ((a[0] != 0UL) ? 1UL : 0UL);
-}
-
-
 /* Computes (a / 2^wordsize) % m, but result can be r = m. 
    Input a must not be equal 0 */
 MAYBE_UNUSED
@@ -655,7 +543,7 @@ modredcul_redcsemi_ul_not0 (residueredcul_t r, const unsigned long a,
   ASSERT (a != 0);
 
   tlow = a * m[0].invm; /* tlow <= 2^w-1 */
-  modredcul_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
+  ularith_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
   /* thigh:tlow <= (2^w-1) * m */
   r[0] = thigh + 1UL; 
   /* (thigh+1):tlow <= 2^w + (2^w-1) * m  <= 2^w + 2^w*m - m 
@@ -676,10 +564,10 @@ modredcul_addredc_ul (residueredcul_t r, const residueredcul_t a,
   ASSERT_EXPENSIVE (a[0] <= m[0].m);
   slow = b;
   shigh = 0UL;
-  modredcul_add_ul_2ul (&slow, &shigh, a[0]);
+  ularith_add_ul_2ul (&slow, &shigh, a[0]);
   
   tlow = slow * m[0].invm;
-  modredcul_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
+  ularith_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
   ASSERT_EXPENSIVE (slow + tlow == 0UL);
   r[0] = thigh + shigh + ((slow != 0UL) ? 1UL : 0UL);
   
@@ -725,12 +613,12 @@ modredcul_addredcsemi_ul (residueredcul_t r, const residueredcul_t a,
   shigh = sb;
 #else
   shigh = 0UL;
-  modredcul_add_ul_2ul (&slow, &shigh, a[0]);
+  ularith_add_ul_2ul (&slow, &shigh, a[0]);
   shigh += (slow != 0UL) ? 1UL : 0UL;
 #endif
 
   tlow = slow * m[0].invm;
-  modredcul_mul_ul_ul_2ul (&tlow, r, tlow, m[0].m);
+  ularith_mul_ul_ul_2ul (&tlow, r, tlow, m[0].m);
   ASSERT_EXPENSIVE (slow + tlow == 0UL);
   r[0] += shigh;
 
@@ -758,9 +646,9 @@ modredcul_mul (residueredcul_t r, const residueredcul_t a,
           a[0], b[0], 8 * sizeof(unsigned long), m[0].m);
 #endif
   
-  modredcul_mul_ul_ul_2ul (&plow, &phigh, a[0], b[0]);
+  ularith_mul_ul_ul_2ul (&plow, &phigh, a[0], b[0]);
   tlow = plow * m[0].invm;
-  modredcul_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
+  ularith_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
   /* Let w = 2^wordsize. We know (phigh * w + plow) + (thigh * w + tlow) 
      == 0 (mod w) so either plow == tlow == 0, or plow !=0 and tlow != 0. 
      In the former case we want phigh + thigh + 1, in the latter 
@@ -769,7 +657,7 @@ modredcul_mul (residueredcul_t r, const residueredcul_t a,
      adding 1 to phigh is safe */
 #if 0
   /* Slower? */
-  modredcul_add_ul_2ul (&plow, &phigh, tlow);
+  ularith_add_ul_2ul (&plow, &phigh, tlow);
 #else
   phigh += (plow != 0UL) ? 1UL : 0UL;
 #endif
@@ -798,10 +686,10 @@ modredcul_muladdredc (residueredcul_t r, const residueredcul_t a,
           a[0], b, 8 * sizeof(unsigned long), m[0]);
 #endif
   
-  modredcul_mul_ul_ul_2ul (&plow, &phigh, a[0], b[0]);
-  modredcul_add_ul_2ul (&plow, &phigh, c[0]);
+  ularith_mul_ul_ul_2ul (&plow, &phigh, a[0], b[0]);
+  ularith_add_ul_2ul (&plow, &phigh, c[0]);
   tlow = plow * m[0].invm;
-  modredcul_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
+  ularith_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
   phigh += (plow != 0UL ? 1UL : 0UL);
   modredcul_add (r, &phigh, &thigh, m);
   

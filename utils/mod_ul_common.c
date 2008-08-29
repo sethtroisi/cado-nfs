@@ -14,41 +14,46 @@ mod_div3 (residue_t r, const residue_t a, const modulus_t m)
 {
   const unsigned long a3 = a[0] % 3UL;
   unsigned long ml, m3;
-#ifndef WANT_ASSERT_EXPENSIVE
   residue_t t;
-#endif
 
-#ifndef WANT_ASSERT_EXPENSIVE
   mod_init_noset0 (t, m);
-  mod_set (t, a, m); /* r might overwrite a */
-#endif
-
-  if (a3 == 0UL)
-    r[0] = a[0] / 3UL;
-  else 
+  
+  mod_set (t, a, m);
+  if (a3 != 0UL)
     {
       ml = mod_getmod_ul (m);
       m3 = ml % 3UL;
       ASSERT(m3 != 0UL);
       
       if (a3 + m3 == 3UL) /* Hence a3 == 1, m3 == 2 or a3 == 2, m3 == 1 */
-	r[0] = a[0] / 3UL + ml / 3UL + 1UL;
+	t[0] = t[0] + ml;
       else /* a3 == 1, m3 == 1 or a3 == 2, m3 == 2 */
-	r[0] = ml - (ml - a[0]) / 3UL;
+	t[0] = t[0] + 2UL * ml;
     }
 
-#ifndef WANT_ASSERT_EXPENSIVE
-  mod_sub (t, t, r, m);
-  mod_sub (t, t, r, m);
-  mod_sub (t, t, r, m);
-  ASSERT_EXPENSIVE (mod_is0 (t, m));
-  mod_clear (t, m);
+  /* Now r[0] == a+k*m (mod 2^w) so that a+k*m is divisible by 3.
+     (a+k*m)/3 < 2^w, so doing a division (mod 2^w) produces the 
+     correct result. */
+  
+  if (sizeof (unsigned long) == 4)
+    t[0] *= 0xaaaaaaabUL; /* 1/3 (mod 2^32) */
+  else
+    t[0] *= 0xaaaaaaaaaaaaaaabUL; /* 1/3 (mod 2^64) */
+  
+#ifdef WANT_ASSERT_EXPENSIVE
+  mod_sub (r, a, t, m);
+  mod_sub (r, r, t, m);
+  mod_sub (r, r, t, m);
+  ASSERT_EXPENSIVE (mod_is0 (r, m));
 #endif
+
+  mod_set (r, t, m);
+  mod_clear (t, m);
 }
 
 
 void 
-mod_gcd (unsigned long *g, const residue_t r, const modulus_t m)
+mod_gcd (modint_t g, const residue_t r, const modulus_t m)
 {
   unsigned long a, b, t;
 

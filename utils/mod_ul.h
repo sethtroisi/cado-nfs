@@ -5,18 +5,17 @@
 /* Naming convention: all function start with modul, for 
    MODulus Unsigned Long, followed by underscore, functionality of function
   (add, mul, etc), and possibly underscore and specification of what argument
-  types the function takes (_ul, etc).
-  There are typedef's that rename all functions to mod_* instead of 
-  modul_*, which one day might become an automatic renaming scheme so that
-  different modulus sizes can be used simply by #including different mod_*.c
-  files, but without changing anything else in the source code. */
+  types the function takes (_ul, etc). */
 
-#ifndef MOD_UL_H__
 
-#define MOD_UL_H__
+#ifndef __MOD_UL_H
+
+#define __MOD_UL_H
 
 /**********************************************************************/
 #include <assert.h>
+#include <limits.h>
+#include "ularith.h"
 
 #ifndef ASSERT
 #define ASSERT(x)	assert(x)
@@ -40,97 +39,142 @@
 #endif
 #endif
 
-#ifdef  mod_init
-#warning "mod_ul.h included after modredc_ul.h ; bindings overwritten"
-#endif
+#define MODUL_SIZE 1
+#define MODUL_MAXBITS LONG_BIT
 
-/* Define the default names and types for arithmetic with these functions */
-#undef mod_init
-#undef mod_init_noset0
-#undef mod_clear
-#undef mod_set
-#undef mod_set_ul
-#undef mod_set_ul_reduced
-#undef mod_swap
-#undef mod_initmod_ul
-#undef mod_getmod_ul
-#undef mod_clearmod
-#undef mod_get_ul
-#undef mod_equal
-#undef mod_is0
-#undef mod_add
-#undef mod_add_ul
-#undef mod_sub
-#undef mod_sub_ul
-#undef mod_neg
-#undef mod_mul
-#undef mod_addredc_ul
-#undef mod_mulredc_ul
-#undef mod_muladdredc_ul
-#undef mod_div2
-#undef mod_div3
-#undef mod_pow_ul
-#undef mod_pow_mp
-#undef mod_2pow_mp
-#undef mod_V_ul
-#undef mod_V_mp
-#undef mod_sprp
-#undef mod_gcd
-#undef mod_inv
-#undef mod_jacobi
-#undef mod_set0
-#undef mod_set1
-#undef mod_next
-#undef mod_finished
-#undef residue_t
-#undef modulus_t
+typedef unsigned long residueul_t[MODUL_SIZE];
+typedef unsigned long modintul_t[MODUL_SIZE];
+typedef unsigned long modulusul_t[MODUL_SIZE];
 
-#define mod_init             modul_init
-#define mod_init_noset0      modul_init_noset0
-#define mod_clear            modul_clear
-#define mod_set              modul_set
-#define mod_set_ul           modul_set_ul
-#define mod_set_ul_reduced   modul_set_ul_reduced
-#define mod_swap             modul_swap
-#define mod_initmod_ul       modul_initmod_ul
-#define mod_getmod_ul        modul_getmod_ul
-#define mod_clearmod         modul_clearmod
-#define mod_get_ul           modul_get_ul
-#define mod_equal            modul_equal
-#define mod_is0              modul_is0
-#define mod_add              modul_add
-#define mod_add_ul           modul_add_ul
-#define mod_sub              modul_sub
-#define mod_sub_ul           modul_sub_ul
-#define mod_neg              modul_neg
-#define mod_mul              modul_mul
-#define mod_tomontgomery     modul_tomontgomery
-#define mod_frommontgomery   modul_frommontgomery
-#define mod_addredc_ul       modul_addredc_ul
-#define mod_mulredc          modul_mulredc
-#define mod_mulredc_ul       modul_mulredc_ul
-#define mod_muladdredc_ul    modul_muladdredc_ul
-#define mod_div2             modul_div2
-#define mod_div3             modul_div3
-#define mod_invmodlong       modul_invmodlong
-#define mod_powredc_ul       modul_powredc_ul
-#define mod_powredc_mp       modul_powredc_mp
-#define mod_2powredc_mp      modul_2powredc_mp
-#define mod_Vredc_ul         modul_Vredc_ul
-#define mod_Vredc_mp         modul_Vredc_mp
-#define mod_sprp             modul_sprp
-#define mod_gcd              modul_gcd
-#define mod_inv              modul_inv
-#define mod_jacobi           modul_jacobi
-#define mod_set0          modul_set0
-#define mod_set1          modul_set1
-#define mod_next          modul_next
-#define mod_finished          modul_finished
+/* ================= Functions that are part of the API ================= */
 
-typedef unsigned long residueul_t[1];
-typedef unsigned long modulusul_t[1];
-typedef residueul_t residue_t;
-typedef modulusul_t modulus_t;
+/* Some functions for integers of the same width as the modulus */
+
+MAYBE_UNUSED
+static inline void
+modul_intset (modintul_t r, const modintul_t s)
+{
+  r[0] = s[0];
+}
+
+
+MAYBE_UNUSED
+static inline void
+modul_intset_ul (modintul_t r, const unsigned long s)
+{
+  r[0] = s;
+}
+
+
+MAYBE_UNUSED
+static inline int
+modul_intequal (const modintul_t a, const modintul_t b)
+{
+  return (a[0] == b[0]);
+}
+
+
+MAYBE_UNUSED
+static inline int
+modul_intequal_ul (const modintul_t a, const unsigned long b)
+{
+  return (a[0] == b);
+}
+
+
+MAYBE_UNUSED
+static inline int
+modul_intcmp (const modintul_t a, const modintul_t b)
+{
+  return (a[0] < b[0]) ? -1 : (a[0] == b[0]) ? 0 : 1;
+}
+
+
+MAYBE_UNUSED
+static inline int
+modul_intcmp_ul (const modintul_t a, const unsigned long b)
+{
+  return (a[0] < b) ? -1 : (a[0] == b) ? 0 : 1;
+}
+
+
+MAYBE_UNUSED
+static inline int
+modul_intfits_ul (const modintul_t a MAYBE_UNUSED)
+{
+  return 1;
+}
+
+
+/* Returns the number of bits in a, that is, floor(log_2(n))+1. 
+   For n==0 returns 0. */
+MAYBE_UNUSED
+static inline int
+modul_intbits (const modintul_t a)
+{
+  int bits = 0;
+  unsigned long n = a[0];
+  while (n > 0UL) /* TODO: use clzl */
+    {
+      bits++;
+      n >>= 1;
+    }
+  return bits;
+}
+
+
+/* r = n/d. We require d|n */
+MAYBE_UNUSED
+static inline void
+modul_intdivexact (modintul_t r, const modintul_t n, const modintul_t d)
+{
+  r[0] = n[0] / d[0]; 
+}
+
+
+/* Functions for the modulus */
+
+MAYBE_UNUSED
+static inline void
+modul_initmod_ul (modulusul_t m, const unsigned long s)
+{
+  m[0] = s;
+}
+
+
+MAYBE_UNUSED
+static inline void
+modul_initmod_uls (modulusul_t m, const modintul_t s)
+{
+  m[0] = s[0];
+}
+
+
+MAYBE_UNUSED
+static inline unsigned long
+modul_getmod_ul (const modulusul_t m)
+{
+  return m[0];
+}
+
+
+MAYBE_UNUSED
+static inline void
+modul_getmod_uls (modintul_t r, const modulusul_t m)
+{
+  r[0] = m[0];
+}
+
+
+MAYBE_UNUSED
+static inline void
+modul_clearmod (modulusul_t m MAYBE_UNUSED)
+{
+  return;
+}
+
+
+/* Functions for residues */
 
 /* Initialises a residue_t type and sets it to zero */
 MAYBE_UNUSED
@@ -147,7 +191,7 @@ modul_init (residueul_t r, const modulusul_t m MAYBE_UNUSED)
 MAYBE_UNUSED
 static inline void
 modul_init_noset0 (residueul_t r MAYBE_UNUSED, 
-                   const modulusul_t m MAYBE_UNUSED)
+		   const modulusul_t m MAYBE_UNUSED)
 {
   return;
 }
@@ -164,8 +208,8 @@ modul_clear (residueul_t r MAYBE_UNUSED,
 
 MAYBE_UNUSED
 static inline void
-modul_set (residueul_t r, const residueul_t s, const 
-	   modulusul_t m MAYBE_UNUSED)
+modul_set (residueul_t r, const residueul_t s, 
+           const modulusul_t m MAYBE_UNUSED)
 {
   ASSERT_EXPENSIVE (s[0] < m[0]);
   r[0] = s[0];
@@ -179,6 +223,7 @@ modul_set_ul (residueul_t r, const unsigned long s, const modulusul_t m)
   r[0] = s % m[0];
 }
 
+
 /* Sets the residue_t to the class represented by the integer s. Assumes that
    s is reduced (mod m), i.e. 0 <= s < m */
 
@@ -191,6 +236,25 @@ modul_set_ul_reduced (residueul_t r, const unsigned long s,
   r[0] = s;
 }
 
+
+MAYBE_UNUSED
+static inline void
+modul_set_uls (residueul_t r, const modintul_t s, 
+		   const modulusul_t m)
+{
+  r[0] = s[0] % m[0];
+}
+
+
+MAYBE_UNUSED
+static inline void
+modul_set_uls_reduced (residueul_t r, const modintul_t s, const modulusul_t m)
+{
+  ASSERT (s[0] < m[0]);
+  r[0] = s[0];
+}
+
+
 /* These two are so trivial that we don't really require m in the
  * interface. For 1 we might, as the internal representation might 
  * not use "1" for 1 (e.g. when using Montgomery's REDC.)
@@ -198,17 +262,17 @@ modul_set_ul_reduced (residueul_t r, const unsigned long s,
  */
 MAYBE_UNUSED 
 static inline void 
-modul_set0 (residueul_t r, MAYBE_UNUSED const modulusul_t m) 
+modul_set0 (residueul_t r, const modulusul_t m MAYBE_UNUSED) 
 { 
-  r[0] = 0UL; 
+  r[0] = 0UL;
 }
 
 
 MAYBE_UNUSED 
 static inline void 
-modul_set1 (residueul_t r, MAYBE_UNUSED const modulusul_t m) 
+modul_set1 (residueul_t r, const modulusul_t m MAYBE_UNUSED) 
 { 
-  r[0] = 1UL; 
+  r[0] = 1UL;
 }
 
 
@@ -228,34 +292,23 @@ modul_swap (residueul_t a, residueul_t b,
                           
 
 MAYBE_UNUSED
-static inline void
-modul_initmod_ul (modulusul_t r, const unsigned long s)
-{
-  r[0] = s;
-}
-
-MAYBE_UNUSED
 static inline unsigned long
-modul_getmod_ul (const modulusul_t m)
-{
-  return m[0];
-}
-
-MAYBE_UNUSED
-static inline void
-modul_clearmod (modulusul_t m MAYBE_UNUSED)
-{
-  return;
-}
-
-MAYBE_UNUSED
-static inline unsigned long
-modul_get_ul (const residueul_t s, 
-	      const modulusul_t m MAYBE_UNUSED)
+modul_get_ul (const residueul_t s, const modulusul_t m MAYBE_UNUSED)
 {
   ASSERT_EXPENSIVE (s[0] < m[0]);
   return s[0];
 }
+
+
+MAYBE_UNUSED
+static inline void
+modul_get_uls (modintul_t r, const residueul_t s, 
+		   const modulusul_t m MAYBE_UNUSED)
+{
+  ASSERT_EXPENSIVE (s[0] < m[0].m);
+  r[0] = s[0];
+}
+
 
 MAYBE_UNUSED
 static inline int
@@ -266,6 +319,7 @@ modul_equal (const residueul_t a, const residueul_t b,
   return (a[0] == b[0]);
 }
 
+
 MAYBE_UNUSED
 static inline int
 modul_is0 (const residueul_t a, const modulusul_t m MAYBE_UNUSED)
@@ -274,6 +328,7 @@ modul_is0 (const residueul_t a, const modulusul_t m MAYBE_UNUSED)
   return (a[0] == 0UL);
 }
 
+
 MAYBE_UNUSED
 static inline int
 modul_is1 (const residueul_t a, const modulusul_t m MAYBE_UNUSED)
@@ -281,6 +336,7 @@ modul_is1 (const residueul_t a, const modulusul_t m MAYBE_UNUSED)
   ASSERT_EXPENSIVE (a[0] < m[0]);
   return (a[0] == 1UL);
 }
+
 
 MAYBE_UNUSED
 static inline void
@@ -303,7 +359,7 @@ modul_add (residueul_t r, const residueul_t a, const residueul_t b,
       : "g" (b[0])
       : "cc"
     );
-    ASSERT_EXPENSIVE (tr == (a[0] >= m[0] - b[0]) ? (a[0] - (m[0] - b[0])) : (a[0] + b[0]));
+    ASSERT_EXPENSIVE (tr == ((a[0] >= m[0] - b[0]) ? (a[0] - (m[0] - b[0])) : (a[0] + b[0])));
     r[0] = tr;
   }
 #else
@@ -316,20 +372,15 @@ modul_add (residueul_t r, const residueul_t a, const residueul_t b,
   ASSERT_EXPENSIVE (r[0] < m[0]);
 }
 
-/* FIXME: This function is really modul_add_ul_reduced */
+
 MAYBE_UNUSED
 static inline void
 modul_add_ul (residueul_t r, const residueul_t a, const unsigned long b, 
 	      const modulusul_t m)
 {
-  ASSERT_EXPENSIVE (a[0] < m[0] && b < m[0]);
-#ifdef MODTRACE
-  printf ("modul_add_ul: a = %lu, b = %lu", a[0], b);
-#endif
-  r[0] = (a[0] >= m[0] - b) ? (a[0] - (m[0] - b)) : (a[0] + b);
-#ifdef MODTRACE
-  printf (", r = %lu\n", r[0]);
-#endif
+  unsigned long b2 = b % m[0];
+  ASSERT_EXPENSIVE (a[0] < m[0]);
+  r[0] = (a[0] >= m[0] - b2) ? (a[0] - (m[0] - b2)) : (a[0] + b2);
 }
 
 MAYBE_UNUSED
@@ -376,22 +427,16 @@ modul_sub (residueul_t r, const residueul_t a, const residueul_t b,
 }
 
 
-/* FIXME: This function is really modul_sub_ul_reduced */
 MAYBE_UNUSED
 static inline void
 modul_sub_ul (residueul_t r, const residueul_t a, const unsigned long b, 
 	      const modulusul_t m)
 {
+  unsigned long b2 = b % m[0];
   ASSERT_EXPENSIVE (a[0] < m[0]);
-  ASSERT(b < m[0]);
-#ifdef MODTRACE
-  printf ("modul_sub_ul: a = %lu, b = %lu", a[0], b);
-#endif
-  r[0] = (a[0] >= b) ? (a[0] - b) : (a[0] + (m[0] - b));
-#ifdef MODTRACE
-  printf (", r = %lu\n", r[0]);
-#endif
+  r[0] = (a[0] >= b2) ? (a[0] - b2) : (a[0] + (m[0] - b2));
 }
+
 
 MAYBE_UNUSED
 static inline void
@@ -404,138 +449,23 @@ modul_neg (residueul_t r, const residueul_t a, const modulusul_t m)
     r[0] = m[0] - a[0];
 }
 
-/* Add an unsigned long to two unsigned longs with carry propagation from 
-   low word to high word. Any carry out from high word is lost. */
-
-static inline void
-modul_add_ul_2ul (unsigned long *r1, unsigned long *r2, const unsigned long a)
-{
-#if defined(__x86_64__) && defined(__GNUC__)
-  __asm__ ( "addq %2, %0\n\t"
-            "adcq $0, %1\n"
-            : "+&r" (*r1), "+r" (*r2)
-            : "rm" (a)
-            : "cc");
-#elif defined(__i386__) && defined(__GNUC__)
-  __asm__ ( "addl %2, %0\n\t"
-            "adcl $0, %1\n"
-            : "+&r" (*r1), "+r" (*r2)
-            : "rm" (a)
-            : "cc");
-#else
-  abort ();
-#endif
-}
-
-/* Add two unsigned longs to two unsigned longs with carry propagation from 
-   low word to high word. Any carry out from high word is lost. */
-
-static inline void
-modul_add_2ul_2ul (unsigned long *r1, unsigned long *r2, 
-                   const unsigned long a1, const unsigned long a2)
-{
-#if defined(__x86_64__) && defined(__GNUC__)
-  __asm__ ( "addq %2, %0\n\t"
-            "adcq %3, %1\n"
-            : "+&r" (*r1), "+r" (*r2)
-            : "rm" (a1), "rm" (a2)
-            : "cc");
-#elif defined(__i386__) && defined(__GNUC__)
-  __asm__ ( "addl %2, %0\n\t"
-            "adcl %3, %1\n"
-            : "+&r" (*r1), "+r" (*r2)
-            : "rm" (a1), "rm" (a2)
-            : "cc");
-#else
-  abort ();
-#endif
-}
-
-
-/* Multiply two unsigned long "a" and "b" and put the result as 
-   r2:r1 (r2 being the high word) */
-
-static inline void
-mul_ul_ul_2ul (unsigned long *r1, unsigned long *r2, const unsigned long a,
-               const unsigned long b)
-{
-#if defined(__x86_64__) && defined(__GNUC__)
-  __asm__ ( "mulq %3"
-	    : "=a" (*r1), "=d" (*r2)
-	    : "%0" (a), "rm" (b)
-	    : "cc");
-#elif defined(__i386__) && defined(__GNUC__)
-  __asm__ ( "mull %3"
-	    : "=a" (*r1), "=d" (*r2)
-	    : "%0" (a), "rm" (b)
-	    : "cc");
-#else
-  abort ();
-#endif
-}
-
-/* Integer division of a two ulong value a2:a1 by a ulong divisor. Returns
-   quotient and remainder. */
-
-static inline void
-div_2ul_ul_ul (unsigned long *q, unsigned long *r, const unsigned long a1,
-               const unsigned long a2, const unsigned long b)
-{
-  ASSERT(a2 < b); /* Or there will be quotient overflow */
-#if defined(__x86_64__) && defined(__GNUC__)
-  __asm__ ( "divq %4"
-            : "=a" (*q), "=d" (*r)
-            : "0" (a1), "1" (a2), "rm" (b)
-            : "cc");
-#elif defined(__i386__) && defined(__GNUC__)
-  __asm__ ( "divl %4"
-            : "=a" (*q), "=d" (*r)
-            : "0" (a1), "1" (a2), "rm" (b)
-            : "cc");
-#else
-  abort ();
-#endif
-}
-
-/* Integer division of a two longint value by a longint divisor. Returns
-   only remainder. */
-
-static inline void
-div_2ul_ul_ul_r (unsigned long *r, unsigned long a1,
-                 const unsigned long a2, const unsigned long b)
-{
-  ASSERT(a2 < b); /* Or there will be quotient overflow */
-#if defined(__x86_64__) && defined(__GNUC__)
-  __asm__ ( "divq %3"
-            : "+a" (a1), "=d" (*r)
-            : "1" (a2), "rm" (b)
-            : "cc");
-#elif defined(__i386__) && defined(__GNUC__)
-  __asm__ ( "divl %3"
-            : "+a" (a1), "=d" (*r)
-            : "1" (a2), "rm" (b)
-            : "cc");
-#else
-  abort ();
-#endif
-}
 
 MAYBE_UNUSED
 static inline void
 modul_mul (residueul_t r, const residueul_t a, const residueul_t b, 
            const modulusul_t m)
 {
-  unsigned long t1, t2, dummy;
+  unsigned long t1, t2;
 #if defined(MODTRACE)
   printf ("mulmod_ul: a = %lu, b = %lu", a[0], b[0]);
 #endif
   
   ASSERT_EXPENSIVE (a[0] < m[0] && b[0] < m[0]);
-  mul_ul_ul_2ul (&t1, &t2, a[0], b[0]);
-  div_2ul_ul_ul (&dummy, r, t1, t2, m[0]);
+  ularith_mul_ul_ul_2ul (&t1, &t2, a[0], b[0]);
+  ularith_div_2ul_ul_ul_r (r, t1, t2, m[0]);
   
 #if defined(MODTRACE)
-  printf (", r = %lu\n", _r);
+  printf (", r = %lu\n", r);
 #endif
 }
 
@@ -545,7 +475,7 @@ static inline void
 modul_tomontgomery (residueul_t r, const residueul_t a, const modulusul_t m)
 {
   ASSERT_EXPENSIVE (a[0] < m[0]);
-  div_2ul_ul_ul_r (r, 0UL, a[0], m[0]);
+  ularith_div_2ul_ul_ul_r (r, 0UL, a[0], m[0]);
 }
 
 
@@ -556,8 +486,8 @@ modul_frommontgomery (residueul_t r, const residueul_t a,
                       const unsigned long invm, const modulusul_t m)
 {
   unsigned long tlow, thigh;
-  mul_ul_ul_2ul (&tlow, &thigh, a[0], invm);
-  mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
+  ularith_mul_ul_ul_2ul (&tlow, &thigh, a[0], invm); /* FIXME: why not IMUL? */
+  ularith_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
   r[0] = thigh + (a[0] != 0UL ? 1UL : 0UL);
 }
 
@@ -574,7 +504,7 @@ modul_redcsemi_ul_not0 (residueul_t r, const unsigned long a,
   ASSERT (a != 0);
 
   tlow = a * invm; /* tlow <= 2^w-1 */
-  mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
+  ularith_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
   /* thigh:tlow <= (2^w-1) * m */
   r[0] = thigh + 1UL; 
   /* (thigh+1):tlow <= 2^w + (2^w-1) * m  <= 2^w + 2^w*m - m 
@@ -595,10 +525,10 @@ modul_addredc_ul (residueul_t r, const residueul_t a, const unsigned long b,
   ASSERT_EXPENSIVE (a[0] <= m[0]);
   slow = b;
   shigh = 0UL;
-  modul_add_ul_2ul (&slow, &shigh, a[0]);
+  ularith_add_ul_2ul (&slow, &shigh, a[0]);
   
   tlow = slow * invm;
-  mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
+  ularith_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
   ASSERT_EXPENSIVE (slow + tlow == 0UL);
   r[0] = thigh + shigh + (slow != 0UL ? 1UL : 0UL);
   
@@ -645,12 +575,12 @@ modul_addredcsemi_ul (residueul_t r, const residueul_t a,
   shigh = sb;
 #else
   shigh = 0UL;
-  modul_add_ul_2ul (&slow, &shigh, a[0]);
+  ularith_add_ul_2ul (&slow, &shigh, a[0]);
   shigh += (slow != 0UL ? 1UL : 0UL);
 #endif
 
   tlow = slow * invm;
-  mul_ul_ul_2ul (&tlow, r, tlow, m[0]);
+  ularith_mul_ul_ul_2ul (&tlow, r, tlow, m[0]);
   ASSERT_EXPENSIVE (slow + tlow == 0UL);
   r[0] += shigh;
 
@@ -678,9 +608,9 @@ modul_mulredc (residueul_t r, const residueul_t a, const residueul_t b,
           a[0], b[0], 8 * sizeof(unsigned long), m[0]);
 #endif
   
-  mul_ul_ul_2ul (&plow, &phigh, a[0], b[0]);
+  ularith_mul_ul_ul_2ul (&plow, &phigh, a[0], b[0]);
   tlow = plow * invm;
-  mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
+  ularith_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
   /* Let w = 2^wordsize. We know (phigh * w + plow) + (thigh * w + tlow) 
      == 0 (mod w) so either plow == tlow == 0, or plow !=0 and tlow != 0. 
      In the former case we want phigh + thigh + 1, in the latter 
@@ -689,7 +619,7 @@ modul_mulredc (residueul_t r, const residueul_t a, const residueul_t b,
      adding 1 to phigh is safe */
 #if 0
   /* Slower? */
-  modul_add_ul_2ul (&plow, &phigh, tlow);
+  ularith_add_ul_2ul (&plow, &phigh, tlow);
 #else
   phigh += (plow != 0UL ? 1UL : 0UL);
 #endif
@@ -701,6 +631,7 @@ modul_mulredc (residueul_t r, const residueul_t a, const residueul_t b,
 #endif
 }
                          
+
 /* FIXME: check for overflow if b > m */
 MAYBE_UNUSED
 static inline void
@@ -714,9 +645,9 @@ modul_mulredc_ul (residueul_t r, const residueul_t a, const unsigned long b,
           a[0], b, 8 * sizeof(unsigned long), m[0]);
 #endif
   
-  mul_ul_ul_2ul (&plow, &phigh, a[0], b);
+  ularith_mul_ul_ul_2ul (&plow, &phigh, a[0], b);
   tlow = plow * invm;
-  mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
+  ularith_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
   phigh += (plow != 0UL ? 1UL : 0UL);
   r[0] = (phigh >= m[0] - thigh) ? (phigh - (m[0] - thigh)) : (phigh + thigh);
   
@@ -742,10 +673,10 @@ modul_muladdredc_ul (residueul_t r, const residueul_t a, const unsigned long b,
           a[0], b, 8 * sizeof(unsigned long), m[0]);
 #endif
   
-  mul_ul_ul_2ul (&plow, &phigh, a[0], b);
-  modul_add_ul_2ul (&plow, &phigh, c);
+  ularith_mul_ul_ul_2ul (&plow, &phigh, a[0], b);
+  ularith_add_ul_2ul (&plow, &phigh, c);
   tlow = plow * invm;
-  mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
+  ularith_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0]);
   phigh += (plow != 0UL ? 1UL : 0UL);
   r[0] = (phigh >= m[0] - thigh) ? (phigh - (m[0] - thigh)) : (phigh + thigh);
   
@@ -759,46 +690,48 @@ MAYBE_UNUSED
 static inline void
 modul_div2 (residueul_t r, const residueul_t a, const modulusul_t m)
 {
+  ASSERT_EXPENSIVE (m[0] % 2UL != 0UL);
   if (a[0] % 2UL == 0UL)
     r[0] = a[0] / 2UL;
   else
-    {
-      ASSERT(m[0] % 2UL != 0UL);
-      r[0] = a[0] / 2UL + m[0] / 2UL + 1UL;
-    }
+    r[0] = a[0] / 2UL + m[0] / 2UL + 1UL;
 }
+
 
 MAYBE_UNUSED
 static inline int
-modul_next(residueul_t r, modulus_t p)
+modul_next (residueul_t r, const modulusul_t m)
 {
-    return (++r[0] == p[0]);
+    return (++r[0] == m[0]);
 }
+
 
 MAYBE_UNUSED
 static inline int
-modul_finished(residueul_t r, modulus_t p)
+modul_finished (const residueul_t r, const modulusul_t m)
 {
-    return (r[0] == p[0]);
+    return (r[0] == m[0]);
 }
+
 
 /* prototypes of non-inline functions */
 void modul_div3 (residueul_t, const residueul_t, const modulusul_t);
-void modul_gcd (residueul_t, const residueul_t, const modulusul_t);
-unsigned long modul_invmodlong (modulusul_t);
-void modul_powredc_ul (residueul_t, const residueul_t, const unsigned long, 
-		       const unsigned long, const modulusul_t);
-void modul_powredc_mp (residueul_t, const residueul_t, const unsigned long *,
-                       const int, const unsigned long, const modulusul_t);
-void modul_2powredc_mp (residueul_t, const residueul_t, const unsigned long *, 
-                        const int, const unsigned long, const unsigned long, 
-                        const modulusul_t);
-void modul_Vredc_ul (residueul_t, const residueul_t, const unsigned long, 
+void modul_gcd (modintul_t, const residueul_t, const modulusul_t);
+void modul_pow_ul (residueul_t, const residueul_t, const unsigned long, 
+		   const modulusul_t);
+void modul_pow_mp (residueul_t, const residueul_t, const unsigned long *,
+                   const int, const modulusul_t);
+void modul_2pow_mp (residueul_t, const residueul_t, const unsigned long *, 
+		    const int, const unsigned long, const modulusul_t);
+void modul_V_ul (residueul_t, const residueul_t, const residueul_t,
                      const unsigned long, const modulusul_t);
-void modul_Vredc_mp (residueul_t, const residueul_t, const unsigned long *,
-                     const int, const unsigned long, const modulusul_t);
-int modul_sprp (const residueul_t, const unsigned long, const modulusul_t);
+void modul_V_mp (residueul_t, const residueul_t, const unsigned long *,
+		 const int, const modulusul_t);
+int modul_sprp (const residueul_t, const modulusul_t);
 int modul_inv (residueul_t, const residueul_t, const modulusul_t);
 int modul_jacobi (const residueul_t, const modulusul_t);
+
+/* Cruft: this belongs in modredc_*.h, not here  */
+unsigned long modul_invmodlong (unsigned long n);
 
 #endif  /* MOD_UL_H__ */

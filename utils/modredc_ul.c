@@ -1,4 +1,5 @@
 #include "modredc_ul.h"
+#include "modredc_ul_default.h"
 #include "mod_ul_common.c"
 
 #if defined(__GNUC__) && (__GNUC__ >= 4 || __GNUC__ >= 3 && __GNUC_MINOR__ >= 4)
@@ -96,8 +97,8 @@ modredcul_inv (residue_t r, const residue_t A, const modulusredcul_t m)
     /* Doing a left shift first and then a full REDC needs a modular addition
        at the end due to larger summands and thus is probably slower */
     tlow = ((a * m[0].invm) & ((1UL << t) - 1UL)); /* tlow <= 2^t-1 */
-    modredcul_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m); /* thigh:tlow <= m*(2^t-1) */
-    modredcul_add_ul_2ul (&tlow, &thigh, a); /* thigh:tlow <= m*2^t-1 (since u<m) */
+    ularith_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m); /* thigh:tlow <= m*(2^t-1) */
+    ularith_add_ul_2ul (&tlow, &thigh, a); /* thigh:tlow <= m*2^t-1 (since u<m) */
     /* Now the low t bits of tlow are 0 */
     ASSERT_EXPENSIVE ((tlow & ((1UL << t) - 1UL)) == 0UL);
     modredcul_shrd (&tlow, thigh, t);
@@ -202,7 +203,7 @@ modredcul_inv (residue_t r, const residue_t A, const modulusredcul_t m)
     {
       unsigned long tlow, thigh;
       tlow = u * m[0].invm; /* tlow <= 2^w-1 */
-      modredcul_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m); /* thigh:tlow <= (2^w-1)*m */
+      ularith_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m); /* thigh:tlow <= (2^w-1)*m */
       u = thigh + ((u != 0UL) ? 1UL : 0UL);
       /* thigh:tlow + u < (2^w-1)*m + m < 2^w*m. No correction necesary */
       t -= LONG_BIT;
@@ -216,11 +217,11 @@ modredcul_inv (residue_t r, const residue_t A, const modulusredcul_t m)
       /* Doing a left shift first and then a full REDC needs a modular addition
 	 at the end due to larger summands and thus is probably slower */
       tlow = ((u * m[0].invm) & ((1UL << t) - 1UL)); /* tlow <= 2^t-1 */
-      modredcul_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m); /* thigh:tlow <= m*(2^t-1) */
-      modredcul_add_ul_2ul (&tlow, &thigh, u); /* thigh:tlow <= m*2^t-1 (since u<m) */
+      ularith_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m); /* thigh:tlow <= m*(2^t-1) */
+      ularith_add_ul_2ul (&tlow, &thigh, u); /* thigh:tlow <= m*2^t-1 (since u<m) */
       /* Now the low t bits of tlow are 0 */
       ASSERT_EXPENSIVE ((tlow & ((1UL << t) - 1UL)) == 0UL);
-      modredcul_shrd (&tlow, thigh, t);
+      ularith_shrd (&tlow, thigh, t);
       u = tlow;
       ASSERT_EXPENSIVE ((thigh >> t) == 0UL && u < m[0].m);
     }
