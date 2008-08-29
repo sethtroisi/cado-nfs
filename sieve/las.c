@@ -1268,21 +1268,21 @@ void factor_list_fprint(FILE *f, factor_list_t fl) {
 static inline int
 trialdiv_with_norm (factorbase_degn_t *fbptr, const mpz_t norm)
 {
-  modulus_t m;
-  residue_t r;
+  modulusul_t m;
+  residueul_t r;
   size_t i;
   int j;
 
-  mod_initmod_ul (m, (unsigned long) fbptr->p);
-  mod_init (r, m);
+  modul_initmod_ul (m, (unsigned long) fbptr->p);
+  modul_init (r, m);
 
   for (i = 0; i < mpz_size (norm); i++)
     modul_addredc_ul (r, r, norm->_mp_d[i], fbptr->invp, m);
 
-  j = (mod_get_ul (r, m) == 0);
+  j = (modul_get_ul (r, m) == 0);
 
-  mod_clear (r, m);
-  mod_clearmod (m);
+  modul_clear (r, m);
+  modul_clearmod (m);
   return j;
 }
 
@@ -1859,6 +1859,7 @@ factor_leftover_norm (mpz_t n, unsigned int l,
   uint32_t i, nr_factors;
   ecode_t ecode;
   unsigned long ul_factors[16];
+  int facul_code;
 
   factors->length = 0;
   multis->length = 0;
@@ -1883,12 +1884,16 @@ factor_leftover_norm (mpz_t n, unsigned int l,
     } 
 
 #if 1 /* use the facul library */
-  nr_factors = facul (ul_factors, n, strategy);
+  facul_code = facul (ul_factors, n, strategy);
+
+  if (facul_code == -1)
+    return 0;
   
-  ASSERT (nr_factors == 0 || mpz_cmp_ui (n, ul_factors[0]) != 0);
+  ASSERT (facul_code == 0 || mpz_cmp_ui (n, ul_factors[0]) != 0);
   
-  if (nr_factors > 0)
+  if (facul_code > 0)
     {
+      nr_factors = facul_code;
       for (i = 0; i < nr_factors; i++)
 	{
 	  unsigned long r;
@@ -1901,7 +1906,8 @@ factor_leftover_norm (mpz_t n, unsigned int l,
 	  mpz_set_ui (t, ul_factors[i]);
 	  append_mpz_to_array (factors, t);
 	  mpz_clear (t);
-	  append_uint32_to_array (multis, 1);
+	  append_uint32_to_array (multis, 1); /* FIXME, deal with repeated 
+						 factors correctly */
 	}
       
       if (mpz_cmp_ui (n, 1UL) == 0)
@@ -1916,7 +1922,7 @@ factor_leftover_norm (mpz_t n, unsigned int l,
 	      append_uint32_to_array (multis, 1);
 	      return 1;
 	    }
-	} 
+	}
     }
 
   /* if facul found no factor, call TIFA, which never fails */

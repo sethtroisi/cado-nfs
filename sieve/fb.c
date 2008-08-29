@@ -165,15 +165,15 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
 
   for (p = 2 ; p <= bound; p = getprime (p))
     {
-      modulus_t m;
-      residue_t r1, r2;
+      modulusul_t m;
+      residueul_t r1, r2;
 
       fb_cur->p = p;
       fb_cur->plog = fb_log (fb_cur->p, log_scale, 0.);
 
-      mod_initmod_ul (m, p);
-      mod_init_noset0 (r1, m);
-      mod_init_noset0 (r2, m);
+      modul_initmod_ul (m, p);
+      modul_init_noset0 (r1, m);
+      modul_init_noset0 (r2, m);
       
       /* We want f_1 * a + f_0 * b == 0 (mod p^k) 
 	 with a, b coprime and f_1, f_0 coprime
@@ -189,38 +189,38 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
 	 
       */
 
-      mod_set_ul_reduced (r2, mpz_fdiv_ui (poly[1], p), m);
+      modul_set_ul_reduced (r2, mpz_fdiv_ui (poly[1], p), m);
       /* If p | g1 and !(p | g0), p|G(a,b) <=> p|b and that will be handeled
 	 by the projective roots */
-      if (mod_get_ul (r2, m) == 0)
+      if (modul_get_ul (r2, m) == 0)
 	continue;
-      mod_set_ul_reduced (r1, mpz_fdiv_ui (poly[0], p), m);
+      modul_set_ul_reduced (r1, mpz_fdiv_ui (poly[0], p), m);
 
       /* We want g_1 * a + g_0 * b == 0 <=> a/b == - g0 / g1 */
-      mod_inv (r2, r2, m); /* r2 = 1 / g1 */
+      modul_inv (r2, r2, m); /* r2 = 1 / g1 */
 
-      mod_mul (r2, r1, r2, m); /* r2 = g0 / g1 */
-      mod_neg (r2, r2, m); /* r2 = - g0 / g1 */
+      modul_mul (r2, r1, r2, m); /* r2 = g0 / g1 */
+      modul_neg (r2, r2, m); /* r2 = - g0 / g1 */
 
 #ifndef NDEBUG
       {
-	residue_t r3;
-	mod_init_noset0 (r3, m);
-	mod_set_ul_reduced (r3, mpz_fdiv_ui (poly[1], p), m);
-	mod_mul (r3, r3, r2, m); /* g1 * (- g0 / g1) */
-	mod_add (r3, r3, r1, m); /* g1 * (- g0 / g1) + g0 */
-	ASSERT (mod_get_ul (r3, m) == 0);
-	mod_clear (r3, m);
+	residueul_t r3;
+	modul_init_noset0 (r3, m);
+	modul_set_ul_reduced (r3, mpz_fdiv_ui (poly[1], p), m);
+	modul_mul (r3, r3, r2, m); /* g1 * (- g0 / g1) */
+	modul_add (r3, r3, r1, m); /* g1 * (- g0 / g1) + g0 */
+	ASSERT (modul_get_ul (r3, m) == 0);
+	modul_clear (r3, m);
       }
 #endif
 
       if (p % 2 != 0)
-	fb_cur->invp = - mod_invmodlong (m);
-      fb_cur->roots[0] = mod_get_ul (r2, m);
+	fb_cur->invp = - modul_invmodlong (modul_getmod_ul (m));
+      fb_cur->roots[0] = modul_get_ul (r2, m);
 
-      mod_clear (r1, m);
-      mod_clear (r2, m);
-      mod_clearmod (m);
+      modul_clear (r1, m);
+      modul_clear (r2, m);
+      modul_clearmod (m);
 
       fb_new = fb_add_to (fb, &fbsize, &fballoc, allocblocksize, fb_cur);
       if (fb_new == NULL)
@@ -294,8 +294,8 @@ fb_make_linear_powers (mpz_t *poly, const fbprime_t bound, const double log_scal
 
   for (p = 2 ; p <= bound; p = getprime (p))
     {
-      modulus_t m;
-      residue_t r1, r2;
+      modulusul_t m;
+      residueul_t r1, r2;
       uint64_t llq;
       fbprime_t q;
       unsigned char old_logpk;
@@ -319,9 +319,9 @@ fb_make_linear_powers (mpz_t *poly, const fbprime_t bound, const double log_scal
 	  fb_cur->plog = old_logpk;
 	}
 
-	mod_initmod_ul (m, q);
-	mod_init_noset0 (r1, m);
-	mod_init_noset0 (r2, m);
+	modul_initmod_ul (m, q);
+	modul_init_noset0 (r1, m);
+	modul_init_noset0 (r2, m);
 
 	/* We want f_1 * a + f_0 * b == 0 (mod p^k) 
 	   with a, b coprime and f_1, f_0 coprime
@@ -337,39 +337,39 @@ fb_make_linear_powers (mpz_t *poly, const fbprime_t bound, const double log_scal
 
 */
 
-	mod_set_ul_reduced (r2, mpz_fdiv_ui (poly[1], q), m);
+	modul_set_ul_reduced (r2, mpz_fdiv_ui (poly[1], q), m);
 	/* If p | g1 and !(p | g0), p|G(a,b) <=> p|b and that will be handeled
 	   by the projective roots */
-	if (mod_get_ul (r2, m) == 0)
+	if (modul_get_ul (r2, m) == 0)
 	  continue;
-	mod_set_ul_reduced (r1, mpz_fdiv_ui (poly[0], q), m);
+	modul_set_ul_reduced (r1, mpz_fdiv_ui (poly[0], q), m);
 
 	/* We want g_1 * a + g_0 * b == 0 <=> a/b == - g0 / g1 */
-	if (!mod_inv (r2, r2, m)) /* r2 = 1 / g1 */
+	if (!modul_inv (r2, r2, m)) /* r2 = 1 / g1 */
 	  continue;
 
-	mod_mul (r2, r1, r2, m); /* r2 = g0 / g1 */
-	mod_neg (r2, r2, m); /* r2 = - g0 / g1 */
+	modul_mul (r2, r1, r2, m); /* r2 = g0 / g1 */
+	modul_neg (r2, r2, m); /* r2 = - g0 / g1 */
 
 #ifndef NDEBUG
 	{
-	  residue_t r3;
-	  mod_init_noset0 (r3, m);
-	  mod_set_ul_reduced (r3, mpz_fdiv_ui (poly[1], q), m);
-	  mod_mul (r3, r3, r2, m); /* g1 * (- g0 / g1) */
-	  mod_add (r3, r3, r1, m); /* g1 * (- g0 / g1) + g0 */
-	  ASSERT (mod_get_ul (r3, m) == 0);
-	  mod_clear (r3, m);
+	  residueul_t r3;
+	  modul_init_noset0 (r3, m);
+	  modul_set_ul_reduced (r3, mpz_fdiv_ui (poly[1], q), m);
+	  modul_mul (r3, r3, r2, m); /* g1 * (- g0 / g1) */
+	  modul_add (r3, r3, r1, m); /* g1 * (- g0 / g1) + g0 */
+	  ASSERT (modul_get_ul (r3, m) == 0);
+	  modul_clear (r3, m);
 	}
 #endif
 
 	if (p % 2 != 0)
-	  fb_cur->invp = - mod_invmodlong (m);
-	fb_cur->roots[0] = mod_get_ul (r2, m);
+	  fb_cur->invp = - modul_invmodlong (m);
+	fb_cur->roots[0] = modul_get_ul (r2, m);
 
-	mod_clear (r1, m);
-	mod_clear (r2, m);
-	mod_clearmod (m);
+	modul_clear (r1, m);
+	modul_clear (r2, m);
+	modul_clearmod (m);
 
 	fb_new = fb_add_to (fb, &fbsize, &fballoc, allocblocksize, fb_cur);
 	if (fb_new == NULL)
@@ -587,11 +587,11 @@ fb_read (const char *filename, const double log_scale, const int verbose)
       /* Compute invp */
       if (fb_cur->p % 2 != 0)
 	{
-	  modulus_t m;
+	  modulusul_t m;
 	  
-	  mod_initmod_ul (m, fb_cur->p);
-	  fb_cur->invp = - mod_invmodlong (m);
-	  mod_clearmod (m);
+	  modul_initmod_ul (m, fb_cur->p);
+	  fb_cur->invp = - modul_invmodlong (modul_getmod_ul (m));
+	  modul_clearmod (m);
 	}
 
       fb_new = fb_add_to (fb, &fbsize, &fballoc, allocblocksize, fb_cur);
@@ -833,43 +833,43 @@ fb_check (factorbase_t fb, cado_poly poly, int side)
 
       for (i = 0; i < fbptr->nr_roots; i++)
 	{
-	  modulus_t m;
-	  residue_t val, r, c;
+	  modulusul_t m;
+	  residueul_t val, r, c;
 	  unsigned long res;
 
-	  mod_initmod_ul (m, p);
-	  mod_init_noset0 (r, m);
-	  mod_init_noset0 (c, m);
-	  mod_init (val, m);
-	  mod_set_ul (r, fbptr->roots[i], m);
+	  modul_initmod_ul (m, p);
+	  modul_init_noset0 (r, m);
+	  modul_init_noset0 (c, m);
+	  modul_init (val, m);
+	  modul_set_ul (r, fbptr->roots[i], m);
 
 	  if (side == 0)
 	    {
 	      int j;
-	      mod_set_ul_reduced (val, mpz_fdiv_ui (poly->f[poly->degree], p), 
+	      modul_set_ul_reduced (val, mpz_fdiv_ui (poly->f[poly->degree], p), 
 				  m);
 	      for (j = 1; j <= poly->degree; j++)
 		{
-		  mod_mul (val, val, r, m);
-		  mod_set_ul_reduced 
+		  modul_mul (val, val, r, m);
+		  modul_set_ul_reduced 
 		    (c, mpz_fdiv_ui (poly->f[poly->degree - j], p), m);
-		  mod_add (val, val, c, m);
+		  modul_add (val, val, c, m);
 		}
 	    }
 	  else
 	    {
-	      mod_set_ul (val, mpz_fdiv_ui (poly->g[1], p), m);
-	      mod_mul (val, val, r, m);
-	      mod_set_ul_reduced (c, mpz_fdiv_ui (poly->g[0], p), m);
-	      mod_add (val, val, c, m);
+	      modul_set_ul (val, mpz_fdiv_ui (poly->g[1], p), m);
+	      modul_mul (val, val, r, m);
+	      modul_set_ul_reduced (c, mpz_fdiv_ui (poly->g[0], p), m);
+	      modul_add (val, val, c, m);
 	    }
 
-	  res = mod_get_ul (val, m);
+	  res = modul_get_ul (val, m);
 
-	  mod_clear (c, m);
-	  mod_clear (r, m);
-	  mod_clear (r, m);
-	  mod_clearmod (m);
+	  modul_clear (c, m);
+	  modul_clear (r, m);
+	  modul_clear (r, m);
+	  modul_clearmod (m);
 
 	  if (res != 0)
 	    {

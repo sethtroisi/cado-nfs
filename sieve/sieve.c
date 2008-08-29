@@ -64,8 +64,8 @@ static inline fbroot_t
       first_sieve_loc (const fbprime_t p, const fbroot_t r, 
                        const fbroot_t amin_p, const unsigned long b, const int odd)
 {
-   modulus_t m;
-   residue_t r1, r2;
+   modulusul_t m;
+   residueul_t r1, r2;
    fbroot_t d;
 
   /* Find first index d in sievearray where p on this root divides.
@@ -80,21 +80,21 @@ static inline fbroot_t
    ASSERT (amin_p < p);
    ASSERT_EXPENSIVE (b % p != 0);
 
-   /* Most of the mod_*() calls are no-ops */
-   mod_initmod_ul (m, (unsigned long) p);
-   mod_init_noset0 (r1, m);
-   mod_init_noset0 (r2, m);
-   mod_set_ul_reduced (r2, (unsigned long) r, m);
-   mod_set_ul (r1, b, m); /* Modular reduction */
-   mod_mul (r1, r1, r2, m); /* Multiply and mod reduction. */
-   mod_sub_ul (r1, r1, (unsigned long) amin_p, m);
+   /* Most of the modul_*() calls are no-ops */
+   modul_initmod_ul (m, (unsigned long) p);
+   modul_init_noset0 (r1, m);
+   modul_init_noset0 (r2, m);
+   modul_set_ul_reduced (r2, (unsigned long) r, m);
+   modul_set_ul (r1, b, m); /* Modular reduction */
+   modul_mul (r1, r1, r2, m); /* Multiply and mod reduction. */
+   modul_sub_ul (r1, r1, (unsigned long) amin_p, m);
    if (odd)
-      mod_div2 (r1, r1, m);
-   d = mod_get_ul (r1, m); 
+      modul_div2 (r1, r1, m);
+   d = modul_get_ul (r1, m); 
    ASSERT (d < p);
-   mod_clear (r1, m);
-   mod_clear (r2, m);
-   mod_clearmod (m);
+   modul_clear (r1, m);
+   modul_clear (r2, m);
+   modul_clearmod (m);
 
 #ifdef PARI
   printf ("(" FBROOT_FORMAT " + " FBROOT_FORMAT " * (1 + %d)) %% " FBPRIME_FORMAT
@@ -960,35 +960,35 @@ trialdiv_with_root (const factorbase_degn_t *fbptr, const long a,
 		    const unsigned long b)
 {
   int i;
-  modulus_t m;
-  residue_t r;
+  modulusul_t m;
+  residueul_t r;
   unsigned long absa;
 
-  mod_initmod_ul (m, (unsigned long) fbptr->p);
-  mod_init_noset0 (r, m);
+  modul_initmod_ul (m, (unsigned long) fbptr->p);
+  modul_init_noset0 (r, m);
 
   absa = labs(a);
 
   for (i = 0; i < fbptr->nr_roots ; i++)
     {
       if (a <= 0) /* We compute rb - a */
-	mod_set_ul_reduced (r, (unsigned long) fbptr->roots[i], m);
+	modul_set_ul_reduced (r, (unsigned long) fbptr->roots[i], m);
       else /* We compute (-r)b + a */
-	mod_set_ul_reduced (r, (unsigned long) (fbptr->p - fbptr->roots[i]), 
+	modul_set_ul_reduced (r, (unsigned long) (fbptr->p - fbptr->roots[i]), 
 	                    m);
 
-      mod_muladdredc_ul (r, r, b, absa, (unsigned long) fbptr->invp, m);
+      modul_muladdredc_ul (r, r, b, absa, (unsigned long) fbptr->invp, m);
       
-      if (mod_get_ul (r, m) == 0UL)
+      if (modul_get_ul (r, m) == 0UL)
 	{
-	  mod_clear (r, m);
-	  mod_clearmod (m);
+	  modul_clear (r, m);
+	  modul_clearmod (m);
 	  return 1;
 	}
     }
 
-  mod_clear (r, m);
-  mod_clearmod (m);
+  modul_clear (r, m);
+  modul_clearmod (m);
   return 0;
 }
 
@@ -998,23 +998,23 @@ trialdiv_with_root (const factorbase_degn_t *fbptr, const long a,
 static inline int
 trialdiv_with_norm (factorbase_degn_t *fbptr, const mpz_t norm)
 {
-  modulus_t m;
-  residue_t r;
+  modulusul_t m;
+  residueul_t r;
   size_t i;
   int j;
 
   ASSERT (mpz_sgn (norm) >= 0);
 
-  mod_initmod_ul (m, (unsigned long) fbptr->p);
-  mod_init (r, m);
+  modul_initmod_ul (m, (unsigned long) fbptr->p);
+  modul_init (r, m);
   
   for (i = 0; i < mpz_size (norm); i++)
     modul_addredc_ul (r, r, norm->_mp_d[i], fbptr->invp, m);
 
-  j = (mod_get_ul (r, m) == 0);
+  j = (modul_get_ul (r, m) == 0);
 
-  mod_clear (r, m);
-  mod_clearmod (m);
+  modul_clear (r, m);
+  modul_clearmod (m);
   return j;
 }
 
@@ -1024,21 +1024,21 @@ static inline int
 trialdiv_with_norm1 (factorbase_degn_t *fbptr, const mpz_t norm, 
 		     const unsigned long add)
 {
-  modulus_t m;
-  residue_t r;
+  modulusul_t m;
+  residueul_t r;
   int i;
 
   ASSERT (mpz_sgn (norm) > 0);
 
-  mod_initmod_ul (m, (unsigned long) fbptr->p);
-  mod_init_noset0 (r, m);
+  modul_initmod_ul (m, (unsigned long) fbptr->p);
+  modul_init_noset0 (r, m);
 
   modul_redcsemi_ul_not0 (r, norm->_mp_d[0], fbptr->invp, m);
 
-  i = (mod_get_ul (r, m) + add == 0UL || mod_get_ul (r, m) + add == m[0]);
+  i = (modul_get_ul (r, m) + add == 0UL || modul_get_ul (r, m) + add == m[0]);
 
-  mod_clear (r, m);
-  mod_clearmod (m);
+  modul_clear (r, m);
+  modul_clearmod (m);
   return i;
 }
 
@@ -1048,22 +1048,22 @@ static inline int
 trialdiv_with_norm2 (factorbase_degn_t *fbptr, const mpz_t norm,
 		     const unsigned long add)
 {
-  modulus_t m;
-  residue_t r;
+  modulusul_t m;
+  residueul_t r;
   int i;
 
   ASSERT (mpz_sgn (norm) > 0);
 
-  mod_initmod_ul (m, (unsigned long)fbptr->p);
-  mod_init_noset0 (r, m);
+  modul_initmod_ul (m, (unsigned long)fbptr->p);
+  modul_init_noset0 (r, m);
 
   modul_redcsemi_ul_not0 (r, norm->_mp_d[0], fbptr->invp, m);
   modul_addredcsemi_ul (r, r, norm->_mp_d[1], fbptr->invp, m);
 
-  i = (mod_get_ul (r, m) + add == 0UL || mod_get_ul (r, m) + add == m[0]);
+  i = (modul_get_ul (r, m) + add == 0UL || modul_get_ul (r, m) + add == m[0]);
 
-  mod_clear (r, m);
-  mod_clearmod (m);
+  modul_clear (r, m);
+  modul_clearmod (m);
   return i;
 }
 
@@ -1073,23 +1073,23 @@ static inline int
 trialdiv_with_norm3 (factorbase_degn_t *fbptr, const mpz_t norm,
 		     const unsigned long add)
 {
-  modulus_t m;
-  residue_t r;
+  modulusul_t m;
+  residueul_t r;
   int i;
 
   ASSERT (mpz_sgn (norm) > 0);
 
-  mod_initmod_ul (m, (unsigned long) fbptr->p);
-  mod_init_noset0 (r, m);
+  modul_initmod_ul (m, (unsigned long) fbptr->p);
+  modul_init_noset0 (r, m);
 
   modul_redcsemi_ul_not0 (r, norm->_mp_d[0], fbptr->invp, m);
   modul_addredcsemi_ul (r, r, norm->_mp_d[1], fbptr->invp, m);
   modul_addredcsemi_ul (r, r, norm->_mp_d[2], fbptr->invp, m);
 
-  i = (mod_get_ul (r, m) + add == 0UL || mod_get_ul (r, m) + add == m[0]);
+  i = (modul_get_ul (r, m) + add == 0UL || modul_get_ul (r, m) + add == m[0]);
 
-  mod_clear (r, m);
-  mod_clearmod (m);
+  modul_clear (r, m);
+  modul_clearmod (m);
   return i;
 }
 
@@ -1099,24 +1099,24 @@ static inline int
 trialdiv_with_norm4 (factorbase_degn_t *fbptr, const mpz_t norm,
 		     const unsigned long add)
 {
-  modulus_t m;
-  residue_t r;
+  modulusul_t m;
+  residueul_t r;
   int i;
 
   ASSERT (mpz_sgn (norm) > 0);
 
-  mod_initmod_ul (m, (unsigned long) fbptr->p);
-  mod_init_noset0 (r, m);
+  modul_initmod_ul (m, (unsigned long) fbptr->p);
+  modul_init_noset0 (r, m);
 
   modul_redcsemi_ul_not0 (r, norm->_mp_d[0], fbptr->invp, m);
   modul_addredcsemi_ul (r, r, norm->_mp_d[1], fbptr->invp, m);
   modul_addredcsemi_ul (r, r, norm->_mp_d[2], fbptr->invp, m);
   modul_addredcsemi_ul (r, r, norm->_mp_d[3], fbptr->invp, m);
 
-  i = (mod_get_ul (r, m) + add == 0UL || mod_get_ul (r, m) + add == m[0]);
+  i = (modul_get_ul (r, m) + add == 0UL || modul_get_ul (r, m) + add == m[0]);
 
-  mod_clear (r, m);
-  mod_clearmod (m);
+  modul_clear (r, m);
+  modul_clearmod (m);
   return i;
 }
 
@@ -1146,7 +1146,7 @@ ul_rho (const unsigned long N, const unsigned long cparm)
   modul_init_noset0 (g, m);
   modul_init_noset0 (accu, m);
   modul_init_noset0 (diff, m);
-  invm = -modul_invmodlong (m);
+  invm = -modul_invmodlong (modul_getmod_ul (m));
   modul_set_ul_reduced (c, cparm, m); /* We set c to cparm and use that as 
 					 the Montgomery representation of 
 					 cparm*2^-w % m */
@@ -1286,7 +1286,6 @@ ul_proven_prime (unsigned long n)
 {
   modulusul_t m;
   residueul_t b;
-  unsigned long invn;
   int r = 0;
   
   if (n % 2UL == 0UL) /* We want odd modulus for REDC */
@@ -1297,10 +1296,9 @@ ul_proven_prime (unsigned long n)
 
   modul_initmod_ul (m, n);
   modul_init_noset0 (b, m);
-  invn = -mod_invmodlong (m);
 
   modul_set_ul (b, 2UL, m);
-  if (!modul_sprp (b, invn, m))
+  if (!modul_sprp (b, m))
     goto end;
 
   if (n < 2047UL)
@@ -1312,10 +1310,10 @@ ul_proven_prime (unsigned long n)
   if (n % 3UL == 1UL)
     {
       modul_set_ul (b, 7UL, m);
-      if (modul_sprp (b, invn, m))
+      if (modul_sprp (b, m))
 	{
 	  modul_set_ul (b, 61UL, m);
-	  if (modul_sprp (b, invn, m)
+	  if (modul_sprp (b, m)
 #if (ULONG_MAX > 4294967295UL)
 	      && n != 4759123141UL && n != 8411807377UL
 #endif
@@ -1328,10 +1326,10 @@ ul_proven_prime (unsigned long n)
       /* Case n % 3 == 0, 2 */
       
       modul_set_ul (b, 3UL, m);
-      if (modul_sprp (b, invn, m))
+      if (modul_sprp (b, m))
 	{
 	  modul_set_ul (b, 5UL, m);
-	  if (modul_sprp (b, invn, m))
+	  if (modul_sprp (b, m))
 	    r = 1;
 	}
     }
