@@ -1886,7 +1886,7 @@ factor_leftover_norm (mpz_t n, unsigned int l,
 #if 1 /* use the facul library */
   facul_code = facul (ul_factors, n, strategy);
 
-  if (facul_code == -1)
+  if (facul_code == FACUL_NOT_SMOOTH)
     return 0;
   
   ASSERT (facul_code == 0 || mpz_cmp_ui (n, ul_factors[0]) != 0);
@@ -2091,7 +2091,8 @@ main (int argc, char *argv[])
     init_rat_norms (&si);
     init_alg_norms (&si);
 
-    si.strategy = facul_make_strategy (15);
+    si.strategy = facul_make_strategy (15, MIN(cpoly->rlim, cpoly->alim),
+                                       1UL << MIN(cpoly->lpbr, cpoly->lpba));
 
     /* special q (and root rho) */
     roots = (uint64_t *) malloc (cpoly->degree * sizeof (uint64_t));
