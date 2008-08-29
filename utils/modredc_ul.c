@@ -140,7 +140,6 @@ modredcul_inv (residue_t r, const residue_t A, const modulusredcul_t m)
 #if LOOKUP_TRAILING_ZEROS
       do {
 	lsh = trailing_zeros [(unsigned char) b];
-	ASSERT_EXPENSIVE (lsh > 0);
 	b >>= lsh;
 	t += lsh;
 	u <<= lsh;
@@ -165,7 +164,6 @@ modredcul_inv (residue_t r, const residue_t A, const modulusredcul_t m)
 #if LOOKUP_TRAILING_ZEROS
       do {
 	lsh = trailing_zeros [(unsigned char) a];
-	ASSERT_EXPENSIVE (lsh > 0);
 	a >>= lsh;
 	t += lsh;
 	v <<= lsh;

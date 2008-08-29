@@ -95,7 +95,7 @@ modredc15ul_div7 (residueredc15ul_t r, const residueredc15ul_t a,
   const unsigned long w_mod_7 = (sizeof (unsigned long) == 4) ? 4UL : 2UL;
   const unsigned long a7 = ((a[1] % 7UL) * w_mod_7 + a[0] % 7UL) % 7UL;
   const unsigned long inv7[7] = {0,6,3,2,5,4,1}; /* inv7[i] = -1/i (mod 7) */
-  unsigned long m7 = ((m[0].m[0] % 7UL) * w_mod_7 + m[0].m[1] % 7UL) % 7UL;
+  unsigned long m7 = ((m[0].m[1] % 7UL) * w_mod_7 + m[0].m[0] % 7UL) % 7UL;
   residueredc15ul_t t;
   
   ASSERT(m7 != 0UL);
