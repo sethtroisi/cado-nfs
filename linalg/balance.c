@@ -954,7 +954,10 @@ struct slice * shuffle_rtable(
                     heap[k].room--;
                     i++;
                 }
-                oversize = l < chunk;
+                /* If one bucket becomes full, then this will change the
+                 * comparison order inevitably */
+                if (heap[k].room == 0)
+                    oversize=1;
             }
             if (oversize)
                 make_heap(heap, heap + ns);
@@ -962,6 +965,7 @@ struct slice * shuffle_rtable(
         for( ; i < ni ; i++) {
             int j = heap[0].i;
             int pos = slices[j].nrows-heap[0].room;
+            assert(heap[0].room);
             slices[j].r[pos] = rt[i].i;
             heap[0].s += rt[i].w;
             heap[0].room--;
