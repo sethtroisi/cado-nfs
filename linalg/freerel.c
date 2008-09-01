@@ -201,7 +201,7 @@ addFreeRelations(char *roots, int deg)
     fbprime_t p;
     int i;
 
-    for(fbptr = fb; fbptr->p != 0; fbptr = fb_next(fbptr)){
+    for(fbptr = fb; fbptr->p != FB_END; fbptr = fb_next(fbptr)){
 	p = fbptr->p;
 	if(fbptr->nr_roots == deg){
 	    // free relation, add it!
@@ -231,8 +231,8 @@ smallFreeRelations(char *fbfilename)
 static void
 usage (char *argv0)
 {
-  fprintf (stderr, "Usage: %s [-v] -poly xxx.poly [-fb xxx.roots]", argv0);
-  fprintf (stderr, " [xxx.rels1 xxx.rels2 ... xxx.relsk]\n");
+  fprintf (stderr, "Usage: %s -fb xxx.roots\n", argv0);
+  fprintf (stderr, "or     %s [-v] -poly xxx.poly xxx.rels1 xxx.rels2 ... xxx.relsk\n", argv0);
   exit (1);
 }
 
