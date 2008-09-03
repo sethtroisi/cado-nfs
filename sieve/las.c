@@ -108,6 +108,9 @@ typedef struct {
     uint32_t *rbadprimes;     /* primes which may appear on the rational side
                                  but are not in the factor base (end of list
                                  is 0) */
+    int qbadsize;             /* size of the [ar]qbadprimes arrays */
+    fbprime_t *aqbadprimes;   /* additional bad primes that appear when */
+    fbprime_t *rqbadprimes;   /* converting to q-lattice */
     unsigned char S_rat[1 << NORM_BITS];
     unsigned char S_alg[1 << NORM_BITS];
     facul_strategy_t *strategy;
@@ -222,6 +225,9 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int logI, uint64_t q0)
   fprintf(stderr, "# bucket_region = %u\n", si->bucket_region);
   fprintf(stderr, "# nb_buckets = %u\n", si->nb_buckets);
   fprintf(stderr, "# bucket_limit = %u\n", si->bucket_limit);
+  si->qbadsize = 16;
+  si->aqbadprimes = malloc (si->qbadsize * sizeof (fbprime_t));
+  si->rqbadprimes = malloc (si->qbadsize * sizeof (fbprime_t));
 }
 
 static void
@@ -310,6 +316,8 @@ sieve_info_clear (sieve_info_t *si)
   free (si->tmpd);
   free (si->abadprimes);
   free (si->rbadprimes);
+  free (si->aqbadprimes);
+  free (si->rqbadprimes);
 }
 
 /*****************************************************************************/
@@ -1120,7 +1128,7 @@ typedef struct {
     fbprime_t p;
     fbprime_t r;        // in ] 0, p [
     int next_position;  // start of the sieve for next bucket_region 
-    unsigned char logp;
+    unsigned char logp; // TODO: word-align?
 } small_typical_prime_data_t;
 
 typedef struct {
@@ -1135,15 +1143,28 @@ typedef struct {
 
 void clear_small_sieve(small_sieve_data_t ssd) {
     free(ssd.nice_p);
+    ssd.nice_p = NULL;
+}
+
+static void 
+copy_small_sieve (small_sieve_data_t *r, const small_sieve_data_t *s) 
+{
+    r->nb_nice_p = s->nb_nice_p;
+    r->nice_p = (small_typical_prime_data_t *) 
+	malloc (r->nb_nice_p * sizeof (small_typical_prime_data_t));
+    memcpy (r->nice_p, s->nice_p, 
+	    r->nb_nice_p * sizeof (small_typical_prime_data_t));
 }
 
 // Prepare sieving of small primes: initialize a small_sieve_data_t
 // structure to be used thereafter during sieving each region.
-void init_small_sieve(small_sieve_data_t *ssd, factorbase_degn_t *fb,
-        sieve_info_t *si)
+// Bad primes are added to *bad, but at most badlen-1 of them. List ends
+// with 0.
+void init_small_sieve(small_sieve_data_t *ssd, fbprime_t *bad, int badlen,
+        factorbase_degn_t *fb, sieve_info_t *si)
 {
     factorbase_degn_t *fb_sav = fb;
-    int n = 0;
+    int n = 0, nr_bad = 0;
     unsigned int I = si->I;
 
     // Count prime ideals.
@@ -1166,16 +1187,25 @@ void init_small_sieve(small_sieve_data_t *ssd, factorbase_degn_t *fb,
             if (r == 0) {
                 // TODO: doit!
                 // special_case_0(S, p, logp, si);
+                if (nr_bad + 1 < badlen && 
+                    (nr_bad == 0 || bad[nr_bad - 1] != fb->p))
+                  bad[nr_bad++] = fb->p;
                 continue;
             } 
             if (r == p) {
                 // TODO: doit!
                 // special_case_p(S, p, logp, si);
+                if (nr_bad + 1 < badlen && 
+                    (nr_bad == 0 || bad[nr_bad - 1] != fb->p))
+                  bad[nr_bad++] = fb->p;
                 continue;
             } 
             if (r == p+1) {
                 // TODO:
                 // Do something with those???
+                if (nr_bad + 1 < badlen && 
+                    (nr_bad == 0 || bad[nr_bad - 1] != fb->p))
+                  bad[nr_bad++] = fb->p;
                 continue;
             }
 
@@ -1189,6 +1219,14 @@ void init_small_sieve(small_sieve_data_t *ssd, factorbase_degn_t *fb,
         fb = fb_next (fb); // cannot do fb++, due to variable size !
     }
     ssd->nb_nice_p = n;
+    ASSERT_ALWAYS (nr_bad < badlen);
+    bad[nr_bad] = 0;
+#if 0
+    fprintf (stderr, "# %d bad primes in q-lattice:", nr_bad);
+    for (n = 0; n < nr_bad; n++)
+      fprintf (stderr, " " FBPRIME_FORMAT, bad[n]);
+    fprintf (stderr, "\n");
+#endif
 }
 
 // Sieve small primes (up to p < I) of the factor base fb in the 
@@ -1234,6 +1272,96 @@ void sieve_small_bucket_region(unsigned char *S,
             S_ptr += I;
           }
         ssd.nice_p[n].next_position = i0;
+    }
+}
+
+/* Sieve small primes (p_thres <= p < I) of the factor base fb in the 
+   next sieve region S, and add primes and the x position where they divide
+   and where there's a sieve report to a bucket (rather than subtracting
+   the log norm from S, as during sieving).
+   Information about where we are is in ssd. */
+void 
+resieve_small_bucket_region (bucket_array_t BA, unsigned char *S, 
+			     small_sieve_data_t *ssd, 
+			     const sieve_info_t *si, 
+			     const fbprime_t resieve_thres,
+			     const unsigned char *S_thres)
+{
+  const uint32_t I = si->I;
+  unsigned char *S_ptr;
+  unsigned long j, nj;
+  int n;
+  const int very_verbose = 0;
+  unsigned char S_thres_local[256];
+
+  nj = (si->bucket_region >> si->logI);
+  ASSERT ((nj & 1) == 0);
+  /* Make local copy of S_thres which can be accessed via stack pointer,
+     so we don't need another pointer in a register */
+  memcpy (S_thres_local, S_thres, 256);
+
+  n = 0;
+  while (n < ssd->nb_nice_p && ssd->nice_p[n].p < resieve_thres)
+    n++; /* Assumes entries of ssd are in order of non-decreasing p */
+  
+  for ( ; n < ssd->nb_nice_p; ++n) 
+    {
+      fbprime_t p, r, twop;
+      unsigned int i0;
+      p = ssd->nice_p[n].p;
+      ASSERT(p >= resieve_thres);
+      twop = p + p;
+      r = ssd->nice_p[n].r;
+      i0 = ssd->nice_p[n].next_position;
+      S_ptr = S;
+      ASSERT(i0 < p);
+      for (j = 0; j < nj; j += 2)
+        {
+          unsigned int i;
+          /* for j even, we sieve only odd i */
+          for (i = (i0 & 1) ? i0 : i0 + p ; i < I; i += twop)
+            {
+              if (S_thres_local[S_ptr[i]])
+                {
+                  bucket_update_t update;
+                  unsigned int x = (j << (si->logI)) + i;
+                  if (very_verbose)
+                    fprintf (stderr, "resieve_small_bucket_region: "
+                             "root %d,%d divides at x = "
+                             "%d = %lu * %u + %d\n", 
+                             p, r, x, j, 1 << si->logI, i);
+                  update.p = p;
+                  update.x = x;
+                  update.logp = 0;
+                  push_bucket_update (BA, 0, update);
+                }
+            }
+          i0 += r;
+          if (i0 >= p)
+              i0 -= p;
+          S_ptr += I;
+          /* j odd */
+          for (i = i0 ; i < I; i += p)
+              if (S_thres_local[S_ptr[i]])
+                {
+                  bucket_update_t update;
+                  unsigned int x = ((j + 1) << (si->logI)) + i;
+                  if (very_verbose)
+                    fprintf (stderr, "resieve_small_bucket_region: "
+                             "root %d,%d divides at x = "
+                             "%d = %lu * %d + %d\n", 
+                             p, r, x, j + 1, 1 << si->logI, i);
+                  update.p = p;
+                  update.x = x;
+                  update.logp = 0;
+                  push_bucket_update (BA, 0, update);
+                }
+          i0 += r;
+          if (i0 >= p)
+              i0 -= p;
+          S_ptr += I;
+        }
+      ssd->nice_p[n].next_position = i0;
     }
 }
 
@@ -1287,25 +1415,45 @@ trialdiv_with_norm (factorbase_degn_t *fbptr, const mpz_t norm)
 }
 
 
+/* The entries in BA must be sorted in order of increasing x */
+static void
+divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const int x, 
+                           bucket_array_t BA, const int N)
+{
+  bucket_update_t update;
+  while (!is_end (BA, N)) {
+      update = get_next_bucket_update(BA, N);
+      if (update.x > x)
+        {
+          rewind_bucket_by_1 (BA, N);
+          break;
+        }
+      if (update.x == x) {
+          unsigned long p = update.p;
+          if (!mpz_divisible_ui_p (norm, p)) {
+            fprintf (stderr, 
+                     "# Error, p = %lu does not divide at x = %d\n",
+                     p, x);
+          } else {
+            while (mpz_divisible_ui_p (norm, p)) {
+              fl->fac[fl->n] = p;
+              fl->n++;
+              ASSERT_ALWAYS(fl->n <= FL_MAX_SIZE);
+              mpz_divexact_ui (norm, norm, p);
+            }
+          }
+      }
+  }
+}
 
-/* L is a list of bad primes (ended with 0) */
+
+/* L and qb are lists of bad primes (ended with 0) */
 static void
 trial_div (factor_list_t *fl, mpz_t norm, bucket_array_t BA, int N, int x,
-           factorbase_degn_t *fb, uint32_t I, uint32_t *L)
+           factorbase_degn_t *fb, uint32_t I, uint32_t *L, fbprime_t *qb,
+	   const fbprime_t resieve_thres, bucket_array_t resieved)
 {
     fl->n = 0; /* reset factor list */
-
-    /* remove bad primes */
-    while (L[0] != 0)
-    {
-        while (mpz_divisible_ui_p (norm, L[0])) {
-            fl->fac[fl->n] = L[0];
-            fl->n++;
-            ASSERT_ALWAYS(fl->n <= FL_MAX_SIZE);
-            mpz_divexact_ui (norm, norm, L[0]);
-        }
-        L ++;
-    }
 
     // handle 2 separately, if it is in fb
     if (fb->p == 2) {
@@ -1320,29 +1468,44 @@ trial_div (factor_list_t *fl, mpz_t norm, bucket_array_t BA, int N, int x,
     }
 
     // remove primes in BA that map to x
-    bucket_update_t update;
-    while (!is_end (BA, N)) {
-        update = get_next_bucket_update(BA, N);
-	if (update.x > x)
-	  {
-	    rewind_bucket_by_1 (BA, N);
-	    break;
-	  }
-        if (update.x == x) {
-            unsigned long p = update.p;
-            while (mpz_divisible_ui_p (norm, p)) {
-                fl->fac[fl->n] = p;
-                fl->n++;
-                ASSERT_ALWAYS(fl->n <= FL_MAX_SIZE);
-                mpz_divexact_ui (norm, norm, p);
-            }
-        }
-    }
+    divide_primes_from_bucket (fl, norm, x, BA, N);
+                               
+    // remove primes found by resieving
+    divide_primes_from_bucket (fl, norm, x, resieved, 0);
     
-    // remove primes in fb that are less than I
-    while (fb->p != FB_END && fb->p <= I) {
+    /* remove bad primes. Do this after resieving, or primes that have
+       both a "bad" root (i.e. at infinity) and a regular one will not
+       be present any more when dividing out resieved primes which 
+       makes asserting that resieved primes really divide harder to do. */
+    while (L[0] != 0)
+    {
+        while (mpz_divisible_ui_p (norm, L[0])) {
+            fl->fac[fl->n] = L[0];
+            fl->n++;
+            ASSERT_ALWAYS(fl->n <= FL_MAX_SIZE);
+            mpz_divexact_ui (norm, norm, L[0]);
+        }
+        L ++;
+    }
+    while (qb[0] != 0)
+    {
+        while (mpz_divisible_ui_p (norm, qb[0])) {
+            fl->fac[fl->n] = qb[0];
+            fl->n++;
+            ASSERT_ALWAYS(fl->n <= FL_MAX_SIZE);
+            mpz_divexact_ui (norm, norm, qb[0]);
+        }
+        qb ++;
+    }
+
+    // remove primes in fb that are less than resieve_thres (or less than I
+    // for printing an error about primes missed in resieving
+    while (fb->p != FB_END && fb->p <= (1 ? resieve_thres : I)) {
       while (trialdiv_with_norm(fb, norm) == 1) {
         //while (mpz_divisible_ui_p (norm, fb->p)) {
+            if (fb->p > resieve_thres)
+              fprintf (stderr, "# Error, dividing out prime " FBPRIME_FORMAT 
+                       " > resieve_thres at x = %d\n", fb->p, x);
             fl->fac[fl->n] = fb->p;
             fl->n++;
             ASSERT_ALWAYS(fl->n <= FL_MAX_SIZE);
@@ -1379,7 +1542,8 @@ static int
 factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
                   bucket_array_t alg_BA, factorbase_degn_t *fb_rat,
                   factorbase_degn_t *fb_alg, cado_poly cpoly, sieve_info_t *si,
-                  unsigned long *survivors)
+                  unsigned long *survivors, 
+		  small_sieve_data_t *srsd_alg, small_sieve_data_t *srsd_rat)
 {
     int x;
     int64_t a;
@@ -1412,6 +1576,28 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
     bucket_sortbucket (alg_BA, N);
     rewind_bucket (alg_BA, N);
 
+    /* Resieve small primes for this bucket region */
+    bucket_array_t resieved_alg, resieved_rat;
+    
+    /* FIXME: make this threshold variable, ideally depending on the number 
+       of survivors */
+    const fbprime_t resieve_thres = 1024;
+    /* FIXME: choose a sensible size here */
+    resieved_alg = init_bucket_array (1, si->bucket_region);
+    resieved_rat = init_bucket_array (1, si->bucket_region);
+    resieve_small_bucket_region (resieved_alg, S, srsd_alg, si, 
+				 resieve_thres, si->alg_Bound);
+    /* fprintf (stderr, "# Resieving bucket %d on alg side found %d primes\n", 
+       N, nb_of_updates (resieved_alg, 0)); */
+    bucket_sortbucket (resieved_alg, 0);
+    rewind_bucket (resieved_alg, 0);
+    resieve_small_bucket_region (resieved_rat, S, srsd_rat, si, 
+				 resieve_thres, si->alg_Bound);
+    /* fprintf (stderr, "# Resieving bucket %d on rat side found %d primes\n", 
+       N, nb_of_updates (resieved_rat, 0)); */
+    bucket_sortbucket (resieved_rat, 0);
+    rewind_bucket (resieved_rat, 0);
+    
     for (x = 0; x < si->bucket_region; ++x)
       {
         unsigned int i, j;
@@ -1431,7 +1617,8 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
         // Trial divide rational norm
         eval_fij (rat_norm, cpoly->g, 1, a, b);
         trial_div (&rat_factors, rat_norm, rat_BA, N, x, fb_rat, si->I,
-                   si->rbadprimes);
+                   si->rbadprimes, si->rqbadprimes, resieve_thres, 
+                   resieved_rat);
         
         if (!check_leftover_norm (rat_norm, cpoly->lpbr, BBrat, cpoly->mfbr))
           continue;
@@ -1440,7 +1627,8 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
         eval_fij (alg_norm, cpoly->f, cpoly->degree, a, b);
         mpz_divexact_ui (alg_norm, alg_norm, si->q);
         trial_div (&alg_factors, alg_norm, alg_BA, N, x, fb_alg, si->I,
-                   si->abadprimes);
+                   si->abadprimes, si->aqbadprimes, resieve_thres, 
+                   resieved_alg);
 
         if (!check_leftover_norm (alg_norm, cpoly->lpba, BBalg, cpoly->mfba))
           continue;
@@ -1472,6 +1660,8 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
         cpt++;
       }
     survivors[0] += surv;
+    clear_bucket_array (resieved_alg);
+    clear_bucket_array (resieved_rat);
     mpz_clear (BBalg);
     mpz_clear (BBrat);
     mpz_clear(alg_norm);
@@ -2168,9 +2358,14 @@ main (int argc, char *argv[])
 
         /* Initialize data for sieving small primes */
         small_sieve_data_t ssd_alg, ssd_rat;
-        init_small_sieve(&ssd_rat, fb_rat, &si);
-        init_small_sieve(&ssd_alg, fb_alg, &si);
+        init_small_sieve(&ssd_rat, si.rqbadprimes, si.qbadsize, fb_rat, &si);
+        init_small_sieve(&ssd_alg, si.aqbadprimes, si.qbadsize, fb_alg, &si);
 
+	/* Copy small sieve data for resieving small primes */
+	small_sieve_data_t srsd_alg, srsd_rat;
+	copy_small_sieve (&srsd_alg, &ssd_alg);
+	copy_small_sieve (&srsd_rat, &ssd_rat);
+	
         /* Process each bucket region, one after the other */
         unsigned char *S;
         S = (unsigned char *)malloc(si.bucket_region*sizeof(unsigned char));
@@ -2202,11 +2397,14 @@ main (int argc, char *argv[])
             /* Factor survivors */
             ttf -= seconds ();
             reports += factor_survivors (S, i, rat_BA, alg_BA, fb_rat,
-                                         fb_alg, cpoly, &si, &survivors1);
+                                         fb_alg, cpoly, &si, &survivors1,
+					 &srsd_alg, &srsd_rat);
             ttf += seconds ();
         }
         clear_small_sieve(ssd_rat);
         clear_small_sieve(ssd_alg);
+        clear_small_sieve(srsd_rat);
+        clear_small_sieve(srsd_alg);
         tot_reports += reports;
 #ifdef VERBOSE
         fprintf (stderr, "# %lu survivors after rational side,", survivors0);

@@ -330,7 +330,7 @@ purge_bucket (bucket_array_t BA, const int i, unsigned char *S,
 /* A compare function suitable for sorting updates in order of ascending x
    with qsort() */
 static int
-bucket_cmp_update (bucket_update_t *a, bucket_update_t *b)
+bucket_cmp_update (const bucket_update_t *a, const bucket_update_t *b)
 {
   if (a->x < b->x)
     return -1;
