@@ -42,4 +42,3 @@ echo "ratio=1.5" >> $tmp/params
 # echo "skip=0" >> $tmp/params
 $cado/merge_linalg_sqrt2.sh $tmp/params
 /bin/rm -fr $tmp/$name
-

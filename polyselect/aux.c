@@ -132,7 +132,9 @@ l1_lognorm (mpz_t *p, unsigned long degree, double S)
   return log (mu);
 }
 
-/* same as L2_lognorm, but takes 'double' instead of 'mpz_t' as coefficients */
+/* Same as L2_lognorm, but takes 'double' instead of 'mpz_t' as coefficients.
+   Returns 1/2*log(int(int(F^2(xs,y)/s^d, x=-1..1), y=-1..1)).
+ */
 static double
 L2_lognorm_d (double *a, unsigned long d, double s)
 {
@@ -181,18 +183,19 @@ L2_lognorm_d (double *a, unsigned long d, double s)
     }
   else if (d == 5)
     {
-      double a5, a4, a3, a2, a1, a0;
+      double a5, a4, a3, a2, a1, a0, s2 = s * s, s3 = s2 * s, s4 = s3 * s,
+        s5 = s4 * s;
 
-      a5 = a[5] * s * s * s * s * s;
-      a4 = a[4] * s * s * s * s;
-      a3 = a[3] * s * s * s;
-      a2 = a[2] * s * s;
-      a1 = a[1] * s;
       a0 = a[0];
+      a1 = a[1] * s;
+      a2 = a[2] * s2;
+      a3 = a[3] * s3;
+      a4 = a[4] * s4;
+      a5 = a[5] * s5;
       n = 4.0 / 11.0 * (a5 * a5 + a0 * a0) + 8.0 / 27.0 * (a5 * a3 + a2 * a0)
         + 4.0 / 27.0 * (a4 * a4 + a1 * a1) + 4.0 / 35.0 * (a3 * a3 + a2 * a2)
         + 8.0 / 35.0 * (a5 * a1 + a4 * a2 + a4 * a0 + a3 * a1);
-      return 0.5 * log(n / (s * s * s * s * s));
+      return 0.5 * log(n / s5);
     }
   else if (d == 6)
     {
@@ -227,7 +230,7 @@ L2_lognorm_d (double *a, unsigned long d, double s)
 double
 L2_lognorm (mpz_t *f, unsigned long d, double s)
 {
-  double a[7];
+  double a[MAX_DEGREE + 1];
   unsigned long i;
 
   for (i = 0; i <= d; i++)
@@ -239,7 +242,7 @@ L2_lognorm (mpz_t *f, unsigned long d, double s)
 double
 L2_skewness (mpz_t *f, int deg, int prec)
 {
-  double s, n0, n1, a, b, c, d, nc, nd, fd[7];
+  double s, n0, n1, a, b, c, d, nc, nd, fd[MAX_DEGREE + 1];
   int i;
 
   /* convert once for all to double's to avoid expensive mpz_get_d() */
@@ -982,7 +985,7 @@ rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1,
   E0 = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
   /* look for negative k */
   best_E = E0;
-#define MAX_k 20
+#define MAX_k 15
   for (i = 1, k = -2; i < MAX_k; i++, k *= 2)
     {
       k0 = rotate_aux (f, b, m, k0, k);
@@ -1094,8 +1097,8 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
       k0 = rotate_aux (f, b, m, k0, 0);
       discriminant_k (D, f, d, m, b);
 
-  for (k = K0; k <= K1; k++)
-    A[k - K0] = 0.0; /* A[k - K0] will store the value alpha(f + k*g) */
+      for (k = K0; k <= K1; k++)
+        A[k - K0] = 0.0; /* A[k - K0] will store the value alpha(f + k*g) */
 
   for (p = 2; p <= alim; p += 1 + (p & 1))
     if (isprime (p))
@@ -1167,7 +1170,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
   for (k = K0; k <= K1; k++)
     {
       alpha = A[k - K0];
-      if (alpha < best_alpha + 1.0)
+      if (alpha < best_alpha + 2.0)
         {
           /* check lognorm + alpha < best_lognorm + best_alpha */
 

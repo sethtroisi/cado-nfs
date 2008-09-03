@@ -285,7 +285,7 @@ sieve_info_update (sieve_info_t *si, double skew)
   if (one_over_b1 < s_over_a1)
     s_over_a1 = one_over_b1; /* min(s/|a1|, 1/|b1|) */
   s_over_a1 *= si->B;
-  if (s_over_a1 > 1.0) /* ensures that J <= I/2 */
+  if (s_over_a1 > 1.0) /* ensures that J does not exceed I/2 */
     s_over_a1 = 1.0;
   si->J = (uint32_t) (s_over_a1 * (double) (si->I >> 1));
 

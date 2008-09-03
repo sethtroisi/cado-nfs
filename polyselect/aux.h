@@ -3,6 +3,8 @@
 #include <float.h>  /* for DBL_MAX */
 #include <string.h>
 
+#define MAX_DEGREE 6
+
 #if 1 /* use L2-norm with integral over whole sieving region */
 #define LOGNORM  L2_lognorm
 #define SKEWNESS L2_skewness
