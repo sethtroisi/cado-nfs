@@ -77,7 +77,7 @@
 
 #define GNUC_VERSION(X,Y,Z)     \
     defined(__GNUC__) &&        \
-(__GNUC__ == X && __GNUC_MINOR__ == Y && __GNUC_PATCHLEVEL == Z)
+(__GNUC__ == X && __GNUC_MINOR__ == Y && __GNUC_PATCHLEVEL__ == Z)
 #define GNUC_VERSION_ATLEAST(X,Y,Z)     \
     defined(__GNUC__) &&        \
 LEXGE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z)
