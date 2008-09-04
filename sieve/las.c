@@ -1184,14 +1184,11 @@ void init_small_sieve(small_sieve_data_t *ssd, fbprime_t *bad, int badlen,
         for (nr = 0; nr < fb->nr_roots; ++nr) {
             fbprime_t r;
             r = fb_root_in_qlattice(p, fb->roots[nr], fb->invp, si);
-            if (r == 0) {
+            /* if (r == 0) {
                 // TODO: doit!
-                // special_case_0(S, p, logp, si);
-                if (nr_bad + 1 < badlen && 
-                    (nr_bad == 0 || bad[nr_bad - 1] != fb->p))
-                  bad[nr_bad++] = fb->p;
-                continue;
-            } 
+                // The current sieving code handles r == 0 correctly, but
+                // we may get a small speedup out of treating it separately
+            } */
             if (r == p) {
                 // TODO: doit!
                 // special_case_p(S, p, logp, si);
@@ -1203,9 +1200,6 @@ void init_small_sieve(small_sieve_data_t *ssd, fbprime_t *bad, int badlen,
             if (r == p+1) {
                 // TODO:
                 // Do something with those???
-                if (nr_bad + 1 < badlen && 
-                    (nr_bad == 0 || bad[nr_bad - 1] != fb->p))
-                  bad[nr_bad++] = fb->p;
                 continue;
             }
 
@@ -1435,12 +1429,12 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const int x,
                      "# Error, p = %lu does not divide at x = %d\n",
                      p, x);
           } else {
-            while (mpz_divisible_ui_p (norm, p)) {
+            do {
               fl->fac[fl->n] = p;
               fl->n++;
               ASSERT_ALWAYS(fl->n <= FL_MAX_SIZE);
               mpz_divexact_ui (norm, norm, p);
-            }
+            } while (mpz_divisible_ui_p (norm, p));
           }
       }
   }
