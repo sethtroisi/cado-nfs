@@ -1374,3 +1374,106 @@ translate (mpz_t *f, int d, mpz_t *g, mpz_t m, mpz_t b, int verbose)
 
   return k;
 }
+
+/* f <- f(x+k), g <- g(x+k) */
+void
+do_translate (mpz_t *f, int d, mpz_t *g, long k)
+{
+  int i, j;
+
+  for (i = d - 1; i >= 0; i--)
+    for (j = i; j < d; j++)
+      mpz_addmul_si (f[j], f[j+1], k);
+  mpz_addmul_si (g[0], g[1], k);
+}
+
+/* Use rotation and translation to find a polynomial with smaller norm
+   (local minimum). Modify f and g accordingly. */
+void
+optimize (mpz_t *f, int d, mpz_t *g, int verbose)
+{
+  long k = 1; /* current offset */
+  int changed;
+  double logmu00, logmu0, logmu;
+  int prec = SKEWNESS_DEFAULT_PREC;
+
+  logmu00 = logmu0 = LOGNORM (f, d, SKEWNESS (f, d, prec));
+  while (1)
+    {
+      changed = 0;
+
+      /* first try translation by k */
+      do_translate (f, d, g, k); /* f(x+k) */
+      logmu = LOGNORM (f, d, SKEWNESS (f, d, prec));
+      if (logmu < logmu0)
+        {
+          changed = 1;
+          logmu0 = logmu;
+        }
+      else
+        {
+          do_translate (f, d, g, -2 * k); /* f(x-k) */
+          logmu = LOGNORM (f, d, SKEWNESS (f, d, prec));
+          if (logmu < logmu0)
+            {
+              changed = 1;
+              logmu0 = logmu;
+            }
+          else
+            do_translate (f, d, g, k); /* original f */
+        }
+      
+      /* then do rotation by -k*x*g */
+      rotate_aux1 (f, g[1], g[0], 0, k);
+      logmu = LOGNORM (f, d, SKEWNESS (f, d, prec));
+      if (logmu < logmu0)
+        {
+          changed = 1;
+          logmu0 = logmu;
+        }
+      else
+        {
+          rotate_aux1 (f, g[1], g[0], 0, -2 * k); /* f + k*x*g */
+          logmu = LOGNORM (f, d, SKEWNESS (f, d, prec));
+          if (logmu < logmu0)
+            {
+              changed = 1;
+              logmu0 = logmu;
+            }
+          else
+            rotate_aux1 (f, g[1], g[0], 0, k); /* previous f */
+        }
+
+      /* then do rotation by -k*g */
+      rotate_aux (f, g[1], g[0], 0, k);
+      logmu = LOGNORM (f, d, SKEWNESS (f, d, prec));
+      if (logmu < logmu0)
+        {
+          changed = 1;
+          logmu0 = logmu;
+        }
+      else
+        {
+          rotate_aux (f, g[1], g[0], 0, -2 * k); /* f + k*g */
+          logmu = LOGNORM (f, d, SKEWNESS (f, d, prec));
+          if (logmu < logmu0)
+            {
+              changed = 1;
+              logmu0 = logmu;
+            }
+          else
+            rotate_aux (f, g[1], g[0], 0, k); /* previous f */
+        }
+
+      if (changed == 1)
+        k = 2 * k;
+      else if (k > 1)
+        k = k / 2;
+      else /* changed = 0 and k = 1 */
+        break;
+    }
+
+  if (verbose > 0)
+    fprintf (stderr, "# Optimized lognorm from %.2f to %.2f\n", logmu00,
+             logmu0);
+}

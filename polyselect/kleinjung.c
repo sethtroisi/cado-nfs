@@ -1190,6 +1190,10 @@ main (int argc, char *argv[])
     {
       mpz_set_ui (poly->f[degree], 0);
       Lemma21 (poly->f, n, degree, Mt[i].b, Mt[i].m);
+      /* optimize norm before root properties */
+      mpz_set (poly->g[1], Mt[i].b);
+      mpz_neg (poly->g[0], Mt[i].m);
+      optimize (poly->f, degree, poly->g, verbose);
       E = rotate (poly->f, degree, ALPHA_BOUND, Mt[i].m, Mt[i].b, &jmin,
                   &kmin, 1);
       if (E < best_E)
@@ -1214,6 +1218,10 @@ main (int argc, char *argv[])
   mpz_set_ui (poly->f[degree], 0);
   i = best_i;
   Lemma21 (poly->f, n, degree, Mt[i].b, Mt[i].m);
+  /* optimize again norm, to start from same polynomial before rotation */
+  mpz_set (poly->g[1], Mt[i].b);
+  mpz_neg (poly->g[0], Mt[i].m);
+  optimize (poly->f, degree, poly->g, 0);
   rotate_aux (poly->f, Mt[i].b, Mt[i].m, 0, bestk);
   rotate_aux1 (poly->f, Mt[i].b, Mt[i].m, 0, bestj);
   translate (poly->f, degree, poly->g, Mt[i].m, Mt[i].b, verbose);

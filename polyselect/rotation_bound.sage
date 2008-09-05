@@ -529,3 +529,78 @@ def rotatebound_choices_all(f,g):
 # This shows that degree-1 rotation, as soon as some work margin is
 # available, give a very clear win over constant rotation, as expected.
 
+# optimize the norm of a given polynomial-pair (f,g) by applying successively
+# translation, rotation by x*g, and rotation by g, until we find a local
+# minimum
+def optimize(f,g):
+    j = 0
+    i = 1
+    while best_l2norm_tk(R(f(x+i)))<best_l2norm_tk(f):
+	f = R(f(x+i))
+	g = R(g(x+i))
+        j = j + i
+        i = 2*i
+    while i>=1:
+        if best_l2norm_tk(R(f(x+i)))<best_l2norm_tk(f):
+            f = R(f(x+i))
+            g = R(g(x+i))
+            j = j + i
+        i = i/2
+    if j<>0:
+       print "translate by", j
+    j = 0
+    i = 1
+    while best_l2norm_tk(R(f(x-i)))<best_l2norm_tk(f):
+	f = R(f(x-i))
+	g = R(g(x-i))
+        j = j - i
+        i = 2*i
+    while i>=1:
+        if best_l2norm_tk(R(f(x-i)))<best_l2norm_tk(f):
+            f = R(f(x-i))
+            g = R(g(x-i))
+            j = j - i
+        i = i/2
+    if j<>0:
+       print "translate by", j
+    j = 0
+    while best_l2norm_tk(f+R(x)*g)<best_l2norm_tk(f):
+	f = f+R(x)*g
+        j = j + 1
+    if j<>0:
+       print "rotate by x*", j
+    j = 0
+    while best_l2norm_tk(f-R(x)*g)<best_l2norm_tk(f):
+	f = f-R(x)*g
+        j = j - 1
+    if j<>0:
+       print "rotate by x*", j
+    j = 0
+    i = 1
+    while best_l2norm_tk(f+i*g)<best_l2norm_tk(f):
+	f = f+i*g
+        j = j + i
+	i = 2*i
+    i = i/2
+    while i>=1:
+	if best_l2norm_tk(f+i*g)<best_l2norm_tk(f):
+	    f = f+i*g
+            j = j + i
+	i = i/2
+    if j<>0:
+       print "rotate by", j
+    j = 0
+    i = 1
+    while best_l2norm_tk(f-i*g)<best_l2norm_tk(f):
+	f = f-i*g
+        j = j - i
+	i = 2*i
+    i = i/2
+    while i>=1:
+	if best_l2norm_tk(f-i*g)<best_l2norm_tk(f):
+	    f = f-i*g
+            j = j - i
+	i = i/2
+    if j<>0:
+       print "rotate by", j
+    return f, g
