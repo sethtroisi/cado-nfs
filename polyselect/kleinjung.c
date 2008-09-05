@@ -222,7 +222,7 @@ void retrieve_sums(uint64_t * targets, struct mu_llist ** res, int ntargets,
 }
 
 /* checks a possible candidate */
-void
+static void
 possible_candidate (int * mu, int l, int d, mpz_t *a, mpz_t P, mpz_t N,
                     double M, mpz_t **x, mpz_t m0)
 {
@@ -230,7 +230,7 @@ possible_candidate (int * mu, int l, int d, mpz_t *a, mpz_t P, mpz_t N,
     int i;
     double lognorm, logM = log (M);
 
-    mpz_init(t);
+    mpz_init (t);
     mpz_add (t, m0, x[0][mu[0]]);
     for (i = 1; i < l; i++)
         mpz_add (t, t, x[i][mu[i]]);
@@ -254,7 +254,7 @@ possible_candidate (int * mu, int l, int d, mpz_t *a, mpz_t P, mpz_t N,
         }
         m_logmu_insert (Mt, Malloc, &Msize, P, t, lognorm, "lognorm=", verbose);
     }
-    mpz_clear(t);
+    mpz_clear (t);
 }
 
 struct expanding_list_s {
@@ -290,8 +290,9 @@ void expanding_list_push(expanding_list l, uint64_t v)
 /* Same as naive_search, but in O~(d^(l/2)) instead of O(d^l).
    Returns the number of polynomials checked, i.e., d^l.
 */
-double quick_search(double f0, double **f, int l, int d, double eps, mpz_t *a,
-	      mpz_t P, mpz_t N, double M, mpz_t **x, mpz_t m0)
+double
+quick_search (double f0, double **f, int l, int d, double eps, mpz_t *a,
+              mpz_t P, mpz_t N, double M, mpz_t **x, mpz_t m0)
 {
     uint64_t ** g;
     double two_64 = pow(2,64);
@@ -554,25 +555,31 @@ naive_search (double f0, double **f, int l, int d, double eps, mpz_t *a,
 
 /* return rho if ad*x^d = N has exactly one root rho mod p0,
    otherwise returns 0. */
-unsigned int
+static unsigned int
 has_one_root (mpz_t ad, int d, mpz_t N, unsigned int p0)
 {
   unsigned int rho = 0, x, nroots = 0;
-  mpz_t t;
+  residueul_t adr, t, xr, Nr;
+  int i;
+  modulusul_t p0r;
 
-  mpz_init (t);
+  modul_initmod_ul (p0r, p0);
+  modul_set_ul (adr, mpz_fdiv_ui (ad, p0), p0r);
+  modul_set_ul (Nr,  mpz_fdiv_ui (N,  p0), p0r);
   for (x = 1; nroots < 2 && x < p0; x ++)
     {
-      mpz_ui_pow_ui (t, x, d);
-      mpz_mul (t, t, ad);
-      mpz_sub (t, t, N);
-      if (mpz_divisible_ui_p (t, p0))
+      modul_set_ul (xr, x, p0r);
+      modul_mul (t, adr, xr, p0r);
+      for (i = 1; i < d; i++)
+        modul_mul (t, t, xr, p0r);
+      modul_sub (t, t, Nr, p0r);
+      if (modul_is0 (t, p0r))
         {
           nroots ++;
           rho = (nroots == 1) ? x : 0;
         }
     }
-  mpz_clear (t);
+  modul_clearmod (p0r);
   return rho;
 }
 
@@ -581,13 +588,15 @@ has_one_root (mpz_t ad, int d, mpz_t N, unsigned int p0)
    Assumes a[d] is set to the current search value.
    Returns the number of polynomials checked.
 */
-double
+static double
 enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
            mpz_t *a, mpz_t N, int d, mpz_t *g, mpz_t mtilde, double M)
 {
   int *p, k, i, j;
-  mpz_t **x, t, u, dad, e, e00, P, P_over_pi, m0, invN, M0, P_over_2;
-  unsigned int pi;
+  mpz_t **x, t, u, dad, e, e00, m0, invN, M0, x0;
+  mpz_t P, P_over_pi, P_over_p0, P_over_2;
+  mpz_t **x1; /* values of the x[][] for p0=1 */
+  unsigned int pi, r0;
   unsigned long *roots;
   double eps, f0, **f, one_over_P2, checked = 0.0, Pd;
 
@@ -595,13 +604,18 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
   for (k = 0; k < l; k++)
     p[k] = k; /* p[] stores the current indices in [0, lQ-1] we consider */
   x = (mpz_t**) malloc (l * sizeof(mpz_t*));
+  x1 = (mpz_t**) malloc (l * sizeof(mpz_t*));
   f = (double**) malloc (l * sizeof(double*));
   for (i = 0; i < l; i++)
     {
       x[i] = (mpz_t*) malloc (d * sizeof(mpz_t));
+      x1[i] = (mpz_t*) malloc (d * sizeof(mpz_t));
       f[i] = (double*) malloc (d * sizeof(double));
       for (j = 0; j < d; j++)
-        mpz_init (x[i][j]);
+        {
+          mpz_init (x[i][j]);
+          mpz_init (x1[i][j]);
+        }
     }
   mpz_init (t);
   mpz_init (u);
@@ -609,9 +623,11 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
   mpz_init (e);
   mpz_init (e00);
   mpz_init (P_over_pi);
+  mpz_init (P_over_p0);
   mpz_init (P_over_2);
   mpz_init (P);
   mpz_init (m0);
+  mpz_init (x0);
   mpz_init (M0);
   mpz_init (invN);
   roots = (unsigned long*) malloc (d * sizeof(unsigned long));
@@ -625,12 +641,35 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
       Pd = mpz_get_d (P);
       if (Pd <= max_adm1)
         {
-            if (verbose >= 3) {
-                printf("# subset");
-                for (k = 0; k < l; k++)
-                    printf(" %u",Q[p[k]]);
-                printf("\n");
+          unsigned int p0_max, p0;
+
+          if (verbose >= 3)
+            {
+              printf("# subset");
+              for (k = 0; k < l; k++)
+                printf(" %u",Q[p[k]]);
+              printf("\n");
             }
+
+          /* p_0 idea */
+          p0_max = (unsigned int) (max_adm1 / Pd);
+          if (p0_max > P0_MAX)
+            p0_max = P0_MAX;
+
+          mpz_set (P_over_p0, P);
+          for (p0 = 1; p0 <= p0_max; p0++)
+            {
+              if (p0 > 1 && p0 % d == 1) /* such primes are already taken */
+                continue;
+
+              if (p0 > 1 && (r0 = has_one_root (a[d], d, N, p0)) == 0)
+                continue;
+              
+              mpz_mul_ui (P, P_over_p0, p0);
+
+              if (verbose >= 2)
+                gmp_printf ("trying P=%Zd\n", P);
+
           /* compute 1/N mod P */
           mpz_invert (invN, N, P);
 
@@ -667,37 +706,66 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
           /* compute the x[i][j] from (3.2) */
           for (i = 0; i < l; i++)
             {
-              /* put in x[i][0..d-1] the d roots of x^d = N/a[d] mod Q[p[i]] */
               pi = Q[p[i]];
-              mpz_set_ui (u, pi);
-              mpz_invert (t, a[d], u);            /* 1/a[d] mod pi */
-              mpz_mul (t, t, N);
-              mpz_mod_ui (t, t, pi);
-              mpz_ui_sub (g[0], pi, t);
-              if (poly_roots_ulong(roots, g, d, pi) != d)
+              if (p0 == 1)
                 {
-                  fprintf (stderr, "Error, d roots expected\n");
-                  exit (1);
-                }
-              mpz_divexact_ui (P_over_pi, P, pi);
-              mpz_invert (t, P_over_pi, u);       /* 1 / (P/pi) mod pi */
-              for (j = 0; j < d; j++)
-                {
-                  /* we want x[i][j] = c*(P/pi) and x[i][j] = roots[j] mod pi,
-                     thus c = roots[j] / (P/pi) mod pi */
-                  mpz_mul_ui (x[i][j], t, roots[j]);
-                  mpz_mod_ui (x[i][j], x[i][j], pi);
-                  mpz_mul (x[i][j], x[i][j], P_over_pi);
+                  /* put in x[i][] the d roots of x^d = N/a[d] mod Q[p[i]] */
+                  mpz_set_ui (u, pi);
+                  mpz_invert (t, a[d], u);            /* 1/a[d] mod pi */
+                  mpz_mul (t, t, N);
+                  mpz_mod_ui (t, t, pi);
+                  mpz_ui_sub (g[0], pi, t);
+                  if (poly_roots_ulong(roots, g, d, pi) != d)
+                    {
+                      fprintf (stderr, "Error, d roots expected\n");
+                      exit (1);
+                    }
+                  mpz_divexact_ui (P_over_pi, P, pi);
+                  mpz_invert (t, P_over_pi, u);       /* 1 / (P/pi) mod pi */
+                  for (j = 0; j < d; j++)
+                    {
+                      /* we want x[i][j] = c*(P/pi) and x[i][j] = roots[j] mod
+                         pi, thus c = roots[j] / (P/pi) mod pi */
+                      mpz_mul_ui (x[i][j], t, roots[j]);
+                      mpz_mod_ui (x[i][j], x[i][j], pi);
+                      mpz_mul (x[i][j], x[i][j], P_over_pi);
 #ifdef NEAREST
-                  /* round the x[i][j] to nearest */
-                  if (mpz_cmp (x[i][j], P_over_2) > 0)
-                    mpz_sub (x[i][j], x[i][j], P);
+                      /* round the x[i][j] to nearest */
+                      if (mpz_cmp (x[i][j], P_over_2) > 0)
+                        mpz_sub (x[i][j], x[i][j], P);
 #endif
+                      mpz_set (x1[i][j], x[i][j]);
+                    }
                 }
-            }
+              else /* case p0 > 1 */
+                {
+                  unsigned long inv;
+
+                  if (i == 0)
+                    {
+                      mpz_set_ui (u, p0);
+                      mpz_invert (t, P_over_p0, u); /* 1/(P/p0) (mod p0) */
+                      mpz_ui_sub (t, p0, t); /* -1/(P/p0) (mod p0) */
+                      inv = mpz_get_ui (t);
+                    }
+                  for (j = 0; j < d; j++)
+                    {
+                      /* x1[i][j] is the value corresponding to p0=1, i.e.,
+                         0 <= x1[i][j] < P/p0 and (P/p0)/pi divides x1[i][j];
+                         we want x[i][j] = x1[i][j] + s*(P/p0) (which implies
+                         (P/p0)/pi divides x[i][j]), and x[i][j] = 0 (mod p0).
+                         This yields s = -x1[i][j]/(P/p0) (mod p0). */
+                      unsigned long s;
+                      s = mpz_fdiv_ui (x1[i][j], p0); /* x1[i][j] mod p0 */
+                      mpz_mul_ui (x[i][j], P_over_p0, s * inv);
+                      mpz_add (x[i][j], x[i][j], x1[i][j]);
+                    }
+                }
+            } /* end of for-loop on i */
           if (verbose >= 3) printf("done\n");
           if (verbose >= 4) {
               for (i = 0; i < l; i++) {
+                printf ("%u: ", Q[p[i]]);
                   for (j = 0; j < d; j++) {
                       gmp_printf("%Zd, ",x[i][j]);
                   }
@@ -709,10 +777,27 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
              for i >= 1, and m[0][j] = m0 + x[0][j] */
 
           mpz_mul_ui (dad, a[d], d);
+          Pd = mpz_get_d (P);
           one_over_P2 = -1.0 / (Pd * Pd);
 
           /* compute the e[i][j] from (3.6) */
           /* first compute e[0][j] = a_{d-1, (j,...,1)} */
+          if (p0 > 1)
+            {
+              /* We need to add x0 to m0 + x[0][] + ... + x[d-1][],
+                 such that x0 = r0 (mod p0) and x0 is divisible by P/p0;
+                 Let x0 = t * (P/p0), then t = r0/(P/p0) mod (p0). */
+              mpz_set_ui (u, p0);
+              mpz_invert (t, P_over_p0, u);
+              mpz_mul_ui (t, t, r0);
+              mpz_fdiv_r_ui (t, t, p0);
+#ifdef NEAREST
+              if (mpz_cmp_ui (t, p0 >> 1) > 0)
+                mpz_sub_ui (t, t, p0);
+#endif
+              mpz_mul (x0, t, P_over_p0);
+              mpz_add (m0, m0, x0);
+            }
           mpz_set (M0, m0);
           for (i = 0; i < l; i++)
             mpz_add (M0, M0, x[i][0]);
@@ -741,6 +826,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
               mpz_mul (u, dad, x[0][j]);
               mpz_addmul (u, e, P);
               f[0][j] = mpz_get_d (u) * one_over_P2;
+              ASSERT_ALWAYS(-2.0 < f[0][j] && f[0][j] < 1.0);
             }
           /* now compute e[i][j] and deduce f[i][j] for i > 0 */
           for (i = 1; i < l; i++)
@@ -748,6 +834,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
               /* since e[i][0] = e_{i,1} = 0, f[i][0] = -d a[d] x[i][0]/p^2 */
               mpz_mul (u, dad, x[i][0]);
               f[i][0] = mpz_get_d (u) * one_over_P2;
+              ASSERT_ALWAYS(-2.0 < f[i][0] && f[i][0] < 1.0);
               mpz_set (t, M0);         /* m_{(1,...,1)} */
               for (j = 1; j < d; j++)
                 {
@@ -770,30 +857,19 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
                   mpz_mul (u, dad, x[i][j]);
                   mpz_addmul (u, e, P);
                   f[i][j] = mpz_get_d (u) * one_over_P2;
+                  ASSERT_ALWAYS(-2.0 < f[i][j] && f[i][j] < 1.0);
                 }
             }
 
           /* now search for a small combination */
           search_time -= seconds ();
-#ifdef  QUICK_SEARCH
+#ifdef QUICK_SEARCH
           checked += quick_search (f0, f, l, d, eps, a, P, N, M, x, m0);
 #else
           checked += naive_search (f0, f, l, d, eps, a, P, N, M, x, m0);
 #endif
           search_time += seconds ();
-
-#if 0
-          unsigned int p0, p0_max, rho;
-
-          /* p_0 idea */
-          p0_max = (unsigned int) (max_adm1 / Pd);
-          if (p0_max > P0_MAX)
-            p0_max = P0_MAX;
-          for (p0 = 2; p0 <= p0_max; p0++)
-            {
-              rho = has_one_root (a[d], d, N, p0);
-            }
-#endif
+            } /* end of p0 loop */
         }
       
       /* go to next subset */
@@ -808,11 +884,16 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
   for (i = 0; i < l; i++)
     {
       for (j = 0; j < d; j++)
-        mpz_clear (x[i][j]);
+        {
+          mpz_clear (x[i][j]);
+          mpz_clear (x1[i][j]);
+        }
       free (x[i]);
+      free (x1[i]);
       free (f[i]);
     }
   free (x);
+  free (x1);
   free (f);
   mpz_clear (t);
   mpz_clear (u);
@@ -820,9 +901,11 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
   mpz_clear (e);
   mpz_clear (e00);
   mpz_clear (P_over_pi);
+  mpz_clear (P_over_p0);
   mpz_clear (P_over_2);
   mpz_clear (P);
   mpz_clear (m0);
+  mpz_clear (x0);
   mpz_clear (M0);
   mpz_clear (invN);
   free (roots);
@@ -1133,12 +1216,13 @@ main (int argc, char *argv[])
   Lemma21 (poly->f, n, degree, Mt[i].b, Mt[i].m);
   rotate_aux (poly->f, Mt[i].b, Mt[i].m, 0, bestk);
   rotate_aux1 (poly->f, Mt[i].b, Mt[i].m, 0, bestj);
+  translate (poly->f, degree, poly->g, Mt[i].m, Mt[i].b, verbose);
 
   mpz_set (poly->n, n);
   poly->degree = degree;
   mpz_set (poly->g[1], Mt[i].b);
   mpz_neg (poly->g[0], Mt[i].m);
-  poly->skew = SKEWNESS (poly->f, degree, SKEWNESS_DEFAULT_PREC);
+  poly->skew = SKEWNESS (poly->f, degree, 2 * SKEWNESS_DEFAULT_PREC);
   strncpy (poly->type, "gnfs", sizeof (poly->type));
   print_poly (stdout, poly, argc0, argv0, st0, raw);
 

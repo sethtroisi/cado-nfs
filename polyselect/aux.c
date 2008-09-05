@@ -265,6 +265,10 @@ L2_skewness (mpz_t *f, int deg, int prec)
   a = (s == 1.0) ? 1.0 : 0.5 * s;
   b = 2.0 * s;
 
+  /* since we use trichotomy, the intervals shrink by 3/2 instead of 2 at each
+     iteration, thus we multiply the precision (in bits) by log(2)/log(3/2) */
+  prec = (int) (1.70951129135145 * (double) prec);
+
   /* use trichotomy */
   while (prec--)
     {
@@ -1288,3 +1292,85 @@ print_poly (FILE *fp, cado_poly p, int argc, char *argv[], double st, int raw)
   fprintf (fp, " in %.2fs\n", (seconds () - st));
 }
 
+/* Returns k such that f(x+k) has the smallest 1-norm, with the corresponding
+   skewness.
+   The coefficients f[] are modified to those of f(x+k).
+
+   The linear polynomial b*x-m is changed into b*(x+k)-m, thus m is
+   changed into m-k*b.
+*/
+long
+translate (mpz_t *f, int d, mpz_t *g, mpz_t m, mpz_t b, int verbose)
+{
+  double logmu0, logmu;
+  int i, j, dir;
+  long k;
+  int prec = 2 * SKEWNESS_DEFAULT_PREC;
+
+  logmu0 = LOGNORM (f, d, SKEWNESS (f, d, prec));
+
+  /* first compute f(x+1) */
+  /* define f_i(x) = f[i] + f[i+1]*x + ... + f[d]*x^(d-i)
+     then f_i(x+1) = f[i] + (x+1)*f_{i+1}(x+1) */
+  for (i = d - 1; i >= 0; i--)
+    {
+      /* invariant: f[i+1], ..., f[d] are the coefficients of f_{i+1}(x+1),
+         thus we have to do: f[i] <- f[i] + f[i+1], f[i+1] <- f[i+1] + f[i+2],
+         ..., f[d-1] <- f[d-1] + f[d] */
+      for (j = i; j < d; j++)
+        mpz_add (f[j], f[j], f[j+1]);
+    }
+  mpz_sub (m, m, b);
+  k = 1;
+
+  /* invariant: the coefficients are those of f(x+k) */
+  logmu = LOGNORM (f, d, SKEWNESS (f, d, prec));
+
+  if (logmu < logmu0)
+    dir = 1;
+  else
+    dir = -1;
+  logmu0 = logmu;
+
+  while (1)
+    {
+      /* translate from f(x+k) to f(x+k+dir) */
+      for (i = d - 1; i >= 0; i--)
+        for (j = i; j < d; j++)
+          if (dir == 1)
+            mpz_add (f[j], f[j], f[j+1]);
+          else
+            mpz_sub (f[j], f[j], f[j+1]);
+      if (dir == 1)
+        mpz_sub (m, m, b);
+      else
+        mpz_add (m, m, b);
+      k = k + dir;
+      logmu = LOGNORM (f, d, SKEWNESS (f, d, prec));
+      if (logmu < logmu0)
+        logmu0 = logmu;
+      else
+        break;
+    }
+
+  /* go back one step */
+  for (i = d - 1; i >= 0; i--)
+    for (j = i; j < d; j++)
+      if (dir == 1)
+        mpz_sub (f[j], f[j], f[j+1]);
+      else
+        mpz_add (f[j], f[j], f[j+1]);
+  if (dir == 1)
+    mpz_add (m, m, b);
+  else
+    mpz_sub (m, m, b);
+  k = k - dir;
+
+  if (verbose > 0)
+    fprintf (stderr, "# Translate by %ld\n", k);
+
+  /* change linear polynomial */
+  mpz_neg (g[0], m);
+
+  return k;
+}

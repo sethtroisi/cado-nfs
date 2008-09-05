@@ -505,85 +505,6 @@ generate_sieving_parameters (cado_poly out)
   out->alambda = default_alambda (out->n);
 }
 
-/* Returns k such that f(x+k) has the smallest 1-norm, with the corresponding
-   skewness.
-   The coefficients f[] are modified to those of f(x+k).
-
-   The linear polynomial b*x-m is changed into b*(x+k)-m, thus m is
-   changed into m-k*b.
-*/
-long
-translate (mpz_t *f, int d, mpz_t *g, mpz_t m, mpz_t b)
-{
-  double logmu0, logmu;
-  int i, j, dir;
-  long k;
-
-  logmu0 = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
-
-  /* first compute f(x+1) */
-  /* define f_i(x) = f[i] + f[i+1]*x + ... + f[d]*x^(d-i)
-     then f_i(x+1) = f[i] + (x+1)*f_{i+1}(x+1) */
-  for (i = d - 1; i >= 0; i--)
-    {
-      /* invariant: f[i+1], ..., f[d] are the coefficients of f_{i+1}(x+1),
-         thus we have to do: f[i] <- f[i] + f[i+1], f[i+1] <- f[i+1] + f[i+2],
-         ..., f[d-1] <- f[d-1] + f[d] */
-      for (j = i; j < d; j++)
-        mpz_add (f[j], f[j], f[j+1]);
-    }
-  mpz_sub (m, m, b);
-  k = 1;
-
-  /* invariant: the coefficients are those of f(x+k) */
-  logmu = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
-
-  if (logmu < logmu0)
-    dir = 1;
-  else
-    dir = -1;
-  logmu0 = logmu;
-
-  while (1)
-    {
-      /* translate from f(x+k) to f(x+k+dir) */
-      for (i = d - 1; i >= 0; i--)
-        for (j = i; j < d; j++)
-          if (dir == 1)
-            mpz_add (f[j], f[j], f[j+1]);
-          else
-            mpz_sub (f[j], f[j], f[j+1]);
-      if (dir == 1)
-        mpz_sub (m, m, b);
-      else
-        mpz_add (m, m, b);
-      k = k + dir;
-      logmu = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
-      if (logmu < logmu0)
-        logmu0 = logmu;
-      else
-        break;
-    }
-
-  /* go back one step */
-  for (i = d - 1; i >= 0; i--)
-    for (j = i; j < d; j++)
-      if (dir == 1)
-        mpz_sub (f[j], f[j], f[j+1]);
-      else
-        mpz_add (f[j], f[j], f[j+1]);
-  if (dir == 1)
-    mpz_add (m, m, b);
-  else
-    mpz_sub (m, m, b);
-  k = k - dir;
-
-  /* change linear polynomial */
-  mpz_neg (g[0], m);
-
-  return k;
-}
-
 /* Method described in reference [2], slide 8
    (Bernstein considered degree d=5, here we generalize to arbitrary d):
    Take m \approx B n^{1/(d+1)}
@@ -730,7 +651,7 @@ generate_poly (cado_poly out, double T, mpz_t b)
   /* rotate */
   rotate (out->f, d, ALPHA_BOUND, out->m, b, &jmin, &kmin, 1);
   /* translate */
-  translate (out->f, d, out->g, out->m, b);
+  translate (out->f, d, out->g, out->m, b, 1);
   /* recompute skewness, since it might differ from the original
      polynomial with no rotation or translation */
   out->skew = SKEWNESS (out->f, out->degree, 20);
