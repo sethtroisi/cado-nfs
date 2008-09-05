@@ -67,7 +67,8 @@ checkrange=50000        # We check if we have enough after each step
 ###########################################################################
 
 prune=1.0               # les brunes comptent pas pour des...
-keep=160                # keep euh le plus
+keeppurge=400000        # excess wanted after purge
+keep=160                # excess wanted after merge
 maxlevel=15             # ???
 cwmax=200               # ???
 rwmax=200               # ???
@@ -75,8 +76,7 @@ ratio=1.5               # ???
 bwstrat=1
 #  maxpr=???
 #  maxpa=???
-#  nrels_dup=???
-#  keep_purge=???
+#  nrels_dup=???ke
 
 ###########################################################################
 # Linear algebra
