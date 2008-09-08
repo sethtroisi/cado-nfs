@@ -937,23 +937,24 @@ sub count_rels {
     opendir(DIR, $wdir) or return 0;
     my @files = readdir(DIR);
     close DIR;
+    my @relfiles=();
     foreach my $f (@files) {
         if ($f =~ /$name\.rels\.(\d+)-(\d+)/) {
             $nrels+= `grep -v "^#" $wdir/$f | wc -l`;
+            push @relfiles, "$wdir/$f";
         }
     }
-    return $nrels;
+    return $nrels, @relfiles;
 }
  
 
 sub parallel_sieve {
     my $param = shift @_;
     my $finished = 0;
-    my $nrels = count_rels($param);
+    my ($nrels,@files) = count_rels($param);
     print "We have found $nrels relations in working dir\n";
     print "Let's start the main loop!\n";
     my $prev_check = 0;
-    my @files=();
     while (! $finished) {
         print "Check what's going on on different machines...\n";
         my ($new_rels,@newfiles) = parallel_sieve_update($param);
