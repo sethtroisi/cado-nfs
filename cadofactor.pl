@@ -289,6 +289,7 @@ sub check_running_select_task {
     my %host_data=%{$mach_desc->{$host}};
     my $wdir = $host_data{'tmpdir'};
     my $cadodir = $host_data{'cadodir'};
+
     # First check if the last line corresponds to finished job:
     my ($t, $lastline) = my_system_timeout(
         "ssh $host tail -1 $wdir/$name.poly.$b", 30);
@@ -548,11 +549,18 @@ sub polyselect {
 sub try_singleton {
     my $param = shift @_;
     my $nrels = shift @_;
+
     my $prefix = $param->{'wdir'} . "/" . $param->{'name'};
+
+    my @files = @_;
+    my $filestring = "$prefix.rels*";
+    if (scalar @files) {
+        $filestring = join(' ', @files);
+    }
 
     banner("Removing duplicates");
     my $cmd = $param->{'cadodir'} .
-      "/linalg/duplicates -nrels $nrels $prefix.rels.* > $prefix.nodup 2> $prefix.duplicates.stderr";
+      "/linalg/duplicates -nrels $nrels $filestring > $prefix.nodup 2> $prefix.duplicates.stderr";
     my_system $cmd;
     my @grouik = split(/ /, `tail -1 $prefix.duplicates.stderr`);
     my $nrels_dup = $grouik[(scalar @grouik)-1];
@@ -686,29 +694,35 @@ sub import_task_result {
     my %host_data=%{$mach_desc->{$host}};
     my $rwdir = $host_data{'tmpdir'};
     my $lwdir = $param->{'wdir'};
-    my $cmd = "rsync --timeout=30 $host:$rwdir/$name.rels.$q0-$q1 $lwdir/";
+    my $fname="$name.rels.$q0-$q1";
+    my $lfname="$lwdir/$fname";
+    my $rfname="$rwdir/$fname";
+    my $cmd = "rsync --timeout=30 $host:$rfname $lwdir/";
     my $ret = system($cmd);
+
     if ($ret != 0) {
-        print STDERR "Problem when importing file $name.rels.$q0-$q1 from $host.\n";
+        print STDERR "Problem when importing file $fname from $host.\n";
         return 0;
     }
-    $cmd = $param->{'cadodir'} . "/utils/check_rels -poly $lwdir/$name.poly $lwdir/$name.rels.$q0-$q1";
+    $cmd = $param->{'cadodir'} . "/utils/check_rels -poly $lwdir/$name.poly $lfname";
     $ret = system($cmd);
     if ($ret != 0) {
-        print STDERR "Buggy relation in file $name.rels.$q0-$q1 from $host.\n";
-        print STDERR "Moving it to FIXME.$name.rels.$q0-$q1 .\n";
+        print STDERR "Buggy relation in file $fname from $host.\n";
+        print STDERR "Moving it to FIXME.$fname .\n";
         print STDERR "If you fix it, should remove the prefix and it will "
           . "be taken into account in the computation";
-        rename "$lwdir/$name.rels.$q0-$q1", "$lwdir/FIXME.$name.rels.$q0-$q1"
+        rename "$lfname", "$lwdir/FIXME.$fname"
             or die "Failed rename: $!\n";
         return 0;
     }
     # Import succeeded, so we can remove the remote file.
     unless ($param->{'keeprelfiles'}) {
-        my_system_timeout("ssh $host /bin/rm $rwdir/$name.rels.$q0-$q1", 30);
+        my_system_timeout("ssh $host /bin/rm $rfname", 30);
     }
 
-    return `grep -v "^#" $lwdir/$name.rels.$q0-$q1 | wc -l`;
+    my $n = `grep -v "^#" $lfname | wc -l`;
+    chomp($n);
+    return ($n, $lfname);
 }
 
 sub read_machine_description {
@@ -744,6 +758,12 @@ sub read_machine_description {
             if (! $h{'tmpdir'}) { die "No tmpdir given for machine $m\n"; }
             if (! $h{'cadodir'}) { die "No cadodir given for machine $m\n"; }
             if (! $h{'cores'}) { $h{'cores'}=1; }
+
+            # Substitute $name if %s is found.
+            if ($h{'tmpdir'} =~ /%s/) {
+                $h{'tmpdir'}=sprintf($h{'tmpdir'}, $param->{'name'});
+            }
+
             $mach_desc{$m}=\%h;
             next;
         }
@@ -751,6 +771,7 @@ sub read_machine_description {
         die "Could not parse: $_ in file $machine_file\n";
     }
     close MACH;
+
     return %mach_desc;
 }
 
@@ -871,6 +892,7 @@ sub parallel_sieve_update {
 
     my $t;
     my @newstatus;
+    my @files=();
     # Loop over all tasks that are listed in status file and
     # check whether they are finished.
     print "  Check all running tasks:\n";
@@ -880,7 +902,9 @@ sub parallel_sieve_update {
             push @newstatus, $t;
         } else {
             # Task is finished. 
-            $new_rels += import_task_result($param, \%mach_desc, @$t);
+            my ($trels,@tfiles) = import_task_result($param, \%mach_desc, @$t);
+            $new_rels += $trels;
+            push @files, @tfiles;
         }
     }
     # If some tasks have finished, restart them according to mach_desc
@@ -889,7 +913,7 @@ sub parallel_sieve_update {
     restart_tasks($param, \@newstatus, \%mach_desc);
     print "  Writing new status file.\n";
     write_status_file($param, \@newstatus);
-    return $new_rels;
+    return $new_rels, @files;
 }
 
 sub count_rels {
@@ -916,15 +940,17 @@ sub parallel_sieve {
     print "We have found $nrels relations in working dir\n";
     print "Let's start the main loop!\n";
     my $prev_check = 0;
+    my @files=();
     while (! $finished) {
         print "Check what's going on on different machines...\n";
-        my $new_rels = parallel_sieve_update($param);
+        my ($new_rels,@newfiles) = parallel_sieve_update($param);
         if ($new_rels) {
             $nrels += $new_rels;
+            push @files, @newfiles;
             print "We have now $nrels relations\n";
             if ($nrels-$prev_check > $param->{'checkrange'}) {
                 print "Trying singleton removal...\n";
-                $finished = try_singleton($param, $nrels);
+                $finished = try_singleton($param, $nrels, @files);
                 $prev_check = $nrels;
             }
         }
@@ -957,6 +983,19 @@ sub sieve {
 
     # Look for finished files.
     my @done=();
+
+    {
+        my $filename = "$prefix.rels";
+        if (-f $filename) {
+            print "Found file $filename...";
+            my $lines = `grep -v "^#" $filename | wc -l`;
+            chomp $lines;
+            print "$lines rels\n";
+            push @done, $filename;
+            $nrels += $lines;
+        }
+    }
+
     while (1) {
         my $qend = $qcurr+$param->{'qrange'};
         my $filename = "$prefix.rels.$qcurr-$qend";
@@ -972,7 +1011,7 @@ sub sieve {
 
     while (1) {
         if ($nrels >= $wantedrels) {
-            last if try_singleton($param, $nrels);
+            last if try_singleton($param, $nrels, @done);
         }
         # Sieve another range.
         my $qend = $qcurr+$param->{'qrange'};
@@ -993,6 +1032,7 @@ sub sieve {
         my $lines = `grep -v "^#" $filename | wc -l`;
         chomp $lines;
         print "$lines\n";
+        push @done, $filename;
         $nrels += $lines;
         print "We have now $nrels relations; need $wantedrels\n";
         $qcurr=$qend;
