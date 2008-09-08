@@ -1,7 +1,7 @@
 # Machine description file.
 #
 # This file is split into several sections [cluster_name].
-# The sections are indepedent.
+# The sections are independent.
 #
 # Each section is read in order.
 # Leading white space is not significant.

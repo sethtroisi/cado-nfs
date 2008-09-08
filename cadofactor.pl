@@ -17,6 +17,18 @@
 # reproduce part of the computation.
 
 
+# TODO-list:
+#  - When we discover that we have enough relations, kill jobs everywhere
+#    and import partial files (having more rels can not hurt)
+#  - Do not restart sieving tasks if we happen to have enough relations
+#  - Create some "scan-holes" mechanism to fill in the blanks.
+#  - Use Kleinjung program instead of polyselect
+#  - Bench polynomials with some sieve before selecting the best one.
+#  - Enable a 'lowmem' option
+#  - How to remove a computer from mach_desc? (should work, but test and
+#    document).
+
+
 use strict;
 use warnings;
 
