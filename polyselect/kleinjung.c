@@ -826,7 +826,6 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
               mpz_mul (u, dad, x[0][j]);
               mpz_addmul (u, e, P);
               f[0][j] = mpz_get_d (u) * one_over_P2;
-              ASSERT_ALWAYS(-2.0 < f[0][j] && f[0][j] < 1.0);
             }
           /* now compute e[i][j] and deduce f[i][j] for i > 0 */
           for (i = 1; i < l; i++)
@@ -834,7 +833,6 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
               /* since e[i][0] = e_{i,1} = 0, f[i][0] = -d a[d] x[i][0]/p^2 */
               mpz_mul (u, dad, x[i][0]);
               f[i][0] = mpz_get_d (u) * one_over_P2;
-              ASSERT_ALWAYS(-2.0 < f[i][0] && f[i][0] < 1.0);
               mpz_set (t, M0);         /* m_{(1,...,1)} */
               for (j = 1; j < d; j++)
                 {
@@ -857,7 +855,6 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
                   mpz_mul (u, dad, x[i][j]);
                   mpz_addmul (u, e, P);
                   f[i][j] = mpz_get_d (u) * one_over_P2;
-                  ASSERT_ALWAYS(-2.0 < f[i][j] && f[i][j] < 1.0);
                 }
             }
 
@@ -917,7 +914,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
 /* N is the number to factor
    d is the wanted degree
    M is the sup-norm bound
-   l is the number of primes = 1 mod d in p
+   l is the minimum number of primes = 1 mod d in p
    pb is the prime bound for those primes
    incr is the increment for a[d]
    Returns the number of polynomials checked.
@@ -1176,7 +1173,8 @@ main (int argc, char *argv[])
       if (E < best_E)
         {
           best_E = E;
-          gmp_fprintf (stderr, "# p=%Zd m=%Zd E~%1.2f\n", Mt[i].b, Mt[i].m, E);
+          gmp_fprintf (stderr, "# ad=%Zd p=%Zd m=%Zd E~%1.2f\n",
+                       poly->f[degree], Mt[i].b, Mt[i].m, E);
           best_i = i;
         }
       m_logmu_insert (Mt, Malloc2, &Msize2, Mt[i].b, Mt[i].m, E, "E~", verbose);
@@ -1199,7 +1197,8 @@ main (int argc, char *argv[])
       if (E < best_E)
         {
           best_E = E;
-          gmp_fprintf (stderr, "# p=%Zd m=%Zd E=%1.2f\n", Mt[i].b, Mt[i].m, E);
+          gmp_fprintf (stderr, "# ad=%Zd p=%Zd m=%Zd E=%1.2f\n",
+                       poly->f[degree], Mt[i].b, Mt[i].m, E);
           best_i = i;
           bestj = jmin;
           bestk = kmin;

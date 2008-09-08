@@ -989,7 +989,7 @@ rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1,
   E0 = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
   /* look for negative k */
   best_E = E0;
-#define MAX_k 15
+#define MAX_k 16
   for (i = 1, k = -2; i < MAX_k; i++, k *= 2)
     {
       k0 = rotate_aux (f, b, m, k0, k);
@@ -1271,7 +1271,7 @@ print_poly (FILE *fp, cado_poly p, int argc, char *argv[], double st, int raw)
       mpz_mod (p->m, p->m, p->n);
     }
   else
-    mpz_set (p->m, p->g[0]);
+    mpz_neg (p->m, p->g[0]);
   mpz_out_str (fp, 10, p->m);
   fprintf (fp, "\n");
   fprintf (fp, "type: %s\n", p->type);
