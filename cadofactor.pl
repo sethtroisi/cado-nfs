@@ -585,6 +585,7 @@ sub try_singleton {
       "/linalg/purge -poly $prefix.poly -keep $keep -nrels $nrels_dup -purged $prefix.purged $prefix.nodup  2> $prefix.purge.stderr";
     my_system $cmd, "no_kill";
     if (-z "$prefix.purged" || ! -f "$prefix.purged") {
+        printf `grep "expected" $prefix.purge.stderr`;
         printf "Not enough relations!\n";
         return 0;
     } else {
