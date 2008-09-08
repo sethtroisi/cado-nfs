@@ -1,0 +1,34 @@
+#!/bin/sh
+
+# Run cadofactor.pl with 2 jobs on the current machine, to factor c59.
+# Print OK or FAILED...
+# and have a return status accordingly.
+
+t=`mktemp -d`
+echo "Testing factorization of c59 in $t"
+
+cp params.c59 $t/param
+host=`hostname --short`
+cadodir=`pwd`
+
+cat > $t/mach_desc <<EOF
+[local]
+tmpdir=$t/tmp
+cadodir=$cadodir
+$host cores=2
+EOF
+
+./cadofactor.pl $t/param machines=$t/mach_desc wdir=$t delay=20 sievenice=0 selectnice=0 2>&1 | tee $t/out
+
+output=`tail -1 $t/out`
+output2="200429218120815554269743635437 357440504101388365610785389017"
+output3="357440504101388365610785389017 200429218120815554269743635437"
+if [ $ouput == $output2 || $ouput == $output3 ]; then
+    echo "OK";
+    rm -r $t;
+    exit 0;
+else
+    echo "FAILED!!!";
+    exit 1;
+fi
+

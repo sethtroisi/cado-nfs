@@ -56,6 +56,7 @@ my @parameter_defaults = (
     bmin=>1,
     bmax=>20,
     e=>1e8,
+    selectnice=>10,
 
     # sieve
     rlim=>8000000,
@@ -75,7 +76,6 @@ my @parameter_defaults = (
     delay=>120,
     sievenice=>19,
     keeprelfiles=>0,
-    selectnice=>10,
 
     # filtering
     prune=>1.0,
