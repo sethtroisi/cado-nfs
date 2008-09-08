@@ -224,6 +224,27 @@ modredc15ul_intbits (const modintredc15ul_t a)
   return bits;
 }
 
+
+MAYBE_UNUSED
+static inline void
+modredc15ul_intshr (modintredc15ul_t r, const modintredc15ul_t s, const int i)
+{
+  r[0] = s[0];
+  ularith_shrd (&(r[0]), s[1], i);
+  r[1] = s[1] >> i;
+}
+
+
+MAYBE_UNUSED
+static inline void
+modredc15ul_intshl (modintredc15ul_t r, const modintredc15ul_t s, const int i)
+{
+  r[1] = s[1];
+  ularith_shld (&(r[1]), s[0], i);
+  r[0] = s[0] << i;
+}
+
+
 /* r = n/d. We require d|n */
 MAYBE_UNUSED
 static inline void

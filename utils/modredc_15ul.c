@@ -516,8 +516,7 @@ modredc15ul_sprp (const residueredc15ul_t b, const modulusredc15ul_t m)
   while (mm1[0] % 2UL == 0UL) /* TODO: use ctzl */
     {
       po2++;
-      ularith_shrd (&(mm1[0]), mm1[1], 1);
-      mm1[1] >>= 1;
+      modredc15ul_intshr (mm1, mm1, 1);
     }
 
   modredc15ul_init_noset0 (r1, m);
@@ -559,8 +558,15 @@ int
 modredc15ul_inv (residueredc15ul_t r, const residueredc15ul_t A, 
 		 const modulusredc15ul_t m) 
 {
-  unsigned long a[2], b[2], u[2], v[2];
+  modintredc15ul_t a, b, u, v;
   int t, lsh;
+#ifdef WANT_ASSERT_EXPENSIVE
+  residueredc15ul_t tmp;
+  modintredc15ul_t tmpi;
+  
+  modredc15ul_init_noset0 (tmp, m);
+  modredc15ul_set (tmp, A, m);
+#endif
 
   ASSERT_EXPENSIVE (modredc15ul_lt_2ul (A, m[0].m));
   ASSERT_EXPENSIVE (m[0].m[0] & 1UL);
@@ -571,31 +577,26 @@ modredc15ul_inv (residueredc15ul_t r, const residueredc15ul_t A,
   b[0] = m[0].m[0];
   b[1] = m[0].m[1];
 
-  /* Let A = x*2^w, so we want the Montgomery representation of 1/x, 
-     which is 2^w/x. We start by getting a = x */ 
+  /* Let A = x*2^{2w}, so we want the Montgomery representation of 1/x, 
+     which is 2^{2w}/x. We start by getting a = x */ 
   modredc15ul_get_uls (a, A, m);
 
-  /* We simply set a = x/2^w and t=0. The result before 
-     correction will be 2^(w+t)/x so we have to divide by t, which
-     may be >64, so we may have to do a full and a variable width REDC. */
-  /* Since t >= log_2(a+b) - 1, we can skip one REDC here if b[1] > 1 */
-  if (b[1] > 1UL)
-    t = -LONG_BIT;
-  else
-    {
-      modredc15ul_frommontgomery (a, a, m);
-      /* Now a = x/2^w */
-      t = 0;
-    }
+  /* We simply set a = x/2^{2w} and t=0. The result before correction 
+     will be 2^(2w+t)/x so we have to divide by t, which may be >64, 
+     so we may have to do one or more full and a variable width REDC. */
+  /* TODO: If b[1] > 1, we could skip one of the two REDC */
+  modredc15ul_frommontgomery (a, a, m);
+  /* Now a = x/2^w */
+  t = 0;
 
-  u[0] = 1UL; u[1] = 0UL; v[0] = 0UL; v[1] = 0UL;
+  modredc15ul_intset_ul (u, 1UL);
+  modredc15ul_intset_ul (v, 0UL);
 
   /* make a odd */
 #if LOOKUP_TRAILING_ZEROS
   do {
     lsh = trailing_zeros [(unsigned char) a[0]];
-    ularith_shrd (&(a[0]), a[1], lsh);
-    a[1] >>= lsh;
+    modredc15ul_intshr (a, a, lsh);
     t += lsh;
   } while (lsh == 8);
 #else
@@ -606,15 +607,16 @@ modredc15ul_inv (residueredc15ul_t r, const residueredc15ul_t A,
       a[1] = 0UL;
       t += LONG_BIT;
     }
+  ASSERT_EXPENSIVE (a[0] != 0UL);
   lsh = ctzl(a[0]);
-  ularith_shrd (&(a[0]), a[1], lsh);
-  a[1] >>= lsh;
+  modredc15ul_intshr (a, a, lsh);
   t += lsh;
 #endif
 
   // Here a and b are odd, and a < b
   do {
     /* Here, a and b are odd, 0 < a < b, u is odd and v is even */
+    ASSERT_EXPENSIVE (modredc15ul_lt_2ul (a, b));
     ASSERT_EXPENSIVE ((a[0] & 1UL) == 1UL);
     ASSERT_EXPENSIVE ((b[0] & 1UL) == 1UL);
     ASSERT_EXPENSIVE ((u[0] & 1UL) == 1UL);
@@ -623,25 +625,25 @@ modredc15ul_inv (residueredc15ul_t r, const residueredc15ul_t A,
     do {
       ularith_sub_2ul_2ul (&(b[0]), &(b[1]), a[0], a[1]);
       ularith_add_2ul_2ul (&(v[0]), &(v[1]), u[0], u[1]);
-      if (b[0] == 0UL)
-	{
-	  b[0] = b[1];
-	  b[1] = 0UL;
-	  u[1] = u[0]; /* Shift left u by LONG_BIT */
-	  u[0] = 0UL;
-	  t += LONG_BIT; /* b[0] can be odd now, so lsh might be 0 below! */
-	}
 #if LOOKUP_TRAILING_ZEROS
       do {
 	lsh = trailing_zeros [(unsigned char) b[0]];
 #else
-	lsh = ctzl(b[0]);
+      if (b[0] == 0UL)
+	{
+	  b[0] = b[1]; /* b[0] can be odd now, so lsh might be 0 below! */
+	  b[1] = 0UL;
+	  ASSERT_EXPENSIVE (u[1] == 0UL);
+	  u[1] = u[0]; /* Shift left u by LONG_BIT */
+	  u[0] = 0UL;
+	  t += LONG_BIT;
+	}
+      lsh = ctzl(b[0]);
 #endif
-	ularith_shrd (&(b[0]), b[1], lsh);
-	b[1] >>= lsh;
-	t += lsh;
-	ularith_shld (&(u[1]), u[0], lsh);
-	u[0] <<= lsh;
+      ASSERT_EXPENSIVE ((b[0] & ((1UL << lsh) - 1UL)) == 0UL);
+      modredc15ul_intshr (b, b, lsh);
+      t += lsh;
+      modredc15ul_intshl (u, u, lsh);
 #if LOOKUP_TRAILING_ZEROS
       } while (lsh == 8);
 #endif
@@ -653,8 +655,9 @@ modredc15ul_inv (residueredc15ul_t r, const residueredc15ul_t A,
     ASSERT_EXPENSIVE ((u[0] & 1UL) == 0UL);
     ASSERT_EXPENSIVE ((v[0] & 1UL) == 1UL);
     
-    if (a[0] == b[0] && a[1] == b[1])
+    if (modredc15ul_intequal (a, b))
       break;
+    ASSERT_EXPENSIVE (modredc15ul_intcmp (a, b) > 0);
     
     /* Here, a and b are odd, 0 < b < a, u is even and v is odd */
     do {
@@ -675,11 +678,10 @@ modredc15ul_inv (residueredc15ul_t r, const residueredc15ul_t A,
 #else
 	lsh = ctzl(a[0]);
 #endif
-	ularith_shrd (&(a[0]), a[1], lsh);
-	a[1] >>= lsh;
+        ASSERT_EXPENSIVE ((a[0] & ((1UL << lsh) - 1UL)) == 0UL);
+	modredc15ul_intshr (a, a, lsh);
 	t += lsh;
-	ularith_shld (&(v[1]), v[0], lsh);
-	v[0] <<= lsh;
+	modredc15ul_intshl (v, v, lsh);
 #if LOOKUP_TRAILING_ZEROS
       } while (lsh == 8);
 #endif
@@ -738,6 +740,20 @@ modredc15ul_inv (residueredc15ul_t r, const residueredc15ul_t A,
       u[1] = s[1];
     }
 
+#ifdef WANT_ASSERT_EXPENSIVE
+  modredc15ul_mul (tmp, tmp, u, m);
+  modredc15ul_get_uls (tmpi, tmp, m);
+  if (modredc15ul_intcmp_ul (tmpi, 1UL) != 0)
+    {
+      fprintf (stderr, "Error, Mod(1/(%lu + 2^%d * %lu), %lu + 2^%d * %lu) == "
+               "%lu + 2^%d * %lu\n",
+               A[0], LONG_BIT, A[1], m[0].m[0], LONG_BIT, m[0].m[1],
+               tmpi[0], LONG_BIT, tmpi[1]);
+    }
+  ASSERT_EXPENSIVE (modredc15ul_intcmp_ul (tmpi, 1UL) == 0);
+  modredc15ul_clear (tmp, m);
+#endif
+
   r[0] = u[0];
   r[1] = u[1];
   return 1;
@@ -758,8 +774,7 @@ modredc15ul_jacobi (const residueredc15ul_t a_par,
   {
     while (a[0] % 2UL == 0UL) /* TODO speedup */
     {
-      ularith_shrd (&(a[0]), a[1], 1);
-      a[1] >>= 1;
+      modredc15ul_intshr (a, a, 1);
       if (m[0] % 8UL == 3UL || m[0] % 8UL == 5UL)
         t = -t;
     }
@@ -775,8 +790,7 @@ modredc15ul_jacobi (const residueredc15ul_t a_par,
 #if LOOKUP_TRAILING_ZEROS
       do {
 	sh = trailing_zeros [(unsigned char) a[0]];
-	ularith_shrd (&(a[0]), a[1], sh);
-	a[1] >>= sh;
+	modredc15ul_intshr (a, a, sh);
       } while (sh == 8);
 #else
       if (a[0] == 0UL) /* ctzl does not like zero input */
@@ -785,8 +799,7 @@ modredc15ul_jacobi (const residueredc15ul_t a_par,
 	  a[1] = 0UL;
 	}
       sh = ctzl(a[0]);
-      ularith_shrd (&(a[0]), a[1], lsh);
-      a[1] >>= sh;
+      ularith_shrd (a, lsh);
 #endif
     }
 
