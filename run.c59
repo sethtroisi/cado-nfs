@@ -1,8 +1,11 @@
-#!/bin/sh
+#!/bin/bash
 
 # Run cadofactor.pl with 2 jobs on the current machine, to factor c59.
 # Print OK or FAILED...
 # and have a return status accordingly.
+#
+# All partial data are put in a temp dir that is removed at the end in
+# case of success.
 
 t=`mktemp -d`
 echo "Testing factorization of c59 in $t"
@@ -23,7 +26,7 @@ EOF
 output=`tail -1 $t/out`
 output2="200429218120815554269743635437 357440504101388365610785389017"
 output3="357440504101388365610785389017 200429218120815554269743635437"
-if [ $ouput == $output2 || $ouput == $output3 ]; then
+if [ "$ouput" == "$output2" -o "$ouput == $output3" ]; then
     echo "OK";
     rm -r $t;
     exit 0;
