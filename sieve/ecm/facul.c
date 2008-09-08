@@ -84,12 +84,13 @@ facul_clear_strategy (facul_strategy_t *strategy)
   for (i = 0; methods[i].method != 0; i++)
     {
       if (methods[i].method == PM1_METHOD)
-	pm1_clear_plan (methods[i].plan);
+        pm1_clear_plan (methods[i].plan);
       else if (methods[i].method == PP1_METHOD)
 	pp1_clear_plan (methods[i].plan);
       else if (methods[i].method == EC_METHOD)
 	ecm_clear_plan (methods[i].plan);
       methods[i].method = 0;
+      free (methods[i].plan);
       methods[i].plan = NULL;
     }
   free (methods);

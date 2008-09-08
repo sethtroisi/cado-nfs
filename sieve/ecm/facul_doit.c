@@ -61,6 +61,11 @@ facul_doit (unsigned long *factors, const modulus_t m,
   
   for (i = method_start; strategy->methods[i].method != 0; i++)
     {
+#ifdef MODREDC15UL
+      if (i > 2)
+        break;
+#endif
+
       if (i < STATS_LEN)
 	  stats_called[i]++;
       
@@ -231,11 +236,12 @@ facul_doit (unsigned long *factors, const modulus_t m,
       else
 	{
 	  int f2;
-	  /* Factor the composite factor */
+	  /* Factor the composite factor. Use the same method again so that
+	     backtracking can separate the factors */
 	  if (f_arith == 0)
-	    f2 = facul_doit_ul (factors + found, fm_ul, strategy, i + 1);
+	    f2 = facul_doit_ul (factors + found, fm_ul, strategy, i);
 	  else
-	    f2 = facul_doit_15ul (factors + found, fm_15ul, strategy, i + 1);
+	    f2 = facul_doit_15ul (factors + found, fm_15ul, strategy, i);
 	  if (f2 == FACUL_NOT_SMOOTH)
 	    {
 	      found = FACUL_NOT_SMOOTH;
