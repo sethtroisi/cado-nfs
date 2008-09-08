@@ -2417,12 +2417,12 @@ main (int argc, char *argv[])
     fprintf (stderr, "# Average J=%1.0f for %lu special-q's\n",
              totJ / (double) sq, sq);
     tts = t0 - (tn_rat + tn_alg + ttf);
+    facul_print_stats (stderr);
     fprintf (stderr, "# Total time %1.1fs [norm %1.2f+%1.1f, sieving %1.1f"
             " (%1.1f + %1.1f),"
              " factor %1.1f]\n", t0, tn_rat, tn_alg, tts, ttsm, tts-ttsm, ttf);
     fprintf (stderr, "# Total %lu reports [%1.3fs/r]\n",
              tot_reports, t0 / (double) tot_reports);
-    facul_print_stats (stderr);
 
     facul_clear_strategy (si.strategy);
     si.strategy = NULL;
