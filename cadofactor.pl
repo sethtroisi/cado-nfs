@@ -7,6 +7,8 @@
 # Parameters passed in arguments *after* param=... will override choices
 # that are made in paramfile.
 
+# See params.c59 for an example of parameter file.
+
 # If the parameter n=<n> is given, then n is factored. Otherwise, it is
 # taken from stdin.
 
@@ -703,7 +705,7 @@ sub import_task_result {
     }
     # Import succeeded, so we can remove the remote file.
     unless ($param->{'keeprelfiles'}) {
-        my_system_timeout("ssh $host rm $rwdir/$name.rels.$q0-$q1", 30);
+        my_system_timeout("ssh $host /bin/rm $rwdir/$name.rels.$q0-$q1", 30);
     }
 
     return `grep -v "^#" $lwdir/$name.rels.$q0-$q1 | wc -l`;
