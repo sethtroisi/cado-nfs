@@ -108,7 +108,7 @@ int check_stream(const char *name, FILE * stream, __cado_poly_struct* cpoly)
         clear_relation(&rel);
         nrels++;
     }
-    fprintf(stderr, "Succesfully checked %s. Found %d relations\n", name, nrels);
+    fprintf(stderr, "%s : ok %d rels\n", name, nrels);
     return 0;
 }
 
