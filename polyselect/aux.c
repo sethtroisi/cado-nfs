@@ -1484,7 +1484,10 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose)
         }
 
       if (changed == 1)
-        k = 2 * k;
+	{
+	  if (LONG_MIN / 2 <= k && k <= LONG_MAX / 2)
+	    k = 2 * k;
+	}
       else if (k > 1)
         k = k / 2;
       else /* changed = 0 and k = 1 */
