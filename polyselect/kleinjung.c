@@ -223,27 +223,31 @@ void retrieve_sums(uint64_t * targets, struct mu_llist ** res, int ntargets,
 
 /* checks a possible candidate */
 static void
-possible_candidate (int * mu, int l, int d, mpz_t *a, mpz_t P, mpz_t N,
+possible_candidate (int *mu, int l, int d, mpz_t *a, mpz_t P, mpz_t N,
                     double M, mpz_t **x, mpz_t m0)
 {
-    mpz_t t;
+    mpz_t m, g[2];
     int i;
     double lognorm, logM = log (M);
 
-    mpz_init (t);
-    mpz_add (t, m0, x[0][mu[0]]);
+    mpz_init (m);
+    mpz_init (g[0]);
+    mpz_init (g[1]);
+    mpz_add (m, m0, x[0][mu[0]]);
     for (i = 1; i < l; i++)
-        mpz_add (t, t, x[i][mu[i]]);
+      mpz_add (m, m, x[i][mu[i]]);
 
-    Lemma21 (a, N, d, P, t);
-    // norm = sup_norm (a, d);
+    Lemma21 (a, N, d, P, m);
+    mpz_set (g[1], P);
+    mpz_neg (g[0], m);
+    optimize (a, d, g, verbose);
     lognorm = LOGNORM (a, d, SKEWNESS (a, d, SKEWNESS_DEFAULT_PREC));
 
     if (lognorm <= logM) {
         if (verbose)
           {
             gmp_printf ("ad=%Zd p=%Zd m=%Zd norm=%1.2e (log %1.2f)\n",
-                        a[d], P, t, exp (lognorm), lognorm);
+                        a[d], P, m, exp (lognorm), lognorm);
             /* terse output does not need the polynomial */
             if (verbose > 1)
               {
@@ -252,9 +256,11 @@ possible_candidate (int * mu, int l, int d, mpz_t *a, mpz_t P, mpz_t N,
               }
             fflush (stdout);
         }
-        m_logmu_insert (Mt, Malloc, &Msize, P, t, lognorm, "lognorm=", verbose);
+        m_logmu_insert (Mt, Malloc, &Msize, P, m, lognorm, "lognorm=", verbose);
     }
-    mpz_clear (t);
+    mpz_clear (m);
+    mpz_clear (g[0]);
+    mpz_clear (g[1]);
 }
 
 struct expanding_list_s {
@@ -596,7 +602,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
   mpz_t **x, t, u, dad, e, e00, m0, invN, M0, x0;
   mpz_t P, P_over_pi, P_over_p0, P_over_2;
   mpz_t **x1; /* values of the x[][] for p0=1 */
-  unsigned int pi, r0;
+  unsigned int pi, r0 = 0;
   unsigned long *roots;
   double eps, f0, **f, one_over_P2, checked = 0.0, Pd;
 
@@ -945,7 +951,6 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
             P[lP - 1] = r;
           }
       }
-  //  fprintf (stderr, "P has %u primes\n", lP);
 
   a = alloc_mpz_array (d + 1);
   g = alloc_mpz_array (d + 1);
@@ -1057,7 +1062,7 @@ main (int argc, char *argv[])
   int raw = 1;
   long jmin, kmin, bestj = 0, bestk = 0;
   param_list pl;
-  mpz_t n, tmp;
+  mpz_t n, newm;
 
   /* print command line */
   fprintf (stderr, "# %s.r%s", argv[0], REV);
@@ -1068,7 +1073,7 @@ main (int argc, char *argv[])
   param_list_init (pl);
   mpz_init_set_ui (n, 0);
   mpz_init_set_ui (incr, 60);
-  mpz_init (tmp);
+  mpz_init (newm);
 
   argv++, argc--;
   for( ; argc ; ) {
@@ -1164,11 +1169,15 @@ main (int argc, char *argv[])
         }
       mpz_set_ui (poly->f[degree], 0);
       Lemma21 (poly->f, n, degree, Mt[i].b, Mt[i].m);
-      /* we do not use translation here, since it has little effect on the
-         norm, and moreover it does not permute with the base-m generation,
-         thus we would need to save Mt[i].m, and redo all steps in the same
-         order below */
-      E = rotate (poly->f, degree, ALPHA_BOUND_SMALL, Mt[i].m, Mt[i].b, &jmin,
+      /* optimize norm before root properties */
+      mpz_set (poly->g[1], Mt[i].b);
+      mpz_neg (poly->g[0], Mt[i].m);
+      optimize (poly->f, degree, poly->g, verbose);
+      ASSERT_ALWAYS (mpz_cmp (poly->g[1], Mt[i].b) == 0);
+      /* Warning: we cannot use Mt[i].m since g[0] might have been changed
+         by optimize */
+      mpz_neg (newm, poly->g[0]);
+      E = rotate (poly->f, degree, ALPHA_BOUND_SMALL, newm, Mt[i].b, &jmin,
                   &kmin, 0);
       if (E < best_E)
         {
@@ -1195,8 +1204,8 @@ main (int argc, char *argv[])
       ASSERT_ALWAYS (mpz_cmp (poly->g[1], Mt[i].b) == 0);
       /* Warning: we cannot use Mt[i].m since g[0] might have been changed
          by optimize */
-      mpz_neg (tmp, poly->g[0]);
-      E = rotate (poly->f, degree, ALPHA_BOUND, tmp, Mt[i].b, &jmin,
+      mpz_neg (newm, poly->g[0]);
+      E = rotate (poly->f, degree, ALPHA_BOUND, newm, Mt[i].b, &jmin,
                   &kmin, 1);
       if (E < best_E)
         {
@@ -1234,8 +1243,8 @@ main (int argc, char *argv[])
   mpz_set (poly->n, n);
   poly->degree = degree;
   ASSERT_ALWAYS (mpz_cmp (Mt[i].b, poly->g[1]) == 0);
-  mpz_neg (tmp, Mt[i].m);
-  ASSERT_ALWAYS (mpz_cmp (tmp, poly->g[0]) == 0);
+  mpz_neg (newm, Mt[i].m);
+  ASSERT_ALWAYS (mpz_cmp (newm, poly->g[0]) == 0);
   poly->skew = SKEWNESS (poly->f, degree, 2 * SKEWNESS_DEFAULT_PREC);
   strncpy (poly->type, "gnfs", sizeof (poly->type));
   print_poly (stdout, poly, argc0, argv0, st0, raw);
@@ -1244,7 +1253,7 @@ main (int argc, char *argv[])
   cado_poly_clear (poly);
   mpz_clear (n);
   mpz_clear (incr);
-  mpz_clear (tmp);
+  mpz_clear (newm);
 
   return 0;
 }

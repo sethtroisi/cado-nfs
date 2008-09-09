@@ -1492,6 +1492,6 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose)
     }
 
   if (verbose > 0)
-    fprintf (stderr, "# Optimized lognorm from %.2f to %.2f\n", logmu00,
-             logmu0);
+    gmp_fprintf (stderr, "# ad=%Zd: optimized lognorm from %.2f to %.2f\n",
+		 f[d], logmu00, logmu0);
 }

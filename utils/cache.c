@@ -7,6 +7,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <inttypes.h>
 #include "utils.h"
 
 int
@@ -47,7 +48,7 @@ main ()
          to the minimum, we have exceeded the cache size */
       if (t < mintime + (mintime / 2))
         L1 = n;
-      fprintf (stderr, "size=%lu time=%lu (%1.2f)\n", n, t,
+      fprintf (stderr, "size=%lu time=%" PRIu64 "(%1.2f)\n", n, t,
                (double) t / (double) mintime);
       free (s0);
     }

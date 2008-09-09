@@ -357,7 +357,7 @@ modul_poly_out (FILE *fp, modul_poly_t f, modulusul_t p)
       int i;
       for (i = 0; i <= f->degree; i++)
 	if (!modul_is0(f->coeff[i],p))
-	  fprintf (fp, "+%llu*x^%d", (long long int) f->coeff[i], i);
+	  fprintf (fp, "+%lu*x^%d", (unsigned long) f->coeff[i], i);
       fprintf (fp, ";\n");
     }
 }
@@ -631,13 +631,13 @@ modul_poly_roots_ulong (unsigned long *r, mpz_t *f, int d, modulusul_t p)
 int
 modul_poly_roots_int64 (int64_t *r, mpz_t *f, int d, modulusul_t p)
 {
-    residueul_t * pr;
+    residueul_t *pr;
     int i, n;
 
     pr = malloc(d * sizeof(residueul_t));
     n = modul_poly_roots(pr,f,d,p);
     for(i = 0 ; i < n ; i++) {
-        r[i] = (int64_t) pr[i];
+      r[i] = modul_getmod_ul (pr[i]);
     }
     free(pr);
     return n;
