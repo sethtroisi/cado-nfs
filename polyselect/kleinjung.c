@@ -1056,6 +1056,8 @@ main (int argc, char *argv[])
   double E, best_E;
   int raw = 1;
   long jmin, kmin, bestj = 0, bestk = 0;
+  param_list pl;
+  mpz_t n, tmp;
 
   /* print command line */
   fprintf (stderr, "# %s.r%s", argv[0], REV);
@@ -1063,12 +1065,10 @@ main (int argc, char *argv[])
     fprintf (stderr, " %s", argv[i]);
   fprintf (stderr, "\n");
 
-  param_list pl;
-  mpz_t n;
-
-  param_list_init(pl);
-  mpz_init_set_ui(n,0);
+  param_list_init (pl);
+  mpz_init_set_ui (n, 0);
   mpz_init_set_ui (incr, 60);
+  mpz_init (tmp);
 
   argv++, argc--;
   for( ; argc ; ) {
@@ -1192,7 +1192,11 @@ main (int argc, char *argv[])
       mpz_set (poly->g[1], Mt[i].b);
       mpz_neg (poly->g[0], Mt[i].m);
       optimize (poly->f, degree, poly->g, verbose);
-      E = rotate (poly->f, degree, ALPHA_BOUND, Mt[i].m, Mt[i].b, &jmin,
+      ASSERT_ALWAYS (mpz_cmp (poly->g[1], Mt[i].b) == 0);
+      /* Warning: we cannot use Mt[i].m since g[0] might have been changed
+         by optimize */
+      mpz_neg (tmp, poly->g[0]);
+      E = rotate (poly->f, degree, ALPHA_BOUND, tmp, Mt[i].b, &jmin,
                   &kmin, 1);
       if (E < best_E)
         {
@@ -1221,14 +1225,17 @@ main (int argc, char *argv[])
   mpz_set (poly->g[1], Mt[i].b);
   mpz_neg (poly->g[0], Mt[i].m);
   optimize (poly->f, degree, poly->g, 0);
+  mpz_neg (Mt[i].m, poly->g[0]);
+  ASSERT_ALWAYS (mpz_cmp (Mt[i].b, poly->g[1]) == 0);
   rotate_aux (poly->f, Mt[i].b, Mt[i].m, 0, bestk);
   rotate_aux1 (poly->f, Mt[i].b, Mt[i].m, 0, bestj);
   translate (poly->f, degree, poly->g, Mt[i].m, Mt[i].b, verbose);
 
   mpz_set (poly->n, n);
   poly->degree = degree;
-  mpz_set (poly->g[1], Mt[i].b);
-  mpz_neg (poly->g[0], Mt[i].m);
+  ASSERT_ALWAYS (mpz_cmp (Mt[i].b, poly->g[1]) == 0);
+  mpz_neg (tmp, Mt[i].m);
+  ASSERT_ALWAYS (mpz_cmp (tmp, poly->g[0]) == 0);
   poly->skew = SKEWNESS (poly->f, degree, 2 * SKEWNESS_DEFAULT_PREC);
   strncpy (poly->type, "gnfs", sizeof (poly->type));
   print_poly (stdout, poly, argc0, argv0, st0, raw);
@@ -1237,6 +1244,7 @@ main (int argc, char *argv[])
   cado_poly_clear (poly);
   mpz_clear (n);
   mpz_clear (incr);
+  mpz_clear (tmp);
 
   return 0;
 }
