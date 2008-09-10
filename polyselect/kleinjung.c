@@ -16,8 +16,6 @@
 
 #define QUICK_SEARCH
 
-#define P0_MAX 1000
-
 /* if NEAREST is defined, round m0 and the x[i][j] to nearest, instead of
    towards +infinity as in the original Algorithm 3.6 */
 #define NEAREST
@@ -596,7 +594,8 @@ has_one_root (mpz_t ad, int d, mpz_t N, unsigned int p0)
 */
 static double
 enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
-           mpz_t *a, mpz_t N, int d, mpz_t *g, mpz_t mtilde, double M)
+           mpz_t *a, mpz_t N, int d, mpz_t *g, mpz_t mtilde, double M,
+           unsigned int p0max, unsigned int *R)
 {
   int *p, k, i, j;
   mpz_t **x, t, u, dad, e, e00, m0, invN, M0, x0;
@@ -659,21 +658,28 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
 
           /* p_0 idea */
           p0_max = (unsigned int) (max_adm1 / Pd);
-          if (p0_max > P0_MAX)
-            p0_max = P0_MAX;
+          if (p0_max > p0max)
+            p0_max = p0max;
 
           mpz_set (P_over_p0, P);
-          for (p0 = 1; p0 <= p0_max; p0++)
+          for (p0 = 1; p0 < p0_max; p0 += 2)
             {
-              if (p0 > 1 && p0 % d == 1) /* such primes are already taken */
-                continue;
-
-              if (p0 > 1 && (r0 = has_one_root (a[d], d, N, p0)) == 0)
+              if (R[p0] == UINT_MAX) /* not yet computed */
+                {
+                  if (isprime (p0) && p0 % d == 1) /* such primes are already
+                                                      taken for a larger l */
+                    R[p0] = 0;
+                  else
+                    R[p0] = has_one_root (a[d], d, N, p0);
+                }
+              
+              r0 = R[p0];
+              if (r0 == 0)
                 continue;
               
               mpz_mul_ui (P, P_over_p0, p0);
 
-              if (verbose >= 2)
+              if (verbose >= 3)
                 gmp_printf ("trying P=%Zd\n", P);
 
           /* compute 1/N mod P */
@@ -721,7 +727,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
                   mpz_mul (t, t, N);
                   mpz_mod_ui (t, t, pi);
                   mpz_ui_sub (g[0], pi, t);
-                  if (poly_roots_ulong(roots, g, d, pi) != d)
+                  if (poly_roots_ulong (roots, g, d, pi) != d)
                     {
                       fprintf (stderr, "Error, d roots expected\n");
                       exit (1);
@@ -784,7 +790,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
 
           mpz_mul_ui (dad, a[d], d);
           Pd = mpz_get_d (P);
-          one_over_P2 = -1.0 / (Pd * Pd);
+          one_over_P2 = -1.0 / (Pd * Pd); /* puts the minus sign here */
 
           /* compute the e[i][j] from (3.6) */
           /* first compute e[0][j] = a_{d-1, (j,...,1)} */
@@ -867,6 +873,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
             {
               /* add the corresponding term for p_0, with e_{i,j} = 0 */
               mpz_mul (u, dad, x0);
+              /* the minus sign is within one_over_P2 */
               f0 += mpz_get_d (u) * one_over_P2;
             }
 
@@ -933,11 +940,12 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
 */
 static double
 Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
-        mpz_t incr, unsigned int keep)
+        unsigned int p0max, mpz_t incr, unsigned int keep)
 {
   unsigned int *P = NULL, lP = 0;
   unsigned int *Q = NULL, lQ = 0;
-  unsigned int r, i;
+  unsigned int *R; /* unique root of a[d]*x^d = N (mod p0), or 0 */
+  unsigned int p0, r, i;
   mpz_t *a, *g, t, mtilde;
   double Nd, max_ad, max_adm1, max_adm2, checked = 0.0;
 
@@ -974,6 +982,7 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
   mpz_set (a[d], incr);
 
   Q = (unsigned int*) malloc (lP * sizeof (unsigned int));
+  R = (unsigned int*) malloc (p0max * sizeof (unsigned int));
   mpz_init (t);
   mpz_init (mtilde);
 
@@ -1010,11 +1019,17 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
         gmp_printf ("# try ad=%Zd max_adm1=%e max_adm2=%e\n",
                     a[d], max_adm1, max_adm2);
 
+      /* initialize R[], which depends on a[d] only */
+      R[1] = 1; /* keep p0=1 */
+      for (p0 = 3; p0 < p0max; p0 += 2)
+        R[p0] = UINT_MAX; /* means not yet computed */
+
       /* enumerate all subsets Pprime of at least l elements of Q such that
          prod(r, r in Pprime) <= max_adm1 */
       for (i = l; i <= lQ; i++)
         checked +=
-          enumerate (Q, lQ, i, max_adm1, max_adm2, a, N, d, g, mtilde, M);
+          enumerate (Q, lQ, i, max_adm1, max_adm2, a, N, d, g, mtilde, M,
+                     p0max, R);
 
     next_ad:
       mpz_add (a[d], a[d], incr);
@@ -1024,6 +1039,7 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
 
   free (P);
   free (Q);
+  free (R);
   clear_mpz_array (a, d + 1);
   clear_mpz_array (g, d + 1);
   mpz_clear (t);
@@ -1043,7 +1059,8 @@ usage ()
   fprintf (stderr, "       -incr i   - ad is incremented by i (default 60)\n");
   fprintf (stderr, "       -l l      - leading coefficient of g(x) has l prime factors (default 7)\n");
   fprintf (stderr, "       -M M      - keep polynomials with sup-norm <= M (default 1e25)\n");
-  fprintf (stderr, "       -pb p   - prime factors are bounded by p (default 256)\n");
+  fprintf (stderr, "       -pb p     - prime factors are bounded by p (default 256)\n");
+  fprintf (stderr, "       -p0max P  - extra prime factor is bounded by P (default 1000)\n");
   fprintf (stderr, "       in        - input file (n:...)\n");
   exit (1);
 }
@@ -1058,6 +1075,7 @@ main (int argc, char *argv[])
   double M = 1e25;
   int l = 7;
   int pb = 256;
+  int p0max = 1000;
   mpz_t incr; /* Implements remark (1) following Algorithm 3.6:
                  try a[d]=incr, then 2*incr, 3*incr, ... */
   unsigned int i, best_i = -1;
@@ -1132,6 +1150,7 @@ main (int argc, char *argv[])
   param_list_parse_mpz(pl, "incr", incr);
   param_list_parse_int(pl, "l", &l);
   param_list_parse_int(pl, "pb", &pb);
+  param_list_parse_int(pl, "p0max", &p0max);
   param_list_parse_double(pl, "M", &M);
   param_list_parse_int(pl, "degree", &degree);
 
@@ -1149,7 +1168,7 @@ main (int argc, char *argv[])
   Mt = m_logmu_init (Malloc);
   cado_poly_init (poly);
 
-  checked = Algo36 (n, degree, M, l, pb, incr, keep);
+  checked = Algo36 (n, degree, M, l, pb, p0max, incr, keep);
 
   fprintf (stderr, "# First phase took %.2fs, checked %1.0f and kept %lu polynomial(s)\n",
            seconds () - st, checked, Msize);
