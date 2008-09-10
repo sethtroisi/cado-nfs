@@ -240,7 +240,7 @@ possible_candidate (int *mu, int l, int d, mpz_t *a, mpz_t P, mpz_t N,
     Lemma21 (a, N, d, P, m);
     mpz_set (g[1], P);
     mpz_neg (g[0], m);
-    optimize (a, d, g, verbose);
+    optimize (a, d, g, verbose - 1);
     lognorm = LOGNORM (a, d, SKEWNESS (a, d, SKEWNESS_DEFAULT_PREC));
 
     if (lognorm <= logM) {
@@ -512,7 +512,7 @@ naive_search (double f0, double **f, int l, int d, double eps, mpz_t *a,
   // double norm;
   mpz_t t;
 
-    // ASSERT_ALWAYS(0 <= eps && eps < 1);
+  // ASSERT_ALWAYS(0 <= eps && eps < 1);
 
   if (verbose >= 3) printf("In naive_search()\n");
   mu = (int*) malloc (l * sizeof (int));
@@ -862,6 +862,12 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
                   mpz_addmul (u, e, P);
                   f[i][j] = mpz_get_d (u) * one_over_P2;
                 }
+            }
+          if (p0 > 1)
+            {
+              /* add the corresponding term for p_0, with e_{i,j} = 0 */
+              mpz_mul (u, dad, x0);
+              f0 += mpz_get_d (u) * one_over_P2;
             }
 
           /* now search for a small combination */
