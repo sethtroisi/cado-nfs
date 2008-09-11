@@ -27,7 +27,8 @@
 #  - Enable a 'lowmem' option
 #  - How to remove a computer from mach_desc? (should work, but test and
 #    document).
-
+#  - (easy) don't put -costmin option in replay when Bwcostmin is empty,
+#    i.e., when BWCOSTMIN is not found in merge.his (e.g., with bwstrat=0)
 
 use strict;
 use warnings;
