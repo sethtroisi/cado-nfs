@@ -273,7 +273,10 @@ MAYBE_UNUSED
 static inline void 
 modul_set1 (residueul_t r, const modulusul_t m MAYBE_UNUSED) 
 { 
-  r[0] = 1UL;
+  if (m[0] == 1UL)
+    r[0] = 0UL;
+  else
+    r[0] = 1UL;
 }
 
 

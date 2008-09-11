@@ -47,6 +47,7 @@ typedef unsigned long modintredcul_t[MODREDCUL_SIZE];
 typedef struct { 
   unsigned long m;
   unsigned long invm;
+  residueredcul_t one;
 } __modulusredcul_t;
 typedef __modulusredcul_t modulusredcul_t[1];
 
@@ -181,6 +182,22 @@ modredcul_intbits (const modintredcul_t a)
   return bits;
 }
 
+MAYBE_UNUSED
+static inline void
+modredcul_intshr (modintredcul_t r, const modintredcul_t s, const int i)
+{
+  r[0] = s[0] >> i;
+}
+
+
+MAYBE_UNUSED
+static inline void
+modredcul_intshl (modintredcul_t r, const modintredcul_t s, const int i)
+{
+  r[0] = s[0] << i;
+}
+
+
 /* r = n/d. We require d|n */
 MAYBE_UNUSED
 static inline void
@@ -199,6 +216,13 @@ modredcul_initmod_ul (modulusredcul_t m, const unsigned long s)
 {
   m[0].m = s;
   m[0].invm = -modredcul_invmodul (s);
+  if (m[0].m == 1UL)
+    m[0].one[0] = 0UL;
+  else
+    {
+      m[0].one[0] = 1UL;
+      modredcul_tomontgomery (m[0].one, m[0].one, m);
+    }
 }
 
 
@@ -208,6 +232,13 @@ modredcul_initmod_uls (modulusredcul_t m, const modintredcul_t s)
 {
   m[0].m = s[0];
   m[0].invm = -modredcul_invmodul (s[0]);
+  if (m[0].m == 1UL)
+    m[0].one[0] = 0UL;
+  else
+    {
+      m[0].one[0] = 1UL;
+      modredcul_tomontgomery (m[0].one, m[0].one, m);
+    }
 }
 
 
@@ -336,9 +367,8 @@ modredcul_set0 (residueredcul_t r, const modulusredcul_t m MAYBE_UNUSED)
 MAYBE_UNUSED 
 static inline void 
 modredcul_set1 (residueredcul_t r, const modulusredcul_t m) 
-{ 
-  r[0] = 1UL;
-  modredcul_tomontgomery (r, r, m);
+{
+  r[0] = m[0].one[0];
 }
 
 
@@ -403,7 +433,7 @@ static inline int
 modredcul_is1 (const residueredcul_t a, const modulusredcul_t m MAYBE_UNUSED)
 {
   ASSERT_EXPENSIVE (a[0] < m[0].m);
-  return (modredcul_get_ul (a, m) == 1UL);
+  return (a[0] == m[0].one[0]);
 }
 
 

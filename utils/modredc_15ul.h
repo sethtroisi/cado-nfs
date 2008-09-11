@@ -50,7 +50,8 @@
 typedef unsigned long residueredc15ul_t[MODREDC15UL_SIZE];
 typedef unsigned long modintredc15ul_t[MODREDC15UL_SIZE];
 typedef struct { 
-  unsigned long m[MODREDC15UL_SIZE];
+  modintredc15ul_t m;
+  residueredc15ul_t one;
   unsigned long invm;
 } __modulusredc15ul_t;
 typedef __modulusredc15ul_t modulusredc15ul_t[1];
@@ -302,9 +303,19 @@ MAYBE_UNUSED
 static inline void
 modredc15ul_initmod_ul (modulusredc15ul_t m, const unsigned long s)
 {
-  m[0].m[0] = s;
-  m[0].m[1] = 0UL;
+  modredc15ul_intset_ul (m[0].m, s);
   m[0].invm = -modredc15ul_invmodul (s);
+  if (modredc15ul_intequal_ul (m[0].m, 1UL))
+    {
+      m[0].one[0] = 0UL;
+      m[0].one[1] = 0UL;
+    }
+  else
+    {
+      m[0].one[0] = 1UL;
+      m[0].one[1] = 0UL;
+      modredc15ul_tomontgomery (m[0].one, m[0].one, m);
+    }
 }
 
 
@@ -315,9 +326,19 @@ MAYBE_UNUSED
 static inline void
 modredc15ul_initmod_uls (modulusredc15ul_t m, const modintredc15ul_t s)
 {
-  m[0].m[0] = s[0];
-  m[0].m[1] = s[1];
+  modredc15ul_intset (m[0].m, s);
   m[0].invm = -modredc15ul_invmodul (s[0]);
+  if (modredc15ul_intequal_ul (m[0].m, 1UL))
+    {
+      m[0].one[0] = 0UL;
+      m[0].one[1] = 0UL;
+    }
+  else
+    {
+      m[0].one[0] = 1UL;
+      m[0].one[1] = 0UL;
+      modredc15ul_tomontgomery (m[0].one, m[0].one, m);
+    }
 }
 
 
@@ -441,20 +462,15 @@ modredc15ul_set_uls (residueredc15ul_t r, const modintredc15ul_t s,
       else
 	{
 	  /* FIXME, slow and stupid */
-	  unsigned long t[2];
-	  t[0] = m[0].m[0];
-	  t[1] = m[0].m[1];
+	  modintredc15ul_t t;
+	  modredc15ul_intset (t, m[0].m);
 	  while (t[1] < r[1] / 2)
-	    {
-	      ularith_shld (&(t[1]), t[0], 1);
-	      t[0] <<= 1;
-	    }
+	    modredc15ul_intshl (t, t, 1);
 	  while (! modredc15ul_lt_2ul (r, m[0].m))
 	    {
 	      if (! modredc15ul_lt_2ul (r, t))
 		ularith_sub_2ul_2ul (&(r[0]), &(r[1]), t[0], t[1]);
-	      ularith_shrd (&(t[0]), t[1], 1);
-	      t[1] >>= 1;
+	      modredc15ul_intshr (t, t, 1);
 	    }
 	}
     }
@@ -492,9 +508,8 @@ MAYBE_UNUSED
 static inline void 
 modredc15ul_set1 (residueredc15ul_t r, const modulusredc15ul_t m) 
 { 
-  r[0] = 1UL;
-  r[1] = 0UL;
-  modredc15ul_tomontgomery (r, r, m);
+  r[0] = m[0].one[0];
+  r[1] = m[0].one[1];
 }
 
 
@@ -569,10 +584,8 @@ MAYBE_UNUSED
 static inline int
 modredc15ul_is1 (const residueredc15ul_t a, const modulusredc15ul_t m MAYBE_UNUSED)
 {
-  unsigned long t[2];
   ASSERT_EXPENSIVE (modredc15ul_lt_2ul (a, m[0].m));
-  modredc15ul_frommontgomery (t, a, m);
-  return (t[1] == 0UL && t[0] == 1UL);
+  return (a[0] == m[0].one[0] && a[1] == m[0].one[1]);
 }
 
 

@@ -261,7 +261,7 @@ modredc15ul_pow_ul (residueredc15ul_t r, const residueredc15ul_t b,
 #endif
   if (e == 0UL)
     {
-      modredc15ul_set_ul (r, 1UL, m);
+      modredc15ul_set1 (r, m);
       return;
     }
 
@@ -308,7 +308,7 @@ modredc15ul_pow_mp (residueredc15ul_t r, const residueredc15ul_t b,
 
   if (e_nrwords == 0 || e[i] == 0UL)
     {
-      modredc15ul_set_ul (r, 1UL, m);
+      modredc15ul_set1 (r, m);
       return;
     }
 
@@ -442,7 +442,8 @@ modredc15ul_V_mp (residueredc15ul_t r, const residueredc15ul_t b,
   residueredc15ul_t r1, two;
 
   modredc15ul_init_noset0 (two, m);
-  modredc15ul_set_ul (two, 2UL, m);
+  modredc15ul_set1 (two, m);
+  modredc15ul_add (two, two, two, m);
 
   if (e_nrwords == 0 || e[i] == 0UL)
     {
@@ -499,7 +500,7 @@ modredc15ul_V_mp (residueredc15ul_t r, const residueredc15ul_t b,
 int
 modredc15ul_sprp (const residueredc15ul_t b, const modulusredc15ul_t m)
 {
-  residueredc15ul_t r1;
+  residueredc15ul_t r1, minusone;
   int i = 0, po2 = 0;
   unsigned long mm1[2];
 
@@ -520,6 +521,9 @@ modredc15ul_sprp (const residueredc15ul_t b, const modulusredc15ul_t m)
     }
 
   modredc15ul_init_noset0 (r1, m);
+  modredc15ul_init_noset0 (minusone, m);
+  modredc15ul_set1 (minusone, m);
+  modredc15ul_neg (minusone, minusone, m);
 
   /* Exponentiate */
   if (mm1[1] > 0UL)
@@ -527,11 +531,8 @@ modredc15ul_sprp (const residueredc15ul_t b, const modulusredc15ul_t m)
   else
     modredc15ul_pow_ul (r1, b, mm1[0], m);
 
-  modredc15ul_get_uls (mm1, r1, m);
-  
   /* If m is prime, then b^mm1 might be == 1 or == -1 (mod m) here */
-  if ((mm1[1] == 0UL && mm1[0] == 1UL) || 
-      (mm1[1] == m[0].m[1] && mm1[0] == m[0].m[0] - 1UL))
+  if (modredc15ul_is1 (r1, m) || modredc15ul_equal (r1, minusone, m))
     i = 1;
   else
     {
@@ -540,8 +541,7 @@ modredc15ul_sprp (const residueredc15ul_t b, const modulusredc15ul_t m)
       for ( ; po2 > 1; po2--)
 	{
 	  modredc15ul_mul (r1, r1, r1, m);
-	  modredc15ul_get_uls (mm1, r1, m);
-	  if (mm1[1] == m[0].m[1] && mm1[0] == m[0].m[0] - 1UL)
+	  if (modredc15ul_equal (r1, minusone, m))
 	    {
 	      i = 1;
 	      break;
@@ -550,6 +550,7 @@ modredc15ul_sprp (const residueredc15ul_t b, const modulusredc15ul_t m)
     }
 
   modredc15ul_clear (r1, m);
+  modredc15ul_clear (minusone, m);
   return i;
 }
 
@@ -562,7 +563,6 @@ modredc15ul_inv (residueredc15ul_t r, const residueredc15ul_t A,
   int t, lsh;
 #ifdef WANT_ASSERT_EXPENSIVE
   residueredc15ul_t tmp;
-  modintredc15ul_t tmpi;
   
   modredc15ul_init_noset0 (tmp, m);
   modredc15ul_set (tmp, A, m);
@@ -742,9 +742,10 @@ modredc15ul_inv (residueredc15ul_t r, const residueredc15ul_t A,
 
 #ifdef WANT_ASSERT_EXPENSIVE
   modredc15ul_mul (tmp, tmp, u, m);
-  modredc15ul_get_uls (tmpi, tmp, m);
-  if (modredc15ul_intcmp_ul (tmpi, 1UL) != 0)
+  if (!modredc15ul_is1 (tmp, m))
     {
+      modintredc15ul_t tmpi;
+      modredc15ul_get_uls (tmpi, tmp, m);
       fprintf (stderr, "Error, Mod(1/(%lu + 2^%d * %lu), %lu + 2^%d * %lu) == "
                "%lu + 2^%d * %lu\n",
                A[0], LONG_BIT, A[1], m[0].m[0], LONG_BIT, m[0].m[1],
@@ -764,13 +765,13 @@ int
 modredc15ul_jacobi (const residueredc15ul_t a_par, 
 		    const modulusredc15ul_t m_par)
 {
-  unsigned long a[2], m[2], s;
+  modintredc15ul_t a, m, s;
   int t = 1;
 
   modredc15ul_get_uls (a, a_par, m_par);
   modredc15ul_getmod_uls (m, m_par);
   
-  while (a[1] != 0UL || a[0] != 0UL)
+  while (!modredc15ul_intequal_ul (a, 0UL))
   {
     while (a[0] % 2UL == 0UL) /* TODO speedup */
     {
@@ -778,31 +779,34 @@ modredc15ul_jacobi (const residueredc15ul_t a_par,
       if (m[0] % 8UL == 3UL || m[0] % 8UL == 5UL)
         t = -t;
     }
-    s = a[0]; a[0] = m[0]; m[0] = s; /* swap */
-    s = a[1]; a[1] = m[1]; m[1] = s;
+    modredc15ul_intset (s, a);
+    modredc15ul_intset (a, m);
+    modredc15ul_intset (m, s);
     if (a[0] % 4UL == 3UL && m[0] % 4UL == 3UL)
       t = -t;
     
     /* m is odd here */
-    while (!modredc15ul_lt_2ul (a, m)) {
-      int sh;
-      ularith_sub_2ul_2ul (&(a[0]), &(a[1]), m[0], m[1]);
-#if LOOKUP_TRAILING_ZEROS
-      do {
-	sh = trailing_zeros [(unsigned char) a[0]];
-	modredc15ul_intshr (a, a, sh);
-      } while (sh == 8);
-#else
-      if (a[0] == 0UL) /* ctzl does not like zero input */
-	{
-	  a[0] = a[1];
-	  a[1] = 0UL;
-	}
-      sh = ctzl(a[0]);
-      ularith_shrd (a, lsh);
-#endif
-    }
-
+    if (modredc15ul_intcmp (a, m) >= 0)
+      {
+        if (a[1] == 0UL)
+          {
+            a[0] %= m[0];
+          }
+        else
+          {
+            /* FIXME, slow and stupid */
+            modintredc15ul_t t;
+            modredc15ul_intset (t, m);
+            while (t[1] < (a[1] + 1) / 2)
+              modredc15ul_intshl (t, t, 1);
+            while (modredc15ul_intcmp (a, m) >= 0)
+              {
+                if (modredc15ul_intcmp (a, t) >= 0)
+                  ularith_sub_2ul_2ul (&(a[0]), &(a[1]), t[0], t[1]);
+                modredc15ul_intshr (t, t, 1);
+              }
+          }
+      }
   }
   if (m[1] != 0UL || m[0] != 1UL)
     t = 0;

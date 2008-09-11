@@ -139,7 +139,7 @@ mod_pow_ul (residue_t r, const residue_t b, const unsigned long e,
 #endif
   if (e == 0UL)
     {
-      mod_set_ul (r, 1UL, m);
+      mod_set1 (r, m);
       return;
     }
 
@@ -185,7 +185,7 @@ mod_pow_mp (residue_t r, const residue_t b, const unsigned long *e,
 
   if (e_nrwords == 0 || e[i] == 0UL)
     {
-      mod_set_ul (r, 1UL, m);
+      mod_set1 (r, m);
       return;
     }
 
@@ -317,7 +317,8 @@ mod_V_mp (residue_t r, const residue_t b, const unsigned long *e,
   residue_t r1, two;
 
   mod_init_noset0 (two, m);
-  mod_set_ul (two, 2UL, m);
+  mod_set1 (two, m);
+  mod_add (two, two, two, m);
 
   if (e_nrwords == 0 || e[i] == 0UL)
     {
@@ -374,9 +375,9 @@ mod_V_mp (residue_t r, const residue_t b, const unsigned long *e,
 int
 mod_sprp (const residue_t b, const modulus_t m)
 {
-  residue_t r1;
+  residue_t r1, minusone;
   int i = 0, po2 = 1;
-  unsigned long mm1, t;
+  unsigned long mm1;
 
   mm1 = mod_getmod_ul (m);
   ASSERT (b[0] < mm1);
@@ -397,19 +398,21 @@ mod_sprp (const residue_t b, const modulus_t m)
   /* Hence, m-1 = mm1 * 2^po2 */
 
   mod_init_noset0 (r1, m);
+  mod_init_noset0 (minusone, m);
+  mod_set1 (minusone, m);
+  mod_neg (minusone, minusone, m);
 
   /* Exponentiate */
   mod_pow_ul (r1, b, mm1, m);
 
-  t = mod_get_ul (r1, m);
-  /* Now t == b^mm1 (mod m) */
+  /* Now r1 == b^mm1 (mod m) */
 #if defined(PARI)
   printf ("(Mod(%lu,%lu) ^ %lu) == %lu /* PARI */\n", 
-	  b, mod_getmod_ul (m), mm1, t);
+	  mod_get_ul (b, m), mod_getmod_ul (m), mm1, mod_get_ul (r1, m));
 #endif
   
   /* If m is prime, then b^mm1 might be == 1 or == -1 (mod m) here */
-  if (t == 1UL || t == mod_getmod_ul (m) - 1UL)
+  if (mod_is1 (r1, m) || mod_equal (r1, minusone, m))
     i = 1;
   else
     {
@@ -418,8 +421,7 @@ mod_sprp (const residue_t b, const modulus_t m)
       for ( ; po2 > 1; po2--)
 	{
 	  mod_mul (r1, r1, r1, m);
-	  t = mod_get_ul (r1, m);
-	  if (t == mod_getmod_ul (m) - 1UL)
+	  if (mod_equal (r1, minusone, m))
 	    {
 	      i = 1;
 	      break;
@@ -428,6 +430,7 @@ mod_sprp (const residue_t b, const modulus_t m)
     }
 
   mod_clear (r1, m);
+  mod_clear (minusone, m);
   return i;
 }
 
@@ -438,6 +441,9 @@ mod_jacobi (const residue_t a_par, const modulus_t m_par)
   unsigned long a, m, s;
   int t = 1;
 
+  /* We probably could stay in Montgomery representation here,
+     a_par = a * 2^w, w even, so 2^w is a square and won't change
+     the quadratic character */
   a = mod_get_ul (a_par, m_par);
   m = mod_getmod_ul (m_par);
   ASSERT (a < m);
