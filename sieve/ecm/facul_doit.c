@@ -29,9 +29,9 @@ primetest (const modulus_t m)
   residue_t one, r;
   int isprime;
   
-  mod_init (one, m);
-  mod_init (r, m);
-  mod_set_ul_reduced (one, 1UL, m);
+  mod_init_noset0 (one, m);
+  mod_init_noset0 (r, m);
+  mod_set1 (one, m);
   mod_add (r, one, one, m); /* r = 2 */
   isprime = mod_sprp (r, m);
   if (isprime)
@@ -62,6 +62,7 @@ facul_doit (unsigned long *factors, const modulus_t m,
   for (i = method_start; strategy->methods[i].method != 0; i++)
     {
 #ifdef MODREDC15UL
+      /* Simple-minded early abort for large input */
       if (i > 2)
         break;
 #endif

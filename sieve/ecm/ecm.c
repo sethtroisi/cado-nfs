@@ -220,8 +220,8 @@ ellM_mul_ul (ellM_point_t R, const ellM_point_t P, unsigned long e,
 
   if (e == 0UL)
     {
-      mod_set_ul (R[0].x, 0UL, m);
-      mod_set_ul (R[0].z, 0UL, m);
+      mod_set0 (R[0].x, m);
+      mod_set0 (R[0].z, m);
       return;
     }
 
@@ -462,7 +462,10 @@ Brent12_curve_from_sigma (residue_t A, residue_t x, const residue_t sigma,
   mod_add (v, sigma, sigma, m);
   mod_add (v, v, v, m); /* v = 4*sigma */
   mod_mul (u, sigma, sigma, m);
-  mod_set_ul (t, 5UL, m);
+  mod_set1 (b, m);
+  mod_add (t, b, b, m);
+  mod_add (t, t, t, m);
+  mod_add (t, t, b, m); /* t = 5 */
   mod_sub (u, u, t, m); /* u = sigma^2 - 5 */
   mod_mul (t, u, u, m);
   mod_mul (x, t, u, m);
@@ -487,7 +490,8 @@ Brent12_curve_from_sigma (residue_t A, residue_t x, const residue_t sigma,
       mod_mul (x, x, v, m);
       mod_mul (v, u, z, m);
       mod_mul (t, A, v, m);
-      mod_set_ul (u, 2UL, m);
+      mod_set1 (u, m);
+      mod_add (u, u, u, m);
       mod_sub (A, t, u, m);
   }
 
@@ -508,18 +512,23 @@ static int
 Monty12_curve_from_k (residue_t A, residue_t x, unsigned long n, 
 		      const modulus_t m)
 {
-  residue_t u, v, u0, v0, a, t2;
+  residue_t u, v, u0, v0, a, t2, one;
   
   /* We want a multiple of the point (-2,4) on the curve Y^2=X^3-12*X */
   mod_init (a, m);
-  mod_init (u, m);
+  mod_init_noset0 (u, m);
   mod_init_noset0 (v, m);
   mod_init (u0, m);
   mod_init (v0, m);
+  mod_init_noset0 (one, m);
 
-  mod_sub_ul (a, a, 12UL, m);
-  mod_sub_ul (u, u, 2UL, m);
-  mod_set_ul (v, 4UL, m);
+  mod_set1 (one, m);
+  mod_add (v, one, one, m);
+  mod_neg (u, v, m); /* u = -2 */
+  mod_add (v, v, v, m); /* v = 4 */
+  mod_sub (a, a, v, m);
+  mod_sub (a, a, v, m);
+  mod_sub (a, a, v, m); /* a = -12 */
   ellW_mul_ui (u, v, n/2, a, m);
   if (n % 2 == 1)
     ellW_add3 (u, v, u, v, u0, v0, a, m);
@@ -531,7 +540,9 @@ Monty12_curve_from_k (residue_t A, residue_t x, unsigned long n,
   mod_init_noset0 (t2, m);
   mod_div2 (v, u, m);
   mod_mul (t2, v, v, m); /* u^2/4 */
-  mod_sub_ul (t2, t2, 3UL, m);
+  mod_sub (t2, t2, one, m);
+  mod_sub (t2, t2, one, m);
+  mod_sub (t2, t2, one, m); /* u^2/4 - 3 */
   if (mod_inv (u, u, m) == 0)
   {
     fprintf (stderr, "Monty12_curve_from_k: u = 0\n");
@@ -543,8 +554,10 @@ Monty12_curve_from_k (residue_t A, residue_t x, unsigned long n,
   }
   mod_mul (t2, t2, u, m); /* t^2 = (u^2/4 - 3)/u = (u^2 - 12)/4u */
 
-  mod_sub_ul (u, t2, 1UL, m);
-  mod_add_ul (v, t2, 3UL, m);
+  mod_sub (u, t2, one, m);
+  mod_add (v, t2, one, m);
+  mod_add (v, v, one, m);
+  mod_add (v, v, one, m);
   mod_mul (a, u, v, m);
   if (mod_inv (a, a, m) == 0) /* a  = 1/(uv), I want u/v and v/u */
   {
@@ -561,7 +574,8 @@ Monty12_curve_from_k (residue_t A, residue_t x, unsigned long n,
   mod_mul (a, a, u, m); /* u^2 * (1/(uv)) = u/v = a*/
 
   mod_mul (u, a, a, m); /* a^2 */
-  mod_add_ul (A, u, 2UL, m); /* a^2 + 2 */
+  mod_add (A, u, one, m);
+  mod_add (A, A, one, m); /* a^2 + 2 */
   mod_add (t2, A, A, m);
   mod_add (A, A, t2, m); /* 3*(a^2 + 2) */
   mod_mul (t2, A, a, m);
@@ -573,10 +587,11 @@ Monty12_curve_from_k (residue_t A, residue_t x, unsigned long n,
 
   mod_add (x, u, u, m);
   mod_add (x, x, u, m); /* 3*a^2 */
-  mod_add_ul (x, x, 1UL, m); /* 3*a^2 + 1 */
+  mod_add (x, x, one, m); /* 3*a^2 + 1 */
   mod_div2 (v, v, m); /* v = 1/(4a) */
   mod_mul (x, x, v, m);
   
+  mod_clear (one, m);
   mod_clear (t2, m);
   mod_clear (v, m);
   mod_clear (u, m);
@@ -599,11 +614,11 @@ curveW_from_Montgomery (residue_t a, residue_t x, residue_t y,
 
   mod_init_noset0 (g, m);
   mod_init_noset0 (one, m);
+  mod_set1 (one, m);
 
-  mod_set_ul (one, 1UL, m);
   mod_add (g, X, A, m);
   mod_mul (g, g, X, m);
-  mod_add_ul (g, g, 1UL, m);
+  mod_add (g, g, one, m);
   mod_mul (g, g, X, m); /* G = X^3 + A*X^2 + X */
   /* printf ("curveW_from_Montgomery: Y^2 = %lu\n", g[0]); */
 
@@ -900,7 +915,7 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
   
   /* Now process all the primes p = id - j, B1 < p <= B2 and multiply
      (id*P)_x - (j*P)_x to the accumulator */
-  mod_set_ul_reduced (a, 1UL, m);
+  mod_set1 (a, m);
   mod_init (a_bk, m); /* Backup value of a, in case we get a == 0 */
   mod_set (a_bk, a, m);
   i = 0;
@@ -1003,7 +1018,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 	return 0;
       }
     mod_clear (s, m);
-    mod_set_ul (P->z, 1UL, m);
+    mod_set1 (P->z, m);
   }
   else if (plan->parameterization == MONTY12)
   {
@@ -1016,7 +1031,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 	ellM_clear (Pt, m);
 	return 0;
       }
-    mod_set_ul (P->z, 1UL, m);
+    mod_set1 (P->z, m);
   }
   else
   {
@@ -1029,7 +1044,9 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 	  mod_get_ul (P->x, m), mod_get_ul (P->z, m));
 #endif
 
-  mod_add_ul (b, A, 2UL, m); /* TODO: precompute 1? */
+  mod_set1 (b, m);
+  mod_add (b, b, b, m);
+  mod_add (b, b, A, m); /* b = A + 2 */
   mod_div2 (b, b, m);
   mod_div2 (b, b, m);
 
@@ -1172,17 +1189,19 @@ ell_pointorder (const residue_t sigma, const int parameterization,
 unsigned long 
 ellM_curveorder_jacobi (residue_t A, residue_t x, modulus_t m)
 {
-  residue_t t;
+  residue_t t, one;
   unsigned long order, i;
   int bchar;
 
   mod_init_noset0 (t, m);
+  mod_init_noset0 (one, m);
+  mod_set1 (one, m);
 
   /* Compute x^3 + A*x^2 + x and see if it is a square */
   mod_set (t, x, m);
   mod_add (t, t, A, m);
   mod_mul (t, t, x, m);
-  mod_add_ul (t, t, 1UL, m);
+  mod_add (t, t, one, m);
   mod_mul (t, t, x, m);
   bchar = mod_jacobi (t, m);
   ASSERT (bchar != 0);
@@ -1194,7 +1213,7 @@ ellM_curveorder_jacobi (residue_t A, residue_t x, modulus_t m)
       mod_set (t, x, m);
       mod_add (t, t, A, m);
       mod_mul (t, t, x, m);
-      mod_add_ul (t, t, 1UL, m);
+      mod_add (t, t, one, m);
       mod_mul (t, t, x, m);
       if (bchar == 1) 
 	order = order + (unsigned long) (1L + (long) mod_jacobi (t, m));
@@ -1203,6 +1222,7 @@ ellM_curveorder_jacobi (residue_t A, residue_t x, modulus_t m)
 	/* Brackets put like this to avoid signedness warning */
     }
 
+  mod_clear (one, m);
   mod_clear (t, m);
   
   return order;

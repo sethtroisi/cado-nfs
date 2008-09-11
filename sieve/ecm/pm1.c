@@ -40,7 +40,7 @@ pm1 (modint_t f, const modulus_t m, const pm1_plan_t *plan)
   mod_init_noset0 (x, m);
   mod_init_noset0 (one, m);
   mod_init_noset0 (two, m);
-  mod_set_ul_reduced (one, 1UL, m);
+  mod_set1 (one, m);
   mod_add (two, one, one, m);
   
   /* Stage 1, a simple exponentiation */
