@@ -27,8 +27,6 @@
 #  - Enable a 'lowmem' option
 #  - How to remove a computer from mach_desc? (should work, but test and
 #    document).
-#  - (easy) don't put -costmin option in replay when Bwcostmin is empty,
-#    i.e., when BWCOSTMIN is not found in merge.his (e.g., with bwstrat=0)
 
 use strict;
 use warnings;
@@ -1154,14 +1152,16 @@ MAIN: {
       my_system "$cmd 2> $prefix.merge.stderr";
     my $bwcostmin=`tail $prefix.merge.his | grep "BWCOSTMIN:" | awk '{print \$NF}'`;
     chomp $bwcostmin;
-    print "Bwcostmin = $bwcostmin\n";
     my $replay="$param->{'cadodir'}/linalg/replay";
     $cmd = $replay .
         " -his $prefix.merge.his" .
         " -index $prefix.index" .
-        " -costmin $bwcostmin" .
         " -purged $prefix.purged" .
         " -out $prefix.small";
+    if (defined($bwcostmin)) {
+        print "Bwcostmin = $bwcostmin\n";
+        $cmd = $cmd . " -costmin $bwcostmin";
+    }
     my_system "$cmd 2> $prefix.replay.stderr";
 
     # Linear algebra
