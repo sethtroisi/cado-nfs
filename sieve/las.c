@@ -1408,12 +1408,13 @@ resieve_small_bucket_region (bucket_array_t BA, unsigned char *S,
   const uint32_t I = si->I;
   unsigned char *S_ptr;
   unsigned long j, nj;
-  int n, td_idx = 0;
+  int n, td_idx;
   const int resieve_very_verbose = 0, resieve_very_verbose_bad = 0;
 
   nj = (si->bucket_region >> si->logI);
   ASSERT ((nj & 1) == 0);
 
+  td_idx = 0;
   for (n = 0 ; n < ssd->nb_nice_p; ++n) {
     const fbprime_t p = ssd->nice_p[n].p;
     while (trialdiv_primes[td_idx] != FB_END && trialdiv_primes[td_idx] < p)
@@ -1480,8 +1481,8 @@ resieve_small_bucket_region (bucket_array_t BA, unsigned char *S,
 
   /* Resieve bad primes */
   td_idx = 0;
-  for ( ; n < ssd->nb_bad_p; ++n) {
-    const fbprime_t p = ssd->nice_p[n].p;
+  for (n = 0; n < ssd->nb_bad_p; ++n) {
+    const fbprime_t p = ssd->bad_p[n].p;
     while (trialdiv_primes[td_idx] != FB_END && trialdiv_primes[td_idx] < p)
       td_idx++;
     if (trialdiv_primes[td_idx] == FB_END || trialdiv_primes[td_idx] != p)
@@ -1636,7 +1637,12 @@ trial_div (factor_list_t *fl, mpz_t norm, bucket_array_t BA, int N, int x,
            factorbase_degn_t *fb, uint32_t *L,
 	   bucket_array_t resieved, trialdiv_divisor_t *trialdiv_data)
 {
+    const int trial_div_very_verbose = 0; // (x == 30878);
     fl->n = 0; /* reset factor list */
+
+    if (trial_div_very_verbose)
+      gmp_fprintf (stderr, "# trial_div() entry, x = %d, norm = %Zd\n", 
+                   x, norm);
 
     // handle 2 separately, if it is in fb
     if (fb->p == 2) {
@@ -1646,15 +1652,24 @@ trial_div (factor_list_t *fl, mpz_t norm, bucket_array_t BA, int N, int x,
             fl->fac[fl->n] = 2;
             fl->n++;
         }
+        if (trial_div_very_verbose)
+          gmp_fprintf (stderr, "# x = %d, dividing out 2^%d, norm = %Zd\n", 
+                       x, bit, norm);
         mpz_tdiv_q_2exp(norm, norm, bit);
         fb = fb_next (fb); // cannot do fb++, due to variable size !
     }
 
     // remove primes in BA that map to x
     divide_primes_from_bucket (fl, norm, x, BA, N);
+    if (trial_div_very_verbose)
+      gmp_fprintf (stderr, "# x = %d, after dividing out buckets norm = %Zd\n", 
+                   x, norm);
                                
     // remove primes found by resieving
     divide_primes_from_bucket (fl, norm, x, resieved, 0);
+    if (trial_div_very_verbose)
+      gmp_fprintf (stderr, "# x = %d, after dividing out resieved norm = %Zd\n", 
+                   x, norm);
     
     /* remove bad primes. Do this after dividing out resieved primes, 
        or primes that have both a "bad" root (i.e. at infinity) and a 
@@ -1671,21 +1686,34 @@ trial_div (factor_list_t *fl, mpz_t norm, bucket_array_t BA, int N, int x,
         }
         L ++;
     }
+    if (trial_div_very_verbose)
+      gmp_fprintf (stderr, 
+                   "# x = %d, after dividing out bad primes norm = %Zd\n", 
+                   x, norm);
     
     {
       /* Trial divide primes with precomputed tables */
       int nr_factors, i;
       unsigned long factors[32];
-      // gmp_fprintf (stderr, "# Before trialdiv(): norm = %Zd\n", norm);
+      if (trial_div_very_verbose)
+        {
+          fprintf (stderr, "# Trial division by ");
+          for (i = 0; trialdiv_data[i].p != 1; i++)
+            fprintf (stderr, " %lu", trialdiv_data[i].p);
+          fprintf (stderr, "\n");
+        }
+
       nr_factors = trialdiv (factors, norm, trialdiv_data);
-      // gmp_fprintf (stderr, "# After trialdiv(): norm = %Zd\n# Found", norm);
       ASSERT (nr_factors <= 32);
+
       for (i = 0; i < nr_factors; i++)
         {
-          // fprintf (stderr, " %lu", factors[i]);
+          if (trial_div_very_verbose)
+            fprintf (stderr, " %lu", factors[i]);
           fl->fac[fl->n++] = factors[i];
         }
-      // fprintf (stderr, "\n");
+      if (trial_div_very_verbose)
+        gmp_fprintf (stderr, "\n# After trialdiv(): norm = %Zd\n", norm);
     }
 }
 
@@ -1786,6 +1814,10 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
         ASSERT((a | b) & 1);
         if (bin_gcd (a, b) != 1)
           continue;
+
+        /* For hunting missed relations */
+        // if (a == -1128230057 && b == 66615)
+        //  fprintf (stderr, "# Have relation -1128230057,66615 at x = %d\n", x);
 
         surv++;
 
