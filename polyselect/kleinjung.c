@@ -390,14 +390,13 @@ quick_search (double f0, double **f, int l, int d, double eps, mpz_t *a,
         all_r[dlr+u]=all_r[u];
     }
 
-    /* This integer stores the difference between the two pointers within
+    /* The integer pd stores the difference between the two pointers within
      * all_r
      */
     unsigned int pd = 0;
     unsigned int rx = dlr + extra - 1;
 
     ASSERT_ALWAYS(all_l[0] + all_r[rx] >= lim);
-
 
     expanding_list ltargets;
     expanding_list rtargets;
@@ -406,12 +405,14 @@ quick_search (double f0, double **f, int l, int d, double eps, mpz_t *a,
     expanding_list_init(rtargets);
 
     for(unsigned int lx = 0 ; lx < dll ; lx++) {
-        unsigned int k = 0;
+        unsigned int k;
         /* arrange so that *rv is the furthermost value with sum < 0 */
         for( ; rx ; rx--, pd++) {
             if (((int64_t) (all_l[lx] + all_r[rx])) < 0)
                 break;
         }
+        /* either rx > 0, and all_l[lx] + all_r[rx] < 0;
+           or     rx = 0, and the sum might have whatever value */
         /* arrange so that rv[pd] is the furthermost value with sum >=0
          * and < lim, but no further than rv */
         for( ; pd && all_l[lx] + all_r[rx+pd] >= lim ; pd--);
@@ -419,13 +420,17 @@ quick_search (double f0, double **f, int l, int d, double eps, mpz_t *a,
          * of solutions. The exact solutions are those whose right part
          * is at [1]...[pd]
          */
-        for(k = 0 ; k < pd ; k++) {
-            /* l[lx] and r[rx+k+1] match together ! */
+        if (rx == 0 && (((int64_t) (all_l[lx] + all_r[0])) >= 0)
+            && all_l[lx] + all_r[rx+pd] <= lim)
+          k = 0;
+        else /* rx=0 and the sum is >= 0 */
+          k = 1;
+        for(; k <= pd ; k++) {
+            /* l[lx] and r[rx+k] match together ! */
             expanding_list_push(ltargets, all_l[lx]);
-            expanding_list_push(rtargets, all_r[rx+k+1]);
+            expanding_list_push(rtargets, all_r[rx+k]);
+            found ++;
         }
-
-        found += pd;
     }
 
     // delta += clock();
@@ -662,15 +667,41 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
             p0_max = p0max;
 
           mpz_set (P_over_p0, P);
-          for (p0 = 1; p0 < p0_max; p0 += 2)
+          for (p0 = 1; p0 < p0_max; p0 ++)
             {
               if (R[p0] == UINT_MAX) /* not yet computed */
                 {
-                  if (isprime (p0) && p0 % d == 1) /* such primes are already
-                                                      taken for a larger l */
-                    R[p0] = 0;
-                  else
-                    R[p0] = has_one_root (a[d], d, N, p0);
+                  /* necessarily p0>1, since R[1] has been initialized to 1 */
+                  if (isprime (p0))
+                    {
+                      if (p0 % d == 1) /* such primes are already considered
+                                          for a larger l */
+                        R[p0] = 0;
+                      else if (mpz_divisible_ui_p (a[d], p0))
+                        R[p0] = 0; /* ad*x^d = N (mod p0) cannot have a unique
+                                      solution */
+                      else
+                        R[p0] = has_one_root (a[d], d, N, p0);
+                    }
+                  else /* composite p0: if p0=p*q then ad*x^d = N should have
+                          one solution for p and q */
+                    {
+                      unsigned int q, r, s;
+
+                      for (q = 2; p0 % q != 0; q++);
+                      ASSERT_ALWAYS(q < p0);
+                      r = p0 / q;
+                      if (R[q] == 0 || R[r] == 0)
+                        R[p0] = 0;
+                      else if (r % q == 0) /* q^2 divides p0 */
+                        R[p0] = has_one_root (a[d], d, N, p0);
+                      else /* CRT of the root mod p0 */
+                        {
+                          /* naive computation of 1/r mod q */
+                          for (s = 1; ((s * r) % q) != 1; s++);
+                          R[p0] = R[r] + (((R[q] + r - R[r]) * s) % r) * r;
+                        }
+                    }
                 }
               
               r0 = R[p0];
@@ -1021,7 +1052,7 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
 
       /* initialize R[], which depends on a[d] only */
       R[1] = 1; /* keep p0=1 */
-      for (p0 = 3; p0 < p0max; p0 += 2)
+      for (p0 = 2; p0 < p0max; p0++)
         R[p0] = UINT_MAX; /* means not yet computed */
 
       /* enumerate all subsets Pprime of at least l elements of Q such that
