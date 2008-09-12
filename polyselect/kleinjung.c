@@ -394,9 +394,9 @@ quick_search (double f0, double **f, int l, int d, double eps, mpz_t *a,
      * all_r
      */
     unsigned int pd = 0;
-    unsigned int rx = dlr + extra - 1;
+    unsigned int rx = dlr + extra;
 
-    ASSERT_ALWAYS(all_l[0] + all_r[rx] >= lim);
+    ASSERT_ALWAYS(all_l[0] + all_r[rx - 1] >= lim);
 
     expanding_list ltargets;
     expanding_list rtargets;
@@ -406,26 +406,23 @@ quick_search (double f0, double **f, int l, int d, double eps, mpz_t *a,
 
     for(unsigned int lx = 0 ; lx < dll ; lx++) {
         unsigned int k;
-        /* arrange so that *rv is the furthermost value with sum < 0 */
+        /* arrange so that all_r[rx-1] is the furthermost value such that
+         * all_l[lx] + all_r[rx] < 0 */
         for( ; rx ; rx--, pd++) {
-            if (((int64_t) (all_l[lx] + all_r[rx])) < 0)
+            if (((int64_t) (all_l[lx] + all_r[rx-1])) < 0)
                 break;
         }
-        /* either rx > 0, and all_l[lx] + all_r[rx] < 0;
-           or     rx = 0, and the sum might have whatever value */
-        /* arrange so that rv[pd] is the furthermost value with sum >=0
-         * and < lim, but no further than rv */
-        for( ; pd && all_l[lx] + all_r[rx+pd] >= lim ; pd--);
+        /* the sum all_l[lx] + all_r[rx-1] (which may be undefined if
+         * rx==0) is < 0 ; we have 0 <= all_l[lx] + all_r[rx].
+         */
+        /* arrange so that all_r[rx+pd-1] is the furthermost value with
+         * sum >=0 and < lim, but no further than all_r[rx] */
+        for( ; pd && all_l[lx] + all_r[rx+pd-1] >= lim ; pd--);
         /* The difference between the two pointers is exactly the number
          * of solutions. The exact solutions are those whose right part
-         * is at [1]...[pd]
+         * is at [rx]...[rx+pd-1]
          */
-        if (rx == 0 && (((int64_t) (all_l[lx] + all_r[0])) >= 0)
-            && all_l[lx] + all_r[rx+pd] <= lim)
-          k = 0;
-        else /* rx=0 and the sum is >= 0 */
-          k = 1;
-        for(; k <= pd ; k++) {
+        for(k = 0; k < pd ; k++) {
             /* l[lx] and r[rx+k] match together ! */
             expanding_list_push(ltargets, all_l[lx]);
             expanding_list_push(rtargets, all_r[rx+k]);
