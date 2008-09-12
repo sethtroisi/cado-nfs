@@ -16,8 +16,9 @@
 
 wdir=/tmp/noise         # directory where temporary files are put
 name=c59                # basename for temporary files
-#cadodir=$HOME/cado      # where to find cado binaries
-parallel=1           # do we use parallel computation?
+#cadodir=$HOME/cado     # where to find cado binaries
+parallel=1              # do we use parallel computation?
+delay=120               # time in seconds between two checks
 
 machines=mach_desc      # file describing available computers for parallel
                         # computation
@@ -67,8 +68,11 @@ sievenice=10            # nice level for the sieving jobs
 # Filtering
 ###########################################################################
 
+excess=400000           # minimal excess wanted after purge
+                        # (don't start merge otherwise)
 prune=1.0               # les brunes comptent pas pour des...
-keeppurge=400000        # excess wanted after purge
+keeppurge=1000000       # maximal excess wanted after purge
+                        # (purge shrinks if needed)
 keep=160                # excess wanted after merge
 maxlevel=15             # ???
 cwmax=200               # ???
