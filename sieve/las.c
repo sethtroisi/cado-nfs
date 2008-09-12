@@ -17,6 +17,7 @@
 #include <tifa.h>
 #include "ecm/facul.h"
 #include "bucket.h"
+#include "trialdiv.h"
 
 #ifdef SSE_NORM_INIT
 #include <emmintrin.h>
@@ -108,6 +109,10 @@ typedef struct {
     uint32_t *rbadprimes;     /* primes which may appear on the rational side
                                  but are not in the factor base (end of list
                                  is 0) */
+    fbprime_t *trialdiv_primes_alg;
+    fbprime_t *trialdiv_primes_rat;
+    trialdiv_divisor_t *trialdiv_data_alg;
+    trialdiv_divisor_t *trialdiv_data_rat;
     unsigned char S_rat[1 << NORM_BITS];
     unsigned char S_alg[1 << NORM_BITS];
     facul_strategy_t *strategy;
@@ -1387,41 +1392,36 @@ void sieve_small_bucket_region(unsigned char *S,
     }
 }
 
-/* Sieve small primes (resieve_thres <= p < I) of the factor base fb in the 
-   next sieve region S, and add primes and the x position where they divide
-   and where there's a sieve report to a bucket (rather than subtracting
-   the log norm from S, as during sieving).
-   Information about where we are is in ssd. */
+/* Sieve small primes (p < I, p not in trialdiv_primes list) of the factor 
+   base fb in the next sieve region S, and add primes and the x position 
+   where they divide and where there's a sieve report to a bucket (rather 
+   than subtracting the log norm from S, as during sieving).
+   Information about where we are is in ssd. 
+   Primes in trialdiv_primes must be in increasing order. */
 void 
 resieve_small_bucket_region (bucket_array_t BA, unsigned char *S, 
 			     small_sieve_data_t *ssd, 
 			     const sieve_info_t *si, 
-			     const fbprime_t resieve_thres,
+			     fbprime_t *trialdiv_primes, 
 			     const unsigned char *S_thres)
 {
   const uint32_t I = si->I;
   unsigned char *S_ptr;
   unsigned long j, nj;
-  int n;
+  int n, td_idx = 0;
   const int resieve_very_verbose = 0, resieve_very_verbose_bad = 0;
 
   nj = (si->bucket_region >> si->logI);
   ASSERT ((nj & 1) == 0);
 
-  n = 0;
-  while (n < ssd->nb_nice_p && ssd->nice_p[n].p < resieve_thres)
+  for (n = 0 ; n < ssd->nb_nice_p; ++n) {
+    const fbprime_t p = ssd->nice_p[n].p;
+    while (trialdiv_primes[td_idx] != FB_END && trialdiv_primes[td_idx] < p)
+      td_idx++;
+    if (trialdiv_primes[td_idx] == FB_END || trialdiv_primes[td_idx] != p)
     {
-      /* Assumes entries of ssd->nice_p are in order of non-decreasing p */
-      ASSERT (n == 0 || ssd->nice_p[n - 1].p <= ssd->nice_p[n].p);
-      n++;
-    }
-  
-  for ( ; n < ssd->nb_nice_p; ++n) 
-    {
-      fbprime_t p, r, twop;
+      fbprime_t r, twop;
       unsigned int i0;
-      p = ssd->nice_p[n].p;
-      ASSERT(p >= resieve_thres);
       twop = p + p;
       r = ssd->nice_p[n].r;
       i0 = ssd->nice_p[n].next_position;
@@ -1475,20 +1475,18 @@ resieve_small_bucket_region (bucket_array_t BA, unsigned char *S,
         }
       ssd->nice_p[n].next_position = i0;
     }
+  }
+    
 
   /* Resieve bad primes */
-  n = 0;
-  while (n < ssd->nb_bad_p && ssd->bad_p[n].p < resieve_thres)
-    {
-      /* Assumes entries of ssd->bad_p are in order of non-decreasing p */
-      ASSERT (n == 0 || ssd->bad_p[n - 1].p <= ssd->bad_p[n].p);
-      n++;
-    }
-  
-  for ( ; n < ssd->nb_bad_p; ++n) 
+  td_idx = 0;
+  for ( ; n < ssd->nb_bad_p; ++n) {
+    const fbprime_t p = ssd->nice_p[n].p;
+    while (trialdiv_primes[td_idx] != FB_END && trialdiv_primes[td_idx] < p)
+      td_idx++;
+    if (trialdiv_primes[td_idx] == FB_END || trialdiv_primes[td_idx] != p)
     {
       /* Test every p-th line, starting at S[next_position] */
-      const fbprime_t p = ssd->bad_p[n].p;
       unsigned int i, i0 = ssd->bad_p[n].next_position;
       ASSERT (n == 0 || ssd->bad_p[n - 1].p <= ssd->bad_p[n].p);
       ASSERT (i0 % I == 0); /* make sure next_position points at start 
@@ -1547,6 +1545,7 @@ resieve_small_bucket_region (bucket_array_t BA, unsigned char *S,
                          "new next_position = %d\n", 
                  i0, si->bucket_region, ssd->bad_p[n].next_position);
     }
+  }
 }
 
 typedef struct {
@@ -1631,11 +1630,11 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const int x,
 }
 
 
-/* L and qb are lists of bad primes (ended with 0) */
+/* L is lists of bad primes (ended with 0) */
 static void
 trial_div (factor_list_t *fl, mpz_t norm, bucket_array_t BA, int N, int x,
-           factorbase_degn_t *fb, uint32_t I, uint32_t *L,
-	   const fbprime_t resieve_thres, bucket_array_t resieved)
+           factorbase_degn_t *fb, uint32_t *L,
+	   bucket_array_t resieved, trialdiv_divisor_t *trialdiv_data)
 {
     fl->n = 0; /* reset factor list */
 
@@ -1657,10 +1656,11 @@ trial_div (factor_list_t *fl, mpz_t norm, bucket_array_t BA, int N, int x,
     // remove primes found by resieving
     divide_primes_from_bucket (fl, norm, x, resieved, 0);
     
-    /* remove bad primes. Do this after resieving, or primes that have
-       both a "bad" root (i.e. at infinity) and a regular one will not
-       be present any more when dividing out resieved primes which 
-       makes asserting that resieved primes really divide harder to do. */
+    /* remove bad primes. Do this after dividing out resieved primes, 
+       or primes that have both a "bad" root (i.e. at infinity) and a 
+       regular one will not be present any more when dividing out 
+       resieved primes which makes asserting that resieved primes 
+       really divide harder to do. */
     while (L[0] != 0)
     {
         while (mpz_divisible_ui_p (norm, L[0])) {
@@ -1671,21 +1671,21 @@ trial_div (factor_list_t *fl, mpz_t norm, bucket_array_t BA, int N, int x,
         }
         L ++;
     }
-
-    /* remove primes in fb that are less than resieve_thres (or less than I
-       for printing an error about primes missed in resieving) */
-    while (fb->p != FB_END && fb->p <= (1 ? resieve_thres : I)) {
-      while (trialdiv_with_norm(fb, norm) == 1) {
-        //while (mpz_divisible_ui_p (norm, fb->p)) {
-            if (fb->p > resieve_thres)
-              fprintf (stderr, "# Error, dividing out prime " FBPRIME_FORMAT 
-                       " > resieve_thres at x = %d\n", fb->p, x);
-            fl->fac[fl->n] = fb->p;
-            fl->n++;
-            ASSERT_ALWAYS(fl->n <= FL_MAX_SIZE);
-            mpz_divexact_ui (norm, norm, fb->p);
+    
+    {
+      /* Trial divide primes with precomputed tables */
+      int nr_factors, i;
+      unsigned long factors[32];
+      // gmp_fprintf (stderr, "# Before trialdiv(): norm = %Zd\n", norm);
+      nr_factors = trialdiv (factors, norm, trialdiv_data);
+      // gmp_fprintf (stderr, "# After trialdiv(): norm = %Zd\n# Found", norm);
+      ASSERT (nr_factors <= 32);
+      for (i = 0; i < nr_factors; i++)
+        {
+          // fprintf (stderr, " %lu", factors[i]);
+          fl->fac[fl->n++] = factors[i];
         }
-        fb = fb_next (fb); // cannot do fb++, due to variable size !
+      // fprintf (stderr, "\n");
     }
 }
 
@@ -1757,20 +1757,17 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
     /* Resieve small primes for this bucket region */
     bucket_array_t resieved_alg, resieved_rat;
     
-    /* FIXME: make this threshold variable, ideally depending on the number 
-       of survivors */
-    const fbprime_t resieve_thres = 1024;
     /* FIXME: choose a sensible size here */
     resieved_alg = init_bucket_array (1, si->bucket_region);
     resieved_rat = init_bucket_array (1, si->bucket_region);
     resieve_small_bucket_region (resieved_alg, S, srsd_alg, si, 
-				 resieve_thres, si->alg_Bound);
+				 si->trialdiv_primes_alg, si->alg_Bound);
     /* fprintf (stderr, "# Resieving bucket %d on alg side found %d primes\n", 
        N, nb_of_updates (resieved_alg, 0)); */
     bucket_sortbucket (resieved_alg, 0);
     rewind_bucket (resieved_alg, 0);
     resieve_small_bucket_region (resieved_rat, S, srsd_rat, si, 
-				 resieve_thres, si->alg_Bound);
+				 si->trialdiv_primes_rat, si->alg_Bound);
     /* fprintf (stderr, "# Resieving bucket %d on rat side found %d primes\n", 
        N, nb_of_updates (resieved_rat, 0)); */
     bucket_sortbucket (resieved_rat, 0);
@@ -1794,8 +1791,8 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
 
         // Trial divide rational norm
         eval_fij (rat_norm, cpoly->g, 1, a, b);
-        trial_div (&rat_factors, rat_norm, rat_BA, N, x, fb_rat, si->I,
-                   si->rbadprimes, resieve_thres, resieved_rat);
+        trial_div (&rat_factors, rat_norm, rat_BA, N, x, fb_rat, 
+                   si->rbadprimes, resieved_rat, si->trialdiv_data_rat);
         
         if (!check_leftover_norm (rat_norm, cpoly->lpbr, BBrat, BBBrat, 
                                   cpoly->mfbr))
@@ -1804,8 +1801,8 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
         // Trial divide algebraic norm
         eval_fij (alg_norm, cpoly->f, cpoly->degree, a, b);
         mpz_divexact_ui (alg_norm, alg_norm, si->q);
-        trial_div (&alg_factors, alg_norm, alg_BA, N, x, fb_alg, si->I,
-                   si->abadprimes, resieve_thres, resieved_alg);
+        trial_div (&alg_factors, alg_norm, alg_BA, N, x, fb_alg, 
+                   si->abadprimes, resieved_alg, si->trialdiv_data_alg);
 
         if (!check_leftover_norm (alg_norm, cpoly->lpba, BBalg, BBBalg, 
                                   cpoly->mfba))
@@ -2472,6 +2469,18 @@ main (int argc, char *argv[])
     init_rat_norms (&si);
     init_alg_norms (&si);
 
+    /* Init refactoring stuff */
+    int skip2;
+    si.trialdiv_primes_rat = fb_extract_bycost (fb_rat, si.I, 1024);
+    si.trialdiv_primes_alg = fb_extract_bycost (fb_alg, si.I, 1024);
+    for (i = 0; si.trialdiv_primes_alg[i] != FB_END; i++);
+    skip2 = (i > 0 && si.trialdiv_primes_alg[0] == 2) ? 1 : 0;
+    si.trialdiv_data_alg = trialdiv_init (si.trialdiv_primes_alg + skip2, 
+                                          i - skip2);
+    for (i = 0; si.trialdiv_primes_rat[i] != FB_END; i++);
+    skip2 = (i > 0 && si.trialdiv_primes_alg[0] == 2) ? 1 : 0;
+    si.trialdiv_data_rat = trialdiv_init (si.trialdiv_primes_rat + skip2, 
+                                          i - skip2);
     si.strategy = facul_make_strategy (15, MIN(cpoly->rlim, cpoly->alim),
                                        1UL << MIN(cpoly->lpbr, cpoly->lpba));
 
@@ -2591,8 +2600,8 @@ main (int argc, char *argv[])
         clear_small_sieve(srsd_alg);
         tot_reports += reports;
 #ifdef VERBOSE
-        fprintf (stderr, "# %lu entries after sieve init,", survivors0);
-        fprintf (stderr, " %lu survivors after sieving\n", survivors1);
+        fprintf (stderr, "# %lu survivors after rational sieve,", survivors0);
+        fprintf (stderr, " %lu survivors after algebraic sieve\n", survivors1);
 #endif
         fprintf (stderr, "# %d relation(s) for (%" PRIu64 ",%" PRIu64
                  "), total %lu [%1.3fs/r]\n#\n", reports, si.q, si.rho,
@@ -2616,6 +2625,10 @@ main (int argc, char *argv[])
 
     facul_clear_strategy (si.strategy);
     si.strategy = NULL;
+    trialdiv_clear (si.trialdiv_data_alg);
+    trialdiv_clear (si.trialdiv_data_rat);
+    free (si.trialdiv_primes_alg);
+    free (si.trialdiv_primes_rat);
     free (fb_alg);
     free (fb_rat);
     sieve_info_clear (&si);

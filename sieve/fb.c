@@ -900,3 +900,39 @@ fb_clear (factorbase_t fb)
       fb->fbinit[i] = NULL;
     }
 }
+
+/* Extracts primes p <= plim with p/nr_roots <= costlim. 
+   List ends with FB_END. Allocates memory */
+fbprime_t *
+fb_extract_bycost (const factorbase_degn_t *fb, const fbprime_t plim, 
+                   const fbprime_t costlim)
+{
+  const factorbase_degn_t *fb_ptr;
+  fbprime_t *primes;
+  int i;
+  
+  fb_ptr = fb;
+  i = 0;
+  while (fb_ptr->p != FB_END && fb_ptr->p <= plim)  
+    {
+      if (fb_ptr->p <= costlim * fb_ptr->nr_roots)
+        i++;
+      fb_ptr = fb_next (fb_ptr);
+    }
+
+  primes = (fbprime_t *) malloc ((i + 1) * sizeof (fbprime_t));
+  ASSERT (primes != NULL);
+
+  fb_ptr = fb;
+  i = 0;
+  while (fb_ptr->p != FB_END && fb_ptr->p <= plim)  
+    {
+      if (fb_ptr->p <= costlim * fb_ptr->nr_roots)
+        primes[i++] = fb_ptr->p;
+      fb_ptr = fb_next (fb_ptr);
+    }
+
+  primes[i] = FB_END;
+  
+  return primes;
+}

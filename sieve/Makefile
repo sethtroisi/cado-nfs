@@ -31,7 +31,7 @@ sieve: sieve.o fb.o ;
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -ltifa -lgmp -lm
 makefb: makefb.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -ltifa -lgmp -lm
-las: las.o fb.o
+las: las.o fb.o trialdiv.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lfacul -lutils -ltifa -lgmp -lm
 
 # Some dependencies on headers.
@@ -39,11 +39,11 @@ las.o: bucket.h ecm/facul.h
 fb.o : fb.c fb.h config.h basicnt.h
 sieve.o : sieve.c bucket.h config.h basicnt.h $(TOP)/cado.h
 makefb.o : makefb.c
-
+trialdiv.o : trialdiv.h fb.h
 
 # Also give some info on extra dependencies.
 sieve makefb las: $(TOP)/utils/libutils.a
-las: $(TIFA_LIBDIR)/libtifa.a
+las: $(TIFA_LIBDIR)/libtifa.a ecm/libfacul.a
 
 
 config.h: config_h.in

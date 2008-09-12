@@ -2,6 +2,9 @@
 *                Functions for the factor base                  *
 *****************************************************************/
 
+#ifndef __FB_H
+#define __FB_H
+
 #include "config.h"
 #include "cado.h"
 
@@ -22,7 +25,9 @@ void 		fb_extract_small (factorbase_t, const unsigned int, const int,
                                   const int);
 int             fb_check (factorbase_t, cado_poly, int);
 void            fb_clear (factorbase_t);
-
+fbprime_t	*fb_extract_bycost (const factorbase_degn_t *, 
+                                    const fbprime_t, const fbprime_t costlim);
+                   
 
 /* Some inlined functions which need to be fast */
   
@@ -56,3 +61,5 @@ fb_entrysize_uc (const unsigned char n)
 {
   return (sizeof (factorbase_degn_t) + n * sizeof (fbroot_t));
 }
+
+#endif
