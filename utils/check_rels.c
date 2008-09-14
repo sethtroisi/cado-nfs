@@ -75,17 +75,22 @@ int check_relation(relation_t *rel, __cado_poly_struct* cpoly) {
     return 1;
 }
 
-
+#define MAX_LENGTH 512
 
 int check_stream(const char *name, FILE * stream, __cado_poly_struct* cpoly)
 {
     int lnum;
     int nrels = 0;
 
-    for (lnum = 0;; lnum++) {
-        char line[256];
+    for (lnum = 1;; lnum++) {
+        char line[MAX_LENGTH];
         if (fgets(line, sizeof(line), stream) == NULL)
             break;
+        if (line[strlen(line)-1] != '\n')
+          {
+            fprintf (stderr, "Line %d of %s is too long, please increase MAX_LENGTH in check_rels.c\n", lnum, name);
+            exit (1);
+          }
         if (line[0] == '#')
             continue;
 
