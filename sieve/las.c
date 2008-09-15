@@ -103,10 +103,10 @@ typedef struct {
     unsigned char rat_Bound[256]; /* non-zero for good lognorms */
     int checknorms;          /* if non-zero, completely factor the potential
                                 relations */
-    uint32_t *abadprimes;     /* primes which may appear on the algebraic side
+    fbprime_t *abadprimes;   /* primes which may appear on the algebraic side
                                  but are not in the factor base (end of list
                                  is 0) */
-    uint32_t *rbadprimes;     /* primes which may appear on the rational side
+    fbprime_t *rbadprimes;   /* primes which may appear on the rational side
                                  but are not in the factor base (end of list
                                  is 0) */
     fbprime_t *trialdiv_primes_alg;
@@ -247,7 +247,7 @@ compute_badprimes (sieve_info_t *si, cado_poly cpoly,
   unsigned long l; /* number of bad primes */
 
   l = 0;
-  si->abadprimes = (uint32_t*) malloc (sizeof (uint32_t));
+  si->abadprimes = (fbprime_t*) malloc (sizeof (fbprime_t));
   fprintf (stderr, "# Alg. bad primes:");
   for (p = 2; p <= cpoly->alim; p = getprime (p))
     {
@@ -257,8 +257,8 @@ compute_badprimes (sieve_info_t *si, cado_poly cpoly,
       if (mpz_divisible_ui_p (cpoly->f[cpoly->degree], p))
         {
           l ++;
-          si->abadprimes = (uint32_t*) realloc (si->abadprimes,
-                                                (l + 1) * sizeof (uint32_t));
+          si->abadprimes = (fbprime_t*) realloc (si->abadprimes,
+                                                (l + 1) * sizeof (fbprime_t));
           si->abadprimes[l - 1] = p;
           fprintf (stderr, " %lu", p);
         }
@@ -268,7 +268,7 @@ compute_badprimes (sieve_info_t *si, cado_poly cpoly,
   getprime (0);
 
   l = 0;
-  si->rbadprimes = (uint32_t*) malloc (sizeof (uint32_t));
+  si->rbadprimes = (fbprime_t*) malloc (sizeof (fbprime_t));
   fprintf (stderr, "# Rat. bad primes:");
   for (p = 2; p <= cpoly->rlim; p = getprime (p))
     {
@@ -278,8 +278,8 @@ compute_badprimes (sieve_info_t *si, cado_poly cpoly,
       if (p != fb_rat->p && mpz_divisible_ui_p (cpoly->g[1], p))
         {
           l ++;
-          si->rbadprimes = (uint32_t*) realloc (si->rbadprimes,
-                                                (l + 1) * sizeof (uint32_t));
+          si->rbadprimes = (fbprime_t*) realloc (si->rbadprimes,
+                                                (l + 1) * sizeof (fbprime_t));
           si->rbadprimes[l - 1] = p;
           fprintf (stderr, " %lu", p);
         }
@@ -598,6 +598,51 @@ simple_fb_root_in_qlattice(const fbprime_t p, const fbprime_t R, const sieve_inf
     return (fbprime_t)(num % ((uint64_t) p));
 }
 
+/* Transform a "bad" prime with root "at infinity" in the a,b-plane
+   to the i,j plane. Homogenized, we have s/t = r, so at == bs (mod p),
+   where r=inf means s==1, t==0 (mod p).
+   We want i,j so that (a_0 i + a_1 j) t == (b_0 i + b_1 j) s (mod p), 
+   or for s=1, t=0, simply b_0 i = -b_1 j (mod p).
+   If b_0 is invertible (mod p), we get a regular root -b_1/b_0 in the 
+   i,j-plane; otherwise the root is at infinity again and we get a "bad"
+   prime in the i,j-plane. (Can that even happen?) */
+
+static inline fbprime_t
+inf_root_in_qlattice(const fbprime_t p, const sieve_info_t * si)
+{
+  modulusul_t m;
+  residueul_t num, den;
+  fbprime_t root;
+
+  modul_initmod_ul (m, p);
+  modul_init (den, m);
+  modul_set_ul (den, labs(si->b0), m);
+  if (si->b0 < 0)
+    modul_neg (den, den, m);
+  if (modul_is0 (den, m))
+    {
+      modul_clear (den, m);
+      modul_clearmod (m);
+      return p;
+    }
+  if (! modul_inv (den, den, m))
+    {
+      modul_clear (den, m);
+      modul_clearmod (m);
+      return p+1;
+    }
+  modul_init (num, m);
+  modul_set_ul (num, labs(si->b1), m);
+  if (si->b1 < 0)
+    modul_neg (num, num, m);
+  modul_mul (num, num, den, m);
+  modul_neg (num, num, m);
+  root = modul_get_ul (num, m);
+  modul_clear (den, m);
+  modul_clear (num, m);
+  modul_clearmod (m);
+  return root;
+}
 
 #ifndef PROFILE 
 inline static
@@ -1189,78 +1234,116 @@ copy_small_sieve (small_sieve_data_t *r, const small_sieve_data_t *s)
 
 // Prepare sieving of small primes: initialize a small_sieve_data_t
 // structure to be used thereafter during sieving each region.
-void init_small_sieve(small_sieve_data_t *ssd, factorbase_degn_t *fb, 
-                      sieve_info_t *si)
+void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb, 
+                      const sieve_info_t *si, const char side)
 {
-    factorbase_degn_t *fb_sav = fb;
-    int n = 0;
+    const factorbase_degn_t *fb_sav = fb;
+    const fbprime_t *badprimes;
+    int n = 0, nb;
     unsigned int I = si->I;
+    const int verbose = 0;
 
-    // Count prime ideals.
+    ASSERT (side == 'a' || side == 'r');
+    badprimes = (side == 'r') ? si->rbadprimes : si->abadprimes;
+    ASSERT (badprimes != NULL);
+
+    // Count prime ideals of factor base primes p < I
     while (fb->p != FB_END && fb->p <= I) {
         n += fb->nr_roots;
         fb = fb_next (fb); // cannot do fb++, due to variable size !
     }
+    // Count bad primes p < I
+    nb = 0;
+    while (badprimes[nb] != 0 && badprimes[nb] < I)
+      nb++;
+    n += nb;
     fb = fb_sav;
+
     // allocate space for these. n is an upper bound, since some of the
     // ideals might become special ones.
     ssd->nice_p = (small_typical_prime_data_t *)malloc(n*sizeof(small_typical_prime_data_t));
     n = 0;
+    nb = 0;
     ssd->nb_bad_p = 0;
     ssd->bad_p = NULL;
-    // Do another pass on fb, to fill in the data
-    while (fb->p != FB_END && fb->p <= I) {
-        int nr;
-        fbprime_t p = fb->p;
-        for (nr = 0; nr < fb->nr_roots; ++nr) {
-            fbprime_t r;
-            r = fb_root_in_qlattice(p, fb->roots[nr], fb->invp, si);
-            /* if (r == 0) {
-                // TODO: doit!
-                // The current sieving code handles r == 0 correctly, but
-                // we may get a small speedup out of treating it separately
-            } */
-            if (r == p) {
-                // Fill in data for this bad prime
-                /* Shouldn't happen that often so a realloc is ok */
-                ssd->bad_p = (small_bad_prime_data_t *) 
-                             realloc (ssd->bad_p, (ssd->nb_bad_p + 1) * 
-                                      sizeof (small_bad_prime_data_t));
-                ssd->bad_p[ssd->nb_bad_p].p = fb->p;
-                /* gcd (a,b) = gcd (i,j), so for j=0, gcd(a,b) = abs(i), so 
-                   the only potential relation in the q-lattice line with 
-                   j=0 is i = +-1. I think we don't bother sieving for that 
-                   one, do we? (Although that one has a nice small norm...)
-                   Assuming we don't, skip over j=0 by initing next_position 
-                   to p*I here (i.e., the line j = p) */
-                ssd->bad_p[ssd->nb_bad_p].next_position = p * I;
-                ssd->bad_p[ssd->nb_bad_p].logp = fb->plog;
-                ssd->nb_bad_p++;
-                continue;
+    // Do another pass on fb and badprimes, to fill in the data
+    // while we have any regular primes or bad primes < I left
+    while ((fb->p != FB_END && fb->p <= I) || 
+           (badprimes[nb] != 0 && badprimes[nb] < I)) {
+      int nr = 0, nr_roots, logp;
+      fbprime_t p, r;
+      do // We process either a bad prime, or one root of a good prime
+        {
+          // If there's a bad prime less than the next eligible regular prime
+          if (badprimes[nb] != 0 && badprimes[nb] < I && 
+             (fb->p == FB_END || badprimes[nb] < fb->p)) 
+            {
+              /* Transform a prime that's "bad" in the a,b-plane */
+              p = badprimes[nb++];
+              nr_roots = 1;
+              /* logp isn't stored in badprimes, so we need to compute it */
+              logp = fb_log (p, (side == 'r' ? si->scale_rat : si->scale_alg)
+                                 * LOG_SCALE, 0.);
+              r = inf_root_in_qlattice (p, si);
+              if (verbose)
+                fprintf (stderr, "# Prime %d root inf -> %d\n", p, r);
+            } else {
+              /* Transform a regular prime */
+              p = fb->p;
+              logp = fb->plog;
+              nr_roots = fb->nr_roots;
+              r = fb_root_in_qlattice(p, fb->roots[nr], fb->invp, si);
+              if (verbose && r == p)
+                fprintf (stderr, "# Prime %d root %d -> inf\n", 
+                         p, fb->roots[nr]);
+              nr++;
             }
-            if (r == p+1) {
-                // TODO:
-                // Do something with those???
-                continue;
+          /* if (r == 0) {
+              // TODO: doit!
+              // The current sieving code handles r == 0 correctly, but
+              // we may get a small speedup out of treating it separately
+          } else */
+          if (r == p) {
+            if (p < si->J) { /* If p>=J, we never get p|j for 0<j<J */
+              // Fill in data for this bad prime
+              /* Shouldn't happen that often so a realloc is ok */
+              ssd->bad_p = (small_bad_prime_data_t *) 
+                           realloc (ssd->bad_p, (ssd->nb_bad_p + 1) * 
+                                    sizeof (small_bad_prime_data_t));
+              ssd->bad_p[ssd->nb_bad_p].p = p;
+              /* gcd (a,b) = gcd (i,j), so for j=0, gcd(a,b) = abs(i), so 
+                 the only potential relation in the q-lattice line with 
+                 j=0 is i = +-1. I think we don't bother sieving for that 
+                 one, do we? (Although that one has a nice small norm...)
+                 Assuming we don't, skip over j=0 by initing next_position 
+                 to p*I here (i.e., the line j = p) */
+              ssd->bad_p[ssd->nb_bad_p].next_position = p * I;
+              ssd->bad_p[ssd->nb_bad_p].logp = logp;
+              ssd->nb_bad_p++;
             }
-
+          } else if (r == p+1) {
+              // TODO:
+              // Do something with those???
+          } else {
             // Fill in data for this nice prime
             ssd->nice_p[n].p = p;
             ssd->nice_p[n].r = r;
-            ssd->nice_p[n].logp = fb->plog;
+            ssd->nice_p[n].logp = logp;
             ssd->nice_p[n].next_position = (I>>1)%p;
             n++;
-        }
-        fb = fb_next (fb); // cannot do fb++, due to variable size !
+          }
+        }  while (nr < nr_roots);
+      fb = fb_next (fb); // cannot do fb++, due to variable size !
     }
     ssd->nb_nice_p = n;
-#if 0
-    fprintf (stderr, "# %d bad primes in q-lattice%s", 
-             ssd->nb_bad_p, ssd->nb_bad_p > 0 ? ":" : "");
-    for (n = 0; n < ssd->nb_bad_p; n++)
-      fprintf (stderr, " " FBPRIME_FORMAT, ssd->bad_p[n].p);
-    fprintf (stderr, "\n");
-#endif
+    if (verbose)
+      {
+        fprintf (stderr, "# %d bad primes in q-lattice%s", 
+                 ssd->nb_bad_p, ssd->nb_bad_p > 0 ? ":" : "");
+        for (n = 0; n < ssd->nb_bad_p; n++)
+          fprintf (stderr, " " FBPRIME_FORMAT, ssd->bad_p[n].p);
+        fprintf (stderr, "\n");
+      }
 }
 
 // Sieve small primes (up to p < I) of the factor base fb in the 
@@ -1634,7 +1717,7 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const int x,
 /* L is lists of bad primes (ended with 0) */
 static void
 trial_div (factor_list_t *fl, mpz_t norm, bucket_array_t BA, int N, int x,
-           factorbase_degn_t *fb, uint32_t *L,
+           factorbase_degn_t *fb, fbprime_t *L,
 	   bucket_array_t resieved, trialdiv_divisor_t *trialdiv_data)
 {
     const int trial_div_very_verbose = 0; // (x == 30878);
@@ -2378,6 +2461,7 @@ usage (char *argv0)
   fprintf (stderr, "          -q0 nnn         left bound of special-q range\n");
   fprintf (stderr, "          -q1 nnn         right bound of special-q range\n");
   fprintf (stderr, "          -rho r          sieve only algebraic root r mod q0\n");
+  fprintf (stderr, "          -tdthresh nnn   trial-divide primes p/r <= nnn (r=number of roots)\n");
   exit (1);
 }
 
@@ -2394,6 +2478,7 @@ main (int argc, char *argv[])
     unsigned long nroots, tot_reports = 0, survivors0, survivors1;
     factorbase_degn_t * fb_alg, * fb_rat;
     int checknorms = 1; /* factor or not the remaining norms */
+    int td_thresh = 1024; /* cost threshold trialdiv/resieving */
     int I = DEFAULT_I, i;
     unsigned long sq = 0;
     double totJ = 0.0;
@@ -2445,6 +2530,12 @@ main (int argc, char *argv[])
         else if (argc > 2 && strcmp (argv[1], "-rho") == 0)
           {
             rho = strtouint64 (argv[2], NULL, 10);
+            argc -= 2;
+            argv += 2;
+          }
+        else if (argc > 2 && strcmp (argv[1], "-tdthresh") == 0)
+          {
+            td_thresh = atoi (argv[2]);
             argc -= 2;
             argv += 2;
           }
@@ -2503,8 +2594,8 @@ main (int argc, char *argv[])
 
     /* Init refactoring stuff */
     int skip2;
-    si.trialdiv_primes_rat = fb_extract_bycost (fb_rat, si.I, 1024);
-    si.trialdiv_primes_alg = fb_extract_bycost (fb_alg, si.I, 1024);
+    si.trialdiv_primes_rat = fb_extract_bycost (fb_rat, si.I, td_thresh);
+    si.trialdiv_primes_alg = fb_extract_bycost (fb_alg, si.I, td_thresh);
     for (i = 0; si.trialdiv_primes_alg[i] != FB_END; i++);
     skip2 = (i > 0 && si.trialdiv_primes_alg[0] == 2) ? 1 : 0;
     si.trialdiv_data_alg = trialdiv_init (si.trialdiv_primes_alg + skip2, 
@@ -2583,8 +2674,8 @@ main (int argc, char *argv[])
 
         /* Initialize data for sieving small primes */
         small_sieve_data_t ssd_alg, ssd_rat;
-        init_small_sieve(&ssd_rat, fb_rat, &si);
-        init_small_sieve(&ssd_alg, fb_alg, &si);
+        init_small_sieve(&ssd_rat, fb_rat, &si, 'r');
+        init_small_sieve(&ssd_alg, fb_alg, &si, 'a');
 
 	/* Copy small sieve data for resieving small primes */
 	small_sieve_data_t srsd_alg, srsd_rat;
