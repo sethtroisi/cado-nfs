@@ -68,8 +68,10 @@ sievenice=10            # nice level for the sieving jobs
 # Filtering
 ###########################################################################
 
-excess=400000           # minimal excess wanted after purge
+excess=20000            # minimal excess wanted after purge
                         # (don't start merge otherwise)
+                        # 20k is largely enough for a c59, for a larger
+                        # number 400k should be ok
 prune=1.0               # les brunes comptent pas pour des...
 keeppurge=1000000       # maximal excess wanted after purge
                         # (purge shrinks if needed)

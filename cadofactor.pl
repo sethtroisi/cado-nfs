@@ -1232,7 +1232,7 @@ MAIN: {
     my $i;
     for ($i = 0; $i < $ndepmax; $i++) {
         my $suf = sprintf("%03d", $i);
-        print "Testing dependency numnber $i...\n";
+        print "Testing dependency number $i...\n";
         $cmd = "$param->{'cadodir'}/sqrt/naive/algsqrt" .
           "  $prefix.dep.alg.$suf $prefix.dep.rat.$suf $prefix.poly";
         my_system "$cmd> $prefix.fact.$suf 2>> $prefix.algsqrt.stderr";
