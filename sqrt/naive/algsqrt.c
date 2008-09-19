@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <gmp.h>
+#include <math.h> /* for log */
 #include "cado.h"
 #include "utils/utils.h"
 
@@ -42,34 +43,48 @@ void polymodF_from_ab(polymodF_t tmp, long a, unsigned long b) {
   mpz_set_si(tmp->p->coeff[0], a);
 }
 
-// Check whether the coefficients of R (that are given modulo m) are in
-// fact genuine integers. We assume that x mod m is a genuine integer if
-// x or m-x is less than m/10^6.
-int poly_integer_reconstruction(poly_t Q, const poly_t R, const mpz_t m) {
+/* Reduce the coefficients of R in [-m/2, m/2], which are assumed in [0, m[ */
+static void
+poly_mod_center (poly_t R, const mpz_t m)
+{
   int i;
-  mpz_t aux;
+  mpz_t m_over_2;
 
-  mpz_init(aux);
-  for (i=0; i <= R->deg; ++i) {
-    mpz_mul_ui(aux, R->coeff[i], 1000000);
-    if (mpz_cmp(aux, m) <= 0)
-      poly_setcoeff(Q, i, R->coeff[i]);
-    else {
-      mpz_sub(aux, m, R->coeff[i]);
-      mpz_mul_ui(aux, aux, 1000000);
-      if (mpz_cmp(aux, m) > 0)
-        {
-          mpz_clear (aux);
-          return 0;
-        }
-      else {
-	mpz_sub(aux, m, R->coeff[i]);
-	mpz_neg(aux, aux);
-	poly_setcoeff(Q, i, aux);
-      }
+  mpz_init (m_over_2);
+  mpz_div_2exp (m_over_2, m, 2);
+  for (i=0; i <= R->deg; i++)
+    {
+      ASSERT_ALWAYS(mpz_cmp_ui (R->coeff[i], 0) >= 0);
+      ASSERT_ALWAYS(mpz_cmp (R->coeff[i], m) < 0);
+      if (mpz_cmp (R->coeff[i], m_over_2) > 0)
+        mpz_sub (R->coeff[i], R->coeff[i], m);
     }
-  }
-  mpz_clear (aux);
+  mpz_clear (m_over_2);
+}
+
+/* Check whether the coefficients of R (that are given modulo m) are in
+   fact genuine integers. We assume that x mod m is a genuine integer if
+   x or |x-m| is less than m/10^6, i.e., the bit size of x or |x-m| is
+   less than that of m minus 20.
+   Assumes the coefficients x satisfy 0 <= x < m.
+*/
+int
+poly_integer_reconstruction (poly_t R, const mpz_t m)
+{
+  int i;
+  size_t sizem = mpz_sizeinbase (m, 2), sizer;
+
+  for (i=0; i <= R->deg; ++i)
+    {
+      sizer = mpz_sizeinbase (R->coeff[i], 2);
+      if (sizer + 20 > sizem)
+        {
+          mpz_sub (R->coeff[i], R->coeff[i], m);
+          sizer = mpz_sizeinbase (R->coeff[i], 2);
+          if (sizer + 20 > sizem)
+            return 0;
+        }
+    }
   return 1;
 }
 
@@ -156,12 +171,29 @@ void TonelliShanks(poly_t res, const poly_t a, const poly_t f, unsigned long p) 
   mpz_clear (t);
 }
 
-// compute Sqrt(A) mod F, using p-adic lifting, at prime p.
-void polymodF_sqrt(polymodF_t res, polymodF_t AA, poly_t F, unsigned long p) {
+// res <- Sqrt(AA) mod F, using p-adic lifting, at prime p.
+void
+polymodF_sqrt (polymodF_t res, polymodF_t AA, poly_t F, unsigned long p)
+{
   poly_t A, *P;
   int v;
   int d = F->deg;
-  int k, lk;
+  int k, lk, target_k, logk, K[32];
+  size_t target_size; /* target bit size for Hensel lifting */
+
+  /* The size of the coefficients of the square root of A should be about half
+     the size of the coefficients of A. Here is an heuristic argument: let
+     K = Q[x]/(f(x)) where f(x) is the algebraic polynomial. The square root
+     r(x) might be considered as a random element of K: it is smooth, not far
+     from an integer, but except that has no relationship with the coefficients
+     of f(x). When we square r(x), we obtain a polynomial with coefficients
+     twice as large, before reduction by f(x). The reduction modulo f(x)
+     produces A(x), however that reduction should not decrease the size of
+     the coefficients. */
+  target_size = poly_sizeinbase (AA->p, AA->p->deg, 2);
+  target_size = target_size / 2;
+  target_size += target_size / 10;
+  fprintf (stderr, "target_size=%lu\n", target_size);
 
   poly_alloc(A, d-1);
   // Clean up the mess with denominator: if it is an odd power of fd,
@@ -189,13 +221,30 @@ void polymodF_sqrt(polymodF_t res, polymodF_t AA, poly_t F, unsigned long p) {
   mpz_init (pk);
   mpz_init (invpk);
 
+  /* Jason Papadopoulos's trick: since we will lift the square root of A to at
+     most target_size bits, we can reduce A accordingly */
+  double st = seconds ();
+  target_k = (int) ((double) target_size * log ((double) 2) / log((double) p));
+  mpz_ui_pow_ui (pk, p, target_k);
+  while (mpz_sizeinbase (pk, 2) <= target_size)
+    {
+      mpz_mul_ui (pk, pk, p);
+      target_k ++;
+    }
+  poly_reduce_mod_mpz (A, A, pk);
+  for (k = target_k, logk = 0; k > 1; k = (k + 1) / 2, logk ++)
+    K[logk] = k;
+  K[logk] = 1;
+  fprintf (stderr, "Reducing A mod p^%d took %2.2lf\n", target_k,
+           seconds () - st);
+
   // Initialize things modulo p:
-  mpz_set_ui(pk, p);
+  mpz_set_ui (pk, p);
   k = 1; /* invariant: pk = p^k */
   lk = 0; /* k = 2^lk */
-  poly_reduce_makemonic_mod_mpz(f, F, pk);
-  double st = seconds ();
-  P = poly_base_modp_init (A, p);
+  poly_reduce_makemonic_mod_mpz (f, F, pk);
+  st = seconds ();
+  P = poly_base_modp_init (A, p, K, logk);
   fprintf (stderr, "poly_base_modp_init took %2.2lf\n", seconds () - st);
 
   poly_copy (a, P[0]);
@@ -235,16 +284,34 @@ void polymodF_sqrt(polymodF_t res, polymodF_t AA, poly_t F, unsigned long p) {
   do {
     double st;
 
+    if (mpz_sizeinbase (pk, 2) > target_size)
+      {
+        fprintf (stderr, "Failed to reconstruct an integer polynomial\n");
+        printf ("Failed\n");
+        exit (1);
+      }
+
     /* invariant: invsqrtA = 1/sqrt(A) bmod p^k */
 
     st = seconds ();
     poly_base_modp_lift (a, P, ++lk, pk);
     st = seconds () - st;
 
-    mpz_mul(pk, pk, pk);	// double the current precision
-    k *= 2;
+    /* invariant: k = K[logk] */
+    ASSERT_ALWAYS(k == K[logk]);
+
+    mpz_set (invpk, pk);
+    mpz_mul (pk, pk, pk);	// double the current precision
+    logk --;
+    if (K[logk] & 1)
+      {
+        mpz_div_ui (pk, pk, p);
+        k --;
+      }
+    k = K[logk];
     barrett_init (invpk, pk); /* FIXME: we could lift 1/p^k also */
-    fprintf(stderr, "lifting mod p^%d at %2.2lf\n", k, seconds());
+    fprintf (stderr, "lifting mod p^%d (%lu bits) at %2.2lf\n",
+             k, mpz_sizeinbase (pk, 2), seconds ());
 #ifdef VERBOSE
     fprintf (stderr, "   poly_base_modp_lift took %2.2lf\n", st);
 #endif
@@ -282,7 +349,12 @@ void polymodF_sqrt(polymodF_t res, polymodF_t AA, poly_t F, unsigned long p) {
 #ifdef VERBOSE
     fprintf (stderr, "   poly_mul_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
 #endif
-  } while (!poly_integer_reconstruction(tmp, tmp, pk));
+    poly_mod_center (tmp, pk);
+#ifdef VERBOSE
+    fprintf (stderr, "   max. bit-size of centered coefficients: %lu\n",
+             poly_sizeinbase (tmp, tmp->deg, 2));
+#endif
+  } while (!poly_integer_reconstruction (tmp, pk));
 
   poly_base_modp_clear (P);
 
@@ -450,6 +522,9 @@ int main(int argc, char **argv) {
       if(b == 0)
 	  nfree++;
     }
+    fprintf (stderr, "# Read %d including %d free relations\n", nab, nfree);
+    ASSERT_ALWAYS ((nab & 1) == 0);
+    ASSERT_ALWAYS ((nfree & 1) == 0);
     accumulate_fast_end (prd_tab, F, lprd);
     fclose(depfile);
 
@@ -461,12 +536,10 @@ int main(int argc, char **argv) {
   }
 #endif
 
-  fprintf(stderr, "Finished accumulating the product in %2.2lf\n", seconds());
+  fprintf(stderr, "Finished accumulating the product at %2.2lf\n", seconds());
   fprintf(stderr, "nab = %d, nfree = %d, v = %d\n", nab, nfree, prd->v);
-  fprintf(stderr, "sizeinbit of cst term = %lu\n",
-	  (unsigned long) mpz_sizeinbase(prd->p->coeff[0], 2));
-  fprintf(stderr, "sizeinbit of leading term = %lu\n",
-	  (unsigned long) mpz_sizeinbase(prd->p->coeff[pol->degree-1], 2));
+  fprintf (stderr, "maximal polynomial bit-size = %lu\n",
+           (unsigned long) poly_sizeinbase (prd->p, pol->degree - 1, 2));
 
   p = FindSuitableModP(F);
   fprintf(stderr, "Using p=%lu for lifting\n", p);

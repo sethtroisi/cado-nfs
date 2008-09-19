@@ -269,7 +269,7 @@ void poly_eval_mod_mpz(mpz_t res, const poly_t f, const mpz_t x, const mpz_t m)
 }
 
 static void poly_mul(poly_t f, const poly_t g, const poly_t h) {
-  int i, j, maxdeg;
+  int i, maxdeg;
   poly_t prd;
 
   if ((g->deg == -1) || (h->deg == -1)) {
@@ -281,10 +281,62 @@ static void poly_mul(poly_t f, const poly_t g, const poly_t h) {
   poly_alloc(prd, maxdeg);
   for (i = maxdeg; i >= 0; --i)
     mpz_set_ui(prd->coeff[i], 0);
-  
+
+#if 0 /* naive product */
+  int j;
   for (i = 0; i <= g->deg; ++i)
     for (j = 0; j <= h->deg; ++j)
       mpz_addmul(prd->coeff[i+j], g->coeff[i], h->coeff[j]);
+#else /* segmentation */
+  {
+    mpz_t G, H;
+    size_t sg, sh, s;
+    mpz_init (G);
+    mpz_init (H);
+    for (sg = 0, i = 0; i <= g->deg; i++)
+      {
+        s = mpz_sizeinbase (g->coeff[i], 2);
+        if (s > sg)
+          sg = s;
+      }
+    for (sh = 0, i = 0; i <= h->deg; i++)
+      {
+        s = mpz_sizeinbase (h->coeff[i], 2);
+        if (s > sh)
+          sh = s;
+      }
+    /* the +1 accounts for a possible sign */
+    for (s = sg + sh + 1, i = h->deg; i > 1; i = (i + 1) / 2, s++);
+    mpz_set (G, g->coeff[g->deg]);
+    for (i = g->deg - 1; i >= 0; i--)
+      {
+        mpz_mul_2exp (G, G, s);
+        mpz_add (G, G, g->coeff[i]);
+      }
+    mpz_set (H, h->coeff[h->deg]);
+    for (i = h->deg - 1; i >= 0; i--)
+      {
+        mpz_mul_2exp (H, H, s);
+        mpz_add (H, H, h->coeff[i]);
+      }
+    mpz_mul (G, G, H);
+    for (i = 0; i < g->deg + h->deg; i++)
+      {
+        mpz_fdiv_r_2exp (prd->coeff[i], G, s);
+        if (mpz_sizeinbase (prd->coeff[i], 2) == s)
+          {
+            mpz_cdiv_r_2exp (prd->coeff[i], G, s);
+            mpz_cdiv_q_2exp (G, G, s);
+          }
+        else
+          mpz_fdiv_q_2exp (G, G, s);
+        ASSERT_ALWAYS(mpz_sizeinbase (prd->coeff[i], 2) < s);
+      }
+    mpz_set (prd->coeff[i], G);
+    mpz_clear (G);
+    mpz_clear (H);
+  }
+#endif
 
   for (i = maxdeg; i >= 0; --i) 
     poly_setcoeff(f, i, prd->coeff[i]);
@@ -369,7 +421,6 @@ poly_mul_mpz(poly_t Q, const poly_t P, const mpz_t a) {
   mpz_clear(aux);
 }
 
-#if 0 /* unused */
 /* Q <- P mod m, where m = p^k */
 void     
 poly_reduce_mod_mpz (poly_t Q, const poly_t P, const mpz_t m)
@@ -385,67 +436,63 @@ poly_reduce_mod_mpz (poly_t Q, const poly_t P, const mpz_t m)
   }
   mpz_clear(aux);
 }
-#endif
 
-/* return a list of polynomials P[0], P[1], ..., P[k] such that
-   P0 = Q[k-1] + p^(2^(k-1))*P[k]
-   Q[k-1] = Q[k-2] + p^(2^(k-2))*P[k-1]
+/* return a list of polynomials P[0], P[1], ..., P[l] such that
+   P0 = Q[l-1] + p^K[1]*P[l]
+   Q[l-1] = Q[l-2] + p^K[2]*P[l-1]
    ...
-   Q[2] = Q[1] + p^2*P[2]
-   Q[1] = Q[0] + p*P[1]
+   Q[2] = Q[1] + p^K[l-1]*P[2]
+   Q[1] = Q[0] + p*P[1]         where K[l] = 1
    Q[0] = P[0]
    ...
-   With all coefficients of P[i] smaller than p^(2^(i-1)).
+   With all coefficients of P[i] smaller than p^(K[l-i]-K[l-(i-1)]).
 
-   P0 = P[0] + p*P[1] + p^2*P[2] + ... + p^(2^(k-1))*P[k] < p^(2^k)
+   Assume K[l]=1, K[l-1]=2, ..., K[i] = 2*K[i+1] or 2*K[i+1]-2.
 
-   The end of the list is P[k+1]=0.
+   P0 = P[0] + p*P[1] + p^2*P[2] + ... + p^K[1]*P[l] < p^K[0]
+
+   The end of the list is P[l+1]=0.
 */
 poly_t*
-poly_base_modp_init (const poly_t P0, int p)
+poly_base_modp_init (const poly_t P0, int p, int *K, int l)
 {
   poly_t *P;
   int k, i, j;
   mpz_t *pk;
-  size_t l;
 
-  /* first compute p^(2^k) until the coefficients of P0 are smaller than
-     p^(2^k) */
-  pk = (mpz_t*) malloc (sizeof (mpz_t));
-  k = 1;
-  mpz_init_set_ui (pk[0], p); /* pk[k] = p^(2^k) */
-  while (1)
+  ASSERT_ALWAYS (K[l] == 1);
+
+  /* initialize pk[i] = p^K[l-i] for 0 <= i < l */
+  pk = (mpz_t*) malloc (l * sizeof (mpz_t));
+  mpz_init_set_ui (pk[0], p);
+  for (i = 1; i < l; i++)
     {
-      /* Check if all coefficients of P0 are smaller than pk[k-1]^2.
-         We use an approximate test to avoid squaring pk[k-1]. */
-      l = mpz_sizeinbase (pk[k-1], 2);
-      /* 2^(2l-2) <= pk[k-1] */
-      for (i = 0; i <= P0->deg; i++)
-        if (mpz_sizeinbase (P0->coeff[i], 2) > 2 * l - 2)
-          break;
-      if (i > P0->deg) /* all coeffs are smaller than pk[k-1]^2 */
-        break;
-      k ++;
-      pk = (mpz_t*) realloc (pk, k * sizeof (mpz_t));
-      mpz_init (pk[k-1]);
-      mpz_mul (pk[k-1], pk[k-2], pk[k-2]);
+      mpz_init (pk[i]);
+      mpz_mul (pk[i], pk[i-1], pk[i-1]);
+      if (K[l-i] & 1)
+        {
+          ASSERT_ALWAYS (K[l-i] == 2 * K[l-i+1] - 1);
+          mpz_div_ui (pk[i], pk[i], p);
+        }
+      else
+        ASSERT_ALWAYS (K[l-i] == 2 * K[l-i+1]);
     }
 
   /* now decompose P0: we need P[0], P[1] for factor p, P[2] for p^2,
-     ..., P[k] for p^(2^(k-1)), and one for the end of list,
-     thus k+2 polynomials */
-  P = (poly_t*) malloc ((k + 2) * sizeof(poly_t));
-  for (i = 0; i < k + 2; i++)
+     ..., P[l] for p^K[1], and one for the end of list,
+     thus l+2 polynomials */
+  P = (poly_t*) malloc ((l + 2) * sizeof(poly_t));
+  for (i = 0; i < l + 2; i++)
     poly_alloc (P[i], P0->deg);
-  /* P[k+1] is initialized to 0 by poly_alloc */
+  /* P[l+1] is initialized to 0 by poly_alloc */
 
   /* initialize P[k], and put remainder in P[k-1] */
-  for (i = 0; i <= P0->deg; i++)
+  for (k = l, i = 0; i <= P0->deg; i++)
     mpz_tdiv_qr (P[k]->coeff[i], P[k-1]->coeff[i], P0->coeff[i], pk[k-1]);
   cleandeg (P[k], P0->deg);
 
   /* now go down */
-  for (j = k-1; j >= 1; j--)
+  for (j = l-1; j >= 1; j--)
     {
       /* reduce P[j] into P[j] and P[j-1] */
       for (i = 0; i <= P0->deg; i++)
@@ -455,7 +502,7 @@ poly_base_modp_init (const poly_t P0, int p)
     }
   cleandeg (P[0], P0->deg);
 
-  for (i = 0; i < k; i++)
+  for (i = 0; i < l; i++)
     mpz_clear (pk[i]);
   free (pk);
 
@@ -494,8 +541,10 @@ poly_base_modp_clear (poly_t *P)
   free (P);
 }
 
+/* Q <- P/lc(P) mod m, Q and P might be identical */
 void
-poly_reduce_makemonic_mod_mpz(poly_t Q, const poly_t P, const mpz_t m) {
+poly_reduce_makemonic_mod_mpz (poly_t Q, const poly_t P, const mpz_t m)
+{
   int i;
   mpz_t aux, aux2;
   mpz_init(aux);
@@ -505,14 +554,18 @@ poly_reduce_makemonic_mod_mpz(poly_t Q, const poly_t P, const mpz_t m) {
     mpz_mod(aux, P->coeff[i], m);
     i--;
   } while ((i>=0) && (mpz_cmp_ui(aux, 0) == 0));
+  /* either i+1 >= 0 and P[i+1] <> 0 (mod m),
+     or i = -1 and P is identically zero modulo m */
   if (i>=0) {
     Q->deg = i+1;
     mpz_invert(aux2, aux, m);
-    for (i = 0; i <= Q->deg; ++i) {
+    for (i = 0; i < Q->deg; ++i) {
       mpz_mul(aux, aux2, P->coeff[i]);
       mpz_mod(aux, aux, m);
       poly_setcoeff(Q, i, aux);
     }
+    /* we can directly set the leading coefficient to 1 */
+    mpz_set_ui (Q->coeff[Q->deg], 1);
   } else {
     if (mpz_cmp_ui(aux, 0) == 0)
       Q->deg = -1;
@@ -537,10 +590,8 @@ poly_mul_mod_f_mod_mpz(poly_t Q, const poly_t P1, const poly_t P2,
   int dF = F->deg;
   poly_t R;
   int i, j;
-  mpz_t aux;
 
   poly_alloc(R, d);
-  mpz_init(aux);
 
   // product mod m
   for (i = 0; i <= d1; ++i)
@@ -563,7 +614,6 @@ poly_mul_mod_f_mod_mpz(poly_t Q, const poly_t P1, const poly_t P2,
   cleandeg(R, d);
   poly_copy(Q, R);
   poly_free(R);
-  mpz_clear(aux);
 }
 
 // Q = P^2 mod F, mod m (assume F monic)
@@ -577,6 +627,8 @@ poly_sqr_mod_f_mod_mpz (poly_t Q, const poly_t P, const poly_t F,
   poly_t R;
   int i, j;
   mpz_t aux;
+
+  ASSERT_ALWAYS(mpz_cmp_ui (F->coeff[dF], 1) == 0);
 
   poly_alloc(R, d);
   mpz_init(aux);
@@ -644,4 +696,20 @@ poly_power_mod_f_mod_ui(poly_t Q, const poly_t P, const poly_t F,
   poly_copy(Q, R);
   mpz_clear (m);
   poly_free(R);
+}
+
+/* return the maximal size of the coefficients of f in base b */
+size_t
+poly_sizeinbase (poly_t f, int d, int b)
+{
+  size_t S = 0, s;
+  int i;
+
+  for (i = 0; i <= d; i++)
+    {
+      s = mpz_sizeinbase (f->coeff[i], b);
+      if (s > S)
+        S = s;
+    }
+  return S;
 }
