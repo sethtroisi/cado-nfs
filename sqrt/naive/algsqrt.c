@@ -506,8 +506,8 @@ int main(int argc, char **argv) {
 	// case g(X)=m1*X+m2 with m1 != 1
 	// we should have prod (a+b*m2/m1) = A^2 = R^2/m1^(nab-nfree)
 	// and therefore nab should be even
-	if((nab-nfree) & 1){
-	    fprintf(stderr, "Sorry, but nb of relations is odd\n");
+	if(nab & 1){
+	    fprintf(stderr, "Sorry, but #(a, b) is odd\n");
 	    fprintf(stderr, "Bug: this should be patched! Please report your buggy input\n");
 	    printf("Failed\n");
 	    return 0;
