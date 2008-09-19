@@ -769,7 +769,7 @@ sub read_machine_description {
             # Check mandatory args and complete with defaults.
             if (! $h{'tmpdir'}) { die "No tmpdir given for machine $m\n"; }
             if (! $h{'cadodir'}) { die "No cadodir given for machine $m\n"; }
-            if (! $h{'cores'}) { $h{'cores'}=1; }
+            if (! defined($h{'cores'})) { $h{'cores'}=1; }
 
             # Substitute $name if %s is found.
             if ($h{'tmpdir'} =~ /%s/) {

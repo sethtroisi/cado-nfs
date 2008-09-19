@@ -14,6 +14,36 @@
 # tmpdir and cadodir are mandatory.
 # cores defaults to 1.
 # group is planned for use in linear algebra.
+# 
+#
+# Changing the list during a computation:
+# #######################################
+#
+# If during a computation you want to add a machine, you just have to add
+# appropriate line. Next time cadofactor.pl will check if there are finished
+# jobs, it will also start new ones on the new machine. You can also increase
+# the number of cores of an already listed machine. 
+#
+# If you need to stop the jobs on a machine, you can put cores=0 after its
+# name. Once the current job is finished on the machine, no new job will be
+# started again. Do not remove the machine name of the list, otherwise
+# cadofactor.pl won't know where to look for tmp data to import result.
+# If you can not wait for the job to be finished, feel free to kill it after
+# having put cores=0 in this file: cadofactor.pl will eventually detect that
+# the job is dead and import the partial result file.
+#
+# When you decrease the value of cores, this will have a similar effect: the
+# script will let the job finish but won't start new ones until the number of 
+# jobs becomes less than the value of cores.
+#
+# If you need to change the tmpdir during a computation, this is more tricky, 
+# since cadofactor.pl assumes that all the jobs on a machine run with the same
+# tmpdir. Therefore, you have do it like so:
+#  - put cores=0 for the target machine
+#  - wait until all running jobs of the machine are finished
+#  - change tmpdir for this machine
+#  - put the previous value of cores.
+#
 
 [cacao]
 # WARNING: $HOME is substitued locally!
