@@ -1,13 +1,13 @@
 /* 
  * Program: algsqrt
- * Author : P. Gaudry
+ * Authors: P. Gaudry, P. Zimmermann
  * Purpose: computing the squareroots and finishing the factorization
  *
  Possible easy improvements:
- * check the precisions in Hensel lifting (and adjust them if needed)
- * use Kronecker's substitution for polynomial multiplications
- * predict a bound for the required precision, and build a corresponding
-   optimal sequence of precisions in Hensel lifting
+ * implement fast polynomial multiplication
+   (done for poly_mul, which uses a generic Toom-Cook implementation, the
+    segmentation code seems to have problems with huge inputs, it remains
+    to be done for poly_sqr_mod_f_mod_mpz)
  Harder improvements:
  * improve the reduction modulo f (what is the best strategy?)
  * cache FFT transforms wherever possible
@@ -35,12 +35,12 @@
 
 // #define VERBOSE
 
-void polymodF_from_ab(polymodF_t tmp, long a, unsigned long b) {
+static void
+polymodF_from_ab(polymodF_t tmp, long a, unsigned long b) {
   tmp->v = 0;
-  tmp->p->deg = 1;
-  mpz_set_ui(tmp->p->coeff[1], b);
-  mpz_neg(tmp->p->coeff[1], tmp->p->coeff[1]);
-  mpz_set_si(tmp->p->coeff[0], a);
+  tmp->p->deg = (b != 0) ? 1 : 0;
+  mpz_set_si (tmp->p->coeff[1], - (long) b);
+  mpz_set_si (tmp->p->coeff[0], a);
 }
 
 /* Reduce the coefficients of R in [-m/2, m/2], which are assumed in [0, m[ */
@@ -62,13 +62,14 @@ poly_mod_center (poly_t R, const mpz_t m)
   mpz_clear (m_over_2);
 }
 
+#if 0
 /* Check whether the coefficients of R (that are given modulo m) are in
    fact genuine integers. We assume that x mod m is a genuine integer if
    x or |x-m| is less than m/10^6, i.e., the bit size of x or |x-m| is
    less than that of m minus 20.
    Assumes the coefficients x satisfy 0 <= x < m.
 */
-int
+static int
 poly_integer_reconstruction (poly_t R, const mpz_t m)
 {
   int i;
@@ -87,6 +88,7 @@ poly_integer_reconstruction (poly_t R, const mpz_t m)
     }
   return 1;
 }
+#endif
 
 // compute res := sqrt(a) in Fp[x]/f(x)
 void TonelliShanks(poly_t res, const poly_t a, const poly_t f, unsigned long p) {
@@ -310,7 +312,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, poly_t F, unsigned long p)
       }
     k = K[logk];
     barrett_init (invpk, pk); /* FIXME: we could lift 1/p^k also */
-    fprintf (stderr, "lifting mod p^%d (%lu bits) at %2.2lf\n",
+    fprintf (stderr, "start lifting mod p^%d (%lu bits) at %2.2lf\n",
              k, mpz_sizeinbase (pk, 2), seconds ());
 #ifdef VERBOSE
     fprintf (stderr, "   poly_base_modp_lift took %2.2lf\n", st);
@@ -343,18 +345,11 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, poly_t F, unsigned long p)
     /* tmp = invsqrtA/2 * (a*invsqrtA^2-1) */
     poly_sub_mod_mpz (invsqrtA, invsqrtA, tmp, pk);
 
-    // multiply by a, to check if rational reconstruction succeeds
-    st = seconds ();
-    poly_mul_mod_f_mod_mpz (tmp, invsqrtA, a, f, pk, invpk);
-#ifdef VERBOSE
-    fprintf (stderr, "   poly_mul_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
-#endif
-    poly_mod_center (tmp, pk);
-#ifdef VERBOSE
-    fprintf (stderr, "   max. bit-size of centered coefficients: %lu\n",
-             poly_sizeinbase (tmp, tmp->deg, 2));
-#endif
-  } while (!poly_integer_reconstruction (tmp, pk));
+  } while (k < target_k);
+
+  /* multiply by a to get an approximation of the square root */
+  poly_mul_mod_f_mod_mpz (tmp, invsqrtA, a, f, pk, invpk);
+  poly_mod_center (tmp, pk);
 
   poly_base_modp_clear (P);
 
@@ -408,9 +403,8 @@ accumulate_fast (polymodF_t *prd, const polymodF_t a, const poly_t F,
                  unsigned long *lprd, unsigned long nprd)
 {
   unsigned long i;
-  static double st = 0.0;
 
-  polymodF_mul(prd[0], prd[0], a, F);
+  polymodF_mul (prd[0], prd[0], a, F);
   nprd ++;
 
   for (i = 0; nprd % THRESHOLD == 0; i++, nprd /= THRESHOLD)
@@ -425,9 +419,7 @@ accumulate_fast (polymodF_t *prd, const polymodF_t a, const poly_t F,
 	  prd[i+1]->p->deg = 0;
 	  prd[i+1]->v = 0;
         }
-      st -= seconds ();
-      polymodF_mul(prd[i+1], prd[i+1], prd[i], F);
-      st += seconds ();
+      polymodF_mul (prd[i+1], prd[i+1], prd[i], F);
       mpz_set_ui(prd[i]->p->coeff[0], 1);
       prd[i]->p->deg = 0;
       prd[i]->v = 0;
@@ -443,10 +435,12 @@ accumulate_fast_end (polymodF_t *prd, const poly_t F, unsigned long lprd)
   unsigned long i;
 
   for (i = 1; i < lprd; i++)
-    polymodF_mul(prd[0], prd[0], prd[i], F);
+    polymodF_mul (prd[0], prd[0], prd[i], F);
 }
 
-int main(int argc, char **argv) {
+int
+main(int argc, char **argv)
+{
   FILE * depfile;
   cado_poly pol;
   poly_t F;
@@ -455,6 +449,7 @@ int main(int argc, char **argv) {
   unsigned long b;
   int ret, i;
   unsigned long p;
+  double t0 = seconds ();
 
   if (argc != 4) {
     fprintf(stderr, "usage: %s algdepfile ratdepfile polyfile\n", argv[0]);
@@ -496,8 +491,8 @@ int main(int argc, char **argv) {
       fprintf(stderr, "# Reading ab pair #%d at %2.2lf\n",nab,seconds());
     if((a == 0) && (b == 0))
       break;
-    polymodF_from_ab(tmp, a, b);
-    polymodF_mul(prd, prd, tmp, F);
+    polymodF_from_ab (tmp, a, b);
+    polymodF_mul (prd, prd, tmp, F);
     nab++;
   }
 #else
@@ -545,8 +540,8 @@ int main(int argc, char **argv) {
   fprintf(stderr, "Using p=%lu for lifting\n", p);
 
   double tm = seconds();
-  polymodF_sqrt(prd, prd, F, p);
-  fprintf(stderr, "Square root lifted in %2.2lf\n", seconds()-tm);
+  polymodF_sqrt (prd, prd, F, p);
+  fprintf (stderr, "Square root lifted in %2.2lf\n", seconds()-tm);
   
   mpz_t algsqrt, aux;
   mpz_init(algsqrt);
@@ -565,6 +560,7 @@ int main(int argc, char **argv) {
   fclose(depfile);
 
   gmp_fprintf(stderr, "Rational square root is: %Zd\n", aux);
+  fprintf (stderr, "Total square root time is %2.2lf\n", seconds() - t0);
 
   int found = 0;
   {

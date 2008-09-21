@@ -61,6 +61,12 @@ barrett_mod (mpz_t a, mpz_t b, const mpz_t m, const mpz_t invm)
   mpz_mod (a, a, m);
 }
 
+static int
+poly_normalized_p (const poly_t f)
+{
+  return (f->deg == -1) || mpz_cmp_ui (f->coeff[f->deg], 0) != 0;
+}
+
 // allocate a polynomial that can contain d+1 coeffs, and set to zero.
 void poly_alloc(poly_t f, int d) {
   int i;
@@ -268,6 +274,140 @@ void poly_eval_mod_mpz(mpz_t res, const poly_t f, const mpz_t x, const mpz_t m)
   }
 }
 
+#if 0
+/* f <- g*h, where g has degree r, and h has degree s */
+static int
+poly_mul_basecase (mpz_t *f, mpz_t *g, int r, mpz_t *h, int s)
+{
+  int i, j;
+
+  for (i = 0; i <= r + s; i++)
+    mpz_set_ui (f[i], 0);
+  for (i = 0; i <= r; ++i)
+    for (j = 0; j <= s; ++j)
+      mpz_addmul(f[i+j], g[i], h[j]);
+  return r + s;
+}
+#endif
+
+/* Generic Toom-Cook implementation: stores in f[0..r+s] the coefficients
+   of g*h, where g has degree r and h has degree s, and their coefficients
+   are in g[0..r] and h[0..s].
+   Assumes f differs from g and h, and f[0..r+s] are already allocated.
+   Returns the degree of f.
+*/
+static int
+poly_mul_tc (mpz_t *f, mpz_t *g, int r, mpz_t *h, int s)
+{
+  int t = r + s; /* product has t+1 coefficients */
+  int i, j, k;
+  mpz_t tmp;
+  uint64_t M[15][15];
+
+  if ((r == -1) || (s == -1)) /* g or h is 0 */
+    return -1;
+
+  /* If r, s < d, then the maximal value of i^j is (2d-2)^(d-1),
+     which equals 105413504 for d=8. However M[i][j] might become
+     larger later on. An exhaustive search shows that for d<=8,
+     |M[i][j]| < 2^63, as well as intermediate operations involving M[i][j],
+     and |g|, |h| < 2^31. */
+  ASSERT_ALWAYS (r < 8);
+  ASSERT_ALWAYS (s < 8);
+
+  mpz_init (tmp);
+  
+  /* first store g(i)*h(i) in f[i] for 0 <= i <= t */
+  for (i = 0; i <= t; i++)
+    {
+      /* f[i] <- g(i) */
+      mpz_set (tmp, g[r]);
+      for (j = r - 1; j >= 0; j--)
+        {
+          mpz_mul_ui (tmp, tmp, i);
+          mpz_add (tmp, tmp, g[j]);
+        }
+      mpz_set (f[i], tmp);
+      /* tmp <- h(i) */
+      mpz_set (tmp, h[s]);
+      for (j = s - 1; j >= 0; j--)
+        {
+          mpz_mul_ui (tmp, tmp, i);
+          mpz_add (tmp, tmp, h[j]);
+        }
+      /* f[i] <- g(i)*h(i) */
+      mpz_mul (f[i], f[i], tmp);
+      /* M[i][j] = i^j */
+      for (j = 0; j <= t; j++)
+        M[i][j] = (j == 0) ? 1 : i * M[i][j-1];
+    }
+
+  /* forward Gauss: zero the under-diagonal coefficients while going down */
+  for (i = 1; i <= t; i++)
+    {
+      for (j = 0; j < i; j++)
+        {
+          if (M[i][j] != 0)
+            {
+              uint64_t g, h;
+
+              g = gcd_int64 (M[i][j], M[j][j]);
+              h = M[i][j] / g;
+              g = M[j][j] / g;
+              /* f[i] <- g*f[i] - h*f[j] */
+              mpz_mul_si (f[i], f[i], g);
+              mpz_mul_si (tmp, f[j], h);
+              mpz_sub (f[i], f[i], tmp);
+              for (k = j; k <= t; k++)
+                M[i][k] = g * M[i][k] - h * M[j][k];
+            }
+        }
+    }
+
+  /* now zero upper-diagonal coefficients while going up */
+  for (i = t; i >= 0; i--)
+    {
+      for (j = i + 1; j <= t; j++)
+        {
+          /* f[i] = f[i] - M[i][j] * f[j] */
+          mpz_mul_si (tmp, f[j], M[i][j]);
+          mpz_sub (f[i], f[i], tmp);
+        }
+      ASSERT_ALWAYS (mpz_divisible_ui_p (f[i], M[i][i]));
+      mpz_divexact_ui (f[i], f[i], M[i][i]);
+    }
+
+  mpz_clear (tmp);
+  return t;
+}
+
+#if 0
+/* returns z mod (B-1) where B is 2^GMP_NUMB_BITS */
+static mp_limb_t
+mod_base_minus_1 (mpz_t z)
+{
+  size_t i;
+  mp_limb_t r = (mp_limb_t) 0, s;
+  for (i = 0; i <= mpz_size (z); i++)
+    {
+      s = mpz_getlimbn (z, i);
+      r += s;
+      /* If there is a carry, it should be added back to r.
+         In that case, since r, s <= B-1, r+s <=2B-2, thus
+         the remainder without the carry is <= B-2, and the
+         following cannot give a carry. */
+      r += (r < s);
+    }
+  /* if r = B-1, reduce to 0 */
+  if (r + 1 == (mp_limb_t) 0)
+    r = (mp_limb_t) 0;
+  return r;
+}
+#endif
+
+/* f <- g*h
+   Assumes f differs from g and h.
+ */
 static void poly_mul(poly_t f, const poly_t g, const poly_t h) {
   int i, maxdeg;
   poly_t prd;
@@ -277,17 +417,31 @@ static void poly_mul(poly_t f, const poly_t g, const poly_t h) {
     return;
   }
 
-  maxdeg = g->deg+h->deg;
-  poly_alloc(prd, maxdeg);
-  for (i = maxdeg; i >= 0; --i)
-    mpz_set_ui(prd->coeff[i], 0);
+  if (g->deg == 0)
+    {
+      poly_mul_mpz (f, h, g->coeff[0]);
+      return;
+    }
 
-#if 0 /* naive product */
-  int j;
-  for (i = 0; i <= g->deg; ++i)
-    for (j = 0; j <= h->deg; ++j)
-      mpz_addmul(prd->coeff[i+j], g->coeff[i], h->coeff[j]);
-#else /* segmentation */
+  if (h->deg == 0)
+    {
+      poly_mul_mpz (f, g, h->coeff[0]);
+      return;
+    }
+
+  ASSERT_ALWAYS(mpz_cmp_ui (g->coeff[g->deg], 0) != 0);
+  ASSERT_ALWAYS(mpz_cmp_ui (h->coeff[h->deg], 0) != 0);
+  ASSERT_ALWAYS(f != g);
+  ASSERT_ALWAYS(f != h);
+
+  maxdeg = g->deg + h->deg;
+  poly_alloc(prd, maxdeg);
+
+#if 1 /* naive product */
+  //  prd->deg = poly_mul_basecase (prd->coeff, g->coeff, g->deg, h->coeff, h->deg);
+  prd->deg = poly_mul_tc (prd->coeff, g->coeff, g->deg, h->coeff, h->deg);
+#else /* segmentation, this code has problem with huge runs, for example
+         degree 5 with lifting to 631516975 bits */
   {
     mpz_t G, H;
     size_t sg, sh, s;
@@ -313,13 +467,32 @@ static void poly_mul(poly_t f, const poly_t g, const poly_t h) {
         mpz_mul_2exp (G, G, s);
         mpz_add (G, G, g->coeff[i]);
       }
+    /* sanity check: G should have sizeinbase(lc(g))+d*s bits (or -1) */
+    size_t size_g = mpz_sizeinbase (g->coeff[g->deg], 2) + g->deg * s;
+    ASSERT_ALWAYS(mpz_sizeinbase (G, 2) == size_g ||
+                  mpz_sizeinbase (G, 2) == size_g - 1);
     mpz_set (H, h->coeff[h->deg]);
     for (i = h->deg - 1; i >= 0; i--)
       {
         mpz_mul_2exp (H, H, s);
         mpz_add (H, H, h->coeff[i]);
       }
+    /* sanity check: H should have sizeinbase(lc(h))+d*s bits (or -1) */
+    size_t size_h = mpz_sizeinbase (h->coeff[h->deg], 2) + h->deg * s;
+    ASSERT_ALWAYS(mpz_sizeinbase (H, 2) == size_h ||
+                  mpz_sizeinbase (H, 2) == size_h - 1);
+    size_g = mpz_sizeinbase (G, 2);
+    size_h = mpz_sizeinbase (H, 2);
+    /* sanity check: we verify that the product agrees both mod B and B-1 */
+    mp_limb_t g0 = mpz_getlimbn (G, 0), h0 = mpz_getlimbn (H, 0);
+    mp_limb_t g1 = mod_base_minus_1 (G), h1 = mod_base_minus_1 (H);
     mpz_mul (G, G, H);
+    ASSERT_ALWAYS (mpz_getlimbn (G, 0) == g0 * h0);
+    mpz_set_ui (H, g1);
+    mpz_mul_ui (H, H, h1);
+    ASSERT_ALWAYS (mod_base_minus_1 (G) == mod_base_minus_1 (H));
+    ASSERT_ALWAYS(mpz_sizeinbase (G, 2) == size_g + size_h ||
+                  mpz_sizeinbase (G, 2) == size_g + size_h - 1);
     for (i = 0; i < g->deg + h->deg; i++)
       {
         mpz_fdiv_r_2exp (prd->coeff[i], G, s);
@@ -341,6 +514,7 @@ static void poly_mul(poly_t f, const poly_t g, const poly_t h) {
   for (i = maxdeg; i >= 0; --i) 
     poly_setcoeff(f, i, prd->coeff[i]);
   cleandeg(f, maxdeg);
+  ASSERT_ALWAYS(mpz_cmp_ui (f->coeff[f->deg], 0) != 0);
 
   poly_free(prd);
 }
@@ -398,6 +572,9 @@ polymodF_mul (polymodF_t Q, const polymodF_t P1, const polymodF_t P2,
   int v;
 
   poly_alloc(prd, P1->p->deg+P2->p->deg);
+
+  ASSERT_ALWAYS(poly_normalized_p (P1->p));
+  ASSERT_ALWAYS(poly_normalized_p (P2->p));
 
   poly_mul(prd, P1->p, P2->p);
   v = P1->v + P2->v;
