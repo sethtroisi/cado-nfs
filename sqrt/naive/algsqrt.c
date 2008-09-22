@@ -4,10 +4,7 @@
  * Purpose: computing the squareroots and finishing the factorization
  *
  Possible easy improvements:
- * implement fast polynomial multiplication
-   (done for poly_mul, which uses a generic Toom-Cook implementation, the
-    segmentation code seems to have problems with huge inputs, it remains
-    to be done for poly_sqr_mod_f_mod_mpz)
+ * none so far
  Harder improvements:
  * improve the reduction modulo f (what is the best strategy?)
  * cache FFT transforms wherever possible

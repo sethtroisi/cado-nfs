@@ -290,30 +290,73 @@ poly_mul_basecase (mpz_t *f, mpz_t *g, int r, mpz_t *h, int s)
 }
 #endif
 
+/* Given f[0]...f[t] that contain respectively f(0), ..., f(t),
+   put in f[0]...f[t] the coefficients of f.
+   Assumes t <= MAX_T.
+*/
+static void
+poly_mul_tc_interpolate (mpz_t *f, int t)
+{
+#define MAX_T 13
+  uint64_t M[MAX_T+1][MAX_T+1], g, h;
+  int i, j, k;
+
+  ASSERT_ALWAYS (t <= MAX_T); /* Ensures that all M[i][j] fit in uint64_t,
+                                 and similarly for all intermediate
+                                 computations on M[i][j]. This avoids the
+                                 use of mpz_t to store the M[i][j]. */
+  
+  /* initialize M[i][j] = i^j */
+  for (i = 0; i <= t; i++)
+    for (j = 0; j <= t; j++)
+      M[i][j] = (j == 0) ? 1 : i * M[i][j-1];
+
+  /* forward Gauss: zero the under-diagonal coefficients while going down */
+  for (i = 1; i <= t; i++)
+    for (j = 0; j < i; j++)
+      if (M[i][j] != 0)
+        {
+          g = gcd_uint64 (M[i][j], M[j][j]);
+          h = M[i][j] / g;
+          g = M[j][j] / g;
+          /* f[i] <- g*f[i] - h*f[j] */
+          mpz_mul_ui (f[i], f[i], g);
+          mpz_submul_ui (f[i], f[j], h);
+          for (k = j; k <= t; k++)
+            M[i][k] = g * M[i][k] - h * M[j][k];
+        }
+
+  /* now zero upper-diagonal coefficients while going up */
+  for (i = t; i >= 0; i--)
+    {
+      for (j = i + 1; j <= t; j++)
+        /* f[i] = f[i] - M[i][j] * f[j] */
+        mpz_submul_ui (f[i], f[j], M[i][j]);
+      ASSERT (mpz_divisible_ui_p (f[i], M[i][i]));
+      mpz_divexact_ui (f[i], f[i], M[i][i]);
+    }
+}
+
 /* Generic Toom-Cook implementation: stores in f[0..r+s] the coefficients
    of g*h, where g has degree r and h has degree s, and their coefficients
    are in g[0..r] and h[0..s].
    Assumes f differs from g and h, and f[0..r+s] are already allocated.
+   Assumes r + s <= MAX_T (MAX_T = 13 ensures all the matrix coefficients
+   in the inversion fit into uint64_t, and those used in mpz_mul_ui calls
+   fit into uint32_t).
    Returns the degree of f.
 */
 static int
 poly_mul_tc (mpz_t *f, mpz_t *g, int r, mpz_t *h, int s)
 {
   int t = r + s; /* product has t+1 coefficients */
-  int i, j, k;
+  int i, j;
   mpz_t tmp;
-  uint64_t M[15][15];
 
   if ((r == -1) || (s == -1)) /* g or h is 0 */
     return -1;
 
-  /* If r, s < d, then the maximal value of i^j is (2d-2)^(d-1),
-     which equals 105413504 for d=8. However M[i][j] might become
-     larger later on. An exhaustive search shows that for d<=8,
-     |M[i][j]| < 2^63, as well as intermediate operations involving M[i][j],
-     and |g|, |h| < 2^31. */
-  ASSERT_ALWAYS (r < 8);
-  ASSERT_ALWAYS (s < 8);
+  ASSERT_ALWAYS (t <= MAX_T);
 
   mpz_init (tmp);
   
@@ -321,13 +364,12 @@ poly_mul_tc (mpz_t *f, mpz_t *g, int r, mpz_t *h, int s)
   for (i = 0; i <= t; i++)
     {
       /* f[i] <- g(i) */
-      mpz_set (tmp, g[r]);
+      mpz_set (f[i], g[r]);
       for (j = r - 1; j >= 0; j--)
         {
-          mpz_mul_ui (tmp, tmp, i);
-          mpz_add (tmp, tmp, g[j]);
+          mpz_mul_ui (f[i], f[i], i);
+          mpz_add (f[i], f[i], g[j]);
         }
-      mpz_set (f[i], tmp);
       /* tmp <- h(i) */
       mpz_set (tmp, h[s]);
       for (j = s - 1; j >= 0; j--)
@@ -337,47 +379,47 @@ poly_mul_tc (mpz_t *f, mpz_t *g, int r, mpz_t *h, int s)
         }
       /* f[i] <- g(i)*h(i) */
       mpz_mul (f[i], f[i], tmp);
-      /* M[i][j] = i^j */
-      for (j = 0; j <= t; j++)
-        M[i][j] = (j == 0) ? 1 : i * M[i][j-1];
     }
 
-  /* forward Gauss: zero the under-diagonal coefficients while going down */
-  for (i = 1; i <= t; i++)
-    {
-      for (j = 0; j < i; j++)
-        {
-          if (M[i][j] != 0)
-            {
-              uint64_t g, h;
-
-              g = gcd_int64 (M[i][j], M[j][j]);
-              h = M[i][j] / g;
-              g = M[j][j] / g;
-              /* f[i] <- g*f[i] - h*f[j] */
-              mpz_mul_si (f[i], f[i], g);
-              mpz_mul_si (tmp, f[j], h);
-              mpz_sub (f[i], f[i], tmp);
-              for (k = j; k <= t; k++)
-                M[i][k] = g * M[i][k] - h * M[j][k];
-            }
-        }
-    }
-
-  /* now zero upper-diagonal coefficients while going up */
-  for (i = t; i >= 0; i--)
-    {
-      for (j = i + 1; j <= t; j++)
-        {
-          /* f[i] = f[i] - M[i][j] * f[j] */
-          mpz_mul_si (tmp, f[j], M[i][j]);
-          mpz_sub (f[i], f[i], tmp);
-        }
-      ASSERT_ALWAYS (mpz_divisible_ui_p (f[i], M[i][i]));
-      mpz_divexact_ui (f[i], f[i], M[i][i]);
-    }
+  poly_mul_tc_interpolate (f, t);
 
   mpz_clear (tmp);
+  return t;
+}
+
+/* Same as poly_mul_tc for the squaring: store in f[0..2r] the coefficients
+   of g^2, where g has degree r, and their coefficients are in g[0..r].
+   Assumes f differs from g, and f[0..2r] are already allocated.
+   Assumes 2r <= MAX_T (MAX_T = 17 ensures all the matrix coefficients
+   in the inversion fit into uint64_t).
+   Returns the degree of f.
+*/
+static int
+poly_sqr_tc (mpz_t *f, mpz_t *g, int r)
+{
+  int t = 2 * r; /* product has t+1 coefficients */
+  int i, j;
+
+  if (r == -1) /* g is 0 */
+    return -1;
+
+  ASSERT_ALWAYS (t <= MAX_T);
+
+  /* first store g(i)^2 in f[i] for 0 <= i <= t */
+  for (i = 0; i <= t; i++)
+    {
+      /* f[i] <- g(i) */
+      mpz_set (f[i], g[r]);
+      for (j = r - 1; j >= 0; j--)
+        {
+          mpz_mul_ui (f[i], f[i], i);
+          mpz_add (f[i], f[i], g[j]);
+        }
+      mpz_mul (f[i], f[i], f[i]);
+    }
+
+  poly_mul_tc_interpolate (f, t);
+
   return t;
 }
 
@@ -770,10 +812,13 @@ poly_mul_mod_f_mod_mpz(poly_t Q, const poly_t P1, const poly_t P2,
 
   poly_alloc(R, d);
 
+#if 0
   // product mod m
   for (i = 0; i <= d1; ++i)
     for (j = 0; j <= d2; ++j)
       mpz_addmul(R->coeff[i+j], P1->coeff[i], P2->coeff[j]);
+#endif
+  poly_mul_tc (R->coeff, P1->coeff, d1, P2->coeff, d2);
 
   // reduce mod F
   while (d >= dF) {
@@ -802,7 +847,7 @@ poly_sqr_mod_f_mod_mpz (poly_t Q, const poly_t P, const poly_t F,
   int d = d1 + d1;
   int dF = F->deg;
   poly_t R;
-  int i, j;
+  int i;
   mpz_t aux;
 
   ASSERT_ALWAYS(mpz_cmp_ui (F->coeff[dF], 1) == 0);
@@ -810,6 +855,10 @@ poly_sqr_mod_f_mod_mpz (poly_t Q, const poly_t P, const poly_t F,
   poly_alloc(R, d);
   mpz_init(aux);
 
+#if 0 /* Naive squaring in d1*(d1+1)/2 products and d1+1 squares, i.e.,
+         d*(d-1)/2 products and d squares for an algebraic polynomial of
+         degree d. For d=5 (d1=4), this gives 10 products and 5 squares. */
+  int j;
   // product mod m
   /* first accumulate triangular terms */
   for (i = 0; i < d1; ++i)
@@ -821,6 +870,11 @@ poly_sqr_mod_f_mod_mpz (poly_t Q, const poly_t P, const poly_t F,
   /* finally accumulate diagonal terms */
   for (i = 0; i <= d1; ++i)
     mpz_addmul(R->coeff[2*i], P->coeff[i], P->coeff[i]);
+#else
+  /* Fast squaring in 2d1+1 squares, i.e., 2d-1 squares.
+     For d=5, this gives 9 squares. */
+  poly_sqr_tc (R->coeff, P->coeff, d1);
+#endif
 
   // reduce mod F
   while (d >= dF) {
