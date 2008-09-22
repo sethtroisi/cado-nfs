@@ -85,6 +85,7 @@ typedef struct {
     uint64_t rho;
     int32_t a0, b0, a1, b1;
     // parameters for bucket sieving
+    int bucket_thresh;    // bucket sieve primes >= bucket_thresh
     int bucket_region;    // should be around L1 cache size, a power of 2
                           // and a multiple of I.
     int log_bucket_region;    
@@ -228,6 +229,7 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int logI, uint64_t q0)
   // bucket info
   // TODO: be more clever, here.
   si->log_bucket_region = BUCKET_REGION;
+  si->bucket_thresh = si->I; /* Default value */
   ASSERT_ALWAYS(si->log_bucket_region > si->logI); /* so that we sieve an even
                                                       number of rows */
   si->bucket_region = 1<<si->log_bucket_region;
@@ -806,8 +808,8 @@ reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r,
 void
 fill_in_buckets(bucket_array_t BA, factorbase_degn_t *fb, 
 		const const_sieve_info_t * si) {
-    // Loop over all primes in the factor base > I
-    while (fb->p < si->I)
+    // Loop over all primes in the factor base >= bucket_thresh
+    while (fb->p != FB_END && fb->p < (fbprime_t) si->bucket_thresh)
         fb = fb_next (fb); // cannot do fb++, due to variable size !
     while (fb->p != FB_END) {
         unsigned char nr;
@@ -815,27 +817,62 @@ fill_in_buckets(bucket_array_t BA, factorbase_degn_t *fb,
         unsigned char logp = fb->plog;
 
         for (nr = 0; nr < fb->nr_roots; ++nr) {
-            fbprime_t r, R;
-            R = fb->roots[nr];
-            r = fb_root_in_qlattice(p, R, fb->invp, si);
-            // Special cases should be quite rare for primes > I,
-            // so we ignore them.
-            // TODO: should be line sieved in the non-bucket phase?
-            // Or should we have a bucket line siever?
-            if (r == 0 || r >= p)
-                continue;
-            
             const uint32_t I = si->I;
             const uint32_t logI = si->logI;
             const uint32_t maskI = I-1;
             const uint32_t maskbucket = si->bucket_region - 1;
             const int shiftbucket = si->log_bucket_region;
             const uint32_t IJ = si->I * si->J;
+            fbprime_t r, R;
  
+            R = fb->roots[nr];
+            r = fb_root_in_qlattice(p, R, fb->invp, si);
+            // TODO: should be line sieved in the non-bucket phase?
+            // Or should we have a bucket line siever?
+            if (UNLIKELY(r == 0))
+              {
+                /* If r == 0 (mod p), this prime hits for i == 0 (mod p),
+                   but since p > I, this implies i = 0 or i > I. We don't
+                   sieve i > I. Since gcd(i,j) | gcd(a,b), for i = 0 we 
+                   only need to sieve j = 1 */
+                /* x = j*I + (i + I/2) = I + I/2 */
+                bucket_update_t update;
+                uint32_t x = si->I + si->I / 2;
+                update.x = (uint16_t) (x & maskbucket);
+                update.p = p;
+                update.logp = logp;
+                push_bucket_update(BA, x >> shiftbucket, update);
+                continue;
+              }
+            if (UNLIKELY(r == p))
+              {
+                /* r == p means root at infinity, which hits for 
+                   j == 0 (mod p). Since q > I > J, this implies j = 0 
+                   or j > J. This means we sieve only (i,j) = (1,0) here. 
+                   Since I < bucket_region, this always goes in bucket 0.
+                   FIXME: what about (-1,0)? It's the same (a,b) as (1,0) 
+                   but which of these two (if any) do we sieve? */
+                bucket_update_t update;
+                update.x = (uint16_t) si->I / 2 + 1;
+                update.p = p;
+                update.logp = logp;
+                push_bucket_update(BA, 0, update);
+                continue;
+              }
+            if (UNLIKELY(r > p))
+              {
+                continue;
+              }
+            
             plattice_info_t pli;
             if (reduce_plattice(&pli, p, r, si) == 0)
-              continue; /* Simply don't consider that (p,r) for now.
-                           FIXME: can we find the locations to sieve? */
+              {
+                fprintf (stderr, "# fill_in_buckets: reduce_plattice() "
+                         "returned 0 for p = " FBPRIME_FORMAT ", r = "
+                         FBPRIME_FORMAT "\n", p, r);
+                continue; /* Simply don't consider that (p,r) for now.
+                             FIXME: can we find the locations to sieve? */
+              }
               
             // Start sieving from (0,0) which is I/2 in x-coordinate
             uint32_t x;
@@ -1240,21 +1277,21 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
     const factorbase_degn_t *fb_sav = fb;
     const fbprime_t *badprimes;
     int n = 0, nb;
-    unsigned int I = si->I;
+    const unsigned int thresh = si->bucket_thresh;
     const int verbose = 0;
 
     ASSERT (side == 'a' || side == 'r');
     badprimes = (side == 'r') ? si->rbadprimes : si->abadprimes;
     ASSERT (badprimes != NULL);
 
-    // Count prime ideals of factor base primes p < I
-    while (fb->p != FB_END && fb->p <= I) {
+    // Count prime ideals of factor base primes p < thresh
+    while (fb->p != FB_END && fb->p < thresh) {
         n += fb->nr_roots;
         fb = fb_next (fb); // cannot do fb++, due to variable size !
     }
-    // Count bad primes p < I
+    // Count bad primes p < thresh
     nb = 0;
-    while (badprimes[nb] != 0 && badprimes[nb] < I)
+    while (badprimes[nb] != 0 && badprimes[nb] < thresh)
       nb++;
     n += nb;
     fb = fb_sav;
@@ -1267,15 +1304,15 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
     ssd->nb_bad_p = 0;
     ssd->bad_p = NULL;
     // Do another pass on fb and badprimes, to fill in the data
-    // while we have any regular primes or bad primes < I left
-    while ((fb->p != FB_END && fb->p <= I) || 
-           (badprimes[nb] != 0 && badprimes[nb] < I)) {
+    // while we have any regular primes or bad primes < thresh left
+    while ((fb->p != FB_END && fb->p < thresh) || 
+           (badprimes[nb] != 0 && badprimes[nb] < thresh)) {
       int nr = 0, nr_roots, logp;
       fbprime_t p, r;
       do // We process either a bad prime, or one root of a good prime
         {
           // If there's a bad prime less than the next eligible regular prime
-          if (badprimes[nb] != 0 && badprimes[nb] < I && 
+          if (badprimes[nb] != 0 && badprimes[nb] < thresh && 
              (fb->p == FB_END || badprimes[nb] < fb->p)) 
             {
               /* Transform a prime that's "bad" in the a,b-plane */
@@ -1317,7 +1354,7 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
                  one, do we? (Although that one has a nice small norm...)
                  Assuming we don't, skip over j=0 by initing next_position 
                  to p*I here (i.e., the line j = p) */
-              ssd->bad_p[ssd->nb_bad_p].next_position = p * I;
+              ssd->bad_p[ssd->nb_bad_p].next_position = p * si->I;
               ssd->bad_p[ssd->nb_bad_p].logp = logp;
               ssd->nb_bad_p++;
             }
@@ -1329,7 +1366,7 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
             ssd->nice_p[n].p = p;
             ssd->nice_p[n].r = r;
             ssd->nice_p[n].logp = logp;
-            ssd->nice_p[n].next_position = (I>>1)%p;
+            ssd->nice_p[n].next_position = (si->I >> 1)%p;
             n++;
           }
         }  while (nr < nr_roots);
@@ -1346,7 +1383,7 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
       }
 }
 
-// Sieve small primes (up to p < I) of the factor base fb in the 
+// Sieve small primes (up to p < bucket_thresh) of the factor base fb in the 
 // next sieve region S.
 // Information about where we are is in ssd.
 void sieve_small_bucket_region(unsigned char *S, 
@@ -1485,8 +1522,7 @@ void
 resieve_small_bucket_region (bucket_array_t BA, unsigned char *S, 
 			     small_sieve_data_t *ssd, 
 			     const sieve_info_t *si, 
-			     fbprime_t *trialdiv_primes, 
-			     const unsigned char *S_thres)
+			     fbprime_t *trialdiv_primes)
 {
   const uint32_t I = si->I;
   unsigned char *S_ptr;
@@ -1517,7 +1553,7 @@ resieve_small_bucket_region (bucket_array_t BA, unsigned char *S,
           /* for j even, we sieve only odd i */
           for (i = (i0 & 1) ? i0 : i0 + p ; i < I; i += twop)
             {
-              if (S_thres[S_ptr[i]])
+              if (S_ptr[i] != 255)
                 {
                   bucket_update_t update;
                   unsigned int x = (j << (si->logI)) + i;
@@ -1538,7 +1574,7 @@ resieve_small_bucket_region (bucket_array_t BA, unsigned char *S,
           S_ptr += I;
           /* j odd */
           for (i = i0 ; i < I; i += p)
-              if (S_thres[S_ptr[i]])
+              if (S_ptr[i] != 255)
                 {
                   bucket_update_t update;
                   unsigned int x = ((j + 1) << (si->logI)) + i;
@@ -1586,7 +1622,7 @@ resieve_small_bucket_region (bucket_array_t BA, unsigned char *S,
               /* Yes, test only odd i-coordinates */
               for (i = 1; i < I; i += 2)
                 {
-                  if (S_thres[S_ptr[i]])
+                  if (S_ptr[i] != 255)
                     {
                       bucket_update_t update;
                       const unsigned int x = i0 + i;
@@ -1606,7 +1642,7 @@ resieve_small_bucket_region (bucket_array_t BA, unsigned char *S,
               /* No, test all i-coordinates */
               for (i = 0; i < I; i++)
                 {
-                  if (S_thres[S_ptr[i]])
+                  if (S_ptr[i] != 255)
                     {
                       bucket_update_t update;
                       const unsigned int x = i0 + i;
@@ -1821,20 +1857,23 @@ check_leftover_norm (mpz_t n, size_t lpb, mpz_t BB, mpz_t BBB, size_t mfb)
   return 1;
 }
 
-/* Stores the number of sieve reports with coprime a, b in *survivors */
+/* Adds the number of sieve reports to *survivors,
+   number of survivors with coprime a, b to *coprimes */
 
 static int
 factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
                   bucket_array_t alg_BA, factorbase_degn_t *fb_rat,
                   factorbase_degn_t *fb_alg, cado_poly cpoly, sieve_info_t *si,
-                  unsigned long *survivors, 
-		  small_sieve_data_t *srsd_alg, small_sieve_data_t *srsd_rat)
+                  unsigned long *survivors, unsigned long *coprimes,
+		  small_sieve_data_t *srsd_alg, small_sieve_data_t *srsd_rat,
+		  unsigned long *report_sizes_a, unsigned long *report_sizes_r,
+		  const unsigned char *rat_S)
 {
     int x;
     int64_t a;
     uint64_t b;
     int cpt = 0;
-    int surv = 0;
+    int surv = 0, copr = 0;
     mpz_t alg_norm, rat_norm, BBalg, BBrat, BBBalg, BBBrat;
     factor_list_t alg_factors, rat_factors;
     mpz_array_t *f_r = NULL, *f_a = NULL;    /* large prime factors */
@@ -1858,10 +1897,32 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
     mpz_mul_ui (BBBalg, BBalg, cpoly->alim);
     mpz_mul_ui (BBBrat, BBrat, cpoly->rlim);
 
-    purge_bucket (rat_BA, N, S, si->alg_Bound);
+    for (x = 0; x < si->bucket_region; ++x)
+      {
+        unsigned int X;
+        unsigned int i, j;
+
+        if (!(si->alg_Bound[S[x]]))
+          {
+            S[x] = 255;
+            continue;
+          }
+        surv++;
+
+        X = x + (N << si->log_bucket_region);
+        i = abs ((int) (X & (si->I - 1)) - si->I / 2);
+        j = X >> si->logI;
+        if (bin_gcd (i, j) != 1)
+          {
+            S[x] = 255;
+            continue;
+          }
+      }
+
+    purge_bucket (rat_BA, N, S);
     bucket_sortbucket (rat_BA, N);
     rewind_bucket (rat_BA, N);
-    purge_bucket (alg_BA, N, S, si->alg_Bound);
+    purge_bucket (alg_BA, N, S);
     bucket_sortbucket (alg_BA, N);
     rewind_bucket (alg_BA, N);
 
@@ -1872,13 +1933,13 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
     resieved_alg = init_bucket_array (1, si->bucket_region);
     resieved_rat = init_bucket_array (1, si->bucket_region);
     resieve_small_bucket_region (resieved_alg, S, srsd_alg, si, 
-				 si->trialdiv_primes_alg, si->alg_Bound);
+				 si->trialdiv_primes_alg);
     /* fprintf (stderr, "# Resieving bucket %d on alg side found %d primes\n", 
        N, nb_of_updates (resieved_alg, 0)); */
     bucket_sortbucket (resieved_alg, 0);
     rewind_bucket (resieved_alg, 0);
     resieve_small_bucket_region (resieved_rat, S, srsd_rat, si, 
-				 si->trialdiv_primes_rat, si->alg_Bound);
+				 si->trialdiv_primes_rat);
     /* fprintf (stderr, "# Resieving bucket %d on rat side found %d primes\n", 
        N, nb_of_updates (resieved_rat, 0)); */
     bucket_sortbucket (resieved_rat, 0);
@@ -1888,21 +1949,23 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
       {
         unsigned int i, j;
 
-        if (!(si->alg_Bound[S[x]]))
+        if (S[x] == 255)
           continue;
 
         // Compute algebraic and rational norms.
         xToAB (&a, &b, x + N*si->bucket_region, si);
         /* since a,b both even were not sieved, either a or b should be odd */
         ASSERT((a | b) & 1);
-        if (bin_gcd (a, b) != 1)
+        /* Since the q-lattice is exactly those (a, b) with 
+           a == rho*b (mod q), q|b  ==>  q|a  ==>  q | gcd(a,b) */
+        if (b == 0 || (b >= si->q && b % si->q == 0))
           continue;
+
+        copr++;
 
         /* For hunting missed relations */
         // if (a == -1128230057 && b == 66615)
         //  fprintf (stderr, "# Have relation -1128230057,66615 at x = %d\n", x);
-
-        surv++;
 
         // Trial divide rational norm
         eval_fij (rat_norm, cpoly->g, 1, a, b);
@@ -1948,8 +2011,12 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
         printf ("\n");
         fflush (stdout);
         cpt++;
+        report_sizes_a[S[x]]++; /* Build histogram of lucky S[x] values */
+        if (rat_S != NULL)
+          report_sizes_r[rat_S[x]]++; 
       }
     survivors[0] += surv;
+    coprimes[0] += copr;
     clear_bucket_array (resieved_alg);
     clear_bucket_array (resieved_rat);
     mpz_clear (BBalg);
@@ -2462,6 +2529,8 @@ usage (char *argv0)
   fprintf (stderr, "          -q1 nnn         right bound of special-q range\n");
   fprintf (stderr, "          -rho r          sieve only algebraic root r mod q0\n");
   fprintf (stderr, "          -tdthresh nnn   trial-divide primes p/r <= nnn (r=number of roots)\n");
+  fprintf (stderr, "          -bkthresh nnn   bucket-sieve primes p >= nnn\n");
+  fprintf (stderr, "          -v              be verbose (print some sieving statistics)\n");
   exit (1);
 }
 
@@ -2475,13 +2544,16 @@ main (int argc, char *argv[])
     double t0, tfb, tq, tn_rat, tn_alg, tts, ttsm, ttf;
     uint64_t q0 = 0, q1 = 0, rho = 0;
     uint64_t *roots;
-    unsigned long nroots, tot_reports = 0, survivors0, survivors1;
+    unsigned long nroots, tot_reports = 0, survivors0, survivors1, survivors2;
     factorbase_degn_t * fb_alg, * fb_rat;
     int checknorms = 1; /* factor or not the remaining norms */
     int td_thresh = 1024; /* cost threshold trialdiv/resieving */
+    int bucket_thresh = 0;
     int I = DEFAULT_I, i;
+    int verbose = 0;
     unsigned long sq = 0;
     double totJ = 0.0;
+    unsigned long report_sizes_a[256], report_sizes_r[256];
 
     fprintf (stderr, "# %s.r%s", argv[0], REV);
     for (i = 1; i < argc; i++)
@@ -2493,6 +2565,12 @@ main (int argc, char *argv[])
         if (strcmp (argv[1], "-no-checknorms") == 0)
           {
             checknorms = 0;
+            argc -= 1;
+            argv += 1;
+          }
+        if (strcmp (argv[1], "-v") == 0)
+          {
+            verbose = 1;
             argc -= 1;
             argv += 1;
           }
@@ -2539,6 +2617,12 @@ main (int argc, char *argv[])
             argc -= 2;
             argv += 2;
           }
+        else if (argc > 2 && strcmp (argv[1], "-bkthresh") == 0)
+          {
+            bucket_thresh = atoi (argv[2]);
+            argc -= 2;
+            argv += 2;
+          }
         else
           usage (argv0);
       }
@@ -2574,6 +2658,9 @@ main (int argc, char *argv[])
     /* this does not depend on the special-q */
     sieve_info_init (&si, cpoly, I, q0);
     si.checknorms = checknorms;
+    if (bucket_thresh > si.bucket_thresh)
+      si.bucket_thresh = bucket_thresh;
+      
 
     tfb = seconds ();
     fb_alg = fb_read (fbfilename, si.scale_alg * LOG_SCALE, 0);
@@ -2594,8 +2681,10 @@ main (int argc, char *argv[])
 
     /* Init refactoring stuff */
     int skip2;
-    si.trialdiv_primes_rat = fb_extract_bycost (fb_rat, si.I, td_thresh);
-    si.trialdiv_primes_alg = fb_extract_bycost (fb_alg, si.I, td_thresh);
+    si.trialdiv_primes_rat = fb_extract_bycost (fb_rat, si.bucket_thresh, 
+                                                td_thresh);
+    si.trialdiv_primes_alg = fb_extract_bycost (fb_alg, si.bucket_thresh, 
+                                                td_thresh);
     for (i = 0; si.trialdiv_primes_alg[i] != FB_END; i++);
     skip2 = (i > 0 && si.trialdiv_primes_alg[0] == 2) ? 1 : 0;
     si.trialdiv_data_alg = trialdiv_init (si.trialdiv_primes_alg + skip2, 
@@ -2606,6 +2695,12 @@ main (int argc, char *argv[])
                                           i - skip2);
     si.strategy = facul_make_strategy (15, MIN(cpoly->rlim, cpoly->alim),
                                        1UL << MIN(cpoly->lpbr, cpoly->lpba));
+
+    for (i = 0; i < 256; i++)
+      {
+        report_sizes_a[i] = 0;
+        report_sizes_r[i] = 0;
+      }
 
     /* special q (and root rho) */
     roots = (uint64_t *) malloc (cpoly->degree * sizeof (uint64_t));
@@ -2683,10 +2778,15 @@ main (int argc, char *argv[])
 	copy_small_sieve (&srsd_rat, &ssd_rat);
 	
         /* Process each bucket region, one after the other */
-        unsigned char *S;
+        unsigned char *S, *rat_S;
         S = (unsigned char *)malloc(si.bucket_region*sizeof(unsigned char));
+        if (verbose)
+          rat_S = (unsigned char *)
+                  malloc(si.bucket_region*sizeof(unsigned char));
+        else
+          rat_S = NULL;
         int reports = 0;
-        survivors0 = survivors1 = 0;
+        survivors0 = survivors1 = survivors2 = 0;
         for (i = 0; i < si.nb_buckets; ++i) {
             /* Init rational norms */
             tn_rat -= seconds ();
@@ -2698,6 +2798,9 @@ main (int argc, char *argv[])
             ttsm += seconds();
             /* Sieve small rational primes */
             sieve_small_bucket_region(S, ssd_rat, &si);
+            /* Make copy of sieve report values for histogram */
+            if (rat_S != NULL)
+              memcpy (rat_S, S, si.bucket_region*sizeof(unsigned char));
 
             /* Init algebraic norms */
             tn_alg -= seconds ();
@@ -2714,7 +2817,9 @@ main (int argc, char *argv[])
             ttf -= seconds ();
             reports += factor_survivors (S, i, rat_BA, alg_BA, fb_rat,
                                          fb_alg, cpoly, &si, &survivors1,
-					 &srsd_alg, &srsd_rat);
+					 &survivors2, &srsd_alg, &srsd_rat,
+					 report_sizes_a, report_sizes_r,
+					 rat_S);
             ttf += seconds ();
         }
         clear_small_sieve(ssd_rat);
@@ -2722,16 +2827,22 @@ main (int argc, char *argv[])
         clear_small_sieve(srsd_rat);
         clear_small_sieve(srsd_alg);
         tot_reports += reports;
-#ifdef VERBOSE
-        fprintf (stderr, "# %lu survivors after rational sieve,", survivors0);
-        fprintf (stderr, " %lu survivors after algebraic sieve\n", survivors1);
-#endif
+        if (verbose)
+          {
+            fprintf (stderr, "# %lu survivors after rational sieve,", 
+                     survivors0);
+            fprintf (stderr, " %lu survivors after algebraic sieve, ", 
+                     survivors1);
+            fprintf (stderr, "coprime: %lu\n", survivors2);
+          }
         fprintf (stderr, "# %d relation(s) for (%" PRIu64 ",%" PRIu64
                  "), total %lu [%1.3fs/r]\n#\n", reports, si.q, si.rho,
                  tot_reports, (seconds () - t0) / (double) tot_reports);
         clear_bucket_array(alg_BA);
         clear_bucket_array(rat_BA);
         free(S);
+        if (rat_S != NULL)
+          free (rat_S);
       } // end of loop over special q ideals.
 
  end:
@@ -2739,7 +2850,21 @@ main (int argc, char *argv[])
     fprintf (stderr, "# Average J=%1.0f for %lu special-q's\n",
              totJ / (double) sq, sq);
     tts = t0 - (tn_rat + tn_alg + ttf);
-    facul_print_stats (stderr);
+    if (verbose)
+      facul_print_stats (stderr);
+    if (verbose)
+      {
+        fprintf (stderr, "# Histogram of sieve report values that led to "
+                 "relations:\n# Algebraic side: ");
+        for (i = 0; i < 256; i++)
+          if (report_sizes_a[i] > 0)
+            fprintf (stderr, "%d:%lu ", i, report_sizes_a[i]);
+        fprintf (stderr, "\n# Rational side: ");
+        for (i = 0; i < 256; i++)
+          if (report_sizes_r[i] > 0)
+            fprintf (stderr, "%d:%lu ", i, report_sizes_r[i]);
+        fprintf (stderr, "\n");
+      }
     fprintf (stderr, "# Total time %1.1fs [norm %1.2f+%1.1f, sieving %1.1f"
             " (%1.1f + %1.1f),"
              " factor %1.1f]\n", t0, tn_rat, tn_alg, tts, ttsm, tts-ttsm, ttf);
