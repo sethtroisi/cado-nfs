@@ -316,13 +316,12 @@ is_end(const bucket_array_t BA, const int i)
    This will speed up the trial division, since we will loop
    over less entries. */
 static void
-purge_bucket (bucket_array_t BA, const int i, unsigned char *S,
-              unsigned char *tst)
+purge_bucket (bucket_array_t BA, const int i, unsigned char *S)
 {
   bucket_update_t *u, *v;
 
   for (u = v = BA.bucket_start[i]; u < BA.bucket_write[i]; u++)
-    if (tst[S[u->x]])
+    if (S[u->x] != 255)
       *v++ = *u;
   BA.bucket_write[i] = v;
 }
