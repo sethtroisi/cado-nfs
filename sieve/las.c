@@ -1348,7 +1348,7 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
                            realloc (ssd->bad_p, (ssd->nb_bad_p + 1) * 
                                     sizeof (small_bad_prime_data_t));
               ssd->bad_p[ssd->nb_bad_p].p = p;
-              /* gcd (a,b) = gcd (i,j), so for j=0, gcd(a,b) = abs(i), so 
+              /* gcd (i,j) | gcd (a,b), so for j=0, gcd(a,b) = abs(i), so 
                  the only potential relation in the q-lattice line with 
                  j=0 is i = +-1. I think we don't bother sieving for that 
                  one, do we? (Although that one has a nice small norm...)
@@ -1869,7 +1869,7 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
 		  unsigned long *report_sizes_a, unsigned long *report_sizes_r,
 		  const unsigned char *rat_S)
 {
-    int x;
+    int x, xul;
     int64_t a;
     uint64_t b;
     int cpt = 0;
@@ -1945,76 +1945,81 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
     bucket_sortbucket (resieved_rat, 0);
     rewind_bucket (resieved_rat, 0);
     
-    for (x = 0; x < si->bucket_region; ++x)
-      {
-        unsigned int i, j;
+    /* Scan array one long word at a time. If any byte is <255, i.e. if
+       the long word is != 0xFFFF...FF, examine the bytes */
+    for (xul = 0; xul < si->bucket_region; xul += sizeof (unsigned long))
+      if (*(unsigned long *)(S + xul) != (unsigned long)(-1L))
+        for (x = xul; x < xul + (int) sizeof (unsigned long); ++x)
+          {
+            unsigned int i, j;
 
-        if (S[x] == 255)
-          continue;
+            if (S[x] == 255)
+              continue;
 
-        // Compute algebraic and rational norms.
-        xToAB (&a, &b, x + N*si->bucket_region, si);
-        /* since a,b both even were not sieved, either a or b should be odd */
-        ASSERT((a | b) & 1);
-        /* Since the q-lattice is exactly those (a, b) with 
-           a == rho*b (mod q), q|b  ==>  q|a  ==>  q | gcd(a,b) */
-        if (b == 0 || (b >= si->q && b % si->q == 0))
-          continue;
+            // Compute algebraic and rational norms.
+            xToAB (&a, &b, x + N*si->bucket_region, si);
+            /* since a,b both even were not sieved, either a or b should be odd */
+            ASSERT((a | b) & 1);
+            /* Since the q-lattice is exactly those (a, b) with 
+               a == rho*b (mod q), q|b  ==>  q|a  ==>  q | gcd(a,b) */
+            if (b == 0 || (b >= si->q && b % si->q == 0))
+              continue;
 
-        copr++;
+            copr++;
 
-        /* For hunting missed relations */
-        // if (a == -1128230057 && b == 66615)
-        //  fprintf (stderr, "# Have relation -1128230057,66615 at x = %d\n", x);
+            /* For hunting missed relations */
+            // if (a == -1128230057 && b == 66615)
+            //  fprintf (stderr, "# Have relation -1128230057,66615 at x = %d\n", x);
 
-        // Trial divide rational norm
-        eval_fij (rat_norm, cpoly->g, 1, a, b);
-        trial_div (&rat_factors, rat_norm, rat_BA, N, x, fb_rat, 
-                   si->rbadprimes, resieved_rat, si->trialdiv_data_rat);
-        
-        if (!check_leftover_norm (rat_norm, cpoly->lpbr, BBrat, BBBrat, 
-                                  cpoly->mfbr))
-          continue;
+            // Trial divide rational norm
+            eval_fij (rat_norm, cpoly->g, 1, a, b);
+            trial_div (&rat_factors, rat_norm, rat_BA, N, x, fb_rat, 
+                       si->rbadprimes, resieved_rat, si->trialdiv_data_rat);
+            
+            if (!check_leftover_norm (rat_norm, cpoly->lpbr, BBrat, BBBrat, 
+                                      cpoly->mfbr))
+              continue;
 
-        // Trial divide algebraic norm
-        eval_fij (alg_norm, cpoly->f, cpoly->degree, a, b);
-        mpz_divexact_ui (alg_norm, alg_norm, si->q);
-        trial_div (&alg_factors, alg_norm, alg_BA, N, x, fb_alg, 
-                   si->abadprimes, resieved_alg, si->trialdiv_data_alg);
+            // Trial divide algebraic norm
+            eval_fij (alg_norm, cpoly->f, cpoly->degree, a, b);
+            mpz_divexact_ui (alg_norm, alg_norm, si->q);
+            trial_div (&alg_factors, alg_norm, alg_BA, N, x, fb_alg, 
+                       si->abadprimes, resieved_alg, si->trialdiv_data_alg);
 
-        if (!check_leftover_norm (alg_norm, cpoly->lpba, BBalg, BBBalg, 
-                                  cpoly->mfba))
-          continue;
+            if (!check_leftover_norm (alg_norm, cpoly->lpba, BBalg, BBBalg, 
+                                      cpoly->mfba))
+              continue;
 
-        if (factor_leftover_norm (rat_norm, cpoly->lpbr, f_r, m_r, 
-				  si->strategy) == 0)
-          continue;
+            if (factor_leftover_norm (rat_norm, cpoly->lpbr, f_r, m_r, 
+                                      si->strategy) == 0)
+              continue;
 
-        if (factor_leftover_norm (alg_norm, cpoly->lpba, f_a, m_a, 
-				  si->strategy) == 0)
-          continue;
+            if (factor_leftover_norm (alg_norm, cpoly->lpba, f_a, m_a, 
+                                      si->strategy) == 0)
+              continue;
 
-        printf ("%" PRId64 ",%" PRIu64 ":", a, b);
-        factor_list_fprint (stdout, rat_factors);
-        for (i = 0; i < f_r->length; ++i)
-          for (j = 0; j < m_r->data[i]; j++)
-            gmp_printf (",%Zx", f_r->data[i]);
-        printf (":");
-        factor_list_fprint (stdout, alg_factors);
-        if (alg_factors.n != 0)
-          printf (",");
-        for (i = 0; i < f_a->length; ++i)
-          for (j = 0; j < m_a->data[i]; j++)
-            gmp_printf ("%Zx,", f_a->data[i]);
-        /* print special q */
-        printf ("%" PRIx64 "", si->q);
-        printf ("\n");
-        fflush (stdout);
-        cpt++;
-        report_sizes_a[S[x]]++; /* Build histogram of lucky S[x] values */
-        if (rat_S != NULL)
-          report_sizes_r[rat_S[x]]++; 
-      }
+            printf ("%" PRId64 ",%" PRIu64 ":", a, b);
+            factor_list_fprint (stdout, rat_factors);
+            for (i = 0; i < f_r->length; ++i)
+              for (j = 0; j < m_r->data[i]; j++)
+                gmp_printf (",%Zx", f_r->data[i]);
+            printf (":");
+            factor_list_fprint (stdout, alg_factors);
+            if (alg_factors.n != 0)
+              printf (",");
+            for (i = 0; i < f_a->length; ++i)
+              for (j = 0; j < m_a->data[i]; j++)
+                gmp_printf ("%Zx,", f_a->data[i]);
+            /* print special q */
+            printf ("%" PRIx64 "", si->q);
+            printf ("\n");
+            fflush (stdout);
+            cpt++;
+            report_sizes_a[S[x]]++; /* Build histogram of lucky S[x] values */
+            if (rat_S != NULL)
+              report_sizes_r[rat_S[x]]++; 
+          }
+
     survivors[0] += surv;
     coprimes[0] += copr;
     clear_bucket_array (resieved_alg);
