@@ -23,5 +23,7 @@
 #include "cado_poly.h"
 #include "rootfinder.h"
 #include "params.h"
+#include "gcd_int64.h"
+#include "gcd_uint64.h"
 
 #endif	/* CADO_UTILS_H_ */

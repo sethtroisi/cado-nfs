@@ -4,7 +4,7 @@ include $(TOP)/Makefile.common
 # All parts of libutils.
 names:=	cado_poly relation timing plain_poly \
 	getprime mod_ul modredc_ul modredc_15ul modul_poly gmp_aux \
-	fpoly rootfinder params
+	fpoly rootfinder params gcd_int64 gcd_uint64
 
 src:=$(patsubst %,%.c,$(names))
 obj:=$(patsubst %,%.o,$(names))
