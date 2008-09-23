@@ -1,12 +1,17 @@
-#!/bin/sh -
+#!/bin/bash
 # shell-script to automate the (re)factorization of reference numbers
 # Usage: factor_from_rels name <parameters>
 
+# You may tweak the choice of default parameters on the command line. If
+# variables d, tmp, cado, or mt are defined in the environment, then the
+# values for the environment are preferred over the default values which
+# can be read below for these parameters.
+
 # update if necessary, or better autoselect directory from site (LORIA/LIX)
-d=/net/tiramisu/cado1/cado/Examples
-tmp=/localdisk/tmp
+: ${d:=/net/tiramisu/cado1/cado/Examples}
+: ${tmp:=/localdisk/tmp}
 # $cado should point to the ../dist/src directory
-cado="`dirname $0`"
+: ${cado:="`dirname $0`"}
 
 name=$1
 
@@ -19,7 +24,7 @@ if [ $# -ge 4 ]; then cwmax=$4; fi
 if [ $# -ge 5 ]; then rwmax=$5; fi
 
 # number of processors
-mt=2
+: ${mt:=2}
 
 /bin/rm -fr $tmp/$name
 tmp=$tmp/$name
