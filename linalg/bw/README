@@ -1,5 +1,5 @@
 Block Wiedemann.  
-For the impatient, there's a ./doit.pl script which illustrates how the
+For the impatient, there's a ./bw.pl script which illustrates how the
 solver works. It works as follows, for checking random matrices.
 
 ./doit.pl msize=10000 dens=100 modulus=31 mn=8 vectoring=2 threshold=128
@@ -74,16 +74,14 @@ tidy=0		do not remove the working directory once the computation
 		is finished
 		default: 1, do remove the directory.
 
-Restarting from a checkpoint:
+Restarting from a checkpoint.
 * in theory, it should suffice to restart the bw.pl command issued by say
-  cadofactor.pl, however it seems the current version of bw.pl deletes the
-  existing files in the working directory bw.
-* as a temporary workaround, for a restart in krylov:
-  1) save a copy of the V00.001 file (not in the bw directory!)
+  cadofactor.pl, with the added ``resume=1'' option on the command line.
+  however this functionality has its ups and downs over time.
+* as a workaround, for a restart in krylov:
+  1) save a backup of the bw directory ; you may hard-link matrix file
+     from the backup directory to the original
   2) start bw.pl
-  3) once the krylov command is issued in the stderr file, kill bw.pl,
-     copy the V00.001 file in bw, and restart the krylov command.
-     Then you should run manually lingen and mksol.
-
-
-
+  3) once the krylov command line is issued in the stderr file, kill
+     bw.pl, copy back the contents of the backup directory to where they
+     were originally, and later on copy-paste the krylov command.
