@@ -25,8 +25,6 @@
 #  - Use Kleinjung program instead of polyselect
 #  - Bench polynomials with some sieve before selecting the best one.
 #  - Enable a 'lowmem' option
-#  - How to remove a computer from mach_desc? (should work, but test and
-#    document).
 
 use strict;
 use warnings;
@@ -973,6 +971,15 @@ sub parallel_sieve {
             print "Wait for $delay seconds before checking again.\n";
             sleep($delay);
         }
+    }
+
+    ## clean remaining sieving-related files on slaves
+    my %mach_desc = read_machine_description($param);
+    my $name = $param->{'name'};
+    for my $m (keys %mach_desc) {
+        my %desc = %{$mach_desc{$m}};
+        my $wdir = $desc{'tmpdir'};
+        my $ret = `ssh $m "/bin/rm $wdir/$name.rels.* $wdir/$name.poly $wdir/$name.roots"`;
     }
     return $nrels;
 }
