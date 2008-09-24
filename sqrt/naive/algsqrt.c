@@ -4,9 +4,15 @@
  * Purpose: computing the squareroots and finishing the factorization
  *
  Possible easy improvements:
- * none so far
+ * implement a subquadratic reduction mod F in poly_mod_f_mod_mpz.
+   However the main cost now comes from the barrett_mod() calls, i.e.,
+   from the reduction of coefficients, not from that of the polynomial.
  Harder improvements:
- * improve the reduction modulo f (what is the best strategy?)
+ * instead of collecting all a-b*x in the numerator, collect half of them
+   in the numerator, and half of them in the denominator (cf paper of Nguyen
+   at ANTS3, and thesis of Elkenbracht-Huizing). Some experiments suggest
+   that only 1/3rd of the precision is enough to recover sqrt(P/Q), which
+   is then a polynomial with *rational* coefficients.
  * cache FFT transforms wherever possible
  * use Karp-Markstein trick to incorporate in the last Hensel iteration for
    1/sqrt(x) the value of x to get an approximation of sqrt(x)
@@ -88,8 +94,10 @@ poly_integer_reconstruction (poly_t R, const mpz_t m)
 #endif
 
 // compute res := sqrt(a) in Fp[x]/f(x)
-void TonelliShanks(poly_t res, const poly_t a, const poly_t f, unsigned long p) {
-  int d = f->deg;
+static void
+TonelliShanks (poly_t res, const poly_t a, const poly_t F, unsigned long p)
+{
+  int d = F->deg;
   mpz_t q;
   poly_t delta;  // a non quadratic residue
   poly_t auxpol;
@@ -127,7 +135,7 @@ void TonelliShanks(poly_t res, const poly_t a, const poly_t f, unsigned long p) 
 	mpz_urandomm(delta->coeff[i], state, myp);
       cleandeg(delta, d-1);
       // raise it to power (q-1)/2
-      poly_power_mod_f_mod_ui(auxpol, delta, f, aux, p);
+      poly_power_mod_f_mod_ui(auxpol, delta, F, aux, p);
     } while ((auxpol->deg != 0) || (mpz_cmp_ui(auxpol->coeff[0], p-1)!= 0));
     gmp_randclear (state);
   }
@@ -140,23 +148,23 @@ void TonelliShanks(poly_t res, const poly_t a, const poly_t f, unsigned long p) 
     poly_alloc(A, d);
     poly_alloc(D, d);
     mpz_init_set_ui(m, 0);
-    poly_power_mod_f_mod_ui(A, a, f, t, p);
-    poly_power_mod_f_mod_ui(D, delta, f, t, p);
+    poly_power_mod_f_mod_ui(A, a, F, t, p);
+    poly_power_mod_f_mod_ui(D, delta, F, t, p);
     for (i = 0; i <= s-1; ++i) {
-      poly_power_mod_f_mod_ui(auxpol, D, f, m, p);
-      poly_mul_mod_f_mod_mpz(auxpol, auxpol, A, f, myp, NULL);
+      poly_power_mod_f_mod_ui(auxpol, D, F, m, p);
+      poly_mul_mod_f_mod_mpz(auxpol, auxpol, A, F, myp, NULL);
       mpz_ui_pow_ui(aux, 2, (s-1-i));
-      poly_power_mod_f_mod_ui(auxpol, auxpol, f, aux, p);
+      poly_power_mod_f_mod_ui(auxpol, auxpol, F, aux, p);
       if ((auxpol->deg == 0) && (mpz_cmp_ui(auxpol->coeff[0], p-1)== 0))
 	mpz_add_ui(m, m, 1UL<<i);
     }
     mpz_add_ui(t, t, 1);
     mpz_divexact_ui(t, t, 2);
-    poly_power_mod_f_mod_ui(res, a, f, t, p);
+    poly_power_mod_f_mod_ui(res, a, F, t, p);
     mpz_divexact_ui(m, m, 2);
-    poly_power_mod_f_mod_ui(auxpol, D, f, m, p);
+    poly_power_mod_f_mod_ui(auxpol, D, F, m, p);
 
-    poly_mul_mod_f_mod_mpz(res, res, auxpol, f, myp, NULL);
+    poly_mul_mod_f_mod_mpz(res, res, auxpol, F, myp, NULL);
     poly_free(D);
     poly_free(A);
     mpz_clear(m);
@@ -211,10 +219,9 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, poly_t F, unsigned long p)
   // Variables for the lifted values
   poly_t invsqrtA;
   // variables for A and F modulo pk
-  poly_t a, f;
+  poly_t a;
   poly_alloc(invsqrtA, d-1);
   poly_alloc(a, d-1);
-  poly_alloc(f, d);
   // variable for the current pk
   mpz_t pk, invpk;
   mpz_init (pk);
@@ -241,7 +248,6 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, poly_t F, unsigned long p)
   mpz_set_ui (pk, p);
   k = 1; /* invariant: pk = p^k */
   lk = 0; /* k = 2^lk */
-  poly_reduce_makemonic_mod_mpz (f, F, pk);
   st = seconds ();
   P = poly_base_modp_init (A, p, K, logk);
   fprintf (stderr, "poly_base_modp_init took %2.2lf\n", seconds () - st);
@@ -262,11 +268,11 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, poly_t F, unsigned long p)
     mpz_mul_ui(aux, q, 3);
     mpz_sub_ui(aux, aux, 5);
     mpz_divexact_ui(aux, aux, 4);		        // aux := (3q-5)/4
-    poly_power_mod_f_mod_ui(invsqrtA, a, f, aux, p);	
+    poly_power_mod_f_mod_ui(invsqrtA, a, F, aux, p);
 #else
-    TonelliShanks(invsqrtA, a, f, p);
+    TonelliShanks(invsqrtA, a, F, p);
     mpz_sub_ui(aux, q, 2);
-    poly_power_mod_f_mod_ui(invsqrtA, invsqrtA, f, aux, p);
+    poly_power_mod_f_mod_ui(invsqrtA, invsqrtA, F, aux, p);
 #endif
 
     mpz_clear(aux);
@@ -314,12 +320,10 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, poly_t F, unsigned long p)
 #ifdef VERBOSE
     fprintf (stderr, "   poly_base_modp_lift took %2.2lf\n", st);
 #endif
-    // compute F,A modulo the new modulus p^k
-    poly_reduce_makemonic_mod_mpz(f, F, pk); /* f = F/lc(F) mod p^k */
 
     // now, do the Newton operation x <- 1/2(3*x-a*x^3)
     st = seconds ();
-    poly_sqr_mod_f_mod_mpz(tmp, invsqrtA, f, pk, invpk); /* tmp = invsqrtA^2 */
+    poly_sqr_mod_f_mod_mpz(tmp, invsqrtA, F, pk, invpk); /* tmp = invsqrtA^2 */
 #ifdef VERBOSE
     fprintf (stderr, "   poly_sqr_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
 #endif
@@ -328,14 +332,14 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, poly_t F, unsigned long p)
        However I don't see how to use the fact that the coefficients
        if 1-a*x^2 are divisible by p^(k/2). */
     st = seconds ();
-    poly_mul_mod_f_mod_mpz (tmp, tmp, a, f, pk, invpk); /* tmp=a*invsqrtA^2 */
+    poly_mul_mod_f_mod_mpz (tmp, tmp, a, F, pk, invpk); /* tmp=a*invsqrtA^2 */
 #ifdef VERBOSE
     fprintf (stderr, "   poly_mul_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
 #endif
     poly_sub_ui (tmp, 1); /* a*invsqrtA^2-1 */
     poly_div_2_mod_mpz (tmp, tmp, pk); /* (a*invsqrtA^2-1)/2 */
     st = seconds ();
-    poly_mul_mod_f_mod_mpz (tmp, tmp, invsqrtA, f, pk, invpk);
+    poly_mul_mod_f_mod_mpz (tmp, tmp, invsqrtA, F, pk, invpk);
 #ifdef VERBOSE
     fprintf (stderr, "   poly_mul_mod_f_mod_mpz took %2.2lf\n", seconds () - st);
 #endif
@@ -345,7 +349,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, poly_t F, unsigned long p)
   } while (k < target_k);
 
   /* multiply by a to get an approximation of the square root */
-  poly_mul_mod_f_mod_mpz (tmp, invsqrtA, a, f, pk, invpk);
+  poly_mul_mod_f_mod_mpz (tmp, invsqrtA, a, F, pk, invpk);
   poly_mod_center (tmp, pk);
 
   poly_base_modp_clear (P);
@@ -357,7 +361,6 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, poly_t F, unsigned long p)
   mpz_clear (invpk);
   poly_free(tmp);
   poly_free(tmp2);
-  poly_free(f);
   poly_free (A);
   poly_free (invsqrtA);
   poly_free (a);

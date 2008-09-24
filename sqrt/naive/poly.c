@@ -305,7 +305,7 @@ poly_mul_tc_interpolate (mpz_t *f, int t)
                                  and similarly for all intermediate
                                  computations on M[i][j]. This avoids the
                                  use of mpz_t to store the M[i][j]. */
-  
+
   /* initialize M[i][j] = i^j */
   for (i = 0; i <= t; i++)
     for (j = 0; j <= t; j++)
@@ -359,7 +359,7 @@ poly_mul_tc (mpz_t *f, mpz_t *g, int r, mpz_t *h, int s)
   ASSERT_ALWAYS (t <= MAX_T);
 
   mpz_init (tmp);
-  
+
   /* first store g(i)*h(i) in f[i] for 0 <= i <= t */
   for (i = 0; i <= t; i++)
     {
@@ -581,22 +581,17 @@ poly_reducemodF(polymodF_t P, poly_t p, const poly_t F) {
     const int k = p->deg;
     int i;
 
-    /* We compute F[d]*p - p[k]*F. In case F[d] divides p[k],
-       we can simply compute p - p[k]/F[d]*F */
-
-    if (mpz_divisible_p (p->coeff[k], F->coeff[d]))
-      mpz_divexact (p->coeff[k], p->coeff[k], F->coeff[d]);
-    else
-      {
-        v++; /* we consider p/F[d]^v */
-        for (i = 0; i < k; ++i)
-          mpz_mul(p->coeff[i], p->coeff[i], F->coeff[d]);
-      }
+    /* We compute F[d]*p - p[k]*F. In case F[d] divides p[k], we can simply
+       compute p - p[k]/F[d]*F. However this will happen rarely with
+       Kleinjung's polynomial selection, since lc(F) is large. */
+    v++; /* we consider p/F[d]^v */
+    for (i = 0; i < k; ++i)
+      mpz_mul (p->coeff[i], p->coeff[i], F->coeff[d]);
 
     for (i = 0; i < d; ++i) 
-      mpz_submul(p->coeff[k-d+i], p->coeff[k], F->coeff[i]);
+      mpz_submul (p->coeff[k-d+i], p->coeff[k], F->coeff[i]);
 
-    cleandeg(p, k-1);
+    cleandeg (p, k-1);
   }
   
   poly_copy(P->p, p);
@@ -798,62 +793,99 @@ poly_reduce_makemonic_mod_mpz (poly_t Q, const poly_t P, const mpz_t m)
   mpz_clear(aux2);
 }
 
-// Q = P1*P2 mod F, mod m (assume F monic)
+/* Reduce R[d]*x^d + ... + R[0] mod f[df]*x^df + ... + f[0] modulo m.
+   Return the degree of the remainder.
+ */
+int
+poly_mod_f_mod_mpz (mpz_t *R, int d, mpz_t *f, int df, const mpz_t m,
+                    const mpz_t invm)
+{
+  int i;
+  mpz_t aux, c;
+
+  mpz_init (aux);
+  mpz_init (c);
+  mpz_invert (aux, m, f[df]); /* aux = 1/m mod lc(f). We could precompute it
+                                 but it should not cost much. */
+  // FIXME: write a subquadratic variant
+  while (d >= df)
+    {
+      /* First reduce the leading coefficient of R mod m. However this is
+         quite expensive, since it costs O(D(n)) where m has size n, whereas
+         if we leave R[d] to size 2n, we have an overhead of O(n) only. */
+      // barrett_mod (R[d], R[d], m, invm);
+      /* Here m is large (typically several million bits) and lc(f) is small
+         (typically one word). We first add to R lambda * m * x^(d-df)
+         --- which is zero mod m --- 
+         such that the new coefficient of degree d
+         is divisible by lc(f), i.e., lambda = -R[d]/m mod lc(f).
+         Then if c = (R[d] + lambda * m) / lc(f), we simply subtract
+         c * x^(d-df) * f.
+      */
+      mpz_mod (c, R[d], f[df]); /* R[d] mod lc(f) */
+      mpz_mul (c, c, aux);
+      mpz_mod (c, c, f[df]);    /* R[d]/m mod lc(f) */
+      mpz_submul (R[d], m, c);  /* R[d] - m * (R[d] / m mod lc(f)) */
+      ASSERT (mpz_divisible_p (R[d], f[df]));
+      mpz_divexact (c, R[d], f[df]);
+      for (i = d - 1; i >= d - df; --i)
+        mpz_submul (R[i], c, f[df-d+i]);
+      d--;
+    }
+
+  /* reduce lower coefficients */
+  for (i = 0; i <= d; ++i)
+    barrett_mod (R[i], R[i], m, invm);
+  mpz_clear (aux);
+  mpz_clear (c);
+
+  return d;
+}
+
+// Q = P1*P2 mod f, mod m
+// f is the original algebraic polynomial (non monic but small coefficients)
 void
-poly_mul_mod_f_mod_mpz(poly_t Q, const poly_t P1, const poly_t P2,
-                       const poly_t F, const mpz_t m, const mpz_t invm)
+poly_mul_mod_f_mod_mpz (poly_t Q, const poly_t P1, const poly_t P2,
+                        const poly_t f, const mpz_t m, const mpz_t invm)
 {
   int d1 = P1->deg;
   int d2 = P2->deg;
   int d = d1+d2;
-  int dF = F->deg;
+  int df = f->deg;
   poly_t R;
-  int i, j;
 
   poly_alloc(R, d);
 
-#if 0
+#if 0 /* quadratic product */
+  int j;
   // product mod m
   for (i = 0; i <= d1; ++i)
     for (j = 0; j <= d2; ++j)
       mpz_addmul(R->coeff[i+j], P1->coeff[i], P2->coeff[j]);
-#endif
+#else /* fast product */
   poly_mul_tc (R->coeff, P1->coeff, d1, P2->coeff, d2);
+#endif
 
-  // reduce mod F
-  while (d >= dF) {
-    barrett_mod (R->coeff[d], R->coeff[d], m, invm);
-    for (i = d-1; i >= d-dF; --i) {
-      mpz_submul(R->coeff[i], R->coeff[d], F->coeff[dF-d+i]);
-    }
-    d--;
-  }
-
-  /* reduce lower coefficients */
-  for (i = 0; i <= d; ++i)
-    barrett_mod(R->coeff[i], R->coeff[i], m, invm);
+  // reduce mod f
+  d = poly_mod_f_mod_mpz (R->coeff, d, f->coeff, df, m, invm);
 
   cleandeg(R, d);
   poly_copy(Q, R);
   poly_free(R);
 }
 
-// Q = P^2 mod F, mod m (assume F monic)
+// Q = P^2 mod f, mod m
+// f is the original algebraic polynomial (non monic but small coefficients)
 void
-poly_sqr_mod_f_mod_mpz (poly_t Q, const poly_t P, const poly_t F,
+poly_sqr_mod_f_mod_mpz (poly_t Q, const poly_t P, const poly_t f,
                         const mpz_t m, const mpz_t invm)
 {
   int d1 = P->deg;
   int d = d1 + d1;
-  int dF = F->deg;
+  int df = f->deg;
   poly_t R;
-  int i;
-  mpz_t aux;
-
-  ASSERT_ALWAYS(mpz_cmp_ui (F->coeff[dF], 1) == 0);
 
   poly_alloc(R, d);
-  mpz_init(aux);
 
 #if 0 /* Naive squaring in d1*(d1+1)/2 products and d1+1 squares, i.e.,
          d*(d-1)/2 products and d squares for an algebraic polynomial of
@@ -876,29 +908,18 @@ poly_sqr_mod_f_mod_mpz (poly_t Q, const poly_t P, const poly_t F,
   poly_sqr_tc (R->coeff, P->coeff, d1);
 #endif
 
-  // reduce mod F
-  while (d >= dF) {
-    barrett_mod (R->coeff[d], R->coeff[d], m, invm);
-    for (i = d-1; i >= d-dF; --i) {
-      mpz_submul(R->coeff[i], R->coeff[d], F->coeff[dF-d+i]);
-    }
-    d--;
-  }
-
-  /* reduce lower coefficients */
-  for (i = 0; i <= d; ++i)
-    barrett_mod (R->coeff[i], R->coeff[i], m, invm);
+  // reduce mod f
+  d = poly_mod_f_mod_mpz (R->coeff, d, f->coeff, df, m, invm);
 
   cleandeg(R, d);
   poly_copy(Q, R);
   poly_free(R);
-  mpz_clear(aux);
 }
 
-// Q = P^a mod F, mod p
+// Q = P^a mod f, mod p (f is the algebraic polynomial, non monic)
 void 
-poly_power_mod_f_mod_ui(poly_t Q, const poly_t P, const poly_t F,
-    const mpz_t a, unsigned long p)
+poly_power_mod_f_mod_ui (poly_t Q, const poly_t P, const poly_t f,
+                         const mpz_t a, unsigned long p)
 {
   mpz_t m;
   int k = mpz_sizeinbase(a, 2);
@@ -911,7 +932,7 @@ poly_power_mod_f_mod_ui(poly_t Q, const poly_t P, const poly_t F,
   }
 
   mpz_init_set_ui(m, p);
-  poly_alloc(R, 2*F->deg);
+  poly_alloc(R, 2*f->deg);
   
   // Initialize R to P
   poly_copy(R, P);
@@ -919,9 +940,9 @@ poly_power_mod_f_mod_ui(poly_t Q, const poly_t P, const poly_t F,
   // Horner
   for (k -= 2; k >= 0; k--)
   {
-    poly_sqr_mod_f_mod_mpz(R, R, F, m, NULL);  // R <- R^2
+    poly_sqr_mod_f_mod_mpz(R, R, f, m, NULL);  // R <- R^2
     if (mpz_tstbit(a, k))
-      poly_mul_mod_f_mod_mpz(R, R, P, F, m, NULL);  // R <- R*P
+      poly_mul_mod_f_mod_mpz(R, R, P, f, m, NULL);  // R <- R*P
   }
 
   poly_copy(Q, R);

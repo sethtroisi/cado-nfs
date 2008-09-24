@@ -60,10 +60,10 @@ void poly_mul_mpz(poly_t Q, const poly_t P, const mpz_t a);
 void poly_reduce_mod_mpz (poly_t Q, const poly_t P, const mpz_t m);
 void poly_reduce_makemonic_mod_mpz(poly_t Q, const poly_t P, const mpz_t m);
 void poly_mul_mod_f_mod_mpz(poly_t Q, const poly_t P1, const poly_t P2,
-                            const poly_t F, const mpz_t m, const mpz_t invm);
-void poly_sqr_mod_f_mod_mpz(poly_t Q, const poly_t P, const poly_t F,
+                            const poly_t f, const mpz_t m, const mpz_t invm);
+void poly_sqr_mod_f_mod_mpz(poly_t Q, const poly_t P, const poly_t f,
                             const mpz_t m, const mpz_t invm);
-void poly_power_mod_f_mod_ui(poly_t Q, const poly_t P, const poly_t F,
+void poly_power_mod_f_mod_ui(poly_t Q, const poly_t P, const poly_t f,
         const mpz_t a, unsigned long p);
 void barrett_init (mpz_t invm, const mpz_t m);
 poly_t* poly_base_modp_init (const poly_t P0, int p, int *K, int l);
