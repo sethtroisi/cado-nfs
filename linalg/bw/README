@@ -74,5 +74,16 @@ tidy=0		do not remove the working directory once the computation
 		is finished
 		default: 1, do remove the directory.
 
+Restarting from a checkpoint:
+* in theory, it should suffice to restart the bw.pl command issued by say
+  cadofactor.pl, however it seems the current version of bw.pl deletes the
+  existing files in the working directory bw.
+* as a temporary workaround, for a restart in krylov:
+  1) save a copy of the V00.001 file (not in the bw directory!)
+  2) start bw.pl
+  3) once the krylov command is issued in the stderr file, kill bw.pl,
+     copy the V00.001 file in bw, and restart the krylov command.
+     Then you should run manually lingen and mksol.
+
 
 
