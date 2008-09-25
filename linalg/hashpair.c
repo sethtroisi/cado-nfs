@@ -38,8 +38,8 @@ hashInit(hashtable_t *H, unsigned int n, int verbose)
                  (alloc_hashcount + alloc_hashtab_p + alloc_hashtab_r) / 1000000);
       }
     if(sizeof(unsigned long) == 8){
-	H->HC0 = 314159265358979323UL;
-	H->HC1 = 271828182845904523UL;
+      H->HC0 = MAGIC_HC0;
+      H->HC1 = MAGIC_HC1;
     }
     else{
 	H->HC0 = 3141592653UL;
@@ -93,7 +93,7 @@ getHashAddrAux(hashtable_t *H, long p, unsigned long r, unsigned int h)
 int
 getHashAddr(hashtable_t *H, long p, unsigned long r)
 {
-    unsigned int h = getInitialAddress((unsigned long)p, r, H->HC0, H->HC1, H->hashmod);
+    unsigned int h = getInitialAddressMod((unsigned long)p, r, H->HC0, H->HC1, H->hashmod);
 
     return getHashAddrAux(H, p, r, h);
 }
