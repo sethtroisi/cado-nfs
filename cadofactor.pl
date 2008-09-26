@@ -25,6 +25,11 @@
 #  - Use Kleinjung program instead of polyselect
 #  - Bench polynomials with some sieve before selecting the best one.
 #  - Enable a 'lowmem' option
+#  - Use compressed files (cf duplicates -out nodup.gz). Should we implement
+#    such a mechanism in las, or should we simply use las | gzip?
+#  - Recognize when the linear algebra was already started, and in such a case
+#    don't restart the sieving/pruning/filtering/merging steps, but resume
+#    bw with resume=1.
 
 use strict;
 use warnings;
