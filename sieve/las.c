@@ -32,6 +32,10 @@
 /* number of bits used to estimate the norms */
 #define NORM_BITS 10
 
+/* define PROFILE to keep certain function from being inlined, in order to
+   make them show up on profiler output */
+//#define PROFILE
+
 /* Trick to discard lognorms that will probably lead to non L-smooth
    cofactors. Disabled for now since it requires accurate sieving
    (in particular by prime powers and bad primes). */
@@ -70,6 +74,16 @@
 /* define TRACE_K to -I/2+i+I*j to trace the sieve array entry corresponding
    to (i,j), i.e., a = a0*i+a1*j, b = b0*i+b1*j */
 // #define TRACE_K 5418470
+
+/* Some functions should not be inlined when we profile or it's hard or 
+   impossible to tell them apart from the rest in the profiler output */
+#ifdef PROFILE
+#define NOPROFILE_INLINE
+#define NOPROFILE_STATIC
+#else
+#define NOPROFILE_INLINE static inline
+#define NOPROFILE_STATIC static
+#endif
 
 /* uintmax_t is guaranteed to be larger or equal to uint64_t */
 #define strtouint64(nptr,endptr,base) (uint64_t) strtoumax(nptr,endptr,base)
@@ -132,7 +146,7 @@ static void xToAB(int64_t *a, uint64_t *b, const unsigned int x,
 int factor_leftover_norm (mpz_t n, unsigned int b, mpz_array_t* const factors, 
 			  uint32_array_t* const multis, 
 			  facul_strategy_t *strategy);
-static void
+NOPROFILE_STATIC void
 eval_fij (mpz_t v, mpz_t *f, unsigned int d, long i, unsigned long j);
 
 
@@ -448,10 +462,7 @@ bingcd(unsigned long a, unsigned long b) {
 // a must be less than b.
 // a is modified in place
 // return 1 on succes, 0 on failure
-#ifndef PROFILE 
-inline static
-#endif
-int
+NOPROFILE_INLINE int
 invmod(unsigned long *pa, unsigned long b) {
 #if LOOKUP_TRAILING_ZEROS
   static const unsigned char trailing_zeros[256] = 
@@ -646,10 +657,7 @@ inf_root_in_qlattice(const fbprime_t p, const sieve_info_t * si)
   return root;
 }
 
-#ifndef PROFILE 
-inline static
-#endif
-fbprime_t
+NOPROFILE_INLINE fbprime_t
 fb_root_in_qlattice(const fbprime_t p, const fbprime_t R,
         const uint32_t invp, const sieve_info_t * si)
 {
@@ -720,10 +728,7 @@ typedef struct {
 //   yield (a0=g, b0=0) at some point --- or the converse --- and the loop
 //   while (|a0| >= I) a0 += b0 will loop forever.
 //
-#ifndef PROFILE 
-inline static
-#endif
-int
+NOPROFILE_INLINE int
 reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r,
                  const sieve_info_t * si)
 {
@@ -923,7 +928,7 @@ fill_in_buckets(bucket_array_t BA, factorbase_degn_t *fb,
     }
 }
 
-static void
+NOPROFILE_STATIC void
 apply_one_bucket (unsigned char *S, bucket_array_t BA, int i,
                      sieve_info_t * si MAYBE_UNUSED)
 {
@@ -942,7 +947,7 @@ apply_one_bucket (unsigned char *S, bucket_array_t BA, int i,
 /* Knowing the norm on the rational side is bounded by 2^(2^k), compute
    lognorms approximations for k bits of exponent + NORM_BITS-k bits
    of mantissa */
-static void
+NOPROFILE_STATIC void
 init_rat_norms (sieve_info_t *si)
 {
   double e, m, norm, h;
@@ -969,7 +974,7 @@ init_rat_norms (sieve_info_t *si)
 }
 
 /* idem as init_rat_norms, but for the algebraic side */
-static void
+NOPROFILE_STATIC void
 init_alg_norms (sieve_info_t *si)
 {
   double e, m, norm, h;
@@ -1001,7 +1006,7 @@ init_alg_norms (sieve_info_t *si)
  * For the moment, nothing clever, wrt discarding (a,b) pairs that are
  * not coprime, except for the line j=0.
  */
-static void
+NOPROFILE_STATIC void
 init_rat_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly,
                               sieve_info_t *si)
 {
@@ -1124,7 +1129,7 @@ fpoly_eval_v2df_deg5(const __v2df *f, const __v2df x)
  * others are set to 255. Case GCD(i,j)!=1 also gets 255.
  * return the number of reports (= number of norm initialisations)
  */
-static int
+NOPROFILE_STATIC int
 init_alg_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly,
                               sieve_info_t *si)
 {
@@ -1751,7 +1756,7 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const int x,
 
 
 /* L is lists of bad primes (ended with 0) */
-static void
+NOPROFILE_STATIC void
 trial_div (factor_list_t *fl, mpz_t norm, bucket_array_t BA, int N, int x,
            factorbase_degn_t *fb, fbprime_t *L,
 	   bucket_array_t resieved, trialdiv_divisor_t *trialdiv_data)
@@ -1854,13 +1859,15 @@ check_leftover_norm (mpz_t n, size_t lpb, mpz_t BB, mpz_t BBB, size_t mfb)
     return 0;
   if (2 * lpb < s && mpz_cmp (n, BBB) < 0)
     return 0;
+  if (lpb < s && mpz_probab_prime_p (n, 1))
+    return 0;
   return 1;
 }
 
 /* Adds the number of sieve reports to *survivors,
    number of survivors with coprime a, b to *coprimes */
 
-static int
+NOPROFILE_STATIC int
 factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
                   bucket_array_t alg_BA, factorbase_degn_t *fb_rat,
                   factorbase_degn_t *fb_alg, cado_poly cpoly, sieve_info_t *si,
@@ -1874,7 +1881,7 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
     uint64_t b;
     int cpt = 0;
     int surv = 0, copr = 0;
-    mpz_t alg_norm, rat_norm, BBalg, BBrat, BBBalg, BBBrat;
+    mpz_t alg_norm, rat_norm, BBalg, BBrat, BBBalg, BBBrat, BLPrat;
     factor_list_t alg_factors, rat_factors;
     mpz_array_t *f_r = NULL, *f_a = NULL;    /* large prime factors */
     uint32_array_t *m_r = NULL, *m_a = NULL; /* corresponding multiplicities */
@@ -1892,10 +1899,13 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
     mpz_init (BBrat);
     mpz_init (BBBalg);
     mpz_init (BBBrat);
+    mpz_init (BLPrat);
     mpz_ui_pow_ui (BBalg, cpoly->alim, 2);
     mpz_ui_pow_ui (BBrat, cpoly->rlim, 2);
     mpz_mul_ui (BBBalg, BBalg, cpoly->alim);
     mpz_mul_ui (BBBrat, BBrat, cpoly->rlim);
+    mpz_set_ui (BLPrat, cpoly->alim);
+    mpz_mul_2exp (BLPrat, BLPrat, cpoly->lpba); /* fb bound * lp bound */
 
     for (x = 0; x < si->bucket_region; ++x)
       {
@@ -1990,13 +2000,28 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
                                       cpoly->mfba))
               continue;
 
-            if (factor_leftover_norm (rat_norm, cpoly->lpbr, f_r, m_r, 
-                                      si->strategy) == 0)
-              continue;
+            if (mpz_cmp (rat_norm, BLPrat) > 0)
+              {
+                /* rat_norm might not be smooth, factor it first */
+                if (factor_leftover_norm (rat_norm, cpoly->lpbr, f_r, m_r, 
+                                          si->strategy) == 0)
+                  continue;
 
-            if (factor_leftover_norm (alg_norm, cpoly->lpba, f_a, m_a, 
-                                      si->strategy) == 0)
-              continue;
+                if (factor_leftover_norm (alg_norm, cpoly->lpba, f_a, m_a, 
+                                          si->strategy) == 0)
+                  continue;
+              }
+            else
+              {
+                /* rat_norm is definitely smooth, factor it last */
+                if (factor_leftover_norm (alg_norm, cpoly->lpba, f_a, m_a, 
+                                          si->strategy) == 0)
+                  continue;
+
+                if (factor_leftover_norm (rat_norm, cpoly->lpbr, f_r, m_r, 
+                                          si->strategy) == 0)
+                  continue;
+              }
 
             printf ("%" PRId64 ",%" PRIu64 ":", a, b);
             factor_list_fprint (stdout, rat_factors);
@@ -2028,6 +2053,7 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
     mpz_clear (BBrat);
     mpz_clear (BBBalg);
     mpz_clear (BBBrat);
+    mpz_clear (BLPrat);
     mpz_clear(alg_norm);
     mpz_clear(rat_norm);
     factor_list_clear(&alg_factors);
@@ -2305,7 +2331,7 @@ get_maxnorm (cado_poly cpoly, sieve_info_t *si, uint64_t q0)
 }
 
 /* v <- |f(i,j)|, where f is of degree d */
-static void
+NOPROFILE_STATIC void
 eval_fij (mpz_t v, mpz_t *f, unsigned int d, long i, unsigned long j)
 {
   unsigned int k;
@@ -2402,7 +2428,7 @@ skewness (sieve_info_t *si)
 
 /* This function was contributed by Jerome Milan (and bugs were introduced
    by Paul Zimmermann :-).
-   Input: n - the number to be factored (leftover norm)
+   Input: n - the number to be factored (leftover norm). Must be composite!
           l - (large) prime bit size bound is L=2^l
    Assumes n > 0.
    Return value:
@@ -2438,10 +2464,12 @@ factor_leftover_norm (mpz_t n, unsigned int l,
       append_uint32_to_array (multis, 1);
       return 1;
     }
+/* Input is required to be composite!
   else if (IS_PROBAB_PRIME(n))
     {
       return 0;
     } 
+*/
 
 #if 1 /* use the facul library */
   facul_code = facul (ul_factors, n, strategy);
