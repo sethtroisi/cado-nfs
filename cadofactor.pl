@@ -1001,16 +1001,29 @@ sub sieve {
 
     print "Sieving for $wantedrels relations\n";
 
+    my %ls_result=();
+    {
+        opendir D, $param->{'wdir'};
+        for my $x (readdir D) {
+            next if $x =~ /^\./;
+            next if $x =~ /(?:FIXME|bak|~)$/;
+            $ls_result{$x}=1;
+        }
+        closedir D;
+    }
+
     # Look for finished files.
     my @done=();
 
     {
         my $filename = "$prefix.rels";
+        my $basename = "$param->{'name'}.rels";
         if (-f $filename) {
             print "Found file $filename...";
             my $lines = `grep -v "^#" $filename | wc -l`;
             chomp $lines;
             print "$lines rels\n";
+            delete $ls_result{$basename};
             push @done, $filename;
             $nrels += $lines;
         }
@@ -1019,15 +1032,21 @@ sub sieve {
     while (1) {
         my $qend = $qcurr+$param->{'qrange'};
         my $filename = "$prefix.rels.$qcurr-$qend";
+        my $basename = "$param->{'name'}.rels.$qcurr-$qend";
         last unless -f $filename;
         $qcurr = $qend;
         print "Found file $filename...";
         my $lines = `grep -v "^#" $filename | wc -l`;
         chomp $lines;
         print "$lines rels\n";
+        delete $ls_result{$basename};
         push @done, $filename;
         $nrels += $lines;
     }
+
+    my @missed = grep(/^$param->{'name'}.rels.\d+-\d+$/,keys %ls_result);
+    print STDERR "Uh, I'm not considering these files:\n",
+        join("\n",@missed), "\n";
 
     while (1) {
         if ($nrels >= $wantedrels) {
