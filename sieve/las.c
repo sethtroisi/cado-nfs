@@ -2563,6 +2563,14 @@ usage (char *argv0)
   fprintf (stderr, "          -rho r          sieve only algebraic root r mod q0\n");
   fprintf (stderr, "          -tdthresh nnn   trial-divide primes p/r <= nnn (r=number of roots)\n");
   fprintf (stderr, "          -bkthresh nnn   bucket-sieve primes p >= nnn\n");
+  fprintf (stderr, "          -rlim     nnn   rational factor base bound nnn\n");
+  fprintf (stderr, "          -alim     nnn   algebraic factor base bound nnn\n");
+  fprintf (stderr, "          -lpbr     nnn   rational large prime bound 2^nnn\n");
+  fprintf (stderr, "          -lpba     nnn   algebraic large prime bound 2^nnn\n");
+  fprintf (stderr, "          -mfbr     nnn   rational cofactor bound 2^nnn\n");
+  fprintf (stderr, "          -mfba     nnn   algebraic cofactor bound 2^nnn\n");
+  fprintf (stderr, "          -rlambda  nnn   rational lambda value is nnn\n");
+  fprintf (stderr, "          -alambda  nnn   algebraic lambda value is nnn\n");
   fprintf (stderr, "          -v              be verbose (print some sieving statistics)\n");
   exit (1);
 }
@@ -2587,6 +2595,11 @@ main (int argc, char *argv[])
     unsigned long sq = 0;
     double totJ = 0.0;
     unsigned long report_sizes_a[256], report_sizes_r[256];
+    /* following command-line values override those in the polynomial file */
+    int rlim = 0, alim = 0; 
+    int lpbr = 0, lpba = 0;
+    int mfbr = 0, mfba = 0;
+    double rlambda = 0.0, alambda = 0.0;
 
     fprintf (stderr, "# %s.r%s", argv[0], REV);
     for (i = 1; i < argc; i++)
@@ -2656,6 +2669,54 @@ main (int argc, char *argv[])
             argc -= 2;
             argv += 2;
           }
+        else if (argc > 2 && strcmp (argv[1], "-rlim") == 0)
+          {
+            rlim = atoi (argv[2]);
+            argc -= 2;
+            argv += 2;
+          }
+        else if (argc > 2 && strcmp (argv[1], "-alim") == 0)
+          {
+            alim = atoi (argv[2]);
+            argc -= 2;
+            argv += 2;
+          }
+        else if (argc > 2 && strcmp (argv[1], "-lpbr") == 0)
+          {
+            lpbr = atoi (argv[2]);
+            argc -= 2;
+            argv += 2;
+          }
+        else if (argc > 2 && strcmp (argv[1], "-lpba") == 0)
+          {
+            lpba = atoi (argv[2]);
+            argc -= 2;
+            argv += 2;
+          }
+        else if (argc > 2 && strcmp (argv[1], "-mfbr") == 0)
+          {
+            mfbr = atoi (argv[2]);
+            argc -= 2;
+            argv += 2;
+          }
+        else if (argc > 2 && strcmp (argv[1], "-mfba") == 0)
+          {
+            mfba = atoi (argv[2]);
+            argc -= 2;
+            argv += 2;
+          }
+        else if (argc > 2 && strcmp (argv[1], "-rlambda") == 0)
+          {
+            rlambda = atof (argv[2]);
+            argc -= 2;
+            argv += 2;
+          }
+        else if (argc > 2 && strcmp (argv[1], "-alambda") == 0)
+          {
+            alambda = atof (argv[2]);
+            argc -= 2;
+            argv += 2;
+          }
         else
           usage (argv0);
       }
@@ -2687,6 +2748,28 @@ main (int argc, char *argv[])
         fprintf (stderr, "Error reading polynomial file\n");
         exit (EXIT_FAILURE);
       }
+
+    /* override sieving parameters if needed */
+    if (rlim != 0)
+      cpoly->rlim = rlim;
+    if (alim != 0)
+      cpoly->alim = alim;
+    if (lpbr != 0)
+      cpoly->lpbr = lpbr;
+    if (lpba != 0)
+      cpoly->lpba = lpba;
+    if (mfbr != 0)
+      cpoly->mfbr = mfbr;
+    if (mfba != 0)
+      cpoly->mfba = mfba;
+    if (rlambda != 0.0)
+      cpoly->rlambda = rlambda;
+    if (alambda != 0.0)
+      cpoly->alambda = alambda;
+    fprintf (stderr, "# Sieving parameters: rlim=%lu alim=%lu lpbr=%d lpba=%d\n",
+             cpoly->rlim, cpoly->alim, cpoly->lpbr, cpoly->lpba);
+    fprintf (stderr, "#                     mfbr=%d mfba=%d rlambda=%1.1f alambda=%1.1f\n",
+             cpoly->mfbr, cpoly->mfba, cpoly->rlambda, cpoly->alambda);
 
     /* this does not depend on the special-q */
     sieve_info_init (&si, cpoly, I, q0);
