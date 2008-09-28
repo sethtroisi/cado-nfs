@@ -30,6 +30,8 @@
 #  - Recognize when the linear algebra was already started, and in such a case
 #    don't restart the sieving/pruning/filtering/merging steps, but resume
 #    bw with resume=1.
+#  - Use free relations (they are computed, but never used...)
+#  - Use the -skip option, say with default 32 (should speed up BW)
 
 use strict;
 use warnings;
