@@ -7,6 +7,11 @@
  * implement a subquadratic reduction mod F in poly_mod_f_mod_mpz.
    However the main cost now comes from the barrett_mod() calls, i.e.,
    from the reduction of coefficients, not from that of the polynomial.
+ * instead of collecting all a-b*x in P(x), computing 1/sqrt(P(x)) mod p^k,
+   then multiplying by P(x) to get sqrt(P(x)) mod p^k, avoid the product
+   by P(x), and try to recognize a polynomial with rational coefficients
+   (using rational reconstruction). If this works, and if the denominator is
+   the same, this will trade a cost of (2d-1)M(n) for M(n)log(n) + (d-1)M(n).
  Harder improvements:
  * instead of collecting all a-b*x in the numerator, collect half of them
    in the numerator, and half of them in the denominator (cf paper of Nguyen
