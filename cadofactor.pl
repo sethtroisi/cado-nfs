@@ -1212,6 +1212,7 @@ MAIN: {
         " vectoring=64" .
         " multisols=1" .
         " wdir=$wdir/bw" .
+        " tidy=0" .
         " solution=$prefix.W";
         my_system "$cmd >& $prefix.bw.stderr";
     } else {
