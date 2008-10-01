@@ -1271,8 +1271,10 @@ print_poly (FILE *fp, cado_poly p, int argc, char *argv[], double st, int raw)
       mpz_out_str (fp, 10, p->f[i]);
       fprintf (fp, "\n");
     }
+#ifdef DEBUG
   fprintf (fp, "# ");
   fprint_polynomial (fp, p->f, p->degree);
+#endif
   fprintf (fp, "Y1: ");
   mpz_out_str (fp, 10, p->g[1]);
   fprintf (fp, "\n");

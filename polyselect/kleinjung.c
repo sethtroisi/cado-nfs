@@ -968,7 +968,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
 */
 static double
 Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
-        unsigned int p0max, mpz_t incr, unsigned int keep)
+        unsigned int p0max, mpz_t incr, double admin, double admax)
 {
   unsigned int *P = NULL, lP = 0;
   unsigned int *Q = NULL, lQ = 0;
@@ -1006,8 +1006,12 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
   max_ad = pow (pow (M, (double) (2 * d - 2)) / Nd, 1.0 / (double) (d - 3));
   fprintf (stderr, "# max ad=%1.2e\n", max_ad);
   fflush (stderr);
+  if (admax < max_ad)
+    max_ad = admax;
 
-  mpz_set (a[d], incr);
+  admin = ceil (admin / mpz_get_d (incr));
+  mpz_set_d (a[d], admin);
+  mpz_mul (a[d], a[d], incr);
 
   Q = (unsigned int*) malloc (lP * sizeof (unsigned int));
   R = (unsigned int*) malloc (p0max * sizeof (unsigned int));
@@ -1016,7 +1020,7 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
 
   /* step 2 */
   Msize = 0;
-  while (Msize < keep && mpz_cmp_d (a[d], max_ad) <= 0)
+  while (mpz_cmp_d (a[d], max_ad) <= 0)
     {
       for (i = lQ = 0; i < lP; i++)
         {
@@ -1089,6 +1093,8 @@ usage ()
   fprintf (stderr, "       -M M      - keep polynomials with sup-norm <= M (default 1e25)\n");
   fprintf (stderr, "       -pb p     - prime factors are bounded by p (default 256)\n");
   fprintf (stderr, "       -p0max P  - extra prime factor is bounded by P (default 1000)\n");
+  fprintf (stderr, "       -admin a  - minimal leading coefficient of f(x)\n");
+  fprintf (stderr, "       -admax a  - maximal leading coefficient of f(x)\n");
   fprintf (stderr, "       in        - input file (n:...)\n");
   exit (1);
 }
@@ -1099,11 +1105,12 @@ main (int argc, char *argv[])
   int argc0 = argc;
   char **argv0 = argv;
   int degree = 5;
-  unsigned int keep = 100;
+  unsigned int keep = 100; /* here, keeping the 100 polynomials of smallest
+                              norm is enough for the first phase */
   double M = 1e25;
   int l = 7;
   int pb = 256;
-  int p0max = 1000;
+  int p0max = 100000;
   mpz_t incr; /* Implements remark (1) following Algorithm 3.6:
                  try a[d]=incr, then 2*incr, 3*incr, ... */
   unsigned int i, best_i = -1;
@@ -1115,6 +1122,7 @@ main (int argc, char *argv[])
   long jmin, kmin, bestj = 0, bestk = 0;
   param_list pl;
   mpz_t n, newm;
+  double admin = 1.0, admax = DBL_MAX;
 
   /* print command line */
   fprintf (stderr, "# %s.r%s", argv[0], REV);
@@ -1180,6 +1188,8 @@ main (int argc, char *argv[])
   param_list_parse_int(pl, "pb", &pb);
   param_list_parse_int(pl, "p0max", &p0max);
   param_list_parse_double(pl, "M", &M);
+  param_list_parse_double(pl, "admin", &admin);
+  param_list_parse_double(pl, "admax", &admax);
   param_list_parse_int(pl, "degree", &degree);
 
   if (verbose) {
@@ -1191,12 +1201,11 @@ main (int argc, char *argv[])
   }
   param_list_clear(pl);
 
-  Malloc = 100; /* for Kleinjung's algorithm, keeping the 100 polynomials
-                   of smallest norm is enough for the first phase */
+  Malloc = keep;
   Mt = m_logmu_init (Malloc);
   cado_poly_init (poly);
 
-  checked = Algo36 (n, degree, M, l, pb, p0max, incr, keep);
+  checked = Algo36 (n, degree, M, l, pb, p0max, incr, admin, admax);
 
   fprintf (stderr, "# First phase took %.2fs, checked %1.0f and kept %lu polynomial(s)\n",
            seconds () - st, checked, Msize);
@@ -1210,7 +1219,10 @@ main (int argc, char *argv[])
      considering small primes only, and keep only the best polynomials, for
      which we compute an approximation of alpha(F) up to a larger prime bound.
   */
-  Malloc2 = 10; /* we keep the best 10 polynomials only */
+  Malloc2 = (unsigned long) sqrt ((double) Malloc); /* we keep the square root
+                                                       of the number of
+                                                       polynomials kept in the
+                                                       first phase */
   Msize2 = 0;
   st = seconds ();
   for (i = 0, best_E = DBL_MAX; i < Msize; i++)
