@@ -732,10 +732,10 @@ NOPROFILE_INLINE int
 reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r,
                  const sieve_info_t * si)
 {
-    int32_t a0, a1, b0, b1, I, J, k;
+    int32_t a0, a1, b0, b1, I, IJ, k;
+    int logI;
 
     I = si->I;
-    J = si->J;
     a0 = -((int32_t)p); a1 = 0;
     b0 = r;  b1 = 1;
 
@@ -786,17 +786,19 @@ reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r,
     ASSERT (pli->delta > 0);
     ASSERT ((pli->alpha <= 0) && (pli->alpha > -I));
     ASSERT ((pli->gamma >= 0) && (pli->gamma < I));
-    ASSERT (pli->gamma-pli->alpha >= I);
+    ASSERT (pli->gamma - pli->alpha >= I);
 
     // WARNING: Here, we assume a lot on a bound on I,J
     // TODO: clean these bound problems
-    int64_t aa = ((int64_t)pli->beta)*I + (int64_t)(pli->alpha);
-    if (aa > I*J)
+    logI = si->logI;
+    IJ = si->J << logI;
+    int64_t aa = ((int64_t)pli->beta << logI) + (int64_t)(pli->alpha);
+    if (aa > IJ)
         pli->a = (uint32_t)(INT32_MAX/2);
     else
         pli->a = (uint32_t)aa;
-    int64_t cc = ((int64_t)pli->delta)*I + (int64_t)(pli->gamma);
-    if (cc > I*J)
+    int64_t cc = ((int64_t)pli->delta << logI) + (int64_t)(pli->gamma);
+    if (cc > IJ)
         pli->c = (uint32_t)(INT32_MAX/2);
     else
         pli->c = (uint32_t)cc;
@@ -878,14 +880,15 @@ fill_in_buckets(bucket_array_t BA, factorbase_degn_t *fb,
                 continue; /* Simply don't consider that (p,r) for now.
                              FIXME: can we find the locations to sieve? */
               }
-              
+	    
             // Start sieving from (0,0) which is I/2 in x-coordinate
             uint32_t x;
             x = (I>>1);
             // Skip (0,0), since this can not be a valid report.
             {
                 uint32_t i;
-                i = x & maskI;
+                /* i = x & maskI;  ??? x = I/2, maskI = I-1, so x < maskI */
+		i = x;
                 if (i >= pli.b1)
                     x += pli.a;
                 if (i < pli.b0)
