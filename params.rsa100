@@ -43,16 +43,16 @@ kjp0max=1000            # bound on the additional factor in lc(g)
 # Sieve
 ###########################################################################
 
-rlim=1000000
-alim=2000000
-lpbr=25
-lpba=25
-mfbr=50
-mfba=50
+rlim=600000
+alim=1200000
+lpbr=24
+lpba=24
+mfbr=48
+mfba=48
 rlambda=2.1
-alambda=2.5
+alambda=2.3
 
-I=12                    # Sieving range in lattice siever
+I=11                    # Sieving range in lattice siever
 qmin=2000000            # Start of the special-q range
 qrange=10000            # The size of an elementary sieving task
 checkrange=1            # We check if we have enough after each step
