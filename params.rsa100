@@ -57,7 +57,7 @@ qmin=2000000            # Start of the special-q range
 qrange=10000            # The size of an elementary sieving task
 checkrange=1            # We check if we have enough after each step
                         # of that many relations found.
-sievenice=10            # nice level for the sieving jobs
+sievenice=0             # nice level for the sieving jobs
 
 ###########################################################################
 # Filtering
