@@ -42,6 +42,7 @@ kjadrange=1e5           # individual tasks
 
 ## Other parameters of kleinjung
 kjkeep=100              # number of preselected polynomials
+kjkmax=10               # rotation is bounded by 2^kmax
 kjincr=60               # forced divisor of lc(f)
 kjpb=256                # bound on primes allowed in lc(g)
 kjp0max=1000            # bound on the additional factor in lc(g)
