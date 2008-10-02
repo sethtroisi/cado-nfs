@@ -1,3 +1,4 @@
+#define __STDC_LIMIT_MACROS
 #include <cstdio>
 #include <cstdlib>
 #include "auxfuncs.h"
