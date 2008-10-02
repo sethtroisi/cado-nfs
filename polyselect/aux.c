@@ -1223,19 +1223,19 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
 
   if (verbose)
     {
-      printf ("# Rotate by ");
+      fprintf (stderr, "# Rotate by ");
       if (*jmin != 0)
         {
           if (*jmin == -1)
-            printf ("-");
+            fprintf (stderr, "-");
           else if (*jmin != 1)
-            printf ("%ld*", *jmin);
-          printf ("x");
+            fprintf (stderr, "%ld*", *jmin);
+          fprintf (stderr, "x");
           if (*kmin >= 0)
-            printf ("+");
+            fprintf (stderr, "+");
         }
-      printf ("%ld: alpha improved from %1.2f to %1.2f\n", *kmin,
-              alpha0, best_alpha);
+      fprintf (stderr, "%ld: alpha improved from %1.2f to %1.2f\n", *kmin,
+               alpha0, best_alpha);
     }
 
   free (A);

@@ -16,6 +16,15 @@
 
 #define QUICK_SEARCH
 
+/* default parameters */
+#define DEFAULT_P0MAX  100000
+#define DEFAULT_DEGREE 5
+#define DEFAULT_KEEP   100
+#define DEFAULT_M      1e25
+#define DEFAULT_PB     256
+#define DEFAULT_INCR   60
+#define DEFAULT_L      7
+
 /* if NEAREST is defined, round m0 and the x[i][j] to nearest, instead of
    towards +infinity as in the original Algorithm 3.6 */
 #define NEAREST
@@ -244,8 +253,8 @@ possible_candidate (int *mu, int l, int d, mpz_t *a, mpz_t P, mpz_t N,
     if (lognorm <= logM) {
         if (verbose)
           {
-            gmp_printf ("ad=%Zd p=%Zd m=%Zd norm=%1.2e (log %1.2f)\n",
-                        a[d], P, m, exp (lognorm), lognorm);
+            gmp_fprintf (stderr, "ad=%Zd p=%Zd m=%Zd norm=%1.2e (log %1.2f)\n",
+                         a[d], P, m, exp (lognorm), lognorm);
             /* terse output does not need the polynomial */
             if (verbose > 1)
               {
@@ -683,7 +692,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
                   else /* composite p0: if p0=p*q then ad*x^d = N should have
                           one solution for p and q */
                     {
-                      unsigned int q, r, s;
+                      unsigned int q, r, s, t;
 
                       for (q = 2; p0 % q != 0; q++);
                       ASSERT_ALWAYS(q < p0);
@@ -696,7 +705,11 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
                         {
                           /* naive computation of 1/r mod q */
                           for (s = 1; ((s * r) % q) != 1; s++);
-                          R[p0] = R[r] + (((R[q] + r - R[r]) * s) % r) * r;
+                          /* get t = R[q] + c*q >= R[r] to ensure % q gets
+                             a nonnegative input */
+                          for (t = R[q]; t < R[r]; t += q);
+                          R[p0] = R[r] + (((t - R[r]) * s) % q) * r;
+                          R[p0] = R[p0] % p0;
                         }
                     }
                 }
@@ -854,6 +867,8 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
               mpz_pow_ui (u, t, d);
               mpz_mul (u, u, a[d]);
               mpz_sub (u, N, u);
+              if (mpz_divisible_p (u, P) == 0)
+                gmp_printf ("ad=%Zd p0=%u r0=%u t=%Zd u=%Zd P=%Zd m0=%Zd\n", a[d], p0, r0, t, u, P, m0);
               ASSERT (mpz_divisible_p (u, P));
               mpz_divexact (u, u, P);
               mpz_mul (u, u, invN);
@@ -979,7 +994,8 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
 
   ASSERT_ALWAYS (d >= 4);
 
-  if (verbose) printf("# Step 1\n");
+  if (verbose)
+    fprintf (stderr, "# Step 1\n");
   /* step 1 */
   for (r = 1; r < pb; r += d)
     if (isprime (r))
@@ -1086,13 +1102,13 @@ usage ()
   fprintf (stderr, "Usage: kleinjung [-v] [-degree d] [-keep k] [-incr i] [-l l] [-M M] [-pb p] < in\n\n");
   fprintf (stderr, "       -v        - verbose\n");
   fprintf (stderr, "       -full     - also output factor base parameters\n");
-  fprintf (stderr, "       -degree d - use algebraic polynomial of degree d (default 5)\n");
-  fprintf (stderr, "       -keep k   - keep k smallest polynomials (default 100)\n");
-  fprintf (stderr, "       -incr i   - ad is incremented by i (default 60)\n");
-  fprintf (stderr, "       -l l      - leading coefficient of g(x) has l prime factors (default 7)\n");
-  fprintf (stderr, "       -M M      - keep polynomials with sup-norm <= M (default 1e25)\n");
-  fprintf (stderr, "       -pb p     - prime factors are bounded by p (default 256)\n");
-  fprintf (stderr, "       -p0max P  - extra prime factor is bounded by P (default 1000)\n");
+  fprintf (stderr, "       -degree d - use algebraic polynomial of degree d (default %u)\n", DEFAULT_DEGREE);
+  fprintf (stderr, "       -keep k   - keep k smallest polynomials (default %u)\n", DEFAULT_KEEP);
+  fprintf (stderr, "       -incr i   - ad is incremented by i (default %u)\n", DEFAULT_INCR);
+  fprintf (stderr, "       -l l      - leading coefficient of g(x) has l prime factors (default %u)\n", DEFAULT_L);
+  fprintf (stderr, "       -M M      - keep polynomials with sup-norm <= M (default %1.0e)\n", DEFAULT_M);
+  fprintf (stderr, "       -pb p     - prime factors are bounded by p (default %u)\n", DEFAULT_PB);
+  fprintf (stderr, "       -p0max P  - extra prime factor is bounded by P (default %u)\n", DEFAULT_P0MAX);
   fprintf (stderr, "       -admin a  - minimal leading coefficient of f(x)\n");
   fprintf (stderr, "       -admax a  - maximal leading coefficient of f(x)\n");
   fprintf (stderr, "       in        - input file (n:...)\n");
@@ -1104,13 +1120,13 @@ main (int argc, char *argv[])
 {
   int argc0 = argc;
   char **argv0 = argv;
-  int degree = 5;
-  unsigned int keep = 100; /* here, keeping the 100 polynomials of smallest
-                              norm is enough for the first phase */
-  double M = 1e25;
-  int l = 7;
-  int pb = 256;
-  int p0max = 100000;
+  int degree = DEFAULT_DEGREE;
+  unsigned int keep = DEFAULT_KEEP; /* number of polynomials of smallest
+                                       norm kept for the first phase */
+  double M = DEFAULT_M;
+  int l = DEFAULT_L;
+  int pb = DEFAULT_PB;
+  int p0max = DEFAULT_P0MAX;
   mpz_t incr; /* Implements remark (1) following Algorithm 3.6:
                  try a[d]=incr, then 2*incr, 3*incr, ... */
   unsigned int i, best_i = -1;
@@ -1192,9 +1208,8 @@ main (int argc, char *argv[])
   param_list_parse_double(pl, "admax", &admax);
   param_list_parse_int(pl, "degree", &degree);
 
-  if (verbose) {
-      param_list_display(pl, stdout);
-  }
+  if (verbose)
+    param_list_display (pl, stderr);
 
   if (param_list_warn_unused(pl)) {
       usage();
