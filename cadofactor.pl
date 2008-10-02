@@ -609,6 +609,7 @@ sub import_select_task_result {
         print STDERR "Problem when importing file $outfile from $host.\n";
         return 0;
     }
+    my_system_timeout("ssh $host /bin/rm $rwdir/$outfile", 30);
 
     return get_logmualpha_value("$lwdir/$outfile");
 }
@@ -665,6 +666,16 @@ sub parallel_polyselect {
             sleep($delay);
         }
     }
+
+    # A bit of cleaning on slaves
+    my %mach_desc = read_machine_description($param);
+    for my $m (keys %mach_desc) {
+        my %desc = %{$mach_desc{$m}};
+        my $wdir = $desc{'tmpdir'};
+        my_system_timeout("ssh $m /bin/rm -f $wdir/$name.n", 30);
+    }
+
+
     # Choose best according to logmu+alpha
     my $Emin;
     my $bestfile;
