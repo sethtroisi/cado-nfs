@@ -58,6 +58,7 @@ my @parameter_defaults = (
     # polyselect using Kleinjung (kj) algorithm
     degree=>5,
     kjkeep=>100,
+    kjkmax=>10,
     kjincr=>60,
     kjl=>7,
     kjM=>1e25,
@@ -553,6 +554,7 @@ sub restart_select_tasks {
             push_select_files($mach, $wdir, $param);
             my $cmd = "/bin/nice -$nice $bindir/polyselect/kleinjung" .
               " -keep " . $param->{'kjkeep'} .
+              " -kmax " . $param->{'kjkmax'} .
               " -incr " . $param->{'kjincr'} .
               " -l " . $param->{'kjl'} .
               " -M " . $param->{'kjM'} .

@@ -1,0 +1,15 @@
+[cacao]
+tmpdir=/localdisk/tmp
+cadodir=$CADO
+
+cores=2
+group=0
+    achille
+    andromaque
+    cassandre
+    hector
+    hecube
+    helene
+    paris
+    priam
+    ulysse
