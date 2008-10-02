@@ -455,6 +455,11 @@ sub check_running_select_task {
         print "      finished!\n";
         return 0;
     }
+    if (/No polynomial found/) {
+        print "      finished but found no polynomial!\n";
+        return 0;
+    }
+
     # If file is partial, check its last modification time:
     my $date;
     ($t, $date) = my_system_timeout("ssh $host date +%s", 30);
@@ -587,7 +592,8 @@ sub get_logmualpha_value {
         return $E;
     } else {
         print STDERR "Can not parse output of $filename for geting logmu+alpha\n";
-        return 0;
+        print STDERR "Putting an arbitrary (large) value for E\n";
+        return 100000;
     }
 }
 
