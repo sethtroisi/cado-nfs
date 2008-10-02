@@ -583,14 +583,14 @@ generate_poly (cado_poly out, double T, mpz_t b)
       T--; /* T counts the number of calls to generate_base_mb */
       generate_base_mb (out, out->m, b);
       logmu = LOGNORM (out->f, d, out->skew);
-      m_logmu_insert (M, Malloc, &Msize, b, out->m, logmu, "lognorm=", 0);
+      m_logmu_insert (M, Malloc, &Msize, b, out->m, logmu, "lognorm=");
       if (T > 0 && mpz_sgn (out->f[d - 1]) > 0)
         { /* try another small f[d-1], avoiding a mpz_pow_ui call */
           mpz_add_ui (out->m, out->m, 1);
           T--;
           generate_base_mb (out, out->m, b);
           logmu = LOGNORM (out->f, d, out->skew);
-          m_logmu_insert (M, Malloc, &Msize, b, out->m, logmu, "lognorm=", 0);
+          m_logmu_insert (M, Malloc, &Msize, b, out->m, logmu, "lognorm=");
         }
       mpz_add_ui (out->m, out->m, 1);
     }
@@ -617,7 +617,7 @@ generate_poly (cado_poly out, double T, mpz_t b)
          thus we would need to save M[i].m, and redo all steps in the same
          order below */
       E = rotate (out->f, d, ALPHA_BOUND_SMALL, M[i].m, M[i].b, &jmin, &kmin, 0);
-      m_logmu_insert (M, Malloc2, &Msize2, M[i].b, M[i].m, E, "E~", 0);
+      m_logmu_insert (M, Malloc2, &Msize2, M[i].b, M[i].m, E, "E~");
     }
   fprintf (stderr, "# Second phase took %.2fs and kept %lu polynomial(s)\n",
            seconds () - st, Msize2);

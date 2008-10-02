@@ -10,6 +10,9 @@
 #include "utils/utils.h"
 #include "aux.h"
 
+/* for the rotation, we try (j*x+k) for |k| <= 2^MAX_k */
+int MAX_k = 16;
+
 /************************ arrays of mpz_t ************************************/
 
 /* allocate an array of d coefficients, and initialize it */
@@ -326,7 +329,7 @@ m_logmu_clear (m_logmu_t* M, unsigned long Malloc)
 */
 int
 m_logmu_insert (m_logmu_t* M, unsigned long alloc, unsigned long *psize,
-                mpz_t b, mpz_t m, double logmu, char *str, int verbose)
+                mpz_t b, mpz_t m, double logmu, char *str)
 {
   unsigned long size = *psize;
 
@@ -998,7 +1001,6 @@ rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1,
   E0 = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
   /* look for negative k */
   best_E = E0;
-#define MAX_k 16
   for (i = 1, k = -2; i < MAX_k; i++, k *= 2)
     {
       k0 = rotate_aux (f, b, m, k0, k);

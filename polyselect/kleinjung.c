@@ -25,6 +25,8 @@
 #define DEFAULT_INCR   60
 #define DEFAULT_L      7
 
+extern int MAX_k;
+
 /* if NEAREST is defined, round m0 and the x[i][j] to nearest, instead of
    towards +infinity as in the original Algorithm 3.6 */
 #define NEAREST
@@ -263,7 +265,7 @@ possible_candidate (int *mu, int l, int d, mpz_t *a, mpz_t P, mpz_t N,
               }
             fflush (stdout);
         }
-        m_logmu_insert (Mt, Malloc, &Msize, P, m, lognorm, "lognorm=", verbose);
+        m_logmu_insert (Mt, Malloc, &Msize, P, m, lognorm, "lognorm=");
     }
     mpz_clear (m);
     mpz_clear (g[0]);
@@ -1111,6 +1113,7 @@ usage ()
   fprintf (stderr, "       -p0max P  - extra prime factor is bounded by P (default %u)\n", DEFAULT_P0MAX);
   fprintf (stderr, "       -admin a  - minimal leading coefficient of f(x)\n");
   fprintf (stderr, "       -admax a  - maximal leading coefficient of f(x)\n");
+  fprintf (stderr, "       -kmax k   - rotation is bounded by 2^k\n");
   fprintf (stderr, "       in        - input file (n:...)\n");
   exit (1);
 }
@@ -1139,6 +1142,7 @@ main (int argc, char *argv[])
   param_list pl;
   mpz_t n, newm;
   double admin = 1.0, admax = DBL_MAX;
+  int kmax = MAX_k;
 
   /* print command line */
   fprintf (stderr, "# %s.r%s", argv[0], REV);
@@ -1207,6 +1211,8 @@ main (int argc, char *argv[])
   param_list_parse_double(pl, "admin", &admin);
   param_list_parse_double(pl, "admax", &admax);
   param_list_parse_int(pl, "degree", &degree);
+  param_list_parse_int(pl, "kmax", &kmax);
+  MAX_k = kmax;
 
   if (verbose)
     param_list_display (pl, stderr);
@@ -1266,7 +1272,7 @@ main (int argc, char *argv[])
                        poly->f[degree], Mt[i].b, Mt[i].m, E);
           best_i = i;
         }
-      m_logmu_insert (Mt, Malloc2, &Msize2, Mt[i].b, Mt[i].m, E, "E~", verbose);
+      m_logmu_insert (Mt, Malloc2, &Msize2, Mt[i].b, Mt[i].m, E, "E~");
     }
   fprintf (stderr, "# Second phase took %.2fs and kept %lu polynomial(s)\n",
            seconds () - st, Msize2);
