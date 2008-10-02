@@ -26,15 +26,25 @@ machines=mach_desc      # file describing available computers for parallel
 n=71641520761751435455133616475667090434063332228247871795429
 
 ###########################################################################
-# Polynomial selection
+# Polynomial selection with Kleinjung's algorithm
 ###########################################################################
 
-degree=3                # degree of the algebraic polynomial
-# Try linear polynomials of the form b*x-m, with b in [bmin-bmax]
-bmin=1
-bmax=4
-# Effort to be done for each b
-e=1e5
+degree=4                # degree of the algebraic polynomial
+kjdelay=40              # time between two checks
+selectnice=10           # nice level for selection
+
+## Most important parameters of kleinjung
+kjM=5e10                # maximum norm allowed
+kjl=4                   # minimal number of primes in lc(g)
+kjadmin=1               # min value for lc(f)
+kjadmax=2e5             # max value for lc(f)
+kjadrange=1e5           # individual tasks
+
+## Other parameters of kleinjung
+kjkeep=100              # number of preselected polynomials
+kjincr=60               # forced divisor of lc(f)
+kjpb=256                # bound on primes allowed in lc(g)
+kjp0max=1000            # bound on the additional factor in lc(g)
 
 ###########################################################################
 # Sieve

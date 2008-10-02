@@ -55,11 +55,18 @@ my @parameter_defaults = (
     n=>undef,
     parallel=>0,
 
-    # polyselect
+    # polyselect using Kleinjung (kj) algorithm
     degree=>5,
-    bmin=>1,
-    bmax=>20,
-    e=>1e8,
+    kjkeep=>100,
+    kjincr=>60,
+    kjl=>7,
+    kjM=>1e25,
+    kjpb=>256,
+    kjp0max=>100000,
+    kjadmin=>undef,
+    kjadmax=>undef,
+    kjadrange=>1e7,
+    kjdelay=>120,
     selectnice=>10,
 
     # sieve
@@ -247,9 +254,138 @@ sub cmp_filedate {
         return 1;
     }
 }
+
+
+
+###########################################################################
+### Some functions to manipulate a list of ranges and detect holes
+###########################################################################
+
+# Invariant: A good-formed list of ranges looks like
+#     [ [a0,b0] , [a1,b1], ...   [ak,bk] ]
+# with bi < a_{i+1}   (and of course ai < bi)
+# All the inegalities are *strict* (otherwise, merge ranges!)
+
+sub check_wellformed_rangelist {
+    my $T = shift @_;
+    my $curr_value = -1;
+
+    foreach my $range (@$T) {
+        my ($a, $b) = @$range;
+        if ($a >= $b) { return 0; }
+        if ($a <= $curr_value) { return 0; }
+        $curr_value = $b;
+    }
+    return 1;
+}
+
+
+# Take a list of ranges and returns a good-formed list
+sub filter_ranges {
+    my @ranges = @_;
+
+    @ranges = sort { $a->[0] <=> $b->[0] } @ranges;
+
+    my @brokendown = ();
+    my @overlap = ();
+
+    my $current = shift @ranges or return @ranges;
+    my ($cs,$ce) = @$current;
+
+    while (defined(my $x = shift @ranges)) {
+        my ($s, $e) = @$x;
+        if ($e == $s) {
+            print STDERR "stupid sub-range [${s}..${e}[\n";
+            next;
+        }
+        die "Uh : $e <= $s" if $e <= $s;
+
+        if ($s == $ce) {
+            $ce = $e;
+            @overlap=($x);
+        } elsif ($s < $ce) {
+            # fetch the viewed ranges that overlap with this range.
+            my @y=();
+            for my $z (@overlap) {
+                push @y, $z if $z->[1] > $s;
+                my ($os, $oe) = @{$z};
+            }
+            @overlap = @y;
+            push @overlap, $x;
+            @overlap = sort { $a->[1] <=> $b->[1] } @overlap;
+            if ($e > $ce) {
+                $ce = $e;
+            }
+        } else {
+            push @brokendown, [$cs, $ce];
+            $cs = $s;
+            $ce = $e;
+            @overlap=($x);
+        }
+    }
+    push @brokendown, [$cs, $ce];
+    return @brokendown;
+}
+
+
+# Return first hole in list of ranges, with given rangemax, and amin
+# The list of ranges is updated.
+sub get_next_hole {
+  my $ranges = shift @_;
+  my $rangemax = shift @_;
+  my $amin = shift @_;
+
+  if (scalar @$ranges == 0) {
+      my @r = ($amin, $amin+$rangemax);
+      return \@r, [\@r];
+  }
+
+  my $r0 = $$ranges[0];
+  # Case where there is some room at the begining
+  if ($$r0[0] > $amin) {
+      my $x = $amin+$rangemax;
+      if ($x >= $$r0[0]) {
+          $$ranges[0] = [$amin, $$r0[1]];
+          my @r = ($amin, $$r0[0]);
+          return \@r, $ranges;
+      } else {
+          my @r = ($amin, $x);
+          unshift @$ranges, \@r;
+          return \@r, $ranges;
+      }
+  }
+  # Case where there is no second range
+  if (scalar @$ranges == 1) {
+      my $x = $$r0[1];
+      my $y = $x+$rangemax;
+      my @r = ($x, $y);
+      $$ranges[0] = [$$r0[0], $y];
+      return \@r, $ranges;
+  }
+  # last case: a hole between first and second range
+  my $r1 = $$ranges[1];
+  my $x = $$r0[0];
+  my $y = $x + $rangemax;
+  if ($y >= $$r1[0]) { 
+      # the hole will be filled in
+      shift @$ranges;
+      $$ranges[0] = [$$r0[0], $$r1[1]];
+      my @r = ($$r0[1], $$r1[0]);
+      return \@r, $ranges;
+  } else {
+      $$ranges[0] = [$$r0[0], $y];
+      my @r = ($x, $y);
+      return \@r, $ranges;
+  }
+}
+       
+###########################################################################
+## Parallel polynomial selection
+###########################################################################
+
 # Read a selection status file:
 # Each line is of the form
-#   hostname b
+#   hostname admin admax
 # Any empty line is ignored.
 # any line that starts with # is ignored
 sub read_select_status_file {
@@ -267,8 +403,8 @@ sub read_select_status_file {
     while (<SF>) {
         if (/^\s*\n$/) { next; }
         if (/^#/) { next; }
-        if (/^\s*(\w*)\s+(\d+)/) {
-            push @status, [$1, $2];
+        if (/^\s*(\w*)\s+(\w+)\s+(\w+)/) {
+            push @status, [$1, $2, $3];
             next;
         }
         die "Could not parse status file: $_\n";
@@ -285,12 +421,12 @@ sub write_select_status_file {
     open GRR, ">$statfile" or die "$statfile: $!\n";
     foreach my $t (@$status) {
         my @tt = @$t;
-        print GRR "" . $tt[0] . " " . $tt[1] . "\n";
+        print GRR "" . $tt[0] . " " . $tt[1] . " " . $tt[2] . "\n";
     }
     close GRR;
 }
 
-# A task is a pair (hostname b)
+# A task is a triple (hostname admin admax)
 # This function ssh to hostname, and tests if the task is still alive,
 # dead or finished.
 # 1 means running
@@ -300,15 +436,15 @@ sub check_running_select_task {
     my $param = shift @_;
     my $name = $param->{'name'};
     my $mach_desc = shift @_;
-    my ($host, $b) = @_;
-    print "    $host \t$b:\n";
+    my ($host, $admin, $admax) = @_;
+    print "    $host \t$admin\t$admax:\n";
     my %host_data=%{$mach_desc->{$host}};
     my $wdir = $host_data{'tmpdir'};
     my $cadodir = $host_data{'cadodir'};
 
     # First check if the last line corresponds to finished job:
     my ($t, $lastline) = my_system_timeout(
-        "ssh $host tail -1 $wdir/$name.poly.$b", 30);
+        "ssh $host tail -1 $wdir/$name.kjout.$admin-$admax", 30);
     if (! $t) {
         print "      Assume task is still running...\n";
         return 1;
@@ -318,7 +454,7 @@ sub check_running_select_task {
         print "      finished!\n";
         return 0;
     }
-    # If file is partial check its last modification time:
+    # If file is partial, check its last modification time:
     my $date;
     ($t, $date) = my_system_timeout("ssh $host date +%s", 30);
     if (! $t) {
@@ -327,7 +463,7 @@ sub check_running_select_task {
     }
     my $modifdate;
     ($t, $modifdate) = my_system_timeout(
-        "ssh $host stat -c %Y $wdir/$name.poly.$b", 30);
+        "ssh $host stat -c %Y $wdir/$name.kjout.$admin-$admax", 30);
     if (! $t) {
         print "      Assume task is still running...\n";
         return 1;
@@ -366,32 +502,25 @@ sub restart_select_tasks {
     my $name = $param->{'name'};
     my $nice = $param->{'selectnice'};
 
-    my %doneb;
+    my @ranges = ();
     my $prefix = $param->{'wdir'} . "/" . $param->{'name'};
     my $wdir = $param->{'wdir'};
     opendir(DIR, $wdir) or die "can't opendir $wdir: $!";
     my @files = readdir(DIR);
     close DIR;
     foreach my $f (@files) {
-        if ($f =~ /$name\.poly\.(\d+)/) {
-            $doneb{$1}=1;
+        if ($f =~ /$name\.kjout\.(\w+)-(\w+)/) {
+            push @ranges, [$1, $2];
         }
     }
     foreach my $t (@$running) {
-        $doneb{${$t}[1]}=1;
+        push @ranges, [${$t}[1], ${$t}[2]];
     }
 
-    my @setb;
-    for ($b = $param->{'bmin'}; $b <= $param->{'bmax'}; $b++) {
-        if (! $doneb{$b}) {
-            push @setb, $b;
-        }
-    }
-    if (scalar @$running == 0 && scalar @setb == 0) {
-        # finished!
-        return 1;
-    }
+    @ranges = filter_ranges(@ranges);
+    die unless check_wellformed_rangelist(\@ranges);
 
+    ### Restart as many tasks as neeeded.
     for my $m (keys %$mach_desc) {
         my $cpt = 0;
         my $t;
@@ -406,27 +535,42 @@ sub restart_select_tasks {
         # Number of new tasks to run is:
         $cpt = $desc{'cores'} - $cpt;
         for (my $i = 0; $i < $cpt; $i++) {
-            if (! scalar @setb) { last; }
-            $b = shift @setb;
-            $t = [$m, $b ];
+            ## Get next task to start
+            my ($xx, $yy) = get_next_hole(\@ranges, $param->{'kjadrange'},
+                $param->{'kjadmin'});
+            my ($admin, $admax) = @$xx;
+            if ($admin >= $param->{'kjadmax'}) {
+                return;
+            }
+            if ($admax >= $param->{'kjadmax'}) {
+                $admax = $param->{'kjadmax'};
+            }
+            @ranges = @$yy;
+            $t = [$m, $admin, $admax ];
             my $mach = $m;
             my $wdir = $desc{'tmpdir'};
             my $bindir = $desc{'cadodir'};
             push_select_files($mach, $wdir, $param);
-            my $cmd = "/bin/nice -$nice $bindir/polyselect/polyselect" .
-              " -b $b" .
-              " -e " . $param->{'e'} .
+            my $cmd = "/bin/nice -$nice $bindir/polyselect/kleinjung" .
+              " -keep " . $param->{'kjkeep'} .
+              " -incr " . $param->{'kjincr'} .
+              " -l " . $param->{'kjl'} .
+              " -M " . $param->{'kjM'} .
+              " -pb " . $param->{'kjpb'} .
+              " -p0max " . $param->{'kjp0max'} .
+              " -admin " . $admin .
+              " -admax " . $admax .
               " -degree " . $param->{'degree'} .
               " < $wdir/$name.n";
-            my $ret = `ssh $mach "$cmd >& $wdir/$name.poly.$b&"`;
-            print "    Starting $mach $b.\n";
+            my $outfile = "$wdir/$name.kjout.$admin-$admax";
+            my $ret = `ssh $mach "$cmd >& $outfile&"`;
+            print "    Starting $mach $admin $admax.\n";
             open FH, ">> " . $param->{'wdir'} . "/$name.cmd";
-            print FH "ssh $mach \"$cmd >& $wdir/$name.poly.$b&\"\n";
+            print FH "ssh $mach \"$cmd >& $outfile&\"\n";
             close FH;
             push @$running, $t;
         }
     }
-    return 0;
 }
 
 sub get_logmualpha_value {
@@ -435,7 +579,7 @@ sub get_logmualpha_value {
     my @lines = readline(FILE);
     close FILE;
     @lines = grep (/E=/, @lines);
-    $_ = $lines[0];
+    $_ = $lines[$#lines];
     if (/E=(\d+\.\d*)/) {
         my $E = $1;
         return $E;
@@ -452,29 +596,27 @@ sub import_select_task_result {
     my $param = shift @_;
     my $name = $param->{'name'};
     my $mach_desc = shift @_;
-    my ($host, $b) = @_;
+    my ($host, $admin, $admax) = @_;
     my %host_data=%{$mach_desc->{$host}};
     my $rwdir = $host_data{'tmpdir'};
     my $lwdir = $param->{'wdir'};
-    my $cmd = "rsync --timeout=30 $host:$rwdir/$name.poly.$b $lwdir/";
+    my $outfile = "$name.kjout.$admin-$admax";
+    my $cmd = "rsync --timeout=30 $host:$rwdir/$outfile $lwdir/";
     my $ret = system($cmd);
     if ($ret != 0) {
-        print STDERR "Problem when importing file $name.poly.$b from $host.\n";
+        print STDERR "Problem when importing file $outfile from $host.\n";
         return 0;
     }
 
-    return get_logmualpha_value("$lwdir/$name.poly.$b");
+    return get_logmualpha_value("$lwdir/$outfile");
 }
 
 
 sub parallel_polyselect {
     my $param = shift @_;
     my $prefix = $param->{'wdir'} . "/" . $param->{'name'};
-    my $b;
+    my $name = $param->{'name'};
     my $t;
-    my $bestb=0;
-    my $effort=$param->{'e'};
-    my $degree=$param->{'degree'};
     my $finished = 0;
     while (! $finished) {
         my %mach_desc = read_machine_description($param);
@@ -492,35 +634,56 @@ sub parallel_polyselect {
             }
         }
         print "  Start new tasks.\n";
-        $finished = restart_select_tasks($param, \@newstatus, \%mach_desc);
+        restart_select_tasks($param, \@newstatus, \%mach_desc);
         write_select_status_file($param, \@newstatus);
+        # check if finished
+        my @ranges = ();
+        my $wdir = $param->{'wdir'};
+        opendir(DIR, $wdir) or die "can't opendir $wdir: $!";
+        my @files = readdir(DIR);
+        close DIR;
+        foreach my $f (@files) {
+            if ($f =~ /$name\.kjout\.(\w+)-(\w+)/) {
+                push @ranges, [$1, $2];
+            }
+        }
+        @ranges = filter_ranges(@ranges);
+        die unless check_wellformed_rangelist(\@ranges);
+        if (scalar @ranges > 0) {
+            my $first_range=$ranges[0];
+            my ($a, $b) = @$first_range;
+            if ($a <= $param->{'kjadmin'} && $b >= $param->{'kjadmax'}) {
+                $finished = 1;
+            }
+        }
+
         if (!$finished) {
-            my $delay = $param->{'delay'};
+            my $delay = $param->{'kjdelay'};
             print "Wait for $delay seconds before checking again.\n";
             sleep($delay);
         }
     }
     # Choose best according to logmu+alpha
     my $Emin;
-    for ($b = $param->{'bmin'}; $b <= $param->{'bmax'}; $b++) { 
-        if (! -f "$prefix.poly.$b") {
-            die "Hey! Where is $prefix.poly.$b ????\n";
-        }
-        my $E = get_logmualpha_value("$prefix.poly.$b");
-        if ((!$Emin) || $E < $Emin) {
-            $Emin = $E;
-            $bestb = $b;
+    my $bestfile;
+
+    my $wdir = $param->{'wdir'};
+    opendir(DIR, $wdir) or die "can't opendir $wdir: $!";
+    my @files = readdir(DIR);
+    close DIR;
+    foreach my $f (@files) {
+        if ($f =~ /$name\.kjout\.(\w+)-(\w+)/) {
+            my $E = get_logmualpha_value("$wdir/$f");
+            if ((!$Emin) || $E < $Emin) {
+                $Emin = $E;
+                $bestfile = "$wdir/$f";
+            }
         }
     }
-
-    # choose best.
-    # For the moment, we do it according to logmu+alpha
-    print "Best polynomial is for b = $bestb\n";
-    copy("$prefix.poly.$bestb" , "$prefix.poly");
-    system("echo cp $prefix.poly.$bestb $prefix.poly >> $prefix.cmd");
+    print "Best polynomial is from $bestfile\n";
+    copy("$bestfile" , "$prefix.poly");
+    system("echo cp $bestfile $prefix.poly >> $prefix.cmd");
 }
-
-
 
 
 
