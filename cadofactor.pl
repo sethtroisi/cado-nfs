@@ -404,7 +404,7 @@ sub read_select_status_file {
     while (<SF>) {
         if (/^\s*\n$/) { next; }
         if (/^#/) { next; }
-        if (/^\s*(\w*)\s+(\w+)\s+(\w+)/) {
+        if (/^\s*([\w\.]*)\s+([\w\.]+)\s+([\w\.]+)/) {
             push @status, [$1, $2, $3];
             next;
         }
@@ -515,7 +515,7 @@ sub restart_select_tasks {
     my @files = readdir(DIR);
     close DIR;
     foreach my $f (@files) {
-        if ($f =~ /$name\.kjout\.(\w+)-(\w+)/) {
+        if ($f =~ /$name\.kjout\.([\w\.]+)-([\w\.]+)/) {
             push @ranges, [$1, $2];
         }
     }
@@ -652,7 +652,7 @@ sub parallel_polyselect {
         my @files = readdir(DIR);
         close DIR;
         foreach my $f (@files) {
-            if ($f =~ /$name\.kjout\.(\w+)-(\w+)/) {
+            if ($f =~ /$name\.kjout\.([\w\.]+)-([\w\.]+)/) {
                 push @ranges, [$1, $2];
             }
         }
@@ -691,7 +691,7 @@ sub parallel_polyselect {
     my @files = readdir(DIR);
     close DIR;
     foreach my $f (@files) {
-        if ($f =~ /$name\.kjout\.(\w+)-(\w+)/) {
+        if ($f =~ /$name\.kjout\.([\w\.]+)-([\w\.]+)/) {
             my $E = get_logmualpha_value("$wdir/$f");
             if ((!$Emin) || $E < $Emin) {
                 $Emin = $E;
