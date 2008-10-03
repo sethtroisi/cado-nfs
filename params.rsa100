@@ -21,12 +21,12 @@ n=152260502792253336053561837813263742971806811496138068865790849458012296325895
 # Polynomial selection with Kleinjung's algorithm
 ###########################################################################
 
-degree=5                # degree of the algebraic polynomial
+degree=4                # degree of the algebraic polynomial
 kjdelay=10              # time between two checks
 selectnice=0            # nice level for selection
 
 ## Most important parameters of kleinjung
-kjM=1.7e14              # maximum norm allowed
+kjM=2e17                # maximum norm allowed
 kjl=5                   # minimal number of primes in lc(g)
 kjadmin=1               # min value for lc(f)
 kjadmax=21000000        # max value for lc(f)
@@ -43,8 +43,8 @@ kjp0max=1000            # bound on the additional factor in lc(g)
 # Sieve
 ###########################################################################
 
-rlim=600000
-alim=1200000
+rlim=1000000
+alim=1000000
 lpbr=24
 lpba=24
 mfbr=48
@@ -53,7 +53,7 @@ rlambda=2.1
 alambda=2.3
 
 I=11                    # Sieving range in lattice siever
-qmin=1200000            # Start of the special-q range
+qmin=1000000            # Start of the special-q range
 qrange=10000            # The size of an elementary sieving task
 checkrange=1            # We check if we have enough after each step
                         # of that many relations found.
@@ -63,7 +63,7 @@ sievenice=0             # nice level for the sieving jobs
 # Filtering
 ###########################################################################
 
-excess=100000           # minimal excess wanted after purge
+excess=200000           # minimal excess wanted after purge
                         # (don't start merge otherwise)
                         # 20k is largely enough for a c59, for a larger
                         # number 400k should be ok
