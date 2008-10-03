@@ -31,7 +31,6 @@
 #    don't restart the sieving/pruning/filtering/merging steps, but resume
 #    bw with resume=1.
 #  - Use free relations (they are computed, but never used...)
-#  - Use the -skip option, say with default 32 (should speed up BW)
 
 use strict;
 use warnings;
@@ -91,13 +90,14 @@ my @parameter_defaults = (
 
     # filtering
     prune=>1.0,
-    keep=>160,
+    keep=>160, # should be 128+skip
     keeppurge=>100000,
     maxlevel=>15,
     cwmax=>200,
     rwmax=>200,
     ratio=>1.5,
     bwstrat=>1,
+    skip=>32,
 
     # linalg
     linalg=>'bw',
@@ -1383,6 +1383,7 @@ MAIN: {
     print "Transposing...\n";
     $cmd = "$param->{'cadodir'}/linalg/transpose" .
       " -T $param->{'wdir'}" .
+      " -skip $param->{'skip'}" .
       " -in $prefix.small -out $prefix.small.tr";
     my_system $cmd;
     if ($param->{'linalg'} eq 'bw') { 
@@ -1427,6 +1428,7 @@ MAIN: {
       " -rel $prefix.nodup" .
       " -small $prefix.small" .
       " -nker $nker" .
+      " -skip $param->{'skip'}" .
       " -nchar $param->{'nchar'}";
     my_system "$cmd > $prefix.ker 2> $prefix.characters.stderr";
 
