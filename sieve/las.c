@@ -2987,8 +2987,9 @@ main (int argc, char *argv[])
     fprintf (stderr, "# Total time %1.1fs [norm %1.2f+%1.1f, sieving %1.1f"
             " (%1.1f + %1.1f),"
              " factor %1.1f]\n", t0, tn_rat, tn_alg, tts, ttsm, tts-ttsm, ttf);
-    fprintf (stderr, "# Total %lu reports [%1.3fs/r]\n",
-             tot_reports, t0 / (double) tot_reports);
+    fprintf (stderr, "# Total %lu reports [%1.3fs/r, %1.1fr/sq]\n",
+             tot_reports, t0 / (double) tot_reports,
+             (double) tot_reports / (double) sq);
 
     facul_clear_strategy (si.strategy);
     si.strategy = NULL;
