@@ -212,7 +212,7 @@ remove_duplicates(FILE *out, char *ficname[], int nbfic, unsigned int *nrels, sm
     
     ASSERT(nbfic > 0);
     for(i = 0; i < nbfic; i++){
-	relfile = fopen(ficname[i], "r");
+        relfile = gzip_open (ficname[i], "r");
 	if(relfile == NULL){
 	    fprintf(stderr, "Pb opening file %s\n", ficname[i]);
 	    exit(1);
@@ -223,16 +223,28 @@ remove_duplicates(FILE *out, char *ficname[], int nbfic, unsigned int *nrels, sm
 	    fprintf(stderr, "Warning: error when reading file %s\n", ficname[i]);
 	    break;
 	}
-	fclose(relfile);
+        gzip_close (relfile, ficname[i]);
     }
     fprintf(stderr, "Scanned %d relations\n", irel+1);
     
     return (ret == -1);
 }
 
-int
-main(int argc, char **argv)
+void
+usage (char **argv)
 {
+  fprintf (stderr, "usage: %s -nrels n [options] file1 ... filen\n", argv[0]);
+  fprintf (stderr, "       -v            verbose\n");
+  fprintf (stderr, "       -nrels n      input files have n relations\n");
+  fprintf (stderr, "       -slice k      split input in 2^k parts\n");
+  fprintf (stderr, "       -out   f      output file is f (if ends in .gz, use gzip)\n");
+  exit(1);
+}
+
+int
+main (int argc, char **argv)
+{
+    char **argv0 = argv;
     FILE *outfile = NULL;
 #if AGRESSIVE_MODE == 0
     Hashtable_t Hab;
@@ -246,17 +258,7 @@ main(int argc, char **argv)
     unsigned int nrelsmax = 0, nrels, Hsize;
     int verbose = 0;
     
-    if(argc == 1) {
-	fprintf(stderr, "usage: %s [filename]\n", argv[0]);
-	fprintf(stderr, "  stdin input is not yet available, sorry.\n");
-	exit(1);
-    } 
-    if(argc < 4) {
-	fprintf(stderr, "usage: %s nrel file1 ... filen\n", argv[0]);
-	fprintf(stderr, "  if no filename is given, takes input on stdin\n");
-	exit(1);
-    }
-
+    /* print command-line arguments */
     fprintf (stderr, "%s.r%s", argv[0], REV);
     for (k = 1; k < argc; k++)
       fprintf (stderr, " %s", argv[k]);
@@ -285,10 +287,10 @@ main(int argc, char **argv)
 	}
     }
 
-    if(nrelsmax == 0)
+    if (nrelsmax == 0)
       {
-        fprintf(stderr, "Error, missing -nrels ... option\n");
-        exit(1);
+        fprintf (stderr, "Error, missing -nrels option\n");
+        usage (argv0);
       }
 
     if(slice > 0)
