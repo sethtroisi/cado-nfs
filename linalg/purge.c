@@ -129,13 +129,14 @@ static void
 fprint_rat(int *table_ind, int *nb_coeff, relation_t rel, hashtable_t *H)
 {
     int index, old_index, i, parity, nbc = *nb_coeff;
+    uint64_t minus2 = (uint64_t) (-2);
 
-    index = getHashAddr(H, rel.rp[0].p, -2);
+    index = getHashAddr(H, rel.rp[0].p, minus2);
     old_index = index;
     parity = 1;
     
     for (i = 1; i < rel.nb_rp; ++i) {
-	index = getHashAddr(H, rel.rp[i].p, -2);
+	index = getHashAddr(H, rel.rp[i].p, minus2);
 	if (index == old_index) {
 	    parity = 1 - parity;
 	} else {
@@ -159,15 +160,6 @@ fprint_alg(int *table_ind, int *nb_coeff, relation_t rel,
 {
     int i, index, old_index, parity, nbc = *nb_coeff;
 
-#if 0
-    if(rel.nb_ap == 0)
-	fprintf(stderr, "WARNING: nb_ap == 0 in fprint_alg\n");
-    i = 0;
-    while (isBadPrime(rel.ap[i].p, bad_primes))
-	i++;
-    if(i >= rel.nb_ap)
-	fprintf(stderr, "WARNING: i=%d >= nb_ap=%d in fprint_alg\n", i, rel.nb_ap);
-#else
     for(i = 0; i < rel.nb_ap; i++)
       if(!isBadPrime())
 	    break;
@@ -175,7 +167,6 @@ fprint_alg(int *table_ind, int *nb_coeff, relation_t rel,
 	fprintf(stderr, "WARNING: i=%d >= nb_ap=%d in fprint_alg\n", i, rel.nb_ap);
 	return; // rare, but...
     }
-#endif
     index = getHashAddr(H, rel.ap[i].p, rel.ap[i].r);
     old_index = index;
     parity = 1;
@@ -206,8 +197,9 @@ fprint_free(int *table_ind, int *nb_coeff, relation_t rel, hashtable_t *H)
 {
     long p = rel.a;
     int i, nbc = *nb_coeff, index;
+    uint64_t minus2 = (uint64_t) (-2);
 
-    index = getHashAddr(H, p, -2);
+    index = getHashAddr(H, p, minus2);
     if(H->hashcount[index] >= 0)
 	table_ind[nbc++] = H->hashcount[index];
     for(i = 0; i < rel.nb_ap; i++){
@@ -230,7 +222,6 @@ fprint_rel_row (FILE *file, int irel, relation_t rel,
   int *table_ind;
   int nb_coeff;
 
-  //  fprintf(file, "%ld %lu ", rel.a, rel.b); // old stuff
   table_ind = (int*) malloc((rel.nb_rp + rel.nb_ap)*sizeof(int));
 
   nb_coeff = 0;
@@ -275,8 +266,8 @@ specialHashInsert(hashtable_t *H, long p, unsigned long r, int irel)
 
     if(H->hashcount[h] == 0){
         // new empty place
-        H->hashtab_p[h] = p;
-        H->hashtab_r[h] = r;
+        SET_HASH_P(H,h,p);
+        SET_HASH_R(H,h,r);
 	H->hashcount[h] = -(irel+1); // trick!!!
     }
     else
@@ -296,12 +287,19 @@ insertNormalRelation(char *rel_used, int **rel_compact, int irel, int *nprimes,
                      long minpa, int final, unsigned long *tot_alloc)
 {
     int *tmp = NULL, ltmp = 0, itmp, j, h, ok = 1;
+    /* special values of the roots are:
+       -2: for rational primes, so that they don't conflict with algebraic
+           primes,
+       -1: for algebraic primes dividing lc(f).
+       We apply a mask so that -2 in 64-bit translates to -2 in 32-bits. */
+    uint64_t mask = (H->need64) ? (uint64_t) (-1) : (uint32_t) 4294967295;
+    uint64_t minus2 = mask & (uint64_t) -2;
 
 #if LP_ONLY == 0
     rlim = alim = 0; // ohhhhhhhhhhhhh!
 #endif
-    reduce_exponents_mod2(rel);
-    computeroots(rel);
+    reduce_exponents_mod2 (rel);
+    computeroots (rel);
     if(final){
 	// first count number of "large" primes
 	for(j = 0; j < rel->nb_rp; j++)
@@ -341,7 +339,7 @@ insertNormalRelation(char *rel_used, int **rel_compact, int irel, int *nprimes,
           /* trick: we use the same hash table for rational and algebraic
              primes, but use a fake root -2 for rational primes, which
              ensures there is no collision with algebraic primes */
-	    h = hashInsert(H, rel->rp[j].p, -2);
+            h = hashInsert(H, rel->rp[j].p, minus2);
 	    if(H->hashcount[h] == 1)
 		// new prime
 		*nprimes += 1;
@@ -350,7 +348,8 @@ insertNormalRelation(char *rel_used, int **rel_compact, int irel, int *nprimes,
 	    tmp[itmp++] = h;
 	}
 	for(j = 0; j < rel->nb_ap; j++){
-	    h = hashInsert(H, rel->ap[j].p, rel->ap[j].r);
+            /* apply mask to map 64-bit -1 to 32-bit -1 if needed */
+	    h = hashInsert(H, rel->ap[j].p, mask & rel->ap[j].r);
 	    if(H->hashcount[h] == 1)
               // new prime
               *nprimes += 1;
@@ -368,13 +367,13 @@ insertNormalRelation(char *rel_used, int **rel_compact, int irel, int *nprimes,
     else{
 	// reduce mode only
 	for(j = 0; j < rel->nb_rp; j++){
-	    h = specialHashInsert(H, rel->rp[j].p, -2, irel);
+	    h = specialHashInsert(H, rel->rp[j].p, minus2, irel);
 	    if(H->hashcount[h] < 0)
 		// new prime
 		*nprimes += 1;
 	}
 	for(j = 0; j < rel->nb_ap; j++){
-	    h = specialHashInsert(H, rel->ap[j].p, rel->ap[j].r, irel);
+	    h = specialHashInsert(H, rel->ap[j].p, mask & rel->ap[j].r, irel);
 	    if(H->hashcount[h] < 0){
 		// new prime
 		*nprimes += 1;
@@ -393,6 +392,7 @@ insertFreeRelation (char *rel_used, int **rel_compact, int irel, int *nprimes,
 {
     long p = rel->a; // rel->b == 0
     int j, h, *tmp = NULL, itmp;
+    uint64_t minus2 = (H->need64) ? (uint64_t) (-2) : (uint32_t) (-2);
 
     if(final){
 #if LP_ONLY
@@ -403,7 +403,7 @@ insertFreeRelation (char *rel_used, int **rel_compact, int irel, int *nprimes,
         *tot_alloc += (1 + rel->nb_ap + 1) * sizeof(int);
 	itmp = 0;
 #endif
-	h = hashInsert(H, p, -2);
+	h = hashInsert(H, p, minus2);
 	if(H->hashcount[h] == 1)
 	    // new prime
 	    *nprimes += 1;
@@ -427,7 +427,7 @@ insertFreeRelation (char *rel_used, int **rel_compact, int irel, int *nprimes,
     }
     else{
 	// reduce mode
-	h = specialHashInsert(H, p, -2, irel);
+	h = specialHashInsert(H, p, minus2, irel);
 	if(H->hashcount[h] < 0)
 	    // new prime
 	    *nprimes += 1;
@@ -501,7 +501,7 @@ scan_relations (char *ficname[], int nbfic, int *nrel, int *nprimes,
     ASSERT(nbfic > 0);
     ASSERT(!final || (final && rel_compact != NULL));
     for(i = 0; i < nbfic; i++){
-	relfile = fopen(ficname[i], "r");
+	relfile = gzip_open (ficname[i], "r");
 	if(relfile == NULL){
 	    fprintf(stderr, "Pb opening file %s\n", ficname[i]);
 	    exit(1);
@@ -515,7 +515,7 @@ scan_relations (char *ficname[], int nbfic, int *nrel, int *nprimes,
 	    fprintf(stderr, "Warning: error when reading file %s\n", ficname[i]);
 	    break;
 	}
-	fclose(relfile);
+	gzip_close (relfile, ficname[i]);
     }
     fprintf(stderr, "Scanned %d relations\n", irel+1);
 
@@ -647,7 +647,7 @@ onepass_singleton_removal (int nrelmax, int *nrel, int *nprimes,
 	    if(h >= 0){
 #  if DEBUG >= 2
 		printf("h = %d is single -> (%ld, %ld)\n", 
-		       h, H->hashtab_p[h], H->hashtab_r[h]);
+		       h, GET_HASH_P(H,h), GET_HASH_R(H,h));
 #  endif
 		delete_relation (i, nprimes, H, rel_used, rel_compact);
 		*nrel -= 1;
@@ -718,7 +718,7 @@ renumber(int *nprimes, hashtable_t *H, char *sos)
 
     if(sos != NULL){
 	fprintf(stderr, "Outputting renumber table in file %s\n", sos);
-	fsos = fopen(sos, "w");
+	fsos = gzip_open (sos, "w");
     }
     for(i = 0, nb = 1; i < H->hashmod; i++)
       if(isBadPrime() || (H->hashcount[i] == 0))
@@ -735,12 +735,12 @@ renumber(int *nprimes, hashtable_t *H, char *sos)
 		H->hashcount[i] = nb++;
 		if(fsos != NULL)
 		    fprintf(fsos, "%d %lx %lx\n",
-			    H->hashcount[i]-1,H->hashtab_p[i],
-			    (long)H->hashtab_r[i]);
+			    H->hashcount[i]-1, GET_HASH_P(H,i),
+                            (long) GET_HASH_R(H,i));
 	    }
 	}
     if(fsos != NULL)
-	fclose(fsos);
+      gzip_close (fsos, sos);
     nb--;
     fprintf(stderr, "nb = %d\n", nb);
     *nprimes = nb;
@@ -757,7 +757,7 @@ reread(FILE *ofile, char *ficname[], unsigned int nbfic,
     unsigned int i;
 
     for(i = 0; i < nbfic; i++){
-	file = fopen(ficname[i], "r");
+	file = gzip_open (ficname[i], "r");
 	if (file == NULL) {
 	    fprintf(stderr,"problem opening file %s for reading\n",ficname[i]);
 	    exit(1);
@@ -784,7 +784,7 @@ reread(FILE *ofile, char *ficname[], unsigned int nbfic,
 		clear_relation(&rel);
 	    }
 	} while(ret == 1);
-	fclose(file);
+	gzip_close (file, ficname[i]);
     }
 }
 
@@ -805,7 +805,7 @@ reduce(char **ficname, unsigned int nbfic, hashtable_t *H, char *rel_used,
 	}
     // I/O
     for(i = 0; i < nbfic; i++){
-	relfile = fopen(ficname[i], "r");
+	relfile = gzip_open (ficname[i], "r");
 	if(relfile == NULL){
 	    fprintf(stderr, "Pb opening file %s\n", ficname[i]);
 	    exit(1);
@@ -818,7 +818,7 @@ reduce(char **ficname, unsigned int nbfic, hashtable_t *H, char *rel_used,
 		printf("%s", str);
 	    }
 	}
-	fclose(relfile);
+	gzip_close (relfile, ficname[i]);
     }
     fprintf(stderr, "old_nrels=%d old_nprimes=%d\n", nrels, nprimes);
     fprintf(stderr, "new_nrels=%d new_nprimes=%d\n", newnrels, newnprimes);
@@ -840,6 +840,14 @@ usage (char *argv[])
   fprintf (stderr, "       -sos sosfile - to keep track of the renumbering\n");
 }
 
+/* Estimate the number of primes <= B. The 0.85 factor accounts for the
+   fact that the combinatorial explosion happens before B/log(B). */
+static int
+approx_phi (long B)
+{
+  return (B <= 1) ? 0 : (int) (0.85 * (double) B / log ((double) B));
+}
+
 int
 main(int argc, char **argv)
 {
@@ -858,6 +866,7 @@ main(int argc, char **argv)
     long minpr = 0, minpa = 0;
     cado_poly pol;
     unsigned long tot_alloc;
+    int need64 = 0; /* non-zero if large primes are > 2^32 */
     
     fprintf (stderr, "%s.r%s", argv[0], REV);
     for (k = 1; k < argc; k++)
@@ -921,7 +930,7 @@ main(int argc, char **argv)
 	    argv += 2;
 	}
     }
-    if(keep <= 0)
+    if (keep <= 0)
 	keep = nrelmax;
 
     if (argc == 1) {
@@ -946,25 +955,26 @@ main(int argc, char **argv)
     //	fic = extractFic(&nfic, &nrelmax, argv[3]);
     cado_poly_init(pol);
     cado_poly_read(pol, polyname);
-    if(maxpr == 0)
+
+    if (maxpr == 0)
 	maxpr = 1L << pol[0].lpbr;
-    if(maxpa == 0)
+    if (maxpa == 0)
 	maxpa = 1L << pol[0].lpba;
+    need64 = (maxpr >> 32) || (maxpa >> 32);
+
     fprintf(stderr, "Number of relations is %u\n", nrelmax);
     if(nprimes > 0)
 	Hsize = nprimes;
     else{
-      /* Estimating the number of primes: a rule of thumb is that for n large
-         primes, we need 0.8*n/log(n) relations (remember that hashInit
+      /* Estimating the number of needed primes (remember that hashInit
          multiplies by a factor 1.5). */
-      // TODO: use minpr and minpa also
-      Hsizer = (int) (0.85 * (double) maxpr / log ((double) maxpr));
-      Hsizea = (int) (0.85 * (double) maxpa / log ((double) maxpa));
+      Hsizer = approx_phi (maxpr) - approx_phi (minpr);
+      Hsizea = approx_phi (maxpa) - approx_phi (minpa);
       Hsize = Hsizer + Hsizea;
     }
     fprintf (stderr, "initializing hash tables with Hsize=%d...\n", Hsize);
-    hashInit (&H, Hsize, 1);
-    tot_alloc = H.hashmod * (sizeof(int) + sizeof(long) + sizeof(unsigned long));
+    hashInit (&H, Hsize, 1, need64);
+    tot_alloc = H.hashmod * H.size;
 
     rel_used = (char *) malloc (nrelmax * sizeof (char));
     tot_alloc += nrelmax * sizeof (char);
@@ -1005,7 +1015,7 @@ main(int argc, char **argv)
 #endif
 
     if(final == 0)
-	reduce(fic, nfic, &H, rel_used, nrelmax, nprimes);
+	reduce (fic, nfic, &H, rel_used, nrelmax, nprimes);
     else{
 	fprintf(stderr, "starting singleton removal...\n");
 	nrel_new = nrel;
@@ -1051,7 +1061,7 @@ main(int argc, char **argv)
 	fprintf (purgedfile, "%d %d\n", nrel_new, nprimes_new);
 	reread (purgedfile, fic, nfic, /*bad_primes,*/ &H, rel_used, nrel_new
                /*, nprimes_new*/);
-	gzip_close(purgedfile, purgedname);
+	gzip_close (purgedfile, purgedname);
 	// write excess to stdout
 	printf("EXCESS: %d\n", nrel_new - nprimes_new);
     }

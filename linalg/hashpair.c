@@ -8,9 +8,17 @@
 void
 hashClear(hashtable_t *H)
 {
-    memset(H->hashcount, 0, H->hashmod * sizeof(int));
-    memset(H->hashtab_p, 0, H->hashmod * sizeof(long));
-    memset(H->hashtab_r, 0, H->hashmod * sizeof(unsigned long));
+    memset(H->hashcount, 0, H->hashmod * sizeof(int32_t));
+    if (H->need64)
+      {
+        memset(H->hashtab64_p, 0, H->hashmod * sizeof(int64_t));
+        memset(H->hashtab64_r, 0, H->hashmod * sizeof(int64_t));
+      }
+    else
+      {
+        memset(H->hashtab32_p, 0, H->hashmod * sizeof(int32_t));
+        memset(H->hashtab32_r, 0, H->hashmod * sizeof(int32_t));
+      }
 }
 
 unsigned long
@@ -22,20 +30,32 @@ getHashMod(unsigned long n, int verbose)
   return n;
 }
 
+/* need64 is non-zero if we need 64-bit fields for primes and/or ideals */
 void
-hashInit(hashtable_t *H, unsigned int n, int verbose)
+hashInit (hashtable_t *H, unsigned int n, int verbose, int need64)
 {
+    H->need64 = need64;
+    H->size = sizeof(int32_t) /* hashcount */
+      + ((need64) ? sizeof(int64_t) : sizeof(int32_t)) /* hashtab_p */
+      + ((need64) ? sizeof(uint64_t) : sizeof(uint32_t)); /* hashtab_r */
     H->hashmod = getHashMod((3*n)/2, verbose);
     H->hashcount = (int *)malloc(H->hashmod * sizeof(int));
-    H->hashtab_p = (long *)malloc(H->hashmod * sizeof(long));
-    H->hashtab_r = (unsigned long *)malloc(H->hashmod * sizeof(unsigned long));
+    if (H->need64)
+      {
+        H->hashtab64_p = (int64_t*) malloc (H->hashmod * sizeof(int64_t));
+        H->hashtab64_r = (uint64_t*) malloc (H->hashmod * sizeof(uint64_t));
+      }
+    else
+      {
+        H->hashtab32_p = (int32_t*) malloc (H->hashmod * sizeof(int32_t));
+        H->hashtab32_r = (uint32_t*) malloc (H->hashmod * sizeof(uint32_t));
+      }
     if (verbose)
       {
-        unsigned long alloc_hashcount = H->hashmod * sizeof(int);
-        unsigned long alloc_hashtab_p = H->hashmod * sizeof(long);
-        unsigned long alloc_hashtab_r = H->hashmod * sizeof(unsigned long);
+        fprintf (stderr, "Using %d-bit types\n",
+                 (need64) ? 64 : 32);
         fprintf (stderr, "Allocated hash tables of total size %luMb\n",
-                 (alloc_hashcount + alloc_hashtab_p + alloc_hashtab_r) / 1000000);
+                 (H->hashmod * H->size) / 1000000);
       }
     if(sizeof(unsigned long) == 8){
       H->HC0 = MAGIC_HC0;
@@ -52,8 +72,16 @@ void
 hashFree(hashtable_t *H)
 {
     free(H->hashcount);
-    free(H->hashtab_p);
-    free(H->hashtab_r);
+    if (H->need64)
+      {
+        free (H->hashtab64_p);
+        free (H->hashtab64_r);
+      }
+    else
+      {
+      free (H->hashtab32_p);
+      free (H->hashtab32_r);
+      }
 }
 
 // Returns a new address or the one already containing (p, r), starting from
@@ -67,11 +95,11 @@ getHashAddrAux(hashtable_t *H, long p, unsigned long r, unsigned int h)
 #if DEBUG >= 2
     printf("H(%ld, %lu) = %d\n", p, r, h);
 #endif
-
+    
     while(1){
 	if(H->hashcount[h] == 0)
 	    break;
-	if((H->hashtab_p[h] == p) && (H->hashtab_r[h] == r))
+	if((GET_HASH_P(H,h) == p) && (GET_HASH_R(H,h) == r))
 	    // (p, r) already known
 	    break;
 	h++;
@@ -93,7 +121,12 @@ getHashAddrAux(hashtable_t *H, long p, unsigned long r, unsigned int h)
 int
 getHashAddr(hashtable_t *H, long p, unsigned long r)
 {
-    unsigned int h = getInitialAddressMod((unsigned long)p, r, H->HC0, H->HC1, H->hashmod);
+    uint64_t mask = (H->need64) ? (uint64_t) (-1) : (uint32_t) 4294967295;
+    unsigned int h;
+
+    r = r & mask; /* ensures that -1 and -2 are mapped to -1 and -2
+                     in 32-bit mode */
+    h = getInitialAddressMod((unsigned long)p, r, H->HC0, H->HC1, H->hashmod);
 
     return getHashAddrAux(H, p, r, h);
 }
@@ -104,8 +137,8 @@ hashInsert(hashtable_t *H, long p, unsigned long r)
     int h = getHashAddr(H, p, r);
     if(H->hashcount[h] == 0){
 	// new empty place
-	H->hashtab_p[h] = p;
-	H->hashtab_r[h] = r;
+        SET_HASH_P(H,h,p);
+        SET_HASH_R(H,h,r);
     }
     H->hashcount[h]++;
     return h;

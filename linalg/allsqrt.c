@@ -79,6 +79,7 @@ void
 treatRationalRelation(hashtable_t *H, relation_t rel)
 {
     int j, h;
+    uint64_t minus2 = (H->need64) ? (uint64_t) (-2) : (uint32_t) (-2);
 
 #if MAPLE >= 1
     fprintf(stderr, "P:=P * (%ld-m*%lu):\n", rel.a, rel.b);
@@ -87,11 +88,11 @@ treatRationalRelation(hashtable_t *H, relation_t rel)
 #if MAPLE >= 1
 	fprintf(stderr, "R2:=R2*%ld^%d:\n", rel.rp[j].p, rel.rp[j].e);
 #endif
-	h = getHashAddr(H, rel.rp[j].p, -2);
+	h = getHashAddr(H, rel.rp[j].p, minus2);
 	if(H->hashcount[h] == 0){
 	    // new empty place
-	    H->hashtab_p[h] = rel.rp[j].p;
-	    H->hashtab_r[h] = (unsigned long)(-2);
+            SET_HASH_P(H,h,rel.rp[j].p);
+            SET_HASH_R(H,h,minus2);
 	}
 	H->hashcount[h] += rel.rp[j].e;
     }
@@ -131,8 +132,8 @@ treatAlgebraicRelation(FILE *algfile, hashtable_t *H, relation_t rel)
 	h = getHashAddr(H, rel.ap[j].p, rel.ap[j].r);
 	if(H->hashcount[h] == 0){
 	    // new empty place
-	    H->hashtab_p[h] = rel.ap[j].p;
-	    H->hashtab_r[h] = rel.ap[j].r;
+            SET_HASH_P(H,h,rel.ap[j].p);
+            SET_HASH_R(H,h,rel.ap[j].r);
 	}
 	H->hashcount[h] += rel.ap[j].e;
     }
@@ -144,6 +145,7 @@ finishRationalSqrt(FILE *ratfile, hashtable_t *H, cado_poly pol)
     mpz_t prod;
     int j;
     unsigned int i;
+    uint64_t minus2 = (H->need64) ? (uint64_t) (-2) : (uint32_t) (-2);
 
     mpz_init_set_ui(prod, 1);
 #if MAPLE >= 1
@@ -151,11 +153,11 @@ finishRationalSqrt(FILE *ratfile, hashtable_t *H, cado_poly pol)
 #endif
     for(i = 0; i < H->hashmod; i++){
 	if(H->hashcount[i] > 0){
-	    if(H->hashtab_r[i] != ((unsigned long)-2))
+          if (GET_HASH_R(H,i) != minus2)
 		continue;
 	    if ((H->hashcount[i] & 1)) {
 	        fprintf(stderr, "  Odd valuation! At rational prime %lu\n",
-		    H->hashtab_p[i]);
+                        GET_HASH_P(H,i));
 		exit(1);
 	    }
 #if MAPLE >= 1
@@ -164,7 +166,7 @@ finishRationalSqrt(FILE *ratfile, hashtable_t *H, cado_poly pol)
 #endif
 	    // TODO: do better
 	    for(j = 0; j < (H->hashcount[i]>>1); j++)
-		mpz_mul_ui(prod, prod, H->hashtab_p[i]);
+              mpz_mul_ui(prod, prod, GET_HASH_P(H,i));
 	    mpz_mod(prod, prod, pol->n);
 	}
     }
@@ -181,6 +183,7 @@ static void
 finishAlgebraicSqrt(FILE *algfile, hashtable_t *H /*, cado_poly pol*/)
 {
     unsigned int i;
+    uint64_t minus2 = (H->need64) ? (uint64_t) (-2) : (uint32_t) (-2);
 
     fprintf(algfile, "0 0\n");
 #if DEBUG >= 1
@@ -188,15 +191,15 @@ finishAlgebraicSqrt(FILE *algfile, hashtable_t *H /*, cado_poly pol*/)
 #endif
     for(i = 0; i < H->hashmod; i++)
 	if(H->hashcount[i] > 0){
-	    if(H->hashtab_r[i] == ((unsigned long)-2))
+          if (GET_HASH_R(H,i) == minus2)
 		continue;
 	    if ((H->hashcount[i] & 1)) {
 	        fprintf(stderr, "  Odd valuation! At algebraic prime %lu %lu\n",
-		                        H->hashtab_p[i], H->hashtab_r[i]);
+                        GET_HASH_P(H,i), GET_HASH_R(H,i));
 		exit(1);
 	    }
 	    fprintf(algfile, "%ld %ld %d\n", 
-		    H->hashtab_p[i], H->hashtab_r[i], H->hashcount[i]>>1);
+		    GET_HASH_P(H,i), GET_HASH_R(H,i), H->hashcount[i]>>1);
 #if DEBUG >= 1
 	    fprintf(stderr, "# H[%d] = %d\n", i, H->hashcount[i]);
 #endif
@@ -357,6 +360,7 @@ SqrtWithIndexAll(char *prefix, char *relname, char *purgedname, char *indexname,
     int i, j, ret, nlimbs, nrows, ncols, small_nrows, small_ncols;
     char *small_row_used, *rel_used;
     int *vec; // useful to check dependency relation in the purged matrix
+    int need64 = (pol->lpba > 32) || (pol->lpbr > 32);
 
     purgedfile = gzip_open(purgedname, "r");
     fscanf(purgedfile, "%d %d", &nrows, &ncols);
@@ -389,7 +393,7 @@ SqrtWithIndexAll(char *prefix, char *relname, char *purgedname, char *indexname,
 	    ret = fscanf(kerfile, "%lx", &w);
 
     // use a hash table to rebuild P2
-    hashInit(&H, nrows, 1);
+    hashInit(&H, nrows, 1, need64);
     while(1){
 	if(ndepmin >= ndepmax)
 	    break;

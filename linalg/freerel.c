@@ -44,8 +44,8 @@ findFreeRelations(hashtable_t *H, cado_poly pol, int nprimes)
 
     for(i = 0; i < H->hashmod; i++)
 	if(H->hashcount[i] > 0){
-	    tmp[ntmp++] = (unsigned long)H->hashtab_p[i];
-	    tmp[ntmp++] = H->hashtab_r[i];
+          tmp[ntmp++] = (unsigned long) GET_HASH_P(H,i);
+          tmp[ntmp++] = GET_HASH_R(H,i);
 	}
     qsort(tmp, (ntmp>>1), 2 * sizeof(unsigned long), compare_ul2);
     // add a sentinel
@@ -129,6 +129,7 @@ largeFreeRelations (cado_poly pol, char **fic, int nfic, int verbose)
     FILE *file;
     hashtable_t H;
     int Hsizea, nprimes_alg = 0, nfree = 0, i;
+    int need64 = (pol->lpbr > 32) || (pol->lpba > 32);
 
     ASSERT(fic != NULL);
     /* The number of algebraic large primes is about 1/2*L/log(L)
@@ -136,7 +137,7 @@ largeFreeRelations (cado_poly pol, char **fic, int nfic, int verbose)
        However since we store separately primes p and the corresponding root r
        of f mod p, the number of (p,r) pairs is about L/log(L). */
     Hsizea = (1 << pol[0].lpba) / ((int)((double) pol[0].lpba * log(2.0)));
-    hashInit (&H, Hsizea, verbose);
+    hashInit (&H, Hsizea, verbose, need64);
     if (verbose)
       fprintf (stderr, "Scanning relations\n");
     for(i = 0; i < nfic; i++){
