@@ -123,14 +123,10 @@ modredc15ul_invmodul (unsigned long n)
 
   ASSERT (n % 2UL != 0UL);
   
-  /* The square of an odd integer is always 1 (mod 8). So by
-     initing r = m, the low three bits in the approximate inverse
-     are correct. 
-     When r = 1/m (mod 16), the 4th bit of r happens to be the
-     XOR of bits 2, 3 and 4 of m. This gives us an approximate 
-     inverse with the 4 lowest bits correct, so 3 (for 32 bit) or
-     4 (for 64 bit) Newton iterations are enough. */
-  r = n ^ ((n & 4UL) << 1) ^ ((n & 2UL) << 2);
+  /* Suggestion from PLM: initing the inverse to (3*n) XOR 2 gives the
+     correct inverse modulo 32, then 3 (for 32 bit) or 4 (for 64 bit) 
+     Newton iterations are enough. */
+  r = (3UL * n) ^ 2UL;
   r = 2UL * r - r * r * n; /* Newton iteration */
   r = 2UL * r - r * r * n;
   r = 2UL * r - r * r * n;

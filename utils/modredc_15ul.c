@@ -750,8 +750,8 @@ modredc15ul_inv (residueredc15ul_t r, const residueredc15ul_t A,
                "%lu + 2^%d * %lu\n",
                A[0], LONG_BIT, A[1], m[0].m[0], LONG_BIT, m[0].m[1],
                tmpi[0], LONG_BIT, tmpi[1]);
+      ASSERT_EXPENSIVE (modredc15ul_intcmp_ul (tmpi, 1UL) == 0);
     }
-  ASSERT_EXPENSIVE (modredc15ul_intcmp_ul (tmpi, 1UL) == 0);
   modredc15ul_clear (tmp, m);
 #endif
 
