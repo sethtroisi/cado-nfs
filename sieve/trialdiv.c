@@ -236,11 +236,12 @@ int main (int argc, char **argv)
   trialdiv_divisor_t d[2];
   unsigned long factors[16];
   int i, r = 0, len = 1;
-  mpz_t N;
+  mpz_t M, N;
   
   if (argc > 1)
     len = atoi (argv[1]);
   
+  mpz_init (M);
   mpz_init (N);
   mpz_set_ui (N, 1UL);
   mpz_mul_2exp (N, N, 8 * sizeof(unsigned long) * len);
@@ -251,10 +252,12 @@ int main (int argc, char **argv)
 
   for (i=0; i < 100000000; i++)
     {
-      r += trialdiv (factors, N, d);
+      mpz_set (M, N);
+      r += trialdiv (factors, M, d);
       mpz_add_ui (N, N, 1UL);
     }
  
+  mpz_clear (M);
   mpz_clear (N);
   printf ("%d\n", r);
   return 0;
