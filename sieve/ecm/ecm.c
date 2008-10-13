@@ -9,6 +9,12 @@
 #define ell_pointorder ell_pointorder_ul
 #define ellM_curveorder_jacobi ellM_curveorder_jacobi_ul
 #define ell_curveorder ell_curveorder_ul
+/* The next ones are static so there's no need to rename them, but it's 
+   nice to have these functions distinguishable e.g. in profiler output */
+#define ellM_double ellM_double_ul
+#define ellM_add ellM_add_ul
+#define ellM_interpret_bytecode ellM_interpret_bytecode_ul
+#define ecm_stage2 ecm_stage2_ul
 #elif defined(MODREDC15UL)
 #include "modredc_15ul.h"
 #include "modredc_15ul_default.h"
@@ -16,6 +22,10 @@
 #define ell_pointorder ell_pointorder_15ul
 #define ellM_curveorder_jacobi ellM_curveorder_jacobi_15ul
 #define ell_curveorder ell_curveorder_15ul
+#define ellM_double ellM_double_15ul
+#define ellM_add ellM_add_15ul
+#define ellM_interpret_bytecode ellM_interpret_bytecode_15ul
+#define ecm_stage2 ecm_stage2_15ul
 #else
 #error Please define MODREDCUL or MODREDC15UL
 #endif

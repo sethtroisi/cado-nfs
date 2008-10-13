@@ -1,6 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 #include <gmp.h>
 #include <primegen.h>
 #include "facul.h"
@@ -33,12 +35,14 @@ void print_help (char *programname)
   printf ("-cof <n> Multiply numbers from search interval by <num> before "
 	  "calling\n"
 	  "         factoring routine\n");
+  printf ("-m <n>   Choose modulus, do separate counts of p %% modulus\n");
 }
 
 int main (int argc, char **argv)
 {
-  unsigned long start, stop, x0 = 2UL, i, B1, B2;
+  unsigned long start, stop, x0 = 2UL, i, B1, B2, mod = 0UL;
   unsigned long hits = 0, hits_input = 0, total = 0;
+  struct rusage usage;
   mpz_t N, cof;
   facul_strategy_t *strategy;
   primegen pg[1];
@@ -48,6 +52,8 @@ int main (int argc, char **argv)
   int parameterization = 0;
   int only_primes = 0, verbose = 0;
   int printfactors = 0;
+  int got_usage;
+  unsigned long *primmod = NULL, *hitsmod = NULL;
 
   /* Parse options */
   mpz_init (N);
@@ -113,6 +119,16 @@ int main (int argc, char **argv)
       else if (argc > 2 && strcmp (argv[1], "-x0") == 0)
 	{
 	  x0 = strtoul (argv[2], NULL, 10);
+	  argc -= 2;
+	  argv += 2;
+	}
+      else if (argc > 2 && strcmp (argv[1], "-m") == 0)
+	{
+	  mod= strtoul (argv[2], NULL, 10);
+	  hitsmod = (unsigned long *) malloc (mod * sizeof (unsigned long));
+	  primmod = (unsigned long *) malloc (mod * sizeof (unsigned long));
+	  for (i = 0; i < mod; i++)
+	    hitsmod[i] = primmod[i]= 0;
 	  argc -= 2;
 	  argv += 2;
 	}
@@ -195,12 +211,19 @@ int main (int argc, char **argv)
       unsigned long f[16];
       int facul_code;
 
+      if (mod > 0)
+        primmod[i % mod]++;
+
       total++;
       mpz_mul_ui (N, cof, i);
       facul_code = facul (f, N, strategy);
       
       if (facul_code > 0)
-        hits++;
+        {
+          hits++;
+          if (mod > 0)
+            hitsmod[i % mod]++;
+        }
       
       if (printfactors && facul_code > 0)
         {
@@ -209,7 +232,7 @@ int main (int argc, char **argv)
             printf ("%lu ", f[j]);
           printf ("\n");
         }
-      
+
       if (only_primes)
 	i = primegen_next (pg);
       else
@@ -218,17 +241,47 @@ int main (int argc, char **argv)
 
   facul_clear_strategy (strategy);
 
+  got_usage = getrusage(RUSAGE_SELF, &usage);
+
   printf ("Of %lu %s in [%lu, %lu] there were %lu with smooth order\n", 
-	  total, (only_primes) ? "primes" : "odd numbers", start, stop, hits);
+           total, (only_primes) ? "primes" : "odd numbers", start, stop, hits);
   printf ("Ratio: %f\n", (double)hits / (double)total);
   if (mpz_cmp_ui (cof, 1UL) != 0)
     {
       printf ("Input number was found %lu times\n", hits_input);
     }
+  if (got_usage == 0)
+    {
+      double usrtime;
+      usrtime = (double) usage.ru_utime.tv_sec * 1000000. +
+                (double) usage.ru_utime.tv_usec;
+      printf ("Total time: %.2f s, per call: %f usec, per factor: %f usec\n",
+              usrtime / 1000000., usrtime / (double) total, 
+              usrtime / (double) hits);
+    }
+    
+  if (mod > 0)
+    {
+      printf ("Distribution of factors found over residue classes mod %lu:\n",
+              mod);
+      for (i = 0; i < mod; i++)
+        if (hitsmod[i] > 0)
+          printf ("%lu:%lu (%f)%s", 
+                  i, hitsmod[i], (double)hitsmod[i] / (double) primmod[i],
+                  (i < mod - 1) ? ", " : "\n");
+    }
+
   mpz_clear (N);
   mpz_clear (cof);
 
-  facul_print_stats (stdout);
+  if (mod > 0)
+    {
+      free (hitsmod);
+      free (primmod);
+    }
+
+  if (verbose)
+    facul_print_stats (stdout);
 
   return 0;
 }

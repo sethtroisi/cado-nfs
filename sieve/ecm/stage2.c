@@ -5,9 +5,10 @@
 #include "utils.h"
 #include "stage2.h"
 
+#if 0
 /* Looks for x in the sorted array a which has length l. Requires that
    x actually appears in a[]. */
-unsigned int 
+static unsigned int 
 binsearch (const int *a, const unsigned int l, const int x)
 {
   unsigned int low = 0, high = l - 1, mid;
@@ -24,7 +25,7 @@ binsearch (const int *a, const unsigned int l, const int x)
   }
   abort(); /* Not found! */
 }
-
+#endif
 
 static void
 bitset (unsigned char *a, unsigned int i)
@@ -82,7 +83,7 @@ stage2_make_plan (stage2_plan_t *plan, unsigned int B2min, unsigned int B2,
   plan->S1 = malloc (plan->s1 * sizeof (int));
   ASSERT (plan->S1 != NULL);
   for (i = 0, j = 1; j < plan->d / 2; j += 2 /* Assumes 2|d */)
-    if (gcd_ul ((unsigned long) j, (unsigned long) plan->d) == 1)
+    if (gcd_ul ((unsigned long) j, (unsigned long) plan->d) == 1UL)
       plan->S1[i++] = j;
   ASSERT (i == plan->s1);
 
