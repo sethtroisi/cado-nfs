@@ -22,7 +22,6 @@
 #    and import partial files (having more rels can not hurt)
 #  - Do not restart sieving tasks if we happen to have enough relations
 #  - Create some "scan-holes" mechanism to fill in the blanks.
-#  - Use Kleinjung program instead of polyselect
 #  - Bench polynomials with some sieve before selecting the best one.
 #  - Enable a 'lowmem' option
 #  - Use compressed files (cf duplicates -out nodup.gz). Should we implement
@@ -365,7 +364,7 @@ sub get_next_hole {
   }
   # last case: a hole between first and second range
   my $r1 = $$ranges[1];
-  my $x = $$r0[0];
+  my $x = $$r0[1];
   my $y = $x + $rangemax;
   if ($y >= $$r1[0]) { 
       # the hole will be filled in
@@ -474,11 +473,14 @@ sub check_running_select_task {
         print "      Assume task is still running...\n";
         return 1;
     }
+    # TODO: detecting dead task is more tricky for polynomial selection,
+    # since the output file might not be touched for a long time...
     ## If didn't move for 10 minutes, assume it's dead
-    if ($date > ($modifdate + 600)) {
-        print "      dead ?!?\n";
-        return -1;
-    }
+    #if ($date > ($modifdate + 600)) {
+    #    print "      dead ?!?\n";
+    #    return -1;
+    #}
+    #
     # otherwise it's running:
     print "      running...\n";
     return 1;
@@ -743,6 +745,9 @@ sub polyselect {
     system("echo cp $prefix.poly.$bestb $prefix.poly >> $prefix.cmd");
 }
 
+###########################################################################
+## Parallel sieving
+###########################################################################
 
 sub try_singleton {
     my $param = shift @_;
@@ -872,10 +877,11 @@ sub check_running_task {
         return 1;
     }
     ## If didn't move for 10 minutes, assume it's dead
-    if ($date > ($modifdate + 600)) {
-        print "      dead ?!?\n";
-        return 0;
-    }
+#    if ($date > ($modifdate + 600)) {
+#        print "      dead ?!?\n";
+#        return 0;
+#    }
+    ### TODO: Dead job detection is not working properly!!!
     # otherwise it's running:
     print "      running...\n";
     return 1;
