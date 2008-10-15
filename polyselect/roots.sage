@@ -39,10 +39,8 @@ def all_roots(f,p):
     Z=Integers();
     ZP=f.parent()
     x=ZP.gen()
-    kmax=ceil(48*log(2)/log(p))
+    kmax=ceil(64*log(2)/log(p))
     aff=all_roots_affine(f,p,kmax,0,0,x)
-    fh = ZP((p*x)^f.degree()*f(1/(p*x)))
-    v = valuation (fh.content(), p)
     final=[]
     # affine
     for r in aff:
@@ -52,10 +50,12 @@ def all_roots(f,p):
     # That's a special precaution, as the all_roots_affine code assumes
     # we've got no content on input. Note that this value v is used later
     # on.
+    fh = ZP((p*x)^f.degree()*f(1/(p*x)))
+    v = valuation (fh.content(), p)
     if v > 0:
         final.append((1,1,0,v,0))
         fh=ZP(fh/p^v)
-    proj=all_roots_affine(fh,p,kmax,0,0,x)
+    proj=all_roots_affine(fh,p,kmax-1,0,0,x)
     for r in proj:
         final.append((1+r[0],1,p*r[1],v+r[3],v+r[2]))
         # print "%d^%d : (%d:%d), delta=%d-%d" % (p,1+r[0],1,p*r[1],v+r[3],v+r[2])
@@ -65,5 +65,5 @@ def all_roots(f,p):
     hom_f=ZP2(f(X/Y)*Y^(f.degree()))
     for r in final:
         rr = tuple([p]+list(r))
-        print "%d^%d : (%d:%d), delta=%d-%d" % rr
+        print "%d^%d : (%r:%r), delta=%d-%d" % rr
         assert valuation(hom_f(rr[2]+p^rr[1]*X,rr[3]+p^rr[1]*Y).content(),p) == rr[4]
