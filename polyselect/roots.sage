@@ -1,3 +1,6 @@
+# Here's another nice example:
+# all_roots(((x-3)*(x-19)^2+2^16)*(x-1234567)+2^40,2)
+
 def lift_root_unramified(f,df,r,p,kmax):
     assert f(r) % p == 0
     assert df(r) % p != 0
