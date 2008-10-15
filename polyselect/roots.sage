@@ -1,5 +1,21 @@
-# Here's another nice example:
+# An example:
 # all_roots(((x-3)*(x-19)^2+2^16)*(x-1234567)+2^40,2)
+# studies the exponent of 2 in F(a,b), where F(x,y) = y^deg(f)*f(x/y)
+# which returns (among others):
+# 2^52 : (2576298330889987:1), delta=62-61
+# This result means that for a,b fixed mod 2^52, we have to 
+# add 62-61 = 1 * log(2) to the concerned cells, which are those
+# in the lattice a=2576298330889987*i+j, b=2^52*i.
+
+# For roots at infinity, the 2nd part of the output is (1:x), which means
+# the lattice is a=i+x*j, b=2^52*j.
+
+# The delta value is not always 1, and it is given by a difference wrt
+# smaller exponents.
+
+# Remark: to avoid rounding errors, instead of adding delta*log(2) in the
+# sieving, it is preferable to add round(hi*log(2)) - round(lo*log(2)),
+# where delta = hi - lo.
 
 def lift_root_unramified(f,df,r,p,kmax):
     assert f(r) % p == 0
