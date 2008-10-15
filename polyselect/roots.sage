@@ -1,4 +1,10 @@
 # An example:
+# sage: attach roots.sage
+# sage: x=PolynomialRing(Integers(),['x']).gen()
+# sage: f=1008593880*x^5 - 47389790327*x^4 - 84256212127259029352*x^3 + 3474222647711706240332297*x^2 + 76764659243128790828718944401*x + 62435925692971697863740890240
+# sage: all_roots(f,5)
+
+# An example:
 # all_roots(((x-3)*(x-19)^2+2^16)*(x-1234567)+2^40,2)
 # studies the exponent of 2 in F(a,b), where F(x,y) = y^deg(f)*f(x/y)
 # which returns (among others):
