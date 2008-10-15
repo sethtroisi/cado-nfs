@@ -68,6 +68,14 @@
 
 #define XORBIT(a,i,x) (a[(i)/WLEN] ^= ((x)) << ((i)%WLEN))
 
+static void * malloc_or_die(size_t size)
+{
+    void * res = malloc(size);
+    if (res == NULL)
+        abort();
+    return res;
+}
+
 static void Copy(unsigned long *a, const unsigned long *b, long n)
 {
     ASSERT(n >= 0);
@@ -508,7 +516,7 @@ static unsigned long *decompose(unsigned long **A, const unsigned long *a,
     // The calling routine should free(A0) when A[0]..A[K-1] are
     // no longer needed.
 
-    A0 = (unsigned long *) malloc(2 * np * K * sizeof(unsigned long));
+    A0 = (unsigned long *) malloc_or_die(2 * np * K * sizeof(unsigned long));
 
     for (i = 0; i < K; i++)
 	A[i] = A0 + 2 * i * np;
@@ -560,18 +568,18 @@ void FFTMul0(unsigned long *c, const unsigned long *a, long an,
     ASSERT((K % 3) == 0);
     ASSERT(2 * K * M >= cn * WLEN);
 
-    A = (unsigned long **) malloc(K * sizeof(unsigned long *));
-    B = (unsigned long **) malloc(K * sizeof(unsigned long *));
+    A = (unsigned long **) malloc_or_die(K * sizeof(unsigned long *));
+    B = (unsigned long **) malloc_or_die(K * sizeof(unsigned long *));
     A0 = decompose(A, a, an, M, K, np);
     B0 = decompose(B, b, bn, M, K, np);
     i = toomspace(2 * np);
     if (i < 2 * np)
 	i = 2 * np;
     ltmp = 4 * np + i;
-    tmp1 = (unsigned long *) malloc(ltmp * sizeof(unsigned long));
+    tmp1 = (unsigned long *) malloc_or_die(ltmp * sizeof(unsigned long));
     tmp2 = tmp1 + 2 * np;
     tmp3 = tmp2 + 2 * np;	/* space for max(2np,toomspace(2np)) words */
-    perm = (long *) malloc(K * sizeof(long));
+    perm = (long *) malloc_or_die(K * sizeof(long));
     bitrev(0, 0, K, 1, perm);
 
     fft(A, K, Mp, Np, 1, tmp1, tmp2, tmp3, perm);
@@ -733,8 +741,8 @@ void FFTMul1(unsigned long *c, long cn,
 // Allocate temporaries with enough space and copy inputs.
 // In principle we could avoid some of this overhead.
 
-    a = (unsigned long *) malloc(sa * sizeof(unsigned long));
-    b = (unsigned long *) malloc(sa * sizeof(unsigned long));
+    a = (unsigned long *) malloc_or_die(sa * sizeof(unsigned long));
+    b = (unsigned long *) malloc_or_die(sa * sizeof(unsigned long));
 
     Copy(a, aa, an);		// Copy aa to a
     Clear(a, an, sa);		// Clear upper part of a
@@ -796,8 +804,8 @@ void FFTMul2(unsigned long *c, const unsigned long *a, long an,
 
 // Sometimes (cn > an+bn) so need temporary c1 (as well as c2)
 
-    c1 = (unsigned long *) malloc(cn * sizeof(unsigned long));
-    c2 = (unsigned long *) malloc(cn * sizeof(unsigned long));
+    c1 = (unsigned long *) malloc_or_die(cn * sizeof(unsigned long));
+    c2 = (unsigned long *) malloc_or_die(cn * sizeof(unsigned long));
 
     FFTMul1(c1, cn, a, an, b, bn, K, m1);	// multiplication mod x^n1 + 1
     FFTMul1(c2, cn, a, an, b, bn, K, m2);	// multiplication mod x^n2 + 1

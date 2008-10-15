@@ -36,6 +36,20 @@
 #define ASSERT(x)	assert(x)
 #endif
 
+
+#ifndef	GNUC_VERSION
+#define GNUC_VERSION(X,Y,Z)     \
+    (defined(__GNUC__) &&        \
+    (__GNUC__ == X && __GNUC_MINOR__ == Y && __GNUC_PATCHLEVEL__ == Z))
+#endif
+
+#if GNUC_VERSION(4,3,0) || GNUC_VERSION(4,3,1)
+#warning "Your GCC version is buggy. Binary fields may fail randomly"
+/* Gcc bug reports 37101 and 37340 -- the only convenient fix is to
+ * upgrade to 4.3.2 */
+#endif
+
+
 /*********************************************************************/
 /* Helper macros */
 #ifndef	MAYBE_UNUSED

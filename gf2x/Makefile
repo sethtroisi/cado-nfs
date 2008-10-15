@@ -5,6 +5,7 @@
 
 # Default flags
 CFLAGS:=-O2 -DNDEBUG
+CXXFLAGS:=$(CFLAGS)
 
 ALWAYS_CFLAGS:=-std=c99 -g -W -Wall
 ALWAYS_CXXFLAGS:=-g -W -Wall
@@ -12,7 +13,7 @@ ALWAYS_CXXFLAGS:=-g -W -Wall
 # Start with defaults that should never be overridden
 MY_CFLAGS=$(ALWAYS_CFLAGS)
 MY_CXXFLAGS=$(ALWAYS_CXXFLAGS)
-MY_LFLAGS=
+MY_LFLAGS=-L.
 
 # Add the possibly overridden variables.
 MY_CFLAGS+=$(CFLAGS)
@@ -32,6 +33,7 @@ endif
 MY_CFLAGS+=$(GMP_CFLAGS)
 MY_CXXFLAGS+=$(GMP_CXXFLAGS)
 MY_LFLAGS+=$(GMP_LFLAGS)
+
 .c.o:
 	$(CC) $(MY_CFLAGS) $< -c -o $@
 
@@ -86,28 +88,45 @@ mul-inlines.c:
 
 tune1:	mul-inlines.c
 
-TUNETOOM_FILES:=$(LIBGF2X_FILES) tunetoom.c timing.c replace.c
+TUNETOOM_FILES:=$(LIBGF2X_FILES) tunetoom.c timing.c tuning-common.c
 tunetoom: $(patsubst %.c,%.o,$(TUNETOOM_FILES))
 	$(CC) $(MY_CFLAGS) -o $@ $^
-TUNEFFT_FILES:=$(LIBGF2X_FILES) tunefft.c timing.c mulfft-bit.c replace.c
+UPDATE_THRESHOLDS_FILES:=update-thresholds.c replace.c
+update-thresholds: $(patsubst %.c,%.o,$(UPDATE_THRESHOLDS_FILES))
+	$(CC) $(MY_CFLAGS) -o $@ $^
+TUNEFFT_FILES:=$(LIBGF2X_FILES) tunefft.c timing.c mulfft-bit.c tuning-common.c
 tunefft: $(patsubst %.c,%.o,$(TUNEFFT_FILES))
 	$(CC) $(MY_CFLAGS) -o $@ $^
-TEST_FILES:=$(LIBGF2X_FILES) test.c timing.c
-test: $(patsubst %.c,%.o,$(TEST_FILES))
-	$(CC) $(MY_CFLAGS) -o $@ $^
+BENCH_FILES:=bench.c
+bench: $(patsubst %.c,%.o,$(BENCH_FILES))
+	$(CC) $(MY_LFLAGS) -o $@ $^ -lgf2x
 
 factor.o: factor.cpp
-	$(CXX) $(MY_CXXFLAGS) -o $@ -c $^
+	$(CXX) $(MY_CXXFLAGS) -o $@ -c $<
 
 factor: factor.o
-	$(CXX) $(MY_LFLAGS) -o $@ -lntl -lgmp -lgf2x
+	$(CXX) $(MY_LFLAGS) -o $@ $< -lntl -lgmp -lgf2x
 
 factor: libgf2x.a
 
+.PHONY: do-tune-toom do-tune-fft
+
+recover-tune:
+	cat tunetoom.res tunefft.res | ./update-thresholds -o thresholds.h
+
+do-tune-toom: tunetoom
+	./tunetoom -s 1.05 2048 -o tunetoom.res
+	./update-thresholds -o thresholds.h < tunetoom.res
+
+do-tune-fft: tunefft
+	./tunefft -s 1.02 8000000 -o tunefft.res
+	./update-thresholds -o thresholds.h < tunefft.res
+
+
 tune-all:
 	$(MAKE) tune1
-	$(MAKE) tunetoom && ./tunetoom 2048
-	$(MAKE) tunefft && ./tunefft 100000
+	$(MAKE) do-tune-toom
+	$(MAKE) do-tune-fft
 
 do-check%.in: check%.in factor
 	tail -n +2 $< | \
@@ -136,5 +155,7 @@ toomspace.o: gf2x.h thresholds.h
 tunetoom.o: gf2x.h replace.h thresholds.h
 tunefft.o: gf2x.h replace.h thresholds.h
 test.o: gf2x.h thresholds.h
-replace.o: replace.h thresholds.h
+replace.o: replace.h
 factor.o: HalfGCD.c gf2x.h thresholds.h
+mulfft-bit.o: gf2x.h thresholds.h
+mul-gf2x.o: gf2x.h thresholds.h

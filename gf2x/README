@@ -37,20 +37,30 @@ replace.c  - Helper code
 replace.h  - Helper code
 timing.c   - Helper code
 timing.h   - Helper code
+tuning-common.h - Helper code
+tuning-common.c - Helper code
+update-thresholds.c - Helper code
+update-thresholds.h - Helper code
 
 For testing:
 
 factor.c     - finds smallest irreducible factor of trinomial over GF(2)
 HalfGCD.c    - subquadratic gcd over GF(2)[x]
-test.c       - trivial test.
+bench.c      - bench program.
 checkXXX.*   - test sets
 
 No longer used:
 
 patch-wrt-ntl-5.3.1 - patch for file GF2X.c from NTL
 
+Caution:
+========
+
+gcc versions 4.3.0 and 4.3.1 have a bug which affects gf2x in a an
+unpredictable way. It is recommended to upgrade to at least 4.3.2.
+
 Instructions to install the package:
-===================================
+====================================
 
 1) Type:
 
@@ -62,16 +72,56 @@ Instructions to install the package:
       make w=64
 
    At this point, you should have a working libgf2x.a ; However it is not
-   tuned. It means in particular that the FFT is not available.
+   tuned. It means in particular that the FFT is not available at all.
 
-2) tune Karatsuba/Toom-Cook and FFT multiplication
+2) Optional, but recommended: tune Karatsuba/Toom-Cook and FFT multiplication
 
       make tune-all
 
-   This unfortunately takes a long while.
+   This unfortunately takes a long while. You may split the tuning into
+   the most elementary steps, which are by default:
+        make tunetoom
+        ./tunetoom -s 1.05 2048 -o tunetoom.res
+        make recover-tune
+        make tunefft
+        ./tunefft -s 1.02 8000000 -o tunefft.res
+        make recover-tune
+        make
+    Both the tunetoom and tunefft programs accept a -s <multiplicative
+    step> option as well as a max size argument. The max size to tunetoom
+    may not exceed 2048. Increasing the multiplicative step is likely to
+    speed up the tuning computation, at the expense of a decreased
+    accuracy.
+
+    The ``make recover-tune'' target is here so that interrupted tuning
+    programs (either by the user being fed up or some other reason) can
+    still be used to produce a valid thresholds.h file.
+
+    As an alternative to tuning, it is possible to replace thresholds.h
+    by one of the pre-shipped thresholds files. Those files contain
+    information on the characteristics of the machine on which the tuning
+    was run, so if you find a close match with your machine, it is a
+    reasonable option. You may do for example:
+        cp thresholds.h.core2 thresholds.h
 
 3) run:
 
       make check
 
    to see whether everything went ok.
+
+4) optional: you may inject gf2x into the ntl library. The current
+   version of gf2x has the ability to inject itself into ntl version
+   5.4.2. To do so, use the shell script:
+    ./inject-ntl /path/to/ntl-5.4.2/
+   and then:
+    make -C /path/to/ntl-5.4.2/src/
+   
+   This effectively replaces the complete binary polynomial
+   multiplication mechanism of ntl by the one in gf2x ; one should
+   observe significant speed-ups. Note that for linking program with this
+   ``hybrid'' ntl, you must both link with -lntl and -lgf2x ; libntl.a is
+   found at the place where ntl installed it, libgf2x.a is found in
+   gf2x's directory.
+
+

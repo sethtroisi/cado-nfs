@@ -4,10 +4,13 @@
 /* This file contains sensible defaults to start with, which are updated
  * by the tuning program */
 
-/* If you read "placeholder" here, it means that the tuning program has
- * not been run (or has not completed) */
 #define TOOM_TUNING_INFO		"tunetoom.c (2048 2048) run on crumble.loria.fr on Wed May 21 02:37:32 2008"
 #define FFT_TUNING_INFO		"tunefft.c (100000) run on crumble.loria.fr on Wed May 21 03:16:22 2008"
+
+/* Notes on crumble.loria.fr:
+ *
+ * Intel(R) Pentium(R) 4 CPU 3.20GHz
+ */
 
 /* First size for which KARA is used. Essentially hard-coded, since the
  * sizes up to 9 words are already karatsuba, unrolled. The unrolled
@@ -85,3 +88,5 @@
 #define	GF2X_SELECT_UNB_TC3U	1	/* do not change ! */
 
 #endif	/* THRESHOLDS_H_ */
+
+/* vim: set ft=c: */

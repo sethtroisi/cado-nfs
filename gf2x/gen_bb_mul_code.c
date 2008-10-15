@@ -37,6 +37,8 @@ int main(int argc, char *argv[])
     w = atoi(argv[1]);
     K = atoi(argv[2]);
 
+    printf("#ifndef MUL_INLINES_C_\n");
+    printf("#define MUL_INLINES_C_\n");
     printf("/* This file was generated automatically with\n");
     printf("   %s %u %u. Don't edit it! */\n\n",
 	   argv[0], w, K);
@@ -154,6 +156,8 @@ int main(int argc, char *argv[])
 	}
 	printf("}\n\n");
     }
+
+    printf("#endif\t/* MUL_INLINES_C_ */\n");
 
     return 0;
 }

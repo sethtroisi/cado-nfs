@@ -1,0 +1,56 @@
+--- a/src/Wizard	2008-03-05 00:35:01.000000000 +0100
++++ b/src/Wizard	2008-10-12 16:05:39.000000000 +0200
+@@ -81,6 +81,7 @@
+ cp ../include/NTL/WordVector.h small/include/NTL
+ cp ../include/NTL/vec_GF2.h small/include/NTL
+ cp ../include/NTL/GF2X.h small/include/NTL
++ln -s ../../../include/@@gf2x_inject@@ small/include/
+ 
+ cp cfile small/src
+ cp WizardAux small/src
+--- a/src/GF2X.c	2008-03-05 00:35:01.000000000 +0100
++++ b/src/GF2X.c	2008-10-12 17:14:03.000000000 +0200
+@@ -451,7 +451,22 @@
+ }
+ 
+ 
++#if 1
++#include "@@gf2x_inject@@/gf2x.h"
+ 
++void mul(GF2X& c, const GF2X& a, const GF2X& b)
++{
++   long sa = a.xrep.length();
++   long sb = b.xrep.length();
++
++   if (sa <= 0 || sb <= 0) {
++      clear(c);
++      return;
++   }
++   c.xrep.SetLength(sa+sb);
++   mul_gf2x(c.xrep.elts(), a.xrep.elts(), sa, b.xrep.elts(), sb);
++}
++#else
+ 
+ 
+ /*
+@@ -1264,6 +1279,9 @@
+ 
+ 
+ 
++#endif
++
++
+ 
+ void mul(GF2X& c, const GF2X& a, long b)
+ {
+--- a/src/makefile	2008-03-05 00:35:02.000000000 +0100
++++ b/src/makefile	2008-10-12 19:21:00.000000000 +0200
+@@ -488,7 +488,7 @@
+ 
+ 
+ GF2XTimeTest:
+-	$(LINK_CXX) -o GF2XTimeTest GF2XTimeTest.c wntl.a  $(GMP_LIBDIR) $(GMP_LIB) $(LDLIBS_CXX)
++	$(LINK_CXX) -o GF2XTimeTest GF2XTimeTest.c wntl.a -L../include/@@gf2x_inject@@ -lgf2x $(GMP_LIBDIR) $(GMP_LIB) $(LDLIBS_CXX)
+ 
+ InitSettings:
+ 	$(LINK_CXX) -o InitSettings InitSettings.c  $(LDLIBS_CXX)

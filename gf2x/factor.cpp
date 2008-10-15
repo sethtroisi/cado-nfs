@@ -98,25 +98,26 @@ void fastsqr(GF2X& b, GF2X& a, _ntl_ulong r, _ntl_ulong s)
   _ntl_ulong c0, c1, c2, c3, c4, c5;
   			
   long wd = 6;			/* 64-bit words */
-  long wlen = 64;		/* wordlength (bits) = 2^wd */
+  unsigned long wlen = 64;	/* wordlength (bits) = 2^wd */
   long wlenm = 63;		/* wlen - 1 */
 
   if ((r&s&1) == 0) 
     {
-    printf("Error in fastsqr: r = %d and s = %d must be odd\n", r, s);
-    exit (1);
+      printf("Error in fastsqr: r = %lu and s = %lu must be odd\n", r, s);
+      exit (1);
     }
     
   if (s <= 2*wlen)
     {  
-    printf("Error in fastsqr: s = %d must be at least %d\n", s, 2*wlen+1);
-    exit (1);
+      printf("Error in fastsqr: s = %lu must be at least %lu\n", s, 2*wlen+1);
+      exit (1);
     }
   
   if ((r-s) <= 2*wlen)
     {  
-    printf("Error in fastsqr: r-s = %d must be at least %d\n", r-s, 2*wlen+1);
-    exit (1);
+      printf("Error in fastsqr: r-s = %lu must be at least %lu\n",
+	     r-s, 2*wlen+1);
+      exit (1);
     }
   
   smax = (r+wlen-1) >> wd;	/* max size in words = ceil(r/wlen) */
@@ -404,19 +405,20 @@ void fastrem (GF2X& a, _ntl_ulong r, _ntl_ulong s)
 // Assumes 0 < s < r and 32-bit or 64-bit words.	RPB 20070321
 
 {
-  long d, rs, j, jb, jw, krb, krw, ksb, ksw; 
-  long apr, aps, lastr, lasts, sh1, sh2, wlenr;
+  long d, jw, krb, krw, ksb, ksw; 
+  long apr, aps, lastr, lasts, sh1, sh2;
+  unsigned long rs, j, wlenr, jb;
 
 #if (NTL_BITS_PER_LONG == 64)
 				/* Assume wordlength is 32 or 64 bits */
   				/* This is for 64 bits */
   long wd = 6;
-  long wlen = 64;		/* wordlength (bits) = 2^wd */
-  long wlenm = 63;		/* wlen - 1 */
+  unsigned long wlen = 64;	/* wordlength (bits) = 2^wd */
+  unsigned long wlenm = 63;	/* wlen - 1 */
 #else
   long wd = 5;			/* This is for 32 bits */
-  long wlen = 32;		/* wordlength (bits) = 2^wd */
-  long wlenm = 31;		/* wlen - 1 */
+  unsigned long wlen = 32;	/* wordlength (bits) = 2^wd */
+  unsigned long wlenm = 31;	/* wlen - 1 */
 #endif
 
   _ntl_ulong high;
@@ -428,9 +430,9 @@ void fastrem (GF2X& a, _ntl_ulong r, _ntl_ulong s)
 
   if ((s <= 0) || (rs <= 0)) 
     {
-    printf("Error in fastrem: r = %d and s = %d must satisfy r > s > 0\n", 
-      	    r, s);
-    exit (1);
+      printf("Error in fastrem: r = %lu and s = %lu must satisfy r > s > 0\n", 
+	     r, s);
+      exit (1);
     }
 
   d = deg(a);
@@ -521,7 +523,6 @@ void print_hex (char *s, GF2X a, int flip)
 
 {
   long d = deg (a);
-  long n = (d + 4) / 4; /* number of characters */
   long i, j, c;
   char t[17] = "0123456789abcdef";
 
@@ -548,9 +549,9 @@ fastmulmod (GF2X& c, const GF2X& a, const GF2X& b, const GF2XModulus& F,
 {
   if ((s <= 0) || (r <= s)) 
     {
-    printf("Error in fastmulmod: r = %d and s = %d must satisfy r > s > 0\n", 
-      	    r, s);
-    exit (1);
+      printf("Error in fastmulmod: r = %lu and s = %lu must satisfy r > s > 0\n", 
+	     r, s);
+      exit (1);
     }
 
    GF2X t;
@@ -572,13 +573,13 @@ void fastmulbyxmod (GF2X& c, const GF2X& a, _ntl_ulong r, _ntl_ulong s)
 {
   if ((s <= 0) || (r <= s)) 
     {
-    printf("Error in fastmulbyxmod: r = %d and s = %d must satisfy r > s > 0\n",
-      	    r, s);
-    exit (1);
+      printf("Error in fastmulbyxmod: r = %lu and s = %lu must satisfy r > s > 0\n",
+	     r, s);
+      exit (1);
     }
 
    MulByX(c, a);
-   if (deg(c) >= r)
+   if (deg(c) >= (long) r)
      {
      SetCoeff(c, r, 0);
      SetCoeff(c, s,  !(rep (coeff (c, s))));
@@ -603,7 +604,7 @@ void init_h (vec_GF2X& h, long k, long m, const GF2XModulus& F,
    for 0 <= j < m */
 
 {
-  long i, j, w;
+  long i, j;
   GF2X a, x, htemp;
 
   /* we use the following Pascal-triangle algorithm:
@@ -717,8 +718,8 @@ save_state (long s, long k2)
 int
 main (int argc, char *argv[])
 {
-  long r, rhigh, maxd = LONG_MAX, k, k1, k2, s, ss, i, n, twokm1, q, r3; 
-  long m = 0, k0 = 0, b0 = 2, q0 = 4, q1 = 0, q2;
+  long r, rhigh, maxd = LONG_MAX, k = 0, k1, k2, s, ss, i, q, r3; 
+  long m = 0, k0 = 0, b0 = 2, q0 = 4, q1 = 0, q2 = 0;
   long skipd = 0, fineDDFtol;
   long tkt = 0;
   int fineDDF, flip, swan;
@@ -848,21 +849,23 @@ main (int argc, char *argv[])
   if ((primitive) && (!ProbPrime(r, 2)))
     {
       fprintf (stderr, 
-        "Error: -p option and r = %d is not prime\n", r);
+	       "Error: -p option and r = %lu is not prime\n", r);
       exit (1);
     }
 
   if (k0 == 0)
     {
-    for (; (2 << k0) < r; k0++);
-    if (k0 > 20) 
-      k0 = (k0+20)/2; 		// Empirical optimum, could check at runtime
+      for (; (2 << k0) < r; k0++)
+	;
+      if (k0 > 20) 
+	k0 = (k0+20)/2;		// Empirical optimum, could check at runtime
     }
 
   if (m == 0)
     {
-    choose_m = (r > 10000);	// Later try to find optimal m
-    for (; (2 << m) < r; m++);	// Reasonable though probably not optimal.
+      choose_m = (r > 10000);	 // Later try to find optimal m
+      for ( ; (2 << m) < r; m++) // Reasonable though probably not optimal.
+	;
     }			
 
   if (r < 17) 			// Tiny case, this avoids a problem
@@ -874,7 +877,7 @@ main (int argc, char *argv[])
     				// V1.29, but not with V1.30 .. V1.32)
   if (m > r / 2)
     {
-      fprintf (stderr, "Error, m = %d greater than r/2\n", m);
+      fprintf (stderr, "Error, m = %ld greater than r/2\n", m);
       exit (1);
     }
 
@@ -898,14 +901,14 @@ main (int argc, char *argv[])
 
   if (verbose)
     {
-      printf ("Test separately degrees up to k0=%u\n", k0);
+      printf ("Test separately degrees up to k0=%ld\n", k0);
       if (skipd > 0)
-        printf ("Skip degrees up to %u\n", skipd);
-      printf ("Using block size of m=%u\n", m);
-      printf ("Start with q0=%u block(s)\n", q0);
+        printf ("Skip degrees up to %ld\n", skipd);
+      printf ("Using block size of m=%ld\n", m);
+      printf ("Start with q0=%ld block(s)\n", q0);
       if (q1 < r)
-        printf ("Stop when number of blocks is > q1=%u\n", q1);
-      printf ("Use fine DDF above %d\n", fineDDFtol);
+        printf ("Stop when number of blocks is > q1=%ld\n", q1);
+      printf ("Use fine DDF above %ld\n", fineDDFtol);
       fflush (stdout);
     }
 
@@ -928,7 +931,7 @@ main (int argc, char *argv[])
       if (c != 'u') 	/* just copies rest of line */
         {
           if (s != -1)
-            printf ("%d ", s);
+            printf ("%ld ", s);
 	  printf ("%c", c);
 	  
           do
@@ -964,7 +967,7 @@ main (int argc, char *argv[])
 	    }
 	  if (s >= r)
 	    {
-	    fprintf (stderr, "Error, s = %d >= r\n", s);
+	      fprintf (stderr, "Error, s = %ld >= r\n", s);
 	      exit (1);
 	    }
 	    
@@ -1018,20 +1021,19 @@ main (int argc, char *argv[])
                 rhigh = r;
             }
           else if (verbose && swan)
-	    printf ("By Swan's theorem search at most to degree %d\n", rhigh);
+	    printf ("By Swan's theorem search at most to degree %ld\n", rhigh);
 
           if (maxd < rhigh)
             {
               rhigh = maxd;
               if (verbose)
-                printf ("Maximal degree checked reduced to %d\n", rhigh);
+                printf ("Maximal degree checked reduced to %ld\n", rhigh);
             }
 
 	  SetCoeff(p, s, 1);
 	  GF2X a, c, htemp, htemp2;
 	  GF2XModulus F;
           int Finit = 0; // non zero if F is build
-	  long w;
 	  clear(htemp);
 	  double st;
 	  
@@ -1083,11 +1085,11 @@ main (int argc, char *argv[])
 	    mopt = 2*(long)((double)0.5*sqrt(timem/times) + (double)0.5);
 	    fprintf (stderr, "M %f msec, S %f msec, M/S %f, sqrt(M/S) %f\n", 
 	      1000.0* timem, 1000.0*times, timem/times, sqrt(timem/times));
-	    fprintf (stderr, "Estimate of best m %d\n", mopt);
+	    fprintf (stderr, "Estimate of best m %ld\n", mopt);
  	    if ((mopt > 1) && (mopt <= 100))
  	      {
  	      m = mopt;
- 	      if (verbose) printf ("Using optimal block size of m=%u\n", m);
+ 	      if (verbose) printf ("Using optimal block size of m=%ld\n", m);
  	      }
 	    }
 
@@ -1126,7 +1128,7 @@ main (int argc, char *argv[])
 		  unsigned long K = (1 << k) - 1;
 		  
 		  if (verbose)
-                    printf ("Degree %d: ", k);
+                    printf ("Degree %ld: ", k);
 
                   if (k <= skipd)
                     {
@@ -1182,7 +1184,7 @@ main (int argc, char *argv[])
 		      
 		  if (verbose)
                     {
-                      printf ("Current q %d\n", q);
+                      printf ("Current q %ld\n", q);
                       fflush (stdout);
                     }
 
@@ -1192,7 +1194,7 @@ main (int argc, char *argv[])
 		      q = (rhigh - k + m) / m;	// Round up
 		      k2 = k + q * m - 1;
 		      if (verbose)
-			printf ("Reducing q to %d\n", q);
+			printf ("Reducing q to %ld\n", q);
 		    }
 
 		  /* we need to save h whenever q > 1 and the current gcd=1 */
@@ -1201,7 +1203,7 @@ main (int argc, char *argv[])
 		    
 		  if (verbose)
                     {
-                      printf ("Interval %d..%d:\n", k, k2);
+                      printf ("Interval %ld..%ld:\n", k, k2);
                       fflush (stdout);
                     }
 
@@ -1244,7 +1246,7 @@ main (int argc, char *argv[])
                         if (i + m - 1 <= skipd)
                           {
                             if (verbose >= 2)
-                              printf ("   skip degree interval %u..%u\n",
+                              printf ("   skip degree interval %ld..%ld\n",
                                       i, i + m - 1);
                           }
                         else
@@ -1284,7 +1286,7 @@ main (int argc, char *argv[])
 			    /* check for GCD error */
 			    if (deg(a) < k)
 			      {
-			      printf ("Error: GCD degree %d < %d\n", 
+			      printf ("Error: GCD degree %ld < %ld\n", 
 			      	deg(a), k);
 			      exit (1);
 			      }
@@ -1327,12 +1329,12 @@ main (int argc, char *argv[])
 		  a = factors[i0].a; // the lex least factor of smallest
 		  		     // degree (unless flipped)
 		  if (verbose)
-		    printf ("CanZass took %f, total degree %d, small degree %d\n", 
+		    printf ("CanZass took %f, total degree %ld, small degree %ld\n", 
 			    GetTime () - st, k1, deg(a));
 		  k1 = deg(a);       // the smallest degree
 		  if (k1 < k)
 		    {
-		    printf ("Error: GCD degree %d < %d \n", k1, k);
+		    printf ("Error: GCD degree %ld < %ld \n", k1, k);
 		    exit (1);
 		    }
 		}
@@ -1344,20 +1346,20 @@ main (int argc, char *argv[])
             {
               SqrMul_kt1 += (double) (rhigh-k0);	// best possible
               if (skip)
-                printf ("%d u\n", ss);
+                printf ("%ld u\n", ss);
               else if (primitive)
-                printf ("%d primitive\n", ss);
+                printf ("%ld primitive\n", ss);
               else  
-	        printf ("%d irreducible\n", ss);
+	        printf ("%ld irreducible\n", ss);
             }
           else
             {
               if (k1 > k0)
                 SqrMul_kt1 += (double) (k1-k0);		// best possible
               if (k1 != 0)
-                printf ("%d %d", ss, k1);
+                printf ("%ld %ld", ss, k1);
               else
-                printf ("%d non-irreducible", ss);
+                printf ("%ld non-irreducible", ss);
 	      if (k1 >= b0) 
 	        printf (" p%s", fact);
 	      printf("\n");  
@@ -1371,15 +1373,15 @@ main (int argc, char *argv[])
 
   if (verbose_t && (GCD_kt2 > (double) 0.0) && (Total_t > (double) 0.0))
     {
-      printf ("Normal end of run for r = %d, m = %d, version %1.2f\n", 
+      printf ("Normal end of run for r = %ld, m = %ld, version %1.2f\n", 
         r, m, VERSION);
-      printf ("Total Exp time        %f = %2.2f \%\n", 
+      printf ("Total Exp time        %f = %2.2f %%\n", 
 	       Exp_t, 100.0*Exp_t/Total_t);
-      printf ("Total Sqr/Mul time    %f = %2.2f \%\n", 
+      printf ("Total Sqr/Mul time    %f = %2.2f %%\n", 
 	       SqrMul_t, 100.0*SqrMul_t/Total_t);
-      printf ("Total GCD time        %f = %2.2f \%\n", 
+      printf ("Total GCD time        %f = %2.2f %%\n", 
 	       GCD_t, 100.0*GCD_t/Total_t);
-      printf ("Total CanZass time    %f = %2.2f \%\n", 
+      printf ("Total CanZass time    %f = %2.2f %%\n", 
 	       CanZass_t, 100.0*CanZass_t/Total_t);
       printf ("Total computation     %f\n", Total_t);
       if (tkt > 0)

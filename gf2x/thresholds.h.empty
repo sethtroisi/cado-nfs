@@ -68,3 +68,5 @@
 #define	GF2X_SELECT_UNB_TC3U	1	/* do not change ! */
 
 #endif	/* THRESHOLDS_H_ */
+
+/* vim: set ft=c: */
