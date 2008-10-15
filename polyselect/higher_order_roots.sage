@@ -1,23 +1,27 @@
 # An example:
-# sage: attach roots.sage
+# sage: attach higher_order_roots.sage
 # sage: x=PolynomialRing(Integers(),['x']).gen()
 # sage: f=1008593880*x^5 - 47389790327*x^4 - 84256212127259029352*x^3 + 3474222647711706240332297*x^2 + 76764659243128790828718944401*x + 62435925692971697863740890240
 # sage: all_roots(f,5)
+# sage: all_roots(f,17)
 
-# An example:
+# Another example:
 # all_roots(((x-3)*(x-19)^2+2^16)*(x-1234567)+2^40,2)
-# studies the exponent of 2 in F(a,b), where F(x,y) = y^deg(f)*f(x/y)
-# which returns (among others):
+# This studies the exponent of 2 in F(a,b), where F(x,y) = y^deg(f)*f(x/y)
+# The printed data contains (among others):
 # 2^52 : (2576298330889987:1), delta=62-61
-# This result means that for a,b fixed mod 2^52, we have to 
-# add 62-61 = 1 * log(2) to the concerned cells, which are those
-# in the lattice a=2576298330889987*i+j, b=2^52*i.
 
-# For roots at infinity, the 2nd part of the output is (1:x), which means
-# the lattice is a=i+x*j, b=2^52*j.
+# This means that for the projective class (a:b) fixed mod 2^52 (in other
+# terms, the quotient a/b fixed mod 2^52, funny things at infinity set
+# aside), we have to add 62-61 = 1 * log(2) to the concerned cells, which
+# are those in the lattice a=2576298330889987*i+j*2^52, b=i.
+
+# For roots at infinity, the 2nd part of the output is (1:r), which means
+# the lattice is a=i, b=r*i+2^52*j.
 
 # The delta value is not always 1, and it is given by a difference wrt
-# smaller exponents.
+# smaller exponents. Values of delta greater than 1 account for the
+# presence of multiple roots mod p.
 
 # Remark: to avoid rounding errors, instead of adding delta*log(2) in the
 # sieving, it is preferable to add round(hi*log(2)) - round(lo*log(2)),
