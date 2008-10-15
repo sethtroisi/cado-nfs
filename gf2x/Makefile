@@ -138,7 +138,7 @@ check: $(addprefix do-,$(wildcard check*.in))
 clean:
 	-rm -f gen_bb_mul_code mul-inlines-k*.c tuneup-k* tune1-k*
 	-rm -f mul-inlines.c *~ tune1.log
-	-rm -f test tunetoom tunefft libgf2x.a
+	-rm -f bench update-thresholds tunetoom tunefft libgf2x.a
 	-rm -f check*.res factor
 	-rm -f *.o
 

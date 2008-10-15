@@ -218,7 +218,11 @@ ugly_label:
 	}
 
 	if (T[3] < T[1] && T[3] < T[2]) {
-            besti--;
+            if (besti) {
+                if (besti == 1)
+                    abort();
+                besti--;
+            }
 	    K0 *= 3;
             /* K just stays as it was */
             i = 3;
