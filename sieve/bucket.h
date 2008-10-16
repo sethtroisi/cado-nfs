@@ -17,6 +17,8 @@
  * buckets. The user says for each data to which bucket it belongs. This
  * module is supposed to perform this storage in a cache-friendly way and
  * so on...
+ * Updates can be "tagged" with a one-byte value which must be increasing
+ * across all the updates stored.
  */
 
 /*
@@ -111,8 +113,12 @@ typedef struct {
                                         // location in each bucket.
     bucket_update_t ** bucket_read;     // Contains pointers to first unread
                                         // location in each bucket.
+    bucket_update_t *** first_logp;     // For each bucket, an array of 
+                                        // pointers to the first bucket entry
+                                        // with a given log_p
     int bucket_size;                    // The allocated size of one bucket.
     int n_bucket;                       // Number of buckets.
+    unsigned char last_logp;
 } bucket_array_t;
 
 /*
@@ -182,9 +188,22 @@ is_end(const bucket_array_t BA, const int i);
 static inline void
 rewind_bucket(bucket_array_t BA, const int i);
 
+/* If you want to read the most recently read update again, rewind by 1: */
+static inline void
+rewind_bucket_by_1 (bucket_array_t BA, const int i);
+
 /* If you want to access updates in a non-sequential way: */
 static inline bucket_update_t
 get_kth_bucket_update(const bucket_array_t BA, const int i, const int k);
+
+/* Call this to mark the current write position in the buckets the start
+   of the log(p) value logp. I.e. for each bucket number i, 
+   the updates at addresses >= BA.first_logp[i][logp], 
+   < BA.first_logp[i][logp+1] correspond to primes p with log(p) = logp.
+   The logp can be set only incrementally, calling with a logp that is not
+   larger than the largest previously used one has no effect. */
+static inline void
+bucket_new_logp(bucket_array_t BA, const unsigned char logp);
 
 /******** Bucket array implementation **************/
 
@@ -216,6 +235,7 @@ init_bucket_array(const int n_bucket, const int bucket_size)
     BA.bucket_start = (bucket_update_t **)malloc_pagealigned(n_bucket*sizeof(bucket_update_t *));
     BA.bucket_write = (bucket_update_t **)malloc_check(n_bucket*sizeof(bucket_update_t *));
     BA.bucket_read  = (bucket_update_t **)malloc_check(n_bucket*sizeof(bucket_update_t *));
+    BA.first_logp = (bucket_update_t ***)malloc_check(n_bucket*sizeof(bucket_update_t **));
 
     for (i = 0; i < n_bucket; ++i) {
         // TODO: shall we ensure here that those pointer do not differ by
@@ -226,7 +246,10 @@ init_bucket_array(const int n_bucket, const int bucket_size)
         BA.bucket_start[i] = (bucket_update_t *)malloc_check(bucket_size*sizeof(bucket_update_t));
         BA.bucket_write[i] = BA.bucket_start[i];
         BA.bucket_read[i] = BA.bucket_start[i];
+	BA.first_logp[i] = (bucket_update_t **)malloc_check(256 * sizeof(bucket_update_t *));
+	BA.first_logp[i][0] = BA.bucket_write[i];
     }
+    BA.last_logp = 0;
     return BA;
 }
 
@@ -235,10 +258,14 @@ clear_bucket_array(bucket_array_t BA)
 {
     int i;
     for (i = 0; i < BA.n_bucket; ++i)
+      {
         free(BA.bucket_start[i]);
+	free(BA.first_logp[i]);
+      }
     free(BA.bucket_start);
     free(BA.bucket_write);
     free(BA.bucket_read);
+    free(BA.first_logp);
 }
 
 static inline void
@@ -252,6 +279,17 @@ push_bucket_update(bucket_array_t BA, const int i,
         BA.bucket_write[i]--;
     }
 #endif
+}
+
+static inline void
+bucket_new_logp(bucket_array_t BA, const unsigned char logp)
+{
+  int i, j;
+  for (i = 0; i < BA.n_bucket; ++i)
+    for (j = (int) BA.last_logp + 1; j <= (int) logp; j++)
+      BA.first_logp[i][j] = BA.bucket_write[i];
+  if (BA.last_logp < logp)
+    BA.last_logp = logp;
 }
 
 static inline void

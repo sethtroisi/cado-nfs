@@ -147,7 +147,8 @@ int factor_leftover_norm (mpz_t n, unsigned int b, mpz_array_t* const factors,
 			  uint32_array_t* const multis, 
 			  facul_strategy_t *strategy);
 NOPROFILE_STATIC void
-eval_fij (mpz_t v, mpz_t *f, unsigned int d, long i, unsigned long j);
+eval_fij (mpz_t v, const mpz_t *f, const unsigned int d, const long i, 
+	  const unsigned long j);
 
 
 /************************** sieve info stuff *********************************/
@@ -479,6 +480,9 @@ invmod(unsigned long *pa, unsigned long b) {
   int t, lsh;
   a = *pa;
 
+  if (UNLIKELY(*pa == 0))
+    return 0; /* or we get infinite loop */
+
   if (UNLIKELY(((b & 1UL)==0)))
     {
       modulusul_t m;
@@ -566,128 +570,104 @@ invmod(unsigned long *pa, unsigned long b) {
   return 1;
 }
 
+MAYBE_UNUSED
+static inline fbprime_t
+invmod_po2 (fbprime_t n)
+{
+  fbprime_t r;
+
+  ASSERT (n % 2 != 0);
+  
+  r = (3 * n) ^ 2;
+  r = 2 * r - r * r * n;
+  r = 2 * r - r * r * n;
+  r = 2 * r - r * r * n;
+  if (sizeof (fbprime_t) > 4)
+    r = 2 * r - r * r * n;
+
+  return r;
+}
+
 // Compute the root r describing the lattice inside the q-lattice
 // corresponding to the factor base prime (p,R).
 // Formula: r = - (a1-R*b1)/(a0-R*b0) mod p
-// In the case where denominator is zero, returns p.
-// In the case where denominator is non-invertible mod p, returns p+1.
-// Otherwise r in [0,p-1]
 // Assumes p < 2^32
 
-static inline fbprime_t
-simple_fb_root_in_qlattice(const fbprime_t p, const fbprime_t R, const sieve_info_t * si)
-{
-    int64_t aux;
-    uint64_t num, den;
-
-    // numerator
-    aux = ((int64_t)R)*((int64_t)si->b1) - ((int64_t)si->a1); 
-    if (aux >= 0)
-        num = ((uint64_t)aux) % ((uint64_t)p);
-    else {
-        num = ((uint64_t)(-aux)) % ((uint64_t)p);
-        num = (uint64_t)p - num;
-    }
-    if (num == 0)
-        return 0;
-
-    // denominator
-    aux = ((int64_t)si->a0) - ((int64_t)R)*((int64_t)si->b0); 
-    if (aux >= 0) {
-        den = ((uint64_t)aux) % ((uint64_t)p);
-        if (den == 0)
-            return p;
-    } else {
-        den = ((uint64_t)(-aux)) % ((uint64_t)p);
-        if (den == 0)
-            return p;
-        den = (uint64_t)p - den;
-    }
-
-    // divide
-    if (!invmod(&den, p))
-      return p+1;
-    num = num*den;
-    return (fbprime_t)(num % ((uint64_t) p));
-}
-
-/* Transform a "bad" prime with root "at infinity" in the a,b-plane
-   to the i,j plane. Homogenized, we have s/t = r, so at == bs (mod p),
-   where r=inf means s==1, t==0 (mod p).
-   We want i,j so that (a_0 i + a_1 j) t == (b_0 i + b_1 j) s (mod p), 
-   or for s=1, t=0, simply b_0 i = -b_1 j (mod p).
-   If b_0 is invertible (mod p), we get a regular root -b_1/b_0 in the 
-   i,j-plane; otherwise the root is at infinity again and we get a "bad"
-   prime in the i,j-plane. (Can that even happen?) */
-
-static inline fbprime_t
-inf_root_in_qlattice(const fbprime_t p, const sieve_info_t * si)
-{
-  modulusul_t m;
-  residueul_t num, den;
-  fbprime_t root;
-
-  modul_initmod_ul (m, p);
-  modul_init (den, m);
-  modul_set_ul (den, labs(si->b0), m);
-  if (si->b0 < 0)
-    modul_neg (den, den, m);
-  if (modul_is0 (den, m))
-    {
-      modul_clear (den, m);
-      modul_clearmod (m);
-      return p;
-    }
-  if (! modul_inv (den, den, m))
-    {
-      modul_clear (den, m);
-      modul_clearmod (m);
-      return p+1;
-    }
-  modul_init (num, m);
-  modul_set_ul (num, labs(si->b1), m);
-  if (si->b1 < 0)
-    modul_neg (num, num, m);
-  modul_mul (num, num, den, m);
-  modul_neg (num, num, m);
-  root = modul_get_ul (num, m);
-  modul_clear (den, m);
-  modul_clear (num, m);
-  modul_clearmod (m);
-  return root;
-}
+/* General version of the lattice transform function. Allows projective 
+   roots in input and output, and handles prime powers.
+   In input, if the root is projective, say s/t (mod p) and t is 
+   non-invertible (mod p), then we expect R = p + (t/s mod p).
+   On output, if the root is projective, say u/v (mod p) and v is 
+   non-invertible (mod p), then return value r = p + (v/u mod p).
+   So projective roots are stored as their reciprocal, and have p added
+   to signal the fact that it's a reciprocal value.
+*/
 
 NOPROFILE_INLINE fbprime_t
-fb_root_in_qlattice(const fbprime_t p, const fbprime_t R,
+fb_root_in_qlattice (const fbprime_t p, const fbprime_t R,
         const uint32_t invp, const sieve_info_t * si)
 {
-    int64_t aux;
-    uint64_t num, den;
+  int64_t aux1, aux2;
+  uint64_t u, v;
+  fbprime_t add;
 
-    if (UNLIKELY(p == 2))
-        return simple_fb_root_in_qlattice(p, R, si);
+    /* Handle powers of 2 separately, REDC doesn't like them */
+    if (UNLIKELY(p % 2 == 0))
+      {
+	fbprime_t u, v;
+	ASSERT(p == (p & -p)); /* Test that p is power of 2 */
+	if (R < p) /* Root in a,b-plane is non-projective */
+	  {
+	    u = R * si->b1 - si->a1;
+	    v = si->a0 - R * si->b0;
+	  }
+	else /* Root in a,b-plane is projective */
+	  {
+	    u = si->b1 - (R - p) * si->a1;
+	    v = (R - p) * si->a0 - si->b0;
+	  }
+	
+	if (v % 2 != 0)
+	  {
+	    /* root in i,j-plane is non-projective */
+	    v = invmod_po2 (v);
+	    return (u * v) & (p - 1);
+	  }
+	else
+	  {
+	    /* root in i,j-plane is projective */
+	    u = invmod_po2 (u);
+	    return p + ((u * v) & (p - 1));
+	  }
+      }
 
     // Use Signed Redc for the computation:
     // Numerator and denominator will get divided by 2^32, but this does
     // not matter, since we take their quotient.
 
-    // numerator
-    aux = ((int64_t)R)*((int64_t)si->b1) - ((int64_t)si->a1); 
-    num = redc_32(aux, p, invp); /* 0 <= num < p */
-    if (num == 0)
-        return 0;
+    if (LIKELY(R < p)) /* Root in a,b-plane is non-projective */
+      {
+	aux1 = ((int64_t)R)*((int64_t)si->b1) - ((int64_t)si->a1); 
+	aux2 = ((int64_t)si->a0) - ((int64_t)R)*((int64_t)si->b0); 
+      }
+    else /* Root in a,b-plane is projective */
+      {
+	aux1 = ((int64_t)si->b1) - ((int64_t)(R - p))*((int64_t)si->a1); 
+	aux2 = ((int64_t)(R - p))*((int64_t)si->a0) - ((int64_t)si->b0); 
+      }
+    u = redc_32(aux1, p, invp); /* 0 <= u < p */
+    v = redc_32(aux2, p, invp); /* 0 <= den < p */
 
-    // denominator
-    aux = ((int64_t)si->a0) - ((int64_t)R)*((int64_t)si->b0); 
-    den = redc_32(aux, p, invp); /* 0 <= den < p */
-    if (den == 0)
-        return p;
-
-    // divide: for p odd, invmod computes 2^32/den (mod p)
-    if (UNLIKELY(!invmod(&den, p)))
-      return p+1;
-    num = num * den; /* 0 < num < p^2 */
-    return (fbprime_t) redc_u32 (num, p, invp);
+    add = 0;
+    if (UNLIKELY(!invmod(&v, p)))
+      {
+	/* root in i,j-plane is projective */
+	if (UNLIKELY(!invmod(&u, p)))
+	  abort (); /* Should never happen! */
+	add = p;
+      }
+    u *= v;
+    return (fbprime_t) redc_u32 (u, p, invp) + add;
 }
 
 
@@ -815,13 +795,25 @@ reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r,
 void
 fill_in_buckets(bucket_array_t BA, factorbase_degn_t *fb, 
 		const const_sieve_info_t * si) {
+unsigned char prev_logp = 0;
     // Loop over all primes in the factor base >= bucket_thresh
     while (fb->p != FB_END && fb->p < (fbprime_t) si->bucket_thresh)
         fb = fb_next (fb); // cannot do fb++, due to variable size !
+    if (fb->p != FB_END)
+      {
+        prev_logp = fb->plog;
+        bucket_new_logp (BA, fb->plog);
+      }
     while (fb->p != FB_END) {
         unsigned char nr;
         fbprime_t p = fb->p;
         unsigned char logp = fb->plog;
+
+        if (fb->plog > prev_logp)
+          {
+            prev_logp = fb->plog;
+            bucket_new_logp (BA, fb->plog);
+          }
 
         for (nr = 0; nr < fb->nr_roots; ++nr) {
             const uint32_t I = si->I;
@@ -1284,9 +1276,10 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
 {
     const factorbase_degn_t *fb_sav = fb;
     const fbprime_t *badprimes;
-    int n = 0, nb;
+    int size = 0, n, nb;
     const unsigned int thresh = si->bucket_thresh;
     const int verbose = 0;
+    const int do_bad_primes = 1;
 
     ASSERT (side == 'a' || side == 'r');
     badprimes = (side == 'r') ? si->rbadprimes : si->abadprimes;
@@ -1294,19 +1287,20 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
 
     // Count prime ideals of factor base primes p < thresh
     while (fb->p != FB_END && fb->p < thresh) {
-        n += fb->nr_roots;
+        size += fb->nr_roots;
         fb = fb_next (fb); // cannot do fb++, due to variable size !
     }
     // Count bad primes p < thresh
     nb = 0;
     while (badprimes[nb] != 0 && badprimes[nb] < thresh)
       nb++;
-    n += nb;
+    size += nb;
     fb = fb_sav;
 
     // allocate space for these. n is an upper bound, since some of the
     // ideals might become special ones.
-    ssd->nice_p = (small_typical_prime_data_t *)malloc(n*sizeof(small_typical_prime_data_t));
+    ssd->nice_p = (small_typical_prime_data_t *)
+      malloc(size * sizeof(small_typical_prime_data_t));
     n = 0;
     nb = 0;
     ssd->nb_bad_p = 0;
@@ -1314,22 +1308,24 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
     // Do another pass on fb and badprimes, to fill in the data
     // while we have any regular primes or bad primes < thresh left
     while ((fb->p != FB_END && fb->p < thresh) || 
-           (badprimes[nb] != 0 && badprimes[nb] < thresh)) {
+           (do_bad_primes && badprimes[nb] != 0 && badprimes[nb] < thresh)) {
       int nr = 0, nr_roots, logp;
       fbprime_t p, r;
       do // We process either a bad prime, or one root of a good prime
         {
           // If there's a bad prime less than the next eligible regular prime
-          if (badprimes[nb] != 0 && badprimes[nb] < thresh && 
+          if (do_bad_primes && badprimes[nb] != 0 && badprimes[nb] < thresh && 
              (fb->p == FB_END || badprimes[nb] < fb->p)) 
             {
+	      uint32_t invp;
               /* Transform a prime that's "bad" in the a,b-plane */
               p = badprimes[nb++];
               nr_roots = 1;
               /* logp isn't stored in badprimes, so we need to compute it */
               logp = fb_log (p, (side == 'r' ? si->scale_rat : si->scale_alg)
                                  * LOG_SCALE, 0.);
-              r = inf_root_in_qlattice (p, si);
+	      invp = (p % 2 == 1) ? (uint32_t) -invmod_po2 (p) : 1;
+              r = fb_root_in_qlattice (p, p, invp, si);
               if (verbose)
                 fprintf (stderr, "# Prime %d root inf -> %d\n", p, r);
             } else {
@@ -1338,7 +1334,7 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
               logp = fb->plog;
               nr_roots = fb->nr_roots;
               r = fb_root_in_qlattice(p, fb->roots[nr], fb->invp, si);
-              if (verbose && r == p)
+              if (verbose && r >= p)
                 fprintf (stderr, "# Prime %d root %d -> inf\n", 
                          p, fb->roots[nr]);
               nr++;
@@ -1349,28 +1345,27 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
               // we may get a small speedup out of treating it separately
           } else */
           if (r == p) {
-            if (p < si->J) { /* If p>=J, we never get p|j for 0<j<J */
-              // Fill in data for this bad prime
-              /* Shouldn't happen that often so a realloc is ok */
-              ssd->bad_p = (small_bad_prime_data_t *) 
-                           realloc (ssd->bad_p, (ssd->nb_bad_p + 1) * 
-                                    sizeof (small_bad_prime_data_t));
-              ssd->bad_p[ssd->nb_bad_p].p = p;
-              /* gcd (i,j) | gcd (a,b), so for j=0, gcd(a,b) = abs(i), so 
-                 the only potential relation in the q-lattice line with 
-                 j=0 is i = +-1. I think we don't bother sieving for that 
-                 one, do we? (Although that one has a nice small norm...)
-                 Assuming we don't, skip over j=0 by initing next_position 
-                 to p*I here (i.e., the line j = p) */
-              ssd->bad_p[ssd->nb_bad_p].next_position = p * si->I;
-              ssd->bad_p[ssd->nb_bad_p].logp = logp;
-              ssd->nb_bad_p++;
-            }
-          } else if (r == p+1) {
-              // TODO:
-              // Do something with those???
+            if (do_bad_primes && p < si->J)  /* If p>=J, we never get p|j for 0<j<J */
+	      {
+		// Fill in data for this bad prime
+		/* Shouldn't happen that often so a realloc is ok */
+		ssd->bad_p = (small_bad_prime_data_t *) 
+		  realloc (ssd->bad_p, (ssd->nb_bad_p + 1) * 
+			   sizeof (small_bad_prime_data_t));
+		ssd->bad_p[ssd->nb_bad_p].p = p;
+		/* gcd (i,j) | gcd (a,b), so for j=0, gcd(a,b) = abs(i), so 
+		   the only potential relation in the q-lattice line with 
+		   j=0 is i = +-1. I think we don't bother sieving for that 
+		   one, do we? (Although that one has a nice small norm...)
+		   Assuming we don't, skip over j=0 by initing next_position 
+		   to p*I here (i.e., the line j = p) */
+		ssd->bad_p[ssd->nb_bad_p].next_position = p * si->I;
+		ssd->bad_p[ssd->nb_bad_p].logp = logp;
+		ssd->nb_bad_p++;
+	      }
           } else {
             // Fill in data for this nice prime
+	    ASSERT (n < size);
             ssd->nice_p[n].p = p;
             ssd->nice_p[n].r = r;
             ssd->nice_p[n].logp = logp;
@@ -1409,6 +1404,7 @@ void sieve_small_bucket_region(unsigned char *S,
        it works correctly, it updates some i,j with gcd(i,j) = 2 for p = 2). 
        Also, 2 can be sieved more quickly with long word transfers. 
        TODO: use SSE2 */
+    ASSERT ((I / 2) % sizeof (unsigned long) == 0);
     for (n = 0 ; n < ssd.nb_nice_p && ssd.nice_p[n].p == 2; n++) {
       unsigned long *S_ptr;
       unsigned long logps;
@@ -1985,7 +1981,7 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
             //  fprintf (stderr, "# Have relation -1128230057,66615 at x = %d\n", x);
 
             // Trial divide rational norm
-            eval_fij (rat_norm, cpoly->g, 1, a, b);
+            eval_fij (rat_norm, (const mpz_t *) cpoly->g, 1, a, b);
             trial_div (&rat_factors, rat_norm, rat_BA, N, x, fb_rat, 
                        si->rbadprimes, resieved_rat, si->trialdiv_data_rat);
             
@@ -1994,7 +1990,7 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
               continue;
 
             // Trial divide algebraic norm
-            eval_fij (alg_norm, cpoly->f, cpoly->degree, a, b);
+            eval_fij (alg_norm, (const mpz_t *) cpoly->f, cpoly->degree, a, b);
             mpz_divexact_ui (alg_norm, alg_norm, si->q);
             trial_div (&alg_factors, alg_norm, alg_BA, N, x, fb_alg, 
                        si->abadprimes, resieved_alg, si->trialdiv_data_alg);
@@ -2335,7 +2331,8 @@ get_maxnorm (cado_poly cpoly, sieve_info_t *si, uint64_t q0)
 
 /* v <- |f(i,j)|, where f is of degree d */
 NOPROFILE_STATIC void
-eval_fij (mpz_t v, mpz_t *f, unsigned int d, long i, unsigned long j)
+eval_fij (mpz_t v, const mpz_t *f, const unsigned int d, const long i, 
+	  const unsigned long j)
 {
   unsigned int k;
   mpz_t jpow;
