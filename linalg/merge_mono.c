@@ -1,6 +1,9 @@
 // TODO: use unified compact lists...!
 // TODO: reintroduce mat->weight
 
+/* If one wants to change the R data structure, please check the diff of
+   revision 1568, which clearly identifies the places where R is used. */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <gmp.h>
@@ -1400,6 +1403,7 @@ add_i_to_Rj(sparse_mat_t *mat, int i, int j)
     fprintf(stderr, "Adding row %d to R[%d]\n", i, j);
 #endif
 #ifndef USE_COMPACT_R
+    /* FIXME: isn't it possible that i already appears in Rj? */
     for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
 	if(mat->R[GETJ(mat, j)][k] == -1)
 	    break;
