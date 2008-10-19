@@ -280,11 +280,18 @@ specialHashInsert(hashtable_t *H, long p, unsigned long r, int irel)
 // the hash table, but not in the relations. This might end up with singletons
 // here and there, but we don't care, since they will be dealt with in
 // merge.
+/* Meaning of the different parameters:
+   minpr, minpa: only ideals > minpr (resp. minpa) are considered on the
+                 rational (resp. algebraic) side. This means that the output
+                 might contain ideals <= minpr or minpa appearing only once.
+   maxpr, maxpa: relations with ideals > maxpr (resp. maxpa) on the rational
+                 (resp. algebraic) side are discarded.
+*/
 static void
 insertNormalRelation(char *rel_used, int **rel_compact, int irel, int *nprimes,
-                     hashtable_t *H, relation_t *rel, unsigned long rlim,
-                     unsigned long alim, long maxpr, long maxpa, long minpr,
-                     long minpa, int final, unsigned long *tot_alloc)
+                     hashtable_t *H, relation_t *rel,
+                     long maxpr, long maxpa, unsigned long minpr,
+                     unsigned long minpa, int final, unsigned long *tot_alloc)
 {
     int *tmp = NULL, ltmp = 0, itmp, j, h, ok = 1;
     /* special values of the roots are:
@@ -295,27 +302,24 @@ insertNormalRelation(char *rel_used, int **rel_compact, int irel, int *nprimes,
     uint64_t mask = (H->need64) ? (uint64_t) (-1) : (uint32_t) 4294967295;
     uint64_t minus2 = mask & (uint64_t) -2;
 
-#if LP_ONLY == 0
-    rlim = alim = 0; // ohhhhhhhhhhhhh!
-#endif
     reduce_exponents_mod2 (rel);
     computeroots (rel);
     if(final){
 	// first count number of "large" primes
-	for(j = 0; j < rel->nb_rp; j++)
-	    if(rel->rp[j].p > rlim){
-		if((rel->rp[j].p > (unsigned long) maxpr)
-		   || (rel->rp[j].p < (unsigned long) minpr))
-		    ok = 0;
-		ltmp++;
+	for (j = 0; j < rel->nb_rp; j++)
+          if (rel->rp[j].p > minpr) /* only consider primes > minpr */
+            {
+              if (rel->rp[j].p > (unsigned long) maxpr)
+                ok = 0; /* discard relations with too large primes */
+              ltmp++;
 	    }
-	for(j = 0; j < rel->nb_ap; j++)
-	    if(rel->ap[j].p > alim){
-		if((rel->ap[j].p > (unsigned long) maxpa)
-		   || (rel->ap[j].p <  (unsigned long) minpa))
-		    ok = 0;
-		ltmp++;
-	    }
+	for (j = 0; j < rel->nb_ap; j++)
+          if (rel->ap[j].p > minpa) /* only consider primes > minpr */
+            {
+              if (rel->ap[j].p > (unsigned long) maxpa)
+                ok = 0; /* discard relations with too large primes */
+              ltmp++;
+            }
 	if(ok == 0){
 	    rel_used[irel] = 0;
 	    rel_compact[irel] = NULL;
@@ -343,7 +347,7 @@ insertNormalRelation(char *rel_used, int **rel_compact, int irel, int *nprimes,
 	    if(H->hashcount[h] == 1)
 		// new prime
 		*nprimes += 1;
-	    if (rel->rp[j].p <= rlim)
+	    if (rel->rp[j].p <= minpr) /* don't consider small primes */
 		continue;
 	    tmp[itmp++] = h;
 	}
@@ -353,7 +357,7 @@ insertNormalRelation(char *rel_used, int **rel_compact, int irel, int *nprimes,
 	    if(H->hashcount[h] == 1)
               // new prime
               *nprimes += 1;
-	    if(rel->ap[j].p <= alim)
+	    if(rel->ap[j].p <= minpa) /* don't consider small primes */
 		continue;
 	    tmp[itmp++] = h;
 	}
@@ -444,8 +448,7 @@ insertFreeRelation (char *rel_used, int **rel_compact, int irel, int *nprimes,
 static int
 scan_relations_from_file (int *irel, int *nrel, char *rel_used,
                           int **rel_compact, int *nprimes, hashtable_t *H,
-                          FILE *file, unsigned long rlim,
-                          unsigned long alim, 
+                          FILE *file,
 			  long maxpr, long maxpa, long minpr, long minpa,
                           int final, unsigned long *tot_alloc)
 {
@@ -463,8 +466,7 @@ scan_relations_from_file (int *irel, int *nrel, char *rel_used,
                     *irel, seconds (), *tot_alloc / 1000000);
 	rel_used[*irel] = 1;
 	if(rel.b > 0)
-          insertNormalRelation (rel_used, rel_compact, *irel, nprimes,
-                                H, &rel, rlim, alim,
+          insertNormalRelation (rel_used, rel_compact, *irel, nprimes, H, &rel,
                                 maxpr, maxpa, minpr, minpa, final, tot_alloc);
 	else
           insertFreeRelation (rel_used, rel_compact, *irel, nprimes, H, &rel,
@@ -488,8 +490,7 @@ scan_relations_from_file (int *irel, int *nrel, char *rel_used,
 static int
 scan_relations (char *ficname[], int nbfic, int *nrel, int *nprimes,
                 hashtable_t *H,
-                char *rel_used, int **rel_compact, unsigned long rlim,
-                unsigned long alim, long maxpr, long maxpa, 
+                char *rel_used, int **rel_compact, long maxpr, long maxpa, 
 		long minpr, long minpa, int final, unsigned long *tot_alloc)
 {
     FILE *relfile;
@@ -508,7 +509,7 @@ scan_relations (char *ficname[], int nbfic, int *nrel, int *nprimes,
 	}
 	fprintf(stderr, "Adding file %s\n", ficname[i]);
 	ret = scan_relations_from_file (&irel, nrel, rel_used, rel_compact,
-                                        nprimes, H, relfile, rlim, alim, 
+                                        nprimes, H, relfile,
 					maxpr, maxpa, minpr, minpa,
                                         final, tot_alloc);
 	if (ret == 0) {
@@ -832,10 +833,10 @@ usage (char *argv[])
   fprintf (stderr, "Options:\n");
   fprintf (stderr, "       -nonfinal    - perform only one singleton pass\n");
   fprintf (stderr, "       -keep    nnn - stop when excess <= nnn (default -1)\n");
-  fprintf (stderr, "       -maxpa   nnn - keep only alg. primes <= nnn (default 2^lpba)\n");
-  fprintf (stderr, "       -maxpr   nnn - keep only rat. primes <= nnn (default 2^lpbr)\n");
-  fprintf (stderr, "       -minpa   nnn - keep only alg. primes >= nnn (default 0)\n");
-  fprintf (stderr, "       -minpr   nnn - keep only rat. primes >= nnn (default 0)\n");
+  fprintf (stderr, "       -maxpa   nnn - discard rels with alg. primes <= nnn (default 2^lpba)\n");
+  fprintf (stderr, "       -maxpr   nnn - discard rels with rat. primes <= nnn (default 2^lpbr)\n");
+  fprintf (stderr, "       -minpa   nnn - purge alg. primes >= nnn only (default 0)\n");
+  fprintf (stderr, "       -minpr   nnn - purge rat. primes >= nnn only (default 0)\n");
   fprintf (stderr, "       -nprimes nnn - number of prime ideals\n");
   fprintf (stderr, "       -sos sosfile - to keep track of the renumbering\n");
 }
@@ -1001,7 +1002,7 @@ main(int argc, char **argv)
     fprintf(stderr, "reading file of relations...\n");
     nrel = nrelmax;
     ret = scan_relations (fic, nfic, &nrel, &nprimes, &H,
-                          rel_used, rel_compact, pol[0].rlim, pol[0].alim,
+                          rel_used, rel_compact,
                           maxpr, maxpa, minpr, minpa, final, &tot_alloc);
     ASSERT (ret);
     
