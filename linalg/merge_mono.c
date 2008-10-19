@@ -1393,6 +1393,8 @@ remove_i_from_Rj(sparse_mat_t *mat, int i, int j)
 #endif
 }
 
+// cell M[i, j] is incorporated in the data structure. It is used
+// later on in cases where i is not already present in row[j].
 void
 add_i_to_Rj(sparse_mat_t *mat, int i, int j)
 {
@@ -1403,7 +1405,6 @@ add_i_to_Rj(sparse_mat_t *mat, int i, int j)
     fprintf(stderr, "Adding row %d to R[%d]\n", i, j);
 #endif
 #ifndef USE_COMPACT_R
-    /* FIXME: isn't it possible that i already appears in Rj? */
     for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
 	if(mat->R[GETJ(mat, j)][k] == -1)
 	    break;
@@ -1538,6 +1539,7 @@ removeRowSWAR(sparse_mat_t *mat, int i)
     }
 }
 
+// M[i, j] is set to 1.
 void
 addCellSWAR(sparse_mat_t *mat, int i, INT j)
 {
@@ -1575,6 +1577,7 @@ addCellSWAR(sparse_mat_t *mat, int i, INT j)
     add_i_to_Rj(mat, i, j);
 }
 
+// All entries M[i, j] are added to the SWAR structure.
 void
 addRowSWAR(sparse_mat_t *mat, int i)
 {
@@ -2246,7 +2249,7 @@ inspectRowWeight(report_t *rep, sparse_mat_t *mat)
 int
 deleteScore(sparse_mat_t *mat, INT i)
 {
-#if 0
+#if 1
     // plain weight to remove heaviest rows
     return lengthRow(mat, i);
 #endif
@@ -2262,7 +2265,7 @@ deleteScore(sparse_mat_t *mat, INT i)
 	s += abs(mat->wt[GETJ(mat, mat->rows[i][k])]);
     return s;
 #endif
-#if 1
+#if 0
     // not using rows with too many light columns
     int k, s = 0;
 
