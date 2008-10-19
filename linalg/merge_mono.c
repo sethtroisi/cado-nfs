@@ -192,9 +192,14 @@ fillSWAR(sparse_mat_t *mat)
 	    dclistPrint(stderr, mat->S[mat->wt[GETJ(mat, j)]]->next);
 	    fprintf(stderr, "\n");
 #  endif
+#ifndef USE_COMPACT_R
 	    Rj = (INT *)malloc((mat->wt[GETJ(mat, j)]+1) * sizeof(INT));
 	    Rj[0] = 0; // last index used
 	    mat->R[GETJ(mat, j)] = Rj;
+#else
+	    fprintf(stderr, "R: NYI in fillSWAR\n");
+	    exit(1);
+#endif
 	}
 	else{
 #if USE_MERGE_FAST <= 1
@@ -203,7 +208,12 @@ fillSWAR(sparse_mat_t *mat)
 	    mat->wt[GETJ(mat, j)] = -mat->wt[GETJ(mat, j)]; // trick!!!
 #endif
 	    mat->A[GETJ(mat, j)] = NULL; // TODO: renumber j's?????
+#ifndef USE_COMPACT_R
 	    mat->R[GETJ(mat, j)] = NULL;
+#else
+            fprintf(stderr, "R: NYI2 in fillSWAR\n");
+            exit(1);
+#endif
 	}
     }
 }
@@ -255,6 +265,7 @@ printSWAR(sparse_mat_t *mat, int ncols)
     for(j = 0; j < ncols; j++)
 	fprintf(stderr, "  Wj[%d]=%d\n", j, mat->wt[GETJ(mat, j)]);
     fprintf(stderr, "===== R is\n");
+#ifndef USE_COMPACT_R
     for(j = 0; j < ncols; j++){
 	if(mat->R[GETJ(mat, j)] == NULL)
 	    continue;
@@ -263,6 +274,10 @@ printSWAR(sparse_mat_t *mat, int ncols)
           fprintf(stderr, " %ld", (long int) mat->R[GETJ(mat, j)][k]);
 	fprintf(stderr, "\n");
     }
+#else
+	fprintf(stderr, "R: NYI in printSWAR\n");
+	exit(1);
+#endif
 }
 
 void
@@ -330,6 +345,7 @@ texSWAR(sparse_mat_t *mat)
     for(j = 0; j < mat->ncols; j++)
 	fprintf(stderr, "& %d", mat->wt[GETJ(mat, j)]);
     fprintf(stderr, "\\\\\\hline\n\\end{array}$$\n");
+#ifndef USE_COMPACT_R
     fprintf(stderr, "\\begin{verbatim}\n");
     for(j = 0; j < mat->ncols; j++){
 	if(mat->R[GETJ(mat, j)] == NULL)
@@ -339,6 +355,7 @@ texSWAR(sparse_mat_t *mat)
           fprintf(stderr, " %ld", (long int) mat->R[GETJ(mat, j)][k]);
 	fprintf(stderr, "\n");
     }
+#endif
 }
 
 // terrific hack: everybody on the same line
@@ -510,8 +527,13 @@ readmat(sparse_mat_t *mat, FILE *file)
 		    // this will be the weight in the current slice
 		    mat->weight++; 
 		    if(mat->wt[GETJ(mat, j)] > 0){ // redundant test?
+#ifndef USE_COMPACT_R
 			mat->R[GETJ(mat, j)][0]++;
 			mat->R[GETJ(mat, j)][mat->R[GETJ(mat, j)][0]] = i;
+#else
+			fprintf(stderr, "R: NYI in readmat\n");
+			exit(1);
+#endif
 		    }
 # if DEBUG >= 1
 		    if(j == 15054){
@@ -1219,6 +1241,7 @@ checkCoherence(sparse_mat_t *mat, int m, int j)
 {
     int nchk = 0, k;
 
+#ifndef USE_COMPACT_R
     for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
 	if(mat->R[GETJ(mat, j)][k] != -1)
 	    nchk++;
@@ -1232,6 +1255,10 @@ checkCoherence(sparse_mat_t *mat, int m, int j)
 	}
 	ASSERT(nchk == m);
     }
+#else
+    fprintf(stderr, "R: NYI in checkCoherence\n");
+    exit(1);
+#endif
 }
 
 // w(j) has decreased in such a way that it can be incorporated in the
@@ -1245,6 +1272,7 @@ incorporateColumn(sparse_mat_t *mat, INT j, int i0)
     INT *Rj;
 
     wj = -mat->wt[GETJ(mat, j)];
+#ifndef USE_COMPACT_R
     Rj = (INT *)malloc((wj+1) * sizeof(INT));
     // find all rows in which j appears
     for(i = 0, ni = 1; i < mat->nrows; i++)
@@ -1258,6 +1286,10 @@ incorporateColumn(sparse_mat_t *mat, INT j, int i0)
 #endif
     Rj[0] = ni-1;
     mat->R[GETJ(mat, j)] = Rj;
+#else
+    fprintf(stderr, "R: NYI in incorporateColumn\n");
+    exit(1);
+#endif
     mat->wt[GETJ(mat, j)] = wj;
     ASSERT(wj == Rj[0]);
     mat->A[GETJ(mat, j)] = dclistInsert (mat->S[wj], j);
@@ -1311,8 +1343,13 @@ remove_j_from_S(sparse_mat_t *mat, int j)
 void
 destroyRj(sparse_mat_t *mat, int j)
 {
+#ifndef USE_COMPACT_R
     free(mat->R[GETJ(mat, j)]);
     mat->R[GETJ(mat, j)] = NULL;
+#else
+    fprintf(stderr, "R: NYI in destroyRj\n");
+    exit(1);
+#endif
 }
 
 void
@@ -1334,6 +1371,7 @@ remove_i_from_Rj(sparse_mat_t *mat, int i, int j)
     // be dumb for a while
     int k;
 
+#ifndef USE_COMPACT_R
     if(mat->R[GETJ(mat, j)] == NULL){
 	fprintf(stderr, "Row %d already empty\n", j);
 	return;
@@ -1346,6 +1384,10 @@ remove_i_from_Rj(sparse_mat_t *mat, int i, int j)
 	    mat->R[GETJ(mat, j)][k] = -1;
 	    break;
 	}
+#else
+    fprintf(stderr, "R: NYI in remove_i_from_Rj\n");
+    exit(1);
+#endif
 }
 
 void
@@ -1357,6 +1399,7 @@ add_i_to_Rj(sparse_mat_t *mat, int i, int j)
 #if DEBUG >= 1
     fprintf(stderr, "Adding row %d to R[%d]\n", i, j);
 #endif
+#ifndef USE_COMPACT_R
     for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
 	if(mat->R[GETJ(mat, j)][k] == -1)
 	    break;
@@ -1373,6 +1416,10 @@ add_i_to_Rj(sparse_mat_t *mat, int i, int j)
 	mat->R[GETJ(mat, j)][l-1] = i;
 	mat->R[GETJ(mat, j)][0] = l-1;
     }
+#else
+    fprintf(stderr, "R: NYI in add_i_to_Rj\n");
+    exit(1);
+#endif
 }
 
 int
@@ -1693,6 +1740,7 @@ deleteAllColsFromStack(report_t *rep, sparse_mat_t *mat, int iS)
 	if(iS == 0)
 	    mat->rem_ncols--;
 	if(iS == 1){
+#ifndef USE_COMPACT_R
 	    for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
 		if(mat->R[GETJ(mat, j)][k] != -1){
 # if TRACE_COL >= 0
@@ -1704,6 +1752,10 @@ deleteAllColsFromStack(report_t *rep, sparse_mat_t *mat, int iS)
 		    mat->rem_ncols--;
 		}
 	    mat->wt[GETJ(mat, j)] = 0;
+#else
+	    fprintf(stderr, "R: NYI in deleteAllColsFromStack\n");
+	    exit(1);
+#endif
 	}
 	k = mat->wt[GETJ(mat, j)]; // make a copy of the weight
 	remove_j_from_SWAR(mat, j);
@@ -1964,6 +2016,7 @@ mergeForColumn(report_t *rep, double *tt, double *tfill, double *tMST,
     checkCoherence(mat, m, j);
 #endif
     ni = 0;
+#ifndef USE_COMPACT_R
     for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++){
 	if(mat->R[GETJ(mat, j)][k] != -1){
 	    ind[ni++] = mat->R[GETJ(mat, j)][k];
@@ -1971,6 +2024,10 @@ mergeForColumn(report_t *rep, double *tt, double *tfill, double *tMST,
 		break;
 	}
     }
+#else
+    fprintf(stderr, "R: NYI in mergeForColumn\n");
+    exit(1);
+#endif
 #if DEBUG >= 1
     fprintf(stderr, " %d", j);
     fprintf(stderr, "=> the %d rows are:\n", m);
@@ -2162,6 +2219,7 @@ inspectRowWeight(report_t *rep, sparse_mat_t *mat)
 	}
     }
 #if (USE_MERGE_FAST < 3) && !defined(USE_MPI)
+    // only activated rarely...!
     for(i = 0; i < mat->nrows; i++)
 	if(!isRowNull(mat, i) && isRowToBeDeleted(mat, i)){
 # if DEBUG >= 1
@@ -2184,7 +2242,7 @@ inspectRowWeight(report_t *rep, sparse_mat_t *mat)
 int
 deleteScore(sparse_mat_t *mat, INT i)
 {
-#if 1
+#if 0
     // plain weight to remove heaviest rows
     return lengthRow(mat, i);
 #endif
@@ -2199,6 +2257,14 @@ deleteScore(sparse_mat_t *mat, INT i)
     for(k = 1; k <= lengthRow(mat, i); k++)
 	s += abs(mat->wt[GETJ(mat, mat->rows[i][k])]);
     return s;
+#endif
+#if 1
+    // not using rows with too many light columns
+    int k, s = 0;
+
+    for(k = 1; k <= lengthRow(mat, i); k++)
+	s += abs(mat->wt[GETJ(mat, mat->rows[i][k])]);
+    return -s;
 #endif
 #if 0
     // return the weight of the lightest column
@@ -2221,6 +2287,7 @@ findSuperfluousRowsFor2(int *tmp, int ntmp, sparse_mat_t *mat)
 
     for(dcl = mat->S[3]->next; dcl != NULL; dcl = dcl->next){
 	j = dcl->j;
+#ifndef USE_COMPACT_R
 	Rj = mat->R[GETJ(mat, j)];
 	// be semi-stupid
 	for(kmin = 1; Rj[kmin] == -1; kmin++); // should stop at some point...!
@@ -2233,10 +2300,15 @@ findSuperfluousRowsFor2(int *tmp, int ntmp, sparse_mat_t *mat)
 	if(itmp >= ntmp)
 	    // should not happen, but...
 	    break;
+#else
+	fprintf(stderr, "R: NYI in findSuperfluousRowsFor2\n");
+	exit(1);
+#endif
     }
     return itmp;
 }
 
+// this guy is linear => total is quadratic, be careful!
 int
 findSuperfluousRows(int *tmp, int ntmp, sparse_mat_t *mat, int m)
 {
