@@ -17,7 +17,8 @@ f1=f(x+22977)+(3*x+18223)*g1
 # sage: alpha(f1+(x-26071)*g1,2000)
 # -4.6975881658522551
 #
-# the C version catches this in 82 seconds on nougatine.
+# the C version catches this in 82 seconds on nougatine, and 51s on achille
+# try: kleinjung -p0max 14 -pb 522 -v -l 7 -M 2e22 -incr 1008593880 110...351
 
 f=f1
 g=g1
