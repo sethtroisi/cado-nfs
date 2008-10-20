@@ -9,7 +9,7 @@ n=110547499294735934596573920716806495615146307355718579549435266277149267619863
 ad=1008593880; p=1628876881135933; m=161423410553519491417914681351; E=44.88
 f,g=lemme_21(n,5,ad,p,m)
 g1=g(x+22977)
-f1=f(x+22977)+(3*x+18223)*g1
+f1=f(x+22977)-(3*x+18223)*g1
 
 # Now alpha(f1,2000) is 0.18.
 # Within rotation by (jx+k), |j|<=4, |k|<=2^16, the best alpha is reached
@@ -90,7 +90,7 @@ print "Took %.2f seconds" % (cputime()-t0)
 print "Now with root sieve"
 t0=cputime()
 rdict=rotation_init(f,g,0,sbound,0,sbound)
-testp(rdict,p,complete)
+testp(rdict,p,refp)
 print "Took %.2f seconds" % (cputime()-t0)
 
 
@@ -100,14 +100,27 @@ KP3=K['t','u','v']
 KF3=KP3.fraction_field()
 ZF3=ZP3.fraction_field()
 
-# More extensive testing:
+# More extensive testing ; copy-paste these lines:
+# print "First computing reference scores with the naive method"
+# t0=cputime()
 # ref2=get_reference(sbound,2)
 # ref3=get_reference(sbound,3)
 # ref5=get_reference(sbound,5)
 # ref7=get_reference(sbound,7)
-
+# print "Took %.2f seconds (total)" % (cputime()-t0)
+# 
+# print "Now with root sieve"
+# t0=cputime()
 # rdict=rotation_init(f,g,0,sbound,0,sbound)
-# t0=cputime();testp(rdict,2,ref2);testp(rdict,3,ref3);testp(rdict,5,ref5);cputime()-t0
+# testp(rdict,2,ref2)
+# testp(rdict,3,ref3)
+# testp(rdict,5,ref5)
+# print "Took %.2f seconds (total)" % (cputime()-t0)
+# 
+
+# Another possible bench
+# manyp(rdict,50)
+
 
 
 # zview(mround(matrix(sbound,sbound,sarr)-complete),1,0,p)
