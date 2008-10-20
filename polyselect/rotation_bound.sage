@@ -533,6 +533,8 @@ def rotatebound_choices_all(f,g):
 # translation, rotation by x*g, and rotation by g, until we find a local
 # minimum
 def optimize(f,g):
+    R = f.parent()
+    x = f.parent().gen()
     j = 0
     i = 1
     while best_l2norm_tk(R(f(x+i)))<best_l2norm_tk(f):

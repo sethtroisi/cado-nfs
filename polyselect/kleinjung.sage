@@ -140,84 +140,6 @@ def rotation (n,d,p,m):
     sys.stdout.flush()
     rotation_inner(f,g,range(-U,U+1),range(-V,V+1))
 
-def rotation_inner(f,g,u_range, v_range):
-    """returns the multiplier lambda=u*x+v giving the best yield for
-    f+lambda*g ; u and v are prescribed to the ranges u_range and
-    v_range"""
-    B=2000
-    x = f.parent().gen()
-    lognorm = flog (best_l2norm_tk(f))
-    a0=alpha_projective(f,B)
-    a1=alpha_affine(f,B)
-    a=a0+a1
-    E = lognorm + a
-    print "original polynomial: lognorm=%.2f alpha=%.2f E=%.2f" % (lognorm,a,E)
-    Emin = E
-    umin = 0
-    vmin = 0
-    suma1=0
-    suma1_squares=0
-    for u in u_range:
-        for v in v_range:
-            frot = f + (u*x+v)*g
-            lognorm = flog (best_l2norm_tk (frot))
-            a1 = alpha_affine (frot, B)
-            a = a0 + a1
-            E = lognorm + a
-            suma1+=a1
-            suma1_squares+=a1*a1
-            if E < Emin:
-                Emin = E
-                umin = u
-                vmin = v
-                print "u=%r v=%r lognorm=%.2f alpha=%.2f E=%.2f" % (u,v,lognorm,a,E)
-                sys.stdout.flush()
-    me=suma1/len(u_range)/len(v_range)
-    sd=sqrt(suma1_squares/len(u_range)/len(v_range)-me^2)
-    print "Observed alpha_affine: mean=%.2f, sdev=%.2f" % (me,sd)
-    return p, m, umin*x+vmin, Emin
-
-
-
-
-
-def sylvestermatrix(p1,p2):
-    m=matrix(p1(0).parent(),p1.degree()+p2.degree())
-    for i in range(p1.degree()):
-        for j in [0..p2.degree()]:
-            m[i,i+j]=p2[j]
-    for j in range(p2.degree()):
-        for i in [0..p1.degree()]:
-            m[j+p1.degree(),i+j]=p1[i]
-    return m
-
-def discriminant_polynomial(f,g):
-    t0=cputime()
-    # We want the discrimnant in x of (f+(ux+v)g). Sage can't do that, so
-    # we'll resort on computing the Sylvester matrix ourselves.
-    ZP3.<x,u,v>=Integers()['x','u','v']
-    frot=(f(x)+(u*x+v)*g(x)).polynomial(x)
-    m=sylvestermatrix(frot, frot.derivative())
-    sys.stdout.write("Computing discriminant polynomial...");
-    sys.stdout.flush()
-    t0=cputime()
-    disc=m.determinant()
-    z=disc.monomials()
-    lc=frot[frot.degree()]
-    d1=sum([zz*ZZ(QQ(disc.monomial_coefficient(zz)/lc)) for zz in z])
-    t1=cputime()
-    sys.stdout.write("done in %.2fs\n" % (t1-t0))
-    sys.stdout.flush()
-    return d1
-
-def discriminant_polynomial_pari(f,g):
-    """This is instantaneous. However, once we've done this, there's no
-    coming back"""
-    ZP3=PolynomialRing(ZZ,['x','u','v'])
-    x,u,v=ZP3.gens()
-    dd=pari(f(x)+(u*x+v)*g(x)).poldisc(x)
-    return dd
-
 def rotation_global_contrib_commonroots(rdict):
     """Fills in the global_contrib_commonroots entry in the provided
     rotation dictionary. This makes sense only for SNFS"""
@@ -238,11 +160,11 @@ def rotation_global_contrib_commonroots(rdict):
 
 def rotation_init(f,g,u0,u1,v0,v1):
     """Sets up rotation for using the area [u0..u1] x [v0..v1]"""
-    lu=u1-u0+1
-    lv=v1-v0+1
-    space=lu*lv
+    assert(u0==0)
+    assert(v0==0)
+    space=u1*v1
     print "Rotation space: %r" % space 
-    rdict=dict(u0=u0,u1=u1,v0=v0,v1=v1,f=f,g=g)
+    rdict=dict(umax=u1,vmax=v1,f=f,g=g)
     rdict['sarr']=[float(0.0) for i in range(space)]
     # Estimate the common value for the different cells.
     B=2000
@@ -255,293 +177,310 @@ def rotation_init(f,g,u0,u1,v0,v1):
     gcc=rdict['global_contrib_commonroots']
     rdict['fgquo_prime']=((-f/g).derivative())
     # This gives the exceptional values for u (once divided by g(l)^2)
-    rdict['fggf']=f*g.derivative()-g*f.derivative()
+    df=f.derivative()
+    dg=g.derivative()
+    ddf=df.derivative()
+    ddg=dg.derivative()
+    rdict['fdg_gdf']=f*dg-g*df
     return rdict
 
-def lift_root(f,l,p,k):
-    x=f.parent().gen()
-    fl=f(l)
-    v=valuation(fl,p)
-    assert v>=k
-    g=f.parent()(f(l+p^k*x)/p^v)
-    R=GF(p)
-    RP=R['x']
-    gg=RP(g)
-    if gg.degree() != 1:
-        print "Cannot lift further ; degree == %d" %gg.degree()
+def rotation_clear(rdict):
+    sarr=rdict['sarr']
+    for i in range(len(sarr)): sarr[i]=0.0
+
+def extend_ppow_list(rdict,l):
+    ppow = rdict['ppow']
+    ppows = len(ppow)
+    pmaxi = ppow[ppows-1]
+    while ppows < l+1:
+        pmaxi *= ppow[1]
+        ppow.append(pmaxi)
+        ppows+=1
+
+
+def rotation_handle_p(rdict,p):
+    u0=v0=0
+    ff,gg=rdict['f'],rdict['g']
+    f,g=rdict['f'],rdict['g']
+    x=Integers()['x'].gen()
+    phi=x
+    # The denominator exponent here is only controlled by the number of
+    # fixed coeffs of l. At the beginning, l has zero fixed coeffs, for
+    # which scale0 holds.
+    scale0=float(log(p))*p/(p+1)
+    l0,ld,md,m,k=0,0,0,0,0
+    scale = scale0
+    ZP3.<l,u,v>=ZZ['l','u','v']
+    rdict['h']=f(l)+(u*l+v)*g(l)
+    rdict['history']=[]
+    rdict['logbook']=[]
+    rotation_inner(rdict,p,ff,gg,u0,v0,l0,ld,md,m,k,scale,phi,0)
+
+def rotation_inner(rdict,p,ff,gg,u0,v0,l0,ld,md,m,k,scale,phi,d):
+    maxpow = 20
+    if m >= maxpow:
         return
-    e=-gg[0]/gg[1]
-    print "Valuation %r^%r: %r" %(p,k,e)
-    if k < 10:
-        l+=p^k*e
-        lift_root(f,l,p,k+1)
 
-def rotation_handle_p(rdict,p):
-    scale=float(log(p))/(p+1)
-    rotation_handle_p_recursive(rdict,p,0,0,0,0,float(log(p))/(p+1))
+    rdict['history'].append((p,ff,gg,u0,v0,l0,ld,md,m,k,scale,phi,d))
+    # p,ff,gg,u0,v0,l0,ld,md,m,k,scale,phi,d=rdict['history'][-1]
 
-def rotation_handle_p_recursive_inner(rdict,p,l0,u0,v0,k):
-    """Recursively computes alpha contributions mod p for (l,u,v)
-    congruent to (l0,u0,v0) mod p^k"""
-    # If we denote S(l,u,v)=(f(l)+(u*l+v)*g(l)), then Sl,Su,Sv the partial
-    # derivatives wrt l,u,v, and finally X0 the triple (l0,u0,v0), then
-    # we have forced:
-    # S(X0)=0 mod p^k
-    # Sl(X0)=0 mod p^k -- because otherwise we're talking simple roots,
-    # which are easily worked out.
-    #
-    # The question is how does S(X0+p^kX1) behave, for X=(l1,u1,v1)) ?
-    # We have:
-    # S(X0+p^kX1)=S(X0)+p^k(l1*Sl(X0)+u1*Su(X0)+v1*Sv(X0))+O(p^(2k))
-    #            =p^k*(S(X0)/p^k+u1*Su(X0)+v1*Sv(X0)) + O(p^(2k))
-    #
-    # This implies that our congruences can be refined considerably. For
-    # each value u1 in [0..p^k-1], we have a corresponding value v1 such
-    # that the equation above yields cancellation modulo p^(2k). Note
-    # that:
-    #
-    # - we want to count contributions also modulo p^(k+1) and so on.
-    # This will give more values of v1, many of which will give
-    # ``terminating'' congruences. This is done in k different passes
-    # through the v-line.
-    #
-    # - Su(X0) and Sv(X0) are in fact pretty similar. Respectively
-    # l0*g(l0) and g(l0). g(l0) is assumed to be a unit mod p, so it has
-    # a computable inverse modulo p^(2k). This yields the equation:
-    #
-    # v1 = -u1 * l0 - (1/g(l0)) * (S(X0)/p^k)
-    #
-    # as in the first-order case, forcing the derivative to vanish modulo
-    # p^k yields specific values of u, since:
-    # Sl = f'(l)+(ul+v)g'(l)+ug(l)
-    K=GF(p)
-    pl=[0 for i in [0..k]]
-    pl[0]=p^k
-    for i in [1..k]:
-        pl[i]=pl[i-1]*p
+    callnumber=len(rdict['history'])-1
+    prefix = " " * d
+    msg=prefix+"Entering recursive call number %d, depth %d" % (callnumber,d)
+    rdict['logbook'].append(msg)
+    print msg
 
-    pk=pl[0]
-    p2k=pl[k]
-    R0=Integers(pk)
-    R=Integers(p2k)
-    RP.<x>=R['x']
-    fl0=RP(rdict['f'])(l0)
-    gl0=RP(rdict['g'])(l0)
-    assert(gl0.is_unit())
-    # igl0 is needed to high precision in order to compute the
-    # exceptional u1 value. For the congruence equation, it's unused.
-    igl0=1/R(gl0)
-    SX0=fl0+(u0*l0+v0)*gl0
-    # How does the congruence equation look like ?
-    veq_0=-R0(igl0)*R0(Integers()(Integers()(SX0)/pk))
-    veq_1=R0(-l0)
-    # So basically it's v1 = veq_0 + veq_1 * u1
+    a = vector([p^k,0])
+    b = vector([0,p^k])
+    uv0=vector((u0,v0))
 
-    # The global u range is rdict.u0..rdict.u1
-    # We want u0+pk*u1 in this range.
-    u1min = ceil((rdict['u0']-u0)/pk)
-    u1max = floor((rdict['u1']-u0)/pk)
-    v1min = ceil((rdict['v0']-v0)/pk)
-    v1max = floor((rdict['v1']-v0)/pk)
+    K=GF(p); KP=K['x']; KR=FractionField(KP)
+    Z=Integers(); ZP=Z['x'];
+    x=ZP.gen()
+    sarr=rdict['sarr']
+    fence=vector([rdict['umax'],rdict['vmax']])
 
-    u1 = u1min
+    h = rdict['h']
+    l,u,v=h.parent().gens()
+    nh = h(phi(l),u0+p^k*u,v0+p^k*v)
+    assert valuation(nh.content(),p)==m
+    assert nh/p^m == ff(l)+(u*phi(l)+v)*gg(l)
+    assert valuation(nh.derivative(l).content(),p)>=m
+    # assert valuation(nh.derivative(l).content(),p)==ld+md
 
-    lv=rdict['v1']-rdict['v0']+1
-    lvpk=lv*pk
-    v1p = veq_0 + veq_1 * u1
+    # Our expression is c0(l)+u*cu(l)+v*cv(l)
+    c0 = ZP([c % p^maxpow for c in ff.coeffs()])
+    cv = ZP([c % p^maxpow for c in gg.coeffs()])
+    cu = phi * cv
+    assert valuation((nh - p^m*(c0(l)+u*cu(l)+v*cv(l))).content(),p) >= maxpow
+    assert cv == Integers(p^maxpow)['x'](rdict['g'](phi))
 
-    uoffset = (u0+u1min*pk - rdict['u0']) * lv
-    voffset = (v0+v1min*pk - rdict['v0'])
+    # The assertions on the trivariate polynomial nh above contain more
+    # that this, but here follows a breakdown just in case.
+    assert p^m*ff(l) == rdict['f'](phi(l))+((u0*phi(l)+v0)*rdict['g'](phi(l)))
+    assert p^m*(u*phi(l)+v)*gg(l)==p^k*((u*phi(l)+v)*rdict['g'](phi(l)))
+    assert p^m*gg(l)==p^k*rdict['g'](phi(l))
 
-    u1_exceptional = R0(Integers()(RP(rdict['fggf'])(l0) * igl0^2 - u0)/p)
+    cc0 = valuation(c0.content(),p)
+    ccu = valuation(cu.content(),p)
+    ccv = valuation(cv.content(),p)
+    assert ccu >= ccv
 
-    u1p = R0(u1)
+    c = min(cc0,ccu,ccv)
+    assert c == 0
 
-    # Pre-compute v1 mod p^l for l in [1..k] ; we leave cell [0] unused.
-    v1ls=[0 for i in [0..k]]
-    v1ls[k]=Integers()(v1p)
-    for l in reversed([1..k-1]):
-        v1ls[l]=v1ls[l+1] % pl[l]
+    # zview(mround(matrix(sbound,sbound,sarr)-complete),u0,v0,p^k)
 
-    while u1 <= u1max:
-        # Hit points in [vmin,vmax] that correspond to v1...
+    dc0 = c0.derivative()
+    dcu = cu.derivative()
+    dcv = cv.derivative()
 
-        # For congruences to powers less than p^(2k-1), we always have
-        # contributions. We sum them up in the most pedestrian way. A
-        # priori, congruences will stop. So the contribution at each
-        # prime power is only 1/p^(k+l)
+    # Now we know that the minimum valuation is zero.
 
-        for l in [1..k-1]:
-            # modulo p^(k+l)
-            # find v in [v1min..v1max] such that v==v1 mod p^l
-            dv=(v1ls[l]-v1min)%pl[l]
-            z=offset+voffset+pk*dv
-            dv+=v1min
-            while dv < v1max:
-                rdict['sarr'][z]-=1/pl[l]
-                z+=pl[l]
-                dv+=pl[l]
+    g0 = KP(c0)
+    gu = KP(cu)
+    gv = KP(cv)
 
-        if u1p != u1_exceptional:
-            # The generic case. Congruences modulo p^(2k) are
-            # liftable to arbitrary precision since the derivative does
-            # not vanish. Hence the contribution to the valuation is
-            # 1/(p^2k-1).
-            l=k
-            dv=(v1ls[l]-v1min)%pl[l]
-            z=offset+voffset+pk*dv
-            dv+=v1min
-            while dv < v1max:
-                rdict['sarr'][z]-=1/(pl[l]-l)
-                z+=pl[l]
-                dv+=pl[l]
+    if not g0.is_constant():
+        # Then it's the typical case, as encountered for instance at the
+        # beginning of the root sieve.
+        # Each possible l value must be tried, and will give rise to
+        # potentially intersecting lattices. 
+        for l in range(p):
+            if k==0: l0=l
+            g0l = g0(l); dg0l = KP(dc0)(l)
+            gul = gu(l); dgul = KP(dcu)(l)
+            gvl = gv(l); dgvl = KP(dcv)(l)
+            if gvl == 0: continue
+            msg=prefix+"Looking at roots phi(%r), where phi==%r" %(l,phi)
+            rdict['logbook'].append(msg)
+            print msg
+            igl = 1/gvl
+            du=0
+            dv0=Z(-g0l * igl)
+            dv=dv0
+            u1 = u0 + p^k * du
+            v1 = v0 + p^k * dv
+            uv1=vector((u1,v1))
+            rdict['logbook'].append((uv1, a-phi(l)*b, p* b, -scale/(p-1)))
+            hits = light_array(sarr, uv1, a-phi(l)*b, p* b, fence,-scale/(p-1))
+            msg=prefix+ "%d hits" %hits
+            rdict['logbook'].append(msg)
+            print msg
+            if hits == 0: continue
+            # We're optimistic here ; we're counting on the fact that we
+            # expect the derivative not to cancel.
+            
+            # However, there is the possibility that we reach the
+            # cancellation point. This only once per (p,p) square,
+            # meaning that u,v are constrained.
+
+            msg=prefix+ "Looking for multiple roots at phi(%r), where phi==%r" %(l,phi)
+            rdict['logbook'].append(msg)
+            print msg
+            # The good equation for u is given by:
+            df=rdict['f'].derivative()
+            dg=rdict['g'].derivative()
+
+            # Try to guess the right value for du.
+            Zm1=Integers(p^(m+1))
+            # rhs = Z(Zm1((f*dg-df*g)(phi(l))/cv(l)^2-u0))
+            rhs = Z(K(((f*dg-g*df)(phi(l))/cv(l)^2-u0)/p^(m-ld)))
+            # va = valuation(rhs,p)
+            # assert va >= md
+            # assert k >= md
+            # if va < k:
+                # # Then by no means the derivative will vanish.
+                # continue
+            range_du=[]
+            if k-m+ld > 0 and rhs == 0:
+                # Then all u's will do.
+                range_du=range(p)
+            else:
+                range_du = [rhs]
+            ## u = Z(-igl*K((((df+(u0*x+v0)*dg+u0*g)(phi))(l)-ff(l)*(p^k*dg(phi))(l))/p^m))
+            ## du = Z((-dg0l * gvl + g0l * dgvl) * igl ^ 2)
+            ## u = Z(Z(Integers(p^(m+1))((f*dg-df*g)(phi(l))/cv(l)^2)-uv0[0])/p^k)
+            for du in range_du:
+                dv = (dv0 - du *l0) % p
+                u1 = u0 + p^k * du
+                v1 = v0 + p^k * dv
+                uv1=vector((u1,v1))
+                rdict['logbook'].append((uv1, p*a, p*b, scale/(p-1)/p))
+                hits = light_array(sarr,
+                            uv1, p*a, p*b, fence, scale/(p-1)/p)
+                msg=prefix+ "%d hits" %hits
+                rdict['logbook'].append(msg)
+                print msg
+                if hits == 0:
+                    continue
+                # scale/(p-1)/p is scale/(p-1)-scale/p ; hence it brings
+                # back the cells to the contribution -scale/p, which is the
+                # contribution from a _single_ zero at this location, not
+                # liftable because of ramification. Later recursive calls
+                # will investigate the possibility that despite the multiple
+                # root mod p, we still get roots at higher precision.
+                nphi=phi(l+p*x)
+                nff=ZP((ff(l+p*x)+(du*nphi+dv)*gg(l+p*x))/p)
+                ngg=gg(l+p*x)
+                ## l,u,v=h.parent().gens()
+                ## nnh=nh(nphi(l),uv1[0]+p*u,uv1[1]+p*v)
+                ## assert nnh == p*(nff(l)+(u*nphi(l)+v)*ngg(l))
+                # ff,gg,uv0,l0,m,k,scale,phi=nff,ngg,uv1,l0,m+1,k+1,scale/p,nphi
+                rotation_inner(rdict,p,nff,ngg,u1,v1,l0,ld+1,md+1,m+1,k+1,scale/p,nphi,d+1)
+    elif ccv > 0:
+        # ccv is zero, so ccu is even larger, which implies that cc0 has
+        # to be zero. Since c0 is a constant polynomial, this implies
+        # that there is no solution. So we finish here.
+        return
+    else:
+        msg=prefix+ "We are here in recursive call number %d" % callnumber
+        rdict['logbook'].append(msg)
+        print msg
+        # cc0 is not zero, which means that our expression has an extra
+        # root only for specific u,v pairs. Basically, we have a linear
+        # term in u and v which must be cancelled.
+        constant_term=g0.constant_coefficient()
+        dv0=Z(-constant_term/gv(l0))
+        dv=dv0
+        u1 = u0
+        v1 = v0 + p^k * dv
+        uv1=vector((u1,v1))
+        assert ccv==0
+        # Furthermore, our expression is c0(l)+u*cu(l)+v*cv(l) ; We know
+        # that cu == phi * cv, hence our equation is simply v == -phi * u
+        msg=prefix+ "Looking for places where the multiple root at %r may lift"%phi
+        rdict['logbook'].append(msg)
+        print msg
+        rdict['logbook'].append((uv1, a-l0*b, p*b,-scale))
+        hits=light_array(sarr, uv1, a-l0*b, p* b, fence,-scale)
+        msg=prefix+ "%d hits" %hits
+        rdict['logbook'].append(msg)
+        print msg
+        if hits == 0:
+            return
+        msg=prefix+"%r"%(K['l','u','v'](c0(l)+u*cu(l)+v*cv(l)))
+        rdict['logbook'].append(msg)
+        print msg
+        for du in range(p):
+            dv = (dv0-du*l0) % p
+            uvscal=vector((du,dv))
+            msg=prefix+ "Looking for lift specifically at u,v === %r" % uvscal
+            rdict['logbook'].append(msg)
+            print msg
+            u2 = u0 + p^k * du
+            v2 = v0 + p^k * dv
+            uv2=vector((u2,v2))
+            msg=prefix+ "global sub-lattice %r+%r,%r" % (uv2,p*a,p*b)
+            rdict['logbook'].append(msg)
+            print msg
+            # We know that phi === l0 mod p, so (u0*phi+v0) is zero mod
+            # p. ff itself is also zero mod p. However, some subtleties
+            # can occur in the difference between the two.
+            nff=ZP((ff+(du*phi+dv)*gg)/p)
+            l,u,v=h.parent().gens()
+            assert nh(l,du+p*u,dv+p*v)/p^(m+1) == nff(l)+(u*phi(l)+v)*gg(l)
+            ## ff,u0,v0,m,k=nff,u1,v1,m+1,k+1
+            rotation_inner(rdict,p,nff,gg,u2,v2,l0,ld,md,m+1,k+1,scale,phi,d+1)
+    msg=prefix+ "Finishing recursive call number %d" % callnumber
+    rdict['logbook'].append(msg)
+    print msg
+
+
+def filter_logbook(rdict,u,v):
+    vec=vector((u,v))
+    for s in rdict['logbook']:
+        if type(s) == type(''):
+            print s
         else:
-            # Then we need to recurse, yeah !
-            # We do count the p^2k contribution right now. Higher order
-            # contributions will be handled in the recursive calls.
-            # contributions are 
-            l=k
-            dv=(v1ls[l]-v1min)%pl[l]
-            z=offset+voffset+pk*dv
-            dv+=v1min
-            while dv < v1max:
-                rdict['sarr'][z]-=1/pl[l]
-                rotation_handle_p_recursive_outer(rdict,p,l0,u0,v0,2*k)
-                z+=pl[l]
-                dv+=pl[l]
+            st="sub-lattice %r+%r,%r: %f" % s
+            if ((vec-s[0])*matrix([s[1],s[2]])^-1) in vec.parent():
+                st="** " + st
+            print st
 
-        u1+=1
-        u1p+=1
-        v1ls[k]=Integers(v1ls[k]+veq_1)
-        for l in reversed([1..k-1]):
-            v1ls[l]=v1ls[l+1] % pl[l]
-        offset+=lv*pk
+def filter_logbook_quick(rdict,u,v):
+    vec=vector((u,v))
+    for s in rdict['logbook']:
+        if type(s) != type(''):
+            if ((vec-s[0])*matrix([s[1],s[2]])^-1) in vec.parent():
+                st="sub-lattice %r+%r,%r: %f" % s
+                st="** " + st
+                print st
 
 
-def rotation_handle_p_recursive_outer(rdict,p,l0,u0,v0,k):
-    """l0 is known to be a root at (u0,v0) mod p^k"""
-    ### This code is not finished.
-    assert(false)
-    K=GF(p)
-    KP=K['x']
-    x=KP.gen()
-    KR=FractionField(KP)
-    scale0=float(log(p))/(p-1)
-    scale=p*float(log(p))/(p^2-1)
-    fgquo_p=KR(rdict['fgquo_prime'])
-    fp=KP(rdict['f'])
-    gp=KP(rdict['g'])
-    sarr=rdict['sarr']
-    for l in K:
-        fl=fp(l)
-        gl=gp(l)
-        # Then we want v == -fl/gl - u*l mod p if ever gl == 0, then we
-        # want fl==0 and that's all (and independent of u and v) ; if
-        # this is the case, it would mean that f and g have a common root
-        # mod p. It is handled as a global contribution further up (and
-        # only for SNFS)
-        if gl==0: continue
-        zl=-fl/gl
-        # print "l=%r -> z=%r" %(l,zl)
-        # For which u values are multiple roots possible ?
-        u_excep=fgquo_p(l)
-        # Update array.
-        pos=0
-        v0=rdict['v0']
-        v1=rdict['v1']
-        u=rdict['u0']
-        u1=rdict['u1']
-        up=K(u)
-        lv=v1-v0+1
-        while u <= u1:
-            # want v0+k == zl-ul mod p
-            k=Integers()(K(zl-u*l-v0))
-            if up != u_excep:
-                print "root at l=%r for u,v = %r,%r" %(l,u,v0+k)
-                while k < lv:
-                    sarr[pos+k]-=scale
-                    k+=p
-            else:
-                # We know that l will be a multiple root.
-                print "Multiple root at l=%r for u,v = %r,%r" %(l,u,v0+k)
-                while k < lv:
-                    # Count only the local contribution for now. Higher
-                    # contributions will be counted separately.
-                    sarr[pos+k]-=scale0
-                    k+=p
-            pos+=lv
-            u+=1
-            up+=1
+def light_array(sarr,x0,a,b,fence,value):
+    x = copy(x0)
+    pos = x[0] * fence[1]
+    assert b[0] == 0
+    dpos = a[0] * fence[1]
+    hits=0
+    while x[0] < fence[0]:
+        # reduce within the row, since we know that b[0] is zero
+        x[1] = x[1] % b[1]
+        while x[1] < fence[1]:
+            sarr[pos + x[1]] += value
+            hits+=1
+            x[1] += b[1]
+        x += a
+        pos += dpos
+    return hits
 
-def rotation_handle_p(rdict,p):
-    K=GF(p)
-    KP=K['x']
-    x=KP.gen()
-    KR=FractionField(KP)
-    scale0=float(log(p))/(p-1)
-    scale=p*float(log(p))/(p^2-1)
-    fgquo_p=KR(rdict['fgquo_prime'])
-    fp=KP(rdict['f'])
-    gp=KP(rdict['g'])
-    sarr=rdict['sarr']
-    for l in K:
-        fl=fp(l)
-        gl=gp(l)
-        # Then we want v == -fl/gl - u*l mod p if ever gl == 0, then we
-        # want fl==0 and that's all (and independent of u and v) ; if
-        # this is the case, it would mean that f and g have a common root
-        # mod p. It is handled as a global contribution further up (and
-        # only for SNFS)
-        if gl==0: continue
-        zl=-fl/gl
-        # print "l=%r -> z=%r" %(l,zl)
-        # For which u values are multiple roots possible ?
-        u_excep=fgquo_p(l)
-        # Update array.
-        pos=0
-        v0=rdict['v0']
-        v1=rdict['v1']
-        u=rdict['u0']
-        u1=rdict['u1']
-        up=K(u)
-        lv=v1-v0+1
-        while u <= u1:
-            # want v0+k == zl-ul mod p
-            k=Integers()(K(zl-u*l-v0))
-            if up != u_excep:
-                print "root at l=%r for u,v = %r,%r" %(l,u,v0+k)
-                while k < lv:
-                    sarr[pos+k]-=scale
-                    k+=p
-            else:
-                # We know that l will be a multiple root.
-                print "Multiple root at l=%r for u,v = %r,%r" %(l,u,v0+k)
-                while k < lv:
-                    # Count only the local contribution for now. Higher
-                    # contributions will be counted separately.
-                    sarr[pos+k]-=scale0
-                    k+=p
-            pos+=lv
-            u+=1
-            up+=1
+# These are helpers, to be removed once the code works ok.
+def zview(m,i0,j0,d):
+    ncols = ((m.ncols() - j0) / d).ceil()
+    nrows = ((m.nrows() - i0) / d).ceil()
+    n=matrix(nrows,ncols)
+    for i in range(0,nrows):
+        for j in range(0,ncols):
+            n[i,j]=m[i0+i*d,j0+j*d]
+    return n
 
-#def rotation_using_sieve2(f,g,u_range, v_range,disc):
-#    #sarr=rotation_using_sieve(f,g,u_range, v_range)
-#    B=2000
-#    fraction=0
-#    for p in prime_range(B):
-#        KP2=GF(p)['u','v']
-#        KP1.<v>=GF(p)['v']
-#        dp=KP2(disc)
-#        # This will give us the update points on one of the sieve lines
-#        for u in u_range:
-#            dpu=KP1(dp(u,v))
-#            if dpu==0:
-#                # print "disc(%d,x)==0 mod %d"%(u,p)
-#                fraction+=flog(p)^2
-#                continue
-#            rdisc=dpu.roots()
-#            # print "%d roots of the discriminant mod %d" % (len(rdisc),p)
-#            fraction+=len(rdisc)*float(p)^2/p
-#    return fraction
-#    #return sarr
+def mround(m):
+    d=matrix(ZZ,m.nrows(),m.ncols())
+    for k in range(m.nrows()):
+        for l in range(m.nrows()):
+            d[k,l]=ZZ(floor(m[k,l]*1000))
+    return d
+
+def mprint(m):
+    print m.str()

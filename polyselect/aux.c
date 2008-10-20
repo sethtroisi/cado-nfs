@@ -1489,7 +1489,12 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose)
         break;
     }
 
-  if (verbose > 0)
+  if (verbose > 0) {
     gmp_fprintf (stderr, "# ad=%Zd: optimized lognorm from %.2f to %.2f\n",
 		 f[d], logmu00, logmu0);
+    if (verbose > 1) {
+      fprintf (stderr, "# "); fprint_polynomial (stderr, f, d);
+      fprintf (stderr, "# "); fprint_polynomial (stderr, g, d);
+    }
+  }
 }

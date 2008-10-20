@@ -64,11 +64,11 @@ def all_roots_affine(f,p,kmax,k0,m,phi):
             res.extend(all_roots_affine(ZP(ff/p^v),p,kmax,k0+v,m+1,nphi))
     return res
 
-def all_roots(f,p):
+def all_roots(f,p,maxbits):
     Z=Integers();
     ZP=f.parent()
     x=ZP.gen()
-    kmax=ceil(64*log(2)/log(p))
+    kmax=ceil(maxbits*log(2)/log(p))
     aff=all_roots_affine(f,p,kmax,0,0,x)
     final=[]
     # affine

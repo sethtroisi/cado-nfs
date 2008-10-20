@@ -89,6 +89,12 @@ def alpha_p(f,disc,p):
         s = float((1-number_of_roots(f,p)*p/(p+1))*log(p)/(p-1))
     return s
 
+def alpha_p_nodisc(f,p):
+    """
+    Computes the contribution at p of the alpha value of f
+    """
+    return alpha_p(f,f.discriminant(),p)
+
 #def alpha_p_affine_deviation(f,disc,p):
 #    """
 #    Computes the contribution at p of the alpha value of f, as a
@@ -138,6 +144,12 @@ def alpha_p_projective(f,disc,p):
 #        s = 0
 #    return s
 #
+
+def alpha_p_affine_nodisc(f,p):
+    return alpha_p_affine(f,f.discriminant(),p)
+
+def alpha_p_projective_nodisc(f,p):
+    return alpha_p_projective(f,f.discriminant(),p)
 
 def alpha(f,B):
     """
