@@ -609,6 +609,10 @@ def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi):
             # Most probably due to the cost of computing remainders all
             # the way to the final value, which ends up being more
             # expensve than it should.
+
+            # TODO: There has to be a way to remove valuations very early
+            # on here. In fact, my guess is that it could very probably
+            # be done every time m-ld increases...
             rhs = Z(K((fdg_gdf(l)-u0*gg(l)^2)/ppow[m-ld]))
             if ld > 0 and rhs != 0:
                 continue

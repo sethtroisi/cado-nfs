@@ -91,6 +91,13 @@ rdict=rotation_init(f,g,0,sbound,0,sbound)
 testp(rdict,p,complete)
 print "Took %.2f seconds" % (cputime()-t0)
 
+
+K=GF(p)
+KP=K['t']
+KP3=K['t','u','v']
+KF3=KP3.fraction_field()
+ZF3=ZP3.fraction_field()
+
 # More extensive testing:
 # ref2=get_reference(sbound,2)
 # ref3=get_reference(sbound,3)
