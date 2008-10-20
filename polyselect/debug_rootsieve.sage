@@ -33,40 +33,73 @@ ZP3.<t,u,v>=PolynomialRing(Integers(),3)
 h=f(t)+(u*t+v)*g(t)
 
 
-sbound=32
-simple=matrix(RR,sbound)
-complete=matrix(RR,sbound)
-dz=matrix(ZZ,sbound)
-p=2
-a = flog(p)/(p-1)
+def get_reference(sbound,p):
+    complete=matrix(RR,sbound)
+    a = flog(p)/(p-1)
+    x=ZP.gen()
+    t0=cputime()
+    for k in range(sbound):
+        for l in range(sbound):
+            a=flog(p)/(p-1)
+            r=f+(k*x+l)*g
+            s=alpha_p_simplistic(r,p)-a
+            if (valuation(r[r.degree()],p)>=1):
+                s -= -p/(p+1)*a
+            c=alpha_p_affine_nodisc(r,p)-a
+            # simple[k,l]=s
+            complete[k,l]=c
+    return complete
 
-x=ZP.gen()
+
+
+def testp(rdict,p,reference):
+    rotation_clear(rdict)
+    rotation_handle_p(rdict,p)
+    allcoeffs=reduce((lambda x,y: x+y),[list(x) for x in
+         list(matrix(sbound,sbound,rdict['sarr'])-reference)],[])
+    mi,ma=min(allcoeffs), max(allcoeffs);
+    res=max(ma,-mi)
+    print "Maximal inaccuracy: %e (large means bug!)" % res
+    return res < 0.1
+
+def manyp(rdict,plim):
+    rotation_clear(rdict)
+    t0=cputime()
+    for p in prime_range(plim):
+        t1=cputime()
+        hits=rotation_handle_p(rdict,p)
+        print "%r: %.2f seconds, %r hits" % (p,cputime()-t1,hits)
+    print "total: %.2f seconds" % (cputime()-t0)
+
+
+
+####################################
+# To try:
+
+# Fix a size for the sieving area. It's taken square here, but the
+# program accepts also a rectangle. We look into polynomials h(x,u,v) for
+# u and v integers within the interval [0,sbound-1]
+sbound=40
+p=43
+
 print "First computing reference scores with the naive method"
-t0=cputime()
-for k in range(sbound):
-    for l in range(sbound):
-        a=flog(p)/(p-1)
-        r=f+(k*x+l)*g
-        s=alpha_p_simplistic(r,p)-a
-        if (valuation(r[r.degree()],p)>=1):
-            s -= -p/(p+1)*a
-        c=alpha_p_affine_nodisc(r,p)-a
-        simple[k,l]=s
-        complete[k,l]=c
-
+refp = get_reference(sbound, p)
 print "Took %.2f seconds" % (cputime()-t0)
-
-
 print "Now with root sieve"
 t0=cputime()
 rdict=rotation_init(f,g,0,sbound,0,sbound)
-rotation_clear(rdict)
-rotation_handle_p(rdict,p)
-allcoeffs=reduce((lambda x,y: x+y),[list(x) for x in
-     list(matrix(sbound,sbound,rdict['sarr'])-complete)],[])
-mi,ma=min(allcoeffs), max(allcoeffs);
+testp(rdict,p,complete)
 print "Took %.2f seconds" % (cputime()-t0)
-print "Maximal inaccuracy: %e (large means bug!)" % max(ma,-mi)
+
+# More extensive testing:
+# ref2=get_reference(sbound,2)
+# ref3=get_reference(sbound,3)
+# ref5=get_reference(sbound,5)
+# ref7=get_reference(sbound,7)
+
+# rdict=rotation_init(f,g,0,sbound,0,sbound)
+# t0=cputime();testp(rdict,2,ref2);testp(rdict,3,ref3);testp(rdict,5,ref5);cputime()-t0
+
 
 # zview(mround(matrix(sbound,sbound,sarr)-complete),1,0,p)
 # zview(mround(matrix(sbound,sbound,sarr)-complete),2,1,p)
