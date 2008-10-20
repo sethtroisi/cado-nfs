@@ -82,6 +82,7 @@ def manyp(rdict,plim):
 sbound=40
 p=43
 
+t0=cputime()
 print "First computing reference scores with the naive method"
 refp = get_reference(sbound, p)
 print "Took %.2f seconds" % (cputime()-t0)
