@@ -11,7 +11,7 @@ f,g=lemme_21(n,5,ad,p,m)
 g1=g(x+22977)
 f1=f(x+22977)-(3*x+18223)*g1
 
-# Now alpha(f1,2000) is 0.18.
+# Now alpha(f1,2000) is -0.18.
 # Within rotation by (jx+k), |j|<=4, |k|<=2^16, the best alpha is reached
 # for:
 # sage: alpha(f1+(x-26071)*g1,2000)
