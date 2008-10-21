@@ -32,7 +32,7 @@ checkdep: checkdep.o
 	$(CC) $(MY_LFLAGS) -o $@ $^
 linalg: linalg.o gauss.o readmat.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils
-balance: balance.o
+balance: balance.o readbuffer.o rowset_heap.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lm
 
 gauss.o: gauss.c

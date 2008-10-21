@@ -18,6 +18,9 @@
 #include <sys/types.h>  /* mkdir */
 #include <unistd.h>     /* chdir */
 
+#include "readbuffer.h"
+#include "rowset_heap.h"
+
 
 /*{{{ macros */
 #ifdef  __cplusplus
@@ -198,83 +201,6 @@ struct slice * alloc_slices(unsigned int water, unsigned int n)
     }
 
     return res;
-}
-/* }}} */
-/* {{{ reading buffer stuff */
-struct reading_buffer_s {
-    char buf[1024];
-    FILE * f;
-    int siz;
-    off_t o;
-    char * filename;
-};
-
-typedef struct reading_buffer_s reading_buffer[1];
-
-
-static void rb_open(reading_buffer b, const char * filename)
-{
-    b->filename = strdup(filename);
-    b->f = fopen(filename, "r");
-    DIE_ERRNO_DIAG(b->f == NULL, "fopen", b->filename);
-}
-static void rb_close(reading_buffer b)
-{
-    fclose(b->f);
-    free(b->filename);
-}
-
-static void rb_read_line(reading_buffer b)
-{
-    char * ptr;
-    b->o = ftello(b->f);                                                  
-    ptr = fgets(b->buf, sizeof(b->buf), b->f);
-    if (ptr == NULL) {
-        fprintf(stderr, "Unexpected %s at position %ld in %s\n",    
-                feof(b->f) ? "EOF" : "error", b->o, b->filename);            
-        exit(1);
-    }
-    b->siz = strlen(ptr);
-}
-
-static void rb_gobble_long_line(reading_buffer b)
-{
-    char * ptr;
-    while (!(b->siz < (int) (sizeof(b->buf)-1) ||
-                b->buf[sizeof(b->buf)-2] == '\n'))
-    {
-        ptr = fgets(b->buf, sizeof(b->buf), b->f);
-        if (ptr == NULL) {
-            fprintf(stderr, "Unexpected %s at position %ld in %s\n",    
-                    feof(b->f) ? "EOF" : "error",
-                    ftello(b->f), b->filename);    
-            exit(1);
-        }
-        b->siz = strlen(ptr);
-    }                                                                   
-    b->o = ftello(b->f);
-}
-
-void rb_feed_buffer_again_if_lowwater(reading_buffer b,
-        int * ppos, int low)
-{
-    char * ptr;
-    if (*ppos+low <= (int) sizeof(b->buf) ||
-            (b->siz < (int) (sizeof(b->buf)-1) ||
-                b->buf[sizeof(b->buf)-2] == '\n')) {
-        return;
-    }
-
-    memcpy(b->buf, b->buf+*ppos, b->siz-*ppos);
-    b->siz = b->siz-*ppos;
-    *ppos=0;
-    ptr = fgets(b->buf+b->siz,sizeof(b->buf)-b->siz,b->f);
-    if (ptr == NULL) {
-        fprintf(stderr, "Unexpected %s at position %ld in %s\n",    
-                feof(b->f) ? "EOF" : "error", ftello(b->f), b->filename);    
-        exit(1);
-    }
-    b->siz += strlen(b->buf + b->siz);
 }
 /* }}} */
 /* {{{ copy buffers -- useful for copying large chunks of data when there
@@ -665,11 +591,15 @@ int read_matrix()
         int w;
         int pos;
         rb_read_line(b);
-        if (sscanf(b->buf, "%d%n", &w, &pos) < 1) {
+        char * ptr = b->buf;
+        char * nptr;
+        w = strtoul(ptr, &nptr, 10);
+        if (ptr == nptr) {
             fprintf(stderr, "Parse error while reading line %"PRIu32" of %s\n",
                     i+1, b->filename);
             exit(1);
         }
+        ptr = nptr;
         row_table[i].i = i;
         row_table[i].w = w;
         line_bytes[i] = -b->o;
@@ -683,26 +613,28 @@ int read_matrix()
             int nread;
             for(nread = 0 ; ; nread++) {
                 uint32_t j;
-                int dpos;
-                int rc;
-                /* A column index is never going to take more than that */
-                rb_feed_buffer_again_if_lowwater(b,&pos,10);
-                /* We know that leading whit space will be removed */
-                rc = sscanf(b->buf+pos, "%" SCNu32 "%n", &j, &dpos);
-                if (rc == EOF) {
+                /* A column index + whitespace + exponent is never going to take
+                 * more than 20 bytes */
+                pos = ptr - b->buf;
+                rb_feed_buffer_again_if_lowwater(b,&pos,20);
+                ptr = b->buf + pos;
+                /* remove leading ws */
+                for( ; *ptr && (isspace(*ptr) && *ptr != '\n') ; ptr++) ;
+                if (*ptr == '\n')
                     break;
-                }
-                if (rc < 1) {
+
+                j = strtoul(ptr, &nptr, 10);
+                if (nptr == ptr) {
                     fprintf(stderr, "Parse error while reading line %"
                             PRIu32" of %s\n", i+1, b->filename);
                     exit(1);
                 }
+                ptr = nptr;
 
                 assert(j < nc);
                 col_table[j].w++;
-                pos += dpos;
                 /* discard as well the possible exponent information */
-                for(;b->buf[pos]&&!isspace(b->buf[pos]);pos++);
+                for( ; *ptr && !isspace(*ptr) ; ptr++) ;
             }
             ASSERT_ALWAYS(nread == w);
         }
@@ -794,112 +726,6 @@ int row_compare_index(const struct row * a, const struct row * b)
 }
 #endif
 
-/* {{{ Data type for buckets used in the priority queue stuff (w/ tests) */
-/* We'll arrange our slices in a priority heap, so that we'll always
- * easily access the lightest one.
- *
- * The number of rows in a bucket does not really matter, except that we
- * absolutely want to make sure that it never exceeds the bucket size.
- * Hence if a bucket becomes full, then it's always considered heavier
- * than anything.
- * */
-
-struct bucket {
-    unsigned long s;    /* total weight */
-    unsigned long room; /* nb of rows that can still be stored */
-    int i;              /* bucket index */
-};
-
-int heap_index_compare(const struct bucket * a, const struct bucket * b)
-{
-    return (int32_t) a->i - (int32_t) b->i;
-}
-
-int heap_compare(const struct bucket * a, const struct bucket * b)
-{
-    /* Returns whether b is a better candidate to be on top of the heap
-     * IOW: Whether b is lighter than a
-     * */
-    if (b->room == 0) return 0;
-    if (a->room == 0) return 1;
-    return b->s < a->s;
-}
-/* }}} */
-
-/* The code below is the glibc heap implementation, as copied from
- * /usr/include/c++/4.1.2/bits/stl_heap.h */
-/* {{{ */
-void
-push_heap0(struct bucket * __first,
-        ptrdiff_t hole, ptrdiff_t __topIndex,
-        const struct bucket * __value)
-{
-    ptrdiff_t __parent = (hole - 1) / 2;
-    while (hole > __topIndex && heap_compare(__first + __parent, __value))
-    {
-        *(__first + hole) = *(__first + __parent);
-        hole = __parent;
-        __parent = (hole - 1) / 2;
-    }
-    *(__first + hole) = *__value;
-}
-
-static inline void
-push_heap(struct bucket * __first, struct bucket * __last)
-{
-    struct bucket ref = __last[-1];
-    push_heap0(__first, (__last - __first) - 1, 0, & ref);
-}
-
-void
-adjust_heap(struct bucket * __first, ptrdiff_t hole,
-        ptrdiff_t __len, const struct bucket * __value)
-{
-    const ptrdiff_t __topIndex = hole;
-    ptrdiff_t right = 2 * hole + 2;
-    while (right < __len)
-    {
-        if (heap_compare(__first + right,
-                    __first + (right - 1)))
-            right--;
-        *(__first + hole) = *(__first + right);
-        hole = right;
-        right = 2 * (right + 1);
-    }
-    if (right == __len)
-    {
-        *(__first + hole) = *(__first + (right - 1));
-        hole = right - 1;
-    }
-    push_heap0(__first, hole, __topIndex, __value);
-}
-
-static inline void
-pop_heap(struct bucket * __first, struct bucket * __last)
-{
-    struct bucket ref = __last[-1];
-    __last[-1] = __first[0];
-    adjust_heap(__first, 0, __last - __first, & ref);
-}
-
-static inline void
-make_heap(struct bucket * __first, struct bucket * __last)
-{
-    if (__last - __first < 2)
-        return;
-
-    const ptrdiff_t __len = __last - __first;
-    ptrdiff_t __parent = (__len - 2) / 2;
-    for(;;) {
-        struct bucket ref = __first[__parent];
-        adjust_heap(__first, __parent, __len, &ref);
-        if (__parent == 0)
-            return;
-        __parent--;
-    }
-}
-/* end of heap code */
-/* }}} */
 
 /*}}}*/
 
