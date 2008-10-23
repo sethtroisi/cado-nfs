@@ -2806,7 +2806,7 @@ main (int argc, char *argv[])
     si.trialdiv_data_alg = trialdiv_init (si.trialdiv_primes_alg + skip2, 
                                           i - skip2);
     for (i = 0; si.trialdiv_primes_rat[i] != FB_END; i++);
-    skip2 = (i > 0 && si.trialdiv_primes_alg[0] == 2) ? 1 : 0;
+    skip2 = (i > 0 && si.trialdiv_primes_rat[0] == 2) ? 1 : 0;
     si.trialdiv_data_rat = trialdiv_init (si.trialdiv_primes_rat + skip2, 
                                           i - skip2);
     si.strategy = facul_make_strategy (15, MIN(cpoly->rlim, cpoly->alim),
