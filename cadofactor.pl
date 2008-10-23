@@ -1131,7 +1131,7 @@ sub count_rels {
     close DIR;
     my @relfiles=();
     foreach my $f (@files) {
-        if ($f =~ /$name\.rels\.(\d+)-(\d+)/) {
+        if ($f =~ /$name\.rels\.(\d+)-(\d+)/ || $f =~ /$name\.freerels/) {
             $nrels+= `grep -v "^#" $wdir/$f | wc -l`;
             push @relfiles, "$wdir/$f";
         }
