@@ -2364,8 +2364,8 @@ SkewGauss (sieve_info_t *si, double skewness)
                                                so that a[0] is exact */
   b[0] = 0.0;
   a[1] = (double) si->rho;
-  skewness = rint (skewness);
   b[1] = skewness;
+  ASSERT_ALWAYS(b[1] != 0);
   while (1)
     {
       /* reduce vector (a[0], b[0]) with respect to (a[1], b[1]) */
@@ -2383,24 +2383,28 @@ SkewGauss (sieve_info_t *si, double skewness)
       a[1] -= q * a[0];
       b[1] -= q * b[0];
     }
+  /* now b[0], b[1] should be of the form i*skewness, but this might not be
+     exact due to rounding errors, thus we round them to the nearest integer */
+  b[0] = rint (b[0] / skewness);
+  b[1] = rint (b[1] / skewness);
   /* put the smallest vector in (a0,b0) */
   ASSERT(fits_int32_t(a[0]));
-  ASSERT(fits_int32_t(b[0] / skewness));
+  ASSERT(fits_int32_t(b[0]));
   ASSERT(fits_int32_t(a[1]));
-  ASSERT(fits_int32_t(b[1] / skewness));
+  ASSERT(fits_int32_t(b[1]));
   if (a[0] * a[0] + b[0] * b[0] < a[1] * a[1] + b[1] * b[1])
     {
       si->a0 = (int32_t) a[0];
-      si->b0 = (int32_t) (b[0] / skewness);
+      si->b0 = (int32_t) b[0];
       si->a1 = (int32_t) a[1];
-      si->b1 = (int32_t) (b[1] / skewness);
+      si->b1 = (int32_t) b[1];
     }
   else
     {
       si->a0 = (int32_t) a[1];
-      si->b0 = (int32_t) (b[1] / skewness);
+      si->b0 = (int32_t) b[1];
       si->a1 = (int32_t) a[0];
-      si->b1 = (int32_t) (b[0] / skewness);
+      si->b1 = (int32_t) b[0];
     }
 }
 
@@ -2572,7 +2576,7 @@ usage (char *argv0)
   fprintf (stderr, "          -rlambda  nnn   rational lambda value is nnn\n");
   fprintf (stderr, "          -alambda  nnn   algebraic lambda value is nnn\n");
   fprintf (stderr, "          -v              be verbose (print some sieving statistics)\n");
-  exit (1);
+  exit (EXIT_FAILURE);
 }
 
 int
@@ -2728,7 +2732,7 @@ main (int argc, char *argv[])
     if (rho != 0 && q1 != 0)
       {
         fprintf (stderr, "Error, -q1 and -rho are mutually exclusive\n");
-        exit (1);
+        exit (EXIT_FAILURE);
       }
 
     /* if -q1 is not given, sieve only for q0 */
@@ -2739,7 +2743,7 @@ main (int argc, char *argv[])
     if (q1 > (uint64_t) ULONG_MAX)
       {
         fprintf (stderr, "Error, q1=%" PRIu64 " exceeds ULONG_MAX\n", q1);
-        exit (1);
+        exit (EXIT_FAILURE);
       }
 
     cado_poly_init(cpoly);
