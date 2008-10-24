@@ -307,20 +307,8 @@ compute_badprimes (sieve_info_t *si, cado_poly cpoly,
 }
 
 static void
-sieve_info_update (sieve_info_t *si, double skew)
+sieve_info_update (sieve_info_t *si)
 {
-  double s_over_a1, one_over_b1;
-
-  /* check J */
-  s_over_a1 = fabs (skew / (double) si->a1);
-  one_over_b1 = fabs (1.0 / (double) si->b1);
-  if (one_over_b1 < s_over_a1)
-    s_over_a1 = one_over_b1; /* min(s/|a1|, 1/|b1|) */
-  s_over_a1 *= si->B;
-  if (s_over_a1 > 1.0) /* ensures that J does not exceed I/2 */
-    s_over_a1 = 1.0;
-  si->J = (uint32_t) (s_over_a1 * (double) (si->I >> 1));
-
 #ifdef VERBOSE
   fprintf (stderr, "# I=%u; J=%u\n", si->I, si->J);
 #endif
@@ -2357,7 +2345,7 @@ eval_fij (mpz_t v, const mpz_t *f, const unsigned int d, const long i,
 void
 SkewGauss (sieve_info_t *si, double skewness)
 {
-  double a[2], b[2], q;
+  double a[2], b[2], q, maxab0, maxab1;
 
   a[0] = (double) si->q;
   ASSERT_ALWAYS(a[0] < 9007199254740992.0); /* si.q should be less than 2^53
@@ -2365,7 +2353,7 @@ SkewGauss (sieve_info_t *si, double skewness)
   b[0] = 0.0;
   a[1] = (double) si->rho;
   b[1] = skewness;
-  ASSERT_ALWAYS(b[1] != 0);
+  ASSERT(b[1] != 0);
   while (1)
     {
       /* reduce vector (a[0], b[0]) with respect to (a[1], b[1]) */
@@ -2375,6 +2363,7 @@ SkewGauss (sieve_info_t *si, double skewness)
         break;
       a[0] -= q * a[1];
       b[0] -= q * b[1];
+
       /* reduce vector (a[1], b[1]) with respect to (a[0], b[0]) */
       q = (a[0] * a[1] + b[0] * b[1]) / (a[0] * a[0] + b[0] * b[0]);
       q = rint (q);
@@ -2383,29 +2372,35 @@ SkewGauss (sieve_info_t *si, double skewness)
       a[1] -= q * a[0];
       b[1] -= q * b[0];
     }
+  ASSERT(fits_int32_t(a[0]));
+  ASSERT(fits_int32_t(b[0] / skewness));
+  ASSERT(fits_int32_t(a[1]));
+  ASSERT(fits_int32_t(b[1] / skewness));
   /* now b[0], b[1] should be of the form i*skewness, but this might not be
      exact due to rounding errors, thus we round them to the nearest integer */
-  b[0] = rint (b[0] / skewness);
-  b[1] = rint (b[1] / skewness);
-  /* put the smallest vector in (a0,b0) */
-  ASSERT(fits_int32_t(a[0]));
-  ASSERT(fits_int32_t(b[0]));
-  ASSERT(fits_int32_t(a[1]));
-  ASSERT(fits_int32_t(b[1]));
-  if (a[0] * a[0] + b[0] * b[0] < a[1] * a[1] + b[1] * b[1])
+  maxab0 = fabs (a[0]) > fabs (b[0]) ? fabs (a[0]) : fabs (b[0]);
+  maxab1 = fabs (a[1]) > fabs (b[1]) ? fabs (a[1]) : fabs (b[1]);
+  if (maxab0 <= maxab1)
     {
       si->a0 = (int32_t) a[0];
-      si->b0 = (int32_t) b[0];
+      si->b0 = (int32_t) rint (b[0] / skewness);
       si->a1 = (int32_t) a[1];
-      si->b1 = (int32_t) b[1];
+      si->b1 = (int32_t) rint (b[1] / skewness);
     }
-  else
+  else /* swap (a0,b0) and (a1,b1) */
     {
-      si->a0 = (int32_t) a[1];
-      si->b0 = (int32_t) b[1];
       si->a1 = (int32_t) a[0];
-      si->b1 = (int32_t) b[0];
+      si->b1 = (int32_t) rint (b[0] / skewness);
+      si->a0 = (int32_t) a[1];
+      si->b0 = (int32_t) rint (b[1] / skewness);
+      maxab1 = maxab0;
     }
+  
+  /* make sure J does not exceed I/2 */
+  if (maxab1 >= si->B)
+    si->J = (uint32_t) (si->B * skewness / maxab1 * (double) (si->I >> 1));
+  else
+    si->J = si->I >> 1;
 }
 
 /* return max(|a0|,|a1|)/min(|a0|,|a1|) */
@@ -2868,7 +2863,7 @@ main (int argc, char *argv[])
         fij_from_f (&si, cpoly->f, cpoly->degree);
 
         /* checks the value of J */
-        sieve_info_update (&si, cpoly->skew);
+        sieve_info_update (&si);
         totJ += (double) si.J;
 
         /* Allocate alg buckets */
