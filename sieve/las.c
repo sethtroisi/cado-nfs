@@ -1678,6 +1678,7 @@ void factor_list_clear(factor_list_t *fl) {
 }
 
 // print a comma-separated list of factors.
+// assumes there is at least one factor
 void factor_list_fprint(FILE *f, factor_list_t fl) {
     int i;
     for (i = 0; i < fl.n-1; ++i)
@@ -2020,9 +2021,11 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
               for (j = 0; j < m_r->data[i]; j++)
                 gmp_printf (",%Zx", f_r->data[i]);
             printf (":");
-            factor_list_fprint (stdout, alg_factors);
             if (alg_factors.n != 0)
-              printf (",");
+              {
+                factor_list_fprint (stdout, alg_factors);
+                printf (",");
+              }
             for (i = 0; i < f_a->length; ++i)
               for (j = 0; j < m_a->data[i]; j++)
                 gmp_printf ("%Zx,", f_a->data[i]);
