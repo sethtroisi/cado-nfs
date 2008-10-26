@@ -1955,8 +1955,12 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
 
             // Compute algebraic and rational norms.
             xToAB (&a, &b, x + N*si->bucket_region, si);
+
             /* since a,b both even were not sieved, either a or b should be odd */
-            ASSERT((a | b) & 1);
+            // ASSERT((a | b) & 1);
+            if (UNLIKELY(((a | b) & 1) == 0))
+              continue;
+
             /* Since the q-lattice is exactly those (a, b) with 
                a == rho*b (mod q), q|b  ==>  q|a  ==>  q | gcd(a,b) */
             if (b == 0 || (b >= si->q && b % si->q == 0))
