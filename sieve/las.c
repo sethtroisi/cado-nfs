@@ -307,11 +307,10 @@ compute_badprimes (sieve_info_t *si, cado_poly cpoly,
 }
 
 static void
-sieve_info_update (sieve_info_t *si)
+sieve_info_update (sieve_info_t *si, const int verbose)
 {
-#ifdef VERBOSE
-  fprintf (stderr, "# I=%u; J=%u\n", si->I, si->J);
-#endif
+  if (verbose)
+    fprintf (stderr, "# I=%u; J=%u\n", si->I, si->J);
 
   /* update number of buckets */
   si->nb_buckets = 1 + (si->I * si->J - 1) / si->bucket_region;
@@ -1033,6 +1032,7 @@ init_rat_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly,
       } 
     for (; j < lastj; ++j)
       {
+        unsigned char n;
         gjj = gj * (double) j;
         zx->z = gjj - gi * (double) halfI;
         __asm__("### Begin rational norm loop\n");
@@ -1044,7 +1044,9 @@ init_rat_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly,
           /* the magic constant here is simply 1023*2^52, where
              1023 is the exponent bias in binary64 */
           y = (zx->x - (uint64_t) 0x3FF0000000000000) >> (52 - l);
-          *S++ = si->S_rat[y & mask];
+          n = si->S_rat[y & mask];
+          ASSERT (n > 0);
+          *S++ = n;
           zx->z += gi;
         }
 #else
@@ -1154,11 +1156,14 @@ init_alg_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly,
           if (si->rat_Bound[*S])
             {
 #ifndef SSE_NORM_INIT
+              unsigned char n;
               zx->z = fpoly_eval (u, d, i);
               /* 4607182418800017408 = 1023*2^52 */
               y = (zx->x - (uint64_t) 0x3FF0000000000000) >> (52 - l);
               report++;
-              *S++ = T[y & mask];
+              n = T[y & mask];
+              ASSERT (n > 0);
+              *S++ = n;
 #else
               ASSERT(d == 5);
               __v2di mask_vec = { mask, mask };
@@ -1960,7 +1965,15 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
             /* since a,b both even were not sieved, either a or b should be odd */
             // ASSERT((a | b) & 1);
             if (UNLIKELY(((a | b) & 1) == 0))
-              continue;
+              {
+                fprintf (stderr, "# Error: a and b both even for N = %d, x = %d,\n"
+                                 "i = %d, j = %d, a = %ld, b = %lu\n", 
+                         N, x, ((x + N*si->bucket_region) & (si->I - 1)) 
+                           - (si->I >> 1),
+                         (x + N*si->bucket_region) >> si->logI,
+                         (long) a, (unsigned long) b);
+                continue;
+              }
 
             /* Since the q-lattice is exactly those (a, b) with 
                a == rho*b (mod q), q|b  ==>  q|a  ==>  q | gcd(a,b) */
@@ -2870,7 +2883,7 @@ main (int argc, char *argv[])
         fij_from_f (&si, cpoly->f, cpoly->degree);
 
         /* checks the value of J */
-        sieve_info_update (&si);
+        sieve_info_update (&si, verbose);
         totJ += (double) si.J;
 
         /* Allocate alg buckets */
