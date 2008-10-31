@@ -133,16 +133,12 @@ typedef struct {
     facul_strategy_t *strategy;
 } sieve_info_t;
 
-/* A "const sieve_info_t *" tells the compiler only that the pointer value
-   is constant, not that the data in the referenced memory is constant,
-   which can prevent important optimizations by making the generated code
-   read from memory every time. To fix that, one must define a "const" 
-   variant of the data type, and pass a pointer to that */
-typedef const sieve_info_t const_sieve_info_t;
-
 /* Forward declarations of functions */
 static void xToAB(int64_t *a, uint64_t *b, const unsigned int x, 
                   const sieve_info_t *si);
+/* Test if entry x in bucket region n is divisible by p */
+void test_divisible_x (const fbprime_t p, const unsigned long x, const int n, 
+		       const sieve_info_t *si);
 int factor_leftover_norm (mpz_t n, unsigned int b, mpz_array_t* const factors, 
 			  uint32_array_t* const multis, 
 			  facul_strategy_t *strategy);
@@ -781,7 +777,7 @@ reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r,
 
 void
 fill_in_buckets(bucket_array_t BA, factorbase_degn_t *fb, 
-		const const_sieve_info_t * si) {
+		const sieve_info_t * si) {
 unsigned char prev_logp = 0;
     // Loop over all primes in the factor base >= bucket_thresh
     while (fb->p != FB_END && fb->p < (fbprime_t) si->bucket_thresh)
@@ -1213,13 +1209,17 @@ typedef struct {
     unsigned char logp; // TODO: word-align?
 } small_typical_prime_data_t;
 
-/* Small primes with root at infinity */
+/* Small primes or powers of small primes p^k with projective root.
+   These hit at i*v == j*u (mod p^k), but gcd(v, p^k) > 1.
+   We store g = gcd(v, p^k), q = p^k / g, and U = u * (v/g)^(-1) (mod q). 
+   Then, for lines j = k*g, these primes hit at positions i == k*r (mod q).
+   We initialise next_position = -I/2 + i % q, 
+   then within a line sieve next_position + k*q < I/2,
+   and update next_position += r + g*I to get the first position to sieve
+   in the next suitable line. */
 typedef struct {
-    fbprime_t p;
-    int next_position; /* For each line in the i,j plane with j == 0 (mod p),
-                          subtract logp from each location of the line. 
-                          next_position points at the first entry of the 
-                          first line to sieve in the next bucket_region */
+    fbprime_t g, q, U;
+    int next_position;
     unsigned char logp; // TODO: word-align?
 } small_bad_prime_data_t;
 
@@ -1246,17 +1246,23 @@ static void
 copy_small_sieve (small_sieve_data_t *r, const small_sieve_data_t *s) 
 {
     r->nb_nice_p = s->nb_nice_p;
-    r->nice_p = (small_typical_prime_data_t *) 
-	malloc (r->nb_nice_p * sizeof (small_typical_prime_data_t));
-    memcpy (r->nice_p, s->nice_p, 
-	    r->nb_nice_p * sizeof (small_typical_prime_data_t));
-    r->nb_bad_p = s->nb_bad_p;
-    if (r->nb_bad_p > 0)
+    if (s->nb_nice_p > 0)
       {
-        r->bad_p = (small_bad_prime_data_t *) 
-                   malloc (r->nb_bad_p * sizeof (small_bad_prime_data_t));
-        memcpy (r->bad_p, s->bad_p, 
-                r->nb_bad_p * sizeof (small_bad_prime_data_t));
+        const size_t size = s->nb_nice_p * sizeof (small_typical_prime_data_t);
+	r->nice_p = (small_typical_prime_data_t *) malloc (size);
+	ASSERT (r->nice_p != NULL);
+	memcpy (r->nice_p, s->nice_p, size);
+      }
+    else
+      r->nice_p = NULL;
+
+    r->nb_bad_p = s->nb_bad_p;
+    if (s->nb_bad_p > 0)
+      {
+        const size_t size = s->nb_bad_p * sizeof (small_bad_prime_data_t);
+        r->bad_p = (small_bad_prime_data_t *) malloc (size);
+        ASSERT (r->bad_p != NULL);
+        memcpy (r->bad_p, s->bad_p, size);
       }
     else
       r->bad_p = NULL;
@@ -1320,16 +1326,14 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
 	      invp = (p % 2 == 1) ? (uint32_t) -invmod_po2 (p) : 1;
               r = fb_root_in_qlattice (p, p, invp, si);
               if (verbose)
-                fprintf (stderr, "# Prime %d root inf -> %d\n", p, r);
+                fprintf (stderr, "# Side %c, prime %d root inf -> %d\n", 
+                         side, p, r);
             } else {
               /* Transform a regular prime */
               p = fb->p;
               logp = fb->plog;
               nr_roots = fb->nr_roots;
               r = fb_root_in_qlattice(p, fb->roots[nr], fb->invp, si);
-              if (verbose && r >= p)
-                fprintf (stderr, "# Prime %d root %d -> inf\n", 
-                         p, fb->roots[nr]);
               nr++;
             }
           /* if (r == 0) {
@@ -1337,26 +1341,46 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
               // The current sieving code handles r == 0 correctly, but
               // we may get a small speedup out of treating it separately
           } else */
-          if (r == p) {
-            if (do_bad_primes && p < si->J)  /* If p>=J, we never get p|j for 0<j<J */
-	      {
-		// Fill in data for this bad prime
-		/* Shouldn't happen that often so a realloc is ok */
-		ssd->bad_p = (small_bad_prime_data_t *) 
-		  realloc (ssd->bad_p, (ssd->nb_bad_p + 1) * 
-			   sizeof (small_bad_prime_data_t));
-		ssd->bad_p[ssd->nb_bad_p].p = p;
-		/* gcd (i,j) | gcd (a,b), so for j=0, gcd(a,b) = abs(i), so 
-		   the only potential relation in the q-lattice line with 
-		   j=0 is i = +-1. I think we don't bother sieving for that 
-		   one, do we? (Although that one has a nice small norm...)
-		   Assuming we don't, skip over j=0 by initing next_position 
-		   to p*I here (i.e., the line j = p) */
-		ssd->bad_p[ssd->nb_bad_p].next_position = p * si->I;
-		ssd->bad_p[ssd->nb_bad_p].logp = logp;
-		ssd->nb_bad_p++;
-	      }
-          } else {
+          if (r >= p) 
+	    {
+	      fbprime_t q, g;
+	      g = bin_gcd (p, r - p);
+	      if (do_bad_primes && g < si->J)
+		{
+		  // Fill in data for this bad prime
+		  /* Shouldn't happen that often so a realloc is ok */
+		  ssd->bad_p = (small_bad_prime_data_t *) 
+		    realloc (ssd->bad_p, (ssd->nb_bad_p + 1) * 
+			     sizeof (small_bad_prime_data_t));
+		  q = p / g;
+		  if (verbose)
+		    fprintf (stderr, "# Side %c, projective root in (i,j) "
+			     "plane: p = " FBPRIME_FORMAT ", r = " 
+			     FBPRIME_FORMAT ", g = " FBPRIME_FORMAT ", q = " 
+			     FBPRIME_FORMAT "\n", side, p, r, g, q);
+		  ssd->bad_p[ssd->nb_bad_p].g = g;
+		  ssd->bad_p[ssd->nb_bad_p].q = q;
+		  if (q == 1)
+		    {
+		      ssd->bad_p[ssd->nb_bad_p].U = 0;
+		      ssd->bad_p[ssd->nb_bad_p].next_position = g * si->I;
+		    }
+		  else
+		    {
+		      fprintf (stderr, "# Projective roots in (i,j)-plane for "
+			       "prime powers not implemented yet\n");
+		      fprintf (stderr, "# p = " FBPRIME_FORMAT 
+			       ", r = " FBPRIME_FORMAT "\n", p, r);
+		      abort (); /* Use a general enough modinv!
+				   ssd->bad_p[ssd->nb_bad_p].U = modinv ((r-p) / g, q); */
+		      ssd->bad_p[ssd->nb_bad_p].next_position = (si->I >> 1) % q;
+		    }
+		  ssd->bad_p[ssd->nb_bad_p].logp = logp;
+		  ssd->nb_bad_p++;
+		}
+	    } 
+	  else 
+	    {
             // Fill in data for this nice prime
 	    ASSERT (n < size);
             ssd->nice_p[n].p = p;
@@ -1369,35 +1393,28 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
       fb = fb_next (fb); // cannot do fb++, due to variable size !
     }
     ssd->nb_nice_p = n;
-    if (verbose)
-      {
-        fprintf (stderr, "# %d bad primes in q-lattice%s", 
-                 ssd->nb_bad_p, ssd->nb_bad_p > 0 ? ":" : "");
-        for (n = 0; n < ssd->nb_bad_p; n++)
-          fprintf (stderr, " " FBPRIME_FORMAT, ssd->bad_p[n].p);
-        fprintf (stderr, "\n");
-      }
 }
 
 // Sieve small primes (up to p < bucket_thresh) of the factor base fb in the 
 // next sieve region S.
 // Information about where we are is in ssd.
-void sieve_small_bucket_region(unsigned char *S, 
-        small_sieve_data_t ssd, sieve_info_t *si)
+void sieve_small_bucket_region(unsigned char *S, const int bucket_nr, 
+			       small_sieve_data_t ssd, sieve_info_t *si,
+			       const unsigned char side)
 {
     const uint32_t I = si->I;
     unsigned char *S_ptr;
     unsigned long j, nj;
     int n;
+    const int test_divisibility = 0; /* very slow, but nice for debugging */
 
-    nj = (si->bucket_region >> si->logI);
+    nj = (si->bucket_region >> si->logI); /* Nr. of lines per bucket region */
     ASSERT ((nj & 1) == 0);
 
     /* Handle 2 separately. The general code below assumes odd p (although
        it works correctly, it updates some i,j with gcd(i,j) = 2 for p = 2). 
        Also, 2 can be sieved more quickly with long word transfers. 
        TODO: use SSE2 */
-    ASSERT ((I / 2) % sizeof (unsigned long) == 0);
     for (n = 0 ; n < ssd.nb_nice_p && ssd.nice_p[n].p == 2; n++) {
       unsigned long *S_ptr;
       unsigned long logps;
@@ -1407,17 +1424,12 @@ void sieve_small_bucket_region(unsigned char *S,
          So either way, skip even j. 
          r == 1/0, i.e. i == 1, j == 0 (mod 2) will be sieved as a
          "bad" prime below. */
+      ASSERT (r < 2);
       logps = 0UL;
-      ((unsigned char *)&logps)[r] = ssd.nice_p[n].logp;
-      ((unsigned char *)&logps)[2 + r] = ssd.nice_p[n].logp;
-      if (sizeof (unsigned long) == 8)
-        {
-          ((unsigned char *)&logps)[4 + r] = ssd.nice_p[n].logp;
-          ((unsigned char *)&logps)[6 + r] = ssd.nice_p[n].logp;
-        }
-      
+      for (j = 0; j < sizeof (unsigned long); j += 2)
+	((unsigned char *)&logps)[r + j] = ssd.nice_p[n].logp;
       ASSERT (I % (4 * sizeof (unsigned long)) == 0);
-      S_ptr = (unsigned long *) (S + I);
+      S_ptr = (unsigned long *) (S + I); /* Sieve only odd lines */
       for (j = 1; j < nj; j += 2)
       {
         const unsigned long *end = (unsigned long *)((char *) S_ptr + I);
@@ -1449,14 +1461,22 @@ void sieve_small_bucket_region(unsigned char *S,
           {
             /* for j even, we sieve only odd i */
             for (i = (i0 & 1) ? i0 : i0 + p; i < I; i += twop)
-              S_ptr[i] -= logp;
+	      {
+		if (test_divisibility && side == 'a')
+		  test_divisible_x (p, S_ptr + i - S, bucket_nr, si);
+		S_ptr[i] -= logp;
+	      }
             i0 += r;
             if (i0 >= p)
               i0 -= p;
             S_ptr += I;
             /* j odd */
             for (i = i0 ; i < I; i += p)
-              S_ptr[i] -= logp;
+	      {
+		if (test_divisibility && side == 'a')
+		  test_divisible_x (p, S_ptr + i - S, bucket_nr, si);
+		S_ptr[i] -= logp;
+	      }
             i0 += r;
             if (i0 >= p)
               i0 -= p;
@@ -1465,47 +1485,101 @@ void sieve_small_bucket_region(unsigned char *S,
         ssd.nice_p[n].next_position = i0;
     }
   
-    /* Sieve the bad primes */
+    /* Sieve the bad primes. We have
+       i * g == j * U (mod p^k) where g = p^l. This hits only for g|j,
+       then j = j' * g, and i == j' * U (mod p^(k-l)).
+       In ssd we have stored g, q = p^(k-l), U, and next_position so that
+       S + next_position is the next sieve entry that needs to be sieved. 
+       So if S + next_position is in the current bucket region, we
+       update all  S + next_position + k*q  where  next_position + k*q < I,
+       then set next_position = ((next_position % I) + U) % q) + I * g.  */
     for (n = 0; n < ssd.nb_bad_p; ++n) {
-      /* Fill every p-th line, starting at S[next_position] */
-      const fbprime_t p = ssd.bad_p[n].p;
-      unsigned long logps;
-      unsigned int i0 = ssd.bad_p[n].next_position;
-      ASSERT (i0 % I == 0);
-      ASSERT (I % (4 * sizeof (unsigned long)) == 0);
-      logps = ssd.bad_p[n].logp;
-      logps = logps | (logps << 8);
-      logps = logps | (logps << 16);
-      if (sizeof (unsigned long) > 4)
-        logps = logps | (logps << 32);
-      while (i0 < (unsigned int) si->bucket_region)
+      if (0 && ssd.bad_p[n].q == 1)
         {
-          unsigned long *S_ptr = (unsigned long *) (S + i0);
-          unsigned long *end = S_ptr + I / sizeof (unsigned long);
-          unsigned long logps2 = logps;
-          if ((i0 >> si->logI) % 2 == 0) /* Even j coordinate? */
+	  /* q = 1, therefore U = 0, and we sieve all entries in lines 
+	     with g|j, beginning with the line starting at S[next_position] */
+          unsigned long logps;
+          unsigned int i0 = ssd.bad_p[n].next_position;
+	  ASSERT (ssd.bad_p[n].U == 0);
+          ASSERT (i0 % I == 0);
+          ASSERT (I % (4 * sizeof (unsigned long)) == 0);
+	  for (j = 0; j < sizeof (unsigned long); j++)
+	    ((unsigned char *)&logps)[j] = ssd.bad_p[n].logp;
+          while (i0 < (unsigned int) si->bucket_region)
             {
-              /* Yes, update only odd i-coordinates */
-              /* Use array indexing to avoid endianness issues. Ugly. */
-              ((unsigned char *)&logps2)[0] = 0;
-              ((unsigned char *)&logps2)[2] = 0;
-              if (sizeof (unsigned long) == 8)
+              unsigned long *S_ptr = (unsigned long *) (S + i0);
+              unsigned long *end = S_ptr + I / sizeof (unsigned long);
+              unsigned long logps2 = logps;
+              if ((i0 & I) == 0) /* Even j coordinate? */
                 {
-                  ((unsigned char *)&logps2)[4] = 0;
-                  ((unsigned char *)&logps2)[6] = 0;
+                  /* Yes, update only odd i-coordinates */
+                  /* Use array indexing to avoid endianness issues. */
+		  for (j = 0; j < sizeof (unsigned long); j += 2)
+		    ((unsigned char *)&logps2)[j] = 0;
                 }
+              while (S_ptr < end)
+                {
+                  *(S_ptr) -= logps2;
+                  *(S_ptr + 1) -= logps2;
+                  *(S_ptr + 2) -= logps2;
+                  *(S_ptr + 3) -= logps2;
+                  S_ptr += 4;
+                }
+              i0 += ssd.bad_p[n].g * I;
             }
-          while (S_ptr < end)
-            {
-              *(S_ptr) -= logps2;
-              *(S_ptr + 1) -= logps2;
-              *(S_ptr + 2) -= logps2;
-              *(S_ptr + 3) -= logps2;
-              S_ptr += 4;
-            }
-          i0 += p * I;
+          ssd.bad_p[n].next_position = i0 - si->bucket_region;
         }
-      ssd.bad_p[n].next_position = i0 - si->bucket_region;
+      else 
+	{
+	  /* q > 1, more general sieving code. */
+	  unsigned int i0 = ssd.bad_p[n].next_position;
+	  unsigned int line_idx = i0 & (I - 1U); /* Index in line to sieve */
+	  unsigned char *S_ptr = S + i0 - line_idx; /* Start of line to sieve */
+	  const fbprime_t g = ssd.bad_p[n].g;
+	  const fbprime_t q = ssd.bad_p[n].q;
+	  const fbprime_t U = ssd.bad_p[n].U;
+	  const unsigned char logp = ssd.bad_p[n].logp;
+	  const fbprime_t evenq = (q % 2 == 0) ? q : 2 * q;
+	  ASSERT (U < q);
+	  while (i0 < (unsigned int) si->bucket_region)
+	    {
+	      unsigned int i = line_idx;
+	      if ((i0 & I) == 0) /* Is j even? */
+		{
+		  /* Yes, sieve only odd i values */
+		  if (i % 2 == 0) /* Make i odd */
+		    {
+		      ASSERT (q % 2 == 1);
+		      i += q;
+		    }
+		  for ( ; i < I; i += evenq)
+		    {
+		      if (test_divisibility && side == 'a')
+			test_divisible_x (g*q, S_ptr + i - S, bucket_nr, si);
+		      S_ptr[i] -= logp;
+		    }
+		}
+	      else
+		{
+		  for ( ; i < I; i += q)
+		    {
+		      if (test_divisibility && side == 'a')
+			test_divisible_x (g*q, S_ptr + i - S, bucket_nr, si);
+		      S_ptr[i] -= logp;
+		    }
+		}
+	      
+	      line_idx += U;
+	      S_ptr += ssd.bad_p[n].g * I;
+	      i0 += g * I + U;
+	      if (line_idx >= q)
+		{
+		  line_idx -= q;
+		  i0 -= q;
+		}
+	    }
+	  ssd.bad_p[n].next_position = i0 - si->bucket_region;
+	}
     }
 }
 
@@ -1598,19 +1672,19 @@ resieve_small_bucket_region (bucket_array_t BA, unsigned char *S,
   /* Resieve bad primes */
   td_idx = 0;
   for (n = 0; n < ssd->nb_bad_p; ++n) {
-    const fbprime_t p = ssd->bad_p[n].p;
-    while (trialdiv_primes[td_idx] != FB_END && trialdiv_primes[td_idx] < p)
+    const fbprime_t g = ssd->bad_p[n].g;
+    while (trialdiv_primes[td_idx] != FB_END && trialdiv_primes[td_idx] < g)
       td_idx++;
-    if (trialdiv_primes[td_idx] == FB_END || trialdiv_primes[td_idx] != p)
+    if (trialdiv_primes[td_idx] == FB_END || trialdiv_primes[td_idx] != g)
     {
       /* Test every p-th line, starting at S[next_position] */
       unsigned int i, i0 = ssd->bad_p[n].next_position;
-      ASSERT (n == 0 || ssd->bad_p[n - 1].p <= ssd->bad_p[n].p);
+      ASSERT (n == 0 || ssd->bad_p[n - 1].g <= ssd->bad_p[n].g);
       ASSERT (i0 % I == 0); /* make sure next_position points at start 
                                of line */
       if (resieve_very_verbose_bad)
         fprintf (stderr, "# resieving bad prime " FBPRIME_FORMAT 
-                 ", i0 = %u\n", p, i0);
+                 ", i0 = %u\n", g, i0);
       while (i0 < (unsigned int) si->bucket_region)
         {
           unsigned char *S_ptr = S + i0;
@@ -1626,8 +1700,8 @@ resieve_small_bucket_region (bucket_array_t BA, unsigned char *S,
                       if (resieve_very_verbose_bad)
                         fprintf (stderr, "resieve_small_bucket_region even j: root " 
                                  FBPRIME_FORMAT ",inf divides at x = %u\n", 
-                                 p, x);
-                      update.p = p;
+                                 g, x);
+                      update.p = g;
                       update.x = x;
                       update.logp = 0;
                       push_bucket_update (BA, 0, update);
@@ -1646,15 +1720,15 @@ resieve_small_bucket_region (bucket_array_t BA, unsigned char *S,
                       if (resieve_very_verbose_bad)
                         fprintf (stderr, "resieve_small_bucket_region odd j: root "
                                  FBPRIME_FORMAT ",inf divides at x = %u\n", 
-                                 p, x);
-                      update.p = p;
+                                 g, x);
+                      update.p = g;
                       update.x = x;
                       update.logp = 0;
                       push_bucket_update (BA, 0, update);
                     }
                 }
             }
-          i0 += p * I;
+          i0 += g * I;
         }
       ssd->bad_p[n].next_position = i0 - si->bucket_region;
       if (resieve_very_verbose_bad)
@@ -2124,6 +2198,23 @@ xToAB(int64_t *a, uint64_t *b, const unsigned int x, const sieve_info_t *si)
         *b = -c;
       }
 }
+
+void test_divisible_x (const fbprime_t p, const unsigned long x, const int n, 
+		       const sieve_info_t *si)
+{
+  const unsigned long X = x + n * si->bucket_region;
+  const long i = (long) (X & ((unsigned long) si->I - 1UL)) - (long) si->I / 2;
+  const unsigned long j = X >> si->logI;
+  mpz_t v;
+
+  mpz_init (v);
+  eval_fij (v, (const mpz_t *) si->fij, si->degree, i, j);
+  /* gmp_fprintf (stderr, "# test_divisible_x (" FBPRIME_FORMAT ", %lu, %d, ): "
+     "i = %ld, j = %lu, v = %Zd\n", p, x, n, i, j, v); */
+  ASSERT (mpz_divisible_ui_p (v, (unsigned long) p));
+  mpz_clear (v);
+}
+
 
 /*********************** norm computation ************************************/
 
@@ -2932,7 +3023,7 @@ main (int argc, char *argv[])
             apply_one_bucket(S, rat_BA, i, &si);
             ttsm += seconds();
             /* Sieve small rational primes */
-            sieve_small_bucket_region(S, ssd_rat, &si);
+            sieve_small_bucket_region(S, i, ssd_rat, &si, 'r');
             /* Make copy of sieve report values for histogram */
             if (rat_S != NULL)
               memcpy (rat_S, S, si.bucket_region*sizeof(unsigned char));
@@ -2946,7 +3037,7 @@ main (int argc, char *argv[])
             apply_one_bucket(S, alg_BA, i, &si);
             ttsm += seconds();
             /* Sieve small algebraic primes */
-            sieve_small_bucket_region(S, ssd_alg, &si);
+            sieve_small_bucket_region(S, i, ssd_alg, &si, 'a');
 
             /* Factor survivors */
             ttf -= seconds ();
