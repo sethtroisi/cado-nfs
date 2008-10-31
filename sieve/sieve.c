@@ -2291,7 +2291,7 @@ main (int argc, char **argv)
     {
       /* Generate rational fb */
       fbr->fullfb = fb_make_linear (cpoly->g, (fbprime_t) cpoly->rlim, 
-				    log_scale, verbose);
+				    log_scale, verbose, 0);
       if (fbr == NULL)
 	{
 	  fprintf (stderr, 

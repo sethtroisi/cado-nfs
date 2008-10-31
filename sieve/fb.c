@@ -139,15 +139,18 @@ fb_init_firstlog (factorbase_t fb)
 
 
 /* Generate a factor base with primes <= bound for a linear polynomial */
+/* If projective != 0, adds projective roots (for primes that divide 
+   leading coefficient */
 
 factorbase_degn_t *
 fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale, 
-		const int verbose)
+		const int verbose, const int projective)
 {
   fbprime_t p;
   factorbase_degn_t *fb = NULL, *fb_cur, *fb_new;
   size_t fbsize = 0, fballoc = 0;
   const size_t allocblocksize = 1 << 20;
+  int had_proj_root = 0;
   
   rdtscll (tsc1);
   fb_cur = (factorbase_degn_t *) malloc (fb_entrysize_uc (1));
@@ -157,11 +160,9 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
   fb_cur->size = fb_entrysize_uc (1);
 
   if (verbose)
-    {
-      printf ("# Making factor base for polynomial g(x) = ");
-      //      mp_poly_print (poly, 1, "");
-      printf ("\n");
-    }
+    gmp_fprintf (stderr, 
+		"# Making factor base for polynomial g(x) = %Zd * x + %Zd\n",
+		poly[0], poly[1]);
 
   for (p = 2 ; p <= bound; p = getprime (p))
     {
@@ -190,33 +191,53 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
       */
 
       modul_set_ul_reduced (r2, mpz_fdiv_ui (poly[1], p), m);
-      /* If p | g1 and !(p | g0), p|G(a,b) <=> p|b and that will be handeled
-	 by the projective roots */
-      if (modul_get_ul (r2, m) == 0)
-	continue;
-      modul_set_ul_reduced (r1, mpz_fdiv_ui (poly[0], p), m);
+      if (modul_is0 (r2, m))
+	{
+	  /* If p | g1 and !(p | g0), p|G(a,b) <=> p|b so that's a 
+	     projective root */
+	  if (!projective)
+	    continue; /* If we don't do projective roots, just move on to 
+			 the next prime */
+	  if (verbose)
+	    {
+	      if (!had_proj_root)
+		{
+		  fprintf (stderr, "# Primes with projective roots:");
+		  had_proj_root = 1;
+		}
+	      fprintf (stderr, " " FBPRIME_FORMAT , p);
+	    }
+	  fb_cur->roots[0] = p; /* The root is 1/0, which we store as 0/1 + p */
+	  if (p % 2 != 0)
+	    fb_cur->invp = - modul_invmodlong (modul_getmod_ul (m));
+	}
+      else
+	{
+	  /* Affine root */
+	  modul_set_ul_reduced (r1, mpz_fdiv_ui (poly[0], p), m);
 
-      /* We want g_1 * a + g_0 * b == 0 <=> a/b == - g0 / g1 */
-      modul_inv (r2, r2, m); /* r2 = 1 / g1 */
+	  /* We want g_1 * a + g_0 * b == 0 <=> a/b == - g0 / g1 */
+	  modul_inv (r2, r2, m); /* r2 = 1 / g1 */
 
-      modul_mul (r2, r1, r2, m); /* r2 = g0 / g1 */
-      modul_neg (r2, r2, m); /* r2 = - g0 / g1 */
+	  modul_mul (r2, r1, r2, m); /* r2 = g0 / g1 */
+	  modul_neg (r2, r2, m); /* r2 = - g0 / g1 */
 
 #ifndef NDEBUG
-      {
-	residueul_t r3;
-	modul_init_noset0 (r3, m);
-	modul_set_ul_reduced (r3, mpz_fdiv_ui (poly[1], p), m);
-	modul_mul (r3, r3, r2, m); /* g1 * (- g0 / g1) */
-	modul_add (r3, r3, r1, m); /* g1 * (- g0 / g1) + g0 */
-	ASSERT (modul_get_ul (r3, m) == 0);
-	modul_clear (r3, m);
-      }
+	  {
+	    residueul_t r3;
+	    modul_init_noset0 (r3, m);
+	    modul_set_ul_reduced (r3, mpz_fdiv_ui (poly[1], p), m);
+	    modul_mul (r3, r3, r2, m); /* g1 * (- g0 / g1) */
+	    modul_add (r3, r3, r1, m); /* g1 * (- g0 / g1) + g0 */
+	    ASSERT (modul_get_ul (r3, m) == 0);
+	    modul_clear (r3, m);
+	  }
 #endif
 
-      if (p % 2 != 0)
-	fb_cur->invp = - modul_invmodlong (modul_getmod_ul (m));
-      fb_cur->roots[0] = modul_get_ul (r2, m);
+	  if (p % 2 != 0)
+	    fb_cur->invp = - modul_invmodlong (modul_getmod_ul (m));
+	  fb_cur->roots[0] = modul_get_ul (r2, m);
+	}
 
       modul_clear (r1, m);
       modul_clear (r2, m);
@@ -248,6 +269,9 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
     }
 
   free (fb_cur);
+
+  if (had_proj_root)
+    fprintf (stderr, "\n");
 
   rdtscll (tsc2);
 
