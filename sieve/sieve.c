@@ -2350,7 +2350,7 @@ main (int argc, char **argv)
   if (verbose)
     for (s = 0; fb_skip(fb, s)->p != FB_END; 
 	 s += fb_entrysize (fb_skip (fb, s)))
-      fb_print_entry (fb_skip(fb, s));
+      fb_print_entry (stdout, fb_skip(fb, s));
 #endif
 
   if (verbose)
