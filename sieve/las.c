@@ -909,12 +909,22 @@ init_rat_norms (sieve_info_t *si)
   h = 1.0 / (double) L;
   for (e = 1.0, i = 0; i < K; i++, e *= 2.0)
     {
+      /* e = 2^i for 0 <= i < 2^k */
       for (m = 1.0, j = 0; j < L; j++, m += h)
         {
+          /* m = 1 + j/2^l for 0 <= j < 2^l */
           norm = m * e;
+          /* Warning: since si->logmax_rat does not usually correspond to
+             a power a two, and we consider full binades here, we have to
+             take care that values > si->logmax_rat do not wrap around to 0 */
           norm = log2 (norm);
-          norm = norm * si->scale_rat;
-          S[(i << l) + j] = GUARD + (unsigned char) norm;
+          if (norm >= si->logmax_rat)
+            S[(i << l) + j] = 255;
+          else
+            {
+              norm = norm * si->scale_rat;
+              S[(i << l) + j] = GUARD + (unsigned char) norm;
+            }
         }
     }
 }
@@ -941,8 +951,13 @@ init_alg_norms (sieve_info_t *si)
         {
           norm = m * e;
           norm = log2 (norm);
-          norm = norm * si->scale_alg;
-          S[(i << l) + j] = GUARD + (unsigned char) norm;
+          if (norm >= si->logmax_alg)
+            S[(i << l) + j] = 255;
+          else
+            {
+              norm = norm * si->scale_alg;
+              S[(i << l) + j] = GUARD + (unsigned char) norm;
+            }
         }
     }
 }
