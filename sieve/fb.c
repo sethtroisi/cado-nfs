@@ -168,7 +168,7 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
   if (verbose)
     gmp_fprintf (stderr, 
 		"# Making factor base for polynomial g(x) = %Zd * x + %Zd\n",
-		poly[0], poly[1]);
+		poly[1], poly[0]);
 
   for (p = 2 ; p <= bound; p = getprime (p))
     {
@@ -561,6 +561,16 @@ fb_read_addproj (const char *filename, const double log_scale,
           fb_cur->plog = fb_log (fb_cur->p, log_scale, 0.);
           fb_cur->nr_roots = 1;
           fb_cur->roots[0] = fb_cur->p;
+	  /* Compute invp */
+	  if (fb_cur->p % 2 != 0)
+	    {
+	      modulusul_t m;
+	      
+	      modul_initmod_ul (m, fb_cur->p);
+	      fb_cur->invp = - modul_invmodlong (modul_getmod_ul (m));
+	      modul_clearmod (m);
+	    }
+	  
           fb_new = fb_add_to (fb, &fbsize, &fballoc, allocblocksize, fb_cur);
           if (fb_new == NULL)
             {
