@@ -77,6 +77,12 @@ int main(int argc, char * argv[])
     uint64_t w;
 
 
+    /* print command line */
+    fprintf (stderr, "# %s.r%s", argv[0], VERSION);
+    for (i = 1; i < argc; i++)
+      fprintf (stderr, " %s", argv[i]);
+    fprintf (stderr, "\n");
+
     /* read all data in memory */
     alloc = 1024; x = malloc(alloc * sizeof(unsigned long));
     if (argc != 2) {
