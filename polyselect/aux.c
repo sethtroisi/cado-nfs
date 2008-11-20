@@ -1077,9 +1077,9 @@ mpz_poly_eval_si (mpz_t res, mpz_t *f, int d, long k)
     }
 }
 
-/* Return the smallest value of lognorm + alpha(f + k*(b*x-m)) for k small
-   enough such that the norm does not increase too much, and modify f[]
-   accordingly. */
+/* Return the smallest value of lognorm + alpha(f + (j*x+k)*(b*x-m)) for
+   j and k small enough such that the norm does not increase too much, and
+   modify f[] accordingly. */
 double
 rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
         long *jmin, long *kmin, int verbose)
@@ -1090,14 +1090,17 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
   double alpha0 = 0.0, e;
   unsigned long p;
 
-  /* first compute D(k) = disc(f + k*g, x) */
+  /* allocate D(k) = disc(f + (j*x+k)*g, x) */
   D = alloc_mpz_array (d + 1);
+
+  /* allocate v */
   mpz_init (v);
 
   /* compute range for k */
   rotate_bounds (f, d, b, m, &K0, &K1, &J0, &J1, verbose);
   ASSERT_ALWAYS(K0 <= 0 && 0 <= K1);
 
+  /* allocate sieving zone for computing alpha */
   A = (double*) malloc ((K1 + 1 - K0) * sizeof(double));
   j0 = k0 = 0; /* the current coefficients f[] correspond to f+(j*x+k)*g */
   
@@ -1209,8 +1212,8 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
        break;
     }
 
-  /* we now have f + k0*(bx-m) and we want f + kmin*(bx-m), thus we have
-     to add (kmin-k0)*(bx-m) */
+  /* we now have f + (j0*x+k0)*(bx-m) and we want f + (jmin*x+kmin)*(bx-m),
+     thus we have to add ((jmin-j0)*x+(kmin-k0)*(bx-m) */
   rotate_aux (f, b, m, k0, *kmin);
   rotate_aux1 (f, b, m, j0, *jmin);
 
@@ -1227,8 +1230,8 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
           if (*kmin >= 0)
             fprintf (stderr, "+");
         }
-      fprintf (stderr, "%ld: alpha improved from %1.2f to %1.2f\n", *kmin,
-               alpha0, best_alpha);
+      fprintf (stderr, "(%ld*x+%ld): alpha improved from %1.2f to %1.2f\n",
+              *jmin, *kmin, alpha0, best_alpha);
     }
 
   free (A);
