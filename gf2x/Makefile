@@ -111,19 +111,19 @@ factor: libgf2x.a
 
 .PHONY: do-tune-toom do-tune-fft
 
-recover-tune:
+recover-tune: update-thresholds
 	cat tunetoom.res tunefft.res | ./update-thresholds -o thresholds.h
 
-do-tune-toom: tunetoom
+do-tune-toom: tunetoom update-thresholds
 	./tunetoom -s 1.05 2048 -o tunetoom.res
 	./update-thresholds -o thresholds.h < tunetoom.res
 
-do-tune-fft: tunefft
+do-tune-fft: tunefft update-thresholds
 	./tunefft -s 1.02 8000000 -o tunefft.res
 	./update-thresholds -o thresholds.h < tunefft.res
 
 
-tune-all:
+tune-all: update-thresholds
 	$(MAKE) tune1
 	$(MAKE) do-tune-toom
 	$(MAKE) do-tune-fft
