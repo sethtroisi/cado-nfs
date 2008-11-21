@@ -84,6 +84,8 @@ int weight_sort_in_cells = 0;
 int rows_are_weight_sorted = 1;
 int cols_are_weight_sorted = 1;
 
+int replicate_rows_perm_for_columns = 0;
+int replicate_columns_perm_for_rows = 0;
 
 /* full path to the input matrix */
 const char * pristine_filename;
@@ -833,16 +835,75 @@ struct slice * shuffle_rtable(
 
     return slices;
 }
+
+struct slice * replicate_permutation(
+        const char * text MAYBE_UNUSED,
+        struct row * rt,
+        uint32_t n,
+        unsigned int ns,
+        const struct slice * reference,
+        unsigned int ns_reference)
+{
+    /* pick the dispatching from the reference array, and output a
+     * slicing which corresponds to the same permutation, but in the
+     * other dimension. 
+     */
+    ASSERT_ALWAYS(nr == nc);
+    struct slice * slices;
+    uint32_t i, j, jr, k, kr;
+    slices = alloc_slices(n, ns);
+
+    j = k = 0;
+    for(kr = 0 ; kr < ns_reference ; kr++) {
+        for(jr = 0 ; jr < reference[kr].nrows ; jr++) {
+            i = reference[kr].r[jr];
+            if (j == slices[k].nrows) {
+                k++;
+                j=0;
+            }
+            slices[k].r[j]=i;
+            assert(rt[i].i == i);
+            slices[k].coeffs+=rt[i].w;
+            j++;
+        }
+    }
+
+    for(i = 0 ; i < ns ; i++) {
+        printf("%s slice %d, span=%" PRIu32", weight=%"PRIu32"\n",
+                text,
+                i, slices[i].nrows,
+                slices[i].coeffs);
+    }
+
+    uint32_t i0 = 0;
+    for(i = 0 ; i < ns ; i++) {
+        slices[i].i0=i0;
+        i0 += slices[i].nrows;
+    }
+
+    return slices;
+}
+
 /* }}} */
 
 
 void compute_permutation()
 {
-    if (permute_rows) {
+    if (replicate_rows_perm_for_columns && permute_rows) {
         row_slices = shuffle_rtable("horizontal", row_table, nr, nhslices);
-    }
-    if (permute_cols) {
+        col_slices = replicate_permutation("vertical", col_table, nc,
+                nvslices, row_slices, nvslices);
+    } else if (replicate_columns_perm_for_rows && permute_cols) {
         col_slices = shuffle_rtable("vertical", col_table, nc, nvslices);
+        row_slices = replicate_permutation("horizontal", row_table, nr,
+                nhslices, col_slices, nvslices);
+    } else {
+        if (permute_rows) {
+            row_slices = shuffle_rtable("horizontal", row_table, nr, nhslices);
+        }
+        if (permute_cols) {
+            col_slices = shuffle_rtable("vertical", col_table, nc, nvslices);
+        }
     }
     if (nhslices == 1 && !permute_rows && permute_cols) {
         row_slices = alloc_slices(nr, nhslices);
@@ -1743,6 +1804,10 @@ int main(int argc, char * argv[])
             argv++,argc--;
             if (!argc) usage();
             nvslices = atoi(argv[0]);
+        } else if (strcmp(argv[0], "--permute-rows-like-columns") == 0) {
+            replicate_columns_perm_for_rows = 1;
+        } else if (strcmp(argv[0], "--permute-columns-like-rows") == 0) {
+            replicate_rows_perm_for_columns = 1;
         } else {
           fprintf (stderr, "Unknown option: %s\n", argv[0]);
             usage();
@@ -1771,10 +1836,19 @@ int main(int argc, char * argv[])
     }
 #endif
 
+    ASSERT_ALWAYS(replicate_columns_perm_for_rows + replicate_rows_perm_for_columns <= 1);
+
     weight_sort_in_cells = 1;
 
     permute_rows = weight_sort_in_cells || nhslices > 1;
     permute_cols = weight_sort_in_cells || nvslices > 1;
+
+    if (replicate_columns_perm_for_rows) {
+        permute_rows = permute_cols;
+    }
+    if (replicate_rows_perm_for_columns) {
+        permute_cols = permute_rows;
+    }
 
     if (!(permute_rows || permute_cols || weight_sort_in_cells)) {
         /* Then we've got absolutely nothing to do ! */
