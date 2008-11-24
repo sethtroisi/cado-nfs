@@ -769,7 +769,11 @@ unsigned char prev_logp = 0;
             bucket_new_logp (BA, fb->plog);
           }
 
-        if (p == si->q)
+        /* If we sieve for special-q's smaller than the algebraic factor
+           base bound, the prime p might equal the special-q prime q.
+           Note that usually, this doesn't happen on the rational side, since
+           the prime q cannot divide both sides, unless q divides Res(f,g). */
+        if (UNLIKELY(p == si->q))
           continue;
 
         for (nr = 0; nr < fb->nr_roots; ++nr) {
