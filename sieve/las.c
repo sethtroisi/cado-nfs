@@ -614,7 +614,10 @@ fb_root_in_qlattice (const fbprime_t p, const fbprime_t R,
       {
 	/* root in i,j-plane is projective */
 	if (UNLIKELY(!invmod(&u, p)))
-	  abort (); /* Should never happen! */
+          {
+            fprintf (stderr, "Error, root in (i,j)-plane is projective\n");
+            exit (1); /* Should never happen! */
+          }
 	add = p;
       }
     u *= v;
