@@ -758,7 +758,7 @@ unsigned char prev_logp = 0;
         prev_logp = fb->plog;
         bucket_new_logp (BA, fb->plog);
       }
-    while (fb->p != FB_END) {
+    for (;fb->p != FB_END; fb = fb_next (fb)) {
         unsigned char nr;
         fbprime_t p = fb->p;
         unsigned char logp = fb->plog;
@@ -768,6 +768,9 @@ unsigned char prev_logp = 0;
             prev_logp = fb->plog;
             bucket_new_logp (BA, fb->plog);
           }
+
+        if (p == si->q)
+          continue;
 
         for (nr = 0; nr < fb->nr_roots; ++nr) {
             const uint32_t I = si->I;
@@ -873,7 +876,6 @@ unsigned char prev_logp = 0;
             }
             __asm__("## Inner bucket sieving loop stops here!!!\n");
         }
-        fb = fb_next (fb); // cannot do fb++, due to variable size !
     }
 }
 
