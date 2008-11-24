@@ -49,10 +49,19 @@ CC?=gcc
 CXX?=g++
 SCONS_BINARY?=scons
 
-
+MY_CXXFLAGS=$(filter-out -std=c99,$(MY_CFLAGS))
 
 .c.o:
 	$(CC) $(MY_CFLAGS) $< -c -o $@
 
-default-target: all
+.cpp.o:
+	$(CXX) $(MY_CXXFLAGS) $< -c -o $@
 
+.deps/%.c.d: %.c
+	@mkdir -p .deps
+	$(CC) $(MY_CFLAGS) -M -MM -MG -MP -MF $@ -MT '$@ $(build_dir)$*.o' $<
+.deps/%.cpp.d: %.cpp
+	@mkdir -p .deps
+	$(CXX) $(MY_CXXFLAGS) -M -MM -MG -MP -MF $@ -MT '$@ $(build_dir)$*.o' $<
+
+default-target: all
