@@ -17,6 +17,7 @@
 #include <sys/stat.h>   /* mkdir */
 #include <sys/types.h>  /* mkdir */
 #include <unistd.h>     /* chdir */
+#include <time.h>       /* ctime */
 
 #include "readbuffer.h"
 #include "rowset_heap.h"
@@ -1065,8 +1066,9 @@ void write_permutation(const char * filename,
             if (already_sorted && i) {
                 ASSERT_ALWAYS(r->r[i] > r->r[i-1]);
             }
-            fprintf(f, "%" PRIu32 "\n", r->r[i]);
+            // fprintf(f, "%" PRIu32 "\n", r->r[i]);
         }
+        fwrite(r->r, sizeof(uint32_t), r->nrows, f);
     }
     fclose(f);
 }
@@ -1676,7 +1678,7 @@ cat /tmp/mat.h0.debug* | (n=0; while read x ; do echo "row $n" >&2 ; echo $x | (
 
 }
 
-void write_info_file()
+void write_info_file(int argc, char * argv[])
 {
     char * info;
     FILE * f;
@@ -1702,6 +1704,14 @@ void write_info_file()
                     final_file_info[i*nvslices+j]->s);
         }
     }
+    time_t t = time(NULL);
+    fprintf(f, "# %s", ctime(&t));
+    fprintf(f, "# revision " REV "\n");
+    fprintf(f, "#");
+    for(i = 0 ; i < (unsigned int) argc ; i++) {
+        fprintf(f, " %s", argv[i]);
+    }
+    fprintf(f, "\n");
     fclose(f);
     free(info);
 }
@@ -1721,6 +1731,9 @@ void cleanup()
 int main(int argc, char * argv[])
 {
     int rc;
+    int argc0 = argc;
+    char ** argv0 = argv;
+
     argv++,argc--;
     for(;argc;argv++,argc--) {
         if (strcmp(argv[0], "--subdir") == 0) {
@@ -1865,12 +1878,16 @@ int main(int argc, char * argv[])
     if (col_table) free(col_table);
 
     if (permute_rows) {
-        write_permutation("row_perm.txt",
-                row_slices, nhslices, rows_are_weight_sorted);
+        char * rp;
+        asprintf(&rp, "%s.row_perm", working_filename);
+        write_permutation(rp, row_slices, nhslices, rows_are_weight_sorted);
+        free(rp);
     }
     if (permute_cols) {
-        write_permutation("col_perm.txt",
-                col_slices, nvslices, cols_are_weight_sorted);
+        char * cp;
+        asprintf(&cp, "%s.col_perm", working_filename);
+        write_permutation(cp, col_slices, nvslices, cols_are_weight_sorted);
+        free(cp);
     }
 
     fileset work;
@@ -1897,7 +1914,7 @@ int main(int argc, char * argv[])
     fileset_clear(work);
 
     if (!legacy) {
-        write_info_file();
+        write_info_file(argc0, argv0);
     }
 
     fprintf(stderr, "Done\n");
