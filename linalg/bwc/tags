@@ -1,0 +1,351 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.7	//
+ABASE_H_	abase.h	2;"	d
+ABASE_U64_H_	abase-u64.h	2;"	d
+ARGS_H_	args.h	2;"	d
+ARGUMENTS_HPP_	arguments.hpp	2;"	d
+ASSIGN_ONCE	info_file.cpp	12;"	d	file:
+AUXFUNCS_H_	auxfuncs.h	2;"	d
+A_FLUSH_INTERVAL_DEFAULT	defaults.h	17;"	d
+CC	Makefile	/^CC:=$(CC) -Wl,-rpath,$(shell cat \/etc\/alternatives\/mpilibs64)$/;"	m
+CC	Makefile	/^CC:=$(shell $(CC) -showme | sed -e 's\/-I\/-isystem \/g')$/;"	m
+CC	Makefile	/^CC:=mpicc$/;"	m
+CHECK_INTERVAL_DEFAULT	defaults.h	10;"	d
+COMMON_ARGUMENTS_HPP_	common_arguments.hpp	2;"	d
+CONFIG_FILE_HPP_	config_file.hpp	2;"	d
+CONJUGATED_PERMUTATIONS	matmul_top.h	12;"	d
+CXX	Makefile	/^CXX:=$(CXX) -Wl,-rpath,$(shell cat \/etc\/alternatives\/mpilibs64)$/;"	m
+CXX	Makefile	/^CXX:=$(shell $(CXX) -showme | sed -e 's\/-I\/-isystem \/g')$/;"	m
+CXX	Makefile	/^CXX:=mpic++$/;"	m
+DEFAULTS_H_	defaults.h	2;"	d
+DOES_NOT_RETURN	auxfuncs.h	12;"	d
+DOES_NOT_RETURN	auxfuncs.h	14;"	d
+FAKEMPI_H_	fakempi.h	2;"	d
+FAKEPTHREAD_H_	fakepthread.h	2;"	d
+FILENAME_LENGTH	auxfuncs.c	17;"	d	file:
+FORMATTER_HPP_	fmt.hpp	2;"	d
+INFO_FILE_H_	info_file.h	2;"	d
+INTERSECTIONS_HPP_	intersections.hpp	2;"	d
+MALLOC_LOG_LIMIT	auxfuncs.c	18;"	d	file:
+MATMUL_H_	matmul.h	2;"	d
+MATMUL_TOP_H_	matmul_top.h	2;"	d
+MM	matmul.cpp	54;"	d	file:
+MPI_BYTE	fakempi.h	14;"	d
+MPI_Barrier	fakempi.h	/^static inline int MPI_Barrier (MPI_Comm x) { return 0; }$/;"	f
+MPI_Bcast	fakempi.h	/^static inline int MPI_Bcast( void *buffer, int count, MPI_Datatype datatype, int root, MPI_Comm comm){return 0;}$/;"	f
+MPI_COMM_WORLD	fakempi.h	17;"	d
+MPI_Comm	fakempi.h	/^typedef int MPI_Comm;$/;"	t
+MPI_Comm_dup	fakempi.h	/^static inline int MPI_Comm_dup (MPI_Comm y, MPI_Comm * x) { *x = y; return 0; }$/;"	f
+MPI_Comm_free	fakempi.h	/^static inline int MPI_Comm_free (MPI_Comm * x) { return 0; }$/;"	f
+MPI_Comm_rank	fakempi.h	/^static inline int MPI_Comm_rank(int s, int  * p) { *p=0; return 0;}$/;"	f
+MPI_Comm_size	fakempi.h	/^static inline int MPI_Comm_size(int s, int  * p) { *p=1; return 0;}$/;"	f
+MPI_Comm_split	fakempi.h	/^static inline int MPI_Comm_split (MPI_Comm x, int color, int key, MPI_Comm * y)$/;"	f
+MPI_Datatype	fakempi.h	/^typedef int MPI_Datatype;$/;"	t
+MPI_Finalize	fakempi.h	/^static inline int MPI_Finalize() {return 0;}$/;"	f
+MPI_Gatherv	fakempi.h	/^static inline int MPI_Gatherv(void * sendbuf, int sendcount,  MPI_Datatype st, void * recvbuf, int * recvcounts, int * displs, MPI_Datatype rt, int root, MPI_Comm x) {$/;"	f
+MPI_Init	fakempi.h	/^static inline int MPI_Init(int * argc, char *** argv) { return 0; }$/;"	f
+MPI_Initialized	fakempi.h	/^static inline int MPI_Initialized(int  * p) { *p=1; return 0; }$/;"	f
+MPI_Op	fakempi.h	/^typedef int MPI_Op;$/;"	t
+MPI_Op_create	fakempi.h	/^static inline int MPI_Op_create( MPI_User_function *function, int commute, MPI_Op *op ){return 0;}$/;"	f
+MPI_Recv	fakempi.h	/^static inline int MPI_Recv( void *buf, int count, MPI_Datatype datatype, int source,int tag, MPI_Comm comm, MPI_Status *status ){ abort(); return 0;}$/;"	f
+MPI_Reduce	fakempi.h	/^static inline int MPI_Reduce ( void *sendbuf, void *recvbuf, int count,MPI_Datatype datatype, MPI_Op op, int root, MPI_Comm comm )$/;"	f
+MPI_Scatterv	fakempi.h	/^static inline int MPI_Scatterv(void * sendbuf, int * sendcounts, int * displs,  MPI_Datatype st, void * recvbuf, int recvcount, MPI_Datatype rt, int root, MPI_Comm x) {$/;"	f
+MPI_Send	fakempi.h	/^static inline int MPI_Send( void *buf, int count, MPI_Datatype datatype, int dest,int tag, MPI_Comm comm ){return 0;}$/;"	f
+MPI_Status	fakempi.h	/^typedef int MPI_Status;$/;"	t
+MPI_UNSIGNED_LONG	fakempi.h	15;"	d
+MPI_User_function	fakempi.h	/^typedef int MPI_User_function;$/;"	t
+MY_PTHREAD_BARRIER_SERIAL_THREAD	fakepthread.h	34;"	d
+MY_PTHREAD_BARRIER_SERIAL_THREAD	select_mpi.h	20;"	d
+PARALLELIZING_INFO_H_	parallelizing_info.h	2;"	d
+PARSE_CHECK	preparegrid.c	29;"	d	file:
+PREP_ARGUMENTS_HPP_	prep_arguments.hpp	2;"	d
+SELECT_MPI_H_	select_mpi.h	2;"	d
+TOP	Makefile	/^TOP:=..\/..$/;"	m
+V_SAVE_INTERVAL_DEFAULT	defaults.h	25;"	d
+_GNU_SOURCE	preparegrid.c	13;"	d	file:
+_POSIX_C_SOURCE	matmul_top.cpp	1;"	d	file:
+_POSIX_C_SOURCE	parallelizing_info.c	1;"	d	file:
+_POSIX_C_SOURCE	prep.c	1;"	d	file:
+__STDC_FORMAT_MACROS	preparegrid.c	12;"	d	file:
+__STDC_LIMIT_MACROS	matmul.cpp	1;"	d	file:
+_my_malloc	auxfuncs.c	/^void * _my_malloc(size_t s,const char * fn,int lin)$/;"	f
+abaddmul	abase-u64.h	193;"	d
+abase	matmul_top.h	/^    abobj_ptr abase;$/;"	m	struct:matmul_top_data_s
+abase	prep.c	/^abobj_t abase;$/;"	v
+abase_u64_addmul	abase-u64.h	/^void abase_u64_addmul(abase_u64_obj_srcptr x MAYBE_UNUSED,$/;"	f
+abase_u64_base_type	abase-u64.h	/^typedef uint64_t abase_u64_base_type;$/;"	t
+abase_u64_bytes	abase-u64.h	/^abase_u64_bytes(abase_u64_obj_srcptr x MAYBE_UNUSED, unsigned int k)$/;"	f
+abase_u64_clear	abase-u64.h	/^abase_u64_base_type * abase_u64_clear(abase_u64_obj_srcptr x MAYBE_UNUSED,$/;"	f
+abase_u64_clearf	abase-u64.h	/^abase_u64_base_type * abase_u64_clearf(abase_u64_obj_srcptr x MAYBE_UNUSED,$/;"	f
+abase_u64_copy	abase-u64.h	/^void abase_u64_copy(abase_u64_obj_srcptr x MAYBE_UNUSED,$/;"	f
+abase_u64_init	abase-u64.h	/^abase_u64_base_type * abase_u64_init(abase_u64_obj_srcptr x MAYBE_UNUSED,$/;"	f
+abase_u64_initf	abase-u64.h	/^abase_u64_base_type * abase_u64_initf(abase_u64_obj_srcptr x MAYBE_UNUSED)$/;"	f
+abase_u64_is_zero	abase-u64.h	/^int abase_u64_is_zero(abase_u64_obj_srcptr x MAYBE_UNUSED,$/;"	f
+abase_u64_max_accumulate	abase-u64.h	38;"	d
+abase_u64_max_accumulate_wide	abase-u64.h	39;"	d
+abase_u64_nbits	abase-u64.h	31;"	d
+abase_u64_needs_scrap	abase-u64.h	36;"	d
+abase_u64_obj_clear	abase-u64.h	28;"	d
+abase_u64_obj_init	abase-u64.h	27;"	d
+abase_u64_obj_ptr	abase-u64.h	/^typedef void * abase_u64_obj_ptr;$/;"	t
+abase_u64_obj_srcptr	abase-u64.h	/^typedef const void * abase_u64_obj_srcptr;$/;"	t
+abase_u64_obj_t	abase-u64.h	/^typedef void * abase_u64_obj_t;$/;"	t
+abase_u64_offset	abase-u64.h	/^abase_u64_offset(abase_u64_obj_srcptr x MAYBE_UNUSED, unsigned int k)$/;"	f
+abase_u64_random	abase-u64.h	/^void abase_u64_random(abase_u64_obj_srcptr x MAYBE_UNUSED,$/;"	f
+abase_u64_read	abase-u64.h	/^abase_u64_read(abase_u64_obj_srcptr x MAYBE_UNUSED,$/;"	f
+abase_u64_repeat	abase-u64.h	35;"	d
+abase_u64_write	abase-u64.h	/^abase_u64_write(abase_u64_obj_srcptr x MAYBE_UNUSED,$/;"	f
+abase_u64_zero	abase-u64.h	/^void abase_u64_zero(abase_u64_obj_srcptr x MAYBE_UNUSED,$/;"	f
+abbytes	abase-u64.h	191;"	d
+abclear	abase-u64.h	185;"	d
+abclearf	abase-u64.h	186;"	d
+abcopy	abase-u64.h	192;"	d
+abinit	abase-u64.h	183;"	d
+abinitf	abase-u64.h	184;"	d
+abis_zero	abase-u64.h	188;"	d
+abmax_accumulate	abase-u64.h	181;"	d
+abmax_accumulate_wide	abase-u64.h	182;"	d
+abnbits	abase-u64.h	178;"	d
+abneeds_scrap	abase-u64.h	180;"	d
+abobj_clear	abase-u64.h	175;"	d
+abobj_init	abase-u64.h	174;"	d
+abobj_ptr	abase-u64.h	172;"	d
+abobj_srcptr	abase-u64.h	173;"	d
+abobj_t	abase-u64.h	171;"	d
+aboffset	abase-u64.h	190;"	d
+abrandom	abase-u64.h	189;"	d
+abread	abase-u64.h	194;"	d
+abrepeat	abase-u64.h	179;"	d
+abt	abase-u64.h	177;"	d
+abwrite	abase-u64.h	195;"	d
+abzero	abase-u64.h	187;"	d
+argc	arguments.hpp	/^	int argc;$/;"	m	class:argparser::situation
+argparse	args.cpp	/^int argparse(int * p_argc, char *** p_argv)$/;"	f
+argparser	arguments.hpp	/^namespace argparser {$/;"	n
+bar	parallelizing_info.h	/^    my_pthread_barrier_t * bar;$/;"	m	struct:pi_wiring
+bins	Makefile	/^bins:=build prep$/;"	m
+broadcast_across	matmul_top.cpp	/^broadcast_across(matmul_top_data_ptr mmt, int d)$/;"	f	file:
+build_objs	Makefile	/^build_objs:=build.o matmul.o ..\/readbuffer.o ..\/readmat.o$/;"	m
+can_print	args.cpp	/^int can_print;$/;"	v
+ceil_log2	auxfuncs.c	/^unsigned int ceil_log2(unsigned int d)$/;"	f
+cf	args.cpp	/^config_file_t cf;$/;"	v
+check	arguments.hpp	/^	bool check(const char * opt, int k) {$/;"	f	class:argparser::situation
+check	arguments.hpp	/^	bool check(std::ostream& o MAYBE_UNUSED) { return true; }$/;"	f	struct:no_arguments
+check	common_arguments.hpp	/^    bool check(std::ostream& o, bool can_print) {$/;"	f	struct:common_arguments
+check	prep_arguments.hpp	/^	bool check(std::ostream& o MAYBE_UNUSED, bool can_print MAYBE_UNUSED)$/;"	f	struct:prep_arguments
+check_interval	prep_arguments.hpp	/^        int check_interval;$/;"	m	struct:prep_arguments
+check_limit_requirements	auxfuncs.c	/^void check_limit_requirements(int talk MAYBE_UNUSED)$/;"	f
+checkpoints	common_arguments.hpp	/^    bool checkpoints;$/;"	m	struct:common_arguments
+common_arguments	common_arguments.hpp	/^    common_arguments() {$/;"	f	struct:common_arguments
+common_arguments	common_arguments.hpp	/^struct common_arguments {$/;"	s
+config_file_t	config_file.hpp	/^typedef std::map<std::string, std::string> config_file_t;$/;"	t
+core_ok	common_arguments.hpp	/^    bool core_ok;$/;"	m	struct:common_arguments
+coredump_limit	auxfuncs.c	/^void coredump_limit(int allow, int talk)$/;"	f
+count	intersections.hpp	/^    unsigned int count;$/;"	m	struct:isect_info
+data	matmul.cpp	/^    data_t data;$/;"	m	struct:matmul_data_s	file:
+data_offset	matmul.cpp	/^    size_t data_offset;$/;"	m	struct:slice_info	file:
+data_t	matmul.cpp	/^typedef vector<uint16_t> data_t;$/;"	t	file:
+di_avg	matmul.cpp	/^    double di_avg;$/;"	m	struct:slice_info	file:
+di_max	matmul.cpp	/^    int32_t di_max;$/;"	m	struct:slice_info	file:
+di_sdev	matmul.cpp	/^    double di_sdev;$/;"	m	struct:slice_info	file:
+die	auxfuncs.c	/^void die(const char * fmt, int signal, ... )$/;"	f
+dj_avg	matmul.cpp	/^    double dj_avg;$/;"	m	struct:slice_info	file:
+dj_sdev	matmul.cpp	/^    double dj_sdev;$/;"	m	struct:slice_info	file:
+doc	arguments.hpp	/^	void doc(std::ostream& o) const {$/;"	f	struct:no_arguments
+doc	common_arguments.hpp	/^    void doc(std::ostream& o) {$/;"	f	struct:common_arguments
+doc	prep_arguments.hpp	/^	void doc(std::ostream& o) {$/;"	f	struct:prep_arguments
+dslices_info	matmul.cpp	/^    vector<slice_info> dslices_info;$/;"	m	struct:matmul_data_s	file:
+eat	fmt.hpp	/^    void eat() {$/;"	f	class:fmt_match
+enforce_limit	auxfuncs.c	/^static void enforce_limit(int l, rlim_t min, const char * name)$/;"	f	file:
+eof	fmt.hpp	/^    bool eof() const {$/;"	f	class:fmt_match
+error	fmt.hpp	/^        inline error(const char s[], const std::string& v)$/;"	f	struct:fmt_base::error
+error	fmt.hpp	/^    struct error : public std::runtime_error {$/;"	s	struct:fmt_base
+eternal_sleep	auxfuncs.c	/^void eternal_sleep(void)$/;"	f
+exist	auxfuncs.c	/^int exist(const char * s)$/;"	f
+fcopy	auxfuncs.c	/^long fcopy(FILE *dst, FILE *src, size_t kamount)$/;"	f
+fences	matmul_top.h	/^    unsigned int * fences;$/;"	m	struct:mmt_wiring
+filename	matmul_top.h	/^    char * filename;$/;"	m	struct:matmul_top_data_s
+finish	args.cpp	/^int finish()$/;"	f
+fmt	fmt.hpp	/^    fmt(const char * c, int p = 0) : s(c), pos(p) {}$/;"	f	class:fmt
+fmt	fmt.hpp	/^    fmt(const std::string& c, int p = 0) : s(c), pos(p) {}$/;"	f	class:fmt
+fmt	fmt.hpp	/^class fmt : public fmt_base {$/;"	c
+fmt_base	fmt.hpp	/^struct fmt_base {$/;"	s
+fmt_match	fmt.hpp	/^    fmt_match(const fmt& s, const std::string& t)$/;"	f	class:fmt_match
+fmt_match	fmt.hpp	/^    fmt_match(const std::string& s, const std::string& t)$/;"	f	class:fmt_match
+fmt_match	fmt.hpp	/^class fmt_match : public fmt_base {$/;"	c
+get_config_value	config_file.hpp	/^bool get_config_value(config_file_t const & cf, const char * k, T & x)$/;"	f
+get_config_value	config_file.hpp	/^bool get_config_value(config_file_t const & cf, std::string& k, T & x)$/;"	f
+header	preparegrid.c	/^char * header \/* = NULL *\/;$/;"	v
+hello	parallelizing_info.c	/^void hello(parallelizing_info_ptr pi)$/;"	f
+i0	matmul_top.h	/^    unsigned int i0;$/;"	m	struct:mmt_wiring
+i1	matmul_top.h	/^    unsigned int i1;$/;"	m	struct:mmt_wiring
+intersect	intersections.cpp	/^intersect(unsigned int * fences, unsigned int x0, unsigned int x1)$/;"	f
+interval	prep.c	/^int interval=1000;$/;"	v
+isect_info	intersections.hpp	/^struct isect_info {$/;"	s
+jcommon	parallelizing_info.h	/^    unsigned int jcommon;       \/\/ was j$/;"	m	struct:pi_wiring
+jrank	parallelizing_info.h	/^    unsigned int jrank; \/\/ was rank$/;"	m	struct:pi_wiring
+k	intersections.hpp	/^    int k;$/;"	m	struct:isect_info
+load_vector	matmul_top.cpp	/^void load_vector(matmul_top_data_ptr mmt, int d, unsigned int index, unsigned int iter)$/;"	f
+m	args.cpp	/^unsigned int m, n;$/;"	v
+m	parallelizing_info.h	/^    struct pi_wiring m[1];$/;"	m	struct:parallelizing_info_s	typeref:struct:parallelizing_info_s::pi_wiring
+m	prep.c	/^int m,n;$/;"	v
+m	prep_arguments.hpp	/^	int m, n;$/;"	m	struct:prep_arguments
+main	build.c	/^int main(int argc, char * argv[])$/;"	f
+main	prep.c	/^int main(int argc, char * argv[])$/;"	f
+main	preparegrid.c	/^main (int argc, char *argv[])$/;"	f
+matmul	matmul.cpp	/^void matmul(void * mm, abt * dst, abt const * src)$/;"	f
+matmul_build	matmul.cpp	/^void * matmul_build(abobj_ptr xx, const char * filename)$/;"	f
+matmul_clear	matmul.cpp	/^void matmul_clear(matmul_ptr mm)$/;"	f
+matmul_data_s	matmul.cpp	/^struct matmul_data_s {$/;"	s	file:
+matmul_ptr	matmul.h	/^typedef void * matmul_ptr;$/;"	t
+matmul_reload_cache	matmul.cpp	/^void * matmul_reload_cache(abobj_ptr xx, const char * filename)$/;"	f
+matmul_report	matmul.cpp	/^void matmul_report(void * mm MAYBE_UNUSED) {$/;"	f
+matmul_save_cache	matmul.cpp	/^void matmul_save_cache(void * mm, const char * filename)$/;"	f
+matmul_t	matmul.h	/^typedef void * matmul_t;$/;"	t
+matmul_top_clear	matmul_top.cpp	/^void matmul_top_clear(matmul_top_data_ptr mmt, abobj_ptr abase MAYBE_UNUSED)$/;"	f
+matmul_top_data	matmul_top.h	/^typedef struct matmul_top_data_s matmul_top_data[1];$/;"	t	typeref:struct:matmul_top_data_s
+matmul_top_data_ptr	matmul_top.h	/^typedef struct matmul_top_data_s * matmul_top_data_ptr;$/;"	t	typeref:struct:matmul_top_data_s
+matmul_top_data_s	matmul_top.h	/^struct matmul_top_data_s {$/;"	s
+matmul_top_data_srcptr	matmul_top.h	/^typedef struct matmul_top_data_s const * matmul_top_data_srcptr;$/;"	t
+matmul_top_fill_random	matmul_top.cpp	/^void matmul_top_fill_random(matmul_top_data_ptr mmt, int d)$/;"	f
+matmul_top_init	matmul_top.cpp	/^void matmul_top_init(matmul_top_data_ptr mmt,$/;"	f
+matmul_top_read_matrix	matmul_top.cpp	/^void matmul_top_read_matrix(matmul_top_data_ptr mmt)$/;"	f
+matrix_filename	prep.c	/^char matrix_filename[FILENAME_MAX];$/;"	v
+mine	args.cpp	/^prep_arguments mine;$/;"	v
+mkfname	auxfuncs.c	/^int mkfname(char *s, const char *fmt, ...)$/;"	f
+mm	matmul_top.h	/^    matmul_ptr mm;$/;"	m	struct:matmul_top_data_s
+mmt_wiring	matmul_top.h	/^struct mmt_wiring {$/;"	s
+mx	parallelizing_info.h	/^    my_pthread_mutex_t * mx;$/;"	m	struct:pi_wiring
+my_pthread_attr_t	fakepthread.h	/^typedef int my_pthread_attr_t;$/;"	t
+my_pthread_barrier_destroy	fakepthread.h	/^static inline int my_pthread_barrier_destroy(my_pthread_barrier_t * b MAYBE_UNUSED)$/;"	f
+my_pthread_barrier_destroy	select_mpi.h	22;"	d
+my_pthread_barrier_init	fakepthread.h	/^static inline int my_pthread_barrier_init(my_pthread_barrier_t * \/* restrict *\/ b MAYBE_UNUSED, const my_pthread_barrierattr_t * \/* restrict *\/ attr MAYBE_UNUSED, unsigned int c)$/;"	f
+my_pthread_barrier_init	select_mpi.h	19;"	d
+my_pthread_barrier_t	fakepthread.h	/^typedef int my_pthread_barrier_t;$/;"	t
+my_pthread_barrier_t	select_mpi.h	18;"	d
+my_pthread_barrier_wait	fakepthread.h	/^static inline int my_pthread_barrier_wait(my_pthread_barrier_t * b MAYBE_UNUSED)$/;"	f
+my_pthread_barrier_wait	select_mpi.h	21;"	d
+my_pthread_barrierattr_t	fakepthread.h	/^typedef int my_pthread_barrierattr_t;$/;"	t
+my_pthread_create	fakepthread.h	/^static inline int my_pthread_create(my_pthread_t * \/* restrict *\/ t, const my_pthread_attr_t * \/* restrict *\/ a MAYBE_UNUSED, void *(*s)(void*), void * arg)$/;"	f
+my_pthread_create	select_mpi.h	16;"	d
+my_pthread_join	fakepthread.h	/^static inline int my_pthread_join(my_pthread_t t, void ** vp)$/;"	f
+my_pthread_join	select_mpi.h	17;"	d
+my_pthread_mutex_destroy	fakepthread.h	/^static inline int my_pthread_mutex_destroy(my_pthread_mutex_t * m MAYBE_UNUSED)$/;"	f
+my_pthread_mutex_destroy	select_mpi.h	28;"	d
+my_pthread_mutex_init	fakepthread.h	/^static inline int my_pthread_mutex_init(my_pthread_mutex_t * \/* restrict *\/ m MAYBE_UNUSED, const my_pthread_mutexattr_t * \/* restrict *\/ attr MAYBE_UNUSED)$/;"	f
+my_pthread_mutex_init	select_mpi.h	24;"	d
+my_pthread_mutex_lock	fakepthread.h	/^static inline int my_pthread_mutex_lock(my_pthread_mutex_t * m MAYBE_UNUSED)$/;"	f
+my_pthread_mutex_lock	select_mpi.h	25;"	d
+my_pthread_mutex_t	fakepthread.h	/^typedef int my_pthread_mutex_t;$/;"	t
+my_pthread_mutex_t	select_mpi.h	23;"	d
+my_pthread_mutex_trylock	fakepthread.h	/^static inline int my_pthread_mutex_trylock(my_pthread_mutex_t * m MAYBE_UNUSED)$/;"	f
+my_pthread_mutex_trylock	select_mpi.h	27;"	d
+my_pthread_mutex_unlock	fakepthread.h	/^static inline int my_pthread_mutex_unlock(my_pthread_mutex_t * m MAYBE_UNUSED)$/;"	f
+my_pthread_mutex_unlock	select_mpi.h	26;"	d
+my_pthread_mutexattr_t	fakepthread.h	/^typedef int my_pthread_mutexattr_t;$/;"	t
+my_pthread_t	fakepthread.h	/^typedef void * my_pthread_t;$/;"	t
+my_pthread_t	select_mpi.h	15;"	d
+mymalloc	auxfuncs.h	21;"	d
+n	args.cpp	/^unsigned int m, n;$/;"	v
+n	matmul_top.h	/^    unsigned int n;$/;"	m	struct:mmt_wiring
+n	prep.c	/^int m,n;$/;"	v
+n	prep_arguments.hpp	/^	int m, n;$/;"	m	struct:prep_arguments
+nc	preparegrid.c	/^uint32_t nc;$/;"	v
+ncoeffs	matmul.cpp	/^    unsigned int ncoeffs;$/;"	m	struct:slice_info	file:
+ncoeffs	matmul_top.h	/^    unsigned int ncoeffs;$/;"	m	struct:matmul_top_data_s
+ncoeffs_total	matmul_top.h	/^    unsigned int ncoeffs_total;$/;"	m	struct:matmul_top_data_s
+ncores	parallelizing_info.h	/^    unsigned int ncores;$/;"	m	struct:pi_wiring
+njobs	parallelizing_info.h	/^    unsigned int njobs;$/;"	m	struct:pi_wiring
+no_arguments	arguments.hpp	/^struct no_arguments {$/;"	s
+npasses	matmul.cpp	/^    unsigned int npasses;$/;"	m	struct:slice_info	file:
+nr	preparegrid.c	/^uint32_t nr;$/;"	v
+nrows	matmul.cpp	/^    unsigned int nrows;$/;"	m	struct:slice_info	file:
+nslices	parallelizing_info.h	/^    unsigned int nslices;$/;"	m	struct:pi_wiring
+offset_me	intersections.hpp	/^    unsigned int offset_me;$/;"	m	struct:isect_info
+offset_there	intersections.hpp	/^    unsigned int offset_there;$/;"	m	struct:isect_info
+ok	fmt.hpp	/^    bool ok;$/;"	m	class:fmt_match
+operator !=	arguments.hpp	/^	bool operator!=(const char *x) const { return !operator==(x); }$/;"	f	class:argparser::situation
+operator !=	arguments.hpp	/^	bool operator!=(std::string & x) const { return !operator==(x); }$/;"	f	class:argparser::situation
+operator %	fmt.hpp	/^        fmt operator%(const T& arg) const {$/;"	f	class:fmt
+operator %	fmt.hpp	/^        fmt_match operator%(T& arg) {$/;"	f	class:fmt_match
+operator ()	arguments.hpp	/^	bool operator()(const char * opt, T & var) {$/;"	f	class:argparser::situation
+operator ()	arguments.hpp	/^	bool operator()(const char * opt, bool & var) {$/;"	f	class:argparser::situation
+operator ()	arguments.hpp	/^	bool operator()(const char * opt, char const * & var) {$/;"	f	class:argparser::situation
+operator ()	arguments.hpp	/^	bool operator()(const char * opt, std::string & var) {$/;"	f	class:argparser::situation
+operator ()	arguments.hpp	/^	bool operator()(const char * opt, std::vector<T> & var) {$/;"	f	class:argparser::situation
+operator ++	arguments.hpp	/^	situation operator++(int) { situation t = *this; ++(*this); return t; }$/;"	f	class:argparser::situation
+operator ++	arguments.hpp	/^	situation& operator++() { argc--, p++; return *this; }$/;"	f	class:argparser::situation
+operator <<	fmt.hpp	/^    inline std::ostream& operator<<(std::ostream& o, const fmt& f)$/;"	f	namespace:std
+operator ==	arguments.hpp	/^	bool operator==(const char *x) const { return std::string(x) == p[0]; }$/;"	f	class:argparser::situation
+operator ==	arguments.hpp	/^	bool operator==(std::string & x) const { return x == p[0]; }$/;"	f	class:argparser::situation
+operator bool	fmt.hpp	/^    operator bool() const { return ok; }$/;"	f	class:fmt_match
+operator const char *	arguments.hpp	/^	operator const char *() const {$/;"	f	class:argparser::situation
+operator std::string	fmt.hpp	/^    operator std::string() const {$/;"	f	class:fmt
+p	args.cpp	/^mpz_class p;$/;"	v
+p	arguments.hpp	/^	char ** p;$/;"	m	class:argparser::situation
+p	prep.c	/^mpz_t p;$/;"	v
+p	prep_arguments.hpp	/^        mpz_class p;$/;"	m	struct:prep_arguments
+pals	parallelizing_info.h	/^    MPI_Comm pals;$/;"	m	struct:pi_wiring
+parallelizing_info	parallelizing_info.h	/^typedef struct parallelizing_info_s parallelizing_info[1];$/;"	t	typeref:struct:parallelizing_info_s
+parallelizing_info_ptr	parallelizing_info.h	/^typedef struct parallelizing_info_s * parallelizing_info_ptr;$/;"	t	typeref:struct:parallelizing_info_s
+parallelizing_info_s	parallelizing_info.h	/^struct parallelizing_info_s {$/;"	s
+parallelizing_info_srcptr	parallelizing_info.h	/^typedef const struct parallelizing_info_s * parallelizing_info_srcptr;$/;"	t	typeref:struct:parallelizing_info_s
+params_file	args.cpp	/^const char * params_file = "bw.cfg";$/;"	v
+parse	arguments.hpp	/^	bool parse(argparser::situation& s MAYBE_UNUSED) { return false; }$/;"	f	struct:no_arguments
+parse	common_arguments.hpp	/^    bool parse(argparser::situation& s) {$/;"	f	struct:common_arguments
+parse	prep_arguments.hpp	/^	bool parse(argparser::situation& s) {$/;"	f	struct:prep_arguments
+pi	matmul_top.h	/^    parallelizing_info_ptr pi;$/;"	m	struct:matmul_top_data_s
+pi_go	parallelizing_info.c	/^void pi_go(void *(*fcn)(parallelizing_info_ptr),$/;"	f
+pi_wiring	parallelizing_info.h	/^struct pi_wiring {$/;"	s
+pi_wiring_destroy_pthread_things	parallelizing_info.c	/^static inline void pi_wiring_destroy_pthread_things(struct pi_wiring * w)$/;"	f	file:
+pi_wiring_init_pthread_things	parallelizing_info.c	/^static inline void pi_wiring_init_pthread_things(struct pi_wiring * w)$/;"	f	file:
+pos	fmt.hpp	/^    int pos;$/;"	m	class:fmt
+prep_arguments	prep_arguments.hpp	/^	prep_arguments() :$/;"	f	struct:prep_arguments
+prep_arguments	prep_arguments.hpp	/^struct prep_arguments {$/;"	s
+prep_objs	Makefile	/^prep_objs:=prep.o intersections.o matmul.o	\\$/;"	m
+process_arguments	arguments.hpp	/^void process_arguments(int argc, char * argv [], common& com, special& spe,$/;"	f
+program	prep.c	/^void * program(parallelizing_info_ptr pi)$/;"	f
+pthread_callee_t	parallelizing_info.c	/^typedef void * (*pthread_callee_t)(void*);$/;"	t	file:
+push	matmul.cpp	/^    void push(uint32_t x)$/;"	f	struct:matmul_data_s
+read_config_file	config_file.cpp	/^void read_config_file(config_file_t& cf, std::string const& f, bool mandatory)$/;"	f
+read_info_file	info_file.cpp	/^void read_info_file(matmul_top_data_ptr mmt, const char * filename)$/;"	f
+read_matrix	preparegrid.c	/^void read_matrix(const char * filename)$/;"	f
+s	fmt.hpp	/^    std::string s;      \/* format string *\/$/;"	m	class:fmt_match
+s	fmt.hpp	/^    std::string s;$/;"	m	class:fmt
+save_vector	matmul_top.cpp	/^void save_vector(matmul_top_data_ptr mmt, int d, unsigned int index, unsigned int iter)$/;"	f
+say_hello	parallelizing_info.c	/^void say_hello(struct pi_wiring * w, parallelizing_info_ptr pi, const char * ctx)$/;"	f
+seed	prep_arguments.hpp	/^	unsigned int seed;$/;"	m	struct:prep_arguments
+serializer	parallelizing_info.c	/^int serializer(struct pi_wiring * w)$/;"	f
+set_config_value	config_file.hpp	/^void set_config_value(config_file_t & cf, const char * k, T const & x)$/;"	f
+set_config_value	config_file.hpp	/^void set_config_value(config_file_t & cf, std::string& k, T const & x)$/;"	f
+situation	arguments.hpp	/^class situation {$/;"	c	namespace:argparser
+skip_lim_check	common_arguments.hpp	/^    bool skip_lim_check;$/;"	m	struct:common_arguments
+slice_info	matmul.cpp	/^struct slice_info {$/;"	s	file:
+snprintf	auxfuncs.c	/^int snprintf(char * s, size_t n, const char * fmt, ...)$/;"	f
+spent_time	matmul.cpp	/^    double spent_time;$/;"	m	struct:slice_info	file:
+spos	fmt.hpp	/^    std::string::size_type spos;$/;"	m	class:fmt_match
+std	fmt.hpp	/^namespace std {$/;"	n
+subdir	common_arguments.hpp	/^    std::string subdir;$/;"	m	struct:common_arguments
+t	fmt.hpp	/^    std::string t;      \/* text string *\/$/;"	m	class:fmt_match
+tcommon	parallelizing_info.h	/^    unsigned int tcommon;$/;"	m	struct:pi_wiring
+tpos	fmt.hpp	/^    std::string::size_type tpos;$/;"	m	class:fmt_match
+trank	parallelizing_info.h	/^    unsigned int trank; \/\/ was c$/;"	m	struct:pi_wiring
+trigger	arguments.hpp	/^	void trigger() const {}$/;"	f	struct:no_arguments
+trigger	common_arguments.hpp	/^    void trigger(bool can_print) const {$/;"	f	struct:common_arguments
+trigger	prep_arguments.hpp	/^	void trigger(bool can_print MAYBE_UNUSED) const { }$/;"	f	struct:prep_arguments
+update_wiring	info_file.cpp	/^void update_wiring(matmul_top_data_ptr mmt, unsigned int d)$/;"	f
+usage	prep.c	/^void usage()$/;"	f
+usage	preparegrid.c	/^void usage()$/;"	f
+v	matmul_top.h	/^    abt * v;$/;"	m	struct:mmt_wiring
+verbose	prep.c	/^int verbose=0;$/;"	v
+vsnprintf	auxfuncs.c	/^int vsnprintf(char * s, size_t n, const char * fmt, va_list ap)$/;"	f
+wr	matmul_top.h	/^    struct mmt_wiring wr[2][1];$/;"	m	struct:matmul_top_data_s	typeref:struct:matmul_top_data_s::mmt_wiring
+wr	parallelizing_info.h	/^    struct pi_wiring wr[2][1];$/;"	m	struct:parallelizing_info_s	typeref:struct:parallelizing_info_s::pi_wiring
+write_config_file	config_file.cpp	/^void write_config_file(config_file_t const & cf, std::string const& f)$/;"	f
+x	matmul_top.h	/^    struct isect_info * x;$/;"	m	struct:mmt_wiring	typeref:struct:mmt_wiring::isect_info
+xab	matmul.cpp	/^    abobj_t xab;$/;"	m	struct:matmul_data_s	file:
+xlen	matmul_top.h	/^    unsigned int xlen;$/;"	m	struct:mmt_wiring
