@@ -798,64 +798,6 @@ get_alpha (mpz_t *f, const int d, unsigned long B)
 
 /**************************** rotation ***************************************/
 
-/* D <- |discriminant (f)| = |resultant(f,diff(f,x))/lc(f)| */
-void
-discriminant (mpz_t D, mpz_t *f0, const int d)
-{
-  mpz_t *f, *g, num, den;
-  int df, dg, i, s;
-
-  f = alloc_mpz_array (d + 1);
-  g = alloc_mpz_array (d);
-  copy_poly (f, f0, d);
-  df = d;
-  diff_poly (g, f0, d);
-  dg = d - 1;
-  mpz_init_set_ui (num, 1);
-  mpz_init_set_ui (den, 1);
-  while (dg > 0)
-    {
-      s = df;
-      while (df >= dg)
-	{
-	  /* f <- f * lc(g), except f[df] since we'll divide it afterwards */
-	  for (i = 0; i < df; i++)
-	    mpz_mul (f[i], f[i], g[dg]);
-	  s -= dg;
-	  for (i = 0; i < dg; i++)
-	    mpz_submul (f[i + df - dg], g[i], f[df]);
-	  df --;
-	  /* normalize f */
-	  while (df > 0 && mpz_cmp_ui (f[df], 0) == 0)
-	    df --;
-	}
-      /* den <- den * lc(g)^deg(f) */
-      s -= df;
-      if (s > 0)
-	for (i = 0; i < s; i++)
-	  mpz_mul (num, num, g[dg]);
-      else
-	for (i = 0; i < -s; i++)
-	  mpz_mul (den, den, g[dg]);
-      /* swap f and g */
-      for (i = 0; i <= dg; i++)
-	mpz_swap (f[i], g[i]);
-      i = df;
-      df = dg;
-      dg = i;
-    }
-  /* num/den*g^deg(f) */
-  mpz_pow_ui (g[0], g[0], df);
-  mpz_mul (g[0], g[0], num);
-  mpz_divexact (g[0], g[0], den);
-  /* divide by lc(f0) to get the discriminant */
-  mpz_divexact (D, g[0], f0[d]);
-  mpz_clear (num);
-  mpz_clear (den);
-  clear_mpz_array (f, d + 1);
-  clear_mpz_array (g, d);
-}
-
 /* D <- discriminant (f+k*g), which has degree d */
 static void
 discriminant_k (mpz_t *D, mpz_t *f, int d, mpz_t m, mpz_t b)

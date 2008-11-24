@@ -4,7 +4,7 @@ include $(TOP)/Makefile.common
 # All parts of libutils.
 names:=	cado_poly relation timing plain_poly \
 	getprime mod_ul modredc_ul modredc_15ul modul_poly gmp_aux \
-	fpoly rootfinder params gcd_int64 gcd_uint64
+	fpoly rootfinder params gcd_int64 gcd_uint64 discriminant
 
 src:=$(patsubst %,%.c,$(names))
 obj:=$(patsubst %,%.o,$(names))
@@ -23,11 +23,11 @@ check_rels: check_rels.o
 
 check_rels: libutils.a
 
-mod_ul.o: mod_ul.h mod_ul_common.c
+mod_ul.o: mod_ul.h mod_ul_common.c ularith.h
 
-modredc_ul.o: modredc_ul.h mod_ul_common.c
+modredc_ul.o: modredc_ul.h mod_ul_common.c ularith.h
 
-modredc_15ul.o: modredc_15ul.h
+modredc_15ul.o: modredc_15ul.h ularith.h
 
 libutils.a: $(obj)
 	ar r libutils.a $(obj)
