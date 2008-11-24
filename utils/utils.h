@@ -25,5 +25,6 @@
 #include "params.h"
 #include "gcd_int64.h"
 #include "gcd_uint64.h"
+#include "random_generation.h"
 
 #endif	/* CADO_UTILS_H_ */

@@ -47,7 +47,6 @@ def get_reference(sbound,p):
             if (valuation(r[r.degree()],p)>=1):
                 s -= -p/(p+1)*a
             c=alpha_p_affine_nodisc(r,p)-a
-            # simple[k,l]=s
             complete[k,l]=c
     return complete
 

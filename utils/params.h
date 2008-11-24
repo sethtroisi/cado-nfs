@@ -64,6 +64,8 @@ extern int param_list_parse_ulong(param_list, const char *, unsigned long *);
 extern int param_list_parse_double(param_list, const char *, double *);
 extern int param_list_parse_string(param_list, const char *, char *, size_t);
 extern int param_list_parse_mpz(param_list, const char *, mpz_ptr);
+extern int param_list_parse_intxint(param_list pl, const char * key, int * r);
+extern void param_list_save(param_list pl, const char * filename);
 
 // tells whether everything has been consumed. Otherwise, return the key
 // of the first unconsumed argument.

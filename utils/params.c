@@ -3,6 +3,7 @@
 #include <string.h>
 #include <ctype.h>              /* isdigit isspace */
 #include <limits.h>             /* INT_MIN INT_MAX */
+#include <errno.h>
 
 #include "params.h"
 #include "macros.h"
@@ -355,6 +356,38 @@ int param_list_parse_int(param_list pl, const char * key, int * r)
     return 1;
 }
 
+int param_list_parse_intxint(param_list pl, const char * key, int * r)
+{
+    int v = assoc(pl, key);
+    if (v < 0)
+        return 0;
+    char * value = pl->p[v]->value;
+    pl->p[v]->parsed=1;
+    char * end;
+    long res[2];
+    res[0] = strtol(value, &end, 0);
+    if (*end != 'x') {
+        fprintf(stderr, "Parse error: parameter for key %s"
+                " must match %%dx%%d; got %s\n",
+                key, pl->p[v]->value);
+        exit(1);
+    }
+    value = end + 1;
+    res[1] = strtol(value, &end, 0);
+    if (*end != '\0') {
+        fprintf(stderr, "Parse error: parameter for key %s"
+                " must match %%dx%%d; got %s\n",
+                key, pl->p[v]->value);
+        exit(1);
+    }
+    if (r) {
+        r[0] = res[0];
+        r[1] = res[1];
+    }
+    return 1;
+}
+
+
 int param_list_parse_ulong(param_list pl, const char * key, unsigned long * r)
 {
     int v = assoc(pl, key);
@@ -487,4 +520,16 @@ void param_list_display(param_list pl, FILE *f)
     for(unsigned int i = 0 ; i < pl->size ; i++) {
         fprintf(f,"%s=%s\n", pl->p[i]->key, pl->p[i]->value);
     }
+}
+
+void param_list_save(param_list pl, const char * filename)
+{
+    FILE * f = fopen(filename, "w");
+    if (f == NULL) {
+        fprintf(stderr, "fopen(%s): %s\n", filename, strerror(errno));
+        exit(1);
+    }
+
+    param_list_display(pl, f);
+    fclose(f);
 }
