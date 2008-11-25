@@ -41,7 +41,7 @@ double get_alpha (mpz_t*, const int, unsigned long);
 void discriminant (mpz_t, mpz_t*, const int);
 long rotate_aux (mpz_t *f, mpz_t b, mpz_t m, long k0, long k);
 long rotate_aux1 (mpz_t *f, mpz_t b, mpz_t m, long j0, long j);
-double rotate (mpz_t*, int, unsigned long, mpz_t, mpz_t, long*, long*, int);
+double rotate (mpz_t*, int, unsigned long, mpz_t, mpz_t, long*, long*, int,int);
 void print_poly (FILE*, cado_poly, int, char**, double, int);
 long translate (mpz_t*, int, mpz_t*, mpz_t, mpz_t, int);
 void optimize (mpz_t*, int, mpz_t*, int);

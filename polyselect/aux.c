@@ -1021,16 +1021,33 @@ mpz_poly_eval_si (mpz_t res, mpz_t *f, int d, long k)
 
 /* Return the smallest value of lognorm + alpha(f + (j*x+k)*(b*x-m)) for
    j and k small enough such that the norm does not increase too much, and
-   modify f[] accordingly. */
+   modify f[] accordingly. 
+   The parameter "multi" means that several polynomials are wanted. If
+   multi=0 or 1, then only 1 polynomial is returned (classical behavior).
+   Otherwise, multi polynomials are stored in jmin and kmin (that
+   must be initialized arrays with at least multi elements). This option
+   might be useful for Coppersmith variant (a.k.a. MNFS). 
+   In the multi case, the smallest of the returned values of lognorm + alpha
+   is returned (and f[] accordingly).
+   */
 double
 rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
-        long *jmin, long *kmin, int verbose)
+        long *jmin, long *kmin, int multi, int verbose)
 {
   mpz_t *D, v;
   long K0, K1, J0, J1, k0, k, i, j, j0, l;
   double *A, alpha, lognorm, best_alpha = DBL_MAX, best_lognorm = DBL_MAX;
   double alpha0 = 0.0, e;
   unsigned long p;
+  double *best_E = NULL; /* set to NULL to avoid warning... */
+
+
+  /* allocate best_E, to store the best (lognorm+alpha) in multi mode */
+  if (multi > 1) {
+      best_E = (double *)malloc(multi*sizeof(double));
+      for (i = 0; i < multi; ++i)
+          best_E[i] = DBL_MAX;
+  }
 
   /* allocate D(k) = disc(f + (j*x+k)*g, x) */
   D = alloc_mpz_array (d + 1);
@@ -1137,13 +1154,36 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
           /* translate from k0 to k */
           k0 = rotate_aux (f, b, m, k0, k);
           lognorm = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
-          if (lognorm + alpha < best_lognorm + best_alpha)
-            {
-              best_lognorm = lognorm;
-              best_alpha = alpha;
-              *kmin = k;
-              *jmin = j;
-            }
+          if (multi <= 1) {
+              if (lognorm + alpha < best_lognorm + best_alpha) {
+                  best_lognorm = lognorm;
+                  best_alpha = alpha;
+                  *kmin = k;
+                  *jmin = j;
+              } 
+          } else { /* multi mode */
+              /* Rem: best_lognorm + best_alpha is the worse of the
+                 preselected */
+              double newE = lognorm + alpha;
+              if (newE < best_E[multi-1]) {
+                  int ii;
+                  /* find position; assume list of preselected is sorted */
+                  for (ii = 0; ii < multi; ++ii) {
+                      if (best_E[ii] > newE)
+                          break;
+                  }
+                  ASSERT_ALWAYS(ii < multi); 
+                  /* insert */
+                  for (i = multi - 1; i > ii; --i) {
+                      kmin[i] = kmin[i-1];
+                      jmin[i] = jmin[i-1];
+                      best_E[i] = best_E[i-1];
+                  }
+                  kmin[ii] = k;
+                  jmin[ii] = j;
+                  best_E[ii] = newE;
+              }
+          }
         }
     }
 
@@ -1156,10 +1196,11 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
 
   /* we now have f + (j0*x+k0)*(bx-m) and we want f + (jmin*x+kmin)*(bx-m),
      thus we have to add ((jmin-j0)*x+(kmin-k0)*(bx-m) */
+  /* if you are in multi-mode, we use the best polynomial */
   rotate_aux (f, b, m, k0, *kmin);
   rotate_aux1 (f, b, m, j0, *jmin);
 
-  if (verbose)
+  if (verbose && (multi <= 1))
     {
       fprintf (stderr, "# Rotate by ");
       if (*jmin != 0)
@@ -1176,12 +1217,26 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
               *jmin, *kmin, alpha0, best_alpha);
     }
 
+  if (verbose && (multi > 1)) {
+      fprintf(stderr, "Found the following polynomials  (j, k, E):\n");
+      for (i = 0; i < multi; ++i) {
+          fprintf(stderr, "  %ld\t%ld\t%1.2f\n", jmin[i], kmin[i], best_E[i]);
+      }
+  }
+
   free (A);
 
   clear_mpz_array (D, d + 1);
   mpz_clear (v);
 
-  return best_lognorm + best_alpha;
+  {
+      double ret_val = best_lognorm + best_alpha;
+      if (multi>1) {
+          ret_val = best_E[0]; /* we return the smallest */
+          free(best_E);
+      } 
+      return ret_val;
+  }
 }
 
 /*****************************************************************************/

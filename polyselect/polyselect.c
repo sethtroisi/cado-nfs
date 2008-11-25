@@ -616,7 +616,7 @@ generate_poly (cado_poly out, double T, mpz_t b)
          norm, and moreover it does not permute with the base-m generation,
          thus we would need to save M[i].m, and redo all steps in the same
          order below */
-      E = rotate (out->f, d, ALPHA_BOUND_SMALL, M[i].m, M[i].b, &jmin, &kmin, 0);
+      E = rotate (out->f, d, ALPHA_BOUND_SMALL, M[i].m, M[i].b, &jmin, &kmin, 1, 0);
       m_logmu_insert (M, Malloc2, &Msize2, M[i].b, M[i].m, E, "E~");
     }
   fprintf (stderr, "# Second phase took %.2fs and kept %lu polynomial(s)\n",
@@ -627,7 +627,7 @@ generate_poly (cado_poly out, double T, mpz_t b)
   for (i = 0; i < Msize2; i++)
     {
       generate_base_mb (out, M[i].m, M[i].b);
-      E = rotate (out->f, d, ALPHA_BOUND, M[i].m, M[i].b, &jmin, &kmin, 0);
+      E = rotate (out->f, d, ALPHA_BOUND, M[i].m, M[i].b, &jmin, &kmin, 1, 0);
       if (E < best_E)
         {
           best_E = E;
@@ -649,7 +649,7 @@ generate_poly (cado_poly out, double T, mpz_t b)
      generation does not permute with the translation. */
   generate_base_mb (out, best_m, b);
   /* rotate */
-  rotate (out->f, d, ALPHA_BOUND, out->m, b, &jmin, &kmin, 1);
+  rotate (out->f, d, ALPHA_BOUND, out->m, b, &jmin, &kmin, 1, 1);
   /* translate */
   translate (out->f, d, out->g, out->m, b, 1);
   /* recompute skewness, since it might differ from the original

@@ -982,6 +982,8 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
    pb is the prime bound for those primes
    incr is the increment for a[d]
    Returns the number of polynomials checked.
+   The best ones are stored in the global variable m_logmu_t * Mt that must
+      have been initialized. 
 */
 static double
 Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
@@ -1114,6 +1116,8 @@ usage ()
   fprintf (stderr, "       -admin a  - minimal leading coefficient of f(x)\n");
   fprintf (stderr, "       -admax a  - maximal leading coefficient of f(x)\n");
   fprintf (stderr, "       -kmax k   - rotation is bounded by 2^k\n");
+  fprintf (stderr, "       -multi k  - returns k polynomials with same g(x)\n");
+  fprintf (stderr, "       -notr     - skip final translation\n");
   fprintf (stderr, "       in        - input file (n:...)\n");
   exit (1);
 }
@@ -1143,6 +1147,8 @@ main (int argc, char *argv[])
   mpz_t n, newm;
   double admin = 1.0, admax = DBL_MAX;
   int kmax = MAX_k;
+  int multi = 1;
+  int notr = 0;
 
   /* print command line */
   fprintf (stderr, "# %s.r%s", argv[0], REV);
@@ -1160,6 +1166,7 @@ main (int argc, char *argv[])
       /* knobs first */
       if (strcmp(argv[0], "-v") == 0) { verbose++; argv++,argc--; continue; }
       if (strcmp(argv[0], "-full") == 0) { raw=0; argv++,argc--; continue; }
+      if (strcmp(argv[0], "-notr") == 0) { notr=1; argv++,argc--; continue; }
       /* Then aliases */
       if (param_list_update_cmdline_alias(pl, "degree", "-d", &argc, &argv))
           continue;
@@ -1212,6 +1219,7 @@ main (int argc, char *argv[])
   param_list_parse_double(pl, "admax", &admax);
   param_list_parse_int(pl, "degree", &degree);
   param_list_parse_int(pl, "kmax", &kmax);
+  param_list_parse_int(pl, "multi", &multi);
   MAX_k = kmax;
 
   if (verbose)
@@ -1232,7 +1240,7 @@ main (int argc, char *argv[])
            seconds () - st, checked, Msize);
   fflush (stderr);
 
-  /* Second/third phases: loop over entries in M database, and try to find the
+  /* Second/third phases: loop over entries in Mt database, and try to find the
      best rotation for each one. In principle we should compute the
      contribution to alpha(F) for primes up to the algebraic factor base bound,
      but since it is too expensive, we use a fixed bound.
@@ -1264,7 +1272,7 @@ main (int argc, char *argv[])
          by optimize */
       mpz_neg (newm, poly->g[0]);
       E = rotate (poly->f, degree, ALPHA_BOUND_SMALL, newm, Mt[i].b, &jmin,
-                  &kmin, 0);
+                  &kmin, 1, 0);
       if (E < best_E)
         {
           best_E = E;
@@ -1291,8 +1299,21 @@ main (int argc, char *argv[])
       /* Warning: we cannot use Mt[i].m since g[0] might have been changed
          by optimize */
       mpz_neg (newm, poly->g[0]);
-      E = rotate (poly->f, degree, ALPHA_BOUND, newm, Mt[i].b, &jmin,
-                  &kmin, 1);
+      if (multi <= 1) {
+          E = rotate (poly->f, degree, ALPHA_BOUND, newm, Mt[i].b, &jmin,
+                  &kmin, 1, 1);
+      } else {
+          long *jjmin, *kkmin;
+          jjmin = (long *)malloc(multi*sizeof(long));
+          kkmin = (long *)malloc(multi*sizeof(long));
+          E = rotate (poly->f, degree, ALPHA_BOUND, newm, Mt[i].b, jjmin,
+                  kkmin, multi, 1);
+          jmin = jjmin[0];
+          kmin = kkmin[0];
+          free(jjmin);
+          free(kkmin);
+      }
+
       if (E < best_E)
         {
           best_E = E;
@@ -1324,7 +1345,8 @@ main (int argc, char *argv[])
   ASSERT_ALWAYS (mpz_cmp (Mt[i].b, poly->g[1]) == 0);
   rotate_aux (poly->f, Mt[i].b, Mt[i].m, 0, bestk);
   rotate_aux1 (poly->f, Mt[i].b, Mt[i].m, 0, bestj);
-  translate (poly->f, degree, poly->g, Mt[i].m, Mt[i].b, verbose);
+  if (!notr)
+      translate (poly->f, degree, poly->g, Mt[i].m, Mt[i].b, verbose);
 
   mpz_set (poly->n, n);
   poly->degree = degree;
