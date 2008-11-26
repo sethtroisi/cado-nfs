@@ -617,6 +617,8 @@ MKSOL : {
 	}
 	$exe .= " --task mksol --subdir $wdir";
 
+        $exe .= " --checkpoints";
+
         if (!$multisols) {
             # Aggressively select only one solution.
             @sols = ($sols[0]);
