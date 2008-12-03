@@ -1213,8 +1213,8 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
           if (*kmin >= 0)
             fprintf (stderr, "+");
         }
-      fprintf (stderr, "(%ld*x+%ld): alpha improved from %1.2f to %1.2f\n",
-              *jmin, *kmin, alpha0, best_alpha);
+      fprintf (stderr, "%ld: alpha improved from %1.2f to %1.2f\n", *kmin, 
+              alpha0, best_alpha);
     }
 
   if (verbose && (multi > 1)) {
