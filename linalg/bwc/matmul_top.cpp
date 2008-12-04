@@ -54,7 +54,6 @@ void matmul_top_init(matmul_top_data_ptr mmt,
     mmt->pi = pi;
 
     read_info_file(mmt, filename);
-
 }
 
 void matmul_top_read_matrix(matmul_top_data_ptr mmt)
@@ -78,11 +77,16 @@ void matmul_top_clear(matmul_top_data_ptr mmt, abobj_ptr abase MAYBE_UNUSED)
     free(mmt->filename);
 }
 
+/* XXX
+ * ``across'' (horizontally) and ``down'' (vertically) are just here for
+ * exposition. The binding of this operation to job/thread arrangement
+ * is flexible, through argument d.
+ * XXX
+ */
 static void
-broadcast_across(matmul_top_data_ptr mmt, int d)
+broadcast_down(matmul_top_data_ptr mmt, int d)
 {
-    // broadcasting across columns is for common agreement on a column
-    // vector.
+    // broadcasting down columns is for common agreement on a column vector.
 #ifdef  CONJUGATED_PERMUTATIONS
     for(unsigned int i = 0 ; i < mmt->wr[d]->xlen ; i++) {
         void * ptr = mmt->wr[d]->v + aboffset(mmt->abase, mmt->wr[d]->x[i].offset_me);
@@ -99,17 +103,28 @@ broadcast_across(matmul_top_data_ptr mmt, int d)
 #endif
 }
 
+static void
+reduce_across(matmul_top_data_ptr mmt, int d)
+{
+#ifdef  CONJUGATED_PERMUTATIONS
+    choke me;
+#else
+    choke me;
+#endif
+}
+
+
+
 void matmul_top_fill_random(matmul_top_data_ptr mmt, int d)
 {
     // In conjugation mode, it is possible to fill exactly the data chunk
     // that will eventually be relevant. However, it's easy enough to
-    // fill our output vector with garbage, and do broadcast_across_column
+    // fill our output vector with garbage, and do broadcast_down
     // afterwards...
-
     abrandom(mmt->abase, mmt->wr[d]->v, mmt->wr[d]->i1 - mmt->wr[d]->i0);
 
     // reconcile all cells which correspond to the same vertical block.
-    broadcast_across(mmt, d);
+    broadcast_down(mmt, d);
 }
 
 // comments are written assuming that d == 1 (save right vector). The
@@ -119,12 +134,12 @@ void matmul_top_fill_random(matmul_top_data_ptr mmt, int d)
 // as well. Data is therefore found in the right vector area, as after
 // the reduce step.
 //
-// Doing a broadcast_across columns will ensure that each row contains
+// Doing a broadcast_down columns will ensure that each row contains
 // the complete data set for our vector.
 void save_vector(matmul_top_data_ptr mmt, int d, unsigned int index, unsigned int iter)
 {
     // just to make sure...
-    broadcast_across(mmt, !d);
+    broadcast_down(mmt, !d);
 
     // Now in our row, everybody has the vector. We'll do I/O only from
     // one row, that's easier. Pick the one whose rank is zero in the
@@ -206,7 +221,7 @@ void save_vector(matmul_top_data_ptr mmt, int d, unsigned int index, unsigned in
 void load_vector(matmul_top_data_ptr mmt, int d, unsigned int index, unsigned int iter)
 {
     // just to make sure...
-    broadcast_across(mmt, !d);
+    broadcast_down(mmt, !d);
 
     // Now in our row, everybody has the vector. We'll do I/O only from
     // one row, that's easier. Pick the one whose rank is zero in the
