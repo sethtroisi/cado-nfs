@@ -87,7 +87,8 @@ static void create_characters(rootprime_t * tabchar, int k, cado_poly pol)
     mpz_t pp;
     unsigned long *roots;
 
-    mpz_init_set_ui(pp, 1 << (pol->lpba + 1));
+    /* we want some prime beyond the (algebraic) large prime bound */
+    mpz_init_set_ui (pp, 1UL << pol->lpba);
     roots = malloc(pol->degree * sizeof(unsigned long));
 
     do {
@@ -414,7 +415,7 @@ int main(int argc, char **argv)
 	    argv += 2;
 	}
 	if (argc > 2 && strcmp(argv[1], "-rel") == 0) {
-	    relfile = fopen(argv[2], "r");
+	    relfile = gzip_open (argv[2], "r");
 	    argc -= 2;
 	    argv += 2;
 	}
