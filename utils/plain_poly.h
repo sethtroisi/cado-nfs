@@ -13,7 +13,11 @@
 
 
 /* The type used for plain_poly coefficients. Must be a POD (plain old
- * datatype) */
+ * datatype). Note that when asserting whether a given modulus is
+ * eligible for use with a plain_poly layer, we consider the modulus as
+ * an uint64_t when calling plain_poly_fits. Afterwards, the prime
+ * requirement is that the modulus itself fits in a plain_poly_coeff_t
+ * (plain_poly_fits is actually more precise than that). */
 
 #include <stdint.h>
 typedef int64_t plain_poly_coeff_t;
@@ -44,7 +48,7 @@ extern "C" {
 extern void plain_poly_init (plain_poly_t f, int d);
 extern void plain_poly_clear (plain_poly_t f);
 extern int plain_poly_set_mod (plain_poly_t fp, mpz_t *f, int d, plain_poly_coeff_t p);
-extern int plain_poly_fits (unsigned int, plain_poly_coeff_t);
+extern int plain_poly_fits (unsigned int, uint64_t);
 extern int plain_poly_is_irreducible(plain_poly_t fp, const plain_poly_coeff_t p);
 
 /* These do not require the caller to create the plain_poly_t structure

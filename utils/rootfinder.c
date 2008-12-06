@@ -63,6 +63,8 @@ int poly_roots_long(long * r, mpz_t * f, int d, unsigned long p)
 int poly_roots_uint64(uint64_t * r, mpz_t * f, int d, uint64_t p)
 {
     FATAL_ERROR_CHECK(p >= ULONG_MAX, "poly_roots_uint64 is a stub");
+    /* This is glue around poly_roots_ulong, nothing more. When uint64
+     * means asking a lot more than ulong, we miss code. */
     unsigned long * rr;
     int i,n;
 

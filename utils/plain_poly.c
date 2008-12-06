@@ -26,11 +26,16 @@
 
 /* return non-zero if (p-1)+d*(p-1)^2 fits in type plain_poly_coeff_t (defined in utils.h) */
 int
-plain_poly_fits (unsigned int d, plain_poly_coeff_t p)
+plain_poly_fits (unsigned int d, uint64_t p)
 {
-  plain_poly_coeff_t max = 0;
+  uint64_t max = 0;
 
-  max = PLAIN_POLY_COEFF_MAX - (p - 1); /* > 0 since p <= LONG_MAX */
+#if ! ( PLAIN_POLY_COEFF_MAX <= UINT64_MAX)
+#error "We have a (small) problem here."
+/* It's really a matter of deciding something ``optimal'' or not */
+#endif
+
+  max = (uint64_t) PLAIN_POLY_COEFF_MAX - (p - 1); /* > 0 since p <= LONG_MAX */
 
   /* computes floor(max/d) */
   max = max / d;
