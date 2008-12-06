@@ -1706,7 +1706,11 @@ void write_info_file(int argc, char * argv[])
     }
     time_t t = time(NULL);
     fprintf(f, "# %s", ctime(&t));
+#ifdef  REV
     fprintf(f, "# revision " REV "\n");
+#else
+    fprintf(f, "# revision (unspecified)\n");
+#endif
     fprintf(f, "#");
     for(i = 0 ; i < (unsigned int) argc ; i++) {
         fprintf(f, " %s", argv[i]);
