@@ -177,7 +177,12 @@ buildCharacterMatrix(char **charmat, int k, rootprime_t * tabchar,
 	irel = nr + 1;
 	computeAllCharacters(charbig, i, k, tabchar, rel.a, rel.b, pol);
 	clear_relation(&rel);
+        if ((i + 1) % 100000 == 0) {
+            fprintf(stderr, "%d/%d\r", i+1,nrows);
+        }
     }
+    fprintf(stderr, "%d rows done     \n",nrows);
+
     fprintf(stderr, "Reading index file to reconstruct the characters\n");
     // read all relation-sets and update charmat accordingly
     for (i = 0; i < small_nrows; i++) {
@@ -322,6 +327,7 @@ handleKer(dense_mat_t * mat, rootprime_t * tabchar, FILE * purgedfile,
 	for (j = 0; j < mat->limbs_per_row; ++j)
 	    mat->data[i * mat->limbs_per_row + j] = 0UL;
 
+    // TODO/speed: eliminate branch in the loop. Try to do block-wise.
     // mat[i, j] = sum ker[i][u] * charmat[u][j]
     for (i = 0; i < n; ++i) {
 	for (j = 0; j < k; ++j) {
@@ -500,7 +506,11 @@ int main(int argc, char **argv)
 	ASSERT(myker[i] != NULL);
 	for (j = 0; j < mymat.limbs_per_col; ++j)
 	    myker[i][j] = 0UL;
+        if ((i + 1) % 100000 == 0) {
+            fprintf(stderr, "%d/%d\r", i+1,mymat.nrows);
+        }
     }
+    fprintf(stderr, "%d rows done      \n", mymat.nrows);
     fprintf(stderr, "Computing tiny kernel\n");
     dim =
 	kernel(mymat.data, myker, mymat.nrows, mymat.ncols,
