@@ -209,11 +209,11 @@ modul_poly_sqr (modul_poly_t h, const modul_poly_t g, modulusul_t p)
 
 /* normalize h so that h->coeff[deg(h)] <> 0 */
 static void
-modul_poly_normalize (modul_poly_t h)
+modul_poly_normalize (modul_poly_t h, modulusul_t p)
 {
   int dh = h->degree;
 
-  while (dh >= 0 && h->coeff[dh] == 0)
+  while (dh >= 0 && modul_is0(h->coeff[dh],p))
     dh --;
   h->degree = dh;
 }
@@ -252,7 +252,7 @@ modul_poly_sub_x (modul_poly_t h, const modul_poly_t g, modulusul_t p)
     modul_set0(h->coeff[i], p);
   modul_sub_ul(h->coeff[1], h->coeff[1], 1, p);
   h->degree = (d < 1) ? 1 : d;
-  modul_poly_normalize (h);
+  modul_poly_normalize (h, p);
 }
 
 /* h <- g - 1 mod p */
@@ -269,7 +269,7 @@ modul_poly_sub_1 (modul_poly_t h, const modul_poly_t g, modulusul_t p)
     modul_set0(h->coeff[i], p);
   modul_sub_ul(h->coeff[0], h->coeff[0], 1, p);
   h->degree = (d < 0) ? 0 : d;
-  modul_poly_normalize (h);
+  modul_poly_normalize (h, p);
 }
 
 /* h <- rem(h, f) mod p, f not necessarily monic */
@@ -295,7 +295,7 @@ modul_poly_div_r (modul_poly_t h, const modul_poly_t f, modulusul_t p)
       }
       do {
 	  dh --;
-      } while (dh >= 0 && hc[dh] == 0);
+      } while (dh >= 0 && modul_is0(hc[dh],p));
       h->degree = dh;
     }
 }
@@ -331,7 +331,7 @@ modul_poly_divexact (modul_poly_t q, modul_poly_t h, const modul_poly_t f, modul
       }
       dh --;
     }
-  modul_poly_normalize (q);
+  modul_poly_normalize (q, p);
 }
 
 /* fp <- gcd (fp, g), clobbers g */
@@ -357,7 +357,7 @@ modul_poly_out (FILE *fp, modul_poly_t f, modulusul_t p)
       int i;
       for (i = 0; i <= f->degree; i++)
 	if (!modul_is0(f->coeff[i],p))
-	  fprintf (fp, "+%lu*x^%d", (unsigned long) f->coeff[i], i);
+	  gmp_fprintf (fp, "+%Nu*x^%d", f->coeff[i], MODUL_SIZE, i);
       fprintf (fp, ";\n");
     }
 }
@@ -552,6 +552,7 @@ modul_poly_roots(residueul_t *r, mpz_t *f, int d, modulusul_t p)
 
   modul_poly_init (fp, d);
   d = modul_poly_set_mod (fp, f, d, p);
+
    /* d is the degree of fp (-1 if fp=0) */
 
   if (d == 0)
@@ -577,7 +578,11 @@ modul_poly_roots(residueul_t *r, mpz_t *f, int d, modulusul_t p)
      2d-2, and multiplication by x gives 2d-1. */
 
   /* g <- x^p mod fp */
-  modul_poly_powmod_ui (g, fp, h, 0, p[0], p);
+  residueul_t zero;
+  modul_init(zero,p);
+  modul_poly_powmod_ui (g, fp, h, zero, p[0], p);
+  modul_clear(zero,p);
+
 
   /* subtract x */
   modul_poly_sub_x (g, g, p);
