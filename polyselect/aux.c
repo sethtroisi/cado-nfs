@@ -940,6 +940,9 @@ rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1,
   long k, k0 = 0, j, j0 = 0;
   double lognorm, alpha, E0, E, best_E;
 
+#define MARGIN 0.12 /* we allow a small error margin in the expected lognorm
+                       + alpha values, to get a larger search range */
+
   E0 = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
   /* look for negative k */
   best_E = E0;
@@ -949,21 +952,29 @@ rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1,
       lognorm = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
       alpha = exp_alpha[i];
       E = lognorm + alpha;
-      if (E < best_E)
-        best_E = E;
+      if (E < best_E + MARGIN)
+        {
+          if (E < best_E)
+            best_E = E;
+        }
       else
         break;
     }
+  /* go back to k=0 */
+  k0 = rotate_aux (f, b, m, k0, 0);
   *K0 = k;
-  /* now try negative j */
-  for (j = -1; exp_alpha[i] != DBL_MAX; i++, j *= 2)
+  /* now try negative j: -1, -3, -7, ... */
+  for (j = -1, i++; exp_alpha[i] != DBL_MAX; i++, j = 2 * j - 1)
     {
       j0 = rotate_aux1 (f, b, m, j0, j);
       lognorm = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
       alpha = exp_alpha[i];
       E = lognorm + alpha;
-      if (E < best_E)
-        best_E = E;
+      if (E < best_E + MARGIN)
+        {
+          if (E < best_E)
+            best_E = E;
+        }
       else
         break;
     }
@@ -978,21 +989,29 @@ rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1,
       lognorm = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
       alpha = exp_alpha[i];
       E = lognorm + alpha;
-      if (E < best_E)
-        best_E = E;
+      if (E < best_E + MARGIN)
+        {
+          if (E < best_E)
+            best_E = E;
+        }
       else
         break;
     }
   *K1 = k;
-  /* now try positive j */
-  for (j = 1; exp_alpha[i] != DBL_MAX; i++, j *= 2)
+  /* go back to k=0 */
+  k0 = rotate_aux (f, b, m, k0, 0);
+  /* now try positive j: 1, 3, 7, ... */
+  for (j = 1, i++; exp_alpha[i] != DBL_MAX; i++, j = 2 * j + 1)
     {
       j0 = rotate_aux1 (f, b, m, j0, j);
       lognorm = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
       alpha = exp_alpha[i];
       E = lognorm + alpha;
-      if (E < best_E)
-        best_E = E;
+      if (E < best_E + MARGIN)
+        {
+          if (E < best_E)
+            best_E = E;
+        }
       else
         break;
     }
