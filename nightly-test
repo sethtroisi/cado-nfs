@@ -6,10 +6,13 @@
 #    This will create a ssh key with empty passphrase in .ssh/cle_gforge,
 #    with the public key in .ssh/cle_gforge.pub
 # 2) add the content of .ssh/cle_gforge.pub in the list of your ssh keys on
-#    gforge.inria.fr
+#    gforge.inria.fr (this will be added in authorized_keys)
 # 3) add the following lines in your .ssh/config file:
 # Host scm.gforge.inria.fr
-#    IdentityFile .ssh/cle_gforge.pub
+#    IdentityFile /users/mygroup/mylogin/.ssh/cle_gforge
+# 4) since run.c59 also calls ssh, you need to add also IdentityFile ... for
+#    the computer on which you run nightly-test, and to add the content of
+#    cle_gforge.pub in the authorized_keys on that computer.
 set -e
 CC="$1"
 DIR=cado-nightly
