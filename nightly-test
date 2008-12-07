@@ -1,5 +1,5 @@
 #!/bin/sh
-# Usage: nightly-test
+# Usage: nightly-test <CC>
 # If you use this in your crontab, since cron does not have access to
 # ssh-agent, a trick is the following:
 # 1) run from your home directory: ssh-keygen -N "" -t rsa -f .ssh/cle_gforge
@@ -11,6 +11,7 @@
 # Host scm.gforge.inria.fr
 #    IdentityFile .ssh/cle_gforge.pub
 set -e
+CC="$1"
 DIR=cado-nightly
 USER=`whoami`
 cd /tmp
@@ -20,7 +21,7 @@ mkdir "$DIR"
 test ! -h "$DIR"
 svn checkout svn+ssh://${USER}@scm.gforge.inria.fr/svn/cado/trunk/dist/src "$DIR"
 cd "$DIR"
-make CC=gcc
+make CC="$CC"
 ./run.c59
 cd /tmp
 /bin/rm -fr "$DIR"
