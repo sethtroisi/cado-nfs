@@ -1,0 +1,27 @@
+#!/bin/sh
+# Usage: nightly-test
+# If you use this in your crontab, since cron does not have access to
+# ssh-agent, a trick is the following:
+# 1) run from your home directory: ssh-keygen -N "" -t rsa -f .ssh/cle_gforge
+#    This will create a ssh key with empty passphrase in .ssh/cle_gforge,
+#    with the public key in .ssh/cle_gforge.pub
+# 2) add the content of .ssh/cle_gforge.pub in the list of your ssh keys on
+#    gforge.inria.fr
+# 3) add the following lines in your .ssh/config file:
+# Host scm.gforge.inria.fr
+#    IdentityFile .ssh/cle_gforge.pub
+set -e
+DIR=cado-nightly
+USER=`whoami`
+cd /tmp
+/bin/rm -fr "$DIR"
+mkdir "$DIR"
+# The following test should be useless, but let's be paranoid.
+test ! -h "$DIR"
+svn checkout svn+ssh://${USER}@scm.gforge.inria.fr/svn/cado/trunk/dist/src "$DIR"
+cd "$DIR"
+make CC=gcc
+./run.c59
+cd /tmp
+/bin/rm -fr "$DIR"
+
