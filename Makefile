@@ -35,7 +35,6 @@ all:
 	$(MAKE) -C gf2x
 	$(MAKE) -C gf2x/cantor
 	$(MAKE) -C linalg/bw
-	$(MAKE) -C linalg/bl
 
 clean:
 	$(MAKE) -C utils		clean
@@ -49,5 +48,4 @@ clean:
 	$(MAKE) -C gf2x			clean
 	$(MAKE) -C gf2x/cantor		clean
 	$(MAKE) -C linalg/bw		clean
-	$(MAKE) -C linalg/bl		clean
 
