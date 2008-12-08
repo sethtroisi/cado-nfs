@@ -2,6 +2,27 @@
 
 # General script for factoring integers with Cado-NFS.
 #
+# Copyright 2008 Pierrick Gaudry, Emmanuel Thome, Paul Zimmermann
+#
+# This file is part of CADO-NFS.
+#
+# CADO-NFS is free software; you can redistribute it and/or modify it under the
+# terms of the GNU Lesser General Public License as published by the Free
+# Software Foundation; either version 2.1 of the License, or (at your option)
+# any later version.
+#
+# CADO-NFS is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+# A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
+# details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with CADO-NFS; see the file COPYING.  If not, write to the Free
+# Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+# 02110-1301, USA.
+
+
+
 # usage:
 #    cadofactor.pl param=<paramfile> wdir=<...> ...
 # Parameters passed in arguments *after* param=... will override choices
@@ -37,6 +58,7 @@ use warnings;
 use Data::Dumper;
 
 use File::Copy;
+use File::Basename;
 use POSIX qw(ceil floor);
 
 # Default parameters
@@ -117,18 +139,6 @@ my $default_param = {};
 # Build the list of default parameters
 %$default_param = @parameter_defaults;
 
-sub splitpath {
-    # Returns dirname and basename. 
-    $_[0] =~ m{^(?:(.*)/)?(.*)$};
-    my $dir=defined($1) ? $1 : ".";
-    my $base=$2;
-    if ($dir eq '.') {
-        $dir = `pwd`;
-        chomp $dir;
-    }
-    return ($dir, $base);
-}
-
 sub read_param {
     my @args = @_;
     my $param = $default_param;
@@ -171,7 +181,7 @@ sub read_param {
         die "With parallel, I need a machines argument!\n"; }
     if (!$param->{'cadodir'}) {
         print STDERR "Warning: taking current script's basedir as cadodir\n";
-        ($param->{'cadodir'}) =  splitpath($0);
+        ($param->{'cadodir'}) =  dirname($0);
     }
     return $param;
 }
@@ -210,28 +220,31 @@ sub my_system {
 
 # Execute the given $cmd using backticks, allowing $timeout time for it
 # to finish. 
-# Returns a pair ( $t, $ret )
+# Returns a triple ( $t, $ret, $code )
 #   where $t is a 0 or 1 depending whether the timout was reached (0
-#   means timeout, 1 means success).
-#   and $ret is the returned value (empty string if timeout).
+#   means timeout, 1 means success),
+#   $ret is the returned value (empty string if timeout),
+#   and $status is the exit status of the command (-1 if timeout).
 #
 # For timeout, we use the alarm mechanism. See perldoc -f alarm.
 sub my_system_timeout {
     my ($cmd, $timeout) = @_;
     my $ret = "";
+    my $status = 0;
     eval {
         local $SIG{'ALRM'} = sub { die "alarm\n" }; # NB: \n required
         alarm $timeout;
         $ret = `$cmd`;
+        $status = $? >> 8;
         alarm 0;
     };
     if ($@) {
         die unless $@ eq "alarm\n";   # propagate unexpected errors
         print "WARNING! The command $cmd timed out.\n";
-        return (0, "");
+        return (0, "", -1);
     }
     else {
-        return (1, $ret);
+        return (1, $ret, $status);
     }
 }
 
@@ -497,12 +510,12 @@ sub push_select_files {
     my $ldir = $param->{'wdir'};
     my $t;
     my $ret;
+    my $status;
     ($t, $ret) = my_system_timeout("ssh $mach mkdir -p $wdir", 60);
     if (! $t) { die "Connection to $mach timeout\n"; }
-    ($t, $ret) = my_system_timeout("ssh $mach ls $wdir/$name.n", 120);
+    ($t, $ret, $status) = my_system_timeout("ssh $mach test -e $wdir/$name.n", 120);
     if (! $t) { die "Connection to $mach timeout\n"; }
-    chomp $ret;
-    if ($ret eq "") {
+    if ($status != 0) {
         print "    Pushing $name.n to $mach.\n";
         system("rsync --timeout=120 $ldir/$name.n $mach:$wdir/");
     }
@@ -564,7 +577,7 @@ sub restart_select_tasks {
             my $wdir = $desc{'tmpdir'};
             my $bindir = $desc{'cadodir'};
             push_select_files($mach, $wdir, $param);
-            my $cmd = "/bin/nice -$nice $bindir/polyselect/polyselect" .
+            my $cmd = "nice -$nice $bindir/polyselect/polyselect" .
               " -keep " . $param->{'kjkeep'} .
               " -kmax " . $param->{'kjkmax'} .
               " -incr " . $param->{'kjincr'} .
@@ -577,10 +590,10 @@ sub restart_select_tasks {
               " -degree " . $param->{'degree'} .
               " < $wdir/$name.n";
             my $outfile = "$wdir/$name.kjout.$admin-$admax";
-            my $ret = `ssh $mach "$cmd >& $outfile&"`;
+            my $ret = `ssh $mach "/bin/sh -c '$cmd > $outfile 2>&1&'"`;
             print "    Starting $mach $admin $admax.\n";
             open FH, ">> " . $param->{'wdir'} . "/$name.cmd";
-            print FH "ssh $mach \"$cmd >& $outfile&\"\n";
+            print FH "ssh $mach \"/bin/sh -c '$cmd > $outfile 2>&1&'\"\n";
             close FH;
             push @$running, $t;
         }
@@ -997,19 +1010,18 @@ sub push_files {
     my $ldir = $param->{'wdir'};
     my $t;
     my $ret;
+    my $status;
     ($t, $ret) = my_system_timeout("ssh $mach mkdir -p $wdir", 60);
     if (! $t) { die "Connection to $mach timeout\n"; }
-    ($t, $ret) = my_system_timeout("ssh $mach ls $wdir/$name.poly", 120);
+    ($t, $ret, $status) = my_system_timeout("ssh $mach test -e $wdir/$name.poly", 120);
     if (! $t) { die "Connection to $mach timeout\n"; }
-    chomp $ret;
-    if ($ret eq "") {
+    if ($status != 0) {
         print "    Pushing $name.poly to $mach.\n";
         system("rsync --timeout=120 $ldir/$name.poly $mach:$wdir/");
     }
-    ($t, $ret) = my_system_timeout("ssh $mach ls $wdir/$name.roots", 120);
+    ($t, $ret, $status) = my_system_timeout("ssh $mach test -e $wdir/$name.roots", 120);
     if (! $t) { die "Connection to $mach timeout\n"; }
-    chomp $ret;
-    if ($ret eq "") {
+    if ($status != 0) {
         print "    Pushing $name.roots to $mach.\n";
         system("rsync --timeout=120 $ldir/$name.roots $mach:$wdir/");
     }
@@ -1074,15 +1086,15 @@ sub restart_tasks {
             my $wdir = $desc{'tmpdir'};
             my $bindir = $desc{'cadodir'};
             push_files($mach, $wdir, $param);
-            my $cmd = "/bin/nice -$nice $bindir/sieve/las" .
+            my $cmd = "nice -$nice $bindir/sieve/las" .
               " -I " . $param->{'I'} .
               " -poly $wdir/$name.poly" .
               " -fb $wdir/$name.roots" .
               " -q0 $q_curr -q1 $qend";
-            my $ret = `ssh $mach "$cmd >& $wdir/$name.rels.$q_curr-$qend&"`;
+            my $ret = `ssh $mach "/bin/sh -c '$cmd > $wdir/$name.rels.$q_curr-$qend 2>&1&'"`;
             print "    Starting $mach $q_curr-$qend.\n";
             open FH, ">> " . $param->{'wdir'} . "/$name.cmd";
-            print FH "ssh $mach \"$cmd >& $wdir/$name.rels.$q_curr-$qend&\"\n";
+            print FH "ssh $mach \"/bin/sh -c '$cmd > $wdir/$name.rels.$q_curr-$qend 2>&1&'\"\n";
             close FH;
             push @$running, $t;
             $q_curr = $qend;
@@ -1265,7 +1277,7 @@ sub sieve {
               " -fb $prefix.roots" .
               " -q0 $qcurr -q1 $qend";
             print "Running lattice siever for q in [$qcurr,$qend]...\n";
-            my_system "$cmd >& $filename";
+            my_system "/bin/sh -c '$cmd > $filename 2>&1'";
         } else {
             print "Found an existing relation file!\n";
         }
@@ -1402,6 +1414,7 @@ MAIN: {
     if ($param->{'linalg'} eq 'bw') { 
         print "Calling Block-Wiedemann...\n";
         $cmd = "$param->{'cadodir'}/linalg/bw/bw.pl" .
+        " seed=1" . # For debugging purposes, we use a deterministic BW
         " mt=$param->{'bwmt'}" .
         " matrix=$prefix.small.tr" .
         " mn=64" .
@@ -1410,7 +1423,7 @@ MAIN: {
         " wdir=$wdir/bw" .
         " tidy=0" .
         " solution=$prefix.W";
-        my_system "$cmd >& $prefix.bw.stderr";
+        my_system "/bin/sh -c '$cmd > $prefix.bw.stderr 2>&1'";
     } else {
         if ($param->{'linalg'} ne 'bl') {
             print "WARNING: I don't know linalg=$param->{'linalg'}" .
@@ -1421,7 +1434,7 @@ MAIN: {
         " matrix=$prefix.small.tr" .
         " wdir=$wdir/bl" .
         " solution=$prefix.W";
-        my_system "$cmd >& $prefix.bl.stderr";
+        my_system "/bin/sh -c '$cmd > $prefix.bl.stderr 2>&1'";
     }
     print "Converting dependencies to CADO format...\n";
     $cmd = "$param->{'cadodir'}/linalg/bw/mkbitstrings " .
