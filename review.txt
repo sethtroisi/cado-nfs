@@ -26,7 +26,7 @@ Lines 5-19: the license stuff.
 
 Formatted preamble ends at line 20.
 
-See dist/src/polyselect/kleinjung.c for the example to follow /
+See dist/src/polyselect/polyselect.c for the example to follow /
 copy-paste.
 
 *** For binaries: check options
