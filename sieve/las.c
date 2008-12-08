@@ -14,7 +14,6 @@
 #include "../utils/utils.h"
 #include "../utils/manu.h"   /* for ctzl */
 #include "basicnt.h"         /* for bin_gcd */
-#include <tifa.h>
 #include "ecm/facul.h"
 #include "bucket.h"
 #include "trialdiv.h"
@@ -2460,7 +2459,7 @@ skewness (sieve_info_t *si)
   return (a0 > a1) ? a0 / a1 : a1 / a0;
 }
 
-/************************ factoring with TIFA ********************************/
+/************************ cofactorization ********************************/
 
 /* FIXME: the value of 20 seems large. Normally, a few Miller-Rabin passes
    should be enough. See also http://www.trnicely.net/misc/mpzspsp.html */
@@ -2490,14 +2489,13 @@ factor_leftover_norm (mpz_t n, unsigned int l,
 		      facul_strategy_t *strategy)
 {
   uint32_t i, nr_factors;
-  ecode_t ecode;
   unsigned long ul_factors[16];
   int facul_code;
 
   factors->length = 0;
   multis->length = 0;
 
-  /* tifa_factor does not like 1 */
+  /* factoring programs do not like 1 */
   if (mpz_cmp_ui (n, 1) == 0)
     return 1;
 
@@ -2517,7 +2515,7 @@ factor_leftover_norm (mpz_t n, unsigned int l,
     } 
 */
 
-#if 1 /* use the facul library */
+  /* use the facul library */
   facul_code = facul (ul_factors, n, strategy);
 
   if (facul_code == FACUL_NOT_SMOOTH)
@@ -2562,33 +2560,8 @@ factor_leftover_norm (mpz_t n, unsigned int l,
         return 0; */
     }
   /* When sieving for 3 large primes, here are so many left over, non-smooth 
-     numbers here that factoring them all with TIFA takes a long time, for 
-     few additional relations */
-  return 0;
-#endif
-  
-  ecode = tifa_factor (factors, multis, n, FIND_COMPLETE_FACTORIZATION);
-
-  switch (ecode)
-    {
-    case COMPLETE_FACTORIZATION_FOUND:
-      for (i = 0; i < factors->length; i++)
-        {
-          if (BITSIZE(factors->data[i]) > l)
-            return 0;
-        }
-      return 1;
-
-    case PARTIAL_FACTORIZATION_FOUND:
-    case NO_FACTOR_FOUND:
-    case FATAL_INTERNAL_ERROR:
-    default:
-        //
-        // Should be rare but I cannot give any warranties here... We could
-        // try to use another factoring library...
-        //
-        return 0;
-    }
+     numbers here that factoring them all takes a long time, for few
+     additional relations */
   return 0;
 }
 

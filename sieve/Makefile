@@ -19,8 +19,6 @@ else
     CFLAGS+=-DHAVE_POSIX_MEMALIGN=0
 endif
 
-include $(TOP)/Makefile.tifa-support
-
 # We require the cado utils library
 MY_LFLAGS+=-L$(TOP)/utils -Lecm
 MY_CFLAGS+=-I$(TOP)/utils -Iecm
@@ -28,11 +26,11 @@ MY_CFLAGS+=-I$(TOP)/utils -Iecm
 all: sieve makefb las
 
 sieve: sieve.o fb.o ; 
-	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -ltifa -lgmp -lm
+	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lgmp -lm
 makefb: makefb.o
-	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -ltifa -lgmp -lm
+	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lgmp -lm
 las: las.o fb.o trialdiv.o
-	$(CC) $(MY_LFLAGS) -o $@ $^ -lfacul -lutils -ltifa -lgmp -lm
+	$(CC) $(MY_LFLAGS) -o $@ $^ -lfacul -lutils -lgmp -lm
 
 # Some dependencies on headers.
 las.o: bucket.h ecm/facul.h
@@ -43,7 +41,7 @@ trialdiv.o : trialdiv.h fb.h
 
 # Also give some info on extra dependencies.
 sieve makefb las: $(TOP)/utils/libutils.a
-las: $(TIFA_LIBDIR)/libtifa.a ecm/libfacul.a
+las: ecm/libfacul.a
 
 
 config.h: config_h.in
