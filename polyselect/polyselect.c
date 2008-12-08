@@ -1012,6 +1012,7 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
   unsigned int *R; /* unique root of a[d]*x^d = N (mod p0), or 0 */
   unsigned int p0, r, i;
   mpz_t *a, *g, t, mtilde;
+  mpz_array_t *A, *G;
   double Nd, max_ad, max_adm1, max_adm2, checked = 0.0;
 
   ASSERT_ALWAYS (d >= 4);
@@ -1032,8 +1033,10 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
           }
       }
 
-  a = alloc_mpz_array (d + 1);
-  g = alloc_mpz_array (d + 1);
+  A = alloc_mpz_array (d + 1);
+  a = A->data;
+  G = alloc_mpz_array (d + 1);
+  g = G->data;
   /* g will store the polynomial x^d - t */
   mpz_set_ui (g[d], 1);
   for (i = 1; i < d; i++)
@@ -1110,8 +1113,8 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
   free (P);
   free (Q);
   free (R);
-  clear_mpz_array (a, d + 1);
-  clear_mpz_array (g, d + 1);
+  clear_mpz_array (A);
+  clear_mpz_array (G);
   mpz_clear (t);
   mpz_clear (mtilde);
 

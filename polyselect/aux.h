@@ -27,9 +27,6 @@
   if (c >= 0) mpz_submul_ui (a, b, c);          \
   else mpz_addmul_ui (a, b, -(c))
   
-mpz_t* alloc_mpz_array   (int);
-mpz_t* realloc_mpz_array (mpz_t *, int, int);
-void   clear_mpz_array   (mpz_t *, int);
 void mpz_ndiv_qr (mpz_t, mpz_t, mpz_t, mpz_t);
 void generate_base_mb (cado_poly, mpz_t, mpz_t);
 double l1_skewness (mpz_t*, int, int);

@@ -13,45 +13,6 @@
 /* for the rotation, we try (j*x+k) for |k| <= 2^MAX_k */
 int MAX_k = 16;
 
-/************************ arrays of mpz_t ************************************/
-
-/* allocate an array of d coefficients, and initialize it */
-mpz_t*
-alloc_mpz_array (int d)
-{
-  mpz_t *f;
-  int i;
-
-  f = (mpz_t*) malloc (d * sizeof (mpz_t));
-  ASSERT_ALWAYS(f != NULL);
-  for (i = 0; i < d; i++)
-    mpz_init (f[i]);
-  return f;
-}
-
-/* reallocate an array having d0 coefficients to d > d0 coefficients */
-mpz_t*
-realloc_mpz_array (mpz_t *f, int d0, int d)
-{
-  int i;
-
-  f = (mpz_t*) realloc (f, d * sizeof (mpz_t));
-  for (i = d0; i < d; i++)
-    mpz_init (f[i]);
-  return f;
-}
-
-/* free an array of d coefficients */
-void
-clear_mpz_array (mpz_t *f, int d)
-{
-  int i;
-  
-  for (i = 0; i < d; i++)
-    mpz_clear (f[i]);
-  free (f);
-}
-
 /************************* norm and skewness *********************************/
 
 /* Return an approximation of the value of S that minimizes the expression:
@@ -602,6 +563,7 @@ special_val0 (mpz_t *f, int d, unsigned long p)
   mpz_t c, *g, *h;
   int alloc, i, r0, nroots;
   unsigned long *roots, r;
+  mpz_array_t *G, *H;
 
   mpz_init (c);
   content_poly (c, f, d);
@@ -611,7 +573,8 @@ special_val0 (mpz_t *f, int d, unsigned long p)
   /* g <- f/p^v */
   if (alloc != 0)
     {
-      g = alloc_mpz_array (d + 1);
+      G = alloc_mpz_array (d + 1);
+      g = G->data;
       mpz_ui_pow_ui (c, p, (unsigned long) v); /* p^v */
       for (i = 0; i <= d; i++)
         mpz_divexact (g[i], f[i], c);
@@ -619,7 +582,8 @@ special_val0 (mpz_t *f, int d, unsigned long p)
   else
     g = f;
 
-  h = alloc_mpz_array (d + 1);
+  H = alloc_mpz_array (d + 1);
+  h = H->data;
   /* first compute h(x) = g(px) */
   mpz_set_ui (c, 1);
   for (i = 0; i <= d; i++)
@@ -651,10 +615,10 @@ special_val0 (mpz_t *f, int d, unsigned long p)
 	}
     }
   free (roots);
-  clear_mpz_array (h, d + 1);
+  clear_mpz_array (H);
 
   if (alloc != 0)
-    clear_mpz_array (g, d + 1);
+    clear_mpz_array (G);
   mpz_clear (c);
 
   return v;
@@ -737,18 +701,20 @@ special_valuation (mpz_t * f, int d, unsigned long p, mpz_t disc)
 	if (p_divides_lc) {
 	    /* compute g(x) = f(1/(px))*(px)^d, i.e., g[i] = f[d-i]*p^i */
 	    /* IOW, the reciprocal polynomial evaluated at px */
+            mpz_array_t *G;
 	    mpz_t *g;
 	    mpz_t t;
 	    int i;
 
-	    g = alloc_mpz_array(d + 1);
+	    G = alloc_mpz_array (d + 1);
+            g = G->data;
 	    mpz_init_set_ui(t, 1);	/* will contains p^i */
 	    for (i = 0; i <= d; i++) {
 		mpz_mul(g[i], f[d - i], t);
 		mpz_mul_ui(t, t, p);
 	    }
 	    v += special_val0(g, d, p);
-	    clear_mpz_array(g, d + 1);
+	    clear_mpz_array (G);
             mpz_clear(t);
 	}
 	v /= (double) (p + 1);
@@ -1053,7 +1019,8 @@ double
 rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
         long *jmin, long *kmin, int multi, int verbose)
 {
-  mpz_t *D, v;
+  mpz_t v;
+  mpz_array_t *D;
   long K0, K1, J0, J1, k0, k, i, j, j0, l;
   double *A, alpha, lognorm, best_alpha = DBL_MAX, best_lognorm = DBL_MAX;
   double alpha0 = 0.0, e;
@@ -1091,7 +1058,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
       j0 = rotate_aux1 (f, b, m, j0, j);
       /* go back to k=0 for the discriminant */
       k0 = rotate_aux (f, b, m, k0, 0);
-      discriminant_k (D, f, d, m, b);
+      discriminant_k (D->data, f, d, m, b);
 
       for (k = K0; k <= K1; k++)
         A[k - K0] = 0.0; /* A[k - K0] will store the value alpha(f + k*g) */
@@ -1109,7 +1076,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
             k0 = rotate_aux (f, b, m, k0, k);
 
             /* compute contribution for k */
-            mpz_poly_eval_si (v, D, d, k);
+            mpz_poly_eval_si (v, D->data, d, k);
             e = special_valuation (f, d, p, v);
             alpha = (one_over_pm1 - e) * logp;
 
@@ -1138,7 +1105,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
                       {
                         for (l = i + pp; l <= K1; l += pp)
                           {
-                            mpz_poly_eval_si (v, D, d, l);
+                            mpz_poly_eval_si (v, D->data, d, l);
                             /* translate from k0 to l */
                             k0 = rotate_aux (f, b, m, k0, l);
                             e = special_valuation (f, d, p, v);
@@ -1149,7 +1116,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
                     i += p;
                     if (i >= k + (long) pp || i > K1)
                       break;
-                    mpz_poly_eval_si (v, D, d, i);
+                    mpz_poly_eval_si (v, D->data, d, i);
                     /* translate from k0 to i */
                     k0 = rotate_aux (f, b, m, k0, i);
                     e = special_valuation (f, d, p, v);
@@ -1245,7 +1212,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
 
   free (A);
 
-  clear_mpz_array (D, d + 1);
+  clear_mpz_array (D);
   mpz_clear (v);
 
   {
