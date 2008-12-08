@@ -432,6 +432,7 @@ sub write_select_status_file {
 # 1 means running
 # 0 means finished
 # -1 means (probably dead)
+# -2 means binary for polynomial selection was not found
 sub check_running_select_task {
     my $param = shift @_;
     my $name = $param->{'name'};
@@ -457,6 +458,10 @@ sub check_running_select_task {
     if (/No polynomial found/) {
         print "      finished but found no polynomial!\n";
         return 0;
+    }
+    if (/No such file or directory/) {
+        print "      program for polynomial selection was not found!\n";
+        return -2;
     }
 
     # If file is partial, check its last modification time:
@@ -559,7 +564,7 @@ sub restart_select_tasks {
             my $wdir = $desc{'tmpdir'};
             my $bindir = $desc{'cadodir'};
             push_select_files($mach, $wdir, $param);
-            my $cmd = "/bin/nice -$nice $bindir/polyselect/kleinjung" .
+            my $cmd = "/bin/nice -$nice $bindir/polyselect/polyselect" .
               " -keep " . $param->{'kjkeep'} .
               " -kmax " . $param->{'kjkmax'} .
               " -incr " . $param->{'kjincr'} .
@@ -640,6 +645,8 @@ sub parallel_polyselect {
                 push @newstatus, $t;
             } elsif ($running == 0) {
                 import_select_task_result($param, \%mach_desc, @$t);
+            } elsif ($running == -2) {
+                die "program for polynomial selection not found\n";
             } else { # dead task!
                 # do nothing, this will be restarted soon...
             }
