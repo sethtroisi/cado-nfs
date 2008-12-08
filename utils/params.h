@@ -12,16 +12,37 @@ struct parameter_s {
     char * value;
     enum parameter_origin origin;
     int parsed;
+    int seen;
 };
 typedef struct parameter_s parameter[1];
 typedef struct parameter_s * parameter_ptr;
 typedef struct parameter_s const * parameter_srcptr;
+
+struct param_list_alias_s {
+    const char * alias;
+    const char * key;
+};
+
+typedef struct param_list_alias_s param_list_alias[1];
+
+struct param_list_knob_s {
+    const char * knob;
+    int * ptr;
+};
+
+typedef struct param_list_knob_s param_list_knob[1];
 
 struct param_list_s {
     unsigned int alloc;
     unsigned int size;
     parameter * p;
     int consolidated;
+    param_list_alias * aliases;
+    int naliases;
+    int naliases_alloc;
+    param_list_knob * knobs;
+    int nknobs;
+    int nknobs_alloc;
 };
 
 typedef struct param_list_s param_list[1];
@@ -45,17 +66,21 @@ extern int param_list_read_stream(param_list pl, FILE *f);
 extern int param_list_read_file(param_list pl, const char * name);
 
 // sees whether the arguments pointed to by argv[0] and (possibly)
-// argv[1] correspond to either -<key> <value>, --<key> <value> or <key>=<value>
-// Having key==NULL means that anything will be read.
-extern int param_list_update_cmdline(param_list pl, const char * key,
+// argv[1] correspond to either -<key> <value>, --<key> <value> or
+// <key>=<value> ; configured knobs and aliases for the param list are
+// also checked.
+extern int param_list_update_cmdline(param_list pl,
         int * p_argc, char *** p_argv);
 
+#if 0
 // This one allows shorthands. Notice that the alias string has to
-// contain the exact for of the wanted alias, which may be either "-x",
+// contain the exact form of the wanted alias, which may be either "-x",
 // "--x", or "x=" (a terminating = tells the program that the option is
-// wanted all in one go).
+// wanted all in one go, like in ./a.out m=42, in contrast to ./a.out -m
+// 42).
 extern int param_list_update_cmdline_alias(param_list pl, const char * key,
         const char * alias, int * p_argc, char *** p_argv);
+#endif
 
 extern int param_list_parse_int(param_list, const char *, int *);
 extern int param_list_parse_long(param_list, const char *, long *);
@@ -65,7 +90,22 @@ extern int param_list_parse_double(param_list, const char *, double *);
 extern int param_list_parse_string(param_list, const char *, char *, size_t);
 extern int param_list_parse_mpz(param_list, const char *, mpz_ptr);
 extern int param_list_parse_intxint(param_list pl, const char * key, int * r);
+extern int param_list_parse_knob(param_list pl, const char * key);
+
+extern const char * param_list_lookup_string(param_list pl, const char * key);
+
 extern void param_list_save(param_list pl, const char * filename);
+
+// This one allows shorthands. Notice that the alias string has to
+// contain the exact form of the wanted alias, which may be either "-x",
+// "--x", or "x=" (a terminating = tells the program that the option is
+// wanted all in one go, like in ./a.out m=42, in contrast to ./a.out -m
+// 42).
+extern int param_list_configure_alias(param_list pl, const char * key, const char * alias);
+
+// A knob is a command-line argument which sets a value by its mere
+// presence. Could be for instance --verbose, or --use-smart-algorithm
+extern int param_list_configure_knob(param_list pl, const char * key, int * ptr);
 
 // tells whether everything has been consumed. Otherwise, return the key
 // of the first unconsumed argument.

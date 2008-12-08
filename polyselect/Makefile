@@ -18,8 +18,8 @@ rotate: rotate.o aux.o
 polyselect.o: polyselect.c aux.o $(TOP)/cado.h
 
 rotate.o: rotate.c aux.o $(TOP)/cado.h
-
 aux.o: aux.c aux.h $(TOP)/cado.h
+polyselect rotate: $(TOP)/utils/libutils.a
 
 clean:
 	-rm -f rotate polyselect *~ *.o

@@ -1182,21 +1182,20 @@ main (int argc, char *argv[])
   mpz_init_set_ui (incr, 60);
   mpz_init (newm);
 
+  int full = 0;
+
+  param_list_configure_knob(pl, "-v", &verbose);
+  param_list_configure_knob(pl, "-full", &full);
+  param_list_configure_knob(pl, "-notr", &notr);
+  param_list_configure_alias(pl, "effort", "-e");
+  param_list_configure_alias(pl, "degree", "-d");
+  param_list_configure_alias(pl, "degree", "d=");
+  param_list_configure_alias(pl, "incr", "-i");
+
+
   argv++, argc--;
   for( ; argc ; ) {
-      /* knobs first */
-      if (strcmp(argv[0], "-v") == 0) { verbose++; argv++,argc--; continue; }
-      if (strcmp(argv[0], "-full") == 0) { raw=0; argv++,argc--; continue; }
-      if (strcmp(argv[0], "-notr") == 0) { notr=1; argv++,argc--; continue; }
-      /* Then aliases */
-      if (param_list_update_cmdline_alias(pl, "degree", "-d", &argc, &argv))
-          continue;
-      if (param_list_update_cmdline_alias(pl, "degree", "d=", &argc, &argv))
-          continue;
-      if (param_list_update_cmdline_alias(pl, "incr", "-i", &argc, &argv))
-          continue;
-      /* Pick just everything from the rest that looks like a parameter */
-      if (param_list_update_cmdline(pl, NULL, &argc, &argv)) { continue; }
+      if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
 
       /* Now last resort measures */
       if (strspn(argv[0], "0123456789") == strlen(argv[0])) {
@@ -1215,6 +1214,7 @@ main (int argc, char *argv[])
       fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
       usage();
   }
+  raw = ! full;
   int have_n = param_list_parse_mpz(pl, "n", n);
 
   if (!have_n) {

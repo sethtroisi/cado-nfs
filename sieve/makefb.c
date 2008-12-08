@@ -274,21 +274,12 @@ main (int argc, char *argv[])
   param_list_init(pl);
   cado_poly_init(cpoly);
 
+  param_list_configure_knob(pl, "-v", &verbose);
+  param_list_configure_knob(pl, "-powers", &use_powers);
+
   argv++, argc--;
   for( ; argc ; ) {
-      /* knobs first */
-      if (strcmp(argv[0], "-v") == 0) { verbose++; argv++,argc--; continue; }
-      if (strcmp(argv[0], "-powers") == 0)
-        { use_powers=1; argv++,argc--; continue; }
-      if (argc >= 2 && strcmp (argv[0], "-poly") == 0) {
-          param_list_read_file(pl, argv[1]);
-          argv++,argc--;
-          argv++,argc--;
-          continue;
-      }
-      /* Then aliases -- no aliases for makefb */
-      /* Pick just everything from the rest that looks like a parameter */
-      if (param_list_update_cmdline(pl, NULL, &argc, &argv)) { continue; }
+      if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
 
       /* Could also be a file */
       if ((f = fopen(argv[0], "r")) != NULL) {
@@ -300,6 +291,11 @@ main (int argc, char *argv[])
 
       fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
       usage();
+  }
+
+  const char * filename;
+  if ((filename = param_list_lookup_string(pl, "poly")) != NULL) {
+      param_list_read_file(pl, filename);
   }
 
   if (!cado_poly_set_plist (cpoly, pl))

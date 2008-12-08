@@ -2105,32 +2105,17 @@ main (int argc, char **argv)
   cado_poly_init(cpoly);
 
   argv++, argc--;
+  int rhotiming;
+  int skip_r;
+  int skip_a;
+
+  param_list_configure_knob(pl, "-v", &verbose);
+  param_list_configure_knob(pl, "-rhotiming", &rhotiming);
+  param_list_configure_knob(pl, "-skip_a", &skip_a);
+  param_list_configure_knob(pl, "-skip_r", &skip_r);
+
   for( ; argc ; ) {
-      /* knobs first */
-      if (strcmp(argv[0], "-v") == 0) { verbose++; argv++,argc--; continue; }
-      if (strcmp(argv[0], "-rhotiming") == 0) {
-          rho_timing();
-          argv++,argc--;
-          continue;
-      }
-      if (strcmp(argv[0], "-skip_a") == 0) {
-          sieve_a=0;
-          argv++,argc--;
-          continue;
-      }
-      if (strcmp(argv[0], "-skip_r") == 0) {
-          sieve_r=0;
-          argv++,argc--;
-          continue;
-      }
-      if (argc >= 2 && strcmp (argv[0], "-poly") == 0) {
-          param_list_read_file(pl, argv[1]);
-          argv++,argc--;
-          argv++,argc--;
-          continue;
-      }
-      /* Pick just everything from the rest that looks like a parameter */
-      if (param_list_update_cmdline(pl, NULL, &argc, &argv)) { continue; }
+      if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
 
       if (wild < 4 && strspn(argv[0], "-0123456789") == strlen(argv[0])) {
           param_list_add_key(pl, wild_name[wild], argv[0],
@@ -2151,6 +2136,15 @@ main (int argc, char **argv)
       fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
       usage();
   }
+
+  const char * filename;
+  if ((filename = param_list_lookup_string(pl, "poly")) != NULL) {
+      param_list_read_file(pl, filename);
+  }
+
+  if (rhotiming) rho_timing();
+  sieve_a = ! skip_a;
+  sieve_r = ! skip_r;
 
   if (!param_list_parse_string(pl, "fb", fbfilename, sizeof(fbfilename))) {
       fprintf (stderr, 

@@ -14,6 +14,12 @@ void param_list_init(param_list pl)
     pl->alloc = 16;
     pl->p = (parameter *) malloc(pl->alloc * sizeof(parameter));
     pl->consolidated = 1;
+    pl->aliases = NULL;
+    pl->naliases = 0;
+    pl->naliases_alloc = 0;
+    pl->knobs = NULL;
+    pl->nknobs = 0;
+    pl->nknobs_alloc = 0;
 }
 
 void param_list_clear(param_list pl)
@@ -23,6 +29,8 @@ void param_list_clear(param_list pl)
         free(pl->p[i]->value);
     }
     free(pl->p);
+    free(pl->aliases);
+    free(pl->knobs);
     memset(pl, 0, sizeof(pl));
 }
 
@@ -39,7 +47,7 @@ static void make_room(param_list pl, unsigned int more)
     pl->p = (parameter *) realloc(pl->p, pl->alloc * sizeof(parameter));
 }
 
-static void param_list_add_key_nodup(param_list pl,
+static void param_list_add_key_nostrdup(param_list pl,
         char * key, char * value, enum parameter_origin o)
 {
     make_room(pl, 1);
@@ -47,6 +55,8 @@ static void param_list_add_key_nodup(param_list pl,
     pl->p[pl->size]->value = value;
     pl->p[pl->size]->origin = o;
     pl->p[pl->size]->parsed = 0;
+    // values above 1 are builtin within the sorting step.
+    pl->p[pl->size]->seen = 1;
     pl->size++;
     pl->consolidated = 0;
 }
@@ -54,7 +64,8 @@ static void param_list_add_key_nodup(param_list pl,
 void param_list_add_key(param_list pl,
         const char * key, const char * value, enum parameter_origin o)
 {
-    param_list_add_key_nodup(pl, strdup(key), strdup(value), o);
+    param_list_add_key_nostrdup(pl,
+            strdup(key), value ? strdup(value) : NULL, o);
 }
 
 struct sorting_data {
@@ -102,8 +113,13 @@ void param_list_consolidate(param_list pl)
     unsigned int j = 0;
     for(unsigned int i = 0 ; i < pl->size ; i++) {
         if (i + 1 < pl->size && strcmp(pl->p[i]->key, pl->p[i+1]->key) == 0) {
+            /* The latest pair in the list is the one having highest
+             * priority. Do we don't do the copy at this moment.
+             */
             free(pl->p[i]->key);
             free(pl->p[i]->value);
+            // this value is useful for knobs
+            pl->p[i+1]->seen += pl->p[i]->seen;
         } else {
             // I can't see why there could conceivably be a problem if i == j,
             // but valgrind complains...
@@ -189,7 +205,7 @@ int param_list_read_stream(param_list pl, FILE *f)
 
         newvalue = strdup(q);
 
-        param_list_add_key_nodup(pl, newkey, newvalue, PARAMETER_FROM_FILE);
+        param_list_add_key_nostrdup(pl, newkey, newvalue, PARAMETER_FROM_FILE);
     }
     param_list_consolidate(pl);
 
@@ -209,95 +225,138 @@ int param_list_read_file(param_list pl, const char * name)
     return r;
 }
 
-int param_list_update_cmdline(param_list pl, const char * key,
-        int * p_argc, char *** p_argv)
+int param_list_configure_alias(param_list pl, const char * key, const char * alias)
 {
-    if (*p_argc == 0)
-        return 0;
-    const char * a = (*p_argv[0]);
-    if (key == NULL) {
-        /* A NULL key is a wildcard */
-        if (*p_argc >= 2 && a[0] == '-') {
-            a++;
-            a+= *a == '-';
-            int x=0;
-            /* parameters _must_ begin by alphabetic characters, or
-             * otherwise we suffer to distinguish immediate numerical
-             * entries.
-             */
-            if (!isalpha(a[x]))
-                return 0;
-            for( ; a[x] && (isalnum(a[x]) || a[x] == '_') ; x++);
-            if (a[x] == '\0') {
-                param_list_add_key(pl, a, (*p_argv)[1], PARAMETER_FROM_CMDLINE);
-                (*p_argv)+=2;
-                (*p_argc)-=2;
-                return 1;
-            }
-        } else {
-            /* Check for <key>=<value> syntax */
-            int x=0;
-            for( ; a[x] && (isalnum(a[x]) || a[x] == '_') ; x++);
-            if (a[x] == '=' && a[x+1]) {
-                char * newkey = malloc(x+1);
-                memcpy(newkey, a, x);
-                newkey[x]='\0';
-                char * newvalue = strdup(a+x+1);
-                param_list_add_key_nodup(pl,
-                        newkey, newvalue, PARAMETER_FROM_CMDLINE);
-                (*p_argv)+=1;
-                (*p_argc)-=1;
-                return 1;
-            }
-        }
-        return 0;
-    }
+    ASSERT_ALWAYS(alias != NULL);
+    ASSERT_ALWAYS(key != NULL);
+    /* A knob may be aliases, but only as another knob !!! */
+    ASSERT_ALWAYS(key[0] != '-' || (alias[0] == '-' && alias[strlen(alias)-1] != '='));
 
-    if (*p_argc >= 2 && a[0] == '-') {
-        a++;
-        a+= *a == '-';
-        if (strcmp(a, key) == 0) {
-            param_list_add_key(pl, key, (*p_argv)[1], PARAMETER_FROM_CMDLINE);
-            (*p_argv)+=2;
-            (*p_argc)-=2;
-            return 1;
-        }
+    if (pl->naliases == pl->naliases_alloc) {
+        pl->naliases_alloc += 1;
+        pl->naliases_alloc <<= 1;
+        pl->aliases = realloc(pl->aliases, pl->naliases_alloc * sizeof(param_list_alias));
     }
-    
-    if (strncmp(a, key, strlen(key)) == 0) {
-        /* Check for <key>=<value> syntax */
-        a += strlen(key);
-        if (*a == '=' && a[1]) {
-            param_list_add_key(pl, key, a+1, PARAMETER_FROM_CMDLINE);
-            (*p_argv)+=1;
-            (*p_argc)-=1;
-            return 1;
-        }
-    }
+    pl->aliases[pl->naliases]->alias = alias;
+    pl->aliases[pl->naliases]->key = alias;
+    pl->naliases++;
     return 0;
 }
 
-int param_list_update_cmdline_alias(param_list pl, const char * key,
-        const char * alias, int * p_argc, char *** p_argv)
+int param_list_configure_knob(param_list pl, const char * knob, int * ptr)
 {
-    ASSERT_ALWAYS(alias != NULL);
+    ASSERT_ALWAYS(knob != NULL);
+    if (pl->nknobs == pl->nknobs_alloc) {
+        pl->nknobs_alloc += 1;
+        pl->nknobs_alloc <<= 1;
+        pl->knobs = realloc(pl->knobs, pl->nknobs_alloc * sizeof(param_list_knob));
+    }
+    pl->knobs[pl->nknobs]->knob = knob;
+    pl->knobs[pl->nknobs]->ptr = ptr;
+    if (ptr) *ptr = 0;
+    pl->nknobs++;
+    return 0;
+}
+
+
+static int param_list_update_cmdline_alias(param_list pl,
+        param_list_alias al,
+        int * p_argc, char const *** p_argv)
+{
     const char * a = (*p_argv[0]);
-    if (alias[strlen(alias)-1] == '=') {
-        if (strncmp(a, alias, strlen(alias)) != 0)
+    if (al->alias[strlen(al->alias)-1] == '=') {
+        // since knobs are aliased only by knobs, we know we have a plain
+        // option here.
+        if (strncmp(a, al->alias, strlen(al->alias)) != 0)
             return 0;
-        a += strlen(alias);
+        a += strlen(al->alias);
         if (a[1] == '\0')
             return 0;
-        param_list_add_key(pl, key, a+1, PARAMETER_FROM_CMDLINE);
+        param_list_add_key(pl, al->key, a+1, PARAMETER_FROM_CMDLINE);
         (*p_argv)+=1;
         (*p_argc)-=1;
         return 1;
     }
-    if (strcmp(a, alias) == 0) {
-        param_list_add_key(pl, key, (*p_argv)[1], PARAMETER_FROM_CMDLINE);
-        (*p_argv)+=2;
-        (*p_argc)-=2;
+    if (strcmp(a, al->alias) == 0) {
+        // then we simply hook the new value inside argv. Ugly, but
+        // effective. It's important that normal processing comes later
+        // on !
+        *p_argv[0] = al->alias;
+    }
+    return 0;
+}
+
+static int param_list_update_cmdline_knob(param_list pl,
+        param_list_knob knob,
+        int * p_argc, char const *** p_argv)
+{
+    const char * a = (*p_argv[0]);
+    if (strcmp(a, knob->knob) == 0) {
+        param_list_add_key(pl, knob->knob, NULL, PARAMETER_FROM_CMDLINE);
+        (*p_argv)+=1;
+        (*p_argc)-=1;
+        if (knob->ptr) (*(knob->ptr))++;
         return 1;
+    }
+    return 0;
+}
+
+int param_list_update_cmdline(param_list pl,
+        int * p_argc, char *** pp_argv)
+{
+    char const *** p_argv = (char const ***) pp_argv;
+    if (*p_argc == 0)
+        return 0;
+
+    int i;
+
+    /* We rely on having alias scanning first, because this incurs a
+     * command line changed (could get along without except in the case
+     * of knobs where it's particularly handy).
+     */
+    for(i = 0 ; i < pl->naliases ; i++) {
+        if (param_list_update_cmdline_alias(pl, pl->aliases[i], p_argc, p_argv))
+            return 1;
+    }
+
+    for(i = 0 ; i < pl->nknobs ; i++) {
+        if (param_list_update_cmdline_knob(pl, pl->knobs[i], p_argc, p_argv))
+            return 1;
+    }
+
+    const char * a = (*p_argv[0]);
+    if (*p_argc >= 2 && a[0] == '-') {
+        a++;
+        a+= *a == '-';
+        int x=0;
+        /* parameters _must_ begin by alphabetic characters, or
+         * otherwise we suffer to distinguish immediate numerical
+         * entries.
+         */
+        if (!isalpha(a[x]))
+            return 0;
+        for( ; a[x] && (isalnum(a[x]) || a[x] == '_') ; x++);
+        if (a[x] == '\0') {
+            param_list_add_key(pl, a, (*p_argv)[1], PARAMETER_FROM_CMDLINE);
+            (*p_argv)+=2;
+            (*p_argc)-=2;
+            return 1;
+        }
+    } else {
+        /* Check for <key>=<value> syntax */
+        int x=0;
+        for( ; a[x] && (isalnum(a[x]) || a[x] == '_') ; x++);
+        if (a[x] == '=' && a[x+1]) {
+            char * newkey = malloc(x+1);
+            memcpy(newkey, a, x);
+            newkey[x]='\0';
+            char * newvalue = strdup(a+x+1);
+            param_list_add_key_nostrdup(pl,
+                    newkey, newvalue, PARAMETER_FROM_CMDLINE);
+            (*p_argv)+=1;
+            (*p_argc)-=1;
+            return 1;
+        }
     }
     return 0;
 }
@@ -337,13 +396,15 @@ int param_list_parse_long(param_list pl, const char * key, long * r)
     }
     if (r)
         *r = res;
-    return 1;
+    return pl->p[v]->seen;
 }
 
 int param_list_parse_int(param_list pl, const char * key, int * r)
 {
     long res;
-    if (param_list_parse_long(pl, key, &res) == 0)
+    int rc;
+    rc = param_list_parse_long(pl, key, &res);
+    if (rc == 0)
         return 0;
     if (res > INT_MAX || res < INT_MIN) {
         fprintf(stderr, "Parse error:"
@@ -353,7 +414,7 @@ int param_list_parse_int(param_list pl, const char * key, int * r)
     }
     if (r)
         *r  = res;
-    return 1;
+    return rc;
 }
 
 int param_list_parse_intxint(param_list pl, const char * key, int * r)
@@ -384,7 +445,7 @@ int param_list_parse_intxint(param_list pl, const char * key, int * r)
         r[0] = res[0];
         r[1] = res[1];
     }
-    return 1;
+    return pl->p[v]->seen;
 }
 
 
@@ -406,13 +467,14 @@ int param_list_parse_ulong(param_list pl, const char * key, unsigned long * r)
     }
     if (r)
         *r = res;
-    return 1;
+    return pl->p[v]->seen;
 }
 
 int param_list_parse_uint(param_list pl, const char * key, unsigned int * r)
 {
     unsigned long res;
-    if (param_list_parse_ulong(pl, key, &res) == 0)
+    int rc = param_list_parse_ulong(pl, key, &res);
+    if (rc == 0)
         return 0;
     if (res > UINT_MAX) {
         fprintf(stderr, "Parse error:"
@@ -422,7 +484,7 @@ int param_list_parse_uint(param_list pl, const char * key, unsigned int * r)
     }
     if (r)
         *r  = res;
-    return 1;
+    return rc;
 }
 
 
@@ -443,7 +505,7 @@ int param_list_parse_double(param_list pl, const char * key, double * r)
     }
     if (r)
         *r = res;
-    return 1;
+    return pl->p[v]->seen;
 }
 
 int param_list_parse_string(param_list pl, const char * key, char * r, size_t n)
@@ -461,7 +523,17 @@ int param_list_parse_string(param_list pl, const char * key, char * r, size_t n)
     }
     if (r)
         strncpy(r, value, n);
-    return 1;
+    return pl->p[v]->seen;
+}
+
+const char * param_list_lookup_string(param_list pl, const char * key)
+{
+    int v = assoc(pl, key);
+    if (v < 0)
+        return NULL;
+    pl->p[v]->parsed=1;
+    const char * value = pl->p[v]->value;
+    return value;
 }
 
 int param_list_parse_mpz(param_list pl, const char * key, mpz_ptr r)
@@ -484,7 +556,20 @@ int param_list_parse_mpz(param_list pl, const char * key, mpz_ptr r)
                 key, value);
         exit(1);
     }
-    return 1;
+    return pl->p[v]->seen;
+}
+
+int param_list_parse_knob(param_list pl, const char * key)
+{
+    int v = assoc(pl, key);
+    if (v < 0)
+        return 0;
+    pl->p[v]->parsed=1;
+    if (pl->p[v]->value != NULL) {
+        fprintf(stderr, "Parse error: option %s accepts no argument\n", key);
+        exit(1);
+    }
+    return pl->p[v]->seen;
 }
 
 int param_list_all_consumed(param_list pl, char ** extraneous)
