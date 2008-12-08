@@ -5,7 +5,6 @@
 #include <pthread.h>
 #include <time.h>
 
-#include "timer.h"
 #include "barrier.h"
 #include "manu.h"
 
