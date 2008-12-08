@@ -34,7 +34,7 @@ las: las.o fb.o trialdiv.o
 
 # Some dependencies on headers.
 las.o: bucket.h ecm/facul.h
-fb.o : fb.c fb.h basicnt.h
+fb.o : fb.c fb.h basicnt.h config.h
 sieve.o : sieve.c bucket.h config.h basicnt.h $(TOP)/cado.h
 makefb.o : makefb.c
 trialdiv.o : trialdiv.h fb.h
