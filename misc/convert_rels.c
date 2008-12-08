@@ -19,12 +19,16 @@
 #include <stdlib.h>
 #include <stdint.h> /* for UINT32_MAX */
 #include <string.h>
+#include <assert.h>
+#include "../linalg/gzip.h"
 #include "gmp.h"
 
 #define MAX_PRIMES 255 /* maximal number of factor base primes */
 #define MAX_LPRIMES 3  /* maximal number of large primes */
 #define DEGF_MAX 6
 #define REPS 10
+
+int line_number;
 
 uint32_t
 get_uint32 (FILE *fp)
@@ -77,6 +81,64 @@ print_large_prime (uint32_t l, uint32_t h)
   mpz_add_ui (P, P, l);
   mpz_out_str (stdout, 16, P);
   mpz_clear (P);
+}
+
+/* Return 1 if the largest prime in rel is < 2^lpb, 0 otherwise */
+int
+checksize_relation_cado (relation_t *rel, int32_t *rfb, int32_t *afb, int lpb)
+{
+  unsigned int i;
+  unsigned long p;
+
+  if (lpb == 0)
+    return 1;
+
+  /* rational side */
+  for (i = 0; i < rel->rfb_entries; i++)
+    {
+      assert(rel->rexp[i] > 0);
+      if (rfb == NULL)
+        p = rel->rprimes[i];
+      else
+        p = rfb[rel->rprimes[i]];
+      if (p >> lpb)
+        return 0;
+    }
+  for (i = 0; i < rel->num_lrp; i++)
+    {
+      p = rel->large_rprimes[i];
+      if (p >> lpb)
+        return 0;
+    }
+
+  /* algebraic side */
+  for (i = 0; i < rel->afb_entries; i++)
+    {
+      assert (rel->aexp[i] > 0);
+      if (afb == NULL)
+        p = rel->aprimes[i];
+      else
+        p = afb[rel->aprimes[i]];
+      if (p >> lpb)
+        return 0;
+    }
+  for (i = 0; i < rel->sp_entries; i++)
+    {
+      if (rel->sexp[i] > 0)
+        {
+          p = rel->sprimes[i];
+          if (p >> lpb)
+            return 0;
+        }
+    }
+  for (i = 0; i < rel->num_lap; i++)
+    {
+      p = rel->large_aprimes[i];
+      if (p >> lpb)
+        return 0;
+    }
+
+  return 1;
 }
 
 /* output a relation in CADO format:
@@ -272,12 +334,15 @@ read_relation_cado (FILE *fp, relation_t *rel)
 }
 
 int 
-fk_read_line (char *lp, const int maxlen, FILE *fp)
+fk_read_line (char *lp, const int maxlen, FILE *fp, char *file)
 {
-  int i;
+  int i, skip;
+
   do {
     if (fgets (lp, maxlen, fp) == NULL)
       return 0; /* Possibly EOF */
+
+    line_number ++;
     
     i = strlen (lp); /* fgets() always puts a '\0' so this is safe */
     if (i == maxlen - 1 && lp[i] != '\n')
@@ -285,12 +350,15 @@ fk_read_line (char *lp, const int maxlen, FILE *fp)
 	fprintf (stderr, "Error, input line too long\n");
 	exit(1);
       }
+    skip = 0;
     if (i == 0 || lp[i - 1] != '\n')
       {
-	fprintf (stderr, "Error, incomplete line\n");
-	exit(1);
+	fprintf (stderr, "Skipping incomplete line %d in file %s:\n",
+                 line_number, file);
+        fprintf (stderr, "   %s\n", lp);
+	skip = 1;
       }
-  } while (lp[0] == '#' || strncmp (lp, "F 0 X", 5) == 0);
+  } while (skip || lp[0] == '#' || strncmp (lp, "F 0 X", 5) == 0);
   /* Lines beginning with '#' are comments and are skipped over. Each file
      begins with "F 0 X", but the input may be several files concatenated,
      so we allow (and ignore) "F 0 X" anywhere */
@@ -331,15 +399,15 @@ fk_read_primes (char **lp, unsigned long *exponent, unsigned long *primes)
 }
 
 int
-read_relation_fk (FILE *fp, relation_t *rel)
+read_relation_fk (FILE *fp, relation_t *rel, char *file)
 {
   char line[512];
   char *lp;
 
   /* Read the "W" line with the a and b values */
-  if (fk_read_line (line, 512, fp) == 0)
+  if (fk_read_line (line, 512, fp, file) == 0)
     return -1; /* Signal EOF */
-  
+
   if (line[0] != 'W' || line[1] != ' ')
     {
       fprintf (stderr, "Error, no W line at start of relation\n");
@@ -357,7 +425,7 @@ read_relation_fk (FILE *fp, relation_t *rel)
     }
   
   /* Read the "X" line, which has the algebraic primes */
-  if (fk_read_line (line, 512, fp) != 1)
+  if (fk_read_line (line, 512, fp, file) != 1)
     {
       fprintf (stderr, "Error, incomplete relation at end of file\n");
       exit (1);
@@ -373,7 +441,7 @@ read_relation_fk (FILE *fp, relation_t *rel)
   rel->num_lap = 0;
 
   /* Read the "Y" line, which has the rational primes */
-  if (fk_read_line (line, 512, fp) != 1)
+  if (fk_read_line (line, 512, fp, file) != 1)
     {
       fprintf (stderr, "Error, incomplete relations at end of file\n");
       exit (1);
@@ -594,7 +662,7 @@ read_relation_ggnfs (FILE *fp, relation_t *rel, mpz_t norm, mpz_t *f,
 */
 unsigned long
 convert_relations (char *rels, int32_t *rfb, int32_t *afb, mpz_t *f, int degf,
-		int iformat, int oformat, int verbose)
+                   int iformat, int oformat, int lpb, int verbose)
 {
   FILE *fp;
   relation_t rel[1];
@@ -602,8 +670,10 @@ convert_relations (char *rels, int32_t *rfb, int32_t *afb, mpz_t *f, int degf,
   unsigned int j;
   mpz_t norm;
   int ok;
+  int compressed = 0;
 
-  fp = fopen (rels, "rb");
+  compressed = is_gzip (rels);
+  fp = (compressed) ? gzip_open (rels, "r") : fopen (rels, "rb");
   if (fp == NULL)
     {
       fprintf (stderr, "Error, unable to open relation file %s\n", rels);
@@ -614,6 +684,7 @@ convert_relations (char *rels, int32_t *rfb, int32_t *afb, mpz_t *f, int degf,
 
   /* the first 4 bytes give the number of relations in the file */
   rewind (fp);
+  line_number = 0;
 
   if (iformat == FORMAT_GGNFS)
     {
@@ -632,7 +703,7 @@ convert_relations (char *rels, int32_t *rfb, int32_t *afb, mpz_t *f, int degf,
       else if (iformat == FORMAT_CADO)
         ok = read_relation_cado (fp, rel);
       else if (iformat == FORMAT_FK)
-        ok = read_relation_fk (fp, rel);
+        ok = read_relation_fk (fp, rel, rels);
       else if (iformat == FORMAT_CWI)
         ok = read_relation_cwi (fp, rel);
       else
@@ -644,7 +715,7 @@ convert_relations (char *rels, int32_t *rfb, int32_t *afb, mpz_t *f, int degf,
       if (ok == -1) /* end of file */
         break;
 
-      if (ok != 0) /* valid relation */
+      if (ok != 0 && checksize_relation_cado (rel, rfb, afb, lpb))
         {
           switch (oformat)
             {
@@ -676,7 +747,10 @@ convert_relations (char *rels, int32_t *rfb, int32_t *afb, mpz_t *f, int degf,
 
   mpz_clear (norm);
 
-  fclose (fp);
+  if (compressed)
+    gzip_close (fp, rels);
+  else
+    fclose (fp);
 
   return outputRels;
 }
@@ -807,6 +881,7 @@ usage (char *s)
   fprintf (stderr, "                  where xxx, yyy are in {cado, fk, ggnfs}\n");
   fprintf (stderr, "       -fb file - factor base (needed for ggnfs input)\n");
   fprintf (stderr, "       -deg d   - algebraic degree (needed for fk output)\n");
+  fprintf (stderr, "       -lpb l   - discard relations with primes >= 2^l\n");
 }
 
 int
@@ -824,6 +899,7 @@ main (int argc, char *argv[])
   char *RELS; /* name of binary file to read */
   int num_files = 0;
   char *program_name = argv[0];
+  int lpb = 0; /* 0 means no bound */
 
   while (argc > 1 && argv[1][0] == '-')
     {
@@ -879,6 +955,12 @@ main (int argc, char *argv[])
 	  argv += 2;
 	  argc -= 2;
 	}
+      else if (argc > 2 && strcmp (argv[1], "-lpb") == 0)
+	{
+	  lpb = atoi (argv[2]);
+	  argv += 2;
+	  argc -= 2;
+	}
       else
 	{
 	  fprintf (stderr, "Unknown option: %s\n", argv[1]);
@@ -901,6 +983,8 @@ main (int argc, char *argv[])
             ((iformat == FORMAT_CWI) ? "CWI" : "GGNFS")),
            (oformat == FORMAT_CADO) ? "CADO" :
            ((oformat == FORMAT_FK) ? "Franke-Kleinjung" : "GGNFS"));
+  if (lpb != 0)
+    fprintf (stderr, "(keeping relations with primes < 2^%d only)\n", lpb);
 
   if (oformat == FORMAT_GGNFS)
     {
@@ -939,7 +1023,7 @@ main (int argc, char *argv[])
 	printf ("F 0 X %d 1\n", degf);
       num_files ++;
       num_rels += convert_relations (RELS, rfb, afb, f, degf, iformat, oformat,
-                                     verbose);
+                                     lpb, verbose);
     }
 
   fprintf (stderr, "Output %lu relations from %d file(s).\n", num_rels,
