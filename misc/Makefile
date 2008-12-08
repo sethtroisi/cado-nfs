@@ -14,5 +14,10 @@ all: $(targets)
 .c:
 	gcc $(CFLAGS) $< -I.. -I$(GMPINCLUDE) $(GMPLIB) -o $@
 
+# the dependence on ../linalg/gzip.o is a dirty hack, once we switch to cmake
+# this can be done in a clean way, or better the gzip stuff should go in utils
+convert_rels: convert_rels.c
+	gcc $(CFLAGS) $< ../linalg/gzip.o -I.. -I$(GMPINCLUDE) $(GMPLIB) -o $@
+
 clean:
 	\rm -f $(targets) *~
