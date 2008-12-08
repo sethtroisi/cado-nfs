@@ -584,6 +584,10 @@ poly_reducemodF(polymodF_t P, poly_t p, const poly_t F) {
     /* We compute F[d]*p - p[k]*F. In case F[d] divides p[k], we can simply
        compute p - p[k]/F[d]*F. However this will happen rarely with
        Kleinjung's polynomial selection, since lc(F) is large. */
+
+    /* FIXME: in msieve, Jason Papadopoulos reduces by F[d]^d*F(x/F[d])
+       instead of F(x). This might avoid one of the for-loops below. */
+
     v++; /* we consider p/F[d]^v */
     for (i = 0; i < k; ++i)
       mpz_mul (p->coeff[i], p->coeff[i], F->coeff[d]);
