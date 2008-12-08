@@ -14,7 +14,7 @@ fmalgsqrt: fmalgsqrt.o poly.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lgmp
 
 ratsqrt: ratsqrt.o
-	$(CC) $(MY_LFLAGS) -o $@ $^ -lgmp
+	$(CC) $(MY_LFLAGS) -o $@ $^ -lgmp -lm
 
 # Add some dependencies
 algsqrt fmalgsqrt ratsqrt: $(TOP)/utils/libutils.a
