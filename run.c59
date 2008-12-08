@@ -26,7 +26,8 @@ EOF
 output=`tail -1 $t/out`
 output2="200429218120815554269743635437 357440504101388365610785389017"
 output3="357440504101388365610785389017 200429218120815554269743635437"
-if [ "$ouput" == "$output2" -o "$ouput == $output3" ]; then
+if [ "$output" == "$output2" -o "$output" == "$output3" ]; then
+    echo $output
     echo "OK";
     rm -r $t;
     exit 0;
