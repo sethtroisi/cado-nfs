@@ -16,10 +16,11 @@ all:
 	$(MAKE) -C sieve/ecm libfacul.a
 	$(MAKE) -C sieve makefb las
 	$(MAKE) -C linalg freerel duplicates purge merge replay transpose \
-                   balance
+                   balance characters allsqrt
 	$(MAKE) -C gf2x
 	$(MAKE) -C gf2x/cantor
 	$(MAKE) -C linalg/bw
+	$(MAKE) -C sqrt/naive algsqrt
 
 clean:
 	$(MAKE) -C utils		clean
@@ -30,4 +31,5 @@ clean:
 	$(MAKE) -C gf2x			clean
 	$(MAKE) -C gf2x/cantor		clean
 	$(MAKE) -C linalg/bw		clean
+	$(MAKE) -C sqrt/naive		clean
 

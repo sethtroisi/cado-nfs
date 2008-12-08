@@ -85,7 +85,10 @@ LINALG_FILES=linalg/Makefile linalg/freerel.c linalg/hashpair.h \
 	   linalg/merge_mono.c linalg/prune.c linalg/replay.c \
 	   linalg/transpose.c linalg/readmat.h linalg/readmat.c \
 	   linalg/balance.c linalg/readbuffer.h linalg/rowset_heap.h \
-	   linalg/readbuffer.c linalg/rowset_heap.c
+	   linalg/readbuffer.c linalg/rowset_heap.c linalg/apply_perm.cpp \
+	   linalg/characters.c linalg/gauss.c linalg/gauss.h linalg/allsqrt.c
+SQRT_FILES=sqrt/naive/Makefile sqrt/naive/algsqrt.c sqrt/naive/poly.h \
+           sqrt/naive/poly.c
 
 dist:
 	/bin/rm -fr cado-nfs-$(VERSION)
@@ -109,7 +112,6 @@ dist:
 	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/.svn
 	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/include/.svn
 	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/cxx/.svn
-	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/cxx/*.o
 	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/tests
 	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/matlingen.skel/.svn
 	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/matlingen.skel/util/.svn
@@ -119,4 +121,8 @@ dist:
 	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/.deps
 	/bin/rm -fr cado-nfs-$(VERSION)/gf2x/.svn
 	/bin/rm -fr cado-nfs-$(VERSION)/gf2x/cantor/.svn
+	mkdir cado-nfs-$(VERSION)/sqrt
+	mkdir cado-nfs-$(VERSION)/sqrt/naive
+	cp $(SQRT_FILES) cado-nfs-$(VERSION)/sqrt/naive
 	tar zcf cado-nfs-$(VERSION).tgz cado-nfs-$(VERSION)
+	/bin/rm -fr cado-nfs-$(VERSION)
