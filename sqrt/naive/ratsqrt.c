@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <gmp.h>
+#include <math.h>
 #include "cado.h"
 #include "utils/utils.h"
 
@@ -221,21 +222,86 @@ main (int argc, char **argv)
 
 #ifdef DEBUG2 /* print all primes with odd exponent */
   {
-    unsigned long p, e;
-    for (p = 2; mpz_cmp_ui (prd[0], 1) > 0; p += 1 + (p > 2))
+#define MAX_ACCU 1048576
+    unsigned long p, P[MAX_ACCU], E[MAX_ACCU], f, F[MAX_ACCU];
+    int i, j;
+    mpz_t t, q, u;
+    double d;
+    mpz_init (t);
+    mpz_init (q);
+    mpz_init (u);
+    p = 2;
+    /* since we know we have a square, take the square root */
+    mpz_sqrtrem (prd[0], t, prd[0]);
+    ASSERT_ALWAYS(mpz_cmp_ui (t, 0) == 0);
+    while (mpz_cmp_ui (prd[0], 1) > 0)
       {
-        e = 0;
-        while (mpz_divisible_ui_p (prd[0], p))
+        fprintf (stderr, "# Remains %lu bits\n", mpz_sizeinbase (prd[0], 2));
+        /* accumulate small primes in q */
+        i = 0;
+        d = 0.0;
+        mpz_set_ui (q, 1);
+        while (i < MAX_ACCU && d < 1.0)
           {
-            e ++;
-            mpz_divexact_ui (prd[0], prd[0], p);
+            mpz_mul_ui (q, q, p);
+            P[i] = p;
+            E[i] = 0;
+            i ++;
+            d += log((double) p) * log((double) p) / (double) p;
+            do
+              {
+                p = p + 1 + (p > 2);
+              }
+            while (isprime (p) == 0);
           }
-        if (e % 2)
+        f = 1; /* invariant: q = (P[0] * P[1] * ... * P[i-1])^f */
+        while (mpz_divisible_p (prd[0], q))
           {
-            printf ("exponent of %lu is odd: %lu, remains %lu bits\n",
-                    p, e, mpz_sizeinbase (prd[0], 2));
+            mpz_mul (q, q, q);
+            f *= 2;
           }
+        if (f > 1)
+          {
+            mpz_sqrt (q, q);
+            f /= 2; /* now f >= 1 */
+          }
+        for (j = 0; j < i; j++)
+          F[j] = f;
+        /* invariant: q = P[0]^F[0] * P[1]^F[1] * ... * P[i-1]^F[i-1] */
+        while (mpz_cmp_ui (q, 1) > 0)
+          {
+            mpz_fdiv_qr (t, u, prd[0], q);
+            if (mpz_cmp_ui (u, 0) == 0) /* division is exact */
+              {
+                for (j = 0; j < i; j++)
+                  E[j] += F[j];
+                mpz_set (prd[0], t);
+              }
+            else /* some P[j]^F[j] do not divide fully: divide F[j] by 2 */
+              {
+                for (j = 0; j < i; j++)
+                  {
+                    if (F[j] == 0)
+                      continue;
+                    mpz_ui_pow_ui (t, P[j], F[j]);
+                    while (mpz_divisible_p (u, t) == 0 && F[j] > 0)
+                      {
+                        if (F[j] >= 2)
+                          mpz_sqrt (t, t);
+                        /* else F[j]=1: t = P[j] */
+                        mpz_divexact (q, q, t);
+                        F[j] /= 2;
+                      }
+                  }
+              }
+          }
+        for (j = 0; j < i; j++)
+          printf ("%lu %lu\n", P[j], 2 * E[j]);
+        fflush (stdout);
       }
+    mpz_clear (t);
+    mpz_clear (q);
+    mpz_clear (u);
   }
 #endif
   mpz_sqrtrem (prd[0], a, prd[0]);
