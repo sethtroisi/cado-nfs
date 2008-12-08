@@ -115,8 +115,10 @@ endif
 tags:
 	ctags --exclude=.git --exclude=.svn -R $(TOPPATH)
 
-CLEAN_PATTERN:=*~ *.bak
-DCLEAN_PATTERN:=
+# These have to undergo late expansion !
+CLEAN_PATTERN=*~ *.bak
+DCLEAN_PATTERN=
+
 BIN_TARGETS:=
 LIB_TARGETS:=
 ALLDEPS:=
