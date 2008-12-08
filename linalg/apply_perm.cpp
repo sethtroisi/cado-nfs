@@ -69,7 +69,7 @@ int main(int argc, char * argv[])
     {
         ifstream pfile(perm);
         unsigned int v;
-        for( ; pfile >> v ; ) {
+        for( ; pfile.read((char*)&v, sizeof(unsigned int)) ; ) {
             p.push_back(v);
         }
         pfile.close();

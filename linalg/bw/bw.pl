@@ -676,9 +676,9 @@ MKSOL : {
             }
             if (-f "$wdir/W") {
                 unlink $sol;
-                if (-f "$wdir/col_perm.txt") {
+                if (-f "$wdir/matrix.txt.col_perm") {
                     do_mv "$wdir/W", "$wdir/W.twisted";
-                    action "${bindir}bw-apply-perm $wdir/col_perm.txt $wdir/W.twisted > $sol";
+                    action "${bindir}bw-apply-perm $wdir/matrix.txt.col_perm $wdir/W.twisted > $sol";
                 } else {
                     do_cp "$wdir/W", $sol;
                 }
