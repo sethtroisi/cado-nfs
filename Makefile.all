@@ -1,0 +1,122 @@
+.PHONY: clean all
+
+TOP:=.
+include $(TOP)/Makefile.common
+
+# It's useful to pass these down to sub-makefiles if we do have the
+# information. Some of the code base does not (yet) explicitly load
+# Makefile.local becase it's got a life outside cado
+export CC
+export CXX
+export GMP_LIBDIR
+export GMP_INCDIR
+
+# Pass down these overrides to scons
+ifneq ($(CC),)
+SCONS_FLAGS+=CC=$(CC)
+endif
+ifneq ($(GMP_LIBDIR),)
+SCONS_FLAGS+=GMP_LIBDIR=$(GMP_LIBDIR)
+endif
+ifneq ($(GMP_INCDIR),)
+SCONS_FLAGS+=GMP_INCDIR=$(GMP_INCDIR)
+endif
+
+VERSION = 0.0
+
+all:
+	$(MAKE) -C utils
+	$(MAKE) -C polyselect
+	(cd postsieve/tifa; $(SCONS_BINARY) $(SCONS_FLAGS))
+	$(MAKE) -C sieve/ecm
+	$(MAKE) -C sieve
+	$(MAKE) -C postsieve/checknorms
+	$(MAKE) -C linalg
+	$(MAKE) -C sqrt/naive
+	$(MAKE) -C gf2x
+	$(MAKE) -C gf2x/cantor
+	$(MAKE) -C linalg/bw
+
+clean:
+	$(MAKE) -C utils		clean
+	$(MAKE) -C polyselect		clean
+	(cd postsieve/tifa; $(SCONS_BINARY) $(SCONS_FLAGS) -c)
+	$(MAKE) -C sieve/ecm		clean
+	$(MAKE) -C sieve		clean
+	$(MAKE) -C postsieve/checknorms	clean
+	$(MAKE) -C linalg		clean
+	$(MAKE) -C sqrt/naive		clean
+	$(MAKE) -C gf2x			clean
+	$(MAKE) -C gf2x/cantor		clean
+	$(MAKE) -C linalg/bw		clean
+
+DIST_FILES=run.c59 params.c59 cadofactor.pl Makefile Makefile.common cado.h \
+           macros.h
+POLYSELECT_FILES=polyselect/Makefile polyselect/polyselect.c \
+           polyselect/rotate.c polyselect/aux.c polyselect/aux.h
+UTILS_FILES=utils/utils.h utils/mod_ul.h utils/fpoly.h utils/getprime.h \
+           utils/timing.h utils/relation.h utils/gmp_aux.h utils/cado_poly.h \
+           utils/rootfinder.h utils/params.h utils/gcd_int64.h \
+           utils/gcd_uint64.h utils/random_generation.h utils/ularith.h \
+           utils/Makefile utils/cado_poly.c utils/relation.c utils/timing.c \
+           utils/plain_poly.c utils/plain_poly.h utils/getprime.c \
+           utils/mod_ul_common.c utils/modredc_ul.h utils/modredc_15ul.h \
+           utils/modul_poly.c utils/modul_poly.h utils/gmp_aux.c \
+           utils/fpoly.c utils/rootfinder.c utils/params.c utils/gcd_int64.c \
+	   utils/gcd_uint64.c utils/discriminant.c utils/discriminant.h \
+	   utils/random_generation.c utils/manu.h utils/mod_ul.c \
+	   utils/mod_ul_default.h utils/modredc_ul.c \
+	   utils/modredc_ul_default.h utils/modredc_15ul.c \
+	   utils/mpz_array.h utils/mpz_array.c utils/modredc_15ul_default.h \
+	   utils/check_rels.c
+SIEVE_FILES=sieve/Makefile sieve/makefb.c sieve/las.c sieve/bucket.h \
+           sieve/fb.h sieve/basicnt.h sieve/trialdiv.h sieve/fb.c \
+	   sieve/config_h.in sieve/trialdiv.c
+SIEVE_ECM_FILES=sieve/ecm/Makefile sieve/ecm/facul.h sieve/ecm/ecm.c \
+           sieve/ecm/ecm.h sieve/ecm/stage2.h sieve/ecm/pm1.c \
+	   sieve/ecm/pm1.h sieve/ecm/pp1.h sieve/ecm/pp1.c \
+	   sieve/ecm/prac_bc.h sieve/ecm/prac_bc.c sieve/ecm/makeplan.c \
+	   sieve/ecm/facul_doit.c sieve/ecm/facul_doit.h sieve/ecm/stage2.c \
+	   sieve/ecm/facul.c
+LINALG_FILES=linalg/Makefile linalg/freerel.c linalg/hashpair.h \
+           linalg/hashpair.c linalg/duplicates.c linalg/files.h linalg/gzip.h \
+	   linalg/files.c linalg/gzip.c linalg/purge.c linalg/merge.c \
+	   linalg/sparse.h linalg/merge_mono.h linalg/prune.h linalg/sparse.c \
+	   linalg/merge_mono.c linalg/prune.c linalg/replay.c \
+	   linalg/transpose.c linalg/readmat.h linalg/readmat.c \
+	   linalg/balance.c linalg/readbuffer.h linalg/rowset_heap.h \
+	   linalg/readbuffer.c linalg/rowset_heap.c
+
+dist:
+	/bin/rm -fr cado-nfs-$(VERSION)
+	mkdir cado-nfs-$(VERSION)
+	cp $(DIST_FILES) cado-nfs-$(VERSION)
+	mkdir cado-nfs-$(VERSION)/polyselect
+	cp $(POLYSELECT_FILES) cado-nfs-$(VERSION)/polyselect
+	mkdir cado-nfs-$(VERSION)/utils
+	cp $(UTILS_FILES) cado-nfs-$(VERSION)/utils
+	mkdir cado-nfs-$(VERSION)/sieve
+	cp $(SIEVE_FILES) cado-nfs-$(VERSION)/sieve
+	mkdir cado-nfs-$(VERSION)/sieve/ecm
+	cp $(SIEVE_ECM_FILES) cado-nfs-$(VERSION)/sieve/ecm
+	mkdir cado-nfs-$(VERSION)/linalg
+	cp $(LINALG_FILES) cado-nfs-$(VERSION)/linalg
+	cp -r gf2x cado-nfs-$(VERSION)
+	$(MAKE) -C cado-nfs-$(VERSION)/gf2x clean
+	$(MAKE) -C cado-nfs-$(VERSION)/gf2x/cantor clean
+	cp -r linalg/bw cado-nfs-$(VERSION)/linalg
+	$(MAKE) -C cado-nfs-$(VERSION)/linalg/bw clean
+	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/.svn
+	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/include/.svn
+	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/cxx/.svn
+	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/cxx/*.o
+	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/tests
+	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/matlingen.skel/.svn
+	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/matlingen.skel/util/.svn
+	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/util/.svn
+	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/old
+	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/crap
+	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/.deps
+	/bin/rm -fr cado-nfs-$(VERSION)/gf2x/.svn
+	/bin/rm -fr cado-nfs-$(VERSION)/gf2x/cantor/.svn
+	tar zcf cado-nfs-$(VERSION).tgz cado-nfs-$(VERSION)
