@@ -16,6 +16,10 @@
 #include "merge_mono.h"
 #include "prune.h"
 
+#if USE_TAB == 0
+#error "This file assumes USE_TAB is non-zero"
+#endif
+
 double removeCellSWAR_time = 0.0;
 
 typedef struct {
@@ -37,11 +41,7 @@ visit (int i, int *nodes, int *edges, sparse_mat_t *mat, unsigned int *rsum)
     
     nodes[i] = 1; /* also mark as visited */
     edges[i] = 0;
-#if USE_TAB == 0
-    for(m = 0; m < mat->data[i].len; m++){
-#else
     for(m = 1; m <= lengthRow(mat, i); m++){
-#endif
 	j = cell(mat, i, m);
 	if(mat->wt[GETJ(mat, j)] == 2){
 	    edges[i]++;
@@ -72,11 +72,7 @@ delete (report_t *rep, int i, int *nodes, sparse_mat_t *mat, unsigned int *rsum)
     // inspired from removeRowSWAR(mat, i) but for the recursive call
     // to delete...!
     mat->weight -= l; /* decrease the total weight of the matrix */
-#if USE_TAB == 0
-    for(k = 0; k < mat->data[i].len; k++){
-#else
     for(k = 1; k <= l; k++){
-#endif
         j = cell(mat, i, k); /* column index of the kth non-zero coefficient */
         rsum[j] -= i;        /* update rsum */
         removeCellSWAR_time -= seconds ();
