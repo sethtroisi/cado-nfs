@@ -30,7 +30,7 @@ n=71641520761751435455133616475667090434063332228247871795429
 ###########################################################################
 
 degree=4                # degree of the algebraic polynomial
-kjdelay=40              # time between two checks
+kjdelay=60              # time between two checks
 selectnice=10           # nice level for selection
 
 ## Most important parameters of kleinjung
