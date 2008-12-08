@@ -220,7 +220,7 @@ sub my_system {
 
 # Execute the given $cmd using backticks, allowing $timeout time for it
 # to finish. 
-# Returns a triple ( $t, $ret, $code )
+# Returns a triple ( $t, $ret, $status )
 #   where $t is a 0 or 1 depending whether the timout was reached (0
 #   means timeout, 1 means success),
 #   $ret is the returned value (empty string if timeout),
