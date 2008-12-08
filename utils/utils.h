@@ -26,5 +26,6 @@
 #include "gcd_int64.h"
 #include "gcd_uint64.h"
 #include "random_generation.h"
+#include "mpz_array.h"
 
 #endif	/* CADO_UTILS_H_ */

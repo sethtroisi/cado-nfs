@@ -5,7 +5,7 @@ include $(TOP)/Makefile.common
 names:=	cado_poly relation timing plain_poly \
 	getprime mod_ul modredc_ul modredc_15ul modul_poly gmp_aux \
 	fpoly rootfinder params gcd_int64 gcd_uint64 discriminant	\
-	random_generation
+	random_generation mpz_array
 
 src:=$(patsubst %,%.c,$(names))
 obj:=$(patsubst %,%.o,$(names))

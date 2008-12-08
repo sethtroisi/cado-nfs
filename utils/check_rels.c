@@ -86,9 +86,9 @@ int check_stream(const char *name, FILE * stream, __cado_poly_struct* cpoly)
         char line[MAX_LENGTH];
         if (fgets(line, sizeof(line), stream) == NULL)
             break;
-        if (line[strlen(line)-1] != '\n')
+        if (line[strlen(line) - 1] != '\n')
           {
-            fprintf (stderr, "Line %d of %s is too long, please increase MAX_LENGTH in check_rels.c\n", lnum, name);
+            fprintf (stderr, "Line %d of %s is buggy or too long, please check or increase MAX_LENGTH in check_rels.c\n", lnum, name);
             exit (1);
           }
         if (line[0] == '#')
