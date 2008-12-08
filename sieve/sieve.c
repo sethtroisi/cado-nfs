@@ -11,6 +11,7 @@
 #include "cado.h"
 #include "sieve.h"
 #include "../utils/mod_ul.h"
+#include "config.h"
 #include "fb.h"
 #include "basicnt.h"
 #include "../utils/utils.h"

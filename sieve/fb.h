@@ -6,7 +6,6 @@
 #define __FB_H
 
 #include <stdio.h>
-#include "config.h"
 #include "cado.h"
 
 #define FB_END ((fbprime_t) 1)
