@@ -2,7 +2,7 @@
 
 # General script for factoring integers with Cado-NFS.
 #
-# Copyright 2008 Pierrick Gaudry, Emmanuel Thome, Paul Zimmermann
+# Copyright 2008 Pierrick Gaudry, Emmanuel Thome, Paul Zimmermann, Jeremie Detrey
 #
 # This file is part of CADO-NFS.
 #
@@ -417,8 +417,8 @@ sub read_select_status_file {
     while (<SF>) {
         if (/^\s*\n$/) { next; }
         if (/^#/) { next; }
-        if (/^\s*([\w\.]*)\s+([\w\.]+)\s+([\w\.]+)/) {
-            push @status, [$1, $2, $3];
+        if (/^\s*([\w\.]*)\s+([\w\.]+)\s+([\w\.]+)\s+([\w\.]+)/) {
+            push @status, [$1, $2, $3, $4];
             next;
         }
         die "Could not parse status file: $_\n";
@@ -435,12 +435,12 @@ sub write_select_status_file {
     open GRR, ">$statfile" or die "$statfile: $!\n";
     foreach my $t (@$status) {
         my @tt = @$t;
-        print GRR "" . $tt[0] . " " . $tt[1] . " " . $tt[2] . "\n";
+        print GRR "" . $tt[0] . " " . $tt[1] . " " . $tt[2] . " " . $tt[3] . "\n";
     }
     close GRR;
 }
 
-# A task is a triple (hostname admin admax)
+# A task is a quadruple (hostname admin admax pid)
 # This function ssh to hostname, and tests if the task is still alive,
 # dead or finished.
 # 1 means running
@@ -451,7 +451,7 @@ sub check_running_select_task {
     my $param = shift @_;
     my $name = $param->{'name'};
     my $mach_desc = shift @_;
-    my ($host, $admin, $admax) = @_;
+    my ($host, $admin, $admax, $pid) = @_;
     print "    $host \t$admin\t$admax:\n";
     my %host_data=%{$mach_desc->{$host}};
     my $wdir = $host_data{'tmpdir'};
@@ -478,28 +478,44 @@ sub check_running_select_task {
         return -2;
     }
 
-    # If file is partial, check its last modification time:
-    my $date;
-    ($t, $date) = my_system_timeout("ssh $host date +%s", 30);
-    if (! $t) {
-        print "      Assume task is still running...\n";
-        return 1;
-    }
-    my $modifdate;
-    ($t, $modifdate) = my_system_timeout(
-        "ssh $host stat -c %Y $wdir/$name.kjout.$admin-$admax", 30);
-    if (! $t) {
-        print "      Assume task is still running...\n";
-        return 1;
-    }
-    # TODO: detecting dead task is more tricky for polynomial selection,
-    # since the output file might not be touched for a long time...
+    ## If file is partial, check its last modification time:
+    #my $date;
+    #($t, $date) = my_system_timeout("ssh $host date +%s", 30);
+    #if (! $t) {
+    #    print "      Assume task is still running...\n";
+    #    return 1;
+    #}
+    #my $modifdate;
+    #($t, $modifdate) = my_system_timeout(
+    #    "ssh $host stat -c %Y $wdir/$name.kjout.$admin-$admax", 30);
+    #if (! $t) {
+    #    print "      Assume task is still running...\n";
+    #    return 1;
+    #}
     ## If didn't move for 10 minutes, assume it's dead
     #if ($date > ($modifdate + 600)) {
     #    print "      dead ?!?\n";
     #    return -1;
     #}
     #
+
+    # TODO: this is still not good enough: if the process dies and another
+    # one jumps in and takes its PID, we won't detect it.
+    # Possible solutions: check the /proc/$pid/cmdline (Linux-specific)
+    # or keep a temporary file regularly touched by the program.
+    my $ret;
+    my $status;
+    ($t, $ret, $status) = my_system_timeout(
+        "ssh $host \"/bin/kill -0 $pid\"", 30);
+    if (! $t) {
+        print "      Assume task is still running...\n";
+        return 1;
+    }
+    if ($status != 0) {
+        print "      dead ?!?\n";
+        return -1;
+    }
+
     # otherwise it's running:
     print "      running...\n";
     return 1;
@@ -573,7 +589,6 @@ sub restart_select_tasks {
                 $admax = $param->{'kjadmax'};
             }
             @ranges = @$yy;
-            $t = [$m, $admin, $admax ];
             my $mach = $m;
             my $wdir = $desc{'tmpdir'};
             my $bindir = $desc{'cadodir'};
@@ -591,12 +606,13 @@ sub restart_select_tasks {
               " -degree " . $param->{'degree'} .
               " < $wdir/$name.n";
             my $outfile = "$wdir/$name.kjout.$admin-$admax";
-            my $ret = `ssh $mach "/bin/sh -c '$cmd > $outfile 2>&1&'"`;
+            my $pid = `ssh $mach "/bin/sh -c '$cmd > $outfile 2>&1& echo \\\$!'"`;
+            chomp $pid;
             print "    Starting $mach $admin $admax.\n";
             open FH, ">> " . $param->{'wdir'} . "/$name.cmd";
-            print FH "ssh $mach \"/bin/sh -c '$cmd > $outfile 2>&1&'\"\n";
+            print FH "ssh $mach \"/bin/sh -c '$cmd > $outfile 2>&1& echo \\\$!'\"\n";
             close FH;
-            push @$running, $t;
+            push @$running, [$m, $admin, $admax, $pid];
         }
     }
 }
@@ -835,8 +851,8 @@ sub read_status_file {
     while (<SF>) {
         if (/^\s*\n$/) { next; }
         if (/^#/) { next; }
-        if (/^\s*(\w*)\s+(\d+)\s+(\d+)/) {
-            push @status, [$1, $2, $3];
+        if (/^\s*(\w*)\s+(\d+)\s+(\d+)\s+(\d+)/) {
+            push @status, [$1, $2, $3, $4];
             next;
         }
         die "Could not parse status file: $_\n";
@@ -853,20 +869,20 @@ sub write_status_file {
     open GRR, ">$statfile" or die "$statfile: $!\n";
     foreach my $t (@$status) {
         my @tt = @$t;
-        print GRR "" . $tt[0] . " " . $tt[1] . " " . $tt[2] . "\n";
+        print GRR "" . $tt[0] . " " . $tt[1] . " " . $tt[2] . " " . $tt[3] . "\n";
     }
     close GRR;
 }
 
 
-# A task is a triple (hostname q0 q1)
+# A task is a quadruple (hostname q0 q1 pid)
 # This function ssh to hostname, and tests if the task is still alive,
 # dead or finished.
 sub check_running_task {
     my $param = shift @_;
     my $name = $param->{'name'};
     my $mach_desc = shift @_;
-    my ($host, $q0, $q1) = @_;
+    my ($host, $q0, $q1, $pid) = @_;
     print "    $host \t$q0-$q1:\n";
     my %host_data=%{$mach_desc->{$host}};
     my $wdir = $host_data{'tmpdir'};
@@ -884,25 +900,44 @@ sub check_running_task {
         return 0;
     }
     # If file is partial check its last modification time:
-    my $date;
-    ($t, $date) = my_system_timeout("ssh $host date +%s", 30);
-    if (! $t) {
-        print "      Assume task is still running...\n";
-        return 1;
-    }
-    my $modifdate;
-    ($t, $modifdate) = my_system_timeout(
-        "ssh $host stat -c %Y $wdir/$name.rels.$q0-$q1", 30);
-    if (! $t) {
-        print "      Assume task is still running...\n";
-        return 1;
-    }
-    ## If didn't move for 10 minutes, assume it's dead
+#    my $date;
+#    ($t, $date) = my_system_timeout("ssh $host date +%s", 30);
+#    if (! $t) {
+#        print "      Assume task is still running...\n";
+#        return 1;
+#    }
+#    my $modifdate;
+#    ($t, $modifdate) = my_system_timeout(
+#        "ssh $host stat -c %Y $wdir/$name.rels.$q0-$q1", 30);
+#    if (! $t) {
+#        print "      Assume task is still running...\n";
+#        return 1;
+#    }
+#    ## If didn't move for 10 minutes, assume it's dead
 #    if ($date > ($modifdate + 600)) {
 #        print "      dead ?!?\n";
 #        return 0;
 #    }
-    ### TODO: Dead job detection is not working properly!!!
+
+    # TODO: this is still not good enough: if the process dies and another
+    # one jumps in and takes its PID, we won't detect it.
+    # Possible solutions: check the /proc/$pid/cmdline (Linux-specific)
+    # or keep a temporary file regularly touched by the program.
+    my $ret;
+    my $status;
+    ($t, $ret, $status) = my_system_timeout(
+        "ssh $host \"/bin/kill -0 $pid\"", 30);
+    if (! $t) {
+        print "      Assume task is still running...\n";
+        return 1;
+    }
+    if ($status != 0) {
+        print "      dead ?!?\n";
+        # TODO: this is no good! We should return a different status code
+        # to distinguish the "dead" status from the "finished" status.
+        return 0;
+    }
+
     # otherwise it's running:
     print "      running...\n";
     return 1;
@@ -1082,7 +1117,6 @@ sub restart_tasks {
         $cpt = $desc{'cores'} - $cpt;
         for (my $i = 0; $i < $cpt; $i++) {
             my $qend = $q_curr + $param->{'qrange'};
-            $t = [$m, $q_curr, $qend ];
             my $mach = $m;
             my $wdir = $desc{'tmpdir'};
             my $bindir = $desc{'cadodir'};
@@ -1092,12 +1126,13 @@ sub restart_tasks {
               " -poly $wdir/$name.poly" .
               " -fb $wdir/$name.roots" .
               " -q0 $q_curr -q1 $qend";
-            my $ret = `ssh $mach "/bin/sh -c '$cmd > $wdir/$name.rels.$q_curr-$qend 2>&1&'"`;
+            my $pid = `ssh $mach "/bin/sh -c '$cmd > $wdir/$name.rels.$q_curr-$qend 2>&1& echo \\\$!'"`;
+            chomp $pid;
             print "    Starting $mach $q_curr-$qend.\n";
             open FH, ">> " . $param->{'wdir'} . "/$name.cmd";
-            print FH "ssh $mach \"/bin/sh -c '$cmd > $wdir/$name.rels.$q_curr-$qend 2>&1&'\"\n";
+            print FH "ssh $mach \"/bin/sh -c '$cmd > $wdir/$name.rels.$q_curr-$qend 2>&1& echo \\\$!'\"\n";
             close FH;
-            push @$running, $t;
+            push @$running, [$m, $q_curr, $qend, $pid];
             $q_curr = $qend;
         }
     }
@@ -1126,7 +1161,7 @@ sub parallel_sieve_update {
         if ($running) {
             push @newstatus, $t;
         } else {
-            # Task is finished. 
+            # Task is finished or dead. 
             my ($trels,@tfiles) = import_task_result($param, \%mach_desc, @$t);
             $new_rels += $trels;
             push @files, @tfiles;
@@ -1186,6 +1221,14 @@ sub parallel_sieve {
             print "Wait for $delay seconds before checking again.\n";
             sleep($delay);
         }
+    }
+
+    ## kill remaining siever processes
+    my @status = read_status_file($param);
+    foreach my $t (@status) {
+        my $m   = ${$t}[0];
+        my $pid = ${$t}[3];
+        my $ret = `ssh $m "/bin/kill -KILL $pid"`;
     }
 
     ## clean remaining sieving-related files on slaves
