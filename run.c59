@@ -10,6 +10,12 @@
 t=`mktemp -d`
 echo "Testing factorization of c59 in $t"
 
+if [ -z "$USEHOST" ] ; then
+   host=localhost
+else
+   host=`hostname --short`
+fi
+
 cp params.c59 $t/param
 cadodir=`pwd`
 
@@ -17,7 +23,7 @@ cat > $t/mach_desc <<EOF
 [local]
 tmpdir=$t/tmp
 cadodir=$cadodir
-localhost cores=2
+$host cores=2
 EOF
 
 ./cadofactor.pl $t/param machines=$t/mach_desc wdir=$t delay=20 sievenice=0 selectnice=0 2>&1 | tee $t/out
