@@ -118,6 +118,8 @@ dist:
 	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/util/.svn
 	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/old
 	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/crap
+	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/matlingen.skel
+	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/matlingen_files
 	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/.deps
 	/bin/rm -fr cado-nfs-$(VERSION)/gf2x/.svn
 	/bin/rm -fr cado-nfs-$(VERSION)/gf2x/cantor/.svn
