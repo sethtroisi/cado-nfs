@@ -59,6 +59,7 @@ use Data::Dumper;
 
 use File::Copy;
 use File::Basename;
+use Cwd qw(abs_path);
 use POSIX qw(ceil floor);
 
 # Default parameters
@@ -181,7 +182,7 @@ sub read_param {
         die "With parallel, I need a machines argument!\n"; }
     if (!$param->{'cadodir'}) {
         print STDERR "Warning: taking current script's basedir as cadodir\n";
-        ($param->{'cadodir'}) =  dirname($0);
+        $param->{'cadodir'} = abs_path(dirname($0));
     }
     return $param;
 }
