@@ -468,26 +468,6 @@ generate_base_mb (cado_poly p, mpz_t m, mpz_t b)
 
 /************************** polynomial arithmetic ****************************/
 
-/* f <- g */
-static void
-copy_poly (mpz_t *f, mpz_t *g, int d)
-{
-  int i;
-
-  for (i = 0; i <= d; i++)
-    mpz_set (f[i], g[i]);
-}
-
-/* f <- diff(g,x) */
-static void
-diff_poly (mpz_t *f, mpz_t *g, int d)
-{
-  int i;
-
-  for (i = 0; i < d; i++)
-    mpz_mul_ui (f[i], g[i + 1], i + 1);
-}
-
 /* g <- content(f) where deg(f)=d */
 static void
 content_poly (mpz_t g, mpz_t *f, int d)
