@@ -541,17 +541,16 @@ special_val0 (mpz_t *f, int d, unsigned long p)
 {
   double v;
   mpz_t c, *g, *h;
-  int alloc, i, r0, nroots;
+  int i, r0, nroots;
   unsigned long *roots, r;
-  mpz_array_t *G, *H;
+  mpz_array_t *G = NULL, *H;
 
   mpz_init (c);
   content_poly (c, f, d);
   for (v = 0.0; mpz_divisible_ui_p (c, p); v++, mpz_divexact_ui (c, c, p));
-  alloc = v != 0.0;
 
   /* g <- f/p^v */
-  if (alloc != 0)
+  if (v != 0.0)
     {
       G = alloc_mpz_array (d + 1);
       g = G->data;
@@ -597,7 +596,7 @@ special_val0 (mpz_t *f, int d, unsigned long p)
   free (roots);
   clear_mpz_array (H);
 
-  if (alloc != 0)
+  if (G != NULL)
     clear_mpz_array (G);
   mpz_clear (c);
 
