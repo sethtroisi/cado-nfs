@@ -26,6 +26,10 @@ CXX:=mpic++
 CC:=$(shell $(CC) -showme | sed -e 's/-I/-isystem /g')
 CXX:=$(shell $(CXX) -showme | sed -e 's/-I/-isystem /g')
 
+ifeq ($(CC),)
+$(error "You must install an mpicc compiler")
+endif
+
 CC:=$(CC) -Wl,-rpath,$(shell cat /etc/alternatives/mpilibs64)
 CXX:=$(CXX) -Wl,-rpath,$(shell cat /etc/alternatives/mpilibs64)
 endif
@@ -35,11 +39,13 @@ endif
 ## src:=$(patsubst %,%.c,$(names))
 ## obj:=$(patsubst %,%.o,$(names))
 
-bins:=build prep
+bins:=build prep test_hello
 
 all:$(bins)
 
 build_objs:=build.o matmul.o ../readbuffer.o ../readmat.o
+
+test_hello_objs:=test_hello.o parallelizing_info.o
 
 prep_objs:=prep.o intersections.o matmul.o	\
 	matmul_top.o parallelizing_info.o	\
@@ -47,11 +53,34 @@ prep_objs:=prep.o intersections.o matmul.o	\
 	auxfuncs.o config_file.o
 
 
+test_hello: $(test_hello_objs)
+	$(CXX) $(MY_LFLAGS) $(test_hello_objs) -o $@ -lutils -lgmp
+
 build: $(build_objs)
 	$(CXX) $(MY_LFLAGS) $(build_objs) -o $@ -lutils -lgmp
 
 prep: $(prep_objs)
 	$(CXX) $(MY_LFLAGS) $(prep_objs) -o $@ -lutils -lgmp -lgmpxx
+
+ifeq ($(WITH_MPI),1)
+ifeq ($(WITH_PTHREADS),1)
+cregexp:=.
+else
+cregexp:='thr=1x1'
+endif
+else
+ifeq ($(WITH_PTHREADS),1)
+cregexp:='mpi=1x1'
+else
+cregexp:='mpi=1x1.*thr=1x1'
+endif
+endif
+
+check: test_hello
+	grep $(cregexp) checks.list.light | ./checks.sh
+
+test: test_hello
+	grep $(cregexp) checks.list | ./checks.sh
 
 clean:
 	-rm -f *.bak *.o $(bins) *~
@@ -63,7 +92,7 @@ clean:
 sources:=	\
     args.cpp auxfuncs.c build.c config_file.cpp info_file.cpp		\
     intersections.cpp matmul.cpp matmul_top.cpp parallelizing_info.c	\
-    prep.c preparegrid.c
+    prep.c preparegrid.c test_hello.c
 dep: $(patsubst %,.deps/%.d,$(sources))
 -include $(patsubst %,.deps/%.d,$(sources))
 

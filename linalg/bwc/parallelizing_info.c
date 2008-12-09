@@ -356,6 +356,9 @@ void hello(parallelizing_info_ptr pi)
         serialize_threads(pi->m);
     }
 
-    serialize(pi->m);   //
+    if (serialize(pi->m)) {
+        printf("OK: Finished hello world loop\n");
+    }
+
 }
 

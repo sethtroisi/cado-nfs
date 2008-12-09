@@ -1,0 +1,42 @@
+./test_hello mpi=1x1 thr=1x1
+./test_hello mpi=1x1 thr=2x1
+./test_hello mpi=1x1 thr=1x2
+./test_hello mpi=1x1 thr=2x2
+./test_hello mpi=1x1 thr=4x1
+./test_hello mpi=1x1 thr=1x4
+
+mpirun -np 2 ./test_hello mpi=2x1 thr=1x1
+mpirun -np 2 ./test_hello mpi=2x1 thr=2x1
+mpirun -np 2 ./test_hello mpi=2x1 thr=1x2
+mpirun -np 2 ./test_hello mpi=2x1 thr=2x2
+mpirun -np 2 ./test_hello mpi=2x1 thr=4x1
+mpirun -np 2 ./test_hello mpi=2x1 thr=1x4
+
+mpirun -np 2 ./test_hello mpi=1x2 thr=1x1
+mpirun -np 2 ./test_hello mpi=1x2 thr=2x1
+mpirun -np 2 ./test_hello mpi=1x2 thr=1x2
+mpirun -np 2 ./test_hello mpi=1x2 thr=2x2
+mpirun -np 2 ./test_hello mpi=1x2 thr=4x1
+mpirun -np 2 ./test_hello mpi=1x2 thr=1x4
+
+mpirun -np 4 ./test_hello mpi=4x1 thr=1x1
+mpirun -np 4 ./test_hello mpi=4x1 thr=2x1
+mpirun -np 4 ./test_hello mpi=4x1 thr=1x2
+mpirun -np 4 ./test_hello mpi=4x1 thr=2x2
+mpirun -np 4 ./test_hello mpi=4x1 thr=4x1
+mpirun -np 4 ./test_hello mpi=4x1 thr=1x4
+
+mpirun -np 4 ./test_hello mpi=2x2 thr=1x1
+mpirun -np 4 ./test_hello mpi=2x2 thr=2x1
+mpirun -np 4 ./test_hello mpi=2x2 thr=1x2
+mpirun -np 4 ./test_hello mpi=2x2 thr=2x2
+mpirun -np 4 ./test_hello mpi=2x2 thr=4x1
+mpirun -np 4 ./test_hello mpi=2x2 thr=1x4
+
+mpirun -np 4 ./test_hello mpi=1x4 thr=1x1
+mpirun -np 4 ./test_hello mpi=1x4 thr=2x1
+mpirun -np 4 ./test_hello mpi=1x4 thr=1x2
+mpirun -np 4 ./test_hello mpi=1x4 thr=2x2
+mpirun -np 4 ./test_hello mpi=1x4 thr=4x1
+mpirun -np 4 ./test_hello mpi=1x4 thr=1x4
+

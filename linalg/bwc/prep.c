@@ -72,9 +72,9 @@ int main(int argc, char * argv[])
 
     param_list_init (pl);
     argv++, argc--;
+    param_list_configure_knob(pl, "-v", &verbose);
     for( ; argc ; ) {
-        if (strcmp(argv[0], "-v") == 0) { verbose++; argv++,argc--; continue; }
-        if (param_list_update_cmdline(pl, NULL, &argc, &argv)) { continue; }
+        if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
         fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
         usage();
     }
