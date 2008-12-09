@@ -1,5 +1,5 @@
 #!/bin/sh
-# Usage: nightly-test <CC>
+# Usage: nightly-test <MAKE_ARGS>
 # If you use this in your crontab, since cron does not have access to
 # ssh-agent, a trick is the following:
 # 1) run from your home directory: ssh-keygen -N "" -t rsa -f .ssh/cle_gforge
@@ -14,7 +14,7 @@
 #    the computer on which you run nightly-test, and to add the content of
 #    cle_gforge.pub in the authorized_keys on that computer.
 set -e
-CC="$1"
+MAKE_ARGS="$1"
 DIR=cado-nightly
 USER=`whoami`
 cd /tmp
@@ -24,7 +24,12 @@ mkdir "$DIR"
 test ! -h "$DIR"
 svn checkout svn+ssh://${USER}@scm.gforge.inria.fr/svn/cado/trunk/dist/src "$DIR"
 cd "$DIR"
-make CC="$CC"
+# first build a tarball
+make -f Makefile.all dist VERSION=dev
+# now extract the tarball and test it
+tar zxf cado-nfs-dev.tgz
+cd cado-nfs-dev
+make $MAKE_ARGS
 ./run.c59
 cd /tmp
 /bin/rm -fr "$DIR"
