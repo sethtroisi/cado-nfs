@@ -47,10 +47,11 @@ static void make_room(param_list pl, unsigned int more)
     pl->p = (parameter *) realloc(pl->p, pl->alloc * sizeof(parameter));
 }
 
-static void param_list_add_key_nostrdup(param_list pl,
+static int param_list_add_key_nostrdup(param_list pl,
         char * key, char * value, enum parameter_origin o)
 {
     make_room(pl, 1);
+    int r = pl->size;
     pl->p[pl->size]->key = key;
     pl->p[pl->size]->value = value;
     pl->p[pl->size]->origin = o;
@@ -59,13 +60,15 @@ static void param_list_add_key_nostrdup(param_list pl,
     pl->p[pl->size]->seen = 1;
     pl->size++;
     pl->consolidated = 0;
+    return r;
 }
 
-void param_list_add_key(param_list pl,
+int param_list_add_key(param_list pl,
         const char * key, const char * value, enum parameter_origin o)
 {
-    param_list_add_key_nostrdup(pl,
+    int r = param_list_add_key_nostrdup(pl,
             strdup(key), value ? strdup(value) : NULL, o);
+    return r;
 }
 
 struct sorting_data {
@@ -292,7 +295,10 @@ static int param_list_update_cmdline_knob(param_list pl,
 {
     const char * a = (*p_argv[0]);
     if (strcmp(a, knob->knob) == 0) {
-        param_list_add_key(pl, knob->knob, NULL, PARAMETER_FROM_CMDLINE);
+        int r;
+        r = param_list_add_key(pl, knob->knob, NULL, PARAMETER_FROM_CMDLINE);
+        // knobs always count as parsed, of course.
+        pl->p[r]->parsed=1;
         (*p_argv)+=1;
         (*p_argc)-=1;
         if (knob->ptr) (*(knob->ptr))++;

@@ -116,8 +116,8 @@ extern int param_list_all_consumed(param_list pl, char ** extraneous);
 // normal (although note that in some cases, it could be bad as well).
 extern int param_list_warn_unused(param_list pl);
 
-// this one is the ``joker'' call.
-extern void param_list_add_key(param_list pl,
+// this one is the ``joker'' call. Return type is for internal use.
+extern int param_list_add_key(param_list pl,
         const char *, const char *, enum parameter_origin);
 
 // for debugging.
