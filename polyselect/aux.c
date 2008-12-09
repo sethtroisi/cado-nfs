@@ -97,7 +97,10 @@ l1_lognorm (mpz_t *p, unsigned long degree, double S)
 }
 
 /* Same as L2_lognorm, but takes 'double' instead of 'mpz_t' as coefficients.
-   Returns 1/2*log(int(int(F^2(xs,y)/s^d, x=-1..1), y=-1..1)).
+   Returns 1/2*log(int(int(F^2(xs,y)/s^d, x=-1..1), y=-1..1)) for the
+   'rectangular' method, and
+   1/2*log(int(int(F^2(r cos(t) s,r sin(t))*r/s^d, r=0..1), t=0..2*Pi))
+   with the 'circular' method.
  */
 static double
 L2_lognorm_d (double *a, unsigned long d, double s)
@@ -121,6 +124,7 @@ L2_lognorm_d (double *a, unsigned long d, double s)
      of the de-skewed polynomial)
    */
 
+#define USE_CIRCULAR
   if (d == 3)
     {
       double a3, a2, a1, a0;
@@ -128,7 +132,18 @@ L2_lognorm_d (double *a, unsigned long d, double s)
       a2 = a[2] * s * s;
       a1 = a[1] * s;
       a0 = a[0];
+#ifndef USE_CIRCULAR
       n=4.0/7.0*(a3*a3+a0*a0)+8.0/15.0*(a1*a3+a0*a2)+4.0/15.0*(a2*a2+a1*a1);
+#else
+      /* f := a3*x^3+a2*x^2+a1*x+a0:
+         d := degree(f,x):
+         F := expand(y^d*subs(x=x/y,f));
+         subs(x=r*cos(t), y=r*sin(t), %);
+         int(int(%^2/s^d*r, r=0..1),t=0..2*Pi); */
+      n = 5.0 * (a3 * a3 + a0 * a0) + 2.0 * (a3 * a1 + a0 * a2)
+        + a1 * a1 + a2 * a2;
+      n = n * 0.049087385212340519352; /* Pi/64 */
+#endif
       return 0.5 * log(n / (s * s * s));
     }
   else if (d == 4)
@@ -140,9 +155,21 @@ L2_lognorm_d (double *a, unsigned long d, double s)
       a2 = a[2] * s * s;
       a1 = a[1] * s;
       a0 = a[0];
+#ifndef USE_CIRCULAR
       n = 4.0 / 9.0 * (a4 * a4 + a0 * a0) + 8.0 / 21.0 * (a4 * a2 + a2 * a0)
         + 4.0 / 21.0 * (a3 * a3 + a1 * a1) + 8.0 / 25.0 * (a4 * a0 + a3 * a1)
         + 4.0 / 25.0 * a2 * a2;
+#else
+      /* f := a4*x^4+a3*x^3+a2*x^2+a1*x+a0:
+         d := degree(f,x):
+         F := expand(y^d*subs(x=x/y,f));
+         subs(x=r*cos(t), y=r*sin(t), %);
+         int(int(%^2/s^d*r, r=0..1),t=0..2*Pi); */
+      n = 35.0 * (a4 * a4 + a0 * a0) + 10.0 * (a4 * a2 + a2 * a0)
+        + 5.0 * (a3 * a3 + a1 * a1) + 6.0 * (a4 * a0 + a3 * a1)
+        + 3.0 * a2 * a2;
+      n = n * 0.0049087385212340519352; /* Pi/640 */
+#endif
       return 0.5 * log(n / (s * s * s * s));
     }
   else if (d == 5)
@@ -156,9 +183,20 @@ L2_lognorm_d (double *a, unsigned long d, double s)
       a3 = a[3] * s3;
       a4 = a[4] * s4;
       a5 = a[5] * s5;
+#ifndef USE_CIRCULAR
       n = 4.0 / 11.0 * (a5 * a5 + a0 * a0) + 8.0 / 27.0 * (a5 * a3 + a2 * a0)
         + 4.0 / 27.0 * (a4 * a4 + a1 * a1) + 4.0 / 35.0 * (a3 * a3 + a2 * a2)
         + 8.0 / 35.0 * (a5 * a1 + a4 * a2 + a4 * a0 + a3 * a1);
+#else /* use circular integral:
+         f := a5*x^5+a4*x^4+a3*x^3+a2*x^2+a1*x+a0:
+         F := expand(y^5*subs(x=x/y,f));
+         subs(x=r*cos(t), y=r*sin(t), %);
+         int(int(%^2/s^5*r, r=0..1),t=0..2*Pi); */
+      n = 6.0 * (a3 * a1 + a1 * a5 + a4 * a2 + a0 * a4)
+        + 14.0 * (a0 * a2 + a3 * a5) + 63.0 * (a0 * a0 + a5 * a5)
+        + 7.0 * (a4 * a4 + a1 * a1) + 3.0 * (a3 * a3 + a2 * a2);
+      n = n * 0.0020453077171808549730; /* Pi/1536 */
+#endif
       return 0.5 * log(n / s5);
     }
   else if (d == 6)
@@ -172,10 +210,22 @@ L2_lognorm_d (double *a, unsigned long d, double s)
       a2 = a[2] * s * s;
       a1 = a[1] * s;
       a0 = a[0];
+#ifndef USE_CIRCULAR
       n = 4.0 / 13.0 * (a6 * a6 + a0 * a0) + 8.0 / 33.0 * (a6 * a4 + a2 * a0)
         + 4.0 / 33.0 * (a5 * a5 + a1 * a1) + 4.0 / 45.0 * (a4 * a4 + a2 * a2)
         + 8.0 / 45.0 * (a6 * a2 + a5 * a3 + a4 * a0 + a3 * a1)
         + 8.0 / 49.0 * (a6 * a0 + a5 * a1 + a4 * a2) + 4.0 / 49.0 * a3 * a3;
+#else /* use circular integral:
+         f := a6*x^6+a5*x^5+a4*x^4+a3*x^3+a2*x^2+a1*x+a0:
+         F := expand(y^6*subs(x=x/y,f));
+         subs(x=r*cos(t), y=r*sin(t), %);
+         int(int(%^2/s^6*r, r=0..1),t=0..2*Pi); */
+      n = 231.0 * (a6 * a6 + a0 * a0) + 42.0 * (a6 * a4 + a2 * a0)
+        + 21.0 * (a5 * a5 + a1 * a1) + 7.0 * (a4 * a4 + a2 * a2)
+        + 14.0 * (a6 * a2 + a5 * a3 + a4 * a0 + a3 * a1)
+        + 10.0 * (a6 * a0 + a5 * a1 + a4 * a2) + 5.0 * a3 * a3;
+      n = n * 0.00043828022511018320850; /* Pi/7168 */
+#endif
       return 0.5 * log(n / (s * s * s * s * s * s));
     }
   else
