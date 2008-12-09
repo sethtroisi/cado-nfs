@@ -13,7 +13,7 @@
 
 #include <sys/time.h>   // gettimeofday
 
-#define xxxCONCURRENCY_DEBUG
+#define CONCURRENCY_DEBUG
 
 static inline void pi_wiring_init_pthread_things(struct pi_wiring * w, const char * desc)
 {
@@ -101,6 +101,9 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr),
     pi->wr[1]->trank = 0;
 
     for(int d = 0 ; d < 2 ; d++) {
+        // A subgroup contains all process having the same jcommon value.
+        // Therefore, we have as many horizontal MPI barriers set up as
+        // one finds MPI job numbers across a column.
         MPI_Comm_split(pi->m->pals, pi->wr[d]->jcommon,
                 pi->m->jrank, &pi->wr[d]->pals);
         MPI_Comm_rank(pi->wr[d]->pals, (int*) &pi->wr[d]->jrank);
@@ -132,8 +135,8 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr),
     }
 
     // row barriers.
-    // we've got pi->wr[1]->ncores working on separate rows (that's the
-    // number of cores we encounter when walking down one column). So
+    // we've got pi->wr[1]->ncores cores working on separate rows (that's
+    // the number of cores we encounter when walking down one column). So
     // each row leader is at index c * pi->wr[0]->ncores, because
     // pi->wr[0]->ncores is the number of cores working on separate
     // columns.
@@ -273,10 +276,10 @@ int serialize__(struct pi_wiring * w, unsigned int l MAYBE_UNUSED)
             w->trank, w->ncores,
             w->th->desc, w->th->b);
 #endif
+    my_pthread_barrier_wait(w->th->b);
     if (w->trank == 0) {
         MPI_Barrier(w->pals);
     }
-    my_pthread_barrier_wait(w->th->b);
     // struct timeval tv[1];
     // gettimeofday(tv, NULL);
     // printf("%.2f\n", tv->tv_sec + (double) tv->tv_usec / 1.0e6);
@@ -308,6 +311,7 @@ int serialize_threads__(struct pi_wiring * w, unsigned int l MAYBE_UNUSED)
 
 void say_hello(struct pi_wiring * w, parallelizing_info_ptr pi)
 {
+    serialize(w);
     for(unsigned int j = 0 ; j < w->njobs ; j++) {
         serialize(w);
         if ((unsigned int) w->jrank != j)
@@ -324,7 +328,6 @@ void say_hello(struct pi_wiring * w, parallelizing_info_ptr pi)
               );
         my_pthread_mutex_unlock(w->th->m);
     }
-    serialize(w);       //
 }
 
 void hello(parallelizing_info_ptr pi)
@@ -334,31 +337,32 @@ void hello(parallelizing_info_ptr pi)
     }
     say_hello(pi->m, pi);
 
-    serialize(pi->m);   //
+    // before changing the grain of the barriers, we have to serialize at
+    // the thread level (i.e. wait for the mpi serialization calls to
+    // complete). Otherwise, inter-job communication occuring within
+    // say_hello might clash with the inter-job calls done within
+    // serialize().
+    // Rule is: never let mpi-level synchronisations on a communicator
+    // wander outside an execution period for which all threads sharing
+    // this communicator are doing the same.
     for(unsigned int i = 0 ; i < pi->wr[0]->njobs * pi->wr[0]->ncores ; i++) {
-        serialize(pi->m);       //
+        serialize(pi->m);
+        serialize_threads(pi->m);
         if (i == pi->wr[0]->jrank * pi->wr[0]->ncores + pi->wr[0]->trank) {
             say_hello(pi->wr[1], pi);
         }
-        // XXX we need to serialize __threads__ here, before attempting
-        // anything at the job level ! Otherwise, me might have an
-        // inter-job communication occuring within say_hello above, which
-        // could clash with the main serialization below...
-        serialize_threads(pi->m);
     }
 
-    serialize(pi->m);   //
     for(unsigned int i = 0 ; i < pi->wr[1]->njobs * pi->wr[1]->ncores ; i++) {
-        serialize(pi->m);       //
+        serialize(pi->m);
+        serialize_threads(pi->m);
         if (i == pi->wr[1]->jrank * pi->wr[1]->ncores + pi->wr[1]->trank) {
             say_hello(pi->wr[0], pi);
         }
-        serialize_threads(pi->m);
     }
 
     if (serialize(pi->m)) {
         printf("OK: Finished hello world loop\n");
     }
-
 }
 
