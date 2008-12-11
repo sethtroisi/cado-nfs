@@ -9,6 +9,9 @@
 
 t=`mktemp -d`
 echo "Testing factorization of c59 in $t"
+if [ "$DEBUG" ] ; then
+    echo "(debug mode, temporary files will be kept in $t)"
+fi
 
 if [ -z "$USEHOST" ] ; then
    host=localhost
@@ -41,6 +44,10 @@ if [ "$output" == "$output2" -o "$output" == "$output3" ]; then
     exit 0;
 else
     echo "FAILED!!!";
-    rm -r $t;
+    if [ -z "$DEBUG" ] ; then
+        rm -r $t;
+    else
+        echo "(debug mode -- keeping $t)"
+    fi
     exit 1;
 fi
