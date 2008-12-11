@@ -258,9 +258,9 @@ BW_RANDOM_LIBS:=-lgmpxx -lgmp
 # NFSFORGE_LIBS:=-lgmpxx -lgmp
 # -include .nfsforge.mkf
 # 
-BW_BALANCE_SOURCES:=../balance.c ../readbuffer.c ../rowset_heap.c
-BW_BALANCE_LIBS:=
--include .bw-balance.mkf
+# BW_BALANCE_SOURCES:=../balance.c ../readbuffer.c ../rowset_heap.c
+# BW_BALANCE_LIBS:=
+# -include .bw-balance.mkf
 BW_APPLY_PERM_SOURCES:=../apply_perm.cpp
 BW_APPLY_PERM_LIBS:=
 -include .bw-apply-perm.mkf

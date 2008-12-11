@@ -33,7 +33,7 @@ checkdep: checkdep.o
 linalg: linalg.o gauss.o readmat.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils
 balance: balance.o readbuffer.o rowset_heap.o
-	$(CC) $(MY_LFLAGS) -o $@ $^ -lm
+	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lgmp -lm
 
 gauss.o: gauss.c
 	$(CC) $(MY_CFLAGS) -DMULTI_ROW=3 -DNO_MAIN $< -c -o $@
@@ -56,6 +56,9 @@ matprune: matprune.o
 
 apply_perm: apply_perm.o
 	$(CXX) $(MY_LXXFLAGS) -o $@ $^
+
+# Don't forget the dependency on libutils !
+procrels hashpair freerel duplicates purge merge replay linalg balance: $(TOP)/utils/libutils.a
 
 ######################################################################
 ## MPI section

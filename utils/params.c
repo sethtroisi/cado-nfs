@@ -55,8 +55,9 @@ static int param_list_add_key_nostrdup(param_list pl,
     pl->p[pl->size]->key = key;
     pl->p[pl->size]->value = value;
     pl->p[pl->size]->origin = o;
-    pl->p[pl->size]->parsed = 0;
-    // values above 1 are builtin within the sorting step.
+    // knobs always count as parsed, of course. Hence the (value==NULL) thing
+    pl->p[pl->size]->parsed = (value == NULL);
+    // values above 1 are built within the sorting step.
     pl->p[pl->size]->seen = 1;
     pl->size++;
     pl->consolidated = 0;
@@ -230,10 +231,24 @@ int param_list_read_file(param_list pl, const char * name)
 
 int param_list_configure_alias(param_list pl, const char * key, const char * alias)
 {
+    size_t len = strlen(alias);
+
     ASSERT_ALWAYS(alias != NULL);
     ASSERT_ALWAYS(key != NULL);
     /* A knob may be aliases, but only as another knob !!! */
-    ASSERT_ALWAYS(key[0] != '-' || (alias[0] == '-' && alias[strlen(alias)-1] != '='));
+    ASSERT_ALWAYS(key[0] != '-' || (alias[0] == '-' && alias[len-1] != '='));
+
+    if (alias[0] != '-' && alias[len-1] != '=') {
+        /* Then, accept both the --xxx and xxx= forms */
+        char * tmp;
+        tmp = malloc(len + 4);
+        snprintf(tmp, len+4, "--%s", alias);
+        param_list_configure_alias(pl, key, strdup(tmp));
+        snprintf(tmp, len+4, "%s=", alias);
+        param_list_configure_alias(pl, key, strdup(tmp));
+        free(tmp);
+        return 0;
+    }
 
     if (pl->naliases == pl->naliases_alloc) {
         pl->naliases_alloc += 1;
@@ -241,7 +256,7 @@ int param_list_configure_alias(param_list pl, const char * key, const char * ali
         pl->aliases = realloc(pl->aliases, pl->naliases_alloc * sizeof(param_list_alias));
     }
     pl->aliases[pl->naliases]->alias = alias;
-    pl->aliases[pl->naliases]->key = alias;
+    pl->aliases[pl->naliases]->key = key;
     pl->naliases++;
     return 0;
 }
@@ -281,10 +296,28 @@ static int param_list_update_cmdline_alias(param_list pl,
         return 1;
     }
     if (strcmp(a, al->alias) == 0) {
-        // then we simply hook the new value inside argv. Ugly, but
-        // effective. It's important that normal processing comes later
-        // on !
-        *p_argv[0] = al->alias;
+        if (al->key[0] == '-') {
+            /* This is a knob ; we have to treat it accordingly. The
+             * difficult part is to properly land on
+             * param_list_update_cmdline_knob at the proper time. This
+             * means in particular not necessarily there. It's
+             * considerably easier to simply change the value in the
+             * command line.
+             */
+            (*p_argv)[0] = al->key;
+            /* leave argv and argc unchanged. */
+            return 0;
+        }
+        (*p_argv)+=1;
+        (*p_argc)-=1;
+        if (*p_argc == 0) {
+            fprintf(stderr, "Option %s requires an argument\n", a);
+            exit(1);
+        }
+        param_list_add_key(pl, al->key, (*p_argv[0]), PARAMETER_FROM_CMDLINE);
+        (*p_argv)+=1;
+        (*p_argc)-=1;
+        return 1;
     }
     return 0;
 }
@@ -297,8 +330,6 @@ static int param_list_update_cmdline_knob(param_list pl,
     if (strcmp(a, knob->knob) == 0) {
         int r;
         r = param_list_add_key(pl, knob->knob, NULL, PARAMETER_FROM_CMDLINE);
-        // knobs always count as parsed, of course.
-        pl->p[r]->parsed=1;
         (*p_argv)+=1;
         (*p_argc)-=1;
         if (knob->ptr) (*(knob->ptr))++;

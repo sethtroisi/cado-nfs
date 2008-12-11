@@ -1,5 +1,5 @@
 #define __STDC_FORMAT_MACROS    /* For C++ to have PRId64 and friends */
-#define _GNU_SOURCE    /* for strndup only -- really easy to make a workalike */
+#define _GNU_SOURCE    /* for strndup and asprintf */
 
 #include <stddef.h>     /* ptrdiff_t */
 #include <stdio.h>
@@ -11,7 +11,7 @@
 #include <assert.h>
 #include <limits.h>
 #include <ctype.h>
-#include <math.h>       /* XXX could probably remove it */
+#include <math.h>     /* for sqrt -- we're computing the sdev of the weights */
 
 /* platform headers */
 #include <sys/stat.h>   /* mkdir */
@@ -21,33 +21,13 @@
 
 #include "readbuffer.h"
 #include "rowset_heap.h"
-
+#include "utils.h"
 
 /*{{{ macros */
 #ifdef  __cplusplus
 using namespace std;
 #endif
 
-/* I'd prefer the program to stay completely standalone */
-#ifndef ASSERT_ALWAYS
-#define ASSERT_ALWAYS(x) do { if (!(x)) { fprintf(stderr, "Assertion " #x " failed\n"); abort(); } } while (0)
-#endif
-#if defined(__GNUC__)
-#ifndef	MAYBE_UNUSED
-#define MAYBE_UNUSED __attribute__ ((unused))
-#endif
-#else
-#ifndef	MAYBE_UNUSED
-#define MAYBE_UNUSED
-#endif
-#endif
-
-#define DIE_ERRNO_DIAG(tst, func, arg) do {				\
-    if ((tst)) {					        	\
-        fprintf(stderr, func "(%s): %s\n", arg, strerror(errno));       \
-        exit(1);					        	\
-    }							        	\
-} while (0)
 #define PARSE_CHECK(tst, kind, text) do {				\
     if ((tst)) {							\
         fprintf(stderr, "parse error while reading %s: %s",		\
@@ -60,6 +40,9 @@ using namespace std;
 typedef int (*sortfunc_t)(const void *, const void *);
 
 /*{{{ globals ; flags, mostly */
+
+#define BIGCHUNK        16384
+
 unsigned int nhslices = 1;
 unsigned int nvslices = 1;
 
@@ -89,10 +72,10 @@ int replicate_rows_perm_for_columns = 0;
 int replicate_columns_perm_for_rows = 0;
 
 /* full path to the input matrix */
-const char * pristine_filename;
+char * pristine_filename;
 
 /* basename of the resulting matrix filename */
-const char * working_filename = "matrix.txt";
+char * working_filename;
 /*}}}*/
 
 void usage()
@@ -126,6 +109,8 @@ struct row * row_table /* = NULL */;
 
 uint32_t nc;
 struct row * col_table /* = NULL */;
+
+uint32_t nmax;
 
 /* These two really only have to do with optimizing I/O for the matrix.
  * In case we're able to skip parsing entirely, we save line sizes for
@@ -305,8 +290,27 @@ void prefix_fixup(char * s, const char * pfx)
     strncpy(s+s2-s1, pfx, s1);
 }
 
+/* POSIX dirname sucks */
+char * my_dirname(const char * s)
+{
+    const char * last_slash = strrchr(s, '/');
+    if (last_slash == NULL)
+        return NULL;
+    else
+        return strndup(s, last_slash - s);
+}
+
+const char * my_basename(const char * s)
+{
+    const char * last_slash = strrchr(s, '/');
+    if (last_slash == NULL)
+        return s;
+    else
+        return last_slash+1;
+}
+
 #if 0
-int has_prefix(const char * s, const char * pfx)
+int basename_has_prefix(const char * s, const char * pfx)
 {
     size_t s1;
     const char * last_slash;
@@ -320,7 +324,18 @@ int has_prefix(const char * s, const char * pfx)
         last_slash++;
     return strncmp(last_slash, pfx, s1) == 0;
 }
+int has_suffix(const char * s, const char * x)
+{
+    size_t ls = strlen(s);
+    size_t lx = strlen(x);
+    size_t j;
+    s += ls-1;
+    x += lx-1;
+    for(j = 0 ; j < lx && j < ls && *s-- == *x-- ; j++) ;
+    return j == lx;
+}
 #endif
+
 
 void remove_prefix(char * s, const char * pfx)
 {
@@ -528,6 +543,83 @@ void give_stats(const char * text, const struct row * data, unsigned int n)
 // }}}
 
 /* {{{ read the matrix */
+void read_matrix_trailer()
+{
+    unsigned int i;
+
+    if (permute_rows) give_stats("row", row_table, nr);
+    if (permute_cols) give_stats("column", col_table, nc);
+
+    if (weight_sort_in_cells) {
+        assert(permute_rows);
+        for(i = 1 ; i < nr ; i++) {
+            if (row_table[i].w > row_table[i-1].w) {
+                rows_are_weight_sorted=0;
+                break;
+            }
+        }
+        if (rows_are_weight_sorted) {
+            printf("rows are already sorted by weight\n");
+            permute_rows = (nhslices > 1);
+        }
+
+        assert(permute_cols);
+        for(i = 1 ; i < nc ; i++) {
+            if (col_table[i].w > col_table[i-1].w) {
+                cols_are_weight_sorted=0;
+                break;
+            }
+        }
+        if (cols_are_weight_sorted) {
+            printf("cols are already sorted by weight\n");
+            permute_cols = (nvslices > 1);
+        }
+    }
+}
+
+void update_header()
+{
+    /* nmax is the largest dimension. If we pad to square size, we will
+     * work with a matrix of size nmax * nmax.
+     */
+    nmax = nc < nr ? nr : nc;
+
+    fprintf(stderr, "Matrix has %"PRIu32" rows, %"PRIu32" columns\n",
+            nr, nc);
+
+    /* Make this only a warning now -- it's actually going to disappear,
+     * as this program is meant to become completely generic. */
+    if (nc < nr) {
+        fprintf(stderr, "Matrix has more rows than columns\n"
+                "Perhaps the matrix should have been transposed first\n");
+    /*
+        exit(1);
+    */
+    }
+
+    if (pad_to_square) {
+        fprintf(stderr, "Output matrix will be padded to"
+                " %"PRIu32" rows,"
+                " %"PRIu32" columns\n",
+                nmax, nmax);
+        /* update the header accordingly ; it's no longer correct to copy
+         * the old header verbatim */
+        header = realloc(header, header_bytes + 10);
+        if (strncmp(header, "//", 2) == 0) {
+            /* untested ! */
+            int pos;
+            sscanf(header, "// %*" SCNu32 " ROWS %*" SCNu32 "%n", &pos);
+            char * trailer = strdup(header + pos);
+            snprintf(header, header_bytes + 10,
+                    "// %" PRIu32 " ROWS %" PRIu32 "%s", nmax, nmax, trailer);
+            free(trailer);
+        } else {
+            snprintf(header, header_bytes + 10,
+                    "%" PRIu32 " %" PRIu32 "\n", nmax, nmax);
+        }
+    }
+}
+
 int read_matrix()
 {
     reading_buffer b;
@@ -549,23 +641,7 @@ int read_matrix()
     header_bytes = b->o;
     header = strndup(b->buf, b->o);
 
-    /* nmax is the largest dimension. If we pad to square size, we will
-     * work with a matrix of size nmax * nmax.
-     */
-    uint32_t nmax = nc < nr ? nr : nc;
-
-    fprintf(stderr, "Matrix has %"PRIu32" rows, %"PRIu32" columns\n",
-            nr, nc);
-
-    /* Make this only a warning now -- it's actually going to disappear,
-     * as this program is meant to become completely generic. */
-    if (nc < nr) {
-        fprintf(stderr, "Matrix has more rows than columns\n"
-                "Perhaps the matrix should have been transposed first\n");
-    /*
-        exit(1);
-    */
-    }
+    update_header();
 
     if (permute_rows) {
         row_table = (struct row*) malloc(nmax * sizeof(struct row));
@@ -658,68 +734,218 @@ int read_matrix()
 
     rb_close(b);
 
-    if (permute_rows) give_stats("row", row_table, nr);
-    if (permute_cols) give_stats("column", col_table, nc);
-
-    if (weight_sort_in_cells) {
-        assert(permute_rows);
-        for(i = 1 ; i < nr ; i++) {
-            if (row_table[i].w > row_table[i-1].w) {
-                rows_are_weight_sorted=0;
-                break;
-            }
-        }
-        if (rows_are_weight_sorted) {
-            printf("rows are already sorted by weight\n");
-            permute_rows = (nhslices > 1);
-        }
-
-        assert(permute_cols);
-        for(i = 1 ; i < nc ; i++) {
-            if (col_table[i].w > col_table[i-1].w) {
-                cols_are_weight_sorted=0;
-                break;
-            }
-        }
-        if (cols_are_weight_sorted) {
-            printf("cols are already sorted by weight\n");
-            permute_cols = (nvslices > 1);
-        }
-    }
-
-
-    if (pad_to_square) {
-        nr = nmax;
-        nc = nmax;
-        fprintf(stderr, "Output matrix will be padded to"
-                " %"PRIu32" rows,"
-                " %"PRIu32" columns\n",
-                nr, nc);
-        /* update the header accordingly ; it's no longer correct to copy
-         * the old header verbatim */
-        header = realloc(header, header_bytes + 10);
-        if (strncmp(header, "//", 2) == 0) {
-            /* untested ! */
-            int pos;
-            sscanf(header, "// %*" SCNu32 " ROWS %*" SCNu32 "%n", &pos);
-            char * trailer = strdup(header + pos);
-            snprintf(header, header_bytes + 10,
-                    "// %" PRIu32 " ROWS %" PRIu32 "%s", nr, nc, trailer);
-            free(trailer);
-        } else {
-            snprintf(header, header_bytes + 10,
-                    "%" PRIu32 " %" PRIu32 "\n", nr, nc);
-        }
-    }
+    read_matrix_trailer();
+    if (pad_to_square) nr = nc = nmax;
 
     return 0;
 }
+
+
+void read_shuffled_matrix(const char * bigfile, const char * base)
+{
+    FILE * info;
+    FILE * big;
+    char * infoname;
+    char rbuf[BIGCHUNK];
+
+    asprintf(&infoname, "%s.info", base);
+
+    info = fopen(infoname, "r");
+    DIE_ERRNO_DIAG(info == NULL, "fopen", infoname);
+
+    big = fopen(bigfile, "w");
+    DIE_ERRNO_DIAG(big == NULL, "fopen", bigfile);
+
+    fgets(rbuf, sizeof(rbuf), info);
+    if (strncmp(rbuf, "//", 2) == 0) {
+        int rc = sscanf(rbuf, "// %" SCNu32 " ROWS %" SCNu32, &nr, &nc);
+        PARSE_CHECK(rc < 2, "header", rbuf);
+    } else {
+        int rc = sscanf(rbuf, "%" SCNu32 " %" SCNu32, &nr, &nc);
+        PARSE_CHECK(rc < 2, "header", rbuf);
+    }
+    header_bytes = ftello(info);
+    header = strdup(rbuf);
+    // Of course, the new header does _NOT_ get copied to the big file !
+
+    update_header();
+
+    unsigned int nhs, nvs;
+    fscanf(info, "%u %u", &nhs, &nvs);
+    fprintf(stderr, "Existing matrix is split %ux%u\n", nhs, nvs);
+
+    struct onefile {
+        unsigned int i0;
+        unsigned int j0;
+        unsigned int i1;
+        unsigned int j1;
+        unsigned int ncoeffs;
+        char locfile[80];
+    };
+
+    struct onefile ** files;
+
+    unsigned int si;
+    unsigned int sj;
+
+    files = malloc(nhs * sizeof(struct onefile*));
+    for(si = 0 ; si < nhs ; si++) {
+        files[si] = malloc(nvs * sizeof(struct onefile));
+    }
+
+    for(si = 0 ; si < nhs ; si++) {
+        for(sj = 0 ; sj < nvs ; sj++) {
+            int rc;
+            rc = fscanf(info, "%u %u", &si, &sj);
+            FATAL_ERROR_CHECK(rc != 2, "parse error in .info file");
+            rc = fscanf(info, "%u %u %u %u %u %80s\n",
+                    &files[si][sj].i0,
+                    &files[si][sj].j0,
+                    &files[si][sj].i1,
+                    &files[si][sj].j1,
+                    &files[si][sj].ncoeffs,
+                    files[si][sj].locfile);
+            FATAL_ERROR_CHECK(rc != 6, "parse error in .info file");
+            files[si][sj].i1 += files[si][sj].i0;
+            files[si][sj].j1 += files[si][sj].j0;
+        }
+    }
+    fclose(info);
+
+    if (permute_rows) {
+        row_table = (struct row*) malloc(nmax * sizeof(struct row));
+        if (row_table == NULL) abort();
+    }
+    if (permute_cols) {
+        col_table = (struct row *) malloc(nmax * sizeof(struct row));
+        if (col_table == NULL) abort();
+    }
+
+    if (permute_cols) {
+        unsigned int k;
+        memset(col_table, 0, nmax * sizeof(struct row));
+        for(k = 0 ; k < nmax ; k++) {
+            col_table[k].i=k;
+        }
+    }
+
+    line_bytes = (size_t *) malloc(nmax * sizeof(size_t));
+    if (line_bytes == NULL) abort();
+
+    assert(permute_rows);
+
+    fprintf(stderr, "Reading matrix (first pass, counting weights)\n");
+
+    FILE ** fps;
+    unsigned int * fws;
+    fps = malloc(nvs * sizeof(FILE *));
+    fws = malloc(nvs * sizeof(unsigned int));
+
+    off_t pos = ftello(big);
+
+    unsigned int i = 0;
+
+    char * input_dirname = my_dirname(base);
+
+    for(si = 0 ; si < nhs ; si++) {
+        for(sj = 0 ; sj < nvs ; sj++) {
+            const char * nm = files[si][sj].locfile;
+            if (input_dirname) {
+                snprintf(rbuf,sizeof(rbuf),"%s/%s", input_dirname, nm);
+                nm = rbuf;
+            }
+            fps[sj] = fopen(nm, "r");
+            DIE_ERRNO_DIAG(fps[sj] == NULL, "fopen", nm);
+            /* discard the header. */
+            fgets(rbuf, sizeof(rbuf), fps[sj]);
+            // fos[sj] = ftello(fps[sj]);
+        }
+
+        ASSERT_ALWAYS(i == files[si][0].i0);
+
+        for( ; i < files[si][0].i1 ; i++) {
+            unsigned int w = 0;
+            for(sj = 0 ; sj < nvs ; sj++) {
+                int rc = fscanf(fps[sj], "%u", &fws[sj]);
+                FATAL_ERROR_CHECK(rc != 1, "parsing split files");
+                w += fws[sj];
+            }
+
+            fprintf(big, "%u", w);
+            for(sj = 0 ; sj < nvs ; sj++) {
+                for(unsigned int k = 0 ; k < fws[sj] ; k++) {
+                    unsigned int index;
+                    int rc = fscanf(fps[sj], "%u", &index);
+                    FATAL_ERROR_CHECK(rc != 1, "parsing split files");
+                    index += files[si][sj].j0;
+                    fprintf(big, " %u", index);
+                    if (permute_cols) {
+                        col_table[index].w++;
+                    }
+                    for(char c ; !isspace(c = fgetc(fps[sj])) ; fputc(c, big));
+                }
+            }
+            fputc('\n', big);
+            row_table[i].i = i;
+            row_table[i].w = w;
+            off_t npos = ftello(big);
+            line_bytes[i] = npos - pos;
+            pos = npos;
+        }
+
+        for(sj = 0 ; sj < nvs ; sj++) {
+            fclose(fps[sj]);
+            if (remove_input) {
+                const char * nm = files[si][sj].locfile;
+                if (input_dirname) {
+                    snprintf(rbuf,sizeof(rbuf),"%s/%s", input_dirname, nm);
+                    nm = rbuf;
+                }
+                unlink(nm);
+            }
+        }
+    }
+
+    free(input_dirname);
+
+    for( ; i < nmax ; i++) {
+        row_table[i].i = i;
+        row_table[i].w = 0;
+        line_bytes[i] = 0;
+    }
+
+    free(fws);
+    free(fps);
+
+    for(si = 0 ; si < nhs ; si++) {
+        free(files[si]);
+    }
+    free(files);
+
+    fclose(big);
+
+    read_matrix_trailer();
+    if (pad_to_square) nr = nc = nmax;
+
+    if (remove_input) {
+        unlink(infoname);
+    }
+    free(infoname);
+}
+
+
 /* }}} */
 
 /*{{{ utilities for shuffle_rtable */
 int decr_weight_cmp(const struct row * a, const struct row * b)
 {
-    return b->w - a->w;
+    int dw = b->w - a->w;
+    if (dw) return dw;
+    if (a->i < b->i)
+        return 1;
+    else if (b->i < a->i)
+        return -1;
+    return 0;
 }
 
 #if 0
@@ -994,7 +1220,6 @@ void dispatcher(
     copybuf cb;
 
     cb_init(cb);
-#define BIGCHUNK        16384
     cb_ensure(cb, BIGCHUNK);
 
     f = fileset_open_one(src, 0, "r");
@@ -1053,7 +1278,7 @@ void dispatch_row_slices(fileset fs)
 
 /*{{{ write_permutation */
 void write_permutation(const char * filename,
-        struct slice * slice, unsigned int ns, int already_sorted)
+        struct slice * sl, unsigned int ns /*, int already_sorted */)
 {
     FILE * f;
     uint32_t i,ii;
@@ -1061,11 +1286,16 @@ void write_permutation(const char * filename,
     i = 0;
 
     for(ii = 0 ; ii < ns ; ii++) {
-        const struct slice * r = &(slice[ii]);
+        const struct slice * r = &(sl[ii]);
         for(i = 0 ; i < r->nrows ; i++) {
+            /* This assertion is bogus. What really matters is the
+             * weight, not the index in the file. So here, the data we
+             * access might show a drift, while actually there is none
+             * because the two rows have the same weight.
             if (already_sorted && i) {
                 ASSERT_ALWAYS(r->r[i] > r->r[i-1]);
             }
+            */
             // fprintf(f, "%" PRIu32 "\n", r->r[i]);
         }
         fwrite(r->r, sizeof(uint32_t), r->nrows, f);
@@ -1073,6 +1303,56 @@ void write_permutation(const char * filename,
     fclose(f);
 }
 /*}}}*/
+
+/*{{{ read_permutation */
+unsigned int * read_permutation(const char * name, unsigned int n)
+{
+    FILE * f;
+    unsigned int * res;
+    if ((f = fopen(name, "r")) == NULL)
+        return NULL;
+
+    res = malloc(n * sizeof(unsigned int));
+    unsigned int rc = fread(res, sizeof(unsigned int), n, f);
+    FATAL_ERROR_CHECK(rc != n, "short read");
+    return res;
+}
+/* }}} */
+
+/*{{{ inverse_permutation */
+void inverse_permutation(unsigned int * s, unsigned int n)
+{
+    if (s == NULL)
+        return;
+
+    unsigned int * t;
+
+    t = malloc(n * sizeof(unsigned int));
+    unsigned int i;
+    for(i = 0 ; i < n ; i++) {
+        ASSERT(s[i] < n);
+        t[s[i]]=i;
+    }
+    memcpy(s,t,n * sizeof(unsigned int));
+    free(t);
+}
+/* }}} */
+
+void reindex_slices(struct slice * sl, unsigned int ns, unsigned int * s)
+{
+    if (s == NULL)
+        return;
+
+    uint32_t i,ii;
+    for(ii = 0 ; ii < ns ; ii++) {
+        const struct slice * r = &(sl[ii]);
+        for(i = 0 ; i < r->nrows ; i++) {
+            r->r[i] = s[r->r[i]];
+        }
+    }
+}
+
+
 
 /* {{{ comparison functions for weight_sort_hslice */
 struct idxpair {
@@ -1701,7 +1981,7 @@ void write_info_file(int argc, char * argv[])
                     row_slices ? row_slices[i].nrows : nr,
                     col_slices ? col_slices[j].nrows : nc,
                     final_file_info[i*nvslices+j]->coeffs,
-                    final_file_info[i*nvslices+j]->s);
+                    my_basename(final_file_info[i*nvslices+j]->s));
         }
     }
     time_t t = time(NULL);
@@ -1732,110 +2012,137 @@ void cleanup()
     free(final_file_info);
 }
 
+void writeout_both_permutations()
+{
+    if (permute_rows) {
+        char * rp;
+        asprintf(&rp, "%s.row_perm", working_filename);
+        write_permutation(rp, row_slices, nhslices);
+        // write_permutation(rp, row_slices, nhslices, rows_are_weight_sorted);
+        free(rp);
+    }
+    if (permute_cols) {
+        char * cp;
+        asprintf(&cp, "%s.col_perm", working_filename);
+        write_permutation(cp, col_slices, nvslices);
+        // write_permutation(cp, col_slices, nvslices, cols_are_weight_sorted);
+        free(cp);
+    }
+}
+
 int main(int argc, char * argv[])
 {
-    int rc;
     int argc0 = argc;
     char ** argv0 = argv;
+    param_list pl;
+
+    param_list_init(pl);
 
     argv++,argc--;
-    for(;argc;argv++,argc--) {
-        if (strcmp(argv[0], "--subdir") == 0) {
-            argv++,argc--;
-            if (!argc) usage();
-            rc = chdir(argv[0]);
-            if (rc < 0 && errno == ENOENT) {
-                rc = mkdir(argv[0], 0777);
-                DIE_ERRNO_DIAG(rc < 0, "mkdir", argv[0]);
-                rc = chdir(argv[0]);
-                DIE_ERRNO_DIAG(rc < 0, "chdir", argv[0]);
-            }
-        } else if (strcmp(argv[0], "--legacy") == 0) {
-            legacy = 1;
-        } else if (strcmp(argv[0], "--remove-input") == 0) {
-            remove_input = 1;
-        } else if (strcmp(argv[0], "--pad") == 0
-                || strcmp(argv[0], "--square") == 0)
-        {
-            pad_to_square = 1;
-        } else if (strcmp(argv[0], "--keep-temps") == 0) {
-            keep_temps = 1;
-        } else if (strcmp(argv[0], "--ram-limit") == 0) {
-            argv++,argc--;
-            if (!argc) usage();
-            char * eptr;
-            ram_limit = strtoul(argv[0], &eptr, 10);
-            if (ram_limit == 0) usage();
-            switch (*eptr) {
-                case 'g': case 'G': ram_limit <<= 10;
-                case 'm': case 'M': ram_limit <<= 10;
-                case 'k': case 'K': ram_limit <<= 10;
-                eptr++;
-                default:
-                if (*eptr != '\0') usage();
-            }
-        } else if (strcmp(argv[0], "--output-name") == 0
-                || strcmp(argv[0], "--out") == 0)
-        {
-            argv++,argc--;
-            if (!argc) usage();
-            working_filename = argv[0];
-        } else if (strcmp(argv[0], "--matrix") == 0
-                || strcmp(argv[0], "--in") == 0)
-        {
-            argv++,argc--;
-            if (!argc) usage();
-            pristine_filename = argv[0];
-        } else if (strcmp(argv[0], "--nbuckets") == 0
-                || strcmp(argv[0], "--nslices") == 0
-                || strcmp(argv[0], "--slices") == 0)
-        {
-            /* We accept a sole argument to mean n hslices and one
-             * vslice, or an argument of the form MMMxNNN
-             */
-            argv++,argc--;
-            if (!argc) usage();
-            {
-                char * ptr;
-                nhslices = strtoul(argv[0], &ptr, 10);
-                if (nhslices == 0)
-                    usage();
-                if (*ptr == '\0') {
-                    nvslices = 1;
-                } else if (*ptr != 'x') {
-                    usage();
-                } else {
-                    ptr++;
-                    nvslices = strtoul(ptr, &ptr, 10);
-                    if (nvslices == 0)
-                        usage();
-                    if (*ptr != '\0')
-                        usage();
-                }
-            }
-        } else if (strcmp(argv[0], "--hslices") == 0) {
-            argv++,argc--;
-            if (!argc) usage();
-            nhslices = atoi(argv[0]);
-        } else if (strcmp(argv[0], "--vslices") == 0) {
-            argv++,argc--;
-            if (!argc) usage();
-            nvslices = atoi(argv[0]);
-        } else if (strcmp(argv[0], "--permute-rows-like-columns") == 0) {
-            replicate_columns_perm_for_rows = 1;
-        } else if (strcmp(argv[0], "--permute-columns-like-rows") == 0) {
-            replicate_rows_perm_for_columns = 1;
-        } else {
-          fprintf (stderr, "Unknown option: %s\n", argv[0]);
-            usage();
+    param_list_configure_knob(pl, "--legacy", &legacy);
+    param_list_configure_knob(pl, "--remove-input", &remove_input);
+    param_list_configure_knob(pl, "--pad", &pad_to_square);
+    param_list_configure_alias(pl, "--pad", "--square");
+    param_list_configure_alias(pl, "out", "output-name");
+    param_list_configure_alias(pl, "in", "matrix");
+    param_list_configure_alias(pl, "ram-limit", "ramlimit");
+    param_list_configure_alias(pl, "nbuckets", "nslices");
+    param_list_configure_alias(pl, "nbuckets", "slices");
+    param_list_configure_knob(pl, "--keep-temps", &keep_temps);
+    param_list_configure_knob(pl, "--permute-rows-like-columns",
+            &replicate_columns_perm_for_rows);
+    param_list_configure_knob(pl, "--permute-columns-like-rows",
+            &replicate_rows_perm_for_columns);
+
+    for( ; argc ; ) {
+        if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
+        fprintf (stderr, "Unknown option: %s\n", argv[0]);
+        usage();
+    }
+
+    const char * tmp;
+
+    if ((tmp = param_list_lookup_string(pl, "subdir")) != NULL) {
+        fprintf(stderr, "--subdir is no longer supported."
+                " prepend --out with a path instead.\n");
+        exit(1);
+#if 0
+        /* chdir'ing to the destination directory when input files may
+         * reside elsewhere is sort of buggy */
+        int rc = chdir(tmp);
+        if (rc < 0 && errno == ENOENT) {
+            rc = mkdir(tmp, 0777);
+            DIE_ERRNO_DIAG(rc < 0, "mkdir", tmp);
+            rc = chdir(tmp);
+            DIE_ERRNO_DIAG(rc < 0, "chdir", tmp);
+        }
+#endif
+    }
+
+    if ((tmp = param_list_lookup_string(pl, "ram-limit")) != NULL) {
+        char * eptr;
+        ram_limit = strtoul(tmp, &eptr, 10);
+        if (ram_limit == 0) usage();
+        switch (*eptr) {
+            case 'g': case 'G': ram_limit <<= 10;
+            case 'm': case 'M': ram_limit <<= 10;
+            case 'k': case 'K': ram_limit <<= 10;
+                                eptr++;
+            default:
+                                if (*eptr != '\0') usage();
         }
     }
 
-
-    if (pristine_filename == NULL) {
-        fprintf(stderr, "which matrix whall I read ?\n");
+    working_filename = strdup(param_list_lookup_string(pl, "out"));
+    pristine_filename = strdup(param_list_lookup_string(pl, "in"));
+    if (working_filename == NULL) {
+        fprintf(stderr, "Required argument --out is missing\n");
         exit(1);
     }
+    if (pristine_filename == NULL) {
+        fprintf(stderr, "Required argument --out is missing\n");
+        exit(1);
+    }
+
+    {
+        char * output_dirname = my_dirname(working_filename);
+        if (output_dirname) {
+            if (access(output_dirname,X_OK) < 0) {
+                int rc = mkdir(output_dirname, 0777);
+                DIE_ERRNO_DIAG(rc < 0, "mkdir", output_dirname);
+            }
+            free(output_dirname);
+        }
+    }
+
+    /* We accept a sole argument to mean n hslices and one vslice, or an
+     * argument of the form MMMxNNN
+     */
+    int split[2] = {1,1};
+
+    tmp = param_list_lookup_string(pl, "nbuckets");
+    if (tmp == NULL) {
+        fprintf(stderr, "Required argument --nslices is missing\n");
+        exit(1);
+    }
+
+    if (strchr(tmp,'x')) {
+        param_list_parse_intxint(pl, "nbuckets", split);
+    } else {
+        param_list_parse_int(pl, "nbuckets", &split[0]);
+    }
+
+    param_list_parse_int(pl, "hslices", &split[0]);
+    param_list_parse_int(pl, "vslices", &split[1]);
+
+    if (param_list_warn_unused(pl)) {
+        usage();
+    }
+    param_list_clear(pl);
+
+    nhslices = split[0];
+    nvslices = split[1];
+
 
     /* 10 is overestimated here. I think 4 suffices: 0,1,2, and f.
      */
@@ -1873,31 +2180,91 @@ int main(int argc, char * argv[])
         exit(1);
     }
 
-    read_matrix(pristine_filename);
-
-    fprintf(stderr, "Computing permutation\n");
-    compute_permutation();
-
-    if (row_table) free(row_table);
-    if (col_table) free(col_table);
-
-    if (permute_rows) {
-        char * rp;
-        asprintf(&rp, "%s.row_perm", working_filename);
-        write_permutation(rp, row_slices, nhslices, rows_are_weight_sorted);
-        free(rp);
-    }
-    if (permute_cols) {
-        char * cp;
-        asprintf(&cp, "%s.col_perm", working_filename);
-        write_permutation(cp, col_slices, nvslices, cols_are_weight_sorted);
-        free(cp);
+    int recycle_shuffled_matrix = 0;
+    if (access(pristine_filename, F_OK) < 0) {
+        char * tmp;
+        asprintf(&tmp, "%s.info", pristine_filename);
+        if (access(tmp, F_OK) < 0) {
+            fprintf(stderr, "%s: file not found\n", pristine_filename);
+            exit(1);
+        }
+        free(tmp);
+        recycle_shuffled_matrix = 1;
     }
 
     fileset work;
     fileset_init(work, 1);
-    work->names[0] = strdup(pristine_filename);
-    work->status = INPUT;
+
+    if (recycle_shuffled_matrix) {
+        /* special case. We rebuild a full matrix from the existing
+         * version. Note that it is somewhat disk-intensive. we're not
+         * doing it the totally stupid way, which would incur re-doing
+         * balance in the reverse order. However, we're not doing it the
+         * I/O-smart way, in that we create a temporary file which could
+         * be avoided. This would be a nightmare, however.
+         */
+        asprintf(&(work->names[0]), "tmp-%s", working_filename);
+        prefix_fixup(work->names[0],"tmp-");
+
+        read_shuffled_matrix(work->names[0], pristine_filename);
+        
+        work->status = TEMP;
+
+        char * oldrp = NULL;
+        asprintf(&oldrp, "%s.row_perm", pristine_filename);
+        unsigned int * old_rowperm = read_permutation(oldrp, nr);
+        free(oldrp);
+
+        char * oldcp = NULL;
+        asprintf(&oldcp, "%s.col_perm", pristine_filename);
+        unsigned int * old_colperm = read_permutation(oldcp, nc);
+        free(oldcp);
+
+        unsigned int i;
+
+        /* Apply to row_table and col_table */
+        if (old_rowperm) {
+            for(i = 0 ; i < nr ; i++)
+                row_table[i].i = old_rowperm[i];
+        }
+        if (old_colperm) {
+            for(i = 0 ; i < nc ; i++)
+                col_table[i].i = old_colperm[i];
+        }
+
+        /* Haven't dared to check whether the current code exploits these
+         * flags correctly */
+        rows_are_weight_sorted = 0;
+        cols_are_weight_sorted = 0;
+
+        fprintf(stderr, "Computing permutation\n");
+        compute_permutation();
+        if (row_table) free(row_table);
+        if (col_table) free(col_table);
+
+        writeout_both_permutations();
+
+        /* Now permute back row_slices and col_slices */
+        inverse_permutation(old_rowperm, nr);
+        inverse_permutation(old_colperm, nc);
+
+        reindex_slices(row_slices, nhslices, old_rowperm);
+        reindex_slices(col_slices, nvslices, old_colperm);
+
+        free(old_rowperm);
+        free(old_colperm);
+    } else {
+        read_matrix(pristine_filename);
+        work->names[0] = strdup(pristine_filename);
+        work->status = INPUT;
+
+        fprintf(stderr, "Computing permutation\n");
+        compute_permutation();
+        if (row_table) free(row_table);
+        if (col_table) free(col_table);
+    }
+
+    writeout_both_permutations();
 
     if (nhslices > 1) {
         fprintf(stderr, "Dispatching matrix in row slices\n");
@@ -1921,8 +2288,10 @@ int main(int argc, char * argv[])
         write_info_file(argc0, argv0);
     }
 
-    fprintf(stderr, "Done\n");
+    free(pristine_filename);
+    free(working_filename);
 
+    fprintf(stderr, "Done\n");
     cleanup();
     return 0;
 }

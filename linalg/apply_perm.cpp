@@ -9,12 +9,7 @@
 #include <iostream>
 #include <algorithm>
 
-#define DIE_ERRNO_DIAG(tst, func, arg) do {				\
-    if ((tst)) {					        	\
-        fprintf(stderr, func "(%s): %s\n", arg, strerror(errno));       \
-        exit(1);					        	\
-    }							        	\
-} while (0)
+#include "macros.h"
 
 #define LBSIZE  4096
 

@@ -31,6 +31,14 @@
         }								\
     } while (0)
 
+#define DIE_ERRNO_DIAG(tst, func, arg) do {				\
+    if ((tst)) {					        	\
+        fprintf(stderr, func "(%s): %s\n", arg, strerror(errno));       \
+        exit(1);					        	\
+    }							        	\
+} while (0)
+
+
 /*********************************************************************/
 /* Helper macros */
 /* See README.macro_usage */
