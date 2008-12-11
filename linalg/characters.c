@@ -178,7 +178,7 @@ buildCharacterMatrix(char **charmat, int k, rootprime_t * tabchar,
 	computeAllCharacters(charbig, i, k, tabchar, rel.a, rel.b, pol);
 	clear_relation(&rel);
         if ((i + 1) % 100000 == 0) {
-            fprintf(stderr, "%d/%d\r", i+1,nrows);
+            fprintf (stderr, "   read %d/%d (a,b) pairs\r", i + 1, nrows);
         }
     }
     fprintf(stderr, "%d rows done     \n",nrows);
@@ -271,6 +271,7 @@ addHeavyBlock(char **charmat, FILE * smallfile, int kmin, int skip)
 	}
 	i++;
     }
+    fprintf (stderr, "   done at %2.2lf\n", seconds ());
 }
 
 static void
@@ -298,9 +299,11 @@ handleKer(dense_mat_t * mat, rootprime_t * tabchar, FILE * purgedfile,
     if (skip > 0)
 	addHeavyBlock(charmat, smallfile, k - skip, skip);
 #ifndef NDEBUG
+    fprintf (stderr, "Checking character matrix\n");
     for (i = 0; i < small_nrows; ++i)
 	for (j = 0; j < k; j++)
 	    ASSERT((charmat[i][j] == 1) || (charmat[i][j] == -1));
+    fprintf (stderr, "   done at %2.2lf\n", seconds ());
 #endif
 #if DEBUG >= 1
     fprintf(stderr, "charmat:=array([");
@@ -322,27 +325,32 @@ handleKer(dense_mat_t * mat, rootprime_t * tabchar, FILE * purgedfile,
     fprintf(stderr, ";\n");
 #endif
 
-    // now multiply: ker * charmat 
+    // now multiply: ker * charmat
+    fprintf (stderr, "Multiply ker and character matrix\n");
     for (i = 0; i < n; ++i)
 	for (j = 0; j < mat->limbs_per_row; ++j)
 	    mat->data[i * mat->limbs_per_row + j] = 0UL;
 
-    // TODO/speed: eliminate branch in the loop. Try to do block-wise.
     // mat[i, j] = sum ker[i][u] * charmat[u][j]
-    for (i = 0; i < n; ++i) {
-	for (j = 0; j < k; ++j) {
-	    int j0 = j / GMP_NUMB_BITS;
-	    int j1 = j - j0 * GMP_NUMB_BITS;
-	    int u;
-	    for (u = 0; u < small_nrows; u++) {
-		int u0 = u / GMP_NUMB_BITS;
-		int u1 = u - u0 * GMP_NUMB_BITS;
-		if ((ker[i][u0] >> u1) & 1UL)
-		    if (charmat[u][j] == -1)
-			mat->data[i * mat->limbs_per_row + j0] ^= (1UL << j1);
-	    }
-	}
-    }
+    {
+      int u;
+      for (u = 0; u < small_nrows; u++)
+        {
+          int u0 = u / GMP_NUMB_BITS;
+          int u1 = u - u0 * GMP_NUMB_BITS;
+          for (i = 0; i < n; ++i)
+            if ((ker[i][u0] >> u1) & 1UL)
+              for (j = 0; j < k; ++j)
+                {
+                  /* GCC is smart enough to do the following with masks and
+                     shifts when GMP_NUMB_BITS is a power of two */
+                  int j0 = j / GMP_NUMB_BITS;
+                  int j1 = j - j0 * GMP_NUMB_BITS;
+                  mat->data[i * mat->limbs_per_row + j0] ^=
+                    (charmat[u][j] == -1) << j1;
+                }
+          }
+      }
 #if DEBUG >= 1
     fprintf(stderr, "prod:=");
     printTabMatrix(mat, n, k);
@@ -475,13 +483,15 @@ int main(int argc, char **argv)
 
     ker = (mp_limb_t **) malloc(n * sizeof(mp_limb_t *));
     ASSERT(ker != NULL);
+    fprintf(stderr, "Reading dependency");
     for (j = 0; j < n; ++j) {
-	fprintf(stderr, "Reading dependency %u\n", j);
+	fprintf(stderr, " %u", j);
+        fflush (stderr);
 	ker[j] = (mp_limb_t *) malloc(nlimbs * sizeof(mp_limb_t));
 	ASSERT(ker[j] != NULL);
 	readOneKer(ker[j], kerfile, nlimbs);
     }
-    fprintf(stderr, "finished reading kernel file\n");
+    fprintf(stderr, "\nfinished reading kernel file\n");
 
     mymat.nrows = n;
     mymat.ncols = k + skip + 1;	// 1 (rat sign)+(k-1) characters+skip+1 (freerels)
@@ -498,6 +508,7 @@ int main(int argc, char **argv)
     handleKer(&mymat, tabchar, purgedfile, ker, pol,
 	      indexfile, relfile, small_nrows, smallfile, skip);
 
+    /* this is a cheap loop, since mymat.nrows is small, typically 64 */
     myker = (mp_limb_t **) malloc(mymat.nrows * sizeof(mp_limb_t *));
     ASSERT(myker != NULL);
     for (i = 0; i < mymat.nrows; ++i) {
@@ -506,9 +517,6 @@ int main(int argc, char **argv)
 	ASSERT(myker[i] != NULL);
 	for (j = 0; j < mymat.limbs_per_col; ++j)
 	    myker[i][j] = 0UL;
-        if ((i + 1) % 100000 == 0) {
-            fprintf(stderr, "%d/%d\r", i+1,mymat.nrows);
-        }
     }
     fprintf(stderr, "%d rows done      \n", mymat.nrows);
     fprintf(stderr, "Computing tiny kernel\n");
