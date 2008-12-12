@@ -55,7 +55,7 @@ matprune: matprune.o
 	$(CC) $(MY_LFLAGS) -o $@ $^
 
 apply_perm: apply_perm.o
-	$(CXX) $(MY_LXXFLAGS) -o $@ $^
+	$(CC) $(MY_LFLAGS) -o $@ $^ -lgmp
 
 # Don't forget the dependency on libutils !
 procrels hashpair freerel duplicates purge merge replay linalg balance: $(TOP)/utils/libutils.a
