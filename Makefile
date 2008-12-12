@@ -16,7 +16,7 @@ all:
 	$(MAKE) -C sieve/ecm libfacul.a
 	$(MAKE) -C sieve makefb las
 	$(MAKE) -C linalg freerel duplicates purge merge replay transpose \
-                   balance characters allsqrt
+                   balance characters allsqrt apply_perm
 	$(MAKE) -C gf2x
 	$(MAKE) -C gf2x/cantor
 	$(MAKE) -C linalg/bw
