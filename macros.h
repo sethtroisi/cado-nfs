@@ -28,6 +28,7 @@
     do {								\
       if (UNLIKELY((cond))) {                                           \
             croak__("Fatal error", msg);				\
+          abort();                                                      \
         }								\
     } while (0)
 
