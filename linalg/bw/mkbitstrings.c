@@ -117,14 +117,14 @@ int main(int argc, char * argv[])
             w |= ((x[k] >> i) & 1UL) << j;
             j ++;
             if (j == 64) {
-                printf ("%016"PRIu64" ", w);
+                printf ("%016"PRIx64" ", w);
                 j = 0;
                 w = 0;
             }
         }
         /* print last word */
         if (j > 0)
-            printf ("%" PRIu64, w);
+            printf ("%" PRIx64, w);
         printf("\n");
     }
 
