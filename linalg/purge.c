@@ -961,7 +961,10 @@ main(int argc, char **argv)
 	maxpr = 1L << pol[0].lpbr;
     if (maxpa == 0)
 	maxpa = 1L << pol[0].lpba;
-    need64 = (maxpr >> 32) || (maxpa >> 32);
+    /* On a 32-bit computer, even 1 << 32 would overflow. Well, we could set
+       map[ra] = 2^32-1 in that case, but not sure we want to support 32-bit
+       primes on a 32-bit computer... */
+    need64 = (pol[0].lpbr >= 32) || (pol[0].lpba >= 32);
 
     fprintf(stderr, "Number of relations is %u\n", nrelmax);
     if(nprimes > 0)
