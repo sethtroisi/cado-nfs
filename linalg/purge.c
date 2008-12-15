@@ -291,8 +291,8 @@ specialHashInsert(hashtable_t *H, long p, unsigned long r, int irel)
 static void
 insertNormalRelation(char *rel_used, int **rel_compact, int irel, int *nprimes,
                      hashtable_t *H, relation_t *rel,
-                     long maxpr, long maxpa, unsigned long minpr,
-                     unsigned long minpa, int final, unsigned long *tot_alloc)
+                     uint64_t maxpr, uint64_t maxpa, uint64_t minpr,
+                     uint64_t minpa, int final, unsigned long *tot_alloc)
 {
     int *tmp = NULL, ltmp = 0, itmp, j, h, ok = 1;
     /* special values of the roots are:
@@ -310,14 +310,14 @@ insertNormalRelation(char *rel_used, int **rel_compact, int irel, int *nprimes,
 	for (j = 0; j < rel->nb_rp; j++)
           if (rel->rp[j].p > minpr) /* only consider primes > minpr */
             {
-              if (rel->rp[j].p > (unsigned long) maxpr)
+              if (rel->rp[j].p > maxpr)
                 ok = 0; /* discard relations with too large primes */
               ltmp++;
 	    }
 	for (j = 0; j < rel->nb_ap; j++)
           if (rel->ap[j].p > minpa) /* only consider primes > minpr */
             {
-              if (rel->ap[j].p > (unsigned long) maxpa)
+              if (rel->ap[j].p > maxpa)
                 ok = 0; /* discard relations with too large primes */
               ltmp++;
             }
@@ -864,8 +864,8 @@ main(int argc, char **argv)
     int nrel, nprimes = 0, final = 1;
     unsigned long int nrelmax = 0, i;
     int nrel_new, nprimes_new, Hsize, Hsizer, Hsizea;
-    long maxpr = 0, maxpa = 0, keep = -1; // maximum value for nrows-ncols
-    long minpr = 0, minpa = 0;
+    int64_t maxpr = 0, maxpa = 0, keep = -1; // maximum value for nrows-ncols
+    int64_t minpr = 0, minpa = 0;
     cado_poly pol;
     unsigned long tot_alloc;
     int need64 = 0; /* non-zero if large primes are > 2^32 */
