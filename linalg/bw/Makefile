@@ -58,6 +58,7 @@ BW_PREP_SOURCES:=					\
 		cxx/prep.cpp cxx/files.cpp		\
 		cxx/matrix_header.cpp cxx/matrix.cpp	\
 		cxx/preconditioner.cpp			\
+		cxx/bitstring.cpp			\
 		cxx/matrix_line.cpp
 BW_PREP_LIBS:=-lgmpxx -lgmp
 -include .bw-prep.mkf
@@ -123,6 +124,7 @@ BW_LINGEN_BINARY_SOURCES:=		\
 		cxx/matrix.cpp		\
 		cxx/matrix_header.cpp		\
 		cxx/matrix_line.cpp		\
+		cxx/bitstring.cpp		\
 		cxx/config_file.cpp	\
 		cxx/fake_fft.c
 BW_LINGEN_BINARY_LIBS:=-lgmpxx -lgmp -lutils -lgf2x ../../gf2x/cantor/cantor128.o

@@ -7,6 +7,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <ctype.h>
 #include <gmp.h>
 #include <gmpxx.h>
 #include "gmp-hacks.h"
@@ -28,6 +29,18 @@
 
 using namespace std;
 
+/* There used to be a fair amount of mess with checkpoints, earlier on.
+ * It seems actually that the situation is much easier than what one
+ * would be led to think by re-reading the old commit logs.
+ *
+ * Let K denote the checkpoint periodicity (variable cp_lag, also
+ * reported on stdout). Let V_0 denote the vector Y, and V_i = M^(K*i)Y.
+ *
+ * The files A-*-* must be interpreted as sets of K lines. The i-th such
+ * set (starting with i=0) contains X^T V_i, X^T M V_i, ..., X^T M^(K-1) V_i.
+ * If this set is complete, and if V_{i+1} has been computed already,
+ * then it is possible to continue.
+ */
 int recoverable_iteration(int m, int col, int nbys, int cp_lag)
 {
 	mpz_class t;
@@ -43,16 +56,16 @@ int recoverable_iteration(int m, int col, int nbys, int cp_lag)
 		int v = 0;
 		std::string line;
 		for( ; getline(a, line) ; ) {
-			istringstream ss(line);
-			int ny;
-			for(ny = 0 ; ss >> t ; ny++);
-			if (ny != nbys) {
-				/* The data file might not have been
-				 * flushed */
-				BUG_ON(!a.eof());
-				break;
-			}
-			v++;
+                    size_t len = line.size();
+                    for( ; len && isspace(line[len-1]) ; ) ;
+                    int ny = 4 * len;
+                    if (ny != nbys) {
+                        /* The data file might not have been
+                         * flushed */
+                        BUG_ON(!a.eof());
+                        break;
+                    }
+                    v++;
 		}
 		per_row.push_back(v);
 	}
@@ -61,16 +74,6 @@ int recoverable_iteration(int m, int col, int nbys, int cp_lag)
 	int mi = *min_element(per_row.begin(), per_row.end());
 	int mx = *max_element(per_row.begin(), per_row.end());
 	
-	/* Each checkpoint is (cp_lag) integers long ; when k integers
-	 * are present in the A files, the last is (x, B^(k-1) y). We
-	 * know that the A files are flushed once B^k y has been
-	 * computed, for k a multiple of cp_lag. Hence we expect to
-	 * discard at least one integer in all cases (except when there
-	 * is no data anyway).
-	 */
-	mi -= (mi != 0);
-	mx -= (mx != 0);
-
 	mi -= mi % cp_lag;
 	mx -= mx % cp_lag;
 
@@ -81,8 +84,8 @@ int recoverable_iteration(int m, int col, int nbys, int cp_lag)
 	return mi / cp_lag;
 }
 
-/* We read the first r == (k * cp_lag) integers in the A files.  */
-int recover_iteration(int m, int col, int nbys, int r)
+/* We read the first r == (k * cp_lag) lines in the A files.  */
+int recover_iteration(int m, int col, int nbys MAYBE_UNUSED, int r)
 {
 	for(int i = 0 ; i < m ; i++) {
 		string a_string = files::a % i % col;
@@ -95,11 +98,10 @@ int recover_iteration(int m, int col, int nbys, int r)
 			ifstream a;
 			mpz_class dummy;
 			must_open(a, a_nm);
-			int j;
-			for(j = 0 ; j < r * nbys && (a >> dummy); j++);
-			BUG_ON(j != r * nbys);
-			/* Important : get the newline as well ! */
-			a >> ws;
+			int j = 0;
+                        std::string line;
+                        for(std::string line ; j < r && getline(a, line) ; j++);
+			BUG_ON(j != r);
 			a_pos = a.tellg();
 			a.close();
 		}

@@ -55,7 +55,7 @@ unsigned int blim = 0;
 unsigned int ulim = 0;
 
 struct fft_tuning_pair {
-    long sz;
+    int64_t sz;
     int method;
 };
 
@@ -92,7 +92,7 @@ void read_table()
     for(;;) {
         char buf[1024];
         int r;
-        long sz;
+        int64_t sz;
         int m;
         char token[16];
         char * ptr;
@@ -113,7 +113,7 @@ void read_table()
             }
             continue;
         }
-        r = sscanf(buf, "%16s %ld %d", token, &sz, &m);
+        r = sscanf(buf, "%16s %" SCNd64 " %d", token, &sz, &m);
         if (r != 3) {
             fprintf(stderr, "Bad input line: %s", buf);
             exit(1);
@@ -207,8 +207,19 @@ void prepare_and_push_hash_define_fft_tbl(const char *name,
 	if (i % 4 == 0) {
 	    h += snprintf(table_string + h, sz - h, "\t\\\n\t");
 	}
-	h += snprintf(table_string + h, sz - h, "{ %ld, %d }, ", tbl[i].sz,
-		      tbl[i].method);
+        if (tbl[i].sz >> 32) {
+            // make sure that the constant looks somewhat right (even
+            // though it's a stupid idea, using a thresholds file for a
+            // 64bit cpu on a 32bit box shouldn't break the meaning of
+            // the data).
+            h += snprintf(table_string + h, sz - h,
+                    "{ INT64_C(%"PRId64"), %d }, ",
+                    tbl[i].sz, tbl[i].method);
+        } else {
+            h += snprintf(table_string + h, sz - h,
+                    "{ %"PRId64", %d }, ",
+                    tbl[i].sz, tbl[i].method);
+        }
     }
     h += snprintf(table_string + h, sz - h, "}\n");
     if (h >= sz)

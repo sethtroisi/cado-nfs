@@ -121,7 +121,7 @@ void mul_gf2x_r(ulong * c,
     } else {
 	ulong *v = pool->stk + toomspace(sa);
 
-	long i, j;
+	unsigned int i, j;
 
 	memset(c, 0, sc * sizeof(ulong));
 

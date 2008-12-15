@@ -735,9 +735,9 @@ renumber(int *nprimes, hashtable_t *H, char *sos)
 	    if(H->hashcount[i] > 0){
 		H->hashcount[i] = nb++;
 		if(fsos != NULL)
-		    fprintf(fsos, "%d %lx %lx\n",
+		    fprintf(fsos, "%d %" PRIx64 " %" PRIx64 "\n",
 			    H->hashcount[i]-1, GET_HASH_P(H,i),
-                            (long) GET_HASH_R(H,i));
+                            GET_HASH_R(H,i));
 	    }
 	}
     if(fsos != NULL)
@@ -980,11 +980,11 @@ main(int argc, char **argv)
     hashInit (&H, Hsize, 1, need64);
     tot_alloc = H.hashmod * H.size;
 
-    rel_used = (char *) malloc (nrelmax * sizeof (char));
-    tot_alloc += nrelmax * sizeof (char);
-    fprintf (stderr, "Allocated rel_used of %luMb (total %luMb so far)\n",
-             (nrelmax * sizeof (char)) / 1000000,
-             tot_alloc / 1000000);
+    rel_used = (char *) malloc (nrelmax);
+    tot_alloc += nrelmax;
+    fprintf (stderr, "Allocated rel_used of %uMb (total %luMb so far)\n",
+             nrelmax >> 20,
+             tot_alloc >> 20);
     if (final)
       {
         /* FIXME: the rel_compact alone uses a lot of memory. For 100M
@@ -992,9 +992,10 @@ main(int argc, char **argv)
            prime bounds 2^30), on a 64-bit machine it uses 0.8Gb!!! */
 	rel_compact = (int **) malloc (nrelmax * sizeof (int *));
         tot_alloc += nrelmax * sizeof (int*);
-        fprintf (stderr, "Allocated rel_compact of %luMb (total %luMb so far)\n",
-                 (nrelmax * sizeof (int *)) / 1000000,
-                 tot_alloc / 1000000);
+        // %zu is the C99 modifier for size_t
+        fprintf (stderr, "Allocated rel_compact of %zuMb (total %luMb so far)\n",
+                 (nrelmax * sizeof (int *)) >>20,
+                 tot_alloc);
       }
 
     bad_primes.allocated = 100;

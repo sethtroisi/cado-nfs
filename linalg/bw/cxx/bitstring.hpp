@@ -28,5 +28,7 @@
  */
 unsigned int read_hexstring(std::istream&, unsigned long *, unsigned int);
 unsigned int write_hexstring(std::ostream&, const unsigned long *, unsigned int);
+unsigned int read_hexstring(FILE * f, unsigned long *, unsigned int);
+unsigned int write_hexstring(FILE * f, const unsigned long *, unsigned int);
 
 #endif	/* BITSTRING_HPP_ */

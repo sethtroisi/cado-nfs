@@ -12,6 +12,7 @@
 #include <string>
 #include <sstream>
 #include "manu.h"
+#include "bitstring.hpp"
 
 /* This enables the purportedly cache-friendly code in
  * matrix_repr_binary_sliced.hpp. Compile with make -V to reproduce the
@@ -79,7 +80,7 @@ struct binary_pod_traits {
 	 */
 	static inline void addmul(wide_scalar_t & dst, scalar_t const & src, int64_t x)
 	{
-		ulong mask = -x;
+		T mask = -x;
 		dst.p ^= mask & src.p;
 	}
 
@@ -142,25 +143,14 @@ struct binary_pod_traits {
 
         static std::ostream& print(std::ostream& o, scalar_t const& x)
         {
-            T mask = 1;
-            for(unsigned int i = 0 ; i < nbits ; i++) {
-                if (i) o << " ";
-                o << ((x.p & mask) != 0);
-                mask <<=1;
-            }
+            write_hexstring(o, (unsigned long *) &x, nbits);
             return o;
         }
 
-        static std::istream& get(std::istream& o, scalar_t & x)
+        static std::istream& get(std::istream& is, scalar_t & x)
         {
-            T z = 0;
-            unsigned long v;
-            for(unsigned int i = 0 ; i < nbits ; i++) {
-                o >> v;
-                z |= (v << i);
-            }
-            x.p = z;
-            return o;
+            read_hexstring(is, (unsigned long *) &x, nbits);
+            return is;
         }
 };
 

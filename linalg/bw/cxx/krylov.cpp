@@ -579,8 +579,9 @@ struct krylov_thread:public thread < traits, krylov_thread < traits > > {
                     }
                     v.close();
 
-                    if (r) {
-                        std::string old = files::v % globals::col % (r-1);
+                    // keep the two last checkpoints
+                    if (r >= 2) {
+                        std::string old = files::v % globals::col % (r-2);
                         unlink(old.c_str());
                     }
                 }

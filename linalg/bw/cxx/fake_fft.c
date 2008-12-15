@@ -17,17 +17,17 @@ void fake_setup(fake_info_t p, int dF, int dG)
 
 void fake_dft(const fake_info_t p MAYBE_UNUSED, fake_t dst, unsigned long * src, int n) {
     ASSERT(n <= p->d1 || n <= p->d2);
-    int s = BITS_TO_WORDS(n + 1, ULONG_BITS);
+    int s = BITS_TO_WORDS(n, ULONG_BITS);
     memcpy(dst, src, s * sizeof(ulong));
 }
 void fake_ift(const fake_info_t p MAYBE_UNUSED, unsigned long * dst, int n, fake_src_t src) {
     ASSERT(n <= p->d3);
-    int t = BITS_TO_WORDS(n + 1, ULONG_BITS);
+    int t = BITS_TO_WORDS(n, ULONG_BITS);
     memcpy(dst, src, t * sizeof(ulong));
 }
 void fake_compose(const fake_info_t p MAYBE_UNUSED, fake_t dst, fake_src_t s1, fake_src_t s2) {
-    int n1 = BITS_TO_WORDS(p->d1 + 1, ULONG_BITS);
-    int n2 = BITS_TO_WORDS(p->d2 + 1, ULONG_BITS);
+    int n1 = BITS_TO_WORDS(p->d1, ULONG_BITS);
+    int n2 = BITS_TO_WORDS(p->d2, ULONG_BITS);
     mul_gf2x(dst, s1, n1, s2, n2);
 }
 void fake_add(const fake_info_t p MAYBE_UNUSED, fake_t dst, fake_src_t s1, fake_src_t s2) {
