@@ -862,7 +862,7 @@ main(int argc, char **argv)
     int **rel_compact = NULL;
     int ret, k;
     int nrel, nprimes = 0, final = 1;
-    unsigned int nrelmax = 0, i;
+    unsigned long int nrelmax = 0, i;
     int nrel_new, nprimes_new, Hsize, Hsizer, Hsizea;
     long maxpr = 0, maxpa = 0, keep = -1; // maximum value for nrows-ncols
     long minpr = 0, minpa = 0;
@@ -964,7 +964,7 @@ main(int argc, char **argv)
 	maxpa = 1L << pol[0].lpba;
     need64 = (maxpr >> 32) || (maxpa >> 32);
 
-    fprintf(stderr, "Number of relations is %u\n", nrelmax);
+    fprintf(stderr, "Number of relations is %lu\n", nrelmax);
     if(nprimes > 0)
 	Hsize = nprimes;
     else{
@@ -980,7 +980,7 @@ main(int argc, char **argv)
 
     rel_used = (char *) malloc (nrelmax * sizeof (char));
     tot_alloc += nrelmax * sizeof (char);
-    fprintf (stderr, "Allocated rel_used of %uMb (total %luMb so far)\n",
+    fprintf (stderr, "Allocated rel_used of %luMb (total %luMb so far)\n",
              (nrelmax * sizeof (char)) / 1000000,
              tot_alloc / 1000000);
     if (final)
@@ -990,7 +990,7 @@ main(int argc, char **argv)
            prime bounds 2^30), on a 64-bit machine it uses 0.8Gb!!! */
 	rel_compact = (int **) malloc (nrelmax * sizeof (int *));
         tot_alloc += nrelmax * sizeof (int*);
-        fprintf (stderr, "Allocated rel_compact of %uMb (total %luMb so far)\n",
+        fprintf (stderr, "Allocated rel_compact of %luMb (total %luMb so far)\n",
                  (nrelmax * sizeof (int *)) / 1000000,
                  tot_alloc / 1000000);
       }
