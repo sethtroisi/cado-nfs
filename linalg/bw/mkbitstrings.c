@@ -124,7 +124,7 @@ int main(int argc, char * argv[])
         }
         /* print last word */
         if (j > 0)
-            printf ("%lx", w);
+            printf ("%" PRIu64, w);
         printf("\n");
     }
 

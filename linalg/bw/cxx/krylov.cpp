@@ -694,7 +694,10 @@ struct mksol_thread:public thread < traits, mksol_thread < traits > > {
                     // xptr->sum[xi - xi0],
                     // width);
                     // v << z << "\n";
-                    write_hexstring(v, xptr->sum + (xi - xi0), fptr.size());
+                    // seems that fptr.size() is in bits anyway, so the
+                    // cast looks safe.
+                    write_hexstring(v,
+                            (const unsigned long *) (xptr->sum + (xi - xi0)), fptr.size());
                     v << "\n";
                 }
             }

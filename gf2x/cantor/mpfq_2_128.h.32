@@ -192,7 +192,7 @@ void mpfq_2_128_field_init(mpfq_2_128_dst_field f)
 }
 
 static inline
-void mpfq_2_128_field_setopt(mpfq_2_128_dst_field f, unsigned long x, void * y)
+void mpfq_2_128_field_setopt(mpfq_2_128_dst_field f, unsigned long x MAYBE_UNUSED, void * y)
 {
     assert(x == MPFQ_IO_TYPE);
     f->io_type=((unsigned long*)y)[0];
@@ -388,6 +388,7 @@ int mpfq_2_128_sqrt(mpfq_2_128_dst_field K, mpfq_2_128_dst_elt r, mpfq_2_128_src
     /* mpfq_2_128_print(K, stdout, r); */
     /* fprintf(stdout, "\n"); */
     /* fflush(stdout); */
+    return 1;
 }
 
 static inline

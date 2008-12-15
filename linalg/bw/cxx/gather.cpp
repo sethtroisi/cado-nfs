@@ -95,7 +95,7 @@ void add_file(const std::string& fn)
 		traits::assign(v[i], foo, 0);
 #endif
                 uint64_t x;
-                read_hexstring(f, &x, 64);
+                read_hexstring(f, (unsigned long*) &x, 64);
                 v[i].p ^= x;
 	}
 	f >> ws;
@@ -150,7 +150,7 @@ void shipout(scalar_t * v, string const & s, bool check=true)
 			v[i] -= globals::modulus;
 		traits::print(wf,v[i]) << "\n";
         */
-                write_hexstring(wf, &(v[i].p), 64);
+                write_hexstring(wf, (const unsigned long *) &(v[i].p), 64);
                 wf << "\n";
 	}
 	wf.close();

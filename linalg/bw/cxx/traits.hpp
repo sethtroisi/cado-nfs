@@ -1,10 +1,14 @@
 #ifndef TRAITS_HPP_
 #define TRAITS_HPP_
 
+#if 0
+/* Remove the non-binary traits */
 #include "typical_scalar_traits.hpp"
 #include "variable_scalar_traits.hpp"
 #include "sse2_8words_traits.hpp"
 #include "sse2_2words_traits.hpp"
+#endif
+
 #include "ulong_traits.hpp"
 #include "binary_sse2_traits.hpp"
 #include "binary_ulong_traits.hpp"
