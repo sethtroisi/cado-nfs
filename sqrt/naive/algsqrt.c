@@ -1,4 +1,4 @@
-/* 
+/*
  * Program: algsqrt
  * Authors: P. Gaudry, P. Zimmermann
  * Purpose: computing the squareroots and finishing the factorization
@@ -117,7 +117,7 @@ TonelliShanks (poly_t res, const poly_t a, const poly_t F, unsigned long p)
   mpz_init(q);
   poly_alloc(auxpol, d);
   mpz_ui_pow_ui(q, p, (unsigned long)d);
-    
+
   // compute aux = (q-1)/2
   // and (s,t) s.t.  q-1 = 2^s*t
   mpz_sub_ui(aux, q, 1);
@@ -205,7 +205,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, poly_t F, unsigned long p)
   target_size = poly_sizeinbase (AA->p, AA->p->deg, 2);
   target_size = target_size / 2;
   target_size += target_size / 10;
-  fprintf (stderr, "target_size=%lu\n", target_size);
+  fprintf (stderr, "target_size=%lu\n", (unsigned long int) target_size);
 
   poly_alloc(A, d-1);
   // Clean up the mess with denominator: if it is an odd power of fd,
@@ -260,7 +260,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, poly_t F, unsigned long p)
   poly_copy (a, P[0]);
 
   // First compute the inverse square root modulo p
-  { 
+  {
     mpz_t q, aux;
     mpz_init(q);
     mpz_init(aux);
@@ -287,7 +287,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, poly_t F, unsigned long p)
   // Now, the lift begins
   // When entering the loop, invsqrtA contains the inverse square root
   // of A computed modulo pk.
-  
+
   poly_t tmp, tmp2;
   poly_alloc(tmp, 2*d-1);
   poly_alloc(tmp2, 2*d-1);
@@ -321,7 +321,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, poly_t F, unsigned long p)
     k = K[logk];
     barrett_init (invpk, pk); /* FIXME: we could lift 1/p^k also */
     fprintf (stderr, "start lifting mod p^%d (%lu bits) at %2.2lf\n",
-             k, mpz_sizeinbase (pk, 2), seconds ());
+             k, (unsigned long int) mpz_sizeinbase (pk, 2), seconds ());
 #ifdef VERBOSE
     fprintf (stderr, "   poly_base_modp_lift took %2.2lf\n", st);
 #endif
@@ -374,7 +374,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, poly_t F, unsigned long p)
 unsigned long FindSuitableModP(poly_t F) {
   unsigned long p = 2;
   int dF = F->deg;
-  
+
   plain_poly_t fp;
   plain_poly_init(fp, dF);
   while (1) {
@@ -398,7 +398,7 @@ unsigned long FindSuitableModP(poly_t F) {
 #define THRESHOLD 2 /* must be >= 2 */
 
 /* accumulate up to THRESHOLD products in prd[0], 2^i*THRESHOLD in prd[i].
-   nprd is the number of already accumulated values: if nprd = n0 + 
+   nprd is the number of already accumulated values: if nprd = n0 +
    n1 * THRESHOLD + n2 * THRESHOLD^2 + ..., then prd[0] has n0 entries,
    prd[1] has n1*THRESHOLD entries, and so on.
 */
@@ -547,7 +547,7 @@ main(int argc, char **argv)
   double tm = seconds();
   polymodF_sqrt (prd, prd, F, p);
   fprintf (stderr, "Square root lifted in %2.2lf\n", seconds()-tm);
-  
+
   mpz_t algsqrt, aux;
   mpz_init(algsqrt);
   mpz_init(aux);

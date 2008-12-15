@@ -81,14 +81,14 @@ char * working_filename;
 void usage()
 {
     fprintf(stderr, "Usage: ./bw-balance <options>\n");
-    fprintf(stderr, 
+    fprintf(stderr,
             "Typical options:\n"
             "--in <path>\tinput matrix filename\n"
             "--out <path>\toutput matrix filename\n"
             "--nslices <n1>[x<n2>]\toptimize for <n1>x<n2> strips\n"
             "--square\tpad matrix with zeroes to obtain square size\n"
         );
-    fprintf(stderr, 
+    fprintf(stderr,
             "More advanced:\n"
             "--remove-input\tremove the input file as soon as possible\n"
             "--ram-limit <nnn>[kmgKMG]\tfix maximum memory usage\n"
@@ -230,7 +230,7 @@ typedef struct fileset_s * fileset_ptr;
 void fileset_init(fileset x, unsigned int n)
 {
     x->names = (char **) malloc(n * sizeof(char *));
-    memset(x->names, 0, n * sizeof(char *)); 
+    memset(x->names, 0, n * sizeof(char *));
     x->n = n;
 }
 
@@ -1073,7 +1073,7 @@ struct slice * replicate_permutation(
 {
     /* pick the dispatching from the reference array, and output a
      * slicing which corresponds to the same permutation, but in the
-     * other dimension. 
+     * other dimension.
      */
     ASSERT_ALWAYS(nr == nc);
     struct slice * slices;
@@ -1205,7 +1205,7 @@ void close_hslices_files(char *** names, FILE *** g, int n)
 #endif /* }}} */
 
 void dispatcher(
-        fileset dst, fileset src, 
+        fileset dst, fileset src,
         size_t * sizes,
         unsigned int *dispatch,
         unsigned int nr)
@@ -2146,8 +2146,8 @@ int main(int argc, char * argv[])
 
     /* 10 is overestimated here. I think 4 suffices: 0,1,2, and f.
      */
-    if (sysconf(_SC_OPEN_MAX) <= nhslices + 10) {
-        fprintf(stderr, "Not enough open files allowed (%ld)\n", 
+    if (sysconf(_SC_OPEN_MAX) <= (long int) (nhslices + 10)) {
+        fprintf(stderr, "Not enough open files allowed (%ld)\n",
                 sysconf(_SC_OPEN_MAX));
         exit(1);
     }
@@ -2207,7 +2207,7 @@ int main(int argc, char * argv[])
         prefix_fixup(work->names[0],"tmp-");
 
         read_shuffled_matrix(work->names[0], pristine_filename);
-        
+
         work->status = TEMP;
 
         char * oldrp = NULL;
