@@ -800,7 +800,7 @@ sub try_singleton {
 
     banner("Removing duplicates");
     my $cmd = $param->{'cadodir'} .
-      "/linalg/duplicates -nrels $nrels $filestring > $prefix.nodup 2> $prefix.duplicates.stderr";
+      "/linalg/duplicates -nrels $nrels -out $prefix.nodup $filestring 2> $prefix.duplicates.stderr";
     my_system $cmd;
     my @grouik = split(/ /, `tail -1 $prefix.duplicates.stderr`);
     my $nrels_dup = $grouik[(scalar @grouik)-1];
