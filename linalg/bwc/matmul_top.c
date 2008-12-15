@@ -376,14 +376,16 @@ static void load_vector_toprow(matmul_top_data_ptr mmt, int d, unsigned int inde
     
     void * sendbuf = NULL;
     int fd = -1;
+    size_t siz = abbytes(mmt->abase, mmt->n[!d]);
+    size_t wsiz = ((siz - 1) | (sysconf(_SC_PAGESIZE)-1)) + 1;
     if (pirow->jrank == 0) {
         if (pirow->trank == 0) {
             char * filename;
             asprintf(&filename, "V%u.%u.twisted", index, iter);
             fd = open(filename, O_RDONLY, 0666);
             DIE_ERRNO_DIAG(fd < 0, "fopen", filename);
-            sendbuf = mmap(NULL, abbytes(mmt->abase, mmt->n[!d]),
-                    PROT_READ, 0, fd, 0);
+            sendbuf = mmap(NULL, wsiz, PROT_READ, MAP_SHARED, fd, 0);
+            DIE_ERRNO_DIAG(sendbuf == MAP_FAILED, "mmap", filename);
             free(filename);
         }
         /* Now all threads from job zero see the area mmaped by their
@@ -417,11 +419,13 @@ static void load_vector_toprow(matmul_top_data_ptr mmt, int d, unsigned int inde
         }
     }
 
+    serialize_threads(pirow);
+
     free(sendcounts);
     free(displs);
 
     if (pirow->jrank == 0 && pirow->trank == 0) {
-        munmap(sendbuf, abbytes(mmt->abase, mmt->n[d]));
+        munmap(sendbuf, wsiz);
         close(fd);
     }
 }
@@ -449,10 +453,14 @@ void matmul_top_load_vector(matmul_top_data_ptr mmt, int d, unsigned int index, 
         // first, down on columns.
         for(unsigned int t = 0 ; t < pirow->ncores ; t++) {
             serialize_threads(pirow);
-            void * ptr = mmt->wr[d]->v;
-            MPI_Bcast(ptr, siz, MPI_BYTE, 0, picol->pals);
+            if (t == pirow->trank) {
+                void * ptr = mmt->wr[d]->v;
+                MPI_Bcast(ptr, siz, MPI_BYTE, 0, picol->pals);
+            }
         }
     }
+
+    serialize(mmt->pi->m);
 
     // then maybe amongst threads if they're not sharing data.
     if ((mmt->flags[d] & THREAD_SHARED_VECTOR) == 0) {
