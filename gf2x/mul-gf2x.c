@@ -18,11 +18,12 @@
   02111-1307, USA.
 */
 #include <string.h>
+#include <stdint.h>
 
 #include "gf2x.h"
 
 #ifdef MUL_FFT_TABLE
-long T_FFT_TAB[][2] = MUL_FFT_TABLE;
+int64_t T_FFT_TAB[][2] = MUL_FFT_TABLE;
 #endif
 
 /* This is the toplevel multiplication routine. It handles the temporary
