@@ -1,7 +1,7 @@
 #include <vector>
 
 #include "macros.h"
-#include "intersections.hpp"
+#include "intersections.h"
 
 /*  Computes the intersection of [i0..i1[ with the fences */
 std::vector<isect_info>
@@ -55,5 +55,15 @@ intersect(unsigned int * fences, unsigned int x0, unsigned int x1)
     }
     return res;
 }
+
+void intersect(unsigned int * plen, struct isect_info ** res, unsigned int * fences, unsigned int x0, unsigned int x1)
+{
+    std::vector<isect_info> vv;
+    vv = intersect(fences, x0, x1);
+    *plen = vv.size();
+    *res = (struct isect_info *) malloc(*plen * sizeof(struct isect_info));   
+    std::copy(vv.begin(), vv.end(), *res);
+}
+
 /*  */
 

@@ -14,11 +14,13 @@ struct isect_info {
 
 /*  Computes the intersection of [i0..i1[ with the fences */
 #ifdef __cplusplus
-
-#include <vector>
-std::vector<isect_info>
-intersect(unsigned int * fences, unsigned int x0, unsigned int x1);
+extern "C" {
 #endif
 
+void intersect(unsigned int * plen, struct isect_info ** res, unsigned int * fences, unsigned int x0, unsigned int x1);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif	/* INTERSECTIONS_HPP_ */

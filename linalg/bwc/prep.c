@@ -12,6 +12,7 @@
 #include "random_generation.h"
 
 #include "params.h"
+#include "xvectors.h"
 
 abobj_t abase;
 
@@ -20,6 +21,15 @@ mpz_t p;
 int interval=1000;
 int verbose=0;
 char matrix_filename[FILENAME_MAX];
+int can_print;
+
+unsigned int nx_main;
+
+// dir is a boolean flag equal to 1 if we are looking for the right nullspace
+// of the matrix.
+int dir = 1;
+
+const char * dirtext[] = { "left", "right" };
 
 void * program(parallelizing_info_ptr pi)
 {
@@ -27,8 +37,52 @@ void * program(parallelizing_info_ptr pi)
     // global mpi/pthreads setup. So despite its apparent irrelevance, I
     // suggest leaving it here as a cheap sanity check.
     hello(pi);
+
+    // avoid cluttering output too much.
+    int tcan_print = can_print & pi->m->trank == 0;
+
+    unsigned int nx = 1;
+
     matmul_top_data mmt;
-    matmul_top_init(mmt, abase, pi, matrix_filename);
+
+    // FIXME: we have set no multiplication algorithm here.
+    matmul_top_init(mmt, abase, NULL, pi, matrix_filename);
+
+    uint32_t * xvecs = malloc(nx * m * sizeof(uint32_t));
+
+    for (unsigned ntri = 0;; ntri++) {
+        if (tcan_print) {
+            printf("// Generating new x,y vector pair\n");
+        }
+        if (ntri >= nx * 10) {
+            ++nx;
+            if (tcan_print) {
+                printf("// Getting bored. Trying %u x vectors\n", nx);
+            }
+            xvecs = realloc(xvecs, nx * m * sizeof(uint32_t));
+            ASSERT_ALWAYS(xvecs != NULL);
+        }
+
+        // if we're looking for the right nullspace, then x is on the left.
+        // Otherwise, it's on the right
+        setup_x_random(xvecs, m, nx, mmt->n[dir], pi);
+
+        break;
+    }
+
+    matmul_top_fill_random_source(mmt, dir);
+    matmul_top_save_vector(mmt, dir, 0, 0);
+    serialize(pi->m);
+
+    matmul_top_load_vector(mmt, dir, 0, 0);
+    matmul_top_save_vector(mmt, dir, 0, 1);
+
+    // last 
+    serialize(pi->m);
+
+    if (pi->m->trank == 0) {
+        nx_main = nx;
+    }
 
     return NULL;
 }
@@ -60,7 +114,7 @@ int main(int argc, char * argv[])
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    int can_print = rank == 0 || getenv("CAN_PRINT");
+    can_print = rank == 0 || getenv("CAN_PRINT");
 
     if (can_print) {
         /* print command line */
@@ -79,6 +133,9 @@ int main(int argc, char * argv[])
         usage();
     }
 
+    // Here, the matrix filename really ends up in some heap data that will
+    // survive after freeing the param_list (if ever we do so early -- as a
+    // matter of fact, in prep.c we don't)
     param_list_parse_string(pl, "matrix", matrix_filename, sizeof(matrix_filename));
     int mpi_split[2] = {1,1,};
     int thr_split[2] = {1,1,};
@@ -89,11 +146,25 @@ int main(int argc, char * argv[])
     param_list_parse_int(pl, "seed", &seed);
     param_list_parse_int(pl, "interval", &interval);
 
-    char subdir[1024] = { 0, };
-    param_list_parse_string(pl, "subdir", subdir, sizeof(subdir));
-    if (subdir[0]) {
-        if (chdir(subdir) < 0) {
-            fprintf(stderr, "chdir(%s): %s\n", subdir, strerror(errno));
+    const char * tmp;
+
+    if ((tmp = param_list_lookup_string(pl, "nullspace")) != NULL) {
+        if (strcmp(tmp, dirtext[0])) {
+            dir = 0;
+        } else if (strcmp(tmp, dirtext[1])) {
+            dir = 1;
+        } else {
+            fprintf(stderr, "Parameter nullspace may only be %s|%s\n",
+                    dirtext[0], dirtext[1]);
+            exit(1);
+        }
+    } else {
+        param_list_add_key(pl, "nullspace", dirtext[dir], PARAMETER_FROM_FILE);
+    }
+
+    if ((tmp = param_list_lookup_string(pl, "tmp")) != NULL) {
+        if (chdir(tmp) < 0) {
+            fprintf(stderr, "chdir(%s): %s\n", tmp, strerror(errno));
             exit(1);
         }
     }
@@ -124,12 +195,21 @@ int main(int argc, char * argv[])
     }
 
     param_list_save(pl, "bw-prep.cfg");
-    param_list_clear(pl);
 
     // abase is our arithmetic type.
     abobj_init(abase);
 
     pi_go(program, mpi_split[0], mpi_split[1], thr_split[0], thr_split[1]);
+
+    // now we're not multithread anymore.
+
+    // we save the parameter list once again, because the prep program
+    // generates some useful info.
+    char nxstring[10];
+    snprintf(nxstring, sizeof(nxstring), "%u", nx_main);
+    param_list_add_key(pl, "nx", nxstring, PARAMETER_FROM_FILE);
+    param_list_save(pl, "bw.cfg");
+    param_list_clear(pl);
 
     mpz_clear(p);
     MPI_Finalize();

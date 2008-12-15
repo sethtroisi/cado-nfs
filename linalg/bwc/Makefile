@@ -50,7 +50,7 @@ test_hello_objs:=test_hello.o parallelizing_info.o
 prep_objs:=prep.o intersections.o matmul.o	\
 	matmul_top.o parallelizing_info.o	\
 	info_file.o ../readbuffer.o ../readmat.o	\
-	auxfuncs.o config_file.o
+	auxfuncs.o config_file.o xvectors.o
 
 
 test_hello: $(test_hello_objs)
@@ -90,9 +90,9 @@ clean:
 # ALL source files must come here. Using $(wildcard *.c) is discouraged
 # for obvious reasons.
 sources:=	\
-    args.cpp auxfuncs.c build.c config_file.cpp info_file.cpp		\
-    intersections.cpp matmul.cpp matmul_top.cpp parallelizing_info.c	\
-    prep.c preparegrid.c test_hello.c
+    args.cpp auxfuncs.c build.c config_file.cpp info_file.c		\
+    intersections.cpp matmul.cpp matmul_top.c parallelizing_info.c	\
+    prep.c test_hello.c xvectors.c
 dep: $(patsubst %,.deps/%.d,$(sources))
 -include $(patsubst %,.deps/%.d,$(sources))
 

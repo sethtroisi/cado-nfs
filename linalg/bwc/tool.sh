@@ -26,7 +26,9 @@ if [ $1 = "--inside" ] ; then
     # --inside is an internal parameter, do not use.
     shift
 else
-    xterm -e $0 --inside "$@"
+    # I set this in .Xdefaults
+    # mpi-debug.vt100.faceSize: 5
+    xterm -name mpi-debug -e $0 --inside "$@"
     exit 0
 fi
 

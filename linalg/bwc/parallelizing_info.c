@@ -13,9 +13,9 @@
 
 #include <sys/time.h>   // gettimeofday
 
-#define CONCURRENCY_DEBUG
+#define xxxCONCURRENCY_DEBUG
 
-static inline void pi_wiring_init_pthread_things(struct pi_wiring * w, const char * desc)
+static inline void pi_wiring_init_pthread_things(pi_wiring_ptr w, const char * desc)
 {
     struct pthread_things * res;
 
@@ -28,12 +28,13 @@ static inline void pi_wiring_init_pthread_things(struct pi_wiring * w, const cha
     w->th = res;
 }
 
-static inline void pi_wiring_destroy_pthread_things(struct pi_wiring * w)
+static inline void pi_wiring_destroy_pthread_things(pi_wiring_ptr w)
 {
     my_pthread_barrier_destroy(w->th->b);
     my_pthread_mutex_destroy(w->th->m);
     /* Beware ! Freeing mustn't happen more than once ! */
     free(w->th->desc);
+    free(w->th);
     w->th = NULL;
 }
 
@@ -69,6 +70,7 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr),
 
     pi->m->njobs = nhj * nvj;
     pi->m->ncores = nhc * nvc;
+    pi->m->totalsize = pi->m->njobs * pi->m->ncores;
     MPI_Comm_dup(MPI_COMM_WORLD, & pi->m->pals);
     MPI_Comm_rank(pi->m->pals, (int*) & pi->m->jrank);
 
@@ -91,6 +93,8 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr),
     pi->wr[0]->ncores = nvc;
     pi->wr[1]->njobs = nhj;
     pi->wr[1]->ncores = nhc;
+    pi->wr[0]->totalsize = pi->wr[0]->njobs * pi->wr[0]->ncores;
+    pi->wr[1]->totalsize = pi->wr[1]->njobs * pi->wr[1]->ncores;
 
     // Here we want the _common row number_ ; not to be confused with the
     // rank !
@@ -145,7 +149,7 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr),
         snprintf(buf, sizeof(buf), "r%u", 
                 pi->wr[1]->jrank * pi->wr[1]->ncores + c);
         unsigned int Nc = c * pi->wr[0]->ncores;
-        struct pi_wiring * leader = grid[Nc]->wr[0];
+        pi_wiring_ptr leader = grid[Nc]->wr[0];
         pi_wiring_init_pthread_things(leader, buf);
         // replicate.
         for(unsigned int k = 0 ; k < pi->wr[0]->ncores ; k++) {
@@ -158,7 +162,7 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr),
     for(unsigned int c = 0 ; c < pi->wr[0]->ncores ; c++) {
         snprintf(buf, sizeof(buf), "c%u", 
                 pi->wr[0]->jrank * pi->wr[0]->ncores + c);
-        struct pi_wiring * leader = grid[c]->wr[1];
+        pi_wiring_ptr leader = grid[c]->wr[1];
         pi_wiring_init_pthread_things(leader, buf);
         // replicate.
         for(unsigned int k = 0 ; k < pi->wr[1]->ncores ; k++) {
@@ -266,13 +270,41 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr),
     }
 }
 
-#define serialize(w)   serialize__(w, __LINE__)
-int serialize__(struct pi_wiring * w, unsigned int l MAYBE_UNUSED)
+void thread_agreement(pi_wiring_ptr wr, void ** ptr, unsigned int i)
+{
+    // FIXME: this design is flawed. Correct reentrancy is not achieved.
+    // All the stuff around the barrier here should be done with the
+    // mutex locked, otherwise disaster may occur.
+    // A fix would incur either basically rewriting barrier code, so as
+    // to place stuff at the right spot. Note that there _is_ some
+    // barrier code in bw/barrier.[ch] which could easily be expanded for
+    // this purpose.
+    if (wr->trank == i) {
+        wr->th->utility_ptr = *ptr;
+    }
+    my_pthread_barrier_wait(wr->th->b);
+    *ptr = wr->th->utility_ptr;
+}
+
+void complete_broadcast(pi_wiring_ptr wr, void * ptr, size_t size, unsigned int j, unsigned int t)
+{
+    ASSERT(j < wr->njobs);
+    ASSERT(t < wr->ncores);
+    if (wr->trank == t) {
+        MPI_Bcast(ptr, size, MPI_BYTE, j, wr->pals);
+    }
+    void * leader_ptr = ptr;
+    thread_agreement(wr, &leader_ptr, 0);
+    memcpy(ptr, leader_ptr, size);
+}
+
+
+int serialize__(pi_wiring_ptr w, const char * s MAYBE_UNUSED, unsigned int l MAYBE_UNUSED)
 {
 #ifdef  CONCURRENCY_DEBUG
     // note how w->th_count is normally a thread-private thing !
     w->th_count++;
-    printf("(line %u) barrier #%d, %u/%u on %s [%p]\n", l, w->th_count,
+    printf("(%s:%u) barrier #%d, %u/%u on %s [%p]\n", s, l, w->th_count,
             w->trank, w->ncores,
             w->th->desc, w->th->b);
 #endif
@@ -287,13 +319,12 @@ int serialize__(struct pi_wiring * w, unsigned int l MAYBE_UNUSED)
     return w->jrank == 0 && w->trank == 0;
 }
 
-#define serialize_threads(w)   serialize_threads__(w, __LINE__)
-int serialize_threads__(struct pi_wiring * w, unsigned int l MAYBE_UNUSED)
+int serialize_threads__(pi_wiring_ptr w, const char * s MAYBE_UNUSED, unsigned int l MAYBE_UNUSED)
 {
 #ifdef  CONCURRENCY_DEBUG
     // note how w->th_count is normally a thread-private thing !
     w->th_count++;
-    printf("(line %u) tbarrier #%d, %u/%u on %s [%p]\n", l, w->th_count,
+    printf("(%s:%u) tbarrier #%d, %u/%u on %s [%p]\n", s, l, w->th_count,
             w->trank, w->ncores,
             w->th->desc, w->th->b);
 #endif
@@ -309,7 +340,7 @@ int serialize_threads__(struct pi_wiring * w, unsigned int l MAYBE_UNUSED)
 // functional use, apart from the fact that they exert some pressure on
 // the mpi+pthreads way of doing things.
 
-void say_hello(struct pi_wiring * w, parallelizing_info_ptr pi)
+void say_hello(pi_wiring_ptr w, parallelizing_info_ptr pi)
 {
     serialize(w);
     for(unsigned int j = 0 ; j < w->njobs ; j++) {
@@ -345,7 +376,7 @@ void hello(parallelizing_info_ptr pi)
     // Rule is: never let mpi-level synchronisations on a communicator
     // wander outside an execution period for which all threads sharing
     // this communicator are doing the same.
-    for(unsigned int i = 0 ; i < pi->wr[0]->njobs * pi->wr[0]->ncores ; i++) {
+    for(unsigned int i = 0 ; i < pi->wr[0]->totalsize ; i++) {
         serialize(pi->m);
         serialize_threads(pi->m);
         if (i == pi->wr[0]->jrank * pi->wr[0]->ncores + pi->wr[0]->trank) {
@@ -353,7 +384,7 @@ void hello(parallelizing_info_ptr pi)
         }
     }
 
-    for(unsigned int i = 0 ; i < pi->wr[1]->njobs * pi->wr[1]->ncores ; i++) {
+    for(unsigned int i = 0 ; i < pi->wr[1]->totalsize ; i++) {
         serialize(pi->m);
         serialize_threads(pi->m);
         if (i == pi->wr[1]->jrank * pi->wr[1]->ncores + pi->wr[1]->trank) {

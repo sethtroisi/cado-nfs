@@ -3,6 +3,7 @@
 
 #if !(defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L)
 #error "Define _POSIX_C_SOURCE to at least 200112L on top of the source files"
+#define _POSIX_C_SOURCE 200112L
 #endif
 
 // for some absurd reason, the gnu standard C++ library <string> header
