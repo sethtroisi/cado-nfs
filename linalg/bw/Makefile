@@ -28,6 +28,9 @@ LFLAGS:=-L ../../utils -L ../../gf2x -L ../../gf2x/cantor
 
 IFLAGS+=-DVERSION='"$(shell util/version.sh)"'
 
+# Always enable sse2.
+IFLAGS+=-msse2
+
 ifdef PATCHED_GMP
 IFLAGS+=-DPATCHED_GMP
 endif
