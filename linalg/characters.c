@@ -14,7 +14,7 @@
 #define DEBUG 0
 
 int kernel(mp_limb_t * mat, mp_limb_t ** ker, int nrows, int ncols,
-	   int limbs_per_row, int limbs_per_col);
+           int limbs_per_row, int limbs_per_col);
 
 // Data structure for one algebraic prime and for a table of those.
 typedef struct {
@@ -28,26 +28,26 @@ static int eval_char(long a, unsigned long b, rootprime_t ch)
     int res;
 #if DEBUG >= 1
     printf("a := %ld; b := %lu; p := %lu; r := %lu;", a, b, ch.prime,
-	   ch.root);
+           ch.root);
 #endif
     if (a < 0) {
-	ua = ((unsigned long) (-a)) % ch.prime;
-	b = b % ch.prime;
-	modul_mul(&aux, &b, &ch.root, &ch.prime);
-	modul_add(&aux, &ua, &aux, &ch.prime);
-	modul_neg(&aux, &aux, &ch.prime);
-	res = modul_jacobi(&aux, &ch.prime);
+        ua = ((unsigned long) (-a)) % ch.prime;
+        b = b % ch.prime;
+        modul_mul(&aux, &b, &ch.root, &ch.prime);
+        modul_add(&aux, &ua, &aux, &ch.prime);
+        modul_neg(&aux, &aux, &ch.prime);
+        res = modul_jacobi(&aux, &ch.prime);
     } else {
-	ua = ((unsigned long) (a)) % ch.prime;
-	b = b % ch.prime;
-	modul_mul(&aux, &b, &ch.root, &ch.prime);
-	modul_sub(&aux, &ua, &aux, &ch.prime);
-	res = modul_jacobi(&aux, &ch.prime);
+        ua = ((unsigned long) (a)) % ch.prime;
+        b = b % ch.prime;
+        modul_mul(&aux, &b, &ch.root, &ch.prime);
+        modul_sub(&aux, &ua, &aux, &ch.prime);
+        res = modul_jacobi(&aux, &ch.prime);
     }
     if (res == 0) {
-	fprintf(stderr, "Strange: have a jacobi symbol that is zero:\n");
-	fprintf(stderr, "  a = %ld, b = %lu, p := %lu; r := %lu;", a, saveb,
-		ch.prime, ch.root);
+        fprintf(stderr, "Strange: have a jacobi symbol that is zero:\n");
+        fprintf(stderr, "  a = %ld, b = %lu, p := %lu; r := %lu;", a, saveb,
+                ch.prime, ch.root);
     }
 #if DEBUG >= 1
     printf("res := %d; assert (JacobiSymbol(a-b*r, p) eq res);\n", res);
@@ -65,7 +65,7 @@ static int eval_rat_char(long a, unsigned long b, cado_poly pol)
     /* first perform a quick check */
     s = (a > 0) ? mpz_sgn(pol->g[1]) : -mpz_sgn(pol->g[1]);
     if (mpz_sgn(pol->g[0]) == s)
-	return s;
+        return s;
 
     mpz_init(tmp1);
     mpz_mul_si(tmp1, pol->g[1], a);
@@ -92,15 +92,15 @@ static void create_characters(rootprime_t * tabchar, int k, cado_poly pol)
     roots = malloc(pol->degree * sizeof(unsigned long));
 
     do {
-	mpz_nextprime(pp, pp);
-	p = mpz_get_ui(pp);
-	ret = poly_roots_ulong(roots, pol->f, pol->degree, p);
-	if (ret == 0)
-	    continue;
-	tabchar[i].prime = p;
+        mpz_nextprime(pp, pp);
+        p = mpz_get_ui(pp);
+        ret = poly_roots_ulong(roots, pol->f, pol->degree, p);
+        if (ret == 0)
+            continue;
+        tabchar[i].prime = p;
         /* FIXME: Why do we take only one root per prime ??? */
-	tabchar[i].root = roots[0];
-	i++;
+        tabchar[i].root = roots[0];
+        i++;
     }
     while (i < k);
 
@@ -114,10 +114,10 @@ static void readOneKer(mp_limb_t * vec, FILE * file, int nlimbs)
     int ret, i;
 
     for (i = 0; i < nlimbs; ++i) {
-	ret = fscanf(file, "%lx", &w);
-	ASSERT(ret == 1);
-	*vec = w;
-	vec++;
+        ret = fscanf(file, "%lx", &w);
+        ASSERT(ret == 1);
+        *vec = w;
+        vec++;
     }
 }
 
@@ -132,15 +132,15 @@ typedef struct {
 // charmat is small_nrows x k
 static void
 computeAllCharacters(char **charbig, int i, int k, rootprime_t * tabchar,
-		     long a, unsigned long b, cado_poly pol)
+                     long a, unsigned long b, cado_poly pol)
 {
     int j;
 
     for (j = 0; j < k - 2; j++)
-	charbig[i][j] = (char) eval_char(a, b, tabchar[j]);
+        charbig[i][j] = (char) eval_char(a, b, tabchar[j]);
     charbig[i][k - 2] = (char) eval_rat_char(a, b, pol);
     // last column is for the free relations...
-    charbig[i][k - 1] = (b == 0 ? (char) (-1) : 1);	// ohhhhhhhhhhh!
+    charbig[i][k - 1] = (b == 0 ? (char) (-1) : 1);        // ohhhhhhhhhhh!
 }
 
 // charmat is small_nrows x k
@@ -149,8 +149,8 @@ computeAllCharacters(char **charbig, int i, int k, rootprime_t * tabchar,
 // indexfile contains the coding "row[i] uses rows i_0...i_r in purgedfile".
 static void
 buildCharacterMatrix(char **charmat, int k, rootprime_t * tabchar,
-		     FILE * purgedfile, FILE * indexfile, FILE * relfile,
-		     cado_poly pol, int small_nrows)
+                     FILE * purgedfile, FILE * indexfile, FILE * relfile,
+                     cado_poly pol, int small_nrows)
 {
     relation_t rel;
     int i, j, r, nr, nrows, ncols, irel, kk;
@@ -167,16 +167,16 @@ buildCharacterMatrix(char **charmat, int k, rootprime_t * tabchar,
     // charbig is nrows x k
     charbig = (char **) malloc(nrows * sizeof(char *));
     for (i = 0; i < nrows; i++)
-	charbig[i] = (char *) malloc(k * sizeof(char));
+        charbig[i] = (char *) malloc(k * sizeof(char));
     irel = 0;
     //    rewind(relfile); // useless?
     for (i = 0; i < nrows; i++) {
-	fgets(str, 1024, purgedfile);
-	sscanf(str, "%d", &nr);
-	jumpToRelation(&rel, relfile, irel, nr);
-	irel = nr + 1;
-	computeAllCharacters(charbig, i, k, tabchar, rel.a, rel.b, pol);
-	clear_relation(&rel);
+        fgets(str, 1024, purgedfile);
+        sscanf(str, "%d", &nr);
+        jumpToRelation(&rel, relfile, irel, nr);
+        irel = nr + 1;
+        computeAllCharacters(charbig, i, k, tabchar, rel.a, rel.b, pol);
+        clear_relation(&rel);
         if ((i + 1) % 100000 == 0) {
             fprintf (stderr, "   read %d/%d (a,b) pairs\r", i + 1, nrows);
         }
@@ -186,18 +186,18 @@ buildCharacterMatrix(char **charmat, int k, rootprime_t * tabchar,
     fprintf(stderr, "Reading index file to reconstruct the characters\n");
     // read all relation-sets and update charmat accordingly
     for (i = 0; i < small_nrows; i++) {
-	if (!(i % 10000))
-	    fprintf(stderr, "Treating relation #%d / %d at %2.2lf\n",
-		    i, small_nrows, seconds());
-	fscanf(indexfile, "%d", &nr);
-	for (j = 0; j < nr; j++) {
-	    fscanf(indexfile, "%d", &r);
-	    for (kk = 0; kk < k; kk++)
-		charmat[i][kk] *= charbig[r][kk];
-	}
+        if (!(i % 10000))
+            fprintf(stderr, "Treating relation #%d / %d at %2.2lf\n",
+                    i, small_nrows, seconds());
+        fscanf(indexfile, "%d", &nr);
+        for (j = 0; j < nr; j++) {
+            fscanf(indexfile, "%d", &r);
+            for (kk = 0; kk < k; kk++)
+                charmat[i][kk] *= charbig[r][kk];
+        }
     }
     for (i = 0; i < nrows; i++)
-	free(charbig[i]);
+        free(charbig[i]);
     free(charbig);
 }
 
@@ -208,21 +208,21 @@ static void printCompactMatrix(mp_limb_t ** A, int nrows, int ncols)
 
     fprintf(stderr, "array([\n");
     for (i = 0; i < nrows; i++) {
-	fprintf(stderr, "[");
-	for (j = 0; j < ncols; j++) {
-	    int j0 = j / GMP_NUMB_BITS;
-	    int j1 = j - j0 * GMP_NUMB_BITS;
-	    if ((A[i][j0] >> j1) & 1UL)
-		fprintf(stderr, "1");
-	    else
-		fprintf(stderr, "0");
-	    if (j < ncols - 1)
-		fprintf(stderr, ", ");
-	}
-	fprintf(stderr, "]");
-	if (i < nrows - 1)
-	    fprintf(stderr, ", ");
-	fprintf(stderr, "\n");
+        fprintf(stderr, "[");
+        for (j = 0; j < ncols; j++) {
+            int j0 = j / GMP_NUMB_BITS;
+            int j1 = j - j0 * GMP_NUMB_BITS;
+            if ((A[i][j0] >> j1) & 1UL)
+                fprintf(stderr, "1");
+            else
+                fprintf(stderr, "0");
+            if (j < ncols - 1)
+                fprintf(stderr, ", ");
+        }
+        fprintf(stderr, "]");
+        if (i < nrows - 1)
+            fprintf(stderr, ", ");
+        fprintf(stderr, "\n");
     }
     fprintf(stderr, "])");
 }
@@ -233,27 +233,27 @@ static void printTabMatrix(dense_mat_t * mat, int nrows, int ncols)
 
     fprintf(stderr, "array([\n");
     for (i = 0; i < nrows; i++) {
-	fprintf(stderr, "[");
-	for (j = 0; j < ncols; j++) {
-	    int j0 = j / GMP_NUMB_BITS;
-	    int j1 = j - j0 * GMP_NUMB_BITS;
-	    if ((mat->data[i * mat->limbs_per_row + j0] >> j1) & 1UL)
-		fprintf(stderr, "1");
-	    else
-		fprintf(stderr, "0");
-	    if (j < ncols - 1)
-		fprintf(stderr, ", ");
-	}
-	fprintf(stderr, "]");
-	if (i < nrows - 1)
-	    fprintf(stderr, ", ");
-	fprintf(stderr, "\n");
+        fprintf(stderr, "[");
+        for (j = 0; j < ncols; j++) {
+            int j0 = j / GMP_NUMB_BITS;
+            int j1 = j - j0 * GMP_NUMB_BITS;
+            if ((mat->data[i * mat->limbs_per_row + j0] >> j1) & 1UL)
+                fprintf(stderr, "1");
+            else
+                fprintf(stderr, "0");
+            if (j < ncols - 1)
+                fprintf(stderr, ", ");
+        }
+        fprintf(stderr, "]");
+        if (i < nrows - 1)
+            fprintf(stderr, ", ");
+        fprintf(stderr, "\n");
     }
     fprintf(stderr, "])");
 }
 #endif
 
-// We add the heaviest columns of M_small to the last [kmin..kmin+skip[ 
+// We add the heaviest columns of M_small to the last [kmin..kmin+skip[
 // columns of charmat.
 static void
 addHeavyBlock(char **charmat, FILE * smallfile, int kmin, int skip)
@@ -264,60 +264,60 @@ addHeavyBlock(char **charmat, FILE * smallfile, int kmin, int skip)
     fscanf(smallfile, "%d %d", &i, &nc);
     i = 0;
     while (fscanf(smallfile, "%d", &nc) != EOF) {
-	for (u = 0; u < nc; u++) {
-	    fscanf(smallfile, "%d", &j);
-	    if (j < skip)
-		charmat[i][kmin + j] = (char) (-1);	// humf...!
-	}
-	i++;
+        for (u = 0; u < nc; u++) {
+            fscanf(smallfile, "%d", &j);
+            if (j < skip)
+                charmat[i][kmin + j] = (char) (-1);        // humf...!
+        }
+        i++;
     }
     fprintf (stderr, "   done at %2.2lf\n", seconds ());
 }
 
 static void
 handleKer(dense_mat_t * mat, rootprime_t * tabchar, FILE * purgedfile,
-	  mp_limb_t ** ker, cado_poly pol,
-	  FILE * indexfile, FILE * relfile,
-	  int small_nrows, FILE * smallfile, int skip)
+          mp_limb_t ** ker, cado_poly pol,
+          FILE * indexfile, FILE * relfile,
+          int small_nrows, FILE * smallfile, int skip)
 {
     int i, n;
     unsigned int j, k;
     char **charmat;
 
     n = mat->nrows;
-    k = mat->ncols;		// [(nchar-1)+1]+skip+1
+    k = mat->ncols;                // [(nchar-1)+1]+skip+1
     charmat = (char **) malloc(small_nrows * sizeof(char *));
     ASSERT(charmat != NULL);
     for (i = 0; i < small_nrows; ++i) {
-	charmat[i] = (char *) malloc(k * sizeof(char));
-	ASSERT(charmat[i] != NULL);
-	for (j = 0; j < k; ++j)
-	    charmat[i][j] = 1;
+        charmat[i] = (char *) malloc(k * sizeof(char));
+        ASSERT(charmat[i] != NULL);
+        for (j = 0; j < k; ++j)
+            charmat[i][j] = 1;
     }
     buildCharacterMatrix(charmat, k - skip, tabchar,
-			 purgedfile, indexfile, relfile, pol, small_nrows);
+                         purgedfile, indexfile, relfile, pol, small_nrows);
     if (skip > 0)
-	addHeavyBlock(charmat, smallfile, k - skip, skip);
+        addHeavyBlock(charmat, smallfile, k - skip, skip);
 #ifndef NDEBUG
     fprintf (stderr, "Checking character matrix\n");
     for (i = 0; i < small_nrows; ++i)
-	for (j = 0; j < k; j++)
-	    ASSERT((charmat[i][j] == 1) || (charmat[i][j] == -1));
+        for (j = 0; j < k; j++)
+            ASSERT((charmat[i][j] == 1) || (charmat[i][j] == -1));
     fprintf (stderr, "   done at %2.2lf\n", seconds ());
 #endif
 #if DEBUG >= 1
     fprintf(stderr, "charmat:=array([");
     for (i = 0; i < small_nrows; ++i) {
-	fprintf(stderr, "[");
-	for (j = 0; j < k; j++) {
-	    fprintf(stderr, "%d", (charmat[i][j] == 1 ? 0 : 1));
-	    if (j < k - 1)
-		fprintf(stderr, ", ");
-	}
-	fprintf(stderr, "]");
-	if (i < small_nrows - 1)
-	    fprintf(stderr, ", ");
-	fprintf(stderr, "\n");
+        fprintf(stderr, "[");
+        for (j = 0; j < k; j++) {
+            fprintf(stderr, "%d", (charmat[i][j] == 1 ? 0 : 1));
+            if (j < k - 1)
+                fprintf(stderr, ", ");
+        }
+        fprintf(stderr, "]");
+        if (i < small_nrows - 1)
+            fprintf(stderr, ", ");
+        fprintf(stderr, "\n");
     }
     fprintf(stderr, "]);\n");
     fprintf(stderr, "ker:=");
@@ -328,8 +328,8 @@ handleKer(dense_mat_t * mat, rootprime_t * tabchar, FILE * purgedfile,
     // now multiply: ker * charmat
     fprintf (stderr, "Multiply ker and character matrix\n");
     for (i = 0; i < n; ++i)
-	for (j = 0; j < mat->limbs_per_row; ++j)
-	    mat->data[i * mat->limbs_per_row + j] = 0UL;
+        for (j = 0; j < mat->limbs_per_row; ++j)
+            mat->data[i * mat->limbs_per_row + j] = 0UL;
 
     // mat[i, j] = sum ker[i][u] * charmat[u][j]
     {
@@ -358,7 +358,7 @@ handleKer(dense_mat_t * mat, rootprime_t * tabchar, FILE * purgedfile,
 #endif
 
     for (i = 0; i < small_nrows; ++i)
-	free(charmat[i]);
+        free(charmat[i]);
     free(charmat);
 }
 
@@ -388,71 +388,71 @@ int main(int argc, char **argv)
 #if 0
     // FIXME...
     if (argc != 8) {
-	fprintf(stderr, "usage: %s purgedfile kerfile polyfile", argv[0]);
-	fprintf(stderr, "indexfile relfile n k\n");
-	fprintf(stderr,
-		"  where n is the number of kernel vector to deal with\n");
-	fprintf(stderr,
-		"    and k is the number of characters you want to use\n");
-	exit(1);
+        fprintf(stderr, "usage: %s purgedfile kerfile polyfile", argv[0]);
+        fprintf(stderr, "indexfile relfile n k\n");
+        fprintf(stderr,
+                "  where n is the number of kernel vector to deal with\n");
+        fprintf(stderr,
+                "    and k is the number of characters you want to use\n");
+        exit(1);
     }
 #endif
 
     /* print the command line */
     fprintf(stderr, "%s.r%s", argv[0], REV);
     for (k = 1; k < argc; k++)
-	fprintf(stderr, " %s", argv[k]);
+        fprintf(stderr, " %s", argv[k]);
     fprintf(stderr, "\n");
 
     n = UINT_MAX;
 
     cado_poly_init(pol);
     while (argc > 1 && argv[1][0] == '-') {
-	if (argc > 2 && strcmp(argv[1], "-purged") == 0) {
-	    purgedfile = gzip_open(argv[2], "r");
-	    argc -= 2;
-	    argv += 2;
-	}
-	if (argc > 2 && strcmp(argv[1], "-ker") == 0) {
-	    kerfile = fopen(argv[2], "r");
-	    argc -= 2;
-	    argv += 2;
-	}
-	if (argc > 2 && strcmp(argv[1], "-poly") == 0) {
+        if (argc > 2 && strcmp(argv[1], "-purged") == 0) {
+            purgedfile = gzip_open(argv[2], "r");
+            argc -= 2;
+            argv += 2;
+        }
+        if (argc > 2 && strcmp(argv[1], "-ker") == 0) {
+            kerfile = fopen(argv[2], "r");
+            argc -= 2;
+            argv += 2;
+        }
+        if (argc > 2 && strcmp(argv[1], "-poly") == 0) {
             cado_poly_read(pol, argv[2]);
-	    argc -= 2;
-	    argv += 2;
-	}
-	if (argc > 2 && strcmp(argv[1], "-index") == 0) {
-	    indexfile = fopen(argv[2], "r");
-	    argc -= 2;
-	    argv += 2;
-	}
-	if (argc > 2 && strcmp(argv[1], "-rel") == 0) {
-	    relfile = gzip_open (argv[2], "r");
-	    argc -= 2;
-	    argv += 2;
-	}
-	if (argc > 2 && strcmp(argv[1], "-nker") == 0) {
-	    n = atoi(argv[2]);
-	    argc -= 2;
-	    argv += 2;
-	}
-	if (argc > 2 && strcmp(argv[1], "-nchar") == 0) {
-	    k = atoi(argv[2]);
-	    argc -= 2;
-	    argv += 2;
-	}
-	if (argc > 2 && strcmp(argv[1], "-small") == 0) {
-	    smallfile = fopen(argv[2], "r");
-	    argc -= 2;
-	    argv += 2;
-	}
-	if (argc > 2 && strcmp(argv[1], "-skip") == 0) {
-	    skip = atoi(argv[2]);
-	    argc -= 2;
-	    argv += 2;
-	}
+            argc -= 2;
+            argv += 2;
+        }
+        if (argc > 2 && strcmp(argv[1], "-index") == 0) {
+            indexfile = fopen(argv[2], "r");
+            argc -= 2;
+            argv += 2;
+        }
+        if (argc > 2 && strcmp(argv[1], "-rel") == 0) {
+            relfile = gzip_open (argv[2], "r");
+            argc -= 2;
+            argv += 2;
+        }
+        if (argc > 2 && strcmp(argv[1], "-nker") == 0) {
+            n = atoi(argv[2]);
+            argc -= 2;
+            argv += 2;
+        }
+        if (argc > 2 && strcmp(argv[1], "-nchar") == 0) {
+            k = atoi(argv[2]);
+            argc -= 2;
+            argv += 2;
+        }
+        if (argc > 2 && strcmp(argv[1], "-small") == 0) {
+            smallfile = fopen(argv[2], "r");
+            argc -= 2;
+            argv += 2;
+        }
+        if (argc > 2 && strcmp(argv[1], "-skip") == 0) {
+            skip = atoi(argv[2]);
+            argc -= 2;
+            argv += 2;
+        }
     }
 
     ASSERT_ALWAYS(n != UINT_MAX);
@@ -471,58 +471,58 @@ int main(int argc, char **argv)
 #if DEBUG >= 2
     fprintf(stderr, "using characters (p,r):\n");
     for (i = 0; i < k - 1; ++i)
-	fprintf(stderr, "\t%lu %lu\n", tabchar[i].prime, tabchar[i].root);
+        fprintf(stderr, "\t%lu %lu\n", tabchar[i].prime, tabchar[i].root);
 #endif
 
     int small_nrows, small_ncols;
     {
-	ret = fscanf(indexfile, "%d %d", &small_nrows, &small_ncols);
-	ASSERT(ret == 2);
-	nlimbs = ((small_nrows - 1) / GMP_NUMB_BITS) + 1;
+        ret = fscanf(indexfile, "%d %d", &small_nrows, &small_ncols);
+        ASSERT(ret == 2);
+        nlimbs = ((small_nrows - 1) / GMP_NUMB_BITS) + 1;
     }
 
     ker = (mp_limb_t **) malloc(n * sizeof(mp_limb_t *));
     ASSERT(ker != NULL);
     fprintf(stderr, "Reading dependency");
     for (j = 0; j < n; ++j) {
-	fprintf(stderr, " %u", j);
+        fprintf(stderr, " %u", j);
         fflush (stderr);
-	ker[j] = (mp_limb_t *) malloc(nlimbs * sizeof(mp_limb_t));
-	ASSERT(ker[j] != NULL);
-	readOneKer(ker[j], kerfile, nlimbs);
+        ker[j] = (mp_limb_t *) malloc(nlimbs * sizeof(mp_limb_t));
+        ASSERT(ker[j] != NULL);
+        readOneKer(ker[j], kerfile, nlimbs);
     }
     fprintf(stderr, "\nfinished reading kernel file\n");
 
     mymat.nrows = n;
-    mymat.ncols = k + skip + 1;	// 1 (rat sign)+(k-1) characters+skip+1 (freerels)
+    mymat.ncols = k + skip + 1;        // 1 (rat sign)+(k-1) characters+skip+1 (freerels)
     mymat.limbs_per_row = ((mymat.ncols - 1) / GMP_NUMB_BITS) + 1;
     mymat.limbs_per_col = ((mymat.nrows - 1) / GMP_NUMB_BITS) + 1;
 
     mymat.data =
-	(mp_limb_t *) malloc(mymat.limbs_per_row * mymat.nrows *
-			     sizeof(mp_limb_t));
+        (mp_limb_t *) malloc(mymat.limbs_per_row * mymat.nrows *
+                             sizeof(mp_limb_t));
     ASSERT(mymat.data != NULL);
 
     fprintf(stderr, "start computing characters...\n");
 
     handleKer(&mymat, tabchar, purgedfile, ker, pol,
-	      indexfile, relfile, small_nrows, smallfile, skip);
+              indexfile, relfile, small_nrows, smallfile, skip);
 
     /* this is a cheap loop, since mymat.nrows is small, typically 64 */
     myker = (mp_limb_t **) malloc(mymat.nrows * sizeof(mp_limb_t *));
     ASSERT(myker != NULL);
     for (i = 0; i < mymat.nrows; ++i) {
-	myker[i] =
-	    (mp_limb_t *) malloc(mymat.limbs_per_col * sizeof(mp_limb_t));
-	ASSERT(myker[i] != NULL);
-	for (j = 0; j < mymat.limbs_per_col; ++j)
-	    myker[i][j] = 0UL;
+        myker[i] =
+            (mp_limb_t *) malloc(mymat.limbs_per_col * sizeof(mp_limb_t));
+        ASSERT(myker[i] != NULL);
+        for (j = 0; j < mymat.limbs_per_col; ++j)
+            myker[i][j] = 0UL;
     }
     fprintf(stderr, "%d rows done      \n", mymat.nrows);
     fprintf(stderr, "Computing tiny kernel\n");
     dim =
-	kernel(mymat.data, myker, mymat.nrows, mymat.ncols,
-	       mymat.limbs_per_row, mymat.limbs_per_col);
+        kernel(mymat.data, myker, mymat.nrows, mymat.ncols,
+               mymat.limbs_per_row, mymat.limbs_per_col);
     fprintf(stderr, "dim of ker = %d\n", dim);
 
 #if DEBUG >= 1
@@ -534,44 +534,44 @@ int main(int argc, char **argv)
     newker = (mp_limb_t *) malloc(nlimbs * sizeof(mp_limb_t));
     ASSERT(newker != NULL);
     for (i = 0; i < dim; ++i) {
-	for (j = 0; j < nlimbs; ++j)
-	    newker[j] = 0;
-	for (j = 0; j < mymat.limbs_per_col; ++j) {
-	    int jj;
-	    unsigned int kk;
-	    unsigned long w = myker[i][j];
-	    for (jj = 0; jj < GMP_NUMB_BITS; ++jj) {
-		if (w & 1UL) {
-		    for (kk = 0; kk < nlimbs; ++kk)
-			newker[kk] ^= ker[j * GMP_NUMB_BITS + jj][kk];
-		}
-		w >>= 1;
-	    }
-	}
-	// do not print zero vector...!
-	isz = 1;
-	for (j = 0; j < nlimbs; ++j)
-	    if (newker[j]) {
-		isz = 0;
-		break;
-	    }
-	if (isz)
-	    fprintf(stderr, "Sorry %d-th vector is 0\n", i);
-	else {
-	    for (j = 0; j < nlimbs; ++j)
-		printf("%lx ", newker[j]);
-	    printf("\n");
-	}
+        for (j = 0; j < nlimbs; ++j)
+            newker[j] = 0;
+        for (j = 0; j < mymat.limbs_per_col; ++j) {
+            int jj;
+            unsigned int kk;
+            unsigned long w = myker[i][j];
+            for (jj = 0; jj < GMP_NUMB_BITS; ++jj) {
+                if (w & 1UL) {
+                    for (kk = 0; kk < nlimbs; ++kk)
+                        newker[kk] ^= ker[j * GMP_NUMB_BITS + jj][kk];
+                }
+                w >>= 1;
+            }
+        }
+        // do not print zero vector...!
+        isz = 1;
+        for (j = 0; j < nlimbs; ++j)
+            if (newker[j]) {
+                isz = 0;
+                break;
+            }
+        if (isz)
+            fprintf(stderr, "Sorry %d-th vector is 0\n", i);
+        else {
+            for (j = 0; j < nlimbs; ++j)
+                printf("%lx ", newker[j]);
+            printf("\n");
+        }
     }
 
     free(tabchar);
     for (j = 0; j < n; ++j)
-	free(ker[j]);
+        free(ker[j]);
     free(ker);
     free(newker);
     free(mymat.data);
     for (i = 0; i < mymat.nrows; ++i)
-	free(myker[i]);
+        free(myker[i]);
     free(myker);
 
     return 0;

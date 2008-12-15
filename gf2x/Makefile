@@ -37,13 +37,13 @@ MY_LFLAGS+=$(GMP_LFLAGS)
 .c.o:
 	$(CC) $(MY_CFLAGS) $< -c -o $@
 
-ifeq ($(shell arch),i686)
+ifeq ($(shell uname -m),i686)
 w:=32
 CFLAGS+=-msse2
 CXXFLAGS+=-msse2
 endif
 
-ifeq ($(shell arch),x86_64)
+ifeq ($(shell uname -m),x86_64)
 w:=64
 endif
 ifndef w

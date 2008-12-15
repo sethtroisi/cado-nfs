@@ -367,16 +367,22 @@ int main(int argc, char *argv[])
             simple_matmul_toy<T> mul_code(stats, files::matrix);
             setup_vectors(mul_code);
         } else {
+#if 0
             typedef variable_scalar_traits T; 
             globals::nbys = 1;
             simple_matmul_toy<T> mul_code(stats, files::matrix);
             setup_vectors(mul_code);
+#endif
+            abort();
         }
     } else {
+#if 0
         typedef variable_scalar_traits T; 
         globals::nbys = 1;
         simple_matmul_toy<T> mul_code(stats, files::matrix);
         setup_vectors(mul_code);
+#endif
+            abort();
     }
 }
 

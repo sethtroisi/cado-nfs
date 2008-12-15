@@ -134,7 +134,9 @@ struct binary_pod_traits {
 	static inline void assign(std::vector<mpz_class>& z, scalar_t const & x) {
 		BUG_ON(z.size() != nbits);
 		for(unsigned int i = 0 ; i < nbits ; i++) {
-			z[i] = (x.p >> i) & (T) 1;
+                    T t;
+                    t = (x.p >> i) & (T) 1;
+                    z[i] = (unsigned long) t;
 		}
 	}
 

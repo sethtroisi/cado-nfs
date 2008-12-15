@@ -135,7 +135,9 @@ struct binary_sse2_traits {
 		memcpy(foo, &x.p, sizeof(sse2_scalars));
 		BUG_ON(z.size() != 128);
 		for(unsigned int i = 0 ; i < 128 ; i++) {
-			z[i] = (foo[i>>6] >> (i & 63)) & 1UL;
+                    // make sure this compiles also on 32-bits.
+                    inner_type t = (foo[i>>6] >> (i & 63)) & 1UL;
+                    z[i] = (unsigned long) t;
 		}
 	}
 

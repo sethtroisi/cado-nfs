@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <ctype.h>
+#include <inttypes.h>
 #include "manu.h"
 #include "utils.h"
 
@@ -116,14 +117,14 @@ int main(int argc, char * argv[])
             w |= ((x[k] >> i) & 1UL) << j;
             j ++;
             if (j == 64) {
-                printf ("%016lx ", w);
+                printf ("%016"PRIu64" ", w);
                 j = 0;
                 w = 0;
             }
         }
         /* print last word */
         if (j > 0)
-            printf ("%lx", w);
+            printf ("%" PRIu64, w);
         printf("\n");
     }
 
