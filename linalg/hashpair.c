@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <inttypes.h>
 
 #include "hashpair.h"
 #include "../utils/utils.h"
@@ -54,7 +55,7 @@ hashInit (hashtable_t *H, unsigned int n, int verbose, int need64)
       {
         fprintf (stderr, "Using %d-bit types\n",
                  (need64) ? 64 : 32);
-        fprintf (stderr, "Allocated hash tables of total size %luMb\n",
+        fprintf (stderr, "Allocated hash tables of total size %"PRIu64"Mb\n",
                  (H->hashmod * H->size) / 1000000);
       }
     if(sizeof(unsigned long) == 8){
@@ -95,7 +96,7 @@ getHashAddrAux(hashtable_t *H, long p, unsigned long r, unsigned int h)
 #if DEBUG >= 2
     printf("H(%ld, %lu) = %d\n", p, r, h);
 #endif
-    
+
     while(1){
 	if(H->hashcount[h] == 0)
 	    break;
@@ -153,7 +154,7 @@ hashCheck (hashtable_t *H)
     for(i = 0; i < H->hashmod; i++)
 	if(H->hashcount[i] > 0)
 	    nb++;
-    fprintf(stderr, "Hash table %1.1f%% full (%u entries vs size %lu)\n",
+    fprintf(stderr, "Hash table %1.1f%% full (%u entries vs size %"PRIu64")\n",
             100.0 * (double) nb / (double) H->hashmod, nb, H->hashmod);
 }
 

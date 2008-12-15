@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <gmp.h>
 #include <string.h>
+#include <inttypes.h>
 
 #include "cado.h"
 #include "utils/utils.h"
@@ -126,7 +127,7 @@ treatAlgebraicRelation(FILE *algfile, hashtable_t *H, relation_t rel)
 #endif
     for(j = 0; j < rel.nb_ap; j++){
 #if MAPLE >= 2
-	fprintf(stderr, "A2:=A2*[%ld, %ld]^%d:\n", 
+	fprintf(stderr, "A2:=A2*[%ld, %ld]^%d:\n",
 		rel.ap[j].p, rel.ap[j].r, rel.ap[j].e);
 #endif
 	h = getHashAddr(H, rel.ap[j].p, rel.ap[j].r);
@@ -156,7 +157,7 @@ finishRationalSqrt(FILE *ratfile, hashtable_t *H, cado_poly pol)
           if (GET_HASH_R(H,i) != minus2)
 		continue;
 	    if ((H->hashcount[i] & 1)) {
-	        fprintf(stderr, "  Odd valuation! At rational prime %lu\n",
+	        fprintf(stderr, "  Odd valuation! At rational prime %"PRIi64"\n",
                         GET_HASH_P(H,i));
 		exit(1);
 	    }
@@ -194,11 +195,11 @@ finishAlgebraicSqrt(FILE *algfile, hashtable_t *H /*, cado_poly pol*/)
           if (GET_HASH_R(H,i) == minus2)
 		continue;
 	    if ((H->hashcount[i] & 1)) {
-	        fprintf(stderr, "  Odd valuation! At algebraic prime %lu %lu\n",
+	        fprintf(stderr, "  Odd valuation! At algebraic prime %"PRIi64" %"PRIu64"\n",
                         GET_HASH_P(H,i), GET_HASH_R(H,i));
 		exit(1);
 	    }
-	    fprintf(algfile, "%ld %ld %d\n", 
+	    fprintf(algfile, "%"PRIi64" %"PRIu64" %d\n",
 		    GET_HASH_P(H,i), GET_HASH_R(H,i), H->hashcount[i]>>1);
 #if DEBUG >= 1
 	    fprintf(stderr, "# H[%d] = %d\n", i, H->hashcount[i]);
@@ -440,7 +441,7 @@ int main(int argc, char *argv[])
     polyname = argv[5];
     ndepmin = atoi(argv[6]);
     ndepmax = atoi(argv[7]);
-    
+
     kerfile = fopen(kername, "r");
 
     cado_poly_init(pol);

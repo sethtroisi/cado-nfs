@@ -1,8 +1,8 @@
-/* 
+/*
  * Program: filter
  * Author : F. Morain
  * Purpose: filtering
- * 
+ *
  * Algorithm: Cavallar++
  *
  */
@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
+#include <inttypes.h>
 
 #include "utils/utils.h"
 
@@ -111,7 +112,7 @@ my_malloc_free_all (void)
 
 /*****************************************************************************/
 
-static int 
+static int
 isBadPrime(/*unsigned long p, tab_prime_t bad_primes*/) {
 #if 1
     return 0;
@@ -134,7 +135,7 @@ fprint_rat(int *table_ind, int *nb_coeff, relation_t rel, hashtable_t *H)
     index = getHashAddr(H, rel.rp[0].p, minus2);
     old_index = index;
     parity = 1;
-    
+
     for (i = 1; i < rel.nb_rp; ++i) {
 	index = getHashAddr(H, rel.rp[i].p, minus2);
 	if (index == old_index) {
@@ -214,7 +215,7 @@ fprint_free(int *table_ind, int *nb_coeff, relation_t rel, hashtable_t *H)
    don't take into account bad primes and even powers of primes.
    WARNING: the primes in the input relation are not necessarily sorted.
 */
-static void 
+static void
 fprint_rel_row (FILE *file, int irel, relation_t rel,
                 /*tab_prime_t bad_primes,*/ hashtable_t *H)
 {
@@ -233,7 +234,7 @@ fprint_rel_row (FILE *file, int irel, relation_t rel,
 	  fprintf(stderr, "WARNING: nb_rp = 0\n");
       else
 	  fprint_rat(table_ind, &nb_coeff, rel, H);
-      
+
       if(rel.nb_ap == 0)
 	  fprintf(stderr, "WARNING: nb_ap=0\n");
       else
@@ -490,13 +491,13 @@ scan_relations_from_file (int *irel, int *nrel, char *rel_used,
 static int
 scan_relations (char *ficname[], int nbfic, int *nrel, int *nprimes,
                 hashtable_t *H,
-                char *rel_used, int **rel_compact, long maxpr, long maxpa, 
+                char *rel_used, int **rel_compact, long maxpr, long maxpa,
 		long minpr, long minpa, int final, unsigned long *tot_alloc)
 {
     FILE *relfile;
     int ret = 0, irel = -1;
     int i;
-    
+
     *nprimes = 0;
 
     ASSERT(nbfic > 0);
@@ -562,7 +563,7 @@ removeSingletonIfAny(int *nprimes, hashtable_t *H, char *rel_used,
                      int **rel_compact, int i)
 {
     int j, j0 = -1, *tab = rel_compact[i];
-    
+
     for(j = 0; tab[j] != -1; j++)
 	if(j0 == -1){
 	    if(H->hashcount[tab[j]] == 1){
@@ -647,7 +648,7 @@ onepass_singleton_removal (int nrelmax, int *nrel, int *nprimes,
 	    int h = has_singleton (rel_compact[i], H);
 	    if(h >= 0){
 #  if DEBUG >= 2
-		printf("h = %d is single -> (%ld, %ld)\n", 
+		printf("h = %d is single -> (%ld, %ld)\n",
 		       h, GET_HASH_P(H,h), GET_HASH_R(H,h));
 #  endif
 		delete_relation (i, nprimes, H, rel_used, rel_compact);
@@ -735,9 +736,9 @@ renumber(int *nprimes, hashtable_t *H, char *sos)
 	    if(H->hashcount[i] > 0){
 		H->hashcount[i] = nb++;
 		if(fsos != NULL)
-		    fprintf(fsos, "%d %lx %lx\n",
+		    fprintf(fsos, "%d %"PRIi64" %"PRIu64"\n",
 			    H->hashcount[i]-1, GET_HASH_P(H,i),
-                            (long) GET_HASH_R(H,i));
+                            GET_HASH_R(H,i));
 	    }
 	}
     if(fsos != NULL)
@@ -868,12 +869,12 @@ main(int argc, char **argv)
     cado_poly pol;
     unsigned long tot_alloc;
     int need64 = 0; /* non-zero if large primes are > 2^32 */
-    
+
     fprintf (stderr, "%s.r%s", argv[0], REV);
     for (k = 1; k < argc; k++)
       fprintf (stderr, " %s", argv[k]);
     fprintf (stderr, "\n");
-    
+
     while(argc > 1 && argv[1][0] == '-'){
 	if(argc > 2 && strcmp (argv[1], "-poly") == 0){
 	    polyname = argv[2];
@@ -937,7 +938,7 @@ main(int argc, char **argv)
     if (argc == 1) {
         usage (argv);
 	exit(1);
-    } 
+    }
 
     if (polyname == NULL)
       {
@@ -979,7 +980,7 @@ main(int argc, char **argv)
 
     rel_used = (char *) malloc (nrelmax * sizeof (char));
     tot_alloc += nrelmax * sizeof (char);
-    fprintf (stderr, "Allocated rel_used of %luMb (total %luMb so far)\n",
+    fprintf (stderr, "Allocated rel_used of %uMb (total %luMb so far)\n",
              (nrelmax * sizeof (char)) / 1000000,
              tot_alloc / 1000000);
     if (final)
@@ -989,11 +990,11 @@ main(int argc, char **argv)
            prime bounds 2^30), on a 64-bit machine it uses 0.8Gb!!! */
 	rel_compact = (int **) malloc (nrelmax * sizeof (int *));
         tot_alloc += nrelmax * sizeof (int*);
-        fprintf (stderr, "Allocated rel_compact of %luMb (total %luMb so far)\n",
+        fprintf (stderr, "Allocated rel_compact of %uMb (total %luMb so far)\n",
                  (nrelmax * sizeof (int *)) / 1000000,
                  tot_alloc / 1000000);
       }
-    
+
     bad_primes.allocated = 100;
     bad_primes.length = 0;
     bad_primes.tab = (unsigned long *) malloc (bad_primes.allocated
@@ -1005,7 +1006,7 @@ main(int argc, char **argv)
                           rel_used, rel_compact,
                           maxpr, maxpa, minpr, minpa, final, &tot_alloc);
     ASSERT (ret);
-    
+
     fprintf (stderr, "nrel(useful)=%d, nprimes=%d (expected %d)\n",
              nrel, nprimes, Hsize);
 
@@ -1023,24 +1024,24 @@ main(int argc, char **argv)
 	nprimes_new = nprimes;
 	remove_singletons (&nrel_new, nrelmax, &nprimes_new, &H, rel_used,
                            rel_compact, keep);
-	
+
 	fprintf(stderr, "\nbadprimes = \n");
 	for (i = 0; i < bad_primes.length; ++i){
 	    fprintf(stderr, "%lu ", bad_primes.tab[i]);
 	    nprimes_new--;
 	}
 	fprintf(stderr, "\n");
-	
-	fprintf(stderr, "nrel=%d, nprimes=%d; excess=%d\n", 
+
+	fprintf(stderr, "nrel=%d, nprimes=%d; excess=%d\n",
 		nrel_new, nprimes_new, nrel_new - nprimes_new);
 
 	if (nrel_new <= nprimes_new) /* covers the case nrel = nprimes = 0 */
 	    exit(1);
-	
+
 	// we renumber the primes in order of apparition in the hashtable
         fprintf (stderr, "Renumbering primes...\n");
 	renumber (&nprimes_new, &H, sos);
-	
+
 #if DEBUG >= 2
 	hashCheck(nprimes_new);
 #endif
@@ -1055,7 +1056,7 @@ main(int argc, char **argv)
 		free(rel_compact[i]);
 #endif
 	free(rel_compact);
-    
+
 	// now, we reread the file of relations and convert it to the new coding...
         fprintf (stderr, "Storing remaining relations...\n");
 	purgedfile = gzip_open (purgedname, "w");
