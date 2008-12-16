@@ -1,6 +1,9 @@
 #ifndef ABASE_U64_H_
 #define ABASE_U64_H_
 
+/* This is used in order to enable GF(2)-only code */
+#define ABASE_BINARY
+
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -119,7 +122,7 @@ int abase_u64_is_zero(abase_u64_obj_srcptr x MAYBE_UNUSED,
 }
 
 static inline
-void abase_u64_addmul(abase_u64_obj_srcptr x MAYBE_UNUSED,
+void abase_u64_add(abase_u64_obj_srcptr x MAYBE_UNUSED,
         abase_u64_base_type * dst, const abase_u64_base_type * src)
 {
     for(unsigned int i = 0 ; i < abase_u64_repeat(x) ; i++) {
@@ -190,7 +193,7 @@ abase_u64_write(abase_u64_obj_srcptr x MAYBE_UNUSED,
 #define aboffset(x,k)   abase_u64_offset(x,k)
 #define abbytes(x,k)   abase_u64_bytes(x,k)
 #define abcopy(x,q,p,n) abase_u64_copy(x,q,p,n)
-#define abaddmul(x,q,p) abase_u64_addmul(x,q,p)
+#define abadd(x,q,p) abase_u64_add(x,q,p)
 #define abread(x,f,p,n) abase_u64_read(x,f,p,n)
 #define abwrite(x,f,p,n) abase_u64_write(x,f,p,n)
 

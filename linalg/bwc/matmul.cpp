@@ -311,7 +311,7 @@ void matmul(void * mm, abt * dst, abt const * src)
         for(uint32_t c = 0 ; c < ncoeffs_slice ; c++) {
             j += *q++;
             uint32_t di = *q++;
-            abaddmul(x, dst + aboffset(x, i + di), src + aboffset(x, j));
+            abadd(x, dst + aboffset(x, i + di), src + aboffset(x, j));
         }
         i += nrows_packed;
         asm("# end of critical loop\n");
