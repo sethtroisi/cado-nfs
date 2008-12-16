@@ -25,6 +25,31 @@ using namespace std;
 #include "abase.h"
 #include "manu.h"
 
+/* Here is how the matrix is stored in memory, in the "matmul_data_s" type.
+ * The matrix is cut in slices, where each slice is a set of contiguous
+ * rows. The size of a slice is hardcoded (?) as about 3072, with some
+ * adjustment to handle non-exact divisibility: some slices will have
+ * packbase rows and some others packbase+1 rows.
+ * Within a slice, entries are stored as a list of pairs
+ *   (column index, row index),
+ * sorted according to column index. Then, only the difference between
+ * two consecutive column indices is actually stored, so that it will fit
+ * in 16 bits. Also the row index fits in 16 bits, so that a slice is
+ * actually a list of 16-bit unsigned integers. 
+ * All the slices are stored in a big array of uint16_t, in the data
+ * field. Within this data field, the information is organized like so:
+ *   data[0] : total number of slices
+ *   data[1] : number of rows in slice number 1
+ *   data[2..3]: number of entries in slice number 1, say k_1
+ *   data[4..(4+2*k_1)]: list of entries of slice number 1
+ *   data[(4+2k_1+1)]: number of rows in slice number 2
+ *   etc...
+ * Additionally, for each slice, a slice_info structure is stored, giving
+ * statistics about the slice, and the offset in the data array where it
+ * is stored.
+ */
+
+
 struct slice_info {
     unsigned int nrows;
     unsigned int ncoeffs;
@@ -60,7 +85,7 @@ void matmul_clear(matmul_ptr mm)
     free(MM);
 }
 
-void * matmul_build(abobj_ptr xx, const char * filename)
+matmul_ptr matmul_build(abobj_ptr xx, const char * filename)
 {
     struct matmul_data_s * mm;
     mm = (struct matmul_data_s *) malloc(sizeof(struct matmul_data_s));
@@ -227,10 +252,10 @@ void * matmul_build(abobj_ptr xx, const char * filename)
 #endif
     std::cout << std::flush;
 
-    return MM;
+    return (matmul_ptr)mm;
 }
 
-void * matmul_reload_cache(abobj_ptr xx, const char * filename)
+matmul_ptr matmul_reload_cache(abobj_ptr xx, const char * filename)
 {
     string base(filename);
     FILE * f;
@@ -261,10 +286,10 @@ void * matmul_reload_cache(abobj_ptr xx, const char * filename)
 
     fclose(f);
 
-    return mm;
+    return (matmul_ptr) mm;
 }
 
-void matmul_save_cache(void * mm, const char * filename)
+void matmul_save_cache(matmul_ptr mm, const char * filename)
 {
     string base(filename);
     FILE * f;
@@ -289,7 +314,7 @@ void matmul_save_cache(void * mm, const char * filename)
     fclose(f);
 }
 
-void matmul(void * mm, abt * dst, abt const * src)
+void matmul(matmul_ptr mm, abt * dst, abt const * src)
 {
     asm("# multiplication code\n");
     data_t::const_iterator q = MM->data.begin();
@@ -328,7 +353,7 @@ void matmul(void * mm, abt * dst, abt const * src)
     asm("# end of multiplication code\n");
 }
 
-void matmul_report(void * mm MAYBE_UNUSED) {
+void matmul_report(matmul_ptr mm MAYBE_UNUSED) {
 #ifdef  SLICE_STATS
     if (MM->dslices_info.empty())
         return;
