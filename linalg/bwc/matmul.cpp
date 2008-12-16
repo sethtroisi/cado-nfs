@@ -116,16 +116,16 @@ matmul_ptr matmul_build(abobj_ptr xx, const char * filename)
     /* How many slices of size packbase */
     unsigned int nslices0 = nslices - nslices1;
 
-    unsigned int i;
+    unsigned int current;
     unsigned int next = i0;
 
     /* There we're handling the horizontal strips */
     unsigned int s;
 
     for(s = 0 ; s < nslices ; s++) {
-        i = next;
+        current = next;
         npack = packbase + (s < nslices1);
-        next = i + npack;
+        next = current + npack;
 
         slice_info si;
         memset(&si,0,sizeof(si));
@@ -133,7 +133,7 @@ matmul_ptr matmul_build(abobj_ptr xx, const char * filename)
         si.data_offset = MM->data.size();
 
         /*
-           std::cout << "Packing " << npack << " rows from " << i
+           std::cout << "Packing " << npack << " rows from " << current
            << " to " << next << std::endl;
            */
         typedef std::vector<std::pair<uint32_t, uint32_t> > L_t;
@@ -156,7 +156,7 @@ matmul_ptr matmul_build(abobj_ptr xx, const char * filename)
         MM->push(L.size() >> 16);
 
         uint32_t j = 0;
-        uint32_t i = 0; /* XXX I know, this treds over i above */
+        uint32_t i = 0;
         int32_t di_max = 0;
         double sumdj=0;
         double sumdj2=0;
