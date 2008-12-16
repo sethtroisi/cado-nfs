@@ -14,6 +14,7 @@
 #include <gmp.h>
 #include <errno.h>
 #include <unistd.h>
+#include <ctype.h>
 #include <utility>
 #include <vector>
 #include <set>
@@ -43,6 +44,7 @@ unsigned int cantor_threshold = UINT_MAX;
 #include "files.hpp"
 #include "config_file.hpp"
 #include "matrix.hpp"
+#include "bitstring.hpp"
 
 /* output: F0x is the candidate number x. All coordinates of the
  * candidate are grouped, and coefficients come in order (least
@@ -110,7 +112,7 @@ void dbmat(bmat const * x)
             w << setw(ULONG_BITS/4) << hex << z;
         }
         w.flush();
-        std::cout << w.str() << "\n";
+        std::cout << ":" << w.str() << "\n";
     }
 }
 void dpmat(polmat const * pa, unsigned int k)
@@ -227,8 +229,8 @@ void read_data_for_series(polmat& A, int & rc)/*{{{*/
     for (i = 0; i < m; i++) {
         for (j = 0; j < n;) {
             unsigned int y = 0;
-            char * ptr;
-            int d;
+            // char * ptr;
+            // int d;
             std::string filename = files::a % i % j;
             files[i][j] = fopen(filename.c_str(),"r");
             if (files[i][j] == NULL) {
@@ -243,12 +245,15 @@ void read_data_for_series(polmat& A, int & rc)/*{{{*/
              */
 
             char row[1024];
-            unsigned long blah;
+            // unsigned long blah;
             /* We also use this in order to read the number
              * of coefficients per row */
             fgets(row, sizeof(row), files[i][j]);
-            ptr = row;
-            for(y = 0 ; sscanf(ptr,"%lu%n",&blah,&d) >= 1 ; ptr += d, y++);
+            // ptr = row;
+            // for(y = 0 ; sscanf(ptr,"%lu%n",&blah,&d) >= 1 ; ptr += d, y++);
+            size_t len = strlen(row);
+            for( ; len && isspace(row[len-1]) ; len--);
+            y = 4 * len;
             if (y == 0) {
                 fprintf(stderr, "\nproblem while reading %s, line = %s\n",
                         filename.c_str(), row);
@@ -272,6 +277,7 @@ void read_data_for_series(polmat& A, int & rc)/*{{{*/
 
     unsigned int read_coeffs = 0;       /* please gcc */
 
+    unsigned long * tmp = (unsigned long *) malloc(n);
     for (i = 0; i < m; i++) {
         unsigned long * pol[n];
         for (j = 0; j < n; j ++) {
@@ -283,10 +289,12 @@ void read_data_for_series(polmat& A, int & rc)/*{{{*/
             unsigned int rc = 0;
             for (j = 0; j < n; j += nbys[j]) {
                 unsigned int l;
+                read_hexstring(files[i][j], tmp, nbys[j]);
+                rc += nbys[j];
                 for(l = 0 ; l < nbys[j] ; l++) {
-                    unsigned long blah;
-                    rc += 1 == fscanf(files[i][j], "%lu", &blah);
-                    pol[j + l][shift] |= mask & -blah;
+                    unsigned long b;
+                    b = tmp[l / ULONG_BITS] >> (l % ULONG_BITS);
+                    pol[j + l][shift] |= mask & -(b & 1UL);
                 }
             }
             if (rc == 0) {
@@ -307,6 +315,7 @@ void read_data_for_series(polmat& A, int & rc)/*{{{*/
             BUG_ON(k != read_coeffs);
         }
     }
+    free(tmp);
     for (j = 0; j < n; j ++) {
         a.deg(j) = read_coeffs - 1;
     }
@@ -1281,6 +1290,8 @@ static bool go_recursive(polmat& pi, unsigned int level)
     fft_type o(deg, expected_pi_deg, deg + expected_pi_deg - kill, m + n);
 
     tpolmat<fft_type> E_hat;
+
+    // our ``degree'' here counts actually for a dft _length_ !
     transform(E_hat, E, o, deg);
 
     E.resize(ldeg);
@@ -1427,9 +1438,11 @@ static bool compute_lingen(polmat& pi, unsigned int level)
         spent.push_back(spent_time());
     }
 
+    ASSERT(spent.size() > level);
+
     double st = seconds();
     double children = 0;
-    if (spent.size() >= level + 1) {
+    if (spent.size() > level + 1) {
         children = -spent[level+1].total;
     }
 
@@ -1450,7 +1463,7 @@ static bool compute_lingen(polmat& pi, unsigned int level)
     // unsigned int t1 = t;
     double dtime = seconds() - st;
 
-    if (spent.size() >= level + 1) {
+    if (spent.size() > level + 1) {
         children += spent[level+1].total;
     }
 

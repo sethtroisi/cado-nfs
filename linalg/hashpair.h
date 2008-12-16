@@ -41,10 +41,10 @@ typedef struct {
 /* The constants C0 = floor(Pi*10^17) and C1 = floor(exp(1)*10^17) are given
    in Cavallar's thesis. They guarantee that if a, b have at most 53 bits,
    then H(a,b) = C0*a+C1*b is injective, i.e., has no collision. */
-#define MAGIC_HC0 314159265358979323UL
-#define MAGIC_HC1 271828182845904523UL
+#define MAGIC_HC0 (uint64_t) 314159265358979323ULL
+#define MAGIC_HC1 (uint64_t) 271828182845904523ULL
 
-#define getInitialAddress(a,b,HC0,HC1) ((HC0)*(a)+(HC1)*(b))
+#define getInitialAddress(a,b,HC0,HC1) ((HC0)*((uint64_t) (a))+(HC1)*((uint64_t) (b)))
 #define getInitialAddressMod(a,b,HC0,HC1,M) (getInitialAddress(a,b,HC0,HC1) % M)
 
 extern unsigned long getHashMod(unsigned long n, int verbose);

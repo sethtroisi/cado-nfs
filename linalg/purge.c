@@ -13,7 +13,6 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
-#include <inttypes.h>
 
 #include "utils/utils.h"
 
@@ -291,8 +290,8 @@ specialHashInsert(hashtable_t *H, long p, unsigned long r, int irel)
 static void
 insertNormalRelation(char *rel_used, int **rel_compact, int irel, int *nprimes,
                      hashtable_t *H, relation_t *rel,
-                     uint64_t maxpr, uint64_t maxpa, uint64_t minpr,
-                     uint64_t minpa, int final, unsigned long *tot_alloc)
+                     long maxpr, long maxpa, unsigned long minpr,
+                     unsigned long minpa, int final, unsigned long *tot_alloc)
 {
     int *tmp = NULL, ltmp = 0, itmp, j, h, ok = 1;
     /* special values of the roots are:
@@ -310,14 +309,14 @@ insertNormalRelation(char *rel_used, int **rel_compact, int irel, int *nprimes,
 	for (j = 0; j < rel->nb_rp; j++)
           if (rel->rp[j].p > minpr) /* only consider primes > minpr */
             {
-              if (rel->rp[j].p > maxpr)
+              if (rel->rp[j].p > (unsigned long) maxpr)
                 ok = 0; /* discard relations with too large primes */
               ltmp++;
 	    }
 	for (j = 0; j < rel->nb_ap; j++)
           if (rel->ap[j].p > minpa) /* only consider primes > minpr */
             {
-              if (rel->ap[j].p > maxpa)
+              if (rel->ap[j].p > (unsigned long) maxpa)
                 ok = 0; /* discard relations with too large primes */
               ltmp++;
             }
@@ -736,7 +735,7 @@ renumber(int *nprimes, hashtable_t *H, char *sos)
 	    if(H->hashcount[i] > 0){
 		H->hashcount[i] = nb++;
 		if(fsos != NULL)
-		    fprintf(fsos, "%d %"PRIi64" %"PRIu64"\n",
+		    fprintf(fsos, "%d %" PRIx64 " %" PRIx64 "\n",
 			    H->hashcount[i]-1, GET_HASH_P(H,i),
                             GET_HASH_R(H,i));
 	    }
@@ -862,10 +861,10 @@ main(int argc, char **argv)
     int **rel_compact = NULL;
     int ret, k;
     int nrel, nprimes = 0, final = 1;
-    unsigned long int nrelmax = 0, i;
+    unsigned int nrelmax = 0, i;
     int nrel_new, nprimes_new, Hsize, Hsizer, Hsizea;
-    int64_t maxpr = 0, maxpa = 0, keep = -1; // maximum value for nrows-ncols
-    int64_t minpr = 0, minpa = 0;
+    long maxpr = 0, maxpa = 0, keep = -1; // maximum value for nrows-ncols
+    long minpr = 0, minpa = 0;
     cado_poly pol;
     unsigned long tot_alloc;
     int need64 = 0; /* non-zero if large primes are > 2^32 */
@@ -962,9 +961,12 @@ main(int argc, char **argv)
 	maxpr = 1L << pol[0].lpbr;
     if (maxpa == 0)
 	maxpa = 1L << pol[0].lpba;
-    need64 = (maxpr >> 32) || (maxpa >> 32);
+    /* On a 32-bit computer, even 1 << 32 would overflow. Well, we could set
+       map[ra] = 2^32-1 in that case, but not sure we want to support 32-bit
+       primes on a 32-bit computer... */
+    need64 = (pol[0].lpbr >= 32) || (pol[0].lpba >= 32);
 
-    fprintf(stderr, "Number of relations is %lu\n", nrelmax);
+    fprintf(stderr, "Number of relations is %u\n", nrelmax);
     if(nprimes > 0)
 	Hsize = nprimes;
     else{
@@ -978,11 +980,11 @@ main(int argc, char **argv)
     hashInit (&H, Hsize, 1, need64);
     tot_alloc = H.hashmod * H.size;
 
-    rel_used = (char *) malloc (nrelmax * sizeof (char));
-    tot_alloc += nrelmax * sizeof (char);
-    fprintf (stderr, "Allocated rel_used of %luMb (total %luMb so far)\n",
-             (nrelmax * sizeof (char)) / 1000000,
-             tot_alloc / 1000000);
+    rel_used = (char *) malloc (nrelmax);
+    tot_alloc += nrelmax;
+    fprintf (stderr, "Allocated rel_used of %uMb (total %luMb so far)\n",
+             nrelmax >> 20,
+             tot_alloc >> 20);
     if (final)
       {
         /* FIXME: the rel_compact alone uses a lot of memory. For 100M
@@ -990,9 +992,10 @@ main(int argc, char **argv)
            prime bounds 2^30), on a 64-bit machine it uses 0.8Gb!!! */
 	rel_compact = (int **) malloc (nrelmax * sizeof (int *));
         tot_alloc += nrelmax * sizeof (int*);
-        fprintf (stderr, "Allocated rel_compact of %luMb (total %luMb so far)\n",
-                 (nrelmax * sizeof (int *)) / 1000000,
-                 tot_alloc / 1000000);
+        // %zu is the C99 modifier for size_t
+        fprintf (stderr, "Allocated rel_compact of %zuMb (total %luMb so far)\n",
+                 (nrelmax * sizeof (int *)) >>20,
+                 tot_alloc);
       }
 
     bad_primes.allocated = 100;

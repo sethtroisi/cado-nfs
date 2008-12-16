@@ -4,14 +4,13 @@
 #include <ctype.h> /* for isxdigit */
 
 #include "mod_ul.h"
+#include "relation.h"
 
 /*
   Convention for I/O of rels:
     a and b are printed in decimal
     primes are printed in hexadecimal.
 */
-
-
 
 void
 copy_rel (relation_t *Rel, relation_t rel)
@@ -151,6 +150,23 @@ read_relation (relation_t *rel, const char *str)
   return 1;
 }
 
+/* Read a new relation line from file 'file', and put in in 'str'.
+   Return 0 on failure
+          1 on success
+         -1 on EOF
+*/
+int
+fread_buf (char str[STR_LEN_MAX], FILE *file)
+{
+  do
+    {
+      /* fgets returns NULL on error or EOF */
+      if (fgets (str, STR_LEN_MAX, file) == NULL)
+	return feof (file) ? -1 : 0;
+    }
+  while (str[0] == '#'); /* skip comments */
+  return 1;
+}
 
 // return 0 on failure
 //        1 on success
@@ -159,45 +175,12 @@ read_relation (relation_t *rel, const char *str)
 // the relation. 
 int fread_relation (FILE *file, relation_t *rel)
 {
-  int c, i;
-  char str[1024];
+  int ret;
+  char str[STR_LEN_MAX];
 
-  // skip spaces and commented lines
-  do {
-    // skip spaces
-    do {
-      c = fgetc(file);
-      if (c == EOF)
-	return -1;
-    } while (isspace(c));
-    // skip commented lines
-    if (c == '#') {
-      do {
-	c = fgetc(file);
-	if (c == EOF)
-	  return -1;
-      } while (c != '\n');
-    } else {
-      ungetc(c, file);
-      break;
-    }
-  } while (1);
-  
-  // copy line into str
-  i = 0;
-  do {
-    c = fgetc(file);
-    if (c == EOF)
-      return -1;
-    str[i++] = c;
-    if (i == 1024) {
-      fprintf(stderr, "warning: line too long\n");
-      return 0;
-    }
-  } while (c != '\n');
-
-  str[i] = '\0';
-
+  ret = fread_buf (str, file);
+  if (ret != 1)
+    return ret;
   return read_relation (rel, str);
 }
 

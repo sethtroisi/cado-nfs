@@ -18,11 +18,12 @@
   02111-1307, USA.
 */
 #include <string.h>
+#include <stdint.h>
 
 #include "gf2x.h"
 
 #ifdef MUL_FFT_TABLE
-long T_FFT_TAB[][2] = MUL_FFT_TABLE;
+int64_t T_FFT_TAB[][2] = MUL_FFT_TABLE;
 #endif
 
 /* This is the toplevel multiplication routine. It handles the temporary
@@ -121,7 +122,7 @@ void mul_gf2x_r(ulong * c,
     } else {
 	ulong *v = pool->stk + toomspace(sa);
 
-	long i, j;
+	unsigned int i, j;
 
 	memset(c, 0, sc * sizeof(ulong));
 
