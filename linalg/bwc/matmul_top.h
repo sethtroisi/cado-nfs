@@ -60,6 +60,17 @@ struct mmt_wiring_s {
     /* This is likely to be relevant only for conjugated matrices */
     struct isect_info * x;
     unsigned int xlen;
+
+    // this second intersection list is used for reduction, where the row
+    // threads collectively build the result vector from their respective
+    // parts -- deciding where the computed sum eventually goes is
+    // determined by the intersection of i0+k/n*(i1-i0)..i0+(k+1)/n*(i1-i0)
+    // with the vertical fences.
+    //
+    // note that the way reduction is performed is likely to cause some
+    // cache invalidates unless some fences end up correctly aligned.
+    struct isect_info * y;
+    unsigned int ylen;
 #endif
 };
 typedef struct mmt_wiring_s mmt_wiring[1];
@@ -104,6 +115,12 @@ struct matmul_top_data_s {
     int flags[2];
 };
 
+/* THREAD_MULTIPLE_VECTOR is when several threads will be writing to the
+ * vector simultaneously. This implies having separate areas.
+ *
+ * TODO: Think about waiving this restriction in the spirit of bucket
+ * sieving, maybe */
+#define THREAD_MULTIPLE_VECTOR    0
 #define THREAD_SHARED_VECTOR    1
 
 typedef struct matmul_top_data_s matmul_top_data[1];
@@ -118,9 +135,12 @@ void matmul_top_init(matmul_top_data_ptr mmt,
         abobj_ptr abase,
         matmul_ptr mm,
         parallelizing_info_ptr pi,
+        int const * flags,
         const char * filename);
 
-void matmul_top_read_matrix(matmul_top_data_ptr mmt);
+void mmt_finish_init(matmul_top_data_ptr mmt, unsigned int d);
+
+void matmul_top_read_submatrix(matmul_top_data_ptr mmt);
 void matmul_top_clear(matmul_top_data_ptr mmt, abobj_ptr abase);
 void matmul_top_fill_random_source(matmul_top_data_ptr mmt, int d);
 void matmul_top_load_vector(matmul_top_data_ptr mmt, int d, unsigned int index, unsigned int iter);

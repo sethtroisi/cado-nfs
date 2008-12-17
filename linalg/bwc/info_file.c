@@ -6,55 +6,6 @@
 #include <string.h>
 
 #include "info_file.h"
-#include "matmul_top.h"
-#include "intersections.h"
-
-/* Some work has to be done in order to fill the remaining fields in the
- * matmul_top structure.
- */
-void mmt_finish_init(matmul_top_data_ptr mmt, unsigned int d)
-{
-#ifdef  CONJUGATED_PERMUTATIONS
-    // assume d == 1 ; we have some column indices given by our i0 and i1
-    // values. We want to know how this intersects the horizontal fences
-    
-    mmt_wiring_ptr w = mmt->wr[d];
-    pi_wiring_ptr picol = mmt->pi->wr[d];
-
-
-    intersect(&(w->xlen), &(w->x),
-            mmt->fences[!d],
-            w->i0, MIN(w->i1, mmt->n[d]));
-    // intersect with horizontal fences, but of course we limit to the numer
-    // of rows, which is a vertical data.
-
-    if (mmt->flags[d] & THREAD_SHARED_VECTOR) {
-        void * r;
-        if (picol->trank == 0)
-            r = abinit(mmt->abase, w->i1 - w->i0);
-        thread_agreement(picol, &r, 0);
-        w->v = r;
-        for(unsigned int t = 0 ; t < picol->ncores ; t++) {
-            w->all_v[t] = w->v;
-        }
-    } else {
-        w->v = abinit(mmt->abase, w->i1 - w->i0);
-        w->all_v[picol->trank] = w->v;
-        for(unsigned int t = 0 ; t < picol->ncores ; t++) {
-            // TODO: once thread_agreement is fixed (if ever), we can drop this
-            // serialization point. At the moment, it's needed.
-            serialize_threads(picol);
-            void * r;
-            r = w->v;
-            thread_agreement(picol, &r, t);
-            w->all_v[t] = r;
-        }
-    }
-
-    // TODO: fill the intersections.
-    // TODO: reuse the ../bw-matmul/matmul/matrix_base.cpp things.
-}
-#endif
 
 void read_info_file(matmul_top_data_ptr mmt, const char * filename)
 {
