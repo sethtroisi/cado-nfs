@@ -39,7 +39,7 @@ endif
 ## src:=$(patsubst %,%.c,$(names))
 ## obj:=$(patsubst %,%.o,$(names))
 
-bins:=build prep test_hello
+bins:=build prep test_hello test_pthread_reduce
 
 all:$(bins)
 
@@ -52,6 +52,7 @@ prep_objs:=prep.o intersections.o matmul.o	\
 	info_file.o ../readbuffer.o ../readmat.o	\
 	auxfuncs.o config_file.o xvectors.o
 
+test_pthread_reduce_objs:=test_pthread_reduce.o
 
 test_hello: $(test_hello_objs)
 	$(CXX) $(MY_LFLAGS) $(test_hello_objs) -o $@ -lutils -lgmp
@@ -61,6 +62,10 @@ build: $(build_objs)
 
 prep: $(prep_objs)
 	$(CXX) $(MY_LFLAGS) $(prep_objs) -o $@ -lutils -lgmp -lgmpxx
+
+test_pthread_reduce: $(test_pthread_reduce_objs)
+	$(CC) $(MY_LFLAGS) $(test_pthread_reduce_objs) -o $@ -lpthread -O4
+
 
 ifeq ($(WITH_MPI),1)
 ifeq ($(WITH_PTHREADS),1)
@@ -83,6 +88,7 @@ test: test_hello
 	grep $(cregexp) checks.list | ./checks.sh
 
 clean:
+	-rm -f sketch.aux sketch.dvi sketch.log sketch.ps
 	-rm -f *.bak *.o $(bins) *~
 	-rm -rf .deps
 	
