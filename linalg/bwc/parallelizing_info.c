@@ -56,11 +56,23 @@ static void print_several(unsigned int n1, unsigned int n2, char a, char b, unsi
     printf("\n");
 }
 
+struct pi_go_helper_s {
+    void *(*fcn)(parallelizing_info_ptr, void*);
+    parallelizing_info_ptr p;
+    void * arg;
+};
+
+void * pi_go_helper_func(struct pi_go_helper_s * s)
+{
+    return (s->fcn)(s->p, s->arg);
+}
+
 typedef void * (*pthread_callee_t)(void*);
 
-void pi_go(void *(*fcn)(parallelizing_info_ptr),
+void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
         unsigned int nhj, unsigned int nvj,
-        unsigned int nhc, unsigned int nvc)
+        unsigned int nhc, unsigned int nvc,
+        void * arg)
 {
     /* used in several places for doing snprintf */
     char buf[20];
@@ -214,7 +226,14 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr),
     // go mt.
     my_pthread_t * tgrid;
     tgrid = (my_pthread_t *) malloc(nhc * nvc * sizeof(my_pthread_t));
+
+    struct pi_go_helper_s * helper_grid;
+    helper_grid = malloc(nhc * nvc * sizeof(struct pi_go_helper_s));
+
     for(unsigned int k = 0 ; k < nhc * nvc ; k++) {
+        helper_grid[k].fcn = fcn;
+        helper_grid[k].arg = arg;
+        helper_grid[k].p = (parallelizing_info_ptr) grid + k;
 #if 0
         printf("Job %u Thread %u"
                 " ROW (%u,%u) Job %u Thread %u"
@@ -229,7 +248,8 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr),
                 grid[k]->wr[1]->jrank,
                 grid[k]->wr[1]->trank);
 #endif
-        my_pthread_create(tgrid+k, NULL, (pthread_callee_t) fcn, grid+k);
+        my_pthread_create(tgrid+k, NULL,
+                (pthread_callee_t) pi_go_helper_func, helper_grid+k);
 #if 0
         printf("Thread (%u,%u)/(%u,%u) started\n",
                 grid[k]->wr[0]->jrank, grid[k]->wr[1]->jrank,
@@ -250,6 +270,7 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr),
         printf("Thread (%u,%u) finished\n", grid[k]->wr[0]->trank, grid[k]->wr[1]->trank);
 #endif
     }
+    free(helper_grid);
     free(tgrid);
     // destroy row barriers.
     for(unsigned int c = 0 ; c < pi->wr[1]->ncores ; c++) {

@@ -31,7 +31,7 @@ int dir = 1;
 
 const char * dirtext[] = { "left", "right" };
 
-void * program(parallelizing_info_ptr pi)
+void * program(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
 {
     // Doing the ``hello world'' test is a very good way of testing the
     // global mpi/pthreads setup. So despite its apparent irrelevance, I
@@ -39,14 +39,16 @@ void * program(parallelizing_info_ptr pi)
     hello(pi);
 
     // avoid cluttering output too much.
-    int tcan_print = can_print & pi->m->trank == 0;
+    int tcan_print = can_print && pi->m->trank == 0;
 
     unsigned int nx = 1;
 
     matmul_top_data mmt;
 
+    int flags[2] = { 0, THREAD_SHARED_VECTOR };
+
     // FIXME: we have set no multiplication algorithm here.
-    matmul_top_init(mmt, abase, NULL, pi, matrix_filename);
+    matmul_top_init(mmt, abase, NULL, pi, flags, matrix_filename);
 
     uint32_t * xvecs = malloc(nx * m * sizeof(uint32_t));
 
@@ -71,6 +73,10 @@ void * program(parallelizing_info_ptr pi)
     }
 
     matmul_top_fill_random_source(mmt, dir);
+
+    // we need to save this starting vector for later use if it turns out
+    // that we need to save it for real.
+
     matmul_top_save_vector(mmt, dir, 0, 0);
     serialize(pi->m);
 
@@ -199,7 +205,7 @@ int main(int argc, char * argv[])
     // abase is our arithmetic type.
     abobj_init(abase);
 
-    pi_go(program, mpi_split[0], mpi_split[1], thr_split[0], thr_split[1]);
+    pi_go(program, mpi_split[0], mpi_split[1], thr_split[0], thr_split[1], 0);
 
     // now we're not multithread anymore.
 

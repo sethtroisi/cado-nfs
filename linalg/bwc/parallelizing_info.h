@@ -96,9 +96,10 @@ static inline unsigned int pi_dst_chunk(parallelizing_info_srcptr pi)
  *
  * nhc, nvc are the same for threads (cores).
  */
-extern void pi_go(void *(*fcn)(parallelizing_info_ptr),
+extern void pi_go(void *(*fcn)(parallelizing_info_ptr, void * arg),
         unsigned int nhj, unsigned int nvj,
-        unsigned int nhc, unsigned int nvc);
+        unsigned int nhc, unsigned int nvc,
+        void * arg);
 
 extern void hello(parallelizing_info_ptr pi);
 

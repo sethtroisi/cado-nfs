@@ -13,7 +13,7 @@
 int m,n;
 int verbose=0;
 
-void * program(parallelizing_info_ptr pi)
+void * program(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
 {
     // it is here as a cheap sanity check.
     hello(pi);
@@ -65,7 +65,7 @@ int main(int argc, char * argv[])
     // param_list_save(pl, "bw-prep.cfg");
     param_list_clear(pl);
 
-    pi_go(program, mpi_split[0], mpi_split[1], thr_split[0], thr_split[1]);
+    pi_go(program, mpi_split[0], mpi_split[1], thr_split[0], thr_split[1], 0);
 
     MPI_Finalize();
 
