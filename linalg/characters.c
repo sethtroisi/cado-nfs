@@ -1,6 +1,6 @@
 /* Characters
 
-Copyright 2008 Pierrick Gaudry, Francois Morain, Emmanuel Thome, Paul Zimmermann
+Copyright 2008 Pierrick Gaudry, Fran\,cois Morain, Emmanuel Thom\'e, Paul Zimmermann
 
 This file is part of CADO-NFS.
 

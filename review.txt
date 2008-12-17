@@ -18,7 +18,9 @@ Third line: Copyright <years> author1, author2, ...
 
 We put 2008 or 2009 for the year: this really matters only when the first
 release will be done. As for authors, even if an author wrote only one
-tiny function, it is better to put his name.
+tiny function, it is better to put his name. For names that are not 7-bit
+(like Thom\'e, Fran\,cois, J\'er\'emie), we use a TeX-style accent. Don't put
+8-bit characters, since they might cause some problems, even within comments.
 
 Fourth line: blank
 
