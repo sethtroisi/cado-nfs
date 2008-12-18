@@ -54,7 +54,7 @@ int legacy = 0;
 int permute_rows = 0;
 int permute_cols = 0;
 
-size_t ram_limit = 1 << 28;     /* 256 MB */
+size_t ram_limit = 1 << 28;     /* 256 MB */
 
 /* If we do this, then necessarily we'll have to copy the matrix,
  * unless... */
@@ -350,7 +350,7 @@ void remove_prefix(char * s, const char * pfx)
     else
         last_slash++;
     ASSERT_ALWAYS(strncmp(last_slash, pfx, s1) == 0);
-    memcpy(last_slash, last_slash + s1, strlen(last_slash + s1) + 1);
+    memmove(last_slash, last_slash + s1, strlen(last_slash + s1) + 1);
 }
 
 void fileset_name(fileset x, const char * name, const char * key)
@@ -2254,7 +2254,7 @@ int main(int argc, char * argv[])
         free(old_rowperm);
         free(old_colperm);
     } else {
-        read_matrix(pristine_filename);
+        read_matrix();
         work->names[0] = strdup(pristine_filename);
         work->status = INPUT;
 
