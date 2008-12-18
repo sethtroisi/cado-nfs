@@ -5,9 +5,16 @@
 
 /*  Computes the intersection of [i0..i1[ with the fences */
 std::vector<isect_info>
-intersect(unsigned int * fences, unsigned int x0, unsigned int x1)
+intersect(unsigned int * fences, unsigned int x0, unsigned int x1, unsigned int nmax)
 {
     std::vector<isect_info> res;
+
+    x0 = MIN(x0, nmax);
+    x1 = MIN(x1, nmax);
+
+    if (x1 == x0) {
+        return res;
+    }
 
     unsigned int k;
     for(k = 0 ; fences[k + 1] <= x0 ; k++) ;
@@ -56,10 +63,10 @@ intersect(unsigned int * fences, unsigned int x0, unsigned int x1)
     return res;
 }
 
-void intersect(unsigned int * plen, struct isect_info ** res, unsigned int * fences, unsigned int x0, unsigned int x1)
+void intersect(unsigned int * plen, struct isect_info ** res, unsigned int * fences, unsigned int x0, unsigned int x1, unsigned int nmax)
 {
     std::vector<isect_info> vv;
-    vv = intersect(fences, x0, x1);
+    vv = intersect(fences, x0, x1, nmax);
     *plen = vv.size();
     *res = (struct isect_info *) malloc(*plen * sizeof(struct isect_info));   
     std::copy(vv.begin(), vv.end(), *res);

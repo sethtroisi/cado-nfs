@@ -1,4 +1,5 @@
 #define _POSIX_C_SOURCE 200112L
+#define _GNU_SOURCE
 
 #include <unistd.h>
 #include <errno.h>
@@ -80,10 +81,18 @@ void * program(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
     matmul_top_save_vector(mmt, dir, 0, 0);
     serialize(pi->m);
 
-    matmul_top_load_vector(mmt, dir, 0, 0);
+    matmul_top_mul(mmt, 1);
     matmul_top_save_vector(mmt, dir, 0, 1);
 
+    matmul_top_mul(mmt, 1);
+    matmul_top_save_vector(mmt, dir, 0, 2);
+
+    matmul_top_mul(mmt, 1);
+    matmul_top_save_vector(mmt, dir, 0, 3);
+
     // last 
+    serialize(pi->m);
+    matmul_top_clear(mmt, abase);
     serialize(pi->m);
 
     if (pi->m->trank == 0) {

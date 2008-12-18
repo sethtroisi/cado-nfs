@@ -13,7 +13,7 @@
 #include <stdint.h>
 
 // C++ headers.
-#include <string>
+// #include <string>
 #include <vector>
 #include <algorithm>    // sort
 #include <iostream>     // cout
@@ -49,6 +49,11 @@ using namespace std;
  * is stored.
  */
 
+/* This extension is used to distinguish between several possible
+ * implementations of the product */
+#define MM_EXTENSION   "-sliced"
+#define MM_MAGIC        0xa0001001UL
+
 
 struct slice_info {
     unsigned int nrows;
@@ -82,13 +87,18 @@ void matmul_clear(matmul_ptr mm)
 {
     MM->dslices_info.clear();
     MM->data.clear();
-    free(MM);
+    delete MM;
 }
+
+matmul_ptr matmul_init()
+{
+    return new matmul_data_s;
+}
+
 
 matmul_ptr matmul_build(abobj_ptr xx, const char * filename)
 {
-    struct matmul_data_s * mm;
-    mm = (struct matmul_data_s *) malloc(sizeof(struct matmul_data_s));
+    matmul_ptr mm = matmul_init();
 
     MM->xab = xx;
 
@@ -252,30 +262,37 @@ matmul_ptr matmul_build(abobj_ptr xx, const char * filename)
 #endif
     std::cout << std::flush;
 
-    return (matmul_ptr)mm;
+    return mm;
 }
 
 matmul_ptr matmul_reload_cache(abobj_ptr xx, const char * filename)
 {
-    string base(filename);
+    char * base;
     FILE * f;
 
-    base += ".bin";
+    asprintf(&base, "%s" MM_EXTENSION ".bin", filename);
 
-    f = fopen(base.c_str(), "r");
+    f = fopen(base, "r");
+
     if (f == NULL) {
-        // It is not an error.
-        // fprintf(stderr, "fopen(%s): %s\n", base.c_str(), strerror(errno));
+        // fprintf(stderr, "fopen(%s): %s\n", base, strerror(errno));
+        fprintf(stderr, "no cache file %s\n", base);
+        free(base);
         return NULL;
     }
+    free(base);
 
     size_t n;
     unsigned int rc;
-    struct matmul_data_s * mm;
-    mm = (struct matmul_data_s *) malloc(sizeof(struct matmul_data_s));
+    matmul_ptr mm = matmul_init();
 
     MM->xab = xx;
 
+    unsigned long magic_check;
+    rc = fread(&magic_check, sizeof(unsigned long), 1, f);
+    FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
+    FATAL_ERROR_CHECK(magic_check != MM_MAGIC,
+            "Wrong magic in cached matrix file");
 
     rc = fread(&n, sizeof(size_t), 1, f);
     FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
@@ -286,24 +303,30 @@ matmul_ptr matmul_reload_cache(abobj_ptr xx, const char * filename)
 
     fclose(f);
 
-    return (matmul_ptr) mm;
+    return mm;
 }
 
 void matmul_save_cache(matmul_ptr mm, const char * filename)
 {
-    string base(filename);
+    char * base;
     FILE * f;
 
-    base += ".bin";
+    asprintf(&base, "%s" MM_EXTENSION ".bin", filename);
 
-    f = fopen(base.c_str(), "w");
+    f = fopen(base, "w");
     if (f == NULL) {
-        fprintf(stderr, "fopen(%s): %s\n", base.c_str(), strerror(errno));
+        fprintf(stderr, "fopen(%s): %s\n", base, strerror(errno));
+        free(base);
         exit(1);
     }
+    free(base);
 
     size_t n = MM->data.size();
+    unsigned long magic = MM_MAGIC;
     unsigned int rc;
+
+    rc = fwrite(&magic, sizeof(unsigned long), 1, f);
+    FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
 
     rc = fwrite(&n, sizeof(size_t), 1, f);
     FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
