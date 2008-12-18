@@ -417,8 +417,8 @@ sub read_select_status_file {
     while (<SF>) {
         if (/^\s*\n$/) { next; }
         if (/^#/) { next; }
-        if (/^\s*([\w\.]*)\s+([\w\.]+)\s+([\w\.]+)\s+([\w\.]+)/) {
-            push @status, [$1, $2, $3, $4];
+        if (/^\s*([\w\.]*)\s+([\w\.]+)\s+([\w\.]+)(\s+([\w\.]+))?/) {
+            push @status, [$1, $2, $3, $5];
             next;
         }
         die "Could not parse status file: $_\n";
@@ -503,17 +503,20 @@ sub check_running_select_task {
     # one jumps in and takes its PID, we won't detect it.
     # Possible solutions: check the /proc/$pid/cmdline (Linux-specific)
     # or keep a temporary file regularly touched by the program.
-    my $ret;
-    my $status;
-    ($t, $ret, $status) = my_system_timeout(
-        "ssh $host \"/bin/kill -0 $pid\"", 30);
-    if (! $t) {
-        print "      Assume task is still running...\n";
-        return 1;
-    }
-    if ($status != 0) {
-        print "      dead ?!?\n";
-        return -1;
+
+    if ($pid) {
+        my $ret;
+        my $status;
+        ($t, $ret, $status) = my_system_timeout(
+            "ssh $host \"/bin/kill -0 $pid\"", 30);
+        if (! $t) {
+            print "      Assume task is still running...\n";
+            return 1;
+        }
+        if ($status != 0) {
+            print "      dead ?!?\n";
+            return -1;
+        }
     }
 
     # otherwise it's running:
@@ -851,8 +854,8 @@ sub read_status_file {
     while (<SF>) {
         if (/^\s*\n$/) { next; }
         if (/^#/) { next; }
-        if (/^\s*(\w*)\s+(\d+)\s+(\d+)\s+(\d+)/) {
-            push @status, [$1, $2, $3, $4];
+        if (/^\s*(\w*)\s+(\d+)\s+(\d+)(\s+(\d+))?/) {
+            push @status, [$1, $2, $3, $5];
             next;
         }
         die "Could not parse status file: $_\n";
@@ -923,19 +926,21 @@ sub check_running_task {
     # one jumps in and takes its PID, we won't detect it.
     # Possible solutions: check the /proc/$pid/cmdline (Linux-specific)
     # or keep a temporary file regularly touched by the program.
-    my $ret;
-    my $status;
-    ($t, $ret, $status) = my_system_timeout(
-        "ssh $host \"/bin/kill -0 $pid\"", 30);
-    if (! $t) {
-        print "      Assume task is still running...\n";
-        return 1;
-    }
-    if ($status != 0) {
-        print "      dead ?!?\n";
-        # TODO: this is no good! We should return a different status code
-        # to distinguish the "dead" status from the "finished" status.
-        return 0;
+    if ($pid) {
+        my $ret;
+        my $status;
+        ($t, $ret, $status) = my_system_timeout(
+            "ssh $host \"/bin/kill -0 $pid\"", 30);
+        if (! $t) {
+            print "      Assume task is still running...\n";
+            return 1;
+        }
+        if ($status != 0) {
+            print "      dead ?!?\n";
+            # TODO: this is no good! We should return a different status code
+            # to distinguish the "dead" status from the "finished" status.
+            return 0;
+        }
     }
 
     # otherwise it's running:
@@ -1228,7 +1233,7 @@ sub parallel_sieve {
     foreach my $t (@status) {
         my $m   = ${$t}[0];
         my $pid = ${$t}[3];
-        my $ret = `ssh $m "/bin/kill -KILL $pid"`;
+        my $ret = `ssh $m "/bin/kill -KILL $pid"` if $pid;
     }
 
     ## clean remaining sieving-related files on slaves

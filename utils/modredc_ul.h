@@ -91,11 +91,18 @@ modredcul_invmodul (unsigned long n)
      correct inverse modulo 32, then 3 (for 32 bit) or 4 (for 64 bit) 
      Newton iterations are enough. */
   r = (3UL * n) ^ 2UL;
-  r = 2UL * r - r * r * n; /* Newton iteration */
-  r = 2UL * r - r * r * n;
-  r = 2UL * r - r * r * n;
-  if (sizeof (unsigned long) > 4)
-    r = 2UL * r - r * r * n;
+  /* Newton iteration */
+  r = 2UL * r - (unsigned int) r * (unsigned int) r * (unsigned int) n;
+  r = 2UL * r - (unsigned int) r * (unsigned int) r * (unsigned int) n;
+  if (sizeof (unsigned long) == 4)
+    {
+      r = 2UL * r - r * r * n;
+    }
+  else
+    {
+      r = 2UL * r - (unsigned int) r * (unsigned int) r * (unsigned int) n;
+      r = 2UL * r - r * r * n;
+    }
 
   ASSERT_EXPENSIVE (r * n == 1UL);
 
