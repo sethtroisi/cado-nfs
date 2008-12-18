@@ -1,11 +1,16 @@
 #ifndef INTERSECTIONS_HPP_
 #define INTERSECTIONS_HPP_
 
+
+/*
+ * Structure for the intersection between an interval [i0..i1[ and
+ * two consecutives fences.
+ */
 struct isect_info {
-    int k;
-    unsigned int offset_me;
-    unsigned int offset_there;
-    unsigned int count;
+    int k;                      // intersection with [fences[k]..fences[k+1][
+    unsigned int offset_me;     // offset w.r.t. i0
+    unsigned int offset_there;  // offset w.r.t. fences[k]
+    unsigned int count;         // size of the intersection
 };
 
 /* This internal routine is used only in the case where the row and
