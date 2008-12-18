@@ -16,7 +16,11 @@ int heap_compare(const struct bucket * a, const struct bucket * b)
     if (a->room == 0) return 1;
     return b->s < a->s;
 }
-/*  */
+
+
+/* FIXME: libstdc++ is GPL, not LGPL. So we're probably not allow to copy
+ * code from there (IANAL). It would be safer to rewrite that.
+ */
 
 /* The code below is the glibc heap implementation, as copied from
  * /usr/include/c++/4.1.2/bits/stl_heap.h */
