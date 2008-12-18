@@ -8,6 +8,8 @@
                      // 2: jump to minimal possible mergelevel
                      // 3: perform one merge, then check for next min weight
 
+//#define USE_MARKOWITZ // says it...!
+
 // 0 means dummy filtering using slow methods
 // 1 means:
 //  * fast with optimized-though-memory-consuming data structure;
@@ -63,6 +65,9 @@ typedef struct {
                         weight(j) <= cwmax.
                         R[j][k] = -1 if the corresponding row has been deleted.
                         R[j]=NULL for weight(j) > cwmax. */
+#ifdef USE_MARKOWITZ
+  INT *MKZQ;         /* priority queue for Markowitz stuff */    
+#endif  
 } sparse_mat_t;
 
 // data structure for reporting actions during the merge; in standard mode
