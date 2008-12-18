@@ -813,7 +813,7 @@ sub try_singleton {
     banner("Singleton removal");
     my $keep = $param->{'keeppurge'};
     $cmd = $param->{'cadodir'} .
-      "/linalg/purge -poly $prefix.poly -keep $keep -nrels $nrels_dup -purged $prefix.purged $prefix.nodup  2> $prefix.purge.stderr";
+      "/linalg/purge -poly $prefix.poly -keep $keep -nrels $nrels_dup -out $prefix.purged $prefix.nodup  2> $prefix.purge.stderr";
     my_system $cmd, "no_kill";
     if (-z "$prefix.purged" || ! -f "$prefix.purged") {
         printf `grep "expected" $prefix.purge.stderr`;

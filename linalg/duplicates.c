@@ -1,6 +1,6 @@
-/* duplicates --- removing duplicate relations
+/* duplicates --- remove duplicate relations
 
-Copyright 2008 Francois Morain
+Copyright 2008 Francois Morain, Paul Zimmermann
 
 This file is part of CADO-NFS.
 
@@ -106,10 +106,13 @@ remove_duplicates_from_file (FILE *out, unsigned long *irel,
         HAB = getInitialAddress (a, b, MAGIC_HC0, MAGIC_HC1);
 	hab = HAB % Hab->hashmod;
 
+	/* FIXME: with that setting, the low 'slice' bits of hab are
+	 *always* equal to 'slice0', thus we only hit 1/2^slice of the
+	 hash table at the first time */
 	if((slice > 0) && ((hab & mask) != (unsigned) slice0))
 	  continue; /* this relation is not in that slice */
 
-	if (is_ab_new(Hab, hab, HAB)){
+	if (is_ab_new (Hab, hab, HAB)){
 	    *nrels += 1;
 	    fprintf(out, "%s", str);
 	}
@@ -234,7 +237,7 @@ main (int argc, char **argv)
     fic = argv+1;
     nfic = argc-1;
     fprintf (stderr, "Maximal number of relations is %u\n", nrelsmax);
-    Hab.hashmod = getHashMod (Hsize + Hsize / 10, 1);
+    Hab.hashmod = getHashMod (Hsize + Hsize / 2, 1);
     Hab.hashtab = (uint64_t*) malloc (Hab.hashmod * sizeof(uint64_t));
 
     if (outname != NULL)
