@@ -30,6 +30,9 @@ void param_list_clear(param_list pl)
     }
     free(pl->p);
     free(pl->aliases);
+    for(int i = 0 ; i < pl->nknobs ; i++) {
+        free(pl->knobs[i]->knob);
+    }
     free(pl->knobs);
     memset(pl, 0, sizeof(pl));
 }
@@ -264,15 +267,30 @@ int param_list_configure_alias(param_list pl, const char * key, const char * ali
 int param_list_configure_knob(param_list pl, const char * knob, int * ptr)
 {
     ASSERT_ALWAYS(knob != NULL);
-    if (pl->nknobs == pl->nknobs_alloc) {
-        pl->nknobs_alloc += 1;
+    if ((pl->nknobs + 1) >= pl->nknobs_alloc) {
+        pl->nknobs_alloc += 2;
         pl->nknobs_alloc <<= 1;
         pl->knobs = realloc(pl->knobs, pl->nknobs_alloc * sizeof(param_list_knob));
     }
-    pl->knobs[pl->nknobs]->knob = knob;
+    char * tmp = (char *) malloc(strlen(knob)+2);
+    tmp[0]='-';
+    if (knob[1] == '-') { // have -- in the knob
+        strcpy(tmp, knob);
+    } else {
+        strcpy(tmp+1, knob);
+    }
+    // put the -- version
+    pl->knobs[pl->nknobs]->knob = strdup(tmp);
     pl->knobs[pl->nknobs]->ptr = ptr;
     if (ptr) *ptr = 0;
     pl->nknobs++;
+    // put the - version
+    pl->knobs[pl->nknobs]->knob = strdup(tmp+1);
+    pl->knobs[pl->nknobs]->ptr = ptr;
+    if (ptr) *ptr = 0;
+    pl->nknobs++;
+    free(tmp);
+
     return 0;
 }
 
