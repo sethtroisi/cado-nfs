@@ -33,7 +33,7 @@ fillSWAR(sparse_mat_t *mat)
 	fprintf(stderr, "Treating column %d\n", j);
 #  endif
 	if(mat->wt[GETJ(mat, j)] <= mat->cwmax){
-	    mat->A[GETJ(mat, j)] = dclistInsert (mat->S[mat->wt[GETJ(mat, j)]], j);
+	    mat->A[GETJ(mat, j)] = dclistInsert(mat->S[mat->wt[GETJ(mat, j)]], j);
 #  if DEBUG >= 1
 	    fprintf(stderr, "Inserting %d in S[%d]:", j, mat->wt[GETJ(mat, j)]);
 	    dclistPrint(stderr, mat->S[mat->wt[GETJ(mat, j)]]->next);
@@ -134,7 +134,7 @@ incorporateColumn(sparse_mat_t *mat, INT j, int i0)
 #endif
     mat->wt[GETJ(mat, j)] = wj;
     ASSERT(wj == Rj[0]);
-    mat->A[GETJ(mat, j)] = dclistInsert (mat->S[wj], j);
+    mat->A[GETJ(mat, j)] = dclistInsert(mat->S[wj], j);
 }
 
 int

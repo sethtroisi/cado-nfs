@@ -1210,94 +1210,6 @@ remove_j_from_row(sparse_mat_t *mat, int i, int j)
 #endif
 }
 
-// These columns are simply removed from the current squeleton matrix, but
-// not from the small matrix.
-int
-deleteAllColsFromStack(report_t *rep, sparse_mat_t *mat, int iS)
-{
-    dclist dcl;
-    INT j;
-    int k, njrem = 0;
-
-    while(1){
-	dcl = mat->S[iS]->next;
-	if(dcl == NULL)
-	    break;
-	j = dcl->j;
-	njrem++;
-#if DEBUG >= 1
-	fprintf(stderr, "Removing column %d from S[%d]\n", j, iS);
-#endif
-#if TRACE_COL >= 0
-	if(j == TRACE_COL)
-	    fprintf(stderr, "Removing column %d from S[%d]\n", j, iS);
-#endif
-	// we destroy column j
-	// TODO: do faster?
-#if USE_MERGE_FAST <= 1
-	fprintf(stderr, "FIXMEEEEEEEEE.\n");
-#else
-	if(iS == 0)
-	    mat->rem_ncols--;
-	if(iS == 1){
-#ifndef USE_COMPACT_R
-	    for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
-		if(mat->R[GETJ(mat, j)][k] != -1){
-# if TRACE_COL >= 0
-		    if(j == TRACE_COL)
-			fprintf(stderr, "deleteAllCols: row is %d\n",mat->R[GETJ(mat, j)][k]);
-# endif
-		    remove_j_from_row(mat, mat->R[GETJ(mat, j)][k], j);
-		    removeRowDefinitely(rep, mat, mat->R[GETJ(mat, j)][k]);
-		    mat->rem_ncols--;
-		}
-	    mat->wt[GETJ(mat, j)] = 0;
-#else
-	    fprintf(stderr, "R: NYI in deleteAllColsFromStack\n");
-	    exit(1);
-#endif
-	}
-	k = mat->wt[GETJ(mat, j)]; // make a copy of the weight
-	remove_j_from_SWAR(mat, j);
-	// mat->wt[j] was put to 0...
-	mat->wt[GETJ(mat, j)] = -k; // restore and update
-#endif
-    }
-#if DEBUG >= 1
-    if(njrem > 0)
-	fprintf(stderr, "deleteAllColsFromStack[%d]: %d\n", iS, njrem);
-#endif
-    return njrem;
-}
-
-int
-removeSingletons(report_t *rep, sparse_mat_t *mat)
-{
-#if USE_MERGE_FAST == 0
-    INT i, j;
-
-    for(j = 0; j < mat->ncols; j++)
-	if(mat->wt[GETJ(mat, j)] == 1){
-	    // find row...
-	    for(i = 0; i < mat->nrows; i++)
-		if(hasCol(mat->rows, i, j))
-		    break;
-	    ASSERT(i < mat->nrows);
-	    removeWeightFromRow(mat, i);
-	    destroyRow(mat, i);
-	    report1(rep, i); // signal to replay...!
-	}
-#else
-    return deleteAllColsFromStack(rep, mat, 1);
-#endif
-}
-
-int
-deleteHeavyColumns(report_t *rep, sparse_mat_t *mat)
-{
-    return deleteAllColsFromStack(rep, mat, mat->cwmax+1);
-}
-
 //////////////////////////////////////////////////////////////////////
 // making things independent of the real data structure used
 //////////////////////////////////////////////////////////////////////
@@ -1360,7 +1272,101 @@ addRowsAndUpdate(sparse_mat_t *mat, int i1, int i2, int len)
     addOneRowAndUpdate(mat, i1);
 }
 
+void
+removeColumnAndUpdate(sparse_mat_t *mat, int j)
+{
+    remove_j_from_SWAR(mat, j);
+}
+
 //////////////////////////////////////////////////////////////////////
+
+// These columns are simply removed from the current squeleton matrix, but
+// not from the small matrix.
+int
+deleteAllColsFromStack(report_t *rep, sparse_mat_t *mat, int iS)
+{
+    dclist dcl;
+    INT j;
+    int k, njrem = 0;
+
+    while(1){
+	dcl = mat->S[iS]->next;
+	if(dcl == NULL)
+	    break;
+	j = dcl->j;
+	njrem++;
+#if DEBUG >= 1
+	fprintf(stderr, "Removing column %d from S[%d]\n", j, iS);
+#endif
+#if TRACE_COL >= 0
+	if(j == TRACE_COL)
+	    fprintf(stderr, "Removing column %d from S[%d]\n", j, iS);
+#endif
+	// we destroy column j
+	// TODO: do faster?
+#if USE_MERGE_FAST <= 1
+	fprintf(stderr, "FIXMEEEEEEEEE.\n");
+#else
+	if(iS == 0)
+	    mat->rem_ncols--;
+	if(iS == 1){
+#ifndef USE_COMPACT_R
+	    for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
+		if(mat->R[GETJ(mat, j)][k] != -1){
+# if TRACE_COL >= 0
+		    if(j == TRACE_COL)
+			fprintf(stderr, "deleteAllCols: row is %d\n",mat->R[GETJ(mat, j)][k]);
+# endif
+		    remove_j_from_row(mat, mat->R[GETJ(mat, j)][k], j);
+		    removeRowDefinitely(rep, mat, mat->R[GETJ(mat, j)][k]);
+		    mat->rem_ncols--;
+		}
+	    mat->wt[GETJ(mat, j)] = 0;
+#else
+	    fprintf(stderr, "R: NYI in deleteAllColsFromStack\n");
+	    exit(1);
+#endif
+	}
+	k = mat->wt[GETJ(mat, j)]; // make a copy of the weight
+	removeColumnAndUpdate(mat, j);
+	// mat->wt[j] was put to 0...
+	mat->wt[GETJ(mat, j)] = -k; // restore and update
+#endif
+    }
+#if DEBUG >= 1
+    if(njrem > 0)
+	fprintf(stderr, "deleteAllColsFromStack[%d]: %d\n", iS, njrem);
+#endif
+    return njrem;
+}
+
+int
+removeSingletons(report_t *rep, sparse_mat_t *mat)
+{
+#if USE_MERGE_FAST == 0
+    INT i, j;
+
+    for(j = 0; j < mat->ncols; j++)
+	if(mat->wt[GETJ(mat, j)] == 1){
+	    // find row...
+	    for(i = 0; i < mat->nrows; i++)
+		if(hasCol(mat->rows, i, j))
+		    break;
+	    ASSERT(i < mat->nrows);
+	    removeWeightFromRow(mat, i);
+	    destroyRow(mat, i);
+	    report1(rep, i); // signal to replay...!
+	}
+#else
+    return deleteAllColsFromStack(rep, mat, 1);
+#endif
+}
+
+int
+deleteHeavyColumns(report_t *rep, sparse_mat_t *mat)
+{
+    return deleteAllColsFromStack(rep, mat, mat->cwmax+1);
+}
 
 void
 removeRowDefinitely(report_t *rep, sparse_mat_t *mat, INT i)
@@ -1598,7 +1604,7 @@ mergeForColumn(report_t *rep, double *tt, double *tfill, double *tMST,
     *tt = seconds()-(*tt);
     mat->rem_nrows--;
     mat->rem_ncols--;
-    remove_j_from_SWAR(mat, j);
+    removeColumnAndUpdate(mat, j);
 }
 
 // maxdo is 0 if we want to perform a non-bounded number of operations; 
@@ -2353,7 +2359,7 @@ resume(report_t *rep, sparse_mat_t *mat, char *resumename)
     for(j = mat->jmin; j < mat->jmax; j++)
 	if((mat->wt[GETJ(mat, j)] == 0) && (mat->A[GETJ(mat, j)] != NULL))
 	    // be sure j was removed...
-	    remove_j_from_SWAR(mat, j);
+	    removeColumnAndUpdate(mat, j);
     nactivej = 0;
     for(j = mat->jmin; j < mat->jmax; j++)
 	if(mat->wt[GETJ(mat, j)] != 0)
