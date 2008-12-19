@@ -1214,9 +1214,17 @@ remove_j_from_row(sparse_mat_t *mat, int i, int j)
 // making things independent of the real data structure used
 //////////////////////////////////////////////////////////////////////
 
+// The cell [i, j] must be incorporated to the data structure, at least
+// if j is not too heavy, etc. 
+// TODO: this should be shared and redistributed
+// between swar.c and the present file.
 void
 addCellAndUpdate(sparse_mat_t *mat, int i, INT j)
 {
+#if TRACE_ROW >= 0
+    if(i == TRACE_ROW)
+	fprintf(stderr, "TRACE_ROW: addCellSWAR i=%d j=%d\n", i, j);
+#endif
     addCellSWAR(mat, i, j);
 }
 

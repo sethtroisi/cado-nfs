@@ -286,10 +286,6 @@ addCellSWAR(sparse_mat_t *mat, int i, INT j)
 {
     int ind;
 
-#if TRACE_ROW >= 0
-    if(i == TRACE_ROW)
-	fprintf(stderr, "TRACE_ROW: addCellSWAR i=%d j=%d\n", i, j);
-#endif
     // update weight
 #if DEBUG >= 1
     fprintf(stderr, "addCellSWAR: moving j=%d from S[%d] to S[%d]\n",
@@ -315,6 +311,8 @@ addCellSWAR(sparse_mat_t *mat, int i, INT j)
     dclistConnect(mat->S[ind], mat->A[GETJ(mat, j)]);
 #endif
     // update R[j] by adding i
+    // TODO: this is more or less independant of SWAR...!
+    // but take care to the return stuff above!
     add_i_to_Rj(mat, i, j);
 }
 
