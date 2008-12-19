@@ -201,10 +201,9 @@ main(int argc, char *argv[])
 #endif
 
     gzip_close(rep.outfile, outname);
-    fprintf(stderr, "Final matrix has N=%d nc=%d (%d) w(M)=%lu N*w(M)=%lu\n",
+    fprintf(stderr, "Final matrix has N=%d nc=%d (%d) w(M)=%lu N*w(M)=%1.0f\n",
 	    mat.rem_nrows, mat.rem_ncols, mat.rem_nrows-mat.rem_ncols,
-	    mat.weight,
-	    ((unsigned long)mat.rem_nrows) * mat.weight);
+	    mat.weight, (double) mat.rem_nrows * (double) mat.weight);
 #if TEX
     fprintf(stderr, "\\end{verbatim}\n");
 #endif
