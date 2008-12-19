@@ -18,6 +18,7 @@
 #include "sparse.h"
 #include "dclist.h"
 #include "sparse_mat.h"
+#include "swar.h"
 #include "merge_mono.h"
 #include "prune.h"
 
