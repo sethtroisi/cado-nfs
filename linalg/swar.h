@@ -1,9 +1,4 @@
-// doubly chained lists
-typedef struct dclist{
-    INT j;
-    struct dclist *prev, *next;
-} *dclist;
+extern void addCellSWAR(sparse_mat_t *mat, int i, INT j);
 
-extern dclist dclistCreate(INT j);
-extern void dclistTex(FILE *file, dclist dcl);
-extern int dclistLength(dclist dcl);
+/* INT is defined in sparse.h */
+

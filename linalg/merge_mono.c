@@ -15,12 +15,14 @@
 #include "files.h"
 #include "gzip.h"
 #include "sparse.h"
+#include "dclist.h"
+#include "sparse_mat.h"
+#include "swar.h"
 
-#include "swar.h" // TODO: protect with ifdef sometime
-#include "merge_mono.h"
 #ifdef USE_MARKOWITZ
-# include "markowitz.h"
+#include "markowitz.h"
 #endif
+#include "merge_mono.h"
 #include "prune.h"
 
 #define STR_LEN_MAX 1024
@@ -1208,15 +1210,6 @@ remove_j_from_row(sparse_mat_t *mat, int i, int j)
 #endif
 }
 
-void
-removeRowDefinitely(report_t *rep, sparse_mat_t *mat, INT i)
-{
-    removeRowSWAR(mat, i);
-    destroyRow(mat, i);
-    report1(rep, i);
-    mat->rem_nrows--;
-}
-
 // These columns are simply removed from the current squeleton matrix, but
 // not from the small matrix.
 int
@@ -1305,6 +1298,79 @@ deleteHeavyColumns(report_t *rep, sparse_mat_t *mat)
     return deleteAllColsFromStack(rep, mat, mat->cwmax+1);
 }
 
+//////////////////////////////////////////////////////////////////////
+// making things independent of the real data structure used
+//////////////////////////////////////////////////////////////////////
+
+void
+addCellAndUpdate(sparse_mat_t *mat, int i, INT j)
+{
+    addCellSWAR(mat, i, j);
+}
+
+void
+removeCellAndUpdate(sparse_mat_t *mat, int i, INT j)
+{
+    removeCellSWAR(mat, i, j);
+}
+
+// for all j in row[i], removes j and update data
+void
+removeRowAndUpdate(sparse_mat_t *mat, int i)
+{
+    int k;
+
+#if TRACE_ROW >= 0
+    if(i == TRACE_ROW)
+	fprintf(stderr, "TRACE_ROW: removeRowAndUpdate i=%d\n", i);
+#endif
+    mat->weight -= lengthRow(mat, i);
+    for(k = 1; k <= lengthRow(mat, i); k++){
+#if TRACE_COL >= 0
+	if(cell(mat, i, k) == TRACE_COL){
+	    fprintf(stderr, "removeRowAndUpdate removes %d from R_%d\n",
+		    TRACE_COL, i);
+	}
+#endif
+	removeCellAndUpdate(mat, i, cell(mat, i, k));
+    }
+}
+
+// All entries M[i, j] are added to the structure.
+void
+addOneRowAndUpdate(sparse_mat_t *mat, int i)
+{
+    int k;
+
+    mat->weight += lengthRow(mat, i);
+    for(k = 1; k <= lengthRow(mat, i); k++)
+	addCellAndUpdate(mat, i, cell(mat, i, k));
+}
+
+// realize mat[i1] += mat[i2] and update the data structure.
+// len could be the real length of row[i1]+row[i2] or -1.
+void
+addRowsAndUpdate(sparse_mat_t *mat, int i1, int i2, int len)
+{
+    // cleaner one, that shares addRowsData() to prepare the next move...!
+    // i1 is to disappear, replaced by a new one
+    removeRowAndUpdate(mat, i1);
+    // we know the length of row[i1]+row[i2]
+    addRows(mat->rows, i1, i2, len);
+    addOneRowAndUpdate(mat, i1);
+}
+
+//////////////////////////////////////////////////////////////////////
+
+void
+removeRowDefinitely(report_t *rep, sparse_mat_t *mat, INT i)
+{
+    removeRowAndUpdate(mat, i);
+    destroyRow(mat, i);
+    report1(rep, i);
+    mat->rem_nrows--;
+}
+
 // try all combinations to find the smaller one
 void
 tryAllCombinations(report_t *rep, sparse_mat_t *mat, int m, INT *ind)
@@ -1317,7 +1383,7 @@ tryAllCombinations(report_t *rep, sparse_mat_t *mat, int m, INT *ind)
 #endif
     for(k = 0; k < m; k++)
 	if(k != i){
-	    addRowsSWAR(mat, ind[k], ind[i], -1);
+	    addRowsAndUpdate(mat, ind[k], ind[i], -1);
 #if DEBUG >= 1
 	    fprintf(stderr, "new row[%d]=", ind[k]);
 	    print_row(mat, ind[k]);
@@ -1335,7 +1401,7 @@ tryAllCombinations(report_t *rep, sparse_mat_t *mat, int m, INT *ind)
     fprintf(stderr, "=> new_ind: %d %d\n", ind[0], ind[1]);
 #endif
     reportn(rep, ind, m);
-    removeRowSWAR(mat, ind[0]);
+    removeRowAndUpdate(mat, ind[0]);
     destroyRow(mat, ind[0]);
 }
 
@@ -1367,7 +1433,7 @@ addFatherToSonsRec(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 	    level = i1;
 	i1 = ind[sons[u][k]];
 	// add u to its son
-	addRowsSWAR(mat, i1, i2, A[sons[u][k]][u]);
+	addRowsAndUpdate(mat, i1, i2, A[sons[u][k]][u]);
 	history[level0][itab++] = i1;
     }
     history[level0][0] = itab-1;
@@ -1418,7 +1484,7 @@ MSTWithA(report_t *rep, sparse_mat_t *mat, int m, INT *ind, double *tMST,
 #else
         reportn(rep, history[i]+1, history[i][0]);
 #endif
-    removeRowSWAR(mat, ind[0]);
+    removeRowAndUpdate(mat, ind[0]);
     destroyRow(mat, ind[0]);
 }
 
@@ -1714,7 +1780,7 @@ inspectRowWeight(report_t *rep, sparse_mat_t *mat)
 # if DEBUG >= 1
 	    fprintf(stderr, "Row %d is no longer useful in merge\n", i);
 # endif
-	    removeRowSWAR(mat, i);
+	    removeRowAndUpdate(mat, i);
 	    destroyRow(mat, i);
 	    useless++;
 	}
@@ -2243,14 +2309,14 @@ doAllAdds(report_t *rep, sparse_mat_t *mat, char *str)
 	sg = 1;
     }
     for(k = 1; k < ni; k++)
-	addRowsSWAR(mat, ind[k], i0, -1);
+	addRowsAndUpdate(mat, ind[k], i0, -1);
     reportn(rep, ind, ni);
     if(sg > 0){
 	// when ni == 1, then the corresponding row was too heavy and dropped
 	// unless m = 1 was used, in which case S[1] will contain j and
 	// can dispensed of next time (?) In the case of S[0], it'll be done
 	// later on also (?)
-	removeRowSWAR(mat, i0);
+	removeRowAndUpdate(mat, i0);
 	destroyRow(mat, i0);
 	mat->rem_nrows--;
 	// the number of active j's is recomputed, anyway, later on

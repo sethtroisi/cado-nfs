@@ -87,6 +87,7 @@ LINALG_FILES=linalg/Makefile linalg/freerel.c linalg/hashpair.h \
 	   linalg/balance.c linalg/readbuffer.h linalg/rowset_heap.h \
 	   linalg/readbuffer.c linalg/rowset_heap.c linalg/apply_perm.c \
 	   linalg/characters.c linalg/gauss.c linalg/gauss.h linalg/allsqrt.c \
+	   linalg/dclist.c linalg/dclist.h \
 	   linalg/swar.c linalg/swar.h \
 	   linalg/markowitz.c linalg/markowitz.h
 SQRT_FILES=sqrt/naive/Makefile sqrt/naive/algsqrt.c sqrt/naive/poly.h \

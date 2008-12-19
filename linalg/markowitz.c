@@ -1,9 +1,12 @@
 #include "utils/utils.h"
 #include "sparse.h"
-#include "merge_mono.h"
-#include "markowitz.h"
+#include "dclist.h"
+#include "sparse_mat.h"
+#include "swar.h"
 
 #ifdef USE_MARKOWITZ
+#include "markowitz.h"
+#include "merge_mono.h"
 
 #define MKZ_DEBUG 1
 

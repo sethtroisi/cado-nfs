@@ -16,6 +16,8 @@
 #include "files.h"
 #include "gzip.h"
 #include "sparse.h"
+#include "dclist.h"
+#include "sparse_mat.h"
 #include "merge_mono.h"
 #include "prune.h"
 

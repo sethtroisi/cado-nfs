@@ -9,75 +9,10 @@
 
 #include "utils/utils.h"
 #include "sparse.h"
+#include "dclist.h"
+#include "sparse_mat.h"
 #include "swar.h"
 #include "merge_mono.h"
-
-dclist
-dclistCreate(INT j)
-{
-    dclist dcl = (dclist)malloc(sizeof(struct dclist));
-
-    dcl->j = j;
-    dcl->prev = NULL;
-    dcl->next = NULL;
-    return dcl;
-}
-
-void
-dclistPrint(FILE *file, dclist dcl)
-{
-    while(dcl != NULL){
-      fprintf(file, " -> %ld", (long int) dcl->j);
-	dcl = dcl->next;
-    }
-}
-
-int
-dclistLength(dclist dcl)
-{
-    int l = 0;
-
-    while(dcl != NULL){
-	l++;
-	dcl = dcl->next;
-    }
-    return l;
-}
-
-void
-dclistTex(FILE *file, dclist dcl)
-{
-    fprintf(stderr, "\\begin{array}{r}\n");
-    while(dcl != NULL){
-      fprintf(file, "%ld\\\\\n", (long int) dcl->j);
-	dcl = dcl->next;
-    }
-    fprintf(stderr, "\\end{array}\n");
-}
-
-/* insert j in doubly-chained list dcl (between cell of dcl and dcl->next),
-   and return pointer at cell containing j */
-static dclist
-dclistInsert(dclist dcl, INT j)
-{
-    dclist newdcl = dclistCreate(j);
-
-    newdcl->next = dcl->next;
-    newdcl->prev = dcl;
-    if(newdcl->next != NULL)
-	newdcl->next->prev = newdcl;
-    dcl->next = newdcl;
-    return newdcl;
-}
-
-// connect dcl to S
-void
-dclistConnect(dclist S, dclist dcl)
-{
-    dcl->next = S->next;
-    dcl->prev = S;
-    S->next = dcl;
-}
 
 /* Initializes the SWAR data structure.
    Inputs:
@@ -345,32 +280,6 @@ removeCellSWAR(sparse_mat_t *mat, int i, INT j)
     remove_i_from_Rj(mat, i, j);
 }
 
-// for all j in row[i], removes j and update data
-void
-removeRowSWAR(sparse_mat_t *mat, int i)
-{
-    int k;
-
-#if TRACE_ROW >= 0
-    if(i == TRACE_ROW)
-	fprintf(stderr, "TRACE_ROW: removeRowSWAR i=%d\n", i);
-#endif
-    mat->weight -= lengthRow(mat, i);
-#if USE_TAB == 0
-    for(k = 0; k < lengthRow(mat, i); k++){
-#else
-    for(k = 1; k <= lengthRow(mat, i); k++){
-#endif
-#if TRACE_COL >= 0
-	if(cell(mat, i, k) == TRACE_COL){
-	    fprintf(stderr, "removeRowSWAR removes %d from R_%d\n",
-		    TRACE_COL, i);
-	}
-#endif
-	removeCellSWAR(mat, i, cell(mat, i, k));
-    }
-}
-
 // M[i, j] is set to 1.
 void
 addCellSWAR(sparse_mat_t *mat, int i, INT j)
@@ -407,95 +316,6 @@ addCellSWAR(sparse_mat_t *mat, int i, INT j)
 #endif
     // update R[j] by adding i
     add_i_to_Rj(mat, i, j);
-}
-
-// All entries M[i, j] are added to the SWAR structure.
-void
-addRowSWAR(sparse_mat_t *mat, int i)
-{
-    int k;
-
-    mat->weight += lengthRow(mat, i);
-#if USE_TAB == 0
-    for(k = 0; k < lengthRow(mat, i); k++)
-#else
-    for(k = 1; k <= lengthRow(mat, i); k++)
-#endif
-	addCellSWAR(mat, i, cell(mat, i, k));
-}
-
-// i1 += i2.
-// len could be the real length of row[i1]+row[i2] or -1.
-void
-addRowsSWAR(sparse_mat_t *mat, int i1, int i2, int len)
-{
-#if 0 // original version, probably obsolete
-    int k1, k2, k, len, *tmp, *tmp2;
-
-# if TEX
-    fprintf(stderr, "row[%d] += row[%d]\n", i1, i2);
-# endif
-# if DEBUG >= 1
-    fprintf(stderr, "row[%d] =", i1); print_row(mat, i1);
-    fprintf(stderr, "\n");
-    fprintf(stderr, "row[%d] =", i2); print_row(mat, i2);
-    fprintf(stderr, "\n");
-# endif
-    // merge row[i1] and row[i2] in i1...
-    len = mat->data[i1].len + mat->data[i2].len;
-    tmp = (INT *)malloc(len * sizeof(INT));
-    k = k1 = k2 = 0;
-
-    // i1 is to disappear, replaced by a new one
-    removeRowSWAR(mat, i1);
-    // loop while everybody is here
-    while((k1 < mat->data[i1].len) && (k2 < mat->data[i2].len)){
-	if(mat->data[i1].val[k1] < mat->data[i2].val[k2]){
-	    tmp[k++] = mat->data[i1].val[k1++];
-	    mat->weight++;
-	}
-	else if(mat->data[i1].val[k1] > mat->data[i2].val[k2]){
-            tmp[k++] = mat->data[i2].val[k2++];
-	    mat->weight++;
-        }
-	else{
-	    k1++;
-	    k2++;
-	}
-    }
-    // finish with k1
-    for( ; k1 < mat->data[i1].len; k1++){
-	tmp[k++] = mat->data[i1].val[k1];
-	mat->weight++;
-    }
-    // finish with k2
-    for( ; k2 < mat->data[i2].len; k2++){
-	tmp[k++] = mat->data[i2].val[k2];
-	mat->weight++;
-    }
-    // destroy and copy back
-    free(mat->data[i1].val);
-    tmp2 = (INT *)malloc(k * sizeof(INT));
-    memcpy(tmp2, tmp, k * sizeof(INT));
-    mat->data[i1].len = k;
-    mat->data[i1].val = tmp2;
-    free(tmp);
-    addRowSWAR(mat, i1);
-# if DEBUG >= 1
-    fprintf(stderr, "row[%d]+row[%d] =", i1, i2);
-    print_row(mat, i1); fprintf(stderr, "\n");
-# endif
-#else // cleaner one, that shares addRowsData() to prepare the next move...!
-    // i1 is to disappear, replaced by a new one
-    removeRowSWAR(mat, i1);
-# if USE_TAB == 0
-    addRowsData(mat->data, i1, i2);
-# else
-    // we know the length of row[i1]+row[i2]
-    addRows(mat->rows, i1, i2, len);
-# endif
-    addRowSWAR(mat, i1);
-#endif
 }
 
 int
