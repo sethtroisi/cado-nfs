@@ -24,6 +24,15 @@
  * items (as many as one finds COL groups), and conversely.
  */
 
+/* don't enable this. Clutters output a lot */
+#define xxxCONCURRENCY_DEBUG
+
+/* This isn't ready yet. Should work as long as openmpi has been compiled
+ * with --enable-mpi-threads ; but does not at the moment.
+ */
+#define xxxDUPLICATE_COMMS
+
+
 /* utility structure. It is stored in thread-shared memory */
 struct pthread_things {
     my_pthread_barrier_t b[1];

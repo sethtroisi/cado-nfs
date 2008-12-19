@@ -35,8 +35,13 @@ ifeq ($(CC),)
 $(error "You must install an mpicc compiler")
 endif
 
-CC:=$(CC) -Wl,-rpath,$(shell cat /etc/alternatives/mpilibs64)
-CXX:=$(CXX) -Wl,-rpath,$(shell cat /etc/alternatives/mpilibs64)
+mpicclibs:=$(shell $(MPICC) -showme | sed -e 's/^.*-L\(\S*\)\>.*$$/\1/')
+mpicxxlibs:=$(shell $(MPICXX) -showme | sed -e 's/^.*-L\(\S*\)\>.*$$/\1/')
+
+# CC:=$(CC) -Wl,-rpath,$(shell cat /etc/alternatives/mpilibs64)
+# CXX:=$(CXX) -Wl,-rpath,$(shell cat /etc/alternatives/mpilibs64)
+CC:=$(CC) -Wl,-rpath,$(mpicclibs)
+CXX:=$(CXX) -Wl,-rpath,$(mpicxxlibs)
 endif
 
 

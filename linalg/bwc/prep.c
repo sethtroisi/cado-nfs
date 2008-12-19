@@ -120,7 +120,20 @@ void usage()
 
 int main(int argc, char * argv[])
 {
+#ifdef  DUPLICATE_COMMS
+    int req = MPI_THREAD_MULTIPLE;
+    int prov;
+    MPI_Init_thread(&argc, &argv, req, &prov);
+    if (req != prov) {
+        fprintf(stderr, "Cannot init mpi with MPI_THREAD_MULTIPLE ;"
+                " got %d != req %d\n",
+                prov, req);
+        exit(1);
+    }
+#else
     MPI_Init(&argc, &argv);
+#endif
+
     param_list pl;
 
     int rank;

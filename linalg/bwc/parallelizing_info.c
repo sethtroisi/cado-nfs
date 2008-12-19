@@ -14,8 +14,6 @@
 
 #include <sys/time.h>   // gettimeofday
 
-#define xxxCONCURRENCY_DEBUG
-
 static inline void pi_wiring_init_pthread_things(pi_wiring_ptr w, const char * desc)
 {
     struct pthread_things * res;
@@ -174,11 +172,20 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
     grid = (parallelizing_info *) malloc(nhc * nvc * sizeof(parallelizing_info));
     memset(grid, 0, nhc * nvc * sizeof(parallelizing_info));
 
+
     for(unsigned int k = 0 ; k < nhc * nvc ; k++) {
-        memcpy(grid+k, pi, sizeof(parallelizing_info));
-        grid[k]->m->trank = k;
-        grid[k]->wr[0]->trank = k % nvc;
-        grid[k]->wr[1]->trank = k / nvc;
+        parallelizing_info_ptr e = grid[k];
+        memcpy(e, pi, sizeof(parallelizing_info));
+        unsigned int k0 = k % nvc;
+        unsigned int k1 = k / nvc;
+        e->m->trank = k;
+        e->wr[0]->trank = k0;
+        e->wr[1]->trank = k1;
+#ifdef  DUPLICATE_COMMS
+        MPI_Comm_dup(pi->m->pals, &(e->m->pals));
+        MPI_Comm_dup(pi->wr[0]->pals, &(e->wr[0]->pals));
+        MPI_Comm_dup(pi->wr[1]->pals, &(e->wr[1]->pals));
+#endif  /* DUPLICATE_COMMS */
     }
 
     // row barriers.
@@ -318,6 +325,13 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
     for(unsigned int c = 0 ; c < pi->wr[0]->ncores ; c++) {
         pi_wiring_destroy_pthread_things(grid[c]->wr[1]);
     }
+#ifdef  DUPLICATE_COMMS
+    for(unsigned int k = 0 ; k < nhc * nvc ; k++) {
+        MPI_Comm_free(&grid[k]->m->pals);
+        MPI_Comm_free(&grid[k]->wr[0]->pals);
+        MPI_Comm_free(&grid[k]->wr[1]->pals);
+    }
+#endif  /* DUPLICATE_COMMS */
 
     free(grid);
 

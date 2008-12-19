@@ -299,7 +299,9 @@ reduce_across(matmul_top_data_ptr mmt, int d)
 
     /* reducing across a row is when d == 0 */
     pi_wiring_ptr pirow = mmt->pi->wr[d];
-    // pi_wiring_ptr picol = mmt->pi->wr[!d];
+#ifndef DUPLICATE_COMMS
+    pi_wiring_ptr picol = mmt->pi->wr[!d];
+#endif
 
     mmt_wiring_ptr mrow = mmt->wr[d];
     mmt_wiring_ptr mcol = mmt->wr[!d];
@@ -335,23 +337,47 @@ reduce_across(matmul_top_data_ptr mmt, int d)
         }
     }
 
+#ifndef DUPLICATE_COMMS
     /* Now we can perform mpi-level reduction across rows. */
-    // all row threads are likely to engage in a collective operation
-    // at one moment or another.
-    for(unsigned int i = 0 ; i < mrow->xlen ; i++) {
-        struct isect_info * xx = &(mrow->x[i]);
-        unsigned int tdst = xx->k % pirow->ncores;
-        serialize_threads(pirow);
-        if (pirow->trank != tdst)
-            continue;
-        unsigned int jdst = xx->k / pirow->ncores;
-        // MPI_Reduce does not know about const-ness !
-        abt * sptr = mrow->v + aboffset(mmt->abase, xx->offset_me);
-        abt * dptr = mcol->v + aboffset(mmt->abase, xx->offset_there);
-        size_t siz = xx->count * sizeof(abt);
-        err = MPI_Reduce(sptr, dptr, siz, MPI_BYTE, MPI_BXOR, jdst, pirow->pals);
-        BUG_ON(err);
+    for(unsigned int t = 0 ; t < picol->ncores ; t++) {
+        serialize_threads(picol);
+        if (t != picol->trank)
+            continue;   // not our turn.
+
+        // all row threads are likely to engage in a collective operation
+        // at one moment or another.
+        for(unsigned int i = 0 ; i < mrow->xlen ; i++) {
+            struct isect_info * xx = &(mrow->x[i]);
+            unsigned int tdst = xx->k % pirow->ncores;
+            serialize_threads(pirow);
+            if (pirow->trank != tdst)
+                continue;
+            unsigned int jdst = xx->k / pirow->ncores;
+            // MPI_Reduce does not know about const-ness !
+            abt * sptr = mrow->v + aboffset(mmt->abase, xx->offset_me);
+            abt * dptr = mcol->v + aboffset(mmt->abase, xx->offset_there);
+            size_t siz = xx->count * sizeof(abt);
+            err = MPI_Reduce(sptr, dptr, siz, MPI_BYTE, MPI_BXOR, jdst, pirow->pals);
+            BUG_ON(err);
+        }
     }
+#else   /* DUPLICATE_COMMS */
+        for(unsigned int i = 0 ; i < mrow->xlen ; i++) {
+            struct isect_info * xx = &(mrow->x[i]);
+            unsigned int tdst = xx->k % pirow->ncores;
+            // serialize_threads(pirow);
+            if (pirow->trank != tdst)
+                continue;
+            unsigned int jdst = xx->k / pirow->ncores;
+            // MPI_Reduce does not know about const-ness !
+            abt * sptr = mrow->v + aboffset(mmt->abase, xx->offset_me);
+            abt * dptr = mcol->v + aboffset(mmt->abase, xx->offset_there);
+            size_t siz = xx->count * sizeof(abt);
+            err = MPI_Reduce(sptr, dptr, siz, MPI_BYTE, MPI_BXOR, jdst, pirow->pals);
+            BUG_ON(err);
+        }
+#endif
+
 
     // as usual, we do not serialize on exit. Up to the next routine to
     // do so if needed.
@@ -484,6 +510,7 @@ static void save_vector_toprow(matmul_top_data_ptr mmt, int d, unsigned int inde
      * simply drop the pthread barrier.  Lacking this possibility, we
      * have to serialize here (for now).
      */
+#ifndef DUPLICATE_COMMS
     for(unsigned int t = 0 ; t < pirow->ncores ; t++) {
         serialize_threads(pirow);
         if (t == pirow->trank) { // our turn.
@@ -494,6 +521,13 @@ static void save_vector_toprow(matmul_top_data_ptr mmt, int d, unsigned int inde
             BUG_ON(err);
         }
     }
+#else
+            ASSERT(sendcount == recvcounts[pirow->jrank]);
+            err = MPI_Gatherv(sendbuf, sendcount, MPI_BYTE,
+                    recvbuf, recvcounts, displs, MPI_BYTE,
+                    0, pirow->pals);
+            BUG_ON(err);
+#endif
     // what a pain in the Xss. Because we don't exit with the mutex
     // locked, we can't do much... The main thread might end up calling
     // munmap before we complete the call to MPI_Gatherv.
