@@ -304,7 +304,7 @@ reduce_across(matmul_top_data_ptr mmt, int d)
     mmt_wiring_ptr mrow = mmt->wr[d];
     mmt_wiring_ptr mcol = mmt->wr[!d];
 
-    if ((mmt->flags[d] & THREAD_SHARED_VECTOR) == 0 && pirow->ncores) {
+    if ((mmt->flags[d] & THREAD_SHARED_VECTOR) == 0 && (pirow->ncores > 1)) {
         /* row threads have to sum up their data. Of course it's
          * irrelevant when there is only one such thread...
          *
