@@ -127,11 +127,18 @@ modredc15ul_invmodul (unsigned long n)
      correct inverse modulo 32, then 3 (for 32 bit) or 4 (for 64 bit) 
      Newton iterations are enough. */
   r = (3UL * n) ^ 2UL;
-  r = 2UL * r - r * r * n; /* Newton iteration */
-  r = 2UL * r - r * r * n;
-  r = 2UL * r - r * r * n;
-  if (sizeof (unsigned long) > 4)
-    r = 2UL * r - r * r * n;
+  /* Newton iteration */
+  r = 2UL * r - (unsigned int) r * (unsigned int) r * (unsigned int) n;
+  r = 2UL * r - (unsigned int) r * (unsigned int) r * (unsigned int) n;
+  if (sizeof (unsigned long) == 4)
+    {
+      r = 2UL * r - r * r * n;
+    }
+  else
+    {
+      r = 2UL * r - (unsigned int) r * (unsigned int) r * (unsigned int) n;
+      r = 2UL * r - r * r * n;
+    }
 
   ASSERT_EXPENSIVE (r * n == 1UL);
 
@@ -705,15 +712,15 @@ modredc15ul_mul (residueredc15ul_t r, const residueredc15ul_t a,
 	  m[0].m[1], LONG_BIT, m[0].m[0]);
 #endif
   
-  ularith_mul_ul_ul_2ul (&(t[0]), &(t[1]), a[0], b[0]);
+  ularith_mul_ul_ul_2ul (&(t[0]), &(t[1]), a[0], b[0]); /* t1:t0 <= (2^w-1)^2 */
   k = t[0] * m[0].invm;
   ularith_mul_ul_ul_2ul (&pl, &ph, k, m[0].m[0]);
   if (pl != 0UL)
-    ph++;
+    ph++; /* ph <= w-1 */
   t[2] = 0UL;
-  ularith_add_ul_2ul (&(t[1]), &(t[2]), ph); /* t[2] <= 1 */
-  ularith_mul_ul_ul_2ul (&pl, &ph, k, m[0].m[1]);
-  ularith_add_2ul_2ul (&(t[1]), &(t[2]), pl, ph); 
+  ularith_add_ul_2ul (&(t[1]), &(t[2]), ph); /* t2:t1:t0 <= 2*2^(2w) - 2^w + 1 */
+  ularith_mul_ul_ul_2ul (&pl, &ph, k, m[0].m[1]); /* ph:pl <= 2^(3w/2) - 2^w - 2^(w/2) + 1 */
+  ularith_add_2ul_2ul (&(t[1]), &(t[2]), pl, ph); /* t2:t1:t0 <= 2*2^(2w) - 2*2^w + 2 + 2^(3w/2) - 2^(w/2) */
   ularith_mul_ul_ul_2ul (&pl, &ph, a[1], b[0]);
   ularith_add_2ul_2ul (&(t[1]), &(t[2]), pl, ph);
   ularith_mul_ul_ul_2ul (&pl, &ph, a[0], b[1]);

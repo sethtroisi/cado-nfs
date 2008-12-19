@@ -184,11 +184,20 @@ main(int argc, char *argv[])
     fprintf(stderr, "WARNING: forcing forbw=0...!!!!\n");
 #endif
 
+#ifdef USE_MARKOWITZ
+    MkzInit(&mat);
+#endif
+
 #if M_STRATEGY <= 2
+# ifdef USE_MARKOWITZ
+    fprintf(stderr, "merge NYI for Markowitz\n");
+    return 1;
+# endif
     merge(&mat, maxlevel, verbose, forbw);
 #else
     mergeOneByOne(&rep, &mat, maxlevel, verbose, forbw, ratio, coverNmax);
 #endif
+
     gzip_close(rep.outfile, outname);
     fprintf(stderr, "Final matrix has N=%d nc=%d (%d) w(M)=%lu N*w(M)=%lu\n",
 	    mat.rem_nrows, mat.rem_ncols, mat.rem_nrows-mat.rem_ncols,

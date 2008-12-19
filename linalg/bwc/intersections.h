@@ -17,12 +17,15 @@ struct isect_info {
  * column permutations are equal.
  */
 
-/*  Computes the intersection of [i0..i1[ with the fences */
+/*  Computes the intersection of [i0..i1[ with the fences ; we clamp the
+ *  interval [i0..i1[ to the maximum value nmax, which must correspond to
+ *  the last defined fence.
+ */
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-void intersect(unsigned int * plen, struct isect_info ** res, unsigned int * fences, unsigned int x0, unsigned int x1);
+void intersect(unsigned int * plen, struct isect_info ** res, unsigned int * fences, unsigned int i0, unsigned int i1, unsigned int nmax);
 
 #ifdef __cplusplus
 }

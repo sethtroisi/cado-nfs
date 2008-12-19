@@ -85,7 +85,7 @@ postsieve/checknorms/checknorms -poly $tmp/$name.poly $tmp/$name.rels_raw \
 Using merge_linalg_sqrt2.sh
 ----------------------------
 
-Since we are having zillions of parameters (and more to come), 
+Since we are having zillions of parameters (and more to come),
 this script takes as input a configuration file for the filtering phase.
 At the same time, it is designed to handle zillions of relation files if
 needed.

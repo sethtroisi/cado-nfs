@@ -2,7 +2,7 @@
 #define SELECT_MPI_H_
 
 #if !(defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L)
-#error "Define _POSIX_C_SOURCE to at least 200112L on top of the source files"
+#error "Define _POSIX_C_SOURCE to at least 200112L on top of the translation unit"
 #define _POSIX_C_SOURCE 200112L
 #endif
 

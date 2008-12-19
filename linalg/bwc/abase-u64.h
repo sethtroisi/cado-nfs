@@ -15,6 +15,8 @@
 
 #include "macros.h"
 #include "random_generation.h"
+// #include "electric_alloc.h"
+
 
 /* provides an interface for the arithmetic base of computations.
  * Typically, we have plain old datatypes here, e.g. uint64_t's
@@ -46,6 +48,7 @@ abase_u64_base_type * abase_u64_init(abase_u64_obj_srcptr x MAYBE_UNUSED,
         unsigned int n)
 {
     return (abase_u64_base_type *) malloc(n * abase_u64_repeat(x) * sizeof(abase_u64_base_type));
+    // return (abase_u64_base_type *) electric_alloc(n * abase_u64_repeat(x) * sizeof(abase_u64_base_type));
 }
 
 static inline
@@ -54,6 +57,7 @@ abase_u64_base_type * abase_u64_clear(abase_u64_obj_srcptr x MAYBE_UNUSED,
         unsigned int n MAYBE_UNUSED)
 {
     free(p);
+    // electric_free(p, n * abase_u64_repeat(x) * sizeof(abase_u64_base_type));
     return NULL;
 }
 

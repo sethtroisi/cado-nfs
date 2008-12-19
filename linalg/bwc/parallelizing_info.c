@@ -316,7 +316,8 @@ void complete_broadcast(pi_wiring_ptr wr, void * ptr, size_t size, unsigned int 
     }
     void * leader_ptr = ptr;
     thread_agreement(wr, &leader_ptr, 0);
-    memcpy(ptr, leader_ptr, size);
+    if (ptr != leader_ptr)
+        memcpy(ptr, leader_ptr, size);
 }
 
 

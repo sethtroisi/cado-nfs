@@ -16,6 +16,8 @@ void read_info_file(matmul_top_data_ptr mmt, const char * filename)
     char line[1024];
     char * rptr;
 
+    char * last_slash = strrchr(filename, '/');
+
     DIE_ERRNO_DIAG(f == NULL, "fopen", infoname);
 
     rptr = fgets(line, sizeof(line), f);
@@ -104,12 +106,20 @@ void read_info_file(matmul_top_data_ptr mmt, const char * filename)
         mmt->wr[1]->i1 = j1;
         mmt->ncoeffs = ncoeffs;
         mmt->ncoeffs_total += ncoeffs;
-        mmt->locfile = strdup(locfile);
+        
+        if (strchr(locfile, '/') == NULL && last_slash != NULL) {
+            // there is a dirname for the matrix info file, so honour it.
+            char * dirname = strndup(filename, last_slash+1-filename);
+            asprintf(&(mmt->locfile), "%s%s", dirname, locfile);
+            free(dirname);
+        } else {
+            // keep it as it is.
+            mmt->locfile = strdup(locfile);
+        }
     }
     fclose(f);
     free(infoname);
 
-    mmt_finish_init(mmt, 0);
-    mmt_finish_init(mmt, 1);
+    mmt_finish_init(mmt);
 }
 

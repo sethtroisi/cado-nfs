@@ -1999,13 +1999,20 @@ checkMatrixWeight(sparse_mat_t *mat)
     ASSERT(w == mat->weight);
 }
 
-// j has weight m.
+// j has weight m, which should coherent with mat->wt[j] == m
 void
 mergeForColumn(report_t *rep, double *tt, double *tfill, double *tMST,
 	       sparse_mat_t *mat, int m, INT j, int useMST)
 {
     INT ind[MERGE_LEVEL_MAX];
     int ni, k;
+
+#ifdef USE_MARKOWITZ
+    // let's be cautious...
+    if(mat->wt[j] != m){
+	fprintf(stderr, "GASP: wt[%d]=%d != %d\n", j, mat->wt[j], m);
+    }
+#endif
 
 #if DEBUG >= 1
     fprintf(stderr, "Treating column %d of weight %d\n", j, mat->wt[GETJ(mat, j)]);
@@ -2474,13 +2481,28 @@ my_cost(unsigned long N, unsigned long c, int forbw)
     return 0;
 }
 
+void
+mergeForColumn2(report_t *rep, sparse_mat_t *mat, int *njrem, 
+		double *totopt, double *totfill, double *totMST, 
+		double *totdel, int useMST, INT j)
+{
+    double tt, tfill, tMST;
+
+    mergeForColumn(rep, &tt, &tfill, &tMST, mat, mat->wt[j], j, useMST);
+    *totopt += tt;
+    *totfill += tfill;
+    *totMST += tMST;
+    tt = seconds();
+    *njrem += deleteHeavyColumns(rep, mat);
+    *totdel += (seconds()-tt);
+}
+
 // njrem is the number of columns removed.
 void
 doOneMerge(report_t *rep, sparse_mat_t *mat, int *njrem, double *totopt, double *totfill, double *totMST, double *totdel, int m, int maxdo, int useMST, int verbose)
 {
     dclist dcl;
-    double tt, tfill, tMST;
-    int j;
+    INT j;
 
     if(m == 1){
 	// do all of these
@@ -2498,13 +2520,8 @@ doOneMerge(report_t *rep, sparse_mat_t *mat, int *njrem, double *totopt, double 
 	//	    fprintf(stderr, "Performing one merge for m=%d\n", m);
 	dcl = mat->S[m]->next;
 	j = dcl->j;
-	mergeForColumn(rep, &tt, &tfill, &tMST, mat, m, j, useMST);
-	*totopt += tt;
-	*totfill += tfill;
-	*totMST += tMST;
-	tt = seconds();
-	*njrem += deleteHeavyColumns(rep, mat);
-	*totdel += (seconds()-tt);
+	mergeForColumn2(rep, mat, njrem, totopt, totfill, totMST, totdel,
+			useMST, j);
     }
 }
 
@@ -2535,6 +2552,10 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
     unsigned long bwcostmin = 0, oldbwcost = 0, bwcost = 0;
     int old_nrows, old_ncols, m = 2, njrem = 0, ncost = 0, ncostmax, njproc;
     int mmax = 0, target = 10000, ni2rem;
+#ifdef USE_MARKOWITZ
+    INT j, mkz;
+#endif
+
 
     fprintf(stderr, "Using mergeOneByOne\n");
     ncostmax = 20; // was 5
@@ -2543,6 +2564,7 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
 	oldbwcost = bwcost;
 	old_nrows = mat->rem_nrows;
 	old_ncols = mat->rem_ncols;
+#ifndef USE_MARKOWITZ
 	m = minColWeight(mat);
 	if(m > mmax)
 	    mmax = m;
@@ -2556,6 +2578,12 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
 	}
 	doOneMerge(rep, mat, &njrem, &totopt, &totfill, &totMST, &totdel,
 		   m, 0, 1, verbose);
+#else
+	MkzPopQueue(&j, &mkz, mat->MKZQ);
+	fprintf(stderr, "I pop j=%d mkz=%d\n", j, mkz); 
+	mergeForColumn2(rep, mat, &njrem, &totopt, &totfill, &totMST, &totdel,
+			1, j);
+#endif
 	// number of columns removed
 	njproc += old_ncols - mat->rem_ncols;
 	deleteEmptyColumns(mat);
