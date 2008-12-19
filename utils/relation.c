@@ -72,9 +72,10 @@ read_relation (relation_t *rel, const char *str)
     const char * pstr = str;
 
     while (pstr[0] != ':') {
-      if (pstr[0] == ',') 
-	cpt++;
-      pstr++;
+      if (pstr[0] == ',')
+	cpt++, pstr += 2; /* there cannot be two consecutive ',' or ':' */
+      else
+	pstr++;
     }
     rel->nb_rp = cpt;
   }
