@@ -17,10 +17,15 @@ ifeq ($(WITH_PTHREADS),1)
 MY_CFLAGS+=-DWITH_PTHREADS
 endif
 
+# offer the possibility of changing the mpi library by specifying other
+# compilers on the make command line.
+MPICC:=mpicc
+MPICXX:=mpic++
+
 ifeq ($(WITH_MPI),1)
 MY_CFLAGS+=-DWITH_MPI
-CC:=mpicc
-CXX:=mpic++
+CC:=$(MPICC)
+CXX:=$(MPICXX)
 
 # Work around bugs that clutter output.
 CC:=$(shell $(CC) -showme | sed -e 's/-I/-isystem /g')

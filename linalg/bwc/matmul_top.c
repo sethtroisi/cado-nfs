@@ -187,6 +187,7 @@ broadcast_down(matmul_top_data_ptr mmt, int d)
 #ifndef  CONJUGATED_PERMUTATIONS
     choke me;
 #endif
+    int err;
 
     pi_wiring_ptr picol = mmt->pi->wr[d];
     pi_wiring_ptr pirow = mmt->pi->wr[!d];
@@ -230,7 +231,8 @@ broadcast_down(matmul_top_data_ptr mmt, int d)
                     void * ptr = mcol->v + off;
                     size_t siz = xx->count * sizeof(abt);
                     unsigned int root = xx->k / picol->ncores;
-                    MPI_Bcast(ptr, siz, MPI_BYTE, root, picol->pals);
+                    err = MPI_Bcast(ptr, siz, MPI_BYTE, root, picol->pals);
+                    BUG_ON(err);
                 }
                 /* Note that at this point, it is not guaranteed that all
                  * our input range [i0,i1[ has been covered. In the case
@@ -292,6 +294,9 @@ reduce_across(matmul_top_data_ptr mmt, int d)
 #ifndef  CONJUGATED_PERMUTATIONS
     choke me;
 #endif
+
+    int err;
+
     /* reducing across a row is when d == 0 */
     pi_wiring_ptr pirow = mmt->pi->wr[d];
     // pi_wiring_ptr picol = mmt->pi->wr[!d];
@@ -344,7 +349,8 @@ reduce_across(matmul_top_data_ptr mmt, int d)
         abt * sptr = mrow->v + aboffset(mmt->abase, xx->offset_me);
         abt * dptr = mcol->v + aboffset(mmt->abase, xx->offset_there);
         size_t siz = xx->count * sizeof(abt);
-        MPI_Reduce(sptr, dptr, siz, MPI_BYTE, MPI_BXOR, jdst, pirow->pals);
+        err = MPI_Reduce(sptr, dptr, siz, MPI_BYTE, MPI_BXOR, jdst, pirow->pals);
+        BUG_ON(err);
     }
 
     // as usual, we do not serialize on exit. Up to the next routine to
@@ -407,6 +413,8 @@ void matmul_top_mul(matmul_top_data_ptr mmt, int d)
  */
 static void save_vector_toprow(matmul_top_data_ptr mmt, int d, unsigned int index, unsigned int iter)
 {
+    int err;
+
     // pi_wiring_ptr picol = mmt->pi->wr[d];
     pi_wiring_ptr pirow = mmt->pi->wr[!d];
     mmt_wiring_ptr mcol = mmt->wr[d];
@@ -480,9 +488,10 @@ static void save_vector_toprow(matmul_top_data_ptr mmt, int d, unsigned int inde
         serialize_threads(pirow);
         if (t == pirow->trank) { // our turn.
             ASSERT(sendcount == recvcounts[pirow->jrank]);
-            MPI_Gatherv(sendbuf, sendcount, MPI_BYTE,
+            err = MPI_Gatherv(sendbuf, sendcount, MPI_BYTE,
                     recvbuf, recvcounts, displs, MPI_BYTE,
                     0, pirow->pals);
+            BUG_ON(err);
         }
     }
     // what a pain in the Xss. Because we don't exit with the mutex
@@ -503,7 +512,7 @@ static void save_vector_toprow(matmul_top_data_ptr mmt, int d, unsigned int inde
 
 void matmul_top_save_vector(matmul_top_data_ptr mmt, int d, unsigned int index, unsigned int iter)
 {
-    // just to make sure...
+    // we want row 0 to have everything.
     broadcast_down(mmt, d);
 
     // we'll do some funky stuff, so serialize in order to avoid jokes.
@@ -531,6 +540,8 @@ void matmul_top_save_vector(matmul_top_data_ptr mmt, int d, unsigned int index, 
  */
 static void load_vector_toprow(matmul_top_data_ptr mmt, int d, unsigned int index, unsigned int iter)
 {
+    int err;
+
     // pi_wiring_ptr picol = mmt->pi->wr[d];
     pi_wiring_ptr pirow = mmt->pi->wr[!d];
     mmt_wiring_ptr mcol = mmt->wr[d];
@@ -575,9 +586,10 @@ static void load_vector_toprow(matmul_top_data_ptr mmt, int d, unsigned int inde
         serialize_threads(pirow);
         if (t == pirow->trank) { // our turn.
             ASSERT(recvcount == sendcounts[pirow->jrank]);
-            MPI_Scatterv(sendbuf, sendcounts, displs, MPI_BYTE,
+            err = MPI_Scatterv(sendbuf, sendcounts, displs, MPI_BYTE,
                     recvbuf, recvcount, MPI_BYTE,
                     0, pirow->pals);
+            BUG_ON(err);
         }
     }
 
@@ -594,6 +606,8 @@ static void load_vector_toprow(matmul_top_data_ptr mmt, int d, unsigned int inde
 
 void matmul_top_load_vector(matmul_top_data_ptr mmt, int d, unsigned int index, unsigned int iter)
 {
+    int err;
+
     serialize(mmt->pi->m);
     serialize_threads(mmt->pi->m);
 
@@ -619,7 +633,8 @@ void matmul_top_load_vector(matmul_top_data_ptr mmt, int d, unsigned int index, 
             serialize_threads(pirow);
             if (t == pirow->trank) {
                 void * ptr = mcol->v;
-                MPI_Bcast(ptr, siz, MPI_BYTE, 0, picol->pals);
+                err = MPI_Bcast(ptr, siz, MPI_BYTE, 0, picol->pals);
+                BUG_ON(err);
             }
         }
     }

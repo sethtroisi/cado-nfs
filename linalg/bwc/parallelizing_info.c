@@ -10,6 +10,7 @@
 #include "select_mpi.h"
 #include "parallelizing_info.h"
 #include "macros.h"
+#include "manu.h"
 
 #include <sys/time.h>   // gettimeofday
 
@@ -69,6 +70,27 @@ void * pi_go_helper_func(struct pi_go_helper_s * s)
 
 typedef void * (*pthread_callee_t)(void*);
 
+/*
+void pi_errhandler(MPI_Comm * comm, int * err, ...)
+{
+    int size;
+    int rank;
+    MPI_Comm_size(*comm, &size);
+    MPI_Comm_rank(*comm, &rank);
+    fprintf(stderr, "Fatal MPI error ;\n");
+    fprintf(stderr, " job %d in a comm. of size %d ;\n", rank, size);
+    if (err == NULL) {
+        fprintf(stderr, " no error code.\n");
+    } else {
+        char buf[MPI_MAX_ERROR_STRING];
+        int len = sizeof(buf);
+        MPI_Error_string(*err, buf, &len);
+        fprintf(stderr, " %s\n", buf);
+    }
+    abort();
+}
+*/
+
 void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
         unsigned int nhj, unsigned int nvj,
         unsigned int nhc, unsigned int nvc,
@@ -76,6 +98,7 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
 {
     /* used in several places for doing snprintf */
     char buf[20];
+    int err;
 
     parallelizing_info pi;
     memset(pi, 0, sizeof(pi));
@@ -83,11 +106,18 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
     pi->m->njobs = nhj * nvj;
     pi->m->ncores = nhc * nvc;
     pi->m->totalsize = pi->m->njobs * pi->m->ncores;
+
+    MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
+
+    // MPI_Errhandler my_eh;
+    // MPI_Comm_create_errhandler(&pi_errhandler, &my_eh);
+    // MPI_Comm_set_errhandler(MPI_COMM_WORLD, my_eh);
+
     MPI_Comm_dup(MPI_COMM_WORLD, & pi->m->pals);
     MPI_Comm_rank(pi->m->pals, (int*) & pi->m->jrank);
 
     int size;
-    MPI_Comm_size(MPI_COMM_WORLD, & size);
+    MPI_Comm_size(pi->m->pals, & size);
     if ((unsigned int) size != pi->m->njobs) {
         if (pi->m->jrank == 0) {
             fprintf(stderr, "Inconsistency -- exactly %u == %u * %u"
@@ -120,8 +150,9 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
         // A subgroup contains all process having the same jcommon value.
         // Therefore, we have as many horizontal MPI barriers set up as
         // one finds MPI job numbers across a column.
-        MPI_Comm_split(pi->m->pals, pi->wr[d]->jcommon,
+        err = MPI_Comm_split(pi->m->pals, pi->wr[d]->jcommon,
                 pi->m->jrank, &pi->wr[d]->pals);
+        BUG_ON(err);
         MPI_Comm_rank(pi->wr[d]->pals, (int*) &pi->wr[d]->jrank);
     }
 
@@ -187,7 +218,8 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
     // Now do some printing, for debugging.
     for(unsigned int ij = 0 ; ij < pi->wr[1]->njobs ; ij++) {
         // not mt at the moment, so it's easy.
-        MPI_Barrier(pi->m->pals);
+        err = MPI_Barrier(pi->m->pals);
+        BUG_ON(err);
 
         if (pi->wr[1]->jrank != ij) continue;
 
@@ -197,7 +229,8 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
         for(unsigned int it = 0 ; it < pi->wr[1]->ncores ; it++) {
             if (pi->wr[0]->jrank == 0) printf("|");
             for(unsigned int jj = 0 ; jj < pi->wr[0]->njobs ; jj++) {
-                MPI_Barrier(pi->wr[0]->pals);
+                err = MPI_Barrier(pi->wr[0]->pals);
+                BUG_ON(err);
                 for(unsigned int jt = 0 ; jt < pi->wr[0]->ncores ; jt++) {
                     parallelizing_info_srcptr tpi;
                     tpi = grid[it*pi->wr[0]->ncores+jt];
@@ -206,7 +239,9 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
                             tpi->m->trank,
                             tpi->wr[0]->th->desc,
                             tpi->wr[1]->th->desc);
-                    MPI_Bcast(buf, sizeof(buf), MPI_BYTE, jj, pi->wr[0]->pals);
+                    err = MPI_Bcast(buf, sizeof(buf),
+                            MPI_BYTE, jj, pi->wr[0]->pals);
+                    BUG_ON(err);
                     int fence = jt == pi->wr[0]->ncores - 1;
                     if (pi->wr[0]->jrank == 0)
                         printf("%-12s%c", buf, fence ? '|' : ' ');
@@ -218,10 +253,12 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
             print_several(pi->wr[0]->njobs,pi->wr[0]->ncores, '-', '+', 12);
     }
 
-    MPI_Barrier(pi->m->pals);
+    err = MPI_Barrier(pi->m->pals);
+    BUG_ON(err);
     if (pi->m->jrank == pi->m->njobs - 1)
         printf("going multithread now\n");
-    MPI_Barrier(pi->m->pals);
+    err = MPI_Barrier(pi->m->pals);
+    BUG_ON(err);
 
     // go mt.
     my_pthread_t * tgrid;
@@ -289,6 +326,9 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
     for(int d = 0 ; d < 2 ; d++) {
         MPI_Comm_free(&pi->wr[d]->pals);
     }
+    MPI_Comm_free(&pi->m->pals);
+
+    // MPI_Errhandler_free(&my_eh);
 }
 
 void thread_agreement(pi_wiring_ptr wr, void ** ptr, unsigned int i)
@@ -309,10 +349,13 @@ void thread_agreement(pi_wiring_ptr wr, void ** ptr, unsigned int i)
 
 void complete_broadcast(pi_wiring_ptr wr, void * ptr, size_t size, unsigned int j, unsigned int t)
 {
+    int err;
+
     ASSERT(j < wr->njobs);
     ASSERT(t < wr->ncores);
     if (wr->trank == t) {
-        MPI_Bcast(ptr, size, MPI_BYTE, j, wr->pals);
+        err = MPI_Bcast(ptr, size, MPI_BYTE, j, wr->pals);
+        BUG_ON(err);
     }
     void * leader_ptr = ptr;
     thread_agreement(wr, &leader_ptr, 0);
@@ -323,6 +366,7 @@ void complete_broadcast(pi_wiring_ptr wr, void * ptr, size_t size, unsigned int 
 
 int serialize__(pi_wiring_ptr w, const char * s MAYBE_UNUSED, unsigned int l MAYBE_UNUSED)
 {
+    int err;
 #ifdef  CONCURRENCY_DEBUG
     // note how w->th_count is normally a thread-private thing !
     w->th_count++;
@@ -332,7 +376,8 @@ int serialize__(pi_wiring_ptr w, const char * s MAYBE_UNUSED, unsigned int l MAY
 #endif
     my_pthread_barrier_wait(w->th->b);
     if (w->trank == 0) {
-        MPI_Barrier(w->pals);
+        err = MPI_Barrier(w->pals);
+        BUG_ON(err);
     }
     // struct timeval tv[1];
     // gettimeofday(tv, NULL);
