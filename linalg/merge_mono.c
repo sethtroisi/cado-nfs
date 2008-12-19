@@ -15,16 +15,18 @@
 #include "files.h"
 #include "gzip.h"
 #include "sparse.h"
+
+#include "swar.h" // TODO: protect with ifdef sometime
 #include "merge_mono.h"
+#ifdef USE_MARKOWITZ
+# include "markowitz.h"
+#endif
 #include "prune.h"
 
 #define STR_LEN_MAX 1024
 
 #define DEBUG 0
 #define TEX 0
-
-#define TRACE_COL -1 // 253224 // 231 // put to -1 if not...!
-#define TRACE_ROW -1 // put to -1 if not...!
 
 #define USE_CONNECT 0
 
@@ -39,73 +41,6 @@ cmp(const void *p, const void *q) {
     int x = *((int *)p);
     int y = *((int *)q);
     return (x <= y ? -1 : 1);
-}
-
-dclist
-dclistCreate(INT j)
-{
-    dclist dcl = (dclist)malloc(sizeof(struct dclist));
-
-    dcl->j = j;
-    dcl->prev = NULL;
-    dcl->next = NULL;
-    return dcl;
-}
-
-void
-dclistPrint(FILE *file, dclist dcl)
-{
-    while(dcl != NULL){
-      fprintf(file, " -> %ld", (long int) dcl->j);
-	dcl = dcl->next;
-    }
-}
-
-int
-dclistLength(dclist dcl)
-{
-    int l = 0;
-
-    while(dcl != NULL){
-	l++;
-	dcl = dcl->next;
-    }
-    return l;
-}
-
-void
-dclistTex(FILE *file, dclist dcl)
-{
-    fprintf(stderr, "\\begin{array}{r}\n");
-    while(dcl != NULL){
-      fprintf(file, "%ld\\\\\n", (long int) dcl->j);
-	dcl = dcl->next;
-    }
-    fprintf(stderr, "\\end{array}\n");
-}
-
-/* insert j in doubly-chained list dcl (between cell of dcl and dcl->next),
-   and return pointer at cell containing j */
-static dclist
-dclistInsert(dclist dcl, INT j)
-{
-    dclist newdcl = dclistCreate(j);
-
-    newdcl->next = dcl->next;
-    newdcl->prev = dcl;
-    if(newdcl->next != NULL)
-	newdcl->next->prev = newdcl;
-    dcl->next = newdcl;
-    return newdcl;
-}
-
-// connect dcl to S
-void
-dclistConnect(dclist S, dclist dcl)
-{
-    dcl->next = S->next;
-    dcl->prev = S;
-    S->next = dcl;
 }
 
 void
@@ -145,6 +80,11 @@ initMat(sparse_mat_t *mat, INT jmin, INT jmax)
 
     ASSERT_ALWAYS(S != NULL);
     ASSERT_ALWAYS(A != NULL);
+    // S[0] has a meaning at least for temporary reasons
+    for(k = 0; k <= mat->cwmax+1; k++)
+	S[k] = dclistCreate(-1);
+    mat->S = S;
+    mat->A = A;
 #endif
 
     mat->jmin = jmin;
@@ -159,82 +99,10 @@ initMat(sparse_mat_t *mat, INT jmin, INT jmax)
     mat->wt = (int*) malloc ((mat->jmax-mat->jmin) * sizeof (int));
     memset(mat->wt, 0, (mat->jmax-mat->jmin) * sizeof (int));
 #if USE_MERGE_FAST
-    // S[0] has a meaning at least for temporary reasons
-    for(k = 0; k <= mat->cwmax+1; k++)
-	S[k] = dclistCreate(-1);
     R = (INT **)malloc((mat->jmax-mat->jmin) * sizeof(INT *));
     ASSERT_ALWAYS(R != NULL);
-    mat->S = S;
-    mat->A = A;
     mat->R = R;
 #endif
-}
-
-/* Initializes the SWAR data structure.
-   Inputs:
-      mat->ncols - number of columns of matrix mat
-      mat->wt[j] - weight of column j, for 0 <= j < mat->ncols
-      mat->cwmax - weight bound
-      mat->S[w]  - lists containing only one element (-1), 0 <= w <= mat->cwmax
-   Outputs:
-      mat->S[w]  - doubly-chained list with columns j of weight w
- */
-void
-fillSWAR(sparse_mat_t *mat)
-{
-    INT j, *Rj, jmin = mat->jmin, jmax = mat->jmax;
-
-    for(j = jmin; j < jmax; j++){
-#  if DEBUG >= 1
-	fprintf(stderr, "Treating column %d\n", j);
-#  endif
-	if(mat->wt[GETJ(mat, j)] <= mat->cwmax){
-	    mat->A[GETJ(mat, j)] = dclistInsert (mat->S[mat->wt[GETJ(mat, j)]], j);
-#  if DEBUG >= 1
-	    fprintf(stderr, "Inserting %d in S[%d]:", j, mat->wt[GETJ(mat, j)]);
-	    dclistPrint(stderr, mat->S[mat->wt[GETJ(mat, j)]]->next);
-	    fprintf(stderr, "\n");
-#  endif
-#ifndef USE_COMPACT_R
-	    Rj = (INT *)malloc((mat->wt[GETJ(mat, j)]+1) * sizeof(INT));
-	    Rj[0] = 0; // last index used
-	    mat->R[GETJ(mat, j)] = Rj;
-#else
-	    fprintf(stderr, "R: NYI in fillSWAR\n");
-	    exit(1);
-#endif
-	}
-	else{
-#if USE_MERGE_FAST <= 1
-	    mat->wt[GETJ(mat, j)] = -1;
-#else
-	    mat->wt[GETJ(mat, j)] = -mat->wt[GETJ(mat, j)]; // trick!!!
-#endif
-	    mat->A[GETJ(mat, j)] = NULL; // TODO: renumber j's?????
-#ifndef USE_COMPACT_R
-	    mat->R[GETJ(mat, j)] = NULL;
-#else
-            fprintf(stderr, "R: NYI2 in fillSWAR\n");
-            exit(1);
-#endif
-	}
-    }
-}
-
-// TODO
-void
-closeSWAR(/*sparse_mat_t *mat*/)
-{
-}
-
-void
-printStats(sparse_mat_t *mat)
-{
-    int w;
-
-    for(w = 0; w <= mat->cwmax; w++)
-	fprintf(stderr, "I found %d primes of weight %d\n",
-		dclistLength(mat->S[w]->next), w);
 }
 
 void
@@ -251,37 +119,6 @@ checkData(sparse_mat_t *mat)
     }
 }
 
-// dump for debugging reasons
-void
-printSWAR(sparse_mat_t *mat, int ncols)
-{
-    int j, w;
-    INT k;
-
-    fprintf(stderr, "===== S is\n");
-    for(w = 0; w <= mat->cwmax; w++){
-	fprintf(stderr, "  S[%d] ", w);
-	dclistPrint(stderr, mat->S[w]->next);
-	fprintf(stderr, "\n");
-    }
-    fprintf(stderr, "===== Wj is\n");
-    for(j = 0; j < ncols; j++)
-	fprintf(stderr, "  Wj[%d]=%d\n", j, mat->wt[GETJ(mat, j)]);
-    fprintf(stderr, "===== R is\n");
-#ifndef USE_COMPACT_R
-    for(j = 0; j < ncols; j++){
-	if(mat->R[GETJ(mat, j)] == NULL)
-	    continue;
-	fprintf(stderr, "  R[%d]=", j);
-	for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
-          fprintf(stderr, " %ld", (long int) mat->R[GETJ(mat, j)][k]);
-	fprintf(stderr, "\n");
-    }
-#else
-	fprintf(stderr, "R: NYI in printSWAR\n");
-	exit(1);
-#endif
-}
 
 void
 matrix2tex(sparse_mat_t *mat)
@@ -359,6 +196,16 @@ texSWAR(sparse_mat_t *mat)
 	fprintf(stderr, "\n");
     }
 #endif
+}
+
+void
+printStats(sparse_mat_t *mat)
+{
+    int w;
+
+    for(w = 0; w <= mat->cwmax; w++)
+	fprintf(stderr, "I found %d primes of weight %d\n",
+		dclistLength(mat->S[w]->next), w);
 }
 
 // terrific hack: everybody on the same line
@@ -647,23 +494,6 @@ addWeightFromRow(sparse_mat_t *mat, int i)
 	mat->wt[GETJ(mat, mat->rows[i][k])]++;
 #endif
     mat->weight += lengthRow(mat, i);
-}
-
-int
-hasCol(sparse_mat_t *mat, int i, INT j)
-{
-    INT k;
-
-#if USE_TAB == 0
-    for(k = 0; k < lengthRow(mat, i); k++)
-	if(cell(mat, i, k) == j)
-	    return 1;
-#else
-    for(k = 1; k <= mat->rows[i][0]; k++)
-	if(cell(mat, i, k) == j)
-	    return 1;
-#endif
-    return 0;
 }
 
 // i1 += i2; weights are taken care of outside...
@@ -1264,85 +1094,6 @@ checkCoherence(sparse_mat_t *mat, int m, int j)
 #endif
 }
 
-// w(j) has decreased in such a way that it can be incorporated in the
-// SWAR structure. We need find all the info we need to do that. Note this
-// can be costly. We must not store row index i0, since j was discovered
-// when row i0 was treated.
-void
-incorporateColumn(sparse_mat_t *mat, INT j, int i0)
-{
-    int i, ni, wj;
-    INT *Rj;
-
-    wj = -mat->wt[GETJ(mat, j)];
-#ifndef USE_COMPACT_R
-    Rj = (INT *)malloc((wj+1) * sizeof(INT));
-    // find all rows in which j appears
-    for(i = 0, ni = 1; i < mat->nrows; i++)
-	if(!isRowNull(mat, i))
-	    if((i != i0) && hasCol(mat, i, j))
-#if 1
-		Rj[ni++] = i;
-#else
-                ni++;
-    fprintf(stderr, "iC: %d %d\n", j, ni);
-#endif
-    Rj[0] = ni-1;
-    mat->R[GETJ(mat, j)] = Rj;
-#else
-    fprintf(stderr, "R: NYI in incorporateColumn\n");
-    exit(1);
-#endif
-    mat->wt[GETJ(mat, j)] = wj;
-    ASSERT(wj == Rj[0]);
-    mat->A[GETJ(mat, j)] = dclistInsert (mat->S[wj], j);
-}
-
-int
-getNextj(dclist dcl)
-{
-    INT j;
-    dclist foo;
-
-    foo = dcl->next;
-    j = foo->j;
-    dcl->next = foo->next;
-    if(foo->next != NULL)
-	foo->next->prev = dcl;
-    free(foo);
-    return j;
-}
-
-void
-remove_j_from_S(sparse_mat_t *mat, int j)
-{
-    dclist dcl = mat->A[GETJ(mat, j)], foo;
-
-    if(dcl == NULL){
-	fprintf(stderr, "Column %d already removed?\n", j);
-	return;
-    }
-#if DEBUG >= 2
-    int ind = mat->wt[GETJ(mat, j)];
-    if(ind > mat->cwmax)
-        ind = mat->cwmax+1;
-    fprintf(stderr, "S[%d]_b=", ind);
-    dclistPrint(stderr, mat->S[ind]->next); fprintf(stderr, "\n");
-    fprintf(stderr, "dcl="); dclistPrint(stderr, dcl); fprintf(stderr, "\n");
-#endif
-    foo = dcl->prev;
-    foo->next = dcl->next;
-    if(dcl->next != NULL)
-	dcl->next->prev = foo;
-#if DEBUG >= 2
-    fprintf(stderr, "S[%d]_a=", ind);
-    dclistPrint(stderr, mat->S[ind]->next); fprintf(stderr, "\n");
-#endif
-#if USE_CONNECT == 0
-    free(dcl);
-#endif
-}
-
 void
 destroyRj(sparse_mat_t *mat, int j)
 {
@@ -1353,18 +1104,6 @@ destroyRj(sparse_mat_t *mat, int j)
     fprintf(stderr, "R: NYI in destroyRj\n");
     exit(1);
 #endif
-}
-
-void
-remove_j_from_SWAR(sparse_mat_t *mat, int j)
-{
-    remove_j_from_S(mat, j);
-#if USE_CONNECT
-    free(mat->A[GETJ(mat, j)]);
-#endif
-    mat->A[GETJ(mat, j)] = NULL;
-    mat->wt[GETJ(mat, j)] = 0;
-    destroyRj(mat, j);
 }
 
 // Don't touch to R[j][0]!!!!
@@ -1424,245 +1163,6 @@ add_i_to_Rj(sparse_mat_t *mat, int i, int j)
 #else
     fprintf(stderr, "R: NYI in add_i_to_Rj\n");
     exit(1);
-#endif
-}
-
-int
-decrS(int w)
-{
-#if USE_MERGE_FAST <= 1
-    return w-1;
-#else
-    return (w >= 0 ? w-1 : w+1);
-#endif
-}
-
-int
-incrS(int w)
-{
-#if USE_MERGE_FAST <= 1
-    return w+1;
-#else
-    return (w >= 0 ? w+1 : w-1);
-#endif
-}
-
-/* remove the cell (i,j), and updates matrix correspondingly.
-   Note: A[j] contains the address of the cell in S[w] where j is stored.
-   
-   Updates:
-   - mat->wt[j] (weight of column j)
-   - mat->S[w] : cell j is removed, with w = weight(j)
-   - mat->S[w-1] : cell j is added
-   - A[j] : points to S[w-1] instead of S[w]
-*/
-void
-removeCellSWAR(sparse_mat_t *mat, int i, INT j)
-{
-    int ind;
-
-#if TRACE_ROW >= 0
-    if(i == TRACE_ROW){
-	fprintf(stderr, "TRACE_ROW: removeCellSWAR i=%d j=%d\n", i, j);
-    }
-#endif
-    // update weight
-#if DEBUG >= 1
-    fprintf(stderr, "removeCellSWAR: moving j=%d from S[%d] to S[%d]\n",
-	    j, mat->wt[GETJ(mat, j)], decrS(mat->wt[GETJ(mat, j)]));
-#endif
-#if USE_MERGE_FAST > 1
-    if(mat->wt[GETJ(mat, j)] < 0){
-	// if mat->wt[j] is already < 0, we don't care about
-	// decreasing, updating, etc. except when > 2
-# if USE_MERGE_FAST > 2
-	ind = mat->wt[GETJ(mat, j)] = decrS(mat->wt[GETJ(mat, j)]);
-	// we incorporate the column and update the data structure
-	if(abs(ind) <= mat->mergelevelmax){
-#  if DEBUG >= 1
-	    fprintf(stderr, "WARNING: column %d becomes light at %d...!\n",
-		    j, abs(ind));
-#  endif
-	    incorporateColumn(mat, j, i);
-	}
-# endif
-	return;
-    }
-#endif
-    // at this point, we should have mat->wt[j] > 0
-    ind = mat->wt[GETJ(mat, j)] = decrS(mat->wt[GETJ(mat, j)]);
-    remove_j_from_S(mat, j);
-    if(mat->wt[GETJ(mat, j)] > mat->cwmax)
-	ind = mat->cwmax+1;
-    // update A[j]
-#if DEBUG >= 2
-    fprintf(stderr, "S[%d]_b=", ind);
-    dclistPrint(stderr, mat->S[ind]->next); fprintf(stderr, "\n");
-#endif
-    // TODO: replace this with a move of pointers...!
-#if USE_CONNECT == 0
-    mat->A[GETJ(mat, j)] = dclistInsert(mat->S[ind], j);
-#else
-    dclistConnect(mat->S[ind], mat->A[GETJ(mat, j)]);
-#endif
-#if DEBUG >= 2
-    fprintf(stderr, "S[%d]_a=", ind);
-    dclistPrint(stderr, mat->S[ind]->next); fprintf(stderr, "\n");
-#endif
-    // update R[j] by removing i
-    remove_i_from_Rj(mat, i, j);
-}
-
-// for all j in row[i], removes j and update data
-void
-removeRowSWAR(sparse_mat_t *mat, int i)
-{
-    int k;
-
-#if TRACE_ROW >= 0
-    if(i == TRACE_ROW)
-	fprintf(stderr, "TRACE_ROW: removeRowSWAR i=%d\n", i);
-#endif
-    mat->weight -= lengthRow(mat, i);
-#if USE_TAB == 0
-    for(k = 0; k < lengthRow(mat, i); k++){
-#else
-    for(k = 1; k <= lengthRow(mat, i); k++){
-#endif
-#if TRACE_COL >= 0
-	if(cell(mat, i, k) == TRACE_COL){
-	    fprintf(stderr, "removeRowSWAR removes %d from R_%d\n",
-		    TRACE_COL, i);
-	}
-#endif
-	removeCellSWAR(mat, i, cell(mat, i, k));
-    }
-}
-
-// M[i, j] is set to 1.
-void
-addCellSWAR(sparse_mat_t *mat, int i, INT j)
-{
-    int ind;
-
-#if TRACE_ROW >= 0
-    if(i == TRACE_ROW)
-	fprintf(stderr, "TRACE_ROW: addCellSWAR i=%d j=%d\n", i, j);
-#endif
-    // update weight
-#if DEBUG >= 1
-    fprintf(stderr, "addCellSWAR: moving j=%d from S[%d] to S[%d]\n",
-	    j, mat->wt[GETJ(mat, j)], incrS(mat->wt[GETJ(mat, j)]));
-#endif
-    ind = mat->wt[GETJ(mat, j)] = incrS(mat->wt[GETJ(mat, j)]);
-#if USE_MERGE_FAST > 1
-    if(ind < 0)
-	return;
-#endif
-    remove_j_from_S(mat, j);
-    if(mat->wt[GETJ(mat, j)] > mat->cwmax){
-#if DEBUG >= 1
-	fprintf(stderr, "WARNING: column %d is too heavy (%d)\n", j,
-		mat->wt[GETJ(mat, j)]);
-#endif
-	ind = mat->cwmax+1; // trick
-    }
-    // update A[j]
-#if USE_CONNECT == 0
-    mat->A[GETJ(mat, j)] = dclistInsert(mat->S[ind], j);
-#else
-    dclistConnect(mat->S[ind], mat->A[GETJ(mat, j)]);
-#endif
-    // update R[j] by adding i
-    add_i_to_Rj(mat, i, j);
-}
-
-// All entries M[i, j] are added to the SWAR structure.
-void
-addRowSWAR(sparse_mat_t *mat, int i)
-{
-    int k;
-
-    mat->weight += lengthRow(mat, i);
-#if USE_TAB == 0
-    for(k = 0; k < lengthRow(mat, i); k++)
-#else
-    for(k = 1; k <= lengthRow(mat, i); k++)
-#endif
-	addCellSWAR(mat, i, cell(mat, i, k));
-}
-
-// i1 += i2.
-// len could be the real length of row[i1]+row[i2] or -1.
-void
-addRowsSWAR(sparse_mat_t *mat, int i1, int i2, int len)
-{
-#if 0 // original version
-    int k1, k2, k, len, *tmp, *tmp2;
-
-# if TEX
-    fprintf(stderr, "row[%d] += row[%d]\n", i1, i2);
-# endif
-# if DEBUG >= 1
-    fprintf(stderr, "row[%d] =", i1); print_row(mat, i1);
-    fprintf(stderr, "\n");
-    fprintf(stderr, "row[%d] =", i2); print_row(mat, i2);
-    fprintf(stderr, "\n");
-# endif
-    // merge row[i1] and row[i2] in i1...
-    len = mat->data[i1].len + mat->data[i2].len;
-    tmp = (INT *)malloc(len * sizeof(INT));
-    k = k1 = k2 = 0;
-
-    // i1 is to disappear, replaced by a new one
-    removeRowSWAR(mat, i1);
-    // loop while everybody is here
-    while((k1 < mat->data[i1].len) && (k2 < mat->data[i2].len)){
-	if(mat->data[i1].val[k1] < mat->data[i2].val[k2]){
-	    tmp[k++] = mat->data[i1].val[k1++];
-	    mat->weight++;
-	}
-	else if(mat->data[i1].val[k1] > mat->data[i2].val[k2]){
-            tmp[k++] = mat->data[i2].val[k2++];
-	    mat->weight++;
-        }
-	else{
-	    k1++;
-	    k2++;
-	}
-    }
-    // finish with k1
-    for( ; k1 < mat->data[i1].len; k1++){
-	tmp[k++] = mat->data[i1].val[k1];
-	mat->weight++;
-    }
-    // finish with k2
-    for( ; k2 < mat->data[i2].len; k2++){
-	tmp[k++] = mat->data[i2].val[k2];
-	mat->weight++;
-    }
-    // destroy and copy back
-    free(mat->data[i1].val);
-    tmp2 = (INT *)malloc(k * sizeof(INT));
-    memcpy(tmp2, tmp, k * sizeof(INT));
-    mat->data[i1].len = k;
-    mat->data[i1].val = tmp2;
-    free(tmp);
-    addRowSWAR(mat, i1);
-# if DEBUG >= 1
-    fprintf(stderr, "row[%d]+row[%d] =", i1, i2);
-    print_row(mat, i1); fprintf(stderr, "\n");
-# endif
-#else // cleaner one, that shares addRowsData() to prepare the next move...!
-    // i1 is to disappear, replaced by a new one
-    removeRowSWAR(mat, i1);
-# if USE_TAB == 0
-    addRowsData(mat->data, i1, i2);
-# else
-    // we know the length of row[i1]+row[i2]
-    addRows(mat->rows, i1, i2, len);
-# endif
-    addRowSWAR(mat, i1);
 #endif
 }
 
@@ -1778,37 +1278,6 @@ deleteAllColsFromStack(report_t *rep, sparse_mat_t *mat, int iS)
 }
 
 int
-deleteHeavyColumns(report_t *rep, sparse_mat_t *mat)
-{
-    return deleteAllColsFromStack(rep, mat, mat->cwmax+1);
-}
-
-int
-deleteEmptyColumns(sparse_mat_t *mat)
-{
-#if 0
-    return deleteAllColsFromStack(mat, 0);
-#else
-    dclist dcl = mat->S[0], foo;
-    int njrem = 0;
-    INT j;
-
-    while(dcl->next != NULL){
-	foo = dcl->next;
-	j = foo->j;
-	dcl->next = foo->next;
-	free(foo);
-	njrem++;
-	mat->A[GETJ(mat, j)] = NULL;
-	mat->wt[GETJ(mat, j)] = 0;
-	destroyRj(mat, j);
-    }
-    mat->rem_ncols -= njrem;
-    return njrem;
-#endif
-}
-
-int
 removeSingletons(report_t *rep, sparse_mat_t *mat)
 {
 #if USE_MERGE_FAST == 0
@@ -1818,7 +1287,7 @@ removeSingletons(report_t *rep, sparse_mat_t *mat)
 	if(mat->wt[GETJ(mat, j)] == 1){
 	    // find row...
 	    for(i = 0; i < mat->nrows; i++)
-		if(hasCol(mat, i, j))
+		if(hasCol(mat->rows, i, j))
 		    break;
 	    ASSERT(i < mat->nrows);
 	    removeWeightFromRow(mat, i);
@@ -1828,6 +1297,12 @@ removeSingletons(report_t *rep, sparse_mat_t *mat)
 #else
     return deleteAllColsFromStack(rep, mat, 1);
 #endif
+}
+
+int
+deleteHeavyColumns(report_t *rep, sparse_mat_t *mat)
+{
+    return deleteAllColsFromStack(rep, mat, mat->cwmax+1);
 }
 
 // try all combinations to find the smaller one
@@ -1979,7 +1454,7 @@ checkWeight(sparse_mat_t *mat, INT j)
     fprintf(stderr, "Rows containing %ld:", (long int) j);
     for(i = 0; i < mat->nrows; i++)
 	if(!isRowNull(mat, i))
-	    if(hasCol(mat, i, j)){
+	    if(hasCol(mat->rows, i, j)){
 		fprintf(stderr, " %d", i);
 		w++;
 	    }
@@ -2427,7 +1902,7 @@ merge(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 	int i, ni = 0, j0 = 191342;
 
 	for(i = 0; i < mat->nrows; i++)
-	    if((mat->data[i].val != NULL) && hasCol(mat, i, j0))
+	    if((mat->data[i].val != NULL) && hasCol(mat->rows, i, j0))
 		ni++;
 	printf("CHECK: %d %d\n", ni, mat->wt[GETJ(mat, j0)]);
     }
@@ -2556,7 +2031,6 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
     INT j, mkz;
 #endif
 
-
     fprintf(stderr, "Using mergeOneByOne\n");
     ncostmax = 20; // was 5
     njproc = 0;
@@ -2579,7 +2053,7 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
 	doOneMerge(rep, mat, &njrem, &totopt, &totfill, &totMST, &totdel,
 		   m, 0, 1, verbose);
 #else
-	MkzPopQueue(&j, &mkz, mat->MKZQ);
+	MkzPopQueue(&j, &mkz, mat->MKZQ, mat->MKZA);
 	fprintf(stderr, "I pop j=%d mkz=%d\n", j, mkz); 
 	mergeForColumn2(rep, mat, &njrem, &totopt, &totfill, &totMST, &totdel,
 			1, j);

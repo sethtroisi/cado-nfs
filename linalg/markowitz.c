@@ -34,36 +34,40 @@ MkzPrintQueue(INT *Q)
 }
 
 void
-MkzUpQueue(INT *Q, INT k)
+MkzUpQueue(INT *Q, INT *A, INT k)
 {
-    INT x = MkzGet(Q, k, 0), v = MkzGet(Q, k, 1);
+    INT x = MkzGet(Q, k, 0), v = MkzGet(Q, k, 1), j;
 
     while((k > 1) && (MkzGet(Q, k/2, 1) >= v)){
 	// we are at level > 0 and the father is >= son
 	// the father replaces the son
-	MkzSet(Q, k, 0, MkzGet(Q, k/2, 0));
+	j = MkzGet(Q, k/2, 0);
+	MkzSet(Q, k, 0, j);
 	MkzSet(Q, k, 1, MkzGet(Q, k/2, 1)); // could be simplified...!
+	A[j] = k;
 	k /= 2;
     }
     // we found the place of (x, v)
     MkzSet(Q, k, 0, x);
     MkzSet(Q, k, 1, v);
+    A[x] = k;
 }
 
 void
-MkzInsert(INT *Q, INT j, INT c)
+MkzInsert(INT *Q, INT *A, INT j, INT c)
 {
     Q[0]++;
     MkzSet(Q, Q[0], 0, j); 
-    MkzSet(Q, Q[0], 1, c); 
-    MkzUpQueue(Q, Q[0]);
+    MkzSet(Q, Q[0], 1, c);
+    A[j] = Q[0];
+    MkzUpQueue(Q, A, Q[0]);
 }
 
 // Move Q[1] down.
 void
-MkzDownQueue(INT *Q, INT k)
+MkzDownQueue(INT *Q, INT *A, INT k)
 {
-    INT x = MkzGet(Q, k, 0), v = MkzGet(Q, k, 1), j;
+    INT x = MkzGet(Q, k, 0), v = MkzGet(Q, k, 1), j, z;
 
     while(k <= Q[0]/2){
 	// k has at least a left son
@@ -77,25 +81,43 @@ MkzDownQueue(INT *Q, INT k)
 	    break;
 	else{
 	    // the father takes the place of the son
-	    MkzSet(Q, k, 0, MkzGet(Q, j, 0));
+	    z = MkzGet(Q, j, 0);
+	    MkzSet(Q, k, 0, z);
 	    MkzSet(Q, k, 1, MkzGet(Q, j, 1));
+	    A[z] = k;
 	    k = j;
 	}
     }
-    // we found the place of v
+    // we found the place of (x, v)
     MkzSet(Q, k, 0, x);
     MkzSet(Q, k, 1, v);
+    A[x] = k;
 }
 
 void
-MkzPopQueue(INT *j, INT *mkz, INT *Q)
+MkzPopQueue(INT *j, INT *mkz, INT *Q, INT *A)
 {
+    INT z;
+
     *j = MkzGet(Q, 1, 0);
     *mkz = MkzGet(Q, 1, 1);
-    MkzSet(Q, 1, 0, MkzGet(Q, Q[0], 0));
+    z = MkzGet(Q, Q[0], 0);
+    MkzSet(Q, 1, 0, z);
     MkzSet(Q, 1, 1, MkzGet(Q, Q[0], 1));
+    A[z] = 1;
     Q[0]--;
-    MkzDownQueue(Q, 1);
+    MkzDownQueue(Q, A, 1);
+}
+
+void
+MkzCheck(sparse_mat_t *mat)
+{
+    INT j;
+
+    for(j = mat->jmin; j < mat->jmax; j++)
+	if(mat->wt[j] > 0)
+	    if(MkzGet(mat->MKZQ, mat->MKZA[j], 0) != j)
+		fprintf(stderr, "GASP: %d in MkzCheck\n", j);
 }
 
 void
@@ -105,6 +127,7 @@ MkzInit(sparse_mat_t *mat)
 
     printf("Entering initMarkowitz\n");
     mat->MKZQ = (INT *)malloc((mat->ncols+1) * 2 * sizeof(INT));
+    mat->MKZA = (INT *)malloc((mat->ncols+1) * sizeof(INT));
     // just to understand
     for(j = mat->jmin; j < mat->jmax; j++)
 	if(mat->wt[GETJ(mat, j)] > 0){
@@ -125,9 +148,10 @@ MkzInit(sparse_mat_t *mat)
 #if MKZ_DEBUG >= 2
 	    printf(" => mkz=%d\n", mkz);
 #endif
-	    MkzInsert(mat->MKZQ, j, mkz);
+	    MkzInsert(mat->MKZQ, mat->MKZA, j, mkz);
 	}
-    // TODO: underflow in mkz???
+    // TODO: overflow in mkz???
+    MkzCheck(mat);
 }
 
 void

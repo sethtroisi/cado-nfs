@@ -18,5 +18,6 @@ extern INT * copyRow(INT *row);
 extern void removeWeight(INT **rows, int *wt, int i);
 extern void addWeight(INT **rows, int *wt, int i);
 extern void addRows(INT **rows, int i1, int i2, int len0);
+extern int hasCol(INT **rows, int i, INT j);
 
 #endif  /* CADO_SPARSE_H_ */

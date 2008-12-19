@@ -10,6 +10,9 @@
 
 //#define USE_MARKOWITZ // says it...!
 
+#define TRACE_COL -1 // 253224 // 231 // put to -1 if not...!
+#define TRACE_ROW -1 // put to -1 if not...!
+
 // 0 means dummy filtering using slow methods
 // 1 means:
 //  * fast with optimized-though-memory-consuming data structure;
@@ -24,12 +27,6 @@
 #define USE_MERGE_FAST 2
 
 /* INT is defined in sparse.h */
-
-// doubly chained lists
-typedef struct dclist{
-    INT j;
-    struct dclist *prev, *next;
-} *dclist;
 
 /* rows correspond to relations, and columns to primes (or prime ideals) */
 typedef struct {
@@ -67,6 +64,7 @@ typedef struct {
                         R[j]=NULL for weight(j) > cwmax. */
 #ifdef USE_MARKOWITZ
   INT *MKZQ;         /* priority queue for Markowitz stuff */    
+  INT *MKZA;         /* MKZA[j] gives u s.t. MKZQ[u] = j */ 
 #endif  
 } sparse_mat_t;
 
@@ -100,6 +98,12 @@ typedef struct{
 #define cell(mat, i, k) (mat)->rows[(i)][(k)]
 #define SPARSE_ITERATE(mat, i, k) for((k)=1; (k)<=lengthRow((mat),(i)); (k)++)
 #endif
+// TODO: remove these one day, since the dependency is strange in swar.c
+extern void destroyRj(sparse_mat_t *mat, int j);
+extern void remove_i_from_Rj(sparse_mat_t *mat, int i, int j);
+extern void add_i_to_Rj(sparse_mat_t *mat, int i, int j);
+// TODO_END
+
 
 extern void init_rep(report_t *rep, char *outname, sparse_mat_t *mat, int type);
 extern void initMat(sparse_mat_t *mat, INT jmin, INT jmax);
