@@ -1,3 +1,80 @@
+/* Cutting a matrix file into small pieces for parallel linear algebra
+
+Copyright 2008 Emmanuel Thom\'e
+
+This file is part of CADO-NFS.
+
+CADO-NFS is free software; you can redistribute it and/or modify it under the
+terms of the GNU Lesser General Public License as published by the Free
+Software Foundation; either version 2.1 of the License, or (at your option)
+any later version.
+
+CADO-NFS is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
+details.
+
+You should have received a copy of the GNU Lesser General Public License
+along with CADO-NFS; see the file COPYING.  If not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
+
+
+The purpose of this program is to cut a big matrix file into several small
+files, corresponding to the subsequent distribution of a linear algebra step
+on several computers.
+
+Features:
+  - The output splitting is a grid n x m
+  - The rows (resp. cols) are weight sorted during the process
+  - If the sorting is done according to the weight of rows, then
+    the same permutation is used for columns
+  - The temporary files, the input files and so on, can be optionnally
+    kept or removed asap
+  - Memory usage is under control (tunable)
+  - Can pad the matrix with zeros to get a square matrix
+
+Disk usage:
+  If the input matrix has size 100 (whatever the unit is), then the total
+  size of the output will be 100. The top disk usage (if the input is kept)
+  will be 100 + 100 + 100/n, where
+    - the first 100 are for the input
+    - the second 100 are for the ouput
+    - the 100/n are for temporaries
+    - n is the number of horizontal slices
+  If the ram-limit is high enough to contain a whole horizontal slice, then
+  the 100/n term is not present.
+
+  In the case where the input matrix can be erased asap, then the top disk
+  usage is 100 + 100.
+  TODO: Would it be possible to have it in 100 + 100/n ???
+        This is not at all clear that POSIX allows to do that with files.
+
+List of options: (-in and -out are mandatory)
+  -in <path>    input matrix filename
+  -out <path>   output matrix filename 
+                If there is a directory path prepending the name, then
+                the same subdirectory is used for temp files.
+  -nslices n    balance for n horizontal slices and 1 vertical slice 
+           nxm  balance for n horizontal slices and m vertical slices
+  -square       Pad the matrix with zeroes to get a square matrix
+  -permute-rows-like-columns
+                The weight-sorting is done on columns and the permutation
+                is applied also to rows
+  -permute-columns-like-rows
+                The weight-sorting is done on rows and the permutation
+                is applied also to columns
+
+Other options that do not change the ouput:
+  -remove-input Erase the input matrix file as soon as possible
+  -ram-limit <x>
+                Do not use more than x memory. x is of the form 14M, or 2G
+                or 8000k ...
+                The default is 256 MB.
+  -keep-temps   Do not erase temp files (for debugging purpose)
+  -legacy       Obsolete output format
+  
+*/
+
 #define __STDC_FORMAT_MACROS    /* For C++ to have PRId64 and friends */
 #define _GNU_SOURCE    /* for strndup and asprintf */
 
