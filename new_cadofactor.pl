@@ -1905,6 +1905,8 @@ MAIN :
     select(STDERR); $| = 1; # always flush stderr
     select(STDOUT); $| = 1; # always flush stdout
 
+    print "$0 ".(join " ", @ARGV)."\n";
+
     do_init();
     do_task("algsqrt");
 
