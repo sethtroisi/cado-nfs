@@ -30,7 +30,7 @@ make -f Makefile.all dist VERSION=dev
 tar zxf cado-nfs-dev.tgz
 cd cado-nfs-dev
 make $MAKE_ARGS
-./run.c59
+./new_run.c59
 cd /tmp
 /bin/rm -fr "$DIR"
 
