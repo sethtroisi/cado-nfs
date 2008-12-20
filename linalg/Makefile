@@ -18,6 +18,8 @@ hashpair.o: hashpair.h
 prune.o: prune.h
 merge_mono.o: merge_mono.h
 markowitz.o: markowitz.h
+dclist.o: dclist.h
+swar.o: swar.h
 
 freerel: freerel.o ../sieve/fb.o hashpair.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lgmp -lm
@@ -25,7 +27,7 @@ duplicates: duplicates.o hashpair.o files.o gzip.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lgmp
 purge: purge.o hashpair.o files.o gzip.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lgmp -lm
-merge: merge.o markowitz.o merge_mono.o sparse.o prune.o gzip.o
+merge: merge.o markowitz.o swar.o dclist.o merge_mono.o sparse.o prune.o gzip.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lm
 replay: replay.o sparse.o gzip.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils

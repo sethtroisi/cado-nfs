@@ -26,7 +26,7 @@ struct param_list_alias_s {
 typedef struct param_list_alias_s param_list_alias[1];
 
 struct param_list_knob_s {
-    const char * knob;
+    char * knob;
     int * ptr;
 };
 

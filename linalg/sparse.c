@@ -116,3 +116,15 @@ addWeight(INT **rows, int *wt, int i)
     for(k = 1; k <= rows[i][0]; k++)
 	wt[rows[i][k]]++;
 }
+
+int
+hasCol(INT **rows, int i, INT j)
+{
+    INT k;
+
+    for(k = 1; k <= rows[i][0]; k++)
+	if(rows[i][k] == j)
+	    return 1;
+    return 0;
+}
+
