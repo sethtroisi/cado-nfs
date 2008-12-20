@@ -619,7 +619,7 @@ static void bw_init(void)
     // unsigned int ncmax = (total_work<<1)+2;
     // ft_order_t::init(ncmax, ops_poly_args);
 
-    delta.assign(m + n, -1);
+    delta.assign(m + n, (unsigned int) -1);
     chance_list.assign(m + n, 0);
 
     if (!recover_f0_data(files::f_initq.c_str())) {
