@@ -17,6 +17,7 @@
 #include "sparse.h"
 #include "dclist.h"
 #include "sparse_mat.h"
+#include "report.h"
 #include "swar.h"
 
 #ifdef USE_MARKOWITZ
@@ -43,30 +44,6 @@ cmp(const void *p, const void *q) {
     int x = *((int *)p);
     int y = *((int *)q);
     return (x <= y ? -1 : 1);
-}
-
-void
-init_rep(report_t *rep, char *outname, sparse_mat_t *mat, int type)
-{
-    INT** tmp, i;
-
-    rep->type = type;
-    rep->outfile = gzip_open(outname, "w");
-    switch(type){
-    case 0:
-	// classical one: output to a file
-	break;
-    case 1:
-	// mostly for MPI
-	tmp = (INT **)malloc(mat->nrows * sizeof(INT *));
-	for(i = 0; i < mat->nrows; i++)
-	    tmp[i] = NULL;
-	rep->history = tmp;
-	rep->mark = -1;
-	break;
-    default:
-	fprintf(stderr, "Unknown type: %d\n", type);
-    }
 }
 
 // TODO: ncols could be a new renumbered ncols...
@@ -208,76 +185,6 @@ printStats(sparse_mat_t *mat)
     for(w = 0; w <= mat->cwmax; w++)
 	fprintf(stderr, "I found %d primes of weight %d\n",
 		dclistLength(mat->S[w]->next), w);
-}
-
-// terrific hack: everybody on the same line
-// the first is to be destroyed in replay!!!
-void
-reportn(report_t *rep, INT *ind, int n)
-{
-    int i;
-
-#if DEBUG >= 1
-    fprintf(stderr, "Reporting for n=%d\n", n);
-#endif
-    if(rep->type == 0){
-	for(i = 0; i < n; i++){
-	    fprintf(rep->outfile, "%ld", (long int) ind[i]);
-	    if(i < n-1)
-		fprintf(rep->outfile, " ");
-	}
-	fprintf(rep->outfile, "\n");
-    }
-    else if((rep->type == 1) && (rep->mark != -2)){
-	// mark == -2 => we are probably resuming and we don't care
-	// to consume a lot of memory that will not be used, anyway.
-	rep->mark += 1;
-	if(rep->history[rep->mark] == NULL)
-	    rep->history[rep->mark] = 
-		(INT *)malloc((MERGE_LEVEL_MAX+1)*sizeof(INT));
-	rep->history[rep->mark][0] = n;
-	for(i = 0; i < n; i++)
-	    rep->history[rep->mark][i+1] = ind[i];
-    }
-}
-
-// Same as reportn, but with another input type.
-// TODO: destroy this, since a workaround is found using pointers.
-void
-reporthis(report_t *rep, INT tab[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1], int i0)
-{
-    int k;
-
-#if DEBUG >= 1
-    fprintf(stderr, "Reporting for tab[%d]\n", i0);
-#endif
-    if(rep->type == 0){
-	for(k = 1; k <= tab[i0][0]; k++){
-	    fprintf(rep->outfile, "%ld", (long int) tab[i0][k]);
-	    if(k <= tab[i0][0]-1)
-		fprintf(rep->outfile, " ");
-	}
-	fprintf(rep->outfile, "\n");
-    }
-    else{
-	fprintf(stderr, "I told you this is useless\n");
-	exit(0);
-    }
-}
-
-void
-report1(report_t *rep, INT i)
-{
-    reportn(rep, &i, 1);
-}
-
-void
-report2(report_t *rep, INT i1, INT i2)
-{
-    INT tmp[2];
-    tmp[0] = i1;
-    tmp[1] = i2;
-    reportn(rep, tmp, 2);
 }
 
 /* compute the weight mat->wt[j] of each column j, for the set of relations
@@ -1225,7 +1132,9 @@ addCellAndUpdate(sparse_mat_t *mat, int i, INT j)
     if(i == TRACE_ROW)
 	fprintf(stderr, "TRACE_ROW: addCellSWAR i=%d j=%d\n", i, j);
 #endif
-    addCellSWAR(mat, i, j);
+    if(addColSWAR(mat, j) >= 0)
+	// update R[j] by adding i
+	add_i_to_Rj(mat, i, j);
 }
 
 void
@@ -1234,59 +1143,11 @@ removeCellAndUpdate(sparse_mat_t *mat, int i, INT j)
     removeCellSWAR(mat, i, j);
 }
 
-// for all j in row[i], removes j and update data
-void
-removeRowAndUpdate(sparse_mat_t *mat, int i)
-{
-    int k;
-
-#if TRACE_ROW >= 0
-    if(i == TRACE_ROW)
-	fprintf(stderr, "TRACE_ROW: removeRowAndUpdate i=%d\n", i);
-#endif
-    mat->weight -= lengthRow(mat, i);
-    for(k = 1; k <= lengthRow(mat, i); k++){
-#if TRACE_COL >= 0
-	if(cell(mat, i, k) == TRACE_COL){
-	    fprintf(stderr, "removeRowAndUpdate removes %d from R_%d\n",
-		    TRACE_COL, i);
-	}
-#endif
-	removeCellAndUpdate(mat, i, cell(mat, i, k));
-    }
-}
-
-// All entries M[i, j] are added to the structure.
-void
-addOneRowAndUpdate(sparse_mat_t *mat, int i)
-{
-    int k;
-
-    mat->weight += lengthRow(mat, i);
-    for(k = 1; k <= lengthRow(mat, i); k++)
-	addCellAndUpdate(mat, i, cell(mat, i, k));
-}
-
-// realize mat[i1] += mat[i2] and update the data structure.
-// len could be the real length of row[i1]+row[i2] or -1.
-void
-addRowsAndUpdate(sparse_mat_t *mat, int i1, int i2, int len)
-{
-    // cleaner one, that shares addRowsData() to prepare the next move...!
-    // i1 is to disappear, replaced by a new one
-    removeRowAndUpdate(mat, i1);
-    // we know the length of row[i1]+row[i2]
-    addRows(mat->rows, i1, i2, len);
-    addOneRowAndUpdate(mat, i1);
-}
-
 void
 removeColumnAndUpdate(sparse_mat_t *mat, int j)
 {
     remove_j_from_SWAR(mat, j);
 }
-
-//////////////////////////////////////////////////////////////////////
 
 // These columns are simply removed from the current squeleton matrix, but
 // not from the small matrix.
@@ -1346,6 +1207,55 @@ deleteAllColsFromStack(report_t *rep, sparse_mat_t *mat, int iS)
 	fprintf(stderr, "deleteAllColsFromStack[%d]: %d\n", iS, njrem);
 #endif
     return njrem;
+}
+
+//////////////////////////////////////////////////////////////////////
+// now, these guys are generic...!
+
+// for all j in row[i], removes j and update data
+void
+removeRowAndUpdate(sparse_mat_t *mat, int i)
+{
+    int k;
+
+#if TRACE_ROW >= 0
+    if(i == TRACE_ROW)
+	fprintf(stderr, "TRACE_ROW: removeRowAndUpdate i=%d\n", i);
+#endif
+    mat->weight -= lengthRow(mat, i);
+    for(k = 1; k <= lengthRow(mat, i); k++){
+#if TRACE_COL >= 0
+	if(cell(mat, i, k) == TRACE_COL){
+	    fprintf(stderr, "removeRowAndUpdate removes %d from R_%d\n",
+		    TRACE_COL, i);
+	}
+#endif
+	removeCellAndUpdate(mat, i, cell(mat, i, k));
+    }
+}
+
+// All entries M[i, j] are added to the structure.
+void
+addOneRowAndUpdate(sparse_mat_t *mat, int i)
+{
+    int k;
+
+    mat->weight += lengthRow(mat, i);
+    for(k = 1; k <= lengthRow(mat, i); k++)
+	addCellAndUpdate(mat, i, cell(mat, i, k));
+}
+
+// realize mat[i1] += mat[i2] and update the data structure.
+// len could be the real length of row[i1]+row[i2] or -1.
+void
+addRowsAndUpdate(sparse_mat_t *mat, int i1, int i2, int len)
+{
+    // cleaner one, that shares addRowsData() to prepare the next move...!
+    // i1 is to disappear, replaced by a new one
+    removeRowAndUpdate(mat, i1);
+    // we know the length of row[i1]+row[i2]
+    addRows(mat->rows, i1, i2, len);
+    addOneRowAndUpdate(mat, i1);
 }
 
 int
