@@ -383,7 +383,7 @@ scan_relations_from_file (int *irel, int *nrel, char *rel_used,
 	*irel += 1;
 	if(!(*irel % 100000))
 	    fprintf(stderr, "nrel = %d at %2.2lfs (memory %luMb)\n",
-                    *irel, seconds (), *tot_alloc / 1000000);
+                    *irel, seconds (), *tot_alloc >> 20);
 	rel_used[*irel] = 1;
 	if(rel.b > 0)
           insertNormalRelation (rel_used, rel_compact, *irel, nprimes, H, &rel,
@@ -834,8 +834,8 @@ main(int argc, char **argv)
         tot_alloc += nrelmax * sizeof (int*);
         /* %zu is the C99 modifier for size_t */
         fprintf (stderr, "Allocated rel_compact of %zuMb (total %luMb so far)\n",
-                 (nrelmax * sizeof (int *)) >>20,
-                 tot_alloc);
+                 (nrelmax * sizeof (int *)) >> 20,
+                 tot_alloc >> 20);
       }
 
     fprintf(stderr, "Reading file of relations...\n");

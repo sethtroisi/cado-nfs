@@ -43,7 +43,7 @@
 # TODO-list:
 #  - Bench polynomials with some sieve before selecting the best one.
 #  - Enable a 'lowmem' option
-#  - Use compressed files (cf duplicates -out nodup.gz). Should we implement
+#  - Use compressed files everywhere (done for nodup.gz). Should we implement
 #    such a mechanism in las, or should we simply use las | gzip?
 #  - Recognize when the linear algebra was already started, and in such a case
 #    resume bw with resume=1.
@@ -978,7 +978,7 @@ my %tasks = (
                    req    => ['factbase', 'freerels'],
                    param  => ['excess'],
                    files  => ['rels\.[\de.]+-[\de.]+', 'rels\.tmp',
-                              'nodup', 'duplicates\.stderr',
+                              'nodup\.gz', 'duplicates\.stderr',
                               'purged', 'purge\.stderr'],
                    resume => 1,
                    dist   => 1 },
@@ -1553,7 +1553,7 @@ sub do_sieve {
         info "Removing duplicates...";
         $tab_level++;
         cmd("$param{cadodir}/linalg/duplicates -nrels $nrels ".
-            "-out $param{prefix}.nodup $files ".
+            "-out $param{prefix}.nodup.gz $files ".
             "> $param{prefix}.duplicates.stderr 2>&1",
             { log => 1, kill => 1 });
 
@@ -1571,7 +1571,7 @@ sub do_sieve {
         my $ret = cmd("$param{cadodir}/linalg/purge ".
                       "-poly $param{prefix}.poly -keep $param{keeppurge} ".
                       "-nrels $n -out $param{prefix}.purged ".
-                      "$param{prefix}.nodup ".
+                      "$param{prefix}.nodup.gz ".
                       "> $param{prefix}.purge.stderr 2>&1", { log => 1 });
 
         if ($ret->{status}) {
@@ -1813,7 +1813,7 @@ sub do_chars {
               "-purged $param{prefix}.purged ".
               "-ker $param{prefix}.ker_raw ".
               "-index $param{prefix}.index ".
-              "-rel $param{prefix}.nodup ".
+              "-rel $param{prefix}.nodup.gz ".
               "-small $param{prefix}.small ".
               "-nker $nker ".
               "-skip $param{skip} ".
@@ -1845,7 +1845,7 @@ sub do_allsqrt {
     $tab_level++;
 
     my $cmd = "$param{cadodir}/linalg/allsqrt ".
-              "$param{prefix}.nodup ".
+              "$param{prefix}.nodup.gz ".
               "$param{prefix}.purged ".
               "$param{prefix}.index ".
               "$param{prefix}.ker ".
