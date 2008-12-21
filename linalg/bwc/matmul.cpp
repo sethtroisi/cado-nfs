@@ -52,7 +52,7 @@ using namespace std;
 /* This extension is used to distinguish between several possible
  * implementations of the product */
 #define MM_EXTENSION   "-sliced"
-#define MM_MAGIC        0xa0001001UL
+#define MM_MAGIC        0xa0001003UL
 
 
 struct slice_info {
@@ -71,13 +71,64 @@ struct slice_info {
 typedef vector<uint16_t> data_t;
 
 struct matmul_data_s {
+    /* repeat the fields from the public interface */
+    unsigned int nrows;
+    unsigned int ncols;
+    unsigned long ncoeffs;
     abobj_t xab;
     data_t data;
     vector<slice_info> dslices_info;
     void push(uint32_t x)
     {
-        BUG_ON(x > UINT16_MAX);
+        BUG_ON(x >> 16);
         data.push_back(x);
+    }
+    void push32(uint64_t x)
+    {
+        BUG_ON(x >> 32);
+        data.push_back(x & ((1u << 16) - 1));
+        x >>= 16;
+        data.push_back(x & ((1u << 16) - 1));
+    }
+    void push48(uint64_t x)
+    {
+        BUG_ON(x >> 48);
+        data.push_back(x & ((1u << 16) - 1));
+        x >>= 16;
+        data.push_back(x & ((1u << 16) - 1));
+        x >>= 16;
+        data.push_back(x & ((1u << 16) - 1));
+    }
+    void push64(uint64_t x)
+    {
+        data.push_back(x & ((1u << 16) - 1));
+        x >>= 16;
+        data.push_back(x & ((1u << 16) - 1));
+        x >>= 16;
+        data.push_back(x & ((1u << 16) - 1));
+        x >>= 16;
+        data.push_back(x & ((1u << 16) - 1));
+    }
+    void place48(unsigned int i, uint64_t x)
+    {
+        BUG_ON(x >> 48);
+        BUG_ON(i+3>data.size());
+        data[i++] = x & ((1u << 16) - 1);
+        x >>= 16;
+        data[i++] = x & ((1u << 16) - 1);
+        x >>= 16;
+        data[i++] = x & ((1u << 16) - 1);
+    }
+    void place64(unsigned int i, uint64_t x)
+    {
+        BUG_ON(i+4>data.size());
+        data[i++] = x & ((1u << 16) - 1);
+        x >>= 16;
+        data[i++] = x & ((1u << 16) - 1);
+        x >>= 16;
+        data[i++] = x & ((1u << 16) - 1);
+        x >>= 16;
+        data[i++] = x & ((1u << 16) - 1);
     }
 };
 
@@ -92,7 +143,7 @@ void matmul_clear(matmul_ptr mm)
 
 matmul_ptr matmul_init()
 {
-    return new matmul_data_s;
+    return (struct matmul_public_s *) new matmul_data_s;
 }
 
 
@@ -117,9 +168,23 @@ matmul_ptr matmul_build(abobj_ptr xx, const char * filename)
     uint32_t i0 = 0;
     uint32_t i1 = smat->nrows;
 
+    MM->nrows = smat->nrows;
+    MM->ncols = smat->ncols;
+    MM->ncoeffs = 0;
+
+    MM->push32(MM->nrows);
+    MM->push32(MM->ncols);
+
+    // allow 64 bits for the number of coefficients
+    unsigned int ncoeffs_index = MM->data.size();
+    MM->push64(0);
+
     unsigned int npack = 3072;
     unsigned int nslices = iceildiv(i1-i0, npack);
+
+    unsigned int nslices_index = MM->data.size();
     MM->push(0);
+
     unsigned int packbase = (i1-i0) / nslices;
     /* How many slices of size packbase+1 */
     unsigned int nslices1 = (i1-i0) % nslices;
@@ -150,20 +215,20 @@ matmul_ptr matmul_build(abobj_ptr xx, const char * filename)
         typedef L_t::const_iterator Lci_t;
         L_t L;
         for(unsigned int di = 0 ; di < npack ; di++) {
-            /* Our dst pointer never changes, since we write matrix rows
-             * over and over again in memory. */
+            /* Our dst pointer for read_matrix_row never changes, since
+             * we write matrix rows over and over again in memory. */
             read_matrix_row(f,smat,smat->data,1);
             for(unsigned int j = 0 ; j < smat->data[0] ; j++) {
                 L.push_back(std::make_pair(smat->data[1+j],di));
             }
+            MM->ncoeffs += smat->data[0];
         }
         /* L is the list of (column index, row index) of all
          * coefficients in the current horizontal slice */
         std::sort(L.begin(), L.end());
 
         MM->push(npack);
-        MM->push(L.size() & ((1u << 16) - 1));
-        MM->push(L.size() >> 16);
+        MM->push32(L.size());
 
         uint32_t j = 0;
         uint32_t i = 0;
@@ -201,7 +266,7 @@ matmul_ptr matmul_build(abobj_ptr xx, const char * filename)
 
             MM->push(dj); MM->push(i);
         }
-        MM->data[0]++;
+        MM->data[nslices_index]++;
         double dj2_avg = sumdj2 / weight;
         double dj_avg = sumdj / weight;
         double dj_sdev = sqrt(dj2_avg-dj_avg*dj_avg);
@@ -224,6 +289,9 @@ matmul_ptr matmul_build(abobj_ptr xx, const char * filename)
 #endif
         MM->dslices_info.push_back(si);
     }
+
+    MM->place64(ncoeffs_index, MM->ncoeffs);
+
     /* There's an other option for the dense strips. For a given
      * set of source values (fitting in L2), store delta_j's for
      * a given destination value. Could actually be eight bits.
@@ -347,6 +415,11 @@ void matmul(matmul_ptr mm, abt * dst, abt const * src)
 {
     asm("# multiplication code\n");
     data_t::const_iterator q = MM->data.begin();
+
+    q += 2;     // nrows
+    q += 2;     // ncols
+    q += 4;     // ncoeffs, 64 bits.
+
     uint16_t nhstrips = *q++;
     uint32_t i = 0;
 #ifdef  SLICE_STATS

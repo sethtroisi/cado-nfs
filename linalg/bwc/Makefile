@@ -32,9 +32,9 @@ MY_CFLAGS+=-DWITH_MPI
 CC:=$(MPICC)
 CXX:=$(MPICXX)
 
-# Work around bugs that clutter output.
-CC:=$(shell $(CC) -show | sed -e 's/-I/-isystem /g')
-CXX:=$(shell $(CXX) -show | sed -e 's/-I/-isystem /g')
+# Work around bugs that clutter output. Avoid forced optimization level.
+CC:=$(shell $(CC) -show | sed -e 's/-I/-isystem /g' -e 's/-O[0-9]//g')
+CXX:=$(shell $(CXX) -show | sed -e 's/-I/-isystem /g' -e 's/-O[0-9]//g')
 
 ifeq ($(CC),)
 $(error "You must install an mpicc compiler")
@@ -54,11 +54,12 @@ endif
 ## src:=$(patsubst %,%.c,$(names))
 ## obj:=$(patsubst %,%.o,$(names))
 
-bins:=build prep test_hello test_pthread_reduce
+bins:=bench build prep test_hello test_pthread_reduce
 
 all:$(bins)
 
 build_objs:=build.o matmul.o ../readbuffer.o ../readmat.o
+bench_objs:=bench.o matmul.o ../readbuffer.o ../readmat.o
 
 test_hello_objs:=test_hello.o parallelizing_info.o
 
@@ -74,6 +75,9 @@ test_hello: $(test_hello_objs)
 
 build: $(build_objs)
 	$(CXX) $(MY_LFLAGS) $(build_objs) -o $@ -lutils -lgmp
+
+bench: $(bench_objs)
+	$(CXX) $(MY_LFLAGS) $(bench_objs) -o $@ -lutils -lgmp
 
 prep: $(prep_objs)
 	$(CXX) $(MY_LFLAGS) $(prep_objs) -o $@ -lutils -lgmp -lgmpxx
@@ -111,7 +115,7 @@ clean:
 # ALL source files must come here. Using $(wildcard *.c) is discouraged
 # for obvious reasons.
 sources:=	\
-    auxfuncs.c build.c info_file.c		\
+    auxfuncs.c bench.c build.c info_file.c		\
     intersections.cpp matmul.cpp matmul_top.c parallelizing_info.c	\
     prep.c test_hello.c xvectors.c
 dep: $(patsubst %,.deps/%.d,$(sources))

@@ -1,7 +1,5 @@
-#define _BSD_SOURCE
-
 #include <stdio.h>
-#include <matmul.h>
+#include "matmul.h"
 
 #include "abase.h"
 #include "macros.h"

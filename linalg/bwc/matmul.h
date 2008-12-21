@@ -7,8 +7,19 @@
 extern "C" {
 #endif
 
-typedef void * matmul_t;
-typedef void * matmul_ptr;
+struct matmul_public_s {
+    /* The three fields here must be exposed by all implementations */
+    unsigned int nrows;
+    unsigned int ncols;
+    unsigned long ncoeffs;
+    /* The rest of the implementation-dependent storage comes right after
+     * that, in memory. Therefore, only the pointer may be manipulated
+     * freely.
+     */
+};
+
+typedef struct matmul_public_s  * matmul_t;
+typedef struct matmul_public_s  * matmul_ptr;
 
 extern matmul_ptr matmul_build(abobj_ptr, const char * filename);
 extern matmul_ptr matmul_reload_cache(abobj_ptr, const char * filename);
