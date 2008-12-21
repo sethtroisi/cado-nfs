@@ -821,7 +821,7 @@ sub distribute_task {
 
 
 
-        # Start new job(s)
+        # Start new job(s) (parallel mode)
         if ($param{parallel}) {
             info "Starting new jobs...\n";
             $tab_level++;
@@ -861,22 +861,28 @@ sub distribute_task {
             write_jobs($jobs, "$param{prefix}.$opt->{task}_jobs");
             $tab_level--;
         }
-        elsif (my @r = find_hole($opt->{min}, $opt->{max},
-                                 $opt->{len}, $ranges)) {
-            info "Starting job: ".pad($r[0], 8)." ".pad($r[1], 8)."\n";
-            $tab_level++;
-            my $cmd = &{$opt->{cmd}}(@r, $machines{localhost});
-            cmd($cmd, { log => 1, kill => 1 });
-            $tab_level--;
-        }
 
 
 
-        # Print the progress of the task (counting only completed ranges)
+        # Print the progress of the task
         &{$opt->{progress}}($file_ranges);
 
         # This might be enough to exit the loop now
         last if &{$opt->{is_done}}($file_ranges);
+
+
+
+        # Start new job (sequential mode)
+        if (!$param{parallel} && (my @r = find_hole($opt->{min}, $opt->{max},
+                                                    $opt->{len}, $ranges))) {
+            info "Starting job: ".pad($r[0], 8)." ".pad($r[1], 8)."\n";
+            $tab_level++;
+            my $cmd = &{$opt->{cmd}}(@r, $machines{localhost});
+            cmd($cmd, { log => 1, kill => 1 });
+            &{$opt->{check}}("$param{prefix}.$opt->{suffix}.$r[0]-$r[1]",
+                             1); # Exhaustive testing!
+            $tab_level--;
+        }
 
 
 
@@ -1076,7 +1082,8 @@ sub do_init {
         $tab_level--;
     } else {
         $machines{localhost} = { tmpdir  => $param{wdir},
-                                 cadodir => $param{cadodir} };
+                                 cadodir => $param{cadodir},
+                                 prefix  => $param{prefix} };
     }
 
     info "Initializing the working directory...\n";
