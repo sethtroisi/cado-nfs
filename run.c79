@@ -32,7 +32,7 @@ else
     echo "FAILED!!!";
     ret=1;
 fi
-if [ -z "$DEBUG" ] ; then
+if [ -z "$CADO_DEBUG" ] ; then
     rm -r $t;
 else
     echo "(debug mode -- keeping $t)"

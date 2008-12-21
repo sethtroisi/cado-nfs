@@ -9,11 +9,11 @@
 
 t=`mktemp -d`
 echo "Testing factorization of c59 in $t"
-if [ "$DEBUG" ] ; then
+if [ "$CADO_DEBUG" ] ; then
     echo "(debug mode, temporary files will be kept in $t)"
 fi
 
-if [ -z "$USEHOST" ] ; then
+if [ -z "$CADO_USEHOST" ] ; then
    host=localhost
 else
    host=`hostname --short`
@@ -37,7 +37,7 @@ output2="200429218120815554269743635437 357440504101388365610785389017"
 output3="357440504101388365610785389017 200429218120815554269743635437"
 if [ "$output" == "$output2" -o "$output" == "$output3" ]; then
     echo "OK";
-    if [ -z "$DEBUG" ] ; then
+    if [ -z "$CADO_DEBUG" ] ; then
         rm -r $t;
     else
         echo "(debug mode -- keeping $t)"
@@ -45,7 +45,7 @@ if [ "$output" == "$output2" -o "$output" == "$output3" ]; then
     exit 0;
 else
     echo "FAILED!!!";
-    if [ -z "$DEBUG" ] ; then
+    if [ -z "$CADO_DEBUG" ] ; then
         rm -r $t;
     else
         echo "(debug mode -- keeping $t)"
