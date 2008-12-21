@@ -18,6 +18,7 @@
 #include "sparse.h"
 #include "dclist.h"
 #include "sparse_mat.h"
+#include "report.h"
 #include "swar.h"
 #include "merge_mono.h"
 #include "prune.h"
@@ -162,7 +163,7 @@ main(int argc, char *argv[])
     checkmat(&mat);
 #endif
 
-    init_rep(&rep, outname, &mat, 0);
+    init_rep(&rep, outname, &mat, 0, MERGE_LEVEL_MAX);
     report2(&rep, mat.nrows, mat.ncols);
 
     /* iprune is the excess we want at the end of prune */

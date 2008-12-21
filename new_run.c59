@@ -9,11 +9,11 @@
 
 t=`mktemp -d`
 echo "Testing factorization of c59 in $t"
-if [ "$DEBUG" ] ; then
+if [ "$CADO_DEBUG" ] ; then
     echo "(debug mode, temporary files will be kept in $t)"
 fi
 
-if [ -z "$USEHOST" ] ; then
+if [ -z "$CADO_USEHOST" ] ; then
    host=localhost
 else
    host=`hostname --short`
@@ -29,15 +29,15 @@ cadodir=$cadodir
 $host cores=2
 EOF
 
-STDOUT=`lsof -Fn -a -p $$ -d 1 | sed -e '/^n/!d ; s/^n//'`
-./new_cadofactor.pl $t/param machines=$t/mach_desc wdir=$t delay=20 sievenice=0 selectnice=0 2>&1 | tee $STDOUT | sed -e 's/\o033\[[^m]*m//g' > $t/out
+./new_cadofactor.pl $t/param machines=$t/mach_desc wdir=$t delay=20 sievenice=0 selectnice=0 $@ 2>&1 | tee $t/out
+sed -i -e 's/\o033\[[^m]*m//g' $t/out
 
 output=`tail -1 $t/out`
 output2="200429218120815554269743635437 357440504101388365610785389017"
 output3="357440504101388365610785389017 200429218120815554269743635437"
 if [ "$output" == "$output2" -o "$output" == "$output3" ]; then
     echo "OK";
-    if [ -z "$DEBUG" ] ; then
+    if [ -z "$CADO_DEBUG" ] ; then
         rm -r $t;
     else
         echo "(debug mode -- keeping $t)"
@@ -45,7 +45,7 @@ if [ "$output" == "$output2" -o "$output" == "$output3" ]; then
     exit 0;
 else
     echo "FAILED!!!";
-    if [ -z "$DEBUG" ] ; then
+    if [ -z "$CADO_DEBUG" ] ; then
         rm -r $t;
     else
         echo "(debug mode -- keeping $t)"

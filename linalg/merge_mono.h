@@ -24,19 +24,6 @@
 //    for large numbers).
 #define USE_MERGE_FAST 2
 
-// data structure for reporting actions during the merge; in standard mode
-// (say mono proc), this is just a wrap around for a FILE; otherwise,
-// it can be used to register things in an array that will be examined and
-// flushed from time to time. See the MPI version for more.
-typedef struct{
-    char type;
-    // '0' for the standard stuff
-    FILE *outfile;
-    // '1' for MPI
-    INT **history;
-    int mark;
-} report_t;
-
 #ifdef USE_MPI
 #define GETJ(mat, j) ((j)-(mat)->jmin)
 #else
@@ -61,15 +48,12 @@ extern void add_i_to_Rj(sparse_mat_t *mat, int i, int j);
 // TODO_END
 
 
-extern void init_rep(report_t *rep, char *outname, sparse_mat_t *mat, int type);
 extern void initMat(sparse_mat_t *mat, INT jmin, INT jmax);
 extern void initWeightFromFile(sparse_mat_t *mat, FILE *purgedfile);
 extern void fillSWAR(sparse_mat_t *mat);
 extern void closeSWAR(/*sparse_mat_t *mat*/);
 
 extern int readmat(sparse_mat_t *mat, FILE *file);
-extern void report1(report_t *rep, INT i);
-extern void report2(report_t *rep, INT i1, INT i2);
 extern void removeCellSWAR(sparse_mat_t *mat, int i, INT j);
 extern void addRowSWAR(sparse_mat_t *mat, int i);
 extern void addRowsSWAR(sparse_mat_t *mat, int i1, int i2, int len);

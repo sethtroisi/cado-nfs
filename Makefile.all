@@ -50,8 +50,8 @@ clean:
 	$(MAKE) -C gf2x/cantor		clean
 	$(MAKE) -C linalg/bw		clean
 
-DIST_FILES=run.c59 params.c59 cadofactor.pl Makefile Makefile.common cado.h \
-           macros.h
+DIST_FILES=new_run.c59 params.c59 new_cadofactor.pl Makefile Makefile.common \
+           cado.h macros.h
 POLYSELECT_FILES=polyselect/Makefile polyselect/polyselect.c \
            polyselect/rotate.c polyselect/aux.c polyselect/aux.h
 UTILS_FILES=utils/utils.h utils/mod_ul.h utils/fpoly.h utils/getprime.h \
@@ -89,6 +89,7 @@ LINALG_FILES=linalg/Makefile linalg/freerel.c linalg/hashpair.h \
 	   linalg/characters.c linalg/gauss.c linalg/gauss.h linalg/allsqrt.c \
 	   linalg/sparse_mat.h \
 	   linalg/dclist.c linalg/dclist.h \
+	   linalg/report.c linalg/report.h \
 	   linalg/swar.c linalg/swar.h \
 	   linalg/markowitz.c linalg/markowitz.h
 SQRT_FILES=sqrt/naive/Makefile sqrt/naive/algsqrt.c sqrt/naive/poly.h \

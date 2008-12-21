@@ -43,7 +43,7 @@
 # TODO-list:
 #  - Bench polynomials with some sieve before selecting the best one.
 #  - Enable a 'lowmem' option
-#  - Use compressed files (cf duplicates -out nodup.gz). Should we implement
+#  - Use compressed files everywhere (done for nodup.gz). Should we implement
 #    such a mechanism in las, or should we simply use las | gzip?
 #  - Recognize when the linear algebra was already started, and in such a case
 #    resume bw with resume=1.
@@ -67,7 +67,7 @@ use Cwd qw(abs_path);
 my $tab_level = 0;
 
 # Should we use colors (for terminal output) or not?
-my $use_colors = 1;
+my $use_colors = defined $ENV{CADO_COLOR} ? $ENV{CADO_COLOR} : 1;
 
 # Terminal width
 my $term_cols = 80;
@@ -821,7 +821,7 @@ sub distribute_task {
 
 
 
-        # Start new job(s)
+        # Start new job(s) (parallel mode)
         if ($param{parallel}) {
             info "Starting new jobs...\n";
             $tab_level++;
@@ -861,22 +861,28 @@ sub distribute_task {
             write_jobs($jobs, "$param{prefix}.$opt->{task}_jobs");
             $tab_level--;
         }
-        elsif (my @r = find_hole($opt->{min}, $opt->{max},
-                                 $opt->{len}, $ranges)) {
-            info "Starting job: ".pad($r[0], 8)." ".pad($r[1], 8)."\n";
-            $tab_level++;
-            my $cmd = &{$opt->{cmd}}(@r, $machines{localhost});
-            cmd($cmd, { log => 1, kill => 1 });
-            $tab_level--;
-        }
 
 
 
-        # Print the progress of the task (counting only completed ranges)
+        # Print the progress of the task
         &{$opt->{progress}}($file_ranges);
 
         # This might be enough to exit the loop now
         last if &{$opt->{is_done}}($file_ranges);
+
+
+
+        # Start new job (sequential mode)
+        if (!$param{parallel} && (my @r = find_hole($opt->{min}, $opt->{max},
+                                                    $opt->{len}, $ranges))) {
+            info "Starting job: ".pad($r[0], 8)." ".pad($r[1], 8)."\n";
+            $tab_level++;
+            my $cmd = &{$opt->{cmd}}(@r, $machines{localhost});
+            cmd($cmd, { log => 1, kill => 1 });
+            &{$opt->{check}}("$param{prefix}.$opt->{suffix}.$r[0]-$r[1]",
+                             1); # Exhaustive testing!
+            $tab_level--;
+        }
 
 
 
@@ -972,7 +978,7 @@ my %tasks = (
                    req    => ['factbase', 'freerels'],
                    param  => ['excess'],
                    files  => ['rels\.[\de.]+-[\de.]+', 'rels\.tmp',
-                              'nodup', 'duplicates\.stderr',
+                              'nodup\.gz', 'duplicates\.stderr',
                               'purged', 'purge\.stderr'],
                    resume => 1,
                    dist   => 1 },
@@ -1076,7 +1082,8 @@ sub do_init {
         $tab_level--;
     } else {
         $machines{localhost} = { tmpdir  => $param{wdir},
-                                 cadodir => $param{cadodir} };
+                                 cadodir => $param{cadodir},
+                                 prefix  => $param{prefix} };
     }
 
     info "Initializing the working directory...\n";
@@ -1546,7 +1553,7 @@ sub do_sieve {
         info "Removing duplicates...";
         $tab_level++;
         cmd("$param{cadodir}/linalg/duplicates -nrels $nrels ".
-            "-out $param{prefix}.nodup $files ".
+            "-out $param{prefix}.nodup.gz $files ".
             "> $param{prefix}.duplicates.stderr 2>&1",
             { log => 1, kill => 1 });
 
@@ -1564,7 +1571,7 @@ sub do_sieve {
         my $ret = cmd("$param{cadodir}/linalg/purge ".
                       "-poly $param{prefix}.poly -keep $param{keeppurge} ".
                       "-nrels $n -out $param{prefix}.purged ".
-                      "$param{prefix}.nodup ".
+                      "$param{prefix}.nodup.gz ".
                       "> $param{prefix}.purge.stderr 2>&1", { log => 1 });
 
         if ($ret->{status}) {
@@ -1806,7 +1813,7 @@ sub do_chars {
               "-purged $param{prefix}.purged ".
               "-ker $param{prefix}.ker_raw ".
               "-index $param{prefix}.index ".
-              "-rel $param{prefix}.nodup ".
+              "-rel $param{prefix}.nodup.gz ".
               "-small $param{prefix}.small ".
               "-nker $nker ".
               "-skip $param{skip} ".
@@ -1838,7 +1845,7 @@ sub do_allsqrt {
     $tab_level++;
 
     my $cmd = "$param{cadodir}/linalg/allsqrt ".
-              "$param{prefix}.nodup ".
+              "$param{prefix}.nodup.gz ".
               "$param{prefix}.purged ".
               "$param{prefix}.index ".
               "$param{prefix}.ker ".
@@ -1904,6 +1911,8 @@ MAIN :
 {
     select(STDERR); $| = 1; # always flush stderr
     select(STDOUT); $| = 1; # always flush stdout
+
+    print "$0 ".(join " ", @ARGV)."\n";
 
     do_init();
     do_task("algsqrt");

@@ -56,7 +56,7 @@ hashInit (hashtable_t *H, unsigned int n, int verbose, int need64)
         fprintf (stderr, "Using %d-bit types\n",
                  (need64) ? 64 : 32);
         fprintf (stderr, "Allocated hash tables of total size %"PRIu64"Mb\n",
-                 (H->hashmod * H->size) / 1000000);
+                 (H->hashmod * H->size) >> 20);
       }
     if(sizeof(unsigned long) == 8){
       H->HC0 = MAGIC_HC0;

@@ -11,6 +11,7 @@
 #include "sparse.h"
 #include "dclist.h"
 #include "sparse_mat.h"
+#include "report.h"
 #include "swar.h"
 #include "merge_mono.h"
 
@@ -280,9 +281,9 @@ removeCellSWAR(sparse_mat_t *mat, int i, INT j)
     remove_i_from_Rj(mat, i, j);
 }
 
-// M[i, j] is set to 1.
-void
-addCellSWAR(sparse_mat_t *mat, int i, INT j)
+// Returns a value < 0 if nothing was done, since the weight was too heavy.
+int
+addColSWAR(sparse_mat_t *mat, INT j)
 {
     int ind;
 
@@ -294,7 +295,7 @@ addCellSWAR(sparse_mat_t *mat, int i, INT j)
     ind = mat->wt[GETJ(mat, j)] = incrS(mat->wt[GETJ(mat, j)]);
 #if USE_MERGE_FAST > 1
     if(ind < 0)
-	return;
+	return ind;
 #endif
     remove_j_from_S(mat, j);
     if(mat->wt[GETJ(mat, j)] > mat->cwmax){
@@ -310,10 +311,7 @@ addCellSWAR(sparse_mat_t *mat, int i, INT j)
 #else
     dclistConnect(mat->S[ind], mat->A[GETJ(mat, j)]);
 #endif
-    // update R[j] by adding i
-    // TODO: this is more or less independant of SWAR...!
-    // but take care to the return stuff above!
-    add_i_to_Rj(mat, i, j);
+    return ind;
 }
 
 int
