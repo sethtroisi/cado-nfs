@@ -67,7 +67,7 @@ use Cwd qw(abs_path);
 my $tab_level = 0;
 
 # Should we use colors (for terminal output) or not?
-my $use_colors = 1;
+my $use_colors = defined $ENV{CADO_COLOR} ? $ENV{CADO_COLOR} : 1;
 
 # Terminal width
 my $term_cols = 80;
