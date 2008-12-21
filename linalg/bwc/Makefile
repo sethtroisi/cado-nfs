@@ -21,10 +21,10 @@ endif
 # compilers on the make command line.
 ifneq ($(MPI),)
 MPICC:=$(MPI)/mpicc
-MPICXX:=$(MPI)/mpic++
+MPICXX:=$(MPI)/mpicxx
 else
 MPICC:=mpicc
-MPICXX:=mpic++
+MPICXX:=mpicxx
 endif
 
 ifeq ($(WITH_MPI),1)
@@ -40,8 +40,8 @@ ifeq ($(CC),)
 $(error "You must install an mpicc compiler")
 endif
 
-mpicclibs:=$(shell $(MPICC) -showme | sed -e 's/^.*-L\(\S*\)\>.*$$/\1/')
-mpicxxlibs:=$(shell $(MPICXX) -showme | sed -e 's/^.*-L\(\S*\)\>.*$$/\1/')
+mpicclibs:=$(shell $(MPICC) -show | sed -e 's/^.*-L\(\S*\)\>.*$$/\1/')
+mpicxxlibs:=$(shell $(MPICXX) -show | sed -e 's/^.*-L\(\S*\)\>.*$$/\1/')
 
 # CC:=$(CC) -Wl,-rpath,$(shell cat /etc/alternatives/mpilibs64)
 # CXX:=$(CXX) -Wl,-rpath,$(shell cat /etc/alternatives/mpilibs64)
@@ -65,7 +65,7 @@ test_hello_objs:=test_hello.o parallelizing_info.o
 prep_objs:=prep.o intersections.o matmul.o	\
 	matmul_top.o parallelizing_info.o	\
 	info_file.o ../readbuffer.o ../readmat.o	\
-	auxfuncs.o config_file.o xvectors.o
+	auxfuncs.o xvectors.o
 
 test_pthread_reduce_objs:=test_pthread_reduce.o
 
@@ -111,7 +111,7 @@ clean:
 # ALL source files must come here. Using $(wildcard *.c) is discouraged
 # for obvious reasons.
 sources:=	\
-    args.cpp auxfuncs.c build.c config_file.cpp info_file.c		\
+    auxfuncs.c build.c info_file.c		\
     intersections.cpp matmul.cpp matmul_top.c parallelizing_info.c	\
     prep.c test_hello.c xvectors.c
 dep: $(patsubst %,.deps/%.d,$(sources))
