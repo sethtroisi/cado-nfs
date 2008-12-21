@@ -19,6 +19,10 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 
+#ifndef MAP_ANONYMOUS
+#error "Please define _GNU_SOURCE or _BSD_SOURCE on top of the translation unit"
+#endif
+
 static inline
 void * electric_alloc(size_t s)
 {
