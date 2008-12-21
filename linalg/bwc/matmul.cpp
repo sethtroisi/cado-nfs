@@ -270,7 +270,10 @@ matmul_ptr matmul_reload_cache(abobj_ptr xx, const char * filename)
     char * base;
     FILE * f;
 
-    asprintf(&base, "%s" MM_EXTENSION ".bin", filename);
+    {
+        int rc = asprintf(&base, "%s" MM_EXTENSION ".bin", filename);
+        FATAL_ERROR_CHECK(rc < 0, "out of memory");
+    }
 
     f = fopen(base, "r");
 
@@ -283,7 +286,7 @@ matmul_ptr matmul_reload_cache(abobj_ptr xx, const char * filename)
     free(base);
 
     size_t n;
-    unsigned int rc;
+    size_t rc;
     matmul_ptr mm = matmul_init();
 
     MM->xab = xx;
@@ -311,7 +314,10 @@ void matmul_save_cache(matmul_ptr mm, const char * filename)
     char * base;
     FILE * f;
 
-    asprintf(&base, "%s" MM_EXTENSION ".bin", filename);
+    {
+        int rc = asprintf(&base, "%s" MM_EXTENSION ".bin", filename);
+        FATAL_ERROR_CHECK(rc < 0, "out of memory");
+    }
 
     f = fopen(base, "w");
     if (f == NULL) {
@@ -323,7 +329,7 @@ void matmul_save_cache(matmul_ptr mm, const char * filename)
 
     size_t n = MM->data.size();
     unsigned long magic = MM_MAGIC;
-    unsigned int rc;
+    size_t rc;
 
     rc = fwrite(&magic, sizeof(unsigned long), 1, f);
     FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");

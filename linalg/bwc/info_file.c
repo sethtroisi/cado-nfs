@@ -10,7 +10,8 @@
 void read_info_file(matmul_top_data_ptr mmt, const char * filename)
 {
     char * infoname;
-    asprintf(&infoname, "%s.info", filename);
+    int rc = asprintf(&infoname, "%s.info", filename);
+    FATAL_ERROR_CHECK(rc < 0, "out of memory");
 
     FILE * f = fopen(infoname, "r");
     char line[1024];
@@ -110,7 +111,8 @@ void read_info_file(matmul_top_data_ptr mmt, const char * filename)
         if (strchr(locfile, '/') == NULL && last_slash != NULL) {
             // there is a dirname for the matrix info file, so honour it.
             char * dirname = strndup(filename, last_slash+1-filename);
-            asprintf(&(mmt->locfile), "%s%s", dirname, locfile);
+            int rc = asprintf(&(mmt->locfile), "%s%s", dirname, locfile);
+            FATAL_ERROR_CHECK(rc < 0, "out of memory");
             free(dirname);
         } else {
             // keep it as it is.

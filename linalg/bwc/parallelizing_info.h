@@ -27,7 +27,11 @@
 /* don't enable this. Clutters output a lot */
 #define xxxCONCURRENCY_DEBUG
 
-/* This isn't ready yet. In presence of an MPI library which correctly
+/*
+ * MPI_LIBRARY_MT_CAPABLE: do mpi communications in a furiously
+ * concurrent manner.
+ *
+ * This isn't ready yet. In presence of an MPI library which correctly
  * supports MPI_THREAD_MULTIPLE, chances are that this gets close to
  * working ok, and even maybe improve performance quite a bit.
  *
@@ -35,9 +39,10 @@
  * --enable-mpi-threads, it does not work (crash observed at
  * MPI_Init_thread -- fairly weird).
  *
- * Mpich2 1.1 might perform better -- not tested yet.
+ * Mpich2 1.1a2 works, apparently. And it even seems to end up being
+ * noticeably faster for my toy examples (= latency-wise).
  */
-#define xxxMPI_LIBRARY_MT_CAPABLE
+#define MPI_LIBRARY_MT_CAPABLE
 
 
 /* utility structure. It is stored in thread-shared memory */

@@ -190,7 +190,9 @@ broadcast_down(matmul_top_data_ptr mmt, int d)
     int err;
 
     pi_wiring_ptr picol = mmt->pi->wr[d];
+#ifndef MPI_LIBRARY_MT_CAPABLE
     pi_wiring_ptr pirow = mmt->pi->wr[!d];
+#endif
 
     mmt_wiring_ptr mcol = mmt->wr[d];
     // mmt_wiring_ptr mrow = mmt->wr[!d];
@@ -207,6 +209,16 @@ broadcast_down(matmul_top_data_ptr mmt, int d)
      * broadcasted. We define the ``extra'' flag in this case.
      */
     unsigned int extra = (mmt->flags[d] & THREAD_SHARED_VECTOR) == 0;
+
+    if (extra) {
+        /* While this code has been written with some caution, it has had
+         * zero coverage at the moment. So please be kind when
+         * encountering bugs.
+         */
+        BUG();
+    }
+
+#ifndef MPI_LIBRARY_MT_CAPABLE
     for(unsigned int t = 0 ; t < pirow->ncores + extra ; t++) {
         serialize_threads(pirow);
         if (t == pirow->trank) {
@@ -245,7 +257,7 @@ broadcast_down(matmul_top_data_ptr mmt, int d)
             }
         } else if (t == pirow->trank + 1 && extra) {
             /* Then, while the next column is communicating, we'll do the
-             * inter-thread bcast if needed. It is pointless (and
+             * inter-thread (column) bcast if needed. It is pointless (and
              * skipped) when the right vectors are shared, of course,
              * since no matter which thread received the data, it ends up
              * in the right place.
@@ -258,18 +270,56 @@ broadcast_down(matmul_top_data_ptr mmt, int d)
             for(unsigned int i = 0 ; i < mcol->xlen ; i++) {
                 struct isect_info * xx = &(mcol->x[i]);
                 unsigned int src = xx->k % picol->ncores;
-                if (picol->trank == src)
+                if (picol->trank == src) {
+                    /* as a symmetry compared to above, the leader is
+                     * specifically the guy who's not working.  */
                     continue;
+                }
                 unsigned int off = aboffset(mmt->abase, xx->offset_me);
                 abt * ptr = mcol->v + off;
                 abt * sptr = mcol->all_v[src] + off;
                 size_t siz = xx->count * sizeof(abt);
-                if (ptr == sptr)
-                    abort();
+                ASSERT(ptr != sptr);
                 memcpy(ptr, sptr, siz);
             }
         }
     }
+#else   /* MPI_LIBRARY_MT_CAPABLE */
+    for(unsigned int i = 0 ; i < mcol->xlen ; i++) {
+        struct isect_info * xx = &(mcol->x[i]);
+        unsigned int src = xx->k % picol->ncores;
+        if (src != picol->trank) {
+            continue;
+        }
+        unsigned int off = aboffset(mmt->abase, xx->offset_me);
+        void * ptr = mcol->v + off;
+        size_t siz = xx->count * sizeof(abt);
+        unsigned int root = xx->k / picol->ncores;
+        err = MPI_Bcast(ptr, siz, MPI_BYTE, root, picol->pals);
+        BUG_ON(err);
+    }
+    if (extra) {
+        /* The inter-column broadcast, for non-shared right vectors, must
+         * occur with column threads serialized.
+         */
+        serialize_threads(picol);
+        for(unsigned int i = 0 ; i < mcol->xlen ; i++) {
+            struct isect_info * xx = &(mcol->x[i]);
+            unsigned int src = xx->k % picol->ncores;
+            if (picol->trank == src) {
+                /* as a symmetry compared to above, the leader is
+                 * specifically the guy who's not working.  */
+                continue;
+            }
+            unsigned int off = aboffset(mmt->abase, xx->offset_me);
+            abt * ptr = mcol->v + off;
+            abt * sptr = mcol->all_v[src] + off;
+            size_t siz = xx->count * sizeof(abt);
+            ASSERT(ptr != sptr);
+            memcpy(ptr, sptr, siz);
+        }
+    }
+#endif  /* MPI_LIBRARY_MT_CAPABLE */
 
     if (mcol->i1 > nrows) {
         /* untested */
@@ -457,7 +507,9 @@ static void save_vector_toprow(matmul_top_data_ptr mmt, int d, unsigned int inde
     if (pirow->jrank == 0) {
         if (pirow->trank == 0) {
             char * filename;
-            asprintf(&filename, "V%u.%u.twisted", index, iter);
+            int rc;
+            rc = asprintf(&filename, "V%u.%u.twisted", index, iter);
+            FATAL_ERROR_CHECK(rc < 0, "out of memory");
             fd = open(filename, O_RDWR|O_CREAT, 0666);
             if (fd < 0) {
                 fprintf(stderr, "fopen(%s): %s\n",
@@ -468,7 +520,15 @@ static void save_vector_toprow(matmul_top_data_ptr mmt, int d, unsigned int inde
                 return;
             }
 
-            ftruncate(fd, wsiz);
+            rc = ftruncate(fd, wsiz);
+            if (rc < 0) {
+                fprintf(stderr, "ftruncate(%s): %s\n",
+                        filename, strerror(errno));
+                fprintf(stderr, "WARNING: checkpointing failed\n");
+                free(filename);
+                close(fd);
+                return;
+            }
             recvbuf = mmap(NULL, wsiz, PROT_WRITE, MAP_SHARED, fd, 0);
             if (recvbuf == MAP_FAILED) {
                 fprintf(stderr, "mmap(%s): %s\n",
@@ -479,6 +539,7 @@ static void save_vector_toprow(matmul_top_data_ptr mmt, int d, unsigned int inde
                 return;
             }
             free(filename);
+
         }
         /* Now all threads from job zero see the area mmaped by their
          * leader thread.
@@ -539,7 +600,10 @@ static void save_vector_toprow(matmul_top_data_ptr mmt, int d, unsigned int inde
 
     if (pirow->jrank == 0 && pirow->trank == 0) {
         munmap(recvbuf, wsiz);
-        ftruncate(fd, siz);
+        int rc = ftruncate(fd, siz);
+        if (rc < 0) {
+            fprintf(stderr, "ftruncate(): %s\n", strerror(errno));
+        }
         close(fd);
     }
 }
@@ -588,7 +652,8 @@ static void load_vector_toprow(matmul_top_data_ptr mmt, int d, unsigned int inde
     if (pirow->jrank == 0) {
         if (pirow->trank == 0) {
             char * filename;
-            asprintf(&filename, "V%u.%u.twisted", index, iter);
+            int rc = asprintf(&filename, "V%u.%u.twisted", index, iter);
+            FATAL_ERROR_CHECK(rc < 0, "out of memory");
             fd = open(filename, O_RDONLY, 0666);
             DIE_ERRNO_DIAG(fd < 0, "fopen", filename);
             sendbuf = mmap(NULL, wsiz, PROT_READ, MAP_SHARED, fd, 0);
