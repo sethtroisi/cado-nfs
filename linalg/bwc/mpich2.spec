@@ -103,7 +103,7 @@ alternatives    \
 
 %preun
 alternatives --remove mpicc %{mpiprefix}%{_bindir}/mpicc
-alternatives --remove mpilibs%{mode} %{mpiprefix}%{_sysconfdir}/ld.so.conf.d/mpi%{mode}.conf
+alternatives --remove mpilibs%{mode} %{mpiprefix}%{_libdir}/%{name}.ld.conf 
 alternatives --remove mpi-run %{mpiprefix}%{_bindir}/mpirun
 
 %postun -p /sbin/ldconfig
