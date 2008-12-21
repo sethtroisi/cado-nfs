@@ -19,8 +19,13 @@ endif
 
 # offer the possibility of changing the mpi library by specifying other
 # compilers on the make command line.
+ifneq ($(MPI),)
+MPICC:=$(MPI)/mpicc
+MPICXX:=$(MPI)/mpic++
+else
 MPICC:=mpicc
 MPICXX:=mpic++
+endif
 
 ifeq ($(WITH_MPI),1)
 MY_CFLAGS+=-DWITH_MPI
@@ -28,8 +33,8 @@ CC:=$(MPICC)
 CXX:=$(MPICXX)
 
 # Work around bugs that clutter output.
-CC:=$(shell $(CC) -showme | sed -e 's/-I/-isystem /g')
-CXX:=$(shell $(CXX) -showme | sed -e 's/-I/-isystem /g')
+CC:=$(shell $(CC) -show | sed -e 's/-I/-isystem /g')
+CXX:=$(shell $(CXX) -show | sed -e 's/-I/-isystem /g')
 
 ifeq ($(CC),)
 $(error "You must install an mpicc compiler")

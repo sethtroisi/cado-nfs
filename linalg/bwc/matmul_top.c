@@ -299,7 +299,7 @@ reduce_across(matmul_top_data_ptr mmt, int d)
 
     /* reducing across a row is when d == 0 */
     pi_wiring_ptr pirow = mmt->pi->wr[d];
-#ifndef DUPLICATE_COMMS
+#ifndef MPI_LIBRARY_MT_CAPABLE
     pi_wiring_ptr picol = mmt->pi->wr[!d];
 #endif
 
@@ -337,7 +337,7 @@ reduce_across(matmul_top_data_ptr mmt, int d)
         }
     }
 
-#ifndef DUPLICATE_COMMS
+#ifndef MPI_LIBRARY_MT_CAPABLE
     /* Now we can perform mpi-level reduction across rows. */
     for(unsigned int t = 0 ; t < picol->ncores ; t++) {
         serialize_threads(picol);
@@ -361,7 +361,7 @@ reduce_across(matmul_top_data_ptr mmt, int d)
             BUG_ON(err);
         }
     }
-#else   /* DUPLICATE_COMMS */
+#else   /* MPI_LIBRARY_MT_CAPABLE */
         for(unsigned int i = 0 ; i < mrow->xlen ; i++) {
             struct isect_info * xx = &(mrow->x[i]);
             unsigned int tdst = xx->k % pirow->ncores;
@@ -510,7 +510,7 @@ static void save_vector_toprow(matmul_top_data_ptr mmt, int d, unsigned int inde
      * simply drop the pthread barrier.  Lacking this possibility, we
      * have to serialize here (for now).
      */
-#ifndef DUPLICATE_COMMS
+#ifndef MPI_LIBRARY_MT_CAPABLE
     for(unsigned int t = 0 ; t < pirow->ncores ; t++) {
         serialize_threads(pirow);
         if (t == pirow->trank) { // our turn.

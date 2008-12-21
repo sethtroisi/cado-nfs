@@ -120,7 +120,7 @@ void usage()
 
 int main(int argc, char * argv[])
 {
-#ifdef  DUPLICATE_COMMS
+#ifdef  MPI_LIBRARY_MT_CAPABLE
     int req = MPI_THREAD_MULTIPLE;
     int prov;
     MPI_Init_thread(&argc, &argv, req, &prov);

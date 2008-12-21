@@ -181,11 +181,11 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
         e->m->trank = k;
         e->wr[0]->trank = k0;
         e->wr[1]->trank = k1;
-#ifdef  DUPLICATE_COMMS
+#ifdef  MPI_LIBRARY_MT_CAPABLE
         MPI_Comm_dup(pi->m->pals, &(e->m->pals));
         MPI_Comm_dup(pi->wr[0]->pals, &(e->wr[0]->pals));
         MPI_Comm_dup(pi->wr[1]->pals, &(e->wr[1]->pals));
-#endif  /* DUPLICATE_COMMS */
+#endif  /* MPI_LIBRARY_MT_CAPABLE */
     }
 
     // row barriers.
@@ -325,13 +325,13 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
     for(unsigned int c = 0 ; c < pi->wr[0]->ncores ; c++) {
         pi_wiring_destroy_pthread_things(grid[c]->wr[1]);
     }
-#ifdef  DUPLICATE_COMMS
+#ifdef  MPI_LIBRARY_MT_CAPABLE
     for(unsigned int k = 0 ; k < nhc * nvc ; k++) {
         MPI_Comm_free(&grid[k]->m->pals);
         MPI_Comm_free(&grid[k]->wr[0]->pals);
         MPI_Comm_free(&grid[k]->wr[1]->pals);
     }
-#endif  /* DUPLICATE_COMMS */
+#endif  /* MPI_LIBRARY_MT_CAPABLE */
 
     free(grid);
 

@@ -27,10 +27,17 @@
 /* don't enable this. Clutters output a lot */
 #define xxxCONCURRENCY_DEBUG
 
-/* This isn't ready yet. Should work as long as openmpi has been compiled
- * with --enable-mpi-threads ; but does not at the moment.
+/* This isn't ready yet. In presence of an MPI library which correctly
+ * supports MPI_THREAD_MULTIPLE, chances are that this gets close to
+ * working ok, and even maybe improve performance quite a bit.
+ *
+ * At the moment, with openmpi 1.2.8 compiled with
+ * --enable-mpi-threads, it does not work (crash observed at
+ * MPI_Init_thread -- fairly weird).
+ *
+ * Mpich2 1.1 might perform better -- not tested yet.
  */
-#define xxxDUPLICATE_COMMS
+#define xxxMPI_LIBRARY_MT_CAPABLE
 
 
 /* utility structure. It is stored in thread-shared memory */
