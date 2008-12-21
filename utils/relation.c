@@ -50,10 +50,11 @@ clear_relation (relation_t *rel)
 // Stores the primes into the relation, by collecting identical primes
 // and setting the corresponding exponents. Thus a given prime will
 // appear only once in rel (but it can appear with an even exponent).
+/* Assumes identical primes are consecutive. */
 int
 read_relation (relation_t *rel, const char *str)
 {
-  int i, j, k, ret;
+  int i, j, ret;
   unsigned long p;
   
   ret = sscanf (str, "%ld,%lu:", &(rel->a), &(rel->b));
@@ -82,18 +83,18 @@ read_relation (relation_t *rel, const char *str)
 
   // read rp
   rel->rp = (rat_prime_t*) malloc (rel->nb_rp * sizeof (rat_prime_t));
+  /* j is the number of (p,e) pairs already stored in rel */
   for (i = j = 0; i < rel->nb_rp; ++i)
     {
       ret = sscanf (str, "%lx", &p);
-      if (ret!=1)
+      if (ret != 1)
         {
           fprintf (stderr, "warning: failed reading rat prime %d\n", i);
           return 0;
         }
-      /* j is the number of (p,e) pairs already stored in rel */
-      for (k = 0; k < j && rel->rp[k].p != p; k++);
-      if (k < j) /* prime already appeared */
-        rel->rp[k].e ++;
+      /* we assume identical primes are consecutive */
+      if (j > 0 && rel->rp[j - 1].p == p)
+        rel->rp[j - 1].e ++;
       else /* new prime */
         {
           rel->rp[j].p = p;
@@ -113,15 +114,17 @@ read_relation (relation_t *rel, const char *str)
     const char * pstr = str;
 
     while (pstr[0] != '\n') {
-      if (pstr[0] == ',') 
-	cpt++;
-      pstr++;
+      if (pstr[0] == ',')
+	cpt++, pstr += 2; /* there cannot be two consecutive ',' or ':' */
+      else
+        pstr++;
     }
     rel->nb_ap = cpt;
   }
 
   // read ap
   rel->ap = (alg_prime_t*) malloc (rel->nb_ap * sizeof (alg_prime_t));
+  /* j is the number of (p,e) pairs already stored in rel */
   for (i = j = 0; i < rel->nb_ap; ++i)
     {
       ret = sscanf(str, "%lx", &p);
@@ -131,10 +134,9 @@ read_relation (relation_t *rel, const char *str)
           fprintf (stderr, "warning: failed reading alg prime %d\n", i);
           return 0;
         }
-      /* j is the number of (p,e) pairs already stored in rel */
-      for (k = 0; k < j && rel->ap[k].p != p; k++);
-      if (k < j) /* prime already appeared */
-        rel->ap[k].e ++;
+      /* we assume identical primes are consecutive */
+      if (j > 0 && rel->ap[j - 1].p == p)
+        rel->ap[j - 1].e ++;
       else /* new prime */
         {
           rel->ap[j].p = p;
@@ -185,6 +187,7 @@ int fread_relation (FILE *file, relation_t *rel)
   return read_relation (rel, str);
 }
 
+/* return a/b mod p, and -1 when gcd(b,p) <> 1 */
 unsigned long
 findroot(long a, unsigned long b, unsigned long p) {
   int sig, inv;
@@ -265,12 +268,12 @@ reduce_exponents_mod2 (relation_t *rel)
 {
   int i, j;
 
-  if(rel->nb_rp == 0)
-      fprintf(stderr, "WARNING: nb_rp = 0 in reduce_exponents_mod2\n");
+  if (rel->nb_rp == 0)
+    fprintf (stderr, "WARNING: nb_rp = 0 in reduce_exponents_mod2\n");
 
   for (i = j = 0; i < rel->nb_rp; i++)
     {
-      rel->rp[i].e &= 1;
+      rel->rp[i].e &= 1; /* reduce exponent mod 2 */
       if (rel->rp[i].e != 0)
         {
           rel->rp[j].p = rel->rp[i].p;
@@ -289,7 +292,7 @@ reduce_exponents_mod2 (relation_t *rel)
 
   for (i = j = 0; i < rel->nb_ap; i++)
     {
-      rel->ap[i].e &= 1;
+      rel->ap[i].e &= 1; /* reduce exponent mod 2 */
       if (rel->ap[i].e != 0)
         {
           rel->ap[j].p = rel->ap[i].p;

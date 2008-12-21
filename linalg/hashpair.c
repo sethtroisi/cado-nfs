@@ -88,7 +88,7 @@ hashFree(hashtable_t *H)
 // Returns a new address or the one already containing (p, r), starting from
 // h.
 int
-getHashAddrAux(hashtable_t *H, long p, unsigned long r, unsigned int h)
+getHashAddrAux (hashtable_t *H, long p, unsigned long r, unsigned int h)
 {
     static unsigned int cptmax = 0;
     unsigned int cpt = 0; /* number of iterations to find a free location */
@@ -119,17 +119,19 @@ getHashAddrAux(hashtable_t *H, long p, unsigned long r, unsigned int h)
     return h;
 }
 
+/* Map (p,r) into an hash address, find the corresponding entry in the hash
+   table, and return the corresponding index. */
 int
-getHashAddr(hashtable_t *H, long p, unsigned long r)
+getHashAddr (hashtable_t *H, long p, unsigned long r)
 {
-    uint64_t mask = (H->need64) ? (uint64_t) (-1) : (uint32_t) 4294967295;
+    uint64_t mask = (H->need64) ? (uint64_t) (-1) : (uint32_t) (-1);
     unsigned int h;
 
     r = r & mask; /* ensures that -1 and -2 are mapped to -1 and -2
                      in 32-bit mode */
-    h = getInitialAddressMod((unsigned long)p, r, H->HC0, H->HC1, H->hashmod);
+    h = getInitialAddressMod((unsigned long) p, r, H->HC0, H->HC1, H->hashmod);
 
-    return getHashAddrAux(H, p, r, h);
+    return getHashAddrAux (H, p, r, h);
 }
 
 int
