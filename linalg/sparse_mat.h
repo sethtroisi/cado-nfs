@@ -37,3 +37,9 @@ typedef struct {
 #endif
 } sparse_mat_t;
 
+#ifdef USE_MPI
+#define GETJ(mat, j) ((j)-(mat)->jmin)
+#else
+#define GETJ(mat, j) (j)
+#endif
+

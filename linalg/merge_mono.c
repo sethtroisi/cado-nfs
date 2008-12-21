@@ -46,24 +46,32 @@ cmp(const void *p, const void *q) {
     return (x <= y ? -1 : 1);
 }
 
+int
+decrS(int w)
+{
+#if USE_MERGE_FAST <= 1
+    return w-1;
+#else
+    return (w >= 0 ? w-1 : w+1);
+#endif
+}
+
+int
+incrS(int w)
+{
+#if USE_MERGE_FAST <= 1
+    return w+1;
+#else
+    return (w >= 0 ? w+1 : w-1);
+#endif
+}
+
 // TODO: ncols could be a new renumbered ncols...
 void
 initMat(sparse_mat_t *mat, INT jmin, INT jmax)
 {
 #if USE_MERGE_FAST
-    // mat->cwmax+2 to prevent bangs
-    dclist *S = (dclist *)malloc((mat->cwmax+2) * sizeof(dclist));
-    dclist *A = (dclist *)malloc((jmax-jmin) * sizeof(dclist));
     INT **R;
-    int k;
-
-    ASSERT_ALWAYS(S != NULL);
-    ASSERT_ALWAYS(A != NULL);
-    // S[0] has a meaning at least for temporary reasons
-    for(k = 0; k <= mat->cwmax+1; k++)
-	S[k] = dclistCreate(-1);
-    mat->S = S;
-    mat->A = A;
 #endif
 
     mat->jmin = jmin;
@@ -128,30 +136,16 @@ matrix2tex(sparse_mat_t *mat)
 }
 
 void
-texSWAR(sparse_mat_t *mat)
+Sparse2Tex(sparse_mat_t *mat)
 {
-    int j, w;
+    int j;
     INT k;
 
     fprintf(stderr, "\\end{verbatim}\n");
     matrix2tex(mat);
-    fprintf(stderr, "$$\\begin{array}{|");
-    for(w = 0; w <= mat->cwmax; w++)
-	fprintf(stderr, "r|");
-    fprintf(stderr, "|r|}\\hline\n");
-    for(w = 0; w <= mat->cwmax+1; w++){
-	fprintf(stderr, "S[%d]", w);
-	if(w < mat->cwmax+1)
-	    fprintf(stderr, "&");
-    }
-    fprintf(stderr, "\\\\\\hline\n");
-    for(w = 0; w <= mat->cwmax+1; w++){
-	dclistTex(stderr, mat->S[w]->next);
-	if(w < mat->cwmax+1)
-            fprintf(stderr, "&");
-    }
-    fprintf(stderr, "\\\\\\hline\n");
-    fprintf(stderr, "\\end{array}$$\n");
+#ifndef USE_MARKOWITZ
+    texSWAR(mat);
+#endif
     fprintf(stderr, "$$\\begin{array}{|c|");
     for(j = 0; j < mat->ncols; j++)
 	fprintf(stderr, "r|");
@@ -175,16 +169,6 @@ texSWAR(sparse_mat_t *mat)
 	fprintf(stderr, "\n");
     }
 #endif
-}
-
-void
-printStats(sparse_mat_t *mat)
-{
-    int w;
-
-    for(w = 0; w <= mat->cwmax; w++)
-	fprintf(stderr, "I found %d primes of weight %d\n",
-		dclistLength(mat->S[w]->next), w);
 }
 
 /* compute the weight mat->wt[j] of each column j, for the set of relations
@@ -336,7 +320,9 @@ readmat(sparse_mat_t *mat, FILE *file)
     // we need to keep informed of what really happens; this will be an upper
     // bound on the number of active columns, I guess
     mat->rem_ncols = mat->ncols;
-    printStats(mat);
+#ifndef USE_MARKOWITZ
+    printStatsSWAR(mat);
+#endif
     return 1;
 }
 
@@ -1121,7 +1107,7 @@ remove_j_from_row(sparse_mat_t *mat, int i, int j)
 // making things independent of the real data structure used
 //////////////////////////////////////////////////////////////////////
 
-// The cell [i, j] must be incorporated to the data structure, at least
+// The cell [i, j] may be incorporated to the data structure, at least
 // if j is not too heavy, etc. 
 // TODO: this should be shared and redistributed
 // between swar.c and the present file.
@@ -1132,21 +1118,37 @@ addCellAndUpdate(sparse_mat_t *mat, int i, INT j)
     if(i == TRACE_ROW)
 	fprintf(stderr, "TRACE_ROW: addCellSWAR i=%d j=%d\n", i, j);
 #endif
+#ifndef USE_MARKOWITZ
     if(addColSWAR(mat, j) >= 0)
 	// update R[j] by adding i
 	add_i_to_Rj(mat, i, j);
+#else
+    if(MkzAddCol(mat, j) >= 0){
+	// update R[j] by adding i
+	add_i_to_Rj(mat, i, j);
+	MkzUpdate(mat, j);
+    }
+#endif
 }
 
 void
 removeCellAndUpdate(sparse_mat_t *mat, int i, INT j)
 {
+#ifndef USE_MARKOWITZ
     removeCellSWAR(mat, i, j);
+#else
+    fprintf(stderr, "MKZ work needed in removeCellAndUpdate\n");
+#endif
 }
 
 void
 removeColumnAndUpdate(sparse_mat_t *mat, int j)
 {
+#ifndef USE_MARKOWITZ
     remove_j_from_SWAR(mat, j);
+#else
+    fprintf(stderr, "MKZ work needed in removeColumnAndUpdate\n");
+#endif
 }
 
 // These columns are simply removed from the current squeleton matrix, but
@@ -1154,6 +1156,10 @@ removeColumnAndUpdate(sparse_mat_t *mat, int j)
 int
 deleteAllColsFromStack(report_t *rep, sparse_mat_t *mat, int iS)
 {
+#ifdef USE_MARKOWITZ
+    fprintf(stderr, "What's the point to have deleteAllColsFromStack?\n");
+    return 0;
+#else
     dclist dcl;
     INT j;
     int k, njrem = 0;
@@ -1207,6 +1213,7 @@ deleteAllColsFromStack(report_t *rep, sparse_mat_t *mat, int iS)
 	fprintf(stderr, "deleteAllColsFromStack[%d]: %d\n", iS, njrem);
 #endif
     return njrem;
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////
@@ -1234,7 +1241,7 @@ removeRowAndUpdate(sparse_mat_t *mat, int i)
     }
 }
 
-// All entries M[i, j] are added to the structure.
+// All entries M[i, j] are potentially added to the structure.
 void
 addOneRowAndUpdate(sparse_mat_t *mat, int i)
 {
@@ -1485,7 +1492,7 @@ mergeForColumn(report_t *rep, double *tt, double *tfill, double *tMST,
 #if (DEBUG >= 1) || TEX
     fprintf(stderr, "Status before next j=%d to start\n", j);
 # if TEX
-    texSWAR(mat);
+    Sparse2Tex(mat);
 # else
     printSWAR(mat, mat->ncols);
 # endif
@@ -1525,6 +1532,7 @@ mergeForColumn(report_t *rep, double *tt, double *tfill, double *tMST,
     removeColumnAndUpdate(mat, j);
 }
 
+#ifndef USE_MARKOWITZ
 // maxdo is 0 if we want to perform a non-bounded number of operations; 
 // an integer >= 1 otherwise.
 // Default for the monoproc version is 0.
@@ -1586,7 +1594,7 @@ merge_m_fast(report_t *rep, sparse_mat_t *mat, int m, int maxdo, int verbose)
 	    
 #if DEBUG >= 1
     fprintf(stderr, "Status at the end of the process\n");
-    texSWAR(mat);
+    Sparse2Tex(mat);
 #endif
     return njrem;
 }
@@ -1645,6 +1653,7 @@ minColWeight(sparse_mat_t *mat)
     return -1;
 #endif
 }
+#endif
 
 #if (USE_MERGE_FAST < 3) && !defined(USE_MPI)
 int
@@ -1760,6 +1769,10 @@ deleteScore(sparse_mat_t *mat, INT i)
 int
 findSuperfluousRowsFor2(int *tmp, int ntmp, sparse_mat_t *mat)
 {
+#ifdef USE_MARKOWITZ
+    fprintf(stderr, "What's the use of findSuperfluousRowsFor2 for MKZ?\n");
+    return 0;
+#else
     dclist dcl;
     INT *Rj;
     int itmp = 0, j, k, kmin;
@@ -1785,6 +1798,7 @@ findSuperfluousRowsFor2(int *tmp, int ntmp, sparse_mat_t *mat)
 #endif
     }
     return itmp;
+#endif
 }
 
 // this guy is linear => total is quadratic, be careful!
@@ -1837,6 +1851,9 @@ deleteSuperfluousRows(report_t *rep, sparse_mat_t *mat, int keep, int niremmax, 
 void
 merge(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 {
+#ifdef USE_MARKOWITZ
+    fprintf(stderr, "What's the use of merge for MKZ?\n");
+#else
     unsigned long bwcostmin = 0, oldcost = 0, cost;
     int old_nrows, old_ncols, m, mm, njrem = 0, ncost = 0, ncostmax;
 
@@ -1928,6 +1945,7 @@ merge(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 	fprintf(rep->outfile, "BWCOSTMIN: %lu\n", bwcostmin);
 	fprintf(stderr, "Minimal bwcost found: %lu\n", bwcostmin);
     }
+#endif
 }
 
 static double
@@ -1967,6 +1985,9 @@ mergeForColumn2(report_t *rep, sparse_mat_t *mat, int *njrem,
 void
 doOneMerge(report_t *rep, sparse_mat_t *mat, int *njrem, double *totopt, double *totfill, double *totMST, double *totdel, int m, int maxdo, int useMST, int verbose)
 {
+#ifdef USE_MARKOWITZ
+    fprintf(stderr, "What's the use of doOneMerge for MKZ?\n");
+#else
     dclist dcl;
     INT j;
 
@@ -1989,6 +2010,7 @@ doOneMerge(report_t *rep, sparse_mat_t *mat, int *njrem, double *totopt, double 
 	mergeForColumn2(rep, mat, njrem, totopt, totfill, totMST, totdel,
 			useMST, j);
     }
+#endif
 }
 
 int
@@ -2009,6 +2031,17 @@ number_of_superfluous_rows(sparse_mat_t *mat)
     else
 	ni2rem = mat->delta * (kappa/64);
     return ni2rem;
+}
+
+int
+deleteEmptyColumns(sparse_mat_t *mat)
+{
+#ifndef USE_MARKOWITZ
+    return deleteEmptyColumnsSWAR(mat);
+#else
+    fprintf(stderr, "MKZ work needed in deleteEmptyColumns\n");
+    return 0;
+#endif
 }
 
 void
@@ -2251,6 +2284,9 @@ doAllAdds(report_t *rep, sparse_mat_t *mat, char *str)
 void
 resume(report_t *rep, sparse_mat_t *mat, char *resumename)
 {
+#ifdef USE_MARKOWITZ
+    fprintf(stderr, "Resume not operational for Markowitz, sorry\n");
+#else
     FILE *resumefile = fopen(resumename, "r");
     char str[STR_LEN_MAX];
     unsigned long addread = 0;
@@ -2286,4 +2322,5 @@ resume(report_t *rep, sparse_mat_t *mat, char *resumename)
     fprintf(stderr, "At the end of resume, we have");
     fprintf(stderr, " nrows=%d ncols=%d (%d)\n",
 	    mat->rem_nrows, mat->rem_ncols, mat->rem_nrows-mat->rem_ncols);
+#endif
 }

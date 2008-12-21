@@ -150,10 +150,12 @@ main(int argc, char *argv[])
     initWeightFromFile(&mat, purgedfile);
     fprintf(stderr, "Time for initWeightFromFile: %2.2lf\n", seconds()-tt);
     gzip_close(purgedfile, purgedname);
-    
+
+#ifndef USE_MARKOWITZ
     tt = seconds();
     fillSWAR(&mat);
     fprintf(stderr, "Time for fillSWAR: %2.2lf\n", seconds()-tt);
+#endif
     
     purgedfile = gzip_open(purgedname, "r");
     ASSERT_ALWAYS(purgedfile != NULL);
@@ -216,6 +218,8 @@ main(int argc, char *argv[])
 	fclose(ofile);
     }
 #endif
+#ifndef USE_MARKOWITZ
     closeSWAR(/*&mat*/);
+#endif
     return 0;
 }

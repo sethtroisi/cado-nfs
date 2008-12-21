@@ -24,12 +24,6 @@
 //    for large numbers).
 #define USE_MERGE_FAST 2
 
-#ifdef USE_MPI
-#define GETJ(mat, j) ((j)-(mat)->jmin)
-#else
-#define GETJ(mat, j) (j)
-#endif
-
 #if USE_TAB == 0
 #define isRowNull(mat, i) ((mat)->data[(i)].val == NULL)
 #define lengthRow(mat, i) (mat)->data[(i)].len
@@ -45,13 +39,13 @@
 extern void destroyRj(sparse_mat_t *mat, int j);
 extern void remove_i_from_Rj(sparse_mat_t *mat, int i, int j);
 extern void add_i_to_Rj(sparse_mat_t *mat, int i, int j);
+extern int decrS(int w);
+extern int incrS(int w);
 // TODO_END
 
 
 extern void initMat(sparse_mat_t *mat, INT jmin, INT jmax);
 extern void initWeightFromFile(sparse_mat_t *mat, FILE *purgedfile);
-extern void fillSWAR(sparse_mat_t *mat);
-extern void closeSWAR(/*sparse_mat_t *mat*/);
 
 extern int readmat(sparse_mat_t *mat, FILE *file);
 extern void removeCellSWAR(sparse_mat_t *mat, int i, INT j);

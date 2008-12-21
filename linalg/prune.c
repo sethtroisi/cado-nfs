@@ -80,7 +80,12 @@ delete (report_t *rep, int i, int *nodes, sparse_mat_t *mat, unsigned int *rsum)
         j = cell(mat, i, k); /* column index of the kth non-zero coefficient */
         rsum[j] -= i;        /* update rsum */
         removeCellSWAR_time -= seconds ();
-	removeCellSWAR(mat, i, j); /* defined in merge.c */
+#ifndef USE_MARKOWITZ 
+	removeCellSWAR(mat, i, j); /* defined in swar.c */
+#else
+	fprintf(stderr, "ERROR: MKZ not operational here!!!\n");
+	exit(-1);
+#endif
         removeCellSWAR_time += seconds ();
 	if(mat->wt[GETJ(mat, j)] == 0)
 	    nd++;

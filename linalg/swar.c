@@ -12,6 +12,9 @@
 #include "dclist.h"
 #include "sparse_mat.h"
 #include "report.h"
+
+#ifndef USE_MARKOWITZ
+
 #include "swar.h"
 #include "merge_mono.h"
 
@@ -27,8 +30,18 @@
 void
 fillSWAR(sparse_mat_t *mat)
 {
-    INT j, *Rj, jmin = mat->jmin, jmax = mat->jmax;
+    // mat->cwmax+2 to prevent bangs
+    dclist *S = (dclist *)malloc((mat->cwmax+2) * sizeof(dclist));
+    dclist *A = (dclist *)malloc((mat->jmax-mat->jmin) * sizeof(dclist));
+    INT j, *Rj, jmin = mat->jmin, jmax = mat->jmax, k;
 
+    ASSERT_ALWAYS(S != NULL);
+    ASSERT_ALWAYS(A != NULL);
+    // S[0] has a meaning at least for temporary reasons
+    for(k = 0; k <= mat->cwmax+1; k++)
+	S[k] = dclistCreate(-1);
+    mat->S = S;
+    mat->A = A;
     for(j = jmin; j < jmax; j++){
 #  if DEBUG >= 1
 	fprintf(stderr, "Treating column %d\n", j);
@@ -102,6 +115,40 @@ printSWAR(sparse_mat_t *mat, int ncols)
 	fprintf(stderr, "R: NYI in printSWAR\n");
 	exit(1);
 #endif
+}
+
+void
+texSWAR(sparse_mat_t *mat)
+{
+    int w;
+
+    fprintf(stderr, "$$\\begin{array}{|");
+    for(w = 0; w <= mat->cwmax; w++)
+	fprintf(stderr, "r|");
+    fprintf(stderr, "|r|}\\hline\n");
+    for(w = 0; w <= mat->cwmax+1; w++){
+	fprintf(stderr, "S[%d]", w);
+	if(w < mat->cwmax+1)
+	    fprintf(stderr, "&");
+    }
+    fprintf(stderr, "\\\\\\hline\n");
+    for(w = 0; w <= mat->cwmax+1; w++){
+	dclistTex(stderr, mat->S[w]->next);
+	if(w < mat->cwmax+1)
+            fprintf(stderr, "&");
+    }
+    fprintf(stderr, "\\\\\\hline\n");
+    fprintf(stderr, "\\end{array}$$\n");
+}
+
+void
+printStatsSWAR(sparse_mat_t *mat)
+{
+    int w;
+
+    for(w = 0; w <= mat->cwmax; w++)
+	fprintf(stderr, "I found %d primes of weight %d\n",
+		dclistLength(mat->S[w]->next), w);
 }
 
 // w(j) has decreased in such a way that it can be incorporated in the
@@ -195,26 +242,6 @@ remove_j_from_SWAR(sparse_mat_t *mat, int j)
     destroyRj(mat, j);
 }
 
-int
-decrS(int w)
-{
-#if USE_MERGE_FAST <= 1
-    return w-1;
-#else
-    return (w >= 0 ? w-1 : w+1);
-#endif
-}
-
-int
-incrS(int w)
-{
-#if USE_MERGE_FAST <= 1
-    return w+1;
-#else
-    return (w >= 0 ? w+1 : w-1);
-#endif
-}
-
 /* remove the cell (i,j), and updates matrix correspondingly.
    Note: A[j] contains the address of the cell in S[w] where j is stored.
    
@@ -289,7 +316,7 @@ addColSWAR(sparse_mat_t *mat, INT j)
 
     // update weight
 #if DEBUG >= 1
-    fprintf(stderr, "addCellSWAR: moving j=%d from S[%d] to S[%d]\n",
+    fprintf(stderr, "addColSWAR: moving j=%d from S[%d] to S[%d]?\n",
 	    j, mat->wt[GETJ(mat, j)], incrS(mat->wt[GETJ(mat, j)]));
 #endif
     ind = mat->wt[GETJ(mat, j)] = incrS(mat->wt[GETJ(mat, j)]);
@@ -315,7 +342,7 @@ addColSWAR(sparse_mat_t *mat, INT j)
 }
 
 int
-deleteEmptyColumns(sparse_mat_t *mat)
+deleteEmptyColumnsSWAR(sparse_mat_t *mat)
 {
 #if 0
     return deleteAllColsFromStack(mat, 0);
@@ -339,3 +366,4 @@ deleteEmptyColumns(sparse_mat_t *mat)
 #endif
 }
 
+#endif

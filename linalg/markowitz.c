@@ -2,6 +2,7 @@
 #include "sparse.h"
 #include "dclist.h"
 #include "sparse_mat.h"
+#include "report.h"
 #include "swar.h"
 
 #ifdef USE_MARKOWITZ
@@ -14,11 +15,25 @@
 // Q[0] contains the number of items in Q[], so that useful part of Q
 // is Q[1..Q[0]]
 
+// Q[2*i] contains j-jmin = dj
+// Q[2*i+1] contains the Markowitz count for j
+
 #define MkZIsQueueEmpty(Q) (Q[0] == 0)
 
 // get j-th component of Q[i] 
 #define MkzGet(Q, i, j) (Q[((i)<<1)+(j)])
 #define MkzSet(Q, i, j, val) (Q[((i)<<1)+(j)] = (val))
+
+// (Q, A)[k1] <- (Q, A)[k2]
+void
+MkzAssign(INT *Q, INT *A, INT k1, INT k2)
+{
+    INT dj = MkzGet(Q, k2, 0);
+
+    MkzSet(Q, k1, 0, dj);
+    MkzSet(Q, k1, 1, MkzGet(Q, k2, 1)); // could be simplified...!
+    A[dj] = k1;
+}
 
 void
 MkzPrintQueue(INT *Q)
@@ -39,15 +54,12 @@ MkzPrintQueue(INT *Q)
 void
 MkzUpQueue(INT *Q, INT *A, INT k)
 {
-    INT x = MkzGet(Q, k, 0), v = MkzGet(Q, k, 1), j;
+    INT x = MkzGet(Q, k, 0), v = MkzGet(Q, k, 1);
 
     while((k > 1) && (MkzGet(Q, k/2, 1) >= v)){
 	// we are at level > 0 and the father is >= son
 	// the father replaces the son
-	j = MkzGet(Q, k/2, 0);
-	MkzSet(Q, k, 0, j);
-	MkzSet(Q, k, 1, MkzGet(Q, k/2, 1)); // could be simplified...!
-	A[j] = k;
+	MkzAssign(Q, A, k, k/2);
 	k /= 2;
     }
     // we found the place of (x, v)
@@ -57,12 +69,12 @@ MkzUpQueue(INT *Q, INT *A, INT k)
 }
 
 void
-MkzInsert(INT *Q, INT *A, INT j, INT c)
+MkzInsert(INT *Q, INT *A, INT dj, INT c)
 {
     Q[0]++;
-    MkzSet(Q, Q[0], 0, j); 
+    MkzSet(Q, Q[0], 0, dj);
     MkzSet(Q, Q[0], 1, c);
-    A[j] = Q[0];
+    A[dj] = Q[0];
     MkzUpQueue(Q, A, Q[0]);
 }
 
@@ -70,7 +82,7 @@ MkzInsert(INT *Q, INT *A, INT j, INT c)
 void
 MkzDownQueue(INT *Q, INT *A, INT k)
 {
-    INT x = MkzGet(Q, k, 0), v = MkzGet(Q, k, 1), j, z;
+    INT x = MkzGet(Q, k, 0), v = MkzGet(Q, k, 1), j;
 
     while(k <= Q[0]/2){
 	// k has at least a left son
@@ -84,10 +96,7 @@ MkzDownQueue(INT *Q, INT *A, INT k)
 	    break;
 	else{
 	    // the father takes the place of the son
-	    z = MkzGet(Q, j, 0);
-	    MkzSet(Q, k, 0, z);
-	    MkzSet(Q, k, 1, MkzGet(Q, j, 1));
-	    A[z] = k;
+	    MkzAssign(Q, A, k, j);
 	    k = j;
 	}
     }
@@ -98,16 +107,11 @@ MkzDownQueue(INT *Q, INT *A, INT k)
 }
 
 void
-MkzPopQueue(INT *j, INT *mkz, INT *Q, INT *A)
+MkzPopQueue(INT *dj, INT *mkz, INT *Q, INT *A)
 {
-    INT z;
-
-    *j = MkzGet(Q, 1, 0);
+    *dj = MkzGet(Q, 1, 0);
     *mkz = MkzGet(Q, 1, 1);
-    z = MkzGet(Q, Q[0], 0);
-    MkzSet(Q, 1, 0, z);
-    MkzSet(Q, 1, 1, MkzGet(Q, Q[0], 1));
-    A[z] = 1;
+    MkzAssign(Q, A, 1, Q[0]);
     Q[0]--;
     MkzDownQueue(Q, A, 1);
 }
@@ -115,43 +119,47 @@ MkzPopQueue(INT *j, INT *mkz, INT *Q, INT *A)
 void
 MkzCheck(sparse_mat_t *mat)
 {
-    INT j;
+    INT dj;
 
-    for(j = mat->jmin; j < mat->jmax; j++)
-	if(mat->wt[j] > 0)
-	    if(MkzGet(mat->MKZQ, mat->MKZA[j], 0) != j)
-		fprintf(stderr, "GASP: %d in MkzCheck\n", j);
+    for(dj = 0; dj < mat->jmax - mat->jmin; dj++)
+	if(mat->wt[dj] > 0)
+	    if(MkzGet(mat->MKZQ, mat->MKZA[dj], 0) != dj)
+		fprintf(stderr, "GASP: %d in MkzCheck\n", dj);
+}
+
+int
+MkzCount(sparse_mat_t *mat, INT j)
+{
+    int mkz, k, i;
+
+    mkz = mat->nrows;
+    for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
+	if((i = mat->R[GETJ(mat, j)][k]) != -1){
+	    // this should be the weight of row i
+	    if(mat->rows[i][0] < mkz)
+		mkz = mat->rows[i][0];
+	}
+    return ((mkz-1) * mat->wt[GETJ(mat, j)]);
 }
 
 void
 MkzInit(sparse_mat_t *mat)
 {
-    INT i, j, k, mkz;
+    INT j, mkz;
+    int sz = mat->jmax - mat->jmin;
 
     printf("Entering initMarkowitz\n");
-    mat->MKZQ = (INT *)malloc((mat->ncols+1) * 2 * sizeof(INT));
-    mat->MKZA = (INT *)malloc((mat->ncols+1) * sizeof(INT));
+    mat->MKZQ = (INT *)malloc((sz+1) * 2 * sizeof(INT));
+    mat->MKZA = (INT *)malloc((sz+1) * sizeof(INT));
     // just to understand
     for(j = mat->jmin; j < mat->jmax; j++)
 	if(mat->wt[GETJ(mat, j)] > 0){
-	    mkz = mat->nrows;
+	    mkz = MkzCount(mat, j);
 #if MKZ_DEBUG >= 2
 	    printf("j=%d wt=%d", j, mat->wt[GETJ(mat, j)]);
-#endif
-	    for(k = 1; k <= mat->R[j][0]; k++)
-		if((i = mat->R[j][k]) != -1){
-		    // this should be the weight of row i
-#if MKZ_DEBUG >= 2
-		    printf(" %d", mat->rows[i][0]);
-#endif
-		    if(mat->rows[i][0] < mkz)
-			mkz = mat->rows[i][0];
-		}
-	    mkz = (mkz-1) * mat->wt[GETJ(mat, j)];
-#if MKZ_DEBUG >= 2
 	    printf(" => mkz=%d\n", mkz);
 #endif
-	    MkzInsert(mat->MKZQ, mat->MKZA, j, mkz);
+	    MkzInsert(mat->MKZQ, mat->MKZA, GETJ(mat, j), mkz);
 	}
     // TODO: overflow in mkz???
     MkzCheck(mat);
@@ -161,6 +169,27 @@ void
 MkzClose(sparse_mat_t *mat)
 {
     free(mat->MKZQ);
+}
+
+int
+MkzAddCol(sparse_mat_t *mat, INT j)
+{
+    int ind = mat->wt[GETJ(mat, j)] = incrS(mat->wt[GETJ(mat, j)]);
+
+    return ind;
+}
+
+void
+MkzUpdate(sparse_mat_t *mat, INT j)
+{
+    INT adr = mat->MKZA[GETJ(mat, j)];
+    int mkz = MkzCount(mat, j);
+
+    // nothing to do if new count == old count
+    if(mkz != MkzGet(mat->MKZQ, adr, 0)){
+	// remove old count
+	// add new count
+    }
 }
 
 #endif
