@@ -12,6 +12,8 @@
 #define DEBUG 0
 
 #include "utils/utils.h"
+
+#include "merge_opts.h"
 #include "sparse.h"
 #include "dclist.h"
 #include "sparse_mat.h"

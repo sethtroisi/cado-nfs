@@ -87,7 +87,8 @@ LINALG_FILES=linalg/Makefile linalg/freerel.c linalg/hashpair.h \
 	   linalg/balance.c linalg/readbuffer.h linalg/rowset_heap.h \
 	   linalg/readbuffer.c linalg/rowset_heap.cpp linalg/apply_perm.c \
 	   linalg/characters.c linalg/gauss.c linalg/gauss.h linalg/allsqrt.c \
-	   linalg/sparse_mat.h \
+	   linalg/merge_opts.h \
+	   linalg/sparse_mat.c linalg/sparse_mat.h \
 	   linalg/dclist.c linalg/dclist.h \
 	   linalg/report.c linalg/report.h \
 	   linalg/swar.c linalg/swar.h \

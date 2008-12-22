@@ -1,4 +1,7 @@
-//#define USE_MARKOWITZ // says it...!
+#define USE_TAB 1 // 1 for compact rows...
+
+#define TRACE_COL -1 // 253224 // 231 // put to -1 if not...!
+#define TRACE_ROW -1 // put to -1 if not...!
 
 /* rows correspond to relations, and columns to primes (or prime ideals) */
 typedef struct {
@@ -43,3 +46,24 @@ typedef struct {
 #define GETJ(mat, j) (j)
 #endif
 
+extern void addRowsWithWeight(sparse_mat_t *mat, int i1, int i2);
+extern void removeWeightFromRow(sparse_mat_t *mat, int i);
+extern void remove_j_from_row(sparse_mat_t *mat, int i, int j);
+extern void print_row(sparse_mat_t *mat, int i);
+
+#if USE_TAB == 0
+#define isRowNull(mat, i) ((mat)->data[(i)].val == NULL)
+#define lengthRow(mat, i) (mat)->data[(i)].len
+#define cell(mat, i, k) (mat)->data[(i)].val[(k)]
+#define SPARSE_ITERATE(mat, i, k) for((k)=0; (k)<lengthRow((mat),(i)); (k)++)
+#else
+#define isRowNull(mat, i) ((mat)->rows[(i)] == NULL)
+#define lengthRow(mat, i) (mat)->rows[(i)][0]
+#define cell(mat, i, k) (mat)->rows[(i)][(k)]
+#define SPARSE_ITERATE(mat, i, k) for((k)=1; (k)<=lengthRow((mat),(i)); (k)++)
+#endif
+extern void destroyRj(sparse_mat_t *mat, int j);
+extern void remove_i_from_Rj(sparse_mat_t *mat, int i, int j);
+extern void add_i_to_Rj(sparse_mat_t *mat, int i, int j);
+extern int decrS(int w);
+extern int incrS(int w);
