@@ -20,7 +20,7 @@
 
 using namespace std;
 
-#include "matmul.h"
+#include "matmul-sliced.h"
 #include "readmat.h"
 #include "abase.h"
 #include "manu.h"
@@ -50,10 +50,14 @@ using namespace std;
  */
 
 /* This extension is used to distinguish between several possible
- * implementations of the product */
+ * implementations of the product. The upper word correspond to the
+ * implementation itself, the lower one to the n-th binary incompatible
+ * change (make sure to bump it) */
 #define MM_EXTENSION   "-sliced"
-#define MM_MAGIC        0xa0001003UL
 
+#define MM_MAGIC_FAMILY        0xa000UL
+#define MM_MAGIC_VERSION       0x1004UL
+#define MM_MAGIC (MM_MAGIC_FAMILY << 16 | MM_MAGIC_VERSION)
 
 struct slice_info {
     unsigned int nrows;
@@ -90,80 +94,32 @@ struct matmul_data_s {
         x >>= 16;
         data.push_back(x & ((1u << 16) - 1));
     }
-    void push48(uint64_t x)
-    {
-        BUG_ON(x >> 48);
-        data.push_back(x & ((1u << 16) - 1));
-        x >>= 16;
-        data.push_back(x & ((1u << 16) - 1));
-        x >>= 16;
-        data.push_back(x & ((1u << 16) - 1));
-    }
-    void push64(uint64_t x)
-    {
-        data.push_back(x & ((1u << 16) - 1));
-        x >>= 16;
-        data.push_back(x & ((1u << 16) - 1));
-        x >>= 16;
-        data.push_back(x & ((1u << 16) - 1));
-        x >>= 16;
-        data.push_back(x & ((1u << 16) - 1));
-    }
-    void place48(unsigned int i, uint64_t x)
-    {
-        BUG_ON(x >> 48);
-        BUG_ON(i+3>data.size());
-        data[i++] = x & ((1u << 16) - 1);
-        x >>= 16;
-        data[i++] = x & ((1u << 16) - 1);
-        x >>= 16;
-        data[i++] = x & ((1u << 16) - 1);
-    }
-    void place64(unsigned int i, uint64_t x)
-    {
-        BUG_ON(i+4>data.size());
-        data[i++] = x & ((1u << 16) - 1);
-        x >>= 16;
-        data[i++] = x & ((1u << 16) - 1);
-        x >>= 16;
-        data[i++] = x & ((1u << 16) - 1);
-        x >>= 16;
-        data[i++] = x & ((1u << 16) - 1);
-    }
-    uint32_t read32(data_t::const_iterator & q) {
+    static inline uint32_t read32(data_t::const_iterator & q) {
         uint32_t res;
         res = *q++;
         res |= ((uint32_t) *q++) << 16;
-        return res;
-    }
-    uint32_t read64(data_t::const_iterator & q) {
-        uint64_t res;
-        res = *q++;
-        res |= ((uint64_t) *q++) << 16;
-        res |= ((uint64_t) *q++) << 32;
-        res |= ((uint64_t) *q++) << 48;
         return res;
     }
 };
 
 #define MM      ((struct matmul_data_s *) mm)
 
-void matmul_clear(matmul_ptr mm)
+void matmul_sliced_clear(matmul_ptr mm)
 {
     MM->dslices_info.clear();
     MM->data.clear();
     delete MM;
 }
 
-matmul_ptr matmul_init()
+static matmul_ptr matmul_sliced_init()
 {
     return (struct matmul_public_s *) new matmul_data_s;
 }
 
 
-matmul_ptr matmul_build(abobj_ptr xx, const char * filename)
+matmul_ptr matmul_sliced_build(abobj_ptr xx, const char * filename)
 {
-    matmul_ptr mm = matmul_init();
+    matmul_ptr mm = matmul_sliced_init();
 
     MM->xab = xx;
 
@@ -185,13 +141,6 @@ matmul_ptr matmul_build(abobj_ptr xx, const char * filename)
     MM->nrows = smat->nrows;
     MM->ncols = smat->ncols;
     MM->ncoeffs = 0;
-
-    MM->push32(MM->nrows);
-    MM->push32(MM->ncols);
-
-    // allow 64 bits for the number of coefficients
-    unsigned int ncoeffs_index = MM->data.size();
-    MM->push64(0);
 
     unsigned int npack = 3072;
     unsigned int nslices = iceildiv(i1-i0, npack);
@@ -304,8 +253,6 @@ matmul_ptr matmul_build(abobj_ptr xx, const char * filename)
         MM->dslices_info.push_back(si);
     }
 
-    MM->place64(ncoeffs_index, MM->ncoeffs);
-
     /* There's an other option for the dense strips. For a given
      * set of source values (fitting in L2), store delta_j's for
      * a given destination value. Could actually be eight bits.
@@ -347,7 +294,7 @@ matmul_ptr matmul_build(abobj_ptr xx, const char * filename)
     return mm;
 }
 
-matmul_ptr matmul_reload_cache(abobj_ptr xx, const char * filename)
+matmul_ptr matmul_sliced_reload_cache(abobj_ptr xx, const char * filename)
 {
     char * base;
     FILE * f;
@@ -369,7 +316,7 @@ matmul_ptr matmul_reload_cache(abobj_ptr xx, const char * filename)
 
     size_t n;
     size_t rc;
-    matmul_ptr mm = matmul_init();
+    matmul_ptr mm = matmul_sliced_init();
 
     MM->xab = xx;
 
@@ -378,6 +325,13 @@ matmul_ptr matmul_reload_cache(abobj_ptr xx, const char * filename)
     FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
     FATAL_ERROR_CHECK(magic_check != MM_MAGIC,
             "Wrong magic in cached matrix file");
+
+    rc = fread(&MM->nrows, sizeof(unsigned int), 1, f);
+    FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
+    rc = fread(&MM->ncols, sizeof(unsigned int), 1, f);
+    FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
+    rc = fread(&MM->ncoeffs, sizeof(unsigned long), 1, f);
+    FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
 
     rc = fread(&n, sizeof(size_t), 1, f);
     FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
@@ -390,14 +344,10 @@ matmul_ptr matmul_reload_cache(abobj_ptr xx, const char * filename)
 
     data_t::const_iterator q = MM->data.begin();
 
-    MM->nrows = MM->read32(q);
-    MM->ncols = MM->read32(q);
-    MM->ncoeffs = MM->read64(q);
-
     return mm;
 }
 
-void matmul_save_cache(matmul_ptr mm, const char * filename)
+void matmul_sliced_save_cache(matmul_ptr mm, const char * filename)
 {
     char * base;
     FILE * f;
@@ -422,6 +372,13 @@ void matmul_save_cache(matmul_ptr mm, const char * filename)
     rc = fwrite(&magic, sizeof(unsigned long), 1, f);
     FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
 
+    rc = fwrite(&MM->nrows, sizeof(unsigned int), 1, f);
+    FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
+    rc = fwrite(&MM->ncols, sizeof(unsigned int), 1, f);
+    FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
+    rc = fwrite(&MM->ncoeffs, sizeof(unsigned long), 1, f);
+    FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
+
     rc = fwrite(&n, sizeof(size_t), 1, f);
     FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
 
@@ -431,51 +388,65 @@ void matmul_save_cache(matmul_ptr mm, const char * filename)
     fclose(f);
 }
 
-void matmul(matmul_ptr mm, abt * dst, abt const * src)
+void matmul_sliced_mul(matmul_ptr mm, abt * dst, abt const * src, int d)
 {
     asm("# multiplication code\n");
     data_t::const_iterator q = MM->data.begin();
 
-    q += 2;     // nrows
-    q += 2;     // ncols
-    q += 4;     // ncoeffs, 64 bits.
-
     uint16_t nhstrips = *q++;
     uint32_t i = 0;
-#ifdef  SLICE_STATS
-    std::vector<slice_info>::iterator sit = dslices_info.begin();
-    double tick = oncpu_ticks();
-#endif
     abobj_ptr x = MM->xab;
-    for(uint16_t s = 0 ; s < nhstrips ; s++) {
-        uint32_t j = 0;
-        uint16_t nrows_packed = *q++;
-        abzero(x, dst + aboffset(x, i), nrows_packed);
-        asm("# critical loop\n");
-        uint32_t ncoeffs_slice;
-        ncoeffs_slice = *q++;
-        ncoeffs_slice |= ((uint32_t) *q++) << 16;
-        for(uint32_t c = 0 ; c < ncoeffs_slice ; c++) {
-            j += *q++;
-            uint32_t di = *q++;
-            abadd(x, dst + aboffset(x, i + di), src + aboffset(x, j));
-        }
-        i += nrows_packed;
-        asm("# end of critical loop\n");
+
+    if (d == 1) {
 #ifdef  SLICE_STATS
-        if (!MM->dslices_info.empty()) {
-            double ntick = oncpu_ticks();
-            sit->spent_time += ntick - tick;
-            tick = ntick;
-            sit->npasses++;
-            sit++;
-        }
+        std::vector<slice_info>::iterator sit = dslices_info.begin();
+        double tick = oncpu_ticks();
 #endif
+        for(uint16_t s = 0 ; s < nhstrips ; s++) {
+            uint32_t j = 0;
+            uint16_t nrows_packed = *q++;
+            abzero(x, dst + aboffset(x, i), nrows_packed);
+            asm("# critical loop\n");
+            uint32_t ncoeffs_slice = matmul_data_s::read32(q);
+            for(uint32_t c = 0 ; c < ncoeffs_slice ; c++) {
+                j += *q++;
+                uint32_t di = *q++;
+                abadd(x, dst + aboffset(x, i + di), src + aboffset(x, j));
+            }
+            i += nrows_packed;
+            asm("# end of critical loop\n");
+#ifdef  SLICE_STATS
+            if (!MM->dslices_info.empty()) {
+                double ntick = oncpu_ticks();
+                sit->spent_time += ntick - tick;
+                tick = ntick;
+                sit->npasses++;
+                sit++;
+            }
+#endif
+        }
+    } else {
+        /* d == 0 */
+        /* BEWARE, it's wildly sub-optimal ! */
+        abzero(x, dst, MM->ncols);
+        for(uint16_t s = 0 ; s < nhstrips ; s++) {
+            uint32_t j = 0;
+            uint16_t nrows_packed = *q++;
+            asm("# critical loop\n");
+            uint32_t ncoeffs_slice = matmul_data_s::read32(q);
+            for(uint32_t c = 0 ; c < ncoeffs_slice ; c++) {
+                j += *q++;
+                uint32_t di = *q++;
+                abadd(x, dst + aboffset(x, j), src + aboffset(x, i + di));
+            }
+            i += nrows_packed;
+            asm("# end of critical loop\n");
+        }
     }
     asm("# end of multiplication code\n");
 }
 
-void matmul_report(matmul_ptr mm MAYBE_UNUSED) {
+void matmul_sliced_report(matmul_ptr mm MAYBE_UNUSED) {
 #ifdef  SLICE_STATS
     if (MM->dslices_info.empty())
         return;

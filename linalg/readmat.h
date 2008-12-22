@@ -10,14 +10,16 @@ extern "C" {
 
 // data is stored in a huge table:
 //   [ nb_coeff c0 c1 ... ck nb_coeff c0 c1 ..... ]
-typedef struct {
+struct sparse_mat_s {
     unsigned int nrows;
     unsigned int ncols;
     unsigned int *data;
 
     unsigned int alloc;
     unsigned int wt;		// number of coeffs
-} sparse_mat_t[1];
+};
+
+typedef struct sparse_mat_s sparse_mat_t[1];
 
 /* Reads the whole matrix */
 extern void readmat(FILE *file, sparse_mat_t mat, int compact);

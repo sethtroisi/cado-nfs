@@ -450,8 +450,15 @@ void matmul_top_fill_random_source(matmul_top_data_ptr mmt, int d)
 
 void matmul_top_mul(matmul_top_data_ptr mmt, int d)
 {
+#ifndef NDEBUG
+    unsigned int di_in = mmt->wr[d]->i1 - mmt->wr[d]->i0;
+    unsigned int di_out = mmt->wr[!d]->i1 - mmt->wr[!d]->i0;
+    ASSERT(mmt->mm->ncols == (d ? di_in : di_out));
+    ASSERT(mmt->mm->nrows == (d ? di_out : di_in));
+#endif
+
     broadcast_down(mmt, d);
-    matmul(mmt->mm, mmt->wr[!d]->v, mmt->wr[d]->v);
+    matmul_mul(mmt->mm, mmt->wr[!d]->v, mmt->wr[d]->v, d);
     reduce_across(mmt, !d);
 }
 

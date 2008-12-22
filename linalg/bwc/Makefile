@@ -19,6 +19,10 @@ endif
 
 # offer the possibility of changing the mpi library by specifying other
 # compilers on the make command line.
+#
+# As an alternative to specifying both MPICC and MPICXX, it's possible to
+# give the MPI= parameter, pointing to the bin/ directory of the MPI
+# installed tree.
 ifneq ($(MPI),)
 MPICC:=$(MPI)/mpicc
 MPICXX:=$(MPI)/mpicxx
@@ -50,7 +54,7 @@ CXX:=$(CXX) -Wl,-rpath,$(mpicxxlibs)
 endif
 
 
-## names:=build.c matmul.cpp
+## names:=build.c matmul-sliced.cpp
 ## src:=$(patsubst %,%.c,$(names))
 ## obj:=$(patsubst %,%.o,$(names))
 
@@ -58,15 +62,22 @@ bins:=bench build prep test_hello test_pthread_reduce
 
 all:$(bins)
 
-build_objs:=build.o matmul.o ../readbuffer.o ../readmat.o
-bench_objs:=bench.o matmul.o ../readbuffer.o ../readmat.o
+build_objs:=build.o ../readbuffer.o ../readmat.o libmatmul.a
+bench_objs:=bench.o ../readbuffer.o ../readmat.o libmatmul.a
+
+libmatmul_objs:=matmul-sliced.o matmul-basic.o matmul.o
+
+libmatmul.a: $(libmatmul_objs)
+	-rm -f $@
+	ar r $@ $(libmatmul_objs)
 
 test_hello_objs:=test_hello.o parallelizing_info.o
 
-prep_objs:=prep.o intersections.o matmul.o	\
-	matmul_top.o parallelizing_info.o	\
+prep_objs:=prep.o intersections.o 			\
+	matmul_top.o parallelizing_info.o		\
 	info_file.o ../readbuffer.o ../readmat.o	\
-	auxfuncs.o xvectors.o
+	auxfuncs.o xvectors.o				\
+	libmatmul.a
 
 test_pthread_reduce_objs:=test_pthread_reduce.o
 
@@ -116,8 +127,10 @@ clean:
 # for obvious reasons.
 sources:=	\
     auxfuncs.c bench.c build.c info_file.c		\
-    intersections.cpp matmul.cpp matmul_top.c parallelizing_info.c	\
-    prep.c test_hello.c xvectors.c
+    intersections.cpp matmul-sliced.cpp matmul_top.c	\
+    parallelizing_info.c prep.c test_hello.c xvectors.c	\
+    matmul.c matmul-basic.c
+
 dep: $(patsubst %,.deps/%.d,$(sources))
 -include $(patsubst %,.deps/%.d,$(sources))
 
