@@ -1316,7 +1316,7 @@ sub do_polysel {
         open FILE, "< $f"
             or die "Cannot open `$f' for reading: $!.\n";
         while (<FILE>) {
-            $poly{$1} = $2 if /^(\w+):\s*([\w-.]+)$/;
+            $poly{$1} = $2 if /^(\w+):\s*([\w\-.]+)$/;
         }
         close FILE;
         
