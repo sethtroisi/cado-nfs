@@ -130,6 +130,20 @@ struct matmul_data_s {
         x >>= 16;
         data[i++] = x & ((1u << 16) - 1);
     }
+    uint32_t read32(data_t::const_iterator & q) {
+        uint32_t res;
+        res = *q++;
+        res |= ((uint32_t) *q++) << 16;
+        return res;
+    }
+    uint32_t read64(data_t::const_iterator & q) {
+        uint64_t res;
+        res = *q++;
+        res |= ((uint64_t) *q++) << 16;
+        res |= ((uint64_t) *q++) << 32;
+        res |= ((uint64_t) *q++) << 48;
+        return res;
+    }
 };
 
 #define MM      ((struct matmul_data_s *) mm)
@@ -373,6 +387,12 @@ matmul_ptr matmul_reload_cache(abobj_ptr xx, const char * filename)
     FATAL_ERROR_CHECK(rc < n, "Short read from cached matrix file");
 
     fclose(f);
+
+    data_t::const_iterator q = MM->data.begin();
+
+    MM->nrows = MM->read32(q);
+    MM->ncols = MM->read32(q);
+    MM->ncoeffs = MM->read64(q);
 
     return mm;
 }
