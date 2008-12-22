@@ -20,6 +20,9 @@
 #include "sparse_mat.h"
 #include "report.h"
 #include "swar.h"
+#ifdef USE_MARKOWITZ
+#include "markowitz.h"
+#endif
 #include "merge_mono.h"
 #include "prune.h"
 
@@ -152,10 +155,11 @@ main(int argc, char *argv[])
     gzip_close(purgedfile, purgedname);
 
 #ifndef USE_MARKOWITZ
-    tt = seconds();
-    fillSWAR(&mat);
-    fprintf(stderr, "Time for fillSWAR: %2.2lf\n", seconds()-tt);
+    initSWAR(&mat);
 #endif
+    tt = seconds();
+    fillmat(&mat);
+    fprintf(stderr, "Time for fillmat: %2.2lf\n", seconds()-tt);
     
     purgedfile = gzip_open(purgedname, "r");
     ASSERT_ALWAYS(purgedfile != NULL);

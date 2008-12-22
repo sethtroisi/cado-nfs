@@ -47,6 +47,7 @@ extern int incrS(int w);
 extern void initMat(sparse_mat_t *mat, INT jmin, INT jmax);
 extern void initWeightFromFile(sparse_mat_t *mat, FILE *purgedfile);
 
+extern void fillmat(sparse_mat_t *mat);
 extern int readmat(sparse_mat_t *mat, FILE *file);
 extern void removeCellSWAR(sparse_mat_t *mat, int i, INT j);
 extern void addRowSWAR(sparse_mat_t *mat, int i);

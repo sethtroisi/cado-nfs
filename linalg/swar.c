@@ -28,12 +28,12 @@
       mat->S[w]  - doubly-chained list with columns j of weight w
  */
 void
-fillSWAR(sparse_mat_t *mat)
+initSWAR(sparse_mat_t *mat)
 {
     // mat->cwmax+2 to prevent bangs
     dclist *S = (dclist *)malloc((mat->cwmax+2) * sizeof(dclist));
     dclist *A = (dclist *)malloc((mat->jmax-mat->jmin) * sizeof(dclist));
-    INT j, *Rj, jmin = mat->jmin, jmax = mat->jmax, k;
+    int k;
 
     ASSERT_ALWAYS(S != NULL);
     ASSERT_ALWAYS(A != NULL);
@@ -42,41 +42,6 @@ fillSWAR(sparse_mat_t *mat)
 	S[k] = dclistCreate(-1);
     mat->S = S;
     mat->A = A;
-    for(j = jmin; j < jmax; j++){
-#  if DEBUG >= 1
-	fprintf(stderr, "Treating column %d\n", j);
-#  endif
-	if(mat->wt[GETJ(mat, j)] <= mat->cwmax){
-	    mat->A[GETJ(mat, j)] = dclistInsert(mat->S[mat->wt[GETJ(mat, j)]], j);
-#  if DEBUG >= 1
-	    fprintf(stderr, "Inserting %d in S[%d]:", j, mat->wt[GETJ(mat, j)]);
-	    dclistPrint(stderr, mat->S[mat->wt[GETJ(mat, j)]]->next);
-	    fprintf(stderr, "\n");
-#  endif
-#ifndef USE_COMPACT_R
-	    Rj = (INT *)malloc((mat->wt[GETJ(mat, j)]+1) * sizeof(INT));
-	    Rj[0] = 0; // last index used
-	    mat->R[GETJ(mat, j)] = Rj;
-#else
-	    fprintf(stderr, "R: NYI in fillSWAR\n");
-	    exit(1);
-#endif
-	}
-	else{
-#if USE_MERGE_FAST <= 1
-	    mat->wt[GETJ(mat, j)] = -1;
-#else
-	    mat->wt[GETJ(mat, j)] = -mat->wt[GETJ(mat, j)]; // trick!!!
-#endif
-	    mat->A[GETJ(mat, j)] = NULL; // TODO: renumber j's?????
-#ifndef USE_COMPACT_R
-	    mat->R[GETJ(mat, j)] = NULL;
-#else
-            fprintf(stderr, "R: NYI2 in fillSWAR\n");
-            exit(1);
-#endif
-	}
-    }
 }
 
 // TODO

@@ -142,6 +142,7 @@ MkzCount(sparse_mat_t *mat, INT j)
     return ((mkz-1) * mat->wt[GETJ(mat, j)]);
 }
 
+// TODO: make this look like fillmat??? or initSWAR???
 void
 MkzInit(sparse_mat_t *mat)
 {
