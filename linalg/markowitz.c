@@ -1,13 +1,14 @@
 #include "utils/utils.h"
+
+#include "merge_opts.h"
+
+#ifdef USE_MARKOWITZ
+
 #include "sparse.h"
 #include "dclist.h"
 #include "sparse_mat.h"
 #include "report.h"
-#include "swar.h"
-
-#ifdef USE_MARKOWITZ
 #include "markowitz.h"
-#include "merge_mono.h"
 
 #define MKZ_DEBUG 1
 
@@ -191,6 +192,11 @@ MkzUpdate(sparse_mat_t *mat, INT j)
 	// remove old count
 	// add new count
     }
+}
+
+void
+MkzRemoveCell(sparse_mat_t *mat, int i, INT j)
+{
 }
 
 #endif

@@ -123,7 +123,7 @@ printStatsSWAR(sparse_mat_t *mat)
 // can be costly. We must not store row index i0, since j was discovered
 // when row i0 was treated.
 void
-incorporateColumn(sparse_mat_t *mat, INT j, int i0)
+incorporateColumnSWAR(sparse_mat_t *mat, INT j, int i0)
 {
     int i, ni, wj;
     INT *Rj;
@@ -217,39 +217,19 @@ remove_j_from_SWAR(sparse_mat_t *mat, int j)
    - mat->S[w] : cell j is removed, with w = weight(j)
    - mat->S[w-1] : cell j is added
    - A[j] : points to S[w-1] instead of S[w]
+
+   We arrive here when mat->wt[j] > 0.
+
 */
 void
 removeCellSWAR(sparse_mat_t *mat, int i, INT j)
 {
     int ind;
 
-#if TRACE_ROW >= 0
-    if(i == TRACE_ROW){
-	fprintf(stderr, "TRACE_ROW: removeCellSWAR i=%d j=%d\n", i, j);
-    }
-#endif
     // update weight
 #if DEBUG >= 1
     fprintf(stderr, "removeCellSWAR: moving j=%d from S[%d] to S[%d]\n",
 	    j, mat->wt[GETJ(mat, j)], decrS(mat->wt[GETJ(mat, j)]));
-#endif
-#if USE_MERGE_FAST > 1
-    if(mat->wt[GETJ(mat, j)] < 0){
-	// if mat->wt[j] is already < 0, we don't care about
-	// decreasing, updating, etc. except when > 2
-# if USE_MERGE_FAST > 2
-	ind = mat->wt[GETJ(mat, j)] = decrS(mat->wt[GETJ(mat, j)]);
-	// we incorporate the column and update the data structure
-	if(abs(ind) <= mat->mergelevelmax){
-#  if DEBUG >= 1
-	    fprintf(stderr, "WARNING: column %d becomes light at %d...!\n",
-		    j, abs(ind));
-#  endif
-	    incorporateColumn(mat, j, i);
-	}
-# endif
-	return;
-    }
 #endif
     // at this point, we should have mat->wt[j] > 0
     ind = mat->wt[GETJ(mat, j)] = decrS(mat->wt[GETJ(mat, j)]);

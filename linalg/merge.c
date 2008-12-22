@@ -21,9 +21,10 @@
 #include "dclist.h"
 #include "sparse_mat.h"
 #include "report.h"
-#include "swar.h"
-#ifdef USE_MARKOWITZ
-#include "markowitz.h"
+#ifndef USE_MARKOWITZ
+# include "swar.h"
+#else
+# include "markowitz.h"
 #endif
 #include "merge_mono.h"
 #include "prune.h"

@@ -20,10 +20,11 @@
 #include "dclist.h"
 #include "sparse_mat.h"
 #include "report.h"
-#include "swar.h"
 
-#ifdef USE_MARKOWITZ
-#include "markowitz.h"
+#ifndef USE_MARKOWITZ
+# include "swar.h"
+#else
+# include "markowitz.h"
 #endif
 #include "merge_mono.h"
 #include "prune.h"
@@ -776,13 +777,37 @@ addCellAndUpdate(sparse_mat_t *mat, int i, INT j)
 #endif
 }
 
+// remove the cell (i,j), and updates matrix correspondingly.
 void
 removeCellAndUpdate(sparse_mat_t *mat, int i, INT j)
 {
+#if TRACE_ROW >= 0
+    if(i == TRACE_ROW){
+	fprintf(stderr, "TRACE_ROW: removeCellAndUpdate i=%d j=%d\n", i, j);
+    }
+#endif
+#if USE_MERGE_FAST > 1
+    if(mat->wt[GETJ(mat, j)] < 0){
+	// if mat->wt[j] is already < 0, we don't care about
+	// decreasing, updating, etc. except when > 2
+# if USE_MERGE_FAST > 2
+	int ind = mat->wt[GETJ(mat, j)] = decrS(mat->wt[GETJ(mat, j)]);
+	// we incorporate the column and update the data structure
+	if(abs(ind) <= mat->mergelevelmax){
+#  if DEBUG >= 1
+	    fprintf(stderr, "WARNING: column %d becomes light at %d...!\n",
+		    j, abs(ind));
+#  endif
+	    incorporateColumnSWAR(mat, j, i);
+	}
+# endif
+	return;
+    }
+#endif
 #ifndef USE_MARKOWITZ
     removeCellSWAR(mat, i, j);
 #else
-    fprintf(stderr, "MKZ work needed in removeCellAndUpdate\n");
+    MkzRemoveCell(mat, i, j);
 #endif
 }
 
