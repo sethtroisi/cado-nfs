@@ -12,6 +12,8 @@
 
 #define MKZ_DEBUG 1
 
+#define MKZ_INF -1
+
 // Again, a priority queue as a heap...!
 // Q[0] contains the number of items in Q[], so that useful part of Q
 // is Q[1..Q[0]]
@@ -43,7 +45,7 @@ MkzPrintQueue(INT *Q)
 
     fprintf(stderr, "L0:");
     for(i = 1; i <= Q[0]; i++){
-	fprintf(stderr, " %d", MkzGet(Q, i, 1));
+	fprintf(stderr, " [%d, %d]", MkzGet(Q, i, 1), MkzGet(Q, i, 0));
 	if(i == imax){
 	    imax = (imax<<1)+1;
 	    fprintf(stderr, "\nL%d:", ++level);
@@ -79,7 +81,7 @@ MkzInsert(INT *Q, INT *A, INT dj, INT c)
     MkzUpQueue(Q, A, Q[0]);
 }
 
-// Move Q[1] down.
+// Move Q[k] down.
 void
 MkzDownQueue(INT *Q, INT *A, INT k)
 {
@@ -115,6 +117,51 @@ MkzPopQueue(INT *dj, INT *mkz, INT *Q, INT *A)
     MkzAssign(Q, A, 1, Q[0]);
     Q[0]--;
     MkzDownQueue(Q, A, 1);
+}
+
+// Remove (A, Q)[k].
+void
+MkzDelete(INT *Q, INT *A, INT k)
+{
+    // we put Q[Q[0]] in Q[k]
+    MkzAssign(Q, A, k, Q[0]);
+    Q[0]--;
+    // move new node up or down
+    if(k == 1)
+	// rare event!
+	MkzDownQueue(Q, A, 1);
+    else{
+	// k has a father
+	if(MkzGet(Q, k/2, 1) > MkzGet(Q, k, 1))
+	    // we have to move up
+	    MkzUpQueue(Q, A, k);
+	else
+	    MkzDownQueue(Q, A, k);
+    }
+}
+
+int
+MkzIsHeap(INT *Q)
+{
+    int k;
+
+    for(k = 1; k <= Q[0]/2; k++){
+	// k has a left son
+	if(MkzGet(Q, k, 1) > MkzGet(Q, 2*k, 1)){
+	    fprintf(stderr, "Pb: father=%d > lson=%d\n", 
+		    MkzGet(Q, k, 1), MkzGet(Q, 2*k, 1));
+	    return 0;
+	}
+	if(k < Q[0]/2){
+	    // k has a right son
+	    if(MkzGet(Q, k, 1) > MkzGet(Q, 2*k+1, 1)){
+		fprintf(stderr, "Pb: father=%d > rson=%d\n", 
+			MkzGet(Q, k, 1), MkzGet(Q, 2*k+1, 1));
+		return 0;
+	    }
+	}
+    }
+    return 1;
 }
 
 void
@@ -165,6 +212,10 @@ MkzInit(sparse_mat_t *mat)
 	}
     // TODO: overflow in mkz???
     MkzCheck(mat);
+#if MKZ_DEBUG >= 1
+    fprintf(stderr, "Initial queue is\n");
+    MkzPrintQueue(mat->MKZQ);
+#endif
 }
 
 void
@@ -194,9 +245,41 @@ MkzUpdate(sparse_mat_t *mat, INT j)
     }
 }
 
+/* remove the cell (i,j), and updates matrix correspondingly.
+   
+   Updates:
+   - mat->wt[j] (weight of column j)
+   - (Q, A)
+
+   We arrive here when mat->wt[j] > 0.
+
+*/
 void
-MkzRemoveCell(sparse_mat_t *mat, int i, INT j)
+MkzRemoveCol(sparse_mat_t *mat, INT j)
 {
+    INT dj = GETJ(mat, j);
+
+    mat->wt[dj] = decrS(mat->wt[dj]);
+    // remove j from the QA structure
+    MkzDelete(mat->MKZQ, mat->MKZA, mat->MKZA[dj]);
+    mat->MKZA[dj] = MKZ_INF;
+#if MKZ_DEBUG >= 1
+    MkzIsHeap(mat->MKZQ);
+#endif
+}
+
+void
+MkzRemoveJ(sparse_mat_t *mat, INT j)
+{
+    INT dj = GETJ(mat, j);
+
+    mat->wt[dj] = 0;
+    // remove j from the QA structure
+    MkzDelete(mat->MKZQ, mat->MKZA, mat->MKZA[dj]);
+    mat->MKZA[dj] = MKZ_INF;
+#if MKZ_DEBUG >= 1
+    MkzIsHeap(mat->MKZQ);
+#endif
 }
 
 #endif

@@ -167,6 +167,7 @@ getNextj(dclist dcl)
     return j;
 }
 
+// remove j from the stack it belongs to.
 void
 remove_j_from_S(sparse_mat_t *mat, int j)
 {
@@ -205,8 +206,6 @@ remove_j_from_SWAR(sparse_mat_t *mat, int j)
     free(mat->A[GETJ(mat, j)]);
 #endif
     mat->A[GETJ(mat, j)] = NULL;
-    mat->wt[GETJ(mat, j)] = 0;
-    destroyRj(mat, j);
 }
 
 /* remove the cell (i,j), and updates matrix correspondingly.
@@ -231,7 +230,6 @@ removeCellSWAR(sparse_mat_t *mat, int i, INT j)
     fprintf(stderr, "removeCellSWAR: moving j=%d from S[%d] to S[%d]\n",
 	    j, mat->wt[GETJ(mat, j)], decrS(mat->wt[GETJ(mat, j)]));
 #endif
-    // at this point, we should have mat->wt[j] > 0
     ind = mat->wt[GETJ(mat, j)] = decrS(mat->wt[GETJ(mat, j)]);
     remove_j_from_S(mat, j);
     if(mat->wt[GETJ(mat, j)] > mat->cwmax)
@@ -251,8 +249,6 @@ removeCellSWAR(sparse_mat_t *mat, int i, INT j)
     fprintf(stderr, "S[%d]_a=", ind);
     dclistPrint(stderr, mat->S[ind]->next); fprintf(stderr, "\n");
 #endif
-    // update R[j] by removing i
-    remove_i_from_Rj(mat, i, j);
 }
 
 // Returns a value < 0 if nothing was done, since the weight was too heavy.

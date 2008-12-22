@@ -807,8 +807,10 @@ removeCellAndUpdate(sparse_mat_t *mat, int i, INT j)
 #ifndef USE_MARKOWITZ
     removeCellSWAR(mat, i, j);
 #else
-    MkzRemoveCell(mat, i, j);
+    MkzRemoveCol(mat, j);
 #endif
+    // update R[j] by removing i
+    remove_i_from_Rj(mat, i, j);
 }
 
 void
@@ -817,8 +819,10 @@ removeColumnAndUpdate(sparse_mat_t *mat, int j)
 #ifndef USE_MARKOWITZ
     remove_j_from_SWAR(mat, j);
 #else
-    fprintf(stderr, "MKZ work needed in removeColumnAndUpdate\n");
+    MkzRemoveJ(mat, j);
 #endif
+    mat->wt[GETJ(mat, j)] = 0;
+    destroyRj(mat, j);
 }
 
 // These columns are simply removed from the current squeleton matrix, but
@@ -960,7 +964,12 @@ removeSingletons(report_t *rep, sparse_mat_t *mat)
 int
 deleteHeavyColumns(report_t *rep, sparse_mat_t *mat)
 {
+#ifndef USE_MARKOWITZ
     return deleteAllColsFromStack(rep, mat, mat->cwmax+1);
+#else
+    fprintf(stderr, "One day, work has to be done in deleteHeavyColumns\n");
+    return 0;
+#endif
 }
 
 void
@@ -1709,7 +1718,7 @@ deleteEmptyColumns(sparse_mat_t *mat)
 #ifndef USE_MARKOWITZ
     return deleteEmptyColumnsSWAR(mat);
 #else
-    fprintf(stderr, "MKZ work needed in deleteEmptyColumns\n");
+    // nothing to do; the pb has to be solved elsewhere...!
     return 0;
 #endif
 }
