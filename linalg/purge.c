@@ -513,11 +513,16 @@ remove_singletons (int *nrel, int nrelmax, int *nprimes, hashtable_t *H,
     *nprimes = newnprimes;
 }
 
-/* we locate used primes and do not try to do fancy things as sorting w.r.t.
+/* This function renumbers used primes (those with H->hashcount[i] > 1)
+   and puts the corresponding index in H->hashcount[i].
+
+   At return, nprimes is the number of used primes.
+
+   We locate used primes and do not try to do fancy things as sorting w.r.t.
    weight, since this will probably be done later on.
    All rows will be 1 more that needed -> subtract 1 in fprint...! */
 static void
-renumber(int *nprimes, hashtable_t *H, char *sos)
+renumber (int *nprimes, hashtable_t *H, char *sos)
 {
     FILE *fsos = NULL;
     unsigned int i;
@@ -531,7 +536,10 @@ renumber(int *nprimes, hashtable_t *H, char *sos)
       if(H->hashcount[i] == 0)
 	    H->hashcount[i] = -1;
 	else{
-	    ASSERT(H->hashcount[i] > 1);
+            /* Since we consider only primes >= minpr or minpa,
+               smaller primes might appear only once here, thus we can't
+               assert H->hashcount[i] > 1, but H->hashcount[i] = 1 should
+               be rare if minpr/minpa are well chosen (not too large). */
 	    H->hashcount[i] = nb++;
 	    if(fsos != NULL)
 	      fprintf(fsos, "%d %" PRIx64 " %" PRIx64 "\n",
@@ -622,9 +630,9 @@ reduce(char **ficname, unsigned int nbfic, hashtable_t *H, char *rel_used,
 }
 
 static void
-usage (char *argv[])
+usage (void)
 {
-  fprintf (stderr, "Usage: %s [options] -poly polyfile -out purgedfile -nrels nnn file1 ... filen\n", argv[0]);
+  fprintf (stderr, "Usage: purge [options] -poly polyfile -out purgedfile -nrels nnn file1 ... filen\n");
   fprintf (stderr, "Options:\n");
   fprintf (stderr, "       -nonfinal    - perform only one singleton pass\n");
   fprintf (stderr, "       -keep    nnn - stop when excess <= nnn (default -1)\n");
@@ -632,6 +640,7 @@ usage (char *argv[])
   fprintf (stderr, "       -minpr   nnn - purge rat. primes >= nnn (default rlim)\n");
   fprintf (stderr, "       -nprimes nnn - number of prime ideals\n");
   fprintf (stderr, "       -sos sosfile - to keep track of the renumbering\n");
+  exit (1);
 }
 
 /* Estimate the number of primes <= B. The 0.85 factor accounts for the
@@ -712,14 +721,17 @@ main (int argc, char **argv)
 	    argc -= 2;
 	    argv += 2;
 	}
+        else
+          {
+            fprintf (stderr, "Error, unknown option %s\n", argv[1]);
+            usage ();
+          }
     }
     if (keep <= 0)
 	keep = nrelmax;
 
-    if (argc == 1) {
-        usage (argv);
-	exit(1);
-    }
+    if (argc == 1)
+      usage ();
 
     if (polyname == NULL)
       {
