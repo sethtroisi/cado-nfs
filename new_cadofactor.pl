@@ -813,7 +813,8 @@ sub distribute_task {
         closedir DIR;
         push @$ranges, map { /\.([\de.]+)-([\de.]+)$/; [$1, $2] } @files;
         $ranges = merge_ranges($ranges);
-        my $file_ranges = [ @$ranges ]; # Keep a copy for later
+        # Keep a copy for later
+        my $file_ranges = [ map [@$_], @$ranges ];
 
         # Add the ranges from running jobs
         push @$ranges, map { my @p = @{$_->{param}}; \@p } @$jobs;
@@ -1167,6 +1168,7 @@ sub do_init {
     # Topological sort and traversal of the task dependency graph, to check
     # which tasks are up to date.
     my @queue = ("init");
+    my @cleanup;
     while (my $t = shift @queue) {
         my $task = $tasks{$t};
 
@@ -1224,35 +1226,66 @@ sub do_init {
         }
         next if $done || $resume;
 
-        # Otherwise, clean up old files...
+        # Otherwise, add to the clean-up list
         my $files = join "|", (@{$task->{files}}, "${t}_done");
         opendir DIR, $param{wdir}
             or die "Cannot open directory `$param{wdir}': $!\n";
         my @files = grep /^$param{name}\.($files)$/,
                          readdir DIR;
         closedir DIR;
-        info "Cleaning up $task->{name}..." if $task->{name} && @files;
-        $tab_level++;
-        for (map "$param{wdir}/$_", sort @files) {
-            unlink $_ if -f;
-            cmd("env rm -rf $_") if -d;
-        }
-        $tab_level--;
-
-        # ... and kill old jobs
-        if ($task->{dist} && -f "$param{prefix}.${t}_jobs") {
-            info "Killing old $task->{name} jobs..."
-                if $task->{name} && -s "$param{prefix}.${t}_jobs";
-            $tab_level++;
-            my $jobs = read_jobs("$param{prefix}.${t}_jobs");
-            kill_job($_) for @$jobs;
-            unlink "$param{prefix}.${t}_jobs";
-            $tab_level--;
-        }
+        push @cleanup, { task => $t, files => \@files } if @files;
     }
 
     # Clear the `visited' field of each node
     delete $_->{visited} for values %tasks;
+
+    # Cleaning up everything in one go.
+    if (@cleanup) {
+        # Make sure that the user is ready to cleanup!
+        my $list = join "; ", (grep { defined $_ }
+                               (map $tasks{$_->{task}}->{name}, @cleanup));
+        $list =~ s/^(.*);/$1; and/;
+        warn "I will cleanup the following tasks: $list.\n";
+        warn "Are you OK to continue? [Y/n] (30s timeout)\n";
+        my $r = "";
+        eval {
+            local $SIG{ALRM} = sub { die "alarm\n" }; # NB: \n required
+            alarm 30;
+            $r = <STDIN>;
+            alarm 0;
+        };
+        if ($@) {
+            die unless $@ eq "alarm\n"; # propagate unexpected errors
+        }
+        chomp $r;
+        die "Aborting...\n" if $r =~ /^n/i;
+
+        for (@cleanup) {
+            my $t     = $_->{task};
+            my $files = $_->{files};
+            my $task  = $tasks{$t};
+
+            # Clean up old files...
+            info "Cleaning up $task->{name}..." if $task->{name};
+            $tab_level++;
+            for (map "$param{wdir}/$_", sort @$files) {
+                unlink $_ if -f;
+                cmd("env rm -rf $_") if -d;
+            }
+            $tab_level--;
+
+            # ... and kill old jobs
+            if ($task->{dist} && -f "$param{prefix}.${t}_jobs") {
+                info "Killing old $task->{name} jobs..."
+                    if $task->{name} && -s "$param{prefix}.${t}_jobs";
+                $tab_level++;
+                my $jobs = read_jobs("$param{prefix}.${t}_jobs");
+                kill_job($_) for @$jobs;
+                unlink "$param{prefix}.${t}_jobs";
+                $tab_level--;
+            }
+        }
+    }
 
     # Dump parameters into $name.param
     write_param("$param{prefix}.param");
