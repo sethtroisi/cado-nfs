@@ -334,6 +334,7 @@ sub read_machines {
             $desc{tmpdir} =~ s/%s/$param{name}/g;
             $desc{cores}  = 1 unless defined $desc{cores};
             $desc{prefix} = "$desc{tmpdir}/$param{name}";
+            $desc{files}  = {}; # List of files uploaded to the host
 
             $machines{$host} = \%desc;
         } else {
@@ -422,6 +423,9 @@ sub remote_cmd {
 ###############################################################################
 
 # Reads a job status file
+# Format:
+# <host> <pid> <file> <param1> <param2> ...
+# The PID is "done" when the job is finished.
 sub read_jobs {
     my ($file) = @_;
     my $jobs = [];
@@ -437,9 +441,10 @@ sub read_jobs {
         s/^\s+//; s/\s*(#.*)?$//;
         next if /^$/;
 
-        if (s/^(\S+)\s+(\d+)\s+(\S+)\s*//) {
+        if (s/^(\S+)\s+(\d+|done)\s+(\S+)\s*//) {
             my @param = split;
-            my %job = ( host => $1, pid => $2, file => $3, param => \@param );
+            my %job = ( host => $1, file => $3, param => \@param );
+            $job{pid} = $2 unless $2 eq "done";
             push @$jobs, \%job;
         } else {
             die "Cannot parse line `$_' in file `$file'.\n";
@@ -457,8 +462,8 @@ sub write_jobs {
     open FILE, "> $file"
         or die "Cannot open `$file' for writing: $!.\n";
     for my $job (@$jobs) {
-        print FILE "$job->{host} $job->{pid} $job->{file} ".
-                   join(" ", @{$job->{param}})."\n";
+        print FILE "$job->{host} ".($job->{pid} ? $job->{pid} : "done").
+                   " $job->{file} ".join(" ", @{$job->{param}})."\n";
     }
     close FILE;
 }
@@ -551,45 +556,53 @@ sub kill_job {
 
 
 # Sends a file to a remote host.
-# The $force argument forces the upload of the file, even if it's
-# already on the host.
 sub send_file {
-    my ($host, $file, $force) = @_;
+    my ($host, $file) = @_;
     my $m = $machines{$host};
+    my $ret;
 
-    remote_cmd($host, "env mkdir -p $m->{tmpdir} 2>&1", { kill => 1 });
-
-    if (!$force) {
-        my $ret = remote_cmd($host, "env test -e $m->{tmpdir}/$file 2>&1");
-        $force = 1 if $ret->{status};
+    # If the file is already supposed to be here, just check
+    if ($m->{files}->{$file}) {
+        $ret = remote_cmd($host, "env test -e $m->{tmpdir}/$file 2>&1");
+        return unless $ret->{status};
+        delete $m->{files}->{$file};
     }
 
-    if ($force) {
-        info "Sending `$file' to `$host'...";
-        $tab_level++;
-        my $ret = cmd("env rsync --timeout=30 $param{wdir}/$file ".
-                      "$host:$m->{tmpdir}/ 2>&1", { log => 1, kill => 1 });
-        $tab_level--;
+    info "Sending `$file' to `$host'...";
+    $tab_level++;
+
+    # Try to upload the file
+    $ret = remote_cmd($host, "env mkdir -p $m->{tmpdir} 2>&1");
+    $ret = cmd("env rsync --timeout=30 $param{wdir}/$file ".
+               "$host:$m->{tmpdir}/ 2>&1", { log => 1 })
+        unless $ret->{status};
+
+    if ($ret->{status}) {
+        warn "$ret->{out}\n";
+    } else {
+        $m->{files}->{$file} = 1;
     }
+    $tab_level--;
 }
 
 # Retrieves the output file of a finished job from a remote host.
 # The $keep argument prevents the file to be removed on the host.
+# Returns 1 if the download was successful, -1 if the file was not there, or
+# 0 if another error occurred (meaning that we might want to try again).
 sub get_job_output {
     my ($job, $keep) = (@_);
 
-    info "Retrieving `".basename($job->{file})."' from `$job->{host}'...\n";
-    $tab_level++;
-
     my $ret = cmd("env rsync --timeout=30 $job->{host}:$job->{file} ".
                   "$param{wdir}/ 2>&1", { log => 1 });
+    my $status = 1;
     if ($ret->{status}) {
-        warn "$ret->{out}\n";
+        my @out = split /\n/, $ret->{out};
+        warn "$out[0]\n";
+        $status = $out[0] =~ /No such file or directory/ ? -1 : 0;
     } elsif (!$keep) {
         remote_cmd($job->{host}, "env rm -f $job->{file}");
     }
-
-    $tab_level--;
+    return $status;
 }
 
 
@@ -776,42 +789,77 @@ sub distribute_task {
         $tab_level--;
     }
 
-    my $first = 1;
+
+
     while (1) {
         my $jobs = [];
 
         # See what's already running, and retrieve possibly finished data
         if ($param{parallel}) {
-            info "Checking all running jobs...\n";
-            $tab_level++;
-
             $jobs = read_jobs("$param{prefix}.$opt->{task}_jobs");
 
-            my $new_jobs = [];
-            for my $job (@$jobs) {
-                info "Checking job: ".job_string($job)."\n";
+            my @running = grep  defined $_->{pid}, @$jobs;
+            my @done    = grep !defined $_->{pid}, @$jobs;
+            my @new_jobs;
+
+            # Check the status of all running jobs
+            if (@running) {
+                info "Checking all running jobs...\n";
                 $tab_level++;
-                my $status = job_status($job, $opt->{pattern});
-                if ($status == 1) {
-                    # Job is still alive: keep it in the list
-                    push @$new_jobs, $job;
-                }
-                elsif ($status == 0 || $opt->{partial}) {
-                    # Job is terminated: retrieve and check its output file
-                    get_job_output($job, $opt->{keep});
-                    &{$opt->{check}}("$param{wdir}/".basename($job->{file}),
-                                     1); # Exhaustive testing!
-                }
-                else {
-                    # Job is dead: remove its output file on the host
-                    remote_cmd($job->{host}, "env rm -f $job->{file}");
+                for my $job (@running) {
+                    info "Checking job: ".job_string($job)."\n";
+                    $tab_level++;
+                    my $status = job_status($job, $opt->{pattern});
+                    if ($status == 1) {
+                        # Job is still alive: keep it in the list
+                        push @new_jobs, $job;
+                    }
+                    elsif ($status == 0 || $opt->{partial}) {
+                        # Job is (partially) terminated: mark it as done
+                        delete $job->{pid};
+                        push @done, $job;
+                    }
+                    else {
+                        # Job is dead: remove its output file on the host
+                        remote_cmd($job->{host}, "env rm -f $job->{file}");
+                    }
+                    $tab_level--;
                 }
                 $tab_level--;
             }
 
-            $jobs = $new_jobs;
+            # Retrieve files of finished jobs
+            if (@done) {
+                info "Retrieving job data...\n";
+                $tab_level++;
+                for my $job (@done) {
+                    info "Retrieving `".basename($job->{file})."' ".
+                         "from `$job->{host}'...\n";
+                    $tab_level++;
+
+                    my $file = "$param{wdir}/".basename($job->{file});
+                    if (-f $file) {
+                        warn "`$file' already exists. ".
+                             "Assuming it is the same.\n";
+                    } else {
+                        my $status = get_job_output($job, $opt->{keep});
+                        if ($status == 1) {
+                            # Output file was downloaded: exhaustive check
+                            &{$opt->{check}}($file, 1);
+                        } elsif ($status == 0) {
+                            # Can't get output file: let's try again next time
+                            push @new_jobs, $job;
+                        } else {
+                            # File is not there: too bad...
+                        }
+                    }
+                    $tab_level--;
+                }
+                $tab_level--;
+            }
+
+            $jobs = \@new_jobs;
             write_jobs($jobs, "$param{prefix}.$opt->{task}_jobs");
-            $tab_level--;
         }
 
 
@@ -830,7 +878,7 @@ sub distribute_task {
         # Keep a copy for later
         my $file_ranges = [ map [@$_], @$ranges ];
 
-        # Add the ranges from running jobs
+        # Add the ranges from running or done jobs
         push @$ranges, map { my @p = @{$_->{param}}; \@p } @$jobs;
         $ranges = merge_ranges($ranges);
 
@@ -841,17 +889,33 @@ sub distribute_task {
             info "Starting new jobs...\n";
             $tab_level++;
 
-            JOBS : for my $h (keys %machines) {
+            HOST : for my $h (keys %machines) {
                 my $m = $machines{$h};
 
-                send_file($h, $_, $first) for @{$opt->{files}};
-
+                # How many free cores on this host?
                 my $n = $m->{cores} - grep { $_->{host} eq $h } @$jobs;
+                next unless $n;
+
+                # Send files and skip to next host if not all files are here
+                send_file($h, $_) for @{$opt->{files}};
+                next if grep !$m->{files}->{$_}, @{$opt->{files}};
 
                 while ($n--) {
                     my @r = find_hole($opt->{min}, $opt->{max},
                                       $opt->{len}, $ranges);
-                    last JOBS unless @r;
+
+                    # No hole was found. But maybe we are waiting for another
+                    # job to finish, on a host which is unreachable...
+                    # So instead of staying idle, let's be redundant!
+                    # (This patch is sponsored by your local energy provider!)
+                    #if (!@r) {
+                    #    $ranges = [ map [@$_], @$file_ranges ];
+                    #    @r = find_hole($opt->{min}, $opt->{max},
+                    #                   $opt->{len}, $ranges);
+                    #}
+
+                    # Still no hole? Well then, we're truly finished!
+                    last HOST unless @r;
 
                     my $job = { host  => $h,
                                 file  => "$m->{prefix}.$opt->{suffix}.".
@@ -907,9 +971,9 @@ sub distribute_task {
                  "checking again...\n";
             sleep $opt->{delay};
         }
-
-        $first = 0;
     }
+
+
 
     # A bit of cleaning on slaves
     if ($param{parallel}) {
@@ -921,12 +985,18 @@ sub distribute_task {
             kill_job($job, $opt->{partial});
             next unless $opt->{partial};
             $tab_level++;
-            get_job_output($job, $opt->{keep});
-            &{$opt->{check}}("$param{wdir}/".basename($job->{file}), 1);
-            # TODO: For now, the extra relations are imported back in the
-            # working directory, but they are not used. Feeding them to
-            # duplicates/singleton would take some more time and we don't
-            # really care about them since we already have enough relations.
+            my $file = "$param{wdir}/".basename($job->{file});
+            if (-f $file) {
+                warn "`$file' already exists. Assuming it is the same.\n";
+            } else {
+                get_job_output($job, $opt->{keep});
+                &{$opt->{check}}("$param{wdir}/".basename($job->{file}), 1);
+                # TODO: For now, the extra relations are imported back in the
+                # working directory, but they are not used. Feeding them to
+                # duplicates/singleton would take some more time and we don't
+                # really care about them since we already have enough
+                # relations.
+            }
             $tab_level--;
         }
         unlink "$param{prefix}.$opt->{task}_jobs";
@@ -1522,7 +1592,7 @@ sub do_sieve {
             my $n = 10;
             while (<FILE>) {
                 $n--, print TMP $_ unless /^#/;
-                    last unless $n;
+                last unless $n;
             }
             close FILE;
             close TMP;
