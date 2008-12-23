@@ -1612,20 +1612,19 @@ merge(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 #endif
 }
 
-static double
-my_cost (unsigned long N, unsigned long c, int forbw)
+static unsigned long
+my_cost(unsigned long N, unsigned long c, int forbw)
 {
-    double dN = (double)N, dc = (double)c;
-  
     if(forbw == 2){
 	double K1 = .19e-9, K2 = 3.4e-05, K3 = 1.4e-10; // kinda average
+	double dN = (double)N, dc = (double)c;
 
-	return ((K1+K3)*dN*dc+K2*dN*log(dN)*log(dN));
+	return (unsigned long)((K1+K3)*dN*dc+K2*dN*log(dN)*log(dN));
     }
     else if(forbw == 3)
-      return dc / dN;
+	return c/N;
     else if(forbw <= 1)
-	return dN * dc;
+	return (N*c);
     return 0;
 }
 
@@ -1712,7 +1711,7 @@ void
 mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int forbw, double ratio, int coverNmax)
 {
     double totopt = 0.0, totfill = 0.0, totMST = 0.0, totdel = 0.0;
-    double bwcostmin = 0.0, oldbwcost = 0.0, bwcost = 0.0;
+    unsigned long bwcostmin = 0, oldbwcost = 0, bwcost = 0;
     int old_nrows, old_ncols, m = 2, njrem = 0, ncost = 0, ncostmax, njproc;
     int mmax = 0, target = 10000, ni2rem;
 #ifdef USE_MARKOWITZ
@@ -1772,25 +1771,26 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
 		    mat->rem_nrows, mat->rem_ncols, 
 		    mat->rem_nrows - mat->rem_ncols);
 	    if(forbw == 2)
-		fprintf(stderr, " bw=%1.2e", bwcost);
+		fprintf(stderr, " bw=%lu", bwcost);
 	    else if(forbw == 3)
-		fprintf(stderr, " cN=%1.2e",
-			((double) mat->rem_nrows) * ((double) mat->weight));
+		fprintf(stderr, " cN=%lu", 
+			((unsigned long)mat->rem_nrows)
+			*((unsigned long)mat->weight));
 	    else if(forbw <= 1)
-		fprintf(stderr, " cN=%1.2e", bwcost);
+		fprintf(stderr, " cN=%lu", bwcost);
 	    fprintf(stderr, " c/N=%2.2lf\n", 
 		    ((double)mat->weight)/((double)mat->rem_ncols));
 	    // njrem=%d at %2.2lf\n",
 	    if((forbw != 0) && (forbw != 3))
 		// what a trick!!!!
-		fprintf(rep->outfile, "BWCOST: %1.0f\n", bwcost);
+		fprintf(rep->outfile, "BWCOST: %lu\n", bwcost);
 	    target = njproc + 10000;
 	}
 	if((bwcostmin == 0) || (bwcost < bwcostmin)){
 	    bwcostmin = bwcost;
 	    if((forbw != 0) && (forbw != 3))
 		// what a trick!!!!
-		fprintf(rep->outfile, "BWCOST: %1.0f\n", bwcost);
+		fprintf(rep->outfile, "BWCOST: %lu\n", bwcost);
 	}
 	// to be cleaned one day...
 	if((forbw == 0) || (forbw == 2)){
@@ -1805,7 +1805,7 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
 	}
 	else if(forbw == 3){
 	    if(bwcost > (unsigned long)coverNmax){
-		fprintf(stderr, "c/N too high, stopping [%1.2e]\n", bwcost);
+		fprintf(stderr, "c/N too high, stopping [%lu]\n", bwcost);
 		break;
 	    }
 	}
@@ -1839,8 +1839,8 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
     deleteSuperfluousRows(rep, mat, mat->delta, 
 			  mat->rem_nrows-mat->rem_ncols+mat->delta, -1);
     if((forbw != 0) && (forbw != 3)){
-	fprintf(rep->outfile, "BWCOSTMIN: %1.0f\n", bwcostmin);
-	fprintf(stderr, "Minimal bwcost found: %1.0f\n", bwcostmin);
+	fprintf(rep->outfile, "BWCOSTMIN: %lu\n", bwcostmin);
+	fprintf(stderr, "Minimal bwcost found: %lu\n", bwcostmin);
     }
 }
 
