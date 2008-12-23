@@ -305,13 +305,13 @@ addRowsWithWeight(sparse_mat_t *mat, int i1, int i2)
 }
 
 void
-destroyRj(sparse_mat_t *mat, int j)
+freeRj(sparse_mat_t *mat, int j)
 {
 #ifndef USE_COMPACT_R
     free(mat->R[GETJ(mat, j)]);
     mat->R[GETJ(mat, j)] = NULL;
 #else
-    fprintf(stderr, "R: NYI in destroyRj\n");
+    fprintf(stderr, "R: NYI in freeRj\n");
     exit(1);
 #endif
 }

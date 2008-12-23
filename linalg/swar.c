@@ -221,7 +221,7 @@ remove_j_from_SWAR(sparse_mat_t *mat, int j)
 
 */
 void
-removeCellSWAR(sparse_mat_t *mat, int i, INT j)
+decreaseColWeightSWAR(sparse_mat_t *mat, INT j)
 {
     int ind;
 
@@ -302,7 +302,7 @@ deleteEmptyColumnsSWAR(sparse_mat_t *mat)
 	njrem++;
 	mat->A[GETJ(mat, j)] = NULL;
 	mat->wt[GETJ(mat, j)] = 0;
-	destroyRj(mat, j);
+	freeRj(mat, j);
     }
     mat->rem_ncols -= njrem;
     return njrem;

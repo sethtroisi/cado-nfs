@@ -62,7 +62,7 @@ extern void print_row(sparse_mat_t *mat, int i);
 #define cell(mat, i, k) (mat)->rows[(i)][(k)]
 #define SPARSE_ITERATE(mat, i, k) for((k)=1; (k)<=lengthRow((mat),(i)); (k)++)
 #endif
-extern void destroyRj(sparse_mat_t *mat, int j);
+extern void freeRj(sparse_mat_t *mat, int j);
 extern void remove_i_from_Rj(sparse_mat_t *mat, int i, int j);
 extern void add_i_to_Rj(sparse_mat_t *mat, int i, int j);
 extern int decrS(int w);

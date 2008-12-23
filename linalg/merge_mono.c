@@ -36,12 +36,6 @@
 
 #define USE_CONNECT 0
 
-typedef struct {
-  int len;    /* number of non-zero entries */
-  INT *val;   /* array of size len containing column indices of non-zero
-                 entries */
-} rel_t;
-
 int 
 cmp(const void *p, const void *q) {
     int x = *((int *)p);
@@ -56,13 +50,13 @@ fillmat(sparse_mat_t *mat)
     INT j, *Rj, jmin = mat->jmin, jmax = mat->jmax;
 
     for(j = jmin; j < jmax; j++){
-#  if DEBUG >= 1
+#  if DEBUG >= 2
 	fprintf(stderr, "Treating column %d\n", j);
 #  endif
 	if(mat->wt[GETJ(mat, j)] <= mat->cwmax){
 #ifndef USE_MARKOWITZ
 	    mat->A[GETJ(mat, j)] = dclistInsert(mat->S[mat->wt[GETJ(mat, j)]], j);
-#  if DEBUG >= 1
+#  if DEBUG >= 2
 	    fprintf(stderr, "Inserting %d in S[%d]:", j, mat->wt[GETJ(mat, j)]);
 	    dclistPrint(stderr, mat->S[mat->wt[GETJ(mat, j)]]->next);
 	    fprintf(stderr, "\n");
@@ -179,13 +173,6 @@ readmat(sparse_mat_t *mat, FILE *file)
 			exit(1);
 #endif
 		    }
-# if DEBUG >= 1
-		    if(j == 15054){
-			fprintf(stderr, "i=%d, j=%d (ind/nc=%d) mat->%d\n", 
-				i, j, k, mat->R[GETJ(mat, j)][0]);
-			fflush(stderr);
-		    }
-# endif
 		}
 #endif
 	    }
@@ -673,7 +660,7 @@ merge_m_slow(report_t *rep, sparse_mat_t *mat, int m, int verbose)
 	totfindrows += (cputime()-tt);
 #if DEBUG >= 1
 	fprintf(stderr, " %d", j);
-	fprintf(stderr, "=> the %d rows are:\n", j, m);
+	fprintf(stderr, " => the %d rows are:\n", m);
 	for(k = 0; k < m; k++){
 	    fprintf(stderr, "row[%d]=", ind[k]);
 	    print_row(mat, ind[k]);
@@ -755,8 +742,6 @@ checkCoherence(sparse_mat_t *mat, int m, int j)
 
 // The cell [i, j] may be incorporated to the data structure, at least
 // if j is not too heavy, etc. 
-// TODO: this should be shared and redistributed
-// between swar.c and the present file.
 void
 addCellAndUpdate(sparse_mat_t *mat, int i, INT j)
 {
@@ -769,7 +754,7 @@ addCellAndUpdate(sparse_mat_t *mat, int i, INT j)
 	// update R[j] by adding i
 	add_i_to_Rj(mat, i, j);
 #else
-    if(MkzAddCol(mat, j) >= 0){
+    if(MkzIncrCol(mat, j) >= 0){
 	// update R[j] by adding i
 	add_i_to_Rj(mat, i, j);
 	MkzUpdate(mat, j);
@@ -805,9 +790,9 @@ removeCellAndUpdate(sparse_mat_t *mat, int i, INT j)
     }
 #endif
 #ifndef USE_MARKOWITZ
-    removeCellSWAR(mat, i, j);
+    decreaseColWeightSWAR(mat, j);
 #else
-    MkzRemoveCol(mat, j);
+    MkzDecreaseColWeight(mat, j);
 #endif
     // update R[j] by removing i
     remove_i_from_Rj(mat, i, j);
@@ -822,7 +807,7 @@ removeColumnAndUpdate(sparse_mat_t *mat, int j)
     MkzRemoveJ(mat, j);
 #endif
     mat->wt[GETJ(mat, j)] = 0;
-    destroyRj(mat, j);
+    freeRj(mat, j);
 }
 
 // These columns are simply removed from the current squeleton matrix, but
@@ -1160,7 +1145,7 @@ mergeForColumn(report_t *rep, double *tt, double *tfill, double *tMST,
 
 #ifdef USE_MARKOWITZ
     // let's be cautious...
-    if(mat->wt[j] != m){
+    if(mat->wt[GETJ(mat, j)] != m){
 	fprintf(stderr, "GASP: wt[%d]=%d != %d\n", j, mat->wt[j], m);
     }
 #endif
@@ -1168,7 +1153,7 @@ mergeForColumn(report_t *rep, double *tt, double *tfill, double *tMST,
 #if DEBUG >= 1
     fprintf(stderr, "Treating column %d of weight %d\n", j, mat->wt[GETJ(mat, j)]);
 #endif
-#if (DEBUG >= 1) || TEX
+#if (DEBUG >= 2) || TEX
     fprintf(stderr, "Status before next j=%d to start\n", j);
 # if TEX
     Sparse2Tex(mat);
@@ -1195,7 +1180,7 @@ mergeForColumn(report_t *rep, double *tt, double *tfill, double *tMST,
 #endif
 #if DEBUG >= 1
     fprintf(stderr, " %d", j);
-    fprintf(stderr, "=> the %d rows are:\n", m);
+    fprintf(stderr, " => the %d rows are:\n", m);
     for(k = 0; k < m; k++){
 	fprintf(stderr, "row[%d]=", ind[k]);
 	print_row(mat, ind[k]);
@@ -1756,8 +1741,14 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
 	doOneMerge(rep, mat, &njrem, &totopt, &totfill, &totMST, &totdel,
 		   m, 0, 1, verbose);
 #else
+	if(MkzQueueCardinality(mat->MKZQ) <= 1){
+	    // rare event, I must say!
+	    fprintf(stderr, "Q is almost empty: rare!!!\n");
+	    break;
+	}
 	MkzPopQueue(&j, &mkz, mat->MKZQ, mat->MKZA);
-	fprintf(stderr, "I pop j=%d mkz=%d\n", j, mkz); 
+	fprintf(stderr, "I popped j=%d mkz=%d (#Q=%d)",j,mkz,mat->MKZQ[0]);
+	fprintf(stderr, " nrows=%d ncols=%d\n",mat->rem_nrows,mat->rem_ncols);
 	mergeForColumn2(rep, mat, &njrem, &totopt, &totfill, &totMST, &totdel,
 			1, j);
 #endif

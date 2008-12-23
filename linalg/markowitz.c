@@ -10,7 +10,7 @@
 #include "report.h"
 #include "markowitz.h"
 
-#define MKZ_DEBUG 1
+#define MKZ_DEBUG 0
 
 #define MKZ_INF -1
 
@@ -20,8 +20,6 @@
 
 // Q[2*i] contains j-jmin = dj
 // Q[2*i+1] contains the Markowitz count for j
-
-#define MkZIsQueueEmpty(Q) (Q[0] == 0)
 
 // get j-th component of Q[i] 
 #define MkzGet(Q, i, j) (Q[((i)<<1)+(j)])
@@ -114,18 +112,17 @@ MkzPopQueue(INT *dj, INT *mkz, INT *Q, INT *A)
 {
     *dj = MkzGet(Q, 1, 0);
     *mkz = MkzGet(Q, 1, 1);
+    A[*dj] = MKZ_INF;
     MkzAssign(Q, A, 1, Q[0]);
     Q[0]--;
     MkzDownQueue(Q, A, 1);
 }
 
-// Remove (A, Q)[k].
+// (Q, A)[k] has just arrived, but we have to move it in the heap, so that
+// it finds its place.
 void
-MkzDelete(INT *Q, INT *A, INT k)
+MkzMoveUpOrDown(INT *Q, INT *A, INT k)
 {
-    // we put Q[Q[0]] in Q[k]
-    MkzAssign(Q, A, k, Q[0]);
-    Q[0]--;
     // move new node up or down
     if(k == 1)
 	// rare event!
@@ -138,6 +135,18 @@ MkzDelete(INT *Q, INT *A, INT k)
 	else
 	    MkzDownQueue(Q, A, k);
     }
+}
+
+// Remove (Q, A)[k].
+void
+MkzDelete(INT *Q, INT *A, INT k)
+{
+    fprintf(stderr, "MKZ: deleting (Q, A)[%d]=[%d, %d]\n", k,
+	    MkzGet(Q, k, 0), MkzGet(Q, k, 1));
+    // we put Q[Q[0]] in Q[k]
+    MkzAssign(Q, A, k, Q[0]);
+    Q[0]--;
+    MkzMoveUpOrDown(Q, A, k);
 }
 
 int
@@ -200,7 +209,7 @@ MkzInit(sparse_mat_t *mat)
     printf("Entering initMarkowitz\n");
     mat->MKZQ = (INT *)malloc((sz+1) * 2 * sizeof(INT));
     mat->MKZA = (INT *)malloc((sz+1) * sizeof(INT));
-    // just to understand
+    mat->MKZQ[1] = sz; // why not?
     for(j = mat->jmin; j < mat->jmax; j++)
 	if(mat->wt[GETJ(mat, j)] > 0){
 	    mkz = MkzCount(mat, j);
@@ -210,6 +219,8 @@ MkzInit(sparse_mat_t *mat)
 #endif
 	    MkzInsert(mat->MKZQ, mat->MKZA, GETJ(mat, j), mkz);
 	}
+        else
+	    mat->MKZA[GETJ(mat, j)] = MKZ_INF;
     // TODO: overflow in mkz???
     MkzCheck(mat);
 #if MKZ_DEBUG >= 1
@@ -225,10 +236,14 @@ MkzClose(sparse_mat_t *mat)
 }
 
 int
-MkzAddCol(sparse_mat_t *mat, INT j)
+MkzIncrCol(sparse_mat_t *mat, INT j)
 {
-    int ind = mat->wt[GETJ(mat, j)] = incrS(mat->wt[GETJ(mat, j)]);
+    int ind;
 
+#if MKZ_DEBUG >= 1
+    fprintf(stderr, "Incr: wt(%d) was %d\n", j, mat->wt[GETJ(mat, j)]);
+#endif
+    ind = mat->wt[GETJ(mat, j)] = incrS(mat->wt[GETJ(mat, j)]);
     return ind;
 }
 
@@ -236,36 +251,44 @@ void
 MkzUpdate(sparse_mat_t *mat, INT j)
 {
     INT adr = mat->MKZA[GETJ(mat, j)];
-    int mkz = MkzCount(mat, j);
+    int mkz;
 
+    if(adr == -1){
+#if MKZ_DEBUG >= 1
+	fprintf(stderr, "Prevented use of adr[%d]=-1 in MkzUpdate\n", j);
+#endif
+	return;
+    }
+    mkz = MkzCount(mat, j);
+#if MKZ_DEBUG >= 1
+    fprintf(stderr, "Updating j=%d (old=%d, new=%d)\n", j,
+	    MkzGet(mat->MKZQ, adr, 0), mkz);
+#endif
     // nothing to do if new count == old count
     if(mkz != MkzGet(mat->MKZQ, adr, 0)){
-	// remove old count
 	// add new count
+	MkzSet(mat->MKZQ, adr, 1, mkz);
+	// a variant of delete is needed...!
+	MkzMoveUpOrDown(mat->MKZQ, mat->MKZA, adr);
     }
 }
 
-/* remove the cell (i,j), and updates matrix correspondingly.
-   
+/*    
    Updates:
    - mat->wt[j] (weight of column j)
-   - (Q, A)
 
    We arrive here when mat->wt[j] > 0.
 
 */
 void
-MkzRemoveCol(sparse_mat_t *mat, INT j)
+MkzDecreaseColWeight(sparse_mat_t *mat, INT j)
 {
     INT dj = GETJ(mat, j);
 
-    mat->wt[dj] = decrS(mat->wt[dj]);
-    // remove j from the QA structure
-    MkzDelete(mat->MKZQ, mat->MKZA, mat->MKZA[dj]);
-    mat->MKZA[dj] = MKZ_INF;
 #if MKZ_DEBUG >= 1
-    MkzIsHeap(mat->MKZQ);
+    fprintf(stderr, "Decreasing col %d; was %d\n", j, mat->wt[dj]);
 #endif
+    mat->wt[dj] = decrS(mat->wt[dj]);
 }
 
 void
@@ -273,6 +296,13 @@ MkzRemoveJ(sparse_mat_t *mat, INT j)
 {
     INT dj = GETJ(mat, j);
 
+    if(mat->MKZA[dj] == MKZ_INF){
+#if MKZ_DEBUG >= 1
+	fprintf(stderr, "Prevented use of adr[%d]=-1 in MkzRemoveJ\n", j);
+#endif
+	return;
+    }
+    fprintf(stderr, "Removing col %d; was %d\n", j, mat->wt[dj]);
     mat->wt[dj] = 0;
     // remove j from the QA structure
     MkzDelete(mat->MKZQ, mat->MKZA, mat->MKZA[dj]);

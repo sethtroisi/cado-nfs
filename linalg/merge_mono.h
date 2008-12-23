@@ -3,11 +3,7 @@ extern void initWeightFromFile(sparse_mat_t *mat, FILE *purgedfile);
 
 extern void fillmat(sparse_mat_t *mat);
 extern int readmat(sparse_mat_t *mat, FILE *file);
-extern void removeCellSWAR(sparse_mat_t *mat, int i, INT j);
-extern void addRowSWAR(sparse_mat_t *mat, int i);
-extern void addRowsSWAR(sparse_mat_t *mat, int i1, int i2, int len);
-extern void removeRowSWAR(sparse_mat_t *mat, int i);
-extern void remove_j_from_SWAR(sparse_mat_t *mat, int j);
+extern void removeCellAndUpdate(sparse_mat_t *mat, int i, INT j);
 extern void destroyRow(sparse_mat_t *mat, int i);
 extern int removeSingletons(report_t *rep, sparse_mat_t *mat);
 extern int deleteEmptyColumns(sparse_mat_t *mat);
