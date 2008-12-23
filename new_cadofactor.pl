@@ -220,8 +220,9 @@ while (@default_param) {
 
 
 # Parses command-line and configuration file parameters.
-# The second parameter is a pointer to a hash of options:
-#  - mandatory: specifies that we should check the mandatory parameters
+# The second parameter is a hash of options:
+#  - `strict' specifies whether the checking should be strict or not
+#             (i.e. die in case of parsing errors)
 sub read_param {
     my ($param, $opt) = (shift, shift);
 
@@ -244,14 +245,15 @@ sub read_param {
                     push @args, "$1=$2";
                     next;
                 }
-                die "Cannot parse line `$_' in file `$file'.\n";
+                die "Cannot parse line `$_' in file `$file'.\n"
+                    if $opt->{strict};
             }
             close FILE;
             unshift @_, @args;
         } elsif (-f $_) {
             unshift @_, "param=$_";
         } else {
-            die "Unknown argument: `$_'.\n";
+            die "Unknown argument: `$_'.\n" if $opt->{strict};
         }
     }
 
@@ -263,7 +265,7 @@ sub read_param {
     }
 
     # checking mandatory parameters
-    if ($opt->{mandatory}) {
+    if ($opt->{strict}) {
         for my $k ("wdir", "name", "kjadmin", "kjadmax") {
             die "The parameter `$k' is mandatory.\n" if !$param->{$k};
         }
@@ -278,7 +280,6 @@ sub read_param {
 
     # substitute `name' instead of `%s' into `wdir'
     $param->{wdir} =~ s/%s/$param->{name}/g if ($param->{wdir});
-
 
     # `prefix' is a shorthand for `$param->{wdir}/$param->{name}'
     $param->{prefix} = "$param->{wdir}/$param->{name}";
@@ -396,8 +397,14 @@ sub remote_cmd {
     $opt->{timeout} = 30 unless $opt->{timeout};
 
     $cmd =~ s/"/\\"/g;
-    $cmd = "env ssh -q -o \"ConnectTimeout $opt->{timeout}\" $host ".
-           "\"env sh -c '$cmd'\" 2>&1";
+
+    # don't ask for a password: we don't want to fall into interactive mode
+    # all the time (especially not in the middle of the night!)
+    # use public-key authentification instead!
+    $cmd = "env ssh -q ".
+           "-o ConnectTimeout=$opt->{timeout} ".
+           "-o PasswordAuthentication=no ".
+           "$host \"env sh -c '$cmd'\" 2>&1";
 
     my $ret = cmd($cmd, $opt);
 
@@ -1080,7 +1087,7 @@ sub do_init {
     # Getting configuration
     info "Reading the parameters...\n";
     $tab_level++;
-    read_param(\%param, { mandatory => 1 }, @ARGV);
+    read_param(\%param, { strict => 1 }, @ARGV);
     $tab_level--;
 
     if ($param{parallel}) {
@@ -1135,7 +1142,8 @@ sub do_init {
     if ($recover && -f "$param{prefix}.param") {
         eval {
             my %param_old;
-            read_param(\%param_old, {}, "param=$param{prefix}.param");
+            read_param(\%param_old, { strict => 0 },
+                       "param=$param{prefix}.param");
             $param_diff{$_} = !$param_old{$_} || $param{$_} ne $param_old{$_}
                 for keys %param;
         };
@@ -1252,7 +1260,7 @@ sub do_init {
         my $list = join "; ", (grep { defined $_ }
                                (map $tasks{$_->{task}}->{name}, @cleanup));
         $list =~ s/^(.*);/$1; and/;
-        warn "I will cleanup the following tasks: $list.\n";
+        warn "I will clean up the following tasks: $list.\n";
         warn "Are you OK to continue? [y/N] (30s timeout)\n";
         my $r = "";
         eval {
