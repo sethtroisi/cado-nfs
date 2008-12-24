@@ -176,12 +176,14 @@ fprint_free (int *table_ind, int *nb_coeff, relation_t rel, hashtable_t *H)
    k (decimal) is the number of rational and algebraic primes in the relation
    t_1 ... t_k (hexadecimal) are the indices of the primes (starting at 0)
 
+   Return the weight of the relation.
+
    Assumes the remaining primes in 'rel' are those with an odd exponent,
    and are all different.
 
    WARNING: the primes in the input relation are not necessarily sorted.
 */
-static void
+static int
 fprint_rel_row (FILE *file, int irel, relation_t rel, hashtable_t *H)
 {
   int i;
@@ -210,6 +212,8 @@ fprint_rel_row (FILE *file, int irel, relation_t rel, hashtable_t *H)
   fprintf (file, "\n");
 
   free (table_ind);
+
+  return nb_coeff;
 }
 
 /* First we count the number of large primes; then we store all primes in
@@ -425,6 +429,7 @@ delete_relation (int i, int *nprimes, hashtable_t *H,
   rel_used[i] = 0;
 }
 
+#if 0 /* old version of deleteHeavierRows, deleting heaviest rows */
 static int
 compare (const void *v1, const void *v2)
 {
@@ -464,6 +469,113 @@ deleteHeavierRows (hashtable_t *H, int *nrel, int *nprimes, char *rel_used,
       }
     free (tmp);
 }
+#else /* new code, which optimizes the decrease of N*W where N is the number
+         of rows, and W is the total weight. We consider the connected
+         components of the relation R(i1,i2) iff i1 and i2 share a prime
+         of weight 2. If we remove one component of n rows and total weight w,
+         then we save w*N+n*W (neglecting 2nd order terms), thus we remove
+         first the components with the largest value of n/N + w/W. */
+static int
+compare (const void *v1, const void *v2)
+{
+    float w1 = *((float*) v1);
+    float w2 = *((float*) v2);
+
+    return (w1 >= w2) ? -1 : 1;
+}
+
+#define GET_REL(T,i) ((T)[(i) >> 5] & (1 << ((i) & 31)))
+#define SET_REL(T,i) (T)[(i) >> 5] |= (1 << ((i) & 31))
+
+/* Compute connected component of row i for the relation R(i1,i2) if rows
+   i1 and i2 share a prime of weight 2.
+   Return number of rows of components, and put in w the total weight. */
+static int
+compute_connected_component (uint32_t *T, uint32_t i, hashtable_t *H,
+                             unsigned long *w, int **rel_compact,
+                             uint32_t *sum)
+{
+  int j, h, n;
+  uint32_t k;
+
+  n = 1;         /* current row */
+  SET_REL(T, i); /* mark row as visited */
+  for (j = 0; (h = rel_compact[i][j]) != -1; j++)
+    if (H->hashcount[h] == 2)
+      {
+        k = sum[h] - i; /* other row where prime of index h appears */
+        if (GET_REL(T, k) == 0) /* row k was not visited yet */
+          n += compute_connected_component (T, k, H, w, rel_compact, sum);
+      }
+  *w += j; /* add weight of current row */
+  return n;
+}
+
+typedef struct {
+  float w;
+  uint32_t i;
+} comp_t;
+
+static void
+deleteHeavierRows (hashtable_t *H, int *nrel, int *nprimes, char *rel_used,
+                   int **rel_compact, int nrelmax, int keep)
+{
+  uint32_t *sum; /* sum of row indices for primes with weight 2 */
+  int i, j, h, lT, n, ltmp = 0;
+  uint32_t *T; /* bit table */
+  unsigned long w;
+  double W = 0.0; /* total matrix weight */
+  double N = 0.0; /* numebr of rows */
+  comp_t *tmp = NULL; /* (weight, index) */
+
+  if ((*nrel - *nprimes) <= keep)
+    return;
+
+  /* first collect sums for primes with weight 2, and compute total weight */
+  sum = (uint32_t*) malloc (H->hashmod * sizeof (uint32_t));
+  memset (sum, 0, H->hashmod * sizeof (uint32_t));
+  for (i = 0; i < nrelmax; i++)
+    if (rel_used[i] > 0)
+      {
+        for (j = 0; (h = rel_compact[i][j]) != -1; j++)
+          if (H->hashcount[h] == 2)
+            sum[h] += i;
+        N += 1.0;
+        W += (double) j;
+      }
+  fprintf (stderr, "Matrix has %1.0f rows and weight %1.0f\n", N, W);
+  ASSERT_ALWAYS(N == (double) *nrel);
+
+  /* now initialize bit table for relations used */
+  lT = 1 + (nrelmax - 1) / 32;
+  T = (uint32_t*) malloc (lT * sizeof (uint32_t));
+  memset (T, 0, lT * sizeof (uint32_t));
+
+  for (i = 0; i < nrelmax; i++)
+    if (rel_used[i] > 0 && GET_REL(T,i) == 0)
+      {
+        w = 0;
+        n = compute_connected_component (T, i, H, &w, rel_compact, sum);
+        ltmp ++;
+        tmp = (comp_t*) realloc (tmp, ltmp * sizeof (comp_t));
+        tmp[ltmp - 1].w = (float) ((double) w / W + (double) n / N);
+        tmp[ltmp - 1].i = i;
+      }
+
+  qsort (tmp, ltmp, sizeof(comp_t), compare);
+
+  /* remove heaviest components, assuming each one decreases the excess by 1 */
+  for (i = 0; i < ltmp && (*nrel) - (*nprimes) > keep; i ++)
+    {
+      delete_relation (tmp[i].i, nprimes, H, rel_used, rel_compact);
+      *nrel -= 1;
+    }
+
+  free (T);
+  free (sum);
+  free (tmp);
+}
+#endif
 
 static void
 onepass_singleton_removal (int nrelmax, int *nrel, int *nprimes,
@@ -566,6 +678,7 @@ reread (char *oname, char *ficname[], unsigned int nbfic,
   int irel = -1, ret, nr = 0;
   unsigned int i;
   char str[STR_LEN_MAX];
+  double W = 0.0; /* total weight */
 
   ofile = gzip_open (oname, "w");
   fprintf (ofile, "%d %d\n", nrows, ncols);
@@ -596,7 +709,7 @@ reread (char *oname, char *ficname[], unsigned int nbfic,
                     reduce_exponents_mod2 (&rel);
                     computeroots (&rel);
                   }
-                fprint_rel_row (ofile, irel, rel, H);
+                W += (double) fprint_rel_row (ofile, irel, rel, H);
                 nr++;
                 if (nr >= nrows)
                   ret = 0; /* we are done */
@@ -608,6 +721,7 @@ reread (char *oname, char *ficname[], unsigned int nbfic,
     }
   gzip_close (ofile, oname);
   /* write excess to stdout */
+  printf ("WEIGHT: %1.0f WEIGHT*NROWS=%1.2e\n", W, W * (double) nr);
   printf ("EXCESS: %d\n", nrows - ncols);
 }
 
