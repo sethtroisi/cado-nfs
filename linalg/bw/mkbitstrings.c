@@ -29,6 +29,7 @@ unsigned int read_hexstring(FILE *f, unsigned long * ptr, unsigned int n)
             return i;
         }
 
+        /* 0 <= v < 16 */
         x |= v << ir;
         i += 4;
         ir += 4;
@@ -109,12 +110,11 @@ int main(int argc, char * argv[])
 
     fclose(f);
 
-
     for(i = 0 ; i < 64 ; i++) {
         j = 0;
         w = 0;
         for(k = 0 ; k < size ; k++) {
-            w |= ((x[k] >> i) & 1UL) << j;
+            w |= (uint64_t) ((x[k] >> i) & 1UL) << j;
             j ++;
             if (j == 64) {
                 printf ("%016"PRIx64" ", w);
