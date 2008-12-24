@@ -26,9 +26,8 @@ if [ $# -ge 5 ]; then rwmax=$5; fi
 # number of processors
 : ${mt:=2}
 
-/bin/rm -fr $tmp/$name
-tmp=$tmp/$name
-mkdir $tmp
+tmp=`mktemp -d`
+echo Using temporary directory $tmp
 
 cp $d/$name/$name.poly $tmp
 $cado/sieve/makefb -poly $tmp/$name.poly > $tmp/$name.roots
@@ -46,4 +45,9 @@ echo "keep_purge=400000" >> $tmp/params
 echo "ratio=1.5" >> $tmp/params
 echo "skip=32" >> $tmp/params
 $cado/merge_linalg_sqrt2.sh $tmp/params
-/bin/rm -fr $tmp
+if [ "$CADO_DEBUG" ] ; then
+    echo "(debug mode -- keeping $tmp)"
+else
+    echo Removing $tmp
+    /bin/rm -fr $tmp
+fi
