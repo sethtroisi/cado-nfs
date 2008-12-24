@@ -1790,11 +1790,16 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
 	// number of columns removed
 	njproc += old_ncols - mat->rem_ncols;
 	deleteEmptyColumns(mat);
+#ifndef USE_MARKOWITZ
 	if((old_nrows == mat->rem_nrows) && (old_ncols == mat->rem_ncols)){
 	    // is this supposed to be activated at some point? Really?
-	    if((m > maxlevel) || (m <= 0))
+	    if((m > maxlevel) || (m <= 0)){
+		fprintf(stderr, "Stopping, since m=%d // maxlevel=%d\n",
+			m, maxlevel);
 		break;
+	    }
 	}
+#endif
 	bwcost = my_cost((unsigned long)mat->rem_nrows,
 			 (unsigned long)mat->weight, forbw);
 	if(njproc >= target){ // somewhat arbitrary...!
