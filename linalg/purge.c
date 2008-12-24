@@ -650,10 +650,10 @@ renumber (int *nprimes, hashtable_t *H, char *sos)
           if (H->hashcount[i] == 1 && count ++ < 10)
             {
               if (GET_HASH_R(H,i) == minus2)
-                fprintf (stderr, "Warning: singleton rational prime %lu\n",
+                fprintf (stderr, "Warning: singleton rational prime %llu\n",
                          GET_HASH_P(H,i));
               else
-                fprintf (stderr, "Warning: singleton algebraic ideal (%lu,%lu)\n",
+                fprintf (stderr, "Warning: singleton algebraic ideal (%llu,%llu)\n",
                          GET_HASH_P(H,i), GET_HASH_R(H,i));
             }
           H->hashcount[i] = nb++;
