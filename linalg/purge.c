@@ -24,6 +24,38 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
    Stefania Cavallar, PhD Thesis, University of Leiden, 2002.
 */
 
+/*
+  This program works in several passes over the relation files (currently 3):
+  - the first pass considers only rational primes >= minpr and algebraic
+    primes >= minpa. This means that only those primes are loaded in memory,
+    and only relations with singletons in that range can be removed. By
+    default minpr and minpa are taken as rlim and alim respectively.
+    Usually more than half of the relations are discarded in that pass.
+  - the second pass takes minpr=minpa=0, i.e., all primes are now considered
+    (but only for relations surviving the first pass). It removes the remaining
+    relations having singletons (typically very few).
+    Also, if the excess exceeds 'keep', it prunes the heavier relations.
+  - the final pass goes through the relations again, and dumps the remaining
+    ones in the format needed by 'merge'.
+
+  Remark: more passes can be implemented to decrease the memory usage in the
+  first one. Simply increase the initial minpr/minpa, and decrease them at
+  each pass. The only requirement is that the pass before the final one
+  must have minpr=minpa=0, to ensure no singleton remains for 'merge'.
+
+  This program uses the following data structures:
+  rel_used[i]    - non-zero iff relation i is kept (so far)
+  rel_compact[i] - list of 'h' indices in H table of considered (p,r) for row i
+                   (terminated by a -1 sentinel)
+  h = getHashAddr (H, p, r) - index of prime ideal (p, r) in hash table H
+                              (rational primes use r = -2)
+  GET_HASH_P(H,h) - prime corresponding to index h
+  GET_HASH_R(H,h) - root  corresponding to index h (-2 for rational prime)
+  H->hashcount[h] - number of occurrences of (p, r) in current relations
+                   (in the last pass, H->hashcount[] stores the index of the
+                    prime ideal).
+*/
+
 #include <gmp.h>
 #include "mod_ul.c"
 #include <stdio.h>
@@ -79,6 +111,8 @@ my_malloc_free_all (void)
   while (relcompact_current >= 0)
     free (relcompact_list[relcompact_current--]);
   free (relcompact_list);
+  relcompact_list = NULL;
+  relcompact_used = BLOCK_SIZE;
 }
 
 /*****************************************************************************/
@@ -87,25 +121,21 @@ my_malloc_free_all (void)
 static unsigned long minus2;
 
 /* Adds in table_ind[] the indices of the rational primes in 'rel'.
-
    All primes are assumed to be different (and to appear with an odd exponent).
-
    nb_coeff is the current index in table_ind[] (input and output).
  */
 static void
-fprint_rat (int *table_ind, int *nb_coeff, relation_t rel, hashtable_t *H)
+fprint_rat (int *table_ind, int *nb_coeff, relation_t *rel, hashtable_t *H)
 {
     int i, nbc = *nb_coeff;
 
-    for (i = 0; i < rel.nb_rp; i++)
-      table_ind[nbc++] = H->hashcount[getHashAddr (H, rel.rp[i].p, minus2)];
+    for (i = 0; i < rel->nb_rp; i++)
+      table_ind[nbc++] = H->hashcount[getHashAddr (H, rel->rp[i].p, minus2)];
     *nb_coeff = nbc;
 }
 
 /* Adds in table_ind[] the indices of the algebraic primes in 'rel'.
-
    All primes are assumed to be different (and to appear with an odd exponent).
-
    nb_coeff is the current index in table_ind[] (input and output).
  */
 static void
@@ -167,7 +197,7 @@ fprint_rel_row (FILE *file, int irel, relation_t rel, hashtable_t *H)
   else
     {
       /* adds rational primes in table_ind */
-      fprint_rat (table_ind, &nb_coeff, rel, H);
+      fprint_rat (table_ind, &nb_coeff, &rel, H);
 
       /* adds algebraic primes in table_ind */
       fprint_alg (table_ind, &nb_coeff, rel, H);
@@ -182,28 +212,10 @@ fprint_rel_row (FILE *file, int irel, relation_t rel, hashtable_t *H)
   free (table_ind);
 }
 
-/* this function is used in 'reduce' mode only */
-static int
-specialHashInsert (hashtable_t *H, long p, unsigned long r, int irel)
-{
-    int h = getHashAddr(H, p, r);
-
-    if(H->hashcount[h] == 0){
-      /* new empty place */
-        SET_HASH_P(H,h,p);
-        SET_HASH_R(H,h,r);
-	H->hashcount[h] = -(irel+1); /* trick!!! */
-    }
-    else
-	// more than second time
-      H->hashcount[h] = irel+1; /* overcautious!!! */
-    return h;
-}
-
 /* First we count the number of large primes; then we store all primes in
    the hash table, but not in the relations. This might end up with singletons
    here and there, but we don't care, since they will be dealt with in
-   merge. 
+   merge.
 
    Meaning of the different parameters:
    minpr, minpa: only ideals > minpr (resp. minpa) are considered on the
@@ -214,163 +226,140 @@ static void
 insertNormalRelation (int **rel_compact, int irel,
                       int *nprimes, hashtable_t *H, relation_t *rel,
                       unsigned long minpr, unsigned long minpa,
-                      int final, unsigned long *tot_alloc)
+                      unsigned long *tot_alloc)
 {
     int *tmp = NULL, ltmp = 0, i, j, h;
 
     reduce_exponents_mod2 (rel);
-    computeroots (rel); /* FIXME: we might compute roots only for algebraic
-                           primes > minpa */
-    if (final){
-      /* first count number of "large" primes */
-	for (j = 0; j < rel->nb_rp; j++)
-          ltmp += (rel->rp[j].p >= minpr); /* only consider primes >= minpr */
-	for (j = 0; j < rel->nb_ap; j++)
-          ltmp += (rel->ap[j].p >= minpa); /* only consider primes >= minpa */
 
-        /* ltmp is the number of considered primes in the relation.
-           We might have ltmp=0 if all primes are less than minpr, maxpr. */
-        tmp = my_malloc_int (ltmp + 1);
-        *tot_alloc += (ltmp + 1) * sizeof (int);
-	i = 0; /* number of entries in tmp */
+    /* first count number of "large" primes */
+    for (j = 0; j < rel->nb_rp; j++)
+      ltmp += (rel->rp[j].p >= minpr); /* only consider primes >= minpr */
+    for (j = 0; j < rel->nb_ap; j++)
+      ltmp += (rel->ap[j].p >= minpa); /* only consider primes >= minpa */
 
-        /* trick: we use the same hash table for rational and algebraic
-           primes, but use a fake root -2 for rational primes, which
-           ensures there is no collision with algebraic primes */
-	for (j = 0; j < rel->nb_rp; j++)
-          {
-            /* we need to hash-insert also primes < minpr, to get a correct
-               count of distinct primes */
-            h = hashInsert (H, rel->rp[j].p, minus2);
-            *nprimes += (H->hashcount[h] == 1); /* new prime */
-	    if (rel->rp[j].p >= minpr)
-              tmp[i++] = h;
-          }
+    /* ltmp is the number of considered primes in the relation.
+       We might have ltmp=0 if all primes are less than minpr, maxpr. */
+    tmp = my_malloc_int (ltmp + 1);
+    *tot_alloc += (ltmp + 1) * sizeof (int);
+    i = 0; /* number of entries in tmp */
 
-	for (j = 0; j < rel->nb_ap; j++)
-          {
-	    h = hashInsert (H, rel->ap[j].p, rel->ap[j].r);
-            *nprimes += (H->hashcount[h] == 1); /* new prime */
-	    if (rel->ap[j].p >= minpa)
-              tmp[i++] = h;
-          }
+    /* trick: we use the same hash table for rational and algebraic
+       primes, but use a fake root -2 for rational primes, which
+       ensures there is no collision with algebraic primes */
+    for (j = 0; j < rel->nb_rp; j++)
+      if (rel->rp[j].p >= minpr)
+        {
+          /* we only insert 'considered' primes, since we cannot get
+             a correct count of the other ones when we delete a relation */
+          h = hashInsert (H, rel->rp[j].p, minus2);
+          *nprimes += (H->hashcount[h] == 1); /* new prime */
+          tmp[i++] = h;
+        }
 
-        tmp[i] = -1; /* sentinel */
-        rel_compact[irel] = tmp;
-    }
-    else{
-      /* reduce mode only */
-	for(j = 0; j < rel->nb_rp; j++){
-	    h = specialHashInsert(H, rel->rp[j].p, minus2, irel);
-	    if(H->hashcount[h] < 0)
-	      /* new prime */
-		*nprimes += 1;
-	}
-	for(j = 0; j < rel->nb_ap; j++){
-	    h = specialHashInsert(H, rel->ap[j].p, rel->ap[j].r, irel);
-	    if(H->hashcount[h] < 0){
-	      /* new prime */
-		*nprimes += 1;
-	    }
-	}
-    }
+    for (j = 0; j < rel->nb_ap; j++)
+      if (rel->ap[j].p >= minpa)
+        {
+          rel->ap[j].r = findroot (rel->a, rel->b, rel->ap[j].p);
+          h = hashInsert (H, rel->ap[j].p, rel->ap[j].r);
+          *nprimes += (H->hashcount[h] == 1); /* new prime */
+          tmp[i++] = h;
+        }
+
+    tmp[i] = -1; /* sentinel */
+    rel_compact[irel] = tmp;
 }
 
 /* The information is stored in the ap[].p part, which is odd, but convenient.
    rel->ap.p[0..deg[ contains the deg roots of f(x) mod p, leading to deg
    ideals for the factorization of (p). */
 static void
-insertFreeRelation (char *rel_used, int **rel_compact, int irel, int *nprimes,
-                    hashtable_t *H, relation_t *rel, int final,
+insertFreeRelation (int **rel_compact, int irel, int *nprimes,
+                    hashtable_t *H, relation_t *rel,
+                    unsigned long minpr, unsigned long minpa,
                     unsigned long *tot_alloc)
 {
-    long p = rel->a; /* rel->b == 0 */
-    int j, h, *tmp = NULL, itmp;
+    unsigned long p = rel->a; /* rel->b == 0 */
+    int j, h, *tmp = NULL, itmp, ltmp;
 
-    if(final){
-	tmp = (int *)malloc((1 + rel->nb_ap + 1) * sizeof(int));
-        *tot_alloc += (1 + rel->nb_ap + 1) * sizeof(int);
-	itmp = 0;
-	h = hashInsert(H, p, minus2);
-	if(H->hashcount[h] == 1)
-	  /* new prime */
-	    *nprimes += 1;
-	tmp[itmp++] = h;
-	for(j = 0; j < rel->nb_ap; j++){
-	    h = hashInsert(H, p, rel->ap[j].p);
-	    if(H->hashcount[h] == 1)
-	      /* new prime */
-		*nprimes += 1;
-	    tmp[itmp++] = h;
-	}
-	tmp[itmp++] = -1;
-	rel_used[irel] = 1;
-	rel_compact[irel] = tmp;
-    }
-    else{
-      /* reduce mode */
-	h = specialHashInsert(H, p, minus2, irel);
-	if(H->hashcount[h] < 0)
-	  /* new prime */
-	    *nprimes += 1;
-	for(j = 0; j < rel->nb_ap; j++){
-	    h = specialHashInsert(H, p, rel->ap[j].p, irel);
-	    if(H->hashcount[h] < 0)
-	      /* new prime */
-		*nprimes += 1;
-	}
-    }
+    /* the prime on the rational side is rel->a
+       the prime ideal on the algebraic side are (rel->a, rel->ap[j].p) */
+    ltmp = 1 + (p >= minpr);
+    if (p >= minpa)
+      ltmp += rel->nb_ap;
+    tmp = my_malloc_int (ltmp);
+    *tot_alloc += ltmp * sizeof (int);
+    itmp = 0;
+    if (p >= minpr)
+      {
+        h = hashInsert (H, p, minus2);
+        *nprimes += (H->hashcount[h] == 1); /* new prime */
+        tmp[itmp++] = h;
+      }
+    for (j = 0; j < rel->nb_ap; j++)
+      if (p >= minpa)
+        {
+          h = hashInsert(H, p, rel->ap[j].p);
+          *nprimes += (H->hashcount[h] == 1); /* new ideal */
+          tmp[itmp++] = h;
+        }
+    tmp[itmp++] = -1;
+    rel_compact[irel] = tmp;
 }
 
-/* nrel can decrease, for instance in case of duplicate rows. */
+/* Trick: read only active relations, i.e., for which rel_used[i] = 1. */
 static int
-scan_relations_from_file (int *irel, int *nrel, char *rel_used,
-                          int **rel_compact, int *nprimes, hashtable_t *H,
+scan_relations_from_file (int *irel, int **rel_compact, char *rel_used,
+                          int nrelmax, int *nprimes, hashtable_t *H,
                           FILE *file, long minpr, long minpa,
-                          int final, unsigned long *tot_alloc)
+                          unsigned long *tot_alloc)
 {
     relation_t rel;
-    int ret;
+    int ret = 1;
+    char str[STR_LEN_MAX];
 
     while(1){
         /* read rational and algebraic primes and put them in rel
            (identical primes are merged and the corresponding exponent
             computed, but the root for alg. primes is not computed) */
-	ret = fread_relation (file, &rel);
-	if(ret != 1){
-	    break;
-	}
+      if (fgets (str, STR_LEN_MAX, file) == NULL)
+        break; /* end of file or error */
+      //ret = fread_relation (file, &rel);
 	*irel += 1;
 	if(!(*irel % 100000))
-	    fprintf(stderr, "nrel = %d at %2.2lfs (memory %luMb)\n",
+	    fprintf(stderr, "   nrel = %d at %2.2lfs (memory %luMb)\n",
                     *irel, seconds (), *tot_alloc >> 20);
-	rel_used[*irel] = 1;
-	if(rel.b > 0)
-          insertNormalRelation (rel_compact, *irel, nprimes, H, &rel,
-                                minpr, minpa, final, tot_alloc);
-	else
-          insertFreeRelation (rel_used, rel_compact, *irel, nprimes, H, &rel,
-                              final, tot_alloc);
-	if(rel_used[*irel] <= 0)
-	  /* relation removed */
-	    *nrel -= 1;
-	clear_relation(&rel);
+        ASSERT_ALWAYS(*irel < nrelmax);
+        if (rel_used[*irel])
+          {
+            ret = read_relation (&rel, str);
+            if (ret != 1)
+              break;
+            if (rel.b > 0)
+              insertNormalRelation (rel_compact, *irel, nprimes, H, &rel,
+                                    minpr, minpa, tot_alloc);
+            else
+              insertFreeRelation (rel_compact, *irel, nprimes, H, &rel,
+                                  minpr, minpa, tot_alloc);
+            clear_relation(&rel);
+          }
     }
     return ret;
 }
 
 /* Read all relations from file, and fills the rel_used and rel_compact arrays
    for each relation i:
-   - rel_used[i] = 0 or -1 if the relation has no considered prime
-       (i.e., a prime in the interval [minpr, oo] on the rational side),
-       otherwise rel_used[i] = 1
+   - rel_used[i] = 0 if the relation i is deleted
+     rel_used[i] = 1 if the relation i is kept (so far)
    - rel_compact is an array, terminated by -1, of pointers to the entries
      in the hash table for the considered primes
+
+     Trick: we only read relations for which rel_used[i]=1.
  */
 static int
-scan_relations (char *ficname[], int nbfic, int *nrel, int *nprimes,
-                hashtable_t *H, char *rel_used, int **rel_compact,
-		long minpr, long minpa, int final, unsigned long *tot_alloc)
+scan_relations (char *ficname[], int nbfic, int *nprimes, hashtable_t *H,
+                char *rel_used, int nrelmax, int **rel_compact,
+		long minpr, long minpa, unsigned long *tot_alloc)
 {
     FILE *relfile;
     int ret = 0, irel = -1;
@@ -379,65 +368,70 @@ scan_relations (char *ficname[], int nbfic, int *nrel, int *nprimes,
     *nprimes = 0;
 
     ASSERT(nbfic > 0);
-    ASSERT(!final || (final && rel_compact != NULL));
+    ASSERT(rel_compact != NULL);
     for(i = 0; i < nbfic; i++){
 	relfile = gzip_open (ficname[i], "r");
 	if(relfile == NULL){
 	    fprintf(stderr, "Pb opening file %s\n", ficname[i]);
 	    exit(1);
 	}
-	fprintf(stderr, "Adding file %s\n", ficname[i]);
-	ret = scan_relations_from_file (&irel, nrel, rel_used, rel_compact,
+	fprintf(stderr, "   Adding file %s\n", ficname[i]);
+	ret = scan_relations_from_file (&irel, rel_compact, rel_used, nrelmax,
                                         nprimes, H, relfile, minpr, minpa,
-                                        final, tot_alloc);
+                                        tot_alloc);
 	if (ret == 0) {
 	    fprintf(stderr, "Warning: error when reading file %s\n", ficname[i]);
 	    break;
 	}
 	gzip_close (relfile, ficname[i]);
     }
-    fprintf(stderr, "Scanned %d relations\n", irel+1);
+    fprintf(stderr, "   Scanned %d relations\n", irel+1);
+    ASSERT_ALWAYS(irel + 1 <= nrelmax);
 
-    return (ret == -1);
+    return ret;
 }
 
-/* Return a positive value of some prime (ideal) in the array tab[] is single,
-   otherwise return -1: tab[j] is the index in the hash table of the
-   corresponding prime ideal.
+/* Return a non-zero value iff some prime (ideal) in the array tab[] is single
+   (tab[j] is the index in the hash table of the corresponding prime ideal).
 */
 static int
 has_singleton (int *tab, hashtable_t *H)
 {
     int j;
 
-    for(j = 0; tab[j] != -1; j++)
-	if(H->hashcount[tab[j]] == 1)
-	    return tab[j];
-    return -1;
+    for (j = 0; tab[j] != -1; j++)
+      if (H->hashcount[tab[j]] == 1)
+        return 1;
+    return 0;
 }
 
+/* Delete a relation: set rel_used[i] to 0, update the count of primes
+   in that relation, and set rel_compact[i] to NULL.
+   Warning: we only update the count of primes that we consider, i.e.,
+   rational primes >= minpr and algebraic primes >= minpa.
+*/
 static void
 delete_relation (int i, int *nprimes, hashtable_t *H,
                  char *rel_used, int **rel_compact)
 {
-    int j, *tab = rel_compact[i];
+  int j, *tab = rel_compact[i];
 
-    for(j = 0; tab[j] != -1; j++){
-	H->hashcount[tab[j]]--;
-	if(H->hashcount[tab[j]] == 0)
-	    *nprimes -= 1;
+  for (j = 0; tab[j] != -1; j++)
+    {
+      H->hashcount[tab[j]]--; /* remove one occurrence of prime 'j' */
+      *nprimes -= (H->hashcount[tab[j]] == 0);
     }
-    rel_compact[i] = NULL;
-    rel_used[i] = 0;
+  rel_compact[i] = NULL;
+  rel_used[i] = 0;
 }
 
 static int
-compare(const void *v1, const void *v2)
+compare (const void *v1, const void *v2)
 {
     int w1 = *((int*) v1);
     int w2 = *((int*) v2);
 
-    return (w1 >= w2 ? -1 : 1);
+    return (w1 >= w2) ? -1 : 1;
 }
 
 /* Delete the heavier relations if the current excess is larger than 'keep'
@@ -451,58 +445,57 @@ deleteHeavierRows (hashtable_t *H, int *nrel, int *nprimes, char *rel_used,
     if ((*nrel - *nprimes) <= keep)
 	return;
 
-    tmp = (int *)malloc(((*nrel) << 1) * sizeof(int));
-    for(i = 0; i < nrelmax; i++){
-	if(rel_used[i] > 0){
-	    for(nl = 0; rel_compact[i][nl] != -1; nl++);
-	    tmp[j++] = nl;
-	    tmp[j++] = i;
+    tmp = (int *) malloc (((*nrel) << 1) * sizeof(int));
+    for (i = 0; i < nrelmax; i++)
+      if (rel_used[i] > 0)
+        {
+          for (nl = 0; rel_compact[i][nl] != -1; nl++);
+          tmp[j++] = nl; /* relation weight */
+          tmp[j++] = i;  /* relation index */
 	}
-    }
-    qsort(tmp, *nrel, 2 * sizeof(int), compare);
+    qsort (tmp, *nrel, 2 * sizeof(int), compare);
     /* first stupid idea: just remove heavy rows */
-    for(i = 0; i < *nrel; i += 2){
-	if ((*nrel)-(*nprimes) <= keep)
-	    break;
+    for(i = 0; i < 2 * *nrel; i += 2)
+      {
+	if ((*nrel) - (*nprimes) <= keep)
+          break;
 	delete_relation (tmp[i+1], nprimes, H, rel_used, rel_compact);
 	*nrel -= 1;
-    }
-    free(tmp);
+      }
+    free (tmp);
 }
 
 static void
 onepass_singleton_removal (int nrelmax, int *nrel, int *nprimes,
                            hashtable_t *H, char *rel_used, int **rel_compact)
 {
-    int i;
+  int i;
 
-    for(i = 0; i < nrelmax; i++){
-	if(rel_used[i] > 0){
-	    int h = has_singleton (rel_compact[i], H);
-	    if(h >= 0){
-		delete_relation (i, nprimes, H, rel_used, rel_compact);
-		*nrel -= 1;
-	    }
-	}
-    }
+  for (i = 0; i < nrelmax; i++)
+    if (rel_used[i] > 0 && has_singleton (rel_compact[i], H))
+      {
+        delete_relation (i, nprimes, H, rel_used, rel_compact);
+        *nrel -= 1;
+      }
 }
 
 static void
 remove_singletons (int *nrel, int nrelmax, int *nprimes, hashtable_t *H,
-                   char *rel_used, int **rel_compact, int keep)
+                   char *rel_used, int **rel_compact, int keep, int final)
 {
   int old, newnrel = *nrel, newnprimes = *nprimes;
 
     do{
 	old = newnrel;
-	deleteHeavierRows (H, &newnrel, &newnprimes, rel_used, rel_compact,
-                           nrelmax, keep);
+        if (final) /* otherwise the excess is wrong */
+          deleteHeavierRows (H, &newnrel, &newnprimes, rel_used, rel_compact,
+                             nrelmax, keep);
 	if(newnrel != old)
 	    fprintf (stderr, "deleted heavier relations: %d %d at %2.2lf\n",
                      newnrel, newnprimes, seconds ());
 	onepass_singleton_removal (nrelmax, &newnrel, &newnprimes, H,
                                    rel_used, rel_compact);
-	fprintf(stderr, "new_nrows=%d new_ncols=%d (%d) at %2.2lf\n",
+	fprintf (stderr, "   new_nrows=%d new_ncols=%d (%d) at %2.2lf\n",
 		newnrel, newnprimes, newnrel-newnprimes, seconds());
     } while(newnrel != old);
 
@@ -533,100 +526,89 @@ renumber (int *nprimes, hashtable_t *H, char *sos)
 	fsos = gzip_open (sos, "w");
     }
     for(i = 0, nb = 1; i < H->hashmod; i++)
-      if(H->hashcount[i] == 0)
-	    H->hashcount[i] = -1;
-	else{
-            /* Since we consider only primes >= minpr or minpa,
-               smaller primes might appear only once here, thus we can't
-               assert H->hashcount[i] > 1, but H->hashcount[i] = 1 should
-               be rare if minpr/minpa are well chosen (not too large). */
-	    H->hashcount[i] = nb++;
-	    if(fsos != NULL)
-	      fprintf(fsos, "%d %" PRIx64 " %" PRIx64 "\n",
-		      H->hashcount[i] - 1, GET_HASH_P(H,i), GET_HASH_R(H,i));
+      if (H->hashcount[i] == 0)
+        H->hashcount[i] = -1;
+      else
+        {
+          /* Since we consider only primes >= minpr or minpa,
+             smaller primes might appear only once here, thus we can't
+             assert H->hashcount[i] > 1, but H->hashcount[i] = 1 should
+             be rare if minpr/minpa are well chosen (not too large). */
+          static int count = 0;
+          if (H->hashcount[i] == 1 && count ++ < 10)
+            {
+              if (GET_HASH_R(H,i) == minus2)
+                fprintf (stderr, "Warning: singleton rational prime %lu\n",
+                         GET_HASH_P(H,i));
+              else
+                fprintf (stderr, "Warning: singleton algebraic ideal (%lu,%lu)\n",
+                         GET_HASH_P(H,i), GET_HASH_R(H,i));
+            }
+          H->hashcount[i] = nb++;
+          if (fsos != NULL)
+            fprintf(fsos, "%d %" PRIx64 " %" PRIx64 "\n",
+                    H->hashcount[i] - 1, GET_HASH_P(H,i), GET_HASH_R(H,i));
 	}
-    if(fsos != NULL)
+    if (fsos != NULL)
       gzip_close (fsos, sos);
     nb--;
     *nprimes = nb;
 }
 
+/* Read again the relation files ficname[0], ..., ficname[nbfic-1],
+   and output remaining relations (those with rel_used[i] <> 0) in ofile. */
 static void
-reread(FILE *ofile, char *ficname[], unsigned int nbfic,
-       hashtable_t *H, char *rel_used, int nrows)
+reread (char *oname, char *ficname[], unsigned int nbfic,
+        hashtable_t *H, char *rel_used, int nrows, int ncols)
 {
-    FILE *file;
-    relation_t rel;
-    int irel = -1, ret, nr = 0;
-    unsigned int i;
+  FILE *file, *ofile;
+  relation_t rel;
+  int irel = -1, ret, nr = 0;
+  unsigned int i;
+  char str[STR_LEN_MAX];
 
-    for(i = 0; i < nbfic; i++){
-	file = gzip_open (ficname[i], "r");
-	if (file == NULL) {
-	    fprintf(stderr,"problem opening file %s for reading\n",ficname[i]);
-	    exit(1);
-	}
-	fprintf(stderr, "Adding file %s\n", ficname[i]);
-	do{
-	    ret = fread_relation (file, &rel);
-	    if(ret == 1){
-		irel++;
-		if(!(irel % 100000))
-		    fprintf(stderr, "nrel = %d at %2.2lf\n", irel, seconds());
-		if(rel_used[irel]){ /* covers -1 and > 0 */
-		    if(rel.b > 0){
-			reduce_exponents_mod2 (&rel);
-			computeroots (&rel);
-		    }
-		    fprint_rel_row (ofile, irel, rel, H);
-		    nr++;
-		    if(nr >= nrows){
-			ret = 0;
-			break;
-		    }
-		}
-		clear_relation(&rel);
-	    }
-	} while(ret == 1);
-	gzip_close (file, ficname[i]);
+  ofile = gzip_open (oname, "w");
+  fprintf (ofile, "%d %d\n", nrows, ncols);
+  fprintf (stderr, "Final pass:\n");
+  for (i = 0; i < nbfic; i++)
+    {
+      file = gzip_open (ficname[i], "r");
+      if (file == NULL)
+        {
+          fprintf (stderr,"Can't open file %s for reading\n", ficname[i]);
+          exit (1);
+        }
+      fprintf (stderr, "   Adding file %s\n", ficname[i]);
+      do {
+        /* Trick: only parse used relations. This assumes there is no
+           comment or other stuff in the input (nodup) files. */
+        ret = fgets (str, STR_LEN_MAX, file) != NULL;
+        if (ret == 1)
+          {
+            irel++;
+            if (!(irel % 100000))
+              fprintf (stderr, "   nrel = %d at %2.2lf\n", irel, seconds ());
+            if (rel_used[irel])
+              {
+                read_relation (&rel, str);
+                if (rel.b > 0)
+                  {
+                    reduce_exponents_mod2 (&rel);
+                    computeroots (&rel);
+                  }
+                fprint_rel_row (ofile, irel, rel, H);
+                nr++;
+                if (nr >= nrows)
+                  ret = 0; /* we are done */
+                clear_relation (&rel);
+              }
+          }
+      } while (ret == 1);
+      gzip_close (file, ficname[i]);
     }
-}
-
-static void
-reduce(char **ficname, unsigned int nbfic, hashtable_t *H, char *rel_used,
-       int nrels, int nprimes)
-{
-    FILE *relfile;
-    unsigned int i;
-    int nr = 0, newnrels = 0, newnprimes = nprimes;
-    char str[1024];
-
-    /* locate singletons */
-    for(i = 0; i < H->hashmod; i++)
-	if(H->hashcount[i] < 0){
-	  rel_used[-H->hashcount[i]-1] = 0; /* that trick again! */
-	    newnprimes--;
-	}
-    /* I/O */
-    for(i = 0; i < nbfic; i++){
-	relfile = gzip_open (ficname[i], "r");
-	if(relfile == NULL){
-	    fprintf(stderr, "Pb opening file %s\n", ficname[i]);
-	    exit(1);
-	}
-	fprintf(stderr, "Extracting and printing data from file %s\n",
-		ficname[i]);
-	while(fgets(str, 1024, relfile)){
-	    if(rel_used[nr++]){
-		newnrels++;
-		printf("%s", str);
-	    }
-	}
-	gzip_close (relfile, ficname[i]);
-    }
-    fprintf(stderr, "old_nrels=%d old_nprimes=%d\n", nrels, nprimes);
-    fprintf(stderr, "new_nrels=%d new_nprimes=%d\n", newnrels, newnprimes);
-    fprintf(stderr, "-nrels %d -nprimes %d\n", newnrels, newnprimes);
+  gzip_close (ofile, oname);
+  /* write excess to stdout */
+  printf ("EXCESS: %d\n", nrows - ncols);
 }
 
 static void
@@ -634,11 +616,10 @@ usage (void)
 {
   fprintf (stderr, "Usage: purge [options] -poly polyfile -out purgedfile -nrels nnn file1 ... filen\n");
   fprintf (stderr, "Options:\n");
-  fprintf (stderr, "       -nonfinal    - perform only one singleton pass\n");
-  fprintf (stderr, "       -keep    nnn - stop when excess <= nnn (default -1)\n");
+  fprintf (stderr, "       -keep    nnn - prune if excess > nnn (default Inf)\n");
   fprintf (stderr, "       -minpa   nnn - purge alg. primes >= nnn (default alim)\n");
   fprintf (stderr, "       -minpr   nnn - purge rat. primes >= nnn (default rlim)\n");
-  fprintf (stderr, "       -nprimes nnn - number of prime ideals\n");
+  fprintf (stderr, "       -nprimes nnn - expected number of prime ideals\n");
   fprintf (stderr, "       -sos sosfile - to keep track of the renumbering\n");
   exit (1);
 }
@@ -654,21 +635,21 @@ approx_phi (long B)
 int
 main (int argc, char **argv)
 {
-    FILE *purgedfile = NULL;
     hashtable_t H;
     char **fic, *polyname = NULL, *sos = NULL, *purgedname = NULL;
     unsigned int nfic;
     char *rel_used;
     int **rel_compact = NULL;
     int ret, k;
-    int nrel, nprimes = 0, final = 1;
+    int nrel, nprimes = 0;
     unsigned int nrelmax = 0;
     int nrel_new, nprimes_new, Hsize, Hsizer, Hsizea;
     long keep = -1; /* maximum value for nrows-ncols */
-    long minpr = 0, minpa = 0;
+    long minpr = -1, minpa = -1; /* -1 means use minpr=rlim, minpa=alim */
     cado_poly pol;
-    unsigned long tot_alloc;
+    unsigned long tot_alloc, tot_alloc0;
     int need64 = 0; /* non-zero if large primes are > 2^32 */
+    int final, pass = 0;
 
     fprintf (stderr, "%s.r%s", argv[0], REV);
     for (k = 1; k < argc; k++)
@@ -706,11 +687,6 @@ main (int argc, char **argv)
 	    argc -= 2;
 	    argv += 2;
 	}
-	else if(argc > 1 && strcmp (argv[1], "-nonfinal") == 0){
-	    final = 0;
-	    argc--;
-	    argv++;
-	}
 	else if(argc > 1 && strcmp (argv[1], "-sos") == 0){
 	    sos = argv[2];
 	    argc -= 2;
@@ -747,8 +723,8 @@ main (int argc, char **argv)
 
     fic = argv + 1;
     nfic = argc - 1;
-    cado_poly_init(pol);
-    cado_poly_read(pol, polyname);
+    cado_poly_init (pol);
+    cado_poly_read (pol, polyname);
 
     /* On a 32-bit computer, even 1 << 32 would overflow. Well, we could set
        map[ra] = 2^32-1 in that case, but not sure we want to support 32-bit
@@ -757,17 +733,18 @@ main (int argc, char **argv)
 
     if (need64 && sizeof (long) < 8)
       {
-        fprintf (stderr, "Error, too large primes for a 32-bit computer\n");
+        fprintf (stderr, "Error, too large LPBs for a 32-bit computer\n");
         exit (1);
       }
 
-    minus2 = ULONG_MAX - 1;
+    minus2 = (need64) ? 18446744073709551614UL : 4294967294UL;
 
-    if (minpr == 0)
+    if (minpr == -1)
       minpr = pol[0].rlim;
-    if (minpa == 0)
+    if (minpa == -1)
       minpa = pol[0].alim;
 
+    fprintf (stderr, "Using minpr=%ld minpa=%ld\n", minpr, minpa);
     fprintf (stderr, "Number of relations is %u\n", nrelmax);
     if (nprimes > 0)
 	Hsize = nprimes;
@@ -780,70 +757,80 @@ main (int argc, char **argv)
     }
     fprintf (stderr, "initializing hash tables with Hsize=%d...\n", Hsize);
     hashInit (&H, Hsize, 1, need64);
-    tot_alloc = H.hashmod * H.size;
+    tot_alloc0 = H.hashmod * H.size;
 
+    /* FIXME: we could use a bit table for rel_used */
     rel_used = (char *) malloc (nrelmax);
-    tot_alloc += nrelmax;
+    tot_alloc0 += nrelmax;
     fprintf (stderr, "Allocated rel_used of %uMb (total %luMb so far)\n",
              nrelmax >> 20,
-             tot_alloc >> 20);
-    if (final)
+             tot_alloc0 >> 20);
+    /* initialize rel_used[i] to 1 */
+    memset (rel_used, 1, nrelmax);
+
+    /* FIXME: we could allocate rel_compact[] at each pass according to the
+       number of *remaining* relations. We could also manage so that it takes
+       only 32 bits per entry on a 64-bit machine. */
+    rel_compact = (int **) malloc (nrelmax * sizeof (int *));
+    tot_alloc0 += nrelmax * sizeof (int*);
+    /* %zu is the C99 modifier for size_t */
+    fprintf (stderr, "Allocated rel_compact of %zuMb (total %luMb so far)\n",
+             (nrelmax * sizeof (int *)) >> 20,
+             tot_alloc0 >> 20);
+
+    nrel = nrelmax;
+    while (1)
       {
-        /* FIXME: the rel_compact alone uses a lot of memory. For 100M
-           relations (which is reasonable for a 155-digit number with large
-           prime bounds 2^30), on a 64-bit machine it uses 0.8Gb!!! */
-	rel_compact = (int **) malloc (nrelmax * sizeof (int *));
-        tot_alloc += nrelmax * sizeof (int*);
-        /* %zu is the C99 modifier for size_t */
-        fprintf (stderr, "Allocated rel_compact of %zuMb (total %luMb so far)\n",
-                 (nrelmax * sizeof (int *)) >> 20,
-                 tot_alloc >> 20);
+        final = minpr <= 0 && minpa <= 0;
+        tot_alloc = tot_alloc0;
+
+        fprintf (stderr, "Pass %d:\n", ++pass);
+        ret = scan_relations (fic, nfic, &nprimes, &H, rel_used, nrelmax,
+                              rel_compact, minpr, minpa, &tot_alloc);
+        ASSERT (ret);
+
+        fprintf (stderr, "   nrel(useful)=%d, nprimes=%d (expected %d)\n",
+                 nrel, nprimes, Hsize);
+
+        fprintf (stderr, "   Starting singleton removal...\n");
+        nrel_new = nrel;
+        nprimes_new = nprimes;
+        remove_singletons (&nrel_new, nrelmax, &nprimes_new, &H, rel_used,
+                           rel_compact, keep, final);
+        
+        fprintf (stderr, "   nrel=%d, nprimes=%d; excess=%d\n",
+                 nrel_new, nprimes_new, nrel_new - nprimes_new);
+
+        if (nrel_new <= nprimes_new) /* covers case nrel = nprimes = 0 */
+          exit (1); /* if the excess is <= here, it will be more negative
+                       when we decrease minpr and minpa in the next pass */
+
+        my_malloc_free_all ();
+        if (final)
+          break;
+        else
+          minpr = minpa = 0;
+        hashClear (&H); /* Reset all tables to 0. FIXME: in the 2nd pass,
+                           we might reuse some of the information computed
+                           in the 1st pass (roots of primes, etc). */
+        nrel = nrel_new;
       }
 
-    fprintf(stderr, "Reading file of relations...\n");
-    nrel = nrelmax;
-    ret = scan_relations (fic, nfic, &nrel, &nprimes, &H, rel_used,
-                          rel_compact, minpr, minpa, final, &tot_alloc);
-    ASSERT (ret);
+    fprintf (stderr, "Freeing rel_compact array...\n");
+    /* we do not use it anymore */
+    free (rel_compact);
 
-    fprintf (stderr, "nrel(useful)=%d, nprimes=%d (expected %d)\n",
-             nrel, nprimes, Hsize);
+    /* we renumber the primes in order of apparition in the hashtable */
+    fprintf (stderr, "Renumbering primes...\n");
+    renumber (&nprimes_new, &H, sos);
 
-    if(final == 0)
-	reduce (fic, nfic, &H, rel_used, nrelmax, nprimes);
-    else{
-	fprintf(stderr, "starting singleton removal...\n");
-	nrel_new = nrel;
-	nprimes_new = nprimes;
-	remove_singletons (&nrel_new, nrelmax, &nprimes_new, &H, rel_used,
-                           rel_compact, keep);
+    /* reread the relation files and convert them to the new coding */
+    fprintf (stderr, "Storing remaining relations...\n");
+    reread (purgedname, fic, nfic, &H, rel_used, nrel_new, nprimes_new);
 
-	fprintf(stderr, "nrel=%d, nprimes=%d; excess=%d\n",
-		nrel_new, nprimes_new, nrel_new - nprimes_new);
-
-	if (nrel_new <= nprimes_new) /* covers the case nrel = nprimes = 0 */
-	    exit(1);
-
-	/* we renumber the primes in order of apparition in the hashtable */
-        fprintf (stderr, "Renumbering primes...\n");
-	renumber (&nprimes_new, &H, sos);
-
-        fprintf (stderr, "Freeing rel_compact array...\n");
-	/* we do not use it anymore */
-        my_malloc_free_all ();
-	free(rel_compact);
-
-	/* now, we reread the file of relations and convert it to the new
-	   coding... */
-        fprintf (stderr, "Storing remaining relations...\n");
-	purgedfile = gzip_open (purgedname, "w");
-	fprintf (purgedfile, "%d %d\n", nrel_new, nprimes_new);
-	reread (purgedfile, fic, nfic, &H, rel_used, nrel_new);
-	gzip_close (purgedfile, purgedname);
-	/* write excess to stdout */
-	printf("EXCESS: %d\n", nrel_new - nprimes_new);
-    }
-    free(rel_used);
+    hashFree (&H);
+    free (rel_used);
+    cado_poly_clear (pol);
 
     return 0;
 }
