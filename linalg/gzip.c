@@ -24,10 +24,26 @@ FILE *gzip_open(const char * s, const char * t)
     if(is_gzip(s)){
 	char command[1024];
 	if(!strcmp(t, "w")){
+            /* first check the file exists and we can write it */
+            ofile = fopen (s, "w");
+            if (ofile == NULL)
+              {
+                fprintf (stderr, "Error, cannot write file %s\n", s);
+                exit (1);
+              }
+            fclose (ofile);
 	    snprintf(command, sizeof(command), "gzip -c > %s", s);
 	    ofile = popen(command, "w");
 	}
 	else if(!strcmp(t, "r")){
+            /* first check the file exists and we can read it */
+            ofile = fopen (s, "r");
+            if (ofile == NULL)
+              {
+                fprintf (stderr, "Error, cannot read file %s\n", s);
+                exit (1);
+              }
+            fclose (ofile);
 	    snprintf(command, sizeof(command), "gzip -dc %s", s);
 	    ofile = popen(command, "r");
 	}
