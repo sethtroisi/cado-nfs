@@ -287,9 +287,6 @@ addColSWAR(sparse_mat_t *mat, INT j)
 int
 deleteEmptyColumnsSWAR(sparse_mat_t *mat)
 {
-#if 0
-    return deleteAllColsFromStack(mat, 0);
-#else
     dclist dcl = mat->S[0], foo;
     int njrem = 0;
     INT j;
@@ -306,7 +303,6 @@ deleteEmptyColumnsSWAR(sparse_mat_t *mat)
     }
     mat->rem_ncols -= njrem;
     return njrem;
-#endif
 }
 
 #endif

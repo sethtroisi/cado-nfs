@@ -810,6 +810,29 @@ removeColumnAndUpdate(sparse_mat_t *mat, int j)
     freeRj(mat, j);
 }
 
+void
+removeColDefinitely(report_t *rep, sparse_mat_t *mat, INT j)
+{
+    INT k;
+
+#ifndef USE_COMPACT_R
+    for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
+	if(mat->R[GETJ(mat, j)][k] != -1){
+# if TRACE_COL >= 0
+	    if(j == TRACE_COL)
+		fprintf(stderr, "deleteAllCols: row is %d\n",mat->R[GETJ(mat, j)][k]);
+# endif
+	    remove_j_from_row(mat, mat->R[GETJ(mat, j)][k], j);
+	    removeRowDefinitely(rep, mat, mat->R[GETJ(mat, j)][k]);
+	    mat->rem_ncols--;
+	}
+    mat->wt[GETJ(mat, j)] = 0;
+#else
+    fprintf(stderr, "R: NYI in deleteAllColsFromStack\n");
+    exit(1);
+#endif
+}
+
 // These columns are simply removed from the current squeleton matrix, but
 // not from the small matrix.
 int
@@ -843,24 +866,8 @@ deleteAllColsFromStack(report_t *rep, sparse_mat_t *mat, int iS)
 #else
 	if(iS == 0)
 	    mat->rem_ncols--;
-	if(iS == 1){
-#ifndef USE_COMPACT_R
-	    for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
-		if(mat->R[GETJ(mat, j)][k] != -1){
-# if TRACE_COL >= 0
-		    if(j == TRACE_COL)
-			fprintf(stderr, "deleteAllCols: row is %d\n",mat->R[GETJ(mat, j)][k]);
-# endif
-		    remove_j_from_row(mat, mat->R[GETJ(mat, j)][k], j);
-		    removeRowDefinitely(rep, mat, mat->R[GETJ(mat, j)][k]);
-		    mat->rem_ncols--;
-		}
-	    mat->wt[GETJ(mat, j)] = 0;
-#else
-	    fprintf(stderr, "R: NYI in deleteAllColsFromStack\n");
-	    exit(1);
-#endif
-	}
+	if(iS == 1)
+	    removeColDefinitely(rep, mat, j);
 	k = mat->wt[GETJ(mat, j)]; // make a copy of the weight
 	removeColumnAndUpdate(mat, j);
 	// mat->wt[j] was put to 0...
@@ -942,7 +949,19 @@ removeSingletons(report_t *rep, sparse_mat_t *mat)
 	    report1(rep, i); // signal to replay...!
 	}
 #else
+# ifndef USE_MARKOWITZ
     return deleteAllColsFromStack(rep, mat, 1);
+# else
+    INT j;
+    int njrem = 0;
+
+    for(j = mat->jmin; j < mat->jmax; j++)
+	if(mat->wt[GETJ(mat, j)] == 1){
+	    removeColDefinitely(rep, mat, j);
+	    njrem++;
+	}
+    return njrem;
+# endif
 #endif
 }
 
@@ -952,8 +971,7 @@ deleteHeavyColumns(report_t *rep, sparse_mat_t *mat)
 #ifndef USE_MARKOWITZ
     return deleteAllColsFromStack(rep, mat, mat->cwmax+1);
 #else
-    fprintf(stderr, "One day, work has to be done in deleteHeavyColumns\n");
-    return 0;
+    return MkzDeleteHeavyColumns(rep, mat);
 #endif
 }
 
@@ -966,12 +984,14 @@ removeRowDefinitely(report_t *rep, sparse_mat_t *mat, INT i)
     mat->rem_nrows--;
 }
 
-// try all combinations to find the smaller one
+// try all combinations to find the smaller one; resists to m==1
 void
 tryAllCombinations(report_t *rep, sparse_mat_t *mat, int m, INT *ind)
 {
     int i, k;
 
+    if(m == 1)
+	fprintf(stderr, "Warning: m==1 in tryAllCombinations\n");
     i = findBestIndex(mat, m, ind);
 #if DEBUG >= 1
     fprintf(stderr, "Minimal is i=%d (%d %d)\n", i, ind[0], ind[1]);
@@ -1434,7 +1454,9 @@ int
 findSuperfluousRowsFor2(int *tmp, int ntmp, sparse_mat_t *mat)
 {
 #ifdef USE_MARKOWITZ
+# if DEBUG >= 1
     fprintf(stderr, "What's the use of findSuperfluousRowsFor2 for MKZ?\n");
+# endif
     return 0;
 #else
     dclist dcl;
@@ -1612,20 +1634,20 @@ merge(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 #endif
 }
 
-static unsigned long
+static uint64_t
 my_cost(unsigned long N, unsigned long c, int forbw)
 {
     if(forbw == 2){
 	double K1 = .19e-9, K2 = 3.4e-05, K3 = 1.4e-10; // kinda average
 	double dN = (double)N, dc = (double)c;
 
-	return (unsigned long)((K1+K3)*dN*dc+K2*dN*log(dN)*log(dN));
+	return (uint64_t)((K1+K3)*dN*dc+K2*dN*log(dN)*log(dN));
     }
     else if(forbw == 3)
-	return c/N;
+	return (uint64_t)(c/N);
     else if(forbw <= 1)
-	return (N*c);
-    return 0;
+	return ((uint64_t)N)*((uint64_t)c);
+    return (uint64_t)0;
 }
 
 void
@@ -1711,11 +1733,14 @@ void
 mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int forbw, double ratio, int coverNmax)
 {
     double totopt = 0.0, totfill = 0.0, totMST = 0.0, totdel = 0.0;
-    unsigned long bwcostmin = 0, oldbwcost = 0, bwcost = 0;
+    uint64_t bwcostmin = 0, oldbwcost = 0, bwcost = 0;
     int old_nrows, old_ncols, m = 2, njrem = 0, ncost = 0, ncostmax, njproc;
     int mmax = 0, target = 10000, ni2rem;
 #ifdef USE_MARKOWITZ
     INT j, mkz;
+
+    // clean things
+    njrem = removeSingletons(rep, mat);
 #endif
 
     fprintf(stderr, "Using mergeOneByOne\n");
@@ -1746,10 +1771,21 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
 	    break;
 	}
 	MkzPopQueue(&j, &mkz, mat->MKZQ, mat->MKZA);
-	fprintf(stderr, "I popped j=%d mkz=%d (#Q=%d)",j,mkz,mat->MKZQ[0]);
-	fprintf(stderr, " nrows=%d ncols=%d\n",mat->rem_nrows,mat->rem_ncols);
-	mergeForColumn2(rep, mat, &njrem, &totopt, &totfill, &totMST, &totdel,
-			1, j);
+	if(mat->wt[j] == 1){
+# if DEBUG >= 1
+	    fprintf(stderr, "Popped j=%d with w=1\n", j);
+#endif
+	    removeColDefinitely(rep, mat, j);
+	}
+	else if(mat->wt[j] > 0){
+# if DEBUG >= 1
+	    fprintf(stderr, "I popped j=%d mkz=%d (#Q=%d)",j,mkz,mat->MKZQ[0]);
+	    fprintf(stderr, " nrows=%d ncols=%d\n",mat->rem_nrows,mat->rem_ncols);
+# endif
+	    m = mat->wt[j]; // for deleteSuperfluousRows below
+	    mergeForColumn2(rep, mat, &njrem, 
+			    &totopt, &totfill, &totMST, &totdel, 1, j);
+	}
 #endif
 	// number of columns removed
 	njproc += old_ncols - mat->rem_ncols;
@@ -1762,6 +1798,9 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
 	bwcost = my_cost((unsigned long)mat->rem_nrows,
 			 (unsigned long)mat->weight, forbw);
 	if(njproc >= target){ // somewhat arbitrary...!
+#ifdef USE_MARKOWITZ
+	    njrem = removeSingletons(rep, mat);
+#endif
 	    ni2rem = number_of_superfluous_rows(mat);
 	    deleteSuperfluousRows(rep, mat, mat->delta, ni2rem, m);
 	    inspectRowWeight(rep, mat);
@@ -1771,26 +1810,26 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
 		    mat->rem_nrows, mat->rem_ncols, 
 		    mat->rem_nrows - mat->rem_ncols);
 	    if(forbw == 2)
-		fprintf(stderr, " bw=%lu", bwcost);
+		fprintf(stderr, " bw=%"PRIu64"", bwcost);
 	    else if(forbw == 3)
 		fprintf(stderr, " cN=%lu", 
 			((unsigned long)mat->rem_nrows)
 			*((unsigned long)mat->weight));
 	    else if(forbw <= 1)
-		fprintf(stderr, " cN=%lu", bwcost);
+		fprintf(stderr, " cN=%"PRIu64"", bwcost);
 	    fprintf(stderr, " c/N=%2.2lf\n", 
 		    ((double)mat->weight)/((double)mat->rem_ncols));
 	    // njrem=%d at %2.2lf\n",
 	    if((forbw != 0) && (forbw != 3))
 		// what a trick!!!!
-		fprintf(rep->outfile, "BWCOST: %lu\n", bwcost);
+		fprintf(rep->outfile, "BWCOST: %"PRIu64"\n", bwcost);
 	    target = njproc + 10000;
 	}
 	if((bwcostmin == 0) || (bwcost < bwcostmin)){
 	    bwcostmin = bwcost;
 	    if((forbw != 0) && (forbw != 3))
 		// what a trick!!!!
-		fprintf(rep->outfile, "BWCOST: %lu\n", bwcost);
+		fprintf(rep->outfile, "BWCOST: %"PRIu64"\n", bwcost);
 	}
 	// to be cleaned one day...
 	if((forbw == 0) || (forbw == 2)){
@@ -1805,7 +1844,7 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
 	}
 	else if(forbw == 3){
 	    if(bwcost > (unsigned long)coverNmax){
-		fprintf(stderr, "c/N too high, stopping [%lu]\n", bwcost);
+		fprintf(stderr, "c/N too high, stopping [%"PRIu64"]\n", bwcost);
 		break;
 	    }
 	}
@@ -1839,8 +1878,8 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
     deleteSuperfluousRows(rep, mat, mat->delta, 
 			  mat->rem_nrows-mat->rem_ncols+mat->delta, -1);
     if((forbw != 0) && (forbw != 3)){
-	fprintf(rep->outfile, "BWCOSTMIN: %lu\n", bwcostmin);
-	fprintf(stderr, "Minimal bwcost found: %lu\n", bwcostmin);
+	fprintf(rep->outfile, "BWCOSTMIN: %"PRIu64"\n", bwcostmin);
+	fprintf(stderr, "Minimal bwcost found: %"PRIu64"\n", bwcostmin);
     }
 }
 

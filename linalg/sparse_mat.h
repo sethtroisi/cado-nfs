@@ -1,7 +1,7 @@
 #define USE_TAB 1 // 1 for compact rows...
 
 #define TRACE_COL -1 // 253224 // 231 // put to -1 if not...!
-#define TRACE_ROW -1 // put to -1 if not...!
+#define TRACE_ROW -1 // 59496 // put to -1 if not...!
 
 /* rows correspond to relations, and columns to primes (or prime ideals) */
 typedef struct {

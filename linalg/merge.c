@@ -158,7 +158,10 @@ main(int argc, char *argv[])
     gzip_close(purgedfile, purgedname);
 
 #ifndef USE_MARKOWITZ
+    fprintf(stderr, "SWAR version\n");
     initSWAR(&mat);
+#else
+    fprintf(stderr, "Markowitz version\n");
 #endif
     tt = seconds();
     fillmat(&mat);

@@ -259,6 +259,10 @@ MkzUpdate(sparse_mat_t *mat, INT j)
 #endif
 	return;
     }
+#if MKZ_DEBUG >= 1
+    if((mat->wt[GETJ(mat, j)] == 0) || (mat->wt[GETJ(mat, j)] == 1))
+	fprintf(stderr, "W: wt[%d] = %d\n", j, mat->wt[GETJ(mat, j)]);
+#endif
     mkz = MkzCount(mat, j);
 #if MKZ_DEBUG >= 1
     fprintf(stderr, "Updating j=%d (old=%d, new=%d)\n", j,
@@ -310,6 +314,47 @@ MkzRemoveJ(sparse_mat_t *mat, INT j)
 #if MKZ_DEBUG >= 1
     MkzIsHeap(mat->MKZQ);
 #endif
+}
+
+// let's say we remove some columns with the highest Mkz count.
+// Not very pertinent right now.
+int
+MkzDeleteHeavyColumns(report_t *rep, sparse_mat_t *mat)
+{
+#if 1
+    return 0;
+#else
+    INT j;
+    int nj, njmax, w;
+
+    if(MkzQueueCardinality(mat->MKZQ) < 5000)
+	return 0;
+    njmax = 10; // humf
+    for(nj = 0; nj < njmax; nj++){
+	j = MkzGet(mat->MKZQ, Q[0], 0);
+	w = mat->wt[GETJ(mat, j)]; // make a copy of the weight
+	MkzRemoveJ(mat, j);
+        // mat->wt[j] was put to 0...
+        mat->wt[GETJ(mat, j)] = -w; // restore and update
+	Q[0]--;
+    }
+    return njmax;
+#endif
+}
+
+int
+MkzRemoveCols(report_t *rep, sparse_mat_t *mat, int wmin, int wmax)
+{
+    INT j;
+    int w;
+
+    for(j = mat->jmin; j < mat->jmax; j++){
+	w = mat->wt[GETJ(mat, j)] == 1;
+        if((w >= wmin) && (w <= wmax)){
+	    fprintf(stderr, "w[%d]=%d\n", j, w);
+	}
+    }
+    return 0;
 }
 
 #endif

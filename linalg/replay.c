@@ -469,7 +469,8 @@ main(int argc, char *argv[])
     FILE *hisfile, *purgedfile;
     char *purgedname = NULL, *sparsename = NULL, *indexname = NULL;
     char *hisname = NULL;
-    unsigned long bwcost, bwcostmin = 0, addread = 0;
+    uint64_t bwcost, bwcostmin = 0;
+    unsigned long addread = 0;
     int nrows, ncols, nslices = 0;
     int **newrows, i, j, nb, *nbrels, **oldrows, *colweight;
     int ind, small_nrows, small_ncols, **sparsemat;
@@ -509,8 +510,8 @@ main(int argc, char *argv[])
 	    argv += 2;
 	}
 	else if (argc > 2 && strcmp (argv[1], "-costmin") == 0){
-	    sscanf(argv[2], "%lu", &bwcostmin);
-	    fprintf(stderr, "Read bwcostmin=%lu\n", bwcostmin);
+	    sscanf(argv[2], "%"PRIu64"", &bwcostmin);
+	    fprintf(stderr, "Read bwcostmin=%"PRIu64"\n", bwcostmin);
 	    argc -= 2;
 	    argv += 2;
 	}
@@ -549,12 +550,12 @@ main(int argc, char *argv[])
 	    doAllAdds(newrows, str);
 	else{
 	    if(strncmp(str, "BWCOSTMIN", 9) != 0){
-		sscanf(str+8, "%lu", &bwcost);
-		//		fprintf(stderr, "Read bwcost=%lu\n", bwcost);
+		sscanf(str+8, "%"PRIu64"", &bwcost);
+		//	fprintf(stderr, "Read bwcost=%"PRIu64"\n", bwcost);
 		if((bwcostmin != 0) && (bwcost == bwcostmin)){
 		    // what a damn tricky feature!!!!!!!
 		    fprintf(stderr, "Activating tricky stopping feature");
-		    fprintf(stderr, " when finding %lu\n", bwcostmin);
+		    fprintf(stderr, " since I reached %"PRIu64"\n", bwcostmin);
 		    break;
 		}
 	    }

@@ -7,3 +7,5 @@ extern int MkzIncrCol(sparse_mat_t *mat, INT j);
 extern void MkzUpdate(sparse_mat_t *mat, INT j);
 extern void MkzDecreaseColWeight(sparse_mat_t *mat, INT j);
 extern void MkzRemoveJ(sparse_mat_t *mat, INT j);
+extern int MkzDeleteHeavyColumns(report_t *rep, sparse_mat_t *mat);
+extern int MkzRemoveCols(report_t *rep, sparse_mat_t *mat, int wmin, int wmax);
