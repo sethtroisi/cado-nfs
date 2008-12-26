@@ -151,7 +151,7 @@ readOneKer (mp_limb_t *vec, FILE * file, int nlimbs)
             ASSERT(ret == 1);
             j = 64;
           }
-        vec[i++] = w; /* automatic mask if GMP_NUMB_BITS < 64 */
+        vec[i] = w; /* automatic mask if GMP_NUMB_BITS < 64 */
         j -= GMP_NUMB_BITS;
 #if (GMP_NUMB_BITS < 64) /* avoids a warning on 64-bit processors */
         w >>= GMP_NUMB_BITS;
@@ -376,9 +376,9 @@ handleKer (dense_mat_t * mat, rootprime_t * tabchar, FILE * purgedfile,
         {
           int u0 = u / GMP_NUMB_BITS;
           int u1 = u - u0 * GMP_NUMB_BITS;
-          for (i = 0; i < n; ++i)
-            if ((ker[i][u0] >> u1) & 1UL)
-              for (j = 0; j < k; ++j)
+          for (i = 0; i < n; i++)
+            if ((ker[i][u0] >> u1) & (mp_limb_t) 1)
+              for (j = 0; j < k; j++)
                 {
                   /* GCC is smart enough to do the following with masks and
                      shifts when GMP_NUMB_BITS is a power of two */
@@ -508,7 +508,7 @@ int main(int argc, char **argv)
     tabchar = (rootprime_t *) malloc((k - 1) * sizeof(rootprime_t));
     ASSERT(tabchar != NULL);
 
-    create_characters(tabchar, k - 1, pol);
+    create_characters (tabchar, k - 1, pol);
 
 #if DEBUG >= 2
     fprintf(stderr, "using characters (p,r):\n");
@@ -599,11 +599,12 @@ int main(int argc, char **argv)
             }
         if (isz)
             fprintf(stderr, "Sorry %d-th vector is 0\n", i);
-        else {
-            for (j = 0; j < nlimbs; ++j)
-                printf("%lx ", newker[j]);
+        else
+          {
+            for (j = 0; j < nlimbs; j++)
+              printf("%lx ", newker[j]);
             printf("\n");
-        }
+          }
     }
 
     free(tabchar);
