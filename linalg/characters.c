@@ -159,6 +159,34 @@ readOneKer (mp_limb_t *vec, FILE * file, int nlimbs)
       }
 }
 
+/* Print one dependency in file 'file', by chunks of 64 bits, in little
+   endian format. */
+static void
+printOneKer (FILE *file, mp_limb_t *ker, int nlimbs)
+{
+  int i;
+  int j = 0; /* number of bits in w */
+  uint64_t w = 0;
+
+  /* the code below assumes the number of bits per limb divides 64 */
+  ASSERT_ALWAYS ((64 % GMP_NUMB_BITS) == 0);
+
+  for (i = 0; i < nlimbs; i++)
+    {
+      w |= (uint64_t) ker[i] << j; /* little endian */
+      j += GMP_NUMB_BITS;
+      if (j == 64)
+	{
+	  fprintf (file, "%" PRIx64 " ", w);
+	  j = 0;
+	  w = 0;
+	}
+    }
+  if (j > 0)
+    fprintf (file, "%" PRIx64 " ", w);
+  fprintf (file, "\n");
+}
+
 typedef struct {
     unsigned int nrows;
     unsigned int ncols;
@@ -598,13 +626,9 @@ int main(int argc, char **argv)
                 break;
             }
         if (isz)
-            fprintf(stderr, "Sorry %d-th vector is 0\n", i);
+	  fprintf (stderr, "Sorry %d-th vector is 0\n", i);
         else
-          {
-            for (j = 0; j < nlimbs; j++)
-              printf("%lx ", newker[j]);
-            printf("\n");
-          }
+	  printOneKer (stdout, newker, nlimbs);
     }
 
     free(tabchar);
