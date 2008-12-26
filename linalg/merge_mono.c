@@ -27,7 +27,6 @@
 # include "markowitz.h"
 #endif
 #include "merge_mono.h"
-#include "prune.h"
 
 #define STR_LEN_MAX 1024
 

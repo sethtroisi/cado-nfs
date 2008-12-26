@@ -3,6 +3,10 @@
 #
 # Typical use: ./merge_linalg_sqrt.sh Examples/c20/c20 5 10 100 [v]
 #
+
+echo "This file is obsolete, please use merge_linalg_sqrt2.sh instead."
+exit
+
 linalg=linalg
 sqrt=sqrt/naive
 

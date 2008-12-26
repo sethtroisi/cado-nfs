@@ -4,7 +4,7 @@ include $(TOP)/Makefile.common
 
 # Some compilation defaults specific to this directory
 # The following flags are specific to gcc, and fix a regression in gcc 4.3.0
-CFLAGS+=-fno-ivopts -fno-regmove -fno-tree-copy-prop -fno-tree-sra -fno-tree-ter -fno-tree-vrp
+CFLAGS+=-fno-ivopts -fno-regmove -fno-tree-sra -fno-tree-ter
 # using -DSSE_NORM_INIT seems to be slower (about 3% with gcc 4.3.0)
 # CFLAGS+=-DSSE_NORM_INIT
 # -fkeep-inline-functions does not yield any speedup, is it useful?

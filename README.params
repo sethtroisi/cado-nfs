@@ -4,7 +4,7 @@ merge_linalg_sqrt (timings on a 2.4Ghz Opteron).
 The following figures correspond to the data in /local/fleur/cado/Examples,
 with the free relations (see README file). 
 
-      prune mergelevel  cwmax   rwmax  merge  matrix-size    bw/bl
+        mergelevel  cwmax   rwmax  merge  matrix-size    bw/bl
 
 r793:
 c72     nrel=186615, nprimes=157887; excess=28728

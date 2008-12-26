@@ -16,7 +16,6 @@ hashpair: hashpair.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils
 
 hashpair.o: hashpair.h
-prune.o: prune.h
 merge_mono.o: merge_mono.h
 markowitz.o: markowitz.h
 dclist.o: dclist.h
@@ -30,7 +29,7 @@ duplicates: duplicates.o hashpair.o files.o gzip.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lgmp
 purge: purge.o hashpair.o files.o gzip.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lgmp -lm
-merge: merge.o markowitz.o swar.o report.o dclist.o merge_mono.o sparse_mat.o sparse.o prune.o gzip.o
+merge: merge.o markowitz.o swar.o report.o dclist.o merge_mono.o sparse_mat.o sparse.o gzip.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lm
 replay: replay.o sparse.o gzip.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils
@@ -53,12 +52,6 @@ characters: characters.o files.o gauss.o gzip.o
 
 allsqrt: allsqrt.o files.o hashpair.o gzip.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lgmp
-
-matsort: matsort.o gauss.o readmat.o
-	$(CC) $(MY_LFLAGS) -o $@ $^
-
-matprune: matprune.o
-	$(CC) $(MY_LFLAGS) -o $@ $^
 
 apply_perm: apply_perm.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lgmp
@@ -83,7 +76,7 @@ merge_mpi.o: merge_mpi.c merge_mono.c merge.c
 # the path for the libraries
 MPI_CC2:=$(shell $(MPI_CC) -showme | sed -e 's/-I/-isystem /g')
 MPI_CC2:=$(MPI_CC2) -Wl,-rpath,$(MPI_LIB)
-mpimerge: merge.o merge_mpi.o merge_mono.o sparse.o prune.o gzip.o
+mpimerge: merge.o merge_mpi.o merge_mono.o sparse.o gzip.o
 	$(MPI_CC2) -DUSE_MPI $(MPI_INC) $(MY_LFLAGS) -L$(MPI_LIB) -o $@ $^ -lutils -lm
 
 hismerge: hismerge.o

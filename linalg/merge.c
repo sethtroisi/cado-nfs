@@ -27,7 +27,6 @@
 # include "markowitz.h"
 #endif
 #include "merge_mono.h"
-#include "prune.h"
 
 #ifdef USE_MPI
 #include "mpi.h"
@@ -43,10 +42,9 @@ main(int argc, char *argv[])
     char *purgedname = NULL, *hisname = NULL, *outname = NULL;
     char *resumename = NULL;
     int nrows, ncols;
-    int cwmax = 20, rwmax = 1000000, maxlevel = 2, iprune = 0, keep = 128;
+    int cwmax = 20, rwmax = 1000000, maxlevel = 2, keep = 128;
     int verbose = 0; /* default verbose level */
     double tt;
-    double kprune = 1.0; /* prune keeps kprune * (initial excess) */
     double ratio = 1.1; /* bound on cN_new/cN to stop the computation */
     int i, forbw = 0, coverNmax = 0;
 
@@ -87,11 +85,6 @@ main(int argc, char *argv[])
 	    argc -= 2;
 	    argv += 2;
 	}
-	else if (argc > 2 && strcmp (argv[1], "-prune") == 0){
-	    kprune = strtod(argv[2], NULL);
-	    argc -= 2;
-	    argv += 2;
-	}
 	else if (argc > 2 && strcmp (argv[1], "-keep") == 0){
 	    keep = atoi(argv[2]);
 	    argc -= 2;
@@ -127,8 +120,11 @@ main(int argc, char *argv[])
 	    argc -= 2;
 	    argv += 2;
 	}
-	else 
-	    break;
+	else
+	  {
+	    fprintf (stderr, "Error, unknow option %s\n", argv[1]);
+	    exit (1);
+	  }
     }
     purgedfile = gzip_open(purgedname, "r");
     ASSERT_ALWAYS(purgedfile != NULL);
@@ -177,18 +173,6 @@ main(int argc, char *argv[])
 
     init_rep(&rep, outname, &mat, 0, MERGE_LEVEL_MAX);
     report2(&rep, mat.nrows, mat.ncols);
-
-    /* iprune is the excess we want at the end of prune */
-    iprune = (mat.nrows-mat.ncols) * kprune;
-    if (iprune < mat.delta) /* ensures iprune >= DELTA */
-      iprune = mat.delta;
-    /* only call prune if the current excess is larger than iprune */
-    if (iprune < mat.nrows - mat.ncols){
-	double tt = seconds();
-	prune(&rep, &mat, iprune);
-	fprintf(stderr, "Pruning: nrows=%d ncols=%d %2.2lf\n",
-		mat.rem_nrows, mat.rem_ncols, seconds()-tt);
-    }
 
     if(resumename != NULL)
 	resume(&rep, &mat, resumename);

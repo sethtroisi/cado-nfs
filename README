@@ -100,7 +100,6 @@ A param file consists of lines, as in:
 
 cado=where_cado_is
 root=Examples/c59b/c59b
-prune=1.0
 maxlevel=5
 cwmax=10
 rwmax=40
@@ -112,7 +111,7 @@ cN is "minimal".
 
 Parameters that are not found in the file received default
 values. For instance, you can override the choice of the 'name' parameter
-which defauts to $root.$prune"x"$maxlevel"x"$cwmax"x"$rwmax and can be
+which defauts to $root.$maxlevel"x"$cwmax"x"$rwmax and can be
 boring for some users. Just put:
 
 name=toto_likes_his_tata

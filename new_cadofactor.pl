@@ -187,7 +187,6 @@ my @default_param = (
     keeprelfiles => 0,
 
     # filtering
-    prune        => 1.0,
     keep         => 160, # should be 128+skip
     excesspurge  => 1,
     keeppurge    => 160,
@@ -1071,7 +1070,7 @@ my %tasks = (
 
     merge     => { name   => "merge",
                    dep    => ['sieve'],
-                   param  => ['prune', 'keep', 'maxlevel', 'cwmax', 'rwmax',
+                   param  => ['keep', 'maxlevel', 'cwmax', 'rwmax',
                               'ratio', 'bwstrat'],
                    files  => ['merge\.his', 'merge\.stderr'] },
 
@@ -1781,7 +1780,6 @@ sub do_merge {
               "-out $param{prefix}.merge.his ".
               "-mat $param{prefix}.purged ".
               "-forbw $param{bwstrat} ".
-              "-prune $param{prune} ".
               "-keep $param{keep} ".
               "-maxlevel $param{maxlevel} ".
               "-cwmax $param{cwmax} ".

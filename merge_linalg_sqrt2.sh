@@ -35,7 +35,6 @@ keeppurge=${keeppurge-160}
 nkermax=${nkermax-30}
 nchar=${nchar-50}
 
-prune=${prune-1.0}
 maxlevel=${maxlevel-6}
 cwmax=${cwmax-10}
 rwmax=${rwmax-100}
@@ -50,7 +49,7 @@ bwstrat=${bwstrat-1}
 ########## multithreading in bw
 mt=${mt-0}
 
-outdir=${outdir-$root.$prune"x"$maxlevel"x"$cwmax"x"$rwmax}
+outdir=${outdir-$root.$maxlevel"x"$cwmax"x"$rwmax}
 linalg_out=${linalg_out-$outdir}
 
 dir=`dirname $root`
@@ -137,7 +136,7 @@ mergehis=$outdir/merge.his
 keep=`expr 128 '+' $skip`
 ##### warning: first two arguments must be -out <outfile>
 argsa="-out $mergehis -maxlevel $maxlevel -cwmax $cwmax -rwmax $rwmax"
-argsa="$argsa $verbose -prune $prune -mat $purged -keep $keep"
+argsa="$argsa $verbose -mat $purged -keep $keep"
 argsa="$argsa -forbw $bwstrat -ratio $ratio -coverNmax $coverNmax"
 #time $linalg/merge $argsa # 2> $outdir.merge.err
 $cado/merge.sh $argsa

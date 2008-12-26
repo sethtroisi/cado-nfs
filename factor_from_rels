@@ -16,12 +16,11 @@
 name=$1
 
 # default parameters
-prune=1.0; maxlevel=15; cwmax=100; rwmax=100
+maxlevel=15; cwmax=100; rwmax=100
 
-if [ $# -ge 2 ]; then prune=$2; fi
-if [ $# -ge 3 ]; then maxlevel=$3; fi
-if [ $# -ge 4 ]; then cwmax=$4; fi
-if [ $# -ge 5 ]; then rwmax=$5; fi
+if [ $# -ge 2 ]; then maxlevel=$2; fi
+if [ $# -ge 3 ]; then cwmax=$3; fi
+if [ $# -ge 4 ]; then rwmax=$4; fi
 
 # number of processors
 : ${mt:=2}
@@ -38,7 +37,6 @@ $cado/linalg/freerel -poly $tmp/$name.poly $d/$name/$name.rels > $tmp/rels.free
 echo "cado=$cado" > $tmp/params
 echo "root=$tmp/$name" >> $tmp/params
 echo "keeppurge=160" >> $tmp/params
-echo "prune=$prune" >> $tmp/params
 echo "maxlevel=$maxlevel" >> $tmp/params
 echo "cwmax=$cwmax" >> $tmp/params
 echo "rwmax=$rwmax" >> $tmp/params

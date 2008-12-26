@@ -111,7 +111,6 @@ my @parameter_defaults = (
     keeprelfiles=>0,
 
     # filtering
-    prune=>1.0,
     keep=>160, # should be 128+skip
     keeppurge=>100000,
     maxlevel=>15,
@@ -1432,7 +1431,6 @@ MAIN: {
       " -out  $prefix.merge.his" .
       " -mat $prefix.purged" .
       " -forbw $param->{'bwstrat'}" .
-      " -prune $param->{'prune'}" .
       " -keep "  . $param->{'keep'} .
       " -maxlevel $param->{'maxlevel'}" .
       " -cwmax $param->{'cwmax'}" .

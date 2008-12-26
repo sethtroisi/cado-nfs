@@ -68,7 +68,6 @@ sievenice=10
 
 excess=400000           # minimal excess we want after purge
 keeppurge=400001        # shrink in purge if excess exceeds keeppurge
-prune=1.0               # les brunes comptent pas pour des...
 keep=160                # keep euh le plus
 maxlevel=15             # ???
 cwmax=100               # ???

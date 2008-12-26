@@ -81,8 +81,8 @@ SIEVE_ECM_FILES=sieve/ecm/Makefile sieve/ecm/facul.h sieve/ecm/ecm.c \
 LINALG_FILES=linalg/Makefile linalg/freerel.c linalg/hashpair.h \
            linalg/hashpair.c linalg/duplicates.c linalg/files.h linalg/gzip.h \
 	   linalg/files.c linalg/gzip.c linalg/purge.c linalg/merge.c \
-	   linalg/sparse.h linalg/merge_mono.h linalg/prune.h linalg/sparse.c \
-	   linalg/merge_mono.c linalg/prune.c linalg/replay.c \
+	   linalg/sparse.h linalg/merge_mono.h linalg/sparse.c \
+	   linalg/merge_mono.c linalg/replay.c \
 	   linalg/transpose.c linalg/readmat.h linalg/readmat.c \
 	   linalg/balance.c linalg/readbuffer.h linalg/rowset_heap.h \
 	   linalg/readbuffer.c linalg/rowset_heap.cpp linalg/apply_perm.c \
