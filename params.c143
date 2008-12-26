@@ -1,7 +1,7 @@
-# Sample parameter file for a 142-digit gnfs input
-# Example: cadofactor.pl wdir=... n=...
+# Sample parameter file for a 143-digit gnfs input
+# Example: cadofactor.pl wdir=... name=... n=...
 
-name=c142
+name=c143
 
 ##########################################################################
 
@@ -17,11 +17,11 @@ machines=mach_desc      # file describing available computers for parallel
 ###########################################################################
 
 degree=5                # degree of the algebraic polynomial
-kjdelay=300              # time between two checks
+kjdelay=300             # time between two checks
 selectnice=4            # nice level for selection
 
 ## Most important parameters of polyselect
-kjM=3e20                # maximum norm allowed
+kjM=4e20                # maximum norm allowed
 kjl=7                   # minimal number of primes in lc(g)
 kjadmin=1               # min value for lc(f)
 kjadmax=5e9             # max value for lc(f)
@@ -67,7 +67,7 @@ sievenice=10
 ###########################################################################
 
 excess=400000           # minimal excess we want after purge
-keeppurge=10000000      # shrink in purge if excess exceeds keeppurge
+keeppurge=400001        # shrink in purge if excess exceeds keeppurge
 prune=1.0               # les brunes comptent pas pour des...
 keep=160                # keep euh le plus
 maxlevel=15             # ???
