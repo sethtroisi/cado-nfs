@@ -30,9 +30,11 @@ tmp=`mktemp -d`
 echo Using temporary directory $tmp
 
 cp $d/$name/$name.poly $tmp
-$cado/sieve/makefb -poly $tmp/$name.poly > $tmp/$name.roots
-$cado/postsieve/checknorms/checknorms -poly $tmp/$name.poly $d/$name/$name.rels >> $tmp/rels.0
-$cado/linalg/freerel -poly $tmp/$name.poly $tmp/rels.0 > $tmp/rels.free
+# $cado/sieve/makefb -poly $tmp/$name.poly > $tmp/$name.roots
+# we assume now the relations are complete
+# $cado/postsieve/checknorms/checknorms -poly $tmp/$name.poly $d/$name/$name.rels >> $tmp/rels.0
+cp $d/$name/$name.rels $tmp/rels.0
+$cado/linalg/freerel -poly $tmp/$name.poly $d/$name/$name.rels > $tmp/rels.free
 echo "cado=$cado" > $tmp/params
 echo "root=$tmp/$name" >> $tmp/params
 echo "prune=$prune" >> $tmp/params
