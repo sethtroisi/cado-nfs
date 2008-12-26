@@ -313,10 +313,10 @@ addHeavyBlock(char **charmat, FILE * smallfile, int kmin, int skip)
 }
 
 static void
-handleKer(dense_mat_t * mat, rootprime_t * tabchar, FILE * purgedfile,
-          mp_limb_t ** ker, cado_poly pol,
-          FILE * indexfile, FILE * relfile,
-          int small_nrows, FILE * smallfile, int skip)
+handleKer (dense_mat_t * mat, rootprime_t * tabchar, FILE * purgedfile,
+	   mp_limb_t ** ker, cado_poly pol,
+	   FILE * indexfile, FILE * relfile,
+	   int small_nrows, FILE * smallfile, int skip)
 {
     int i, n;
     unsigned int j, k;
@@ -422,6 +422,8 @@ int main(int argc, char **argv)
     dense_mat_t mymat;
     mp_limb_t **myker;
     unsigned int dim;
+    char *purgedname = NULL;
+    char *relname = NULL;
 
 #if 0
     // FIXME...
@@ -444,15 +446,16 @@ int main(int argc, char **argv)
 
     n = UINT_MAX;
 
-    cado_poly_init(pol);
+    cado_poly_init (pol);
     while (argc > 1 && argv[1][0] == '-') {
         if (argc > 2 && strcmp(argv[1], "-purged") == 0) {
-            purgedfile = gzip_open(argv[2], "r");
+	    purgedname = argv[2];
+            purgedfile = gzip_open (purgedname, "r");
             argc -= 2;
             argv += 2;
         }
         if (argc > 2 && strcmp(argv[1], "-ker") == 0) {
-            kerfile = fopen(argv[2], "r");
+            kerfile = fopen (argv[2], "r");
             argc -= 2;
             argv += 2;
         }
@@ -462,12 +465,13 @@ int main(int argc, char **argv)
             argv += 2;
         }
         if (argc > 2 && strcmp(argv[1], "-index") == 0) {
-            indexfile = fopen(argv[2], "r");
+            indexfile = fopen (argv[2], "r");
             argc -= 2;
             argv += 2;
         }
         if (argc > 2 && strcmp(argv[1], "-rel") == 0) {
-            relfile = gzip_open (argv[2], "r");
+	    relname = argv[2];
+            relfile = gzip_open (relname, "r");
             argc -= 2;
             argv += 2;
         }
@@ -482,7 +486,7 @@ int main(int argc, char **argv)
             argv += 2;
         }
         if (argc > 2 && strcmp(argv[1], "-small") == 0) {
-            smallfile = fopen(argv[2], "r");
+            smallfile = fopen (argv[2], "r");
             argc -= 2;
             argv += 2;
         }
@@ -525,9 +529,9 @@ int main(int argc, char **argv)
     for (j = 0; j < n; ++j) {
         fprintf(stderr, " %u", j);
         fflush (stderr);
-        ker[j] = (mp_limb_t *) malloc(nlimbs * sizeof(mp_limb_t));
+        ker[j] = (mp_limb_t *) malloc (nlimbs * sizeof(mp_limb_t));
         ASSERT(ker[j] != NULL);
-        readOneKer(ker[j], kerfile, nlimbs);
+        readOneKer (ker[j], kerfile, nlimbs);
     }
     fprintf(stderr, "\nfinished reading kernel file\n");
 
@@ -611,6 +615,12 @@ int main(int argc, char **argv)
     for (i = 0; i < mymat.nrows; ++i)
         free(myker[i]);
     free(myker);
+    cado_poly_clear (pol);
+    gzip_close (purgedfile, purgedname);
+    gzip_close (relfile, relname);
+    fclose (kerfile);
+    fclose (indexfile);
+    fclose (smallfile);
 
     return 0;
 }
