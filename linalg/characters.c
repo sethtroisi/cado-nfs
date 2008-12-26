@@ -131,29 +131,31 @@ static void create_characters(rootprime_t * tabchar, int k, cado_poly pol)
 
 /* Read one dependency from file 'file', and stores it into 'vec'.
    The dependency in 'file' is stored on one line, with 64-bit words
-   written in hexadecimal.
+   written in hexadecimal (little endian).
  */
 static void
-readOneKer (mp_limb_t * vec, FILE * file, int nlimbs)
+readOneKer (mp_limb_t *vec, FILE * file, int nlimbs)
 {
     uint64_t w;
-    int ret, i, j;
+    int ret, i;
+    int j = 0; /* remaining number of unused bits in w */
 
     /* the code below assumes the number of bits per limb divides 64 */
     ASSERT_ALWAYS ((64 % GMP_NUMB_BITS) == 0);
 
-    for (i = 0; i < nlimbs;)
+    for (i = 0; i < nlimbs; i++)
       {
-        ret = fscanf (file, "%" SCNx64, &w);
-	//        ret = fscanf (file, "%lx", &w);
-        ASSERT(ret == 1);
-	for (j = 0; j < 64; j += GMP_NUMB_BITS)
-	  {
-	    *vec = w; /* automatic mask of low GMP_NUMB_BITS bits */
-	    vec ++;
-	    i ++;
-	    w >>= GMP_NUMB_BITS;
-	  }
+        if (j == 0)
+          {
+            ret = fscanf (file, "%" SCNx64, &w);
+            ASSERT(ret == 1);
+            j = 64;
+          }
+        vec[i++] = w; /* automatic mask if GMP_NUMB_BITS < 64 */
+        j -= GMP_NUMB_BITS;
+#if (GMP_NUMB_BITS < 64) /* avoids a warning on 64-bit processors */
+        w >>= GMP_NUMB_BITS;
+#endif
       }
 }
 
