@@ -1,3 +1,8 @@
+/* Reads a file with n 64-bit vectors (each one encoded as a
+   16-digit hexadecimal string).
+   Outputs a transposed file with 64 n-bit vectors (each one encoded as
+   ceil(n/64) 16-digit hexadecimal strings) */
+
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
@@ -6,12 +11,12 @@
 #include "manu.h"
 #include "utils.h"
 
-unsigned int read_hexstring(FILE *f, unsigned long * ptr, unsigned int n)
+unsigned int read_hexstring(FILE *f, uint64_t * ptr, unsigned int n)
 {
     unsigned int i = 0;
     unsigned int ir = 0;
-    unsigned long x = 0UL;
-    unsigned long v;
+    uint64_t x = (uint64_t) 0UL;
+    uint64_t v;
     char c;
 
     for( ; isspace(c = fgetc(f)) ; );
@@ -33,10 +38,10 @@ unsigned int read_hexstring(FILE *f, unsigned long * ptr, unsigned int n)
         x |= v << ir;
         i += 4;
         ir += 4;
-        if (ir == ULONG_BITS) {
+        if (ir == 64) {
             ir = 0;
             *ptr++ = x;
-            x = 0UL;
+            x = (uint64_t) 0UL;
         }
     }
     if (i == n)
@@ -50,30 +55,12 @@ unsigned int read_hexstring(FILE *f, unsigned long * ptr, unsigned int n)
     return n;
 }
 
-unsigned int write_hexstring(FILE * f, const unsigned long * ptr, unsigned int n)
-{
-    const char hxits[] = "0123456789abcdef";
-    unsigned int i = 0;
-    for( ; i < n ; ) {
-        unsigned long v = *ptr++;
-        unsigned int ir;
-        for(ir = 0 ; ir < ULONG_BITS && i < n ; ) {
-            fputc(hxits[v&0x0f], f);
-            if (ferror(f) || feof(f)) return i;
-            v >>= 4;
-            ir += 4;
-            i += 4;
-        }
-    }
-    return n;
-}
-
 int main(int argc, char * argv[])
 {
     FILE * f;
     int i, j;
     unsigned long k;
-    unsigned long * x;
+    uint64_t * x;
     unsigned int size = 0;
     unsigned int alloc = 0;
     uint64_t w;
@@ -86,7 +73,7 @@ int main(int argc, char * argv[])
     fprintf (stderr, "\n");
 
     /* read all data in memory */
-    alloc = 1024; x = malloc(alloc * sizeof(unsigned long));
+    alloc = 1024; x = malloc(alloc * sizeof(uint64_t));
     if (argc != 2) {
         fprintf(stderr, "missing input file\n");
         exit(1);
@@ -99,9 +86,9 @@ int main(int argc, char * argv[])
         if (size >= alloc) {
             /* fprintf(stderr, "realloc(%d)", alloc); fflush(stderr); */
             alloc <<= 1;
-            x = realloc(x, alloc * sizeof(unsigned long));
+            x = realloc(x, alloc * sizeof(uint64_t));
         }
-        read_hexstring(f, x + size, 64);
+        read_hexstring (f, x + size, 64);
         if (feof(f) || ferror(f))
             break;
     }
