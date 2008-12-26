@@ -731,7 +731,8 @@ usage (void)
 {
   fprintf (stderr, "Usage: purge [options] -poly polyfile -out purgedfile -nrels nnn file1 ... filen\n");
   fprintf (stderr, "Options:\n");
-  fprintf (stderr, "       -keep    nnn - prune if excess > nnn (default Inf)\n");
+  fprintf (stderr, "       -excess  nnn - initial excess must be >= nnn (default 1)\n");
+  fprintf (stderr, "       -keep    nnn - prune if excess > nnn (default 160)\n");
   fprintf (stderr, "       -minpa   nnn - purge alg. primes >= nnn (default alim)\n");
   fprintf (stderr, "       -minpr   nnn - purge rat. primes >= nnn (default rlim)\n");
   fprintf (stderr, "       -nprimes nnn - expected number of prime ideals\n");
@@ -759,7 +760,8 @@ main (int argc, char **argv)
     int nrel, nprimes = 0;
     unsigned int nrelmax = 0;
     int nrel_new, nprimes_new, Hsize, Hsizer, Hsizea;
-    long keep = -1; /* maximum value for nrows-ncols */
+    long excess = 1;    /* minimum initial excess */
+    long keep = 160;    /* maximum final excess */
     long minpr = -1, minpa = -1; /* -1 means use minpr=rlim, minpa=alim */
     cado_poly pol;
     unsigned long tot_alloc, tot_alloc0;
@@ -797,6 +799,11 @@ main (int argc, char **argv)
 	    argc -= 2;
 	    argv += 2;
 	}
+	else if(argc > 2 && strcmp (argv[1], "-excess") == 0){
+	    excess = atol (argv[2]);
+	    argc -= 2;
+	    argv += 2;
+	}
 	else if(argc > 2 && strcmp (argv[1], "-keep") == 0){
 	    keep = atol (argv[2]);
 	    argc -= 2;
@@ -818,8 +825,6 @@ main (int argc, char **argv)
             usage ();
           }
     }
-    if (keep <= 0)
-	keep = nrelmax;
 
     if (argc == 1)
       usage ();
@@ -904,12 +909,18 @@ main (int argc, char **argv)
                               rel_compact, minpr, minpa, &tot_alloc);
         ASSERT (ret);
 
-        fprintf (stderr, "   nrel(useful)=%d, nprimes=%d (expected %d)\n",
-                 nrel, nprimes, Hsize);
+        fprintf (stderr, "   nrels=%d, nprimes=%d; excess=%d\n",
+                 nrel, nprimes, nrel - nprimes);
 
         fprintf (stderr, "   Starting singleton removal...\n");
         nrel_new = nrel;
         nprimes_new = nprimes;
+        if (final && (nrel_new < nprimes_new + excess))
+          {
+            fprintf (stderr, "Initial excess is below requested %ld, stopping.\n",
+                     excess);
+            exit (1); /* initial excess is too small */
+          }
         remove_singletons (&nrel_new, nrelmax, &nprimes_new, &H, rel_used,
                            rel_compact, keep, final);
         

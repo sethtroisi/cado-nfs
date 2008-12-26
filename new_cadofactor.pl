@@ -177,7 +177,7 @@ my @default_param = (
     rlambda      => 2.3,
     alambda      => 2.3,
     I            => 13,
-    excess       => 100,
+    excess       => 1,
     qmin         => 12000000,
     qrange       => 1000000,
     checkrange   => 1000000,
@@ -189,7 +189,8 @@ my @default_param = (
     # filtering
     prune        => 1.0,
     keep         => 160, # should be 128+skip
-    keeppurge    => 100000,
+    excesspurge  => 1,
+    keeppurge    => 160,
     maxlevel     => 15,
     cwmax        => 200,
     rwmax        => 200,
@@ -1703,6 +1704,7 @@ sub do_sieve {
         $tab_level++;
         my $ret = cmd("$param{cadodir}/linalg/purge ".
                       "-poly $param{prefix}.poly -keep $param{keeppurge} ".
+                      "-excess $param{excesspurge} ".
                       "-nrels $n -out $param{prefix}.purged ".
                       "$param{prefix}.nodup.gz ".
                       "> $param{prefix}.purge.stderr 2>&1", { log => 1 });

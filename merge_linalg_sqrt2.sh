@@ -29,7 +29,8 @@ export cado
 linalg=$cado/linalg
 sqrt=$cado/sqrt/naive
 
-keep_purge=${keep_purge-0}
+excesspurge=${excesspurge-1}
+keeppurge=${keeppurge-160}
 
 nkermax=${nkermax-30}
 nchar=${nchar-50}
@@ -104,7 +105,7 @@ else
   else
     nrels_dup=`wc -l < $nodup` ## TODO: what if nodup is gzipped?????
   fi
-  args="-poly $poly -keep $keep_purge"
+  args="-poly $poly -excess $excesspurge -keep $keeppurge"
   if [ "X$sos" != "X" ]; then args="$args -sos $sos"; fi
   time $linalg/purge $args -nrels $nrels_dup -out $purged $nodup > $tmp
   if [ ! -s $purged ]; then echo "zero file $purged"; exit; fi

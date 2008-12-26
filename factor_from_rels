@@ -16,7 +16,7 @@
 name=$1
 
 # default parameters
-prune=1.0; maxlevel=6; cwmax=10; rwmax=100
+prune=1.0; maxlevel=15; cwmax=100; rwmax=100
 
 if [ $# -ge 2 ]; then prune=$2; fi
 if [ $# -ge 3 ]; then maxlevel=$3; fi
@@ -37,13 +37,13 @@ cp $d/$name/$name.rels $tmp/rels.0
 $cado/linalg/freerel -poly $tmp/$name.poly $d/$name/$name.rels > $tmp/rels.free
 echo "cado=$cado" > $tmp/params
 echo "root=$tmp/$name" >> $tmp/params
+echo "keeppurge=160" >> $tmp/params
 echo "prune=$prune" >> $tmp/params
 echo "maxlevel=$maxlevel" >> $tmp/params
 echo "cwmax=$cwmax" >> $tmp/params
 echo "rwmax=$rwmax" >> $tmp/params
 echo "mt=$mt" >> $tmp/params
-echo "bwstrat=0" >> $tmp/params
-echo "keep_purge=400000" >> $tmp/params
+echo "bwstrat=1" >> $tmp/params
 echo "ratio=1.5" >> $tmp/params
 echo "skip=32" >> $tmp/params
 $cado/merge_linalg_sqrt2.sh $tmp/params
