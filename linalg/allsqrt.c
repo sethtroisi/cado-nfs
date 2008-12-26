@@ -180,34 +180,6 @@ finishRationalSqrt(FILE *ratfile, hashtable_t *H, cado_poly pol)
     mpz_clear(prod);
 }
 
-static void
-finishAlgebraicSqrt(FILE *algfile, hashtable_t *H /*, cado_poly pol*/)
-{
-    unsigned int i;
-    uint64_t minus2 = (H->need64) ? (uint64_t) (-2) : (uint32_t) (-2);
-
-    fprintf(algfile, "0 0\n");
-#if DEBUG >= 1
-    fprintf(stderr, "# Now, we print the factors of sqrt(norm): p r e\n");
-#endif
-    for(i = 0; i < H->hashmod; i++)
-	if(H->hashcount[i] > 0){
-          if (GET_HASH_R(H,i) == minus2)
-		continue;
-	    if ((H->hashcount[i] & 1)) {
-	        fprintf(stderr, "  Odd valuation! At algebraic prime %"PRIi64" %"PRIu64"\n",
-                        GET_HASH_P(H,i), GET_HASH_R(H,i));
-		exit(1);
-	    }
-	    fprintf(algfile, "%"PRIi64" %"PRIu64" %d\n",
-		    GET_HASH_P(H,i), GET_HASH_R(H,i), H->hashcount[i]>>1);
-#if DEBUG >= 1
-	    fprintf(stderr, "# H[%d] = %d\n", i, H->hashcount[i]);
-#endif
-	}
-    fprintf(algfile, "0 0\n");
-}
-
 // returns the sign of m1*a+m2*b
 int
 treatSign(relation_t rel, cado_poly pol)
@@ -243,22 +215,22 @@ treatDep(char *ratname, char *algname, char *relname, char *purgedname, char *in
 {
     FILE *ratfile, *algfile, *relfile, *indexfile, *purgedfile = NULL;
     relation_t rel;
-    unsigned long w;
+    uint64_t w;
     int ret, i, j, nrel, r, irel, nr, sg, ind;
     char str[1024];
 
     memset(small_row_used, 0, small_nrows * sizeof(char));
     // now use this dep
     for(i = 0; i < nlimbs; ++i){
-	ret = fscanf(kerfile, "%lx", &w);
+	ret = fscanf (kerfile, "%" SCNx64, &w);
 	if(ret == -1)
 	    return ret;
 	ASSERT (ret == 1);
-	if(verbose)
-	    fprintf(stderr, "w=%lx\n", w);
-	for(j = 0; j < GMP_NUMB_BITS; ++j){
+	if (verbose)
+	    fprintf(stderr, "w=%" PRIx64 "\n", w);
+	for(j = 0; j < 64; ++j){
 	    if(w & 1UL){
-		ind = (i * GMP_NUMB_BITS)+j;
+		ind = (i * 64) + j;
 		if(verbose)
 		    fprintf(stderr, "+R_%d\n", ind);
 		small_row_used[ind] = 1;
@@ -339,8 +311,6 @@ treatDep(char *ratname, char *algname, char *relname, char *purgedname, char *in
     if(sg == -1)
 	fprintf(stderr, "prod(a-b*m) < 0\n");
     else{
-	if((rora == 2) || (rora == 3))
-          finishAlgebraicSqrt(algfile, H /*, pol*/);
 	if((rora == 1) || (rora == 3))
 	    finishRationalSqrt(ratfile, H, pol);
     }
@@ -357,7 +327,7 @@ SqrtWithIndexAll(char *prefix, char *relname, char *purgedname, char *indexname,
     FILE *indexfile, *purgedfile;
     char ratname[200], algname[200], str[1024];
     hashtable_t H;
-    unsigned long w;
+    uint64_t w;
     int i, j, ret, nlimbs, nrows, ncols, small_nrows, small_ncols;
     char *small_row_used, *rel_used;
     int *vec; // useful to check dependency relation in the purged matrix
@@ -370,7 +340,7 @@ SqrtWithIndexAll(char *prefix, char *relname, char *purgedname, char *indexname,
     fscanf(indexfile, "%d %d", &small_nrows, &small_ncols);
     gzip_close(indexfile, indexname);
 
-    nlimbs = (small_nrows / GMP_NUMB_BITS) + 1;
+    nlimbs = ((small_nrows - 1) / 64) + 1;
     // first read used rows in the small matrix
     small_row_used = (char *)malloc(small_nrows * sizeof(char));
     rel_used = (char *)malloc(nrows * sizeof(char));
@@ -391,7 +361,7 @@ SqrtWithIndexAll(char *prefix, char *relname, char *purgedname, char *indexname,
     // skip first ndepmin-1 relations
     for(j = 0; j < ndepmin; j++)
 	for(i = 0; i < nlimbs; ++i)
-	    ret = fscanf(kerfile, "%lx", &w);
+	    ret = fscanf (kerfile, "%" SCNx64, &w);
 
     // use a hash table to rebuild P2
     hashInit(&H, nrows, 1, need64);
