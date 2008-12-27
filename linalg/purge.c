@@ -429,52 +429,28 @@ delete_relation (int i, int *nprimes, hashtable_t *H,
   rel_used[i] = 0;
 }
 
-#if 0 /* old version of deleteHeavierRows, deleting heaviest rows */
-static int
-compare (const void *v1, const void *v2)
-{
-    int w1 = *((int*) v1);
-    int w2 = *((int*) v2);
+/* New pruning code, which optimizes the decrease of N*W where N is the number
+   of rows, and W is the total weight. We consider the connected
+   components of the relation R(i1,i2) iff i1 and i2 share a prime
+   of weight 2. If we remove one component of n rows and total weight w,
+   then we save w*N+n*W (neglecting 2nd order terms), thus we remove
+   first the components with the largest value of n/N + w/W. */
 
-    return (w1 >= w2) ? -1 : 1;
-}
+/* Define the weight of a connected component: those with the largest cost
+   are removed first in the pruning; w (unsigned long) is the component weight,
+   W (double) is the total matrix weight, n (int) is the number of rows of the
+   component, and N (double) is the number of rows of the matrix. This macro
+   must return a double. */
+#if 0
+/* optimize the decrease of W*N */
+#define COST(w,W,n,N) ((double) (w) / (W) + (double) (n) / (N))
+/* optimize the decrease of W */
+#define COST(w,W,n,N) ((double) (w) / (W))
+#endif
 
-/* Delete the heavier relations if the current excess is larger than 'keep'
-   We sort rows w.r.t. their weight and decide which one to delete. */
-static void
-deleteHeavierRows (hashtable_t *H, int *nrel, int *nprimes, char *rel_used,
-                   int **rel_compact, int nrelmax, int keep)
-{
-    int *tmp, i, j = 0, nl;
+/* optimize the decrease of N */
+#define COST(w,W,n,N) ((double) (n) / (N))
 
-    if ((*nrel - *nprimes) <= keep)
-	return;
-
-    tmp = (int *) malloc (((*nrel) << 1) * sizeof(int));
-    for (i = 0; i < nrelmax; i++)
-      if (rel_used[i] > 0)
-        {
-          for (nl = 0; rel_compact[i][nl] != -1; nl++);
-          tmp[j++] = nl; /* relation weight */
-          tmp[j++] = i;  /* relation index */
-	}
-    qsort (tmp, *nrel, 2 * sizeof(int), compare);
-    /* first stupid idea: just remove heavy rows */
-    for(i = 0; i < 2 * *nrel; i += 2)
-      {
-	if ((*nrel) - (*nprimes) <= keep)
-          break;
-	delete_relation (tmp[i+1], nprimes, H, rel_used, rel_compact);
-	*nrel -= 1;
-      }
-    free (tmp);
-}
-#else /* new code, which optimizes the decrease of N*W where N is the number
-         of rows, and W is the total weight. We consider the connected
-         components of the relation R(i1,i2) iff i1 and i2 share a prime
-         of weight 2. If we remove one component of n rows and total weight w,
-         then we save w*N+n*W (neglecting 2nd order terms), thus we remove
-         first the components with the largest value of n/N + w/W. */
 static int
 compare (const void *v1, const void *v2)
 {
@@ -558,7 +534,7 @@ deleteHeavierRows (hashtable_t *H, int *nrel, int *nprimes, char *rel_used,
         n = compute_connected_component (T, i, H, &w, rel_compact, sum);
         ltmp ++;
         tmp = (comp_t*) realloc (tmp, ltmp * sizeof (comp_t));
-        tmp[ltmp - 1].w = (float) ((double) w / W + (double) n / N);
+        tmp[ltmp - 1].w = (float) COST(w,W,n,N);
         tmp[ltmp - 1].i = i;
       }
 
@@ -575,7 +551,6 @@ deleteHeavierRows (hashtable_t *H, int *nrel, int *nprimes, char *rel_used,
   free (sum);
   free (tmp);
 }
-#endif
 
 static void
 onepass_singleton_removal (int nrelmax, int *nrel, int *nprimes,
