@@ -199,17 +199,22 @@ MkzCount(sparse_mat_t *mat, INT j)
     return ((mkz-1) * mat->wt[GETJ(mat, j)]);
 }
 
-// TODO: make this look like fillmat??? or initSWAR???
 void
 MkzInit(sparse_mat_t *mat)
 {
     INT j, mkz;
-    int sz = mat->jmax - mat->jmin;
+    int sz = 0;
 
-    printf("Entering initMarkowitz\n");
+    fprintf(stderr, "Entering initMarkowitz\n");
+    // compute number of elligible columns in the heap
+    for(j = mat->jmin; j < mat->jmax; j++)
+	if(mat->wt[GETJ(mat, j)] > 0)
+	    sz++;
+    fprintf(stderr, "Allocating heap for %d columns\n", sz);
     mat->MKZQ = (INT *)malloc((sz+1) * 2 * sizeof(INT));
-    mat->MKZA = (INT *)malloc((sz+1) * sizeof(INT));
     mat->MKZQ[1] = sz; // why not?
+    // every j needs a pointer
+    mat->MKZA = (INT *)malloc((mat->jmax - mat->jmin + 1) * sizeof(INT));
     for(j = mat->jmin; j < mat->jmax; j++)
 	if(mat->wt[GETJ(mat, j)] > 0){
 	    mkz = MkzCount(mat, j);
@@ -322,6 +327,8 @@ int
 MkzDeleteHeavyColumns(report_t *rep, sparse_mat_t *mat)
 {
 #if 1
+    fprintf(stderr, "Max Markowitz count: %d\n", 
+	    MkzGet(mat->MKZQ, mat->MKZQ[0], 1));
     return 0;
 #else
     INT j;
