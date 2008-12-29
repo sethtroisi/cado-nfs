@@ -237,7 +237,10 @@ MkzInit(sparse_mat_t *mat)
 void
 MkzClose(sparse_mat_t *mat)
 {
+    fprintf(stderr, "Max Markowitz count: %d\n", 
+	    MkzGet(mat->MKZQ, mat->MKZQ[0], 1));
     free(mat->MKZQ);
+    free(mat->MKZA);
 }
 
 int
@@ -327,8 +330,6 @@ int
 MkzDeleteHeavyColumns(report_t *rep, sparse_mat_t *mat)
 {
 #if 1
-    fprintf(stderr, "Max Markowitz count: %d\n", 
-	    MkzGet(mat->MKZQ, mat->MKZQ[0], 1));
     return 0;
 #else
     INT j;
@@ -356,7 +357,7 @@ MkzRemoveCols(report_t *rep, sparse_mat_t *mat, int wmin, int wmax)
     int w;
 
     for(j = mat->jmin; j < mat->jmax; j++){
-	w = mat->wt[GETJ(mat, j)] == 1;
+	w = mat->wt[GETJ(mat, j)];
         if((w >= wmin) && (w <= wmax)){
 	    fprintf(stderr, "w[%d]=%d\n", j, w);
 	}

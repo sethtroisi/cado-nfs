@@ -215,6 +215,8 @@ main(int argc, char *argv[])
 #endif
 #ifndef USE_MARKOWITZ
     closeSWAR(/*&mat*/);
+#else
+    MkzClose(&mat);
 #endif
     return 0;
 }
