@@ -66,14 +66,14 @@ sievenice=10
 # Filtering
 ###########################################################################
 
-excess=400000           # minimal excess we want after purge
-keeppurge=400001        # shrink in purge if excess exceeds keeppurge
+excess=1                # minimal excess we want after purge
+keeppurge=160           # shrink in purge if excess exceeds keeppurge
 keep=160                # keep euh le plus
 maxlevel=15             # ???
 cwmax=100               # ???
 rwmax=100               # ???
 ratio=1.1               # ???
-bwstrat=1               
+bwstrat=0               
 #  maxpr=???
 #  maxpa=???
 #  nrels_dup=???
