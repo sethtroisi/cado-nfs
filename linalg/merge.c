@@ -192,8 +192,9 @@ main(int argc, char *argv[])
 # ifdef USE_MARKOWITZ
     fprintf(stderr, "merge NYI for Markowitz\n");
     return 1;
-# endif
+# else
     merge(&mat, maxlevel, verbose, forbw);
+# endif
 #else
     mergeOneByOne(&rep, &mat, maxlevel, verbose, forbw, ratio, coverNmax);
 #endif

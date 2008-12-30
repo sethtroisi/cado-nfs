@@ -762,6 +762,18 @@ removeColDefinitely(report_t *rep, sparse_mat_t *mat, INT j)
 #endif
 }
 
+void
+removeColumnAndUpdate(sparse_mat_t *mat, int j)
+{
+#ifndef USE_MARKOWITZ
+    remove_j_from_SWAR(mat, j);
+#else
+    MkzRemoveJ(mat, j);
+#endif
+    mat->wt[GETJ(mat, j)] = 0;
+    freeRj(mat, j);
+}
+
 // The cell [i, j] may be incorporated to the data structure, at least
 // if j is not too heavy, etc. 
 void
@@ -780,8 +792,11 @@ addCellAndUpdate(sparse_mat_t *mat, int i, INT j)
 #else
     w = MkzIncrCol(mat, j);
     if(w >= 0){
-	if(w > mat->cwmax)
+	if(w > mat->cwmax){
+	    // first time...
+	    removeColumnAndUpdate(mat, j);
 	    mat->wt[j] = -w;
+	}
 	else{
 	    // update R[j] by adding i
 	    add_i_to_Rj(mat, i, j);
@@ -825,18 +840,6 @@ removeCellAndUpdate(sparse_mat_t *mat, int i, INT j)
 #endif
     // update R[j] by removing i
     remove_i_from_Rj(mat, i, j);
-}
-
-void
-removeColumnAndUpdate(sparse_mat_t *mat, int j)
-{
-#ifndef USE_MARKOWITZ
-    remove_j_from_SWAR(mat, j);
-#else
-    MkzRemoveJ(mat, j);
-#endif
-    mat->wt[GETJ(mat, j)] = 0;
-    freeRj(mat, j);
 }
 
 // These columns are simply removed from the current squeleton matrix, but
@@ -1533,7 +1536,9 @@ deleteSuperfluousRows(report_t *rep, sparse_mat_t *mat, int keep, int niremmax, 
     ntmp = mat->rem_nrows << 1;
     tmp = (int *)malloc(ntmp * sizeof(int));
     ntmp = findSuperfluousRows(tmp, ntmp, mat, m);
+#if 0
     fprintf(stderr, "Number of removable rows[%d]: %d\n", m, ntmp>>1);
+#endif
     // remove rows with largest score
     for(i = ntmp-1; i >= 0; i -= 2){
 	if((nirem >= niremmax) || (mat->rem_nrows - mat->rem_ncols) <= keep)
@@ -1547,12 +1552,10 @@ deleteSuperfluousRows(report_t *rep, sparse_mat_t *mat, int keep, int niremmax, 
     return nirem;
 }
 
+#ifndef USE_MARKOWITZ
 void
 merge(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 {
-#ifdef USE_MARKOWITZ
-    fprintf(stderr, "What's the use of merge for MKZ?\n");
-#else
     unsigned long bwcostmin = 0, oldcost = 0, cost;
     int old_nrows, old_ncols, m, mm, njrem = 0, ncost = 0, ncostmax;
 
@@ -1644,8 +1647,8 @@ merge(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
 	fprintf(rep->outfile, "BWCOSTMIN: %lu\n", bwcostmin);
 	fprintf(stderr, "Minimal bwcost found: %lu\n", bwcostmin);
     }
-#endif
 }
+#endif
 
 static uint64_t
 my_cost(unsigned long N, unsigned long c, int forbw)
@@ -1787,6 +1790,11 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
 	}
 	MkzPopQueue(&dj, &mkz, mat->MKZQ, mat->MKZA);
 	j = dj + mat->jmin;
+# if DEBUG >= 1
+	fprintf(stderr, "I popped j=%d wt=%d mkz=%d (#Q=%d)",
+		j, mat->wt[dj], mkz, mat->MKZQ[0]);
+	fprintf(stderr, " nrows=%d ncols=%d\n",mat->rem_nrows,mat->rem_ncols);
+# endif
 	if(mat->wt[dj] == 1){
 # if DEBUG >= 1
 	    fprintf(stderr,"Popped j=%d with w=%d\n", j, mat->wt[dj]);
@@ -1794,17 +1802,17 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
 	    removeColDefinitely(rep, mat, j);
 	}
 	else if(mat->wt[dj] > 0){
-# if DEBUG >= 1
-	    fprintf(stderr, "I popped j=%d wt=%d mkz=%d (#Q=%d)",
-		    j, mat->wt[dj], mkz, mat->MKZQ[0]);
-	    fprintf(stderr, " nrows=%d ncols=%d\n",mat->rem_nrows,mat->rem_ncols);
-# endif
 	    m = mat->wt[dj]; // for deleteSuperfluousRows below
 	    mergeForColumn2(rep, mat, &njrem, 
 			    &totopt, &totfill, &totMST, &totdel, 1, j);
 	}
-	else
-	    continue;
+# if 0
+	else{
+	    int w = mat->wt[dj];
+	    removeColumnAndUpdate(mat, j);
+	    mat->wt[dj] = w;
+	}
+# endif
 #endif
 	// number of columns removed
 	njproc += old_ncols - mat->rem_ncols;
@@ -1860,12 +1868,20 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
 	// to be cleaned one day...
 	if((forbw == 0) || (forbw == 2)){
 	    double r = ((double)bwcost)/((double)bwcostmin);
-	    if((r > ratio) && (mat->rem_nrows-mat->rem_ncols <= mat->delta)){
-		if(forbw == 0)
-		    fprintf(stderr, "cN too high, stopping [%2.2lf]\n", r);
-		else
-		    fprintf(stderr, "bw too high, stopping [%2.2lf]\n", r);
-		break;
+	    if(r > ratio){
+		if(mat->rem_nrows-mat->rem_ncols > mat->delta){
+		    // drop all remaining columns at once
+		    ni2rem = mat->rem_nrows-mat->rem_ncols+mat->delta;
+		    fprintf(stderr, "Dropping %d rows at once\n", ni2rem);
+		    deleteSuperfluousRows(rep, mat, mat->delta, ni2rem, -1);
+		}
+		else{
+		    if(forbw == 0)
+			fprintf(stderr, "cN too high, stopping [%2.2lf]\n", r);
+		    else
+			fprintf(stderr, "bw too high, stopping [%2.2lf]\n", r);
+		    break;
+		}
 	    }
 	}
 	else if(forbw == 3){
@@ -2016,12 +2032,10 @@ doAllAdds(report_t *rep, sparse_mat_t *mat, char *str)
 }
 
 // resumename is a file of the type mergehis.
+// TODO: Compiles, but not really tested with Markowitz...!
 void
 resume(report_t *rep, sparse_mat_t *mat, char *resumename)
 {
-#ifdef USE_MARKOWITZ
-    fprintf(stderr, "Resume not operational for Markowitz, sorry\n");
-#else
     FILE *resumefile = fopen(resumename, "r");
     char str[STR_LEN_MAX];
     unsigned long addread = 0;
@@ -2046,7 +2060,11 @@ resume(report_t *rep, sparse_mat_t *mat, char *resumename)
     }
     fclose(resumefile);
     for(j = mat->jmin; j < mat->jmax; j++)
+#ifndef USE_MARKOWITZ
 	if((mat->wt[GETJ(mat, j)] == 0) && (mat->A[GETJ(mat, j)] != NULL))
+#else
+	if((mat->wt[GETJ(mat,j)] == 0) && MkzIsAlive(mat->MKZA, GETJ(mat,j)))
+#endif
 	    // be sure j was removed...
 	    removeColumnAndUpdate(mat, j);
     nactivej = 0;
@@ -2057,5 +2075,4 @@ resume(report_t *rep, sparse_mat_t *mat, char *resumename)
     fprintf(stderr, "At the end of resume, we have");
     fprintf(stderr, " nrows=%d ncols=%d (%d)\n",
 	    mat->rem_nrows, mat->rem_ncols, mat->rem_nrows-mat->rem_ncols);
-#endif
 }

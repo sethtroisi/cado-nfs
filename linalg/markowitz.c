@@ -36,6 +36,12 @@ MkzGetCount(INT *Q, INT *A, INT dj)
     return MkzGet(Q, A[dj], 1);
 }
 
+int
+MkzIsAlive(INT *A, INT dj)
+{
+    return A[dj] != MKZ_INF;
+}
+
 // (Q, A)[k1] <- (Q, A)[k2]
 void
 MkzAssign(INT *Q, INT *A, INT k1, INT k2)
@@ -171,8 +177,10 @@ MkzMoveUpOrDown(INT *Q, INT *A, INT k)
 void
 MkzDelete(INT *Q, INT *A, INT k)
 {
+#if MKZ_DEBUG >= 1
     fprintf(stderr, "MKZ: deleting (Q, A)[%d]=[%d, %d]\n", k,
 	    MkzGet(Q, k, 0), MkzGet(Q, k, 1));
+#endif
     // we put Q[Q[0]] in Q[k]
     MkzAssign(Q, A, k, Q[0]);
     Q[0]--;
@@ -370,7 +378,9 @@ MkzRemoveJ(sparse_mat_t *mat, INT j)
 #endif
 	return;
     }
-    fprintf(stderr, "Removing col %d; was %d\n", j, mat->wt[dj]);
+#if MKZ_DEBUG >= 1
+    fprintf(stderr, "Removing col %d of weight %d\n", j, mat->wt[dj]);
+#endif
     mat->wt[dj] = 0;
     // remove j from the QA structure
     MkzDelete(mat->MKZQ, mat->MKZA, mat->MKZA[dj]);
@@ -406,6 +416,7 @@ MkzDeleteHeavyColumns(report_t *rep, sparse_mat_t *mat)
 #endif
 }
 
+// TODO: finish the code if needed.
 int
 MkzRemoveCols(report_t *rep, sparse_mat_t *mat, int wmin, int wmax)
 {

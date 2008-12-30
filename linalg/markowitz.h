@@ -5,6 +5,8 @@ extern void MkzInit(sparse_mat_t *mat);
 extern void MkzClose(sparse_mat_t *mat);
 
 extern int MkzGetCount(INT *Q, INT *A, INT dj);
+extern int MkzIsAlive(INT *A, INT dj);
+
 extern void MkzPopQueue(INT *dj, INT *mkz, INT *Q, INT *A);
 extern int MkzIncrCol(sparse_mat_t *mat, INT j);
 extern void MkzUpdate(sparse_mat_t *mat, INT i, INT j);
