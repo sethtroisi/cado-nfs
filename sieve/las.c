@@ -2804,7 +2804,7 @@ main (int argc, char *argv[])
 				leading_div);
       ASSERT_ALWAYS(fb_alg != NULL);
       tfb = seconds () - tfb;
-      fprintf (stderr, "# Reading algebraic factor base took %1.1fs\n", tfb);
+      fprintf (stderr, "# Reading algebraic factor base of %zuMb took %1.1fs\n", fb_size (fb_alg) >> 20, tfb);
       free (leading_div);
       // fb_fprint (stderr, fb_alg);
     }
@@ -2814,7 +2814,8 @@ main (int argc, char *argv[])
     fb_rat = fb_make_linear (cpoly->g, (fbprime_t) cpoly->rlim,
                              si.scale_rat * LOG_SCALE, verbose, 1);
     tfb = seconds () - tfb;
-    fprintf (stderr, "# Creating rational factor base took %1.1fs\n", tfb);
+    fprintf (stderr, "# Creating rational factor base of %zuMb took %1.1fs\n",
+             fb_size (fb_rat) >> 20, tfb);
 
     init_rat_norms (&si);
     init_alg_norms (&si);

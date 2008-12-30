@@ -30,7 +30,7 @@ int             fb_check (factorbase_t, cado_poly, int);
 void            fb_clear (factorbase_t);
 fbprime_t	*fb_extract_bycost (const factorbase_degn_t *, 
                                     const fbprime_t, const fbprime_t costlim);
-                   
+size_t          fb_size (const factorbase_degn_t *);                   
 
 /* Some inlined functions which need to be fast */
   
