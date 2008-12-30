@@ -1748,8 +1748,10 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
     double totopt = 0.0, totfill = 0.0, totMST = 0.0, totdel = 0.0;
     uint64_t bwcostmin = 0, oldbwcost = 0, bwcost = 0;
     int old_nrows, old_ncols, m = 2, njrem = 0, ncost = 0, ncostmax, njproc;
-    int mmax = 0, target = 10000, ni2rem;
-#ifdef USE_MARKOWITZ
+    int target = 10000, ni2rem;
+#ifndef USE_MARKOWITZ
+    int mmax = 0;
+#else
     INT dj, j, mkz;
 
     // clean things
@@ -1801,6 +1803,8 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
 	    mergeForColumn2(rep, mat, &njrem, 
 			    &totopt, &totfill, &totMST, &totdel, 1, j);
 	}
+	else
+	    continue;
 #endif
 	// number of columns removed
 	njproc += old_ncols - mat->rem_ncols;
@@ -1824,17 +1828,19 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
 	    ni2rem = number_of_superfluous_rows(mat);
 	    deleteSuperfluousRows(rep, mat, mat->delta, ni2rem, m);
 	    inspectRowWeight(rep, mat);
-	    fprintf(stderr, "T=%d mmax=%d N=%d nc=%d (%d)",
-		    (int)seconds(),
-		    mmax,
+	    fprintf(stderr, "T=%d", (int)seconds());
+#ifndef USE_MARKOWITZ
+	    fprintf(stderr, " mmax=%d", mmax);
+#endif	    
+	    fprintf(stderr, " N=%d nc=%d (%d)",
 		    mat->rem_nrows, mat->rem_ncols, 
 		    mat->rem_nrows - mat->rem_ncols);
 	    if(forbw == 2)
 		fprintf(stderr, " bw=%"PRIu64"", bwcost);
 	    else if(forbw == 3)
-		fprintf(stderr, " cN=%lu", 
-			((unsigned long)mat->rem_nrows)
-			*((unsigned long)mat->weight));
+		fprintf(stderr, " cN=%"PRIu64"", 
+			((uint64_t)mat->rem_nrows)
+			*((uint64_t)mat->weight));
 	    else if(forbw <= 1)
 		fprintf(stderr, " cN=%"PRIu64"", bwcost);
 	    fprintf(stderr, " c/N=%2.2lf\n", 
@@ -1863,7 +1869,7 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
 	    }
 	}
 	else if(forbw == 3){
-	    if(bwcost > (unsigned long)coverNmax){
+	    if(bwcost > (uint64_t)coverNmax){
 		fprintf(stderr, "c/N too high, stopping [%"PRIu64"]\n", bwcost);
 		break;
 	    }
