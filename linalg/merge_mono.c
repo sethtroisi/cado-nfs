@@ -739,11 +739,36 @@ checkCoherence(sparse_mat_t *mat, int m, int j)
 // making things independent of the real data structure used
 //////////////////////////////////////////////////////////////////////
 
+void
+removeColDefinitely(report_t *rep, sparse_mat_t *mat, INT j)
+{
+    INT k;
+
+#ifndef USE_COMPACT_R
+    for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
+	if(mat->R[GETJ(mat, j)][k] != -1){
+# if TRACE_COL >= 0
+	    if(j == TRACE_COL)
+		fprintf(stderr, "deleteAllCols: row is %d\n",mat->R[GETJ(mat, j)][k]);
+# endif
+	    remove_j_from_row(mat, mat->R[GETJ(mat, j)][k], j);
+	    removeRowDefinitely(rep, mat, mat->R[GETJ(mat, j)][k]);
+	    mat->rem_ncols--;
+	}
+    mat->wt[GETJ(mat, j)] = 0;
+#else
+    fprintf(stderr, "R: NYI in removeColDefinitely\n");
+    exit(1);
+#endif
+}
+
 // The cell [i, j] may be incorporated to the data structure, at least
 // if j is not too heavy, etc. 
 void
 addCellAndUpdate(sparse_mat_t *mat, int i, INT j)
 {
+    int w;
+
 #if TRACE_ROW >= 0
     if(i == TRACE_ROW)
 	fprintf(stderr, "TRACE_ROW: addCellSWAR i=%d j=%d\n", i, j);
@@ -753,10 +778,15 @@ addCellAndUpdate(sparse_mat_t *mat, int i, INT j)
 	// update R[j] by adding i
 	add_i_to_Rj(mat, i, j);
 #else
-    if(MkzIncrCol(mat, j) >= 0){
-	// update R[j] by adding i
-	add_i_to_Rj(mat, i, j);
-	MkzUpdate(mat, j);
+    w = MkzIncrCol(mat, j);
+    if(w >= 0){
+	if(w > mat->cwmax)
+	    mat->wt[j] = -w;
+	else{
+	    // update R[j] by adding i
+	    add_i_to_Rj(mat, i, j);
+	    MkzUpdate(mat, i, j);
+	}
     }
 #endif
 }
@@ -807,29 +837,6 @@ removeColumnAndUpdate(sparse_mat_t *mat, int j)
 #endif
     mat->wt[GETJ(mat, j)] = 0;
     freeRj(mat, j);
-}
-
-void
-removeColDefinitely(report_t *rep, sparse_mat_t *mat, INT j)
-{
-    INT k;
-
-#ifndef USE_COMPACT_R
-    for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
-	if(mat->R[GETJ(mat, j)][k] != -1){
-# if TRACE_COL >= 0
-	    if(j == TRACE_COL)
-		fprintf(stderr, "deleteAllCols: row is %d\n",mat->R[GETJ(mat, j)][k]);
-# endif
-	    remove_j_from_row(mat, mat->R[GETJ(mat, j)][k], j);
-	    removeRowDefinitely(rep, mat, mat->R[GETJ(mat, j)][k]);
-	    mat->rem_ncols--;
-	}
-    mat->wt[GETJ(mat, j)] = 0;
-#else
-    fprintf(stderr, "R: NYI in deleteAllColsFromStack\n");
-    exit(1);
-#endif
 }
 
 // These columns are simply removed from the current squeleton matrix, but
@@ -1162,15 +1169,22 @@ mergeForColumn(report_t *rep, double *tt, double *tfill, double *tMST,
     INT ind[MERGE_LEVEL_MAX];
     int ni, k;
 
+    if(m > MERGE_LEVEL_MAX){
+	fprintf(stderr, "PB: m=%d > MERGE_LEVEL_MAX=%d\n", m, MERGE_LEVEL_MAX);
+	exit(-1);
+    }
 #ifdef USE_MARKOWITZ
+# if 0
     // let's be cautious...
     if(mat->wt[GETJ(mat, j)] != m){
 	fprintf(stderr, "GASP: wt[%d]=%d != %d\n", j, mat->wt[j], m);
     }
+# endif
 #endif
 
 #if DEBUG >= 1
-    fprintf(stderr, "Treating column %d of weight %d\n", j, mat->wt[GETJ(mat, j)]);
+    fprintf(stderr, "Treating column %d of weight %d",j,mat->wt[GETJ(mat, j)]);
+    fprintf(stderr, "\n");
 #endif
 #if (DEBUG >= 2) || TEX
     fprintf(stderr, "Status before next j=%d to start\n", j);
@@ -1736,7 +1750,7 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
     int old_nrows, old_ncols, m = 2, njrem = 0, ncost = 0, ncostmax, njproc;
     int mmax = 0, target = 10000, ni2rem;
 #ifdef USE_MARKOWITZ
-    INT j, mkz;
+    INT dj, j, mkz;
 
     // clean things
     njrem = removeSingletons(rep, mat);
@@ -1769,19 +1783,21 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
 	    fprintf(stderr, "Q is almost empty: rare!!!\n");
 	    break;
 	}
-	MkzPopQueue(&j, &mkz, mat->MKZQ, mat->MKZA);
-	if(mat->wt[j] == 1){
+	MkzPopQueue(&dj, &mkz, mat->MKZQ, mat->MKZA);
+	j = dj + mat->jmin;
+	if(mat->wt[dj] == 1){
 # if DEBUG >= 1
-	    fprintf(stderr, "Popped j=%d with w=1\n", j);
+	    fprintf(stderr,"Popped j=%d with w=%d\n", j, mat->wt[dj]);
 #endif
 	    removeColDefinitely(rep, mat, j);
 	}
-	else if(mat->wt[j] > 0){
+	else if(mat->wt[dj] > 0){
 # if DEBUG >= 1
-	    fprintf(stderr, "I popped j=%d mkz=%d (#Q=%d)",j,mkz,mat->MKZQ[0]);
+	    fprintf(stderr, "I popped j=%d wt=%d mkz=%d (#Q=%d)",
+		    j, mat->wt[dj], mkz, mat->MKZQ[0]);
 	    fprintf(stderr, " nrows=%d ncols=%d\n",mat->rem_nrows,mat->rem_ncols);
 # endif
-	    m = mat->wt[j]; // for deleteSuperfluousRows below
+	    m = mat->wt[dj]; // for deleteSuperfluousRows below
 	    mergeForColumn2(rep, mat, &njrem, 
 			    &totopt, &totfill, &totMST, &totdel, 1, j);
 	}

@@ -11,6 +11,11 @@
 #include "markowitz.h"
 
 #define MKZ_DEBUG 0
+#define MKZ_TIMINGS 1
+
+#if MKZ_TIMINGS
+double tmkzup, tmkzdown, tmkzupdown, tmkzcount;
+#endif
 
 #define MKZ_INF -1
 
@@ -21,9 +26,15 @@
 // Q[2*i] contains j-jmin = dj
 // Q[2*i+1] contains the Markowitz count for j
 
-// get j-th component of Q[i] 
-#define MkzGet(Q, i, j) (Q[((i)<<1)+(j)])
-#define MkzSet(Q, i, j, val) (Q[((i)<<1)+(j)] = (val))
+// get r-th component of Q[i] 
+#define MkzGet(Q, i, r) (Q[((i)<<1)+(r)])
+#define MkzSet(Q, i, r, val) (Q[((i)<<1)+(r)] = (val))
+
+int
+MkzGetCount(INT *Q, INT *A, INT dj)
+{
+    return MkzGet(Q, A[dj], 1);
+}
 
 // (Q, A)[k1] <- (Q, A)[k2]
 void
@@ -55,26 +66,32 @@ MkzPrintQueue(INT *Q)
 void
 MkzUpQueue(INT *Q, INT *A, INT k)
 {
-    INT x = MkzGet(Q, k, 0), v = MkzGet(Q, k, 1);
+    INT dj = MkzGet(Q, k, 0), count = MkzGet(Q, k, 1);
+#if MKZ_TIMINGS
+    double tt = seconds(); 
+#endif
 
-    while((k > 1) && (MkzGet(Q, k/2, 1) >= v)){
+    while((k > 1) && (MkzGet(Q, k/2, 1) >= count)){
 	// we are at level > 0 and the father is >= son
 	// the father replaces the son
 	MkzAssign(Q, A, k, k/2);
 	k /= 2;
     }
-    // we found the place of (x, v)
-    MkzSet(Q, k, 0, x);
-    MkzSet(Q, k, 1, v);
-    A[x] = k;
+    // we found the place of (dj, count)
+    MkzSet(Q, k, 0, dj);
+    MkzSet(Q, k, 1, count);
+    A[dj] = k;
+#if MKZ_TIMINGS
+    tmkzup += (seconds()-tt);
+#endif
 }
 
 void
-MkzInsert(INT *Q, INT *A, INT dj, INT c)
+MkzInsert(INT *Q, INT *A, INT dj, INT count)
 {
     Q[0]++;
     MkzSet(Q, Q[0], 0, dj);
-    MkzSet(Q, Q[0], 1, c);
+    MkzSet(Q, Q[0], 1, count);
     A[dj] = Q[0];
     MkzUpQueue(Q, A, Q[0]);
 }
@@ -83,7 +100,10 @@ MkzInsert(INT *Q, INT *A, INT dj, INT c)
 void
 MkzDownQueue(INT *Q, INT *A, INT k)
 {
-    INT x = MkzGet(Q, k, 0), v = MkzGet(Q, k, 1), j;
+    INT dj = MkzGet(Q, k, 0), count = MkzGet(Q, k, 1), j;
+#if MKZ_TIMINGS
+    double tt = seconds();
+#endif
 
     while(k <= Q[0]/2){
 	// k has at least a left son
@@ -93,7 +113,7 @@ MkzDownQueue(INT *Q, INT *A, INT k)
 	    if(MkzGet(Q, j, 1) > MkzGet(Q, j+1, 1))
 		j++;
 	// at this point, Q[j] is the largest son
-	if(v <= MkzGet(Q, j, 1))
+	if(count <= MkzGet(Q, j, 1))
 	    break;
 	else{
 	    // the father takes the place of the son
@@ -101,10 +121,13 @@ MkzDownQueue(INT *Q, INT *A, INT k)
 	    k = j;
 	}
     }
-    // we found the place of (x, v)
-    MkzSet(Q, k, 0, x);
-    MkzSet(Q, k, 1, v);
-    A[x] = k;
+    // we found the place of (dj, count)
+    MkzSet(Q, k, 0, dj);
+    MkzSet(Q, k, 1, count);
+    A[dj] = k;
+#if MKZ_TIMINGS
+    tmkzdown += (seconds()-tt);
+#endif
 }
 
 void
@@ -123,6 +146,10 @@ MkzPopQueue(INT *dj, INT *mkz, INT *Q, INT *A)
 void
 MkzMoveUpOrDown(INT *Q, INT *A, INT k)
 {
+#if MKZ_TIMINGS
+    double tt = seconds();
+#endif
+
     // move new node up or down
     if(k == 1)
 	// rare event!
@@ -135,6 +162,9 @@ MkzMoveUpOrDown(INT *Q, INT *A, INT k)
 	else
 	    MkzDownQueue(Q, A, k);
     }
+#if MKZ_TIMINGS
+    tmkzupdown += (seconds()-tt);
+#endif
 }
 
 // Remove (Q, A)[k].
@@ -189,6 +219,9 @@ MkzCount(sparse_mat_t *mat, INT j)
 {
     int mkz, k, i;
 
+#if MKZ_TIMINGS
+    double tt = seconds();
+#endif
     mkz = mat->nrows;
     for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
 	if((i = mat->R[GETJ(mat, j)][k]) != -1){
@@ -196,7 +229,11 @@ MkzCount(sparse_mat_t *mat, INT j)
 	    if(mat->rows[i][0] < mkz)
 		mkz = mat->rows[i][0];
 	}
-    return ((mkz-1) * mat->wt[GETJ(mat, j)]);
+    mkz = (mkz-1) * (mat->wt[GETJ(mat, j)]-1);
+#if MKZ_TIMINGS
+    tmkzcount += (seconds()-tt);
+#endif
+    return mkz;
 }
 
 void
@@ -205,6 +242,9 @@ MkzInit(sparse_mat_t *mat)
     INT j, mkz;
     int sz = 0;
 
+#if MKZ_TIMINGS
+    tmkzup = tmkzdown = tmkzupdown = tmkzcount = 0.0;
+#endif
     fprintf(stderr, "Entering initMarkowitz\n");
     // compute number of elligible columns in the heap
     for(j = mat->jmin; j < mat->jmax; j++)
@@ -239,6 +279,10 @@ MkzClose(sparse_mat_t *mat)
 {
     fprintf(stderr, "Max Markowitz count: %d\n", 
 	    MkzGet(mat->MKZQ, mat->MKZQ[0], 1));
+#if MKZ_TIMINGS
+    fprintf(stderr, "MKZT: up=%d down=%d updown=%d count=%d\n",
+	    (int)tmkzup, (int)tmkzdown, (int)tmkzupdown, (int)tmkzcount);
+#endif
     free(mat->MKZQ);
     free(mat->MKZA);
 }
@@ -255,8 +299,10 @@ MkzIncrCol(sparse_mat_t *mat, INT j)
     return ind;
 }
 
+// Row[i] has been adjoined to column j, so that we can incrementally
+// change the Markowitz count.
 void
-MkzUpdate(sparse_mat_t *mat, INT j)
+MkzUpdate(sparse_mat_t *mat, INT i, INT j)
 {
     INT adr = mat->MKZA[GETJ(mat, j)];
     int mkz;
@@ -271,13 +317,23 @@ MkzUpdate(sparse_mat_t *mat, INT j)
     if((mat->wt[GETJ(mat, j)] == 0) || (mat->wt[GETJ(mat, j)] == 1))
 	fprintf(stderr, "W: wt[%d] = %d\n", j, mat->wt[GETJ(mat, j)]);
 #endif
+#if 1
+    // costly?
     mkz = MkzCount(mat, j);
+#else
+    // old_count = min (r_ii-1)*(w-2) = mu * (w-2)
+    // new_count = min(mu, r_i-1)*(w-1)
+    mkz = MkzGet(mat->MKZQ, adr, 1)/(mat->wt[j]-2); // mu
+    if(mat->rows[i][0] < mkz+1)
+	mkz = mat->rows[i][0]-1;
+    mkz *= (mat->wt[j]-1);
+#endif
 #if MKZ_DEBUG >= 1
     fprintf(stderr, "Updating j=%d (old=%d, new=%d)\n", j,
-	    MkzGet(mat->MKZQ, adr, 0), mkz);
+	    MkzGet(mat->MKZQ, adr, 1), mkz);
 #endif
     // nothing to do if new count == old count
-    if(mkz != MkzGet(mat->MKZQ, adr, 0)){
+    if(mkz < MkzGet(mat->MKZQ, adr, 1)){
 	// add new count
 	MkzSet(mat->MKZQ, adr, 1, mkz);
 	// a variant of delete is needed...!
