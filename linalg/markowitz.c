@@ -230,6 +230,11 @@ MkzCount(sparse_mat_t *mat, INT j)
 #if MKZ_TIMINGS
     double tt = seconds();
 #endif
+    // trick to be sure that these two guys are treated asap
+    if(mat->wt[GETJ(mat, j)] == 1)
+	return -2;
+    else if(mat->wt[GETJ(mat, j)] == 2)
+	return -1;
     mkz = mat->nrows;
     for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
 	if((i = mat->R[GETJ(mat, j)][k]) != -1){
