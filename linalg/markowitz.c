@@ -265,6 +265,7 @@ MkzInit(sparse_mat_t *mat)
 	    sz++;
     fprintf(stderr, "Allocating heap for %d columns\n", sz);
     mat->MKZQ = (INT *)malloc((sz+1) * 2 * sizeof(INT));
+    mat->MKZQ[0] = 0;
     mat->MKZQ[1] = sz; // why not?
     // every j needs a pointer
     mat->MKZA = (INT *)malloc((mat->jmax - mat->jmin + 1) * sizeof(INT));
