@@ -43,7 +43,7 @@ extern void matmul_save_cache(matmul_ptr, const char * filename);
  * paper, both are dual to each other, but doing so equally efficiently
  * with the same in-memory structure is not easy.
  */
-extern void matmul(matmul_ptr, abt *, abt const *, int);
+extern void matmul_mul(matmul_ptr, abt *, abt const *, int);
 
 
 extern void matmul_report(matmul_ptr);

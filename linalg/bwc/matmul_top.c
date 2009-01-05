@@ -43,7 +43,7 @@ void extra_svec_recall(matmul_top_data_srcptr mmt, const abt * x) {
 
 void matmul_top_init(matmul_top_data_ptr mmt,
         abobj_ptr abase,
-        matmul_ptr mm,
+        /* matmul_ptr mm, */
         parallelizing_info_ptr pi,
         int const * flags,
         const char * filename)
@@ -52,7 +52,7 @@ void matmul_top_init(matmul_top_data_ptr mmt,
 
     mmt->abase = abase;
     mmt->pi = pi;
-    mmt->mm = mm;
+    mmt->mm = NULL;
 
     // n[]
     // ncoeffs_total, ncoeffs,

@@ -11,6 +11,7 @@
 #include "abase.h"
 #include "select_mpi.h"
 #include "random_generation.h"
+#include "gauss.h"
 
 #include "params.h"
 #include "xvectors.h"
@@ -48,8 +49,7 @@ void * program(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
 
     int flags[2] = { 0, THREAD_SHARED_VECTOR };
 
-    // FIXME: we have set no multiplication algorithm here.
-    matmul_top_init(mmt, abase, NULL, pi, flags, matrix_filename);
+    matmul_top_init(mmt, abase, pi, flags, matrix_filename);
 
     uint32_t * xvecs = malloc(nx * m * sizeof(uint32_t));
 
