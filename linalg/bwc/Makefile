@@ -79,19 +79,32 @@ prep_objs:=prep.o intersections.o 			\
 	auxfuncs.o xvectors.o				\
 	libmatmul.a
 
+
+# We need to make sure that pthreads are always included.
+common_libs:=-lutils -lgmp
+ifeq ($(WITH_PTHREADS),1)
+# As a matter of cact, it is fairly common for mpi libs to include
+# pthreads automatically. Hence in some cases, we would need this ifndef
+# to avoid very redundant link lines. But strictly specaking, this is a
+# behaviour we can't rely on.
+# ifneq ($(WITH_MPI),1)
+common_libs += -lpthread
+# endif
+endif
+
 test_pthread_reduce_objs:=test_pthread_reduce.o
 
 test_hello: $(test_hello_objs)
-	$(CXX) $(MY_LFLAGS) $(test_hello_objs) -o $@ -lutils -lgmp
+	$(CXX) $(MY_LFLAGS) $(test_hello_objs) -o $@ $(common_libs)
 
 build: $(build_objs)
-	$(CXX) $(MY_LFLAGS) $(build_objs) -o $@ -lutils -lgmp
+	$(CXX) $(MY_LFLAGS) $(build_objs) -o $@ $(common_libs)
 
 bench: $(bench_objs)
-	$(CXX) $(MY_LFLAGS) $(bench_objs) -o $@ -lutils -lgmp
+	$(CXX) $(MY_LFLAGS) $(bench_objs) -o $@ $(common_libs)
 
 prep: $(prep_objs)
-	$(CXX) $(MY_LFLAGS) $(prep_objs) -o $@ -lutils -lgmp -lgmpxx
+	$(CXX) $(MY_LFLAGS) $(prep_objs) -o $@ $(common_libs) -lgmpxx
 
 test_pthread_reduce: $(test_pthread_reduce_objs)
 	$(CC) $(MY_LFLAGS) $(test_pthread_reduce_objs) -o $@ -lpthread -O4

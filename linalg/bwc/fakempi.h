@@ -3,18 +3,29 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include "macros.h"
 
 typedef int MPI_Status;
 typedef int MPI_Datatype;
 typedef int MPI_Comm;
 typedef int MPI_Op;
 typedef int MPI_User_function;
+typedef int MPI_Errhandler;
 
 // type keys are sizeof() values.
 #define MPI_BYTE        1
 #define MPI_UNSIGNED_LONG       sizeof(unsigned long)
 
 #define MPI_COMM_WORLD	0
+
+#define MPI_THREAD_SINGLE       0
+#define MPI_THREAD_MULTIPLE     3
+
+#define MPI_BXOR        0
+
+#define MPI_ERRORS_ARE_FATAl        0
+#define MPI_ERRORS_RETURN        1
+
 
 #ifdef  __GNUC__
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -24,6 +35,7 @@ static inline int MPI_Comm_rank(int s, int  * p) { *p=0; return 0;}
 static inline int MPI_Comm_size(int s, int  * p) { *p=1; return 0;}
 static inline int MPI_Initialized(int  * p) { *p=1; return 0; }
 static inline int MPI_Init(int * argc, char *** argv) { return 0; }
+static inline int MPI_Init_thread(int * argc, char *** argv, int req, int * prov) { if (prov) *prov=req; return 0; }
 static inline int MPI_Finalize() {return 0;}
 static inline int MPI_Op_create( MPI_User_function *function, int commute, MPI_Op *op ){return 0;}
 static inline int MPI_Send( void *buf, int count, MPI_Datatype datatype, int dest,int tag, MPI_Comm comm ){return 0;}
@@ -35,6 +47,10 @@ static inline int MPI_Reduce ( void *sendbuf, void *recvbuf, int count,MPI_Datat
     return 0;
 }
 static inline int MPI_Comm_split (MPI_Comm x, int color, int key, MPI_Comm * y)
+{
+    return 0;
+}
+static inline int MPI_Comm_set_errhandler (MPI_Comm x, MPI_Errhandler e)
 {
     return 0;
 }
