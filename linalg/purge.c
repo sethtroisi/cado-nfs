@@ -625,12 +625,13 @@ renumber (int *nprimes, hashtable_t *H, char *sos)
           if (H->hashcount[i] == 1 && count ++ < 10)
             {
               if (GET_HASH_R(H,i) == minus2)
-                fprintf (stderr, "Warning: singleton rational prime %llu\n",
-                         (unsigned long long) GET_HASH_P(H,i));
+                fprintf (stderr, "Warning: singleton rational prime %"
+                        PRIu64 "\n",
+                         GET_HASH_P(H,i));
               else
-                fprintf (stderr, "Warning: singleton algebraic ideal (%llu,%llu)\n",
-                         (unsigned long long) GET_HASH_P(H,i),
-                         (unsigned long long) GET_HASH_R(H,i));
+                fprintf (stderr, "Warning: singleton algebraic ideal (%"
+                        PRIu64",%"PRIu64")\n",
+                         GET_HASH_P(H,i), GET_HASH_R(H,i));
             }
           H->hashcount[i] = nb++;
           if (fsos != NULL)

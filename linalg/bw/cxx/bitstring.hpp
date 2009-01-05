@@ -28,6 +28,8 @@
  */
 unsigned int read_hexstring(std::istream&, unsigned long *, unsigned int);
 unsigned int write_hexstring(std::ostream&, const unsigned long *, unsigned int);
+unsigned int read_hexstring_u64(std::istream&, uint64_t *, unsigned int);
+unsigned int write_hexstring_u64(std::ostream&, const uint64_t *, unsigned int);
 unsigned int read_hexstring(FILE * f, unsigned long *, unsigned int);
 unsigned int write_hexstring(FILE * f, const unsigned long *, unsigned int);
 
