@@ -140,6 +140,9 @@ int main(int argc, char **argv) {
     nrows = 163;
     ncols = 163;
   }
+
+  /* FIXME: This code is not used, but clearly limbs_per_row is too large
+   * that way */
   limbs_per_row = (ncols / MACHINE_WORD_SIZE) + 1;
   limbs_per_col = (nrows / MACHINE_WORD_SIZE) + 1;
 

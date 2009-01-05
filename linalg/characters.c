@@ -31,11 +31,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 
 #include "files.h"
 #include "gzip.h"
+#include "gauss.h"
 
 #define DEBUG 0
-
-int kernel(mp_limb_t * mat, mp_limb_t ** ker, int nrows, int ncols,
-           int limbs_per_row, int limbs_per_col);
 
 // Data structure for one algebraic prime and for a table of those.
 typedef struct {
