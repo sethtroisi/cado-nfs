@@ -124,7 +124,7 @@ unsigned int read_hexstring_u64(std::istream& is, uint64_t * ptr, unsigned int n
         x |= v << ir;
         i += 4;
         ir += 4;
-        if (ir == ULONG_BITS) {
+        if (ir == 64) {
             ir = 0;
             *ptr++ = x;
             x = 0UL;
