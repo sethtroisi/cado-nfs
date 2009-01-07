@@ -198,6 +198,15 @@ readmat(sparse_mat_t *mat, FILE *file)
 	    memcpy(mat->rows[i]+1, buf, ibuf * sizeof(INT));
 	    // sort indices in val to ease row merges
             qsort(mat->rows[i]+1, ibuf, sizeof(INT), cmp);
+            /* check all indices are distinct, otherwise this is a bug of
+               purge */
+            for (k = 1; k < ibuf; k++)
+              if (mat->rows[i][k] == mat->rows[i][k+1])
+                {
+                  fprintf (stderr, "Error, duplicate ideal %lx in row %i\n",
+                           mat->rows[i][k], i);
+                  exit (1);
+                }
 #endif
 	}
     }
