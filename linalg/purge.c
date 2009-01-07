@@ -503,6 +503,7 @@ deleteHeavierRows (hashtable_t *H, int *nrel, int *nprimes, char *rel_used,
   double W = 0.0; /* total matrix weight */
   double N = 0.0; /* numebr of rows */
   comp_t *tmp = NULL; /* (weight, index) */
+  int target;
 
   if ((*nrel - *nprimes) <= keep)
     return;
@@ -540,9 +541,14 @@ deleteHeavierRows (hashtable_t *H, int *nrel, int *nprimes, char *rel_used,
 
   qsort (tmp, ltmp, sizeof(comp_t), compare);
 
-  /* remove heaviest components, assuming each one decreases the excess by 1 */
-  for (i = 0; i < ltmp && (*nrel) - (*nprimes) > keep; i ++)
+  /* remove heaviest components, assuming each one decreases the excess by 1;
+     we remove only half of the excess at each call of deleteHeavierRows,
+     hoping to get "better" components to remove at the next call. */
+  target = (*nrel - *nprimes + keep) / 2;
+  for (i = 0; i < ltmp && (*nrel) - (*nprimes) > target; i ++)
     {
+      /* it suffices to remove one relation per component, the other ones
+         will be removed by onepass_singleton_removal */
       delete_relation (tmp[i].i, nprimes, H, rel_used, rel_compact);
       *nrel -= 1;
     }
