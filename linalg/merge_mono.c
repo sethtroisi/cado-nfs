@@ -203,7 +203,7 @@ readmat(sparse_mat_t *mat, FILE *file)
             for (k = 1; k < ibuf; k++)
               if (mat->rows[i][k] == mat->rows[i][k+1])
                 {
-                  fprintf (stderr, "Error, duplicate ideal %lx in row %i\n",
+                  fprintf (stderr, "Error, duplicate ideal %x in row %i\n",
                            mat->rows[i][k], i);
                   exit (1);
                 }

@@ -87,6 +87,9 @@ addRows(INT **rows, int i1, int i2, int len0)
 	ASSERT(tmp[0] == len0);
     }
     else{
+        /* FIXME: why not use realloc here instead? Since k <= len,
+           it suffices to shrink the tmp[] array to k entries.
+           Also, we might detect the special case k = len. */
 	tmp2 = (INT *)malloc(k * sizeof(INT));
 	memcpy(tmp2, tmp, k * sizeof(INT));
 	tmp2[0] = k-1;
