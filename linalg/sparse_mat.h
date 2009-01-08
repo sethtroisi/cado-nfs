@@ -67,3 +67,5 @@ extern void remove_i_from_Rj(sparse_mat_t *mat, int i, int j);
 extern void add_i_to_Rj(sparse_mat_t *mat, int i, int j);
 extern int decrS(int w);
 extern int incrS(int w);
+extern int weightSum(sparse_mat_t *mat, int i1, int i2);
+

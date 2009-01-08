@@ -222,41 +222,6 @@ readmat(sparse_mat_t *mat, FILE *file)
     return 1;
 }
 
-// what is the weight of the sum of Ra and Rb? Works even in the partial
-// scenario of MPI.
-int
-weightSum(sparse_mat_t *mat, int i1, int i2)
-{
-    int k1, k2, w = 0, len1, len2;
-
-    len1 = (isRowNull(mat, i1) ? 0 : lengthRow(mat, i1));
-    len2 = (isRowNull(mat, i2) ? 0 : lengthRow(mat, i2));
-    if((len1 == 0) || (len2 == 0))
-	fprintf(stderr, "i1=%d i2=%d len1=%d len2=%d\n", i1, i2, len1, len2);
-#if USE_TAB == 0
-    k1 = k2 = 0;
-    while((k1 < len1) && (k2 < len2)){
-#else
-    k1 = k2 = 1;
-    while((k1 <= len1) && (k2 <= len2)){
-#endif
-	if(cell(mat, i1, k1) < cell(mat, i2, k2)){
-	    k1++;
-	    w++;
-	}
-	else if(cell(mat, i1, k1) > cell(mat, i2, k2)){
-	    k2++;
-	    w++;
-	}
-	else{
-	    k1++; k2++;
-	}
-    }
-    w += (k1 > len1 ? 0 : len1-k1+1);
-    w += (k2 > len2 ? 0 : len2-k2+1);
-    return w;
-}
-
 int
 findAllRowsWithGivenj(INT *ind, sparse_mat_t *mat, INT j, int nb)
 {

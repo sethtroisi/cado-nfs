@@ -225,16 +225,28 @@ MkzCheck(sparse_mat_t *mat)
 int
 MkzCount(sparse_mat_t *mat, INT j)
 {
-    int mkz, k, i;
+    int mkz, k, i, i1, i2;
 
 #if MKZ_TIMINGS
     double tt = seconds();
 #endif
     // trick to be sure that these two guys are treated asap
     if(mat->wt[GETJ(mat, j)] == 1)
-	return -2;
-    else if(mat->wt[GETJ(mat, j)] == 2)
-	return -1;
+	return 1-mat->ncols;
+    else if(mat->wt[GETJ(mat, j)] == 2){
+	i1 = i2 = -1;
+	// locate the two rows
+	for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
+	    if((i = mat->R[GETJ(mat, j)][k]) != -1)
+		if(i1 == -1)
+		    i1 = i;
+		else{
+		    i2 = i;
+		    break;
+		}
+	// the more this is < 0, the less the weight is
+	return weightSum(mat, i1, i2)-mat->ncols;
+    }
     mkz = mat->nrows;
     for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
 	if((i = mat->R[GETJ(mat, j)][k]) != -1){
