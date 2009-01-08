@@ -788,8 +788,6 @@ removeColumnAndUpdate(sparse_mat_t *mat, int j)
 void
 addCellAndUpdate(sparse_mat_t *mat, int i, INT j)
 {
-    int w;
-
 #if TRACE_ROW >= 0
     if(i == TRACE_ROW)
 	fprintf(stderr, "TRACE_ROW: addCellSWAR i=%d j=%d\n", i, j);
@@ -799,7 +797,8 @@ addCellAndUpdate(sparse_mat_t *mat, int i, INT j)
 	// update R[j] by adding i
 	add_i_to_Rj(mat, i, j);
 #else
-    w = MkzIncrCol(mat, j);
+    {
+    int w = MkzIncrCol(mat, j);
     if(w >= 0){
 	if(w > mat->cwmax){
 	    // first time...
@@ -811,6 +810,7 @@ addCellAndUpdate(sparse_mat_t *mat, int i, INT j)
 	    add_i_to_Rj(mat, i, j);
 	    MkzUpdate(mat, i, j);
 	}
+    }
     }
 #endif
 }
