@@ -1951,7 +1951,7 @@ sub do_chars {
               "-nker $nker ".
               "-skip $param{skip} ".
               "-nchar $param{nchar} ".
-              "> $param{prefix}.ker ".
+              "-out $param{prefix}.ker ".
               "2> $param{prefix}.characters.stderr";
 
     cmd($cmd, { log => 1, kill => 1 });

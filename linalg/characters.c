@@ -1,6 +1,6 @@
 /* Characters
 
-Copyright 2008 Pierrick Gaudry, Fran\c{c}ois Morain, Emmanuel Thom\'e, Paul Zimmermann
+Copyright 2009 Andreas Enge, Pierrick Gaudry, Fran\c{c}ois Morain, Emmanuel Thom\'e, Paul Zimmermann
 
 This file is part of CADO-NFS.
 
@@ -35,38 +35,32 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 
 #define DEBUG 0
 
-// Data structure for one algebraic prime and for a table of those.
-typedef struct {
-    unsigned long prime;
-    unsigned long root;
-} rootprime_t;
-
-static int eval_char(long a, unsigned long b, rootprime_t ch)
+static int eval_char(long a, unsigned long b, alg_prime_t ch)
 {
     unsigned long ua, aux, saveb = b;
     int res;
 #if DEBUG >= 1
-    printf("a := %ld; b := %lu; p := %lu; r := %lu;", a, b, ch.prime,
-           ch.root);
+    printf("a := %ld; b := %lu; p := %lu; r := %lu;", a, b, ch.p,
+           ch.r);
 #endif
     if (a < 0) {
-        ua = ((unsigned long) (-a)) % ch.prime;
-        b = b % ch.prime;
-        modul_mul(&aux, &b, &ch.root, &ch.prime);
-        modul_add(&aux, &ua, &aux, &ch.prime);
-        modul_neg(&aux, &aux, &ch.prime);
-        res = modul_jacobi(&aux, &ch.prime);
+        ua = ((unsigned long) (-a)) % ch.p;
+        b = b % ch.p;
+        modul_mul(&aux, &b, &ch.r, &ch.p);
+        modul_add(&aux, &ua, &aux, &ch.p);
+        modul_neg(&aux, &aux, &ch.p);
+        res = modul_jacobi(&aux, &ch.p);
     } else {
-        ua = ((unsigned long) (a)) % ch.prime;
-        b = b % ch.prime;
-        modul_mul(&aux, &b, &ch.root, &ch.prime);
-        modul_sub(&aux, &ua, &aux, &ch.prime);
-        res = modul_jacobi(&aux, &ch.prime);
+        ua = ((unsigned long) (a)) % ch.p;
+        b = b % ch.p;
+        modul_mul(&aux, &b, &ch.r, &ch.p);
+        modul_sub(&aux, &ua, &aux, &ch.p);
+        res = modul_jacobi(&aux, &ch.p);
     }
     if (res == 0) {
         fprintf(stderr, "Strange: have a jacobi symbol that is zero:\n");
         fprintf(stderr, "  a = %ld, b = %lu, p := %lu; r := %lu;", a, saveb,
-                ch.prime, ch.root);
+                ch.p, ch.r);
     }
 #if DEBUG >= 1
     printf("res := %d; assert (JacobiSymbol(a-b*r, p) eq res);\n", res);
@@ -98,7 +92,7 @@ static int eval_rat_char(long a, unsigned long b, cado_poly pol)
     return s;
 }
 
-static void create_characters(rootprime_t * tabchar, int k, cado_poly pol)
+static void create_characters(alg_prime_t * tabchar, int k, cado_poly pol)
 {
     unsigned long p;
     int ret;
@@ -116,9 +110,9 @@ static void create_characters(rootprime_t * tabchar, int k, cado_poly pol)
         ret = poly_roots_ulong(roots, pol->f, pol->degree, p);
         if (ret == 0)
             continue;
-        tabchar[i].prime = p;
+        tabchar[i].p = p;
         /* FIXME: Why do we take only one root per prime ??? */
-        tabchar[i].root = roots[0];
+        tabchar[i].r = roots[0];
         i++;
     }
     while (i < k);
@@ -195,7 +189,7 @@ typedef struct {
 
 // charmat is small_nrows x k
 static void
-computeAllCharacters(char **charbig, int i, int k, rootprime_t * tabchar,
+computeAllCharacters(char **charbig, int i, int k, alg_prime_t * tabchar,
                      long a, unsigned long b, cado_poly pol)
 {
     int j;
@@ -212,7 +206,7 @@ computeAllCharacters(char **charbig, int i, int k, rootprime_t * tabchar,
 // purgedfile contains crunched rows, with their label referring to relfile;
 // indexfile contains the coding "row[i] uses rows i_0...i_r in purgedfile".
 static void
-buildCharacterMatrix(char **charmat, int k, rootprime_t * tabchar,
+buildCharacterMatrix(char **charmat, int k, alg_prime_t * tabchar,
                      FILE * purgedfile, FILE * indexfile, FILE * relfile,
                      cado_poly pol, int small_nrows)
 {
@@ -339,7 +333,7 @@ addHeavyBlock(char **charmat, FILE * smallfile, int kmin, int skip)
 }
 
 static void
-handleKer (dense_mat_t * mat, rootprime_t * tabchar, FILE * purgedfile,
+handleKer (dense_mat_t * mat, alg_prime_t * tabchar, FILE * purgedfile,
 	   mp_limb_t ** ker, cado_poly pol,
 	   FILE * indexfile, FILE * relfile,
 	   int small_nrows, FILE * smallfile, int skip)
@@ -438,10 +432,11 @@ int main(int argc, char **argv)
     FILE *indexfile = NULL;
     FILE *relfile = NULL;
     FILE *smallfile = NULL;
+    FILE *outfile = stdout;
     int ret;
     int k, isz, skip = 0;
     unsigned int i, j, n, nlimbs;
-    rootprime_t *tabchar;
+    alg_prime_t *tabchar;
     cado_poly pol;
     mp_limb_t **ker;
     mp_limb_t *newker;
@@ -450,6 +445,7 @@ int main(int argc, char **argv)
     unsigned int dim;
     char *purgedname = NULL;
     char *relname = NULL;
+    char *outname = NULL;
 
 #if 0
     // FIXME...
@@ -521,6 +517,12 @@ int main(int argc, char **argv)
             argc -= 2;
             argv += 2;
         }
+        if (argc > 2 && strcmp(argv[1], "-out") == 0) {
+            outname = argv[2];
+            outfile = fopen (outname, "w");
+            argc -= 2;
+            argv += 2;
+        }
     }
 
     ASSERT_ALWAYS(n != UINT_MAX);
@@ -531,7 +533,7 @@ int main(int argc, char **argv)
     ASSERT_ALWAYS(smallfile != NULL);
 
     // only k-1, since the k-th character is sign on rational side
-    tabchar = (rootprime_t *) malloc((k - 1) * sizeof(rootprime_t));
+    tabchar = (alg_prime_t *) malloc((k - 1) * sizeof(alg_prime_t));
     ASSERT(tabchar != NULL);
 
     create_characters (tabchar, k - 1, pol);
@@ -626,7 +628,7 @@ int main(int argc, char **argv)
         if (isz)
 	  fprintf (stderr, "Sorry %d-th vector is 0\n", i);
         else
-	  printOneKer (stdout, newker, nlimbs);
+	  printOneKer (outfile, newker, nlimbs);
     }
 
     free(tabchar);
@@ -644,6 +646,8 @@ int main(int argc, char **argv)
     fclose (kerfile);
     fclose (indexfile);
     fclose (smallfile);
+    if (outname != NULL)
+       fclose (outfile);
 
     return 0;
 }
