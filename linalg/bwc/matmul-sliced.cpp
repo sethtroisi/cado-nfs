@@ -21,6 +21,7 @@
 using namespace std;
 
 #include "matmul-sliced.h"
+#include "matmul-sliced-asm.h"
 #include "readmat.h"
 #include "abase.h"
 #include "manu.h"
@@ -56,7 +57,7 @@ using namespace std;
 #define MM_EXTENSION   "-sliced"
 
 #define MM_MAGIC_FAMILY        0xa000UL
-#define MM_MAGIC_VERSION       0x1004UL
+#define MM_MAGIC_VERSION       0x1005UL
 #define MM_MAGIC (MM_MAGIC_FAMILY << 16 | MM_MAGIC_VERSION)
 
 struct slice_info {
@@ -95,6 +96,12 @@ struct matmul_data_s {
         data.push_back(x & ((1u << 16) - 1));
     }
     static inline uint32_t read32(data_t::const_iterator & q) {
+        uint32_t res;
+        res = *q++;
+        res |= ((uint32_t) *q++) << 16;
+        return res;
+    }
+    static inline uint32_t read32(const uint16_t * & q) {
         uint32_t res;
         res = *q++;
         res |= ((uint32_t) *q++) << 16;
@@ -147,6 +154,7 @@ matmul_ptr matmul_sliced_build(abobj_ptr xx, const char * filename)
 
     unsigned int nslices_index = MM->data.size();
     MM->push(0);
+    MM->push(0);        // placeholder for alignment
 
     unsigned int packbase = (i1-i0) / nslices;
     /* How many slices of size packbase+1 */
@@ -190,7 +198,7 @@ matmul_ptr matmul_sliced_build(abobj_ptr xx, const char * filename)
          * coefficients in the current horizontal slice */
         std::sort(L.begin(), L.end());
 
-        MM->push(npack);
+        MM->push32(npack);
         MM->push32(L.size());
 
         uint32_t j = 0;
@@ -391,9 +399,10 @@ void matmul_sliced_save_cache(matmul_ptr mm, const char * filename)
 void matmul_sliced_mul(matmul_ptr mm, abt * dst, abt const * src, int d)
 {
     asm("# multiplication code\n");
-    data_t::const_iterator q = MM->data.begin();
+    const uint16_t * q = &(MM->data.front());
 
     uint16_t nhstrips = *q++;
+    q++;        // alignment.
     uint32_t i = 0;
     abobj_ptr x = MM->xab;
 
@@ -403,18 +412,26 @@ void matmul_sliced_mul(matmul_ptr mm, abt * dst, abt const * src, int d)
         double tick = oncpu_ticks();
 #endif
         for(uint16_t s = 0 ; s < nhstrips ; s++) {
-            uint32_t j = 0;
-            uint16_t nrows_packed = *q++;
-            abzero(x, dst + aboffset(x, i), nrows_packed);
+            uint32_t nrows_packed = matmul_data_s::read32(q);
+            abt * where = dst + aboffset(x, i);
+            abzero(x, where, nrows_packed);
             asm("# critical loop\n");
+            abt const * from = src;
+#if 1
+            q = matmul_sliced_asm(x, where, from, (uint16_t const *) q);
+#else
+            /* The external function must have the same semantics as this
+             * code block */
             uint32_t ncoeffs_slice = matmul_data_s::read32(q);
+            uint32_t j = 0;
             for(uint32_t c = 0 ; c < ncoeffs_slice ; c++) {
                 j += *q++;
                 uint32_t di = *q++;
-                abadd(x, dst + aboffset(x, i + di), src + aboffset(x, j));
+                abadd(x, where + aboffset(x, di), from + aboffset(x, j));
             }
-            i += nrows_packed;
+#endif
             asm("# end of critical loop\n");
+            i += nrows_packed;
 #ifdef  SLICE_STATS
             if (!MM->dslices_info.empty()) {
                 double ntick = oncpu_ticks();

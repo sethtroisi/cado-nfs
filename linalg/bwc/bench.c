@@ -130,15 +130,20 @@ int main(int argc, char * argv[])
     abt * dst = abinit(xx, mm->nrows);
 
     t0 = clock();
-
+    double next = 0.25 * CLOCKS_PER_SEC;
+    if (next > tmax * CLOCKS_PER_SEC) { next = tmax * CLOCKS_PER_SEC; }
     for(unsigned int n = 0 ; n < nmax ; n++ ) {
         (*bind->mul)(mm, dst, src, 1);
         double dt = clock() - t0;
-        dt /= CLOCKS_PER_SEC;
-        printf("%d iterations in %2.fs, %.2f/1, %.2f ns/coeff        \r",
-                n, dt, dt/n, 1.0e9 * dt/n/mm->ncoeffs);
-        if (dt > tmax)
-            break;
+        if (dt > next) {
+            do { next += 0.25 * CLOCKS_PER_SEC; } while (dt > next);
+            if (next > tmax * CLOCKS_PER_SEC) { next = tmax * CLOCKS_PER_SEC; }
+            dt /= CLOCKS_PER_SEC;
+            printf("%d iterations in %2.fs, %.2f/1, %.2f ns/coeff        \r",
+                    n, dt, dt/n, 1.0e9 * dt/n/mm->ncoeffs);
+            if (dt > tmax)
+                break;
+        }
     }
     printf("\n");
 

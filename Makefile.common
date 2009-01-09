@@ -55,6 +55,10 @@ MY_CXXFLAGS=$(filter-out -std=c99,$(MY_CFLAGS))
 	$(CC) $(MY_CFLAGS) $< -c -o $@
 .cpp.o:
 	$(CXX) $(MY_CXXFLAGS) $< -c -o $@
+.s.o:
+	$(CC) $(MY_CFLAGS) $< -c -o $@
+.S.o:
+	$(CC) $(MY_CFLAGS) $< -c -o $@
 
 .deps/%.c.d: %.c
 	@mkdir -p .deps

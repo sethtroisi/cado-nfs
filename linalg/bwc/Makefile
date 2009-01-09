@@ -65,7 +65,7 @@ all:$(bins)
 build_objs:=build.o ../readbuffer.o ../readmat.o libmatmul.a
 bench_objs:=bench.o ../readbuffer.o ../readmat.o libmatmul.a
 
-libmatmul_objs:=matmul-sliced.o matmul-basic.o matmul.o
+libmatmul_objs:=matmul-sliced.o matmul-sliced-asm.o matmul-basic.o matmul.o
 
 libmatmul.a: $(libmatmul_objs)
 	-rm -f $@
