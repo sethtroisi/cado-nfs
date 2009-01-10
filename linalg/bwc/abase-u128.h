@@ -31,6 +31,7 @@ typedef const void * abase_u128_obj_srcptr;
 
 #define abase_u128_obj_init(x) (x=NULL)
 #define abase_u128_obj_clear(x)
+#define abase_u128_obj_init_set(y,x) (y=x)
 
 #include <emmintrin.h>
 
@@ -40,7 +41,6 @@ typedef __v2di abase_u128_base_type;
 // repeating is just the fact of putting several base type elements next
 // to each other.
 #define abase_u128_repeat(x)  1
-#define abase_u128_needs_scrap(x)    false
 
 #define abase_u128_max_accumulate(x) UINT_MAX
 #define abase_u128_max_accumulate_wide(x) UINT_MAX
@@ -176,17 +176,56 @@ abase_u128_write(abase_u128_obj_srcptr x MAYBE_UNUSED,
     return fread(p, abase_u128_repeat(x) * sizeof(abase_u128_base_type), n, f);
 }
 
+static inline void
+abase_u128_dotprod(abase_u128_obj_srcptr x MAYBE_UNUSED,
+        abase_u128_base_type * w,
+        const abase_u128_base_type * u,
+        const abase_u128_base_type * v,
+        unsigned int n)
+{
+    memset(w, 0, abase_u128_nbits(x) * abase_u128_repeat(x) * sizeof(abase_u128_base_type));
+    for(unsigned int i = 0 ; i < n ; i++) {
+        __v2di * w0 = (__v2di*) w;
+        for(unsigned int l = 0 ; l < abase_u128_repeat(x) ; l++) {
+#define SSE_0   ((__v2di) {0,0} )
+            __v2di mb[4][2] = { 
+                {SSE_0, SSE_0},
+                {*v, SSE_0},
+                {SSE_0, *v},
+                {*v, *v},
+            };
+#undef SSE_0
+            v++;
+            __v2di *sw = w0;
+            const uint64_t * ut = (const uint64_t *) u;
+            for(unsigned int k = 0 ; k < 2 * abase_u128_repeat(x) ; k++) {
+                uint64_t a = *ut++;
+                for (unsigned int j = 0; j < 64; j += 2) {
+                    *sw ^= mb[a & 3][0];
+                    sw += abase_u128_repeat(x);
+                    *sw ^= mb[a & 3][1];
+                    sw += abase_u128_repeat(x);
+                    a >>= 2;
+                }
+            }
+            w0++;
+        }
+        u += abase_u128_repeat(x);
+    }
+}
+
+
 /* Define our convenience macros */
 #define abobj_t   abase_u128_obj_t
 #define abobj_ptr   abase_u128_obj_ptr
 #define abobj_srcptr   abase_u128_obj_srcptr
 #define abobj_init(x)   abase_u128_obj_init(x)
+#define abobj_init_set(y,x)   abase_u128_obj_init_set(y,x)
 #define abobj_clear(x)  abase_u128_obj_clear(x)
 
 #define abt     abase_u128_base_type
 #define abnbits(x)      abase_u128_nbits(x)
 #define abrepeat(x)     abase_u128_repeat(x)
-#define abneeds_scrap(x)        abase_u128_needs_scrap(x)
 #define abmax_accumulate(x)     abase_u128_max_accumulate(x)
 #define abmax_accumulate_wide(x)        abase_u128_max_accumulate_wide(x)
 #define abinit(x,n)     abase_u128_init(x,n)
@@ -202,5 +241,6 @@ abase_u128_write(abase_u128_obj_srcptr x MAYBE_UNUSED,
 #define abadd(x,q,p) abase_u128_add(x,q,p)
 #define abread(x,f,p,n) abase_u128_read(x,f,p,n)
 #define abwrite(x,f,p,n) abase_u128_write(x,f,p,n)
+#define abdotprod(x,w,u,v,n) abase_u128_dotprod(x,w,u,v,n)
 
 #endif	/* ABASE_U128_H_ */

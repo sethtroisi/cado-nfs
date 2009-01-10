@@ -134,6 +134,8 @@ int main(int argc, char * argv[])
     abt * src = abinit(xx, mm->ncols);
     abt * dst = abinit(xx, mm->nrows);
 
+    setup_seeding(1);
+
     abrandom(xx, src, mm->ncols);
 
     if (!nocheck) {

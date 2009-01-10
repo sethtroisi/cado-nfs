@@ -31,6 +31,7 @@ typedef const void * abase_u64_obj_srcptr;
 
 #define abase_u64_obj_init(x) (x=NULL)
 #define abase_u64_obj_clear(x)
+#define abase_u64_obj_init_set(y,x) (y=x)
 
 typedef uint64_t abase_u64_base_type;
 
@@ -203,15 +204,15 @@ abase_u64_dotprod(abase_u64_obj_srcptr x MAYBE_UNUSED,
             // wee bit maybe.
             __v2di mb[4] = {
                 (__v2di) {0, 0},
-                (__v2di) {*u, 0},
-                (__v2di) {0, *u},
-                (__v2di) {*u, *u},
+                (__v2di) {*v, 0},
+                (__v2di) {0, *v},
+                (__v2di) {*v, *v},
             };
-            u++;
+            v++;
             __v2di *sw = w0;
-            const abase_u64_base_type * vt = v;
+            const abase_u64_base_type * ut = u;
             for(unsigned int k = 0 ; k < abase_u64_repeat(x) ; k++) {
-                uint64_t a = *vt++;
+                uint64_t a = *ut++;
                 for (unsigned int j = 0; j < 64; j += 2) {
                     *sw ^= mb[a & 3];
                     a >>= 2;
@@ -220,7 +221,7 @@ abase_u64_dotprod(abase_u64_obj_srcptr x MAYBE_UNUSED,
             }
             w0++;
         }
-        v += abase_u64_repeat(x);
+        u += abase_u64_repeat(x);
     }
 }
 
@@ -230,6 +231,7 @@ abase_u64_dotprod(abase_u64_obj_srcptr x MAYBE_UNUSED,
 #define abobj_ptr   abase_u64_obj_ptr
 #define abobj_srcptr   abase_u64_obj_srcptr
 #define abobj_init(x)   abase_u64_obj_init(x)
+#define abobj_init_set(y,x)   abase_u64_obj_init_set(y,x)
 #define abobj_clear(x)  abase_u64_obj_clear(x)
 
 #define abt     abase_u64_base_type

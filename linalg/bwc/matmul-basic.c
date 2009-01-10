@@ -50,11 +50,11 @@ static int uint_cmp(unsigned int * a, unsigned int * b)
     return 0;
 }
 
-matmul_ptr matmul_basic_build(abobj_ptr xx, const char * filename)
+matmul_ptr matmul_basic_build(abobj_ptr xx MAYBE_UNUSED, const char * filename)
 {
     matmul_ptr mm = matmul_basic_init();
 
-    MM->xab = xx;
+    abobj_init_set(MM->xab, xx);
 
     sparse_mat_t smat;
     FILE * f;
@@ -107,7 +107,7 @@ matmul_ptr matmul_basic_build(abobj_ptr xx, const char * filename)
     return mm;
 }
 
-matmul_ptr matmul_basic_reload_cache(abobj_ptr xx, const char * filename)
+matmul_ptr matmul_basic_reload_cache(abobj_ptr xx MAYBE_UNUSED, const char * filename)
 {
     char * base;
     FILE * f;
@@ -130,7 +130,7 @@ matmul_ptr matmul_basic_reload_cache(abobj_ptr xx, const char * filename)
     size_t rc;
     matmul_ptr mm = matmul_basic_init();
 
-    MM->xab = xx;
+    abobj_init_set(MM->xab, xx);
 
     unsigned long magic_check;
     rc = fread(&magic_check, sizeof(unsigned long), 1, f);

@@ -124,11 +124,11 @@ static matmul_ptr matmul_sliced_init()
 }
 
 
-matmul_ptr matmul_sliced_build(abobj_ptr xx, const char * filename)
+matmul_ptr matmul_sliced_build(abobj_ptr xx MAYBE_UNUSED, const char * filename)
 {
     matmul_ptr mm = matmul_sliced_init();
 
-    MM->xab = xx;
+    abobj_init_set(MM->xab, xx);
 
     sparse_mat_t smat;
     FILE * f;
@@ -302,7 +302,7 @@ matmul_ptr matmul_sliced_build(abobj_ptr xx, const char * filename)
     return mm;
 }
 
-matmul_ptr matmul_sliced_reload_cache(abobj_ptr xx, const char * filename)
+matmul_ptr matmul_sliced_reload_cache(abobj_ptr xx MAYBE_UNUSED, const char * filename)
 {
     char * base;
     FILE * f;
@@ -326,7 +326,7 @@ matmul_ptr matmul_sliced_reload_cache(abobj_ptr xx, const char * filename)
     size_t rc;
     matmul_ptr mm = matmul_sliced_init();
 
-    MM->xab = xx;
+    abobj_init_set(MM->xab, xx);
 
     unsigned long magic_check;
     rc = fread(&magic_check, sizeof(unsigned long), 1, f);
@@ -417,7 +417,10 @@ void matmul_sliced_mul(matmul_ptr mm, abt * dst, abt const * src, int d)
             abzero(x, where, nrows_packed);
             asm("# critical loop\n");
             abt const * from = src;
-#if 1
+#define ENABLE_ASM
+            /* Make sure that the assembly function is only called if it
+             * matches correctly the abase header !! */
+#if defined(ENABLE_ASM) && defined(ABASE_U64_H_)
             q = matmul_sliced_asm(x, where, from, (uint16_t const *) q);
 #else
             /* The external function must have the same semantics as this
