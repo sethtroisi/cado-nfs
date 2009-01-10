@@ -17,6 +17,7 @@
 #include "matmul.h"
 #include "abase.h"
 #include "macros.h"
+#include "manu.h"
 #include "params.h"
 
 /* Include all matmul implementations here */
@@ -62,6 +63,8 @@ int main(int argc, char * argv[])
     const char * impl = "sliced";
     const char * file = NULL;
     int transpose = 0;
+    int nocheck = 0;
+    int nchecks = 4;
 
     param_list pl;
 
@@ -69,6 +72,7 @@ int main(int argc, char * argv[])
 
     argv++,argc--;
     param_list_configure_knob(pl, "--transpose", &transpose);
+    param_list_configure_knob(pl, "--nocheck", &nocheck);
     param_list_configure_alias(pl, "--transpose", "-t");
 
     int wild = 0;
@@ -89,6 +93,7 @@ int main(int argc, char * argv[])
 
     double tmax = 100.0;
     param_list_parse_double(pl, "tmax", &tmax);
+    param_list_parse_int(pl, "nchecks", &nchecks);
 
     const char * tmp;
     if ((tmp = param_list_lookup_string(pl, "impl")) != NULL) {
@@ -128,6 +133,39 @@ int main(int argc, char * argv[])
 
     abt * src = abinit(xx, mm->ncols);
     abt * dst = abinit(xx, mm->nrows);
+
+    abrandom(xx, src, mm->ncols);
+
+    if (!nocheck) {
+        abt * src2 = abinit(xx, mm->ncols);
+        abt * dst2 = abinit(xx, mm->nrows);
+
+        abt * checkA = abinit(xx, abnbits(xx));
+        abt * checkB = abinit(xx, abnbits(xx));
+
+        for(int t = 0; t < nchecks ; t++) {
+            abrandom(xx, src, mm->ncols);
+            abrandom(xx, dst, mm->nrows);
+            abcopy(xx, src2, src, mm->ncols);
+            abcopy(xx, dst2, dst, mm->nrows);
+            (*bind->mul)(mm, dst, src, 1);
+            abdotprod(xx, checkA, dst, dst2, mm->nrows);
+            (*bind->mul)(mm, src2, dst2, 0);
+            abdotprod(xx, checkB, src, src2, mm->ncols);
+
+            if (memcmp(checkA, checkB, aboffset(xx, abnbits(xx))) != 0) {
+                fprintf(stderr, "Check %d failed\n", t);
+                BUG();
+            }
+        }
+        printf("All %d checks passed\n", nchecks);
+
+        abclear(xx, checkA, abnbits(xx));
+        abclear(xx, checkB, abnbits(xx));
+
+        abclear(xx, src2, mm->ncols);
+        abclear(xx, dst2, mm->nrows);
+    }
 
     t0 = clock();
     double next = 0.25 * CLOCKS_PER_SEC;

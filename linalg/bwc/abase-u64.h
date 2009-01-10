@@ -33,12 +33,18 @@ typedef const void * abase_u64_obj_srcptr;
 #define abase_u64_obj_clear(x)
 
 typedef uint64_t abase_u64_base_type;
-#define abase_u64_nbits(x)  64
+
 
 // repeating is just the fact of putting several base type elements next
-// to each other.
+// to each other. in the case of this header, it's an easy constant. But
+// the api has provision for it because in hard cases it could be handy
+// (albeit never needed in critical paths -- only handy as a convenient
+// way of doing bookkeeping tasks in e.g. prep).
 #define abase_u64_repeat(x)  1
-#define abase_u64_needs_scrap(x)    false
+
+// nbits takes into account the repeat count. So it's repeat(x) times the
+// number of bits in abase_u64_base_type.
+#define abase_u64_nbits(x)  64
 
 #define abase_u64_max_accumulate(x) UINT_MAX
 #define abase_u64_max_accumulate_wide(x) UINT_MAX
@@ -174,6 +180,51 @@ abase_u64_write(abase_u64_obj_srcptr x MAYBE_UNUSED,
     return fread(p, abase_u64_repeat(x) * sizeof(abase_u64_base_type), n, f);
 }
 
+
+/* This is the only non trivial function from this file. Given the number
+ * K of entries represented by the abase type (which is
+ * abase_u64_nbits(x), here 1 * 64 = 64), write
+ * a K times K matrix as K elements in the area pointed to by w.  */
+#include <emmintrin.h>
+static inline void
+abase_u64_dotprod(abase_u64_obj_srcptr x MAYBE_UNUSED,
+        abase_u64_base_type * w,
+        const abase_u64_base_type * u,
+        const abase_u64_base_type * v,
+        unsigned int n)
+{
+    memset(w, 0, abase_u64_nbits(x) * abase_u64_repeat(x) * sizeof(abase_u64_base_type));
+    for(unsigned int i = 0 ; i < n ; i++) {
+        __v2di * w0 = (__v2di*) w;
+        for(unsigned int l = 0 ; l < abase_u64_repeat(x) ; l++) {
+            // TODO: It's possible to expand more, and use a __v2di
+            // mb[4][2], or even [4]. This wouldn't change the code much
+            // (see the u128 version), and is likely to speed things up a
+            // wee bit maybe.
+            __v2di mb[4] = {
+                (__v2di) {0, 0},
+                (__v2di) {*u, 0},
+                (__v2di) {0, *u},
+                (__v2di) {*u, *u},
+            };
+            u++;
+            __v2di *sw = w0;
+            const abase_u64_base_type * vt = v;
+            for(unsigned int k = 0 ; k < abase_u64_repeat(x) ; k++) {
+                uint64_t a = *vt++;
+                for (unsigned int j = 0; j < 64; j += 2) {
+                    *sw ^= mb[a & 3];
+                    a >>= 2;
+                    sw += abase_u64_repeat(x);
+                }
+            }
+            w0++;
+        }
+        v += abase_u64_repeat(x);
+    }
+}
+
+
 /* Define our convenience macros */
 #define abobj_t   abase_u64_obj_t
 #define abobj_ptr   abase_u64_obj_ptr
@@ -184,7 +235,6 @@ abase_u64_write(abase_u64_obj_srcptr x MAYBE_UNUSED,
 #define abt     abase_u64_base_type
 #define abnbits(x)      abase_u64_nbits(x)
 #define abrepeat(x)     abase_u64_repeat(x)
-#define abneeds_scrap(x)        abase_u64_needs_scrap(x)
 #define abmax_accumulate(x)     abase_u64_max_accumulate(x)
 #define abmax_accumulate_wide(x)        abase_u64_max_accumulate_wide(x)
 #define abinit(x,n)     abase_u64_init(x,n)
@@ -200,5 +250,6 @@ abase_u64_write(abase_u64_obj_srcptr x MAYBE_UNUSED,
 #define abadd(x,q,p) abase_u64_add(x,q,p)
 #define abread(x,f,p,n) abase_u64_read(x,f,p,n)
 #define abwrite(x,f,p,n) abase_u64_write(x,f,p,n)
+#define abdotprod(x,w,u,v,n) abase_u64_dotprod(x,w,u,v,n)
 
 #endif	/* ABASE_U64_H_ */

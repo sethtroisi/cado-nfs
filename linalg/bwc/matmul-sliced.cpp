@@ -448,7 +448,7 @@ void matmul_sliced_mul(matmul_ptr mm, abt * dst, abt const * src, int d)
         abzero(x, dst, MM->ncols);
         for(uint16_t s = 0 ; s < nhstrips ; s++) {
             uint32_t j = 0;
-            uint16_t nrows_packed = *q++;
+            uint32_t nrows_packed = matmul_data_s::read32(q);
             asm("# critical loop\n");
             uint32_t ncoeffs_slice = matmul_data_s::read32(q);
             for(uint32_t c = 0 ; c < ncoeffs_slice ; c++) {
