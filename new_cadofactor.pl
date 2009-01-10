@@ -200,6 +200,8 @@ my @default_param = (
     # linalg
     linalg       => 'bw',
     bwmt         => 2,
+    bwthreshold  => 64,
+    bwtidy       => 1,
 
     # characters
     nkermax      => 30,
@@ -1083,7 +1085,7 @@ my %tasks = (
 
     linalg    => { name   => "linear algebra",
                    dep    => ['transpose'],
-                   param  => ['bwmt', 'linalg'],
+                   param  => ['bwmt', 'bwthreshold', 'linalg'],
                    files  => ['bw', 'bw\.stderr', 'bl', 'bl\.stderr', 'W'] },
 
     bitstr    => { dep    => ['linalg'],
@@ -1880,7 +1882,8 @@ sub do_linalg {
                "vectoring=64 ".
                "multisols=1 ".
                "wdir=$param{wdir}/bw" .
-               "tidy=0 ".
+               "tidy=$param{'bwtidy'} ".
+               "threshold=$param{'bwthreshold'} ".
                "solution=$param{prefix}.W ".
                "> $param{prefix}.bw.stderr ".
                "2>&1";
