@@ -123,6 +123,8 @@ my @parameter_defaults = (
     # linalg
     linalg=>'bw',
     bwmt=>2,
+    bwtidy=>1,
+    bwthreshold=>64,
 
     # characters
     nkermax=>30,
@@ -226,7 +228,7 @@ sub my_system {
 #   $ret is the returned value (empty string if timeout),
 #   and $status is the exit status of the command (-1 if timeout).
 #
-# For timeout, we use the alarm mechanism. See perldoc -f alarm.
+# For timeout, we use the ala64m mechanism. See perldoc -f alarm.
 sub my_system_timeout {
     my ($cmd, $timeout) = @_;
     my $ret = "";
@@ -1468,8 +1470,10 @@ MAIN: {
         " vectoring=64" .
         " multisols=1" .
         " wdir=$wdir/bw" .
-        " tidy=0" .
-        " solution=$prefix.W";
+        " solution=$prefix.W" .
+        " threshold=$param->{'bwthreshold'}" .
+        " tidy=$param->{'bwtidy'}" .
+        "";
         my_system "/bin/sh -c '$cmd > $prefix.bw.stderr 2>&1'";
     } else {
         if ($param->{'linalg'} ne 'bl') {
