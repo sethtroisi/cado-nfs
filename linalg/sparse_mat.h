@@ -68,4 +68,7 @@ extern void add_i_to_Rj(sparse_mat_t *mat, int i, int j);
 extern int decrS(int w);
 extern int incrS(int w);
 extern int weightSum(sparse_mat_t *mat, int i1, int i2);
+extern int findAllRowsWithGivenj(INT *ind, sparse_mat_t *mat, INT j, int nb);
+extern void fillTabWithRowsForGivenj(INT *ind, sparse_mat_t *mat, INT j);
+
 

@@ -453,3 +453,47 @@ weightSum(sparse_mat_t *mat, int i1, int i2)
     return w;
 }
 
+int
+findAllRowsWithGivenj(INT *ind, sparse_mat_t *mat, INT j, int nb)
+{
+    int i, k, r = 0;
+
+    // TODO: special hack for nb==2???
+    for(i = 0; i < mat->nrows; i++){
+	if(isRowNull(mat, i))
+	    continue;
+#if USE_TAB == 0
+	for(k = 0; k < lengthRow(mat, i)-1; k++) // trick!
+	    if(cell(mat, i, k) >= j)
+		break;
+	if(cell(mat, i, k) == j){
+	    ind[r++] = i;
+	    if(r == nb)
+		return 1;
+	}
+#else
+	for(k = 1; k <= lengthRow(mat, i)-1; k++) // trick!
+	    if(cell(mat, i, k) >= j)
+		break;
+	if(cell(mat, i, k) == j){
+	    ind[r++] = i;
+	    if(r == nb)
+		return 1;
+	}
+#endif
+    }
+    return 0;
+}
+
+void
+fillTabWithRowsForGivenj(INT *ind, sparse_mat_t *mat, INT j)
+{
+    int ni = 0, k, i;
+
+    for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
+	if((i = mat->R[GETJ(mat, j)][k]) != -1){
+	    ind[ni++] = i;
+	    if(ni == mat->wt[GETJ(mat, j)])
+		break;
+	}
+}

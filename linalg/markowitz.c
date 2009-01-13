@@ -225,28 +225,27 @@ MkzCheck(sparse_mat_t *mat)
 int
 MkzCount(sparse_mat_t *mat, INT j)
 {
-    int mkz, k, i, i1, i2;
+    int mkz, k, i;
+    INT ind[MERGE_LEVEL_MAX];
+    double tfill, tMST;
 
 #if MKZ_TIMINGS
     double tt = seconds();
 #endif
     // trick to be sure that these two guys are treated asap
     if(mat->wt[GETJ(mat, j)] == 1)
-	return 1-mat->ncols;
+	return 1-2*mat->ncols;
     else if(mat->wt[GETJ(mat, j)] == 2){
-	i1 = i2 = -1;
-	// locate the two rows
-	for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
-	    if((i = mat->R[GETJ(mat, j)][k]) != -1)
-		if(i1 == -1)
-		    i1 = i;
-		else{
-		    i2 = i;
-		    break;
-		}
+	fillTabWithRowsForGivenj(ind, mat, j);
 	// the more this is < 0, the less the weight is
-	return weightSum(mat, i1, i2)-mat->ncols;
+	return weightSum(mat, ind[0], ind[1])-2*mat->ncols;
     }
+    else if(mat->wt[GETJ(mat, j)] <= 3){
+	fillTabWithRowsForGivenj(ind, mat, j);
+	mkz = minCostUsingMST(mat, mat->wt[GETJ(mat, j)], ind, &tfill, &tMST);
+	return mkz - mat->ncols;
+    }
+    // real traditional Markowitz count
     mkz = mat->nrows;
     for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
 	if((i = mat->R[GETJ(mat, j)][k]) != -1){
