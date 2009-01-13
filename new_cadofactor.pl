@@ -1881,7 +1881,7 @@ sub do_linalg {
                "mn=64 ".
                "vectoring=64 ".
                "multisols=1 ".
-               "wdir=$param{wdir}/bw" .
+               "wdir=$param{wdir}/bw " .
                "tidy=$param{'bwtidy'} ".
                "threshold=$param{'bwthreshold'} ".
                "solution=$param{prefix}.W ".
