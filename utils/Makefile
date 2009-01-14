@@ -5,7 +5,7 @@ include $(TOP)/Makefile.common
 names:=	cado_poly relation timing plain_poly \
 	getprime mod_ul modredc_ul modredc_15ul modul_poly gmp_aux \
 	fpoly rootfinder params gcd_int64 gcd_uint64 discriminant	\
-	random_generation mpz_array
+	random_generation mpz_array gzip
 
 src:=$(patsubst %,%.c,$(names))
 obj:=$(patsubst %,%.o,$(names))
@@ -48,7 +48,8 @@ sources:=       \
     cache.c cachesize.c cado_poly.c check_rels.c discriminant.c fpoly.c	\
     gcd_int64.c gcd_uint64.c getprime.c gmp_aux.c mod_ul.c mod_ul_common.c \
     modredc_15ul.c modredc_ul.c modul_poly.c params.c plain_poly.c \
-    random_generation.c relation.c rootfinder.c test-rootfinder.c timing.c
+    random_generation.c relation.c rootfinder.c test-rootfinder.c timing.c \
+    gzip.c
 
 dep: $(patsubst %,.deps/%.d,$(sources))
 -include $(patsubst %,.deps/%.d,$(sources))

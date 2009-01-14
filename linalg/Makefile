@@ -26,13 +26,13 @@ mst.o: mst.h
 
 freerel: freerel.o ../sieve/fb.o hashpair.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lgmp -lm
-duplicates: duplicates.o hashpair.o files.o gzip.o
+duplicates: duplicates.o hashpair.o files.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lgmp
-purge: purge.o hashpair.o files.o gzip.o
+purge: purge.o hashpair.o files.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lgmp -lm
-merge: merge.o markowitz.o swar.o mst.o report.o dclist.o merge_mono.o sparse_mat.o sparse.o gzip.o
+merge: merge.o markowitz.o swar.o mst.o report.o dclist.o merge_mono.o sparse_mat.o sparse.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lm
-replay: replay.o sparse.o gzip.o
+replay: replay.o sparse.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils
 checkdep: checkdep.o
 	$(CC) $(MY_LFLAGS) -o $@ $^
@@ -48,10 +48,10 @@ gauss.o: gauss.h
 transpose: transpose.o readmat.o
 	$(CC) $(MY_LFLAGS) -o $@ $^
 
-characters: characters.o files.o gauss.o gzip.o
-	$(CC) $(MY_LFLAGS) -o $@ $^ -lgmp
+characters: characters.o files.o gauss.o
+	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lgmp
 
-allsqrt: allsqrt.o files.o hashpair.o gzip.o
+allsqrt: allsqrt.o files.o hashpair.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lgmp
 
 apply_perm: apply_perm.o
@@ -77,7 +77,7 @@ merge_mpi.o: merge_mpi.c merge_mono.c merge.c
 # the path for the libraries
 MPI_CC2:=$(shell $(MPI_CC) -showme | sed -e 's/-I/-isystem /g')
 MPI_CC2:=$(MPI_CC2) -Wl,-rpath,$(MPI_LIB)
-mpimerge: merge.o merge_mpi.o merge_mono.o sparse.o gzip.o
+mpimerge: merge.o merge_mpi.o merge_mono.o sparse.o
 	$(MPI_CC2) -DUSE_MPI $(MPI_INC) $(MY_LFLAGS) -L$(MPI_LIB) -o $@ $^ -lutils -lm
 
 hismerge: hismerge.o
