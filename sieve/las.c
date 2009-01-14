@@ -173,7 +173,8 @@ sieve_info_init_lognorm (unsigned char *C, unsigned char threshold,
 }
 
 static void
-sieve_info_init (sieve_info_t *si, cado_poly cpoly, int logI, uint64_t q0)
+sieve_info_init (sieve_info_t *si, cado_poly cpoly, int logI, uint64_t q0,
+		 FILE *output)
 {
   unsigned int d = cpoly->degree;
   unsigned int k;
@@ -198,13 +199,13 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int logI, uint64_t q0)
    * non-survivors.*/
   scale = si->logmax_alg + cpoly->alambda * (double) cpoly->lpba;
 
-  fprintf (stderr, "# Alg. side: log2(maxnorm)=%1.2f logbase=%1.6f",
+  fprintf (output, "# Alg. side: log2(maxnorm)=%1.2f logbase=%1.6f",
            scale, exp2 (scale / LOG_MAX));
   // second guard, due to the 255 trick!
   scale = (LOG_MAX - GUARD) / scale;
   alg_bound = (unsigned char) (cpoly->alambda * (double) cpoly->lpba *  scale)
             + GUARD;
-  fprintf (stderr, " bound=%u\n", alg_bound);
+  fprintf (output, " bound=%u\n", alg_bound);
   sieve_info_init_lognorm (si->alg_Bound, alg_bound, cpoly->alim, cpoly->lpba,
                            scale);
   si->scale_alg = scale;
@@ -220,13 +221,13 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int logI, uint64_t q0)
      maximal lognorm to compute the log base */
   r = cpoly->rlambda * (double) cpoly->lpbr; /* base-2 logarithm of the
                                                 report bound */
-  fprintf (stderr, "# Rat. side: log2(maxnorm)=%1.2f ", scale);
-  fprintf (stderr, "logbase=%1.6f", exp2 (scale / LOG_MAX ));
+  fprintf (output, "# Rat. side: log2(maxnorm)=%1.2f ", scale);
+  fprintf (output, "logbase=%1.6f", exp2 (scale / LOG_MAX ));
   /* we subtract again GUARD to avoid that non-reports overlap the report
      region due to roundoff errors */
   si->scale_rat = LOG_MAX / scale;
   rat_bound = (unsigned char) (r * si->scale_rat) + GUARD;
-  fprintf (stderr, " bound=%u\n", rat_bound);
+  fprintf (output, " bound=%u\n", rat_bound);
   sieve_info_init_lognorm (si->rat_Bound, rat_bound, cpoly->rlim, cpoly->lpbr,
                            si->scale_rat);
 
@@ -239,10 +240,10 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int logI, uint64_t q0)
   si->bucket_region = 1<<si->log_bucket_region;
   si->nb_buckets = 1 + (si->I * si->J - 1) / si->bucket_region;
   si->bucket_limit = (BUCKET_LIMIT_FACTOR)*si->bucket_region;
-  fprintf(stderr, "# log_bucket_region = %u\n", si->log_bucket_region);
-  fprintf(stderr, "# bucket_region = %u\n", si->bucket_region);
-  fprintf(stderr, "# nb_buckets = %u\n", si->nb_buckets);
-  fprintf(stderr, "# bucket_limit = %u\n", si->bucket_limit);
+  fprintf(output, "# log_bucket_region = %u\n", si->log_bucket_region);
+  fprintf(output, "# bucket_region = %u\n", si->bucket_region);
+  fprintf(output, "# nb_buckets = %u\n", si->nb_buckets);
+  fprintf(output, "# bucket_limit = %u\n", si->bucket_limit);
 }
 
 
@@ -272,10 +273,10 @@ factor_small (mpz_t n, fbprime_t lim)
 }
 
 static void
-sieve_info_update (sieve_info_t *si, const int verbose)
+sieve_info_update (sieve_info_t *si, const int verbose, FILE *output)
 {
   if (verbose)
-    fprintf (stderr, "# I=%u; J=%u\n", si->I, si->J);
+    fprintf (output, "# I=%u; J=%u\n", si->I, si->J);
 
   /* update number of buckets */
   si->nb_buckets = 1 + (si->I * si->J - 1) / si->bucket_region;
@@ -1262,7 +1263,7 @@ copy_small_sieve (small_sieve_data_t *r, const small_sieve_data_t *s)
 // Prepare sieving of small primes: initialize a small_sieve_data_t
 // structure to be used thereafter during sieving each region.
 void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
-                      const sieve_info_t *si, const char side)
+                      const sieve_info_t *si, const char side, FILE *output)
 {
     const factorbase_degn_t *fb_sav = fb;
     int size = 0, n;
@@ -1299,8 +1300,8 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
 	  /* If this root is somehow interesting (projective in (a,b) or
 	     in  (i,j) plane), print a message */
 	  if (verbose && (fb->roots[nr] >= p || r >= p))
-	    fprintf (stderr, "# Side %c, prime " FBPRIME_FORMAT
-		     " root " FBPRIME_FORMAT " -> %d\n",
+	    fprintf (output, "# Side %c, prime " FBPRIME_FORMAT
+		     " root " FBPRIME_FORMAT " -> " FBPRIME_FORMAT "\n",
 		     side, p, fb->roots[nr], r);
           if (r >= p)
 	    {
@@ -1876,7 +1877,7 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
                   unsigned long *survivors, unsigned long *coprimes,
 		  small_sieve_data_t *srsd_alg, small_sieve_data_t *srsd_rat,
 		  unsigned long *report_sizes_a, unsigned long *report_sizes_r,
-		  const unsigned char *rat_S)
+		  const unsigned char *rat_S, FILE *output)
 {
     int x, xul;
     int64_t a;
@@ -1946,13 +1947,13 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
     resieved_rat = init_bucket_array (1, si->bucket_region);
     resieve_small_bucket_region (resieved_alg, S, srsd_alg, si,
 				 si->trialdiv_primes_alg);
-    /* fprintf (stderr, "# Resieving bucket %d on alg side found %d primes\n",
+    /* fprintf (output, "# Resieving bucket %d on alg side found %d primes\n",
        N, nb_of_updates (resieved_alg, 0)); */
     bucket_sortbucket (resieved_alg, 0);
     rewind_bucket (resieved_alg, 0);
     resieve_small_bucket_region (resieved_rat, S, srsd_rat, si,
 				 si->trialdiv_primes_rat);
-    /* fprintf (stderr, "# Resieving bucket %d on rat side found %d primes\n",
+    /* fprintf (output, "# Resieving bucket %d on rat side found %d primes\n",
        N, nb_of_updates (resieved_rat, 0)); */
     bucket_sortbucket (resieved_rat, 0);
     rewind_bucket (resieved_rat, 0);
@@ -2037,24 +2038,24 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
                   continue;
               }
 
-            printf ("%" PRId64 ",%" PRIu64 ":", a, b);
-            factor_list_fprint (stdout, rat_factors);
+            fprintf (output, "%" PRId64 ",%" PRIu64 ":", a, b);
+            factor_list_fprint (output, rat_factors);
             for (i = 0; i < f_r->length; ++i)
               for (j = 0; j < m_r->data[i]; j++)
-                gmp_printf (",%Zx", f_r->data[i]);
-            printf (":");
+                gmp_fprintf (output, ",%Zx", f_r->data[i]);
+            fprintf (output, ":");
             if (alg_factors.n != 0)
               {
-                factor_list_fprint (stdout, alg_factors);
-                printf (",");
+                factor_list_fprint (output, alg_factors);
+                fprintf (output, ",");
               }
             for (i = 0; i < f_a->length; ++i)
               for (j = 0; j < m_a->data[i]; j++)
-                gmp_printf ("%Zx,", f_a->data[i]);
+                gmp_fprintf (output, "%Zx,", f_a->data[i]);
             /* print special q */
-            printf ("%" PRIx64 "", si->q);
-            printf ("\n");
-            fflush (stdout);
+            fprintf (output, "%" PRIx64 "", si->q);
+            fprintf (output, "\n");
+            fflush (output);
             cpt++;
             report_sizes_a[S[x]]++; /* Build histogram of lucky S[x] values */
             if (rat_S != NULL)
@@ -2569,7 +2570,7 @@ factor_leftover_norm (mpz_t n, unsigned int l,
 /*************************** main program ************************************/
 
 static void
-usage (char *argv0)
+usage (const char *argv0)
 {
   fprintf (stderr, "Usage: %s [-no-checknorms] [-I I] -poly xxx.poly -fb xxx.roots -q0 q0 [-q1 q1] [-rho rho]\n",
            argv0);
@@ -2591,13 +2592,13 @@ usage (char *argv0)
   fprintf (stderr, "          -rlambda  nnn   rational lambda value is nnn\n");
   fprintf (stderr, "          -alambda  nnn   algebraic lambda value is nnn\n");
   fprintf (stderr, "          -v              be verbose (print some sieving statistics)\n");
+  fprintf (stderr, "          -out filename   write relations to filename instead of stdout\n");
   exit (EXIT_FAILURE);
 }
 
 int
-main (int argc, char *argv[])
+main (int argc0, char *argv0[])
 {
-    char *argv0 = argv[0];
     sieve_info_t si;
     char *fbfilename = NULL, *polyfilename = NULL;
     cado_poly cpoly;
@@ -2619,11 +2620,10 @@ main (int argc, char *argv[])
     int lpbr = 0, lpba = 0;
     int mfbr = 0, mfba = 0;
     double rlambda = 0.0, alambda = 0.0;
-
-    fprintf (stderr, "# %s.r%s", argv[0], REV);
-    for (i = 1; i < argc; i++)
-      fprintf (stderr, " %s", argv[i]);
-    fprintf (stderr, "\n");
+    FILE *output;
+    char *outputname = NULL;
+    int argc = argc0;
+    char **argv = argv0;
 
     while (argc > 1 && argv[1][0] == '-')
       {
@@ -2736,12 +2736,37 @@ main (int argc, char *argv[])
             argc -= 2;
             argv += 2;
           }
+        else if (argc > 2 && strcmp (argv[1], "-out") == 0)
+          {
+            outputname = argv[2];
+            argc -= 2;
+            argv += 2;
+          }
         else
-          usage (argv0);
+          usage (argv0[0]);
       }
 
+    /* Init output file */
+    if (outputname == NULL)
+      output = stdout;
+    else
+      {
+	output = gzip_open (outputname, "w");
+	if (output == NULL)
+	  {
+	    fprintf (stderr, "Could not open %s for writing\n", outputname);
+	    exit (EXIT_FAILURE);
+	  }
+      }
+
+    /* Print command line to output */
+    fprintf (output, "# %s.r%s", argv[0], REV);
+    for (i = 1; i < argc; i++)
+      fprintf (output, " %s", argv[i]);
+    fprintf (output, "\n");
+
     if (polyfilename == NULL || fbfilename == NULL || q0 == 0)
-      usage (argv0);
+      usage (argv0[0]);
 
     /* if -rho is given, we sieve only for q0, thus -q1 is not allowed */
     if (rho != 0 && q1 != 0)
@@ -2785,13 +2810,13 @@ main (int argc, char *argv[])
       cpoly->rlambda = rlambda;
     if (alambda != 0.0)
       cpoly->alambda = alambda;
-    fprintf (stderr, "# Sieving parameters: rlim=%lu alim=%lu lpbr=%d lpba=%d\n",
+    fprintf (output, "# Sieving parameters: rlim=%lu alim=%lu lpbr=%d lpba=%d\n",
              cpoly->rlim, cpoly->alim, cpoly->lpbr, cpoly->lpba);
-    fprintf (stderr, "#                     mfbr=%d mfba=%d rlambda=%1.1f alambda=%1.1f\n",
+    fprintf (output, "#                     mfbr=%d mfba=%d rlambda=%1.1f alambda=%1.1f\n",
              cpoly->mfbr, cpoly->mfba, cpoly->rlambda, cpoly->alambda);
 
     /* this does not depend on the special-q */
-    sieve_info_init (&si, cpoly, I, q0);
+    sieve_info_init (&si, cpoly, I, q0, output);
     si.checknorms = checknorms;
     if (bucket_thresh > si.bucket_thresh)
       si.bucket_thresh = bucket_thresh;
@@ -2804,7 +2829,9 @@ main (int argc, char *argv[])
 				leading_div);
       ASSERT_ALWAYS(fb_alg != NULL);
       tfb = seconds () - tfb;
-      fprintf (stderr, "# Reading algebraic factor base of %zuMb took %1.1fs\n", fb_size (fb_alg) >> 20, tfb);
+      fprintf (output, 
+               "# Reading algebraic factor base of %zuMb took %1.1fs\n", 
+               fb_size (fb_alg) >> 20, tfb);
       free (leading_div);
       // fb_fprint (stderr, fb_alg);
     }
@@ -2812,9 +2839,9 @@ main (int argc, char *argv[])
     /* Prepare rational factor base */
     tfb = seconds ();
     fb_rat = fb_make_linear (cpoly->g, (fbprime_t) cpoly->rlim,
-                             si.scale_rat * LOG_SCALE, verbose, 1);
+                             si.scale_rat * LOG_SCALE, verbose, 1, output);
     tfb = seconds () - tfb;
-    fprintf (stderr, "# Creating rational factor base of %zuMb took %1.1fs\n",
+    fprintf (output, "# Creating rational factor base of %zuMb took %1.1fs\n",
              fb_size (fb_rat) >> 20, tfb);
 
     init_rat_norms (&si);
@@ -2850,7 +2877,7 @@ main (int argc, char *argv[])
     tot_reports = 0;
     tn_rat = tn_alg = tts = ttsm = ttf = 0.0;
     t0 = seconds ();
-    fprintf (stderr, "#\n");
+    fprintf (output, "#\n");
     while (q0 < q1)
       {
         while (nroots == 0) /* go to next prime and generate roots */
@@ -2862,11 +2889,11 @@ main (int argc, char *argv[])
             nroots = poly_roots_uint64 (roots, cpoly->f, cpoly->degree, q0);
             if (nroots > 0)
               {
-                fprintf (stderr, "### q=%" PRIu64 ": root%s", q0,
+                fprintf (output, "### q=%" PRIu64 ": root%s", q0,
                          (nroots == 1) ? "" : "s");
                 for (i = 1; i <= (int) nroots; i++)
-                  fprintf (stderr, " %" PRIu64, roots[nroots-i]);
-                fprintf (stderr, "\n");
+                  fprintf (output, " %" PRIu64, roots[nroots-i]);
+                fprintf (output, "\n");
               }
           }
         tq = seconds ();
@@ -2881,7 +2908,7 @@ main (int argc, char *argv[])
         /* if (skewness (&si) > 32.0)
            continue; */
 
-        fprintf (stderr, "# Sieving q=%" PRIu64 "; rho=%" PRIu64
+        fprintf (output, "# Sieving q=%" PRIu64 "; rho=%" PRIu64
                  "; a0=%d; b0=%d; a1=%d; b1=%d\n",
                  si.q, si.rho, si.a0, si.b0, si.a1, si.b1);
         sq ++;
@@ -2889,7 +2916,7 @@ main (int argc, char *argv[])
         fij_from_f (&si, cpoly->f, cpoly->degree);
 
         /* checks the value of J */
-        sieve_info_update (&si, verbose);
+        sieve_info_update (&si, verbose, output);
         totJ += (double) si.J;
 
         /* Allocate alg buckets */
@@ -2910,8 +2937,8 @@ main (int argc, char *argv[])
 
         /* Initialize data for sieving small primes */
         small_sieve_data_t ssd_alg, ssd_rat;
-        init_small_sieve(&ssd_rat, fb_rat, &si, 'r');
-        init_small_sieve(&ssd_alg, fb_alg, &si, 'a');
+        init_small_sieve(&ssd_rat, fb_rat, &si, 'r', output);
+        init_small_sieve(&ssd_alg, fb_alg, &si, 'a', output);
 
 	/* Copy small sieve data for resieving small primes */
 	small_sieve_data_t srsd_alg, srsd_rat;
@@ -2960,7 +2987,7 @@ main (int argc, char *argv[])
                                          fb_alg, cpoly, &si, &survivors1,
 					 &survivors2, &srsd_alg, &srsd_rat,
 					 report_sizes_a, report_sizes_r,
-					 rat_S);
+					 rat_S, output);
             ttf += seconds ();
         }
         clear_small_sieve(ssd_rat);
@@ -2970,13 +2997,13 @@ main (int argc, char *argv[])
         tot_reports += reports;
         if (verbose)
           {
-            fprintf (stderr, "# %lu survivors after rational sieve,",
+            fprintf (output, "# %lu survivors after rational sieve,",
                      survivors0);
-            fprintf (stderr, " %lu survivors after algebraic sieve, ",
+            fprintf (output, " %lu survivors after algebraic sieve, ",
                      survivors1);
-            fprintf (stderr, "coprime: %lu\n", survivors2);
+            fprintf (output, "coprime: %lu\n", survivors2);
           }
-        fprintf (stderr, "# %d relation(s) for (%" PRIu64 ",%" PRIu64
+        fprintf (output, "# %d relation(s) for (%" PRIu64 ",%" PRIu64
                  "), total %lu [%1.3fs/r]\n#\n", reports, si.q, si.rho,
                  tot_reports, (seconds () - t0) / (double) tot_reports);
         clear_bucket_array(alg_BA);
@@ -2988,28 +3015,28 @@ main (int argc, char *argv[])
 
  end:
     t0 = seconds () - t0;
-    fprintf (stderr, "# Average J=%1.0f for %lu special-q's\n",
+    fprintf (output, "# Average J=%1.0f for %lu special-q's\n",
              totJ / (double) sq, sq);
     tts = t0 - (tn_rat + tn_alg + ttf);
     if (verbose)
-      facul_print_stats (stderr);
+      facul_print_stats (output);
     if (verbose)
       {
-        fprintf (stderr, "# Histogram of sieve report values that led to "
+        fprintf (output, "# Histogram of sieve report values that led to "
                  "relations:\n# Algebraic side: ");
         for (i = 0; i < 256; i++)
           if (report_sizes_a[i] > 0)
-            fprintf (stderr, "%d:%lu ", i, report_sizes_a[i]);
-        fprintf (stderr, "\n# Rational side: ");
+            fprintf (output, "%d:%lu ", i, report_sizes_a[i]);
+        fprintf (output, "\n# Rational side: ");
         for (i = 0; i < 256; i++)
           if (report_sizes_r[i] > 0)
-            fprintf (stderr, "%d:%lu ", i, report_sizes_r[i]);
-        fprintf (stderr, "\n");
+            fprintf (output, "%d:%lu ", i, report_sizes_r[i]);
+        fprintf (output, "\n");
       }
-    fprintf (stderr, "# Total time %1.1fs [norm %1.2f+%1.1f, sieving %1.1f"
+    fprintf (output, "# Total time %1.1fs [norm %1.2f+%1.1f, sieving %1.1f"
             " (%1.1f + %1.1f),"
              " factor %1.1f]\n", t0, tn_rat, tn_alg, tts, ttsm, tts-ttsm, ttf);
-    fprintf (stderr, "# Total %lu reports [%1.3fs/r, %1.1fr/sq]\n",
+    fprintf (output, "# Total %lu reports [%1.3fs/r, %1.1fr/sq]\n",
              tot_reports, t0 / (double) tot_reports,
              (double) tot_reports / (double) sq);
 
@@ -3024,6 +3051,9 @@ main (int argc, char *argv[])
     sieve_info_clear (&si);
     cado_poly_clear (cpoly);
     free (roots);
+
+    if (outputname != NULL)
+      gzip_close (output, "");
 
     return 0;
 }

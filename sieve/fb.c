@@ -150,7 +150,7 @@ fb_init_firstlog (factorbase_t fb)
 
 factorbase_degn_t *
 fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale, 
-		const int verbose, const int projective)
+		const int verbose, const int projective, FILE *output)
 {
   fbprime_t p;
   factorbase_degn_t *fb = NULL, *fb_cur, *fb_new;
@@ -166,7 +166,7 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
   fb_cur->size = fb_entrysize_uc (1);
 
   if (verbose)
-    gmp_fprintf (stderr, 
+    gmp_fprintf (output, 
 		"# Making factor base for polynomial g(x) = %Zd * x + %Zd\n",
 		poly[1], poly[0]);
 
@@ -208,10 +208,10 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
 	    {
 	      if (!had_proj_root)
 		{
-		  fprintf (stderr, "# Primes with projective roots:");
+		  fprintf (output, "# Primes with projective roots:");
 		  had_proj_root = 1;
 		}
-	      fprintf (stderr, " " FBPRIME_FORMAT , p);
+	      fprintf (output, " " FBPRIME_FORMAT , p);
 	    }
 	  fb_cur->roots[0] = p; /* The root is 1/0, which we store as 0/1 + p */
 	  if (p % 2 != 0)
@@ -277,7 +277,7 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
   free (fb_cur);
 
   if (had_proj_root)
-    fprintf (stderr, "\n");
+    fprintf (output, "\n");
 
   rdtscll (tsc2);
 
