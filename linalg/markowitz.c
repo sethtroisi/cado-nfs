@@ -234,7 +234,7 @@ MkzCheck(sparse_mat_t *mat)
 }
 
 int
-MkzCount(sparse_mat_t *mat, INT j)
+MkzCount1(sparse_mat_t *mat, INT j)
 {
     int mkz, k, i;
     INT ind[MERGE_LEVEL_MAX];
@@ -271,6 +271,47 @@ MkzCount(sparse_mat_t *mat, INT j)
     return mkz;
 }
 
+// forcing lighter columns first.
+int
+MkzCount(sparse_mat_t *mat, INT j)
+{
+    int mkz, k, i, wj, cte;
+    INT ind[MERGE_LEVEL_MAX];
+    double tfill, tMST;
+
+#if MKZ_TIMINGS
+    double tt = seconds();
+#endif
+    // trick to be sure that columns with wt <= 2 are treated asap
+    wj = mat->wt[GETJ(mat, j)];
+    cte = mat->ncols; // could be smaller
+    if(wj == 1)
+	return cte;
+    else if(wj == 2){
+	fillTabWithRowsForGivenj(ind, mat, j);
+	// the more this is < 0, the less the weight is
+	return 2 * cte + weightSum(mat, ind[0], ind[1]);
+    }
+    else if(wj <= mat->wmstmax){
+	fillTabWithRowsForGivenj(ind, mat, j);
+	mkz = minCostUsingMST(mat, mat->wt[GETJ(mat, j)], ind, &tfill, &tMST);
+	return wj * cte + mkz;
+    }
+    // real traditional Markowitz count
+    mkz = mat->nrows;
+    for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
+	if((i = mat->R[GETJ(mat, j)][k]) != -1){
+	    // this should be the weight of row i
+	    if(mat->rows[i][0] < mkz)
+		mkz = mat->rows[i][0];
+	}
+    mkz = wj * cte + (mkz-1) * (wj-1);
+#if MKZ_TIMINGS
+    tmkzcount += (seconds()-tt);
+#endif
+    return mkz;
+}
+
 void
 MkzInit(sparse_mat_t *mat)
 {
@@ -280,7 +321,8 @@ MkzInit(sparse_mat_t *mat)
 #if MKZ_TIMINGS
     tmkzup = tmkzdown = tmkzupdown = tmkzcount = 0.0;
 #endif
-    fprintf(stderr, "Entering initMarkowitz (wmstmax=%d)\n", mat->wmstmax);
+    fprintf(stderr, "Entering initMarkowitz");
+    fprintf(stderr, " (wmstmax=%d, rnd=%d)\n", mat->wmstmax, mat->mkzrnd);
     // compute number of elligible columns in the heap
     for(j = mat->jmin; j < mat->jmax; j++)
 	if(mat->wt[GETJ(mat, j)] > 0)

@@ -38,6 +38,7 @@ typedef struct {
   INT *MKZQ;         /* priority queue for Markowitz stuff */    
   INT *MKZA;         /* MKZA[j] gives u s.t. MKZQ[u] = j */ 
   int wmstmax;
+  int mkzrnd;      /* to randomize things */
 #endif
 } sparse_mat_t;
 
