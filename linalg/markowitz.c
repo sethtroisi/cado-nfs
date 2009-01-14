@@ -7,6 +7,7 @@
 #include "sparse.h"
 #include "dclist.h"
 #include "sparse_mat.h"
+#include "mst.h"
 #include "report.h"
 #include "markowitz.h"
 
@@ -141,6 +142,16 @@ MkzPopQueue(INT *dj, INT *mkz, INT *Q, INT *A)
 {
     *dj = MkzGet(Q, 1, 0);
     *mkz = MkzGet(Q, 1, 1);
+#if 0 // to see what happens
+    {
+	int i;
+
+	for(i = 2; i <= Q[0]; i++)
+	    if(MkzGet(Q, i, 1) != *mkz)
+		break;
+	printf("N(mkz=%d)=%d\n", *mkz, i);
+    }
+#endif
     A[*dj] = MKZ_INF;
     MkzAssign(Q, A, 1, Q[0]);
     Q[0]--;
@@ -232,7 +243,7 @@ MkzCount(sparse_mat_t *mat, INT j)
 #if MKZ_TIMINGS
     double tt = seconds();
 #endif
-    // trick to be sure that these two guys are treated asap
+    // trick to be sure that columns with wt <= 2 are treated asap
     if(mat->wt[GETJ(mat, j)] == 1)
 	return 1-2*mat->ncols;
     else if(mat->wt[GETJ(mat, j)] == 2){
@@ -240,7 +251,7 @@ MkzCount(sparse_mat_t *mat, INT j)
 	// the more this is < 0, the less the weight is
 	return weightSum(mat, ind[0], ind[1])-2*mat->ncols;
     }
-    else if(mat->wt[GETJ(mat, j)] <= 3){
+    else if(mat->wt[GETJ(mat, j)] <= mat->wmstmax){
 	fillTabWithRowsForGivenj(ind, mat, j);
 	mkz = minCostUsingMST(mat, mat->wt[GETJ(mat, j)], ind, &tfill, &tMST);
 	return mkz - mat->ncols;
@@ -269,7 +280,7 @@ MkzInit(sparse_mat_t *mat)
 #if MKZ_TIMINGS
     tmkzup = tmkzdown = tmkzupdown = tmkzcount = 0.0;
 #endif
-    fprintf(stderr, "Entering initMarkowitz\n");
+    fprintf(stderr, "Entering initMarkowitz (wmstmax=%d)\n", mat->wmstmax);
     // compute number of elligible columns in the heap
     for(j = mat->jmin; j < mat->jmax; j++)
 	if(mat->wt[GETJ(mat, j)] > 0)
@@ -283,7 +294,7 @@ MkzInit(sparse_mat_t *mat)
     for(j = mat->jmin; j < mat->jmax; j++)
 	if(mat->wt[GETJ(mat, j)] > 0){
 	    mkz = MkzCount(mat, j);
-#if MKZ_DEBUG >= 2
+#if MKZ_DEBUG >= 1
 	    printf("j=%d wt=%d", j, mat->wt[GETJ(mat, j)]);
 	    printf(" => mkz=%d\n", mkz);
 #endif

@@ -37,6 +37,7 @@ typedef struct {
 #else
   INT *MKZQ;         /* priority queue for Markowitz stuff */    
   INT *MKZA;         /* MKZA[j] gives u s.t. MKZQ[u] = j */ 
+  int wmstmax;
 #endif
 } sparse_mat_t;
 

@@ -47,6 +47,9 @@ main(int argc, char *argv[])
     double tt;
     double ratio = 1.1; /* bound on cN_new/cN to stop the computation */
     int i, forbw = 0, coverNmax = 0;
+#ifdef USE_MARKOWITZ
+    int wmstmax = 7; /* use real MST minimum for wt[j] <= wmstmax */
+#endif
 
     fprintf (stderr, "%s.r%s", argv[0], REV);
     for (i = 1; i < argc; i++)
@@ -120,9 +123,16 @@ main(int argc, char *argv[])
 	    argc -= 2;
 	    argv += 2;
 	}
+#ifdef USE_MARKOWITZ
+	else if (argc > 2 && strcmp (argv[1], "-wmstmax") == 0){
+	    wmstmax = atoi(argv[2]);
+	    argc -= 2;
+	    argv += 2;
+	}
+#endif
 	else
 	  {
-	    fprintf (stderr, "Error, unknow option %s\n", argv[1]);
+	    fprintf (stderr, "Error, unknown option %s\n", argv[1]);
 	    exit (1);
 	  }
     }
@@ -185,7 +195,10 @@ main(int argc, char *argv[])
 #endif
 
 #ifdef USE_MARKOWITZ
+    mat.wmstmax = wmstmax;
+    tt = seconds();
     MkzInit(&mat);
+    fprintf(stderr, "Time for MkzInit: %2.2lf\n", seconds()-tt);
 #endif
 
 #if M_STRATEGY <= 2
