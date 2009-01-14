@@ -68,7 +68,7 @@ UTILS_FILES=utils/utils.h utils/mod_ul.h utils/fpoly.h utils/getprime.h \
 	   utils/mod_ul_default.h utils/modredc_ul.c \
 	   utils/modredc_ul_default.h utils/modredc_15ul.c \
 	   utils/mpz_array.h utils/mpz_array.c utils/modredc_15ul_default.h \
-	   utils/check_rels.c
+	   utils/check_rels.c utils/gzip.c utils/gzip.h
 SIEVE_FILES=sieve/Makefile sieve/makefb.c sieve/las.c sieve/bucket.h \
            sieve/fb.h sieve/basicnt.h sieve/trialdiv.h sieve/fb.c \
 	   sieve/config_h.in sieve/trialdiv.c
@@ -79,8 +79,8 @@ SIEVE_ECM_FILES=sieve/ecm/Makefile sieve/ecm/facul.h sieve/ecm/ecm.c \
 	   sieve/ecm/facul_doit.c sieve/ecm/facul_doit.h sieve/ecm/stage2.c \
 	   sieve/ecm/facul.c
 LINALG_FILES=linalg/Makefile linalg/freerel.c linalg/hashpair.h \
-           linalg/hashpair.c linalg/duplicates.c linalg/files.h linalg/gzip.h \
-	   linalg/files.c linalg/gzip.c linalg/purge.c linalg/merge.c \
+           linalg/hashpair.c linalg/duplicates.c linalg/files.h \
+	   linalg/files.c linalg/purge.c linalg/merge.c \
 	   linalg/sparse.h linalg/merge_mono.h linalg/sparse.c \
 	   linalg/merge_mono.c linalg/replay.c \
 	   linalg/transpose.c linalg/readmat.h linalg/readmat.c \
