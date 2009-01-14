@@ -50,7 +50,9 @@ clear_relation (relation_t *rel)
 // Stores the primes into the relation, by collecting identical primes
 // and setting the corresponding exponents. Thus a given prime will
 // appear only once in rel (but it can appear with an even exponent).
-/* Assumes identical primes are consecutive. */
+/* Assumes identical primes are consecutive, except possibly for the special-q
+   on the algebraic side, which is assumed to be in last position, and can
+   appear in another position. */
 int
 read_relation (relation_t *rel, const char *str)
 {
@@ -134,11 +136,25 @@ read_relation (relation_t *rel, const char *str)
           fprintf (stderr, "warning: failed reading alg prime %d\n", i);
           return 0;
         }
-      /* we assume identical primes are consecutive */
+      /* we assume identical primes are consecutive, except possibly the
+         special-q, which appears last, and may appear in another position */
       if (j > 0 && rel->ap[j - 1].p == p)
         rel->ap[j - 1].e ++;
+      else if (i == rel->nb_ap - 1) /* special-q */
+        {
+          int k;
+          for (k = 0; k < j; k++)
+            if (rel->ap[k].p == p)
+              {
+                rel->ap[k].e ++;
+                break;
+              }
+          if (k == j) /* not found */
+            goto new_prime;
+        }
       else /* new prime */
         {
+        new_prime:
           rel->ap[j].p = p;
           rel->ap[j].e = 1;
           j ++;
@@ -260,6 +276,39 @@ fprint_relation(FILE *file, relation_t rel) {
     }
   fprintf (file, "%lx\n", rel.ap[rel.nb_ap-1].p);
   ASSERT (rel.ap[rel.nb_ap-1].e == 1);
+}
+
+/* same as fprint_relation, but exponents > 1 are allowed */
+void
+fprint_relation_raw (FILE *file, relation_t rel)
+{
+  int i, j;
+
+  fprintf (file, "%ld,%lu:", rel.a, rel.b);
+  for (i = 0; i < rel.nb_rp; ++i)
+    {
+      ASSERT (rel.rp[i].e >= 1);
+      for (j = 0; j < rel.rp[i].e; j++)
+        {
+          fprintf (file, "%lx", rel.rp[i].p);
+          if (i + 1 != rel.nb_rp || j + 1 != rel.rp[i].e)
+            fprintf (file, ",");
+          else
+            fprintf (file, ":");
+        }
+    }
+  for (i = 0; i < rel.nb_ap; ++i)
+    {
+      ASSERT (rel.ap[i].e >= 1);
+      for (j = 0; j < rel.ap[i].e; j++)
+        {
+          fprintf (file, "%lx", rel.ap[i].p);
+          if (i + 1 != rel.nb_ap || j + 1 != rel.ap[i].e)
+            fprintf (file, ",");
+          else
+            fprintf (file, "\n");
+        }
+    }
 }
 
 /* reduces exponents mod 2, and discards primes with even exponent */
