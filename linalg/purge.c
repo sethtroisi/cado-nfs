@@ -651,10 +651,14 @@ renumber (int *nprimes, hashtable_t *H, char *sos)
 }
 
 /* Read again the relation files ficname[0], ..., ficname[nbfic-1],
-   and output remaining relations (those with rel_used[i] <> 0) in ofile. */
+   and output remaining relations (those with rel_used[i] <> 0) in ofile.
+
+   If raw is non-zero, output relations in CADO format
+   (otherwise in format used by merge).
+*/
 static void
 reread (char *oname, char *ficname[], unsigned int nbfic,
-        hashtable_t *H, char *rel_used, int nrows, int ncols)
+        hashtable_t *H, char *rel_used, int nrows, int ncols, int raw)
 {
   FILE *file, *ofile;
   relation_t rel;
@@ -664,7 +668,8 @@ reread (char *oname, char *ficname[], unsigned int nbfic,
   double W = 0.0; /* total weight */
 
   ofile = gzip_open (oname, "w");
-  fprintf (ofile, "%d %d\n", nrows, ncols);
+  if (raw == 0)
+    fprintf (ofile, "%d %d\n", nrows, ncols);
   fprintf (stderr, "Final pass:\n");
   for (i = 0; i < nbfic; i++)
     {
@@ -687,12 +692,17 @@ reread (char *oname, char *ficname[], unsigned int nbfic,
             if (rel_used[irel])
               {
                 read_relation (&rel, str);
-                if (rel.b > 0)
+                if (raw == 0)
                   {
-                    reduce_exponents_mod2 (&rel);
-                    computeroots (&rel);
+                    if (rel.b > 0)
+                      {
+                        reduce_exponents_mod2 (&rel);
+                        computeroots (&rel);
+                      }
+                    W += (double) fprint_rel_row (ofile, irel, rel, H);
                   }
-                W += (double) fprint_rel_row (ofile, irel, rel, H);
+                else
+                  fprint_relation_raw (ofile, rel);
                 nr++;
                 if (nr >= nrows)
                   ret = 0; /* we are done */
@@ -704,7 +714,8 @@ reread (char *oname, char *ficname[], unsigned int nbfic,
     }
   gzip_close (ofile, oname);
   /* write excess to stdout */
-  printf ("WEIGHT: %1.0f WEIGHT*NROWS=%1.2e\n", W, W * (double) nr);
+  if (raw == 0)
+    printf ("WEIGHT: %1.0f WEIGHT*NROWS=%1.2e\n", W, W * (double) nr);
   printf ("EXCESS: %d\n", nrows - ncols);
 }
 
@@ -719,6 +730,7 @@ usage (void)
   fprintf (stderr, "       -minpr   nnn - purge rat. primes >= nnn (default rlim)\n");
   fprintf (stderr, "       -nprimes nnn - expected number of prime ideals\n");
   fprintf (stderr, "       -sos sosfile - to keep track of the renumbering\n");
+  fprintf (stderr, "       -raw         - output relations in CADO format\n");
   exit (1);
 }
 
@@ -749,6 +761,7 @@ main (int argc, char **argv)
     unsigned long tot_alloc, tot_alloc0;
     int need64 = 0; /* non-zero if large primes are > 2^32 */
     int final, pass = 0;
+    int raw = 0;
 
     fprintf (stderr, "%s.r%s", argv[0], REV);
     for (k = 1; k < argc; k++)
@@ -791,15 +804,20 @@ main (int argc, char **argv)
 	    argc -= 2;
 	    argv += 2;
 	}
-	else if(argc > 1 && strcmp (argv[1], "-sos") == 0){
+	else if(argc > 2 && strcmp (argv[1], "-sos") == 0){
 	    sos = argv[2];
 	    argc -= 2;
 	    argv += 2;
 	}
-	else if(argc > 1 && strcmp (argv[1], "-out") == 0){
+	else if(argc > 2 && strcmp (argv[1], "-out") == 0){
 	    purgedname = argv[2];
 	    argc -= 2;
 	    argv += 2;
+	}
+	else if(argc > 1 && strcmp (argv[1], "-raw") == 0){
+            raw = 1;
+	    argc --;
+	    argv ++;
 	}
         else
           {
@@ -934,7 +952,7 @@ main (int argc, char **argv)
 
     /* reread the relation files and convert them to the new coding */
     fprintf (stderr, "Storing remaining relations...\n");
-    reread (purgedname, fic, nfic, &H, rel_used, nrel_new, nprimes_new);
+    reread (purgedname, fic, nfic, &H, rel_used, nrel_new, nprimes_new, raw);
 
     hashFree (&H);
     free (rel_used);
