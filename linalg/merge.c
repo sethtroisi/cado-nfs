@@ -50,6 +50,7 @@ main(int argc, char *argv[])
 #ifdef USE_MARKOWITZ
     int wmstmax = 7; /* use real MST minimum for wt[j] <= wmstmax */
     int mkzrnd = 0;
+    int mkztype = 2;
 #endif
     int itermax = 0;
 
@@ -136,6 +137,11 @@ main(int argc, char *argv[])
 	    argc -= 2;
 	    argv += 2;
 	}
+	else if (argc > 2 && strcmp (argv[1], "-mkztype") == 0){
+	    mkztype = atoi(argv[2]);
+	    argc -= 2;
+	    argv += 2;
+	}
 #endif
 	else if (argc > 2 && strcmp (argv[1], "-itermax") == 0){
 	    itermax = atoi(argv[2]);
@@ -210,6 +216,7 @@ main(int argc, char *argv[])
 #ifdef USE_MARKOWITZ
     mat.wmstmax = wmstmax;
     mat.mkzrnd = mkzrnd;
+    mat.mkztype = mkztype;
     tt = seconds();
     MkzInit(&mat);
     fprintf(stderr, "Time for MkzInit: %2.2lf\n", seconds()-tt);

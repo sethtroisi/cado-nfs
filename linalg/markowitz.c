@@ -246,11 +246,16 @@ MkzCheck(sparse_mat_t *mat)
 }
 
 int
-MkzCount1(sparse_mat_t *mat, INT j)
+Cavallar(sparse_mat_t *mat, INT j)
+{
+    return abs(mat->wt[GETJ(mat, j)]);
+}
+
+int
+pureMkz(sparse_mat_t *mat, INT j)
 {
     int mkz, k, i;
     INT ind[MERGE_LEVEL_MAX];
-    double tfill, tMST;
 
 #if MKZ_TIMINGS
     double tt = seconds();
@@ -262,11 +267,6 @@ MkzCount1(sparse_mat_t *mat, INT j)
 	fillTabWithRowsForGivenj(ind, mat, j);
 	// the more this is < 0, the less the weight is
 	return weightSum(mat, ind[0], ind[1])-2*mat->ncols;
-    }
-    else if(mat->wt[GETJ(mat, j)] <= mat->wmstmax){
-	fillTabWithRowsForGivenj(ind, mat, j);
-	mkz = minCostUsingMST(mat, mat->wt[GETJ(mat, j)], ind, &tfill, &tMST);
-	return mkz - mat->ncols;
     }
     // real traditional Markowitz count
     mkz = mat->nrows;
@@ -285,7 +285,7 @@ MkzCount1(sparse_mat_t *mat, INT j)
 
 // forcing lighter columns first.
 int
-MkzCount(sparse_mat_t *mat, INT j)
+lightColAndMkz(sparse_mat_t *mat, INT j)
 {
     int mkz, k, i, wj, cte;
     INT ind[MERGE_LEVEL_MAX];
@@ -324,6 +324,20 @@ MkzCount(sparse_mat_t *mat, INT j)
     return mkz;
 }
 
+int
+MkzCount(sparse_mat_t *mat, INT j)
+{
+    switch(mat->mkztype){
+    case 2:
+	return lightColAndMkz(mat, j);
+    case 1:
+	return pureMkz(mat, j);
+    case 0:
+    default:
+	return Cavallar(mat, j);
+    }
+}
+
 void
 MkzInit(sparse_mat_t *mat)
 {
@@ -334,7 +348,8 @@ MkzInit(sparse_mat_t *mat)
     tmkzup = tmkzdown = tmkzupdown = tmkzcount = 0.0;
 #endif
     fprintf(stderr, "Entering initMarkowitz");
-    fprintf(stderr, " (wmstmax=%d, rnd=%d)\n", mat->wmstmax, mat->mkzrnd);
+    fprintf(stderr, " (wmstmax=%d, rnd=%d", mat->wmstmax, mat->mkzrnd);
+    fprintf(stderr, ", type=%d)\n", mat->mkztype);
     // compute number of elligible columns in the heap
     for(j = mat->jmin; j < mat->jmax; j++)
 	if(mat->wt[GETJ(mat, j)] > 0)

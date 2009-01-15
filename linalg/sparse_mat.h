@@ -39,6 +39,7 @@ typedef struct {
   INT *MKZA;         /* MKZA[j] gives u s.t. MKZQ[u] = j */ 
   int wmstmax;
   int mkzrnd;        /* to randomize things */
+  int mkztype;       /* which type of count */
 #endif
   int itermax;       /* used for performing some sampling */
 } sparse_mat_t;
