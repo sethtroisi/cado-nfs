@@ -18,6 +18,9 @@
   02111-1307, USA.
 */
 
+/* define the INTEL_AVX macro if you want to use the PCLMULQDQ assembly
+   instruction */
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -62,8 +65,15 @@ int main(int argc, char *argv[])
 "#include \"gf2x.h\"\n"
 "\n");
 
+#ifdef INTEL_AVX
+    printf("\n#include \"mul1_avx.c\"\n");
+#endif
+
     for (fn = 0; fn < 3; fn++) {
 	if (fn == 0) {
+#ifdef INTEL_AVX
+          continue;
+#endif
 	    printf("static inline void\n");
 	    printf("mul1 (ulong *c, ulong a, ulong b)\n");
 	} else if (fn == 1) {
