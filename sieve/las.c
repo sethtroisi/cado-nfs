@@ -2760,9 +2760,9 @@ main (int argc0, char *argv0[])
       }
 
     /* Print command line to output */
-    fprintf (output, "# %s.r%s", argv[0], REV);
-    for (i = 1; i < argc; i++)
-      fprintf (output, " %s", argv[i]);
+    fprintf (output, "# %s.r%s", argv0[0], REV);
+    for (i = 1; i < argc0; i++)
+      fprintf (output, " %s", argv0[i]);
     fprintf (output, "\n");
 
     if (polyfilename == NULL || fbfilename == NULL || q0 == 0)
