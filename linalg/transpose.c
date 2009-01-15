@@ -116,8 +116,8 @@ void rebuild(int skip)
 {
     FILE * fout;
     FILE ** fin_vchunks;
-    unsigned int i, j;
-    int ret;
+    unsigned int i, j, lastsize, minskip = UINT_MAX, maxskip = 0;
+    int ret, skip0 = skip;
 
     fout = fopen(filename_out, "w");
     BUG_ON_MSG(fout == NULL, "Cannot open output matrix");
@@ -161,7 +161,17 @@ void rebuild(int skip)
         }
         for(k = 0 ; k < kmax ; k++) {
             unsigned int c;
+            if (k > 0 && rows[k]->size > lastsize)
+              {
+                fprintf (stderr, "Error, matrix rows are not in decreasing weight\n");
+                exit (1);
+              }
+            lastsize = rows[k]->size;
 	    if(skip > 0){
+                if (lastsize > maxskip)
+                  maxskip = lastsize;
+                if (lastsize < minskip)
+                  minskip = lastsize;
 		skip--;
 		continue;
 	    }
@@ -183,6 +193,8 @@ void rebuild(int skip)
         unlink(dstfile);
     }
     free(fin_vchunks);
+    fprintf (stderr, "Skipped %d rows of weight %d to %d\n",
+             skip0, minskip, maxskip);
 }
 
 
