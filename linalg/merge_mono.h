@@ -1,3 +1,4 @@
+extern void removeColDefinitely(report_t *rep, sparse_mat_t *mat, INT j);
 extern void removeCellAndUpdate(sparse_mat_t *mat, int i, INT j);
 extern void destroyRow(sparse_mat_t *mat, int i);
 extern int removeSingletons(report_t *rep, sparse_mat_t *mat);

@@ -12,6 +12,9 @@ init_rep(report_t *rep, char *outname, sparse_mat_t *mat, int type, int bufsize)
     INT** tmp, i;
 
     rep->type = type;
+    if(type == 2)
+	// do nothing...!
+	return;
     rep->outfile = gzip_open(outname, "w");
     switch(type){
     case 0:
@@ -41,6 +44,8 @@ reportn(report_t *rep, INT *ind, int n)
 #if DEBUG >= 1
     fprintf(stderr, "Reporting for n=%d\n", n);
 #endif
+    if(rep->type == 2)
+	return;
     if(rep->type == 0){
 	for(i = 0; i < n; i++){
 	    fprintf(rep->outfile, "%ld", (long int) ind[i]);
