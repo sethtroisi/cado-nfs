@@ -245,7 +245,7 @@ treatDep(char *ratname, char *algname, char *relname, char *purgedname, char *in
     for(i = 0; i < small_nrows; i++){
 	fscanf(indexfile, "%d", &nrel);
 	for(j = 0; j < nrel; j++){
-	    fscanf(indexfile, "%d", &r);
+	    fscanf(indexfile, PURGE_INT_FORMAT, &r);
 	    if(small_row_used[i]){
 #if DEBUG >= 1
 		fprintf(stderr, "# Small[%d] -> %d\n", i, r);

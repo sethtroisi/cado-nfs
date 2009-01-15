@@ -249,7 +249,7 @@ buildCharacterMatrix(char **charmat, int k, alg_prime_t * tabchar,
                     i, small_nrows, seconds());
         fscanf(indexfile, "%d", &nr);
         for (j = 0; j < nr; j++) {
-            fscanf(indexfile, "%d", &r);
+            fscanf(indexfile, PURGE_INT_FORMAT, &r);
             for (kk = 0; kk < k; kk++)
                 charmat[i][kk] *= charbig[r][kk];
         }

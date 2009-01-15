@@ -280,8 +280,10 @@ makeIndexFile(char *indexname, int nrows, int **newrows, int small_nrows, int sm
     for(i = 0; i < nrows; i++)
 	if(newrows[i] != NULL){
 	    fprintf(indexfile, "%d", newrows[i][0]);
-	    for(j = 1; j <= newrows[i][0]; j++)
-		fprintf(indexfile, " %d", newrows[i][j]);
+	    for(j = 1; j <= newrows[i][0]; j++){
+		fprintf(indexfile, " ");
+		fprintf(indexfile, PURGE_INT_FORMAT, newrows[i][j]);
+	    }
 	    fprintf(indexfile, "\n");
 	}
     gzip_close(indexfile, indexname);

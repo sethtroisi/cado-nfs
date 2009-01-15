@@ -51,6 +51,7 @@ main(int argc, char *argv[])
     int wmstmax = 7; /* use real MST minimum for wt[j] <= wmstmax */
     int mkzrnd = 0;
 #endif
+    int itermax = 0;
 
     fprintf (stderr, "%s.r%s", argv[0], REV);
     for (i = 1; i < argc; i++)
@@ -136,6 +137,11 @@ main(int argc, char *argv[])
 	    argv += 2;
 	}
 #endif
+	else if (argc > 2 && strcmp (argv[1], "-itermax") == 0){
+	    itermax = atoi(argv[2]);
+	    argc -= 2;
+	    argv += 2;
+	}
 	else
 	  {
 	    fprintf (stderr, "Error, unknown option %s\n", argv[1]);
@@ -165,7 +171,7 @@ main(int argc, char *argv[])
     fprintf(stderr, "Time for initMat: %2.2lf\n", seconds()-tt);
 
     tt = seconds();
-    initWeightFromFile(&mat, purgedfile);
+    initWeightFromFile(&mat, purgedfile, 1);
     fprintf(stderr, "Time for initWeightFromFile: %2.2lf\n", seconds()-tt);
     gzip_close(purgedfile, purgedname);
 
@@ -181,7 +187,7 @@ main(int argc, char *argv[])
     
     purgedfile = gzip_open(purgedname, "r");
     ASSERT_ALWAYS(purgedfile != NULL);
-    readmat(&mat, purgedfile);
+    readmat(&mat, purgedfile, 1);
     gzip_close(purgedfile, purgedname);
 #if DEBUG >= 3
     checkmat(&mat);
@@ -200,6 +206,7 @@ main(int argc, char *argv[])
     fprintf(stderr, "WARNING: forcing forbw=0...!!!!\n");
 #endif
 
+    mat.itermax = itermax;
 #ifdef USE_MARKOWITZ
     mat.wmstmax = wmstmax;
     mat.mkzrnd = mkzrnd;

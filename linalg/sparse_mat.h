@@ -38,8 +38,9 @@ typedef struct {
   INT *MKZQ;         /* priority queue for Markowitz stuff */    
   INT *MKZA;         /* MKZA[j] gives u s.t. MKZQ[u] = j */ 
   int wmstmax;
-  int mkzrnd;      /* to randomize things */
+  int mkzrnd;        /* to randomize things */
 #endif
+  int itermax;       /* used for performing some sampling */
 } sparse_mat_t;
 
 #ifdef USE_MPI
@@ -47,6 +48,11 @@ typedef struct {
 #else
 #define GETJ(mat, j) (j)
 #endif
+
+extern void initMat(sparse_mat_t *mat, INT jmin, INT jmax);
+extern void initWeightFromFile(sparse_mat_t *mat, FILE *purgedfile, int skipfirst);
+extern void fillmat(sparse_mat_t *mat);
+extern int readmat(sparse_mat_t *mat, FILE *file, int skipfirst);
 
 extern void addRowsWithWeight(sparse_mat_t *mat, int i1, int i2);
 extern void removeWeightFromRow(sparse_mat_t *mat, int i);

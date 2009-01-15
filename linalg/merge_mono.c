@@ -36,193 +36,6 @@
 
 #define USE_CONNECT 0
 
-int 
-cmp(const void *p, const void *q) {
-    int x = *((int *)p);
-    int y = *((int *)q);
-    return (x <= y ? -1 : 1);
-}
-
-// builds Rj[j] for light j's.
-void
-fillmat(sparse_mat_t *mat)
-{
-    INT j, *Rj, jmin = mat->jmin, jmax = mat->jmax;
-
-    for(j = jmin; j < jmax; j++){
-#  if DEBUG >= 2
-	fprintf(stderr, "Treating column %d\n", j);
-#  endif
-	if(mat->wt[GETJ(mat, j)] <= mat->cwmax){
-#ifndef USE_MARKOWITZ
-	    mat->A[GETJ(mat, j)] = dclistInsert(mat->S[mat->wt[GETJ(mat, j)]], j);
-#  if DEBUG >= 2
-	    fprintf(stderr, "Inserting %d in S[%d]:", j, mat->wt[GETJ(mat, j)]);
-	    dclistPrint(stderr, mat->S[mat->wt[GETJ(mat, j)]]->next);
-	    fprintf(stderr, "\n");
-#  endif
-#endif // USE_MARKOWITZ
-#ifndef USE_COMPACT_R
-	    Rj = (INT *)malloc((mat->wt[GETJ(mat, j)]+1) * sizeof(INT));
-	    Rj[0] = 0; // last index used
-	    mat->R[GETJ(mat, j)] = Rj;
-#else
-	    fprintf(stderr, "R: NYI in fillSWAR\n");
-	    exit(1);
-#endif
-	}
-	else{
-#if USE_MERGE_FAST <= 1
-	    mat->wt[GETJ(mat, j)] = -1;
-#else
-	    mat->wt[GETJ(mat, j)] = -mat->wt[GETJ(mat, j)]; // trick!!!
-#endif
-#ifndef USE_MARKOWITZ
-	    mat->A[GETJ(mat, j)] = NULL; // TODO: renumber j's?????
-#endif
-#ifndef USE_COMPACT_R
-	    mat->R[GETJ(mat, j)] = NULL;
-#else
-            fprintf(stderr, "R: NYI2 in fillSWAR\n");
-            exit(1);
-#endif
-	}
-    }
-}
-
-#define BUF_LEN 100
-
-/* Reads a matrix file, and puts in mat->wt[j], 0 <= j < ncols, the
-   weight of column j (adapted from matsort.c).
-
-   We skip columns that are too heavy.
-
-   mat->wt is already filled and put to - values when needed. So don't touch.
-*/
-int
-readmat(sparse_mat_t *mat, FILE *file)
-{
-    int ret;
-    int i, k;
-    int nc, buf[BUF_LEN];
-#if (USE_MERGE_FAST < 3) && !defined(USE_MPI)
-    int nh = 0;
-#endif
-    INT ibuf, j, jmin = mat->jmin, jmax = mat->jmax;
-
-    ret = fscanf (file, "%d %d", &(mat->nrows), &(mat->ncols));
-    ASSERT_ALWAYS (ret == 2);
-    
-    fprintf(stderr, "Reading matrix of %d rows and %d columns: excess is %d\n",
-	    mat->nrows, mat->ncols, mat->nrows - mat->ncols);
-    mat->rem_nrows = mat->nrows;
-    mat->weight = 0;
-
-    for (i = 0; i < mat->nrows; i++){
-	if(!(i % 100000))
-	    fprintf(stderr, "Reading %d-th row\n", i);
-	ret = fscanf(file, "%d", &nc); // unused index to rels file
-	if(ret != 1){
-	    fprintf(stderr, "Pb1 in readmat\n");
-	    return 0;
-	}
-	ret = fscanf (file, "%d", &nc);
-	if(ret != 1){
-	    fprintf(stderr, "Pb2 in readmat\n");
-	    return 0;
-	}
-	if(nc == 0){
-#if USE_TAB == 0
-	    lengthRow(mat, i) = 0;
-	    mat->data[i].val = NULL;
-#else
-	    mat->rows[i] = NULL;
-#endif
-	    mat->rem_nrows--;
-	}
-	else{
-#if (USE_MERGE_FAST < 3) && !defined(USE_MPI)
-	    int nb_heavy_j = 0;
-#endif
-	    for(k = 0, ibuf = 0; k < nc; k++){
-		ret = fscanf(file, PURGE_INT_FORMAT, &j);
-		if(ret != 1){
-		    fprintf(stderr, "Pb3 in readmat: k=%d\n", k);
-		    return 0;
-		}
-		ASSERT_ALWAYS (0 <= j && j < mat->ncols);
-#if (USE_MERGE_FAST < 3) && !defined(USE_MPI)
-		if(mat->wt[GETJ(mat, j)] < 0)
-		    nb_heavy_j++;
-#endif
-#if USE_MERGE_FAST <= 1
-		if(mat->wt[GETJ(mat, j)] > 0)
-		    buf[ibuf++] = j;
-#else
-		// always store j in the right interval...!
-		if((j >= jmin) && (j < jmax)){
-		    buf[ibuf++] = j;
-		    // this will be the weight in the current slice
-		    mat->weight++; 
-		    if(mat->wt[GETJ(mat, j)] > 0){ // redundant test?
-#ifndef USE_COMPACT_R
-			mat->R[GETJ(mat, j)][0]++;
-			mat->R[GETJ(mat, j)][mat->R[GETJ(mat, j)][0]] = i;
-#else
-			fprintf(stderr, "R: NYI in readmat\n");
-			exit(1);
-#endif
-		    }
-		}
-#endif
-	    }
-#if (USE_MERGE_FAST < 3) && !defined(USE_MPI)
-	    if(nb_heavy_j == nc){
-		// all the columns are heavy and thus will never participate
-		mat->rows[i] = NULL;
-		nh++;
-		continue;
-	    }
-#endif
-	    ASSERT_ALWAYS(ibuf <= BUF_LEN);
-	    // TODO: do not store rows not having at least one light
-	    // column, but do not decrease mat->nrows!
-#if USE_TAB == 0
-	    lengthRow(mat, i) = ibuf;
-	    mat->data[i].val = (int*) malloc (ibuf * sizeof (int));
-	    memcpy(mat->data[i].val, buf, ibuf * sizeof(int));
-	    // sort indices in val to ease row merges
-	    qsort(mat->data[i].val, ibuf, sizeof(int), cmp);
-#else
-	    mat->rows[i] = (INT*) malloc ((ibuf+1) * sizeof (INT));
-	    mat->rows[i][0] = ibuf;
-	    memcpy(mat->rows[i]+1, buf, ibuf * sizeof(INT));
-	    // sort indices in val to ease row merges
-            qsort(mat->rows[i]+1, ibuf, sizeof(INT), cmp);
-            /* check all indices are distinct, otherwise this is a bug of
-               purge */
-            for (k = 1; k < ibuf; k++)
-              if (mat->rows[i][k] == mat->rows[i][k+1])
-                {
-                  fprintf (stderr, "Error, duplicate ideal %x in row %i\n",
-                           mat->rows[i][k], i);
-                  exit (1);
-                }
-#endif
-	}
-    }
-#if (USE_MERGE_FAST < 3) && !defined(USE_MPI)
-    fprintf(stderr, "Number of heavy rows: %d\n", nh);
-#endif
-    // we need to keep informed of what really happens; this will be an upper
-    // bound on the number of active columns, I guess
-    mat->rem_ncols = mat->ncols;
-#ifndef USE_MARKOWITZ
-    printStatsSWAR(mat);
-#endif
-    return 1;
-}
-
 // not mallocing to speed up(?).
 int
 findBestIndex(sparse_mat_t *mat, int m, INT *ind)
@@ -1384,6 +1197,10 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
     ncostmax = 20; // was 5
     njproc = 0;
     while(1){
+	if(mat->itermax && (njproc >= mat->itermax)){
+	    fprintf(stderr, "itermax=%d reached, stopping!\n", mat->itermax);
+	    break;
+	}
 	oldbwcost = bwcost;
 	old_nrows = mat->rem_nrows;
 	old_ncols = mat->rem_ncols;
@@ -1407,7 +1224,10 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
 	    fprintf(stderr, "Q is almost empty: rare!!!\n");
 	    break;
 	}
-	MkzPopQueue(&dj, &mkz, mat->MKZQ, mat->MKZA);
+	if((mat->mkzrnd == 0) || (mat->mkzrnd > mat->MKZQ[0]))
+	    MkzPopQueue(&dj, &mkz, mat->MKZQ, mat->MKZA);
+	else
+	    MkzRemove(&dj, &mkz, mat->MKZQ, mat->MKZA, mat->mkzrnd);
 	j = dj + mat->jmin;
 # if DEBUG >= 1
 	fprintf(stderr, "I popped j=%d wt=%d mkz=%d (#Q=%d)",
@@ -1536,8 +1356,9 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
 	else
 	    ncost = 0;
     }
-    deleteSuperfluousRows(rep, mat, mat->delta, 
-			  mat->rem_nrows-mat->rem_ncols+mat->delta, -1);
+    if(mat->itermax == 0)
+	deleteSuperfluousRows(rep, mat, mat->delta, 
+			      mat->rem_nrows-mat->rem_ncols+mat->delta, -1);
     if((forbw != 0) && (forbw != 3)){
 	fprintf(rep->outfile, "BWCOSTMIN: %"PRIu64"\n", bwcostmin);
 	fprintf(stderr, "Minimal bwcost found: %"PRIu64"\n", bwcostmin);

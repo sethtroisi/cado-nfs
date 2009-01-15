@@ -198,6 +198,18 @@ MkzDelete(INT *Q, INT *A, INT k)
     MkzMoveUpOrDown(Q, A, k);
 }
 
+// Remove (Q, A)[k].
+void
+MkzRemove(INT *dj, INT *mkz, INT *Q, INT *A, INT k)
+{
+    *dj = MkzGet(Q, k, 0);
+    *mkz = MkzGet(Q, k, 1);
+    A[*dj] = MKZ_INF;
+    MkzAssign(Q, A, k, Q[0]);
+    Q[0]--;
+    MkzMoveUpOrDown(Q, A, k);
+}
+
 int
 MkzIsHeap(INT *Q)
 {

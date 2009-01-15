@@ -8,6 +8,7 @@ extern int MkzGetCount(INT *Q, INT *A, INT dj);
 extern int MkzIsAlive(INT *A, INT dj);
 
 extern void MkzPopQueue(INT *dj, INT *mkz, INT *Q, INT *A);
+extern void MkzRemove(INT *dj, INT *mkz, INT *Q, INT *A, INT k);
 extern int MkzIncrCol(sparse_mat_t *mat, INT j);
 extern void MkzUpdate(sparse_mat_t *mat, INT i, INT j);
 extern void MkzDecreaseColWeight(sparse_mat_t *mat, INT j);
