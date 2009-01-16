@@ -268,7 +268,7 @@ makeabFile(char *abname, char *purgedname, int nrows, int **newrows, int small_n
 }
 #endif
 
-// Do we have enough space for this approach?
+// dump of newrows in indexname.
 void
 makeIndexFile(char *indexname, int nrows, int **newrows, int small_nrows, int small_ncols)
 {
@@ -459,80 +459,13 @@ manyFiles(char *sparsename, int **sparsemat, int *colweight, char *purgedname, F
     return small_ncols;
 }
 
-// We start from M_purged which is nrows x ncols;
-// we build M_small which is small_nrows x small_ncols.
-// newrows[i] if != NULL, contains a list of the indices of the rows in
-// M_purged that were added together to form this new row in M_small.
-// TODO: replace this index by the index to rels directly to skip one
-// indirection???
-int
-main(int argc, char *argv[])
+void
+build_newrows_from_file(int **newrows, int nrows, FILE *hisfile, uint64_t bwcost, uint64_t bwcostmin)
 {
-    FILE *hisfile, *purgedfile;
-    char *purgedname = NULL, *sparsename = NULL, *indexname = NULL;
-    char *hisname = NULL;
-    uint64_t bwcost, bwcostmin = 0;
     unsigned long addread = 0;
-    int nrows, ncols, nslices = 0;
-    int **newrows, i, j, nb, *nbrels, **oldrows, *colweight;
-    int ind, small_nrows, small_ncols, **sparsemat;
+    int i;
     char str[STRLENMAX];
-    int verbose = 0;
 
-    // printing the arguments as everybody does these days
-    fprintf (stderr, "%s.r%s", argv[0], REV);
-    for (i = 1; i < argc; i++)
-      fprintf (stderr, " %s", argv[i]);
-    fprintf (stderr, "\n");
-
-    while(argc > 1 && argv[1][0] == '-'){
-        if (argc > 2 && strcmp (argv[1], "-purged") == 0){
-	    purgedname = argv[2];
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if (argc > 2 && strcmp (argv[1], "-his") == 0){
-	    hisname = argv[2];
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if (argc > 2 && strcmp (argv[1], "-out") == 0){
-	    sparsename = argv[2];
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if (argc > 2 && strcmp (argv[1], "-index") == 0){
-	    indexname = argv[2];
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if (argc > 2 && strcmp (argv[1], "-nslices") == 0){
-	    nslices = atoi(argv[2]);
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if (argc > 2 && strcmp (argv[1], "-costmin") == 0){
-	    sscanf(argv[2], "%"PRIu64"", &bwcostmin);
-	    fprintf(stderr, "Read bwcostmin=%"PRIu64"\n", bwcostmin);
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if (argc > 1 && strcmp (argv[1], "-v") == 0){
-            verbose ++;
-	    argc -= 1;
-	    argv += 1;
-	}
-    }
-
-    purgedfile = gzip_open(purgedname, "r");
-    ASSERT(purgedfile != NULL);
-    // read parameters that should be the same as in purgedfile!
-    hisfile = fopen(hisname, "r");
-    ASSERT(hisfile != NULL);
-    fgets(str, STRLENMAX, hisfile);
-    sscanf(str, "%d %d", &nrows, &ncols);
-    fprintf(stderr, "Original matrix has size %d x %d\n", nrows, ncols);
-    newrows = (int **)malloc(nrows * sizeof(int *));
     for(i = 0; i < nrows; i++){
 	newrows[i] = (int *)malloc(2 * sizeof(int));
 	newrows[i][0] = 1;
@@ -563,7 +496,118 @@ main(int argc, char *argv[])
 	    }
 	}
     }
+}
+
+void
+read_newrows_from_file(int **newrows, int nrows, FILE *file)
+{
+    int small_nrows, small_ncols, i, nc, k, *tmp;
+    
+    fscanf(file, "%d %d", &small_nrows, &small_ncols);
+    for(i = 0; i < small_nrows; i++){
+	fscanf(file, "%d", &nc);
+	tmp = (int *)malloc((1+nc) * sizeof(int));
+	tmp[0] = nc;
+	for(k = 0; k < nc; k++)
+	    fscanf(file, PURGE_INT_FORMAT, tmp+k+1);
+	newrows[i] = tmp;
+    }
+    for( ; i < nrows; i++)
+	newrows[i] = NULL;
+}
+
+// We start from M_purged which is nrows x ncols;
+// we build M_small which is small_nrows x small_ncols.
+// newrows[i] if != NULL, contains a list of the indices of the rows in
+// M_purged that were added together to form this new row in M_small.
+// TODO: replace this index by the index to rels directly to skip one
+// indirection???
+int
+main(int argc, char *argv[])
+{
+    FILE *hisfile, *purgedfile, *fromfile;
+    char *purgedname = NULL, *sparsename = NULL, *indexname = NULL;
+    char *hisname = NULL, *fromname = NULL;
+    uint64_t bwcost, bwcostmin = 0;
+    int nrows, ncols, nslices = 0;
+    int **newrows, i, j, nb, *nbrels, **oldrows, *colweight;
+    int ind, small_nrows, small_ncols, **sparsemat;
+    int verbose = 0, writeindex;
+    char str[STRLENMAX];
+
+    // printing the arguments as everybody does these days
+    fprintf (stderr, "%s.r%s", argv[0], REV);
+    for (i = 1; i < argc; i++)
+      fprintf (stderr, " %s", argv[i]);
+    fprintf (stderr, "\n");
+
+    while(argc > 1 && argv[1][0] == '-'){
+        if (argc > 2 && strcmp (argv[1], "-purged") == 0){
+	    purgedname = argv[2];
+	    argc -= 2;
+	    argv += 2;
+	}
+	else if (argc > 2 && strcmp (argv[1], "-his") == 0){
+	    hisname = argv[2];
+	    argc -= 2;
+	    argv += 2;
+	}
+	else if (argc > 2 && strcmp (argv[1], "-out") == 0){
+	    sparsename = argv[2];
+	    argc -= 2;
+	    argv += 2;
+	}
+	else if (argc > 2 && strcmp (argv[1], "-index") == 0){
+	    indexname = argv[2];
+	    argc -= 2;
+	    argv += 2;
+	}
+	else if (argc > 2 && strcmp (argv[1], "-from") == 0){
+	    fromname = argv[2];
+	    argc -= 2;
+	    argv += 2;
+	}
+	else if (argc > 2 && strcmp (argv[1], "-nslices") == 0){
+	    nslices = atoi(argv[2]);
+	    argc -= 2;
+	    argv += 2;
+	}
+	else if (argc > 2 && strcmp (argv[1], "-costmin") == 0){
+	    sscanf(argv[2], "%"PRIu64"", &bwcostmin);
+	    fprintf(stderr, "Read bwcostmin=%"PRIu64"\n", bwcostmin);
+	    argc -= 2;
+	    argv += 2;
+	}
+	else if (argc > 1 && strcmp (argv[1], "-v") == 0){
+            verbose ++;
+	    argc -= 1;
+	    argv += 1;
+	}
+    }
+
+    purgedfile = gzip_open(purgedname, "r");
+    ASSERT(purgedfile != NULL);
+
+    hisfile = fopen(hisname, "r");
+    ASSERT(hisfile != NULL);
+    fgets(str, STRLENMAX, hisfile);
+    // read parameters that should be the same as in purgedfile!
+    sscanf(str, "%d %d", &nrows, &ncols);
+    fprintf(stderr, "Original matrix has size %d x %d\n", nrows, ncols);
+    newrows = (int **)malloc(nrows * sizeof(int *));
+
+    if(fromname == NULL){
+	writeindex = 1;
+	build_newrows_from_file(newrows, nrows, hisfile, bwcost, bwcostmin);
+    }
+    else{
+	writeindex = 0;
+	fromfile = fopen(fromname, "r");
+	ASSERT(fromfile != NULL);
+	read_newrows_from_file(newrows, nrows, fromfile);
+    }
     fclose(hisfile);
+
     nbrels = (int *)malloc(nrows * sizeof(int));
     memset(nbrels, 0, nrows * sizeof(int));
     // nbrels[oldi] contains the number of new relations in which old
@@ -622,15 +666,17 @@ main(int argc, char *argv[])
 				nslices);
 	exit(0);
     }
-    // this part depends on newrows only
-    double tt = seconds();
-    fprintf(stderr, "Writing index file\n");
+    if(writeindex){
+	// this part depends on newrows only
+	double tt = seconds();
+	fprintf(stderr, "Writing index file\n");
 #if 0
-    makeabFile(argv[4], argv[1], nrows, newrows, small_nrows, small_ncols);
+	makeabFile(argv[4], argv[1], nrows, newrows, small_nrows, small_ncols);
 #else
-    makeIndexFile(indexname, nrows, newrows, small_nrows, small_ncols);
+	makeIndexFile(indexname, nrows, newrows, small_nrows, small_ncols);
 #endif
-    fprintf(stderr, "#T# writing index file: %2.2lf\n", seconds()-tt);
+	fprintf(stderr, "#T# writing index file: %2.2lf\n", seconds()-tt);
+    }
 
     for(i = 0; i < small_nrows; i++)
 	if(sparsemat[i] != NULL)

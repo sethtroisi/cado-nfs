@@ -1,3 +1,4 @@
+extern void addRowsAndUpdate(sparse_mat_t *mat, int i1, int i2, int len);
 extern void removeColDefinitely(report_t *rep, sparse_mat_t *mat, INT j);
 extern void removeCellAndUpdate(sparse_mat_t *mat, int i, INT j);
 extern void destroyRow(sparse_mat_t *mat, int i);
@@ -8,6 +9,7 @@ extern int minColWeight(sparse_mat_t *mat);
 extern void fillRowAddMatrix(int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], sparse_mat_t *mat, int m, INT *ind);
 extern void MSTWithA(report_t *rep, sparse_mat_t *mat, int m, INT *ind, double *tMST, int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX]);
 extern int deleteHeavyColumns(report_t *rep, sparse_mat_t *mat);
+extern int addFatherToSons(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1], sparse_mat_t *mat, int m, int *ind,	int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], int *father, int *height MAYBE_UNUSED, int hmax MAYBE_UNUSED, int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1]);
 
 extern int cmp(const void *p, const void *q);
 extern int number_of_superfluous_rows(sparse_mat_t *mat);

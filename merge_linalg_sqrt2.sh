@@ -16,6 +16,9 @@ echo "Args: $*"
 
 params=$1; shift
 
+fc155=false # really means: true if the .nodup file is not present
+tryslices=false # to test the slice cutting program in replay
+
 # default parameters (see README.params)
 
 #####
@@ -61,8 +64,6 @@ poly=$root.poly
 nodup=$root.nodup
 purged=$root.purged #.gz
 tmp=$root.tmp$$
-
-fc155=false
 
 if $fc155
 then
@@ -144,30 +145,53 @@ echo "SIZE(merge.his): `ls -s $mergehis`"
 
 echo "Replaying merges"
 
+small=$outdir/small
+
+index0=$outdir/index0
 bwcostmin=`tail $mergehis | grep "BWCOSTMIN:" | awk '{print $NF}'`
-argsr="-purged $purged -his $mergehis -out $outdir/small -index $outdir/index"
+argsr="-purged $purged -his $mergehis -out $small -index $index0"
 if [ "X$bwcostmin" != "X" ]
 then
     argsr="$argsr -costmin $bwcostmin"
 fi
-time $linalg/replay $argsr # 2> $outdir.replay.err
-
-if [ ! -s $outdir/index ]
+if $tryslices
 then
-    echo "Index file $outdir/index does not exist, stopping"
+    echo "Trying slices"
+    time $linalg/replay $argsr -nslices 4
+    echo "Rebuilding small matrix"
+    time $linalg/mksmall $small 4 > $small
+else
+    time $linalg/replay $argsr # 2> $outdir.replay.err
+fi
+
+if [ ! -s $index0 ]
+then
+    echo "Index file $index0 does not exist, stopping"
     exit
 fi
-echo "SIZE(index): `ls -s $outdir/index`"
+echo "SIZE(index0): `ls -s $index0`"
 
-if [ ! -s $outdir/small ]
+if true ## put this to false if you want to try postprocessing...!
 then
-    echo "Small matrix $outdir/small does not exist, stopping"
+  index=$index0
+else
+  echo "Postprocessing $index0 to get $index"
+  index=$outdir/index
+  nrows=`head -1 $purged | awk '{print $1}'`
+  $linalg/postprocess -index $index0 -out $index -nrows $nrows
+  echo "Now, we build the small matrix associated with $index"
+  $linalg/replay -purged $purged -his $mergehis -from $index -out $small
+fi
+
+if [ ! -s $small ]
+then
+    echo "Small matrix $small does not exist, stopping"
     exit
 fi
 
 echo "Performing the linear algebra phase"
 
-$cado/linalg.sh $outdir/small $skip $linalg_out $mt
+$cado/linalg.sh $small $skip $linalg_out $mt
 
 if [ ! -s $linalg_out/ker_raw ]; then echo "Zerodim kernel, stopping"; exit; fi
 
@@ -177,8 +201,8 @@ if [ $nker -lt $nkermax ]; then nkermax=$nker; fi
 echo "Adding characters"
 
 args0="-purged $purged -ker $linalg_out/ker_raw"
-args0="$args0 -poly $poly -index $outdir/index"
-args0="$args0 -rel $nodup -small $outdir/small"
+args0="$args0 -poly $poly -index $index"
+args0="$args0 -rel $nodup -small $small"
 args0="$args0 -nker $nker -nchar $nchar -skip $skip"
 time $linalg/characters $args0 > $linalg_out/ker
 
@@ -187,7 +211,7 @@ if [ $ndepmax -ge 30 ]; then ndepmax=30; fi
 
 echo "Preparing $ndepmax squareroots"
 
-args1="$nodup $purged $outdir/index $linalg_out/ker $poly"
+args1="$nodup $purged $index $linalg_out/ker $poly"
 time $linalg/allsqrt $args1 0 $ndepmax ar $linalg_out/dep
 
 echo "Entering the last phase"

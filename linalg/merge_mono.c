@@ -508,6 +508,21 @@ addFatherToSons(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 }
 
 void
+printMST(int father[MERGE_LEVEL_MAX], int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1], int m)
+{
+    int i, k;
+
+    for(i = 0; i < m; i++)
+	fprintf(stderr, "father[%d] = %d\n", i, father[i]);
+    for(i = 0; i < m; i++){
+	fprintf(stderr, "Sons of %d:", i);
+	for(k = 1; k <= sons[i][0]; k++)
+	    fprintf(stderr, " %d", sons[i][k]);
+	fprintf(stderr, "\n");
+    }
+}
+
+void
 MSTWithA(report_t *rep, sparse_mat_t *mat, int m, INT *ind, double *tMST,
 	 int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX])
 {
@@ -519,19 +534,7 @@ MSTWithA(report_t *rep, sparse_mat_t *mat, int m, INT *ind, double *tMST,
     hmax = minimalSpanningTree(&w, father, height, sons, m, A);
     *tMST = seconds()-*tMST;
 #if DEBUG >= 1
-    {
-      int i;
-      for (i = 0; i < m; i++)
-	fprintf (stderr, "father[%d] = %d\n", i, father[i]);
-      for (i = 0; i < m; i++)
-        {
-          int k;
-          fprintf (stderr, "Sons of %d:", i);
-          for (k = 1; k <= sons[i][0]; k++)
-	    fprintf (stderr, " %d", sons[i][k]);
-          fprintf (stderr, "\n");
-        }
-    }
+    printMST(father, sons, m);
 #endif
     hmax = addFatherToSons(history, mat, m, ind, A, father, height, hmax,sons);
     for(i = hmax; i >= 0; i--)
