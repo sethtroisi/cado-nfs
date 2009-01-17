@@ -460,8 +460,9 @@ manyFiles(char *sparsename, int **sparsemat, int *colweight, char *purgedname, F
 }
 
 void
-build_newrows_from_file(int **newrows, int nrows, FILE *hisfile, uint64_t bwcost, uint64_t bwcostmin)
+build_newrows_from_file(int **newrows, int nrows, FILE *hisfile, uint64_t bwcostmin)
 {
+    uint64_t bwcost;
     unsigned long addread = 0;
     int i;
     char str[STRLENMAX];
@@ -528,7 +529,7 @@ main(int argc, char *argv[])
     FILE *hisfile, *purgedfile, *fromfile;
     char *purgedname = NULL, *sparsename = NULL, *indexname = NULL;
     char *hisname = NULL, *fromname = NULL;
-    uint64_t bwcost, bwcostmin = 0;
+    uint64_t bwcostmin = 0;
     int nrows, ncols, nslices = 0;
     int **newrows, i, j, nb, *nbrels, **oldrows, *colweight;
     int ind, small_nrows, small_ncols, **sparsemat;
@@ -598,7 +599,7 @@ main(int argc, char *argv[])
 
     if(fromname == NULL){
 	writeindex = 1;
-	build_newrows_from_file(newrows, nrows, hisfile, bwcost, bwcostmin);
+	build_newrows_from_file(newrows, nrows, hisfile, bwcostmin);
     }
     else{
 	writeindex = 0;

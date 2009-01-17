@@ -32,7 +32,7 @@ purge: purge.o hashpair.o files.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lgmp -lm
 merge: merge.o markowitz.o swar.o mst.o report.o dclist.o merge_mono.o sparse_mat.o sparse.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lm
-postprocess: postprocess.o markowitz.o mst.o report.o dclist.o merge_mono.o sparse_mat.o sparse.o
+postprocess: postprocess.o markowitz.o mst.o report.o merge_mono.o sparse_mat.o sparse.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lm
 replay: replay.o sparse.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils

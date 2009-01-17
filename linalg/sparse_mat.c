@@ -217,8 +217,6 @@ cmp(const void *p, const void *q) {
     return (x <= y ? -1 : 1);
 }
 
-#define BUF_LEN 100
-
 /* Reads a matrix file, and puts in mat->wt[j], 0 <= j < ncols, the
    weight of column j (adapted from matsort.c).
 
@@ -231,12 +229,13 @@ readmat(sparse_mat_t *mat, FILE *file, int skipfirst)
 {
     int ret;
     int i, k;
-    int nc, buf[BUF_LEN];
+    int nc, lbuf = 100, *buf;
 #if (USE_MERGE_FAST < 3) && !defined(USE_MPI)
     int nh = 0;
 #endif
     INT ibuf, j, jmin = mat->jmin, jmax = mat->jmax;
 
+    buf = (int *)malloc(lbuf * sizeof(int));
     ret = fscanf (file, "%d %d", &i, &k); // already set up...!
     ASSERT_ALWAYS (ret == 2);
     
@@ -273,6 +272,13 @@ readmat(sparse_mat_t *mat, FILE *file, int skipfirst)
 #if (USE_MERGE_FAST < 3) && !defined(USE_MPI)
 	    int nb_heavy_j = 0;
 #endif
+	    if(nc > lbuf){
+		lbuf <<= 1;
+		fprintf(stderr, "Warning: doubling lbuf in readmat;");
+		fprintf(stderr, " new value is %d\n", lbuf);
+		free(buf);
+		buf = (int *)malloc(lbuf * sizeof(int));
+	    }
 	    for(k = 0, ibuf = 0; k < nc; k++){
 		ret = fscanf(file, PURGE_INT_FORMAT, &j);
 		if(ret != 1){
@@ -313,7 +319,6 @@ readmat(sparse_mat_t *mat, FILE *file, int skipfirst)
 		continue;
 	    }
 #endif
-	    ASSERT_ALWAYS(ibuf <= BUF_LEN);
 	    // TODO: do not store rows not having at least one light
 	    // column, but do not decrease mat->nrows!
 #if USE_TAB == 0
@@ -349,6 +354,7 @@ readmat(sparse_mat_t *mat, FILE *file, int skipfirst)
 #ifndef USE_MARKOWITZ
     printStatsSWAR(mat);
 #endif
+    free(buf);
     return 1;
 }
 

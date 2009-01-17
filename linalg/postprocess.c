@@ -142,7 +142,7 @@ main(int argc, char *argv[])
     FILE *indexfile, *outfile;
     char *indexname = NULL, *outname = NULL;
     sparse_mat_t mat;
-    int small_nrows, small_ncols, nrows;
+    int small_nrows, small_ncols, nrows = 0;
     int i;
     double tt;
 
@@ -172,6 +172,7 @@ main(int argc, char *argv[])
 	    exit (1);
 	  }
     }
+    ASSERT_ALWAYS(nrows > 0);
     indexfile = gzip_open(indexname, "r");
     ASSERT_ALWAYS(indexfile != NULL);
     fscanf(indexfile, "%d %d", &small_nrows, &small_ncols);
