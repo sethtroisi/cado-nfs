@@ -139,6 +139,7 @@ keep=`expr 128 '+' $skip`
 argsa="-out $mergehis -maxlevel $maxlevel -cwmax $cwmax -rwmax $rwmax"
 argsa="$argsa $verbose -mat $purged -keep $keep"
 argsa="$argsa -forbw $bwstrat -ratio $ratio -coverNmax $coverNmax"
+argsa="$argsa -skip 100"
 #time $linalg/merge $argsa # 2> $outdir.merge.err
 $cado/merge.sh $argsa
 echo "SIZE(merge.his): `ls -s $mergehis`"

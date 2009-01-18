@@ -69,6 +69,7 @@ replaceWithMST(sparse_mat_t *mat, int m, INT *ind)
 	wold += lengthRow(mat, ind[k]);
     fillRowAddMatrix(A, mat, m, ind);
 #if DEBUG >= 1
+    fprintf(stderr, "Initial rows\n");
     for(k = 0; k < m; k++){
 	fprintRow(stderr, mat->rows[ind[k]]);
 	fprintf(stderr, "\n");
@@ -97,10 +98,14 @@ replaceWithMST(sparse_mat_t *mat, int m, INT *ind)
 #endif
 	if(wnew < wold){
 	    hmax=addFatherToSons(history,mat,m,ind,A,father,height,hmax,sons);
-	    hmax = 0;
-	    for(k = 0; k < m; k++)
-		hmax += lengthRow(mat, ind[k]);
 #if DEBUG >= 1
+	    hmax = 0;
+	    fprintf(stderr, "New rows\n");
+	    for(k = 0; k < m; k++){
+		fprintRow(stderr, mat->rows[ind[k]]);
+		fprintf(stderr, "\n");
+		hmax += lengthRow(mat, ind[k]);
+	    }
 	    fprintf(stderr, "wold=%d wnewer=%d\n", wold, hmax);
 #endif
 	}
@@ -181,6 +186,8 @@ main(int argc, char *argv[])
     mat.nrows = small_nrows;
     mat.ncols = nrows; // ohhhhhhhhhhhhh!!!!
     mat.wmstmax = 7;
+    mat.cwmax = mat.nrows;
+    mat.mkztype = 1;
 
     tt = seconds();
     initMat(&mat, 0, nrows);
@@ -191,16 +198,14 @@ main(int argc, char *argv[])
     fprintf(stderr, "Time for initWeightFromFile: %2.2lf\n", seconds()-tt);
     gzip_close(indexfile, indexname);
 
-    fprintf(stderr, "Markowitz version\n");
+    fprintf(stderr, "Markowitz version (mkztype=%d)\n", mat.mkztype);
     tt = seconds();
-    mat.cwmax = mat.nrows;
-    mat.mkztype = 0;
     fillmat(&mat);
     fprintf(stderr, "Time for fillmat: %2.2lf\n", seconds()-tt);
     
     indexfile = gzip_open(indexname, "r");
     ASSERT_ALWAYS(indexfile != NULL);
-    readmat(&mat, indexfile, 0);
+    readmat(&mat, indexfile, 0, 0);
     gzip_close(indexfile, indexname);
 #if DEBUG >= 1
     for(i = 0; i < mat.nrows; i++){

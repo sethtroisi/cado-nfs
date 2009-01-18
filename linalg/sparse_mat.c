@@ -225,7 +225,7 @@ cmp(const void *p, const void *q) {
    mat->wt is already filled and put to - values when needed. So don't touch.
 */
 int
-readmat(sparse_mat_t *mat, FILE *file, int skipfirst)
+readmat(sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols)
 {
     int ret;
     int i, k;
@@ -234,6 +234,7 @@ readmat(sparse_mat_t *mat, FILE *file, int skipfirst)
     int nh = 0;
 #endif
     INT ibuf, j, jmin = mat->jmin, jmax = mat->jmax;
+    char *tooheavy = NULL;
 
     buf = (int *)malloc(lbuf * sizeof(int));
     ret = fscanf (file, "%d %d", &i, &k); // already set up...!
@@ -243,6 +244,24 @@ readmat(sparse_mat_t *mat, FILE *file, int skipfirst)
 	    mat->nrows, mat->ncols, mat->nrows - mat->ncols);
     mat->rem_nrows = mat->nrows;
     mat->weight = 0;
+
+    if(skipheavycols > 0){
+	INT *tmp = (INT *)malloc((mat->ncols << 1) * sizeof(INT));
+
+	for(j = 0; j < mat->ncols; j++){
+	    tmp[2*j] = mat->wt[j];
+	    tmp[2*j+1] = j;
+	}
+	qsort(tmp, mat->ncols, 2 * sizeof(INT), cmp);
+	// heavy columns already have wt < 0
+	tooheavy = (char *)malloc(mat->ncols * sizeof(char));
+	memset(tooheavy, 0, mat->ncols * sizeof(char));
+	for(k = 0; k < skipheavycols; k++){
+	    fprintf(stderr, "Skipping j=%d (wt=%d)\n", tmp[2*k+1], tmp[2*k]);
+	    tooheavy[tmp[2*k+1]] = 1;
+	}
+	free(tmp);
+    }
 
     for (i = 0; i < mat->nrows; i++){
 	if(!(i % 100000))
@@ -296,17 +315,19 @@ readmat(sparse_mat_t *mat, FILE *file, int skipfirst)
 #else
 		// always store j in the right interval...!
 		if((j >= jmin) && (j < jmax)){
-		    buf[ibuf++] = j;
-		    // this will be the weight in the current slice
-		    mat->weight++; 
-		    if(mat->wt[GETJ(mat, j)] > 0){ // redundant test?
+		    if((tooheavy == NULL) || (tooheavy[j] == 0)){
+			buf[ibuf++] = j;
+			// this will be the weight in the current slice
+			mat->weight++; 
+			if(mat->wt[GETJ(mat, j)] > 0){ // redundant test?
 #ifndef USE_COMPACT_R
-			mat->R[GETJ(mat, j)][0]++;
-			mat->R[GETJ(mat, j)][mat->R[GETJ(mat, j)][0]] = i;
+			    mat->R[GETJ(mat, j)][0]++;
+			    mat->R[GETJ(mat, j)][mat->R[GETJ(mat, j)][0]] = i;
 #else
-			fprintf(stderr, "R: NYI in readmat\n");
-			exit(1);
+			    fprintf(stderr, "R: NYI in readmat\n");
+			    exit(1);
 #endif
+			}
 		    }
 		}
 #endif
@@ -355,6 +376,8 @@ readmat(sparse_mat_t *mat, FILE *file, int skipfirst)
     printStatsSWAR(mat);
 #endif
     free(buf);
+    if(tooheavy != NULL)
+	free(tooheavy);
     return 1;
 }
 

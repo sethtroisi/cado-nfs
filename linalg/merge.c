@@ -52,7 +52,7 @@ main(int argc, char *argv[])
     int mkzrnd = 0;
     int mkztype = 2;
 #endif
-    int itermax = 0;
+    int itermax = 0, skip = 0;
 
     fprintf (stderr, "%s.r%s", argv[0], REV);
     for (i = 1; i < argc; i++)
@@ -148,6 +148,11 @@ main(int argc, char *argv[])
 	    argc -= 2;
 	    argv += 2;
 	}
+	else if (argc > 2 && strcmp (argv[1], "-skip") == 0){
+	    skip = atoi(argv[2]);
+	    argc -= 2;
+	    argv += 2;
+	}
 	else
 	  {
 	    fprintf (stderr, "Error, unknown option %s\n", argv[1]);
@@ -164,6 +169,7 @@ main(int argc, char *argv[])
     mat.cwmax = cwmax;
     mat.rwmax = rwmax;
     mat.mergelevelmax = maxlevel;
+    mat.itermax = itermax;
     
 #ifdef USE_MPI
     mpi_start_proc(outname,&mat,purgedfile,purgedname,forbw,ratio,coverNmax,
@@ -193,7 +199,7 @@ main(int argc, char *argv[])
     
     purgedfile = gzip_open(purgedname, "r");
     ASSERT_ALWAYS(purgedfile != NULL);
-    readmat(&mat, purgedfile, 1);
+    readmat(&mat, purgedfile, 1, skip);
     gzip_close(purgedfile, purgedname);
 #if DEBUG >= 3
     checkmat(&mat);
@@ -212,7 +218,6 @@ main(int argc, char *argv[])
     fprintf(stderr, "WARNING: forcing forbw=0...!!!!\n");
 #endif
 
-    mat.itermax = itermax;
 #ifdef USE_MARKOWITZ
     mat.wmstmax = wmstmax;
     mat.mkzrnd = mkzrnd;

@@ -53,7 +53,7 @@ typedef struct {
 extern void initMat(sparse_mat_t *mat, INT jmin, INT jmax);
 extern void initWeightFromFile(sparse_mat_t *mat, FILE *purgedfile, int skipfirst);
 extern void fillmat(sparse_mat_t *mat);
-extern int readmat(sparse_mat_t *mat, FILE *file, int skipfirst);
+extern int readmat(sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols);
 
 extern void addRowsWithWeight(sparse_mat_t *mat, int i1, int i2);
 extern void removeWeightFromRow(sparse_mat_t *mat, int i);
