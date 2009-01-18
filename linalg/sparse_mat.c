@@ -12,6 +12,8 @@
 # include "swar.h"
 #endif
 
+#define DEBUG 0
+
 int
 decrS(int w)
 {
@@ -42,15 +44,12 @@ initMat(sparse_mat_t *mat, INT jmin, INT jmax)
 
     mat->jmin = jmin;
     mat->jmax = jmax;
-#if USE_TAB == 0
-    mat->data = (rel_t*) malloc (mat->nrows * sizeof (rel_t));
-    ASSERT_ALWAYS(mat->data != NULL);
-#else
     mat->rows = (INT **)malloc(mat->nrows * sizeof (INT *));
     ASSERT_ALWAYS(mat->rows != NULL);
-#endif
     mat->wt = (int*) malloc ((mat->jmax-mat->jmin) * sizeof (int));
     memset(mat->wt, 0, (mat->jmax-mat->jmin) * sizeof (int));
+    mat->wburried = (int*) malloc (mat->nrows * sizeof (int));
+    memset(mat->wburried, 0, mat->nrows * sizeof (int));
 #if USE_MERGE_FAST
     R = (INT **)malloc((mat->jmax-mat->jmin) * sizeof(INT *));
     ASSERT_ALWAYS(R != NULL);
@@ -223,6 +222,9 @@ cmp(const void *p, const void *q) {
    We skip columns that are too heavy.
 
    mat->wt is already filled and put to - values when needed. So don't touch.
+
+   mat->weight is correct on exit; it will be only approximately true
+   when skipheavycols will be activated.
 */
 int
 readmat(sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols)
@@ -235,6 +237,7 @@ readmat(sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols)
 #endif
     INT ibuf, j, jmin = mat->jmin, jmax = mat->jmax;
     char *tooheavy = NULL;
+    int nburried = 0;
 
     buf = (int *)malloc(lbuf * sizeof(int));
     ret = fscanf (file, "%d %d", &i, &k); // already set up...!
@@ -245,23 +248,21 @@ readmat(sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols)
     mat->rem_nrows = mat->nrows;
     mat->weight = 0;
 
-    if(skipheavycols > 0){
-	INT *tmp = (INT *)malloc((mat->ncols << 1) * sizeof(INT));
-
-	for(j = 0; j < mat->ncols; j++){
-	    tmp[2*j] = mat->wt[j];
-	    tmp[2*j+1] = j;
-	}
-	qsort(tmp, mat->ncols, 2 * sizeof(INT), cmp);
+    if(skipheavycols != 0){
 	// heavy columns already have wt < 0
 	tooheavy = (char *)malloc(mat->ncols * sizeof(char));
 	memset(tooheavy, 0, mat->ncols * sizeof(char));
-	for(k = 0; k < skipheavycols; k++){
-	    fprintf(stderr, "Skipping j=%d (wt=%d)\n", tmp[2*k+1], tmp[2*k]);
-	    tooheavy[tmp[2*k+1]] = 1;
+	for(j = 0; j < mat->ncols; j++){
+	    if(abs(mat->wt[j]) > mat->ncols/1000){
+#if DEBUG >= 1 
+		fprintf(stderr, "Burrying j=%d (wt=%d)\n", j, abs(mat->wt[j]));
+#endif
+		tooheavy[j] = 1;
+		nburried++;
+	    }
 	}
-	free(tmp);
     }
+    fprintf(stderr, "# Number of burried columns is %d\n", nburried);
 
     for (i = 0; i < mat->nrows; i++){
 	if(!(i % 100000))
@@ -279,12 +280,7 @@ readmat(sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols)
 	    return 0;
 	}
 	if(nc == 0){
-#if USE_TAB == 0
-	    lengthRow(mat, i) = 0;
-	    mat->data[i].val = NULL;
-#else
 	    mat->rows[i] = NULL;
-#endif
 	    mat->rem_nrows--;
 	}
 	else{
@@ -315,10 +311,12 @@ readmat(sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols)
 #else
 		// always store j in the right interval...!
 		if((j >= jmin) && (j < jmax)){
-		    if((tooheavy == NULL) || (tooheavy[j] == 0)){
+		    // this will be the weight in the current slice
+		    mat->weight++; 
+		    if((tooheavy != NULL) && (tooheavy[j] != 0))
+			mat->wburried[i] += 1;
+		    else{
 			buf[ibuf++] = j;
-			// this will be the weight in the current slice
-			mat->weight++; 
 			if(mat->wt[GETJ(mat, j)] > 0){ // redundant test?
 #ifndef USE_COMPACT_R
 			    mat->R[GETJ(mat, j)][0]++;
@@ -342,13 +340,6 @@ readmat(sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols)
 #endif
 	    // TODO: do not store rows not having at least one light
 	    // column, but do not decrease mat->nrows!
-#if USE_TAB == 0
-	    lengthRow(mat, i) = ibuf;
-	    mat->data[i].val = (int*) malloc (ibuf * sizeof (int));
-	    memcpy(mat->data[i].val, buf, ibuf * sizeof(int));
-	    // sort indices in val to ease row merges
-	    qsort(mat->data[i].val, ibuf, sizeof(int), cmp);
-#else
 	    mat->rows[i] = (INT*) malloc ((ibuf+1) * sizeof (INT));
 	    mat->rows[i][0] = ibuf;
 	    memcpy(mat->rows[i]+1, buf, ibuf * sizeof(INT));
@@ -363,7 +354,6 @@ readmat(sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols)
                            mat->rows[i][k], i);
                   exit (1);
                 }
-#endif
 	}
     }
 #if (USE_MERGE_FAST < 3) && !defined(USE_MPI)
@@ -384,43 +374,24 @@ readmat(sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols)
 void
 print_row(sparse_mat_t *mat, int i)
 {
-#if USE_TAB == 0
-    int k;
-    
-    for(k = 0; k < lengthRow(mat, i); k++)
-	fprintf(stderr, " %d", cell(mat, i, k));
-#else
     fprintRow(stderr, mat->rows[i]);
-#endif
 }
 
 void
 destroyRow(sparse_mat_t *mat, int i)
 {
-#if USE_TAB == 0
-    free(mat->data[i].val);
-    mat->data[i].val = NULL;
-    lengthRow(mat, i) = 0;
-#else
     free(mat->rows[i]);
     mat->rows[i] = NULL;
-#endif
 }
 
+// we do not use/touch wburried[i]
 void
 removeWeightFromRow(sparse_mat_t *mat, int i)
 {
-#if USE_TAB == 0
-    int k;
-
-    for(k = 0; k < lengthRow(mat, i); k++)
-	mat->wt[GETJ(mat, cell(mat, i, k))]--;
-#else
     INT k;
 
     for(k = 1; k <= mat->rows[i][0]; k++)
 	mat->wt[GETJ(mat, mat->rows[i][k])]--;
-#endif
 #if TRACE_ROW >= 0
     if(i == TRACE_ROW)
 	fprintf(stderr, "TRACE_ROW: removeWeightFromRow %d\n", 
@@ -429,79 +400,16 @@ removeWeightFromRow(sparse_mat_t *mat, int i)
     mat->weight -= lengthRow(mat, i);
 }
 
+// we do not use/touch wburried[i]
 void
 addWeightFromRow(sparse_mat_t *mat, int i)
 {
-#if USE_TAB == 0
-    int k;
-
-    for(k = 0; k < lengthRow(mat, i); k++)
-	mat->wt[GETJ(mat, cell(mat, i, k))]++;
-#else
     INT k;
 
     for(k = 1; k <= mat->rows[i][0]; k++)
 	mat->wt[GETJ(mat, mat->rows[i][k])]++;
-#endif
     mat->weight += lengthRow(mat, i);
 }
-
-#if USE_TAB == 0
-// i1 += i2; weights are taken care of outside...
-void
-addRowsData(rel_t *data, int i1, int i2)
-{
-    int k1, k2, k, len;
-    INT *tmp, *tmp2;
-
-#if DEBUG >= 2
-    fprintf(stderr, "row[%d] =", i1); print_row(mat, i1);
-    fprintf(stderr, "\n");
-    fprintf(stderr, "row[%d] =", i2); print_row(mat, i2);
-    fprintf(stderr, "\n");
-#endif
-    // merge row[i1] and row[i2] in i1...
-    len = data[i1].len + data[i2].len;
-    tmp = (INT *)malloc(len * sizeof(INT));
-    k = k1 = k2 = 0;
-
-    // loop while everybody is here
-    while((k1 < data[i1].len) && (k2 < data[i2].len)){
-	if(data[i1].val[k1] < data[i2].val[k2])
-	    tmp[k++] = data[i1].val[k1++];
-	else if(data[i1].val[k1] > data[i2].val[k2])
-            tmp[k++] = data[i2].val[k2++];
-	else{
-#if DEBUG >= 1
-	    fprintf(stderr, "ADD[%d=(%ld,%lu), %d=(%ld,%lu)]: new w[%d]=%lu\n", 
-		    i1, data[i1].a, data[i1].b,
-		    i2, data[i2].a, data[i2].b,
-		    data[i1].val[k1], 
-		    wt[data[i1].val[k1]]);
-#endif
-	    k1++;
-	    k2++;
-	}
-    }
-    // finish with k1
-    for( ; k1 < data[i1].len; k1++)
-	tmp[k++] = data[i1].val[k1];
-    // finish with k2
-    for( ; k2 < data[i2].len; k2++)
-	tmp[k++] = data[i2].val[k2];
-    // destroy and copy back
-    free(data[i1].val);
-    tmp2 = (INT *)malloc(k * sizeof(INT));
-    memcpy(tmp2, tmp, k * sizeof(INT));
-    data[i1].len = k;
-    data[i1].val = tmp2;
-    free(tmp);
-#if DEBUG >= 2
-    fprintf(stderr, "row[%d]+row[%d] =", i1, i2);
-    print_row(mat, i1); fprintf(stderr, "\n");
-#endif
-}
-#endif
 
 // i1 += i2, mat->wt is updated at the same time.
 void
@@ -509,11 +417,8 @@ addRowsWithWeight(sparse_mat_t *mat, int i1, int i2)
 {
     // i1 is to disappear, replaced by a new one
     removeWeightFromRow(mat, i1);
-#if USE_TAB == 0
-    addRowsData(mat->data, i1, i2);
-#else
     addRows(mat->rows, i1, i2, -1);
-#endif
+    mat->wburried[i1] += mat->wburried[i2];
     // new row i1 has to contribute to the weight
     addWeightFromRow(mat, i1);
 #if TRACE_ROW >= 0
@@ -640,6 +545,7 @@ remove_j_from_row(sparse_mat_t *mat, int i, int j)
 
 // what is the weight of the sum of Ra and Rb? Works even in the partial
 // scenario of MPI.
+// New: uses the estimated wburried stuff. TODO: what about MPI???
 int
 weightSum(sparse_mat_t *mat, int i1, int i2)
 {
@@ -670,7 +576,7 @@ weightSum(sparse_mat_t *mat, int i1, int i2)
     }
     w += (k1 > len1 ? 0 : len1-k1+1);
     w += (k2 > len2 ? 0 : len2-k2+1);
-    return w;
+    return w + mat->wburried[i1] + mat->wburried[i2];
 }
 
 int

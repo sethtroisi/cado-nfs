@@ -336,7 +336,7 @@ removeRowAndUpdate(sparse_mat_t *mat, int i)
     if(i == TRACE_ROW)
 	fprintf(stderr, "TRACE_ROW: removeRowAndUpdate i=%d\n", i);
 #endif
-    mat->weight -= lengthRow(mat, i);
+    mat->weight -= lengthRow(mat, i) + mat->wburried[i];
     for(k = 1; k <= lengthRow(mat, i); k++){
 #if TRACE_COL >= 0
 	if(cell(mat, i, k) == TRACE_COL){
@@ -354,7 +354,7 @@ addOneRowAndUpdate(sparse_mat_t *mat, int i)
 {
     int k;
 
-    mat->weight += lengthRow(mat, i);
+    mat->weight += lengthRow(mat, i) + mat->wburried[i];
     for(k = 1; k <= lengthRow(mat, i); k++)
 	addCellAndUpdate(mat, i, cell(mat, i, k));
 }
@@ -505,21 +505,6 @@ addFatherToSons(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 		int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1])
 {
     return addFatherToSonsRec(history, mat, m, ind, A, father, sons, 0, 0);
-}
-
-void
-printMST(int father[MERGE_LEVEL_MAX], int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1], int m)
-{
-    int i, k;
-
-    for(i = 0; i < m; i++)
-	fprintf(stderr, "father[%d] = %d\n", i, father[i]);
-    for(i = 0; i < m; i++){
-	fprintf(stderr, "Sons of %d:", i);
-	for(k = 1; k <= sons[i][0]; k++)
-	    fprintf(stderr, " %d", sons[i][k]);
-	fprintf(stderr, "\n");
-    }
 }
 
 void

@@ -349,3 +349,18 @@ minCostUsingMST(sparse_mat_t *mat, int m, INT *ind, double *tfill, double *tMST)
     return w;
 }
 
+void
+printMST(int father[MERGE_LEVEL_MAX], int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1], int m)
+{
+    int i, k;
+
+    for(i = 0; i < m; i++)
+	fprintf(stderr, "father[%d] = %d\n", i, father[i]);
+    for(i = 0; i < m; i++){
+	fprintf(stderr, "Sons of %d:", i);
+	for(k = 1; k <= sons[i][0]; k++)
+	    fprintf(stderr, " %d", sons[i][k]);
+	fprintf(stderr, "\n");
+    }
+}
+

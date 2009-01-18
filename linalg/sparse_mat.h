@@ -14,6 +14,8 @@ typedef struct {
   int *wt;           /* weight w of column j, if w <= cwmax,
                         else <= 1 for a deleted column
                         (trick: we store -w if w > cwmax) */
+  int *wburried;     /* wburried[i] counts the estimated weight of burried
+			columns */
   unsigned long *ad;
   unsigned long weight;
   int cwmax;         /* bound on weight of j to enter the SWAR structure */
@@ -43,6 +45,8 @@ typedef struct {
 #endif
   int itermax;       /* used for performing some sampling */
 } sparse_mat_t;
+
+#define weightRow(mat, i) (mat->rows[(i)][0] + mat->wburried[(i)])
 
 #ifdef USE_MPI
 #define GETJ(mat, j) ((j)-(mat)->jmin)
