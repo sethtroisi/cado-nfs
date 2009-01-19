@@ -249,20 +249,26 @@ readmat(sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols)
     mat->weight = 0;
 
     if(skipheavycols != 0){
+	int bmin = mat->nrows, bmax = 0, wc, wmax;
+
+	wmax = 5 * mat->cwmax;
 	// heavy columns already have wt < 0
 	tooheavy = (char *)malloc(mat->ncols * sizeof(char));
 	memset(tooheavy, 0, mat->ncols * sizeof(char));
 	for(j = 0; j < mat->ncols; j++){
-	    if(abs(mat->wt[j]) > mat->ncols/1000){
+	    if((wc = abs(mat->wt[j])) > wmax){
 #if DEBUG >= 1 
-		fprintf(stderr, "Burrying j=%d (wt=%d)\n", j, abs(mat->wt[j]));
+		fprintf(stderr, "Burrying j=%d (wt=%d)\n", j, wc);
 #endif
 		tooheavy[j] = 1;
 		nburried++;
+		if(wc > bmax) bmax = wc;
+		if(wc < bmin) bmin = wc;
 	    }
 	}
+	fprintf(stderr, "# Number of burried columns is %d", nburried);
+	fprintf(stderr, " (min=%d max=%d)\n", bmin, bmax);
     }
-    fprintf(stderr, "# Number of burried columns is %d\n", nburried);
 
     for (i = 0; i < mat->nrows; i++){
 	if(!(i % 100000))
