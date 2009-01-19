@@ -53,61 +53,115 @@ CC:=$(CC) -Wl,-rpath,$(mpicclibs)
 CXX:=$(CXX) -Wl,-rpath,$(mpicxxlibs)
 endif
 
-
 ## names:=build.c matmul-sliced.cpp
 ## src:=$(patsubst %,%.c,$(names))
 ## obj:=$(patsubst %,%.o,$(names))
 
-bins:=bench build prep test_hello test_pthread_reduce
+bins:=bench build prep
 
-all:$(bins)
+default-target: all
+allbins:=test_hello
 
-build_objs:=build.o ../readbuffer.o ../readmat.o libmatmul.a
-bench_objs:=bench.o ../readbuffer.o ../readmat.o libmatmul.a
-
-libmatmul_objs:=matmul-sliced.o matmul-sliced-asm.o matmul-basic.o matmul.o
-
-libmatmul.a: $(libmatmul_objs)
-	-rm -f $@
-	ar r $@ $(libmatmul_objs)
 
 test_hello_objs:=test_hello.o parallelizing_info.o
-
-prep_objs:=prep.o intersections.o 			\
-	matmul_top.o parallelizing_info.o		\
-	info_file.o ../readbuffer.o ../readmat.o	\
-	auxfuncs.o xvectors.o				\
-	libmatmul.a
-
+test_hello: $(test_hello_objs)
+	$(CXX) $(MY_LFLAGS) $(test_hello_objs) -o $@ $(common_libs)
+-include $(patsubst %,.deps/%.d,$(test_hello_objs))
 
 # We need to make sure that pthreads are always included.
 common_libs:=-lutils -lgmp
 ifeq ($(WITH_PTHREADS),1)
-# As a matter of cact, it is fairly common for mpi libs to include
+# As a matter of fact, it is fairly common for mpi libs to include
 # pthreads automatically. Hence in some cases, we would need this ifndef
-# to avoid very redundant link lines. But strictly specaking, this is a
+# to avoid very redundant link lines. But strictly speaking, this is a
 # behaviour we can't rely on.
 # ifneq ($(WITH_MPI),1)
 common_libs += -lpthread
 # endif
 endif
 
-test_pthread_reduce_objs:=test_pthread_reduce.o
 
-test_hello: $(test_hello_objs)
-	$(CXX) $(MY_LFLAGS) $(test_hello_objs) -o $@ $(common_libs)
+rmobjs:=../readbuffer.o ../readmat.o
+libmatmul_objs:=matmul-sliced.o matmul-sliced-asm.o matmul-basic.o matmul.o
+build_objs:=build.o libmatmul.a
+bench_objs:=bench.o libmatmul.a
+prep_objs:=prep.o intersections.o 			\
+	matmul_top.o parallelizing_info.o		\
+	info_file.o 					\
+	auxfuncs.o xvectors.o				\
+	libmatmul.a
 
-build: $(build_objs)
-	$(CXX) $(MY_LFLAGS) $(build_objs) -o $@ $(common_libs)
+# This list contains the object files which do not depend on the abase
+# selection.
+constant_objects:=parallelizing_info.o intersections.o auxfuncs.o xvectors.o
 
-bench: $(bench_objs)
-	$(CXX) $(MY_LFLAGS) $(bench_objs) -o $@ $(common_libs)
+# ALL object files must come here. Using $(wildcard *.c) is discouraged
+# for obvious reasons. This list is used for computing dependencies.
+all_objs:=
+sources:=	\
+    auxfuncs.c bench.c build.c info_file.c		\
+    intersections.cpp matmul-sliced.cpp matmul_top.c	\
+    parallelizing_info.c prep.c test_hello.c xvectors.c	\
+    matmul.c matmul-basic.c
 
-prep: $(prep_objs)
-	$(CXX) $(MY_LFLAGS) $(prep_objs) -o $@ $(common_libs) -lgmpxx
+define hardlink_object
+$(1)/$(2): $(2)
+	ln -f $$< $$@
+endef
 
-test_pthread_reduce: $(test_pthread_reduce_objs)
-	$(CC) $(MY_LFLAGS) $(test_pthread_reduce_objs) -o $@ -lpthread -O4
+define configure_abase
+$$(foreach x,$$(constant_objects),$$(eval $$(call hardlink_object,$(1),$$(x))))
+
+$(1)/%.o: %.c
+	@mkdir -p $(1)
+	$$(CC) -DSELECT_ABASE_$(1) $$(MY_CFLAGS) $$< -c -o $$@
+$(1)/%.o: %.S
+	@mkdir -p $(1)
+	$$(CC) -DSELECT_ABASE_$(1) $$(MY_CFLAGS) $$< -c -o $$@
+$(1)/%.o: %.cpp
+	@mkdir -p $(1)
+	$$(CXX) -DSELECT_ABASE_$(1) $$(MY_CXXFLAGS) $$< -c -o $$@
+.deps/$(1)/%.o.d: %.c
+	@mkdir -p .deps/$(1)
+	$$(CC) $$(MY_CFLAGS) -M -MM -MG -MP -MF $$@ -MT '$$@ $(1)/$$*.o' $$<
+.deps/$(1)/%.o.d: %.S
+	@mkdir -p .deps/$(1)
+	$$(CC) $$(MY_CFLAGS) -M -MM -MG -MP -MF $$@ -MT '$$@ $(1)/$$*.o' $$<
+.deps/$(1)/%.o.d: %.cpp
+	@mkdir -p .deps/$(1)
+	$$(CXX) $$(MY_CXXFLAGS) -M -MM -MG -MP -MF $$@ -MT '$$@ $(1)/$$*.o' $$<
+
+
+$(1)_libmatmul_objs:=$$(patsubst %,$(1)/%,$$(libmatmul_objs))
+$(1)/libmatmul.a: $$($(1)_libmatmul_objs)
+	-rm -f $$@
+	ar r $$@ $$($(1)_libmatmul_objs)
+$(1)_build_objs:=$$(patsubst %,$(1)/%,$$(build_objs))
+$(1)/build: $$($(1)_build_objs) $$(rmobjs)
+	$$(CXX) $$(MY_LFLAGS) $$($(1)_build_objs) $$(rmobjs) -o $$@ $$(common_libs)
+-include $$(patsubst %,.deps/%.d,$$($(1)_build_objs))
+
+$(1)_bench_objs:=$$(patsubst %,$(1)/%,$$(bench_objs))
+$(1)/bench: $$($(1)_bench_objs) $$(rmobjs)
+	$$(CXX) $$(MY_LFLAGS) $$($(1)_bench_objs) $$(rmobjs) -o $$@ $$(common_libs)
+-include $$(patsubst %,.deps/%.d,$$($(1)_bench_objs))
+
+$(1)_prep_objs:=$$(patsubst %,$(1)/%,$$(prep_objs))
+$(1)/prep: $$($(1)_prep_objs) $$(rmobjs)
+	$$(CXX) $$(MY_LFLAGS) $$($(1)_prep_objs) $$(rmobjs) -o $$@ $$(common_libs) -lgmpxx
+-include $$(patsubst %,.deps/%.d,$$($(1)_prep_objs))
+
+allbins+=$$(patsubst %,$(1)/%,$(bins))
+endef
+
+# U64 is the prime-time version. The others can be dropped to accelerate
+# compilation.
+$(eval $(call configure_abase,U64))
+$(eval $(call configure_abase,U64K))
+$(eval $(call configure_abase,U64N))
+$(eval $(call configure_abase,U128))
+
+all: $(allbins)
 
 
 ifeq ($(WITH_MPI),1)
@@ -132,18 +186,5 @@ test: test_hello
 
 clean:
 	-rm -f sketch.aux sketch.dvi sketch.log sketch.ps
-	-rm -f *.bak *.o $(bins) *~
+	-rm -f *.bak *.[oa] $(bins) *~ U*/*.[oa] $(allbins)
 	-rm -rf .deps
-	
-
-# ALL source files must come here. Using $(wildcard *.c) is discouraged
-# for obvious reasons.
-sources:=	\
-    auxfuncs.c bench.c build.c info_file.c		\
-    intersections.cpp matmul-sliced.cpp matmul_top.c	\
-    parallelizing_info.c prep.c test_hello.c xvectors.c	\
-    matmul.c matmul-basic.c
-
-dep: $(patsubst %,.deps/%.d,$(sources))
--include $(patsubst %,.deps/%.d,$(sources))
-

@@ -45,6 +45,11 @@ typedef __v2di abase_u128_base_type;
 #define abase_u128_max_accumulate(x) UINT_MAX
 #define abase_u128_max_accumulate_wide(x) UINT_MAX
 
+static inline void abase_u128_obj_set_nbys(abase_u128_obj_ptr x MAYBE_UNUSED, unsigned int nbys)
+{
+    ASSERT_ALWAYS(nbys == abase_u128_nbits(x));
+}
+
 static inline
 abase_u128_base_type * abase_u128_init(abase_u128_obj_srcptr x MAYBE_UNUSED,
         unsigned int n)
@@ -222,6 +227,7 @@ abase_u128_dotprod(abase_u128_obj_srcptr x MAYBE_UNUSED,
 #define abobj_init(x)   abase_u128_obj_init(x)
 #define abobj_init_set(y,x)   abase_u128_obj_init_set(y,x)
 #define abobj_clear(x)  abase_u128_obj_clear(x)
+#define abobj_set_nbys(x,nbys)   abase_u128_obj_set_nbys(x,nbys)
 
 #define abt     abase_u128_base_type
 #define abnbits(x)      abase_u128_nbits(x)

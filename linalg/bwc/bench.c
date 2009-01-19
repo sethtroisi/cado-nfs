@@ -80,7 +80,7 @@ int main(int argc, char * argv[])
         if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
         if (wild == 0) {
             file = argv[0];
-            argc--;
+            argv++,argc--;
             wild++;
             continue;
         }
@@ -98,6 +98,17 @@ int main(int argc, char * argv[])
     const char * tmp;
     if ((tmp = param_list_lookup_string(pl, "impl")) != NULL) {
         impl = tmp;
+    }
+
+    unsigned int nbys;
+
+    if (param_list_parse_uint(pl, "nbys", &nbys)) {
+        /* The api mandates that we set the desired value for nbys. Here,
+         * that's not really our intent, since we really want to bench
+         * the layer in its favorite working context. Most of the time,
+         * setting nbys is pointless.
+         */
+        abobj_set_nbys(xx,nbys);
     }
 
     if (param_list_warn_unused(pl)) {
@@ -155,7 +166,7 @@ int main(int argc, char * argv[])
             (*bind->mul)(mm, src2, dst2, 0);
             abdotprod(xx, checkB, src, src2, mm->ncols);
 
-            if (memcmp(checkA, checkB, aboffset(xx, abnbits(xx))) != 0) {
+            if (memcmp(checkA, checkB, aboffset(xx, abnbits(xx)) * sizeof(abt)) != 0) {
                 fprintf(stderr, "Check %d failed\n", t);
                 BUG();
             }

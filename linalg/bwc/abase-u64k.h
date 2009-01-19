@@ -50,6 +50,11 @@ typedef uint64_t abase_u64k_base_type;
 #define abase_u64k_max_accumulate(x) UINT_MAX
 #define abase_u64k_max_accumulate_wide(x) UINT_MAX
 
+static inline void abase_u64k_obj_set_nbys(abase_u64k_obj_ptr x MAYBE_UNUSED, unsigned int nbys)
+{
+    ASSERT_ALWAYS(nbys == abase_u64k_nbits(x));
+}
+
 static inline
 abase_u64k_base_type * abase_u64k_init(abase_u64k_obj_srcptr x MAYBE_UNUSED,
         unsigned int n)
@@ -233,6 +238,7 @@ abase_u64k_dotprod(abase_u64k_obj_srcptr x MAYBE_UNUSED,
 #define abobj_init(x)   abase_u64k_obj_init(x)
 #define abobj_init_set(y,x)   abase_u64k_obj_init_set(y,x)
 #define abobj_clear(x)  abase_u64k_obj_clear(x)
+#define abobj_set_nbys(x,nbys)   abase_u64k_obj_set_nbys(x,nbys)
 
 #define abt     abase_u64k_base_type
 #define abnbits(x)      abase_u64k_nbits(x)

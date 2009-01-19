@@ -7,9 +7,9 @@
 #include <stdio.h>
 
 #include "parallelizing_info.h"
-#include "abase.h"
 #include "select_mpi.h"
 #include "params.h"
+#include "macros.h"
 
 int m,n;
 int verbose=0;
