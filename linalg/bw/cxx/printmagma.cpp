@@ -16,6 +16,7 @@
 #include "config_file.hpp"
 #include "matrix.hpp"
 #include "bitstring.hpp"
+#include "utils.h"
 
 using namespace std;
 // using namespace boost;
@@ -46,6 +47,9 @@ int data_per_row(std::string const f)
     }
     std::string line;
     getline(a, line);
+    if (line.find(" ") == line.npos) {
+        return -4*line.size();
+    }
     istringstream ss(line);
     int ny;
     for(ny = 0 ; ss >> t ; ny++);
@@ -148,26 +152,43 @@ bool r_avec(vector<T>& co, int m, int n)
             /* columns might come together ! */
             std::string a_nm = files::a % i % j;
             int ny = data_per_row<T>(a_nm);
-            if (ny < 0)
+            if (ny == -1)
                 break;
             ifstream a(a_nm.c_str());
-            T t;
-            for(int d = 0 ; !a.eof() ; d++) {
-                int k;
-                for(k = 0 ; k < ny && a >> t ; k++) {
+            if (ny > 0) {
+                T t;
+                for(int d = 0 ; !a.eof() ; d++) {
+                    int k;
+                    for(k = 0 ; k < ny && a >> t ; k++) {
+                        if ((int) co.size() <= d*m*n) {
+                            co.insert(co.end(), (d+1)*m*n - co.size(), 0);
+                        }
+                        co[d*m*n+i*n+j+k] = t;
+                    }
+                    if (k != ny && !a.eof()) {
+                        std::string line;
+                        getline(a, line);
+                        cerr << fmt("error parsing % (asking for %x% data, nbys=%)\n") % a_nm % m % n % ny;
+                        return false;
+                    }
+                }
+            } else {
+                ny = -ny;
+                unsigned long buf[ny>>6];
+                for(int d = 0 ; !a.eof() ; d++) {
+                    int k;
+                    read_hexstring(a, buf, ny);
                     if ((int) co.size() <= d*m*n) {
                         co.insert(co.end(), (d+1)*m*n - co.size(), 0);
                     }
-                    co[d*m*n+i*n+j+k] = t;
-                }
-                if (k != ny && !a.eof()) {
-                    std::string line;
-                    getline(a, line);
-                    cerr << fmt("error parsing % (asking for %x% data, nbys=%)\n") % a_nm % m % n % ny;
-                    return false;
+                    for(k = 0 ; k < ny ; k++) {
+                        unsigned long b;
+                        b = buf[k / ULONG_BITS] >> (k % ULONG_BITS);
+                        b &= 1UL;
+                        co[d*m*n+i*n+j+k] = b;
+                    }
                 }
             }
-
             j += ny;
         }
     }

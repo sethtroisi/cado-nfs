@@ -4,6 +4,8 @@
 
 #define CAT(X,Y) X ## Y
 
+/* _setup and _dft, _ift integer arguments correspond to lengths */
+
 #define DEFINE_FFT_ADAPTER(visible,Z)					\
 struct visible {							\
 	CAT(Z,info_t) o;						\
@@ -11,12 +13,12 @@ struct visible {							\
 	typedef CAT(Z,src_t) src_t;					\
 									\
 	visible() {}							\
-	visible(int d1, int d2) { CAT(Z,setup)(o, d1, d2); }		\
-	visible(int d1, int d2,					\
-			int d3 MAYBE_UNUSED,				\
+	visible(int n1, int n2) { CAT(Z,setup)(o, n1, n2); }		\
+	visible(int n1, int n2,					\
+			int n3 MAYBE_UNUSED,				\
 			int acc MAYBE_UNUSED)			\
 	{								\
-		CAT(Z,setup)(o, d1, d2);				\
+		CAT(Z,setup)(o, n1, n2);				\
 	}								\
 									\
 	inline t alloc(int n) const { return CAT(Z,alloc)(o, n); }	\

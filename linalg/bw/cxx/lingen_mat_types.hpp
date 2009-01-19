@@ -285,6 +285,20 @@ struct polmat { /* {{{ */
         podswap(order,n.order);
         podswap(_deg,n._deg);
     }
+    inline void copy(polmat & n) {
+        nrows=n.nrows;
+        ncols=n.ncols;
+        ncoef=n.ncoef;
+        delete[] x;
+        delete[] order;
+        delete[] _deg;
+        order=new unsigned int[ncols];
+        _deg=new int[ncols];
+        x = new unsigned long[ncols*colstride()];
+        memcpy(order,n.order,ncols*sizeof(unsigned long));
+        memcpy(_deg,n._deg,ncols*sizeof(int));
+        memcpy(x, n.x, ncols*colstride()*sizeof(unsigned long));
+    }
     /* }}} */
     public:
 #if 0
@@ -565,6 +579,8 @@ struct polmat { /* {{{ */
         /* Beware, trailing bits are lurking here and there */
         if (colstride() == a.colstride()) {
             /* Then this is fast *//*{{{*/
+            // notice that since we shift the whole column, bits shifted
+            // out from a row reappear as noise bit higher up.
             if (sb) {
                 if (s > 0) {
                     mpn_lshift(dst + sw, src, colstride() - sw, sb);

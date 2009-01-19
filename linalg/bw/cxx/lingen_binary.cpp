@@ -45,6 +45,7 @@ unsigned int cantor_threshold = UINT_MAX;
 #include "config_file.hpp"
 #include "matrix.hpp"
 #include "bitstring.hpp"
+#include "gf2x.h"
 
 /* output: F0x is the candidate number x. All coordinates of the
  * candidate are grouped, and coefficients come in order (least
@@ -106,10 +107,13 @@ void dbmat(bmat const * x)
         for( ; j < x->ncols ; ) {
             unsigned long z = 0;
             for(unsigned int k = 0 ; j < x->ncols && k < ULONG_BITS ; k++,j++) {
-                z <<= 1;
-                z |= x->coeff(i,j);
+                // z <<= 1;
+                // z |= x->coeff(i,j);
+                // This fancy bit positioning matches the syntax of
+                // read_hexstring and write_hexstring
+                z |= ((unsigned long) x->coeff(i,j)) << (ULONG_BITS-4-k+((k&3)<<1));
             }
-            w << setw(ULONG_BITS/4) << hex << z;
+            w << setw(ULONG_BITS/4) << setfill('0') << hex << z;
         }
         w.flush();
         std::cout << ":" << w.str() << "\n";
@@ -131,6 +135,9 @@ namespace globals {
     std::vector<unsigned int> chance_list;
 
     polmat E;
+#ifndef NDEBUG
+    polmat E_saved;
+#endif
     bmat e0;
 
     // F0 is exactly the n x n identity matrix, plus the X^(s-exponent)e_{cnum}
@@ -158,7 +165,77 @@ void compute_E_from_A(polmat const &a)/*{{{*/
         tmp_E.import_col_shift(n + j, a, cnum, - (int) exponent);
     }
     E.swap(tmp_E);
+
 }/*}}}*/
+
+#ifdef  DO_EXPENSIVE_CHECKS
+/* revive this old piece of code from old commits. */
+void multiply_slow(polmat& dst, polmat /* const */ &a, polmat /* const */ &b)
+{
+    BUG_ON(a.ncols != b.nrows);
+
+    unsigned int Gaw = (a.ncoef+ULONG_BITS-1)/ULONG_BITS;
+    unsigned int Gbw = (b.ncoef+ULONG_BITS-1)/ULONG_BITS;
+
+    unsigned long tmp[Gaw + Gbw];
+
+    polmat res(a.nrows, b.ncols, (Gaw + Gbw) * ULONG_BITS);
+    for (uint j = 0; j < b.ncols; j++) {
+        for (uint i = 0; i < a.nrows; i++) {
+            for (uint k = 0; k < a.ncols; k++) {
+                int da = a.deg(k);
+                int db = b.deg(j);
+                if (da == -1 || db == -1)
+                    continue;
+                /* const */ unsigned long * ax = a.poly(i,k);
+                /* const */ unsigned long * bx = b.poly(k,j);
+                unsigned int aw = 1 + da / ULONG_BITS;
+                unsigned int bw = 1 + db / ULONG_BITS;
+                unsigned int az = (da+1) & (ULONG_BITS-1);
+                unsigned int bz = (db+1) & (ULONG_BITS-1);
+
+                /* It's problematic if the high bits aren't cleared, as
+                 * gf2x works at the word level */
+                /* becuase import_col_shift isn't careful enough, we have
+                 * to do the cleanup by ourself.
+                 */
+                if (az) { ax[aw-1] &= (1UL << az) - 1; }
+                if (bz) { bx[bw-1] &= (1UL << bz) - 1; }
+                // if (az) { ASSERT((ax[aw-1]>>az)==0); }
+                // if (bz) { ASSERT((bx[bw-1]>>bz)==0); }
+                mul_gf2x(tmp,ax,aw,bx,bw);
+                
+                for(unsigned int w = 0 ; w < aw+bw ; w++) {
+                    res.poly(i,j)[w] ^= tmp[w];
+                }
+            }
+        }
+    }
+    for (uint j = 0; j < b.ncols; j++) {
+        res.setdeg(j);
+    }
+    dst.swap(res);
+}
+
+struct checker {
+    polmat e;
+    unsigned int t0;
+    checker() {
+        e.copy(globals::E_saved);
+        t0=globals::t;
+    }
+    int check(polmat& pi) {
+        using namespace globals;
+        printf("Checking %u..%u\n",t0,t);
+        multiply_slow(e,e,pi);
+        unsigned int v = e.valuation();
+        ASSERT(v == t-t0);
+        e.xdiv_resize(t-t0, e.ncoef-(t-t0));
+        return v == t-t0;
+    }
+};
+#endif
+
 
 // F is in fact F0 * PI.
 // To multiply on the *left* by F, we cannot work directly at the column
@@ -342,22 +419,26 @@ void write_polmat(polmat const& P, const char * fn)/*{{{*/
         exit(1);
     }
 
-    for(unsigned int k = 0 ; k < P.ncoef ; k++) {
-        for(unsigned int i = 0 ; i < P.nrows ; i++) {
-            for(unsigned int j = 0 ; j < P.ncols ; j++) {
-                if (j) f << " ";
-                if ((int) k <= P.deg(j)) {
-                    f << P.coeff(i,j,k);
-                } else {
-                    f << 0;
-                }
-            }
+    size_t nw = ( P.ncoef + ULONG_BITS - 1) / ULONG_BITS;
+    unsigned long tmp[ nw ];
+
+    f << P.nrows << " " << P.ncols << " " << P.ncoef << "\n";
+    for(unsigned int j = 0 ; j < P.ncols ; j++) {
+        if (j) f << " ";
+        f << P.deg(j);
+    }
+    f << "\n";
+    for(unsigned int i = 0 ; i < P.nrows ; i++) {
+        for(unsigned int j = 0 ; j < P.ncols ; j++) {
+            memcpy(tmp,P.poly(i,j),nw * sizeof(unsigned long));
+            write_hexstring(f,tmp,1+P.deg(j));
             f << "\n";
         }
-        f << "\n";
     }
     printf("Written f to %s\n",fn);
-}/*}}}*/
+}
+
+/*}}}*/
 
 bool recover_f0_data(const char * fn)/*{{{*/
 {
@@ -1172,7 +1253,11 @@ static void extract_coeff_degree_t(unsigned int tstart, unsigned int dt, unsigne
                 if (zz[j].first-zz[i].first != j-i) break;
                 if (zz[j].second != zz[i].second) break;
             }
-            cout << fmt(" [%..%]") % zz[i].first % zz[j-1].first;
+            if (zz[i].first < zz[j-1].first) {
+                cout << fmt(" [%..%]") % zz[i].first % zz[j-1].first;
+            } else {
+                cout << fmt(" [%]") % zz[i].first;
+            }
             if (zz[i].second > 1) {
                 cout << fmt("*%") % zz[i].second;
             }
@@ -1247,10 +1332,26 @@ static bool go_quadratic(polmat& pi)/*{{{*/
         // write_polmat(tmp_pi,std::string(fmt("pi-%-%") % tstart % t).c_str());
     }
     pi.swap(tmp_pi);
+#ifdef  DO_EXPENSIVE_CHECKS
+        write_polmat(pi,std::string(fmt("pi-%-%") % tstart % t).c_str());
+#else
     if (checkpoints)
         write_polmat(pi,std::string(fmt("pi-%-%") % tstart % t).c_str());
+#endif
+
 #ifdef  VERBOSE
     print_deltas();
+#endif
+
+#ifdef  DO_EXPENSIVE_CHECKS
+    printf("Checking\n");
+    multiply_slow(E_saved,E_saved,pi);
+    unsigned int v = E_saved.valuation();
+    ASSERT(v == t-tstart);
+    E_saved.xdiv_resize(t-tstart, E_saved.ncoef-(t-tstart));
+    for (uint j = 0; j < E_saved.ncols; j++) {
+        E_saved.setdeg(j);
+    }
 #endif
 
     return finished;
@@ -1280,6 +1381,10 @@ static bool go_recursive(polmat& pi, unsigned int level)
     unsigned int tmiddle;
     bool finished_early;
 
+#ifdef  DO_EXPENSIVE_CHECKS
+    checker c;
+#endif
+
 #ifdef	HAS_CONVOLUTION_SPECIAL
     kill=ldeg;
 #else
@@ -1291,8 +1396,9 @@ static bool go_recursive(polmat& pi, unsigned int level)
 
     tpolmat<fft_type> E_hat;
 
-    // our ``degree'' here counts actually for a dft _length_ !
-    transform(E_hat, E, o, deg);
+    /* The transform() calls expect a number of coefficients, not a
+     * degree ! */
+    transform(E_hat, E, o, deg + 1);
 
     E.resize(ldeg);
     polmat pi_left;
@@ -1356,7 +1462,9 @@ static bool go_recursive(polmat& pi, unsigned int level)
 #endif
 
     tpolmat<fft_type> pi_l_hat;
-    transform(pi_l_hat, pi_left, o, pi_l_deg);
+    /* The transform() calls expect a number of coefficients, not a
+     * degree ! */
+    transform(pi_l_hat, pi_left, o, pi_l_deg + 1);
     pi_left.clear();
 
     tpolmat<fft_type> E_middle_hat;
@@ -1366,7 +1474,9 @@ static bool go_recursive(polmat& pi, unsigned int level)
     E_hat.clear();
     /* pi_l_hat is used later on ! */
 
-    itransform(E, E_middle_hat, o, deg-1 + pi_l_deg - kill);
+    /* The transform() calls expect a number of coefficients, not a
+     * degree ! */
+    itransform(E, E_middle_hat, o, deg + pi_l_deg - kill + 1);
     E_middle_hat.clear();
 
     /* Make sure that the first ldeg-kill coefficients of all entries of
@@ -1384,7 +1494,9 @@ static bool go_recursive(polmat& pi, unsigned int level)
     E.clear();
 
     tpolmat<fft_type> pi_r_hat;
-    transform(pi_r_hat, pi_right, o, pi_r_deg);
+    /* The transform() calls expect a number of coefficients, not a
+     * degree ! */
+    transform(pi_r_hat, pi_right, o, pi_r_deg + 1);
     pi_right.clear();
 
     tpolmat<fft_type> pi_hat;
@@ -1392,7 +1504,9 @@ static bool go_recursive(polmat& pi, unsigned int level)
     pi_l_hat.clear();
     pi_r_hat.clear();
 
-    itransform(pi, pi_hat, o, pi_l_deg + pi_r_deg);
+    /* The transform() calls expect a number of coefficients, not a
+     * degree ! */
+    itransform(pi, pi_hat, o, pi_l_deg + pi_r_deg + 1);
 
     if (checkpoints) {
         write_polmat(pi,std::string(fmt("pi-%-%") % tstart % t).c_str());
@@ -1406,6 +1520,9 @@ static bool go_recursive(polmat& pi, unsigned int level)
         }
     }
 
+#ifdef  DO_EXPENSIVE_CHECKS
+    c.check(pi);
+#endif
 
     if (finished_early) {
         printf("%-8u" "deg(pi_r) = %d ; escaping\n",
@@ -1670,6 +1787,10 @@ void block_wiedemann(void)
     for(unsigned int i = 0 ; i < m + n ; i++) {
         E.deg(i) = E.ncoef - 1;
     }
+
+#ifndef NDEBUG
+    E_saved.copy(E);
+#endif
 
     start_time = seconds();
 

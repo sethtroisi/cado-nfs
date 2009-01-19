@@ -530,14 +530,19 @@ void recomposeK(unsigned long * F, Kelt * f, int Fl, int k MAYBE_UNUSED)
 #error "define ULONG_BITS"
 #endif
 
-void c128_setup(c128_info_t p, int dF, int dG)
+/* nF is a number of coefficients */
+void c128_setup(c128_info_t p, int nF, int nG)
 {
     int k;
     int Hl;
     int n;
 
-    int Fl = (dF + 1 + 63) / 64;
-    int Gl = (dG + 1 + 63) / 64;
+    /* Since internally we're working with 64-bit data, then it's really
+     * a hard 64 here, not ULONG_BITS : We're just deciding on the order
+     * of things.
+     */
+    int Fl = (nF + 63) / 64;
+    int Gl = (nG + 63) / 64;
 
     Hl = Fl + Gl;               // nb of uint64_t of the result
     n = Hl;                     // nb of Kelt of the result.
@@ -552,9 +557,10 @@ void c128_setup(c128_info_t p, int dF, int dG)
     p->n = n;
 }
 
-void c128_dft(const c128_info_t p, c128_t x, unsigned long * F, int dF)
+/* nF is a number of coefficients */
+void c128_dft(const c128_info_t p, c128_t x, unsigned long * F, int nF)
 {
-    int Fl = 1 + dF / ULONG_BITS;
+    int Fl = (nF + ULONG_BITS - 1) / ULONG_BITS;
     decomposeK(x,F,Fl,p->k);
     multievaluateKnew_trunc(x, p->k, p->n);
 }
@@ -572,13 +578,15 @@ void c128_add(const c128_info_t p, c128_t y, c128_src_t x1, c128_src_t x2)
         Kadd(y[j], x1[j], x2[j]);
     }
 }
+
+/* nH is a number of coefficients */
 void c128_ift(
         const c128_info_t p,
         unsigned long * H,
-        int dH,
+        int nH,
         c128_t h)
 {
-    int Hl = 1 + dH / ULONG_BITS;
+    int Hl = (nH + ULONG_BITS - 1) / ULONG_BITS;
 
     // fill in with zeros to facilitate interpolation
     memset(h + p->n, 0, ((1 << p->k) - p->n) * sizeof(Kelt));
@@ -601,21 +609,21 @@ void mulCantor128(unsigned long * H, unsigned long * F, int Fl, unsigned long * 
     c128_info_t order;
     c128_t f,g;
 
-    int dF = Fl * ULONG_BITS - 1;
-    int dG = Gl * ULONG_BITS - 1;
+    int nF = Fl * ULONG_BITS;
+    int nG = Gl * ULONG_BITS;
 
-    c128_setup(order, dF, dG);
+    c128_setup(order, nF, nG);
 
     f = c128_alloc(order, 1);
-    c128_dft(order, f, F, dF);
+    c128_dft(order, f, F, nF);
 
     g = c128_alloc(order, 1);
-    c128_dft(order, g, G, dG);
+    c128_dft(order, g, G, nG);
 
     c128_compose(order, f, f, g);
 
     c128_free(order, g, 1);
-    c128_ift(order, H, dF + dG, f);
+    c128_ift(order, H, nF + nG -1, f);
 
     c128_free(order, f, 1);
 }
