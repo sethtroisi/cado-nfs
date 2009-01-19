@@ -67,13 +67,18 @@ void * program(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
         }
 
         // if we're looking for the right nullspace, then x is on the left.
-        // Otherwise, it's on the right
+        // Otherwise, it's on the right.
         setup_x_random(xvecs, m, nx, mmt->n[dir], pi);
+
+        // Compute y.
+        matmul_top_fill_random_source(mmt, dir);
+
+        // We must compute x^T M y, x^T M^2 y, and so on.
+        
 
         break;
     }
 
-    matmul_top_fill_random_source(mmt, dir);
 
     // we need to save this starting vector for later use if it turns out
     // that we need to save it for real.

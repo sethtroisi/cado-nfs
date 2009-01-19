@@ -81,7 +81,10 @@ common_libs += -lpthread
 endif
 
 
-rmobjs:=../readbuffer.o ../readmat.o
+normalobjs:=../readbuffer.o ../readmat.o
+
+all_objlists:=libmatmul build bench prep
+
 libmatmul_objs:=matmul-sliced.o matmul-sliced-asm.o matmul-basic.o matmul.o
 build_objs:=build.o libmatmul.a
 bench_objs:=bench.o libmatmul.a
@@ -131,24 +134,23 @@ $(1)/%.o: %.cpp
 	@mkdir -p .deps/$(1)
 	$$(CXX) $$(MY_CXXFLAGS) -M -MM -MG -MP -MF $$@ -MT '$$@ $(1)/$$*.o' $$<
 
+$$(foreach x,$$(all_objlists),$$(eval $(1)_$$(x)_objs:=$(1)/abase-$(1).o $$(patsubst %,$(1)/%,$$($$(x)_objs))))
 
-$(1)_libmatmul_objs:=$$(patsubst %,$(1)/%,$$(libmatmul_objs))
+
 $(1)/libmatmul.a: $$($(1)_libmatmul_objs)
 	-rm -f $$@
 	ar r $$@ $$($(1)_libmatmul_objs)
-$(1)_build_objs:=$$(patsubst %,$(1)/%,$$(build_objs))
-$(1)/build: $$($(1)_build_objs) $$(rmobjs)
-	$$(CXX) $$(MY_LFLAGS) $$($(1)_build_objs) $$(rmobjs) -o $$@ $$(common_libs)
+
+$(1)/build: $$($(1)_build_objs) $$(normalobjs)
+	$$(CXX) $$(MY_LFLAGS) $$($(1)_build_objs) $$(normalobjs) -o $$@ $$(common_libs)
 -include $$(patsubst %,.deps/%.d,$$($(1)_build_objs))
 
-$(1)_bench_objs:=$$(patsubst %,$(1)/%,$$(bench_objs))
-$(1)/bench: $$($(1)_bench_objs) $$(rmobjs)
-	$$(CXX) $$(MY_LFLAGS) $$($(1)_bench_objs) $$(rmobjs) -o $$@ $$(common_libs)
+$(1)/bench: $$($(1)_bench_objs) $$(normalobjs)
+	$$(CXX) $$(MY_LFLAGS) $$($(1)_bench_objs) $$(normalobjs) -o $$@ $$(common_libs)
 -include $$(patsubst %,.deps/%.d,$$($(1)_bench_objs))
 
-$(1)_prep_objs:=$$(patsubst %,$(1)/%,$$(prep_objs))
-$(1)/prep: $$($(1)_prep_objs) $$(rmobjs)
-	$$(CXX) $$(MY_LFLAGS) $$($(1)_prep_objs) $$(rmobjs) -o $$@ $$(common_libs) -lgmpxx
+$(1)/prep: $$($(1)_prep_objs) $$(normalobjs)
+	$$(CXX) $$(MY_LFLAGS) $$($(1)_prep_objs) $$(normalobjs) -o $$@ $$(common_libs) -lgmpxx
 -include $$(patsubst %,.deps/%.d,$$($(1)_prep_objs))
 
 allbins+=$$(patsubst %,$(1)/%,$(bins))
@@ -156,10 +158,10 @@ endef
 
 # U64 is the prime-time version. The others can be dropped to accelerate
 # compilation.
-$(eval $(call configure_abase,U64))
-$(eval $(call configure_abase,U64K))
-$(eval $(call configure_abase,U64N))
-$(eval $(call configure_abase,U128))
+$(eval $(call configure_abase,u64))
+$(eval $(call configure_abase,u64k))
+$(eval $(call configure_abase,u64n))
+$(eval $(call configure_abase,u128))
 
 all: $(allbins)
 

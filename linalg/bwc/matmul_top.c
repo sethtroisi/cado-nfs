@@ -442,7 +442,8 @@ void matmul_top_fill_random_source(matmul_top_data_ptr mmt, int d)
     // that will eventually be relevant. However, it's easy enough to
     // fill our output vector with garbage, and do broadcast_down
     // afterwards...
-    abrandom(mmt->abase, mmt->wr[d]->v, mmt->wr[d]->i1 - mmt->wr[d]->i0);
+    if ((mmt->flags[d] & THREAD_SHARED_VECTOR) == 0 || mmt->pi->wr[d]->trank == 0)
+        abrandom(mmt->abase, mmt->wr[d]->v, mmt->wr[d]->i1 - mmt->wr[d]->i0);
 
     // reconcile all cells which correspond to the same vertical block.
     broadcast_down(mmt, d);
