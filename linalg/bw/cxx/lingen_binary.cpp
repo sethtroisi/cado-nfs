@@ -1239,7 +1239,7 @@ static void extract_coeff_degree_t(unsigned int tstart, unsigned int dt, unsigne
             }
         }
 
-        std::cout << fmt("%[w8-]% zero cols:") % (tstart + dt) % z.size();
+        std::cout << fmt("%[w8-]%cols=0:") % (tstart + dt) % z.size();
 
         vector<pair<unsigned int, unsigned int> > zz;
         for(unsigned int i = 0 ; i < z.size() ; i++) {
@@ -1247,21 +1247,41 @@ static void extract_coeff_degree_t(unsigned int tstart, unsigned int dt, unsigne
         }
 
         // Now print this out more nicely.
-        for(unsigned int i = 0 ; i < zz.size() ; ) {
-            unsigned int j;
-            for(j = i; j < zz.size() ; j++) {
-                if (zz[j].first-zz[i].first != j-i) break;
-                if (zz[j].second != zz[i].second) break;
+        sort(zz.begin(),zz.end());
+        for( ; zz.size() ; ) {
+            unsigned int mi = UINT_MAX;
+            for(unsigned int i = 0 ; i < zz.size() ; i++) {
+                if (zz[i].second < mi) {
+                    mi = zz[i].second;
+                }
             }
-            if (zz[i].first < zz[j-1].first) {
-                cout << fmt(" [%..%]") % zz[i].first % zz[j-1].first;
-            } else {
-                cout << fmt(" [%]") % zz[i].first;
+            cout << " [";
+            for(unsigned int i = 0 ; i < zz.size() ; ) {
+                unsigned int j;
+                for(j = i; j < zz.size() ; j++) {
+                    if (zz[j].first-zz[i].first != j-i) break;
+                }
+                if (i) cout << ",";
+                if (zz[i].first == zz[j-1].first - 1) {
+                    cout << fmt("%,%") % zz[i].first % zz[j-1].first;
+                } else if (zz[i].first < zz[j-1].first) {
+                    cout << fmt("%..%") % zz[i].first % zz[j-1].first;
+                } else {
+                    cout << fmt("%") % zz[i].first;
+                }
+                i = j;
             }
-            if (zz[i].second > 1) {
-                cout << fmt("*%") % zz[i].second;
+            cout << "]";
+            if (mi > 1)
+                cout << "*" << mi;
+
+            vector<pair<unsigned int, unsigned int> > zz2;
+            for(unsigned int i = 0 ; i < zz.size() ; i++) {
+                if (zz[i].second > mi) {
+                    zz2.push_back(make_pair(zz[i].first,zz[i].second));
+                }
             }
-            i = j;
+            zz.swap(zz2);
         }
         std::cout << "\n";
     }
@@ -1481,9 +1501,10 @@ static bool go_recursive(polmat& pi, unsigned int level)
 
     /* Make sure that the first ldeg-kill coefficients of all entries of
      * E are zero. It's only a matter of verification, so this does not
-     * have to be critical. */
+     * have to be critical. Yet, it's an easy way of spotting bugs as
+     * well... */
 
-    ASSERT(E.valuation() >= ldeg - kill);
+    ASSERT_ALWAYS(E.valuation() >= ldeg - kill);
 
     /* This chops off some data */
     E.xdiv_resize(ldeg - kill, rdeg);

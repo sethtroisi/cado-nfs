@@ -6,9 +6,9 @@
 /* nF, nG : number of coefficients */
 void fake_setup(fake_info_t p, int nF, int nG)
 {
-    p->d1 = 1 + dF;
-    p->d2 = 1 + dG;
-    p->d3 = 1 + dF + dG;
+    p->d1 = 1 + nF;
+    p->d2 = 1 + nG;
+    p->d3 = 1 + nF + nG;
     int nc = -1;
     if (p->d1 > nc) nc = p->d1;
     if (p->d2 > nc) nc = p->d2;
