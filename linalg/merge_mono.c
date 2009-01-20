@@ -463,6 +463,7 @@ tryAllCombinations(report_t *rep, sparse_mat_t *mat, int m, INT *ind)
 
 // add u to its sons; we save the history in the history array, so that
 // we can report all at once and prepare for MPI.
+// A[i][j] contains the estimated weight/length of R[ind[i]]+R[ind[j]].
 int
 addFatherToSonsRec(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 		   sparse_mat_t *mat, int m, int *ind,
@@ -471,7 +472,7 @@ addFatherToSonsRec(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 		   int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 		   int u, int level0)
 {
-    int k, itab = 1, i1, i2, level = level0;
+    int k, itab = 1, i1, i2, level = level0, len;
 
     if(sons[u][0] == 0)
 	// nothing to do for a leaf...!
@@ -489,9 +490,10 @@ addFatherToSonsRec(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 	    level = i1;
 	i1 = ind[sons[u][k]];
 	// add u to its son
-#if 0 // it might be possible to reuse this, but A no longer contains
-      // the length of the addition, due to the wburried stuff, sob.
-	addRowsAndUpdate(mat, i1, i2, A[sons[u][k]][u]);
+#if 1
+	// recover true length of non-burried part for R[i1]+R[i2]
+	len = A[sons[u][k]][u] - mat->wburried[i1] - mat->wburried[i2];
+	addRowsAndUpdate(mat, i1, i2, len);
 #else
 	addRowsAndUpdate(mat, i1, i2, -1);
 #endif

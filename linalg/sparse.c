@@ -44,7 +44,7 @@ INT * copyRow(INT *row)
 void
 addRows(INT **rows, int i1, int i2, int len0)
 {
-    INT k1, k2, k, len, *tmp, *tmp2;
+    INT k1, k2, k, len, *tmp;
 
     ASSERT(rows[i1] != NULL);
     ASSERT(rows[i2] != NULL);
@@ -90,11 +90,19 @@ addRows(INT **rows, int i1, int i2, int len0)
         /* FIXME: why not use realloc here instead? Since k <= len,
            it suffices to shrink the tmp[] array to k entries.
            Also, we might detect the special case k = len. */
-	tmp2 = (INT *)malloc(k * sizeof(INT));
+#if 0
+	int *tmp2 = (INT *)malloc(k * sizeof(INT));
 	memcpy(tmp2, tmp, k * sizeof(INT));
 	tmp2[0] = k-1;
 	rows[i1] = tmp2;
 	free(tmp);
+#else
+	tmp[0] = k-1;
+	if(k == len)
+	    rows[i1] = tmp;
+	else
+	    rows[i1] = realloc(tmp, k * sizeof(INT));
+#endif
     }
 #if DEBUG >= 1
     fprintf(stderr, "row[%d]+row[%d] =", i1, i2);
