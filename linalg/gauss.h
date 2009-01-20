@@ -14,12 +14,14 @@ extern "C" {
  * hold space for at least limbs_per_col mp_limb_t values. Caution leads
  * to allocate as many as ncols pointers in the ker array.
  *
- * The rank is given by the return value. If ker == NULL, this is the
- * only thing computed.
+ * The dimension of the kernel is given by the return value. If ker ==
+ * NULL, this is the only thing computed (and limbs_per_col is unused).
  *
  * limbs_per_row (and accordingly limbs_per_col) must of course being
  * larger than or equal to ceiling(nrows/GMP_LIMB_BITS). We allow this
  * value to be exceeded so as to allow some padding.
+ *
+ * In case you wonder, this function is not reentrant at all. Sorry.
  */
 extern int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
 		  int limbs_per_row, int limbs_per_col);

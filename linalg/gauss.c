@@ -76,9 +76,6 @@ If just the dimension of kernel is wanted, set ker=NULL.
 typedef unsigned long int mp_limb_t;
 #endif
 
-#define INLINE __inline__
-
-
 /* some global variables storing the data */
 static int NROWS = 0;
 static int NCOLS = 0;
@@ -94,14 +91,14 @@ static void check_soundness();
 static void addPartialRows(int row, int pivot, mp_limb_t mask,
 			   int j_cur, mp_limb_t **ptr);
 #endif
-INLINE static void addRows(int row, int pivot, mp_limb_t mask,
+static inline void addRows(int row, int pivot, mp_limb_t mask,
 			   /*int j_cur,*/ mp_limb_t **ptr);
-INLINE static void add2Rows(int row, int row2, int pivot, mp_limb_t mask,
+static inline void add2Rows(int row, int row2, int pivot, mp_limb_t mask,
 			    /*int j_cur,*/ mp_limb_t **ptr_current);
-INLINE static void add3Rows(int row, int row2, int row3, int pivot,
+static inline void add3Rows(int row, int row2, int row3, int pivot,
 			    mp_limb_t mask, /* int j_current, */
 			    mp_limb_t **ptr_current);
-INLINE static int getPivot(mp_limb_t **ptr, mp_limb_t mask);
+static inline int getPivot(mp_limb_t **ptr, mp_limb_t mask);
 #if VERBOSE
 static void printVector(mp_limb_t *V, int n);
 static void printMatrix(mp_limb_t *M, int nrows, int ncols, int limbs_per_row);
@@ -236,7 +233,10 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
   mp_limb_t mask1, mask2;
   double st0 = seconds(), st;
 
+  // shut up.
+#if VERBOSE
   fprintf (stderr, "Using MULTI_ROW=%d\n", MULTI_ROW);
+#endif
 
   /* store the data in the global variables */
   matrix = mat;
@@ -360,9 +360,11 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
     if ((col_current % 128) == 0)
       {
         st = (seconds () - st0); /* time in seconds */
+#if VERBOSE
         fprintf (stderr, "done %d pivots in %1.0fs (est. %1.0fs)\n",
 			col_current,
                  st, (double) NCOLS * st / (double) col_current);
+#endif
       }
 
   } /* end while */
@@ -379,7 +381,9 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
   printf("%d]\n", set_used[NROWS-1]);
 #endif     
  
-  assert (limbs_per_col*MACHINE_WORD_SIZE >= NROWS);
+  /* if ker == NULL, then don't bug the user if he just gave 0 for the
+   * otherwise unused limbs_per_col value */
+  assert (ker == NULL || limbs_per_col*MACHINE_WORD_SIZE >= NROWS);
   /* Explore the set of unused rows, get the rank */
   rank = NROWS;
   for (i = 0; i < NROWS; ++i)
@@ -434,7 +438,7 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
  *   j_current is the number of the limb which contains the column
  */
 
-INLINE static void addRows(int row, int pivot, mp_limb_t mask,
+static inline void addRows(int row, int pivot, mp_limb_t mask,
                            /*int j_current,*/  mp_limb_t **ptr_current) {
   int i;
   mp_limb_t *ptr1, *ptr2;
@@ -453,7 +457,7 @@ INLINE static void addRows(int row, int pivot, mp_limb_t mask,
  *   j_current is the number of the limb which contains the column
  */
 
-INLINE static void add2Rows(int row, int row2, int pivot, mp_limb_t mask,
+static inline void add2Rows(int row, int row2, int pivot, mp_limb_t mask,
 			    /*int j_current,*/ mp_limb_t **ptr_current)
 {
   // int i;
@@ -473,7 +477,7 @@ INLINE static void add2Rows(int row, int row2, int pivot, mp_limb_t mask,
 } /* end function add2Rows */
 
 
-INLINE static void add3Rows(int row, int row2, int row3, int pivot,
+static inline void add3Rows(int row, int row2, int row3, int pivot,
 			    mp_limb_t mask, /* int j_current, */
 			    mp_limb_t **ptr_current) {
   // int i;
@@ -521,7 +525,7 @@ static void addPartialRows(int row, int pivot, mp_limb_t mask, int j_current,
 /* Return the index of the first row with a one in the desired column. */
 /* If the column is empty, return -1 */
 
-INLINE static int getPivot(mp_limb_t **ptr, mp_limb_t mask) {
+static inline int getPivot(mp_limb_t **ptr, mp_limb_t mask) {
   int i;
   for (i = 0; i < NROWS; ++i)
     if (*ptr[i]&mask)
