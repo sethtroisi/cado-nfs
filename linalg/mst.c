@@ -313,7 +313,7 @@ fillRowAddMatrix(int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], sparse_mat_t *mat,
 
     for(i = 0; i < m; i++)
 	A[i][i] = 0;
-    // A[i][j] <- Weight(R[ind[i]]+R[ind[j]]);
+    // A[i][j] <- estimated weight(R[ind[i]]+R[ind[j]]);
     for(i = 0; i < m; i++)
 	for(j = i+1; j < m; j++){
 	    A[i][j] = weightSum(mat, ind[i], ind[j]);

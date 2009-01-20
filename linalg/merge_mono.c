@@ -489,7 +489,12 @@ addFatherToSonsRec(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 	    level = i1;
 	i1 = ind[sons[u][k]];
 	// add u to its son
+#if 0 // it might be possible to reuse this, but A no longer contains
+      // the length of the addition, due to the wburried stuff, sob.
 	addRowsAndUpdate(mat, i1, i2, A[sons[u][k]][u]);
+#else
+	addRowsAndUpdate(mat, i1, i2, -1);
+#endif
 	history[level0][itab++] = i1;
     }
     history[level0][0] = itab-1;
