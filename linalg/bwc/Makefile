@@ -81,8 +81,6 @@ common_libs += -lpthread
 endif
 
 
-normalobjs:=../readbuffer.o ../readmat.o
-
 all_objlists:=libmatmul build bench prep
 
 libmatmul_objs:=matmul-sliced.o matmul-sliced-asm.o matmul-basic.o matmul.o
@@ -93,6 +91,10 @@ prep_objs:=prep.o intersections.o 			\
 	info_file.o 					\
 	auxfuncs.o xvectors.o				\
 	libmatmul.a
+build_normalobjs:=../readbuffer.o ../readmat.o
+bench_normalobjs:=../readbuffer.o ../readmat.o
+prep_normalobjs:=../readbuffer.o ../readmat.o ../gauss.o
+
 
 # This list contains the object files which do not depend on the abase
 # selection.
@@ -110,6 +112,13 @@ sources:=	\
 define hardlink_object
 $(1)/$(2): $(2)
 	ln -f $$< $$@
+endef
+
+define	multiple_binary
+$(1)/$(2): $$($(1)_$(2)_objs) $$($(2)_normalobjs)
+	$$(CXX) $$(MY_LFLAGS) $$($(1)_$(2)_objs) $$($(2)_normalobjs) -o $$@ $$(common_libs)
+-include $$(patsubst %,.deps/%.d,$$($(1)_$(2)_objs))
+allbins+=$(1)/$(2)
 endef
 
 define configure_abase
@@ -141,19 +150,9 @@ $(1)/libmatmul.a: $$($(1)_libmatmul_objs)
 	-rm -f $$@
 	ar r $$@ $$($(1)_libmatmul_objs)
 
-$(1)/build: $$($(1)_build_objs) $$(normalobjs)
-	$$(CXX) $$(MY_LFLAGS) $$($(1)_build_objs) $$(normalobjs) -o $$@ $$(common_libs)
--include $$(patsubst %,.deps/%.d,$$($(1)_build_objs))
-
-$(1)/bench: $$($(1)_bench_objs) $$(normalobjs)
-	$$(CXX) $$(MY_LFLAGS) $$($(1)_bench_objs) $$(normalobjs) -o $$@ $$(common_libs)
--include $$(patsubst %,.deps/%.d,$$($(1)_bench_objs))
-
-$(1)/prep: $$($(1)_prep_objs) $$(normalobjs)
-	$$(CXX) $$(MY_LFLAGS) $$($(1)_prep_objs) $$(normalobjs) -o $$@ $$(common_libs) -lgmpxx
--include $$(patsubst %,.deps/%.d,$$($(1)_prep_objs))
-
-allbins+=$$(patsubst %,$(1)/%,$(bins))
+$(call multiple_binary,$(1),build)
+$(call multiple_binary,$(1),bench)
+$(call multiple_binary,$(1),prep)
 endef
 
 # U64 is the prime-time version. The others can be dropped to accelerate
@@ -188,5 +187,5 @@ test: test_hello
 
 clean:
 	-rm -f sketch.aux sketch.dvi sketch.log sketch.ps
-	-rm -f *.bak *.[oa] $(bins) *~ U*/*.[oa] $(allbins)
+	-rm -f *.bak *.[oa] $(bins) *~ u*/*.[oa] $(allbins)
 	-rm -rf .deps

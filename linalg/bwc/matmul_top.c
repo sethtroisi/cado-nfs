@@ -241,7 +241,7 @@ broadcast_down(matmul_top_data_ptr mmt, int d)
                     }
                     unsigned int off = aboffset(mmt->abase, xx->offset_me);
                     void * ptr = mcol->v + off;
-                    size_t siz = xx->count * sizeof(abt);
+                    size_t siz = abbytes(mmt->abase, xx->count);
                     unsigned int root = xx->k / picol->ncores;
                     err = MPI_Bcast(ptr, siz, MPI_BYTE, root, picol->pals);
                     BUG_ON(err);
@@ -278,7 +278,7 @@ broadcast_down(matmul_top_data_ptr mmt, int d)
                 unsigned int off = aboffset(mmt->abase, xx->offset_me);
                 abt * ptr = mcol->v + off;
                 abt * sptr = mcol->all_v[src] + off;
-                size_t siz = xx->count * sizeof(abt);
+                size_t siz = abbytes(mmt->abase, xx->count);
                 ASSERT(ptr != sptr);
                 memcpy(ptr, sptr, siz);
             }
@@ -293,7 +293,7 @@ broadcast_down(matmul_top_data_ptr mmt, int d)
         }
         unsigned int off = aboffset(mmt->abase, xx->offset_me);
         void * ptr = mcol->v + off;
-        size_t siz = xx->count * sizeof(abt);
+        size_t siz = abbytes(mmt->abase, xx->count);
         unsigned int root = xx->k / picol->ncores;
         err = MPI_Bcast(ptr, siz, MPI_BYTE, root, picol->pals);
         BUG_ON(err);
@@ -314,7 +314,7 @@ broadcast_down(matmul_top_data_ptr mmt, int d)
             unsigned int off = aboffset(mmt->abase, xx->offset_me);
             abt * ptr = mcol->v + off;
             abt * sptr = mcol->all_v[src] + off;
-            size_t siz = xx->count * sizeof(abt);
+            size_t siz = abbytes(mmt->abase, xx->count);
             ASSERT(ptr != sptr);
             memcpy(ptr, sptr, siz);
         }
@@ -371,7 +371,7 @@ reduce_across(matmul_top_data_ptr mmt, int d)
             unsigned int dst = xx->k % pirow->ncores;
             unsigned int off = aboffset(mmt->abase, xx->offset_me);
             abt * dptr = mrow->all_v[dst] + off;
-            // size_t siz = xx->count * sizeof(abt);
+            // size_t siz = abbytes(mmt->abase, xx->count);
             ASSERT(off + xx->count <= mrow->i1 - mrow->i0);
             for(unsigned int j = 1 ; j < pirow->ncores ; j++) {
                 const abt * sptr = mrow->all_v[dst+j] + off;
@@ -406,7 +406,7 @@ reduce_across(matmul_top_data_ptr mmt, int d)
             // MPI_Reduce does not know about const-ness !
             abt * sptr = mrow->v + aboffset(mmt->abase, xx->offset_me);
             abt * dptr = mcol->v + aboffset(mmt->abase, xx->offset_there);
-            size_t siz = xx->count * sizeof(abt);
+            size_t siz = abbytes(mmt->abase, xx->count);
             err = MPI_Reduce(sptr, dptr, siz, MPI_BYTE, MPI_BXOR, jdst, pirow->pals);
             BUG_ON(err);
         }
@@ -422,7 +422,7 @@ reduce_across(matmul_top_data_ptr mmt, int d)
             // MPI_Reduce does not know about const-ness !
             abt * sptr = mrow->v + aboffset(mmt->abase, xx->offset_me);
             abt * dptr = mcol->v + aboffset(mmt->abase, xx->offset_there);
-            size_t siz = xx->count * sizeof(abt);
+            size_t siz = abbytes(mmt->abase, xx->count);
             err = MPI_Reduce(sptr, dptr, siz, MPI_BYTE, MPI_BXOR, jdst, pirow->pals);
             BUG_ON(err);
         }

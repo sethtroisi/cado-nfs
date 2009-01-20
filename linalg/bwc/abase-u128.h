@@ -15,6 +15,7 @@
 
 #include "macros.h"
 #include "random_generation.h"
+#include "pad.h"
 // #include "electric_alloc.h"
 
 
@@ -25,6 +26,7 @@
  * how all this could carry over to data types stored within mpns, even
  * possibly when the type width is going to be determined at runtime.
  */
+
 typedef void * abase_u128_obj_t;
 typedef void * abase_u128_obj_ptr;
 typedef const void * abase_u128_obj_srcptr;
@@ -34,8 +36,13 @@ typedef const void * abase_u128_obj_srcptr;
 #define abase_u128_obj_init_set(y,x) (y=x)
 
 #include <emmintrin.h>
-
 typedef __v2di abase_u128_base_type;
+
+/* Our `best-friend' variable-width type is u64n. We ask not to bind it,
+ * but our call to abase-api.h will do vbinding though */
+#define ABASE_DONTBIND_u64n
+#include "abase-u64n.h"
+
 #define abase_u128_nbits(x)  128
 
 // repeating is just the fact of putting several base type elements next
@@ -45,12 +52,13 @@ typedef __v2di abase_u128_base_type;
 #define abase_u128_max_accumulate(x) UINT_MAX
 #define abase_u128_max_accumulate_wide(x) UINT_MAX
 
-#include "pad.h"
 #define P(X)    PAD(abase_u128,X)
+#define PV(X)    PAD(abase_u64n,X)
 #define ABASE_F(t,n,a) static inline t P(n) a
 
 #define AVOID_GENERIC_is_zero
 #include "abase-binary-generic.h"
+#undef  AVOID_GENERIC_is_zero
 
 ABASE_F(int, is_zero, (P(obj_srcptr) x MAYBE_UNUSED,
             const P(base_type) * p,
@@ -74,6 +82,7 @@ P(dotprod)(P(obj_srcptr) x,
 #ifndef ABASE_DONTBIND_u128
 /* Bind our interface as the default one */
 #define ABASE_BIND(X)    PAD(abase_u128,X)
+#define ABASE_VBIND(X)    PAD(abase_u64n,X)
 #include "abase-api.h"
 #endif
 

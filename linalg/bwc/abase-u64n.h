@@ -24,6 +24,7 @@
 
 #include "macros.h"
 #include "random_generation.h"
+#include "pad.h"
 // #include "electric_alloc.h"
 
 
@@ -34,6 +35,7 @@
  * how all this could carry over to data types stored within mpns, even
  * possibly when the type width is going to be determined at runtime.
  */
+
 typedef unsigned int abase_u64n_obj_t[1];
 typedef unsigned int * abase_u64n_obj_ptr;
 typedef const unsigned int * abase_u64n_obj_srcptr;
@@ -44,6 +46,9 @@ typedef const unsigned int * abase_u64n_obj_srcptr;
 
 typedef uint64_t abase_u64n_base_type;
 
+/* Our `best-friend' variable-width type is u64n. Funny, that's
+ * ourselves !! */
+
 #define abase_u64n_repeat(x)  (x[0])
 
 // nbits takes into account the repeat count. So it's repeat(x) times the
@@ -53,8 +58,8 @@ typedef uint64_t abase_u64n_base_type;
 #define abase_u64n_max_accumulate(x) UINT_MAX
 #define abase_u64n_max_accumulate_wide(x) UINT_MAX
 
-#include "pad.h"
 #define P(X)    PAD(abase_u64n,X)
+#define PV(X)    PAD(abase_u64n,X)
 #define ABASE_F(t,n,a) static inline t P(n) a
 
 #define AVOID_GENERIC_obj_set_nbys
@@ -66,8 +71,9 @@ ABASE_F(void,obj_set_nbys,(P(obj_ptr) x MAYBE_UNUSED, unsigned int nbys))
     ASSERT_ALWAYS(r == 0);
     x[0] = q;
 }
-
 #include "abase-binary-generic.h"
+#undef AVOID_GENERIC_obj_set_nbys
+
 
 /* This one is in the C file. */
 extern void
@@ -80,6 +86,7 @@ P(dotprod)(P(obj_srcptr) x,
 #ifndef ABASE_DONTBIND_u64n
 /* Bind our interface as the default one */
 #define ABASE_BIND(X)    PAD(abase_u64n,X)
+#define ABASE_VBIND(X)    PAD(abase_u64n,X)
 #include "abase-api.h"
 #endif
 

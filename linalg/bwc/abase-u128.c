@@ -40,3 +40,41 @@ ABASE_F(void,dotprod,(P(obj_srcptr) x,
         u += P(repeat)(x);
     }
 }
+ABASE_F(void,vdotprod,(
+            P(obj_srcptr) x,
+            PV(obj_srcptr) y,
+        P(base_type) * w,
+        const PV(base_type) * u,
+        const P(base_type) * v,
+        unsigned int n))
+{
+    memset(w, 0, P(bytes)(x,P(nbits)(x)));
+    for(unsigned int i = 0 ; i < n ; i++) {
+        __v2di * w0 = (__v2di*) w;
+        for(unsigned int l = 0 ; l < P(repeat)(x) ; l++) {
+#define SSE_0   ((__v2di) {0,0} )
+            __v2di mb[4][2] = { 
+                {SSE_0, SSE_0},
+                {*v, SSE_0},
+                {SSE_0, *v},
+                {*v, *v},
+            };
+#undef SSE_0
+            v++;
+            __v2di *sw = w0;
+            const PV(base_type) * ut = u;
+            for(unsigned int k = 0 ; k < PV(repeat)(y) ; k++) {
+                uint64_t a = *ut++;
+                for (unsigned int j = 0; j < 64; j += 2) {
+                    *sw ^= mb[a & 3][0];
+                    sw += P(repeat)(x);
+                    *sw ^= mb[a & 3][1];
+                    sw += P(repeat)(x);
+                    a >>= 2;
+                }
+            }
+            w0++;
+        }
+        u += PV(repeat)(y);
+    }
+}

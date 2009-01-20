@@ -26,9 +26,15 @@ using namespace std;
 #include "abase.h"
 #include "manu.h"
 
+// #define L1_CACHE_SIZE   32768
+// take only 3/4 of the L1 cache.
+#define L1_CACHE_SIZE   24576
+// for 8-bytes abt values, this gives 3072 items.
+
 /* Here is how the matrix is stored in memory, in the "matmul_data_s" type.
  * The matrix is cut in slices, where each slice is a set of contiguous
- * rows. The size of a slice is hardcoded (?) as about 3072, with some
+ * rows. The size of a slice is tune so as to fill the L1 cache as per
+ * the macro above, with some
  * adjustment to handle non-exact divisibility: some slices will have
  * packbase rows and some others packbase+1 rows.
  * Within a slice, entries are stored as a list of pairs
@@ -57,7 +63,7 @@ using namespace std;
 #define MM_EXTENSION   "-sliced"
 
 #define MM_MAGIC_FAMILY        0xa000UL
-#define MM_MAGIC_VERSION       0x1005UL
+#define MM_MAGIC_VERSION       0x1006UL
 #define MM_MAGIC (MM_MAGIC_FAMILY << 16 | MM_MAGIC_VERSION)
 
 struct slice_info {
@@ -149,7 +155,7 @@ matmul_ptr matmul_sliced_build(abobj_ptr xx MAYBE_UNUSED, const char * filename)
     MM->ncols = smat->ncols;
     MM->ncoeffs = 0;
 
-    unsigned int npack = 3072;
+    unsigned int npack = L1_CACHE_SIZE / abbytes(MM->xab,1);
     unsigned int nslices = iceildiv(i1-i0, npack);
 
     unsigned int nslices_index = MM->data.size();
@@ -331,8 +337,21 @@ matmul_ptr matmul_sliced_reload_cache(abobj_ptr xx MAYBE_UNUSED, const char * fi
     unsigned long magic_check;
     rc = fread(&magic_check, sizeof(unsigned long), 1, f);
     FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
-    FATAL_ERROR_CHECK(magic_check != MM_MAGIC,
-            "Wrong magic in cached matrix file");
+    
+    if (magic_check != MM_MAGIC) {
+        fprintf(stderr, "Wrong magic in cached matrix file\n");
+        return NULL;
+    }
+
+    unsigned long nbytes_check;
+    rc = fread(&nbytes_check, sizeof(unsigned long), 1, f);
+    FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
+    
+    /* It's not fatal. It only deserves a warning */
+    if (nbytes_check != abbytes(MM->xab, 1)) {
+        fprintf(stderr, "Warning: cached matrix file fits data with different striding\n");
+    }
+
 
     rc = fread(&MM->nrows, sizeof(unsigned int), 1, f);
     FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
@@ -378,6 +397,10 @@ void matmul_sliced_save_cache(matmul_ptr mm, const char * filename)
     size_t rc;
 
     rc = fwrite(&magic, sizeof(unsigned long), 1, f);
+    FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
+
+    unsigned long nbytes = abbytes(MM->xab, 1);
+    rc = fwrite(&nbytes, sizeof(unsigned long), 1, f);
     FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
 
     rc = fwrite(&MM->nrows, sizeof(unsigned int), 1, f);

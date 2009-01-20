@@ -17,7 +17,7 @@
  * in reading the description of functions.
  *
  * Under normal circumstances, with ABASE_BIND undefined, cpp-ing this
- * file gives emmpty output.
+ * file gives empty output.
  *
  * (ABASE_BIND could be used as a global ifdef. My original intention was
  * to also allow the possibility of declaring function pointers in a
@@ -138,6 +138,11 @@
 #define abrandom(x,p,n) ABASE_BIND(random)(x,p,n)
 #endif
 
+/* abset_ui(x,p,k,v) ; set bit k of the record pointed to by p to the value v */
+#ifdef  ABASE_BIND
+#define abset_ui(x,p,k,v) ABASE_BIND(set_ui)(x,p,k,v)
+#endif
+
 /* aboffset(x,k) ; indicates the value D such that p+D points to the k-th
  * record after the one pointed to by p */
 #ifdef  ABASE_BIND
@@ -175,11 +180,51 @@
  * by u and v. The vector is stored in w as nbits records consisting of
  * abt values.
  *
+ * abvdotprod(x,y,w,u,v,n) ; does the same, but with u of type const
+ * abvt *, corresponding to the abvobj_t descriptor y.
  * This interface will be revised to accomodate the need to have u and v
  * of different types.
  */
 #ifdef  ABASE_BIND
 #define abdotprod(x,w,u,v,n) ABASE_BIND(dotprod)(x,w,u,v,n)
+#define abvdotprod(x,y,w,u,v,n) ABASE_BIND(vdotprod)(x,y,w,u,v,n)
 #endif
 
+/*
+ * Things controlled by ABASE_VBIND correspond to something different.
+ * It's the readily accessible workalike type which has runtime-specified
+ * width. It's dog slow by design, but comes in quite handy for things
+ * such as checks and so on.
+ */
+#ifdef  ABASE_VBIND
+#define abvobj_t   ABASE_VBIND(obj_t)
+#define abvobj_ptr   ABASE_VBIND(obj_ptr)
+#define abvobj_srcptr   ABASE_VBIND(obj_srcptr)
+#define abvt     ABASE_VBIND(base_type)
+#define abvobj_init(x)   ABASE_VBIND(obj_init)(x)
+#define abvobj_clear(x)  ABASE_VBIND(obj_clear)(x)
+#define abvobj_init_set(y,x)   ABASE_VBIND(obj_init_set)(y,x)
+#define abvobj_set_nbys(x,nbys)   ABASE_VBIND(obj_set_nbys)(x,nbys)
+#define abvnbits(x)      ABASE_VBIND(nbits)(x)
+#define abvrepeat(x)     ABASE_VBIND(repeat)(x)
+#define abvmax_accumulate(x)     ABASE_VBIND(max_accumulate)(x)
+#define abvmax_accumulate_wide(x)        ABASE_VBIND(max_accumulate_wide)(x)
+#define abvinit(x,n)     ABASE_VBIND(init)(x,n)
+#define abvclear(x,p,n)  ABASE_VBIND(clear)(x,p,n)
+#define abvinitf(x,n)    ABASE_VBIND(initf)(x,n)
+#define abvclearf(x,p,n) ABASE_VBIND(clearf)(x,p,n)
+#define abvzero(x,p,n)   ABASE_VBIND(zero)(x,p,n)
+#define abvis_zero(x,p,n)        ABASE_VBIND(is_zero)(x,p,n)
+#define abvrandom(x,p,n) ABASE_VBIND(random)(x,p,n)
+#define abvset_ui(x,p,k,v) ABASE_VBIND(set_ui)(x,p,k,v)
+#define abvoffset(x,k)   ABASE_VBIND(offset)(x,k)
+#define abvbytes(x,k)   ABASE_VBIND(bytes)(x,k)
+#define abvcopy(x,q,p,n) ABASE_VBIND(copy)(x,q,p,n)
+#define abvadd(x,q,p) ABASE_VBIND(add)(x,q,p)
+#define abvread(x,f,p,n) ABASE_VBIND(read)(x,f,p,n)
+#define abvwrite(x,f,p,n) ABASE_VBIND(write)(x,f,p,n)
+/* abvdotprod exists already above... */
+#endif  /* ABASE_VBIND */
+
 #endif	/* ABASE_API_H_ */
+

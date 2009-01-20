@@ -1,5 +1,6 @@
-#ifndef ABASE_BINARY_GENERIC_H_
-#define ABASE_BINARY_GENERIC_H_
+/* This header is intentionally NOT #ifdef-protected, because it may be
+ * included several times.
+ */
 
 /* This is most of the meat for binary abase implementations.
  * Must be included with ABASE_F and P properly defined.
@@ -65,6 +66,18 @@ ABASE_F(void,random, (P(obj_srcptr) x MAYBE_UNUSED,
         unsigned int n MAYBE_UNUSED))
 {
     myrand_area(p, P(bytes)(x,n));
+}
+#endif
+
+#ifndef AVOID_GENERIC_set_ui
+ABASE_F(void,set_ui, (P(obj_srcptr) x MAYBE_UNUSED,
+        P(base_type) * p,
+        unsigned int k, unsigned int v))
+{
+    ASSERT(k < P(nbits)(x));
+    uint64_t * xp = (uint64_t *) p;
+    uint64_t mask = ((uint64_t)1) << (k%64);
+    xp[k/64] = (xp[k/64] & ~mask) | ((v << (k%64))&mask);
 }
 #endif
 
@@ -138,5 +151,3 @@ ABASE_F(unsigned int, write, (P(obj_srcptr) x MAYBE_UNUSED,
 #ifdef __cplusplus
 }
 #endif
-
-#endif	/* ABASE_BINARY_GENERIC_H_ */
