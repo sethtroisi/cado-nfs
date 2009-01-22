@@ -494,10 +494,13 @@ sub is_job_alive {
     # Using lsof, check if this process is accessing the $job->{file} file.
     # We need to call readlink here to get the _absolute_ path of the file,
     # as returned by lsof.
-    $ret = remote_cmd($job->{host}, "env lsof -Fn -a -p$job->{pid} -d1 | ".
-                      "env grep ^n\\`env readlink -f $job->{file}\\`\$");
-    return -1 if $ret->{status} == 255;
-    return 0  if $ret->{status};
+    # FIXME: on some hosts (e.g. our trojans) lsof is not in PATH
+    if (0) {
+      $ret = remote_cmd($job->{host}, "env lsof -Fn -a -p$job->{pid} -d1 | ".
+                        "env grep ^n\\`env readlink -f $job->{file}\\`\$");
+      return -1 if $ret->{status} == 255;
+      return 0  if $ret->{status};
+    }
 
     return 1;
 }
@@ -1143,7 +1146,7 @@ sub do_task {
     open FILE, "> $param{prefix}.${t}_done"
         or die "Cannot open `$param{prefix}.${t}_done' for writing: $!.\n";
     close FILE;
-    $task->{done} = (stat("$param{prefix}.${t}_done"))[9]
+    $task->{done} = (stat("$param{prefix}.${t}_done"))[9] # modificaton time
         or die "Cannot stat `$param{prefix}.${t}_done': $!.\n";
 }
 
@@ -1239,14 +1242,14 @@ sub do_init {
 
     # Log file for commands
     $cmdlog = "$param{prefix}.cmd";
-    unlink $cmdlog if !$recover && -f $cmdlog;
+    # unlink $cmdlog if !$recover && -f $cmdlog;
     open LOG, ">> $cmdlog"
         or die "Cannot open `$cmdlog' for writing: $!.\n";
     print LOG "# Starting " . basename($0) . " on " . localtime() . "\n";
     close LOG;
 
     # Timestamp the task with the date of the last modification of $name.n
-    $tasks{init}->{done} = (stat("$param{prefix}.n"))[9]
+    $tasks{init}->{done} = (stat("$param{prefix}.n"))[9] # modification time
         or die "Cannot stat `$param{prefix}.n': $!.\n";
 
 
@@ -1278,14 +1281,22 @@ sub do_init {
         # Is there already a $name.${t}_done file? If so, it must mean that
         # the task has already been done
         if (!$done && -f "$param{prefix}.${t}_done") {
-            $done = (stat("$param{prefix}.${t}_done"))[9]
+            $done = (stat("$param{prefix}.${t}_done"))[9] # modification time
                 or die "Cannot stat `$param{prefix}.${t}_done': $!.\n";
         }
 
         # Check dependencies
         if ($done || $resume) {
             for (map $tasks{$_}, @{$task->{dep}}) {
-                if (!$_->{done} || ($done && $_->{done} > $done)) {
+                if (!$_->{done}) {
+                    info "$_->{name} not flagged as done, flagging ${t} as ".
+                      "not done\n";
+                    undef $done;
+                    undef $resume;
+                    last;
+                }
+                if ($done && $_->{done} > $done) {
+                    info "$_->{name}_done newer than ${t}_done\n";
                     undef $done;
                     undef $resume;
                     last;
@@ -1297,6 +1308,7 @@ sub do_init {
         if ($done || $resume) {
             for (@{$task->{param}}) {
                 if ($param_diff{$_}) {
+                    info "Parameters changed for ${t}\n";
                     undef $done;
                     undef $resume;
                     last;
