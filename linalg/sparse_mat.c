@@ -237,8 +237,8 @@ readmat(sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols)
 #endif
     INT ibuf, j, jmin = mat->jmin, jmax = mat->jmax;
     char *tooheavy = NULL;
-    int nburried = 0;
 
+    mat->nburried = 0;
     buf = (int *)malloc(lbuf * sizeof(int));
     ret = fscanf (file, "%d %d", &i, &k); // already set up...!
     ASSERT_ALWAYS (ret == 2);
@@ -261,12 +261,12 @@ readmat(sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols)
 		fprintf(stderr, "Burrying j=%d (wt=%d)\n", j, wc);
 #endif
 		tooheavy[j] = 1;
-		nburried++;
+		mat->nburried += 1;
 		if(wc > bmax) bmax = wc;
 		if(wc < bmin) bmin = wc;
 	    }
 	}
-	fprintf(stderr, "# Number of burried columns is %d", nburried);
+	fprintf(stderr, "# Number of burried columns is %d", mat->nburried);
 	fprintf(stderr, " (min=%d max=%d)\n", bmin, bmax);
     }
 
@@ -425,6 +425,8 @@ addRowsWithWeight(sparse_mat_t *mat, int i1, int i2)
     removeWeightFromRow(mat, i1);
     addRows(mat->rows, i1, i2, -1);
     mat->wburried[i1] += mat->wburried[i2];
+    if(mat->wburried[i1] > mat->nburried)
+	mat->wburried[i1] = mat->nburried;
     // new row i1 has to contribute to the weight
     addWeightFromRow(mat, i1);
 #if TRACE_ROW >= 0
@@ -555,19 +557,17 @@ remove_j_from_row(sparse_mat_t *mat, int i, int j)
 int
 weightSum(sparse_mat_t *mat, int i1, int i2)
 {
-    int k1, k2, w = 0, len1, len2;
+    int k1, k2, w, len1, len2;
 
+    w = mat->wburried[i1] + mat->wburried[i2];
+    if(w > mat->nburried)
+	w = mat->nburried;
     len1 = (isRowNull(mat, i1) ? 0 : lengthRow(mat, i1));
     len2 = (isRowNull(mat, i2) ? 0 : lengthRow(mat, i2));
     if((len1 == 0) || (len2 == 0))
 	fprintf(stderr, "i1=%d i2=%d len1=%d len2=%d\n", i1, i2, len1, len2);
-#if USE_TAB == 0
-    k1 = k2 = 0;
-    while((k1 < len1) && (k2 < len2)){
-#else
     k1 = k2 = 1;
     while((k1 <= len1) && (k2 <= len2)){
-#endif
 	if(cell(mat, i1, k1) < cell(mat, i2, k2)){
 	    k1++;
 	    w++;
@@ -582,7 +582,7 @@ weightSum(sparse_mat_t *mat, int i1, int i2)
     }
     w += (k1 > len1 ? 0 : len1-k1+1);
     w += (k2 > len2 ? 0 : len2-k2+1);
-    return w + mat->wburried[i1] + mat->wburried[i2];
+    return w;
 }
 
 int

@@ -492,7 +492,10 @@ addFatherToSonsRec(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 	// add u to its son
 #if 1
 	// recover true length of non-burried part for R[i1]+R[i2]
-	len = A[sons[u][k]][u] - mat->wburried[i1] - mat->wburried[i2];
+	len = mat->wburried[i1] + mat->wburried[i2];
+	if(len > mat->nburried)
+	    len = mat->nburried;
+	len = A[sons[u][k]][u] - len;
 	addRowsAndUpdate(mat, i1, i2, len);
 #else
 	addRowsAndUpdate(mat, i1, i2, -1);

@@ -16,6 +16,8 @@ typedef struct {
                         (trick: we store -w if w > cwmax) */
   int *wburried;     /* wburried[i] counts the estimated weight of burried
 			columns */
+  int nburried;     /* the number of burried columns, hence an upper
+			bound for wburried[i] */
   unsigned long *ad;
   unsigned long weight;
   int cwmax;         /* bound on weight of j to enter the SWAR structure */
