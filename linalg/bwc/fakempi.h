@@ -26,6 +26,8 @@ typedef int MPI_Errhandler;
 #define MPI_ERRORS_ARE_FATAl        0
 #define MPI_ERRORS_RETURN        1
 
+#define MPI_IN_PLACE    0
+
 
 #ifdef  __GNUC__
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -43,7 +45,12 @@ static inline int MPI_Recv( void *buf, int count, MPI_Datatype datatype, int sou
 static inline int MPI_Bcast( void *buffer, int count, MPI_Datatype datatype, int root, MPI_Comm comm){return 0;}
 static inline int MPI_Reduce ( void *sendbuf, void *recvbuf, int count,MPI_Datatype datatype, MPI_Op op, int root, MPI_Comm comm )
 {
-    memcpy(recvbuf, sendbuf, count * datatype);
+    if (sendbuf) memcpy(recvbuf, sendbuf, count * datatype);
+    return 0;
+}
+static inline int MPI_Allreduce ( void *sendbuf, void *recvbuf, int count,MPI_Datatype datatype, MPI_Op op, MPI_Comm comm )
+{
+    if (sendbuf) memcpy(recvbuf, sendbuf, count * datatype);
     return 0;
 }
 static inline int MPI_Comm_split (MPI_Comm x, int color, int key, MPI_Comm * y)
