@@ -1,0 +1,160 @@
+The tools present in this subdirectory form an implementation of the
+Block-Wiedemann algorithm with the following features:
+- parallelism at a multithread / MPI level. No multi-site level (yet).
+- checkpointing / restarting in case of problem.
+- checksums during the computation to detect problems.
+
+The input is a matrix that comes out from merge (the .small matrix) and
+the ouput is a set of vectors of its kernel.
+
+Calling sequence of binaries
+----------------------------
+
+1- balance
+   decomposes the input matrix into blocks that will be dispatched to
+   nodes
+2- prep
+   select input blocks of vectors, and check that rank conditions are
+   satisfied
+3- secure
+   precompute some data useful for checksums
+4- krylov
+   compute the Krylov sequence
+5- lingen
+   Berlekamp-Massey -like step: produces a generating polynomial
+6- mksol
+   create the solutions from the polynomial
+7- gather / apply_perm
+   reconstruct solutions from the mess
+
+
+Files (standard name, standard place, etc)
+------------------------------------------
+
+Input file is usually called   xxx.small
+It is a good idea to create a subdirectory bw/ where all subsequent
+temporaries are stored. bw.pl is doing that.
+
+balance will create a bunch of files in bw/ :
+  mat.col_perm, mat.row_perm   permutation on row/cols applied to balance
+                               weights
+  tmp-mat.xxxx                 temporary files for split/sort
+  mat.hi.vj                    contains the (i,j) block of the matrix
+  mat.info                     some statistics on slices (incl. weight)
+
+prep reads the output from balance, and create the following:
+  mat.hi.vj-sliced.bin         contains the (i,j) block of the matrix in
+                               a compact, precomputed form.
+  bw-prep.cfg, bw.cfg          recalls the command-line parameters
+  V0.0.twisted                 
+  V0.xx.twisted                vectors used for checksums
+  X.twisted                    X vector used for Krylov.
+  Y.twisted                    Y vector used for Krylov.
+
+The .twisted suffix means that the vectors have been permuted according
+to mat.col_perm or mat.row_perm. Use apply_perm to untwist them.
+
+krylov uses all this data and produces the linear sequence (a_ij), as a
+set of files
+  A-xx-00   (???)
+Some checkpoint data will also be produced:
+  ?????
+
+lingen, mksol, gather/applyperm
+
+
+The pi_go() function
+--------------------
+
+This is the main workhorse for the parallelizing of the computation. It
+allows multi-thread (with pthread) and multinode (with MPI) processing.
+
+The parameters given to pi_go() are:
+   . a pointer to the function that must be called in parallel.
+   . the mpi splitting (a pair of integers)
+   . the thread splitting (a pair of integers)
+
+Its implementation is in parallelizing_info.[ch] .  The main data
+structure that conveys information on the parallel setting is 
+  struct parallelizing_info_s
+The details are not so simple... but in a nutshell, we get 3 "wirings",
+the meaning of which is more or less a generalization of "MPI_Comm" to
+encompass also the pthread level. The first wiring allows full
+communication, the second is for row-wise communications, the third is
+for column-wise communications.
+
+The prototype of the function passed to pi_go() is
+  void *(*fcn)(parallelizing_info_ptr pi, void * arg)
+where parallelizing_info_ptr pi is built by pi_go and passed to the
+function. The last argument allows any additional thing to be passed
+through.
+
+Below are a few things you can do with the pi variable. In these protos,
+wr should be one of the wiring inside pi.
+  hello(pi)             // a small hello-world that tests the pi
+  thread_agreement(wr, void** ptr, uint i)
+                        // Broadcasting function at thread level
+  complete_broadcast(wr, ...)
+                        // Broadcasting function at MPI+thread level
+  serialize(wr)         // Serializing stuff
+  serialize_threads(wr)
+The most interesting example of using these is matmul_top.[ch] . Be
+carfeful: in these files, the pi's wirings are completed by others
+wirings that links pieces of the matrix.
+
+The "abase" mechanism
+---------------------
+
+The matrix stuff is kind-of generic w.r.t the type of objects inside the
+matrix. The "abase" mechanism provides this genericity -- don't expect a
+clean ring structure, beautifully following the mathematical notions.
+
+The main idea is to use a block of bits as a main type that corresponds
+to the machine word-size, typically uint64_t on a 64 bit computer.
+
+Two main types:
+  abobj_t               // the parent structure (may be NULL)
+  abt                   // an element
+
+Each instance of the abase mechanism is a pair abase-xxx.[ch] . This may
+describe elements whose sizes are known at compile-time (uint64_t), or
+block of them, of width possibly known only at running-time.
+
+The idea is to have genericity and variable width for boring stuff (like
+prep) that does not need maximal efficiency, and fixed sized- code for
+the main operations inside Krylov.
+
+See the header of abase-api.h for details on how to use this.
+
+Currently the following are implemented:
+  abase-u64     // uint64_t
+  abase-u128    // uint128_t, packed into SSE2 if possible.
+  abase-u64k    // block of k unint64_t, size known at compile-time
+  abase-u64n    // block of n unint64_t, size not known at compile-time
+
+The main use of this type is for vectors to be multiplied by the binary
+matrix. We have for instance in matmul.[ch] a fonction called:
+  void matmul_mul(matmul_ptr M , abt * B , abt const * A , int d)
+that computes B = M . A  (or transpose of d=1), where A and B are vectors
+of "abase".
+
+Matrix - vector product
+-----------------------
+
+The code that will run on a single thread is in matmul.[ch] and the
+different implementations it encapsulates: matmul-sliced.[ch] and
+matmul-basic.[ch] for the moment. Given the amount of time spent in these
+routines waiting for data transiting through the FSB, some
+matmul-bucketsort-cachecompliant-asm-prefetch.[ch] could be worthwhile.
+
+On top of this very basic mono-threaded matrix x vector product, the
+matmul_top.[ch] mechanism handles the parallelizing: each node / thread
+gets a piece of the matrix (produced by balance) and does its own small
+block x partial_vector product, and then the partial results are
+transmitted and collected.
+
+The intersections.[ch] files are used to help the communications. In one
+word, this describes how an horizontal vector (spread on various
+nodes/threads) can be transposed in a vertical vector (also spread on
+various nodes/threads). This is tricky and will be explained somewhere
+else (the code is short, but beware of headaches).
