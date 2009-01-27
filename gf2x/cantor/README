@@ -19,10 +19,10 @@ void mulCantor128(unsigned long *H, unsigned long *F, int Fl, unsigned long *G, 
 
 as well as other functions allowing FFT caching.
 
-extern void c128_setup(c128_info_t p, int dF, int dG);
+extern void c128_setup(c128_info_t p, int nF, int nG);
 
 	sets up the appropriate data for multiplying polynomials having
-	degrees bounded respectively by dF and dG.
+	numbers of coefficients bounded respectively by nF and nG.
 	
 extern c128_t c128_alloc(const c128_info_t p, int n);
 
@@ -40,9 +40,9 @@ extern inline c128_get(const c128_info_t p, c128_t x, int k);
 
 	accesses the k-th transform stored at location x.
 
-extern void c128_dft(const c128_info_t p, c128_t x, unsigned long * F, int dF);
+extern void c128_dft(const c128_info_t p, c128_t x, unsigned long * F, int nF);
 
-	performs a direct transform of F, having degree at most dF.
+	performs a direct transform of F, having at most nF coefficients.
 
 extern void c128_compose(const c128_info_t p,
 		c128_t y, c128_src_t x1, c128_src_t x2);
@@ -55,9 +55,9 @@ extern void c128_add(const c128_info_t p,
 
 	adds two transforms (the direct transform is linear).
 
-extern void c128_ift(const c128_info_t p, unsigned long * H, int dH, c128_t h);
+extern void c128_ift(const c128_info_t p, unsigned long * H, int nH, c128_t h);
 
-	performs an inverse transform.
+	performs an inverse transform. nH is the number of coefficients.
 
 
 This package relies on some routines taken from the Mpfq library. This
