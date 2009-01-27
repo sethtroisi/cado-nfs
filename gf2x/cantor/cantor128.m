@@ -21,6 +21,9 @@ x := PP.1;
 F128<z> := ext<GF(2) | x^128 + x^7 + x^2 + x + 1>;
 P128<x> := PolynomialRing(F128);
 
+fi:=f;
+gi:=g;
+fgi:=fg;
 
 function convertF128(F128, x)
   return F128!PP!Intseq(x, 2);
@@ -30,20 +33,44 @@ function convertP128(F128, f)
   return Polynomial([ convertF128(F128, z): z in Intseq(Seqint(f, 2^w), 2^64)]);
 end function;
 
-ffi := convertP128(P128,F128,fi);
-ggi := convertP128(P128,F128,gi);
-h := convertP128(P128,F128,fgi);
-fg := ffi*ggi;
+function reglue(ffi)
+    return &+[ PP!Eltseq(Coefficient(ffi,i))*x^(64*i) : i in [0..Degree(ffi)]];
+end function;
+
+ffi := convertP128(F128,fi);
+ggi := convertP128(F128,gi);
+
+reglue(ffi) eq F;
+reglue(ggi) eq G;
+reglue(ffi*ggi) eq F*G;
+
+h := convertP128(F128,fgi);
+reglue(h) eq F*G;  
 
 
-beta0 := F128!1;
-beta1 := F128!Intseq((7451958335100816136 +2^64*2979905974001933049 ), 2);
-beta2 := F128!Intseq((18379359142562139938+2^64*11678753174964950217), 2);
-beta3 := F128!Intseq((6032672185962850376 +2^64*8744256601846606146 ), 2);
-beta4 := F128!Intseq((14608789766813931076+2^64*645900494672607458  ), 2);
-beta5 := F128!Intseq((5568895992531017964 +2^64*5316835906050072984 ), 2);
-beta6 := F128!Intseq((11619261390503595532+2^64*377604546732988956  ), 2);
-beta7 := F128!Intseq((6679137017075335448 +2^64*5571574281931689094 ), 2);
+
+
+beta_0 := F128!1;
+beta_1 := F128!Intseq((7451958335100816136 +2^64*2979905974001933049 ), 2);
+beta_2 := F128!Intseq((18379359142562139938+2^64*11678753174964950217), 2);
+beta_3 := F128!Intseq((6032672185962850376 +2^64*8744256601846606146 ), 2);
+beta_4 := F128!Intseq((14608789766813931076+2^64*645900494672607458  ), 2);
+beta_5 := F128!Intseq((5568895992531017964 +2^64*5316835906050072984 ), 2);
+beta_6 := F128!Intseq((11619261390503595532+2^64*377604546732988956  ), 2);
+beta_7 := F128!Intseq((6679137017075335448 +2^64*5571574281931689094 ), 2);
+beta_8 := F128!Intseq(102777404866455936327711046477332611352, 2);
+beta:=[beta_0,beta_1,beta_2,beta_3,beta_4,beta_5,beta_6,beta_7];
+
+function next_beta(b)
+    x:=PolynomialRing(Parent(b)).1;
+    return Roots(x^2+x+b)[1][1];
+end function;
+
+// can be used to print omega values.
+function F128_to_int(b)
+    Z:=IntegerRing();
+    return Seqint(ChangeUniverse(Eltseq(b),Z),2);
+end function;
 
 s1:=x^2+x;
 s2:=Evaluate(s1,s1);
@@ -52,6 +79,28 @@ s4:=Evaluate(s2,s2);
 s5:=Evaluate(s1,s4);
 s6:=Evaluate(s3,s3);
 s7:=Evaluate(s3,s4);
+spoly:=[s1,s2,s3,s4,s5,s6,s7];
+
+// throw in some more, while we're at it.
+Append(~beta,next_beta(beta[#beta]));
+Append(~spoly,Evaluate(s1,spoly[#spoly]));
+Append(~beta,next_beta(beta[#beta]));
+Append(~spoly,Evaluate(s1,spoly[#spoly]));
+
+&and [Evaluate(spoly[i],beta[i+1]) eq 1:i in [1..#spoly]];             
+&and [Evaluate(s1,beta[i+1]) eq beta[i]:i in [1..#spoly]];
+
+
+function one_omega(i)
+    n:=Intseq(i,2);
+    if #n eq 0 then return F128!0; end if;
+    return &+ [beta[j]*n[j]:j in [1..#n]];
+end function;
+
+&and[spoly[j] eq PP!&*[x-one_omega(i):i in [0..2^j-1]]:j in [1..#spoly]];
+
+
+///////////////////////////////////////////////////////////////////////////
 
 
 function split(fi)
@@ -70,6 +119,7 @@ end procedure;
 
 
 
+/*
 procedure reduceModTrunc(k, length)
   pf := 0;
   len := length;
@@ -107,4 +157,192 @@ procedure reduceModTrunc(k, length)
     i +:= 1;
   end while;
 end procedure;
+*/
 
+ind_S:=[
+    [1],                        // S1
+    [1],                        // S2
+    [4, 2, 1],                  // S3
+    [1],                        // S4
+    [16, 2, 1],                 // S5
+    [16, 4, 1],                 // S6
+    [64, 32, 16, 8, 4, 2, 1],   // S7
+    [1],                        // S8
+    [256, 2, 1],                // S9
+    [256, 4, 1],                // S10
+    [1024, 512, 256, 8, 4, 2, 1],       // S11
+    [256, 16, 1],               // S12
+    [4096, 512, 256, 32, 16, 2, 1],     // S13
+    [4096, 1024, 256, 64, 16, 4, 1],    // S14
+    [16384, 8192, 4096, 2048, 1024, 512, 256, 128, 64, 32, 16, 8, 4, 2, 1],     // S15
+    [1],                        // S16
+    [65536, 2, 1],              // S17
+    [65536, 4, 1],              // S18
+    [262144, 131072, 65536, 8, 4, 2, 1],        // S19
+    [65536, 16, 1],             // S20
+    [1048576, 131072, 65536, 32, 16, 2, 1],     // S21
+    [1048576, 262144, 65536, 64, 16, 4, 1],     // S22
+    [4194304, 2097152, 1048576, 524288, 262144, 131072, 65536, 128, 64, 32, 16, 8, 4, 2, 1],    // S23
+    [65536, 256, 1],            // S24
+    [16777216, 131072, 65536, 512, 256, 2, 1],  // S25
+    [16777216, 262144, 65536, 1024, 256, 4, 1], // S26
+    [67108864, 33554432, 16777216, 524288, 262144, 131072, 65536, 2048, 1024, 512, 256, 8, 4, 2, 1],    // S27
+    [16777216, 1048576, 65536, 4096, 256, 16, 1],       // S28
+    [268435456, 33554432, 16777216, 2097152, 1048576, 131072, 65536, 8192, 4096, 512, 256, 32, 16, 2, 1],       // S29
+    [268435456, 67108864, 16777216, 4194304, 1048576, 262144, 65536, 16384, 4096, 1024, 256, 64, 16, 4, 1]     // S30
+];
+
+// reduce mod Sk + omega and Sk + omega + 1
+procedure reduceSi_inplace(k, ~f, omega)
+    K:=2^k;
+    assert #f eq 2*K;
+    a:=P128!f;
+
+    // put rest mod Sk+omega in low part of f and quo in high part.
+    for i in [2*K-1..K by -1] do
+        fi:=f[1+i];
+        for j in ind_S[k] do
+            f[1+j+i-K] +:= fi;
+        end for;
+        f[1+i-K] +:= fi * omega;
+    end for;
+
+    print P128!(f[K+1..2*K]) eq a div (spoly[k]+omega);
+    print P128!(f[1..K]) eq a mod (spoly[k]+omega);
+
+    for i in [0..K-1] do
+        f[1+i+K] +:= f[1+i];
+    end for;
+
+    print P128!(f[K+1..2*K]) eq a mod (spoly[k]+omega+1);
+
+end procedure;
+
+// reduce mod Sk + omega and Sk + omega + 1
+function reduceSi(k,a,omega)
+    K:=2^k;
+    f:=[F128!0:i in [1..2*K]];
+    for i in [0..Degree(a)] do f[1+i]:=Coefficient(a,i); end for;
+    for i in [2*K-1..K by -1] do
+        fi:=f[1+i];
+        if k gt 0 then
+            for j in ind_S[k] do
+                f[1+j+i-K] +:= fi;
+            end for;
+        end if;
+        f[1+i-K] +:= fi * omega;
+    end for;
+    for i in [0..K-1] do
+        f[1+i+K] +:= f[1+i];
+    end for;
+    h:=P128!(f[K+1..2*K]);
+    if k gt 0 then assert h eq a mod (spoly[k]+omega+1); end if;
+    l:=P128!(f[1..K]);
+    if k gt 0 then assert l eq a mod (spoly[k]+omega); end if;
+    return [l,h];
+end function;
+
+function multieval(k,f,i_omega)
+    // our input is defined modulo s_k + omega_{i_omega}
+    assert k ge 1;
+    // the end case is where we have output defined modulo s_1+b, for some
+    // omega value b. We have to compute f mod x+c and x+c+1, where c is the
+    // root of x^2+x+b, hence of index 2*i_omega
+    i_omega *:= 2;
+    children := reduceSi(k-1, f, one_omega(i_omega));
+    if k eq 1 then
+        return [Coefficient(children[1],0),Coefficient(children[2],0)];
+    else
+        // then we recurse, since the children are not leaves.
+        return
+            multieval(k-1,children[1],i_omega)
+            cat multieval(k-1,children[2],i_omega+1);
+    end if;
+end function;
+
+function reduce_top_cantor(k,kappa,f,i_omega)
+    if k eq kappa then
+        return [<f,i_omega>];
+    else
+        i_omega *:= 2;
+        children := reduceSi(k-1, f, one_omega(i_omega));
+        return
+            reduce_top_cantor(k-1,kappa,children[1],i_omega)
+            cat
+            reduce_top_cantor(k-1,kappa,children[2],i_omega+1);
+    end if;
+end function;
+
+// must hold.
+print multieval(7,ffi,0) eq [Evaluate(ffi,one_omega(i)):i in [0..127]]; 
+
+function expand0(a,t,t0)
+    // a has at most 2^t coefficients. Split in pieces of 2^t0 coefficients.
+    if t eq t0 then return [a]; end if;
+    x:=Parent(a).1;
+    K:=2^(t-1);
+    K0:=2^(t-1-t0);
+    // split a modulo x^(2^(t-1))-x^(2^(t-1-t0))
+    f:=[CoefficientRing(Parent(a))|0:i in [1..2*K]];
+    for i in [0..Degree(a)] do f[1+i]:=Coefficient(a,i); end for;
+    // compute quotient.
+    for i in [2*K-1..K by -1] do
+        f[1+i+K0-K] +:= f[1+i];
+    end for;
+    s:=x^K-x^K0;
+    h:=P128!(f[K+1..2*K]);
+    l:=P128!(f[1..K]);
+    assert h eq a div s;
+    assert l eq a mod s;
+    return expand0(l,t-1,t0) cat expand0(h,t-1,t0);
+end function;
+
+function expand(f,t)
+    // write f, having at most 2^(2t) terms, in base x^(2^t)+x
+    return expand0(f,2*t,t);
+end function;
+
+
+function multieval_gm_top(f)
+    n:=Degree(f)+1;
+    k:=1+Ilog2(n-1);
+    // 2^(k-1) < n <= 2^k
+    assert IsPowerOf(k,2);
+end function;
+
+function gm_trick(two_t,f,j)
+    // Compute f on omega_{j + i}, i in [0..2^two_t-1]
+    assert IsPowerOf(two_t,2);
+    eta:=2^two_t;
+    // f has eta coefficients.
+    if eta eq 2 then
+        omega := one_omega(2*j);
+        f0:=Coefficient(f,0);
+        f1:=Coefficient(f,1);
+        z := f1 * omega + f0;
+        return [ z, z + f1 ];
+    end if;
+    t:=two_t div 2;
+    tau:=2^t;
+    // we'll first write f in base x^(2^t)+x ; that makes 2^t terms.
+    g:=expand(f,t);
+    T:=[0..tau-1];
+    h:=[Parent(f)![Coefficient(g[1+i],l):i in T]:l in T];
+    evals_h:=[gm_trick(t, h[1+l], j): l in [0..tau-1]];
+    f_mod_xtau_x_omega_phi:=[Parent(f)![evals_h[1+i][1+o]:i in T]:o in T];
+    // f_mod_xtau_x_omega_phi eq [f mod (x^tau-x-one_omega(i)):i in T];
+    return &cat[gm_trick(t,f_mod_xtau_x_omega_phi[1+i],j*tau+i):i in
+  T];
+    // gm_trick(two_t,f,j) eq [Evaluate(f,one_omega(i)):i in [0..2^(two_t)-1]];
+end function;
+
+// children:=reduce_top_cantor(7,4,ffi,0);f:=children[1][1];j:=0;two_t:=4;
+
+function multieval_toplevel(k,f)
+    r:=Ilog2(k);
+    kappa:=2^r;
+    children:=reduce_top_cantor(k,kappa,f,0);
+    return &cat [ gm_trick(kappa,f[1],f[2]):f in children];
+end function;
+
+// f:=ffi;k:=7;multieval_toplevel(k,f) eq [Evaluate(f,one_omega(i)):i in [0..2^k-1]];
