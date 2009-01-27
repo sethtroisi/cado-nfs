@@ -81,7 +81,7 @@ common_libs += -lpthread
 endif
 
 
-all_objlists:=libmatmul build bench prep
+all_objlists:=libmatmul build bench prep secure
 
 libmatmul_objs:=matmul-sliced.o matmul-sliced-asm.o matmul-basic.o matmul.o
 build_objs:=build.o libmatmul.a
@@ -91,9 +91,15 @@ prep_objs:=prep.o intersections.o 			\
 	info_file.o 					\
 	auxfuncs.o xvectors.o				\
 	libmatmul.a
+secure_objs:=secure.o intersections.o 			\
+	matmul_top.o parallelizing_info.o		\
+	info_file.o 					\
+	auxfuncs.o xvectors.o				\
+	libmatmul.a
 build_normalobjs:=../readbuffer.o ../readmat.o
 bench_normalobjs:=../readbuffer.o ../readmat.o
 prep_normalobjs:=../readbuffer.o ../readmat.o ../gauss.o
+secure_normalobjs:=../readbuffer.o ../readmat.o
 
 
 # This list contains the object files which do not depend on the abase
@@ -106,7 +112,7 @@ all_objs:=
 sources:=	\
     auxfuncs.c bench.c build.c info_file.c		\
     intersections.cpp matmul-sliced.cpp matmul_top.c	\
-    parallelizing_info.c prep.c test_hello.c xvectors.c	\
+    parallelizing_info.c secure.c prep.c test_hello.c xvectors.c	\
     matmul.c matmul-basic.c
 
 define hardlink_object
@@ -150,17 +156,22 @@ $(1)/libmatmul.a: $$($(1)_libmatmul_objs)
 	-rm -f $$@
 	ar r $$@ $$($(1)_libmatmul_objs)
 
+# These two make sense for all binary instances -- although nobody sane
+# would ever consider running them seriously for u64n
 $(call multiple_binary,$(1),build)
 $(call multiple_binary,$(1),bench)
-$(call multiple_binary,$(1),prep)
 endef
 
-# U64 is the prime-time version. The others can be dropped to accelerate
+# u64 is the prime-time version. The others can be dropped to accelerate
 # compilation.
 $(eval $(call configure_abase,u64))
 $(eval $(call configure_abase,u64k))
 $(eval $(call configure_abase,u64n))
 $(eval $(call configure_abase,u128))
+
+# Only one version of prep and secure exist.
+$(eval $(call multiple_binary,u64n,prep))
+$(eval $(call multiple_binary,u64,secure))
 
 all: $(allbins)
 

@@ -495,7 +495,7 @@ void matmul_top_mul(matmul_top_data_ptr mmt, int d)
 
 /* The first function is the back-end, run only on the top row.
  */
-static void save_vector_toprow(matmul_top_data_ptr mmt, int d, unsigned int index, unsigned int iter)
+static void save_vector_toprow(matmul_top_data_ptr mmt, const char name[2], int d, unsigned int index, unsigned int iter)
 {
     int err;
 
@@ -516,7 +516,7 @@ static void save_vector_toprow(matmul_top_data_ptr mmt, int d, unsigned int inde
         if (pirow->trank == 0) {
             char * filename;
             int rc;
-            rc = asprintf(&filename, "V%u.%u.twisted", index, iter);
+            rc = asprintf(&filename, "%c%u.%u.twisted", name[d], index, iter);
             FATAL_ERROR_CHECK(rc < 0, "out of memory");
             fd = open(filename, O_RDWR|O_CREAT, 0666);
             if (fd < 0) {
@@ -616,7 +616,7 @@ static void save_vector_toprow(matmul_top_data_ptr mmt, int d, unsigned int inde
     }
 }
 
-void matmul_top_save_vector(matmul_top_data_ptr mmt, int d, unsigned int index, unsigned int iter)
+void matmul_top_save_vector(matmul_top_data_ptr mmt, const char name[2], int d, unsigned int index, unsigned int iter)
 {
     // we want row 0 to have everything.
     broadcast_down(mmt, d);
@@ -632,7 +632,7 @@ void matmul_top_save_vector(matmul_top_data_ptr mmt, int d, unsigned int index, 
     // Now every job row has the complete vector.  We'll do I/O from only
     // one row, that's easier. Pick the topmost one.
     if (picol->jrank == 0 && picol->trank == 0) {
-        save_vector_toprow(mmt, d, index, iter);
+        save_vector_toprow(mmt, name, d, index, iter);
     }
 
     serialize(mmt->pi->m);
@@ -644,7 +644,7 @@ void matmul_top_save_vector(matmul_top_data_ptr mmt, int d, unsigned int index, 
 
 /* The backend is exactly dual to save_vector_toprow.
  */
-static void load_vector_toprow(matmul_top_data_ptr mmt, int d, unsigned int index, unsigned int iter)
+static void load_vector_toprow(matmul_top_data_ptr mmt, const char name[2], int d, unsigned int index, unsigned int iter)
 {
     int err;
 
@@ -660,7 +660,7 @@ static void load_vector_toprow(matmul_top_data_ptr mmt, int d, unsigned int inde
     if (pirow->jrank == 0) {
         if (pirow->trank == 0) {
             char * filename;
-            int rc = asprintf(&filename, "V%u.%u.twisted", index, iter);
+            int rc = asprintf(&filename, "%c%u.%u.twisted", name[d], index, iter);
             FATAL_ERROR_CHECK(rc < 0, "out of memory");
             fd = open(filename, O_RDONLY, 0666);
             DIE_ERRNO_DIAG(fd < 0, "fopen", filename);
@@ -711,7 +711,7 @@ static void load_vector_toprow(matmul_top_data_ptr mmt, int d, unsigned int inde
     }
 }
 
-void matmul_top_load_vector(matmul_top_data_ptr mmt, int d, unsigned int index, unsigned int iter)
+void matmul_top_load_vector(matmul_top_data_ptr mmt, const char name[2], int d, unsigned int index, unsigned int iter)
 {
     int err;
 
@@ -724,7 +724,7 @@ void matmul_top_load_vector(matmul_top_data_ptr mmt, int d, unsigned int index, 
     // mmt_wiring_ptr mrow = mmt->wr[!d];
 
     if (picol->jrank == 0 && picol->trank == 0) {
-        load_vector_toprow(mmt, d, index, iter);
+        load_vector_toprow(mmt, name, d, index, iter);
     }
 
     serialize(mmt->pi->m);

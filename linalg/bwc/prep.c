@@ -21,6 +21,8 @@
 
 /* Number of copies of m by n matrices to use for trying to obtain a
  * full-rank matrix (rank m).
+ *
+ * Note that it must be at least m/n, otherwise we stand no chance !
  */
 #define NBITER  2
 
@@ -28,7 +30,6 @@ abobj_t abase;
 
 int m,n;
 mpz_t p;
-int interval=1000;
 int verbose=0;
 char matrix_filename[FILENAME_MAX];
 int can_print;
@@ -136,7 +137,7 @@ void * prep_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
 
         // we need to save this starting vector for later use if it turns out
         // that we need to save it for real.
-        matmul_top_save_vector(mmt, dir, 0, 0);
+        matmul_top_save_vector(mmt, "XY", dir, 0, 0);
     
         // We must compute x^T M y, x^T M^2 y, and so on.
         
@@ -247,73 +248,19 @@ void * prep_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
     return NULL;
 }
 
-void * sec_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
-{
-    /* OK. Now we merely have to build up a check vector. We've got a
-     * fairly easy candidate for that: the x vector.
-     */
-    int tcan_print = can_print && pi->m->trank == 0;
-    matmul_top_data mmt;
-
-    int flags[2];
-    flags[!dir] = THREAD_SHARED_VECTOR;
-    flags[dir] = 0;
-
-    matmul_top_init(mmt, abase, pi, flags, matrix_filename);
-
-    abzero(abase, mmt->wr[!dir]->v, mmt->wr[!dir]->i1 - mmt->wr[!dir]->i0);
-
-    for(int j = 0 ; j < m ; j++) {
-        for(unsigned int k = 0 ; k < nx_main ; k++) {
-            // set bit j of entry gxvecs[j*nx+k] to 1.
-            uint32_t i = gxvecs[j*nx_main+k];
-            if (i < mmt->wr[!dir]->i0 || i >= mmt->wr[!dir]->i1)
-                continue;
-            abt * where;
-            where = mmt->wr[!dir]->v + aboffset(abase, i-mmt->wr[!dir]->i0);
-            abset_ui(abase, where, j, 1);
-        }
-    }
-
-    if (tcan_print) {
-        printf("Computing trsp(x)*M^%d\n",interval);
-    }
-
-    serialize(pi->m);
-
-    for(int k = 0 ; k < interval ; k++) {
-        matmul_top_mul(mmt, !dir);
-        if (tcan_print) {
-            putchar('.');
-            fflush(stdout);
-        }
-    }
-    printf("\n");
-
-    serialize(pi->m);
-
-    matmul_top_save_vector(mmt, !dir, 0, interval);
-
-    serialize(pi->m);
-    matmul_top_clear(mmt, abase);
-    serialize(pi->m);
-
-    return NULL;
-}
-
-
 void usage()
 {
-    fprintf(stderr, "Usage: bw-prep <options>\n"
+    fprintf(stderr, "Usage: ./prep <options>\n"
         "Allowed options are\n"
         "\tm=<int>\t(*) set m blocking factor\n"
         "\tn=<int>\t(*) set n blocking factor\n"
         "\tmn=<int>\tset both m and n (exclusive with the two above)\n"
+        "\twdir=<path>\tchdir to <path> beforehand\n"
         "\tmpi=<int>x<int>\tset number of mpi jobs. Must agree with mpirun\n"
         "\tthr=<int>x<int>\tset number of threads.\n"
         "\tmatrix=<filename>\tset matrix\n"
         "\tseed=<int>\tset random seed\n"
-        "\tinterval=<int>\tset checking interval\n"
+        "\tinterval=<int>\tset checking interval (not used by prep)\n"
         );
     exit(1);
 }
@@ -372,7 +319,6 @@ int main(int argc, char * argv[])
     param_list_parse_intxint(pl, "mpi", mpi_split);
     param_list_parse_intxint(pl, "thr", thr_split);
     param_list_parse_int(pl, "seed", &seed);
-    param_list_parse_int(pl, "interval", &interval);
 
     const char * tmp;
 
@@ -390,7 +336,7 @@ int main(int argc, char * argv[])
         param_list_add_key(pl, "nullspace", dirtext[dir], PARAMETER_FROM_FILE);
     }
 
-    if ((tmp = param_list_lookup_string(pl, "tmp")) != NULL) {
+    if ((tmp = param_list_lookup_string(pl, "wdir")) != NULL) {
         if (chdir(tmp) < 0) {
             fprintf(stderr, "chdir(%s): %s\n", tmp, strerror(errno));
             exit(1);
@@ -416,23 +362,23 @@ int main(int argc, char * argv[])
 
     setup_seeding(seed);
 
+    // we don't use this parameter, but we tolerate it, since it's going
+    // to be used by the secure program afterwards. By looking it up, we
+    // force the param_list routines to accept it, so that it'll be
+    // written to the config file eventually.
+    param_list_lookup_string(pl, "interval");
+
     if (verbose)
         param_list_display (pl, stderr);
     if (param_list_warn_unused(pl)) {
         usage();
     }
 
-    param_list_save(pl, "bw-prep.cfg");
-
     // abase is our arithmetic type.
     abobj_init(abase);
 
     abobj_set_nbys(abase, n);
     pi_go(prep_prog, mpi_split[0], mpi_split[1], thr_split[0], thr_split[1], 0);
-
-    // now do the computation of the iterates for the check vector.
-    abobj_set_nbys(abase, m);
-    pi_go(sec_prog, mpi_split[0], mpi_split[1], thr_split[0], thr_split[1], 0);
 
     // now we're not multithread anymore.
 
