@@ -1,5 +1,5 @@
 ./test_hello mpi=1x1 thr=2x1
 ./test_hello mpi=1x1 thr=1x2
-mpirun -np 2 ./test_hello mpi=2x1 thr=1x2
-mpirun -np 2 ./test_hello mpi=1x2 thr=2x1
-mpirun -np 2 ./test_hello mpi=1x2 thr=1x2
+mpiexec -n 2 ./test_hello mpi=2x1 thr=1x2
+mpiexec -n 2 ./test_hello mpi=1x2 thr=2x1
+mpiexec -n 2 ./test_hello mpi=1x2 thr=1x2
