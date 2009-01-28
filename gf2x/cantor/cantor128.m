@@ -260,23 +260,35 @@ function multieval(k,f,i_omega)
     end if;
 end function;
 
-function reduce_top_cantor(k,kappa,f,i_omega)
-    if k eq kappa then
-        return [<f,i_omega>];
+// f has 2^k coefficients. Returns chunks of 2^kappa coefficients,
+// corresponding to reductions mod x^(2^kappa)-x-omega, for all the
+// 2^(k-kappa) relevant values of omega.
+//
+// The ``truncation'' by n actually computes only the first ceiling(n/2^kappa)
+// terms of the sequence defined above. n0 is initially zero, but recursive
+// calls update it to indicate the number of terms computed on the left side
+// of the tree. If n==2^k, it's a full computation.
+function reduce_top_cantor(k,kappa,f,i_omega,n,n0)
+    assert Degree(f)+1 le 2^k;
+    if n0 ge n then
+        return [Parent(f)|];
+    elif k eq kappa then
+        return [f];
     else
         i_omega *:= 2;
         children := reduceSi(k-1, f, one_omega(i_omega));
         return
-            reduce_top_cantor(k-1,kappa,children[1],i_omega)
+            reduce_top_cantor(k-1,kappa,children[1],i_omega,n,n0)
             cat
-            reduce_top_cantor(k-1,kappa,children[2],i_omega+1);
+            reduce_top_cantor(k-1,kappa,children[2],i_omega+1,n,n0+2^(k-1));
     end if;
 end function;
 
 // must hold.
 print multieval(7,ffi,0) eq [Evaluate(ffi,one_omega(i)):i in [0..127]]; 
 
-function expand0(a,t,t0)
+function expand(a,t,t0)
+    // write a, having at most 2^t terms, in base x^(2^t0)+x
     // a has at most 2^t coefficients. Split in pieces of 2^t0 coefficients.
     if t eq t0 then return [a]; end if;
     x:=Parent(a).1;
@@ -294,21 +306,28 @@ function expand0(a,t,t0)
     l:=P128!(f[1..K]);
     assert h eq a div s;
     assert l eq a mod s;
-    return expand0(l,t-1,t0) cat expand0(h,t-1,t0);
-end function;
-
-function expand(f,t)
-    // write f, having at most 2^(2t) terms, in base x^(2^t)+x
-    return expand0(f,2*t,t);
+    return expand(l,t-1,t0) cat expand(h,t-1,t0);
 end function;
 
 
-function multieval_gm_top(f)
-    n:=Degree(f)+1;
-    k:=1+Ilog2(n-1);
-    // 2^(k-1) < n <= 2^k
-    assert IsPowerOf(k,2);
+function expand_trunc(a,t,t0,n)
+    K:=2^(t-1);
+    if t eq t0 then return [a]; end if;
+    if n le K then
+        return expand_trunc(a,t-1,t0,n);
+    end if;
+    x:=Parent(a).1;
+    K0:=2^(t-1-t0);
+    f:=[CoefficientRing(Parent(a))|0:i in [1..n]];
+    for i in [0..Degree(a)] do f[1+i]:=Coefficient(a,i); end for;
+    for i in [n-1..K by -1] do
+        f[1+i+K0-K] +:= f[1+i];
+    end for;
+    h:=P128!(f[K+1..n]);
+    l:=P128!(f[1..K]);
+    return expand_trunc(l,t-1,t0,K) cat expand_trunc(h,t-1,t0,n-K);
 end function;
+
 
 function gm_trick(two_t,f,j)
     // Compute f on omega_{j + i}, i in [0..2^two_t-1]
@@ -325,7 +344,7 @@ function gm_trick(two_t,f,j)
     t:=two_t div 2;
     tau:=2^t;
     // we'll first write f in base x^(2^t)+x ; that makes 2^t terms.
-    g:=expand(f,t);
+    g:=expand(f,two_t,t);
     T:=[0..tau-1];
     h:=[Parent(f)![Coefficient(g[1+i],l):i in T]:l in T];
     evals_h:=[gm_trick(t, h[1+l], j): l in [0..tau-1]];
@@ -336,13 +355,62 @@ function gm_trick(two_t,f,j)
     // gm_trick(two_t,f,j) eq [Evaluate(f,one_omega(i)):i in [0..2^(two_t)-1]];
 end function;
 
+/*
+function gm_trick_trunc(two_t,f,j,n)
+    // Compute f on omega_{j * eta + i}, i in [0..n-1]
+    // n must be at most 2^two_t
+    assert IsPowerOf(two_t,2);
+    eta:=2^two_t;
+    assert n le eta;
+    // f has eta coefficients.
+    if n eq 0 then return [ CoefficientRing(f) | ]; end if;
+    if eta eq 2 then
+        omega := one_omega(2*j);
+        f0:=Coefficient(f,0);
+        f1:=Coefficient(f,1);
+        z := f1 * omega + f0;
+        if n eq 1 then return [z]; end if;
+        return [ z, z + f1 ];
+    end if;
+    t:=two_t div 2;
+    tau:=2^t;
+    // we'll first write f in base x^(2^t)+x ; that makes 2^t terms.
+    g:=expand_trunc(f,two_t,t,n);
+    T:=[0..tau-1];
+    h:=[Parent(f)![Coefficient(g[1+i],l):i in [0..#g-1]]:l in T];
+    // h_lambda has Ceiling(n/2^t) coeffs at most. More exactly, it's
+    // n div 2^t + (lambda gt (n mod 2^t) select 1 else 0);
+    // &and [1+Degree(h[lambda+1]) eq n div 2^t + (lambda lt (n mod 2^t)
+    // select 1 else 0) : lambda in T];
+    ncoeffs_h:=func<l|n div 2^t + (l lt (n mod 2^t) select 1 else 0)>;
+    // here we know that the evaluation is never trivial, but we forcibly
+    // compute only the values we're interested in.
+    evals_h:=[gm_trick_trunc(t, h[1+l], j, ncoeffs_h(l)): l in T];
+    
+    // and then here we fail. The f's make no sense if we don't have all the
+    // values.
+    f_mod_xtau_x_omega_phi:=[Parent(f)![evals_h[1+i][1+o]:i in T]:o in T];
+    // f_mod_xtau_x_omega_phi eq [f mod (x^tau-x-one_omega(i)):i in T];
+    return &cat[gm_trick_trunc(t,f_mod_xtau_x_omega_phi[1+i],j*tau+i):i in
+  T];
+    // gm_trick_trunc(two_t,f,j) eq [Evaluate(f,one_omega(i)):i in [0..2^(two_t)-1]];
+end function;
+*/
+
 // children:=reduce_top_cantor(7,4,ffi,0);f:=children[1][1];j:=0;two_t:=4;
 
-function multieval_toplevel(k,f)
+// n:=5000;f:=Parent(f)![Random(F128):i in [0..n-1]];j:=0;two_t:=16;
+
+
+// f has n coeffs, which is at most 2^k.
+function multieval_toplevel(f)
+    n:=1+Degree(f);
+    k:=Ilog2(n)+1;
+    assert 1 + Degree(f) le 2^k;
     r:=Ilog2(k);
     kappa:=2^r;
-    children:=reduce_top_cantor(k,kappa,f,0);
-    return &cat [ gm_trick(kappa,f[1],f[2]):f in children];
+    children:=reduce_top_cantor(k,kappa,f,0,2^k,0);
+    return &cat [ gm_trick(kappa,children[i],i):i in [1..#children]];
 end function;
 
 // f:=ffi;k:=7;multieval_toplevel(k,f) eq [Evaluate(f,one_omega(i)):i in [0..2^k-1]];

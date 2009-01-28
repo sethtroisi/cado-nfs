@@ -1,7 +1,9 @@
 #!/bin/sh
 
+if [ -z "$CANTOR" ] ; then CANTOR=./cantor ; fi
+
 for i in "$@" ; do
-  ./cantor $i > /tmp/toto
+  "$CANTOR" $i > /tmp/toto
   if `magma < cantor128.m | grep true`; then
     echo "ok $i"
   else
