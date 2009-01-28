@@ -26,6 +26,8 @@
 
 #include "cantor128.h"
 
+extern int mulcount;
+
 // cputime in millisec.
 static int cputime()
 {
@@ -99,6 +101,8 @@ int main(int argc, char **argv)
     while (n <= nmax) {
 	int tm;
 	int i, rep;
+        mulcount=0;
+
 	tm = cputime();
 	mulCantor128(h, f, n, g, n);
 	tm = cputime() - tm;
@@ -115,8 +119,8 @@ int main(int argc, char **argv)
 	for (i = 0; i < rep; ++i)
 	    mulCantor128(h, f, n, g, n);
 	tm = cputime() - tm;
-	printf("%d\t%f\n", n, ((double) tm) / ((double) rep));
-	fprintf(stderr, "%d\t%f\n", n, ((double) tm) / ((double) rep));
+	printf("%d\t%f\t%d\n", n, ((double) tm) / ((double) rep),mulcount);
+	fprintf(stderr, "%d\t%f\t%d\n", n, ((double) tm) / ((double) rep),mulcount);
 	fflush(stdout);
 	fflush(stderr);
 	if (additive)
