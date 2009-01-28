@@ -355,7 +355,10 @@ function gm_trick(two_t,f,j)
     // gm_trick(two_t,f,j) eq [Evaluate(f,one_omega(i)):i in [0..2^(two_t)-1]];
 end function;
 
-/*
+function gm_trick_trunc_slow(two_t,f,j,n)
+    return [Evaluate(f,one_omega(j*2^two_t+i)):i in [0..n-1]];
+end function;
+
 function gm_trick_trunc(two_t,f,j,n)
     // Compute f on omega_{j * eta + i}, i in [0..n-1]
     // n must be at most 2^two_t
@@ -385,21 +388,26 @@ function gm_trick_trunc(two_t,f,j,n)
     ncoeffs_h:=func<l|n div 2^t + (l lt (n mod 2^t) select 1 else 0)>;
     // here we know that the evaluation is never trivial, but we forcibly
     // compute only the values we're interested in.
-    evals_h:=[gm_trick_trunc(t, h[1+l], j, ncoeffs_h(l)): l in T];
+    // evals_h:=[gm_trick_trunc(t, h[1+l], j, ncoeffs_h(l)): l in T];
+    evals_h:=[gm_trick_trunc(t, h[1+l], j, Ceiling(n/tau)): l in T];
     
-    // and then here we fail. The f's make no sense if we don't have all the
-    // values.
-    f_mod_xtau_x_omega_phi:=[Parent(f)![evals_h[1+i][1+o]:i in T]:o in T];
+    f_mod_xtau_x_omega_phi:=[Parent(f)![evals_h[1+i][1+o]:i in [0..tau-1]]:o in [0..Ceiling(n/tau)-1]];
     // f_mod_xtau_x_omega_phi eq [f mod (x^tau-x-one_omega(i)):i in T];
-    return &cat[gm_trick_trunc(t,f_mod_xtau_x_omega_phi[1+i],j*tau+i):i in
-  T];
-    // gm_trick_trunc(two_t,f,j) eq [Evaluate(f,one_omega(i)):i in [0..2^(two_t)-1]];
+    
+    // asking for fewer values than the number of coefficients won't work for
+    // now.
+    // return &cat[gm_trick_trunc(t,f_mod_xtau_x_omega_phi[1+i],j*tau+i,Minimum(tau,n-i*tau)):i in [0..Ceiling(n/tau)-1]];
+    return &cat[gm_trick(t,f_mod_xtau_x_omega_phi[1+i],j*tau+i)[1..Minimum(tau,n-i*tau)]:i in [0..Ceiling(n/tau)-1]];
+    // gm_trick_trunc(two_t,f,j,n) eq [Evaluate(f,one_omega(i)):i in [0..n-1]];
 end function;
-*/
 
 // children:=reduce_top_cantor(7,4,ffi,0);f:=children[1][1];j:=0;two_t:=4;
 
-// n:=5000;f:=Parent(f)![Random(F128):i in [0..n-1]];j:=0;two_t:=16;
+/*
+n:=384;
+f:=Polynomial([Random(F128):i in [0..n-1]]);j:=0;two_t:=16;
+gm_trick_trunc(two_t,f,j,n) eq [Evaluate(f,one_omega(i)):i in [0..n-1]];
+*/
 
 
 // f has n coeffs, which is at most 2^k.
