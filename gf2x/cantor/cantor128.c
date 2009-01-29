@@ -157,21 +157,22 @@ static const int ind_number[31] =
 
 // At index i=i0+2*i1+4*i2+8*i3..., one computes 
 //     allBetai[i] = i0*Betai[1] + i1*Betai[2] + i2*Betai[3] + ...
-static inline void allBetai(Kelt x, int i)
+static inline void allBetai(Kdst_elt x, int i)
 {
     int j;
     Kset_ui(x,0);
     j = 0;
-    while (i != 0) {
-        if (i & 1) {
-            Kadd(x, x, Betai[j]);
-        }
-        i >>= 1;
-        j++;
+    for( ; i ; i>>=1, j++) {
+        if (!(i & 1)) continue;
+        Kadd(x, x, Betai[j]);
     }
 }
 
-static inline void allBetai1(Kelt x, int i)
+#ifdef  CANTOR_GM
+#if 0
+/* These versions would make sense if Kelt were defined to be _v2di *,
+ * which it isn't */
+static inline void allBetai1(Kdst_elt x, int i)
 {
     int j;
     Kset_ui(x,0);
@@ -183,7 +184,7 @@ static inline void allBetai1(Kelt x, int i)
 }
 
 // compute omega_i and omega_{2i}
-static inline void allBetai2(Kelt x, Kelt y, int i)
+static inline void allBetai2(Kdst_elt x, Kdst_elt y, int i)
 {
     int j;
     Kset_ui(x,0);
@@ -195,7 +196,7 @@ static inline void allBetai2(Kelt x, Kelt y, int i)
             * (__v2di*)  y ^= m[i&1] & * (__v2di*) Betai[j+1];
     }
 }
-static inline void allBetai4(Kelt x, Kelt y, Kelt z, Kelt t, int i)
+static inline void allBetai4(Kdst_elt x, Kdst_elt y, Kdst_elt z, Kdst_elt t, int i)
 {
     int j;
     Kset_ui(x,0);
@@ -205,14 +206,55 @@ static inline void allBetai4(Kelt x, Kelt y, Kelt z, Kelt t, int i)
     j = 0;
     __v2di m[2] = { (__v2di) {0,0}, (__v2di) { -1L, -1L } };
     for( ; i ; i>>=1, j++) {
-            * (__v2di*)  x ^= m[i&1] & * (__v2di*) Betai[j];
-            * (__v2di*)  y ^= m[i&1] & * (__v2di*) Betai[j+1];
-            * (__v2di*)  z ^= m[i&1] & * (__v2di*) Betai[j+2];
-            * (__v2di*)  t ^= m[i&1] & * (__v2di*) Betai[j+3];
+            * (__v2di*) x ^= m[i&1] & * (__v2di*) Betai[j];
+            * (__v2di*) y ^= m[i&1] & * (__v2di*) Betai[j+1];
+            * (__v2di*) z ^= m[i&1] & * (__v2di*) Betai[j+2];
+            * (__v2di*) t ^= m[i&1] & * (__v2di*) Betai[j+3];
     }
 }
+#else
+static inline void allBetai1(Kdst_elt x, int i)
+{
+    int j;
+    Kset_ui(x,0);
+    j = 0;
+    for( ; i ; i>>=1, j++) {
+        if (!(i & 1)) continue;
+        Kadd(x, x, Betai[j]);
+    }
+}
+static inline void allBetai2(Kdst_elt x, Kdst_elt y, int i)
+{
+    int j;
+    Kset_ui(x,0);
+    Kset_ui(y,0);
+    j = 0;
+    for( ; i ; i>>=1, j++) {
+        if (!(i & 1)) continue;
+        Kadd(x, x, Betai[j]);
+        Kadd(y, y, Betai[j+1]);
+    }
+}
+static inline void allBetai4(Kdst_elt x, Kdst_elt y, Kdst_elt z, Kdst_elt t, int i)
+{
+    int j;
+    Kset_ui(x,0);
+    Kset_ui(y,0);
+    Kset_ui(z,0);
+    Kset_ui(t,0);
+    j = 0;
+    for( ; i ; i>>=1, j++) {
+        if (!(i & 1)) continue;
+        Kadd(x, x, Betai[j]);
+        Kadd(y, y, Betai[j+1]);
+        Kadd(z, z, Betai[j+2]);
+        Kadd(t, t, Betai[j+3]);
+    }
+}
+#endif  /* v2di or not v2di */
+#endif  /* CANTOR_GM */
 
-
+#ifdef  CANTOR_GM
 static inline void expand(Kelt * f, int t, int t0)
 {
     // f has at most 2^t coefficients. Split in pieces of 2^t0
@@ -240,6 +282,8 @@ static inline void expand_trunc(Kelt * f, int t, int t0, long n)
     expand(f, t-1, t0);
     expand_trunc(f+K, t-1, t0, n-K);
 }
+
+#if 0
 static inline void expand_unroll(Kelt * f, int t, int t0)
 {
     // f has at most 2^t coefficients. Split in pieces of 2^t0
@@ -256,14 +300,6 @@ static inline void expand_unroll(Kelt * f, int t, int t0)
     }
     expand_unroll(f, t-1, t0);
     expand_unroll(f+K, t-1, t0);
-}
-
-#if 0
-static inline void expand(Kelt * f, int t)
-{
-    // f has at most 2^(2*t) coefficients. Split it in place, in chunks
-    // of 2^t coefficients.
-    expand(f,2*t,t);
 }
 #endif
 
@@ -294,6 +330,7 @@ void transpose_outofplace(Kelt * g, Kelt * f, int t1, int t2)
     }
 }
 
+#if 0
 void gm_trick_unroll(int two_t, Kelt * f, int j, int m, int d)
 {
     assert((two_t & (two_t-1)) == 0);
@@ -356,6 +393,7 @@ void gm_trick_unroll(int two_t, Kelt * f, int j, int m, int d)
         gm_trick_unroll(t, f + (i << t), (j << t) + i, m << t, (d << t) + i);
     }
 }
+#endif
 
 static inline void gm_trick2(Kdst_elt f0, Kdst_elt f1, Kdst_elt f2, Kdst_elt f3, Ksrc_elt w2, Ksrc_elt w4)
 {
@@ -380,137 +418,6 @@ static inline void gm_trick2z(Kdst_elt f0, Kdst_elt f1, Kdst_elt f2, Kdst_elt f3
     Kadd(f2,z,f2);
     Kadd(f3,f3,f2);
 }
-
-
-#if 0
-void gm_trick4(Kelt * f, long j)
-{
-    Kelt z;
-    Kelt u;
-    Kelt f0; Kelt f1; Kelt f2; Kelt f3; 
-    Kelt f4; Kelt f5; Kelt f6; Kelt f7; 
-    Kelt f8; Kelt f9; Kelt fa; Kelt fb;
-    Kelt fc; Kelt fd; Kelt fe; Kelt ff;
-
-    Kset(f0,f[0]);	Kset(f1,f[1]);	Kset(f2,f[2]);	Kset(f3,f[3]);
-    Kset(f4,f[4]);	Kset(f5,f[5]);	Kset(f6,f[6]);	Kset(f7,f[7]);
-    Kset(f8,f[8]);	Kset(f9,f[9]);	Kset(fa,f[10]); Kset(fb,f[11]);
-    Kset(fc,f[12]);	Kset(fd,f[13]); Kset(fe,f[14]); Kset(ff,f[15]);
-
-    Kadd(f9,f9,ff);	Kadd(f8,f8,fe); Kadd(f7,f7,fd);
-    Kadd(f6,f6,fc);	Kadd(f5,f5,fb); Kadd(f4,f4,fa);
-    Kadd(f3,f3,f9);	Kadd(f2,f2,f8);	Kadd(f4,f4,f7);
-    Kadd(f3,f3,f6);	Kadd(f2,f2,f5);	Kadd(f1,f1,f4);
-    Kadd(fc,fc,ff);	Kadd(fb,fb,fe);	Kadd(fa,fa,fd);
-    Kadd(f9,f9,fc);
-
-    Kelt w2;
-    Kelt w4;
-    Kelt w8;
-    Kelt w16;
-    allBetai4(w2,w4,w8,w16,j<<1);
-
-    gm_trick2(f0,f4,f8,fc,w2,w4);
-    /*
-    Kadd(f8,f8,fc);	Kadd(f4,f4,f8);
-                        Kmul(z,w2,f8);	Kadd(f0,z,f0);	Kadd(f8,f8,f0);
-                        Kmul(z,w2,fc);	Kadd(f4,z,f4);	Kadd(fc,fc,f4);
-    Kset(u,w4);      	Kmul(z,u,f4);	Kadd(f0,z,f0);	Kadd(f4,f4,f0);
-    Kadd(u,u,Betai[1]); Kmul(z,u,fc);	Kadd(f8,z,f8);	Kadd(fc,fc,f8);
-    */
-
-    gm_trick2(f1,f5,f9,fd,w2,w4);
-    /*
-    Kadd(f9,f9,fd);
-    Kadd(f5,f5,f9);
-                        Kmul(z,w2,f9);	Kadd(f1,z,f1);	Kadd(f9,f9,f1);
-                        Kmul(z,w2,fd);	Kadd(f5,z,f5);	Kadd(fd,fd,f5);
-    Kset(u,w4);      	Kmul(z,u,f5);	Kadd(f1,z,f1);	Kadd(f5,f5,f1);
-    Kadd(u,u,Betai[1]); Kmul(z,u,fd);	Kadd(f9,z,f9);	Kadd(fd,fd,f9);
-    */
-
-    gm_trick2(f2,f6,fa,fe,w2,w4);
-    /*
-    Kadd(fa,fa,fe);
-    Kadd(f6,f6,fa);
-                        Kmul(z,w2,fa);	Kadd(f2,z,f2);	Kadd(fa,fa,f2);
-                        Kmul(z,w2,fe);	Kadd(f6,z,f6);	Kadd(fe,fe,f6);
-    Kset(u,w4); 	Kmul(z,u,f6);	Kadd(f2,z,f2);	Kadd(f6,f6,f2);
-    Kadd(u,u,Betai[1]); Kmul(z,u,fe);	Kadd(fa,z,fa);  Kadd(fe,fe,fa);
-    */
-
-    gm_trick2(f3,f7,fb,ff,w2,w4);
-    /*
-    Kadd(fb,fb,ff);
-    Kadd(f7,f7,fb);
-                        Kmul(z,w2,fb);	Kadd(f3,z,f3);	Kadd(fb,fb,f3);
-                        Kmul(z,w2,ff);	Kadd(f7,z,f7);	Kadd(ff,ff,f7);
-    Kset(u,w4);       	Kmul(z,u,f7);	Kadd(f3,z,f3);	Kadd(f7,f7,f3);
-    Kadd(u,u,Betai[1]); Kmul(z,u,ff);	Kadd(fb,z,fb);  Kadd(ff,ff,fb);
-    */
-
-    gm_trick2(f0,f1,f2,f3,w8,w16);
-    /*
-    Kadd(f2,f2,f3);
-    Kadd(f1,f1,f2);
-                        Kmul(z,w8,f2);	Kadd(f0,z,f0);	Kadd(f2,f2,f0);
-                        Kmul(z,w8,f3);	Kadd(f1,z,f1);	Kadd(f3,f3,f1);
-    Kset(u,w16);	Kmul(z,u,f1);	Kadd(f0,z,f0);	Kadd(f1,f1,f0);
-    Kadd(u,u,Betai[1]);	Kmul(z,u,f3);	Kadd(f2,z,f2);	Kadd(f3,f3,f2);
-    */
-
-    Kadd(w2,w8,Betai[1]);
-    Kadd(w4,w16,Betai[2]);
-    gm_trick2(f4,f5,f6,f7,w2,w4);
-    /*
-    Kadd(f6,f6,f7);
-    Kadd(f5,f5,f6);
-    Kset(u,w8);
-    Kadd(u,u,Betai[1]);
-                        Kmul(z,u,f6);	Kadd(f4,z,f4);	Kadd(f6,f6,f4);
-                        Kmul(z,u,f7);	Kadd(f5,z,f5);	Kadd(f7,f7,f5);
-    Kadd(u,w16,Betai[2]);Kmul(z,u,f5);	Kadd(f4,z,f4);	Kadd(f5,f5,f4);
-    Kadd(u,u,Betai[1]);	Kmul(z,u,f7);	Kadd(f6,z,f6);	Kadd(f7,f7,f6);
-    */
-
-    Kadd(w8,w8,Betai[2]);
-    Kadd(w16,w16,Betai[3]);
-    gm_trick2(f8,f9,fa,fb,w8,w16);
-    /*
-    Kadd(fa,fa,fb);
-    Kadd(f9,f9,fa);
-    Kset(u,w8);
-    Kadd(u,u,Betai[2]);
-                        Kmul(z,u,fa);	Kadd(f8,z,f8);	Kadd(fa,fa,f8);
-                        Kmul(z,u,fb);	Kadd(f9,z,f9);	Kadd(fb,fb,f9);
-    Kadd(u,w16,Betai[3]);Kmul(z,u,f9);	Kadd(f8,z,f8);	Kadd(f9,f9,f8);
-    Kadd(u,u,Betai[1]);	Kmul(z,u,fb);	Kadd(fa,z,fa);  Kadd(fb,fb,fa);
-    */
-
-    Kadd(w2,w2,Betai[2]);
-    Kadd(w4,w4,Betai[3]);
-    gm_trick2(fc,fd,fe,ff,w2,w4);
-    /*
-    Kadd(fe,fe,ff);
-    Kadd(fd,fd,fe);
-    Kset(u,w8);
-    Kadd(u,u,Betai[2]);
-    Kadd(u,u,Betai[1]);
-    Kmul(z,u,fe);	Kadd(fc,z,fc);  Kadd(fe,fe,fc);
-                        Kmul(z,u,ff);	Kadd(fd,z,fd);  Kadd(ff,ff,fd);
-    Kset(u,w16);
-    Kadd(u,u,Betai[3]);
-    Kadd(u,u,Betai[2]);
-                        Kmul(z,u,fd);	Kadd(fc,z,fc);  Kadd(fd,fd,fc);
-    Kadd(u,u,Betai[1]);	Kmul(z,u,ff);	Kadd(fe,z,fe);  Kadd(ff,ff,fe);
-    */
-
-    Kset(f[0],f0);	Kset(f[1],f1);	Kset(f[2],f2);	Kset(f[3],f3);
-    Kset(f[4],f4);	Kset(f[5],f5);	Kset(f[6],f6);	Kset(f[7],f7);
-    Kset(f[8],f8);	Kset(f[9],f9);	Kset(f[10],fa); Kset(f[11],fb);
-    Kset(f[12],fc);	Kset(f[13],fd); Kset(f[14],fe); Kset(f[15],ff);
-}
-#endif
 
 void gm_trick4(Kelt * f, long j)
 {
@@ -656,7 +563,9 @@ void gm_trick(int two_t, Kelt * f, long j)
         gm_trick(t, f + (i << t), (j << t) + i);
     }
 }
+#endif
 
+#ifdef  CANTOR_GM_TRUNCATE
 // compute only n' = 1L<<k values -- f must not have more than n coefficients !
 //
 // n' is larger than or equal to n.
@@ -715,6 +624,8 @@ void gm_trick_trunc(int two_t, Kelt * f, Kelt * buf, long j, int k, long n)
         gm_trick(t, f + (i << t), (j << t) + i);
     }
 }
+#endif
+
 
 /* 20080122 -- hard-coded versions of reduceSi for small sizes have been
  * tried, but do not seem to pay off. Look for the svn data to
@@ -745,6 +656,7 @@ static inline void reduceSi(int k, Kelt * f, Kelt beta)
         Kadd(f[i + K], f[i + K], f[i]);
 }
 
+#ifdef  CANTOR_GM
 // same as multieval, but only to chunks of size kappa
 void reduce_top_cantor(int k, int kappa, Kelt * f, long j)
 {
@@ -758,7 +670,7 @@ void reduce_top_cantor(int k, int kappa, Kelt * f, long j)
     reduce_top_cantor(k-1,kappa,f,j);
     reduce_top_cantor(k-1,kappa,f+(1L<<(k-1)),j+1);
 }
-
+#endif
 
 
 // The generic reduction function.
@@ -865,6 +777,7 @@ void multievaluateKrec(Kelt * f, int i, long rep_beta)
     }
 }
 
+#ifdef  CANTOR_GM
 // f must have 2^k coeffs exactly
 void multievaluateGM(Kelt * f, int k, long length MAYBE_UNUSED)
 {
@@ -887,6 +800,7 @@ void multievaluateGM(Kelt * f, int k, long length MAYBE_UNUSED)
     }
 #endif
 }
+#endif
 
 void multievaluateKrec_trunc(Kelt * f, int i, long rep_beta, long length)
 {
