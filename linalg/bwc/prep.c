@@ -159,7 +159,8 @@ void * prep_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
                      */
                     if (i < mmt->wr[!dir]->i0 || i >= mmt->wr[!dir]->i1)
                         continue;
-                    abadd(abase, where, mmt->wr[dir]->v + i - mmt->wr[dir]->i0);
+                    abadd(abase, where,
+                            mmt->wr[dir]->v->v + aboffset(abase, i - mmt->wr[dir]->i0));
                 }
             }
             matmul_top_mul(mmt, dir);

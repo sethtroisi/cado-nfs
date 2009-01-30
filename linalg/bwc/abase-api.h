@@ -117,15 +117,15 @@
 /* abclear(x,p,n) ; clear it */
 /* abinitf(x,n), abclearf(x,p,n) ; same, but allocate on the stack */
 #ifdef  ABASE_BIND
-#define abinit(x,n)     ABASE_BIND(init)(x,n)
-#define abclear(x,p,n)  ABASE_BIND(clear)(x,p,n)
-#define abinitf(x,n)    ABASE_BIND(initf)(x,n)
-#define abclearf(x,p,n) ABASE_BIND(clearf)(x,p,n)
+#define abinit(x,n)     abase_generic_init(abbytes(x,1),n)
+#define abclear(x,p,n)  abase_generic_clear(abbytes(x,1),p,n)
+#define abinitf(x,n)    abase_generic_initf(abbytes(x,1),n)
+#define abclearf(x,p,n) abase_generic_clearf(abbytes(x,1),p,n)
 #endif
 
 /* abzero(x,p,n) ; zero out the n records pointed to by p */
 #ifdef  ABASE_BIND
-#define abzero(x,p,n)   ABASE_BIND(zero)(x,p,n)
+#define abzero(x,p,n)   abase_generic_zero(abbytes(x,1),p,n)
 #endif
 
 /* abis_zero(x,p,n) ; test whether the n records pointed to by p are zero */
@@ -135,7 +135,7 @@
 
 /* abrandom(x,p,n) ; set the n records pointed to by p to random values */
 #ifdef  ABASE_BIND
-#define abrandom(x,p,n) ABASE_BIND(random)(x,p,n)
+#define abrandom(x,p,n) abase_generic_random(abbytes(x,1),p,n)
 #endif
 
 /* abset_ui(x,p,k,v) ; set bit k of the record pointed to by p to the value v */
@@ -159,7 +159,7 @@
 /* abcopy(x,q,p,n) ; copy the n records pointed to by p to the are
  * pointed to by q */
 #ifdef  ABASE_BIND
-#define abcopy(x,q,p,n) ABASE_BIND(copy)(x,q,p,n)
+#define abcopy(x,q,p,n) abase_generic_copy(abbytes(x,1),q,p,n)
 #endif
 
 /* abadd(x,q,p,n) ; add the record pointed to by p to the one pointed to
@@ -172,8 +172,8 @@
  * by p */
 /* abwrite(x,f,p,n) ; write them */
 #ifdef  ABASE_BIND
-#define abread(x,f,p,n) ABASE_BIND(read)(x,f,p,n)
-#define abwrite(x,f,p,n) ABASE_BIND(write)(x,f,p,n)
+#define abread(x,f,p,n) abase_generic_read(abbytes(x,1),f,p,n)
+#define abwrite(x,f,p,n) abase_generic_write(abbytes(x,1),f,p,n)
 #endif
 
 /* abdotprod(x,w,u,v,n) ; computes the dot product of vectors pointed to

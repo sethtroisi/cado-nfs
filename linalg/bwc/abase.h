@@ -1,6 +1,8 @@
 #ifndef ABASE_H_
 #define ABASE_H_
 
+#include "abase-generic.h"
+
 #if defined(SELECT_ABASE_u64)
 #include "abase-u64.h"
 #elif defined(SELECT_ABASE_u64k)

@@ -57,7 +57,7 @@ void save_x(uint32_t * xs, unsigned int m, unsigned int nx, parallelizing_info_p
         FILE * fx = fopen("X.twisted","w");
         FATAL_ERROR_CHECK(fx == NULL, "Cannot open file X for writing");
         fprintf(fx,"%u\n",nx);
-        for(int i = 0 ; i < m ; i++) {
+        for(unsigned int i = 0 ; i < m ; i++) {
             for(unsigned int k = 0 ; k < nx ; k++) {
                 fprintf(fx,"%s%" PRIu32,k?" ":"",xs[i*nx+k]);
             }

@@ -90,6 +90,7 @@ extern int param_list_parse_double(param_list, const char *, double *);
 extern int param_list_parse_string(param_list, const char *, char *, size_t);
 extern int param_list_parse_mpz(param_list, const char *, mpz_ptr);
 extern int param_list_parse_intxint(param_list pl, const char * key, int * r);
+extern int param_list_parse_int_and_int(param_list pl, const char * key, int * r, const char * sep);
 extern int param_list_parse_knob(param_list pl, const char * key);
 
 extern const char * param_list_lookup_string(param_list pl, const char * key);

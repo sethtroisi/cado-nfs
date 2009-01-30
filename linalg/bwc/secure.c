@@ -48,7 +48,7 @@ void * sec_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
 
     matmul_top_init(mmt, abase, pi, flags, matrix_filename);
 
-    abzero(abase, mmt->wr[!dir]->v, mmt->wr[!dir]->i1 - mmt->wr[!dir]->i0);
+    abzero(abase, mmt->wr[!dir]->v->v, mmt->wr[!dir]->i1 - mmt->wr[!dir]->i0);
 
     uint32_t * gxvecs = malloc(nx * m * sizeof(uint32_t));
 
@@ -62,7 +62,7 @@ void * sec_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
             if (i < mmt->wr[!dir]->i0 || i >= mmt->wr[!dir]->i1)
                 continue;
             abt * where;
-            where = mmt->wr[!dir]->v + aboffset(abase, i-mmt->wr[!dir]->i0);
+            where = mmt->wr[!dir]->v->v + aboffset(abase, i-mmt->wr[!dir]->i0);
             abset_ui(abase, where, j, 1);
         }
     }
@@ -239,9 +239,12 @@ int main(int argc, char * argv[])
 
     // now we're not multithread anymore.
 
-    // we save the parameter list once again, in case we inherited some
-    // new parameter. Is there any point in doing so ???
-    param_list_save(pl, "bw.cfg");
+    // XXX
+    // we used to save the parameter list once again, in case we
+    // inherited some new parameter. However, for most of them it just
+    // makes no sense to depart from the meaning found in the config
+    // file, so why bother ???
+    // param_list_save(pl, "bw.cfg");
     param_list_clear(pl);
 
     mpz_clear(p);

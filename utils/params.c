@@ -473,7 +473,7 @@ int param_list_parse_int(param_list pl, const char * key, int * r)
     return rc;
 }
 
-int param_list_parse_intxint(param_list pl, const char * key, int * r)
+int param_list_parse_int_and_int(param_list pl, const char * key, int * r, const char * sep)
 {
     int v = assoc(pl, key);
     if (v < 0)
@@ -483,13 +483,13 @@ int param_list_parse_intxint(param_list pl, const char * key, int * r)
     char * end;
     long res[2];
     res[0] = strtol(value, &end, 0);
-    if (*end != 'x') {
+    if (strncmp(end, sep, strlen(sep)) != 0) {
         fprintf(stderr, "Parse error: parameter for key %s"
-                " must match %%dx%%d; got %s\n",
-                key, pl->p[v]->value);
+                " must match %%d%s%%d; got %s\n",
+                key, sep, pl->p[v]->value);
         exit(1);
     }
-    value = end + 1;
+    value = end + strlen(sep);
     res[1] = strtol(value, &end, 0);
     if (*end != '\0') {
         fprintf(stderr, "Parse error: parameter for key %s"
@@ -502,6 +502,11 @@ int param_list_parse_intxint(param_list pl, const char * key, int * r)
         r[1] = res[1];
     }
     return pl->p[v]->seen;
+}
+
+int param_list_parse_intxint(param_list pl, const char * key, int * r)
+{
+    return param_list_parse_int_and_int(pl, key, r, "x");
 }
 
 

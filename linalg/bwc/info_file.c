@@ -121,7 +121,5 @@ void read_info_file(matmul_top_data_ptr mmt, const char * filename)
     }
     fclose(f);
     free(infoname);
-
-    mmt_finish_init(mmt);
 }
 

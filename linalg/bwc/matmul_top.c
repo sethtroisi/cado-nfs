@@ -41,144 +41,70 @@ void extra_svec_recall(matmul_top_data_srcptr mmt, const abt * x) {
 #error "Do you really, really want to use arbitrary left and right sigmas ?"
 #endif
 
-void matmul_top_init(matmul_top_data_ptr mmt,
-        abobj_ptr abase,
-        /* matmul_ptr mm, */
-        parallelizing_info_ptr pi,
-        int const * flags,
-        const char * filename)
+///////////////////////////////////////////////////////////////////
+/* Start with stuff that does not depend on abase at all -- this
+ * provides a half-baked interface */
+
+void matmul_top_vec_init_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, int d, int flags)
 {
-    memset(mmt, 0, sizeof(*mmt));
+    pi_wiring_ptr picol = mmt->pi->wr[d];
+    if (v == NULL) v = (mmt_generic_vec_ptr) mmt->wr[d]->v;
 
-    mmt->abase = abase;
-    mmt->pi = pi;
-    mmt->mm = NULL;
+    v->flags = flags;
 
-    // n[]
-    // ncoeffs_total, ncoeffs,
-    // locfile,
-    // fences[]
-    // wr[]->*
-    // are filled in later within read_info_file
+    unsigned int i0 = mmt->wr[d]->i0;
+    unsigned int i1 = mmt->wr[d]->i1;
 
     // all_v pointers are stored twice, in a rotating buffer manner, so
     // that it's possible for one thread to address the n other threads
     // without having to compute a modulo
-    mmt->wr[0]->all_v = malloc(2 * mmt->pi->wr[0]->ncores * sizeof(abt *));
-    mmt->wr[1]->all_v = malloc(2 * mmt->pi->wr[1]->ncores * sizeof(abt *));
+    v->all_v = malloc(2 * picol->ncores * sizeof(void *));
 
-    if (flags) {
-        mmt->flags[0] = flags[0];
-        mmt->flags[1] = flags[1];
-    } else {
-        /* otherwise the default zero value is OK */
-    }
-
-    read_info_file(mmt, filename);
-}
-
-/* Some work has to be done in order to fill the remaining fields in the
- * matmul_top structure.
- */
-void mmt_finish_init(matmul_top_data_ptr mmt)
-{
-#ifndef  CONJUGATED_PERMUTATIONS
-    choke me;
-#endif
-    for(unsigned int d = 0 ; d < 2 ; d++) {
-        // assume d == 1 ; we have some column indices given by our i0 and i1
-        // values. We want to know how this intersects the horizontal fences
-        
-        mmt_wiring_ptr mcol = mmt->wr[d];
-        pi_wiring_ptr picol = mmt->pi->wr[d];
-
-
-        // intersect with horizontal fences, but of course we limit to the numer
-        // of rows, which is a vertical data.
-        unsigned int i0 = mcol->i0;
-        unsigned int i1 = mcol->i1;
-        intersect(&(mcol->xlen), &(mcol->x),
-                mmt->fences[!d], i0, i1, mmt->n[d]);
-
-        // do also the secondary level intersections. They're used for
-        // reduction.
-        unsigned int ii0 = i0 +  picol->trank    * (i1 - i0) / picol->ncores;
-        unsigned int ii1 = i0 + (picol->trank+1) * (i1 - i0) / picol->ncores;
-        intersect(&(mcol->ylen), &(mcol->y),
-                mmt->fences[!d], ii0, ii1, mmt->n[d]);
-
-
-        if (mmt->flags[d] & THREAD_SHARED_VECTOR) {
-            void * r;
-            if (picol->trank == 0)
-                r = abinit(mmt->abase, i1 - i0);
-            thread_agreement(picol, &r, 0);
-            mcol->v = r;
-            for(unsigned int t = 0 ; t < picol->ncores ; t++) {
-                mcol->all_v[t] = mcol->v;
-            }
-        } else {
-            mcol->v = abinit(mmt->abase, i1 - i0);
-            mcol->all_v[picol->trank] = mcol->v;
-            for(unsigned int t = 0 ; t < picol->ncores ; t++) {
-                // TODO: once thread_agreement is fixed (if ever), we can
-                // drop this serialization point. At the moment, it's
-                // needed.
-                serialize_threads(picol);
-                void * r;
-                r = mcol->v;
-                thread_agreement(picol, &r, t);
-                mcol->all_v[t] = r;
-            }
-        }
+    if (flags & THREAD_SHARED_VECTOR) {
+        void * r;
+        if (picol->trank == 0)
+            r = abase_generic_init(stride, i1 - i0);
+        thread_agreement(picol, &r, 0);
+        v->v = r;
         for(unsigned int t = 0 ; t < picol->ncores ; t++) {
-            mcol->all_v[picol->ncores + t] = mcol->all_v[t];
+            v->all_v[t] = v->v;
+        }
+    } else {
+        v->v = abase_generic_init(stride, i1 - i0);
+        v->all_v[picol->trank] = v->v;
+        for(unsigned int t = 0 ; t < picol->ncores ; t++) {
+            // TODO: once thread_agreement is fixed (if ever), we can
+            // drop this serialization point. At the moment, it's
+            // needed.
+            serialize_threads(picol);
+            void * r;
+            r = v->v;
+            thread_agreement(picol, &r, t);
+            v->all_v[t] = r;
         }
     }
-
-    // TODO: reuse the ../bw-matmul/matmul/matrix_base.cpp things for
-    // displaying communication info.
-    
-    matmul_top_read_submatrix(mmt);
-}
-
-void matmul_top_read_submatrix(matmul_top_data_ptr mmt)
-{
-    mmt->mm = matmul_reload_cache(mmt->abase, mmt->locfile);
-    if (mmt->mm)
-        return;
-
-    // fprintf(stderr, "Could not find cache file for %s\n", mmt->locfile);
-    mmt->mm = matmul_build(mmt->abase, mmt->locfile);
-    matmul_save_cache(mmt->mm, mmt->locfile);
-}
-
-
-void matmul_top_clear(matmul_top_data_ptr mmt, abobj_ptr abase MAYBE_UNUSED)
-{
-    matmul_clear(mmt->mm);
-    for(int d = 0 ; d < 2 ; d++) {
-        mmt_wiring_ptr mcol = mmt->wr[d];
-        pi_wiring_ptr picol = mmt->pi->wr[d];
-        if (mmt->flags[d] & THREAD_SHARED_VECTOR) {
-            if (picol->trank == 0)
-                abclear(mmt->abase, mcol->v, mcol->i1 - mcol->i0);
-        } else {
-            abclear(mmt->abase, mcol->v, mcol->i1 - mcol->i0);
-        }
-        free(mcol->all_v);
+    for(unsigned int t = 0 ; t < picol->ncores ; t++) {
+        v->all_v[picol->ncores + t] = v->all_v[t];
     }
-    free(mmt->locfile);
 }
 
-/* XXX
- * ``across'' (horizontally) and ``down'' (vertically) are just here for
- * exposition. The binding of this operation to job/thread arrangement
- * is flexible, through argument d.
- * XXX
- */
+void matmul_top_vec_clear_generic(matmul_top_data_ptr mmt, size_t stride MAYBE_UNUSED, mmt_generic_vec_ptr v, int d)
+{
+    mmt_wiring_ptr mcol MAYBE_UNUSED = mmt->wr[d];
+    pi_wiring_ptr picol = mmt->pi->wr[d];
+    if (v == NULL) v = (mmt_generic_vec_ptr) mmt->wr[d]->v;
+
+    if (v->flags & THREAD_SHARED_VECTOR) {
+        if (picol->trank == 0)
+            abase_generic_clear(stride, v->v, mcol->i1 - mcol->i0);
+    } else {
+        abase_generic_clear(stride, v->v, mcol->i1 - mcol->i0);
+    }
+    free(v->all_v);
+}
+
 static void
-broadcast_down(matmul_top_data_ptr mmt, int d)
+broadcast_down_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, int d)
 {
     // broadcasting down columns is for common agreement on a right
     // source vector, once a left output has been computed.
@@ -188,6 +114,7 @@ broadcast_down(matmul_top_data_ptr mmt, int d)
     choke me;
 #endif
     int err;
+    if (v == NULL) v = (mmt_generic_vec_ptr) mmt->wr[d]->v;
 
     pi_wiring_ptr picol = mmt->pi->wr[d];
 #ifndef MPI_LIBRARY_MT_CAPABLE
@@ -208,7 +135,7 @@ broadcast_down(matmul_top_data_ptr mmt, int d)
     /* If our vector data is not shared amongst threads, it has to be
      * broadcasted. We define the ``extra'' flag in this case.
      */
-    unsigned int extra = (mmt->flags[d] & THREAD_SHARED_VECTOR) == 0;
+    unsigned int extra = (v->flags & THREAD_SHARED_VECTOR) == 0;
 
     if (extra) {
         /* While this code has been written with some caution, it has had
@@ -239,9 +166,9 @@ broadcast_down(matmul_top_data_ptr mmt, int d)
                         // below)
                         continue;
                     }
-                    unsigned int off = aboffset(mmt->abase, xx->offset_me);
-                    void * ptr = mcol->v + off;
-                    size_t siz = abbytes(mmt->abase, xx->count);
+                    size_t off = xx->offset_me * stride;
+                    abase_generic_ptr ptr = abase_generic_ptr_add(v->v, off);
+                    size_t siz = xx->count * stride;
                     unsigned int root = xx->k / picol->ncores;
                     err = MPI_Bcast(ptr, siz, MPI_BYTE, root, picol->pals);
                     BUG_ON(err);
@@ -275,10 +202,10 @@ broadcast_down(matmul_top_data_ptr mmt, int d)
                      * specifically the guy who's not working.  */
                     continue;
                 }
-                unsigned int off = aboffset(mmt->abase, xx->offset_me);
-                abt * ptr = mcol->v + off;
-                abt * sptr = mcol->all_v[src] + off;
-                size_t siz = abbytes(mmt->abase, xx->count);
+                size_t off = xx->offset_me * stride;
+                abase_generic_ptr ptr = abase_generic_ptr_add(v->v, off);
+                abase_generic_ptr sptr = abase_generic_ptr_add(v->all_v[src], off);
+                size_t siz = xx->count * stride;
                 ASSERT(ptr != sptr);
                 memcpy(ptr, sptr, siz);
             }
@@ -291,9 +218,9 @@ broadcast_down(matmul_top_data_ptr mmt, int d)
         if (src != picol->trank) {
             continue;
         }
-        unsigned int off = aboffset(mmt->abase, xx->offset_me);
-        void * ptr = mcol->v + off;
-        size_t siz = abbytes(mmt->abase, xx->count);
+        size_t off = xx->offset_me * stride;
+        abase_generic_ptr ptr = abase_generic_ptr_add(v->v,off);
+        size_t siz = xx->count * stride;
         unsigned int root = xx->k / picol->ncores;
         err = MPI_Bcast(ptr, siz, MPI_BYTE, root, picol->pals);
         BUG_ON(err);
@@ -311,10 +238,10 @@ broadcast_down(matmul_top_data_ptr mmt, int d)
                  * specifically the guy who's not working.  */
                 continue;
             }
-            unsigned int off = aboffset(mmt->abase, xx->offset_me);
-            abt * ptr = mcol->v + off;
-            abt * sptr = mcol->all_v[src] + off;
-            size_t siz = abbytes(mmt->abase, xx->count);
+            size_t off = xx->offset_me * stride;
+            abase_generic_ptr ptr = abase_generic_ptr_add(v->v, off);
+            abase_generic_ptr sptr = abase_generic_ptr_add(v->all_v[src], off);
+            size_t siz = xx->count * stride;
             ASSERT(ptr != sptr);
             memcpy(ptr, sptr, siz);
         }
@@ -325,9 +252,9 @@ broadcast_down(matmul_top_data_ptr mmt, int d)
         /* untested */
         BUG();
         if (extra || picol->trank == 0) {
-            abzero(mmt->abase,
-                    mcol->v + aboffset(mmt->abase, nrows-mcol->i0),
-                    mcol->i1-nrows);
+            abase_generic_zero(stride, abase_generic_ptr_add(v->v,
+                        (nrows-mcol->i0) * stride),
+                        (mcol->i1-nrows) * stride);
         }
         if (!extra) {
             /* of course all threads within the same column have common
@@ -337,167 +264,25 @@ broadcast_down(matmul_top_data_ptr mmt, int d)
     }
 }
 
-
-static void
-reduce_across(matmul_top_data_ptr mmt, int d)
+void matmul_top_fill_random_source_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, int d)
 {
-#ifndef  CONJUGATED_PERMUTATIONS
-    choke me;
-#endif
+    if (v == NULL) v = (mmt_generic_vec_ptr) mmt->wr[d]->v;
 
-    int err;
-
-    /* reducing across a row is when d == 0 */
-    pi_wiring_ptr pirow = mmt->pi->wr[d];
-#ifndef MPI_LIBRARY_MT_CAPABLE
-    pi_wiring_ptr picol = mmt->pi->wr[!d];
-#endif
-
-    mmt_wiring_ptr mrow = mmt->wr[d];
-    mmt_wiring_ptr mcol = mmt->wr[!d];
-
-    if ((mmt->flags[d] & THREAD_SHARED_VECTOR) == 0 && (pirow->ncores > 1)) {
-        /* row threads have to sum up their data. Of course it's
-         * irrelevant when there is only one such thread...
-         *
-         * note that no locking is needed here.
-         */
-        // unsigned int i0 = mrow->i0;
-        // unsigned int i1 = MIN(mrow->i1, mmt->n[d]);
-        // unsigned int ii0 = i0 +  pirow->trank    * (i1 - i0) / pirow->ncores;
-        // unsigned int ii1 = i0 + (pirow->trank+1) * (i1 - i0) / pirow->ncores;
-        for(unsigned int i = 0 ; i < mrow->ylen ; i++) {
-            struct isect_info * xx = &(mrow->y[i]);
-            unsigned int dst = xx->k % pirow->ncores;
-            unsigned int off = aboffset(mmt->abase, xx->offset_me);
-            abt * dptr = mrow->all_v[dst] + off;
-            // size_t siz = abbytes(mmt->abase, xx->count);
-            ASSERT(off + xx->count <= mrow->i1 - mrow->i0);
-            for(unsigned int j = 1 ; j < pirow->ncores ; j++) {
-                const abt * sptr = mrow->all_v[dst+j] + off;
-                for(unsigned int k = 0 ; k < xx->count ; k++) {
-                    abadd(mmt->abase, dptr + k, sptr + k);
-                    // TODO: for non-binary fields, here we would have an
-                    // unreduced add (of probably already unreduced data
-                    // as they come out of the matrix-vector
-                    // multiplication), followed later on by a reduction
-                    // in dptr.
-                }
-            }
-        }
-    }
-
-#ifndef MPI_LIBRARY_MT_CAPABLE
-    /* Now we can perform mpi-level reduction across rows. */
-    for(unsigned int t = 0 ; t < picol->ncores ; t++) {
-        serialize_threads(picol);
-        if (t != picol->trank)
-            continue;   // not our turn.
-
-        // all row threads are likely to engage in a collective operation
-        // at one moment or another.
-        for(unsigned int i = 0 ; i < mrow->xlen ; i++) {
-            struct isect_info * xx = &(mrow->x[i]);
-            unsigned int tdst = xx->k % pirow->ncores;
-            serialize_threads(pirow);
-            if (pirow->trank != tdst)
-                continue;
-            unsigned int jdst = xx->k / pirow->ncores;
-            // MPI_Reduce does not know about const-ness !
-            abt * sptr = mrow->v + aboffset(mmt->abase, xx->offset_me);
-            abt * dptr = mcol->v + aboffset(mmt->abase, xx->offset_there);
-            size_t siz = abbytes(mmt->abase, xx->count);
-            err = MPI_Reduce(sptr, dptr, siz, MPI_BYTE, MPI_BXOR, jdst, pirow->pals);
-            BUG_ON(err);
-        }
-    }
-#else   /* MPI_LIBRARY_MT_CAPABLE */
-        for(unsigned int i = 0 ; i < mrow->xlen ; i++) {
-            struct isect_info * xx = &(mrow->x[i]);
-            unsigned int tdst = xx->k % pirow->ncores;
-            // serialize_threads(pirow);
-            if (pirow->trank != tdst)
-                continue;
-            unsigned int jdst = xx->k / pirow->ncores;
-            // MPI_Reduce does not know about const-ness !
-            abt * sptr = mrow->v + aboffset(mmt->abase, xx->offset_me);
-            abt * dptr = mcol->v + aboffset(mmt->abase, xx->offset_there);
-            size_t siz = abbytes(mmt->abase, xx->count);
-            err = MPI_Reduce(sptr, dptr, siz, MPI_BYTE, MPI_BXOR, jdst, pirow->pals);
-            BUG_ON(err);
-        }
-#endif
-
-
-    // as usual, we do not serialize on exit. Up to the next routine to
-    // do so if needed.
-    // 
-    // what _is_ guaranteed is that in each column, the leader thread has
-    // all the necessary data to begin the column broadcast.
-}
-
-void matmul_top_fill_random_source(matmul_top_data_ptr mmt, int d)
-{
     // In conjugation mode, it is possible to fill exactly the data chunk
     // that will eventually be relevant. However, it's easy enough to
     // fill our output vector with garbage, and do broadcast_down
     // afterwards...
-    if ((mmt->flags[d] & THREAD_SHARED_VECTOR) == 0 || mmt->pi->wr[d]->trank == 0)
-        abrandom(mmt->abase, mmt->wr[d]->v, mmt->wr[d]->i1 - mmt->wr[d]->i0);
+    if ((v->flags & THREAD_SHARED_VECTOR) == 0 || mmt->pi->wr[d]->trank == 0)
+        abase_generic_random(stride, v->v, mmt->wr[d]->i1 - mmt->wr[d]->i0);
 
     // reconcile all cells which correspond to the same vertical block.
-    broadcast_down(mmt, d);
+    broadcast_down_generic(mmt, stride, v, d);
 }
 
-void matmul_top_mul(matmul_top_data_ptr mmt, int d)
-{
-#ifndef NDEBUG
-    unsigned int di_in = mmt->wr[d]->i1 - mmt->wr[d]->i0;
-    unsigned int di_out = mmt->wr[!d]->i1 - mmt->wr[!d]->i0;
-    ASSERT(mmt->mm->ncols == (d ? di_in : di_out));
-    ASSERT(mmt->mm->nrows == (d ? di_out : di_in));
-#endif
-
-    broadcast_down(mmt, d);
-    matmul_mul(mmt->mm, mmt->wr[!d]->v, mmt->wr[d]->v, d);
-    reduce_across(mmt, !d);
-}
-
-
-/* Vector I/O is done by only one job, one thread. It incurs a
- * significant amount of memory allocation, but this is done relatively
- * rarely.
- *
- * Vectors, as handled within the core routines, are permuted. He have
- * coordinates (v_{\sigma(0)}...v_{\sigma(n-1)}), where \sigma is the
- * permutation given by the *_perm files. Notice that we assume that we
- * have conjugated permutations on the two sides. This means that no
- * data manipulation is required within the critical loops (this would
- * imply a fuzzy communication pattern, boiling down to essentially
- * using allreduce instead of reduce).
- */
-
-/* As always, comments are written with one given point of view in mind.
- * The vector wich gets saved is always the source vector. Here, our
- * arbitrary description choice is that we iterate M^i times vector,
- * hence the source vector is on the right: d == 1.
- */
-
-// comments, variable names and so on are names which for simplicity
-// reflect the situation d == 1 (save right vector). The stable state we
-// start with is after a matrix-times-vector product (or just before
-// one): The left vector has been computed, and the data for indices
-// [i0..i1[ is on the nodes seeing those indices vertically as well. Data
-// is therefore found in the right vector area, as after the reduce step.
-//
-// Doing a broadcast_down columns will ensure that each row contains
-// the complete data set for our vector.
-
-/* The first function is the back-end, run only on the top row.
- */
-static void save_vector_toprow(matmul_top_data_ptr mmt, const char * name, int d, unsigned int index, unsigned int iter)
+static void save_vector_toprow_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, const char * name, int d, unsigned int index, unsigned int iter)
 {
     int err;
+    if (v == NULL) v = (mmt_generic_vec_ptr) mmt->wr[d]->v;
 
     // pi_wiring_ptr picol = mmt->pi->wr[d];
     pi_wiring_ptr pirow = mmt->pi->wr[!d];
@@ -507,7 +292,7 @@ static void save_vector_toprow(matmul_top_data_ptr mmt, const char * name, int d
     // The vector is saved by _one_ node, _one_ thread.
     void * recvbuf = NULL;
     int fd = -1;
-    size_t siz = abbytes(mmt->abase, mmt->n[!d]);
+    size_t siz = stride * (mmt->n[!d]);
     // the page size is always a multiple of two, so rounding to the next
     // multiple is easy.
     size_t wsiz = ((siz - 1) | (sysconf(_SC_PAGESIZE)-1)) + 1;
@@ -556,8 +341,8 @@ static void save_vector_toprow(matmul_top_data_ptr mmt, const char * name, int d
     }
 
     /* Prepare gatherv arguments */
-    void * sendbuf = (void *) mcol->v;
-    int sendcount = abbytes(mmt->abase, mcol->i1 - mcol->i0);
+    void * sendbuf = (void *) v->v;
+    int sendcount = stride * (mcol->i1 - mcol->i0);
 
     int * displs = (int *) malloc(pirow->njobs * sizeof(int));
     int * recvcounts = (int *) malloc(pirow->njobs * sizeof(int));
@@ -570,8 +355,8 @@ static void save_vector_toprow(matmul_top_data_ptr mmt, const char * name, int d
         unsigned int dx0 = mmt->fences[d][x];
         unsigned int dx1 = mmt->fences[d][x+1];
 
-        displs[k] = abbytes(mmt->abase, dx0);
-        recvcounts[k] = abbytes(mmt->abase, dx1 - dx0);
+        displs[k] = stride * (dx0);
+        recvcounts[k] = stride * (dx1 - dx0);
     }
 
     /* At this point, if ever we could have as many communications via
@@ -616,37 +401,14 @@ static void save_vector_toprow(matmul_top_data_ptr mmt, const char * name, int d
     }
 }
 
-void matmul_top_save_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int index, unsigned int iter)
-{
-    // we want row 0 to have everything.
-    broadcast_down(mmt, d);
-
-    // we'll do some funky stuff, so serialize in order to avoid jokes.
-    // Penalty is insignificant anyway since I/O are rare.
-    serialize(mmt->pi->m);
-    serialize_threads(mmt->pi->m);
-
-    pi_wiring_ptr picol = mmt->pi->wr[d];
-    // pi_wiring_ptr pirow = mmt->pi->wr[!d];
-
-    // Now every job row has the complete vector.  We'll do I/O from only
-    // one row, that's easier. Pick the topmost one.
-    if (picol->jrank == 0 && picol->trank == 0) {
-        save_vector_toprow(mmt, name, d, index, iter);
-    }
-
-    serialize(mmt->pi->m);
-    serialize_threads(mmt->pi->m);
-
-}
-
 // now the exact opposite.
 
-/* The backend is exactly dual to save_vector_toprow.
+/* The backend is exactly dual to save_vector_toprow_generic.
  */
-static void load_vector_toprow(matmul_top_data_ptr mmt, const char * name, int d, unsigned int index, unsigned int iter)
+static void load_vector_toprow_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, const char * name, int d, unsigned int index, unsigned int iter)
 {
     int err;
+    if (v == NULL) v = (mmt_generic_vec_ptr) mmt->wr[d]->v;
 
     // pi_wiring_ptr picol = mmt->pi->wr[d];
     pi_wiring_ptr pirow = mmt->pi->wr[!d];
@@ -655,7 +417,7 @@ static void load_vector_toprow(matmul_top_data_ptr mmt, const char * name, int d
     
     void * sendbuf = NULL;
     int fd = -1;
-    size_t siz = abbytes(mmt->abase, mmt->n[!d]);
+    size_t siz = stride * (mmt->n[!d]);
     size_t wsiz = ((siz - 1) | (sysconf(_SC_PAGESIZE)-1)) + 1;
     if (pirow->jrank == 0) {
         if (pirow->trank == 0) {
@@ -674,8 +436,8 @@ static void load_vector_toprow(matmul_top_data_ptr mmt, const char * name, int d
         thread_agreement(pirow, &sendbuf, 0);
     }
 
-    void * recvbuf = (void *) mcol->v;
-    int recvcount = abbytes(mmt->abase, mcol->i1 - mcol->i0);
+    void * recvbuf = (void *) v->v;
+    int recvcount = stride * (mcol->i1 - mcol->i0);
 
     int * displs = (int *) malloc(pirow->njobs * sizeof(int));
     int * sendcounts = (int *) malloc(pirow->njobs * sizeof(int));
@@ -685,8 +447,8 @@ static void load_vector_toprow(matmul_top_data_ptr mmt, const char * name, int d
         unsigned int dx0 = mmt->fences[d][x];
         unsigned int dx1 = mmt->fences[d][x+1];
 
-        displs[k] = abbytes(mmt->abase, dx0);
-        sendcounts[k] = abbytes(mmt->abase, dx1 - dx0);
+        displs[k] = stride * (dx0);
+        sendcounts[k] = stride * (dx1 - dx0);
     }
 
     for(unsigned int t = 0 ; t < pirow->ncores ; t++) {
@@ -711,9 +473,10 @@ static void load_vector_toprow(matmul_top_data_ptr mmt, const char * name, int d
     }
 }
 
-void matmul_top_load_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int index, unsigned int iter)
+void matmul_top_load_vector_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, const char * name, int d, unsigned int index, unsigned int iter)
 {
     int err;
+    if (v == NULL) v = (mmt_generic_vec_ptr) mmt->wr[d]->v;
 
     serialize(mmt->pi->m);
     serialize_threads(mmt->pi->m);
@@ -724,7 +487,7 @@ void matmul_top_load_vector(matmul_top_data_ptr mmt, const char * name, int d, u
     // mmt_wiring_ptr mrow = mmt->wr[!d];
 
     if (picol->jrank == 0 && picol->trank == 0) {
-        load_vector_toprow(mmt, name, d, index, iter);
+        load_vector_toprow_generic(mmt, stride, v, name, d, index, iter);
     }
 
     serialize(mmt->pi->m);
@@ -733,13 +496,13 @@ void matmul_top_load_vector(matmul_top_data_ptr mmt, const char * name, int d, u
     // after loading, we need to broadcast the data. As in other
     // occcasions, this has to be one one thread at a time.
 
-    size_t siz = abbytes(mmt->abase, mcol->i1 - mcol->i0);
+    size_t siz = stride * (mcol->i1 - mcol->i0);
     if (picol->trank == 0) {
         // first, down on columns.
         for(unsigned int t = 0 ; t < pirow->ncores ; t++) {
             serialize_threads(pirow);
             if (t == pirow->trank) {
-                void * ptr = mcol->v;
+                void * ptr = v->v;
                 err = MPI_Bcast(ptr, siz, MPI_BYTE, 0, picol->pals);
                 BUG_ON(err);
             }
@@ -749,13 +512,312 @@ void matmul_top_load_vector(matmul_top_data_ptr mmt, const char * name, int d, u
     serialize(mmt->pi->m);
 
     // then maybe amongst threads if they're not sharing data.
-    if ((mmt->flags[d] & THREAD_SHARED_VECTOR) == 0) {
+    if ((v->flags & THREAD_SHARED_VECTOR) == 0) {
         // we have picol->ncores threads, which would be delighted to get
         // access to some common data. The data is known to sit in thread
         // zero, so that's relatively easy.
         
         if (picol->trank != 0) {
-            memcpy(mcol->v, mcol->all_v[0], siz);
+            memcpy(v->v, v->all_v[0], siz);
         }
     }
+}
+
+void matmul_top_save_vector_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, const char * name, int d, unsigned int index, unsigned int iter)
+{
+    if (v == NULL) v = (mmt_generic_vec_ptr) mmt->wr[d]->v;
+
+    // we want row 0 to have everything.
+    broadcast_down_generic(mmt, stride, v, d);
+
+    // we'll do some funky stuff, so serialize in order to avoid jokes.
+    // Penalty is insignificant anyway since I/O are rare.
+    serialize(mmt->pi->m);
+    serialize_threads(mmt->pi->m);
+
+    pi_wiring_ptr picol = mmt->pi->wr[d];
+    // pi_wiring_ptr pirow = mmt->pi->wr[!d];
+
+    // Now every job row has the complete vector.  We'll do I/O from only
+    // one row, that's easier. Pick the topmost one.
+    if (picol->jrank == 0 && picol->trank == 0) {
+        save_vector_toprow_generic(mmt, stride, v, name, d, index, iter);
+    }
+
+    serialize(mmt->pi->m);
+    serialize_threads(mmt->pi->m);
+}
+
+//////////////////////////////////////////////////////////////////////////
+
+void matmul_top_vec_init(matmul_top_data_ptr mmt, int d, int flags)
+{
+    matmul_top_vec_init_generic(mmt, abbytes(mmt->abase, 1), NULL, d, flags);
+}
+
+void matmul_top_init(matmul_top_data_ptr mmt,
+        abobj_ptr abase,
+        /* matmul_ptr mm, */
+        parallelizing_info_ptr pi,
+        int const * flags,
+        const char * filename)
+{
+    memset(mmt, 0, sizeof(*mmt));
+
+    mmt->abase = abase;
+    mmt->pi = pi;
+    mmt->mm = NULL;
+
+    // n[]
+    // ncoeffs_total, ncoeffs,
+    // locfile,
+    // fences[]
+    // wr[]->*
+    // are filled in later within read_info_file
+
+    read_info_file(mmt, filename);
+
+    /* NOTE: flags default to zero */
+    matmul_top_vec_init(mmt, 0, flags ? flags[0] : 0);
+    matmul_top_vec_init(mmt, 1, flags ? flags[1] : 0);
+
+    mmt_finish_init(mmt);
+}
+
+/* Some work has to be done in order to fill the remaining fields in the
+ * matmul_top structure.
+ */
+void mmt_finish_init(matmul_top_data_ptr mmt)
+{
+#ifndef  CONJUGATED_PERMUTATIONS
+    choke me;
+#endif
+    for(unsigned int d = 0 ; d < 2 ; d++) {
+        // assume d == 1 ; we have some column indices given by our i0 and i1
+        // values. We want to know how this intersects the horizontal fences
+        
+        mmt_wiring_ptr mcol = mmt->wr[d];
+        pi_wiring_ptr picol = mmt->pi->wr[d];
+
+
+        // intersect with horizontal fences, but of course we limit to the numer
+        // of rows, which is a vertical data.
+        unsigned int i0 = mcol->i0;
+        unsigned int i1 = mcol->i1;
+        intersect(&(mcol->xlen), &(mcol->x),
+                mmt->fences[!d], i0, i1, mmt->n[d]);
+
+        // do also the secondary level intersections. They're used for
+        // reduction.
+        unsigned int ii0 = i0 +  picol->trank    * (i1 - i0) / picol->ncores;
+        unsigned int ii1 = i0 + (picol->trank+1) * (i1 - i0) / picol->ncores;
+        intersect(&(mcol->ylen), &(mcol->y),
+                mmt->fences[!d], ii0, ii1, mmt->n[d]);
+
+
+    }
+
+    // TODO: reuse the ../bw-matmul/matmul/matrix_base.cpp things for
+    // displaying communication info.
+    
+    matmul_top_read_submatrix(mmt);
+}
+
+void matmul_top_read_submatrix(matmul_top_data_ptr mmt)
+{
+    mmt->mm = matmul_reload_cache(mmt->abase, mmt->locfile);
+    if (mmt->mm)
+        return;
+
+    // fprintf(stderr, "Could not find cache file for %s\n", mmt->locfile);
+    mmt->mm = matmul_build(mmt->abase, mmt->locfile);
+    matmul_save_cache(mmt->mm, mmt->locfile);
+}
+
+void matmul_top_vec_clear(matmul_top_data_ptr mmt, int d)
+{
+    matmul_top_vec_clear_generic(mmt, abbytes(mmt->abase, 1), NULL, d);
+}
+
+
+void matmul_top_clear(matmul_top_data_ptr mmt, abobj_ptr abase MAYBE_UNUSED)
+{
+    matmul_clear(mmt->mm);
+    matmul_top_vec_clear(mmt,0);
+    matmul_top_vec_clear(mmt,1);
+    free(mmt->locfile);
+}
+
+/* XXX
+ * ``across'' (horizontally) and ``down'' (vertically) are just here for
+ * exposition. The binding of this operation to job/thread arrangement
+ * is flexible, through argument d.
+ * XXX
+ */
+static void
+broadcast_down(matmul_top_data_ptr mmt, int d)
+{
+    broadcast_down_generic(mmt, abbytes(mmt->abase, 1), NULL, d);
+}
+
+
+/* Note that because reduce_across does additions, it is _NOT_ generic.
+ */
+static void
+reduce_across(matmul_top_data_ptr mmt, int d)
+{
+#ifndef  CONJUGATED_PERMUTATIONS
+    choke me;
+#endif
+
+    int err;
+
+    /* reducing across a row is when d == 0 */
+    pi_wiring_ptr pirow = mmt->pi->wr[d];
+#ifndef MPI_LIBRARY_MT_CAPABLE
+    pi_wiring_ptr picol = mmt->pi->wr[!d];
+#endif
+
+    mmt_wiring_ptr mrow = mmt->wr[d];
+    mmt_wiring_ptr mcol = mmt->wr[!d];
+
+    if ((mmt->wr[d]->v->flags & THREAD_SHARED_VECTOR) == 0 && (pirow->ncores > 1)) {
+        /* row threads have to sum up their data. Of course it's
+         * irrelevant when there is only one such thread...
+         *
+         * note that no locking is needed here.
+         */
+        // unsigned int i0 = mrow->i0;
+        // unsigned int i1 = MIN(mrow->i1, mmt->n[d]);
+        // unsigned int ii0 = i0 +  pirow->trank    * (i1 - i0) / pirow->ncores;
+        // unsigned int ii1 = i0 + (pirow->trank+1) * (i1 - i0) / pirow->ncores;
+        for(unsigned int i = 0 ; i < mrow->ylen ; i++) {
+            struct isect_info * xx = &(mrow->y[i]);
+            unsigned int dst = xx->k % pirow->ncores;
+            unsigned int off = aboffset(mmt->abase, xx->offset_me);
+            abt * dptr = mrow->v->all_v[dst] + off;
+            // size_t siz = abbytes(mmt->abase, xx->count);
+            ASSERT(off + xx->count <= mrow->i1 - mrow->i0);
+            for(unsigned int j = 1 ; j < pirow->ncores ; j++) {
+                const abt * sptr = mrow->v->all_v[dst+j] + off;
+                for(unsigned int k = 0 ; k < xx->count ; k++) {
+                    abadd(mmt->abase, dptr + k, sptr + k);
+                    // TODO: for non-binary fields, here we would have an
+                    // unreduced add (of probably already unreduced data
+                    // as they come out of the matrix-vector
+                    // multiplication), followed later on by a reduction
+                    // in dptr.
+                }
+            }
+        }
+    }
+
+#ifndef MPI_LIBRARY_MT_CAPABLE
+    /* Now we can perform mpi-level reduction across rows. */
+    for(unsigned int t = 0 ; t < picol->ncores ; t++) {
+        serialize_threads(picol);
+        if (t != picol->trank)
+            continue;   // not our turn.
+
+        // all row threads are likely to engage in a collective operation
+        // at one moment or another.
+        for(unsigned int i = 0 ; i < mrow->xlen ; i++) {
+            struct isect_info * xx = &(mrow->x[i]);
+            unsigned int tdst = xx->k % pirow->ncores;
+            serialize_threads(pirow);
+            if (pirow->trank != tdst)
+                continue;
+            unsigned int jdst = xx->k / pirow->ncores;
+            // MPI_Reduce does not know about const-ness !
+            abt * sptr = mrow->v->v + aboffset(mmt->abase, xx->offset_me);
+            abt * dptr = mcol->v->v + aboffset(mmt->abase, xx->offset_there);
+            size_t siz = abbytes(mmt->abase, xx->count);
+            err = MPI_Reduce(sptr, dptr, siz, MPI_BYTE, MPI_BXOR, jdst, pirow->pals);
+            BUG_ON(err);
+        }
+    }
+#else   /* MPI_LIBRARY_MT_CAPABLE */
+        for(unsigned int i = 0 ; i < mrow->xlen ; i++) {
+            struct isect_info * xx = &(mrow->x[i]);
+            unsigned int tdst = xx->k % pirow->ncores;
+            // serialize_threads(pirow);
+            if (pirow->trank != tdst)
+                continue;
+            unsigned int jdst = xx->k / pirow->ncores;
+            // MPI_Reduce does not know about const-ness !
+            abt * sptr = mrow->v->v + aboffset(mmt->abase, xx->offset_me);
+            abt * dptr = mcol->v->v + aboffset(mmt->abase, xx->offset_there);
+            size_t siz = abbytes(mmt->abase, xx->count);
+            err = MPI_Reduce(sptr, dptr, siz, MPI_BYTE, MPI_BXOR, jdst, pirow->pals);
+            BUG_ON(err);
+        }
+#endif
+
+
+    // as usual, we do not serialize on exit. Up to the next routine to
+    // do so if needed.
+    // 
+    // what _is_ guaranteed is that in each column, the leader thread has
+    // all the necessary data to begin the column broadcast.
+}
+
+void matmul_top_fill_random_source(matmul_top_data_ptr mmt, int d)
+{
+    matmul_top_fill_random_source_generic(mmt, abbytes(mmt->abase, 1), NULL, d);
+}
+
+
+void matmul_top_mul(matmul_top_data_ptr mmt, int d)
+{
+#ifndef NDEBUG
+    unsigned int di_in = mmt->wr[d]->i1 - mmt->wr[d]->i0;
+    unsigned int di_out = mmt->wr[!d]->i1 - mmt->wr[!d]->i0;
+    ASSERT(mmt->mm->ncols == (d ? di_in : di_out));
+    ASSERT(mmt->mm->nrows == (d ? di_out : di_in));
+#endif
+
+    broadcast_down(mmt, d);
+    matmul_mul(mmt->mm, mmt->wr[!d]->v->v, mmt->wr[d]->v->v, d);
+    reduce_across(mmt, !d);
+}
+
+/* Vector I/O is done by only one job, one thread. It incurs a
+ * significant amount of memory allocation, but this is done relatively
+ * rarely.
+ *
+ * Vectors, as handled within the core routines, are permuted. He have
+ * coordinates (v_{\sigma(0)}...v_{\sigma(n-1)}), where \sigma is the
+ * permutation given by the *_perm files. Notice that we assume that we
+ * have conjugated permutations on the two sides. This means that no
+ * data manipulation is required within the critical loops (this would
+ * imply a fuzzy communication pattern, boiling down to essentially
+ * using allreduce instead of reduce).
+ */
+
+/* As always, comments are written with one given point of view in mind.
+ * The vector wich gets saved is always the source vector. Here, our
+ * arbitrary description choice is that we iterate M^i times vector,
+ * hence the source vector is on the right: d == 1.
+ */
+
+// comments, variable names and so on are names which for simplicity
+// reflect the situation d == 1 (save right vector). The stable state we
+// start with is after a matrix-times-vector product (or just before
+// one): The left vector has been computed, and the data for indices
+// [i0..i1[ is on the nodes seeing those indices vertically as well. Data
+// is therefore found in the right vector area, as after the reduce step.
+//
+// Doing a broadcast_down columns will ensure that each row contains
+// the complete data set for our vector.
+
+/* The first function is the back-end, run only on the top row.
+ */
+void matmul_top_save_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int index, unsigned int iter)
+{
+    matmul_top_save_vector_generic(mmt, abbytes(mmt->abase, 1), NULL, name, d, index, iter);
+}
+
+void matmul_top_load_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int index, unsigned int iter)
+{
+    matmul_top_load_vector_generic(mmt, abbytes(mmt->abase, 1), NULL, name, d, index, iter);
 }

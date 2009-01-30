@@ -51,9 +51,18 @@
 // mmt->wr[0]. In some cases, these pointers may be equal (for source
 // vectors, never used as destination), and in some cases not.
 
-struct mmt_wiring_s {
+struct mmt_vec_s {
     abt * v;
     abt * * all_v;
+    // internal use
+    int flags;
+};
+typedef struct mmt_vec_s mmt_vec[1];
+typedef struct mmt_vec_s * mmt_vec_ptr;
+
+
+struct mmt_wiring_s {
+    mmt_vec v;
     unsigned int i0;
     unsigned int i1;
 #ifdef  CONJUGATED_PERMUTATIONS
@@ -110,9 +119,6 @@ struct matmul_top_data_s {
     // bad decision. Fortunately, fences[] is rarely used.
     unsigned int * fences[2];
 #endif
-
-    // internal use
-    int flags[2];
 };
 
 /* THREAD_MULTIPLE_VECTOR is when several threads will be writing to the
@@ -147,6 +153,30 @@ void matmul_top_load_vector(matmul_top_data_ptr mmt, const char * name, int d, u
 void matmul_top_save_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int index, unsigned int iter);
 void matmul_top_mul(matmul_top_data_ptr mmt, int d);
 
+/* Now some of the generic interface calls. By design, not everything is
+ * possible with these calls. In particular, nothing critical is doable.
+ * As a general convention, the only thing these calls need to know about
+ * the abase is the stride value, which corresponds to abbytes(abase, 1).
+ * Besides that, the generic calls take the vector pointer as argument.
+ * Specifying NULL as vector argument is equivalent to taking the default
+ * vector defined in the mmt data for the given direction flag. */
+
+/* Same as mmt_vec, but not bound to the given abase. Used for generic
+ * calls */
+struct mmt_generic_vec_s {
+    abase_generic_ptr v;
+    abase_generic_ptr * all_v;
+    // internal use
+    int flags;
+};
+typedef struct mmt_generic_vec_s mmt_generic_vec[1];
+typedef struct mmt_generic_vec_s * mmt_generic_vec_ptr;
+
+void matmul_top_vec_init_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, int d, int flags);
+void matmul_top_vec_clear_generic(matmul_top_data_ptr mmt, size_t stride MAYBE_UNUSED, mmt_generic_vec_ptr v, int d);
+void matmul_top_fill_random_source_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, int d);
+void matmul_top_load_vector_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, const char * name, int d, unsigned int index, unsigned int iter);
+void matmul_top_save_vector_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, const char * name, int d, unsigned int index, unsigned int iter);
 
 #ifdef __cplusplus
 }
