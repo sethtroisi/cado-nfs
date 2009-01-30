@@ -12,7 +12,7 @@
  * bindings may be used */
 
 typedef void * abase_generic_ptr;
-#define abase_generic_ptr_add(p,k) ((p)+(k))
+#define abase_generic_ptr_add(p,k) (((void*)(p))+(k))
 
 // I know arithmetic on void pointers is not C99. So if you insist, that
 // sh*t should work.
