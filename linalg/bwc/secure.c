@@ -28,8 +28,6 @@ int can_print;
 
 unsigned int nx;
 
-uint32_t * gxvecs;
-
 // dir is a boolean flag equal to 1 if we are looking for the right nullspace
 // of the matrix.
 int dir = 1;
@@ -51,6 +49,10 @@ void * sec_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
     matmul_top_init(mmt, abase, pi, flags, matrix_filename);
 
     abzero(abase, mmt->wr[!dir]->v, mmt->wr[!dir]->i1 - mmt->wr[!dir]->i0);
+
+    uint32_t * gxvecs = malloc(nx * m * sizeof(uint32_t));
+
+    load_x(gxvecs, m, nx, pi);
 
     ASSERT_ALWAYS(m >= 64);
     for(int j = 0 ; j < 64 ; j++) {
@@ -78,15 +80,18 @@ void * sec_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
             fflush(stdout);
         }
     }
-    printf("\n");
-
+    if (tcan_print) {
+        printf("\n");
+    }
     serialize(pi->m);
 
-    matmul_top_save_vector(mmt, "CD", !dir, 0, interval);
+    matmul_top_save_vector(mmt, "C", !dir, 0, interval);
 
     serialize(pi->m);
     matmul_top_clear(mmt, abase);
     serialize(pi->m);
+
+    free(gxvecs);
 
     return NULL;
 }
@@ -100,7 +105,7 @@ void usage()
         "\tn=<int>\t(*) set n blocking factor\n"
         "\tmn=<int>\tset both m and n (exclusive with the two above)\n"
         "\twdir=<path>\tchdir to <path> beforehand\n"
-        "\tmpi=<int>x<int>\tset number of mpi jobs. Must agree with mpirun\n"
+        "\tmpi=<int>x<int>\tset number of mpi jobs. Must agree with mpiexec\n"
         "\tthr=<int>x<int>\tset number of threads.\n"
         "\tmatrix=<filename>\tset matrix\n"
         "\tinterval=<int>\tset checking interval\n"
@@ -154,10 +159,19 @@ int main(int argc, char * argv[])
         usage();
     }
 
+    const char * tmp;
+
+    if ((tmp = param_list_lookup_string(pl, "wdir")) != NULL) {
+        if (chdir(tmp) < 0) {
+            fprintf(stderr, "chdir(%s): %s\n", tmp, strerror(errno));
+            exit(1);
+        }
+    }
+
     const char * cfg;
 
     if (!(cfg = param_list_lookup_string(pl, "cfg"))) {
-        cfg = "./bw.cfg";
+        cfg = "bw.cfg";
     }
     param_list_read_file(pl, cfg);
 
@@ -172,8 +186,6 @@ int main(int argc, char * argv[])
     param_list_parse_intxint(pl, "thr", thr_split);
     param_list_parse_int(pl, "interval", &interval);
 
-    const char * tmp;
-
     if ((tmp = param_list_lookup_string(pl, "nullspace")) != NULL) {
         if (strcmp(tmp, dirtext[0])) {
             dir = 0;
@@ -186,13 +198,6 @@ int main(int argc, char * argv[])
         }
     } else {
         param_list_add_key(pl, "nullspace", dirtext[dir], PARAMETER_FROM_FILE);
-    }
-
-    if ((tmp = param_list_lookup_string(pl, "wdir")) != NULL) {
-        if (chdir(tmp) < 0) {
-            fprintf(stderr, "chdir(%s): %s\n", tmp, strerror(errno));
-            exit(1);
-        }
     }
 
     

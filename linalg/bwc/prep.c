@@ -137,7 +137,7 @@ void * prep_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
 
         // we need to save this starting vector for later use if it turns out
         // that we need to save it for real.
-        matmul_top_save_vector(mmt, "XY", dir, 0, 0);
+        matmul_top_save_vector(mmt, "Y", dir, 0, 0);
     
         // We must compute x^T M y, x^T M^2 y, and so on.
         
@@ -210,18 +210,7 @@ void * prep_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
         nx_main = nx;
     }
 
-    if (pi->m->trank == 0 && pi->m->jrank == 0) {
-        // write the X vector
-        FILE * fx = fopen("X.twisted","w");
-        fprintf(fx,"%u\n",nx);
-        for(int i = 0 ; i < m ; i++) {
-            for(unsigned int k = 0 ; k < nx ; k++) {
-                fprintf(fx,"%s%u",k?" ":"",xvecs[i*nx+k]);
-            }
-            fprintf(fx,"\n");
-        }
-        fclose(fx);
-    }
+    save_x(xvecs, m, nx, pi);
 
     // last 
     serialize(pi->m);
@@ -256,7 +245,7 @@ void usage()
         "\tn=<int>\t(*) set n blocking factor\n"
         "\tmn=<int>\tset both m and n (exclusive with the two above)\n"
         "\twdir=<path>\tchdir to <path> beforehand\n"
-        "\tmpi=<int>x<int>\tset number of mpi jobs. Must agree with mpirun\n"
+        "\tmpi=<int>x<int>\tset number of mpi jobs. Must agree with mpiexec\n"
         "\tthr=<int>x<int>\tset number of threads.\n"
         "\tmatrix=<filename>\tset matrix\n"
         "\tseed=<int>\tset random seed\n"
@@ -308,6 +297,15 @@ int main(int argc, char * argv[])
         usage();
     }
 
+    const char * tmp;
+
+    if ((tmp = param_list_lookup_string(pl, "wdir")) != NULL) {
+        if (chdir(tmp) < 0) {
+            fprintf(stderr, "chdir(%s): %s\n", tmp, strerror(errno));
+            exit(1);
+        }
+    }
+
     // Here, the matrix filename really ends up in some heap data that will
     // survive after freeing the param_list (if ever we do so early -- as a
     // matter of fact, in prep.c we don't)
@@ -319,8 +317,6 @@ int main(int argc, char * argv[])
     param_list_parse_intxint(pl, "mpi", mpi_split);
     param_list_parse_intxint(pl, "thr", thr_split);
     param_list_parse_int(pl, "seed", &seed);
-
-    const char * tmp;
 
     if ((tmp = param_list_lookup_string(pl, "nullspace")) != NULL) {
         if (strcmp(tmp, dirtext[0])) {
@@ -334,13 +330,6 @@ int main(int argc, char * argv[])
         }
     } else {
         param_list_add_key(pl, "nullspace", dirtext[dir], PARAMETER_FROM_FILE);
-    }
-
-    if ((tmp = param_list_lookup_string(pl, "wdir")) != NULL) {
-        if (chdir(tmp) < 0) {
-            fprintf(stderr, "chdir(%s): %s\n", tmp, strerror(errno));
-            exit(1);
-        }
     }
 
     

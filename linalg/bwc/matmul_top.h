@@ -143,8 +143,8 @@ void mmt_finish_init(matmul_top_data_ptr mmt);
 void matmul_top_read_submatrix(matmul_top_data_ptr mmt);
 void matmul_top_clear(matmul_top_data_ptr mmt, abobj_ptr abase);
 void matmul_top_fill_random_source(matmul_top_data_ptr mmt, int d);
-void matmul_top_load_vector(matmul_top_data_ptr mmt, const char name[2], int d, unsigned int index, unsigned int iter);
-void matmul_top_save_vector(matmul_top_data_ptr mmt, const char name[2], int d, unsigned int index, unsigned int iter);
+void matmul_top_load_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int index, unsigned int iter);
+void matmul_top_save_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int index, unsigned int iter);
 void matmul_top_mul(matmul_top_data_ptr mmt, int d);
 
 

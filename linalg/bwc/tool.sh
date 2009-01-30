@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # This script can be used to run an mpi program with one xterm per job,
 # and wraps the program as a child of some ``controlling application''.
@@ -28,17 +28,21 @@ if [ $1 = "--inside" ] ; then
 else
     # I set this in .Xdefaults
     # mpi-debug.vt100.faceSize: 5
+    if [ "$1" = "--display" ] ; then
+        shift; export DISPLAY=$1; shift
+    fi
     xterm -name mpi-debug -e $0 --inside "$@"
     exit 0
 fi
 
-if [ $1 = "--tool" ] ; then
-    shift
-    tool=$1
-    shift
-fi
+while [[ $1 =~ ^-- ]] ; do
+    case "$1" in
+        --tool) shift; tool=$1; shift;;
+        *) break
+    esac
+done
 
-env | grep OMPI
+env | egrep '(MPI|DISPLAY)'
 
 CAN_PRINT=1
 export CAN_PRINT

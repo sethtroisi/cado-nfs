@@ -30,8 +30,14 @@ void load_x(uint32_t * xs, unsigned int m, unsigned int nx,
 {
     /* pretty much the same deal as above */
     if (pi->m->trank == 0 && pi->m->jrank == 0) {
-        FILE * f = fopen("X", "r");
+        FILE * f = fopen("X.twisted", "r");
         FATAL_ERROR_CHECK(f == NULL, "Cannot open file X for reading");
+        unsigned int nx_file;
+        fscanf(f, "%u", &nx_file);
+        if (nx == 0) {
+            nx = nx_file;       // nx means auto-detect.
+        }
+        FATAL_ERROR_CHECK(nx != nx_file, "X.twisted has bad nx value");
         for (unsigned int i = 0 ; i < nx * m; i++) {
             int rc = fscanf(f, "%" SCNu32, &(xs[i]));
             FATAL_ERROR_CHECK(rc != 1, "short read in file X");
@@ -47,12 +53,16 @@ void save_x(uint32_t * xs, unsigned int m, unsigned int nx, parallelizing_info_p
      * no synchronization is necessary.
      */
     if (pi->m->trank == 0 && pi->m->jrank == 0) {
-        FILE * f = fopen("X", "w");
-        FATAL_ERROR_CHECK(f == NULL, "Cannot open file X for writing");
-        for (unsigned int i = 0 ; i < nx * m; i++) {
-            int rc = fprintf(f, "%" PRIu32, xs[i]);
-            FATAL_ERROR_CHECK(rc != 1, "short write in file X");
+        // write the X vector
+        FILE * fx = fopen("X.twisted","w");
+        FATAL_ERROR_CHECK(fx == NULL, "Cannot open file X for writing");
+        fprintf(fx,"%u\n",nx);
+        for(int i = 0 ; i < m ; i++) {
+            for(unsigned int k = 0 ; k < nx ; k++) {
+                fprintf(fx,"%s%" PRIu32,k?" ":"",xs[i*nx+k]);
+            }
+            fprintf(fx,"\n");
         }
-        fclose(f);
+        fclose(fx);
     }
 }
