@@ -1,3 +1,10 @@
+#ifndef MERGE_MONO_H_
+#define MERGE_MONO_H_
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 extern void addRowsAndUpdate(sparse_mat_t *mat, int i1, int i2, int len);
 extern void removeColDefinitely(report_t *rep, sparse_mat_t *mat, INT j);
 extern void removeCellAndUpdate(sparse_mat_t *mat, int i, INT j);
@@ -18,3 +25,9 @@ extern void mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int ve
 extern void doOneMerge(report_t *rep, sparse_mat_t *mat, int *njrem, double *totopt, double *totfill, double *totMST, double *totdel, int m, int maxdo, int useMST, int verbose);
 
 extern void resume(report_t *rep, sparse_mat_t *mat, char *resumename);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif	/* MERGE_MONO_H_ */

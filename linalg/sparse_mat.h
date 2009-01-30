@@ -1,3 +1,8 @@
+#ifndef SPARSE_MAT_H_
+#define SPARSE_MAT_H_
+
+#include "dclist.h"
+
 #define USE_TAB 1 // 1 for compact rows...
 
 #define TRACE_COL -1 // 253224 // 231 // put to -1 if not...!
@@ -48,6 +53,10 @@ typedef struct {
   int itermax;       /* used for performing some sampling */
 } sparse_mat_t;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define weightRow(mat, i) (mat->rows[(i)][0] + mat->wburried[(i)])
 
 #ifdef USE_MPI
@@ -86,4 +95,8 @@ extern int weightSum(sparse_mat_t *mat, int i1, int i2);
 extern int findAllRowsWithGivenj(INT *ind, sparse_mat_t *mat, INT j, int nb);
 extern void fillTabWithRowsForGivenj(INT *ind, sparse_mat_t *mat, INT j);
 
+#ifdef __cplusplus
+}
+#endif
 
+#endif	/* SPARSE_MAT_H_ */

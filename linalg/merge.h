@@ -1,12 +1,11 @@
+#ifndef MERGE_H_
+#define MERGE_H_
+
 #define USE_TAB 1 // 1 for compact rows...
 
 /* INT is defined in sparse.h */
 
-// doubly chained lists
-typedef struct dclist{
-    INT j;
-    struct dclist *prev, *next;
-} *dclist;
+#include "dclist.h"
 
 /* rows correspond to relations, and columns to primes (or prime ideals) */
 typedef struct {
@@ -55,6 +54,10 @@ typedef struct {
 #define SPARSE_ITERATE(mat, i, k) for((k)=1; (k)<=lengthRow((mat),(i)); (k)++)
 #endif
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 extern void report1(FILE *outfile, INT i);
 extern void removeCellSWAR(sparse_mat_t *mat, int i, INT j);
 extern void destroyRow(sparse_mat_t *mat, int i);
@@ -66,3 +69,9 @@ extern void mpi_send_inactive_cols(int i);
 extern void mpi_add_rows(sparse_mat_t *mat, int m, INT j, INT *ind);
 extern void mpi_load_rows_for_j(sparse_mat_t *mat, int m, INT j);
 #endif
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif	/* MERGE_H_ */

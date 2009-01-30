@@ -18,7 +18,6 @@
 
 #include "merge_opts.h"
 #include "sparse.h"
-#include "dclist.h"
 #include "sparse_mat.h"
 #include "report.h"
 #ifndef USE_MARKOWITZ

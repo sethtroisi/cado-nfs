@@ -70,17 +70,25 @@ MPI_LIB=$(MPI_DIR)/lib
 MPI_INC=-I$(MPI_DIR)/include
 MPI_CC=mpicc
 
-merge_mpi.o: merge_mpi.c merge_mono.c merge.c
-	$(MPI_CC) -DUSE_MPI $(MPI_INC) $(MY_CFLAGS) merge_mono.c -c -o merge_mono.o
-	$(MPI_CC) -DUSE_MPI $(MPI_INC) $(MY_CFLAGS) merge.c -c -o merge.o
-	$(MPI_CC) -DUSE_MPI $(MPI_INC) $(MY_CFLAGS) $< -c -o $@
+# Work around bugs that clutter output. Avoid forced optimization level.
+mpicclibs:=$(shell $(MPI_CC) -show | sed -e 's/^.*-L\(\S*\)\>.*$$/\1/')
+MPI_CC:=$(shell $(MPI_CC) -show | sed -e 's/-I/-isystem /g' -e 's/-O[0-9]//g')
+MPI_CC:=$(MPI_CC) -DUSE_MPI
+MPI_CC+=$(MPI_INC)
+MPI_CC2:=$(MPI_CC) -Wl,-rpath,$(mpicclibs)
+MPI_CC2+=-L$(MPI_LIB)
 
-# for xterm debug, thanks ET: gore, isn't it? But we need to export somehow
-# the path for the libraries
-MPI_CC2:=$(shell $(MPI_CC) -showme | sed -e 's/-I/-isystem /g')
-MPI_CC2:=$(MPI_CC2) -Wl,-rpath,$(MPI_LIB)
-mpimerge: merge.o merge_mpi.o merge_mono.o sparse.o
-	$(MPI_CC2) -DUSE_MPI $(MPI_INC) $(MY_LFLAGS) -L$(MPI_LIB) -o $@ $^ -lutils -lm
+merge_mono_usempi.o: merge_mono.c
+	$(MPI_CC) $(MY_CFLAGS) $< -c -o $@
+
+merge_usempi.o: merge.c
+	$(MPI_CC) $(MY_CFLAGS) $< -c -o $@
+
+merge_mpi.o: merge_mpi.c
+	$(MPI_CC) $(MY_CFLAGS) $< -c -o $@
+
+mpimerge: merge_usempi.o merge_mpi.o merge_mono_usempi.o sparse.o
+	$(MPI_CC2) $(MY_LFLAGS) -o $@ $^ -lutils -lm
 
 hismerge: hismerge.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils

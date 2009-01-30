@@ -14,7 +14,14 @@
 #include "utils/utils.h"
 #include "files.h"
 #include "gzip.h"
+
+#include "merge_opts.h"
 #include "sparse.h"
+#include "sparse_mat.h"
+#include "report.h"
+
+# include "swar.h"
+
 #include "merge_mono.h"
 #include "mpi.h"
 #include "merge_mpi.h"
