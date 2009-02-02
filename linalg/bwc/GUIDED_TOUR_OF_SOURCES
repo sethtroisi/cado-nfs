@@ -45,7 +45,8 @@ balance will create a bunch of files in bw/ :
 prep reads the output from balance, and create the following:
   mat.hi.vj-sliced.bin         contains the (i,j) block of the matrix in
                                a compact, precomputed form.
-  bw-prep.cfg, bw.cfg          recalls the command-line parameters
+     [ Rem: these files can be created using the "build" utility ]
+  bw.cfg                       recalls the command-line parameters
   V0.0.twisted                 
   V0.xx.twisted                vectors used for checksums
   X.twisted                    X vector used for Krylov.

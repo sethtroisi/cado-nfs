@@ -71,6 +71,7 @@ Other options that do not change the ouput:
                 or 8000k ...
                 The default is 256 MB.
   -keep-temps   Do not erase temp files (for debugging purpose)
+And that obsolete option:
   -legacy       Obsolete output format
   
 */

@@ -244,7 +244,7 @@ void usage()
         "Allowed options are\n"
         "\tm=<int>\t(*) set m blocking factor\n"
         "\tn=<int>\t(*) set n blocking factor\n"
-        "\tmn=<int>\tset both m and n (exclusive with the two above)\n"
+        "\tmn=<int>\tset both m and n to same value (exclusive with the two above)\n"
         "\twdir=<path>\tchdir to <path> beforehand\n"
         "\tmpi=<int>x<int>\tset number of mpi jobs. Must agree with mpiexec\n"
         "\tthr=<int>x<int>\tset number of threads.\n"
