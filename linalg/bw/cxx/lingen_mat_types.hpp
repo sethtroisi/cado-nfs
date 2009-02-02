@@ -800,7 +800,164 @@ void transform(tpolmat<fft_type>& dst, polmat& src, fft_type& o, int d)
     dst.swap(tmp);
 }
 
-/* XXX Do Strassen here ! */
+template<typename fft_type>
+void glue4(
+        tpolmat<fft_type> & dst,
+        tpolmat<fft_type> const & s00,
+        tpolmat<fft_type> const & s01,
+        tpolmat<fft_type> const & s10,
+        tpolmat<fft_type> const & s11,
+        fft_type& o)
+{
+    unsigned int nr2 = dst.nrows >> 1;
+    unsigned int nc2 = dst.ncols >> 1;
+    for(unsigned int i = 0; i < nr2; ++i) {
+        for(unsigned int j = 0; j < nc2; ++j) {
+            o.cpy(dst.poly(i,j), s00.poly(i,j));
+            o.cpy(dst.poly(i,j+nc2), s01.poly(i,j));
+        }
+    }
+    for(unsigned int i = 0; i < nr2; ++i) {
+        for(unsigned int j = 0; j < nc2; ++j) {
+            o.cpy(dst.poly(i+nr2,j), s10.poly(i,j));
+            o.cpy(dst.poly(i+nr2,j+nc2), s11.poly(i,j));
+        }
+    }
+}
+
+template<typename fft_type>
+void splitin4(
+        tpolmat<fft_type>& dst00,
+        tpolmat<fft_type>& dst01,
+        tpolmat<fft_type>& dst10,
+        tpolmat<fft_type>& dst11,
+        tpolmat<fft_type> const & s,
+        fft_type& o)
+{
+    ASSERT((s.nrows & 1) == 0);
+    ASSERT((s.ncols & 1) == 0);
+    unsigned int nr2 = s.nrows >> 1;
+    unsigned int nc2 = s.ncols >> 1;
+    for(unsigned int i = 0; i < nr2; ++i) {
+        for(unsigned int j = 0; j < nc2; ++j) {
+            o.cpy(dst00.poly(i,j), s.poly(i,j));
+            o.cpy(dst01.poly(i,j), s.poly(i,j+nc2));
+        }
+    }
+    for(unsigned int i = 0; i < nr2; ++i) {
+        for(unsigned int j = 0; j < nc2; ++j) {
+            o.cpy(dst10.poly(i,j), s.poly(i+nr2,j));
+            o.cpy(dst11.poly(i,j), s.poly(i+nr2,j+nc2));
+        }
+    }
+}
+
+template<typename fft_type>
+void add(
+        tpolmat<fft_type>& dst,
+        tpolmat<fft_type> const & s1,
+        tpolmat<fft_type> const & s2,
+        fft_type& o)
+{
+    ASSERT(s1.nrows == s2.nrows);
+    ASSERT(s1.ncols == s2.ncols);
+    for(unsigned int i = 0 ; i < s1.nrows ; i++) {
+        for(unsigned int j = 0 ; j < s1.ncols ; j++) {
+            o.add(dst.poly(i,j), s1.poly(i,j), s2.poly(i,j));
+        }
+    }
+}
+
+
+template<typename fft_type>
+void compose_strassen(
+        tpolmat<fft_type>& dst,
+        tpolmat<fft_type> const & s1,
+        tpolmat<fft_type> const & s2,
+        fft_type& o)
+{
+    ASSERT(s1.ncols == s2.nrows);
+    // Build submatrices
+    // We don't even try do to it in place
+    ASSERT((s1.nrows & 1) == 0);
+    ASSERT((s1.ncols & 1) == 0);
+    unsigned int nr2 = s1.nrows >> 1;
+    unsigned int nc2 = s1.ncols >> 1;
+    tpolmat<fft_type> A11(nr2, nc2, o);
+    tpolmat<fft_type> A12(nr2, nc2, o);
+    tpolmat<fft_type> A21(nr2, nc2, o);
+    tpolmat<fft_type> A22(nr2, nc2, o);
+    tpolmat<fft_type> tmpA(nr2, nc2, o);
+    splitin4(A11, A12, A21, A22, s1, o);
+
+    ASSERT((s2.nrows & 1) == 0);
+    ASSERT((s2.ncols & 1) == 0);
+    nr2 = s2.nrows >> 1;
+    nc2 = s2.ncols >> 1;
+    tpolmat<fft_type> B11(nr2, nc2, o);
+    tpolmat<fft_type> B12(nr2, nc2, o);
+    tpolmat<fft_type> B21(nr2, nc2, o);
+    tpolmat<fft_type> B22(nr2, nc2, o);
+    tpolmat<fft_type> tmpB(nr2, nc2, o);
+    splitin4(B11, B12, B21, B22, s2, o);
+
+    // Build partial products
+    unsigned int nr = s1.nrows >> 1;
+    unsigned int nc = s2.ncols >> 1;
+    // M1 = (A11 + A22)*(B11 +  B22)
+    tpolmat<fft_type> M1(nr, nc, o);
+    add(tmpA, A11, A22, o); add(tmpB, B11, B22, o);
+    compose(M1, tmpA, tmpB, o);
+    // M2 = (A21 + A22)*B11
+    tpolmat<fft_type> M2(nr, nc, o);
+    add(tmpA, A21, A22, o); 
+    compose(M2, tmpA, B11, o);
+    // M3 = A11*(B12-B22)
+    tpolmat<fft_type> M3(nr, nc, o);
+    add(tmpB, B12, B22, o); 
+    compose(M3, A11, tmpB, o);
+    // M4 = A22*(B21-B11)
+    tpolmat<fft_type> M4(nr, nc, o);
+    add(tmpB, B21, B11, o); 
+    compose(M4, A22, tmpB, o);
+    // M5 = (A11+A12)*B22
+    tpolmat<fft_type> M5(nr, nc, o);
+    add(tmpA, A11, A12, o);
+    compose(M5, tmpA, B22, o);
+    // M6 = (A21-A11)*(B11+B12)
+    tpolmat<fft_type> M6(nr, nc, o);
+    add(tmpA, A21, A11, o); add(tmpB, B11, B12, o);
+    compose(M6, tmpA, tmpB, o);
+    // M7 = (A12-A22)*(B21+B22)
+    tpolmat<fft_type> M7(nr, nc, o);
+    add(tmpA, A12, A22, o); add(tmpB, B21, B22, o);
+    compose(M7, tmpA, tmpB, o);
+
+    // Reconstruct result
+    // C11 = M1+M4-M5+M7  Store it in M7
+    add(M7, M7, M1, o); add(M7, M7, M4, o); add(M7, M7, M5, o);
+    // C12 = M3+ M5    Store it in M5
+    add(M5, M5, M3, o);
+    // C21 = M2+M4     Store it in M4
+    add(M4, M4, M2, o);
+    // C22 = M1 - M2 + M3 + M6  Store it in M6
+    add(M6, M6, M1, o); add(M6, M6, M2, o); add(M6, M6, M3, o);
+
+    glue4(dst, M7, M5, M4, M6, o);
+}
+
+
+// How to tune a threshold for Strassen's algo ????
+// This is a 3-d problem...
+// And this probably depends also on the degrees of the polynomials.
+int use_strassen(unsigned int m, unsigned int n, unsigned int p, int deg) {
+    static const unsigned int minsize = 4;
+    static const int mindeg = 200;
+    if (m < minsize || n < minsize || p < minsize || deg < mindeg) 
+        return 0;
+    return 1;
+}
+
 template<typename fft_type>
 void compose(
         tpolmat<fft_type>& dst,
@@ -810,19 +967,24 @@ void compose(
 {
     tpolmat<fft_type> tmp(s1.nrows, s2.ncols, o);
     ASSERT(s1.ncols == s2.nrows);
-    tmp.zero();
-    typename fft_type::t x = o.alloc(1);
-    for(unsigned int j = 0 ; j < s2.ncols ; j++) {
-        for(unsigned int k = 0 ; k < s1.ncols ; k++) {
-            for(unsigned int i = 0 ; i < s1.nrows ; i++) {
-                o.compose(x, s1.poly(i,k), s2.poly(k,j));
-                o.add(tmp.poly(i,j), tmp.poly(i,j), x);
+    if (use_strassen(s1.nrows, s1.ncols, s2.ncols, o.size())) {
+        compose_strassen(tmp, s1, s2, o);
+    } else {
+        typename fft_type::t x = o.alloc(1);
+        tmp.zero();
+        for(unsigned int j = 0 ; j < s2.ncols ; j++) {
+            for(unsigned int k = 0 ; k < s1.ncols ; k++) {
+                for(unsigned int i = 0 ; i < s1.nrows ; i++) {
+                    o.compose(x, s1.poly(i,k), s2.poly(k,j));
+                    o.add(tmp.poly(i,j), tmp.poly(i,j), x);
+                }
             }
         }
+        o.free(x,1);
     }
-    o.free(x,1);
     dst.swap(tmp);
 }
+
 
 template<typename fft_type>
 void itransform(polmat& dst, tpolmat<fft_type>& src, fft_type& o, int d)

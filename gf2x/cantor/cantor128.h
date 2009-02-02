@@ -33,8 +33,10 @@ extern void c128_compose(const c128_info_t p,
 		c128_t y, c128_src_t x1, c128_src_t x2);
 extern void c128_add(const c128_info_t p,
 		c128_t y, c128_src_t x1, c128_src_t x2);
+extern void c128_cpy(const c128_info_t p, c128_t y, c128_src_t x);
 extern void c128_ift(const c128_info_t p,
 		unsigned long * H, long Hl, c128_src_t h);
+extern int c128_size(const c128_info_t p);
 
 extern void mulCantor128(unsigned long *H, unsigned long *F, long Fl, unsigned long *G, long Gl);
 #ifdef __cplusplus

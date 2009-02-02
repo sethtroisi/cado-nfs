@@ -41,4 +41,13 @@ void fake_add(const fake_info_t p MAYBE_UNUSED, fake_t dst, fake_src_t s1, fake_
     }
 }
 
+void fake_cpy(const fake_info_t p MAYBE_UNUSED, fake_t dst, fake_src_t s) {
+    memcpy(dst, s, (p->size)*sizeof(ulong));
+}
+
+int fake_size(const fake_info_t p) {
+    return (p->size);
+}
+
+
 /* vim: set sw=4 sta et: */

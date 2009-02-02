@@ -1113,6 +1113,16 @@ void c128_add(const c128_info_t p, c128_t y, c128_src_t x1, c128_src_t x2)
     }
 }
 
+void c128_cpy(const c128_info_t p, c128_t y, c128_src_t x)
+{
+    memcpy(y, x, (p->n)*sizeof(Kelt));
+}
+
+int c128_size(const c128_info_t p)
+{
+    return (p->n);
+}
+
 /* nH is a number of coefficients */
 void c128_ift(
         const c128_info_t p,

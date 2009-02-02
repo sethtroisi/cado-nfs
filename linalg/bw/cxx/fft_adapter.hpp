@@ -37,6 +37,12 @@ struct visible {							\
 	inline void add(t y, src_t x1, src_t x2) const {		\
 		return CAT(Z,add)(o,y,x1,x2);				\
 	}								\
+	inline void cpy(t y, src_t x) const {		                \
+		return CAT(Z,cpy)(o,y,x);				\
+	}								\
+	inline int size() const {	        	                \
+		return CAT(Z,size)(o);	        			\
+	}								\
 };
 
 #include "fake_fft.h"

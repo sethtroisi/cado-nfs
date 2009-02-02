@@ -48,8 +48,10 @@ extern inline void fake_zero(const fake_info_t p, fake_t x, int n)
 extern void fake_dft(const fake_info_t p, fake_t x, unsigned long * F, int dF);
 extern void fake_compose(const fake_info_t p, fake_t y, fake_src_t x1, fake_src_t x2);
 extern void fake_add(const fake_info_t p, fake_t y, fake_src_t x1, fake_src_t x2);
+extern void fake_cpy(const fake_info_t p, fake_t y, fake_src_t x);
 extern void fake_ift(const fake_info_t p, unsigned long * H, int Hl, fake_src_t h);
 
+extern int fake_size(const fake_info_t p);
 
 #ifdef __cplusplus
 }
