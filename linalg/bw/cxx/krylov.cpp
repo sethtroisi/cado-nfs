@@ -297,6 +297,11 @@ struct thread:public traits {
         double rem;
         double pcpu;
 
+        if (done == go_mark) {
+            /* does not make sense yet ! */
+            return;
+        }
+
         thread_lock(&globals::console_lock);
 
         pcpu = ticks_diff / wct_diff;
