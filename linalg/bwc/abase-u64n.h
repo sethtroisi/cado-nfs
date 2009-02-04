@@ -82,6 +82,13 @@ P(dotprod)(P(obj_srcptr) x,
         const P(base_type) * u,
         const P(base_type) * v,
         unsigned int n);
+extern void
+P(vdotprod)(P(obj_srcptr) x,
+        PV(obj_srcptr) y,
+        P(base_type) * w,
+        const PV(base_type) * u,
+        const P(base_type) * v,
+        unsigned int n);
 
 #ifndef ABASE_DONTBIND_u64n
 /* Bind our interface as the default one */

@@ -57,7 +57,7 @@ endif
 ## src:=$(patsubst %,%.c,$(names))
 ## obj:=$(patsubst %,%.o,$(names))
 
-bins:=bench build prep
+bins:=bench build prep krylov
 
 default-target: all
 allbins:=test_hello split
@@ -86,15 +86,26 @@ common_libs += -lpthread
 endif
 
 
-all_objlists:=libmatmul build bench prep secure
+all_objlists:=libmatmul build bench prep secure krylov
 
-libmatmul_objs:=matmul-sliced.o matmul-sliced-asm.o matmul-basic.o matmul.o
+libmatmul_objs:=matmul-sliced.o matmul-basic.o matmul.o
+ifeq ($(shell uname -m),x86_64)
+libmatmul_objs+=matmul-sliced-asm.o
+endif
+
 build_objs:=build.o libmatmul.a
 bench_objs:=bench.o libmatmul.a
 prep_objs:=prep.o intersections.o 			\
 	matmul_top.o parallelizing_info.o		\
 	info_file.o 					\
 	xvectors.o					\
+	xymats.o					\
+	libmatmul.a
+krylov_objs:=krylov.o intersections.o 			\
+	matmul_top.o parallelizing_info.o		\
+	info_file.o 					\
+	xvectors.o					\
+	xymats.o					\
 	libmatmul.a
 secure_objs:=secure.o intersections.o 			\
 	matmul_top.o parallelizing_info.o		\
@@ -104,6 +115,7 @@ secure_objs:=secure.o intersections.o 			\
 build_normalobjs:=../readbuffer.o ../readmat.o
 bench_normalobjs:=../readbuffer.o ../readmat.o
 prep_normalobjs:=../readbuffer.o ../readmat.o ../gauss.o
+krylov_normalobjs:=../readbuffer.o ../readmat.o
 secure_normalobjs:=../readbuffer.o ../readmat.o
 
 
@@ -118,7 +130,7 @@ sources:=	\
     bench.c build.c info_file.c				\
     intersections.cpp matmul-sliced.cpp matmul_top.c	\
     parallelizing_info.c secure.c prep.c test_hello.c xvectors.c	\
-    matmul.c matmul-basic.c
+    matmul.c matmul-basic.c krylov.c xymats.c
 
 define hardlink_object
 $(1)/$(2): $(2)
@@ -161,10 +173,11 @@ $(1)/libmatmul.a: $$($(1)_libmatmul_objs)
 	-rm -f $$@
 	ar r $$@ $$($(1)_libmatmul_objs)
 
-# These two make sense for all binary instances -- although nobody sane
+# These targets make sense for all binary instances -- although nobody sane
 # would ever consider running them seriously for u64n
 $(call multiple_binary,$(1),build)
 $(call multiple_binary,$(1),bench)
+$(call multiple_binary,$(1),krylov)
 endef
 
 # u64 is the prime-time version. The others can be dropped to accelerate

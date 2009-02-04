@@ -10,7 +10,7 @@
 #include <limits.h>
 #include "macros.h"
 
-const char * ifile = "Y.twisted";
+const char * ifile = "Y.0.twisted";
 const char * ofile_fmt = "V%d-%d.0.twisted";
 
 int main(int argc, char * argv[])
@@ -55,7 +55,7 @@ int main(int argc, char * argv[])
         char * fname;
         int i = 0;
         /* Special case ; a hard link is enough */
-        asprintf(&fname, ofile_fmt, stops[i], stops[i+1]);
+        asprintf(&fname, ofile_fmt, stops[i], CHAR_BIT * stops[i+1]);
         rc = stat(fname, sbuf);
         if (rc == 0) {
             fprintf(stderr,"%s already exists\n", fname);
@@ -76,7 +76,7 @@ int main(int argc, char * argv[])
 
     for(int i = 0 ; i < nstops ; i++) {
         char * fname;
-        asprintf(&fname, ofile_fmt, stops[i], stops[i+1]);
+        asprintf(&fname, ofile_fmt, stops[i], CHAR_BIT * stops[i+1]);
         rc = stat(fname, sbuf);
         if (rc == 0) {
             fprintf(stderr,"%s already exists\n", fname);

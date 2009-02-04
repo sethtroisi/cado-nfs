@@ -25,6 +25,8 @@ struct isect_info {
 extern "C" {
 #endif
 
+unsigned int intersect_two_intervals(unsigned int * offset_a, unsigned int * offset_b, unsigned int a0, unsigned int a1, unsigned int b0, unsigned int b1);
+
 void intersect(unsigned int * plen, struct isect_info ** res, unsigned int * fences, unsigned int i0, unsigned int i1, unsigned int nmax);
 
 #ifdef __cplusplus

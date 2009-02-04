@@ -40,7 +40,7 @@ ABASE_F(void,set_ui, (P(obj_srcptr) x MAYBE_UNUSED,
     ASSERT(k < P(nbits)(x));
     uint64_t * xp = (uint64_t *) p;
     uint64_t mask = ((uint64_t)1) << (k%64);
-    xp[k/64] = (xp[k/64] & ~mask) | ((v << (k%64))&mask);
+    xp[k/64] = (xp[k/64] & ~mask) | ((((uint64_t)v) << (k%64))&mask);
 }
 #endif
 

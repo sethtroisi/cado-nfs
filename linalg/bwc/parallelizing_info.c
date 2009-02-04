@@ -53,6 +53,7 @@ static void print_several(unsigned int n1, unsigned int n2, char a, char b, unsi
         printf(toto);
     }
     printf("\n");
+    free(toto);
 }
 
 struct pi_go_helper_s {

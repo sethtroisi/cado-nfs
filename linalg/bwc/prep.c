@@ -12,12 +12,12 @@
 #include "select_mpi.h"
 #include "random_generation.h"
 #include "gauss.h"
-//#include "hexstring.h"
 #include "manu.h"
 #include "gauss.h"
 
 #include "params.h"
 #include "xvectors.h"
+#include "xymats.h"
 
 /* Number of copies of m by n matrices to use for trying to obtain a
  * full-rank matrix (rank m).
@@ -36,46 +36,34 @@ int can_print;
 
 unsigned int nx_main;
 
-uint32_t * gxvecs;
-
 // dir is a boolean flag equal to 1 if we are looking for the right nullspace
 // of the matrix.
 int dir = 1;
 
 const char * dirtext[] = { "left", "right" };
 
-void xymat_reduce_threadlevel(abobj_t abase, abt * xy_mats2, abt ** all_xy_mats, pi_wiring_ptr wr)
+#if 0
+#include "hexstring.h"
+void display_matrix(abobj_ptr abase, mmt_vec_ptr xy, pi_wiring_ptr wr, unsigned int nr, unsigned int nvblocks)
 {
-    abzero(abase, xy_mats2, m * NBITER);
-    for(unsigned int t = 0 ; t < wr->ncores ; t++) {
-        for(int k = 0 ; k < m * NBITER ; k++) {
-            abadd(abase, xy_mats2 + aboffset(abase,k),
-                    all_xy_mats[t] + aboffset(abase,k));
-        }
-    }
-}
-
-void xymat_reduce_mpilevel(abobj_t abase, abt * xy_mats2, pi_wiring_ptr wr)
-{
-#ifndef MPI_LIBRARY_MT_CAPABLE
-    for(unsigned int t = 0 ; t < wr->ncores ; t++) {
+    for(int z = 0 ; z < wr->ncores ; z++) {
         serialize_threads(wr);
-        if (t != wr->trank)
-            continue;   // not our turn.
-        abt * dptr = xy_mats2;
-        size_t siz = abbytes(abase, m * NBITER);
-        int err = MPI_Allreduce(MPI_IN_PLACE, dptr, siz, MPI_BYTE, MPI_BXOR, wr->pals);
-        BUG_ON(err);
+        if (z != wr->trank) continue;
+        for(unsigned int i = 0 ; i < m ; i++) {
+            printf("(% 2d)", z);
+            for(unsigned int k = 0 ; k < nvblocks ; k++) {
+                unsigned long * data;
+                data = xy->v + aboffset(abase, i * NBITER + k);
+                putchar(' ');
+                write_hexstring(stdout, (unsigned long *) data, abnbits(abase));
+            }
+            putchar('\n');
+        }
+        putchar('\n');
     }
-#else   /* MPI_LIBRARY_MT_CAPABLE */
-    {
-        abt * dptr = xy_mats2;
-        size_t siz = abbytes(abase, m * NBITER);
-        int err = MPI_Allreduce(MPI_IN_PLACE, dptr, siz, MPI_BYTE, MPI_BXOR, wr->pals);
-        BUG_ON(err);
-    }
-#endif
+    serialize_threads(wr);
 }
+#endif
 
 void * prep_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
 {
@@ -99,19 +87,11 @@ void * prep_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
 
     uint32_t * xvecs = malloc(nx * m * sizeof(uint32_t));
 
-    abt * xy_mats;
-    xy_mats = abinit(abase, m * NBITER);
-    /* The second one is used for outputs of collective operations */
-    abt * xy_mats2;
-    xy_mats2 = abinit(abase, m * NBITER);
+    mmt_vec xymats;
+    size_t stride =  abbytes(abase, 1);
 
-    abt ** all_xy_mats;
-
-    if (pi->m->trank == 0) {
-        all_xy_mats = malloc(pi->m->ncores * sizeof(abt *));
-    }
-    thread_agreement(pi->m,(void**) &all_xy_mats,0);
-    all_xy_mats[pi->m->trank] = xy_mats;
+    /* We're cheating on the generic init routines */
+    vec_init_generic(pi->m, stride, (mmt_generic_vec_ptr) xymats, 0, m*NBITER);
 
     for (unsigned ntri = 0;; ntri++) {
         serialize_threads(pi->m);
@@ -137,22 +117,33 @@ void * prep_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
 
         // we need to save this starting vector for later use if it turns out
         // that we need to save it for real.
-        matmul_top_save_vector(mmt, "Y", dir, 0, 0);
-    
+        matmul_top_save_vector(mmt, "Y", dir, 0);
+
         // We must compute x^T M y, x^T M^2 y, and so on.
         
         // we have indices mmt->wr[1]->i0..i1 available.
-        abzero(abase, xy_mats, m * NBITER);
+        abzero(abase, xymats->v, m * NBITER);
 
 
         for(unsigned int k = 0 ; k < NBITER ; k++) {
+#if 0
+            {
+                char * tmp;
+                asprintf(&tmp, "/tmp/y%d.%d.%d.try%d", k, pi->m->jrank, pi->m->trank, ntri);
+                FILE * f = fopen(tmp, "w");
+                fwrite(mmt->wr[dir]->v, sizeof(abt), aboffset(abase, mmt->wr[dir]->i1 - mmt->wr[dir]->i0), f);
+                fclose(f);
+            }
+            serialize_threads(pi->m);
+#endif
+    
             for(int j = 0 ; j < m ; j++) {
-                abt * where = xy_mats + aboffset(abase, j * NBITER + k);
+                abt * where = xymats->v + aboffset(abase, j * NBITER + k);
                 for(unsigned int t = 0 ; t < nx ; t++) {
                     uint32_t i = xvecs[j*nx+t];
                     if (i < mmt->wr[dir]->i0 || i >= mmt->wr[dir]->i1)
                         continue;
-                    /* We want the data to match our onterval on both
+                    /* We want the data to match our interval on both
                      * directions, because otherwise we'll end up
                      * computing rubbish -- recall that no broadcast_down
                      * has occurred yet.
@@ -170,25 +161,26 @@ void * prep_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
         serialize_threads(pi->m);
 
         /* Now all threads and jobs must collectively reduce the zone
-         * pointed to by xy_mats */
-        xymat_reduce_threadlevel(abase, xy_mats2, all_xy_mats, pi->m);
-        xymat_reduce_mpilevel(abase, xy_mats2, pi->m);
+         * pointed to by xymats */
+        reduce_generic(abase, xymats, pi->m, m * NBITER);
 
         /* OK -- now everybody has the same data, as can be seen for
          * instance with the following debugging code.  */
-#if 0
-        pthread_mutex_lock(pi->m->th->m);
-        write_hexstring(stdout, (unsigned long *) xy_mats2, m * NBITER * abnbits(abase));
-        putchar('\n');
-        pthread_mutex_unlock(pi->m->th->m);
-#endif
+        {
+            char * tmp;
+            asprintf(&tmp, "/tmp/xy.%d.%d.try%d.postred", pi->m->jrank, pi->m->trank, ntri);
+            FILE * f = fopen(tmp, "w");
+            fwrite(xymats->v, sizeof(abt), aboffset(abase, m * NBITER), f);
+            fclose(f);
+        }
+
 
         int dimk;
         int * pdimk;
         
         /* the kernel() call is not reentrant */
         if (pi->m->trank == 0) {
-            dimk = kernel((mp_limb_t *) xy_mats2, NULL,
+            dimk = kernel((mp_limb_t *) xymats->v, NULL,
                     m, NBITER * abnbits(abase), 
                 abbytes(abase,NBITER) / sizeof(mp_limb_t), 0);
             pdimk = &dimk;
@@ -218,21 +210,8 @@ void * prep_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
     matmul_top_clear(mmt, abase);
     serialize(pi->m);
 
-    /* save xy mats for later use */
-    if (pi->m->trank == 0) {
-        gxvecs = malloc(nx * m * sizeof(uint32_t));
-        memcpy(gxvecs, xvecs, nx * m * sizeof(uint32_t));
-    }
-    serialize(pi->m);
-
-    serialize(pi->m);
     /* clean up xy mats stuff */
-    abclear(abase, xy_mats, m * NBITER);
-    abclear(abase, xy_mats2, m * NBITER);
-
-    if (pi->m->trank == 0) {
-        free(all_xy_mats);
-    }
+    vec_clear_generic(pi->m, stride, (mmt_generic_vec_ptr) xymats, m*NBITER);
 
     free(xvecs);
     return NULL;
@@ -320,9 +299,9 @@ int main(int argc, char * argv[])
     param_list_parse_int(pl, "seed", &seed);
 
     if ((tmp = param_list_lookup_string(pl, "nullspace")) != NULL) {
-        if (strcmp(tmp, dirtext[0])) {
+        if (strcmp(tmp, dirtext[0]) == 0) {
             dir = 0;
-        } else if (strcmp(tmp, dirtext[1])) {
+        } else if (strcmp(tmp, dirtext[1]) == 0) {
             dir = 1;
         } else {
             fprintf(stderr, "Parameter nullspace may only be %s|%s\n",

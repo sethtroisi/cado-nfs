@@ -45,15 +45,9 @@ void extra_svec_recall(matmul_top_data_srcptr mmt, const abt * x) {
 /* Start with stuff that does not depend on abase at all -- this
  * provides a half-baked interface */
 
-void matmul_top_vec_init_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, int d, int flags)
+void vec_init_generic(pi_wiring_ptr picol, size_t stride, mmt_generic_vec_ptr v, int flags, unsigned int n)
 {
-    pi_wiring_ptr picol = mmt->pi->wr[d];
-    if (v == NULL) v = (mmt_generic_vec_ptr) mmt->wr[d]->v;
-
     v->flags = flags;
-
-    unsigned int i0 = mmt->wr[d]->i0;
-    unsigned int i1 = mmt->wr[d]->i1;
 
     // all_v pointers are stored twice, in a rotating buffer manner, so
     // that it's possible for one thread to address the n other threads
@@ -63,14 +57,14 @@ void matmul_top_vec_init_generic(matmul_top_data_ptr mmt, size_t stride, mmt_gen
     if (flags & THREAD_SHARED_VECTOR) {
         void * r;
         if (picol->trank == 0)
-            r = abase_generic_init(stride, i1 - i0);
+            r = abase_generic_init(stride, n);
         thread_agreement(picol, &r, 0);
         v->v = r;
         for(unsigned int t = 0 ; t < picol->ncores ; t++) {
             v->all_v[t] = v->v;
         }
     } else {
-        v->v = abase_generic_init(stride, i1 - i0);
+        v->v = abase_generic_init(stride, n);
         v->all_v[picol->trank] = v->v;
         for(unsigned int t = 0 ; t < picol->ncores ; t++) {
             // TODO: once thread_agreement is fixed (if ever), we can
@@ -88,20 +82,29 @@ void matmul_top_vec_init_generic(matmul_top_data_ptr mmt, size_t stride, mmt_gen
     }
 }
 
-void matmul_top_vec_clear_generic(matmul_top_data_ptr mmt, size_t stride MAYBE_UNUSED, mmt_generic_vec_ptr v, int d)
+void vec_clear_generic(pi_wiring_ptr picol, size_t stride MAYBE_UNUSED, mmt_generic_vec_ptr v, unsigned int n MAYBE_UNUSED)
 {
-    mmt_wiring_ptr mcol MAYBE_UNUSED = mmt->wr[d];
-    pi_wiring_ptr picol = mmt->pi->wr[d];
-    if (v == NULL) v = (mmt_generic_vec_ptr) mmt->wr[d]->v;
-
     if (v->flags & THREAD_SHARED_VECTOR) {
         if (picol->trank == 0)
-            abase_generic_clear(stride, v->v, mcol->i1 - mcol->i0);
+            abase_generic_clear(stride, v->v, n);
     } else {
-        abase_generic_clear(stride, v->v, mcol->i1 - mcol->i0);
+        abase_generic_clear(stride, v->v, n);
     }
     free(v->all_v);
 }
+
+void matmul_top_vec_init_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, int d, int flags)
+{
+    if (v == NULL) v = (mmt_generic_vec_ptr) mmt->wr[d]->v;
+    vec_init_generic(mmt->pi->wr[d], stride, v, flags, mmt->wr[d]->i1 - mmt->wr[d]->i0);
+}
+
+void matmul_top_vec_clear_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, int d)
+{
+    if (v == NULL) v = (mmt_generic_vec_ptr) mmt->wr[d]->v;
+    vec_clear_generic(mmt->pi->wr[d], stride, v, mmt->wr[d]->i1 - mmt->wr[d]->i0);
+}
+
 
 static void
 broadcast_down_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, int d)
@@ -279,7 +282,7 @@ void matmul_top_fill_random_source_generic(matmul_top_data_ptr mmt, size_t strid
     broadcast_down_generic(mmt, stride, v, d);
 }
 
-static void save_vector_toprow_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, const char * name, int d, unsigned int index, unsigned int iter)
+static void save_vector_toprow_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, const char * name, int d, unsigned int iter)
 {
     int err;
     if (v == NULL) v = (mmt_generic_vec_ptr) mmt->wr[d]->v;
@@ -301,7 +304,7 @@ static void save_vector_toprow_generic(matmul_top_data_ptr mmt, size_t stride, m
         if (pirow->trank == 0) {
             char * filename;
             int rc;
-            rc = asprintf(&filename, "%s%u.%u.twisted", name, index, iter);
+            rc = asprintf(&filename, "%s.%u.twisted", name, iter);
             FATAL_ERROR_CHECK(rc < 0, "out of memory");
             fd = open(filename, O_RDWR|O_CREAT, 0666);
             if (fd < 0) {
@@ -405,7 +408,7 @@ static void save_vector_toprow_generic(matmul_top_data_ptr mmt, size_t stride, m
 
 /* The backend is exactly dual to save_vector_toprow_generic.
  */
-static void load_vector_toprow_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, const char * name, int d, unsigned int index, unsigned int iter)
+static void load_vector_toprow_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, const char * name, int d, unsigned int iter)
 {
     int err;
     if (v == NULL) v = (mmt_generic_vec_ptr) mmt->wr[d]->v;
@@ -422,7 +425,7 @@ static void load_vector_toprow_generic(matmul_top_data_ptr mmt, size_t stride, m
     if (pirow->jrank == 0) {
         if (pirow->trank == 0) {
             char * filename;
-            int rc = asprintf(&filename, "%s%u.%u.twisted", name, index, iter);
+            int rc = asprintf(&filename, "%s.%u.twisted", name, iter);
             FATAL_ERROR_CHECK(rc < 0, "out of memory");
             fd = open(filename, O_RDONLY, 0666);
             DIE_ERRNO_DIAG(fd < 0, "fopen", filename);
@@ -473,7 +476,7 @@ static void load_vector_toprow_generic(matmul_top_data_ptr mmt, size_t stride, m
     }
 }
 
-void matmul_top_load_vector_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, const char * name, int d, unsigned int index, unsigned int iter)
+void matmul_top_load_vector_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, const char * name, int d, unsigned int iter)
 {
     int err;
     if (v == NULL) v = (mmt_generic_vec_ptr) mmt->wr[d]->v;
@@ -487,7 +490,7 @@ void matmul_top_load_vector_generic(matmul_top_data_ptr mmt, size_t stride, mmt_
     // mmt_wiring_ptr mrow = mmt->wr[!d];
 
     if (picol->jrank == 0 && picol->trank == 0) {
-        load_vector_toprow_generic(mmt, stride, v, name, d, index, iter);
+        load_vector_toprow_generic(mmt, stride, v, name, d, iter);
     }
 
     serialize(mmt->pi->m);
@@ -523,7 +526,7 @@ void matmul_top_load_vector_generic(matmul_top_data_ptr mmt, size_t stride, mmt_
     }
 }
 
-void matmul_top_save_vector_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, const char * name, int d, unsigned int index, unsigned int iter)
+void matmul_top_save_vector_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, const char * name, int d, unsigned int iter)
 {
     if (v == NULL) v = (mmt_generic_vec_ptr) mmt->wr[d]->v;
 
@@ -541,7 +544,7 @@ void matmul_top_save_vector_generic(matmul_top_data_ptr mmt, size_t stride, mmt_
     // Now every job row has the complete vector.  We'll do I/O from only
     // one row, that's easier. Pick the topmost one.
     if (picol->jrank == 0 && picol->trank == 0) {
-        save_vector_toprow_generic(mmt, stride, v, name, d, index, iter);
+        save_vector_toprow_generic(mmt, stride, v, name, d, iter);
     }
 
     serialize(mmt->pi->m);
@@ -645,6 +648,12 @@ void matmul_top_clear(matmul_top_data_ptr mmt, abobj_ptr abase MAYBE_UNUSED)
     matmul_clear(mmt->mm);
     matmul_top_vec_clear(mmt,0);
     matmul_top_vec_clear(mmt,1);
+    free(mmt->fences[0]);
+    free(mmt->fences[1]);
+    for(unsigned int d = 0 ; d < 2 ; d++) {
+        free(mmt->wr[d]->x);
+        free(mmt->wr[d]->y);
+    }
     free(mmt->locfile);
 }
 
@@ -812,12 +821,12 @@ void matmul_top_mul(matmul_top_data_ptr mmt, int d)
 
 /* The first function is the back-end, run only on the top row.
  */
-void matmul_top_save_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int index, unsigned int iter)
+void matmul_top_save_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int iter)
 {
-    matmul_top_save_vector_generic(mmt, abbytes(mmt->abase, 1), NULL, name, d, index, iter);
+    matmul_top_save_vector_generic(mmt, abbytes(mmt->abase, 1), NULL, name, d, iter);
 }
 
-void matmul_top_load_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int index, unsigned int iter)
+void matmul_top_load_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int iter)
 {
-    matmul_top_load_vector_generic(mmt, abbytes(mmt->abase, 1), NULL, name, d, index, iter);
+    matmul_top_load_vector_generic(mmt, abbytes(mmt->abase, 1), NULL, name, d, iter);
 }

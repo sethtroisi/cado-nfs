@@ -21,7 +21,11 @@
 using namespace std;
 
 #include "matmul-sliced.h"
+#ifdef  __x86_64
 #include "matmul-sliced-asm.h"
+#define ENABLE_ASM
+#endif
+
 #include "readmat.h"
 #include "abase.h"
 #include "manu.h"
@@ -440,7 +444,6 @@ void matmul_sliced_mul(matmul_ptr mm, abt * dst, abt const * src, int d)
             abzero(x, where, nrows_packed);
             asm("# critical loop\n");
             abt const * from = src;
-#define ENABLE_ASM
             /* Make sure that the assembly function is only called if it
              * matches correctly the abase header !! */
 #if defined(ENABLE_ASM) && defined(ABASE_U64_H_)

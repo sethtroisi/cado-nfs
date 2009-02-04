@@ -9,6 +9,7 @@
 #include "parallelizing_info.h"
 #include "matmul.h"
 
+/* Don't touch this. */
 #define CONJUGATED_PERMUTATIONS
 
 /* A wiring is the information concerning our matrix in one of its two
@@ -149,8 +150,8 @@ void mmt_finish_init(matmul_top_data_ptr mmt);
 void matmul_top_read_submatrix(matmul_top_data_ptr mmt);
 void matmul_top_clear(matmul_top_data_ptr mmt, abobj_ptr abase);
 void matmul_top_fill_random_source(matmul_top_data_ptr mmt, int d);
-void matmul_top_load_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int index, unsigned int iter);
-void matmul_top_save_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int index, unsigned int iter);
+void matmul_top_load_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int iter);
+void matmul_top_save_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int iter);
 void matmul_top_mul(matmul_top_data_ptr mmt, int d);
 
 /* Now some of the generic interface calls. By design, not everything is
@@ -175,8 +176,13 @@ typedef struct mmt_generic_vec_s * mmt_generic_vec_ptr;
 void matmul_top_vec_init_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, int d, int flags);
 void matmul_top_vec_clear_generic(matmul_top_data_ptr mmt, size_t stride MAYBE_UNUSED, mmt_generic_vec_ptr v, int d);
 void matmul_top_fill_random_source_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, int d);
-void matmul_top_load_vector_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, const char * name, int d, unsigned int index, unsigned int iter);
-void matmul_top_save_vector_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, const char * name, int d, unsigned int index, unsigned int iter);
+void matmul_top_load_vector_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, const char * name, int d, unsigned int iter);
+void matmul_top_save_vector_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, const char * name, int d, unsigned int iter);
+
+/* These two do not really belong here, but comes as a useful complement
+ */
+void vec_init_generic(pi_wiring_ptr, size_t, mmt_generic_vec_ptr, int, unsigned int);
+void vec_clear_generic(pi_wiring_ptr, size_t, mmt_generic_vec_ptr, unsigned int);
 
 #ifdef __cplusplus
 }

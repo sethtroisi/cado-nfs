@@ -85,7 +85,7 @@ void * sec_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
     }
     serialize(pi->m);
 
-    matmul_top_save_vector(mmt, "C", !dir, 0, interval);
+    matmul_top_save_vector(mmt, "C", !dir, interval);
 
     serialize(pi->m);
     matmul_top_clear(mmt, abase);
@@ -187,9 +187,9 @@ int main(int argc, char * argv[])
     param_list_parse_int(pl, "interval", &interval);
 
     if ((tmp = param_list_lookup_string(pl, "nullspace")) != NULL) {
-        if (strcmp(tmp, dirtext[0])) {
+        if (strcmp(tmp, dirtext[0]) == 0) {
             dir = 0;
-        } else if (strcmp(tmp, dirtext[1])) {
+        } else if (strcmp(tmp, dirtext[1]) == 0) {
             dir = 1;
         } else {
             fprintf(stderr, "Parameter nullspace may only be %s|%s\n",
