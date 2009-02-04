@@ -60,13 +60,18 @@ endif
 bins:=bench build prep
 
 default-target: all
-allbins:=test_hello
+allbins:=test_hello split
 
 
 test_hello_objs:=test_hello.o parallelizing_info.o
 test_hello: $(test_hello_objs)
 	$(CXX) $(MY_LFLAGS) $(test_hello_objs) -o $@ $(common_libs)
 -include $(patsubst %,.deps/%.d,$(test_hello_objs))
+
+split_objs:=split.o
+split: $(split_objs)
+	$(CXX) $(MY_LFLAGS) $(split_objs) -o $@ $(common_libs)
+-include $(patsubst %,.deps/%.d,$(split_objs))
 
 # We need to make sure that pthreads are always included.
 common_libs:=-lutils -lgmp
