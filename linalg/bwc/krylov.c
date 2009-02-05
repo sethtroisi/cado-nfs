@@ -13,6 +13,7 @@
 #include "select_mpi.h"
 #include "gauss.h"
 #include "manu.h"
+#include "debug.h"
 
 #include "params.h"
 #include "xvectors.h"
@@ -158,6 +159,12 @@ void * krylov_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
             /* Compute the product by x */
             x_dotprod(mmt, xymats->v + aboffset(abase, i * m), m, gxvecs, nx);
             matmul_top_mul(mmt, dir);
+
+            /*
+            debug_write(abase, mmt->wr[dir]->v->v,
+                    mmt->wr[dir]->i1-mmt->wr[dir]->i0, "pV%u.j%u.t%u",
+                    s+i+1, mmt->pi->m->jrank, mmt->pi->m->trank);
+             */
         }
         serialize(pi->m);
 

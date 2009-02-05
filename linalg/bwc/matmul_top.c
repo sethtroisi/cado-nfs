@@ -146,6 +146,10 @@ broadcast_down_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_p
         /* While this code has been written with some caution, it has had
          * zero coverage at the moment. So please be kind when
          * encountering bugs.
+         *
+         * XXX A second word of caution. Some serializing calls could
+         * very probably be dropped if we don't have a shared vector. So
+         * performance-wise, that could be a thing to check.
          */
         BUG();
     }
@@ -863,6 +867,14 @@ void matmul_top_mul(matmul_top_data_ptr mmt, int d)
     // serialize(mmt->pi->m);
     broadcast_down(mmt, d);
     // mmt_debug_writeout(mmt, d, "before_mul");
+
+    /* If we have shared input data for the column threads, then we'd
+     * better make sure it has arrived completely.
+     */
+    if (mmt->wr[d]->v->flags & THREAD_SHARED_VECTOR) {
+        serialize_threads(mmt->pi->wr[d]);
+    }
+
     matmul_mul(mmt->mm, mmt->wr[!d]->v->v, mmt->wr[d]->v->v, d);
     // mmt_debug_writeout(mmt, !d, "after_mul");
     reduce_across(mmt, !d);

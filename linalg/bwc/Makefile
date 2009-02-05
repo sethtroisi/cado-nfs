@@ -128,6 +128,8 @@ sources:=	\
     parallelizing_info.c secure.c prep.c test_hello.c xvectors.c	\
     matmul.c matmul-basic.c krylov.c xymats.c
 
+# hardlinking like this over nfs is prone to exhibit bugs with time
+# difference w.r.t the nfs server.
 define hardlink_object
 $(1)/$(2): $(2)
 	ln -f $$< $$@
