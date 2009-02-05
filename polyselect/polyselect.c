@@ -1,6 +1,6 @@
 /* Polynomial selection with Kleinjung's algorithm
 
-Copyright 2008 Pierrick Gaudry, Emmanuel Thome, Paul Zimmermann
+Copyright 2008 Emmanuel Thome, Paul Zimmermann
 
 This file is part of CADO-NFS.
 
@@ -687,7 +687,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
               printf("\n");
             }
 
-          /* p_0 idea */
+          /* p_0 improvement : it helps to yield more pairs from the enumeration of the subsets of Q(ad). */
           p0_max = (unsigned int) (max_adm1 / Pd);
           if (p0_max > p0max)
             p0_max = p0max;
@@ -739,7 +739,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
                 continue;
               
               mpz_mul_ui (P, P_over_p0, p0);
-
+	      
               if (verbose >= 3)
                 gmp_printf ("trying P=%Zd\n", P);
 
@@ -1019,7 +1019,11 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
 
   if (verbose)
     fprintf (stderr, "# Step 1\n");
+
   /* step 1 */
+  
+  /* Construction of the set P. */
+
   for (r = 1; r < pb; r += d)
     if (isprime (r))
       {
@@ -1033,6 +1037,8 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
           }
       }
 
+  /* End of the construction of P. */
+    
   A = alloc_mpz_array (d + 1);
   a = A->data;
   G = alloc_mpz_array (d + 1);
@@ -1043,7 +1049,8 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
     mpz_set_ui (g[i], 0);
 
   Nd = mpz_get_d (N);
-
+  
+  /* Initial setup for ad and its bounds. */
   max_ad = pow (pow (M, (double) (2 * d - 2)) / Nd, 1.0 / (double) (d - 3));
   fprintf (stderr, "# max ad=%1.2e\n", max_ad);
   fflush (stderr);
@@ -1063,6 +1070,8 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
   Msize = 0;
   while (mpz_cmp_d (a[d], max_ad) <= 0)
     {
+      /* For ad in the bounds, we construct the subset Q=Q(ad) of P, of the primes r such that it exists some solution x of [ a_d*x^d=N (mod r) ] */
+
       for (i = lQ = 0; i < lP; i++)
         {
           /* add r = P[i] to Q if a[d]/N <> 0 and is a dth power modulo r */
@@ -1079,10 +1088,16 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
             }
         }
       if (lQ < l)
+	/* At this point Q doesn't have enough elements: we abort and we continue with the next ad.  */
         goto next_ad;
 
+      /* At this point, Q has at least l elements, so we continue the search for pairs (p,m). */
+
+      /* We compute the lower bound for m, in order to be able to apply Lemma 2.1, ... */
       mpz_tdiv_q (mtilde, N, a[d]);
       mpz_root (mtilde, mtilde, d);
+
+      /* ... and we compute the upper bounds for a_{d-1}, a_{d-2}. */
       max_adm1 = M * M / mpz_get_d (mtilde);
       max_adm2 = pow ((pow (M, (double) (2 * d - 6)) /
                       pow (mpz_get_d (mtilde), (double) (d - 4))),
@@ -1131,7 +1146,7 @@ usage ()
   fprintf (stderr, "       -keep k   - keep k smallest polynomials (default %u)\n", DEFAULT_KEEP);
   fprintf (stderr, "       -incr i   - ad is incremented by i (default %u)\n", DEFAULT_INCR);
   fprintf (stderr, "       -l l      - leading coefficient of g(x) has l prime factors (default %u)\n", DEFAULT_L);
-  fprintf (stderr, "       -M M      - keep polynomials with sup-norm <= M (default %1.0e)\n", DEFAULT_M);
+  fprintf (stderr, "       -M M      - only keep polynomials with sup-norm <= M (default %1.0e)\n", DEFAULT_M);
   fprintf (stderr, "       -pb p     - prime factors are bounded by p (default %u)\n", DEFAULT_PB);
   fprintf (stderr, "       -p0max P  - extra prime factor is bounded by P (default %u)\n", DEFAULT_P0MAX);
   fprintf (stderr, "       -admin a  - minimal leading coefficient of f(x)\n");
@@ -1187,7 +1202,6 @@ main (int argc, char *argv[])
   param_list_configure_knob(pl, "-v", &verbose);
   param_list_configure_knob(pl, "-full", &full);
   param_list_configure_knob(pl, "-notr", &notr);
-  param_list_configure_alias(pl, "effort", "-e");
   param_list_configure_alias(pl, "degree", "-d");
   param_list_configure_alias(pl, "degree", "d=");
   param_list_configure_alias(pl, "incr", "-i");
