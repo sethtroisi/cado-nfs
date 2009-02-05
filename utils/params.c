@@ -1,9 +1,12 @@
 #define _BSD_SOURCE     /* strdup */
+#define _GNU_SOURCE     /* vasprintf */
+
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>              /* isdigit isspace */
 #include <limits.h>             /* INT_MIN INT_MAX */
 #include <errno.h>
+#include <stdarg.h>
 
 #include "params.h"
 #include "macros.h"
@@ -678,4 +681,19 @@ void param_list_save(param_list pl, const char * filename)
 
     param_list_display(pl, f);
     fclose(f);
+}
+
+int param_list_save_parameter(param_list pl, enum parameter_origin o, 
+        const char * key, const char * format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+
+    char * tmp;
+    int rc;
+    rc = vasprintf(&tmp, format, ap);
+    param_list_add_key(pl, key, tmp, o);
+    free(tmp);
+
+    return rc;
 }

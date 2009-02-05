@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <gmp.h>
 
+#include "macros.h"
+
 /* This is by increasing order of priority */
 enum parameter_origin { PARAMETER_FROM_FILE, PARAMETER_FROM_CMDLINE, };
 
@@ -123,6 +125,12 @@ extern int param_list_add_key(param_list pl,
 
 // for debugging.
 extern void param_list_display(param_list pl, FILE *f);
+
+// quick way to reinject parameters in the param_list (presumably before
+// saving)
+extern int param_list_save_parameter(param_list pl, enum parameter_origin o, 
+        const char * key, const char * format, ...) ATTR_PRINTF(4,5);
+
 #ifdef __cplusplus
 }
 #endif

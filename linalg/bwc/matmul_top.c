@@ -23,21 +23,6 @@
 #include "info_file.h"
 #include "debug.h"
 
-#if 0
-abt * extra_svec_init(matmul_top_data_srcptr mmt) {
-    return abinit(mmt->abase, mmt->i1 - mmt->i0);
-}
-void extra_svec_clear(matmul_top_data_srcptr mmt, abt * x) {
-    abclear(mmt->abase, x, mmt->i1 - mmt->i0);
-}
-void extra_svec_update(matmul_top_data_srcptr mmt, abt * x) {
-    abcopy(mmt->abase, x, mmt->v, mmt->i1 - mmt->i0);
-}
-void extra_svec_recall(matmul_top_data_srcptr mmt, const abt * x) {
-    abcopy(mmt->abase, mmt->v, x, mmt->i1 - mmt->i0);
-}
-#endif
-
 #ifndef CONJUGATED_PERMUTATIONS
 #error "Do you really, really want to use arbitrary left and right sigmas ?"
 #endif
@@ -728,10 +713,6 @@ reduce_across(matmul_top_data_ptr mmt, int d)
          * reducing compared to n^2 would cause clobbering).
          *
          */
-        // unsigned int i0 = mrow->i0;
-        // unsigned int i1 = MIN(mrow->i1, mmt->n[d]);
-        // unsigned int ii0 = i0 +  pirow->trank    * (i1 - i0) / pirow->ncores;
-        // unsigned int ii1 = i0 + (pirow->trank+1) * (i1 - i0) / pirow->ncores;
         /* y gives the intersections of the range
          * [ii0..ii1[ (where ii1-ii0=(i1-i0)/pirow->ncores, ii0=i0+k*(ii1-ii0))
          * with the fences in the other direction (vertical fences).
@@ -751,10 +732,9 @@ reduce_across(matmul_top_data_ptr mmt, int d)
              * so on. all_v has been allocated with wraparound pointers
              * precisely for accomodating the hack here. */
             for(unsigned int j = 1 ; j < pirow->ncores ; j++) {
-                /* XXX Note that in theory, a given data offset is summed
-                 * by only one of the row threads. Otherwise, we're
-                 * clearly creating rubbish since sptr and dptr lie
-                 * within mrow->v
+                /* A given data offset is summed by only one of the row
+                 * threads. Otherwise, we're clearly creating rubbish
+                 * since sptr and dptr lie within mrow->v
                  */
                 const abt * sptr = mrow->v->all_v[dst+j] + off;
                 for(unsigned int k = 0 ; k < xx->count ; k++) {
@@ -786,7 +766,8 @@ reduce_across(matmul_top_data_ptr mmt, int d)
      * Unfortunately, that's not the whole story. We must also serialize
      * column-wise. Because we're writing on the right vector buffers,
      * which are used as input for the matrix multiplication code --
-     * which may be still running at this point.
+     * which may be still running at this point because there has been no
+     * column serialization in the current procedure yet.
      */
     serialize_threads(mmt->pi->m);
 
@@ -845,8 +826,8 @@ void matmul_top_fill_random_source(matmul_top_data_ptr mmt, int d)
     matmul_top_fill_random_source_generic(mmt, abbytes(mmt->abase, 1), NULL, d);
 }
 
-#if 1
-void mmt_debug_writeout(matmul_top_data_ptr mmt, int d, const char * name)
+#if 0
+static void mmt_debug_writeout(matmul_top_data_ptr mmt, int d, const char * name)
 {
     serialize(mmt->pi->m);
     debug_write(mmt->abase, mmt->wr[d]->v->v, mmt->wr[d]->i1 - mmt->wr[d]->i0,
