@@ -92,25 +92,21 @@ libmatmul_objs:=matmul-sliced.o matmul-basic.o matmul.o
 ifeq ($(shell uname -m),x86_64)
 libmatmul_objs+=matmul-sliced-asm.o
 endif
+libmatmul_objs+=aligned_malloc.o
 
 build_objs:=build.o libmatmul.a
 bench_objs:=bench.o libmatmul.a
 prep_objs:=prep.o intersections.o 			\
-	matmul_top.o parallelizing_info.o		\
-	info_file.o 					\
-	xvectors.o					\
-	xymats.o					\
+	matmul_top.o parallelizing_info.o info_file.o	\
+	xvectors.o xymats.o debug.o			\
 	libmatmul.a
 krylov_objs:=krylov.o intersections.o 			\
-	matmul_top.o parallelizing_info.o		\
-	info_file.o 					\
-	xvectors.o					\
-	xymats.o					\
+	matmul_top.o parallelizing_info.o info_file.o	\
+	xvectors.o xymats.o debug.o			\
 	libmatmul.a
 secure_objs:=secure.o intersections.o 			\
-	matmul_top.o parallelizing_info.o		\
-	info_file.o 					\
-	xvectors.o					\
+	matmul_top.o parallelizing_info.o info_file.o	\
+	xvectors.o debug.o				\
 	libmatmul.a
 build_normalobjs:=../readbuffer.o ../readmat.o
 bench_normalobjs:=../readbuffer.o ../readmat.o
@@ -121,7 +117,7 @@ secure_normalobjs:=../readbuffer.o ../readmat.o
 
 # This list contains the object files which do not depend on the abase
 # selection.
-constant_objects:=parallelizing_info.o intersections.o xvectors.o
+constant_objects:=parallelizing_info.o intersections.o xvectors.o aligned_malloc.o
 
 # ALL object files must come here. Using $(wildcard *.c) is discouraged
 # for obvious reasons. This list is used for computing dependencies.

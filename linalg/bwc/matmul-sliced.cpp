@@ -67,7 +67,7 @@ using namespace std;
 #define MM_EXTENSION   "-sliced"
 
 #define MM_MAGIC_FAMILY        0xa000UL
-#define MM_MAGIC_VERSION       0x1006UL
+#define MM_MAGIC_VERSION       0x1007UL
 #define MM_MAGIC (MM_MAGIC_FAMILY << 16 | MM_MAGIC_VERSION)
 
 struct slice_info {
@@ -338,8 +338,8 @@ matmul_ptr matmul_sliced_reload_cache(abobj_ptr xx MAYBE_UNUSED, const char * fi
 
     abobj_init_set(MM->xab, xx);
 
-    unsigned long magic_check;
-    rc = fread(&magic_check, sizeof(unsigned long), 1, f);
+    uint32_t magic_check;
+    rc = fread(&magic_check, sizeof(uint32_t), 1, f);
     FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
     
     if (magic_check != MM_MAGIC) {
@@ -347,8 +347,8 @@ matmul_ptr matmul_sliced_reload_cache(abobj_ptr xx MAYBE_UNUSED, const char * fi
         return NULL;
     }
 
-    unsigned long nbytes_check;
-    rc = fread(&nbytes_check, sizeof(unsigned long), 1, f);
+    uint32_t nbytes_check;
+    rc = fread(&nbytes_check, sizeof(uint32_t), 1, f);
     FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
     
     /* It's not fatal. It only deserves a warning */
@@ -356,16 +356,30 @@ matmul_ptr matmul_sliced_reload_cache(abobj_ptr xx MAYBE_UNUSED, const char * fi
         fprintf(stderr, "Warning: cached matrix file fits data with different striding\n");
     }
 
-
-    rc = fread(&MM->nrows, sizeof(unsigned int), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
-    rc = fread(&MM->ncols, sizeof(unsigned int), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
-    rc = fread(&MM->ncoeffs, sizeof(unsigned long), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
-
-    rc = fread(&n, sizeof(size_t), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
+    {
+        uint32_t v;
+        rc = fread(&v, sizeof(uint32_t), 1, f);
+        FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
+        MM->nrows = v;
+    }
+    {
+        uint32_t v;
+        rc = fread(&v, sizeof(uint32_t), 1, f);
+        FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
+        MM->ncols = v;
+    }
+    {
+        uint64_t v;
+        rc = fread(&v, sizeof(uint64_t), 1, f);
+        FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
+        MM->ncoeffs = v;
+    }
+    {
+        uint32_t v;
+        rc = fread(&v, sizeof(uint32_t), 1, f);
+        FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
+        n = v;
+    }
 
     MM->data.resize(n);
     rc = fread(&(MM->data.front()), sizeof(uint16_t), n, f);
@@ -397,25 +411,36 @@ void matmul_sliced_save_cache(matmul_ptr mm, const char * filename)
     free(base);
 
     size_t n = MM->data.size();
-    unsigned long magic = MM_MAGIC;
+    uint32_t magic = MM_MAGIC;
     size_t rc;
 
-    rc = fwrite(&magic, sizeof(unsigned long), 1, f);
+    rc = fwrite(&magic, sizeof(uint32_t), 1, f);
     FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
 
-    unsigned long nbytes = abbytes(MM->xab, 1);
-    rc = fwrite(&nbytes, sizeof(unsigned long), 1, f);
+    uint32_t nbytes = abbytes(MM->xab, 1);
+    rc = fwrite(&nbytes, sizeof(uint32_t), 1, f);
     FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
 
-    rc = fwrite(&MM->nrows, sizeof(unsigned int), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
-    rc = fwrite(&MM->ncols, sizeof(unsigned int), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
-    rc = fwrite(&MM->ncoeffs, sizeof(unsigned long), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
-
-    rc = fwrite(&n, sizeof(size_t), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
+    {
+        uint32_t v = MM->nrows;
+        rc = fwrite(&v, sizeof(uint32_t), 1, f);
+        FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
+    }
+    {
+        uint32_t v = MM->ncols;
+        rc = fwrite(&v, sizeof(uint32_t), 1, f);
+        FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
+    }
+    {
+        uint64_t v = MM->ncoeffs;
+        rc = fwrite(&v, sizeof(uint64_t), 1, f);
+        FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
+    }
+    {
+        uint32_t v = n;
+        rc = fwrite(&v, sizeof(uint32_t), 1, f);
+        FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
+    }
 
     rc = fwrite(&(MM->data.front()), sizeof(uint16_t), n, f);
     FATAL_ERROR_CHECK(rc < n, "Short write to cached matrix file");

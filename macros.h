@@ -63,6 +63,9 @@
 #ifndef EXPECT
 #define EXPECT(x,val)	__builtin_expect(x,val)
 #endif
+#ifndef ATTR_PRINTF
+#define ATTR_PRINTF(a,b) __attribute__((format(printf,a,b)))
+#endif
 #else
 #ifndef	MAYBE_UNUSED
 #define MAYBE_UNUSED
@@ -70,6 +73,10 @@
 #ifndef EXPECT
 #define	EXPECT(x,val)	(x)
 #endif
+#ifndef ATTR_PRINTF
+#define ATTR_PRINTF(a,b) /**/
+#endif
+
 #endif
 
 #ifndef	LIKELY

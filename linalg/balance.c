@@ -264,6 +264,7 @@ struct slice * alloc_slices(unsigned int water, unsigned int n)
     for(i = 0 ; i < n ; i++) {
         res[i].nrows = min_size + (i < (water % n));
         res[i].r = (uint32_t *) malloc(res[i].nrows * sizeof(uint32_t));
+        res[i].coeffs = 0;
     }
 
     return res;
@@ -602,7 +603,7 @@ void give_stats(const char * text, const struct row * data, unsigned int n)
 
     if (nz) {
         unsigned int i;
-        printf("%u zero %s:", nz, text);
+        printf("%u zero %s(s):", nz, text);
         for(i = 0 ; i < nz && i < STORE_ZEROES ; i++) {
             printf(" %u", zz[i]);
         }
@@ -1197,7 +1198,7 @@ void compute_permutation()
     if (replicate_rows_perm_for_columns && permute_rows) {
         row_slices = shuffle_rtable("horizontal", row_table, nr, nhslices);
         col_slices = replicate_permutation("vertical", col_table, nc,
-                nvslices, row_slices, nvslices);
+                nvslices, row_slices, nhslices);
     } else if (replicate_columns_perm_for_rows && permute_cols) {
         col_slices = shuffle_rtable("vertical", col_table, nc, nvslices);
         row_slices = replicate_permutation("horizontal", row_table, nr,

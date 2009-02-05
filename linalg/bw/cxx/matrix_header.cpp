@@ -13,7 +13,11 @@ using namespace std;
 
 void put_matrix_header(ostream & mtx, unsigned int nr, unsigned int nc, const string & mstr)
 {
-    mtx << fmt("// % ROWS % COLUMNS ; MODULUS %\n") % nr % nc % mstr;
+    if (mstr == "2") {
+        mtx << fmt("% %\n") % nr % nc;
+    } else {
+        mtx << fmt("// % ROWS % COLUMNS ; MODULUS %\n") % nr % nc % mstr;
+    }
     mtx << flush;
 }
 

@@ -21,6 +21,7 @@
 #include "select_mpi.h"
 #include "intersections.h"
 #include "info_file.h"
+#include "debug.h"
 
 #if 0
 abt * extra_svec_init(matmul_top_data_srcptr mmt) {
@@ -52,7 +53,8 @@ void vec_init_generic(pi_wiring_ptr picol, size_t stride, mmt_generic_vec_ptr v,
     // all_v pointers are stored twice, in a rotating buffer manner, so
     // that it's possible for one thread to address the n other threads
     // without having to compute a modulo
-    v->all_v = malloc(2 * picol->ncores * sizeof(void *));
+    size_t allocsize = 2 * picol->ncores * sizeof(void *);
+    v->all_v = alignable_malloc(allocsize);
 
     if (flags & THREAD_SHARED_VECTOR) {
         void * r;
@@ -147,6 +149,10 @@ broadcast_down_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_p
          */
         BUG();
     }
+
+    /* Make sure that no thread on the column is wandering in other
+     * places */
+    serialize_threads(picol);
 
 #ifndef MPI_LIBRARY_MT_CAPABLE
     for(unsigned int t = 0 ; t < pirow->ncores + extra ; t++) {
@@ -617,7 +623,10 @@ void mmt_finish_init(matmul_top_data_ptr mmt)
         intersect(&(mcol->ylen), &(mcol->y),
                 mmt->fences[!d], ii0, ii1, mmt->n[d]);
 
-
+        // adjust by ii0-i0.
+        for(unsigned int z = 0 ; z < mcol->ylen ; z++) {
+            mcol->y[z].offset_me += ii0-i0;
+        }
     }
 
     // TODO: reuse the ../bw-matmul/matmul/matrix_base.cpp things for
@@ -694,20 +703,55 @@ reduce_across(matmul_top_data_ptr mmt, int d)
         /* row threads have to sum up their data. Of course it's
          * irrelevant when there is only one such thread...
          *
-         * note that no locking is needed here.
+         * Concerning locking, we have to make sure that everybody on the
+         * row has finished its computation task, but besides that,
+         * there's no locking until we start mpi stuff.
+         */
+        serialize_threads(pirow);
+
+        /* Our [i0,i1[ range is split into pirow->ncores parts. This range
+         * represent coordinates which are common to all threads on
+         * pirow. Corresponding data has to be summed. Amongst the
+         * pirow->ncores threads, thread k takes the responsibility of
+         * summing data in the k-th block (that is, indices
+         * i0+k*(i1-i0)/pirow->ncores and further). Note that the exact
+         * thread which eventually owns the final data is not necessarily
+         * the same for the whole range, nor does it carry any
+         * relationship with the thread doing the computation ! In any
+         * case, one should consider that data in threads other than the
+         * destination thread may be clobbered by the operation (although
+         * in the present implementation it is not -- faster n\log n
+         * reducing compared to n^2 would cause clobbering).
+         *
          */
         // unsigned int i0 = mrow->i0;
         // unsigned int i1 = MIN(mrow->i1, mmt->n[d]);
         // unsigned int ii0 = i0 +  pirow->trank    * (i1 - i0) / pirow->ncores;
         // unsigned int ii1 = i0 + (pirow->trank+1) * (i1 - i0) / pirow->ncores;
+        /* y gives the intersections of the range
+         * [ii0..ii1[ (where ii1-ii0=(i1-i0)/pirow->ncores, ii0=i0+k*(ii1-ii0))
+         * with the fences in the other direction (vertical fences).
+         */
         for(unsigned int i = 0 ; i < mrow->ylen ; i++) {
             struct isect_info * xx = &(mrow->y[i]);
             unsigned int dst = xx->k % pirow->ncores;
+            /* Note that ``offset_there'' does not count here, since at
+             * this point we're not yet flipping to the buffer in the
+             * other direction.
+             */
             unsigned int off = aboffset(mmt->abase, xx->offset_me);
             abt * dptr = mrow->v->all_v[dst] + off;
             // size_t siz = abbytes(mmt->abase, xx->count);
             ASSERT(off + xx->count <= mrow->i1 - mrow->i0);
+            /* j indicates a thread number offset -- 0 means destination, and
+             * so on. all_v has been allocated with wraparound pointers
+             * precisely for accomodating the hack here. */
             for(unsigned int j = 1 ; j < pirow->ncores ; j++) {
+                /* XXX Note that in theory, a given data offset is summed
+                 * by only one of the row threads. Otherwise, we're
+                 * clearly creating rubbish since sptr and dptr lie
+                 * within mrow->v
+                 */
                 const abt * sptr = mrow->v->all_v[dst+j] + off;
                 for(unsigned int k = 0 ; k < xx->count ; k++) {
                     abadd(mmt->abase, dptr + k, sptr + k);
@@ -721,8 +765,29 @@ reduce_across(matmul_top_data_ptr mmt, int d)
         }
     }
 
+    /* Good. Now we can drop the secondary-level intersections (y), and
+     * concentrate on the coarser grain ``x'' intersections. All threads
+     * such that the [i0,i1[ range intersects between the two directions,
+     * as well as the corresponding threads on the same row (those with
+     * equal pirow->trank but different pirow->jrank) must now
+     * collectively sum their data. Within each such group, one is the
+     * leader, and is in charge of storing what it receives in the buffer
+     * in the other direction.
+     */
+
+    /* XXX We have to serialize threads here. At least row-wise, so that
+     * the computations above are finished. Easily seen, that's just a
+     * couple of lines above.
+     *
+     * Unfortunately, that's not the whole story. We must also serialize
+     * column-wise. Because we're writing on the right vector buffers,
+     * which are used as input for the matrix multiplication code --
+     * which may be still running at this point.
+     */
+    serialize_threads(mmt->pi->m);
+
 #ifndef MPI_LIBRARY_MT_CAPABLE
-    /* Now we can perform mpi-level reduction across rows. */
+    /* We need two levels of locking :-( */
     for(unsigned int t = 0 ; t < picol->ncores ; t++) {
         serialize_threads(picol);
         if (t != picol->trank)
@@ -746,6 +811,8 @@ reduce_across(matmul_top_data_ptr mmt, int d)
         }
     }
 #else   /* MPI_LIBRARY_MT_CAPABLE */
+        /* Different rows will operate concurrently ; and even within a
+         * row, all threads may trigger an operation */
         for(unsigned int i = 0 ; i < mrow->xlen ; i++) {
             struct isect_info * xx = &(mrow->x[i]);
             unsigned int tdst = xx->k % pirow->ncores;
@@ -762,7 +829,6 @@ reduce_across(matmul_top_data_ptr mmt, int d)
         }
 #endif
 
-
     // as usual, we do not serialize on exit. Up to the next routine to
     // do so if needed.
     // 
@@ -775,6 +841,15 @@ void matmul_top_fill_random_source(matmul_top_data_ptr mmt, int d)
     matmul_top_fill_random_source_generic(mmt, abbytes(mmt->abase, 1), NULL, d);
 }
 
+#if 1
+void mmt_debug_writeout(matmul_top_data_ptr mmt, int d, const char * name)
+{
+    serialize(mmt->pi->m);
+    debug_write(mmt->abase, mmt->wr[d]->v->v, mmt->wr[d]->i1 - mmt->wr[d]->i0,
+            "%s.j%u.t%u", name, mmt->pi->m->jrank, mmt->pi->m->trank);
+    serialize(mmt->pi->m);
+}
+#endif
 
 void matmul_top_mul(matmul_top_data_ptr mmt, int d)
 {
@@ -785,9 +860,13 @@ void matmul_top_mul(matmul_top_data_ptr mmt, int d)
     ASSERT(mmt->mm->nrows == (d ? di_out : di_in));
 #endif
 
+    // serialize(mmt->pi->m);
     broadcast_down(mmt, d);
+    // mmt_debug_writeout(mmt, d, "before_mul");
     matmul_mul(mmt->mm, mmt->wr[!d]->v->v, mmt->wr[d]->v->v, d);
+    // mmt_debug_writeout(mmt, !d, "after_mul");
     reduce_across(mmt, !d);
+    // mmt_debug_writeout(mmt, d, "after_reduce");
 }
 
 /* Vector I/O is done by only one job, one thread. It incurs a

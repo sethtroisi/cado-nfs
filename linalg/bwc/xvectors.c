@@ -8,6 +8,16 @@
 #include "xvectors.h"
 #include "utils.h"
 
+int uint32_cmp(const uint32_t * xa, const uint32_t * xb)
+{
+    if (*xa < *xb) {
+        return -1;
+    } else if (*xb < *xb) {
+        return 1;
+    }
+    return 0;
+}
+
 void setup_x_random(uint32_t * xs,
         unsigned int m, unsigned int nx, unsigned int nr,
         parallelizing_info_ptr pi)
@@ -18,8 +28,28 @@ void setup_x_random(uint32_t * xs,
      */
     // job 0 thread 0 decides for everybody.
     if (pi->m->trank == 0 && pi->m->jrank == 0) {
-        for(unsigned int i = 0 ; i < nx * m ; i++) {
-            xs[i] = myrand() % nr;
+        for(unsigned int i = 0 ; i < m ; i++) {
+            for(;;) {
+                for(unsigned int j = 0 ; j < nx ; j++) {
+                    xs[i*nx+j] = myrand() % nr;
+                }
+                /* Make sure that there's no collision. Not that it
+                 * matters so much, but at times the X vector is set with
+                 * set_ui, and later on used in an additive manner. Plus,
+                 * it does not make a lot of sense to have duplicates,
+                 * since that amounts to having nothing anyway...
+                 */
+                qsort(xs+i*nx,sizeof(unsigned int),nx,uint32_cmp);
+                int collision=0;
+                for(unsigned int j = 1 ; j < nx ; j++) {
+                    if (xs[i*nx+j] == xs[i*nx+j-1]) {
+                        collision=1;
+                        break;
+                    }
+                }
+                if (!collision)
+                    break;
+            }
         }
     }
     complete_broadcast(pi->m, xs, nx * m * sizeof(unsigned int), 0, 0);

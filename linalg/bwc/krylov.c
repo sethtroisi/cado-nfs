@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdarg.h>
 
 #include "parallelizing_info.h"
 #include "matmul_top.h"
@@ -47,6 +48,12 @@ const char * dirtext[] = { "left", "right" };
 
 void x_dotprod(matmul_top_data_ptr mmt, abt * v, int m, uint32_t * xv, unsigned int nx)
 {
+    /* We're reading from the shared right vector data -- this area is
+     * written to by the other threads in the column. Some of them might
+     * be lingering in reduce operations, so we have to wait for them
+     */
+    serialize_threads(mmt->pi->wr[dir]);
+
     for(int j = 0 ; j < m ; j++) {
         abt * where = v + aboffset(abase, j);
         for(unsigned int t = 0 ; t < nx ; t++) {
@@ -138,6 +145,12 @@ void * krylov_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
             abt * v = mmt->wr[dir]->v->v + aboffset(abase, offset_v);
             abvdotprod(abase, placeholder, ahead->v, c, v, how_many);
         }
+
+        /*
+        debug_write(abase, ahead->v, NCHECKS_CHECK_VECTOR, "ahead.%u.j%u.t%u",
+                s, mmt->pi->m->jrank, mmt->pi->m->trank);
+         */
+
         abzero(abase, xymats->v, m*interval);
 
         serialize(pi->m);
@@ -148,11 +161,23 @@ void * krylov_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
         }
         serialize(pi->m);
 
+        /*
+        debug_write(abase, xymats->v, m * interval, "xy.%u-%u.j%u.t%u",
+                s, s + interval, mmt->pi->m->jrank, mmt->pi->m->trank);
+         */
+
         /* Last dot product. This must cancel ! */
         x_dotprod(mmt, ahead->v, m, gxvecs, nx);
+
+        /*
+        debug_write(abase, ahead->v, NCHECKS_CHECK_VECTOR, "post%u.j%u.t%u",
+                s, mmt->pi->m->jrank, mmt->pi->m->trank);
+         */
+
         reduce_generic(abase, ahead, pi->m, NCHECKS_CHECK_VECTOR);
         if (!abis_zero(abase, ahead->v, NCHECKS_CHECK_VECTOR)) {
             printf("Failed check at iteration %d\n", s + interval);
+            exit(1);
         }
 
         /* Now (and only now) collect the xy matrices */

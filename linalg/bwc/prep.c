@@ -166,6 +166,7 @@ void * prep_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
 
         /* OK -- now everybody has the same data, as can be seen for
          * instance with the following debugging code.  */
+#if 0
         {
             char * tmp;
             asprintf(&tmp, "/tmp/xy.%d.%d.try%d.postred", pi->m->jrank, pi->m->trank, ntri);
@@ -173,6 +174,7 @@ void * prep_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
             fwrite(xymats->v, sizeof(abt), aboffset(abase, m * NBITER), f);
             fclose(f);
         }
+#endif
 
 
         int dimk;
