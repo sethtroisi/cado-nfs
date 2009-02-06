@@ -6,7 +6,7 @@
 
 # CFLAGS can be overridden, e.g., add -DNDEBUG to disable the assert() calls
 CFLAGS:=-O2
-REV:=$(shell svnversion $(TOP) | tr -d ' ')
+REV:=$(shell $(TOP)/version.sh | tr ' ' '_')
 ALWAYS_CFLAGS:=-std=c99 -g -W -Wall -DREV=\"$(REV)\"
 
 # Start with defaults that should never be overridden

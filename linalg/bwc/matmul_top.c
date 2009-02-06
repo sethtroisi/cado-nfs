@@ -57,7 +57,9 @@ void vec_init_generic(pi_wiring_ptr picol, size_t stride, mmt_generic_vec_ptr v,
             // TODO: once thread_agreement is fixed (if ever), we can
             // drop this serialization point. At the moment, it's
             // needed.
+#ifndef HOMEMADE_BARRIERS
             serialize_threads(picol);
+#endif
             void * r;
             r = v->v;
             thread_agreement(picol, &r, t);
@@ -643,6 +645,7 @@ void matmul_top_vec_clear(matmul_top_data_ptr mmt, int d)
 
 void matmul_top_clear(matmul_top_data_ptr mmt, abobj_ptr abase MAYBE_UNUSED)
 {
+    serialize(mmt->pi->m);
     matmul_clear(mmt->mm);
     matmul_top_vec_clear(mmt,0);
     matmul_top_vec_clear(mmt,1);

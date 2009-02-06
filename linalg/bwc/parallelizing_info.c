@@ -20,7 +20,11 @@ static inline void pi_wiring_init_pthread_things(pi_wiring_ptr w, const char * d
 
     res = malloc(sizeof(struct pthread_things));
 
+#ifdef  HOMEMADE_BARRIERS
+    barrier_init(res->b, w->ncores);
+#else
     my_pthread_barrier_init(res->b, NULL, w->ncores);
+#endif
     my_pthread_mutex_init(res->m, NULL);
     res->desc = strdup(desc);
 
@@ -29,7 +33,12 @@ static inline void pi_wiring_init_pthread_things(pi_wiring_ptr w, const char * d
 
 static inline void pi_wiring_destroy_pthread_things(pi_wiring_ptr w)
 {
+#ifdef  HOMEMADE_BARRIERS
+    barrier_destroy(w->th->b);
+#else
     my_pthread_barrier_destroy(w->th->b);
+#endif
+
     my_pthread_mutex_destroy(w->th->m);
     /* Beware ! Freeing mustn't happen more than once ! */
     free(w->th->desc);
@@ -89,6 +98,65 @@ void pi_errhandler(MPI_Comm * comm, int * err, ...)
     abort();
 }
 */
+
+
+void grid_print(parallelizing_info_ptr pi, char * buf, size_t siz, int print)
+{
+    pi_wiring_ptr wr = pi->m;
+
+    char * strings;
+    strings = malloc(wr->njobs * wr->ncores * siz);
+
+    // printf("timing_check wait %d timing%d\n", iter, wr->trank);
+
+    int me = wr->jrank * wr->ncores + wr->trank;
+
+    /* instead of doing memcpy, we align the stuff. */
+    char * fmt;
+    asprintf(&fmt, "%%-%ds", siz-1);
+    snprintf(strings + me * siz, siz, fmt, buf);
+    free(fmt);
+
+    serialize(wr);
+    for(unsigned int j = 0 ; j < wr->njobs ; j++) {
+        for(unsigned int t = 0 ; t < wr->ncores ; t++) {
+            /* we serialize because of the thread_agreement bug */
+            serialize_threads(wr);
+            complete_broadcast(wr, strings + (j * wr->ncores + t) * siz,
+                    siz, j, t);
+        }
+    }
+    serialize(wr);
+
+    char * ptr = strings;
+
+    if (print) {
+        /* There's also the null byte counted in siz. So that makes one
+         * less.
+         */
+        unsigned int nj0 = pi->wr[0]->njobs;
+        unsigned int nj1 = pi->wr[1]->njobs;
+        unsigned int nt0 = pi->wr[0]->ncores;
+        unsigned int nt1 = pi->wr[1]->ncores;
+        print_several(nj0, nt0, '-', '+', siz-1);
+        for(unsigned int j1 = 0 ; j1 < nj1 ; j1++) {
+            for(unsigned int t1 = 0 ; t1 < nt1 ; t1++) {
+                printf("|");
+                for(unsigned int j0 = 0 ; j0 < nj0 ; j0++) {
+                    for(unsigned int t0 = 0 ; t0 < nt0 ; t0++) {
+                        int fence = t0 == nt0 - 1;
+                        printf("%s%c", ptr, fence ? '|' : ' ');
+                        ptr += siz;
+                    }
+                }
+                printf("\n");
+            }
+            print_several(nj0, nt0, '-', '+', siz-1);
+        }
+    }
+    serialize(wr);
+    free(strings);
+}
 
 void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
         unsigned int nhj, unsigned int nvj,
@@ -346,8 +414,38 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
     // MPI_Errhandler_free(&my_eh);
 }
 
+#ifdef  HOMEMADE_BARRIERS
+struct thread_agreement_arg {
+    pi_wiring_ptr wr;
+    void ** ptr;
+    unsigned int i;
+};
+
+void thread_agreement_in(int s MAYBE_UNUSED, struct thread_agreement_arg * a)
+{
+    if (a->wr->trank == a->i) {
+        a->wr->th->utility_ptr = *a->ptr;
+    }
+}
+
+void thread_agreement_out(int s MAYBE_UNUSED, struct thread_agreement_arg * a)
+{
+    *a->ptr = a->wr->th->utility_ptr;
+}
+#endif
+
 void thread_agreement(pi_wiring_ptr wr, void ** ptr, unsigned int i)
 {
+#ifdef  HOMEMADE_BARRIERS
+    struct thread_agreement_arg a[1];
+    a->wr = wr;
+    a->ptr = ptr;
+    a->i = i;
+    barrier_wait(wr->th->b,
+            (void(*)(int,void*)) &thread_agreement_in,
+            (void(*)(int,void*)) &thread_agreement_out,
+            a);
+#else
     // FIXME: this design is flawed. Correct reentrancy is not achieved.
     // All the stuff around the barrier here should be done with the
     // mutex locked, otherwise disaster may occur.
@@ -360,7 +458,25 @@ void thread_agreement(pi_wiring_ptr wr, void ** ptr, unsigned int i)
     }
     my_pthread_barrier_wait(wr->th->b);
     *ptr = wr->th->utility_ptr;
+#endif
 }
+
+#ifdef  HOMEMADE_BARRIERS
+/* That's a bonus obtained from serializations. */
+void serialize_in(int s, pi_wiring_ptr wr)
+{
+    if (s == 0) {
+        wr->th->utility_ptr = &(wr->shared_data);
+    }
+}
+
+void serialize_out(int s, pi_wiring_ptr wr)
+{
+    if (s) {
+        wr->shared_data = * (unsigned long *) wr->th->utility_ptr;
+    }
+}
+#endif
 
 void complete_broadcast(pi_wiring_ptr wr, void * ptr, size_t size, unsigned int j, unsigned int t)
 {
@@ -373,7 +489,7 @@ void complete_broadcast(pi_wiring_ptr wr, void * ptr, size_t size, unsigned int 
         BUG_ON(err);
     }
     void * leader_ptr = ptr;
-    thread_agreement(wr, &leader_ptr, 0);
+    thread_agreement(wr, &leader_ptr, t);
     if (ptr != leader_ptr)
         memcpy(ptr, leader_ptr, size);
 }
@@ -389,7 +505,14 @@ int serialize__(pi_wiring_ptr w, const char * s MAYBE_UNUSED, unsigned int l MAY
             w->trank, w->ncores,
             w->th->desc, w->th->b);
 #endif
+#ifdef  HOMEMADE_BARRIERS
+    barrier_wait(wr->th->b,
+            (void(*)(int,void*)) serialize_in,
+            (void(*)(int,void*)) serialize_out,
+            wr);
+#else
     my_pthread_barrier_wait(w->th->b);
+#endif
     if (w->trank == 0) {
         err = MPI_Barrier(w->pals);
         BUG_ON(err);
@@ -410,7 +533,14 @@ int serialize_threads__(pi_wiring_ptr w, const char * s MAYBE_UNUSED, unsigned i
             w->trank, w->ncores,
             w->th->desc, w->th->b);
 #endif
+#ifdef  HOMEMADE_BARRIERS
+    barrier_wait(wr->th->b,
+            (void(*)(int,void*)) serialize_in,
+            (void(*)(int,void*)) serialize_out,
+            wr);
+#else
     my_pthread_barrier_wait(w->th->b);
+#endif
     // struct timeval tv[1];
     // gettimeofday(tv, NULL);
     // printf("%.2f\n", tv->tv_sec + (double) tv->tv_usec / 1.0e6);

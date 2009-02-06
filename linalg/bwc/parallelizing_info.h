@@ -3,6 +3,10 @@
 
 #include "select_mpi.h"
 
+#ifdef  HOMEMADE_BARRIERS
+#include "barrier.h"
+#endif
+
 /*
  * The main guy here is the parallelizing_info data type. It is commonly
  * declared as pi.
@@ -47,7 +51,12 @@
 
 /* utility structure. It is stored in thread-shared memory */
 struct pthread_things {
+#ifdef  HOMEMADE_BARRIERS
+    barrier_t b[1];
+#else
     my_pthread_barrier_t b[1];
+#endif
+
     my_pthread_mutex_t m[1];
     char * desc;
     void * utility_ptr;
@@ -62,11 +71,15 @@ struct pi_wiring_s {
 
     /* product njobs * ncores */
     unsigned int totalsize;
-    unsigned int jcommon;       // was j
-    unsigned int jrank; // was rank
+    unsigned int jcommon;
+    unsigned int jrank;
     unsigned int tcommon;
-    unsigned int trank; // was c
+    unsigned int trank;
     MPI_Comm pals;
+
+#ifdef  HOMEMADE_BARRIERS
+    unsigned long shared_data;
+#endif
 
     struct pthread_things * th;
 #ifdef  CONCURRENCY_DEBUG
@@ -94,19 +107,6 @@ typedef const struct parallelizing_info_s * parallelizing_info_srcptr;
 extern "C" {
 #endif
 
-#if 0
-static inline unsigned int pi_jid(parallelizing_info_srcptr pi)
-{ return pi->wr[1]->j + pi->wr[1]->njobs * pi->wr[0]->j; }
-static inline unsigned int pi_tid(parallelizing_info_srcptr pi)
-{ return pi->wr[1]->c + pi->wr[1]->ncores * pi->wr[0]->c; }
-static inline unsigned int pi_id(parallelizing_info_srcptr pi)
-{ return pi_tid(pi) + pi->wr[0]->ncores * pi->wr[1]->ncores * pi_jid(pi); }
-static inline unsigned int pi_src_chunk(parallelizing_info_srcptr pi)
-{ return pi->wr[1]->c + pi->wr[1]->ncores * pi->wr[1]->j; }
-static inline unsigned int pi_dst_chunk(parallelizing_info_srcptr pi)
-{ return pi->wr[0]->c + pi->wr[0]->ncores * pi->wr[0]->j; }
-#endif
-
 /* pi_go is the main function. It is responsible of creating all the
  * parallelizing_info data structures, set up the different
  * inter-job and inter-thread conciliation toys (communicators, pthread
@@ -126,7 +126,7 @@ extern void hello(parallelizing_info_ptr pi);
 
 /* This must be viewed as a companion to MPI_Bcast. Threads must agree on
  * a shared area. The area is the *ptr value as presented on input by
- * the thread having index i ; i ==0 is a reasonable start in general. In
+ * the thread having index i ; i == 0 is a reasonable start in general. In
  * any case, it must be an integer between 0 and ncores-1.
  *
  * This function uses the wr->utility_ptr field.
@@ -138,6 +138,9 @@ extern void thread_agreement(pi_wiring_ptr wr, void ** ptr, unsigned int i);
  * to all jobs and threads.
  */
 extern void complete_broadcast(pi_wiring_ptr wr, void * ptr, size_t size, unsigned int j, unsigned int t);
+
+/* prints the given string in a ascii-form matrix. */
+extern void grid_print(parallelizing_info_ptr pi, char * buf, size_t siz, int print);
 
 #define serialize(w)   serialize__(w, __FILE__, __LINE__)
 extern int serialize__(pi_wiring_ptr, const char *, unsigned int);

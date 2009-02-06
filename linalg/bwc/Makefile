@@ -99,14 +99,17 @@ bench_objs:=bench.o libmatmul.a
 prep_objs:=prep.o intersections.o 			\
 	matmul_top.o parallelizing_info.o info_file.o	\
 	xvectors.o xymats.o debug.o bw-common.o		\
+	rusage.o async.o				\
 	libmatmul.a
 krylov_objs:=krylov.o intersections.o 			\
 	matmul_top.o parallelizing_info.o info_file.o	\
 	xvectors.o xymats.o debug.o bw-common.o		\
+	rusage.o async.o				\
 	libmatmul.a
 secure_objs:=secure.o intersections.o 			\
 	matmul_top.o parallelizing_info.o info_file.o	\
 	xvectors.o debug.o bw-common.o			\
+	rusage.o async.o				\
 	libmatmul.a
 build_normalobjs:=../readbuffer.o ../readmat.o
 bench_normalobjs:=../readbuffer.o ../readmat.o
@@ -117,7 +120,7 @@ secure_normalobjs:=../readbuffer.o ../readmat.o
 
 # This list contains the object files which do not depend on the abase
 # selection.
-constant_objects:=parallelizing_info.o intersections.o xvectors.o aligned_malloc.o bw-common.o
+constant_objects:=parallelizing_info.o intersections.o xvectors.o aligned_malloc.o bw-common.o rusage.o async.o
 
 # ALL object files must come here. Using $(wildcard *.c) is discouraged
 # for obvious reasons. This list is used for computing dependencies.

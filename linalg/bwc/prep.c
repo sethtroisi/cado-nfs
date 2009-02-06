@@ -147,10 +147,7 @@ void * prep_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
 
     save_x(xvecs, m, my_nx, pi);
 
-    // last 
-    serialize(pi->m);
     matmul_top_clear(mmt, abase);
-    serialize(pi->m);
 
     /* clean up xy mats stuff */
     vec_clear_generic(pi->m, stride, (mmt_generic_vec_ptr) xymats, m*NBITER);

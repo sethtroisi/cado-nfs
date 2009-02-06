@@ -7,8 +7,6 @@
 #include "matmul_top.h"
 #include "abase.h"
 #include "select_mpi.h"
-#include "gauss.h"
-//#include "hexstring.h"
 #include "manu.h"
 
 #include "params.h"
@@ -25,6 +23,8 @@ void * sec_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
     int tcan_print = can_print && pi->m->trank == 0;
     matmul_top_data mmt;
 
+    /* XXX Here we're roking in the opposite direction compared to
+     * prep/krylov/mksol ! */
     int flags[2];
     flags[!dir] = THREAD_SHARED_VECTOR;
     flags[dir] = 0;
@@ -70,9 +70,7 @@ void * sec_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
 
     matmul_top_save_vector(mmt, "C", !dir, interval);
 
-    serialize(pi->m);
     matmul_top_clear(mmt, abase);
-    serialize(pi->m);
 
     free(gxvecs);
 

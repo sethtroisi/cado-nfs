@@ -7,17 +7,16 @@
 #include "matmul_top.h"
 #include "abase.h"
 #include "select_mpi.h"
-#include "gauss.h"
 #include "manu.h"
 #include "debug.h"
-
 #include "params.h"
 #include "xvectors.h"
 #include "xymats.h"
+#include "bw-common.h"
+#include "async.h"
+// #include "rusage.h"
 
 abobj_t abase;
-
-#include "bw-common.h"
 
 void x_dotprod(matmul_top_data_ptr mmt, abt * v, int m, uint32_t * xv, unsigned int nx)
 {
@@ -25,7 +24,13 @@ void x_dotprod(matmul_top_data_ptr mmt, abt * v, int m, uint32_t * xv, unsigned 
      * written to by the other threads in the column. Some of them might
      * be lingering in reduce operations, so we have to wait for them
      */
-    serialize_threads(mmt->pi->wr[dir]);
+    if (mmt->wr[dir]->v->flags & THREAD_SHARED_VECTOR) {
+        serialize_threads(mmt->pi->wr[dir]);
+    } else {
+        /* I presume that no locking is needed here. But it's unchecked
+         */
+        BUG();
+    }
 
     for(int j = 0 ; j < m ; j++) {
         abt * where = v + aboffset(abase, j);
@@ -50,10 +55,13 @@ void * krylov_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
 {
     int tcan_print = can_print && pi->m->trank == 0;
     matmul_top_data mmt;
+    struct timing_data timing[1];
 
     int flags[2];
     flags[dir] = THREAD_SHARED_VECTOR;
     flags[!dir] = 0;
+
+    block_control_signals();
 
     matmul_top_init(mmt, abase, pi, flags, matrix_filename);
 
@@ -99,6 +107,8 @@ void * krylov_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
     }
     vec_init_generic(pi->m, stride, (mmt_generic_vec_ptr) xymats, 0, m*interval);
     
+    timing_init(timing, start);
+
     for(int s = start ; ; s += interval ) {
         // Plan ahead. The check vector is here to predict the final A matrix.
         // Note that our share of the dot product is determined by the
@@ -137,6 +147,7 @@ void * krylov_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
                     mmt->wr[dir]->i1-mmt->wr[dir]->i0, "pV%u.j%u.t%u",
                     s+i+1, mmt->pi->m->jrank, mmt->pi->m->trank);
              */
+            timing_check(pi, timing, s+i+1);
         }
         serialize(pi->m);
 
@@ -186,9 +197,9 @@ void * krylov_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
     vec_clear_generic(pi->m, stride, (mmt_generic_vec_ptr) ahead, NCHECKS_CHECK_VECTOR);
     free(gxvecs);
 
-    serialize(pi->m);
     matmul_top_clear(mmt, abase);
-    serialize(pi->m);
+
+    timing_clear(timing);
 
     return NULL;
 }
@@ -213,6 +224,7 @@ int main(int argc, char * argv[])
     abobj_init(abase);
     abobj_set_nbys(abase, ys[1]-ys[0]);
 
+    catch_control_signals();
     pi_go(krylov_prog, mpi_split[0], mpi_split[1], thr_split[0], thr_split[1], 0);
 
     bw_common_clear();
