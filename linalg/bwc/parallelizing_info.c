@@ -1,7 +1,7 @@
 #define _POSIX_C_SOURCE 200112L
 
-#define _BSD_SOURCE
-/* for strdup */
+#define _BSD_SOURCE /* for strdup */
+#define _GNU_SOURCE /* asprintf */
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -116,6 +116,8 @@ void grid_print(parallelizing_info_ptr pi, char * buf, size_t siz, int print)
     asprintf(&fmt, "%%-%ds", siz-1);
     snprintf(strings + me * siz, siz, fmt, buf);
     free(fmt);
+
+    /* ceinture et bretelles */
 
     serialize(wr);
     for(unsigned int j = 0 ; j < wr->njobs ; j++) {

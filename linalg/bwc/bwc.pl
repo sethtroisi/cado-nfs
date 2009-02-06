@@ -113,16 +113,12 @@ sub drive {
     }
 
     if ($program eq ':balance') {
-        # TODO: Note that the choice between --permute-columns-like-rows and
-        # --permute-rows-like-columns is not obvious. Somehow it could be
-        # guessed from the largest standard deviation value --something
-        # automatic in balance.c
         mkdir $wdir;
         my $cmd="../balance"
                 . " -in $matrix_dir"
                 . " -out $wdir/mat"
                 . " --nslices ${nh}x${nv}"
-                . " --permute-columns-like-rows"
+                . " --conjugate-permutations"
                 . " --square"
                 ;
         print "$cmd\n";

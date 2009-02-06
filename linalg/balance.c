@@ -63,6 +63,9 @@ List of options: (-in and -out are mandatory)
   -permute-columns-like-rows
                 The weight-sorting is done on rows and the permutation
                 is applied also to columns
+  -conjugate-permutations
+                Decide on one of the two options above given the largest
+                standard deviation encountered.
 
 Other options that do not change the ouput:
   -remove-input Erase the input matrix file as soon as possible
@@ -148,6 +151,10 @@ int cols_are_weight_sorted = 1;
 
 int replicate_rows_perm_for_columns = 0;
 int replicate_columns_perm_for_rows = 0;
+int conjugate_permutations = 0;
+
+double row_sdev;
+double col_sdev;
 
 /* full path to the input matrix */
 char * pristine_filename;
@@ -566,7 +573,7 @@ void cperm_append(cperm_buf cp, unsigned int i, const char * text, unsigned int 
 
 
 // {{{ give mean, std dev and so on
-void give_stats(const char * text, const struct row * data, unsigned int n)
+double give_stats(const char * text, const struct row * data, unsigned int n)
 {
     uint32_t dmin = UINT_MAX;
     uint32_t dmax = 0;
@@ -618,6 +625,7 @@ void give_stats(const char * text, const struct row * data, unsigned int n)
        }
        printf(" \n");
        */
+    return sdev;
 }
 // }}}
 
@@ -626,8 +634,8 @@ void read_matrix_trailer()
 {
     unsigned int i;
 
-    if (permute_rows) give_stats("row", row_table, nr);
-    if (permute_cols) give_stats("column", col_table, nc);
+    if (permute_rows) row_sdev = give_stats("row", row_table, nr);
+    if (permute_cols) col_sdev = give_stats("column", col_table, nc);
 
     if (weight_sort_in_cells) {
         assert(permute_rows);
@@ -2132,6 +2140,8 @@ int main(int argc, char * argv[])
             &replicate_columns_perm_for_rows);
     param_list_configure_knob(pl, "--permute-columns-like-rows",
             &replicate_rows_perm_for_columns);
+    param_list_configure_knob(pl, "--conjugate-permutations",
+            &conjugate_permutations);
 
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
@@ -2239,7 +2249,7 @@ int main(int argc, char * argv[])
     }
 #endif
 
-    ASSERT_ALWAYS(replicate_columns_perm_for_rows + replicate_rows_perm_for_columns <= 1);
+    ASSERT_ALWAYS(replicate_columns_perm_for_rows + replicate_rows_perm_for_columns + conjugate_permutations <= 1);
 
     weight_sort_in_cells = 1;
 
@@ -2251,6 +2261,9 @@ int main(int argc, char * argv[])
     }
     if (replicate_rows_perm_for_columns) {
         permute_cols = permute_rows;
+    }
+    if (conjugate_permutations) {
+        permute_rows = permute_cols = 1;
     }
 
     if (!(permute_rows || permute_cols || weight_sort_in_cells)) {
@@ -2286,6 +2299,16 @@ int main(int argc, char * argv[])
         prefix_fixup(work->names[0],"tmp-");
 
         read_shuffled_matrix(work->names[0], pristine_filename);
+
+        if (conjugate_permutations) {
+            if (col_sdev > row_sdev) {
+                fprintf(stderr, "Permuting rows like columns\n");
+                replicate_columns_perm_for_rows = 1;
+            } else {
+                fprintf(stderr, "Permuting columns like rows\n");
+                replicate_rows_perm_for_columns = 1;
+            }
+        }
 
         work->status = TEMP;
 
@@ -2334,6 +2357,17 @@ int main(int argc, char * argv[])
         free(old_colperm);
     } else {
         read_matrix();
+
+        if (conjugate_permutations) {
+            if (col_sdev > row_sdev) {
+                fprintf(stderr, "Permuting rows like columns\n");
+                replicate_columns_perm_for_rows = 1;
+            } else {
+                fprintf(stderr, "Permuting columns like rows\n");
+                replicate_rows_perm_for_columns = 1;
+            }
+        }
+
         work->names[0] = strdup(pristine_filename);
         work->status = INPUT;
 

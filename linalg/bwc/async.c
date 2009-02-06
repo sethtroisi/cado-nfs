@@ -68,7 +68,9 @@ void timing_rare_checks(pi_wiring_ptr wr, struct timing_data * t, int iter)
     thread_agreement(wr, &ptr, 0);
     caught_something = * (unsigned int *) ptr;
 
-    /* ok, got it. */
+    /* ok, got it. Before we possibly leave, make sure everybody has read
+     * the data from the pointer. */
+    serialize(wr);
 
     if (!caught_something) {
         /* And the result of all this is... nothing :-(( */
@@ -115,8 +117,6 @@ void timing_check(parallelizing_info pi, struct timing_data * timing, int iter)
     timing->current->job = seconds();
     timing->current->thread = thread_seconds();
     timing->current->wct = walltime_seconds();
-
-    /* ceinture et bretelles */
 
     char buf[10];
     double dt = timing->current->thread - timing->go->thread;
