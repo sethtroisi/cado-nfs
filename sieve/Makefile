@@ -6,9 +6,9 @@ include $(TOP)/Makefile.common
 # The following flags are specific to gcc, and fix a regression in gcc 4.3.0
 CFLAGS+=-fno-ivopts -fno-regmove -fno-tree-sra -fno-tree-ter
 
-# if you compile with GCC 4.2 or later, you can also try -march/mtune=native
-# instead of the default -march/mtune=generic.
-# Cf http://gcc.gnu.org/ml/gcc-help/2008-07/msg00060.html
+# if you compile with GCC 4.2 or later, you can also try -march=native
+# instead of the default -mtune=generic (cf man gcc and
+# http://gcc.gnu.org/ml/gcc-help/2008-07/msg00060.html)
 
 # using -DSSE_NORM_INIT seems to be slower (about 3% with gcc 4.3.0)
 # CFLAGS+=-DSSE_NORM_INIT
