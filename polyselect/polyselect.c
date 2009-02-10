@@ -31,9 +31,6 @@ Thorsten Kleinjung, Mathematics of Computation 75 (2006), p. 2037-2047.
 Algorithm",
 Murphy, B.A., PhD thesis, Australian National University, 1999.
 
-- The papers of the CADO team, in the dist/papers directory of this
-distribution.
-
 
 OVERVIEW
 
@@ -48,8 +45,8 @@ Roughly speaking, there are three main phases.
 
 In the first phase, that uses Kleinjung's algorithm, the program generates 
 polynomial pairs formed by a rational polynomial of the form 
-f_2(x) = px-m (here p is not a prime in general), and an algebraic polynomial 
-f_1(x) = a_d*x^d + a_{d-1}*x^{d-1}+ ... + a_1*x + a_0
+g(x) = px-m (here p is not a prime in general), and an algebraic polynomial 
+f(x) = a_d*x^d + a_{d-1}*x^{d-1}+ ... + a_1*x + a_0
 which corresponds to the (m,p)-expansion of the number n to be factored,
 n = a_d*m^d + a_{d-1}*m^{d-1}*p+ ... + a_1*m*p^{d-1} + a_0*p^d .
 The generated pairs have rather small coefficients (but not necessarily
