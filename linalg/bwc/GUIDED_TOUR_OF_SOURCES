@@ -13,25 +13,38 @@ the ouput is a set of vectors of its kernel.
 Calling sequence of binaries
 ----------------------------
 
-1- balance
-   decomposes the input matrix into blocks that will be dispatched to
-   nodes
-2- prep
-   select input blocks of vectors, and check that rank conditions are
-   satisfied
-3- secure
-   precompute some data useful for checksums
-4- split
-   split the main input vector Y into several blocks for independent
-   processing at different sites.
-5- krylov
-   compute the Krylov sequence
-6- lingen
-   Berlekamp-Massey -like step: produces a generating polynomial
-7- mksol
-   create the solutions from the polynomial
-8- gather / apply_perm
-   reconstruct solutions from the mess
+ 1 - balance
+     decomposes the input matrix into blocks that will be dispatched to
+     nodes
+ 2 - prep
+     select input blocks of vectors, and check that rank conditions are
+     satisfied
+ 3 - secure
+     precompute some data useful for checksums
+ 4 - split
+     split the main input vector Y into several blocks for independent
+     processing at different sites.
+!5 - krylov
+     compute the Krylov sequence
+ 6 - acollect
+     collect the Krylov sequece files into one big file. Can be done at
+     several moments in the computation.
+!7 - lingen
+     Berlekamp-Massey -like step: produces a generating polynomial
+!8 - mksol
+     create the solutions from the polynomial
+ 9 - gather / apply_perm
+     reconstruct solutions from the mess
+
+krylov, lingen, mksol are the steps having a real computational impact.
+prep is cheap but important for ensuring the success of the algorithm.
+split,acollect,gather,apply_perm are juste trivial bookkeeping.
+balance is I/O intensive.
+secure is akin to doing a few krylov iterations. It runs for roughly just
+as long as the desired time between two recoverable checkpoints (the
+longer it runs, the less often checks are done -- but checks are
+relatively cheap anyway).
+
 
 
 Files (standard name, standard place, etc)

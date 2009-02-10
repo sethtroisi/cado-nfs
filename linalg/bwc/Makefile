@@ -60,7 +60,7 @@ endif
 bins:=bench build prep krylov
 
 default-target: all
-allbins:=test_hello split
+allbins:=test_hello split acollect
 
 
 test_hello_objs:=test_hello.o parallelizing_info.o
@@ -72,6 +72,11 @@ split_objs:=split.o
 split: $(split_objs)
 	$(CXX) $(MY_LFLAGS) $(split_objs) -o $@ $(common_libs)
 -include $(patsubst %,.deps/%.d,$(split_objs))
+
+acollect_objs:=acollect.o
+acollect: $(acollect_objs)
+	$(CXX) $(MY_LFLAGS) $(acollect_objs) -o $@ $(common_libs)
+-include $(patsubst %,.deps/%.d,$(acollect_objs))
 
 # We need to make sure that pthreads are always included.
 common_libs:=-lutils -lgmp

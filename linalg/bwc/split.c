@@ -18,6 +18,33 @@ int main(int argc, char * argv[])
     int * stops;
     FILE ** files;
 
+#if 0
+    /* TODO before sticking in param_list : add a
+     * param_list_parse_int_list.
+     */
+    param_list pl;
+
+    param_list_init (pl);
+
+    argv++, argc--;
+    for( ; argc ; ) {
+        if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
+        fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
+        usage();
+    }
+
+    const char * tmp;
+
+    if ((tmp = param_list_lookup_string(pl, "wdir")) != NULL) {
+        if (chdir(tmp) < 0) {
+            fprintf(stderr, "chdir(%s): %s\n", tmp, strerror(errno));
+            exit(1);
+        }
+    }
+
+    param_list_clear (pl);
+#endif
+
     if (argc <= 1) {
         fprintf(stderr, "Usage: split <n_0> <n_1> ...\n");
         exit(1);
