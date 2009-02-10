@@ -17,10 +17,131 @@ details.
 You should have received a copy of the GNU Lesser General Public License
 along with CADO-NFS; see the file COPYING.  If not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
+*/
 
-Reference:
-   "On polynomial selection for the general number field sieve",
-   Thorsten Kleinjung, Mathematics of Computation 75 (2006), p. 2037-2047.
+/* 
+
+REFERENCES:
+The algorithms and ideas used in this program are described in 
+
+- "On polynomial selection for the general number field sieve",
+Thorsten Kleinjung, Mathematics of Computation 75 (2006), p. 2037-2047.
+
+- "Polynomial Selection for the Number Field Sieve Integer Factorisation 
+Algorithm",
+Murphy, B.A., PhD thesis, Australian National University, 1999.
+
+- The papers of the CADO team, in the dist/papers directory of this
+distribution.
+
+
+OVERVIEW
+
+This program generates a polynomial pair which has rather small coefficients
+and rather good root properties, that is, the image of the sieving region
+under these polynomials is likely to contain a good fraction of smooth 
+numbers. It uses Kleinjung's algorithm for generation, Murphy's alpha index 
+for quantifying the root properties and (soon) Thomé's fast root sieve 
+for improvement of the root properties.
+
+Roughly speaking, there are three main phases.
+
+In the first phase, that uses Kleinjung's algorithm, the program generates 
+polynomial pairs formed by a rational polynomial of the form 
+f_2(x) = px-m (here p is not a prime in general), and an algebraic polynomial 
+f_1(x) = a_d*x^d + a_{d-1}*x^{d-1}+ ... + a_1*x + a_0
+which corresponds to the (m,p)-expansion of the number n to be factored,
+n = a_d*m^d + a_{d-1}*m^{d-1}*p+ ... + a_1*m*p^{d-1} + a_0*p^d .
+The generated pairs have rather small coefficients (but not necessarily
+good root properties). 
+
+In the second phase, the generated polynomial pairs are treated one by
+one, improving their root properties (i.e., minimizing the Murphy's 
+"alpha" index, subject to the constraint of not increasing too much the
+size of the coefficients). Each polynomial pair is replaced by its 
+improved alter-ego.
+
+In the third phase, we rank polynomial pairs with respect to a criterion
+conciliating root properties and size of coefficients, and we choose the
+best one.
+
+In practice, the second and third phases are performed in an intertwined way.
+
+SYNOPSIS
+
+polyselect [OPTIONS] [-n n | < FILE]
+
+
+MANDATORY PARAMETER
+
+The only mandatory argument is the number n to be factored. This mandatory
+argument can be given in the command-line, like in
+
+polyselect -n 156785165745616576515615645465156735465487
+
+or in a FILE, which must contain a line
+
+n:156785165745616576515615645465156735465487
+
+(espaces above and below for clarity).
+
+
+OPTIONS
+
+-v 
+          Verbose output.
+
+
+KLEINJUNG'S ALGORITHM OPTIONS (FIRST PHASE)
+
+-degree d 
+          Use algebraic polynomial of degree d.
+
+-incr i 
+          Increment a_d by i at each iteration.
+
+-keep k 
+          Keep at most k polynomial pairs after the first phase.
+
+-l l  
+          Leading coefficient p of g(x) must have l prime factors.
+
+-M M      
+          Only keep polynomials with sup-norm <= M.
+
+-pb p      
+          Prime factors are bounded by p.
+
+-p0max P  
+          Extra prime factor is bounded by P.
+
+-admin a  
+          Lower bound for the leading coefficient of f(x)
+
+-admax a  
+          Upper bound for the leading coefficient of f(x)
+
+-multi k   
+          Returns k polynomials with same g(x)
+
+
+ROOT SIEVING OPTIONS (SECOND PHASE)
+
+-kmax k  
+          Rotation is bounded by 2^k
+
+-notr  
+          Skip final translation
+
+
+POLYNOMIAL RANKING OPTIONS (THIRD PHASE)
+
+There are no specific options for this phase.
+
+EXAMPLES (To be completed)
+
+See the scripts "dist/src/new_run.X" where X is c59 or c79. 
+
 */
 
 #include <stdio.h>
