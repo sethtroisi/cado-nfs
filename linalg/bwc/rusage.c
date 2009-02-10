@@ -21,8 +21,13 @@ double seconds()
 
 double walltime_seconds()
 {
+#if 0
     clock_t c = clock();
     return (double) c / CLOCKS_PER_SEC;
+#endif
+    struct timeval tv[1];
+    gettimeofday(tv, NULL);
+    return (double) tv->tv_sec + 1.0e-6 * tv->tv_usec;
 }
 
 /* We need some way to detect the time spent by threads. Unfortunately,
@@ -57,12 +62,12 @@ static int statfields(pid_t t, ...)
     va_list ap;
     va_start(ap, t);
     char * tmp;
-    asprintf(&tmp,"/proc/%d/stat",t);
+    int rc = asprintf(&tmp,"/proc/%d/stat",t);
+    if (rc < 0) return 0;
     char buf[1024];
     FILE * f = fopen(tmp,"r");
-    fgets(buf, sizeof(buf), f);
-
-    char * s = buf;
+    char * s = fgets(buf, sizeof(buf), f);
+    if (s == NULL) return 0;
     int j = va_arg(ap, int);
     for(int i = 0 ; j != -1 ; i++) {
         char * next;

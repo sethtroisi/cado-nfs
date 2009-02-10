@@ -8,6 +8,8 @@
 #include "xvectors.h"
 #include "utils.h"
 
+typedef int (*sortfunc_t) (const void *, const void *);
+
 int uint32_cmp(const uint32_t * xa, const uint32_t * xb)
 {
     if (*xa < *xb) {
@@ -39,7 +41,7 @@ void setup_x_random(uint32_t * xs,
                  * it does not make a lot of sense to have duplicates,
                  * since that amounts to having nothing anyway...
                  */
-                qsort(xs+i*nx,sizeof(unsigned int),nx,uint32_cmp);
+                qsort(xs+i*nx,sizeof(unsigned int),nx,(sortfunc_t)uint32_cmp);
                 int collision=0;
                 for(unsigned int j = 1 ; j < nx ; j++) {
                     if (xs[i*nx+j] == xs[i*nx+j-1]) {
@@ -63,7 +65,7 @@ void load_x(uint32_t * xs, unsigned int m, unsigned int nx,
         FILE * f = fopen("X.twisted", "r");
         FATAL_ERROR_CHECK(f == NULL, "Cannot open file X for reading");
         unsigned int nx_file;
-        fscanf(f, "%u", &nx_file);
+        int rc = fscanf(f, "%u", &nx_file);
         if (nx == 0) {
             nx = nx_file;       // nx means auto-detect.
         }

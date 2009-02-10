@@ -8,8 +8,6 @@ use POSIX qw/getcwd/;
 
 # MPI=/opt/mpich2-1.1a2-1.fc10.x86_64/usr/bin ./bwc.pl :complete mat=c72 interval=256 splits=64 mn=64 ys=0..64 mpi=4x4
 
-# TODO: HYDRA_HOST_FILE
-
 # $program denotes either a simple command, or something prepended by ':'
 # which indicates something having a special meaning for the script.
 my $main = shift @ARGV;
@@ -68,6 +66,15 @@ if (!defined($wdir) && defined($matrix_dir)) {
         die "No directory $wdir found";
     }
     push @main_args, "wdir=$wdir", "matrix=mat";
+}
+
+my $env_strings = "";
+
+sub my_setenv
+{
+    return if (exists($ENV{$_[0]}) && $ENV{$_[0]} eq $_[1]);
+    $env_strings .= "$_[0]=$_[1] ";
+    $ENV{$_[0]}=$_[1];
 }
 
 
@@ -136,22 +143,23 @@ sub drive {
         unshift @_, $program;
         # Need hosts.
         if (defined($hostfile)) {
-            $ENV{'HYDRA_HOST_FILE'}=$hostfile;
+            my_setenv 'HYDRA_HOST_FILE', $hostfile;
         } elsif (scalar @hosts) {
             open F, ">$wdir/HOSTS";
             for my $h (@hosts) { print F "$h\n"; }
             close F;
-            $ENV{'HYDRA_HOST_FILE'}="$wdir/HOSTS";
+            my_setenv 'HYDRA_HOST_FILE', "$wdir/HOSTS";
         } else {
-            $ENV{'HYDRA_USE_LOCALHOST'}=1;
+            my_setenv 'HYDRA_USE_LOCALHOST', 1;
         }
         unshift @_, '-n', $mpi_split[0] * $mpi_split[1];
         $program=$mpiexec;
     }
 
-    print STDERR "Running $program ", join(' ', @_), "\n";
+    print STDERR "Running $env_strings$program ", join(' ', @_), "\n";
     system $program, @_;
 }
+
 
 &drive($main, @main_args);
 

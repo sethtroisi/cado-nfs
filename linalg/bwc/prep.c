@@ -27,6 +27,8 @@
 
 abobj_t abase;
 
+struct bw_params bw[1];
+
 void * prep_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
 {
     // Doing the ``hello world'' test is a very good way of testing the
@@ -35,25 +37,25 @@ void * prep_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
     hello(pi);
 
     // avoid cluttering output too much.
-    int tcan_print = can_print && pi->m->trank == 0;
+    int tcan_print = bw->can_print && pi->m->trank == 0;
 
     unsigned int my_nx = 1;
 
     matmul_top_data mmt;
 
     int flags[2];
-    flags[dir] = THREAD_SHARED_VECTOR;
-    flags[!dir] = 0;
+    flags[bw->dir] = THREAD_SHARED_VECTOR;
+    flags[!bw->dir] = 0;
 
-    matmul_top_init(mmt, abase, pi, flags, matrix_filename);
+    matmul_top_init(mmt, abase, pi, flags, bw->matrix_filename);
 
-    uint32_t * xvecs = malloc(my_nx * m * sizeof(uint32_t));
+    uint32_t * xvecs = malloc(my_nx * bw->m * sizeof(uint32_t));
 
     mmt_vec xymats;
     size_t stride =  abbytes(abase, 1);
 
     /* We're cheating on the generic init routines */
-    vec_init_generic(pi->m, stride, (mmt_generic_vec_ptr) xymats, 0, m*NBITER);
+    vec_init_generic(pi->m, stride, (mmt_generic_vec_ptr) xymats, 0, bw->m*NBITER);
 
     for (unsigned ntri = 0;; ntri++) {
         serialize_threads(pi->m);
@@ -66,46 +68,46 @@ void * prep_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
             if (tcan_print) {
                 printf("// Getting bored. Trying %u x vectors\n", my_nx);
             }
-            xvecs = realloc(xvecs, my_nx * m * sizeof(uint32_t));
+            xvecs = realloc(xvecs, my_nx * bw->m * sizeof(uint32_t));
             ASSERT_ALWAYS(xvecs != NULL);
         }
 
         // if we're looking for the right nullspace, then x is on the left.
         // Otherwise, it's on the right.
-        setup_x_random(xvecs, m, my_nx, mmt->n[dir], pi);
+        setup_x_random(xvecs, bw->m, my_nx, mmt->n[bw->dir], pi);
 
         // Compute y.
-        matmul_top_fill_random_source(mmt, dir);
+        matmul_top_fill_random_source(mmt, bw->dir);
 
         // we need to save this starting vector for later use if it turns out
         // that we need to save it for real.
-        matmul_top_save_vector(mmt, "Y", dir, 0);
+        matmul_top_save_vector(mmt, "Y", bw->dir, 0);
 
-        // We must compute x^T M y, x^T M^2 y, and so on.
+        // We must compute x^T bw->M y, x^T bw->M^2 y, and so on.
         
         // we have indices mmt->wr[1]->i0..i1 available.
-        abzero(abase, xymats->v, m * NBITER);
+        abzero(abase, xymats->v, bw->m * NBITER);
 
 
         for(unsigned int k = 0 ; k < NBITER ; k++) {
-            for(int j = 0 ; j < m ; j++) {
+            for(int j = 0 ; j < bw->m ; j++) {
                 abt * where = xymats->v + aboffset(abase, j * NBITER + k);
                 for(unsigned int t = 0 ; t < my_nx ; t++) {
                     uint32_t i = xvecs[j*my_nx+t];
-                    if (i < mmt->wr[dir]->i0 || i >= mmt->wr[dir]->i1)
+                    if (i < mmt->wr[bw->dir]->i0 || i >= mmt->wr[bw->dir]->i1)
                         continue;
-                    /* We want the data to match our interval on both
+                    /* We want the data to match our bw->interval on both
                      * directions, because otherwise we'll end up
                      * computing rubbish -- recall that no broadcast_down
                      * has occurred yet.
                      */
-                    if (i < mmt->wr[!dir]->i0 || i >= mmt->wr[!dir]->i1)
+                    if (i < mmt->wr[!bw->dir]->i0 || i >= mmt->wr[!bw->dir]->i1)
                         continue;
                     abadd(abase, where,
-                            mmt->wr[dir]->v->v + aboffset(abase, i - mmt->wr[dir]->i0));
+                            mmt->wr[bw->dir]->v->v + aboffset(abase, i - mmt->wr[bw->dir]->i0));
                 }
             }
-            matmul_top_mul(mmt, dir);
+            matmul_top_mul(mmt, bw->dir);
         }
 
         /* Make sure computation is over for everyone ! */
@@ -113,7 +115,7 @@ void * prep_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
 
         /* Now all threads and jobs must collectively reduce the zone
          * pointed to by xymats */
-        reduce_generic(abase, xymats, pi->m, m * NBITER);
+        reduce_generic(abase, xymats, pi->m, bw->m * NBITER);
 
         /* OK -- now everybody has the same data */
 
@@ -123,7 +125,7 @@ void * prep_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
         /* the kernel() call is not reentrant */
         if (pi->m->trank == 0) {
             dimk = kernel((mp_limb_t *) xymats->v, NULL,
-                    m, NBITER * abnbits(abase), 
+                    bw->m, NBITER * abnbits(abase), 
                 abbytes(abase,NBITER) / sizeof(mp_limb_t), 0);
             pdimk = &dimk;
         }
@@ -142,15 +144,15 @@ void * prep_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
     }
 
     if (pi->m->trank == 0) {
-        nx = my_nx;
+        bw->nx = my_nx;
     }
 
-    save_x(xvecs, m, my_nx, pi);
+    save_x(xvecs, bw->m, my_nx, pi);
 
     matmul_top_clear(mmt, abase);
 
     /* clean up xy mats stuff */
-    vec_clear_generic(pi->m, stride, (mmt_generic_vec_ptr) xymats, m*NBITER);
+    vec_clear_generic(pi->m, stride, (mmt_generic_vec_ptr) xymats, bw->m*NBITER);
 
     free(xvecs);
     return NULL;
@@ -160,27 +162,27 @@ void usage()
 {
     fprintf(stderr, "Usage: ./prep <options>\n");
     fprintf(stderr, bw_common_usage_string());
-    fprintf(stderr, "Relevant options here: wdir cfg m n mpi thr matrix\n");
+    fprintf(stderr, "Relevant options here: wdir cfg bw->m bw->n mpi thr matrix\n");
     exit(1);
 }
 
 int main(int argc, char * argv[])
 {
-    bw_common_init_mpi(argc, argv);
+    bw_common_init_mpi(bw, argc, argv);
 
-    if (seed) setup_seeding(seed);
+    if (bw->seed) setup_seeding(bw->seed);
 
     abobj_init(abase);
-    abobj_set_nbys(abase, n);
+    abobj_set_nbys(abase, bw->n);
 
-    pi_go(prep_prog, mpi_split[0], mpi_split[1], thr_split[0], thr_split[1], 0);
+    pi_go(prep_prog, bw->mpi_split[0], bw->mpi_split[1], bw->thr_split[0], bw->thr_split[1], 0);
 
     // we save the parameter list once again, because the prep program
-    // generates some useful info, nx in particular.
-    param_list_save_parameter(pl, PARAMETER_FROM_FILE, "nx", "%u", nx);
-    param_list_save(pl, "bw.cfg");
+    // generates some useful info, bw->nx in particular.
+    param_list_save_parameter(bw->pl, PARAMETER_FROM_FILE, "bw->nx", "%u", bw->nx);
+    param_list_save(bw->pl, "bw.cfg");
 
-    bw_common_clear();
+    bw_common_clear(bw);
     return 0;
 }
 

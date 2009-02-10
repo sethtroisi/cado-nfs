@@ -1,4 +1,5 @@
 #define _POSIX_C_SOURCE 200112L
+#define _GNU_SOURCE
 
 #include <stdio.h>
 #include <stdarg.h>
@@ -11,9 +12,9 @@ void debug_write(abobj_ptr abase, const abt * v,
     va_list ap;
 
     va_start(ap, fmt);
-    vasprintf(&tmp, fmt, ap);
+    int rc = vasprintf(&tmp, fmt, ap);
     FILE * f = fopen(tmp, "w");
-    fwrite(v, sizeof(abt), aboffset(abase, n), f);
+    rc = fwrite(v, sizeof(abt), aboffset(abase, n), f);
     fclose(f);
     va_end(ap);
 }

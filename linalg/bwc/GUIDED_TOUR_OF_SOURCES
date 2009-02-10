@@ -1,6 +1,9 @@
-The tools present in this subdirectory form an implementation of the
+
+The tools present in this subdirectory form an implementation (*) of the
 Block-Wiedemann algorithm with the following features:
-- parallelism at a multithread / MPI level. No multi-site level (yet).
+
+- parallelism at a multithread / MPI level. No fully integrated
+  multi-site level yet, but bare bones are there.
 - checkpointing / restarting in case of problem.
 - checksums during the computation to detect problems.
 
@@ -18,13 +21,16 @@ Calling sequence of binaries
    satisfied
 3- secure
    precompute some data useful for checksums
-4- krylov
+4- split
+   split the main input vector Y into several blocks for independent
+   processing at different sites.
+5- krylov
    compute the Krylov sequence
-5- lingen
+6- lingen
    Berlekamp-Massey -like step: produces a generating polynomial
-6- mksol
+7- mksol
    create the solutions from the polynomial
-7- gather / apply_perm
+8- gather / apply_perm
    reconstruct solutions from the mess
 
 
@@ -42,24 +48,48 @@ balance will create a bunch of files in bw/ :
   mat.hi.vj                    contains the (i,j) block of the matrix
   mat.info                     some statistics on slices (incl. weight)
 
-prep reads the output from balance, and create the following:
+The identity verified by the twisted matrix is:
+Sr^-1 * Mt * Sc eq M;
+where Sc is the permutation sending 0 to the first 32-bit integer found
+in col_perm, etc.
+
+
+prep reads the output from balance, and creates the following:
   mat.hi.vj-sliced.bin         contains the (i,j) block of the matrix in
                                a compact, precomputed form.
      [ Rem: these files can be created using the "build" utility ]
   bw.cfg                       recalls the command-line parameters
-  V0.0.twisted                 
-  V0.xx.twisted                vectors used for checksums
+                               (reread by all program)
   X.twisted                    X vector used for Krylov.
-  Y.twisted                    Y vector used for Krylov.
+  Y.0.twisted                  Y vector used for Krylov.
 
-The .twisted suffix means that the vectors have been permuted according
-to mat.col_perm or mat.row_perm. Use apply_perm to untwist them.
+secure reads the output from prep, and creates:
+  C.<n>.twisted                check vector = trsp(M)^n * X, used for
+                               checkpointing every <n> iterations
+
+split reads only Y.0.twisted and its command line arguments n0 n1 n2 etc
+to create:
+  V<n1>-<n2>.0.twisted         columns <n1>..<n2> (n2 exclusive) of the
+                               n-column vector Y. Input for krylov.
 
 krylov uses all this data and produces the linear sequence (a_ij), as a
 set of files
-  A-xx-00   (???)
-Some checkpoint data will also be produced:
-  ?????
+  A<n1>-<n2>.<j1>-<j2>         krylov sequence data. j2-j1 consecutive
+                               blocks of m by (n2-n1) bit matrices,
+                               stored in binary format, row major.
+  V<n1>-<n2>.<j>.twisted       columns <n1>..<n2> of M^j Y. Created by
+                               krylov. Can be used to resume computations
+                               past iteration j.
+                               (created by krylov).
+(j2-j1 is always equal to n as in C.n.twisted, and j is always a multiple
+of n).
+
+When V<n1>-<n2>.<j2>.twisted is computed, krylov verifies that it is in
+accordance with the input vector V<n1>-<n2>.<j1>.twisted. The file
+A<n1>-<n2>.<j1>-<j2> is written only if this test succeeds.
+
+The .twisted suffix means that the vectors have been permuted according
+to mat.col_perm or mat.row_perm. Use apply_perm to untwist them.
 
 lingen, mksol, gather/applyperm
 
@@ -147,6 +177,11 @@ different implementations it encapsulates: matmul-sliced.[ch] and
 matmul-basic.[ch] for the moment. Given the amount of time spent in these
 routines waiting for data transiting through the FSB, some
 matmul-bucketsort-cachecompliant-asm-prefetch.[ch] could be worthwhile.
+
+[ Note that this single task can be benched separately of the bw
+  infrastructure by the standalone bench program. Be aware though that
+  some of the difficuly performance-wise arises when all cpu cores are
+  trying to interact with memory simultaneously. ]
 
 On top of this very basic mono-threaded matrix x vector product, the
 matmul_top.[ch] mechanism handles the parallelizing: each node / thread

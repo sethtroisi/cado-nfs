@@ -46,7 +46,18 @@
  * Mpich2 1.1a2 works, apparently. And it even seems to end up being
  * noticeably faster for my toy examples (= latency-wise).
  */
+
+#if defined(MPICH2) && MPICH2_NUMVERSION >= 10100002
 #define MPI_LIBRARY_MT_CAPABLE
+/*
+ * at present I know of no version of openmpi with MPI_THREAD_MULTIPLE
+ * working.
+#elif defined(OPEN_MPI) && OMPI_MAJOR_VERSION >= 123456789
+#define MPI_LIBRARY_MT_CAPABLE
+ */
+#else
+/* Assume it does not work */
+#endif
 
 
 /* utility structure. It is stored in thread-shared memory */

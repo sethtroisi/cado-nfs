@@ -11,7 +11,7 @@
 // int int_caught = 0;
 int hup_caught = 0;
 
-void timing_init(struct timing_data * t, int iter)
+void timing_partial_init(struct timing_data * t, int iter)
 {
     t->go_mark = iter;
     t->last_print = iter;
@@ -25,27 +25,40 @@ void timing_init(struct timing_data * t, int iter)
     memcpy(t->go, t->current, sizeof(*t->go));
 }
 
+void timing_init(struct timing_data * t, int iter)
+{
+    timing_partial_init(t, iter);
+    memcpy(t->beginning, t->go, sizeof(*t->go));
+    t->begin_mark = iter;
+}
+
+void timing_update_ticks(struct timing_data * t, int iter MAYBE_UNUSED)
+{
+    t->current->job = seconds();
+    t->current->thread = thread_seconds();
+    t->current->wct = walltime_seconds();
+}
+
 void timing_clear(struct timing_data * t MAYBE_UNUSED)
 {
 }
 
-void timing_rare_checks(pi_wiring_ptr wr, struct timing_data * t, int iter)
+void timing_rare_checks(pi_wiring_ptr wr, struct timing_data * t, int iter, int print)
 {
-    int tcan_print = can_print && wr->trank == 0;
-
     /* We've decided that it was time to check for asynchronous data.
      * Since it's an expensive operation, the whole point is to avoid
      * doing this check too often. */
-    t->current->job = seconds();
-    t->current->thread = thread_seconds();
-    t->current->wct = walltime_seconds();
+    timing_update_ticks(t, iter);
 
     /* First, re-evaluate the async checking period */
     double av = (t->current->thread - t->go->thread) / (iter - t->go_mark);
     double good_period = PREFERRED_ASYNC_LAG / av;
     int guess = 1 + (int) good_period;
     complete_broadcast(wr, &guess, sizeof(int), 0, 0);
-    if (iter == t->go_mark + 1 && tcan_print) {
+    /* negative stuff is most probably caused by overflows in a fast
+     * context */
+    if (guess <= 0) guess = 10;
+    if (iter == t->go_mark + 1 && print) {
         printf("Checking for asynchronous events every %d iterations\n", guess);
     }
     t->next_async_check += guess;
@@ -78,17 +91,17 @@ void timing_rare_checks(pi_wiring_ptr wr, struct timing_data * t, int iter)
     }
 
     /* We have something ! */
-    if (tcan_print) {
+    if (print) {
         printf("Signal caught (iteration %d), restarting timings\n", iter);
     }
     serialize(wr);
     hup_caught = 0;
     // int_caught = 0;
-    timing_init(t, iter);
+    timing_partial_init(t, iter);
 }
 
 
-void timing_check(parallelizing_info pi, struct timing_data * timing, int iter)
+void timing_check(parallelizing_info pi, struct timing_data * timing, int iter, int print)
 {
     pi_wiring_ptr wr = pi->m;
 
@@ -96,13 +109,11 @@ void timing_check(parallelizing_info pi, struct timing_data * timing, int iter)
 
     if (iter == timing->next_async_check) {
         // printf("timing_check async %d timing%d\n", iter, wr->trank);
-        timing_rare_checks(wr, timing, iter);
+        timing_rare_checks(wr, timing, iter, print);
     }
 
     if (iter < timing->next_print)
         return;
-
-    int tcan_print = can_print && wr->trank == 0;
 
     const int period[] = {1,5,20,100,1000,10000,100000,1000000,0};
     int i;
@@ -114,21 +125,46 @@ void timing_check(parallelizing_info pi, struct timing_data * timing, int iter)
     ASSERT(iter % period[i] == 0);
     timing->next_print = iter + period[i];
 
-    timing->current->job = seconds();
-    timing->current->thread = thread_seconds();
-    timing->current->wct = walltime_seconds();
+    timing_update_ticks(timing, iter);
 
-    char buf[10];
+    char buf[20];
     double dt = timing->current->thread - timing->go->thread;
     double av = dt / (iter - timing->go_mark);
     double pcpu = 100.0 * dt / (timing->current->wct - timing->go->wct);
-    snprintf(buf, sizeof(buf), "%.2f %2d%%", av, (int) pcpu);
+    snprintf(buf, sizeof(buf), "%.2f %.2f %2d%%", dt, av, (int) pcpu);
 
-    if (tcan_print)
+    if (print)
         printf("iteration %d\n", iter);
 
-    grid_print(pi, buf, sizeof(buf), tcan_print);
+    grid_print(pi, buf, sizeof(buf), print);
 }
+
+void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * timing, int iter, int print)
+{
+    timing_update_ticks(timing, iter);
+    double oncpu = timing->current->job - timing->beginning->job;
+    double wct = timing->current->wct - timing->beginning->wct;
+    double dt = timing->current->job-timing->go->job;
+    // dt must be collected.
+    MPI_Allreduce(MPI_IN_PLACE, &oncpu, 1, MPI_DOUBLE, MPI_SUM, pi->m->pals);
+    MPI_Allreduce(MPI_IN_PLACE, &dt, 1, MPI_DOUBLE, MPI_SUM, pi->m->pals);
+    double di = iter - timing->go_mark;
+    double av = dt / di;
+    double pcpu = 100.0 * dt / (double) (timing->current->wct - timing->go->wct);
+
+    char * what = "s";
+    if (av < 0.1) {
+        what = "ms";
+        av *= 1000.0;
+    }
+
+    if (print) {
+        printf("N=%d ; %.2f cpu, %.2f wct"
+                " %.2f %s/iter, %.2f%% cpu\n",
+                iter, oncpu, wct, av, what, pcpu);
+    }
+}
+
 
 void block_control_signals()
 {
