@@ -15,8 +15,8 @@ struct timing_data {
     int next_async_check;
     int async_check_period;
     struct {
-        double job;
-        double thread;
+        double job[2];
+        double thread[2];
         double wct;
     } go[1], current[1], beginning[1];
 };

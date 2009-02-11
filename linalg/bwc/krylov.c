@@ -114,7 +114,26 @@ void * krylov_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
     
     timing_init(timing, bw->start);
 
-    for(int s = bw->start ; ; s += bw->interval ) {
+    if (bw->end == 0) {
+        /* Decide on an automatic ending value */
+        unsigned int length;
+        length = MAX(mmt->n[0], mmt->n[1]);
+        length = iceildiv(length, bw->m) + iceildiv(length, bw->n);
+        length += 2 * iceildiv(bw->m, bw->n);
+        length += 2 * iceildiv(bw->n, bw->m);
+        length += 10;
+        /* Because bw is a global variable, we protect its use */
+        if (serialize_threads(pi->m)) {
+            bw->end = length;
+        }
+        serialize(pi->m);
+    }
+
+    if (tcan_print) {
+        fprintf(stderr, "Target iteration is %u\n", bw->end);
+    }
+
+    for(int s = bw->start ; s < bw->end ; s += bw->interval ) {
         // Plan ahead. The check vector is here to predict the final A matrix.
         // Note that our share of the dot product is determined by the
         // intersections of the i0..i1 intervals on both sides.
@@ -224,7 +243,7 @@ void usage()
 {
     fprintf(stderr, "Usage: ./krylov <options>\n");
     fprintf(stderr, bw_common_usage_string());
-    fprintf(stderr, "Relevant options here: wdir cfg bw->m bw->n mpi thr matrix bw->interval bw->start bw->ys\n");
+    fprintf(stderr, "Relevant options here: wdir cfg m n mpi thr matrix interval start ys\n");
     fprintf(stderr, "Note: data files must be found in wdir !\n");
     exit(1);
 }
@@ -233,8 +252,8 @@ int main(int argc, char * argv[])
 {
     bw_common_init_mpi(bw, argc, argv);
 
-    if (bw->nx == 0) { fprintf(stderr, "no bw->nx value set\n"); exit(1); } 
-    if (bw->ys[0] < 0) { fprintf(stderr, "no bw->ys value set\n"); exit(1); }
+    if (bw->nx == 0) { fprintf(stderr, "no nx value set\n"); exit(1); } 
+    if (bw->ys[0] < 0) { fprintf(stderr, "no ys value set\n"); exit(1); }
 
     abobj_init(abase);
     abobj_set_nbys(abase, bw->ys[1]-bw->ys[0]);

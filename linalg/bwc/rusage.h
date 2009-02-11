@@ -5,8 +5,8 @@
 extern "C" {
 #endif
 
-extern double seconds();
-extern double thread_seconds();
+extern void seconds(double *);
+extern void thread_seconds(double *);
 extern double walltime_seconds();
 
 #ifdef __cplusplus

@@ -162,7 +162,7 @@ void usage()
 {
     fprintf(stderr, "Usage: ./prep <options>\n");
     fprintf(stderr, bw_common_usage_string());
-    fprintf(stderr, "Relevant options here: wdir cfg bw->m bw->n mpi thr matrix\n");
+    fprintf(stderr, "Relevant options here: wdir cfg m n mpi thr matrix\n");
     exit(1);
 }
 
@@ -179,7 +179,7 @@ int main(int argc, char * argv[])
 
     // we save the parameter list once again, because the prep program
     // generates some useful info, bw->nx in particular.
-    param_list_save_parameter(bw->pl, PARAMETER_FROM_FILE, "bw->nx", "%u", bw->nx);
+    param_list_save_parameter(bw->pl, PARAMETER_FROM_FILE, "nx", "%u", bw->nx);
     param_list_save(bw->pl, "bw.cfg");
 
     bw_common_clear(bw);

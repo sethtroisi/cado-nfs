@@ -41,8 +41,9 @@ char matrix_filename[FILENAME_MAX];
 /* Whether the current job/thread may print to stdout */
 int can_print;
 
-/* This indicates the starting iteration */
+/* This indicates the starting iteration -- only for krylov and mksol */
 int start;
+int end;
 
 /* for a given krylov/mksol task, indicates the coordinate range in
  * [0..n[ that is relevant for us. ys[1]-ys[0] defines the ``local''

@@ -83,7 +83,7 @@ void usage()
 {
     fprintf(stderr, "Usage: ./secure <options>\n");
     fprintf(stderr, bw_common_usage_string());
-    fprintf(stderr, "Relevant options here: wdir cfg bw->m bw->n mpi thr matrix bw->interval\n");
+    fprintf(stderr, "Relevant options here: wdir cfg m n mpi thr matrix interval\n");
     fprintf(stderr, "Note: data files must be found in wdir !\n");
     exit(1);
 }
@@ -92,7 +92,7 @@ int main(int argc, char * argv[])
 {
     bw_common_init_mpi(bw, argc, argv);
 
-    if (bw->nx == 0) { fprintf(stderr, "no bw->nx value set\n"); exit(1); } 
+    if (bw->nx == 0) { fprintf(stderr, "no nx value set\n"); exit(1); } 
 
     abobj_init(abase);
     abobj_set_nbys(abase, NCHECKS_CHECK_VECTOR);

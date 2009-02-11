@@ -11,12 +11,19 @@
 #include <sys/resource.h>
 #include <time.h>
 
-double seconds()
+#if defined(__linux)
+#include <linux/version.h>
+#if LINUX_VERSION_CODE >= 0x20611
+#define HAVE_GETRUSAGE_THREAD
+#endif
+#endif
+
+void seconds(double * res)
 {
     struct rusage ru[1];
     getrusage(RUSAGE_SELF, ru);
-    double r = ru->ru_utime.tv_sec +  (double) ru->ru_utime.tv_usec / 1.0e6;
-    return r;
+    res[0] = ru->ru_utime.tv_sec +  (double) ru->ru_utime.tv_usec / 1.0e6;
+    res[1] = ru->ru_stime.tv_sec +  (double) ru->ru_stime.tv_usec / 1.0e6;
 }
 
 double walltime_seconds()
@@ -36,12 +43,12 @@ double walltime_seconds()
 
 /* Only on linux >= 2.6.26, and IRIX, solaris. */
 #if defined(HAVE_GETRUSAGE_THREAD)
-double thread_seconds()
+void thread_seconds(double * res)
 {
     struct rusage ru[1];
     getrusage(RUSAGE_THREAD, ru);
-    double r = ru->ru_utime.tv_sec +  (double) ru->ru_utime.tv_usec / 1.0e6;
-    return r;
+    res[0] = ru->ru_utime.tv_sec +  (double) ru->ru_utime.tv_usec / 1.0e6;
+    res[1] = ru->ru_stime.tv_sec +  (double) ru->ru_stime.tv_usec / 1.0e6;
 }
 #elif defined(__linux)
 #include <sys/syscall.h>
@@ -91,15 +98,17 @@ static int statfields(pid_t t, ...)
     return nparsed;
 }
 
-double thread_seconds()
+void thread_seconds(double * res)
 {
     unsigned long utime = 0;
-    statfields(gettid(), 13, "%lu", &utime, -1);
-    return (double) utime / sysconf(_SC_CLK_TCK); }
+    unsigned long stime = 0;
+    statfields(gettid(), 13, "%lu", &utime, 14, "%lu", &stime, -1);
+    res[0] = (double) utime / sysconf(_SC_CLK_TCK); }
+    res[1] = (double) stime / sysconf(_SC_CLK_TCK); }
 #else   /* Otherwise we'll do something stupid */
-double thread_seconds()
+void thread_seconds(double * res)
 {
-    return seconds(); /* really stupid */
+    seconds(res); /* really stupid */
 }
 #endif
 

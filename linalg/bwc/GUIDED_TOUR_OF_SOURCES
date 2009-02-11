@@ -38,7 +38,7 @@ Calling sequence of binaries
 
 krylov, lingen, mksol are the steps having a real computational impact.
 prep is cheap but important for ensuring the success of the algorithm.
-split,acollect,gather,apply_perm are juste trivial bookkeeping.
+split,acollect,gather,apply_perm are just trivial bookkeeping.
 balance is I/O intensive.
 secure is akin to doing a few krylov iterations. It runs for roughly just
 as long as the desired time between two recoverable checkpoints (the

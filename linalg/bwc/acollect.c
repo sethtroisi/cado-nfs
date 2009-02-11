@@ -10,7 +10,7 @@
 #include <limits.h>
 #include <dirent.h>
 #include "macros.h"
-
+#include "manu.h"
 #include "utils.h"
 
 /* This program is rather standalone. It checks the current directory
@@ -181,17 +181,16 @@ int main(int argc, char * argv[])
         int k;
         for(k = k0 ; k < k1 ; k++) {
             char * tmp;
-            asprintf(&tmp, "A%u-%u.%u-%u",
+            int rc = asprintf(&tmp, "A%u-%u.%u-%u",
                     afiles[k]->n0,afiles[k]->n1,afiles[k]->j0,afiles[k]->j1);
             rs[k - k0] = fopen(tmp, "r");
             free(tmp);
             if (rs[k-k0] == NULL) {
                 fprintf(stderr, "fopen: %s\n", strerror(errno));
                 rc = 2;
-                break;
+                goto bailout;
             }
         }
-        if (k != k1) break;
 
         char * buf = malloc((n1-n0)/CHAR_BIT);
 
@@ -200,12 +199,27 @@ int main(int argc, char * argv[])
         for(unsigned int j = j0 ; j < j1 ; j++) {
             for(unsigned int i = 0 ; i < m ; i++) {
                 char * ptr = buf;
+                size_t rz;
+                size_t sz;
                 for(int k = k0 ; k < k1 ; k++) {
-                    size_t sz = (afiles[k]->n1 - afiles[k]->n0) / CHAR_BIT;
-                    fread(ptr, 1, sz, rs[k-k0]);
+                    sz = (afiles[k]->n1 - afiles[k]->n0) / CHAR_BIT;
+                    rz = fread(ptr, 1, sz, rs[k-k0]);
+                    if (rz < sz) {
+                        fprintf(stderr, "fread: short read\n");
+                        rc = 2;
+                        fflush(f);
+                        goto bailout;
+                    }
                     ptr += sz;
                 }
-                fwrite(buf, 1, (n1-n0)/CHAR_BIT, f);
+                sz = (n1-n0)/CHAR_BIT;
+                rz = fwrite(buf, 1, sz, f);
+                if (rz != sz) {
+                    fprintf(stderr, "fwrite: short write\n");
+                    rc = 2;
+                    fflush(f);
+                    goto bailout;
+                }
             }
             final->j1++;
         }
@@ -228,8 +242,9 @@ int main(int argc, char * argv[])
             fclose(rs[k-k0]);
             if (!remove_old) continue;
             char * tmp;
-            asprintf(&tmp, "A%u-%u.%u-%u",
+            int rc = asprintf(&tmp, "A%u-%u.%u-%u",
                     afiles[k]->n0,afiles[k]->n1,afiles[k]->j0,afiles[k]->j1);
+            BUG_ON(rc < 0);     // shut up, dammit.
             if (unlink(tmp) < 0) {
                 fprintf(stderr, "unlink: %s\n", strerror(errno));
             }
@@ -239,12 +254,13 @@ int main(int argc, char * argv[])
 
         k0 = k1;
     }
-
+bailout:
     fclose(f);
     if (final->j0 != UINT_MAX) {
         char * tmp;
-        asprintf(&tmp, "A%u-%u.%u-%u", final->n0,final->n1,final->j0,final->j1);
-        int r = rename("A.temp", tmp);
+        int r;
+        r = asprintf(&tmp, "A%u-%u.%u-%u", final->n0,final->n1,final->j0,final->j1);
+        r = rename("A.temp", tmp);
         if (r < 0) {
             fprintf(stderr, "rename: %s\n", strerror(errno));
         }

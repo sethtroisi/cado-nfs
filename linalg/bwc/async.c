@@ -11,6 +11,13 @@
 // int int_caught = 0;
 int hup_caught = 0;
 
+void timing_update_ticks(struct timing_data * t, int iter MAYBE_UNUSED)
+{
+    seconds(t->current->job);
+    thread_seconds(t->current->thread);
+    t->current->wct = walltime_seconds();
+}
+
 void timing_partial_init(struct timing_data * t, int iter)
 {
     t->go_mark = iter;
@@ -19,9 +26,7 @@ void timing_partial_init(struct timing_data * t, int iter)
     t->next_async_check = iter + 1;
     t->async_check_period = 1;
 
-    t->current->job = seconds();
-    t->current->thread = thread_seconds();
-    t->current->wct = walltime_seconds();
+    timing_update_ticks(t, iter);
     memcpy(t->go, t->current, sizeof(*t->go));
 }
 
@@ -30,13 +35,6 @@ void timing_init(struct timing_data * t, int iter)
     timing_partial_init(t, iter);
     memcpy(t->beginning, t->go, sizeof(*t->go));
     t->begin_mark = iter;
-}
-
-void timing_update_ticks(struct timing_data * t, int iter MAYBE_UNUSED)
-{
-    t->current->job = seconds();
-    t->current->thread = thread_seconds();
-    t->current->wct = walltime_seconds();
 }
 
 void timing_clear(struct timing_data * t MAYBE_UNUSED)
@@ -51,8 +49,12 @@ void timing_rare_checks(pi_wiring_ptr wr, struct timing_data * t, int iter, int 
     timing_update_ticks(t, iter);
 
     /* First, re-evaluate the async checking period */
-    double av = (t->current->thread - t->go->thread) / (iter - t->go_mark);
-    double good_period = PREFERRED_ASYNC_LAG / av;
+    double av[2];
+
+    av[0] = (t->current->thread[0] - t->go->thread[0])/(iter - t->go_mark);
+    av[1] = (t->current->thread[1] - t->go->thread[1])/(iter - t->go_mark);
+
+    double good_period = PREFERRED_ASYNC_LAG / av[0];
     int guess = 1 + (int) good_period;
     complete_broadcast(wr, &guess, sizeof(int), 0, 0);
     /* negative stuff is most probably caused by overflows in a fast
@@ -128,10 +130,22 @@ void timing_check(parallelizing_info pi, struct timing_data * timing, int iter, 
     timing_update_ticks(timing, iter);
 
     char buf[20];
-    double dt = timing->current->thread - timing->go->thread;
-    double av = dt / (iter - timing->go_mark);
-    double pcpu = 100.0 * dt / (timing->current->wct - timing->go->wct);
-    snprintf(buf, sizeof(buf), "%.2f %.2f %2d%%", dt, av, (int) pcpu);
+
+    double dt[2];
+    double av[2];
+    double pcpu[2];
+
+    dt[0] = timing->current->thread[0] - timing->go->thread[0];
+    dt[1] = timing->current->thread[1] - timing->go->thread[1];
+
+    av[0] = dt[0] / (iter - timing->go_mark);
+    av[1] = dt[1] / (iter - timing->go_mark);
+
+    pcpu[0] = 100.0 * dt[0] / (timing->current->wct - timing->go->wct);
+    pcpu[1] = 100.0 * dt[1] / (timing->current->wct - timing->go->wct);
+
+    snprintf(buf, sizeof(buf), "%.2f %.2f %2d%%+%2d%%",
+            dt[0], av[0], (int) pcpu[0], (int) pcpu[1]);
 
     if (print)
         printf("iteration %d\n", iter);
@@ -141,27 +155,41 @@ void timing_check(parallelizing_info pi, struct timing_data * timing, int iter, 
 
 void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * timing, int iter, int print)
 {
-    timing_update_ticks(timing, iter);
-    double oncpu = timing->current->job - timing->beginning->job;
-    double wct = timing->current->wct - timing->beginning->wct;
-    double dt = timing->current->job-timing->go->job;
-    // dt must be collected.
-    MPI_Allreduce(MPI_IN_PLACE, &oncpu, 1, MPI_DOUBLE, MPI_SUM, pi->m->pals);
-    MPI_Allreduce(MPI_IN_PLACE, &dt, 1, MPI_DOUBLE, MPI_SUM, pi->m->pals);
-    double di = iter - timing->go_mark;
-    double av = dt / di;
-    double pcpu = 100.0 * dt / (double) (timing->current->wct - timing->go->wct);
+    double oncpu[2];
+    double dt[2];
+    double av[2];
+    double pcpu[2];
 
+    timing_update_ticks(timing, iter);
+
+    oncpu[0] = timing->current->job[0] - timing->beginning->job[0];
+    oncpu[1] = timing->current->job[1] - timing->beginning->job[1];
+
+    double wct = timing->current->wct - timing->beginning->wct;
+
+    dt[0] = timing->current->job[0]-timing->go->job[0];
+    dt[1] = timing->current->job[1]-timing->go->job[1];
+    // dt must be collected.
+    MPI_Allreduce(MPI_IN_PLACE, oncpu, 2, MPI_DOUBLE, MPI_SUM, pi->m->pals);
+    MPI_Allreduce(MPI_IN_PLACE, dt, 2, MPI_DOUBLE, MPI_SUM, pi->m->pals);
+    double di = iter - timing->go_mark;
+
+    av[0] = dt[0] / di;
+    av[1] = dt[1] / di;
+    pcpu[0] = 100.0 * dt[0] / (double) (timing->current->wct - timing->go->wct);
+    pcpu[1] = 100.0 * dt[1] / (double) (timing->current->wct - timing->go->wct);
+
+    double avsum = av[0] + av[1];
     char * what = "s";
-    if (av < 0.1) {
+    if (avsum < 0.1) {
         what = "ms";
-        av *= 1000.0;
+        avsum *= 1000.0;
     }
 
     if (print) {
-        printf("N=%d ; %.2f cpu, %.2f wct"
-                " %.2f %s/iter, %.2f%% cpu\n",
-                iter, oncpu, wct, av, what, pcpu);
+        printf("N=%d ; %.2f cpu, %.2f sys, %.2f wct"
+                " %.2f %s/iter, %.2f%% cpu + %.2f%% sys\n",
+                iter, oncpu[0], oncpu[1], wct, avsum, what, pcpu[0], pcpu[1]);
     }
 }
 

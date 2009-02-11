@@ -547,7 +547,7 @@ int serialize_threads__(pi_wiring_ptr w, const char * s MAYBE_UNUSED, unsigned i
     // gettimeofday(tv, NULL);
     // printf("%.2f\n", tv->tv_sec + (double) tv->tv_usec / 1.0e6);
     // sleep(1);
-    return w->jrank == 0 && w->trank == 0;
+    return w->trank == 0;
 }
 
 // XXX Many serializing calls in the two routines below have no

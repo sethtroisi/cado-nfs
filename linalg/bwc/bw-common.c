@@ -84,6 +84,7 @@ int bw_common_init_shared(struct bw_params * bw, int argc, char * argv[])
     param_list_parse_uint(bw->pl, "nx", &bw->nx);
     param_list_parse_int_and_int(bw->pl, "ys", bw->ys, "..");
     param_list_parse_int(bw->pl, "start", &bw->start);
+    param_list_parse_int(bw->pl, "end", &bw->end);
 
     mpz_init_set_ui(bw->p, 2);
     param_list_parse_mpz(bw->pl, "p", bw->p);
