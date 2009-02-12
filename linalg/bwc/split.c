@@ -9,9 +9,11 @@
 #include <unistd.h>
 #include <limits.h>
 #include "macros.h"
+#include "filenames.h"
 
-const char * ifile = "Y.0.twisted";
-const char * ofile_fmt = "V%d-%d.0.twisted";
+char * ifile;
+char * ofile_fmt;
+
 
 int main(int argc, char * argv[])
 {
@@ -61,6 +63,14 @@ int main(int argc, char * argv[])
         stops[i] = stops[i-1] + len / CHAR_BIT;
     }
 
+    int rc;
+
+    /* prepare the file names */
+    rc = asprintf(&ifile, COMMON_VECTOR_ITERATE_PATTERN,
+            Y_FILE_BASE, 0);
+    rc = asprintf(&ofile_fmt, COMMON_VECTOR_ITERATE_PATTERN,
+            V_FILE_BASE_PATTERN, 0);
+
     struct stat sbuf[1];
     stat(ifile, sbuf);
 
@@ -69,8 +79,6 @@ int main(int argc, char * argv[])
                 "Size of %s (%ld bytes) is not a multiple of %d bytes\n",
                 ifile, (long) sbuf->st_size, stops[nstops]);
     }
-
-    int rc;
 
     FILE * f = fopen(ifile, "r");
     if (f == NULL) {

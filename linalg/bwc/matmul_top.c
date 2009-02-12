@@ -22,6 +22,7 @@
 #include "intersections.h"
 #include "info_file.h"
 #include "debug.h"
+#include "filenames.h"
 
 #ifndef CONJUGATED_PERMUTATIONS
 #error "Do you really, really want to use arbitrary left and right sigmas ?"
@@ -301,7 +302,7 @@ static void save_vector_toprow_generic(matmul_top_data_ptr mmt, size_t stride, m
         if (pirow->trank == 0) {
             char * filename;
             int rc;
-            rc = asprintf(&filename, "%s.%u.twisted", name, iter);
+            rc = asprintf(&filename, COMMON_VECTOR_ITERATE_PATTERN, name, iter);
             FATAL_ERROR_CHECK(rc < 0, "out of memory");
             fd = open(filename, O_RDWR|O_CREAT, 0666);
             if (fd < 0) {
@@ -422,7 +423,7 @@ static void load_vector_toprow_generic(matmul_top_data_ptr mmt, size_t stride, m
     if (pirow->jrank == 0) {
         if (pirow->trank == 0) {
             char * filename;
-            int rc = asprintf(&filename, "%s.%u.twisted", name, iter);
+            int rc = asprintf(&filename, COMMON_VECTOR_ITERATE_PATTERN, name, iter);
             FATAL_ERROR_CHECK(rc < 0, "out of memory");
             fd = open(filename, O_RDONLY, 0666);
             DIE_ERRNO_DIAG(fd < 0, "fopen", filename);

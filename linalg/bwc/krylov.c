@@ -15,6 +15,7 @@
 #include "bw-common.h"
 #include "async.h"
 // #include "rusage.h"
+#include "filenames.h"
 
 abobj_t abase;
 struct bw_params bw[1];
@@ -79,7 +80,7 @@ void * krylov_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
     load_x(gxvecs, bw->m, bw->nx, pi);
 
     char * v_name;
-    int rc = asprintf(&v_name, "V%u-%u", bw->ys[0], bw->ys[1]);
+    int rc = asprintf(&v_name, V_FILE_BASE_PATTERN, bw->ys[0], bw->ys[1]);
 
     if (tcan_print) { printf("Loading %s...", v_name); fflush(stdout); }
     matmul_top_load_vector(mmt, v_name, bw->dir, bw->start);
@@ -96,7 +97,7 @@ void * krylov_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
             check_vector, !bw->dir, THREAD_SHARED_VECTOR);
     if (tcan_print) { printf("Loading check vector..."); fflush(stdout); }
     matmul_top_load_vector_generic(mmt, vstride,
-            check_vector, "C", !bw->dir, bw->interval);
+            check_vector, CHECK_FILE_BASE, !bw->dir, bw->interval);
     if (tcan_print) { printf("done\n"); }
 
     mmt_vec ahead;
@@ -199,7 +200,7 @@ void * krylov_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
 
         if (pi->m->trank == 0 && pi->m->jrank == 0) {
             char * tmp;
-            rc = asprintf(&tmp, "A%u-%u.%u-%u", bw->ys[0], bw->ys[1], s, s+bw->interval);
+            rc = asprintf(&tmp, A_FILE_PATTERN, bw->ys[0], bw->ys[1], s, s+bw->interval);
             FILE * f = fopen(tmp, "w");
             rc = fwrite(xymats->v, stride, aboffset(abase, bw->m*bw->interval), f);
             if (rc != aboffset(abase, bw->m*bw->interval)) {

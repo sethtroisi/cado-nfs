@@ -114,6 +114,7 @@ void grid_print(parallelizing_info_ptr pi, char * buf, size_t siz, int print)
     /* instead of doing memcpy, we align the stuff. */
     char * fmt;
     int rc = asprintf(&fmt, "%%-%zus", siz-1);
+    BUG_ON(rc < 0);
     snprintf(strings + me * siz, siz, fmt, buf);
     free(fmt);
 

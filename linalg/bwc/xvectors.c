@@ -7,6 +7,7 @@
 #include <inttypes.h>
 #include "xvectors.h"
 #include "utils.h"
+#include "filenames.h"
 
 typedef int (*sortfunc_t) (const void *, const void *);
 
@@ -62,17 +63,18 @@ void load_x(uint32_t * xs, unsigned int m, unsigned int nx,
 {
     /* pretty much the same deal as above */
     if (pi->m->trank == 0 && pi->m->jrank == 0) {
-        FILE * f = fopen("X.twisted", "r");
-        FATAL_ERROR_CHECK(f == NULL, "Cannot open file X for reading");
+        FILE * f = fopen(X_TWISTED_FILE, "r");
+        FATAL_ERROR_CHECK(f == NULL, "Cannot open "X_TWISTED_FILE" for reading");
         unsigned int nx_file;
         int rc = fscanf(f, "%u", &nx_file);
+        FATAL_ERROR_CHECK(rc != 1, "short read in file X");
         if (nx == 0) {
             nx = nx_file;       // nx means auto-detect.
         }
-        FATAL_ERROR_CHECK(nx != nx_file, "X.twisted has bad nx value");
+        FATAL_ERROR_CHECK(nx != nx_file, X_TWISTED_FILE " has bad nx value");
         for (unsigned int i = 0 ; i < nx * m; i++) {
-            int rc = fscanf(f, "%" SCNu32, &(xs[i]));
-            FATAL_ERROR_CHECK(rc != 1, "short read in file X");
+            rc = fscanf(f, "%" SCNu32, &(xs[i]));
+            FATAL_ERROR_CHECK(rc != 1, "short read in " X_TWISTED_FILE);
         }
         fclose(f);
     }
@@ -86,8 +88,8 @@ void save_x(uint32_t * xs, unsigned int m, unsigned int nx, parallelizing_info_p
      */
     if (pi->m->trank == 0 && pi->m->jrank == 0) {
         // write the X vector
-        FILE * fx = fopen("X.twisted","w");
-        FATAL_ERROR_CHECK(fx == NULL, "Cannot open file X for writing");
+        FILE * fx = fopen(X_TWISTED_FILE,"w");
+        FATAL_ERROR_CHECK(fx == NULL, "Cannot open "X_TWISTED_FILE" for writing");
         fprintf(fx,"%u\n",nx);
         for(unsigned int i = 0 ; i < m ; i++) {
             for(unsigned int k = 0 ; k < nx ; k++) {

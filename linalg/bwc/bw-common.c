@@ -8,6 +8,7 @@
 #include "bw-common.h"
 #include "select_mpi.h"
 #include "params.h"
+#include "filenames.h"
 
 const char * dirtext[] = { "left", "right" };
 
@@ -66,7 +67,7 @@ int bw_common_init_shared(struct bw_params * bw, int argc, char * argv[])
         param_list_read_file(bw->pl, cfg);
     } else {
         /* Otherwise we check first that the file exists */
-        cfg = "bw.cfg";
+        cfg = BW_CONFIG_FILE;
         if (access(cfg, R_OK) == 0) {
             param_list_read_file(bw->pl, cfg);
         }

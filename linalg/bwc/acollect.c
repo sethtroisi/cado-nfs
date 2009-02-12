@@ -12,6 +12,7 @@
 #include "macros.h"
 #include "manu.h"
 #include "utils.h"
+#include "filenames.h"
 
 /* This program is rather standalone. It checks the current directory
  * for files matching the pattern A%u-%u.%u-%u, and concatenates them.
@@ -181,7 +182,7 @@ int main(int argc, char * argv[])
         int k;
         for(k = k0 ; k < k1 ; k++) {
             char * tmp;
-            int rc = asprintf(&tmp, "A%u-%u.%u-%u",
+            int rc = asprintf(&tmp, A_FILE_PATTERN,
                     afiles[k]->n0,afiles[k]->n1,afiles[k]->j0,afiles[k]->j1);
             rs[k - k0] = fopen(tmp, "r");
             free(tmp);
@@ -242,7 +243,7 @@ int main(int argc, char * argv[])
             fclose(rs[k-k0]);
             if (!remove_old) continue;
             char * tmp;
-            int rc = asprintf(&tmp, "A%u-%u.%u-%u",
+            int rc = asprintf(&tmp, A_FILE_PATTERN,
                     afiles[k]->n0,afiles[k]->n1,afiles[k]->j0,afiles[k]->j1);
             BUG_ON(rc < 0);     // shut up, dammit.
             if (unlink(tmp) < 0) {
@@ -259,7 +260,7 @@ bailout:
     if (final->j0 != UINT_MAX) {
         char * tmp;
         int r;
-        r = asprintf(&tmp, "A%u-%u.%u-%u", final->n0,final->n1,final->j0,final->j1);
+        r = asprintf(&tmp, A_FILE_PATTERN, final->n0,final->n1,final->j0,final->j1);
         r = rename("A.temp", tmp);
         if (r < 0) {
             fprintf(stderr, "rename: %s\n", strerror(errno));

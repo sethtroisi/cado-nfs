@@ -12,6 +12,7 @@
 #include "params.h"
 #include "xvectors.h"
 #include "bw-common.h"
+#include "filenames.h"
 
 abobj_t abase;
 struct bw_params bw[1];
@@ -69,7 +70,7 @@ void * sec_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
     }
     serialize(pi->m);
 
-    matmul_top_save_vector(mmt, "C", !bw->dir, bw->interval);
+    matmul_top_save_vector(mmt, CHECK_FILE_BASE, !bw->dir, bw->interval);
 
     matmul_top_clear(mmt, abase);
 

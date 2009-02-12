@@ -17,6 +17,7 @@
 #include "xymats.h"
 
 #include "bw-common.h"
+#include "filenames.h"
 
 /* Number of copies of m by n matrices to use for trying to obtain a
  * full-rank matrix (rank m).
@@ -81,7 +82,7 @@ void * prep_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
 
         // we need to save this starting vector for later use if it turns out
         // that we need to save it for real.
-        matmul_top_save_vector(mmt, "Y", bw->dir, 0);
+        matmul_top_save_vector(mmt, Y_FILE_BASE, bw->dir, 0);
 
         // We must compute x^T bw->M y, x^T bw->M^2 y, and so on.
         
@@ -180,7 +181,7 @@ int main(int argc, char * argv[])
     // we save the parameter list once again, because the prep program
     // generates some useful info, bw->nx in particular.
     param_list_save_parameter(bw->pl, PARAMETER_FROM_FILE, "nx", "%u", bw->nx);
-    param_list_save(bw->pl, "bw.cfg");
+    param_list_save(bw->pl, BW_CONFIG_FILE);
 
     bw_common_clear(bw);
     return 0;

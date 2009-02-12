@@ -6,11 +6,12 @@
 #include <string.h>
 
 #include "info_file.h"
+#include "filenames.h"
 
 void read_info_file(matmul_top_data_ptr mmt, const char * filename)
 {
     char * infoname;
-    int rc = asprintf(&infoname, "%s.info", filename);
+    int rc = asprintf(&infoname, MATRIX_INFO_FILE_PATTERN, filename);
     FATAL_ERROR_CHECK(rc < 0, "out of memory");
 
     FILE * f = fopen(infoname, "r");
