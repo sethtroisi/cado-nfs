@@ -42,7 +42,7 @@ void setup_x_random(uint32_t * xs,
                  * it does not make a lot of sense to have duplicates,
                  * since that amounts to having nothing anyway...
                  */
-                qsort(xs+i*nx,sizeof(unsigned int),nx,(sortfunc_t)uint32_cmp);
+                qsort(xs+i*nx,nx,sizeof(unsigned int),(sortfunc_t)uint32_cmp);
                 int collision=0;
                 for(unsigned int j = 1 ; j < nx ; j++) {
                     if (xs[i*nx+j] == xs[i*nx+j-1]) {

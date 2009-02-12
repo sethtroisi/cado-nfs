@@ -13,7 +13,7 @@ int hup_caught = 0;
 
 void timing_update_ticks(struct timing_data * t, int iter MAYBE_UNUSED)
 {
-    seconds(t->current->job);
+    job_seconds(t->current->job);
     thread_seconds(t->current->thread);
     t->current->wct = walltime_seconds();
 }

@@ -131,7 +131,8 @@ void * krylov_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
     }
 
     if (tcan_print) {
-        fprintf(stderr, "Target iteration is %u\n", bw->end);
+        fprintf(stderr, "Target iteration is %u ; going to %u\n", bw->end,
+                bw->interval * iceildiv(bw->end, bw->interval));
     }
 
     for(int s = bw->start ; s < bw->end ; s += bw->interval ) {
@@ -222,7 +223,7 @@ void * krylov_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
     }
 
     if (tcan_print) {
-        printf("\n");
+        printf("Done.\n");
     }
     serialize(pi->m);
 

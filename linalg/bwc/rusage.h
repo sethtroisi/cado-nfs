@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-extern void seconds(double *);
+extern void job_seconds(double *);
 extern void thread_seconds(double *);
 extern double walltime_seconds();
 

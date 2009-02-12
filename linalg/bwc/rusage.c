@@ -18,7 +18,7 @@
 #endif
 #endif
 
-void seconds(double * res)
+void job_seconds(double * res)
 {
     struct rusage ru[1];
     getrusage(RUSAGE_SELF, ru);
@@ -108,7 +108,7 @@ void thread_seconds(double * res)
 #else   /* Otherwise we'll do something stupid */
 void thread_seconds(double * res)
 {
-    seconds(res); /* really stupid */
+    job_seconds(res); /* really stupid */
 }
 #endif
 
