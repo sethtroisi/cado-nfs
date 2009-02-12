@@ -3,12 +3,12 @@ include $(TOP)/Makefile.common
 
 # We require the cado utils library
 MY_CFLAGS+=-I$(TOP)/utils -I..
-MY_CFLAGS+=-I ../.. -I ../../utils
-MY_CFLAGS+=-I ../../gf2x -I ../../gf2x/cantor
-MY_CFLAGS+=-I $(TOPPATH)/include -I .
+MY_CFLAGS+=-I $(TOP) -I $(TOP)/utils
+MY_CFLAGS+=-I $(TOP)/gf2x -I $(TOP)/gf2x/cantor
+MY_CFLAGS+=-I.
 
 MY_LFLAGS+=-L$(TOP)/utils
-MY_LFLAGS+=-L ../../utils -L ../../gf2x -L ../../gf2x/cantor
+MY_LFLAGS+=-L $(TOP)/utils -L $(TOP)/gf2x -L $(TOP)/gf2x/cantor
 
 
 -include Makefile.local
@@ -104,17 +104,17 @@ bench_objs:=bench.o libmatmul.a
 prep_objs:=prep.o intersections.o 			\
 	matmul_top.o parallelizing_info.o info_file.o	\
 	xvectors.o xymats.o debug.o bw-common.o		\
-	rusage.o async.o				\
+	rusage.o async.o bw-common-mpi.o		\
 	libmatmul.a
 krylov_objs:=krylov.o intersections.o 			\
 	matmul_top.o parallelizing_info.o info_file.o	\
 	xvectors.o xymats.o debug.o bw-common.o		\
-	rusage.o async.o				\
+	rusage.o async.o bw-common-mpi.o		\
 	libmatmul.a
 secure_objs:=secure.o intersections.o 			\
 	matmul_top.o parallelizing_info.o info_file.o	\
 	xvectors.o debug.o bw-common.o			\
-	rusage.o async.o				\
+	rusage.o async.o bw-common-mpi.o		\
 	libmatmul.a
 build_normalobjs:=../readbuffer.o ../readmat.o
 bench_normalobjs:=../readbuffer.o ../readmat.o
@@ -125,7 +125,7 @@ secure_normalobjs:=../readbuffer.o ../readmat.o
 
 # This list contains the object files which do not depend on the abase
 # selection.
-constant_objects:=parallelizing_info.o intersections.o xvectors.o aligned_malloc.o bw-common.o rusage.o async.o
+constant_objects:=parallelizing_info.o intersections.o xvectors.o aligned_malloc.o bw-common.o bw-common-mpi.o rusage.o async.o
 
 # ALL object files must come here. Using $(wildcard *.c) is discouraged
 # for obvious reasons. This list is used for computing dependencies.

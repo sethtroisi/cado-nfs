@@ -18,6 +18,12 @@
 #define CHECK_FILE_BASE "C"
 #define COMMON_VECTOR_ITERATE_PATTERN "%s.%u" TWISTED_EXTENSION
 
+/* lingen */
+#define LINGEN_BOOTSTRAP_FILE   "F_INIT_QUICK"
+#define LINGEN_F_FILE   "F"
+#define LINGEN_F_OUTPUT_PATTERN   "F%u"
+#define LINGEN_PI_PATTERN       "pi-%u-%u"
+
 /* misc */
 #define BW_CONFIG_FILE "bw.cfg"
 #define MATRIX_INFO_FILE_PATTERN "%s.info"

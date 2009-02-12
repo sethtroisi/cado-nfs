@@ -1,3 +1,7 @@
+#ifndef __cplusplus
+#define _GNU_SOURCE
+#endif
+
 #include <sys/time.h>
 #include <sys/types.h>
 #include <dirent.h>
@@ -24,26 +28,37 @@
 #include <iomanip>
 #include <sstream>
 
+#include <sys/types.h>
+#include <sys/stat.h>
+
 #include "cado.h"
 #include "utils.h"
+#include "bw-common.h"
+#include "filenames.h"
 
-#define Lmacro(N, m, n) (iceildiv((N)+2*(n),(m))+iceildiv((N)+2*(n),(n))+10)
-
-unsigned int rec_threshold = 0;
-bool checkpoints = false;
-
-/* This disables cantor for the time being */
-unsigned int cantor_threshold = UINT_MAX;
+struct bw_params bw[1];
 
 #include "manu.h"
-#include "fmt.hpp"
 #include "fft_adapter.hpp"
 #include "lingen_mat_types.hpp"
-#include "files.hpp"
-#include "config_file.hpp"
-#include "matrix.hpp"
-#include "bitstring.hpp"
 #include "gf2x.h"
+
+/* {{{ macros used here only -- could be bumped to macros.h if there is
+ * need.
+ */
+#define NEVER_HAPPENS(tst, action) do {					\
+    if (UNLIKELY(tst)) {						\
+        fprintf(stderr, "under attack by martians\n");	        	\
+        action								\
+    }									\
+} while (0)
+
+#define WARN_ERRNO_DIAG(tst, func, arg) do {				\
+    if (UNLIKELY(tst)) {						\
+        fprintf(stderr, "%s(%s): %s\n", func, arg, strerror(errno));	\
+    }									\
+} while (0)
+/* }}} */
 
 /* output: F0x is the candidate number x. All coordinates of the
  * candidate are grouped, and coefficients come in order (least
@@ -54,7 +69,7 @@ unsigned int cantor_threshold = UINT_MAX;
 template<typename T>
 void permute(std::vector<T>& a, unsigned int p[])
 {
-    std::vector<T> b(a.size());
+    std::vector<T> b(a.size(), (unsigned int) -1);
     for(unsigned int i = 0 ; i < a.size() ; i++) {
         b[p[i]] = a[i];
     }
@@ -125,10 +140,8 @@ void dpmat(polmat const * pa, unsigned int k)
 }/*}}}*/
 
 namespace globals {
-    unsigned int nrows;
-    unsigned int ncols;
     unsigned int m,n;
-    unsigned int t,t0,total_work;
+    unsigned int t,t0,sequence_length;
     std::vector<unsigned int> delta;
     std::vector<unsigned int> chance_list;
 
@@ -166,7 +179,7 @@ void compute_E_from_A(polmat const &a)/*{{{*/
 
 }/*}}}*/
 
-#ifdef  DO_EXPENSIVE_CHECKS
+#ifdef  DO_EXPENSIVE_CHECKS     /* {{{ */
 /* revive this old piece of code from old commits. */
 void multiply_slow(polmat& dst, polmat /* const */ &a, polmat /* const */ &b)
 {
@@ -232,8 +245,29 @@ struct checker {
         return v == t-t0;
     }
 };
-#endif
+#endif /* }}} */
 
+/* {{{ utility */
+template<typename iterator>
+std::string intlist_to_string(iterator t0, iterator t1)
+{
+    std::ostringstream cset;
+    for(iterator t = t0 ; t != t1 ; ) {
+        iterator u;
+        for(u = t ; u != t1 ; u++) {
+            if (*u - *t != u-t) break;
+        }
+        if (t != t0) cset << ',';
+        if (u-t == 1) {
+            cset << *t;
+        } else {
+            cset << *t << "-" << u[-1];
+        }
+        t = u;
+    }
+    return cset.str();
+}
+/* }}} */
 
 // F is in fact F0 * PI.
 // To multiply on the *left* by F, we cannot work directly at the column
@@ -242,7 +276,7 @@ struct checker {
 // polynomials.
 void compute_final_F_from_PI(polmat& F, polmat const& pi)/*{{{*/
 {
-    std::cout << "Computing final F from PI" << std::endl;
+    printf("Computing final F from PI\n");
     using namespace globals;
     // We take t0 rows, so that we can do as few shifts as possible
     polmat tmpmat(t0,1,pi.ncoef);
@@ -266,9 +300,10 @@ void compute_final_F_from_PI(polmat& F, polmat const& pi)/*{{{*/
         // Now fill in the row.
         for(unsigned int j = 0 ; j < m + n ; j++) {
             // We zero out the whole column, it's less trouble.
-            tmpmat.zcol(0);
+            tmpmat.zcol(0);// XXX FIXME what's this ? 0 ?
             for(unsigned int k = 0 ; k < l.size() ; k++) {
                 tmpmat.addpoly(l[k].second, 0, pi.poly(l[k].first, j));
+                tmpmat.zcol(0);// XXX FIXME what's this ? 0 ?
             }
             tmp_F.addpoly(i,j,pi.poly(i,j));
             for(unsigned int k = 0 ; k < exps.size() ; k++) {
@@ -278,170 +313,219 @@ void compute_final_F_from_PI(polmat& F, polmat const& pi)/*{{{*/
         }
     }
     for(unsigned int j = 0 ; j < m + n ; j++) {
-        tmp_F.deg(j) = t0 + pi.deg(j);
+        int pideg = pi.deg(j);
+        tmp_F.deg(j) = t0 + pideg;
+        if (pideg == -1) {
+            tmp_F.deg(j) = -1;
+        }
     }
     F.swap(tmp_F);
 }/*}}}*/
 
-
-void read_data_for_series(polmat& A, int & rc)/*{{{*/
+/* {{{ main input ; read_data_for_series */
+/* ondisk_length denotes something which might be larger than the
+ * actually required sequence length, because the krylov computation is
+ * allowed to run longer
+ */
+void read_data_for_series(polmat& A MAYBE_UNUSED, unsigned int ondisk_length)
 {
     using namespace globals;
 
-    FILE * files[m][n];
-    unsigned int nbys[n];
+    /* It's slightly non-trivial. polmat entries are polynomials, so
+     * we've got to cope with the non-trivial striding */
+    
+    { /* {{{ check file size */
+        struct stat sbuf[1];
+        int rc = stat(bw->a, sbuf);
+        DIE_ERRNO_DIAG(rc<0,"stat",bw->a);
+        ssize_t expected = m * n / CHAR_BIT * ondisk_length;
 
-    polmat a(m,n,total_work+1);
-
-    unsigned int i, j;
-    unsigned int k;
-
-    for (j = 0; j < n; j++) { nbys[j] = 0; }
-
-    printf("Reading A files:\n");
-    fflush(stdout);
-
-    for (i = 0; i < m; i++) {
-        for (j = 0; j < n;) {
-            unsigned int y = 0;
-            // char * ptr;
-            // int d;
-            std::string filename = files::a % i % j;
-            files[i][j] = fopen(filename.c_str(),"r");
-            if (files[i][j] == NULL) {
-                fprintf(stderr, "fopen(%s) : %s", errno, filename.c_str(),
-                        strerror(errno));
-                abort();
-            }
-
-            /* NOTE : we drop the first coefficient, because
-             * we mean to work with the sequence generated
-             * on x and By, so that we obtain a generator
-             * afterwards.
-             */
-
-            char row[1024];
-            // unsigned long blah;
-            /* We also use this in order to read the number
-             * of coefficients per row */
-            fgets(row, sizeof(row), files[i][j]);
-            // ptr = row;
-            // for(y = 0 ; sscanf(ptr,"%lu%n",&blah,&d) >= 1 ; ptr += d, y++);
-            size_t len = strlen(row);
-            for( ; len && isspace(row[len-1]) ; len--);
-            y = 4 * len;
-            if (y == 0) {
-                fprintf(stderr, "\nproblem while reading %s, line = %s\n",
-                        filename.c_str(), row);
-                abort();
-            }
-            if (y > 1 && nbys[j] == 0) {
-                printf("[ %d values per row ]\n", y);
-                fflush(stdout);
-            }
-            putchar('.');
-            fflush(stdout);
-            if (nbys[j] != 0) {
-                BUG_ON(y != nbys[j]);
-            }
-            nbys[j] = y;
-            j += y;
+        if (sbuf->st_size != expected) {
+            fprintf(stderr, "%s does not have expected size %zu\n",
+                    bw->a, expected);
+            exit(1);
         }
+    } /* }}} */
+
+    /* We've got matrices of m times n bits. */
+    FILE * f = fopen(bw->a, "r");
+    DIE_ERRNO_DIAG(f == NULL, "fopen", bw->a);
+
+
+    ASSERT_ALWAYS(n % ULONG_BITS == 0);
+    size_t ulongs_per_mat = m*n/ULONG_BITS;
+    unsigned long * buf;
+    size_t rz;
+
+    buf = (unsigned long *) malloc(ulongs_per_mat * sizeof(unsigned long));
+
+    rz = fread(buf, sizeof(unsigned long), ulongs_per_mat, f);
+    NEVER_HAPPENS(rz != ulongs_per_mat, exit(1););
+
+    printf("Using A(X) div X in order to consider Y as starting point\n");
+    sequence_length--;
+
+    polmat a(m, n, sequence_length);
+
+    /* We hardly have any other option than reading the stuff bit by bit
+     * :-(( */
+
+    unsigned long mask = 1UL;
+    unsigned int offset = 0;
+    for(unsigned int k = 0 ; k < sequence_length ; k++) {
+        rz = fread(buf, sizeof(unsigned long), ulongs_per_mat, f);
+        NEVER_HAPPENS(rz != ulongs_per_mat, exit(1););
+
+        unsigned long * v = buf;
+        unsigned long lmask = 1UL;
+
+        for(unsigned int i = 0 ; i < m ; i++) {
+            for(unsigned int j = 0 ; j < n ; j++) {
+                a.poly(i,j)[offset] |= mask & -((*v & lmask) != 0);
+                lmask <<= 1;
+                v += (lmask == 0);
+                lmask += (lmask == 0);
+            }
+        }
+
+        mask <<= 1;
+        offset += mask == 0;
+        mask += mask == 0;
     }
-    printf("\n");
-    fflush(stdout);
-
-    unsigned int read_coeffs = 0;       /* please gcc */
-
-    unsigned long * tmp = (unsigned long *) malloc(n);
-    for (i = 0; i < m; i++) {
-        unsigned long * pol[n];
-        for (j = 0; j < n; j ++) {
-            pol[j] = a.poly(i,j);
-        }
-        unsigned long mask = 1UL;
-        unsigned int shift = 0;
-        for (k = 0; k <= total_work; k++) {
-            unsigned int rc = 0;
-            for (j = 0; j < n; j += nbys[j]) {
-                unsigned int l;
-                read_hexstring(files[i][j], tmp, nbys[j]);
-                rc += nbys[j];
-                for(l = 0 ; l < nbys[j] ; l++) {
-                    unsigned long b;
-                    b = tmp[l / ULONG_BITS] >> (l % ULONG_BITS);
-                    pol[j + l][shift] |= mask & -(b & 1UL);
-                }
-            }
-            if (rc == 0) {
-                break;
-            } else if (rc != n) {
-                fprintf(stderr, "A files not in sync ; "
-                        "read only %u coeffs in X^%d, row %d\n", rc, k, i);
-                break;
-            }
-            mask <<= 1;
-            shift += mask == 0;
-            mask += mask == 0;
-        }
-        if (i == 0) {
-            read_coeffs = k;
-        } else {
-            /* This happens when A files have gone live */
-            BUG_ON(k != read_coeffs);
-        }
-    }
-    free(tmp);
-    for (j = 0; j < n; j ++) {
-        a.deg(j) = read_coeffs - 1;
+    for (unsigned int j = 0; j < n; j ++) {
+        a.deg(j) = sequence_length - 1;
     }
 
-    for (i = 0; i < m; i++) {
-        for (j = 0; j < n; j+= nbys[j]) {
-            fclose(files[i][j]);
-        }
-    }
+    free(buf);
+    fclose(f);
 
-    printf("I have read %u coefficients (not counting 1st)"
-            " -- total work %u\n",
-            read_coeffs, total_work);
-
-    rc = read_coeffs;
     A.swap(a);
-}/*}}}*/
+}
+/* }}} */
 
+
+/* {{{ main output ; bw_commit_f */
+void bw_commit_f(polmat& F)
+{
+    using namespace globals;
+    using namespace std;
+
+    /* Say n' columns are said interesting. We'll pad these to n */
+    printf("Writing F files\n");
+
+    unsigned int * pick = (unsigned int *) malloc(n * sizeof(unsigned int));
+    memset(pick, 0, n * sizeof(unsigned int));
+    unsigned int nres = 0;
+
+    unsigned int ncoef = 0;
+    for (unsigned int j = 0; j < m + n; j++) {
+        if (chance_list[j]) {
+            ASSERT_ALWAYS(F.deg(j) != -1);
+            ncoef = std::max(ncoef, (unsigned int) (1 + F.deg(j)));
+            ASSERT_ALWAYS(nres < n);
+            pick[nres++] = j;
+        }
+    }
+    string s = intlist_to_string(pick, pick + nres);
+    printf("Picking columns %s\n", s.c_str());
+
+    ASSERT_ALWAYS(n % ULONG_BITS == 0);
+    size_t ulongs_per_mat = n*n/ULONG_BITS;
+    unsigned long * buf;
+    size_t rz;
+
+    FILE * f = fopen(LINGEN_F_FILE, "w");
+    DIE_ERRNO_DIAG(f == NULL, "fopen", LINGEN_F_FILE);
+
+    buf = (unsigned long *) malloc(ulongs_per_mat * sizeof(unsigned long));
+
+    unsigned long mask = 1UL;
+    unsigned int offset = 0;
+
+    for(unsigned int k = 0 ; k < ncoef ; k++) {
+        memset(buf, 0, ulongs_per_mat * sizeof(unsigned long));
+
+        unsigned long * v = buf;
+        unsigned long lmask = 1UL;
+
+        for(unsigned int i = 0 ; i < nres ; i++) {
+            for(unsigned int j = 0 ; j < n ; j++) {
+                *v |= lmask & -((F.poly(j,pick[i])[offset] & mask) != 0);
+                lmask <<= 1;
+                v += (lmask == 0);
+                lmask += (lmask == 0);
+            }
+        }
+
+        rz = fwrite(buf, sizeof(unsigned long), ulongs_per_mat, f);
+        NEVER_HAPPENS(rz != ulongs_per_mat, exit(1););
+
+        mask <<= 1;
+        offset += mask == 0;
+        mask += mask == 0;
+    }
+    fclose(f);
+    free(pick);
+    free(buf);
+}
+/*}}}*/
+
+
+/* {{{ polmat I/O ; this concerns only th epi matrices */
+/* This changes from the format used pre-bwc. */
 void write_polmat(polmat const& P, const char * fn)/*{{{*/
 {
-    std::ofstream f(fn);
-    if (!f.is_open()) {
+    FILE * f = fopen(fn, "w");
+    if (f == NULL) {
         perror(fn);
         exit(1);
     }
 
+    size_t rz;
     size_t nw = ( P.ncoef + ULONG_BITS - 1) / ULONG_BITS;
-    unsigned long tmp[ nw ];
 
-    f << P.nrows << " " << P.ncols << " " << P.ncoef << "\n";
+    fprintf(f, "%u %u %u\n", P.nrows, P.ncols, P.ncoef);
     for(unsigned int j = 0 ; j < P.ncols ; j++) {
-        if (j) f << " ";
-        f << P.deg(j);
+        fprintf(f, "%s%d", j?" ":"", P.deg(j));
     }
-    f << "\n";
+    fprintf(f, "\n");
+
+    fprintf(f, "%zu %zu\n", nw, sizeof(unsigned long));
     for(unsigned int i = 0 ; i < P.nrows ; i++) {
         for(unsigned int j = 0 ; j < P.ncols ; j++) {
-            memcpy(tmp,P.poly(i,j),nw * sizeof(unsigned long));
-            write_hexstring(f,tmp,1+P.deg(j));
-            f << "\n";
+            rz = fwrite(P.poly(i,j), sizeof(unsigned long), nw, f);
+            NEVER_HAPPENS(rz != nw, );
         }
     }
-    printf("Written f to %s\n",fn);
+    fclose(f);
 }
 
 /*}}}*/
 
-bool recover_f0_data(const char * fn)/*{{{*/
+void write_pi(polmat const& P, unsigned int t1, unsigned int t2)
 {
-    std::ifstream f(fn);
+    char * tmp;
+    int rc = asprintf(&tmp, LINGEN_PI_PATTERN, t1, t2);
+    NEVER_HAPPENS(rc < 0, return;);
+    write_polmat(P, tmp);
+    // printf("written %s\n", tmp);
+    free(tmp);
+}
+
+void unlink_pi(unsigned int t1, unsigned int t2)
+{
+    char * tmp;
+    int rc = asprintf(&tmp, LINGEN_PI_PATTERN, t1, t2);
+    NEVER_HAPPENS(rc < 0, return;);
+    rc = unlink(tmp);
+    WARN_ERRNO_DIAG(rc < 0, "unlink", tmp);
+    free(tmp);
+}
+/* }}} */
+
+bool recover_f0_data()/*{{{*/
+{
+    std::ifstream f(LINGEN_BOOTSTRAP_FILE);
 
     using namespace globals;
     for(unsigned int i = 0 ; i < m ; i++) {
@@ -450,13 +534,13 @@ bool recover_f0_data(const char * fn)/*{{{*/
             return false;
         f0_data.push_back(std::make_pair(cnum,exponent));
     }
-    std::cout << fmt("recovered init data % on disk\n") % fn;
+    printf("recovered " LINGEN_BOOTSTRAP_FILE " from disk\n");
     return true;
 }/*}}}*/
 
-bool write_f0_data(const char * fn)/*{{{*/
+bool write_f0_data()/*{{{*/
 {
-    std::ofstream f(fn);
+    std::ofstream f(LINGEN_BOOTSTRAP_FILE);
 
     using namespace globals;
     for(unsigned int i = 0 ; i < m ; i++) {
@@ -466,7 +550,7 @@ bool write_f0_data(const char * fn)/*{{{*/
             return false;
     }
     f << std::endl;
-    std::cout << fmt("written init data % to disk\n") % fn;
+    printf("written " LINGEN_BOOTSTRAP_FILE " to disk\n");
     return true;
 }/*}}}*/
 
@@ -486,50 +570,6 @@ void set_t0_delta_from_F0()/*{{{*/
         // delta.
     }
 }/*}}}*/
-
-void write_F0_from_F0_quick()/*{{{*/
-{
-    using namespace globals;
-    unsigned int s = t0;
-    /* Now build f */
-    polmat F0(n, m + n, s + 1);
-
-    /* First n columns: identity matrix */
-    /* rest: X^(s-exponent)cnum's */
-    for(unsigned int i=0;i<n;i++) {
-        F0.addcoeff(i,i,0,1);
-        F0.deg(i) = 0;
-    }
-    for(unsigned int j=0;j<m;j++) {
-        unsigned int cnum = f0_data[j].first;
-        unsigned int exponent = f0_data[j].second;
-        F0.addcoeff(cnum,n+j,t0-exponent,1);
-        F0.deg(n + j) = t0-exponent;
-    }
-    write_polmat(F0, "F_INIT");
-}/*}}}*/
-
-void bw_commit_f(polmat& F) /*{{{*/
-{
-    using namespace globals;
-    using namespace std;
-
-    cout << "Writing F files" << endl;
-    for (unsigned int j = 0; j < m + n ; j++) {
-        std::string filename = files::f % j;
-        ofstream f(filename.c_str());
-        if (!f.is_open()) {
-            perror("writing f");
-            abort();
-        }
-        for (int k = 0; k <= F.deg(j); k++) {
-            for (unsigned int i = 0; i < n; i++) {
-                f << F.coeff(i,j,k) << (i == (n-1) ? "\n" : " ");
-            }
-        }
-    }
-}
-/*}}}*/
 
 void compute_f_init(polmat& A)/*{{{*/
 {
@@ -623,7 +663,7 @@ void compute_f_init(polmat& A)/*{{{*/
 void print_deltas()/*{{{*/
 {
     using namespace globals;
-    std::cout << fmt("[t=%[w4]] delta =") % t;
+    printf("[t=%4u] delta =", t);
     unsigned int last = UINT_MAX;
     unsigned int nrep = 0;
     for(unsigned int i = 0 ; i < m + n ; i++) {
@@ -634,118 +674,19 @@ void print_deltas()/*{{{*/
         }
         // Flush the pending repeats
         if (last != UINT_MAX) {
-            std::cout << " " << last;
+            printf(" %u", last);
             if (nrep > 1)
-                std::cout << "[" << nrep << "]";
+                printf(" [%u]", nrep);
         }
         last = d;
         nrep = 1;
     }
     BUG_ON(last == UINT_MAX);
-    std::cout << " " << last;
+    printf(" %u", last);
     if (nrep > 1)
-        std::cout << "[" << nrep << "]";
-    std::cout << "\n";
+        printf(" [%u]", nrep);
+    printf("\n");
 }/*}}}*/
-
-/*{{{*//* bw_init
- *
- * fill in the structures with the data available on disk. a(X) is
- * fetched this way. f(X) is chosen in order to make [X^0]e(X)
- * nonsingular. Once this condition is satisfied, e(X) is computed. All
- * further computations are done with e(X).
- *
- * a(X) is thrown away as soon as e(X) is computed.
- *
- * At a given point of the algorithm, one can bet that most of the data
- * for e(X) is useless.
- *
- * XXX Therefore it is wise to shrink e(x) aggressively. The new
- * organisation of the data prevents e(x) from being properly swapped
- * out. XXX TODO !!!
- *
- */
-static void bw_init(void)
-{
-    int read_coeffs;
-    polmat A;
-    using namespace globals;
-
-    printf("Using A(X) div X in order to consider Y as starting point\n");
-    total_work--;
-
-
-    printf("Reading scalar data in polynomial ``a''\n");
-    read_data_for_series(A, read_coeffs);
-
-
-    /* informational *//*{{{ */
-    if (read_coeffs < (int) total_work) {
-	printf("Since we do not have the full information yet "
-	       "(only %d coefficients while %d were needed)"
-	       ", we\n"
-	       "merely can tell if the system looks like doable\n",
-	       read_coeffs, total_work);
-    }
-
-
-
-
-
-    /*}}} */
-    /* Data read stage completed. */
-    /* TODO. Prepare the FFT engine for handling polynomial
-     * multiplications up to ncmax coeffs */
-    // unsigned int ncmax = (total_work<<1)+2;
-    // ft_order_t::init(ncmax, ops_poly_args);
-
-    delta.assign(m + n, (unsigned int) -1);
-    chance_list.assign(m + n, 0);
-
-    if (!recover_f0_data(files::f_initq.c_str())) {
-        // This is no longer useful
-	// give_poly_rank_info(A, read_coeffs - 1);
-	compute_f_init(A);
-	write_f0_data(files::f_initq.c_str());
-    }
-    set_t0_delta_from_F0();
-
-    // this is not used. It's only a debugging aid for the helper magma
-    // code.
-    write_F0_from_F0_quick();
-
-    /*
-        if (!read_f_init(F0, files::f_initq.c_str(), n, m + n)) {
-            give_poly_rank_info(A, read_coeffs - 1);
-            compute_f_init(A);
-            write_f0_data(F0, files::f_initq.c_str());
-        }
-    */
-    t = t0;
-    printf("t0 = %d\n", t0);
-
-
-    /*
-       for(j=0;j< m + n ;j++) {
-       global_delta[j]  = t_counter;
-       chance_list[j]   = 0;
-       }
-     */
-
-    total_work = read_coeffs;
-    // A must be understood as A_computed + O(X^total_work)
-    // therefore it does not make sense to compute coefficients of E at
-    // degrees above total_work-1
-    std::cout << "Computing value of E(X)=A(X)F(X) "
-        << fmt("(degree %) [ +O(X^%) ]\n") % (total_work-1) % total_work;
-    
-    // multiply_slow(E, A, F0, t0, total_work-1);
-    compute_E_from_A(A);
-
-    printf("Throwing out a(X)\n");
-    A.clear();
-}
-/*}}} */
 
 static void rearrange_ordering(polmat & PI, unsigned int piv[])/*{{{*/
 {
@@ -764,7 +705,11 @@ static void rearrange_ordering(polmat & PI, unsigned int piv[])/*{{{*/
     typedef pair<pair<unsigned int,unsigned int>, int> corresp_t;
     vector<corresp_t> corresp(m+n);
     for(unsigned int i = 0 ; i < m + n ; i++) {
-        corresp[i] = make_pair(make_pair(delta[i],PI.deg(i)), i);
+        int pideg = PI.deg(i);
+        if (pideg == -1) { /* overflowed ! */
+            pideg = INT_MAX;
+        }
+        corresp[i] = make_pair(make_pair(delta[i],pideg), i);
     }
     sort(corresp.begin(), corresp.end(), less<corresp_t>());
     unsigned int p[m+n];
@@ -833,6 +778,9 @@ static bool gauss(unsigned int piv[], polmat& PI)/*{{{*/
         delta[j]++;
         if (PI.deg(j) >= (int) PI.ncoef - 1) {
             overflowed.push_back(j);
+            /* Then don't hesitate. Set the degree to -1 altoghether.
+             * There's not much meaning remaining in this vector anyway,
+             * so we'd better trash it */
         }
     }
     BUG_ON (rank != m);
@@ -841,23 +789,10 @@ static bool gauss(unsigned int piv[], polmat& PI)/*{{{*/
      * least one generator found.
      */
     if (!overflowed.empty()) {
-        std::ostringstream cset;
-        for(unsigned int i = 0 ; i < overflowed.size() ; ) {
-            unsigned int j;
-            for(j = i ; j < overflowed.size() ; j++) {
-                if (overflowed[j]-overflowed[i] != j-i) break;
-            }
-            if (i) cset << ',';
-            if (j-i == 1) {
-                cset << i;
-            } else {
-                cset << fmt("%-%") % overflowed[i] % overflowed[j-1];
-            }
-            i = j;
-        }
-        std::cout << fmt("%[w8-]**** % cols (%) exceed maxdeg=%"
-                " (normal at the end) ****\n")
-            % t % overflowed.size() % cset.str() % (PI.ncoef - 1);
+        std::string s = intlist_to_string(overflowed.begin(), overflowed.end());
+
+        printf("%-8u** %zu cols (%s) exceed maxdeg=%d (normal at the end) **\n",
+                t, overflowed.size(), s.c_str(), PI.ncoef - 1);
         unsigned ctot = 0;
         for (unsigned int j = 0; j < m + n; j++) {
             ctot += chance_list[j];
@@ -895,22 +830,6 @@ static bool gauss(unsigned int piv[], polmat& PI)/*{{{*/
     }
     std::cout << " ]\n";
     */
-}/*}}}*/
-
-void read_mat_file_header(const char *name)/*{{{*/
-{
-    FILE *f = fopen(name, "r");
-    if (f == NULL) {
-        fprintf(stderr, "fopen(%s): %s", name, strerror(errno));
-        abort();
-    }
-    char modulus[512];
-    fscanf(f, "// %u ROWS %u COLUMNS ; MODULUS %s",
-            &globals::nrows, &globals::ncols, modulus);
-    BUG_ON(strcmp(modulus,"2") != 0);
-    BUG_ON(globals::nrows > globals::ncols);
-
-    fclose(f);
 }/*}}}*/
 
 #if 0/* {{{ */
@@ -1021,8 +940,8 @@ static int retrieve_pi_files(struct t_poly ** p_pi, int t_start)
         unsigned int pideg;
         pideg = iceildiv(m * (t_max - t_start), (m+n));
         pideg += 10;
-        if (t_max > total_work) {
-            pideg += t_max - total_work;
+        if (t_max > sequence_length) {
+            pideg += t_max - sequence_length;
         }
 
         right=tp_read(f, pideg);
@@ -1239,7 +1158,7 @@ static void extract_coeff_degree_t(unsigned int tstart, unsigned int dt, unsigne
             }
         }
 
-        std::cout << fmt("%[w8-]%cols=0:") % (tstart + dt) % z.size();
+        printf("%-8u%zucols=0:", tstart + dt, z.size());
 
         vector<pair<unsigned int, unsigned int> > zz;
         for(unsigned int i = 0 ; i < z.size() ; i++) {
@@ -1255,25 +1174,25 @@ static void extract_coeff_degree_t(unsigned int tstart, unsigned int dt, unsigne
                     mi = zz[i].second;
                 }
             }
-            cout << " [";
+            printf(" [");
             for(unsigned int i = 0 ; i < zz.size() ; ) {
                 unsigned int j;
                 for(j = i; j < zz.size() ; j++) {
                     if (zz[j].first-zz[i].first != j-i) break;
                 }
-                if (i) cout << ",";
+                if (i) printf(",");
                 if (zz[i].first == zz[j-1].first - 1) {
-                    cout << fmt("%,%") % zz[i].first % zz[j-1].first;
+                    printf("%u,%u", zz[i].first, zz[j-1].first);
                 } else if (zz[i].first < zz[j-1].first) {
-                    cout << fmt("%..%") % zz[i].first % zz[j-1].first;
+                    printf("%u..%u", zz[i].first, zz[j-1].first);
                 } else {
-                    cout << fmt("%") % zz[i].first;
+                    printf("%u", zz[i].first);
                 }
                 i = j;
             }
-            cout << "]";
+            printf("]");
             if (mi > 1)
-                cout << "*" << mi;
+                printf("*%u",mi);
 
             vector<pair<unsigned int, unsigned int> > zz2;
             for(unsigned int i = 0 ; i < zz.size() ; i++) {
@@ -1283,7 +1202,7 @@ static void extract_coeff_degree_t(unsigned int tstart, unsigned int dt, unsigne
             }
             zz.swap(zz2);
         }
-        std::cout << "\n";
+        printf("\n");
     }
 }/*}}}*/
 
@@ -1349,14 +1268,14 @@ static bool go_quadratic(polmat& pi)/*{{{*/
         rearrange_ordering(tmp_pi, piv);
         t++;
         // if (t % 60 < 10 || deg-dt < 30)
-        // write_polmat(tmp_pi,std::string(fmt("pi-%-%") % tstart % t).c_str());
+        // write_pi(tmp_pi,tstart,t);
     }
     pi.swap(tmp_pi);
 #ifdef  DO_EXPENSIVE_CHECKS
-        write_polmat(pi,std::string(fmt("pi-%-%") % tstart % t).c_str());
+        write_pi(pi,tstart,t);
 #else
-    if (checkpoints)
-        write_polmat(pi,std::string(fmt("pi-%-%") % tstart % t).c_str());
+    if (bw->checkpoints)
+        write_pi(pi,tstart,t);
 #endif
 
 #ifdef  VERBOSE
@@ -1377,11 +1296,137 @@ static bool go_quadratic(polmat& pi)/*{{{*/
     return finished;
 }/*}}}*/
 
+/* {{{ a tool for measuring timings and displaying progress of a
+ * recursive algorithm
+ */
+struct recursive_tree_timer_t {
+    struct spent_time {
+        unsigned int step;
+        double total;
+        double proper;
+        spent_time() : step(0), total(0), proper(0) {}
+    };
 
-static bool compute_lingen(polmat& pi, unsigned int);
+    std::vector<spent_time> spent;
+
+    std::vector<std::pair<double, double> > stack;
+
+    void push() {
+        unsigned int level = stack.size();
+
+        if (spent.size() <= level) {
+            assert(spent.size() == level);
+            spent.push_back(spent_time());
+        }
+
+        ASSERT(spent.size() > level);
+
+        double st = seconds();
+        double children = 0;
+        if (spent.size() > level + 1) {
+            children = -spent[level+1].total;
+        }
+
+        stack.push_back(std::make_pair(st, children));
+    }
+
+    void pop(unsigned int t) {
+        unsigned int level = stack.size() - 1;
+
+        double st = stack.back().first;
+        double children = stack.back().second;
+        stack.pop_back();
+
+        // unsigned int t1 = t;
+        double dtime = seconds() - st;
+
+        if (spent.size() > level + 1) {
+            children += spent[level+1].total;
+        }
+
+        spent[level].step++;
+        spent[level].total += dtime;
+
+        double ptime = dtime - children;
+
+        spent[level].proper += ptime;
+
+        double pct_loc = spent[level].step / (double) (1 << level);
+
+        /* make up some guess about the total time of all levels */
+        unsigned int outermost = level;
+        for(unsigned int back = 0 ; back <= level ; back++) {
+            if (spent[level-back].step == 0)
+                break;
+            outermost = level-back;
+        }
+        unsigned int innermost = spent.size() - 1;
+        double estim_tot = 0;
+        double spent_tot = 0;
+        for(unsigned int i = outermost ; i <= innermost ; i++) {
+            estim_tot += spent[i].proper * (1 << i) / (double) spent[i].step;
+            spent_tot += spent[i].proper;
+        }
+        double estim_above = 0;
+        double spent_above = 0;
+        for(unsigned int i = level ; i <= innermost ; i++) {
+            estim_above += spent[i].proper * (1 << i) / (double) spent[i].step;
+            spent_above += spent[i].proper;
+        }
+
+        bool leaf = level == spent.size() - 1;
+
+        printf("%-8u", t);
+        /*
+        if (leaf) {
+            printf(" %.2f", ptime);
+        } else {
+            printf(" %.2f+%.2f", ptime, children);
+        }
+        */
+        // printf(" (total %.2f)\n", spent_tot);
+        // printf("      est:");
+        char * buf;
+        int rc = 0;
+        if (leaf) {
+            rc = asprintf(&buf, "[%u]: %.1f/%.1f",
+                    level, spent[level].proper, spent[level].proper / pct_loc);
+            NEVER_HAPPENS(rc < 0, return;);
+        } else {
+            rc = asprintf(&buf, "[%u,%u+]: %.1f/%.1f,%.1f",
+                    level, level, spent[level].proper, spent[level].proper / pct_loc,
+                    estim_above);
+            NEVER_HAPPENS(rc < 0, return;);
+        }
+        printf("%-36s", buf);
+        free(buf);
+        rc = asprintf(&buf, "[%u+]: %.1f/%.1f (%.0f%%)",
+                outermost, spent_tot, estim_tot, 100.0 * spent_tot/estim_tot);
+        NEVER_HAPPENS(rc < 0, return;);
+        printf("%-27s", buf);
+            free(buf);
+        printf("\n");
+    }
+    void final_info()
+    {
+        for(unsigned int i = 0 ; i < spent.size() ; i++) {
+            printf("[%d] spent %.2f",
+                    i, spent[i].proper);
+            if (i < spent.size() - 1) {
+                printf(" (%.2f counting children)",
+                        spent[i].total);
+            }
+            printf("\n");
+        }
+        printf("Total computation took %.2f\n", spent[0].total);
+    }
+};      /* }}} */
+
+
+static bool compute_lingen(polmat& pi, recursive_tree_timer_t&);
 
 template<typename fft_type>
-static bool go_recursive(polmat& pi, unsigned int level)
+static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
 {
     using namespace globals;
 
@@ -1389,13 +1434,13 @@ static bool go_recursive(polmat& pi, unsigned int level)
      * of degree E.ncoef -- this is exactly the number of increases we
      * have to make
      */
-    unsigned int deg = E.ncoef;
-    unsigned int rdeg = deg / 2;
-    unsigned int ldeg = deg - rdeg;
+    unsigned int length_E = E.ncoef;
+    unsigned int rlen = length_E / 2;
+    unsigned int llen = length_E - rlen;
 
-    ASSERT(ldeg && rdeg && ldeg + rdeg == deg);
+    ASSERT(llen && rlen && llen + rlen == length_E);
 
-    unsigned int expected_pi_deg = pi_deg_bound(ldeg);
+    unsigned int expected_pi_deg = pi_deg_bound(llen);
     unsigned int kill;
     unsigned int tstart = t;
     unsigned int tmiddle;
@@ -1406,27 +1451,30 @@ static bool go_recursive(polmat& pi, unsigned int level)
 #endif
 
 #ifdef	HAS_CONVOLUTION_SPECIAL
-    kill=ldeg;
+    kill=llen;
 #else
     kill=0;
 #endif
 
-    // std::cout << "Recursive call, degree " << deg << std::endl;
-    fft_type o(deg, expected_pi_deg, deg + expected_pi_deg - kill, m + n);
+    // std::cout << "Recursive call, degree " << length_E << std::endl;
+    // takes lengths.
+    fft_type o(length_E, expected_pi_deg + 1, length_E + expected_pi_deg - kill, m + n);
 
     tpolmat<fft_type> E_hat;
 
     /* The transform() calls expect a number of coefficients, not a
-     * degree ! */
-    transform(E_hat, E, o, deg + 1);
+     * degree. */
+    transform(E_hat, E, o, length_E);
 
-    E.resize(ldeg);
+    /* ditto for this one */
+    E.resize(llen);
+
     polmat pi_left;
-    finished_early = compute_lingen(pi_left, level+1);
+    finished_early = compute_lingen(pi_left, tim);
     E.clear();
     int pi_l_deg = pi_left.maxdeg();
 
-    if (t < t0 + ldeg) {
+    if (t < t0 + llen) {
         ASSERT(finished_early);
     }
     if (finished_early) {
@@ -1462,10 +1510,10 @@ static bool go_recursive(polmat& pi, unsigned int level)
         printf("order %d , while :\n"
                 "deg=%d\n"
                 "deg(pi_left)=%d\n"
-                "ldeg-1=%d\n"
+                "llen-1=%d\n"
                 "hence, %d is too big\n",
                 so_i,
-                deg,pi_left->degree,ldeg - 1,
+                deg,pi_left->degree,llen - 1,
                 deg+pi_left->degree-kill + 1);
                 */
 
@@ -1489,28 +1537,28 @@ static bool go_recursive(polmat& pi, unsigned int level)
 
     tpolmat<fft_type> E_middle_hat;
 
-    /* XXX Do special convolutions here */
+    /* TODO XXX Do special convolutions here */
     compose(E_middle_hat, E_hat, pi_l_hat, o);
     E_hat.clear();
     /* pi_l_hat is used later on ! */
 
     /* The transform() calls expect a number of coefficients, not a
      * degree ! */
-    itransform(E, E_middle_hat, o, deg + pi_l_deg - kill + 1);
+    itransform(E, E_middle_hat, o, length_E + pi_l_deg - kill + 1);
     E_middle_hat.clear();
 
-    /* Make sure that the first ldeg-kill coefficients of all entries of
+    /* Make sure that the first llen-kill coefficients of all entries of
      * E are zero. It's only a matter of verification, so this does not
      * have to be critical. Yet, it's an easy way of spotting bugs as
      * well... */
 
-    ASSERT_ALWAYS(E.valuation() >= ldeg - kill);
+    ASSERT_ALWAYS(E.valuation() >= llen - kill);
 
     /* This chops off some data */
-    E.xdiv_resize(ldeg - kill, rdeg);
+    E.xdiv_resize(llen - kill, rlen);
 
     polmat pi_right;
-    finished_early = compute_lingen(pi_right, level+1);
+    finished_early = compute_lingen(pi_right, tim);
     int pi_r_deg = pi_right.maxdeg();
     E.clear();
 
@@ -1529,15 +1577,11 @@ static bool go_recursive(polmat& pi, unsigned int level)
      * degree ! */
     itransform(pi, pi_hat, o, pi_l_deg + pi_r_deg + 1);
 
-    if (checkpoints) {
-        write_polmat(pi,std::string(fmt("pi-%-%") % tstart % t).c_str());
+    if (bw->checkpoints) {
+        write_pi(pi,tstart,t);
         {
-            std::string lpi = fmt("pi-%-%") % tstart % tmiddle;
-            std::string rpi = fmt("pi-%-%") % tmiddle % t;
-            if (unlink(lpi.c_str()) < 0)
-                std::cerr << fmt("unlink(%): %\n") % lpi % strerror(errno);
-            if (unlink(rpi.c_str()) < 0)
-                std::cerr << fmt("unlink(%): %\n") % rpi % strerror(errno);
+            unlink_pi(tstart,tmiddle);
+            unlink_pi(tmiddle,t);
         }
     }
 
@@ -1552,139 +1596,35 @@ static bool go_recursive(polmat& pi, unsigned int level)
     return finished_early;
 }
 
-struct spent_time {
-    unsigned int step;
-    double total;
-    double proper;
-    spent_time() : step(0), total(0), proper(0) {}
-};
-
-std::vector<spent_time> spent;
-
-static bool compute_lingen(polmat& pi, unsigned int level)
+static bool compute_lingen(polmat& pi, recursive_tree_timer_t & tim)
 {
     /* reads the data in the global thing, E and delta. ;
      * compute the linear generator from this.
      */
     using namespace globals;
-    unsigned int deg = E.ncoef - 1;
+    unsigned int deg_E = E.ncoef - 1;
 
     bool b;
 
-    if (spent.size() <= level) {
-        assert(spent.size() == level);
-        spent.push_back(spent_time());
-    }
-
-    ASSERT(spent.size() > level);
-
-    double st = seconds();
-    double children = 0;
-    if (spent.size() > level + 1) {
-        children = -spent[level+1].total;
-    }
-
     // unsigned int t0 = t;
+    
+    tim.push();
 
-
-    if (deg <= rec_threshold) {
+    if (deg_E <= bw->lingen_threshold) {
         b = go_quadratic(pi);
-    } else if (deg < cantor_threshold) {
+    } else if (deg_E < bw->cantor_threshold) {
         /* The bound is such that deg + deg/4 is 64 words or less */
-        b = go_recursive<fake_fft>(pi, level);
+        b = go_recursive<fake_fft>(pi, tim);
     } else {
         /* Presently, c128 requires input polynomials that are large
          * enough.
          */
-        b = go_recursive<cantor_fft>(pi, level);
-    }
-    // unsigned int t1 = t;
-    double dtime = seconds() - st;
-
-    if (spent.size() > level + 1) {
-        children += spent[level+1].total;
+        b = go_recursive<cantor_fft>(pi, tim);
     }
 
-    spent[level].step++;
-    spent[level].total += dtime;
+    tim.pop(t);
 
-    double ptime = dtime - children;
-
-    spent[level].proper += ptime;
-
-    double pct_loc = spent[level].step / (double) (1 << level);
-
-    /* make up some guess about the total time of all levels */
-    unsigned int outermost = level;
-    for(unsigned int back = 0 ; back <= level ; back++) {
-        if (spent[level-back].step == 0)
-            break;
-        outermost = level-back;
-    }
-    unsigned int innermost = spent.size() - 1;
-    double estim_tot = 0;
-    double spent_tot = 0;
-    for(unsigned int i = outermost ; i <= innermost ; i++) {
-        estim_tot += spent[i].proper * (1 << i) / (double) spent[i].step;
-        spent_tot += spent[i].proper;
-    }
-    double estim_above = 0;
-    double spent_above = 0;
-    for(unsigned int i = level ; i <= innermost ; i++) {
-        estim_above += spent[i].proper * (1 << i) / (double) spent[i].step;
-        spent_above += spent[i].proper;
-    }
-
-    bool leaf = level == spent.size() - 1;
-
-    printf("%-8u", t);
-    /*
-    if (leaf) {
-        printf(" %.2f", ptime);
-    } else {
-        printf(" %.2f+%.2f", ptime, children);
-    }
-    */
-    // printf(" (total %.2f)\n", spent_tot);
-    // printf("      est:");
-    {
-        std::ostringstream buf;
-        if (leaf) {
-            buf << fmt("[%]: %[F.1]/%[F.1]") % level %
-                spent[level].proper % (spent[level].proper / pct_loc);
-        } else {
-            buf << fmt("[%,%+]: %[F.1]/%[F.1],%[F.1]")
-                % level % level % spent[level].proper %
-                (spent[level].proper / pct_loc) % estim_above;
-        }
-        printf("%-36s", buf.str().c_str());
-    }
-
-    {
-        std::ostringstream buf;
-        buf << fmt("[%+]: %[F.1]/%[F.1] (%[F.0]%%)")
-                % outermost % spent_tot % estim_tot %
-                (100.0 * spent_tot/estim_tot);
-        printf("%-27s", buf.str().c_str());
-    }
-
-    printf("\n");
     return b;
-}
-
-void timing_info()
-{
-    for(unsigned int i = 0 ; i < spent.size() ; i++) {
-        printf("[%d] spent %.2f",
-                i, spent[i].proper);
-        if (i < spent.size() - 1) {
-            printf(" (%.2f counting children)",
-                    spent[i].total);
-        }
-        printf("\n");
-    }
-
-    printf("Total computation took %.2f\n", spent[0].total);
 }
 
 
@@ -1783,9 +1723,117 @@ void recycle_old_pi(polmat& pi MAYBE_UNUSED)
 #endif/*}}}*/
 }
 
-void block_wiedemann(void)
+extern "C" {
+    void usage();
+}
+
+void usage()
 {
-    bw_init();
+    fprintf(stderr, "Usage: ./bw-lingen-binary --subdir <dir> -t <threshold>\n");
+    exit(1);
+}
+
+int main(int argc, char *argv[])
+{
+    using namespace globals;
+
+    setvbuf(stdout,NULL,_IONBF,0);
+    setvbuf(stderr,NULL,_IONBF,0);
+
+    bw_common_init(bw, argc, argv);
+
+    m = n = 0;
+
+    if (bw->m == -1) { fprintf(stderr, "no m value set\n"); exit(1); } 
+    if (bw->a[0] == '\0') { fprintf(stderr, "no a filename set\n"); exit(1); } 
+    if (bw->lingen_threshold == 0) {
+        fprintf(stderr, "no lingen_threshold value set\n");
+        exit(1);
+    }
+
+    unsigned int n0, n1, j0, j1;
+
+    int rc = sscanf(bw->a, A_FILE_PATTERN, &n0, &n1, &j0, &j1);
+
+    if (rc != 4) {
+        fprintf(stderr, "a file %s does not match pattern %s\n", bw->a, A_FILE_PATTERN);
+        exit(1);
+    }
+
+    if (bw->n == 0) {
+        bw->n = n1 - n0;
+    } else if (bw->n != (int) (n1 - n0)) {
+        fprintf(stderr, "n value mismatch (%d versus %u)\n",
+                bw->n, n1 - n0);
+        exit(1);
+    }
+
+    m = bw->m;
+    n = bw->n;
+
+    if (bw->end == 0) {
+        ASSERT_ALWAYS(bw->start == 0);
+        bw->end = j1 - j0;
+    } else if (bw->end - bw->start > (int) (j1 - j0)) {
+        fprintf(stderr, "sequence file %s is too short\n", bw->a);
+        exit(1);
+    }
+        
+    sequence_length = bw->end - bw->start;
+
+/* bw_init
+ *
+ * fill in the structures with the data available on disk. a(X) is
+ * fetched this way. f(X) is chosen in order to make [X^0]e(X)
+ * nonsingular. Once this condition is satisfied, e(X) is computed. All
+ * further computations are done with e(X).
+ *
+ * a(X) is thrown away as soon as e(X) is computed.
+ *
+ * At a given point of the algorithm, one can bet that most of the data
+ * for e(X) is useless.
+ *
+ * XXX Therefore it is wise to shrink e(x) aggressively. The new
+ * organisation of the data prevents e(x) from being properly swapped
+ * out. XXX TODO !!!
+ *
+ */
+    polmat A;
+
+    printf("Reading scalar data in polynomial ``a''\n");
+    read_data_for_series(A, j1 - j0);
+
+    /* Data read stage completed. */
+    /* TODO. Prepare the FFT engine for handling polynomial
+     * multiplications up to ncmax coeffs */
+    // unsigned int ncmax = (sequence_length<<1)+2;
+    // ft_order_t::init(ncmax, ops_poly_args);
+
+    delta.assign(m + n, (unsigned int) -1);
+    chance_list.assign(m + n, 0);
+
+    if (!recover_f0_data()) {
+        // This is no longer useful
+	// give_poly_rank_info(A, read_coeffs - 1);
+	compute_f_init(A);
+	write_f0_data();
+    }
+    set_t0_delta_from_F0();
+
+    t = t0;
+    printf("t0 = %d\n", t0);
+
+    // A must be understood as A_computed + O(X^sequence_length)
+    // therefore it does not make sense to compute coefficients of E at
+    // degrees above sequence_length-1
+    printf("Computing value of E(X)=A(X)F(X) (degree %d) [ +O(X^%d) ]\n",
+            sequence_length-1, sequence_length);
+    
+    // multiply_slow(E, A, F0, t0, sequence_length-1);
+    compute_E_from_A(A);
+
+    printf("Throwing out a(X)\n");
+    A.clear();
 
 
 #if 0/*{{{*/
@@ -1801,7 +1849,7 @@ void block_wiedemann(void)
     using namespace globals;
     using namespace std;
 
-    cout << fmt("E: % coeffs, t=%\n") % E.ncoef % t;
+    printf("E: %d coeffs, t=%u\n", E.ncoef, t);
 
     { bmat tmp_e0(m,m + n); e0.swap(tmp_e0); }
 
@@ -1817,19 +1865,22 @@ void block_wiedemann(void)
 
     // E.resize(deg + 1);
     polmat pi_left;
-    compute_lingen(pi_left, 0);
-    timing_info();
+    recursive_tree_timer_t tim;
+    compute_lingen(pi_left, tim);
+    tim.final_info();
+
+    int nresults = 0;
+    for (unsigned int j = 0; j < m + n; j++) {
+        nresults += chance_list[j];
+    }
+    if (nresults == 0) {
+        fprintf(stderr, "No solution found\n");
+        exit(1);
+    }
 
     polmat F;
     compute_final_F_from_PI(F, pi_left);
     bw_commit_f(F);
-
-    printf("// step %d LOOK [", t);
-    for (unsigned int j = 0; j < m + n; j++) {
-        if (chance_list[j])
-            printf(" %d", j);
-    }
-    printf(" ]\n");
 
 #if 0/*{{{*/
     if (ec->degree>=0) {
@@ -1884,123 +1935,7 @@ void block_wiedemann(void)
          */
     }
 #endif/*}}}*/
-    // print_chance_list(total_work, chance_list);
-}
-
-void usage()
-{
-    fprintf(stderr, "Usage: ./bw-lingen-binary --subdir <dir> -t <threshold>\n");
-    exit(1);
-}
-
-int main(int argc, char *argv[])
-{
-    setvbuf(stdout,NULL,_IONBF,0);
-    setvbuf(stderr,NULL,_IONBF,0);
-
-    argv++, argc--;
-
-    std::cout << "// This is bw-lingen-binary, version " VERSION << std::endl;
-
-    using namespace globals;
-    using namespace std;
-
-    for( ; argc ; ) {
-        if (strcmp(argv[0], "--subdir") == 0) {
-            if (argc <= 1) usage();
-            int rc = chdir(argv[1]);
-            if (rc < 0) {
-                perror(argv[1]);
-                exit(errno);
-            }
-            argv+=2;
-            argc-=2;
-            continue;
-        }
-        if (strcmp(argv[0], "-t") == 0) {
-            if (argc <= 1) usage();
-            argv++, argc--;
-            rec_threshold = atoi(argv[0]);
-            argv++, argc--;
-            continue;
-        }
-        if (strcmp(argv[0], "-c") == 0) {
-            if (argc <= 1) usage();
-            argv++, argc--;
-            cantor_threshold = atoi(argv[0]);
-            argv++, argc--;
-            continue;
-        }
-        if (strcmp(argv[0], "--checkpoints") == 0) {
-            checkpoints = 1;
-            argv++, argc--;
-            continue;
-        }
-#if 0/*{{{*/
-        if (strcmp(argv[0], "-p") == 0) {
-            if (argc <= 1) usage();
-            argv++, argc--;
-            print_min = atoi(argv[0]);
-            argv++, argc--;
-            continue;
-        }
-        if (strcmp(argv[0], "--enable-complex-field") == 0
-                || strcmp(argv[0], "--fermat-prime") == 0)
-        {
-            ops_poly_args.push_back(argv[0]);
-            argv++, argc--;
-            continue;
-        }
-        if (strcmp(argv[0], "--no-check-input") == 0) {
-            check_input = 0;
-            argv++, argc--;
-            continue;
-        }
-        if (strcmp(argv[0], "--nopi") == 0) {
-            check_pi = 0;
-            argv++, argc--;
-            continue;
-        }
-        if (strcmp(argv[0], "-q") == 0) {
-            if (argc <= 1) usage();
-            argv++, argc--;
-            preferred_quadratic_algorithm = atoi(argv[0]);
-            argv++, argc--;
-            continue;
-            /* changes the quadratic algorithm employed
-               {"coppersmith old uneven",0},
-               {"new even",1},
-             */
-        }
-#endif/*}}}*/
-        usage();
-    }
-
-    config_file_t cf;
-    read_config_file(cf, files::params);
-
-    bool rc = true;
-    rc &= get_config_value(cf, "m",m); cout << fmt("// m = %\n") % m;
-    rc &= get_config_value(cf, "n",n); cout << fmt("// n = %\n") % n;
-
-    matrix_stats stat;
-    stat(files::matrix);
-
-    if (!rc) {
-        cerr << "Missing config file " << files::params << "\n";
-        exit(1);
-    }
-
-    if (rec_threshold == 0) {
-        usage();
-    }
-
-    globals::nrows = stat.nr;
-    globals::ncols = stat.nc;
-
-    total_work = Lmacro(ncols, m, n);
-
-    block_wiedemann();
+    // print_chance_list(sequence_length, chance_list);
 
     return 0;
 }

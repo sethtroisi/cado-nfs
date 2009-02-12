@@ -33,6 +33,8 @@ void * electric_alloc(size_t s)
     p = (char *)
     mmap(0, (multip + 1) * r, PROT_READ | PROT_WRITE,
                 MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    // could please valgrind ?
+    // memset(p, 0, (multip + 1) * r);
 #ifdef PROTECT_OVERRUN
     p += (multip + 1) * r;
     mprotect((void*) (p-r), r, PROT_NONE);
@@ -60,7 +62,6 @@ void electric_free(void * p0, size_t s)
     mprotect(p, r, PROT_READ | PROT_WRITE);
 #endif
     munmap(p, (multip + 1) * r);
-    // actually unmapping crashes, I don't know why.
 }
 
 static inline
@@ -78,5 +79,14 @@ void electric_free_nosize(void * p0)
     size_t s = * (size_t *) p0;
     electric_free(p0, s + sizeof(s));
 }
+
+#ifdef  __cplusplus
+template<typename T> inline T * electric_new(size_t s) {
+    return (T*) electric_alloc(sizeof(T)*s);
+}
+template<typename T> inline void electric_delete(T * p, size_t s) {
+    electric_free(p, sizeof(T)*s);
+}
+#endif
 
 #endif  /* CADO_UTILS_ELECTRIC_ALLOC_H_ */

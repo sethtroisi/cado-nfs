@@ -16,7 +16,7 @@
 #include "xvectors.h"
 #include "xymats.h"
 
-#include "bw-common.h"
+#include "bw-common-mpi.h"
 #include "filenames.h"
 
 /* Number of copies of m by n matrices to use for trying to obtain a
@@ -183,7 +183,7 @@ int main(int argc, char * argv[])
     param_list_save_parameter(bw->pl, PARAMETER_FROM_FILE, "nx", "%u", bw->nx);
     param_list_save(bw->pl, BW_CONFIG_FILE);
 
-    bw_common_clear(bw);
+    bw_common_clear_mpi(bw);
     return 0;
 }
 

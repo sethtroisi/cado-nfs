@@ -9,6 +9,8 @@
 
 #include <algorithm>
 
+#include "alloc_proxy.h"
+
 /* See the discussion in lingen_binary about the pros and cons of data
  * ordering schemes */
 
@@ -27,10 +29,10 @@ struct bcol {/*{{{*/
     unsigned long * x;
     public:
     bcol(unsigned int nrows)
-        : nrows(nrows), x(new unsigned long[stride()])
+        : nrows(nrows), x(mynew<unsigned long>(stride()))
     {}
     bcol() { nrows = 0; x = NULL; }
-    void clear() { nrows = 0; delete[] x; x = NULL; }
+    void clear() { mydelete(x, stride()); nrows = 0; }
     private:
     bcol(bcol const& a) : nrows(a.nrows), x(a.x) {}
     bcol& operator=(bcol const& a) {
@@ -39,7 +41,7 @@ struct bcol {/*{{{*/
         return *this;
     }
     public:
-    ~bcol() { delete[] x; }
+    ~bcol() { mydelete(x, stride()); }
     void swap(bcol& a) {
         podswap(nrows, a.nrows);
         podswap(x, a.x);
@@ -85,8 +87,8 @@ struct bmat { /* This is for example small-e, an m times b matrix *//*{{{*/
     inline unsigned int stride() const { return BITS_TO_WORDS(nrows, ULONG_BITS); }
     public:
     bmat(unsigned int nrows, unsigned int ncols)
-        : nrows(nrows), ncols(ncols), x(new unsigned long[ncols*stride()]),
-        order(new unsigned int[ncols])
+        : nrows(nrows), ncols(ncols), x(mynew<unsigned long>(ncols*stride())),
+        order(mynew<unsigned int>(ncols))
     {
         memset(x, 0, ncols*stride()*sizeof(unsigned long));
         for(unsigned int j = 0 ; j < ncols ; j++) order[j]=j;
@@ -97,9 +99,9 @@ struct bmat { /* This is for example small-e, an m times b matrix *//*{{{*/
         order = NULL;
     }
     void clear() {
+        mydelete(x, ncols*stride());
+        mydelete(order, ncols);
         nrows = ncols = 0;
-        delete[] x; x = NULL;
-        delete[] order; order = NULL;
     }
 private:
     bmat(bmat const& a) : nrows(a.nrows), ncols(a.ncols), x(a.x), order(a.order) {}
@@ -118,8 +120,8 @@ public:
         podswap(order,a.order);
     }
     ~bmat() {
-        delete[] x;
-        delete[] order;
+        mydelete(x, ncols*stride());
+        mydelete(order, ncols);
     };
 #if 0
     bmat clone() const {
@@ -198,7 +200,7 @@ public:
      * now be accessed at index p[i]
      */
     void perm(unsigned int * p) {
-        unsigned int * norder(new unsigned int[ncols]);
+        unsigned int * norder(mynew<unsigned int>(ncols));
         for(unsigned int i = 0 ; i < ncols ; i++) {
             norder[p[i]]=order[i];
         }
@@ -245,22 +247,25 @@ struct polmat { /* {{{ */
         }
         return m;
     }/*}}}*/
+    void alloc() {
+        /* we don't care about exceptions */
+        x = mynew<unsigned long>(ncols*colstride());
+        order = mynew<unsigned int>(ncols);
+        _deg = mynew<int>(ncols);
+    }
+    void clear() {
+        mydelete(x, ncols*colstride());
+        mydelete(order, ncols);
+        mydelete(_deg, ncols);
+    }
     /* ctors dtors etc {{{ */
     polmat(unsigned int nrows, unsigned int ncols, unsigned int ncoef)
-        : nrows(nrows), ncols(ncols), ncoef(ncoef),
-        x(new unsigned long[ncols*colstride()]),
-        order(new unsigned int[ncols]),
-        _deg(new int[ncols])
+        : nrows(nrows), ncols(ncols), ncoef(ncoef)
     {
+        alloc();
         memset(x, 0, ncols*colstride()*sizeof(unsigned long));
         for(unsigned int j = 0 ; j < ncols ; j++) order[j]=j;
         for(unsigned int j = 0 ; j < ncols ; j++) _deg[j]=-1;
-    }
-    void clear() {
-        nrows = ncols = ncoef = 0;
-        delete[] x; x = NULL;
-        delete[] order; order = NULL;
-        delete[] _deg; _deg = NULL;
     }
     polmat() {
         nrows = ncols = ncoef = 0;
@@ -273,9 +278,7 @@ struct polmat { /* {{{ */
     polmat& operator=(polmat const&){ return *this;}
     public:
     ~polmat() {
-        delete[] x;
-        delete[] order;
-        delete[] _deg;
+        clear();
     }
     inline void swap(polmat & n) {
         podswap(nrows,n.nrows);
@@ -286,16 +289,12 @@ struct polmat { /* {{{ */
         podswap(_deg,n._deg);
     }
     inline void copy(polmat & n) {
+        clear();
         nrows=n.nrows;
         ncols=n.ncols;
         ncoef=n.ncoef;
-        delete[] x;
-        delete[] order;
-        delete[] _deg;
-        order=new unsigned int[ncols];
-        _deg=new int[ncols];
-        x = new unsigned long[ncols*colstride()];
-        memcpy(order,n.order,ncols*sizeof(unsigned long));
+        alloc();
+        memcpy(order,n.order,ncols*sizeof(unsigned int));
         memcpy(_deg,n._deg,ncols*sizeof(int));
         memcpy(x, n.x, ncols*colstride()*sizeof(unsigned long));
     }
@@ -386,10 +385,10 @@ struct polmat { /* {{{ */
                     src += stride();
                 }
 
-                unsigned long * tmp = new unsigned long[input_length];
+                unsigned long * tmp = mynew<unsigned long>(input_length);
                 mpn_rshift(tmp, src + sw, input_length, sb);
                 memcpy(dst, tmp, newstride * sizeof(unsigned long));
-                delete[] tmp;
+                mydelete(tmp, input_length);
             }
             /*}}}*/
         } else {
@@ -478,12 +477,13 @@ struct polmat { /* {{{ */
      * now be accessed at index p[i]
      */
     void perm(unsigned int * p) {/*{{{*/
-        unsigned int * norder(new unsigned int[ncols]);
+        unsigned int * norder;
+        norder = mynew<unsigned int>(ncols);
         for(unsigned int i = 0 ; i < ncols ; i++) {
             norder[p[i]]=order[i];
         }
         podswap(order,norder);
-        delete[] norder;
+        mydelete(norder, ncols);
     }/*}}}*/
     unsigned int ffs(unsigned int j, unsigned int k) const {/*{{{*/
         ASSERT(k < nrows);
@@ -704,8 +704,8 @@ template<typename fft_type> struct tpolmat /* {{{ */
     tpolmat(unsigned int nrows, unsigned int ncols, fft_type const& o)
         : nrows(nrows), ncols(ncols), o(o),
         x(o.alloc(nrows * ncols)),
-        order(new unsigned int[ncols]),
-        _deg(new int[ncols])
+        order(mynew<unsigned int>(ncols)),
+        _deg(mynew<int>(ncols))
     {
         for(unsigned int j = 0 ; j < ncols ; j++) order[j]=j;
         for(unsigned int j = 0 ; j < ncols ; j++) _deg[j]=-1;
@@ -715,10 +715,10 @@ template<typename fft_type> struct tpolmat /* {{{ */
         o.zero(x, nrows * ncols);
     }
     void clear() {
-        nrows = ncols = 0;
         o.free(x, nrows * ncols); x = NULL;
-        delete[] order; order = NULL;
-        delete[] _deg; _deg = NULL;
+        mydelete(order, ncols);
+        mydelete(_deg, ncols);
+        nrows = ncols = 0;
     }
     tpolmat() {
         nrows = ncols = 0;
@@ -731,9 +731,9 @@ template<typename fft_type> struct tpolmat /* {{{ */
     tpolmat& operator=(tpolmat const&){ return *this;}
     public:
     ~tpolmat() {
-        o.free(x,  nrows * ncols);
-        delete[] order;
-        delete[] _deg;
+        o.free(x, nrows * ncols); x = NULL;
+        mydelete(order, ncols);
+        mydelete(_deg, ncols);
     }
     inline void swap(tpolmat & n) {
         podswap(nrows,n.nrows);
@@ -757,12 +757,12 @@ template<typename fft_type> struct tpolmat /* {{{ */
      * now be accessed at index p[i]
      */
     void perm(unsigned int * p) {
-        unsigned int * norder(new unsigned int[ncols]);
+        unsigned int * norder(mynew<unsigned int>(ncols));
         for(unsigned int i = 0 ; i < ncols ; i++) {
             norder[p[i]]=order[i];
         }
         podswap(order,norder);
-        delete[] norder;
+        mydelete(norder, ncols);
     }
     typename fft_type::t poly(unsigned int i, unsigned int j)
     {
@@ -800,7 +800,164 @@ void transform(tpolmat<fft_type>& dst, polmat& src, fft_type& o, int d)
     dst.swap(tmp);
 }
 
-/* XXX Do Strassen here ! */
+template<typename fft_type>
+void glue4(
+        tpolmat<fft_type> & dst,
+        tpolmat<fft_type> const & s00,
+        tpolmat<fft_type> const & s01,
+        tpolmat<fft_type> const & s10,
+        tpolmat<fft_type> const & s11,
+        fft_type& o)
+{
+    unsigned int nr2 = dst.nrows >> 1;
+    unsigned int nc2 = dst.ncols >> 1;
+    for(unsigned int i = 0; i < nr2; ++i) {
+        for(unsigned int j = 0; j < nc2; ++j) {
+            o.cpy(dst.poly(i,j), s00.poly(i,j));
+            o.cpy(dst.poly(i,j+nc2), s01.poly(i,j));
+        }
+    }
+    for(unsigned int i = 0; i < nr2; ++i) {
+        for(unsigned int j = 0; j < nc2; ++j) {
+            o.cpy(dst.poly(i+nr2,j), s10.poly(i,j));
+            o.cpy(dst.poly(i+nr2,j+nc2), s11.poly(i,j));
+        }
+    }
+}
+
+template<typename fft_type>
+void splitin4(
+        tpolmat<fft_type>& dst00,
+        tpolmat<fft_type>& dst01,
+        tpolmat<fft_type>& dst10,
+        tpolmat<fft_type>& dst11,
+        tpolmat<fft_type> const & s,
+        fft_type& o)
+{
+    ASSERT((s.nrows & 1) == 0);
+    ASSERT((s.ncols & 1) == 0);
+    unsigned int nr2 = s.nrows >> 1;
+    unsigned int nc2 = s.ncols >> 1;
+    for(unsigned int i = 0; i < nr2; ++i) {
+        for(unsigned int j = 0; j < nc2; ++j) {
+            o.cpy(dst00.poly(i,j), s.poly(i,j));
+            o.cpy(dst01.poly(i,j), s.poly(i,j+nc2));
+        }
+    }
+    for(unsigned int i = 0; i < nr2; ++i) {
+        for(unsigned int j = 0; j < nc2; ++j) {
+            o.cpy(dst10.poly(i,j), s.poly(i+nr2,j));
+            o.cpy(dst11.poly(i,j), s.poly(i+nr2,j+nc2));
+        }
+    }
+}
+
+template<typename fft_type>
+void add(
+        tpolmat<fft_type>& dst,
+        tpolmat<fft_type> const & s1,
+        tpolmat<fft_type> const & s2,
+        fft_type& o)
+{
+    ASSERT(s1.nrows == s2.nrows);
+    ASSERT(s1.ncols == s2.ncols);
+    for(unsigned int i = 0 ; i < s1.nrows ; i++) {
+        for(unsigned int j = 0 ; j < s1.ncols ; j++) {
+            o.add(dst.poly(i,j), s1.poly(i,j), s2.poly(i,j));
+        }
+    }
+}
+
+
+template<typename fft_type>
+void compose_strassen(
+        tpolmat<fft_type>& dst,
+        tpolmat<fft_type> const & s1,
+        tpolmat<fft_type> const & s2,
+        fft_type& o)
+{
+    ASSERT(s1.ncols == s2.nrows);
+    // Build submatrices
+    // We don't even try do to it in place
+    ASSERT((s1.nrows & 1) == 0);
+    ASSERT((s1.ncols & 1) == 0);
+    unsigned int nr2 = s1.nrows >> 1;
+    unsigned int nc2 = s1.ncols >> 1;
+    tpolmat<fft_type> A11(nr2, nc2, o);
+    tpolmat<fft_type> A12(nr2, nc2, o);
+    tpolmat<fft_type> A21(nr2, nc2, o);
+    tpolmat<fft_type> A22(nr2, nc2, o);
+    tpolmat<fft_type> tmpA(nr2, nc2, o);
+    splitin4(A11, A12, A21, A22, s1, o);
+
+    ASSERT((s2.nrows & 1) == 0);
+    ASSERT((s2.ncols & 1) == 0);
+    nr2 = s2.nrows >> 1;
+    nc2 = s2.ncols >> 1;
+    tpolmat<fft_type> B11(nr2, nc2, o);
+    tpolmat<fft_type> B12(nr2, nc2, o);
+    tpolmat<fft_type> B21(nr2, nc2, o);
+    tpolmat<fft_type> B22(nr2, nc2, o);
+    tpolmat<fft_type> tmpB(nr2, nc2, o);
+    splitin4(B11, B12, B21, B22, s2, o);
+
+    // Build partial products
+    unsigned int nr = s1.nrows >> 1;
+    unsigned int nc = s2.ncols >> 1;
+    // M1 = (A11 + A22)*(B11 +  B22)
+    tpolmat<fft_type> M1(nr, nc, o);
+    add(tmpA, A11, A22, o); add(tmpB, B11, B22, o);
+    compose(M1, tmpA, tmpB, o);
+    // M2 = (A21 + A22)*B11
+    tpolmat<fft_type> M2(nr, nc, o);
+    add(tmpA, A21, A22, o); 
+    compose(M2, tmpA, B11, o);
+    // M3 = A11*(B12-B22)
+    tpolmat<fft_type> M3(nr, nc, o);
+    add(tmpB, B12, B22, o); 
+    compose(M3, A11, tmpB, o);
+    // M4 = A22*(B21-B11)
+    tpolmat<fft_type> M4(nr, nc, o);
+    add(tmpB, B21, B11, o); 
+    compose(M4, A22, tmpB, o);
+    // M5 = (A11+A12)*B22
+    tpolmat<fft_type> M5(nr, nc, o);
+    add(tmpA, A11, A12, o);
+    compose(M5, tmpA, B22, o);
+    // M6 = (A21-A11)*(B11+B12)
+    tpolmat<fft_type> M6(nr, nc, o);
+    add(tmpA, A21, A11, o); add(tmpB, B11, B12, o);
+    compose(M6, tmpA, tmpB, o);
+    // M7 = (A12-A22)*(B21+B22)
+    tpolmat<fft_type> M7(nr, nc, o);
+    add(tmpA, A12, A22, o); add(tmpB, B21, B22, o);
+    compose(M7, tmpA, tmpB, o);
+
+    // Reconstruct result
+    // C11 = M1+M4-M5+M7  Store it in M7
+    add(M7, M7, M1, o); add(M7, M7, M4, o); add(M7, M7, M5, o);
+    // C12 = M3+ M5    Store it in M5
+    add(M5, M5, M3, o);
+    // C21 = M2+M4     Store it in M4
+    add(M4, M4, M2, o);
+    // C22 = M1 - M2 + M3 + M6  Store it in M6
+    add(M6, M6, M1, o); add(M6, M6, M2, o); add(M6, M6, M3, o);
+
+    glue4(dst, M7, M5, M4, M6, o);
+}
+
+
+// How to tune a threshold for Strassen's algo ????
+// This is a 3-d problem...
+// And this probably depends also on the degrees of the polynomials.
+int use_strassen(unsigned int m, unsigned int n, unsigned int p, int deg) {
+    static const unsigned int minsize = 4;
+    static const int mindeg = 200;
+    if (m < minsize || n < minsize || p < minsize || deg < mindeg) 
+        return 0;
+    return 1;
+}
+
 template<typename fft_type>
 void compose(
         tpolmat<fft_type>& dst,
@@ -810,19 +967,25 @@ void compose(
 {
     tpolmat<fft_type> tmp(s1.nrows, s2.ncols, o);
     ASSERT(s1.ncols == s2.nrows);
-    tmp.zero();
-    typename fft_type::t x = o.alloc(1);
-    for(unsigned int j = 0 ; j < s2.ncols ; j++) {
-        for(unsigned int k = 0 ; k < s1.ncols ; k++) {
-            for(unsigned int i = 0 ; i < s1.nrows ; i++) {
-                o.compose(x, s1.poly(i,k), s2.poly(k,j));
-                o.add(tmp.poly(i,j), tmp.poly(i,j), x);
+    if (use_strassen(s1.nrows, s1.ncols, s2.ncols, o.size())) {
+        compose_strassen(tmp, s1, s2, o);
+    } else {
+        typename fft_type::t x = o.alloc(1);
+        tmp.zero();
+        for(unsigned int j = 0 ; j < s2.ncols ; j++) {
+            for(unsigned int k = 0 ; k < s1.ncols ; k++) {
+                for(unsigned int i = 0 ; i < s1.nrows ; i++) {
+                    o.compose(x, s1.poly(i,k), s2.poly(k,j));
+                    o.add(tmp.poly(i,j), tmp.poly(i,j), x);
+                }
             }
         }
+        o.free(x,1);
+        x = NULL;
     }
-    o.free(x,1);
     dst.swap(tmp);
 }
+
 
 template<typename fft_type>
 void itransform(polmat& dst, tpolmat<fft_type>& src, fft_type& o, int d)

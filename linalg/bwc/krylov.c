@@ -12,7 +12,7 @@
 #include "params.h"
 #include "xvectors.h"
 #include "xymats.h"
-#include "bw-common.h"
+#include "bw-common-mpi.h"
 #include "async.h"
 // #include "rusage.h"
 #include "filenames.h"
@@ -263,7 +263,7 @@ int main(int argc, char * argv[])
     catch_control_signals();
     pi_go(krylov_prog, bw->mpi_split[0], bw->mpi_split[1], bw->thr_split[0], bw->thr_split[1], 0);
 
-    bw_common_clear(bw);
+    bw_common_clear_mpi(bw);
     return 0;
 }
 

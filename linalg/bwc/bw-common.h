@@ -19,61 +19,75 @@
 
 struct bw_params {
 
-/* m,n blocking factors as in the textbook BW description */
-int m,n;
+    /* m,n blocking factors as in the textbook BW description */
+    int m,n;
 
-/* modulus -- has to be 2 for now. Depending on abase and some stuff here
- * and there, it could be expanded. */
-mpz_t p;
+    /* modulus -- has to be 2 for now. Depending on abase and some stuff here
+     * and there, it could be expanded. */
+    mpz_t p;
 
-/* _at the moment_ this corresponds to the checking & checkpointing
- * interval. Quite clearly, the two could be separated.
- */
-int interval;
+    /* _at the moment_ this corresponds to the checking & checkpointing
+     * interval. Quite clearly, the two could be separated.
+     */
+    int interval;
 
-/* defined, but unused */
-int verbose;
+    /* defined, but unused */
+    int verbose;
 
-/* XXX Could be dropped -- most filenames are hardcoded anyway, so why not
- * this one ? */
-char matrix_filename[FILENAME_MAX];
+    /* XXX Could be dropped -- most filenames are hardcoded anyway, so why not
+     * this one ? */
+    char matrix_filename[FILENAME_MAX];
 
-/* Whether the current job/thread may print to stdout */
-int can_print;
+    /* Whether the current job/thread may print to stdout */
+    int can_print;
 
-/* This indicates the starting iteration -- only for krylov and mksol */
-int start;
-int end;
+    /* This indicates the starting iteration -- only for krylov and mksol */
+    int start;
+    int end;
 
-/* for a given krylov/mksol task, indicates the coordinate range in
- * [0..n[ that is relevant for us. ys[1]-ys[0] defines the ``local''
- * blocking factor n'.
- */
-int ys[2];
+    /* for a given krylov/mksol task, indicates the coordinate range in
+     * [0..n[ that is relevant for us. ys[1]-ys[0] defines the ``local''
+     * blocking factor n'.
+     */
+    int ys[2];
 
-/* Number of coordinates in the X vectors */
-unsigned int nx;
+    /* Number of coordinates in the X vectors */
+    unsigned int nx;
 
-/* dir is a boolean flag equal to 1 if we are looking for the right
- * nullspace of the matrix. In matmul_top speak, it indicates where the
- * source vector is.
- */
-int dir;
+    /* dir is a boolean flag equal to 1 if we are looking for the right
+     * nullspace of the matrix. In matmul_top speak, it indicates where the
+     * source vector is.
+     */
+    int dir;
 
-/* How many mpi jobs are defined. First array member indicates the number
- * of horizontal stripes in the mpi job grid, second is vertical
- */
-int mpi_split[2];
+    /* How many mpi jobs are defined. First array member indicates the number
+     * of horizontal stripes in the mpi job grid, second is vertical
+     */
+    int mpi_split[2];
 
-/* Similar, but for threads. Not exclusive of the above.
- */
-int thr_split[2];
+    /* Similar, but for threads. Not exclusive of the above.
+    */
+    int thr_split[2];
 
-/* Only prep and lingen are not deterministic. */
-int seed;
+    /* Only prep and lingen are not deterministic. */
+    int seed;
 
-/* This is exposed only for hacks */
-param_list pl;
+    /* This is exposed only for hacks */
+    param_list pl;
+
+    /* Save checkpoints or not */
+    int checkpoints;
+
+    /* Some stuff relevant for lingen only */
+    
+    /* Name of the source a file */
+    char a[FILENAME_MAX];
+
+    /* threshold for the recursive algorithm */
+    unsigned int lingen_threshold;
+
+    /* threshold for cantor fft algorithm */
+    unsigned int cantor_threshold;
 };
 
 #ifdef __cplusplus
@@ -81,9 +95,13 @@ extern "C" {
 #endif
 
 extern int bw_common_init(struct bw_params * bw, int argc, char * argv[]);
-extern int bw_common_init_mpi(struct bw_params * bw, int argc, char * argv[]);
 extern int bw_common_clear(struct bw_params * bw);
 extern const char * bw_common_usage_string();
+
+/* Some stuff which is shared as well by bw-common-mpi.h, but not within
+ * the public interface nevertheless */
+extern int bw_common_init_shared(struct bw_params * bw, int argc, char * argv[]);
+extern int bw_common_init_defaults(struct bw_params * bw);
 
 #ifdef __cplusplus
 }

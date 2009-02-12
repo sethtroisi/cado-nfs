@@ -6,7 +6,6 @@
 #include <errno.h>
 
 #include "bw-common.h"
-#include "select_mpi.h"
 #include "params.h"
 #include "filenames.h"
 
@@ -14,8 +13,6 @@ const char * dirtext[] = { "left", "right" };
 
 /* Has to be defined by the program */
 extern void usage();
-
-static int init_mpi = 0;
 
 int bw_common_init_defaults(struct bw_params * bw)
 {
@@ -28,6 +25,10 @@ int bw_common_init_defaults(struct bw_params * bw)
     bw->dir = 1;
     bw->mpi_split[0] = bw->mpi_split[1] = 1;
     bw->thr_split[0] = bw->thr_split[1] = 1;
+
+    bw->checkpoints = 1;
+
+    bw->cantor_threshold = UINT_MAX;
 
     return 0;
 }
@@ -46,6 +47,8 @@ int bw_common_init_shared(struct bw_params * bw, int argc, char * argv[])
 
     argv++, argc--;
     param_list_configure_knob(bw->pl, "-v", &bw->verbose);
+    param_list_configure_alias(bw->pl, "lingen-threshold", "lingen_threshold");
+    param_list_configure_alias(bw->pl, "cantor-threshold", "cantor_threshold");
     for( ; argc ; ) {
         if (param_list_update_cmdline(bw->pl, &argc, &argv)) { continue; }
         fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
@@ -86,6 +89,11 @@ int bw_common_init_shared(struct bw_params * bw, int argc, char * argv[])
     param_list_parse_int_and_int(bw->pl, "ys", bw->ys, "..");
     param_list_parse_int(bw->pl, "start", &bw->start);
     param_list_parse_int(bw->pl, "end", &bw->end);
+    param_list_parse_int(bw->pl, "checkpoints", &bw->checkpoints);
+    param_list_parse_uint(bw->pl, "lingen-threshold", &bw->lingen_threshold);
+    param_list_parse_uint(bw->pl, "cantor-threshold", &bw->cantor_threshold);
+
+    param_list_parse_string(bw->pl, "a", bw->a, sizeof(bw->a));
 
     mpz_init_set_ui(bw->p, 2);
     param_list_parse_mpz(bw->pl, "p", bw->p);
@@ -133,46 +141,10 @@ int bw_common_init(struct bw_params * bw, int argc, char * argv[])
     return bw_common_init_shared(bw, argc, argv);
 }
 
-int bw_common_init_mpi(struct bw_params * bw, int argc, char * argv[])
-{
-    bw_common_init_defaults(bw);
-
-#ifdef  MPI_LIBRARY_MT_CAPABLE
-    int req = MPI_THREAD_MULTIPLE;
-    int prov;
-    MPI_Init_thread(&argc, &argv, req, &prov);
-    if (req != prov) {
-        fprintf(stderr, "Cannot init mpi with MPI_THREAD_MULTIPLE ;"
-                " got %d != req %d\n",
-                prov, req);
-        exit(1);
-    }
-#else
-    MPI_Init(&argc, &argv);
-#endif
-    int rank;
-    int size;
-
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-
-    bw->can_print = rank == 0 || getenv("CAN_PRINT");
-
-    init_mpi = 1;
-
-    return bw_common_init_shared(bw, argc, argv);
-}
-
 int bw_common_clear(struct bw_params * bw)
 {
     param_list_clear(bw->pl);
-
     mpz_clear(bw->p);
-
-    if (init_mpi) {
-        MPI_Finalize();
-    }
-
     return 0;
 }
 
@@ -187,6 +159,7 @@ const char * bw_common_usage_string()
         "\tmn=<int>\tset both bw->m and bw->n (exclusive with the two above)\n"
         "\tmpi=<int>x<int>\tset number of mpi jobs. Must agree with mpiexec\n"
         "\tthr=<int>x<int>\tset number of threads.\n"
+        "\tcheckpoints=<bool>\tsave checkpoints.\n"
         "\tmatrix=<filename>\tset matrix\n"
         "\tinterval=<int>\tset checking bw->interval\n"
         "\tseed=<int>\tseed value for picking random numbers\n"

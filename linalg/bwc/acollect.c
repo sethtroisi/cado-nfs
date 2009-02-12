@@ -53,6 +53,8 @@ int afile_cmp(afile_ptr a, afile_ptr b)
 
 int main(int argc, char * argv[])
 {
+    int rc = 0;
+
     param_list pl;
 
     param_list_init (pl);
@@ -135,6 +137,16 @@ int main(int argc, char * argv[])
         return 0;
     }
 
+    if (n_afiles == 1) {
+        char * tmp;
+        rc = asprintf(&tmp, A_FILE_PATTERN,
+                afiles[0]->n0,afiles[0]->n1,afiles[0]->j0,afiles[0]->j1);
+        printf("%s\n", tmp);
+        free(tmp);
+        free(afiles);
+        return 0;
+    }
+
     qsort(afiles, n_afiles, sizeof(afile), (sortfunc_t) &afile_cmp);
 
     afile final;
@@ -144,10 +156,10 @@ int main(int argc, char * argv[])
     final->j0 = UINT_MAX;
     final->j1 = UINT_MAX;
     FILE * f = fopen("A.temp", "w");
-    int rc = 0;
 
     int k0 = 0;
     int k1;
+
     for( ; k0 < n_afiles ; ) {
         unsigned int j0 = afiles[k0]->j0;
         unsigned int j1 = afiles[k0]->j1;
@@ -265,6 +277,7 @@ bailout:
         if (r < 0) {
             fprintf(stderr, "rename: %s\n", strerror(errno));
         }
+        printf("%s\n",tmp);
         free(tmp);
     }
     free(afiles);
