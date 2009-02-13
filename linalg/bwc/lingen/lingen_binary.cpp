@@ -30,6 +30,7 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <dirent.h>
 
 #include "cado.h"
 #include "utils.h"
@@ -42,6 +43,15 @@ struct bw_params bw[1];
 #include "fft_adapter.hpp"
 #include "lingen_mat_types.hpp"
 #include "gf2x.h"
+
+/* Name of the source a file */
+char input_file[FILENAME_MAX];
+
+/* threshold for the recursive algorithm */
+unsigned int lingen_threshold = 0;
+
+/* threshold for cantor fft algorithm */
+unsigned int cantor_threshold = UINT_MAX;
 
 /* {{{ macros used here only -- could be bumped to macros.h if there is
  * need.
@@ -279,6 +289,7 @@ void compute_final_F_from_PI(polmat& F, polmat const& pi)/*{{{*/
     printf("Computing final F from PI\n");
     using namespace globals;
     // We take t0 rows, so that we can do as few shifts as possible
+    // tmpmat is used only within the inner loop.
     polmat tmpmat(t0,1,pi.ncoef);
     polmat tmp_F(n, m + n, globals::t0 + pi.ncoef);
     using namespace std;
@@ -299,11 +310,10 @@ void compute_final_F_from_PI(polmat& F, polmat const& pi)/*{{{*/
         //
         // Now fill in the row.
         for(unsigned int j = 0 ; j < m + n ; j++) {
-            // We zero out the whole column, it's less trouble.
-            tmpmat.zcol(0);// XXX FIXME what's this ? 0 ?
+            // tmpmat is a single column.
+            tmpmat.zcol(0);
             for(unsigned int k = 0 ; k < l.size() ; k++) {
                 tmpmat.addpoly(l[k].second, 0, pi.poly(l[k].first, j));
-                tmpmat.zcol(0);// XXX FIXME what's this ? 0 ?
             }
             tmp_F.addpoly(i,j,pi.poly(i,j));
             for(unsigned int k = 0 ; k < exps.size() ; k++) {
@@ -336,20 +346,20 @@ void read_data_for_series(polmat& A MAYBE_UNUSED, unsigned int ondisk_length)
     
     { /* {{{ check file size */
         struct stat sbuf[1];
-        int rc = stat(bw->a, sbuf);
-        DIE_ERRNO_DIAG(rc<0,"stat",bw->a);
+        int rc = stat(input_file, sbuf);
+        DIE_ERRNO_DIAG(rc<0,"stat",input_file);
         ssize_t expected = m * n / CHAR_BIT * ondisk_length;
 
         if (sbuf->st_size != expected) {
             fprintf(stderr, "%s does not have expected size %zu\n",
-                    bw->a, expected);
+                    input_file, expected);
             exit(1);
         }
     } /* }}} */
 
     /* We've got matrices of m times n bits. */
-    FILE * f = fopen(bw->a, "r");
-    DIE_ERRNO_DIAG(f == NULL, "fopen", bw->a);
+    FILE * f = fopen(input_file, "r");
+    DIE_ERRNO_DIAG(f == NULL, "fopen", input_file);
 
 
     ASSERT_ALWAYS(n % ULONG_BITS == 0);
@@ -1610,9 +1620,9 @@ static bool compute_lingen(polmat& pi, recursive_tree_timer_t & tim)
     
     tim.push();
 
-    if (deg_E <= bw->lingen_threshold) {
+    if (deg_E <= lingen_threshold) {
         b = go_quadratic(pi);
-    } else if (deg_E < bw->cantor_threshold) {
+    } else if (deg_E < cantor_threshold) {
         /* The bound is such that deg + deg/4 is 64 words or less */
         b = go_recursive<fake_fft>(pi, tim);
     } else {
@@ -1740,25 +1750,50 @@ int main(int argc, char *argv[])
     setvbuf(stdout,NULL,_IONBF,0);
     setvbuf(stderr,NULL,_IONBF,0);
 
-    bw_common_init(bw, argc, argv);
+    param_list pl;
+    param_list_init(pl);
+    param_list_configure_alias(pl, "lingen-threshold", "lingen_threshold");
+    param_list_configure_alias(pl, "cantor-threshold", "cantor_threshold");
+    bw_common_init(bw, pl, argc, argv);
+    param_list_parse_uint(pl, "lingen-threshold", &lingen_threshold);
+    param_list_parse_uint(pl, "cantor-threshold", &cantor_threshold);
+    if (param_list_warn_unused(pl)) usage();
+    param_list_clear(pl);
 
     m = n = 0;
 
     if (bw->m == -1) { fprintf(stderr, "no m value set\n"); exit(1); } 
-    if (bw->a[0] == '\0') { fprintf(stderr, "no a filename set\n"); exit(1); } 
-    if (bw->lingen_threshold == 0) {
+
+    if (lingen_threshold == 0) {
         fprintf(stderr, "no lingen_threshold value set\n");
         exit(1);
     }
 
     unsigned int n0, n1, j0, j1;
 
-    int rc = sscanf(bw->a, A_FILE_PATTERN, &n0, &n1, &j0, &j1);
-
-    if (rc != 4) {
-        fprintf(stderr, "a file %s does not match pattern %s\n", bw->a, A_FILE_PATTERN);
-        exit(1);
-    }
+    { /* {{{ detect the input file -- there must be only one file. */
+        DIR * dir = opendir(".");
+        struct dirent * de;
+        input_file[0]='\0';
+        for( ; (de = readdir(dir)) != NULL ; ) {
+            int len;
+            int rc = sscanf(de->d_name, A_FILE_PATTERN "%n",
+                    &n0, &n1, &j0, &j1, &len);
+            /* rc is expected to be 4 or 5 depending on our reading of the
+             * standard */
+            if (rc < 4 || len != (int) strlen(de->d_name)) {
+                continue;
+            }
+            if (input_file[0] != '\0') {
+                fprintf(stderr, "Found two possible file names %s and %s\n",
+                        input_file, de->d_name);
+                exit(1);
+            }
+            size_t clen = std::max((size_t) len, sizeof(input_file));
+            memcpy(input_file, de->d_name, clen);
+        }
+        closedir(dir);
+    } /* }}} */
 
     if (bw->n == 0) {
         bw->n = n1 - n0;
@@ -1775,7 +1810,7 @@ int main(int argc, char *argv[])
         ASSERT_ALWAYS(bw->start == 0);
         bw->end = j1 - j0;
     } else if (bw->end - bw->start > (int) (j1 - j0)) {
-        fprintf(stderr, "sequence file %s is too short\n", bw->a);
+        fprintf(stderr, "sequence file %s is too short\n", input_file);
         exit(1);
     }
         

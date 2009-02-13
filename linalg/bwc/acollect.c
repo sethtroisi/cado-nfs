@@ -13,6 +13,7 @@
 #include "manu.h"
 #include "utils.h"
 #include "filenames.h"
+#include "bw-common.h"
 
 /* This program is rather standalone. It checks the current directory
  * for files matching the pattern A%u-%u.%u-%u, and concatenates them.
@@ -22,9 +23,11 @@
 
 void usage()
 {
-    fprintf(stderr, "Usage: acollect m=<m> [wdir=<path>] [--remove-old]\n");
+    fprintf(stderr, "Usage: acollect [m=<m>] [wdir=<path>] [--remove-old]\n");
     exit(1);
 }
+
+struct bw_params bw[1];
 
 int remove_old = 0;
 
@@ -56,36 +59,11 @@ int main(int argc, char * argv[])
     int rc = 0;
 
     param_list pl;
-
-    param_list_init (pl);
-
-    argv++, argc--;
-
+    param_list_init(pl);
     param_list_configure_knob(pl, "--remove-old", &remove_old);
+    bw_common_init(bw, pl, argc, argv);
+    param_list_clear(pl);
 
-    for( ; argc ; ) {
-        if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
-        fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
-        usage();
-    }
-
-    const char * tmp;
-
-    if ((tmp = param_list_lookup_string(pl, "wdir")) != NULL) {
-        if (chdir(tmp) < 0) {
-            fprintf(stderr, "chdir(%s): %s\n", tmp, strerror(errno));
-            exit(1);
-        }
-    }
-
-    unsigned int m;
-
-    if (!param_list_parse_uint(pl, "m", &m)) {
-        usage();
-    }
-
-    param_list_warn_unused (pl);
-    param_list_clear (pl);
 
     afile * afiles = NULL;
     int n_afiles = 0;
@@ -97,7 +75,7 @@ int main(int argc, char * argv[])
     for( ; (de = readdir(dir)) != NULL ; ) {
         afile_ptr a = afiles[n_afiles];
         int k;
-        int rc = sscanf(de->d_name, "A%u-%u.%u-%u%n", &a->n0, &a->n1, &a->j0, &a->j1, &k);
+        int rc = sscanf(de->d_name, A_FILE_PATTERN "%n", &a->n0, &a->n1, &a->j0, &a->j1, &k);
         /* rc is expected to be 4 or 5 depending on our reading of the
          * standard */
         if (rc < 4 || k != (int) strlen(de->d_name)) {
@@ -114,7 +92,7 @@ int main(int argc, char * argv[])
                 fprintf(stderr, "stat: %s\n", strerror(errno));
                 exit(1);
             }
-            ssize_t expected = m * (a->n1-a->n0) / CHAR_BIT * (a->j1 - a->j0);
+            ssize_t expected = bw->m * (a->n1-a->n0) / CHAR_BIT * (a->j1 - a->j0);
 
             if (sbuf->st_size != expected) {
                 fprintf(stderr, "%s does not have expected size %zu\n",
@@ -210,7 +188,7 @@ int main(int argc, char * argv[])
         final->j1 = j0;
 
         for(unsigned int j = j0 ; j < j1 ; j++) {
-            for(unsigned int i = 0 ; i < m ; i++) {
+            for(int i = 0 ; i < bw->m ; i++) {
                 char * ptr = buf;
                 size_t rz;
                 size_t sz;

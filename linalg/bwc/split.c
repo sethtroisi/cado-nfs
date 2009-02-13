@@ -10,74 +10,99 @@
 #include <limits.h>
 #include "macros.h"
 #include "filenames.h"
+#include "bw-common.h"
+#include "params.h"
 
 char * ifile;
 char * ofile_fmt;
 
+/* Maximum number of possible splits */
+#define MAXSPLITS 16
+
+/* splits for the different sites */
+int splits[MAXSPLITS + 1];
+
+struct bw_params bw[1];
+
+int split_y = 0;
+int split_f = 0;
+int force = 0;
+
+void usage()
+{
+    fprintf(stderr, "Usage: ./splits <options> [--split-y|--split-f] splits=0,<n1>,<n2>,...\n");
+    fprintf(stderr, bw_common_usage_string());
+    fprintf(stderr, "Relevant options here: wdir cfg n\n");
+    fprintf(stderr, "Note: data files must be found in wdir !\n");
+    exit(1);
+}
 
 int main(int argc, char * argv[])
 {
-    int * stops;
     FILE ** files;
 
-#if 0
-    /* TODO before sticking in param_list : add a
-     * param_list_parse_int_list.
-     */
     param_list pl;
-
-    param_list_init (pl);
-
-    argv++, argc--;
-    for( ; argc ; ) {
-        if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
-        fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
+    param_list_init(pl);
+    param_list_configure_knob(pl, "--split-y", &split_y);
+    param_list_configure_knob(pl, "--split-f", &split_f);
+    param_list_configure_knob(pl, "--force", &force);
+    bw_common_init(bw, pl, argc, argv);
+    int nsplits;
+    nsplits = param_list_parse_int_list(pl, "splits", splits, MAXSPLITS, ",");
+    if (param_list_warn_unused(pl)) usage();
+    if (split_f + split_y != 1) {
+        fprintf(stderr, "Please select one of --split-y or --split-f\n");
         usage();
     }
-
-    const char * tmp;
-
-    if ((tmp = param_list_lookup_string(pl, "wdir")) != NULL) {
-        if (chdir(tmp) < 0) {
-            fprintf(stderr, "chdir(%s): %s\n", tmp, strerror(errno));
-            exit(1);
-        }
+    if (nsplits == 0) {
+        fprintf(stderr, "Please indicate the splitting points\n");
+        usage();
     }
-
-    param_list_clear (pl);
-#endif
+    param_list_clear(pl);
 
     if (argc <= 1) {
         fprintf(stderr, "Usage: split <n_0> <n_1> ...\n");
         exit(1);
     }
 
-    int nstops = argc-1;
-    stops = malloc((nstops+1) * sizeof(unsigned int));
-    files = malloc(nstops * sizeof(FILE *));
-    stops[0] = 0;
-    for(int i = 1 ; i < argc ; i++) {
-        unsigned int len = atoi(argv[i]);
-        ASSERT_ALWAYS(len);
-        ASSERT_ALWAYS(len % CHAR_BIT == 0);
-        stops[i] = stops[i-1] + len / CHAR_BIT;
+    files = malloc(nsplits * sizeof(FILE *));
+
+    for(int i = 0 ; i < nsplits ; i++) {
+        ASSERT_ALWAYS((i == 0) == (splits[i] == 0));
+        ASSERT_ALWAYS((i == 0) || (splits[i-1] < splits[i]));
     }
+    if (splits[nsplits-1] != bw->n) {
+        fprintf(stderr, "last split coincides with configured n\n");
+        exit(1);
+    }
+
+    for(int i = 0 ; i < nsplits ; i++) {
+        ASSERT_ALWAYS(splits[i] % CHAR_BIT == 0);
+        splits[i] /= CHAR_BIT;
+    }
+
+    nsplits--;
 
     int rc;
 
     /* prepare the file names */
-    rc = asprintf(&ifile, COMMON_VECTOR_ITERATE_PATTERN,
-            Y_FILE_BASE, 0);
-    rc = asprintf(&ofile_fmt, COMMON_VECTOR_ITERATE_PATTERN,
-            V_FILE_BASE_PATTERN, 0);
+    if (split_y) {
+        rc = asprintf(&ifile, COMMON_VECTOR_ITERATE_PATTERN,
+                Y_FILE_BASE, 0);
+        rc = asprintf(&ofile_fmt, COMMON_VECTOR_ITERATE_PATTERN,
+                V_FILE_BASE_PATTERN, 0);
+    } else {
+        ifile = strdup(LINGEN_F_FILE);
+        ofile_fmt = strdup(F_FILE_SLICE_PATTERN);
+    }
 
     struct stat sbuf[1];
     stat(ifile, sbuf);
 
-    if ((sbuf->st_size) % stops[nstops] != 0) {
+    if ((sbuf->st_size) % splits[nsplits] != 0) {
         fprintf(stderr, 
                 "Size of %s (%ld bytes) is not a multiple of %d bytes\n",
-                ifile, (long) sbuf->st_size, stops[nstops]);
+                ifile, (long) sbuf->st_size, splits[nsplits]);
     }
 
     FILE * f = fopen(ifile, "r");
@@ -86,16 +111,17 @@ int main(int argc, char * argv[])
         exit(1);
     }
 
-    if (nstops == 1) {
+    if (nsplits == 1) {
         char * fname;
         int i = 0;
         /* Special case ; a hard link is enough */
-        rc = asprintf(&fname, ofile_fmt, stops[i], CHAR_BIT * stops[i+1]);
+        rc = asprintf(&fname, ofile_fmt, splits[i], CHAR_BIT * splits[i+1]);
         rc = stat(fname, sbuf);
-        if (rc == 0) {
+        if (rc == 0 && !force) {
             fprintf(stderr,"%s already exists\n", fname);
             exit(1);
         }
+        if (rc == 0 && force) { unlink(fname); }
         if (rc < 0 && errno != ENOENT) {
             fprintf(stderr,"%s: %s\n", fname, strerror(errno));
             exit(1);
@@ -106,17 +132,20 @@ int main(int argc, char * argv[])
             exit(1);
         }
         free(fname);
+        free(ifile);
+        free(ofile_fmt);
         return 0;
     }
 
-    for(int i = 0 ; i < nstops ; i++) {
+    for(int i = 0 ; i < nsplits ; i++) {
         char * fname;
-        rc = asprintf(&fname, ofile_fmt, stops[i], CHAR_BIT * stops[i+1]);
+        rc = asprintf(&fname, ofile_fmt, splits[i], CHAR_BIT * splits[i+1]);
         rc = stat(fname, sbuf);
-        if (rc == 0) {
+        if (rc == 0 && !force) {
             fprintf(stderr,"%s already exists\n", fname);
             exit(1);
         }
+        if (rc == 0 && force) { unlink(fname); }
         if (rc < 0 && errno != ENOENT) {
             fprintf(stderr,"%s: %s\n", fname, strerror(errno));
             exit(1);
@@ -129,11 +158,11 @@ int main(int argc, char * argv[])
         free(fname);
     }
 
-    void * ptr = malloc(stops[nstops]);
+    void * ptr = malloc(splits[nsplits]);
 
     for(;;) {
-        rc = fread(ptr, 1, stops[nstops], f);
-        if (rc != stops[nstops] && rc != 0) {
+        rc = fread(ptr, 1, splits[nsplits], f);
+        if (rc != splits[nsplits] && rc != 0) {
             fprintf(stderr, "Unexpected short read\n");
             exit(1);
         }
@@ -142,19 +171,22 @@ int main(int argc, char * argv[])
 
         char * q = ptr;
 
-        for(int i = 0 ; i < nstops ; i++) {
-            rc = fwrite(q, 1, stops[i+1]-stops[i], files[i]);
-            if (rc != stops[i+1]-stops[i]) {
+        for(int i = 0 ; i < nsplits ; i++) {
+            rc = fwrite(q, 1, splits[i+1]-splits[i], files[i]);
+            if (rc != splits[i+1]-splits[i]) {
                 fprintf(stderr, "short write\n");
                 exit(1);
             }
-            q += stops[i+1]-stops[i];
+            q += splits[i+1]-splits[i];
         }
     }
 
-    for(int i = 0 ; i < nstops ; i++) {
+    for(int i = 0 ; i < nsplits ; i++) {
         fclose(files[i]);
     }
     fclose(f);
+
+    free(ifile);
+    free(ofile_fmt);
 }
 

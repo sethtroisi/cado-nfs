@@ -8,7 +8,7 @@
 #include "select_mpi.h"
 #include "bw-common-mpi.h"
 
-int bw_common_init_mpi(struct bw_params * bw, int argc, char * argv[])
+int bw_common_init_mpi(struct bw_params * bw, param_list pl, int argc, char * argv[])
 {
     bw_common_init_defaults(bw);
 
@@ -33,7 +33,7 @@ int bw_common_init_mpi(struct bw_params * bw, int argc, char * argv[])
 
     bw->can_print = rank == 0 || getenv("CAN_PRINT");
 
-    return bw_common_init_shared(bw, argc, argv);
+    return bw_common_init_shared(bw, pl, argc, argv);
 }
 int bw_common_clear_mpi(struct bw_params * bw)
 {

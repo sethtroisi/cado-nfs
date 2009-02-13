@@ -178,7 +178,7 @@ int param_list_read_stream(param_list pl, FILE *f)
 
         // look for a left-hand-side.
         l = 0;
-        for( ; p[l] && (isalnum(p[l]) || p[l] == '_') ; l++);
+        for( ; p[l] && (isalnum(p[l]) || p[l] == '_' || p[l] == '-') ; l++);
 
         int lhs_length = l;
 
@@ -394,7 +394,7 @@ int param_list_update_cmdline(param_list pl,
          */
         if (!isalpha(a[x]))
             return 0;
-        for( ; a[x] && (isalnum(a[x]) || a[x] == '_') ; x++);
+        for( ; a[x] && (isalnum(a[x]) || a[x] == '_' || a[x] == '-') ; x++);
         if (a[x] == '\0') {
             param_list_add_key(pl, a, (*p_argv)[1], PARAMETER_FROM_CMDLINE);
             (*p_argv)+=2;
@@ -404,7 +404,7 @@ int param_list_update_cmdline(param_list pl,
     } else {
         /* Check for <key>=<value> syntax */
         int x=0;
-        for( ; a[x] && (isalnum(a[x]) || a[x] == '_') ; x++);
+        for( ; a[x] && (isalnum(a[x]) || a[x] == '_' || a[x] == '-') ; x++);
         if (a[x] == '=' && a[x+1]) {
             char * newkey = malloc(x+1);
             memcpy(newkey, a, x);
@@ -496,8 +496,8 @@ int param_list_parse_int_and_int(param_list pl, const char * key, int * r, const
     res[1] = strtol(value, &end, 0);
     if (*end != '\0') {
         fprintf(stderr, "Parse error: parameter for key %s"
-                " must match %%dx%%d; got %s\n",
-                key, pl->p[v]->value);
+                " must match %%d%s%%d; got %s\n",
+                key, sep, pl->p[v]->value);
         exit(1);
     }
     if (r) {
@@ -588,6 +588,44 @@ int param_list_parse_string(param_list pl, const char * key, char * r, size_t n)
     if (r)
         strncpy(r, value, n);
     return pl->p[v]->seen;
+}
+
+int param_list_parse_int_list(param_list pl, const char * key, int * r, size_t n, const char * sep)
+{
+    int v = assoc(pl, key);
+    if (v < 0)
+        return 0;
+    char * value = pl->p[v]->value;
+    pl->p[v]->parsed=1;
+    char * end;
+    int * res = malloc(n * sizeof(int));
+    memset(res, 0, n * sizeof(int));
+    size_t parsed = 0;
+    for( ;; ) {
+        res[parsed] = strtol(value, &end, 0);
+        if (parsed++ == n)
+            break;
+        if (parsed && *end == '\0')
+            break;
+        if (strncmp(end, sep, strlen(sep)) != 0) {
+            fprintf(stderr, "Parse error: parameter for key %s"
+                    " must match %%d(%s%%d)*; got %s\n",
+                    key, sep, pl->p[v]->value);
+            exit(1);
+        }
+        value = end + strlen(sep);
+    }
+    if (*end != '\0') {
+        fprintf(stderr, "Parse error: parameter for key %s"
+                " must match %%d(%s%%d)*; got %s\n",
+                key, sep, pl->p[v]->value);
+        exit(1);
+    }
+    if (r) {
+        memcpy(r, res, n * sizeof(int));
+    }
+    free(res);
+    return parsed;
 }
 
 const char * param_list_lookup_string(param_list pl, const char * key)

@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-extern int bw_common_init_mpi(struct bw_params * bw, int argc, char * argv[]);
+extern int bw_common_init_mpi(struct bw_params * bw, param_list pl, int argc, char * argv[]);
 extern int bw_common_clear_mpi(struct bw_params * bw);
 
 #ifdef __cplusplus

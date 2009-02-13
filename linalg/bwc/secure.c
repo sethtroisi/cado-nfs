@@ -91,7 +91,11 @@ void usage()
 
 int main(int argc, char * argv[])
 {
-    bw_common_init_mpi(bw, argc, argv);
+    param_list pl;
+    param_list_init(pl);
+    bw_common_init_mpi(bw, pl, argc, argv);
+    if (param_list_warn_unused(pl)) usage();
+    param_list_clear(pl);
 
     if (bw->nx == 0) { fprintf(stderr, "no nx value set\n"); exit(1); } 
 

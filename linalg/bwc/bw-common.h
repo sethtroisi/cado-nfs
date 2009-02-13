@@ -72,35 +72,21 @@ struct bw_params {
     /* Only prep and lingen are not deterministic. */
     int seed;
 
-    /* This is exposed only for hacks */
-    param_list pl;
-
     /* Save checkpoints or not */
     int checkpoints;
-
-    /* Some stuff relevant for lingen only */
-    
-    /* Name of the source a file */
-    char a[FILENAME_MAX];
-
-    /* threshold for the recursive algorithm */
-    unsigned int lingen_threshold;
-
-    /* threshold for cantor fft algorithm */
-    unsigned int cantor_threshold;
 };
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-extern int bw_common_init(struct bw_params * bw, int argc, char * argv[]);
+extern int bw_common_init(struct bw_params * bw, param_list pl, int argc, char * argv[]);
 extern int bw_common_clear(struct bw_params * bw);
 extern const char * bw_common_usage_string();
 
 /* Some stuff which is shared as well by bw-common-mpi.h, but not within
  * the public interface nevertheless */
-extern int bw_common_init_shared(struct bw_params * bw, int argc, char * argv[]);
+extern int bw_common_init_shared(struct bw_params * bw, param_list pl, int argc, char * argv[]);
 extern int bw_common_init_defaults(struct bw_params * bw);
 
 #ifdef __cplusplus

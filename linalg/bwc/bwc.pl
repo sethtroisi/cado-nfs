@@ -99,23 +99,15 @@ sub drive {
         return;
     }
 
-    if ($program eq ':split') {
-        # Special case, really.
-        my $pwd = getcwd;
-        chdir $wdir;
-        $program="$pwd/split";
-        print STDERR "Running $program ", join(' ', @splits), "\n";
-        system $program, @splits;
-        chdir $pwd;
-        return;
-    }
-
     if ($program eq ':complete') {
         &drive(':wipeout', @_);
         &drive('u64n/prep', @_);
         &drive('u64/secure', @_);
-        &drive(':split', @_);
+        &drive('./split', @_, "--split-y");
         &drive('u64/krylov', @_);
+        &drive('./acollect', @_, "--remove-old");
+        &drive('lingen/lingen', @_, '--lingen-threshold', 64);
+        &drive('./split', @_, "--split-f");
         return;
     }
 
@@ -133,8 +125,13 @@ sub drive {
         return;
     }
 
+    if ($program eq ':ysplit') { $program="./split"; push @_, "--split-y"; }
+    if ($program eq ':fsplit') { $program="./split"; push @_, "--split-f"; }
+
     # Some arguments are relevant only to some contexts.
-    @_ = grep !/^splits?=/, @_;
+    unless ($program =~ /split$/) {
+        @_ = grep !/^(?:splits?=|--split-[yf])/, @_;
+    }
     unless ($program =~ /krylov$/) {
         @_ = grep !/^ys=/, @_;
     }

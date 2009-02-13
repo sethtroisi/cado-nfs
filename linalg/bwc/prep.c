@@ -169,7 +169,10 @@ void usage()
 
 int main(int argc, char * argv[])
 {
-    bw_common_init_mpi(bw, argc, argv);
+    param_list pl;
+    param_list_init(pl);
+    bw_common_init_mpi(bw, pl, argc, argv);
+    if (param_list_warn_unused(pl)) usage();
 
     if (bw->seed) setup_seeding(bw->seed);
 
@@ -180,8 +183,9 @@ int main(int argc, char * argv[])
 
     // we save the parameter list once again, because the prep program
     // generates some useful info, bw->nx in particular.
-    param_list_save_parameter(bw->pl, PARAMETER_FROM_FILE, "nx", "%u", bw->nx);
-    param_list_save(bw->pl, BW_CONFIG_FILE);
+    param_list_save_parameter(pl, PARAMETER_FROM_FILE, "nx", "%u", bw->nx);
+    param_list_save(pl, BW_CONFIG_FILE);
+    param_list_clear(pl);
 
     bw_common_clear_mpi(bw);
     return 0;

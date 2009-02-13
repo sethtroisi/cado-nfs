@@ -28,12 +28,10 @@ int bw_common_init_defaults(struct bw_params * bw)
 
     bw->checkpoints = 1;
 
-    bw->cantor_threshold = UINT_MAX;
-
     return 0;
 }
 
-int bw_common_init_shared(struct bw_params * bw, int argc, char * argv[])
+int bw_common_init_shared(struct bw_params * bw, param_list pl, int argc, char * argv[])
 {
     if (bw->can_print) {
         /* print command line */
@@ -43,21 +41,17 @@ int bw_common_init_shared(struct bw_params * bw, int argc, char * argv[])
         fprintf (stderr, "\n");
     }
 
-    param_list_init (bw->pl);
-
     argv++, argc--;
-    param_list_configure_knob(bw->pl, "-v", &bw->verbose);
-    param_list_configure_alias(bw->pl, "lingen-threshold", "lingen_threshold");
-    param_list_configure_alias(bw->pl, "cantor-threshold", "cantor_threshold");
+    param_list_configure_knob(pl, "-v", &bw->verbose);
     for( ; argc ; ) {
-        if (param_list_update_cmdline(bw->pl, &argc, &argv)) { continue; }
+        if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
         fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
         usage();
     }
 
     const char * tmp;
 
-    if ((tmp = param_list_lookup_string(bw->pl, "wdir")) != NULL) {
+    if ((tmp = param_list_lookup_string(pl, "wdir")) != NULL) {
         if (chdir(tmp) < 0) {
             fprintf(stderr, "chdir(%s): %s\n", tmp, strerror(errno));
             exit(1);
@@ -66,13 +60,13 @@ int bw_common_init_shared(struct bw_params * bw, int argc, char * argv[])
 
     const char * cfg;
 
-    if ((cfg = param_list_lookup_string(bw->pl, "cfg"))) {
-        param_list_read_file(bw->pl, cfg);
+    if ((cfg = param_list_lookup_string(pl, "cfg"))) {
+        param_list_read_file(pl, cfg);
     } else {
         /* Otherwise we check first that the file exists */
         cfg = BW_CONFIG_FILE;
         if (access(cfg, R_OK) == 0) {
-            param_list_read_file(bw->pl, cfg);
+            param_list_read_file(pl, cfg);
         }
     }
 
@@ -80,25 +74,22 @@ int bw_common_init_shared(struct bw_params * bw, int argc, char * argv[])
     // Here, the matrix filename really ends up in some heap data that will
     // survive after freeing the param_list (if ever we do so early -- as a
     // matter of fact, in prep.c we don't)
-    param_list_parse_string(bw->pl, "matrix", bw->matrix_filename, sizeof(bw->matrix_filename));
-    param_list_parse_intxint(bw->pl, "mpi", bw->mpi_split);
-    param_list_parse_intxint(bw->pl, "thr", bw->thr_split);
-    param_list_parse_int(bw->pl, "seed", &bw->seed);
-    param_list_parse_int(bw->pl, "interval", &bw->interval);
-    param_list_parse_uint(bw->pl, "nx", &bw->nx);
-    param_list_parse_int_and_int(bw->pl, "ys", bw->ys, "..");
-    param_list_parse_int(bw->pl, "start", &bw->start);
-    param_list_parse_int(bw->pl, "end", &bw->end);
-    param_list_parse_int(bw->pl, "checkpoints", &bw->checkpoints);
-    param_list_parse_uint(bw->pl, "lingen-threshold", &bw->lingen_threshold);
-    param_list_parse_uint(bw->pl, "cantor-threshold", &bw->cantor_threshold);
+    param_list_parse_string(pl, "matrix", bw->matrix_filename, sizeof(bw->matrix_filename));
+    param_list_parse_intxint(pl, "mpi", bw->mpi_split);
+    param_list_parse_intxint(pl, "thr", bw->thr_split);
+    param_list_parse_int(pl, "seed", &bw->seed);
+    param_list_parse_int(pl, "interval", &bw->interval);
+    param_list_parse_uint(pl, "nx", &bw->nx);
+    param_list_parse_int_and_int(pl, "ys", bw->ys, "..");
+    param_list_parse_int(pl, "start", &bw->start);
+    param_list_parse_int(pl, "end", &bw->end);
+    param_list_parse_int(pl, "checkpoints", &bw->checkpoints);
 
-    param_list_parse_string(bw->pl, "a", bw->a, sizeof(bw->a));
 
     mpz_init_set_ui(bw->p, 2);
-    param_list_parse_mpz(bw->pl, "p", bw->p);
+    param_list_parse_mpz(pl, "p", bw->p);
 
-    if ((tmp = param_list_lookup_string(bw->pl, "nullspace")) != NULL) {
+    if ((tmp = param_list_lookup_string(pl, "nullspace")) != NULL) {
         if (strcmp(tmp, dirtext[0]) == 0) {
             bw->dir = 0;
         } else if (strcmp(tmp, dirtext[1]) == 0) {
@@ -109,41 +100,37 @@ int bw_common_init_shared(struct bw_params * bw, int argc, char * argv[])
             exit(1);
         }
     } else {
-        param_list_add_key(bw->pl, "nullspace", dirtext[bw->dir], PARAMETER_FROM_FILE);
+        param_list_add_key(pl, "nullspace", dirtext[bw->dir], PARAMETER_FROM_FILE);
     }
 
     
     int okm=0, okn=0;
     int mn;
-    if (param_list_parse_int(bw->pl, "mn", &mn)) {
+    if (param_list_parse_int(pl, "mn", &mn)) {
         bw->m=mn;
         bw->n=mn;
         okm++;
         okn++;
     }
-    okm += param_list_parse_int(bw->pl, "m", &bw->m);
-    okn += param_list_parse_int(bw->pl, "n", &bw->n);
+    okm += param_list_parse_int(pl, "m", &bw->m);
+    okn += param_list_parse_int(pl, "n", &bw->n);
     if (okm != 1 || okn != 1)
         usage();
 
-    if (bw->verbose)
-        param_list_display (bw->pl, stderr);
-    if (param_list_warn_unused(bw->pl)) {
-        usage();
-    }
+    if (bw->verbose && bw->can_print)
+        param_list_display (pl, stderr);
 
     return 0;
 }
 
-int bw_common_init(struct bw_params * bw, int argc, char * argv[])
+int bw_common_init(struct bw_params * bw, param_list pl, int argc, char * argv[])
 {
     bw_common_init_defaults(bw);
-    return bw_common_init_shared(bw, argc, argv);
+    return bw_common_init_shared(bw, pl, argc, argv);
 }
 
 int bw_common_clear(struct bw_params * bw)
 {
-    param_list_clear(bw->pl);
     mpz_clear(bw->p);
     return 0;
 }

@@ -62,24 +62,10 @@ bins:=bench build prep krylov
 default-target: all
 allbins:=test_hello split acollect
 
-
-test_hello_objs:=test_hello.o parallelizing_info.o
-test_hello: $(test_hello_objs)
-	$(CXX) $(MY_LFLAGS) $(test_hello_objs) -o $@ $(common_libs)
--include $(patsubst %,.deps/%.d,$(test_hello_objs))
-
-split_objs:=split.o
-split: $(split_objs)
-	$(CXX) $(MY_LFLAGS) $(split_objs) -o $@ $(common_libs)
--include $(patsubst %,.deps/%.d,$(split_objs))
-
-acollect_objs:=acollect.o
-acollect: $(acollect_objs)
-	$(CXX) $(MY_LFLAGS) $(acollect_objs) -o $@ $(common_libs)
--include $(patsubst %,.deps/%.d,$(acollect_objs))
+common_libs:=-lutils -lgmp
+common_link_deps:=$(TOP)/utils/libutils.a
 
 # We need to make sure that pthreads are always included.
-common_libs:=-lutils -lgmp
 ifeq ($(WITH_PTHREADS),1)
 # As a matter of fact, it is fairly common for mpi libs to include
 # pthreads automatically. Hence in some cases, we would need this ifndef
@@ -89,6 +75,22 @@ ifeq ($(WITH_PTHREADS),1)
 common_libs += -lpthread
 # endif
 endif
+
+
+test_hello_objs:=test_hello.o parallelizing_info.o
+test_hello: $(test_hello_objs) $(common_link_deps)
+	$(CXX) $(MY_LFLAGS) $(test_hello_objs) -o $@ $(common_libs)
+-include $(patsubst %,.deps/%.d,$(test_hello_objs))
+
+split_objs:=split.o bw-common.o
+split: $(split_objs) $(common_link_deps)
+	$(CXX) $(MY_LFLAGS) $(split_objs) -o $@ $(common_libs)
+-include $(patsubst %,.deps/%.d,$(split_objs))
+
+acollect_objs:=acollect.o bw-common.o
+acollect: $(acollect_objs) $(common_link_deps)
+	$(CXX) $(MY_LFLAGS) $(acollect_objs) -o $@ $(common_libs)
+-include $(patsubst %,.deps/%.d,$(acollect_objs))
 
 
 all_objlists:=libmatmul build bench prep secure krylov
@@ -144,7 +146,7 @@ $(1)/$(2): $(2)
 endef
 
 define	multiple_binary
-$(1)/$(2): $$($(1)_$(2)_objs) $$($(2)_normalobjs)
+$(1)/$(2): $$($(1)_$(2)_objs) $$($(2)_normalobjs) $(common_link_deps)
 	$$(CXX) $$(MY_LFLAGS) $$($(1)_$(2)_objs) $$($(2)_normalobjs) -o $$@ $$(common_libs)
 -include $$(patsubst %,.deps/%.d,$$($(1)_$(2)_objs))
 allbins+=$(1)/$(2)
