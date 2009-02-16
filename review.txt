@@ -140,10 +140,11 @@ Francois        Review of gf2x/
 Pierrick        Review of linalg/bw/
                 Review of utils/
 
-Paul            Review of linalg/merge-purge-duplicates
+Paul            Review of linalg/duplicates-purge               done
+                Review of linalg/merge                          in progress
                 Review of sieve/ecm
-                Write the nightly build
-                Handle the list of files for the "make dist"
+                Write the nightly build				done
+                Handle the list of files for the "make dist"	done
 
 Andreas         Review of linalg/characters
 
