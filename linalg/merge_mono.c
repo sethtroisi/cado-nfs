@@ -32,7 +32,6 @@
 #define STR_LEN_MAX 1024
 
 #define DEBUG 0
-#define TEX 0
 
 #define USE_CONNECT 0
 
@@ -511,13 +510,9 @@ mergeForColumn(report_t *rep, double *tt, double *tfill, double *tMST,
     fprintf(stderr, "Treating column %d of weight %d",j,mat->wt[GETJ(mat, j)]);
     fprintf(stderr, "\n");
 #endif
-#if (DEBUG >= 2) || TEX
+#if DEBUG >= 2
     fprintf(stderr, "Status before next j=%d to start\n", j);
-# if TEX
-    Sparse2Tex(mat);
-# else
     printSWAR(mat, mat->ncols);
-# endif
 #endif
     // the corresponding rows are in R[j], skipping 1st cell and -1's
 #if DEBUG >= 2

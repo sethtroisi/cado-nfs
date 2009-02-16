@@ -12,6 +12,7 @@ extern "C" {
 #endif
 
 extern dclist dclistCreate(int32_t j);
+extern void dclistClear (dclist dcl);
 extern void dclistTex(FILE *file, dclist dcl);
 extern int dclistLength(dclist dcl);
 extern dclist dclistInsert(dclist dcl, int32_t j);

@@ -5,12 +5,22 @@
 dclist
 dclistCreate(int32_t j)
 {
-    dclist dcl = (dclist)malloc(sizeof(struct dclist));
+    dclist dcl = (dclist) malloc(sizeof(struct dclist));
 
     dcl->j = j;
     dcl->prev = NULL;
     dcl->next = NULL;
     return dcl;
+}
+
+void
+dclistClear (dclist dcl)
+{
+  if (dcl != NULL)
+    {
+      dclistClear (dcl->next);
+      free (dcl);
+    }
 }
 
 void
@@ -32,17 +42,6 @@ dclistLength(dclist dcl)
 	dcl = dcl->next;
     }
     return l;
-}
-
-void
-dclistTex(FILE *file, dclist dcl)
-{
-    fprintf(stderr, "\\begin{array}{r}\n");
-    while(dcl != NULL){
-      fprintf(file, "%ld\\\\\n", (long int) dcl->j);
-	dcl = dcl->next;
-    }
-    fprintf(stderr, "\\end{array}\n");
 }
 
 /* insert j in doubly-chained list dcl (between cell of dcl and dcl->next),

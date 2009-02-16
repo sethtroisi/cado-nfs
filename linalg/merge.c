@@ -72,7 +72,8 @@ usage (void)
   fprintf (stderr, "   -ratio rrr     - maximal ratio cN(final)/cN(min) with forbw=0 (default %1.1f)\n",
 	   RATIO_DEFAULT);
   fprintf (stderr, "   -coverNmax nnn - with forbw=3, stop when c/N exceeds nnn (default %u)\n", COVERNMAX_DEFAULT);
-  fprintf (stderr, "   -itermax nnn   - if non-zero, stop when nnn columns have been removed\n");
+  fprintf (stderr, "   -itermax nnn   - if non-zero, stop when nnn columns have been removed (cf -resume)\n");
+  fprintf (stderr, "   -resume xxx    - resume from history file xxx (cf -itermax)\n");
   fprintf (stderr, "\nThe different optimization functions are, where c is the total matrix weight\n");
   fprintf (stderr, "and N the number of rows (relation-sets):\n");
   fprintf (stderr, "   -forbw 0 - optimize the matrix size N (cf -ratio)\n");
@@ -85,8 +86,8 @@ int
 main (int argc, char *argv[])
 {
     FILE *purgedfile;
-    sparse_mat_t mat;
-    report_t rep;
+    sparse_mat_t mat[1];
+    report_t rep[1];
     char *purgedname = NULL, *outname = NULL;
     char *resumename = NULL;
     int nrows, ncols;
@@ -112,9 +113,6 @@ main (int argc, char *argv[])
     MPI_Init(&argc, &argv);
 #endif
 
-#if TEX
-    fprintf(stderr, "\\begin{verbatim}\n");
-#endif    
     while(argc > 1 && argv[1][0] == '-'){
         if (argc > 2 && strcmp (argv[1], "-mat") == 0){
 	    purgedname = argv[2];
@@ -166,6 +164,8 @@ main (int argc, char *argv[])
 	    argc -= 2;
 	    argv += 2;
 	}
+	/* -resume can be useful to continue a merge stopped due
+	   to a too small value of -maxlevel */
 	else if (argc > 2 && strcmp (argv[1], "-resume") == 0){
 	    resumename = argv[2];
 	    argc -= 2;
@@ -188,6 +188,9 @@ main (int argc, char *argv[])
 	    argv += 2;
 	}
 #endif
+	/* -itermax can be used with -resume, for example:
+	   merge -itermax 1000 -out his.tmp
+           merge -resume his.tmp -out his.final */
 	else if (argc > 2 && strcmp (argv[1], "-itermax") == 0){
 	    itermax = atoi(argv[2]);
 	    argc -= 2;
@@ -200,67 +203,64 @@ main (int argc, char *argv[])
     ASSERT_ALWAYS (purgedfile != NULL);
     fscanf (purgedfile, "%d %d\n", &nrows, &ncols);
 
-    mat.nrows = nrows;
-    mat.ncols = ncols;
-    mat.keep  = keep;
-    mat.cwmax = cwmax;
-    mat.rwmax = rwmax;
-    mat.mergelevelmax = maxlevel;
-    mat.itermax = itermax;
+    mat->nrows = nrows;
+    mat->ncols = ncols;
+    mat->keep  = keep;
+    mat->cwmax = cwmax;
+    mat->rwmax = rwmax;
+    mat->mergelevelmax = maxlevel;
+    mat->itermax = itermax;
     
 #ifdef USE_MPI
-    mpi_start_proc(outname,&mat,purgedfile,purgedname,forbw,ratio,coverNmax,
+    mpi_start_proc(outname,mat,purgedfile,purgedname,forbw,ratio,coverNmax,
 		   resumename);
     /* TODO: clean the mat data structure (?) */
     MPI_Finalize();
     return 0;
 #endif    
-    initMat (&mat, 0, ncols);
+    initMat (mat, 0, ncols);
 
     tt = seconds ();
-    initWeightFromFile (&mat, purgedfile, 1);
+    initWeightFromFile (mat, purgedfile, 1);
     fprintf (stderr, "Getting column weights took %2.2lf\n", seconds () - tt);
     gzip_close (purgedfile, purgedname);
 
 #ifndef USE_MARKOWITZ
     fprintf (stderr, "SWAR version\n");
-    initSWAR (&mat);
+    initSWAR (mat);
 #else
     fprintf(stderr, "Markowitz version\n");
 #endif
-    fillmat (&mat);
+    fillmat (mat);
     
     tt = seconds ();
     purgedfile = gzip_open (purgedname, "r");
     ASSERT_ALWAYS (purgedfile != NULL);
-    readmat (&mat, purgedfile, 1, 1, verbose);
-    /* in case of pb, put "1, 0, verbose" instead above */
+    /* the first 1 means we ignor the 1st entry of each purged line;
+       the second 1 is to burry heavy columns (0 considers all columns) */
+    readmat (mat, purgedfile, 1, 1, verbose);
     gzip_close (purgedfile, purgedname);
 #if DEBUG >= 3
-    checkmat(&mat);
+    checkmat (mat);
 #endif
     fprintf (stderr, "Time for readmat: %2.2lf\n", seconds () - tt);
 
-    init_rep(&rep, outname, &mat, 0, MERGE_LEVEL_MAX);
-    report2(&rep, mat.nrows, mat.ncols);
+    /* initialize rep, i.e., mostly opens outname */
+    init_rep (rep, outname, mat, 0, MERGE_LEVEL_MAX);
+    /* output the matrix dimensions in the history file */
+    report2 (rep, mat->nrows, mat->ncols);
 
-    if(resumename != NULL)
-	resume(&rep, &mat, resumename);
-
-    // ouhhhhhhhhhh
-    // we do not have a clear idea of which function to minimize...!
-#if 0
-    forbw = 0;
-    fprintf(stderr, "WARNING: forcing forbw=0...!!!!\n");
-#endif
+    /* resume from given history file if needed */
+    if (resumename != NULL)
+      resume (rep, mat, resumename);
 
 #ifdef USE_MARKOWITZ
-    mat.wmstmax = wmstmax;
-    mat.mkzrnd = mkzrnd;
-    mat.mkztype = mkztype;
+    mat->wmstmax = wmstmax;
+    mat->mkzrnd = mkzrnd;
+    mat->mkztype = mkztype;
     tt = seconds();
-    MkzInit(&mat);
-    fprintf(stderr, "Time for MkzInit: %2.2lf\n", seconds()-tt);
+    MkzInit (mat);
+    fprintf (stderr, "Time for MkzInit: %2.2lf\n", seconds()-tt);
 #endif
 
 #if M_STRATEGY <= 2
@@ -268,31 +268,29 @@ main (int argc, char *argv[])
     fprintf(stderr, "merge NYI for Markowitz\n");
     return 1;
 # else
-    merge(&mat, maxlevel, verbose, forbw);
+    merge (mat, maxlevel, verbose, forbw);
 # endif
 #else
-    mergeOneByOne(&rep, &mat, maxlevel, verbose, forbw, ratio, coverNmax);
-#endif
+    mergeOneByOne (rep, mat, maxlevel, verbose, forbw, ratio, coverNmax);
+#endif /* M_STRATEGY <= 2 */
 
-    gzip_close(rep.outfile, outname);
+    gzip_close (rep->outfile, outname);
     fprintf(stderr, "Final matrix has N=%d nc=%d (%d) w(M)=%lu N*w(M)=%"PRIu64"\n",
-	    mat.rem_nrows, mat.rem_ncols, mat.rem_nrows-mat.rem_ncols,
-	    mat.weight,
-	    (uint64_t) mat.rem_nrows * (uint64_t) mat.weight);
-#if TEX
-    fprintf(stderr, "\\end{verbatim}\n");
-#endif
+	    mat->rem_nrows, mat->rem_ncols, mat->rem_nrows - mat->rem_ncols,
+	    mat->weight,
+	    (uint64_t) mat->rem_nrows * (uint64_t) mat->weight);
 #if DEBUG >= 1
     {
 	FILE *ofile = fopen("toto", "w");
-	dumpSparse(ofile, &mat);
+	dumpSparse (ofile, mat);
 	fclose(ofile);
     }
 #endif
 #ifndef USE_MARKOWITZ
-    closeSWAR(/*&mat*/);
+    closeSWAR (mat);
 #else
-    MkzClose(&mat);
+    MkzClose (mat);
 #endif
+    clearMat (mat);
     return 0;
 }

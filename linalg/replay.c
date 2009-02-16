@@ -316,7 +316,7 @@ renumber(int *small_ncols, int *colweight, int ncols)
 	colweight[tmp[j+1]] = k++; // always this +1 trick
 #else
     // useful for BW + skipping heavy part only...
-    fprintf(stderr, "Sorting in DEcreasing weight order of j\n");
+    fprintf (stderr, "Sorting columns by decreasing weight\n");
     for(j = nb-1, k = 1; j >= 0; j -= 2)
 	colweight[tmp[j]] = k++; // always this +1 trick
 #endif

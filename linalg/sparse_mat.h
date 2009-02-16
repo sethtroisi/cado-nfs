@@ -66,6 +66,7 @@ extern "C" {
 #endif
 
 extern void initMat(sparse_mat_t *mat, int32_t jmin, int32_t jmax);
+extern void clearMat (sparse_mat_t *mat);
 extern void initWeightFromFile(sparse_mat_t *mat, FILE *purgedfile, int skipfirst);
 extern void fillmat(sparse_mat_t *mat);
 extern int readmat (sparse_mat_t *mat, FILE *file, int skipfirst,

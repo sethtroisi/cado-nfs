@@ -1,3 +1,24 @@
+/* report.c --- auxiliary merge program
+
+Copyright 2008-2009 Francois Morain, Paul Zimmermann
+
+This file is part of CADO-NFS.
+
+CADO-NFS is free software; you can redistribute it and/or modify it under the
+terms of the GNU Lesser General Public License as published by the Free
+Software Foundation; either version 2.1 of the License, or (at your option)
+any later version.
+
+CADO-NFS is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
+details.
+
+You should have received a copy of the GNU Lesser General Public License
+along with CADO-NFS; see the file COPYING.  If not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
+*/
+
 #include "utils/utils.h"
 #include "files.h"
 #include "gzip.h"
@@ -6,38 +27,46 @@
 #include "sparse_mat.h"
 #include "report.h"
 
+/* initialize the rep data structure
+   outname is the name of the output (history) file
+   mat is the input matrix
+   type = 2 does nothing
+*/
 void
-init_rep(report_t *rep, char *outname, sparse_mat_t *mat, int type, int bufsize)
+init_rep (report_t *rep, char *outname, sparse_mat_t *mat, int type,
+	  int bufsize)
 {
     int32_t** tmp, i;
 
     rep->type = type;
-    if(type == 2)
-	// do nothing...!
-	return;
-    rep->outfile = gzip_open(outname, "w");
-    switch(type){
-    case 0:
-	// classical one: output to a file
+    if (type == 2) /* do nothing...! */
+      return;
+    rep->outfile = gzip_open (outname, "w");
+    switch (type)
+      {
+      case 0: /* classical one: output to a file */
 	break;
-    case 1:
-	// mostly for MPI
-	tmp = (int32_t **)malloc(mat->nrows * sizeof(int32_t *));
+      case 1: /* mostly for MPI */
+	/* FIXME: probably a clear_rep function is needed to free tmp */
+	tmp = (int32_t **) malloc (mat->nrows * sizeof(int32_t *));
 	for(i = 0; i < mat->nrows; i++)
 	    tmp[i] = NULL;
 	rep->history = tmp;
 	rep->mark = -1;
 	rep->bufsize = bufsize;
 	break;
-    default:
-	fprintf(stderr, "Unknown type: %d\n", type);
-    }
+      default:
+	{
+	  fprintf(stderr, "Unknown type: %d\n", type);
+	  exit (1);
+	}
+      }
 }
 
-// terrific hack: everybody on the same line
-// the first is to be destroyed in replay!!!
+/* terrific hack: everybody on the same line
+   the first is to be destroyed in replay!!! */
 void
-reportn(report_t *rep, int32_t *ind, int n)
+reportn (report_t *rep, int32_t *ind, int n)
 {
     int i;
 
@@ -67,44 +96,21 @@ reportn(report_t *rep, int32_t *ind, int n)
     }
 }
 
-#if 0 // probably obsolete
-// Same as reportn, but with another input type.
-// TODO: destroy this, since a workaround is found using pointers.
+/* print a new line "i" in the history file */
 void
-reporthis(report_t *rep, int32_t tab[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1], int i0)
+report1 (report_t *rep, int32_t i)
 {
-    int k;
-
-#if DEBUG >= 1
-    fprintf(stderr, "Reporting for tab[%d]\n", i0);
-#endif
-    if(rep->type == 0){
-	for(k = 1; k <= tab[i0][0]; k++){
-	    fprintf(rep->outfile, "%ld", (long int) tab[i0][k]);
-	    if(k <= tab[i0][0]-1)
-		fprintf(rep->outfile, " ");
-	}
-	fprintf(rep->outfile, "\n");
-    }
-    else{
-	fprintf(stderr, "I told you this is useless\n");
-	exit(0);
-    }
-}
-#endif
-
-void
-report1(report_t *rep, int32_t i)
-{
-    reportn(rep, &i, 1);
+  reportn (rep, &i, 1);
 }
 
+/* print a new line "i1 i2" in the history file */
 void
-report2(report_t *rep, int32_t i1, int32_t i2)
+report2 (report_t *rep, int32_t i1, int32_t i2)
 {
     int32_t tmp[2];
+
     tmp[0] = i1;
     tmp[1] = i2;
-    reportn(rep, tmp, 2);
+    reportn (rep, tmp, 2);
 }
 

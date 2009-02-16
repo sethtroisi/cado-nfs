@@ -42,9 +42,24 @@ initMat (sparse_mat_t *mat, int32_t jmin, int32_t jmax)
     memset (mat->wt, 0, (mat->jmax - mat->jmin) * sizeof (int));
     mat->wburried = (int*) malloc (mat->nrows * sizeof (int));
     memset (mat->wburried, 0, mat->nrows * sizeof (int));
-    R = (int32_t **)malloc((mat->jmax-mat->jmin) * sizeof(int32_t *));
+    R = (int32_t **) malloc ((mat->jmax - mat->jmin) * sizeof(int32_t *));
     ASSERT_ALWAYS(R != NULL);
     mat->R = R;
+}
+
+void
+clearMat (sparse_mat_t *mat)
+{
+  int32_t i, j;
+
+  for (i = 0; i < mat->nrows; i++)
+    free (mat->rows[i]);
+  free (mat->rows);
+  free (mat->wt);
+  free (mat->wburried);
+  for (j = 0; j < mat->jmax - mat->jmin; j++)
+    free (mat->R[j]);
+  free (mat->R);
 }
 
 void
@@ -61,70 +76,6 @@ checkData(sparse_mat_t *mat)
     }
 }
 
-
-void
-matrix2tex(sparse_mat_t *mat)
-{
-    int i, j, k, *tab;
-
-    tab = (int *)malloc(mat->ncols * sizeof(int));
-    fprintf(stderr, "$$\\begin{array}{l|");
-    for(j = 0; j < mat->ncols; j++)
-	fprintf(stderr, "c");
-    fprintf(stderr, "}\n");
-    for(i = 0; i < mat->nrows; i++){
-	memset(tab, 0, mat->ncols * sizeof(int));
-	for(k = 0; k < lengthRow(mat, i); k++)
-	    tab[cell(mat, i, k)] = 1;
-	fprintf(stderr, "R_{%d}", i);
-	for(j = 0; j < mat->ncols; j++)
-	    fprintf(stderr, "& %d", tab[j]);
-	fprintf(stderr, "\\\\\n");
-    }
-    fprintf(stderr, "\\hline\n");
-    fprintf(stderr, "\\text{weight}");
-    for(j = 0; j < mat->ncols; j++)
-	fprintf(stderr, "& %d", mat->wt[GETJ(mat, j)]);
-    fprintf(stderr, "\\\\\n");
-    fprintf(stderr, "\\end{array}$$\n");
-    free(tab);
-}
-
-void
-Sparse2Tex(sparse_mat_t *mat)
-{
-    int j;
-    int32_t k;
-
-    fprintf(stderr, "\\end{verbatim}\n");
-    matrix2tex(mat);
-#ifndef USE_MARKOWITZ
-    texSWAR(mat);
-#endif
-    fprintf(stderr, "$$\\begin{array}{|c|");
-    for(j = 0; j < mat->ncols; j++)
-	fprintf(stderr, "r|");
-    fprintf(stderr, "}\\hline\n");
-    fprintf(stderr, "j");
-    for(j = 0; j < mat->ncols; j++)
-	fprintf(stderr, "& %d", j);
-    fprintf(stderr, "\\\\\\hline\n");
-    fprintf(stderr, "W[j]");
-    for(j = 0; j < mat->ncols; j++)
-	fprintf(stderr, "& %d", mat->wt[GETJ(mat, j)]);
-    fprintf(stderr, "\\\\\\hline\n\\end{array}$$\n");
-#ifndef USE_COMPACT_R
-    fprintf(stderr, "\\begin{verbatim}\n");
-    for(j = 0; j < mat->ncols; j++){
-	if(mat->R[GETJ(mat, j)] == NULL)
-	    continue;
-	fprintf(stderr, "  R[%d]=", j);
-	for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
-          fprintf(stderr, " %ld", (long int) mat->R[GETJ(mat, j)][k]);
-	fprintf(stderr, "\n");
-    }
-#endif
-}
 
 #define MAX_LENGTH 1024
 
@@ -241,17 +192,16 @@ readmat (sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols,
     if(skipheavycols != 0){
 	int bmin = mat->nrows, bmax = 0, wmax;
 
-	/* don't consider heavy columns of density > 1/100, this roughly
-	   corresponds to primes < 100 or ideals of norm < 100 */
-	// wmax = -10 * mat->cwmax;
-	wmax = -(mat->nrows / 100);
+	/* don't consider heavy columns of density > 1/2000, this roughly
+	   corresponds to primes < 2000 or ideals of norm < 2000 */
+	wmax = -(mat->nrows / 2000);
 	/* heavy columns already have wt < 0 */
 	tooheavy = (char *) malloc (mat->ncols * sizeof(char));
 	memset (tooheavy, 0, mat->ncols * sizeof(char));
 	for(j = 0; j < mat->ncols; j++){
 	    if(mat->wt[j] < wmax){
               int wc = -mat->wt[j];
-#if DEBUG >= 0
+#if DEBUG >= 1
 	      fprintf(stderr, "Burrying j=%d (wt=%d)\n", j, wc);
 #endif
 		tooheavy[j] = 1;
@@ -358,11 +308,12 @@ readmat (sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols,
     // bound on the number of active columns, I guess
     mat->rem_ncols = mat->ncols;
 #ifndef USE_MARKOWITZ
-    printStatsSWAR(mat);
+    if (verbose)
+      printStatsSWAR (mat);
 #endif
-    free(buf);
-    if(tooheavy != NULL)
-	free(tooheavy);
+    free (buf);
+    if (tooheavy != NULL)
+      free (tooheavy);
     return 1;
 }
 

@@ -33,8 +33,8 @@ void
 initSWAR (sparse_mat_t *mat)
 {
     /* mat->cwmax+2 to prevent bangs */
-    dclist *S = (dclist *) malloc((mat->cwmax + 2) * sizeof(dclist));
-    dclist *A = (dclist *) malloc((mat->jmax - mat->jmin) * sizeof(dclist));
+    dclist *S = (dclist *) malloc ((mat->cwmax + 2) * sizeof(dclist));
+    dclist *A = (dclist *) malloc ((mat->jmax - mat->jmin) * sizeof(dclist));
     int k;
 
     ASSERT_ALWAYS(S != NULL);
@@ -46,10 +46,16 @@ initSWAR (sparse_mat_t *mat)
     mat->A = A;
 }
 
-// TODO
+/* free the memory allocated in mat */
 void
-closeSWAR(/*sparse_mat_t *mat*/)
+closeSWAR (sparse_mat_t *mat)
 {
+  int k;
+
+  for(k = 0; k <= mat->cwmax + 1; k++)
+    dclistClear (mat->S[k]);
+  free (mat->S);
+  free (mat->A);
 }
 
 // dump for debugging reasons
@@ -85,37 +91,13 @@ printSWAR(sparse_mat_t *mat, int ncols)
 }
 
 void
-texSWAR(sparse_mat_t *mat)
+printStatsSWAR (sparse_mat_t *mat)
 {
     int w;
 
-    fprintf(stderr, "$$\\begin{array}{|");
-    for(w = 0; w <= mat->cwmax; w++)
-	fprintf(stderr, "r|");
-    fprintf(stderr, "|r|}\\hline\n");
-    for(w = 0; w <= mat->cwmax+1; w++){
-	fprintf(stderr, "S[%d]", w);
-	if(w < mat->cwmax+1)
-	    fprintf(stderr, "&");
-    }
-    fprintf(stderr, "\\\\\\hline\n");
-    for(w = 0; w <= mat->cwmax+1; w++){
-	dclistTex(stderr, mat->S[w]->next);
-	if(w < mat->cwmax+1)
-            fprintf(stderr, "&");
-    }
-    fprintf(stderr, "\\\\\\hline\n");
-    fprintf(stderr, "\\end{array}$$\n");
-}
-
-void
-printStatsSWAR(sparse_mat_t *mat)
-{
-    int w;
-
-    for(w = 0; w <= mat->cwmax; w++)
-	fprintf(stderr, "I found %d primes of weight %d\n",
-		dclistLength(mat->S[w]->next), w);
+    for (w = 0; w <= mat->cwmax; w++)
+      fprintf (stderr, "I found %d primes of weight %d\n",
+	       dclistLength (mat->S[w]->next), w);
 }
 
 // w(j) has decreased in such a way that it can be incorporated in the
