@@ -3,7 +3,7 @@
 #include "dclist.h"
 
 dclist
-dclistCreate(INT j)
+dclistCreate(int32_t j)
 {
     dclist dcl = (dclist)malloc(sizeof(struct dclist));
 
@@ -48,7 +48,7 @@ dclistTex(FILE *file, dclist dcl)
 /* insert j in doubly-chained list dcl (between cell of dcl and dcl->next),
    and return pointer at cell containing j */
 dclist
-dclistInsert(dclist dcl, INT j)
+dclistInsert(dclist dcl, int32_t j)
 {
     dclist newdcl = dclistCreate(j);
 

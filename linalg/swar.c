@@ -30,18 +30,18 @@
       mat->S[w]  - doubly-chained list with columns j of weight w
  */
 void
-initSWAR(sparse_mat_t *mat)
+initSWAR (sparse_mat_t *mat)
 {
-    // mat->cwmax+2 to prevent bangs
-    dclist *S = (dclist *)malloc((mat->cwmax+2) * sizeof(dclist));
-    dclist *A = (dclist *)malloc((mat->jmax-mat->jmin) * sizeof(dclist));
+    /* mat->cwmax+2 to prevent bangs */
+    dclist *S = (dclist *) malloc((mat->cwmax + 2) * sizeof(dclist));
+    dclist *A = (dclist *) malloc((mat->jmax - mat->jmin) * sizeof(dclist));
     int k;
 
     ASSERT_ALWAYS(S != NULL);
     ASSERT_ALWAYS(A != NULL);
-    // S[0] has a meaning at least for temporary reasons
-    for(k = 0; k <= mat->cwmax+1; k++)
-	S[k] = dclistCreate(-1);
+    /* S[0] has a meaning at least for temporary reasons */
+    for(k = 0; k <= mat->cwmax + 1; k++)
+	S[k] = dclistCreate (-1);
     mat->S = S;
     mat->A = A;
 }
@@ -57,7 +57,7 @@ void
 printSWAR(sparse_mat_t *mat, int ncols)
 {
     int j, w;
-    INT k;
+    int32_t k;
 
     fprintf(stderr, "===== S is\n");
     for(w = 0; w <= mat->cwmax; w++){
@@ -123,14 +123,14 @@ printStatsSWAR(sparse_mat_t *mat)
 // can be costly. We must not store row index i0, since j was discovered
 // when row i0 was treated.
 void
-incorporateColumnSWAR(sparse_mat_t *mat, INT j, int i0)
+incorporateColumnSWAR(sparse_mat_t *mat, int32_t j, int i0)
 {
     int i, ni, wj;
-    INT *Rj;
+    int32_t *Rj;
 
     wj = -mat->wt[GETJ(mat, j)];
 #ifndef USE_COMPACT_R
-    Rj = (INT *)malloc((wj+1) * sizeof(INT));
+    Rj = (int32_t *)malloc((wj+1) * sizeof(int32_t));
     // find all rows in which j appears
     for(i = 0, ni = 1; i < mat->nrows; i++)
 	if(!isRowNull(mat, i))
@@ -155,7 +155,7 @@ incorporateColumnSWAR(sparse_mat_t *mat, INT j, int i0)
 int
 getNextj(dclist dcl)
 {
-    INT j;
+    int32_t j;
     dclist foo;
 
     foo = dcl->next;
@@ -221,7 +221,7 @@ remove_j_from_SWAR(sparse_mat_t *mat, int j)
 
 */
 void
-decreaseColWeightSWAR(sparse_mat_t *mat, INT j)
+decreaseColWeightSWAR(sparse_mat_t *mat, int32_t j)
 {
     int ind;
 
@@ -253,7 +253,7 @@ decreaseColWeightSWAR(sparse_mat_t *mat, INT j)
 
 // Returns a value < 0 if nothing was done, since the weight was too heavy.
 int
-addColSWAR(sparse_mat_t *mat, INT j)
+addColSWAR(sparse_mat_t *mat, int32_t j)
 {
     int ind;
 
@@ -263,10 +263,8 @@ addColSWAR(sparse_mat_t *mat, INT j)
 	    j, mat->wt[GETJ(mat, j)], incrS(mat->wt[GETJ(mat, j)]));
 #endif
     ind = mat->wt[GETJ(mat, j)] = incrS(mat->wt[GETJ(mat, j)]);
-#if USE_MERGE_FAST > 1
-    if(ind < 0)
+    if (ind < 0)
 	return ind;
-#endif
     remove_j_from_S(mat, j);
     if(mat->wt[GETJ(mat, j)] > mat->cwmax){
 #if DEBUG >= 1
@@ -289,7 +287,7 @@ deleteEmptyColumnsSWAR(sparse_mat_t *mat)
 {
     dclist dcl = mat->S[0], foo;
     int njrem = 0;
-    INT j;
+    int32_t j;
 
     while(dcl->next != NULL){
 	foo = dcl->next;

@@ -15,46 +15,36 @@
 #define DEBUG 0
 
 int
-decrS(int w)
+decrS (int w)
 {
-#if USE_MERGE_FAST <= 1
-    return w-1;
-#else
-    return (w >= 0 ? w-1 : w+1);
-#endif
+  return (w >= 0 ? w - 1 : w + 1);
 }
 
 int
-incrS(int w)
+incrS (int w)
 {
-#if USE_MERGE_FAST <= 1
-    return w+1;
-#else
-    return (w >= 0 ? w+1 : w-1);
-#endif
+  return (w >= 0 ? w + 1 : w - 1);
 }
 
+/* initialize the sparse matrix mat,
+   where we consider only columns from jmin to jmax-1 */
 // TODO: ncols could be a new renumbered ncols...
 void
-initMat(sparse_mat_t *mat, INT jmin, INT jmax)
+initMat (sparse_mat_t *mat, int32_t jmin, int32_t jmax)
 {
-#if USE_MERGE_FAST
-    INT **R;
-#endif
+    int32_t **R;
 
     mat->jmin = jmin;
     mat->jmax = jmax;
-    mat->rows = (INT **)malloc(mat->nrows * sizeof (INT *));
-    ASSERT_ALWAYS(mat->rows != NULL);
-    mat->wt = (int*) malloc ((mat->jmax-mat->jmin) * sizeof (int));
-    memset(mat->wt, 0, (mat->jmax-mat->jmin) * sizeof (int));
+    mat->rows = (int32_t **) malloc (mat->nrows * sizeof (int32_t *));
+    ASSERT_ALWAYS (mat->rows != NULL);
+    mat->wt = (int*) malloc ((mat->jmax - mat->jmin) * sizeof (int));
+    memset (mat->wt, 0, (mat->jmax - mat->jmin) * sizeof (int));
     mat->wburried = (int*) malloc (mat->nrows * sizeof (int));
-    memset(mat->wburried, 0, mat->nrows * sizeof (int));
-#if USE_MERGE_FAST
-    R = (INT **)malloc((mat->jmax-mat->jmin) * sizeof(INT *));
+    memset (mat->wburried, 0, mat->nrows * sizeof (int));
+    R = (int32_t **)malloc((mat->jmax-mat->jmin) * sizeof(int32_t *));
     ASSERT_ALWAYS(R != NULL);
     mat->R = R;
-#endif
 }
 
 void
@@ -104,7 +94,7 @@ void
 Sparse2Tex(sparse_mat_t *mat)
 {
     int j;
-    INT k;
+    int32_t k;
 
     fprintf(stderr, "\\end{verbatim}\n");
     matrix2tex(mat);
@@ -136,66 +126,64 @@ Sparse2Tex(sparse_mat_t *mat)
 #endif
 }
 
+#define MAX_LENGTH 1024
+
 /* compute the weight mat->wt[j] of each column j, for the set of relations
    in file purgedfile.
+   Assume mat->wt is initialized to 0 (as done by initMat).
+   Assume we have already read the 1st line of purgedfile (nrows, ncols).
+   If skipfirst is non-zero, skip the 1st entry of each line.
 */
 void
-initWeightFromFile(sparse_mat_t *mat, FILE *purgedfile, int skipfirst)
+initWeightFromFile (sparse_mat_t *mat, FILE *purgedfile, int skipfirst)
 {
-    INT j, jmin = mat->jmin, jmax = mat->jmax;
-    int i, k, ret, nc;
+  int32_t j, jmin = mat->jmin, jmax = mat->jmax;
+  int i, k, nc;
+  char s[MAX_LENGTH], *ptr[1];
 
-    memset(mat->wt, 0, (mat->jmax - mat->jmin) * sizeof(int));
-    for(i = 0; i < mat->nrows; i++){
-	if(skipfirst != 0){
-	    ret = fscanf(purgedfile, "%d", &k); // unused index to rels file
-	    ASSERT_ALWAYS (ret == 1);
-	}
-	ret = fscanf (purgedfile, "%d", &nc);
-	ASSERT_ALWAYS (ret == 1);
-	for(k = 0; k < nc; k++){
-	    ret = fscanf(purgedfile, PURGE_INT_FORMAT, &j);
-	    ASSERT_ALWAYS (ret == 1);
-	    if((j >= jmin) && (j < jmax))
-		mat->wt[GETJ(mat, j)]++;
+   
+  /* this code was rewritten using fgets/strtol instead of fscanf,
+     giving a speedup of a factor about 2 */
+  for (i = 0; i < mat->nrows; i++)
+    {
+      ptr[0] = fgets (s, MAX_LENGTH, purgedfile);
+      ASSERT_ALWAYS (ptr[0] != NULL);
+      if(skipfirst != 0)
+	strtol (s, ptr, 10); /* unused index to rels file */
+      nc = strtol (ptr[0], ptr, 10);
+      /* nc is the number of prime ideals of the current relation */
+      for (k = 0; k < nc; k++)
+	{
+	  j = strtol (ptr[0], ptr, 16);
+	  if (LIKELY((j >= jmin) && (j < jmax)))
+	    mat->wt[GETJ(mat, j)]++;
 	}
     }
 }
 
-// builds Rj[j] for light j's.
+/* initialize Rj[j] for light columns, i.e., for those of weight <= cwmax */
 void
-fillmat(sparse_mat_t *mat)
+fillmat (sparse_mat_t *mat)
 {
-    INT j, *Rj, jmin = mat->jmin, jmax = mat->jmax;
+  int32_t j, *Rj, jmin = mat->jmin, jmax = mat->jmax, wj;
 
     for(j = jmin; j < jmax; j++){
-#  if DEBUG >= 2
-	fprintf(stderr, "Treating column %d\n", j);
-#  endif
-	if(mat->wt[GETJ(mat, j)] <= mat->cwmax){
+        wj = mat->wt[GETJ(mat, j)];
+	if (wj <= mat->cwmax){
 #ifndef USE_MARKOWITZ
-	    mat->A[GETJ(mat, j)] = dclistInsert(mat->S[mat->wt[GETJ(mat, j)]], j);
-#  if DEBUG >= 2
-	    fprintf(stderr, "Inserting %d in S[%d]:", j, mat->wt[GETJ(mat, j)]);
-	    dclistPrint(stderr, mat->S[mat->wt[GETJ(mat, j)]]->next);
-	    fprintf(stderr, "\n");
-#  endif
-#endif // USE_MARKOWITZ
+            mat->A[GETJ(mat, j)] = dclistInsert(mat->S[wj], j);
+#endif
 #ifndef USE_COMPACT_R
-	    Rj = (INT *)malloc((mat->wt[GETJ(mat, j)]+1) * sizeof(INT));
-	    Rj[0] = 0; // last index used
+	    Rj = (int32_t *) malloc((wj + 1) * sizeof(int32_t));
+	    Rj[0] = 0; /* last index used */
 	    mat->R[GETJ(mat, j)] = Rj;
 #else
 	    fprintf(stderr, "R: NYI in fillSWAR\n");
 	    exit(1);
 #endif
 	}
-	else{
-#if USE_MERGE_FAST <= 1
-	    mat->wt[GETJ(mat, j)] = -1;
-#else
+	else{ /* weight is larger than cwmax */
 	    mat->wt[GETJ(mat, j)] = -mat->wt[GETJ(mat, j)]; // trick!!!
-#endif
 #ifndef USE_MARKOWITZ
 	    mat->A[GETJ(mat, j)] = NULL; // TODO: renumber j's?????
 #endif
@@ -216,30 +204,32 @@ cmp(const void *p, const void *q) {
     return (x <= y ? -1 : 1);
 }
 
-/* Reads a matrix file, and puts in mat->wt[j], 0 <= j < ncols, the
-   weight of column j (adapted from matsort.c).
+/* Reads a matrix file.
 
    We skip columns that are too heavy.
 
-   mat->wt is already filled and put to - values when needed. So don't touch.
+   mat->wt is already filled:
+   * if mat->wt[j] > 0, it is the weight of column j that we consider
+   * if mat->wt[j] < 0, we don't consider column j
 
    mat->weight is correct on exit; it will be only approximately true
    when skipheavycols will be activated.
 */
 int
-readmat(sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols)
+readmat (sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols,
+	 int verbose)
 {
     int ret;
     int i, k;
     int nc, lbuf = 100, *buf;
-#if (USE_MERGE_FAST < 3) && !defined(USE_MPI)
+#if !defined(USE_MPI)
     int nh = 0;
 #endif
-    INT ibuf, j, jmin = mat->jmin, jmax = mat->jmax;
+    int32_t ibuf, j, jmin = mat->jmin, jmax = mat->jmax;
     char *tooheavy = NULL;
 
     mat->nburried = 0;
-    buf = (int *)malloc(lbuf * sizeof(int));
+    buf = (int *) malloc(lbuf * sizeof(int));
     ret = fscanf (file, "%d %d", &i, &k); // already set up...!
     ASSERT_ALWAYS (ret == 2);
     
@@ -249,16 +239,20 @@ readmat(sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols)
     mat->weight = 0;
 
     if(skipheavycols != 0){
-	int bmin = mat->nrows, bmax = 0, wc, wmax;
+	int bmin = mat->nrows, bmax = 0, wmax;
 
-	wmax = 5 * mat->cwmax;
-	// heavy columns already have wt < 0
-	tooheavy = (char *)malloc(mat->ncols * sizeof(char));
-	memset(tooheavy, 0, mat->ncols * sizeof(char));
+	/* don't consider heavy columns of density > 1/100, this roughly
+	   corresponds to primes < 100 or ideals of norm < 100 */
+	// wmax = -10 * mat->cwmax;
+	wmax = -(mat->nrows / 100);
+	/* heavy columns already have wt < 0 */
+	tooheavy = (char *) malloc (mat->ncols * sizeof(char));
+	memset (tooheavy, 0, mat->ncols * sizeof(char));
 	for(j = 0; j < mat->ncols; j++){
-	    if((wc = abs(mat->wt[j])) > wmax){
-#if DEBUG >= 1 
-		fprintf(stderr, "Burrying j=%d (wt=%d)\n", j, wc);
+	    if(mat->wt[j] < wmax){
+              int wc = -mat->wt[j];
+#if DEBUG >= 0
+	      fprintf(stderr, "Burrying j=%d (wt=%d)\n", j, wc);
 #endif
 		tooheavy[j] = 1;
 		mat->nburried += 1;
@@ -271,7 +265,7 @@ readmat(sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols)
     }
 
     for (i = 0; i < mat->nrows; i++){
-	if(!(i % 100000))
+	if(!(i % 100000) && verbose)
 	    fprintf(stderr, "Reading %d-th row\n", i);
 	if(skipfirst != 0){
 	    ret = fscanf(file, "%d", &nc); // unused index to rels file
@@ -290,7 +284,7 @@ readmat(sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols)
 	    mat->rem_nrows--;
 	}
 	else{
-#if (USE_MERGE_FAST < 3) && !defined(USE_MPI)
+#if !defined(USE_MPI)
 	    int nb_heavy_j = 0;
 #endif
 	    if(nc > lbuf){
@@ -307,14 +301,10 @@ readmat(sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols)
 		    return 0;
 		}
 		ASSERT_ALWAYS (0 <= j && j < mat->ncols);
-#if (USE_MERGE_FAST < 3) && !defined(USE_MPI)
+#if !defined(USE_MPI)
 		if(mat->wt[GETJ(mat, j)] < 0)
 		    nb_heavy_j++;
 #endif
-#if USE_MERGE_FAST <= 1
-		if(mat->wt[GETJ(mat, j)] > 0)
-		    buf[ibuf++] = j;
-#else
 		// always store j in the right interval...!
 		if((j >= jmin) && (j < jmax)){
 		    // this will be the weight in the current slice
@@ -334,9 +324,8 @@ readmat(sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols)
 			}
 		    }
 		}
-#endif
 	    }
-#if (USE_MERGE_FAST < 3) && !defined(USE_MPI)
+#if !defined(USE_MPI)
 	    if(nb_heavy_j == nc){
 		// all the columns are heavy and thus will never participate
 		mat->rows[i] = NULL;
@@ -346,11 +335,11 @@ readmat(sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols)
 #endif
 	    // TODO: do not store rows not having at least one light
 	    // column, but do not decrease mat->nrows!
-	    mat->rows[i] = (INT*) malloc ((ibuf+1) * sizeof (INT));
+	    mat->rows[i] = (int32_t*) malloc ((ibuf+1) * sizeof (int32_t));
 	    mat->rows[i][0] = ibuf;
-	    memcpy(mat->rows[i]+1, buf, ibuf * sizeof(INT));
+	    memcpy(mat->rows[i]+1, buf, ibuf * sizeof(int32_t));
 	    // sort indices in val to ease row merges
-            qsort(mat->rows[i]+1, ibuf, sizeof(INT), cmp);
+            qsort(mat->rows[i]+1, ibuf, sizeof(int32_t), cmp);
             /* check all indices are distinct, otherwise this is a bug of
                purge */
             for (k = 1; k < ibuf; k++)
@@ -362,7 +351,7 @@ readmat(sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols)
                 }
 	}
     }
-#if (USE_MERGE_FAST < 3) && !defined(USE_MPI)
+#if !defined(USE_MPI)
     fprintf(stderr, "Number of heavy rows: %d\n", nh);
 #endif
     // we need to keep informed of what really happens; this will be an upper
@@ -394,7 +383,7 @@ destroyRow(sparse_mat_t *mat, int i)
 void
 removeWeightFromRow(sparse_mat_t *mat, int i)
 {
-    INT k;
+    int32_t k;
 
     for(k = 1; k <= mat->rows[i][0]; k++)
 	mat->wt[GETJ(mat, mat->rows[i][k])]--;
@@ -410,7 +399,7 @@ removeWeightFromRow(sparse_mat_t *mat, int i)
 void
 addWeightFromRow(sparse_mat_t *mat, int i)
 {
-    INT k;
+    int32_t k;
 
     for(k = 1; k <= mat->rows[i][0]; k++)
 	mat->wt[GETJ(mat, mat->rows[i][k])]++;
@@ -499,7 +488,7 @@ add_i_to_Rj(sparse_mat_t *mat, int i, int j)
 	fprintf(stderr, "WARNING: reallocing things in add_i_to_Rj for R[%d]\n", j);
 #endif
 	int l = mat->R[GETJ(mat, j)][0]+2;
-	mat->R[GETJ(mat, j)] = (INT *)realloc(mat->R[GETJ(mat, j)], l * sizeof(INT));
+	mat->R[GETJ(mat, j)] = (int32_t *)realloc(mat->R[GETJ(mat, j)], l * sizeof(int32_t));
 	mat->R[GETJ(mat, j)][l-1] = i;
 	mat->R[GETJ(mat, j)][0] = l-1;
     }
@@ -586,7 +575,7 @@ weightSum(sparse_mat_t *mat, int i1, int i2)
 }
 
 int
-findAllRowsWithGivenj(INT *ind, sparse_mat_t *mat, INT j, int nb)
+findAllRowsWithGivenj(int32_t *ind, sparse_mat_t *mat, int32_t j, int nb)
 {
     int i, k, r = 0;
 
@@ -618,7 +607,7 @@ findAllRowsWithGivenj(INT *ind, sparse_mat_t *mat, INT j, int nb)
 }
 
 void
-fillTabWithRowsForGivenj(INT *ind, sparse_mat_t *mat, INT j)
+fillTabWithRowsForGivenj(int32_t *ind, sparse_mat_t *mat, int32_t j)
 {
     int ni = 0, k, i;
 

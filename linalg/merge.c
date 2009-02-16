@@ -1,51 +1,101 @@
-/*
- * Program: main program for merge
- * Author : F. Morain
- * Purpose: merging relations
- * 
- * Algorithm: digest and interpolation from Cavallar.
- *
+/* merge --- main program to merge relations into relation-sets (cycles)
+
+Copyright 2008-2009 Francois Morain, Paul Zimmermann
+
+This file is part of CADO-NFS.
+
+CADO-NFS is free software; you can redistribute it and/or modify it under the
+terms of the GNU Lesser General Public License as published by the Free
+Software Foundation; either version 2.1 of the License, or (at your option)
+any later version.
+
+CADO-NFS is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
+details.
+
+You should have received a copy of the GNU Lesser General Public License
+along with CADO-NFS; see the file COPYING.  If not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
+*/
+
+/* Algorithm: digest and interpolation from Cavallar02.
+
+  Stefania Cavallar, On the Number Field Sieve Integer Factorisation Algorithm,
+  PhD thesis, University of Leiden, 2002, 108 pages.
  */
 
-#include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
-#include <limits.h> /* for INT_MAX */
+#include <stdlib.h>
+#include <string.h> /* for strcmp */
 
-#include "utils/utils.h"
-#include "files.h"
-#include "gzip.h"
+#include "utils/utils.h" /* for gzip_open */
 
-#include "merge_opts.h"
-#include "sparse.h"
-#include "sparse_mat.h"
-#include "report.h"
+#include "merge_opts.h" /* for USE_MARKOWITZ */
+#include "sparse_mat.h" /* for sparse_mat_t */
+#include "report.h"     /* for report_t */
 #ifndef USE_MARKOWITZ
-# include "swar.h"
+# include "swar.h"      /* for initSWAR */
 #else
-# include "markowitz.h"
+# include "markowitz.h" /* for MkzInit */
 #endif
-#include "merge_mono.h"
+#include "merge_mono.h" /* for mergeOneByOne */
 
 #ifdef USE_MPI
 #include "mpi.h"
 #include "merge_mpi.h"
 #endif
 
+#define CWMAX_DEFAULT 100
+#define RWMAX_DEFAULT 100
+#define MAXLEVEL_DEFAULT 10
+#define KEEP_DEFAULT 128
+#define FORBW_DEFAULT 0
+#define RATIO_DEFAULT 1.1
+#define COVERNMAX_DEFAULT 100
+
+static void
+usage (void)
+{
+  fprintf (stderr, "Usage: merge [options]\n");
+  fprintf (stderr, "   -v             - print some extra information\n");
+  fprintf (stderr, "   -mat   xxx     - input (purged) file is xxx\n");
+  fprintf (stderr, "   -out   xxx     - output (history) file is xxx\n");
+  fprintf (stderr, "   -cwmax nnn     - merge columns of weight <= nnn only (default %u)\n", CWMAX_DEFAULT);
+  fprintf (stderr, "   -rwmax nnn     - merge rows of weight <= nnn only (default %u)\n", RWMAX_DEFAULT);
+  fprintf (stderr, "   -maxlevel nnn  - merge up to nnn rows (default %u)\n",
+	   MAXLEVEL_DEFAULT);
+  fprintf (stderr, "   -keep nnn      - keep an excess of nnn (default %u)\n",
+	   KEEP_DEFAULT);
+  fprintf (stderr, "   -forbw nnn     - controls the optimization function (default %u, see below)\n",
+	   FORBW_DEFAULT);
+  fprintf (stderr, "   -ratio rrr     - maximal ratio cN(final)/cN(min) with forbw=0 (default %1.1f)\n",
+	   RATIO_DEFAULT);
+  fprintf (stderr, "   -coverNmax nnn - with forbw=3, stop when c/N exceeds nnn (default %u)\n", COVERNMAX_DEFAULT);
+  fprintf (stderr, "   -itermax nnn   - if non-zero, stop when nnn columns have been removed\n");
+  fprintf (stderr, "\nThe different optimization functions are, where c is the total matrix weight\n");
+  fprintf (stderr, "and N the number of rows (relation-sets):\n");
+  fprintf (stderr, "   -forbw 0 - optimize the matrix size N (cf -ratio)\n");
+  fprintf (stderr, "   -forbw 1 - stop when the product cN is minimal\n");
+  fprintf (stderr, "   -forbw 3 - stop when the ratio c/N exceeds coverNmax\n");
+  exit (1);
+}
+
 int
-main(int argc, char *argv[])
+main (int argc, char *argv[])
 {
     FILE *purgedfile;
     sparse_mat_t mat;
     report_t rep;
-    char *purgedname = NULL, *hisname = NULL, *outname = NULL;
+    char *purgedname = NULL, *outname = NULL;
     char *resumename = NULL;
     int nrows, ncols;
-    int cwmax = 20, rwmax = 1000000, maxlevel = 2, keep = 128;
+    int cwmax = CWMAX_DEFAULT, rwmax = RWMAX_DEFAULT;
+    int maxlevel = MAXLEVEL_DEFAULT, keep = KEEP_DEFAULT;
     int verbose = 0; /* default verbose level */
     double tt;
-    double ratio = 1.1; /* bound on cN_new/cN to stop the computation */
-    int i, forbw = 0, coverNmax = 0;
+    double ratio = RATIO_DEFAULT; /* bound on cN_new/cN to stop the merge */
+    int i, forbw = FORBW_DEFAULT, coverNmax = COVERNMAX_DEFAULT;
 #ifdef USE_MARKOWITZ
     int wmstmax = 7; /* use real MST minimum for wt[j] <= wmstmax */
     int mkzrnd = 0;
@@ -53,6 +103,7 @@ main(int argc, char *argv[])
 #endif
     int itermax = 0;
 
+    /* print comand-line arguments */
     fprintf (stderr, "%s.r%s", argv[0], REV);
     for (i = 1; i < argc; i++)
       fprintf (stderr, " %s", argv[i]);
@@ -67,11 +118,6 @@ main(int argc, char *argv[])
     while(argc > 1 && argv[1][0] == '-'){
         if (argc > 2 && strcmp (argv[1], "-mat") == 0){
 	    purgedname = argv[2];
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if (argc > 2 && strcmp (argv[1], "-rebuild") == 0){
-	    hisname = argv[2];
 	    argc -= 2;
 	    argv += 2;
 	}
@@ -148,18 +194,15 @@ main(int argc, char *argv[])
 	    argv += 2;
 	}
 	else
-	  {
-	    fprintf (stderr, "Error, unknown option %s\n", argv[1]);
-	    exit (1);
-	  }
+	  usage ();
     }
-    purgedfile = gzip_open(purgedname, "r");
-    ASSERT_ALWAYS(purgedfile != NULL);
-    fscanf(purgedfile, "%d %d", &nrows, &ncols);
+    purgedfile = gzip_open (purgedname, "r");
+    ASSERT_ALWAYS (purgedfile != NULL);
+    fscanf (purgedfile, "%d %d\n", &nrows, &ncols);
 
     mat.nrows = nrows;
     mat.ncols = ncols;
-    mat.delta = keep; // FIXME: change the name of delta
+    mat.keep  = keep;
     mat.cwmax = cwmax;
     mat.rwmax = rwmax;
     mat.mergelevelmax = maxlevel;
@@ -168,36 +211,35 @@ main(int argc, char *argv[])
 #ifdef USE_MPI
     mpi_start_proc(outname,&mat,purgedfile,purgedname,forbw,ratio,coverNmax,
 		   resumename);
-    // TODO: clean the mat data structure (?)
+    /* TODO: clean the mat data structure (?) */
     MPI_Finalize();
     return 0;
 #endif    
-    tt = seconds();
-    initMat(&mat, 0, ncols);
-    fprintf(stderr, "Time for initMat: %2.2lf\n", seconds()-tt);
+    initMat (&mat, 0, ncols);
 
-    tt = seconds();
-    initWeightFromFile(&mat, purgedfile, 1);
-    fprintf(stderr, "Time for initWeightFromFile: %2.2lf\n", seconds()-tt);
-    gzip_close(purgedfile, purgedname);
+    tt = seconds ();
+    initWeightFromFile (&mat, purgedfile, 1);
+    fprintf (stderr, "Getting column weights took %2.2lf\n", seconds () - tt);
+    gzip_close (purgedfile, purgedname);
 
 #ifndef USE_MARKOWITZ
-    fprintf(stderr, "SWAR version\n");
-    initSWAR(&mat);
+    fprintf (stderr, "SWAR version\n");
+    initSWAR (&mat);
 #else
     fprintf(stderr, "Markowitz version\n");
 #endif
-    tt = seconds();
-    fillmat(&mat);
-    fprintf(stderr, "Time for fillmat: %2.2lf\n", seconds()-tt);
+    fillmat (&mat);
     
-    purgedfile = gzip_open(purgedname, "r");
-    ASSERT_ALWAYS(purgedfile != NULL);
-    readmat(&mat, purgedfile, 1, 1); // in case of pb, put "1, 0)" instead
-    gzip_close(purgedfile, purgedname);
+    tt = seconds ();
+    purgedfile = gzip_open (purgedname, "r");
+    ASSERT_ALWAYS (purgedfile != NULL);
+    readmat (&mat, purgedfile, 1, 1, verbose);
+    /* in case of pb, put "1, 0, verbose" instead above */
+    gzip_close (purgedfile, purgedname);
 #if DEBUG >= 3
     checkmat(&mat);
 #endif
+    fprintf (stderr, "Time for readmat: %2.2lf\n", seconds () - tt);
 
     init_rep(&rep, outname, &mat, 0, MERGE_LEVEL_MAX);
     report2(&rep, mat.nrows, mat.ncols);

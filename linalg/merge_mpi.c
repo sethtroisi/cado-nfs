@@ -165,7 +165,7 @@ mpi_kill_slaves()
 }
 
 void
-mpi_check_rows(sparse_mat_t *mat, INT i, INT *tab, int ntab)
+mpi_check_rows(sparse_mat_t *mat, int32_t i, int32_t *tab, int ntab)
 {
     int k1, k2;
 #if DEBUG >= 1
@@ -216,12 +216,12 @@ mpi_check_rows(sparse_mat_t *mat, INT i, INT *tab, int ntab)
 
 #if 0 // useful???
 void
-mpi_load_rows_for_j(sparse_mat_t *mat, int m, INT j)
+mpi_load_rows_for_j(sparse_mat_t *mat, int m, int32_t j)
 {
     MPI_Status status;
     unsigned int buf[MPI_BUF_SIZE];
     int mpi_size, ibuf, k, nrecv, cnt, ind;
-    INT i, **newrows;
+    int32_t i, **newrows;
     char *done;
 
     fprintf(stderr, "Loading m=%d rows for j=%d\n", m, j);
@@ -249,10 +249,10 @@ mpi_load_rows_for_j(sparse_mat_t *mat, int m, INT j)
 	done[k] = 0;
     }
     // feed newrows
-    newrows = (INT **)malloc(m * sizeof(INT *));
+    newrows = (int32_t **)malloc(m * sizeof(int32_t *));
     for(k = 0; k < m; k++){
-	newrows[k] = (INT *)malloc(MAX_ROW_LENGTH * sizeof(INT));
-	newrows[k][0] = (INT)buf[k+2];
+	newrows[k] = (int32_t *)malloc(MAX_ROW_LENGTH * sizeof(int32_t));
+	newrows[k][0] = (int32_t)buf[k+2];
 	newrows[k][1] = 1; // last index fed
     }
     nrecv = 0;
@@ -278,7 +278,7 @@ mpi_load_rows_for_j(sparse_mat_t *mat, int m, INT j)
 #endif
 	    // buf = [m, j, i, j_1, ..., j_r] where the indices j_s
 	    // are positions in mat->rows[i]
-	    i = (INT)buf[2];
+	    i = (int32_t)buf[2];
 	    if(isRowNull(mat, i)){
 		fprintf(stderr, "Can it really happen??? i=%d j=%u cnt=%d\n", 
 			i, buf[1], cnt);
@@ -294,7 +294,7 @@ mpi_load_rows_for_j(sparse_mat_t *mat, int m, INT j)
 		    fprintf(stderr, "#!# newrows.length exceeded, sorry!\n");
 		    exit(0);
 		}
-		newrows[ind][newrows[ind][1]] = (INT)buf[k];
+		newrows[ind][newrows[ind][1]] = (int32_t)buf[k];
 	    }
 	    done[status.MPI_SOURCE] += 1;
 	    if(done[status.MPI_SOURCE] == m){
@@ -305,7 +305,7 @@ mpi_load_rows_for_j(sparse_mat_t *mat, int m, INT j)
 	}
     }
     for(k = 0; k < m; k++){
-	qsort(newrows[k]+2, newrows[k][1]-1, sizeof(INT), cmp);
+	qsort(newrows[k]+2, newrows[k][1]-1, sizeof(int32_t), cmp);
 	mpi_check_rows(mat, newrows[k][0], newrows[k]+2, newrows[k][1]-1);
     }
     free(done);
@@ -335,7 +335,7 @@ mpi_send_inactive_rows(int i)
 int
 mpi_get_number_of_active_colums(sparse_mat_t *mat)
 {
-    INT j;
+    int32_t j;
     int nb = 0;
 
     for(j = mat->jmin; j < mat->jmax; j++)
@@ -398,7 +398,7 @@ mpi_MST(report_t *rep, sparse_mat_t *mat, int *njrem, unsigned int *buf)
 #endif
     dclist dcl;
     double tMST;
-    INT j, ind[MERGE_LEVEL_MAX];
+    int32_t j, ind[MERGE_LEVEL_MAX];
     int k, ni, m, A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX];
 
     // first, we need the rows
@@ -411,7 +411,7 @@ mpi_MST(report_t *rep, sparse_mat_t *mat, int *njrem, unsigned int *buf)
     ni = 0;
     for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++){
 	if(mat->R[GETJ(mat, j)][k] != -1){
-	    ind[ni++] = (INT)mat->R[GETJ(mat, j)][k];
+	    ind[ni++] = (int32_t)mat->R[GETJ(mat, j)][k];
 #if DEBUG >= 1
 	    fprintf(stderr, "ind[%d]=%d -> len=%d\n",
 		    ni-1, ind[ni-1], 
@@ -688,11 +688,11 @@ mpi_replay_history(report_t *rep, sparse_mat_t *mat, unsigned int *send_buf, uns
 int
 mpi_mst_share(unsigned int *send_buf, sparse_mat_t *mat, unsigned int *buf)
 {
-    INT ind[MERGE_LEVEL_MAX];
+    int32_t ind[MERGE_LEVEL_MAX];
     int m = (int)buf[1], r, s, A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], ibuf;
 
     for(r = 0; r < m; r++)
-	ind[r] = (INT)buf[r+2];
+	ind[r] = (int32_t)buf[r+2];
     fillRowAddMatrix(A, mat, m, ind);
     ibuf = 0;
     send_buf[ibuf++] = buf[0];
@@ -710,7 +710,7 @@ mpi_slave(report_t *rep, int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char
     unsigned int buf[MPI_BUF_SIZE];
     unsigned int send_buf[MPI_BUF_SIZE];
     MPI_Status status;
-    INT jmin, jmax;
+    int32_t jmin, jmax;
     int cnt, m, njdel = 0, dw, submaster, nbminm = 0, ok, nbac;
 
     // loop forever
@@ -733,8 +733,8 @@ mpi_slave(report_t *rep, int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char
 		     (int)seconds(),(int)(MPI_Wtime()-wctstart),(int)totwait);
 	    break;
 	case MPI_J_TAG:
-	    jmin = (INT)buf[0];
-	    jmax = (INT)buf[1];
+	    jmin = (int32_t)buf[0];
+	    jmax = (int32_t)buf[1];
 	    mpi_err2("A slave does not need to do too much things...\n... but has to treat C[%d..%d[\n", jmin, jmax);
 	    tt = seconds();
 	    initMat(mat, jmin, jmax);
@@ -956,7 +956,7 @@ mpi_feed(int *row_weight, sparse_mat_t *mat, FILE *purgedfile)
 	ret = fscanf (purgedfile, "%d", &nc);
 	ASSERT_ALWAYS (ret == 1);
 	for(j = 0; j < nc; j++)
-	    ret = fscanf(purgedfile, PURGE_INT_FORMAT, &x);
+	    ret = fscanf(purgedfile, PURGE_int32_t_FORMAT, &x);
 	row_weight[i] = nc;
 	mat->weight += nc;
     }

@@ -307,7 +307,7 @@ minimalSpanningTreeWithKruskal(int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], int m)
 
 void
 fillRowAddMatrix(int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], sparse_mat_t *mat,
-                 int m, INT *ind)
+                 int m, int32_t *ind)
 {
     int i, j;
 
@@ -334,7 +334,7 @@ minimalSpanningTree(int *w, int *father, int *height,
 }
 
 int
-minCostUsingMST(sparse_mat_t *mat, int m, INT *ind, double *tfill, double *tMST)
+minCostUsingMST(sparse_mat_t *mat, int m, int32_t *ind, double *tfill, double *tMST)
 {
     int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX];
     int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1];

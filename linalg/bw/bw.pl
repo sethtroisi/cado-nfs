@@ -40,7 +40,7 @@ $favorite_tmp = "/tmp" if ! -d $favorite_tmp;
 
 # Parameters that will be used only if nothing sets them earlier.
 my $weak = {
-	tidy=>1,
+	tidy=>0, # tidy=0 does not remove intermediate files
 	wdir=> "$favorite_tmp/testmat",
 };
 

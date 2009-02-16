@@ -1,22 +1,13 @@
 #ifndef CADO_SPARSE_H_
 #define CADO_SPARSE_H_
-/* Data type to store column values: a 32-bit integer should be enough for
-   most applications!
-*/
-#include <stdint.h>
 
-/* TODO: rename this to sparse_coeff_t when Francois is done with the mpi
- * merge stuff.  */
+#include <stdint.h> /* for int32_t */
 
-// please, do not use an unsigned type!
-// (needed because of some trick on negative numbers in MST related stuff).
-#define INT int32_t
-
-extern void fprintRow(FILE *file, INT *row);
-extern INT * copyRow(INT *row);
-extern void removeWeight(INT **rows, int *wt, int i);
-extern void addWeight(INT **rows, int *wt, int i);
-extern void addRows(INT **rows, int i1, int i2, int len0);
-extern int hasCol(INT **rows, int i, INT j);
+extern void fprintRow(FILE *file, int32_t *row);
+extern int32_t * copyRow(int32_t *row);
+extern void removeWeight(int32_t **rows, int *wt, int i);
+extern void addWeight(int32_t **rows, int *wt, int i);
+extern void addRows(int32_t **rows, int i1, int i2, int len0);
+extern int hasCol(int32_t **rows, int i, int32_t j);
 
 #endif  /* CADO_SPARSE_H_ */

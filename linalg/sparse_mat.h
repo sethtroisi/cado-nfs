@@ -14,8 +14,8 @@ typedef struct {
   int ncols;
   int rem_nrows;     /* number of remaining rows */
   int rem_ncols;     /* number of remaining columns */
-  INT jmin, jmax;    /* we are interested in columns [jmin..jmax[ */
-  INT **rows;
+  int32_t jmin, jmax;    /* we are interested in columns [jmin..jmax[ */
+  int32_t **rows;
   int *wt;           /* weight w of column j, if w <= cwmax,
                         else <= 1 for a deleted column
                         (trick: we store -w if w > cwmax) */
@@ -27,9 +27,9 @@ typedef struct {
   unsigned long weight;
   int cwmax;         /* bound on weight of j to enter the SWAR structure */
   int rwmax;         /* if a weight(row) > rwmax, kill that row */
-  int delta;         /* bound for nrows-ncols */
+  int keep;          /* target for nrows-ncols */
   int mergelevelmax; /* says it */
-  INT **R;           /* R[j][k] contains the rows of the non-empty elements
+  int32_t **R;           /* R[j][k] contains the rows of the non-empty elements
                         of column j, 0 <= j < ncols, 1 <= k <= R[j][0], for
                         weight(j) <= cwmax.
                         R[j][k] = -1 if the corresponding row has been deleted.
@@ -44,8 +44,8 @@ typedef struct {
                         where w = weight(j), for w <= cwmax. A[j]=NULL for
                         w > cwmax. */
 #else
-  INT *MKZQ;         /* priority queue for Markowitz stuff */    
-  INT *MKZA;         /* MKZA[j] gives u s.t. MKZQ[u] = j */ 
+  int32_t *MKZQ;         /* priority queue for Markowitz stuff */    
+  int32_t *MKZA;         /* MKZA[j] gives u s.t. MKZQ[u] = j */ 
   int wmstmax;
   int mkzrnd;        /* to randomize things */
   int mkztype;       /* which type of count */
@@ -65,10 +65,11 @@ extern "C" {
 #define GETJ(mat, j) (j)
 #endif
 
-extern void initMat(sparse_mat_t *mat, INT jmin, INT jmax);
+extern void initMat(sparse_mat_t *mat, int32_t jmin, int32_t jmax);
 extern void initWeightFromFile(sparse_mat_t *mat, FILE *purgedfile, int skipfirst);
 extern void fillmat(sparse_mat_t *mat);
-extern int readmat(sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols);
+extern int readmat (sparse_mat_t *mat, FILE *file, int skipfirst,
+                    int skipheavycols, int verbose);
 
 extern void addRowsWithWeight(sparse_mat_t *mat, int i1, int i2);
 extern void removeWeightFromRow(sparse_mat_t *mat, int i);
@@ -92,8 +93,8 @@ extern void add_i_to_Rj(sparse_mat_t *mat, int i, int j);
 extern int decrS(int w);
 extern int incrS(int w);
 extern int weightSum(sparse_mat_t *mat, int i1, int i2);
-extern int findAllRowsWithGivenj(INT *ind, sparse_mat_t *mat, INT j, int nb);
-extern void fillTabWithRowsForGivenj(INT *ind, sparse_mat_t *mat, INT j);
+extern int findAllRowsWithGivenj(int32_t *ind, sparse_mat_t *mat, int32_t j, int nb);
+extern void fillTabWithRowsForGivenj(int32_t *ind, sparse_mat_t *mat, int32_t j);
 
 #ifdef __cplusplus
 }

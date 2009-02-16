@@ -3,7 +3,7 @@
 
 #define USE_TAB 1 // 1 for compact rows...
 
-/* INT is defined in sparse.h */
+/* int32_t is defined in sparse.h */
 
 #include "dclist.h"
 
@@ -16,7 +16,7 @@ typedef struct {
 #if USE_TAB == 0
   rel_t *data;
 #else
-  INT **rows;
+  int32_t **rows;
 #endif
   int *wt;           /* weight w of column j, if w <= cwmax,
                         else <= 1 for a deleted column
@@ -25,7 +25,7 @@ typedef struct {
   unsigned long weight;
   int cwmax;         /* bound on weight of j to enter the SWAR structure */
   int rwmax;         /* if a weight(row) > rwmax, kill that row */
-  int delta;         /* bound for nrows-ncols */
+  int keep;          /* target for nrows-ncols */
   int mergelevelmax; /* says it */
   dclist *S;         /* S[w] is a doubly-chained list with columns of weight w,
                         for w <= cwmax. For technical reasons (to avoid NULL
@@ -35,7 +35,7 @@ typedef struct {
   dclist *A;         /* A[j] points to the unique cell in S[w] containing j,
                         where w = weight(j), for w <= cwmax. A[j]=NULL for
                         w > cwmax. */
-  INT **R;           /* R[j][k] contains the rows of the non-empty elements
+  int32_t **R;           /* R[j][k] contains the rows of the non-empty elements
                         of column j, 0 <= j < ncols, 1 <= k <= R[j][0], for
                         weight(j) <= cwmax.
                         R[j][k] = -1 if the corresponding row has been deleted.
@@ -58,16 +58,16 @@ typedef struct {
 extern "C" {
 #endif
 
-extern void report1(FILE *outfile, INT i);
-extern void removeCellSWAR(sparse_mat_t *mat, int i, INT j);
+extern void report1(FILE *outfile, int32_t i);
+extern void removeCellSWAR(sparse_mat_t *mat, int i, int32_t j);
 extern void destroyRow(sparse_mat_t *mat, int i);
 extern int removeSingletons(FILE *outfile, sparse_mat_t *mat);
 extern int deleteEmptyColumns(sparse_mat_t *mat);
 
 #ifdef USE_MPI
 extern void mpi_send_inactive_cols(int i);
-extern void mpi_add_rows(sparse_mat_t *mat, int m, INT j, INT *ind);
-extern void mpi_load_rows_for_j(sparse_mat_t *mat, int m, INT j);
+extern void mpi_add_rows(sparse_mat_t *mat, int m, int32_t j, int32_t *ind);
+extern void mpi_load_rows_for_j(sparse_mat_t *mat, int m, int32_t j);
 #endif
 
 #ifdef __cplusplus

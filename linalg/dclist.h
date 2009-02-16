@@ -3,7 +3,7 @@
 
 // doubly chained lists
 typedef struct dclist{
-    INT j;
+    int32_t j;
     struct dclist *prev, *next;
 } *dclist;
 
@@ -11,10 +11,10 @@ typedef struct dclist{
 extern "C" {
 #endif
 
-extern dclist dclistCreate(INT j);
+extern dclist dclistCreate(int32_t j);
 extern void dclistTex(FILE *file, dclist dcl);
 extern int dclistLength(dclist dcl);
-extern dclist dclistInsert(dclist dcl, INT j);
+extern dclist dclistInsert(dclist dcl, int32_t j);
 extern void dclistPrint(FILE *file, dclist dcl);
 
 #ifdef __cplusplus

@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <limits.h> /* for INT_MAX */
+#include <limits.h> /* for int32_t_MAX */
 
 #include "utils/utils.h"
 #include "files.h"
@@ -34,14 +34,14 @@
 #define DEBUG 0
 
 void
-flushRow(FILE *outfile, sparse_mat_t *mat, INT i)
+flushRow(FILE *outfile, sparse_mat_t *mat, int32_t i)
 {
     int k;
 
     fprintf(outfile, "%d", lengthRow(mat, i));
     for(k = 1; k <= lengthRow(mat, i); k++){
 	fprintf(outfile, " ");
-	fprintf(outfile, PURGE_INT_FORMAT, cell(mat, i, k));
+	fprintf(outfile, PURGE_int32_t_FORMAT, cell(mat, i, k));
     }
     fprintf(outfile, "\n");
 }
@@ -49,14 +49,14 @@ flushRow(FILE *outfile, sparse_mat_t *mat, INT i)
 void
 flushMatrix(FILE *outfile, sparse_mat_t *mat)
 {
-    INT i;
+    int32_t i;
 
     for(i = 0; i < mat->nrows; i++)
 	flushRow(outfile, mat, i);
 }
 
 void
-replaceWithMST(sparse_mat_t *mat, int m, INT *ind)
+replaceWithMST(sparse_mat_t *mat, int m, int32_t *ind)
 {
     int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX];
     int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1];
@@ -115,8 +115,8 @@ replaceWithMST(sparse_mat_t *mat, int m, INT *ind)
 void
 postProcess(FILE *outfile, sparse_mat_t *mat)
 {
-    INT dj, j, mkz;
-    INT ind[MERGE_LEVEL_MAX];
+    int32_t dj, j, mkz;
+    int32_t ind[MERGE_LEVEL_MAX];
     unsigned long oldw = mat->weight;
 
     while(!MkzIsQueueEmpty(mat->MKZQ)){

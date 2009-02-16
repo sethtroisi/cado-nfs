@@ -9,7 +9,7 @@
 void
 init_rep(report_t *rep, char *outname, sparse_mat_t *mat, int type, int bufsize)
 {
-    INT** tmp, i;
+    int32_t** tmp, i;
 
     rep->type = type;
     if(type == 2)
@@ -22,7 +22,7 @@ init_rep(report_t *rep, char *outname, sparse_mat_t *mat, int type, int bufsize)
 	break;
     case 1:
 	// mostly for MPI
-	tmp = (INT **)malloc(mat->nrows * sizeof(INT *));
+	tmp = (int32_t **)malloc(mat->nrows * sizeof(int32_t *));
 	for(i = 0; i < mat->nrows; i++)
 	    tmp[i] = NULL;
 	rep->history = tmp;
@@ -37,7 +37,7 @@ init_rep(report_t *rep, char *outname, sparse_mat_t *mat, int type, int bufsize)
 // terrific hack: everybody on the same line
 // the first is to be destroyed in replay!!!
 void
-reportn(report_t *rep, INT *ind, int n)
+reportn(report_t *rep, int32_t *ind, int n)
 {
     int i;
 
@@ -60,7 +60,7 @@ reportn(report_t *rep, INT *ind, int n)
 	rep->mark += 1;
 	if(rep->history[rep->mark] == NULL)
 	    rep->history[rep->mark] = 
-		(INT *)malloc((rep->bufsize+1)*sizeof(INT));
+		(int32_t *)malloc((rep->bufsize+1)*sizeof(int32_t));
 	rep->history[rep->mark][0] = n;
 	for(i = 0; i < n; i++)
 	    rep->history[rep->mark][i+1] = ind[i];
@@ -71,7 +71,7 @@ reportn(report_t *rep, INT *ind, int n)
 // Same as reportn, but with another input type.
 // TODO: destroy this, since a workaround is found using pointers.
 void
-reporthis(report_t *rep, INT tab[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1], int i0)
+reporthis(report_t *rep, int32_t tab[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1], int i0)
 {
     int k;
 
@@ -94,15 +94,15 @@ reporthis(report_t *rep, INT tab[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1], int i0)
 #endif
 
 void
-report1(report_t *rep, INT i)
+report1(report_t *rep, int32_t i)
 {
     reportn(rep, &i, 1);
 }
 
 void
-report2(report_t *rep, INT i1, INT i2)
+report2(report_t *rep, int32_t i1, int32_t i2)
 {
-    INT tmp[2];
+    int32_t tmp[2];
     tmp[0] = i1;
     tmp[1] = i2;
     reportn(rep, tmp, 2);
