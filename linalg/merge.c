@@ -1,6 +1,7 @@
 /* merge --- main program to merge relations into relation-sets (cycles)
 
-Copyright 2008-2009 Francois Morain, Paul Zimmermann
+Copyright 2008-2009 Francois Morain.
+Reviewed by Paul Zimmermann, February 2009.
 
 This file is part of CADO-NFS.
 
@@ -264,25 +265,17 @@ main (int argc, char *argv[])
 # ifdef USE_MARKOWITZ
     fprintf(stderr, "merge NYI for Markowitz\n");
     return 1;
-# else
-    merge (mat, maxlevel, verbose, forbw);
 # endif
+    merge (mat, maxlevel, verbose, forbw);
 #else
     mergeOneByOne (rep, mat, maxlevel, verbose, forbw, ratio, coverNmax);
 #endif /* M_STRATEGY <= 2 */
 
     gzip_close (rep->outfile, outname);
-    fprintf(stderr, "Final matrix has N=%d nc=%d (%d) w(M)=%lu N*w(M)=%"PRIu64"\n",
-	    mat->rem_nrows, mat->rem_ncols, mat->rem_nrows - mat->rem_ncols,
-	    mat->weight,
+    fprintf (stderr, "Final matrix has N=%d nc=%d (%d) w(M)=%lu N*w(M)=%"
+	     PRIu64"\n", mat->rem_nrows, mat->rem_ncols,
+	     mat->rem_nrows - mat->rem_ncols, mat->weight,
 	    (uint64_t) mat->rem_nrows * (uint64_t) mat->weight);
-#if DEBUG >= 1
-    {
-	FILE *ofile = fopen("toto", "w");
-	dumpSparse (ofile, mat);
-	fclose(ofile);
-    }
-#endif
 #ifndef USE_MARKOWITZ
     closeSWAR (mat);
 #else

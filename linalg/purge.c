@@ -612,7 +612,7 @@ renumber (int *nprimes, hashtable_t *H, char *sos)
 {
     FILE *fsos = NULL;
     unsigned int i;
-    int nb = 1; /* FIXME: why do we start at 1 and not 0? */
+    int nb = 1; /* we start at 1 here, but subtract 1 in fprint_rel_row */
 
     if(sos != NULL){
 	fprintf(stderr, "Outputting renumber table in file %s\n", sos);

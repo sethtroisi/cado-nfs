@@ -33,8 +33,6 @@
 
 #define DEBUG 0
 
-#define USE_CONNECT 0
-
 // not mallocing to speed up(?).
 static int
 findBestIndex(sparse_mat_t *mat, int m, int32_t *ind)
@@ -201,8 +199,8 @@ deleteAllColsFromStack(report_t *rep, sparse_mat_t *mat, int iS)
     int k, njrem = 0;
 
     while(1){
-	dcl = mat->S[iS]->next;
-	if(dcl == NULL)
+        dcl = dclistFirst (mat->S[iS]);
+	if (dcl == NULL)
 	    break;
 	j = dcl->j;
 	njrem++;
@@ -564,7 +562,7 @@ merge_m_fast(report_t *rep, sparse_mat_t *mat, int m, int maxdo, int verbose)
     double totdel = 0;
     int njproc = 0, njrem = 0;
     int32_t j;
-    dclist dcl = mat->S[m];
+    dclist dcl;
     int report = (verbose == 0) ? 10000 : 1000;
 
 #if DEBUG >= 1
@@ -579,8 +577,8 @@ merge_m_fast(report_t *rep, sparse_mat_t *mat, int m, int maxdo, int verbose)
 	checkData(mat);
 #endif
 	// get next j
-	dcl = mat->S[m]->next;
-	if(dcl == NULL)
+	dcl = dclistFirst (mat->S[m]);
+	if (dcl == NULL)
 	    break;
 	j = dcl->j;
 	njproc++;
@@ -633,9 +631,9 @@ minColWeight(sparse_mat_t *mat)
     // in this case, locating minw is easy: inspect the stacks!
     int m;
 
-    for(m = 1; m <= mat->cwmax; m++)
-	if(mat->S[m]->next != NULL)
-	    return m;
+    for (m = 1; m <= mat->cwmax; m++)
+      if (dclistFirst(mat->S[m]) != NULL)
+	return m;
     return -1;
 }
 #endif
@@ -764,7 +762,7 @@ findSuperfluousRowsFor2(int *tmp, int ntmp, sparse_mat_t *mat)
     int32_t *Rj;
     int itmp = 0, j, k, kmin;
 
-    for(dcl = mat->S[3]->next; dcl != NULL; dcl = dcl->next){
+    for (dcl = dclistFirst (mat->S[3]); dcl != NULL; dcl = dcl->next){
 	j = dcl->j;
 #ifndef USE_COMPACT_R
 	Rj = mat->R[GETJ(mat, j)];
@@ -986,7 +984,7 @@ doOneMerge(report_t *rep, sparse_mat_t *mat, int *njrem, double *totopt, double 
       *njrem += merge_m (rep, mat, m, maxdo, verbose);
     else{
 	//	    fprintf(stderr, "Performing one merge for m=%d\n", m);
-	dcl = mat->S[m]->next;
+        dcl = dclistFirst (mat->S[m]);
 	j = dcl->j;
 	mergeForColumn2(rep, mat, njrem, totopt, totfill, totMST, totdel,
 			useMST, j);
@@ -1211,41 +1209,6 @@ mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int f
 	fprintf(rep->outfile, "BWCOSTMIN: %"PRIu64"\n", bwcostmin);
 	fprintf(stderr, "Minimal bwcost found: %"PRIu64"\n", bwcostmin);
     }
-}
-
-void
-dumpSparse(FILE *ofile, sparse_mat_t *mat)
-{
-    long w = 0;
-    int i, j, k, buf[1000], ibuf, new_nrows = 0;
-
-    fprintf(ofile, "%d %d\n", mat->rem_nrows, mat->rem_ncols);
-    for(i = 0; i < mat->nrows; i++){
-	if(isRowNull(mat, i))
-	    continue;
-	w += lengthRow(mat, i);
-	new_nrows++;
-	ibuf = 0;
-#if USE_TAB == 0
-	for(k = 0; k < lengthRow(mat, i); k++)
-#else
-	for(k = 1; k <= lengthRow(mat, i); k++)
-#endif
-	    buf[ibuf++] = cell(mat, i, k);
-	fprintf(ofile, "%d", ibuf);
-	for(k = 0; k < ibuf; k++)
-	    fprintf(ofile, " %d", buf[k]);
-	fprintf(ofile, "\n");
-    }
-    fprintf(stderr, "Weight = %ld\n", w);
-    ASSERT(new_nrows == mat->rem_nrows);
-    // check j used
-    for(j = 0; j < mat->ncols; j++)
-	if(mat->wt[GETJ(mat, j)] != 0){
-	    fprintf(ofile, "J %d %d\n", j, abs(mat->wt[GETJ(mat, j)]));
-	    if(abs(mat->wt[GETJ(mat, j)]) <= mat->mergelevelmax)
-		fprintf(stderr, "Gasp: %d %d\n", j, mat->wt[GETJ(mat, j)]);
-	}
 }
 
 //////////////////////////////////////////////////////////////////////

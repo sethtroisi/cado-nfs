@@ -2,7 +2,7 @@
 #define DCLIST_H_
 
 // doubly chained lists
-typedef struct dclist{
+typedef struct dclist {
     int32_t j;
     struct dclist *prev, *next;
 } *dclist;
@@ -17,7 +17,9 @@ extern void dclistTex(FILE *file, dclist dcl);
 extern int dclistLength(dclist dcl);
 extern dclist dclistInsert(dclist dcl, int32_t j);
 extern void dclistPrint(FILE *file, dclist dcl);
-void dclistConnect (dclist S, dclist dcl);
+extern void dclistRemove (dclist dcl);
+extern int dclistRemoveNext(dclist dcl);
+extern dclist dclistFirst (dclist dcl);
 
 #ifdef __cplusplus
 }

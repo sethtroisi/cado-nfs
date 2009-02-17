@@ -1,11 +1,24 @@
-/* 
- * Program: history
- * Author : F. Morain
- * Purpose: data structure for elimination
- * 
- * Algorithm:
- *
- */
+/* swar.c --- routines dealing with the SWAR data structure
+
+Copyright 2008-2009 Francois Morain.
+Reviewed by Paul Zimmermann, February 2009.
+
+This file is part of CADO-NFS.
+
+CADO-NFS is free software; you can redistribute it and/or modify it under the
+terms of the GNU Lesser General Public License as published by the Free
+Software Foundation; either version 2.1 of the License, or (at your option)
+any later version.
+
+CADO-NFS is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
+details.
+
+You should have received a copy of the GNU Lesser General Public License
+along with CADO-NFS; see the file COPYING.  If not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
+*/
 
 #include "utils/utils.h"
 
@@ -33,6 +46,7 @@ void
 initSWAR (sparse_mat_t *mat)
 {
     /* mat->cwmax+2 to prevent bangs */
+    /* FIXME: what is the purpose of S[cwmax+1]? */
     dclist *S = (dclist *) malloc ((mat->cwmax + 2) * sizeof(dclist));
     dclist *A = (dclist *) malloc ((mat->jmax - mat->jmin) * sizeof(dclist));
     int k;
@@ -68,7 +82,7 @@ printSWAR(sparse_mat_t *mat, int ncols)
     fprintf(stderr, "===== S is\n");
     for(w = 0; w <= mat->cwmax; w++){
 	fprintf(stderr, "  S[%d] ", w);
-	dclistPrint(stderr, mat->S[w]->next);
+	dclistPrint(stderr, mat->S[w]);
 	fprintf(stderr, "\n");
     }
     fprintf(stderr, "===== Wj is\n");
@@ -97,14 +111,14 @@ printStatsSWAR (sparse_mat_t *mat)
 
     for (w = 0; w <= mat->cwmax; w++)
       fprintf (stderr, "I found %d primes of weight %d\n",
-	       dclistLength (mat->S[w]->next), w);
+	       dclistLength (mat->S[w]), w);
 }
 
 // remove j from the stack it belongs to.
 static void
 remove_j_from_S(sparse_mat_t *mat, int j)
 {
-    dclist dcl = mat->A[GETJ(mat, j)], foo;
+    dclist dcl = mat->A[GETJ(mat, j)];
 
     if(dcl == NULL){
 	fprintf(stderr, "Column %d already removed?\n", j);
@@ -115,19 +129,14 @@ remove_j_from_S(sparse_mat_t *mat, int j)
     if(ind > mat->cwmax)
         ind = mat->cwmax+1;
     fprintf(stderr, "S[%d]_b=", ind);
-    dclistPrint(stderr, mat->S[ind]->next); fprintf(stderr, "\n");
+    dclistPrint(stderr, mat->S[ind]); fprintf(stderr, "\n");
     fprintf(stderr, "dcl="); dclistPrint(stderr, dcl); fprintf(stderr, "\n");
 #endif
-    foo = dcl->prev;
-    foo->next = dcl->next;
-    if(dcl->next != NULL)
-	dcl->next->prev = foo;
+    /* remove current cell from dcl */
+    dclistRemove (dcl);
 #if DEBUG >= 2
     fprintf(stderr, "S[%d]_a=", ind);
-    dclistPrint(stderr, mat->S[ind]->next); fprintf(stderr, "\n");
-#endif
-#if USE_CONNECT == 0
-    free(dcl);
+    dclistPrint(stderr, mat->S[ind]); fprintf(stderr, "\n");
 #endif
 }
 
@@ -135,9 +144,6 @@ void
 remove_j_from_SWAR(sparse_mat_t *mat, int j)
 {
     remove_j_from_S(mat, j);
-#if USE_CONNECT
-    free(mat->A[GETJ(mat, j)]);
-#endif
     mat->A[GETJ(mat, j)] = NULL;
 }
 
@@ -170,17 +176,13 @@ decreaseColWeightSWAR(sparse_mat_t *mat, int32_t j)
     // update A[j]
 #if DEBUG >= 2
     fprintf(stderr, "S[%d]_b=", ind);
-    dclistPrint(stderr, mat->S[ind]->next); fprintf(stderr, "\n");
+    dclistPrint(stderr, mat->S[ind]); fprintf(stderr, "\n");
 #endif
     // TODO: replace this with a move of pointers...!
-#if USE_CONNECT == 0
     mat->A[GETJ(mat, j)] = dclistInsert(mat->S[ind], j);
-#else
-    dclistConnect(mat->S[ind], mat->A[GETJ(mat, j)]);
-#endif
 #if DEBUG >= 2
     fprintf(stderr, "S[%d]_a=", ind);
-    dclistPrint(stderr, mat->S[ind]->next); fprintf(stderr, "\n");
+    dclistPrint(stderr, mat->S[ind]); fprintf(stderr, "\n");
 #endif
 }
 
@@ -207,31 +209,26 @@ addColSWAR(sparse_mat_t *mat, int32_t j)
 	ind = mat->cwmax+1; // trick
     }
     // update A[j]
-#if USE_CONNECT == 0
     mat->A[GETJ(mat, j)] = dclistInsert(mat->S[ind], j);
-#else
-    dclistConnect(mat->S[ind], mat->A[GETJ(mat, j)]);
-#endif
     return ind;
 }
 
 int
-deleteEmptyColumnsSWAR(sparse_mat_t *mat)
+deleteEmptyColumnsSWAR (sparse_mat_t *mat)
 {
-    dclist dcl = mat->S[0], foo;
+    dclist dcl = mat->S[0];
     int njrem = 0;
     int32_t j;
 
-    while(dcl->next != NULL){
-	foo = dcl->next;
-	j = foo->j;
-	dcl->next = foo->next;
-	free(foo);
+    ASSERT(dcl != NULL);
+    while (dcl->next != NULL)
+      {
+        j = dclistRemoveNext (dcl->next);
 	njrem++;
 	mat->A[GETJ(mat, j)] = NULL;
 	mat->wt[GETJ(mat, j)] = 0;
-	freeRj(mat, j);
-    }
+	freeRj (mat, j);
+      }
     mat->rem_ncols -= njrem;
     return njrem;
 }
