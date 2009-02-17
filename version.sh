@@ -6,7 +6,7 @@
 cd "`dirname $0`"
 if [ -d .svn ] ; then
     svnversion
-    svn status -q
+    # svn status -q # removed, since it pollutes the revision number
 else
     commit="`git-show --pretty=format:%h 2>/dev/null | head -1`"
     if [ "$commit" != "" ] ; then
