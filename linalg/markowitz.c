@@ -31,7 +31,7 @@ double tmkzup, tmkzdown, tmkzupdown, tmkzcount;
 #define MkzGet(Q, i, r) (Q[((i)<<1)+(r)])
 #define MkzSet(Q, i, r, val) (Q[((i)<<1)+(r)] = (val))
 
-int
+static int
 MkzGetCount(int32_t *Q, int32_t *A, int32_t dj)
 {
     return MkzGet(Q, A[dj], 1);
@@ -44,7 +44,7 @@ MkzIsAlive(int32_t *A, int32_t dj)
 }
 
 // (Q, A)[k1] <- (Q, A)[k2]
-void
+static void
 MkzAssign(int32_t *Q, int32_t *A, int32_t k1, int32_t k2)
 {
     int32_t dj = MkzGet(Q, k2, 0);
@@ -54,7 +54,7 @@ MkzAssign(int32_t *Q, int32_t *A, int32_t k1, int32_t k2)
     A[dj] = k1;
 }
 
-void
+static void
 MkzPrintQueue(int32_t *Q)
 {
     int level = 0, imax = 1, i;
@@ -70,7 +70,7 @@ MkzPrintQueue(int32_t *Q)
     fprintf(stderr, "\n");
 }
 
-void
+static void
 MkzUpQueue(int32_t *Q, int32_t *A, int32_t k)
 {
     int32_t dj = MkzGet(Q, k, 0), count = MkzGet(Q, k, 1);
@@ -93,7 +93,7 @@ MkzUpQueue(int32_t *Q, int32_t *A, int32_t k)
 #endif
 }
 
-void
+static void
 MkzInsert(int32_t *Q, int32_t *A, int32_t dj, int32_t count)
 {
     Q[0]++;
@@ -104,7 +104,7 @@ MkzInsert(int32_t *Q, int32_t *A, int32_t dj, int32_t count)
 }
 
 // Move Q[k] down.
-void
+static void
 MkzDownQueue(int32_t *Q, int32_t *A, int32_t k)
 {
     int32_t dj = MkzGet(Q, k, 0), count = MkzGet(Q, k, 1), j;
@@ -160,7 +160,7 @@ MkzPopQueue(int32_t *dj, int32_t *mkz, int32_t *Q, int32_t *A)
 
 // (Q, A)[k] has just arrived, but we have to move it in the heap, so that
 // it finds its place.
-void
+static void
 MkzMoveUpOrDown(int32_t *Q, int32_t *A, int32_t k)
 {
 #if MKZ_TIMINGS
@@ -185,7 +185,7 @@ MkzMoveUpOrDown(int32_t *Q, int32_t *A, int32_t k)
 }
 
 // Remove (Q, A)[k].
-void
+static void
 MkzDelete(int32_t *Q, int32_t *A, int32_t k)
 {
 #if MKZ_DEBUG >= 1
@@ -210,7 +210,7 @@ MkzRemove(int32_t *dj, int32_t *mkz, int32_t *Q, int32_t *A, int32_t k)
     MkzMoveUpOrDown(Q, A, k);
 }
 
-int
+static int
 MkzIsHeap(int32_t *Q)
 {
     int k;
@@ -234,7 +234,7 @@ MkzIsHeap(int32_t *Q)
     return 1;
 }
 
-void
+static void
 MkzCheck(sparse_mat_t *mat)
 {
     int32_t dj;
@@ -245,13 +245,13 @@ MkzCheck(sparse_mat_t *mat)
 		fprintf(stderr, "GASP: %d in MkzCheck\n", dj);
 }
 
-int
+static int
 Cavallar(sparse_mat_t *mat, int32_t j)
 {
     return abs(mat->wt[GETJ(mat, j)]);
 }
 
-int
+static int
 pureMkz(sparse_mat_t *mat, int32_t j)
 {
     int mkz, k, i;
@@ -284,7 +284,7 @@ pureMkz(sparse_mat_t *mat, int32_t j)
 }
 
 // forcing lighter columns first.
-int
+static int
 lightColAndMkz(sparse_mat_t *mat, int32_t j)
 {
     int mkz, k, i, wj, cte;
@@ -324,7 +324,7 @@ lightColAndMkz(sparse_mat_t *mat, int32_t j)
     return mkz;
 }
 
-int
+static int
 MkzCount(sparse_mat_t *mat, int32_t j)
 {
     switch(mat->mkztype){
@@ -513,20 +513,4 @@ MkzDeleteHeavyColumns(report_t *rep, sparse_mat_t *mat)
 #endif
 }
 
-// TODO: finish the code if needed.
-int
-MkzRemoveCols(report_t *rep, sparse_mat_t *mat, int wmin, int wmax)
-{
-    int32_t j;
-    int w;
-
-    for(j = mat->jmin; j < mat->jmax; j++){
-	w = mat->wt[GETJ(mat, j)];
-        if((w >= wmin) && (w <= wmax)){
-	    fprintf(stderr, "w[%d]=%d\n", j, w);
-	}
-    }
-    return 0;
-}
-
-#endif
+#endif /* USE_MARKOWITZ */

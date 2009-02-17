@@ -18,7 +18,7 @@
 
 #define isQueueEmpty(Q) (Q[0][0] == Q[0][1])
 
-void
+static void
 popQueue(int *s, int *t, int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3])
 {
     int fQ = Q[0][0];
@@ -28,7 +28,8 @@ popQueue(int *s, int *t, int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3])
     Q[0][0]++;
 }
 
-void
+#if DEBUG >= 1
+static void
 printQueue(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3])
 {
     int i;
@@ -36,8 +37,9 @@ printQueue(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3])
     for(i = Q[0][0]; i < Q[0][1]; i++)
 	fprintf(stderr, "Q[%d] = [%d, %d, %d]\n", i,Q[i][0], Q[i][1], Q[i][2]);
 }
+#endif
 
-void
+static void
 addEdge(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3], int u, int v, int Auv)
 {
     int i, j, fQ = Q[0][0], lQ = Q[0][1];
@@ -57,13 +59,15 @@ addEdge(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3], int u, int v, int Auv)
     Q[0][1]++;
 }
 
-#else
+#else /* QUEUE_TYPE == 0 */
+
 // Q[0][0] contains the number of items in Q[], so that useful part of Q
 // is Q[1..Q[0][0]].
 
 #define isQueueEmpty(Q) (Q[0][0] == 0)
 
-void
+#if DEBUG >= 1
+static void
 printQueue(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3])
 {
     int level = 0, imax = 1, i;
@@ -78,8 +82,9 @@ printQueue(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3])
     }
     fprintf(stderr, "\n");
 }
+#endif
 
-void
+static void
 upQueue(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3], int k)
 {
     int x = Q[k][0], y = Q[k][1], v = Q[k][2];
@@ -98,7 +103,7 @@ upQueue(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3], int k)
     Q[k][2] = v;
 }
 
-void
+static void
 addEdge(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3], int u, int v, int Auv)
 {
     Q[0][0]++;
@@ -111,7 +116,7 @@ addEdge(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3], int u, int v, int Auv)
 }
 
 // Move Q[1] down.
-void
+static void
 downQueue(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3], int k)
 {
     int x = Q[k][0], y = Q[k][1], v = Q[k][2], j;
@@ -141,7 +146,7 @@ downQueue(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3], int k)
 }
 
 // smallest edge (s, t) is always in Q[1]
-void
+static void
 popQueue(int *s, int *t, int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3])
 {
     *s = Q[1][0];
@@ -152,11 +157,11 @@ popQueue(int *s, int *t, int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3])
     Q[0][0]--;
     downQueue(Q, 1);
 }
-#endif
+#endif /* QUEUE_TYPE == 0 */
 
 // Add all neighbors of u, which is already in T; all edges with v in T
 // are not useful anymore.
-void
+static void
 addAllEdges(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3],
 	    int u, int *father, int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], int m)
 {
@@ -168,7 +173,7 @@ addAllEdges(int Q[MERGE_LEVEL_MAX*MERGE_LEVEL_MAX][3],
 }
 
 // height[0] = 0, etc. Returns hmax; *w will contain the minimal sum.
-int
+static int
 minimalSpanningTreeWithPrim(int *w, int *father, int *height, 
 			    int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 			    int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], int m)
@@ -232,78 +237,6 @@ minimalSpanningTreeWithPrim(int *w, int *father, int *height,
     }
     return hmax;
 }
-
-#if 0
-void
-minimalSpanningTreeWithKruskal(int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], int m)
-{
-#if 0
-    int *E, m2 = m*(m-1), i, j, iE = 0, lE = 3*m2;
-    int nV = 0, *ancester, *father;
-
-    E = (int *)malloc(lE * sizeof(int));
-    for(i = 0; i < m; i++)
-	for(j = 0; j < m; j++){
-	    if(j != i){
-		E[iE++] = A[i][j];
-		E[iE++] = i;
-		E[iE++] = j;
-	    }
-	}
-    // sort edges
-    qsort(E, m2, 3 * sizeof(int), cmp);
-#if DEBUG >= 1
-    for(i = 0; i < m2; i++)
-	fprintf(stderr, "w(%d, %d)=%d\n", E[3*i+1], E[3*i+2], E[3*i]);
-#endif
-    ancester = (int *)malloc(m * sizeof(int));
-    father = (int *)malloc(m * sizeof(int));
-    for(i = 0; i < m; i++){
-	ancester[i] = -1;
-	father[i] = -1; // everybody is a root
-    }
-    nV = 0;
-    iE = -3;
-    while(1){
-	iE += 3;
-	if((ancester[E[iE+1]] == -1) && (ancester[E[iE+2]] == -1)){
-	    // new cc
-	    ancester[E[iE+1]] = E[iE+1];
-	    ancester[E[iE+2]] = father[E[iE+2]] = E[iE+1];
-	    nV += 2;
-	}
-	else if(ancester[E[iE+1]] == -1){
-	    // new edge to cc of E[iE+2]
-	    father[E[iE+1]] = E[iE+2];
-	    ancester[E[iE+1]] = ancester[E[iE+2]];
-	    nV++;
-	}
-	else if(ancester[E[iE+2]] == -1){
-            // new edge to cc of E[iE+1]
-            father[E[iE+2]] = E[iE+1];
-            ancester[E[iE+2]] = ancester[E[iE+1]];
-	    nV++;
-        }
-	else{
-	    // E[iE+1] and E[iE+2] are already known, check ancesters
-	    int anc1 = findAncester(E[iE+1], ancester);
-	    int anc2 = findAncester(E[iE+2], ancester);
-	    // if anc1 == anc2, then this would create a cycle
-	    if(anc1 != anc2){
-		// we have to merge the two cc's
-		ancester[E[iE+2]] = ancester[E[iE+1]];
-		// but how do we deal with the father's...?
-	    }
-	}
-	if(nV == m)
-	    break;
-    }
-    free(E);
-    free(ancester);
-    free(father);
-#endif
-}
-#endif
 
 void
 fillRowAddMatrix(int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], sparse_mat_t *mat,

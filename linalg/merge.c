@@ -240,9 +240,6 @@ main (int argc, char *argv[])
        the second 1 is to burry heavy columns (0 considers all columns) */
     readmat (mat, purgedfile, 1, 1, verbose);
     gzip_close (purgedfile, purgedname);
-#if DEBUG >= 3
-    checkmat (mat);
-#endif
     fprintf (stderr, "Time for readmat: %2.2lf\n", seconds () - tt);
 
     /* initialize rep, i.e., mostly opens outname */

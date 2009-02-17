@@ -29,7 +29,8 @@ fprintRow(FILE *file, int32_t *row)
 }
 
 // row[0..row[0]] is of lenfth row[0]+1.
-int32_t * copyRow(int32_t *row)
+int32_t*
+copyRow(int32_t *row)
 {
     int32_t *tmp = (int32_t *)malloc((1+row[0]) * sizeof(int32_t));
     
@@ -119,15 +120,6 @@ removeWeight(int32_t **rows, int *wt, int i)
 	wt[rows[i][k]]--;
 }
 
-void
-addWeight(int32_t **rows, int *wt, int i)
-{
-    int32_t k;
-
-    for(k = 1; k <= rows[i][0]; k++)
-	wt[rows[i][k]]++;
-}
-
 int
 hasCol(int32_t **rows, int i, int32_t j)
 {
@@ -139,3 +131,10 @@ hasCol(int32_t **rows, int i, int32_t j)
     return 0;
 }
 
+int 
+cmp (const void *p, const void *q)
+{
+  int x = *((int *)p);
+  int y = *((int *)q);
+  return (x <= y ? -1 : 1);
+}

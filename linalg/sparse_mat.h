@@ -72,8 +72,6 @@ extern void fillmat(sparse_mat_t *mat);
 extern int readmat (sparse_mat_t *mat, FILE *file, int skipfirst,
                     int skipheavycols, int verbose);
 
-extern void addRowsWithWeight(sparse_mat_t *mat, int i1, int i2);
-extern void removeWeightFromRow(sparse_mat_t *mat, int i);
 extern void remove_j_from_row(sparse_mat_t *mat, int i, int j);
 extern void print_row(sparse_mat_t *mat, int i);
 
@@ -94,8 +92,9 @@ extern void add_i_to_Rj(sparse_mat_t *mat, int i, int j);
 extern int decrS(int w);
 extern int incrS(int w);
 extern int weightSum(sparse_mat_t *mat, int i1, int i2);
-extern int findAllRowsWithGivenj(int32_t *ind, sparse_mat_t *mat, int32_t j, int nb);
 extern void fillTabWithRowsForGivenj(int32_t *ind, sparse_mat_t *mat, int32_t j);
+extern void checkData(sparse_mat_t *mat);
+extern void destroyRow(sparse_mat_t *mat, int i);
 
 #ifdef __cplusplus
 }

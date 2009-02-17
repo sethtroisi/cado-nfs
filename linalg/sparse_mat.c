@@ -148,13 +148,6 @@ fillmat (sparse_mat_t *mat)
     }
 }
 
-int 
-cmp(const void *p, const void *q) {
-    int x = *((int *)p);
-    int y = *((int *)q);
-    return (x <= y ? -1 : 1);
-}
-
 /* Reads a matrix file.
 
    We skip columns that are too heavy.
@@ -215,8 +208,8 @@ readmat (sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols,
     }
 
     for (i = 0; i < mat->nrows; i++){
-	if(!(i % 100000) && verbose)
-	    fprintf(stderr, "Reading %d-th row\n", i);
+      if(!(i % 100000))
+	    fprintf (stderr, "Reading %d-th row\r", i);
 	if(skipfirst != 0){
 	    ret = fscanf(file, "%d", &nc); // unused index to rels file
 	    if(ret != 1){
@@ -301,6 +294,7 @@ readmat (sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols,
                 }
 	}
     }
+    fprintf (stderr, "\n"); /* to keep last output on screen */
 #if !defined(USE_MPI)
     fprintf(stderr, "Number of heavy rows: %d\n", nh);
 #endif
@@ -328,53 +322,6 @@ destroyRow(sparse_mat_t *mat, int i)
 {
     free(mat->rows[i]);
     mat->rows[i] = NULL;
-}
-
-// we do not use/touch wburried[i]
-void
-removeWeightFromRow(sparse_mat_t *mat, int i)
-{
-    int32_t k;
-
-    for(k = 1; k <= mat->rows[i][0]; k++)
-	mat->wt[GETJ(mat, mat->rows[i][k])]--;
-#if TRACE_ROW >= 0
-    if(i == TRACE_ROW)
-	fprintf(stderr, "TRACE_ROW: removeWeightFromRow %d\n", 
-		lengthRow(mat, i));
-#endif
-    mat->weight -= lengthRow(mat, i);
-}
-
-// we do not use/touch wburried[i]
-void
-addWeightFromRow(sparse_mat_t *mat, int i)
-{
-    int32_t k;
-
-    for(k = 1; k <= mat->rows[i][0]; k++)
-	mat->wt[GETJ(mat, mat->rows[i][k])]++;
-    mat->weight += lengthRow(mat, i);
-}
-
-// i1 += i2, mat->wt is updated at the same time.
-void
-addRowsWithWeight(sparse_mat_t *mat, int i1, int i2)
-{
-    // i1 is to disappear, replaced by a new one
-    removeWeightFromRow(mat, i1);
-    addRows(mat->rows, i1, i2, -1);
-    mat->wburried[i1] += mat->wburried[i2];
-    if(mat->wburried[i1] > mat->nburried)
-	mat->wburried[i1] = mat->nburried;
-    // new row i1 has to contribute to the weight
-    addWeightFromRow(mat, i1);
-#if TRACE_ROW >= 0
-    if(i1 == TRACE_ROW)
-	fprintf(stderr, "TRACE_ROW: addRowsWithWeight i1=%d\n", i1);
-    if(i2 == TRACE_ROW)
-	fprintf(stderr, "TRACE_ROW: addRowsWithWeight i2=%d\n", i2);
-#endif
 }
 
 void
@@ -523,38 +470,6 @@ weightSum(sparse_mat_t *mat, int i1, int i2)
     w += (k1 > len1 ? 0 : len1-k1+1);
     w += (k2 > len2 ? 0 : len2-k2+1);
     return w;
-}
-
-int
-findAllRowsWithGivenj(int32_t *ind, sparse_mat_t *mat, int32_t j, int nb)
-{
-    int i, k, r = 0;
-
-    // TODO: special hack for nb==2???
-    for(i = 0; i < mat->nrows; i++){
-	if(isRowNull(mat, i))
-	    continue;
-#if USE_TAB == 0
-	for(k = 0; k < lengthRow(mat, i)-1; k++) // trick!
-	    if(cell(mat, i, k) >= j)
-		break;
-	if(cell(mat, i, k) == j){
-	    ind[r++] = i;
-	    if(r == nb)
-		return 1;
-	}
-#else
-	for(k = 1; k <= lengthRow(mat, i)-1; k++) // trick!
-	    if(cell(mat, i, k) >= j)
-		break;
-	if(cell(mat, i, k) == j){
-	    ind[r++] = i;
-	    if(r == nb)
-		return 1;
-	}
-#endif
-    }
-    return 0;
 }
 
 void

@@ -28,7 +28,8 @@
 // After computing newrows, we deduce for all old rows the list of newrows
 // containing it.
 
-void
+#if DEBUG >= 1
+static void
 printOldRows(int **oldrows, int nrows)
 {
     int i;
@@ -42,7 +43,7 @@ printOldRows(int **oldrows, int nrows)
 	}
 }
 
-void
+static void
 printBuf(FILE *file, int *buf, int ibuf)
 {
     int i;
@@ -51,9 +52,10 @@ printBuf(FILE *file, int *buf, int ibuf)
     for(i = 0; i < ibuf; i++)
 	fprintf(file, " %d", buf[i]);
 }
+#endif
 
 // add buf[0..ibuf[ to row i of sparsemat
-void
+static void
 addrel(int **sparsemat, int *colweight, int *buf, int ibuf, int i)
 {
     int *rowi = sparsemat[i], *tmp, tmp_len, k1, k2, k;
@@ -123,13 +125,6 @@ addrel(int **sparsemat, int *colweight, int *buf, int ibuf, int i)
     }
 }
 
-static int 
-cmp(const void *p, const void *q) {
-    int x = *((int *)p);
-    int y = *((int *)q);
-    return (x <= y ? -1 : 1);
-}
-
 static void
 makeSparse(int **sparsemat, int *colweight, FILE *purgedfile,
            int jmin, int jmax, int **oldrows, int verbose, int nslices)
@@ -138,7 +133,7 @@ makeSparse(int **sparsemat, int *colweight, FILE *purgedfile,
     int report = (verbose == 0) ? 100000 : 10000;
 
     buf_len = 100;
-    buf = (int *)malloc(buf_len * sizeof(int));
+    buf = (int *) malloc (buf_len * sizeof(int));
     fprintf(stderr, "Reading and treating relations from purged file\n");
     fscanf(purgedfile, "%d %d", &i, &j); // skip first line; check?
     ind = 0;
@@ -148,7 +143,7 @@ makeSparse(int **sparsemat, int *colweight, FILE *purgedfile,
 	// store primes in rel
 	if(nj > buf_len){
 	    fprintf(stderr, "WARNING: realloc for buf [nj=%d]\n", nj);
-	    buf = (int *)realloc(buf, nj * sizeof(int));
+	    buf = (int *) realloc (buf, nj * sizeof(int));
 	    buf_len = nj;
 	}
 	// take everybody and clean
@@ -173,9 +168,10 @@ makeSparse(int **sparsemat, int *colweight, FILE *purgedfile,
 	}
 	ind++;
     }
+    free (buf);
 }
 
-unsigned long
+static unsigned long
 flushSparse(char *sparsename, int **sparsemat, int small_nrows, int small_ncols, int *code)
 {
     FILE *ofile;
@@ -199,11 +195,11 @@ flushSparse(char *sparsename, int **sparsemat, int small_nrows, int small_ncols,
 	}
 	fprintf(ofile, "\n");
     }
-    gzip_close(ofile, sparsename);
+    gzip_close (ofile, sparsename);
     return W;
 }
 
-void
+static void
 infos4Manu(char *name, char *sparsename, int small_nrows, int small_ncols, int nvslices, int *tabnc, unsigned long *Wslice)
 {
     FILE *ofile;
@@ -233,43 +229,8 @@ infos4Manu(char *name, char *sparsename, int small_nrows, int small_ncols, int n
     fclose(ofile);
 }
 
-#if 0
-// Do we have enough space for this approach?
-void
-makeabFile(char *abname, char *purgedname, int nrows, int **newrows, int small_nrows, int small_ncols)
-{
-    FILE *purgedfile = gzip_open(purgedname, "r"), *abfile;
-    long *ta = (long *)malloc(nrows * sizeof(long));
-    unsigned long *tb = (unsigned long *)malloc(nrows * sizeof(unsigned long));
-    int i, j, ind;
-    char c;
-
-    fprintf(stderr, "Fetching all ab pairs from file %s\n", purgedname);
-    fscanf(purgedfile, "%d %d", &i, &j); // skip first line; check?
-    ind = 0;
-    while(fscanf(purgedfile, "%ld %lu", ta+ind, tb+ind) != EOF){
-	if(!(ind % 1000))
-	    fprintf(stderr, "Treating rel #%d\n", ind);
-	// skip till end of line
-	while((c = getc(purgedfile)) != '\n');
-	ind++;
-    }
-    gzipclose(purgedfile, purgedname);
-    fprintf(stderr, "Building ab file\n");
-    abfile = fopen(abname, "w");
-    fprintf(abfile, "%d %d\nmultiab\n", small_nrows, small_ncols);
-    for(i = 0; i < nrows; i++)
-	if(newrows[i] != NULL){
-	    fprintf(abfile, "%d\n", newrows[i][0]);
-	    for(j = 1; j <= newrows[i][0]; j++)
-		fprintf(abfile, "%ld %lu\n", ta[newrows[i][j]], tb[newrows[i][j]]);
-	}
-    fclose(abfile);
-}
-#endif
-
 // dump of newrows in indexname.
-void
+static void
 makeIndexFile(char *indexname, int nrows, int **newrows, int small_nrows, int small_ncols)
 {
     FILE *indexfile;
@@ -291,7 +252,7 @@ makeIndexFile(char *indexname, int nrows, int **newrows, int small_nrows, int sm
 
 // on input, colweight[j] contains the weight; on exit, colweight[j]
 // contains the new index for j.
-void
+static void
 renumber(int *small_ncols, int *colweight, int ncols)
 {
     int j, k, nb, *tmp;
@@ -331,7 +292,7 @@ renumber(int *small_ncols, int *colweight, int ncols)
 // If i < 0 then
 //     row[-i-1] is to be added to rows i1...ik and NOT destroyed.
 //
-void
+static void
 doAllAdds(int **newrows, char *str)
 {
     char *t = str;
@@ -375,7 +336,7 @@ doAllAdds(int **newrows, char *str)
 
 #define STRLENMAX 2048
 
-int
+static int
 oneFile(char *sparsename, int **sparsemat, int *colweight, char *purgedname, FILE *purgedfile, int **oldrows, int ncols, int small_nrows, int verbose)
 {
     unsigned long W;
@@ -398,7 +359,7 @@ oneFile(char *sparsename, int **sparsemat, int *colweight, char *purgedname, FIL
     return small_ncols;
 }
 
-int
+static int
 manyFiles(char *sparsename, int **sparsemat, int *colweight, char *purgedname, FILE *purgedfile, int **oldrows, int ncols, int small_nrows, int verbose, int nslices)
 {
     char *name;
@@ -459,7 +420,7 @@ manyFiles(char *sparsename, int **sparsemat, int *colweight, char *purgedname, F
     return small_ncols;
 }
 
-void
+static void
 build_newrows_from_file(int **newrows, int nrows, FILE *hisfile, uint64_t bwcostmin)
 {
     uint64_t bwcost;
@@ -499,7 +460,7 @@ build_newrows_from_file(int **newrows, int nrows, FILE *hisfile, uint64_t bwcost
     }
 }
 
-void
+static void
 read_newrows_from_file(int **newrows, int nrows, FILE *file)
 {
     int small_nrows, small_ncols, i, nc, k, *tmp;
@@ -609,8 +570,8 @@ main(int argc, char *argv[])
     }
     fclose(hisfile);
 
-    nbrels = (int *)malloc(nrows * sizeof(int));
-    memset(nbrels, 0, nrows * sizeof(int));
+    nbrels = (int *) malloc(nrows * sizeof(int));
+    memset (nbrels, 0, nrows * sizeof(int));
     // nbrels[oldi] contains the number of new relations in which old
     // relation of index oldi takes part
     small_nrows = 0;
@@ -636,6 +597,7 @@ main(int argc, char *argv[])
 	oldrows[i] = (int *)malloc((nbrels[i]+1) * sizeof(int));
 	oldrows[i][0] = 0;
     }
+    free (nbrels);
     fprintf(stderr, "Filling oldrows\n");
     for(i = 0, nb = 0; i < nrows; i++)
         if(newrows[i] != NULL){
@@ -671,11 +633,7 @@ main(int argc, char *argv[])
 	// this part depends on newrows only
 	double tt = seconds();
 	fprintf(stderr, "Writing index file\n");
-#if 0
-	makeabFile(argv[4], argv[1], nrows, newrows, small_nrows, small_ncols);
-#else
 	makeIndexFile(indexname, nrows, newrows, small_nrows, small_ncols);
-#endif
 	fprintf(stderr, "#T# writing index file: %2.2lf\n", seconds()-tt);
     }
 

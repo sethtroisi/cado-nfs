@@ -100,57 +100,8 @@ printStatsSWAR (sparse_mat_t *mat)
 	       dclistLength (mat->S[w]->next), w);
 }
 
-// w(j) has decreased in such a way that it can be incorporated in the
-// SWAR structure. We need find all the info we need to do that. Note this
-// can be costly. We must not store row index i0, since j was discovered
-// when row i0 was treated.
-void
-incorporateColumnSWAR(sparse_mat_t *mat, int32_t j, int i0)
-{
-    int i, ni, wj;
-    int32_t *Rj;
-
-    wj = -mat->wt[GETJ(mat, j)];
-#ifndef USE_COMPACT_R
-    Rj = (int32_t *)malloc((wj+1) * sizeof(int32_t));
-    // find all rows in which j appears
-    for(i = 0, ni = 1; i < mat->nrows; i++)
-	if(!isRowNull(mat, i))
-	    if((i != i0) && hasCol(mat->rows, i, j))
-#if 1
-		Rj[ni++] = i;
-#else
-                ni++;
-    fprintf(stderr, "iC: %d %d\n", j, ni);
-#endif
-    Rj[0] = ni-1;
-    mat->R[GETJ(mat, j)] = Rj;
-#else
-    fprintf(stderr, "R: NYI in incorporateColumn\n");
-    exit(1);
-#endif
-    mat->wt[GETJ(mat, j)] = wj;
-    ASSERT(wj == Rj[0]);
-    mat->A[GETJ(mat, j)] = dclistInsert(mat->S[wj], j);
-}
-
-int
-getNextj(dclist dcl)
-{
-    int32_t j;
-    dclist foo;
-
-    foo = dcl->next;
-    j = foo->j;
-    dcl->next = foo->next;
-    if(foo->next != NULL)
-	foo->next->prev = dcl;
-    free(foo);
-    return j;
-}
-
 // remove j from the stack it belongs to.
-void
+static void
 remove_j_from_S(sparse_mat_t *mat, int j)
 {
     dclist dcl = mat->A[GETJ(mat, j)], foo;
@@ -285,4 +236,4 @@ deleteEmptyColumnsSWAR(sparse_mat_t *mat)
     return njrem;
 }
 
-#endif
+#endif /* ifndef USE_MARKOWITZ */

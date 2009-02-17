@@ -60,9 +60,6 @@ extern "C" {
 
 extern void report1(FILE *outfile, int32_t i);
 extern void removeCellSWAR(sparse_mat_t *mat, int i, int32_t j);
-extern void destroyRow(sparse_mat_t *mat, int i);
-extern int removeSingletons(FILE *outfile, sparse_mat_t *mat);
-extern int deleteEmptyColumns(sparse_mat_t *mat);
 
 #ifdef USE_MPI
 extern void mpi_send_inactive_cols(int i);

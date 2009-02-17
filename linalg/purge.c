@@ -612,13 +612,13 @@ renumber (int *nprimes, hashtable_t *H, char *sos)
 {
     FILE *fsos = NULL;
     unsigned int i;
-    int nb;
+    int nb = 1; /* FIXME: why do we start at 1 and not 0? */
 
     if(sos != NULL){
 	fprintf(stderr, "Outputting renumber table in file %s\n", sos);
 	fsos = gzip_open (sos, "w");
     }
-    for(i = 0, nb = 1; i < H->hashmod; i++)
+    for(i = 0; i < H->hashmod; i++)
       if (H->hashcount[i] == 0)
         H->hashcount[i] = -1;
       else
@@ -640,6 +640,9 @@ renumber (int *nprimes, hashtable_t *H, char *sos)
                          GET_HASH_P(H,i), GET_HASH_R(H,i));
             }
           H->hashcount[i] = nb++;
+	  if (H->hashcount[i] == 0x5686f)
+	    fprintf (stderr, "index=0x5686f p=%"PRIu64" r=%"PRIu64"\n",
+		     GET_HASH_P(H,i), GET_HASH_R(H,i));
           if (fsos != NULL)
             fprintf(fsos, "%d %" PRIx64 " %" PRIx64 "\n",
                     H->hashcount[i] - 1, GET_HASH_P(H,i), GET_HASH_R(H,i));
