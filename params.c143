@@ -66,6 +66,7 @@ sievenice=10
 # Filtering
 ###########################################################################
 
+excesspurge=400000      # minimal excess we want before pruning
 excess=1                # minimal excess we want after purge
 keeppurge=160           # shrink in purge if excess exceeds keeppurge
 keep=160                # keep euh le plus
