@@ -50,17 +50,14 @@ clear_relation (relation_t *rel)
 // Stores the primes into the relation, by collecting identical primes
 // and setting the corresponding exponents. Thus a given prime will
 // appear only once in rel (but it can appear with an even exponent).
-/* Assumes identical primes are consecutive, except possibly for the special-q
-   on the algebraic side, which is assumed to be in last position, and can
-   appear in another position. */
 int
 read_relation (relation_t *rel, const char *str)
 {
-  int i, j, ret;
+  int i, j, k, ret;
   unsigned long p;
   
   ret = sscanf (str, "%ld,%lu:", &(rel->a), &(rel->b));
-  if (ret != 2)
+  if (UNLIKELY(ret != 2))
     {
       fprintf (stderr, "warning: failed reading a,b in relation '%s'\n", str);
       return 0;
@@ -69,7 +66,7 @@ read_relation (relation_t *rel, const char *str)
     str++;
   str++;
 
-  // count nb of rp by counting commas (have to add one)
+  /* count number of rational primes by counting commas (have to add one) */
   {
     int cpt = 1;
     const char * pstr = str;
@@ -83,20 +80,21 @@ read_relation (relation_t *rel, const char *str)
     rel->nb_rp = cpt;
   }
 
-  // read rp
+  /* read rational primes */
   rel->rp = (rat_prime_t*) malloc (rel->nb_rp * sizeof (rat_prime_t));
   /* j is the number of (p,e) pairs already stored in rel */
   for (i = j = 0; i < rel->nb_rp; ++i)
     {
       ret = sscanf (str, "%lx", &p);
-      if (ret != 1)
+      if (UNLIKELY(ret != 1))
         {
           fprintf (stderr, "warning: failed reading rat prime %d\n", i);
           return 0;
         }
-      /* we assume identical primes are consecutive */
-      if (j > 0 && rel->rp[j - 1].p == p)
-        rel->rp[j - 1].e ++;
+      /* check if the prime already appears */
+      for (k = j - 1; k >= 0 && rel->rp[k].p != p; k--);
+      if (k >= 0) /* p = rel->rp[k].p */
+	rel->rp[k].e ++;
       else /* new prime */
         {
           rel->rp[j].p = p;
@@ -105,12 +103,12 @@ read_relation (relation_t *rel, const char *str)
         }
       while (isxdigit(str[0]))
         str++;
-      str++;
+      str++; /* skip ',' or ':' */
     }
   rel->nb_rp = j;
   rel->rp = (rat_prime_t*) realloc (rel->rp, j * sizeof (rat_prime_t));
 
-  // count nb of ap by counting commas (have to add one)
+  /* count number of algebraic primes by counting commas (have to add one) */
   {
     int cpt = 1;
     const char * pstr = str;
@@ -124,44 +122,31 @@ read_relation (relation_t *rel, const char *str)
     rel->nb_ap = cpt;
   }
 
-  // read ap
+  /* read algebraic primes */
   rel->ap = (alg_prime_t*) malloc (rel->nb_ap * sizeof (alg_prime_t));
   /* j is the number of (p,e) pairs already stored in rel */
   for (i = j = 0; i < rel->nb_ap; ++i)
     {
       ret = sscanf(str, "%lx", &p);
       /* corresponding root must be computed by the caller */
-      if (ret != 1)
+      if (UNLIKELY(ret != 1))
         {
           fprintf (stderr, "warning: failed reading alg prime %d\n", i);
           return 0;
         }
-      /* we assume identical primes are consecutive, except possibly the
-         special-q, which appears last, and may appear in another position */
-      if (j > 0 && rel->ap[j - 1].p == p)
-        rel->ap[j - 1].e ++;
-      else if (i == rel->nb_ap - 1) /* special-q */
-        {
-          int k;
-          for (k = 0; k < j; k++)
-            if (rel->ap[k].p == p)
-              {
-                rel->ap[k].e ++;
-                break;
-              }
-          if (k == j) /* not found */
-            goto new_prime;
-        }
+      /* check if the prime ideal already appears */
+      for (k = j - 1; k >= 0 && rel->ap[k].p != p; k--);
+      if (k >= 0) /* rel->ap[k].p = k */
+	rel->ap[k].e ++;
       else /* new prime */
         {
-        new_prime:
           rel->ap[j].p = p;
           rel->ap[j].e = 1;
           j ++;
         }
       while (isxdigit(str[0]))
         str++;
-      str++;
+      str++; /* skip ',' or ':' */
     }
   rel->nb_ap = j;
   rel->ap = (alg_prime_t*) realloc (rel->ap, j * sizeof (alg_prime_t));
