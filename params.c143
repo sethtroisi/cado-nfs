@@ -66,11 +66,11 @@ sievenice=10
 # Filtering
 ###########################################################################
 
-excesspurge=400000      # minimal excess we want before pruning
+excesspurge=1000000     # minimal excess we want before pruning
 excess=1                # minimal excess we want after purge
 keeppurge=160           # shrink in purge if excess exceeds keeppurge
 keep=160                # keep euh le plus
-maxlevel=15             # ???
+maxlevel=20             # maximal merge level
 cwmax=100               # ???
 rwmax=100               # ???
 ratio=1.1               # ???
