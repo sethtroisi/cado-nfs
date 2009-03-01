@@ -51,9 +51,9 @@ alim=20000000
 lpbr=28
 lpba=28
 mfbr=56
-mfba=56
+mfba=84
 rlambda=2.2
-alambda=2.5
+alambda=3.2
 
 I=13                    # Sieving range in lattice siever
 qmin=10000000           # Start of the special-q range
