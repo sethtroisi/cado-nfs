@@ -48,10 +48,10 @@ kjp0max=100000          # bound on the additional factor in lc(g)
 #                                      lambda times lpb, we reject.
 rlim=10000000
 alim=20000000
-lpbr=28
-lpba=28
-mfbr=56
-mfba=84
+lpbr=29
+lpba=29
+mfbr=58
+mfba=87
 rlambda=2.2
 alambda=3.2
 
