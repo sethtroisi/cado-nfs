@@ -779,7 +779,7 @@ modredc15ul_jacobi (const residueredc15ul_t a_par,
       if (m[0] % 8UL == 3UL || m[0] % 8UL == 5UL)
         t = -t;
     }
-    modredc15ul_intset (s, a);
+    modredc15ul_intset (s, a); /* swap a and m */
     modredc15ul_intset (a, m);
     modredc15ul_intset (m, s);
     if (a[0] % 4UL == 3UL && m[0] % 4UL == 3UL)
@@ -797,12 +797,11 @@ modredc15ul_jacobi (const residueredc15ul_t a_par,
             /* FIXME, slow and stupid */
             modintredc15ul_t t;
             modredc15ul_intset (t, m);
-            while (t[1] < (a[1] + 1) / 2)
+            while (modredc15ul_intcmp (t, a) < 0)
               modredc15ul_intshl (t, t, 1);
             while (modredc15ul_intcmp (a, m) >= 0)
               {
-                if (modredc15ul_intcmp (a, t) >= 0)
-                  ularith_sub_2ul_2ul (&(a[0]), &(a[1]), t[0], t[1]);
+		ularith_sub_2ul_2ul_ge (&(a[0]), &(a[1]), t[0], t[1]);
                 modredc15ul_intshr (t, t, 1);
               }
           }
