@@ -63,6 +63,9 @@ typedef __modulusredc15ul_t modulusredc15ul_t[1];
 static inline void
 modredc15ul_add (residueredc15ul_t r, const residueredc15ul_t a, 
 		 const residueredc15ul_t b, const modulusredc15ul_t m);
+static inline void
+modredc15ul_get_uls (modintredc15ul_t r, const residueredc15ul_t s, 
+		     const modulusredc15ul_t m MAYBE_UNUSED);
 
 MAYBE_UNUSED
 static inline void
@@ -311,6 +314,13 @@ modredc15ul_initmod_uls (modulusredc15ul_t m, const modintredc15ul_t s)
   m[0].one[1] = 1UL;
   for (i = 0; i < LONG_BIT; i++)
     modredc15ul_add (m[0].one, m[0].one, m[0].one, m);
+#ifdef WANT_ASSERT_EXPENSIVE
+  {
+    modintredc15ul_t t;
+    modredc15ul_get_uls (t, m[0].one, m);
+    ASSERT_EXPENSIVE (t[0] == 1UL && t[1] == 0UL);
+  }
+#endif
 }
 
 
@@ -383,6 +393,13 @@ modredc15ul_set_ul (residueredc15ul_t r, const unsigned long s,
   r[0] = s;
   r[1] = 0UL;
   modredc15ul_tomontgomery (r, r, m);
+#ifdef WANT_ASSERT_EXPENSIVE
+  {
+    modintredc15ul_t t;
+    modredc15ul_get_uls (t, r, m);
+    ASSERT_EXPENSIVE (t[0] == s && t[1] == 0UL);
+  }
+#endif
 }
 
 
@@ -394,9 +411,7 @@ static inline void
 modredc15ul_set_ul_reduced (residueredc15ul_t r, const unsigned long s, 
 			    const modulusredc15ul_t m MAYBE_UNUSED)
 {
-  r[0] = s;
-  r[1] = 0UL;
-  modredc15ul_tomontgomery (r, r, m);
+  modredc15ul_set_ul (r, s, m);
 }
 
 
@@ -541,13 +556,15 @@ static inline void
 modredc15ul_add (residueredc15ul_t r, const residueredc15ul_t a, 
 		 const residueredc15ul_t b, const modulusredc15ul_t m)
 {
+  unsigned long t0 = b[0], t1 = b[1]; /* r, a, and/or b may overlap */
   ASSERT_EXPENSIVE (modredc15ul_intcmp (a, m[0].m) < 0);
   ASSERT_EXPENSIVE (modredc15ul_intcmp (b, m[0].m) < 0);
 
   r[0] = a[0];
   r[1] = a[1];
-  ularith_add_2ul_2ul (&(r[0]), &(r[1]), b[0], b[1]);
+  ularith_add_2ul_2ul (&(r[0]), &(r[1]), t0, t1);
   ularith_sub_2ul_2ul_ge (&(r[0]), &(r[1]), m[0].m[0], m[0].m[1]);
+  ASSERT_EXPENSIVE (modredc15ul_intcmp (r, m[0].m) < 0);
 }
 
 
