@@ -166,6 +166,45 @@ ularith_sub_2ul_2ul (unsigned long *r1, unsigned long *r2,
 }
 
 
+/* Subtract only if result is non-negative */
+
+static inline void
+ularith_sub_2ul_2ul_ge (unsigned long *r1, unsigned long *r2, 
+			const unsigned long a1, const unsigned long a2)
+{
+  unsigned long t1 = *r1, t2 = *r2;
+#ifdef ULARITH_VERBOSE_ASM
+  __asm__ ("# ularith_sub_2ul_2ul_ge (%0, %1, %2, %3)\n" : : 
+           "X" (*r1), "X" (*r2), "X" (a1), "X" (a2));
+#endif
+#if !defined (ULARITH_NO_ASM) && defined(__x86_64__) && defined(__GNUC__)
+  __asm__ ( "subq %4, %0\n\t" /* r1 -= a1 */
+            "sbbq %5, %1\n\t" /* r2 -= a2 + cy */
+	    "cmovc %2, %0\n\t" /* If there's a borrow, restore r1 from t1 */
+	    "cmovc %3, %1\n\t" /* and r2 from t2 */
+            : "+r" (*r1), "+r" (*r2), "+r" (t1), "+r" (t2)
+            : "g" (a1), "g" (a2)
+            : "cc");
+#elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
+  __asm__ ( "subl %4, %0\n\t"
+            "sbbl %5, %1\n\t"
+	    "cmovc %2, %0\n\t"
+	    "cmovc %3, %1\n\t"
+            : "+r" (*r1), "+r" (*r2), "+r" (t1), "+r" (t2)
+            : "g" (a1), "g" (a2)
+            : "cc");
+#else
+  t1 -= a1;
+  t2 -= a2 + (t1 > *r1);
+  if (t2 <= *r2)
+    {
+      *r1 = t1;
+      *r2 = t2;
+    }
+#endif
+}
+
+
 /* Multiply two unsigned long "a" and "b" and put the result as 
    r2:r1 (r2 being the high word) */
 
