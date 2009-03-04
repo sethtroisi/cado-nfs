@@ -48,6 +48,8 @@ def get_reference(sbound,p):
                 s -= -p/(p+1)*a
             c=alpha_p_affine_nodisc(r,p)-a
             complete[k,l]=c
+        sys.stdout.write(".")
+        sys.stdout.flush()
     return complete
 
 
@@ -79,8 +81,8 @@ def manyp(rdict,plim):
 # Fix a size for the sieving area. It's taken square here, but the
 # program accepts also a rectangle. We look into polynomials h(x,u,v) for
 # u and v integers within the interval [0,sbound-1]
-sbound=40
-p=43
+sbound=1000
+p=11
 
 t0=cputime()
 print "First computing reference scores with the naive method"
@@ -120,6 +122,15 @@ ZF3=ZP3.fraction_field()
 # Another possible bench
 # manyp(rdict,50)
 
+
+def zview(m,i0,j0,d):
+    ncols = ((m.ncols() - j0) / d).ceil()
+    nrows = ((m.nrows() - i0) / d).ceil()
+    n=matrix(nrows,ncols)
+    for i in range(0,nrows):
+        for j in range(0,ncols):
+            n[i,j]=m[i0+i*d,j0+j*d]
+    return n
 
 
 # zview(mround(matrix(sbound,sbound,sarr)-complete),1,0,p)

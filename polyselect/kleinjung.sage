@@ -523,16 +523,26 @@ def rotation_handle_p(rdict,p):
     # dphi is (phi-l0)/p -- so this starting value is rubbish, just to
     # get the universe right...
     dphi=x
-    hits=rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,0,scale,dphi)
+    rdict['l0']=0
+    hits=rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,0,scale,dphi,[])
     return hits
 
-def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi):
+def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi,hist):
     """Internal routine for the fast root sieve. We are looking at roots
     of the form phi(x), where phi has the form constant_term+p^ld*x. ff,
     gg, and fdg_gdf are basically f composed with phi, taking into
     account the necessary adjustments (see the more extensive code for
     some asserts). dphi and twist_v1 are variables valid only below
     recursion depth 1. m is the recursion depth."""
+    
+    if len(hist) > 6:
+        nhist=copy(hist)
+        nhist.append([dphi,u0,v0,dphi(0),ld,m])
+        print "Found tree of height %d" % len(nhist)
+        for hi in nhist:
+            print hi
+
+
     if scale < rdict['cutoff']:
         return 0
 
@@ -553,7 +563,7 @@ def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi):
     # vanishes.
     
     # This is always useful.
-    g0 = KP(ff)
+    minus_f_over_g_modp = KP(ff)
 
     scale1 = scale/(p-1)
     scale2 = scale/p
@@ -564,19 +574,25 @@ def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi):
     if m > 0:
         l0=rdict['l0']
         igl=rdict['igl']
-        g0*=-igl
+        minus_f_over_g_modp*=-igl
 
-    # Deciding whether we're in the general case or note has some
+    # Deciding whether we're in the general case or not has some
     # subtleties, unfortunately.
-    look_many_roots = not g0.is_constant() or   \
+    look_many_roots = not minus_f_over_g_modp.is_constant() or   \
                     m == 0 and not rdict['gmodp'].is_constant()
+
+    nhist = copy(hist)
+    if not look_many_roots: nhist.append([dphi,u0,v0,l0+p*dphi(0),ld,m])
+
     if look_many_roots:
         # Then it's the typical case, as encountered for instance at the
         # beginning of the root sieve.
         # Each possible l value must be tried, and will give rise to
         # potentially intersecting lattices. 
         for l in range(p):
-            g0l = g0(l);
+            nhist=copy(hist)
+            nhist.append([dphi,u0,v0,l0+p*dphi(l),ld,m])
+            minus_f_over_g_modp_l = minus_f_over_g_modp(l);
             if m==0:
                 l0=l
                 gvl = rdict['gmodp'](l);
@@ -585,8 +601,8 @@ def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi):
                 rdict['l0']=l0
                 rdict['igl']=igl
                 twist_v1 = - l0
-                g0l *= -igl
-            dv0=Z(g0l)
+                minus_f_over_g_modp_l *= -igl
+            dv0=Z(minus_f_over_g_modp_l)
             u1 = u0
             v1 = v0 + pm * dv0
 
@@ -608,7 +624,7 @@ def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi):
             # Slightly faster when not doing reductions while evaluating.
             # Most probably due to the cost of computing remainders all
             # the way to the final value, which ends up being more
-            # expensve than it should.
+            # expensive than it should.
 
             # TODO: There has to be a way to remove valuations very early
             # on here. In fact, my guess is that it could very probably
@@ -622,7 +638,10 @@ def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi):
             nff = compose_reduce(ff,psi,pmax)
             ngg = compose_reduce(gg,psi,pmax)
             if m == 0:
-                ndphi=x
+                # XXX This is fairly bizarre. Results are correct with
+                # this, but I don't see at the moment why we don't have
+                # psi instead of x here.
+                ndphi = x
             else:
                 ndphi = dphi(psi)
             nff=ZP((nff+dv0*ngg)/p)
@@ -654,7 +673,7 @@ def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi):
                 # will investigate the possibility that despite the multiple
                 # root mod p, we still get roots at higher precision.
                 if hits >0:
-                    thits += rotation_inner(rdict,p,nff,ngg,nfdg_gdf,u1,v1,l0,ld+1,m+1,new_twist_v1,scale2,ndphi)
+                    thits += rotation_inner(rdict,p,nff,ngg,nfdg_gdf,u1,v1,l0,ld+1,m+1,new_twist_v1,scale2,ndphi,nhist)
                 nff+=twist_f
                 u1 += pm
                 v1 += twist_v1
@@ -664,7 +683,7 @@ def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi):
         # Basically, we have a linear term in u and v which must be
         # cancelled.
         assert m>0
-        dv0=Z(g0.constant_coefficient())
+        dv0=Z(minus_f_over_g_modp.constant_coefficient())
         u1 = u0
         v1 = v0 + pm * dv0
         hits=light(sarr, u1, v1, pm, pm1, twist_v1, um, vm, -scale)
@@ -676,7 +695,7 @@ def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi):
         twist_f=dphi*gg
         new_twist_v1 = p * twist_v1
         for du in range(p):
-            hits = rotation_inner(rdict,p,nff,gg,fdg_gdf,u1,v1,l0,ld,m+1,new_twist_v1,scale,dphi)
+            hits = rotation_inner(rdict,p,nff,gg,fdg_gdf,u1,v1,l0,ld,m+1,new_twist_v1,scale,dphi,nhist)
             # print "secondary/excep, level %d : %d hits" % (m, hits)
             thits += hits
             u1 += pm
