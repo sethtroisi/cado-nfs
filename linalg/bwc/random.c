@@ -17,10 +17,9 @@ static inline double dist_func()
     y += y == 0;
     double x = (double) y / RAND_MAX;
     /* With this distribution, bizarrely we tend to get a density which
-     * is larger than expected...
+     * is larger than expected... would be accounted for by our
      */
-    // return (x + 2 / sqrt(x) - 3) / 1.5;
-    return 3 * (1-x) * (1-x);
+    return (x + 2 / sqrt(x) - 3) / 1.5;
     // return 2 * x;
 }
 
@@ -42,16 +41,23 @@ int gen_row(double lambda, int n, int * ptr)
  * u_k = 1 + lambda + (1+lambda) * u_{k-1}.
  * From which the general expression for u_k follows.
  *
- * We use it boldly to reverse the sense of the exepcted value, so as to
+ * We use it boldly to reverse the sense of the expected value, so as to
  * say that the expected density it the first integer k such that the
- * expected value for the k-th pick exceeds n (which I doubt would hold).
+ * expected value for the k-th pick exceeds n (which looks very wrong).
  */
 double expected_density_from_lambda(double lambda, int n)
 {
+#if 0
     double u = log(1+lambda*n / (1 + lambda));
     double v = log(1+lambda);
-
     return u/v;
+#else
+    double r = 0;
+    for(int i = 0 ; i < 10 ; i++) {
+        r += gen_row(lambda, n, NULL);
+    }
+    return r / 10.0;
+#endif
 }
 
 double get_corresponding_lambda(int dens, int n)
