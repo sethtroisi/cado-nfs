@@ -138,7 +138,7 @@ broadcast_down_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_p
     }
 
     /* Make sure that no thread on the column is wandering in other
-     * places */
+     * places -- when we're leaving reduce, this is important. */
     serialize_threads(picol);
 
     /* This loop suffers from two-dimensional serializing, so the
@@ -596,8 +596,15 @@ reduce_across(matmul_top_data_ptr mmt, int d)
                  * since sptr and dptr lie within mrow->v
                  */
                 const abt * sptr = mrow->v->all_v[dst+j] + off;
+                /*
+                printf("thread %u sums %p..%p onto %p..%p\n",
+                        mmt->pi->m->trank,
+                        sptr, sptr + xx->count,
+                        dptr, dptr + xx->count);
+                        */
                 for(unsigned int k = 0 ; k < xx->count ; k++) {
-                    abadd(mmt->abase, dptr + k, sptr + k);
+                    abadd(mmt->abase, dptr + aboffset(mmt->abase, k),
+                            sptr + aboffset(mmt->abase, k));
                     // TODO: for non-binary fields, here we would have an
                     // unreduced add (of probably already unreduced data
                     // as they come out of the matrix-vector
@@ -676,8 +683,13 @@ reduce_across(matmul_top_data_ptr mmt, int d)
     // as usual, we do not serialize on exit. Up to the next routine to
     // do so if needed.
     // 
-    // what _is_ guaranteed is that in each column, the leader thread has
-    // all the necessary data to begin the column broadcast.
+    // what _is_ guaranteed is that in each column, the _leader_ thread
+    // has all the necessary data to begin the column broadcast.
+    //
+    // In most cases, threads must be prevented from starting computation
+    // before the leader thread has finished importing data. This means
+    // that a column thread serialization is probably needed in most
+    // circumstances after this step.
 }
 
 void matmul_top_fill_random_source(matmul_top_data_ptr mmt, int d)
@@ -688,10 +700,10 @@ void matmul_top_fill_random_source(matmul_top_data_ptr mmt, int d)
 #if 0
 static void mmt_debug_writeout(matmul_top_data_ptr mmt, int d, const char * name)
 {
-    serialize(mmt->pi->m);
+    // serialize(mmt->pi->m);
     debug_write(mmt->abase, mmt->wr[d]->v->v, mmt->wr[d]->i1 - mmt->wr[d]->i0,
             "%s.j%u.t%u", name, mmt->pi->m->jrank, mmt->pi->m->trank);
-    serialize(mmt->pi->m);
+    // serialize(mmt->pi->m);
 }
 #endif
 
@@ -718,7 +730,6 @@ void matmul_top_mul(matmul_top_data_ptr mmt, int d)
     matmul_mul(mmt->mm, mmt->wr[!d]->v->v, mmt->wr[d]->v->v, d);
     // mmt_debug_writeout(mmt, !d, "after_mul");
     reduce_across(mmt, !d);
-    // mmt_debug_writeout(mmt, d, "after_reduce");
 }
 
 /* Vector I/O is done by only one job, one thread. It incurs a

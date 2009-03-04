@@ -236,6 +236,9 @@ void * mksol_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
             size_t off = i * abnbits(abase) * rstride;
             abase_generic_ptr fptr = abase_generic_ptr_add(fcoeffs->v, off);
 
+            /* usage tips for reduce */
+            serialize_threads(picol);
+
             abvaddmul_tiny(abase, abase_rhs,
                     sum->v,
                     ((abvt*) mcol->v->v) + abvoffset(abase_rhs, ii0 - mcol->i0),
