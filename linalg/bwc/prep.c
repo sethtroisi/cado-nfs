@@ -85,11 +85,13 @@ void * prep_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
         // that we need to save it for real.
         matmul_top_save_vector(mmt, Y_FILE_BASE, bw->dir, 0);
 
-        // We must compute x^T bw->M y, x^T bw->M^2 y, and so on.
+        // We must compute x^T M y, x^T M^2 y, and so on.
+        // XXX Note that x^Ty does not count here, because it does nto
+        // take part to the sequence computed by lingen !
+        matmul_top_mul(mmt, bw->dir);
         
         // we have indices mmt->wr[1]->i0..i1 available.
         abzero(abase, xymats->v, bw->m * NBITER);
-
 
         for(unsigned int k = 0 ; k < NBITER ; k++) {
             for(int j = 0 ; j < bw->m ; j++) {

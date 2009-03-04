@@ -77,6 +77,27 @@ sub my_setenv
     $ENV{$_[0]}=$_[1];
 }
 
+sub dosystem
+{
+    my $prg = shift @_;
+    my @args = @_;
+    print STDERR '#' x 77, "\n";
+    print STDERR "Running $env_strings$prg ", join(' ', @args), "\n";
+    my $rc = system $prg, @args;
+    return if $rc == 0;
+    if ($rc == -1) {
+        print STDERR "Cannot execute $prg\n";
+    } elsif ($rc & 127) {
+        my $sig = $rc & 127;
+        my $coreinfo = ($rc & 128) ? 'with' : 'without';
+        print STDERR "$prg: died with signal $sig, $coreinfo coredump\n";
+    } else {
+        my $ret = $rc >> 8;
+        print STDERR "$prg: exited with status $ret\n";
+    }
+    exit 1;
+}
+
 
 ### ok -- now @main_args is something relatively useful.
 
@@ -100,6 +121,9 @@ sub drive {
     }
 
     if ($program eq ':complete') {
+        if (! -d $wdir) {
+            &drive(':balance', @_);
+        }
         &drive(':wipeout', @_);
         &drive('u64n/prep', @_);
         &drive('u64/secure', @_);
@@ -115,15 +139,14 @@ sub drive {
 
     if ($program eq ':balance') {
         mkdir $wdir;
-        my $cmd="../balance"
-                . " -in $matrix_dir"
-                . " -out $wdir/mat"
-                . " --nslices ${nh}x${nv}"
-                . " --conjugate-permutations"
-                . " --square"
-                ;
-        print "$cmd\n";
-        system $cmd;
+        my $cmd="../balance";
+        my @args= (
+                "-in", $matrix_dir,
+                "-out", "$wdir/mat",
+                "--nslices", "${nh}x${nv}",
+                "--conjugate-permutations",
+                "--square");
+        dosystem($cmd, @args);
         return;
     }
 
@@ -155,8 +178,7 @@ sub drive {
         $program=$mpiexec;
     }
 
-    print STDERR "Running $env_strings$program ", join(' ', @_), "\n";
-    system $program, @_;
+    dosystem($program, @_);
 }
 
 

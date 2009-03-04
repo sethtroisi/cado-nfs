@@ -203,6 +203,16 @@ int main(int argc, char * argv[])
     if (kernel_left < 0)
         kernel_left = 0;
 
+    if (kernel_right > nrows / 4) {
+        fprintf(stderr, "Warning, right kernel is large."
+                " Could trigger misbehaviours\n");
+    }
+
+    if (kernel_left > ncols / 4) {
+        fprintf(stderr, "Warning, left kernel is large."
+                " Could trigger misbehaviours\n");
+    }
+
     printrows(nrows - kernel_right, ncols - kernel_left, lambda);
     for(int i = 0 ; i < kernel_right ; i++) {
         printf("0\n");
