@@ -1109,7 +1109,9 @@ ell_pointorder (const residue_t sigma, const int parameterization,
 {
   residue_t A, x, a, xi, yi, x1, y1;
   unsigned long min, max, i, order, p;
+  modint_t tm;
 
+  mod_getmod_uls (tm, m);
   mod_init (A, m);
 
   if (parameterization == BRENT12)
@@ -1129,21 +1131,34 @@ ell_pointorder (const residue_t sigma, const int parameterization,
   }
   
   if (verbose >= 2)
-    printf ("Curve parameters: A = %ld, x = %ld (mod %ld)\n", 
-            mod_get_ul (A, m), mod_get_ul (x, m), mod_getmod_ul (m));
+    {
+      modint_t tA, tx;
+      mod_get_uls (tA, A, m);
+      mod_get_uls (tx, x, m);
+      /* FIXME need multiple precision print */
+      printf ("Curve parameters: A = %lu, x = %ld (mod %ld)\n", 
+              tA[0], tx[0], tm[0]); 
+    }
 
   if (curveW_from_Montgomery (a, x1, y1, x, A, m) == 0)
     return 0UL;
 
   if (verbose >= 2)
-    printf ("Finding order of point (%ld, %ld) on curve "
-	    "y^2 = x^3 + %ld * x + b (mod %ld)\n", 
-	    mod_get_ul (x1, m), mod_get_ul (y1, m), mod_get_ul (a, m), 
-	    mod_getmod_ul (m));
+    {
+      modint_t tx1, ty1, ta;
+      mod_get_uls (tx1, x1, m);
+      mod_get_uls (ty1, y1, m);
+      mod_get_uls (ta, a, m);
+      /* FIXME need multiple precision print */
+      printf ("Finding order of point (%ld, %ld) on curve "
+              "y^2 = x^3 + %ld * x + b (mod %ld)\n", 
+              tx1[0], ty1[0], ta[0], tm[0]);
+    }
 
-  i = 2 * (unsigned long) sqrt((double) mod_getmod_ul (m));
-  min = mod_getmod_ul (m) - i + 1;
-  max = mod_getmod_ul (m) + i + 1;
+  /* FIXME deal with multiple precision modulus */
+  i = 2 * (unsigned long) sqrt((double) tm[0]);
+  min = tm[0] - i + 1;
+  max = tm[0] + i + 1;
   mod_set (xi, x1, m);
   mod_set (yi, y1, m);
   if (ellW_mul_ui (xi, yi, min, a, m) == 0)
@@ -1169,13 +1184,15 @@ ell_pointorder (const residue_t sigma, const int parameterization,
       mod_set (xi, x1, m);
       mod_set (yi, y1, m);
       if (ellW_mul_ui (xi, yi, i, a, m) != 0)
-      {
+        {
+          modint_t tx1, ty1;
+          mod_get_uls (tx1, x1, m);
+          mod_get_uls (ty1, y1, m);
 	  fprintf (stderr, "ell_order: Error, %ld*(%ld, %ld) (mod %ld) is "
 		   "not the point at infinity\n", 
-		   i, mod_get_ul (x1, m), mod_get_ul (y1, m), 
-		   mod_getmod_ul (m));
+		   i, tx1[0], ty1[0], tm[0]);
 	  return 0UL;
-      }
+        }
   }
   
   /* Ok, now we have some i so that ord(P) | i. Find ord(P).
@@ -1201,6 +1218,7 @@ ellM_curveorder_jacobi (residue_t A, residue_t x, modulus_t m)
 {
   residue_t t, one;
   unsigned long order, i;
+  modint_t tm;
   int bchar;
 
   mod_init_noset0 (t, m);
@@ -1217,7 +1235,9 @@ ellM_curveorder_jacobi (residue_t A, residue_t x, modulus_t m)
   ASSERT (bchar != 0);
 
   order = 2; /* One for (0, 0, 1), one for the point at infinity */
-  for (i = 1; i < mod_getmod_ul(m); i++)
+  /* FIXME deal with multi-word modulus */
+  mod_getmod_uls (tm, m);
+  for (i = 1; mod_intcmp_ul (tm, i) > 0; i++)
     {
       mod_set_ul (x, i, m);
       mod_set (t, x, m);
@@ -1243,10 +1263,12 @@ ell_curveorder (const unsigned long sigma_par, int parameterization,
 		const unsigned long m_par)
 {
   residue_t sigma, A, X;
+  modint_t lm;
   modulus_t m;
   unsigned long order;
 
-  mod_initmod_ul (m, m_par);
+  mod_intset_ul (lm, m_par);
+  mod_initmod_uls (m, lm);
   mod_set_ul (sigma, sigma_par, m);
 
   if (parameterization == BRENT12)
