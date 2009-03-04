@@ -100,6 +100,13 @@ extern "C" {
 #define iceildiv(x,y)	(((x)+(y)-1)/(y))
 #endif
 
+#ifndef NEXT_MULTIPLE_OF_POWEROF2
+/* k must be a power of 2. Returns the smallest multiple of k greater
+ * than or equal to n
+ */
+#define NEXT_MULTIPLE_OF_POWEROF2(n,k)      ((n)+(k)-1-(((n)-1)&((k)-1)))
+#endif
+
 /* Number of words holding B bits ; better naming sought. */
 #ifndef  BITS_TO_WORDS
 #define	BITS_TO_WORDS(B,W)	iceildiv((B),(W))

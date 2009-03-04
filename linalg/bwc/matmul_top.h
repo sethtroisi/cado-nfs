@@ -21,7 +21,7 @@
  * n is the total number of rows ; the total number of instances of this
  * ``wiring'', so to say.
  * v is the LEFT vector (result of matrix-times-vector, or input of
- *   vectora-times-matrix).
+ *   vector-times-matrix).
  * fences denote the row indices within the matrix where the different
  *   jobs are split.
  * x denotes the intersection data for communication across rows.

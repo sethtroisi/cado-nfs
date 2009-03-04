@@ -37,8 +37,6 @@
 #include "bw-common.h"
 #include "filenames.h"
 
-struct bw_params bw[1];
-
 #include "manu.h"
 #include "fft_adapter.hpp"
 #include "lingen_mat_types.hpp"
@@ -265,7 +263,7 @@ std::string intlist_to_string(iterator t0, iterator t1)
     for(iterator t = t0 ; t != t1 ; ) {
         iterator u;
         for(u = t ; u != t1 ; u++) {
-            if (*u - *t != u-t) break;
+            if ((typename std::iterator_traits<iterator>::difference_type) (*u - *t) != (u-t)) break;
         }
         if (t != t0) cset << ',';
         if (u-t == 1) {
@@ -449,8 +447,25 @@ void bw_commit_f(polmat& F)
 
     buf = (unsigned long *) malloc(ulongs_per_mat * sizeof(unsigned long));
 
-    unsigned long mask = 1UL;
-    unsigned int offset = 0;
+    /* We're writing the reversal of the F polynomials in the output
+     * file. The reversal is taken column-wise. Since not all delta_i's
+     * are equal, we have to take into account the possibility that the
+     * data written to disk corresponds to possibly unrelated terms in
+     * the polynomial expansion of F.
+     */
+
+    unsigned long * fmasks;
+    unsigned int * foffsets = 0;
+    fmasks = (unsigned long *) malloc(nres  * sizeof(unsigned long));
+    foffsets = (unsigned int *) malloc(nres  * sizeof(unsigned int));
+
+    for(unsigned int i = 0 ; i < nres ; i++) {
+        unsigned int ii = pick[i];
+        unsigned int d = delta[ii];
+
+        fmasks[i] = 1UL << (d % ULONG_BITS);
+        foffsets[i] = d / ULONG_BITS;
+    }
 
     for(unsigned int k = 0 ; k < ncoef ; k++) {
         memset(buf, 0, ulongs_per_mat * sizeof(unsigned long));
@@ -460,7 +475,8 @@ void bw_commit_f(polmat& F)
 
         for(unsigned int i = 0 ; i < nres ; i++) {
             for(unsigned int j = 0 ; j < n ; j++) {
-                *v |= lmask & -((F.poly(j,pick[i])[offset] & mask) != 0);
+                if (foffsets[i] != UINT_MAX)
+                    *v |= lmask & -((F.poly(j,pick[i])[foffsets[i]] & fmasks[i]) != 0);
                 lmask <<= 1;
                 v += (lmask == 0);
                 lmask += (lmask == 0);
@@ -470,11 +486,18 @@ void bw_commit_f(polmat& F)
         rz = fwrite(buf, sizeof(unsigned long), ulongs_per_mat, f);
         NEVER_HAPPENS(rz != ulongs_per_mat, exit(1););
 
-        mask <<= 1;
-        offset += mask == 0;
-        mask += mask == 0;
+        for(unsigned int i = 0 ; i < nres ; i++) {
+            if (foffsets[i] == UINT_MAX)
+                continue;
+
+            fmasks[i] >>= 1;
+            foffsets[i] -= fmasks[i] == 0;
+            fmasks[i] += ((unsigned long) (fmasks[i] == 0)) << (ULONG_BITS-1);
+        }
     }
     fclose(f);
+    free(fmasks);
+    free(foffsets);
     free(pick);
     free(buf);
 }

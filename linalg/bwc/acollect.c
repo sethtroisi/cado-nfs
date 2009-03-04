@@ -80,36 +80,36 @@ int main(int argc, char * argv[])
          * standard */
         if (rc < 4 || k != (int) strlen(de->d_name)) {
             // fprintf(stderr, "skipped %s\n", de->d_name);
-        } else {
-            if (a->n1 % CHAR_BIT || a->n0 % CHAR_BIT) {
-                fprintf(stderr, "%s has bad boundaries\n",
-                        de->d_name);
-                exit(1);
-            }
-            struct stat sbuf[1];
-            rc = stat(de->d_name, sbuf);
-            if (rc < 0) {
-                fprintf(stderr, "stat: %s\n", strerror(errno));
-                exit(1);
-            }
-            ssize_t expected = bw->m * (a->n1-a->n0) / CHAR_BIT * (a->j1 - a->j0);
+            continue;
+        }
+        if (a->n1 % CHAR_BIT || a->n0 % CHAR_BIT) {
+            fprintf(stderr, "%s has bad boundaries\n",
+                    de->d_name);
+            exit(1);
+        }
+        struct stat sbuf[1];
+        rc = stat(de->d_name, sbuf);
+        if (rc < 0) {
+            fprintf(stderr, "stat(%s): %s\n", de->d_name, strerror(errno));
+            exit(1);
+        }
+        ssize_t expected = bw->m * (a->n1-a->n0) / CHAR_BIT * (a->j1 - a->j0);
 
-            if (sbuf->st_size != expected) {
-                fprintf(stderr, "%s does not have expected size %zu\n",
-                        de->d_name, expected);
-                exit(1);
-            }
+        if (sbuf->st_size != expected) {
+            fprintf(stderr, "%s does not have expected size %zu\n",
+                    de->d_name, expected);
+            exit(1);
+        }
 
-            // fprintf(stderr, "take %s\n", de->d_name);
-            n_afiles++;
-            if (n_afiles >= alloc_afiles) {
-                alloc_afiles += alloc_afiles / 4;
-                afiles = realloc(afiles, alloc_afiles * sizeof(afile));
-            }
+        // fprintf(stderr, "take %s\n", de->d_name);
+        n_afiles++;
+        if (n_afiles >= alloc_afiles) {
+            alloc_afiles += alloc_afiles / 4;
+            afiles = realloc(afiles, alloc_afiles * sizeof(afile));
         }
     }
     closedir(dir);
-    
+
     if (n_afiles == 0) {
         free(afiles);
         return 0;
@@ -175,12 +175,13 @@ int main(int argc, char * argv[])
             int rc = asprintf(&tmp, A_FILE_PATTERN,
                     afiles[k]->n0,afiles[k]->n1,afiles[k]->j0,afiles[k]->j1);
             rs[k - k0] = fopen(tmp, "r");
-            free(tmp);
             if (rs[k-k0] == NULL) {
-                fprintf(stderr, "fopen: %s\n", strerror(errno));
+                fprintf(stderr, "fopen(%s): %s\n", tmp, strerror(errno));
                 rc = 2;
+                free(tmp);
                 goto bailout;
             }
+            free(tmp);
         }
 
         char * buf = malloc((n1-n0)/CHAR_BIT);
@@ -237,7 +238,7 @@ int main(int argc, char * argv[])
                     afiles[k]->n0,afiles[k]->n1,afiles[k]->j0,afiles[k]->j1);
             BUG_ON(rc < 0);     // shut up, dammit.
             if (unlink(tmp) < 0) {
-                fprintf(stderr, "unlink: %s\n", strerror(errno));
+                fprintf(stderr, "unlink(%s): %s\n", tmp, strerror(errno));
             }
             free(tmp);
         }
@@ -253,7 +254,7 @@ bailout:
         r = asprintf(&tmp, A_FILE_PATTERN, final->n0,final->n1,final->j0,final->j1);
         r = rename("A.temp", tmp);
         if (r < 0) {
-            fprintf(stderr, "rename: %s\n", strerror(errno));
+            fprintf(stderr, "rename(A.temp, %s): %s\n", tmp, strerror(errno));
         }
         printf("%s\n",tmp);
         free(tmp);

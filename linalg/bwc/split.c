@@ -22,8 +22,6 @@ char * ofile_fmt;
 /* splits for the different sites */
 int splits[MAXSPLITS + 1];
 
-struct bw_params bw[1];
-
 int split_y = 0;
 int split_f = 0;
 int force = 0;

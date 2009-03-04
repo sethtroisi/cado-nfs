@@ -6,13 +6,6 @@
 #include <stdlib.h>
 #include <errno.h>
 
-// we're doing open close mmap truncate...
-#include <sys/mman.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-
 
 #include "manu.h"
 
@@ -80,7 +73,9 @@ void vec_clear_generic(pi_wiring_ptr picol, size_t stride MAYBE_UNUSED, mmt_gene
     } else {
         abase_generic_clear(stride, v->v, n);
     }
-    free(v->all_v);
+    size_t allocsize MAYBE_UNUSED;
+    allocsize = 2 * picol->ncores * sizeof(void *);
+    alignable_free(v->all_v, allocsize);
 }
 
 void matmul_top_vec_init_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, int d, int flags)
@@ -146,6 +141,10 @@ broadcast_down_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_p
      * places */
     serialize_threads(picol);
 
+    /* This loop suffers from two-dimensional serializing, so the
+     * simplistic macros SEVERAL_THREADS_PLAY_MPI_BEGIN and END do not
+     * help here.
+     */
 #ifndef MPI_LIBRARY_MT_CAPABLE
     for(unsigned int t = 0 ; t < pirow->ncores + extra ; t++) {
         serialize_threads(pirow);
@@ -280,198 +279,54 @@ void matmul_top_fill_random_source_generic(matmul_top_data_ptr mmt, size_t strid
     broadcast_down_generic(mmt, stride, v, d);
 }
 
+/* It really something relevant to the pirow communicator. Turn it so */
 static void save_vector_toprow_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, const char * name, int d, unsigned int iter)
 {
-    int err;
     if (v == NULL) v = (mmt_generic_vec_ptr) mmt->wr[d]->v;
 
-    // pi_wiring_ptr picol = mmt->pi->wr[d];
     pi_wiring_ptr pirow = mmt->pi->wr[!d];
     mmt_wiring_ptr mcol = mmt->wr[d];
-    // mmt_wiring_ptr mrow = mmt->wr[!d];
 
-    // The vector is saved by _one_ node, _one_ thread.
-    void * recvbuf = NULL;
-    int fd = -1;
-    size_t siz = stride * (mmt->n[!d]);
-    // the page size is always a multiple of two, so rounding to the next
-    // multiple is easy.
-    size_t wsiz = ((siz - 1) | (sysconf(_SC_PAGESIZE)-1)) + 1;
+    char * filename;
+    int rc;
+    rc = asprintf(&filename, COMMON_VECTOR_ITERATE_PATTERN, name, iter);
+    FATAL_ERROR_CHECK(rc < 0, "out of memory");
 
-    if (pirow->jrank == 0) {
-        if (pirow->trank == 0) {
-            char * filename;
-            int rc;
-            rc = asprintf(&filename, COMMON_VECTOR_ITERATE_PATTERN, name, iter);
-            FATAL_ERROR_CHECK(rc < 0, "out of memory");
-            fd = open(filename, O_RDWR|O_CREAT, 0666);
-            if (fd < 0) {
-                fprintf(stderr, "fopen(%s): %s\n",
-                        filename, strerror(errno));
-                fprintf(stderr, "WARNING: checkpointing failed\n");
-                free(filename);
-                // XXX what do we do here ?
-                return;
-            }
+    size_t mysize = stride * (mcol->i1 - mcol->i0);
 
-            rc = ftruncate(fd, wsiz);
-            if (rc < 0) {
-                fprintf(stderr, "ftruncate(%s): %s\n",
-                        filename, strerror(errno));
-                fprintf(stderr, "WARNING: checkpointing failed\n");
-                free(filename);
-                close(fd);
-                return;
-            }
-            recvbuf = mmap(NULL, wsiz, PROT_WRITE, MAP_SHARED, fd, 0);
-            if (recvbuf == MAP_FAILED) {
-                fprintf(stderr, "mmap(%s): %s\n",
-                        filename, strerror(errno));
-                fprintf(stderr, "WARNING: checkpointing failed\n");
-                free(filename);
-                close(fd);
-                return;
-            }
-            free(filename);
+    rc = pi_save_file(pirow, filename, (void*) v->v, mysize);
 
-        }
-        /* Now all threads from job zero see the area mmaped by their
-         * leader thread.
-         */
-        thread_agreement(pirow, &recvbuf, 0);
+    if (rc == 0) {
+        fprintf(stderr, "WARNING: checkpointing failed\n");
     }
 
-    /* Prepare gatherv arguments */
-    void * sendbuf = (void *) v->v;
-    int sendcount = stride * (mcol->i1 - mcol->i0);
-
-    int * displs = (int *) malloc(pirow->njobs * sizeof(int));
-    int * recvcounts = (int *) malloc(pirow->njobs * sizeof(int));
-
-    /* recall that ``fences'' must be understood as vertical when
-     * visually they form a vertical line. Since we are interested in
-     * column indices here, this means vertical fences */
-    for(unsigned int k = 0 ; k < pirow->njobs ; k++) {
-        int x = k * pirow->ncores + pirow->trank;
-        unsigned int dx0 = mmt->fences[d][x];
-        unsigned int dx1 = mmt->fences[d][x+1];
-
-        displs[k] = stride * (dx0);
-        recvcounts[k] = stride * (dx1 - dx0);
-    }
-
-    /* At this point, if ever we could have as many communications via
-     * the MPI channel as we have wires, that would be cool: we would
-     * simply drop the pthread barrier.  Lacking this possibility, we
-     * have to serialize here (for now).
-     */
-#ifndef MPI_LIBRARY_MT_CAPABLE
-    for(unsigned int t = 0 ; t < pirow->ncores ; t++) {
-        serialize_threads(pirow);
-        if (t == pirow->trank) { // our turn.
-            ASSERT(sendcount == recvcounts[pirow->jrank]);
-            err = MPI_Gatherv(sendbuf, sendcount, MPI_BYTE,
-                    recvbuf, recvcounts, displs, MPI_BYTE,
-                    0, pirow->pals);
-            BUG_ON(err);
-        }
-    }
-#else
-            ASSERT(sendcount == recvcounts[pirow->jrank]);
-            err = MPI_Gatherv(sendbuf, sendcount, MPI_BYTE,
-                    recvbuf, recvcounts, displs, MPI_BYTE,
-                    0, pirow->pals);
-            BUG_ON(err);
-#endif
-    // what a pain in the Xss. Because we don't exit with the mutex
-    // locked, we can't do much... The main thread might end up calling
-    // munmap before we complete the call to MPI_Gatherv.
-
-    serialize_threads(pirow);
-    
-    free(recvcounts);
-    free(displs);
-
-    if (pirow->jrank == 0 && pirow->trank == 0) {
-        munmap(recvbuf, wsiz);
-        int rc = ftruncate(fd, siz);
-        if (rc < 0) {
-            fprintf(stderr, "ftruncate(): %s\n", strerror(errno));
-        }
-        close(fd);
-    }
+    free(filename);
 }
-
 // now the exact opposite.
 
 /* The backend is exactly dual to save_vector_toprow_generic.
  */
-static void load_vector_toprow_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, const char * name, int d, unsigned int iter)
+void load_vector_toprow_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, const char * name, int d, unsigned int iter)
 {
-    int err;
     if (v == NULL) v = (mmt_generic_vec_ptr) mmt->wr[d]->v;
 
-    // pi_wiring_ptr picol = mmt->pi->wr[d];
     pi_wiring_ptr pirow = mmt->pi->wr[!d];
     mmt_wiring_ptr mcol = mmt->wr[d];
-    // mmt_wiring_ptr mrow = mmt->wr[!d];
-    
-    void * sendbuf = NULL;
-    int fd = -1;
-    size_t siz = stride * (mmt->n[!d]);
-    size_t wsiz = ((siz - 1) | (sysconf(_SC_PAGESIZE)-1)) + 1;
-    if (pirow->jrank == 0) {
-        if (pirow->trank == 0) {
-            char * filename;
-            int rc = asprintf(&filename, COMMON_VECTOR_ITERATE_PATTERN, name, iter);
-            FATAL_ERROR_CHECK(rc < 0, "out of memory");
-            fd = open(filename, O_RDONLY, 0666);
-            DIE_ERRNO_DIAG(fd < 0, "fopen", filename);
-            sendbuf = mmap(NULL, wsiz, PROT_READ, MAP_SHARED, fd, 0);
-            DIE_ERRNO_DIAG(sendbuf == MAP_FAILED, "mmap", filename);
-            free(filename);
-        }
-        /* Now all threads from job zero see the area mmaped by their
-         * leader thread.
-         */
-        thread_agreement(pirow, &sendbuf, 0);
+
+    char * filename;
+    int rc;
+    rc = asprintf(&filename, COMMON_VECTOR_ITERATE_PATTERN, name, iter);
+    FATAL_ERROR_CHECK(rc < 0, "out of memory");
+
+    size_t mysize = stride * (mcol->i1 - mcol->i0);
+
+    rc = pi_load_file(pirow, filename, (void*) v->v, mysize);
+
+    if (rc == 0) {
+        fprintf(stderr, "WARNING: checkpointing failed\n");
     }
 
-    void * recvbuf = (void *) v->v;
-    int recvcount = stride * (mcol->i1 - mcol->i0);
-
-    int * displs = (int *) malloc(pirow->njobs * sizeof(int));
-    int * sendcounts = (int *) malloc(pirow->njobs * sizeof(int));
-
-    for(unsigned int k = 0 ; k < pirow->njobs ; k++) {
-        int x = k * pirow->ncores + pirow->trank;
-        unsigned int dx0 = mmt->fences[d][x];
-        unsigned int dx1 = mmt->fences[d][x+1];
-
-        displs[k] = stride * (dx0);
-        sendcounts[k] = stride * (dx1 - dx0);
-    }
-
-    for(unsigned int t = 0 ; t < pirow->ncores ; t++) {
-        serialize_threads(pirow);
-        if (t == pirow->trank) { // our turn.
-            ASSERT(recvcount == sendcounts[pirow->jrank]);
-            err = MPI_Scatterv(sendbuf, sendcounts, displs, MPI_BYTE,
-                    recvbuf, recvcount, MPI_BYTE,
-                    0, pirow->pals);
-            BUG_ON(err);
-        }
-    }
-
-    serialize_threads(pirow);
-
-    free(sendcounts);
-    free(displs);
-
-    if (pirow->jrank == 0 && pirow->trank == 0) {
-        munmap(sendbuf, wsiz);
-        close(fd);
-    }
+    free(filename);
 }
 
 void matmul_top_load_vector_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, const char * name, int d, unsigned int iter)
@@ -483,7 +338,9 @@ void matmul_top_load_vector_generic(matmul_top_data_ptr mmt, size_t stride, mmt_
     serialize_threads(mmt->pi->m);
 
     pi_wiring_ptr picol = mmt->pi->wr[d];
+#ifndef MPI_LIBRARY_MT_CAPABLE
     pi_wiring_ptr pirow = mmt->pi->wr[!d];
+#endif
     mmt_wiring_ptr mcol = mmt->wr[d];
     // mmt_wiring_ptr mrow = mmt->wr[!d];
 
@@ -500,14 +357,12 @@ void matmul_top_load_vector_generic(matmul_top_data_ptr mmt, size_t stride, mmt_
     size_t siz = stride * (mcol->i1 - mcol->i0);
     if (picol->trank == 0) {
         // first, down on columns.
-        for(unsigned int t = 0 ; t < pirow->ncores ; t++) {
-            serialize_threads(pirow);
-            if (t == pirow->trank) {
-                void * ptr = v->v;
-                err = MPI_Bcast(ptr, siz, MPI_BYTE, 0, picol->pals);
-                BUG_ON(err);
-            }
+        SEVERAL_THREADS_PLAY_MPI_BEGIN(pirow) {
+            void * ptr = v->v;
+            err = MPI_Bcast(ptr, siz, MPI_BYTE, 0, picol->pals);
+            BUG_ON(err);
         }
+        SEVERAL_THREADS_PLAY_MPI_END;
     }
 
     serialize(mmt->pi->m);

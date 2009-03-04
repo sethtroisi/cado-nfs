@@ -29,8 +29,13 @@ else
     # I set this in .Xdefaults
     # mpi-debug.vt100.faceSize: 5
     if [ "$1" = "--display" ] ; then
+        echo "Please prefer mpiexec --enable-x when using mpich2" >&2
         shift; export DISPLAY=$1; shift
     fi
+    # Problem: mpirun may span several ssh connections at once. And these
+    # will try to lock the Xauthority file concurrently. Subtly enough,
+    # they'll file because the file is on NFS.
+    echo "display $DISPLAY"
     xterm -name mpi-debug -e $0 --inside "$@"
     exit 0
 fi

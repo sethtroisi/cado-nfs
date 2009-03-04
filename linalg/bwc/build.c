@@ -1,3 +1,5 @@
+#define _GNU_SOURCE     // sometimes we use elctric_alloc->mmap->MMAP_ANONYMOUS
+
 #include <stdio.h>
 #include "matmul.h"
 

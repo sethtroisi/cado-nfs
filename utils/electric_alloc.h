@@ -55,8 +55,8 @@ void electric_free(void * p0, size_t s)
     unsigned int multip = (s+r-1)/r;
 #ifdef PROTECT_OVERRUN
     p += s;
-    mprotect((void*) (p - r), r, PROT_READ | PROT_WRITE);
-    p -= (multip + 1) * r;
+    mprotect((void*) p, r, PROT_READ | PROT_WRITE);
+    p -= multip * r;
 #else
     p -= r;
     mprotect(p, r, PROT_READ | PROT_WRITE);

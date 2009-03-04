@@ -28,8 +28,6 @@
 
 abobj_t abase;
 
-struct bw_params bw[1];
-
 void * prep_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
 {
     // Doing the ``hello world'' test is a very good way of testing the
@@ -49,6 +47,9 @@ void * prep_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
     flags[!bw->dir] = 0;
 
     matmul_top_init(mmt, abase, pi, flags, bw->matrix_filename);
+
+    mmt_wiring_ptr mcol = mmt->wr[bw->dir];
+    mmt_wiring_ptr mrow = mmt->wr[!bw->dir];
 
     uint32_t * xvecs = malloc(my_nx * bw->m * sizeof(uint32_t));
 
@@ -95,17 +96,17 @@ void * prep_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
                 abt * where = xymats->v + aboffset(abase, j * NBITER + k);
                 for(unsigned int t = 0 ; t < my_nx ; t++) {
                     uint32_t i = xvecs[j*my_nx+t];
-                    if (i < mmt->wr[bw->dir]->i0 || i >= mmt->wr[bw->dir]->i1)
+                    if (i < mcol->i0 || i >= mcol->i1)
                         continue;
                     /* We want the data to match our bw->interval on both
                      * directions, because otherwise we'll end up
                      * computing rubbish -- recall that no broadcast_down
                      * has occurred yet.
                      */
-                    if (i < mmt->wr[!bw->dir]->i0 || i >= mmt->wr[!bw->dir]->i1)
+                    if (i < mrow->i0 || i >= mrow->i1)
                         continue;
                     abadd(abase, where,
-                            mmt->wr[bw->dir]->v->v + aboffset(abase, i - mmt->wr[bw->dir]->i0));
+                            mcol->v->v + aboffset(abase, i - mcol->i0));
                 }
             }
             matmul_top_mul(mmt, bw->dir);
@@ -116,7 +117,7 @@ void * prep_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
 
         /* Now all threads and jobs must collectively reduce the zone
          * pointed to by xymats */
-        reduce_generic(abase, xymats, pi->m, bw->m * NBITER);
+        allreduce_generic(abase, xymats, pi->m, bw->m * NBITER);
 
         /* OK -- now everybody has the same data */
 

@@ -18,6 +18,7 @@
 #include "pad.h"
 // #include "electric_alloc.h"
 
+#include "abase-generic.h"
 
 /* provides an interface for the arithmetic base of computations.
  * Typically, we have plain old datatypes here, e.g. uint128_t's
@@ -85,6 +86,19 @@ P(vdotprod)(P(obj_srcptr) x,
         const PV(base_type) * u,
         const P(base_type) * v,
         unsigned int n);
+extern void
+P(vaddmul_tiny)(P(obj_srcptr) x,
+        PV(obj_srcptr) y,
+        PV(base_type) * w,
+        const PV(base_type) * u,
+        const P(base_type) * v,
+        unsigned int n);
+extern void
+P(vtranspose)(PV(obj_srcptr) y,
+        P(obj_srcptr) x,
+        PV(base_type) * w,
+        const P(base_type) * u);
+
 
 #ifndef ABASE_DONTBIND_u128
 /* Bind our interface as the default one */
@@ -95,5 +109,19 @@ P(vdotprod)(P(obj_srcptr) x,
 
 #undef  P
 #undef  ABASE_F
+
+/* Contrary to most u64-based abases, this one does not require readahead
+ * padding */
+
+/* proxy for the generic functions */
+#define abase_u128_init(x,n) abase_generic_init(abase_u128_bytes(x,1),n)
+#define abase_u128_clear(x,p,n) abase_generic_clear(abase_u128_bytes(x,1),p,n)
+#define abase_u128_initf(x,n) abase_generic_initf(abase_u128_bytes(x,1),n)
+#define abase_u128_clearf(x,p,n) abase_generic_clearf(abase_u128_bytes(x,1),p,n)
+#define abase_u128_zero(x,p,n) abase_generic_zero(abase_u128_bytes(x,1),p,n)
+#define abase_u128_copy(x,q,p,n) abase_generic_copy(abase_u128_bytes(x,1),q,p,n)
+#define abase_u128_write(x,p,n) abase_generic_write(abase_u128_bytes(x,1),p,n)
+#define abase_u128_read(x,p,n) abase_generic_read(abase_u128_bytes(x,1),p,n)
+#define abase_u128_random(x,p,n) abase_generic_random(abase_u128_bytes(x,1),p,n)
 
 #endif	/* ABASE_U128_H_ */

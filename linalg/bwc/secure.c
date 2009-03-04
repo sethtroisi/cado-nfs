@@ -15,7 +15,6 @@
 #include "filenames.h"
 
 abobj_t abase;
-struct bw_params bw[1];
 
 void * sec_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
 {
@@ -33,7 +32,10 @@ void * sec_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
 
     matmul_top_init(mmt, abase, pi, flags, bw->matrix_filename);
 
-    abzero(abase, mmt->wr[!bw->dir]->v->v, mmt->wr[!bw->dir]->i1 - mmt->wr[!bw->dir]->i0);
+    // mmt_wiring_ptr mcol = mmt->wr[bw->dir];
+    mmt_wiring_ptr mrow = mmt->wr[!bw->dir];
+
+    abzero(abase, mrow->v->v, mrow->i1 - mrow->i0);
 
     uint32_t * gxvecs = malloc(bw->nx * bw->m * sizeof(uint32_t));
 
@@ -44,10 +46,10 @@ void * sec_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
         for(unsigned int k = 0 ; k < bw->nx ; k++) {
             // set bit j of entry gxvecs[j*bw->nx+k] to 1.
             uint32_t i = gxvecs[j*bw->nx+k];
-            if (i < mmt->wr[!bw->dir]->i0 || i >= mmt->wr[!bw->dir]->i1)
+            if (i < mrow->i0 || i >= mrow->i1)
                 continue;
             abt * where;
-            where = mmt->wr[!bw->dir]->v->v + aboffset(abase, i-mmt->wr[!bw->dir]->i0);
+            where = mrow->v->v + aboffset(abase, i-mrow->i0);
             abset_ui(abase, where, j, 1);
         }
     }

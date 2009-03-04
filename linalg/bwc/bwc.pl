@@ -108,6 +108,8 @@ sub drive {
         &drive('./acollect', @_, "--remove-old");
         &drive('lingen/lingen', @_, '--lingen-threshold', 64);
         &drive('./split', @_, "--split-f");
+        &drive('u64/mksol', @_);
+        &drive('u64n/gather', @_);
         return;
     }
 
@@ -132,11 +134,11 @@ sub drive {
     unless ($program =~ /split$/) {
         @_ = grep !/^(?:splits?=|--split-[yf])/, @_;
     }
-    unless ($program =~ /krylov$/) {
+    unless ($program =~ /(?:krylov|mksol)$/) {
         @_ = grep !/^ys=/, @_;
     }
 
-    if ($mpi_split[0] * $mpi_split[1] != 1) {
+    if ($mpi_split[0] * $mpi_split[1] != 1 && $program !~ /(?:split|acollect|lingen)$/) {
         unshift @_, $program;
         # Need hosts.
         if (defined($hostfile)) {

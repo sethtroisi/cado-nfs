@@ -1,3 +1,4 @@
+#include "abase-common.h"
 #include "abase-u64n.h"
 
 #include "pad.h"

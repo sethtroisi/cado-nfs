@@ -1,22 +1,7 @@
 #ifndef ABASE_H_
 #define ABASE_H_
 
-/* This has to match the largest possible alignment requirement from
- * different abase layers.
- */
-#define ALWAYS_ALIGN_LARGE_MALLOCS      16
-
-#include "aligned_malloc.h"
-
-#ifdef  ALWAYS_ALIGN_LARGE_MALLOCS
-#define alignable_malloc(s)     aligned_malloc((s), ALWAYS_ALIGN_LARGE_MALLOCS)
-#else
-#define alignable_malloc(s)     malloc((s))
-#endif
-#define alignable_free(p,s)     free((p))
-
-
-#include "abase-generic.h"
+#include "abase-common.h"
 
 #if defined(SELECT_ABASE_u64)
 #include "abase-u64.h"

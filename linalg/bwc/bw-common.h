@@ -76,6 +76,8 @@ struct bw_params {
     int checkpoints;
 };
 
+extern struct bw_params bw[1];
+
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -57,10 +57,10 @@ endif
 ## src:=$(patsubst %,%.c,$(names))
 ## obj:=$(patsubst %,%.o,$(names))
 
-bins:=bench build prep krylov
+bins:=bench build prep krylov mksol
 
 default-target: all
-allbins:=test_hello split acollect
+allbins:=test_hello split acollect random
 
 common_libs:=-lutils -lgmp
 common_link_deps:=$(TOP)/utils/libutils.a
@@ -82,6 +82,11 @@ test_hello: $(test_hello_objs) $(common_link_deps)
 	$(CXX) $(MY_LFLAGS) $(test_hello_objs) -o $@ $(common_libs)
 -include $(patsubst %,.deps/%.d,$(test_hello_objs))
 
+random_objs:=random.o
+random: $(random_objs) $(common_link_deps)
+	$(CXX) $(MY_LFLAGS) $(random_objs) -o $@ $(common_libs) -lm
+-include $(patsubst %,.deps/%.d,$(random_objs))
+
 split_objs:=split.o bw-common.o
 split: $(split_objs) $(common_link_deps)
 	$(CXX) $(MY_LFLAGS) $(split_objs) -o $@ $(common_libs)
@@ -93,7 +98,7 @@ acollect: $(acollect_objs) $(common_link_deps)
 -include $(patsubst %,.deps/%.d,$(acollect_objs))
 
 
-all_objlists:=libmatmul build bench prep secure krylov
+all_objlists:=libmatmul build bench prep gather secure krylov mksol
 
 libmatmul_objs:=matmul-sliced.o matmul-basic.o matmul.o
 ifeq ($(shell uname -m),x86_64)
@@ -112,6 +117,18 @@ krylov_objs:=krylov.o intersections.o 			\
 	matmul_top.o parallelizing_info.o info_file.o	\
 	xvectors.o xymats.o debug.o bw-common.o		\
 	rusage.o async.o bw-common-mpi.o		\
+	xdotprod.o					\
+	libmatmul.a
+mksol_objs:=mksol.o intersections.o 			\
+	matmul_top.o parallelizing_info.o info_file.o	\
+	xvectors.o xymats.o debug.o bw-common.o		\
+	rusage.o async.o bw-common-mpi.o		\
+	xdotprod.o					\
+	libmatmul.a
+gather_objs:=gather.o intersections.o 			\
+	matmul_top.o parallelizing_info.o info_file.o	\
+	xvectors.o debug.o bw-common.o			\
+	rusage.o async.o bw-common-mpi.o		\
 	libmatmul.a
 secure_objs:=secure.o intersections.o 			\
 	matmul_top.o parallelizing_info.o info_file.o	\
@@ -122,7 +139,9 @@ build_normalobjs:=../readbuffer.o ../readmat.o
 bench_normalobjs:=../readbuffer.o ../readmat.o
 prep_normalobjs:=../readbuffer.o ../readmat.o ../gauss.o
 krylov_normalobjs:=../readbuffer.o ../readmat.o
+mksol_normalobjs:=../readbuffer.o ../readmat.o
 secure_normalobjs:=../readbuffer.o ../readmat.o
+gather_normalobjs:=../readbuffer.o ../readmat.o
 
 
 # This list contains the object files which do not depend on the abase
@@ -135,8 +154,9 @@ all_objs:=
 sources:=	\
     bench.c build.c info_file.c				\
     intersections.cpp matmul-sliced.cpp matmul_top.c	\
-    parallelizing_info.c secure.c prep.c test_hello.c xvectors.c	\
-    matmul.c matmul-basic.c krylov.c xymats.c
+    parallelizing_info.c gather.c secure.c prep.c	\
+    random.c test_hello.c xvectors.c				\
+    matmul.c matmul-basic.c krylov.c mksol.c xymats.c
 
 # hardlinking like this over nfs is prone to exhibit bugs with time
 # difference w.r.t the nfs server.
@@ -166,13 +186,13 @@ $(1)/%.o: %.cpp
 	$$(CXX) -DSELECT_ABASE_$(1) $$(MY_CXXFLAGS) $$< -c -o $$@
 .deps/$(1)/%.o.d: %.c
 	@mkdir -p .deps/$(1)
-	$$(CC) $$(MY_CFLAGS) -M -MM -MG -MP -MF $$@ -MT '$$@ $(1)/$$*.o' $$<
+	$$(CC) -DSELECT_ABASE_$(1) $$(MY_CFLAGS) -M -MM -MG -MP -MF $$@ -MT '$$@ $(1)/$$*.o' $$<
 .deps/$(1)/%.o.d: %.S
 	@mkdir -p .deps/$(1)
-	$$(CC) $$(MY_CFLAGS) -M -MM -MG -MP -MF $$@ -MT '$$@ $(1)/$$*.o' $$<
+	$$(CC) -DSELECT_ABASE_$(1) $$(MY_CFLAGS) -M -MM -MG -MP -MF $$@ -MT '$$@ $(1)/$$*.o' $$<
 .deps/$(1)/%.o.d: %.cpp
 	@mkdir -p .deps/$(1)
-	$$(CXX) $$(MY_CXXFLAGS) -M -MM -MG -MP -MF $$@ -MT '$$@ $(1)/$$*.o' $$<
+	$$(CXX) -DSELECT_ABASE_$(1) $$(MY_CXXFLAGS) -M -MM -MG -MP -MF $$@ -MT '$$@ $(1)/$$*.o' $$<
 
 $$(foreach x,$$(all_objlists),$$(eval $(1)_$$(x)_objs:=$(1)/abase-$(1).o $$(patsubst %,$(1)/%,$$($$(x)_objs))))
 
@@ -186,6 +206,7 @@ $(1)/libmatmul.a: $$($(1)_libmatmul_objs)
 $(call multiple_binary,$(1),build)
 $(call multiple_binary,$(1),bench)
 $(call multiple_binary,$(1),krylov)
+$(call multiple_binary,$(1),mksol)
 endef
 
 # u64 is the prime-time version. The others can be dropped to accelerate
@@ -198,6 +219,7 @@ $(eval $(call configure_abase,u128))
 # Only one version of prep and secure exist.
 $(eval $(call multiple_binary,u64n,prep))
 $(eval $(call multiple_binary,u64,secure))
+$(eval $(call multiple_binary,u64n,gather))
 
 all: $(allbins)
 

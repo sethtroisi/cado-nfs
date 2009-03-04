@@ -191,6 +191,25 @@
 #endif
 
 /*
+ * abvtranspose(y,x,w,u) ; transposes a matrix u made of abt's,
+ * having nbits(y) rows represented by word strings of nbits(x) bits.
+ * Result is put in w.
+ */
+#ifdef  ABASE_BIND
+#define abvtranspose(y,x,u,v) ABASE_BIND(vtranspose)(y,x,u,v)
+#endif
+
+/*
+ * abvaddmul_tiny(x,y,w,u,v,n) ; multiply a matrix u with abase x, having
+ * abnbits(x) columns and n rows, by a matrix v with abase y, having
+ * abvnbits(y) columns and abnbits(x) rows. The resulting matrix is w,
+ * with abase y, having abvnbits(y) columns and n rows.
+ */
+#ifdef  ABASE_BIND
+#define abvaddmul_tiny(x,y,w,u,v,n) ABASE_BIND(vaddmul_tiny)(x,y,w,u,v,n)
+#endif
+
+/*
  * Things controlled by ABASE_VBIND correspond to something different.
  * It's the readily accessible workalike type which has runtime-specified
  * width. It's dog slow by design, but comes in quite handy for things

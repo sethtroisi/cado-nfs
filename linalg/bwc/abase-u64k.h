@@ -24,6 +24,7 @@
 #include "pad.h"
 // #include "electric_alloc.h"
 
+#include "abase-generic.h"
 
 /* provides an interface for the arithmetic base of computations.
  * Typically, we have plain old datatypes here, e.g. uint64_t's
@@ -77,6 +78,19 @@ P(vdotprod)(P(obj_srcptr) x,
         const PV(base_type) * u,
         const P(base_type) * v,
         unsigned int n);
+extern void
+P(vaddmul_tiny)(P(obj_srcptr) x,
+        PV(obj_srcptr) y,
+        PV(base_type) * w,
+        const PV(base_type) * u,
+        const P(base_type) * v,
+        unsigned int n);
+extern void
+P(vtranspose)(PV(obj_srcptr) y,
+        P(obj_srcptr) x,
+        PV(base_type) * w,
+        const P(base_type) * u);
+
 
 #ifndef ABASE_DONTBIND_u64k
 /* Bind our interface as the default one */
@@ -87,5 +101,20 @@ P(vdotprod)(P(obj_srcptr) x,
 
 #undef  P
 #undef  ABASE_F
+
+#if !(defined(ABASE_UNIVERSAL_READAHEAD_ITEMS) && ABASE_UNIVERSAL_READAHEAD_ITEMS % 2 == 0)
+#error "The universal readahead count must be a multiple of 2"
+#endif
+
+/* proxy for the generic functions */
+#define abase_u64k_init(x,n) abase_generic_init(abase_u64k_bytes(x,1),n)
+#define abase_u64k_clear(x,p,n) abase_generic_clear(abase_u64k_bytes(x,1),p,n)
+#define abase_u64k_initf(x,n) abase_generic_initf(abase_u64k_bytes(x,1),n)
+#define abase_u64k_clearf(x,p,n) abase_generic_clearf(abase_u64k_bytes(x,1),p,n)
+#define abase_u64k_zero(x,p,n) abase_generic_zero(abase_u64k_bytes(x,1),p,n)
+#define abase_u64k_copy(x,q,p,n) abase_generic_copy(abase_u64k_bytes(x,1),q,p,n)
+#define abase_u64k_write(x,p,n) abase_generic_write(abase_u64k_bytes(x,1),p,n)
+#define abase_u64k_read(x,p,n) abase_generic_read(abase_u64k_bytes(x,1),p,n)
+#define abase_u64k_random(x,p,n) abase_generic_random(abase_u64k_bytes(x,1),p,n)
 
 #endif	/* ABASE_U64K_H_ */

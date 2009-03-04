@@ -158,8 +158,26 @@ extern int serialize__(pi_wiring_ptr, const char *, unsigned int);
 #define serialize_threads(w)   serialize_threads__(w, __FILE__, __LINE__)
 extern int serialize_threads__(pi_wiring_ptr, const char *, unsigned int);
 
+extern int pi_save_file(pi_wiring_ptr, const char *, void *, size_t);
+extern int pi_load_file(pi_wiring_ptr, const char *, void *, size_t);
+
+extern int pi_load_file_2d(parallelizing_info_ptr, int, const char *, void *, size_t);
+extern int pi_save_file_2d(parallelizing_info_ptr, int, const char *, void *, size_t);
+
 #ifdef __cplusplus
 }
+#endif
+
+/* This provides a fairly typical construct */
+#ifndef MPI_LIBRARY_MT_CAPABLE
+#define SEVERAL_THREADS_PLAY_MPI_BEGIN(comm)
+    for(unsigned int t__ = 0 ; t__ < comm->ncores ; t__++) {
+        serialize_threads(comm);
+        if (t__ != comm->trank) continue; // not our turn.
+#define SEVERAL_THREADS_PLAY_MPI_END    }
+#else
+#define SEVERAL_THREADS_PLAY_MPI_BEGIN(comm)    /**/
+#define SEVERAL_THREADS_PLAY_MPI_END            /**/
 #endif
 
 #endif	/* PARALLELIZING_INFO_H_ */

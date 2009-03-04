@@ -10,7 +10,8 @@
  *
  * This operation serializes threads.
  */
-void reduce_generic_threadlevel(abobj_t abase, mmt_vec_ptr v, pi_wiring_ptr wr, unsigned int n)
+#if 0
+void allreduce_generic_threadlevel(abobj_t abase, mmt_vec_ptr v, pi_wiring_ptr wr, unsigned int n)
 {
     if (v->flags & THREAD_SHARED_VECTOR)
         return; /* If the vector is shared, reduction is pointless */
@@ -30,8 +31,9 @@ void reduce_generic_threadlevel(abobj_t abase, mmt_vec_ptr v, pi_wiring_ptr wr, 
         abcopy(abase, v->v, v->all_v[0], n);
     }
 }
+#endif
 
-void reduce_generic_mpilevel(abobj_t abase, mmt_vec_ptr v, pi_wiring_ptr wr, unsigned int n)
+static void allreduce_generic_mpilevel(abobj_t abase, mmt_vec_ptr v, pi_wiring_ptr wr, unsigned int n)
 {
     if (wr->trank == 0) {
         size_t siz = abbytes(abase, n);
@@ -47,10 +49,10 @@ void reduce_generic_mpilevel(abobj_t abase, mmt_vec_ptr v, pi_wiring_ptr wr, uns
 }
 
 /* This combines both, with fewer thread locks */
-void reduce_generic(abobj_t abase, mmt_vec_ptr v, pi_wiring_ptr wr, unsigned int n)
+void allreduce_generic(abobj_t abase, mmt_vec_ptr v, pi_wiring_ptr wr, unsigned int n)
 {
     if (v->flags & THREAD_SHARED_VECTOR) {
-        reduce_generic_mpilevel(abase, v, wr, n);
+        allreduce_generic_mpilevel(abase, v, wr, n);
     }
 
     /* Do it star-like. Easy enough. */
@@ -72,23 +74,39 @@ void reduce_generic(abobj_t abase, mmt_vec_ptr v, pi_wiring_ptr wr, unsigned int
     }
 }
 
-#if 0
+void broadcast_generic_threadlevel(mmt_generic_vec_ptr v, pi_wiring_ptr wr, size_t siz, unsigned int t0)
+{
+    if (v->flags & THREAD_SHARED_VECTOR)
+        return; /* If the vector is shared, reduction is pointless */
+
+    serialize_threads(wr);
+    /* Do it star-like. Easy enough. */
+    if (wr->trank != t0) // valgrind is picky sometimes.
+        memcpy(v->v, v->all_v[t0], siz);
+}
+
+void broadcast_generic_mpilevel(mmt_generic_vec_ptr v, pi_wiring_ptr wr, size_t siz, unsigned int j0)
+{
+    if (v->flags & THREAD_SHARED_VECTOR) {
+        if (wr->trank == 0) {
+            MPI_Bcast(v->v, siz, MPI_BYTE, j0, wr->pals);
+        }
+        return;
+    }
+
 #ifndef MPI_LIBRARY_MT_CAPABLE
     for(unsigned int t = 0 ; t < wr->ncores ; t++) {
         serialize_threads(wr);
-        if (t != wr->trank)
-            continue;   // not our turn.
-        abt * dptr = xy_mats2;
-        size_t siz = abbytes(abase, m * NBITER);
-        int err = MPI_Allreduce(MPI_IN_PLACE, dptr, siz, MPI_BYTE, MPI_BXOR, wr->pals);
-        BUG_ON(err);
+        if (t != wr->trank) continue;   // not our turn.
+        MPI_Bcast(v->v, siz, MPI_BYTE, j0, wr->pals);
     }
-#else   /* MPI_LIBRARY_MT_CAPABLE */
-    {
-        abt * dptr = xy_mats2;
-        size_t siz = abbytes(abase, m * NBITER);
-        int err = MPI_Allreduce(MPI_IN_PLACE, dptr, siz, MPI_BYTE, MPI_BXOR, wr->pals);
-        BUG_ON(err);
-    }
+#else
+    MPI_Bcast(v->v, siz, MPI_BYTE, j0, wr->pals);
 #endif
-#endif
+}
+
+void broadcast_generic(mmt_generic_vec_ptr v, pi_wiring_ptr wr, size_t siz, unsigned int j0, unsigned int t0)
+{
+    broadcast_generic_threadlevel(v, wr, siz, t0);
+    broadcast_generic_mpilevel(v, wr, siz, j0);
+}

@@ -9,6 +9,8 @@
 #include "params.h"
 #include "filenames.h"
 
+struct bw_params bw[1];
+
 const char * dirtext[] = { "left", "right" };
 
 /* Has to be defined by the program */

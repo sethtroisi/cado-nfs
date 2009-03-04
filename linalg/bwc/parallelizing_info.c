@@ -7,6 +7,15 @@
 #include <stdio.h>
 #include <string.h>
 
+// we're doing open close mmap truncate...
+#include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
+
+
 #include "select_mpi.h"
 #include "parallelizing_info.h"
 #include "macros.h"
@@ -610,5 +619,421 @@ void hello(parallelizing_info_ptr pi)
     if (serialize(pi->m)) {
         printf("OK: Finished hello world loop\n");
     }
+}
+
+static int get_counts_and_displacements(pi_wiring_ptr w, int my_size,
+        int * displs, int * counts)
+{
+    counts[w->jrank] = my_size;
+    SEVERAL_THREADS_PLAY_MPI_BEGIN(w) {
+        MPI_Allgather(MPI_IN_PLACE, 1, MPI_INT, counts, 1, MPI_INT, w->pals);
+    }
+    SEVERAL_THREADS_PLAY_MPI_END;
+
+    /* Now all threads know the size argument of their friend threads. We
+     * need to know the displacement values. These are obtained by
+     * looking at the progressive sum over threads.
+     *
+     * We're serialization-happy here, since anyway I/O s occur rarely
+     */
+    int * allcounts;
+    if (w->trank == 0) {
+        allcounts = (int*) malloc(w->njobs*w->ncores*sizeof(int));
+    }
+    thread_agreement(w, (void**) &allcounts, 0);
+    for(unsigned int k = 0 ; k < w->njobs ; k++) {
+        allcounts[k * w->ncores + w->trank] = counts[k];
+    }
+    serialize_threads(w);
+    int dis = 0;
+    for(unsigned int k = 0 ; k < w->njobs ; k++) {
+        unsigned int t;
+        for(t = 0 ; t < w->trank ; t++) {
+            dis += allcounts[k * w->ncores + t];
+        }
+        displs[k] = dis;
+        dis += allcounts[k * w->ncores + t];
+        for(t++ ; t < w->ncores ; t++) {
+            dis += allcounts[k * w->ncores + t];
+        }
+    }
+    serialize_threads(w);
+    if (w->trank == 0) {
+        free(allcounts);
+    }
+    return dis;
+}
+
+/* d indicates whether we read the ranks row by row (d==0) or column by
+ * column */
+int get_counts_and_displacements_2d(parallelizing_info_ptr pi, int d,
+        int my_size, int * displs, int * counts)
+{
+    pi_wiring_ptr w = pi->m;
+
+    counts[w->jrank] = my_size;
+    SEVERAL_THREADS_PLAY_MPI_BEGIN(w) {
+        MPI_Allgather(MPI_IN_PLACE, 1, MPI_INT, counts, 1, MPI_INT, w->pals);
+    }
+    SEVERAL_THREADS_PLAY_MPI_END;
+
+    /* Now all threads know the size argument of their friend threads. We
+     * need to know the displacement values. These are obtained by
+     * looking at the progressive sum over threads.
+     *
+     * We're serialization-happy here, since anyway I/O s occur rarely
+     */
+    int * allcounts;
+    if (w->trank == 0) {
+        allcounts = (int*) malloc(w->njobs*w->ncores*sizeof(int));
+    }
+    thread_agreement(w, (void**) &allcounts, 0);
+
+    // Given an orientation value d, the numbering for the thread (it,jt)
+    // on job (ij,jj) is:
+    // it+pi->wr[d]->ncores*(ij+pi->wr[d]->njobs*(jt+pi->wr[!d]->ncores*jj))
+    // where ij ranges over pi->wr[d]->njobs and jj over pi->wr[!d]->njobs
+    // (it and jt similar of course)
+    //
+    // Since we're filling the array in a multithreaded way, we're only
+    // interested by the relevant value of it,jt (which is
+    // pi->wr[d]->trank,pi->wr[!d]->trank).
+    
+    unsigned int v0;
+
+    v0 = pi->wr[d]->trank+pi->wr[!d]->trank*pi->wr[d]->ncores*pi->wr[d]->njobs;
+    for(unsigned int ij = 0 ; ij < pi->wr[d]->njobs ; ij++) {
+        unsigned int v = v0;
+        for(unsigned int jj = 0 ; jj < pi->wr[!d]->njobs ; jj++) {
+            /* which count ? This precisely does _not_ depend on d ! */
+            allcounts[v] = counts[jj+pi->wr[1]->njobs*ij];
+            v += pi->m->ncores*pi->wr[d]->njobs;
+        }
+        v0 += pi->wr[d]->ncores;
+    }
+
+    serialize_threads(w);
+
+    int * alldisps = (int*) malloc(w->njobs*w->ncores*sizeof(int));
+    int dis = 0;
+    for(unsigned int k = 0 ; k < w->njobs * w->ncores ; k++) {
+        alldisps[k] = dis;
+        dis += allcounts[k];
+    }
+
+    v0 = pi->wr[d]->trank+pi->wr[!d]->trank*pi->wr[d]->ncores*pi->wr[d]->njobs;
+    for(unsigned int ij = 0 ; ij < pi->wr[d]->njobs ; ij++) {
+        unsigned int v = v0;
+        for(unsigned int jj = 0 ; jj < pi->wr[!d]->njobs ; jj++) {
+            /* which displ ? This precisely does _not_ depend on d ! */
+            displs[jj+pi->wr[1]->njobs*ij] = alldisps[v];
+            v += pi->m->ncores*pi->wr[d]->njobs;
+        }
+        v0 += pi->wr[d]->ncores;
+    }
+
+    free(alldisps);
+
+    serialize_threads(w);
+    if (w->trank == 0) {
+        free(allcounts);
+    }
+
+#if 0
+    for(unsigned int i = 0 ; i < w->njobs ; i++) {
+        my_pthread_mutex_lock(w->th->m);
+        printf("J%uT%u %u @ %u\n", i, w->trank, counts[i], displs[i]);
+        my_pthread_mutex_unlock(w->th->m);
+    }
+#endif
+
+    return dis;
+}
+
+/* That's a workalike to MPI_File_write_ordered, except that we work with
+ * the finer-grained pi_wiring_ptr's.
+ */
+int pi_save_file(pi_wiring_ptr w, const char * name, void * buf, size_t mysize)
+{
+    int * displs = (int *) malloc(w->njobs * sizeof(int));
+    int * recvcounts = (int *) malloc(w->njobs * sizeof(int));
+    size_t siz;
+    siz = get_counts_and_displacements(w, mysize, displs, recvcounts);
+
+    // the page size is always a power of two, so rounding to the next
+    // multiple is easy.
+    size_t wsiz = ((siz - 1) | (sysconf(_SC_PAGESIZE)-1)) + 1;
+    int leader = w->jrank == 0 && w->trank == 0;
+    void * recvbuf = NULL;
+    int fd = -1;        // only used by leader
+    int rc;
+    int err;
+
+    if (leader) {
+        fd = open(name, O_RDWR|O_CREAT, 0666);
+        if (fd < 0) {
+            fprintf(stderr, "fopen(%s): %s\n", name, strerror(errno));
+            goto pi_save_file_leader_init_done;
+        }
+
+        rc = ftruncate(fd, wsiz);
+        if (rc < 0) {
+            fprintf(stderr, "ftruncate(%s): %s\n",
+                    name, strerror(errno));
+            close(fd);
+            goto pi_save_file_leader_init_done;
+        }
+        recvbuf = mmap(NULL, wsiz, PROT_WRITE, MAP_SHARED, fd, 0);
+        if (recvbuf == MAP_FAILED) {
+            fprintf(stderr, "mmap(%s): %s\n",
+                    name, strerror(errno));
+            recvbuf = NULL;
+            close(fd);
+            goto pi_save_file_leader_init_done;
+        }
+pi_save_file_leader_init_done:
+        ;
+    }
+
+    /* Now all threads from job zero see the area mmaped by their leader
+     * thread. It does not make sense on other jobs of course, since for
+     * these, recvbuf is unused. */
+    if (w->jrank == 0) {
+        thread_agreement(w, &recvbuf, 0);
+    }
+
+    /* Rather unfortunate, but error checking requires some checking. As
+     * mentioned earlier, we don't feel concerned a lot by this, since
+     * inour context I/Os are rare enough
+     */
+    int ok = recvbuf != NULL;
+    SEVERAL_THREADS_PLAY_MPI_BEGIN(w) {
+        MPI_Bcast(&ok, 1, MPI_INT, 0, w->pals);
+    }
+    SEVERAL_THREADS_PLAY_MPI_END;
+    if (!ok) return 0;
+
+    SEVERAL_THREADS_PLAY_MPI_BEGIN(w) {
+        err = MPI_Gatherv(buf, mysize, MPI_BYTE,
+                recvbuf, recvcounts, displs, MPI_BYTE,
+                0, w->pals);
+        BUG_ON(err);
+    }
+    SEVERAL_THREADS_PLAY_MPI_END;
+
+    // what a pain in the Xss. Because we don't exit with the mutex
+    // locked, we can't do much... The main thread might end up calling
+    // munmap before we complete the call to MPI_Gatherv.
+
+    serialize_threads(w);
+    
+    free(recvcounts);
+    free(displs);
+
+    if (leader) {
+        munmap(recvbuf, wsiz);
+        rc = ftruncate(fd, siz);
+        if (rc < 0) {
+            fprintf(stderr, "ftruncate(): %s\n", strerror(errno));
+            /* If only ftruncate failed, don't return an error */
+        }
+        close(fd);
+    }
+
+    return 1;
+}
+
+/* d indicates whether we read the ranks row by row (d==0) or column by
+ * column */
+int pi_save_file_2d(parallelizing_info_ptr pi, int d, const char * name, void * buf, size_t mysize)
+{
+    pi_wiring_ptr w = pi->m;
+
+    int * displs = (int *) malloc(w->njobs * sizeof(int));
+    int * recvcounts = (int *) malloc(w->njobs * sizeof(int));
+    size_t siz;
+    siz = get_counts_and_displacements_2d(pi, d, mysize, displs, recvcounts);
+
+    // the page size is always a power of two, so rounding to the next
+    // multiple is easy.
+    size_t wsiz = ((siz - 1) | (sysconf(_SC_PAGESIZE)-1)) + 1;
+    int leader = w->jrank == 0 && w->trank == 0;
+    void * recvbuf = NULL;
+    int fd = -1;        // only used by leader
+    int rc;
+    int err;
+
+    if (leader) {
+        fd = open(name, O_RDWR|O_CREAT, 0666);
+        if (fd < 0) {
+            fprintf(stderr, "fopen(%s): %s\n", name, strerror(errno));
+            goto pi_save_file_2d_leader_init_done;
+        }
+
+        rc = ftruncate(fd, wsiz);
+        if (rc < 0) {
+            fprintf(stderr, "ftruncate(%s): %s\n",
+                    name, strerror(errno));
+            close(fd);
+            goto pi_save_file_2d_leader_init_done;
+        }
+        recvbuf = mmap(NULL, wsiz, PROT_WRITE, MAP_SHARED, fd, 0);
+        if (recvbuf == MAP_FAILED) {
+            fprintf(stderr, "mmap(%s): %s\n",
+                    name, strerror(errno));
+            recvbuf = NULL;
+            close(fd);
+            goto pi_save_file_2d_leader_init_done;
+        }
+pi_save_file_2d_leader_init_done:
+        ;
+    }
+
+    /* Now all threads from job zero see the area mmaped by their leader
+     * thread. It does not make sense on other jobs of course, since for
+     * these, recvbuf is unused. */
+    if (w->jrank == 0) {
+        thread_agreement(w, &recvbuf, 0);
+    }
+
+    /* Rather unfortunate, but error checking requires some checking. As
+     * mentioned earlier, we don't feel concerned a lot by this, since
+     * inour context I/Os are rare enough
+     */
+    int ok = recvbuf != NULL;
+    SEVERAL_THREADS_PLAY_MPI_BEGIN(w) {
+        MPI_Bcast(&ok, 1, MPI_INT, 0, w->pals);
+    }
+    SEVERAL_THREADS_PLAY_MPI_END;
+    if (!ok) return 0;
+
+    SEVERAL_THREADS_PLAY_MPI_BEGIN(w) {
+        err = MPI_Gatherv(buf, mysize, MPI_BYTE,
+                recvbuf, recvcounts, displs, MPI_BYTE,
+                0, w->pals);
+        BUG_ON(err);
+    }
+    SEVERAL_THREADS_PLAY_MPI_END;
+
+    // what a pain in the Xss. Because we don't exit with the mutex
+    // locked, we can't do much... The main thread might end up calling
+    // munmap before we complete the call to MPI_Gatherv.
+
+    serialize_threads(w);
+    
+    free(recvcounts);
+    free(displs);
+
+    if (leader) {
+        munmap(recvbuf, wsiz);
+        rc = ftruncate(fd, siz);
+        if (rc < 0) {
+            fprintf(stderr, "ftruncate(): %s\n", strerror(errno));
+            /* If only ftruncate failed, don't return an error */
+        }
+        close(fd);
+    }
+
+    return 1;
+}
+
+int pi_load_file(pi_wiring_ptr w, const char * name, void * buf, size_t mysize)
+{
+    int * displs = (int *) malloc(w->njobs * sizeof(int));
+    int * sendcounts = (int *) malloc(w->njobs * sizeof(int));
+    size_t siz;
+    siz = get_counts_and_displacements(w, mysize, displs, sendcounts);
+
+    // the page size is always a power of two, so rounding to the next
+    // multiple is easy.
+    size_t wsiz = ((siz - 1) | (sysconf(_SC_PAGESIZE)-1)) + 1;
+    int leader = w->jrank == 0 && w->trank == 0;
+    void * sendbuf = NULL;
+    int fd = -1;        // only used by leader
+    int err;
+
+    if (leader) {
+        fd = open(name, O_RDONLY, 0666);
+        DIE_ERRNO_DIAG(fd < 0, "fopen", name);
+        sendbuf = mmap(NULL, wsiz, PROT_READ, MAP_SHARED, fd, 0);
+        DIE_ERRNO_DIAG(sendbuf == MAP_FAILED, "mmap", name);
+    }
+
+    if (w->jrank == 0) {
+        thread_agreement(w, &sendbuf, 0);
+    }
+
+    /* For loading, in contrast to saving, we simply abort if reading
+     * can't work. So no need to agree on an ok value. */
+
+    SEVERAL_THREADS_PLAY_MPI_BEGIN(w) {
+        ASSERT_ALWAYS(mysize == (size_t) sendcounts[w->jrank]);
+        err = MPI_Scatterv(sendbuf, sendcounts, displs, MPI_BYTE,
+                buf, mysize, MPI_BYTE,
+                0, w->pals);
+        BUG_ON(err);
+    }
+
+    serialize_threads(w);
+
+    free(sendcounts);
+    free(displs);
+
+    if (leader) {
+        munmap(sendbuf, wsiz);
+        close(fd);
+    }
+    return 1;
+}
+
+int pi_load_file_2d(parallelizing_info_ptr pi, int d, const char * name, void * buf, size_t mysize)
+{
+    pi_wiring_ptr w = pi->m;
+
+    int * displs = (int *) malloc(w->njobs * sizeof(int));
+    int * sendcounts = (int *) malloc(w->njobs * sizeof(int));
+    size_t siz;
+    siz = get_counts_and_displacements_2d(pi, d, mysize, displs, sendcounts);
+
+    // the page size is always a power of two, so rounding to the next
+    // multiple is easy.
+    size_t wsiz = ((siz - 1) | (sysconf(_SC_PAGESIZE)-1)) + 1;
+    int leader = w->jrank == 0 && w->trank == 0;
+    void * sendbuf = NULL;
+    int fd = -1;        // only used by leader
+    int err;
+
+    if (leader) {
+        fd = open(name, O_RDONLY, 0666);
+        DIE_ERRNO_DIAG(fd < 0, "fopen", name);
+        sendbuf = mmap(NULL, wsiz, PROT_READ, MAP_SHARED, fd, 0);
+        DIE_ERRNO_DIAG(sendbuf == MAP_FAILED, "mmap", name);
+    }
+
+    if (w->jrank == 0) {
+        thread_agreement(w, &sendbuf, 0);
+    }
+
+    /* For loading, in contrast to saving, we simply abort if reading
+     * can't work. So no need to agree on an ok value. */
+
+    SEVERAL_THREADS_PLAY_MPI_BEGIN(w) {
+        ASSERT_ALWAYS(mysize == (size_t) sendcounts[w->jrank]);
+        err = MPI_Scatterv(sendbuf, sendcounts, displs, MPI_BYTE,
+                buf, mysize, MPI_BYTE,
+                0, w->pals);
+        BUG_ON(err);
+    }
+
+    serialize_threads(w);
+
+    free(sendcounts);
+    free(displs);
+
+    if (leader) {
+        munmap(sendbuf, wsiz);
+        close(fd);
+    }
+    return 1;
 }
 
