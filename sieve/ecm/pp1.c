@@ -92,7 +92,8 @@ pp1_stage1 (residue_t X, const char *code, const unsigned int l,
             pp1_add (t2, t, A, B, m);
 	    mod_set (B, t2, m);
             pp1_double (t, A, two, m);
-            pp1_add (A, A, t, A, m);
+            mod_set (t2, A, m);
+            pp1_add (A, A, t, t2, m);
             break;
           case 8:
             pp1_add (t, A, B, C, m);
