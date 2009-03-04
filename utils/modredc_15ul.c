@@ -568,7 +568,7 @@ modredc15ul_inv (residueredc15ul_t r, const residueredc15ul_t A,
   modredc15ul_set (tmp, A, m);
 #endif
 
-  ASSERT_EXPENSIVE (modredc15ul_lt_2ul (A, m[0].m));
+  ASSERT_EXPENSIVE (modredc15ul_intcmp (A, m[0].m) < 0);
   ASSERT_EXPENSIVE (m[0].m[0] & 1UL);
 
   if (A[0] == 0UL && A[1] == 0UL)
@@ -616,7 +616,7 @@ modredc15ul_inv (residueredc15ul_t r, const residueredc15ul_t A,
   // Here a and b are odd, and a < b
   do {
     /* Here, a and b are odd, 0 < a < b, u is odd and v is even */
-    ASSERT_EXPENSIVE (modredc15ul_lt_2ul (a, b));
+    ASSERT_EXPENSIVE (modredc15ul_intcmp (a, b) < 0);
     ASSERT_EXPENSIVE ((a[0] & 1UL) == 1UL);
     ASSERT_EXPENSIVE ((b[0] & 1UL) == 1UL);
     ASSERT_EXPENSIVE ((u[0] & 1UL) == 1UL);
@@ -647,7 +647,7 @@ modredc15ul_inv (residueredc15ul_t r, const residueredc15ul_t A,
 #if LOOKUP_TRAILING_ZEROS
       } while (lsh == 8);
 #endif
-    } while (modredc15ul_lt_2ul(a, b)); /* ~50% branch taken :( */
+    } while (modredc15ul_intcmp (a, b) < 0); /* ~50% branch taken :( */
     
     /* Here, a and b are odd, 0 < b =< a, u is even and v is odd */
     ASSERT_EXPENSIVE ((a[0] & 1UL) == 1UL);
@@ -686,7 +686,7 @@ modredc15ul_inv (residueredc15ul_t r, const residueredc15ul_t A,
       } while (lsh == 8);
 #endif
 
-    } while (modredc15ul_lt_2ul(b, a)); /* about 50% branch taken :( */
+    } while (modredc15ul_intcmp (a, b) > 0); /* about 50% branch taken :( */
     /* Here, a and b are odd, 0 < a =< b, u is odd and v is even */
   } while (a[0] != b[0] || a[1] != b[1]);
   

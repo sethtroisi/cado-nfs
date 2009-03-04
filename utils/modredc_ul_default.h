@@ -13,8 +13,8 @@
 #undef residue_t
 #undef modulus_t
 #undef modint_t
-#undef MODUL_SIZE
-#undef MODUL_MAXBITS
+#undef MOD_SIZE
+#undef MOD_MAXBITS
 #undef mod_intset
 #undef mod_intset_ul
 #undef mod_intequal
@@ -69,8 +69,8 @@
 #define residue_t            residueredcul_t
 #define modulus_t            modulusredcul_t
 #define modint_t             modintredcul_t
-#define MODUL_SIZE           MODREDCUL_SIZE
-#define MODUL_MAXBITS        MODREDCUL_MAXBITS
+#define MOD_SIZE             MODREDCUL_SIZE
+#define MOD_MAXBITS          MODREDCUL_MAXBITS
 #define mod_intset           modredcul_intset
 #define mod_intset_ul        modredcul_intset_ul
 #define mod_intequal         modredcul_intequal

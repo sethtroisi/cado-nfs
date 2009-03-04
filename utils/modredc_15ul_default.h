@@ -13,8 +13,9 @@
 #undef residue_t
 #undef modulus_t
 #undef modint_t
-#undef MODUL_SIZE
-#undef MODUL_MAXBITS
+#undef MOD_SIZE
+#undef MOD_MINBITS
+#undef MOD_MAXBITS
 #undef mod_intset
 #undef mod_intset_ul
 #undef mod_intequal
@@ -69,8 +70,9 @@
 #define residue_t            residueredc15ul_t
 #define modulus_t            modulusredc15ul_t
 #define modint_t             modintredc15ul_t
-#define MODUL_SIZE           MODREDC15UL_SIZE
-#define MODUL_MAXBITS        MODREDC15UL_MAXBITS
+#define MOD_SIZE             MODREDC15UL_SIZE
+#define MOD_MINBITS          MODREDC15UL_MINBITS
+#define MOD_MAXBITS          MODREDC15UL_MAXBITS
 #define mod_intset           modredc15ul_intset
 #define mod_intset_ul        modredc15ul_intset_ul
 #define mod_intequal         modredc15ul_intequal
@@ -89,7 +91,6 @@
 #define mod_set_uls          modredc15ul_set_uls
 #define mod_set_uls_reduced  modredc15ul_set_uls_reduced
 #define mod_swap             modredc15ul_swap
-#define mod_initmod_ul       modredc15ul_initmod_ul
 #define mod_initmod_uls      modredc15ul_initmod_uls
 #define mod_getmod_ul        modredc15ul_getmod_ul
 #define mod_getmod_uls       modredc15ul_getmod_uls
