@@ -89,20 +89,17 @@ void broadcast_generic_mpilevel(mmt_generic_vec_ptr v, pi_wiring_ptr wr, size_t 
 {
     if (v->flags & THREAD_SHARED_VECTOR) {
         if (wr->trank == 0) {
-            MPI_Bcast(v->v, siz, MPI_BYTE, j0, wr->pals);
+            int err = MPI_Bcast(v->v, siz, MPI_BYTE, j0, wr->pals);
+            BUG_ON(err);
         }
         return;
     }
 
-#ifndef MPI_LIBRARY_MT_CAPABLE
-    for(unsigned int t = 0 ; t < wr->ncores ; t++) {
-        serialize_threads(wr);
-        if (t != wr->trank) continue;   // not our turn.
-        MPI_Bcast(v->v, siz, MPI_BYTE, j0, wr->pals);
+    SEVERAL_THREADS_PLAY_MPI_BEGIN(wr) {
+        int err = MPI_Bcast(v->v, siz, MPI_BYTE, j0, wr->pals);
+        BUG_ON(err);
     }
-#else
-    MPI_Bcast(v->v, siz, MPI_BYTE, j0, wr->pals);
-#endif
+    SEVERAL_THREADS_PLAY_MPI_END;
 }
 
 void broadcast_generic(mmt_generic_vec_ptr v, pi_wiring_ptr wr, size_t siz, unsigned int j0, unsigned int t0)

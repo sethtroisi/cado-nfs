@@ -96,7 +96,8 @@ int agree_on_flag(pi_wiring_ptr w, int v)
     serialize_threads(w);
 
     if (w->trank == 0) {
-        MPI_Reduce(MPI_IN_PLACE, &v, 1, MPI_INT, MPI_LAND, 0, w->pals);
+        int err = MPI_Allreduce(MPI_IN_PLACE, &v, 1, MPI_INT, MPI_LAND, w->pals);
+        BUG_ON(err);
     }
     serialize_threads(w);
     v = *ptr;

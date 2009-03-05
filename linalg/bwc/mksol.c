@@ -196,7 +196,8 @@ void * mksol_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
              * the information about the end value -- it might have
              * changed because of EOF. We're not so disturbed
              * by serialization points here. */
-            MPI_Bcast(&(bw->end), 1, MPI_INT, 0, pi->m->pals);
+            int err = MPI_Bcast(&(bw->end), 1, MPI_INT, 0, pi->m->pals);
+            BUG_ON(err);
         }
         serialize_threads(pi->m);
 
@@ -235,9 +236,6 @@ void * mksol_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
         for(int i = 0 ; i < bw->interval ; i++) {
             size_t off = i * abnbits(abase) * rstride;
             abase_generic_ptr fptr = abase_generic_ptr_add(fcoeffs->v, off);
-
-            /* usage tips for reduce */
-            serialize_threads(picol);
 
             abvaddmul_tiny(abase, abase_rhs,
                     sum->v,

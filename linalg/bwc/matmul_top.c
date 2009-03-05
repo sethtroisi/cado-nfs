@@ -352,7 +352,8 @@ void matmul_top_load_vector_generic(matmul_top_data_ptr mmt, size_t stride, mmt_
     serialize_threads(mmt->pi->m);
 
     // after loading, we need to broadcast the data. As in other
-    // occcasions, this has to be one one thread at a time.
+    // occcasions, this has to be one one thread at a time unless the MPI
+    // library can handle concurrent calls along parallel communicators.
 
     size_t siz = stride * (mcol->i1 - mcol->i0);
     if (picol->trank == 0) {
@@ -716,20 +717,23 @@ void matmul_top_mul(matmul_top_data_ptr mmt, int d)
     ASSERT(mmt->mm->nrows == (d ? di_out : di_in));
 #endif
 
-    // serialize(mmt->pi->m);
-    broadcast_down(mmt, d);
+    pi_wiring_ptr picol = mmt->pi->wr[d];
+    mmt_wiring_ptr mcol = mmt->wr[d];
+    mmt_wiring_ptr mrow = mmt->wr[!d];
+
     // mmt_debug_writeout(mmt, d, "before_mul");
-
-    /* If we have shared input data for the column threads, then we'd
-     * better make sure it has arrived completely.
-     */
-    if (mmt->wr[d]->v->flags & THREAD_SHARED_VECTOR) {
-        serialize_threads(mmt->pi->wr[d]);
-    }
-
-    matmul_mul(mmt->mm, mmt->wr[!d]->v->v, mmt->wr[d]->v->v, d);
+    matmul_mul(mmt->mm, mrow->v->v, mcol->v->v, d);
     // mmt_debug_writeout(mmt, !d, "after_mul");
     reduce_across(mmt, !d);
+    broadcast_down(mmt, d);
+
+    /* If we have shared input data for the column threads, then we'd
+     * better make sure it has arrived completely, because while all
+     * threads will need the data, only one is actually importing it.
+     */
+    if (mcol->v->flags & THREAD_SHARED_VECTOR) {
+        serialize_threads(picol);
+    }
 }
 
 /* Vector I/O is done by only one job, one thread. It incurs a

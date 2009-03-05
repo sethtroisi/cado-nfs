@@ -626,7 +626,8 @@ static int get_counts_and_displacements(pi_wiring_ptr w, int my_size,
 {
     counts[w->jrank] = my_size;
     SEVERAL_THREADS_PLAY_MPI_BEGIN(w) {
-        MPI_Allgather(MPI_IN_PLACE, 1, MPI_INT, counts, 1, MPI_INT, w->pals);
+        int err = MPI_Allgather(MPI_IN_PLACE, 1, MPI_INT, counts, 1, MPI_INT, w->pals);
+        BUG_ON(err);
     }
     SEVERAL_THREADS_PLAY_MPI_END;
 
@@ -673,7 +674,8 @@ int get_counts_and_displacements_2d(parallelizing_info_ptr pi, int d,
 
     counts[w->jrank] = my_size;
     SEVERAL_THREADS_PLAY_MPI_BEGIN(w) {
-        MPI_Allgather(MPI_IN_PLACE, 1, MPI_INT, counts, 1, MPI_INT, w->pals);
+        int err = MPI_Allgather(MPI_IN_PLACE, 1, MPI_INT, counts, 1, MPI_INT, w->pals);
+        BUG_ON(err);
     }
     SEVERAL_THREADS_PLAY_MPI_END;
 
@@ -808,7 +810,8 @@ pi_save_file_leader_init_done:
      */
     int ok = recvbuf != NULL;
     SEVERAL_THREADS_PLAY_MPI_BEGIN(w) {
-        MPI_Bcast(&ok, 1, MPI_INT, 0, w->pals);
+        err = MPI_Bcast(&ok, 1, MPI_INT, 0, w->pals);
+        BUG_ON(err);
     }
     SEVERAL_THREADS_PLAY_MPI_END;
     if (!ok) return 0;
@@ -902,7 +905,8 @@ pi_save_file_2d_leader_init_done:
      */
     int ok = recvbuf != NULL;
     SEVERAL_THREADS_PLAY_MPI_BEGIN(w) {
-        MPI_Bcast(&ok, 1, MPI_INT, 0, w->pals);
+        err = MPI_Bcast(&ok, 1, MPI_INT, 0, w->pals);
+        BUG_ON(err);
     }
     SEVERAL_THREADS_PLAY_MPI_END;
     if (!ok) return 0;
