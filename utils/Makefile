@@ -51,6 +51,7 @@ libutils.a: $(obj)
 
 clean:
 	-rm -f *.bak *.o libutils.a $(bins)
+	-rm -f test-rootfinder test_mod_ul test_mod_redcul test_mod_redc15ul
 
 
 check: test-rootfinder test_mod_ul test_mod_redcul test_mod_redc15ul
