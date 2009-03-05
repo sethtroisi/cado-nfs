@@ -25,11 +25,26 @@ check_rels: check_rels.o
 test-rootfinder: test-rootfinder.o
 	$(CC) $(MY_LFLAGS) $^ -o $@ -L. -lutils -lgmp
 
+test_mod_ul: test_mod.c
+	$(CC) $(MY_LFLAGS) -DARITHMETIC=\"mod_ul_default.h\" -o $@ $^ \
+	-lutils -lgmp
+
+test_mod_redcul: test_mod.c
+	$(CC) $(MY_LFLAGS) -DARITHMETIC=\"modredc_ul_default.h\" -o $@ $^ \
+	-lutils -lgmp
+
+test_mod_redc15ul: test_mod.c
+	$(CC) $(MY_LFLAGS) -DARITHMETIC=\"modredc_15ul_default.h\" -o $@ $^ \
+	-lutils -lgmp
+
 test-rootfinder: libutils.a
 check_rels: libutils.a
 mod_ul.o: mod_ul.h mod_ul_common.c ularith.h
 modredc_ul.o: modredc_ul.h mod_ul_common.c ularith.h
 modredc_15ul.o: modredc_15ul.h ularith.h
+test_mod_ul: mod_ul.h libutils.a
+test_mod_redcul: modredc_ul.h libutils.a
+test_mod_redc15ul: modredc_15ul.h libutils.a
 
 libutils.a: $(obj)
 	ar r libutils.a $(obj)
@@ -37,9 +52,12 @@ libutils.a: $(obj)
 clean:
 	-rm -f *.bak *.o libutils.a $(bins)
 
-test: test-rootfinder
-	./test-rootfinder-script.sh < testbase-rootfinder.quick
 
+check: test-rootfinder test_mod_ul test_mod_redcul test_mod_redc15ul
+	./test-rootfinder-script.sh < testbase-rootfinder.quick
+	./test_mod_ul
+	./test_mod_redcul
+	./test_mod_redc15ul
 
 
 # ALL source files must come here. Using $(wildcard *.c) is discouraged

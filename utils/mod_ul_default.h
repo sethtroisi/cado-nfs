@@ -1,3 +1,5 @@
+#include "mod_ul.h"
+
 /*
    Here are typedef's that rename all functions to mod_* instead of 
    modredcul_*, which one day might become an automatic renaming scheme so 
