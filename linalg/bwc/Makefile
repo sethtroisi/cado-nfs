@@ -146,7 +146,7 @@ gather_normalobjs:=../readbuffer.o ../readmat.o
 
 # This list contains the object files which do not depend on the abase
 # selection.
-constant_objects:=parallelizing_info.o intersections.o xvectors.o aligned_malloc.o bw-common.o bw-common-mpi.o rusage.o async.o
+constant_objects:=parallelizing_info.o intersections.o xvectors.o aligned_malloc.o bw-common.o bw-common-mpi.o rusage.o async.o debug.o
 
 # ALL object files must come here. Using $(wildcard *.c) is discouraged
 # for obvious reasons. This list is used for computing dependencies.

@@ -122,7 +122,7 @@ void * krylov_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
         }
 
         /*
-        debug_write(abase, ahead->v, NCHECKS_CHECK_VECTOR, "ahead.%u.j%u.t%u",
+        debug_write(ahead->v, NCHECKS_CHECK_VECTOR * stride, "ahead.%u.j%u.t%u",
                 s, mmt->pi->m->jrank, mmt->pi->m->trank);
          */
 
@@ -135,8 +135,8 @@ void * krylov_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
             matmul_top_mul(mmt, bw->dir);
 
             /*
-            debug_write(abase, mcol->v->v,
-                    mcol->i1-mcol->i0, "pV%u.j%u.t%u",
+            debug_write(mcol->v->v,
+                    (mcol->i1-mcol->i0) * stride, "pV%u.j%u.t%u",
                     s+i+1, mmt->pi->m->jrank, mmt->pi->m->trank);
              */
             timing_check(pi, timing, s+i+1, tcan_print);
@@ -144,7 +144,7 @@ void * krylov_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
         serialize(pi->m);
 
         /*
-        debug_write(abase, xymats->v, bw->m * bw->interval, "xy.%u-%u.j%u.t%u",
+        debug_write(xymats->v, (bw->m * bw->interval) * stride, "xy.%u-%u.j%u.t%u",
                 s, s + bw->interval, mmt->pi->m->jrank, mmt->pi->m->trank);
          */
 
@@ -152,7 +152,7 @@ void * krylov_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
         x_dotprod(mmt, gxvecs, ahead->v);
 
         /*
-        debug_write(abase, ahead->v, NCHECKS_CHECK_VECTOR, "post%u.j%u.t%u",
+        debug_write(ahead->v, NCHECKS_CHECK_VECTOR * stride, "post%u.j%u.t%u",
                 s, mmt->pi->m->jrank, mmt->pi->m->trank);
          */
 

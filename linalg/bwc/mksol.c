@@ -260,6 +260,7 @@ void * mksol_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
 
         char * s_name2;
         rc = asprintf(&s_name2, COMMON_VECTOR_ITERATE_PATTERN, s_name, s + bw->interval);
+
         pi_save_file_2d(pi, bw->dir, s_name2, sum->v, (ii1 - ii0) * rstride);
         free(s_name2);
 

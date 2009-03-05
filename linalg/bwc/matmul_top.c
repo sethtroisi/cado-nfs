@@ -702,7 +702,8 @@ void matmul_top_fill_random_source(matmul_top_data_ptr mmt, int d)
 static void mmt_debug_writeout(matmul_top_data_ptr mmt, int d, const char * name)
 {
     // serialize(mmt->pi->m);
-    debug_write(mmt->abase, mmt->wr[d]->v->v, mmt->wr[d]->i1 - mmt->wr[d]->i0,
+    debug_write(mmt->wr[d]->v->v,
+            abbytes(mmt->abase, mmt->wr[d]->i1 - mmt->wr[d]->i0),
             "%s.j%u.t%u", name, mmt->pi->m->jrank, mmt->pi->m->trank);
     // serialize(mmt->pi->m);
 }

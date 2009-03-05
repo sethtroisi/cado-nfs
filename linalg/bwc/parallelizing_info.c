@@ -708,7 +708,14 @@ int get_counts_and_displacements_2d(parallelizing_info_ptr pi, int d,
         unsigned int v = v0;
         for(unsigned int jj = 0 ; jj < pi->wr[!d]->njobs ; jj++) {
             /* which count ? This precisely does _not_ depend on d ! */
-            allcounts[v] = counts[jj+pi->wr[1]->njobs*ij];
+            /* Note that ij, despite its name, does not represent a row
+             * index in all cases: when d==0, it's a column index.
+             */
+            unsigned int which = 0;
+            which += ij * (d == 1 ? pi->wr[1]->njobs : 1);
+            which += jj * (d == 0 ? pi->wr[0]->njobs : 1);
+            ASSERT(which < pi->m->njobs);
+            allcounts[v] = counts[which];
             v += pi->m->ncores*pi->wr[d]->njobs;
         }
         v0 += pi->wr[d]->ncores;
@@ -727,8 +734,15 @@ int get_counts_and_displacements_2d(parallelizing_info_ptr pi, int d,
     for(unsigned int ij = 0 ; ij < pi->wr[d]->njobs ; ij++) {
         unsigned int v = v0;
         for(unsigned int jj = 0 ; jj < pi->wr[!d]->njobs ; jj++) {
-            /* which displ ? This precisely does _not_ depend on d ! */
-            displs[jj+pi->wr[1]->njobs*ij] = alldisps[v];
+            /* which count ? This precisely does _not_ depend on d ! */
+            /* Note that ij, despite its name, does not represent a row
+             * index in all cases: when d==0, it's a column index.
+             */
+            unsigned int which = 0;
+            which += ij * (d == 1 ? pi->wr[1]->njobs : 1);
+            which += jj * (d == 0 ? pi->wr[0]->njobs : 1);
+            ASSERT(which < pi->m->njobs);
+            displs[which] = alldisps[v];
             v += pi->m->ncores*pi->wr[d]->njobs;
         }
         v0 += pi->wr[d]->ncores;
