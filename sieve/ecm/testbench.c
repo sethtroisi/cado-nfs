@@ -48,6 +48,7 @@ int main (int argc, char **argv)
   int parameterization = 0;
   int only_primes = 0, verbose = 0;
   int printfactors = 0;
+  int inp_raw = 0;
   int got_usage;
   unsigned long *primmod = NULL, *hitsmod = NULL;
   unsigned long f[16];
@@ -159,6 +160,13 @@ int main (int argc, char **argv)
 	  argc -= 2;
 	  argv += 2;
 	}
+      else if (argc > 2 && strcmp (argv[1], "-inpraw") == 0)
+	{
+	  inp_fn = argv[2];
+	  inp_raw = 1;
+	  argc -= 2;
+	  argv += 2;
+	}
       else
         {
 	  printf ("Unrecoglized option: %s\n", argv[1]);
@@ -233,7 +241,10 @@ int main (int argc, char **argv)
       /* Read lines from inp */
       while (!feof(inp))
       {
-	  mpz_inp_str (N, inp, 0);
+          if (inp_raw)
+            mpz_inp_raw (N, inp);
+          else
+	    mpz_inp_str (N, inp, 0);
 	  if (mpz_sgn (N) <= 0)
 	      continue;
 	  mpz_mul (N, N, cof);
