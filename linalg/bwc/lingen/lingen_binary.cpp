@@ -1821,7 +1821,7 @@ int main(int argc, char *argv[])
     if (bw->n == 0) {
         bw->n = n1 - n0;
     } else if (bw->n != (int) (n1 - n0)) {
-        fprintf(stderr, "n value mismatch (%d versus %u)\n",
+        fprintf(stderr, "n value mismatch (config says %d, A file says %u)\n",
                 bw->n, n1 - n0);
         exit(1);
     }

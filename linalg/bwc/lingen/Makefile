@@ -19,8 +19,10 @@ all: lingen
 lingen_objs:=fake_fft.o lingen_binary.o
 lingen_libs:=../bw-common.o -lgmpxx -lgmp -lutils -lgf2x $(TOP)/gf2x/cantor/cantor128.o
 
-lingen: $(lingen_objs) 
-	$(CXX) $(MY_LFLAGS) -o $@ $^ $(lingen_libs)
+common_link_deps:=$(TOP)/utils/libutils.a
+
+lingen: $(lingen_objs) $(common_link_deps)
+	$(CXX) $(MY_LFLAGS) -o $@ $(lingen_objs) $(lingen_libs)
 
 clean:
 	-rm -f $(lingen_objs) lingen

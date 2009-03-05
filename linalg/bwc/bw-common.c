@@ -116,7 +116,7 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int argc, char *
     }
     okm += param_list_parse_int(pl, "m", &bw->m);
     okn += param_list_parse_int(pl, "n", &bw->n);
-    if (okm != 1 || okn != 1)
+    if (!okm || !okn)
         usage();
 
     if (bw->verbose && bw->can_print)

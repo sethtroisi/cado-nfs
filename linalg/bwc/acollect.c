@@ -154,6 +154,7 @@ int main(int argc, char * argv[])
             }
             n = afiles[k1]->n1;
         }
+        n1 = n;
         
         /* Files [k0] to [k1] can be collected */
 

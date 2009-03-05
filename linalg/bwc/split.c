@@ -113,7 +113,7 @@ int main(int argc, char * argv[])
         char * fname;
         int i = 0;
         /* Special case ; a hard link is enough */
-        rc = asprintf(&fname, ofile_fmt, splits[i], CHAR_BIT * splits[i+1]);
+        rc = asprintf(&fname, ofile_fmt, CHAR_BIT * splits[i], CHAR_BIT * splits[i+1]);
         rc = stat(fname, sbuf);
         if (rc == 0 && !force) {
             fprintf(stderr,"%s already exists\n", fname);
@@ -137,7 +137,7 @@ int main(int argc, char * argv[])
 
     for(int i = 0 ; i < nsplits ; i++) {
         char * fname;
-        rc = asprintf(&fname, ofile_fmt, splits[i], CHAR_BIT * splits[i+1]);
+        rc = asprintf(&fname, ofile_fmt, CHAR_BIT * splits[i], CHAR_BIT * splits[i+1]);
         rc = stat(fname, sbuf);
         if (rc == 0 && !force) {
             fprintf(stderr,"%s already exists\n", fname);
