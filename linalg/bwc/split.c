@@ -70,7 +70,7 @@ int main(int argc, char * argv[])
         ASSERT_ALWAYS((i == 0) || (splits[i-1] < splits[i]));
     }
     if (splits[nsplits-1] != bw->n) {
-        fprintf(stderr, "last split coincides with configured n\n");
+        fprintf(stderr, "last split does not coincide with configured n\n");
         exit(1);
     }
 

@@ -587,7 +587,7 @@ reduce_across(matmul_top_data_ptr mmt, int d)
             unsigned int off = aboffset(mmt->abase, xx->offset_me);
             abt * dptr = mrow->v->all_v[dst] + off;
             // size_t siz = abbytes(mmt->abase, xx->count);
-            ASSERT(off + xx->count <= mrow->i1 - mrow->i0);
+            ASSERT(xx->offset_me + xx->count <= mrow->i1 - mrow->i0);
             /* j indicates a thread number offset -- 0 means destination, and
              * so on. all_v has been allocated with wraparound pointers
              * precisely for accomodating the hack here. */

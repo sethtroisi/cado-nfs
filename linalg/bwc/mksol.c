@@ -239,7 +239,7 @@ void * mksol_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
 
             abvaddmul_tiny(abase, abase_rhs,
                     sum->v,
-                    ((abvt*) mcol->v->v) + abvoffset(abase_rhs, ii0 - mcol->i0),
+                    mcol->v->v + aboffset(abase, ii0 - mcol->i0),
                     fptr, ii1 - ii0);
 
             matmul_top_mul(mmt, bw->dir);
@@ -250,7 +250,7 @@ void * mksol_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
 
         /* Last dot product. This must cancel ! Recall that x_dotprod
          * adds to the result. */
-        x_dotprod(mmt, gxvecs, ahead->v);
+        x_dotprod(mmt, gxvecs, ahead->v, NCHECKS_CHECK_VECTOR);
 
         allreduce_generic(abase, ahead, pi->m, NCHECKS_CHECK_VECTOR);
         if (!abis_zero(abase, ahead->v, NCHECKS_CHECK_VECTOR)) {

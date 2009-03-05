@@ -131,7 +131,8 @@ void * krylov_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
         serialize(pi->m);
         for(int i = 0 ; i < bw->interval ; i++) {
             /* Compute the product by x */
-            x_dotprod(mmt, gxvecs, xymats->v + aboffset(abase, i * bw->m));
+            x_dotprod(mmt, gxvecs,
+                    xymats->v + aboffset(abase, i * bw->m), bw->m);
             matmul_top_mul(mmt, bw->dir);
 
             /*
@@ -149,7 +150,7 @@ void * krylov_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
          */
 
         /* Last dot product. This must cancel ! */
-        x_dotprod(mmt, gxvecs, ahead->v);
+        x_dotprod(mmt, gxvecs, ahead->v, NCHECKS_CHECK_VECTOR);
 
         /*
         debug_write(ahead->v, NCHECKS_CHECK_VECTOR * stride, "post%u.j%u.t%u",
@@ -169,8 +170,8 @@ void * krylov_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
             char * tmp;
             rc = asprintf(&tmp, A_FILE_PATTERN, bw->ys[0], bw->ys[1], s, s+bw->interval);
             FILE * f = fopen(tmp, "w");
-            rc = fwrite(xymats->v, stride, aboffset(abase, bw->m*bw->interval), f);
-            if (rc != aboffset(abase, bw->m*bw->interval)) {
+            rc = fwrite(xymats->v, stride, bw->m*bw->interval, f);
+            if (rc != bw->m*bw->interval) {
                 fprintf(stderr, "Ayee -- short write\n");
                 // make sure our input data won't be deleted -- this
                 // chunk will have to be redone later, maybe the disk

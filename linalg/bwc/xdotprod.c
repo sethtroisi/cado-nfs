@@ -7,7 +7,7 @@
 #include "bw-common.h"
 
 
-void x_dotprod(matmul_top_data_ptr mmt, uint32_t * xv, abt * v)
+void x_dotprod(matmul_top_data_ptr mmt, uint32_t * xv, abt * v, unsigned int m)
 {
     /* We're reading from the shared right vector data -- this area is
      * written to by the other threads in the column. Some of them might
@@ -21,7 +21,7 @@ void x_dotprod(matmul_top_data_ptr mmt, uint32_t * xv, abt * v)
         BUG();
     }
 
-    for(int j = 0 ; j < bw->m ; j++) {
+    for(unsigned int j = 0 ; j < m ; j++) {
         abt * where = v + aboffset(mmt->abase, j);
         for(unsigned int t = 0 ; t < bw->nx ; t++) {
             uint32_t i = xv[j*bw->nx+t];

@@ -26,6 +26,8 @@ my $wdir;
 my $mn;
 my @splits=();
 my @hosts=();
+my $mode='u64';
+my $show_only=0;
 
 if (defined($ENV{'MPI'})) {
     $mpiexec="$ENV{'MPI'}/mpiexec";
@@ -42,6 +44,8 @@ while (defined($_ = shift @ARGV)) {
     if (/^hostfile=(\S*)$/) { $hostfile = $1; next; }
     if (/^matpath=(\S*)$/) { $matpath=$1; next; }
     if (/^hosts=([\w:\.]+(?:,[\w:\.]+)*)$/) { @hosts=split ',', $1; next; }
+    if (/^mode=(\w+)$/) { $mode=$1; next; }
+    if (/^(-d|--show)$/) { $show_only=1; next; }
 
     # These will be passed anyway.
     push @main_args, $_;
@@ -82,7 +86,14 @@ sub dosystem
     my $prg = shift @_;
     my @args = @_;
     print STDERR '#' x 77, "\n";
-    print STDERR "Running $env_strings$prg ", join(' ', @args), "\n";
+    my $msg = "$env_strings$prg " . (join(' ', @args)) . "\n";
+
+    if ($show_only) {
+        print $msg;
+        return 0;
+    }
+
+    print STDERR $msg;
     my $rc = system $prg, @args;
     return if $rc == 0;
     if ($rc == -1) {
@@ -111,11 +122,18 @@ sub drive {
     if ($program eq ':wipeout') {
         # Special case, really.
         my $pwd = getcwd;
+        if ($show_only && ! -d $wdir) {
+            print "mkdir $wdir\n";
+        }
         die "No directory $wdir" unless -d $wdir;
         chdir $wdir;
         die "Won't wipe cwd" if $pwd eq getcwd;
         print STDERR "Doing cleanup in $wdir\n";
-        system "/bin/rm -f [A-Z]* bw.cfg";
+        if ($show_only) {
+            print "/bin/rm -f [A-Z]* bw.cfg\n";
+        } else {
+            system "/bin/rm -f [A-Z]* bw.cfg";
+        }
         chdir $pwd;
         return;
     }
@@ -124,16 +142,16 @@ sub drive {
         if (! -d $wdir) {
             &drive(':balance', @_);
         }
-        &drive(':wipeout', @_);
-        &drive('u64n/prep', @_);
-        &drive('u64/secure', @_);
-        &drive('./split', @_, "--split-y");
-        &drive('u64/krylov', @_);
-        &drive('./acollect', @_, "--remove-old");
-        &drive('lingen/lingen', @_, '--lingen-threshold', 64);
-        &drive('./split', @_, "--split-f");
-        &drive('u64/mksol', @_);
-        &drive('u64n/gather', @_);
+        &drive(":wipeout", @_);
+        &drive("u64n/prep", @_);
+        &drive("u64/secure", @_);
+        &drive("./split", @_, "--split-y");
+        &drive("$mode/krylov", @_);
+        &drive("./acollect", @_, "--remove-old");
+        &drive("lingen/lingen", @_, "--lingen-threshold", 64);
+        &drive("./split", @_, "--split-f");
+        &drive("$mode/mksol", @_);
+        &drive("u64n/gather", @_);
         return;
     }
 

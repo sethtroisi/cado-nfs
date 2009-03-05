@@ -95,8 +95,8 @@ extern void
 P(vaddmul_tiny)(P(obj_srcptr) x,
         PV(obj_srcptr) y,
         PV(base_type) * w,
-        const PV(base_type) * u,
-        const P(base_type) * v,
+        const P(base_type) * u,
+        const PV(base_type) * v,
         unsigned int n);
 extern void
 P(vtranspose)(PV(obj_srcptr) y,
