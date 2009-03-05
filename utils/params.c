@@ -47,7 +47,7 @@ static void make_room(param_list pl, unsigned int more)
     }
 
     for( ; pl->size + more > pl->alloc ; ) {
-        pl->alloc += 8 + pl->alloc >> 1;
+      pl->alloc += 8 + (pl->alloc >> 1);
     }
 
     pl->p = (parameter *) realloc(pl->p, pl->alloc * sizeof(parameter));
