@@ -672,6 +672,8 @@ int get_counts_and_displacements_2d(parallelizing_info_ptr pi, int d,
 {
     pi_wiring_ptr w = pi->m;
 
+    memset(displs, -1, w->njobs * sizeof(int));
+
     counts[w->jrank] = my_size;
     SEVERAL_THREADS_PLAY_MPI_BEGIN(w) {
         int err = MPI_Allgather(MPI_IN_PLACE, 1, MPI_INT, counts, 1, MPI_INT, w->pals);
@@ -693,32 +695,46 @@ int get_counts_and_displacements_2d(parallelizing_info_ptr pi, int d,
 
     // Given an orientation value d, the numbering for the thread (it,jt)
     // on job (ij,jj) is:
+    //
     // it+pi->wr[d]->ncores*(ij+pi->wr[d]->njobs*(jt+pi->wr[!d]->ncores*jj))
     // where ij ranges over pi->wr[d]->njobs and jj over pi->wr[!d]->njobs
     // (it and jt similar of course)
     //
     // Since we're filling the array in a multithreaded way, we're only
-    // interested by the relevant value of it,jt (which is
-    // pi->wr[d]->trank,pi->wr[!d]->trank).
+    // interested by the relevant value of it,jt ; the contribution
+    // depending on ij,jj can be added later on. So we split the sum:
+    //
+    // it+pi->wr[d]->ncores*pi->wr[d]->njobs*jt
+    // +
+    // pi->wr[d]->ncores*(ij+pi->wr[d]->njobs*pi->wr[!d]->ncores*jj)
+    // == 
+    // it+pi->wr[d]->ncores*pi->wr[d]->njobs*jt
+    // +
+    // pi->wr[d]->ncores*ij + pi->m->ncores*pi->wr[d]->njobs*jj
     
     unsigned int v0;
 
     v0 = pi->wr[d]->trank+pi->wr[!d]->trank*pi->wr[d]->ncores*pi->wr[d]->njobs;
-    for(unsigned int ij = 0 ; ij < pi->wr[d]->njobs ; ij++) {
+    for(unsigned int jj = 0 ; jj < pi->wr[!d]->njobs ; jj++) {
         unsigned int v = v0;
-        for(unsigned int jj = 0 ; jj < pi->wr[!d]->njobs ; jj++) {
-            /* which count ? This precisely does _not_ depend on d ! */
-            /* Note that ij, despite its name, does not represent a row
-             * index in all cases: when d==0, it's a column index.
+        /* d == 1 : we'll order offsets column by column */
+        /* d == 0 : we'll order row column by row */
+        for(unsigned int ij = 0 ; ij < pi->wr[d]->njobs ; ij++) {
+            /* relative to pi->m, which job exactly corresponds to this
+             * count ?
+             * it's row_index * ncols + col_index. But we have to know
+             * which is the row index.
+             * d == 1 : ij is the row index
+             * d == 0 : jj is the row index
              */
             unsigned int which = 0;
-            which += ij * (d == 1 ? pi->wr[1]->njobs : 1);
+            which += ij * (d == 1 ? pi->wr[0]->njobs : 1);
             which += jj * (d == 0 ? pi->wr[0]->njobs : 1);
             ASSERT(which < pi->m->njobs);
             allcounts[v] = counts[which];
-            v += pi->m->ncores*pi->wr[d]->njobs;
+            v += pi->wr[d]->ncores;
         }
-        v0 += pi->wr[d]->ncores;
+        v0 += pi->m->ncores*pi->wr[d]->njobs;
     }
 
     serialize_threads(w);
@@ -731,29 +747,20 @@ int get_counts_and_displacements_2d(parallelizing_info_ptr pi, int d,
     }
 
     v0 = pi->wr[d]->trank+pi->wr[!d]->trank*pi->wr[d]->ncores*pi->wr[d]->njobs;
-    for(unsigned int ij = 0 ; ij < pi->wr[d]->njobs ; ij++) {
+    for(unsigned int jj = 0 ; jj < pi->wr[!d]->njobs ; jj++) {
         unsigned int v = v0;
-        for(unsigned int jj = 0 ; jj < pi->wr[!d]->njobs ; jj++) {
-            /* which count ? This precisely does _not_ depend on d ! */
-            /* Note that ij, despite its name, does not represent a row
-             * index in all cases: when d==0, it's a column index.
-             */
+        for(unsigned int ij = 0 ; ij < pi->wr[d]->njobs ; ij++) {
             unsigned int which = 0;
-            which += ij * (d == 1 ? pi->wr[1]->njobs : 1);
+            which += ij * (d == 1 ? pi->wr[0]->njobs : 1);
             which += jj * (d == 0 ? pi->wr[0]->njobs : 1);
             ASSERT(which < pi->m->njobs);
             displs[which] = alldisps[v];
-            v += pi->m->ncores*pi->wr[d]->njobs;
+            v += pi->wr[d]->ncores;
         }
-        v0 += pi->wr[d]->ncores;
+        v0 += pi->m->ncores*pi->wr[d]->njobs;
     }
 
     free(alldisps);
-
-    serialize_threads(w);
-    if (w->trank == 0) {
-        free(allcounts);
-    }
 
 #if 0
     for(unsigned int i = 0 ; i < w->njobs ; i++) {
@@ -762,6 +769,18 @@ int get_counts_and_displacements_2d(parallelizing_info_ptr pi, int d,
         my_pthread_mutex_unlock(w->th->m);
     }
 #endif
+
+    serialize_threads(w);
+
+#if 0
+    ASSERT_ALWAYS(displs[w->jrank] >= 0);
+    if (displs[w->jrank] == 0)
+        ASSERT_ALWAYS(w->trank == 0);
+#endif
+
+    if (w->trank == 0) {
+        free(allcounts);
+    }
 
     return dis;
 }
