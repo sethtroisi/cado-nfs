@@ -1,9 +1,12 @@
+TOP:=..
+include $(TOP)/Makefile.common
+
 include Makefile.local
 # Set default filenames/paths if not already set.
 GMP ?= /usr/local/
 GMPLIB ?= $(GMP)/lib/libgmp.a
 GMPINCLUDE ?= $(GMP)/include/
-CFLAGS ?= -g -O2 -DNDEBUG -W -Wall
+CFLAGS ?= -g -O2 -DNDEBUG -W -Wall -I$(TOP)/utils
 
 targets:=convert_poly convert_rels contains_zerochar 
 
@@ -14,10 +17,8 @@ all: $(targets)
 .c:
 	gcc $(CFLAGS) $< -I.. -I$(GMPINCLUDE) $(GMPLIB) -o $@
 
-# the dependence on ../linalg/gzip.o is a dirty hack, once we switch to cmake
-# this can be done in a clean way, or better the gzip stuff should go in utils
 convert_rels: convert_rels.c
-	gcc $(CFLAGS) $< ../linalg/gzip.o -I.. -I$(GMPINCLUDE) $(GMPLIB) -o $@
+	gcc $(CFLAGS) $< -I.. -I$(GMPINCLUDE) $(GMPLIB) -o $@ -L$(TOP)/utils -lutils
 
 clean:
 	\rm -f $(targets) *~

@@ -653,8 +653,8 @@ read_relation_ggnfs (FILE *fp, relation_t *rel, mpz_t norm, mpz_t *f,
 /* Read relations from file fp, with input format is 'iformat'. 
    and prints them with given output format 'oformat'.
 
-   degf is the degree of the algebraic polynomial (needed for GGNFS and
-   Franke-Kleinjung input formats).
+   degf is the degree of the algebraic polynomial (needed for GGNFS
+   input formats).
    
    For GGNFS input: the rational factor base is into rfb, the algebraic factor
    base is into afb, and the coefficients of the algebraic polynomial are into
@@ -880,7 +880,7 @@ usage (char *s)
   fprintf (stderr, "       -of yyy  - specifies output format (default cado)\n");
   fprintf (stderr, "                  where xxx, yyy are in {cado, fk, ggnfs}\n");
   fprintf (stderr, "       -fb file - factor base (needed for ggnfs input)\n");
-  fprintf (stderr, "       -deg d   - algebraic degree (needed for fk output)\n");
+  fprintf (stderr, "       -deg d   - algebraic degree (for fk output)\n");
   fprintf (stderr, "       -lpb l   - discard relations with primes >= 2^l\n");
 }
 
@@ -970,8 +970,7 @@ main (int argc, char *argv[])
 
   /* for ggnfs input, we need the factor base,
      and for Franke-Kleinjung output, we need the algebraic degree */
-  if ((iformat == FORMAT_GGNFS && FB == NULL) || 
-      (oformat == FORMAT_FK && degf == 0) || argc <= 1)
+  if ((iformat == FORMAT_GGNFS && FB == NULL) || argc <= 1)
     {
       usage (program_name);
       exit (1);
@@ -1019,7 +1018,8 @@ main (int argc, char *argv[])
       RELS = argv[1];
       argv ++;
       argc --;
-      if (oformat == FORMAT_FK && num_files == 0)
+      /* if output format is Franke-Kleinjung, print degree if provided */
+      if (oformat == FORMAT_FK && num_files == 0 && degf != 0)
 	printf ("F 0 X %d 1\n", degf);
       num_files ++;
       num_rels += convert_relations (RELS, rfb, afb, f, degf, iformat, oformat,
