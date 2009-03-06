@@ -55,11 +55,14 @@
 #undef mod_div3
 #undef mod_div7
 #undef mod_pow_ul
+#undef mod_2pow_ul
 #undef mod_pow_mp
 #undef mod_2pow_mp
 #undef mod_V_ul
 #undef mod_V_mp
 #undef mod_sprp
+#undef mod_sprp2
+#undef mod_isprime
 #undef mod_gcd
 #undef mod_inv
 #undef mod_jacobi
@@ -111,11 +114,14 @@
 #define mod_div3             modul_div3
 #define mod_div7             modul_div7
 #define mod_pow_ul           modul_pow_ul
+#define mod_2pow_ul          modul_2pow_ul
 #define mod_pow_mp           modul_pow_mp
 #define mod_2pow_mp          modul_2pow_mp
 #define mod_V_ul             modul_V_ul
 #define mod_V_mp             modul_V_mp
 #define mod_sprp             modul_sprp
+#define mod_sprp2            modul_sprp2
+#define mod_isprime          modul_isprime
 #define mod_gcd              modul_gcd
 #define mod_inv              modul_inv
 #define mod_jacobi           modul_jacobi

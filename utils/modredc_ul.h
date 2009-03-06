@@ -770,6 +770,8 @@ void modredcul_gcd (unsigned long *, const residueredcul_t,
                     const modulusredcul_t);
 void modredcul_pow_ul (residueredcul_t, const residueredcul_t, 
                    const unsigned long, const modulusredcul_t);
+void modredcul_2pow_ul (residueredcul_t, const unsigned long, 
+                        const modulusredcul_t);
 void modredcul_pow_mp (residueredcul_t, const residueredcul_t, 
                    const unsigned long *, const int, const modulusredcul_t);
 void modredcul_2pow_mp (residueredcul_t, const residueredcul_t, 
@@ -781,6 +783,8 @@ void modredcul_V_ul (residueredcul_t, const residueredcul_t,
 void modredcul_V_mp (residueredcul_t, const residueredcul_t, 
 		     const unsigned long *, const int, const modulusredcul_t);
 int modredcul_sprp (const residueredcul_t, const modulusredcul_t);
+int modredcul_sprp2 (const modulusredcul_t);
+int modredcul_isprime (const modulusredcul_t);
 int modredcul_inv (residueredcul_t, const residueredcul_t, 
 		   const modulusredcul_t);
 int modredcul_jacobi (const residueredcul_t, const modulusredcul_t);

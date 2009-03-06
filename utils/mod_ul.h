@@ -724,6 +724,7 @@ void modul_div7 (residueul_t, const residueul_t, const modulusul_t);
 void modul_gcd (modintul_t, const residueul_t, const modulusul_t);
 void modul_pow_ul (residueul_t, const residueul_t, const unsigned long, 
 		   const modulusul_t);
+void modul_2pow_ul (residueul_t, const unsigned long, const modulusul_t);
 void modul_pow_mp (residueul_t, const residueul_t, const unsigned long *,
                    const int, const modulusul_t);
 void modul_2pow_mp (residueul_t, const residueul_t, const unsigned long *, 
@@ -733,6 +734,8 @@ void modul_V_ul (residueul_t, const residueul_t, const residueul_t,
 void modul_V_mp (residueul_t, const residueul_t, const unsigned long *,
 		 const int, const modulusul_t);
 int modul_sprp (const residueul_t, const modulusul_t);
+int modul_sprp2 (const modulusul_t);
+int modul_isprime (const modulusul_t);
 int modul_inv (residueul_t, const residueul_t, const modulusul_t);
 int modul_jacobi (const residueul_t, const modulusul_t);
 
