@@ -147,8 +147,7 @@ mod_pow_ul (residue_t r, const residue_t b, const unsigned long e,
      r^mask * b^e is invariant, and is the result we want */
 
   /* Find highest set bit in e. */
-  while ((e & mask) == 0UL)
-    mask >>= 1; /* r = 1, so r^(mask/2) * b^e = r^mask * b^e  */
+  mask = (1UL << (LONG_BIT - 1)) >> ularith_clz (e);
 
   /* Exponentiate */
 
@@ -192,8 +191,7 @@ mod_2pow_ul (residue_t r, const unsigned long e, const modulus_t m)
      r^mask * b^e is invariant, and is the result we want */
 
   /* Find highest set bit in e. */
-  while ((e & mask) == 0UL)
-    mask >>= 1; /* r = 1, so r^(mask/2) * b^e = r^mask * b^e  */
+  mask = (1UL << (LONG_BIT - 1)) >> ularith_clz (e);
 
   /* Exponentiate */
 
@@ -236,8 +234,7 @@ mod_pow_mp (residue_t r, const residue_t b, const unsigned long *e,
     }
 
   /* Find highest set bit in e. */
-  while ((e[i] & mask) == 0UL)
-    mask >>= 1; /* r = 1, so r^(mask/2) * b^e = r^mask * b^e  */
+  mask = (1UL << (LONG_BIT - 1)) >> ularith_clz (e[i]);
 
   /* Exponentiate */
 
@@ -312,8 +309,7 @@ mod_V_ul (residue_t r, const residue_t b, const residue_t two,
     }
 
   /* Find highest set bit in e. */
-  while ((e & mask) == 0UL)
-    mask >>= 1; /* r = 1, so r^(mask/2) * b^e = r^mask * b^e  */
+  mask = (1UL << (LONG_BIT - 1)) >> ularith_clz (e);
 
   /* Exponentiate */
 
@@ -374,8 +370,7 @@ mod_V_mp (residue_t r, const residue_t b, const unsigned long *e,
     }
 
   /* Find highest set bit in e. */
-  while ((e[i] & mask) == 0UL)
-    mask >>= 1; /* r = 1, so r^(mask/2) * b^e = r^mask * b^e  */
+  mask = (1UL << (LONG_BIT - 1)) >> ularith_clz (e[i]);
 
   /* Exponentiate */
 
@@ -484,7 +479,7 @@ mod_sprp (const residue_t b, const modulus_t m)
 int
 mod_sprp2 (const modulus_t m)
 {
-  residue_t r1, minusone;
+  residue_t r, minusone;
   int i = 0, po2 = 1;
   unsigned long mm1;
 
@@ -496,6 +491,13 @@ mod_sprp2 (const modulus_t m)
   if (mm1 % 2UL == 0UL)
     return 0;
 
+  /* If m == 1,7 (mod 8), then 2 is a quadratic residue, and we must find
+     -1 with one less squaring. This does not reduce the number of
+     pseudo-primes because strong pseudo-primes are also Euler pseudo-primes, 
+     but makes identifying composites a little faster on avarage. */
+  if (mm1 % 8 == 1 || mm1 % 8 == 7)
+    po2--;
+
   /* Set mm1 to the odd part of m-1 */
   mm1 = (mm1 - 1) >> 1;
   while (mm1 % 2UL == 0UL)
@@ -505,22 +507,22 @@ mod_sprp2 (const modulus_t m)
     }
   /* Hence, m-1 = mm1 * 2^po2 */
 
-  mod_init_noset0 (r1, m);
+  mod_init_noset0 (r, m);
   mod_init_noset0 (minusone, m);
   mod_set1 (minusone, m);
   mod_neg (minusone, minusone, m);
 
   /* Exponentiate */
-  mod_2pow_ul (r1, mm1, m);
+  mod_2pow_ul (r, mm1, m);
 
-  /* Now r1 == b^mm1 (mod m) */
+  /* Now r == b^mm1 (mod m) */
 #if defined(PARI)
   printf ("(Mod(2,%lu) ^ %lu) == %lu /* PARI */\n", 
-	  mod_getmod_ul (m), mm1, mod_get_ul (r1, m));
+	  mod_getmod_ul (m), mm1, mod_get_ul (r, m));
 #endif
   
   /* If m is prime, then b^mm1 might be == 1 or == -1 (mod m) here */
-  if (mod_is1 (r1, m) || mod_equal (r1, minusone, m))
+  if (mod_is1 (r, m) || mod_equal (r, minusone, m))
     i = 1;
   else
     {
@@ -528,8 +530,8 @@ mod_sprp2 (const modulus_t m)
 	 b^(2^(po2 - 1)*mm1)  must be == -1 (mod m) */
       for ( ; po2 > 1; po2--)
 	{
-	  mod_mul (r1, r1, r1, m);
-	  if (mod_equal (r1, minusone, m))
+	  mod_mul (r, r, r, m);
+	  if (mod_equal (r, minusone, m))
 	    {
 	      i = 1;
 	      break;
@@ -537,7 +539,7 @@ mod_sprp2 (const modulus_t m)
 	}
     }
 
-  mod_clear (r1, m);
+  mod_clear (r, m);
   mod_clear (minusone, m);
   return i;
 }
@@ -546,9 +548,10 @@ mod_sprp2 (const modulus_t m)
 int
 mod_isprime (const modulus_t m)
 {
-  residue_t b;
+  residue_t b, minusone, r1;
   const unsigned long n = mod_getmod_ul (m);
-  int r = 0;
+  unsigned long mm1;
+  int r = 0, i, po2;
   
   if (n % 2UL == 0UL)
     {
@@ -559,10 +562,30 @@ mod_isprime (const modulus_t m)
       return r;
     }
 
+  /* Set mm1 to the odd part of m-1 */
+  mm1 = n - 1;
+  po2 = ularith_ctz (mm1);
+  mm1 >>= po2;
+  
   mod_init_noset0 (b, m);
+  mod_init_noset0 (minusone, m);
+  mod_init_noset0 (r1, m);
+  mod_set1 (minusone, m);
+  mod_neg (minusone, minusone, m);
 
-  if (!mod_sprp2 (m))
-    goto end;
+  /* Do base 2 SPRP test */
+  mod_2pow_ul (r1, mm1, m);   /* r = 2^mm1 mod m */
+  /* If m is prime, then b^mm1 might be == 1 or == -1 (mod m) here */
+  if (!mod_is1 (r1, m))
+    {
+      /* If m is a prime, then one of b^mm1, b^(2*mm1), b^(2^2*mm1), ..., 
+	 b^(2^(po2 - 1)*mm1)  must be == -1 (mod m) */
+	i = (n % 8 == 3 || n % 8 == 5) ? 0 : 1;
+	for (; i < po2 && !mod_equal (r1, minusone, m); i++)
+	  mod_mul (r1, r1, r1, m);
+	if (i >= po2)
+	  goto end; /* Not prime */
+    }
 
   if (n < 2047UL)
     {
@@ -573,70 +596,107 @@ mod_isprime (const modulus_t m)
   if (n % 3UL == 1UL)
     {
       mod_set_ul_reduced (b, 7UL, m);
-      if (mod_sprp (b, m))
+      mod_pow_ul (r1, b, mm1, m);   /* r = 7^mm1 mod m */
+      if (!mod_is1 (r1, m))
         {
-          mod_set_ul_reduced (b, 61UL, m);
-          if (mod_sprp (b, m))
-	    {
-#if (ULONG_MAX > 4294967295UL)
-	      if (n < 4759123141UL)
-		{
-		  return 1;
-		  goto end;
-		}
+	  for (i = 0; i < po2 && !mod_equal (r1, minusone, m); i++)
+	    mod_mul (r1, r1, r1, m);
+	  if (i >= po2)
+	    goto end; /* Not prime */
+	}
 
-              mod_set_ul_reduced (b, 5UL, m);
-              if (mod_sprp (b, m))
-                {
-                  /* These are the base 5,7,61 SPSP */
-                  r = (n != 30926647201UL && n != 45821738881UL && 
-                       n != 74359744201UL && n != 90528271681UL && 
-                       n != 110330267041UL && n != 373303331521UL && 
-                       n != 440478111067UL && n != 1436309367751UL && 
-                       n != 1437328758421UL && n != 1858903385041UL && 
-                       n != 4897239482521UL && n != 5026103290981UL && 
-                       n != 5219055617887UL && n != 5660137043641UL && 
-                       n != 6385803726241UL);
-                }
+      if (n < 2269093UL)
+        {
+	  r = (n != 314821);
+	  goto end;
+        }
+      
+      mod_set_ul_reduced (b, 61UL, m);
+      mod_pow_ul (r1, b, mm1, m);   /* r = 61^mm1 mod m */
+      if (!mod_is1 (r1, m))
+        {
+	  for (i = 0; i < po2 && !mod_equal (r1, minusone, m); i++)
+	    mod_mul (r1, r1, r1, m);
+	  if (i >= po2)
+	    goto end; /* Not prime */
+	}
+
+#if (ULONG_MAX > 4294967295UL)
+      if (n != 4759123141UL && n != 8411807377UL && n < 11207066041UL)
+        {
+	  r = 1;
+	  goto end;
+        }
+      
+      mod_set_ul_reduced (b, 5UL, m);
+      mod_pow_ul (r1, b, mm1, m);   /* r = 61^mm1 mod m */
+      if (!mod_is1 (r1, m))
+        {
+	  for (i = 0; i < po2 && !mod_equal (r1, minusone, m); i++)
+	    mod_mul (r1, r1, r1, m);
+	  if (i >= po2)
+	    goto end; /* Not prime */
+	}
+	  
+          /* These are the base 5,7,61 SPSP < 10^13 and n == 1 (mod 3) */
+	  r = (n != 30926647201UL && n != 45821738881UL && 
+	       n != 74359744201UL && n != 90528271681UL && 
+	       n != 110330267041UL && n != 373303331521UL && 
+	       n != 440478111067UL && n != 1436309367751UL && 
+	       n != 1437328758421UL && n != 1858903385041UL && 
+	       n != 4897239482521UL && n != 5026103290981UL && 
+	       n != 5219055617887UL && n != 5660137043641UL && 
+	       n != 6385803726241UL);
 #else
 	      r = 1;
 #endif
-	    }
-        }
     }
   else
     {
       /* Case n % 3 == 0, 2 */
       
       mod_set_ul_reduced (b, 3UL, m);
-      if (mod_sprp (b, m))
+      mod_pow_ul (r1, b, mm1, m);   /* r = 61^mm1 mod m */
+      if (!mod_is1 (r1, m))
         {
-          if (n < 1373653UL)
-            {
-              r = 1;
-            }
-          else
-            {
-              mod_set_ul_reduced (b, 5UL, m);
-              if (mod_sprp (b, m))
-                {
+	  for (i = 0; i < po2 && !mod_equal (r1, minusone, m); i++)
+	    mod_mul (r1, r1, r1, m);
+	  if (i >= po2)
+	    goto end; /* Not prime */
+	}
+      
+      if (n < 102690677UL && n != 5173601UL && n != 16070429UL && n != 54029741)
+        {
+	  r = 1;
+	  goto end;
+	}
+      
+      mod_set_ul_reduced (b, 5UL, m);
+      mod_pow_ul (r1, b, mm1, m);   /* r = 61^mm1 mod m */
+      if (!mod_is1 (r1, m))
+        {
+	  for (i = 0; i < po2 && !mod_equal (r1, minusone, m); i++)
+	    mod_mul (r1, r1, r1, m);
+	  if (i >= po2)
+	    goto end; /* Not prime */
+	}
+
 #if (ULONG_MAX > 4294967295UL)
-	          r = (n != 244970876021UL && n != 405439595861UL && 
-		       n != 1566655993781UL && n != 3857382025841UL &&
-		       n != 4074652846961UL && n != 5783688565841UL);
+      r = (n != 244970876021UL && n != 405439595861UL && 
+	   n != 1566655993781UL && n != 3857382025841UL &&
+	   n != 4074652846961UL && n != 5783688565841UL);
 #else
-	          r = 1;
+      r = 1;
 #endif
-                }
-	    }
-        }
     }
-  
+ 
  end:
 #if defined(PARI)
   printf ("isprime(%lu) == %d /* PARI */\n", n, r);
 #endif
   mod_clear (b, m);
+  mod_clear (minusone, m);
+  mod_clear (r1, m);
   return r;
 }
 

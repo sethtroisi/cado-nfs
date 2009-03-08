@@ -345,4 +345,40 @@ ularith_shld (unsigned long *r, const unsigned long a, const int i)
 #endif
 }
 
+/* Returns number of trailing zeros in a. a must not be zero */
+MAYBE_UNUSED
+static inline int
+ularith_ctz (const unsigned long a)
+{
+#if defined(__GNUC__) && (__GNUC__ >= 4 || __GNUC__ >= 3 && __GNUC_MINOR__ >= 4)
+  ASSERT (a != 0UL);
+  return __builtin_ctzl(a);
+#else
+  unsigned long t = a;
+  int i;
+  ASSERT (a != 0UL);
+  for (i = 0; (t & 1UL) == 0UL; i++)
+    t >>= 1;
+  return i;
+#endif
+}
+
+/* Returns number of leading zeros in a. a must not be zero */
+MAYBE_UNUSED
+static inline int
+ularith_clz (const unsigned long a)
+{
+#if defined(__GNUC__) && (__GNUC__ >= 4 || __GNUC__ >= 3 && __GNUC_MINOR__ >= 4)
+  ASSERT (a != 0UL);
+  return __builtin_clzl(a);
+#else
+  unsigned long t = 1UL << (LONG_BIT - 1);
+  int i;
+  ASSERT (a != 0UL);
+  for (i = 0; (a & t) == 0UL; i++)
+    t >>= 1;
+  return i;
+#endif
+}
+
 #endif
