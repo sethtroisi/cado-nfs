@@ -182,16 +182,16 @@ ularith_sub_2ul_2ul_ge (unsigned long *r1, unsigned long *r2,
             "sbbq %5, %1\n\t" /* r2 -= a2 + cy */
 	    "cmovc %2, %0\n\t" /* If there's a borrow, restore r1 from t1 */
 	    "cmovc %3, %1\n\t" /* and r2 from t2 */
-            : "+r" (*r1), "+r" (*r2), "+r" (t1), "+r" (t2)
-            : "g" (a1), "g" (a2)
+            : "+&r" (*r1), "+&r" (*r2)
+            : "r" (t1), "r" (t2), "g" (a1), "g" (a2)
             : "cc");
 #elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
   __asm__ ( "subl %4, %0\n\t"
             "sbbl %5, %1\n\t"
 	    "cmovc %2, %0\n\t"
 	    "cmovc %3, %1\n\t"
-            : "+r" (*r1), "+r" (*r2), "+r" (t1), "+r" (t2)
-            : "g" (a1), "g" (a2)
+            : "+&r" (*r1), "+&r" (*r2)
+            : "r" (t1), "r" (t2), "g" (a1), "g" (a2)
             : "cc");
 #else
   t1 -= a1;
