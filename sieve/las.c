@@ -1300,9 +1300,9 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
 	  /* If this root is somehow interesting (projective in (a,b) or
 	     in  (i,j) plane), print a message */
 	  if (verbose && (fb->roots[nr] >= p || r >= p))
-	    fprintf (output, "# Side %c, prime " FBPRIME_FORMAT
-		     " root " FBPRIME_FORMAT " -> " FBPRIME_FORMAT "\n",
-		     side, p, fb->roots[nr], r);
+	    fprintf (output, "# init_small_sieve: Side %c, prime " 
+		     FBPRIME_FORMAT " root " FBPRIME_FORMAT " -> " 
+		     FBPRIME_FORMAT "\n", side, p, fb->roots[nr], r);
           if (r >= p)
 	    {
 	      fbprime_t q, g;
@@ -1334,6 +1334,17 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
 		    }
 		  ssd->bad_p[ssd->nb_bad_p].logp = fb->plog;
 		  ssd->nb_bad_p++;
+		} 
+	      else 
+		{
+		  if (verbose && !do_bad_primes)
+		    fprintf (output, "# init_small_sieve: not adding bad "
+			     "prime " FBPRIME_FORMAT " to small sieve because "
+			     "do_bad_primes = 0\n", g);
+		  else if (verbose && g >= si->J)
+		    fprintf (output, "# init_small_sieve: not adding bad "
+			     "prime g = " FBPRIME_FORMAT " to small sieve "
+			     " because  g >= si->J = %d\n", g, si->J);
 		}
 	    }
 	  else
@@ -1350,6 +1361,10 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
       fb = fb_next (fb); // cannot do fb++, due to variable size !
     }
     ssd->nb_nice_p = n;
+    if (verbose)
+      fprintf (output, 
+	       "# init_small_sieve: side %c has %d nice and %d bad primes\n",
+	       side, ssd->nb_nice_p, ssd->nb_bad_p);
 }
 
 // Sieve small primes (up to p < bucket_thresh) of the factor base fb in the
@@ -1628,6 +1643,14 @@ resieve_small_bucket_region (bucket_array_t BA, unsigned char *S,
 
   /* Resieve bad primes */
   td_idx = 0;
+  if (resieve_very_verbose_bad)
+    {
+      fprintf (stderr, "# %d bad primes to resieve: ", ssd->nb_bad_p);
+      for (n = 0; n < ssd->nb_bad_p; ++n)
+	fprintf (stderr, "%s" FBPRIME_FORMAT, 
+		 (n>0) ? ", " : "", ssd->bad_p[n].g);
+      fprintf (stderr, "\n");
+    }
   for (n = 0; n < ssd->nb_bad_p; ++n) {
     const fbprime_t g = ssd->bad_p[n].g;
     while (trialdiv_primes[td_idx] != FB_END && trialdiv_primes[td_idx] < g)
@@ -1693,6 +1716,9 @@ resieve_small_bucket_region (bucket_array_t BA, unsigned char *S,
                          "new next_position = %d\n",
                  i0, si->bucket_region, ssd->bad_p[n].next_position);
     }
+    else if (resieve_very_verbose_bad)
+	fprintf (stderr, "# not resieving " FBPRIME_FORMAT 
+		 ", has been trial divided\n", g);
   }
 }
 
@@ -2517,6 +2543,7 @@ factor_leftover_norm (mpz_t n, unsigned int l,
 */
 
   /* use the facul library */
+  // gmp_printf ("facul: %Zd\n", n);
   facul_code = facul (ul_factors, n, strategy);
 
   if (facul_code == FACUL_NOT_SMOOTH)
