@@ -26,15 +26,15 @@ test-rootfinder: test-rootfinder.o
 	$(CC) $(MY_LFLAGS) $^ -o $@ -L. -lutils -lgmp
 
 test_mod_ul: test_mod.c
-	$(CC) $(MY_LFLAGS) -DARITHMETIC=\"mod_ul_default.h\" -o $@ $^ \
+	$(CC) $(MY_CFLAGS) $(MY_LFLAGS) -DARITHMETIC=\"mod_ul_default.h\" -o $@ $^ \
 	-lutils -lgmp
 
 test_mod_redcul: test_mod.c
-	$(CC) $(MY_LFLAGS) -DARITHMETIC=\"modredc_ul_default.h\" -o $@ $^ \
+	$(CC) $(MY_CFLAGS) $(MY_LFLAGS) -DARITHMETIC=\"modredc_ul_default.h\" -o $@ $^ \
 	-lutils -lgmp
 
 test_mod_redc15ul: test_mod.c
-	$(CC) $(MY_LFLAGS) -DARITHMETIC=\"modredc_15ul_default.h\" -o $@ $^ \
+	$(CC) $(MY_CFLAGS) $(MY_LFLAGS) -DARITHMETIC=\"modredc_15ul_default.h\" -o $@ $^ \
 	-lutils -lgmp
 
 test-rootfinder: libutils.a

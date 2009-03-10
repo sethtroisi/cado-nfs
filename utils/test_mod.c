@@ -1,3 +1,4 @@
+#define _XOPEN_SOURCE 500
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
@@ -301,6 +302,67 @@ tests_mod_pow_ul (int iter)
 }
 
 
+static void
+test_mod_2pow_ul (const modint_t lm, const unsigned long e)
+{
+  modulus_t m;
+  residue_t r;
+  modint_t lt;
+  mpz_t mt, mr, mm, m2;
+
+  mod_initmod_uls (m, lm);
+  mod_init (r, m);
+  
+  mod_2pow_ul (r, e, m);  /* s = 2^e % m */
+  mod_get_uls (lt, r, m); /* result as integer in t */
+  
+  mpz_init (mm);
+  mpz_init (mr);
+  mpz_init (mt);
+  mpz_init (m2);
+  mod_setint_mpz (mm, lm); /* modulus */
+  mpz_set_ui (m2, 2UL);
+  mod_setint_mpz (mt, lt);  /* result of mod_2pow_ul() */
+  
+  mpz_powm_ui (mr, m2, e, mm);
+  if (mpz_cmp (mr, mt) != 0)
+    {
+      gmp_printf ("mod_pow_ui(2, %lu, %Zd) wrong (%Zd)\n", 
+	          e, mm, mt);
+      abort ();
+    }
+  mpz_clear (mt);
+  mpz_clear (mr);
+  mpz_clear (m2);
+  mpz_clear (mm);
+  
+  mod_clear (r, m);
+  mod_clearmod (m);
+}
+
+
+void
+tests_mod_2pow_ul (int iter)
+{
+  modint_t tm;
+  unsigned long e;
+  int i;
+  
+  for (i = 0; i < iter; i++)
+    {
+      random_modulus (tm);
+      test_mod_2pow_ul (tm, 0UL);
+      test_mod_2pow_ul (tm, 1UL);
+      test_mod_2pow_ul (tm, 2UL);
+      test_mod_2pow_ul (tm, 3UL);
+      test_mod_2pow_ul (tm, 4UL);
+      test_mod_2pow_ul (tm, ~0UL);
+      e = (unsigned long) random();
+      test_mod_2pow_ul (tm, e);
+    }
+}
+
+
 static void 
 test_mod_inv (const modint_t la, const modint_t lm)
 {
@@ -460,6 +522,8 @@ int main(int argc, char **argv)
   tests_mod_gcd (iter);
   printf ("Testing mod_pow_ul()\n");
   tests_mod_pow_ul (iter);
+  printf ("Testing mod_2pow_ul()\n");
+  tests_mod_2pow_ul (iter);
   printf ("Testing mod_inv()\n");
   tests_mod_inv (iter);
   printf ("Testing mod_jacobi()\n");

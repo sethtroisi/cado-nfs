@@ -133,7 +133,8 @@ void
 mod_pow_ul (residue_t r, const residue_t b, const unsigned long e, 
             const modulus_t m)
 {
-  unsigned long mask = ~0UL - (~0UL >> 1); /* Only MSB set */
+  unsigned long mask;
+  residue_t t;
 #ifndef NDEBUG
   unsigned long e1 = e;
 #endif
@@ -143,33 +144,36 @@ mod_pow_ul (residue_t r, const residue_t b, const unsigned long e,
       return;
     }
 
-  /* Assume r = 1 here for the invariant.
-     r^mask * b^e is invariant, and is the result we want */
+  /* Assume t = 1 here for the invariant.
+     t^mask * b^e is invariant, and is the result we want */
 
   /* Find highest set bit in e. */
   mask = (1UL << (LONG_BIT - 1)) >> ularith_clz (e);
 
   /* Exponentiate */
 
-  mod_set (r, b, m);       /* (r*b)^mask * b^(e-mask) = r^mask * b^e */
+  mod_init (t, m);
+  mod_set (t, b, m);       /* (t*b)^mask * b^(e-mask) = t^mask * b^e */
 #ifndef NDEBUG
   e1 -= mask;
 #endif
 
   while (mask > 1UL)
     {
-      mod_mul (r, r, r, m);
-      mask >>= 1;            /* (r^2)^(mask/2) * b^e = r^mask * b^e */
+      mod_mul (t, t, t, m);
+      mask >>= 1;            /* (t^2)^(mask/2) * b^e = t^mask * b^e */
       if (e & mask)
         {
-	  mod_mul (r, r, b, m);
+	  mod_mul (t, t, b, m);
 #ifndef NDEBUG
           e1 -= mask;
 #endif
         }
     }
   ASSERT (e1 == 0UL && mask == 1UL);
-  /* Now e = 0, mask = 1, and r^mask * b^0 = r^mask is the result we want */
+  /* Now e = 0, mask = 1, and t^mask * b^0 = t^mask is the result we want */
+  mod_set (r, t, m);
+  mod_clear (t, m);
 }
 
 
@@ -177,7 +181,8 @@ mod_pow_ul (residue_t r, const residue_t b, const unsigned long e,
 void
 mod_2pow_ul (residue_t r, const unsigned long e, const modulus_t m)
 {
-  unsigned long mask = ~0UL - (~0UL >> 1); /* Only MSB set */
+  unsigned long mask;
+  residue_t t;
 #ifndef NDEBUG
   unsigned long e1 = e;
 #endif
@@ -187,34 +192,30 @@ mod_2pow_ul (residue_t r, const unsigned long e, const modulus_t m)
       return;
     }
 
-  /* Assume r = 1 here for the invariant.
-     r^mask * b^e is invariant, and is the result we want */
-
-  /* Find highest set bit in e. */
   mask = (1UL << (LONG_BIT - 1)) >> ularith_clz (e);
 
-  /* Exponentiate */
-
-  mod_set1 (r, m);       
-  mod_add (r, r, r, m);  /* (r*b)^mask * b^(e-mask) = r^mask * b^e */
+  mod_init (t, m);
+  mod_set1 (t, m);
+  mod_add (t, t, t, m);
 #ifndef NDEBUG
   e1 -= mask;
 #endif
 
   while (mask > 1UL)
     {
-      mod_mul (r, r, r, m);
-      mask >>= 1;            /* (r^2)^(mask/2) * b^e = r^mask * b^e */
+      mod_mul (t, t, t, m);
+      mask >>= 1;
       if (e & mask)
         {
-	  mod_add (r, r, r, m);
+	  mod_add (t, t, t, m);
 #ifndef NDEBUG
           e1 -= mask;
 #endif
         }
     }
   ASSERT (e1 == 0UL && mask == 1UL);
-  /* Now e = 0, mask = 1, and r^mask * b^0 = r^mask is the result we want */
+  mod_set (r, t, m);
+  mod_clear (t, m); 
 }
 
 
@@ -224,7 +225,8 @@ void
 mod_pow_mp (residue_t r, const residue_t b, const unsigned long *e, 
             const int e_nrwords, const modulus_t m)
 {
-  unsigned long mask = ~0UL - (~0UL >> 1); /* Only MSB set */
+  unsigned long mask;
+  residue_t t;
   int i = e_nrwords - 1;
 
   if (e_nrwords == 0 || e[i] == 0UL)
@@ -233,25 +235,25 @@ mod_pow_mp (residue_t r, const residue_t b, const unsigned long *e,
       return;
     }
 
-  /* Find highest set bit in e. */
   mask = (1UL << (LONG_BIT - 1)) >> ularith_clz (e[i]);
 
-  /* Exponentiate */
-
-  mod_set (r, b, m);       /* (r*b)^mask * b^(e-mask) = r^mask * b^e */
+  mod_init (t, m);
+  mod_set (t, b, m);
   mask >>= 1;
 
   for ( ; i >= 0; i--)
     {
       while (mask > 0UL)
         {
-          mod_mul (r, r, r, m);
+          mod_mul (t, t, t, m);
           if (e[i] & mask)
-            mod_mul (r, r, b, m);
-          mask >>= 1;            /* (r^2)^(mask/2) * b^e = r^mask * b^e */
+            mod_mul (t, t, b, m);
+          mask >>= 1;
         }
       mask = ~0UL - (~0UL >> 1);
     }
+  mod_set (r, t, m);
+  mod_clear (t, m);
 }
 
 
@@ -260,19 +262,20 @@ mod_pow_mp (residue_t r, const residue_t b, const unsigned long *e,
    (i.e. 2*2^w (mod m) must be passed. */
 
 void
-mod_2pow_mp (residue_t r, const residue_t two, const unsigned long *e, 
-             const int e_nrwords, const unsigned long e_mask, 
+mod_2pow_mp (residue_t r, const unsigned long *e, const int e_nrwords, 
              const modulus_t m)
 {
   residue_t t;
-  unsigned long mask = e_mask;
+  unsigned long mask;
   int i = e_nrwords - 1;
 
-  ASSERT (e_nrwords != 0 && e[e_nrwords - 1] != 0);
-  ASSERT ((e[e_nrwords - 1] & e_mask) == e_mask);
+  ASSERT (e_nrwords != 0 && e[i] != 0);
 
-  mod_init (t, m);
-  mod_set (t, two, m);
+  mask = (1UL << (LONG_BIT - 1)) >> ularith_clz (e[i]);
+
+  mod_init_noset0 (t, m);
+  mod_set1 (t, m);
+  mod_add (t, t, t , m);
   mask >>= 1;
 
   for ( ; i >= 0; i--)
@@ -282,7 +285,7 @@ mod_2pow_mp (residue_t r, const residue_t two, const unsigned long *e,
           mod_mul (t, t, t, m);
           if (e[i] & mask)
             mod_add (t, t, t, m);
-          mask >>= 1;            /* (r^2)^(mask/2) * b^e = r^mask * b^e */
+          mask >>= 1;
         }
       mask = ~0UL - (~0UL >> 1);
     }
@@ -296,15 +299,16 @@ mod_2pow_mp (residue_t r, const residue_t two, const unsigned long *e,
    V_e(x + 1/x) = x^e + 1/x^e. Here e is an unsigned long. */
 
 void
-mod_V_ul (residue_t r, const residue_t b, const residue_t two, 
-          const unsigned long e, const modulus_t m)
+mod_V_ul (residue_t r, const residue_t b, const unsigned long e, 
+	  const modulus_t m)
 {
-  unsigned long mask = ~0UL - (~0UL >> 1); /* Only MSB set */
-  residue_t r1;
+  unsigned long mask;
+  residue_t t, t1, two;
 
   if (e == 0UL)
     {
-      mod_set (r, two, m);
+      mod_set1 (r, m);
+      mod_add (r, r, r, m);
       return;
     }
 
@@ -313,36 +317,43 @@ mod_V_ul (residue_t r, const residue_t b, const residue_t two,
 
   /* Exponentiate */
 
-  mod_init_noset0 (r1, m);
-  mod_set (r, b, m);         /* r = b = V_1 (b) */
-  mod_mul (r1, b, b, m);
-  mod_sub (r1, r1, two, m);  /* r1 = b^2 - 2 = V_2 (b) */
+  mod_init_noset0 (t, m);
+  mod_init_noset0 (t1, m);
+  mod_init_noset0 (two, m);
+  mod_set1 (two, m);
+  mod_add (two, two, two, m);
+  mod_set (t, b, m);         /* t = b = V_1 (b) */
+  mod_mul (t1, b, b, m);
+  mod_sub (t1, t1, two, m);  /* t1 = b^2 - 2 = V_2 (b) */
   mask >>= 1;
 
-  /* Here r = V_j (b) and r1 = V_{j+1} (b) for j = 1 */
+  /* Here t = V_j (b) and t1 = V_{j+1} (b) for j = 1 */
 
   while (mask > 0UL)
     {
       if (e & mask)
         {
           /* j -> 2*j+1. Compute V_{2j+1} and V_{2j+2} */
-          mod_mul (r, r, r1, m);
-          mod_sub (r, r, b, m); /* V_j * V_{j+1} - V_1 = V_{2j+1} */
-          mod_mul (r1, r1, r1, m);
-          mod_sub (r1, r1, two, m); /* (V_{j+1})^2 - 2 = V_{2j+2} */
+          mod_mul (t, t, t1, m);
+          mod_sub (t, t, b, m); /* V_j * V_{j+1} - V_1 = V_{2j+1} */
+          mod_mul (t1, t1, t1, m);
+          mod_sub (t1, t1, two, m); /* (V_{j+1})^2 - 2 = V_{2j+2} */
         }
       else
         {
           /* j -> 2*j. Compute V_{2j} and V_{2j+1} */
-          mod_mul (r1, r1, r, m);
-          mod_sub (r1, r1, b, m); /* V_j * V_{j+1} - V_1 = V_{2j+1}*/
-          mod_mul (r, r, r, m);
-          mod_sub (r, r, two, m);
+          mod_mul (t1, t1, t, m);
+          mod_sub (t1, t1, b, m); /* V_j * V_{j+1} - V_1 = V_{2j+1}*/
+          mod_mul (t, t, t, m);
+          mod_sub (t, t, two, m);
         }
       mask >>= 1;
     }
 
-  mod_clear (r1, m);
+  mod_set (r, t, m);
+  mod_clear (t, m);
+  mod_clear (t1, m);
+  mod_clear (two, m);
 }
 
 
@@ -354,33 +365,28 @@ void
 mod_V_mp (residue_t r, const residue_t b, const unsigned long *e, 
           const int e_nrwords, const modulus_t m)
 {
-  unsigned long mask = ~0UL - (~0UL >> 1); /* Only MSB set */
+  unsigned long mask;
   int i = e_nrwords - 1;
-  residue_t r1, two;
-
-  mod_init_noset0 (two, m);
-  mod_set1 (two, m);
-  mod_add (two, two, two, m);
+  residue_t t, t1, two;
 
   if (e_nrwords == 0 || e[i] == 0UL)
     {
-      mod_set (r, two, m);
-      mod_clear (two, m);
+      mod_set1 (r, m);
+      mod_add (r, r, r, m);
       return;
     }
 
-  /* Find highest set bit in e. */
   mask = (1UL << (LONG_BIT - 1)) >> ularith_clz (e[i]);
 
-  /* Exponentiate */
-
-  mod_init_noset0 (r1, m);
-  mod_set (r, b, m);         /* r = b = V_1 (b) */
-  mod_mul (r1, b, b, m);
-  mod_sub (r1, r1, two, m);  /* r1 = b^2 - 2 = V_2 (b) */
+  mod_init_noset0 (t, m);
+  mod_init_noset0 (t1, m);
+  mod_init_noset0 (two, m);
+  mod_set1 (two, m);
+  mod_add (two, two, two, m);
+  mod_set (t, b, m);
+  mod_mul (t1, b, b, m);
+  mod_sub (t1, t1, two, m);
   mask >>= 1;
-
-  /* Here r = V_j (b) and r1 = V_{j+1} (b) for j = 1 */
 
   for ( ; i >= 0; i--)
     {
@@ -388,26 +394,26 @@ mod_V_mp (residue_t r, const residue_t b, const unsigned long *e,
         {
           if (e[i] & mask)
 	    {
-	      /* j -> 2*j+1. Compute V_{2j+1} and V_{2j+2} */
-	      mod_mul (r, r, r1, m);
-	      mod_sub (r, r, b, m); /* V_j * V_{j+1} - V_1 = V_{2j+1} */
-	      mod_mul (r1, r1, r1, m);
-	      mod_sub (r1, r1, two, m); /* (V_{j+1})^2 - 2 = V_{2j+2} */
+	      mod_mul (t, t, t1, m);
+	      mod_sub (t, t, b, m);
+	      mod_mul (t1, t1, t1, m);
+	      mod_sub (t1, t1, two, m);
 	    }
 	  else
 	    {
-	      /* j -> 2*j. Compute V_{2j} and V_{2j+1} */
-	      mod_mul (r1, r1, r, m);
-	      mod_sub (r1, r1, b, m); /* V_j * V_{j+1} - V_1 = V_{2j+1}*/
-	      mod_mul (r, r, r, m);
-	      mod_sub (r, r, two, m);
+	      mod_mul (t1, t1, t, m);
+	      mod_sub (t1, t1, b, m);
+	      mod_mul (t, t, t, m);
+	      mod_sub (t, t, two, m);
 	    }
           mask >>= 1;
         }
       mask = ~0UL - (~0UL >> 1);
     }
+  mod_set (r, t, m);
   mod_clear (two, m);
-  mod_clear (r1, m);
+  mod_clear (t, m);
+  mod_clear (t1, m);
 }
 
 
@@ -420,7 +426,6 @@ mod_sprp (const residue_t b, const modulus_t m)
   unsigned long mm1;
 
   mm1 = mod_getmod_ul (m);
-  ASSERT (b[0] < mm1);
 
   if (mm1 <= 3UL)
     return (mm1 >= 2UL);

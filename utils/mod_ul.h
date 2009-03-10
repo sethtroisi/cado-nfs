@@ -727,10 +727,10 @@ void modul_pow_ul (residueul_t, const residueul_t, const unsigned long,
 void modul_2pow_ul (residueul_t, const unsigned long, const modulusul_t);
 void modul_pow_mp (residueul_t, const residueul_t, const unsigned long *,
                    const int, const modulusul_t);
-void modul_2pow_mp (residueul_t, const residueul_t, const unsigned long *, 
-		    const int, const unsigned long, const modulusul_t);
-void modul_V_ul (residueul_t, const residueul_t, const residueul_t,
-                     const unsigned long, const modulusul_t);
+void modul_2pow_mp (residueul_t, const unsigned long *, const int, 
+                    const modulusul_t);
+void modul_V_ul (residueul_t, const residueul_t, const unsigned long, 
+                 const modulusul_t);
 void modul_V_mp (residueul_t, const residueul_t, const unsigned long *,
 		 const int, const modulusul_t);
 int modul_sprp (const residueul_t, const modulusul_t);

@@ -255,37 +255,40 @@ void
 modredc15ul_pow_ul (residueredc15ul_t r, const residueredc15ul_t b, 
 		    const unsigned long e, const modulusredc15ul_t m)
 {
-  unsigned long mask = ~0UL - (~0UL >> 1); /* Only MSB set */
+  unsigned long mask;
+  residueredc15ul_t t;
 #ifndef NDEBUG
   unsigned long e1 = e;
 #endif
+  
   if (e == 0UL)
     {
       modredc15ul_set1 (r, m);
       return;
     }
 
-  /* Assume r = 1 here for the invariant.
+  /* Assume t = 1 here for the invariant.
      r^mask * b^e is invariant, and is the result we want */
 
   /* Find highest set bit in e. */
-  while ((e & mask) == 0UL)
-    mask >>= 1; /* r = 1, so r^(mask/2) * b^e = r^mask * b^e  */
+  mask = (1UL << (LONG_BIT - 1)) >> ularith_clz (e);
+  /* r = 1, so r^(mask/2) * b^e = r^mask * b^e  */
 
   /* Exponentiate */
 
-  modredc15ul_set (r, b, m);       /* (r*b)^mask * b^(e-mask) = r^mask * b^e */
+  modredc15ul_init (t, m);
+  modredc15ul_set (t, b, m);       /* (r*b)^mask * b^(e-mask) = r^mask * b^e */
 #ifndef NDEBUG
   e1 -= mask;
 #endif
 
   while (mask > 1UL)
     {
-      modredc15ul_mul (r, r, r, m);
+      modredc15ul_mul (t, t, t, m);
       mask >>= 1;            /* (r^2)^(mask/2) * b^e = r^mask * b^e */
       if (e & mask)
         {
-	  modredc15ul_mul (r, r, b, m);
+	  modredc15ul_mul (t, t, b, m);
 #ifndef NDEBUG
           e1 -= mask;
 #endif
@@ -293,17 +296,65 @@ modredc15ul_pow_ul (residueredc15ul_t r, const residueredc15ul_t b,
     }
   ASSERT (e1 == 0UL && mask == 1UL);
   /* Now e = 0, mask = 1, and r^mask * b^0 = r^mask is the result we want */
+  modredc15ul_set (r, t, m);
+  modredc15ul_clear (t, m);
+}
+
+
+/* Compute r = 2^e. Here, e is an unsigned long */
+void
+modredc15ul_2pow_ul (residueredc15ul_t r, const unsigned long e, 
+		     const modulusredc15ul_t m)
+{
+  unsigned long mask;
+  residueredc15ul_t t;
+#ifndef NDEBUG
+  unsigned long e1 = e;
+#endif
+
+  if (e == 0UL)
+    {
+      modredc15ul_set1 (r, m);
+      return;
+    }
+
+  mask = (1UL << (LONG_BIT - 1)) >> ularith_clz (e);
+  ASSERT (e & mask);
+
+  modredc15ul_init (t, m);
+  modredc15ul_set1 (t, m);
+  modredc15ul_add (t, t, t, m); /* t = 2 */
+#ifndef NDEBUG
+  e1 -= mask;
+#endif
+
+  while (mask > 1UL)
+    {
+      modredc15ul_mul (t, t, t, m);
+      mask >>= 1;
+      if (e & mask)
+        {
+	  modredc15ul_add (t, t, t, m);
+#ifndef NDEBUG
+          e1 -= mask;
+#endif
+        }
+    }
+  ASSERT (e1 == 0UL && mask == 1UL);
+  modredc15ul_set (r, t, m);
+  modredc15ul_clear (t, m);
 }
 
 
 /* Compute r = b^e. Here e is a multiple precision integer 
-   sum_{i=0}^{e_nrwords} e[i] * (machine word base)^i */
+   sum_{i=0}^{e_nrwords-1} e[i] * (machine word base)^i */
 void
 modredc15ul_pow_mp (residueredc15ul_t r, const residueredc15ul_t b, 
 		    const unsigned long *e, const int e_nrwords, 
 		    const modulusredc15ul_t m)
 {
-  unsigned long mask = ~0UL - (~0UL >> 1); /* Only MSB set */
+  unsigned long mask;
+  residueredc15ul_t t;
   int i = e_nrwords - 1;
 
   if (e_nrwords == 0 || e[i] == 0UL)
@@ -312,47 +363,60 @@ modredc15ul_pow_mp (residueredc15ul_t r, const residueredc15ul_t b,
       return;
     }
 
-  /* Find highest set bit in e. */
-  while ((e[i] & mask) == 0UL)
-    mask >>= 1; /* r = 1, so r^(mask/2) * b^e = r^mask * b^e  */
+  /* Find highest set bit in e[i]. */
+  mask = (1UL << (LONG_BIT - 1)) >> ularith_clz (e[i]);
+  /* t = 1, so t^(mask/2) * b^e = t^mask * b^e  */
 
   /* Exponentiate */
 
-  modredc15ul_set (r, b, m);       /* (r*b)^mask * b^(e-mask) = r^mask * b^e */
+  modredc15ul_init (t, m);
+  modredc15ul_set (t, b, m);       /* (r*b)^mask * b^(e-mask) = r^mask * b^e */
   mask >>= 1;
 
   for ( ; i >= 0; i--)
     {
       while (mask > 0UL)
         {
-          modredc15ul_mul (r, r, r, m);
+          modredc15ul_mul (t, t, t, m);
           if (e[i] & mask)
-            modredc15ul_mul (r, r, b, m);
+            modredc15ul_mul (t, t, b, m);
           mask >>= 1;            /* (r^2)^(mask/2) * b^e = r^mask * b^e */
         }
       mask = ~0UL - (~0UL >> 1);
     }
+  modredc15ul_set (r, t, m);
+  modredc15ul_clear (t, m);
 }
 
 
-/* Computes 2^e (mod m), where e is a multiple precision integer.
-   Requires e != 0. The value of 2 in Montgomery representation 
-   (i.e. 2*2^w (mod m) must be passed. */
-
+/* Compute r = 2^e. Here e is a multiple precision integer 
+   sum_{i=0}^{e_nrwords-1} e[i] * (machine word base)^i */
 void
-modredc15ul_2pow_mp (residueredc15ul_t r, const residueredc15ul_t two, 
-		     const unsigned long *e, const int e_nrwords, 
-		     const unsigned long e_mask, const modulusredc15ul_t m)
+modredc15ul_2pow_mp (residueredc15ul_t r, const unsigned long *e, 
+		     const int e_nrwords, const modulusredc15ul_t m)
 {
+  unsigned long mask;
   residueredc15ul_t t;
-  unsigned long mask = e_mask;
   int i = e_nrwords - 1;
 
-  ASSERT (e_nrwords != 0 && e[e_nrwords - 1] != 0);
-  ASSERT ((e[e_nrwords - 1] & e_mask) == e_mask);
+  if (e_nrwords == 0 || e[i] == 0UL)
+    {
+      modredc15ul_set1 (r, m);
+      return;
+    }
+
+  ASSERT (e[e_nrwords - 1] != 0);
+
+  /* Find highest set bit in e[i]. */
+  mask = (1UL << (LONG_BIT - 1)) >> ularith_clz (e[i]);
+  /* t = 1, so t^(mask/2) * b^e = t^mask * b^e  */
+  
+  /* Exponentiate */
 
   modredc15ul_init (t, m);
-  modredc15ul_set (t, two, m);
+  modredc15ul_set1 (t, m);
+  modredc15ul_add (t, t, t, m); /* t = 2 */
+  /* (t*2)^mask * b^(e-mask) = t^mask * b^e */
   mask >>= 1;
 
   for ( ; i >= 0; i--)
@@ -366,7 +430,6 @@ modredc15ul_2pow_mp (residueredc15ul_t r, const residueredc15ul_t two,
         }
       mask = ~0UL - (~0UL >> 1);
     }
-    
   modredc15ul_set (r, t, m);
   modredc15ul_clear (t, m);
 }
@@ -377,54 +440,61 @@ modredc15ul_2pow_mp (residueredc15ul_t r, const residueredc15ul_t two,
 
 void
 modredc15ul_V_ul (residueredc15ul_t r, const residueredc15ul_t b, 
-		  const residueredc15ul_t two, const unsigned long e, 
-		  const modulusredc15ul_t m)
+		  const unsigned long e, const modulusredc15ul_t m)
 {
-  unsigned long mask = ~0UL - (~0UL >> 1); /* Only MSB set */
-  residueredc15ul_t r1;
+  unsigned long mask;
+  residueredc15ul_t t, t1, two;
 
   if (e == 0UL)
     {
-      modredc15ul_set (r, two, m);
+      modredc15ul_set1 (r, m);
+      modredc15ul_add (r, r, r, m);
       return;
     }
-
+  
   /* Find highest set bit in e. */
-  while ((e & mask) == 0UL)
-    mask >>= 1; /* r = 1, so r^(mask/2) * b^e = r^mask * b^e  */
+  mask = (1UL << (LONG_BIT - 1)) >> ularith_clz (e);
+  /* r = 1, so r^(mask/2) * b^e = r^mask * b^e  */
 
   /* Exponentiate */
-
-  modredc15ul_init_noset0 (r1, m);
-  modredc15ul_set (r, b, m);         /* r = b = V_1 (b) */
-  modredc15ul_mul (r1, b, b, m);
-  modredc15ul_sub (r1, r1, two, m);  /* r1 = b^2 - 2 = V_2 (b) */
+  
+  modredc15ul_init_noset0 (t, m);
+  modredc15ul_init_noset0 (t1, m);
+  modredc15ul_init_noset0 (two, m);
+  modredc15ul_set1 (two, m);
+  modredc15ul_add (two, two, two, m);
+  modredc15ul_set (t, b, m);        /* t = b = V_1 (b) */
+  modredc15ul_mul (t1, b, b, m);
+  modredc15ul_sub (t1, t1, two, m);  /* r1 = b^2 - 2 = V_2 (b) */
   mask >>= 1;
 
-  /* Here r = V_j (b) and r1 = V_{j+1} (b) for j = 1 */
+  /* Here t = V_j (b) and t1 = V_{j+1} (b) for j = 1 */
 
   while (mask > 0UL)
     {
       if (e & mask)
         {
           /* j -> 2*j+1. Compute V_{2j+1} and V_{2j+2} */
-          modredc15ul_mul (r, r, r1, m);
-          modredc15ul_sub (r, r, b, m); /* V_j * V_{j+1} - V_1 = V_{2j+1} */
-          modredc15ul_mul (r1, r1, r1, m);
-          modredc15ul_sub (r1, r1, two, m); /* (V_{j+1})^2 - 2 = V_{2j+2} */
+          modredc15ul_mul (t, t, t1, m);
+          modredc15ul_sub (t, t, b, m); /* V_j * V_{j+1} - V_1 = V_{2j+1} */
+          modredc15ul_mul (t1, t1, t1, m);
+          modredc15ul_sub (t1, t1, two, m); /* (V_{j+1})^2 - 2 = V_{2j+2} */
         }
       else
         {
           /* j -> 2*j. Compute V_{2j} and V_{2j+1} */
-          modredc15ul_mul (r1, r1, r, m);
-          modredc15ul_sub (r1, r1, b, m); /* V_j * V_{j+1} - V_1 = V_{2j+1}*/
-          modredc15ul_mul (r, r, r, m);
-          modredc15ul_sub (r, r, two, m);
+          modredc15ul_mul (t1, t1, t, m);
+          modredc15ul_sub (t1, t1, b, m); /* V_j * V_{j+1} - V_1 = V_{2j+1}*/
+          modredc15ul_mul (t, t, t, m);
+          modredc15ul_sub (t, t, two, m);
         }
       mask >>= 1;
     }
 
-  modredc15ul_clear (r1, m);
+  modredc15ul_set (r, t, m);
+  modredc15ul_clear (t, m);
+  modredc15ul_clear (t1, m);
+  modredc15ul_clear (two, m);
 }
 
 
@@ -437,34 +507,34 @@ modredc15ul_V_mp (residueredc15ul_t r, const residueredc15ul_t b,
 		  const unsigned long *e, const int e_nrwords, 
 		  const modulusredc15ul_t m)
 {
-  unsigned long mask = ~0UL - (~0UL >> 1); /* Only MSB set */
+  unsigned long mask;
   int i = e_nrwords - 1;
-  residueredc15ul_t r1, two;
-
-  modredc15ul_init_noset0 (two, m);
-  modredc15ul_set1 (two, m);
-  modredc15ul_add (two, two, two, m);
+  residueredc15ul_t t, t1, two;
 
   if (e_nrwords == 0 || e[i] == 0UL)
     {
-      modredc15ul_set (r, two, m);
-      modredc15ul_clear (two, m);
+      modredc15ul_set1 (r, m);
+      modredc15ul_add (r, r, r, m);
       return;
     }
 
   /* Find highest set bit in e. */
-  while ((e[i] & mask) == 0UL)
-    mask >>= 1; /* r = 1, so r^(mask/2) * b^e = r^mask * b^e  */
+  mask = (1UL << (LONG_BIT - 1)) >> ularith_clz (e[i]);
+  /* t = 1, so r^(mask/2) * b^e = t^mask * b^e  */
 
   /* Exponentiate */
 
-  modredc15ul_init_noset0 (r1, m);
-  modredc15ul_set (r, b, m);         /* r = b = V_1 (b) */
-  modredc15ul_mul (r1, b, b, m);
-  modredc15ul_sub (r1, r1, two, m);  /* r1 = b^2 - 2 = V_2 (b) */
+  modredc15ul_init_noset0 (t, m);
+  modredc15ul_init_noset0 (t1, m);
+  modredc15ul_init_noset0 (two, m);
+  modredc15ul_set1 (two, m);
+  modredc15ul_add (two, two, two, m);
+  modredc15ul_set (t, b, m);         /* t = b = V_1 (b) */
+  modredc15ul_mul (t1, b, b, m);
+  modredc15ul_sub (t1, t1, two, m);  /* t1 = b^2 - 2 = V_2 (b) */
   mask >>= 1;
 
-  /* Here r = V_j (b) and r1 = V_{j+1} (b) for j = 1 */
+  /* Here t = V_j (b) and t1 = V_{j+1} (b) for j = 1 */
 
   for ( ; i >= 0; i--)
     {
@@ -473,66 +543,71 @@ modredc15ul_V_mp (residueredc15ul_t r, const residueredc15ul_t b,
           if (e[i] & mask)
 	    {
 	      /* j -> 2*j+1. Compute V_{2j+1} and V_{2j+2} */
-	      modredc15ul_mul (r, r, r1, m);
-	      modredc15ul_sub (r, r, b, m); /* V_j * V_{j+1} - V_1 = V_{2j+1} */
-	      modredc15ul_mul (r1, r1, r1, m);
-	      modredc15ul_sub (r1, r1, two, m); /* (V_{j+1})^2 - 2 = V_{2j+2} */
+	      modredc15ul_mul (t, t, t1, m);
+	      modredc15ul_sub (t, t, b, m); /* V_j * V_{j+1} - V_1 = V_{2j+1} */
+	      modredc15ul_mul (t1, t1, t1, m);
+	      modredc15ul_sub (t1, t1, two, m); /* (V_{j+1})^2 - 2 = V_{2j+2} */
 	    }
 	  else
 	    {
 	      /* j -> 2*j. Compute V_{2j} and V_{2j+1} */
-	      modredc15ul_mul (r1, r1, r, m);
-	      modredc15ul_sub (r1, r1, b, m); /* V_j * V_{j+1} - V_1 = V_{2j+1}*/
-	      modredc15ul_mul (r, r, r, m);
-	      modredc15ul_sub (r, r, two, m);
+	      modredc15ul_mul (t1, t1, t, m);
+	      modredc15ul_sub (t1, t1, b, m); /* V_j * V_{j+1} - V_1 = V_{2j+1}*/
+	      modredc15ul_mul (t, t, t, m);
+	      modredc15ul_sub (t, t, two, m);
 	    }
           mask >>= 1;
         }
       mask = ~0UL - (~0UL >> 1);
     }
+  
+  modredc15ul_set (r, t, m);
+  modredc15ul_clear (t, m);
+  modredc15ul_clear (t1, m);
   modredc15ul_clear (two, m);
-  modredc15ul_clear (r1, m);
 }
 
 
 /* Returns 1 if m is a strong probable prime wrt base b, 0 otherwise.
-   b must be < m. */
+   We assume m is odd. */
 int
 modredc15ul_sprp (const residueredc15ul_t b, const modulusredc15ul_t m)
 {
-  residueredc15ul_t r1, minusone;
+  residueredc15ul_t r, minusone;
   int i = 0, po2 = 0;
-  unsigned long mm1[2];
+  modintredc15ul_t mm1;
 
   modredc15ul_getmod_uls (mm1, m);
 
-  if (mm1[1] == 0UL && mm1[0] <= 3UL)
-    return (mm1[0] >= 2UL);
-
-  if (mm1[0] % 2UL == 0UL)
+  if (modredc15ul_intequal_ul (mm1, 1UL))
     return 0;
 
   /* Let m-1 = 2^l * k, k odd. Set mm1 = k, po2 = l */
   mm1[0]--; /* No borrow since m is odd */
-  while (mm1[0] % 2UL == 0UL) /* TODO: use ctzl */
+  if (mm1[0] == 0UL)
     {
-      po2++;
-      modredc15ul_intshr (mm1, mm1, 1);
+      mm1[0] = mm1[1];
+      mm1[1] = 0UL;
+      po2 += LONG_BIT;
     }
+  ASSERT (mm1[0] != 0UL);
+  i = ularith_clz (mm1[0]);
+  modredc15ul_intshr (mm1, mm1, i);
+  po2 += i;
 
-  modredc15ul_init_noset0 (r1, m);
+  modredc15ul_init_noset0 (r, m);
   modredc15ul_init_noset0 (minusone, m);
   modredc15ul_set1 (minusone, m);
   modredc15ul_neg (minusone, minusone, m);
 
   /* Exponentiate */
   if (mm1[1] > 0UL)
-    modredc15ul_pow_mp (r1, b, mm1, 2UL, m);
+    modredc15ul_pow_mp (r, b, mm1, 2UL, m);
   else
-    modredc15ul_pow_ul (r1, b, mm1[0], m);
+    modredc15ul_pow_ul (r, b, mm1[0], m);
 
   /* If m is prime, then b^mm1 might be == 1 or == -1 (mod m) here */
-  if (modredc15ul_is1 (r1, m) || modredc15ul_equal (r1, minusone, m))
+  if (modredc15ul_is1 (r, m) || modredc15ul_equal (r, minusone, m))
     i = 1;
   else
     {
@@ -540,8 +615,8 @@ modredc15ul_sprp (const residueredc15ul_t b, const modulusredc15ul_t m)
 	 b^(2^(po2 - 1)*mm1)  must be == -1 (mod m) */
       for ( ; po2 > 1; po2--)
 	{
-	  modredc15ul_mul (r1, r1, r1, m);
-	  if (modredc15ul_equal (r1, minusone, m))
+	  modredc15ul_mul (r, r, r, m);
+	  if (modredc15ul_equal (r, minusone, m))
 	    {
 	      i = 1;
 	      break;
@@ -549,7 +624,67 @@ modredc15ul_sprp (const residueredc15ul_t b, const modulusredc15ul_t m)
 	}
     }
 
-  modredc15ul_clear (r1, m);
+  modredc15ul_clear (r, m);
+  modredc15ul_clear (minusone, m);
+  return i;
+}
+
+
+/* Returns 1 if m is a strong probable prime wrt base 2, 0 otherwise. 
+   We assume m is odd. */
+int
+modredc15ul_sprp2 (const modulusredc15ul_t m)
+{
+  residueredc15ul_t r, minusone;
+  int i = 0, po2 = 0;
+  modintredc15ul_t mm1;
+
+  modredc15ul_getmod_uls (mm1, m);
+
+  /* Let m-1 = 2^l * k, k odd. Set mm1 = k, po2 = l */
+  mm1[0]--; /* No borrow since m is odd */
+
+  if (mm1[0] == 0UL)
+    {
+      mm1[0] = mm1[1];
+      mm1[1] = 0UL;
+      po2 += LONG_BIT;
+    }
+  ASSERT (mm1[0] != 0UL);
+  i = ularith_clz (mm1[0]);
+  modredc15ul_intshr (mm1, mm1, i);
+  po2 += i;
+
+  modredc15ul_init_noset0 (r, m);
+  modredc15ul_init_noset0 (minusone, m);
+  modredc15ul_set1 (minusone, m);
+  modredc15ul_neg (minusone, minusone, m);
+
+  /* Exponentiate */
+  if (mm1[1] > 0UL)
+    modredc15ul_2pow_mp (r, mm1, 2UL, m);
+  else
+    modredc15ul_2pow_ul (r, mm1[0], m);
+
+  /* If m is prime, then b^mm1 might be == 1 or == -1 (mod m) here */
+  if (modredc15ul_is1 (r, m) || modredc15ul_equal (r, minusone, m))
+    i = 1;
+  else
+    {
+      /* If m is a prime, then one of b^(2*mm1), b^(2^2*mm1), ..., 
+	 b^(2^(po2 - 1)*mm1)  must be == -1 (mod m) */
+      for ( ; po2 > 1; po2--)
+	{
+	  modredc15ul_mul (r, r, r, m);
+	  if (modredc15ul_equal (r, minusone, m))
+	    {
+	      i = 1;
+	      break;
+	    }
+	}
+    }
+
+  modredc15ul_clear (r, m);
   modredc15ul_clear (minusone, m);
   return i;
 }

@@ -766,20 +766,18 @@ void modredcul_div3 (residueredcul_t, const residueredcul_t,
                      const modulusredcul_t);
 void modredcul_div7 (residueredcul_t, const residueredcul_t, 
                      const modulusredcul_t);
-void modredcul_gcd (unsigned long *, const residueredcul_t, 
+void modredcul_gcd (modintredcul_t, const residueredcul_t, 
                     const modulusredcul_t);
 void modredcul_pow_ul (residueredcul_t, const residueredcul_t, 
-                   const unsigned long, const modulusredcul_t);
+                       const unsigned long, const modulusredcul_t);
 void modredcul_2pow_ul (residueredcul_t, const unsigned long, 
                         const modulusredcul_t);
 void modredcul_pow_mp (residueredcul_t, const residueredcul_t, 
                    const unsigned long *, const int, const modulusredcul_t);
-void modredcul_2pow_mp (residueredcul_t, const residueredcul_t, 
-                    const unsigned long *, const int, const unsigned long, 
-                    const modulusredcul_t);
+void modredcul_2pow_mp (residueredcul_t, const unsigned long *, const int, 
+                        const modulusredcul_t);
 void modredcul_V_ul (residueredcul_t, const residueredcul_t, 
-		     const residueredcul_t, const unsigned long, 
-		     const modulusredcul_t);
+		     const unsigned long, const modulusredcul_t);
 void modredcul_V_mp (residueredcul_t, const residueredcul_t, 
 		     const unsigned long *, const int, const modulusredcul_t);
 int modredcul_sprp (const residueredcul_t, const modulusredcul_t);

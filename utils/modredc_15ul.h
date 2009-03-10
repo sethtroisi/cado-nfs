@@ -308,6 +308,7 @@ modredc15ul_initmod_uls (modulusredc15ul_t m, const modintredc15ul_t s)
 {
   int i;
   ASSERT (s[1] > 0UL);
+  ASSERT (s[1] < (1UL << (LONG_BIT / 2)));
   modredc15ul_intset (m[0].m, s);
   m[0].invm = -modredc15ul_invmodul (s[0]);
   m[0].one[0] = 0UL;
@@ -556,7 +557,7 @@ static inline void
 modredc15ul_add (residueredc15ul_t r, const residueredc15ul_t a, 
 		 const residueredc15ul_t b, const modulusredc15ul_t m)
 {
-  unsigned long t0 = b[0], t1 = b[1]; /* r, a, and/or b may overlap */
+  const unsigned long t0 = b[0], t1 = b[1]; /* r, a, and/or b may overlap */
   ASSERT_EXPENSIVE (modredc15ul_intcmp (a, m[0].m) < 0);
   ASSERT_EXPENSIVE (modredc15ul_intcmp (b, m[0].m) < 0);
 
@@ -728,21 +729,26 @@ void modredc15ul_div3 (residueredc15ul_t, const residueredc15ul_t,
 		       const modulusredc15ul_t);
 void modredc15ul_div7 (residueredc15ul_t, const residueredc15ul_t, 
 		       const modulusredc15ul_t);
-void modredc15ul_gcd (unsigned long *, const residueredc15ul_t, 
+void modredc15ul_gcd (modintredc15ul_t, const residueredc15ul_t, 
 		      const modulusredc15ul_t);
-int modredc15ul_inv (residueredc15ul_t, const residueredc15ul_t, 
-		     const modulusredc15ul_t);
 void modredc15ul_pow_ul (residueredc15ul_t, const residueredc15ul_t, 
 			 const unsigned long, const modulusredc15ul_t);
+void modredc15ul_2pow_ul (residueredc15ul_t, const unsigned long, 
+                          const modulusredc15ul_t);
 void modredc15ul_pow_mp (residueredc15ul_t, const residueredc15ul_t, 
 			 const unsigned long *, const int, 
 			 const modulusredc15ul_t);
-int modredc15ul_sprp (const residueredc15ul_t, const modulusredc15ul_t);
-void modredc15ul_2pow_mp (residueredc15ul_t, const residueredc15ul_t, 
-			  const unsigned long *, const int, 
-			  const unsigned long, const modulusredc15ul_t);
+void modredc15ul_2pow_mp (residueredc15ul_t, const unsigned long *, const int, 
+			  const modulusredc15ul_t);
 void modredc15ul_V_ul (residueredc15ul_t, const residueredc15ul_t, 
-		       const residueredc15ul_t, const unsigned long, 
+		       const unsigned long, const modulusredc15ul_t);
+void modredc15ul_V_mp (residueredc15ul_t, const residueredc15ul_t, 
+		       const unsigned long *, const int, 
 		       const modulusredc15ul_t);
+int modredc15ul_sprp (const residueredc15ul_t, const modulusredc15ul_t);
+int modredc15ul_sprp2 (const modulusredc15ul_t);
+int modredc15ul_isprime (const modulusredc15ul_t);
+int modredc15ul_inv (residueredc15ul_t, const residueredc15ul_t, 
+		     const modulusredc15ul_t);
 int modredc15ul_jacobi (const residueredc15ul_t, const modulusredc15ul_t);
 #endif
