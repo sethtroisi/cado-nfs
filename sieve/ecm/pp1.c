@@ -189,7 +189,7 @@ pp1_stage2 (residue_t r, const residue_t X, const stage2_plan_t *plan,
 #define FAST_XJ_INIT
 #ifndef FAST_XJ_INIT
   /* Compute Xd = V_d(X) */
-  mod_V_ul (Xd, X, two, plan->d, m);
+  mod_V_ul (Xd, X, plan->d, m);
 
 #ifdef PARI
       printf ("d = %u; Xd = V(d, X); Xd == %lu /* PARI */\n",
@@ -203,7 +203,7 @@ pp1_stage2 (residue_t r, const residue_t X, const stage2_plan_t *plan,
   for (k = 0; k < plan->s1; k++)
     {
       mod_init_noset0 (Xj[k], m);
-      mod_V_ul (Xj[k], X, two, plan->S1[k], m);
+      mod_V_ul (Xj[k], X, plan->S1[k], m);
 #ifdef PARI
       printf ("V(%u, X) == %lu /* = Xj[%d] */ /* PARI */\n",
 	      plan->S1[k], mod_get_ul (Xj[k], m), k);
@@ -308,7 +308,7 @@ pp1_stage2 (residue_t r, const residue_t X, const stage2_plan_t *plan,
       }
     
     /* Also compute Xd = V_d(X) while we've got V_6(X) */
-    mod_V_ul (Xd, X6, two, plan->d / 6, m);
+    mod_V_ul (Xd, X6, plan->d / 6, m);
 
 #ifdef PARI
     printf ("d = %u; Xd = V(d, X); Xd == %lu /* PARI */\n",
@@ -338,8 +338,8 @@ pp1_stage2 (residue_t r, const residue_t X, const stage2_plan_t *plan,
        TODO: init both with the same binary chain. */
     
     /* Todo: do both with the same addition chain */
-    mod_V_ul (Xid, Xd, two, plan->i0, m);
-    mod_V_ul (Xid1, Xd, two, plan->i0 + 1, m);
+    mod_V_ul (Xid, Xd, plan->i0, m);
+    mod_V_ul (Xid1, Xd, plan->i0 + 1, m);
 #ifdef PARI
     printf ("V(%u, X) == %lu /* PARI */\n",
 	    plan->d * plan->i0, mod_get_ul (Xid, m));

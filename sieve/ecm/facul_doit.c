@@ -29,18 +29,18 @@ primetest (const modulus_t m)
   residue_t one, r;
   int isprime;
   
-  mod_init_noset0 (one, m);
-  mod_init_noset0 (r, m);
-  mod_set1 (one, m);
-  mod_add (r, one, one, m); /* r = 2 */
-  isprime = mod_sprp (r, m);
+  isprime = mod_sprp2 (m);
   if (isprime)
     {
-      mod_add (r, r, one, m);
+      mod_init_noset0 (one, m);
+      mod_init_noset0 (r, m);
+      mod_set1 (one, m);
+      mod_add (r, one, one, m);
+      mod_add (r, r, one, m);   /* r = 3 */
       isprime = mod_sprp (r, m);
+      mod_clear (one, m);
+      mod_clear (r, m);
     }
-  mod_clear (one, m);
-  mod_clear (r, m);
   
   return isprime;
 }

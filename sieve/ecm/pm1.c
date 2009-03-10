@@ -44,7 +44,7 @@ pm1 (modint_t f, const modulus_t m, const pm1_plan_t *plan)
   mod_add (two, one, one, m);
   
   /* Stage 1, a simple exponentiation */
-  mod_2pow_mp (x, two, plan->E, plan->E_nrwords, plan->E_mask, m);
+  mod_2pow_mp (x, plan->E, plan->E_nrwords, m);
   
 #ifdef PARI
   printf ("E = B1_exponent (%u); x = Mod(2, %lu)^E; x == %lu /* PARI */\n", 
