@@ -264,6 +264,11 @@ insertNormalRelation (int **rel_compact, int irel,
     for (j = 0; j < rel->nb_ap; j++)
       if (rel->ap[j].p >= minpa)
         {
+          /* FIXME: instead of computing r = a/b mod p, we could
+             first search for a potential match (p,r) in the hash table,
+             then check that a = r*b mod b, and only compute a/b mod p
+             for new entries, thus trading a modular inverse by a modular
+             multiplication for all but the first occurrences of that ideal */
           rel->ap[j].r = findroot (rel->a, rel->b, rel->ap[j].p);
           h = hashInsert (H, rel->ap[j].p, rel->ap[j].r);
           *nprimes += (H->hashcount[h] == 1); /* new prime */
@@ -640,9 +645,6 @@ renumber (int *nprimes, hashtable_t *H, char *sos)
                          GET_HASH_P(H,i), GET_HASH_R(H,i));
             }
           H->hashcount[i] = nb++;
-	  if (H->hashcount[i] == 0x5686f)
-	    fprintf (stderr, "index=0x5686f p=%"PRIu64" r=%"PRIu64"\n",
-		     GET_HASH_P(H,i), GET_HASH_R(H,i));
           if (fsos != NULL)
             fprintf(fsos, "%d %" PRIx64 " %" PRIx64 "\n",
                     H->hashcount[i] - 1, GET_HASH_P(H,i), GET_HASH_R(H,i));
