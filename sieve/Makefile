@@ -5,6 +5,8 @@ include $(TOP)/Makefile.common
 # Some compilation defaults specific to this directory
 # The following flags are specific to gcc, and fix a regression in gcc 4.3.0
 CFLAGS+=-fno-ivopts -fno-regmove -fno-tree-sra -fno-tree-ter
+# CFLAGS=-O0 -g
+# CFLAGS+=-DPROFILE
 
 # if you compile with GCC 4.2 or later, you can also try -march=native
 # instead of the default -mtune=generic (cf man gcc and
@@ -36,6 +38,8 @@ makefb: makefb.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lgmp -lm
 las: las.o fb.o trialdiv.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lfacul -lutils -lgmp -lm
+trialdiv: trialdiv.c trialdiv.h
+	$(CC) $(MY_CFLAGS) $(MY_LFLAGS) -DTESTDRIVE -o $@ $< -lgmp -lutils
 
 # Some dependencies on headers.
 las.o: bucket.h ecm/facul.h

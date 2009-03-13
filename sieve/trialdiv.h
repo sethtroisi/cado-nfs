@@ -1,9 +1,13 @@
 #include <gmp.h>
 #include "fb.h"
 
+/* The maximum number of words in the numbers to be trial-divided.
+   The $l$ value from the thesis text is equal to TRIALDIV_MAXLEN - 1 */
+#define TRIALDIV_MAXLEN 6
+
 typedef struct {
   unsigned long p;
-  unsigned long w[5]; /* w[i] = w^{i+1} mod p */
+  unsigned long w[TRIALDIV_MAXLEN - 1]; /* w[i] = w^{i+1} mod p */
   unsigned long pinv; /* pinv == 1/p (mod w) */
   unsigned long plim; /* plim = (w-1)/p */
 } trialdiv_divisor_t;

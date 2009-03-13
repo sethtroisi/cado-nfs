@@ -1,33 +1,49 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
 #include "ularith.h"
 #include "modredc_ul.h"
 #include "trialdiv.h"
+#ifdef TESTDRIVE
+#include "getprime.h"
+#include <sys/time.h>
+#include <sys/resource.h>
+#endif
 
 static const int verbose = 0;
 
 static void
 trialdiv_init_divisor (trialdiv_divisor_t *d, const unsigned long p)
 {
-  /* TODO: test if p is too large */
+#if TRIALDIV_MAXLEN > 1
+  int i;
+#endif
   ASSERT (p % 2UL == 1UL);
+  /* Test that p^2 does not overflow an unsigned long */
+  ASSERT (TRIALDIV_MAXLEN == 1 || p < (1UL << (LONG_BIT / 2)));
+  /* Test that p < sqrt (word_base / (TRIALDIV_MAXLEN - 1)) */
+  ASSERT (TRIALDIV_MAXLEN == 1 || 
+	  p * p < ULONG_MAX / (TRIALDIV_MAXLEN - 1));
   d->p = p;
+#if TRIALDIV_MAXLEN > 1
   if (p == 1UL)
-    d->w[0] = 0UL;
+    d->w[0] = 0UL; /* DIV would cause quotient overflow */
   else
     ularith_div_2ul_ul_ul_r (&(d->w[0]), 0UL, 1UL, p);
-  ularith_div_2ul_ul_ul_r (&(d->w[1]), 0UL, d->w[0], p);
-  ularith_div_2ul_ul_ul_r (&(d->w[2]), 0UL, d->w[1], p);
-  ularith_div_2ul_ul_ul_r (&(d->w[3]), 0UL, d->w[2], p);
-  ularith_div_2ul_ul_ul_r (&(d->w[4]), 0UL, d->w[3], p);
+  for (i = 1; i < TRIALDIV_MAXLEN; i++)
+    ularith_div_2ul_ul_ul_r (&(d->w[i]), 0UL, d->w[i - 1], p);
+#endif
   d->pinv = modredcul_invmodul (p);
-  d->plim = (unsigned long) (-1L) / p;
+  d->plim = ULONG_MAX / p;
 }
 
 /* Trial division for integers with 1 unsigned long */
 static inline int
 trialdiv_div1 (const unsigned long *n, const trialdiv_divisor_t *d)
 {
+#ifdef __GNUC__
+  __asm__ ("# trialdiv_div1");
+#endif
   return n[0] * d->pinv <= d->plim;
 }
 
@@ -36,7 +52,9 @@ static inline int
 trialdiv_div2 (const unsigned long *n, const trialdiv_divisor_t *d)
 {
   unsigned long r0, r1, x0, x1;
+#ifdef __GNUC__
   __asm__ ("# trialdiv_div2");
+#endif
   ularith_mul_ul_ul_2ul (&x0, &x1, n[1], d->w[0]); /* n_1 * (w^1 % p) */
   r0 = n[0];
   r1 = x1;
@@ -54,6 +72,9 @@ static inline int
 trialdiv_div3 (const unsigned long *n, const trialdiv_divisor_t *d)
 {
   unsigned long r0, r1, x0, x1;
+#ifdef __GNUC__
+  __asm__ ("# trialdiv_div3");
+#endif
   if (verbose)
     printf ("p = %lu, n2:n1:n0 = %lu * w^2 + %lu * w + %lu", 
             d->p, n[2], n[1], n[0]);
@@ -80,6 +101,9 @@ static inline int
 trialdiv_div4 (const unsigned long *n, const trialdiv_divisor_t *d)
 {
   unsigned long r0, r1, x0, x1;
+#ifdef __GNUC__
+  __asm__ ("# trialdiv_div4");
+#endif
   ularith_mul_ul_ul_2ul (&x0, &x1, n[1], d->w[0]); /* n_1 * (w^1 % p) */
   r0 = n[0];
   r1 = x1;
@@ -101,6 +125,9 @@ static inline int
 trialdiv_div5 (const unsigned long *n, const trialdiv_divisor_t *d)
 {
   unsigned long r0, r1, x0, x1;
+#ifdef __GNUC__
+  __asm__ ("# trialdiv_div5");
+#endif
   ularith_mul_ul_ul_2ul (&x0, &x1, n[1], d->w[0]); /* n_1 * (w^1 % p) */
   r0 = n[0];
   r1 = x1;
@@ -124,6 +151,9 @@ static inline int
 trialdiv_div6 (const unsigned long *n, const trialdiv_divisor_t *d)
 {
   unsigned long r0, r1, x0, x1;
+#ifdef __GNUC__
+  __asm__ ("# trialdiv_div6");
+#endif
   ularith_mul_ul_ul_2ul (&x0, &x1, n[1], d->w[0]); /* n_1 * (w^1 % p) */
   r0 = n[0];
   r1 = x1;
@@ -152,42 +182,57 @@ trialdiv (unsigned long *f, mpz_t N, const trialdiv_divisor_t *d)
 {
   int n = 0;
   
+#if TRIALDIV_MAXLEN > 6
+#error trialdiv not implemented for input sizes of more than 6 words
+#endif
+
   while (mpz_cmp_ui (N, 1UL) > 0)
     {
       size_t s = mpz_size(N);
       if (verbose) gmp_printf ("s = %d, N = %Zd, ", s, N);
-      if (s > 6)
+      if (s > TRIALDIV_MAXLEN)
         abort ();
       if (s == 1)
         {
-          while (!trialdiv_div1 (N[0]._mp_d, d))
-            d++;
+	  mp_limb_t t = mpz_getlimbn (N, 0);
+	  while (t * d->pinv > d->plim)
+	    d++;
         }
+#if TRIALDIV_MAXLEN >= 2
       else if (s == 2)
         {
           while (!trialdiv_div2 (N[0]._mp_d, d))
             d++;
         }
+#endif
+#if TRIALDIV_MAXLEN >= 3
       else if (s == 3)
         {
           while (!trialdiv_div3 (N[0]._mp_d, d))
             d++;
         }
+#endif
+#if TRIALDIV_MAXLEN >= 4
       else if (s == 4)
         {
           while (!trialdiv_div4 (N[0]._mp_d, d))
             d++;
         }
+#endif
+#if TRIALDIV_MAXLEN >= 5
       else if (s == 5)
         {
           while (!trialdiv_div5 (N[0]._mp_d, d))
             d++;
         }
+#endif
+#if TRIALDIV_MAXLEN >= 6
       else if (s == 6)
         {
           while (!trialdiv_div6 (N[0]._mp_d, d))
             d++;
         }
+#endif
       if (verbose) printf ("\n");
 
       if (d->p == 1UL)
@@ -195,11 +240,8 @@ trialdiv (unsigned long *f, mpz_t N, const trialdiv_divisor_t *d)
 
       ASSERT (mpz_divisible_ui_p (N, d->p));
 
-      do {
-       f[n++] = d->p;
-        mpz_divexact_ui (N, N, d->p);
-      } while (mpz_divisible_ui_p (N, d->p));
-      d++;
+      f[n++] = d->p;
+      mpz_divexact_ui (N, N, d->p); /* TODO, we can use pinv here */
     }
   
   return n;
@@ -230,36 +272,81 @@ trialdiv_clear (trialdiv_divisor_t *d)
   free (d);
 }
 
-#if 0
+#ifdef TESTDRIVE
 int main (int argc, char **argv)
 {
-  trialdiv_divisor_t d[2];
+  fbprime_t *primes;
+  trialdiv_divisor_t *d;
   unsigned long factors[16];
-  int i, r = 0, len = 1;
+  int i, r = 0, expect = 0, len = 1, nr_primes = 1000, nr_N = 1000000;
   mpz_t M, N;
+  struct rusage usage;
+  double usrtime;
   
   if (argc > 1)
     len = atoi (argv[1]);
   
+  if (argc > 2)
+    nr_N = atoi (argv[2]);
+
+  if (argc > 3)
+    nr_primes = atoi (argv[3]);
+  
+  if (len > TRIALDIV_MAXLEN)
+    {
+      printf ("Error, trialdiv not implemented for input sizes greater than "
+	      "%d words\n", TRIALDIV_MAXLEN);
+      exit (EXIT_FAILURE);
+    }
+
   mpz_init (M);
   mpz_init (N);
   mpz_set_ui (N, 1UL);
   mpz_mul_2exp (N, N, 8 * sizeof(unsigned long) * len);
   mpz_tdiv_q_ui (N, N, 3UL);
-    
-  trialdiv_init_divisor (&(d[0]), 101UL);
-  trialdiv_init_divisor (&(d[1]), 1UL);
+  mpz_nextprime (N, N);
 
-  for (i=0; i < 100000000; i++)
+  for (i = 0; i < 0; i++)
+    getprime(1UL);
+  primes = malloc (nr_primes * sizeof (fbprime_t));
+  for (i = 0; i < nr_primes; i++)
+    {
+      unsigned long ppow;
+      primes[i] = getprime(1UL);
+      ppow = 1UL;
+      while (ULONG_MAX / primes[i] >= ppow)
+	{
+	  ppow *= primes[i];
+	  expect += nr_N / ppow;
+	  if (mpz_tdiv_ui (N, ppow) + nr_N % ppow > ppow)
+	    expect++;
+	}
+    }
+  printf ("First prime is %lu\n", (unsigned long) primes[0]);
+  printf ("Last prime is %lu\n", (unsigned long) primes[nr_primes - 1]);
+  
+  d = trialdiv_init (primes, nr_primes);
+  free (primes);
+  
+  for (i = 0; i < nr_N; i++)
     {
       mpz_set (M, N);
       r += trialdiv (factors, M, d);
       mpz_add_ui (N, N, 1UL);
     }
- 
+  
+  getrusage(RUSAGE_SELF, &usage);
+  usrtime = (double) usage.ru_utime.tv_sec * 1000000. +
+      (double) usage.ru_utime.tv_usec;
+
   mpz_clear (M);
   mpz_clear (N);
-  printf ("%d\n", r);
+  trialdiv_clear (d);
+  printf ("Found %d divisors, expected %d\n", r, expect);
+  if (r != expect)
+    printf ("Error: did not find the expected number of divisors!\n");
+  printf ("Time: %f s, per N: %f mus, per prime: %f ns\n", 
+	  usrtime / 1e6, usrtime / nr_N, usrtime / nr_N / nr_primes * 1e3);
   return 0;
 }
 #endif
