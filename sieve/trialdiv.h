@@ -13,7 +13,8 @@ typedef struct {
 } trialdiv_divisor_t;
 
 /* Divides primes in d out of N and stores them (with multiplicity) in f */
-int trialdiv (unsigned long *, mpz_t, const trialdiv_divisor_t *);
+size_t trialdiv (unsigned long *, mpz_t, const trialdiv_divisor_t *,
+		 const size_t);
 
 /* Initialise a trialdiv_divisor_t array with the primes stored in an 
    fbprime_t array. Allocates memory. */

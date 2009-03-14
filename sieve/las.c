@@ -1856,7 +1856,7 @@ trial_div (factor_list_t *fl, mpz_t norm, bucket_array_t BA, int N, int x,
           fprintf (stderr, "\n");
         }
 
-      nr_factors = trialdiv (factors, norm, trialdiv_data);
+      nr_factors = trialdiv (factors, norm, trialdiv_data, 32);
       ASSERT (nr_factors <= 32);
 
       for (i = 0; i < nr_factors; i++)

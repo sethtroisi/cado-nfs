@@ -175,12 +175,18 @@ trialdiv_div6 (const unsigned long *n, const trialdiv_divisor_t *d)
 }
 
 
-/* Divides primes in d out of N and stores them (with multiplicity) in f */
+/* Divides primes in d out of N and stores them (with multiplicity) in f.
+   Never stores more than max_div primes in f. Returns the number of
+   primes found, or max_div+1 if the number of primes exceeds max_div. 
+   Primes not stored in f (because max_div was exceeded) are not divided out.
+   This way, trial division of highly composite values can be processed
+   by repeated calls of trialdiv(). */
 
-int 
-trialdiv (unsigned long *f, mpz_t N, const trialdiv_divisor_t *d)
+size_t 
+trialdiv (unsigned long *f, mpz_t N, const trialdiv_divisor_t *d,
+	  const size_t max_div)
 {
-  int n = 0;
+  size_t n = 0;
   
 #if TRIALDIV_MAXLEN > 6
 #error trialdiv not implemented for input sizes of more than 6 words
@@ -240,6 +246,9 @@ trialdiv (unsigned long *f, mpz_t N, const trialdiv_divisor_t *d)
 
       ASSERT (mpz_divisible_ui_p (N, d->p));
 
+      if (n == max_div)
+	return max_div + 1;
+
       f[n++] = d->p;
       mpz_divexact_ui (N, N, d->p); /* TODO, we can use pinv here */
     }
@@ -277,7 +286,8 @@ int main (int argc, char **argv)
 {
   fbprime_t *primes;
   trialdiv_divisor_t *d;
-  unsigned long factors[16];
+  size_t max_div = 16;
+  unsigned long *factors;
   int i, r = 0, expect = 0, len = 1, nr_primes = 1000, nr_N = 1000000;
   mpz_t M, N;
   struct rusage usage;
@@ -314,6 +324,7 @@ int main (int argc, char **argv)
       unsigned long ppow;
       primes[i] = getprime(1UL);
       ppow = 1UL;
+      /* FIXME powers greater than ULONG_MAX may appear in N */
       while (ULONG_MAX / primes[i] >= ppow)
 	{
 	  ppow *= primes[i];
@@ -322,16 +333,22 @@ int main (int argc, char **argv)
 	    expect++;
 	}
     }
-  printf ("First prime is %lu\n", (unsigned long) primes[0]);
-  printf ("Last prime is %lu\n", (unsigned long) primes[nr_primes - 1]);
-  
+  printf ("Primes in [%lu, %lu]\n", 
+	  (unsigned long) primes[0], (unsigned long) primes[nr_primes - 1]);
+  getprime (0);
+
   d = trialdiv_init (primes, nr_primes);
   free (primes);
+  factors = (unsigned long *) malloc (max_div * sizeof (unsigned long));
   
   for (i = 0; i < nr_N; i++)
     {
+      size_t t;
       mpz_set (M, N);
-      r += trialdiv (factors, M, d);
+      do {
+	t = trialdiv (factors, M, d, max_div);
+	r += (t > max_div) ? max_div : t;
+      } while (t > max_div);
       mpz_add_ui (N, N, 1UL);
     }
   
@@ -342,6 +359,7 @@ int main (int argc, char **argv)
   mpz_clear (M);
   mpz_clear (N);
   trialdiv_clear (d);
+  free (factors);
   printf ("Found %d divisors, expected %d\n", r, expect);
   if (r != expect)
     printf ("Error: did not find the expected number of divisors!\n");
