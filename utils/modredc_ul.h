@@ -503,14 +503,13 @@ modredcul_sub (residueredcul_t r, const residueredcul_t a,
 
 #if (defined(__i386__) || defined(__x86_64__)) && defined(__GNUC__)
   {
-    unsigned long t = 0, tr = a[0];
+    unsigned long tr = 0, t = a[0];
     __asm__ (
-      "sub %2, %0\n\t"  /* tr -= b */
-      "cmovc %3, %1\n\t" /* if (a < b) t = m */
-      "add %1, %0\n"    /* tr += t. Moving this out of the asm block results
-                            in slowdown!?! */
+      "sub %2, %1\n\t"  /* t -= b ( = a - b) */
+      "lea (%1,%3,1), %0\n\t" /* tr = t + m ( = a - b + m) */
+      "cmovnc %1, %0\n\t" /* if (a >= b) tr = t */
       : "+&r" (tr), "+&r" (t)
-      : "g" (b[0]), "rm" (m[0].m)
+      : "g" (b[0]), "r" (m[0].m)
       : "cc"
     );
     r[0] = tr;
