@@ -206,7 +206,7 @@ void block_control_signals()
     sigemptyset(sset);
     sigaddset(sset, SIGHUP);
     // sigaddset(sset, SIGINT);
-    pthread_sigmask(SIG_BLOCK, sset, NULL);
+    my_pthread_sigmask(SIG_BLOCK, sset, NULL);
 }
 
 void sighandler(int sig)
@@ -230,5 +230,5 @@ void catch_control_signals()
     sigemptyset(sset);
     sigaddset(sset, SIGHUP);
     // sigaddset(sset, SIGINT);
-    pthread_sigmask(SIG_UNBLOCK, sset, NULL);
+    my_pthread_sigmask(SIG_UNBLOCK, sset, NULL);
 }

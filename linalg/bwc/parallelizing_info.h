@@ -170,9 +170,9 @@ extern int pi_save_file_2d(parallelizing_info_ptr, int, const char *, void *, si
 
 /* This provides a fairly typical construct */
 #ifndef MPI_LIBRARY_MT_CAPABLE
-#define SEVERAL_THREADS_PLAY_MPI_BEGIN(comm)
-    for(unsigned int t__ = 0 ; t__ < comm->ncores ; t__++) {
-        serialize_threads(comm);
+#define SEVERAL_THREADS_PLAY_MPI_BEGIN(comm)				\
+    for(unsigned int t__ = 0 ; t__ < comm->ncores ; t__++) {		\
+        serialize_threads(comm);					\
         if (t__ != comm->trank) continue; // not our turn.
 #define SEVERAL_THREADS_PLAY_MPI_END    }
 #else

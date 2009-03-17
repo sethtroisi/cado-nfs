@@ -11,9 +11,11 @@
 #include <sys/resource.h>
 #include <time.h>
 
-#if defined(__linux)
+#if defined(__linux) && defined(__GLIBC__)
 #include <linux/version.h>
-#if LINUX_VERSION_CODE >= 0x20611
+#include <features.h>
+#include "macros.h"
+#if LINUX_VERSION_CODE >= 0x20611 && LEXGE2(__GLIBC__,__GLIBC_MINOR__,2,9)
 #define HAVE_GETRUSAGE_THREAD
 #endif
 #endif
@@ -103,8 +105,10 @@ void thread_seconds(double * res)
     unsigned long utime = 0;
     unsigned long stime = 0;
     statfields(gettid(), 13, "%lu", &utime, 14, "%lu", &stime, -1);
-    res[0] = (double) utime / sysconf(_SC_CLK_TCK); }
-    res[1] = (double) stime / sysconf(_SC_CLK_TCK); }
+    res[0] = (double) utime / sysconf(_SC_CLK_TCK);
+    res[1] = (double) stime / sysconf(_SC_CLK_TCK);
+}
+
 #else   /* Otherwise we'll do something stupid */
 void thread_seconds(double * res)
 {

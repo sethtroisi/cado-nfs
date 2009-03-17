@@ -1,4 +1,6 @@
 #define _GNU_SOURCE     /* asprintf */
+#define _POSIX_C_SOURCE 200112L
+
 #include <stdio.h>
 #include <errno.h>
 #include <limits.h>

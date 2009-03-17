@@ -1010,6 +1010,7 @@ int pi_load_file(pi_wiring_ptr w, const char * name, void * buf, size_t mysize)
                 0, w->pals);
         BUG_ON(err);
     }
+    SEVERAL_THREADS_PLAY_MPI_END;
 
     serialize_threads(w);
 
@@ -1061,6 +1062,7 @@ int pi_load_file_2d(parallelizing_info_ptr pi, int d, const char * name, void * 
                 0, w->pals);
         BUG_ON(err);
     }
+    SEVERAL_THREADS_PLAY_MPI_END;
 
     serialize_threads(w);
 

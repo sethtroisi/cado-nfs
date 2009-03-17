@@ -7,8 +7,6 @@ TOP:=.
 # Makefile.local becase it's got a life outside cado
 export CC
 export CXX
-export GMP_LIBDIR
-export GMP_INCDIR
 
 all:
 	$(MAKE) -C utils libutils.a check_rels

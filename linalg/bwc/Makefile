@@ -75,6 +75,7 @@ ifeq ($(WITH_PTHREADS),1)
 common_libs += -lpthread
 # endif
 endif
+common_libs += $(EXTRA_LIBS)
 
 
 test_hello_objs:=test_hello.o parallelizing_info.o

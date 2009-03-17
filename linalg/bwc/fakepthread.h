@@ -2,6 +2,7 @@
 #define FAKEPTHREAD_H_
 
 #include "macros.h"
+#include <signal.h>
 
 // See select_mpi.h for info on my_* stuff.
 
@@ -64,6 +65,10 @@ static inline int my_pthread_mutex_unlock(my_pthread_mutex_t * m MAYBE_UNUSED)
 static inline int my_pthread_mutex_destroy(my_pthread_mutex_t * m MAYBE_UNUSED)
 {
     return 0;
+}
+static inline int my_pthread_sigmask(int how, const sigset_t * set, sigset_t * oset)
+{
+    return sigprocmask(how, set, oset);
 }
 
 #endif	/* FAKEPTHREAD_H_ */
