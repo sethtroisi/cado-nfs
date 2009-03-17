@@ -68,7 +68,8 @@ UTILS_FILES=utils/utils.h utils/mod_ul.h utils/fpoly.h utils/getprime.h \
 	   utils/mod_ul_default.h utils/modredc_ul.c \
 	   utils/modredc_ul_default.h utils/modredc_15ul.c \
 	   utils/mpz_array.h utils/mpz_array.c utils/modredc_15ul_default.h \
-	   utils/check_rels.c utils/gzip.c utils/gzip.h
+	   utils/check_rels.c utils/gzip.c utils/gzip.h	\
+	   utils/mpz_poly.c utils/mpz_poly.h
 SIEVE_FILES=sieve/Makefile sieve/makefb.c sieve/las.c sieve/bucket.h \
            sieve/fb.h sieve/basicnt.h sieve/trialdiv.h sieve/fb.c \
 	   sieve/config_h.in sieve/trialdiv.c
