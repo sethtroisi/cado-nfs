@@ -43,7 +43,11 @@ while (defined($_ = shift @ARGV)) {
 
     if (/^hostfile=(\S*)$/) { $hostfile = $1; next; }
     if (/^matpath=(\S*)$/) { $matpath=$1; next; }
-    if (/^hosts=([\w:\.]+(?:,[\w:\.]+)*)$/) { @hosts=split ',', $1; next; }
+    if (/^hosts=([\w:\.-]+(?:,[\w:\.-]+)*)$/) {
+        my @nh=split ',', $1;
+        push @hosts, @nh; 
+        next;
+    }
     if (/^mode=(\w+)$/) { $mode=$1; next; }
     if (/^(-d|--show)$/) { $show_only=1; next; }
 
