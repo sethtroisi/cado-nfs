@@ -53,6 +53,17 @@ CC:=$(CC) -Wl,-rpath,$(mpicclibs)
 CXX:=$(CXX) -Wl,-rpath,$(mpicxxlibs)
 endif
 
+# That's really a quirk, but otherwise gcc output is awfully cluttered
+# with gcc 4.1.x
+ifneq ($(TRY_TO_REMOVE_GCC_NOLINK_WARNINGS),)
+# MY_LFLAGS has late expansion
+lflags_extracted:=$(filter -Wl% -l%,$(CC))
+MY_LFLAGS+=$(lflags_extracted)
+CC:=$(filter-out -Wl% -l%,$(CC))
+CXX:=$(filter-out -Wl% -l%,$(CXX))
+endif
+
+
 ## names:=build.c matmul-sliced.cpp
 ## src:=$(patsubst %,%.c,$(names))
 ## obj:=$(patsubst %,%.o,$(names))
