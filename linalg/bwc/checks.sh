@@ -19,6 +19,7 @@ fi
 
 ntests=0
 while read cmd ; do
+    if [ -z "$cmd" ] ; then continue; fi
     let ntests+=1
     echo -n "$cmd --> "
     if sh -c "$cmd" < /dev/null | grep OK ; then
