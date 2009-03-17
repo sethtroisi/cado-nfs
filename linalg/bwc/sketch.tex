@@ -4,56 +4,12 @@
 \usepackage[francais]{babel}
 \usepackage{pstricks}
 \usepackage{killmargins}
+\usepackage{bwc}
 \unprintable 1.5cm
 
 \pagestyle{empty}
-\newcount\nj
-\newcount\nt
-\newcount\vj
-\newcount\vt
-\newdimen\dj
-\newdimen\dt
-\newdimen\Dx
-\newdimen\Dy
-\newdimen\tmp
 
-\def\main{%
-\divide\dj by \nj\relax
-\dt=\dj\divide\dt by \nt\relax
-\tmp=0pt
-\vj=0\relax
-\loop\ifnum\vj<\nj\relax
-    \bob{\tmp}{linewidth=2pt}%
-    {%
-    \vt=0\loop\ifnum\vt<\nt\relax
-        \global\advance\tmp\dt
-        \bob{\tmp}{linewidth=1pt,linestyle=dotted}%
-        \advance\vt by 1\relax
-    \repeat
-    \relax
-    }%
-    \advance\vj by 1\relax
-\repeat
-\relax
-\bob{\tmp}{linewidth=2pt}%
-}
 
-\def\drawcut#1#2x#3,#4x#5{%
-\Dx=#1\relax
-\Dy=#1\relax
-\begin{pspicture}(\Dx,\Dy)
-
-\def\bob##1##2{\psline[##2](0,##1)(\Dx,##1)}
-\nj=#2\nt=#4\dj=\Dy\main
-
-\def\bob##1##2{\psline[##2](##1,0)(##1,\Dy)}
-\nj=#3\nt=#5\dj=\Dy\main\dj=\Dx\main
-
-\psline(0,\Dy)(\Dx,0)
-\end{pspicture}
-\bigskip
-
-}
 
 \begin{document}
 \leavevmode
@@ -61,9 +17,9 @@
 \vfill
 \begin{center}
 \begin{tabular}{cc}
-\drawcut{6cm}2x3,2x2 & \drawcut{6cm}3x2,1x2 \\
-\drawcut{6cm}2x2,2x2 & \drawcut{6cm}2x3,4x1 \\
-\drawcut{6cm}1x1,2x3 & \drawcut{6cm}3x2,2x4 \\
+\bwcsketch{6cm}2x3,2x2 & \bwcsketch{6cm}3x2,1x2 \\
+\bwcsketch{6cm}2x2,2x2 & \bwcsketch{6cm}2x3,4x1 \\
+\bwcsketch{6cm}1x1,2x3 & \bwcsketch{6cm}3x2,2x4 \\
 \end{tabular}
 \end{center}
 \vfill
