@@ -1850,7 +1850,7 @@ void weight_sort_hslice(sink datasink, fileset fs, unsigned int ii)
      */
 
     size_t * nbytes = malloc(nrs * sizeof(size_t));
-    uint32_t tot = 0;
+    size_t tot = 0;
     for(i = 0 ; i < nrs ; i++) {
         nbytes[shuffle[i]]=line_bytes[row_slices[ii].r[i]];
     }
