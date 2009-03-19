@@ -440,8 +440,8 @@ invmod(uint64_t *pa, uint64_t b) {
       residueul_t r;
       int rc;
       modul_initmod_ul (m, b);
-      modul_init (r, m); /* With mod reduction */
-      modul_set_ul (r, *pa, m);
+      modul_init (r, m);
+      modul_set_ul (r, *pa, m); /* With mod reduction */
       if ((rc = modul_inv(r, r, m)))
         *pa = modul_get_ul (r, m);
       modul_clear (r, m);
@@ -1746,30 +1746,6 @@ void factor_list_fprint(FILE *f, factor_list_t fl) {
     for (i = 0; i < fl.n-1; ++i)
         fprintf(f, "%" PRIx64 ",", fl.fac[i]);
     fprintf(f, "%" PRIx64, fl.fac[fl.n-1]);
-}
-
-
-/* Function stolen to sieve.c (AK) */
-/* Returns 1 if fbptr->p divides norm, 0 otherwise */
-static inline int
-trialdiv_with_norm (factorbase_degn_t *fbptr, const mpz_t norm)
-{
-  modulusul_t m;
-  residueul_t r;
-  size_t i;
-  int j;
-
-  modul_initmod_ul (m, (unsigned long) fbptr->p);
-  modul_init (r, m);
-
-  for (i = 0; i < mpz_size (norm); i++)
-    modul_addredc_ul (r, r, norm->_mp_d[i], fbptr->invp, m);
-
-  j = (modul_get_ul (r, m) == 0);
-
-  modul_clear (r, m);
-  modul_clearmod (m);
-  return j;
 }
 
 
