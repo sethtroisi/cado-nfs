@@ -47,8 +47,6 @@ typedef struct {
     nr_missingprimes,     /* The number of times we actually found 
 			     missingprime */
     nr_primes2,           /* The number of the 2nd largest ... */
-    ul_rho_called,        /* Number of times we called ul_rho () */
-    mpz_rho_called,       /* Number of times we called mpz_rho () */
     missinglog_hist[missinglog_hist_max], /* The histogram of missinglog */
     missinglog_guessdiscard_hist[missinglog_hist_max]; /* The histogram of
 			     missinglog when we discard due to guessed 

@@ -32,20 +32,6 @@
 #define GUESS_NORM_AFTER_MISSINGPRIME_THRES_DEFAULT
 #endif
 
-/* We'll use ul_rho() instead of trial division if the size in bits 
-   of the missing factor base prime is > UL_RHO_LOGTHRES */
-#ifndef UL_RHO_LOGTHRES
-#define UL_RHO_LOGTHRES 16
-#define UL_RHO_LOGTHRES_DEFAULT
-#endif
-
-/* We'll use mpz_rho() instead of trial division if the size in bits 
-   of the missing factor base prime is > UL_RHO_LOGTHRES */
-#ifndef MPZ_RHO_LOGTHRES
-#define MPZ_RHO_LOGTHRES 20
-#define MPZ_RHO_LOGTHRES_DEFAULT
-#endif
-
 #define uc_add(a,b) ((unsigned char) ((a)+(b)))
 #define uc_sub(a,b) ((unsigned char) ((a)-(b)))
 #define add_error(a) ((unsigned char) ((a) + SIEVE_PERMISSIBLE_ERROR))
@@ -58,8 +44,6 @@
 
 
 unsigned long skipped_ahead_too_far;
-unsigned long ul_rho_toolarge_nr, ul_rho_toolarge_sum; 
-long long ul_rho_time;
 
 static inline fbroot_t
       first_sieve_loc (const fbprime_t p, const fbroot_t r, 
@@ -1122,154 +1106,6 @@ trialdiv_with_norm4 (factorbase_degn_t *fbptr, const mpz_t norm,
 }
 
 
-static unsigned long
-ul_rho (const unsigned long N, const unsigned long cparm)
-{
-  modulusul_t m;
-  residueul_t r1, r2, c, diff, accu;
-  residueul_t g;
-  unsigned long invm;
-  int i;
-  unsigned int iterations = 0;
-  const int iterations_between_gcd = 32;
-  clock_t tsc1, tsc2;
-
-  ASSERT (cparm < N);
-
-  tsc1 = clock ();
-
-  /* printf ("ul_rho: factoring %lu\n", N); */
-
-  modul_initmod_ul (m, N);
-  modul_init_noset0 (r1, m);
-  modul_init_noset0 (r2, m);
-  modul_init_noset0 (c, m);
-  modul_init_noset0 (g, m);
-  modul_init_noset0 (accu, m);
-  modul_init_noset0 (diff, m);
-  invm = -modul_invmodlong (modul_getmod_ul (m));
-  modul_set_ul_reduced (c, cparm, m); /* We set c to cparm and use that as 
-					 the Montgomery representation of 
-					 cparm*2^-w % m */
-  modul_set_ul_reduced (r1, 2UL, m);
-  modul_set (r2, r1, m);
-  modul_set (accu, r1, m);
-
-  do {
-    for (i = 0; i < iterations_between_gcd; i++)
-      {
-	/* FIXME: use modul_muladdredc_ul()? How does that change the 
-	   arithmetic? */
-	modul_mulredc (r1, r1, r1, invm, m);
-	modul_add (r1, r1, c, m);
-
-      	modul_mulredc (r2, r2, r2, invm, m);
-	modul_add (r2, r2, c, m);
-	modul_mulredc (r2, r2, r2, invm, m);
-	modul_add (r2, r2, c, m);
-
-	modul_sub (diff, r1, r2, m);
-	modul_mulredc (accu, accu, diff, invm, m);
-      }
-    iterations += iterations_between_gcd;
-    modul_gcd (g, accu, m);
-  } while (modul_is1(g, m));
-
-  modul_clear (r1, m);
-  modul_clear (r2, m);
-  modul_clear (c, m);
-  modul_clear (g, m);
-  modul_clear (accu, m);
-  modul_clear (diff, m);
-  modul_clearmod (m);
-
-  tsc2 = clock ();
-  ul_rho_time += tsc2 - tsc1;
-
-  /* printf ("ul_rho: took %u iterations to find %lu\n", iterations, g); */
-
-  return modul_get_ul(g, m);
-}
-
-
-static unsigned long
-mpz_rho (const mpz_t N, const unsigned long c)
-{
-  mpz_t m, r1, r2, t, accu;
-  int i;
-  unsigned int iterations = 0;
-  const int iterations_between_gcd = 32;
-  unsigned long f;
-
-  ASSERT (mpz_cmp_ui(N, c) > 0);
-
-#if 0 || defined(RHODEBUG)
-  gmp_printf ("mpz_rho: factoring %Zd\n", N);
-#endif
-
-  mpz_init (m);
-  mpz_init (r1);
-  mpz_init (r2);
-  mpz_init (t);
-  mpz_init (accu);
-
-  mpz_set (m, N);
-  mpz_set_ui (r1, 2UL);
-  mpz_set_ui (r2, 2UL);
-  mpz_set_ui (accu, 2UL);
-
-  do {
-    for (i = 0; i < iterations_between_gcd; i++)
-      {
-	mpz_mul (t, r1, r1);
-	mpz_add_ui (t, t, c);
-	mpz_mod (r1, t, m);
-
-	mpz_mul (t, r2, r2);
-	mpz_add_ui (t, t, c);
-	mpz_mod (r2, t, m);
-	mpz_mul (t, r2, r2);
-	mpz_add_ui (t, t, c);
-	mpz_mod (r2, t, m);
-
-	mpz_sub (t, r1, r2);
-	mpz_mul (t, t, accu);
-	mpz_mod (accu, t, m);
-      }
-    iterations += iterations_between_gcd;
-    mpz_gcd (t, accu, m);
-  } while (mpz_cmp_ui (t, 1UL) == 0);
-
-  /* FIXME: deal with too large factors better than this! */
-  if (!mpz_fits_ulong_p (t))
-    f = 1;
-  else
-    f = mpz_get_ui (t);
-
-
-  mpz_clear (accu);
-  mpz_clear (t);
-  mpz_clear (r2);
-  mpz_clear (r1);
-  mpz_clear (m);
-
-#if 0 || defined(RHODEBUG)
-  {
-    static double ratio = 0., nr = 0.;
-    double r = (double)iterations/sqrt((double)f);
-    ratio += r;
-    nr += 1.;
-    printf ("mpz_rho: took %u iterations to find %lu, i/sqrt(p) = %.3f, "
-	    "avg = %.3f\n", 
-	    iterations, f, r, ratio/nr);
-    /* Interestingly, the average comes out as almost exactly 1! */
-  }
-#endif
-
-  return f;
-}
-
-
 /* If n <= 10^10 then this function proves primality/compositeness
    of n. For larger n, return value 0 means n is composite, return 
    value 1 means it is probably prime */
@@ -1844,14 +1680,6 @@ print_stats (refactor_stats_t *stats)
   printf ("# Actual cofactor was > 2^mfb %u times\n", stats->cof_toolarge);
   printf ("# There was a large prime > 2^lpb %u times\n", stats->lp_toolarge);
   printf ("# There were %u survivors\n", stats->survivors);
-#if 0
-  printf ("# Called ul_rho %lu times, mpz_rho %lu times\n",
-	  stats->ul_rho_called, stats->mpz_rho_called);
-  printf ("# %lu cofactors too large for ul_rho and too small for "
-	  "mpz_rho, average %.3f", ul_rho_toolarge_nr, 
-	  (double) ul_rho_toolarge_sum / (double) ul_rho_toolarge_nr);
-  printf ("# Calls to ul_rho() took %llu clocks\n", ul_rho_time);
-#endif
 }
 
 /* return the number of printed relations */
@@ -1886,7 +1714,6 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
   mpz_init (scaled_poly_r[0]);
   mpz_init (scaled_poly_r[1]);
 
-  ul_rho_time = 0LL;
   tsc1 = clock ();
 
   /* Multiply f_i (and g_i resp.) by b^(deg-i) and put in scaled_poly */
@@ -1908,7 +1735,6 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 		 max_nr_proj_primes);
 
   skipped_ahead_too_far = 0;
-  ul_rho_toolarge_nr = ul_rho_toolarge_sum = 0;
 
   /* Set stats to zero */
   memset (&stats_a, 0, sizeof (stats_a));
@@ -2032,45 +1858,10 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 }
 
 
-void rho_timing()
-{
-  mpz_t m;
-  unsigned long n, q;
-  unsigned int i;
-  clock_t tsc1, tsc2;
-  const unsigned int iterations = 10000;
-
-#if (ULONG_MAX > 4294967295UL)
-  n = 404428732271UL;
-#else
-  n = 4292870399UL; /* Too small really for meaningful tests */
-#endif
-  mpz_init (m);
-  mpz_set_ui (m, n);
-
-  tsc1 = clock ();
-  for (i = 0; i < 10000; i++)
-    q = ul_rho (n, 2UL);
-
-  tsc2 = clock ();
-  printf ("%u iteratios of ul_rho took %ld clocks\n", 
-	  iterations, (long int) (tsc2 - tsc1));
-
-  tsc1 = clock ();
-  for (i = 0; i < 10000; i++)
-    q = mpz_rho (m, 2UL);
-  tsc2 = clock ();
-  printf ("%u iteratios of mpz_rho took %ld clocks\n", 
-	  iterations, (long int) (tsc2 - tsc1));
-
-  fflush (stdout);
-  mpz_clear (m);
-}
-
 static void
 usage (void)
 {
-  fprintf (stderr, "Usage: sieve [-v] [-fb file] [-poly file] [-reports_a_len int] [-reports_r_len int] [-skip_a|-skip_r]  [-rhotiming] amin amax bmin bmax\n");
+  fprintf (stderr, "Usage: sieve [-v] [-fb file] [-poly file] [-reports_a_len int] [-reports_r_len int] [-skip_a|-skip_r] amin amax bmin bmax\n");
   exit (1);
 }
 
@@ -2105,12 +1896,10 @@ main (int argc, char **argv)
   cado_poly_init(cpoly);
 
   argv++, argc--;
-  int rhotiming;
   int skip_r;
   int skip_a;
 
   param_list_configure_knob(pl, "-v", &verbose);
-  param_list_configure_knob(pl, "-rhotiming", &rhotiming);
   param_list_configure_knob(pl, "-skip_a", &skip_a);
   param_list_configure_knob(pl, "-skip_r", &skip_r);
 
@@ -2142,7 +1931,6 @@ main (int argc, char **argv)
       param_list_read_file(pl, filename);
   }
 
-  if (rhotiming) rho_timing();
   sieve_a = ! skip_a;
   sieve_r = ! skip_r;
 
