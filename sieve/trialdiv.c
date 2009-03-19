@@ -33,7 +33,7 @@ trialdiv_init_divisor (trialdiv_divisor_t *d, const unsigned long p)
   for (i = 1; i < TRIALDIV_MAXLEN; i++)
     ularith_div_2ul_ul_ul_r (&(d->w[i]), 0UL, d->w[i - 1], p);
 #endif
-  d->pinv = modredcul_invmodul (p);
+  d->pinv = ularith_invmod (p);
   d->plim = ULONG_MAX / p;
 }
 

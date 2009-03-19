@@ -54,6 +54,9 @@ typedef __modulusredcul_t modulusredcul_t[1];
 
 /* ==================== Functions used internally ==================== */
 
+static inline void
+modredcul_add (residueredcul_t, const residueredcul_t, 
+               const residueredcul_t, const modulusredcul_t);
 /* Computes (a * 2^wordsize) % m */
 MAYBE_UNUSED
 static inline void
@@ -65,7 +68,7 @@ modredcul_tomontgomery (residueredcul_t r, const residueredcul_t a,
 }
 
 
-/* Computes (a / 2^wordsize) % m */
+/* Computes (a / 2^wordsize) % m. Assumes a < m */
 MAYBE_UNUSED
 static inline void
 modredcul_frommontgomery (residueredcul_t r, const residueredcul_t a, 
@@ -77,36 +80,24 @@ modredcul_frommontgomery (residueredcul_t r, const residueredcul_t a,
   r[0] = thigh + ((a[0] != 0UL) ? 1UL : 0UL);
 }
 
-
-/* Compute 1/n (mod 2^wordsize) */
+/* Computes ((phigh*2^wordsize + plow) / 2^wordsize) % m */
 MAYBE_UNUSED
-static inline unsigned long
-modredcul_invmodul (unsigned long n)
+static inline void
+modredcul_redc (residueredcul_t r, const unsigned long plow, 
+                const unsigned long phigh, const modulusredcul_t m)
 {
-  unsigned long r;
+  unsigned long tlow, thigh, t = phigh;
 
-  ASSERT (n % 2UL != 0UL);
-  
-  /* Suggestion from PLM: initing the inverse to (3*n) XOR 2 gives the
-     correct inverse modulo 32, then 3 (for 32 bit) or 4 (for 64 bit) 
-     Newton iterations are enough. */
-  r = (3UL * n) ^ 2UL;
-  /* Newton iteration */
-  r = 2UL * r - (unsigned int) r * (unsigned int) r * (unsigned int) n;
-  r = 2UL * r - (unsigned int) r * (unsigned int) r * (unsigned int) n;
-  if (sizeof (unsigned long) == 4)
-    {
-      r = 2UL * r - r * r * n;
-    }
-  else
-    {
-      r = 2UL * r - (unsigned int) r * (unsigned int) r * (unsigned int) n;
-      r = 2UL * r - r * r * n;
-    }
-
-  ASSERT_EXPENSIVE (r * n == 1UL);
-
-  return r;
+  tlow = plow * m[0].invm;
+  ularith_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
+  /* Let w = 2^wordsize. We know (phigh * w + plow) + (thigh * w + tlow) 
+     == 0 (mod w) so either plow == tlow == 0, or plow !=0 and tlow != 0. 
+     In the former case we want phigh + thigh + 1, in the latter 
+     phigh + thigh */
+  /* Since a,b <= w-1, ab <= w^2 - 2*w + 1, so
+     adding 1 to phigh is safe */
+  t += (plow != 0UL) ? 1UL : 0UL; /* Does not depend on the mul */ 
+  modredcul_add (r, &t, &thigh, m);
 }
 
 
@@ -207,7 +198,8 @@ static inline void
 modredcul_intdivexact (modintredcul_t r, const modintredcul_t n, 
                        const modintredcul_t d)
 {
-  r[0] = n[0] / d[0]; 
+  /* ularith_invmod() is faster than a DIV */
+  r[0] = n[0] * ularith_invmod(d[0]); 
 }
 
 
@@ -218,7 +210,7 @@ static inline void
 modredcul_initmod_ul (modulusredcul_t m, const unsigned long s)
 {
   m[0].m = s;
-  m[0].invm = -modredcul_invmodul (s);
+  m[0].invm = -ularith_invmod (s);
   if (m[0].m == 1UL)
     m[0].one[0] = 0UL;
   else
@@ -234,7 +226,7 @@ static inline void
 modredcul_initmod_uls (modulusredcul_t m, const modintredcul_t s)
 {
   m[0].m = s[0];
-  m[0].invm = -modredcul_invmodul (s[0]);
+  m[0].invm = -ularith_invmod (s[0]);
   if (m[0].m == 1UL)
     m[0].one[0] = 0UL;
   else
@@ -315,7 +307,9 @@ static inline void
 modredcul_set_ul (residueredcul_t r, const unsigned long s, 
                   const modulusredcul_t m)
 {
-  r[0] = s % m[0].m;
+  unsigned long plow, phigh;
+  ularith_mul_ul_ul_2ul (&plow, &phigh, s, m[0].one[0]);
+  modredcul_redc (r, plow, phigh, m);
   modredcul_tomontgomery (r, r, m);
 }
 
@@ -563,113 +557,12 @@ modredcul_neg (residueredcul_t r, const residueredcul_t a,
 }
 
 
-/* Computes (a / 2^wordsize) % m, but result can be r = m. 
-   Input a must not be equal 0 */
-MAYBE_UNUSED
-static inline void
-modredcul_redcsemi_ul_not0 (residueredcul_t r, const unsigned long a, 
-                            const modulusredcul_t m)
-{
-  unsigned long tlow, thigh;
-
-  ASSERT (a != 0);
-
-  tlow = a * m[0].invm; /* tlow <= 2^w-1 */
-  ularith_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
-  /* thigh:tlow <= (2^w-1) * m */
-  r[0] = thigh + 1UL; 
-  /* (thigh+1):tlow <= 2^w + (2^w-1) * m  <= 2^w + 2^w*m - m 
-                    <= 2^w * (m + 1) - m */
-  /* r <= floor ((2^w * (m + 1) - m) / 2^w) <= floor((m + 1) - m/2^w)
-       <= m */
-}
-
-
-/* Computes ((a + b) / 2^wordsize) % m. a <= m is permissible */
-MAYBE_UNUSED
-static inline void
-modredcul_addredc_ul (residueredcul_t r, const residueredcul_t a, 
-                      const unsigned long b, const modulusredcul_t m)
-{
-  unsigned long slow, shigh, tlow, thigh;
-  
-  ASSERT_EXPENSIVE (a[0] <= m[0].m);
-  slow = b;
-  shigh = 0UL;
-  ularith_add_ul_2ul (&slow, &shigh, a[0]);
-  
-  tlow = slow * m[0].invm;
-  ularith_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
-  ASSERT_EXPENSIVE (slow + tlow == 0UL);
-  r[0] = thigh + shigh + ((slow != 0UL) ? 1UL : 0UL);
-  
-  /* r = ((a+b) + (((a+b)%2^w * invm) % 2^w) * m) / 2^w  Use a<=m-1, b<=2^w-1
-     r <= (m + 2^w - 1 + (2^w - 1) * m) / 2^w
-        = (m - 1 + 2^w + m*2^w - m) / 2^w
-        = (- 1 + 2^w + m2^w) / 2^w
-        = m + 1 - 1/2^w
-     r <= m, since r is an integer
-  */
-  if (r[0] == m[0].m)
-    r[0] = 0UL;
-}
-
-
-/* Computes ((a + b) / 2^wordsize) % m, but result can be == m.
-   a <= m is permissible */
-MAYBE_UNUSED
-static inline void
-modredcul_addredcsemi_ul (residueredcul_t r, const residueredcul_t a, 
-                          const unsigned long b, const modulusredcul_t m)
-{
-  unsigned long slow, shigh, tlow;
-  unsigned char sb;
-  
-  ASSERT_EXPENSIVE(a[0] <= m[0].m);
-  slow = b;
-#if defined(__x86_64__) && defined(__GNUC__)
-   __asm__ ( "addq %2, %0\n\t" /* cy * 2^w + slow = a + b */
-            "setne %1\n\t"     /* if (slow != 0) sb = 1 */
-            "adcb $0, %1\n"    /* sb += cy */
-            : "+&r" (slow), "=qm" (sb)
-            : "rm" (a[0])
-            : "cc");
-  shigh = sb;
-#elif defined(__i386__) && defined(__GNUC__)
-   __asm__ ( "addl %2, %0\n\t"
-            "setne %1\n\t"
-            "adcb $0, %1\n"
-            : "+&r" (slow), "=qm" (sb)
-            : "rm" (a[0])
-            : "cc");
-  shigh = sb;
-#else
-  shigh = 0UL;
-  ularith_add_ul_2ul (&slow, &shigh, a[0]);
-  shigh += (slow != 0UL) ? 1UL : 0UL;
-#endif
-
-  tlow = slow * m[0].invm;
-  ularith_mul_ul_ul_2ul (&tlow, r, tlow, m[0].m);
-  ASSERT_EXPENSIVE (slow + tlow == 0UL);
-  r[0] += shigh;
-
-  /* r = ((a+b) + (((a+b)%2^w * invm) % 2^w) * m) / 2^w
-     r <= ((a+b) + (2^w - 1) * m) / 2^w
-     r <= (m + 2^w-1 + m*2^w - m) / 2^w
-     r <= (2^w -1 + p2^w) / 2^w
-     r <= p + 1 - 1/2^w
-     r <= p
-  */
-}
-
-
 MAYBE_UNUSED
 static inline void
 modredcul_mul (residueredcul_t r, const residueredcul_t a, 
                const residueredcul_t b, const modulusredcul_t m)
 {
-  unsigned long plow, phigh, tlow, thigh;
+  unsigned long plow, phigh;
 
   ASSERT_EXPENSIVE (m[0].m % 2 != 0);
   ASSERT_EXPENSIVE (a[0] < m[0].m && b[0] < m[0].m);
@@ -679,57 +572,13 @@ modredcul_mul (residueredcul_t r, const residueredcul_t a,
 #endif
   
   ularith_mul_ul_ul_2ul (&plow, &phigh, a[0], b[0]);
-  tlow = plow * m[0].invm;
-  ularith_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
-  /* Let w = 2^wordsize. We know (phigh * w + plow) + (thigh * w + tlow) 
-     == 0 (mod w) so either plow == tlow == 0, or plow !=0 and tlow != 0. 
-     In the former case we want phigh + thigh + 1, in the latter 
-     phigh + thigh */
-  /* Since a <= p-1 and b <= p-1, and p <= w-1, a*b <= w^2 - 4*w + 4, so
-     adding 1 to phigh is safe */
-#if 0
-  /* Slower? */
-  ularith_add_ul_2ul (&plow, &phigh, tlow);
-#else
-  phigh += (plow != 0UL) ? 1UL : 0UL;
-#endif
-
-  modredcul_add (r, &phigh, &thigh, m);
+  modredcul_redc (r, plow, phigh, m);
 
 #if defined(MODTRACE)
   printf (" == %lu /* PARI */ \n", r[0]);
 #endif
 }
-                         
 
-/* Computes (a * b + c)/ 2^wordsize % m. Requires that 
-   a * b + c < 2^wordsize * m */
-
-MAYBE_UNUSED
-static inline void
-modredcul_muladdredc (residueredcul_t r, const residueredcul_t a, 
-		      const residueredcul_t b, const residueredcul_t c, 
-		      const modulusredcul_t m)
-{
-  unsigned long plow, phigh, tlow, thigh;
-  ASSERT_EXPENSIVE (m[0].m % 2 != 0);
-#if defined(MODTRACE)
-  printf ("(%lu * %lu / 2^%ld) %% %lu", 
-          a[0], b, 8 * sizeof(unsigned long), m[0]);
-#endif
-  
-  ularith_mul_ul_ul_2ul (&plow, &phigh, a[0], b[0]);
-  ularith_add_ul_2ul (&plow, &phigh, c[0]);
-  tlow = plow * m[0].invm;
-  ularith_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
-  phigh += (plow != 0UL ? 1UL : 0UL);
-  modredcul_add (r, &phigh, &thigh, m);
-  
-#if defined(MODTRACE)
-  printf (" == %lu /* PARI */ \n", r[0]);
-#endif
-}
-                         
 
 MAYBE_UNUSED
 static inline void
