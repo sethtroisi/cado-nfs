@@ -102,6 +102,45 @@ mod_div7 (residue_t r, const residue_t a, const modulus_t m)
 }
 
 
+void
+mod_div13 (residue_t r, const residue_t a, const modulus_t m)
+{
+  unsigned long ml, m13, k;
+  residue_t t;
+  const unsigned long a13 = a[0] % 13UL;
+  /* inv13[i] = -1/i (mod 13) */
+  const unsigned long inv13[13] = {0, 12, 6, 4, 3, 5, 2, 11, 8, 10, 9, 7, 1}; 
+
+  ASSERT_EXPENSIVE (a[0] < mod_getmod_ul (m));
+
+  mod_init_noset0 (t, m);
+  mod_set (t, a, m);
+  if (a13 != 0UL)
+    {
+      ml = mod_getmod_ul (m);
+      m13 = ml % 13UL;
+      ASSERT (m13 != 0UL);
+      
+      /* We want a+km == 0 (mod 13), so k = -a*m^{-1} (mod 13) */
+      k = (a13 * inv13[m13]) % 13UL;
+      ASSERT_EXPENSIVE ((k*m13 + a13) % 13UL == 0UL);
+      t[0] = a[0] + k * ml;
+    }
+
+  /* Now t[0] == a+k*m (mod 2^w) so that a+k*m is divisible by 13.
+     (a+k*m)/13 < 2^w, so doing a division (mod 2^w) produces the 
+     correct result. */
+  
+  if (sizeof (unsigned long) == 4)
+    t[0] *= 0xc4ec4ec5; /* 1/13 (mod 2^32) */
+  else
+    t[0] *= 0x4ec4ec4ec4ec4ec5; /* 1/13 (mod 2^64) */
+  
+  mod_set (r, t, m);
+  mod_clear (t, m);
+}
+
+
 void 
 mod_gcd (modint_t g, const residue_t r, const modulus_t m)
 {

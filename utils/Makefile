@@ -48,14 +48,15 @@ libutils.a: $(obj)
 
 clean:
 	-rm -f *.bak *.o libutils.a $(bins)
+	-rm -f test_mod_ul.o test_mod_redcul.o test_mod_redc15ul.o
 	-rm -f test-rootfinder test_mod_ul test_mod_redcul test_mod_redc15ul
 
 
 check: test-rootfinder test_mod_ul test_mod_redcul test_mod_redc15ul
-	./test-rootfinder-script.sh < testbase-rootfinder.quick
 	./test_mod_ul
 	./test_mod_redcul
 	./test_mod_redc15ul
+	./test-rootfinder-script.sh < testbase-rootfinder.quick
 
 
 # ALL source files must come here. Using $(wildcard *.c) is discouraged

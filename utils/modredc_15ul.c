@@ -94,11 +94,7 @@ modredc15ul_div7 (residueredc15ul_t r, const residueredc15ul_t a,
 {
   const unsigned long w_mod_7 = (sizeof (unsigned long) == 4) ? 4UL : 2UL;
   const unsigned long a7 = ((a[1] % 7UL) * w_mod_7 + a[0] % 7UL) % 7UL;
-  const unsigned long inv7[7] = {0,6,3,2,5,4,1}; /* inv7[i] = -1/i (mod 7) */
-  unsigned long m7 = ((m[0].m[1] % 7UL) * w_mod_7 + m[0].m[0] % 7UL) % 7UL;
   residueredc15ul_t t;
-  
-  ASSERT(m7 != 0UL);
   
   modredc15ul_init_noset0 (t, m);
   t[1] = a[1];
@@ -107,19 +103,17 @@ modredc15ul_div7 (residueredc15ul_t r, const residueredc15ul_t a,
   /* Make t[1]:t[0] divisible by 7 */
   if (a7 != 0UL)
     {
-      /* We want a+km == 0 (mod 7), so k = -a*m^{-1} (mod 7) */
-      m7 = (inv7[m7] * a7) % 7UL;
+      const unsigned long m7 = ((m[0].m[1] % 7UL) * w_mod_7 + m[0].m[0] % 7UL) % 7UL;
+      ASSERT(m7 != 0UL);
       
-      switch (m7) 
-	{
-	case 6: ularith_add_2ul_2ul (&(t[0]), &(t[1]), m[0].m[0], m[0].m[1]);
-	case 5: ularith_add_2ul_2ul (&(t[0]), &(t[1]), m[0].m[0], m[0].m[1]);
-	case 4: ularith_add_2ul_2ul (&(t[0]), &(t[1]), m[0].m[0], m[0].m[1]);
-	case 3: ularith_add_2ul_2ul (&(t[0]), &(t[1]), m[0].m[0], m[0].m[1]);
-	case 2: ularith_add_2ul_2ul (&(t[0]), &(t[1]), m[0].m[0], m[0].m[1]);
-	case 1: ularith_add_2ul_2ul (&(t[0]), &(t[1]), m[0].m[0], m[0].m[1]);
-	case 0: ;
-	}
+       /* inv7[i] = -1/i (mod 7) */
+      const unsigned long inv7[7] = {0,6,3,2,5,4,1};
+      unsigned long k;
+      /* We want a+km == 0 (mod 7), so k = -a*m^{-1} (mod 7) */
+      k = (inv7[m7] * a7) % 7UL;
+      ularith_mul_ul_ul_2ul (&(t[0]), &(t[1]), m[0].m[0], k);
+      t[1] += m[0].m[1] * k;
+      ularith_add_2ul_2ul (&(t[0]), &(t[1]), a[0], a[1]);
       
       /* Now t[1]:t[0] is divisible by 7 */
       ASSERT_EXPENSIVE (((t[1] % 7UL) * w_mod_7 + t[0] % 7UL) % 7UL == 0UL);
@@ -141,6 +135,48 @@ modredc15ul_div7 (residueredc15ul_t r, const residueredc15ul_t a,
   modredc15ul_sub (r, r, t, m);
   ASSERT_EXPENSIVE (modredc15ul_is0 (r, m));
 #endif
+  r[0] = t[0];
+  r[1] = t[1];
+  modredc15ul_clear (t, m);
+}
+
+
+void
+modredc15ul_div13 (residueredc15ul_t r, const residueredc15ul_t a, 
+		   const modulusredc15ul_t m)
+{
+  const unsigned long w_mod_13 = (sizeof (unsigned long) == 4) ? 9UL : 3UL;
+  const unsigned long a13 = ((a[1] % 13UL) * w_mod_13 + a[0] % 13UL) % 13UL;
+  /* inv13[i] = -1/i (mod 13) */
+  const unsigned long inv13[13] = {0, 12, 6, 4, 3, 5, 2, 11, 8, 10, 9, 7, 1}; 
+  unsigned long m13 = ((m[0].m[1] % 13UL) * w_mod_13 + m[0].m[0] % 13UL) % 13UL;
+  residueredc15ul_t t;
+  
+  ASSERT(m13 != 0UL);
+  
+  modredc15ul_init_noset0 (t, m);
+  
+  t[1] = a[1];
+  t[0] = a[0];
+  /* Make t[1]:t[0] divisible by 13 */
+  if (a13 != 0UL)
+    {
+      /* We want a+km == 0 (mod 13), so k = -a*m^{-1} (mod 13) */
+      m13 = (inv13[m13] * a13) % 13UL;
+      ularith_mul_ul_ul_2ul (&(t[0]), &(t[1]), m[0].m[0], m13);
+      t[1] += m[0].m[1] * m13;
+      ularith_add_2ul_2ul (&(t[0]), &(t[1]), a[0], a[1]);
+      
+      /* Now t[1]:t[0] is divisible by 13 */
+      ASSERT_EXPENSIVE (((t[1] % 13UL) * w_mod_13 + t[0] % 13UL) % 13UL == 0UL);
+    }
+  
+  t[1] = t[1] / 13UL;
+  if (sizeof (unsigned long) == 4)
+    t[0] *= 0xc4ec4ec5; /* 1/13 (mod 2^32) */
+  else
+    t[0] *= 0x4ec4ec4ec4ec4ec5; /* 1/13 (mod 2^64) */
+
   r[0] = t[0];
   r[1] = t[1];
   modredc15ul_clear (t, m);

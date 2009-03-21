@@ -110,39 +110,6 @@ modredc15ul_frommontgomery (residueredc15ul_t r, const residueredc15ul_t s,
   r[1] = t[3];
 }
 
-
-/* Compute 1/n (mod 2^wordsize) */
-MAYBE_UNUSED
-static inline unsigned long
-modredc15ul_invmodul (unsigned long n)
-{
-  unsigned long r;
-
-  ASSERT (n % 2UL != 0UL);
-  
-  /* Suggestion from PLM: initing the inverse to (3*n) XOR 2 gives the
-     correct inverse modulo 32, then 3 (for 32 bit) or 4 (for 64 bit) 
-     Newton iterations are enough. */
-  r = (3UL * n) ^ 2UL;
-  /* Newton iteration */
-  r = 2UL * r - (unsigned int) r * (unsigned int) r * (unsigned int) n;
-  r = 2UL * r - (unsigned int) r * (unsigned int) r * (unsigned int) n;
-  if (sizeof (unsigned long) == 4)
-    {
-      r = 2UL * r - r * r * n;
-    }
-  else
-    {
-      r = 2UL * r - (unsigned int) r * (unsigned int) r * (unsigned int) n;
-      r = 2UL * r - r * r * n;
-    }
-
-  ASSERT_EXPENSIVE (r * n == 1UL);
-
-  return r;
-}
-
-
 /* ================= Functions that are part of the API ================= */
 
 /* Some functions for integers of the same width as the modulus */
@@ -273,7 +240,7 @@ modredc15ul_intdivexact (modintredc15ul_t r, const modintredc15ul_t n,
       n1[1] >>= 1;
     }
   
-  invf = modredc15ul_invmodul (d1[0]);
+  invf = ularith_invmod (d1[0]);
   r0 = invf * n1[0];
   ularith_mul_ul_ul_2ul (&k0, &k1, r0, d1[0]);
   ularith_sub_2ul_2ul (&(n1[0]), &(n1[1]), k0, k1);
@@ -310,7 +277,7 @@ modredc15ul_initmod_uls (modulusredc15ul_t m, const modintredc15ul_t s)
   ASSERT (s[1] > 0UL);
   ASSERT (s[1] < (1UL << (LONG_BIT / 2)));
   modredc15ul_intset (m[0].m, s);
-  m[0].invm = -modredc15ul_invmodul (s[0]);
+  m[0].invm = -ularith_invmod (s[0]);
   m[0].one[0] = 0UL;
   m[0].one[1] = 1UL;
   for (i = 0; i < LONG_BIT; i++)
@@ -574,18 +541,38 @@ static inline void
 modredc15ul_sub (residueredc15ul_t r, const residueredc15ul_t a, 
 		 const residueredc15ul_t b, const modulusredc15ul_t m)
 {
-  unsigned long t1 = a[0], t2 = a[1];
-  
   ASSERT_EXPENSIVE (modredc15ul_intcmp (a, m[0].m) < 0);
   ASSERT_EXPENSIVE (modredc15ul_intcmp (b, m[0].m) < 0);
 
-  ularith_sub_2ul_2ul (&t1, &t2, b[0], b[1]);
-  
-  if (t2 > a[1] || (t2 == a[1] && t1 > a[0]))
-    ularith_add_2ul_2ul (&t1, &t2, m[0].m[0], m[0].m[1]);
-  
-  r[0] = t1;
-  r[1] = t2;
+#if (defined(__i386__) || defined(__x86_64__)) && defined(__GNUC__)
+  {
+    unsigned long s1 = 0, s2 = 0, t1 = a[0], t2 = a[1];
+    
+    __asm__ (
+	     "sub %4, %0\n\t"
+	     "sbb %5, %1\n\t"   /* r -= b */
+	     "cmovc %6, %2\n\t" /* If carry, s = m */
+	     "cmovc %7, %3\n"
+	     : "+&r" (t1), "+&r" (t2), "+&r" (s1), "+r" (s2)
+	     : "g" (b[0]), "g" (b[1]), "rm" (m[0].m[0]), "rm" (m[0].m[1])
+	     : "cc"
+	     );
+    ularith_add_2ul_2ul (&t1, &t2, s1, s2);
+    r[0] = t1;
+    r[1] = t2;
+  }
+#else
+  {
+    unsigned long t1 = a[0], t2 = a[1];
+    ularith_sub_2ul_2ul (&t1, &t2, b[0], b[1]);
+    
+    if (t2 > a[1] || (t2 == a[1] && t1 > a[0]))
+      ularith_add_2ul_2ul (&t1, &t2, m[0].m[0], m[0].m[1]);
+
+    r[0] = t1;
+    r[1] = t2;
+  }
+#endif
 }
 
 
@@ -671,29 +658,37 @@ modredc15ul_mul (residueredc15ul_t r, const residueredc15ul_t a,
 	  m[0].m[1], LONG_BIT, m[0].m[0]);
 #endif
   
-  ularith_mul_ul_ul_2ul (&(t[0]), &(t[1]), a[0], b[0]); /* t1:t0 <= (2^w-1)^2 */
-  k = t[0] * m[0].invm;
-  ularith_mul_ul_ul_2ul (&pl, &ph, k, m[0].m[0]);
+  /* Product of the two low words */
+  ularith_mul_ul_ul_2ul (&(t[0]), &(t[1]), a[0], b[0]); /* t1:t0 = a[0]*b[0] <= W^2 - 2W + 1 */
+
+  /* One REDC step */
+  k = t[0] * m[0].invm; /* k <= W-1 */
+  ularith_mul_ul_ul_2ul (&pl, &ph, k, m[0].m[0]); /* ph:pl = k*m[0] <= W^2 - 2W + 1 */
+  /* t[0] + pl == 0 (mod W) */
   if (pl != 0UL)
-    ph++; /* ph <= w-1 */
+    ph++; /* ph <= W-1 */
   t[2] = 0UL;
-  ularith_add_ul_2ul (&(t[1]), &(t[2]), ph); /* t2:t1:t0 <= 2*2^(2w) - 2^w + 1 */
-  ularith_mul_ul_ul_2ul (&pl, &ph, k, m[0].m[1]); /* ph:pl <= 2^(3w/2) - 2^w - 2^(w/2) + 1 */
-  ularith_add_2ul_2ul (&(t[1]), &(t[2]), pl, ph); /* t2:t1:t0 <= 2*2^(2w) - 2*2^w + 2 + 2^(3w/2) - 2^(w/2) */
-  ularith_mul_ul_ul_2ul (&pl, &ph, a[1], b[0]);
-  ularith_add_2ul_2ul (&(t[1]), &(t[2]), pl, ph);
-  ularith_mul_ul_ul_2ul (&pl, &ph, a[0], b[1]);
-  ularith_add_2ul_2ul (&(t[1]), &(t[2]), pl, ph);
+  ularith_add_ul_2ul (&(t[1]), &(t[2]), ph); /* t2:t1:0 = a[0]*b[0] + k*m[0] <= 2*W^2 - 4W + 2, so
+                                                t2:t1 = (a[0]*b[0] + k*m[0]) / W <= 2*W - 4 */
+  ularith_mul_ul_ul_2ul (&pl, &ph, k, m[0].m[1]); /* ph:pl <= (W^(1/2)-1)*(W-1) = W^(3/2) - W - W^(1/2) + 1 */
+  ularith_add_2ul_2ul (&(t[1]), &(t[2]), pl, ph); /* t2:t1 <= W^(3/2) + W - W^(1/2) - 3 */
+
+  /* Products of one low and one high word  */
+  ularith_mul_ul_ul_2ul (&pl, &ph, a[1], b[0]);   /* ph:pl <= W^(3/2) - W - W^(1/2) + 1 */
+  ularith_add_2ul_2ul (&(t[1]), &(t[2]), pl, ph); /* t2:t1 <= 2W^(3/2) - 2W^(1/2) - 2 */
+  ularith_mul_ul_ul_2ul (&pl, &ph, a[0], b[1]);   /* ph:pl <= W^(3/2) - W - W^(1/2) + 1 */
+  ularith_add_2ul_2ul (&(t[1]), &(t[2]), pl, ph); /* t2:t1 <= 3W^(3/2) - 3W^(1/2) - W - 1 */
   t[3] = 0UL;
-  pl = a[1] * b[1];
-  ularith_add_ul_2ul (&(t[2]), &(t[3]), pl);
+  pl = a[1] * b[1];                               /* pl <= (W^(1/2)-1)^2 = W - 2W^(1/2) + 1 */
+  ularith_add_ul_2ul (&(t[2]), &(t[3]), pl);      /* t3:t2:t1 <= W^2 + W^(3/2) - 3W^(1/2) - 1 */
   k = t[1] * m[0].invm;
-  ularith_mul_ul_ul_2ul (&pl, &ph, k, m[0].m[0]);
+  ularith_mul_ul_ul_2ul (&pl, &ph, k, m[0].m[0]); /* ph:pl <= W^2 - 2W + 1 */
   if (pl != 0UL)
     ph++;
-  ularith_add_ul_2ul (&(t[2]), &(t[3]), ph);
-  ularith_mul_ul_ul_2ul (&pl, &ph, k, m[0].m[1]);
-  ularith_add_2ul_2ul (&(t[2]), &(t[3]), pl, ph);
+  ularith_add_ul_2ul (&(t[2]), &(t[3]), ph);      /* t3:t2:t1 <= 2W^2 + W^(3/2) - 2W - 3W^(1/2), t1 = 0 so
+						     t3:t2 <= 2W + W^(1/2) - 3 */
+  ularith_mul_ul_ul_2ul (&pl, &ph, k, m[0].m[1]); /* ph:pl <= W^(3/2) - W - W^(1/2) + 1 */
+  ularith_add_2ul_2ul (&(t[2]), &(t[3]), pl, ph); /* t3:t2 <= W^(3/2) + W - 2 */
 
   /* Result may be larger than m, but is < 2*m */
 
@@ -729,6 +724,8 @@ void modredc15ul_div3 (residueredc15ul_t, const residueredc15ul_t,
 		       const modulusredc15ul_t);
 void modredc15ul_div7 (residueredc15ul_t, const residueredc15ul_t, 
 		       const modulusredc15ul_t);
+void modredc15ul_div13 (residueredc15ul_t, const residueredc15ul_t, 
+		        const modulusredc15ul_t);
 void modredc15ul_gcd (modintredc15ul_t, const residueredc15ul_t, 
 		      const modulusredc15ul_t);
 void modredc15ul_pow_ul (residueredc15ul_t, const residueredc15ul_t, 

@@ -84,7 +84,89 @@ mod_setint_mpz (mpz_t r, const modint_t s)
 
 
 static void
-test_mod_div3(const modint_t la, const modint_t lm)
+test_mod_set_uls(const modint_t la, const modint_t lm)
+{
+  modulus_t m;
+  residue_t r;
+  modint_t s;
+  mpz_t mm, ma, mr, ms;
+
+  mod_initmod_uls (m, lm);
+  mod_init (r, m);
+  mod_set_uls (r, la, m);
+  mod_get_uls (s, r, m);
+
+  mpz_init (mm);
+  mpz_init (ma);
+  mpz_init (mr);
+  mpz_init (ms);
+  mod_setint_mpz (mm, lm);
+  mod_setint_mpz (ma, la);
+  mpz_mod (mr, ma, mm);
+  mod_setint_mpz (ms, s);
+
+  if (mpz_cmp (mr, ms) != 0)
+    {
+      gmp_printf ("mod_set(%Zd, %Zd) wrong (%Zd), GMP has %Zd\n", 
+	          ma, mm, ms, mr);
+      abort ();
+    }
+  mpz_clear (mm);
+  mpz_clear (ma);
+  mpz_clear (mr);
+  mpz_clear (ms);
+  mod_clear (r, m);
+  mod_clearmod (m);
+}
+
+
+void
+tests_mod_set_uls(int iter)
+{
+  modint_t tm, tr;
+  int i, j;
+  
+  /* Test large moduli */
+  for (i = 0; i < MOD_SIZE; i++)
+    tm[i] = ULONG_MAX;
+  limit_modulus (tm);
+
+  for (i = 1; i < 100; i++) /* Test i/2 and (m-i)/2 for i=0, ..., 99 */
+    {
+      mod_intset_ul (tr, (unsigned long) i);
+      test_mod_set_uls (tr, tm);
+      mod_intset (tr, tm);
+      tr[0] -= i;
+      test_mod_set_uls (tr, tm);
+    }
+  
+  for (i = 0; i < iter; i++)
+    {
+      random_modulus (tm);
+
+      /* Test 0, 1 and -1 residue */
+      mod_intset_ul (tr, 0UL);
+      test_mod_set_uls (tr, tm);
+      mod_intset_ul (tr, 1UL);
+      test_mod_set_uls (tr, tm);
+      mod_intset (tr, tm);
+      tr[0]--;
+      test_mod_set_uls (tr, tm);
+
+      /* Test 10 random residues */
+      for (j = 0; j < 10; j++)
+	{
+	  int k;
+	  for (k = 0; k < MOD_SIZE; k++)
+	    tr[k] = (unsigned long) (random() + (RAND_MAX + 1UL) * random());
+	  test_mod_set_uls (tr, tm);
+	}
+    }
+}
+
+
+static void
+test_mod_divn(const modint_t la, const modint_t lm, const unsigned long n)
 {
   modulus_t m;
   residue_t r, s, t;
@@ -94,13 +176,22 @@ test_mod_div3(const modint_t la, const modint_t lm)
   mod_init (s, m);
   mod_init (t, m);
   mod_set_uls (r, la, m);
-  mod_div3 (s, r, m);
-  mod_add (t, s, s, m);
-  mod_add (t, t, s, m);
+  if (n == 2UL)
+    mod_div2 (s, r, m);   /* s = r/n */
+  else if (n == 3UL)
+    mod_div3 (s, r, m);
+  else if (n == 7UL)
+    mod_div7 (s, r, m);
+  else if (n == 13UL)
+    mod_div13 (s, r, m);
+  
+  mod_set_ul (t, n, m);
+  mod_mul (t, t, s, m); /* t = s*n = r */
+  
   if (!mod_equal (r, t, m))
     {
-      printf ("mod_div3(%lu, %lu) wrong (%lu)\n", 
-	      la[0], lm[0], mod_get_ul (s, m));
+      printf ("mod_div%lu(%lu, %lu) wrong (%lu)\n", 
+	      n, la[0], lm[0], mod_get_ul (s, m));
       abort ();
     }
   mod_clear (r, m);
@@ -110,44 +201,49 @@ test_mod_div3(const modint_t la, const modint_t lm)
 
 
 void
-tests_mod_div3(int iter)
+tests_mod_divn(const int iter, const unsigned long n)
 {
   modint_t tm, tr;
   int i, j;
+  mpz_t mod;
+
+  mpz_init (mod);
   
   /* Test large moduli */
   for (i = 0; i < MOD_SIZE; i++)
     tm[i] = ULONG_MAX;
   limit_modulus (tm);
-  tm[0] = ULONG_MAX - 2UL;
+  mod_setint_mpz (mod, tm);
+  while (mpz_divisible_ui_p (mod, n))
+    {
+      tm[0] = ULONG_MAX - 2UL;
+      mod_setint_mpz (mod, tm);
+    }
 
-  for (i = 0; i < 100; i++) /* Test i/3 and (m-i)/3 for i=0, ..., 99 */
+  for (i = 0; i < 100; i++) /* Test i/n and (m-i)/n for i=0, ..., 99 */
     {
       mod_intset_ul (tr, (unsigned long) i);
-      test_mod_div3 (tr, tm);
+      test_mod_divn (tr, tm, n);
       mod_intset (tr, tm);
       tr[0] -= i;
-      test_mod_div3 (tr, tm);
+      test_mod_divn (tr, tm, n);
     }
   
   for (i = 0; i < iter; i++)
     {
-      unsigned long mod3;
       do {
 	random_modulus (tm);
-	mod3 = tm[0] % 3UL;
-	for (j = 1; j < MOD_SIZE; j++)
-	  mod3 = (mod3 + tm[j] % 3UL) % 3UL;
-      } while (mod3 == 0UL);
+	mod_setint_mpz (mod, tm);
+      } while (mpz_divisible_ui_p (mod, n));
 
       /* Test 0, 1 and -1 residue */
       mod_intset_ul (tr, 0UL);
-      test_mod_div3 (tr, tm);
+      test_mod_divn (tr, tm, n);
       mod_intset_ul (tr, 1UL);
-      test_mod_div3 (tr, tm);
+      test_mod_divn (tr, tm, n);
       mod_intset (tr, tm);
       tr[0]--;
-      test_mod_div3 (tr, tm);
+      test_mod_divn (tr, tm, n);
 
       /* Test 10 random residues */
       for (j = 0; j < 10; j++)
@@ -155,9 +251,10 @@ tests_mod_div3(int iter)
 	  int k;
 	  for (k = 0; k < MOD_SIZE; k++)
 	    tr[k] = (unsigned long) (random() + (RAND_MAX + 1UL) * random());
-	  test_mod_div3 (tr, tm);
+	  test_mod_divn (tr, tm, n);
 	}
     }
+  mpz_clear (mod);
 }
 
 
@@ -516,8 +613,16 @@ int main(int argc, char **argv)
   if (argc > 1 && argv[1][0] == '-' && argv[1][1] == 'r')
     srandom (time (NULL)); /* Seed RNG with nr of seconds since epoch */
 
+  printf ("Testing mod_set_uls()\n");
+  tests_mod_set_uls (iter);
+  printf ("Testing mod_div2()\n");
+  tests_mod_divn (iter, 2);
   printf ("Testing mod_div3()\n");
-  tests_mod_div3 (iter);
+  tests_mod_divn (iter, 3);
+  printf ("Testing mod_div7()\n");
+  tests_mod_divn (iter, 7);
+  printf ("Testing mod_div13()\n");
+  tests_mod_divn (iter, 13);
   printf ("Testing mod_gcd()\n");
   tests_mod_gcd (iter);
   printf ("Testing mod_pow_ul()\n");

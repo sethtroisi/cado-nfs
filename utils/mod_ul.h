@@ -693,11 +693,26 @@ MAYBE_UNUSED
 static inline void
 modul_div2 (residueul_t r, const residueul_t a, const modulusul_t m)
 {
+#if (defined(__i386__) || defined(__x86_64__)) && defined(__GNUC__)
+  unsigned long s = a[0], t = m[0];
+  ASSERT_EXPENSIVE (m[0] % 2UL != 0UL);
+
+  __asm__(
+	  "add %1, %0\n\t"
+	  "rcr $1, %0\n\t"
+	  "shr $1, %1\n\t"
+	  "cmovnc %1, %0\n"
+	  : "+&r" (t), "+&r" (s)
+	  : : "cc"
+	  );
+  r[0] = t;
+#else
   ASSERT_EXPENSIVE (m[0] % 2UL != 0UL);
   if (a[0] % 2UL == 0UL)
     r[0] = a[0] / 2UL;
   else
     r[0] = a[0] / 2UL + m[0] / 2UL + 1UL;
+#endif
 }
 
 
@@ -720,6 +735,7 @@ modul_finished (const residueul_t r, const modulusul_t m)
 /* prototypes of non-inline functions */
 void modul_div3 (residueul_t, const residueul_t, const modulusul_t);
 void modul_div7 (residueul_t, const residueul_t, const modulusul_t);
+void modul_div13 (residueul_t, const residueul_t, const modulusul_t);
 void modul_gcd (modintul_t, const residueul_t, const modulusul_t);
 void modul_pow_ul (residueul_t, const residueul_t, const unsigned long, 
 		   const modulusul_t);

@@ -567,8 +567,7 @@ modredcul_mul (residueredcul_t r, const residueredcul_t a,
   ASSERT_EXPENSIVE (m[0].m % 2 != 0);
   ASSERT_EXPENSIVE (a[0] < m[0].m && b[0] < m[0].m);
 #if defined(MODTRACE)
-  printf ("(%lu * %lu / 2^%ld) %% %lu", 
-          a[0], b[0], 8 * sizeof(unsigned long), m[0].m);
+  printf ("(%lu * %lu / 2^%ld) %% %lu", a[0], b[0], LONG_BIT, m[0].m);
 #endif
   
   ularith_mul_ul_ul_2ul (&plow, &phigh, a[0], b[0]);
@@ -585,11 +584,26 @@ static inline void
 modredcul_div2 (residueredcul_t r, const residueredcul_t a, 
                 const modulusredcul_t m)
 {
+#if (defined(__i386__) || defined(__x86_64__)) && defined(__GNUC__)
+  unsigned long s = a[0], t = m[0].m;
+  ASSERT_EXPENSIVE (m[0].m % 2UL != 0UL);
+
+  __asm__(
+	  "add %1, %0\n\t"
+	  "rcr $1, %0\n\t"
+	  "shr $1, %1\n\t"
+	  "cmovnc %1, %0\n"
+	  : "+&r" (t), "+&r" (s)
+	  : : "cc"
+	  );
+  r[0] = t;
+#else
   ASSERT_EXPENSIVE (m[0].m % 2UL != 0UL);
   if (a[0] % 2UL == 0UL)
     r[0] = a[0] / 2UL;
   else
     r[0] = a[0] / 2UL + m[0].m / 2UL + 1UL;
+#endif
 }
 
 
@@ -614,6 +628,8 @@ void modredcul_div3 (residueredcul_t, const residueredcul_t,
                      const modulusredcul_t);
 void modredcul_div7 (residueredcul_t, const residueredcul_t, 
                      const modulusredcul_t);
+void modredcul_div13 (residueredcul_t, const residueredcul_t, 
+                      const modulusredcul_t);
 void modredcul_gcd (modintredcul_t, const residueredcul_t, 
                     const modulusredcul_t);
 void modredcul_pow_ul (residueredcul_t, const residueredcul_t, 
