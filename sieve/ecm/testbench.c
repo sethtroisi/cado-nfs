@@ -23,21 +23,28 @@ void print_help (char *programname)
   printf ("-pm1 <B1> <B2>      Run P-1 with B1, B2\n");
   printf ("-pp1 <B1> <B2>      Run P+1 with B1, B2\n");
   printf ("-ecm <B1> <B2> <s>  Run ECM with B1, B2 and sigma s\n");
-  printf ("-m12     Use Montgomery parameterization with 12 torsion for ECM\n");
+  printf ("-strat   Use the facul default strategy. Don't use with -pm1, -pp1, -ecm\n");
+  printf ("-fbb <n> Use <n> as factor base bound, e.g. for primality checks\n");
+  printf ("-lpb <n> Use <n> as large prime bound, e.g. for early abort\n");
   printf ("-p       Try only primes in [<start>, <stop>] (default: all odd "
 	  "numbers)\n");
   printf ("-v       More verbose output. Once: print parameters. Twice: print "
 	  "residues\n");
   printf ("-vf      Print factors that are found\n");
-  printf ("-cof <n> Multiply each number to test by <num> before calling\n"
-	  "         factoring routine\n");
+  printf ("-cof <n> Multiply each number to test by <num> before calling facul.\n"
+	  "         NOTE: facul does not report input numbers as factors,\n"
+	  "         with -p you MUST use -cof or no factors will be found\n");
   printf ("-m <n>   Choose modulus, do separate counts of p %% modulus\n");
+  printf ("-inp <f> Read decimal numbers to factor from file <f>\n");
+  printf ("-inpraw <f>  Read numbers in GMP raw format from file <f>\n");
+  printf ("-inpstop <n> Stop after reading <n> numbers\n");
 }
 
 int main (int argc, char **argv)
 {
-  unsigned long start, stop, i, mod = 0UL;
+  unsigned long start, stop, i, mod = 0UL, inpstop = ULONG_MAX;
   unsigned long hits = 0, hits_input = 0, total = 0;
+  unsigned long fbb = 0, lpb = ~(0UL);
   char *inp_fn = NULL;
   FILE *inp;
   struct rusage usage;
@@ -45,11 +52,11 @@ int main (int argc, char **argv)
   facul_strategy_t *strategy;
   primegen pg[1];
   int nr_methods = 0;
-  int parameterization = 0;
   int only_primes = 0, verbose = 0;
   int printfactors = 0;
   int inp_raw = 0;
   int got_usage;
+  int strat = 0;
   unsigned long *primmod = NULL, *hitsmod = NULL;
   unsigned long f[16];
   int facul_code;
@@ -102,25 +109,40 @@ int main (int argc, char **argv)
       else if (argc > 4 && strcmp (argv[1], "-ecm") == 0 && 
 	       nr_methods < MAX_METHODS)
 	{
-	  unsigned long B1, B2, sigma;
+	  unsigned long B1, B2;
+	  long sigma;
 	  B1 = strtoul (argv[2], NULL, 10);
 	  B2 = strtoul (argv[3], NULL, 10);
-	  sigma = strtoul (argv[4], NULL, 10);
+	  sigma = strtol (argv[4], NULL, 10);
 	  strategy->methods[nr_methods].method = EC_METHOD;
 	  strategy->methods[nr_methods].plan = malloc (sizeof (ecm_plan_t));
-	  ecm_make_plan (strategy->methods[nr_methods].plan, B1, B2, BRENT12, 
-			 sigma, (verbose >= 2));
+	  ecm_make_plan (strategy->methods[nr_methods].plan, B1, B2, 
+                         (sigma > 0) ? BRENT12 : MONTY12, labs (sigma), 
+                         (verbose >= 2));
 	  nr_methods++;
 	  argc -= 4;
 	  argv += 4;
 	}
-      else if (argc > 1 && strcmp (argv[1], "-m12") == 0)
-	{
-	  parameterization = 1;
-	  argc--;
-	  argv++;
+      else if (argc > 1 && strcmp (argv[1], "-strat") == 0 && 
+	       nr_methods == 0)
+        {
+	  strat = 1;
+	  argc -= 1;
+	  argv += 1;
 	}
-      else if (argc > 1 && strcmp (argv[1], "-p") == 0)
+      else if (argc > 2 && strcmp (argv[1], "-fbb") == 0)
+	{
+	  fbb = strtoul (argv[2], NULL, 10);
+	  argc -= 2;
+	  argv += 2;
+	}
+      else if (argc > 2 && strcmp (argv[1], "-lpb") == 0)
+	{
+	  lpb = strtoul (argv[2], NULL, 10);
+	  argc -= 2;
+	  argv += 2;
+	}
+     else if (argc > 1 && strcmp (argv[1], "-p") == 0)
 	{
 	  only_primes = 1;
 	  argc -= 1;
@@ -137,6 +159,12 @@ int main (int argc, char **argv)
 	  printfactors = 1;
 	  argc -= 1;
 	  argv += 1;
+	}
+      else if (argc > 2 && strcmp (argv[1], "-inpstop") == 0)
+	{
+	  inpstop = strtoul (argv[2], NULL, 10);
+	  argc -= 2;
+	  argv += 2;
 	}
       else if (argc > 2 && strcmp (argv[1], "-m") == 0)
 	{
@@ -174,95 +202,109 @@ int main (int argc, char **argv)
         }
     }
   
-  printf ("Strategy has %d methods\n", nr_methods);
-  strategy->methods[nr_methods].method = 0;
+  if (strat && nr_methods != 0)
+    {
+      printf ("Don't use -strat with -pm1, -pp1 or -ecm\n");
+      exit (EXIT_FAILURE);
+    }
+
+  if (strat)
+    {
+      facul_clear_strategy (strategy);
+      strategy = facul_make_strategy (15, fbb, (lpb == 0) ? 0 : 1UL << lpb);
+    }
+  else
+    {
+      printf ("Strategy has %d methods\n", nr_methods);
+      strategy->methods[nr_methods].method = 0;
+    }
 
   if (inp_fn == NULL)
-  {
+    {
       if (argc < 3)
-      {
+	{
 	  print_help (argv[0]);
 	  return 1;
-      }
+	}
       
       /* Get range to test */
       start = strtoul (argv[1], NULL, 10);
       if (start % 2UL == 0UL)
-	  start++;
+	start++;
       stop = strtoul (argv[2], NULL, 10);
-
+      
       if (only_primes)
-      {
+	{
 	  primegen_init (pg);
 	  primegen_skipto (pg, start);
 	  i = primegen_next (pg);
-      }
+	}
       else
-	  i = start;
+	i = start;
       
       /* The main loop */
       while (i <= stop)
-      {
+	{
 	  if (mod > 0)
-	      primmod[i % mod]++;
+	    primmod[i % mod]++;
 	  
 	  total++;
 	  mpz_mul_ui (N, cof, i);
 	  facul_code = facul (f, N, strategy);
 	  
 	  if (facul_code > 0)
-	  {
+	    {
 	      hits++;
 	      if (mod > 0)
-		  hitsmod[i % mod]++;
-	  }
+		hitsmod[i % mod]++;
+	    }
 	  
 	  if (printfactors && facul_code > 0)
-	  {
+	    {
 	      int j;
 	      for (j = 0; j < facul_code; j++)
-            printf ("%lu ", f[j]);
-          printf ("\n");
-	  }
+		printf ("%lu ", f[j]);
+	      printf ("\n");
+	    }
 	  
 	  if (only_primes)
-	      i = primegen_next (pg);
+	    i = primegen_next (pg);
 	  else
-	      i += 2;
-      }
+	    i += 2;
+	}
   } else {
-      inp = fopen (inp_fn, "r");
-      if (inp == NULL)
+    inp = fopen (inp_fn, "r");
+    if (inp == NULL)
       {
-	  printf ("Could not open %s\n", inp_fn);
-	  exit (EXIT_FAILURE);
+	printf ("Could not open %s\n", inp_fn);
+	exit (EXIT_FAILURE);
       }
 
-      /* Read lines from inp */
-      while (!feof(inp))
+    /* Read lines from inp */
+    while (!feof(inp) && inpstop-- > 0)
       {
-          if (inp_raw)
-            mpz_inp_raw (N, inp);
-          else
-	    mpz_inp_str (N, inp, 0);
-	  if (mpz_sgn (N) <= 0)
-	      continue;
-	  mpz_mul (N, N, cof);
-	  total++;
-	  facul_code = facul (f, N, strategy);
-	  
- 	  if (facul_code > 0)
-	      hits++;
-	  
-	  if (printfactors && facul_code > 0)
+	if (inp_raw)
+	  mpz_inp_raw (N, inp);
+	else
+	  mpz_inp_str (N, inp, 0);
+	if (mpz_sgn (N) <= 0)
+	  continue;
+	mpz_mul (N, N, cof);
+	total++;
+	facul_code = facul (f, N, strategy);
+	
+	if (facul_code > 0)
+	  hits++;
+	
+	if (printfactors && facul_code > 0)
 	  {
-	      int j;
-	      for (j = 0; j < facul_code; j++)
-            printf ("%lu ", f[j]);
-          printf ("\n");
+	    int j;
+	    for (j = 0; j < facul_code; j++)
+	      printf ("%lu ", f[j]);
+	    printf ("\n");
 	  }
       }
-      fclose (inp);
+    fclose (inp);
   }
   
 

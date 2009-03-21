@@ -1,3 +1,7 @@
+vecdiv (a,b) = {
+  vector(min(length(a), length(b)),i,a[i]/b[i])
+}
+
 ecmtorsion12(n,p) = {
   local (t2, a, A, B, u, c, pnt, nmod2);
 
@@ -13,7 +17,8 @@ ecmtorsion12(n,p) = {
     c = ellinit([Mod(0,p),Mod(0,p),Mod(0,p),Mod(-12,p),Mod(0,p)]);
     nmod2 = n % 2;
     pnt = ellpow (c, [Mod(-2,p), Mod(4,p)], (n - nmod2) / 2);
-    if (nmod2, pnt = elladd (c, pnt, [0, 0]));
+    if (nmod2, pnt = elladd (c, pnt, [Mod(0, p), Mod(0, p)]));
+    print ("Resulting point on v^2=u^3-12*u : ", pnt);
     u = pnt[1];
   );
 
@@ -39,6 +44,44 @@ ecmtorsion12(n,p) = {
     return(0);
   );
 /* print("u = ", u, ", t^2 = ", t2, ", a = ", a, ", A = ", A, ", B = ", B); */
+  E = ellinit ([0, B*A, 0, B^2, 0]);
+}
+
+
+ecmtorsion12_Q(n) = {
+  local (t2, a, A, B, u, c, pnt, nmod2);
+
+  c = ellinit([0,0,0,-12,0]);
+  nmod2 = n % 2;
+  pnt = ellpow (c, [-2, 4], (n - nmod2) / 2);
+  if (nmod2, pnt = elladd (c, pnt, [0, 0]));
+  print ("Resulting point on v^2=u^3-12*u : ", pnt);
+  u = pnt[1];
+
+  if (u == 0, 
+    print ("u = ", u);
+    return(0);
+  );
+  t2 = (u^2 - 12)/(4*u);
+  /* t2 = -3 ==> division by 0. t2 = 1 ==> a = 0 => division by 0.
+     t2 = -1 ==> a = -1 ==> A = 2, B = 0 */
+  if (t2 == -3 || t2 == 1 || t2 == -1,
+     print("t2 = ", t2);
+     return(0);
+  );
+  a = (t2 - 1)/(t2 + 3);
+  if (a == 0, return(0));
+  A = (-3*a^4 - 6*a^2 + 1)/(4*a^3);
+  if (A == 2 || A == -2, 
+    print ("A = ", A);
+    return(0);
+  );
+  B = (a^2 - 1)^2/(4*a^3);
+  if (B == 0, 
+    print ("B = ", B);
+    return(0);
+  );
+  print("u = ", u, ", t^2 = ", t2, ", a = ", a, ", A = ", A, ", B = ", B);
   E = ellinit ([0, B*A, 0, B^2, 0]);
 }
 

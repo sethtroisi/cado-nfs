@@ -59,13 +59,20 @@ facul_make_strategy (const int n, const unsigned long fbb,
   
   methods[2].method = EC_METHOD;
   methods[2].plan = malloc (sizeof (ecm_plan_t));
-  ecm_make_plan (methods[2].plan, 105, 3255, BRENT12, 10, 0);
+  ecm_make_plan (methods[2].plan, 105, 3255, MONTY12, 2, 0);
   
-  for (i = 3; i < n + 3; i++)
+  if (n > 0)
+    {
+      methods[3].method = EC_METHOD;
+      methods[3].plan = malloc (sizeof (ecm_plan_t));
+      ecm_make_plan (methods[3].plan, 315, 5355, BRENT12, 11, 0);
+    }
+
+  for (i = 4; i < n + 3; i++)
     {
       methods[i].method = EC_METHOD;
       methods[i].plan = malloc (sizeof (ecm_plan_t));
-      ecm_make_plan (methods[i].plan, 315, 5355, BRENT12, i + 8, 0);
+      ecm_make_plan (methods[i].plan, 315, 5355, MONTY12, i - 1, 0);
     }
 
   methods[n + 3].method = 0;

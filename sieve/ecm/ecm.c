@@ -96,8 +96,8 @@ ellM_double (ellM_point_t Q, const ellM_point_t P, const modulus_t m,
    0 if the result is point at infinity */
 
 static int
-ellW_double (residue_t x3, residue_t y3, residue_t x1, residue_t y1,
-	     residue_t a, const modulus_t m)
+ellW_double (residue_t x3, residue_t y3, const residue_t x1, 
+	     const residue_t y1, const residue_t a, const modulus_t m)
 {
   residue_t lambda, u, v;
 
@@ -163,7 +163,7 @@ ellM_add (ellM_point_t R, const ellM_point_t P, const ellM_point_t Q,
   mod_mul (w, w, w, m);
   mod_mul (v, v, v, m);
   mod_set (u, D->x, m); /* save D->x */
-  mod_mul (R->x, w, D->z, m);
+  mod_mul (R->x, w, D->z, m); /* may overwrite D->x */
   mod_mul (R->z, u, v, m);
 
   mod_clear (w, m);
@@ -178,8 +178,9 @@ ellM_add (ellM_point_t R, const ellM_point_t P, const ellM_point_t Q,
    and 0 otherwise (resulting point is point at infinity) */
 
 static int
-ellW_add3 (residue_t x3, residue_t y3, residue_t x2, residue_t y2, 
-           residue_t x1, residue_t y1, residue_t a, const modulus_t m)
+ellW_add3 (residue_t x3, residue_t y3, const residue_t x2, const residue_t y2, 
+           const residue_t x1, const residue_t y1, const residue_t a, 
+	   const modulus_t m)
 {
   residue_t lambda, u, v;
   int r;
@@ -189,15 +190,25 @@ ellW_add3 (residue_t x3, residue_t y3, residue_t x2, residue_t y2,
 
   mod_sub (u, y2, y1, m);
   mod_sub (v, x2, x1, m);
-  r = mod_inv (v, v, m);
-  if (r == 0)
+  if (mod_inv (v, v, m) == 0)
   {
       /* Maybe we were trying to add two identical points? If so,
          use the ellW_double() function instead */
       if (mod_equal (x1, x2, m) && mod_equal (y1, y2, m))
 	  r = ellW_double (x3, y3, x1, y1, a, m);
-      else
-	  r = 0; /* No, the points were negatives of each other */
+      else 
+	{
+	  /* Or maybe the points are negatives of each other? */
+	  mod_neg (u, y1, m);
+	  if (mod_equal (x1, x2, m) && mod_equal (u, y2, m))
+	    r = 0; /* Signal point at infinity */
+	  else
+	    {
+	      /* Neither identical, nor negatives (mod m). Looks like we
+		 found a proper factor. FIXME: What do we do with it? */
+	      r = 0;
+	    }
+	}
   }
   else
   {
@@ -453,7 +464,8 @@ ellM_interpret_bytecode (ellM_point_t P, const char *code,
 
 
 /* Produces curve in Montgomery form from sigma value.
-   Return 1 if it worked, 0 if a modular inverse failed */
+   Return 1 if it worked, 0 if a modular inverse failed.
+   If modular inverse failed, return non-invertible value in x. */
 
 static int
 Brent12_curve_from_sigma (residue_t A, residue_t x, const residue_t sigma, 
@@ -494,8 +506,12 @@ Brent12_curve_from_sigma (residue_t A, residue_t x, const residue_t sigma,
   mod_mul (v, b, z, m);
 
   r = mod_inv (u, v, m);
-  if (r) /* non trivial gcd */
-  {
+  if (r == 0) /* non-trivial gcd */
+    {
+      mod_set (x, v, m);
+    }
+  else
+    {
       mod_mul (v, u, b, m);
       mod_mul (x, x, v, m);
       mod_mul (v, u, z, m);
@@ -503,7 +519,7 @@ Brent12_curve_from_sigma (residue_t A, residue_t x, const residue_t sigma,
       mod_set1 (u, m);
       mod_add (u, u, u, m);
       mod_sub (A, t, u, m);
-  }
+    }
 
   mod_clear (z, m);
   mod_clear (b, m);
@@ -516,73 +532,108 @@ Brent12_curve_from_sigma (residue_t A, residue_t x, const residue_t sigma,
 
 /* Produces curve in Montgomery parameterization from n value, using
    parameters for a torsion 12 curve as in Montgomery's thesis.
-   Return 1 if it worked, 0 if a modular inverse failed */
+   Return 1 if it worked, 0 if a modular inverse failed. 
+   If a modular inverse failed, the non-invertible value is stored in x. */
 
 static int
-Monty12_curve_from_k (residue_t A, residue_t x, unsigned long n, 
+Monty12_curve_from_k (residue_t A, residue_t x, const unsigned long n, 
 		      const modulus_t m)
 {
-  residue_t u, v, u0, v0, a, t2, one;
+  residue_t u, v, a, t2, one;
+  int r = 0;
   
-  /* We want a multiple of the point (-2,4) on the curve Y^2=X^3-12*X */
-  mod_init (a, m);
+  /* We want a multiple of the point (-2,4) on the curve Y^2=X^3-12*X.
+     The curve has 2-torsion with torsion point (0,0), but adding it 
+     does not seem to change the ECM curve we get out in the end. */
+  mod_init_noset0 (a, m);
   mod_init_noset0 (u, m);
   mod_init_noset0 (v, m);
-  mod_init (u0, m);
-  mod_init (v0, m);
   mod_init_noset0 (one, m);
-
-  mod_set1 (one, m);
-  mod_add (v, one, one, m);
-  mod_neg (u, v, m); /* u = -2 */
-  mod_add (v, v, v, m); /* v = 4 */
-  mod_sub (a, a, v, m);
-  mod_sub (a, a, v, m);
-  mod_sub (a, a, v, m); /* a = -12 */
-  ellW_mul_ui (u, v, n/2, a, m);
-  if (n % 2 == 1)
-    ellW_add3 (u, v, u, v, u0, v0, a, m);
-  /* Now we have a $u$ so that $u^3-12u$ is a square */
-  mod_clear (u0, m);
-  mod_clear (v0, m);
-  /* printf ("Monty12_curve_from_k: u = %lu\n", mod_get_ul (u)); */
   
-  mod_init_noset0 (t2, m);
-  mod_div2 (v, u, m);
-  mod_mul (t2, v, v, m); /* u^2/4 */
-  mod_sub (t2, t2, one, m);
-  mod_sub (t2, t2, one, m);
-  mod_sub (t2, t2, one, m); /* u^2/4 - 3 */
-  if (mod_inv (u, u, m) == 0)
-  {
-    fprintf (stderr, "Monty12_curve_from_k: u = 0\n");
-    mod_clear (t2, m);
-    mod_clear (v, m);
-    mod_clear (u, m);
-    mod_clear (a, m);
-    return 0;
-  }
-  mod_mul (t2, t2, u, m); /* t^2 = (u^2/4 - 3)/u = (u^2 - 12)/4u */
+  mod_set1 (one, m);
 
-  mod_sub (u, t2, one, m);
-  mod_add (v, t2, one, m);
-  mod_add (v, v, one, m);
-  mod_add (v, v, one, m);
-  mod_mul (a, u, v, m);
-  if (mod_inv (a, a, m) == 0) /* a  = 1/(uv), I want u/v and v/u */
-  {
-    fprintf (stderr, "Monty12_curve_from_k: (t^2 - 1)(t^2 + 3) = 0\n");
-    mod_clear (t2, m);
-    mod_clear (v, m);
-    mod_clear (u, m);
-    mod_clear (a, m);
-    return 0;
-  }
-  mod_mul (u, u, u, m); /* u^2 */
-  mod_mul (v, v, v, m); /* v^2 */
-  mod_mul (v, v, a, m); /* v^2 * (1/(uv)) = v/u = 1/a*/
-  mod_mul (a, a, u, m); /* u^2 * (1/(uv)) = u/v = a*/
+  if (n == 2)
+    {
+      mod_add (v, one, one, m);
+      mod_add (v, v, one, m);
+      mod_add (v, v, v, m);
+      mod_add (v, v, v, m);
+      mod_add (v, v, one, m); /* v = 13 */
+      mod_neg (v, v, m);
+      mod_div3 (v, v, m);      /* v = -13/3 = 1/a */
+      mod_add (a, one, one, m);
+      mod_add (a, a, one, m);
+      mod_neg (a, a, m);
+      mod_div13 (a, a, m);     /* a = -3/13 */
+    }
+  else if (n == 3)
+    {
+#if 0
+      mod_set_ul (v, 37UL, m);
+#else
+      /* Addition chain for 37. Slightly faster than the mod_set_ul(). 
+	 Maybe I should just pre-compute 2^(k*LONG_BIT) in Montgomery 
+	 form for fast conversion in mod_set_ul(). */
+      mod_add (v, one, one, m); /* v = 2 */
+      mod_add (v, v, v, m);     /* v = 4 */
+      mod_add (u, v, one, m);   /* u = 5 */
+      mod_add (v, v, v, m);     /* v = 8 */
+      mod_add (v, v, v, m);     /* v = 16 */
+      mod_add (v, v, v, m);     /* v = 32 */
+      mod_add (v, v, u, m);     /* v = 37 */
+#endif
+      mod_div2 (v, v, m);
+      mod_div2 (v, v, m);
+      mod_div7 (v, v, m);      /* v = 37/28 = 1/a */
+      /* TODO: Write a mod_div37()? Or a general mod_div_n() for small n? */
+      if (mod_inv (a, v, m) == 0)  /* a = 28/37 */
+        {
+	  mod_set (x, v, m);
+	  goto clear_and_exit;
+        }
+    }
+  else
+    {
+      mod_add (v, one, one, m);
+      mod_neg (u, v, m);    /* u = -2 */
+      mod_add (v, v, v, m); /* v = 4 */
+      mod_add (a, v, v, m);
+      mod_add (a, a, v, m);
+      mod_neg (a, a, m);    /* a = -12 */
+      ellW_mul_ui (u, v, n, a, m);
+      /* Now we have a $u$ so that $u^3-12u$ is a square */
+      /* printf ("Monty12_curve_from_k: u = %lu\n", mod_get_ul (u)); */
+      
+      mod_init_noset0 (t2, m);
+      mod_div2 (v, u, m);
+      mod_mul (t2, v, v, m); /* u^2/4 */
+      mod_sub (t2, t2, one, m);
+      mod_sub (t2, t2, one, m);
+      mod_sub (t2, t2, one, m); /* u^2/4 - 3 */
+      if (mod_inv (u, u, m) == 0)
+	{
+	  mod_set (x, u, m);
+	  goto clear_and_exit;
+	}
+      mod_mul (t2, t2, u, m); /* t^2 = (u^2/4 - 3)/u = (u^2 - 12)/4u */
+  
+      mod_sub (u, t2, one, m); /* u = t2 - 1 */
+      mod_add (v, t2, one, m);
+      mod_add (v, v, one, m);
+      mod_add (v, v, one, m);  /* v = t2 + 3 */
+      mod_mul (a, u, v, m);
+      if (mod_inv (a, a, m) == 0) /* a  = 1/(uv), I want u/v and v/u */
+	{
+	  mod_set (x, a, m);
+	  goto clear_and_exit;
+	}
+      mod_mul (u, u, u, m); /* u^2 */
+      mod_mul (v, v, v, m); /* v^2 */
+      mod_mul (v, v, a, m); /* v^2 * (1/(uv)) = v/u = 1/a */
+      mod_mul (a, a, u, m); /* u^2 * (1/(uv)) = u/v = a */
+    }
 
+  /* Here we have $a$ in a, $1/a$ in v */
   mod_mul (u, a, a, m); /* a^2 */
   mod_add (A, u, one, m);
   mod_add (A, A, one, m); /* a^2 + 2 */
@@ -600,13 +651,15 @@ Monty12_curve_from_k (residue_t A, residue_t x, unsigned long n,
   mod_add (x, x, one, m); /* 3*a^2 + 1 */
   mod_div2 (v, v, m); /* v = 1/(4a) */
   mod_mul (x, x, v, m);
-  
+  r = 1;
+
+clear_and_exit:  
   mod_clear (one, m);
   mod_clear (t2, m);
   mod_clear (v, m);
   mod_clear (u, m);
   mod_clear (a, m);
-  return 1;
+  return r;
 }
 
 
@@ -1019,6 +1072,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
     mod_set_ul (s, plan->sigma, m);
     if (Brent12_curve_from_sigma (A, P->x, s, m) == 0)
       {
+	mod_gcd (f, P->x, m);
 	mod_clear (u, m);
 	mod_clear (A, m);
 	mod_clear (b, m);
@@ -1034,6 +1088,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   {
     if (Monty12_curve_from_k (A, P->x, plan->sigma, m) == 0)
       {
+	mod_gcd (f, P->x, m);
 	mod_clear (u, m);
 	mod_clear (A, m);
 	mod_clear (b, m);
@@ -1082,7 +1137,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 
   mod_gcd (f, P[0].z, m); /* FIXME: skip this gcd and let the extgcd
 			     in stage 2 init find factors? */
-  if (bt == 0 && f[0] == 1UL && plan->B1 < plan->stage2.B2)
+  if (bt == 0 && mod_intcmp_ul(f, 1UL) == 0 && plan->B1 < plan->stage2.B2)
     {
       bt = ecm_stage2 (r, P, &(plan->stage2), b, m);
       mod_gcd (f, r, m);
