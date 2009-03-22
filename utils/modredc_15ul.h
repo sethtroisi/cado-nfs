@@ -396,7 +396,8 @@ modredc15ul_set_uls (residueredc15ul_t r, const modintredc15ul_t s,
       /* FIXME, slow and stupid */
       modintredc15ul_t t;
       modredc15ul_intset (t, m[0].m);
-      while (modredc15ul_intcmp (t, r) < 0)
+      while ((t[1] & (1UL << (LONG_BIT - 1))) == 0UL &&
+             modredc15ul_intcmp (t, r) < 0)
 	modredc15ul_intshl (t, t, 1);
       while (modredc15ul_intcmp (r, m[0].m) >= 0)
 	{
