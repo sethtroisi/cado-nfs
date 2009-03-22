@@ -36,22 +36,34 @@ int
 pm1 (modint_t f, const modulus_t m, const pm1_plan_t *plan)
 {
   residue_t x, t, X, one, two;
+  unsigned int i;
   
   mod_init_noset0 (x, m);
   mod_init_noset0 (one, m);
   mod_init_noset0 (two, m);
+  mod_init_noset0 (t, m);
   mod_set1 (one, m);
   mod_add (two, one, one, m);
   
-  /* Stage 1, a simple exponentiation */
+  /* Stage 1, a simple exponentiation ... */
   mod_2pow_mp (x, plan->E, plan->E_nrwords, m);
+  /* ... except for the backtracking part for the 2's in the exponent */
+  mod_set (t, x, m);
+  for (i = 0; i < plan->exp2; i++)
+    {
+      mod_mul (x, x, x, m);
+      if (mod_is1 (x, m))
+        {
+          mod_set (x, t, m);
+          break;
+        }
+    }
   
 #ifdef PARI
   printf ("E = B1_exponent (%u); x = Mod(2, %lu)^E; x == %lu /* PARI */\n", 
           plan->B1, mod_getmod_ul (m), mod_get_ul (x, m));
 #endif
   
-  mod_init_noset0 (t, m);
   mod_sub (t, x, one, m);
   mod_gcd (f, t, m);
   
@@ -64,7 +76,7 @@ pm1 (modint_t f, const modulus_t m, const pm1_plan_t *plan)
       return 0;
     }
   
-  /* Compute X = x + 1/x. TODO: Speed this up, use precomputed 2^{3w} % m? */
+  /* Compute X = x + 1/x */
   mod_init_noset0 (X, m);
   mod_inv (X, x, m);
   mod_add (X, X, x, m);

@@ -6,6 +6,7 @@ typedef struct {
   unsigned long *E;        /* The exponent for stage 1 */
   unsigned long E_mask;    /* Mask (one bit set) of MSB in E[E_nrwords-1] */
   unsigned int E_nrwords;  /* Number of words in exponent */
+  unsigned int exp2;       /* Exponent of 2 in stage 1 primes */
   unsigned int B1;
   stage2_plan_t stage2;
 } pm1_plan_t;

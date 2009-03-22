@@ -405,6 +405,7 @@ int
 pp1 (modint_t f, const modulus_t m, const pp1_plan_t *plan)
 {
   residue_t b, two, save, t;
+  unsigned int i;
 
   mod_init_noset0 (b, m);
   mod_init_noset0 (two, m);
@@ -418,6 +419,17 @@ pp1 (modint_t f, const modulus_t m, const pp1_plan_t *plan)
   mod_div7 (b, b, m);
   
   pp1_stage1 (b, plan->bc, plan->bc_len, two, m);
+  /* Backtracking for the 2's in the exponent */
+  mod_set (t, b, m);
+  for (i = 0; i < plan->exp2; i++)
+    {
+      pp1_double (b, b, two, m);
+      if (mod_equal (b, two, m))
+        {
+          mod_set (b, t, m);
+          break;
+        }
+    }
   mod_sub (t, b, two, m);
   mod_gcd (f, t, m);
 

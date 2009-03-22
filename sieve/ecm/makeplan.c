@@ -16,16 +16,22 @@ pm1_make_plan (pm1_plan_t *plan, const unsigned int B1, const unsigned int B2,
   size_t tmp_E_nrwords;
   
   /* Generate the exponent for stage 1 */
+  plan->exp2 = 0;
+  for (p = 1; p <= B1 / 2; p *= 2)
+    plan->exp2++;
+
   plan->B1 = B1;
   mpz_init (E);
   mpz_set_ui (E, 1UL);
-  for (p = 2; p <= B1; p = (unsigned int) getprime (p))
+  p = (unsigned int) getprime (p);
+  ASSERT (p == 3);
+  for ( ; p <= B1; p = (unsigned int) getprime (p))
     {
       unsigned long q;
-      /* FIXME: use p^k s.t. (p-1)p^(k-1) <= B1 instead, except for
-         p=2 because our base 2 is a QR for primes == 1 (mod 8) already */
-      for (q = p; q * p < B1; q *= p);
-      mpz_mul_ui (E, E, q);
+      /* Uses p^k s.t. (p-1)p^(k-1) <= B1, except for p=2 because our 
+         base 2 is a QR for primes == 1 (mod 8) already */
+      for (q = 1; q <= B1 / (p - 1); q *= p)
+        mpz_mul_ui (E, E, p);
     }
   
   if (verbose)
@@ -70,12 +76,18 @@ pp1_make_plan (pp1_plan_t *plan, const unsigned int B1, const unsigned int B2,
   const unsigned int compress = 1;
   
   /* Make bytecode for stage 1 */
+  plan->exp2 = 0;
+  for (p = 1; p <= B1 / 2; p *= 2)
+    plan->exp2++;
+
   plan->B1 = B1;
   bytecoder_init (compress);
-  for (p = 2; p <= B1; p = (unsigned int) getprime (p))
+  p = (unsigned int) getprime (p);
+  ASSERT (p == 3);
+  for ( ; p <= B1; p = (unsigned int) getprime (p))
     {
       unsigned long q;
-      for (q = p; q <= B1; q *= p)
+      for (q = 1; q <= B1 / p; q *= p)
 	prac_bytecode (p, addcost, doublecost);
     }
   bytecoder_flush ();
