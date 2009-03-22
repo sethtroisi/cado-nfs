@@ -544,17 +544,17 @@ modredc15ul_sub (residueredc15ul_t r, const residueredc15ul_t a,
   ASSERT_EXPENSIVE (modredc15ul_intcmp (a, m[0].m) < 0);
   ASSERT_EXPENSIVE (modredc15ul_intcmp (b, m[0].m) < 0);
 
-#if (defined(__i386__) || defined(__x86_64__)) && defined(__GNUC__)
+#if defined(__x86_64__) && defined(__GNUC__)
   {
-    unsigned long s1 = 0, s2 = 0, t1 = a[0], t2 = a[1];
+    unsigned long s1 = m[0].m[0], s2 = m[0].m[1], t1 = a[0], t2 = a[1];
     
     __asm__ (
-	     "sub %4, %0\n\t"
-	     "sbb %5, %1\n\t"   /* r -= b */
-	     "cmovc %6, %2\n\t" /* If carry, s = m */
-	     "cmovc %7, %3\n"
+	     "subq %4, %0\n\t"
+	     "sbbq %5, %1\n\t"    /* r -= b */
+	     "cmovncq %6, %2\n\t" /* If !carry, s = 0 */
+	     "cmovncq %6, %3\n"
 	     : "+&r" (t1), "+&r" (t2), "+&r" (s1), "+r" (s2)
-	     : "g" (b[0]), "g" (b[1]), "rm" (m[0].m[0]), "rm" (m[0].m[1])
+	     : "g" (b[0]), "g" (b[1]), "rm" (0UL)
 	     : "cc"
 	     );
     ularith_add_2ul_2ul (&t1, &t2, s1, s2);
