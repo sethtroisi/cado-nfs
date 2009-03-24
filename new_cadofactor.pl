@@ -1523,7 +1523,9 @@ sub do_polysel {
         }
     }
 
-    die "No polynomial was found in the given range!\n" unless defined $Emin;
+    die "No polynomial was found in the given range!\n".
+        "Please increase the range or the [kj]M value.\n"
+      unless defined $Emin;
 
     # Copy the best polynomial
     info "The best polynomial is from `".basename($best)."' (E = $Emin).\n";
