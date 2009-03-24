@@ -1402,12 +1402,20 @@ sub do_init {
 sub do_polysel {
     my $polysel_check = sub {
         my ($f) = @_;
-        warn "File `$f' not found.\n" unless -f $f;
+        if (! -f $f) {
+            warn "File `$f' not found.\n";
+            return;
+        }
 
         my %poly;
         open FILE, "< $f"
             or die "Cannot open `$f' for reading: $!.\n";
         while (<FILE>) {
+            if (/^No polynomial found/) {
+                warn "No polynomial in file `$f'.\n";
+                close FILE;
+                return;
+            }
             $poly{$1} = $2 if /^(\w+):\s*([\w\-.]+)$/;
         }
         close FILE;
@@ -1417,6 +1425,7 @@ sub do_polysel {
             if (!defined $poly{$_}) {
                 warn "File `$f' is incomplete (missing `$_'). Removing...\n";
                 unlink $f;
+                return;
             }
         }
         if ($poly{n} != $param{n}) {
