@@ -49,137 +49,137 @@ modredcul_inv (residue_t r, const residue_t A, const modulusredcul_t m)
      6,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,4,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,
      5,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0,4,0,1,0,2,0,1,0,3,0,1,0,2,0,1,0};
 #endif
-  unsigned long a, b = m[0].m, u, v;
+  unsigned long x = m[0].m, y, u, v;
   int t, lsh;
 
-  ASSERT (A[0] < b);
-  ASSERT (b & 1UL);
+  ASSERT (A[0] < x);
+  ASSERT (x & 1UL);
 
   if (A[0] == 0UL)
     return 0;
 
-  /* Let A = x*2^w, so we want the Montgomery representation of 1/x, 
-     which is 2^w/x. We start by getting a = x */ 
-  a = modredcul_get_ul (A, m);
+  /* Let A = a*2^w, so we want the Montgomery representation of 1/a, 
+     which is 2^w/a. We start by getting y = a */ 
+  y = modredcul_get_ul (A, m);
 
 #if PRECONDITION_T
-/* If the inverse exists, the value of t is bounded below by log_2(a+b) - 1.
+/* If the inverse exists, the value of t is bounded below by log_2(y+x) - 1.
    Proof.
    
-   Assume a is odd, gcd(a, b) = 1.
+   Assume y is odd, gcd(y, x) = 1.
    
-            { 0, a = b (implies a = b = 1)
-   t(a,b) = { t(a, b/2)+1, a != b, b even
-            { t(b, a), a > b, b odd
-            { t(a, b-a) , a < b, b odd
+            { 0, y = x (implies y = x = 1)
+   t(y,x) = { t(y, x/2)+1, y != x, x even
+            { t(x, y), y > x, x odd
+            { t(y, x-y) , y < x, x odd
             
-   The last case implies a != b-a and b-a even, so can be substituted by
-              t(a, (b-a)/2) + 1 , a < b, b odd
-   In case 2, a+b  ->  a + b/2 and a + b/2 >= (a+b)/2.
-   In case 4, a+b  ->  a + (b-a)/2 and a + (b-a)/2 = (a+b)/2.
-   So each time t increases by 1, a+b drops by at most half. The process 
-   stops when a = b = 1, i.e. a+b = 2. Hence, t >= log_2(a+b) - 1.
+   The last case implies y != x-y and x-y even, so can be substituted by
+              t(y, (x-y)/2) + 1 , y < x, x odd
+   In case 2, y+x  ->  y + x/2 and y + x/2 >= (y+x)/2.
+   In case 4, y+x  ->  y + (x-y)/2 and y + (x-y)/2 = (y+x)/2.
+   So each time t increases by 1, y+x drops by at most half. The process 
+   stops when y = x = 1, i.e. y+x = 2. Hence, t >= log_2(y+x) - 1.
 
-   Before the correction step, the result is 2^t/x, 
-   where t >= log_2(a+b)-1. We divide here by 2^(w-ceil(log_2(a+b)-1))
-   and init t = -ceil(log_2(a+b)-1), so that the result before the
-   correction step is 2^(w+t)/x with t >= 0. This way we can do the 
+   Before the correction step, the result is 2^t/a, 
+   where t >= log_2(y+x)-1. We divide here by 2^(w-ceil(log_2(y+x)-1))
+   and init t = -ceil(log_2(y+x)-1), so that the result before the
+   correction step is 2^(w+t)/a with t >= 0. This way we can do the 
    correction step via a single REDC of width t. */
 
-  ASSERT (b > 1UL);
-  t = clzl (b); /* Since a will change again, we estimate just 
-                    log_2(b)-1 <= log_2(a+b)-1. */
-  t++; /* Now 1 <= t = w - ceil(log_2(b)-1) <= 63 */
+  ASSERT (x > 1UL);
+  t = clzl (x); /* Since y will change again, we estimate just 
+                    log_2(x)-1 <= log_2(y+x)-1. */
+  t++; /* Now 1 <= t = w - ceil(log_2(x)-1) <= 63 */
   
   {
     unsigned long tlow, thigh;
     /* Necessarily t < LONG_BIT, so the shift is ok */
     /* Doing a left shift first and then a full REDC needs a modular addition
        at the end due to larger summands and thus is probably slower */
-    tlow = ((a * m[0].invm) & ((1UL << t) - 1UL)); /* tlow <= 2^t-1 */
+    tlow = ((y * m[0].invm) & ((1UL << t) - 1UL)); /* tlow <= 2^t-1 */
     ularith_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m); /* thigh:tlow <= m*(2^t-1) */
-    ularith_add_ul_2ul (&tlow, &thigh, a); /* thigh:tlow <= m*2^t-1 (since u<m) */
+    ularith_add_ul_2ul (&tlow, &thigh, y); /* thigh:tlow <= m*2^t-1 (since u<m) */
     /* Now the low t bits of tlow are 0 */
     ASSERT_EXPENSIVE ((tlow & ((1UL << t) - 1UL)) == 0UL);
     modredcul_shrd (&tlow, thigh, t);
-    a = tlow;
-    ASSERT_EXPENSIVE ((thigh >> t) == 0UL && a < m[0].m);
+    y = tlow;
+    ASSERT_EXPENSIVE ((thigh >> t) == 0UL && y < m[0].m);
   }
   t -= LONG_BIT;
 #else
-  /* Alternatively, we simply set a = x/2^w and t=0. The result before 
-     correction will be 2^(w+t)/x so we have to divide by t, which
+  /* Alternatively, we simply set y = a/2^w and t=0. The result before 
+     correction will be 2^(w+t)/a so we have to divide by t, which
      may be >64, so we may have to do a full and a variable width REDC. */
-  a = modredcul_get_ul (&a, m);
-  /* Now a = x/2^w */
+  y = modredcul_get_ul (&y, m);
+  /* Now y = a/2^w */
   t = 0;
 #endif
 
   u = 1UL; v = 0UL;
 
-  // make a odd
+  // make y odd
 #if LOOKUP_TRAILING_ZEROS
   do {
-    lsh = trailing_zeros [(unsigned char) a];
-    a >>= lsh;
+    lsh = trailing_zeros [(unsigned char) y];
+    y >>= lsh;
     t += lsh;
   } while (lsh == 8);
 #else
-  lsh = ctzl(a);
-  a >>= lsh;
+  lsh = ctzl(y);
+  y >>= lsh;
   t += lsh;
 #endif
   /* v <<= lsh; ??? v is 0 here */
 
-  // Here a and b are odd, and a < b
+  // Here y and x are odd, and y < x
   do {
-    /* Here, a and b are odd, 0 < a < b, u is odd and v is even */
+    /* Here, y and x are odd, 0 < y < x, u is odd and v is even */
     ASSERT ((u & 1UL) == 1UL && (v & 1UL) == 0UL);
     do {
-      b -= a; v += u;
+      x -= y; v += u;
 #if LOOKUP_TRAILING_ZEROS
       do {
-	lsh = trailing_zeros [(unsigned char) b];
-	b >>= lsh;
+	lsh = trailing_zeros [(unsigned char) x];
+	x >>= lsh;
 	t += lsh;
 	u <<= lsh;
       } while (lsh == 8);
 #else
-      lsh = ctzl(b);
+      lsh = ctzl(x);
       ASSERT_EXPENSIVE (lsh > 0);
-      b >>= lsh;
+      x >>= lsh;
       t += lsh;
       u <<= lsh;
 #endif
-    } while (b > a); /* ~50% branch taken :( */
-    /* Here, a and b are odd, 0 < b =< a, u is even and v is odd */
+    } while (x > y); /* ~50% branch taken :( */
+    /* Here, y and x are odd, 0 < x =< y, u is even and v is odd */
 
-    if (a == b)
+    if (y == x)
       break;
 
-    /* Here, a and b are odd, 0 < b < a, u is even and v is odd */
+    /* Here, y and x are odd, 0 < x < y, u is even and v is odd */
     ASSERT ((u & 1UL) == 0UL && (v & 1UL) == 1UL);
     do {
-      a -= b; u += v;
+      y -= x; u += v;
 #if LOOKUP_TRAILING_ZEROS
       do {
-	lsh = trailing_zeros [(unsigned char) a];
-	a >>= lsh;
+	lsh = trailing_zeros [(unsigned char) y];
+	y >>= lsh;
 	t += lsh;
 	v <<= lsh;
       } while (lsh == 8);
 #else
-      lsh = ctzl(a);
+      lsh = ctzl(y);
       ASSERT_EXPENSIVE (lsh > 0);
-      a >>= lsh;
+      y >>= lsh;
       t += lsh;
       v <<= lsh;
 #endif
-    } while (b < a); /* about 50% branch taken :( */
-    /* Here, a and b are odd, 0 < a =< b, u is odd and v is even */
-  } while (a != b);
+    } while (x < y); /* about 50% branch taken :( */
+    /* Here, y and x are odd, 0 < y =< x, u is odd and v is even */
+  } while (y != x);
   
-  if (a != 1UL) /* Non-trivial GCD */
+  if (y != 1UL) /* Non-trivial GCD */
     return 0;
 
   ASSERT (t >= 0);
@@ -191,9 +191,9 @@ modredcul_inv (residue_t r, const residue_t A, const modulusredcul_t m)
     t_hist[255]++;
 #endif
 
-  /* Here, u = 2^w * 2^t / x. We want 2^w / x. */
+  /* Here, u = 2^w * 2^t / a. We want 2^w / a. */
 
-  /* Here, the inverse of a is u/2^t mod b. To do the division by t,
+  /* Here, the inverse of y is u/2^t mod x. To do the division by t,
      we use a variable-width REDC. We want to add a multiple of m to u
      so that the low t bits of the sum are 0 and we can right-shift by t
      with impunity. */
