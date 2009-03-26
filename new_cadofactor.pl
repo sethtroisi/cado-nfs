@@ -905,7 +905,7 @@ sub distribute_task {
                 send_file($h, $_) for @{$opt->{files}};
                 next if grep !$m->{files}->{$_}, @{$opt->{files}};
 
-                while ($n--) {
+                while ($n-- > 0) {
                     my @r = find_hole($opt->{min}, $opt->{max},
                                       $opt->{len}, $ranges);
 
