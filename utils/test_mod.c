@@ -496,7 +496,7 @@ test_mod_inv (const modint_t la, const modint_t lm)
     {
       if (mpz_cmp (mt, mr) != 0)
 	{
-	  gmp_printf ("mod_inv(%Zd, %Zd) wrong (%lu), GMP has %lu\n", 
+	  gmp_printf ("mod_inv(%Zd, %Zd) wrong (%Zd), GMP has %Zd\n", 
 		      ma, mm, mt, mr);
 	  abort ();
 	}
