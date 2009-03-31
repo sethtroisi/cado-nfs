@@ -3,7 +3,6 @@ include $(TOP)/Makefile.common
 
 # We require the cado utils library
 MY_LFLAGS+=-L$(TOP)/utils
-MY_LXXFLAGS+=-L$(TOP)/utils
 MY_CFLAGS+=-I$(TOP)/utils
 
 binaries:=allsqrt replay merge purge freerel linalg characters duplicates \
@@ -41,7 +40,7 @@ checkdep: checkdep.o
 linalg: linalg.o gauss.o readmat.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils
 balance: balance.o readbuffer.o rowset_heap.o
-	$(CXX) $(MY_LXXFLAGS) -o $@ $^ -lutils -lgmp -lm
+	$(CXX) $(MY_LFLAGS) -o $@ $^ -lutils -lgmp -lm
 
 gauss.o: gauss.c
 	$(CC) $(MY_CFLAGS) -DMULTI_ROW=3 -DNO_MAIN $< -c -o $@

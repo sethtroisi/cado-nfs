@@ -2,16 +2,14 @@ TOP:=../..
 include $(TOP)/Makefile.common
 
 # We require the cado utils library
-MY_CFLAGS+=-I$(TOP)/utils -I..
+MY_CFLAGS+=-I..
 MY_CFLAGS+=-I $(TOP) -I $(TOP)/utils
 MY_CFLAGS+=-I $(TOP)/gf2x -I $(TOP)/gf2x/cantor
 MY_CFLAGS+=-I.
 
-MY_LFLAGS+=-L$(TOP)/utils
 MY_LFLAGS+=-L $(TOP)/utils -L $(TOP)/gf2x -L $(TOP)/gf2x/cantor
 
-
--include Makefile.local
+# -include Makefile.local
 
 ifeq ($(WITH_PTHREADS),1)
 MY_CFLAGS+=-DWITH_PTHREADS

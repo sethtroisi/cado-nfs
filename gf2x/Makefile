@@ -3,39 +3,12 @@
 # appropriate building tool, we'll simply avoid make -j for this one.
 .NOTPARALLEL:
 
-# Default flags
-CFLAGS:=-O2 -DNDEBUG
-CXXFLAGS:=$(CFLAGS)
-
-ALWAYS_CFLAGS:=-std=c99 -g -W -Wall
-ALWAYS_CXXFLAGS:=-g -W -Wall
-
-# Start with defaults that should never be overridden
-MY_CFLAGS=$(ALWAYS_CFLAGS)
-MY_CXXFLAGS=$(ALWAYS_CXXFLAGS)
-MY_LFLAGS=-L.
-
-# Add the possibly overridden variables.
-MY_CFLAGS+=$(CFLAGS)
-MY_CXXFLAGS+=$(CXXFLAGS)
-MY_LFLAGS+=$(LDFLAGS)
-ifneq ($(GMP),)
-GMP_LIBDIR ?= $(GMP)/lib
-GMP_INCDIR ?= $(GMP)/include
+ifdef	WITHIN_CADO
+TOP:=..
+include $(TOP)/Makefile.common
+else
+include Makefile.common.gf2x
 endif
-ifneq ($(GMP_LIBDIR),)
-GMP_LFLAGS ?= $(addprefix -L,$(GMP_LIBDIR))
-endif
-ifneq ($(GMP_INCDIR),)
-GMP_CFLAGS ?= $(addprefix -I,$(GMP_INCDIR))
-GMP_CXXFLAGS ?= $(addprefix -I,$(GMP_INCDIR))
-endif
-MY_CFLAGS+=$(GMP_CFLAGS)
-MY_CXXFLAGS+=$(GMP_CXXFLAGS)
-MY_LFLAGS+=$(GMP_LFLAGS)
-
-.c.o:
-	$(CC) $(MY_CFLAGS) $< -c -o $@
 
 ifeq ($(shell uname -m),i686)
 w:=32

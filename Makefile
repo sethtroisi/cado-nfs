@@ -2,11 +2,12 @@
 
 TOP:=.
 
-# It's useful to pass these down to sub-makefiles if we do have the
-# information. Some of the code base does not (yet) explicitly load
-# Makefile.local becase it's got a life outside cado
-export CC
-export CXX
+# Currently, this stuff is equivalent to forcing ``make WITHIN_CADO=1''
+# for all sub-makes. This allows the makefiles to react differently
+# depending on whether they're within the cado source tree, or within
+# standalone packages (relevant to gf2x).
+WITHIN_CADO:=1
+export WITHIN_CADO
 
 all:
 	$(MAKE) -C utils libutils.a check_rels

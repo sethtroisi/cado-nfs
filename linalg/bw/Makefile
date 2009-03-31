@@ -7,7 +7,6 @@
 # MPFR=<path> --> uses MPFR as in path
 
 TOPPATH:=.
-
 CC:=gcc
 CXX:=g++
 ARQCV:=ar qcv
@@ -18,6 +17,15 @@ PFLAGS:=
 IFLAGS:=-I ../.. -I ../../utils -I ../../gf2x -I ../../gf2x/cantor -I $(TOPPATH)/include -I . -I old
 LFLAGS:=-L ../../utils -L ../../gf2x -L ../../gf2x/cantor
 
+ifdef WITHIN_CADO
+TOP:=../..
+-include $(TOP)/Makefile.common
+
+IFLAGS+=$(MY_CFLAGS)
+LFLAGS+=$(MY_LFLAGS)
+
+else
+
 -include Makefile.local
 #ifdef GMP
 #GMPINCLUDE?=$(GMP)/include
@@ -25,6 +33,7 @@ LFLAGS:=-L ../../utils -L ../../gf2x -L ../../gf2x/cantor
 #IFLAGS+=$(GMPINCLUDE)
 #LFLAGS+=$(GMPLIB)
 #endif
+endif
 
 IFLAGS+=-DVERSION='"$(shell util/version.sh)"'
 
