@@ -34,7 +34,7 @@ void fake_ift(const fake_info_t p MAYBE_UNUSED, unsigned long * dst, int n, fake
 void fake_compose(const fake_info_t p MAYBE_UNUSED, fake_t dst, fake_src_t s1, fake_src_t s2) {
     int n1 = BITS_TO_WORDS(p->d1+1, ULONG_BITS);
     int n2 = BITS_TO_WORDS(p->d2+1, ULONG_BITS);
-    mul_gf2x(dst, s1, n1, s2, n2);
+    gf2x_mul(dst, s1, n1, s2, n2);
 }
 void fake_add(const fake_info_t p MAYBE_UNUSED, fake_t dst, fake_src_t s1, fake_src_t s2) {
     unsigned int i;

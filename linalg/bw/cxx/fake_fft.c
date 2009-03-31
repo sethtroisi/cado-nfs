@@ -20,19 +20,19 @@ void fake_setup(fake_info_t p, int nF, int nG)
 void fake_dft(const fake_info_t p MAYBE_UNUSED, fake_t dst, unsigned long * src, int n) {
     ASSERT(n <= p->d1+1 || n <= p->d2+1);
     int s = BITS_TO_WORDS(n, ULONG_BITS);
-    memcpy(dst, src, s * sizeof(ulong));
+    memcpy(dst, src, s * sizeof(unsigned long));
 }
 
 /* n is a number of coefficients ! */
 void fake_ift(const fake_info_t p MAYBE_UNUSED, unsigned long * dst, int n, fake_src_t src) {
     ASSERT(n <= p->d3+1);
     int t = BITS_TO_WORDS(n, ULONG_BITS);
-    memcpy(dst, src, t * sizeof(ulong));
+    memcpy(dst, src, t * sizeof(unsigned long));
 }
 void fake_compose(const fake_info_t p MAYBE_UNUSED, fake_t dst, fake_src_t s1, fake_src_t s2) {
     int n1 = BITS_TO_WORDS(p->d1+1, ULONG_BITS);
     int n2 = BITS_TO_WORDS(p->d2+1, ULONG_BITS);
-    mul_gf2x(dst, s1, n1, s2, n2);
+    gf2x_mul(dst, s1, n1, s2, n2);
 }
 void fake_add(const fake_info_t p MAYBE_UNUSED, fake_t dst, fake_src_t s1, fake_src_t s2) {
     unsigned int i;
@@ -42,7 +42,7 @@ void fake_add(const fake_info_t p MAYBE_UNUSED, fake_t dst, fake_src_t s1, fake_
 }
 
 void fake_cpy(const fake_info_t p MAYBE_UNUSED, fake_t dst, fake_src_t s) {
-    memcpy(dst, s, (p->size)*sizeof(ulong));
+    memcpy(dst, s, (p->size)*sizeof(unsigned long));
 }
 
 int fake_size(const fake_info_t p) {

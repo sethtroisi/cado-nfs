@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# patches an ntl-5.4.2 tree for use with gf2x
+
+# Note that you must have completed compilation of gf2x first.
+
+# Usage: inject-ntl <path-to-ntl-toplevel>
+
+
+here=`dirname "$0"`
+inject_name=$(sh -c 'cd "$here" ; basename "`pwd`"')
+
+ntl_path="$1"
+if [ ! -d "$ntl_path/include/NTL" ] ; then
+    echo "No ntl found at path $ntl_path" >&2
+    exit 1
+fi
+
+rsync -av --delete "$here/" "$ntl_path/include/$inject_name/"
+sed -e "s/@@gf2x_inject@@/$inject_name/g" < "$here/patch-wrt-ntl-5.4.2" | \
+    patch -p1 -d "$ntl_path"
+sed -e "s#^NTL_INCLUDE.*\$#& -I../include/$inject_name#g" -i "$ntl_path/src/makefile"

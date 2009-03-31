@@ -33,11 +33,11 @@ void bench_polmul(unsigned int d1, unsigned int d2)
     mpn_random((mp_limb_t *) f, nw1);
     mpn_random((mp_limb_t *) g, nw2);
 
-    printf("mul_gf2x (%u x %u):", d1, d2);
+    printf("gf2x_mul (%u x %u):", d1, d2);
 
     tt = cputime();
     for(unsigned int r = 0 ; r < nrep ; r++) {
-        mul_gf2x(h, f, nw1, g, nw2);
+        gf2x_mul(h, f, nw1, g, nw2);
     }
     printf(" %f", (double) (cputime()-tt)/nrep);
     printf("\n");

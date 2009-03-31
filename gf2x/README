@@ -1,5 +1,3 @@
-Installation guide for the gf2x package.
-========================================
 
 Authors: Richard Brent, Pierrick Gaudry, Emmanuel Thomé, Paul Zimmermann.
 Licence: GNU General Public License (version 2 or any later version).
@@ -7,121 +5,209 @@ Licence: GNU General Public License (version 2 or any later version).
 This package contains routines for fast arithmetic in GF(2)[x]
 (multiplication, squaring, gcd).
 
+Summary:
+========
+
+This README covers:
+
+ - Package contents
+ - Caution for gcc users
+ - Instructions to install the package
+ - Caution regarding installation
+ - Hooking gf2x into ntl
+ - Using the library
+
+
+Package contents:
+=================
+
 It contains the following files:
 
+Miscellaneous doc files:
 
-Misc:
-
-README       - this file
-COPYING      - GNU General Public License
+README
+BUGS
+tuning/TODO
+tuning/README
+hardware/tuned/README
+AUTHORS
+ChangeLog
 
 Actual code:
 
-gf2x.h            - main header file
-thresholds.h      - tuning results. The file contains some defaults.
-mul-gf2x.c        - main entry code
-gen_bb_mul_code.c - generates low-level multiplication routines
-mul2t.c           - implements 128x128 -> 256 bit product with SSE2 instructions
-mul-small.c       - code for small sizes
-mul-basecase.c    - base case code
-mul-toom.c        - main file for Karatsuba and Toom-Cook multiplication
-mulfft-bit.c      - multiplication over GF(2)[x] using Fast Fourier Transform
+gf2x.h                 - main api
+gf2x-impl.h            - internal api
+gf2x.c                 - top-level source for multiplication code
+gf2x-small.h           - small-sized inlined multiplication routines
+toom.c                 - main file for Karatsuba and Toom-Cook multiplication
+fft.c                  - multiplication using Fast Fourier Transform
+ntl_gf2x_mul_code.h    - file to be hooked in NTL (see below)
 
-For tuning:
+Code adapted for the selected hardware
 
-tuneup.c   - tuning program for schoolbook/Karatsuba/Toom-Cook multiplication
-tunefft.c  - program to tune the FFT multiplication
-tunetoom.c - program to tune Toom-Cook multiplication
-best_k.sh  - helper script for tuning
-replace.c  - Helper code
-replace.h  - Helper code
-timing.c   - Helper code
-timing.h   - Helper code
-tuning-common.h - Helper code
-tuning-common.c - Helper code
-update-thresholds.c - Helper code
-update-thresholds.h - Helper code
+hardware/              - pre-configured codes for selected architectures.
+hardware/*/gf2x-thresholds.h - pre-tuned thresholds files
+hardware/generic/gf2x-thresholds.h - placeholder thresholds
+hardware/generic64/    - code that works on any 64-bit platform
+hardware/generic32/    - code that works on any 32-bit platform
+hardware/x86_64/       - code that works on amd64 and intel core2
+hardware/x86_sse2/     - code that works on x86 platforms supporting sse2
+hardware/generic/      - code that works everywhere. Does _not_ include mul1
+
+gf2x/                  - place where symlinks to the files above go
 
 For testing:
 
-factor.c     - finds smallest irreducible factor of trinomial over GF(2)
-HalfGCD.c    - subquadratic gcd over GF(2)[x]
-bench.c      - bench program.
-checkXXX.*   - test sets
+tests/check-mul.c       - simple check program
+tests/check-mul.res     - reference results from check-mul
+tests/do-check-mul.sh   - shell script driving check-mul
 
-No longer used:
+For tuning:
 
-patch-wrt-ntl-5.3.1 - patch for file GF2X.c from NTL
+tuning/tuneup.c         - tuning program for basecase multiplication
+tuning/tunetoom.c       - tuning program for Karatsuba/Toom-Cook multiplication
+tuning/tunefft.c        - tuning program for FFT multiplication
+tuning/tune-lowlevel.pl
 
-Caution:
-========
+tuning/mul*.c              - various candidate code samples for basic routines
+tuning/gen_bb_mul_code.c   - program to generate many alternatives for mul1
+tuning/replace.h           - helper code
+tuning/replace.c           - helper code
+tuning/tuning-common.h     - helper code
+tuning/tuning-common.c     - helper code
+tuning/timing.h            - helper code
+tuning/timing.c            - helper code
+tuning/update-thresholds.c - helper code
+
+Applications that use gf2x and NTL:
+
+apps/halfgcd.hpp - subquadratic gcd over GF(2)[x]
+apps/halfgcd.cpp - subquadratic gcd over GF(2)[x]
+apps/factor.cpp  - finds smallest irreducible factor of trinomial over GF(2)
+apps/check*.sh   - some tests using factor
+
+Caution for gcc users:
+======================
 
 gcc versions 4.3.0 and 4.3.1 have a bug which affects gf2x in a an
-unpredictable way. It is recommended to upgrade to at least 4.3.2.
+unpredictable way. It is recommended to upgrade to at least 4.3.2, or
+configure with --disable-sse2
 
 Instructions to install the package:
 ====================================
 
+Cautious users follow steps 1 to 5 below. Urged users follow only 1 and 5.
+
 1) Type:
 
-      make
+      ./configure && make
 
-   If your machine word size is not automatically detected, you might
-   have to type:
+   A special case: your hardware platform may support several ABIs
+   (Application Binary Interfaces), corresponding to the type ``unsigned
+   long'' being either 32-bit or 64-bit wide. The gf2x package
+   accomodates for this under the assumption that ABI selection is
+   covered by the selection of the appropriate compiler options. In order
+   to compile for an ABI different from the default one, you have to pass
+   additional parameters to the configure script:
+
+      ./configure ABI=<bit width of unsigned long> CFLAGS=<corresponding CFLAGS> && make
    
-      make w=64
+   For example on a Mac OS X computer with an Intel Core 2 processor, one
+   may use: ./configure ABI=64 CFLAGS=-m64 && make
 
-   At this point, you should have a working libgf2x.a ; However it is not
-   tuned. It means in particular that the FFT is not available at all.
+   Several other flags and arguments can be passed to ./configure (or set
+   as environment variables) ; see ./configure --help
 
-2) Optional, but recommended: tune Karatsuba/Toom-Cook and FFT multiplication
+2) Highly recommended ; run
 
-      make tune-all
+      make check
 
-   This unfortunately takes a long while. You may split the tuning into
-   the most elementary steps, which are by default:
-        make tunetoom
-        ./tunetoom -s 1.05 2048 -o tunetoom.res
-        make recover-tune
-        make tunefft
-        ./tunefft -s 1.02 8000000 -o tunefft.res
-        make recover-tune
-        make
-    Both the tunetoom and tunefft programs accept a -s <multiplicative
-    step> option as well as a max size argument. The max size to tunetoom
-    may not exceed 2048. Increasing the multiplicative step is likely to
-    speed up the tuning computation, at the expense of a decreased
-    accuracy.
+   To guard against possible bugs (either from gf2x or from the
+   compiler).
 
-    The ``make recover-tune'' target is here so that interrupted tuning
-    programs (either by the user being fed up or some other reason) can
-    still be used to produce a valid thresholds.h file.
+3) Optional, but recommended: tune Karatsuba/Toom-Cook and FFT multiplication
 
-    As an alternative to tuning, it is possible to replace thresholds.h
-    by one of the pre-shipped thresholds files. Those files contain
-    information on the characteristics of the machine on which the tuning
-    was run, so if you find a close match with your machine, it is a
-    reasonable option. You may do for example:
-        cp thresholds.h.core2 thresholds.h
+      make tune-lowlevel
+      make tune-toom
+      make tune-fft
 
-3) run:
+   Note that there are some minor issues related to tuning on amd64 -- see BUGS.
+
+   Tuning unfortunately takes a long while ; it is possible to decrease
+   the time spent in tuning using additional parameters to the ``make
+   tune-*'' commands, more specifically:
+      make tune-toom TOOM_TUNING_LIMIT=<max size in words, at most 2048>
+      make tune-fft FFT_TUNING_LIMIT=<max size in words>
+   The default values for TOOM_TUNING_LIMIT and FFT_TUNING_LIMIT are 2048
+   and 8000000, respectively. TOOM_TUNING_LIMIT must not exceed 2048,
+   while FFT_TUNING_LIMIT is only limited by the available memory.
+   
+   More detailed information on tuning can be found in the
+   tuning/tunetoom.c and tuning/tunefft.c files, as well as
+   tuning/README.
+
+   All the tuning targets automatically rebuild the library in order to
+   incorporate the tuned parameters. So an additional ``make'' is
+   unnecessary (although innocuous, since the library should be up to
+   date).
+
+4) Highly recommended ; run
 
       make check
 
    to see whether everything went ok.
 
-4) optional: you may inject gf2x into the ntl library. The current
-   version of gf2x has the ability to inject itself into ntl version
-   5.4.2. To do so, use the shell script:
-    ./inject-ntl /path/to/ntl-5.4.2/
-   and then:
-    make -C /path/to/ntl-5.4.2/src/
+5) Either run:
+
+      make install
    
-   This effectively replaces the complete binary polynomial
-   multiplication mechanism of ntl by the one in gf2x ; one should
-   observe significant speed-ups. Note that for linking program with this
-   ``hybrid'' ntl, you must both link with -lntl and -lgf2x ; libntl.a is
-   found at the place where ntl installed it, libgf2x.a is found in
-   gf2x's directory.
+   Or, if you prefer, keep your build tree, and have your programs
+   include <buildtree>/gf2x.h, and link against the library
+   <buildtree>/.libs/libgf2x.a (static) or <buildtree>/.libs/libgf2x.so
+   (dynamic). Usual pitfalls apply regarding dynamic linking: if you are
+   familiar with none of the "-Wl,-rpath,<path>" or "LD_LIBRARY_PATH"
+   ways of making this work, your easiest bet is to stick to the static
+   library approach.
 
+Caution regarding installation:
+===============================
 
+The files in the gf2x/ directory are architecure-dependent.
+
+Hooking gf2x into ntl:
+======================
+
+ntl-5.4.3 offers the possibility to replace the multiplication of
+polynomials with the gf2x code. For this, you have to install the gf2x
+library in your favorite /path/to/gf2x/ (e.g. using gf2x's ./configure
+--prefix=/path/to/gf2x/ && make && make install). Then configure NTL with
+
+./configure NTL_GF2X_LIB=on GF2X_PREFIX=/path/to/gf2x/
+
+If for some reason gf2x was installed with custom directories, you may
+also consider the GF2X_INCDIR and GF2X_LIBDIR options ; some setups will
+typically require GF2X_LIBDIR=/path/to/gf2x/lib64, for example.
+
+For version 5.4.2 of ntl, you have the possibility of patching an NTL
+tree with gf2x. For this, do the following.
+
+- untar ntl-5.4.2 in /path/to/ntl-5.4.2
+- build gf2x: cd /path/to/gf2x ; ./configure ; make
+- from the gf2x source tree, run ./inject-ntl-5.4.2 /path/to/ntl-5.4.2
+- cd /path/to/ntl-5.4.2 ; make && make check
+
+Using the library:
+==================
+
+gf2x exports one public header called gf2x.h . This header exports one
+function gf2x_mul, whose use is documented in gf2x.h . Note that gf2x_mul
+is not reentrant, so if you need a reentrant version, prefer gf2x_mul_r
+which uses an externally allocated storage pool.
+
+Some ``half-public'' headers are in the gf2x/ subdirectory. Some of these
+headers (gf2x/gf2x-thresholds.h and gf2x/gf2x_mul* are
+architecture-dependent). In order to use the inlined multiplication
+routines for small sizes, you may use gf2x/gf2x-small.h.
+
+The gf2x libraries are created by default both as static and dynamic
+libraries.

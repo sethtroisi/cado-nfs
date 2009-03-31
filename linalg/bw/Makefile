@@ -14,8 +14,8 @@ ARQCV:=ar qcv
 # saying that 16-bit entries are not enough
 OFLAGS:=-O2 -DNDEBUG
 PFLAGS:=
-IFLAGS:=-I ../.. -I ../../utils -I ../../gf2x -I ../../gf2x/cantor -I $(TOPPATH)/include -I . -I old
-LFLAGS:=-L ../../utils -L ../../gf2x -L ../../gf2x/cantor
+IFLAGS:=-I ../.. -I ../../utils -I ../../gf2x -I ../../cantor -I $(TOPPATH)/include -I . -I old
+LFLAGS:=-L ../../utils -L ../../gf2x/.libs -L ../../cantor
 
 ifdef WITHIN_CADO
 TOP:=../..
@@ -136,7 +136,7 @@ BW_LINGEN_BINARY_SOURCES:=		\
 		cxx/bitstring.cpp		\
 		cxx/config_file.cpp	\
 		cxx/fake_fft.c
-BW_LINGEN_BINARY_LIBS:=-lgmpxx -lgmp -lutils -lgf2x ../../gf2x/cantor/cantor128.o
+BW_LINGEN_BINARY_LIBS:=-lgmpxx -lgmp -lutils -lgf2x ../../cantor/cantor128.o
 -include .bw-lingen-binary.mkf
 
 # ifeq (0,0)
@@ -180,7 +180,7 @@ BW_LINGEN_BINARY_LIBS:=-lgmpxx -lgmp -lutils -lgf2x ../../gf2x/cantor/cantor128.
 BENCH_POLMATMUL_SOURCES:=					\
 		cxx/bench_polmatmul.cpp				\
 		cxx/fake_fft.c
-BENCH_POLMATMUL_LIBS:=-lgmp -lutils -lgf2x ../../gf2x/cantor/cantor128.o
+BENCH_POLMATMUL_LIBS:=-lgmp -lutils -lgf2x ../../cantor/cantor128.o
 -include .bench_polmatmul.mkf
 
 # BW_FFT_BASICTEST_SOURCES:=					\

@@ -33,8 +33,8 @@ all:
 	$(MAKE) -C postsieve/checknorms
 	$(MAKE) -C linalg
 	$(MAKE) -C sqrt/naive
-	$(MAKE) -C gf2x
-	$(MAKE) -C gf2x/cantor
+	$(MAKE) all-gf2x
+	$(MAKE) -C cantor
 	$(MAKE) -C linalg/bw
 
 clean:
@@ -46,9 +46,19 @@ clean:
 	$(MAKE) -C postsieve/checknorms	clean
 	$(MAKE) -C linalg		clean
 	$(MAKE) -C sqrt/naive		clean
-	$(MAKE) -C gf2x			clean
-	$(MAKE) -C gf2x/cantor		clean
+	$(MAKE) clean-gf2x
+	$(MAKE) -C cantor		clean
 	$(MAKE) -C linalg/bw		clean
+
+# Because gf2x is a separate autotools project, we need to call it in a
+# special way.
+
+all-gf2x:
+	if [ ! -f gf2x/Makefile ] ; then cd gf2x ; ./configure ; else : ; fi
+	$(MAKE) -C gf2x
+
+clean-gf2x:
+	if [ ! -f gf2x/Makefile ] ; then : ; else $(MAKE) -C gf2x clean ; fi
 
 DIST_FILES=new_run.c59 params.c59 new_cadofactor.pl Makefile Makefile.common \
            cado.h macros.h
@@ -114,8 +124,9 @@ dist:
 	mkdir cado-nfs-$(VERSION)/linalg
 	cp $(LINALG_FILES) cado-nfs-$(VERSION)/linalg
 	cp -r gf2x cado-nfs-$(VERSION)
-	$(MAKE) -C cado-nfs-$(VERSION)/gf2x clean
-	$(MAKE) -C cado-nfs-$(VERSION)/gf2x/cantor clean
+	-$(MAKE) -C cado-nfs-$(VERSION)/gf2x distclean
+	cp -r cantor cado-nfs-$(VERSION)
+	$(MAKE) -C cado-nfs-$(VERSION)/cantor clean
 	cp -r linalg/bw cado-nfs-$(VERSION)/linalg
 	$(MAKE) -C cado-nfs-$(VERSION)/linalg/bw clean
 	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/.svn
@@ -131,7 +142,7 @@ dist:
 	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/matlingen_files
 	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/.deps
 	/bin/rm -fr cado-nfs-$(VERSION)/gf2x/.svn
-	/bin/rm -fr cado-nfs-$(VERSION)/gf2x/cantor/.svn
+	/bin/rm -fr cado-nfs-$(VERSION)/cantor/.svn
 	mkdir cado-nfs-$(VERSION)/sqrt
 	mkdir cado-nfs-$(VERSION)/sqrt/naive
 	cp $(SQRT_FILES) cado-nfs-$(VERSION)/sqrt/naive

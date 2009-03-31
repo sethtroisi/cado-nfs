@@ -6,18 +6,18 @@ include $(TOP)/Makefile.common
 # We require the cado utils library
 MY_CFLAGS+=-I$(TOP)/utils -I..
 MY_CFLAGS+=-I $(TOP) -I $(TOP)/utils
-MY_CFLAGS+=-I $(TOP)/gf2x -I $(TOP)/gf2x/cantor
+MY_CFLAGS+=-I $(TOP)/gf2x -I $(TOP)/cantor
 MY_CFLAGS+=-I.
 
 MY_LFLAGS+=-L$(TOP)/utils
-MY_LFLAGS+=-L$(TOP)/utils -L$(TOP)/gf2x -L$(TOP)/gf2x/cantor
+MY_LFLAGS+=-L$(TOP)/utils -L$(TOP)/gf2x/.libs -L$(TOP)/cantor
 
 -include Makefile.local
 
 all: lingen
 
 lingen_objs:=fake_fft.o lingen_binary.o
-lingen_libs:=../bw-common.o -lgmpxx -lgmp -lutils -lgf2x $(TOP)/gf2x/cantor/cantor128.o
+lingen_libs:=../bw-common.o -lgmpxx -lgmp -lutils -lgf2x $(TOP)/cantor/cantor128.o
 
 common_link_deps:=$(TOP)/utils/libutils.a
 

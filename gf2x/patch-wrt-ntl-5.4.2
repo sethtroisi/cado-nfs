@@ -10,7 +10,7 @@
  cp WizardAux small/src
 --- a/src/GF2X.c	2008-03-05 00:35:01.000000000 +0100
 +++ b/src/GF2X.c	2008-10-12 17:14:03.000000000 +0200
-@@ -451,7 +451,22 @@
+@@ -451,7 +451,23 @@
  }
  
  
@@ -27,13 +27,14 @@
 +      return;
 +   }
 +   c.xrep.SetLength(sa+sb);
-+   mul_gf2x(c.xrep.elts(), a.xrep.elts(), sa, b.xrep.elts(), sb);
++   gf2x_mul(c.xrep.elts(), a.xrep.elts(), sa, b.xrep.elts(), sb);
++   c.normalize();
 +}
 +#else
  
  
  /*
-@@ -1264,6 +1279,9 @@
+@@ -1264,6 +1280,9 @@
  
  
  
@@ -50,7 +51,7 @@
  
  GF2XTimeTest:
 -	$(LINK_CXX) -o GF2XTimeTest GF2XTimeTest.c wntl.a  $(GMP_LIBDIR) $(GMP_LIB) $(LDLIBS_CXX)
-+	$(LINK_CXX) -o GF2XTimeTest GF2XTimeTest.c wntl.a -L../include/@@gf2x_inject@@ -lgf2x $(GMP_LIBDIR) $(GMP_LIB) $(LDLIBS_CXX)
++	$(LINK_CXX) -o GF2XTimeTest GF2XTimeTest.c wntl.a ../include/@@gf2x_inject@@/libgf2x.la $(GMP_LIBDIR) $(GMP_LIB) $(LDLIBS_CXX)
  
  InitSettings:
  	$(LINK_CXX) -o InitSettings InitSettings.c  $(LDLIBS_CXX)
