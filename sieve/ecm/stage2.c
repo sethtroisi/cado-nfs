@@ -28,21 +28,21 @@ binsearch (const int *a, const unsigned int l, const int x)
 #endif
 
 static void
-bitset (unsigned char *a, unsigned int i)
+bitset (unsigned char *a, const unsigned int i)
 {
   a[i/8] |= 1 << (i%8);
 }
 
 
 static void
-bitclear (unsigned char *a, unsigned int i)
+bitclear (unsigned char *a, const unsigned int i)
 {
   a[i/8] &= ~(1 << (i%8));
 }
 
 
 static int
-bittest (unsigned char *a, unsigned int i)
+bittest (const unsigned char *a, const unsigned int i)
 {
   return (a[i/8] & (1 << (i%8))) != 0;
 }
@@ -51,8 +51,8 @@ bittest (unsigned char *a, unsigned int i)
 
 
 void 
-stage2_make_plan (stage2_plan_t *plan, unsigned int B2min, unsigned int B2,
-		     int verbose)
+stage2_make_plan (stage2_plan_t *plan, const unsigned int B2min, 
+                  const unsigned int B2, const int verbose)
 {
   unsigned int p, nr_primes, nr_pairs;
   unsigned int i, min_i, max_i, j, m, n;

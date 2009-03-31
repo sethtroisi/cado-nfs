@@ -21,7 +21,7 @@ find_primes_hit: find_primes_hit.o
 addchain: addchain.o prac_bc.o
 	$(CC) $(MY_LFLAGS) $^ -o $@ -lutils -lgmp -lm
 testbench: testbench.o libfacul.a $(PRIMEGEN)
-	$(CC) $(MY_LFLAGS) $^ -o $@ -lutils -lfacul -lgmp -lm
+	$(CC) $(MY_LFLAGS) $^ -o $@ -lutils -lgmp -lm
 pm1.o: pm1.c pm1.h $(TOP)/utils/modredc_ul.h
 	$(CC) $(MY_CFLAGS) -c -o $@ -DMODREDCUL $<
 pm1_15.o: pm1.c pm1.h $(TOP)/utils/modredc_15ul.h
@@ -42,10 +42,10 @@ facul_doit_15ul.o: facul_doit.c facul_doit.h facul.h $(TOP)/utils/modredc_ul.h $
 stage2.o: stage2.h ../basicnt.h $(TOP)/utils/utils.h
 prac_bc.o: prac_bc.h
 addchain.o: $(TOP)/utils/modredc_ul.h
-testbench.o: $(TOP)/utils/modredc_ul.h
+testbench.o: facul.h pm1.h pp1.h ecm.h $(TOP)/utils/modredc_ul.h
 find_primes_hit.o: $(TOP)/utils/modredc_ul.h  $(TOP)/utils/modredc_ul.c
 facul.o: facul.h pm1.h pp1.h ecm.h $(TOP)/utils/modredc_ul.h $(TOP)/utils/modredc_15ul.h
 
 clean:
-	-rm -f $(facul_objs) libfacul.a
+	-rm -f $(facul_objs) libfacul.a addchain.o testbench.o
 	-rm -f find_primes_hit addchain testbench

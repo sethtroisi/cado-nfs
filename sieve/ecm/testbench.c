@@ -86,6 +86,7 @@ int main (int argc, char **argv)
 	  B2 = strtoul (argv[3], NULL, 10);
 	  strategy->methods[nr_methods].method = PM1_METHOD;
 	  strategy->methods[nr_methods].plan = malloc (sizeof (pm1_plan_t));
+	  ASSERT (strategy->methods[nr_methods].plan != NULL);
 	  pm1_make_plan (strategy->methods[nr_methods].plan, B1, B2, 
 			 (verbose >= 2));
 	  nr_methods++;
@@ -100,6 +101,7 @@ int main (int argc, char **argv)
 	  B2 = strtoul (argv[3], NULL, 10);
 	  strategy->methods[nr_methods].method = PP1_METHOD;
 	  strategy->methods[nr_methods].plan = malloc (sizeof (pp1_plan_t));
+	  ASSERT (strategy->methods[nr_methods].plan != NULL);
 	  pp1_make_plan (strategy->methods[nr_methods].plan, B1, B2, 
 			 (verbose >= 2));
 	  nr_methods++;
@@ -116,6 +118,7 @@ int main (int argc, char **argv)
 	  sigma = strtol (argv[4], NULL, 10);
 	  strategy->methods[nr_methods].method = EC_METHOD;
 	  strategy->methods[nr_methods].plan = malloc (sizeof (ecm_plan_t));
+	  ASSERT (strategy->methods[nr_methods].plan != NULL);
 	  ecm_make_plan (strategy->methods[nr_methods].plan, B1, B2, 
                          (sigma > 0) ? BRENT12 : MONTY12, labs (sigma), 
                          (verbose >= 2));
@@ -250,7 +253,9 @@ int main (int argc, char **argv)
 	  
 	  total++;
 	  mpz_mul_ui (N, cof, i);
-	  facul_code = facul (f, N, strategy);
+          if (verbose >= 2)
+            gmp_printf ("Trying to factor %Zd\n", N);
+          facul_code = facul (f, N, strategy);
 	  
 	  if (facul_code > 0)
 	    {
@@ -291,6 +296,8 @@ int main (int argc, char **argv)
 	  continue;
 	mpz_mul (N, N, cof);
 	total++;
+        if (verbose >= 2)
+          gmp_printf ("Trying to factor %Zd\n", N);
 	facul_code = facul (f, N, strategy);
 	
 	if (facul_code > 0)
