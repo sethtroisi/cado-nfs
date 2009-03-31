@@ -34,10 +34,6 @@ struct bw_params {
     /* defined, but unused */
     int verbose;
 
-    /* XXX Could be dropped -- most filenames are hardcoded anyway, so why not
-     * this one ? */
-    char matrix_filename[FILENAME_MAX];
-
     /* Whether the current job/thread may print to stdout */
     int can_print;
 

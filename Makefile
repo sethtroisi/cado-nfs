@@ -19,6 +19,8 @@ all:
 	$(MAKE) all-gf2x
 	$(MAKE) -C cantor
 	$(MAKE) -C linalg/bw
+	$(MAKE) -C linalg/bwc
+	$(MAKE) -C linalg/bwc/lingen
 	$(MAKE) -C sqrt/naive algsqrt
 
 clean:
@@ -30,6 +32,8 @@ clean:
 	$(MAKE) clean-gf2x
 	$(MAKE) -C cantor		clean
 	$(MAKE) -C linalg/bw		clean
+	$(MAKE) -C linalg/bwc		clean
+	$(MAKE) -C linalg/bwc/lingen	clean
 	$(MAKE) -C sqrt/naive		clean
 
 # Because gf2x is a separate autotools project, we need to call it in a

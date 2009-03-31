@@ -97,8 +97,9 @@ bwstrat=1
 # Linear algebra
 ###########################################################################
 
-bwmt=2                  # Multithreading level of Block-Wiedemann
-linalg=bw               # Choose linalg algorithm: bl or bw
+bwmt=2x2                # Multithreading level of Block-Wiedemann ; Use
+                        # <m>x<n> for bwc, or only one integer for bw.
+linalg=bwc              # Choose linalg algorithm: one of bwc bw bl
 
 ###########################################################################
 # Characters

@@ -18,7 +18,9 @@
 #include "filenames.h"
 #include "xdotprod.h"
 
+#if 0
 #include "electric_alloc.h"     // debugging
+#endif
 
 abobj_t abase;
 
@@ -34,7 +36,7 @@ void * mksol_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
 
     block_control_signals();
 
-    matmul_top_init(mmt, abase, pi, flags, bw->matrix_filename);
+    matmul_top_init(mmt, abase, pi, flags, MATRIX_INFO_FILE);
 
     mmt_wiring_ptr mcol = mmt->wr[bw->dir];
     mmt_wiring_ptr mrow = mmt->wr[!bw->dir];

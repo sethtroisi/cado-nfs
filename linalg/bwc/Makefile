@@ -1,4 +1,8 @@
 TOP:=../..
+
+# Our default setting has pthreads enabled, but not mpi
+WITH_PTHREADS=1
+
 include $(TOP)/Makefile.common
 
 # We require the cado utils library

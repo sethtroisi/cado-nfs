@@ -12,17 +12,13 @@
 
 void read_info_file(matmul_top_data_ptr mmt, const char * filename)
 {
-    char * infoname;
-    int rc = asprintf(&infoname, MATRIX_INFO_FILE_PATTERN, filename);
-    FATAL_ERROR_CHECK(rc < 0, "out of memory");
-
-    FILE * f = fopen(infoname, "r");
+    FILE * f = fopen(filename, "r");
     char line[1024];
     char * rptr;
 
     char * last_slash = strrchr(filename, '/');
 
-    DIE_ERRNO_DIAG(f == NULL, "fopen", infoname);
+    DIE_ERRNO_DIAG(f == NULL, "fopen", filename);
 
     rptr = fgets(line, sizeof(line), f);
     ASSERT_ALWAYS(rptr != NULL);
@@ -123,6 +119,5 @@ void read_info_file(matmul_top_data_ptr mmt, const char * filename)
         }
     }
     fclose(f);
-    free(infoname);
 }
 

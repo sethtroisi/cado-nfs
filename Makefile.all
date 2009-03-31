@@ -1,15 +1,8 @@
+
 .PHONY: clean all
 
 TOP:=.
 include $(TOP)/Makefile.common
-
-# It's useful to pass these down to sub-makefiles if we do have the
-# information. Some of the code base does not (yet) explicitly load
-# Makefile.local becase it's got a life outside cado
-export CC
-export CXX
-export GMP_LIBDIR
-export GMP_INCDIR
 
 # Pass down these overrides to scons
 ifneq ($(CC),)
@@ -24,44 +17,23 @@ endif
 
 VERSION = 0.0
 
-all:
-	$(MAKE) -C utils
-	$(MAKE) -C polyselect
+all clean:
+	$(MAKE) -f Makefile $@
+	$(MAKE) -f Makefile.all $@-nodist
+
+all-nodist:
 	(cd postsieve/tifa; $(SCONS_BINARY) $(SCONS_FLAGS))
-	$(MAKE) -C sieve/ecm
-	$(MAKE) -C sieve
 	$(MAKE) -C postsieve/checknorms
-	$(MAKE) -C linalg
-	$(MAKE) -C sqrt/naive
-	$(MAKE) all-gf2x
-	$(MAKE) -C cantor
-	$(MAKE) -C linalg/bw
 
-clean:
-	$(MAKE) -C utils		clean
-	$(MAKE) -C polyselect		clean
+clean-nodist:
 	(cd postsieve/tifa; $(SCONS_BINARY) $(SCONS_FLAGS) -c)
-	$(MAKE) -C sieve/ecm		clean
-	$(MAKE) -C sieve		clean
-	$(MAKE) -C postsieve/checknorms	clean
-	$(MAKE) -C linalg		clean
-	$(MAKE) -C sqrt/naive		clean
-	$(MAKE) clean-gf2x
-	$(MAKE) -C cantor		clean
-	$(MAKE) -C linalg/bw		clean
+	$(MAKE) -C postsieve/checknorms clean
 
-# Because gf2x is a separate autotools project, we need to call it in a
-# special way.
-
-all-gf2x:
-	if [ ! -f gf2x/Makefile ] ; then cd gf2x ; ./configure ; else : ; fi
-	$(MAKE) -C gf2x
-
-clean-gf2x:
-	if [ ! -f gf2x/Makefile ] ; then : ; else $(MAKE) -C gf2x clean ; fi
-
-DIST_FILES=new_run.c59 params.c59 new_cadofactor.pl Makefile Makefile.common \
-           cado.h macros.h
+DIST_FILES= new_cadofactor.pl		\
+	    new_run.c59 params.c59	\
+	    new_run.c79 params.c79	\
+	    Makefile Makefile.common	\
+            cado.h macros.h
 POLYSELECT_FILES=polyselect/Makefile polyselect/polyselect.c \
            polyselect/rotate.c polyselect/aux.c polyselect/aux.h
 UTILS_FILES=utils/utils.h utils/mod_ul.h utils/fpoly.h utils/getprime.h \
@@ -79,7 +51,8 @@ UTILS_FILES=utils/utils.h utils/mod_ul.h utils/fpoly.h utils/getprime.h \
 	   utils/modredc_ul_default.h utils/modredc_15ul.c \
 	   utils/mpz_array.h utils/mpz_array.c utils/modredc_15ul_default.h \
 	   utils/check_rels.c utils/gzip.c utils/gzip.h	\
-	   utils/mpz_poly.c utils/mpz_poly.h
+	   utils/mpz_poly.c utils/mpz_poly.h	\
+	   utils/electric_alloc.h
 SIEVE_FILES=sieve/Makefile sieve/makefb.c sieve/las.c sieve/bucket.h \
            sieve/fb.h sieve/basicnt.h sieve/trialdiv.h sieve/fb.c \
 	   sieve/config_h.in sieve/trialdiv.c
@@ -112,6 +85,8 @@ SQRT_FILES=sqrt/naive/Makefile sqrt/naive/algsqrt.c sqrt/naive/poly.h \
 dist:
 	/bin/rm -fr cado-nfs-$(VERSION)
 	mkdir cado-nfs-$(VERSION)
+	(echo "#!/bin/sh" ; echo "echo cado-nfs-$(VERSION)") > cado-nfs-$(VERSION)/version.sh
+	chmod a+x cado-nfs-$(VERSION)/version.sh
 	cp $(DIST_FILES) cado-nfs-$(VERSION)
 	mkdir cado-nfs-$(VERSION)/polyselect
 	cp $(POLYSELECT_FILES) cado-nfs-$(VERSION)/polyselect
@@ -123,26 +98,16 @@ dist:
 	cp $(SIEVE_ECM_FILES) cado-nfs-$(VERSION)/sieve/ecm
 	mkdir cado-nfs-$(VERSION)/linalg
 	cp $(LINALG_FILES) cado-nfs-$(VERSION)/linalg
-	cp -r gf2x cado-nfs-$(VERSION)
-	-$(MAKE) -C cado-nfs-$(VERSION)/gf2x distclean
-	cp -r cantor cado-nfs-$(VERSION)
+	cp -pr gf2x cado-nfs-$(VERSION)
+	if [ -f cado-nfs-$(VERSION)/gf2x/Makefile ] ; then \
+	    $(MAKE) -C cado-nfs-$(VERSION)/gf2x distclean ; else : ; fi
+	cp -pr cantor cado-nfs-$(VERSION)
 	$(MAKE) -C cado-nfs-$(VERSION)/cantor clean
-	cp -r linalg/bw cado-nfs-$(VERSION)/linalg
+	cp -pr linalg/bw cado-nfs-$(VERSION)/linalg
 	$(MAKE) -C cado-nfs-$(VERSION)/linalg/bw clean
-	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/.svn
-	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/include/.svn
-	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/cxx/.svn
-	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/tests
-	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/matlingen.skel/.svn
-	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/matlingen.skel/util/.svn
-	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/util/.svn
-	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/old
-	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/crap
-	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/matlingen.skel
-	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/matlingen_files
-	/bin/rm -fr cado-nfs-$(VERSION)/linalg/bw/.deps
-	/bin/rm -fr cado-nfs-$(VERSION)/gf2x/.svn
-	/bin/rm -fr cado-nfs-$(VERSION)/cantor/.svn
+	cp -pr linalg/bwc cado-nfs-$(VERSION)/linalg
+	$(MAKE) -C cado-nfs-$(VERSION)/linalg/bwc clean
+	find cado-nfs-$(VERSION) -name .svn | xargs -r rm -rf
 	mkdir cado-nfs-$(VERSION)/sqrt
 	mkdir cado-nfs-$(VERSION)/sqrt/naive
 	cp $(SQRT_FILES) cado-nfs-$(VERSION)/sqrt/naive

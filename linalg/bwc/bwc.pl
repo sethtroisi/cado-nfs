@@ -33,13 +33,22 @@ if (defined($ENV{'MPI'})) {
     $mpiexec="$ENV{'MPI'}/mpiexec";
 }
 
+my $bindir;
+if (!defined($bindir=$ENV{'BWC_BINDIR'})) {
+    $bindir=$0;
+    $bindir =~ s{/[^/]*$}{};
+    if ($bindir eq $0) {
+        $bindir='.';
+    }
+}
+
 # Some command-line arguments have a special meaning.
 #
 # auto=<path> -> auto-create wdir from the mpi and thr splittings.
 # hostfile=<path> -> pass to mpiexec if relevant.
 
 while (defined($_ = shift @ARGV)) {
-    if (/^(?:auto|mat)=(\S*)$/) { $matrix_dir=$1; next; }
+    if (/^(?:auto|mat|matrix)=(\S*)$/) { $matrix_dir=$1; next; }
 
     if (/^hostfile=(\S*)$/) { $hostfile = $1; next; }
     if (/^matpath=(\S*)$/) { $matpath=$1; next; }
@@ -73,7 +82,7 @@ if (!defined($wdir) && defined($matrix_dir)) {
     if ($main !~ /^:(?:balance|complete)$/ && !-d $wdir) {
         die "No directory $wdir found";
     }
-    push @main_args, "wdir=$wdir", "matrix=mat";
+    push @main_args, "wdir=$wdir";
 }
 
 my $env_strings = "";
@@ -119,7 +128,7 @@ sub dosystem
 sub drive {
     my $program = shift @_;
 
-    if (! -x $program && $program !~ /^:/) {
+    if (! -x "$bindir/$program" && $program !~ /^:/) {
         die "No program $program found";
     }
 
@@ -161,7 +170,7 @@ sub drive {
 
     if ($program eq ':balance') {
         mkdir $wdir;
-        my $cmd="../balance";
+        my $cmd="$bindir/../balance";
         my @args= (
                 "-in", $matrix_dir,
                 "-out", "$wdir/mat",
@@ -182,6 +191,8 @@ sub drive {
     unless ($program =~ /(?:krylov|mksol)$/) {
         @_ = grep !/^ys=/, @_;
     }
+
+    $program="$bindir/$program";
 
     if ($mpi_split[0] * $mpi_split[1] != 1 && $program !~ /(?:split|acollect|lingen)$/) {
         unshift @_, $program;

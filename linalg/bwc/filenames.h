@@ -36,7 +36,9 @@
 
 /* misc */
 #define BW_CONFIG_FILE "bw.cfg"
-#define MATRIX_INFO_FILE_PATTERN "%s.info"
+
+/* this must follow the info file format */
+#define MATRIX_INFO_FILE "mat.info"
 
 /* mksol */
 #define F_FILE_SLICE_PATTERN "F%u-%u"

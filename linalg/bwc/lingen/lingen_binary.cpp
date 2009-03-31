@@ -367,10 +367,9 @@ void read_data_for_series(polmat& A MAYBE_UNUSED, unsigned int ondisk_length)
 
     buf = (unsigned long *) malloc(ulongs_per_mat * sizeof(unsigned long));
 
+    printf("Using A(X) div X in order to consider Y as starting point\n");
     rz = fread(buf, sizeof(unsigned long), ulongs_per_mat, f);
     NEVER_HAPPENS(rz != ulongs_per_mat, exit(1););
-
-    printf("Using A(X) div X in order to consider Y as starting point\n");
     sequence_length--;
 
     polmat a(m, n, sequence_length);

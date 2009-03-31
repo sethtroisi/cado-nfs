@@ -76,7 +76,6 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int argc, char *
     // Here, the matrix filename really ends up in some heap data that will
     // survive after freeing the param_list (if ever we do so early -- as a
     // matter of fact, in prep.c we don't)
-    param_list_parse_string(pl, "matrix", bw->matrix_filename, sizeof(bw->matrix_filename));
     param_list_parse_intxint(pl, "mpi", bw->mpi_split);
     param_list_parse_intxint(pl, "thr", bw->thr_split);
     param_list_parse_int(pl, "seed", &bw->seed);

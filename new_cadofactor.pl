@@ -248,14 +248,14 @@ sub read_param {
                     next;
                 }
                 die "Cannot parse line `$_' in file `$file'.\n"
-                    if $opt->{strict};
+                    if $opt->{'strict'};
             }
             close FILE;
             unshift @_, @args;
         } elsif (-f $_) {
             unshift @_, "param=$_";
         } else {
-            die "Unknown argument: `$_'.\n" if $opt->{strict};
+            die "Unknown argument: `$_'.\n" if $opt->{'strict'};
         }
     }
 
@@ -267,24 +267,24 @@ sub read_param {
     }
 
     # checking mandatory parameters
-    if ($opt->{strict}) {
+    if ($opt->{'strict'}) {
         for my $k ("wdir", "name", "kjadmin", "kjadmax") {
             die "The parameter `$k' is mandatory.\n" if !$param->{$k};
         }
         die "The parameter `machines' is mandatory for parallel mode.\n"
-            if $param->{parallel} && !$param->{machines};
+            if $param->{'parallel'} && !$param->{'machines'};
 
-        if (!$param->{cadodir}) {
+        if (!$param->{'cadodir'}) {
             warn "Taking current script's directory as `cadodir'.\n";
-            $param->{cadodir} = abs_path(dirname($0));
+            $param->{'cadodir'} = abs_path(dirname($0));
         }
     }
 
     # substitute `name' instead of `%s' into `wdir'
-    $param->{wdir} =~ s/%s/$param->{name}/g if ($param->{wdir});
+    $param->{'wdir'} =~ s/%s/$param->{'name'}/g if ($param->{'wdir'});
 
-    # `prefix' is a shorthand for `$param->{wdir}/$param->{name}'
-    $param->{prefix} = "$param->{wdir}/$param->{name}";
+    # `prefix' is a shorthand for `$param->{'wdir'}/$param->{'name'}'
+    $param->{'prefix'} = "$param->{'wdir'}/$param->{'name'}";
 }
 
 # Dumps the list of parameters to a file
@@ -307,9 +307,9 @@ my %machines;
 
 # Reads the machine description file for parallel computing
 sub read_machines {
-    die "No machine description file was defined.\n" if !$param{machines};
-    open FILE, "< $param{machines}"
-        or die "Cannot open `$param{machines}' for reading: $!.\n";
+    die "No machine description file was defined.\n" if !$param{'machines'};
+    open FILE, "< $param{'machines'}"
+        or die "Cannot open `$param{'machines'}' for reading: $!.\n";
 
     my %vars = ();
 
@@ -327,20 +327,20 @@ sub read_machines {
             while (s/^(\w+)=(\S*)\s*//) {
                 $desc{$1} = $2;
             }
-            die "Cannot parse line `$_' in file `$param{machines}'.\n"
+            die "Cannot parse line `$_' in file `$param{'machines'}'.\n"
                 if !/^$/;
 
             for my $k ("tmpdir", "cadodir") {
                 die "The parameter `$k' is mandatory.\n" if !$desc{$k};
             }
-            $desc{tmpdir} =~ s/%s/$param{name}/g;
-            $desc{cores}  = 1 unless defined $desc{cores};
-            $desc{prefix} = "$desc{tmpdir}/$param{name}";
-            $desc{files}  = {}; # List of files uploaded to the host
+            $desc{'tmpdir'} =~ s/%s/$param{'name'}/g;
+            $desc{'cores'}  = 1 unless defined $desc{'cores'};
+            $desc{'prefix'} = "$desc{'tmpdir'}/$param{'name'}";
+            $desc{'files'}  = {}; # List of files uploaded to the host
 
             $machines{$host} = \%desc;
         } else {
-            die "Cannot parse line `$_' in file `$param{machines}'.\n";
+            die "Cannot parse line `$_' in file `$param{'machines'}'.\n";
         }
     }
 
@@ -367,7 +367,7 @@ my $cmdlog;
 sub cmd {
     my ($cmd, $opt) = @_;
 
-    if ($cmdlog && $opt->{log}) {
+    if ($cmdlog && $opt->{'log'}) {
         open LOG, ">> $cmdlog"
             or die "Cannot open `$cmdlog' for writing: $!.\n";
         print LOG "$cmd\n";
@@ -379,7 +379,7 @@ sub cmd {
 
     die "Command `$cmd' terminated unexpectedly with exit status $status".
         ($out ? ":\n$out\n" : ".\n")
-        if $? && $opt->{kill};
+        if $? && $opt->{'kill'};
 
     return { out => $out, status => $status };
 }
@@ -397,7 +397,7 @@ sub cmd {
 sub remote_cmd {
     my ($host, $cmd, $opt) = @_;
 
-    $opt->{timeout} = 30 unless $opt->{timeout};
+    $opt->{'timeout'} = 30 unless $opt->{'timeout'};
 
     $cmd =~ s/"/\\"/g;
 
@@ -405,15 +405,15 @@ sub remote_cmd {
     # all the time (especially not in the middle of the night!)
     # use public-key authentification instead!
     $cmd = "env ssh -q ".
-           "-o ConnectTimeout=$opt->{timeout} ".
+           "-o ConnectTimeout=$opt->{'timeout'} ".
            "-o PasswordAuthentication=no ".
            "$host \"env sh -c '$cmd'\" 2>&1";
 
     my $ret = cmd($cmd, $opt);
 
     warn "Remote access to `$host' failed".
-         ($ret->{out} ? ":\n$ret->{out}\n" : ".\n")
-        if $ret->{status} == 255;
+         ($ret->{'out'} ? ":\n$ret->{'out'}\n" : ".\n")
+        if $ret->{'status'} == 255;
 
     return $ret;
 }
@@ -446,7 +446,7 @@ sub read_jobs {
         if (s/^(\S+)\s+(\d+|done)\s+(\S+)\s*//) {
             my @param = split;
             my %job = ( host => $1, file => $3, param => \@param );
-            $job{pid} = $2 unless $2 eq "done";
+            $job{'pid'} = $2 unless $2 eq "done";
             push @$jobs, \%job;
         } else {
             die "Cannot parse line `$_' in file `$file'.\n";
@@ -464,8 +464,8 @@ sub write_jobs {
     open FILE, "> $file"
         or die "Cannot open `$file' for writing: $!.\n";
     for my $job (@$jobs) {
-        print FILE "$job->{host} ".($job->{pid} ? $job->{pid} : "done").
-                   " $job->{file} ".join(" ", @{$job->{param}})."\n";
+        print FILE "$job->{'host'} ".($job->{'pid'} ? $job->{'pid'} : "done").
+                   " $job->{'file'} ".join(" ", @{$job->{'param'}})."\n";
     }
     close FILE;
 }
@@ -475,8 +475,8 @@ sub write_jobs {
 # Job description string, with padded fields
 sub job_string {
     my ($job) = @_;
-    my $str = pad($job->{host}, 16);
-    $str .= " ".pad($_, 8) for @{$job->{param}};
+    my $str = pad($job->{'host'}, 16);
+    $str .= " ".pad($_, 8) for @{$job->{'param'}};
     return $str;
 }
 
@@ -487,19 +487,19 @@ sub is_job_alive {
     my ($job) = @_;
 
     # Check if there is a running process of that PID.
-    my $ret = remote_cmd($job->{host}, "env kill -0 $job->{pid}");
-    return -1 if $ret->{status} == 255;
-    return 0  if $ret->{status};
+    my $ret = remote_cmd($job->{'host'}, "env kill -0 $job->{'pid'}");
+    return -1 if $ret->{'status'} == 255;
+    return 0  if $ret->{'status'};
 
-    # Using lsof, check if this process is accessing the $job->{file} file.
+    # Using lsof, check if this process is accessing the $job->{'file'} file.
     # We need to call readlink here to get the _absolute_ path of the file,
     # as returned by lsof.
     # FIXME: on some hosts (e.g. our trojans) lsof is not in PATH
     if (0) {
-      $ret = remote_cmd($job->{host}, "env lsof -Fn -a -p$job->{pid} -d1 | ".
-                        "env grep ^n\\`env readlink -f $job->{file}\\`\$");
-      return -1 if $ret->{status} == 255;
-      return 0  if $ret->{status};
+      $ret = remote_cmd($job->{'host'}, "env lsof -Fn -a -p$job->{'pid'} -d1 | ".
+                        "env grep ^n\\`env readlink -f $job->{'file'}\\`\$");
+      return -1 if $ret->{'status'} == 255;
+      return 0  if $ret->{'status'};
     }
 
     return 1;
@@ -517,20 +517,20 @@ sub job_status {
     my $status;
 
     my $alive = is_job_alive($job);
-    my $ret   = remote_cmd($job->{host}, "env tail -n1 $job->{file} 2>&1");
+    my $ret   = remote_cmd($job->{'host'}, "env tail -n1 $job->{'file'} 2>&1");
 
-    if ($ret->{status} == 255) {
+    if ($ret->{'status'} == 255) {
         info "Unknown status. Assuming job is still running.\n";
         $status = 1;
-    } elsif (!$ret->{status} && $ret->{out} =~ /$pattern/) {
+    } elsif (!$ret->{'status'} && $ret->{'out'} =~ /$pattern/) {
         info "Finished!\n";
         $status = 0;
-    } elsif (!$ret->{status} && $ret->{out} =~ /No such file or directory$/) {
+    } elsif (!$ret->{'status'} && $ret->{'out'} =~ /No such file or directory$/) {
         die "The executable was not found. Make sure the `cadodir' parameter ".
-            "is valid for host `$job->{host}'.\n";
+            "is valid for host `$job->{'host'}'.\n";
     } else {
-        warn "Could not access output file `$job->{file}'.\n"
-            if $ret->{status};
+        warn "Could not access output file `$job->{'file'}'.\n"
+            if $ret->{'status'};
 
         if ($alive) {
             info $alive == 1 ? "Running...\n" :
@@ -552,8 +552,8 @@ sub kill_job {
     info "Killing job:  ".job_string($job)."\n";
     $tab_level++;
     if (is_job_alive($job) == 1) {
-        remote_cmd($job->{host}, "env kill -9 $job->{pid}");
-        remote_cmd($job->{host}, "env rm -f $job->{file}") unless $keep;
+        remote_cmd($job->{'host'}, "env kill -9 $job->{'pid'}");
+        remote_cmd($job->{'host'}, "env rm -f $job->{'file'}") unless $keep;
     }
     $tab_level--;
 }
@@ -567,25 +567,25 @@ sub send_file {
     my $ret;
 
     # If the file is already supposed to be here, just check
-    if ($m->{files}->{$file}) {
-        $ret = remote_cmd($host, "env test -e $m->{tmpdir}/$file 2>&1");
-        return unless $ret->{status};
-        delete $m->{files}->{$file};
+    if ($m->{'files'}->{$file}) {
+        $ret = remote_cmd($host, "env test -e $m->{'tmpdir'}/$file 2>&1");
+        return unless $ret->{'status'};
+        delete $m->{'files'}->{$file};
     }
 
     info "Sending `$file' to `$host'...";
     $tab_level++;
 
     # Try to upload the file
-    $ret = remote_cmd($host, "env mkdir -p $m->{tmpdir} 2>&1");
-    $ret = cmd("env rsync --timeout=30 $param{wdir}/$file ".
-               "$host:$m->{tmpdir}/ 2>&1", { log => 1 })
-        unless $ret->{status};
+    $ret = remote_cmd($host, "env mkdir -p $m->{'tmpdir'} 2>&1");
+    $ret = cmd("env rsync --timeout=30 $param{'wdir'}/$file ".
+               "$host:$m->{'tmpdir'}/ 2>&1", { log => 1 })
+        unless $ret->{'status'};
 
-    if ($ret->{status}) {
-        warn "$ret->{out}\n";
+    if ($ret->{'status'}) {
+        warn "$ret->{'out'}\n";
     } else {
-        $m->{files}->{$file} = 1;
+        $m->{'files'}->{$file} = 1;
     }
     $tab_level--;
 }
@@ -597,15 +597,15 @@ sub send_file {
 sub get_job_output {
     my ($job, $keep) = (@_);
 
-    my $ret = cmd("env rsync --timeout=30 $job->{host}:$job->{file} ".
-                  "$param{wdir}/ 2>&1", { log => 1 });
+    my $ret = cmd("env rsync --timeout=30 $job->{'host'}:$job->{'file'} ".
+                  "$param{'wdir'}/ 2>&1", { log => 1 });
     my $status = 1;
-    if ($ret->{status}) {
-        my @out = split /\n/, $ret->{out};
+    if ($ret->{'status'}) {
+        my @out = split /\n/, $ret->{'out'};
         warn "$out[0]\n";
         $status = $out[0] =~ /No such file or directory/ ? -1 : 0;
     } elsif (!$keep) {
-        remote_cmd($job->{host}, "env rm -f $job->{file}");
+        remote_cmd($job->{'host'}, "env rm -f $job->{'file'}");
     }
     return $status;
 }
@@ -667,10 +667,10 @@ sub append_poly_params {
 
     # Strip the parameters at the end of the poly file, in case they
     # have changed
-    open IN, "< $param{prefix}.poly"
-        or die "Cannot open `$param{prefix}.poly' for reading: $!.\n";
-    open OUT, "> $param{prefix}.poly_tmp"
-        or die "Cannot open `$param{prefix}.poly_tmp' for writing: $!.\n";
+    open IN, "< $param{'prefix'}.poly"
+        or die "Cannot open `$param{'prefix'}.poly' for reading: $!.\n";
+    open OUT, "> $param{'prefix'}.poly_tmp"
+        or die "Cannot open `$param{'prefix'}.poly_tmp' for writing: $!.\n";
     while (<IN>) {
         print OUT "$_" unless /^($list):\s*/;
     }
@@ -680,7 +680,7 @@ sub append_poly_params {
     print OUT "$_: $param{$_}\n" for @list;
     close OUT;
 
-    cmd("env mv -f $param{prefix}.poly_tmp $param{prefix}.poly",
+    cmd("env mv -f $param{'prefix'}.poly_tmp $param{'prefix'}.poly",
         { kill => 1 });
 }
 
@@ -774,14 +774,14 @@ sub find_hole {
 sub distribute_task {
     my ($opt) = @_;
 
-    banner $opt->{title};
+    banner $opt->{'title'};
 
     # Make sure that all the output files that are already here are correct
-    opendir DIR, $param{wdir}
-        or die "Cannot open directory `$param{wdir}': $!\n";
-    my $suffix = $opt->{suffix}.'\.[\de.]+-[\de.]+';
-    $suffix .= "|$opt->{extra}" if $opt->{extra};
-    my @files = grep /^$param{name}\.($suffix)$/,
+    opendir DIR, $param{'wdir'}
+        or die "Cannot open directory `$param{'wdir'}': $!\n";
+    my $suffix = $opt->{'suffix'}.'\.[\de.]+-[\de.]+';
+    $suffix .= "|$opt->{'extra'}" if $opt->{'extra'};
+    my @files = grep /^$param{'name'}\.($suffix)$/,
                      readdir DIR;
     closedir DIR;
 
@@ -790,7 +790,7 @@ sub distribute_task {
         $tab_level++;
         # We don't do exhaustive checking here, it's too slow...
         # We assume the files are here for a good reason!
-        &{$opt->{check}}($_, 0) for (map "$param{wdir}/$_", sort @files);
+        &{$opt->{'check'}}($_, 0) for (map "$param{'wdir'}/$_", sort @files);
         $tab_level--;
     }
 
@@ -800,11 +800,11 @@ sub distribute_task {
         my $jobs = [];
 
         # See what's already running, and retrieve possibly finished data
-        if ($param{parallel}) {
-            $jobs = read_jobs("$param{prefix}.$opt->{task}_jobs");
+        if ($param{'parallel'}) {
+            $jobs = read_jobs("$param{'prefix'}.$opt->{'task'}_jobs");
 
-            my @running = grep  defined $_->{pid}, @$jobs;
-            my @done    = grep !defined $_->{pid}, @$jobs;
+            my @running = grep  defined $_->{'pid'}, @$jobs;
+            my @done    = grep !defined $_->{'pid'}, @$jobs;
             my @new_jobs;
 
             # Check the status of all running jobs
@@ -814,19 +814,19 @@ sub distribute_task {
                 for my $job (@running) {
                     info "Checking job: ".job_string($job)."\n";
                     $tab_level++;
-                    my $status = job_status($job, $opt->{pattern});
+                    my $status = job_status($job, $opt->{'pattern'});
                     if ($status == 1) {
                         # Job is still alive: keep it in the list
                         push @new_jobs, $job;
                     }
-                    elsif ($status == 0 || $opt->{partial}) {
+                    elsif ($status == 0 || $opt->{'partial'}) {
                         # Job is (partially) terminated: mark it as done
-                        delete $job->{pid};
+                        delete $job->{'pid'};
                         push @done, $job;
                     }
                     else {
                         # Job is dead: remove its output file on the host
-                        remote_cmd($job->{host}, "env rm -f $job->{file}");
+                        remote_cmd($job->{'host'}, "env rm -f $job->{'file'}");
                     }
                     $tab_level--;
                 }
@@ -838,19 +838,19 @@ sub distribute_task {
                 info "Retrieving job data...\n";
                 $tab_level++;
                 for my $job (@done) {
-                    info "Retrieving `".basename($job->{file})."' ".
-                         "from `$job->{host}'...\n";
+                    info "Retrieving `".basename($job->{'file'})."' ".
+                         "from `$job->{'host'}'...\n";
                     $tab_level++;
 
-                    my $file = "$param{wdir}/".basename($job->{file});
+                    my $file = "$param{'wdir'}/".basename($job->{'file'});
                     if (-f $file) {
                         warn "`$file' already exists. ".
                              "Assuming it is the same.\n";
                     } else {
-                        my $status = get_job_output($job, $opt->{keep});
+                        my $status = get_job_output($job, $opt->{'keep'});
                         if ($status == 1) {
                             # Output file was downloaded: exhaustive check
-                            &{$opt->{check}}($file, 1);
+                            &{$opt->{'check'}}($file, 1);
                         } elsif ($status == 0) {
                             # Can't get output file: let's try again next time
                             push @new_jobs, $job;
@@ -864,7 +864,7 @@ sub distribute_task {
             }
 
             $jobs = \@new_jobs;
-            write_jobs($jobs, "$param{prefix}.$opt->{task}_jobs");
+            write_jobs($jobs, "$param{'prefix'}.$opt->{'task'}_jobs");
         }
 
 
@@ -873,9 +873,9 @@ sub distribute_task {
         my $ranges = [];
 
         # First, scan the job output files
-        opendir DIR, $param{wdir}
-            or die "Cannot open directory `$param{wdir}': $!\n";
-        my @files = grep /^$param{name}\.$opt->{suffix}\.[\de.]+-[\de.]+$/,
+        opendir DIR, $param{'wdir'}
+            or die "Cannot open directory `$param{'wdir'}': $!\n";
+        my @files = grep /^$param{'name'}\.$opt->{'suffix'}\.[\de.]+-[\de.]+$/,
                          readdir DIR;
         closedir DIR;
         push @$ranges, map { /\.([\de.]+)-([\de.]+)$/; [$1, $2] } @files;
@@ -884,13 +884,13 @@ sub distribute_task {
         my $file_ranges = [ map [@$_], @$ranges ];
 
         # Add the ranges from running or done jobs
-        push @$ranges, map { my @p = @{$_->{param}}; \@p } @$jobs;
+        push @$ranges, map { my @p = @{$_->{'param'}}; \@p } @$jobs;
         $ranges = merge_ranges($ranges);
 
 
 
         # Start new job(s) (parallel mode)
-        if ($param{parallel}) {
+        if ($param{'parallel'}) {
             info "Starting new jobs...\n";
             $tab_level++;
 
@@ -898,16 +898,16 @@ sub distribute_task {
                 my $m = $machines{$h};
 
                 # How many free cores on this host?
-                my $n = $m->{cores} - grep { $_->{host} eq $h } @$jobs;
+                my $n = $m->{'cores'} - grep { $_->{'host'} eq $h } @$jobs;
                 next unless $n;
 
                 # Send files and skip to next host if not all files are here
-                send_file($h, $_) for @{$opt->{files}};
-                next if grep !$m->{files}->{$_}, @{$opt->{files}};
+                send_file($h, $_) for @{$opt->{'files'}};
+                next if grep !$m->{'files'}->{$_}, @{$opt->{'files'}};
 
                 while ($n-- > 0) {
-                    my @r = find_hole($opt->{min}, $opt->{max},
-                                      $opt->{len}, $ranges);
+                    my @r = find_hole($opt->{'min'}, $opt->{'max'},
+                                      $opt->{'len'}, $ranges);
 
                     # No hole was found. But maybe we are waiting for another
                     # job to finish, on a host which is unreachable...
@@ -915,25 +915,25 @@ sub distribute_task {
                     # (This patch is sponsored by your local energy provider!)
                     #if (!@r) {
                     #    $ranges = [ map [@$_], @$file_ranges ];
-                    #    @r = find_hole($opt->{min}, $opt->{max},
-                    #                   $opt->{len}, $ranges);
+                    #    @r = find_hole($opt->{'min'}, $opt->{'max'},
+                    #                   $opt->{'len'}, $ranges);
                     #}
 
                     # Still no hole? Well then, we're truly finished!
                     last HOST unless @r;
 
                     my $job = { host  => $h,
-                                file  => "$m->{prefix}.$opt->{suffix}.".
+                                file  => "$m->{'prefix'}.$opt->{'suffix'}.".
                                          "$r[0]-$r[1]",
                                 param => \@r };
 
                     info "Starting job: ".job_string($job)."\n";
                     $tab_level++;
-                    my $cmd = &{$opt->{cmd}}(@r, $m)." & echo \\\$!";
+                    my $cmd = &{$opt->{'cmd'}}(@r, $m)." & echo \\\$!";
                     my $ret = remote_cmd($h, $cmd, { log => 1 });
-                    if (!$ret->{status}) {
-                        chomp $ret->{out};
-                        $job->{pid} = $ret->{out};
+                    if (!$ret->{'status'}) {
+                        chomp $ret->{'out'};
+                        $job->{'pid'} = $ret->{'out'};
                         push @$jobs, $job;
                         push @$ranges, \@r;
                         $ranges = merge_ranges($ranges);
@@ -942,14 +942,14 @@ sub distribute_task {
                 }
             }
 
-            write_jobs($jobs, "$param{prefix}.$opt->{task}_jobs");
+            write_jobs($jobs, "$param{'prefix'}.$opt->{'task'}_jobs");
             $tab_level--;
         }
 
 
 
         # Print the progress of the task
-        &{$opt->{progress}}($file_ranges);
+        &{$opt->{'progress'}}($file_ranges);
 
         # This might be enough to exit the loop now
         last if &{$opt->{is_done}}($file_ranges);
@@ -957,13 +957,13 @@ sub distribute_task {
 
 
         # Start new job (sequential mode)
-        if (!$param{parallel} && (my @r = find_hole($opt->{min}, $opt->{max},
-                                                    $opt->{len}, $ranges))) {
+        if (!$param{'parallel'} && (my @r = find_hole($opt->{'min'}, $opt->{'max'},
+                                                    $opt->{'len'}, $ranges))) {
             info "Starting job: ".pad($r[0], 8)." ".pad($r[1], 8)."\n";
             $tab_level++;
-            my $cmd = &{$opt->{cmd}}(@r, $machines{localhost});
+            my $cmd = &{$opt->{'cmd'}}(@r, $machines{'localhost'});
             cmd($cmd, { log => 1, kill => 1 });
-            &{$opt->{check}}("$param{prefix}.$opt->{suffix}.$r[0]-$r[1]",
+            &{$opt->{'check'}}("$param{'prefix'}.$opt->{'suffix'}.$r[0]-$r[1]",
                              1); # Exhaustive testing!
             $tab_level--;
         }
@@ -971,31 +971,31 @@ sub distribute_task {
 
 
         # Wait for a bit before having another go
-        if ($param{parallel}) {
-            info "Waiting for $opt->{delay} seconds before ".
+        if ($param{'parallel'}) {
+            info "Waiting for $opt->{'delay'} seconds before ".
                  "checking again...\n";
-            sleep $opt->{delay};
+            sleep $opt->{'delay'};
         }
     }
 
 
 
     # A bit of cleaning on slaves
-    if ($param{parallel}) {
+    if ($param{'parallel'}) {
         info "Cleaning up...\n";
         $tab_level++;
         # Kill jobs
-        my $jobs = read_jobs("$param{prefix}.$opt->{task}_jobs");
+        my $jobs = read_jobs("$param{'prefix'}.$opt->{'task'}_jobs");
         for my $job (@$jobs) {
-            kill_job($job, $opt->{partial});
-            next unless $opt->{partial};
+            kill_job($job, $opt->{'partial'});
+            next unless $opt->{'partial'};
             $tab_level++;
-            my $file = "$param{wdir}/".basename($job->{file});
+            my $file = "$param{'wdir'}/".basename($job->{'file'});
             if (-f $file) {
                 warn "`$file' already exists. Assuming it is the same.\n";
             } else {
-                get_job_output($job, $opt->{keep});
-                &{$opt->{check}}("$param{wdir}/".basename($job->{file}), 1);
+                get_job_output($job, $opt->{'keep'});
+                &{$opt->{'check'}}("$param{'wdir'}/".basename($job->{'file'}), 1);
                 # TODO: For now, the extra relations are imported back in the
                 # working directory, but they are not used. Feeding them to
                 # duplicates/singleton would take some more time and we don't
@@ -1004,10 +1004,10 @@ sub distribute_task {
             }
             $tab_level--;
         }
-        unlink "$param{prefix}.$opt->{task}_jobs";
+        unlink "$param{'prefix'}.$opt->{'task'}_jobs";
         # Remove files
         while (my ($h, $m) = each %machines) {
-            my $files = join " ", (map "$m->{tmpdir}/$_", @{$opt->{files}});
+            my $files = join " ", (map "$m->{'tmpdir'}/$_", @{$opt->{'files'}});
             remote_cmd($h, "env rm -f $files");
         }
         $tab_level--;
@@ -1082,13 +1082,9 @@ my %tasks = (
     replay    => { dep    => ['merge'],
                    files  => ['index', 'small', 'replay\.stderr'] },
 
-    transpose => { dep    => ['replay'],
-                   param  => ['skip'],
-                   files  => ['small\.tr'] },
-
     linalg    => { name   => "linear algebra",
-                   dep    => ['transpose'],
-                   param  => ['bwmt', 'bwthreshold', 'linalg'],
+                   dep    => ['replay'],
+                   param  => ['skip', 'bwmt', 'bwthreshold', 'linalg'],
                    files  => ['bw', 'bw\.stderr', 'bl', 'bl\.stderr', 'W'] },
 
     bitstr    => { dep    => ['linalg'],
@@ -1118,8 +1114,8 @@ for my $v (values %tasks) {
 
 # Build reverse dependencies
 while (my ($k, $v) = each %tasks) {
-    push @{$tasks{$_}->{rdep}}, $k for @{$v->{dep}};
-    push @{$tasks{$_}->{rreq}}, $k for @{$v->{req}};
+    push @{$tasks{$_}->{'rdep'}}, $k for @{$v->{'dep'}};
+    push @{$tasks{$_}->{'rreq'}}, $k for @{$v->{'req'}};
 }
 
 
@@ -1130,10 +1126,10 @@ sub do_task {
     my $task = $tasks{$t};
 
     # Do nothing if the task was already completed
-    return if $task->{done};
+    return if $task->{'done'};
 
     # First, do all tasks on which this one depends
-    do_task($_) for (@{$task->{dep}}, @{$task->{req}});
+    do_task($_) for (@{$task->{'dep'}}, @{$task->{'req'}});
 
     # Call the corresponding do_* function
     # (we need to allow symbolic refs for that)
@@ -1143,11 +1139,11 @@ sub do_task {
     }
 
     # Put a timestamp file
-    open FILE, "> $param{prefix}.${t}_done"
-        or die "Cannot open `$param{prefix}.${t}_done' for writing: $!.\n";
+    open FILE, "> $param{'prefix'}.${t}_done"
+        or die "Cannot open `$param{'prefix'}.${t}_done' for writing: $!.\n";
     close FILE;
-    $task->{done} = (stat("$param{prefix}.${t}_done"))[9] # modificaton time
-        or die "Cannot stat `$param{prefix}.${t}_done': $!.\n";
+    $task->{'done'} = (stat("$param{'prefix'}.${t}_done"))[9] # modificaton time
+        or die "Cannot stat `$param{'prefix'}.${t}_done': $!.\n";
 }
 
 
@@ -1165,45 +1161,45 @@ sub do_init {
     read_param(\%param, { strict => 1 }, @ARGV);
     $tab_level--;
 
-    if ($param{parallel}) {
+    if ($param{'parallel'}) {
         info "Reading the machine description file...\n";
         $tab_level++;
         read_machines();
         $tab_level--;
     } else {
-        $machines{localhost} = { tmpdir  => $param{wdir},
-                                 cadodir => $param{cadodir},
-                                 prefix  => $param{prefix} };
+        $machines{'localhost'} = { tmpdir  => $param{'wdir'},
+                                 cadodir => $param{'cadodir'},
+                                 prefix  => $param{'prefix'} };
     }
 
     info "Initializing the working directory...\n";
     $tab_level++;
     # Create working directory if not there
-    cmd("env mkdir -p $param{wdir} 2>&1", { kill => 1 })
-        if !-d $param{wdir};
+    cmd("env mkdir -p $param{'wdir'} 2>&1", { kill => 1 })
+        if !-d $param{'wdir'};
     $tab_level--;
 
     # Check if there is already some stuff relative to $name in $wdir
     # First thing is $name.n. If it is not there, we consider that
     # everything is obsolete, anyway.
     my $recover = 0;
-    if (-f "$param{prefix}.n") {
-        info "There is already some data relative to `$param{name}' ".
+    if (-f "$param{'prefix'}.n") {
+        info "There is already some data relative to `$param{'name'}' ".
              "in the working directory. Trying to recover...\n";
         $tab_level++;
         $recover = 1;
 
-        open FILE, "< $param{prefix}.n"
-            or die "Cannot open `$param{prefix}.n' for reading: $!.\n";
+        open FILE, "< $param{'prefix'}.n"
+            or die "Cannot open `$param{'prefix'}.n' for reading: $!.\n";
         $_ = <FILE>;
         close FILE;
         chomp;
-        die "Cannot parse `$param{prefix}.n'.\n" unless /^n:\s*(\d+)$/;
+        die "Cannot parse `$param{'prefix'}.n'.\n" unless /^n:\s*(\d+)$/;
 
-        if (!$param{n}) {
-            $param{n} = $1;
-        } elsif ($param{n} != $1) {
-            warn "The contents of `$param{name}.n' are inconsistent ".
+        if (!$param{'n'}) {
+            $param{'n'} = $1;
+        } elsif ($param{'n'} != $1) {
+            warn "The contents of `$param{'name'}.n' are inconsistent ".
                  "with the given parameter `n'. Aborting recovery.\n";
             $recover = 0;
         }
@@ -1214,11 +1210,11 @@ sub do_init {
     # If something was done here before, retrieve the parameters to see
     # from where we should start again
     my %param_diff;
-    if ($recover && -f "$param{prefix}.param") {
+    if ($recover && -f "$param{'prefix'}.param") {
         eval {
             my %param_old;
             read_param(\%param_old, { strict => 0 },
-                       "param=$param{prefix}.param");
+                       "param=$param{'prefix'}.param");
             $param_diff{$_} = !$param_old{$_} || $param{$_} ne $param_old{$_}
                 for keys %param;
         };
@@ -1226,22 +1222,22 @@ sub do_init {
 
     if (!$recover) {
         # Read n if not given on command line
-        if (!$param{n}) {
+        if (!$param{'n'}) {
             info "The parameter `n' was not specified. Please enter the ".
                  "number to factor:\n";
-            $param{n} = <STDIN>;
-            chomp $param{n};
+            $param{'n'} = <STDIN>;
+            chomp $param{'n'};
         }
 
         # Create $name.n in $wdir
-        open FILE, "> $param{prefix}.n"
-            or die "Cannot open `$param{prefix}.n' for writing: $!.\n";
-        print FILE "n: $param{n}\n";
+        open FILE, "> $param{'prefix'}.n"
+            or die "Cannot open `$param{'prefix'}.n' for writing: $!.\n";
+        print FILE "n: $param{'n'}\n";
         close FILE;
     }
 
     # Log file for commands
-    $cmdlog = "$param{prefix}.cmd";
+    $cmdlog = "$param{'prefix'}.cmd";
     # unlink $cmdlog if !$recover && -f $cmdlog;
     open LOG, ">> $cmdlog"
         or die "Cannot open `$cmdlog' for writing: $!.\n";
@@ -1249,8 +1245,8 @@ sub do_init {
     close LOG;
 
     # Timestamp the task with the date of the last modification of $name.n
-    $tasks{init}->{done} = (stat("$param{prefix}.n"))[9] # modification time
-        or die "Cannot stat `$param{prefix}.n': $!.\n";
+    $tasks{'init'}->{'done'} = (stat("$param{'prefix'}.n"))[9] # modification time
+        or die "Cannot stat `$param{'prefix'}.n': $!.\n";
 
 
 
@@ -1263,40 +1259,40 @@ sub do_init {
         my $task = $tasks{$t};
 
         # Skip if already visited
-        next if $task->{visited};
+        next if $task->{'visited'};
 
         # First, check that all previous nodes have been visited, otherwise
         # skip this node for now
-        for (map $tasks{$_}->{visited}, (@{$task->{dep}}, @{$task->{req}})) {
+        for (map $tasks{$_}->{'visited'}, (@{$task->{'dep'}}, @{$task->{'req'}})) {
             next unless $_;
         }
 
         # Visit this node and push the next ones in the queue
-        $task->{visited} = 1;
-        push @queue, (@{$task->{rdep}}, @{$task->{rreq}});
+        $task->{'visited'} = 1;
+        push @queue, (@{$task->{'rdep'}}, @{$task->{'rreq'}});
 
-        my $done   = $task->{done};
-        my $resume = $task->{resume} && $recover;
+        my $done   = $task->{'done'};
+        my $resume = $task->{'resume'} && $recover;
 
         # Is there already a $name.${t}_done file? If so, it must mean that
         # the task has already been done
-        if (!$done && -f "$param{prefix}.${t}_done") {
-            $done = (stat("$param{prefix}.${t}_done"))[9] # modification time
-                or die "Cannot stat `$param{prefix}.${t}_done': $!.\n";
+        if (!$done && -f "$param{'prefix'}.${t}_done") {
+            $done = (stat("$param{'prefix'}.${t}_done"))[9] # modification time
+                or die "Cannot stat `$param{'prefix'}.${t}_done': $!.\n";
         }
 
         # Check dependencies
         if ($done || $resume) {
-            for (map $tasks{$_}, @{$task->{dep}}) {
-                if (!$_->{done}) {
-                    info "$_->{name} not flagged as done, flagging ${t} as ".
+            for (map $tasks{$_}, @{$task->{'dep'}}) {
+                if (!$_->{'done'}) {
+                    info "$_->{'name'} not flagged as done, flagging ${t} as ".
                       "not done\n";
                     undef $done;
                     undef $resume;
                     last;
                 }
-                if ($done && $_->{done} > $done) {
-                    info "$_->{name}_done newer than ${t}_done\n";
+                if ($done && $_->{'done'} > $done) {
+                    info "$_->{'name'}_done newer than ${t}_done\n";
                     undef $done;
                     undef $resume;
                     last;
@@ -1306,7 +1302,7 @@ sub do_init {
 
         # Check parameter changes
         if ($done || $resume) {
-            for (@{$task->{param}}) {
+            for (@{$task->{'param'}}) {
                 if ($param_diff{$_}) {
                     info "Parameters changed for ${t}\n";
                     undef $done;
@@ -1318,37 +1314,37 @@ sub do_init {
 
         # If the task is up to date or can be resumed, we're done for now
         if ($done) {
-            info "Nothing to be done for $task->{name}.\n" if $task->{name};
-            $task->{done} = $done;
+            info "Nothing to be done for $task->{'name'}.\n" if $task->{'name'};
+            $task->{'done'} = $done;
         } else {
-            delete $task->{done};
+            delete $task->{'done'};
         }
         next if $done || $resume;
 
         # Otherwise, add to the clean-up list
-        my $files = join "|", (@{$task->{files}}, "${t}_done");
-        opendir DIR, $param{wdir}
-            or die "Cannot open directory `$param{wdir}': $!\n";
-        my @files = grep /^$param{name}\.($files)$/,
+        my $files = join "|", (@{$task->{'files'}}, "${t}_done");
+        opendir DIR, $param{'wdir'}
+            or die "Cannot open directory `$param{'wdir'}': $!\n";
+        my @files = grep /^$param{'name'}\.($files)$/,
                          readdir DIR;
         closedir DIR;
         push @cleanup, { task => $t, files => \@files } if @files;
     }
 
     # Clear the `visited' field of each node
-    delete $_->{visited} for values %tasks;
+    delete $_->{'visited'} for values %tasks;
 
     # Cleaning up everything in one go.
     if (@cleanup) {
         # Make sure that the user is ready to cleanup!
         my $list = join "; ", (grep { defined $_ }
-                               (map $tasks{$_->{task}}->{name}, @cleanup));
+                               (map $tasks{$_->{'task'}}->{'name'}, @cleanup));
         $list =~ s/^(.*);/$1; and/;
         warn "I will clean up the following tasks: $list.\n";
         warn "Are you OK to continue? [y/N] (30s timeout)\n";
         my $r = "";
         eval {
-            local $SIG{ALRM} = sub { die "alarm\n" }; # NB: \n required
+            local $SIG{'ALRM'} = sub { die "alarm\n" }; # NB: \n required
             alarm 30;
             $r = <STDIN>;
             alarm 0;
@@ -1360,37 +1356,37 @@ sub do_init {
         die "Aborting...\n" unless $r =~ /^y/i;
 
         for (@cleanup) {
-            my $t     = $_->{task};
-            my $files = $_->{files};
+            my $t     = $_->{'task'};
+            my $files = $_->{'files'};
             my $task  = $tasks{$t};
 
             # Clean up old files...
-            info "Cleaning up $task->{name}..." if $task->{name};
+            info "Cleaning up $task->{'name'}..." if $task->{'name'};
             $tab_level++;
-            for (map "$param{wdir}/$_", sort @$files) {
+            for (map "$param{'wdir'}/$_", sort @$files) {
                 unlink $_ if -f;
                 cmd("env rm -rf $_") if -d;
             }
             $tab_level--;
 
             # ... and kill old jobs
-            if ($task->{dist} && -f "$param{prefix}.${t}_jobs") {
-                info "Killing old $task->{name} jobs..."
-                    if $task->{name} && -s "$param{prefix}.${t}_jobs";
+            if ($task->{'dist'} && -f "$param{'prefix'}.${t}_jobs") {
+                info "Killing old $task->{'name'} jobs..."
+                    if $task->{'name'} && -s "$param{'prefix'}.${t}_jobs";
                 $tab_level++;
-                my $jobs = read_jobs("$param{prefix}.${t}_jobs");
+                my $jobs = read_jobs("$param{'prefix'}.${t}_jobs");
                 kill_job($_) for @$jobs;
-                unlink "$param{prefix}.${t}_jobs";
+                unlink "$param{'prefix'}.${t}_jobs";
                 $tab_level--;
             }
         }
     }
 
     # Dump parameters into $name.param
-    write_param("$param{prefix}.param");
+    write_param("$param{'prefix'}.param");
 
     # Update parameters in the $name.poly file if needed
-    append_poly_params() if $tasks{polysel}->{done};
+    append_poly_params() if $tasks{'polysel'}->{'done'};
 }
 
 
@@ -1421,14 +1417,14 @@ sub do_polysel {
         close FILE;
         
         # Remove invalid files
-        for (qw(n skew Y1 Y0), map "c$_", (0 .. $param{degree})) {
+        for (qw(n skew Y1 Y0), map "c$_", (0 .. $param{'degree'})) {
             if (!defined $poly{$_}) {
                 warn "File `$f' is incomplete (missing `$_'). Removing...\n";
                 unlink $f;
                 return;
             }
         }
-        if ($poly{n} != $param{n}) {
+        if ($poly{'n'} != $param{'n'}) {
             warn "File `$f' is invalid (different `n'). Removing...\n";
             unlink $f;
         }
@@ -1436,7 +1432,7 @@ sub do_polysel {
 
     my $polysel_progress = sub {
         my ($ranges) = @_;
-        my ($min, $max) = ($param{kjadmin}, $param{kjadmax});
+        my ($min, $max) = ($param{'kjadmin'}, $param{'kjadmax'});
 
         my $total = 0;
         for (@$ranges) {
@@ -1452,42 +1448,42 @@ sub do_polysel {
     my $polysel_is_done = sub {
         my ($ranges) = @_;
         for (@$ranges) {
-            next     if $_->[1] <  $param{kjadmax};
-            last     if $_->[0] >  $param{kjadmin};
-            return 1 if $_->[0] <= $param{kjadmin} &&
-                        $_->[1] >= $param{kjadmax};
+            next     if $_->[1] <  $param{'kjadmax'};
+            last     if $_->[0] >  $param{'kjadmin'};
+            return 1 if $_->[0] <= $param{'kjadmin'} &&
+                        $_->[1] >= $param{'kjadmax'};
         }
         return 0;
     };
 
     my $polysel_cmd = sub {
         my ($a, $b, $m) = @_;
-        return "env nice -$param{selectnice} ".
-               "$m->{cadodir}/polyselect/polyselect ".
-               "-keep $param{kjkeep} ".
-               "-kmax $param{kjkmax} ".
-               "-incr $param{kjincr} ".
-               "-l $param{kjl} ".
-               "-M $param{kjM} ".
-               "-pb $param{kjpb} ".
+        return "env nice -$param{'selectnice'} ".
+               "$m->{'cadodir'}/polyselect/polyselect ".
+               "-keep $param{'kjkeep'} ".
+               "-kmax $param{'kjkmax'} ".
+               "-incr $param{'kjincr'} ".
+               "-l $param{'kjl'} ".
+               "-M $param{'kjM'} ".
+               "-pb $param{'kjpb'} ".
                "-p0max $param{kjp0max} ".
                "-admin $a ".
                "-admax $b ".
-               "-degree $param{degree} ".
-               "< $m->{prefix}.n ".
-               "> $m->{prefix}.kjout.$a-$b ".
+               "-degree $param{'degree'} ".
+               "< $m->{'prefix'}.n ".
+               "> $m->{'prefix'}.kjout.$a-$b ".
                "2>&1";
     };
 
     distribute_task({ task     => "polysel",
                       title    => "Polynomial selection",
                       suffix   => "kjout",
-                      files    => ["$param{name}.n"],
+                      files    => ["$param{'name'}.n"],
                       pattern  => '^(# generated|No polynomial found)',
-                      min      => $param{kjadmin},
-                      max      => $param{kjadmax},
-                      len      => $param{kjadrange},
-                      delay    => $param{kjdelay},
+                      min      => $param{'kjadmin'},
+                      max      => $param{'kjadmax'},
+                      len      => $param{'kjadrange'},
+                      delay    => $param{'kjdelay'},
                       check    => $polysel_check,
                       progress => $polysel_progress,
                       is_done  => $polysel_is_done,
@@ -1501,13 +1497,13 @@ sub do_polysel {
     my $Emin;
     my $best;
 
-    opendir DIR, $param{wdir}
-        or die "Cannot open directory `$param{wdir}': $!\n";
-    my @files = grep /^$param{name}\.kjout\.[\de.]+-[\de.]+$/,
+    opendir DIR, $param{'wdir'}
+        or die "Cannot open directory `$param{'wdir'}': $!\n";
+    my @files = grep /^$param{'name'}\.kjout\.[\de.]+-[\de.]+$/,
                      readdir DIR;
     closedir DIR;
 
-    for my $f (map "$param{wdir}/$_", sort @files) {
+    for my $f (map "$param{'wdir'}/$_", sort @files) {
         open FILE, "< $f"
             or die "Cannot open `$f' for reading: $!.\n";
         my $last;
@@ -1530,13 +1526,13 @@ sub do_polysel {
     # Copy the best polynomial
     info "The best polynomial is from `".basename($best)."' (E = $Emin).\n";
     $tab_level++;
-    cmd("env cp -f $best $param{prefix}.poly 2>&1",
+    cmd("env cp -f $best $param{'prefix'}.poly 2>&1",
         { log => 1, kill => 1 });
     $tab_level--;
 
     # Append sieving parameters to the poly file
-    open FILE, ">> $param{prefix}.poly"
-        or die "Cannot open `$param{prefix}.poly' for writing: $!.\n";
+    open FILE, ">> $param{'prefix'}.poly"
+        or die "Cannot open `$param{'prefix'}.poly' for writing: $!.\n";
     print FILE "$_: $param{$_}\n"
         for qw(rlim alim lpbr lpba mfbr mfba rlambda alambda);
     close FILE;
@@ -1552,10 +1548,10 @@ sub do_factbase {
     info "Generating factor base...\n";
     $tab_level++;
 
-    my $cmd = "$param{cadodir}/sieve/makefb ".
-              "-poly $param{prefix}.poly ".
-              "> $param{prefix}.roots ".
-              "2> $param{prefix}.makefb.stderr";
+    my $cmd = "$param{'cadodir'}/sieve/makefb ".
+              "-poly $param{'prefix'}.poly ".
+              "> $param{'prefix'}.roots ".
+              "2> $param{'prefix'}.makefb.stderr";
 
     cmd($cmd, { log => 1, kill => 1 });
     $tab_level--;
@@ -1571,11 +1567,11 @@ sub do_freerels {
     info "Computing free relations...\n";
     $tab_level++;
 
-    my $cmd = "$param{cadodir}/linalg/freerel ".
-              "-poly $param{prefix}.poly ".
-              "-fb $param{prefix}.roots ".
-              "> $param{prefix}.freerels ".
-              "2> $param{prefix}.freerel.stderr";
+    my $cmd = "$param{'cadodir'}/linalg/freerel ".
+              "-poly $param{'prefix'}.poly ".
+              "-fb $param{'prefix'}.roots ".
+              "> $param{'prefix'}.freerels ".
+              "2> $param{'prefix'}.freerel.stderr";
 
     cmd($cmd, { log => 1, kill => 1 });
     $tab_level--;
@@ -1608,7 +1604,7 @@ sub do_sieve {
 
         my $check = $f;
         if (!$full) {
-            $check = "$param{prefix}.rels.tmp";
+            $check = "$param{'prefix'}.rels.tmp";
             # Put the first 10 relations into a temp file
             open FILE, "< $f"
                 or die "Cannot open `$f' for reading: $!.\n";
@@ -1624,12 +1620,12 @@ sub do_sieve {
         }
 
         # Check relations
-        my $ret = cmd("$param{cadodir}/utils/check_rels ".
-                      "-poly $param{prefix}.poly $check > /dev/null 2>&1");
+        my $ret = cmd("$param{'cadodir'}/utils/check_rels ".
+                      "-poly $param{'prefix'}.poly $check > /dev/null 2>&1");
         unlink "$check" unless $full;
 
         # Remove invalid files
-        if ($ret->{status}) {
+        if ($ret->{'status'}) {
             warn "File `$f' is invalid. Deleting...\n";
             close FILE;
             unlink $f;
@@ -1665,18 +1661,18 @@ sub do_sieve {
             }
 
             # Truncate the file and add a marker at the end
-            truncate FILE, $lastq[-1]->{pos};
-            seek FILE, $lastq[-1]->{pos}, 0;
+            truncate FILE, $lastq[-1]->{'pos'};
+            seek FILE, $lastq[-1]->{'pos'}, 0;
             print FILE "# Warning: truncated file\n";
             close FILE;
 
             # Rename the file to account for the truncated range
-            basename($f) =~ /^$param{name}\.rels\.([\de.]+)-([\de.]+)$/;
-            my @r = ($1, $lastq[0]->{q}+1);
+            basename($f) =~ /^$param{'name'}\.rels\.([\de.]+)-([\de.]+)$/;
+            my @r = ($1, $lastq[0]->{'q'}+1);
             info "Truncating `".basename($f)."' to range $r[0]-$r[1]...\n";
             $tab_level++;
-            cmd("env mv -f $f $param{prefix}.rels.$r[0]-$r[1]", { kill => 1 });
-            $f = "$param{prefix}.rels.$r[0]-$r[1]";
+            cmd("env mv -f $f $param{'prefix'}.rels.$r[0]-$r[1]", { kill => 1 });
+            $f = "$param{'prefix'}.rels.$r[0]-$r[1]";
             $tab_level--;
         }
 
@@ -1693,30 +1689,30 @@ sub do_sieve {
 
 
     my $sieve_is_done = sub {
-        # Check only every $param{checkrange} relations
-        return 0 if $nrels - $last_check < $param{checkrange};
+        # Check only every $param{'checkrange'} relations
+        return 0 if $nrels - $last_check < $param{'checkrange'};
         $last_check = $nrels;
 
         banner "Duplicate and singleton removal";
 
         # Get the list of relation files
-        opendir DIR, $param{wdir}
-            or die "Cannot open directory `$param{wdir}': $!\n";
-        my @files = grep /^$param{name}\.(rels\.[\de.]+-[\de.]+|freerels)$/,
+        opendir DIR, $param{'wdir'}
+            or die "Cannot open directory `$param{'wdir'}': $!\n";
+        my @files = grep /^$param{'name'}\.(rels\.[\de.]+-[\de.]+|freerels)$/,
                          readdir DIR;
         closedir DIR;
-        my $files = join " ", (map "$param{wdir}/$_", sort @files);
+        my $files = join " ", (map "$param{'wdir'}/$_", sort @files);
 
         # Remove duplicates
         info "Removing duplicates...";
         $tab_level++;
-        cmd("$param{cadodir}/linalg/duplicates -nrels $nrels ".
-            "-out $param{prefix}.nodup.gz $files ".
-            "> $param{prefix}.duplicates.stderr 2>&1",
+        cmd("$param{'cadodir'}/linalg/duplicates -nrels $nrels ".
+            "-out $param{'prefix'}.nodup.gz $files ".
+            "> $param{'prefix'}.duplicates.stderr 2>&1",
             { log => 1, kill => 1 });
 
-        die "Cannot parse file `$param{prefix}.duplicates.stderr'.\n"
-            unless last_line("$param{prefix}.duplicates.stderr") =~
+        die "Cannot parse file `$param{'prefix'}.duplicates.stderr'.\n"
+            unless last_line("$param{'prefix'}.duplicates.stderr") =~
                    /^Number of relations left: (\d+)/;
         my $n = $1;
 
@@ -1726,23 +1722,23 @@ sub do_sieve {
         # Remove singletons
         info "Removing singletons...";
         $tab_level++;
-        my $ret = cmd("$param{cadodir}/linalg/purge ".
-                      "-poly $param{prefix}.poly -keep $param{keeppurge} ".
-                      "-excess $param{excesspurge} ".
-                      "-nrels $n -out $param{prefix}.purged ".
-                      "$param{prefix}.nodup.gz ".
-                      "> $param{prefix}.purge.stderr 2>&1", { log => 1 });
+        my $ret = cmd("$param{'cadodir'}/linalg/purge ".
+                      "-poly $param{'prefix'}.poly -keep $param{'keeppurge'} ".
+                      "-excess $param{'excesspurge'} ".
+                      "-nrels $n -out $param{'prefix'}.purged ".
+                      "$param{'prefix'}.nodup.gz ".
+                      "> $param{'prefix'}.purge.stderr 2>&1", { log => 1 });
 
-        if ($ret->{status}) {
+        if ($ret->{'status'}) {
             info "Not enough relations! Continuing sieving...\n";
             $tab_level--;
             return 0;
         }
 
         # Get the number of rows and columns from the .purged file
-        my ($nrows, $ncols) = split / /, first_line("$param{prefix}.purged");
+        my ($nrows, $ncols) = split / /, first_line("$param{'prefix'}.purged");
         my $excess = $nrows - $ncols;
-        if ($excess < $param{excess}) {
+        if ($excess < $param{'excess'}) {
             info "Not enough relations! Continuing sieving...\n";
             $tab_level--;
             return 0;
@@ -1757,14 +1753,14 @@ sub do_sieve {
 
     my $sieve_cmd = sub {
         my ($a, $b, $m) = @_;
-        return "env nice -$param{sievenice} ".
-               "$m->{cadodir}/sieve/las ".
-               "-I $param{I} ".
-               "-poly $m->{prefix}.poly ".
-               "-fb $m->{prefix}.roots ".
+        return "env nice -$param{'sievenice'} ".
+               "$m->{'cadodir'}/sieve/las ".
+               "-I $param{'I'} ".
+               "-poly $m->{'prefix'}.poly ".
+               "-fb $m->{'prefix'}.roots ".
                "-q0 $a ".
                "-q1 $b ".
-               "> $m->{prefix}.rels.$a-$b ".
+               "> $m->{'prefix'}.rels.$a-$b ".
                "2>&1";
     };
     
@@ -1772,14 +1768,14 @@ sub do_sieve {
                       title    => "Sieve",
                       suffix   => "rels",
                       extra    => "freerels",
-                      files    => ["$param{name}.poly",
-                                   "$param{name}.roots"],
+                      files    => ["$param{'name'}.poly",
+                                   "$param{'name'}.roots"],
                       pattern  => '^# Total \d+ reports',
-                      min      => $param{qmin},
-                      len      => $param{qrange},
+                      min      => $param{'qmin'},
+                      len      => $param{'qrange'},
                       partial  => 1,
-                      keep     => $param{keeprelfiles},
-                      delay    => $param{delay},
+                      keep     => $param{'keeprelfiles'},
+                      delay    => $param{'delay'},
                       check    => $sieve_check,
                       progress => $sieve_progress,
                       is_done  => $sieve_is_done,
@@ -1801,21 +1797,21 @@ sub do_merge {
     info "Merging relations...\n";
     $tab_level++;
 
-    my $cmd = "$param{cadodir}/linalg/merge ".
-              "-out $param{prefix}.merge.his ".
-              "-mat $param{prefix}.purged ".
-              "-forbw $param{bwstrat} ".
-              "-keep $param{keep} ".
-              "-maxlevel $param{maxlevel} ".
-              "-cwmax $param{cwmax} ".
-              "-rwmax $param{rwmax} ".
-              "-ratio $param{ratio} ".
-              "> $param{prefix}.merge.stderr ".
+    my $cmd = "$param{'cadodir'}/linalg/merge ".
+              "-out $param{'prefix'}.merge.his ".
+              "-mat $param{'prefix'}.purged ".
+              "-forbw $param{'bwstrat'} ".
+              "-keep $param{'keep'} ".
+              "-maxlevel $param{'maxlevel'} ".
+              "-cwmax $param{'cwmax'} ".
+              "-rwmax $param{'rwmax'} ".
+              "-ratio $param{'ratio'} ".
+              "> $param{'prefix'}.merge.stderr ".
               "2>&1";
 
     cmd($cmd, { log => 1, kill => 1 });
 
-    if (last_line("$param{prefix}.merge.his") =~ /^BWCOSTMIN: (\d+)/) {
+    if (last_line("$param{'prefix'}.merge.his") =~ /^BWCOSTMIN: (\d+)/) {
         $bwcostmin = $1;
         info "Minimal bwcost: $bwcostmin.\n";
     }
@@ -1834,24 +1830,24 @@ sub do_replay {
     $tab_level++;
 
     if (!defined $bwcostmin &&
-        last_line("$param{prefix}.merge.his") =~ /^BWCOSTMIN: (\d+)/) {
+        last_line("$param{'prefix'}.merge.his") =~ /^BWCOSTMIN: (\d+)/) {
         $bwcostmin = $1;
     }
 
-    my $cmd = "$param{cadodir}/linalg/replay ".
-              "-his $param{prefix}.merge.his ".
-              "-index $param{prefix}.index ".
-              "-purged $param{prefix}.purged ".
-              "-out $param{prefix}.small ".
+    my $cmd = "$param{'cadodir'}/linalg/replay ".
+              "-his $param{'prefix'}.merge.his ".
+              "-index $param{'prefix'}.index ".
+              "-purged $param{'prefix'}.purged ".
+              "-out $param{'prefix'}.small ".
               (defined $bwcostmin ? "-costmin $bwcostmin " : "").
-              "> $param{prefix}.replay.stderr ".
+              "> $param{'prefix'}.replay.stderr ".
               "2>&1";
 
     cmd($cmd, { log => 1, kill => 1 });
 
     my ($nrows, $ncols, $weight);
-    open FILE, "$param{prefix}.replay.stderr"
-        or die "Cannot open `$param{prefix}.replay.stderr' for reading: $!.\n";
+    open FILE, "$param{'prefix'}.replay.stderr"
+        or die "Cannot open `$param{'prefix'}.replay.stderr' for reading: $!.\n";
     while (<FILE>) {
         $nrows = $1, $ncols = $2 if /^small_nrows=(\d+) small_ncols=(\d+)/;
         $weight = $1             if /^# Weight\(M_small\) = (\d+)/;
@@ -1872,11 +1868,11 @@ sub do_transpose {
     info "Transposing the matrix...\n";
     $tab_level++;
 
-    my $cmd = "$param{cadodir}/linalg/transpose ".
-              "-T $param{wdir} ".
-              "-skip $param{skip} ".
-              "-in $param{prefix}.small ".
-              "-out $param{prefix}.small.tr ".
+    my $cmd = "$param{'cadodir'}/linalg/transpose ".
+              "-T $param{'wdir'} ".
+              "-skip $param{'skip'} ".
+              "-in $param{'prefix'}.small ".
+              "-out $param{'prefix'}.small.tr ".
               "> /dev/null ".
               "2>&1";
 
@@ -1894,37 +1890,79 @@ sub do_linalg {
     banner "Linear algebra";
 
     my $cmd;
-    if ($param{linalg} eq "bw") {
-        info "Calling Block-Wiedemann...\n";
+    if ($param{'linalg'} eq "bw") {
+        do_transpose;
+
+        info "Calling Block-Wiedemann (old code)...\n";
         $tab_level++;
-        $cmd = "$param{cadodir}/linalg/bw/bw.pl ".
+        my $mt = $param{'bwmt'};
+        if ($mt =~ /^(\d+)x(\d+)$/) {
+            $mt = $1 * $2;
+        }
+
+        $cmd = "$param{'cadodir'}/linalg/bw/bw.pl ".
                "seed=1 ". # For debugging purposes, we use a deterministic BW
-               "mt=$param{bwmt} ".
-               "matrix=$param{prefix}.small.tr ".
+               "mt=$mt ".
+               "matrix=$param{'prefix'}.small.tr ".
                "mn=64 ".
                "vectoring=64 ".
                "multisols=1 ".
-               "wdir=$param{wdir}/bw " .
+               "wdir=$param{'wdir'}/bw " .
                "tidy=$param{'bwtidy'} ".
                "threshold=$param{'bwthreshold'} ".
-               "solution=$param{prefix}.W ".
-               "> $param{prefix}.bw.stderr ".
+               "solution=$param{'prefix'}.W ".
+               "> $param{'prefix'}.bw.stderr ".
                "2>&1";
-    } else {
-        warn "Value `$param{linalg}' is unknown for parameter `linalg'. ".
-             "Defaulting to `bl'.\n"
-            unless $param{linalg} eq "bl";
+        cmd($cmd, { log => 1, kill => 1 });
+    } elsif ($param{'linalg'} eq "bwc") {
+        if ($param{'skip'}) {
+            warn "Parameter 'skip' currently unhandled by bwc code\n";
+        }
+        info "Calling Block-Wiedemann (new code)...\n";
+        $tab_level++;
+        my $mt = $param{'bwmt'};
+        if ($mt =~ /^(\d+)$/) {
+            $mt = "${mt}x1";
+        }
+
+        $cmd = "$param{'cadodir'}/linalg/bwc/bwc.pl ".
+               ":complete " .
+               "seed=1 ". # For debugging purposes, we use a deterministic BW
+               "thr=$mt ".
+               "mpi=1x1 ".
+               "matrix=$param{'prefix'}.small " .
+               "nullspace=left " .
+               "mn=64 splits=0,64 ys=0..64 ".
+               "wdir=$param{'wdir'}/bwc " .
+               "> $param{'prefix'}.bwc.stderr ".
+               "2>&1";
+        cmd($cmd, { log => 1, kill => 1 });
+
+        $cmd = "$param{'cadodir'}/linalg/apply_perm " .
+            "--perm $param{'wdir'}/bwc/mat.row_perm " .
+            "--in $param{'wdir'}/bwc/W.twisted " .
+            "--out $param{'wdir'}/W.bin";
+        cmd($cmd, { log => 1, kill => 1 });
+
+        $cmd = "xxd -c 8 -ps $param{'wdir'}/W.bin > $param{'prefix'}.W";
+        cmd($cmd, { log => 1, kill => 1 });
+
+    } elsif ($param{'linalg'} eq "bl") {
+        do_transpose;
+
         info "Calling Block-Lanczos...\n";
         $tab_level++;
-        $cmd = "$param{cadodir}/linalg/bl/bl.pl ".
-               "matrix=$param{prefix}.small.tr ".
-               "wdir=$param{wdir}/bw" .
-               "solution=$param{prefix}.W ".
-               "> $param{prefix}.bl.stderr ".
+        $cmd = "$param{'cadodir'}/linalg/bl/bl.pl ".
+               "matrix=$param{'prefix'}.small.tr ".
+               "wdir=$param{'wdir'}/bw" .
+               "solution=$param{'prefix'}.W ".
+               "> $param{'prefix'}.bl.stderr ".
                "2>&1";
+        cmd($cmd, { log => 1, kill => 1 });
+    } else {
+        die "Value `$param{'linalg'}' is unknown for parameter `linalg'\n";
     }
 
-    cmd($cmd, { log => 1, kill => 1 });
     $tab_level--;
 }
 
@@ -1940,14 +1978,14 @@ sub do_bitstr {
     info "Converting dependencies to CADO format...\n";
     $tab_level++;
 
-    my $cmd = "$param{cadodir}/linalg/bw/mkbitstrings ".
-              "$param{prefix}.W ".
-              "> $param{prefix}.ker_raw ".
-              "2> $param{prefix}.mkbitstrings.stderr";
+    my $cmd = "$param{'cadodir'}/linalg/bw/mkbitstrings ".
+              "$param{'prefix'}.W ".
+              "> $param{'prefix'}.ker_raw ".
+              "2> $param{'prefix'}.mkbitstrings.stderr";
 
     cmd($cmd, { log => 1, kill => 1 });
 
-    $nker = count_lines("$param{prefix}.ker_raw");
+    $nker = count_lines("$param{'prefix'}.ker_raw");
     info "Computed $nker vectors of the kernel.\n";
 
     $tab_level--;
@@ -1965,24 +2003,24 @@ sub do_chars {
     info "Adding characters...\n";
     $tab_level++;
 
-    $nker = count_lines("$param{prefix}.ker_raw") unless defined $nker;
+    $nker = count_lines("$param{'prefix'}.ker_raw") unless defined $nker;
 
-    my $cmd = "$param{cadodir}/linalg/characters ".
-              "-poly $param{prefix}.poly ".
-              "-purged $param{prefix}.purged ".
-              "-ker $param{prefix}.ker_raw ".
-              "-index $param{prefix}.index ".
-              "-rel $param{prefix}.nodup.gz ".
-              "-small $param{prefix}.small ".
+    my $cmd = "$param{'cadodir'}/linalg/characters ".
+              "-poly $param{'prefix'}.poly ".
+              "-purged $param{'prefix'}.purged ".
+              "-ker $param{'prefix'}.ker_raw ".
+              "-index $param{'prefix'}.index ".
+              "-rel $param{'prefix'}.nodup.gz ".
+              "-small $param{'prefix'}.small ".
               "-nker $nker ".
-              "-skip $param{skip} ".
-              "-nchar $param{nchar} ".
-              "-out $param{prefix}.ker ".
-              "2> $param{prefix}.characters.stderr";
+              "-skip $param{'skip'} ".
+              "-nchar $param{'nchar'} ".
+              "-out $param{'prefix'}.ker ".
+              "2> $param{'prefix'}.characters.stderr";
 
     cmd($cmd, { log => 1, kill => 1 });
 
-    $ndep = count_lines("$param{prefix}.ker");
+    $ndep = count_lines("$param{'prefix'}.ker");
     info "$ndep vectors remaining after characters.\n";
 
     $tab_level--;
@@ -1997,21 +2035,21 @@ sub do_chars {
 sub do_allsqrt {
     banner "Square root";
 
-    $ndep = count_lines("$param{prefix}.ker") unless defined $ndep;
-    $ndep = $param{nkermax} if $ndep > $param{nkermax};
+    $ndep = count_lines("$param{'prefix'}.ker") unless defined $ndep;
+    $ndep = $param{'nkermax'} if $ndep > $param{'nkermax'};
 
     info "Preparing $ndep square roots...\n";
     $tab_level++;
 
-    my $cmd = "$param{cadodir}/linalg/allsqrt ".
-              "$param{prefix}.nodup.gz ".
-              "$param{prefix}.purged ".
-              "$param{prefix}.index ".
-              "$param{prefix}.ker ".
-              "$param{prefix}.poly ".
+    my $cmd = "$param{'cadodir'}/linalg/allsqrt ".
+              "$param{'prefix'}.nodup.gz ".
+              "$param{'prefix'}.purged ".
+              "$param{'prefix'}.index ".
+              "$param{'prefix'}.ker ".
+              "$param{'prefix'}.poly ".
               "0 $ndep ar ".
-              "$param{prefix}.dep ".
-              "> $param{prefix}.allsqrt.stderr ".
+              "$param{'prefix'}.dep ".
+              "> $param{'prefix'}.allsqrt.stderr ".
               "2>&1";
 
     cmd($cmd, { log => 1, kill => 1 });
@@ -2027,29 +2065,29 @@ sub do_allsqrt {
 sub do_algsqrt {
     banner "Square root" unless defined $ndep;
 
-    opendir DIR, $param{wdir}
-        or die "Cannot open directory `$param{wdir}': $!\n";
-    my @files = grep /^$param{name}\.dep\.alg\.\d+$/,
+    opendir DIR, $param{'wdir'}
+        or die "Cannot open directory `$param{'wdir'}': $!\n";
+    my @files = grep /^$param{'name'}\.dep\.alg\.\d+$/,
                      readdir DIR;
     closedir DIR;
 
     for (sort @files) {
-        /^$param{name}\.dep\.alg\.(\d+)$/;
+        /^$param{'name'}\.dep\.alg\.(\d+)$/;
         my $suffix = $1;
         my $i = 0 + $suffix;
         info "Testing dependency number $i...\n";
         $tab_level++;
-        my $cmd = "$param{cadodir}/sqrt/naive/algsqrt ".
-                  "$param{prefix}.dep.alg.$suffix ".
-                  "$param{prefix}.dep.rat.$suffix ".
-                  "$param{prefix}.poly ".
-                  "> $param{prefix}.fact.$suffix ".
-                  "2>> $param{prefix}.algsqrt.stderr";
+        my $cmd = "$param{'cadodir'}/sqrt/naive/algsqrt ".
+                  "$param{'prefix'}.dep.alg.$suffix ".
+                  "$param{'prefix'}.dep.rat.$suffix ".
+                  "$param{'prefix'}.poly ".
+                  "> $param{'prefix'}.fact.$suffix ".
+                  "2>> $param{'prefix'}.algsqrt.stderr";
         cmd($cmd, { log => 1, kill => 1 });
 
-        if (first_line("$param{prefix}.fact.$suffix") !~ /^Failed/) {
+        if (first_line("$param{'prefix'}.fact.$suffix") !~ /^Failed/) {
             info "Factorization was successful!\n";
-            cmd("env cp -f $param{prefix}.fact.$suffix $param{prefix}.fact",
+            cmd("env cp -f $param{'prefix'}.fact.$suffix $param{'prefix'}.fact",
                 { kill => 1 });
             $tab_level--;
             return;
@@ -2078,8 +2116,8 @@ MAIN :
 
     banner "All done!";
 
-    open FILE, "< $param{prefix}.fact"
-        or die "Cannot open `$param{prefix}.fact' for reading: $!.\n";
+    open FILE, "< $param{'prefix'}.fact"
+        or die "Cannot open `$param{'prefix'}.fact' for reading: $!.\n";
     my @l = (scalar <FILE>, scalar <FILE>);
     close FILE;
     chomp for @l;

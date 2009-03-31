@@ -114,6 +114,7 @@ void usage()
     fprintf(stderr, "Usage: ./random <nrows> [<ncols>] [<density>] [options]\n"
             "Options:\n"
             "\t-d <density> : another way for specifying the density per row\n"
+            "\t-s <seed> : seed\n"
             "\t-v : turn verbosity on\n"
             "\t--kleft <d>: ensure at least a left kernel of dimension d\n"
             "\t--kright <d>: ditto for right kernel\n");
