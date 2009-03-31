@@ -12,21 +12,39 @@
 #define UL_ARITH_H__
 
 #include <assert.h>
+#include <limits.h>
 
 /* <limits.h> defines LONG_BIT only with _XOPEN_SOURCE defined, but if 
    another header (such as <stdio.h>) already included <features.h> before 
    _XOPEN_SOURCE was set to 1, future includes of <features.h> are
    short-circuited and _XOPEN_SOURCE is ignored. */
 
-#ifndef CHAR_BIT
-#define CHAR_BIT 8
-#endif
 #ifndef LONG_BIT
+#ifdef LONG_MAX
+#if LONG_MAX == 2147483647L
+#define LONG_BIT 32
+#else
+#define LONG_BIT 64
+#endif /* if LONG_MAX == 2147483647L */
+#elif defined __LONG_MAX__
+#if __LONG_MAX__ == 2147483647L
+#define LONG_BIT 32
+#else
+#define LONG_BIT 64
+#endif /* if __LONG_MAX__ == 2147483647L */
+#else /* elif defined __LONG_MAX__ */
 #define LONG_BIT	((int) sizeof(long) * CHAR_BIT)
-#endif
+#endif /* elif defined __LONG_MAX__ else */
+#endif /* ifndef LONG_BIT */
 
 #ifndef ASSERT
 #define ASSERT(x)	assert(x)
+#endif
+
+#ifdef WANT_ASSERT_EXPENSIVE
+#define ASSERT_EXPENSIVE(x) ASSERT(x)
+#else
+#define ASSERT_EXPENSIVE(x)
 #endif
 
 #ifndef	MAYBE_UNUSED
@@ -98,6 +116,43 @@ ularith_add_2ul_2ul (unsigned long *r1, unsigned long *r2,
 #endif
 }
 
+/* Adds two unsigned longs from two unsigned longs with carry propagation 
+   from low word (r1) to high word (r2). Returns 1 if there was a carry out 
+   from high word, otherwise returns 0. */
+
+static inline char
+ularith_add_2ul_2ul_cy (unsigned long *r1, unsigned long *r2, 
+			const unsigned long a1, const unsigned long a2)
+{
+  char cy;
+#ifdef ULARITH_VERBOSE_ASM
+  __asm__ ("# ularith_add_2ul_2ul_cy (%0, %1, %2, %3)\n" : : 
+           "X" (*r1), "X" (*r2), "X" (a1), "X" (a2));
+#endif
+#if !defined (ULARITH_NO_ASM) && defined(__x86_64__) && defined(__GNUC__)
+  __asm__ ( "addq %3, %0\n\t"
+            "adcq %4, %1\n\t"
+	    "setc %2\n"
+            : "+&r" (*r1), "+r" (*r2), "=r" (cy)
+            : "g" (a1), "g" (a2)
+            : "cc");
+#elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
+  __asm__ ( "addl %3, %0\n\t"
+            "adcl %4, %1\n"
+	    "setc %2\n"
+            : "+&r" (*r1), "+r" (*r2), "=r" (cy)
+            : "g" (a1), "g" (a2)
+            : "cc");
+#else
+  unsigned long u1 = *r1 + a1, u2 = *r2 + a2;
+  if (u1 < *r1)
+    u2++;
+  cy = (u2 < *r2) ? 1 : 0;
+  *r1 = u1;
+  *r2 = u2;
+#endif
+  return cy;
+}
 
 /* Subtract an unsigned long from two unsigned longs with borrow propagation 
    from low word (r1) to high word (r2). Any borrow out from high word is 
@@ -165,6 +220,43 @@ ularith_sub_2ul_2ul (unsigned long *r1, unsigned long *r2,
 #endif
 }
 
+/* Subtract two unsigned longs from two unsigned longs with borrow propagation 
+   from low word (r1) to high word (r2). Returns 1 if there was a borrow out 
+   from high word, otherwise returns 0. */
+
+static inline char
+ularith_sub_2ul_2ul_cy (unsigned long *r1, unsigned long *r2, 
+			const unsigned long a1, const unsigned long a2)
+{
+  char cy;
+#ifdef ULARITH_VERBOSE_ASM
+  __asm__ ("# ularith_sub_2ul_2ul_cy (%0, %1, %2, %3)\n" : : 
+           "X" (*r1), "X" (*r2), "X" (a1), "X" (a2));
+#endif
+#if !defined (ULARITH_NO_ASM) && defined(__x86_64__) && defined(__GNUC__)
+  __asm__ ( "subq %3, %0\n\t"
+            "sbbq %4, %1\n\t"
+	    "setc %2\n"
+            : "+&r" (*r1), "+r" (*r2), "=r" (cy)
+            : "g" (a1), "g" (a2)
+            : "cc");
+#elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
+  __asm__ ( "subl %3, %0\n\t"
+            "sbbl %4, %1\n"
+	    "setc %2\n"
+            : "+&r" (*r1), "+r" (*r2), "=r" (cy)
+            : "g" (a1), "g" (a2)
+            : "cc");
+#else
+  unsigned long u1 = *r1 - a1, u2 = *r2 - a2;
+  if (u1 > *r1)
+    u2--;
+  cy = (u2 > *r2) ? 1 : 0;
+  *r1 = u1;
+  *r2 = u2;
+#endif
+  return cy;
+}
 
 /* Subtract only if result is non-negative */
 
@@ -216,18 +308,34 @@ ularith_mul_ul_ul_2ul (unsigned long *r1, unsigned long *r2,
   __asm__ ("# ularith_mul_ul_ul_2ul (%0, %1, %2, %3)\n" : : 
            "X" (*r1), "X" (*r2), "X" (a), "X" (b));
 #endif
-#if defined(__x86_64__) && defined(__GNUC__)
+#if !defined (ULARITH_NO_ASM) && defined(__x86_64__) && defined(__GNUC__)
   __asm__ ( "mulq %3"
 	    : "=a" (*r1), "=d" (*r2)
 	    : "%0" (a), "rm" (b)
 	    : "cc");
-#elif defined(__i386__) && defined(__GNUC__)
+#elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
   __asm__ ( "mull %3"
 	    : "=a" (*r1), "=d" (*r2)
 	    : "%0" (a), "rm" (b)
 	    : "cc");
 #else
-  abort ();
+  const int half = LONG_BIT / 2;
+  const unsigned long mask = (1UL << half) - 1UL;
+  unsigned long t1, t2, p1, p2;
+
+  t1 = (a & mask) * (b & mask);
+  t2 = 0UL;
+  p1 = (a >> half) * (b & mask);
+  p2 = p1 >> half;
+  p1 = (p1 & mask) << half;
+  ularith_add_2ul_2ul (&t1, &t2, p1, p2);
+  p1 = (a & mask) * (b >> half);
+  p2 = p1 >> half;
+  p1 = (p1 & mask) << half;
+  ularith_add_2ul_2ul (&t1, &t2, p1, p2);
+  t2 += (a >> half) * (b >> half);
+  *r1 = t1; 
+  *r2 = t2;
 #endif
 }
 
@@ -290,11 +398,12 @@ ularith_div_2ul_ul_ul_r (unsigned long *r, unsigned long a1,
 
 
 /* Shift *r right by i bits, filling in the low bits from a into the high
-   bits of *r */
+   bits of *r. Assumes i < LONG_BIT */
 MAYBE_UNUSED
 static inline void
 ularith_shrd (unsigned long *r, const unsigned long a, const int i)
 {
+  ASSERT_EXPENSIVE (i < LONG_BIT);
 #ifdef ULARITH_VERBOSE_ASM
   __asm__ ("# ularith_shrd (%0, %1, %2)\n" : : 
            "X" (*r), "X" (a), "X" (i));
@@ -313,16 +422,18 @@ ularith_shrd (unsigned long *r, const unsigned long a, const int i)
            "cc"
           );
 #else
-  *r = (*r >> i) | (a << (LONG_BIT - i));
+  if (i > 0) /* shl by LONG_BIT is no-op on x86! */
+    *r = (*r >> i) | (a << (LONG_BIT - i));
 #endif
 }
 
 /* Shift *r left by i bits, filling in the high bits from a into the low
-   bits of *r */
+   bits of *r. Assumes i < LONG_BIT */
 MAYBE_UNUSED
 static inline void
 ularith_shld (unsigned long *r, const unsigned long a, const int i)
 {
+  ASSERT_EXPENSIVE (i < LONG_BIT);
 #ifdef ULARITH_VERBOSE_ASM
   __asm__ ("# ularith_shld (%0, %1, %2)\n" : : 
            "X" (*r), "X" (a), "X" (i));
@@ -341,6 +452,7 @@ ularith_shld (unsigned long *r, const unsigned long a, const int i)
            "cc"
           );
 #else
+  if (i > 0) /* shr by LONG_BIT is no-op on x86! */
   *r = (*r << i) | (a >> (LONG_BIT - i));
 #endif
 }
@@ -350,13 +462,14 @@ MAYBE_UNUSED
 static inline int
 ularith_ctz (const unsigned long a)
 {
-#if defined(__GNUC__) && (__GNUC__ >= 4 || __GNUC__ >= 3 && __GNUC_MINOR__ >= 4)
-  ASSERT (a != 0UL);
+#if !defined (ULARITH_NO_ASM) && defined(__GNUC__) && \
+    (__GNUC__ >= 4 || __GNUC__ >= 3 && __GNUC_MINOR__ >= 4)
+  ASSERT_EXPENSIVE (a != 0UL);
   return __builtin_ctzl(a);
 #else
   unsigned long t = a;
   int i;
-  ASSERT (a != 0UL);
+  ASSERT_EXPENSIVE (a != 0UL);
   for (i = 0; (t & 1UL) == 0UL; i++)
     t >>= 1;
   return i;
@@ -368,13 +481,14 @@ MAYBE_UNUSED
 static inline int
 ularith_clz (const unsigned long a)
 {
-#if defined(__GNUC__) && (__GNUC__ >= 4 || __GNUC__ >= 3 && __GNUC_MINOR__ >= 4)
-  ASSERT (a != 0UL);
+#if !defined (ULARITH_NO_ASM) && defined(__GNUC__) && \
+    (__GNUC__ >= 4 || __GNUC__ >= 3 && __GNUC_MINOR__ >= 4)
+  ASSERT_EXPENSIVE (a != 0UL);
   return __builtin_clzl(a);
 #else
   unsigned long t = 1UL << (LONG_BIT - 1);
   int i;
-  ASSERT (a != 0UL);
+  ASSERT_EXPENSIVE (a != 0UL);
   for (i = 0; (a & t) == 0UL; i++)
     t >>= 1;
   return i;
@@ -411,4 +525,4 @@ ularith_invmod (const unsigned long n)
   return r;
 }
 
-#endif
+#endif /* ifndef UL_ARITH_H__ */
