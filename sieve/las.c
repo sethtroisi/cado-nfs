@@ -2137,8 +2137,8 @@ xToAB(int64_t *a, uint64_t *b, const unsigned int x, const sieve_info_t *si)
       }
 }
 
-void test_divisible_x (const fbprime_t p, const unsigned long x, const int n,
-		       const sieve_info_t *si)
+void test_divisible_x (const fbprime_t p MAYBE_UNUSED, const unsigned long x,
+                       const int n, const sieve_info_t *si)
 {
   const unsigned long X = x + n * si->bucket_region;
   const long i = (long) (X & ((unsigned long) si->I - 1UL)) - (long) si->I / 2;
