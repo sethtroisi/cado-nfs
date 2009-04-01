@@ -1626,9 +1626,18 @@ sub do_sieve {
 
         # Remove invalid files
         if ($ret->{'status'}) {
-            warn "File `$f' is invalid. Deleting...\n";
+            my $msg="File `$f' is invalid (check_rels failed).";
+            if ($ENV{'CADO_DEBUG'}) {
+                my $nf = "$f.error";
+                $msg .= " Moving to $nf\n";
+                warn $msg;
+                rename $f, $nf;
+            } else {
+                $msg .= " Deleting.\n";
+                warn $msg;
+                unlink $f;
+            }
             close FILE;
-            unlink $f;
             return;
         }
 
