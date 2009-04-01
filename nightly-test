@@ -29,7 +29,12 @@ make -f Makefile.all dist VERSION=dev
 # now extract the tarball and test it
 tar zxf cado-nfs-dev.tgz
 cd cado-nfs-dev
-make "$MAKE_ARGS"
+if [ "X$MAKE_ARGS" == "X" ];
+then
+    make
+else
+    make "$MAKE_ARGS"
+fi
 ./new_run.c59
 cd /tmp
 /bin/rm -fr "$DIR"
