@@ -8,17 +8,11 @@
 #ifndef LOOKUP_TRAILING_ZEROS
 #define LOOKUP_TRAILING_ZEROS 1
 #endif
-#ifndef PRECONDITION_T
-/* Sometimes faster, sometimes slower, doesn't seem to matter much on 
-   average */
-#define PRECONDITION_T 0
-#endif
 #define ctzl(x) __builtin_ctzl(x)
 #define clzl(x) __builtin_clzl(x)
 #else
 /* If we have no ctzl(), we always use the table lookup */
 #define LOOKUP_TRAILING_ZEROS 1
-#define PRECONDITION_T 0
 #endif
 
 #ifdef T_HIST
@@ -36,7 +30,8 @@ unsigned int t_hist[256] = {
 
 
 int
-modredcul_inv (residue_t r, const residue_t A, const modulusredcul_t m) 
+modredcul_inv (residueredcul_t r, const residueredcul_t A, 
+               const modulusredcul_t m) 
 {
 #if LOOKUP_TRAILING_ZEROS
   static const unsigned char trailing_zeros[256] = 
@@ -62,58 +57,12 @@ modredcul_inv (residue_t r, const residue_t A, const modulusredcul_t m)
      which is 2^w/a. We start by getting y = a */ 
   y = modredcul_get_ul (A, m);
 
-#if PRECONDITION_T
-/* If the inverse exists, the value of t is bounded below by log_2(y+x) - 1.
-   Proof.
-   
-   Assume y is odd, gcd(y, x) = 1.
-   
-            { 0, y = x (implies y = x = 1)
-   t(y,x) = { t(y, x/2)+1, y != x, x even
-            { t(x, y), y > x, x odd
-            { t(y, x-y) , y < x, x odd
-            
-   The last case implies y != x-y and x-y even, so can be substituted by
-              t(y, (x-y)/2) + 1 , y < x, x odd
-   In case 2, y+x  ->  y + x/2 and y + x/2 >= (y+x)/2.
-   In case 4, y+x  ->  y + (x-y)/2 and y + (x-y)/2 = (y+x)/2.
-   So each time t increases by 1, y+x drops by at most half. The process 
-   stops when y = x = 1, i.e. y+x = 2. Hence, t >= log_2(y+x) - 1.
-
-   Before the correction step, the result is 2^t/a, 
-   where t >= log_2(y+x)-1. We divide here by 2^(w-ceil(log_2(y+x)-1))
-   and init t = -ceil(log_2(y+x)-1), so that the result before the
-   correction step is 2^(w+t)/a with t >= 0. This way we can do the 
-   correction step via a single REDC of width t. */
-
-  ASSERT (x > 1UL);
-  t = clzl (x); /* Since y will change again, we estimate just 
-                    log_2(x)-1 <= log_2(y+x)-1. */
-  t++; /* Now 1 <= t = w - ceil(log_2(x)-1) <= 63 */
-  
-  {
-    unsigned long tlow, thigh;
-    /* Necessarily t < LONG_BIT, so the shift is ok */
-    /* Doing a left shift first and then a full REDC needs a modular addition
-       at the end due to larger summands and thus is probably slower */
-    tlow = ((y * m[0].invm) & ((1UL << t) - 1UL)); /* tlow <= 2^t-1 */
-    ularith_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m); /* thigh:tlow <= m*(2^t-1) */
-    ularith_add_ul_2ul (&tlow, &thigh, y); /* thigh:tlow <= m*2^t-1 (since u<m) */
-    /* Now the low t bits of tlow are 0 */
-    ASSERT_EXPENSIVE ((tlow & ((1UL << t) - 1UL)) == 0UL);
-    modredcul_shrd (&tlow, thigh, t);
-    y = tlow;
-    ASSERT_EXPENSIVE ((thigh >> t) == 0UL && y < m[0].m);
-  }
-  t -= LONG_BIT;
-#else
-  /* Alternatively, we simply set y = a/2^w and t=0. The result before 
+  /* We simply set y = a/2^w and t=0. The result before 
      correction will be 2^(w+t)/a so we have to divide by t, which
      may be >64, so we may have to do a full and a variable width REDC. */
   y = modredcul_get_ul (&y, m);
   /* Now y = a/2^w */
   t = 0;
-#endif
 
   u = 1UL; v = 0UL;
 
@@ -143,7 +92,7 @@ modredcul_inv (residue_t r, const residue_t A, const modulusredcul_t m)
 	x >>= lsh;
 	t += lsh;
 	u <<= lsh;
-      } while (lsh == 8);
+      } while (lsh == 8 && x != 0);
 #else
       lsh = ctzl(x);
       ASSERT_EXPENSIVE (lsh > 0);
@@ -154,7 +103,9 @@ modredcul_inv (residue_t r, const residue_t A, const modulusredcul_t m)
     } while (x > y); /* ~50% branch taken :( */
     /* Here, y and x are odd, 0 < x =< y, u is even and v is odd */
 
-    if (y == x)
+    /* x is the one that got reduced, test if we're done */
+
+    if (x <= 1)
       break;
 
     /* Here, y and x are odd, 0 < x < y, u is even and v is odd */
@@ -167,7 +118,7 @@ modredcul_inv (residue_t r, const residue_t A, const modulusredcul_t m)
 	y >>= lsh;
 	t += lsh;
 	v <<= lsh;
-      } while (lsh == 8);
+      } while (lsh == 8 && y != 0);
 #else
       lsh = ctzl(y);
       ASSERT_EXPENSIVE (lsh > 0);
@@ -177,12 +128,21 @@ modredcul_inv (residue_t r, const residue_t A, const modulusredcul_t m)
 #endif
     } while (x < y); /* about 50% branch taken :( */
     /* Here, y and x are odd, 0 < y =< x, u is odd and v is even */
-  } while (y != x);
+    /* y is the one that got reduced, test if we're done */
+  } while (y > 1);
   
-  if (y != 1UL) /* Non-trivial GCD */
+  if ((x & y) == 0UL) /* Non-trivial GCD */
     return 0;
 
-  ASSERT (t >= 0);
+  if (y != 1)
+    {
+      /* So x is the one that reached 1.
+	 We maintained ya == u2^t (mod m) and xa = -v2^t (mod m).
+	 So 1/a = -v2^t.
+       */
+      u = m[0].m - v;
+      /* Now 1/a = u2^t */
+    }
 
 #ifdef T_HIST
   if (t >= 0 && t < 255)
@@ -227,4 +187,3 @@ modredcul_inv (residue_t r, const residue_t A, const modulusredcul_t m)
   r[0] = u;
   return 1;
 }
-

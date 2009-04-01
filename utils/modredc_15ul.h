@@ -81,6 +81,7 @@ modredc15ul_tomontgomery (residueredc15ul_t r, const residueredc15ul_t s,
     modredc15ul_add (r, r, r, m);
 }
 
+
 MAYBE_UNUSED
 static inline void
 modredc15ul_frommontgomery (residueredc15ul_t r, const residueredc15ul_t s,
@@ -144,6 +145,17 @@ modredc15ul_intequal_ul (const modintredc15ul_t a, const unsigned long b)
   return (a[0] == b && a[1] == 0UL);
 }
 
+/* Returns 1 if a < b, 0 otherwise */
+MAYBE_UNUSED
+static inline int
+modredc15ul_intlt (const modintredc15ul_t a, const modintredc15ul_t b)
+{
+    modintredc15ul_t t;
+
+    modredc15ul_intset (t, a);
+    return ularith_sub_2ul_2ul_cy (&(t[0]), &(t[1]), b[0], b[1]);
+}
+
 MAYBE_UNUSED
 static inline int
 modredc15ul_intcmp (const modintredc15ul_t a, const modintredc15ul_t b)
@@ -169,6 +181,28 @@ static inline int
 modredc15ul_intfits_ul (const modintredc15ul_t a)
 {
   return (a[1] == 0UL);
+}
+
+MAYBE_UNUSED
+static inline void
+modredc15ul_intadd (modintredc15ul_t r, const modintredc15ul_t a,
+		    const modintredc15ul_t b)
+{
+  modintredc15ul_t t;
+  modredc15ul_intset (t, a);
+  ularith_add_2ul_2ul (&(t[0]), &(t[1]), b[0], b[1]);
+  modredc15ul_intset (r, t);
+}
+
+MAYBE_UNUSED
+static inline void
+modredc15ul_intsub (modintredc15ul_t r, const modintredc15ul_t a,
+		    const modintredc15ul_t b)
+{
+  modintredc15ul_t t;
+  modredc15ul_intset (t, a);
+  ularith_sub_2ul_2ul (&(t[0]), &(t[1]), b[0], b[1]);
+  modredc15ul_intset (r, t);
 }
 
 /* Returns the number of bits in a, that is, floor(log_2(n))+1. 
@@ -397,9 +431,9 @@ modredc15ul_set_uls (residueredc15ul_t r, const modintredc15ul_t s,
       modintredc15ul_t t;
       modredc15ul_intset (t, m[0].m);
       while ((t[1] & (1UL << (LONG_BIT - 1))) == 0UL &&
-             modredc15ul_intcmp (t, r) < 0)
+             modredc15ul_intlt (t, r))
 	modredc15ul_intshl (t, t, 1);
-      while (modredc15ul_intcmp (r, m[0].m) >= 0)
+      while (!modredc15ul_intlt (r, m[0].m))
 	{
 	  ularith_sub_2ul_2ul_ge (&(r[0]), &(r[1]), t[0], t[1]);
 	  modredc15ul_intshr (t, t, 1);

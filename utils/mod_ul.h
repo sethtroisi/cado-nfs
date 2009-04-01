@@ -106,6 +106,22 @@ modul_intfits_ul (const modintul_t a MAYBE_UNUSED)
 }
 
 
+MAYBE_UNUSED
+static inline void
+modul_intadd (modintul_t r, const modintul_t a, const modintul_t b)
+{
+  r[0] = a[0] + b[0];
+}
+
+
+MAYBE_UNUSED
+static inline void
+modul_intsub (modintul_t r, const modintul_t a, const modintul_t b)
+{
+  r[0] = a[0] - b[0];
+}
+
+
 /* Returns the number of bits in a, that is, floor(log_2(n))+1. 
    For n==0 returns 0. */
 MAYBE_UNUSED

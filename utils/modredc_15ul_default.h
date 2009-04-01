@@ -25,6 +25,8 @@
 #undef mod_intcmp
 #undef mod_intcmp_ul
 #undef mod_intfits_ul
+#undef mod_intadd
+#undef mod_intsub
 #undef mod_intbits
 #undef mod_intdivexact
 #undef mod_init
@@ -85,6 +87,8 @@
 #define mod_intcmp           modredc15ul_intcmp
 #define mod_intcmp_ul        modredc15ul_intcmp_ul
 #define mod_intfits_ul       modredc15ul_intfits_ul
+#define mod_intadd           modredc15ul_intadd
+#define mod_intsub           modredc15ul_intsub
 #define mod_intbits          modredc15ul_intbits
 #define mod_intdivexact      modredc15ul_intdivexact
 #define mod_init             modredc15ul_init

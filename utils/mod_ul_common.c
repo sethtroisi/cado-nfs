@@ -221,10 +221,8 @@ void
 mod_2pow_ul (residue_t r, const unsigned long e, const modulus_t m)
 {
   unsigned long mask;
-  residue_t t;
-#ifndef NDEBUG
-  unsigned long e1 = e;
-#endif
+  residue_t t, u;
+
   if (e == 0UL)
     {
       mod_set1 (r, m);
@@ -233,28 +231,23 @@ mod_2pow_ul (residue_t r, const unsigned long e, const modulus_t m)
 
   mask = (1UL << (LONG_BIT - 1)) >> ularith_clz (e);
 
-  mod_init (t, m);
+  mod_init_noset0 (t, m);
+  mod_init_noset0 (u, m);
   mod_set1 (t, m);
   mod_add (t, t, t, m);
-#ifndef NDEBUG
-  e1 -= mask;
-#endif
+  mask >>= 1;
 
-  while (mask > 1UL)
+  while (mask > 0UL)
     {
       mod_mul (t, t, t, m);
-      mask >>= 1;
+      mod_add (u, t, t, m);
       if (e & mask)
-        {
-	  mod_add (t, t, t, m);
-#ifndef NDEBUG
-          e1 -= mask;
-#endif
-        }
+        mod_set (t, u, m);
+      mask >>= 1;
     }
-  ASSERT (e1 == 0UL && mask == 1UL);
   mod_set (r, t, m);
   mod_clear (t, m); 
+  mod_clear (u, m); 
 }
 
 
@@ -304,7 +297,7 @@ void
 mod_2pow_mp (residue_t r, const unsigned long *e, const int e_nrwords, 
              const modulus_t m)
 {
-  residue_t t;
+  residue_t t, u;
   unsigned long mask;
   int i = e_nrwords - 1;
 
@@ -313,6 +306,7 @@ mod_2pow_mp (residue_t r, const unsigned long *e, const int e_nrwords,
   mask = (1UL << (LONG_BIT - 1)) >> ularith_clz (e[i]);
 
   mod_init_noset0 (t, m);
+  mod_init_noset0 (u, m);
   mod_set1 (t, m);
   mod_add (t, t, t , m);
   mask >>= 1;
@@ -322,8 +316,9 @@ mod_2pow_mp (residue_t r, const unsigned long *e, const int e_nrwords,
       while (mask > 0UL)
         {
           mod_mul (t, t, t, m);
+          mod_add (u, t, t, m);
           if (e[i] & mask)
-            mod_add (t, t, t, m);
+            mod_set (t, u, m);
           mask >>= 1;
         }
       mask = ~0UL - (~0UL >> 1);
@@ -331,6 +326,7 @@ mod_2pow_mp (residue_t r, const unsigned long *e, const int e_nrwords,
     
   mod_set (r, t, m);
   mod_clear (t, m);
+  mod_clear (u, m);
 }
 
 

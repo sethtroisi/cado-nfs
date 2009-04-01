@@ -80,7 +80,8 @@ modredcul_frommontgomery (residueredcul_t r, const residueredcul_t a,
   r[0] = thigh + ((a[0] != 0UL) ? 1UL : 0UL);
 }
 
-/* Computes ((phigh*2^wordsize + plow) / 2^wordsize) % m */
+/* Computes ((phigh*2^wordsize + plow) / 2^wordsize) % m.
+   Requires phigh < m */
 MAYBE_UNUSED
 static inline void
 modredcul_redc (residueredcul_t r, const unsigned long plow, 
@@ -88,18 +89,73 @@ modredcul_redc (residueredcul_t r, const unsigned long plow,
 {
   unsigned long tlow, thigh, t = phigh;
 
+  ASSERT_EXPENSIVE (phigh < m.[0].m);
+
   tlow = plow * m[0].invm;
   ularith_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
   /* Let w = 2^wordsize. We know (phigh * w + plow) + (thigh * w + tlow) 
      == 0 (mod w) so either plow == tlow == 0, or plow !=0 and tlow != 0. 
      In the former case we want phigh + thigh + 1, in the latter 
-     phigh + thigh */
-  /* Since a,b <= w-1, ab <= w^2 - 2*w + 1, so
-     adding 1 to phigh is safe */
+     phigh + thigh. Since t = phigh < m, and modredcul_add can handle the 
+     case where the second operand is equal to m, adding 1 is safe */
+
   t += (plow != 0UL) ? 1UL : 0UL; /* Does not depend on the mul */ 
+
   modredcul_add (r, &t, &thigh, m);
 }
 
+
+/* Requires a < m, then result == a+b (mod m).
+   If a + b < m, then r = a + b, otherwise r = a + b - m.
+   Implies r < b if b >= m. */
+MAYBE_UNUSED
+static inline void
+modredcul_add_semi (residueredcul_t r, const residueredcul_t a, 
+		    const residueredcul_t b, const modulusredcul_t m)
+{
+  ASSERT_EXPENSIVE (a[0] < m[0].m);
+
+#if (defined(__i386__) || defined(__x86_64__)) && defined(__GNUC__)
+  {
+    unsigned long t = a[0] - m[0].m, tr = a[0] + b[0];
+    
+    __asm__ (
+      "add %2, %1\n\t"   /* t = t + b ( t == a - m + b (mod w)) */
+      "cmovc %1, %0\n\t"  /* if (cy) tr = t */
+      : "+r" (tr), "+&r" (t)
+      : "g" (b[0])
+      : "cc"
+    );
+    r[0] = tr;
+  }
+#else
+  r[0] = (b[0] >= m[0].m - a[0]) ? (b[0] - (m[0].m - a[0])) : (a[0] + b[0]);
+#endif
+}
+
+
+/* Requires phigh < ULONG_MAX. If phigh:plow = a*b with a,b < ULONG_MAX,
+   phigh <= ULONG_MAX - 1, so that works. 
+   If phigh < m, then r < m, otherwise r <= phigh. */
+MAYBE_UNUSED
+static inline void
+modredcul_redc_semi (residueredcul_t r, const unsigned long plow, 
+		     const unsigned long phigh, const modulusredcul_t m)
+{
+  unsigned long tlow, thigh, t = phigh;
+
+  ASSERT_EXPENSIVE (phigh < ULONG_MAX);
+
+  tlow = plow * m[0].invm;
+  ularith_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
+  t += (plow != 0UL) ? 1UL : 0UL;
+  /* We have thigh < m since thigh = trunc (m * (something % w) / w), 
+     so this add always produces the correct residue class (although 
+     it may have r >= m if phigh >= m. This add is slightly slower
+     than in the modredcul_redc() function, since thigh depends on the 
+     previous mul and is used first in the add. */
+  modredcul_add_semi (r, &thigh, &t, m);
+}
 
 
 /* ================= Functions that are part of the API ================= */
@@ -159,6 +215,23 @@ modredcul_intfits_ul (const modintredcul_t a MAYBE_UNUSED)
 {
   return 1;
 }
+
+MAYBE_UNUSED
+static inline void
+modredcul_intadd (modintredcul_t r, const modintredcul_t a, 
+                  const modintredcul_t b)
+{
+  r[0] = a[0] + b[0];
+}
+
+MAYBE_UNUSED
+static inline void
+modredcul_intsub (modintredcul_t r, const modintredcul_t a, 
+                  const modintredcul_t b)
+{
+  r[0] = a[0] - b[0];
+}
+
 
 /* Returns the number of bits in a, that is, floor(log_2(n))+1. 
    For n==0 returns 0. */
@@ -434,12 +507,13 @@ modredcul_is1 (const residueredcul_t a, const modulusredcul_t m MAYBE_UNUSED)
 }
 
 
+/* Requires a < m and b <= m, then r == a+b (mod m) and r < m */
 MAYBE_UNUSED
 static inline void
 modredcul_add (residueredcul_t r, const residueredcul_t a, 
                const residueredcul_t b, const modulusredcul_t m)
 {
-  ASSERT_EXPENSIVE (a[0] < m[0].m && b[0] < m[0].m);
+  ASSERT_EXPENSIVE (a[0] < m[0].m && b[0] <= m[0].m);
 #ifdef MODTRACE
   printf ("modul_add: a = %lu, b = %lu", a[0], b[0]);
 #endif
@@ -459,7 +533,7 @@ modredcul_add (residueredcul_t r, const residueredcul_t a,
     r[0] = tr;
   }
 #else
-  r[0] = (a[0] >= m[0].m - b[0]) ? (a[0] - (m[0].m - b[0])) : (a[0] + b[0]);
+  r[0] = (b[0] >= m[0].m - a[0]) ? (b[0] - (m[0].m - a[0])) : (a[0] + b[0]);
 #endif
 
 #ifdef MODTRACE
