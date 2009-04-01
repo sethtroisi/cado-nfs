@@ -262,11 +262,11 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
     snprintf(commname, sizeof(commname), "rows%u-%u", 
             pi->wr[1]->jrank * pi->wr[1]->ncores,
             (pi->wr[1]->jrank + 1) * pi->wr[1]->ncores - 1);
-    MPI_Comm_set_name(pi->m->wr[0]->pals, commname);
+    MPI_Comm_set_name(pi->wr[0]->pals, commname);
     snprintf(commname, sizeof(commname), "cols%u-%u", 
             pi->wr[0]->jrank * pi->wr[0]->ncores,
             (pi->wr[0]->jrank + 1) * pi->wr[0]->ncores - 1);
-    MPI_Comm_set_name(pi->m->wr[1]->pals, commname);
+    MPI_Comm_set_name(pi->wr[1]->pals, commname);
 #endif
 
     for(unsigned int k = 0 ; k < nhc * nvc ; k++) {

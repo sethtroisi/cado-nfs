@@ -46,6 +46,11 @@
  *
  * Mpich2 1.1a2 works, apparently. And it even seems to end up being
  * noticeably faster for my toy examples (= latency-wise).
+ *
+ * As for the ``fake mpi'' implementation we have, well, it's up to the
+ * reader to decide. All collectives are nops, so it's trivially capable.
+ * OTOH, not setting the flags ensures that the rest of the code compiles
+ * ok.
  */
 
 #if defined(MPICH2) && MPICH2_NUMVERSION >= 10100002

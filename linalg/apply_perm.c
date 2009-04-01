@@ -40,7 +40,7 @@ static size_t filesize(const char * path)
  * space for everyone prior to doing any work.
  */
 
-void apply_perm_byline(void * out, void * in, unsigned int * sigma, size_t ds, size_t n)
+void apply_perm_byline(void * out, void * in, unsigned int * sigma, size_t ds MAYBE_UNUSED, size_t n)
 {
     unsigned int * ssizes = malloc(n * sizeof(unsigned int));
     unsigned int * doffsets = malloc(n * sizeof(unsigned int));

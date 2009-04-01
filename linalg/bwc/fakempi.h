@@ -38,8 +38,10 @@ typedef int MPI_Errhandler;
 
 #define MPI_IN_PLACE    0
 
+#define MPI_MAX_OBJECT_NAME     64
+
 /* That would be quite neat, but it's too coarse (it applies to the whole
- * translation unit), and anyway itisn't supported by oldish gcc's.
+ * translation unit), and anyway it isn't supported by oldish gcc's.
 #ifdef  __GNUC__
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #endif
@@ -75,6 +77,8 @@ static inline int MPI_Comm_set_errhandler (MPI_Comm x MAYBE_UNUSED, MPI_Errhandl
 }
 static inline int MPI_Comm_free (MPI_Comm * x MAYBE_UNUSED) { return 0; }
 static inline int MPI_Comm_dup (MPI_Comm y, MPI_Comm * x) { *x = y; return 0; }
+static inline int MPI_Comm_set_name(MPI_Comm comm MAYBE_UNUSED, char *comm_name MAYBE_UNUSED) { return 0;}
+static inline int MPI_Comm_get_name(MPI_Comm comm MAYBE_UNUSED, char *comm_name MAYBE_UNUSED, int * rlen) { *rlen=0; return 0;}
 static inline int MPI_Scatterv(void * sendbuf, int * sendcounts, int * displs,  MPI_Datatype st, void * recvbuf, int recvcount, MPI_Datatype rt, int root MAYBE_UNUSED, MPI_Comm x MAYBE_UNUSED) {
     ASSERT_ALWAYS(sendcounts[0] * st == recvcount * rt);
     memcpy(recvbuf, ((char *)sendbuf) + displs[0] * st, recvcount * rt);
