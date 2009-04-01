@@ -6,7 +6,73 @@ use POSIX qw/getcwd/;
 
 # This companion program serves as a helper for running bwc programs.
 
-# MPI=/opt/mpich2-1.1a2-1.fc10.x86_64/usr/bin ./bwc.pl :complete mat=c72 interval=256 splits=64 mn=64 ys=0..64 mpi=4x4
+# MPI_BINDIR=/opt/mpich2-1.1a2-1.fc10.x86_64/usr/bin ./bwc.pl :complete matrix=c72 interval=256 splits=64 mn=64 ys=0..64 mpi=4x4
+
+sub usage {
+    print STDERR <<EOF;
+Usage: ./bwc.pl <action> <parameters>
+
+The action to be performed is either:
+- the path to a program, in which case the command line eventually called
+  is quite similar to ``<action> <parameters>'', with some substitutions
+  performed. Depending on the program name, some options are discarded
+  because they are not meaningful.
+- one of the special actions defined by the script. These actions are
+  prepended by a colon.
+    :complete -- do a complete linear system solving. The solution ends
+                 up in \$wdir/W.twisted.
+    :balance  -- compute a balanced splitting of the matrix, according
+                 the specified mpi and thr parameters.
+    :wipeout  -- quite like rm -rf \$wdir, but focuses on bwc files.
+
+Parameters are specified in the form <key>=<value>.
+All parameters having a meaning for the bwc programs are accepted. Some
+parameters control the wrapping script itself.
+
+mpi thr              same meaning as for bwc programs.
+mn m n               same meaning as for bwc programs.
+nullspace            same meaning as for bwc programs.
+interval             same meaning as for bwc programs.
+ys splits            same meaning as for bwc programs (krylov and mksol)
+
+matrix matpath       input matrix file. Either 'matrix' is a full
+                     path, or a basename relative to 'matpath'
+wdir                 working directory.
+                     If unset, derived from 'matrix', 'mpi' 'thr'
+mode                 Family of binaries to be used for e.g. krylov/mksol
+mpiexec              Command to invoke for mpiexec
+hosts                Comma-separated list of hosts. 'hosts' may be supplied
+                     several times, so that lists concatenate. Thus one
+                     may use the shell to supply hosts=node{1,3,5,7}.
+hostfile             path to a host list file to be understood by mpiexec
+                     NOTE: multi-hosts support is incomplete in this
+                     script at the moment, and specific to mpich2+pm=hydra.
+
+Amongst parameters, some options with leading dashes may be set:
+
+-d  Do a dry run ; show the commands that would be executed.
+    (-d is relevant to the script only)
+-v  Increase verbosity level ; understood by bwc, but meaningless at the moment
+-h  Show this help.
+
+Some environment variables have an impact on this script.
+
+HOME         The default value for matpath is \$HOME/Local/mats
+MPI_BINDIR   The path to the directory holding the mpiexec program (the
+             mpiexec= parameter allows to specify the same thing. Note that
+             MPI alone serves as an alias for MPI_BINDIR, but this may be
+             become legacy).
+BWC_BINDIR   The directory holding the bwc binaries. Defaults to the
+             directory holding the current script.
+
+EOF
+
+    if (scalar @_) {
+        print STDERR "Error messages:\n", join("\n", @_), "\n";
+    }
+
+    exit 1;
+}
 
 # $program denotes either a simple command, or something prepended by ':'
 # which indicates something having a special meaning for the script.
@@ -19,18 +85,21 @@ my $matpath="$ENV{HOME}/Local/mats";
 my @main_args = ();
 my @mpi_split=(1,1);
 my @thr_split=(1,1);
-my $matrix_dir;
+my $matrix;
 my $hostfile;
 my $mpiexec='mpiexec';
 my $wdir;
-my $mn;
+my $m;
+my $n;
 my @splits=();
 my @hosts=();
 my $mode='u64';
 my $show_only=0;
+my $nh;
+my $nv;
 
-if (defined($ENV{'MPI'})) {
-    $mpiexec="$ENV{'MPI'}/mpiexec";
+if (defined($_=$ENV{'MPI_BINDIR'}) || defined($_=$ENV{'MPI'})) {
+    $mpiexec="$_/mpiexec";
 }
 
 my $bindir;
@@ -42,51 +111,159 @@ if (!defined($bindir=$ENV{'BWC_BINDIR'})) {
     }
 }
 
-# Some command-line arguments have a special meaning.
-#
-# auto=<path> -> auto-create wdir from the mpi and thr splittings.
-# hostfile=<path> -> pass to mpiexec if relevant.
+my $param={};
 
 while (defined($_ = shift @ARGV)) {
-    if (/^(?:auto|mat|matrix)=(\S*)$/) { $matrix_dir=$1; next; }
-
-    if (/^hostfile=(\S*)$/) { $hostfile = $1; next; }
-    if (/^matpath=(\S*)$/) { $matpath=$1; next; }
-    if (/^hosts=([\w:\.-]+(?:,[\w:\.-]+)*)$/) {
-        my @nh=split ',', $1;
-        push @hosts, @nh; 
+    # -d will never be found as a bw argument, it is 
+    if (/^(-d|--show|--dry-run)$/) { $show_only=1; next; }
+    if (/^(-h|--help)$/) { usage; }
+    my ($k,$v);
+    if (/^(-.*)$/) { $k=$1; $v=1; }
+    if (/^([^=]+)=(.*)$/) { $k=$1; $v=$2; }
+    if (!defined($k)) {
+        usage "Garbage not undertood on command line: $_";
+    }
+    if (!defined($param->{$k})) {
+        $param->{$k}=$v;
         next;
     }
-    if (/^mode=(\w+)$/) { $mode=$1; next; }
-    if (/^(-d|--show)$/) { $show_only=1; next; }
-
-    # These will be passed anyway.
-    push @main_args, $_;
-    
-    if (/^wdir=(\S*)$/) { $wdir=$1; next; }
-    if (/^mn=(\S*)$/) { $mn=$1; next; }
-    if (/^splits?=(\d+(?:,\d+)*)$/) { @splits=split ',', $1; next; }
-    if (/^mpi=(\d+)x(\d+)$/) { @mpi_split = ($1, $2); next; }
-    if (/^thr=(\d+)x(\d+)$/) { @thr_split = ($1, $2); next; }
+    if ($k eq 'hosts') {
+        if (ref $param->{$k} eq '') {
+            $param->{$k} = [$param->{$k}, $v];
+        } elsif (ref $param->{$k} eq 'ARRAY') {
+            $param->{$k} = [@{$param->{$k}}, $v];
+        } else {
+            die "\$param->{$k} has gone nuts.\n";
+        }
+    } else {
+        usage "parameter $k may not be specified more than once";
+    }
 }
 
-my $nh = $mpi_split[0] * $thr_split[0];
-my $nv = $mpi_split[1] * $thr_split[1];
+sub set_mpithr_param {
+    my $v = shift @_;
+    $v=~/(\d+)x(\d+)$/ or usage "bad splitting value '$v'";
+    return ($1, $2);
+}
 
-if (!defined($wdir) && defined($matrix_dir)) {
-    if ($matrix_dir !~ m{/} && defined($matpath)) {
-        $matrix_dir = "$matpath/$matrix_dir";
+# Some parameters are more important than the others because they
+# participate to the default value for wdir.
+if ($param->{'mpi'}) { @mpi_split = set_mpithr_param $param->{'mpi'}; }
+if ($param->{'thr'}) { @thr_split = set_mpithr_param $param->{'thr'}; }
+if ($param->{'wdir'}) { $wdir=$param->{'wdir'}; }
+if ($param->{'matrix'}) { $matrix=$param->{'matrix'}; }
+if ($param->{'matpath'}) { $matpath=$param->{'matpath'}; }
+
+$nh = $mpi_split[0] * $thr_split[0];
+$nv = $mpi_split[1] * $thr_split[1];
+
+# Selection of the working directory -- there are three relevant options.
+# The 'matrix' option gives the file name of the matrix to be used. If
+# 'matrix' gives only a basename, then this basename is interpreted
+# relative to the 'matpath' parameter. The working directory used is
+# either specified as a parameter on its own named 'wdir', or inferred
+# from the basename of the matrix file, appended with some information on
+# the splitting, e.g.  c160-4x4.
+
+if (!defined($wdir) && defined($matrix)) {
+    if ($matrix !~ m{/} && defined($matpath)) {
+        $matrix = "$matpath/$matrix";
     }
-    $matrix_dir =~ s/~/$ENV{HOME}/g;
-    $wdir="$matrix_dir-${nh}x${nv}";
+    $matrix =~ s/~/$ENV{HOME}/g;
+    $wdir="$matrix-${nh}x${nv}";
+    # In most cases, a non-existing wdir is an error, but not for
+    # :balance or :complete, which are entitled to create it.
     if ($main !~ /^:(?:balance|complete)$/ && !-d $wdir) {
         die "No directory $wdir found";
     }
     push @main_args, "wdir=$wdir";
+
+    # Put back in our parameter list.
+    $param->{'matrix'}=$matrix;
+    $param->{'wdir'}=$wdir;
 }
 
-my $env_strings = "";
+# Assuming that the parameters given on the command line are sufficient
+# to determine an existing wdir, then this wdir is scanned for an
+# existing bw.cfg file. This file is read. However, parameters read from
+# the bw.cfg have _lower_ precedence than the ones on the command line.
 
+if (-d $wdir && -f "$wdir/bw.cfg") {
+    open F, "$wdir/bw.cfg";
+    while (<F>) {
+        chomp($_);
+        next if /^#/;
+        next if /^\s*$/;
+        my ($k,$v);
+        if (/^(-.*)$/) { $k=$1; $v=1; }
+        if (/^([^=]+)=(.*)$/) { $k=$1; $v=$2; }
+        if (!defined($k)) {
+            usage "Garbage not undertood in $wdir/bw.cfg:\n$_";
+        }
+        if (!defined($param->{$k})) {
+            $param->{$k}=$v;
+        }
+    }
+    close F;
+}
+
+while (my ($k,$v) = each %$param) {
+    # First the ones that are _not_ relevant to the bwc programs.
+    if ($k eq 'matrix') { $matrix=$v; next; }
+    if ($k eq 'matpath') { $matpath=$v; next; }
+    if ($k eq 'hostfile') { $hostfile=$v; next; }
+    if ($k eq 'mode') { $mode=$v; next; }
+    if ($k eq 'hosts') {
+        $v=[$v] if (ref $v eq '');
+        for (@$v) { push @hosts, split(',',$_); }
+        next;
+    }
+    # The rest is passed to subprograms, unless explicitly discarded on a
+    # per-program basis.
+    push @main_args, "$k=$v";
+
+    # Yet it does make sense to read some parameters, are we are
+    # interested by their value.
+
+    if ($k eq 'wdir') { $wdir=$v; next; }
+    if ($k eq 'mn') { $m=$n=$v; next; }
+    if ($k eq 'n') { $n=$v; next; }
+    if ($k eq 'm') { $m=$v; next; }
+    if ($k eq 'splits') { @splits=split ',', $1; next; }
+    if ($k eq 'mpi') { @mpi_split = set_mpithr_param $v; }
+    if ($k eq 'thr') { @thr_split = set_mpithr_param $v; }
+
+    # Ok, probably there's a fancy argument we don't care about.
+}
+
+# refresh. This may seem silly, but if wdir was non-default, perhaps
+# we've had _no_ information on nh and nv so far !
+$nh = $mpi_split[0] * $thr_split[0];
+$nv = $mpi_split[1] * $thr_split[1];
+
+
+##################################################
+# Some more default values to set. Setting separately splits=, ys= and so
+# on is quite awkward in the case of a single-site test.
+if (!defined($m) || !defined($n)) {
+    usage "The parameters m and n must be set";
+}
+if (!defined($param->{'splits'})) {
+    @splits=(0,$n);
+    push @main_args, "splits=0,$n";
+}
+if (!defined($param->{'ys'})) {
+    push @main_args, "ys=0..$n";
+}
+
+##################################################
+# Done playing around with what we've been given.
+
+##################################################
+##################################################
+# System interaction.
+
+my $env_strings = "";
 sub my_setenv
 {
     return if (exists($ENV{$_[0]}) && $ENV{$_[0]} eq $_[1]);
@@ -122,8 +299,9 @@ sub dosystem
     exit 1;
 }
 
-
+##################################################
 ### ok -- now @main_args is something relatively useful.
+# print "main_args:\n", join("\n", @main_args), "\n";
 
 sub drive {
     my $program = shift @_;
@@ -135,15 +313,12 @@ sub drive {
     if ($program eq ':wipeout') {
         # Special case, really.
         my $pwd = getcwd;
-        if ($show_only && ! -d $wdir) {
-            print "mkdir $wdir\n";
-        }
         die "No directory $wdir" unless -d $wdir;
         chdir $wdir;
         die "Won't wipe cwd" if $pwd eq getcwd;
         print STDERR "Doing cleanup in $wdir\n";
         if ($show_only) {
-            print "/bin/rm -f [A-Z]* bw.cfg\n";
+            print "(cd $wdir ; /bin/rm -f [A-Z]* bw.cfg)\n";
         } else {
             system "/bin/rm -f [A-Z]* bw.cfg";
         }
@@ -169,10 +344,16 @@ sub drive {
     }
 
     if ($program eq ':balance') {
-        mkdir $wdir;
+        if (!-d $wdir) {
+            if ($show_only) {
+                print "mkdir $wdir\n";
+            } else {
+                mkdir $wdir;
+            }
+        }
         my $cmd="$bindir/../balance";
         my @args= (
-                "-in", $matrix_dir,
+                "-in", $matrix,
                 "-out", "$wdir/mat",
                 "--nslices", "${nh}x${nv}",
                 "--conjugate-permutations",
@@ -181,8 +362,8 @@ sub drive {
         return;
     }
 
-    if ($program eq ':ysplit') { $program="./split"; push @_, "--split-y"; }
-    if ($program eq ':fsplit') { $program="./split"; push @_, "--split-f"; }
+    # if ($program eq ':ysplit') { $program="./split"; push @_, "--split-y"; }
+    # if ($program eq ':fsplit') { $program="./split"; push @_, "--split-f"; }
 
     # Some arguments are relevant only to some contexts.
     unless ($program =~ /split$/) {
@@ -213,7 +394,6 @@ sub drive {
 
     dosystem($program, @_);
 }
-
 
 &drive($main, @main_args);
 

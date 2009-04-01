@@ -14,6 +14,9 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
+#include <stdarg.h>
+#include <stdint.h>
+#include <inttypes.h>
 
 
 #include "select_mpi.h"
@@ -253,6 +256,18 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
     grid = (parallelizing_info *) malloc(nhc * nvc * sizeof(parallelizing_info));
     memset(grid, 0, nhc * nvc * sizeof(parallelizing_info));
 
+    char commname[64];
+#ifndef MPI_LIBRARY_MT_CAPABLE
+    MPI_Comm_set_name(pi->m->pals, "main");
+    snprintf(commname, sizeof(commname), "rows%u-%u", 
+            pi->wr[1]->jrank * pi->wr[1]->ncores,
+            (pi->wr[1]->jrank + 1) * pi->wr[1]->ncores - 1);
+    MPI_Comm_set_name(pi->m->wr[0]->pals, commname);
+    snprintf(commname, sizeof(commname), "cols%u-%u", 
+            pi->wr[0]->jrank * pi->wr[0]->ncores,
+            (pi->wr[0]->jrank + 1) * pi->wr[0]->ncores - 1);
+    MPI_Comm_set_name(pi->m->wr[1]->pals, commname);
+#endif
 
     for(unsigned int k = 0 ; k < nhc * nvc ; k++) {
         parallelizing_info_ptr e = grid[k];
@@ -266,6 +281,18 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
         MPI_Comm_dup(pi->m->pals, &(e->m->pals));
         MPI_Comm_dup(pi->wr[0]->pals, &(e->wr[0]->pals));
         MPI_Comm_dup(pi->wr[1]->pals, &(e->wr[1]->pals));
+
+        /* give a name */
+        snprintf(commname, sizeof(commname), "main.%u", k);
+        MPI_Comm_set_name(e->m->pals, commname);
+        snprintf(commname, sizeof(commname), "row%u.%u", 
+                e->wr[1]->jrank * e->wr[1]->ncores + e->wr[1]->trank,
+                e->wr[0]->trank);
+        MPI_Comm_set_name(e->wr[0]->pals, commname);
+        snprintf(commname, sizeof(commname), "col%u.%u", 
+                e->wr[0]->jrank * e->wr[0]->ncores + e->wr[0]->trank,
+                e->wr[1]->trank);
+        MPI_Comm_set_name(e->wr[1]->pals, commname);
 #endif  /* MPI_LIBRARY_MT_CAPABLE */
     }
 
@@ -413,6 +440,11 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
         MPI_Comm_free(&grid[k]->wr[1]->pals);
     }
 #endif  /* MPI_LIBRARY_MT_CAPABLE */
+    for(unsigned int k = 0 ; k < nhc * nvc ; k++) {
+        pi_log_clear(grid[k]->m);
+        pi_log_clear(grid[k]->wr[0]);
+        pi_log_clear(grid[k]->wr[1]);
+    }
 
     free(grid);
 
@@ -424,6 +456,110 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
     MPI_Comm_free(&pi->m->pals);
 
     // MPI_Errhandler_free(&my_eh);
+}
+
+void pi_log_init(pi_wiring_ptr wr)
+{
+    wr->log_book = malloc(sizeof(struct pi_log_book));
+}
+
+void pi_log_clear(pi_wiring_ptr wr)
+{
+    if (wr->log_book)
+        free(wr->log_book);
+}
+
+void pi_log_op(pi_wiring_ptr wr, const char * fmt, ...)
+{
+    va_list ap;
+    struct pi_log_book * lb = wr->log_book;
+    if (!lb)
+        return;
+
+    va_start(ap, fmt);
+
+    struct pi_log_entry * e = &(lb->t[lb->next]);
+
+    gettimeofday(e->tv, NULL);
+
+    vsnprintf(e->what, sizeof(e->what), fmt, ap);
+    va_end(ap);
+
+    lb->next++;
+    lb->next %= PI_LOG_BOOK_ENTRIES;
+    lb->hsize++;
+}
+
+static void pi_log_print_backend(pi_wiring_ptr wr, char ** strings, int * n, int alloc)
+{
+    struct pi_log_book * lb = wr->log_book;
+    if (!lb) return;
+
+    int h = lb->hsize;
+    if (h >= PI_LOG_BOOK_ENTRIES) {
+        h = PI_LOG_BOOK_ENTRIES;
+    }
+    int i0 = lb->next - h;
+    if (i0 < 0)
+        i0 += PI_LOG_BOOK_ENTRIES;
+    char commname[MPI_MAX_OBJECT_NAME];
+    int namelen = sizeof(commname);
+    MPI_Comm_get_name(wr->pals, commname, &namelen);
+
+    for(int i = i0 ; h-- ; ) {
+        struct pi_log_entry * e = &(lb->t[i]);
+
+        ASSERT_ALWAYS(*n < alloc);
+        asprintf(&(strings[*n]), "%"PRIu64".%06u %s %s", 
+                (uint64_t) e->tv->tv_sec,
+                (unsigned int) e->tv->tv_usec,
+                e->what,
+                commname);
+        ++*n;
+
+        i++;
+        if (i == PI_LOG_BOOK_ENTRIES)
+            i = 0;
+    }
+}
+
+void pi_log_print(pi_wiring_ptr wr)
+{
+    /* FIXME stdout or stderr ? */
+    int alloc = PI_LOG_BOOK_ENTRIES;
+    char ** strings = malloc(alloc * sizeof(char*));
+    int n = 0;
+    pi_log_print_backend(wr, strings, &n, alloc);
+    for(int i = 0 ; i < n ; i++) {
+        puts(strings[i]);
+        free(strings[i]);
+    }
+    fflush(stdout);
+    free(strings);
+}
+
+typedef int (*sortfunc_t)(const void *, const void *);
+
+int p_strcmp(char const * const * a, char const * const * b)
+{
+    /* Input is formatted so that sorting makes sense. */
+    return strcmp(*a, *b);
+}
+
+void pi_log_print_all(parallelizing_info_ptr pi)
+{
+    int alloc = 3 * PI_LOG_BOOK_ENTRIES;
+    char ** strings = malloc(alloc * sizeof(char*));
+    int n = 0;
+    pi_log_print_backend(pi->m, strings, &n, alloc);
+    pi_log_print_backend(pi->wr[0], strings, &n, alloc);
+    pi_log_print_backend(pi->wr[1], strings, &n, alloc);
+    qsort(strings, n, sizeof(char*), (sortfunc_t) &p_strcmp);
+    for(int i = 0 ; i < n ; i++) {
+        puts(strings[i]);
+        free(strings[i]);
+    }
+    free(strings);
 }
 
 #ifdef  HOMEMADE_BARRIERS

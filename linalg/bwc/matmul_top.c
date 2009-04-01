@@ -137,6 +137,7 @@ broadcast_down_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_p
         BUG();
     }
 
+    pi_log_op(mmt->pi->m, "[%s] enter first loop", __func__);
     /* Make sure that no thread on the column is wandering in other
      * places -- when we're leaving reduce, this is important. */
     serialize_threads(picol);
@@ -147,7 +148,9 @@ broadcast_down_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_p
      */
 #ifndef MPI_LIBRARY_MT_CAPABLE
     for(unsigned int t = 0 ; t < pirow->ncores + extra ; t++) {
+        pi_log_op(pirow, "[%s] serialize_threads", __func__);
         serialize_threads(pirow);
+        pi_log_op(pirow, "[%s] serialize_threads done", __func__);
         if (t == pirow->trank) {
             for(unsigned int u = 0 ; u < picol->ncores ; u++) {
                 serialize_threads(picol);
@@ -170,7 +173,9 @@ broadcast_down_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_p
                     abase_generic_ptr ptr = abase_generic_ptr_add(v->v, off);
                     size_t siz = xx->count * stride;
                     unsigned int root = xx->k / picol->ncores;
+                    pi_log_op(picol, "[%s] MPI_Bcast", __func__);
                     err = MPI_Bcast(ptr, siz, MPI_BYTE, root, picol->pals);
+                    pi_log_op(picol, "[%s] MPI_Bcast done", __func__);
                     BUG_ON(err);
                 }
                 /* Note that at this point, it is not guaranteed that all
@@ -222,14 +227,18 @@ broadcast_down_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_p
         abase_generic_ptr ptr = abase_generic_ptr_add(v->v,off);
         size_t siz = xx->count * stride;
         unsigned int root = xx->k / picol->ncores;
+        pi_log_op(picol, "[%s] MPI_Bcast", __func__);
         err = MPI_Bcast(ptr, siz, MPI_BYTE, root, picol->pals);
+        pi_log_op(picol, "[%s] MPI_Bcast done", __func__);
         BUG_ON(err);
     }
     if (extra) {
         /* The inter-column broadcast, for non-shared right vectors, must
          * occur with column threads serialized.
          */
+        pi_log_op(picol, "[%s] serialize_threads", __func__);
         serialize_threads(picol);
+        pi_log_op(picol, "[%s] serialize_threads done", __func__);
         for(unsigned int i = 0 ; i < mcol->xlen ; i++) {
             struct isect_info * xx = &(mcol->x[i]);
             unsigned int src = xx->k % picol->ncores;
@@ -247,6 +256,8 @@ broadcast_down_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_p
         }
     }
 #endif  /* MPI_LIBRARY_MT_CAPABLE */
+
+    pi_log_op(mmt->pi->m, "[%s] trailer", __func__);
 
     if (mcol->i1 > nrows) {
         /* untested */
@@ -548,6 +559,8 @@ reduce_across(matmul_top_data_ptr mmt, int d)
     mmt_wiring_ptr mrow = mmt->wr[d];
     mmt_wiring_ptr mcol = mmt->wr[!d];
 
+    pi_log_op(mmt->pi->m, "[%s] enter first loop", __func__);
+
     if ((mmt->wr[d]->v->flags & THREAD_SHARED_VECTOR) == 0 && (pirow->ncores > 1)) {
         /* row threads have to sum up their data. Of course it's
          * irrelevant when there is only one such thread...
@@ -556,7 +569,9 @@ reduce_across(matmul_top_data_ptr mmt, int d)
          * row has finished its computation task, but besides that,
          * there's no locking until we start mpi stuff.
          */
+        pi_log_op(pirow, "[%s] serialize_threads", __func__);
         serialize_threads(pirow);
+        pi_log_op(pirow, "[%s] serialize_threads done", __func__);
 
         /* Our [i0,i1[ range is split into pirow->ncores parts. This range
          * represent coordinates which are common to all threads on
@@ -614,6 +629,7 @@ reduce_across(matmul_top_data_ptr mmt, int d)
                 }
             }
         }
+        pi_log_op(pirow, "[%s] thread reduction done", __func__);
     }
 
     /* Good. Now we can drop the secondary-level intersections (y), and
@@ -636,12 +652,19 @@ reduce_across(matmul_top_data_ptr mmt, int d)
      * which may be still running at this point because there has been no
      * column serialization in the current procedure yet.
      */
+
+    pi_log_op(mmt->pi->m, "[%s] secondary loop", __func__);
+
+    pi_log_op(mmt->pi->m, "[%s] serialize_threads", __func__);
     serialize_threads(mmt->pi->m);
+    pi_log_op(mmt->pi->m, "[%s] serialize_threads done", __func__);
 
 #ifndef MPI_LIBRARY_MT_CAPABLE
     /* We need two levels of locking :-( */
     for(unsigned int t = 0 ; t < picol->ncores ; t++) {
+        pi_log_op(picol, "[%s] serialize_threads", __func__);
         serialize_threads(picol);
+        pi_log_op(picol, "[%s] serialize_threads done", __func__);
         if (t != picol->trank)
             continue;   // not our turn.
 
@@ -658,7 +681,9 @@ reduce_across(matmul_top_data_ptr mmt, int d)
             abt * sptr = mrow->v->v + aboffset(mmt->abase, xx->offset_me);
             abt * dptr = mcol->v->v + aboffset(mmt->abase, xx->offset_there);
             size_t siz = abbytes(mmt->abase, xx->count);
+            pi_log_op(pirow, "[%s] MPI_Reduce", __func__);
             err = MPI_Reduce(sptr, dptr, siz, MPI_BYTE, MPI_BXOR, jdst, pirow->pals);
+            pi_log_op(pirow, "[%s] MPI_Reduce done", __func__);
             BUG_ON(err);
         }
     }
@@ -676,7 +701,9 @@ reduce_across(matmul_top_data_ptr mmt, int d)
             abt * sptr = mrow->v->v + aboffset(mmt->abase, xx->offset_me);
             abt * dptr = mcol->v->v + aboffset(mmt->abase, xx->offset_there);
             size_t siz = abbytes(mmt->abase, xx->count);
+            pi_log_op(pirow, "[%s] MPI_Reduce", __func__);
             err = MPI_Reduce(sptr, dptr, siz, MPI_BYTE, MPI_BXOR, jdst, pirow->pals);
+            pi_log_op(pirow, "[%s] MPI_Reduce done", __func__);
             BUG_ON(err);
         }
 #endif
@@ -722,10 +749,13 @@ void matmul_top_mul(matmul_top_data_ptr mmt, int d)
     mmt_wiring_ptr mcol = mmt->wr[d];
     mmt_wiring_ptr mrow = mmt->wr[!d];
 
+    pi_log_op(mmt->pi->m, "[%s] enter matmul_mul", __func__);
     // mmt_debug_writeout(mmt, d, "before_mul");
     matmul_mul(mmt->mm, mrow->v->v, mcol->v->v, d);
     // mmt_debug_writeout(mmt, !d, "after_mul");
+    pi_log_op(mmt->pi->m, "[%s] enter reduce_across", __func__);
     reduce_across(mmt, !d);
+    pi_log_op(mmt->pi->m, "[%s] enter broadcast_down", __func__);
     broadcast_down(mmt, d);
 
     /* If we have shared input data for the column threads, then we'd
@@ -733,6 +763,7 @@ void matmul_top_mul(matmul_top_data_ptr mmt, int d)
      * threads will need the data, only one is actually importing it.
      */
     if (mcol->v->flags & THREAD_SHARED_VECTOR) {
+        pi_log_op(picol, "[%s] serialize threads", __func__);
         serialize_threads(picol);
     }
 }

@@ -23,9 +23,6 @@ cachesize: cachesize.o
 check_rels: check_rels.o
 	$(CC) $(MY_LFLAGS) $^ -o $@ -L. -lutils -lgmp
 
-test-rootfinder: test-rootfinder.o
-	$(CC) $(MY_LFLAGS) $^ -o $@ -L. -lutils -lgmp
-
 test_mod_ul.o: test_mod.c
 	$(CC) $(MY_CFLAGS) -DARITHMETIC=\"mod_ul_default.h\" -c -o $@ $<
 
@@ -35,9 +32,16 @@ test_mod_redcul.o: test_mod.c
 test_mod_redc15ul.o: test_mod.c
 	$(CC) $(MY_CFLAGS) -DARITHMETIC=\"modredc_15ul_default.h\" -c -o $@ $<
 
+test_mod_ul: test_mod_ul.o
+	$(CC) $(MY_LFLAGS) $^ -o $@ -L. -lutils -lgmp
+test_mod_redcul: test_mod_redcul.o
+	$(CC) $(MY_LFLAGS) $^ -o $@ -L. -lutils -lgmp
+test_mod_redc15ul: test_mod_redc15ul.o
+	$(CC) $(MY_LFLAGS) $^ -o $@ -L. -lutils -lgmp
+
 test-rootfinder: libutils.a
 check_rels: libutils.a
-test_mod_ul test_mod_redcul test_mod_redc15ul: libutils.a $(GMPLIB)
+test_mod_ul test_mod_redcul test_mod_redc15ul: libutils.a
 # Computed includes that auto-deps can't know
 test_mod_ul.o: mod_ul_default.h
 test_mod_redcul.o: modredc_ul_default.h

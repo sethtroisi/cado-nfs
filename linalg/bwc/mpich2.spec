@@ -1,5 +1,5 @@
 Name:           mpich2
-Version:        1.1a2
+Version:        1.1b1
 Release:        1%{?dist}
 Summary:        A Message Passing Interface (MPI) Implementation
 Group:          Development/Libraries
@@ -56,7 +56,7 @@ implementations.
 	--with-pm=hydra \
         --enable-sharedlibs=gcc \
         --enable-cxx    \
-	--enable-threads
+	--enable-threads=multiple
 
 %build
 make
@@ -113,5 +113,8 @@ alternatives --remove mpi-run %{mpiprefix}%{_bindir}/mpirun
 %{mpiprefix}
 
 %changelog
+* Tue Mar 31 2009 Emmanuel Thomé <Emmanuel.Thome@normalesup.org> 1.1b1-1
+- bump
+
 * Sun Dec 21 2008 Emmanuel Thomé <Emmanuel.Thome@normalesup.org> 1.1a2-1
 - initial pkg.

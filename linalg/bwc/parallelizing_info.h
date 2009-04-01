@@ -1,6 +1,7 @@
 #ifndef PARALLELIZING_INFO_H_
 #define PARALLELIZING_INFO_H_
 
+#include <sys/time.h>   /* for struct timeval */
 #include "select_mpi.h"
 
 #ifdef  HOMEMADE_BARRIERS
@@ -74,6 +75,23 @@ struct pthread_things {
     // int count;
 };
 
+/* need to forward-define this for log entries */
+struct pi_wiring_s;
+typedef struct pi_wiring_s * pi_wiring_ptr;
+typedef const struct pi_wiring_s * pi_wiring_srcptr;
+
+struct pi_log_entry {
+    struct timeval tv[1];
+    char what[40];
+};
+
+#define PI_LOG_BOOK_ENTRIES     32
+struct pi_log_book {
+    struct pi_log_entry t[PI_LOG_BOOK_ENTRIES];
+    int hsize;  // history size -- only a count, once the things wraps.
+    int next;   // next free pointer.
+};
+
 struct pi_wiring_s {
     /* njobs : number of mpi jobs concerned by this logical group */
     /* ncores : number of threads concerned by this logical group */
@@ -96,12 +114,10 @@ struct pi_wiring_s {
 #ifdef  CONCURRENCY_DEBUG
     int th_count;
 #endif
+    struct pi_log_book * log_book;
 };
 
 typedef struct pi_wiring_s pi_wiring[1];
-typedef struct pi_wiring_s * pi_wiring_ptr;
-typedef const struct pi_wiring_s * pi_wiring_srcptr;
-
 
 struct parallelizing_info_s {
     // row-wise, column-wise.
@@ -163,6 +179,13 @@ extern int pi_load_file(pi_wiring_ptr, const char *, void *, size_t);
 
 extern int pi_load_file_2d(parallelizing_info_ptr, int, const char *, void *, size_t);
 extern int pi_save_file_2d(parallelizing_info_ptr, int, const char *, void *, size_t);
+
+/* stuff related to log entry printing */
+extern void pi_log_init(pi_wiring_ptr);
+extern void pi_log_clear(pi_wiring_ptr);
+extern void pi_log_op(pi_wiring_ptr, const char * fmt, ...);
+extern void pi_log_print_all(parallelizing_info_ptr);
+extern void pi_log_print(pi_wiring_ptr);
 
 #ifdef __cplusplus
 }
