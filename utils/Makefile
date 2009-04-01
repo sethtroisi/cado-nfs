@@ -14,14 +14,18 @@ obj:=$(patsubst %,%.o,$(names))
 bins:=cache cachesize check_rels
 all: libutils.a $(bins)
 
-cache: cache.o timing.o
-	$(CC) $(MY_LFLAGS) $^ -o $@
+cache_objs:=cache.o timing.o
+cache: $(cache_objs)
+	$(CC) $(MY_LFLAGS) $(cache_objs) -o $@
 
 cachesize: cachesize.o
-	$(CC) $(MY_LFLAGS) $^ -o $@
+	$(CC) $(MY_LFLAGS) $< -o $@
 
 check_rels: check_rels.o
-	$(CC) $(MY_LFLAGS) $^ -o $@ -L. -lutils -lgmp
+	$(CC) $(MY_LFLAGS) $< -o $@ -L. -lutils -lgmp
+
+test-rootfinder: test-rootfinder.o
+	$(CC) $(MY_LFLAGS) $< -o $@ -L. -lutils -lgmp
 
 test_mod_ul.o: test_mod.c
 	$(CC) $(MY_CFLAGS) -DARITHMETIC=\"mod_ul_default.h\" -c -o $@ $<
@@ -33,11 +37,11 @@ test_mod_redc15ul.o: test_mod.c
 	$(CC) $(MY_CFLAGS) -DARITHMETIC=\"modredc_15ul_default.h\" -c -o $@ $<
 
 test_mod_ul: test_mod_ul.o
-	$(CC) $(MY_LFLAGS) $^ -o $@ -L. -lutils -lgmp
+	$(CC) $(MY_LFLAGS) $< -o $@ -L. -lutils -lgmp
 test_mod_redcul: test_mod_redcul.o
-	$(CC) $(MY_LFLAGS) $^ -o $@ -L. -lutils -lgmp
+	$(CC) $(MY_LFLAGS) $< -o $@ -L. -lutils -lgmp
 test_mod_redc15ul: test_mod_redc15ul.o
-	$(CC) $(MY_LFLAGS) $^ -o $@ -L. -lutils -lgmp
+	$(CC) $(MY_LFLAGS) $< -o $@ -L. -lutils -lgmp
 
 test-rootfinder: libutils.a
 check_rels: libutils.a
