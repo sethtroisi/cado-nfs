@@ -92,8 +92,11 @@ ellM_double (ellM_point_t Q, const ellM_point_t P, const modulus_t m,
 }
 
 
-/* For Weierstrass coordinates. Returns 1 if doubling worked normally, 
-   0 if the result is point at infinity */
+/* (x3, y3) <- 2 * (x1, y1) for the curve y^2 = x^3 + a*x + b.
+
+   For Weierstrass coordinates. Returns 1 if doubling worked normally, 
+   0 if the result is point at infinity.
+*/
 
 static int
 ellW_double (residue_t x3, residue_t y3, const residue_t x1, 
@@ -308,6 +311,7 @@ ellM_mul_ul (ellM_point_t R, const ellM_point_t P, unsigned long e,
   ellM_clear (t2, m);
 }
 
+/* (x,y) <- e * (x,y) on the curve y^2 = x^3 + a*x + b (mod m) */
 static int
 ellW_mul_ui (residue_t x, residue_t y, const unsigned long e, residue_t a, 
 	     const modulus_t m)
@@ -533,8 +537,25 @@ Brent12_curve_from_sigma (residue_t A, residue_t x, const residue_t sigma,
 /* Produces curve in Montgomery parameterization from k value, using
    parameters for a torsion 12 curve as in Montgomery's thesis (6.1).
    Return 1 if it worked, 0 if a modular inverse failed. 
-   If a modular inverse failed, the non-invertible value is stored in x. */
+   If a modular inverse failed, the non-invertible value is stored in x.
 
+   The elliptic curve is B y^2 = x^2 + A x^2 + x
+   
+   with A = (-3*a^4-6*a^2+1)/(4*a^3) = (1/a - 3*a*(a^2 + 2))/(2*a)^2
+   and B = (a^2-1)^2/(4*a^3).
+
+   and initial point x = (3*a^2+1)/(4*a).
+
+   A and x are obtained from u and v such that (u,v) = k*P on the curve
+   v^2 = u^3 - 12*u, where P = (-2, 4).
+
+   Then t = v/(2*u), and a=(t^2-1)/(t^2+3).
+
+   For k=2, we get u=4, v=-4, t=-1/2, a=-3/13, A=-4798/351 and x=-49/39.
+
+   For k=3, we get u=-2/9, v=-44/27, t=11/3, a=28/37, A=-6409583/3248896,
+   and x=3721/4144.
+*/
 static int
 Monty12_curve_from_k (residue_t A, residue_t x, const unsigned long k, 
 		      const modulus_t m)
@@ -554,17 +575,17 @@ Monty12_curve_from_k (residue_t A, residue_t x, const unsigned long k,
 
   if (k == 2)
     {
-      mod_add (v, one, one, m);
-      mod_add (v, v, one, m);
-      mod_add (v, v, v, m);
-      mod_add (v, v, v, m);
-      mod_add (v, v, one, m); /* v = 13 */
-      mod_neg (v, v, m);
-      mod_div3 (v, v, m);      /* v = -13/3 = 1/a */
-      mod_add (a, one, one, m);
-      mod_add (a, a, one, m);
-      mod_neg (a, a, m);
-      mod_div13 (a, a, m);     /* a = -3/13 */
+      mod_add (v, one, one, m); /* v = 2 */
+      mod_add (v, v, one, m);   /* v = 3 */
+      mod_add (v, v, v, m);     /* v = 6 */
+      mod_add (v, v, v, m);     /* v = 12 */
+      mod_add (v, v, one, m);   /* v = 13 */
+      mod_neg (v, v, m);        /* v = -13 */
+      mod_div3 (v, v, m);       /* v = -13/3 = 1/a */
+      mod_add (a, one, one, m); /* a = 2 */
+      mod_add (a, a, one, m);   /* a = 3 */
+      mod_neg (a, a, m);        /* a = -3 */
+      mod_div13 (a, a, m);      /* a = -3/13 */
     }
   else if (k == 3)
     {
@@ -634,23 +655,23 @@ Monty12_curve_from_k (residue_t A, residue_t x, const unsigned long k,
     }
 
   /* Here we have $a$ in a, $1/a$ in v */
-  mod_mul (u, a, a, m); /* a^2 */
+  mod_mul (u, a, a, m);   /* a^2 */
   mod_add (A, u, one, m);
   mod_add (A, A, one, m); /* a^2 + 2 */
   mod_add (t2, A, A, m);
-  mod_add (A, A, t2, m); /* 3*(a^2 + 2) */
+  mod_add (A, A, t2, m);  /* 3*(a^2 + 2) */
   mod_mul (t2, A, a, m);
   mod_set (A, v, m);
-  mod_sub (A, A, t2, m); /* 1/a - 3 a (a^2 + 2) */
-  mod_div2 (v, v, m); /* v = 1/(2a) */
-  mod_mul (t2, v, v, m); /* t2 = 1/(2a)^2 */
-  mod_mul (A, A, t2, m);
+  mod_sub (A, A, t2, m);  /* 1/a - 3 a (a^2 + 2) */
+  mod_div2 (v, v, m);     /* v = 1/(2a) */
+  mod_mul (t2, v, v, m);  /* t2 = 1/(2a)^2 */
+  mod_mul (A, A, t2, m);  /* A = [1/a - 3 a (a^2 + 2)]/(2a)^2 */
 
-  mod_add (x, u, u, m);
-  mod_add (x, x, u, m); /* 3*a^2 */
+  mod_add (x, u, u, m);   /* 2a^2 */
+  mod_add (x, x, u, m);   /* 3*a^2 */
   mod_add (x, x, one, m); /* 3*a^2 + 1 */
-  mod_div2 (v, v, m); /* v = 1/(4a) */
-  mod_mul (x, x, v, m);
+  mod_div2 (v, v, m);     /* v = 1/(4a) */
+  mod_mul (x, x, v, m);   /* x = (3*a^2 + 1)/(4a) */
   r = 1;
 
 clear_and_exit:  

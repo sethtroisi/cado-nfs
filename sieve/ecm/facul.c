@@ -48,15 +48,18 @@ facul_make_strategy (const int n, const unsigned long fbb,
 
   methods = malloc ((n + 4) * sizeof (facul_method_t));
   strategy->methods = methods;
-  
+
+  /* run one P-1 curve with B1=315 and B2=2205 */
   methods[0].method = PM1_METHOD;
   methods[0].plan = malloc (sizeof (pm1_plan_t));
   pm1_make_plan (methods[0].plan, 315, 2205, 0);
-  
+
+  /* run one P+1 curve with B1=525 and B2=3255 */
   methods[1].method = PP1_METHOD;
   methods[1].plan = malloc (sizeof (pp1_plan_t));
   pp1_make_plan (methods[1].plan, 525, 3255, 0);
-  
+
+  /* run one ECM curve with Montgomery parametrization, B1=105, B2=3255 */
   methods[2].method = EC_METHOD;
   methods[2].plan = malloc (sizeof (ecm_plan_t));
   ecm_make_plan (methods[2].plan, 105, 3255, MONTY12, 2, 0);
