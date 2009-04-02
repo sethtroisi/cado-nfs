@@ -530,13 +530,13 @@ Brent12_curve_from_sigma (residue_t A, residue_t x, const residue_t sigma,
   return r;
 }
 
-/* Produces curve in Montgomery parameterization from n value, using
-   parameters for a torsion 12 curve as in Montgomery's thesis.
+/* Produces curve in Montgomery parameterization from k value, using
+   parameters for a torsion 12 curve as in Montgomery's thesis (6.1).
    Return 1 if it worked, 0 if a modular inverse failed. 
    If a modular inverse failed, the non-invertible value is stored in x. */
 
 static int
-Monty12_curve_from_k (residue_t A, residue_t x, const unsigned long n, 
+Monty12_curve_from_k (residue_t A, residue_t x, const unsigned long k, 
 		      const modulus_t m)
 {
   residue_t u, v, a, t2, one;
@@ -552,7 +552,7 @@ Monty12_curve_from_k (residue_t A, residue_t x, const unsigned long n,
   
   mod_set1 (one, m);
 
-  if (n == 2)
+  if (k == 2)
     {
       mod_add (v, one, one, m);
       mod_add (v, v, one, m);
@@ -566,7 +566,7 @@ Monty12_curve_from_k (residue_t A, residue_t x, const unsigned long n,
       mod_neg (a, a, m);
       mod_div13 (a, a, m);     /* a = -3/13 */
     }
-  else if (n == 3)
+  else if (k == 3)
     {
 #if 0
       mod_set_ul (v, 37UL, m);
@@ -600,7 +600,7 @@ Monty12_curve_from_k (residue_t A, residue_t x, const unsigned long n,
       mod_add (a, v, v, m);
       mod_add (a, a, v, m);
       mod_neg (a, a, m);    /* a = -12 */
-      ellW_mul_ui (u, v, n, a, m);
+      ellW_mul_ui (u, v, k, a, m);
       /* Now we have a $u$ so that $u^3-12u$ is a square */
       /* printf ("Monty12_curve_from_k: u = %lu\n", mod_get_ul (u)); */
       
