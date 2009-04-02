@@ -111,6 +111,28 @@ modredc15ul_frommontgomery (residueredc15ul_t r, const residueredc15ul_t s,
   r[1] = t[3];
 }
 
+/* Do a one-word REDC, i.e., divide by 2^LONG_BIT */
+MAYBE_UNUSED
+static inline void
+modredc15ul_redc1 (residueredc15ul_t r, const residueredc15ul_t s,
+		   const modulusredc15ul_t m)
+{
+  unsigned long t[4], k;
+  
+  k = s[0] * m[0].invm;
+  ularith_mul_ul_ul_2ul (&(t[0]), &(t[1]), k, m[0].m[0]);
+  if (t[0] != 0UL)
+    t[1]++;
+  t[2] = 0;
+  ularith_add_ul_2ul (&(t[1]), &(t[2]), s[1]); /* t[2] <= 1 */
+  ularith_mul_ul_ul_2ul (&(t[0]), &(t[3]), k, m[0].m[1]); /* t[3] < 2^(w/2) */
+  ularith_add_2ul_2ul (&(t[1]), &(t[2]), t[0], t[3]);
+
+  /* r = (k*m + s) div wb. k <= wb-1, s<m, thus r < m */
+  r[0] = t[1];
+  r[1] = t[2];
+}
+
 /* ================= Functions that are part of the API ================= */
 
 /* Some functions for integers of the same width as the modulus */
