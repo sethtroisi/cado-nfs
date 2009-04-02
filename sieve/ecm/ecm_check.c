@@ -9,7 +9,7 @@
    Puts in 'out' the primes which are not found with the curve (B1,B2,sigma).
  */
 
-#include "../../utils/mod_ul_default.h"
+#include "../../utils/modredc_ul_default.h"
 #include "facul.h"
 #include "ecm.h"
 
@@ -17,13 +17,15 @@
 static int
 tryecm (const unsigned long p, const ecm_plan_t *plan)
 {
-  modulusredcul_t m;
+  modulus_t m;
   modint_t f;
+  int r;
   
-  modredcul_initmod_uls (m, &p);
-  ecm_ul (f, m, plan);
-  modredcul_clearmod (m);
-  return mod_intequal_ul (f, p);
+  mod_intset_ul (f, p);
+  mod_initmod_uls (m, f);
+  r = ecm_ul (f, m, plan);
+  mod_clearmod (m);
+  return r || mod_intequal_ul (f, p);
 }
 
 int
