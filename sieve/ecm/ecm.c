@@ -30,6 +30,12 @@
 #error Please define MODREDCUL or MODREDC15UL
 #endif
 
+/* Do we want backtracking when processing factors of 2 in E? */
+#ifndef ECM_BACKTRACKING
+/* Default is "yes." Set to 0 for "no." */
+#define ECM_BACKTRACKING 1
+#endif
+
 typedef struct {residue_t x, z;} __ellM_point_t;
 typedef __ellM_point_t ellM_point_t[1];
 
@@ -1142,11 +1148,12 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   ellM_interpret_bytecode (P, plan->bc, plan->bc_len, m, b);
 
   /* Add prime 2 in the desired power. If a zero residue for the Z-coordinate 
-     is encountered, we go back to previous point and stop */
+     is encountered, we backtrack to previous point and stop */
   ellM_set (Pt, P, m);
   for (i = 0; i < plan->exp2; i++)
     {
       ellM_double (P, P, m, b);
+#if ECM_BACKTRACKING
       if (mod_is0 (P[0].z, m))
 	{
 	  ellM_set (P, Pt, m);
@@ -1154,6 +1161,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 	  break;
 	}
       ellM_set (Pt, P, m);
+#endif
     }
 
   mod_gcd (f, P[0].z, m); /* FIXME: skip this gcd and let the extgcd

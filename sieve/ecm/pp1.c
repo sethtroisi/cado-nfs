@@ -15,6 +15,12 @@
 #error Please define MODREDCUL or MODREDC15UL
 #endif
 
+/* Do we want backtracking when processing factors of 2 in E? */
+#ifndef PP1_BACKTRACKING
+/* Default is "yes." Set to 0 for "no." */
+#define PP1_BACKTRACKING 0
+#endif
+
 static inline void
 pp1_add (residue_t r, const residue_t a, const residue_t b, 
 	 const residue_t d, const modulus_t m)
@@ -406,6 +412,7 @@ pp1 (modint_t f, const modulus_t m, const pp1_plan_t *plan)
 {
   residue_t b, two, save, t;
   unsigned int i;
+  int bt = 0;
 
   mod_init_noset0 (b, m);
   mod_init_noset0 (two, m);
@@ -424,11 +431,15 @@ pp1 (modint_t f, const modulus_t m, const pp1_plan_t *plan)
   for (i = 0; i < plan->exp2; i++)
     {
       pp1_double (b, b, two, m);
+#if PP1_BACKTRACKING
       if (mod_equal (b, two, m))
         {
           mod_set (b, t, m);
+          bt = 1;
           break;
         }
+      mod_set (t, b, m);
+#endif
     }
   mod_sub (t, b, two, m);
   mod_gcd (f, t, m);
@@ -444,5 +455,5 @@ pp1 (modint_t f, const modulus_t m, const pp1_plan_t *plan)
   mod_clear (two, m);
   mod_clear (t, m);
 
-  return 0;
+  return bt;
 }
