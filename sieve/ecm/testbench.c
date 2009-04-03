@@ -1,3 +1,22 @@
+/* testbench - test program for different factoring strategies
+
+   Examples:
+
+   $ primes 3 1000000 | ./testbench -inp /dev/stdin -cof 4294967311 \
+                                    -ecm 315 5355 6
+   Strategy has 1 methods
+   Of 78498 tries there were 64684 with a factor found
+   Ratio: 0.824021
+   Total time: 4.25 s, per call: 54.095060 usec, per factor: 65.647672 usec
+
+   $ primes 3 1000000 | ./testbench -inp /dev/stdin -cof 4294967311 -pm1 \
+                                    315 3000 -ecm 315 5355 6 -ecm 315 5355 -2
+   Strategy has 3 methods
+   Of 78498 tries there were 77224 with a factor found
+   Ratio: 0.983770
+   Total time: 3.10 s, per call: 39.472700 usec, per factor: 40.123899 usec
+*/
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
