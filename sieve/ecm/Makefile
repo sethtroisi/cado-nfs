@@ -22,6 +22,8 @@ addchain: addchain.o prac_bc.o
 	$(CC) $(MY_LFLAGS) $^ -o $@ -lutils -lgmp -lm
 testbench: testbench.o libfacul.a $(PRIMEGEN)
 	$(CC) $(MY_LFLAGS) $^ -o $@ -lutils -lgmp -lm
+ecm_check: ecm_check.o libfacul.a
+	$(CC) $(MY_LFLAGS) $^ -o $@ -lutils -lgmp -lm
 pm1.o: pm1.c pm1.h $(TOP)/utils/modredc_ul.h
 	$(CC) $(MY_CFLAGS) -c -o $@ -DMODREDCUL $<
 pm1_15.o: pm1.c pm1.h $(TOP)/utils/modredc_15ul.h
@@ -38,6 +40,7 @@ facul_doit_ul.o: facul_doit.c facul_doit.h facul.h $(TOP)/utils/modredc_ul.h
 	$(CC) $(MY_CFLAGS) -c -o $@ -DMODREDCUL $<
 facul_doit_15ul.o: facul_doit.c facul_doit.h facul.h $(TOP)/utils/modredc_ul.h $(TOP)/utils/modredc_15ul.h
 	$(CC) $(MY_CFLAGS) -c -o $@ -DMODREDC15UL $<
+ecm_check.o: facul.h ecm.h $(TOP)/utils/modredc_ul_default.h
 
 stage2.o: stage2.h ../basicnt.h $(TOP)/utils/utils.h
 prac_bc.o: prac_bc.h

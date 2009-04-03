@@ -1,14 +1,11 @@
 /* Usage: ecm_check B1 B2 sigma < in > out
 
-   Compile with:
-
-   gcc -O2 -g -I. -I../../utils ecm_check.c -o ecm_check libfacul.a ../../utils/libutils.a -lgmp
-
    'in' is a file with one prime number per line
    
    Puts in 'out' the primes which are not found with the curve (B1,B2,sigma).
  */
 
+#include <stdlib.h>
 #include "../../utils/modredc_ul_default.h"
 #include "facul.h"
 #include "ecm.h"
@@ -33,6 +30,12 @@ main (int argc, char *argv[])
 {
   unsigned long B1, B2, sigma, p;
   ecm_plan_t plan[1];
+
+  if (argc != 4)
+    {
+      fprintf (stderr, "Usage: ecm_check B1 B2 sigma\n");
+      exit (1);
+    }
 
   B1 = atoi (argv[1]);
   B2 = atoi (argv[2]);
