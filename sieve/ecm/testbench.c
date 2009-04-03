@@ -28,9 +28,11 @@ void print_help (char *programname)
   printf ("-lpb <n> Use <n> as large prime bound, e.g. for early abort\n");
   printf ("-p       Try only primes in [<start>, <stop>] (default: all odd "
 	  "numbers)\n");
-  printf ("-v       More verbose output. Once: print parameters. Twice: print "
-	  "residues\n");
+  printf ("-q       Suppress normal output, output from -v, -vf and -vnf still appears\n");
+  printf ("-v       More verbose output. Once: print statistics. Twice: print \n"
+          "         numbers that are tried. Three: internal info from strategies\n");
   printf ("-vf      Print factors that are found\n");
+  printf ("-vnf     Print input numbers where no factor was found\n");
   printf ("-cof <n> Multiply each number to test by <num> before calling facul.\n"
 	  "         NOTE: facul does not report input numbers as factors,\n"
 	  "         with -p you MUST use -cof or no factors will be found\n");
@@ -51,8 +53,9 @@ int main (int argc, char **argv)
   mpz_t N, cof;
   facul_strategy_t *strategy;
   int nr_methods = 0;
-  int only_primes = 0, verbose = 0;
+  int only_primes = 0, verbose = 0, quiet = 0;
   int printfactors = 0;
+  int printnonfactors = 0;
   int inp_raw = 0;
   int got_usage;
   int strat = 0;
@@ -87,7 +90,7 @@ int main (int argc, char **argv)
 	  strategy->methods[nr_methods].plan = malloc (sizeof (pm1_plan_t));
 	  ASSERT (strategy->methods[nr_methods].plan != NULL);
 	  pm1_make_plan (strategy->methods[nr_methods].plan, B1, B2, 
-			 (verbose >= 2));
+			 (verbose >= 3));
 	  nr_methods++;
 	  argc -= 3;
 	  argv += 3;
@@ -102,7 +105,7 @@ int main (int argc, char **argv)
 	  strategy->methods[nr_methods].plan = malloc (sizeof (pp1_plan_t));
 	  ASSERT (strategy->methods[nr_methods].plan != NULL);
 	  pp1_make_plan (strategy->methods[nr_methods].plan, B1, B2, 
-			 (verbose >= 2));
+			 (verbose >= 3));
 	  nr_methods++;
 	  argc -= 3;
 	  argv += 3;
@@ -120,7 +123,7 @@ int main (int argc, char **argv)
 	  ASSERT (strategy->methods[nr_methods].plan != NULL);
 	  ecm_make_plan (strategy->methods[nr_methods].plan, B1, B2, 
                          (sigma > 0) ? BRENT12 : MONTY12, labs (sigma), 
-                         (verbose >= 2));
+                         (verbose >= 3));
 	  nr_methods++;
 	  argc -= 4;
 	  argv += 4;
@@ -156,9 +159,21 @@ int main (int argc, char **argv)
 	  argc -= 1;
 	  argv += 1;
 	}
+      else if (argc > 1 && strcmp (argv[1], "-q") == 0)
+	{
+	  quiet++;
+	  argc -= 1;
+	  argv += 1;
+	}
       else if (argc > 1 && strcmp (argv[1], "-vf") == 0)
 	{
 	  printfactors = 1;
+	  argc -= 1;
+	  argv += 1;
+	}
+      else if (argc > 1 && strcmp (argv[1], "-vnf") == 0)
+	{
+	  printnonfactors = 1;
 	  argc -= 1;
 	  argv += 1;
 	}
@@ -217,7 +232,7 @@ int main (int argc, char **argv)
     }
   else
     {
-      printf ("Strategy has %d methods\n", nr_methods);
+      if (!quiet) printf ("Strategy has %d methods\n", nr_methods);
       strategy->methods[nr_methods].method = 0;
     }
 
@@ -271,6 +286,9 @@ int main (int argc, char **argv)
 	      printf ("\n");
 	    }
 	  
+	  if (printnonfactors && facul_code == 0)
+            printf ("%lu\n", i);
+	  
 	  if (only_primes)
 	    i = getprime (1);
 	  else
@@ -287,10 +305,13 @@ int main (int argc, char **argv)
     /* Read lines from inp */
     while (!feof(inp) && inpstop-- > 0)
       {
+        size_t read_ok;
 	if (inp_raw)
-	  mpz_inp_raw (N, inp);
+	  read_ok = mpz_inp_raw (N, inp);
 	else
-	  mpz_inp_str (N, inp, 0);
+	  read_ok = mpz_inp_str (N, inp, 0);
+        if (read_ok == 0)
+          break;
 	if (mpz_sgn (N) <= 0)
 	  continue;
 	mpz_mul (N, N, cof);
@@ -309,6 +330,12 @@ int main (int argc, char **argv)
 	      printf ("%lu ", f[j]);
 	    printf ("\n");
 	  }
+
+	if (printnonfactors && facul_code == 0)
+	  {
+	    mpz_divexact (N, N, cof);
+            gmp_printf ("%Zd\n", N);
+          }
       }
     fclose (inp);
   }
@@ -318,11 +345,14 @@ int main (int argc, char **argv)
 
   got_usage = getrusage(RUSAGE_SELF, &usage);
 
-  printf ("Of %lu tries there were %lu with a factor found\n", 
-           total, hits);
-  printf ("Ratio: %f\n", (double)hits / (double)total);
+  if (!quiet)
+    {
+      printf ("Of %lu tries there were %lu with a factor found\n", 
+              total, hits);
+      printf ("Ratio: %f\n", (double)hits / (double)total);
+    }
   
-  if (got_usage == 0)
+  if (!quiet && got_usage == 0)
     {
       double usrtime;
       usrtime = (double) usage.ru_utime.tv_sec * 1000000. +
@@ -332,7 +362,7 @@ int main (int argc, char **argv)
               usrtime / (double) hits);
     }
     
-  if (mod > 0)
+  if (!quiet && mod > 0)
     {
       printf ("Distribution of factors found over residue classes mod %lu:\n",
               mod);
@@ -352,7 +382,7 @@ int main (int argc, char **argv)
       free (primmod);
     }
 
-  if (verbose)
+  if (verbose >= 1)
     facul_print_stats (stdout);
 
   return 0;
