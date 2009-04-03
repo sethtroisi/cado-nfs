@@ -229,7 +229,7 @@ while (my ($k,$v) = each %$param) {
     if ($k eq 'mn') { $m=$n=$v; next; }
     if ($k eq 'n') { $n=$v; next; }
     if ($k eq 'm') { $m=$v; next; }
-    if ($k eq 'splits') { @splits=split ',', $1; next; }
+    if ($k eq 'splits') { @splits=split ',', $v; next; }
     if ($k eq 'mpi') { @mpi_split = set_mpithr_param $v; }
     if ($k eq 'thr') { @thr_split = set_mpithr_param $v; }
 
