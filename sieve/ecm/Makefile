@@ -4,8 +4,6 @@ include $(TOP)/Makefile.common
 MY_CFLAGS+=-I$(TOP)/utils -I$(TOP)
 MY_LFLAGS+=-L$(TOP)/utils
 
-PRIMEGEN=~/lib/primegen.a
-
 all: libfacul.a
 more: find_primes_hit addchain testbench
 tests: testbench
@@ -20,7 +18,7 @@ find_primes_hit: find_primes_hit.o
 	$(CC) $(MY_LFLAGS) $^ -o $@ -lutils -lgmp
 addchain: addchain.o prac_bc.o
 	$(CC) $(MY_LFLAGS) $^ -o $@ -lutils -lgmp -lm
-testbench: testbench.o libfacul.a $(PRIMEGEN)
+testbench: testbench.o libfacul.a
 	$(CC) $(MY_LFLAGS) $^ -o $@ -lutils -lgmp -lm
 ecm_check: ecm_check.o libfacul.a
 	$(CC) $(MY_LFLAGS) $^ -o $@ -lutils -lgmp -lm

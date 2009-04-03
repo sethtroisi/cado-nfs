@@ -4,13 +4,13 @@
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <gmp.h>
-#include <primegen.h>
 #include "facul.h"
 #include "pm1.h"
 #include "pp1.h"
 #include "ecm.h"
 #include "modredc_ul.h"
 #include "modredc_ul_default.h"
+#include "getprime.h"
 
 #define MAX_METHODS 20
 
@@ -50,7 +50,6 @@ int main (int argc, char **argv)
   struct rusage usage;
   mpz_t N, cof;
   facul_strategy_t *strategy;
-  primegen pg[1];
   int nr_methods = 0;
   int only_primes = 0, verbose = 0;
   int printfactors = 0;
@@ -238,9 +237,9 @@ int main (int argc, char **argv)
       
       if (only_primes)
 	{
-	  primegen_init (pg);
-	  primegen_skipto (pg, start);
-	  i = primegen_next (pg);
+	  do {
+            i = getprime (1);
+          } while (i < start);
 	}
       else
 	i = start;
@@ -273,7 +272,7 @@ int main (int argc, char **argv)
 	    }
 	  
 	  if (only_primes)
-	    i = primegen_next (pg);
+	    i = getprime (1);
 	  else
 	    i += 2;
 	}
