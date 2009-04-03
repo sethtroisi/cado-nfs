@@ -14,7 +14,6 @@
 #    the computer on which you run nightly-test, and to add the content of
 #    cle_gforge.pub in the authorized_keys on that computer.
 set -e
-MAKE_ARGS=$1
 DIR=cado-nightly
 USER=`whoami`
 cd /tmp
@@ -29,13 +28,19 @@ make -f Makefile.all dist VERSION=dev
 # now extract the tarball and test it
 tar zxf cado-nfs-dev.tgz
 cd cado-nfs-dev
-if [ "X$MAKE_ARGS" == "X" ];
+if [ "X$1" == "X" ];
 then
     make
 else
-    make "$MAKE_ARGS"
+    if [ "X$2" == "X" ];
+    then
+        make "$1"
+    else
+        make "$1" "$2"
+    fi
 fi
 ./new_run.c59
+exit
 cd /tmp
 /bin/rm -fr "$DIR"
 
