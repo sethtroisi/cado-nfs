@@ -11,7 +11,8 @@ MY_CFLAGS+=-I $(TOP) -I $(TOP)/utils
 MY_CFLAGS+=-I $(TOP)/gf2x -I $(TOP)/cantor
 MY_CFLAGS+=-I.
 
-MY_LFLAGS+=-L $(TOP)/utils -L $(TOP)/gf2x -L $(TOP)/cantor
+# Use "-L<path>", not "-L <path>" !
+MY_LFLAGS+=-L$(TOP)/utils -L$(TOP)/gf2x -L$(TOP)/cantor
 
 # -include Makefile.local
 
@@ -31,6 +32,17 @@ MPICXX:=$(MPI)/mpicxx
 else
 MPICC:=mpicc
 MPICXX:=mpicxx
+endif
+
+HAVE_POSIX_MEMALIGN ?= 1
+ifneq ($(HAVE_POSIX_MEMALIGN), 0)
+    MY_CFLAGS+=-DHAVE_POSIX_MEMALIGN=1
+else
+    MY_CFLAGS+=-DHAVE_POSIX_MEMALIGN=0
+endif
+
+ifdef DISABLE_ASM
+    MY_CFLAGS+=-DDISABLE_ASM
 endif
 
 ifeq ($(WITH_MPI),1)
@@ -115,10 +127,11 @@ acollect: $(acollect_objs) $(common_link_deps)
 all_objlists:=libmatmul build bench prep gather secure krylov mksol
 
 libmatmul_objs:=matmul-sliced.o matmul-basic.o matmul.o
+ifndef	DISABLE_ASM
 ifeq ($(shell uname -m),x86_64)
 libmatmul_objs+=matmul-sliced-asm.o
 endif
-libmatmul_objs+=aligned_malloc.o
+endif
 
 build_objs:=build.o libmatmul.a
 bench_objs:=bench.o libmatmul.a
@@ -160,7 +173,7 @@ gather_normalobjs:=../readbuffer.o ../readmat.o
 
 # This list contains the object files which do not depend on the abase
 # selection.
-constant_objects:=parallelizing_info.o intersections.o xvectors.o aligned_malloc.o bw-common.o bw-common-mpi.o rusage.o async.o debug.o
+constant_objects:=parallelizing_info.o intersections.o xvectors.o bw-common.o bw-common-mpi.o rusage.o async.o debug.o
 
 # ALL object files must come here. Using $(wildcard *.c) is discouraged
 # for obvious reasons. This list is used for computing dependencies.

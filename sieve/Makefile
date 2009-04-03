@@ -16,15 +16,6 @@ CFLAGS+=-fno-ivopts -fno-regmove -fno-tree-sra -fno-tree-ter
 # CFLAGS+=-DSSE_NORM_INIT
 # -fkeep-inline-functions does not yield any speedup, is it useful?
 # CFLAGS+=-fkeep-inline-functions
-# posix_memalign is not available everywhere... For the time being there is no
-# automatic detection. HAVE_POSIX_MEMALIGN is set to one by default. If this
-# fails, try to set it to zero.
-HAVE_POSIX_MEMALIGN ?= 1
-ifneq ($(HAVE_POSIX_MEMALIGN), 0)
-    CFLAGS+=-DHAVE_POSIX_MEMALIGN=1
-else
-    CFLAGS+=-DHAVE_POSIX_MEMALIGN=0
-endif
 
 # We require the cado utils library
 MY_LFLAGS+=-L$(TOP)/utils -Lecm

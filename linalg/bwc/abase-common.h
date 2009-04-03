@@ -33,7 +33,7 @@
 #else
 
 #ifdef  ALWAYS_ALIGN_LARGE_MALLOCS
-#include "aligned_malloc.h"
+#include "misc.h"       /* in aligned_malloc is in utils */
 #define alignable_malloc(s)     aligned_malloc((s), ALWAYS_ALIGN_LARGE_MALLOCS)
 #define alignable_free(p,s)     free((p))
 #else

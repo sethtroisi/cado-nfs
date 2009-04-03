@@ -97,7 +97,7 @@ static void enforce_limit(int l, rlim_t min, const char * name)
 
 	if (min==RLIM_INFINITY || lim.rlim_cur < min) {
 		die("FATAL: Limit %s is %d while we need at least %d\n",-31,
-				name,lim.rlim_cur,min);
+				name,lim.rlim_cur,(unsigned long) min);
 	}
 }
 
@@ -140,7 +140,7 @@ void coredump_limit(int allow)
 			die("getrlimit() failed!\n",31);
 		if (lim.rlim_max != RLIM_INFINITY)
 			fprintf(stdout,"// (actual limit is %lu bytes)\n",
-					lim.rlim_max);
+					(unsigned long) lim.rlim_max);
 		lim.rlim_cur=lim.rlim_max;
 		if (setrlimit(RLIMIT_CORE,&lim) < 0)
 			die("setrlimit() failed!\n",31);

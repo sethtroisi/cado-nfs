@@ -6,7 +6,18 @@ names:=	cado_poly relation timing plain_poly \
 	getprime mod_ul modredc_ul modredc_15ul modul_poly gmp_aux \
 	mpz_poly fpoly rootfinder params gcd_int64 gcd_uint64	\
 	discriminant	\
-	random_generation mpz_array gzip
+	random_generation mpz_array gzip	\
+	misc
+
+# posix_memalign is not available everywhere... For the time being there is no
+# automatic detection. HAVE_POSIX_MEMALIGN is set to one by default. If this
+# fails, try to set it to zero.
+HAVE_POSIX_MEMALIGN ?= 1
+ifneq ($(HAVE_POSIX_MEMALIGN), 0)
+    MY_CFLAGS+=-DHAVE_POSIX_MEMALIGN=1
+else
+    MY_CFLAGS+=-DHAVE_POSIX_MEMALIGN=0
+endif
 
 src:=$(patsubst %,%.c,$(names))
 obj:=$(patsubst %,%.o,$(names))

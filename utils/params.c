@@ -1,5 +1,6 @@
 #define _BSD_SOURCE     /* strdup */
-#define _GNU_SOURCE     /* vasprintf */
+#define _GNU_SOURCE         /* vasprintf */
+#define _DARWIN_C_SOURCE    /* for vasprintf. _ANSI_SOURCE must be undefined */
 
 #include <stdlib.h>
 #include <string.h>

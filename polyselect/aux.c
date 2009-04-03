@@ -2,7 +2,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <values.h> /* for DBL_MAX */
+#include <float.h> /* for DBL_MAX */
 #include <math.h>
 #include "gmp.h"
 #include "macros.h" /* for ASSERT_ALWAYS */

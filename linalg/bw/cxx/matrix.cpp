@@ -54,22 +54,22 @@ void matrix_stats::operator()(std::ifstream& mtx) {
     }
     // We'll constitute an horizontal slice info anyway, even if
     // there's only one such.
-    for(uint j = 0 ; j < nhslices ; j++) {
+    for(unsigned int j = 0 ; j < nhslices ; j++) {
         matrix_slice slice;
         slice.i0 = (j * nr) / nhslices;
         slice.i1 = ((j + 1) * nr) / nhslices;
         slice.ncoeffs = 0;
         slice.pos = mtx.tellg();
-        for(uint i = slice.i0 ; i < slice.i1 ; i++) {
+        for(unsigned int i = slice.i0 ; i < slice.i1 ; i++) {
             std::string s;
             cs.getline(s);
             std::istringstream st(s);
-            uint z;
+            unsigned int z;
             matrix_line mi;
             if (zcols) {
                 if (!(st >> mi)) { BUG(); }
                 z = mi.size();
-                for(uint k = 0 ; k < mi.size() ; k++) {
+                for(unsigned int k = 0 ; k < mi.size() ; k++) {
                     colmap[mi[k].first] = true;
                 }
             } else {
@@ -105,7 +105,7 @@ void matrix_stats::operator()(std::ifstream& mtx) {
     }
     if (zcols) {
         typedef std::vector<bool>::const_iterator vbci_t;
-        uint j=0;
+        unsigned int j=0;
         for(vbci_t xj = colmap.begin() ; xj != colmap.end() ; xj++,j++) {
             if (!*xj) zcols->insert(j);
         }

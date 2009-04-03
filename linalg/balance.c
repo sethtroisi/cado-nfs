@@ -80,7 +80,8 @@ And that obsolete option:
 */
 
 #define __STDC_FORMAT_MACROS    /* For C++ to have PRId64 and friends */
-#define _GNU_SOURCE    /* for strndup and asprintf */
+#define _GNU_SOURCE    /* for asprintf */
+#define _DARWIN_C_SOURCE    /* for asprintf. _ANSI_SOURCE must be undefined */
 
 #include <stddef.h>     /* ptrdiff_t */
 #include <stdio.h>
@@ -383,7 +384,7 @@ char * my_dirname(const char * s)
     if (last_slash == NULL)
         return NULL;
     else
-        return strndup(s, last_slash - s);
+        return cado_strndup(s, last_slash - s);
 }
 
 const char * my_basename(const char * s)
@@ -726,7 +727,7 @@ int read_matrix()
     }
     rb_gobble_long_line(b);
     header_bytes = b->o;
-    header = strndup(b->buf, b->o);
+    header = cado_strndup(b->buf, b->o);
 
     update_header();
 
@@ -1732,14 +1733,14 @@ void sink_feed_row(sink s,
         /* Don't use sscanf here. Its complexity is
          * linear in strlen() of its argument */
         nj=strtoul(data, &ndata, 10);
-        PARSE_CHECK(data==ndata, "row", strndup(data0,sz));
+        PARSE_CHECK(data==ndata, "row", cado_strndup(data0,sz));
         data=ndata;
         for(jj = 0 ; jj < nj ; jj++) {
             unsigned int j;
             assert(*data == ' ');
             data++;
             j=strtoul(data, &ndata, 10);
-            PARSE_CHECK(data==ndata, "row", strndup(data0, sz));
+            PARSE_CHECK(data==ndata, "row", cado_strndup(data0, sz));
             data=ndata;
             unsigned int w;
             char scrap[10];
@@ -1752,7 +1753,7 @@ void sink_feed_row(sink s,
                 data++;
                 e=strtol(data, &ndata, 10);
                 PARSE_CHECK(data==ndata, "row",
-                        strndup(data0,sz));
+                        cado_strndup(data0,sz));
                 cperm_append(s->cp, w, data-1, ndata-data+1);
                 data = ndata;
             }

@@ -9,10 +9,8 @@
 #include <inttypes.h> /* for PRIx64 macro and strtoumax */
 #include <math.h>   // for ceiling, floor in cfrac
 #include "cado.h"
-#include "../utils/mod_ul.h"
 #include "fb.h"
-#include "../utils/utils.h"
-#include "../utils/manu.h"   /* for ctzl */
+#include "utils.h"           /* ctzl, and lots of stuff */
 #include "basicnt.h"         /* for bin_gcd */
 #include "ecm/facul.h"
 #include "bucket.h"

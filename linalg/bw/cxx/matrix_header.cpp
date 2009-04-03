@@ -27,7 +27,7 @@ void get_matrix_header(istream & mtx,
         string & mstr)
 {
     bool ok = false;
-    for (uint line=0 ; !mtx.eof() ; line++) {
+    for (unsigned int line=0 ; !mtx.eof() ; line++) {
         string buffer;
 
         getline(mtx, buffer);

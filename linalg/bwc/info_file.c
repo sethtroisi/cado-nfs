@@ -1,4 +1,5 @@
-#define _GNU_SOURCE     /* asprintf */
+#define _GNU_SOURCE         /* asprintf */
+#define _DARWIN_C_SOURCE    /* for asprintf. _ANSI_SOURCE must be undefined */
 #define _POSIX_C_SOURCE 200112L
 
 #include <stdio.h>
@@ -9,6 +10,7 @@
 
 #include "info_file.h"
 #include "filenames.h"
+#include "utils.h"      /* cado_strndup */
 
 void read_info_file(matmul_top_data_ptr mmt, const char * filename)
 {
@@ -109,7 +111,7 @@ void read_info_file(matmul_top_data_ptr mmt, const char * filename)
         
         if (strchr(locfile, '/') == NULL && last_slash != NULL) {
             // there is a dirname for the matrix info file, so honour it.
-            char * dirname = strndup(filename, last_slash+1-filename);
+            char * dirname = cado_strndup(filename, last_slash+1-filename);
             int rc = asprintf(&(mmt->locfile), "%s%s", dirname, locfile);
             FATAL_ERROR_CHECK(rc < 0, "out of memory");
             free(dirname);

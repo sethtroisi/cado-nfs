@@ -22,7 +22,7 @@ void fake_setup(fake_info_t p, int nF, int nG)
 void fake_dft(const fake_info_t p MAYBE_UNUSED, fake_t dst, unsigned long * src, int n) {
     ASSERT(n <= p->d1+1 || n <= p->d2+1);
     int s = BITS_TO_WORDS(n, ULONG_BITS);
-    memcpy(dst, src, s * sizeof(ulong));
+    memcpy(dst, src, s * sizeof(unsigned long));
 }
 
 /* n is a number of coefficients ! */

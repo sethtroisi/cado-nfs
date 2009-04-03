@@ -154,7 +154,7 @@ struct binary_pod_traits {
         }
 };
 
-typedef binary_pod_traits<ulong> binary_ulong_traits;
+typedef binary_pod_traits<unsigned long> binary_ulong_traits;
 typedef binary_pod_traits<uint64_t> binary_uint64_traits;
 typedef binary_pod_traits<uint32_t> binary_uint32_traits;
 typedef binary_pod_traits<uint16_t> binary_uint16_traits;

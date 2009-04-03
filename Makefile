@@ -2,6 +2,8 @@
 
 TOP:=.
 
+-include Makefile.local
+
 # Currently, this stuff is equivalent to forcing ``make WITHIN_CADO=1''
 # for all sub-makes. This allows the makefiles to react differently
 # depending on whether they're within the cado source tree, or within
@@ -40,7 +42,10 @@ clean:
 # special way. We disable shard libs because it's irrelevant here.
 
 all-gf2x:
-	if [ ! -f gf2x/Makefile ] ; then cd gf2x ; ./configure --disable-shared ; else : ; fi
+	if [ ! -f gf2x/Makefile ] ; then \
+		cd gf2x ;	\
+		./configure --disable-shared $(CONFIGURE_EXTRA) ;	\
+	else : ; fi
 	$(MAKE) -C gf2x
 
 clean-gf2x:

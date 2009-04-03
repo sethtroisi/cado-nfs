@@ -15,7 +15,9 @@ ARQCV:=ar qcv
 OFLAGS:=-O2 -DNDEBUG
 PFLAGS:=
 IFLAGS:=-I ../.. -I ../../utils -I ../../gf2x -I ../../cantor -I $(TOPPATH)/include -I . -I old
-LFLAGS:=-L ../../utils -L ../../gf2x/.libs -L ../../cantor
+# Beware ``-L <path>'' works with some linkers ; some others require
+# ``-L<path>''...
+LFLAGS:=-L../../utils -L../../gf2x/.libs -L../../cantor
 
 ifdef WITHIN_CADO
 TOP:=../..

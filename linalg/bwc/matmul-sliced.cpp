@@ -1,3 +1,8 @@
+#ifndef __cplusplus
+#define _GNU_SOURCE         /* asprintf */
+#endif
+#define _DARWIN_C_SOURCE    /* for asprintf. _ANSI_SOURCE must be undefined */
+
 #define __STDC_LIMIT_MACROS
 /* Manage the in-memory data for the matrix */
 /* It's in C++ because the STL is handy, but that's really all there is
@@ -21,9 +26,11 @@
 using namespace std;
 
 #include "matmul-sliced.h"
+#ifndef DISABLE_ASM     /* Better define this if we don't have GNU as */
 #ifdef  __x86_64
 #include "matmul-sliced-asm.h"
 #define ENABLE_ASM
+#endif
 #endif
 
 #include "readmat.h"

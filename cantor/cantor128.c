@@ -46,7 +46,7 @@
 
 int mulcount=0;
 Kelt * fbase;
-long int * index;
+long int * findex;
 
 #define Kadd(a0,a1,a2)  mpfq_2_128_add (NULL,a0,a1,a2)
 #if 0
@@ -294,9 +294,9 @@ static inline void expand_unroll(Kelt * f, int t, int t0)
     for (long i = 2 * K - 1; i >= K; --i) {
         Kadd(f[i+K0-K], f[i+K0-K], f[i]); 
         fprintf(stderr, "Kadd(f[%ld],f[%ld],f[%ld]);\n",
-                index[i+K0-K+f-fbase],
-                index[i+K0-K+f-fbase],
-                index[i+f-fbase]);
+                findex[i+K0-K+f-fbase],
+                findex[i+K0-K+f-fbase],
+                findex[i+f-fbase]);
     }
     expand_unroll(f, t-1, t0);
     expand_unroll(f+K, t-1, t0);
@@ -341,11 +341,11 @@ void gm_trick_unroll(int two_t, Kelt * f, int j, int m, int d)
             Kmul(z,z,f[1]);
             Kadd(f[0],z,f[0]);
             fprintf(stderr, "allBetai(z,%d*j+%d);\n",2*m,2*d);
-            fprintf(stderr, "Kmul(z,z,f[%ld]);\n",index[1 + f - fbase]);
-            fprintf(stderr, "Kadd(f[%ld],z,f[%ld]);\n",index[f - fbase], index[f-fbase]);
+            fprintf(stderr, "Kmul(z,z,f[%ld]);\n",findex[1 + f - fbase]);
+            fprintf(stderr, "Kadd(f[%ld],z,f[%ld]);\n",findex[f - fbase], findex[f-fbase]);
         }
         Kadd(f[1],f[1],f[0]);
-        fprintf(stderr, "Kadd(f[%ld],f[%ld],f[%ld]);\n",index[f-fbase+1],index[f-fbase+1], index[f-fbase]);
+        fprintf(stderr, "Kadd(f[%ld],f[%ld],f[%ld]);\n",findex[f-fbase+1],findex[f-fbase+1], findex[f-fbase]);
         return;
     }
 
@@ -357,9 +357,9 @@ void gm_trick_unroll(int two_t, Kelt * f, int j, int m, int d)
         for(long j = i+1 ; j < tau ; j++) {
             Kswap(f[(i<<t)+j],f[(j<<t)+i]);
 #if 1
-            long idx = index[(i<<t)+j+f-fbase];
-            index[(i<<t)+j+f-fbase] = index[(j<<t)+i+f-fbase];
-            index[(j<<t)+i+f-fbase] = idx;
+            long idx = findex[(i<<t)+j+f-fbase];
+            findex[(i<<t)+j+f-fbase] = findex[(j<<t)+i+f-fbase];
+            findex[(j<<t)+i+f-fbase] = idx;
 #else
             fprintf(stderr, "Kswap(f[%ld],f[%ld]);\n",
                     (i<<t)+j+f-fbase,
@@ -377,9 +377,9 @@ void gm_trick_unroll(int two_t, Kelt * f, int j, int m, int d)
         for(long j = i+1 ; j < tau ; j++) {
             Kswap(f[(i<<t)+j],f[(j<<t)+i]);
 #if 1
-            long idx = index[(i<<t)+j+f-fbase];
-            index[(i<<t)+j+f-fbase] = index[(j<<t)+i+f-fbase];
-            index[(j<<t)+i+f-fbase] = idx;
+            long idx = findex[(i<<t)+j+f-fbase];
+            findex[(i<<t)+j+f-fbase] = findex[(j<<t)+i+f-fbase];
+            findex[(j<<t)+i+f-fbase] = idx;
 #else
             fprintf(stderr, "Kswap(f[%ld],f[%ld]);\n",
                     (i<<t)+j+f-fbase,
@@ -532,13 +532,13 @@ void gm_trick(int two_t, Kelt * f, long j)
     if (two_t == 4) {
         fprintf(stderr, "// Unrolling gm_trick(%d,f,%d)\n",two_t, j);
         fbase = f;
-        index = malloc(sizeof(long int) << two_t);
+        findex = malloc(sizeof(long int) << two_t);
         for(int i = 0 ; i < (1L << two_t) ; i++) {
-            index[i] = i;
+            findex[i] = i;
         }
         gm_trick_unroll(two_t, f, j, 1, 0);
-        free(index);
-        index = NULL;
+        free(findex);
+        findex = NULL;
         fbase = NULL;
         fprintf(stderr, "// Done unrolling\n\n");
         return;

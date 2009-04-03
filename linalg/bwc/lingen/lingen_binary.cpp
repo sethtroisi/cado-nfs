@@ -1,6 +1,7 @@
 #ifndef __cplusplus
-#define _GNU_SOURCE
+#define _GNU_SOURCE         /* asprintf */
 #endif
+#define _DARWIN_C_SOURCE    /* for asprintf. _ANSI_SOURCE must be undefined */
 
 #include <sys/time.h>
 #include <sys/types.h>

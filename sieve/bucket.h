@@ -6,7 +6,6 @@
                                 // in order to have posix_memalign
 #include <stdlib.h>   // for malloc and friends
 #include <stdint.h>
-#include <unistd.h>   // for getpagesize
 
 //#define SAFE_BUCKETS
 
@@ -29,31 +28,6 @@
  * See the MAIN FUNCTIONS section below for the complete interface, with
  * prototypes of exported functions.
  */
-
-#if HAVE_POSIX_MEMALIGN == 0
-    //
-    // Fri May 16 2008 by JM:
-    // ----------------------
-    //
-    // Most of the *BSD did not provide a posix_memalign function until
-    // recently (FreeBSD now has it since version 7.0). No such method
-    // on Mac OS X either...
-    //
-    // The following function is a temporary fix. Feel free to provide a
-    // real posix_memalign function if you feel like it...
-    //
-    // This temporary fix returns 0 if succeeds, 1 otherwise.
-    //
-    int posix_memalign(void* ptr, size_t alignment, size_t size) {
-        alignment = 0; // get rid of compiler warning (unused parameter)
-        ptr = malloc(size);
-        if (ptr == NULL) {
-            return 1;
-        } else {
-            return 0;
-        }
-    }
-#endif
 
 /********  Data structure for the contents of buckets **************/
 
@@ -207,22 +181,7 @@ bucket_new_logp(bucket_array_t BA, const unsigned char logp);
 
 /******** Bucket array implementation **************/
 
-static inline void * 
-malloc_check(const size_t x) {
-    void *p;
-    p = malloc(x);
-    ASSERT_ALWAYS(p != NULL);
-    return p;
-}
-
-static inline void *
-malloc_pagealigned(const size_t x) {
-    int sz = getpagesize();
-    void *p;
-    int ret = posix_memalign(&p, sz, x);
-    ASSERT_ALWAYS(ret == 0);
-    return p;
-}
+#include "utils/misc.h"
 
 static inline bucket_array_t
 init_bucket_array(const int n_bucket, const int bucket_size)

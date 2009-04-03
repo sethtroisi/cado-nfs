@@ -32,7 +32,7 @@ void rb_read_line(reading_buffer b)
     ptr = fgets(b->buf, sizeof(b->buf), b->f);
     if (ptr == NULL) {
         fprintf(stderr, "Unexpected %s at position %ld in %s\n",    
-                feof(b->f) ? "EOF" : "error", b->o, b->filename);            
+                feof(b->f) ? "EOF" : "error", (long) b->o, b->filename);            
         exit(1);
     }
     b->siz = strlen(ptr);
@@ -48,7 +48,7 @@ void rb_gobble_long_line(reading_buffer b)
         if (ptr == NULL) {
             fprintf(stderr, "Unexpected %s at position %ld in %s\n",    
                     feof(b->f) ? "EOF" : "error",
-                    ftello(b->f), b->filename);    
+                    (long) ftello(b->f), b->filename);    
             exit(1);
         }
         b->siz = strlen(ptr);
@@ -72,7 +72,8 @@ void rb_feed_buffer_again_if_lowwater(reading_buffer b,
     ptr = fgets(b->buf+b->siz,sizeof(b->buf)-b->siz,b->f);
     if (ptr == NULL) {
         fprintf(stderr, "Unexpected %s at position %ld in %s\n",    
-                feof(b->f) ? "EOF" : "error", ftello(b->f), b->filename);    
+                feof(b->f) ? "EOF" : "error",
+                (long) ftello(b->f), b->filename);    
         exit(1);
     }
     b->siz += strlen(b->buf + b->siz);

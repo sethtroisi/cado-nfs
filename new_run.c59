@@ -7,7 +7,10 @@
 # All partial data are put in a temp dir that is removed at the end in
 # case of success.
 
-t=`mktemp -d`
+# Mac OS X's mktemp requires a prefix.
+# And we need $t to be an absolute pathname, or else ./new_cadofactor.pl
+# will fail.
+t=`mktemp -d /tmp/cado.XXXXXXXXXX`
 echo "Testing factorization of c59 in $t"
 if [ "$CADO_DEBUG" ] ; then
     echo "(debug mode, temporary files will be kept in $t)"
