@@ -43,7 +43,7 @@ void print_help (char *programname)
 int main (int argc, char **argv)
 {
   unsigned long start, stop, i, mod = 0UL, inpstop = ULONG_MAX;
-  unsigned long hits = 0, hits_input = 0, total = 0;
+  unsigned long hits = 0, total = 0;
   unsigned long fbb = 0, lpb = ~(0UL);
   char *inp_fn = NULL;
   FILE *inp;
@@ -322,10 +322,7 @@ int main (int argc, char **argv)
   printf ("Of %lu tries there were %lu with a factor found\n", 
            total, hits);
   printf ("Ratio: %f\n", (double)hits / (double)total);
-  if (mpz_cmp_ui (cof, 1UL) != 0)
-    {
-      printf ("Input number was found %lu times\n", hits_input);
-    }
+  
   if (got_usage == 0)
     {
       double usrtime;
