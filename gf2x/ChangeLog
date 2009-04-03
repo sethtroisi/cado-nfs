@@ -1,8 +1,56 @@
-commit 799a02ffd5ebf9762e04f0935b7b118d1e39e9c5
+commit 9c2c3523eba59a71abf0fc9d2c3cfe635227adbe
 Author: Emmanuel Thomé <Emmanuel.Thome@normalesup.org>
-Date:   Tue Mar 31 13:17:17 2009 +0200
+Date:   Thu Apr 2 16:56:33 2009 +0200
+
+    release gf2x-0.9.4
+
+ trunk/ChangeLog |    7 ++++---
+ 1 files changed, 4 insertions(+), 3 deletions(-)
+
+commit b7a4ca4900ddd6cb7e35db8e9f88f71e7be87830
+Author: Emmanuel Thomé <Emmanuel.Thome@normalesup.org>
+Date:   Thu Apr 2 16:37:01 2009 +0200
+
+    release gf2x-0.9.4
+
+ trunk/ChangeLog |   42 ++++++++++++++++++++++++++++++++++++++++--
+ trunk/README    |    6 ++++--
+ 2 files changed, 44 insertions(+), 4 deletions(-)
+
+commit 504add0a23feef5f16934b53d662ba70c2c9e5bd
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Thu Apr 2 14:34:42 2009 +0000
+
+    increased release number to 0.9.4
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@19 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/configure.ac |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+commit 54f038faa01f6f1e9bcd464a591707cbb1fe4179
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Thu Apr 2 14:33:41 2009 +0000
+
+    Fixed aggressive hwdir selection.
+    
+    The configure program was too happily selecting the hardware subdir based
+    on the cpu name -- the ABI needs to be checked as well.
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@18 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/ChangeLog    |    9 +++++++++
+ trunk/acinclude.m4 |   42 +++++++++++++++++++++++++++---------------
+ trunk/configure.ac |   13 ++++++++++---
+ 3 files changed, 46 insertions(+), 18 deletions(-)
+
+commit 8fae616296aaeede20bdf3200fbd60e3f15cdebf
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Thu Apr 2 14:33:40 2009 +0000
 
     release gf2x-0.9.3
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@17 e5c1114b-a573-4582-9dac-f72f410959ce
 
  trunk/ChangeLog |   12 +++++++-----
  1 files changed, 7 insertions(+), 5 deletions(-)

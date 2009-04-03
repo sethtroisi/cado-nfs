@@ -1,5 +1,5 @@
 
-AC_INIT([gf2x], [0.9.3])
+AC_INIT([gf2x], [0.9.4])
 AC_CANONICAL_TARGET
 
 AC_SUBST([gf2x_lib_version], [1:0:0])
@@ -40,7 +40,7 @@ CHECK_SSE2_SUPPORT()
 : ${ABI='default'}
 
 if test x$ABI != xdefault ; then
- VERIFY_WORDSIZE([$ABI])
+ VERIFY_WORDSIZE([$ABI],[whether $CC and ABI=$ABI fit together])
 fi
 
 if test x$hwdir = x ; then
@@ -68,6 +68,14 @@ if test x$hwdir = x ; then
    hwdir=x86_64
    if test x$ABI = x32 ; then
     hwdir=x86_sse2
+   elif test x$ABI = xdefault ; then
+    RUNTIME_ULONG_BITS()
+    case x$gf2x_cv_ulongbits in
+     x64|xdontknow) true ;;
+     *)
+       AC_MSG_WARN([The default ABI for this compiler has $gf2x_cv_ulongbits-bit unsigned longs, not 64-bit as the CPU supports. Using $gf2x_cv_ulongbits-bit])
+       hwdir=x86_sse2;;
+    esac
    fi
    ;;
  esac
@@ -102,8 +110,7 @@ else
   fi
  else
   # At this point we haven't run the standard check.
-  AC_MSG_NOTICE([hardware/$hwdir/ assumes $tuned_nbits-bits unsigned longs, making sure it is correct])
-  VERIFY_WORDSIZE([$tuned_nbits])
+  VERIFY_WORDSIZE([$tuned_nbits],[whether hardware/$hwdir/ is right assuming $tuned_nbits-bits unsigned longs])
  fi
 fi
 

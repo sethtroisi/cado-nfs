@@ -22,24 +22,36 @@ int main() {
 }
 ])
 
-AC_DEFUN([VERIFY_WORDSIZE],[
-    AC_MSG_CHECKING([whether $CC has $1-bit unsigned longs])
-    AC_RUN_IFELSE([WORDSIZE_CODE()],[
-        detected=`cat conftest.out | tr -d -c 0-9`
-        if test x$detected = x ; then
-            AC_MSG_ERROR([test program failed])
-        elif test x$1 != x$detected ; then
-            AC_MSG_ERROR([no, found $detected-bit. Please provide appropriate \$CC variable])
-        else
-            AC_MSG_RESULT([yes])
-        fi
-    ],[
-        AC_MSG_FAILURE([cannot compile/run test program])
-    ],[
-        AC_MSG_NOTICE([check skipped because of cross-compiling])
+AC_DEFUN([RUNTIME_ULONG_BITS],[
+    if test x$gf2x_cv_ulongbits = x ; then
+    AC_CACHE_CHECK([the number of bits in an unsigned long],
+        [gf2x_cv_ulongbits],[
+        AC_RUN_IFELSE([WORDSIZE_CODE()],[
+            detected=`cat conftest.out | tr -d -c 0-9`
+            if test x$detected = x ; then
+                AC_MSG_ERROR([test program failed])
+            else
+                gf2x_cv_ulongbits=$detected
+            fi
+        ],[
+            AC_MSG_FAILURE([cannot compile/run test program])
+        ],[
+            AC_MSG_NOTICE([check skipped because of cross-compiling])
+            gf2x_cv_ulongbits=dontknow
+        ])
     ])
+    fi
 ])
 
+AC_DEFUN([VERIFY_WORDSIZE],[
+    RUNTIME_ULONG_BITS()
+    AC_MSG_CHECKING([$2])
+    case x$gf2x_cv_ulongbits in
+        xdontknow) AC_MSG_NOTICE([cannot tell (cross-compiling)]);;
+        x$1) AC_MSG_RESULT([yes]);;
+        *)   AC_MSG_ERROR([no, $gf2x_cv_ulongbits-bit. Please provide appropriate \$CC variable]);;
+    esac
+])
 
 AC_DEFUN([SSE2_EXAMPLE],[
 #include <emmintrin.h>

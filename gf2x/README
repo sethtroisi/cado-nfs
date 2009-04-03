@@ -112,8 +112,10 @@ Cautious users follow steps 1 to 5 below. Urged users follow only 1 and 5.
 
       ./configure ABI=<bit width of unsigned long> CFLAGS=<corresponding CFLAGS> && make
    
-   For example on a Mac OS X computer with an Intel Core 2 processor, one
-   may use: ./configure ABI=64 CFLAGS=-m64 && make
+   For example on a Mac OS X computer with an Intel Core 2 processor
+   using gcc, one may use: ./configure ABI=64 CFLAGS="-O2 -m64" && make
+
+   (equivalently, one may also use ABI=64 CC='gcc -m64')
 
    Several other flags and arguments can be passed to ./configure (or set
    as environment variables) ; see ./configure --help
