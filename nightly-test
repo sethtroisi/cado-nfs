@@ -14,8 +14,11 @@
 #    the computer on which you run nightly-test, and to add the content of
 #    cle_gforge.pub in the authorized_keys on that computer.
 set -e
-DIR=cado-nightly
-USER=`whoami`
+# If the DIR variable is set, then use it as the basename of the temp directory.
+: ${DIR=cado-nightly}
+# If the USER variable is set, use it instead of the login name for doing
+# the checkout.
+: ${USER=`whoami`}
 cd /tmp
 /bin/rm -fr "$DIR"
 mkdir "$DIR"
@@ -24,21 +27,11 @@ test ! -h "$DIR"
 svn checkout svn+ssh://${USER}@scm.gforge.inria.fr/svn/cado/trunk/dist/src "$DIR"
 cd "$DIR"
 # first build a tarball
-make -f Makefile.all dist VERSION=dev
+make -f Makefile.all dist VERSION=dev "$@"
 # now extract the tarball and test it
 tar zxf cado-nfs-dev.tgz
 cd cado-nfs-dev
-if [ "X$1" == "X" ];
-then
-    make
-else
-    if [ "X$2" == "X" ];
-    then
-        make "$1"
-    else
-        make "$1" "$2"
-    fi
-fi
+make "$@"
 ./new_run.c59
 exit
 cd /tmp
