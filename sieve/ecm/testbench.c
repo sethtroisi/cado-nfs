@@ -37,11 +37,13 @@ const char *method_name[] = {"P-1", "P+1", "ECM"};
 
 void print_help (char *programname)
 {
-  printf ("%s [options] <start> <stop> <B1> <B2>\n", programname);
-  printf ("Run factoring method on numbers in interval [<start>, <stop>]\n");
+  printf ("%s [options] [<start> <stop>]\n", programname);
+  printf ("Run factoring method on numbers in interval [<start>, <stop>], or from file\n");
+  printf ("<start> and <stop> must be given unless -inp or -inpraw is used\n");
   printf ("-pm1 <B1> <B2>      Run P-1 with B1, B2\n");
   printf ("-pp1 <B1> <B2>      Run P+1 with B1, B2\n");
-  printf ("-ecm <B1> <B2> <s>  Run ECM with B1, B2 and sigma s\n");
+  printf ("-ecm <B1> <B2> <s>  Run ECM with B1, B2 and parameter s. If s>0, use BRENT12\n"
+          "                    curve with sigma=s, if s<-1 use MONTY12 with k=-s\n");
   printf ("-strat   Use the facul default strategy. Don't use with -pm1, -pp1, -ecm\n");
   printf ("-fbb <n> Use <n> as factor base bound, e.g. for primality checks\n");
   printf ("-lpb <n> Use <n> as large prime bound, e.g. for early abort\n");
@@ -137,6 +139,12 @@ int main (int argc, char **argv)
 	  B1 = strtoul (argv[2], NULL, 10);
 	  B2 = strtoul (argv[3], NULL, 10);
 	  sigma = strtol (argv[4], NULL, 10);
+          if (sigma == -1)
+            {
+              fprintf (stderr, "Parameter -1 does not lead to a valid curve. "
+              "Use parameter < -1 for MONTY12 curves.\n");
+              exit (EXIT_FAILURE);
+            }
 	  strategy->methods[nr_methods].method = EC_METHOD;
 	  strategy->methods[nr_methods].plan = malloc (sizeof (ecm_plan_t));
 	  ASSERT (strategy->methods[nr_methods].plan != NULL);
@@ -243,6 +251,9 @@ int main (int argc, char **argv)
       printf ("Don't use -strat with -pm1, -pp1 or -ecm\n");
       exit (EXIT_FAILURE);
     }
+
+  if (only_primes && inp_fn != NULL)
+    fprintf (stderr, "-p has no effect with -inp or -inpraw\n");
 
   if (strat)
     {
