@@ -571,12 +571,12 @@ modredcul_sub (residueredcul_t r, const residueredcul_t a,
 
 #if (defined(__i386__) || defined(__x86_64__)) && defined(__GNUC__)
   {
-    unsigned long tr = 0, t = a[0];
+    unsigned long tr, t = a[0];
     __asm__ (
       "sub %2, %1\n\t"  /* t -= b ( = a - b) */
       "lea (%1,%3,1), %0\n\t" /* tr = t + m ( = a - b + m) */
       "cmovnc %1, %0\n\t" /* if (a >= b) tr = t */
-      : "+&r" (tr), "+&r" (t)
+      : "=&r" (tr), "+&r" (t)
       : "g" (b[0]), "r" (m[0].m)
       : "cc"
     );
@@ -585,11 +585,11 @@ modredcul_sub (residueredcul_t r, const residueredcul_t a,
 #elif 1
   /* Seems to be faster than the one below */
   {
-    unsigned long t;
-    t = a[0] - b[0];
-    if (a[0] < b[0])
-      t += m[0].m;
-    r[0] = t;
+    unsigned long t = 0, tr;
+    tr = a[0] - b[0];
+    if (tr > a[0])
+      t = m[0].m;
+    r[0] = tr + t;
   }
 #else
   r[0] = (a[0] < b[0]) ? (a[0] - b[0] + m[0]) : (a[0] - b[0]);
