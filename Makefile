@@ -20,7 +20,6 @@ all:
                    balance characters allsqrt apply_perm
 	$(MAKE) all-gf2x
 	$(MAKE) -C cantor
-	$(MAKE) -C linalg/bw
 	$(MAKE) -C linalg/bwc
 	$(MAKE) -C linalg/bwc/lingen
 	$(MAKE) -C sqrt/naive algsqrt
@@ -33,7 +32,6 @@ clean:
 	$(MAKE) -C linalg               clean
 	$(MAKE) clean-gf2x
 	$(MAKE) -C cantor		clean
-	$(MAKE) -C linalg/bw		clean
 	$(MAKE) -C linalg/bwc		clean
 	$(MAKE) -C linalg/bwc/lingen	clean
 	$(MAKE) -C sqrt/naive		clean
