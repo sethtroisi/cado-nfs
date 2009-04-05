@@ -318,10 +318,10 @@ sub drive {
         die "Won't wipe cwd" if $pwd eq getcwd;
         print STDERR "Doing cleanup in $wdir\n";
         if ($show_only) {
-            print "find $wdir -name '[A-Z]*' | xargs rm";
+            print "find $wdir -name '[A-Z]*' | xargs -r rm";
             print "(cd $wdir ; rm -f bw.cfg)";
         } else {
-            system "find $wdir -name '[A-Z]*' | xargs rm";
+            system "find $wdir -name '[A-Z]*' | xargs -r rm";
             system "rm -f bw.cfg";
         }
         chdir $pwd;

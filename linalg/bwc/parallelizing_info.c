@@ -190,7 +190,7 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
     pi->m->ncores = nhc * nvc;
     pi->m->totalsize = pi->m->njobs * pi->m->ncores;
 
-    MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
+    // MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
 
     // MPI_Errhandler my_eh;
     // MPI_Comm_create_errhandler(&pi_errhandler, &my_eh);
@@ -255,6 +255,8 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
     // column and row barriers are more tricky.
     parallelizing_info * grid;
     grid = (parallelizing_info *) malloc(nhc * nvc * sizeof(parallelizing_info));
+    // setting to zero is important, since several fields are ensured as
+    // null.
     memset(grid, 0, nhc * nvc * sizeof(parallelizing_info));
 
     char commname[64];
@@ -441,11 +443,11 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
         MPI_Comm_free(&grid[k]->wr[1]->pals);
     }
 #endif  /* MPI_LIBRARY_MT_CAPABLE */
-    for(unsigned int k = 0 ; k < nhc * nvc ; k++) {
-        pi_log_clear(grid[k]->m);
-        pi_log_clear(grid[k]->wr[0]);
-        pi_log_clear(grid[k]->wr[1]);
-    }
+
+    /* Don't do pi_log_clear, just like we haven't done pi_log_init. The
+     * sub-threads may define it, in which case it's their responsibility
+     * to clear the thing.
+     */
 
     free(grid);
 
@@ -468,6 +470,7 @@ void pi_log_clear(pi_wiring_ptr wr)
 {
     if (wr->log_book)
         free(wr->log_book);
+    wr->log_book = (void*) 0xdeadbeef;
 }
 
 void pi_log_op(pi_wiring_ptr wr, const char * fmt, ...)
@@ -491,7 +494,7 @@ void pi_log_op(pi_wiring_ptr wr, const char * fmt, ...)
     lb->hsize++;
 }
 
-static void pi_log_print_backend(pi_wiring_ptr wr, char ** strings, int * n, int alloc)
+static void pi_log_print_backend(pi_wiring_ptr wr, const char * myname, char ** strings, int * n, int alloc)
 {
     struct pi_log_book * lb = wr->log_book;
     if (!lb) return;
@@ -511,9 +514,10 @@ static void pi_log_print_backend(pi_wiring_ptr wr, char ** strings, int * n, int
         struct pi_log_entry * e = &(lb->t[i]);
 
         ASSERT_ALWAYS(*n < alloc);
-        asprintf(&(strings[*n]), "%"PRIu64".%06u %s %s", 
+        asprintf(&(strings[*n]), "%"PRIu64".%06u (%s) %s %s", 
                 (uint64_t) e->tv->tv_sec,
                 (unsigned int) e->tv->tv_usec,
+                myname,
                 e->what,
                 commname);
         ++*n;
@@ -530,7 +534,7 @@ void pi_log_print(pi_wiring_ptr wr)
     int alloc = PI_LOG_BOOK_ENTRIES;
     char ** strings = malloc(alloc * sizeof(char*));
     int n = 0;
-    pi_log_print_backend(wr, strings, &n, alloc);
+    pi_log_print_backend(wr, "", strings, &n, alloc);
     for(int i = 0 ; i < n ; i++) {
         puts(strings[i]);
         free(strings[i]);
@@ -552,14 +556,19 @@ void pi_log_print_all(parallelizing_info_ptr pi)
     int alloc = 3 * PI_LOG_BOOK_ENTRIES;
     char ** strings = malloc(alloc * sizeof(char*));
     int n = 0;
-    pi_log_print_backend(pi->m, strings, &n, alloc);
-    pi_log_print_backend(pi->wr[0], strings, &n, alloc);
-    pi_log_print_backend(pi->wr[1], strings, &n, alloc);
+    char * myname;
+    asprintf(&myname, "%s%s", pi->wr[0]->th->desc, pi->wr[1]->th->desc);
+
+    pi_log_print_backend(pi->m, myname, strings, &n, alloc);
+    pi_log_print_backend(pi->wr[0], myname, strings, &n, alloc);
+    pi_log_print_backend(pi->wr[1], myname, strings, &n, alloc);
     qsort(strings, n, sizeof(char*), (sortfunc_t) &p_strcmp);
+
     for(int i = 0 ; i < n ; i++) {
         puts(strings[i]);
         free(strings[i]);
     }
+    free(myname);
     free(strings);
 }
 

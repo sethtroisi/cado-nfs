@@ -756,6 +756,7 @@ void matmul_top_mul(matmul_top_data_ptr mmt, int d)
     // mmt_debug_writeout(mmt, !d, "after_mul");
     pi_log_op(mmt->pi->m, "[%s] enter reduce_across", __func__);
     reduce_across(mmt, !d);
+
     pi_log_op(mmt->pi->m, "[%s] enter broadcast_down", __func__);
     broadcast_down(mmt, d);
 

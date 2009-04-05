@@ -60,10 +60,10 @@ void * sec_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
 
     serialize(pi->m);
 
-    // /* FIXME -- that's temporary ! only for debugging */
-    // pi_log_init(pi->m);
-    // pi_log_init(pi->wr[0]);
-    // pi_log_init(pi->wr[1]);
+    /* FIXME -- that's temporary ! only for debugging */
+    pi_log_init(pi->m);
+    pi_log_init(pi->wr[0]);
+    pi_log_init(pi->wr[1]);
 
     for(int k = 0 ; k < bw->interval ; k++) {
         pi_log_op(mmt->pi->m, "iteration %d", k);
