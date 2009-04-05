@@ -16,8 +16,7 @@ all:
 	$(MAKE) -C polyselect
 	$(MAKE) -C sieve/ecm libfacul.a
 	$(MAKE) -C sieve makefb las
-	$(MAKE) -C linalg freerel duplicates purge merge replay transpose \
-                   balance characters allsqrt apply_perm
+	$(MAKE) -C linalg active-targets
 	$(MAKE) all-gf2x
 	$(MAKE) -C cantor
 	$(MAKE) -C linalg/bwc

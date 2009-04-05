@@ -9,6 +9,10 @@ binaries:=allsqrt replay merge purge freerel linalg characters duplicates \
 	  transpose checkdep balance apply_perm mkbitstrings
 all:	$(binaries)
 
+active-targets:	\
+	freerel duplicates purge merge replay transpose \
+        balance characters allsqrt apply_perm mkbitstrings
+
 procrels: procrels.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils
 hashpair: hashpair.o
