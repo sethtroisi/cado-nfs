@@ -226,6 +226,25 @@ main (int argc, char *argv[])
     fprintf (stderr, "Getting column weights took %2.2lf\n", seconds () - tt);
     gzip_close (purgedfile, purgedname);
 
+    /* print weight counts */
+    {
+      unsigned long j, *nbm;
+      int w;
+      nbm = (unsigned long*) malloc ((maxlevel + 1) * sizeof (unsigned long));
+      memset (nbm, 0, (maxlevel + 1) * sizeof (unsigned long));
+      for (j = 0; j < (unsigned long) mat->ncols; j++)
+        {
+          w = mat->wt[GETJ(mat, j)];
+          if (w <= maxlevel)
+            nbm[w] ++;
+        }
+      for (j = 0; j <= (unsigned long) maxlevel; j++)
+        if (nbm[j] != 0)
+          fprintf (stderr, "There are %lu column(s) of weight %lu\n",
+                   nbm[j], j);
+      free (nbm);
+    }
+
 #ifndef USE_MARKOWITZ
     fprintf (stderr, "SWAR version\n");
     initSWAR (mat);
