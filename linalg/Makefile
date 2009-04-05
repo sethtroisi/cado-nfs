@@ -6,7 +6,7 @@ MY_LFLAGS+=-L$(TOP)/utils
 MY_CFLAGS+=-I$(TOP)/utils
 
 binaries:=allsqrt replay merge purge freerel linalg characters duplicates \
-	  transpose checkdep balance apply_perm
+	  transpose checkdep balance apply_perm mkbitstrings
 all:	$(binaries)
 
 procrels: procrels.o
@@ -41,6 +41,9 @@ linalg: linalg.o gauss.o readmat.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils
 balance: balance.o readbuffer.o rowset_heap.o
 	$(CXX) $(MY_LFLAGS) -o $@ $^ -lutils -lgmp -lm
+
+mkbitstrings: mkbitstrings.o
+	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils
 
 gauss.o: gauss.c
 	$(CC) $(MY_CFLAGS) -DMULTI_ROW=3 -DNO_MAIN $< -c -o $@

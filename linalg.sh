@@ -42,6 +42,6 @@ else
 
    echo "Converting dependencies to CADO format"
    # bw.pl puts the dependency file W in the directory where the matrix was
-   time $linalg/bw/mkbitstrings $solution > $ker
+   time $linalg/mkbitstrings $solution > $ker
 
 fi

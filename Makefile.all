@@ -81,7 +81,8 @@ LINALG_FILES=linalg/Makefile linalg/freerel.c linalg/hashpair.h \
 	   linalg/swar.c linalg/swar.h \
 	   linalg/markowitz.c linalg/markowitz.h \
 	   linalg/mst.c linalg/mst.h \
-	   linalg/postprocess.c
+	   linalg/postprocess.c	\
+	   linalg/mkbitstrings.c
 SQRT_FILES=sqrt/naive/Makefile sqrt/naive/algsqrt.c sqrt/naive/poly.h \
            sqrt/naive/poly.c
 

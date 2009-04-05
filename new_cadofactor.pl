@@ -1987,7 +1987,7 @@ sub do_bitstr {
     info "Converting dependencies to CADO format...\n";
     $tab_level++;
 
-    my $cmd = "$param{'cadodir'}/linalg/bw/mkbitstrings ".
+    my $cmd = "$param{'cadodir'}/linalg/mkbitstrings ".
               "$param{'prefix'}.W ".
               "> $param{'prefix'}.ker_raw ".
               "2> $param{'prefix'}.mkbitstrings.stderr";

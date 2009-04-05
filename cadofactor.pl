@@ -1488,7 +1488,7 @@ MAIN: {
         my_system "/bin/sh -c '$cmd > $prefix.bl.stderr 2>&1'";
     }
     print "Converting dependencies to CADO format...\n";
-    $cmd = "$param->{'cadodir'}/linalg/bw/mkbitstrings " .
+    $cmd = "$param->{'cadodir'}/linalg/mkbitstrings " .
       " $prefix.W";
     my_system "$cmd > $prefix.ker_raw";
     my $nker = `wc -l < $prefix.ker_raw`;

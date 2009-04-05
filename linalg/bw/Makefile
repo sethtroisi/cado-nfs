@@ -51,8 +51,8 @@ include $(TOPPATH)/util/main.mki
 
 ######################################################################
 
-MKBITSTRINGS_SOURCES:=mkbitstrings.c
--include .mkbitstrings.mkf
+# MKBITSTRINGS_SOURCES:=mkbitstrings.c
+# -include .mkbitstrings.mkf
 
 #old/structure_automatic.h: old/structure.m4
 #	m4 -Doutputfile=MAIN < $< > $@
