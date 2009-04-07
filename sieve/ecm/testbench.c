@@ -83,6 +83,7 @@ int main (int argc, char **argv)
   unsigned long *primmod = NULL, *hitsmod = NULL;
   unsigned long f[16];
   int facul_code;
+  double starttime;
 
   strategy = malloc (sizeof(facul_strategy_t));
   strategy->methods = malloc ((MAX_METHODS + 1) * sizeof (facul_method_t));
@@ -289,6 +290,13 @@ int main (int argc, char **argv)
       else
 	i = start;
       
+      got_usage = getrusage(RUSAGE_SELF, &usage);
+      if (got_usage == 0)
+        starttime = (double) usage.ru_utime.tv_sec * 1000000. +
+                    (double) usage.ru_utime.tv_usec;
+      else
+        starttime = 0.;
+
       /* The main loop */
       while (i <= stop)
 	{
@@ -331,6 +339,13 @@ int main (int argc, char **argv)
 	printf ("Could not open %s\n", inp_fn);
 	exit (EXIT_FAILURE);
       }
+
+    got_usage = getrusage(RUSAGE_SELF, &usage);
+    if (got_usage == 0)
+      starttime = (double) usage.ru_utime.tv_sec * 1000000. +
+                  (double) usage.ru_utime.tv_usec;
+    else
+      starttime = 0.;
 
     /* Read lines from inp */
     while (!feof(inp) && inpstop-- > 0)
@@ -387,6 +402,7 @@ int main (int argc, char **argv)
       double usrtime;
       usrtime = (double) usage.ru_utime.tv_sec * 1000000. +
                 (double) usage.ru_utime.tv_usec;
+      usrtime -= starttime;
       printf ("Total time: %.2f s, per call: %f usec, per factor: %f usec\n",
               usrtime / 1000000., usrtime / (double) total, 
               usrtime / (double) hits);
