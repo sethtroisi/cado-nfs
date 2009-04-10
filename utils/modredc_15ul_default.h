@@ -117,6 +117,7 @@
 #define mod_mul              modredc15ul_mul
 #define mod_div2             modredc15ul_div2
 #define mod_div3             modredc15ul_div3
+#define mod_div5             modredc15ul_div5
 #define mod_div7             modredc15ul_div7
 #define mod_div13            modredc15ul_div13
 #define mod_pow_ul           modredc15ul_pow_ul

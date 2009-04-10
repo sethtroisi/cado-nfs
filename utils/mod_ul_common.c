@@ -53,6 +53,54 @@ mod_div3 (residue_t r, const residue_t a, const modulus_t m)
 
 
 void
+mod_div5 (residue_t r, const residue_t a, const modulus_t m)
+{
+  unsigned long ml, m5, k;
+  residue_t t;
+  const unsigned long a5 = a[0] % 5UL;
+  const unsigned long inv5[5] = {0,4,2,3,1}; /* inv5[i] = -1/i (mod 5) */
+
+  ASSERT_EXPENSIVE (a[0] < mod_getmod_ul (m));
+
+  mod_init_noset0 (t, m);
+  mod_set (t, a, m);
+  if (a5 != 0UL)
+    {
+      ml = mod_getmod_ul (m);
+      m5 = ml % 5UL;
+      ASSERT (m5 != 0UL);
+      
+      /* We want a+km == 0 (mod 5), so k = -a*m^{-1} (mod 5) */
+      k = (a5 * inv5[m5]) % 5UL;
+      ASSERT_EXPENSIVE ((k*m5 + a5) % 5UL == 0UL);
+      t[0] = a[0] + k * ml;
+    }
+
+  /* Now t[0] == a+k*m (mod 2^w) so that a+k*m is divisible by 5.
+     (a+k*m)/5 < 2^w, so doing a division (mod 2^w) produces the 
+     correct result. */
+  
+  if (sizeof (unsigned long) == 4)
+    t[0] *= 0xCCCCCCCDUL; /* 1/5 (mod 2^32) */
+  else
+    t[0] *= 0xCCCCCCCCCCCCCCCDUL; /* 1/5 (mod 2^64) */
+  
+#ifdef WANT_ASSERT_EXPENSIVE
+  ASSERT_EXPENSIVE (t[0] < mod_getmod_ul (m));
+  mod_sub (r, a, t, m);
+  mod_sub (r, r, t, m);
+  mod_sub (r, r, t, m);
+  mod_sub (r, r, t, m);
+  mod_sub (r, r, t, m);
+  ASSERT_EXPENSIVE (mod_is0 (r, m));
+#endif
+
+  mod_set (r, t, m);
+  mod_clear (t, m);
+}
+
+
+void
 mod_div7 (residue_t r, const residue_t a, const modulus_t m)
 {
   unsigned long ml, m7, k;

@@ -585,10 +585,9 @@ modredcul_sub (residueredcul_t r, const residueredcul_t a,
 #elif 1
   /* Seems to be faster than the one below */
   {
-    unsigned long t = 0, tr;
-    tr = a[0] - b[0];
-    if (tr > a[0])
-      t = m[0].m;
+    unsigned long t = 0UL, tr;
+    if ((tr = a[0] - b[n]) > a[0])
+      t = m;
     r[0] = tr + t;
   }
 #else
@@ -699,6 +698,8 @@ modredcul_finished (const residueredcul_t r, const modulusredcul_t m)
 
 /* prototypes of non-inline functions */
 void modredcul_div3 (residueredcul_t, const residueredcul_t, 
+                     const modulusredcul_t);
+void modredcul_div5 (residueredcul_t, const residueredcul_t, 
                      const modulusredcul_t);
 void modredcul_div7 (residueredcul_t, const residueredcul_t, 
                      const modulusredcul_t);

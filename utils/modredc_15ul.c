@@ -89,6 +89,56 @@ modredc15ul_div3 (residueredc15ul_t r, const residueredc15ul_t a,
 
 
 void
+modredc15ul_div5 (residueredc15ul_t r, const residueredc15ul_t a, 
+		  const modulusredc15ul_t m)
+{
+  const unsigned long a5 = ((a[1] % 5UL) + a[0] % 5UL) % 5UL;
+  residueredc15ul_t t;
+  
+  modredc15ul_init_noset0 (t, m);
+  t[1] = a[1];
+  t[0] = a[0];
+  
+  /* Make t[1]:t[0] divisible by 5 */
+  if (a5 != 0UL)
+    {
+      const unsigned long m5 = ((m[0].m[1] % 5UL) + m[0].m[0] % 5UL) % 5UL;
+      ASSERT(m5 != 0UL);
+      
+       /* inv5[i] = -1/i (mod 5) */
+      const unsigned long inv5[5] = {0,4,2,3,1};
+      unsigned long k;
+      /* We want a+km == 0 (mod 5), so k = -a*m^{-1} (mod 5) */
+      k = (inv5[m5] * a5) % 5UL;
+      ularith_mul_ul_ul_2ul (&(t[0]), &(t[1]), m[0].m[0], k);
+      t[1] += m[0].m[1] * k;
+      ularith_add_2ul_2ul (&(t[0]), &(t[1]), a[0], a[1]);
+      
+      /* Now t[1]:t[0] is divisible by 5 */
+      ASSERT_EXPENSIVE (((t[1] % 5UL) + t[0] % 5UL) % 5UL == 0UL);
+    }
+  
+  t[1] = t[1] / 5UL;
+  if (sizeof (unsigned long) == 4)
+    t[0] *= 0xCCCCCCCDUL; /* 1/5 (mod 2^32) */
+  else
+    t[0] *= 0xCCCCCCCCCCCCCCCDUL; /* 1/5 (mod 2^64) */
+
+#ifdef WANT_ASSERT_EXPENSIVE
+  modredc15ul_sub (r, a, t, m);
+  modredc15ul_sub (r, r, t, m);
+  modredc15ul_sub (r, r, t, m);
+  modredc15ul_sub (r, r, t, m);
+  modredc15ul_sub (r, r, t, m);
+  ASSERT_EXPENSIVE (modredc15ul_is0 (r, m));
+#endif
+  r[0] = t[0];
+  r[1] = t[1];
+  modredc15ul_clear (t, m);
+}
+
+
+void
 modredc15ul_div7 (residueredc15ul_t r, const residueredc15ul_t a, 
 		  const modulusredc15ul_t m)
 {

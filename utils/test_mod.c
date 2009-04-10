@@ -180,6 +180,8 @@ test_mod_divn(const modint_t la, const modint_t lm, const unsigned long n)
     mod_div2 (s, r, m);   /* s = r/n */
   else if (n == 3UL)
     mod_div3 (s, r, m);
+  else if (n == 5UL)
+    mod_div5 (s, r, m);
   else if (n == 7UL)
     mod_div7 (s, r, m);
   else if (n == 13UL)
@@ -619,6 +621,8 @@ int main(int argc, char **argv)
   tests_mod_divn (iter, 2);
   printf ("Testing mod_div3()\n");
   tests_mod_divn (iter, 3);
+  printf ("Testing mod_div5()\n");
+  tests_mod_divn (iter, 5);
   printf ("Testing mod_div7()\n");
   tests_mod_divn (iter, 7);
   printf ("Testing mod_div13()\n");
