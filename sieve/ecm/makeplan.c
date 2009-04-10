@@ -121,18 +121,27 @@ pp1_clear_plan (pp1_plan_t *plan)
 
 
 /* Make byte code for addition chain for stage 1, and the parameters for 
-   stage 2 */
+   stage 2. Parameterization chooses Brent-Suyama curves with order divisible
+   by 12 (BRENT12), Montgomery with torsion 12 over Q (MONTY12) or Montgomery
+   with torsion 16 over Q (MONTY16), sigma is the associated parameter.
+   Extra primes controls whether some primes should be added (or left out!)
+   on top of the primes and prime powers <= B1, for example to take into 
+   account the known factors in the group order. */
 
 void 
 ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
 	       const int parameterization, const unsigned long sigma, 
-	       const int verbose)
+	       const int extra_primes, const int verbose)
 {
   unsigned int p, q;
   const unsigned int addcost = 6, doublecost = 5; /* TODO: find good ratio */
   const unsigned int compress = 0;
   
-  plan->exp2 = 0;
+  /* If group order is divisible by 12 or 16, add two or four 2s to stage 1 */
+  if (extra_primes)
+    plan->exp2 = (parameterization == MONTY16) ? 4 : 2;
+  else
+    plan->exp2 = 0;
   for (q = 1; q <= B1 / 2; q *= 2)
     plan->exp2++;
   
@@ -143,6 +152,10 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
   bytecoder_init (compress);
   p = (unsigned int) getprime (2UL);
   ASSERT (p == 3);
+  /* If group order is divisible by 12, add another 3 to stage 1 primes */
+  if (extra_primes && 
+      (parameterization == BRENT12 || parameterization == MONTY12))
+    prac_bytecode (3, addcost, doublecost);
   for ( ; p <= B1; p = (unsigned int) getprime (p))
     {
       for (q = 1; q <= B1 / p; q *= p)

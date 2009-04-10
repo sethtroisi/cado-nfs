@@ -690,6 +690,109 @@ clear_and_exit:
 }
 
 
+/* Produces curve in Montgomery parameterization from k value, using
+   parameters for a torsion 16 curve as in Montgomery's thesis.
+   Return 1 if it worked, 0 if a modular inverse failed.
+   Currently can produce only one, hard-coded curve that is cheap 
+   to initialise */
+
+static int
+Monty16_curve_from_k (residue_t b, residue_t x, const unsigned long k, 
+		      const modulus_t m)
+{
+#if 0
+  if (k == 1UL)
+    {
+      /* ERROR: this curve has rank 0! That explains why it only ever
+         finds trivial factorizations... */ 
+      /* Make curve corresponding to (a,b,c) = (4, -3, 5) in 
+         Montgomery's thesis, equation (6.2.2). Then A = 337/144, 
+         b = (A+2)/4 = (25/24)^2. x = -3/2, see table 6.2.1. 
+         This curve is cheap to initialise, three div2, one div3, two add,
+	 one mul */
+      residue_t t, t2, one;
+      
+      mod_init (t, m);
+      mod_init (t2, m);
+      mod_init (one, m);
+      
+      mod_set1 (one, m);
+      mod_div2 (t, one, m);     /* t = 1/2 */
+      mod_div2 (t2, t, m);      /* t2 = 1/4 */
+      mod_add (t, t, one, m);   /* t = 3/2 */
+      mod_neg (x, t, m);        /* x = -3/2 */
+      mod_div2 (t2, t2, m);     /* t2 = 1/8 */
+      mod_div3 (t2, t2, m);     /* t2 = 1/24 */
+      mod_add (t2, t2, one, m); /* t2 = 25/24 */
+      mod_mul (b, t2, t2, m);   /* b = 625/576 */
+
+#ifdef WANT_ASSERT_EXPENSIVE
+      mod_add (t, x, x, m);
+      mod_add (t, t, one, m);
+      mod_add (t, t, one, m);
+      mod_add (t, t, one, m);
+      ASSERT (mod_is0 (t, m));
+      mod_set_ul (t, 576UL, m);
+      mod_mul (t2, b, t, m);
+      mod_set_ul (t, 625UL, m);
+      ASSERT (mod_equal (t, t2, m));
+#endif
+      
+      mod_clear (t, m);
+      mod_clear (t2, m);
+      mod_clear (one, m);
+    }
+#endif
+  if (k == 1UL)
+    {
+      /* Make curve corresponding to (a,b,c) = (8, 15, 17) in 
+         Montgomery's thesis, equation (6.2.2). Then A = 54721/14400, 
+         b = (A+2)/4 = (289/240)^2. x = 8/15, see table 6.2.1. 
+         This curve is cheap to initialise: four div2, one div3, two div5,
+         three add, one mul */
+      residue_t t, t2, one;
+      
+      mod_init (t, m);
+      mod_init (t2, m);
+      mod_init (one, m);
+      
+      mod_set1 (one, m);
+      mod_div3 (t, one, m);
+      mod_div5 (t2, one, m);
+      mod_add (x, t, t2, m);  /* x = 1/3 + 1/5 = 8/15 */
+      mod_div2(t, t, m);
+      mod_div2(t, t, m);
+      mod_div2(t, t, m);
+      mod_div2(t, t, m);      /* t = 1/48 */
+      mod_add (t, t, one, m); /* t = 49/48 */
+      mod_div5 (t, t, m);     /* t = 49/240 */
+      mod_add (t, t, one, m); /* t = 289/240 */
+
+      mod_mul (b, t, t, m); /* b = 83521/57600 */
+      
+#ifdef WANT_ASSERT_EXPENSIVE
+      mod_set_ul (t, 15UL, m);
+      mod_mul (t2, x, t, m);
+      mod_set_ul (t, 8UL, m);
+      ASSERT (mod_equal (t, t2, m));
+      mod_set_ul (t, 57600UL, m);
+      mod_mul (t2, b, t, m);
+      mod_set_ul (t, 83521UL, m);
+      ASSERT (mod_equal (t, t2, m));
+#endif
+      mod_clear (t, m);
+      mod_clear (t2, m);
+      mod_clear (one, m);
+    }
+  else
+    {
+      abort();
+    }
+
+  return 1;
+}
+
+
 /* Make a curve of the form y^2 = x^3 + a*x^2 + b with a valid point
    (x, y) from a curve Y^2 = X^3 + A*X^2 + X. The value of b will not
    be computed. 
@@ -1078,13 +1181,12 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
 int 
 ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 {
-  residue_t u, A, b, r;
+  residue_t u, b, r;
   ellM_point_t P, Pt;
   unsigned int i;
   int bt = 0;
 
   mod_init (u, m);
-  mod_init (A, m);
   mod_init (b, m);
   mod_init (r, m);
   ellM_init (P, m);
@@ -1094,8 +1196,9 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 
   if (plan->parameterization == BRENT12)
   {
-    residue_t s;
+    residue_t s, A;
     mod_init_noset0 (s, m);
+    mod_init_noset0 (A, m);
     mod_set_ul (s, plan->sigma, m);
     if (Brent12_curve_from_sigma (A, P->x, s, m) == 0)
       {
@@ -1110,14 +1213,41 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
       }
     mod_clear (s, m);
     mod_set1 (P->z, m);
+
+    mod_div2 (A, A, m);
+    mod_set1 (b, m);
+    mod_add (b, b, A, m);
+    mod_div2 (b, b, m); /* b = (A + 2)/4 */
+    mod_clear (A, m);
   }
   else if (plan->parameterization == MONTY12)
   {
+    residue_t A;
+    mod_init_noset0 (A, m);
     if (Monty12_curve_from_k (A, P->x, plan->sigma, m) == 0)
       {
 	mod_gcd (f, P->x, m);
 	mod_clear (u, m);
 	mod_clear (A, m);
+	mod_clear (b, m);
+	ellM_clear (P, m);
+	ellM_clear (Pt, m);
+	return 0;
+      }
+    mod_set1 (P->z, m);
+
+    mod_div2 (A, A, m);
+    mod_set1 (b, m);
+    mod_add (b, b, A, m);
+    mod_div2 (b, b, m); /* b = (A + 2)/4 */
+    mod_clear (A, m);
+  }
+  else if (plan->parameterization == MONTY16)
+  {
+    if (Monty16_curve_from_k (b, P->x, plan->sigma, m) == 0)
+      {
+	mod_gcd (f, P->x, m);
+	mod_clear (u, m);
 	mod_clear (b, m);
 	ellM_clear (P, m);
 	ellM_clear (Pt, m);
@@ -1132,15 +1262,9 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   }
 
 #ifdef TRACE
-  printf ("starting point: (%lu::%lu)\n", 
-	  mod_get_ul (P->x, m), mod_get_ul (P->z, m));
+  printf ("starting point: (%lu::%lu) on curve y^2 = x^3 + (%lu*4-2)*x^2 + x\n", 
+	  mod_get_ul (P->x, m), mod_get_ul (P->z, m), mod_get_ul(b, m));
 #endif
-
-  mod_set1 (b, m);
-  mod_add (b, b, b, m);
-  mod_add (b, b, A, m); /* b = A + 2 */
-  mod_div2 (b, b, m);
-  mod_div2 (b, b, m);
 
   /* now start ecm */
 
@@ -1173,7 +1297,6 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
     }
   
   mod_clear (u, m);
-  mod_clear (A, m);
   mod_clear (b, m);
   mod_clear (r, m);
   ellM_clear (P, m);

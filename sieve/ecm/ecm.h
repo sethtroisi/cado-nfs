@@ -4,6 +4,7 @@
 
 #define BRENT12 0
 #define MONTY12 1
+#define MONTY16 2
 
 typedef struct {
   char *bc;             /* Bytecode for the Lucas chain for stage 1 */
@@ -29,5 +30,5 @@ unsigned long ell_pointorder_15ul (const residueredc15ul_t, const int,
 unsigned long ellM_curveorder_jacobi_15ul (residueredc15ul_t, residueredc15ul_t, 
                                            modulusredc15ul_t);
 void ecm_make_plan (ecm_plan_t *, const unsigned int, const unsigned int, 
-		    const int, const unsigned long, const int);
+		    const int, const unsigned long, const int, const int);
 void ecm_clear_plan (ecm_plan_t *);

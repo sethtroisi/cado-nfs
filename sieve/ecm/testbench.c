@@ -42,11 +42,13 @@ void print_help (char *programname)
   printf ("<start> and <stop> must be given unless -inp or -inpraw is used\n");
   printf ("-pm1 <B1> <B2>      Run P-1 with B1, B2\n");
   printf ("-pp1 <B1> <B2>      Run P+1 with B1, B2\n");
-  printf ("-ecm <B1> <B2> <s>  Run ECM with B1, B2 and parameter s. If s>0, use BRENT12\n"
-          "                    curve with sigma=s, if s<-1 use MONTY12 with k=-s\n");
+  printf ("-ecm <B1> <B2> <s>  Run ECM with B1, B2 and parameter s, using BRENT12 curve\n");
+  printf ("-ecmm12 <B1> <B2> <s>  Same, but using Montgomery torsion 12 curve\n");
+  printf ("-ecmm16 <B1> <B2> <s>  Same, but using Montgomery torsion 16 curve\n");
   printf ("-strat   Use the facul default strategy. Don't use with -pm1, -pp1, -ecm\n");
   printf ("-fbb <n> Use <n> as factor base bound, e.g. for primality checks\n");
   printf ("-lpb <n> Use <n> as large prime bound, e.g. for early abort\n");
+  printf ("-ep      Add certain extra primes in ECM stage 1 (e.g., 12 or 16)\n");
   printf ("-p       Try only primes in [<start>, <stop>] (default: all odd "
 	  "numbers)\n");
   printf ("-q       Suppress normal output, output from -v, -vf and -vnf still appears\n");
@@ -80,6 +82,7 @@ int main (int argc, char **argv)
   int inp_raw = 0;
   int got_usage;
   int strat = 0;
+  int extra_primes = 0;
   unsigned long *primmod = NULL, *hitsmod = NULL;
   unsigned long f[16];
   int facul_code;
@@ -132,25 +135,35 @@ int main (int argc, char **argv)
 	  argc -= 3;
 	  argv += 3;
 	}
-      else if (argc > 4 && strcmp (argv[1], "-ecm") == 0 && 
+      else if (argc > 4 && strncmp (argv[1], "-ecm", 4) == 0 && 
 	       nr_methods < MAX_METHODS)
 	{
 	  unsigned long B1, B2;
 	  long sigma;
+	  int parameterization = BRENT12;
 	  B1 = strtoul (argv[2], NULL, 10);
 	  B2 = strtoul (argv[3], NULL, 10);
 	  sigma = strtol (argv[4], NULL, 10);
-          if (sigma == -1)
+	  if (strcmp (argv[1], "-ecmm12") == 0)
+	    parameterization = MONTY12;
+	  if (strcmp (argv[1], "-ecmm16") == 0)
+	    parameterization = MONTY16;
+          if (parameterization == MONTY12 && sigma == 1)
             {
-              fprintf (stderr, "Parameter -1 does not lead to a valid curve. "
-              "Use parameter < -1 for MONTY12 curves.\n");
+              fprintf (stderr, "Parameter 1 does not lead to a valid curve. "
+              "Use parameter > 1 for MONTY12 curves.\n");
+              exit (EXIT_FAILURE);
+            }
+          if (parameterization == MONTY16 && (sigma < 0 || sigma > 1))
+            {
+              fprintf (stderr, "Only parameter 1 for MONTY16 curves so far.\n");
               exit (EXIT_FAILURE);
             }
 	  strategy->methods[nr_methods].method = EC_METHOD;
 	  strategy->methods[nr_methods].plan = malloc (sizeof (ecm_plan_t));
 	  ASSERT (strategy->methods[nr_methods].plan != NULL);
 	  ecm_make_plan (strategy->methods[nr_methods].plan, B1, B2, 
-                         (sigma > 0) ? BRENT12 : MONTY12, labs (sigma), 
+                         parameterization, labs (sigma), extra_primes, 
                          (verbose >= 3));
 	  nr_methods++;
 	  argc -= 4;
@@ -174,6 +187,12 @@ int main (int argc, char **argv)
 	  lpb = strtoul (argv[2], NULL, 10);
 	  argc -= 2;
 	  argv += 2;
+	}
+     else if (argc > 1 && strcmp (argv[1], "-ep") == 0)
+	{
+	  extra_primes = 1;
+	  argc -= 1;
+	  argv += 1;
 	}
      else if (argc > 1 && strcmp (argv[1], "-p") == 0)
 	{
