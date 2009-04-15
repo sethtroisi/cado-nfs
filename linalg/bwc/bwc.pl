@@ -60,7 +60,7 @@ Some environment variables have an impact on this script.
 HOME         The default value for matpath is \$HOME/Local/mats
 MPI_BINDIR   The path to the directory holding the mpiexec program (the
              mpiexec= parameter allows to specify the same thing. Note that
-             MPI alone serves as an alias for MPI_BINDIR, but this may be
+             MPI alone serves as an alias for MPI_BINDIR, but this may
              become legacy).
 BWC_BINDIR   The directory holding the bwc binaries. Defaults to the
              directory holding the current script.
@@ -183,12 +183,16 @@ if (!defined($wdir) && defined($matrix)) {
     $param->{'wdir'}=$wdir;
 }
 
+if (!defined($wdir) && !defined($matrix)) {
+    die "At least one of matrix or wdir must be defined";
+}
+
 # Assuming that the parameters given on the command line are sufficient
 # to determine an existing wdir, then this wdir is scanned for an
 # existing bw.cfg file. This file is read. However, parameters read from
 # the bw.cfg have _lower_ precedence than the ones on the command line.
 
-if (-d $wdir && -f "$wdir/bw.cfg") {
+if (defined($wdir) && -d $wdir && -f "$wdir/bw.cfg") {
     open F, "$wdir/bw.cfg";
     while (<F>) {
         chomp($_);
@@ -245,7 +249,7 @@ $nv = $mpi_split[1] * $thr_split[1];
 ##################################################
 # Some more default values to set. Setting separately splits=, ys= and so
 # on is quite awkward in the case of a single-site test.
-if (!defined($m) || !defined($n)) {
+if ((!defined($m) || !defined($n)) && $main !~ /^:(?:wipeout|balance)$/) {
     usage "The parameters m and n must be set";
 }
 if (!defined($param->{'splits'})) {

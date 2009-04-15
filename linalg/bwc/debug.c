@@ -18,5 +18,5 @@ void debug_write(const void * v,
     rc = fwrite(v, 1, n, f);
     fclose(f);
     va_end(ap);
+    free(tmp);
 }
-
