@@ -2183,8 +2183,8 @@ int main(int argc, char * argv[])
         }
     }
 
-    working_filename = strdup(param_list_lookup_string(pl, "out"));
-    pristine_filename = strdup(param_list_lookup_string(pl, "in"));
+    working_filename = (param_list_lookup_string(pl, "out"));
+    pristine_filename = (param_list_lookup_string(pl, "in"));
     if (working_filename == NULL) {
         fprintf(stderr, "Required argument --out is missing\n");
         exit(1);
@@ -2193,6 +2193,8 @@ int main(int argc, char * argv[])
         fprintf(stderr, "Required argument --out is missing\n");
         exit(1);
     }
+    working_filename = strdup(working_filename);
+    pristine_filename = strdup(pristine_filename);
 
     {
         char * output_dirname = my_dirname(working_filename);
