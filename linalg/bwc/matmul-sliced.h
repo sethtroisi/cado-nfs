@@ -13,6 +13,8 @@ extern void matmul_sliced_save_cache(matmul_ptr, const char * filename);
 extern void matmul_sliced_mul(matmul_ptr, abt *, abt const *, int);
 extern void matmul_sliced_report(matmul_ptr);
 extern void matmul_sliced_clear(matmul_ptr mm);
+extern void matmul_sliced_aux(matmul_ptr mm, int op, ...);
+extern void matmul_sliced_auxv(matmul_ptr mm, int op, va_list ap);
 
 #ifdef __cplusplus
 }

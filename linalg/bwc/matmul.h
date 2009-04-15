@@ -1,6 +1,8 @@
 #ifndef MATMUL_H_
 #define MATMUL_H_
 
+#include <stdarg.h>
+
 /* This header is common to the different matrix product implementations
  * (note that it depends on abase, though). So the matrix product codes
  * are meant to be used as interchangeable .o files.
@@ -28,13 +30,18 @@ typedef struct matmul_public_s  * matmul_ptr;
 extern "C" {
 #endif
 
-
-/* here are the functions which exists irrespective of the implementation */
+/* These two functions are the means of initializing the mm layer. No
+ * bare _init() function is publicly accessible */
 extern matmul_ptr matmul_build(abobj_ptr, const char * filename);
 extern matmul_ptr matmul_reload_cache(abobj_ptr, const char * filename);
+
+/* Exit point */
+extern void matmul_clear(matmul_ptr mm);
+
+/* Convenience. Once the data has been built, it may be saved */
 extern void matmul_save_cache(matmul_ptr, const char * filename);
 
-/* matmul() is the main entry point for the cpu-intensive critical loop.
+/* matmul_mul() is the main entry point for the cpu-intensive critical loop.
  * besides the obvious, there's a direction argument which tells whether
  * we're concerned with the linear operator represented by the matrix
  * (d==1) or its transpose (d==0)
@@ -45,9 +52,21 @@ extern void matmul_save_cache(matmul_ptr, const char * filename);
  */
 extern void matmul_mul(matmul_ptr, abt *, abt const *, int);
 
+/* matmul_aux is used on some occasions for obtaining private
+ * informations on the matmul structure. It's really a virtual method
+ * hiding its name.
+ *
+ * _aux() is only the top-level. auxv is the one that does something.
+ */
+#define MATMUL_AUX_GET_READAHEAD        10
+extern void matmul_auxv(matmul_ptr, int, va_list ap);
+extern void matmul_aux(matmul_ptr, int, ...);
 
+
+/* Used for statistics only */
 extern void matmul_report(matmul_ptr);
-extern void matmul_clear(matmul_ptr mm);
+
+
 #ifdef __cplusplus
 }
 #endif

@@ -126,7 +126,10 @@ acollect: $(acollect_objs) $(common_link_deps)
 
 all_objlists:=libmatmul build bench prep gather secure krylov mksol
 
-libmatmul_objs:=matmul-sliced.o matmul-basic.o matmul.o
+libmatmul_objs:=					\
+    matmul-basic.o matmul-sliced.o matmul-threaded.o	\
+    matmul.o
+
 ifndef	DISABLE_ASM
 ifeq ($(shell uname -m),x86_64)
 libmatmul_objs+=matmul-sliced-asm.o
@@ -162,28 +165,20 @@ secure_objs:=secure.o intersections.o 			\
 	xvectors.o debug.o bw-common.o			\
 	rusage.o async.o bw-common-mpi.o		\
 	libmatmul.a
-build_normalobjs:=../readbuffer.o ../readmat.o
-bench_normalobjs:=../readbuffer.o ../readmat.o
-prep_normalobjs:=../readbuffer.o ../readmat.o ../gauss.o
-krylov_normalobjs:=../readbuffer.o ../readmat.o
-mksol_normalobjs:=../readbuffer.o ../readmat.o
-secure_normalobjs:=../readbuffer.o ../readmat.o
-gather_normalobjs:=../readbuffer.o ../readmat.o
+
+mat_io_objs:=../readbuffer.o ../readmat.o readmat-easy.o
+build_normalobjs:=$(mat_io_objs)
+bench_normalobjs:=$(mat_io_objs) debug.o
+prep_normalobjs:=$(mat_io_objs) ../gauss.o
+krylov_normalobjs:=$(mat_io_objs)
+mksol_normalobjs:=$(mat_io_objs)
+secure_normalobjs:=$(mat_io_objs)
+gather_normalobjs:=$(mat_io_objs)
 
 
 # This list contains the object files which do not depend on the abase
 # selection.
 constant_objects:=parallelizing_info.o intersections.o xvectors.o bw-common.o bw-common-mpi.o rusage.o async.o debug.o
-
-# ALL object files must come here. Using $(wildcard *.c) is discouraged
-# for obvious reasons. This list is used for computing dependencies.
-all_objs:=
-sources:=	\
-    bench.c build.c info_file.c				\
-    intersections.cpp matmul-sliced.cpp matmul_top.c	\
-    parallelizing_info.c gather.c secure.c prep.c	\
-    random.c test_hello.c xvectors.c				\
-    matmul.c matmul-basic.c krylov.c mksol.c xymats.c
 
 # hardlinking like this over nfs is prone to exhibit bugs with time
 # difference w.r.t the nfs server.

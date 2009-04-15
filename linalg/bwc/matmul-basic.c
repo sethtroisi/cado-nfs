@@ -5,8 +5,10 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "matmul.h"
+#include "matmul-basic.h"
 #include "readmat.h"
 #include "abase.h"
 #include "manu.h"
@@ -19,7 +21,7 @@
 #define MM_MAGIC (MM_MAGIC_FAMILY << 16 | MM_MAGIC_VERSION)
 
 
-struct matmul_data_s {
+struct matmul_basic_data_s {
     /* repeat the fields from the public interface */
     unsigned int nrows;
     unsigned int ncols;
@@ -30,7 +32,7 @@ struct matmul_data_s {
 };
 
 
-#define MM      ((struct matmul_data_s *) mm)
+#define MM      ((struct matmul_basic_data_s *) mm)
 
 void matmul_basic_clear(matmul_ptr mm)
 {
@@ -38,9 +40,9 @@ void matmul_basic_clear(matmul_ptr mm)
     free(MM);
 }
 
-matmul_ptr matmul_basic_init()
+static matmul_ptr matmul_basic_init()
 {
-    return malloc(sizeof(struct matmul_data_s));
+    return malloc(sizeof(struct matmul_basic_data_s));
 }
 
 typedef int (*sortfunc_t) (const void *, const void *);
@@ -105,6 +107,8 @@ matmul_ptr matmul_basic_build(abobj_ptr xx MAYBE_UNUSED, const char * filename)
     }
 
     MM->datasize = size * sizeof(uint32_t);
+
+    fclose(f);
 
     return mm;
 }
@@ -228,6 +232,18 @@ void matmul_basic_mul(matmul_ptr mm, abt * dst, abt const * src, int d)
 }
 
 void matmul_basic_report(matmul_ptr mm MAYBE_UNUSED) {
+}
+
+void matmul_basic_auxv(matmul_ptr mm MAYBE_UNUSED, int op MAYBE_UNUSED, va_list ap MAYBE_UNUSED)
+{
+}
+
+void matmul_basic_aux(matmul_ptr mm, int op, ...)
+{
+    va_list ap;
+    va_start(ap, op);
+    matmul_basic_auxv (mm, op, ap);
+    va_end(ap);
 }
 
 /* vim: set sw=4: */

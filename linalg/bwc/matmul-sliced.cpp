@@ -16,6 +16,7 @@
 #include <cmath>
 
 #include <stdint.h>
+#include <string.h>
 
 // C++ headers.
 // #include <string>
@@ -42,7 +43,7 @@ using namespace std;
 #define L1_CACHE_SIZE   24576
 // for 8-bytes abt values, this gives 3072 items.
 
-/* Here is how the matrix is stored in memory, in the "matmul_data_s" type.
+/* Here is how the matrix is stored in memory, in the "matmul_sliced_data_s" type.
  * The matrix is cut in slices, where each slice is a set of contiguous
  * rows. The size of a slice is tune so as to fill the L1 cache as per
  * the macro above, with some
@@ -92,7 +93,7 @@ struct slice_info {
 
 typedef vector<uint16_t> data_t;
 
-struct matmul_data_s {
+struct matmul_sliced_data_s {
     /* repeat the fields from the public interface */
     unsigned int nrows;
     unsigned int ncols;
@@ -126,7 +127,7 @@ struct matmul_data_s {
     }
 };
 
-#define MM      ((struct matmul_data_s *) mm)
+#define MM      ((struct matmul_sliced_data_s *) mm)
 
 void matmul_sliced_clear(matmul_ptr mm)
 {
@@ -137,7 +138,7 @@ void matmul_sliced_clear(matmul_ptr mm)
 
 static matmul_ptr matmul_sliced_init()
 {
-    return (struct matmul_public_s *) new matmul_data_s;
+    return (struct matmul_public_s *) new matmul_sliced_data_s;
 }
 
 
@@ -471,7 +472,7 @@ void matmul_sliced_mul(matmul_ptr mm, abt * dst, abt const * src, int d)
         double tick = oncpu_ticks();
 #endif
         for(uint16_t s = 0 ; s < nhstrips ; s++) {
-            uint32_t nrows_packed = matmul_data_s::read32(q);
+            uint32_t nrows_packed = matmul_sliced_data_s::read32(q);
             abt * where = dst + aboffset(x, i);
             abzero(x, where, nrows_packed);
             asm("# critical loop\n");
@@ -483,7 +484,7 @@ void matmul_sliced_mul(matmul_ptr mm, abt * dst, abt const * src, int d)
 #else
             /* The external function must have the same semantics as this
              * code block */
-            uint32_t ncoeffs_slice = matmul_data_s::read32(q);
+            uint32_t ncoeffs_slice = matmul_sliced_data_s::read32(q);
             uint32_t j = 0;
             for(uint32_t c = 0 ; c < ncoeffs_slice ; c++) {
                 j += *q++;
@@ -509,9 +510,9 @@ void matmul_sliced_mul(matmul_ptr mm, abt * dst, abt const * src, int d)
         abzero(x, dst, MM->ncols);
         for(uint16_t s = 0 ; s < nhstrips ; s++) {
             uint32_t j = 0;
-            uint32_t nrows_packed = matmul_data_s::read32(q);
+            uint32_t nrows_packed = matmul_sliced_data_s::read32(q);
             asm("# critical loop\n");
-            uint32_t ncoeffs_slice = matmul_data_s::read32(q);
+            uint32_t ncoeffs_slice = matmul_sliced_data_s::read32(q);
             for(uint32_t c = 0 ; c < ncoeffs_slice ; c++) {
                 j += *q++;
                 uint32_t di = *q++;
@@ -550,4 +551,15 @@ void matmul_sliced_report(matmul_ptr mm MAYBE_UNUSED) {
 #endif
 }
 
+void matmul_sliced_auxv(matmul_ptr mm MAYBE_UNUSED, int op MAYBE_UNUSED, va_list ap MAYBE_UNUSED)
+{
+}
+
+void matmul_sliced_aux(matmul_ptr mm, int op, ...)
+{
+    va_list ap;
+    va_start(ap, op);
+    matmul_sliced_auxv (mm, op, ap);
+    va_end(ap);
+}
 /* vim: set sw=4: */

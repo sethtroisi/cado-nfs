@@ -13,6 +13,8 @@ extern void matmul_basic_save_cache(matmul_ptr, const char * filename);
 extern void matmul_basic_mul(matmul_ptr, abt *, abt const *, int);
 extern void matmul_basic_report(matmul_ptr);
 extern void matmul_basic_clear(matmul_ptr mm);
+extern void matmul_basic_aux(matmul_ptr mm, int op, ...);
+extern void matmul_basic_auxv(matmul_ptr mm, int op, va_list ap);
 
 #ifdef __cplusplus
 }

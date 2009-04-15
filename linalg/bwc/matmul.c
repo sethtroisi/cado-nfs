@@ -1,3 +1,5 @@
+#include <stdarg.h>
+
 #include "matmul.h"
 
 /* these are just trampoline functions. A macro in the .h would serve the
@@ -27,3 +29,16 @@ void matmul_mul(matmul_ptr mm, abt * dst, abt const * src, int d)
 
 void matmul_report(matmul_ptr mm) { MATMUL(report)(mm); }
 void matmul_clear(matmul_ptr mm) { MATMUL(clear)(mm); }
+
+void matmul_auxv(matmul_ptr mm, int op, va_list ap)
+{
+    MATMUL(auxv) (mm, op, ap);
+}
+
+void matmul_aux(matmul_ptr mm, int op, ...)
+{
+    va_list ap;
+    va_start(ap, op);
+    matmul_auxv (mm, op, ap);
+    va_end(ap);
+}

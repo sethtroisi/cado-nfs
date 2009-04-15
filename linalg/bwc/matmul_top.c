@@ -36,10 +36,16 @@ void vec_init_generic(pi_wiring_ptr picol, size_t stride, mmt_generic_vec_ptr v,
     size_t allocsize = 2 * picol->ncores * sizeof(void *);
     v->all_v = alignable_malloc(allocsize);
 
+    /* Because we sometimes provide extra readahead space, we need to
+     * zero out the allocated area. Strictly speaking, it would suffice
+     * to zero out the readahead zone only, but it's easier this way.
+     */
     if (flags & THREAD_SHARED_VECTOR) {
         void * r;
-        if (picol->trank == 0)
+        if (picol->trank == 0) {
             r = abase_generic_init(stride, n);
+            abase_generic_zero(stride, v->v, n);
+        }
         thread_agreement(picol, &r, 0);
         v->v = r;
         for(unsigned int t = 0 ; t < picol->ncores ; t++) {
@@ -47,6 +53,7 @@ void vec_init_generic(pi_wiring_ptr picol, size_t stride, mmt_generic_vec_ptr v,
         }
     } else {
         v->v = abase_generic_init(stride, n);
+        abase_generic_zero(stride, v->v, n);
         v->all_v[picol->trank] = v->v;
         for(unsigned int t = 0 ; t < picol->ncores ; t++) {
             // TODO: once thread_agreement is fixed (if ever), we can
@@ -64,6 +71,7 @@ void vec_init_generic(pi_wiring_ptr picol, size_t stride, mmt_generic_vec_ptr v,
     for(unsigned int t = 0 ; t < picol->ncores ; t++) {
         v->all_v[picol->ncores + t] = v->all_v[t];
     }
+
 }
 
 void vec_clear_generic(pi_wiring_ptr picol, size_t stride MAYBE_UNUSED, mmt_generic_vec_ptr v, unsigned int n MAYBE_UNUSED)
@@ -82,13 +90,17 @@ void vec_clear_generic(pi_wiring_ptr picol, size_t stride MAYBE_UNUSED, mmt_gene
 void matmul_top_vec_init_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, int d, int flags)
 {
     if (v == NULL) v = (mmt_generic_vec_ptr) mmt->wr[d]->v;
-    vec_init_generic(mmt->pi->wr[d], stride, v, flags, mmt->wr[d]->i1 - mmt->wr[d]->i0);
+    unsigned int n1 = mmt->wr[d]->i1 - mmt->wr[d]->i0;
+    matmul_aux(mmt->mm, MATMUL_AUX_GET_READAHEAD, &n1);
+    vec_init_generic(mmt->pi->wr[d], stride, v, flags, n1);
 }
 
 void matmul_top_vec_clear_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, int d)
 {
     if (v == NULL) v = (mmt_generic_vec_ptr) mmt->wr[d]->v;
-    vec_clear_generic(mmt->pi->wr[d], stride, v, mmt->wr[d]->i1 - mmt->wr[d]->i0);
+    unsigned int n1 = mmt->wr[d]->i1 - mmt->wr[d]->i0;
+    matmul_aux(mmt->mm, MATMUL_AUX_GET_READAHEAD, &n1);
+    vec_clear_generic(mmt->pi->wr[d], stride, v, n1);
 }
 
 
@@ -266,7 +278,7 @@ broadcast_down_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_p
         if (extra || picol->trank == 0) {
             abase_generic_zero(stride, abase_generic_ptr_add(v->v,
                         (nrows-mcol->i0) * stride),
-                        (mcol->i1-nrows) * stride);
+                        (mcol->i1-nrows));
         }
         if (!extra) {
             /* of course all threads within the same column have common

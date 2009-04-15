@@ -19,10 +19,12 @@
 #include "macros.h"
 #include "manu.h"
 #include "params.h"
+#include "debug.h"
 
 /* Include all matmul implementations here */
 #include "matmul-basic.h"
 #include "matmul-sliced.h"
+#include "matmul-threaded.h"
 
 struct matmul_bindings_s {
     matmul_ptr (*build)(abobj_ptr, const char * filename);
@@ -31,6 +33,7 @@ struct matmul_bindings_s {
     void (*mul)(matmul_ptr, abt *, abt const *, int);
     void (*report)(matmul_ptr);
     void (*clear)(matmul_ptr mm);
+    void (*aux)(matmul_ptr mm, int op, ...);
 };
 
 struct matmul_bindings_s bind[1];
@@ -44,6 +47,7 @@ struct matmul_bindings_s bind[1];
         REBIND_F(kind, mul);						\
         REBIND_F(kind, report);						\
         REBIND_F(kind, clear);						\
+        REBIND_F(kind, aux);						\
     } while (0)
 
 void usage()
@@ -119,6 +123,7 @@ int main(int argc, char * argv[])
     if (strcmp(impl, #K) == 0) { REBIND_ALL(K); } else
 
     CHECK_REBIND(sliced)        // no semicolon !
+    CHECK_REBIND(threaded)        // no semicolon !
     CHECK_REBIND(basic)
     { fprintf(stderr, "no implementation %s known\n", impl); exit(1); }
 
@@ -142,16 +147,26 @@ int main(int argc, char * argv[])
     fprintf(stderr, "%s: %u rows %u cols %lu coeffs\n",
             file, mm->nrows, mm->ncols, mm->ncoeffs);
 
-    abt * src = abinit(xx, mm->ncols);
-    abt * dst = abinit(xx, mm->nrows);
+    unsigned int nc;
+    nc = mm->ncols;
+    (*bind->aux)(mm, MATMUL_AUX_GET_READAHEAD, &nc);
+    abt * src = abinit(xx, nc);
+    abzero(xx, src, nc);
+
+    unsigned int nr = mm->nrows;
+    (*bind->aux)(mm, MATMUL_AUX_GET_READAHEAD, &nr);
+    abt * dst = abinit(xx, nr);
+    abzero(xx, dst, nr);
 
     setup_seeding(1);
 
     abrandom(xx, src, mm->ncols);
 
     if (!nocheck) {
-        abt * src2 = abinit(xx, mm->ncols);
-        abt * dst2 = abinit(xx, mm->nrows);
+        abt * src2 = abinit(xx, nc);
+        abt * dst2 = abinit(xx, nr);
+        abzero(xx, src2, nc);
+        abzero(xx, dst2, nr);
 
         abt * checkA = abinit(xx, abnbits(xx));
         abt * checkB = abinit(xx, abnbits(xx));
@@ -162,8 +177,12 @@ int main(int argc, char * argv[])
             abcopy(xx, src2, src, mm->ncols);
             abcopy(xx, dst2, dst, mm->nrows);
             (*bind->mul)(mm, dst, src, 1);
+            debug_write(dst, abbytes(xx, mm->nrows), "/tmp/Lmul.%d", t);
+
             abdotprod(xx, checkA, dst, dst2, mm->nrows);
             (*bind->mul)(mm, src2, dst2, 0);
+            debug_write(src2, abbytes(xx, mm->ncols), "/tmp/Rmul.%d", t);
+
             abdotprod(xx, checkB, src, src2, mm->ncols);
 
             if (memcmp(checkA, checkB, aboffset(xx, abnbits(xx)) * sizeof(abt)) != 0) {
@@ -176,15 +195,15 @@ int main(int argc, char * argv[])
         abclear(xx, checkA, abnbits(xx));
         abclear(xx, checkB, abnbits(xx));
 
-        abclear(xx, src2, mm->ncols);
-        abclear(xx, dst2, mm->nrows);
+        abclear(xx, src2, nc);
+        abclear(xx, dst2, nr);
     }
 
     t0 = clock();
     double next = 0.25 * CLOCKS_PER_SEC;
     if (next > tmax * CLOCKS_PER_SEC) { next = tmax * CLOCKS_PER_SEC; }
     for(unsigned int n = 0 ; n < nmax ; n++ ) {
-        (*bind->mul)(mm, dst, src, 1);
+        (*bind->mul)(mm, dst, src, transpose);
         double dt = clock() - t0;
         if (dt > next) {
             do { next += 0.25 * CLOCKS_PER_SEC; } while (dt > next);
@@ -192,6 +211,7 @@ int main(int argc, char * argv[])
             dt /= CLOCKS_PER_SEC;
             printf("%d iterations in %2.fs, %.2f/1, %.2f ns/coeff        \r",
                     n, dt, dt/n, 1.0e9 * dt/n/mm->ncoeffs);
+            fflush(stdout);
             if (dt > tmax)
                 break;
         }
