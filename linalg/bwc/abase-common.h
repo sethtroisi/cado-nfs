@@ -27,8 +27,8 @@
 #endif
 #include "electric_alloc.h"
 #include "manu.h"
-#define alignable_malloc(s)     electric_alloc(NEXT_MULTIPLE_OF_POWEROF2(s,16))
-#define alignable_free(p,s)     electric_free(p,NEXT_MULTIPLE_OF_POWEROF2(s,16))
+#define alignable_malloc(s)     electric_alloc(next_multiple_of_powerof2(s,16))
+#define alignable_free(p,s)     electric_free(p,next_multiple_of_powerof2(s,16))
 
 #else
 

@@ -26,6 +26,7 @@ struct matmul_basic_data_s {
     unsigned int nrows;
     unsigned int ncols;
     unsigned long ncoeffs;
+    /* now our private fields */
     size_t datasize;
     abobj_t xab;
     uint32_t * q;

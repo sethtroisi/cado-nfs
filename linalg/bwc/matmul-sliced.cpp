@@ -34,6 +34,12 @@ using namespace std;
 #endif
 #endif
 
+#ifdef  __GNUC__
+#define ASM_COMMENT(x)  __asm__("#\t" x "\n")
+#else
+#define ASM_COMMENT(x)  /**/
+#endif
+
 #include "readmat.h"
 #include "abase.h"
 #include "manu.h"
@@ -43,13 +49,13 @@ using namespace std;
 #define L1_CACHE_SIZE   24576
 // for 8-bytes abt values, this gives 3072 items.
 
-/* Here is how the matrix is stored in memory, in the "matmul_sliced_data_s" type.
- * The matrix is cut in slices, where each slice is a set of contiguous
- * rows. The size of a slice is tune so as to fill the L1 cache as per
- * the macro above, with some
- * adjustment to handle non-exact divisibility: some slices will have
- * packbase rows and some others packbase+1 rows.
- * Within a slice, entries are stored as a list of pairs
+/* Here is how the matrix is stored in memory, in the
+ * "matmul_sliced_data_s" type.  The matrix is cut in slices, where each
+ * slice is a set of contiguous rows. The size of a slice is tune so as
+ * to fill the L1 cache as per the macro above, with some adjustment to
+ * handle non-exact divisibility: some slices will have packbase rows and
+ * some others packbase+1 rows.  Within a slice, entries are stored as a
+ * list of pairs
  *   (column index, row index),
  * sorted according to column index. Then, only the difference between
  * two consecutive column indices is actually stored, so that it will fit
@@ -98,6 +104,7 @@ struct matmul_sliced_data_s {
     unsigned int nrows;
     unsigned int ncols;
     unsigned long ncoeffs;
+    /* now our private fields */
     abobj_t xab;
     data_t data;
     vector<slice_info> dslices_info;
@@ -458,7 +465,7 @@ void matmul_sliced_save_cache(matmul_ptr mm, const char * filename)
 
 void matmul_sliced_mul(matmul_ptr mm, abt * dst, abt const * src, int d)
 {
-    asm("# multiplication code\n");
+    ASM_COMMENT("multiplication code");
     const uint16_t * q = &(MM->data.front());
 
     uint16_t nhstrips = *q++;
@@ -475,7 +482,7 @@ void matmul_sliced_mul(matmul_ptr mm, abt * dst, abt const * src, int d)
             uint32_t nrows_packed = matmul_sliced_data_s::read32(q);
             abt * where = dst + aboffset(x, i);
             abzero(x, where, nrows_packed);
-            asm("# critical loop\n");
+            ASM_COMMENT("critical loop");
             abt const * from = src;
             /* Make sure that the assembly function is only called if it
              * matches correctly the abase header !! */
@@ -492,7 +499,7 @@ void matmul_sliced_mul(matmul_ptr mm, abt * dst, abt const * src, int d)
                 abadd(x, where + aboffset(x, di), from + aboffset(x, j));
             }
 #endif
-            asm("# end of critical loop\n");
+            ASM_COMMENT("end of critical loop");
             i += nrows_packed;
 #ifdef  SLICE_STATS
             if (!MM->dslices_info.empty()) {
@@ -511,7 +518,7 @@ void matmul_sliced_mul(matmul_ptr mm, abt * dst, abt const * src, int d)
         for(uint16_t s = 0 ; s < nhstrips ; s++) {
             uint32_t j = 0;
             uint32_t nrows_packed = matmul_sliced_data_s::read32(q);
-            asm("# critical loop\n");
+            ASM_COMMENT("critical loop");
             uint32_t ncoeffs_slice = matmul_sliced_data_s::read32(q);
             for(uint32_t c = 0 ; c < ncoeffs_slice ; c++) {
                 j += *q++;
@@ -519,10 +526,10 @@ void matmul_sliced_mul(matmul_ptr mm, abt * dst, abt const * src, int d)
                 abadd(x, dst + aboffset(x, j), src + aboffset(x, i + di));
             }
             i += nrows_packed;
-            asm("# end of critical loop\n");
+            ASM_COMMENT("end of critical loop");
         }
     }
-    asm("# end of multiplication code\n");
+    ASM_COMMENT("end of multiplication code");
 }
 
 void matmul_sliced_report(matmul_ptr mm MAYBE_UNUSED) {

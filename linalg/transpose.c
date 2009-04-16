@@ -116,7 +116,7 @@ void rebuild(int skip)
 {
     FILE * fout;
     FILE ** fin_vchunks;
-    unsigned int i, j, lastsize, minskip = UINT_MAX, maxskip = 0;
+    unsigned int i, j, lastsize = 0, minskip = UINT_MAX, maxskip = 0;
     int ret, skip0 = skip;
 
     fout = fopen(filename_out, "w");
@@ -161,7 +161,9 @@ void rebuild(int skip)
         }
         for(k = 0 ; k < kmax ; k++) {
             unsigned int c;
-            if (k > 0 && rows[k]->size > lastsize)
+            /* If we're not skipping, it's not a problem to have an
+             * unbalanced matrix */
+            if (k > 0 && skip > 0 && rows[k]->size > lastsize)
               {
                 fprintf (stderr, "Error, matrix rows are not in decreasing weight\n");
                 exit (1);
@@ -193,8 +195,9 @@ void rebuild(int skip)
         unlink(dstfile);
     }
     free(fin_vchunks);
-    fprintf (stderr, "Skipped %d rows of weight %d to %d\n",
-             skip0, minskip, maxskip);
+    if (skip0)
+        fprintf (stderr, "Skipped %d rows of weight %d to %d\n",
+                skip0, minskip, maxskip);
 }
 
 

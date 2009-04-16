@@ -203,7 +203,7 @@ int main(int argc, char * argv[])
     double next = 0.25 * CLOCKS_PER_SEC;
     if (next > tmax * CLOCKS_PER_SEC) { next = tmax * CLOCKS_PER_SEC; }
     for(unsigned int n = 0 ; n < nmax ; n++ ) {
-        (*bind->mul)(mm, dst, src, transpose);
+        (*bind->mul)(mm, transpose ? src : dst, transpose ? dst : src, !transpose);
         double dt = clock() - t0;
         if (dt > next) {
             do { next += 0.25 * CLOCKS_PER_SEC; } while (dt > next);

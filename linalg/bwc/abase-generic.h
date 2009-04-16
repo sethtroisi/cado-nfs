@@ -20,9 +20,9 @@ typedef void * abase_generic_ptr;
 // #define abase_generic_ptr_add(p,k) ((void*) (((char*)(p)) + (k)))
 
 
-#define abase_generic_init(b,n) alignable_malloc((b)*NEXT_MULTIPLE_OF_POWEROF2((n),ABASE_UNIVERSAL_READAHEAD_ITEMS))
-#define abase_generic_clear(b,p,n) alignable_free((p),(b)*NEXT_MULTIPLE_OF_POWEROF2((n),ABASE_UNIVERSAL_READAHEAD_ITEMS))
-#define abase_generic_initf(b,n) alignable_alloca((b)*NEXT_MULTIPLE_OF_POWEROF2((n),ABASE_UNIVERSAL_READAHEAD_ITEMS))
+#define abase_generic_init(b,n) alignable_malloc((b)*next_multiple_of_powerof2((n),ABASE_UNIVERSAL_READAHEAD_ITEMS))
+#define abase_generic_clear(b,p,n) alignable_free((p),(b)*next_multiple_of_powerof2((n),ABASE_UNIVERSAL_READAHEAD_ITEMS))
+#define abase_generic_initf(b,n) alloca((b)*next_multiple_of_powerof2((n),ABASE_UNIVERSAL_READAHEAD_ITEMS))
 #define abase_generic_clearf(b,p,n) /**/
 #define abase_generic_zero(b,p,n) memset((p),0,(b)*(n))
 #define abase_generic_copy(b,q,p,n) memcpy((q),(p),(b)*(n))

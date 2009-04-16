@@ -14,7 +14,6 @@ struct matmul_public_s {
     unsigned int nrows;
     unsigned int ncols;
     unsigned long ncoeffs;
-    size_t datasize;
     /* The rest of the implementation-dependent storage comes right after
      * that, in memory. Therefore, only the pointer may be manipulated
      * freely. The datasize field merely indicates the __on-disk__ data
