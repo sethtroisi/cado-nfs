@@ -2183,18 +2183,16 @@ int main(int argc, char * argv[])
         }
     }
 
-    working_filename = (param_list_lookup_string(pl, "out"));
-    pristine_filename = (param_list_lookup_string(pl, "in"));
-    if (working_filename == NULL) {
+    if ((tmp = param_list_lookup_string(pl, "in")) == NULL) {
+        fprintf(stderr, "Required argument --in is missing\n");
+        exit(1);
+    }
+    pristine_filename = strdup(tmp);
+    if ((tmp = param_list_lookup_string(pl, "out")) == NULL) {
         fprintf(stderr, "Required argument --out is missing\n");
         exit(1);
     }
-    if (pristine_filename == NULL) {
-        fprintf(stderr, "Required argument --out is missing\n");
-        exit(1);
-    }
-    working_filename = strdup(working_filename);
-    pristine_filename = strdup(pristine_filename);
+    working_filename = strdup(tmp);
 
     {
         char * output_dirname = my_dirname(working_filename);
