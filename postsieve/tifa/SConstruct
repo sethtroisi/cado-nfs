@@ -79,21 +79,21 @@ if os.path.exists(os.path.join(os.getcwd(), devel_conf_file)):
     # their own option file without polluting the default BuildOptions.py file
     # that will be distributed...
     #
-    opts = Options(devel_conf_file)
+    opts = Variables(devel_conf_file)
     devel_build = True
 else:
-    opts = Options('BuildOptions.py')
+    opts = Variables('BuildOptions.py')
 #
 # Installation directories options
 #
 installdirs = []
 
 opts.Add(
-    PathOption(
+    PathVariable(
         'PREFIX',
         'Prefix for the other intallation directories',
         '/usr/local',
-        PathOption.PathIsDirCreate
+        PathVariable.PathIsDirCreate
     )
 )
 
@@ -163,7 +163,7 @@ installdirs.append('DOCDIR')
 # Doxygen documentation options
 #
 opts.Add(
-    EnumOption(
+    EnumVariable(
         'GENERATE_DOXYGEN_DOC',
         'Set to build doxygen documentation',
         'yes',
@@ -172,7 +172,7 @@ opts.Add(
     )
 )
 opts.Add(
-    EnumOption(
+    EnumVariable(
         'DOXYGEN_PAPER_TYPE',
         'Set the paper type of the PDF Doxygen documentation',
         'a4wide',
@@ -181,7 +181,7 @@ opts.Add(
     )
 )
 opts.Add(
-    EnumOption(
+    EnumVariable(
         'GENERATE_DOXYGEN_HTML',
         'Set to build doxygen documentation as HTML files',
         'yes',
@@ -190,7 +190,7 @@ opts.Add(
     )
 )
 opts.Add(
-    EnumOption(
+    EnumVariable(
         'GENERATE_DOXYGEN_PDF',
         'Set to build doxygen documentation as a PDF file',
         'yes',
@@ -199,7 +199,7 @@ opts.Add(
     )
 )
 opts.Add(
-    EnumOption(
+    EnumVariable(
         'GENERATE_DOXYGEN_XML',
         'Set to build doxygen documentation as XML files',
         'no',
@@ -208,7 +208,7 @@ opts.Add(
     )
 )
 opts.Add(
-    EnumOption(
+    EnumVariable(
         'GENERATE_DOXYGEN_RTF',
         'Set to build doxygen documentation as a RTF file',
         'no',
@@ -217,7 +217,7 @@ opts.Add(
     )
 )
 opts.Add(
-    EnumOption(
+    EnumVariable(
         'GENERATE_MAN_PAGES',
         'Set to build man pages',
         'yes',
@@ -251,7 +251,7 @@ opts.Add(
     'build'
 )
 opts.Add(
-    BoolOption(
+    BoolVariable(
         'BUILDDIR_DEPENDS_ON_PLATFORM',
         "Set to 'yes' to build in platform dependent subdirectory of BUILDDIR",
         0
@@ -268,7 +268,7 @@ opts.Add(
     ''
 )
 opts.Add(
-    BoolOption(
+    BoolVariable(
         'USE_GMP_INTERNAL_FUNCS',
         "Set to 'yes' to use GMP's internal functions",
         0
@@ -288,7 +288,7 @@ opts.Add(
 # Machine / architecture dependant stuff
 #
 opts.Add(
-    EnumOption(
+    EnumVariable(
         'ENDIANNESS',
         'Endianness of the processor',
         'infer',
@@ -301,7 +301,7 @@ opts.Add(
     ''
 )
 opts.Add(
-    BoolOption(
+    BoolVariable(
         'USE_CALLOC_MEMSET',
         "Set to 'yes' to use calloc/memset for integer array initialization",
         1
@@ -311,63 +311,63 @@ opts.Add(
 # Verbosity options
 #
 opts.Add(
-    BoolOption(
+    BoolVariable(
         'PRINT_ERROR',
         "Set to 'yes' to print critical error messages on stderr",
         1
     )
 )
 opts.Add(
-    BoolOption(
+    BoolVariable(
         'ALLOW_VERBOSE',
         "Set to 'yes' to turn on output messages in some tifa functions",
         0
     )
 )
 opts.Add(
-    BoolOption(
+    BoolVariable(
         'VERBOSE_CFRAC',
         "Set to 'yes' to turn on output messages in the cfrac function",
         1
     )
 )
 opts.Add(
-    BoolOption(
+    BoolVariable(
         'VERBOSE_ECM',
         "Set to 'yes' to turn on output messages in the ecm function",
         1
     )
 )
 opts.Add(
-    BoolOption(
+    BoolVariable(
         'VERBOSE_FERMAT',
         "Set to 'yes' to turn on output messages in the fermat function",
         1
     )
 )
 opts.Add(
-    BoolOption(
+    BoolVariable(
         'VERBOSE_QS',
         "Set to 'yes' to turn on output messages in the qs function",
         1
     )
 )
 opts.Add(
-    BoolOption(
+    BoolVariable(
         'VERBOSE_SIQS',
         "Set to 'yes' to turn on output messages in the siqs function",
         1
     )
 )
 opts.Add(
-    BoolOption(
+    BoolVariable(
         'VERBOSE_SQUFOF',
         "Set to 'yes' to turn on output messages in the squfof function",
         1
     )
 )
 opts.Add(
-    BoolOption(
+    BoolVariable(
         'VERBOSE_TDIV',
         "Set to 'yes' to turn on output messages in the tdiv function",
         1
@@ -377,56 +377,56 @@ opts.Add(
 # Timing options
 #
 opts.Add(
-    BoolOption(
+    BoolVariable(
         'ALLOW_TIMING',
         "Set to 'yes' to turn on timing measurements in some tifa functions",
         0
     )
 )
 opts.Add(
-    BoolOption(
+    BoolVariable(
         'TIMING_CFRAC',
         "Set to 'yes' to turn on timing messages for the cfrac function",
         1
     )
 )
 opts.Add(
-    BoolOption(
+    BoolVariable(
         'TIMING_ECM',
         "Set to 'yes' to turn on timing messages for the ecm function",
         1
     )
 )
 opts.Add(
-    BoolOption(
+    BoolVariable(
         'TIMING_FERMAT',
         "Set to 'yes' to turn on timing messages for the fermat function",
         1
     )
 )
 opts.Add(
-    BoolOption(
+    BoolVariable(
         'TIMING_QS',
         "Set to 'yes' to turn on timing messages for the qs function",
         1
     )
 )
 opts.Add(
-    BoolOption(
+    BoolVariable(
         'TIMING_SIQS',
         "Set to 'yes' to turn on timing messages for the siqs function",
         1
     )
 )
 opts.Add(
-    BoolOption(
+    BoolVariable(
         'TIMING_SQUFOF',
         "Set to 'yes' to turn on timing messages for the squfof function",
         1
     )
 )
 opts.Add(
-    BoolOption(
+    BoolVariable(
         'TIMING_TDIV',
         "Set to 'yes' to turn on timing messages for the tdiv function",
         1
