@@ -1776,7 +1776,7 @@ int main(int argc, char *argv[])
     param_list_init(pl);
     param_list_configure_alias(pl, "lingen-threshold", "lingen_threshold");
     param_list_configure_alias(pl, "cantor-threshold", "cantor_threshold");
-    bw_common_init(bw, pl, argc, argv);
+    bw_common_init(bw, pl, &argc, &argv);
     param_list_parse_uint(pl, "lingen-threshold", &lingen_threshold);
     param_list_parse_uint(pl, "cantor-threshold", &cantor_threshold);
     if (param_list_warn_unused(pl)) usage();

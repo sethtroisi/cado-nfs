@@ -12,6 +12,14 @@
 /* Number of words holding B bits ; better naming sought. */
 #define BITS_TO_WORDS(B,W)      iceildiv((B),(W))
 
+#if defined(__cplusplus) && GNUC_VERSION_ATLEAST(4,3,0)
+/* Starting with gcc 4.3, -Wempty-body moans for loops like
+ * for(;(x=x->next)!=NULL;y++);
+ * It must shut up.
+ */
+#pragma GCC diagnostic ignored "-Wempty-body"
+#endif
+
 /* See the discussion in lingen_binary about the pros and cons of data
  * ordering schemes */
 

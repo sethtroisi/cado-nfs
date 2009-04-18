@@ -33,21 +33,25 @@ int bw_common_init_defaults(struct bw_params * bw)
     return 0;
 }
 
-int bw_common_init_shared(struct bw_params * bw, param_list pl, int argc, char * argv[])
+int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, char *** p_argv)
 {
     if (bw->can_print) {
         /* print command line */
-        fprintf (stderr, "# (%s) %s", REV, argv[0]);
-        for (int i = 1; i < argc; i++)
-            fprintf (stderr, " %s", argv[i]);
+        fprintf (stderr, "# (%s) %s", REV, (*p_argv)[0]);
+        for (int i = 1; i < (*p_argc); i++)
+            fprintf (stderr, " %s", (*p_argv)[i]);
         fprintf (stderr, "\n");
     }
 
-    argv++, argc--;
+    (*p_argv)++, (*p_argc)--;
     param_list_configure_knob(pl, "-v", &bw->verbose);
-    for( ; argc ; ) {
-        if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
-        fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
+    for( ; (*p_argc) ; ) {
+        if (param_list_update_cmdline(pl, p_argc, p_argv)) { continue; }
+        if (strcmp((*p_argv)[0],"--") == 0) {
+            (*p_argv)++, (*p_argc)--;
+            break;
+        }
+        fprintf(stderr, "Unhandled parameter %s\n", (*p_argv)[0]);
         usage();
     }
 
@@ -124,10 +128,10 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int argc, char *
     return 0;
 }
 
-int bw_common_init(struct bw_params * bw, param_list pl, int argc, char * argv[])
+int bw_common_init(struct bw_params * bw, param_list pl, int * p_argc, char *** p_argv)
 {
     bw_common_init_defaults(bw);
-    return bw_common_init_shared(bw, pl, argc, argv);
+    return bw_common_init_shared(bw, pl, p_argc, p_argv);
 }
 
 int bw_common_clear(struct bw_params * bw)

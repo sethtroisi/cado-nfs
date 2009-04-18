@@ -8,14 +8,14 @@
 #include "select_mpi.h"
 #include "bw-common-mpi.h"
 
-int bw_common_init_mpi(struct bw_params * bw, param_list pl, int argc, char * argv[])
+int bw_common_init_mpi(struct bw_params * bw, param_list pl, int * p_argc, char *** p_argv)
 {
     bw_common_init_defaults(bw);
 
 #ifdef  MPI_LIBRARY_MT_CAPABLE
     int req = MPI_THREAD_MULTIPLE;
     int prov;
-    MPI_Init_thread(&argc, &argv, req, &prov);
+    MPI_Init_thread(p_argc, p_argv, req, &prov);
     if (req != prov) {
         fprintf(stderr, "Cannot init mpi with MPI_THREAD_MULTIPLE ;"
                 " got %d != req %d\n",
@@ -23,7 +23,7 @@ int bw_common_init_mpi(struct bw_params * bw, param_list pl, int argc, char * ar
         exit(1);
     }
 #else
-    MPI_Init(&argc, &argv);
+    MPI_Init(p_argc, p_argv);
 #endif
     int rank;
     int size;
@@ -33,7 +33,7 @@ int bw_common_init_mpi(struct bw_params * bw, param_list pl, int argc, char * ar
 
     bw->can_print = rank == 0 || getenv("CAN_PRINT");
 
-    return bw_common_init_shared(bw, pl, argc, argv);
+    return bw_common_init_shared(bw, pl, p_argc, p_argv);
 }
 int bw_common_clear_mpi(struct bw_params * bw)
 {

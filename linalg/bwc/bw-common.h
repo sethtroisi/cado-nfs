@@ -78,13 +78,13 @@ extern struct bw_params bw[1];
 extern "C" {
 #endif
 
-extern int bw_common_init(struct bw_params * bw, param_list pl, int argc, char * argv[]);
+extern int bw_common_init(struct bw_params * bw, param_list pl, int * p_argc, char *** p_argv);
 extern int bw_common_clear(struct bw_params * bw);
 extern const char * bw_common_usage_string();
 
 /* Some stuff which is shared as well by bw-common-mpi.h, but not within
  * the public interface nevertheless */
-extern int bw_common_init_shared(struct bw_params * bw, param_list pl, int argc, char * argv[]);
+extern int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, char *** p_argv);
 extern int bw_common_init_defaults(struct bw_params * bw);
 
 #ifdef __cplusplus

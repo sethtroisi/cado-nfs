@@ -173,7 +173,7 @@ int main(int argc, char * argv[])
 {
     param_list pl;
     param_list_init(pl);
-    bw_common_init_mpi(bw, pl, argc, argv);
+    bw_common_init_mpi(bw, pl, &argc, &argv);
     if (param_list_warn_unused(pl)) usage();
 
     if (bw->seed) setup_seeding(bw->seed);

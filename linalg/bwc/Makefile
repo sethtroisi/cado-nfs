@@ -85,7 +85,7 @@ endif
 bins:=bench build prep krylov mksol
 
 default-target: all
-allbins:=test_hello split acollect random
+allbins:=test_hello split acollect random shell
 
 common_libs:=-lutils -lgmp
 common_link_deps:=$(TOP)/utils/libutils.a
@@ -123,8 +123,12 @@ acollect: $(acollect_objs) $(common_link_deps)
 	$(CXX) $(MY_LFLAGS) $(acollect_objs) -o $@ $(common_libs)
 -include $(patsubst %,.deps/%.d,$(acollect_objs))
 
+shell_objs:=shell.o parallelizing_info.o bw-common.o bw-common-mpi.o
+shell: $(shell_objs) $(common_link_deps)
+	$(CXX) $(MY_LFLAGS) $(shell_objs) -o $@ $(common_libs)
+-include $(patsubst %,.deps/%.d,$(shell_objs))
 
-all_objlists:=libmatmul build bench prep gather secure krylov mksol
+all_objlists:=libmatmul build bench prep gather secure krylov mksol shell
 
 libmatmul_objs:=					\
     matmul-basic.o matmul-sliced.o matmul-threaded.o	\

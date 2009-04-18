@@ -61,7 +61,7 @@ int main(int argc, char * argv[])
     param_list pl;
     param_list_init(pl);
     param_list_configure_knob(pl, "--remove-old", &remove_old);
-    bw_common_init(bw, pl, argc, argv);
+    bw_common_init(bw, pl, &argc, &argv);
     param_list_clear(pl);
 
 

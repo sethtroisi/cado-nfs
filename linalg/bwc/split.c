@@ -45,7 +45,7 @@ int main(int argc, char * argv[])
     param_list_configure_knob(pl, "--split-y", &split_y);
     param_list_configure_knob(pl, "--split-f", &split_f);
     param_list_configure_knob(pl, "--force", &force);
-    bw_common_init(bw, pl, argc, argv);
+    bw_common_init(bw, pl, &argc, &argv);
     int nsplits;
     nsplits = param_list_parse_int_list(pl, "splits", splits, MAXSPLITS, ",");
     if (param_list_warn_unused(pl)) usage();
