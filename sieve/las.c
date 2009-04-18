@@ -10,8 +10,8 @@
 #include <math.h>   // for ceiling, floor in cfrac
 #include "cado.h"
 #include "fb.h"
-#include "utils.h"           /* ctzl, and lots of stuff */
-#include "basicnt.h"         /* for bin_gcd */
+#include "utils.h"           /* lots of stuff */
+#include "basicnt.h"         /* ctzl bin_gcd */
 #include "ecm/facul.h"
 #include "bucket.h"
 #include "trialdiv.h"

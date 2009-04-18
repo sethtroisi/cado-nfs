@@ -38,7 +38,6 @@
 #include "bw-common.h"
 #include "filenames.h"
 
-#include "manu.h"
 #include "fft_adapter.hpp"
 #include "lingen_mat_types.hpp"
 #include "gf2x.h"
@@ -714,7 +713,7 @@ void print_deltas()/*{{{*/
         last = d;
         nrep = 1;
     }
-    BUG_ON(last == UINT_MAX);
+    ASSERT_ALWAYS(last != UINT_MAX);
     printf(" %u", last);
     if (nrep > 1)
         printf(" [%u]", nrep);
@@ -816,7 +815,7 @@ static bool gauss(unsigned int piv[], polmat& PI)/*{{{*/
              * so we'd better trash it */
         }
     }
-    BUG_ON (rank != m);
+    ASSERT_ALWAYS (rank == m);
 
     /* Normally our bound is set up so that we're assured to have at
      * least one generator found.
@@ -830,7 +829,7 @@ static bool gauss(unsigned int piv[], polmat& PI)/*{{{*/
         for (unsigned int j = 0; j < m + n; j++) {
             ctot += chance_list[j];
         }
-        BUG_ON(!ctot);
+        ASSERT_ALWAYS(ctot > 0);
     }
 
     return !overflowed.empty();
@@ -1535,7 +1534,7 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
      * ./doit.pl msize=500 dimk=99 mn=8 vectoring=8 modulus=2 dens=4
      * multisols=1 tidy=0 seed=714318 dump=1
      */
-    BUG_ON(pi_l_deg >= (int) expected_pi_deg);
+    ASSERT_ALWAYS(pi_l_deg < (int) expected_pi_deg);
 #if 0
     if (pi_l_deg >= (int) expected_pi_deg) {/*{{{*/
         printf("Warning : pi grows above its expected degree...\n");

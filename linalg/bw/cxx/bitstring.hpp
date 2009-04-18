@@ -3,6 +3,7 @@
 
 #include <istream>
 #include <ostream>
+#include <stdint.h>
 
 /* These functions read bitstrings in hex format.
  *

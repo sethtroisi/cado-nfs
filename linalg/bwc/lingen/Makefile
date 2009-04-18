@@ -29,10 +29,10 @@ clean:
 
 lingen_binary.o: ../bw-common.h ../filenames.h
 lingen_binary.o: fft_adapter.hpp lingen_mat_types.hpp
-lingen_binary.o: $(TOP)/cado.h $(TOP)/utils/utils.h $(TOP)/utils/manu.h
+lingen_binary.o: $(TOP)/cado.h $(TOP)/utils/utils.h
 lingen_binary.o: $(TOP)/gf2x/gf2x.h
 
 fake_fft.o: fake_fft.h
-fake_fft.o: $(TOP)/gf2x/gf2x.h $(TOP)/utils/utils.h $(TOP)/utils/manu.h
+fake_fft.o: $(TOP)/gf2x/gf2x.h $(TOP)/utils/utils.h
 
 lingen_binary.o fake_fft.o: alloc_proxy.h

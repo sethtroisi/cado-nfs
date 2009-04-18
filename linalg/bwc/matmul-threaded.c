@@ -10,7 +10,6 @@
 #include "matmul.h"
 #include "matmul-threaded.h"
 #include "abase.h"
-#include "manu.h"
 
 #include "readmat-easy.h"
 

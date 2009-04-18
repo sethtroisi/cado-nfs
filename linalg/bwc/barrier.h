@@ -1,8 +1,6 @@
 #ifndef BARRIER_H_
 #define BARRIER_H_
 
-#include "manu.h"
-
 /* This is the interface to barrier synchronization waits.
  *
  * XXX Note that pthread_barrier_wait does only part of the stuff we

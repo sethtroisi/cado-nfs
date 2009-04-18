@@ -9,7 +9,6 @@
 #include "select_mpi.h"
 #include "random_generation.h"
 #include "gauss.h"
-#include "manu.h"
 #include "gauss.h"
 
 #include "params.h"

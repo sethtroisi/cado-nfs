@@ -6,7 +6,6 @@
 #include <time.h>
 
 #include "barrier.h"
-#include "manu.h"
 
 int barrier_init (barrier_t *barrier, int count)
 {

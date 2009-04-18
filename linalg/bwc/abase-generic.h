@@ -6,7 +6,6 @@
 #include <stdlib.h>
 #include <alloca.h>
 #include "random_generation.h"
-#include "manu.h"
 
 /* This header contains the stuff that pertains to the abase interface,
  * but which is known to depend only on the data striding. Hence simple

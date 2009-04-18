@@ -2,9 +2,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <string.h>
-
+#include <limits.h>
+#include "macros.h"
 #include "readmat.h"
-#include "manu.h"
 
 /* Number of unsigned ints that fit in RAM */
 #define	MEM_LIMIT	(1UL << 27)	
@@ -64,7 +64,7 @@ void vec_uint_push_back(vec_uint_t ptr, unsigned int x)
     if (ptr->size >= ptr->alloc) {
         ptr->alloc = vec_next_size(ptr->alloc);
         ptr->data = realloc(ptr->data, ptr->alloc * sizeof(unsigned int));
-        BUG_ON(ptr->data == NULL);
+        ASSERT_ALWAYS(ptr->data != NULL);
     }
     ptr->data[ptr->size++] = x;
 }
@@ -89,10 +89,10 @@ void transpose_and_save(unsigned int i0, unsigned int i1)
 
     ret = snprintf(dstfile, sizeof(dstfile), "%s/temp.%u.%04d",
             tmpdir, getpid(), nfiles);
-    BUG_ON_MSG(ret >= sizeof(dstfile), "Too long temp. file name");
+    ASSERT_ALWAYS(ret < sizeof(dstfile));
 
     FILE * out;
-    out = fopen(dstfile, "w"); BUG_ON_MSG(!out, "cannot open temp file");
+    out = fopen(dstfile, "w"); ASSERT_ALWAYS(out);
     for(j = 0 ; j < mat->ncols ; j++) {
         fprintf(out, "%d", transposed[j]->size);
         for(c = 0 ; c < transposed[j]->size ; c++) {
@@ -120,7 +120,7 @@ void rebuild(int skip)
     int ret, skip0 = skip;
 
     fout = fopen(filename_out, "w");
-    BUG_ON_MSG(fout == NULL, "Cannot open output matrix");
+    ASSERT_ALWAYS(fout != NULL); //  "Cannot open output matrix"
 
     fprintf(fout, "%u %u\n", mat->ncols - skip, mat->nrows);
 
@@ -130,9 +130,9 @@ void rebuild(int skip)
         unsigned int ret;
         ret = snprintf(dstfile, sizeof(dstfile), "%s/temp.%u.%04d",
                        tmpdir, getpid(), i);
-        BUG_ON_MSG(ret >= sizeof(dstfile), "Too long temp. file name");
+        ASSERT_ALWAYS(ret < sizeof(dstfile));
         fin_vchunks[i] = fopen(dstfile, "r");
-        BUG_ON_MSG(fin_vchunks[i] == NULL, "Cannot reopen temp file");
+        ASSERT_ALWAYS(fin_vchunks[i]);
     }
 
     vec_uint_t * rows;
@@ -149,14 +149,14 @@ void rebuild(int skip)
             unsigned int c;
             for(k = 0 ; k < kmax ; k++) {
                 ret = fscanf(fin_vchunks[i], "%u", &nc);
-                BUG_ON(ret != 1);
+                ASSERT_ALWAYS(ret == 1);
                 ret = 0;
                 for(c = 0 ; c < nc ; c++) {
                     unsigned int idx;
                     ret += fscanf(fin_vchunks[i], "%u", &idx);
                     vec_uint_push_back(rows[k], idx);
                 }
-                BUG_ON(ret != (int) nc);
+                ASSERT_ALWAYS(ret == (int) nc);
             }
         }
         for(k = 0 ; k < kmax ; k++) {
@@ -191,7 +191,7 @@ void rebuild(int skip)
         unsigned int ret;
         ret = snprintf(dstfile, sizeof(dstfile), "%s/temp.%u.%04d",
                 tmpdir, getpid(), i);
-        BUG_ON_MSG(ret >= sizeof(dstfile), "Too long temp. file name");
+        ASSERT_ALWAYS(ret < sizeof(dstfile));
         unlink(dstfile);
     }
     free(fin_vchunks);
@@ -247,7 +247,7 @@ int main(int argc, char * argv[])
     }
 
     fin = fopen(filename_in, "r");
-    BUG_ON_MSG(fin == NULL, "Cannot open input matrix");
+    ASSERT_ALWAYS(fin);
 
     sparse_mat_init(mat);
 

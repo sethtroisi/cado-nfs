@@ -2,8 +2,11 @@
 
 #include "fake_fft.h"
 #include "gf2x.h"
-#include "manu.h"
 #include "utils.h"
+
+
+/* Number of words holding B bits ; better naming sought. */
+#define BITS_TO_WORDS(B,W)      iceildiv((B),(W))
 
 /* nF, nG : number of coefficients */
 void fake_setup(fake_info_t p, int nF, int nG)

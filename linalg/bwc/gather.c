@@ -11,7 +11,6 @@
 #include "matmul_top.h"
 #include "abase.h"
 #include "select_mpi.h"
-#include "manu.h"
 
 #include "params.h"
 #include "xvectors.h"
@@ -98,7 +97,7 @@ int agree_on_flag(pi_wiring_ptr w, int v)
 
     if (w->trank == 0) {
         int err = MPI_Allreduce(MPI_IN_PLACE, &v, 1, MPI_INT, MPI_LAND, w->pals);
-        BUG_ON(err);
+        ASSERT_ALWAYS(!err);
     }
     serialize_threads(w);
     v = *ptr;

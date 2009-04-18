@@ -1,9 +1,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
-
+#include "macros.h"
 #include "readmat.h"
-#include "manu.h"
 
 unsigned int next_alloc_size(unsigned int s, unsigned int needed)
 {
@@ -27,18 +26,18 @@ unsigned int *read_matrix_row(FILE * file, sparse_mat_t mat,
 
     if (compact == 0) {
 	ret = fscanf(file, "%ld %lu", &a, &b);
-	BUG_ON_MSG(ret != 2, "Could not read a and b");
+	ASSERT_ALWAYS(ret==2);
 
         /* FIXME -- having a and b stored in the sparse mat struct simply
          * won't scale ! */
 
-        BUG_ON_MSG(a > (long) INT_MAX, "Time to enlarge !");
-        BUG_ON_MSG(a < (long) INT_MIN, "Time to enlarge !");
-        BUG_ON_MSG(b > (unsigned long) INT_MAX, "Time to enlarge !");
+        ASSERT_ALWAYS(a <= (long) INT_MAX);
+        ASSERT_ALWAYS(a >= (long) INT_MIN);
+        ASSERT_ALWAYS(b <= (unsigned long) INT_MAX);
     }
 
     ret = fscanf(file, "%d", &nc);
-    BUG_ON_MSG(ret != 1, "Could not read ncoeffs");
+    ASSERT_ALWAYS(ret == 1);
 
     unsigned int offset = dst - mat->data;
     unsigned int needed = offset + nc + 1;
@@ -63,7 +62,7 @@ unsigned int *read_matrix_row(FILE * file, sparse_mat_t mat,
     for (j = 0; j < nc; ++j) {
 	unsigned int x;
 	ret = fscanf(file, "%u", &x);
-	BUG_ON_MSG(ret != 1, "Could not read coefficient");
+	ASSERT_ALWAYS(ret == 1);
 	*dst++ = x;
     }
     mat->wt += nc;
@@ -75,7 +74,7 @@ void read_matrix_header(FILE * file, sparse_mat_t mat)
     int ret;
 
     ret = fscanf(file, "%d %d", &(mat->nrows), &(mat->ncols));
-    BUG_ON_MSG(ret != 2, "Could not read nrows/ncols");
+    ASSERT_ALWAYS(ret==2);
     mat->alloc = mat->nrows * 10;
     mat->data = (unsigned int *) malloc(mat->alloc * sizeof(unsigned int));
     mat->wt = 0;

@@ -4,7 +4,7 @@
 
 #include <stdint.h>
 #include "cado.h"
-#include "utils/manu.h" /* for ctzl */
+#include "utils/misc.h" /* for ctzl */
 
 #if 0
 /* Buggy ? */

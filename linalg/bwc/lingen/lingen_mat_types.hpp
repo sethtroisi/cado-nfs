@@ -1,8 +1,6 @@
 #ifndef LINGEN_MAT_TYPES_HPP_
 #define LINGEN_MAT_TYPES_HPP_
 
-#include "manu.h"
-
 #include <stdlib.h>
 #include <string.h>
 #include <gmp.h>
@@ -10,6 +8,9 @@
 #include <algorithm>
 
 #include "alloc_proxy.h"
+
+/* Number of words holding B bits ; better naming sought. */
+#define BITS_TO_WORDS(B,W)      iceildiv((B),(W))
 
 /* See the discussion in lingen_binary about the pros and cons of data
  * ordering schemes */
@@ -570,7 +571,7 @@ struct polmat { /* {{{ */
     {
         ASSERT(k < ncols);
         ASSERT(j < a.ncols);
-        BUG_ON(a.nrows != nrows);
+        ASSERT_ALWAYS(a.nrows == nrows);
         unsigned long const * src = a.col(j);
         unsigned long * dst = col(k);
         unsigned int as = s > 0 ? s : -s;
@@ -597,7 +598,7 @@ struct polmat { /* {{{ */
         } else if (colstride() < a.colstride()) {
             /* Otherwise, we have to resample... *//*{{{*/
             unsigned long tmp[a.colstride()];
-            BUG_ON(critical);
+            ASSERT_ALWAYS(!critical);
             for(unsigned int i = 0 ; i < nrows ; i++) {
                 if (sb) {
                     if (s > 0) {
@@ -617,10 +618,10 @@ struct polmat { /* {{{ */
                 dst += stride();
             }/*}}}*/
         } else {
-            BUG();/*{{{*/
+            ASSERT_ALWAYS(0);/*{{{*/
             // I doubt we'll ever end up here, so I do not have a test
             // case. It should be ok though 
-            BUG_ON(critical);
+            ASSERT_ALWAYS(!critical);
             for(unsigned int i = 0 ; i < nrows ; i++) {
                 if (sb) {
                     if (s > 0) {
@@ -646,7 +647,7 @@ struct polmat { /* {{{ */
         ASSERT(i < nrows);
         ASSERT(j < ncols);
         ASSERT(k < ncoef);
-        BUG_ON(critical);
+        ASSERT_ALWAYS(!critical);
         // brev_warning();
         unsigned int offset = k / ULONG_BITS;
         unsigned long shift = k % ULONG_BITS;
@@ -655,7 +656,7 @@ struct polmat { /* {{{ */
     void extract_coeff(bmat& a, unsigned int k) const/*{{{*/
     {
         ASSERT(k < ncoef);
-        BUG_ON(critical);
+        ASSERT_ALWAYS(!critical);
         // brev_warning();
         bmat tmp_a(nrows, ncols);
         for(unsigned int j = 0 ; j < ncols ; j++) {
@@ -673,7 +674,7 @@ struct polmat { /* {{{ */
         ASSERT(i < nrows);
         ASSERT(j < ncols);
         ASSERT(k < ncoef);
-        BUG_ON(critical);
+        ASSERT_ALWAYS(!critical);
         // brev_warning();
         unsigned int offset = k / ULONG_BITS;
         poly(i,j)[offset] ^= z << (k % ULONG_BITS);

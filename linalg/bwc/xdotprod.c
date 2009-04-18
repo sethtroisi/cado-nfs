@@ -2,7 +2,6 @@
 #define _GNU_SOURCE     /* for MMAP_ANONYMOUS when using electric_alloc */
 
 #include "xdotprod.h"
-#include "manu.h"
 
 #include "bw-common.h"
 
@@ -18,7 +17,7 @@ void x_dotprod(matmul_top_data_ptr mmt, uint32_t * xv, abt * v, unsigned int m)
     } else {
         /* I presume that no locking is needed here. But it's unchecked
          */
-        BUG();
+        ASSERT_ALWAYS(0);
     }
 
     for(unsigned int j = 0 ; j < m ; j++) {

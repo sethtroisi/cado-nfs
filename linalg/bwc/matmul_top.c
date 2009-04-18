@@ -7,9 +7,6 @@
 #include <stdlib.h>
 #include <errno.h>
 
-
-#include "manu.h"
-
 #include "matmul.h"
 #include "matmul_top.h"
 #include "select_mpi.h"
@@ -147,7 +144,7 @@ broadcast_down_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_p
          * very probably be dropped if we don't have a shared vector. So
          * performance-wise, that could be a thing to check.
          */
-        BUG();
+        ASSERT_ALWAYS(0);
     }
 
     pi_log_op(mmt->pi->m, "[%s] enter first loop", __func__);
@@ -189,7 +186,7 @@ broadcast_down_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_p
                     pi_log_op(picol, "[%s] MPI_Bcast", __func__);
                     err = MPI_Bcast(ptr, siz, MPI_BYTE, root, picol->pals);
                     pi_log_op(picol, "[%s] MPI_Bcast done", __func__);
-                    BUG_ON(err);
+                    ASSERT_ALWAYS(!err);
                 }
                 /* Note that at this point, it is not guaranteed that all
                  * our input range [i0,i1[ has been covered. In the case
@@ -243,7 +240,7 @@ broadcast_down_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_p
         pi_log_op(picol, "[%s] MPI_Bcast", __func__);
         err = MPI_Bcast(ptr, siz, MPI_BYTE, root, picol->pals);
         pi_log_op(picol, "[%s] MPI_Bcast done", __func__);
-        BUG_ON(err);
+        ASSERT_ALWAYS(!err);
     }
     if (extra) {
         /* The inter-column broadcast, for non-shared right vectors, must
@@ -274,7 +271,7 @@ broadcast_down_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_p
 
     if (mcol->i1 > nrows) {
         /* untested */
-        BUG();
+        ASSERT_ALWAYS(0);
         if (extra || picol->trank == 0) {
             abase_generic_zero(stride, abase_generic_ptr_add(v->v,
                         (nrows-mcol->i0) * stride),
@@ -385,7 +382,7 @@ void matmul_top_load_vector_generic(matmul_top_data_ptr mmt, size_t stride, mmt_
         SEVERAL_THREADS_PLAY_MPI_BEGIN(pirow) {
             void * ptr = v->v;
             err = MPI_Bcast(ptr, siz, MPI_BYTE, 0, picol->pals);
-            BUG_ON(err);
+            ASSERT_ALWAYS(!err);
         }
         SEVERAL_THREADS_PLAY_MPI_END;
     }
@@ -697,7 +694,7 @@ reduce_across(matmul_top_data_ptr mmt, int d)
             pi_log_op(pirow, "[%s] MPI_Reduce", __func__);
             err = MPI_Reduce(sptr, dptr, siz, MPI_BYTE, MPI_BXOR, jdst, pirow->pals);
             pi_log_op(pirow, "[%s] MPI_Reduce done", __func__);
-            BUG_ON(err);
+            ASSERT_ALWAYS(!err);
         }
     }
 #else   /* MPI_LIBRARY_MT_CAPABLE */
@@ -717,7 +714,7 @@ reduce_across(matmul_top_data_ptr mmt, int d)
             pi_log_op(pirow, "[%s] MPI_Reduce", __func__);
             err = MPI_Reduce(sptr, dptr, siz, MPI_BYTE, MPI_BXOR, jdst, pirow->pals);
             pi_log_op(pirow, "[%s] MPI_Reduce done", __func__);
-            BUG_ON(err);
+            ASSERT_ALWAYS(!err);
         }
 #endif
 

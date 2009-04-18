@@ -7,7 +7,6 @@
 #include "rusage.h"
 #include "macros.h"
 #include "bw-common.h"
-#include "manu.h"
 
 // int int_caught = 0;
 int hup_caught = 0;
@@ -76,7 +75,7 @@ void timing_rare_checks(pi_wiring_ptr wr, struct timing_data * t, int iter, int 
     if (wr->trank == 0) {
         int err = MPI_Allreduce(MPI_IN_PLACE, &caught_something, 1,
                 MPI_UNSIGNED, MPI_MAX, wr->pals);
-        BUG_ON(err);
+        ASSERT_ALWAYS(!err);
     }
 
     /* reconcile threads */
@@ -174,9 +173,9 @@ void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * 
     // dt must be collected.
     int err;
     err = MPI_Allreduce(MPI_IN_PLACE, oncpu, 2, MPI_DOUBLE, MPI_SUM, pi->m->pals);
-    BUG_ON(err);
+    ASSERT_ALWAYS(!err);
     err = MPI_Allreduce(MPI_IN_PLACE, dt, 2, MPI_DOUBLE, MPI_SUM, pi->m->pals);
-    BUG_ON(err);
+    ASSERT_ALWAYS(!err);
     double di = iter - timing->go_mark;
 
     av[0] = dt[0] / di;

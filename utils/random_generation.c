@@ -4,7 +4,6 @@
 #include <time.h>
 #include <gmp.h>
 
-#include "manu.h"
 #include "random_generation.h"
 
 #ifdef  USE_GMP_RANDOM

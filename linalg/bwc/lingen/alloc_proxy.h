@@ -1,6 +1,8 @@
 #ifndef ALLOC_PROXY_H_
 #define ALLOC_PROXY_H_
 
+#include "macros.h"
+
 /* This header file defines mynew/mynew/mymalloc/myfree, where deletions
  * require the size to be provided -- this makes it easier to plug in
  * memory debuggers.

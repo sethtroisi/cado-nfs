@@ -48,7 +48,7 @@ UTILS_FILES=utils/utils.h utils/mod_ul.h utils/fpoly.h utils/getprime.h \
            utils/modul_poly.c utils/modul_poly.h utils/gmp_aux.c \
            utils/fpoly.c utils/rootfinder.c utils/params.c utils/gcd_int64.c \
 	   utils/gcd_uint64.c utils/discriminant.c utils/discriminant.h \
-	   utils/random_generation.c utils/manu.h utils/mod_ul.c \
+	   utils/random_generation.c utils/mod_ul.c \
 	   utils/mod_ul_default.h utils/modredc_ul.c \
 	   utils/modredc_ul_default.h utils/modredc_15ul.c \
 	   utils/mpz_array.h utils/mpz_array.c utils/modredc_15ul_default.h \

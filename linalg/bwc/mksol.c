@@ -8,7 +8,6 @@
 #include "matmul_top.h"
 #include "abase.h"
 #include "select_mpi.h"
-#include "manu.h"
 #include "debug.h"
 #include "params.h"
 #include "xvectors.h"
@@ -172,7 +171,7 @@ void * mksol_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
 
             for(int i = 0 ; i < bw->interval ; i++) {
                 rc = fread(ahead->v, stride, bw->n, f);
-                BUG_ON(rc != 0 && rc != bw->n);
+                ASSERT_ALWAYS(rc == 0 || rc == bw->n);
                 if (rc == 0) {
                     printf("Exhausted F data after %d coefficients\n", s+i);
                     bw->end = s+i;
@@ -200,7 +199,7 @@ void * mksol_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
              * changed because of EOF. We're not so disturbed
              * by serialization points here. */
             int err = MPI_Bcast(&(bw->end), 1, MPI_INT, 0, pi->m->pals);
-            BUG_ON(err);
+            ASSERT_ALWAYS(!err);
         }
         serialize_threads(pi->m);
 

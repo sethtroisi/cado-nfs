@@ -23,7 +23,6 @@
 #include "select_mpi.h"
 #include "parallelizing_info.h"
 #include "macros.h"
-#include "manu.h"
 
 #include <sys/time.h>   // gettimeofday
 
@@ -127,7 +126,7 @@ void grid_print(parallelizing_info_ptr pi, char * buf, size_t siz, int print)
     /* instead of doing memcpy, we align the stuff. */
     char * fmt;
     int rc = asprintf(&fmt, "%%-%zus", siz-1);
-    BUG_ON(rc < 0);
+    ASSERT_ALWAYS(rc >= 0);
     snprintf(strings + me * siz, siz, fmt, buf);
     free(fmt);
 
@@ -235,7 +234,7 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
         // one finds MPI job numbers across a column.
         err = MPI_Comm_split(pi->m->pals, pi->wr[d]->jcommon,
                 pi->m->jrank, &pi->wr[d]->pals);
-        BUG_ON(err);
+        ASSERT_ALWAYS(!err);
         MPI_Comm_rank(pi->wr[d]->pals, (int*) &pi->wr[d]->jrank);
     }
 
@@ -337,7 +336,7 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
     for(unsigned int ij = 0 ; ij < pi->wr[1]->njobs ; ij++) {
         // not mt at the moment, so it's easy.
         err = MPI_Barrier(pi->m->pals);
-        BUG_ON(err);
+        ASSERT_ALWAYS(!err);
 
         if (pi->wr[1]->jrank != ij) continue;
 
@@ -348,7 +347,7 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
             if (pi->wr[0]->jrank == 0) printf("|");
             for(unsigned int jj = 0 ; jj < pi->wr[0]->njobs ; jj++) {
                 err = MPI_Barrier(pi->wr[0]->pals);
-                BUG_ON(err);
+                ASSERT_ALWAYS(!err);
                 for(unsigned int jt = 0 ; jt < pi->wr[0]->ncores ; jt++) {
                     parallelizing_info_srcptr tpi;
                     tpi = grid[it*pi->wr[0]->ncores+jt];
@@ -359,7 +358,7 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
                             tpi->wr[1]->th->desc);
                     err = MPI_Bcast(buf, sizeof(buf),
                             MPI_BYTE, jj, pi->wr[0]->pals);
-                    BUG_ON(err);
+                    ASSERT_ALWAYS(!err);
                     int fence = jt == pi->wr[0]->ncores - 1;
                     if (pi->wr[0]->jrank == 0)
                         printf("%-12s%c", buf, fence ? '|' : ' ');
@@ -372,11 +371,11 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
     }
 
     err = MPI_Barrier(pi->m->pals);
-    BUG_ON(err);
+    ASSERT_ALWAYS(!err);
     if (pi->m->jrank == pi->m->njobs - 1)
         printf("going multithread now\n");
     err = MPI_Barrier(pi->m->pals);
-    BUG_ON(err);
+    ASSERT_ALWAYS(!err);
 
     // go mt.
     my_pthread_t * tgrid;
@@ -644,7 +643,7 @@ void complete_broadcast(pi_wiring_ptr wr, void * ptr, size_t size, unsigned int 
     ASSERT(t < wr->ncores);
     if (wr->trank == t) {
         err = MPI_Bcast(ptr, size, MPI_BYTE, j, wr->pals);
-        BUG_ON(err);
+        ASSERT_ALWAYS(!err);
     }
     void * leader_ptr = ptr;
     thread_agreement(wr, &leader_ptr, t);
@@ -673,7 +672,7 @@ int serialize__(pi_wiring_ptr w, const char * s MAYBE_UNUSED, unsigned int l MAY
 #endif
     if (w->trank == 0) {
         err = MPI_Barrier(w->pals);
-        BUG_ON(err);
+        ASSERT_ALWAYS(!err);
     }
     // struct timeval tv[1];
     // gettimeofday(tv, NULL);
@@ -773,7 +772,7 @@ static int get_counts_and_displacements(pi_wiring_ptr w, int my_size,
     counts[w->jrank] = my_size;
     SEVERAL_THREADS_PLAY_MPI_BEGIN(w) {
         int err = MPI_Allgather(MPI_IN_PLACE, 1, MPI_INT, counts, 1, MPI_INT, w->pals);
-        BUG_ON(err);
+        ASSERT_ALWAYS(!err);
     }
     SEVERAL_THREADS_PLAY_MPI_END;
 
@@ -823,7 +822,7 @@ int get_counts_and_displacements_2d(parallelizing_info_ptr pi, int d,
     counts[w->jrank] = my_size;
     SEVERAL_THREADS_PLAY_MPI_BEGIN(w) {
         int err = MPI_Allgather(MPI_IN_PLACE, 1, MPI_INT, counts, 1, MPI_INT, w->pals);
-        BUG_ON(err);
+        ASSERT_ALWAYS(!err);
     }
     SEVERAL_THREADS_PLAY_MPI_END;
 
@@ -990,7 +989,7 @@ pi_save_file_leader_init_done:
     int ok = recvbuf != NULL;
     SEVERAL_THREADS_PLAY_MPI_BEGIN(w) {
         err = MPI_Bcast(&ok, 1, MPI_INT, 0, w->pals);
-        BUG_ON(err);
+        ASSERT_ALWAYS(!err);
     }
     SEVERAL_THREADS_PLAY_MPI_END;
     if (!ok) return 0;
@@ -999,7 +998,7 @@ pi_save_file_leader_init_done:
         err = MPI_Gatherv(buf, mysize, MPI_BYTE,
                 recvbuf, recvcounts, displs, MPI_BYTE,
                 0, w->pals);
-        BUG_ON(err);
+        ASSERT_ALWAYS(!err);
     }
     SEVERAL_THREADS_PLAY_MPI_END;
 
@@ -1085,7 +1084,7 @@ pi_save_file_2d_leader_init_done:
     int ok = recvbuf != NULL;
     SEVERAL_THREADS_PLAY_MPI_BEGIN(w) {
         err = MPI_Bcast(&ok, 1, MPI_INT, 0, w->pals);
-        BUG_ON(err);
+        ASSERT_ALWAYS(!err);
     }
     SEVERAL_THREADS_PLAY_MPI_END;
     if (!ok) return 0;
@@ -1094,7 +1093,7 @@ pi_save_file_2d_leader_init_done:
         err = MPI_Gatherv(buf, mysize, MPI_BYTE,
                 recvbuf, recvcounts, displs, MPI_BYTE,
                 0, w->pals);
-        BUG_ON(err);
+        ASSERT_ALWAYS(!err);
     }
     SEVERAL_THREADS_PLAY_MPI_END;
 
@@ -1154,7 +1153,7 @@ int pi_load_file(pi_wiring_ptr w, const char * name, void * buf, size_t mysize)
         err = MPI_Scatterv(sendbuf, sendcounts, displs, MPI_BYTE,
                 buf, mysize, MPI_BYTE,
                 0, w->pals);
-        BUG_ON(err);
+        ASSERT_ALWAYS(!err);
     }
     SEVERAL_THREADS_PLAY_MPI_END;
 
@@ -1206,7 +1205,7 @@ int pi_load_file_2d(parallelizing_info_ptr pi, int d, const char * name, void * 
         err = MPI_Scatterv(sendbuf, sendcounts, displs, MPI_BYTE,
                 buf, mysize, MPI_BYTE,
                 0, w->pals);
-        BUG_ON(err);
+        ASSERT_ALWAYS(!err);
     }
     SEVERAL_THREADS_PLAY_MPI_END;
 

@@ -11,7 +11,6 @@
 #include "matmul-basic.h"
 #include "readmat.h"
 #include "abase.h"
-#include "manu.h"
 
 /* This extension is used to distinguish between several possible
  * implementations of the product */

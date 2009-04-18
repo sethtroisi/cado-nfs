@@ -17,7 +17,6 @@
 #include "matmul.h"
 #include "abase.h"
 #include "macros.h"
-#include "manu.h"
 #include "params.h"
 #include "debug.h"
 
@@ -187,7 +186,7 @@ int main(int argc, char * argv[])
 
             if (memcmp(checkA, checkB, aboffset(xx, abnbits(xx)) * sizeof(abt)) != 0) {
                 fprintf(stderr, "Check %d failed\n", t);
-                BUG();
+                abort();
             }
         }
         printf("All %d checks passed\n", nchecks);

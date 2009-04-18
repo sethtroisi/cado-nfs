@@ -1,7 +1,6 @@
 #define _POSIX_C_SOURCE 200112L
 
 #include "xymats.h"
-#include "manu.h"
 
 /* This is used as a very simple reduction routine, mostly for the small
  * m*n matrices. It has nothing to do with the more involved reduce
@@ -38,7 +37,7 @@ static void allreduce_generic_mpilevel(abobj_t abase, mmt_vec_ptr v, pi_wiring_p
     if (wr->trank == 0) {
         size_t siz = abbytes(abase, n);
         int err = MPI_Allreduce(MPI_IN_PLACE, v->v, siz, MPI_BYTE, MPI_BXOR, wr->pals);
-        BUG_ON(err);
+        ASSERT_ALWAYS(!err);
     }
     serialize_threads(wr);
 
@@ -66,7 +65,7 @@ void allreduce_generic(abobj_t abase, mmt_vec_ptr v, pi_wiring_ptr wr, unsigned 
         }
         size_t siz = abbytes(abase, n);
         int err = MPI_Allreduce(MPI_IN_PLACE, v->v, siz, MPI_BYTE, MPI_BXOR, wr->pals);
-        BUG_ON(err);
+        ASSERT_ALWAYS(!err);
     }
     serialize_threads(wr);
     if (wr->trank > 0) {
@@ -90,14 +89,14 @@ void broadcast_generic_mpilevel(mmt_generic_vec_ptr v, pi_wiring_ptr wr, size_t 
     if (v->flags & THREAD_SHARED_VECTOR) {
         if (wr->trank == 0) {
             int err = MPI_Bcast(v->v, siz, MPI_BYTE, j0, wr->pals);
-            BUG_ON(err);
+            ASSERT_ALWAYS(!err);
         }
         return;
     }
 
     SEVERAL_THREADS_PLAY_MPI_BEGIN(wr) {
         int err = MPI_Bcast(v->v, siz, MPI_BYTE, j0, wr->pals);
-        BUG_ON(err);
+        ASSERT_ALWAYS(!err);
     }
     SEVERAL_THREADS_PLAY_MPI_END;
 }

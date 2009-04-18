@@ -42,7 +42,6 @@ using namespace std;
 
 #include "readmat.h"
 #include "abase.h"
-#include "manu.h"
 
 // #define L1_CACHE_SIZE   32768
 // take only 3/4 of the L1 cache.
@@ -110,12 +109,12 @@ struct matmul_sliced_data_s {
     vector<slice_info> dslices_info;
     void push(uint32_t x)
     {
-        BUG_ON(x >> 16);
+        ASSERT_ALWAYS(x >> 16 == 0);
         data.push_back(x);
     }
     void push32(uint64_t x)
     {
-        BUG_ON(x >> 32);
+        ASSERT_ALWAYS(x >> 32 == 0);
         data.push_back(x & ((1u << 16) - 1));
         x >>= 16;
         data.push_back(x & ((1u << 16) - 1));

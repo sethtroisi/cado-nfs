@@ -3,7 +3,6 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include "manu.h"
 
 #include "alloc_proxy.h"
 

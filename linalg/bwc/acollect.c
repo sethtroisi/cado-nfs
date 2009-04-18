@@ -11,7 +11,6 @@
 #include <limits.h>
 #include <dirent.h>
 #include "macros.h"
-#include "manu.h"
 #include "utils.h"
 #include "filenames.h"
 #include "bw-common.h"
@@ -238,7 +237,7 @@ int main(int argc, char * argv[])
             char * tmp;
             int rc = asprintf(&tmp, A_FILE_PATTERN,
                     afiles[k]->n0,afiles[k]->n1,afiles[k]->j0,afiles[k]->j1);
-            BUG_ON(rc < 0);     // shut up, dammit.
+            ASSERT_ALWAYS(rc >= 0);
             if (unlink(tmp) < 0) {
                 fprintf(stderr, "unlink(%s): %s\n", tmp, strerror(errno));
             }

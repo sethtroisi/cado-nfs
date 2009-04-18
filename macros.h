@@ -55,6 +55,11 @@
 #define MAX(h,i) ((h) > (i) ? (h) : (i))
 #endif
 
+/* Handy, and does not require libm */
+#ifndef iceildiv
+#define iceildiv(x,y)	(((x)+(y)-1)/(y))
+#endif
+
 #if defined(__GNUC__)
 #ifndef	MAYBE_UNUSED
 #define MAYBE_UNUSED __attribute__ ((unused))

@@ -36,7 +36,7 @@ clean:
 	$(MAKE) -C sqrt/naive		clean
 
 # Because gf2x is a separate autotools project, we need to call it in a
-# special way. We disable shard libs because it's irrelevant here.
+# special way. We disable shared libs because it's irrelevant here.
 
 all-gf2x:
 	if [ ! -f gf2x/Makefile ] ; then \

@@ -8,7 +8,6 @@
 #include "matmul_top.h"
 #include "abase.h"
 #include "select_mpi.h"
-#include "manu.h"
 #include "debug.h"
 #include "params.h"
 #include "xvectors.h"

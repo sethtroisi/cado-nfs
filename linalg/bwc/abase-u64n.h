@@ -25,7 +25,6 @@
 #include "macros.h"
 #include "random_generation.h"
 #include "pad.h"
-#include "manu.h"
 // #include "electric_alloc.h"
 
 #include "abase-generic.h"

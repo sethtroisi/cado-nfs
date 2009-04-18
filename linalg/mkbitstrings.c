@@ -8,7 +8,6 @@
 #include <stdint.h>
 #include <ctype.h>
 #include <inttypes.h>
-#include "manu.h"
 #include "utils.h"
 
 unsigned int read_hexstring(FILE *f, uint64_t * ptr, unsigned int n)
@@ -51,7 +50,7 @@ unsigned int read_hexstring(FILE *f, uint64_t * ptr, unsigned int n)
      * the top i-n bits are zero, and return n.
      */
     v >>= n+4-i;
-    BUG_ON(v);
+    ASSERT_ALWAYS(!v);
     return n;
 }
 
@@ -79,7 +78,7 @@ int main(int argc, char * argv[])
         exit(1);
     }
     f = fopen(argv[1], "r");
-    BUG_ON(f == NULL);
+    ASSERT_ALWAYS(f);
     fprintf(stderr, "reading %s...", argv[1]); fflush(stderr);
 
     for ( ; !(feof(f) || ferror(f)) ; size++) {
