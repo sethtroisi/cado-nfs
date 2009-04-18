@@ -41,7 +41,7 @@ void vec_init_generic(pi_wiring_ptr picol, size_t stride, mmt_generic_vec_ptr v,
         void * r;
         if (picol->trank == 0) {
             r = abase_generic_init(stride, n);
-            abase_generic_zero(stride, v->v, n);
+            abase_generic_zero(stride, r, n);
         }
         thread_agreement(picol, &r, 0);
         v->v = r;

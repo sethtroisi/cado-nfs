@@ -8,7 +8,7 @@ set -e
 t=`mktemp -d /tmp/cado-snapshot.XXXXXXX`
 b=cado-nfs-0.0
 
-GIT=$(git-rev-parse --short HEAD 2>/dev/null)
+GIT=$(git rev-parse --short HEAD 2>/dev/null)
 
 all_files()
 {
