@@ -1,4 +1,6 @@
 
+ACLOCAL_AMFLAGS=-I config --install
+
 lib_LTLIBRARIES=libgf2x.la
 libgf2x_la_SOURCES=gf2x.c toom.c fft.c
 nobase_include_HEADERS=gf2x.h	\
@@ -31,12 +33,11 @@ DISTCLEANFILES=gf2x/gf2x-thresholds.h	\
 	       gf2x/gf2x_mul4.h
 
 EXTRA_DIST=
-EXTRA_DIST+=configfsf.guess
-EXTRA_DIST+=configfsf.sub
+EXTRA_DIST+=config/configfsf.guess
+EXTRA_DIST+=config/configfsf.sub
 EXTRA_DIST+=version.sh.in
 EXTRA_DIST+=BUGS
 EXTRA_DIST+=patch-wrt-ntl-5.4.2 inject-ntl-5.4.2
-EXTRA_DIST+=ntl_gf2x_mul_code.h
 EXTRA_DIST+=hardware
 dist-hook:
 	-find $(distdir) \( -name .svn -type d \) -o -name "*~" -o -name ".#*" \

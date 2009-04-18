@@ -1,14 +1,14 @@
 
 AC_INIT([gf2x], [0.9.4])
+AC_CONFIG_AUX_DIR([config])
+AC_CONFIG_MACRO_DIR([config])
 AC_CANONICAL_TARGET
 
 AC_SUBST([gf2x_lib_version], [1:0:0])
 
 AM_INIT_AUTOMAKE
 
-# Use LT_LANG once switched to libtool 2.2
-m4_defun([_LT_AC_LANG_F77_CONFIG], [:])
-m4_defun([_LT_AC_LANG_GCJ_CONFIG], [:])
+LT_INIT
 
 AC_ARG_ENABLE([ntl-checks],
               [AS_HELP_STRING([--enable-ntl-checks],
@@ -18,8 +18,6 @@ AC_ARG_ENABLE([sse2],
                               [Turn on sse-2 code (default is yes)])])
 
 AM_CONDITIONAL([ENABLE_NTL_CHECKS],[test x$enable_ntl_checks = xyes])
-
-AC_PROG_LIBTOOL
 
 AC_PROG_CC
 AC_PROG_CXX

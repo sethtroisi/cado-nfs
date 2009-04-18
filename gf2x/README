@@ -174,12 +174,12 @@ Cautious users follow steps 1 to 5 below. Urged users follow only 1 and 5.
 Caution regarding installation:
 ===============================
 
-The files in the gf2x/ directory are architecure-dependent.
+The header files installed in $includedir/gf2x/ are architecure-dependent.
 
 Hooking gf2x into ntl:
 ======================
 
-ntl-5.4.3 offers the possibility to replace the multiplication of
+ntl-5.5 offers the possibility to replace the multiplication of
 polynomials with the gf2x code. For this, you have to install the gf2x
 library in your favorite /path/to/gf2x/ (e.g. using gf2x's ./configure
 --prefix=/path/to/gf2x/ && make && make install). Then configure NTL with
@@ -211,5 +211,4 @@ headers (gf2x/gf2x-thresholds.h and gf2x/gf2x_mul* are
 architecture-dependent). In order to use the inlined multiplication
 routines for small sizes, you may use gf2x/gf2x-small.h.
 
-The gf2x libraries are created by default both as static and dynamic
-libraries.
+By default, gf2x creates both static and dynamic libraries.
