@@ -19,24 +19,59 @@ char ** command_argv;
 
 void * shell_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
 {
+    char ** argv = malloc((command_argc + 5) * sizeof(char *));
+    int i;
+    size_t len = 1;
+    for(i = 0 ; i < command_argc ; i++) {
+        argv[i] = command_argv[i];
+        len += 1 + strlen(argv[i]);
+    }
+    asprintf(&(argv[i]), "%d", pi->wr[0]->jrank);
+    len += 1 + strlen(argv[i]);
+    i++;
+    asprintf(&(argv[i]), "%d", pi->wr[1]->jrank);
+    len += 1 + strlen(argv[i]);
+    i++;
+    asprintf(&(argv[i]), "%d", pi->wr[0]->trank);
+    len += 1 + strlen(argv[i]);
+    i++;
+    asprintf(&(argv[i]), "%d", pi->wr[1]->trank);
+    len += 1 + strlen(argv[i]);
+    i++;
+    argv[i++]=NULL;
+
+    char * cmdline = malloc(len);
+    size_t k = 0;
+    for(i = 0 ; i < command_argc + 4 ; i++) {
+        snprintf(cmdline + k, len-k, " %s", argv[i]);
+        k += 1 + strlen(argv[i]);
+    }
+
     pid_t child = fork();
 
     if (child == 0) {
-        char ** argv = malloc((command_argc + 5) * sizeof(char *));
-        int i;
-        for(i = 0 ; i < command_argc ; i++) {
-            argv[i] = command_argv[i];
-        }
-        asprintf(&(argv[i++]), "%d", pi->wr[0]->jrank);
-        asprintf(&(argv[i++]), "%d", pi->wr[1]->jrank);
-        asprintf(&(argv[i++]), "%d", pi->wr[0]->trank);
-        asprintf(&(argv[i++]), "%d", pi->wr[1]->trank);
-        argv[i++]=NULL;
         execvp(argv[0], argv);
     } else {
-        wait(NULL);
+        int status;
+        wait(&status);
+        if (WIFEXITED(status)) {
+            int rc;
+            if ((rc = WEXITSTATUS(status)) != 0) {
+                fprintf("Command%s exited with status %d\n", cmdline, rc);
+            }
+        } else if (WIFSIGNALED(status)) {
+            int sig;
+            fprintf("Command%s exited with signal %d\n", cmdline, WTERMSIG(status));
+        } else {
+            fprintf("Command%s fooleed wait() !\n", cmdline);
+        }
     }
     serialize(pi->m);
+    for(i = 0 ; i < command_argc + 4 ; i++) {
+        free(argv[i]);
+    }
+    free(argv);
+    free(cmdline);
     return NULL;
 }
 
