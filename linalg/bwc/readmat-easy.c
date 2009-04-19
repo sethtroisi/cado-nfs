@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "macros.h"
 #include "readmat.h"
 #include "readmat-easy.h"
 
@@ -110,10 +111,15 @@ uint32_t * read_easy_transposed(const char * filename,
 
     fclose(f);
 
+    if (smat->ncols > smat->nrows) {
+        size += smat->ncols - smat->nrows;
+    }
+
     uint32_t * res = malloc(size * sizeof(uint32_t));
     uint32_t * ptr = res;
     for(unsigned int j = 0 ; j < smat->ncols ; j++) {
         uint32_t w = colweights[j];
+        ASSERT(ptr - res < size);
         *ptr++ = w;
         colptrs[j] = ptr;
         ptr += w;
