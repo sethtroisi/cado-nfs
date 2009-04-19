@@ -59,11 +59,6 @@ int main(int argc, char * argv[])
     }
     param_list_clear(pl);
 
-    if (argc <= 1) {
-        fprintf(stderr, "Usage: split <n_0> <n_1> ...\n");
-        exit(1);
-    }
-
     files = malloc(nsplits * sizeof(FILE *));
 
     for(int i = 0 ; i < nsplits ; i++) {
