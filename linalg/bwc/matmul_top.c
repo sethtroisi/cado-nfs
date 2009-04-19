@@ -455,17 +455,13 @@ void matmul_top_init(matmul_top_data_ptr mmt,
 
     read_info_file(mmt, filename);
 
-    /* NOTE: flags default to zero */
-    matmul_top_vec_init(mmt, 0, flags ? flags[0] : 0);
-    matmul_top_vec_init(mmt, 1, flags ? flags[1] : 0);
-
-    mmt_finish_init(mmt);
+    mmt_finish_init(mmt, flags);
 }
 
 /* Some work has to be done in order to fill the remaining fields in the
  * matmul_top structure.
  */
-void mmt_finish_init(matmul_top_data_ptr mmt)
+void mmt_finish_init(matmul_top_data_ptr mmt, int const * flags)
 {
 #ifndef  CONJUGATED_PERMUTATIONS
     choke me;
@@ -502,6 +498,11 @@ void mmt_finish_init(matmul_top_data_ptr mmt)
     // displaying communication info.
     
     matmul_top_read_submatrix(mmt);
+
+    /* NOTE: flags default to zero */
+    matmul_top_vec_init(mmt, 0, flags ? flags[0] : 0);
+    matmul_top_vec_init(mmt, 1, flags ? flags[1] : 0);
+
 }
 
 void matmul_top_read_submatrix(matmul_top_data_ptr mmt)

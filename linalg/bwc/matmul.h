@@ -75,8 +75,8 @@ extern void matmul_report(matmul_ptr);
 #define MATMUL_NAME_(kind,func) MATMUL_NAME(kind,func)
 #define MATMUL(func) MATMUL_NAME_(MATMUL_PREFERRED,func)
 
-#define MATMUL_PREFERRED sliced
-#include "matmul-sliced.h"
+#define MATMUL_PREFERRED threaded
+#include "matmul-threaded.h"
 
 // #include "matmul-basic.h"
 

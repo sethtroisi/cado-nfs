@@ -145,7 +145,7 @@ void matmul_top_init(matmul_top_data_ptr mmt,
         int const * flags,
         const char * filename);
 
-void mmt_finish_init(matmul_top_data_ptr mmt);
+void mmt_finish_init(matmul_top_data_ptr mmt, int const *);
 
 void matmul_top_read_submatrix(matmul_top_data_ptr mmt);
 void matmul_top_clear(matmul_top_data_ptr mmt, abobj_ptr abase);
