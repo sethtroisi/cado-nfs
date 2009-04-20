@@ -115,10 +115,15 @@ pp1_make_plan (pp1_plan_t *plan, const unsigned int B1, const unsigned int B2,
 
   if (verbose)
     {
-      printf ("Byte code for stage 1 (length %d): ", plan->bc_len);
+      int changes = 0;
+      printf ("Byte code for stage 1: ");
       for (p = 0; p < plan->bc_len; p++)
-	printf ("%s%d", (p == 0) ? "" : ", ", (int) (plan->bc[p]));
+        {
+	  printf ("%s%d", (p == 0) ? "" : ", ", (int) (plan->bc[p]));
+	  changes += (p > 0 && plan->bc[p-1] != plan->bc[p]);
+        }
       printf ("\n");
+      printf ("Length %d, %d code changes\n", plan->bc_len, changes);
     }
     
   /* Make stage 2 plan */
@@ -191,10 +196,15 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
 
   if (verbose)
     {
-      printf ("Byte code for stage 1 (length %d): ", plan->bc_len);
+      int changes = 0;
+      printf ("Byte code for stage 1: ");
       for (p = 0; p < plan->bc_len; p++)
-	printf ("%s%d", (p == 0) ? "" : ", ", (int) (plan->bc[p]));
+        {
+	  printf ("%s%d", (p == 0) ? "" : ", ", (int) (plan->bc[p]));
+	  changes += (p > 0 && plan->bc[p-1] != plan->bc[p]);
+        }
       printf ("\n");
+      printf ("Length %d, %d code changes\n", plan->bc_len, changes);
     }
     
   /* Make stage 2 plan */
