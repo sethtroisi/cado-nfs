@@ -3,29 +3,6 @@
 #include <string.h>
 #include "prac_bc.h"
 
-#define CODER_HISTLEN 10
-static int compress = 0;
-static literal_t coder_history[CODER_HISTLEN];
-static int coder_nrstored = 0;
-static char *buffer;
-static size_t bufalloc, buffull; /* Allocated size and current number of 
-				    codes in buffer */
-
-#if 0
-#define DICT_NRENTRIES 9
-const int dict_len[DICT_NRENTRIES] = {2, 2, 2, 3, 3, 3, 4, 4, 6};
-const literal_t *dict_entry[DICT_NRENTRIES] = 
-  {"\xB\xA", "\x3\x0", "\x3\x3", "\xB\xA\x3", "\x0\x3\x0","\x3\x3\x0",
-   "\x3\x0\x3\x0", "\x3\xB\xA\x3", "\x3\x0\x3\x0\x3\x0"};
-const int dict_code[DICT_NRENTRIES] = {13, 14, 15, 16, 17, 18, 19, 20, 21};
-#else
-#define DICT_NRENTRIES 4
-const int dict_len[DICT_NRENTRIES] = {2, 2, 3, 4};
-const literal_t *dict_entry[DICT_NRENTRIES] = 
-  {"\xB\xA", "\x3\x0", "\x3\xB\xA", "\x3\x0\x3\x0"};
-const int dict_code[DICT_NRENTRIES] = {13, 14, 15, 16};
-#endif
-
 /* Table of multipliers for PRAC. prac_mul[i], i>0, has continued fraction 
    sequence of all ones but with a 2 in the i-th place, and 
    prac_mul[0] is all ones, i.e. the golden ratio */
@@ -37,205 +14,254 @@ static const double prac_mul[PRAC_NR_MULTIPLIERS] =
    1.61834711965622805798 /* 8 */, 1.61791440652881789386 /* 9 */};
 
 
-
-static void 
-bytecoder_output (int c)
+static code_t
+bytecoder_literal_to_code (const literal_t l)
 {
-  assert (c < MAXCODE);
-  if (buffull == bufalloc)
+  /* Maybe a non-trivial mapping is desired sometime */
+  return (code_t) l;
+}
+
+/* Output the code c to the output buffer. Reallocate memory for the 
+   output buffer if necessary. */
+static void 
+bytecoder_output (const code_t c, bc_state_t *state)
+{
+  assert (c < BC_MAXCODE);
+  if (state->buffull == state->bufalloc)
     {
-      char *newbuf = realloc (buffer, bufalloc * 2);
+      assert (state->bufalloc > 0);
+      state->bufalloc *= 2;
+      code_t *newbuf = realloc (state->buffer, 
+				state->bufalloc * sizeof (code_t));
       if (newbuf == NULL)
 	abort ();
-      buffer = newbuf;
-      bufalloc *= 2;
+      state->buffer = newbuf;
     }
-  buffer[buffull++] = c;
+  state->buffer[state->buffull++] = c;
 }
 
 
 /* Returns the length of the matching part of "buf" (with "len" valid bytes)
    and the dictionary entry "entry" */
 
-static int 
-dict_matchlen (const literal_t *buf, const int len, const int entry)
+static size_t 
+dict_matchlen (const bc_state_t *state, const int entry)
 {
-  int i;
+  size_t i;
+  const bc_dict_t *dict = state->dict;
 
-  if (entry == -1)
-    return 0;
+  assert (0 <= entry && entry < dict->nr_entries);
 
-  assert (0 <= entry && entry < DICT_NRENTRIES);
-
-  for (i = 0; i < len && i < dict_len[entry]; i++)
-    if (buf[i] != dict_entry[entry][i])
+  for (i = 0; i < state->nrstored && i < dict->key_len[entry]; i++)
+    if (state->history[i] != dict->key[entry][i])
       break;
   
   return i;
 }
 
 
-/* Returns the index of the dictionary entry that has the longest match with
-   "buf", where "buf" contains "len" valid bytes. If "partial" is != 0, 
-   then matches that don't match the complete dictionary entry are accepted,
-   otherwise only matches with complete dictionary entries are accepted.
-   Return -1 if nothing matched at all */
+/* Returns the index of the dictionary key that has the longest match with
+   the current history window. If "partial" is != 0, then matches that 
+   don't match the complete dictionary key are accepted,
+   otherwise only matches with complete dictionary keys are accepted.
+   Returns -1 if nothing matched at all.
+   If len is non-NULL, length of the match found is stored in *len */
 
 static int
-dict_longestmatch (const literal_t *buf, const int len, const int partial)
+dict_longestmatch (size_t *len, const bc_state_t *state, const int partial)
 {
-  int i, t, matchlen = 0, matchidx = -1;
+  int i, matchidx = -1;
+  size_t t, matchlen = 0;
+  const bc_dict_t *dict = state->dict;
   
-  for (i = 0; i < DICT_NRENTRIES; i++)
+  for (i = 0; i < dict->nr_entries; i++)
     {
-      t = dict_matchlen (buf, len, i);
-      if (t > matchlen && (partial || t == dict_len[i]))
+      t = dict_matchlen (state, i);
+      if (t > matchlen && (partial || t == dict->key_len[i]))
 	{
 	  matchlen = t;
 	  matchidx = i;
 	}
     }
   
+  if (len != NULL)
+    *len = matchlen;
+  
   return matchidx;
 }
 
 
-/* Adds a literal to the coder_history[] FIFO buffer */
+/* Adds a literal to the history window */
 
 static void 
-coder_histadd (const int c)
+coder_histadd (const literal_t c, bc_state_t *state)
 {
-  coder_history[coder_nrstored++] = (literal_t) c;
-  assert (coder_nrstored < CODER_HISTLEN);
+  state->history[state->nrstored++] = c;
+  assert (state->nrstored <= state->histlen);
 }
 
 
-/* Removes n literals from the coder_history[] FIFO buffer */
+/* Removes n literals from the history window */
 
 static void
-coder_histremove (int n)
+coder_histremove (const size_t n, bc_state_t *state)
 {
-  int i;
-  if (n > coder_nrstored)
+  size_t i;
+  if (n > state->nrstored)
     abort();
 
-  for (i = 0; i + n < coder_nrstored; i++)
-    coder_history[i] = coder_history[i + n];
+  for (i = 0; i + n < state->nrstored; i++)
+    state->history[i] = state->history[i + n];
 
-  coder_nrstored -= n;
+  state->nrstored -= n;
 }
 
 
 /* Output the best dictionary match we have at the moment, or a literal
-   if coder_history[] matches no complete dictionary entry */
+   if history[] matches no complete dictionary entry */
 
 static void
-coder_outputbest ()
+coder_outputbest (bc_state_t *state)
 {
-  int best, bestlen;
+  int best;
+  size_t bestlen;
+  const bc_dict_t *dict = state->dict;
   
-  assert (coder_nrstored > 0);
+  assert (state->nrstored > 0);
   
   /* Find longest complete match */
-  best = dict_longestmatch (coder_history, coder_nrstored, 0);
-  bestlen = dict_matchlen (coder_history, coder_nrstored, best);
+  best = dict_longestmatch (&bestlen, state, 0);
   
   /* If there was a complete dictionary match, output that, 
-     otherwise output the first entry in coder_history[] as a literal */
-  if (best != -1 && bestlen == dict_len[best])
+     otherwise output the first entry in history[] as a literal */
+  if (best != -1)
     {
-      bytecoder_output (dict_code[best]);
-      coder_histremove (bestlen);
+      /* Dictonary code 0 is special and means: no output */
+      if (dict->code[best] != 0)
+	bytecoder_output (bytecoder_literal_to_code (dict->code[best]), state);
+      coder_histremove (bestlen, state);
     }
   else
     {
-      bytecoder_output ((int) (coder_history[0]));
-      coder_histremove (1);
+      bytecoder_output (bytecoder_literal_to_code (state->history[0]), state);
+      coder_histremove (1, state);
     }
 }
 
 
-/* If want_compress is non-zero, bytecoder will do dictionary compression,
+/* If dict is non-NULL, bytecoder will do dictionary compression,
    otherwise it just passes the literals through to the output buffer */
 
-void
-bytecoder_init (int want_compress)
+bc_state_t *
+bytecoder_init (const bc_dict_t *dict)
 {
-  compress = want_compress;
-  bufalloc = 10 * sizeof (char);
-  buffer = malloc (bufalloc);
-  buffull = 0;
-  return;
-}
+  int i;
+  bc_state_t *state;
+  state = malloc (sizeof(bc_state_t));
 
-
-void bytecoder_flush ()
-{
-  while (coder_nrstored > 0)
-    coder_outputbest ();
-}
-
-
-unsigned int 
-bytecoder_size ()
-{
-  return buffull;
-}
-
-
-void 
-bytecoder_read (char *dst)
-{
-  memmove(dst, buffer, buffull);
-  buffull = 0;
-}
-
-void
-bytecoder_clear ()
-{
-  bytecoder_flush ();
-  free (buffer);
-  buffer = NULL;
-  bufalloc = 0;
-  buffull = 0;
-  return;
-}
-
-
-void 
-bytecoder (const int c)
-{
-  /* At this point, the first coder_nrstored literals (posibly 0!) of
-     coder_history[] agree with some dictionary entry */
-  
-  /* Now add the new literal */
-  coder_histadd (c);
-  
-  if (compress)
+  if (dict != NULL)
     {
-      /* See if coder_history[] still matches one of the dictionary entries */
+      /* Window size is equal to longest key size + 1 */
+      state->histlen = 1;
+      for (i = 0; i < dict->nr_entries; i++)
+        if (state->histlen < dict->key_len[i] + 1)
+          state->histlen = dict->key_len[i] + 1;
+      state->history = malloc(state->histlen * sizeof(literal_t));
+      if (state->history == NULL)
+        abort ();
+      state->dict = dict;
+    }
+  else
+    {
+      state->histlen = 0;
+      state->history = NULL;
+      state->dict = NULL;
+    }
+  state->nrstored = 0;
+  state->bufalloc = 16;
+  state->buffer = malloc (state->bufalloc * sizeof (code_t));
+  if (state->buffer == NULL)
+    abort ();
+  state->buffull = 0;
+
+  return state;
+}
+
+
+void bytecoder_flush (bc_state_t *state)
+{
+  while (state->nrstored > 0)
+    coder_outputbest (state);
+}
+
+
+/* Return the size in bytes of the data in the output buffer */
+size_t 
+bytecoder_size (const bc_state_t *state)
+{
+  return state->buffull * sizeof (code_t);
+}
+
+
+/* Store the data from the output buffer in "dst" and set buffer to empty */
+void 
+bytecoder_read (code_t *dst, bc_state_t *state)
+{
+  memmove(dst, state->buffer, state->buffull * sizeof (code_t));
+  state->buffull = 0;
+}
+
+void
+bytecoder_clear (bc_state_t *state)
+{
+  bytecoder_flush (state);
+  free (state->history);
+  state->history = NULL;
+  state->histlen = 0;
+  free (state->buffer);
+  state->buffer = NULL;
+  state->bufalloc = 0;
+  state->buffull = 0;
+  state->dict = NULL;
+  free (state);
+  return;
+}
+
+
+void 
+bytecoder (const literal_t c, bc_state_t *state)
+{
+  /* At this point, the first nrstored literals (possibly 0!) of
+     history[] agree with some dictionary entry */
+  
+  if (state->dict != NULL)
+    {
+      /* Now add the new literal */
+      coder_histadd (c, state);
       
-      int best, bestlen = 0;
+      /* See if history[] still matches one of the dictionary entries */
       
-      /* If all coder_history[] matches some dictionary entry, we do nothing */
-      /* Otherwise we repeatedly output the longest complete dictionary match 
-	 or literal code until all of coder_history[] (then possibly empty!) 
-	 matches some dictionary entry again */
+      int best;
+      size_t bestlen = 0;
+      
+      /* If all history[] matches some dictionary entry (possibly partially), 
+         we do nothing */
+      /* Otherwise, we repeatedly output the longest complete dictionary 
+         match or literal code until all of history[] matches some 
+         dictionary entry again, or is empty */
       
       while (1)
 	{
-	  best = dict_longestmatch (coder_history, coder_nrstored, 1);
-	  bestlen = dict_matchlen (coder_history, coder_nrstored, best);
-	  if (bestlen == coder_nrstored)
+	  best = dict_longestmatch (&bestlen, state, 1);
+	  if (bestlen == state->nrstored)
 	    break;
-	  coder_outputbest ();
+	  coder_outputbest (state);
 	}
     }
   else
     {
-      /* No compression: flush the stored code */
-      bytecoder_output (coder_history[0]);
-      coder_nrstored = 0;
+      /* No compression: simply forward the literal to output */
+      bytecoder_output (bytecoder_literal_to_code (c), state);
     }
 }
 
@@ -328,8 +354,7 @@ lucas_cost (const unsigned long n, const double v, const unsigned int addcost,
 
 /* Returns the cost of the cheapest Lucas chain for n found by PRAC 
    using the first m multiplers from prac_mul. If mul is not NULL,
-   stores the index of the first multiplier that produced such a short
-   chain */
+   stores the first multiplier that produced such a short chain */
 
 unsigned long 
 prac_best (double *mul, const unsigned long n, const int m_parm, 
@@ -362,14 +387,14 @@ prac_best (double *mul, const unsigned long n, const int m_parm,
 /* Write bytecode for an addition chain for k. */
 void 
 prac_bytecode (const unsigned long k, const unsigned int addcost, 
-	       const unsigned int doublecost)
+	       const unsigned int doublecost, bc_state_t *state)
 {
   unsigned long d, e, r;
   double m;
   
   if (k == 2)
     {
-      bytecoder ((literal_t) 12);
+      bytecoder ((literal_t) 12, state);
       return;
     }
   
@@ -383,7 +408,7 @@ prac_bytecode (const unsigned long k, const unsigned int addcost,
   
   d = k - r;
   e = 2 * r - k;
-  bytecoder ((literal_t) 10);
+  bytecoder ((literal_t) 10, state);
   
   while (d != e)
     {
@@ -392,58 +417,58 @@ prac_bytecode (const unsigned long k, const unsigned int addcost,
           r = d;
           d = e;
           e = r;
-	  bytecoder ((literal_t) 0);
+	  bytecoder ((literal_t) 0, state);
         }
       /* do the first line of Table 4 whose condition qualifies */
       if (4 * d <= 5 * e && ((d + e) % 3) == 0)
         { /* condition 1 */
           d = (2 * d - e) / 3;
           e = (e - d) / 2;
-	  bytecoder ((literal_t) 1);
+	  bytecoder ((literal_t) 1, state);
         }
       else if (4 * d <= 5 * e && (d - e) % 6 == 0)
         { /* condition 2 */
           d = (d - e) / 2;
-	  bytecoder ((literal_t) 2);
+	  bytecoder ((literal_t) 2, state);
         }
       else if (d <= (4 * e))
         { /* condition 3 */
           d -= e;
-	  bytecoder ((literal_t) 3);
+	  bytecoder ((literal_t) 3, state);
         }
       else if ((d + e) % 2 == 0)
         { /* condition 4 */
           d = (d - e) / 2;
-	  bytecoder ((literal_t) 4);
+	  bytecoder ((literal_t) 4, state);
         }
       else if (d % 2 == 0) /* d+e is now odd */
         { /* condition 5 */
           d /= 2;
-	  bytecoder ((literal_t) 5);
+	  bytecoder ((literal_t) 5, state);
         }
       else if (d % 3 == 0) /* d is odd, e even */
         { /* condition 6 */
           d = d / 3 - e;
-	  bytecoder ((literal_t) 6);
+	  bytecoder ((literal_t) 6, state);
         }
       else if ((d + e) % 3 == 0)
         { /* condition 7 */
           d = (d - 2 * e) / 3;
-	  bytecoder ((literal_t) 7);
+	  bytecoder ((literal_t) 7, state);
         }
       else if ((d - e) % 3 == 0)
         { /* condition 8: never happens? */
           d = (d - e) / 3;
-	  bytecoder ((literal_t) 8);
+	  bytecoder ((literal_t) 8, state);
         }
       else /* necessarily e is even */
         { /* condition 9: never happens? */
           e /= 2;
-	  bytecoder ((literal_t) 9);
+	  bytecoder ((literal_t) 9, state);
         }
     }
   
-  bytecoder ((literal_t) 11);
+  bytecoder ((literal_t) 11, state);
   
   assert (d == 1);
 }

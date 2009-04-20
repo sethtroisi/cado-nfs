@@ -372,15 +372,13 @@ ellW_mul_ui (residue_t x, residue_t y, const unsigned long e, residue_t a,
 }
 
 
-/* Interpret the "l" bytes of bytecode located at "code" and do the 
+/* Interpret the bytecode located at "code" and do the 
    corresponding elliptic curve operations on (x::z) */
 
-static void
+/* static */ void
 ellM_interpret_bytecode (ellM_point_t P, const char *code,
-			 const unsigned long l, const modulus_t m, 
-			 const residue_t b)
+			 const modulus_t m, const residue_t b)
 {
-  unsigned long i;
   ellM_point_t A, B, C, t, t2;
   
   ellM_init (A, m);
@@ -391,15 +389,15 @@ ellM_interpret_bytecode (ellM_point_t P, const char *code,
 
   ellM_set (A, P, m);
 
-  for (i = 0; i < l; i++)
+  /* Implicit init of first subchain */
+  ellM_set (B, A, m);
+  ellM_set (C, A, m);
+  ellM_double (A, A, m, b);
+
+  while (1)
     {
-      switch (code[i])
+      switch (*code++)
         {
-          case 10: /* Init of subchain, B=A, C=A, A=2*A */
-            ellM_set (B, A, m);
-            ellM_set (C, A, m);
-            ellM_double (A, A, m, b);
-            break;
           case 0: /* Swap A, B */
             ellM_swap (A, B, m);
             break;
@@ -449,19 +447,29 @@ ellM_interpret_bytecode (ellM_point_t P, const char *code,
             ellM_add (C, C, B, A, m);
             ellM_double (B, B, m, b);
             break;
-          case 11:
-            ellM_add (A, A, B, C, m); /* Final add */
-            break;
-#if 0
-	    /* p=2 is handled outside of the byte code interpreter now */
-          case 12:
-            ellM_double (A, A, m, b); /* For p=2 */
-            break;
-#endif
+	  case 10: 
+            /* Combined final add of old subchain and init of new subchain */
+            ellM_add (A, A, B, C, m);
+            ellM_set (B, A, m);
+            ellM_set (C, A, m);
+            ellM_double (A, A, m, b);
+	    break;
+	  case 11: /* Combined rule 3 and rule 0 */
+            ellM_add (C, B, A, C, m);
+            ellM_swap (B, C, m);
+            ellM_swap (A, B, m);
+	    break;
+	  case 12: /* End of bytecode */
+	    goto end_of_bytecode;
           default:
             abort ();
         }
     }
+
+end_of_bytecode:
+
+  /* Implicit final add of last subchain */
+  ellM_add (A, A, B, C, m); 
 
   ellM_set (P, A, m);
 
@@ -1269,7 +1277,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   /* now start ecm */
 
   /* Do stage 1 */
-  ellM_interpret_bytecode (P, plan->bc, plan->bc_len, m, b);
+  ellM_interpret_bytecode (P, plan->bc, m, b);
 
   /* Add prime 2 in the desired power. If a zero residue for the Z-coordinate 
      is encountered, we backtrack to previous point and stop */
