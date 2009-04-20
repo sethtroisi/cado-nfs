@@ -7,16 +7,24 @@
 #include "ecm.h"
 #include "prac_bc.h"
 
-#define DICT_NRENTRIES 5
-static size_t dict_len[DICT_NRENTRIES] = {1, 1, 2, 2, 1};
-static literal_t *dict_entry[DICT_NRENTRIES] = 
-{"\xB", "\xA", "\xB\xA", "\x3\x0", "\xFF"};
-static code_t dict_code[DICT_NRENTRIES] = {0, 0, 10, 11, 12};
+#define PP1_DICT_NRENTRIES 6
+static size_t pp1_dict_len[PP1_DICT_NRENTRIES] = {1, 1, 2, 2, 3, 4};
+static literal_t *pp1_dict_entry[PP1_DICT_NRENTRIES] = 
+  {"\xB", "\xA", "\xB\xA", "\x3\x0", "\x3\xB\xA", "\x3\x0\x3\x0"};
+static code_t pp1_dict_code[PP1_DICT_NRENTRIES] = {0, 0, 10, 11, 13, 14};
 
 static bc_dict_t pp1_dict = 
-  {DICT_NRENTRIES, dict_len, dict_entry, dict_code};
+  {PP1_DICT_NRENTRIES, pp1_dict_len, pp1_dict_entry, pp1_dict_code};
+
+
+#define ECM_DICT_NRENTRIES 4
+static size_t ecm_dict_len[ECM_DICT_NRENTRIES] = {1, 1, 2, 2};
+static literal_t *ecm_dict_entry[ECM_DICT_NRENTRIES] = 
+{"\xB", "\xA", "\xB\xA", "\x3\x0"};
+static code_t ecm_dict_code[ECM_DICT_NRENTRIES] = {0, 0, 10, 11};
+
 static bc_dict_t ecm_dict = 
-  {DICT_NRENTRIES, dict_len, dict_entry, dict_code};
+  {ECM_DICT_NRENTRIES, ecm_dict_len, ecm_dict_entry, ecm_dict_code};
 
 
 void 
@@ -84,7 +92,7 @@ pp1_make_plan (pp1_plan_t *plan, const unsigned int B1, const unsigned int B2,
 	       int verbose)
 {
   unsigned int p;
-  const unsigned int addcost = 1, doublecost = 1;
+  const unsigned int addcost = 1, doublecost = 1, bytecost = 1, changecost = 1;
   /* FIXME: without compression, the implicit leading subchain init and 
      final subchain end are superfluous! */
   const unsigned int compress = 1;
@@ -103,7 +111,7 @@ pp1_make_plan (pp1_plan_t *plan, const unsigned int B1, const unsigned int B2,
     {
       unsigned long q;
       for (q = 1; q <= B1 / p; q *= p)
-	prac_bytecode (p, addcost, doublecost, bc_state);
+	prac_bytecode (p, addcost, doublecost, bytecost, changecost, bc_state);
     }
   bytecoder ((literal_t) 12, bc_state);
   bytecoder_flush (bc_state);
@@ -155,7 +163,8 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
 	       const int extra_primes, const int verbose)
 {
   unsigned int p, q;
-  const unsigned int addcost = 6, doublecost = 5; /* TODO: find good ratio */
+  const unsigned int addcost = 6, doublecost = 5, /* TODO: find good ratio */
+    bytecost = 1, changecost = 1;
   /* FIXME: without compression, the implicit leading subchain init and 
      final subchain end are superfluous! */
   const unsigned int compress = 1;
@@ -179,11 +188,11 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
   /* If group order is divisible by 12, add another 3 to stage 1 primes */
   if (extra_primes && 
       (parameterization == BRENT12 || parameterization == MONTY12))
-    prac_bytecode (3, addcost, doublecost, bc_state);
+    prac_bytecode (3, addcost, doublecost, bytecost, changecost, bc_state);
   for ( ; p <= B1; p = (unsigned int) getprime (p))
     {
       for (q = 1; q <= B1 / p; q *= p)
-	prac_bytecode (p, addcost, doublecost, bc_state);
+	prac_bytecode (p, addcost, doublecost, bytecost, changecost, bc_state);
     }
   bytecoder ((literal_t) 12, bc_state);
   bytecoder_flush (bc_state);

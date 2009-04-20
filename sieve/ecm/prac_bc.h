@@ -1,6 +1,5 @@
 /* One more than the highest code number the byte code generator can produce */
 #define BC_MAXCODE 32
-#define PRAC_NR_MULTIPLIERS 10
 
 typedef char literal_t;
 typedef char code_t;
@@ -37,7 +36,5 @@ size_t bytecoder_size (const bc_state_t *);
    and clears the buffer */
 void bytecoder_read (code_t *, bc_state_t *);
 
-unsigned long prac_best (double *, const unsigned long, const int, 
-			 const unsigned int, const unsigned int);
-void prac_bytecode (const unsigned long, const unsigned int, 
-		    const unsigned int, bc_state_t *);
+void prac_bytecode (const unsigned long, const double, const double, 
+		    const double, const double, bc_state_t *);

@@ -3,15 +3,29 @@
 #include <string.h>
 #include "prac_bc.h"
 
-/* Table of multipliers for PRAC. prac_mul[i], i>0, has continued fraction 
-   sequence of all ones but with a 2 in the i-th place, and 
-   prac_mul[0] is all ones, i.e. the golden ratio */
+#define PRAC_NR_MULTIPLIERS 19
+
+/* Table of multipliers for PRAC. prac_mul[i], 1<=<i<=9, has continued 
+   fraction sequence of all ones but with a 2 in the (i+1)-st place, 
+   prac_mul[i], 10<=<i<=17, has continued fraction sequence of all ones 
+   but with a 2 in second and in the (i-7)-th place
+   and prac_mul[0] is all ones, i.e. the golden ratio. */
 static const double prac_mul[PRAC_NR_MULTIPLIERS] = 
   {1.61803398874989484820 /* 0 */, 1.38196601125010515179 /* 1 */, 
    1.72360679774997896964 /* 2 */, 1.58017872829546410471 /* 3 */, 
    1.63283980608870628543 /* 4 */, 1.61242994950949500192 /* 5 */,
    1.62018198080741576482 /* 6 */, 1.61721461653440386266 /* 7 */, 
-   1.61834711965622805798 /* 8 */, 1.61791440652881789386 /* 9 */};
+   1.61834711965622805798 /* 8 */, 1.61791440652881789386 /* 9 */
+#if 0
+   ,
+   1.41982127170453589529, 1.36716019391129371457,
+   1.38757005049050499808, 1.37981801919258423518,
+   1.38278538346559613734, 1.38165288034377194202,
+   1.38208559347118210614, 1.38192033153010418805,
+   1.70431400059211079746};
+#else
+   };
+#endif
 
 
 static code_t
@@ -273,15 +287,16 @@ bytecoder (const literal_t c, bc_state_t *state)
 ************************************************************************/
 
 
-/* Returns the cost of a PRAC chain with initial multiplier v.
-   The cost of an addition is addcost, the cost a doubling is doublecost.
-*/
+/* Produce a PRAC chain with initial multiplier v. 
+   Returns its arithmetic cost.
+   The cost of an addition is addcost, the cost a doubling is doublecost. */
 
-static unsigned long
-lucas_cost (const unsigned long n, const double v, const unsigned int addcost,
-	    const unsigned int doublecost)
+static double
+prac_chain (const unsigned long n, const double v, const double addcost,
+	    const double doublecost, bc_state_t *state)
 {
-  unsigned long c, d, e, r;
+  unsigned long d, e, r;
+  double cost;
 
   d = n;
   r = (unsigned long) ((double) d / v + 0.5);
@@ -289,7 +304,9 @@ lucas_cost (const unsigned long n, const double v, const unsigned int addcost,
     return (addcost * n);
   d = n - r;
   e = 2 * r - n;
-  c = doublecost + addcost; /* initial duplicate and final addition */
+  cost = doublecost + addcost; /* initial doubling and final addition */
+
+  bytecoder ((literal_t) 10, state); /* initial doubling (subchain init) */
   while (d != e)
     {
       if (d < e)
@@ -297,88 +314,127 @@ lucas_cost (const unsigned long n, const double v, const unsigned int addcost,
           r = d;
           d = e;
           e = r;
+	  if (state != NULL) bytecoder ((literal_t) 0, state);
         }
       if (4 * d <= 5 * e && ((d + e) % 3) == 0)
         { /* condition 1 */
           d = (2 * d - e) / 3;
           e = (e - d) / 2;
-          c += 3U * addcost; /* 3 additions */
+          cost += 3 * addcost; /* 3 additions */
+	  if (state != NULL) bytecoder ((literal_t) 1, state);
         }
       else if (4 * d <= 5 * e && (d - e) % 6 == 0)
         { /* condition 2 */
           d = (d - e) / 2;
-          c += addcost + doublecost; /* one addition, one duplicate */
+          cost += addcost + doublecost; /* one addition, one doubling */
+	  if (state != NULL) bytecoder ((literal_t) 2, state);
         }
       else if (d <= 4 * e)
         { /* condition 3 */
           d -= e;
-          c += addcost; /* one addition */
+          cost += addcost; /* one addition */
+	  if (state != NULL) bytecoder ((literal_t) 3, state);
         }
       else if ((d + e) % 2 == 0)
         { /* condition 4 */
           d = (d - e) / 2;
-          c += addcost + doublecost; /* one addition, one duplicate */
+          cost += addcost + doublecost; /* one addition, one doubling */
+	  if (state != NULL) bytecoder ((literal_t) 4, state);
         } 
       /* now d+e is odd */
       else if (d % 2 == 0)
         { /* condition 5 */
           d /= 2;
-          c += addcost + doublecost; /* one addition, one duplicate */
+          cost += addcost + doublecost; /* one addition, one doubling */
+	  if (state != NULL) bytecoder ((literal_t) 5, state);
         }
       /* now d is odd and e even */
       else if (d % 3 == 0)
         { /* condition 6 */
           d = d / 3 - e;
-          c += 3U * addcost + doublecost; /* three additions, one duplicate */
+          cost += 3 * addcost + doublecost; /* three additions, one doubling */
+	  if (state != NULL) bytecoder ((literal_t) 6, state);
         }
       else if ((d + e) % 3 == 0)
         { /* condition 7 */
           d = (d - 2 * e) / 3;
-          c += 3U * addcost + doublecost; /* three additions, one duplicate */
+          cost += 3 * addcost + doublecost; /* three additions, one doubling */
+	  if (state != NULL) bytecoder ((literal_t) 7, state);
         }
       else if ((d - e) % 3 == 0)
         { /* condition 8 */
           d = (d - e) / 3;
-          c += 3U * addcost + doublecost; /* three additions, one duplicate */
+          cost += 3 * addcost + doublecost; /* three additions, one doubling */
+	  if (state != NULL) bytecoder ((literal_t) 8, state);
         }
       else /* necessarily e is even */
         { /* condition 9 */
           e /= 2;
-          c += addcost + doublecost; /* one addition, one duplicate */
+          cost += addcost + doublecost; /* one addition, one doubling */
+	  if (state != NULL) bytecoder ((literal_t) 9, state);
         }
     }
+  bytecoder ((literal_t) 11, state); /* final add (subchain end) */
   
-  return c;
+  /* Here d = gcd(n, r). If d != 1, then the sequence cannot be
+     reduced below d, i.e., the chain does not start at 1. 
+     It would be the end of a concatenated chain instead.
+     Return 0 in this case. */
+  return (d == 1) ? cost : 0.;
 }
 
 
 /* Returns the cost of the cheapest Lucas chain for n found by PRAC 
    using the first m multiplers from prac_mul. If mul is not NULL,
-   stores the first multiplier that produced such a short chain */
+   stores the index of the first multiplier that produced such a cheap
+   chain. The cost of an addition, doubling, code byte and code byte change
+   are passed via parameters.
+   If no valid chain could be found because n was composite and 
+   no starting value was coprime to n, return 0. */
 
-unsigned long 
+static double 
 prac_best (double *mul, const unsigned long n, const int m_parm, 
-	   const unsigned int addcost, const unsigned int doublecost)
+	   const double addcost, const double doublecost,
+	   const double bytecost, const double changecost,
+	   const bc_dict_t *dict)
 {
-  int i, bestmul, m = m_parm;
-  unsigned long bestcost, c;
+  int i, bestmul = 0, m = m_parm;
+  double bestcost = 0., cost;
+  bc_state_t *state;
 
   if (m > PRAC_NR_MULTIPLIERS)
     m = PRAC_NR_MULTIPLIERS;
-  bestcost = lucas_cost (n, prac_mul[0], addcost, doublecost);
-  bestmul = 0;
-  for (i = 1; i < m; i++)
+
+  state = bytecoder_init (dict);
+
+  for (i = 0; i < m; i++)
     {
-      c = lucas_cost (n, prac_mul[i], addcost, doublecost);
-      if (c < bestcost)
+      cost = prac_chain (n, prac_mul[i], addcost, doublecost, state);
+      if (cost > 0.)
 	{
-	  bestcost = c;
-	  bestmul = i;
+	  size_t j;
+	  
+	  /* Add the cost for byte codes and byte code changes */
+	  bytecoder_flush (state);
+	  cost += bytecost * state->buffull;
+
+	  for (j = 1; j < state->buffull; j++)
+	    if (state->buffer[j-1] != state->buffer[j])
+	      cost += changecost;
+
+	  if (bestcost == 0 || cost < bestcost)
+	    {
+	      bestcost = cost;
+	      bestmul = i;
+	    }
+	  state->buffull = 0;
 	}
     }
   
-  if (mul != NULL)
+  if (bestcost > 0. && mul != NULL)
     *mul = prac_mul[bestmul];
+
+  bytecoder_clear (state);
 
   return bestcost;
 }
@@ -386,11 +442,12 @@ prac_best (double *mul, const unsigned long n, const int m_parm,
 
 /* Write bytecode for an addition chain for k. */
 void 
-prac_bytecode (const unsigned long k, const unsigned int addcost, 
-	       const unsigned int doublecost, bc_state_t *state)
+prac_bytecode (const unsigned long k, const double addcost, 
+	       const double doublecost, const double bytecost, 
+	       const double changecost, bc_state_t *state)
 {
-  unsigned long d, e, r;
-  double m;
+  unsigned long d;
+  double m = 0.;
   
   if (k == 2)
     {
@@ -401,74 +458,16 @@ prac_bytecode (const unsigned long k, const unsigned int addcost,
   assert (k % 2 == 1);
   
   /* Find the best multiplier for this k */
-  prac_best (&m, k, PRAC_NR_MULTIPLIERS, addcost, doublecost);
-  
-  d = k;
-  r = (unsigned long) ((double) d / m + 0.5);
-  
-  d = k - r;
-  e = 2 * r - k;
-  bytecoder ((literal_t) 10, state);
-  
-  while (d != e)
+  d = prac_best (&m, k, PRAC_NR_MULTIPLIERS, addcost, doublecost, bytecost, 
+		 changecost, state->dict);
+  if (d == 0)
     {
-      if (d < e)
-        {
-          r = d;
-          d = e;
-          e = r;
-	  bytecoder ((literal_t) 0, state);
-        }
-      /* do the first line of Table 4 whose condition qualifies */
-      if (4 * d <= 5 * e && ((d + e) % 3) == 0)
-        { /* condition 1 */
-          d = (2 * d - e) / 3;
-          e = (e - d) / 2;
-	  bytecoder ((literal_t) 1, state);
-        }
-      else if (4 * d <= 5 * e && (d - e) % 6 == 0)
-        { /* condition 2 */
-          d = (d - e) / 2;
-	  bytecoder ((literal_t) 2, state);
-        }
-      else if (d <= (4 * e))
-        { /* condition 3 */
-          d -= e;
-	  bytecoder ((literal_t) 3, state);
-        }
-      else if ((d + e) % 2 == 0)
-        { /* condition 4 */
-          d = (d - e) / 2;
-	  bytecoder ((literal_t) 4, state);
-        }
-      else if (d % 2 == 0) /* d+e is now odd */
-        { /* condition 5 */
-          d /= 2;
-	  bytecoder ((literal_t) 5, state);
-        }
-      else if (d % 3 == 0) /* d is odd, e even */
-        { /* condition 6 */
-          d = d / 3 - e;
-	  bytecoder ((literal_t) 6, state);
-        }
-      else if ((d + e) % 3 == 0)
-        { /* condition 7 */
-          d = (d - 2 * e) / 3;
-	  bytecoder ((literal_t) 7, state);
-        }
-      else if ((d - e) % 3 == 0)
-        { /* condition 8: never happens? */
-          d = (d - e) / 3;
-	  bytecoder ((literal_t) 8, state);
-        }
-      else /* necessarily e is even */
-        { /* condition 9: never happens? */
-          e /= 2;
-	  bytecoder ((literal_t) 9, state);
-        }
+      /* This k is composite and prac cannot make a valid chain for it.
+	 We could try to factor k and make a composite chain from the
+	 prime factors. For now, we bail out - caller shouldn't give
+	 a composite k that doesn't have a prac chain we can find. */
+      abort ();
     }
-  
-  bytecoder ((literal_t) 11, state);
-  
-  assert (d == 1);
+
+  prac_chain (k, m, addcost, doublecost, state);
 }

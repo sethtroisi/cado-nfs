@@ -132,22 +132,20 @@ pp1_stage1 (residue_t X, const char *code, const residue_t two,
 	    break;
 	  case 12: /* End of bytecode */
 	    goto end_of_bytecode;
-#if 0
-	  case 15:
-	    /* Rule 3, then rule 11, then rule 10 */
+	  case 13:
+	    /* Rule 3, then subchain end/start */
             pp1_add (t, B, A, C, m);
             pp1_add (C, A, t, B, m);
 	    mod_set (B, C, m);
             pp1_double (A, C, two, m);
             break;
-          case 16:
+          case 14:
 	    /* Rule 3, rule 0, rule 3 and rule 0, merged a bit */
 	    mod_set (t, B, m);
 	    pp1_add (B, B, A, C, m);
 	    mod_set (C, A, m);
 	    pp1_add (A, A, B, t, m);
             break;
-#endif
 	  default:
             abort ();
         }
