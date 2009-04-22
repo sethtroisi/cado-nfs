@@ -54,15 +54,17 @@ void * sec_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
     }
 
     if (tcan_print) {
-        printf("Computing trsp(x)*bw->M^%d\n",bw->interval);
+        printf("Computing trsp(x)*M^%d\n",bw->interval);
     }
 
     serialize(pi->m);
 
+#if 0
     /* FIXME -- that's temporary ! only for debugging */
     pi_log_init(pi->m);
     pi_log_init(pi->wr[0]);
     pi_log_init(pi->wr[1]);
+#endif
 
     for(int k = 0 ; k < bw->interval ; k++) {
         pi_log_op(mmt->pi->m, "iteration %d", k);
@@ -83,9 +85,11 @@ void * sec_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
 
     free(gxvecs);
 
+#if 0
     pi_log_clear(pi->m);
     pi_log_clear(pi->wr[0]);
     pi_log_clear(pi->wr[1]);
+#endif
 
     return NULL;
 }
