@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <string.h>
 
 #include "parallelizing_info.h"
 #include "select_mpi.h"
@@ -57,12 +58,12 @@ void * shell_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
         if (WIFEXITED(status)) {
             int rc;
             if ((rc = WEXITSTATUS(status)) != 0) {
-              fprintf (stderr, "Command%s exited with status %d\n", cmdline, rc);
+                fprintf(stderr, "Command%s exited with status %d\n", cmdline, rc);
             }
         } else if (WIFSIGNALED(status)) {
-            fprintf (stderr, "Command%s exited with signal %d\n", cmdline, WTERMSIG(status));
+            fprintf(stderr, "Command%s exited with signal %d\n", cmdline, WTERMSIG(status));
         } else {
-          fprintf (stderr, "Command%s fooleed wait() !\n", cmdline);
+            fprintf(stderr, "Command%s fooleed wait() !\n", cmdline);
         }
     }
     serialize(pi->m);

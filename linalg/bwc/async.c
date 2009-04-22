@@ -183,17 +183,27 @@ void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * 
     pcpu[0] = 100.0 * dt[0] / (double) (timing->current->wct - timing->go->wct);
     pcpu[1] = 100.0 * dt[1] / (double) (timing->current->wct - timing->go->wct);
 
-    double avsum = av[0] + av[1];
-    char * what = "s";
-    if (avsum < 0.1) {
-        what = "ms";
-        avsum *= 1000.0;
-    }
-
     if (print) {
-        printf("N=%d ; %.2f cpu, %.2f sys, %.2f wct"
-                " %.2f %s/iter, %.2f%% cpu + %.2f%% sys\n",
-                iter, oncpu[0], oncpu[1], wct, avsum, what, pcpu[0], pcpu[1]);
+        char * what_cpu = "s";
+        double avcpu = av[0] + av[1];
+        if (avcpu < 0.1) { what_cpu = "ms"; avcpu *= 1000.0; }
+
+        char * what_wct = "s";
+        double avwct = wct / di;
+        if (avwct < 0.1) { what_wct = "ms"; avwct *= 1000.0; }
+
+        printf("N=%d ; CPU"
+                ": %.2f cpu + %.2f sys"
+                ", %.2f %s/iter\n",
+                iter, oncpu[0], oncpu[1],
+                avcpu, what_cpu);
+
+        printf("N=%d ; WCT"
+                ": %.2f tot"
+                ", %.2f %s/iter"
+                ", %.2f%% cpu + %.2f%% sys\n",
+                iter, wct, avwct, what_wct,
+                pcpu[0], pcpu[1]);
     }
 }
 

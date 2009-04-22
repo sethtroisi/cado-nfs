@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <stdint.h>
 #include <string.h>
+#include <stddef.h>
 
 #include "macros.h"
 #include "readmat.h"
