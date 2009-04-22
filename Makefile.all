@@ -15,7 +15,7 @@ ifneq ($(GMP_INCDIR),)
 SCONS_FLAGS+=GMP_INCDIR=$(GMP_INCDIR)
 endif
 
-VERSION = 0.0
+VERSION = 0.1-rc1
 
 all clean:
 	$(MAKE) -f Makefile $@
