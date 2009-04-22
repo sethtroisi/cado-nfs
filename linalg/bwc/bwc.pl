@@ -533,7 +533,11 @@ sub drive {
             $td = tempdir("$filename-${nh}x${nv}.XXXXX", DIR=>$tmpdir, CLEANUP=>1);
             $out = "$td/mat";
             $in = "$td/$filename";
-            dosystem("cp", $matrix, "$td/$filename");
+            if (-w "$tmpdir/$filename") {
+                # Give a chance to factorize copies.
+                dosystem("cp", "$tmpdir/$filename", "$td/$filename");
+            }
+            dosystem("rsync", "-a", $matrix, "$td/$filename");
         }
         my $cmd="$bindir/../balance";
         my @args= (
