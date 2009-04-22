@@ -119,7 +119,7 @@ uint32_t * read_easy_transposed(const char * filename,
     uint32_t * ptr = res;
     for(unsigned int j = 0 ; j < smat->ncols ; j++) {
         uint32_t w = colweights[j];
-        ASSERT(ptr - res < size);
+        ASSERT((size_t) (ptr - res) < size);
         *ptr++ = w;
         colptrs[j] = ptr;
         ptr += w;
