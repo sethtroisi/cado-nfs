@@ -188,6 +188,18 @@ void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * 
     }
     SEVERAL_THREADS_PLAY_MPI_END;
 
+    /* dt[] contains the JOB seconds. So we don't have to sum it up over
+     * threads. However, we do for ncoeffs ! */
+    double ncoeffs_total = 0;
+    void * ptr = &ncoeffs_total;
+    thread_agreement(pi->m, &ptr, 0);
+    double * main_ncoeffs_total = ptr;
+    my_pthread_mutex_lock(pi->m->th->m);
+    * main_ncoeffs_total += ncoeffs_d;
+    my_pthread_mutex_unlock(pi->m->th->m);
+    serialize_threads(pi->m);
+    ncoeffs_d = * main_ncoeffs_total;
+
     double di = iter - timing->go_mark;
 
     av[0] = dt[0] / di;
@@ -198,7 +210,7 @@ void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * 
     if (print) {
         char * what_cpu = "s";
         double avcpu = av[0] + av[1];
-        double nsc = avcpu / ncoeffs * 1.0e9;
+        double nsc = avcpu / ncoeffs_d * 1.0e9;
         if (avcpu < 0.1) { what_cpu = "ms"; avcpu *= 1000.0; }
 
         char * what_wct = "s";
