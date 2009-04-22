@@ -25,7 +25,11 @@ The action to be performed is either:
                  up in \$wdir/W.twisted.
     :balance  -- compute a balanced splitting of the matrix, according
                  the specified mpi and thr parameters.
-    :wipeout  -- quite like rm -rf \$wdir, but focuses on bwc files.
+    :wipeout  -- quite like rm -rf \$wdir, but focuses on bwc files. Does
+                 not wipe out matrix file, nor cached in-memory files.
+    :bench    -- does :balance, :wipeout, prep, secure, and krylov with
+                 an exceedingly large finish bound in order to perform
+                 some timings.
 
 Parameters are specified in the form <key>=<value>.
 All parameters having a meaning for the bwc programs are accepted. Some
@@ -241,7 +245,7 @@ if (!defined($wdir) && defined($matrix)) {
     $wdir="$matrix-${nh}x${nv}";
     # In most cases, a non-existing wdir is an error, but not for
     # :balance or :complete, which are entitled to create it.
-    if ($main !~ /^:(?:balance|complete)$/ && !-d $wdir) {
+    if ($main !~ /^:(?:balance|complete|bench)$/ && !-d $wdir) {
         die "No directory $wdir found";
     }
     push @main_args, "wdir=$wdir";
@@ -481,6 +485,18 @@ sub drive {
             system "rm -f bw.cfg";
         }
         chdir $pwd;
+        return;
+    }
+
+    if ($program eq ':bench') {
+        if (! -d $wdir) {
+            &drive(':balance', @_);
+        }
+        &drive(":wipeout", @_);
+        &drive("u64n/prep", @_);
+        &drive("u64/secure", @_);
+        &drive("./split", @_, "--split-y");
+        &drive("$mode/krylov", @_, "end=1000000");
         return;
     }
 

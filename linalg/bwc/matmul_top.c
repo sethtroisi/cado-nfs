@@ -438,6 +438,7 @@ void matmul_top_init(matmul_top_data_ptr mmt,
         /* matmul_ptr mm, */
         parallelizing_info_ptr pi,
         int const * flags,
+        param_list pl,
         const char * filename)
 {
     memset(mmt, 0, sizeof(*mmt));
@@ -455,13 +456,13 @@ void matmul_top_init(matmul_top_data_ptr mmt,
 
     read_info_file(mmt, filename);
 
-    mmt_finish_init(mmt, flags);
+    mmt_finish_init(mmt, flags, pl);
 }
 
 /* Some work has to be done in order to fill the remaining fields in the
  * matmul_top structure.
  */
-void mmt_finish_init(matmul_top_data_ptr mmt, int const * flags)
+void mmt_finish_init(matmul_top_data_ptr mmt, int const * flags, param_list pl)
 {
 #ifndef  CONJUGATED_PERMUTATIONS
     choke me;
@@ -497,7 +498,7 @@ void mmt_finish_init(matmul_top_data_ptr mmt, int const * flags)
     // TODO: reuse the ../bw-matmul/matmul/matrix_base.cpp things for
     // displaying communication info.
     
-    matmul_top_read_submatrix(mmt);
+    matmul_top_read_submatrix(mmt, pl);
 
     /* NOTE: flags default to zero */
     matmul_top_vec_init(mmt, 0, flags ? flags[0] : 0);
@@ -505,14 +506,16 @@ void mmt_finish_init(matmul_top_data_ptr mmt, int const * flags)
 
 }
 
-void matmul_top_read_submatrix(matmul_top_data_ptr mmt)
+void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl)
 {
-    mmt->mm = matmul_reload_cache(mmt->abase, mmt->locfile);
+    const char * impl = param_list_lookup_string(pl, "bwc_mm_impl");
+
+    mmt->mm = matmul_reload_cache(mmt->abase, mmt->locfile, impl, pl);
     if (mmt->mm)
         return;
 
     // fprintf(stderr, "Could not find cache file for %s\n", mmt->locfile);
-    mmt->mm = matmul_build(mmt->abase, mmt->locfile);
+    mmt->mm = matmul_build(mmt->abase, mmt->locfile, impl, pl);
     matmul_save_cache(mmt->mm, mmt->locfile);
 }
 
@@ -752,19 +755,23 @@ void matmul_top_mul(matmul_top_data_ptr mmt, int d)
 #ifndef NDEBUG
     unsigned int di_in = mmt->wr[d]->i1 - mmt->wr[d]->i0;
     unsigned int di_out = mmt->wr[!d]->i1 - mmt->wr[!d]->i0;
-    ASSERT(mmt->mm->ncols == (d ? di_in : di_out));
-    ASSERT(mmt->mm->nrows == (d ? di_out : di_in));
+    ASSERT(mmt->mm->dim[1] == (d ? di_in : di_out));
+    ASSERT(mmt->mm->dim[0] == (d ? di_out : di_in));
 #endif
 
     pi_wiring_ptr picol = mmt->pi->wr[d];
     mmt_wiring_ptr mcol = mmt->wr[d];
     mmt_wiring_ptr mrow = mmt->wr[!d];
 
+    ASSERT_ALWAYS((mrow->v->flags & THREAD_SHARED_VECTOR) == 0);
+
     pi_log_op(mmt->pi->m, "[%s] enter matmul_mul", __func__);
     // mmt_debug_writeout(mmt, d, "before_mul");
     matmul_mul(mmt->mm, mrow->v->v, mcol->v->v, d);
     // mmt_debug_writeout(mmt, !d, "after_mul");
     pi_log_op(mmt->pi->m, "[%s] enter reduce_across", __func__);
+
+
     reduce_across(mmt, !d);
 
     pi_log_op(mmt->pi->m, "[%s] enter broadcast_down", __func__);

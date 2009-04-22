@@ -13,12 +13,17 @@ int main(int argc, char * argv[])
 
     matmul_t mm;
 
-    if (argc != 2) {
-        fprintf(stderr, "Usage: ./build <file>\n");
+    const char * impl = "basic";
+
+    if (argc != 2 && argc != 3) {
+        fprintf(stderr, "Usage: ./build <file> [<impl>]\n");
         exit(1);
     }
 
-    mm = matmul_build(xx, argv[1]);
+    if (argc == 3)
+        impl = argv[2];
+
+    mm = matmul_build(xx, argv[1], argv[2], NULL);
     matmul_save_cache(mm, argv[1]);
     matmul_clear(mm);
 }

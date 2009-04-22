@@ -154,7 +154,7 @@ void timing_check(parallelizing_info pi, struct timing_data * timing, int iter, 
     grid_print(pi, buf, sizeof(buf), print);
 }
 
-void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * timing, int iter, int print)
+void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * timing, int iter, unsigned long ncoeffs, int print)
 {
     double oncpu[2];
     double dt[2];
@@ -170,12 +170,24 @@ void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * 
 
     dt[0] = timing->current->job[0]-timing->go->job[0];
     dt[1] = timing->current->job[1]-timing->go->job[1];
+
+
     // dt must be collected.
     int err;
-    err = MPI_Allreduce(MPI_IN_PLACE, oncpu, 2, MPI_DOUBLE, MPI_SUM, pi->m->pals);
-    ASSERT_ALWAYS(!err);
-    err = MPI_Allreduce(MPI_IN_PLACE, dt, 2, MPI_DOUBLE, MPI_SUM, pi->m->pals);
-    ASSERT_ALWAYS(!err);
+    double ncoeffs_d = ncoeffs;
+
+    SEVERAL_THREADS_PLAY_MPI_BEGIN(pi->m) {
+        err = MPI_Allreduce(MPI_IN_PLACE, oncpu, 2, MPI_DOUBLE, MPI_SUM, pi->m->pals);
+        ASSERT_ALWAYS(!err);
+
+        err = MPI_Allreduce(MPI_IN_PLACE, dt, 2, MPI_DOUBLE, MPI_SUM, pi->m->pals);
+        ASSERT_ALWAYS(!err);
+
+        err = MPI_Allreduce(MPI_IN_PLACE, &ncoeffs_d, 1, MPI_DOUBLE, MPI_SUM, pi->m->pals);
+        ASSERT_ALWAYS(!err);
+    }
+    SEVERAL_THREADS_PLAY_MPI_END;
+
     double di = iter - timing->go_mark;
 
     av[0] = dt[0] / di;
@@ -186,6 +198,7 @@ void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * 
     if (print) {
         char * what_cpu = "s";
         double avcpu = av[0] + av[1];
+        double nsc = avcpu / ncoeffs * 1.0e9;
         if (avcpu < 0.1) { what_cpu = "ms"; avcpu *= 1000.0; }
 
         char * what_wct = "s";
@@ -194,9 +207,11 @@ void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * 
 
         printf("N=%d ; CPU"
                 ": %.2f cpu + %.2f sys"
-                ", %.2f %s/iter\n",
+                ", %.2f %s/iter"
+                ", %.2f ns/coeff"
+                "\n",
                 iter, oncpu[0], oncpu[1],
-                avcpu, what_cpu);
+                avcpu, what_cpu, nsc);
 
         printf("N=%d ; WCT"
                 ": %.2f tot"

@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include <dirent.h>
+#include <errno.h>
 
 #include "parallelizing_info.h"
 #include "matmul_top.h"
@@ -107,7 +108,7 @@ int agree_on_flag(pi_wiring_ptr w, int v)
     return v;
 }
 
-void * gather_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
+void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
     struct sfiles_list sf[1];
 
@@ -120,7 +121,7 @@ void * gather_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
     flags[bw->dir] = THREAD_SHARED_VECTOR;
     flags[!bw->dir] = 0;
 
-    matmul_top_init(mmt, abase, pi, flags, MATRIX_INFO_FILE);
+    matmul_top_init(mmt, abase, pi, flags, pl, MATRIX_INFO_FILE);
 
     mmt_wiring_ptr mcol = mmt->wr[bw->dir];
     mmt_wiring_ptr mrow = mmt->wr[!bw->dir];
@@ -205,9 +206,15 @@ void * gather_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
                 printf("M^%u * V is zero !\n", i);
             }
             if (pi->m->jrank == 0 && pi->m->trank == 0) {
-                asprintf(&tmp, K_FILE_PATTERN, i-1);
+                int rc;
+                rc = asprintf(&tmp, K_FILE_PATTERN, i-1);
+                ASSERT_ALWAYS(rc != -1);
                 unlink(W_FILE);
-                link(tmp, W_FILE);
+                rc = link(tmp, W_FILE);
+                if (rc < 0) {
+                    fprintf(stderr, "Cannot hard link %s to %s: %s\n",
+                            W_FILE, tmp, strerror(errno));
+                }
                 free(tmp);
             }
             break;
@@ -247,15 +254,15 @@ int main(int argc, char * argv[])
     param_list_init(pl);
     bw_common_init_mpi(bw, pl, &argc, &argv);
     if (param_list_warn_unused(pl)) usage();
-    param_list_clear(pl);
 
     if (bw->nx == 0) { fprintf(stderr, "no nx value set\n"); exit(1); } 
 
     abobj_init(abase);
     abobj_set_nbys(abase, bw->n);
 
-    pi_go(gather_prog, bw->mpi_split[0], bw->mpi_split[1], bw->thr_split[0], bw->thr_split[1], 0);
+    pi_go(gather_prog, pl, 0);
 
+    param_list_clear(pl);
     bw_common_clear_mpi(bw);
     return 0;
 }

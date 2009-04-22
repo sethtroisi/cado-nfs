@@ -15,7 +15,7 @@
 
 abobj_t abase;
 
-void * sec_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
+void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
     /* OK. Now we merely have to build up a check vector. We've got a
      * fairly easy candidate for that: the x vector.
@@ -29,7 +29,7 @@ void * sec_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
     flags[!bw->dir] = THREAD_SHARED_VECTOR;
     flags[bw->dir] = 0;
 
-    matmul_top_init(mmt, abase, pi, flags, MATRIX_INFO_FILE);
+    matmul_top_init(mmt, abase, pi, flags, pl, MATRIX_INFO_FILE);
 
     // mmt_wiring_ptr mcol = mmt->wr[bw->dir];
     mmt_wiring_ptr mrow = mmt->wr[!bw->dir];
@@ -110,15 +110,15 @@ int main(int argc, char * argv[])
     param_list_init(pl);
     bw_common_init_mpi(bw, pl, &argc, &argv);
     if (param_list_warn_unused(pl)) usage();
-    param_list_clear(pl);
 
     if (bw->nx == 0) { fprintf(stderr, "no nx value set\n"); exit(1); } 
 
     abobj_init(abase);
     abobj_set_nbys(abase, NCHECKS_CHECK_VECTOR);
 
-    pi_go(sec_prog, bw->mpi_split[0], bw->mpi_split[1], bw->thr_split[0], bw->thr_split[1], 0);
+    pi_go(sec_prog, pl, 0);
 
+    param_list_clear(pl);
     bw_common_clear_mpi(bw);
     return 0;
 }

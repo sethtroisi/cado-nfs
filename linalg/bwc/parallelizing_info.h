@@ -2,6 +2,8 @@
 #define PARALLELIZING_INFO_H_
 
 #include <sys/time.h>   /* for struct timeval */
+
+#include "params.h"
 #include "select_mpi.h"
 
 #ifdef  HOMEMADE_BARRIERS
@@ -144,14 +146,13 @@ extern "C" {
  * inter-job and inter-thread conciliation toys (communicators, pthread
  * barriers, and so on), and eventually run the provided function.
  *
- * nhj, nvj denotes the number of jobs in each column, and in each row,
- * respectively.
+ * the param_list is checked for parameters mpi and thr, so as to define
+ * the mpi and thr splttings.
  *
  * nhc, nvc are the same for threads (cores).
  */
-extern void pi_go(void *(*fcn)(parallelizing_info_ptr, void * arg),
-        unsigned int nhj, unsigned int nvj,
-        unsigned int nhc, unsigned int nvc,
+extern void pi_go(void *(*fcn)(parallelizing_info_ptr, param_list pl, void * arg),
+        param_list pl,
         void * arg);
 
 extern void hello(parallelizing_info_ptr pi);

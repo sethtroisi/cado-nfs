@@ -99,14 +99,13 @@ struct slice_info {
 typedef vector<uint16_t> data_t;
 
 struct matmul_sliced_data_s {
-    /* repeat the fields from the public interface */
-    unsigned int nrows;
-    unsigned int ncols;
-    unsigned long ncoeffs;
+    /* repeat the fields from the public_ interface */
+    struct matmul_public_s public_[1];
     /* now our private fields */
     abobj_t xab;
     data_t data;
     vector<slice_info> dslices_info;
+    int iteration[2];
     void push(uint32_t x)
     {
         ASSERT_ALWAYS(x >> 16 == 0);
@@ -133,26 +132,24 @@ struct matmul_sliced_data_s {
     }
 };
 
-#define MM      ((struct matmul_sliced_data_s *) mm)
-
-void matmul_sliced_clear(matmul_ptr mm)
+void matmul_sliced_clear(struct matmul_sliced_data_s * mm)
 {
-    MM->dslices_info.clear();
-    MM->data.clear();
-    delete MM;
+    mm->dslices_info.clear();
+    mm->data.clear();
+    delete mm;
 }
 
-static matmul_ptr matmul_sliced_init()
+static struct matmul_sliced_data_s * matmul_sliced_init()
 {
-    return (struct matmul_public_s *) new matmul_sliced_data_s;
+    return new matmul_sliced_data_s;
 }
 
 
-matmul_ptr matmul_sliced_build(abobj_ptr xx MAYBE_UNUSED, const char * filename)
+struct matmul_sliced_data_s * matmul_sliced_build(abobj_ptr xx MAYBE_UNUSED, const char * filename, param_list pl)
 {
-    matmul_ptr mm = matmul_sliced_init();
+    struct matmul_sliced_data_s * mm = matmul_sliced_init();
 
-    abobj_init_set(MM->xab, xx);
+    abobj_init_set(mm->xab, xx);
 
     sparse_mat_t smat;
     FILE * f;
@@ -169,16 +166,20 @@ matmul_ptr matmul_sliced_build(abobj_ptr xx MAYBE_UNUSED, const char * filename)
     uint32_t i0 = 0;
     uint32_t i1 = smat->nrows;
 
-    MM->nrows = smat->nrows;
-    MM->ncols = smat->ncols;
-    MM->ncoeffs = 0;
+    mm->public_->dim[0] = smat->nrows;
+    mm->public_->dim[1] = smat->ncols;
+    mm->public_->ncoeffs = 0;
+    mm->iteration[0]=0;
+    mm->iteration[1]=0;
 
-    unsigned int npack = L1_CACHE_SIZE / abbytes(MM->xab,1);
+    unsigned int npack = L1_CACHE_SIZE;
+    if (pl) param_list_parse_uint(pl, "bwc_mm_l1_cache_size", &npack);
+    npack /= abbytes(mm->xab,1);
     unsigned int nslices = iceildiv(i1-i0, npack);
 
-    unsigned int nslices_index = MM->data.size();
-    MM->push(0);
-    MM->push(0);        // placeholder for alignment
+    unsigned int nslices_index = mm->data.size();
+    mm->push(0);
+    mm->push(0);        // placeholder for alignment
 
     unsigned int packbase = (i1-i0) / nslices;
     /* How many slices of size packbase+1 */
@@ -200,7 +201,7 @@ matmul_ptr matmul_sliced_build(abobj_ptr xx MAYBE_UNUSED, const char * filename)
         slice_info si;
         memset(&si,0,sizeof(si));
         si.nrows = npack;
-        si.data_offset = MM->data.size();
+        si.data_offset = mm->data.size();
 
         /*
            std::cout << "Packing " << npack << " rows from " << current
@@ -216,14 +217,14 @@ matmul_ptr matmul_sliced_build(abobj_ptr xx MAYBE_UNUSED, const char * filename)
             for(unsigned int j = 0 ; j < smat->data[0] ; j++) {
                 L.push_back(std::make_pair(smat->data[1+j],di));
             }
-            MM->ncoeffs += smat->data[0];
+            mm->public_->ncoeffs += smat->data[0];
         }
         /* L is the list of (column index, row index) of all
          * coefficients in the current horizontal slice */
         std::sort(L.begin(), L.end());
 
-        MM->push32(npack);
-        MM->push32(L.size());
+        mm->push32(npack);
+        mm->push32(L.size());
 
         uint32_t j = 0;
         uint32_t i = 0;
@@ -259,9 +260,9 @@ matmul_ptr matmul_sliced_build(abobj_ptr xx MAYBE_UNUSED, const char * filename)
              * sign, or something).
              */
 
-            MM->push(dj); MM->push(i);
+            mm->push(dj); mm->push(i);
         }
-        MM->data[nslices_index]++;
+        mm->data[nslices_index]++;
         double dj2_avg = sumdj2 / weight;
         double dj_avg = sumdj / weight;
         double dj_sdev = sqrt(dj2_avg-dj_avg*dj_avg);
@@ -282,7 +283,7 @@ matmul_ptr matmul_sliced_build(abobj_ptr xx MAYBE_UNUSED, const char * filename)
             // break;
         }
 #endif
-        MM->dslices_info.push_back(si);
+        mm->dslices_info.push_back(si);
     }
 
     /* There's an other option for the dense strips. For a given
@@ -326,7 +327,7 @@ matmul_ptr matmul_sliced_build(abobj_ptr xx MAYBE_UNUSED, const char * filename)
     return mm;
 }
 
-matmul_ptr matmul_sliced_reload_cache(abobj_ptr xx MAYBE_UNUSED, const char * filename)
+struct matmul_sliced_data_s * matmul_sliced_reload_cache(abobj_ptr xx MAYBE_UNUSED, const char * filename, param_list pl MAYBE_UNUSED)
 {
     char * base;
     FILE * f;
@@ -348,9 +349,12 @@ matmul_ptr matmul_sliced_reload_cache(abobj_ptr xx MAYBE_UNUSED, const char * fi
 
     size_t n;
     size_t rc;
-    matmul_ptr mm = matmul_sliced_init();
+    struct matmul_sliced_data_s * mm = matmul_sliced_init();
 
-    abobj_init_set(MM->xab, xx);
+    abobj_init_set(mm->xab, xx);
+
+    mm->iteration[0]=0;
+    mm->iteration[1]=0;
 
     uint32_t magic_check;
     rc = fread(&magic_check, sizeof(uint32_t), 1, f);
@@ -366,7 +370,7 @@ matmul_ptr matmul_sliced_reload_cache(abobj_ptr xx MAYBE_UNUSED, const char * fi
     FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
     
     /* It's not fatal. It only deserves a warning */
-    if (nbytes_check != abbytes(MM->xab, 1)) {
+    if (nbytes_check != abbytes(mm->xab, 1)) {
         fprintf(stderr, "Warning: cached matrix file fits data with different striding\n");
     }
 
@@ -374,19 +378,19 @@ matmul_ptr matmul_sliced_reload_cache(abobj_ptr xx MAYBE_UNUSED, const char * fi
         uint32_t v;
         rc = fread(&v, sizeof(uint32_t), 1, f);
         FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
-        MM->nrows = v;
+        mm->public_->dim[0] = v;
     }
     {
         uint32_t v;
         rc = fread(&v, sizeof(uint32_t), 1, f);
         FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
-        MM->ncols = v;
+        mm->public_->dim[1] = v;
     }
     {
         uint64_t v;
         rc = fread(&v, sizeof(uint64_t), 1, f);
         FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
-        MM->ncoeffs = v;
+        mm->public_->ncoeffs = v;
     }
     {
         uint32_t v;
@@ -395,18 +399,18 @@ matmul_ptr matmul_sliced_reload_cache(abobj_ptr xx MAYBE_UNUSED, const char * fi
         n = v;
     }
 
-    MM->data.resize(n);
-    rc = fread(&(MM->data.front()), sizeof(uint16_t), n, f);
+    mm->data.resize(n);
+    rc = fread(&(mm->data.front()), sizeof(uint16_t), n, f);
     FATAL_ERROR_CHECK(rc < n, "Short read from cached matrix file");
 
     fclose(f);
 
-    data_t::const_iterator q = MM->data.begin();
+    data_t::const_iterator q = mm->data.begin();
 
     return mm;
 }
 
-void matmul_sliced_save_cache(matmul_ptr mm, const char * filename)
+void matmul_sliced_save_cache(struct matmul_sliced_data_s * mm, const char * filename)
 {
     char * base;
     FILE * f;
@@ -424,29 +428,29 @@ void matmul_sliced_save_cache(matmul_ptr mm, const char * filename)
     }
     free(base);
 
-    size_t n = MM->data.size();
+    size_t n = mm->data.size();
     uint32_t magic = MM_MAGIC;
     size_t rc;
 
     rc = fwrite(&magic, sizeof(uint32_t), 1, f);
     FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
 
-    uint32_t nbytes = abbytes(MM->xab, 1);
+    uint32_t nbytes = abbytes(mm->xab, 1);
     rc = fwrite(&nbytes, sizeof(uint32_t), 1, f);
     FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
 
     {
-        uint32_t v = MM->nrows;
+        uint32_t v = mm->public_->dim[0];
         rc = fwrite(&v, sizeof(uint32_t), 1, f);
         FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
     }
     {
-        uint32_t v = MM->ncols;
+        uint32_t v = mm->public_->dim[1];
         rc = fwrite(&v, sizeof(uint32_t), 1, f);
         FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
     }
     {
-        uint64_t v = MM->ncoeffs;
+        uint64_t v = mm->public_->ncoeffs;
         rc = fwrite(&v, sizeof(uint64_t), 1, f);
         FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
     }
@@ -456,21 +460,21 @@ void matmul_sliced_save_cache(matmul_ptr mm, const char * filename)
         FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
     }
 
-    rc = fwrite(&(MM->data.front()), sizeof(uint16_t), n, f);
+    rc = fwrite(&(mm->data.front()), sizeof(uint16_t), n, f);
     FATAL_ERROR_CHECK(rc < n, "Short write to cached matrix file");
 
     fclose(f);
 }
 
-void matmul_sliced_mul(matmul_ptr mm, abt * dst, abt const * src, int d)
+void matmul_sliced_mul(struct matmul_sliced_data_s * mm, abt * dst, abt const * src, int d)
 {
     ASM_COMMENT("multiplication code");
-    const uint16_t * q = &(MM->data.front());
+    const uint16_t * q = &(mm->data.front());
 
     uint16_t nhstrips = *q++;
     q++;        // alignment.
     uint32_t i = 0;
-    abobj_ptr x = MM->xab;
+    abobj_ptr x = mm->xab;
 
     if (d == 1) {
 #ifdef  SLICE_STATS
@@ -501,7 +505,7 @@ void matmul_sliced_mul(matmul_ptr mm, abt * dst, abt const * src, int d)
             ASM_COMMENT("end of critical loop");
             i += nrows_packed;
 #ifdef  SLICE_STATS
-            if (!MM->dslices_info.empty()) {
+            if (!mm->dslices_info.empty()) {
                 double ntick = oncpu_ticks();
                 sit->spent_time += ntick - tick;
                 tick = ntick;
@@ -513,7 +517,11 @@ void matmul_sliced_mul(matmul_ptr mm, abt * dst, abt const * src, int d)
     } else {
         /* d == 0 */
         /* BEWARE, it's wildly sub-optimal ! */
-        abzero(x, dst, MM->ncols);
+        if (mm->iteration[d] == 10) {
+            fprintf(stderr, "Warning: Doing many iterations with bad code\n");
+        }
+
+        abzero(x, dst, mm->public_->dim[1]);
         for(uint16_t s = 0 ; s < nhstrips ; s++) {
             uint32_t j = 0;
             uint32_t nrows_packed = matmul_sliced_data_s::read32(q);
@@ -529,17 +537,18 @@ void matmul_sliced_mul(matmul_ptr mm, abt * dst, abt const * src, int d)
         }
     }
     ASM_COMMENT("end of multiplication code");
+    mm->iteration[d]++;
 }
 
-void matmul_sliced_report(matmul_ptr mm MAYBE_UNUSED) {
+void matmul_sliced_report(struct matmul_sliced_data_s * mm MAYBE_UNUSED) {
 #ifdef  SLICE_STATS
-    if (MM->dslices_info.empty())
+    if (mm->dslices_info.empty())
         return;
     std::ofstream o("dj.stats");
     o << "// Report of timing per slice\n";
     o << "// <snum> <nrows> <ncoeffs> <dj> <npasses> <spent> <M0>\n";
     for(unsigned int s = 0 ; s < dslices_info.size() ; s++) {
-        const slice_info& t(MM->dslices_info[s]);
+        const slice_info& t(mm->dslices_info[s]);
         o << s
             << " " << t.nrows
             << " " << t.ncoeffs
@@ -557,11 +566,11 @@ void matmul_sliced_report(matmul_ptr mm MAYBE_UNUSED) {
 #endif
 }
 
-void matmul_sliced_auxv(matmul_ptr mm MAYBE_UNUSED, int op MAYBE_UNUSED, va_list ap MAYBE_UNUSED)
+void matmul_sliced_auxv(struct matmul_sliced_data_s * mm MAYBE_UNUSED, int op MAYBE_UNUSED, va_list ap MAYBE_UNUSED)
 {
 }
 
-void matmul_sliced_aux(matmul_ptr mm, int op, ...)
+void matmul_sliced_aux(struct matmul_sliced_data_s * mm, int op, ...)
 {
     va_list ap;
     va_start(ap, op);

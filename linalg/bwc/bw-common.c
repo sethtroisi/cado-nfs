@@ -125,6 +125,21 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
     if (bw->verbose && bw->can_print)
         param_list_display (pl, stderr);
 
+    /* Force lookup of parameters that are used late in the process. This
+     * has the effect of eliminating possible warnings. */
+    param_list_lookup_string(pl, "bwc_mm_impl");
+
+    param_list_lookup_string(pl, "bwc_mm_l1_cache_size");
+    param_list_lookup_string(pl, "bwc_mm_cache_line_size");
+
+    param_list_lookup_string(pl, "bwc_mm_threaded_nthreads");
+    param_list_lookup_string(pl, "bwc_mm_threaded_sgroup_size");
+    param_list_lookup_string(pl, "bwc_mm_threaded_offset1");
+    param_list_lookup_string(pl, "bwc_mm_threaded_offset2");
+    param_list_lookup_string(pl, "bwc_mm_threaded_offset3");
+    param_list_lookup_string(pl, "bwc_mm_threaded_densify_tolerance");
+    param_list_lookup_string(pl, "bwc_mm_store_transposed");
+
     return 0;
 }
 

@@ -78,14 +78,15 @@ static void print_several(unsigned int n1, unsigned int n2, char a, char b, unsi
 }
 
 struct pi_go_helper_s {
-    void *(*fcn)(parallelizing_info_ptr, void*);
+    void *(*fcn)(parallelizing_info_ptr, param_list pl, void*);
     parallelizing_info_ptr p;
+    param_list_ptr pl;
     void * arg;
 };
 
 void * pi_go_helper_func(struct pi_go_helper_s * s)
 {
-    return (s->fcn)(s->p, s->arg);
+    return (s->fcn)(s->p, s->pl, s->arg);
 }
 
 typedef void * (*pthread_callee_t)(void*);
@@ -111,6 +112,11 @@ void pi_errhandler(MPI_Comm * comm, int * err, ...)
 }
 */
 
+/* TODO: There would be a fairly easy generalization to that, and quite
+ * handy. Modify the meaning of the ``siz'' argument to mean something
+ * which doesn't have to be equal on all threads. Instead, pick the
+ * maximum and use it for formatting.
+ */
 
 void grid_print(parallelizing_info_ptr pi, char * buf, size_t siz, int print)
 {
@@ -173,9 +179,8 @@ void grid_print(parallelizing_info_ptr pi, char * buf, size_t siz, int print)
     free(strings);
 }
 
-void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
-        unsigned int nhj, unsigned int nvj,
-        unsigned int nhc, unsigned int nvc,
+void pi_go_inner(void *(*fcn)(parallelizing_info_ptr, param_list pl, void *),
+        param_list pl,
         void * arg)
 {
     /* used in several places for doing snprintf */
@@ -184,6 +189,17 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
 
     parallelizing_info pi;
     memset(pi, 0, sizeof(pi));
+
+    int mpi[2] = { 1, 1, };
+    int thr[2] = { 1, 1, };
+
+    param_list_parse_intxint(pl, "mpi", mpi);
+    param_list_parse_intxint(pl, "thr", thr);
+
+    unsigned int nhj = mpi[0];
+    unsigned int nvj = mpi[1];
+    unsigned int nhc = thr[0];
+    unsigned int nvc = thr[1];
 
     pi->m->njobs = nhj * nvj;
     pi->m->ncores = nhc * nvc;
@@ -386,6 +402,7 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
 
     for(unsigned int k = 0 ; k < nhc * nvc ; k++) {
         helper_grid[k].fcn = fcn;
+        helper_grid[k].pl = pl;
         helper_grid[k].arg = arg;
         helper_grid[k].p = (parallelizing_info_ptr) grid + k;
 #if 0
@@ -460,9 +477,26 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, void *),
     // MPI_Errhandler_free(&my_eh);
 }
 
+void pi_go(void *(*fcn)(parallelizing_info_ptr, param_list pl, void *),
+        param_list pl,
+        void * arg)
+{
+    pi_go_inner(fcn, pl, arg);
+}
+
+
 void pi_log_init(pi_wiring_ptr wr)
 {
-    wr->log_book = malloc(sizeof(struct pi_log_book));
+    struct pi_log_book * lb = malloc(sizeof(struct pi_log_book));
+    memset(lb, 0, sizeof(struct pi_log_book));
+    wr->log_book = lb;
+
+    char commname[MPI_MAX_OBJECT_NAME];
+    int namelen = sizeof(commname);
+    MPI_Comm_get_name(wr->pals, commname, &namelen);
+    if (wr->jrank == 0 && wr->trank == 0) {
+        printf("Enabled logging for %s\n", commname);
+    }
 }
 
 void pi_log_clear(pi_wiring_ptr wr)
@@ -481,6 +515,8 @@ void pi_log_op(pi_wiring_ptr wr, const char * fmt, ...)
 
     va_start(ap, fmt);
 
+    ASSERT_ALWAYS(lb->next < PI_LOG_BOOK_ENTRIES);
+
     struct pi_log_entry * e = &(lb->t[lb->next]);
 
     gettimeofday(e->tv, NULL);
@@ -498,6 +534,8 @@ static void pi_log_print_backend(pi_wiring_ptr wr, const char * myname, char ** 
     struct pi_log_book * lb = wr->log_book;
     if (!lb) return;
 
+    ASSERT_ALWAYS(lb->next < PI_LOG_BOOK_ENTRIES);
+
     int h = lb->hsize;
     if (h >= PI_LOG_BOOK_ENTRIES) {
         h = PI_LOG_BOOK_ENTRIES;
@@ -509,16 +547,19 @@ static void pi_log_print_backend(pi_wiring_ptr wr, const char * myname, char ** 
     int namelen = sizeof(commname);
     MPI_Comm_get_name(wr->pals, commname, &namelen);
 
+    int rc;
+
     for(int i = i0 ; h-- ; ) {
         struct pi_log_entry * e = &(lb->t[i]);
 
         ASSERT_ALWAYS(*n < alloc);
-        asprintf(&(strings[*n]), "%"PRIu64".%06u (%s) %s %s", 
+        rc = asprintf(&(strings[*n]), "%"PRIu64".%06u (%s) %s %s", 
                 (uint64_t) e->tv->tv_sec,
                 (unsigned int) e->tv->tv_usec,
                 myname,
                 e->what,
                 commname);
+        ASSERT_ALWAYS(rc != -1);
         ++*n;
 
         i++;
@@ -556,7 +597,9 @@ void pi_log_print_all(parallelizing_info_ptr pi)
     char ** strings = malloc(alloc * sizeof(char*));
     int n = 0;
     char * myname;
-    asprintf(&myname, "%s%s", pi->wr[0]->th->desc, pi->wr[1]->th->desc);
+    int rc;
+    rc = asprintf(&myname, "%s%s", pi->wr[0]->th->desc, pi->wr[1]->th->desc);
+    ASSERT_ALWAYS(rc != -1);
 
     pi_log_print_backend(pi->m, myname, strings, &n, alloc);
     pi_log_print_backend(pi->wr[0], myname, strings, &n, alloc);
@@ -782,11 +825,15 @@ static int get_counts_and_displacements(pi_wiring_ptr w, int my_size,
      *
      * We're serialization-happy here, since anyway I/O s occur rarely
      */
-    int * allcounts;
+    /* The _void thingy makes gcc happy, and I'm not too comfortable
+     * about deciding whether those pesky aliasing warnings are false
+     * positives or not. Better shut them up for good. */
+    void * allcounts_void;
     if (w->trank == 0) {
-        allcounts = (int*) malloc(w->njobs*w->ncores*sizeof(int));
+        allcounts_void = malloc(w->njobs*w->ncores*sizeof(int));
     }
-    thread_agreement(w, (void**) &allcounts, 0);
+    thread_agreement(w, &allcounts_void, 0);
+    int * allcounts = (int *) allcounts_void;
     for(unsigned int k = 0 ; k < w->njobs ; k++) {
         allcounts[k * w->ncores + w->trank] = counts[k];
     }
@@ -832,11 +879,12 @@ int get_counts_and_displacements_2d(parallelizing_info_ptr pi, int d,
      *
      * We're serialization-happy here, since anyway I/O s occur rarely
      */
-    int * allcounts;
+    void * allcounts_void;
     if (w->trank == 0) {
-        allcounts = (int*) malloc(w->njobs*w->ncores*sizeof(int));
+        allcounts_void = malloc(w->njobs*w->ncores*sizeof(int));
     }
-    thread_agreement(w, (void**) &allcounts, 0);
+    thread_agreement(w, &allcounts_void, 0);
+    int * allcounts = (int *) allcounts_void;
 
     // Given an orientation value d, the numbering for the thread (it,jt)
     // on job (ij,jj) is:

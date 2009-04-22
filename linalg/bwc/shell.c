@@ -18,7 +18,7 @@
 int command_argc;
 char ** command_argv;
 
-void * shell_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
+void * shell_prog(parallelizing_info_ptr pi, param_list pl MAYBE_UNUSED, void * arg MAYBE_UNUSED)
 {
     char ** argv = malloc((command_argc + 5) * sizeof(char *));
     int i;
@@ -27,16 +27,21 @@ void * shell_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
         argv[i] = command_argv[i];
         len += 1 + strlen(argv[i]);
     }
-    asprintf(&(argv[i]), "%d", pi->wr[0]->jrank);
+    int rc;
+    rc = asprintf(&(argv[i]), "%d", pi->wr[0]->jrank);
+    ASSERT_ALWAYS(rc != -1);
     len += 1 + strlen(argv[i]);
     i++;
-    asprintf(&(argv[i]), "%d", pi->wr[1]->jrank);
+    rc = asprintf(&(argv[i]), "%d", pi->wr[1]->jrank);
+    ASSERT_ALWAYS(rc != -1);
     len += 1 + strlen(argv[i]);
     i++;
-    asprintf(&(argv[i]), "%d", pi->wr[0]->trank);
+    rc = asprintf(&(argv[i]), "%d", pi->wr[0]->trank);
+    ASSERT_ALWAYS(rc != -1);
     len += 1 + strlen(argv[i]);
     i++;
-    asprintf(&(argv[i]), "%d", pi->wr[1]->trank);
+    rc = asprintf(&(argv[i]), "%d", pi->wr[1]->trank);
+    ASSERT_ALWAYS(rc != -1);
     len += 1 + strlen(argv[i]);
     i++;
     argv[i++]=NULL;
@@ -90,13 +95,13 @@ int main(int argc, char * argv[])
     param_list_add_key(pl, "mn", "0", PARAMETER_FROM_FILE);
     bw_common_init_mpi(bw, pl, &argc, &argv);
     // if (param_list_warn_unused(pl)) usage();
-    param_list_clear(pl);
 
     command_argc = argc;
     command_argv = argv;
 
-    pi_go(shell_prog, bw->mpi_split[0], bw->mpi_split[1], bw->thr_split[0], bw->thr_split[1], 0);
+    pi_go(shell_prog, pl, 0);
 
+    param_list_clear(pl);
     bw_common_clear_mpi(bw);
     return 0;
 }

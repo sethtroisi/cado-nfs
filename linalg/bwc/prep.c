@@ -27,7 +27,7 @@
 
 abobj_t abase;
 
-void * prep_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
+void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
     // Doing the ``hello world'' test is a very good way of testing the
     // global mpi/pthreads setup. So despite its apparent irrelevance, I
@@ -45,7 +45,7 @@ void * prep_prog(parallelizing_info_ptr pi, void * arg MAYBE_UNUSED)
     flags[bw->dir] = THREAD_SHARED_VECTOR;
     flags[!bw->dir] = 0;
 
-    matmul_top_init(mmt, abase, pi, flags, MATRIX_INFO_FILE);
+    matmul_top_init(mmt, abase, pi, flags, pl, MATRIX_INFO_FILE);
 
     mmt_wiring_ptr mcol = mmt->wr[bw->dir];
     mmt_wiring_ptr mrow = mmt->wr[!bw->dir];
@@ -181,7 +181,7 @@ int main(int argc, char * argv[])
     abobj_init(abase);
     abobj_set_nbys(abase, bw->n);
 
-    pi_go(prep_prog, bw->mpi_split[0], bw->mpi_split[1], bw->thr_split[0], bw->thr_split[1], 0);
+    pi_go(prep_prog, pl, 0);
 
     // we save the parameter list once again, because the prep program
     // generates some useful info, bw->nx in particular.

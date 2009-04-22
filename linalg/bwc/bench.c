@@ -20,35 +20,6 @@
 #include "params.h"
 #include "debug.h"
 
-/* Include all matmul implementations here */
-#include "matmul-basic.h"
-#include "matmul-sliced.h"
-#include "matmul-threaded.h"
-
-struct matmul_bindings_s {
-    matmul_ptr (*build)(abobj_ptr, const char * filename);
-    matmul_ptr (*reload_cache)(abobj_ptr, const char * filename);
-    void (*save_cache)(matmul_ptr, const char * filename);
-    void (*mul)(matmul_ptr, abt *, abt const *, int);
-    void (*report)(matmul_ptr);
-    void (*clear)(matmul_ptr mm);
-    void (*aux)(matmul_ptr mm, int op, ...);
-};
-
-struct matmul_bindings_s bind[1];
-
-
-#define REBIND_F(kind,func) bind->func = & MATMUL_NAME(kind, func)
-#define REBIND_ALL(kind) do {						\
-        REBIND_F(kind, build);						\
-        REBIND_F(kind, reload_cache);					\
-        REBIND_F(kind, save_cache);					\
-        REBIND_F(kind, mul);						\
-        REBIND_F(kind, report);						\
-        REBIND_F(kind, clear);						\
-        REBIND_F(kind, aux);						\
-    } while (0)
-
 void usage()
 {
     fprintf(stderr,
@@ -118,48 +89,39 @@ int main(int argc, char * argv[])
         usage();
     }
 
-#define CHECK_REBIND(K) \
-    if (strcmp(impl, #K) == 0) { REBIND_ALL(K); } else
-
-    CHECK_REBIND(sliced)        // no semicolon !
-    CHECK_REBIND(threaded)        // no semicolon !
-    CHECK_REBIND(basic)
-    { fprintf(stderr, "no implementation %s known\n", impl); exit(1); }
-
     fprintf(stderr, "Using implementation \"%s\"\n", impl);
 
     clock_t t0 = clock();
 
-    mm = (*bind->reload_cache)(xx, file);
+    mm = matmul_reload_cache(xx, file, impl, pl);
     if (mm) {
         fprintf(stderr, "Reusing cache file for %s\n", file);
         fprintf(stderr, "Cache load time %.2fs\n",
                 (double) (clock()-t0) / CLOCKS_PER_SEC);
     } else {
         fprintf(stderr, "Building cache file for %s\n", file);
-        mm = (*bind->build)(xx, file);
-        (*bind->save_cache)(mm, file);
+        mm = matmul_build(xx, file, impl, pl);
+        matmul_save_cache(mm, file);
         fprintf(stderr, "Cache build time %.2fs\n",
                 (double) (clock()-t0) / CLOCKS_PER_SEC);
     }
 
     fprintf(stderr, "%s: %u rows %u cols %lu coeffs\n",
-            file, mm->nrows, mm->ncols, mm->ncoeffs);
+            file, mm->dim[0], mm->dim[1], mm->ncoeffs);
 
-    unsigned int nc;
-    nc = mm->ncols;
-    (*bind->aux)(mm, MATMUL_AUX_GET_READAHEAD, &nc);
+    unsigned int nc = mm->dim[1];
+    matmul_aux(mm, MATMUL_AUX_GET_READAHEAD, &nc);
     abt * src = abinit(xx, nc);
     abzero(xx, src, nc);
 
-    unsigned int nr = mm->nrows;
-    (*bind->aux)(mm, MATMUL_AUX_GET_READAHEAD, &nr);
+    unsigned int nr = mm->dim[0];
+    matmul_aux(mm, MATMUL_AUX_GET_READAHEAD, &nr);
     abt * dst = abinit(xx, nr);
     abzero(xx, dst, nr);
 
     setup_seeding(1);
 
-    abrandom(xx, src, mm->ncols);
+    abrandom(xx, src, mm->dim[1]);
 
     if (!nocheck) {
         abt * src2 = abinit(xx, nc);
@@ -171,18 +133,18 @@ int main(int argc, char * argv[])
         abt * checkB = abinit(xx, abnbits(xx));
 
         for(int t = 0; t < nchecks ; t++) {
-            abrandom(xx, src, mm->ncols);
-            abrandom(xx, dst, mm->nrows);
-            abcopy(xx, src2, src, mm->ncols);
-            abcopy(xx, dst2, dst, mm->nrows);
-            (*bind->mul)(mm, dst, src, 1);
-            debug_write(dst, abbytes(xx, mm->nrows), "/tmp/Lmul.%d", t);
+            abrandom(xx, src, mm->dim[1]);
+            abrandom(xx, dst, mm->dim[0]);
+            abcopy(xx, src2, src, mm->dim[1]);
+            abcopy(xx, dst2, dst, mm->dim[0]);
+            matmul_mul(mm, dst, src, 1);
+            debug_write(dst, abbytes(xx, mm->dim[0]), "/tmp/Lmul.%d", t);
 
-            abdotprod(xx, checkA, dst, dst2, mm->nrows);
-            (*bind->mul)(mm, src2, dst2, 0);
-            debug_write(src2, abbytes(xx, mm->ncols), "/tmp/Rmul.%d", t);
+            abdotprod(xx, checkA, dst, dst2, mm->dim[0]);
+            matmul_mul(mm, src2, dst2, 0);
+            debug_write(src2, abbytes(xx, mm->dim[1]), "/tmp/Rmul.%d", t);
 
-            abdotprod(xx, checkB, src, src2, mm->ncols);
+            abdotprod(xx, checkB, src, src2, mm->dim[1]);
 
             if (memcmp(checkA, checkB, aboffset(xx, abnbits(xx)) * sizeof(abt)) != 0) {
                 fprintf(stderr, "Check %d failed\n", t);
@@ -202,7 +164,7 @@ int main(int argc, char * argv[])
     double next = 0.25 * CLOCKS_PER_SEC;
     if (next > tmax * CLOCKS_PER_SEC) { next = tmax * CLOCKS_PER_SEC; }
     for(unsigned int n = 0 ; n < nmax ; n++ ) {
-        (*bind->mul)(mm, transpose ? src : dst, transpose ? dst : src, !transpose);
+        matmul_mul(mm, transpose ? src : dst, transpose ? dst : src, !transpose);
         double dt = clock() - t0;
         if (dt > next) {
             do { next += 0.25 * CLOCKS_PER_SEC; } while (dt > next);
@@ -217,7 +179,7 @@ int main(int argc, char * argv[])
     }
     printf("\n");
 
-    (*bind->clear)(mm);
+    matmul_clear(mm);
 
     param_list_clear(pl);
 

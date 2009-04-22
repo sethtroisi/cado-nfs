@@ -8,12 +8,43 @@
  * are meant to be used as interchangeable .o files.
  */
 #include "abase.h"
+#include "params.h"
+
+struct matmul_public_s;
+
+typedef struct matmul_public_s  * matmul_t;
+typedef struct matmul_public_s  * matmul_ptr;
+
+typedef matmul_ptr (*matmul_build_t)(abobj_ptr, const char * filename, param_list pl);
+typedef matmul_ptr (*matmul_reload_cache_t)(abobj_ptr, const char * filename, param_list pl);
+typedef void (*matmul_save_cache_t)(matmul_ptr, const char * filename);
+typedef void (*matmul_mul_t)(matmul_ptr, abt *, abt const *, int);
+typedef void (*matmul_report_t)(matmul_ptr);
+typedef void (*matmul_clear_t)(matmul_ptr mm);
+typedef void (*matmul_auxv_t)(matmul_ptr mm, int op, ...);
+typedef void (*matmul_aux_t)(matmul_ptr mm, int op, va_list ap);
+
+struct matmul_bindings_s {
+	matmul_build_t		build;
+	matmul_reload_cache_t	reload_cache;
+	matmul_save_cache_t	save_cache;
+	matmul_mul_t		mul;
+	matmul_report_t		report;
+	matmul_clear_t		clear;
+	matmul_auxv_t		auxv;
+	matmul_aux_t		aux;
+};
 
 struct matmul_public_s {
     /* The fields here must be exposed by all implementations */
-    unsigned int nrows;
-    unsigned int ncols;
+    unsigned int dim[2];        /* dim[0] is nrows, dim[1] is ncols. The
+                                   organization of the matrix in memory
+                                   also obeys the ``transposed'' flag */
     unsigned long ncoeffs;
+
+    /* Now the virtual method table */
+    struct matmul_bindings_s bind[1];
+
     /* The rest of the implementation-dependent storage comes right after
      * that, in memory. Therefore, only the pointer may be manipulated
      * freely. The datasize field merely indicates the __on-disk__ data
@@ -22,8 +53,6 @@ struct matmul_public_s {
      */
 };
 
-typedef struct matmul_public_s  * matmul_t;
-typedef struct matmul_public_s  * matmul_ptr;
 
 #ifdef __cplusplus
 extern "C" {
@@ -31,8 +60,8 @@ extern "C" {
 
 /* These two functions are the means of initializing the mm layer. No
  * bare _init() function is publicly accessible */
-extern matmul_ptr matmul_build(abobj_ptr, const char * filename);
-extern matmul_ptr matmul_reload_cache(abobj_ptr, const char * filename);
+extern matmul_ptr matmul_build(abobj_ptr, const char * filename, const char * impl, param_list pl);
+extern matmul_ptr matmul_reload_cache(abobj_ptr, const char * filename, const char * impl, param_list pl);
 
 /* Exit point */
 extern void matmul_clear(matmul_ptr mm);
@@ -69,15 +98,5 @@ extern void matmul_report(matmul_ptr);
 #ifdef __cplusplus
 }
 #endif
-
-/* Now some cpp glue which sets up the different options */
-#define MATMUL_NAME(kind,func) matmul_ ## kind ## _ ## func
-#define MATMUL_NAME_(kind,func) MATMUL_NAME(kind,func)
-#define MATMUL(func) MATMUL_NAME_(MATMUL_PREFERRED,func)
-
-#define MATMUL_PREFERRED threaded
-#include "matmul-threaded.h"
-
-// #include "matmul-basic.h"
 
 #endif	/* MATMUL_H_ */

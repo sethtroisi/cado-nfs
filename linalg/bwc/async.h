@@ -29,7 +29,7 @@ void timing_init(struct timing_data * t, int iter);
 void timing_clear(struct timing_data * t);
 void timing_check(parallelizing_info pi, struct timing_data * t, int iter, int print);
 void timing_update_ticks(struct timing_data * t, int iter);
-void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * timing, int iter, int print);
+void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * timing, int iter, unsigned long ncoeffs, int print);
 void block_control_signals();
 void catch_control_signals();
 

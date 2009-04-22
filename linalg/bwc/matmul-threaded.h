@@ -7,14 +7,16 @@
 extern "C" {
 #endif
 
-extern matmul_ptr matmul_threaded_build(abobj_ptr, const char * filename);
-extern matmul_ptr matmul_threaded_reload_cache(abobj_ptr, const char * filename);
-extern void matmul_threaded_save_cache(matmul_ptr, const char * filename);
-extern void matmul_threaded_mul(matmul_ptr, abt *, abt const *, int);
-extern void matmul_threaded_report(matmul_ptr);
-extern void matmul_threaded_clear(matmul_ptr mm);
-extern void matmul_threaded_aux(matmul_ptr mm, int op, ...);
-extern void matmul_threaded_auxv(matmul_ptr mm, int op, va_list ap);
+struct matmul_threaded_data_s;
+
+extern struct matmul_threaded_data_s * matmul_threaded_build(abobj_ptr, const char * filename, param_list pl);
+extern struct matmul_threaded_data_s * matmul_threaded_reload_cache(abobj_ptr, const char * filename, param_list pl);
+extern void matmul_threaded_save_cache(struct matmul_threaded_data_s *, const char * filename);
+extern void matmul_threaded_mul(struct matmul_threaded_data_s *, abt *, abt const *, int);
+extern void matmul_threaded_report(struct matmul_threaded_data_s *);
+extern void matmul_threaded_clear(struct matmul_threaded_data_s * mm);
+extern void matmul_threaded_aux(struct matmul_threaded_data_s * mm, int op, ...);
+extern void matmul_threaded_auxv(struct matmul_threaded_data_s * mm, int op, va_list ap);
 
 #ifdef __cplusplus
 }
