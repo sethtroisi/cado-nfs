@@ -9,8 +9,8 @@ extern "C" {
 
 struct matmul_sliced_data_s;
 
-extern struct matmul_sliced_data_s * matmul_sliced_build(abobj_ptr, const char * filename, param_list pl);
-extern struct matmul_sliced_data_s * matmul_sliced_reload_cache(abobj_ptr, const char * filename, param_list pl);
+extern struct matmul_sliced_data_s * matmul_sliced_build(abobj_ptr, const char * filename, param_list pl, int);
+extern struct matmul_sliced_data_s * matmul_sliced_reload_cache(abobj_ptr, const char * filename, param_list pl, int);
 extern void matmul_sliced_save_cache(struct matmul_sliced_data_s *, const char * filename);
 extern void matmul_sliced_mul(struct matmul_sliced_data_s *, abt *, abt const *, int);
 extern void matmul_sliced_report(struct matmul_sliced_data_s *);

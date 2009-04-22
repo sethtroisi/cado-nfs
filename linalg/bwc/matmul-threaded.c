@@ -9,35 +9,32 @@
 
 #include "matmul.h"
 #include "matmul-threaded.h"
+#include "matmul-common.h"
 #include "abase.h"
-
-#include "readmat-easy.h"
 
 /* This extension is used to distinguish between several possible
  * implementations of the product */
 #define MM_EXTENSION   "-threaded"
 #define MM_MAGIC_FAMILY        0xa002UL
-#define MM_MAGIC_VERSION       0x1004UL
+#define MM_MAGIC_VERSION       0x1005UL
 #define MM_MAGIC (MM_MAGIC_FAMILY << 16 | MM_MAGIC_VERSION)
 
-#ifdef  __GNUC__
-#define ASM_COMMENT(x)  __asm__("#\t" x "\n")
-#else
-#define ASM_COMMENT(x)  /**/
-#endif
-
-/* A fair part of these should become tunable */
-#define MM_DENSIFY_TOLERANCE    0.5    /* Set to zero to skip dense blocks */
+/* These are just reference values. Everything except MM_DGRP_SIZE is
+ * tunable (but for some of them, it forces to rebuild the cache file:
+ * DENSIFY_TOLERANCE SGRP_SIZE BLOCKSIZE) */
+#define MM_DENSIFY_TOLERANCE    0.25     /* Set to zero to skip dense blocks */
 #define MM_DGRP_SIZE            32
 #define MM_NTHREADS             4
 #define MM_SGRP_SIZE            64
-#define MM_DO_TRANSPOSE         1
+#define MM_STORE_TRANSPOSED     1
 #define MM_PREFETCH_OFFSET_1    32
 #define MM_PREFETCH_OFFSET_2    16
 #define MM_PREFETCH_OFFSET_3    16
 #define MM_BLOCKSIZE            8
 #define MM_CACHE_LINE_SIZE      64
 
+/* see matmul-basic.c */
+#define MM_DIR0_PREFERS_TRANSP_MULT   1
 
 struct thread_info {
     int i;
@@ -72,7 +69,7 @@ struct matmul_threaded_data_s {
     unsigned int sgrp_size;
     unsigned int nthreads;
     unsigned int blocksize;
-    unsigned int transposed;
+    unsigned int store_transposed;
     unsigned int off1;
     unsigned int off2;
     unsigned int off3;
@@ -197,26 +194,20 @@ void matmul_threaded_clear(struct matmul_threaded_data_s * mm)
     free(mm);
 }
 
-static struct matmul_threaded_data_s * matmul_threaded_init(abobj_ptr xx MAYBE_UNUSED, param_list pl)
+static struct matmul_threaded_data_s * matmul_threaded_init(abobj_ptr xx MAYBE_UNUSED, param_list pl, int optimized_direction)
 {
-    struct matmul_threaded_data_s * mm = malloc(sizeof(struct matmul_threaded_data_s));
+    struct matmul_threaded_data_s * mm;
+    mm = malloc(sizeof(struct matmul_threaded_data_s));
     memset(mm, 0, sizeof(struct matmul_threaded_data_s));
-
     abobj_init_set(mm->xab, xx);
 
+    int suggest = optimized_direction ^ MM_DIR0_PREFERS_TRANSP_MULT;
+    matmul_common_init_post(mm->public_, pl, suggest);
+
     mm->nthreads = MM_NTHREADS;
-
     mm->densify_tolerance = MM_DENSIFY_TOLERANCE;
-
-    /* Transposing here is just an optimisation concern. The code does
-     * not compute anything different depending on this value. But it
-     * performs differently */
-    mm->transposed = MM_DO_TRANSPOSE;
-
     mm->sgrp_size = MM_SGRP_SIZE;
-
     mm->blocksize = MM_CACHE_LINE_SIZE;
-
     mm->off1 = MM_PREFETCH_OFFSET_1;
     mm->off2 = MM_PREFETCH_OFFSET_2;
     mm->off3 = MM_PREFETCH_OFFSET_3;
@@ -229,21 +220,11 @@ static struct matmul_threaded_data_s * matmul_threaded_init(abobj_ptr xx MAYBE_U
         param_list_parse_uint(pl, "bwc_mm_threaded_offset1", &mm->off1);
         param_list_parse_uint(pl, "bwc_mm_threaded_offset2", &mm->off2);
         param_list_parse_uint(pl, "bwc_mm_threaded_offset3", &mm->off3);
-        param_list_parse_uint(pl, "bwc_mm_store_transposed", &mm->transposed);
     }
 
     mm->blocksize /= abbytes(mm->xab, 1);
     
     return mm;
-}
-
-typedef int (*sortfunc_t) (const void *, const void *);
-
-static int uint_cmp(unsigned int * a, unsigned int * b)
-{
-    if (*a < *b) return -1;
-    else if (*b < *a) return 1;
-    return 0;
 }
 
 void matmul_threaded_blocks_info(struct matmul_threaded_data_s * mm)
@@ -258,11 +239,15 @@ void matmul_threaded_blocks_info(struct matmul_threaded_data_s * mm)
             (100.0 * padding / sparse_coeffs));
 }
 
-struct matmul_threaded_data_s * matmul_threaded_build(abobj_ptr xx MAYBE_UNUSED, const char * filename, param_list pl)
+struct matmul_threaded_data_s * matmul_threaded_build(abobj_ptr xx, const char * filename, param_list pl, int optimized_direction)
 {
-    struct matmul_threaded_data_s * mm = matmul_threaded_init(xx, pl);
+    struct matmul_threaded_data_s * mm;
+    mm = matmul_threaded_init(xx, pl, optimized_direction);
 
-    /* All fields are initially set to zero */
+    uint32_t * data = matmul_common_read_stupid_data(mm->public_, filename);
+
+    unsigned int nrows_t = mm->public_->dim[ mm->public_->store_transposed];
+    unsigned int ncols_t = mm->public_->dim[!mm->public_->store_transposed];
 
     /* We give some notations and example values.  */
 
@@ -271,21 +256,6 @@ struct matmul_threaded_data_s * matmul_threaded_build(abobj_ptr xx MAYBE_UNUSED,
     // unsigned int b = mm->blocksize;     /* e.g. 16 */
     ASSERT_ALWAYS(g % (mm->nthreads*mm->blocksize) == 0);
     size_t sparse_readahead = mm->nthreads * MAX(mm->off1, mm->off2) * mm->blocksize;
-
-    /* Okay, this matrix reading stage is really a memory hog. But it's
-     * done only once, and we can even consider doing it only once, so we
-     * practically don't care. */
-    /* dims of the transposed matrix */
-    unsigned int nrows_t;
-    unsigned int ncols_t;
-    uint32_t * data;
-    if (mm->transposed) {
-        data = read_easy_transposed(filename, &nrows_t, &ncols_t);
-    } else {
-        data = read_easy(filename, &nrows_t, &ncols_t);
-    }
-    mm->public_->dim[ mm->transposed] = nrows_t;
-    mm->public_->dim[!mm->transposed] = ncols_t;
 
     /* count dense and sparse blocks. Since one entry in the sparse part
      * occupies a 32-bit location, we consider that it's preferrable to
@@ -297,10 +267,7 @@ struct matmul_threaded_data_s * matmul_threaded_build(abobj_ptr xx MAYBE_UNUSED,
      * storage, say up to a factor of 2. That's called
      * mm->densify_tolerance
      */
-
     uint32_t * ptr = data;
-
-
     unsigned int i = 0;
     /* Count dense blocks */
     for( ; i < nrows_t ; mm->dense->n++) {
@@ -314,10 +281,10 @@ struct matmul_threaded_data_s * matmul_threaded_build(abobj_ptr xx MAYBE_UNUSED,
         int dense = weight * mm->densify_tolerance >= ncols_t;
         const char * rc[2] = { "row","col", };
         printf("%ss %u..%u ; total %u coeffs = n%ss(%u) * %.2f ;%s dense\n",
-                rc[mm->transposed],
+                rc[mm->public_->store_transposed],
                 i, i+di-1, weight,
-                rc[!mm->transposed],
-                mm->public_->dim[!mm->transposed],
+                rc[!mm->public_->store_transposed],
+                mm->public_->dim[!mm->public_->store_transposed],
                 (double) weight / ncols_t,
                 dense ? "" : " not");
         if (!dense)
@@ -388,7 +355,6 @@ struct matmul_threaded_data_s * matmul_threaded_build(abobj_ptr xx MAYBE_UNUSED,
             
             if (i + di < nrows_t) {
                 rlen = *ptr++;
-                qsort(ptr, rlen, sizeof(uint32_t), (sortfunc_t) uint_cmp);
             } else {
                 rlen = 0;
             }
@@ -414,85 +380,45 @@ struct matmul_threaded_data_s * matmul_threaded_build(abobj_ptr xx MAYBE_UNUSED,
     return mm;
 }
 
-struct matmul_threaded_data_s * matmul_threaded_reload_cache(abobj_ptr xx MAYBE_UNUSED, const char * filename, param_list pl)
+struct matmul_threaded_data_s * matmul_threaded_reload_cache(abobj_ptr xx, const char * filename, param_list pl, int optimized_direction)
 {
-    char * base;
+    struct matmul_threaded_data_s * mm;
     FILE * f;
 
-    {
-        int rc = asprintf(&base, "%s" MM_EXTENSION ".bin", filename);
-        FATAL_ERROR_CHECK(rc < 0, "out of memory");
-    }
+    mm = matmul_threaded_init(xx, pl, optimized_direction);
+    f = matmul_common_reload_cache_fopen(abbytes(xx, 1), mm->public_, filename, MM_EXTENSION, MM_MAGIC);
+    if (f == NULL) { free(mm); return NULL; }
 
-    f = fopen(base, "r");
+    MATMUL_COMMON_READ_ONE32(mm->dense->weight, f);
+    MATMUL_COMMON_READ_ONE32(mm->sgrp_size, f);
+    MATMUL_COMMON_READ_ONE32(mm->dense->n, f);
+    MATMUL_COMMON_READ_ONE32(mm->sparse->n, f);
+    MATMUL_COMMON_READ_ONE32(mm->sparse->tlen, f);
 
-    if (f == NULL) {
-        // fprintf(stderr, "fopen(%s): %s\n", base, strerror(errno));
-        fprintf(stderr, "no cache file %s\n", base);
-        free(base);
-        return NULL;
-    }
-    free(base);
-
-    size_t rc;
-    struct matmul_threaded_data_s * mm = matmul_threaded_init(xx, pl);
-
-    unsigned long magic_check;
-    rc = fread(&magic_check, sizeof(unsigned long), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
-    FATAL_ERROR_CHECK(magic_check != MM_MAGIC,
-            "Wrong magic in cached matrix file");
-    rc = fread(mm->public_->dim, sizeof(unsigned int), 2, f);
-    FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
-    rc = fread(&mm->public_->ncoeffs, sizeof(unsigned long), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
-    rc = fread(&mm->dense->weight, sizeof(unsigned long), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
-    rc = fread(&mm->sgrp_size, sizeof(unsigned int), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
-    rc = fread(&mm->transposed, sizeof(unsigned int), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
-    rc = fread(&mm->dense->n, sizeof(uint32_t), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
-    rc = fread(&mm->sparse->n, sizeof(uint32_t), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
-    rc = fread(&mm->sparse->tlen, sizeof(uint32_t), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
-
-    // unsigned int nrows_t = mm->public_->dim[ mm->transposed];
-    unsigned int ncols_t = mm->public_->dim[!mm->transposed];
+    unsigned int ncols_t = mm->public_->dim[!mm->public_->store_transposed];
     size_t dblock_stride = next_multiple_of_powerof2(ncols_t, mm->blocksize);
 
     /* sparse_readahead depends on data which is initialized by us, not
      * recovered from the data file */
-    size_t sparse_readahead = mm->nthreads * MAX(mm->off1, mm->off2) * mm->blocksize;
-
-    /* Now read the interesting blocks */
+    size_t sparse_readahead;
+    sparse_readahead = mm->nthreads * MAX(mm->off1, mm->off2) * mm->blocksize;
     mm->dense->q = malloc(mm->dense->n * dblock_stride * sizeof(uint32_t));
     memset(mm->dense->q, 0, mm->dense->n * dblock_stride * sizeof(uint32_t));
     mm->sparse->q = malloc((mm->sparse->tlen + sparse_readahead) * sizeof(uint32_t));
     mm->sparse->len = malloc(mm->sparse->n * sizeof(uint32_t));
 
-    size_t len;
     for(unsigned int i = 0 ; i < mm->dense->n ; i++) {
-        len = ncols_t;
-        rc = fread(mm->dense->q + i * dblock_stride, sizeof(uint32_t), len, f);
-        FATAL_ERROR_CHECK(rc < len, "Short read from cached matrix file");
+        MATMUL_COMMON_READ_MANY32(mm->dense->q + i * dblock_stride, ncols_t, f);
     }
-    len = mm->sparse->n;
-    rc = fread(mm->sparse->len, sizeof(uint32_t), len, f);
-    FATAL_ERROR_CHECK(rc < len, "Short read from cached matrix file");
-    len = mm->sparse->tlen;
-    rc = fread(mm->sparse->q, sizeof(uint32_t), len, f);
-    FATAL_ERROR_CHECK(rc < len, "Short read from cached matrix file");
+    MATMUL_COMMON_READ_MANY32(mm->sparse->len, mm->sparse->n, f);
+    MATMUL_COMMON_READ_MANY32(mm->sparse->q, mm->sparse->tlen, f);
 
     /* fill up the readahead zone properly */
-    memset(mm->sparse->q + len, 0, sparse_readahead * sizeof(uint32_t));
+    memset(mm->sparse->q + mm->sparse->tlen, 0, sparse_readahead * sizeof(uint32_t));
 
     fclose(f);
 
     matmul_threaded_blocks_info(mm);
-
     worker_threads_init(mm);
 
     return mm;
@@ -500,61 +426,24 @@ struct matmul_threaded_data_s * matmul_threaded_reload_cache(abobj_ptr xx MAYBE_
 
 void matmul_threaded_save_cache(struct matmul_threaded_data_s * mm, const char * filename)
 {
-    char * base;
     FILE * f;
 
-    {
-        int rc = asprintf(&base, "%s" MM_EXTENSION ".bin", filename);
-        FATAL_ERROR_CHECK(rc < 0, "out of memory");
-    }
+    f = matmul_common_save_cache_fopen(abbytes(mm->xab, 1), mm->public_, filename, MM_EXTENSION, MM_MAGIC);
 
-    f = fopen(base, "w");
-    if (f == NULL) {
-        fprintf(stderr, "fopen(%s): %s\n", base, strerror(errno));
-        free(base);
-        exit(1);
-    }
-    free(base);
+    MATMUL_COMMON_WRITE_ONE32(mm->dense->weight, f);
+    MATMUL_COMMON_WRITE_ONE32(mm->sgrp_size, f);
+    MATMUL_COMMON_WRITE_ONE32(mm->dense->n, f);
+    MATMUL_COMMON_WRITE_ONE32(mm->sparse->n, f);
+    MATMUL_COMMON_WRITE_ONE32(mm->sparse->tlen, f);
 
-    unsigned long magic = MM_MAGIC;
-    size_t rc;
-
-    rc = fwrite(&magic, sizeof(unsigned long), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
-    rc = fwrite(mm->public_->dim, sizeof(unsigned int), 2, f);
-    FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
-    rc = fwrite(&mm->public_->ncoeffs, sizeof(unsigned long), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
-    rc = fwrite(&mm->dense->weight, sizeof(unsigned long), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
-    rc = fwrite(&mm->sgrp_size, sizeof(unsigned int), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
-    rc = fwrite(&mm->transposed, sizeof(unsigned int), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
-    rc = fwrite(&mm->dense->n, sizeof(uint32_t), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
-    rc = fwrite(&mm->sparse->n, sizeof(uint32_t), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
-    rc = fwrite(&mm->sparse->tlen, sizeof(uint32_t), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
-
-    // unsigned int nrows_t = mm->public_->dim[ mm->transposed];
-    unsigned int ncols_t = mm->public_->dim[!mm->transposed];
+    unsigned int ncols_t = mm->public_->dim[!mm->public_->store_transposed];
     size_t dblock_stride = next_multiple_of_powerof2(ncols_t, mm->blocksize);
 
-    size_t len;
     for(unsigned int i = 0 ; i < mm->dense->n ; i++) {
-        len = ncols_t;
-        rc = fwrite(mm->dense->q + i * dblock_stride, sizeof(uint32_t), len, f);
-        FATAL_ERROR_CHECK(rc < len, "Short write to cached matrix file");
+        MATMUL_COMMON_WRITE_MANY32(mm->dense->q + i * dblock_stride, ncols_t, f);
     }
-    len = mm->sparse->n;
-    rc = fwrite(mm->sparse->len, sizeof(uint32_t), len, f);
-    FATAL_ERROR_CHECK(rc < len, "Short write to cached matrix file");
-    len = mm->sparse->tlen;
-    rc = fwrite(mm->sparse->q, sizeof(uint32_t), len, f);
-    FATAL_ERROR_CHECK(rc < len, "Short write to cached matrix file");
-
+    MATMUL_COMMON_WRITE_MANY32(mm->sparse->len, mm->sparse->n, f);
+    MATMUL_COMMON_WRITE_MANY32(mm->sparse->q, mm->sparse->tlen, f);
     fclose(f);
 }
 
@@ -582,7 +471,7 @@ void matmul_threaded_mul_sub_dense(struct matmul_threaded_data_s * mm, abt * dst
     abt * dst0 = dst;
     abt const * src0 = src;
 
-    if (d == !mm->transposed) {
+    if (d == !mm->public_->store_transposed) {
         /* t == 1 is well suited for d == 0. In this case, dst is
          * progressively filled. The same holds for t == 0 and d == 1 */
 
@@ -725,10 +614,22 @@ void matmul_threaded_mul_sub_sparse(struct matmul_threaded_data_s * mm, abt * ds
     size_t sparse_readahead;
     sparse_readahead = mm->nthreads * MAX(mm->off1, mm->off2) * mm->blocksize;
 
-    if (d == !mm->transposed) {
+    if (d == !mm->public_->store_transposed) {
         dst += aboffset(x, mm->dense->n * MM_DGRP_SIZE);
+#define xxxHARDCODE
+#ifdef HARDCODE
+        ASSERT_ALWAYS(b == MM_BLOCKSIZE);
+        ASSERT_ALWAYS(g == MM_SGRP_SIZE);
+        ASSERT_ALWAYS(nthr == MM_NTHREADS);
+        ASSERT_ALWAYS(off1 == MM_PREFETCH_OFFSET_1);
+        ASSERT_ALWAYS(off2 == MM_PREFETCH_OFFSET_2);
+#define b       MM_BLOCKSIZE
+#define g       MM_SGRP_SIZE
+#define nthr    MM_NTHREADS
+#define off1    MM_PREFETCH_OFFSET_1
+#define off2    MM_PREFETCH_OFFSET_2
+#endif
         for(unsigned int blocknum = 0 ; blocknum < mm->sparse->n ; blocknum++) {
-
             // number of blocks
             uint32_t rlen= mm->sparse->len[blocknum];
             ASM_COMMENT("critical loop");
@@ -755,6 +656,13 @@ void matmul_threaded_mul_sub_sparse(struct matmul_threaded_data_s * mm, abt * ds
 
             dst += aboffset(x, g);
         }
+#ifdef  HARDCODE
+#undef b
+#undef g
+#undef nthr
+#undef off1
+#undef off2
+#endif
     } else {
         /* Then it's not so fun. In fact it's even terribly slow, and
          * bug-prone (concurrent writes all over the place). Therefore we

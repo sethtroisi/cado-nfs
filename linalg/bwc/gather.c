@@ -121,7 +121,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     flags[bw->dir] = THREAD_SHARED_VECTOR;
     flags[!bw->dir] = 0;
 
-    matmul_top_init(mmt, abase, pi, flags, pl, MATRIX_INFO_FILE);
+    matmul_top_init(mmt, abase, pi, flags, pl, MATRIX_INFO_FILE, bw->dir);
 
     mmt_wiring_ptr mcol = mmt->wr[bw->dir];
     mmt_wiring_ptr mrow = mmt->wr[!bw->dir];

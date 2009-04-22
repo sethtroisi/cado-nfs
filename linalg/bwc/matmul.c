@@ -44,21 +44,21 @@ void do_rebinding(matmul_ptr mm, const char * impl)
     { fprintf(stderr, "no implementation %s known\n", impl); exit(1); }
 }
 
-matmul_ptr matmul_build(abobj_ptr x, const char * filename, const char * impl, param_list pl)
+matmul_ptr matmul_build(abobj_ptr x, const char * filename, const char * impl, param_list pl, int optimized_direction)
 {
     struct matmul_public_s fake[1];
     do_rebinding(fake, impl);
-    matmul_ptr mm = fake->bind->build(x, filename, pl);
+    matmul_ptr mm = fake->bind->build(x, filename, pl, optimized_direction);
     if (mm == NULL) return NULL;
     do_rebinding(mm, impl);
     return mm;
 }
 
-matmul_ptr matmul_reload_cache(abobj_ptr x, const char * filename, const char * impl, param_list pl)
+matmul_ptr matmul_reload_cache(abobj_ptr x, const char * filename, const char * impl, param_list pl, int optimized_direction)
 {
     struct matmul_public_s fake[1];
     do_rebinding(fake, impl);
-    matmul_ptr mm = fake->bind->reload_cache(x, filename, pl);
+    matmul_ptr mm = fake->bind->reload_cache(x, filename, pl, optimized_direction);
     if (mm == NULL) return NULL;
     do_rebinding(mm, impl);
     return mm;

@@ -131,6 +131,7 @@ shell: $(shell_objs) $(common_link_deps)
 all_objlists:=libmatmul build bench prep gather secure krylov mksol shell
 
 libmatmul_objs:=					\
+    matmul-common.o					\
     matmul-basic.o matmul-sliced.o matmul-threaded.o	\
     matmul.o
 

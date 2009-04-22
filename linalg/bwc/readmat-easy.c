@@ -11,7 +11,7 @@
 
 typedef int (*sortfunc_t) (const void *, const void *);
 
-static int uint_cmp(unsigned int * a, unsigned int * b)
+static int uint_cmp(uint32_t * a, uint32_t * b)
 {
     if (*a < *b) return -1;
     else if (*b < *a) return 1;

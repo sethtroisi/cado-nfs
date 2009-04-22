@@ -34,14 +34,9 @@ using namespace std;
 #endif
 #endif
 
-#ifdef  __GNUC__
-#define ASM_COMMENT(x)  __asm__("#\t" x "\n")
-#else
-#define ASM_COMMENT(x)  /**/
-#endif
-
 #include "readmat.h"
 #include "abase.h"
+#include "matmul-common.h"
 
 // #define L1_CACHE_SIZE   32768
 // take only 3/4 of the L1 cache.
@@ -83,6 +78,9 @@ using namespace std;
 #define MM_MAGIC_VERSION       0x1007UL
 #define MM_MAGIC (MM_MAGIC_FAMILY << 16 | MM_MAGIC_VERSION)
 
+/* see matmul-basic.c */
+#define MM_DIR0_PREFERS_TRANSP_MULT   1
+
 struct slice_info {
     unsigned int nrows;
     unsigned int ncoeffs;
@@ -105,7 +103,6 @@ struct matmul_sliced_data_s {
     abobj_t xab;
     data_t data;
     vector<slice_info> dslices_info;
-    int iteration[2];
     void push(uint32_t x)
     {
         ASSERT_ALWAYS(x >> 16 == 0);
@@ -139,38 +136,29 @@ void matmul_sliced_clear(struct matmul_sliced_data_s * mm)
     delete mm;
 }
 
-static struct matmul_sliced_data_s * matmul_sliced_init()
+static struct matmul_sliced_data_s * matmul_sliced_init(abobj_ptr xx MAYBE_UNUSED, param_list pl, int optimized_direction)
 {
-    return new matmul_sliced_data_s;
+    struct matmul_sliced_data_s * mm;
+    mm = new matmul_sliced_data_s;
+    memset(mm, 0, sizeof(struct matmul_sliced_data_s));
+    abobj_init_set(mm->xab, xx);
+
+    int suggest = optimized_direction ^ MM_DIR0_PREFERS_TRANSP_MULT;
+    matmul_common_init_post(mm->public_, pl, suggest);
+
+    return mm;
 }
 
 
-struct matmul_sliced_data_s * matmul_sliced_build(abobj_ptr xx MAYBE_UNUSED, const char * filename, param_list pl)
+struct matmul_sliced_data_s * matmul_sliced_build(abobj_ptr xx, const char * filename, param_list pl, int optimized_direction)
 {
-    struct matmul_sliced_data_s * mm = matmul_sliced_init();
+    struct matmul_sliced_data_s * mm;
+    mm = matmul_sliced_init(xx, pl, optimized_direction);
 
-    abobj_init_set(mm->xab, xx);
-
-    sparse_mat_t smat;
-    FILE * f;
-
-    sparse_mat_init(smat);
-
-    f = fopen(filename, "r");
-    if (f == NULL) {
-        fprintf(stderr, "fopen(%s): %s\n", filename, strerror(errno));
-        exit(1);
-    }
-    read_matrix_header(f, smat);
+    uint32_t * data = matmul_common_read_stupid_data(mm->public_, filename);
 
     uint32_t i0 = 0;
-    uint32_t i1 = smat->nrows;
-
-    mm->public_->dim[0] = smat->nrows;
-    mm->public_->dim[1] = smat->ncols;
-    mm->public_->ncoeffs = 0;
-    mm->iteration[0]=0;
-    mm->iteration[1]=0;
+    uint32_t i1 = mm->public_->dim[ mm->public_->store_transposed];
 
     unsigned int npack = L1_CACHE_SIZE;
     if (pl) param_list_parse_uint(pl, "bwc_mm_l1_cache_size", &npack);
@@ -182,25 +170,21 @@ struct matmul_sliced_data_s * matmul_sliced_build(abobj_ptr xx MAYBE_UNUSED, con
     mm->push(0);        // placeholder for alignment
 
     unsigned int packbase = (i1-i0) / nslices;
-    /* How many slices of size packbase+1 */
-    unsigned int nslices1 = (i1-i0) % nslices;
-    /* How many slices of size packbase */
-    unsigned int nslices0 = nslices - nslices1;
 
+    unsigned int nslices1 = (i1-i0) % nslices; /* 1+packbase-sized slices */
+    unsigned int nslices0 = nslices - nslices1;  /* packbase-sized slices */
     unsigned int current;
     unsigned int next = i0;
-
-    /* There we're handling the horizontal strips */
     unsigned int s;
+
+    uint32_t * ptr = data;
 
     for(s = 0 ; s < nslices ; s++) {
         current = next;
         npack = packbase + (s < nslices1);
         next = current + npack;
 
-        slice_info si;
-        memset(&si,0,sizeof(si));
-        si.nrows = npack;
+        slice_info si; memset(&si,0,sizeof(si)); si.nrows = npack;
         si.data_offset = mm->data.size();
 
         /*
@@ -211,13 +195,11 @@ struct matmul_sliced_data_s * matmul_sliced_build(abobj_ptr xx MAYBE_UNUSED, con
         typedef L_t::const_iterator Lci_t;
         L_t L;
         for(unsigned int di = 0 ; di < npack ; di++) {
-            /* Our dst pointer for read_matrix_row never changes, since
-             * we write matrix rows over and over again in memory. */
-            read_matrix_row(f,smat,smat->data,1);
-            for(unsigned int j = 0 ; j < smat->data[0] ; j++) {
-                L.push_back(std::make_pair(smat->data[1+j],di));
+            for(unsigned int j = 0 ; j < *ptr ; j++) {
+                L.push_back(std::make_pair(ptr[1+j],di));
             }
-            mm->public_->ncoeffs += smat->data[0];
+            mm->public_->ncoeffs += *ptr;
+            ptr += 1 + *ptr;
         }
         /* L is the list of (column index, row index) of all
          * coefficients in the current horizontal slice */
@@ -296,19 +278,19 @@ struct matmul_sliced_data_s * matmul_sliced_build(abobj_ptr xx MAYBE_UNUSED, con
     /* We haven't finished the set of horizontal strips. Treat
      * them as vertical sparse strips then. */
 #endif
-    sparse_mat_clear(smat);
-    fclose(f);
 
     /* TODO gather info directly from the dslices_info vector
      * now that it has so much data */
     if (nslices1) {
         std::cout
             << "// " << nslices1
-            << " sub-slices of " << (packbase+1) << " rows\n";
+            << " sub-slices of " << (packbase+1)
+            << " " << rowcol[mm->public_->store_transposed] << "s\n";
     }
     std::cout
         << "// " << nslices0
-        << " sub-slices of " << packbase << " rows\n";
+        << " sub-slices of " << packbase << " "
+        << rowcol[mm->public_->store_transposed] << "s\n";
 #ifdef  SLICE_STATS
     std::cout << "info per sub-slice:";
     typedef std::vector<slice_info>::const_iterator si_t;
@@ -327,81 +309,20 @@ struct matmul_sliced_data_s * matmul_sliced_build(abobj_ptr xx MAYBE_UNUSED, con
     return mm;
 }
 
-struct matmul_sliced_data_s * matmul_sliced_reload_cache(abobj_ptr xx MAYBE_UNUSED, const char * filename, param_list pl MAYBE_UNUSED)
+struct matmul_sliced_data_s * matmul_sliced_reload_cache(abobj_ptr xx, const char * filename, param_list pl, int optimized_direction)
 {
-    char * base;
+    struct matmul_sliced_data_s * mm;
     FILE * f;
 
-    {
-        int rc = asprintf(&base, "%s" MM_EXTENSION ".bin", filename);
-        FATAL_ERROR_CHECK(rc < 0, "out of memory");
-    }
-
-    f = fopen(base, "r");
-
-    if (f == NULL) {
-        // fprintf(stderr, "fopen(%s): %s\n", base, strerror(errno));
-        fprintf(stderr, "no cache file %s\n", base);
-        free(base);
-        return NULL;
-    }
-    free(base);
+    mm = matmul_sliced_init(xx, pl, optimized_direction);
+    f = matmul_common_reload_cache_fopen(abbytes(xx,1), mm->public_, filename, MM_EXTENSION, MM_MAGIC);
+    if (f == NULL) { free(mm); return NULL; }
 
     size_t n;
-    size_t rc;
-    struct matmul_sliced_data_s * mm = matmul_sliced_init();
-
-    abobj_init_set(mm->xab, xx);
-
-    mm->iteration[0]=0;
-    mm->iteration[1]=0;
-
-    uint32_t magic_check;
-    rc = fread(&magic_check, sizeof(uint32_t), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
-    
-    if (magic_check != MM_MAGIC) {
-        fprintf(stderr, "Wrong magic in cached matrix file\n");
-        return NULL;
-    }
-
-    uint32_t nbytes_check;
-    rc = fread(&nbytes_check, sizeof(uint32_t), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
-    
-    /* It's not fatal. It only deserves a warning */
-    if (nbytes_check != abbytes(mm->xab, 1)) {
-        fprintf(stderr, "Warning: cached matrix file fits data with different striding\n");
-    }
-
-    {
-        uint32_t v;
-        rc = fread(&v, sizeof(uint32_t), 1, f);
-        FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
-        mm->public_->dim[0] = v;
-    }
-    {
-        uint32_t v;
-        rc = fread(&v, sizeof(uint32_t), 1, f);
-        FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
-        mm->public_->dim[1] = v;
-    }
-    {
-        uint64_t v;
-        rc = fread(&v, sizeof(uint64_t), 1, f);
-        FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
-        mm->public_->ncoeffs = v;
-    }
-    {
-        uint32_t v;
-        rc = fread(&v, sizeof(uint32_t), 1, f);
-        FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
-        n = v;
-    }
+    MATMUL_COMMON_READ_ONE32(n, f);
 
     mm->data.resize(n);
-    rc = fread(&(mm->data.front()), sizeof(uint16_t), n, f);
-    FATAL_ERROR_CHECK(rc < n, "Short read from cached matrix file");
+    MATMUL_COMMON_READ_MANY16(&(mm->data.front()), n, f);
 
     fclose(f);
 
@@ -412,56 +333,13 @@ struct matmul_sliced_data_s * matmul_sliced_reload_cache(abobj_ptr xx MAYBE_UNUS
 
 void matmul_sliced_save_cache(struct matmul_sliced_data_s * mm, const char * filename)
 {
-    char * base;
     FILE * f;
 
-    {
-        int rc = asprintf(&base, "%s" MM_EXTENSION ".bin", filename);
-        FATAL_ERROR_CHECK(rc < 0, "out of memory");
-    }
-
-    f = fopen(base, "w");
-    if (f == NULL) {
-        fprintf(stderr, "fopen(%s): %s\n", base, strerror(errno));
-        free(base);
-        exit(1);
-    }
-    free(base);
+    f = matmul_common_save_cache_fopen(abbytes(mm->xab,1), mm->public_, filename, MM_EXTENSION, MM_MAGIC);
 
     size_t n = mm->data.size();
-    uint32_t magic = MM_MAGIC;
-    size_t rc;
-
-    rc = fwrite(&magic, sizeof(uint32_t), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
-
-    uint32_t nbytes = abbytes(mm->xab, 1);
-    rc = fwrite(&nbytes, sizeof(uint32_t), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
-
-    {
-        uint32_t v = mm->public_->dim[0];
-        rc = fwrite(&v, sizeof(uint32_t), 1, f);
-        FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
-    }
-    {
-        uint32_t v = mm->public_->dim[1];
-        rc = fwrite(&v, sizeof(uint32_t), 1, f);
-        FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
-    }
-    {
-        uint64_t v = mm->public_->ncoeffs;
-        rc = fwrite(&v, sizeof(uint64_t), 1, f);
-        FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
-    }
-    {
-        uint32_t v = n;
-        rc = fwrite(&v, sizeof(uint32_t), 1, f);
-        FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
-    }
-
-    rc = fwrite(&(mm->data.front()), sizeof(uint16_t), n, f);
-    FATAL_ERROR_CHECK(rc < n, "Short write to cached matrix file");
+    MATMUL_COMMON_WRITE_ONE32(n, f);
+    MATMUL_COMMON_WRITE_MANY16(&(mm->data.front()), n, f);
 
     fclose(f);
 }
@@ -476,7 +354,7 @@ void matmul_sliced_mul(struct matmul_sliced_data_s * mm, abt * dst, abt const * 
     uint32_t i = 0;
     abobj_ptr x = mm->xab;
 
-    if (d == 1) {
+    if (d == !mm->public_->store_transposed) {
 #ifdef  SLICE_STATS
         std::vector<slice_info>::iterator sit = dslices_info.begin();
         double tick = oncpu_ticks();
@@ -517,7 +395,7 @@ void matmul_sliced_mul(struct matmul_sliced_data_s * mm, abt * dst, abt const * 
     } else {
         /* d == 0 */
         /* BEWARE, it's wildly sub-optimal ! */
-        if (mm->iteration[d] == 10) {
+        if (mm->public_->iteration[d] == 10) {
             fprintf(stderr, "Warning: Doing many iterations with bad code\n");
         }
 
@@ -537,7 +415,7 @@ void matmul_sliced_mul(struct matmul_sliced_data_s * mm, abt * dst, abt const * 
         }
     }
     ASM_COMMENT("end of multiplication code");
-    mm->iteration[d]++;
+    mm->public_->iteration[d]++;
 }
 
 void matmul_sliced_report(struct matmul_sliced_data_s * mm MAYBE_UNUSED) {

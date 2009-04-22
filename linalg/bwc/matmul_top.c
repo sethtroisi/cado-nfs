@@ -433,13 +433,17 @@ void matmul_top_vec_init(matmul_top_data_ptr mmt, int d, int flags)
     matmul_top_vec_init_generic(mmt, abbytes(mmt->abase, 1), NULL, d, flags);
 }
 
+static void mmt_finish_init(matmul_top_data_ptr mmt, int const *, param_list pl, int optimized_direction);
+static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, int optimized_direction);
+
 void matmul_top_init(matmul_top_data_ptr mmt,
         abobj_ptr abase,
         /* matmul_ptr mm, */
         parallelizing_info_ptr pi,
         int const * flags,
         param_list pl,
-        const char * filename)
+        const char * filename,
+        int optimized_direction)
 {
     memset(mmt, 0, sizeof(*mmt));
 
@@ -456,13 +460,13 @@ void matmul_top_init(matmul_top_data_ptr mmt,
 
     read_info_file(mmt, filename);
 
-    mmt_finish_init(mmt, flags, pl);
+    mmt_finish_init(mmt, flags, pl, optimized_direction);
 }
 
 /* Some work has to be done in order to fill the remaining fields in the
  * matmul_top structure.
  */
-void mmt_finish_init(matmul_top_data_ptr mmt, int const * flags, param_list pl)
+static void mmt_finish_init(matmul_top_data_ptr mmt, int const * flags, param_list pl, int optimized_direction)
 {
 #ifndef  CONJUGATED_PERMUTATIONS
     choke me;
@@ -498,7 +502,7 @@ void mmt_finish_init(matmul_top_data_ptr mmt, int const * flags, param_list pl)
     // TODO: reuse the ../bw-matmul/matmul/matrix_base.cpp things for
     // displaying communication info.
     
-    matmul_top_read_submatrix(mmt, pl);
+    matmul_top_read_submatrix(mmt, pl, optimized_direction);
 
     /* NOTE: flags default to zero */
     matmul_top_vec_init(mmt, 0, flags ? flags[0] : 0);
@@ -506,16 +510,17 @@ void mmt_finish_init(matmul_top_data_ptr mmt, int const * flags, param_list pl)
 
 }
 
-void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl)
+static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, int optimized_direction)
 {
     const char * impl = param_list_lookup_string(pl, "bwc_mm_impl");
 
-    mmt->mm = matmul_reload_cache(mmt->abase, mmt->locfile, impl, pl);
+    mmt->mm = matmul_reload_cache(mmt->abase, mmt->locfile, impl, pl, optimized_direction);
     if (mmt->mm)
         return;
 
     // fprintf(stderr, "Could not find cache file for %s\n", mmt->locfile);
-    mmt->mm = matmul_build(mmt->abase, mmt->locfile, impl, pl);
+    mmt->mm = matmul_build(mmt->abase, mmt->locfile, impl, pl, optimized_direction);
+
     matmul_save_cache(mmt->mm, mmt->locfile);
 }
 

@@ -555,8 +555,8 @@ sub drive {
 
     @_ = grep !/^tmpdir=/, @_;
 
-    # if ($program eq ':ysplit') { $program="./split"; push @_, "--split-y"; }
-    # if ($program eq ':fsplit') { $program="./split"; push @_, "--split-f"; }
+    if ($program eq ':ysplit') { $program="./split"; push @_, "--split-y"; }
+    if ($program eq ':fsplit') { $program="./split"; push @_, "--split-f"; }
 
     # Some arguments are relevant only to some contexts.
     unless ($program =~ /split$/) {

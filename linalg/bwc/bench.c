@@ -93,14 +93,14 @@ int main(int argc, char * argv[])
 
     clock_t t0 = clock();
 
-    mm = matmul_reload_cache(xx, file, impl, pl);
+    mm = matmul_reload_cache(xx, file, impl, pl, !transpose);
     if (mm) {
         fprintf(stderr, "Reusing cache file for %s\n", file);
         fprintf(stderr, "Cache load time %.2fs\n",
                 (double) (clock()-t0) / CLOCKS_PER_SEC);
     } else {
         fprintf(stderr, "Building cache file for %s\n", file);
-        mm = matmul_build(xx, file, impl, pl);
+        mm = matmul_build(xx, file, impl, pl, !transpose);
         matmul_save_cache(mm, file);
         fprintf(stderr, "Cache build time %.2fs\n",
                 (double) (clock()-t0) / CLOCKS_PER_SEC);

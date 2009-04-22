@@ -23,7 +23,11 @@ int main(int argc, char * argv[])
     if (argc == 3)
         impl = argv[2];
 
-    mm = matmul_build(xx, argv[1], argv[2], NULL);
+    fprintf(stderr, "Saving cache for matrix-times-vector\n");
+    mm = matmul_build(xx, argv[1], argv[2], NULL, 1);
+    fprintf(stderr, "Saving cache for vector-times-matrix\n");
+    mm = matmul_build(xx, argv[1], argv[2], NULL, 0);
+
     matmul_save_cache(mm, argv[1]);
     matmul_clear(mm);
 }

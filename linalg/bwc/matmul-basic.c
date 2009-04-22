@@ -9,16 +9,29 @@
 
 #include "matmul.h"
 #include "matmul-basic.h"
+#include "matmul-common.h"
 #include "readmat.h"
+#include "readmat-easy.h"
 #include "abase.h"
 
 /* This extension is used to distinguish between several possible
  * implementations of the product */
 #define MM_EXTENSION   "-basic"
 #define MM_MAGIC_FAMILY        0xa001UL
-#define MM_MAGIC_VERSION       0x1000UL
+#define MM_MAGIC_VERSION       0x1001UL
 #define MM_MAGIC (MM_MAGIC_FAMILY << 16 | MM_MAGIC_VERSION)
 
+/* This selects the default behaviour as to which is our best code
+ * for multiplying. If this flag is 1, then a multiplication matrix times
+ * vector (direction==1) performs best if the in-memory structure
+ * reflects the non-transposed matrix. Similarly, a vector times matrix
+ * multiplication (direction==0) performs best if the in-memory structure
+ * reflects the transposed matrix. When the flag is 1, the converse
+ * happens.
+ * This flag depends on the implementation, and possibly even on the cpu
+ * type under certain circumstances.
+ */
+#define MM_DIR0_PREFERS_TRANSP_MULT   1
 
 struct matmul_basic_data_s {
     /* repeat the fields from the public interface */
@@ -35,120 +48,70 @@ void matmul_basic_clear(struct matmul_basic_data_s * mm)
     free(mm);
 }
 
-static struct matmul_basic_data_s * matmul_basic_init()
+static struct matmul_basic_data_s * matmul_basic_init(abobj_ptr xx MAYBE_UNUSED, param_list pl, int optimized_direction)
 {
     struct matmul_basic_data_s * mm;
     mm = malloc(sizeof(struct matmul_basic_data_s));
+    memset(mm, 0, sizeof(struct matmul_basic_data_s));
+    abobj_init_set(mm->xab, xx);
+
+    int suggest = optimized_direction ^ MM_DIR0_PREFERS_TRANSP_MULT;
+    matmul_common_init_post(mm->public_, pl, suggest);
+
     return mm;
 }
 
-typedef int (*sortfunc_t) (const void *, const void *);
-
-static int uint_cmp(unsigned int * a, unsigned int * b)
+struct matmul_basic_data_s * matmul_basic_build(abobj_ptr xx, const char * filename, param_list pl, int optimized_direction)
 {
-    if (*a < *b) return -1;
-    else if (*b < *a) return 1;
-    return 0;
-}
+    struct matmul_basic_data_s * mm;
+    mm = matmul_basic_init(xx, pl, optimized_direction);
 
-struct matmul_basic_data_s * matmul_basic_build(abobj_ptr xx MAYBE_UNUSED, const char * filename, param_list pl MAYBE_UNUSED)
-{
-    struct matmul_basic_data_s * mm = matmul_basic_init();
+    uint32_t * data = matmul_common_read_stupid_data(mm->public_, filename);
 
-    abobj_init_set(mm->xab, xx);
+    unsigned int nrows_t = mm->public_->dim[ mm->public_->store_transposed];
+    
+    uint32_t * ptr = data;
+    unsigned int i = 0;
 
-    sparse_mat_t smat;
-    FILE * f;
+    /* count coefficients */
+    for( ; i < nrows_t ; i++) {
+        unsigned int weight = 0;
+        weight += *ptr;
+        mm->public_->ncoeffs += weight;
 
-    sparse_mat_init(smat);
-
-    f = fopen(filename, "r");
-    if (f == NULL) {
-        fprintf(stderr, "fopen(%s): %s\n", filename, strerror(errno));
-        exit(1);
-    }
-    read_matrix_header(f, smat);
-
-    size_t alloc = 0;
-    size_t size = 0;
-
-#define CHECK_REALLOC(n)      do {					\
-        if (size + n >= alloc) {					\
-            alloc = size + n;                                           \
-            alloc += alloc / 2;                                         \
-            mm->q = realloc(mm->q, alloc * sizeof(uint32_t));		\
-        }								\
-    } while (0)
-
-    mm->public_->dim[0] = smat->nrows;
-    mm->public_->dim[1] = smat->ncols;
-    mm->public_->ncoeffs = 0;
-    mm->q = NULL;
-
-    for(unsigned int i = 0 ; i < mm->public_->dim[0] ; i++) {
-        /* Our dst pointer for read_matrix_row never changes, since
-         * we write matrix rows over and over again in memory. */
-        read_matrix_row(f,smat,smat->data,1);
-        CHECK_REALLOC(1 + smat->data[0]);
+        /* Perform the data transformation, since it can be done in
+         * place.
+         */
         uint32_t last = 0;
-        mm->q[size++] = smat->data[0];
-
-        qsort(smat->data + 1, smat->data[0],
-                sizeof(smat->data[0]), (sortfunc_t) uint_cmp);
-
-        for(unsigned int j = 0 ; j < smat->data[0] ; j++) {
-            mm->q[size++] = smat->data[1+j] - last;
-            last = smat->data[1+j];
+        ptr++;
+        for(unsigned int j = 0 ; j < weight ; j++) {
+            uint32_t current = *ptr;
+            *ptr++ -= last;
+            last = current;
         }
-        mm->public_->ncoeffs += smat->data[0];
     }
 
-    mm->datasize = size * sizeof(uint32_t);
+    mm->q = data;
 
-    fclose(f);
+    mm->datasize = nrows_t + mm->public_->ncoeffs;
+
+    ASSERT_ALWAYS(ptr - data == (ptrdiff_t) mm->datasize);
 
     return mm;
 }
 
-struct matmul_basic_data_s * matmul_basic_reload_cache(abobj_ptr xx MAYBE_UNUSED, const char * filename, param_list pl MAYBE_UNUSED)
+struct matmul_basic_data_s * matmul_basic_reload_cache(abobj_ptr xx, const char * filename, param_list pl, int optimized_direction)
 {
-    char * base;
+    struct matmul_basic_data_s * mm;
     FILE * f;
 
-    {
-        int rc = asprintf(&base, "%s" MM_EXTENSION ".bin", filename);
-        FATAL_ERROR_CHECK(rc < 0, "out of memory");
-    }
+    mm = matmul_basic_init(xx, pl, optimized_direction);
+    f = matmul_common_reload_cache_fopen(abbytes(xx,1), mm->public_, filename, MM_EXTENSION, MM_MAGIC);
+    if (f == NULL) { free(mm); return NULL; }
 
-    f = fopen(base, "r");
-
-    if (f == NULL) {
-        // fprintf(stderr, "fopen(%s): %s\n", base, strerror(errno));
-        fprintf(stderr, "no cache file %s\n", base);
-        free(base);
-        return NULL;
-    }
-    free(base);
-
-    size_t rc;
-    struct matmul_basic_data_s * mm = matmul_basic_init();
-
-    abobj_init_set(mm->xab, xx);
-
-    unsigned long magic_check;
-    rc = fread(&magic_check, sizeof(unsigned long), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
-    FATAL_ERROR_CHECK(magic_check != MM_MAGIC,
-            "Wrong magic in cached matrix file");
-    rc = fread(&mm->public_->dim, sizeof(unsigned int), 2, f);
-    FATAL_ERROR_CHECK(rc < 2, "No valid data in cached matrix file");
-    rc = fread(&mm->public_->ncoeffs, sizeof(unsigned long), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
-    rc = fread(&mm->datasize, sizeof(size_t), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");
-    mm->q = malloc(mm->datasize);
-    rc = fread(mm->q, 1, mm->datasize, f);
-    FATAL_ERROR_CHECK(rc < mm->datasize, "Short read from cached matrix file");
+    MATMUL_COMMON_READ_ONE32(mm->datasize, f);
+    mm->q = malloc(mm->datasize * sizeof(uint32_t));
+    MATMUL_COMMON_READ_MANY32(mm->q, mm->datasize, f);
     fclose(f);
 
     return mm;
@@ -156,72 +119,54 @@ struct matmul_basic_data_s * matmul_basic_reload_cache(abobj_ptr xx MAYBE_UNUSED
 
 void matmul_basic_save_cache(struct matmul_basic_data_s * mm, const char * filename)
 {
-    char * base;
     FILE * f;
 
-    {
-        int rc = asprintf(&base, "%s" MM_EXTENSION ".bin", filename);
-        FATAL_ERROR_CHECK(rc < 0, "out of memory");
-    }
+    f = matmul_common_save_cache_fopen(abbytes(mm->xab,1), mm->public_, filename, MM_EXTENSION, MM_MAGIC);
 
-    f = fopen(base, "w");
-    if (f == NULL) {
-        fprintf(stderr, "fopen(%s): %s\n", base, strerror(errno));
-        free(base);
-        exit(1);
-    }
-    free(base);
+    MATMUL_COMMON_WRITE_ONE32(mm->datasize, f);
+    MATMUL_COMMON_WRITE_MANY32(mm->q, mm->datasize, f);
 
-    unsigned long magic = MM_MAGIC;
-    size_t rc;
-
-    rc = fwrite(&magic, sizeof(unsigned long), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
-    rc = fwrite(&mm->public_->dim, sizeof(unsigned int), 2, f);
-    FATAL_ERROR_CHECK(rc < 2, "Cannot write to cached matrix file");
-    rc = fwrite(&mm->public_->ncoeffs, sizeof(unsigned long), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
-    rc = fwrite(&mm->datasize, sizeof(size_t), 1, f);
-    FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");
-    rc = fwrite(mm->q, 1, mm->datasize, f);
-    FATAL_ERROR_CHECK(rc < mm->datasize, "Short write from cached matrix file");
     fclose(f);
 }
 
 void matmul_basic_mul(struct matmul_basic_data_s * mm, abt * dst, abt const * src, int d)
 {
-    __asm__("# multiplication code\n");
+    ASM_COMMENT("multiplication code");
     uint32_t * q = mm->q;
     abobj_ptr x = mm->xab;
 
-    if (d == 1) {
-        abzero(x, dst, mm->public_->dim[0]);
-        __asm__("# critical loop\n");
-        for(unsigned int i = 0 ; i < mm->public_->dim[0] ; i++) {
+    if (d == !mm->public_->store_transposed) {
+        abzero(x, dst, mm->public_->dim[!d]);
+        ASM_COMMENT("critical loop");
+        for(unsigned int i = 0 ; i < mm->public_->dim[!d] ; i++) {
             uint32_t len = *q++;
             unsigned int j = 0;
             for( ; len-- ; ) {
                 j += *q++;
-                ASSERT(j < mm->public_->dim[1]);
+                ASSERT(j < mm->public_->dim[d]);
                 abadd(x, dst + aboffset(x, i), src + aboffset(x, j));
             }
         }
-        __asm__("# end of critical loop\n");
+        ASM_COMMENT("end of critical loop");
     } else {
+        if (mm->public_->iteration[d] == 10) {
+            fprintf(stderr, "Warning: Doing many iterations with transposed code (not a huge problem for impl=basic)\n");
+        }
         abzero(x, dst, mm->public_->dim[1]);
-        __asm__("# critical loop (transposed mult)\n");
-        for(unsigned int i = 0 ; i < mm->public_->dim[0] ; i++) {
+        ASM_COMMENT("critical loop (transposed mult)");
+        for(unsigned int i = 0 ; i < mm->public_->dim[d] ; i++) {
             uint32_t len = *q++;
             unsigned int j = 0;
             for( ; len-- ; ) {
                 j += *q++;
-                ASSERT(j < mm->public_->dim[1]);
+                ASSERT(j < mm->public_->dim[!d]);
                 abadd(x, dst + aboffset(x, j), src + aboffset(x, i));
             }
         }
-        __asm__("# end of critical loop (transposed mult)\n");
+        ASM_COMMENT("end of critical loop (transposed mult)");
     }
-    __asm__("# end of multiplication code\n");
+    ASM_COMMENT("end of multiplication code");
+    mm->public_->iteration[d]++;
 }
 
 void matmul_basic_report(struct matmul_basic_data_s * mm MAYBE_UNUSED) {

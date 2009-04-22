@@ -2,6 +2,7 @@
 #define MATMUL_H_
 
 #include <stdarg.h>
+#include <stdint.h>
 
 /* This header is common to the different matrix product implementations
  * (note that it depends on abase, though). So the matrix product codes
@@ -15,8 +16,8 @@ struct matmul_public_s;
 typedef struct matmul_public_s  * matmul_t;
 typedef struct matmul_public_s  * matmul_ptr;
 
-typedef matmul_ptr (*matmul_build_t)(abobj_ptr, const char * filename, param_list pl);
-typedef matmul_ptr (*matmul_reload_cache_t)(abobj_ptr, const char * filename, param_list pl);
+typedef matmul_ptr (*matmul_build_t)(abobj_ptr, const char * filename, param_list pl, int);
+typedef matmul_ptr (*matmul_reload_cache_t)(abobj_ptr, const char * filename, param_list pl, int);
 typedef void (*matmul_save_cache_t)(matmul_ptr, const char * filename);
 typedef void (*matmul_mul_t)(matmul_ptr, abt *, abt const *, int);
 typedef void (*matmul_report_t)(matmul_ptr);
@@ -40,7 +41,11 @@ struct matmul_public_s {
     unsigned int dim[2];        /* dim[0] is nrows, dim[1] is ncols. The
                                    organization of the matrix in memory
                                    also obeys the ``transposed'' flag */
-    unsigned long ncoeffs;
+    uint64_t ncoeffs;
+
+    unsigned int store_transposed;
+
+    int iteration[2];
 
     /* Now the virtual method table */
     struct matmul_bindings_s bind[1];
@@ -60,8 +65,8 @@ extern "C" {
 
 /* These two functions are the means of initializing the mm layer. No
  * bare _init() function is publicly accessible */
-extern matmul_ptr matmul_build(abobj_ptr, const char * filename, const char * impl, param_list pl);
-extern matmul_ptr matmul_reload_cache(abobj_ptr, const char * filename, const char * impl, param_list pl);
+extern matmul_ptr matmul_build(abobj_ptr, const char * filename, const char * impl, param_list pl, int);
+extern matmul_ptr matmul_reload_cache(abobj_ptr, const char * filename, const char * impl, param_list pl, int);
 
 /* Exit point */
 extern void matmul_clear(matmul_ptr mm);
