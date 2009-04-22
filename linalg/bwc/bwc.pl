@@ -3,6 +3,8 @@ use warnings;
 use strict;
 
 use POSIX qw/getcwd/;
+use File::Basename;
+use File::Temp qw/tempdir/;
 
 # This companion program serves as a helper for running bwc programs.
 
@@ -47,6 +49,8 @@ hosts                Comma-separated list of hosts. 'hosts' may be supplied
 hostfile             path to a host list file to be understood by mpiexec
                      NOTE: multi-hosts support is incomplete in this
                      script at the moment, and specific to mpich2+pm=hydra.
+tmpdir               if the ``balance'' program has to be called, put
+                     temporary files there
 
 Amongst parameters, some options with leading dashes may be set:
 
@@ -97,10 +101,73 @@ my $mode='u64';
 my $show_only=0;
 my $nh;
 my $nv;
+my $mpi;
+my $mpi_ver;
+my $tmpdir;
 
-if (defined($_=$ENV{'MPI_BINDIR'}) || defined($_=$ENV{'MPI'})) {
-    $mpiexec="$_/mpiexec";
+# {{{ MPI detection
+
+sub detect_mpi {
+    if (defined($_=$ENV{'MPI_BINDIR'}) || defined($_=$ENV{'MPI'})) {
+        $mpi=$_;
+    } else {
+        my @path = split(':',$ENV{'PATH'});
+        for my $d (@path) {
+            if (-x "$d/mpiexec") {
+                $mpi=$d;
+                print STDERR "Auto-detected MPI_BINDIR=$mpi\n";
+                last;
+            }
+        }
+    }
+
+    if (defined($mpi)) {
+        CHECK_MPICH2_VERSION: {
+            if (-x "$mpi/mpich2version") {
+                my $v = `$mpi/mpich2version -v`;
+                chomp($v);
+                if ($v =~ /MPICH2 Version:\s*(\d.*)$/) {
+                    $mpi_ver="mpich2-$1";
+                } else {
+                    $mpi_ver="mpich2-UNKNOWN";
+                }
+                $v = `$mpi/mpich2version -c`;
+                chomp($v);
+                if ($v =~ /--with-pm=hydra/) {
+                    $mpi_ver .= "+hydra";
+                }
+            }
+        }
+        CHECK_OMPI_VERSION: {
+            if (-x "$mpi/ompi_info") {
+                my @v = `$mpi/ompi_info`;
+                my @vv = grep { /Open MPI:/; } @v;
+                last CHECK_OMPI_VERSION unless scalar @vv == 1;
+                if ($vv[0] =~ /Open MPI:\s*(\d\S*)$/) {
+                    $mpi_ver="openmpi-$1";
+                } else {
+                    $mpi_ver="openmpi-UNKNOWN";
+                }
+            }
+        }
+
+        if (defined($mpi_ver)) {
+            print STDERR "Using $mpi_ver, MPI_BINDIR=$mpi\n";
+        } else {
+            print STDERR "Using UNKNOWN mpi, MPI_BINDIR=$mpi\n";
+        }
+    }
+
+    if (!defined($mpi)) {
+        print STDERR <<EOMSG;
+***ERROR*** No mpi library was detected. Arrange for mpiexec to be in
+***ERROR*** your PATH, or set the MPI_BINDIR environment variable.
+EOMSG
+        exit 1;
+    }
 }
+# }}}
+
 
 my $bindir;
 if (!defined($bindir=$ENV{'BWC_BINDIR'})) {
@@ -153,6 +220,7 @@ if ($param->{'thr'}) { @thr_split = set_mpithr_param $param->{'thr'}; }
 if ($param->{'wdir'}) { $wdir=$param->{'wdir'}; }
 if ($param->{'matrix'}) { $matrix=$param->{'matrix'}; }
 if ($param->{'matpath'}) { $matpath=$param->{'matpath'}; }
+if ($param->{'tmpdir'}) { $tmpdir=$param->{'tmpdir'}; }
 
 $nh = $mpi_split[0] * $thr_split[0];
 $nv = $mpi_split[1] * $thr_split[1];
@@ -260,6 +328,7 @@ if (!defined($param->{'ys'})) {
     push @main_args, "ys=0..$n";
 }
 
+
 ##################################################
 # Done playing around with what we've been given.
 
@@ -301,6 +370,89 @@ sub dosystem
         print STDERR "$prg: exited with status $ret\n";
     }
     exit 1;
+}
+
+##################################################
+# Do we need mpi ??
+
+# Starting daemons for mpich2 1.0.x
+sub check_mpd_daemons()
+{
+    return if !defined $mpi_ver;
+    return if $mpi_ver !~ /^mpich2/;
+    return if $mpi_ver =~ /^mpich2.*\+hydra/;
+
+    my $rsh='ssh';
+    if (exists($ENV{'OAR_JOBID'})) {
+        $rsh="/usr/bin/oarsh";
+    }
+
+    my $rc = system "$mpi/mpdtrace > /dev/null 2>&1";
+    if ($rc == 0) {
+        print "mpi daemons seem to be ok\n";
+        return;
+    }
+
+    if ($rc == -1) {
+        die "Cannot execute $mpi/mpdtrace";
+    } elsif ($rc & 127) {
+        die "$mpi/mpdtrace died with signal ", ($rc&127);
+    } else {
+        print "No mpi daemons found by $mpi/mpdtrace, restarting\n";
+    }
+
+    open F, $hostfile;
+    my %hosts;
+    while (<F>) {
+        $hosts{$_}=1;
+    }
+    close F;
+    my $n = scalar keys %hosts;
+    print "Running $n mpi daemons\n";
+    dosystem "$mpi/mpdboot -n $n -r $rsh -f $hostfile -v";
+}
+
+my $mpi_needed = $mpi_split[0] * $mpi_split[1] != 1 && $main !~ /(?:split|acollect|lingen)$/;
+
+my @mpi_precmd;
+
+if ($mpi_needed) {
+    detect_mpi;
+
+    push @mpi_precmd, "$mpi/mpiexec";
+
+    # Need hosts.
+    if (exists($ENV{'OAR_JOBID'}) && !defined($hostfile) && !scalar @hosts) {
+        print STDERR "OAR environment detected, setting hostfile.\n";
+        system "uniq $ENV{'OAR_NODEFILE'} > /tmp/HOSTS.$ENV{'OAR_JOBID'}";
+        $hostfile = "/tmp/HOSTS.$ENV{'OAR_JOBID'}";
+    }
+    if (scalar @hosts) {
+        open F, ">$wdir/HOSTS";
+        for my $h (@hosts) { print F "$h\n"; }
+        close F;
+        $hostfile = "$wdir/HOSTS";
+    }
+    if (defined($hostfile)) {
+        if ($mpi_ver =~ /^\+hydra/) {
+            my_setenv 'HYDRA_HOST_FILE', $hostfile;
+        } elsif ($mpi_ver =~ /^openmpi/) {
+            push @mpi_precmd, "--hostfile", $hostfile;
+        } elsif ($mpi_ver =~ /^mpich2/) {
+            # Assume daemons do the job.
+        } else {
+            push @mpi_precmd, "-file", $hostfile;
+        }
+    }
+    if (!defined($hostfile)) {
+        # At this point we're going to run processes on localhost.
+        if ($mpi_ver =~ /^\+hydra/) {
+            my_setenv 'HYDRA_USE_LOCALHOST', 1;
+        }
+        # Otherwise we'll assume that the simple setup will work fine.
+    }
+    check_mpd_daemons();
+    push @mpi_precmd, '-n', $mpi_split[0] * $mpi_split[1];
 }
 
 ##################################################
@@ -357,16 +509,31 @@ sub drive {
                 mkdir $wdir;
             }
         }
+        my $in = $matrix;
+        my $out = "$wdir/mat";
+        my $td;
+        if (defined($tmpdir)) {
+            my $filename = fileparse($matrix);
+            $td = tempdir("$filename-${nh}x${nv}.XXXXX", DIR=>$tmpdir, CLEANUP=>1);
+            $out = "$td/mat";
+            $in = "$td/$filename";
+            dosystem("cp", $matrix, "$td/$filename");
+        }
         my $cmd="$bindir/../balance";
         my @args= (
-                "-in", $matrix,
-                "-out", "$wdir/mat",
+                "-in", $in,
+                "-out", "$out",
                 "--nslices", "${nh}x${nv}",
                 "--conjugate-permutations",
                 "--square");
         dosystem($cmd, @args);
+        if (defined($tmpdir)) {
+            dosystem("rsync", "-a", "$td/", "$wdir/");
+        }
         return;
     }
+
+    @_ = grep !/^tmpdir=/, @_;
 
     # if ($program eq ':ysplit') { $program="./split"; push @_, "--split-y"; }
     # if ($program eq ':fsplit') { $program="./split"; push @_, "--split-f"; }
@@ -383,19 +550,8 @@ sub drive {
 
     if ($mpi_split[0] * $mpi_split[1] != 1 && $program !~ /(?:split|acollect|lingen)$/) {
         unshift @_, $program;
-        # Need hosts.
-        if (defined($hostfile)) {
-            my_setenv 'HYDRA_HOST_FILE', $hostfile;
-        } elsif (scalar @hosts) {
-            open F, ">$wdir/HOSTS";
-            for my $h (@hosts) { print F "$h\n"; }
-            close F;
-            my_setenv 'HYDRA_HOST_FILE', "$wdir/HOSTS";
-        } else {
-            my_setenv 'HYDRA_USE_LOCALHOST', 1;
-        }
-        unshift @_, '-n', $mpi_split[0] * $mpi_split[1];
-        $program=$mpiexec;
+        unshift @_, @mpi_precmd;
+        $program = shift @_;
     }
 
     dosystem($program, @_);
