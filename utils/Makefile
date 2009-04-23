@@ -3,7 +3,7 @@ include $(TOP)/Makefile.common
 
 # All parts of libutils.
 names:=	cado_poly relation timing plain_poly \
-	getprime mod_ul modredc_ul modredc_15ul modul_poly gmp_aux \
+	getprime mod_ul modredc_ul modredc_15ul modredc_2ul2 modul_poly gmp_aux \
 	mpz_poly fpoly rootfinder params gcd_int64 gcd_uint64	\
 	discriminant	\
 	random_generation mpz_array gzip	\
@@ -47,34 +47,42 @@ test_mod_redcul.o: test_mod.c
 test_mod_redc15ul.o: test_mod.c
 	$(CC) $(MY_CFLAGS) -DARITHMETIC=\"modredc_15ul_default.h\" -c -o $@ $<
 
+test_mod_redc2ul2.o: test_mod.c
+	$(CC) $(MY_CFLAGS) -DARITHMETIC=\"modredc_2ul2_default.h\" -c -o $@ $<
+
 test_mod_ul: test_mod_ul.o
 	$(CC) $(MY_LFLAGS) $< -o $@ -L. -lutils -lgmp
 test_mod_redcul: test_mod_redcul.o
 	$(CC) $(MY_LFLAGS) $< -o $@ -L. -lutils -lgmp
 test_mod_redc15ul: test_mod_redc15ul.o
 	$(CC) $(MY_LFLAGS) $< -o $@ -L. -lutils -lgmp
+test_mod_redc2ul2: test_mod_redc2ul2.o
+	$(CC) $(MY_LFLAGS) $< -o $@ -L. -lutils -lgmp
 
 test-rootfinder: libutils.a
 check_rels: libutils.a
-test_mod_ul test_mod_redcul test_mod_redc15ul: libutils.a
+test_mod_ul test_mod_redcul test_mod_redc15ul test_mod_redc2ul2.o: libutils.a
 # Computed includes that auto-deps can't know
 test_mod_ul.o: mod_ul_default.h
 test_mod_redcul.o: modredc_ul_default.h
 test_mod_redc15ul.o: modredc_15ul_default.h
+test_mod_redc2ul2.o: modredc_2ul2_default.h
 
 libutils.a: $(obj)
 	ar r libutils.a $(obj)
 
 clean:
 	-rm -f *.bak *.o libutils.a $(bins)
-	-rm -f test_mod_ul.o test_mod_redcul.o test_mod_redc15ul.o
-	-rm -f test-rootfinder test_mod_ul test_mod_redcul test_mod_redc15ul
+	-rm -f test_mod_ul.o test_mod_redcul.o test_mod_redc15ul.o test_mod_redc2ul2.o
+	-rm -f test-rootfinder test_mod_ul test_mod_redcul test_mod_redc15ul \
+		test_mod_redc2ul2
 
 
-check: test-rootfinder test_mod_ul test_mod_redcul test_mod_redc15ul
+check: test-rootfinder test_mod_ul test_mod_redcul test_mod_redc15ul test_mod_redc2ul2
 	./test_mod_ul
 	./test_mod_redcul
 	./test_mod_redc15ul
+	./test_mod_redc2ul2
 	./test-rootfinder-script.sh < testbase-rootfinder.quick
 
 
@@ -84,12 +92,10 @@ sources:=       \
     cache.c cachesize.c cado_poly.c check_rels.c discriminant.c mpz_poly.c \
     fpoly.c	\
     gcd_int64.c gcd_uint64.c getprime.c gmp_aux.c mod_ul.c mod_ul_common.c \
-    modredc_15ul.c modredc_ul.c modul_poly.c params.c plain_poly.c \
+    modredc_15ul.c modredc_ul.c modredc_2ul2.c modul_poly.c params.c plain_poly.c \
     random_generation.c relation.c rootfinder.c test-rootfinder.c timing.c \
     gzip.c
 ifndef	CLEANING
 dep: $(patsubst %,.deps/%.d,$(sources))
 -include $(patsubst %,.deps/%.d,$(sources))
 endif
-
-

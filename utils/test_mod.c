@@ -192,8 +192,8 @@ test_mod_divn(const modint_t la, const modint_t lm, const unsigned long n)
   
   if (!mod_equal (r, t, m))
     {
-      printf ("mod_div%lu(%lu, %lu) wrong (%lu)\n", 
-	      n, la[0], lm[0], mod_get_ul (s, m));
+      printf ("mod_div%lu(%lu, %lu) wrong\n", 
+	      n, la[0], lm[0]);
       abort ();
     }
   mod_clear (r, m);
@@ -284,7 +284,7 @@ test_mod_gcd (const modint_t la, const modint_t lm)
   mpz_gcd (mr, ma, mm);    /* re-compute gcd */
   if (mpz_cmp (mr, mt) != 0)
     {
-      gmp_printf ("mod_gcd(%Zd, %zd) wrong (%Zd), GMP has %Zd\n", 
+      gmp_printf ("mod_gcd(%Zd, %Zd) wrong (%Zd), GMP has %Zd\n", 
                   ma, mm, mt, mr);
       abort ();
     }

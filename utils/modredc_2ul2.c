@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include "modredc_2ul2.h"
-#include "modredc_2ul_common.c"
 
 #if defined(__GNUC__) && (__GNUC__ >= 4 || __GNUC__ >= 3 && __GNUC_MINOR__ >= 4)
 /* Opteron prefers LOOKUP_TRAILING_ZEROS 1, 
@@ -86,63 +85,92 @@ modredc2ul2_div3 (residueredc2ul2_t r, const residueredc2ul2_t a,
 }
 
 
-void
-modredc2ul2_div5 (residueredc2ul2_t r, const residueredc2ul2_t a, 
-		  const modulusredc2ul2_t m)
+/* Division by small integer n, where (n-1)*m may overflow the most 
+   significant word. Returns 1 if n is invertible modulo m, 0 if not. 
+   
+   w_mod_n is word base (e.g., 2^32 or  2^64) mod n
+   inv_n contains -1/i (mod n) if i is coprime to n, or 0 if i is not coprime 
+   to n, for 0 <= i < n
+   c = n^(-1) (mod word base)
+*/
+
+static inline int
+modredc2ul2_divn_of (residueredc2ul2_t r, const residueredc2ul2_t a, 
+		     const unsigned long n, 
+		     const unsigned long w_mod_n, 
+		     const unsigned long *inv_n,
+		     const unsigned long c,
+		     const modulusredc2ul2_t m)
 {
-  const unsigned long a5 = ((a[1] % 5UL) + a[0] % 5UL) % 5UL;
+  const unsigned long an = ((a[1] % n) * w_mod_n + a[0] % n) % n;
+  const unsigned long mn = ((m[0].m[1] % n) * w_mod_n + m[0].m[0] % n) % n;
+
   residueredc2ul2_t t, t2;
-  unsigned long c;
+  unsigned long k;
   
   modredc2ul2_init_noset0 (t, m);
   modredc2ul2_init_noset0 (t2, m);
   t[1] = a[1];
   t[0] = a[0];
   
-  /* Make t[1]:t[0] == a+km (mod w^2) with a+km divisible by 5 */
-  if (a5 != 0UL)
-    {
-      const unsigned long m5 = ((m[0].m[1] % 5UL) + m[0].m[0] % 5UL) % 5UL;
-      ASSERT(m5 != 0UL);
-      
-      /* inv5[i] = -1/i (mod 5) */
-      const unsigned long inv5[5] = {0,4,2,3,1};
-      unsigned long k;
-      /* We want a+km == 0 (mod 5), so k = -a*m^{-1} (mod 5) */
-      k = (inv5[m5] * a5) % 5UL;
-      ularith_mul_ul_ul_2ul (&(t[0]), &(t[1]), m[0].m[0], k);
-      t[1] += m[0].m[1] * k;
-      ularith_add_2ul_2ul (&(t[0]), &(t[1]), a[0], a[1]);
-    }
+  if (inv_n[mn] == 0)
+    return 0;
 
-  /* We want r = (a+km)/5. */
-  
-  if (sizeof (unsigned long) == 4)
-      c = 0xCCCCCCCDUL;
-  else 
-      c = 0xCCCCCCCCCCCCCCCDUL;
+  /* Make t[1]:t[0] == a+km (mod w^2) with a+km divisible by n */
+  /* We want a+km == 0 (mod n), so k = -a*m^{-1} (mod n) */
+  k = (inv_n[mn] * an) % n;
+  ularith_mul_ul_ul_2ul (&(t[0]), &(t[1]), m[0].m[0], k);
+  t[1] += m[0].m[1] * k;
+  ularith_add_2ul_2ul (&(t[0]), &(t[1]), a[0], a[1]);
+
+  /* We want r = (a+km)/n. */
+
   r[0] = t[0] * c;
 
-  /* r0 == (a+km)/5 (mod w) 
-     (r1*w + r0) * 5 = (a+km)
-     (r1*w + r0) * 5 == t (mod w^2)
-     r1*w*5 == t - 5*r0 (mod w^2)
-                            t - 5*r0 == 0 (mod w), thus
-     r1*5 == (t - 5*r0)/w (mod w) */
+  /* r0 == (a+km)/n (mod w) 
+     (r1*w + r0) * n = (a+km)
+     (r1*w + r0) * n == t (mod w^2)
+     r1*w*n == t - n*r0 (mod w^2)
+                            t - n*r0 == 0 (mod w), thus
+     r1*n == (t - n*r0)/w (mod w) */
 
-  ularith_mul_ul_ul_2ul (&(t2[0]), &(t2[1]), r[0], 5UL);
+  ularith_mul_ul_ul_2ul (&(t2[0]), &(t2[1]), r[0], n);
   ularith_sub_2ul_2ul (&(t[0]), &(t[1]), t2[0], t2[1]);
   ASSERT_EXPENSIVE (t[0] == 0UL);
   r[1] = t[1] * c;
 
-#ifdef WANT_ASSERT_EXPENSIVE
-  modredc2ul2_add (t, r, r, m);
-  modredc2ul2_add (t, t, t, m);
-  modredc2ul2_add (t, t, r, m);
-  ASSERT_EXPENSIVE (modredc2ul2_equal (t, a, m));
-#endif
   modredc2ul2_clear (t, m);
   modredc2ul2_clear (t2, m);
+
+  return 1;
+}
+
+
+void
+modredc2ul2_div5 (residueredc2ul2_t r, const residueredc2ul2_t a, 
+		  const modulusredc2ul2_t m)
+{
+  /* inv13[i] = -1/i (mod 5) */
+  const unsigned long inv_5[5] = {0,4,2,3,1};
+  unsigned long c;
+  if (sizeof (unsigned long) == 4)
+      c = 0xCCCCCCCDUL;
+  else 
+      c = 0xCCCCCCCCCCCCCCCDUL;
+  
+  modredc2ul2_divn_of (r, a, 5UL, 1UL, inv_5, c, m);
+
+#ifdef WANT_ASSERT_EXPENSIVE
+  {
+    residueredc2ul2_t t; 
+    modredc2ul2_init_noset0 (t, m);
+    modredc2ul2_add (t, r, r, m);
+    modredc2ul2_add (t, t, t, m);
+    modredc2ul2_add (t, t, r, m);
+    ASSERT_EXPENSIVE (modredc2ul2_equal (t, a, m));
+    modredc2ul2_clear (t, m);
+  }
+#endif
 }
 
 
@@ -151,50 +179,28 @@ modredc2ul2_div7 (residueredc2ul2_t r, const residueredc2ul2_t a,
 		  const modulusredc2ul2_t m)
 {
   const unsigned long w_mod_7 = (sizeof (unsigned long) == 4) ? 4UL : 2UL;
-  const unsigned long a7 = ((a[1] % 7UL) * w_mod_7 + a[0] % 7UL) % 7UL;
-  const unsigned long inv7[7] = {0,6,3,2,5,4,1};
+  /* inv13[i] = -1/i (mod 7) */
+  const unsigned long inv_7[7] = {0,6,3,2,5,4,1};
   unsigned long c;
-  residueredc2ul2_t t, t2;
-  
-  modredc2ul2_init_noset0 (t, m);
-  modredc2ul2_init_noset0 (t2, m);
-  t[1] = a[1];
-  t[0] = a[0];
-  
-  /* Make t[1]:t[0] == a+km (mod w^2) with a+km divisible by 7 */
-  if (a7 != 0UL)
-    {
-      const unsigned long m7 = ((m[0].m[1] % 7UL) * w_mod_7 + m[0].m[0] % 7UL) % 7UL;
-      unsigned long k;
-      ASSERT(m7 != 0UL);
-      
-      /* inv7[i] = -1/i (mod 7) */
-      /* We want a+km == 0 (mod 7), so k = -a*m^{-1} (mod 7) */
-      k = (inv7[m7] * a7) % 7UL;
-      ularith_mul_ul_ul_2ul (&(t[0]), &(t[1]), m[0].m[0], k);
-      t[1] += m[0].m[1] * k;
-      ularith_add_2ul_2ul (&(t[0]), &(t[1]), a[0], a[1]);
-    }
-  
   if (sizeof (unsigned long) == 4)
       c = 0xb6db6db7UL;
   else 
       c = 0x6db6db6db6db6db7UL;
-  r[0] = t[0] * c;
-  ularith_mul_ul_ul_2ul (&(t2[0]), &(t2[1]), r[0], 7UL);
-  ularith_sub_2ul_2ul (&(t[0]), &(t[1]), t2[0], t2[1]);
-  ASSERT_EXPENSIVE (t[0] == 0UL);
-  r[1] = t[1] * c;
+
+  modredc2ul2_divn_of (r, a, 7UL, w_mod_7, inv_7, c, m);
 
 #ifdef WANT_ASSERT_EXPENSIVE
-  modredc2ul2_add (t, r, r, m);
-  modredc2ul2_add (t, t, t, m);
-  modredc2ul2_add (t, t, t, m);
-  modredc2ul2_sub (t, t, r, m);
-  ASSERT_EXPENSIVE (modredc2ul2_equal (t, a, m));
+  {
+    residueredc2ul2_t t; 
+    modredc2ul2_init_noset0 (t, m);
+    modredc2ul2_add (t, r, r, m);
+    modredc2ul2_add (t, t, t, m);
+    modredc2ul2_add (t, t, t, m);
+    modredc2ul2_sub (t, t, r, m);
+    ASSERT_EXPENSIVE (modredc2ul2_equal (t, a, m));
+    modredc2ul2_clear (t, m);
+  }
 #endif
-  modredc2ul2_clear (t, m);
-  modredc2ul2_clear (t2, m);
 }
 
 
@@ -203,49 +209,30 @@ modredc2ul2_div13 (residueredc2ul2_t r, const residueredc2ul2_t a,
 		   const modulusredc2ul2_t m)
 {
   const unsigned long w_mod_13 = (sizeof (unsigned long) == 4) ? 9UL : 3UL;
-  const unsigned long a13 = ((a[1] % 13UL) * w_mod_13 + a[0] % 13UL) % 13UL;
   /* inv13[i] = -1/i (mod 13) */
-  const unsigned long inv13[13] = {0, 12, 6, 4, 3, 5, 2, 11, 8, 10, 9, 7, 1}; 
-  unsigned long m13 = ((m[0].m[1] % 13UL) * w_mod_13 + m[0].m[0] % 13UL) % 13UL;
+  const unsigned long inv_13[13] = {0, 12, 6, 4, 3, 5, 2, 11, 8, 10, 9, 7, 1}; 
   unsigned long c;
-  residueredc2ul2_t t, t2;
-  
-  ASSERT(m13 != 0UL);
-  
-  modredc2ul2_init_noset0 (t, m);
-  modredc2ul2_init_noset0 (t2, m);
-  
-  t[1] = a[1];
-  t[0] = a[0];
-  /* Make t[1]:t[0] == a+km (mod w^2) with a+km divisible by 13 */
-  if (a13 != 0UL)
-    {
-      /* We want a+km == 0 (mod 13), so k = -a*m^{-1} (mod 13) */
-      m13 = (inv13[m13] * a13) % 13UL;
-      ularith_mul_ul_ul_2ul (&(t[0]), &(t[1]), m[0].m[0], m13);
-      t[1] += m[0].m[1] * m13;
-      ularith_add_2ul_2ul (&(t[0]), &(t[1]), a[0], a[1]);
-    }
   
   if (sizeof (unsigned long) == 4)
       c = 0xc4ec4ec5;
   else 
       c = 0x4ec4ec4ec4ec4ec5;
-  r[0] = t[0] * c;
-  ularith_mul_ul_ul_2ul (&(t2[0]), &(t2[1]), r[0], 13UL);
-  ularith_sub_2ul_2ul (&(t[0]), &(t[1]), t2[0], t2[1]);
-  ASSERT_EXPENSIVE (t[0] == 0UL);
-  r[1] = t[1] * c;
+
+  modredc2ul2_divn_of (r, a, 13UL, w_mod_13, inv_13, c, m);
+
 #ifdef WANT_ASSERT_EXPENSIVE
-  modredc2ul2_add (t, r, r, m);
-  modredc2ul2_add (t, t, r, m);
-  modredc2ul2_add (t, t, t, m);
-  modredc2ul2_add (t, t, t, m);
-  modredc2ul2_add (t, t, r, m);
-  ASSERT_EXPENSIVE (modredc2ul2_equal (t, a, m));
+  {
+    residueredc2ul2_t t;
+    modredc2ul2_init_noset0 (t, m);
+    modredc2ul2_add (t, r, r, m);
+    modredc2ul2_add (t, t, r, m);
+    modredc2ul2_add (t, t, t, m);
+    modredc2ul2_add (t, t, t, m);
+    modredc2ul2_add (t, t, r, m);
+    ASSERT_EXPENSIVE (modredc2ul2_equal (t, a, m));
+    modredc2ul2_clear (t, m);
+  }
 #endif
-  modredc2ul2_clear (t, m);
-  modredc2ul2_clear (t2, m);
 }
 
 

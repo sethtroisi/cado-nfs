@@ -89,7 +89,7 @@ modredcul_redc (residueredcul_t r, const unsigned long plow,
 {
   unsigned long tlow, thigh, t = phigh;
 
-  ASSERT_EXPENSIVE (phigh < m.[0].m);
+  ASSERT_EXPENSIVE (phigh < m[0].m);
 
   tlow = plow * m[0].invm;
   ularith_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
