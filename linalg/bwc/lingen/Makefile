@@ -17,7 +17,7 @@ MY_LFLAGS+=-L$(TOP)/utils -L$(TOP)/gf2x/.libs -L$(TOP)/cantor
 all: lingen
 
 lingen_objs:=fake_fft.o lingen_binary.o
-lingen_libs:=../bw-common.o -lgmpxx -lgmp -lutils -lgf2x $(TOP)/cantor/cantor128.o
+lingen_libs:=../bw-common.o -lgmp -lutils -lgf2x $(TOP)/cantor/cantor128.o
 
 common_link_deps:=$(TOP)/utils/libutils.a
 

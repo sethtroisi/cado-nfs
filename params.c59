@@ -100,6 +100,7 @@ bwstrat=1
 bwmt=2x2                # Multithreading level of Block-Wiedemann ; Use
                         # <m>x<n> for bwc, or only one integer for bw.
 linalg=bwc              # Choose linalg algorithm: one of bwc bw bl
+interval=100    # checkpointing interval for bwc.
 
 ###########################################################################
 # Characters

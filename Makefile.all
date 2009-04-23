@@ -136,7 +136,7 @@ dist-sqrt:
 	cp $(SQRT_FILES) cado-nfs-$(VERSION)/sqrt/naive
 
 dist-post:
-	find cado-nfs-$(VERSION) -name .svn | xargs -r rm -rf
+	-find cado-nfs-$(VERSION) -name .svn | xargs rm -rf
 	tar zcf cado-nfs-$(VERSION).tgz cado-nfs-$(VERSION)
 	/bin/rm -fr cado-nfs-$(VERSION)
 
