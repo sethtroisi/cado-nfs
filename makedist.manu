@@ -6,7 +6,7 @@
 
 set -e
 t=`mktemp -d /tmp/cado-snapshot.XXXXXXX`
-b=cado-nfs-0.0
+b=cado-nfs-`grep ^VERSION Makefile.all | cut -d= -f2`
 
 GIT=$(git rev-parse --short HEAD 2>/dev/null)
 
