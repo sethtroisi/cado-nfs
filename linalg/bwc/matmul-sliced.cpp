@@ -34,7 +34,6 @@ using namespace std;
 #endif
 #endif
 
-#include "readmat.h"
 #include "abase.h"
 #include "matmul-common.h"
 

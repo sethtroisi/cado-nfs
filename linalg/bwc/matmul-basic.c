@@ -10,8 +10,6 @@
 #include "matmul.h"
 #include "matmul-basic.h"
 #include "matmul-common.h"
-#include "readmat.h"
-#include "readmat-easy.h"
 #include "abase.h"
 
 /* This extension is used to distinguish between several possible

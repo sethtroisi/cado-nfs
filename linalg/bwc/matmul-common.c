@@ -100,16 +100,12 @@ void matmul_common_init_post(struct matmul_public_s * mm, param_list pl, int sug
  * done only once, so we practically don't care. */
 uint32_t * matmul_common_read_stupid_data(struct matmul_public_s * mm, const char * filename)
 {
-    /* dims of the possibly transposed matrix */
-    unsigned int nrows_t;
-    unsigned int ncols_t;
     uint32_t * data;
+
     if (mm->store_transposed) {
-        data = read_easy_transposed(filename, &nrows_t, &ncols_t);
+        read_easy(filename, NULL, &data, &mm->dim[0], &mm->dim[1]);
     } else {
-        data = read_easy(filename, &nrows_t, &ncols_t);
+        read_easy(filename, &data, NULL, &mm->dim[0], &mm->dim[1]);
     }
-    mm->dim[ mm->store_transposed] = nrows_t;
-    mm->dim[!mm->store_transposed] = ncols_t;
     return data;
 }

@@ -26,48 +26,8 @@ static int uint_cmp(uint32_t * a, uint32_t * b)
         }								\
     } while (0)
 
-uint32_t * read_easy(const char * filename,
-        unsigned int * p_nr, unsigned int * p_nc)
-{
-    sparse_mat_t smat;
-    FILE * f;
-
-    sparse_mat_init(smat);
-
-    f = fopen(filename, "r");
-    if (f == NULL) {
-        fprintf(stderr, "fopen(%s): %s\n", filename, strerror(errno));
-        exit(1);
-    }
-    read_matrix_header(f, smat);
-
-    uint32_t * data;
-    size_t alloc = 0;
-    size_t size = 0;
-
-    data = NULL;
-
-    if (p_nr) *p_nr = smat->nrows;
-    if (p_nc) *p_nc = smat->ncols;
-
-    /* do it the bovine way. read just about everything in memory. */
-    for(unsigned int i = 0 ; i < smat->nrows ; i++) {
-        read_matrix_row(f,smat,smat->data,1);
-        CHECK_REALLOC(data, alloc, size, 1 + smat->data[0]);
-        data[size++] = smat->data[0];
-        qsort(smat->data + 1, smat->data[0],
-                sizeof(smat->data[0]), (sortfunc_t) uint_cmp);
-        for(unsigned int j = 0 ; j < smat->data[0] ; j++) {
-            data[size++] = smat->data[1+j];
-        }
-    }
-
-    fclose(f);
-
-    return data;
-}
-
-uint32_t * read_easy_transposed(const char * filename,
+void read_easy(const char * filename,
+        uint32_t ** p_direct, uint32_t ** p_transposed,
         unsigned int * p_nr, unsigned int * p_nc)
 {
     sparse_mat_t smat;
@@ -87,15 +47,13 @@ uint32_t * read_easy_transposed(const char * filename,
     size_t size = 0;
 
     uint32_t * colweights;
-    uint32_t ** colptrs;
     colweights = malloc(smat->ncols * sizeof(uint32_t));
     memset(colweights, 0, smat->ncols * sizeof(uint32_t));
-    colptrs = malloc(smat->ncols * sizeof(uint32_t *));
 
     data = NULL;
 
-    if (p_nr) *p_nr = smat->ncols;
-    if (p_nc) *p_nc = smat->nrows;
+    if (p_nr) *p_nr = smat->nrows;
+    if (p_nc) *p_nc = smat->ncols;
 
     /* do it the bovine way. read just about everything in memory. */
     for(unsigned int i = 0 ; i < smat->nrows ; i++) {
@@ -109,8 +67,19 @@ uint32_t * read_easy_transposed(const char * filename,
             colweights[smat->data[1+j]]++;
         }
     }
-
     fclose(f);
+
+    if (p_direct) {
+        *p_direct = data;
+    }
+
+    if (p_transposed == NULL) {
+        free(colweights);
+        return;
+    }
+
+    uint32_t ** colptrs;
+    colptrs = malloc(smat->ncols * sizeof(uint32_t *));
 
     if (smat->ncols > smat->nrows) {
         size += smat->ncols - smat->nrows;
@@ -135,11 +104,15 @@ uint32_t * read_easy_transposed(const char * filename,
         }
     }
 
-    free(data);
+    if (p_direct == NULL) {
+        free(data);
+    }
+
+    ASSERT(p_transposed != NULL);
+    *p_transposed = res;
+
     free(colweights);
     free(colptrs);
-
-    return res;
 }
 
 /* vim: set sw=4: */
