@@ -399,7 +399,7 @@ void matmul_sliced_mul(struct matmul_sliced_data_s * mm, abt * dst, abt const * 
             fprintf(stderr, "Warning: Doing many iterations with bad code\n");
         }
 
-        abzero(x, dst, mm->public_->dim[1]);
+        abzero(x, dst, mm->public_->dim[!d]);
         for(uint16_t s = 0 ; s < nhstrips ; s++) {
             uint32_t j = 0;
             uint32_t nrows_packed = matmul_sliced_data_s::read32(q);
