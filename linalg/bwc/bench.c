@@ -13,6 +13,7 @@
 #include <time.h>
 #include <errno.h>
 #include <limits.h>
+#include <inttypes.h>
 
 #include "matmul.h"
 #include "abase.h"
@@ -106,7 +107,7 @@ int main(int argc, char * argv[])
                 (double) (clock()-t0) / CLOCKS_PER_SEC);
     }
 
-    fprintf(stderr, "%s: %u rows %u cols %lu coeffs\n",
+    fprintf (stderr, "%s: %u rows %u cols %" PRIu64 " coeffs\n",
             file, mm->dim[0], mm->dim[1], mm->ncoeffs);
 
     unsigned int nc = mm->dim[1];
