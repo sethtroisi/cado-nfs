@@ -229,12 +229,13 @@ static struct matmul_threaded_data_s * matmul_threaded_init(abobj_ptr xx MAYBE_U
 
 void matmul_threaded_blocks_info(struct matmul_threaded_data_s * mm)
 {
-    printf("// %u dense blocks of %d rows\n",
-            mm->dense->n, MM_DGRP_SIZE);
+    printf("// %u dense blocks of %d %ss\n",
+            mm->dense->n, MM_DGRP_SIZE, rowcol[mm->store_transposed]);
     unsigned long sparse_coeffs = mm->public_->ncoeffs - mm->dense->weight;
     unsigned long padding = mm->sparse->tlen - sparse_coeffs;
-    printf("// %u sparse blocks of %d rows ; %lu coeffs + %lu padding (+%.2f%%)\n",
+    printf("// %u sparse blocks of %d %ss ; %lu coeffs + %lu padding (+%.2f%%)\n",
             mm->sparse->n, mm->sgrp_size,
+            rowcol[mm->store_transposed],
             sparse_coeffs, padding,
             (100.0 * padding / sparse_coeffs));
 }
@@ -279,11 +280,10 @@ struct matmul_threaded_data_s * matmul_threaded_build(abobj_ptr xx, const char *
             q += 1 + *q;
         }
         int dense = weight * mm->densify_tolerance >= ncols_t;
-        const char * rc[2] = { "row","col", };
         printf("%ss %u..%u ; total %u coeffs = n%ss(%u) * %.2f ;%s dense\n",
-                rc[mm->public_->store_transposed],
+                rowcol[mm->public_->store_transposed],
                 i, i+di-1, weight,
-                rc[!mm->public_->store_transposed],
+                rowcol[!mm->public_->store_transposed],
                 mm->public_->dim[!mm->public_->store_transposed],
                 (double) weight / ncols_t,
                 dense ? "" : " not");
