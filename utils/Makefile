@@ -87,8 +87,9 @@ sources:=       \
     modredc_15ul.c modredc_ul.c modul_poly.c params.c plain_poly.c \
     random_generation.c relation.c rootfinder.c test-rootfinder.c timing.c \
     gzip.c
-
+ifndef	CLEANING
 dep: $(patsubst %,.deps/%.d,$(sources))
 -include $(patsubst %,.deps/%.d,$(sources))
+endif
 
 

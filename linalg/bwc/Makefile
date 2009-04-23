@@ -106,27 +106,37 @@ common_libs += $(EXTRA_LIBS)
 test_hello_objs:=test_hello.o parallelizing_info.o
 test_hello: $(test_hello_objs) $(common_link_deps)
 	$(CXX) $(MY_LFLAGS) $(test_hello_objs) -o $@ $(common_libs)
+ifndef	CLEANING
 -include $(patsubst %,.deps/%.d,$(test_hello_objs))
+endif
 
 random_objs:=random.o
 random: $(random_objs) $(common_link_deps)
 	$(CXX) $(MY_LFLAGS) $(random_objs) -o $@ $(common_libs) -lm
+ifndef	CLEANING
 -include $(patsubst %,.deps/%.d,$(random_objs))
+endif
 
 split_objs:=split.o bw-common.o
 split: $(split_objs) $(common_link_deps)
 	$(CXX) $(MY_LFLAGS) $(split_objs) -o $@ $(common_libs)
+ifndef	CLEANING
 -include $(patsubst %,.deps/%.d,$(split_objs))
+endif
 
 acollect_objs:=acollect.o bw-common.o
 acollect: $(acollect_objs) $(common_link_deps)
 	$(CXX) $(MY_LFLAGS) $(acollect_objs) -o $@ $(common_libs)
+ifndef	CLEANING
 -include $(patsubst %,.deps/%.d,$(acollect_objs))
+endif
 
 shell_objs:=shell.o parallelizing_info.o bw-common.o bw-common-mpi.o
 shell: $(shell_objs) $(common_link_deps)
 	$(CXX) $(MY_LFLAGS) $(shell_objs) -o $@ $(common_libs)
+ifndef	CLEANING
 -include $(patsubst %,.deps/%.d,$(shell_objs))
+endif
 
 all_objlists:=libmatmul build bench prep gather secure krylov mksol shell
 
@@ -195,7 +205,9 @@ endef
 define	multiple_binary
 $(1)/$(2): $$($(1)_$(2)_objs) $$($(2)_normalobjs) $(common_link_deps)
 	$$(CXX) $$(MY_LFLAGS) $$($(1)_$(2)_objs) $$($(2)_normalobjs) -o $$@ $$(common_libs)
+ifndef	CLEANING
 -include $$(patsubst %,.deps/%.d,$$($(1)_$(2)_objs))
+endif
 allbins+=$(1)/$(2)
 endef
 
@@ -211,6 +223,7 @@ $(1)/%.o: %.S
 $(1)/%.o: %.cpp
 	@mkdir -p $(1)
 	$$(CXX) -DSELECT_ABASE_$(1) $$(MY_CXXFLAGS) $$< -c -o $$@
+ifndef	CLEANING
 .deps/$(1)/%.o.d: %.c
 	@mkdir -p .deps/$(1)
 	$$(CC) -DSELECT_ABASE_$(1) $$(MY_CFLAGS) -M -MM -MG -MP -MF $$@ -MT '$$@ $(1)/$$*.o' $$<
@@ -220,6 +233,7 @@ $(1)/%.o: %.cpp
 .deps/$(1)/%.o.d: %.cpp
 	@mkdir -p .deps/$(1)
 	$$(CXX) -DSELECT_ABASE_$(1) $$(MY_CXXFLAGS) -M -MM -MG -MP -MF $$@ -MT '$$@ $(1)/$$*.o' $$<
+endif
 
 $$(foreach x,$$(all_objlists),$$(eval $(1)_$$(x)_objs:=$(1)/abase-$(1).o $$(patsubst %,$(1)/%,$$($$(x)_objs))))
 

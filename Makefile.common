@@ -60,11 +60,14 @@ MY_CXXFLAGS=$(filter-out -std=c99,$(MY_CFLAGS))
 .S.o:
 	$(CC) $(MY_CFLAGS) $< -c -o $@
 
+ifndef	CLEANING
 .deps/%.c.d: %.c
 	@mkdir -p .deps
 	$(CC) $(MY_CFLAGS) -M -MM -MG -MP -MF $@ -MT '$@ $(build_dir)$*.o' $<
 .deps/%.cpp.d: %.cpp
 	@mkdir -p .deps
 	$(CXX) $(MY_CXXFLAGS) -M -MM -MG -MP -MF $@ -MT '$@ $(build_dir)$*.o' $<
+endif
+
 
 default-target: all

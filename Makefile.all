@@ -128,7 +128,7 @@ dist-bw:
 
 dist-bwc:
 	cp -pr linalg/bwc cado-nfs-$(VERSION)/linalg
-	$(MAKE) -C cado-nfs-$(VERSION)/linalg/bwc clean
+	$(MAKE) -C cado-nfs-$(VERSION)/linalg/bwc clean CLEANING=1
 
 dist-sqrt:
 	mkdir cado-nfs-$(VERSION)/sqrt
