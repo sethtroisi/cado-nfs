@@ -202,6 +202,8 @@ my @default_param = (
     bwmt         => 2,
     bwthreshold  => 64,
     bwtidy       => 1,
+    bwc_interval => 1000,
+    bwc_mm_impl => 'sliced',
 
     # characters
     nkermax      => 30,
@@ -1084,7 +1086,7 @@ my %tasks = (
 
     linalg    => { name   => "linear algebra",
                    dep    => ['replay'],
-                   param  => ['skip', 'bwmt', 'bwthreshold', 'linalg'],
+                   param  => [ qw/skip bwmt bwthreshold linalg bwc_interval bwc_mm_impl/],
                    files  => ['bw', 'bw\.stderr', 'bl', 'bl\.stderr', 'W'] },
 
     bitstr    => { dep    => ['linalg'],
@@ -1916,6 +1918,8 @@ sub do_linalg {
                "mn=64 ".
                "vectoring=64 ".
                "multisols=1 ".
+               "interval=$param{'bwc_interval'} ".
+               "bwc_mm_impl=$param{'bwc_mm_impl'} ".
                "wdir=$param{'wdir'}/bw " .
                "tidy=$param{'bwtidy'} ".
                "threshold=$param{'bwthreshold'} ".
