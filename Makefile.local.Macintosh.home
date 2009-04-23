@@ -1,0 +1,8 @@
+HOME=$(shell echo $$HOME)
+CC=$(HOME)/Packages/gcc-4.3.2/bin/gcc
+GMP=$(HOME)/Packages/gmp-4.3.0
+CFLAGS=-m64 -DDISABLE_ASM
+LDFLAGS=-m64
+HAVE_POSIX_MEMALIGN=0
+WITH_PTHREADS=0
+CONFIGURE_EXTRA=ABI=64 CC="$(CC) -m64"

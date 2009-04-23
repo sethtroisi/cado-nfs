@@ -2,7 +2,6 @@ Required software tools:
 =======================
 
 *) GMP (http://gmplib.org): usually installed in most Linux distributions
-   (GMP must be configured with --enable-cxx)
 *) The GCC compiler works ; some others might, but it is untested.
 *) GNU make for building
 

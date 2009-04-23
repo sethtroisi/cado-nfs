@@ -42,9 +42,6 @@ struct thread_info {
 };
 
 struct matmul_threaded_data_s {
-    /* repeat the fields from the public interface */
-    // unsigned int nrows;
-    // unsigned int ncols;
     struct matmul_public_s public_[1];
 
     /* Now our private fields */
@@ -90,7 +87,6 @@ struct matmul_threaded_data_s {
     void * dst;
     const void * src;
     int d;
-    int iteration[2];
 };
 
 extern void matmul_threaded_mul_sub_dense(struct matmul_threaded_data_s * mm, abt * dst, abt const * src, int d, int i);
@@ -113,7 +109,7 @@ void * thread_job(void * ti)
         pthread_cond_wait(&mm->cond_in,&mm->mu);
         mm->working++;
         pthread_mutex_unlock(&mm->mu);
-        if (mm->iteration[mm->d] < 0)
+        if (mm->public_->iteration[mm->d] < 0)
             break;
 
         /* Do our job with mutexes released */
@@ -144,8 +140,6 @@ void worker_threads_init(struct matmul_threaded_data_s * mm)
     pthread_mutex_init(&mm->mu, NULL);
     mm->working = 0;
     mm->done = 0;
-    mm->iteration[0] = 0;
-    mm->iteration[1] = 0;
     for(unsigned int i = 0 ; i < mm->nthreads ; i++) {
         int rc;
         mm->thread_table[i].i = i;
@@ -167,8 +161,8 @@ void worker_threads_init(struct matmul_threaded_data_s * mm)
 
 void worker_threads_clear(struct matmul_threaded_data_s * mm)
 {
-    mm->iteration[0] = -1;
-    mm->iteration[1] = -1;
+    mm->public_->iteration[0] = -1;
+    mm->public_->iteration[1] = -1;
     pthread_mutex_lock(&mm->mu);
     pthread_cond_broadcast(&mm->cond_in);
     pthread_mutex_unlock(&mm->mu);
@@ -674,7 +668,7 @@ void matmul_threaded_mul_sub_sparse(struct matmul_threaded_data_s * mm, abt * ds
         if (throff != 0)
             return;
 
-        if (mm->iteration[d] == 10) {
+        if (mm->public_->iteration[d] == 10) {
             fprintf(stderr, "Warning: Doing many iterations with bad code\n");
         }
 
@@ -736,7 +730,7 @@ void matmul_threaded_mul(struct matmul_threaded_data_s * mm, abt * dst, abt cons
     pthread_cond_wait(&mm->cond_out,&mm->mu);
     pthread_mutex_unlock(&mm->mu);
 
-    mm->iteration[d]++;
+    mm->public_->iteration[d]++;
 }
 
 void matmul_threaded_report(struct matmul_threaded_data_s * mm MAYBE_UNUSED) {

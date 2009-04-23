@@ -31,6 +31,16 @@ make -f Makefile.all dist VERSION=dev "$@"
 # now extract the tarball and test it
 tar zxf cado-nfs-dev.tgz
 cd cado-nfs-dev
+
+# If the cado repository contains a Makefile.local for this machine, use
+# it.
+h=`hostname`
+
+if [ -f Makefile.local.$h ] ; then
+    echo "Using Makefile.local.$h"
+    cp -f Makefile.local.$h  Makefile.local
+fi
+
 make "$@"
 ./new_run.c59
 exit

@@ -393,7 +393,8 @@ void matmul_sliced_mul(struct matmul_sliced_data_s * mm, abt * dst, abt const * 
         }
     } else {
         /* d == 0 */
-        /* BEWARE, it's wildly sub-optimal ! */
+        /* BEWARE, it's a priori sub-optimal ! In practice, the
+         * difference isn't so striking though. */
         if (mm->public_->iteration[d] == 10) {
             fprintf(stderr, "Warning: Doing many iterations with bad code\n");
         }
