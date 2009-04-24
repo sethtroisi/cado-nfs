@@ -64,6 +64,11 @@ extern const char * rowcol[2];  // [0] = "row" [1] = "col"
     rc = fread(ptr__, sizeof(uint16_t), n__, f__);			\
     FATAL_ERROR_CHECK(rc < n__, "Short read from cached matrix file");	\
 } while (0)
+#define MATMUL_COMMON_READ_MANY8(ptr__, n__, f__) do {         	\
+    size_t rc;								\
+    rc = fread(ptr__, sizeof(uint8_t), n__, f__);			\
+    FATAL_ERROR_CHECK(rc < n__, "Short read from cached matrix file");	\
+} while (0)
 #define MATMUL_COMMON_WRITE_ONE64(final_v__, file__)  do {              \
     size_t rc;								\
     uint64_t storage_v__ = final_v__;					\
@@ -90,6 +95,11 @@ extern const char * rowcol[2];  // [0] = "row" [1] = "col"
 #define MATMUL_COMMON_WRITE_MANY16(ptr__, n__, f__) do {         	\
     size_t rc;								\
     rc = fwrite(ptr__, sizeof(uint16_t), n__, f__);			\
+    FATAL_ERROR_CHECK(rc < n__, "Short write to cached matrix file");	\
+} while (0)
+#define MATMUL_COMMON_WRITE_MANY8(ptr__, n__, f__) do {         	\
+    size_t rc;								\
+    rc = fwrite(ptr__, sizeof(uint8_t), n__, f__);			\
     FATAL_ERROR_CHECK(rc < n__, "Short write to cached matrix file");	\
 } while (0)
 

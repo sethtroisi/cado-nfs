@@ -8,6 +8,7 @@
 #include "matmul-basic.h"
 #include "matmul-sliced.h"
 #include "matmul-threaded.h"
+#include "matmul-bucket.h"
 
 
 /* Now some cpp glue which sets up the different options */
@@ -41,7 +42,12 @@ void do_rebinding(matmul_ptr mm, const char * impl)
     CHECK_REBIND(mm, sliced)        // no semicolon !
     CHECK_REBIND(mm, threaded)      // no semicolon !
     CHECK_REBIND(mm, basic)         // no semicolon !
-    { fprintf(stderr, "no implementation %s known\n", impl); exit(1); }
+    CHECK_REBIND(mm, bucket)         // no semicolon !
+    {   
+        fprintf(stderr, "no implementation %s known (update %s ?)\n",
+            impl, __FILE__);
+        exit(1);
+    }
 }
 
 matmul_ptr matmul_build(abobj_ptr x, const char * filename, const char * impl, param_list pl, int optimized_direction)

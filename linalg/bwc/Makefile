@@ -143,6 +143,7 @@ all_objlists:=libmatmul build bench prep gather secure krylov mksol shell
 libmatmul_objs:=					\
     matmul-common.o					\
     matmul-basic.o matmul-sliced.o matmul-threaded.o	\
+    matmul-bucket.o					\
     matmul.o
 
 ifndef	DISABLE_ASM
