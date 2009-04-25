@@ -51,6 +51,7 @@ UTILS_FILES=utils/utils.h utils/mod_ul.h utils/fpoly.h utils/getprime.h \
 	   utils/random_generation.c utils/mod_ul.c \
 	   utils/mod_ul_default.h utils/modredc_ul.c \
 	   utils/modredc_ul_default.h utils/modredc_15ul.c \
+	   utils/modredc_2ul2.c utils/modredc_2ul2.h utils/modredc_2ul2_default.h \
 	   utils/mpz_array.h utils/mpz_array.c utils/modredc_15ul_default.h \
 	   utils/check_rels.c utils/gzip.c utils/gzip.h	\
 	   utils/mpz_poly.c utils/mpz_poly.h	\
