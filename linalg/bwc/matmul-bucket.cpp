@@ -46,7 +46,9 @@ using namespace std;
 
 /* To what should we compare the average dj value for determining when we
  * should switch from dense (small) to sparse (large) blocks */
-#define DJ_LARGE_JUMP   0.05
+#define DJ_LARGE_JUMP   4.0
+
+#define xxxDEBUG_BUCKETS
 
 /* This implementation builds upon the ``sliced'' variant. Several strips
  * are stored in just the same way, and when we reach sparser areas, we
@@ -85,6 +87,7 @@ using namespace std;
 #define MM_EXTENSION   "-bucket"
 
 #define MM_MAGIC_FAMILY        0xa003UL
+
 #define MM_MAGIC_VERSION       0x1007UL
 #define MM_MAGIC (MM_MAGIC_FAMILY << 16 | MM_MAGIC_VERSION)
 
@@ -303,23 +306,23 @@ struct matmul_bucket_data_s * matmul_bucket_build(abobj_ptr xx, const char * fil
                 for( ; c - v0 < len && *c < i1 ; c++) {/*{{{*/
                     uint32_t i = *c - i0;
                     uint8_t w = i / 256;
-                    my_ind[w].push_back((uint8_t) i);
                     uint32_t diff = j - my_lastj;
                     for( ; diff > 255 ; ) {
                         /* This is equivalent to adding two coefficients
                          * to the matrix, but in the same position. */
                         my_main.push_back(255);
-                        my_main.push_back(255);
-                        my_ind[w].push_back(0);
                         my_main.push_back(0);
-                        my_main.push_back(255);
-                        my_ind[w].push_back(0);
+                        my_ind[0].push_back(0);
+                        my_main.push_back(0);
+                        my_main.push_back(0);
+                        my_ind[0].push_back(0);
                         my_lastj += 255;
                         diff -= 255;
                         my_pad++;
                     }
                     my_main.push_back(diff);
                     my_main.push_back(w);
+                    my_ind[w].push_back((uint8_t) i);
                     my_lastj = j;
                     my_weight++;
                 }/*}}}*/
@@ -364,6 +367,16 @@ struct matmul_bucket_data_s * matmul_bucket_build(abobj_ptr xx, const char * fil
                 mm->lsl.push_back(ind[k].size());
                 mm->t8.insert(mm->t8.end(), ind[k].begin(), ind[k].end());
             }
+#ifdef  DEBUG_BUCKETS
+            /* re-count the number of occurences of each. */
+            unsigned int recount[256] = {0, };
+            for(unsigned int z = 1 ; z < main.size() ; z+=2) {
+                recount[main[z]]++;
+            }
+            for(int k = 0 ; k < 256 ; k++) {
+                ASSERT_ALWAYS(recount[k] == mm->lsl[mm->lsl.size()-256+k]);
+            }
+#endif
             mm->public_->ncoeffs += locweight;
             v++;
         }
@@ -520,8 +533,13 @@ void matmul_bucket_mul(struct matmul_bucket_data_s * mm, abt * dst, abt const * 
                 for(int k = 0 ; k < 256 ; k++) {
                     unsigned int l = ql[k];
                     for( ; l-- ; ) {
+                        /* For padding coeffs, the assertion can fail if
+                         * we choose a row not equal to (0,0) -- first in
+                         * the first bucket.
+                         */
                         ASSERT(outp + *q8 < dst + nrows_t);
-                        abadd(x, outp + aboffset(x, *q8), z++);
+                        abadd(x, outp + aboffset(x, *q8), z);
+                        z++;
                         q8++;
                     }
                     outp += aboffset(x, 256);
