@@ -8,17 +8,17 @@ ecmtorsion12(n,p) = {
   /* If the n parameter is a negative rational, use that as the u value */
   if (n < 0,
     u = Mod(-n,p);
-  ,
+  , 
     /* We want a rational u so that v^2 = u^3-12u is a rational square. 
        u=-2, v=4 satisfies this and together with the torsion point (0,0)
        generates all rational points on the curve (which has rank 1).
-       So we get all other (u,v) pairs as multiples of this point on 
-       the curve v^2=u^3-12*u. */
+       Adding the torsion point 90,0) does not seem to affect the
+       ECM curve we get out in the end, so we simply ignore it.
+       So we get all other (u,v) pairs as multiples of the point (-2,4) 
+       on the curve v^2=u^3-12*u. */
     c = ellinit([Mod(0,p),Mod(0,p),Mod(0,p),Mod(-12,p),Mod(0,p)]);
-    nmod2 = n % 2;
-    pnt = ellpow (c, [Mod(-2,p), Mod(4,p)], (n - nmod2) / 2);
-    if (nmod2, pnt = elladd (c, pnt, [Mod(0, p), Mod(0, p)]));
-    print ("Resulting point on v^2=u^3-12*u : ", pnt);
+    pnt = ellpow (c, [Mod(-2,p), Mod(4,p)], n);
+    /* print ("Resulting point on v^2=u^3-12*u : ", pnt); */
     u = pnt[1];
   );
 
@@ -52,9 +52,7 @@ ecmtorsion12_Q(n) = {
   local (t2, a, A, B, u, c, pnt, nmod2);
 
   c = ellinit([0,0,0,-12,0]);
-  nmod2 = n % 2;
-  pnt = ellpow (c, [-2, 4], (n - nmod2) / 2);
-  if (nmod2, pnt = elladd (c, pnt, [0, 0]));
+  pnt = ellpow (c, [-2, 4], n);
   print ("Resulting point on v^2=u^3-12*u : ", pnt);
   u = pnt[1];
 
