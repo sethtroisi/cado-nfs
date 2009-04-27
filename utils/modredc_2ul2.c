@@ -27,7 +27,9 @@ static const unsigned char trailing_zeros[256] =
 #endif
 
 
-void
+/* Divide residue by 3. Returns 1 if division is possible, 0 otherwise */
+
+int
 modredc2ul2_div3 (residueredc2ul2_t r, const residueredc2ul2_t a, 
 		  const modulusredc2ul2_t m)
 {
@@ -37,7 +39,8 @@ modredc2ul2_div3 (residueredc2ul2_t r, const residueredc2ul2_t a,
   const unsigned long m3 = (m[0].m[0] % 256UL + m[0].m[0] / 256UL +
 			    m[0].m[1] % 256UL + m[0].m[1] / 256UL) % 3UL;
 
-  ASSERT(m3 != 0UL);
+  if (m3 == 0)
+    return 0;
 
   modredc2ul2_init_noset0 (t, m);
   t[1] = a[1];
@@ -82,6 +85,8 @@ modredc2ul2_div3 (residueredc2ul2_t r, const residueredc2ul2_t a,
   ASSERT_EXPENSIVE (modredc2ul2_equal (a, t, m));
 #endif
   modredc2ul2_clear (t, m);
+
+  return 1;
 }
 
 
@@ -96,10 +101,8 @@ modredc2ul2_div3 (residueredc2ul2_t r, const residueredc2ul2_t a,
 
 static inline int
 modredc2ul2_divn_of (residueredc2ul2_t r, const residueredc2ul2_t a, 
-		     const unsigned long n, 
-		     const unsigned long w_mod_n, 
-		     const unsigned long *inv_n,
-		     const unsigned long c,
+		     const unsigned long n, const unsigned long w_mod_n, 
+		     const unsigned long *inv_n, const unsigned long c,
 		     const modulusredc2ul2_t m)
 {
   const unsigned long an = ((a[1] % n) * w_mod_n + a[0] % n) % n;
@@ -108,17 +111,18 @@ modredc2ul2_divn_of (residueredc2ul2_t r, const residueredc2ul2_t a,
   residueredc2ul2_t t, t2;
   unsigned long k;
   
+  if (inv_n[mn] == 0)
+    return 0;
+
   modredc2ul2_init_noset0 (t, m);
   modredc2ul2_init_noset0 (t2, m);
   t[1] = a[1];
   t[0] = a[0];
   
-  if (inv_n[mn] == 0)
-    return 0;
-
   /* Make t[1]:t[0] == a+km (mod w^2) with a+km divisible by n */
   /* We want a+km == 0 (mod n), so k = -a*m^{-1} (mod n) */
   k = (inv_n[mn] * an) % n;
+  ASSERT_EXPENSIVE ((an + k*mn) % n == 0);
   ularith_mul_ul_ul_2ul (&(t[0]), &(t[1]), m[0].m[0], k);
   t[1] += m[0].m[1] * k;
   ularith_add_2ul_2ul (&(t[0]), &(t[1]), a[0], a[1]);
@@ -139,6 +143,16 @@ modredc2ul2_divn_of (residueredc2ul2_t r, const residueredc2ul2_t a,
   ASSERT_EXPENSIVE (t[0] == 0UL);
   r[1] = t[1] * c;
 
+#ifdef WANT_ASSERT_EXPENSIVE
+  {
+    int i;
+    modredc2ul2_set (t, r, m);
+    for (i = 1; i < n; i++)
+      modredc2ul2_add (t, t, r, m);
+    ASSERT_EXPENSIVE (modredc2ul2_equal (t, a, m));
+  }
+#endif
+
   modredc2ul2_clear (t, m);
   modredc2ul2_clear (t2, m);
 
@@ -146,40 +160,32 @@ modredc2ul2_divn_of (residueredc2ul2_t r, const residueredc2ul2_t a,
 }
 
 
-void
+/* Divide residue by 5. Returns 1 if division is possible, 0 otherwise */
+
+int
 modredc2ul2_div5 (residueredc2ul2_t r, const residueredc2ul2_t a, 
 		  const modulusredc2ul2_t m)
 {
-  /* inv13[i] = -1/i (mod 5) */
+  /* inv_5[i] = -1/i (mod 5) */
   const unsigned long inv_5[5] = {0,4,2,3,1};
   unsigned long c;
   if (sizeof (unsigned long) == 4)
-      c = 0xCCCCCCCDUL;
+      c = 0xcccccccdUL;
   else 
-      c = 0xCCCCCCCCCCCCCCCDUL;
+      c = 0xcccccccccccccccdUL;
   
-  modredc2ul2_divn_of (r, a, 5UL, 1UL, inv_5, c, m);
-
-#ifdef WANT_ASSERT_EXPENSIVE
-  {
-    residueredc2ul2_t t; 
-    modredc2ul2_init_noset0 (t, m);
-    modredc2ul2_add (t, r, r, m);
-    modredc2ul2_add (t, t, t, m);
-    modredc2ul2_add (t, t, r, m);
-    ASSERT_EXPENSIVE (modredc2ul2_equal (t, a, m));
-    modredc2ul2_clear (t, m);
-  }
-#endif
+  return modredc2ul2_divn_of (r, a, 5UL, 1UL, inv_5, c, m);
 }
 
 
-void
+/* Divide residue by 7. Returns 1 if division is possible, 0 otherwise */
+
+int
 modredc2ul2_div7 (residueredc2ul2_t r, const residueredc2ul2_t a, 
 		  const modulusredc2ul2_t m)
 {
   const unsigned long w_mod_7 = (sizeof (unsigned long) == 4) ? 4UL : 2UL;
-  /* inv13[i] = -1/i (mod 7) */
+  /* inv_7[i] = -1/i (mod 7) */
   const unsigned long inv_7[7] = {0,6,3,2,5,4,1};
   unsigned long c;
   if (sizeof (unsigned long) == 4)
@@ -187,52 +193,47 @@ modredc2ul2_div7 (residueredc2ul2_t r, const residueredc2ul2_t a,
   else 
       c = 0x6db6db6db6db6db7UL;
 
-  modredc2ul2_divn_of (r, a, 7UL, w_mod_7, inv_7, c, m);
-
-#ifdef WANT_ASSERT_EXPENSIVE
-  {
-    residueredc2ul2_t t; 
-    modredc2ul2_init_noset0 (t, m);
-    modredc2ul2_add (t, r, r, m);
-    modredc2ul2_add (t, t, t, m);
-    modredc2ul2_add (t, t, t, m);
-    modredc2ul2_sub (t, t, r, m);
-    ASSERT_EXPENSIVE (modredc2ul2_equal (t, a, m));
-    modredc2ul2_clear (t, m);
-  }
-#endif
+  return modredc2ul2_divn_of (r, a, 7UL, w_mod_7, inv_7, c, m);
 }
 
 
-void
+/* Divide residue by 11. Returns 1 if division is possible, 0 otherwise */
+
+int
+modredc2ul2_div11 (residueredc2ul2_t r, const residueredc2ul2_t a, 
+		   const modulusredc2ul2_t m)
+{
+  const unsigned long w_mod_11 = (sizeof (unsigned long) == 4) ? 4UL : 5UL;
+  /* inv_11[i] = -1/i (mod 11) */
+  const unsigned long inv_11[11] = {0, 10, 5, 7, 8, 2, 9, 3, 4, 6, 1}; 
+  unsigned long c;
+  
+  if (sizeof (unsigned long) == 4)
+      c = 0xba2e8ba3UL;
+  else 
+      c = 0x2e8ba2e8ba2e8ba3UL;
+
+  return modredc2ul2_divn_of (r, a, 11UL, w_mod_11, inv_11, c, m);
+}
+
+
+/* Divide residue by 13. Returns 1 if division is possible, 0 otherwise */
+
+int
 modredc2ul2_div13 (residueredc2ul2_t r, const residueredc2ul2_t a, 
 		   const modulusredc2ul2_t m)
 {
   const unsigned long w_mod_13 = (sizeof (unsigned long) == 4) ? 9UL : 3UL;
-  /* inv13[i] = -1/i (mod 13) */
+  /* inv_13[i] = -1/i (mod 13) */
   const unsigned long inv_13[13] = {0, 12, 6, 4, 3, 5, 2, 11, 8, 10, 9, 7, 1}; 
   unsigned long c;
   
   if (sizeof (unsigned long) == 4)
-      c = 0xc4ec4ec5;
+      c = 0xc4ec4ec5UL;
   else 
-      c = 0x4ec4ec4ec4ec4ec5;
+      c = 0x4ec4ec4ec4ec4ec5UL;
 
-  modredc2ul2_divn_of (r, a, 13UL, w_mod_13, inv_13, c, m);
-
-#ifdef WANT_ASSERT_EXPENSIVE
-  {
-    residueredc2ul2_t t;
-    modredc2ul2_init_noset0 (t, m);
-    modredc2ul2_add (t, r, r, m);
-    modredc2ul2_add (t, t, r, m);
-    modredc2ul2_add (t, t, t, m);
-    modredc2ul2_add (t, t, t, m);
-    modredc2ul2_add (t, t, r, m);
-    ASSERT_EXPENSIVE (modredc2ul2_equal (t, a, m));
-    modredc2ul2_clear (t, m);
-  }
-#endif
+  return modredc2ul2_divn_of (r, a, 13UL, w_mod_13, inv_13, c, m);
 }
 
 

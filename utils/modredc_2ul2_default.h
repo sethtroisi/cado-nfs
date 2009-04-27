@@ -57,6 +57,7 @@
 #undef mod_div2
 #undef mod_div3
 #undef mod_div7
+#undef mod_div11
 #undef mod_div13
 #undef mod_pow_ul
 #undef mod_2pow_ul
@@ -119,6 +120,7 @@
 #define mod_div3             modredc2ul2_div3
 #define mod_div5             modredc2ul2_div5
 #define mod_div7             modredc2ul2_div7
+#define mod_div11            modredc2ul2_div11
 #define mod_div13            modredc2ul2_div13
 #define mod_pow_ul           modredc2ul2_pow_ul
 #define mod_2pow_ul          modredc2ul2_2pow_ul

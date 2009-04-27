@@ -777,14 +777,16 @@ modredc15ul_finished (const residueredc15ul_t r, const modulusredc15ul_t m)
 }
 
 /* prototypes of non-inline functions */
-void modredc15ul_div3 (residueredc15ul_t, const residueredc15ul_t, 
+int modredc15ul_div3 (residueredc15ul_t, const residueredc15ul_t, 
+		      const modulusredc15ul_t);
+int modredc15ul_div5 (residueredc15ul_t, const residueredc15ul_t, 
+		      const modulusredc15ul_t);
+int modredc15ul_div7 (residueredc15ul_t, const residueredc15ul_t, 
+		      const modulusredc15ul_t);
+int modredc15ul_div11 (residueredc15ul_t, const residueredc15ul_t, 
 		       const modulusredc15ul_t);
-void modredc15ul_div5 (residueredc15ul_t, const residueredc15ul_t, 
+int modredc15ul_div13 (residueredc15ul_t, const residueredc15ul_t, 
 		       const modulusredc15ul_t);
-void modredc15ul_div7 (residueredc15ul_t, const residueredc15ul_t, 
-		       const modulusredc15ul_t);
-void modredc15ul_div13 (residueredc15ul_t, const residueredc15ul_t, 
-		        const modulusredc15ul_t);
 void modredc15ul_gcd (modintredc15ul_t, const residueredc15ul_t, 
 		      const modulusredc15ul_t);
 void modredc15ul_pow_ul (residueredc15ul_t, const residueredc15ul_t, 

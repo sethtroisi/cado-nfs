@@ -9,22 +9,25 @@
    but this is a start.
 */
 
-void
+int
 mod_div3 (residue_t r, const residue_t a, const modulus_t m)
 {
   const unsigned long a3 = a[0] % 3UL;
   unsigned long ml, m3;
   residue_t t;
 
+  ASSERT_EXPENSIVE (a[0] < mod_getmod_ul (m));
+
+  ml = mod_getmod_ul (m);
+  m3 = ml % 3UL;
+  if (m3 == 0)
+    return 0;
+
   mod_init_noset0 (t, m);
   
   mod_set (t, a, m);
   if (a3 != 0UL)
     {
-      ml = mod_getmod_ul (m);
-      m3 = ml % 3UL;
-      ASSERT(m3 != 0UL);
-      
       if (a3 + m3 == 3UL) /* Hence a3 == 1, m3 == 2 or a3 == 2, m3 == 1 */
 	t[0] = t[0] + ml;
       else /* a3 == 1, m3 == 1 or a3 == 2, m3 == 2 */
@@ -49,10 +52,12 @@ mod_div3 (residue_t r, const residue_t a, const modulus_t m)
 
   mod_set (r, t, m);
   mod_clear (t, m);
+
+  return 1;
 }
 
 
-void
+int
 mod_div5 (residue_t r, const residue_t a, const modulus_t m)
 {
   unsigned long ml, m5, k;
@@ -62,14 +67,15 @@ mod_div5 (residue_t r, const residue_t a, const modulus_t m)
 
   ASSERT_EXPENSIVE (a[0] < mod_getmod_ul (m));
 
+  ml = mod_getmod_ul (m);
+  m5 = ml % 5UL;
+  if (m5 == 0)
+    return 0;
+      
   mod_init_noset0 (t, m);
   mod_set (t, a, m);
   if (a5 != 0UL)
     {
-      ml = mod_getmod_ul (m);
-      m5 = ml % 5UL;
-      ASSERT (m5 != 0UL);
-      
       /* We want a+km == 0 (mod 5), so k = -a*m^{-1} (mod 5) */
       k = (a5 * inv5[m5]) % 5UL;
       ASSERT_EXPENSIVE ((k*m5 + a5) % 5UL == 0UL);
@@ -81,9 +87,9 @@ mod_div5 (residue_t r, const residue_t a, const modulus_t m)
      correct result. */
   
   if (sizeof (unsigned long) == 4)
-    t[0] *= 0xCCCCCCCDUL; /* 1/5 (mod 2^32) */
+    t[0] *= 0xcccccccdUL; /* 1/5 (mod 2^32) */
   else
-    t[0] *= 0xCCCCCCCCCCCCCCCDUL; /* 1/5 (mod 2^64) */
+    t[0] *= 0xcccccccccccccccdUL; /* 1/5 (mod 2^64) */
   
 #ifdef WANT_ASSERT_EXPENSIVE
   ASSERT_EXPENSIVE (t[0] < mod_getmod_ul (m));
@@ -97,10 +103,12 @@ mod_div5 (residue_t r, const residue_t a, const modulus_t m)
 
   mod_set (r, t, m);
   mod_clear (t, m);
+  
+  return 1;
 }
 
 
-void
+int
 mod_div7 (residue_t r, const residue_t a, const modulus_t m)
 {
   unsigned long ml, m7, k;
@@ -110,14 +118,15 @@ mod_div7 (residue_t r, const residue_t a, const modulus_t m)
 
   ASSERT_EXPENSIVE (a[0] < mod_getmod_ul (m));
 
+  ml = mod_getmod_ul (m);
+  m7 = ml % 7UL;
+  if (m7 == 0)
+    return 0;
+  
   mod_init_noset0 (t, m);
   mod_set (t, a, m);
   if (a7 != 0UL)
     {
-      ml = mod_getmod_ul (m);
-      m7 = ml % 7UL;
-      ASSERT (m7 != 0UL);
-      
       /* We want a+km == 0 (mod 7), so k = -a*m^{-1} (mod 7) */
       k = (a7 * inv7[m7]) % 7UL;
       ASSERT_EXPENSIVE ((k*m7 + a7) % 7UL == 0UL);
@@ -147,10 +156,54 @@ mod_div7 (residue_t r, const residue_t a, const modulus_t m)
 
   mod_set (r, t, m);
   mod_clear (t, m);
+  
+  return 1;
 }
 
 
-void
+int
+mod_div11 (residue_t r, const residue_t a, const modulus_t m)
+{
+  unsigned long ml, m11, k;
+  residue_t t;
+  const unsigned long a11 = a[0] % 11UL;
+  /* inv11[i] = -1/i (mod 11) */
+  const unsigned long inv11[11] = {0, 10, 5, 7, 8, 2, 9, 3, 4, 6, 1}; 
+
+  ASSERT_EXPENSIVE (a[0] < mod_getmod_ul (m));
+
+  ml = mod_getmod_ul (m);
+  m11 = ml % 11UL;
+  if (m11 == 0)
+    return 0;
+  
+  mod_init_noset0 (t, m);
+  mod_set (t, a, m);
+  if (a11 != 0UL)
+    {
+      /* We want a+km == 0 (mod 11), so k = -a*m^{-1} (mod 11) */
+      k = (a11 * inv11[m11]) % 11UL;
+      ASSERT_EXPENSIVE ((k*m11 + a11) % 11UL == 0UL);
+      t[0] = a[0] + k * ml;
+    }
+
+  /* Now t[0] == a+k*m (mod 2^w) so that a+k*m is divisible by 11.
+     (a+k*m)/11 < 2^w, so doing a division (mod 2^w) produces the 
+     correct result. */
+  
+  if (sizeof (unsigned long) == 4)
+    t[0] *= 0xba2e8ba3UL; /* 1/11 (mod 2^32) */
+  else
+    t[0] *= 0x2e8ba2e8ba2e8ba3UL; /* 1/11 (mod 2^64) */
+  
+  mod_set (r, t, m);
+  mod_clear (t, m);
+
+  return 1;
+}
+
+
+int
 mod_div13 (residue_t r, const residue_t a, const modulus_t m)
 {
   unsigned long ml, m13, k;
@@ -161,14 +214,15 @@ mod_div13 (residue_t r, const residue_t a, const modulus_t m)
 
   ASSERT_EXPENSIVE (a[0] < mod_getmod_ul (m));
 
+  ml = mod_getmod_ul (m);
+  m13 = ml % 13UL;
+  if (m13 == 0)
+    return 0;
+  
   mod_init_noset0 (t, m);
   mod_set (t, a, m);
   if (a13 != 0UL)
     {
-      ml = mod_getmod_ul (m);
-      m13 = ml % 13UL;
-      ASSERT (m13 != 0UL);
-      
       /* We want a+km == 0 (mod 13), so k = -a*m^{-1} (mod 13) */
       k = (a13 * inv13[m13]) % 13UL;
       ASSERT_EXPENSIVE ((k*m13 + a13) % 13UL == 0UL);
@@ -180,12 +234,14 @@ mod_div13 (residue_t r, const residue_t a, const modulus_t m)
      correct result. */
   
   if (sizeof (unsigned long) == 4)
-    t[0] *= 0xc4ec4ec5; /* 1/13 (mod 2^32) */
+    t[0] *= 0xc4ec4ec5UL; /* 1/13 (mod 2^32) */
   else
-    t[0] *= 0x4ec4ec4ec4ec4ec5; /* 1/13 (mod 2^64) */
+    t[0] *= 0x4ec4ec4ec4ec4ec5UL; /* 1/13 (mod 2^64) */
   
   mod_set (r, t, m);
   mod_clear (t, m);
+
+  return 1;
 }
 
 

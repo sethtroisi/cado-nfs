@@ -184,6 +184,8 @@ test_mod_divn(const modint_t la, const modint_t lm, const unsigned long n)
     mod_div5 (s, r, m);
   else if (n == 7UL)
     mod_div7 (s, r, m);
+  else if (n == 11UL)
+    mod_div11 (s, r, m);
   else if (n == 13UL)
     mod_div13 (s, r, m);
   
@@ -614,6 +616,8 @@ int main(int argc, char **argv)
 
   if (argc > 1 && argv[1][0] == '-' && argv[1][1] == 'r')
     srandom (time (NULL)); /* Seed RNG with nr of seconds since epoch */
+  else if (argc > 1)
+    iter = atoi (argv[1]);
 
   printf ("Testing mod_set_uls()\n");
   tests_mod_set_uls (iter);
@@ -625,6 +629,8 @@ int main(int argc, char **argv)
   tests_mod_divn (iter, 5);
   printf ("Testing mod_div7()\n");
   tests_mod_divn (iter, 7);
+  printf ("Testing mod_div11()\n");
+  tests_mod_divn (iter, 11);
   printf ("Testing mod_div13()\n");
   tests_mod_divn (iter, 13);
   printf ("Testing mod_gcd()\n");

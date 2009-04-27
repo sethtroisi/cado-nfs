@@ -749,10 +749,11 @@ modul_finished (const residueul_t r, const modulusul_t m)
 
 
 /* prototypes of non-inline functions */
-void modul_div3 (residueul_t, const residueul_t, const modulusul_t);
-void modul_div5 (residueul_t, const residueul_t, const modulusul_t);
-void modul_div7 (residueul_t, const residueul_t, const modulusul_t);
-void modul_div13 (residueul_t, const residueul_t, const modulusul_t);
+int modul_div3 (residueul_t, const residueul_t, const modulusul_t);
+int modul_div5 (residueul_t, const residueul_t, const modulusul_t);
+int modul_div7 (residueul_t, const residueul_t, const modulusul_t);
+int modul_div11 (residueul_t, const residueul_t, const modulusul_t);
+int modul_div13 (residueul_t, const residueul_t, const modulusul_t);
 void modul_gcd (modintul_t, const residueul_t, const modulusul_t);
 void modul_pow_ul (residueul_t, const residueul_t, const unsigned long, 
 		   const modulusul_t);

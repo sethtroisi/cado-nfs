@@ -27,7 +27,9 @@ static const unsigned char trailing_zeros[256] =
 #endif
 
 
-void
+/* Divide residue by 3. Returns 1 if division is possible, 0 otherwise */
+
+int
 modredc15ul_div3 (residueredc15ul_t r, const residueredc15ul_t a, 
 		  const modulusredc15ul_t m)
 {
@@ -37,7 +39,8 @@ modredc15ul_div3 (residueredc15ul_t r, const residueredc15ul_t a,
   const unsigned long m3 = (m[0].m[0] % 256UL + m[0].m[0] / 256UL +
 			    m[0].m[1] % 256UL + m[0].m[1] / 256UL) % 3UL;
 
-  ASSERT(m3 != 0UL);
+  if (m3 == 0)
+    return 0;
 
   modredc15ul_init_noset0 (t, m);
   t[1] = a[1];
@@ -85,151 +88,142 @@ modredc15ul_div3 (residueredc15ul_t r, const residueredc15ul_t a,
   r[0] = t[0];
   r[1] = t[1];
   modredc15ul_clear (t, m);
+  
+  return 1;
 }
 
 
-void
-modredc15ul_div5 (residueredc15ul_t r, const residueredc15ul_t a, 
-		  const modulusredc15ul_t m)
+/* Division by small integer n, where (n-1)*m may NOT overflow the most 
+   significant word. Returns 1 if n is invertible modulo m, 0 if not. 
+   
+   w_mod_n is word base (e.g., 2^32 or  2^64) mod n
+   inv_n contains -1/i (mod n) if i is coprime to n, or 0 if i is not coprime 
+   to n, for 0 <= i < n
+   c = n^(-1) (mod word base)
+*/
+
+static inline int
+modredc15ul_divn_nof (residueredc15ul_t r, const residueredc15ul_t a, 
+		      const unsigned long n, const unsigned long w_mod_n, 
+		      const unsigned long *inv_n, const unsigned long c,
+		      const modulusredc15ul_t m)
 {
-  const unsigned long a5 = ((a[1] % 5UL) + a[0] % 5UL) % 5UL;
+  const unsigned long an = ((a[1] % n)*w_mod_n + a[0] % n) % n;
+  const unsigned long mn = ((m[0].m[1] % n)*w_mod_n + m[0].m[0] % n) % n;
+  unsigned long k;
   residueredc15ul_t t;
   
   modredc15ul_init_noset0 (t, m);
   t[1] = a[1];
   t[0] = a[0];
   
-  /* Make t[1]:t[0] divisible by 5 */
-  if (a5 != 0UL)
+  if (inv_n[mn] == 0)
     {
-      const unsigned long m5 = ((m[0].m[1] % 5UL) + m[0].m[0] % 5UL) % 5UL;
-      ASSERT(m5 != 0UL);
-      
-       /* inv5[i] = -1/i (mod 5) */
-      const unsigned long inv5[5] = {0,4,2,3,1};
-      unsigned long k;
-      /* We want a+km == 0 (mod 5), so k = -a*m^{-1} (mod 5) */
-      k = (inv5[m5] * a5) % 5UL;
-      ularith_mul_ul_ul_2ul (&(t[0]), &(t[1]), m[0].m[0], k);
-      t[1] += m[0].m[1] * k;
-      ularith_add_2ul_2ul (&(t[0]), &(t[1]), a[0], a[1]);
-      
-      /* Now t[1]:t[0] is divisible by 5 */
-      ASSERT_EXPENSIVE (((t[1] % 5UL) + t[0] % 5UL) % 5UL == 0UL);
+      modredc15ul_clear (t, m);
+      return 0;
     }
+
+  /* Make t[1]:t[0] divisible by n */
+  /* We want a+km == 0 (mod n), so k = -a*m^{-1} (mod n) */
+  k = (inv_n[mn] * an) % n;
+  ularith_mul_ul_ul_2ul (&(t[0]), &(t[1]), m[0].m[0], k);
+  t[1] += m[0].m[1] * k;
+  ularith_add_2ul_2ul (&(t[0]), &(t[1]), a[0], a[1]);
   
-  t[1] = t[1] / 5UL;
-  if (sizeof (unsigned long) == 4)
-    t[0] *= 0xCCCCCCCDUL; /* 1/5 (mod 2^32) */
-  else
-    t[0] *= 0xCCCCCCCCCCCCCCCDUL; /* 1/5 (mod 2^64) */
+  /* Now t[1]:t[0] is divisible by n */
+  ASSERT_EXPENSIVE (((t[1] % n)*w_mod_n + t[0] % n) % n == 0UL);
+  
+  r[1] = t[1] / n;
+  r[0] = t[0] * c;
 
 #ifdef WANT_ASSERT_EXPENSIVE
-  modredc15ul_sub (r, a, t, m);
-  modredc15ul_sub (r, r, t, m);
-  modredc15ul_sub (r, r, t, m);
-  modredc15ul_sub (r, r, t, m);
-  modredc15ul_sub (r, r, t, m);
-  ASSERT_EXPENSIVE (modredc15ul_is0 (r, m));
+  {
+    int i;
+    modredc2ul2_set (t, r, m);
+    for (i = 1; i < n; i++)
+      modredc2ul2_add (t, t, r, m);
+    ASSERT_EXPENSIVE (modredc2ul2_equal (t, a, m));
+  }
 #endif
-  r[0] = t[0];
-  r[1] = t[1];
+
   modredc15ul_clear (t, m);
+  return 1;
 }
 
 
-void
+/* Divide residue by 5. Returns 1 if division is possible, 0 otherwise */
+
+int
+modredc15ul_div5 (residueredc15ul_t r, const residueredc15ul_t a, 
+		  const modulusredc15ul_t m)
+{
+  const unsigned long inv_5[5] = {0,4,2,3,1};
+  unsigned long c;
+  if (sizeof (unsigned long) == 4)
+    c = 0xcccccccdUL; /* 1/5 (mod 2^32) */
+  else
+    c = 0xcccccccccccccccdUL; /* 1/5 (mod 2^64) */
+
+  return modredc15ul_divn_nof (r, a, 5UL, 1UL, inv_5, c, m);
+}
+
+
+/* Divide residue by 7. Returns 1 if division is possible, 0 otherwise */
+
+int
 modredc15ul_div7 (residueredc15ul_t r, const residueredc15ul_t a, 
 		  const modulusredc15ul_t m)
 {
   const unsigned long w_mod_7 = (sizeof (unsigned long) == 4) ? 4UL : 2UL;
-  const unsigned long a7 = ((a[1] % 7UL) * w_mod_7 + a[0] % 7UL) % 7UL;
-  residueredc15ul_t t;
-  
-  modredc15ul_init_noset0 (t, m);
-  t[1] = a[1];
-  t[0] = a[0];
-  
-  /* Make t[1]:t[0] divisible by 7 */
-  if (a7 != 0UL)
-    {
-      const unsigned long m7 = ((m[0].m[1] % 7UL) * w_mod_7 + m[0].m[0] % 7UL) % 7UL;
-      ASSERT(m7 != 0UL);
-      
-       /* inv7[i] = -1/i (mod 7) */
-      const unsigned long inv7[7] = {0,6,3,2,5,4,1};
-      unsigned long k;
-      /* We want a+km == 0 (mod 7), so k = -a*m^{-1} (mod 7) */
-      k = (inv7[m7] * a7) % 7UL;
-      ularith_mul_ul_ul_2ul (&(t[0]), &(t[1]), m[0].m[0], k);
-      t[1] += m[0].m[1] * k;
-      ularith_add_2ul_2ul (&(t[0]), &(t[1]), a[0], a[1]);
-      
-      /* Now t[1]:t[0] is divisible by 7 */
-      ASSERT_EXPENSIVE (((t[1] % 7UL) * w_mod_7 + t[0] % 7UL) % 7UL == 0UL);
-    }
-  
-  t[1] = t[1] / 7UL;
+  /* inv_7[i] = -1/i (mod 7) */
+  const unsigned long inv_7[7] = {0,6,3,2,5,4,1};
+  unsigned long c;
   if (sizeof (unsigned long) == 4)
-    t[0] *= 0xb6db6db7UL; /* 1/7 (mod 2^32) */
-  else
-    t[0] *= 0x6db6db6db6db6db7UL; /* 1/7 (mod 2^64) */
+      c = 0xb6db6db7UL;
+  else 
+      c = 0x6db6db6db6db6db7UL;
 
-#ifdef WANT_ASSERT_EXPENSIVE
-  modredc15ul_sub (r, a, t, m);
-  modredc15ul_sub (r, r, t, m);
-  modredc15ul_sub (r, r, t, m);
-  modredc15ul_sub (r, r, t, m);
-  modredc15ul_sub (r, r, t, m);
-  modredc15ul_sub (r, r, t, m);
-  modredc15ul_sub (r, r, t, m);
-  ASSERT_EXPENSIVE (modredc15ul_is0 (r, m));
-#endif
-  r[0] = t[0];
-  r[1] = t[1];
-  modredc15ul_clear (t, m);
+  return modredc15ul_divn_nof (r, a, 7UL, w_mod_7, inv_7, c, m);
 }
 
 
-void
+/* Divide residue by 11. Returns 1 if division is possible, 0 otherwise */
+
+int
+modredc15ul_div11 (residueredc15ul_t r, const residueredc15ul_t a, 
+		   const modulusredc15ul_t m)
+{
+  const unsigned long w_mod_11 = (sizeof (unsigned long) == 4) ? 4UL : 5UL;
+  /* inv_11[i] = -1/i (mod 11) */
+  const unsigned long inv_11[11] = {0, 10, 5, 7, 8, 2, 9, 3, 4, 6, 1}; 
+  unsigned long c;
+  
+  if (sizeof (unsigned long) == 4)
+      c = 0xba2e8ba3UL;
+  else 
+      c = 0x2e8ba2e8ba2e8ba3UL;
+
+  return modredc15ul_divn_nof (r, a, 11UL, w_mod_11, inv_11, c, m);
+}
+
+
+/* Divide residue by 13. Returns 1 if division is possible, 0 otherwise */
+
+int
 modredc15ul_div13 (residueredc15ul_t r, const residueredc15ul_t a, 
 		   const modulusredc15ul_t m)
 {
   const unsigned long w_mod_13 = (sizeof (unsigned long) == 4) ? 9UL : 3UL;
-  const unsigned long a13 = ((a[1] % 13UL) * w_mod_13 + a[0] % 13UL) % 13UL;
-  /* inv13[i] = -1/i (mod 13) */
-  const unsigned long inv13[13] = {0, 12, 6, 4, 3, 5, 2, 11, 8, 10, 9, 7, 1}; 
-  unsigned long m13 = ((m[0].m[1] % 13UL) * w_mod_13 + m[0].m[0] % 13UL) % 13UL;
-  residueredc15ul_t t;
+  /* inv_13[i] = -1/i (mod 13) */
+  const unsigned long inv_13[13] = {0, 12, 6, 4, 3, 5, 2, 11, 8, 10, 9, 7, 1}; 
+  unsigned long c;
   
-  ASSERT(m13 != 0UL);
-  
-  modredc15ul_init_noset0 (t, m);
-  
-  t[1] = a[1];
-  t[0] = a[0];
-  /* Make t[1]:t[0] divisible by 13 */
-  if (a13 != 0UL)
-    {
-      /* We want a+km == 0 (mod 13), so k = -a*m^{-1} (mod 13) */
-      m13 = (inv13[m13] * a13) % 13UL;
-      ularith_mul_ul_ul_2ul (&(t[0]), &(t[1]), m[0].m[0], m13);
-      t[1] += m[0].m[1] * m13;
-      ularith_add_2ul_2ul (&(t[0]), &(t[1]), a[0], a[1]);
-      
-      /* Now t[1]:t[0] is divisible by 13 */
-      ASSERT_EXPENSIVE (((t[1] % 13UL) * w_mod_13 + t[0] % 13UL) % 13UL == 0UL);
-    }
-  
-  t[1] = t[1] / 13UL;
   if (sizeof (unsigned long) == 4)
-    t[0] *= 0xc4ec4ec5; /* 1/13 (mod 2^32) */
-  else
-    t[0] *= 0x4ec4ec4ec4ec4ec5; /* 1/13 (mod 2^64) */
+      c = 0xc4ec4ec5UL;
+  else 
+      c = 0x4ec4ec4ec4ec4ec5UL;
 
-  r[0] = t[0];
-  r[1] = t[1];
-  modredc15ul_clear (t, m);
+  return modredc15ul_divn_nof (r, a, 13UL, w_mod_13, inv_13, c, m);
 }
 
 
@@ -255,8 +249,48 @@ modredc15ul_gcd (unsigned long *r, const residueredc15ul_t A,
   b[0] = m[0].m[0];
   b[1] = m[0].m[1];
 
-  while (b[1] != 0UL || b[0] != 0UL)
+  while (a[1] != 0UL || a[0] != 0UL)
     {
+      /* Make a odd */
+#if LOOKUP_TRAILING_ZEROS
+      do {
+	sh = trailing_zeros [(unsigned char) a[0]];
+	ularith_shrd (&(a[0]), a[1], sh);
+	*(long *) &(a[1]) >>= sh;
+      } while (sh == 8);
+#else
+      if (a[0] == 0UL) /* ctzl does not like zero input */
+	{
+	  a[0] = a[1];
+	  a[1] = ((long)a[1] < 0L) ? (unsigned long) (-1L) : 0UL;
+	}
+      sh = ctzl (a[0]);
+      ularith_shrd (&(a[0]), a[1], sh);
+      *(long *) &(a[1]) >>= sh;
+#endif
+      
+      /* Try to make the low two bits of b[0] zero */
+      ASSERT_EXPENSIVE (a[0] % 2UL == 1UL);
+      ASSERT_EXPENSIVE (b[0] % 2UL == 1UL);
+      if ((a[0] ^ b[0]) & 2UL)
+	ularith_add_2ul_2ul (&(b[0]), &(b[1]), a[0], a[1]);
+      else
+	ularith_sub_2ul_2ul (&(b[0]), &(b[1]), a[0], a[1]);
+
+      if (b[0] == 0UL && b[1] == 0UL)
+	{
+	  if ((long) a[1] < 0L)
+	    {
+	      a[1] = -a[1];
+	      if (a[0] != 0UL)
+		a[1]--;
+	      a[0] = -a[0];
+	    }
+	  r[0] = a[0];
+	  r[1] = a[1];
+	  return;
+	}
+
       /* Make b odd */
 #if LOOKUP_TRAILING_ZEROS
       do {
@@ -274,61 +308,24 @@ modredc15ul_gcd (unsigned long *r, const residueredc15ul_t A,
       ularith_shrd (&(b[0]), b[1], sh);
       *(long *) &(b[1]) >>= sh;
 #endif
-      
-      /* Try to make the low two bits of a[0] zero */
+      ASSERT_EXPENSIVE (a[0] % 2UL == 1UL);
       ASSERT_EXPENSIVE (b[0] % 2UL == 1UL);
-      if ((a[0] ^ b[0]) & 2UL)
+
+      if ((a[0] ^ b[0]) & 2)
 	ularith_add_2ul_2ul (&(a[0]), &(a[1]), b[0], b[1]);
       else
 	ularith_sub_2ul_2ul (&(a[0]), &(a[1]), b[0], b[1]);
-
-      if (a[0] == 0UL && a[1] == 0UL)
-	{
-	  if ((long) b[1] < 0)
-	    {
-	      b[1] = -b[1];
-	      if (b[0] != 0UL)
-		b[1]--;
-	      b[0] = -b[0];
-	    }
-	  r[0] = b[0];
-	  r[1] = b[1];
-	  return;
-	}
-
-#if LOOKUP_TRAILING_ZEROS
-      do {
-	sh = trailing_zeros [(unsigned char) a[0]];
-	ularith_shrd (&(a[0]), a[1], sh);
-	*(long *) &(a[1]) >>= sh;
-      } while (sh == 8);
-#else
-      if (a[0] == 0UL) /* ctzl does not like zero input */
-	{
-	  a[0] = a[1];
-	  a[1] = ((long)a[1] < 0) ? (unsigned long) (-1L) : 0UL;
-	}
-      sh = ctzl (a[0]);
-      ularith_shrd (&(a[0]), a[1], sh);
-      *(long *) &(a[1]) >>= sh;
-#endif
-      ASSERT_EXPENSIVE (a[0] & 1);
-
-      if ((a[0] ^ b[0]) & 2)
-	ularith_add_2ul_2ul (&(b[0]), &(b[1]), a[0], a[1]);
-      else
-	ularith_sub_2ul_2ul (&(b[0]), &(b[1]), a[0], a[1]);
     }
 
-  if ((long) a[1] < 0)
+  if ((long) b[1] < 0)
     {
-      a[1] = -a[1];
-      if (a[0] != 0UL)
-	a[1]--;
-      a[0] = -a[0];
+      b[1] = -b[1];
+      if (b[0] != 0UL)
+	b[1]--;
+      b[0] = -b[0];
     }
-  r[0] = a[0];
-  r[1] = a[1];
+  r[0] = b[0];
+  r[1] = b[1];
 
   return;
 }

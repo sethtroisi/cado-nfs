@@ -761,14 +761,16 @@ modredc2ul2_finished (const residueredc2ul2_t r, const modulusredc2ul2_t m)
 }
 
 /* prototypes of non-inline functions */
-void modredc2ul2_div3 (residueredc2ul2_t, const residueredc2ul2_t, 
+int modredc2ul2_div3 (residueredc2ul2_t, const residueredc2ul2_t, 
+		      const modulusredc2ul2_t);
+int modredc2ul2_div5 (residueredc2ul2_t, const residueredc2ul2_t, 
 		       const modulusredc2ul2_t);
-void modredc2ul2_div5 (residueredc2ul2_t, const residueredc2ul2_t, 
+int modredc2ul2_div7 (residueredc2ul2_t, const residueredc2ul2_t, 
+		      const modulusredc2ul2_t);
+int modredc2ul2_div11 (residueredc2ul2_t, const residueredc2ul2_t, 
 		       const modulusredc2ul2_t);
-void modredc2ul2_div7 (residueredc2ul2_t, const residueredc2ul2_t, 
+int modredc2ul2_div13 (residueredc2ul2_t, const residueredc2ul2_t, 
 		       const modulusredc2ul2_t);
-void modredc2ul2_div13 (residueredc2ul2_t, const residueredc2ul2_t, 
-		        const modulusredc2ul2_t);
 void modredc2ul2_gcd (modintredc2ul2_t, const residueredc2ul2_t, 
 		      const modulusredc2ul2_t);
 void modredc2ul2_pow_ul (residueredc2ul2_t, const residueredc2ul2_t, 
