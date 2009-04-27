@@ -27,6 +27,8 @@
 #undef mod_intadd
 #undef mod_intsub
 #undef mod_intbits
+#undef mod_intshr
+#undef mod_intshl
 #undef mod_intdivexact
 #undef mod_init
 #undef mod_init_noset0
@@ -91,6 +93,8 @@
 #define mod_intadd           modredcul_intadd
 #define mod_intsub           modredcul_intsub
 #define mod_intbits          modredcul_intbits
+#define mod_intshr           modredcul_intshr
+#define mod_intshl           modredcul_intshl
 #define mod_intdivexact      modredcul_intdivexact
 #define mod_init             modredcul_init
 #define mod_init_noset0      modredcul_init_noset0

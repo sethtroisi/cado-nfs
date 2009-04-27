@@ -776,6 +776,66 @@ modredc15ul_finished (const residueredc15ul_t r, const modulusredc15ul_t m)
   return (r[1] == m[0].m[1] && r[0] == m[0].m[0]);
 }
 
+
+/* Division by small integer n, where (n-1)*m may NOT overflow the most 
+   significant word. Returns 1 if n is invertible modulo m, 0 if not. 
+   
+   w_mod_n is word base (e.g., 2^32 or  2^64) mod n
+   inv_n contains -1/i (mod n) if i is coprime to n, or 0 if i is not coprime 
+   to n, for 0 <= i < n
+   c = n^(-1) (mod word base)
+*/
+
+static inline int
+modredc15ul_divn (residueredc15ul_t r, const residueredc15ul_t a, 
+		  const unsigned long n, const unsigned long w_mod_n, 
+		  const unsigned long *inv_n, const unsigned long c,
+		  const modulusredc15ul_t m)
+{
+  const unsigned long an = ((a[1] % n)*w_mod_n + a[0] % n) % n;
+  const unsigned long mn = ((m[0].m[1] % n)*w_mod_n + m[0].m[0] % n) % n;
+  unsigned long k;
+  residueredc15ul_t t;
+  
+  modredc15ul_init_noset0 (t, m);
+  t[1] = a[1];
+  t[0] = a[0];
+  
+  if (inv_n[mn] == 0)
+    {
+      modredc15ul_clear (t, m);
+      return 0;
+    }
+
+  /* Make t[1]:t[0] divisible by n */
+  /* We want a+km == 0 (mod n), so k = -a*m^{-1} (mod n) */
+  k = (inv_n[mn] * an) % n;
+  ularith_mul_ul_ul_2ul (&(t[0]), &(t[1]), m[0].m[0], k);
+  t[1] += m[0].m[1] * k;
+  ularith_add_2ul_2ul (&(t[0]), &(t[1]), a[0], a[1]);
+  
+  /* Now t[1]:t[0] is divisible by n */
+  ASSERT_EXPENSIVE (((t[1] % n)*w_mod_n + t[0] % n) % n == 0UL);
+  
+  r[1] = t[1] / n;
+  r[0] = t[0] * c;
+
+#ifdef WANT_ASSERT_EXPENSIVE
+  {
+    unsigned long i;
+    modredc15ul_set (t, r, m);
+    for (i = 1; i < n; i++)
+      modredc15ul_add (t, t, r, m);
+    ASSERT_EXPENSIVE (modredc15ul_equal (t, a, m));
+  }
+#endif
+
+  modredc15ul_clear (t, m);
+  return 1;
+}
+
+
+
 /* prototypes of non-inline functions */
 int modredc15ul_div3 (residueredc15ul_t, const residueredc15ul_t, 
 		      const modulusredc15ul_t);

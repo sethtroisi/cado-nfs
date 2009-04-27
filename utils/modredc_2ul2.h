@@ -760,6 +760,77 @@ modredc2ul2_finished (const residueredc2ul2_t r, const modulusredc2ul2_t m)
   return (r[1] == m[0].m[1] && r[0] == m[0].m[0]);
 }
 
+/* Division by small integer n, where (n-1)*m may overflow the most 
+   significant word. Returns 1 if n is invertible modulo m, 0 if not. 
+   
+   w_mod_n is word base (e.g., 2^32 or  2^64) mod n
+   inv_n contains -1/i (mod n) if i is coprime to n, or 0 if i is not coprime 
+   to n, for 0 <= i < n
+   c = n^(-1) (mod word base)
+*/
+
+MAYBE_UNUSED
+static inline int
+modredc2ul2_divn (residueredc2ul2_t r, const residueredc2ul2_t a, 
+		  const unsigned long n, const unsigned long w_mod_n, 
+		  const unsigned long *inv_n, const unsigned long c,
+		  const modulusredc2ul2_t m)
+{
+  const unsigned long an = ((a[1] % n) * w_mod_n + a[0] % n) % n;
+  const unsigned long mn = ((m[0].m[1] % n) * w_mod_n + m[0].m[0] % n) % n;
+
+  residueredc2ul2_t t, t2;
+  unsigned long k;
+  
+  if (inv_n[mn] == 0)
+    return 0;
+
+  modredc2ul2_init_noset0 (t, m);
+  modredc2ul2_init_noset0 (t2, m);
+  t[1] = a[1];
+  t[0] = a[0];
+  
+  /* Make t[1]:t[0] == a+km (mod w^2) with a+km divisible by n */
+  /* We want a+km == 0 (mod n), so k = -a*m^{-1} (mod n) */
+  k = (inv_n[mn] * an) % n;
+  ASSERT_EXPENSIVE ((an + k*mn) % n == 0);
+  ularith_mul_ul_ul_2ul (&(t[0]), &(t[1]), m[0].m[0], k);
+  t[1] += m[0].m[1] * k;
+  ularith_add_2ul_2ul (&(t[0]), &(t[1]), a[0], a[1]);
+
+  /* We want r = (a+km)/n. */
+
+  r[0] = t[0] * c;
+
+  /* r0 == (a+km)/n (mod w) 
+     (r1*w + r0) * n = (a+km)
+     (r1*w + r0) * n == t (mod w^2)
+     r1*w*n == t - n*r0 (mod w^2)
+                            t - n*r0 == 0 (mod w), thus
+     r1*n == (t - n*r0)/w (mod w) */
+
+  ularith_mul_ul_ul_2ul (&(t2[0]), &(t2[1]), r[0], n);
+  ularith_sub_2ul_2ul (&(t[0]), &(t[1]), t2[0], t2[1]);
+  ASSERT_EXPENSIVE (t[0] == 0UL);
+  r[1] = t[1] * c;
+
+#ifdef WANT_ASSERT_EXPENSIVE
+  {
+    unsigned long i;
+    modredc2ul2_set (t, r, m);
+    for (i = 1; i < n; i++)
+      modredc2ul2_add (t, t, r, m);
+    ASSERT_EXPENSIVE (modredc2ul2_equal (t, a, m));
+  }
+#endif
+
+  modredc2ul2_clear (t, m);
+  modredc2ul2_clear (t2, m);
+
+  return 1;
+}
+
+
 /* prototypes of non-inline functions */
 int modredc2ul2_div3 (residueredc2ul2_t, const residueredc2ul2_t, 
 		      const modulusredc2ul2_t);

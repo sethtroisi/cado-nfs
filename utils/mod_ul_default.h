@@ -2,7 +2,7 @@
 
 /*
    Here are typedef's that rename all functions to mod_* instead of 
-   modredcul_*, which one day might become an automatic renaming scheme so 
+   modul_*, which one day might become an automatic renaming scheme so 
    that different modulus sizes can be used simply by #including different 
    mod*.h files, but without changing anything else in the source code. 
  */
@@ -27,6 +27,8 @@
 #undef mod_intadd
 #undef mod_intsub
 #undef mod_intbits
+#undef mod_intshr
+#undef mod_intshl
 #undef mod_intdivexact
 #undef mod_init
 #undef mod_init_noset0
@@ -91,6 +93,8 @@
 #define mod_intadd           modul_intadd
 #define mod_intsub           modul_intsub
 #define mod_intbits          modul_intbits
+#define mod_intshr           modul_intshr
+#define mod_intshl           modul_intshl
 #define mod_intdivexact      modul_intdivexact
 #define mod_init             modul_init
 #define mod_init_noset0      modul_init_noset0

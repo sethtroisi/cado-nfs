@@ -54,7 +54,7 @@ UTILS_FILES=utils/utils.h utils/mod_ul.h utils/fpoly.h utils/getprime.h \
 	   utils/modredc_2ul2.c utils/modredc_2ul2.h utils/modredc_2ul2_default.h \
 	   utils/mpz_array.h utils/mpz_array.c utils/modredc_15ul_default.h \
 	   utils/check_rels.c utils/gzip.c utils/gzip.h	\
-	   utils/mpz_poly.c utils/mpz_poly.h	\
+	   utils/mpz_poly.c utils/mpz_poly.h utils/modredc_2ul_common.c \
 	   utils/electric_alloc.h	\
 	   utils/misc.c utils/misc.h
 SIEVE_FILES=sieve/Makefile sieve/makefb.c sieve/las.c sieve/bucket.h \

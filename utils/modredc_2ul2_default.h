@@ -28,6 +28,8 @@
 #undef mod_intadd
 #undef mod_intsub
 #undef mod_intbits
+#undef mod_intshr
+#undef mod_intshl
 #undef mod_intdivexact
 #undef mod_init
 #undef mod_init_noset0
@@ -74,6 +76,7 @@
 #undef mod_set1
 #undef mod_next
 #undef mod_finished
+#undef mod_divn
 
 #define residue_t            residueredc2ul2_t
 #define modulus_t            modulusredc2ul2_t
@@ -91,6 +94,8 @@
 #define mod_intadd           modredc2ul2_intadd
 #define mod_intsub           modredc2ul2_intsub
 #define mod_intbits          modredc2ul2_intbits
+#define mod_intshr           modredc2ul2_intshr
+#define mod_intshl           modredc2ul2_intshl
 #define mod_intdivexact      modredc2ul2_intdivexact
 #define mod_init             modredc2ul2_init
 #define mod_init_noset0      modredc2ul2_init_noset0
@@ -137,3 +142,4 @@
 #define mod_set1             modredc2ul2_set1
 #define mod_next             modredc2ul2_next
 #define mod_finished         modredc2ul2_finished
+#define mod_divn             modredc2ul2_divn

@@ -20,7 +20,7 @@
    short-circuited and _XOPEN_SOURCE is ignored. */
 
 #ifndef LONG_BIT
-#ifdef LONG_MAX
+#ifdef LONG_MAX /* ISO C99 requires LONG_MAX in limits.h */
 #if LONG_MAX == 2147483647L
 #define LONG_BIT 32
 #else
@@ -33,7 +33,7 @@
 #define LONG_BIT 64
 #endif /* if __LONG_MAX__ == 2147483647L */
 #else /* elif defined __LONG_MAX__ */
-#define LONG_BIT	((int) sizeof(long) * CHAR_BIT)
+#error Cannot guess LONG_BIT, please define
 #endif /* elif defined __LONG_MAX__ else */
 #endif /* ifndef LONG_BIT */
 
