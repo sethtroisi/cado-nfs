@@ -247,7 +247,7 @@ struct matmul_bucket_data_s * matmul_bucket_build(abobj_ptr xx, const char * fil
         uint32_t len = * colheads[j];
         uint32_t * v0 = colheads[j] + 1;
         uint32_t * c = colptrs[j];
-        for( ; c - v0 < len && *c < end_sslices ; c++) ;
+        for( ; c - v0 < (ptrdiff_t) len && *c < (uint32_t) end_sslices ; c++) ;
         colptrs[j] = c;
     } /* }}} */
 
@@ -303,7 +303,7 @@ struct matmul_bucket_data_s * matmul_bucket_build(abobj_ptr xx, const char * fil
                 unsigned int my_pad = 0;
                 uint32_t my_lastj = lastj;
 
-                for( ; c - v0 < len && *c < i1 ; c++) {/*{{{*/
+                for( ; c - v0 < (ptrdiff_t) len && *c < i1 ; c++) {/*{{{*/
                     uint32_t i = *c - i0;
                     uint8_t w = i / 256;
                     uint32_t diff = j - my_lastj;
