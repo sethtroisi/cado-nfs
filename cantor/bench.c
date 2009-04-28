@@ -115,10 +115,14 @@ int main(int argc, char **argv)
 	}
 
 	//printf("benching n = %d, repeating %d\n", n, rep);
-	tm = cputime();
-	for (i = 0; i < rep; ++i)
-	    mulCantor128(h, f, n, g, n);
-	tm = cputime() - tm;
+        if (tm < 0.5) {
+            tm = cputime();
+            for (i = 0; i < rep; ++i)
+                mulCantor128(h, f, n, g, n);
+            tm = cputime() - tm;
+        } else {
+            rep = 1; // be content with our first timing.
+        }
 	printf("%d\t%f\t%d\n", n, ((double) tm) / ((double) rep),mulcount);
 	fprintf(stderr, "%d\t%f\t%d\n", n, ((double) tm) / ((double) rep),mulcount);
 	fflush(stdout);
