@@ -1,5 +1,5 @@
 
-AC_INIT([gf2x], [0.9.4])
+AC_INIT([gf2x], [0.9.5])
 AC_CONFIG_AUX_DIR([config])
 AC_CONFIG_MACRO_DIR([config])
 AC_CANONICAL_TARGET

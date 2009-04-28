@@ -1,17 +1,81 @@
-commit 9c2c3523eba59a71abf0fc9d2c3cfe635227adbe
+commit 93c45603532ac46fe48a05282c27873de7928e4e
 Author: Emmanuel Thomé <Emmanuel.Thome@normalesup.org>
-Date:   Thu Apr 2 16:56:33 2009 +0200
+Date:   Mon Apr 27 21:29:00 2009 +0200
+
+    release gf2x-0.9.5
+
+ trunk/ChangeLog |   67 ++++++++++++++++++++++++++++++++++++++++++++++++++-----
+ 1 files changed, 61 insertions(+), 6 deletions(-)
+
+commit b974195b8d7af3fb19100d53ea54a3d1291756ea
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Apr 27 19:27:33 2009 +0000
+
+    bump version number.
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@24 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/configure.ac |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+commit 4e7ba989f02ed81ae6c1bb05c0b87d6ef533ea7b
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Apr 27 19:27:31 2009 +0000
+
+    Fixed extremely stupid bug in fft.
+    
+    That caused largeish multiplications to call toom above the max tuned fft
+    size (!).
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@23 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/gf2x.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
+
+commit d9404d600b58a1993716c9a33664779c2fa0d025
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Apr 27 19:27:30 2009 +0000
+
+    minor changes, now using libtool 2.2.
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@22 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/ChangeLog              |    9 +
+ trunk/Makefile.am            |    7 +-
+ trunk/README                 |    7 +-
+ trunk/acinclude.m4           |  155 -----
+ trunk/config.guess           |  853 -----------------------
+ trunk/config.sub             |  143 ----
+ trunk/config/acinclude.m4    |  155 +++++
+ trunk/config/config.guess    |  853 +++++++++++++++++++++++
+ trunk/config/config.sub      |  143 ++++
+ trunk/config/configfsf.guess | 1460 +++++++++++++++++++++++++++++++++++++++
+ trunk/config/configfsf.sub   | 1554 ++++++++++++++++++++++++++++++++++++++++++
+ trunk/configfsf.guess        | 1460 ---------------------------------------
+ trunk/configfsf.sub          | 1554 ------------------------------------------
+ trunk/configure.ac           |    8 +-
+ trunk/ntl_gf2x_mul_code.h    |   40 --
+ trunk/wipeout-autotools      |    2 +-
+ 16 files changed, 4185 insertions(+), 4218 deletions(-)
+
+commit 3e27826f12b5dbcc101fa82b6147c21e688a2f9b
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Apr 27 19:27:28 2009 +0000
 
     release gf2x-0.9.4
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@21 e5c1114b-a573-4582-9dac-f72f410959ce
 
  trunk/ChangeLog |    7 ++++---
  1 files changed, 4 insertions(+), 3 deletions(-)
 
-commit b7a4ca4900ddd6cb7e35db8e9f88f71e7be87830
-Author: Emmanuel Thomé <Emmanuel.Thome@normalesup.org>
-Date:   Thu Apr 2 16:37:01 2009 +0200
+commit c2153d23cedbeba3c7e8dbfc8fccc21fc0b4cb87
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Apr 27 19:27:27 2009 +0000
 
     release gf2x-0.9.4
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@20 e5c1114b-a573-4582-9dac-f72f410959ce
 
  trunk/ChangeLog |   42 ++++++++++++++++++++++++++++++++++++++++--
  trunk/README    |    6 ++++--
