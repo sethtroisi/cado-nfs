@@ -14,9 +14,9 @@ cp Makefile.local.example Makefile.local
 Edit according to your local settings and your taste. You may have things
 such as:
 
-GMP:=$$HOME/gmp-4.2.4-install-tree/
-CFLAGS:=-O2 -funroll-loops
-CC:=/usr/local/bin/gcc-4.3.2/bin/gcc
+GMP=$HOME/gmp-4.2.4-install-tree/
+CFLAGS=-msse2 -O2
+CC=/usr/local/gcc-4.3.2/bin/gcc
 
 In each sub-directory (*), the top-level Makefile.local is read if it
 exists. Then the Makefile.local present in the directory is read if it
@@ -34,50 +34,14 @@ auto-dependencies)
 Run an example:
 ===============
 
-tmp=/tmp
-name=c59
+./new_run.c59
 
-# or for csh addicts:
-setenv tmp /tmp; setenv name c59
+The skript tries to factor a 59 digit number.
 
-cat <<EOF > $tmp/$name
-n:71641520761751435455133616475667090434063332228247871795429
-EOF
+For other numbers, create a parameter file analogous to params.c59
+and call new_cadofactor.pl with this file name and further parameters
+as can be seen in new_run.c59.
 
-## POLYNOMIAL SELECTION STEP
-polyselect/polyselect -full -degree 4 -M 5e10 -l 4 < $tmp/$name > $tmp/$name.poly
-
-# creating factor base
-sieve/makefb -poly $tmp/$name.poly > $tmp/$name.roots
-
-# if you want to use free relations
-./linalg/freerel -poly $tmp/$name.poly -fb $tmp/$name.roots > $tmp/$name.rels
-
-## SIEVING_STEP
-## the sieving parameters must be given by hand, sorry!
-## and they depend on the polynomial found by polyselect (i.e., b-bound 2500
-## below might be too small with different polynomials)
-## WARNING: see polyselect/README to know how to optimize the sieving region
-## and check the sieving parameters are optimal
-sieve/sieve -poly $tmp/$name.poly -fb $tmp/$name.roots -1000000 1000000 1 2500\
- > $tmp/$name.rels_raw
-
-[lattice siever: it is still in heavy development, but you can use it at your
-own risk, see sieve/README.las]
-
-# note for CACAO members: some data files with sieve relations are available in
-# /net/tiramisu/cado1/cado/Examples/{c20,c59,c80} (see below how to use them)
-
-# checking norms, splitting large cofactors and appending to rels
-postsieve/checknorms/checknorms -poly $tmp/$name.poly $tmp/$name.rels_raw \
-   >> $tmp/$name.rels
-
-/bin/rm -f $tmp/$name.nodup $tmp/$name.purged $tmp/$name.*algside*
-./merge_linalg_sqrt.sh $tmp/$name 1.0 50 500 200
-## (see README.params for parameter values)
-
-## CLEANING STEP: destroys everything, which might not be what you want...
-/bin/rm -fr $tmp/$name.*
 
 ##############################################################################
 Using merge_linalg_sqrt2.sh
