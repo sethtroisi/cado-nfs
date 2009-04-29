@@ -17228,11 +17228,16 @@ else
 $as_echo "$as_me: Using supplied hwdir value $hwdir" >&6;}
 fi
 
-echo "using ABI=\"$ABI\""
-echo "      CC=\"$CC\""
-echo "      CFLAGS=\"$CFLAGS\""
-echo "      CPPFLAGS=\"$CPPFLAGS\""
-echo "      hwdir=\"$hwdir\""
+{ $as_echo "$as_me:$LINENO: using ABI=\"$ABI\"" >&5
+$as_echo "$as_me: using ABI=\"$ABI\"" >&6;}
+{ $as_echo "$as_me:$LINENO:       CC=\"$CC\"" >&5
+$as_echo "$as_me:       CC=\"$CC\"" >&6;}
+{ $as_echo "$as_me:$LINENO:       CFLAGS=\"$CFLAGS\"" >&5
+$as_echo "$as_me:       CFLAGS=\"$CFLAGS\"" >&6;}
+{ $as_echo "$as_me:$LINENO:       CPPFLAGS=\"$CPPFLAGS\"" >&5
+$as_echo "$as_me:       CPPFLAGS=\"$CPPFLAGS\"" >&6;}
+{ $as_echo "$as_me:$LINENO:       hwdir=\"$hwdir\"" >&5
+$as_echo "$as_me:       hwdir=\"$hwdir\"" >&6;}
 
 for f in gf2x-thresholds.h gf2x_mul1.h gf2x_mul2.h gf2x_mul3.h gf2x_mul4.h ; do
  who=tuned

@@ -38,10 +38,17 @@ clean:
 # Because gf2x is a separate autotools project, we need to call it in a
 # special way. We disable shared libs because it's irrelevant here.
 
+configure_extra_always:=--disable-shared
+ifneq (,$(findstring s,$(MAKEFLAGS)))
+configure_extra_always+=--silent
+LIBTOOLFLAGS=--silent
+export LIBTOOLFLAGS
+endif
+
 all-gf2x:
 	if [ ! -f gf2x/Makefile ] ; then \
 		cd gf2x ;	\
-		./configure --disable-shared $(CONFIGURE_EXTRA) ;	\
+		./configure $(configure_extra_always) $(CONFIGURE_EXTRA) ; \
 	else : ; fi
 	$(MAKE) -C gf2x
 

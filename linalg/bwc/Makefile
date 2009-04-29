@@ -50,6 +50,7 @@ MY_CFLAGS+=-DWITH_MPI
 CC:=$(MPICC)
 CXX:=$(MPICXX)
 
+ifeq ($(NOEXPAND_MPICC_CMDLINE),)
 # Work around bugs that clutter output. Avoid forced optimization level.
 CC:=$(shell $(CC) -show | sed -e 's/-I/-isystem /g' -e 's/-O[0-9]//g')
 CXX:=$(shell $(CXX) -show | sed -e 's/-I/-isystem /g' -e 's/-O[0-9]//g')
@@ -75,6 +76,7 @@ lflags_extracted:=$(filter -Wl% -l%,$(CC))
 MY_LFLAGS+=$(lflags_extracted)
 CC:=$(filter-out -Wl% -l%,$(CC))
 CXX:=$(filter-out -Wl% -l%,$(CXX))
+endif
 endif
 
 
