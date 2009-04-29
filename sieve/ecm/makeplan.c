@@ -92,9 +92,7 @@ pp1_make_plan (pp1_plan_t *plan, const unsigned int B1, const unsigned int B2,
 	       int verbose)
 {
   unsigned int p;
-  const unsigned int addcost = 1, doublecost = 1, bytecost = 1, changecost = 1;
-  /* FIXME: without compression, the implicit leading subchain init and 
-     final subchain end are superfluous! */
+  const double addcost = 10, doublecost = 10, bytecost = 1, changecost = 1;
   const unsigned int compress = 1;
   bc_state_t *bc_state;
   
@@ -117,9 +115,27 @@ pp1_make_plan (pp1_plan_t *plan, const unsigned int B1, const unsigned int B2,
   bytecoder_flush (bc_state);
   plan->bc_len = bytecoder_size (bc_state);
   plan->bc = (char *) malloc (plan->bc_len);
-  ASSERT (plan->bc);
+  ASSERT (plan->bc != NULL);
   bytecoder_read (plan->bc, bc_state);
   bytecoder_clear (bc_state);
+  getprime (0);
+
+  if (!compress)
+    {
+      /* The very first chain init and very last chain end are hard-coded
+	 in the stage 1 code and must be removed from the byte code. */
+      size_t i;
+      ASSERT (plan->bc[0] == 10); /* check that first code is chain init */
+      ASSERT (plan->bc[plan->bc_len - 2] == 11); /* check that next-to-last 
+						    code is chain end */
+      /* check that last code is bytecode end */
+      ASSERT (plan->bc[plan->bc_len - 1] == (literal_t) 12);
+      /* Remove first code 10 and last code 11 */
+      for (i = 1; i < plan->bc_len; i++)
+	plan->bc[i - 1] = plan->bc[i];
+      plan->bc[plan->bc_len - 3] = plan->bc[plan->bc_len - 2];
+      plan->bc_len -= 2;
+    }
 
   if (verbose)
     {
@@ -165,8 +181,6 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
   unsigned int p, q;
   const unsigned int addcost = 6, doublecost = 5, /* TODO: find good ratio */
     bytecost = 1, changecost = 1;
-  /* FIXME: without compression, the implicit leading subchain init and 
-     final subchain end are superfluous! */
   const unsigned int compress = 1;
   bc_state_t *bc_state;
   
@@ -202,6 +216,23 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
   bytecoder_read (plan->bc, bc_state);
   bytecoder_clear (bc_state);
   getprime (0);
+
+  if (!compress)
+    {
+      /* The very first chain init and very last chain end are hard-coded
+	 in the stage 1 code and must be removed from the byte code. */
+      size_t i;
+      ASSERT (plan->bc[0] == 10); /* check that first code is chain init */
+      ASSERT (plan->bc[plan->bc_len - 2] == 11); /* check that next-to-last 
+						    code is chain end */
+      /* check that last code is bytecode end */
+      ASSERT (plan->bc[plan->bc_len - 1] == (literal_t) 12);
+      /* Remove first code 10 and last code 11 */
+      for (i = 1; i < plan->bc_len; i++)
+	plan->bc[i - 1] = plan->bc[i];
+      plan->bc[plan->bc_len - 3] = plan->bc[plan->bc_len - 2];
+      plan->bc_len -= 2;
+    }
 
   if (verbose)
     {
