@@ -21,9 +21,6 @@ addchain: addchain.o prac_bc.o
 	$(CC) $(MY_LFLAGS) $^ -o $@ -lutils -lgmp -lm
 testbench: testbench.o libfacul.a
 	$(CC) $(MY_LFLAGS) $^ -o $@ -lutils -lgmp -lm
-ecm_check: ecm_check.o libfacul.a
-	$(CC) $(MY_LFLAGS) $^ -o $@ -lutils -lgmp -lm
-ecm_check.o: facul.h ecm.h $(TOP)/utils/modredc_ul_default.h
 
 stage2.o: stage2.h ../basicnt.h $(TOP)/utils/utils.h
 prac_bc.o: prac_bc.h
