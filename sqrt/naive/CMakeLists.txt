@@ -1,12 +1,6 @@
-SET (sources 
-    algsqrt.c poly.c)
-
-## Add -std=c99 and Revision stuff to compile flags for this target
-SET (CFLAGS "-std=c99 -DREV=\\\"`svnversion ${CMAKE_CURRENT_SOURCE_DIR}`\\\"")
-
-SET_SOURCE_FILES_PROPERTIES (${sources}
-    COMPILE_FLAGS ${CFLAGS})
-
-ADD_EXECUTABLE (algsqrt ${sources})
-TARGET_LINK_LIBRARIES (algsqrt utils ${GMP_LIB})
-
+add_executable(algsqrt algsqrt.c poly.c)
+target_link_libraries(algsqrt utils m)
+# add_executable(fmalgsqrt fmalgsqrt.c poly.c)
+# target_link_libraries(fmalgsqrt gmp)
+add_executable(ratsqrt ratsqrt.c)
+target_link_libraries(ratsqrt utils m)

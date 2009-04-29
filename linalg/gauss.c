@@ -39,6 +39,7 @@ If just the dimension of kernel is wanted, set ker=NULL.
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "gmp.h"   /* only used for setting a random matrix */
 #include "utils.h"  /* for seconds() */
 #include "gauss.h"
@@ -114,7 +115,10 @@ int main(int argc, char **argv) {
   mp_limb_t* mat;
   mp_limb_t** ker;
   int nrows, ncols, limbs_per_row, limbs_per_col;
-  int i, j, justrank = 0;
+  int i, justrank = 0;
+#if VERBOSE
+  int j;
+#endif
   
 
   if (argc > 1) {

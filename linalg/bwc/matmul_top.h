@@ -88,6 +88,10 @@ typedef struct mmt_wiring_s mmt_wiring[1];
 typedef struct mmt_wiring_s * mmt_wiring_ptr;
 typedef struct mmt_wiring_s const * mmt_wiring_srcptr;
 
+/* TODO: It's unhandy to have abase here, since it forces info-file to ba
+ * abase-dependent, which it isn't in reality... Perhaps split the interface
+ * in two ?
+ */
 struct matmul_top_data_s {
     abobj_ptr abase;
     parallelizing_info_ptr pi;

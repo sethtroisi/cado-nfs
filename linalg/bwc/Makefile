@@ -184,7 +184,7 @@ secure_objs:=secure.o intersections.o 			\
 	rusage.o async.o bw-common-mpi.o		\
 	libmatmul.a
 
-mat_io_objs:=../readbuffer.o ../readmat.o readmat-easy.o
+mat_io_objs:=../readbuffer.o ../readmat.o ../readmat-easy.o
 build_normalobjs:=$(mat_io_objs)
 bench_normalobjs:=$(mat_io_objs) debug.o
 prep_normalobjs:=$(mat_io_objs) ../gauss.o

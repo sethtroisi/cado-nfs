@@ -158,9 +158,9 @@ int mpfq_2_128_sscan(mpfq_2_128_dst_field k, mpfq_2_128_dst_elt z, const char * 
 {
     if (k->io_type <= 16) {
         char *tmp;
-        int len = strlen(str);
+        size_t len = strlen(str);
         tmp = (char *)malloc(len+1);
-        int i;
+        size_t i;
         for (i = 0; i < len; ++i) {
             if (str[i] > '9')
                 tmp[i] = str[i] + 10 - 'a';
@@ -170,7 +170,7 @@ int mpfq_2_128_sscan(mpfq_2_128_dst_field k, mpfq_2_128_dst_elt z, const char * 
         mp_limb_t *zz;
         // Allocate one limb per byte... very conservative.
         zz = (mp_limb_t *)malloc(len*sizeof(mp_limb_t));
-        int ret = mpn_set_str(zz, tmp, len, k->io_type);
+        size_t ret = mpn_set_str(zz, (const unsigned char *) tmp, len, k->io_type);
         free(tmp);
         if (ret > 4) {
             free(zz);

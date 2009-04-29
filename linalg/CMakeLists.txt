@@ -1,51 +1,44 @@
-SET (sources 
-    hashpair.c
-    freerel.c
-    duplicates.c
-    prune.c
-    purge.c
-    merge.c
-    replay.c
-    files.c
-    linalg.c
-    gauss.c
-    readmat.c
-    transpose.c
-    characters.c
-    sparse.c
-    allsqrt.c)
 
-## Add Revision stuff to compile flags for this target
-SET (CFLAGS "-DREV=\\\"`svnversion ${CMAKE_CURRENT_SOURCE_DIR}`\\\"")
+set_source_files_properties (gauss.c COMPILE_FLAGS "-DMULTI_ROW=3 -DNO_MAIN")
 
-SET_SOURCE_FILES_PROPERTIES (${sources}
-    COMPILE_FLAGS ${CFLAGS})
+add_executable(freerel freerel.c ../sieve/fb.c hashpair.c)
+target_link_libraries(freerel utils m)
 
-SET_SOURCE_FILES_PROPERTIES (gauss.c
-    COMPILE_FLAGS "-DMULTI_ROW=3 -DNO_MAIN")
+add_executable(duplicates duplicates.c hashpair.c files.c)
+target_link_libraries(duplicates utils)
 
-SET (LIBS utils ${GMP_LIB} m)
+add_executable(purge purge.c hashpair.c files.c)
+target_link_libraries(purge utils m)
 
-ADD_EXECUTABLE(allsqrt allsqrt.c files.c hashpair.c)
-TARGET_LINK_LIBRARIES(allsqrt ${LIBS})
+add_executable(merge merge.c markowitz.c swar.c mst.c report.c dclist.c merge_mono.c sparse_mat.c sparse.c)
+target_link_libraries(merge utils m)
 
-ADD_EXECUTABLE(replay replay.c sparse.c)
-TARGET_LINK_LIBRARIES(replay ${LIBS})
+add_executable(replay replay.c sparse.c)
+target_link_libraries(replay utils)
 
-ADD_EXECUTABLE(merge merge.c sparse.c prune.c)
-TARGET_LINK_LIBRARIES(merge ${LIBS})
+# checkdep: checkdep.o ;
+# linalg: linalg.o gauss.o readmat.o ; target_link_libraries( utils
+# mkbitstrings: mkbitstrings.c ; target_link_libraries( utils
+# hismerge: hismerge.c ; target_link_libraries( utils
+# gauss.c: gauss.c ; $(CC) $(MY_CFLAGS) -DMULTI_ROW=3 -DNO_MAIN $< -c -o $@
 
-ADD_EXECUTABLE(purge purge.c files.c hashpair.c)
-TARGET_LINK_LIBRARIES(purge ${LIBS})
+add_executable(characters characters.c files.c gauss.c)
+target_link_libraries(characters utils)
 
-ADD_EXECUTABLE(freerel freerel.c ../sieve/fb.c hashpair.c)
-TARGET_LINK_LIBRARIES(freerel ${LIBS})
+add_executable(allsqrt allsqrt.c files.c hashpair.c)
+target_link_libraries(allsqrt utils)
 
-ADD_EXECUTABLE(linalg linalg.c gauss.c readmat.c)
-TARGET_LINK_LIBRARIES(linalg ${LIBS})
+add_executable(apply_perm apply_perm.c)
+target_link_libraries(apply_perm utils)
 
-ADD_EXECUTABLE(characters characters.c files.c gauss.c)
-TARGET_LINK_LIBRARIES(characters ${LIBS})
 
-ADD_EXECUTABLE(transpose transpose.c readmat.c)
-TARGET_LINK_LIBRARIES(transpose ${LIBS})
+# This library is used by bwc mostly, but since its files are relevant here as
+# well...
+add_library(mat_io readbuffer.c readmat.c readmat-easy.c)
+
+add_executable(balance balance.c readbuffer.c rowset_heap.cpp)
+target_link_libraries(balance utils m)
+
+add_executable(transpose transpose.c readmat.c)
+target_link_libraries(transpose utils m)
+

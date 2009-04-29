@@ -1,7 +1,7 @@
 
 CC:=gcc
 
-all: cantor bench cantor_gm bench_gm cantor_gmt bench_gmt
+all: cantor cantor_bench cantor_gm cantor_bench_gm cantor_gmt cantor_bench_gmt
 
 ifdef   WITHIN_CADO
 TOP:=..
@@ -19,11 +19,11 @@ cantor128_gmt.o: mpfq_2_128.h.32 mpfq_2_128.h.64 cantor128.h cantor128.c
 mpfq_2_128.o: mpfq_2_128.c.32 mpfq_2_128.c.64
 mpfq_2_128.o: mpfq_2_128.h.32 mpfq_2_128.h.64
 
-bench: bench.o cantor128.o ; $(CC) $(MY_LFLAGS) -o $@ $^ -lgmp
+cantor_bench: cantor_bench.o cantor128.o ; $(CC) $(MY_LFLAGS) -o $@ $^ -lgmp
 cantor: cantor_main.o cantor128.o ; $(CC) $(MY_LFLAGS) -o $@ $^ -lgmp
-bench_gm: bench.o cantor128_gm.o ; $(CC) $(MY_LFLAGS) -o $@ $^ -lgmp
+cantor_bench_gm: cantor_bench.o cantor128_gm.o ; $(CC) $(MY_LFLAGS) -o $@ $^ -lgmp
 cantor_gm: cantor_main.o cantor128_gm.o ; $(CC) $(MY_LFLAGS) -o $@ $^ -lgmp
-bench_gmt: bench.o cantor128_gmt.o ; $(CC) $(MY_LFLAGS) -o $@ $^ -lgmp
+cantor_bench_gmt: cantor_bench.o cantor128_gmt.o ; $(CC) $(MY_LFLAGS) -o $@ $^ -lgmp
 cantor_gmt: cantor_main.o cantor128_gmt.o ; $(CC) $(MY_LFLAGS) -o $@ $^ -lgmp
 
 test: cantor
@@ -34,4 +34,4 @@ test_gmt: cantor_gmt
 	CANTOR=./cantor_gmt ./check_cantor.sh `seq 60 70` `seq 120 140` `seq 250 270`
 
 clean: 
-	-rm -f cantor bench *.o *~
+	-rm -f cantor cantor_bench *.o *~

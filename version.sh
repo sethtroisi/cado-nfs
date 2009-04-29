@@ -8,15 +8,15 @@ if [ -d .svn ] ; then
     svnversion
     # svn status -q # removed, since it pollutes the revision number
 else
-    commit="`git-show --pretty=format:%h 2>/dev/null | head -1`"
+    commit="`git show --pretty=format:%h 2>/dev/null | head -1`"
     if [ "$commit" != "" ] ; then
         # ver="`git svn log | head -n2 | tail -n1 | cut -d\  -f1`"
         # much faster
         perl='while (<>) { /trunk@(\d+)/ && print "$1\n"; }'
-        ver=`git-cat-file commit refs/remotes/trunk | perl -e "$perl"`
+        ver=`git show refs/remotes/trunk | perl -e "$perl"`
         echo -n "svn $ver -- git $commit"
-        # git-diff --name-status is svn status -q
-        if [ "`git-diff --name-status`" != "" ] ; then
+        # git diff --name-status is svn status -q
+        if [ "`git diff --name-status`" != "" ] ; then
             echo " +mods"
         else
             echo

@@ -19,7 +19,7 @@
 #include "abase.h"
 #include "macros.h"
 #include "params.h"
-#include "debug.h"
+// #include "debug.h"
 
 void usage()
 {
@@ -139,11 +139,11 @@ int main(int argc, char * argv[])
             abcopy(xx, src2, src, mm->dim[1]);
             abcopy(xx, dst2, dst, mm->dim[0]);
             matmul_mul(mm, dst, src, 1);
-            debug_write(dst, abbytes(xx, mm->dim[0]), "/tmp/Lmul.%d", t);
+            // debug_write(dst, abbytes(xx, mm->dim[0]), "/tmp/Lmul.%d", t);
 
             abdotprod(xx, checkA, dst, dst2, mm->dim[0]);
             matmul_mul(mm, src2, dst2, 0);
-            debug_write(src2, abbytes(xx, mm->dim[1]), "/tmp/Rmul.%d", t);
+            // debug_write(src2, abbytes(xx, mm->dim[1]), "/tmp/Rmul.%d", t);
 
             abdotprod(xx, checkB, src, src2, mm->dim[1]);
 
