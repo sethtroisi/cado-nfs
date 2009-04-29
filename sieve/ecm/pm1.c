@@ -1,21 +1,6 @@
 #include <stdio.h>
 #include "pp1.h"
 #include "pm1.h"
-#if defined(MODREDCUL)
-#include "modredc_ul.h"
-#include "modredc_ul_default.h"
-#define pm1 pm1_ul
-#define pm1_stage1 pm1_stage1_ul
-#define pp1_stage2 pp1_stage2_ul
-#elif defined(MODREDC15UL)
-#include "modredc_15ul.h"
-#include "modredc_15ul_default.h"
-#define pm1 pm1_15ul
-#define pm1_stage1 pm1_stage1_15ul
-#define pp1_stage2 pp1_stage2_15ul
-#else
-#error Please define MODREDCUL or MODREDC15UL
-#endif
 
 /* Do we want backtracking when processing factors of 2 in E? */
 #ifndef PM1_BACKTRACKING

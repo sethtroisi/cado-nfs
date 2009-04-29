@@ -8,8 +8,9 @@ all: libfacul.a
 more: find_primes_hit addchain testbench
 tests: testbench
 
-facul_objs:=ecm.o ecm_15.o pm1.o pm1_15.o pp1.o pp1_15.o stage2.o prac_bc.o \
-	makeplan.o facul.o facul_doit_ul.o facul_doit_15ul.o
+facul_objs:=ecm_ul.o ecm_15ul.o pm1_ul.o pm1_15ul.o pp1_ul.o pp1_15ul.o \
+	facul_doit_ul.o facul_doit_15ul.o stage2.o prac_bc.o \
+	makeplan.o facul.o 
 
 libfacul.a: $(facul_objs)
 	ar r $@ $^
@@ -22,22 +23,6 @@ testbench: testbench.o libfacul.a
 	$(CC) $(MY_LFLAGS) $^ -o $@ -lutils -lgmp -lm
 ecm_check: ecm_check.o libfacul.a
 	$(CC) $(MY_LFLAGS) $^ -o $@ -lutils -lgmp -lm
-pm1.o: pm1.c pm1.h $(TOP)/utils/modredc_ul.h
-	$(CC) $(MY_CFLAGS) -c -o $@ -DMODREDCUL $<
-pm1_15.o: pm1.c pm1.h $(TOP)/utils/modredc_15ul.h
-	$(CC) $(MY_CFLAGS) -c -o $@ -DMODREDC15UL $<
-pp1.o: pp1.c pp1.h $(TOP)/utils/modredc_ul.h
-	$(CC) $(MY_CFLAGS) -c -o $@ -DMODREDCUL $<
-pp1_15.o: pp1.c pp1.h $(TOP)/utils/modredc_15ul.h
-	$(CC) $(MY_CFLAGS) -c -o $@ -DMODREDC15UL $<
-ecm.o: ecm.c ecm.h $(TOP)/utils/modredc_ul.h
-	$(CC) $(MY_CFLAGS) -c -o $@ -DMODREDCUL $<
-ecm_15.o: ecm.c ecm.h $(TOP)/utils/modredc_15ul.h
-	$(CC) $(MY_CFLAGS) -c -o $@ -DMODREDC15UL $<
-facul_doit_ul.o: facul_doit.c facul_doit.h facul.h $(TOP)/utils/modredc_ul.h
-	$(CC) $(MY_CFLAGS) -c -o $@ -DMODREDCUL $<
-facul_doit_15ul.o: facul_doit.c facul_doit.h facul.h $(TOP)/utils/modredc_ul.h $(TOP)/utils/modredc_15ul.h
-	$(CC) $(MY_CFLAGS) -c -o $@ -DMODREDC15UL $<
 ecm_check.o: facul.h ecm.h $(TOP)/utils/modredc_ul_default.h
 
 stage2.o: stage2.h ../basicnt.h $(TOP)/utils/utils.h
@@ -46,6 +31,8 @@ addchain.o: $(TOP)/utils/modredc_ul.h
 testbench.o: facul.h pm1.h pp1.h ecm.h $(TOP)/utils/modredc_ul.h
 find_primes_hit.o: $(TOP)/utils/modredc_ul.h  $(TOP)/utils/modredc_ul.c
 facul.o: facul.h pm1.h pp1.h ecm.h $(TOP)/utils/modredc_ul.h $(TOP)/utils/modredc_15ul.h
+pm1_ul.o pp1_ul.o ecm_ul.o facul_doit_ul.o : $(TOP)/utils/modredc_ul.h $(TOP)/utils/modredc_ul_default.h
+pm1_15ul.o pp1_15ul.o ecm_15ul.o facul_doit_15ul.o : $(TOP)/utils/modredc_15ul.h $(TOP)/utils/modredc_15ul_default.h 
 
 clean:
 	-rm -f $(facul_objs) libfacul.a addchain.o testbench.o

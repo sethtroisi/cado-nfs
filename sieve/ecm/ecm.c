@@ -2,33 +2,6 @@
 #include <stdlib.h>
 #include <math.h>
 #include "ecm.h"
-#if defined(MODREDCUL)
-#include "modredc_ul.h"
-#include "modredc_ul_default.h"
-#define ecm ecm_ul
-#define ell_pointorder ell_pointorder_ul
-#define ellM_curveorder_jacobi ellM_curveorder_jacobi_ul
-#define ell_curveorder ell_curveorder_ul
-/* The next ones are static so there's no need to rename them, but it's 
-   nice to have these functions distinguishable e.g. in profiler output */
-#define ellM_double ellM_double_ul
-#define ellM_add ellM_add_ul
-#define ellM_interpret_bytecode ellM_interpret_bytecode_ul
-#define ecm_stage2 ecm_stage2_ul
-#elif defined(MODREDC15UL)
-#include "modredc_15ul.h"
-#include "modredc_15ul_default.h"
-#define ecm ecm_15ul
-#define ell_pointorder ell_pointorder_15ul
-#define ellM_curveorder_jacobi ellM_curveorder_jacobi_15ul
-#define ell_curveorder ell_curveorder_15ul
-#define ellM_double ellM_double_15ul
-#define ellM_add ellM_add_15ul
-#define ellM_interpret_bytecode ellM_interpret_bytecode_15ul
-#define ecm_stage2 ecm_stage2_15ul
-#else
-#error Please define MODREDCUL or MODREDC15UL
-#endif
 
 /* Do we want backtracking when processing factors of 2 in E? */
 #ifndef ECM_BACKTRACKING
@@ -187,9 +160,9 @@ ellM_add (ellM_point_t R, const ellM_point_t P, const ellM_point_t Q,
    and 0 otherwise (resulting point is point at infinity) */
 
 static int
-ellW_add3 (residue_t x3, residue_t y3, const residue_t x2, const residue_t y2, 
-           const residue_t x1, const residue_t y1, const residue_t a, 
-	   const modulus_t m)
+ellW_add (residue_t x3, residue_t y3, const residue_t x2, const residue_t y2, 
+          const residue_t x1, const residue_t y1, const residue_t a, 
+	  const modulus_t m)
 {
   residue_t lambda, u, v;
   int r;
@@ -349,7 +322,7 @@ ellW_mul_ui (residue_t x, residue_t y, const unsigned long e, residue_t a,
       if (e & i)
       {
 	  if (tfinite)
-	      tfinite = ellW_add3 (xt, yt, x, y, xt, yt, a, m);
+	      tfinite = ellW_add (xt, yt, x, y, xt, yt, a, m);
 	  else
 	  {
 	      mod_set (xt, x, m);
@@ -1384,7 +1357,7 @@ ell_pointorder (const residue_t sigma, const int parameterization,
   {
       for (i = min + 1; i <= max; i++)
       {
-	  if (!ellW_add3 (xi, yi, xi, yi, x1, y1, a, m))
+	  if (!ellW_add (xi, yi, xi, yi, x1, y1, a, m))
 	      break;
       }
       

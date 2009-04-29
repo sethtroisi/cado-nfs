@@ -1,19 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "pp1.h"
-#if defined(MODREDCUL)
-#include "modredc_ul.h"
-#include "modredc_ul_default.h"
-#define pp1 pp1_ul
-#define pp1_stage2 pp1_stage2_ul
-#elif defined(MODREDC15UL)
-#include "modredc_15ul.h"
-#include "modredc_15ul_default.h"
-#define pp1 pp1_15ul
-#define pp1_stage2 pp1_stage2_15ul
-#else
-#error Please define MODREDCUL or MODREDC15UL
-#endif
 
 /* Do we want backtracking when processing factors of 2 in E? */
 #ifndef PP1_BACKTRACKING
@@ -130,8 +117,6 @@ pp1_stage1 (residue_t X, const char *code, const residue_t two,
 	    mod_set (C, B, m);
 	    mod_set (B, t, m);
 	    break;
-	  case 12: /* End of bytecode */
-	    goto end_of_bytecode;
 	  case 13:
 	    /* Rule 3, then subchain end/start */
             pp1_add (t, B, A, C, m);
@@ -146,6 +131,8 @@ pp1_stage1 (residue_t X, const char *code, const residue_t two,
 	    mod_set (C, A, m);
 	    pp1_add (A, A, B, t, m);
             break;
+	  case 12: /* End of bytecode */
+	    goto end_of_bytecode;
 	  default:
             abort ();
         }
