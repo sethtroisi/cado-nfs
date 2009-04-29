@@ -2,23 +2,6 @@
 #include "pm1.h"
 #include "pp1.h"
 #include "ecm.h"
-#if defined(MODREDCUL)
-#include "modredc_ul_default.h"
-#define pm1 pm1_ul
-#define pp1 pp1_ul
-#define ecm ecm_ul
-#define primetest primetest_ul
-#define facul_doit facul_doit_ul
-#elif defined(MODREDC15UL)
-#include "modredc_15ul_default.h"
-#define pm1 pm1_15ul
-#define pp1 pp1_15ul
-#define ecm ecm_15ul
-#define primetest primetest_15ul
-#define facul_doit facul_doit_15ul
-#else
-#error Please define MODREDCUL or MODREDC15UL
-#endif
 
 extern unsigned long stats_called[];
 extern unsigned long stats_found_n[];
