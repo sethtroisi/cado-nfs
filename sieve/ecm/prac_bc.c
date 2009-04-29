@@ -3,7 +3,6 @@
 #include <string.h>
 #include "prac_bc.h"
 
-#define PRAC_NR_MULTIPLIERS 19
 
 /* Table of multipliers for PRAC. prac_mul[i], 1<=<i<=9, has continued 
    fraction sequence of all ones but with a 2 in the (i+1)-st place, 
@@ -392,7 +391,7 @@ prac_chain (const unsigned long n, const double v, const double addcost,
    If no valid chain could be found because n was composite and 
    no starting value was coprime to n, return 0. */
 
-static double 
+double 
 prac_best (double *mul, const unsigned long n, const int m_parm, 
 	   const double addcost, const double doublecost,
 	   const double bytecost, const double changecost,

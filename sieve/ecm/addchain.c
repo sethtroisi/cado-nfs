@@ -1,5 +1,5 @@
 /* Simple program to find optimal addition chains and generate an unrolled
-   addition chain for stage 1 of P+1 or ECM. */
+   addition chain or byte code for stage 1 of P+1 or ECM. */
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -15,13 +15,12 @@ static unsigned long maxn = 128;
 char *len; /* len[i] is the length of the best chain found for i so far */
 unsigned long *prev; /* Stores next-to-last element of chain for i */
 static unsigned long chain[255];
-static unsigned long pracbest[255];
 static int beat_prac = 0;
 
-/* Stores in codehist2[prev*MAXCODE+i] the frequency of the "prev, i" byte 
+/* Stores in codehist2[prev*BC_MAXCODE+i] the frequency of the "prev, i" byte 
    combination */
-unsigned int codehist[MAXCODE];
-unsigned int codehist2[MAXCODE*MAXCODE];
+unsigned int codehist[BC_MAXCODE];
+unsigned int codehist2[BC_MAXCODE*BC_MAXCODE];
 
 
 /* Simple primality test by trial division */
@@ -108,6 +107,7 @@ int bincost (unsigned long e)
 static void prac_printchain (unsigned long k, const unsigned int addcost, 
 			     const unsigned int doublecost)
 {
+  int cost;
   unsigned long d, e, r;
   double m;
   
@@ -120,15 +120,22 @@ static void prac_printchain (unsigned long k, const unsigned int addcost,
   assert (k % 2 == 1);
   
   /* Find the best multiplier for this k */
-  prac_best (&m, k, PRAC_NR_MULTIPLIERS, addcost, doublecost);
+  cost = prac_best (&m, k, PRAC_NR_MULTIPLIERS, addcost, doublecost, 1, 1, NULL);
+  if (cost == 0)
+    {
+      /* This k is composite and prac cannot make a valid chain for it.
+	 We could try to factor k and make a composite chain from the
+	 prime factors. For now, we bail out - caller shouldn't give
+	 a composite k that doesn't have a prac chain. */
+      abort ();
+    }
   
-  d = k;
-  r = (unsigned long) ((double) d / m + 0.5);
+  r = (unsigned long) ((double) k / m + 0.5);
   
   d = k - r;
   e = 2 * r - k;
-  printf ("set (B, A) /* Start for k=%lu, multiplier %f: init and "
-	  "double */\n", k, m);
+  printf ("set (B, A) /* Start for k=%lu, r=%lu, multiplier %f, cost %d: init and "
+	  "double d = %lu, e = %lu*/\n", k, r, m, cost, d, e);
   printf ("set (C, A)\n");
   printf ("dup (A, A)\n");
   
@@ -139,14 +146,14 @@ static void prac_printchain (unsigned long k, const unsigned int addcost,
           r = d;
           d = e;
           e = r;
-	  printf ("swap (A, B) /* Rule 0: swap */\n");
+	  printf ("swap (A, B) /* Rule 0: swap (d = %lu)*/\n", d);
         }
       /* do the first line of Table 4 whose condition qualifies */
       if (4 * d <= 5 * e && ((d + e) % 3) == 0)
         { /* condition 1 */
           d = (2 * d - e) / 3;
           e = (e - d) / 2;
-	  printf ("add (t, A, B, C) /* Rule 1 */\n");
+	  printf ("add (t, A, B, C) /* Rule 1 (d = %lu)*/\n", d);
 	  printf ("add (t2, t, A, B)\n");
 	  printf ("add (B, B, t, A)\n");
 	  printf ("set (A, t2)\n");
@@ -154,31 +161,31 @@ static void prac_printchain (unsigned long k, const unsigned int addcost,
       else if (4 * d <= 5 * e && (d - e) % 6 == 0)
         { /* condition 2 */
           d = (d - e) / 2;
-	  printf ("add (B, A, B, C) /* Rule 2 */\n");
+	  printf ("add (B, A, B, C) /* Rule 2 (d = %lu) */\n", d);
 	  printf ("dup (A, A)\n");
         }
       else if (d <= (4 * e))
         { /* condition 3 */
           d -= e;
-	  printf ("adds (C, B, A, C) /* Rule 3 */\n");
+	  printf ("adds (C, B, A, C) /* Rule 3 (d = %lu) */\n", d);
 	  printf ("swap (B, C)\n");
         }
       else if ((d + e) % 2 == 0)
         { /* condition 4 */
           d = (d - e) / 2;
-	  printf ("add (B, B, A, C) /* Rule 4 */\n");
+	  printf ("add (B, B, A, C) /* Rule 4 (d = %lu) */\n", d);
 	  printf ("dup (A, A)\n");
         }
       else if (d % 2 == 0) /* d+e is now odd */
         { /* condition 5 */
           d /= 2;
-	  printf ("add (C, C, A, B) /* Rule 5 */\n");
+	  printf ("add (C, C, A, B) /* Rule 5 (d = %lu) */\n", d);
 	  printf ("dup (A, A)\n");
         }
       else if (d % 3 == 0) /* d is odd, e even */
         { /* condition 6 */
           d = d / 3 - e;
-	  printf ("dup (t, A) /* Rule 6 */\n");
+	  printf ("dup (t, A) /* Rule 6 (d = %lu) */\n", d);
 	  printf ("add (t2, A, B, C)\n");
 	  printf ("adds (A,  t, A, A)\n");
 	  printf ("adds (C,  t, t2, C)\n");
@@ -187,7 +194,7 @@ static void prac_printchain (unsigned long k, const unsigned int addcost,
       else if ((d + e) % 3 == 0)
         { /* condition 7 */
           d = (d - 2 * e) / 3;
-	  printf ("add (t, A, B, C) /* Rule 7 */\n");
+	  printf ("add (t, A, B, C) /* Rule 7 (d = %lu) */\n", d);
 	  printf ("adds (B, t, A, B)\n");
 	  printf ("dup (t, A)\n");
 	  printf ("adds (A, A, t, A)\n");
@@ -195,7 +202,7 @@ static void prac_printchain (unsigned long k, const unsigned int addcost,
       else if ((d - e) % 3 == 0)
         { /* condition 8: never happens? */
           d = (d - e) / 3;
-	  printf ("add (t, A, B, C) /* Rule 8 */\n");
+	  printf ("add (t, A, B, C) /* Rule 8 (d = %lu) */\n", d);
 	  printf ("add (C, C, A, B)\n");
 	  printf ("swap (B, t)\n");
 	  printf ("dup (t, A)\n");
@@ -221,12 +228,15 @@ static void prac_printchain (unsigned long k, const unsigned int addcost,
 
 
 /* At function entry, chain[0 ... curlen] contains a Lucas chain of
-   length curlen. If this is a new optimum length for the end value
-   of this chain (i.e., chain[curlen]), then this new optimum length 
-   is stored in len[].
+   length curlen and ending in s. If beat_prac is 0 and this is a new 
+   optimum length for s, then this new optimum length is stored in 
+   len[s]. If beat_prac is 1, then a message is printed if this chain for s
+   is shorted than the length stored in len[s].
+   
    If curlen < maxlen, we try to extend this chain by doubling or 
    adding elements of the chain, where for an addition of two elements
-   their difference must be in the chain as well */
+   their difference must be in the chain as well.
+*/
 
 void chain_extend (int curlen)
 {
@@ -240,7 +250,8 @@ void chain_extend (int curlen)
     {
       if (len[s] > curlen)
 	{
-	  printf ("Optimal chain for %lu beats PRAC:", s);
+	  printf ("This chain (len %d) for %lu beats PRAC (len %d):", 
+		  curlen, s, len[s]);
 	  for (i = 0; i <= curlen; i++)
 	    printf (" %lu", chain[i]);
 	  printf ("\n");
@@ -258,7 +269,7 @@ void chain_extend (int curlen)
   if (curlen >= maxlen)
     return;
 
-#if 0
+#if 1
   /* Try doubling the third-to-last sequence element. 
      FIXME: Is this ever worthwhile? */
   if (curlen > 1 && 2 * chain[curlen - 2] > chain[curlen])
@@ -283,14 +294,18 @@ void chain_extend (int curlen)
         }
     }
 
-  /* Try doubling the last sequence element */
-  s = 2 * chain[curlen];
-  if (s < maxn)
+  /* Try doubling the last sequence element. This results in all following
+     chain elements to be a multiple of the current chain element, i.e.,
+     it is equivalent to a chain concatenation. */
+  if (beat_prac)
     {
-      chain[curlen + 1] = s;
-      chain_extend (curlen + 1);
+      s = 2 * chain[curlen];
+      if (s < maxn)
+        {
+          chain[curlen + 1] = s;
+          chain_extend (curlen + 1);
+        }
     }
-
 
   /* Look for i so that chain[curlen] - chain[i] is in the chain and if
      such an i is found, extend the chain by chain[curlen] + chain[i].
@@ -318,14 +333,15 @@ void find_opt_chain ()
 {
   unsigned long i, uninit = 0, nr_primes, sum_prac_primes, 
     sum_optimal_primes;
-  int j, k, s;
+  int j, k;
+  const int s = (int) sqrt ((double) maxn);
   
   len = malloc (maxn * sizeof (char));
   prev = malloc (maxn * sizeof (unsigned long));
   chain[0] = 1;
   chain[1] = 2;
   chain[2] = 3; /* If chain[2] == 4, then all following chain elements are 
-		   even, and want chains only for odd multipliers - even
+		   even, and we want chains only for odd multipliers - even
 		   ones are trivially reduced */
   len[1] = 0;
   len[2] = 1;
@@ -337,98 +353,123 @@ void find_opt_chain ()
   if (beat_prac)
     {
       for (i = 3; i < maxn; i += 2)
-	if (isprime (i))
-	  len[i] = prac_best (NULL, i, PRAC_NR_MULTIPLIERS, 1, 1);
-      printf ("Histogram of optimal prac multiplier over all primes < %lu: ",
-	      maxn);
-      for (i = 0; i < 255; i++)
-	if (pracbest[i] != 0)
-	  printf ("%d:%d ", (int) i, (int) pracbest[i]);
-      printf ("\n");
+	{
+	  len[i] = prac_best (NULL, i, PRAC_NR_MULTIPLIERS, 1, 1, 0, 0, NULL);
+	  if (len[i] == 0)
+	    printf ("PRAC could not make chain for %lu\n", i);
+	}
+      /* Often PRAC can't find a good non-composite chain for 
+	 composite i, especially if i has a very small prime factor.
+	 Init len[i] to a reasonable composite chain in this case. */
+      for (j = 3; j <= 100; j += 2)
+	if (isprime(j))
+	  for (i = j; i < maxn; i += 2*j)
+	    {
+	      if (len[i] > len[j] + len[i / j])
+		len[i] = len[j] + len[i / j]; 
+	    }
     }
 
   chain_extend (2);
+
+  /* If we don't compare against PRAC, extend_chain() does not do 
+     doubling steps as those lead to concatenated chains. Now
+     we need to check if there are concatenated chains that are
+     shorter than the simple chains that chain_extend() found */
+  if (!beat_prac)
+    {
+      for (i = 3; i < maxn; i *= 3)
+        for (k = 3; k <= s; k += 2)
+          {
+            unsigned long p = (unsigned long) k * k;
+            const int len_k = len[k];
+            
+            if (len_k == 0)
+              continue;
+            
+            for (j = k; p < maxn; j += 2, p += 2*k)
+              {
+                if (len[j] != 0 && (len[p] == 0 || len[p] > len[j] + len_k))
+                  {
+                    if (0)
+                      printf ("Concatenation of chains for %d, %d is shorter "
+                              "(%d) than simple chain for %lu (%d)\n", 
+                            k, j, len[j] + len_k, p, len[p]);
+                    len[p] = len[j] + len_k;
+                    prev[p] = k * prev[j];
+                  }
+              }
+          }
+    }
   
   nr_primes = 0; /* The number of primes in the search interval */
   sum_prac_primes = 0; /* Sum of lengths of PRAC chains for all primes */
   sum_optimal_primes = 0; /* Sum of lengths of optimal chains for all primes */
   
-  /* For each multiplier other than the GR, we remember how many times
-     that multiplier beat the GR. We also remember how often GR was optimal.
-     Init these counts to 0 */
-  for (i = 0; i < 255; i++)
-    pracbest[i] = 0;
-  
   if (1)
-    for (i = 3; i < maxn; i += 2)
-      {
-	if (len[i] != 0)
-	  {
-	    if (isprime (i))
-	      {
-		unsigned long prac_cost;
-		prac_cost = prac_best (NULL, i, PRAC_NR_MULTIPLIERS, 1, 1);
-		nr_primes++;
-		sum_prac_primes += prac_cost;
-		sum_optimal_primes += (unsigned long) len[i];
-		
-		assert ((unsigned long) len[i] <= prac_cost);
-
-		/* For each k print k, the length l of the optimal chain 
-		   for k, k^(1/l) (i.e. the average multiplier in each 
-		   step of the chain), the cost of the binary chain and the
-		   cost of the best chain found by PRAC. If the best PRAC 
-		   chain is worse than the optimal chain, print an asterisk */
-		   
-		printf ("%lu p: %d, r=%lu, radix %f, bin: %d, prac: %lu%s\n", 
-			i, (int) len[i], prev[i], 
-			exp(log((double) (i)) / (double) (len[i])),
-			bincost (i), prac_cost,
-			(prac_cost > (unsigned int) len[i]) ? "*":"");
-	      }
-	    else if (0)
-	      {
-		printf ("%lu c: %d, r=%lu, radix %f, binary cost: %d\n", 
-			i, (int) len[i], prev[i], 
-			exp(log((double) (i)) / (double) (len[i])),
-			bincost (i));
-	      }
-	  }
-	else
-	  if (uninit == 0)
-	    uninit = i;
-      }
+    {
+      for (i = 3; i < maxn; i += 2)
+	{
+	  if (len[i] != 0)
+	    {
+	      if (isprime (i))
+		{
+		  unsigned long prac_cost;
+		  prac_cost = prac_best (NULL, i, PRAC_NR_MULTIPLIERS, 1, 1, 
+					 0, 0, NULL);
+		  nr_primes++;
+		  sum_prac_primes += prac_cost;
+		  sum_optimal_primes += (unsigned long) len[i];
+		  
+		  assert ((unsigned long) len[i] <= prac_cost);
+		  
+		  /* For each k print k, the length l of the optimal chain 
+		     for k, k^(1/l) (i.e. the average multiplier in each 
+		     step of the chain), the cost of the binary chain and the
+		     cost of the best chain found by PRAC. If the best PRAC 
+		     chain is worse than the optimal chain, print an asterisk */
+		  
+		  printf ("%lu prime: %d, r=%lu, radix %f, bin: %d, prac: %lu%s\n", 
+			  i, (int) len[i], prev[i], 
+			  exp(log((double) (i)) / (double) (len[i])),
+			  bincost (i), prac_cost,
+			  (prac_cost > (unsigned int) len[i]) ? "*":"");
+		}
+	      else if (1)
+		{
+		  printf ("%lu compo: %d, r=%lu, radix %f, binary cost: %d\n", 
+			  i, (int) len[i], prev[i], 
+			  exp(log((double) (i)) / (double) (len[i])),
+			  bincost (i));
+		}
+	    }
+	  else
+	    if (uninit == 0)
+	      uninit = i;
+	}
+      printf ("%lu primes, sum of optimal lengths %lu, sum of PRAC lengths "
+	      "%lu\n", nr_primes, sum_optimal_primes, sum_prac_primes);
+    }
   
-  printf ("%lu primes, sum of optimal lengths %lu, sum of PRAC lengths %lu\n",
-	  nr_primes, sum_optimal_primes, sum_prac_primes);
-  printf ("Histogram of optimal prac multiplier: ");
-  for (i = 0; i < 255; i++)
-    if (pracbest[i] != 0)
-      printf ("%d:%d ", (int) i, (int) pracbest[i]);
-  printf ("\n");
-
   if (uninit == 0)
     uninit = maxn;
   printf ("Smallest number for which no chain was found: %lu\n", uninit);
 
 
-  /* Look for cases n=p*q where the concatenated chains of p and q are longer
+  /* Look for cases n=k*j where the concatenated chains of p and q are longer
      than the optimal chain for n */
-  s = (int) sqrt ((double) maxn);
   for (k = 3; k <= s; k += 2)
     {
-      int p;
-      for (j = k, p = k * j; (unsigned long) p < maxn; j += 2, p += 2*k)
-	if (len[p] > 0 && (int) len[p] < (int) len[k] + (int) len [j])
-	  {
-	    if ((int) len[k] + (int) len[j] > (int) len[p] + 1)
-	      printf ("%d:%d beats %d*%d (%d+%d), difference %d\n", 
-		      p, (int) len[p], k, j, (int) len[k], (int) len[j],
-		      (int) len[k] + (int) len[j] - (int) len[p]);
-	    else
-	      printf ("%d:%d beats %d*%d (%d+%d)\n", 
-		      p, (int) len[p], k, j, (int) len[k], (int) len[j]);
-	  }
+      unsigned long p = (unsigned long) k * k;
+      const int len_k = len[k];
+      for (j = k; p < maxn; j += 2, p += 2*k)
+	{
+	  const int len_j = len[j]; 
+	  const int len_p = len[p];
+	  if (len_p > 0 && len_k + len_j > len_p)
+	    printf ("%lu, (prev: %lu, len %d) beats %d*%d (%d+%d), difference %d\n", 
+		    p, prev[p], len_p, k, j, len_k, len_j, len_k + len_j - len_p);
+	}
     }
   free (len);
   len = NULL;
@@ -454,15 +495,14 @@ generate_stage1 (unsigned long B1, unsigned long oldB1, int bytecode,
 		 const unsigned int addcost, const unsigned int doublecost)
 {
   unsigned long p, pp;
+  bc_state_t *bc_state;
   
-  if (bytecode > 0)
-    {
-      bytecoder_init ((bytecode == 2));
-    }
+  if (bytecode)
+    bc_state = bytecoder_init (NULL);
 
-  for (p = 0; p < MAXCODE; p++)
+  for (p = 0; p < BC_MAXCODE; p++)
     codehist[p] = 0;
-  for (p = 0; p < MAXCODE*MAXCODE; p++)
+  for (p = 0; p < BC_MAXCODE*BC_MAXCODE; p++)
     codehist2[p] = 0;
 
   p = 2;
@@ -472,7 +512,7 @@ generate_stage1 (unsigned long B1, unsigned long oldB1, int bytecode,
 	if (pp > oldB1)
 	  {
 	    if (bytecode)
-	      prac_bytecode (p, addcost, doublecost);
+	      prac_bytecode (p, addcost, doublecost, 1, 1, bc_state);
 	    else
 	      prac_printchain (p, addcost, doublecost);
 	  }
@@ -484,26 +524,27 @@ generate_stage1 (unsigned long B1, unsigned long oldB1, int bytecode,
     {
       char *codes;
       unsigned int size, i;
-      bytecoder_flush ();
-      size = bytecoder_size();
+      bytecoder_flush (bc_state);
+      size = bytecoder_size(bc_state);
       codes = malloc (size);
-      bytecoder_read (codes);
-      bytecoder_clear ();
+      bytecoder_read (codes, bc_state);
+      bytecoder_clear (bc_state);
       for (i = 0; i < size; i++)
 	{
 	  printf ("%s%d", (i == 0) ? "" : ", ", (int) codes[i]);
 	  codehist[(int) codes[i]]++;
 	  if (i > 0)
-	    codehist2[(int) codes[i-1] * MAXCODE + (int) codes[i]]++;
+	    codehist2[(int) codes[i-1] * BC_MAXCODE + (int) codes[i]]++;
 	}
       printf ("\n");
       printf ("Histogram of code bytes output:\n");
-      for (p = 0; p < MAXCODE; p++)
+      for (p = 0; p < BC_MAXCODE; p++)
 	if (codehist[p] > 0) 
 	  printf ("%lu: %d\n", p, (int) codehist[p]);
-      for (p = 0; p < MAXCODE*MAXCODE; p++)
+      for (p = 0; p < BC_MAXCODE*BC_MAXCODE; p++)
 	if (codehist2[p] != 0)
-	  printf ("%lu,%lu: %d\n", p / MAXCODE, p % MAXCODE, (int)codehist2[p]);
+	  printf ("%lu,%lu: %d\n", p / BC_MAXCODE, p % BC_MAXCODE, 
+		  (int)codehist2[p]);
       free (codes);
     }
 }
@@ -594,6 +635,18 @@ int main (int argc, char ** argv)
       if (argc > 3)
 	  oldB1 = strtoul (argv[3], NULL, 10);
       generate_stage1 (B1, oldB1, 2, 1, 1);
+    }
+  else if (strcmp (argv[1], "-prac") == 0)
+    {
+      unsigned long n = 1;
+      /* Print PRAC sequence for one number */
+      if (argc < 3)
+        {
+          fprintf (stderr, "Need integer for which to make a PRAC chain\n");
+          exit (EXIT_FAILURE);
+        }
+      n = strtoul (argv[2], NULL, 10);
+      prac_printchain (n, 1, 1);
     }
   else
     {
