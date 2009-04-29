@@ -59,7 +59,7 @@ UTILS_FILES=utils/utils.h utils/mod_ul.h utils/fpoly.h utils/getprime.h \
 	   utils/misc.c utils/misc.h
 SIEVE_FILES=sieve/Makefile sieve/makefb.c sieve/las.c sieve/bucket.h \
            sieve/fb.h sieve/basicnt.h sieve/trialdiv.h sieve/fb.c \
-	   sieve/config_h.in sieve/trialdiv.c
+	   sieve/config_h.in sieve/trialdiv.c sieve/test_trialdiv.c
 SIEVE_ECM_FILES=sieve/ecm/Makefile sieve/ecm/facul.h sieve/ecm/ecm.c \
            sieve/ecm/ecm.h sieve/ecm/stage2.h sieve/ecm/pm1.c \
 	   sieve/ecm/pm1.h sieve/ecm/pp1.h sieve/ecm/pp1.c \
