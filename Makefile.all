@@ -65,7 +65,10 @@ SIEVE_ECM_FILES=sieve/ecm/Makefile sieve/ecm/facul.h sieve/ecm/ecm.c \
 	   sieve/ecm/pm1.h sieve/ecm/pp1.h sieve/ecm/pp1.c \
 	   sieve/ecm/prac_bc.h sieve/ecm/prac_bc.c sieve/ecm/makeplan.c \
 	   sieve/ecm/facul_doit.c sieve/ecm/facul_doit.h sieve/ecm/stage2.c \
-	   sieve/ecm/facul.c
+	   sieve/ecm/facul.c sieve/ecm/ecm_15ul.c sieve/ecm/ecm_ul.c \
+	   sieve/ecm/facul_doit_15ul.c sieve/ecm/facul_doit_ul.c \
+	   sieve/ecm/pm1_15ul.c sieve/ecm/pm1_ul.c sieve/ecm/pp1_15ul.c \
+	   sieve/ecm/pp1_ul.c
 LINALG_FILES=linalg/Makefile linalg/freerel.c linalg/hashpair.h \
            linalg/hashpair.c linalg/duplicates.c linalg/files.h \
 	   linalg/files.c linalg/purge.c linalg/merge.c \
