@@ -29,8 +29,8 @@ makefb: makefb.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lutils -lgmp -lm
 las: las.o fb.o trialdiv.o
 	$(CC) $(MY_LFLAGS) -o $@ $^ -lfacul -lutils -lgmp -lm
-trialdiv: trialdiv.c trialdiv.h
-	$(CC) $(MY_CFLAGS) $(MY_LFLAGS) -DTESTDRIVE -o $@ $< -lgmp -lutils
+test_trialdiv: test_trialdiv.c trialdiv.h trialdiv.o
+	$(CC) $(MY_CFLAGS) $(MY_LFLAGS) -o $@ $< trialdiv.o -lgmp -lutils
 
 # Some dependencies on headers.
 las.o: bucket.h ecm/facul.h
@@ -49,3 +49,6 @@ config.h: config_h.in
 
 clean:
 	rm -f sieve makefb las *.o
+
+check: test_trialdiv
+	./test_trialdiv
