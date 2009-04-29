@@ -51,4 +51,8 @@ clean:
 	rm -f sieve makefb las *.o
 
 check: test_trialdiv
-	./test_trialdiv
+	./test_trialdiv 1
+	./test_trialdiv 2
+	./test_trialdiv 3
+	./test_trialdiv 4
+	./test_trialdiv 5
