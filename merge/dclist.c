@@ -68,6 +68,16 @@ dclistPrint (FILE *file, dclist dcl)
     }
 }
 
+/* consistency check. Protect this presumably with ifndef NDEBUG */
+void dclistCheck(dclist dcl)
+{
+    ASSERT_ALWAYS (dcl != NULL);
+    dclist p;
+    for(p = dcl ; p->next ; p = p->next) ASSERT_ALWAYS(p->next->prev == p);
+    /* Now we've reached the end of the list. p->next is NULL. */
+    for( ; p->prev ; p = p->prev) ASSERT_ALWAYS(p->prev->next == p);
+}
+
 /* return the number of elements of a doubly-chained list, excluding the
    initial -1 */
 int
@@ -122,20 +132,29 @@ dclistRemove (dclist dcl)
   free (dcl);
 }
 
-/* same as dclistRemove, but does not reconstruct prev pointers,
-   and returns the deleted value of j */
+/* same as dclistRemove, but does not reconstruct pointers. Be careful
+ * that it's a can of worms an may bite.
+ *
+ * The use case for this is
+ *
+ * p_dcl = &(some_entry->next)
+ * for( ; *p_dcl != NULL ; ) {
+ *      int j = dclistRemoveMessy(p_dcl);
+ *      // do something with j
+ * }
+ *
+ */
 int
-dclistRemoveNext(dclist dcl)
+dclistRemoveMessy(dclist * p_dcl)
 {
   dclist foo;
   int j;
 
-  ASSERT (dcl != NULL);
-  foo = dcl->prev;
-  j = dcl->j;
-  if (foo != NULL)
-    foo->next = dcl->next;
-  free (dcl);
+  ASSERT ((*p_dcl) != NULL);
+  foo = (*p_dcl)->next;
+  j = (*p_dcl)->j;
+  free(*p_dcl);
+  *p_dcl = foo;
   return j;
 }
 

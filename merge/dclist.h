@@ -18,8 +18,10 @@ extern int dclistLength(dclist dcl);
 extern dclist dclistInsert(dclist dcl, int32_t j);
 extern void dclistPrint(FILE *file, dclist dcl);
 extern void dclistRemove (dclist dcl);
-extern int dclistRemoveNext(dclist dcl);
+extern int dclistRemoveMessy(dclist * p_dcl);
 extern dclist dclistFirst (dclist dcl);
+/* consistency check. Protect this presumably with ifndef NDEBUG */
+extern void dclistCheck(dclist dcl);
 
 #ifdef __cplusplus
 }

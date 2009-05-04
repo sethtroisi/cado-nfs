@@ -218,17 +218,17 @@ deleteEmptyColumnsSWAR (sparse_mat_t *mat)
 {
     dclist dcl = mat->S[0];
     int njrem = 0;
-    int32_t j;
 
+    // dclistCheck(dcl);
     ASSERT(dcl != NULL);
-    while (dcl->next != NULL)
-      {
-        j = dclistRemoveNext (dcl->next);
+    dclist * p_dcl = &(dcl->next);
+    for( ; *p_dcl != NULL ; ) {
+        int32_t j = dclistRemoveMessy(p_dcl);
 	njrem++;
 	mat->A[GETJ(mat, j)] = NULL;
 	mat->wt[GETJ(mat, j)] = 0;
 	freeRj (mat, j);
-      }
+    }
     mat->rem_ncols -= njrem;
     return njrem;
 }
