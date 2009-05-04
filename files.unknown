@@ -5,9 +5,6 @@
 # add a pattern to this file so that it eventually only prints a warning.
 # The normal situation is to have an empty file here.
 merge/README
-polyselect/README
-polyselect/TIMINGS
-polyselect/doit
 sieve/README.las
 sieve/benchsieve.pl
 sieve/ecm/ecm_avg_exp.gp
