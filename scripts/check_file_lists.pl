@@ -23,7 +23,7 @@ if ($? == 0) {
     @files_scm = <SCM>;
     close SCM;
 } elsif (-d ".svn") {
-    open SCM, "svn list |";
+    open SCM, "svn list -R |";
     @files_scm = <SCM>;
     close SCM;
 }
