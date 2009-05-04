@@ -137,7 +137,6 @@ linalg/rowset_heap.cpp
 linalg/rowset_heap.h
 linalg/transpose.c
 local.sh.Macintosh.home
-local.sh.crumble
 local.sh.example
 macros.h
 merge/CMakeLists.txt
