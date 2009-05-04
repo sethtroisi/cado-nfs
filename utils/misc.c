@@ -8,11 +8,11 @@
 #include <errno.h>
 #include <unistd.h>
 
+#include "cado_config.h"
 #include "macros.h"
 #include "misc.h"
 
 /* Not every libc has this, and providing a workalike is very easy */
-
 
 char *cado_strndup(const char *a, size_t n)
 {
@@ -31,14 +31,23 @@ char *cado_strndup(const char *a, size_t n)
 
 int cado_posix_memalign(void **ptr, size_t alignment, size_t size)
 {
-#if defined(HAVE_POSIX_MEMALIGN) && HAVE_POSIX_MEMALIGN==1
+#ifdef HAVE_POSIX_MEMALIGN
     return posix_memalign(ptr, alignment, size);
 #else
+    /* Otherwise do something quite stupid. It's actually fairly
+     * problematic, since we have to way to ensure that we get in return
+     * something which is simultaneously suitably aligned _and_ freeable
+     * with free(). In some cases it's a possible performance hit, or
+     * even possibly a segmentation fault (sse-2 movdqa on a pentium4).
+     * We prefer to abort early, because it's preferrable to be directed
+     * here rather than being misled by a SEGV.
+     */
     size_t r = size % alignment;
     if (r && alignment < size) {
 	size += alignment - r;
     }
     *ptr = malloc(size);
+    ASSERT_ALWAYS((((unsigned long) *ptr) % alignment) == 0);
     if (*ptr == NULL) {
 	return ENOMEM;
     } else {

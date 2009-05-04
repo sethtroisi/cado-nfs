@@ -6,6 +6,6 @@
  */
 #cmakedefine    CADO_VERSION    "@CADO_VERSION@"
 
-#cmakedefine    HAS_POSIX_MEMALIGN
+#cmakedefine    HAVE_POSIX_MEMALIGN
 
 #cmakedefine    USING_ASM

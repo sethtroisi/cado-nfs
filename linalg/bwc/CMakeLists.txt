@@ -42,18 +42,10 @@ macro(configure_bwc_variant v)
 
     string(COMPARE EQUAL "${v}" "u64" doing_u64)
     if(doing_u64)
-        message(STATUS "Trying to compile a sample .S file")
-        TRY_COMPILE(asm_compiles ${CADO_NFS_BINARY_DIR}/config ${CADO_NFS_SOURCE_DIR}/config/asm_sample.c
-            COMPILE_DEFINITIONS "-x assembler"
-            OUTPUT_VARIABLE asm_compile_output)
-        if(asm_compiles)
-            message(STATUS "Trying to compile a sample .S file -- Success")
+        if(gcc_style_amd64_asm)
             set(${v}_matmul_sources ${${v}_matmul_sources} matmul-sliced-asm.S)
             set_property(SOURCE matmul-sliced-asm.S PROPERTY LANGUAGE C)
-        else(asm_compiles)
-            message(STATUS "Trying to compile a sample .S file -- Failed")
-            message(STATUS ${asm_compile_output})
-        endif(asm_compiles)
+        endif(gcc_style_amd64_asm)
     endif(doing_u64)
 
     add_library(${v}_matmul ${${v}_matmul_sources})

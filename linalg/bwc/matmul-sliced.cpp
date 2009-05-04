@@ -27,11 +27,10 @@
 using namespace std;
 
 #include "matmul-sliced.h"
-#ifndef DISABLE_ASM     /* Better define this if we don't have GNU as */
-#ifdef  __x86_64
+
+#if defined(gcc_style_amd64_asm) && defined(ABASE_U64_H_) && !defined(DISABLE_ASM)
 #include "matmul-sliced-asm.h"
 #define ENABLE_ASM
-#endif
 #endif
 
 #include "abase.h"
@@ -366,7 +365,7 @@ void matmul_sliced_mul(struct matmul_sliced_data_s * mm, abt * dst, abt const * 
             abt const * from = src;
             /* Make sure that the assembly function is only called if it
              * matches correctly the abase header !! */
-#if defined(ENABLE_ASM) && defined(ABASE_U64_H_)
+#if defined(ENABLE_ASM)
             q = matmul_sliced_asm(x, where, from, (uint16_t const *) q);
 #else
             /* The external function must have the same semantics as this

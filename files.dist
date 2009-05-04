@@ -294,3 +294,4 @@ utils/ularith.h
 utils/utils.h
 cado_config_h.in
 config/asm_sample.c
+config/sse2.c
