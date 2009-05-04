@@ -1,2 +1,3 @@
 : ${CFLAGS:="-msse2 -O2 -DNDEBUG"}
+: ${CXXFLAGS:="-msse2 -O2 -DNDEBUG"}
 # vim :set ft=bash

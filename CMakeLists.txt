@@ -28,6 +28,7 @@ endif(HAS_${intname}_OVERRIDE)
 endmacro(get_override varname description)
 
 # Syntax is (user-friendly name) (cmake name) (description)
+# Make sure everything is exported from scripts/call_cmake.sh
 get_override(PREFIX     CMAKE_INSTALL_PREFIX  "Install prefix")
 get_override(CFLAGS     CMAKE_C_FLAGS         "CFLAGS")
 get_override(CXXFLAGS   CMAKE_CXX_FLAGS       "CXXFLAGS")
@@ -77,11 +78,13 @@ include_directories (${CADO_NFS_SOURCE_DIR} ${GMP_INCLUDE_PATH}
 link_directories (${CADO_NFS_BINARY_DIR}/utils)
 link_directories (${CADO_NFS_BINARY_DIR}/gf2x)
 
+# Start with cantor since it so easily fails when -msse2 has accidentally been
+# forgotten on a P4 build.
+add_subdirectory (cantor)
 add_subdirectory (utils)
 add_subdirectory (polyselect)
 add_subdirectory (sieve)
 add_subdirectory (sqrt)
-add_subdirectory (cantor)
 add_subdirectory (linalg)
 add_subdirectory (merge)
 add_subdirectory (linalg/bwc)

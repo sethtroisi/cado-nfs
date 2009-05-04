@@ -28,7 +28,7 @@ cantor/mpfq_2_128.h.32
 cantor/mpfq_2_128.h.64
 cantor/mpfq_gf2n_common.h
 gf2x/
-install-cmake.sh
+scripts/install-cmake.sh
 linalg/CMakeLists.txt
 linalg/Makefile
 linalg/apply_perm.c
