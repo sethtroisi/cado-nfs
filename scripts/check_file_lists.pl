@@ -24,7 +24,7 @@ if ($? == 0) {
     close SCM;
 } elsif (-d ".svn") {
     open SCM, "svn list -R |";
-    @files_scm = <SCM>;
+    @files_scm = grep { ! m{/$} } <SCM>;
     close SCM;
 }
 
