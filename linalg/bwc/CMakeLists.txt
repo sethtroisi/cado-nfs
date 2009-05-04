@@ -42,10 +42,10 @@ macro(configure_bwc_variant v)
 
     string(COMPARE EQUAL "${v}" "u64" doing_u64)
     if(doing_u64)
-        if(gcc_style_amd64_asm)
+        if(HAVE_GCC_STYLE_AMD64_ASM)
             set(${v}_matmul_sources ${${v}_matmul_sources} matmul-sliced-asm.S)
             set_property(SOURCE matmul-sliced-asm.S PROPERTY LANGUAGE C)
-        endif(gcc_style_amd64_asm)
+        endif(HAVE_GCC_STYLE_AMD64_ASM)
     endif(doing_u64)
 
     add_library(${v}_matmul ${${v}_matmul_sources})

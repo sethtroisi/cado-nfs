@@ -72,6 +72,8 @@ find_library(GMP_LIB gmp
 # Obtain information from the host.
 
 include(CheckFunctionExists)
+
+# posix_memalign
 CHECK_FUNCTION_EXISTS(posix_memalign      HAVE_POSIX_MEMALIGN)
 
 # SSE-2
@@ -97,18 +99,15 @@ endif(sse2_compiles)
 
 # gcc-style x86_64 assembly.
 message(STATUS "Trying to compile gcc-style x86_64 assembly")
-try_compile(gcc_style_amd64_asm
+try_compile(HAVE_GCC_STYLE_AMD64_ASM
     ${CADO_NFS_BINARY_DIR}/config
     ${CADO_NFS_SOURCE_DIR}/config/asm_sample.c
     COMPILE_DEFINITIONS "-x assembler")
-if(gcc_style_amd64_asm)
+if(HAVE_GCC_STYLE_AMD64_ASM)
     message(STATUS "Trying to compile gcc-style x86_64 assembly -- Success")
-else(gcc_style_amd64_asm)
+else(HAVE_GCC_STYLE_AMD64_ASM)
     message(STATUS "Trying to compile gcc-style x86_64 assembly -- Failed")
-endif(gcc_style_amd64_asm)
-
-
-# TODO: Check for POSIX_MEMALIGN
+endif(HAVE_GCC_STYLE_AMD64_ASM)
 
 #####################################################################
 # now the real stuff.

@@ -28,13 +28,15 @@ using namespace std;
 
 #include "matmul-sliced.h"
 
-#if defined(gcc_style_amd64_asm) && defined(ABASE_U64_H_) && !defined(DISABLE_ASM)
-#include "matmul-sliced-asm.h"
-#define ENABLE_ASM
-#endif
+#include "cado_config.h"
 
 #include "abase.h"
 #include "matmul-common.h"
+
+#if defined(HAVE_GCC_STYLE_AMD64_ASM) && defined(ABASE_U64_H_) && !defined(DISABLE_ASM)
+#include "matmul-sliced-asm.h"
+#define ENABLE_ASM
+#endif
 
 // #define L1_CACHE_SIZE   32768
 // take only 3/4 of the L1 cache.
