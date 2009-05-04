@@ -2,7 +2,7 @@
 project(CADO_NFS)
 
 # May be overridden by environment.
-set(VERSION "0.1-rc2")
+set(CADO_VERSION "0.1-rc2")
 
 #####################################################################
 # cmake version -- I have 2.6 -- yet I recall having used 2.4 before, and so
@@ -34,7 +34,7 @@ get_override(CFLAGS     CMAKE_C_FLAGS         "CFLAGS")
 get_override(CXXFLAGS   CMAKE_CXX_FLAGS       "CXXFLAGS")
 get_override(CC         CMAKE_C_COMPILER      "CC")
 get_override(CXX        CMAKE_CXX_COMPILER    "CXX")
-get_override(VERSION    VERSION               "package version")
+get_override(CADO_VERSION    CADO_VERSION               "package version")
 
 #####################################################################
 # What are we building ?
@@ -42,12 +42,8 @@ get_override(VERSION    VERSION               "package version")
 execute_process(COMMAND scripts/version.sh
         WORKING_DIRECTORY ${CADO_NFS_SOURCE_DIR}
         OUTPUT_STRIP_TRAILING_WHITESPACE
-        OUTPUT_VARIABLE revision)
-message("Configuring CADO version ${revision}")
-
-# TODO ; set the COMPILE_DEFINITIONS property in the global scope ; see
-# cmake-properties.txt
-set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DREV=\"\\\"${revision}\\\"\"")
+        OUTPUT_VARIABLE CADO_REV)
+message("Configuring CADO revision ${CADO_REV}")
 
 #####################################################################
 # Add the CFLAGS that are needed in all cases.
@@ -56,6 +52,8 @@ if(CMAKE_COMPILER_IS_GNUCC)
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -g -W -Wall")
 endif(CMAKE_COMPILER_IS_GNUCC)
 
+#####################################################################
+# Set dependencies for external software.
 # XXX FIXME !
 
 ## You can force a path to gmp.h using -DGMP_INCLUDE_PATH=/path/to/gmph
@@ -71,10 +69,24 @@ find_library(GMP_LIB gmp
     /usr/local/lib64)
 
 #####################################################################
+# Obtain information from the host.
+
+# This will be used by sub-packages at some point, so let's include the thing.
+include(CheckCSourceCompiles)
+
+# TODO: Check for POSIX_MEMALIGN
+
+#####################################################################
 # now the real stuff.
 
-include_directories (${CADO_NFS_SOURCE_DIR} ${GMP_INCLUDE_PATH}
-    ${CADO_NFS_SOURCE_DIR}/utils)
+# First, create the config file gathering everything we've got so far.
+configure_file(cado_config_h.in cado_config.h ESCAPE_QUOTES @ONLY)
+
+include_directories (${GMP_INCLUDE_PATH})
+include_directories (${CADO_NFS_SOURCE_DIR})
+include_directories (${CADO_NFS_SOURCE_DIR}/utils)
+include_directories (${CADO_NFS_BINARY_DIR})
+
 link_directories (${CADO_NFS_BINARY_DIR}/utils)
 link_directories (${CADO_NFS_BINARY_DIR}/gf2x)
 
@@ -102,7 +114,7 @@ add_custom_target(gf2x ALL
     COMMENT "Building gf2x"
 )
 
-set(package_basename cado-nfs-${VERSION})
+set(package_basename cado-nfs-${CADO_VERSION})
 
 add_custom_target(dist
     COMMAND scripts/dist.sh ${package_basename}

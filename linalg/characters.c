@@ -460,7 +460,7 @@ int main(int argc, char **argv)
 #endif
 
     /* print the command line */
-    fprintf(stderr, "%s.r%s", argv[0], REV);
+    fprintf(stderr, "%s.r%s", argv[0], CADO_REV);
     for (k = 1; k < argc; k++)
         fprintf(stderr, " %s", argv[k]);
     fprintf(stderr, "\n");

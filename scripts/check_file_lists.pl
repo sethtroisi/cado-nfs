@@ -55,7 +55,7 @@ sub add_known_list {
 push @$known_lists, &add_known_list('files.dist');
 push @$known_lists, &add_known_list('files.nodist');
 if (defined(my $x = &add_known_list('files.unknown'))) {
-    warn "Warning: files.unknown is not-empty. Please arrange so that every file is covered by a pattern in either files.dist or files.nodist";
+    warn "Warning: files.unknown is not empty. Please arrange so that every file is covered by a pattern in either files.dist or files.nodist";
     push @$known_lists, $x;
 }
 

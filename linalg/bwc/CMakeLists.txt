@@ -36,12 +36,27 @@ endmacro(push_abase_cflags)
 
 set(all_variants)
 macro(configure_bwc_variant v)
-    add_library(${v}_matmul
+    set(${v}_matmul_sources 
         matmul-common.c matmul-basic.c matmul-sliced.cpp
-        matmul-threaded.c matmul-bucket.cpp matmul.c
-        matmul-sliced-asm.S)
+        matmul-threaded.c matmul-bucket.cpp matmul.c)
 
-    set_property(SOURCE matmul-sliced-asm.S PROPERTY LANGUAGE C)
+    string(COMPARE EQUAL "${v}" "u64" doing_u64)
+    if(doing_u64)
+        message(STATUS "Trying to compile a sample .S file")
+        TRY_COMPILE(asm_compiles ${CADO_NFS_BINARY_DIR}/config ${CADO_NFS_SOURCE_DIR}/config/asm_sample.c
+            COMPILE_DEFINITIONS "-x assembler"
+            OUTPUT_VARIABLE asm_compile_output)
+        if(asm_compiles)
+            message(STATUS "Trying to compile a sample .S file -- Success")
+            set(${v}_matmul_sources ${${v}_matmul_sources} matmul-sliced-asm.S)
+            set_property(SOURCE matmul-sliced-asm.S PROPERTY LANGUAGE C)
+        else(asm_compiles)
+            message(STATUS "Trying to compile a sample .S file -- Failed")
+            message(STATUS ${asm_compile_output})
+        endif(asm_compiles)
+    endif(doing_u64)
+
+    add_library(${v}_matmul ${${v}_matmul_sources})
 
     push_abase_cflags(${v} matmul)
     target_link_libraries(${v}_matmul mat_io)

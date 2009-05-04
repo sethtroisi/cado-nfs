@@ -151,7 +151,7 @@ int main(int argc, char *argv[]) {
     //
     // Keep a trace of the command line for debugging...
     //
-    MSG("%s.r%s", argv[0], REV);
+    MSG("%s.r%s", argv[0], CADO_REV);
     for (int i = 1; i < argc; i++) {
         MSG(" %s", argv[i]);
     }

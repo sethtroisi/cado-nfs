@@ -2074,8 +2074,8 @@ void write_info_file(int argc, char * argv[])
     }
     time_t t = time(NULL);
     fprintf(f, "# %s", ctime(&t));
-#ifdef  REV
-    fprintf(f, "# revision " REV "\n");
+#ifdef  CADO_REV
+    fprintf(f, "# revision " CADO_REV "\n");
 #else
     fprintf(f, "# revision (unspecified)\n");
 #endif

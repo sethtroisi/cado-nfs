@@ -87,7 +87,7 @@ Several new meta-targets are defined.
 * make dist
 
 This target expectably build a cado-nfs-<version>.tar.gz file. If the
-VERSION environment variable is set, it is used instead of the default
+CADO_VERSION environment variable is set, it is used instead of the default
 string configured in CMakeLists.txt
 
 What goes in the distribution, what doesn't ?

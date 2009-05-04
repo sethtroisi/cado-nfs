@@ -106,7 +106,7 @@ main (int argc, char *argv[])
     int itermax = 0;
 
     /* print comand-line arguments */
-    fprintf (stderr, "%s.r%s", argv[0], REV);
+    fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
     for (i = 1; i < argc; i++)
       fprintf (stderr, " %s", argv[i]);
     fprintf (stderr, "\n");

@@ -5,6 +5,7 @@
 #include <string.h>
 #include <errno.h>
 
+#include "cado_config.h"
 #include "bw-common.h"
 #include "params.h"
 #include "filenames.h"
@@ -37,7 +38,7 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
 {
     if (bw->can_print) {
         /* print command line */
-        fprintf (stderr, "# (%s) %s", REV, (*p_argv)[0]);
+        fprintf (stderr, "# (%s) %s", CADO_REV, (*p_argv)[0]);
         for (int i = 1; i < (*p_argc); i++)
             fprintf (stderr, " %s", (*p_argv)[i]);
         fprintf (stderr, "\n");

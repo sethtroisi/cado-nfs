@@ -990,7 +990,7 @@ int main(int argc, char *argv[]) {
     int factorall = 0;
     int i;
 
-    MSG("%s.r%s", argv[0], REV);
+    MSG("%s.r%s", argv[0], CADO_REV);
     for (i = 1; i < argc; i++) {
         MSG(" %s", argv[i]);
     }

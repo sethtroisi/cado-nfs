@@ -292,3 +292,5 @@ utils/timing.c
 utils/timing.h
 utils/ularith.h
 utils/utils.h
+cado_config_h.in
+config/asm_sample.c

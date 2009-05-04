@@ -1305,7 +1305,7 @@ main (int argc, char *argv[])
   int notr = 0;
 
   /* print command line */
-  fprintf (stderr, "# %s.r%s", argv[0], REV);
+  fprintf (stderr, "# %s.r%s", argv[0], CADO_REV);
   for (i = 1; i < (unsigned int) argc; i++)
     fprintf (stderr, " %s", argv[i]);
   fprintf (stderr, "\n");

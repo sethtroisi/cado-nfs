@@ -72,7 +72,7 @@ main (int argc, char **argv)
   unsigned long debug_exponent = 0;
 #endif
 
-  fprintf (stderr, "%s revision %s\n", argv[0], REV);
+  fprintf (stderr, "%s revision %s\n", argv[0], CADO_REV);
 
   if (argc > 2 && strcmp (argv[1], "-depnum") == 0)
     {

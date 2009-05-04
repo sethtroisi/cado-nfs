@@ -46,6 +46,7 @@ fi
 # <nothing> won't do, because bash makes no distinction between null and unset
 # here.
 : ${CFLAGS:=-O2}
+: ${CXXFLAGS:=-O2}
 
 
 ########################################################################
@@ -57,7 +58,7 @@ export CFLAGS
 export CXXFLAGS
 export CC
 export CXX
-export VERSION
+export CADO_VERSION
 
 if [ "$1" = "tidy" ] ; then
     echo "Wiping out $build_tree"
@@ -72,6 +73,9 @@ if [ "$1" = "show" ] ; then
     echo "absolute_path_of_source=$absolute_path_of_source"
     echo "relative_path_of_cwd=$relative_path_of_cwd"
     echo "CFLAGS=$CFLAGS"
+    echo "CXXFLAGS=$CXXFLAGS"
+    echo "CC=$CC"
+    echo "CXX=$CXX"
     echo "PREFIX=$PREFIX"
     exit 0
 fi

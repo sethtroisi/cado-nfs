@@ -149,7 +149,7 @@ main(int argc, char *argv[])
     int i;
     double tt;
 
-    fprintf (stderr, "%s.r%s", argv[0], REV);
+    fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
     for (i = 1; i < argc; i++)
       fprintf (stderr, " %s", argv[i]);
     fprintf (stderr, "\n");

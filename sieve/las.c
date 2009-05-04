@@ -2761,7 +2761,7 @@ main (int argc0, char *argv0[])
       }
 
     /* Print command line to output */
-    fprintf (output, "# %s.r%s", argv0[0], REV);
+    fprintf (output, "# %s.r%s", argv0[0], CADO_REV);
     for (i = 1; i < argc0; i++)
       fprintf (output, " %s", argv0[i]);
     fprintf (output, "\n");

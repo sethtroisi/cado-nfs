@@ -1958,7 +1958,7 @@ main (int argc, char **argv)
   /* Print info about program and parameters */
   if (verbose)
     {
-      printf ("# CADO line siever " REV "\n");
+      printf ("# CADO line siever " CADO_REV "\n");
       printf ("# Compiled in parameters:\n");
 #ifndef NDEBUG
       printf ("# Assertions enabled\n");

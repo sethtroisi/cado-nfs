@@ -1,0 +1,11 @@
+
+/* CADO_REV indicates the scm-level revision */
+#cmakedefine    CADO_REV        "@CADO_REV@"
+
+/* CADO_VERSION corresponds to the coarser-grain version of the tarball
+ */
+#cmakedefine    CADO_VERSION    "@CADO_VERSION@"
+
+#cmakedefine    HAS_POSIX_MEMALIGN
+
+#cmakedefine    USING_ASM
