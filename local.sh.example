@@ -1,0 +1,28 @@
+
+############################################################
+# Optimization flags:
+# CFLAGS can be overridden, and contain typically optimization flags, or
+# CPP defines.
+#
+# Anything than is _required_ for compiling is actually added behind the
+# scenes, and cannot be overridden.
+# : ${CFLAGS:="-msse2 -O2 -DNDEBUG"}
+
+
+############################################################
+# Flags relative to the location of some given library: either put
+# GMP=/some/prefix/, and/or GMP_LIBDIR=/some/directory and
+# GMP_INCDIR=/some/directory
+#
+# When GMP=/some/prefix/, includes are fetched in $(GMP)/include and
+# libraries $(GMP)/lib.
+#
+# When GMP is empty, the system libraries are used.
+# Hence:
+# GMP:=$$HOME/gmp-4.2.2-installed/
+#
+# or for the source dir only:
+#
+# GMP_INCDIR:=$$HOME/gmp-4.2.2-sourcetree/
+# GMP_LIBDIR:=$$HOME/gmp-4.2.2-sourcetree/.libs
+

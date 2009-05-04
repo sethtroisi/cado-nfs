@@ -7,7 +7,7 @@
 #include "gmp.h"
 #include "macros.h" /* for ASSERT_ALWAYS */
 #include "cado.h"
-#include "utils/utils.h"
+#include "utils.h"
 #include "aux.h"
 
 /* for the rotation, we try (j*x+k) for |k| <= 2^MAX_k */

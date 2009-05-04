@@ -1,8 +1,9 @@
-#include "cado.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h> /* for isxdigit */
+#include <string.h>
 
+#include "cado.h"
 #include "mod_ul.h"
 #include "relation.h"
 
@@ -187,6 +188,19 @@ int fread_relation (FILE *file, relation_t *rel)
     return ret;
   return read_relation (rel, str);
 }
+
+void skip_relations_in_file(FILE * f, int n)
+{
+    char str[STR_LEN_MAX];
+
+    for( ; n-- ; ) {
+	fgets(str, STR_LEN_MAX, f);
+	if(str[strlen(str)-1] != '\n'){
+	    fprintf(stderr, "Too long string in skip_relations_in_file\n");
+	}
+    }
+}
+
 
 /* return a/b mod p, and -1 when gcd(b,p) <> 1 */
 unsigned long

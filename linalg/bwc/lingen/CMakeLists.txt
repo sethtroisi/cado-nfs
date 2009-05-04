@@ -1,7 +1,0 @@
-include_directories(..)
-include_directories(${CADO_NFS_SOURCE_DIR}/gf2x)
-include_directories(${CADO_NFS_BINARY_DIR}/gf2x)
-link_directories(${CADO_NFS_BINARY_DIR}/gf2x/.libs)
-include_directories(${CADO_NFS_SOURCE_DIR}/cantor)
-add_executable(lingen fake_fft.c lingen_binary.cpp)
-target_link_libraries(lingen bwc_base gf2x cantor128 utils)

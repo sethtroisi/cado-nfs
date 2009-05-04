@@ -1,16 +1,16 @@
 Required software tools:
-=======================
+========================
 
 *) GMP (http://gmplib.org): usually installed in most Linux distributions
 *) The GCC compiler works ; some others might, but it is untested.
-*) GNU make for building
+*) GNU make and CMake for building (CMake is installed on the fly if missing)
 
 [Configure]
-=====================)
+===========
 
 if your site needs tweaks:
 
-cp Makefile.local.example Makefile.local
+cp local.sh.example local.sh
 Edit according to your local settings and your taste. You may have things
 such as:
 
@@ -18,26 +18,35 @@ GMP=$HOME/gmp-4.2.4-install-tree/
 CFLAGS=-msse2 -O2
 CC=/usr/local/gcc-4.3.2/bin/gcc
 
-In each sub-directory (*), the top-level Makefile.local is read if it
-exists. Then the Makefile.local present in the directory is read if it
-exists (thereby overriding settings from the top-level file).
+Note that such tweaks are global ; although earlier CADO versions offered
+the possibility of setting tweaks at a sub-directory level, this is no
+longer so easily doable (but one could try to restore this functionality,
+though).
+
+You may notice that local.sh.example has lines such as
+: ${CFLAGS:="-O2 -DNDEBUG"}
+
+This means ``set CFLAGS to "-O2 -DNDEBUG" if it isn't set to something
+else already. In particular, in such a case, having an environment
+variable CFLAGS can be a handy to override everything even the local.sh
+settings.
 
 
 Compile:
-=======
+========
 
-make clean ; make
+make
 
-(really do make clean if you happen to touch .h files, as there are no
-auto-dependencies)
+It may or may not be relevant to do ``make install'' as well ; at the
+moment consider ``make install'' to be badly tested.
+
 
 Run an example:
 ===============
 
-./new_run.c59
+./run_example.sh c59
 
 The script tries to factor a 59 digit number.
 
-For other numbers, create a parameter file analogous to params.c59
-and call new_cadofactor.pl with this file name and further parameters
-as can be seen in new_run.c59.
+For other numbers, create a parameter file analogous to params/params.c59
+and call ./run_example.sh the same way.

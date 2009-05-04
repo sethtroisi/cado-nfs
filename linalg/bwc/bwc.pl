@@ -493,10 +493,10 @@ sub drive {
             &drive(':balance', @_);
         }
         &drive(":wipeout", @_);
-        &drive("u64n/prep", @_);
-        &drive("u64/secure", @_);
+        &drive("u64n_prep", @_);
+        &drive("u64_secure", @_);
         &drive("./split", @_, "--split-y");
-        &drive("$mode/krylov", @_, "end=1000000");
+        &drive("${mode}_krylov", @_, "end=1000000");
         return;
     }
 
@@ -505,15 +505,15 @@ sub drive {
             &drive(':balance', @_);
         }
         &drive(":wipeout", @_);
-        &drive("u64n/prep", @_);
-        &drive("u64/secure", @_);
+        &drive("u64n_prep", @_);
+        &drive("u64_secure", @_);
         &drive("./split", @_, "--split-y");
-        &drive("$mode/krylov", @_);
+        &drive("${mode}_krylov", @_);
         &drive("./acollect", @_, "--remove-old");
-        &drive("lingen/lingen", @_, "--lingen-threshold", 64);
+        &drive("./lingen", @_, "--lingen-threshold", 64);
         &drive("./split", @_, "--split-f");
-        &drive("$mode/mksol", @_);
-        &drive("u64n/gather", @_);
+        &drive("${mode}_mksol", @_);
+        &drive("u64n_gather", @_);
         return;
     }
 

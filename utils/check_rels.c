@@ -33,7 +33,7 @@ int is_gzip(const char * s)
     return l >= 3 && strcmp(s + l - 3, ".gz") == 0;
 }
 
-int check_relation(relation_t *rel, __cado_poly_struct* cpoly) {
+int check_relation(relation_t *rel, cado_poly_ptr cpoly) {
     mpz_t no, acc;
     int i;
 
@@ -77,7 +77,7 @@ int check_relation(relation_t *rel, __cado_poly_struct* cpoly) {
 
 #define MAX_LENGTH 512
 
-int check_stream(const char *name, FILE * stream, __cado_poly_struct* cpoly)
+int check_stream(const char *name, FILE * stream, cado_poly_ptr cpoly)
 {
     int lnum;
     int nrels = 0;

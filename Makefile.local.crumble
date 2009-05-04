@@ -1,1 +1,0 @@
-CFLAGS=-msse2 -O2 -DNDEBUG

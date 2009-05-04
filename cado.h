@@ -88,9 +88,10 @@ typedef struct
   double rlambda;     /* lambda sieve parameter on the rational  side */
   double alambda;     /* lambda sieve parameter on the algebraic side */
   int qintsize;       /* sieve block range */
-} __cado_poly_struct;
+} cado_poly_struct;
 
-typedef __cado_poly_struct cado_poly[1];
+typedef cado_poly_struct cado_poly[1];
+typedef cado_poly_struct * cado_poly_ptr;
 
 /* Data types */
 
@@ -103,6 +104,10 @@ typedef fbprime_t fbroot_t;
 typedef unsigned long largeprime_t; /* On IA32 they'll only get 32 bit 
                                        large primes */
 #define LARGEPRIME_FORMAT "%lu"
+
+/* merge has some pressure on I/O, so having hex here speeds up the process a
+ * bit */
+#define PURGE_INT_FORMAT "%x"
 
 /* Factor base entry with (possibly) several roots */
 typedef struct {

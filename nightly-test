@@ -15,34 +15,47 @@
 #    cle_gforge.pub in the authorized_keys on that computer.
 set -e
 # If the DIR variable is set, then use it as the basename of the temp directory.
-: ${DIR=cado-nightly}
+if ! [ "$DIR" ] ; then
+    DIR=`mktemp -d /tmp/cado-nightly.XXXXXXXX`
+else
+    /bin/rm -fr "$DIR"
+    mkdir "$DIR"
+fi
+
+# The following test should be useless, but let's be paranoid.
+test ! -h "$DIR"
+cd $DIR
+
 # If the USER variable is set, use it instead of the login name for doing
 # the checkout.
 : ${USER=`whoami`}
-cd /tmp
-/bin/rm -fr "$DIR"
-mkdir "$DIR"
-# The following test should be useless, but let's be paranoid.
-test ! -h "$DIR"
-svn checkout svn+ssh://${USER}@scm.gforge.inria.fr/svn/cado/trunk/dist/src "$DIR"
-cd "$DIR"
-# first build a tarball
-make -f Makefile.all dist VERSION=dev "$@"
-# now extract the tarball and test it
-tar zxf cado-nfs-dev.tgz
 
-# If the cado repository contains a Makefile.local for this machine, use
-# it.
-h=`hostname`
-if [ -f Makefile.local.$h ] ; then
-    echo "Using Makefile.local.$h"
-    cp -f Makefile.local.$h  cado-nfs-dev/Makefile.local
+if [ "$GIT" ] ; then
+    git clone --depth 2 $GIT scm
+    SCM=scm/dist/src
+else
+    svn checkout -q svn+ssh://${USER}@scm.gforge.inria.fr/svn/cado/trunk/dist/src scm
+    SCM=scm
 fi
 
-cd cado-nfs-dev
+export VERSION=snapshot-`date +%Y%m%d%H%M`
+
+# first build a tarball
+make -C $SCM dist
+
+# now extract the tarball and test it
+tar zxf $SCM/cado-nfs-$VERSION.tar.gz
+
+# If the cado repository contains a local.sh for this machine, use it.
+h=`hostname`
+if [ -f local.sh.$h ] ; then
+    echo "Using local.sh.$h"
+    cp -f $SCM/local.sh.$h  cado-nfs-$VERSION/local.sh
+fi
+
+cd cado-nfs-$VERSION
 make "$@"
-./new_run.c59
-exit
-cd /tmp
+./run_example.sh c59
+
 /bin/rm -fr "$DIR"
 

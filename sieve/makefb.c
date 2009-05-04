@@ -3,7 +3,7 @@
 #include <string.h> /* for strcmp() */
 #include <math.h> /* for sqrt and floor */
 #include "cado.h"
-#include "utils/utils.h"
+#include "utils.h"
 
 
 typedef struct {

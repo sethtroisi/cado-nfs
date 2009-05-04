@@ -1,25 +1,4 @@
 TOP:=..
-include $(TOP)/Makefile.common
-
-
-# We require the cado utils library
-MY_LFLAGS+=-L$(TOP)/utils
-MY_CFLAGS+=-I$(TOP)/utils
-
-all: polyselect rotate
-
-polyselect: polyselect.o aux.o
-	$(CC) $(MY_LFLAGS) $^ -o $@ -lutils -lgmp -lm
-
-rotate: rotate.o aux.o
-	$(CC) $(MY_LFLAGS) $^ -o $@ -lutils -lgmp -lm
-
-# Some more dependencies
-polyselect.o: polyselect.c aux.o $(TOP)/cado.h
-
-rotate.o: rotate.c aux.o $(TOP)/cado.h
-aux.o: aux.c aux.h $(TOP)/cado.h
-polyselect rotate: $(TOP)/utils/libutils.a
-
-clean:
-	-rm -f rotate polyselect *~ *.o
+# This makefile is a placeholder. Please have a look to $(TOP)/scripts/call_cmake.sh,
+# and (possibly) edit a file $(TOP)/local.sh to tweak your build preferences.
+all %: ; +@$(TOP)/scripts/call_cmake.sh $@

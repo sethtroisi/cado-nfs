@@ -27,10 +27,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "mod_ul.c"
 
 #include "cado.h"
-#include "utils/utils.h"
+#include "utils.h"
 
-#include "files.h"
-#include "gzip.h"
 #include "gauss.h"
 
 #define DEBUG 0
@@ -231,7 +229,8 @@ buildCharacterMatrix(char **charmat, int k, alg_prime_t * tabchar,
     for (i = 0; i < nrows; i++) {
         fgets(str, 1024, purgedfile);
         sscanf(str, "%d", &nr);
-        jumpToRelation(&rel, relfile, irel, nr);
+        skip_relations_in_file(relfile, nr - irel);
+        fread_relation(relfile, &rel);
         irel = nr + 1;
         computeAllCharacters(charbig, i, k, tabchar, rel.a, rel.b, pol);
         clear_relation(&rel);

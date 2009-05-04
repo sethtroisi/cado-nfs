@@ -1,7 +1,7 @@
 #ifndef RELATION_H_
 #define RELATION_H_
 
-#define STR_LEN_MAX 1024 /* maximal number of characters of a relation line */
+#define STR_LEN_MAX 2048 /* maximal number of characters of a relation line */
 
 #ifdef __cplusplus
 extern "C" {
@@ -18,6 +18,9 @@ extern void computeroots(relation_t * rel);
 extern void fprint_relation(FILE *file, relation_t rel);
 extern void fprint_relation_raw (FILE *file, relation_t rel);
 extern void reduce_exponents_mod2 (relation_t *rel);
+
+/* reads over relations in a file, just discarding them */
+extern void skip_relations_in_file(FILE * file, int n);
 
 
 #ifdef __cplusplus

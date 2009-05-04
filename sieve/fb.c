@@ -2,7 +2,7 @@
  *                Functions for the factor base                  *
  *****************************************************************/
 
-#include "config.h"
+#include "sieve_config.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -12,7 +12,7 @@
 #define rdtscll(x)
 #include "basicnt.h"
 #include "fb.h"
-#include "utils/utils.h"
+#include "utils.h"
 
 
 void 

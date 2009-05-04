@@ -1,6 +1,0 @@
-add_executable(algsqrt algsqrt.c poly.c)
-target_link_libraries(algsqrt utils m)
-# add_executable(fmalgsqrt fmalgsqrt.c poly.c)
-# target_link_libraries(fmalgsqrt gmp)
-add_executable(ratsqrt ratsqrt.c)
-target_link_libraries(ratsqrt utils m)

@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "cado.h"
-#include "utils/utils.h"
+#include "utils.h"
 #include "aux.h" /* for common routines with polyselect.c */
 
 

@@ -29,6 +29,7 @@
 #include "random_generation.h"
 #include "mpz_array.h"
 #include "gzip.h"
+#include "hashpair.h"
 #include "misc.h"
 
 #endif	/* CADO_UTILS_H_ */

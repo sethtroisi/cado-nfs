@@ -1,0 +1,6 @@
+
+add_executable(sieve sieve.c fb.c sieve_config.h)
+target_link_libraries (sieve utils m)
+install(TARGETS sieve RUNTIME DESTINATION bin/sieve)
+
+# vim: set ft=cmake:

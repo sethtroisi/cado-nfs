@@ -1,0 +1,2 @@
+: ${CFLAGS:="-msse2 -O2 -DNDEBUG"}
+# vim :set ft=bash

@@ -1,0 +1,5 @@
+
+add_executable(cache EXCLUDE_FROM_ALL cache.c timing.c)
+add_executable(cachesize EXCLUDE_FROM_ALL cachesize.c)
+
+# vim: set ft=cmake:

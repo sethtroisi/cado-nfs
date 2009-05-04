@@ -1,0 +1,60 @@
+# This file lists the files which don't go in the distribution. If a directory
+# is mentioned (with a trailing slash), then all its children are excluded.
+# Note that the joint of this file and its companion files.dist must agree
+# with the list of files known to the SCM.  A further word of caution:
+# wildcards are *NOT* recognized (by the fascist sanity check program).
+WhoDunit
+builddist.manu
+cantor/cantor128.m
+dev_docs/
+factor_from_rels
+files.dist
+files.nodist
+files.unknown
+linalg/bwc/bind_threads.sh
+linalg/bwc/bwc.sty
+linalg/bwc/convert_magma.pl
+linalg/bwc/sketch.tex
+linalg/tex.c
+makedist.manu
+merge/debug.c
+merge/debug.h
+merge/merge_mpi.c
+merge/merge_mpi.h
+misc/
+nightly-test
+old/
+params/README.params
+params/mach_desc
+params/mach_desc.rsa100
+params/params.c135
+params/params.c142
+params/params.c143
+params/params.c144
+params/params.rsa100
+polyselect/alpha.mpl
+polyselect/alpha.sage
+polyselect/debug_rootsieve.sage
+polyselect/gnuplot_stuff.sage
+polyselect/higher_order_roots.sage
+polyselect/integral.sage
+polyselect/kleinjung.sage
+polyselect/linear_interpolation.sage
+polyselect/play.c
+polyselect/rotation_bound.sage
+scripts/check_file_lists.pl
+scripts/dist.sh
+sieve/CMakeLists-nodist.txt
+sieve/README.sieve
+sieve/ecm/CMakeLists-nodist.txt
+sieve/sieve.c
+sieve/sieve.h
+sqrt/CMakeLists-nodist.txt
+sqrt/finish.mag
+sqrt/fmalgsqrt.c
+sqrt/jmc.mag
+sqrt/magma-manu/
+sqrt/ratsqrt.c
+utils/CMakeLists-nodist.txt
+utils/cache.c
+utils/cachesize.c

@@ -3,11 +3,13 @@ include_directories(..)
 
 Include(FindMPI)
 
-add_executable(test_hello test_hello.c parallelizing_info.c)
+add_executable(test_hello EXCLUDE_FROM_ALL test_hello.c parallelizing_info.c)
 add_executable(random random.c)
 add_executable(split split.c bw-common.c)
 add_executable(shell shell.c parallelizing_info.c bw-common.c bw-common-mpi.c)
 add_executable(acollect acollect.c bw-common.c)
+
+install(TARGETS random split shell acollect RUNTIME DESTINATION bin/linalg/bwc)
 
 target_link_libraries(test_hello utils)
 target_link_libraries(random utils m)
@@ -44,7 +46,7 @@ macro(configure_bwc_variant v)
     push_abase_cflags(${v} matmul)
     target_link_libraries(${v}_matmul mat_io)
 
-    add_library(${v}_bwc info_file.c matmul_top.c)
+    add_library(${v}_bwc abase-${v}.c info_file.c matmul_top.c)
     push_abase_cflags(${v} bwc)
 
     target_link_libraries(${v}_bwc bwc_base ${v}_matmul utils pthread)
@@ -69,16 +71,30 @@ set(secure_objs secure.c)
 macro(configure_program prg)
     foreach(v ${ARGN})
         add_executable(${v}_${prg} ${${prg}_objs})
+        install(TARGETS ${v}_${prg} RUNTIME DESTINATION bin/linalg/bwc)
         target_link_libraries(${v}_${prg} ${v}_bwc)
         push_abase_cflags(${v} ${prg})
         set_target_properties(${v}_${prg} PROPERTIES LINKER_LANGUAGE CXX)
     endforeach(v)
 endmacro(configure_program)
 
-configure_program(krylov ${allvariants})
-configure_program(mksol  ${allvariants})
-configure_program(build  ${allvariants})
-configure_program(bench  ${allvariants})
+configure_program(krylov ${all_variants})
+configure_program(mksol  ${all_variants})
+configure_program(build  ${all_variants})
+configure_program(bench  ${all_variants})
 configure_program(prep   u64n)
 configure_program(gather u64n)
 configure_program(secure u64)
+
+install(PROGRAMS bwc.pl DESTINATION bin/linalg/bwc)
+
+# Also lingen.
+
+include_directories(${CADO_NFS_SOURCE_DIR}/gf2x)
+include_directories(${CADO_NFS_BINARY_DIR}/gf2x)
+link_directories(${CADO_NFS_BINARY_DIR}/gf2x/.libs)
+include_directories(${CADO_NFS_SOURCE_DIR}/cantor)
+add_executable(lingen fake_fft.c lingen_binary.cpp)
+install(TARGETS lingen RUNTIME DESTINATION bin/linalg/bwc)
+target_link_libraries(lingen bwc_base gf2x cantor128 utils)
+

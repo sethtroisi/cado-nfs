@@ -1,4 +1,4 @@
-#include "config.h"
+#include "sieve_config.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -10,11 +10,10 @@
 #include <time.h>
 #include "cado.h"
 #include "sieve.h"
-#include "../utils/mod_ul.h"
-#include "config.h"
+#include "mod_ul.h"
 #include "fb.h"
 #include "basicnt.h"
-#include "../utils/utils.h"
+#include "utils.h"
 
 #define LOG2 0.69314718055994530941723212145817656808
 #define INVLOG2 1.4426950408889634073599246810018921374

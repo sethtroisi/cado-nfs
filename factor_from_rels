@@ -12,21 +12,23 @@
 : ${tmp:=/localdisk/tmp}
 # $cado should point to the ../dist/src directory
 : ${cado:="`dirname $0`"}
-
-name=$1
-
-# default parameters
-maxlevel=15; cwmax=100; rwmax=100
-
-if [ $# -ge 2 ]; then maxlevel=$2; fi
-if [ $# -ge 3 ]; then cwmax=$3; fi
-if [ $# -ge 4 ]; then rwmax=$4; fi
-
+: ${maxlevel:=15}
+: ${cwmax:=100}
+: ${rwmax:=100}
 # number of processors
 : ${mt:=2}
 
+name=$1
+
+if ! [ -d "$d/$name" ] ; then
+    echo "No directory $d/$name found" >&2
+    exit 1
+fi
+
+echo "Using temporary directory $tmp"
+
 tmp=`mktemp -d`
-echo Using temporary directory $tmp
+rsync -a "$d/$name/" "$tmp/"
 
 cp $d/$name/$name.poly $tmp
 # $cado/sieve/makefb -poly $tmp/$name.poly > $tmp/$name.roots
