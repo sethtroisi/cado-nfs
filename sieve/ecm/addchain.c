@@ -495,7 +495,7 @@ generate_stage1 (unsigned long B1, unsigned long oldB1, int bytecode,
 		 const unsigned int addcost, const unsigned int doublecost)
 {
   unsigned long p, pp;
-  bc_state_t *bc_state;
+  bc_state_t *bc_state = NULL;  /* hush gcc-4.4.0 */
   
   if (bytecode)
     bc_state = bytecoder_init (NULL);
