@@ -44,6 +44,7 @@ get_override(CC                   CMAKE_C_COMPILER)
 get_override(CXX                  CMAKE_CXX_COMPILER)
 get_override(CADO_VERSION         CADO_VERSION)
 get_override(MPI                  MPI)
+get_override(PTHREADS             PTHREADS)
 set(GF2X_CONFIGURE_FLAGS --silent --disable-shared)
 get_override(GF2X_CONFIGURE_FLAGS GF2X_CONFIGURE_FLAGS)
 
@@ -189,6 +190,14 @@ install(FILES params/params.c79 DESTINATION ${example_subdir})
 configure_file(
     ${CADO_NFS_SOURCE_DIR}/run_example.sh
     ${CADO_NFS_BINARY_DIR}/run_example.sh
+    ESCAPE_QUOTES
+    @ONLY)
+
+configure_file(
+    ${CADO_NFS_SOURCE_DIR}/scripts/fixup_params_file.sh.in
+    ${CADO_NFS_BINARY_DIR}/fixup_params_file.sh
+    ESCAPE_QUOTES
     @ONLY)
 
 install(PROGRAMS ${CADO_NFS_BINARY_DIR}/run_example.sh DESTINATION bin)
+install(PROGRAMS ${CADO_NFS_BINARY_DIR}/fixup_params_file.sh DESTINATION bin)

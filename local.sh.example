@@ -29,6 +29,20 @@
 # to the default setting.
 
 ############################################################
+# build_tree: where do the object files go.
+#
+# Example values:
+# build_tree="${up_path}build/`hostname`"
+# build_tree="${up_path}build/`uname -m`"
+# build_tree=/tmp/cado-nfs-build
+#
+# up_path, amongst other variables, is defined from the caller script
+# which is scripts/call_cmake.sh.
+#
+# build_tree must be set unconditionally (that is, in contrast to the
+# other variables, you can't do : ${build_tree:=blah blah blah)
+
+############################################################
 # CC: C Compiler
 #
 # Example values:
@@ -79,7 +93,7 @@
 # PREFIX: Installation path
 #
 # Example values:
-# PREFIX=<path-to-source-tree>/dist
+# PREFIX=<path-to-source-tree>/installed
 # PREFIX=/usr/local/cado
 #
 # This is for ``make install'', and using ``make install'' is not
@@ -141,4 +155,16 @@
 # Note that in any case, for the MPI build to be enabled, it is necessary
 # for an MPI C compiler AND an MPI C++ compiler AND an mpiexec program to
 # be found.
+#
+# ``MPI=1'', ``MPI=yes'', ``MPI=on'', are equivalent.
+# ``MPI='', ``MPI=0'', ``MPI=no'', ``MPI=off'', are equivalent.
 
+############################################################
+# PTHREADS: whether to use POSIX threads.
+#
+# Example values:
+# PTHREADS=1
+# PTHREADS=
+#
+# ``PTHREADS=1'', ``PTHREADS=yes'', ``PTHREADS=on'', are equivalent.
+# ``PTHREADS='', ``PTHREADS=0'', ``PTHREADS=no'', ``PTHREADS=off'': idem.

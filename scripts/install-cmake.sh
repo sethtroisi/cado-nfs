@@ -31,7 +31,7 @@ unset CXX
 unset CFLAGS
 unset CXXFLAGS
 cd ${name}-${version}
-./configure --prefix=$me/${name}
+./configure --prefix=$me/${name}-installed
 make -j 4
 make install
 rm -rf $tmpdir

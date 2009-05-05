@@ -19,3 +19,4 @@
     (usually called "long long") as 64 bits.
   * ILP64 defines "int" and "long" as 64 bits.
   
+* re-enable ``make check''

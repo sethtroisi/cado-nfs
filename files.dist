@@ -295,3 +295,5 @@ utils/utils.h
 cado_config_h.in
 config/asm_sample.c
 config/sse2.c
+config/search_for_function.cmake
+scripts/fixup_params_file.sh.in

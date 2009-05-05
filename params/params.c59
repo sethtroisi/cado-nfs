@@ -97,8 +97,10 @@ bwstrat=1
 # Linear algebra
 ###########################################################################
 
-bwmt=1x1                # Multithreading level of Block-Wiedemann ; Use
+bwmt=2x2                # Multithreading level of Block-Wiedemann ; Use
                         # <m>x<n> for bwc, or only one integer for bw.
+                        # Note that this will be substituted with 1x1
+                        # unless PTHREADS have been enabled.
 linalg=bwc              # Choose linalg algorithm: one of bwc bw bl
 bwc_interval=100        # checkpointing interval for bwc.
 

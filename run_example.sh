@@ -23,13 +23,14 @@ shift
 
 #########################################################################
 # Set paths properly.
-cado_prefix=@CMAKE_INSTALL_PREFIX@
-exmple_subdir=@example_subdir@
+cado_prefix="@CMAKE_INSTALL_PREFIX@"
+example_subdir="@example_subdir@"
+mpiexec="@MPIEXEC@"
 
 if [ -d "$cado_prefix" ] ; then
     # We're called in the install tree.
-    if [ -f "$cado_prefix/$exmple_subdir/params.$file" ] ; then
-        file="$cado_prefix/$exmple_subdir/params.$file" 
+    if [ -f "$cado_prefix/$example_subdir/params.$file" ] ; then
+        file="$cado_prefix/$example_subdir/params.$file" 
     fi
     cadodir="$cado_prefix/bin"
     cadofactor="$cadodir/cadofactor.pl"
@@ -60,6 +61,8 @@ echo "Testing factorization as given by $file in $t"
 [ "$CADO_DEBUG" ] && echo "(debug mode, temporary files will be kept in $t)"
 
 cp $file $t/param
+
+$cadodir/fixup_params_file.sh $t/param
 
 # Sets the machine description file
 if [ -z "$CADO_USEHOST" ] ; then

@@ -28,10 +28,11 @@ relative_path_of_cwd=${called_from##$absolute_path_of_source}
 : ${build_tree:="${up_path}build/`hostname`"}
 
 # By default, we also avoid /usr/local ; of course, it may be overridden.
-: ${PREFIX:="$absolute_path_of_source/dist"}
+# Note that cmake does not really have phony targets, so one must avoid
+# basenames which correspond to targets !
+: ${PREFIX:="$absolute_path_of_source/installed"}
 
 # XXX XXX XXX LOOK LOOK LOOK: here you've got an entry point for customizing.
-
 # The source directory may contain a hint script with several useful
 # preferences. Its job is to put environment variables. Quite notably,
 # $build_tree is amongst these.
@@ -64,6 +65,7 @@ export GF2X_CONFIGURE_EXTRA
 export GMP
 export GMP_INCDIR
 export GMP_LIBDIR
+export PTHREADS
 
 if [ "$1" = "tidy" ] ; then
     echo "Wiping out $build_tree"
@@ -85,13 +87,14 @@ if [ "$1" = "show" ] ; then
     echo "CADO_VERSION=\"$CADO_VERSION\""
     echo "MPI=\"$MPI\""
     echo "GF2X_CONFIGURE_EXTRA=\"$GF2X_CONFIGURE_EXTRA\""
+    echo "PTHREADS=\"$PTHREADS\""
     exit 0
 fi
 
 # Make sure we have cmake, by the way !
 cmake_path="`which cmake 2>/dev/null`"
 if [ "$?" != "0" ] || ! [ -x "$cmake_path" ] ; then 
-    cmake_path="$absolute_path_of_source/cmake/bin/cmake"
+    cmake_path="$absolute_path_of_source/cmake-installed/bin/cmake"
     if ! [ -x "$cmake_path" ] ; then
         echo "Need to get cmake first -- this takes long !"
         cd $up_path

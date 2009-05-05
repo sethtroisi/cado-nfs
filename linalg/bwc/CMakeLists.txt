@@ -1,6 +1,24 @@
 
 include_directories(..)
 
+include(${CMAKE_SOURCE_DIR}/config/search_for_function.cmake)
+
+#############################################################
+# pthreads
+if(NOT("$ENV{PTHREADS}" MATCHES "^(0|NO|no|OFF|off|)$"))
+    search_for_function(pthread_create HAVE_PTHREAD_CREATE -lpthread)
+    search_for_function(pthread_barrier_wait HAVE_PTHREAD_BARRIER_WAIT -lrt)
+    if(HAVE_PTHREAD_CREATE AND HAVE_PTHREAD_BARRIER_WAIT)
+        # We're using this variable in the top-level substitution, so it needs
+        # to escape its scope and go into the cache right now.
+        set(WITH_PTHREADS 1 CACHE INTERNAL "pthreads are being used")
+        set(pthread_libs ${pthread_libs} ${CMAKE_REQUIRED_LIBRARIES})
+        add_definitions(-DWITH_PTHREADS)
+    endif(HAVE_PTHREAD_CREATE AND HAVE_PTHREAD_BARRIER_WAIT)
+endif(NOT("$ENV{PTHREADS}" MATCHES "^(0|NO|no|OFF|off|)$"))
+
+#############################################################
+# mpi
 # Don't use the FindMPI module, it's buggy.
 if(NOT("$ENV{MPI}" MATCHES "^(0|NO|no|OFF|off|)$"))
     set(findprog_flags
@@ -29,10 +47,15 @@ if(NOT("$ENV{MPI}" MATCHES "^(0|NO|no|OFF|off|)$"))
         set(CMAKE_C_COMPILER ${MPI_C_COMPILER})
         set(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})
         get_filename_component(HAVE_MPI ${MPIEXEC} PATH)
+        # We're using this variable in the top-level substitution, so it needs
+        # to escape its scope and go into the cache right now.
+        set(WITH_MPI 1 CACHE INTERNAL "MPI is being used")
+        add_definitions(-DWITH_MPI)
     else(MPI_C_COMPILER AND MPI_CXX_COMPILER AND MPIEXEC)
         message(FATAL_ERROR "Cannot find all of mpicc/mpic++/mpiexec with MPI=$ENV{MPI}")
     endif(MPI_C_COMPILER AND MPI_CXX_COMPILER AND MPIEXEC)
 endif(NOT("$ENV{MPI}" MATCHES "^(0|NO|no|OFF|off|)$"))
+
 
 configure_file(bwc.pl ${CMAKE_CURRENT_BINARY_DIR}/bwc.pl ESCAPE_QUOTES @ONLY)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
@@ -49,7 +72,7 @@ install(TARGETS random split shell acollect RUNTIME DESTINATION bin/linalg/bwc)
 target_link_libraries(test_hello utils)
 target_link_libraries(random utils m)
 target_link_libraries(split utils)
-target_link_libraries(shell utils)
+target_link_libraries(shell utils ${pthread_libs})
 target_link_libraries(acollect utils)
 
 set(bwc_base_objs
@@ -63,6 +86,7 @@ set(bwc_base_objs
     debug.c)
 
 add_library(bwc_base ${bwc_base_objs})
+target_link_libraries(bwc_base ${pthread_libs})
 
 macro(push_abase_cflags v target)
     set_property(TARGET ${v}_${target}
@@ -128,7 +152,7 @@ configure_program(prep   u64n)
 configure_program(gather u64n)
 configure_program(secure u64)
 
-install(PROGRAMS bwc.pl DESTINATION bin/linalg/bwc)
+install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/bwc.pl DESTINATION bin/linalg/bwc)
 
 # Also lingen.
 
