@@ -9,11 +9,14 @@ extern "C" {
 #endif
 
 extern char * cado_strndup(const char * a, size_t n);
-extern int cado_posix_memalign(void** ptr, size_t alignment, size_t size);
 
-void * malloc_check(const size_t x);
-void * aligned_malloc(size_t size, size_t alignment);
-void * malloc_pagealigned(size_t sz); 
+extern void * malloc_check(const size_t x);
+
+extern void * malloc_aligned(size_t size, size_t alignment);
+extern void free_aligned(void * ptr, size_t size, size_t alignment);
+
+extern void * malloc_pagealigned(size_t sz); 
+extern void free_pagealigned(void * ptr, size_t sz); 
 
 /* k must be a power of 2. Returns the smallest multiple of k greater
  * than or equal to n

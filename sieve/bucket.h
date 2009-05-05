@@ -2,8 +2,6 @@
  * Some bucket stuff.
  */
 
-#define _XOPEN_SOURCE 600       // should be defined before stdlib.h
-                                // in order to have posix_memalign
 #include <stdlib.h>   // for malloc and friends
 #include <stdint.h>
 
@@ -221,7 +219,7 @@ clear_bucket_array(bucket_array_t BA)
         free(BA.bucket_start[i]);
 	free(BA.first_logp[i]);
       }
-    free(BA.bucket_start);
+    free_pagealigned(BA.bucket_start, BA.n_bucket*sizeof(bucket_update_t *));
     free(BA.bucket_write);
     free(BA.bucket_read);
     free(BA.first_logp);

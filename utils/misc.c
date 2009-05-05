@@ -1,5 +1,5 @@
 #define _POSIX_C_SOURCE 200112L
-#define _XOPEN_SOURCE   600
+#define _XOPEN_SOURCE   600     /* sometimes useful for posix_memalign */
 #define _DARWIN_C_SOURCE /* for getpagesize */
 
 #include <stdlib.h>
@@ -22,40 +22,6 @@ char *cado_strndup(const char *a, size_t n)
     return r;
 }
 
-/* Only in recent posix. Mac OS does not have it. Unfortunately,
- * providing something that works just the same isn't easy: even though
- * adjusting the pointer would be doable (albeit quirky), then free()
- * would choke. Therefore, if we know that the real posix_memalign, use
- * it, or else do something stupid.
- */
-
-int cado_posix_memalign(void **ptr, size_t alignment, size_t size)
-{
-#ifdef HAVE_POSIX_MEMALIGN
-    return posix_memalign(ptr, alignment, size);
-#else
-    /* Otherwise do something quite stupid. It's actually fairly
-     * problematic, since we have to way to ensure that we get in return
-     * something which is simultaneously suitably aligned _and_ freeable
-     * with free(). In some cases it's a possible performance hit, or
-     * even possibly a segmentation fault (sse-2 movdqa on a pentium4).
-     * We prefer to abort early, because it's preferrable to be directed
-     * here rather than being misled by a SEGV.
-     */
-    size_t r = size % alignment;
-    if (r && alignment < size) {
-	size += alignment - r;
-    }
-    *ptr = malloc(size);
-    ASSERT_ALWAYS((((unsigned long) *ptr) % alignment) == 0);
-    if (*ptr == NULL) {
-	return ENOMEM;
-    } else {
-	return 0;
-    }
-#endif
-}
-
 void *malloc_check(const size_t x)
 {
     void *p;
@@ -64,17 +30,58 @@ void *malloc_check(const size_t x)
     return p;
 }
 
+/* Not everybody has posix_memalign. In order to provide a viable
+ * alternative, we need an ``aligned free'' matching the ``aligned
+ * malloc''. We rely on posix_memalign if it is available, or else fall
+ * back on ugly pointer arithmetic so as to guarantee alignment. Note
+ * that not providing the requested alignment can have trouble some
+ * consequences. At best, a performance hit, at worst a segv (sse-2
+ * movdqa on a pentium4 causes a GPE if improperly aligned).
+ */
 
-void *aligned_malloc(size_t size, size_t alignment)
+void *malloc_aligned(size_t size, size_t alignment)
 {
-    void *res;
-    int rc = cado_posix_memalign(&res, alignment, size);
-    return rc == 0 ? res : NULL;
+#ifdef HAVE_POSIX_MEMALIGN
+    void *res = NULL;
+    posix_memalign(&res, alignment, size);
+    return res;
+#else
+    char * res;
+    res = malloc(size + sizeof(size_t) + alignment);
+    res += sizeof(size_t);
+    size_t displ = alignment - ((unsigned long) res) % alignment;
+    res += displ;
+    memcpy(res - sizeof(size_t), &displ, sizeof(size_t));
+    ASSERT_ALWAYS((((unsigned long) res) % alignment) == 0);
+    return (void*) res;
+#endif
+}
+
+void free_aligned(void * p, size_t size MAYBE_UNUSED, size_t alignment MAYBE_UNUSED)
+{
+#ifdef HAVE_POSIX_MEMALIGN
+    free(p);
+#else
+    char * res = (char *) p;
+    ASSERT_ALWAYS((((unsigned long) res) % alignment) == 0);
+    size_t displ;
+    memcpy(&displ, res - sizeof(size_t), sizeof(size_t));
+    res -= displ;
+    ASSERT_ALWAYS(displ == alignment - ((unsigned long) res) % alignment);
+    res -= sizeof(size_t);
+    free(res);
+#endif
 }
 
 void *malloc_pagealigned(size_t sz)
 {
-    void *p = aligned_malloc(sz, getpagesize());
+    void *p = malloc_aligned(sz, getpagesize());
     ASSERT_ALWAYS(p != NULL);
     return p;
 }
+
+void free_pagealigned(void * p, size_t sz)
+{
+    free_aligned(p, sz, getpagesize());
+}
+

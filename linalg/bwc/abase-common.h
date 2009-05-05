@@ -32,12 +32,12 @@
 #else
 
 #ifdef  ALWAYS_ALIGN_LARGE_MALLOCS
-#include "misc.h"       /* in aligned_malloc is in utils */
-#define alignable_malloc(s)     aligned_malloc((s), ALWAYS_ALIGN_LARGE_MALLOCS)
-#define alignable_free(p,s)     free((p))
+#include "misc.h"       /* malloc/free_aligned are in utils */
+#define alignable_malloc(s)  malloc_aligned((s), ALWAYS_ALIGN_LARGE_MALLOCS)
+#define alignable_free(p,s)  free_aligned((p), (s), ALWAYS_ALIGN_LARGE_MALLOCS)
 #else
-#define alignable_malloc(s)     malloc((s))
-#define alignable_free(p,s)     free((p))
+#define alignable_malloc(s)  malloc((s))
+#define alignable_free(p,s)  free((p))
 #endif
 
 #endif
