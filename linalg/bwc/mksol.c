@@ -3,7 +3,7 @@
 #define _DARWIN_C_SOURCE    /* for asprintf. _ANSI_SOURCE must be undefined */
 
 #include <stdio.h>
-
+#include "bwc_config.h"
 #include "parallelizing_info.h"
 #include "matmul_top.h"
 #include "abase.h"

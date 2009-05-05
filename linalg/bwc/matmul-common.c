@@ -3,6 +3,7 @@
 
 #include <errno.h>
 #include <string.h>
+#include "bwc_config.h"
 #include "matmul-common.h"
 #include "params.h"
 #include "readmat-easy.h"

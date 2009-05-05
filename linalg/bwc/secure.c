@@ -2,12 +2,11 @@
 #define _GNU_SOURCE
 
 #include <stdio.h>
-
+#include "bwc_config.h"
 #include "parallelizing_info.h"
 #include "matmul_top.h"
 #include "abase.h"
 #include "select_mpi.h"
-
 #include "params.h"
 #include "xvectors.h"
 #include "bw-common-mpi.h"

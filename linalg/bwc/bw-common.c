@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-
+#include "bwc_config.h"
 #include "cado_config.h"
 #include "bw-common.h"
 #include "params.h"

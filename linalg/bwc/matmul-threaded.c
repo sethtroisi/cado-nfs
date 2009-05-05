@@ -6,7 +6,7 @@
 #include <errno.h>
 #include <stdint.h>
 #include <pthread.h>
-
+#include "bwc_config.h"
 #include "matmul.h"
 #include "matmul-threaded.h"
 #include "matmul-common.h"

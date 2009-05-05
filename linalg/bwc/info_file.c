@@ -5,9 +5,8 @@
 #include <stdio.h>
 #include <errno.h>
 #include <limits.h>
-
 #include <string.h>
-
+#include "bwc_config.h"
 #include "info_file.h"
 #include "filenames.h"
 #include "utils.h"      /* cado_strndup */

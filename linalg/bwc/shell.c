@@ -7,10 +7,9 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <string.h>
-
+#include "bwc_config.h"
 #include "parallelizing_info.h"
 #include "select_mpi.h"
-
 #include "params.h"
 #include "bw-common-mpi.h"
 #include "filenames.h"

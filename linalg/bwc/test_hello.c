@@ -5,7 +5,7 @@
 #include <errno.h>
 #include <string.h>
 #include <stdio.h>
-
+#include "bwc_config.h"
 #include "parallelizing_info.h"
 #include "select_mpi.h"
 #include "params.h"

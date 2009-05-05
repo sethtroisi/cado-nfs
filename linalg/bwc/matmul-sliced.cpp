@@ -23,7 +23,7 @@
 #include <vector>
 #include <algorithm>    // sort
 #include <iostream>     // cout
-
+#include "bwc_config.h"
 using namespace std;
 
 #include "matmul-sliced.h"

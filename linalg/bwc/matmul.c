@@ -1,5 +1,5 @@
 #include <stdarg.h>
-
+#include "bwc_config.h"
 #include "matmul.h"
 
 #define MATMUL_DEFAULT_IMPL sliced

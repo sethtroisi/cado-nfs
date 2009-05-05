@@ -6,7 +6,7 @@
 #include <errno.h>
 #include <stdint.h>
 #include <string.h>
-
+#include "bwc_config.h"
 #include "matmul.h"
 #include "matmul-basic.h"
 #include "matmul-common.h"

@@ -2,7 +2,7 @@
 #define _GNU_SOURCE
 
 #include <stdio.h>
-
+#include "bwc_config.h"
 #include "parallelizing_info.h"
 #include "matmul_top.h"
 #include "abase.h"
@@ -10,11 +10,9 @@
 #include "random_generation.h"
 #include "gauss.h"
 #include "gauss.h"
-
 #include "params.h"
 #include "xvectors.h"
 #include "xymats.h"
-
 #include "bw-common-mpi.h"
 #include "filenames.h"
 

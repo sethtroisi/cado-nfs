@@ -2,7 +2,7 @@
 
 #include <signal.h>
 #include <string.h>
-
+#include "bwc_config.h"
 #include "async.h"
 #include "rusage.h"
 #include "macros.h"

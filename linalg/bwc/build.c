@@ -1,8 +1,8 @@
 #define _GNU_SOURCE     // sometimes we use elctric_alloc->mmap->MMAP_ANONYMOUS
 
 #include <stdio.h>
+#include "bwc_config.h"
 #include "matmul.h"
-
 #include "abase.h"
 #include "macros.h"
 

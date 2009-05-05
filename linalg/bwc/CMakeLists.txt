@@ -1,7 +1,42 @@
 
 include_directories(..)
 
-Include(FindMPI)
+# Don't use the FindMPI module, it's buggy.
+if(NOT("$ENV{MPI}" MATCHES "^(0|NO|no|OFF|off|)$"))
+    set(findprog_flags
+        NO_DEFAULT_PATH
+        NO_CMAKE_ENVIRONMENT_PATH
+        NO_CMAKE_PATH
+        NO_SYSTEM_ENVIRONMENT_PATH
+        NO_CMAKE_SYSTEM_PATH)
+    if("$ENV{MPI}" MATCHES "^(1|YES|yes|ON|on|)$")
+        set(findprog_flags)
+    endif("$ENV{MPI}" MATCHES "^(1|YES|yes|ON|on|)$")
+    find_program(MPI_C_COMPILER mpicc HINTS $ENV{MPI} "$ENV{MPI}/bin"
+        ${findprog_flags})
+    find_program(MPI_CXX_COMPILER
+        NAMES mpic++ mpicxx mpiCC
+        HINTS $ENV{MPI} "$ENV{MPI}/bin"
+        ${findprog_flags})
+    find_program(MPIEXEC
+        mpiexec
+        HINTS $ENV{MPI} "$ENV{MPI}/bin"
+        ${findprog_flags})
+    if (MPI_C_COMPILER AND MPI_CXX_COMPILER AND MPIEXEC)
+        message(STATUS "Using MPI C compiler ${MPI_C_COMPILER}")
+        message(STATUS "Using MPI C++ compiler ${MPI_CXX_COMPILER}")
+        message(STATUS "Using MPI driver ${MPIEXEC}")
+        set(CMAKE_C_COMPILER ${MPI_C_COMPILER})
+        set(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})
+        get_filename_component(HAVE_MPI ${MPIEXEC} PATH)
+    else(MPI_C_COMPILER AND MPI_CXX_COMPILER AND MPIEXEC)
+        message(FATAL_ERROR "Cannot find all of mpicc/mpic++/mpiexec with MPI=$ENV{MPI}")
+    endif(MPI_C_COMPILER AND MPI_CXX_COMPILER AND MPIEXEC)
+endif(NOT("$ENV{MPI}" MATCHES "^(0|NO|no|OFF|off|)$"))
+
+configure_file(bwc.pl ${CMAKE_CURRENT_BINARY_DIR}/bwc.pl ESCAPE_QUOTES @ONLY)
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
+configure_file(bwc_config.h.in ${CMAKE_CURRENT_BINARY_DIR}/bwc_config.h ESCAPE_QUOTES @ONLY)
 
 add_executable(test_hello EXCLUDE_FROM_ALL test_hello.c parallelizing_info.c)
 add_executable(random random.c)

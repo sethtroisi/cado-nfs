@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <limits.h>
+#include "bwc_config.h"
 #include "macros.h"
 #include "filenames.h"
 #include "bw-common.h"

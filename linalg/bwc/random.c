@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "bwc_config.h"
 #include "macros.h"
 #include "utils.h"
 

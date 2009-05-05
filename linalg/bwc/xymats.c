@@ -1,5 +1,5 @@
 #define _POSIX_C_SOURCE 200112L
-
+#include "bwc_config.h"
 #include "xymats.h"
 
 /* This is used as a very simple reduction routine, mostly for the small

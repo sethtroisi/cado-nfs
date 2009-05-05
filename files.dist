@@ -63,6 +63,7 @@ linalg/bwc/bw-common-mpi.c
 linalg/bwc/bw-common-mpi.h
 linalg/bwc/bw-common.c
 linalg/bwc/bw-common.h
+linalg/bwc/bwc_config.h.in
 linalg/bwc/bwc.pl
 linalg/bwc/checks.list
 linalg/bwc/checks.list.light

@@ -1,8 +1,9 @@
 #ifndef FAKEPTHREAD_H_
 #define FAKEPTHREAD_H_
 
-#include "macros.h"
 #include <signal.h>
+#include "bwc_config.h"
+#include "macros.h"
 
 // See select_mpi.h for info on my_* stuff.
 

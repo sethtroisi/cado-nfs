@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <errno.h>
-
+#include "bwc_config.h"
 #include "select_mpi.h"
 #include "bw-common-mpi.h"
 

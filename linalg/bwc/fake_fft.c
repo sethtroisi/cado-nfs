@@ -1,5 +1,5 @@
 #define _GNU_SOURCE
-
+#include "bwc_config.h"
 #include "fake_fft.h"
 #include "gf2x.h"
 #include "utils.h"

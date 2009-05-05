@@ -32,7 +32,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
-
+#include "bwc_config.h"
 #include "cado.h"
 #include "utils.h"
 #include "bw-common.h"

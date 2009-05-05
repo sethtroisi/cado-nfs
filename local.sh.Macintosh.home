@@ -1,5 +1,3 @@
-HOME=$(shell echo $$HOME)
-
 # We assume that the proper tools have been compiled here. GMP must have
 # been compiled with ABI=64 (should be the default setting).
 # Note that gcc-4.3.x and later require both gmp and mpfr to compile. The
@@ -8,24 +6,19 @@ HOME=$(shell echo $$HOME)
 # gmp->gmp-4.3.0, mpfr->mpfr-2.4.1 (or any version number), and compile
 # gcc. Use this fresh gcc to compile gmp again.
 
-CC=$(HOME)/Packages/gcc-4.3.2/bin/gcc
-CXX=$(HOME)/Packages/gcc-4.3.2/bin/g++
-GMP=$(HOME)/Packages/gmp-4.3.0
+CC=$HOME/Packages/gcc-4.3.2/bin/gcc
+CXX=$HOME/Packages/gcc-4.3.2/bin/g++
+GMP=$HOME/Packages/gmp-4.3.0
 
-CFLAGS=-m64 -O2 -DNDEBUG
-CXXFLAGS=-m64 -O2 -DNDEBUG
-LDFLAGS=-m64
-# Because we have an intermediate ./configure step for gf2x, we need to
-# pass some info.
-CONFIGURE_EXTRA=ABI=64 CC=$(CC) CFLAGS=-m64
+# CADO requires these flags to be set as environment variables. As a side
+# effect, they are passed to the configure program for gf2x, therefore
+# the build correcly completes with 64-bit ABI.
+CFLAGS="-m64 -O2 -DNDEBUG"
+CXXFLAGS="-m64 -O2 -DNDEBUG"
+
 # Mac OS X's C library does not have pthread_barrier_wait, which calls
 # for enabling home-brewed code (existing, but untested). I'd rather
 # check whether by chance, they haven't fixed this in a recent release.
-# So the quick contigency plan is to disable pthreads (and use bwmt=1x1
+# So the quick contingency plan is to disable pthreads (and use bwmt=1x1
 # as a parameter).
 WITH_PTHREADS=0
-# Mac OS X's assembler is a bastardized gnu as, which cannot understand
-# the format of my assembly file.
-DISABLE_ASM=1
-# See utils/misc.c
-HAVE_POSIX_MEMALIGN=0

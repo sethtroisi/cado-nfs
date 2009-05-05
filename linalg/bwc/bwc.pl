@@ -95,7 +95,7 @@ my @mpi_split=(1,1);
 my @thr_split=(1,1);
 my $matrix;
 my $hostfile;
-my $mpiexec='mpiexec';
+my $mpiexec='@MPIEXEC@';
 my $wdir;
 my $m;
 my $n;
@@ -112,8 +112,15 @@ my $tmpdir;
 # {{{ MPI detection
 
 sub detect_mpi {
-    if (defined($_=$ENV{'MPI_BINDIR'}) || defined($_=$ENV{'MPI'})) {
+    if (defined($_=$ENV{'MPI_BINDIR'}) && -x "$_/mpiexec") {
         $mpi=$_;
+    } elsif (defined($_=$ENV{'MPI'}) && -x "$_/mpiexec") { 
+        $mpi=$_;
+    } elsif (defined($_=$ENV{'MPI'}) && -x "$_/bin/mpiexec") { 
+        $mpi="$_/bin";
+    } elsif ($mpiexec && -x $mpiexec) {
+        my($basename, $dirname) = fileparse($mpiexec);
+        $mpi=$dirname;
     } else {
         my @path = split(':',$ENV{'PATH'});
         for my $d (@path) {

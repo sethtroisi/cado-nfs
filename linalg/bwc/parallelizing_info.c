@@ -18,8 +18,7 @@
 #include <stdarg.h>
 #include <stdint.h>
 #include <inttypes.h>
-
-
+#include "bwc_config.h"
 #include "select_mpi.h"
 #include "parallelizing_info.h"
 #include "macros.h"

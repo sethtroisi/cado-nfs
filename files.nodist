@@ -4,7 +4,6 @@
 # with the list of files known to the SCM.  A further word of caution:
 # wildcards are *NOT* recognized (by the fascist sanity check program).
 WhoDunit
-builddist.manu
 cantor/cantor128.m
 dev_docs/
 factor_from_rels
@@ -16,7 +15,6 @@ linalg/bwc/bwc.sty
 linalg/bwc/convert_magma.pl
 linalg/bwc/sketch.tex
 linalg/tex.c
-makedist.manu
 merge/debug.c
 merge/debug.h
 merge/merge_mpi.c
@@ -58,3 +56,4 @@ sqrt/ratsqrt.c
 utils/CMakeLists-nodist.txt
 utils/cache.c
 utils/cachesize.c
+utils/build-testcases-rootfinder.m

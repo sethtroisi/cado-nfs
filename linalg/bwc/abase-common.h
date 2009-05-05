@@ -1,6 +1,8 @@
 #ifndef ABASE_COMMON_H_
 #define ABASE_COMMON_H_
 
+#include "bwc_config.h"
+
 /* This has to match the largest possible alignment requirement from
  * different abase layers.
  */

@@ -1,6 +1,6 @@
 #ifndef SELECT_MPI_H_
 #define SELECT_MPI_H_
-
+#include "bwc_config.h"
 #if !(defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L)
 #include "macros.h"
 #if _POSIX_C_SOURCE == 199506L && defined(_GNU_SOURCE) && defined(__GLIBC__) && LEXLE2(__GLIBC__,__GLIBC_MINOR__,2,4)

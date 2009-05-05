@@ -5,36 +5,15 @@ project(CADO_NFS)
 set(CADO_VERSION "0.1-rc2")
 
 #####################################################################
-# cmake version -- I have 2.6 -- yet I recall having used 2.4 before, and so
-# far nothing that I now use appears to be so new that I expect it to cause
-# trouble with 2.4. So my guess is that 2.4 is good enough. If it isn't, then
-# so be it.
-#
-# XXX Maybe set_property ? (utils/)
-cmake_minimum_required(VERSION 2.4)
+# cmake version -- set_property requires 2.6. Note that haters of progress
+# report things (this include me, casually) have to wait for cmake 2.7, since
+# it has only recently become possible to disable them:
+# http://public.kitware.com/Bug/view.php?id=8726
+
+cmake_minimum_required(VERSION 2.6)
 if(COMMAND cmake_policy)
         cmake_policy(SET CMP0003 NEW)
 endif(COMMAND cmake_policy)
-
-#####################################################################
-# Get some overrides from the environment.
-
-macro(get_override extname intname description)
-string(COMPARE NOTEQUAL "$ENV{${extname}}" "" HAS_${intname}_OVERRIDE)
-if(HAS_${intname}_OVERRIDE)
-    set(${intname} "$ENV{${extname}}")
-    message("${description} set to ${${intname}}")
-endif(HAS_${intname}_OVERRIDE)
-endmacro(get_override varname description)
-
-# Syntax is (user-friendly name) (cmake name) (description)
-# Make sure everything is exported from scripts/call_cmake.sh
-get_override(PREFIX     CMAKE_INSTALL_PREFIX  "Install prefix")
-get_override(CFLAGS     CMAKE_C_FLAGS         "CFLAGS")
-get_override(CXXFLAGS   CMAKE_CXX_FLAGS       "CXXFLAGS")
-get_override(CC         CMAKE_C_COMPILER      "CC")
-get_override(CXX        CMAKE_CXX_COMPILER    "CXX")
-get_override(CADO_VERSION    CADO_VERSION               "package version")
 
 #####################################################################
 # What are we building ?
@@ -43,7 +22,30 @@ execute_process(COMMAND scripts/version.sh
         WORKING_DIRECTORY ${CADO_NFS_SOURCE_DIR}
         OUTPUT_STRIP_TRAILING_WHITESPACE
         OUTPUT_VARIABLE CADO_REV)
-message("Configuring CADO revision ${CADO_REV}")
+message(STATUS "Configuring CADO revision ${CADO_REV}")
+
+#####################################################################
+# Get some overrides from the environment.
+
+macro(get_override extname intname)
+string(COMPARE NOTEQUAL "$ENV{${extname}}" "" HAS_${intname}_OVERRIDE)
+if(HAS_${intname}_OVERRIDE)
+    set(${intname} "$ENV{${extname}}")
+    message(STATUS "${extname}=${${intname}}")
+endif(HAS_${intname}_OVERRIDE)
+endmacro(get_override varname)
+
+# Syntax is (user-friendly name) (cmake name)
+# Make sure everything is exported from scripts/call_cmake.sh
+get_override(PREFIX               CMAKE_INSTALL_PREFIX)
+get_override(CFLAGS               CMAKE_C_FLAGS)
+get_override(CXXFLAGS             CMAKE_CXX_FLAGS)
+get_override(CC                   CMAKE_C_COMPILER)
+get_override(CXX                  CMAKE_CXX_COMPILER)
+get_override(CADO_VERSION         CADO_VERSION)
+get_override(MPI                  MPI)
+set(GF2X_CONFIGURE_FLAGS --silent --disable-shared)
+get_override(GF2X_CONFIGURE_FLAGS GF2X_CONFIGURE_FLAGS)
 
 #####################################################################
 # Add the CFLAGS that are needed in all cases.
@@ -80,10 +82,16 @@ find_library(GMP_LIB    gmp   HINTS ${GMP_LIBDIR_HINTS} DOC "Gnu MP library")
 # Yeah. CMake docs defines the ``PATH'' to a file as being its dirname. Very
 # helpful documentation there :-((
 get_filename_component(GMP_LIBDIR ${GMP_LIB} PATH)
-message(STATUS "GMP_INCDIR ${GMP_INCDIR}")
-message(STATUS "GMP_LIBDIR ${GMP_LIBDIR}")
+message(STATUS "GMP_INCDIR=${GMP_INCDIR}")
+message(STATUS "GMP_LIBDIR=${GMP_LIBDIR}")
+string(COMPARE NOTEQUAL "${GMP_INCDIR}" GMP_INCDIR-NOTFOUND GMP_INCDIR_OK)
+string(COMPARE NOTEQUAL "${GMP_LIBDIR}" GMP_LIBDIR-NOTFOUND GMP_LIBDIR_OK)
+if(GMP_INCDIR_OK)
 include_directories(${GMP_INCDIR})
+endif(GMP_INCDIR_OK)
+if(GMP_LIBDIR_OK)
 link_directories(${GMP_LIBDIR})
+endif(GMP_LIBDIR_OK)
 
 #####################################################################
 # Obtain information from the host.
@@ -153,7 +161,7 @@ add_subdirectory (linalg/bwc)
 
 add_custom_command(OUTPUT ${CADO_NFS_BINARY_DIR}/gf2x/Makefile
     COMMAND mkdir -p ${CADO_NFS_BINARY_DIR}/gf2x
-    COMMAND cd gf2x && ${CADO_NFS_SOURCE_DIR}/gf2x/configure --disable-shared
+    COMMAND cd gf2x && ${CADO_NFS_SOURCE_DIR}/gf2x/configure ${GF2X_CONFIGURE_FLAGS}
     COMMENT "Configuring gf2x"
 )
 

@@ -12,10 +12,12 @@
 #include <sys/resource.h>
 #include <time.h>
 
+#include "bwc_config.h"
+#include "macros.h"
+
 #if defined(__linux) && defined(__GLIBC__)
 #include <linux/version.h>
 #include <features.h>
-#include "macros.h"
 #if LINUX_VERSION_CODE >= 0x20611 && LEXGE2(__GLIBC__,__GLIBC_MINOR__,2,9)
 #define HAVE_GETRUSAGE_THREAD
 #endif

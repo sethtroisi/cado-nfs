@@ -7,7 +7,7 @@
 #include <limits.h>
 #include <dirent.h>
 #include <errno.h>
-
+#include "bwc_config.h"
 #include "parallelizing_info.h"
 #include "matmul_top.h"
 #include "abase.h"

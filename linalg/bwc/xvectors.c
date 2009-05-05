@@ -2,9 +2,10 @@
 /* ugly but useful for c++ compilers to recognize inttypes.h */
 #define __STDC_FORMAT_MACROS
 
-#include "parallelizing_info.h"
 #include <stdio.h>
 #include <inttypes.h>
+#include "bwc_config.h"
+#include "parallelizing_info.h"
 #include "xvectors.h"
 #include "utils.h"
 #include "filenames.h"

@@ -14,7 +14,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <inttypes.h>
-
+#include "bwc_config.h"
 #include "matmul.h"
 #include "abase.h"
 #include "macros.h"

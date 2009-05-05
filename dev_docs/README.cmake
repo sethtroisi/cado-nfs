@@ -45,12 +45,15 @@ more portable to use environment variables overrides, like:
 
 CFLAGS=-g make
 
-Note also that a tree which has been built partially with one set of
-flags may require being wiped out before using another set of flags. To
-do so, use the "make tidy" command (see item *special targets below).
+Note also that a tree which has been built partially with one set of flags may
+require being wiped out before using another set of flags. To do so, use the
+"make tidy" command (see item *special targets below). A more precise way to
+act calls the "make cmake" command (see item *special targets below)
 
 The set of environment variables understood by cmake is restricted. See
 the top-level CMakeLists.txt file for the current list.
+
+See local.sh.example for a documentation on the recognized flags.
 
 * local.sh
 
@@ -83,6 +86,10 @@ Several new meta-targets are defined.
 - make dist ; see item *make dist below.
 - make install ; do not use it. It is not really relevant, and not
   reasonably tested.
+- make cmake ; force cmake to regenerate the makefiles, possibly gaining
+  knowledge of newly set environment variables.
+- make clean ; cleans the objects and binaries in the subdir of the build
+  tree which corresponds to the current directory.
 
 * make dist
 

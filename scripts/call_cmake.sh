@@ -59,6 +59,11 @@ export CXXFLAGS
 export CC
 export CXX
 export CADO_VERSION
+export MPI
+export GF2X_CONFIGURE_EXTRA
+export GMP
+export GMP_INCDIR
+export GMP_LIBDIR
 
 if [ "$1" = "tidy" ] ; then
     echo "Wiping out $build_tree"
@@ -67,16 +72,19 @@ if [ "$1" = "tidy" ] ; then
 fi
 
 if [ "$1" = "show" ] ; then
-    echo "build_tree=$build_tree"
-    echo "up_path=$up_path"
-    echo "called_from=$called_from"
-    echo "absolute_path_of_source=$absolute_path_of_source"
-    echo "relative_path_of_cwd=$relative_path_of_cwd"
-    echo "CFLAGS=$CFLAGS"
-    echo "CXXFLAGS=$CXXFLAGS"
-    echo "CC=$CC"
-    echo "CXX=$CXX"
-    echo "PREFIX=$PREFIX"
+    echo "build_tree=\"$build_tree\""
+    echo "up_path=\"$up_path\""
+    echo "called_from=\"$called_from\""
+    echo "absolute_path_of_source=\"$absolute_path_of_source\""
+    echo "relative_path_of_cwd=\"$relative_path_of_cwd\""
+    echo "CFLAGS=\"$CFLAGS\""
+    echo "CXXFLAGS=\"$CXXFLAGS\""
+    echo "CC=\"$CC\""
+    echo "CXX=\"$CXX\""
+    echo "PREFIX=\"$PREFIX\""
+    echo "CADO_VERSION=\"$CADO_VERSION\""
+    echo "MPI=\"$MPI\""
+    echo "GF2X_CONFIGURE_EXTRA=\"$GF2X_CONFIGURE_EXTRA\""
     exit 0
 fi
 
@@ -95,11 +103,14 @@ if [ "$?" != "0" ] || ! [ -x "$cmake_path" ] ; then
     fi
 fi
 
-if [ ! -f "$build_tree/Makefile" ] ; then
+if [ "$1" = "cmake" ] || [ ! -f "$build_tree/Makefile" ] ; then
     mkdir -p $build_tree
     (cd $build_tree ; $cmake_path $absolute_path_of_source)
 fi
 
+if [ "$1" = "cmake" ] ; then
+    exit 0
+fi
 # Now cd into the target directory, and build everything required.
 # Note that it's useful to kill MAKELEVEL, or otherwise we'll get scores
 # and scores of ``Entering directory'' messages (sure, there's the

@@ -6,7 +6,7 @@
 #include <gmp.h>
 
 #include <algorithm>
-
+#include "bwc_config.h"
 #include "alloc_proxy.h"
 
 /* Number of words holding B bits ; better naming sought. */

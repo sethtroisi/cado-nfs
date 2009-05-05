@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include <dirent.h>
+#include "bwc_config.h"
 #include "macros.h"
 #include "utils.h"
 #include "filenames.h"
