@@ -57,11 +57,11 @@ macro(search_for_function FUNCTION VARIABLE)
           
             if(${VARIABLE})
               set(${VARIABLE} 1 CACHE INTERNAL "Have function ${FUNCTION}")
-              if(${sff_rl} EQUAL "")
-                  message(STATUS "Looking for ${FUNCTION} - found")
-              else(${sff_rl} EQUAL "")
+              if(sff_rl)
                   message(STATUS "Looking for ${FUNCTION} - requires ${sff_rl}")
-              endif(${sff_rl} EQUAL "")
+              else(sff_rl)
+                  message(STATUS "Looking for ${FUNCTION} - found")
+              endif(sff_rl)
               file(APPEND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeOutput.log 
                 "Determining if the function ${FUNCTION} exists passed with the following output:\n"
                 "${OUTPUT}\n\n")

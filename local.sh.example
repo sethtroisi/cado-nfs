@@ -136,7 +136,7 @@
 # MPI: Whether to use MPI (Message Passing Interface) or not
 #
 # Example values:
-# MPI=
+# MPI=0
 # MPI=1
 # MPI=/usr/local/mpich2-1.0.8p1/
 # MPI=/usr/local/openmpi-1.3.0/
@@ -157,14 +157,14 @@
 # be found.
 #
 # ``MPI=1'', ``MPI=yes'', ``MPI=on'', are equivalent.
-# ``MPI='', ``MPI=0'', ``MPI=no'', ``MPI=off'', are equivalent.
+# ``MPI=0'', ``MPI=no'', ``MPI=off'', are equivalent.
 
 ############################################################
 # PTHREADS: whether to use POSIX threads.
 #
 # Example values:
 # PTHREADS=1
-# PTHREADS=
+# PTHREADS=0
 #
 # ``PTHREADS=1'', ``PTHREADS=yes'', ``PTHREADS=on'', are equivalent.
-# ``PTHREADS='', ``PTHREADS=0'', ``PTHREADS=no'', ``PTHREADS=off'': idem.
+# ``PTHREADS=0'', ``PTHREADS=no'', ``PTHREADS=off'': idem.

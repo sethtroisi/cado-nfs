@@ -2,6 +2,7 @@
 #include <signal.h>
 #include <string.h>
 #include <math.h>
+#include <time.h>
 #include "bwc_config.h"
 #include "async.h"
 #include "rusage.h"

@@ -48,7 +48,7 @@ fi
 # here.
 : ${CFLAGS:=-O2}
 : ${CXXFLAGS:=-O2}
-
+: ${PTHREADS:=1}
 
 ########################################################################
 # Arrange so that relevant stuff is passed to cmake -- the other end of
