@@ -43,26 +43,20 @@
  * to allow distinction with such errors.
  */
 
-#ifdef WITH_PTHREADS
 #include <pthread.h>
 
 typedef struct barrier_tag {
     pthread_mutex_t     lock;
     pthread_cond_t      cv;
     int                 left;
-    int                 counter;
+    int                 count;
     int                 event;
 } barrier_t;
-
-#else	/* WITH_PTHREADS */
-
-typedef void * barrier_t;
-
-#endif	/* WITH_PTHREADS */
 
 #ifdef	__cplusplus
 extern "C" {
 #endif
+#define BARRIER_SERIAL_THREAD   -1
 extern int barrier_init (barrier_t *, int);
 extern int barrier_destroy (barrier_t *);
 extern int barrier_wait (barrier_t *,

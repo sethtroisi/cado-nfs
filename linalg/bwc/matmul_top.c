@@ -53,12 +53,7 @@ void vec_init_generic(pi_wiring_ptr picol, size_t stride, mmt_generic_vec_ptr v,
         abase_generic_zero(stride, v->v, n);
         v->all_v[picol->trank] = v->v;
         for(unsigned int t = 0 ; t < picol->ncores ; t++) {
-            // TODO: once thread_agreement is fixed (if ever), we can
-            // drop this serialization point. At the moment, it's
-            // needed.
-#ifndef HOMEMADE_BARRIERS
             serialize_threads(picol);
-#endif
             void * r;
             r = v->v;
             thread_agreement(picol, &r, t);

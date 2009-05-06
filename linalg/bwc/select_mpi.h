@@ -1,8 +1,8 @@
 #ifndef SELECT_MPI_H_
 #define SELECT_MPI_H_
 #include "bwc_config.h"
-#if !(defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L)
 #include "macros.h"
+#if !(defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L)
 #if _POSIX_C_SOURCE == 199506L && defined(_GNU_SOURCE) && defined(__GLIBC__) && LEXLE2(__GLIBC__,__GLIBC_MINOR__,2,4)
 /* With glibc 2.4, if _GNU_SOURCE is defined, then _POSIX_C_SOURCE is set
  * to 199506L inconditionally, and there's nothing we can do about it
@@ -37,11 +37,6 @@
 #define my_pthread_t                       pthread_t
 #define my_pthread_create                  pthread_create
 #define my_pthread_join                    pthread_join
-#define my_pthread_barrier_t               pthread_barrier_t
-#define my_pthread_barrier_init            pthread_barrier_init
-#define MY_PTHREAD_BARRIER_SERIAL_THREAD   PTHREAD_BARRIER_SERIAL_THREAD
-#define my_pthread_barrier_wait            pthread_barrier_wait
-#define my_pthread_barrier_destroy         pthread_barrier_destroy
 #define my_pthread_mutex_t                 pthread_mutex_t
 #define my_pthread_mutex_init              pthread_mutex_init
 #define my_pthread_mutex_lock              pthread_mutex_lock
@@ -49,6 +44,34 @@
 #define my_pthread_mutex_trylock           pthread_mutex_trylock
 #define my_pthread_mutex_destroy           pthread_mutex_destroy
 #define my_pthread_sigmask                 pthread_sigmask
+#include "barrier.h"
+#ifndef  HAVE_PTHREAD_BARRIER_WAIT
+/* Also enable proxies for emulating the standard stuff with our more
+ * sophisticated barriers */
+#define my_pthread_barrier_t               barrier_t
+#define my_pthread_barrierattr_t           int
+#define MY_PTHREAD_BARRIER_SERIAL_THREAD   BARRIER_SERIAL_THREAD
+static inline int my_pthread_barrier_init(barrier_t *restrict barrier,
+        const int *restrict attr MAYBE_UNUSED, unsigned count)
+{
+    return barrier_init(barrier, count);
+}
+static inline int my_pthread_barrier_wait(barrier_t * b)
+{
+    return barrier_wait(b, NULL, NULL, NULL);
+}
+static inline int my_pthread_barrier_destroy(barrier_t * b)
+{
+    return barrier_destroy(b);
+}
+#else
+#define my_pthread_barrier_t               pthread_barrier_t
+#define my_pthread_barrierattr_t           pthread_barrierattr_t
+#define my_pthread_barrier_init            pthread_barrier_init
+#define MY_PTHREAD_BARRIER_SERIAL_THREAD   PTHREAD_BARRIER_SERIAL_THREAD
+#define my_pthread_barrier_wait            pthread_barrier_wait
+#define my_pthread_barrier_destroy         pthread_barrier_destroy
+#endif
 #else
 #include "fakepthread.h"
 #endif

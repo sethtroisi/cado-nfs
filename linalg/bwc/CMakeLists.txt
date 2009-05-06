@@ -6,15 +6,24 @@ include(${CMAKE_SOURCE_DIR}/config/search_for_function.cmake)
 #############################################################
 # pthreads
 if(NOT("$ENV{PTHREADS}" MATCHES "^(0|NO|no|OFF|off|)$"))
+    set(CMAKE_REQUIRED_LIBRARIES)
     search_for_function(pthread_create HAVE_PTHREAD_CREATE -lpthread)
-    search_for_function(pthread_barrier_wait HAVE_PTHREAD_BARRIER_WAIT -lrt)
-    if(HAVE_PTHREAD_CREATE AND HAVE_PTHREAD_BARRIER_WAIT)
-        # We're using this variable in the top-level substitution, so it needs
-        # to escape its scope and go into the cache right now.
+    if(HAVE_PTHREAD_CREATE)
+        # OK. Assume that we have the bare minimum for using threads, falling
+        # back on workalikeas for barrier synchronization waits if needed
+        # (like we used to do in the past, anyway). Thus we can already set
+        # the proper flags.  We're using WITH_PTHREADS in the top-level
+        # substitution, so it needs to escape its scope and go into the cache
+        # right now.
         set(WITH_PTHREADS 1 CACHE INTERNAL "pthreads are being used")
-        set(pthread_libs ${pthread_libs} ${CMAKE_REQUIRED_LIBRARIES})
         add_definitions(-DWITH_PTHREADS)
-    endif(HAVE_PTHREAD_CREATE AND HAVE_PTHREAD_BARRIER_WAIT)
+        set(pthread_libs ${pthread_libs} ${CMAKE_REQUIRED_LIBRARIES})
+        set(CMAKE_REQUIRED_LIBRARIES)
+        search_for_function(pthread_barrier_wait HAVE_PTHREAD_BARRIER_WAIT -lrt)
+        if(HAVE_PTHREAD_BARRIER_WAIT)
+            set(pthread_libs ${pthread_libs} ${CMAKE_REQUIRED_LIBRARIES})
+        endif(HAVE_PTHREAD_BARRIER_WAIT)
+    endif(HAVE_PTHREAD_CREATE)
 endif(NOT("$ENV{PTHREADS}" MATCHES "^(0|NO|no|OFF|off|)$"))
 
 #############################################################
@@ -61,10 +70,12 @@ configure_file(bwc.pl ${CMAKE_CURRENT_BINARY_DIR}/bwc.pl ESCAPE_QUOTES @ONLY)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 configure_file(bwc_config.h.in ${CMAKE_CURRENT_BINARY_DIR}/bwc_config.h ESCAPE_QUOTES @ONLY)
 
-add_executable(test_hello EXCLUDE_FROM_ALL test_hello.c parallelizing_info.c)
+add_executable(test_hello EXCLUDE_FROM_ALL
+    test_hello.c parallelizing_info.c barrier.c)
 add_executable(random random.c)
 add_executable(split split.c bw-common.c)
-add_executable(shell shell.c parallelizing_info.c bw-common.c bw-common-mpi.c)
+add_executable(shell
+    shell.c parallelizing_info.c bw-common.c bw-common-mpi.c barrier.c)
 add_executable(acollect acollect.c bw-common.c)
 
 install(TARGETS random split shell acollect RUNTIME DESTINATION bin/linalg/bwc)
@@ -75,7 +86,7 @@ target_link_libraries(split utils)
 target_link_libraries(shell utils ${pthread_libs})
 target_link_libraries(acollect utils)
 
-set(bwc_base_objs
+add_library(bwc_base
     parallelizing_info.c
     intersections.cpp
     xvectors.c
@@ -83,9 +94,8 @@ set(bwc_base_objs
     bw-common-mpi.c
     rusage.c
     async.c
-    debug.c)
-
-add_library(bwc_base ${bwc_base_objs})
+    debug.c
+    barrier.c)
 target_link_libraries(bwc_base ${pthread_libs})
 
 macro(push_abase_cflags v target)

@@ -5,6 +5,9 @@
 /* CADO_VERSION corresponds to the coarser-grain version of the tarball */
 #cmakedefine    CADO_VERSION    "@CADO_VERSION@"
 
+#define CFLAGS      "@CMAKE_C_FLAGS@"
+#define CXXFLAGS    "@CMAKE_CXX_FLAGS@"
+
 #cmakedefine    HAVE_POSIX_MEMALIGN
 
 #cmakedefine    HAVE_GCC_STYLE_AMD64_ASM

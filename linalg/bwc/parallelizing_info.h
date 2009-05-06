@@ -6,10 +6,6 @@
 #include "params.h"
 #include "select_mpi.h"
 
-#ifdef  HOMEMADE_BARRIERS
-#include "barrier.h"
-#endif
-
 /*
  * The main guy here is the parallelizing_info data type. It is commonly
  * declared as pi.
@@ -70,11 +66,8 @@
 
 /* utility structure. It is stored in thread-shared memory */
 struct pthread_things {
-#ifdef  HOMEMADE_BARRIERS
-    barrier_t b[1];
-#else
+    barrier_t bh[1];
     my_pthread_barrier_t b[1];
-#endif
 
     my_pthread_mutex_t m[1];
     char * desc;
@@ -112,10 +105,6 @@ struct pi_wiring_s {
     unsigned int tcommon;
     unsigned int trank;
     MPI_Comm pals;
-
-#ifdef  HOMEMADE_BARRIERS
-    unsigned long shared_data;
-#endif
 
     struct pthread_things * th;
 #ifdef  CONCURRENCY_DEBUG
