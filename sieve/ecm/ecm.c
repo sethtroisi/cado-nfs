@@ -9,6 +9,20 @@
 #define ECM_BACKTRACKING 1
 #endif
 
+/* Define to 1 to make ellM_add() test if the two points are identical,
+   and call ellM_double() if they are */
+#ifndef ELLM_SAFE_ADD
+#define ELLM_SAFE_ADD 0
+#endif
+
+#ifndef MAYBE_UNUSED
+#if defined(__GNUC__)
+#define MAYBE_UNUSED __attribute__ ((unused))
+#else
+#define MAYBE_UNUSED
+#endif
+#endif
+
 typedef struct {residue_t x, z;} __ellM_point_t;
 typedef __ellM_point_t ellM_point_t[1];
 
@@ -126,7 +140,8 @@ ellW_double (residue_t x3, residue_t y3, const residue_t x1,
 
 static void
 ellM_add (ellM_point_t R, const ellM_point_t P, const ellM_point_t Q, 
-          const ellM_point_t D, const modulus_t m)
+          const ellM_point_t D, MAYBE_UNUSED const residue_t b, 
+          const modulus_t m)
 {
   residue_t u, v, w;
 
@@ -136,12 +151,27 @@ ellM_add (ellM_point_t R, const ellM_point_t P, const ellM_point_t Q,
 
   mod_sub (u, P->x, P->z, m);
   mod_add (v, Q->x, Q->z, m);
-  mod_mul (u, u, v, m);
+  mod_mul (u, u, v, m);      /* u = (Px-Pz)*(Qx+Qz) */
   mod_add (w, P->x, P->z, m);
   mod_sub (v, Q->x, Q->z, m);
-  mod_mul (v, w, v, m);
-  mod_add (w, u, v, m);
-  mod_sub (v, u, v, m);
+  mod_mul (v, w, v, m);      /* v = (Px+Pz)*(Qx-Qz) */
+  mod_add (w, u, v, m);      /* w = 2*(Qz*Px - Qx*Pz)*/
+#if ELLM_SAFE_ADD
+  /* Check if w == 0, which happens if P=Q. 
+     If so, use ellM_double() instead.
+     This test only works if P=Q on the pseudo-curve modulo N, i.e.,
+     if N has several prime factors p, q, ... and P=Q on E_p but 
+     not on E_q, this test won't notice it. */
+  if (mod_is0 (w, m))
+    {
+      mod_clear (w, m);
+      mod_clear (v, m);
+      mod_clear (u, m);
+      ellM_double (R, P, m, b);
+      return;
+    }
+#endif
+  mod_sub (v, u, v, m);      /* v = 2*(Qx*Px - Qz*Pz) */
   mod_mul (w, w, w, m);
   mod_mul (v, v, v, m);
   mod_set (u, D->x, m); /* save D->x */
@@ -252,7 +282,7 @@ ellM_mul_ul (ellM_point_t R, const ellM_point_t P, unsigned long e,
   if (e == 3UL)
     {
       ellM_double (t1, P, m, b);
-      ellM_add (R, t1, P, P, m);
+      ellM_add (R, t1, P, P, b, m);
       ellM_clear (t1, m);
       return;
     }
@@ -273,13 +303,13 @@ ellM_mul_ul (ellM_point_t R, const ellM_point_t P, unsigned long e,
       if ((e >> n) & 1) /* (i,i+1) -> (2i+1,2i+2) */
         {
           /* printf ("(i,i+1) -> (2i+1,2i+2)\n"); */
-          ellM_add (t1, t1, t2, P, m);
+          ellM_add (t1, t1, t2, P, b, m);
           ellM_double (t2, t2, m, b);
         }
       else /* (i,i+1) -> (2i,2i+1) */
         {
           /* printf ("(i,i+1) -> (2i,2i+1)\n"); */
-          ellM_add (t2, t1, t2, P, m);
+          ellM_add (t2, t1, t2, P, b, m);
           ellM_double (t1, t1, m, b);
         }
     }
@@ -375,60 +405,60 @@ ellM_interpret_bytecode (ellM_point_t P, const char *code,
             ellM_swap (A, B, m);
             break;
           case 1:
-            ellM_add (t, A, B, C, m);
-            ellM_add (t2, t, A, B, m);
-            ellM_add (B, B, t, A, m);
+            ellM_add (t, A, B, C, b, m);
+            ellM_add (t2, t, A, B, b, m);
+            ellM_add (B, B, t, A, b, m);
             ellM_set (A, t2, m);
             break;
           case 2:
-            ellM_add (B, A, B, C, m);
+            ellM_add (B, A, B, C, b, m);
             ellM_double (A, A, m, b);
             break;
           case 3:
-            ellM_add (C, B, A, C, m);
+            ellM_add (C, B, A, C, b, m);
             ellM_swap (B, C, m);
             break;
           case 4:
-            ellM_add (B, B, A, C, m);
+            ellM_add (B, B, A, C, b, m);
             ellM_double (A, A, m, b);
             break;
           case 5:
-            ellM_add (C, C, A, B, m);
+            ellM_add (C, C, A, B, b, m);
             ellM_double (A, A, m, b);
             break;
           case 6:
             ellM_double (t, A, m, b);
-            ellM_add (t2, A, B, C, m);
-            ellM_add (A, t, A, A, m);
-            ellM_add (C, t, t2, C, m);
+            ellM_add (t2, A, B, C, b, m);
+            ellM_add (A, t, A, A, b, m);
+            ellM_add (C, t, t2, C, b, m);
             ellM_swap (B, C, m);
             break;
           case 7:
-            ellM_add (t, A, B, C, m);
-            ellM_add (B, t, A, B, m);
+            ellM_add (t, A, B, C, b, m);
+            ellM_add (B, t, A, B, b, m);
             ellM_double (t, A, m, b);
-            ellM_add (A, A, t, A, m);
+            ellM_add (A, A, t, A, b, m);
             break;
           case 8:
-            ellM_add (t, A, B, C, m);
-            ellM_add (C, C, A, B, m);
+            ellM_add (t, A, B, C, b, m);
+            ellM_add (C, C, A, B, b, m);
             ellM_swap (B, t, m);
             ellM_double (t, A, m, b);
-            ellM_add (A, A, t, A, m);
+            ellM_add (A, A, t, A, b, m);
             break;
           case 9:
-            ellM_add (C, C, B, A, m);
+            ellM_add (C, C, B, A, b, m);
             ellM_double (B, B, m, b);
             break;
 	  case 10: 
             /* Combined final add of old subchain and init of new subchain */
-            ellM_add (A, A, B, C, m);
+            ellM_add (A, A, B, C, b, m);
             ellM_set (B, A, m);
             ellM_set (C, A, m);
             ellM_double (A, A, m, b);
 	    break;
 	  case 11: /* Combined rule 3 and rule 0 */
-            ellM_add (C, B, A, C, m);
+            ellM_add (C, B, A, C, b, m);
             ellM_swap (B, C, m);
             ellM_swap (A, B, m);
 	    break;
@@ -442,7 +472,7 @@ ellM_interpret_bytecode (ellM_point_t P, const char *code,
 end_of_bytecode:
 
   /* Implicit final add of last subchain */
-  ellM_add (A, A, B, C, m); 
+  ellM_add (A, A, B, C, b, m); 
 
   ellM_set (P, A, m);
 
@@ -874,13 +904,13 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
 
     /* Init ap1_0 = 1P, ap1_1 = 7P, ap5_0 = 5P, ap5_1 = 11P
        and P6 = 6P */
-    ellM_set (ap1_0, P, m);         /* ap1_0 = 1*P */
-    ellM_double (P2, P, m, b);      /* P2 = 2*P */
-    ellM_add (P6, P2, P, P, m);     /* P6 = 3*P (for now) */
-    ellM_add (ap5_0, P6, P2, P, m); /* 5*P = 3*P + 2*P */
-    ellM_double (P6, P6, m, b);     /* P6 = 6*P = 2*(3*P) */
-    ellM_add (ap1_1, P6, P, ap5_0, m); /* 7*P = 6*P + P */
-    ellM_add (ap5_1, P6, ap5_0, P, m); /* 11*P = 6*P + 5*P */
+    ellM_set (ap1_0, P, m);            /* ap1_0 = 1*P */
+    ellM_double (P2, P, m, b);         /* P2 = 2*P */
+    ellM_add (P6, P2, P, P, b, m);     /* P6 = 3*P (for now) */
+    ellM_add (ap5_0, P6, P2, P, b, m); /* 5*P = 3*P + 2*P */
+    ellM_double (P6, P6, m, b);        /* P6 = 6*P = 2*(3*P) */
+    ellM_add (ap1_1, P6, P, ap5_0, b, m); /* 7*P = 6*P + P */
+    ellM_add (ap5_1, P6, ap5_0, P, b, m); /* 11*P = 6*P + 5*P */
     
     ellM_clear (P2, m);
 
@@ -920,12 +950,12 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
 	    continue;
           }
 	
-        ellM_add (Pt, ap1_1, P6, ap1_0, m);
+        ellM_add (Pt, ap1_1, P6, ap1_0, b, m);
         ellM_set (ap1_0, ap1_1, m);
         ellM_set (ap1_1, Pt, m);
         i1 += 6;
 	
-        ellM_add (Pt, ap5_1, P6, ap5_0, m);
+        ellM_add (Pt, ap5_1, P6, ap5_0, b, m);
         ellM_set (ap5_0, ap5_1, m);
         ellM_set (ap5_1, Pt, m);
         i5 += 6;
@@ -982,7 +1012,7 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
       }
     while (i < plan->i1)
       {
-        ellM_add (Pt, Pid1, Pd, Pid, m);
+        ellM_add (Pt, Pid1, Pd, Pid, b, m);
         ellM_set (Pid, Pid1, m);
         ellM_set (Pid1, Pt, m);
         mod_set (Pid_x[k], Pt[0].x, m);
