@@ -10,6 +10,7 @@
 struct timing_data {
     int go_mark;
     int begin_mark;
+    int end_mark;
     int last_print;
     int next_print;
     int next_async_check;
@@ -25,7 +26,7 @@ struct timing_data {
 extern "C" {
 #endif
 
-void timing_init(struct timing_data * t, int iter);
+void timing_init(struct timing_data * t, int start, int end);
 void timing_clear(struct timing_data * t);
 void timing_check(parallelizing_info pi, struct timing_data * t, int iter, int print);
 void timing_update_ticks(struct timing_data * t, int iter);

@@ -124,8 +124,6 @@ void grid_print(parallelizing_info_ptr pi, char * buf, size_t siz, int print)
     char * strings;
     strings = malloc(wr->njobs * wr->ncores * siz);
 
-    // printf("timing_check wait %d timing%d\n", iter, wr->trank);
-
     int me = wr->jrank * wr->ncores + wr->trank;
 
     /* instead of doing memcpy, we align the stuff. */

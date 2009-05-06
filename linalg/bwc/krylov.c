@@ -79,8 +79,6 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     }
     vec_init_generic(pi->m, stride, (mmt_generic_vec_ptr) xymats, 0, bw->m*bw->interval);
     
-    timing_init(timing, bw->start);
-
     if (bw->end == 0) {
         /* Decide on an automatic ending value */
         unsigned int length;
@@ -105,6 +103,8 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     pi_log_init(pi->m);
     pi_log_init(pi->wr[0]);
     pi_log_init(pi->wr[1]);
+
+    timing_init(timing, bw->start, bw->interval * iceildiv(bw->end, bw->interval));
 
     for(int s = bw->start ; s < bw->end ; s += bw->interval ) {
         // Plan ahead. The check vector is here to predict the final A matrix.

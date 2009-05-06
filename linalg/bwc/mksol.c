@@ -141,8 +141,6 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     mmt_generic_vec sum;
     vec_init_generic(mmt->pi->m, rstride, sum, 0, ii1-ii0);
 
-    timing_init(timing, bw->start);
-
     if (bw->end == 0) {
         // for mksol we use EOF as an ending indication.
         serialize_threads(pi->m);
@@ -155,6 +153,8 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         fprintf(stderr, "Target iteration is %u ; going to %u\n", bw->end,
                 bw->interval * iceildiv(bw->end, bw->interval));
     }
+
+    timing_init(timing, bw->start, bw->interval * iceildiv(bw->end, bw->interval));
 
     for(int s = bw->start ; s < bw->end ; s += bw->interval ) {
         serialize(pi->m);
