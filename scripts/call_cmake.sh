@@ -97,7 +97,8 @@ cmake_companion_install_location="$absolute_path_of_source/cmake-installed"
 if [ "$?" != "0" ] || ! [ -x "$cmake_path" ] ; then
     echo "CMake not found" >&2
     cmake_path=
-elif ! [[ "`$cmake_path --version`" =~ "^cmake version 2.[67]" ]] ; then
+# Recall that (some versions of) bash do not want quoting for regex patterns.
+elif ! [[ "`$cmake_path --version`" =~ ^cmake\ version\ 2.[67] ]] ; then
     echo "CMake found, but not with version 2.6 or 2.7" >&2
     cmake_path=
 fi
