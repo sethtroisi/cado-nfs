@@ -93,12 +93,22 @@ fi
 
 # Make sure we have cmake, by the way !
 cmake_path="`which cmake 2>/dev/null`"
-if [ "$?" != "0" ] || ! [ -x "$cmake_path" ] ; then 
-    cmake_path="$absolute_path_of_source/cmake-installed/bin/cmake"
-    if ! [ -x "$cmake_path" ] ; then
+cmake_companion_install_location="$absolute_path_of_source/cmake-installed"
+if [ "$?" != "0" ] || ! [ -x "$cmake_path" ] ; then
+    echo "CMake not found" >&2
+    cmake_path=
+elif ! [[ "`$cmake_path --version`" =~ "^cmake version 2.[67]" ]] ; then
+    echo "CMake found, but not with version 2.6 or 2.7" >&2
+    cmake_path=
+fi
+if ! [ "$cmake_path" ] ; then
+    cmake_path="$cmake_companion_install_location/bin/cmake"
+    if [ -x "$cmake_path" ] ; then
+        echo "Using custom cmake in $cmake_companion_install_location" >&2
+    else
         echo "Need to get cmake first -- this takes long !"
         cd $up_path
-        if ! scripts/install-cmake.sh ; then
+        if ! scripts/install-cmake.sh "$cmake_companion_install_location" ; then
             echo "cmake install Failed, sorry" >&2
             exit 1
         fi

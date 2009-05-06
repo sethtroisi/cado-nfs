@@ -7,7 +7,11 @@ version=2.6.3
 package=${name}-${version}.tar.gz
 url=http://www.cmake.org/files/v2.6/${package}
 
-me=`pwd`
+prefix="$1"
+shift
+
+echo "installing ${name} ${version} in ${prefix}"
+
 tmpdir=`mktemp -d /tmp/${name}-build.XXXXXXXX`
 cd $tmpdir
 rm -f ${package}
@@ -31,7 +35,7 @@ unset CXX
 unset CFLAGS
 unset CXXFLAGS
 cd ${name}-${version}
-./configure --prefix=$me/${name}-installed
+./configure --prefix=$prefix
 make -j 4
 make install
 rm -rf $tmpdir
