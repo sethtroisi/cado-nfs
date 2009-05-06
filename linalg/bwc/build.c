@@ -6,6 +6,11 @@
 #include "abase.h"
 #include "macros.h"
 
+void usage()
+{
+    fprintf(stderr, "Usage: ./build <file> [<impl>] [right|left]\n");
+    exit(1);
+}
 int main(int argc, char * argv[])
 {
     abobj_t xx MAYBE_UNUSED;
@@ -15,20 +20,35 @@ int main(int argc, char * argv[])
 
     const char * impl = "basic";
 
-    if (argc != 2 && argc != 3) {
-        fprintf(stderr, "Usage: ./build <file> [<impl>]\n");
-        exit(1);
+    if (argc != 2 && argc != 3 && argc != 4) {
+        usage();
     }
 
-    if (argc == 3)
+    if (argc >= 3)
         impl = argv[2];
 
-    fprintf(stderr, "Saving cache for matrix-times-vector\n");
-    mm = matmul_build(xx, argv[1], argv[2], NULL, 1);
-    fprintf(stderr, "Saving cache for vector-times-matrix\n");
-    mm = matmul_build(xx, argv[1], argv[2], NULL, 0);
+    int d = 0;
+    int nd = 2;
 
-    matmul_save_cache(mm, argv[1]);
-    matmul_clear(mm);
+    if (argc == 4) {
+        if (strcmp(argv[3],"left") == 0)  {
+            d = 0;
+        } else if(strcmp(argv[3],"right") == 0)  {
+            d = 1;
+        } else {
+            usage();
+        }
+        nd = 1;
+    }
+
+    for( ; nd-- ; d ^= 1) {
+        if (d == 1) {
+            fprintf(stderr, "Saving cache for matrix-times-vector\n");
+        } else {
+            fprintf(stderr, "Saving cache for vector-times-matrix\n");
+        }
+        mm = matmul_build(xx, argv[1], argv[2], NULL, d);
+        matmul_save_cache(mm, argv[1]);
+        matmul_clear(mm);
+    }
 }
-
