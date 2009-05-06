@@ -23,7 +23,9 @@ read_files_dist() {
             */) find $x ;;
             *) echo $x;;
         esac
-    done | sed -e 's+^+/+'
+    done | sed -e 's+//*+/+g' -e 's+^+/+'
+    # On some machines, find foo/ will produce foo//file, which does not
+    # play well with rsync.
 }
 
 read_files_dist | rsync -a     \
