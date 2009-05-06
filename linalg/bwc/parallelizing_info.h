@@ -100,9 +100,7 @@ struct pi_wiring_s {
 
     /* product njobs * ncores */
     unsigned int totalsize;
-    unsigned int jcommon;
     unsigned int jrank;
-    unsigned int tcommon;
     unsigned int trank;
     MPI_Comm pals;
 
@@ -115,11 +113,20 @@ struct pi_wiring_s {
 
 typedef struct pi_wiring_s pi_wiring[1];
 
+struct pi_interleaving_s {
+    int idx;                    /* 0 or 1 */
+    my_pthread_barrier_t * b;   /* not a 1-sized array on purpose --
+                                   being next to index, it can't ! */
+};
+typedef struct pi_interleaving_s pi_interleaving[1];
+typedef struct pi_interleaving_s * pi_interleaving_ptr;
+
 struct parallelizing_info_s {
     // row-wise, column-wise.
     pi_wiring wr[2];
     // main.
     pi_wiring m;
+    pi_interleaving_ptr interleaved;
 };
 
 typedef struct parallelizing_info_s parallelizing_info[1];

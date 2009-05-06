@@ -85,25 +85,25 @@ void * pi_go_helper_func(struct pi_go_helper_s * s)
 typedef void * (*pthread_callee_t)(void*);
 
 /*
-void pi_errhandler(MPI_Comm * comm, int * err, ...)
-{
-    int size;
-    int rank;
-    MPI_Comm_size(*comm, &size);
-    MPI_Comm_rank(*comm, &rank);
-    fprintf(stderr, "Fatal MPI error ;\n");
-    fprintf(stderr, " job %d in a comm. of size %d ;\n", rank, size);
-    if (err == NULL) {
-        fprintf(stderr, " no error code.\n");
-    } else {
-        char buf[MPI_MAX_ERROR_STRING];
-        int len = sizeof(buf);
-        MPI_Error_string(*err, buf, &len);
-        fprintf(stderr, " %s\n", buf);
-    }
-    abort();
-}
-*/
+   void pi_errhandler(MPI_Comm * comm, int * err, ...)
+   {
+   int size;
+   int rank;
+   MPI_Comm_size(*comm, &size);
+   MPI_Comm_rank(*comm, &rank);
+   fprintf(stderr, "Fatal MPI error ;\n");
+   fprintf(stderr, " job %d in a comm. of size %d ;\n", rank, size);
+   if (err == NULL) {
+   fprintf(stderr, " no error code.\n");
+   } else {
+   char buf[MPI_MAX_ERROR_STRING];
+   int len = sizeof(buf);
+   MPI_Error_string(*err, buf, &len);
+   fprintf(stderr, " %s\n", buf);
+   }
+   abort();
+   }
+   */
 
 /* TODO: There would be a fairly easy generalization to that, and quite
  * handy. Modify the meaning of the ``siz'' argument to mean something
@@ -170,17 +170,9 @@ void grid_print(parallelizing_info_ptr pi, char * buf, size_t siz, int print)
     free(strings);
 }
 
-void pi_go_inner(void *(*fcn)(parallelizing_info_ptr, param_list pl, void *),
-        param_list pl,
-        void * arg)
+static void pi_init_mpilevel(parallelizing_info_ptr pi, param_list pl)
 {
-    /* used in several places for doing snprintf */
-    char buf[20];
     int err;
-
-    parallelizing_info pi;
-    memset(pi, 0, sizeof(pi));
-
     int mpi[2] = { 1, 1, };
     int thr[2] = { 1, 1, };
 
@@ -191,6 +183,8 @@ void pi_go_inner(void *(*fcn)(parallelizing_info_ptr, param_list pl, void *),
     unsigned int nvj = mpi[1];
     unsigned int nhc = thr[0];
     unsigned int nvc = thr[1];
+
+    memset(pi, 0, sizeof(parallelizing_info));
 
     pi->m->njobs = nhj * nvj;
     pi->m->ncores = nhc * nvc;
@@ -216,7 +210,6 @@ void pi_go_inner(void *(*fcn)(parallelizing_info_ptr, param_list pl, void *),
         exit(1);
     }
 
-    pi->m->jcommon = 0;       // This can't be anything other than zero.
     pi->m->trank = 0;
 
     /* Init to the simple case */
@@ -229,8 +222,9 @@ void pi_go_inner(void *(*fcn)(parallelizing_info_ptr, param_list pl, void *),
 
     // Here we want the _common row number_ ; not to be confused with the
     // rank !
-    pi->wr[0]->jcommon = pi->m->jrank / nvj;
-    pi->wr[1]->jcommon = pi->m->jrank % nvj;
+    unsigned int jcommon[2];
+    jcommon[0] = pi->m->jrank / nvj;
+    jcommon[1] = pi->m->jrank % nvj;
 
     pi->wr[0]->trank = 0;
     pi->wr[1]->trank = 0;
@@ -239,17 +233,23 @@ void pi_go_inner(void *(*fcn)(parallelizing_info_ptr, param_list pl, void *),
         // A subgroup contains all process having the same jcommon value.
         // Therefore, we have as many horizontal MPI barriers set up as
         // one finds MPI job numbers across a column.
-        err = MPI_Comm_split(pi->m->pals, pi->wr[d]->jcommon,
+        err = MPI_Comm_split(pi->m->pals, jcommon[d],
                 pi->m->jrank, &pi->wr[d]->pals);
         ASSERT_ALWAYS(!err);
         MPI_Comm_rank(pi->wr[d]->pals, (int*) &pi->wr[d]->jrank);
     }
+}
 
-    ASSERT_ALWAYS((unsigned int) pi->m->jrank == pi->wr[0]->jcommon * nvj +  pi->wr[0]->jrank);
-    ASSERT_ALWAYS(pi->wr[0]->jcommon == (unsigned int) pi->wr[1]->jrank);
+    static parallelizing_info *
+pi_grid_init(parallelizing_info_ptr pi)
+{
+    // unsigned int nvj = pi->wr[0]->njobs;
+    // unsigned int nhj = pi->wr[1]->njobs;
+    unsigned int nvc = pi->wr[0]->ncores;
+    unsigned int nhc = pi->wr[1]->ncores;
 
-    ASSERT_ALWAYS((unsigned int) pi->m->jrank == pi->wr[1]->jrank * nvj +  pi->wr[1]->jcommon);
-    ASSERT_ALWAYS(pi->wr[1]->jcommon == (unsigned int) pi->wr[0]->jrank);
+    /* used in several places for doing snprintf */
+    char buf[20];
 
     // OK. So far we have something reasonable except for per-thread
     // setup. We have to first duplicate our structure so as to
@@ -321,7 +321,6 @@ void pi_go_inner(void *(*fcn)(parallelizing_info_ptr, param_list pl, void *),
         // replicate.
         for(unsigned int k = 0 ; k < pi->wr[0]->ncores ; k++) {
             grid[k + Nc]->wr[0]->th = leader->th;
-            grid[k + Nc]->wr[0]->tcommon = c;
         }
     }
 
@@ -335,14 +334,21 @@ void pi_go_inner(void *(*fcn)(parallelizing_info_ptr, param_list pl, void *),
         for(unsigned int k = 0 ; k < pi->wr[1]->ncores ; k++) {
             unsigned int Nk = k * pi->wr[0]->ncores;
             grid[c + Nk]->wr[1]->th = leader->th;
-            grid[c + Nk]->wr[1]->tcommon = c;
         }
     }
 
-    // Now do some printing, for debugging.
+    return grid;
+}
+
+#if 0
+/* TODO: rewrite this using grid_print instead */
+static void
+pi_grid_print_sketch(parallelizing_info_ptr pi, parallelizing_info * grid)
+{
+    char buf[20];
     for(unsigned int ij = 0 ; ij < pi->wr[1]->njobs ; ij++) {
-        // not mt at the moment, so it's easy.
-        err = MPI_Barrier(pi->m->pals);
+        // note that at this point, we're not yet MT.
+        int err = MPI_Barrier(pi->m->pals);
         ASSERT_ALWAYS(!err);
 
         if (pi->wr[1]->jrank != ij) continue;
@@ -376,64 +382,47 @@ void pi_go_inner(void *(*fcn)(parallelizing_info_ptr, param_list pl, void *),
         if (pi->wr[1]->jrank == ij && pi->wr[0]->jrank == 0)
             print_several(pi->wr[0]->njobs,pi->wr[0]->ncores, '-', '+', 12);
     }
+}
+#endif
 
-    err = MPI_Barrier(pi->m->pals);
-    ASSERT_ALWAYS(!err);
-    if (pi->m->jrank == pi->m->njobs - 1)
-        printf("going multithread now\n");
-    err = MPI_Barrier(pi->m->pals);
-    ASSERT_ALWAYS(!err);
-
-    // go mt.
+/* given a grid of processes which has beed set up with pi_grid_init,
+ * start the processes.
+ *
+ * The ngrids argument is here to accomodate the interleaved case.
+ */
+static void pi_go_mt_now(
+        parallelizing_info ** grids,
+        unsigned int ngrids,
+        unsigned int n,
+        void *(*fcn)(parallelizing_info_ptr, param_list pl, void *),
+        param_list pl,
+        void * arg)
+{
     my_pthread_t * tgrid;
-    tgrid = (my_pthread_t *) malloc(nhc * nvc * sizeof(my_pthread_t));
-
     struct pi_go_helper_s * helper_grid;
-    helper_grid = malloc(nhc * nvc * sizeof(struct pi_go_helper_s));
 
-    for(unsigned int k = 0 ; k < nhc * nvc ; k++) {
+    tgrid = (my_pthread_t *) malloc(n * ngrids * sizeof(my_pthread_t));
+    helper_grid = malloc(n * ngrids * sizeof(struct pi_go_helper_s));
+
+    for(unsigned int k = 0 ; k < n * ngrids ; k++) {
         helper_grid[k].fcn = fcn;
         helper_grid[k].pl = pl;
         helper_grid[k].arg = arg;
-        helper_grid[k].p = (parallelizing_info_ptr) grid + k;
-#if 0
-        printf("Job %u Thread %u"
-                " ROW (%u,%u) Job %u Thread %u"
-                " COL (%u,%u) Job %u Thread %u\n",
-                grid[k]->m->jrank, grid[k]->m->trank,
-                grid[k]->wr[0]->jcommon,
-                grid[k]->wr[0]->tcommon,
-                grid[k]->wr[0]->jrank,
-                grid[k]->wr[0]->trank,
-                grid[k]->wr[1]->jcommon,
-                grid[k]->wr[1]->tcommon,
-                grid[k]->wr[1]->jrank,
-                grid[k]->wr[1]->trank);
-#endif
+        helper_grid[k].p = (parallelizing_info_ptr) grids[k/n] + (k%n);
         my_pthread_create(tgrid+k, NULL,
                 (pthread_callee_t) pi_go_helper_func, helper_grid+k);
-#if 0
-        printf("Thread (%u,%u)/(%u,%u) started\n",
-                grid[k]->wr[0]->jrank, grid[k]->wr[1]->jrank,
-                grid[k]->wr[0]->trank, grid[k]->wr[1]->trank);
-#endif
     }
 
-#if 0
-    if (pi->m->jrank == 0) {
-        printf("Done starting threads\n");
-    }
-#endif
     // nothing done here. We're the main job.
-    
-    for(unsigned int k = 0 ; k < nhc * nvc ; k++) {
+    for(unsigned int k = 0 ; k < n * ngrids ; k++) {
         my_pthread_join(tgrid[k], NULL);
-#if 0
-        printf("Thread (%u,%u) finished\n", grid[k]->wr[0]->trank, grid[k]->wr[1]->trank);
-#endif
     }
     free(helper_grid);
     free(tgrid);
+}
+
+static void pi_grid_clear(parallelizing_info_ptr pi, parallelizing_info * grid)
+{
     // destroy row barriers.
     for(unsigned int c = 0 ; c < pi->wr[1]->ncores ; c++) {
         unsigned int Nc = c * pi->wr[0]->ncores;
@@ -444,7 +433,7 @@ void pi_go_inner(void *(*fcn)(parallelizing_info_ptr, param_list pl, void *),
         pi_wiring_destroy_pthread_things(grid[c]->wr[1]);
     }
 #ifdef  MPI_LIBRARY_MT_CAPABLE
-    for(unsigned int k = 0 ; k < nhc * nvc ; k++) {
+    for(unsigned int k = 0 ; k < pi->m->ncores ; k++) {
         MPI_Comm_free(&grid[k]->m->pals);
         MPI_Comm_free(&grid[k]->wr[0]->pals);
         MPI_Comm_free(&grid[k]->wr[1]->pals);
@@ -457,7 +446,10 @@ void pi_go_inner(void *(*fcn)(parallelizing_info_ptr, param_list pl, void *),
      */
 
     free(grid);
+}
 
+static void pi_clear_mpilevel(parallelizing_info_ptr pi)
+{
     pi_wiring_destroy_pthread_things(pi->m);
 
     for(int d = 0 ; d < 2 ; d++) {
@@ -468,11 +460,87 @@ void pi_go_inner(void *(*fcn)(parallelizing_info_ptr, param_list pl, void *),
     // MPI_Errhandler_free(&my_eh);
 }
 
+#if 0
+static void shout_going_mt(pi_wiring_ptr m)
+{
+    int err = MPI_Barrier(m->pals);
+    ASSERT_ALWAYS(!err);
+    if (m->jrank == m->njobs - 1)
+        printf("going multithread now\n");
+    err = MPI_Barrier(m->pals);
+    ASSERT_ALWAYS(!err);
+}
+#endif
+
+static void pi_go_inner_not_interleaved(
+        void *(*fcn)(parallelizing_info_ptr, param_list pl, void *),
+        param_list pl,
+        void * arg)
+{
+    parallelizing_info pi;
+    parallelizing_info * grid;
+    pi_init_mpilevel(pi, pl);
+    grid = pi_grid_init(pi);
+    // shout_going_mt(pi->m);
+    // pi_grid_print_sketch(pi, grids[0]);
+    pi_go_mt_now(&grid, 1, pi->m->ncores, fcn, pl, arg);
+    pi_grid_clear(pi, grid);
+    pi_clear_mpilevel(pi);
+}
+
+static void pi_go_inner_interleaved(
+        void *(*fcn)(parallelizing_info_ptr, param_list pl, void *),
+        param_list pl,
+        void * arg)
+{
+    parallelizing_info pi[2];
+    parallelizing_info * grids[2];
+
+    pi_init_mpilevel(pi[0], pl);
+    memcpy(pi[1], pi[0], sizeof(parallelizing_info));
+
+    pi[0]->interleaved = malloc(sizeof(pi_interleaving));
+    pi[0]->interleaved->idx = 0;
+
+    pi[1]->interleaved = malloc(sizeof(pi_interleaving));
+    pi[1]->interleaved->idx = 1;
+
+    /* Now the whole point is that it's the _same_ barrier ! */
+    my_pthread_barrier_t * b = malloc(sizeof(my_pthread_barrier_t));
+    my_pthread_barrier_init(b, NULL, 2 * pi[0]->m->ncores);
+    pi[0]->interleaved->b = b;
+    pi[1]->interleaved->b = b;
+
+    grids[0] = pi_grid_init(pi[0]);
+    grids[1] = pi_grid_init(pi[1]);
+
+    // shout_going_mt(pi[0]->m);
+    // pi_grid_print_sketch(pi, grids[0]);
+
+    pi_go_mt_now(grids, 2, pi[0]->m->ncores, fcn, pl, arg);
+    pi_grid_clear(pi[0], grids[0]);
+    pi_grid_clear(pi[1], grids[1]);
+
+    my_pthread_barrier_destroy(b);
+
+    free(pi[0]->interleaved);
+    free(pi[1]->interleaved);
+
+    pi_clear_mpilevel(pi[0]);
+    pi_clear_mpilevel(pi[1]);
+}
+
 void pi_go(void *(*fcn)(parallelizing_info_ptr, param_list pl, void *),
         param_list pl,
         void * arg)
 {
-    pi_go_inner(fcn, pl, arg);
+    int interleaving = 0;
+    param_list_parse_int(pl, "interleaving", &interleaving);
+    if (interleaving) {
+        pi_go_inner_interleaved(fcn, pl, arg);
+    } else {
+        pi_go_inner_not_interleaved(fcn, pl, arg);
+    }
 }
 
 
@@ -861,7 +929,7 @@ int get_counts_and_displacements_2d(parallelizing_info_ptr pi, int d,
     // it+pi->wr[d]->ncores*pi->wr[d]->njobs*jt
     // +
     // pi->wr[d]->ncores*ij + pi->m->ncores*pi->wr[d]->njobs*jj
-    
+
     unsigned int v0;
 
     v0 = pi->wr[d]->trank+pi->wr[!d]->trank*pi->wr[d]->ncores*pi->wr[d]->njobs;
@@ -1012,7 +1080,7 @@ pi_save_file_leader_init_done:
     // munmap before we complete the call to MPI_Gatherv.
 
     serialize_threads(w);
-    
+
     free(recvcounts);
     free(displs);
 
@@ -1107,7 +1175,7 @@ pi_save_file_2d_leader_init_done:
     // munmap before we complete the call to MPI_Gatherv.
 
     serialize_threads(w);
-    
+
     free(recvcounts);
     free(displs);
 
