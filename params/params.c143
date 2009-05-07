@@ -84,7 +84,7 @@ bwstrat=0
 ###########################################################################
 
 bwmt=4                  # Multithreading level of Block-Wiedemann
-linalg=bw               # Choose linalg algorithm: bl or bw
+linalg=bwc              # Choose linalg algorithm
 
 ###########################################################################
 # Characters
