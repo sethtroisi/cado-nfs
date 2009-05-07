@@ -12,14 +12,20 @@
 #include "bw-common-mpi.h"
 #include "filenames.h"
 
-abobj_t abase;
+/* We merely have to build up a check vector. We've got a fairly easy
+ * candidate for that: the x vector.  */
 
 void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
-    /* OK. Now we merely have to build up a check vector. We've got a
-     * fairly easy candidate for that: the x vector.
-     */
-    int tcan_print = bw->can_print && pi->m->trank == 0;
+    /* Interleaving does not make sense for this program. So the second
+     * block of threads just leave immediately */
+    if (pi->interleaved && pi->interleaved->idx)
+        return NULL;
+
+    abobj_t abase;
+    abobj_init(abase);
+    abobj_set_nbys(abase, NCHECKS_CHECK_VECTOR);
+
     matmul_top_data mmt;
 
     /* XXX Here we're roking in the opposite direction compared to
@@ -27,6 +33,8 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     int flags[2];
     flags[!bw->dir] = THREAD_SHARED_VECTOR;
     flags[bw->dir] = 0;
+
+    int tcan_print = bw->can_print && pi->m->trank == 0;
 
     /* Because we're a special case, we _expect_ to work opposite to
      * optimized direction. So we pass bw->dir even though _we_ are going
@@ -116,8 +124,9 @@ int main(int argc, char * argv[])
 
     if (bw->nx == 0) { fprintf(stderr, "no nx value set\n"); exit(1); } 
 
-    abobj_init(abase);
-    abobj_set_nbys(abase, NCHECKS_CHECK_VECTOR);
+    setvbuf(stdout,NULL,_IONBF,0);
+    setvbuf(stderr,NULL,_IONBF,0);
+
 
     pi_go(sec_prog, pl, 0);
 

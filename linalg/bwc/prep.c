@@ -16,32 +16,40 @@
 #include "bw-common-mpi.h"
 #include "filenames.h"
 
-/* Number of copies of m by n matrices to use for trying to obtain a
- * full-rank matrix (rank m).
- *
- * Note that it must be at least m/n, otherwise we stand no chance !
- */
-#define NBITER  2
-
-abobj_t abase;
-
 void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
+    /* Interleaving does not make sense for this program. So the second
+     * block of threads just leave immediately */
+    if (pi->interleaved && pi->interleaved->idx)
+        return NULL;
+
     // Doing the ``hello world'' test is a very good way of testing the
     // global mpi/pthreads setup. So despite its apparent irrelevance, I
     // suggest leaving it here as a cheap sanity check.
     hello(pi);
 
-    // avoid cluttering output too much.
-    int tcan_print = bw->can_print && pi->m->trank == 0;
-
-    unsigned int my_nx = 1;
+    abobj_t abase;
+    abobj_init(abase);
+    abobj_set_nbys(abase, bw->n);
 
     matmul_top_data mmt;
 
     int flags[2];
     flags[bw->dir] = THREAD_SHARED_VECTOR;
     flags[!bw->dir] = 0;
+
+    // avoid cluttering output too much.
+    int tcan_print = bw->can_print && pi->m->trank == 0;
+
+    /* Number of copies of m by n matrices to use for trying to obtain a
+     * full-rank matrix (rank m).
+     *
+     * Note that it must be at least m/n, otherwise we stand no chance !
+     */
+    unsigned int prep_lookahead_iterations;
+    prep_lookahead_iterations = iceildiv(bw->m, bw->m) + 1;
+
+    unsigned int my_nx = 1;
 
     matmul_top_init(mmt, abase, pi, flags, pl, MATRIX_INFO_FILE, bw->dir);
 
@@ -54,7 +62,11 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
     size_t stride =  abbytes(abase, 1);
 
     /* We're cheating on the generic init routines */
-    vec_init_generic(pi->m, stride, (mmt_generic_vec_ptr) xymats, 0, bw->m*NBITER);
+    vec_init_generic(pi->m,
+            stride,
+            (mmt_generic_vec_ptr) xymats,
+            0,
+            bw->m * prep_lookahead_iterations);
 
     for (unsigned ntri = 0;; ntri++) {
         serialize_threads(pi->m);
@@ -88,11 +100,13 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
         matmul_top_mul(mmt, bw->dir);
         
         // we have indices mmt->wr[1]->i0..i1 available.
-        abzero(abase, xymats->v, bw->m * NBITER);
+        abzero(abase, xymats->v, bw->m * prep_lookahead_iterations);
 
-        for(unsigned int k = 0 ; k < NBITER ; k++) {
+        for(unsigned int k = 0 ; k < prep_lookahead_iterations ; k++) {
             for(int j = 0 ; j < bw->m ; j++) {
-                abt * where = xymats->v + aboffset(abase, j * NBITER + k);
+                abt * where = xymats->v;
+                where += aboffset(abase, j * prep_lookahead_iterations);
+                where += aboffset(abase, k);
                 for(unsigned int t = 0 ; t < my_nx ; t++) {
                     uint32_t i = xvecs[j*my_nx+t];
                     if (i < mcol->i0 || i >= mcol->i1)
@@ -116,7 +130,8 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
 
         /* Now all threads and jobs must collectively reduce the zone
          * pointed to by xymats */
-        allreduce_generic(abase, xymats, pi->m, bw->m * NBITER);
+        allreduce_generic(abase, xymats, pi->m,
+                bw->m * prep_lookahead_iterations);
 
         /* OK -- now everybody has the same data */
 
@@ -126,8 +141,9 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
         /* the kernel() call is not reentrant */
         if (pi->m->trank == 0) {
             dimk = kernel((mp_limb_t *) xymats->v, NULL,
-                    bw->m, NBITER * abnbits(abase), 
-                abbytes(abase,NBITER) / sizeof(mp_limb_t), 0);
+                    bw->m, prep_lookahead_iterations * abnbits(abase), 
+                    abbytes(abase,prep_lookahead_iterations)/sizeof(mp_limb_t),
+                    0);
             pdimk = &dimk;
         }
         thread_agreement(pi->m, (void **) &pdimk, 0);
@@ -153,7 +169,8 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
     matmul_top_clear(mmt, abase);
 
     /* clean up xy mats stuff */
-    vec_clear_generic(pi->m, stride, (mmt_generic_vec_ptr) xymats, bw->m*NBITER);
+    vec_clear_generic(pi->m, stride, (mmt_generic_vec_ptr) xymats,
+            bw->m * prep_lookahead_iterations);
 
     free(xvecs);
     return NULL;
@@ -176,8 +193,8 @@ int main(int argc, char * argv[])
 
     if (bw->seed) setup_seeding(bw->seed);
 
-    abobj_init(abase);
-    abobj_set_nbys(abase, bw->n);
+    setvbuf(stdout,NULL,_IONBF,0);
+    setvbuf(stderr,NULL,_IONBF,0);
 
     pi_go(prep_prog, pl, 0);
 

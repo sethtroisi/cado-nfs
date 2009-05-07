@@ -18,8 +18,6 @@
 #include "bw-common-mpi.h"
 #include "filenames.h"
 
-abobj_t abase;
-
 struct sfile_info {
     unsigned int n0,n1;
     unsigned int iter;
@@ -63,7 +61,11 @@ void prelude(parallelizing_info_ptr pi, struct sfiles_list * s)
             s->sfiles[s->nsfiles].n1 = n1;
             s->sfiles[s->nsfiles].iter = iter;
             if (bw->interval && iter % bw->interval != 0) {
-                fprintf(stderr, "Warning: %s is not a checkpoint at a multiple of the interval value %d -- this might indicate a severe bug with leftover data, likely to corrupt the final computation\n", de->d_name, bw->interval);
+                fprintf(stderr,
+                        "Warning: %s is not a checkpoint at a multiple of "
+                        "the interval value %d -- this might indicate a "
+                        "severe bug with leftover data, likely to corrupt "
+                        "the final computation\n", de->d_name, bw->interval);
             }
             s->nsfiles++;
         }
@@ -110,9 +112,18 @@ int agree_on_flag(pi_wiring_ptr w, int v)
 
 void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
+    /* Interleaving does not make sense for this program. So the second
+     * block of threads just leave immediately */
+    if (pi->interleaved && pi->interleaved->idx)
+        return NULL;
+
     struct sfiles_list sf[1];
 
     prelude(pi, sf);
+
+    abobj_t abase;
+    abobj_init(abase);
+    abobj_set_nbys(abase, bw->n);
 
     int tcan_print = bw->can_print && pi->m->trank == 0;
     matmul_top_data mmt;
@@ -191,7 +202,8 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     is_zero = abis_zero(abase, check_area, how_many);
 
     if (agree_on_flag(pi->m, is_zero)) {
-        fprintf(stderr, "Found zero vector. Most certainly a bug. No solution found.\n");
+        fprintf(stderr, "Found zero vector. Most certainly a bug. "
+                "No solution found.\n");
         exit(1);
     }
     serialize(pi->m);
@@ -257,8 +269,8 @@ int main(int argc, char * argv[])
 
     if (bw->nx == 0) { fprintf(stderr, "no nx value set\n"); exit(1); } 
 
-    abobj_init(abase);
-    abobj_set_nbys(abase, bw->n);
+    setvbuf(stdout,NULL,_IONBF,0);
+    setvbuf(stderr,NULL,_IONBF,0);
 
     pi_go(gather_prog, pl, 0);
 

@@ -18,17 +18,26 @@
 #include "filenames.h"
 #include "xdotprod.h"
 
-abobj_t abase;
-
 void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
     int tcan_print = bw->can_print && pi->m->trank == 0;
     matmul_top_data mmt;
     struct timing_data timing[1];
+    abobj_t abase;
 
     int flags[2];
     flags[bw->dir] = THREAD_SHARED_VECTOR;
     flags[!bw->dir] = 0;
+
+    int ys[2] = { bw->ys[0], bw->ys[1], };
+    if (pi->interleaved) {
+        ASSERT_ALWAYS((bw->ys[1]-bw->ys[0]) % 2 == 0);
+        ys[0] = bw->ys[0] + pi->interleaved->idx * (bw->ys[1]-bw->ys[0])/2;
+        ys[1] = ys[0] + (bw->ys[1]-bw->ys[0])/2;
+    }
+
+    abobj_init(abase);
+    abobj_set_nbys(abase, ys[1]-ys[0]);
 
     block_control_signals();
 
@@ -46,7 +55,8 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     load_x(gxvecs, bw->m, bw->nx, pi);
 
     char * v_name;
-    int rc = asprintf(&v_name, V_FILE_BASE_PATTERN, bw->ys[0], bw->ys[1]);
+
+    int rc = asprintf(&v_name, V_FILE_BASE_PATTERN, ys[0], ys[1]);
 
     if (tcan_print) { printf("Loading %s...", v_name); fflush(stdout); }
     matmul_top_load_vector(mmt, v_name, bw->dir, bw->start);
@@ -99,10 +109,12 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                 bw->interval * iceildiv(bw->end, bw->interval));
     }
 
+#if 0
     /* FIXME -- that's temporary ! only for debugging */
     pi_log_init(pi->m);
     pi_log_init(pi->wr[0]);
     pi_log_init(pi->wr[1]);
+#endif
 
     timing_init(timing, bw->start, bw->interval * iceildiv(bw->end, bw->interval));
 
@@ -126,17 +138,9 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             abvdotprod(abase, abase_check, ahead->v, c, v, how_many);
         }
 
-        /*
-        debug_write(ahead->v, NCHECKS_CHECK_VECTOR * stride, "ahead.%u.j%u.t%u",
-                s, mmt->pi->m->jrank, mmt->pi->m->trank);
-         */
-
         abzero(abase, xymats->v, bw->m*bw->interval);
-
         serialize(pi->m);
-
-        /* At this point, if we're doing outer interleaving, we'll start
-         * to do some alternating computations and communications.  */
+        pi_interleaving_flip(pi);
 
         for(int i = 0 ; i < bw->interval ; i++) {
             /* Compute the product by x */
@@ -144,34 +148,15 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                     xymats->v + aboffset(abase, i * bw->m), bw->m);
 
             
-
-            matmul_top_mul(mmt, bw->dir);
-            
-
-            /*
-            debug_write(mcol->v->v,
-                    (mcol->i1-mcol->i0) * stride, "pV%u.j%u.t%u",
-                    s+i+1, mmt->pi->m->jrank, mmt->pi->m->trank);
-             */
+            matmul_top_mul_cpu(mmt, bw->dir);
+            pi_interleaving_flip(pi);
+            matmul_top_mul_comm(mmt, bw->dir);
             timing_check(pi, timing, s+i+1, tcan_print);
         }
         serialize(pi->m);
-        /** -- end of possibly interleaving stuff -- */
-
-
-
-        /*
-        debug_write(xymats->v, (bw->m * bw->interval) * stride, "xy.%u-%u.j%u.t%u",
-                s, s + bw->interval, mmt->pi->m->jrank, mmt->pi->m->trank);
-         */
 
         /* Last dot product. This must cancel ! */
         x_dotprod(mmt, gxvecs, ahead->v, NCHECKS_CHECK_VECTOR);
-
-        /*
-        debug_write(ahead->v, NCHECKS_CHECK_VECTOR * stride, "post%u.j%u.t%u",
-                s, mmt->pi->m->jrank, mmt->pi->m->trank);
-         */
 
         allreduce_generic(abase, ahead, pi->m, NCHECKS_CHECK_VECTOR);
         if (!abis_zero(abase, ahead->v, NCHECKS_CHECK_VECTOR)) {
@@ -184,7 +169,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
         if (pi->m->trank == 0 && pi->m->jrank == 0) {
             char * tmp;
-            rc = asprintf(&tmp, A_FILE_PATTERN, bw->ys[0], bw->ys[1], s, s+bw->interval);
+            rc = asprintf(&tmp, A_FILE_PATTERN, ys[0], ys[1], s, s+bw->interval);
             FILE * f = fopen(tmp, "w");
             rc = fwrite(xymats->v, stride, bw->m*bw->interval, f);
             if (rc != bw->m*bw->interval) {
@@ -205,9 +190,11 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         timing_disp_collective_oneline(pi, timing, s + bw->interval, mmt->mm->ncoeffs, tcan_print);
     }
 
+#if 0
     pi_log_clear(pi->m);
     pi_log_clear(pi->wr[0]);
     pi_log_clear(pi->wr[1]);
+#endif
 
     if (tcan_print) {
         printf("Done.\n");
@@ -247,14 +234,14 @@ int main(int argc, char * argv[])
     if (bw->nx == 0) { fprintf(stderr, "no nx value set\n"); exit(1); } 
     if (bw->ys[0] < 0) { fprintf(stderr, "no ys value set\n"); exit(1); }
 
-    abobj_init(abase);
-    abobj_set_nbys(abase, bw->ys[1]-bw->ys[0]);
+    setvbuf(stdout,NULL,_IONBF,0);
+    setvbuf(stderr,NULL,_IONBF,0);
 
     catch_control_signals();
     pi_go(krylov_prog, pl, 0);
-
     param_list_clear(pl);
     bw_common_clear_mpi(bw);
+
     return 0;
 }
 

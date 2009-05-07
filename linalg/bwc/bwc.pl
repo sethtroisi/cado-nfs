@@ -108,6 +108,7 @@ my $nv;
 my $mpi;
 my $mpi_ver;
 my $tmpdir;
+my $interleaving;
 
 # {{{ MPI detection
 
@@ -232,6 +233,7 @@ if ($param->{'wdir'}) { $wdir=$param->{'wdir'}; }
 if ($param->{'matrix'}) { $matrix=$param->{'matrix'}; }
 if ($param->{'matpath'}) { $matpath=$param->{'matpath'}; }
 if ($param->{'tmpdir'}) { $tmpdir=$param->{'tmpdir'}; }
+if ($param->{'interleaving'}) { $interleaving=$param->{'interleaving'}; }
 
 $nh = $mpi_split[0] * $thr_split[0];
 $nv = $mpi_split[1] * $thr_split[1];
@@ -332,8 +334,12 @@ if ((!defined($m) || !defined($n)) && $main !~ /^:(?:wipeout|balance)$/) {
     usage "The parameters m and n must be set";
 }
 if (!defined($param->{'splits'})) {
-    @splits=(0,$n);
-    push @main_args, "splits=0,$n";
+    if ($param->{'interleaving'}) {
+        @splits=(0,int($n/2),$n);
+    } else {
+        @splits=(0,$n);
+    }
+    push @main_args, "splits=" . join(",", @splits);
 }
 if (!defined($param->{'ys'})) {
     push @main_args, "ys=0..$n";

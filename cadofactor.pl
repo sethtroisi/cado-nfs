@@ -210,6 +210,7 @@ my @default_param = (
     bwtidy       => 1,
     bwc_interval => 1000,
     bwc_mm_impl => 'sliced',
+    bwc_interleaving => 0,
 
     # characters
     nkermax      => 30,
@@ -1098,7 +1099,10 @@ my %tasks = (
 
     linalg    => { name   => "linear algebra",
                    dep    => ['replay'],
-                   param  => [ qw/skip bwmt bwthreshold linalg bwc_interval bwc_mm_impl/],
+                   param  => [ qw/skip bwmt bwthreshold linalg
+                               bwc_interval
+                               bwc_mm_impl
+                               bwc_interleaving/],
                    files  => ['bw', 'bw\.stderr', 'bl', 'bl\.stderr', 'W'] },
 
     bitstr    => { dep    => ['linalg'],
@@ -1918,30 +1922,30 @@ sub do_linalg {
 
     my $cmd;
     if ($param{'linalg'} eq "bw") {
-        do_transpose;
-
-        info "Calling Block-Wiedemann (old code)...\n";
-        $tab_level++;
-        my $mt = $param{'bwmt'};
-        if ($mt =~ /^(\d+)x(\d+)$/) {
-            $mt = $1 * $2;
-        }
-
-        $cmd = "$param{'cadodir'}/linalg/bw/bw.pl ".
-               "seed=1 ". # For debugging purposes, we use a deterministic BW
-               "mt=$mt ".
-               "matrix=$param{'prefix'}.small.tr ".
-               "mn=64 ".
-               "vectoring=64 ".
-               "multisols=1 ".
-               "bwc_mm_impl=$param{'bwc_mm_impl'} ".
-               "wdir=$param{'wdir'}/bw " .
-               "tidy=$param{'bwtidy'} ".
-               "threshold=$param{'bwthreshold'} ".
-               "solution=$param{'prefix'}.W ".
-               "> $param{'prefix'}.bw.stderr ".
-               "2>&1";
-        cmd($cmd, { log => 1, kill => 1 });
+        die "No longer supported";
+#        do_transpose;
+#
+#        info "Calling Block-Wiedemann (old code)...\n";
+#        $tab_level++;
+#        my $mt = $param{'bwmt'};
+#        if ($mt =~ /^(\d+)x(\d+)$/) {
+#            $mt = $1 * $2;
+#        }
+#
+#        $cmd = "$param{'cadodir'}/linalg/bw/bw.pl ".
+#               "seed=1 ". # For debugging purposes, we use a deterministic BW
+#               "mt=$mt ".
+#               "matrix=$param{'prefix'}.small.tr ".
+#               "mn=64 ".
+#               "vectoring=64 ".
+#               "multisols=1 ".
+#               "wdir=$param{'wdir'}/bw " .
+#               "tidy=$param{'bwtidy'} ".
+#               "threshold=$param{'bwthreshold'} ".
+#               "solution=$param{'prefix'}.W ".
+#               "> $param{'prefix'}.bw.stderr ".
+#               "2>&1";
+#        cmd($cmd, { log => 1, kill => 1 });
     } elsif ($param{'linalg'} eq "bwc") {
         if ($param{'skip'}) {
             warn "Parameter 'skip' currently unhandled by bwc code\n";
@@ -1970,6 +1974,8 @@ sub do_linalg {
                "mpi=1x1 ".
                "matrix=$param{'prefix'}.small " .
                "nullspace=left " .
+               "mm_impl=$param{'bwc_mm_impl'} ".
+               "interleaving=$param{'bwc_interleaving'} ".
                "interval=$param{'bwc_interval'} ".
                "mode=u64 mn=64 splits=0,64 ys=0..64 ".
                "wdir=$param{'wdir'}/bwc " .
@@ -1987,17 +1993,18 @@ sub do_linalg {
         cmd($cmd, { log => 1, kill => 1 });
 
     } elsif ($param{'linalg'} eq "bl") {
-        do_transpose;
-
-        info "Calling Block-Lanczos...\n";
-        $tab_level++;
-        $cmd = "$param{'cadodir'}/linalg/bl/bl.pl ".
-               "matrix=$param{'prefix'}.small.tr ".
-               "wdir=$param{'wdir'}/bw" .
-               "solution=$param{'prefix'}.W ".
-               "> $param{'prefix'}.bl.stderr ".
-               "2>&1";
-        cmd($cmd, { log => 1, kill => 1 });
+        die "No longer supported";
+#        do_transpose;
+#
+#        info "Calling Block-Lanczos...\n";
+#        $tab_level++;
+#        $cmd = "$param{'cadodir'}/linalg/bl/bl.pl ".
+#               "matrix=$param{'prefix'}.small.tr ".
+#               "wdir=$param{'wdir'}/bw" .
+#               "solution=$param{'prefix'}.W ".
+#               "> $param{'prefix'}.bl.stderr ".
+#               "2>&1";
+#        cmd($cmd, { log => 1, kill => 1 });
     } else {
         die "Value `$param{'linalg'}' is unknown for parameter `linalg'\n";
     }

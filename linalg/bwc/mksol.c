@@ -14,25 +14,29 @@
 #include "xymats.h"
 #include "bw-common-mpi.h"
 #include "async.h"
-// #include "rusage.h"
 #include "filenames.h"
 #include "xdotprod.h"
-
-#if 0
-#include "electric_alloc.h"     // debugging
-#endif
-
-abobj_t abase;
 
 void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
     int tcan_print = bw->can_print && pi->m->trank == 0;
     matmul_top_data mmt;
     struct timing_data timing[1];
+    abobj_t abase;
 
     int flags[2];
     flags[bw->dir] = THREAD_SHARED_VECTOR;
     flags[!bw->dir] = 0;
+
+    int ys[2] = { bw->ys[0], bw->ys[1], };
+    if (pi->interleaved) {
+        ASSERT_ALWAYS((bw->ys[1]-bw->ys[0]) % 2 == 0);
+        ys[0] = bw->ys[0] + pi->interleaved->idx * (bw->ys[1]-bw->ys[0])/2;
+        ys[1] = ys[0] + (bw->ys[1]-bw->ys[0])/2;
+    }
+
+    abobj_init(abase);
+    abobj_set_nbys(abase, ys[1]-ys[0]);
 
     block_control_signals();
 
@@ -41,7 +45,6 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     mmt_wiring_ptr mcol = mmt->wr[bw->dir];
     mmt_wiring_ptr mrow = mmt->wr[!bw->dir];
     pi_wiring_ptr picol = mmt->pi->wr[bw->dir];
-    // pi_wiring_ptr pirow = mmt->pi->wr[!bw->dir];
 
     serialize(pi->m);
     
@@ -54,9 +57,9 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     int rc;
 
     char * v_name;
-    rc = asprintf(&v_name, V_FILE_BASE_PATTERN, bw->ys[0], bw->ys[1]);
+    rc = asprintf(&v_name, V_FILE_BASE_PATTERN, ys[0], ys[1]);
     char * s_name;
-    rc = asprintf(&s_name, S_FILE_BASE_PATTERN, bw->ys[0], bw->ys[1]);
+    rc = asprintf(&s_name, S_FILE_BASE_PATTERN, ys[0], ys[1]);
 
     if (tcan_print) { printf("Loading %s...", v_name); fflush(stdout); }
     matmul_top_load_vector(mmt, v_name, bw->dir, bw->start);
@@ -65,7 +68,6 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     // We must also fetch the check vector C.
     abvobj_t abase_check;
     abvobj_set_nbys(abase_check, NCHECKS_CHECK_VECTOR);
-
     size_t vstride = abvbytes(abase_check, 1);
     size_t stride =  abbytes(abase, 1);
 
@@ -108,7 +110,6 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
      * transposing */
     mmt_vec ahead;
     vec_init_generic(pi->m, stride, (mmt_generic_vec_ptr) ahead, 0, bw->n);
-
 
     /* We'll load all the F coefficient matrices before the main loop.
      * It's dual to the treatment of the xy matrices in krylov. Same
@@ -161,7 +162,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         if (pi->m->trank == 0 && pi->m->jrank == 0) {
             abase_generic_zero(rstride, fcoeffs->v, abnbits(abase)*bw->interval);
             char * tmp;
-            rc = asprintf(&tmp, F_FILE_SLICE_PATTERN, bw->ys[0], bw->ys[1]);
+            rc = asprintf(&tmp, F_FILE_SLICE_PATTERN, ys[0], ys[1]);
 
             FILE * f = fopen(tmp, "r");
             rc = fseek(f, bw->n * stride * s, SEEK_SET);
@@ -229,6 +230,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         }
 
         serialize(pi->m);
+        pi_interleaving_flip(pi);
 
         /* Despite the fact that the bw->end value might lead us
          * to stop earlier, we want to stop at multiples of the checking
@@ -244,8 +246,9 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
                     mcol->v->v + aboffset(abase, ii0 - mcol->i0),
                     fptr, ii1 - ii0);
 
-            matmul_top_mul(mmt, bw->dir);
-
+            matmul_top_mul_cpu(mmt, bw->dir);
+            pi_interleaving_flip(pi);
+            matmul_top_mul_comm(mmt, bw->dir);
             timing_check(pi, timing, s+i+1, tcan_print);
         }
         serialize(pi->m);
@@ -314,14 +317,14 @@ int main(int argc, char * argv[])
     if (bw->nx == 0) { fprintf(stderr, "no nx value set\n"); exit(1); } 
     if (bw->ys[0] < 0) { fprintf(stderr, "no ys value set\n"); exit(1); }
 
-    abobj_init(abase);
-    abobj_set_nbys(abase, bw->ys[1]-bw->ys[0]);
+    setvbuf(stdout,NULL,_IONBF,0);
+    setvbuf(stderr,NULL,_IONBF,0);
 
     catch_control_signals();
     pi_go(mksol_prog, pl, 0);
-
     param_list_clear(pl);
     bw_common_clear_mpi(bw);
+
     return 0;
 }
 

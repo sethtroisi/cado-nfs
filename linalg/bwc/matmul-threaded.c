@@ -207,13 +207,13 @@ static struct matmul_threaded_data_s * matmul_threaded_init(abobj_ptr xx MAYBE_U
     mm->off3 = MM_PREFETCH_OFFSET_3;
 
     if (pl) {
-        param_list_parse_uint(pl, "bwc_mm_cache_line_size", &mm->blocksize);
-        param_list_parse_uint(pl, "bwc_mm_threaded_nthreads", &mm->nthreads);
-        param_list_parse_double(pl, "bwc_mm_threaded_densify_tolerance", &mm->densify_tolerance);
-        param_list_parse_uint(pl, "bwc_mm_threaded_sgroup_size", &mm->sgrp_size);
-        param_list_parse_uint(pl, "bwc_mm_threaded_offset1", &mm->off1);
-        param_list_parse_uint(pl, "bwc_mm_threaded_offset2", &mm->off2);
-        param_list_parse_uint(pl, "bwc_mm_threaded_offset3", &mm->off3);
+        param_list_parse_uint(pl, "cache_line_size", &mm->blocksize);
+        param_list_parse_uint(pl, "mm_threaded_nthreads", &mm->nthreads);
+        param_list_parse_double(pl, "mm_threaded_densify_tolerance", &mm->densify_tolerance);
+        param_list_parse_uint(pl, "mm_threaded_sgroup_size", &mm->sgrp_size);
+        param_list_parse_uint(pl, "mm_threaded_offset1", &mm->off1);
+        param_list_parse_uint(pl, "mm_threaded_offset2", &mm->off2);
+        param_list_parse_uint(pl, "mm_threaded_offset3", &mm->off3);
     }
 
     mm->blocksize /= abbytes(mm->xab, 1);

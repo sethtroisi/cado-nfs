@@ -143,7 +143,7 @@ typedef struct matmul_top_data_s const * matmul_top_data_srcptr;
 extern "C" {
 #endif
 
-void matmul_top_init(matmul_top_data_ptr mmt,
+extern void matmul_top_init(matmul_top_data_ptr mmt,
         abobj_ptr abase,
         parallelizing_info_ptr pi,
         int const * flags,
@@ -152,11 +152,18 @@ void matmul_top_init(matmul_top_data_ptr mmt,
         int optimized_direction);
 
 
-void matmul_top_clear(matmul_top_data_ptr mmt, abobj_ptr abase);
-void matmul_top_fill_random_source(matmul_top_data_ptr mmt, int d);
-void matmul_top_load_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int iter);
-void matmul_top_save_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int iter);
-void matmul_top_mul(matmul_top_data_ptr mmt, int d);
+extern void matmul_top_clear(matmul_top_data_ptr mmt, abobj_ptr abase);
+extern void matmul_top_fill_random_source(matmul_top_data_ptr mmt, int d);
+extern void matmul_top_load_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int iter);
+extern void matmul_top_save_vector(matmul_top_data_ptr mmt, const char * name, int d, unsigned int iter);
+extern void matmul_top_mul_cpu(matmul_top_data_ptr mmt, int d);
+extern void matmul_top_mul_comm(matmul_top_data_ptr mmt, int d);
+static inline void matmul_top_mul(matmul_top_data_ptr mmt, int d)
+{
+    matmul_top_mul_cpu(mmt, d);
+    matmul_top_mul_comm(mmt, d);
+}
+
 
 /* Now some of the generic interface calls. By design, not everything is
  * possible with these calls. In particular, nothing critical is doable.
@@ -177,16 +184,16 @@ struct mmt_generic_vec_s {
 typedef struct mmt_generic_vec_s mmt_generic_vec[1];
 typedef struct mmt_generic_vec_s * mmt_generic_vec_ptr;
 
-void matmul_top_vec_init_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, int d, int flags);
-void matmul_top_vec_clear_generic(matmul_top_data_ptr mmt, size_t stride MAYBE_UNUSED, mmt_generic_vec_ptr v, int d);
-void matmul_top_fill_random_source_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, int d);
-void matmul_top_load_vector_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, const char * name, int d, unsigned int iter);
-void matmul_top_save_vector_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, const char * name, int d, unsigned int iter);
+extern void matmul_top_vec_init_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, int d, int flags);
+extern void matmul_top_vec_clear_generic(matmul_top_data_ptr mmt, size_t stride MAYBE_UNUSED, mmt_generic_vec_ptr v, int d);
+extern void matmul_top_fill_random_source_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, int d);
+extern void matmul_top_load_vector_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, const char * name, int d, unsigned int iter);
+extern void matmul_top_save_vector_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, const char * name, int d, unsigned int iter);
 
 /* These two do not really belong here, but comes as a useful complement
  */
-void vec_init_generic(pi_wiring_ptr, size_t, mmt_generic_vec_ptr, int, unsigned int);
-void vec_clear_generic(pi_wiring_ptr, size_t, mmt_generic_vec_ptr, unsigned int);
+extern void vec_init_generic(pi_wiring_ptr, size_t, mmt_generic_vec_ptr, int, unsigned int);
+extern void vec_clear_generic(pi_wiring_ptr, size_t, mmt_generic_vec_ptr, unsigned int);
 
 #ifdef __cplusplus
 }

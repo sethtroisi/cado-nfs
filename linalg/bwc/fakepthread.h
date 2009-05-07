@@ -7,6 +7,7 @@
 
 // See select_mpi.h for info on my_* stuff.
 
+/* {{{ create/join */
 typedef void * my_pthread_t;
 typedef int my_pthread_attr_t;
 
@@ -22,10 +23,10 @@ static inline int my_pthread_join(my_pthread_t t, void ** vp)
     if (vp)
         *vp = t;
     return 0;
-} 
+}
+/* }}} */
 
-#define my_pthread_barrier_destroy         pthread_barrier_destroy
-
+/* {{{ posix pthread barriers */
 typedef int my_pthread_barrier_t;
 typedef int my_pthread_barrierattr_t;
 
@@ -44,7 +45,9 @@ static inline int my_pthread_barrier_destroy(my_pthread_barrier_t * b MAYBE_UNUS
 {
     return 0;
 }
+/* }}} */
 
+/* {{{ advanced barriers */
 typedef int barrier_t;
 
 static inline int barrier_wait(barrier_t * b MAYBE_UNUSED,
@@ -56,44 +59,55 @@ static inline int barrier_wait(barrier_t * b MAYBE_UNUSED,
     return 1;   /* waker returns 1 */
 }
 
-static inline int barrier_init (barrier_t *b MAYBE_UNUSED, int c)
-{
-    ASSERT_ALWAYS(c==1);
-    return 0;
-}
+static inline int
+barrier_init (barrier_t *b MAYBE_UNUSED, int c)
+{ ASSERT_ALWAYS(c==1); return 0; }
 
-static inline int barrier_destroy (barrier_t *b MAYBE_UNUSED)
-{
-    return 0;
-}
+static inline int
+barrier_destroy (barrier_t *b MAYBE_UNUSED)
+{ return 0; }
+/* }}} */
 
+/* {{{ mutexes */
 typedef int my_pthread_mutex_t;
 typedef int my_pthread_mutexattr_t;
 
-static inline int my_pthread_mutex_init(my_pthread_mutex_t * /* restrict */ m MAYBE_UNUSED, const my_pthread_mutexattr_t * /* restrict */ attr MAYBE_UNUSED)
-{
-    return 0;
-}
+static inline int
+my_pthread_mutex_init(my_pthread_mutex_t *m MAYBE_UNUSED,
+        const my_pthread_mutexattr_t * attr MAYBE_UNUSED)
+{ return 0; }
+static inline int
+my_pthread_mutex_lock(my_pthread_mutex_t * m MAYBE_UNUSED)
+{ return 0; }
+static inline int
+my_pthread_mutex_unlock(my_pthread_mutex_t * m MAYBE_UNUSED)
+{ return 0; }
+static inline int
+my_pthread_mutex_destroy(my_pthread_mutex_t * m MAYBE_UNUSED)
+{ return 0; }
+/* }}} */
 
-static inline int my_pthread_mutex_lock(my_pthread_mutex_t * m MAYBE_UNUSED)
-{
-    return 0;
-}
-static inline int my_pthread_mutex_trylock(my_pthread_mutex_t * m MAYBE_UNUSED)
-{
-    return 0;
-}
-static inline int my_pthread_mutex_unlock(my_pthread_mutex_t * m MAYBE_UNUSED)
-{
-    return 0;
-}
-static inline int my_pthread_mutex_destroy(my_pthread_mutex_t * m MAYBE_UNUSED)
-{
-    return 0;
-}
-static inline int my_pthread_sigmask(int how, const sigset_t * set, sigset_t * oset)
-{
-    return sigprocmask(how, set, oset);
-}
+/* {{{ rwlocks */
+typedef int my_pthread_rwlock_t;
+typedef int my_pthread_rwlockattr_t;
+
+static inline int
+my_pthread_rwlock_init(my_pthread_rwlock_t * m MAYBE_UNUSED,
+        const my_pthread_rwlockattr_t *attr MAYBE_UNUSED)
+{ return 0; }
+
+static inline int
+my_pthread_rwlock_wrlock(my_pthread_rwlock_t * m MAYBE_UNUSED) { return 0; }
+static inline int
+my_pthread_rwlock_rdlock(my_pthread_rwlock_t * m MAYBE_UNUSED) { return 0; }
+static inline int
+my_pthread_rwlock_unlock(my_pthread_rwlock_t * m MAYBE_UNUSED) { return 0; }
+static inline int
+my_pthread_rwlock_destroy(my_pthread_rwlock_t * m MAYBE_UNUSED) { return 0; }
+/* }}} */
+
+static inline int
+my_pthread_sigmask(int how, const sigset_t * set, sigset_t * oset)
+{ return sigprocmask(how, set, oset); }
 
 #endif	/* FAKEPTHREAD_H_ */

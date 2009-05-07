@@ -153,7 +153,7 @@ struct matmul_bucket_data_s * matmul_bucket_build(abobj_ptr xx, const char * fil
      * then arrange for slices of approximately equal size.
      */
     unsigned int npack = L1_CACHE_SIZE;
-    if (pl) param_list_parse_uint(pl, "bwc_mm_l1_cache_size", &npack);
+    if (pl) param_list_parse_uint(pl, "l1_cache_size", &npack);
     npack /= abbytes(mm->xab,1);
     unsigned int nslices = iceildiv(nrows_t, npack);
 
@@ -252,7 +252,7 @@ struct matmul_bucket_data_s * matmul_bucket_build(abobj_ptr xx, const char * fil
     } /* }}} */
 
     unsigned int scrapsize = L2_CACHE_SIZE;
-    if (pl) param_list_parse_uint(pl, "bwc_mm_l2_cache_size", &scrapsize);
+    if (pl) param_list_parse_uint(pl, "l2_cache_size", &scrapsize);
     scrapsize /= abbytes(mm->xab,1);
 
     mm->scrapsize = scrapsize;

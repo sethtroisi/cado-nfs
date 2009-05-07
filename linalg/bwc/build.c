@@ -20,6 +20,9 @@ int main(int argc, char * argv[])
 
     const char * impl = "basic";
 
+    setvbuf(stdout,NULL,_IONBF,0);
+    setvbuf(stderr,NULL,_IONBF,0);
+
     if (argc != 2 && argc != 3 && argc != 4) {
         usage();
     }

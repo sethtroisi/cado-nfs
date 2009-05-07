@@ -41,8 +41,13 @@
 #define my_pthread_mutex_init              pthread_mutex_init
 #define my_pthread_mutex_lock              pthread_mutex_lock
 #define my_pthread_mutex_unlock            pthread_mutex_unlock
-#define my_pthread_mutex_trylock           pthread_mutex_trylock
 #define my_pthread_mutex_destroy           pthread_mutex_destroy
+#define my_pthread_rwlock_t                pthread_rwlock_t
+#define my_pthread_rwlock_init             pthread_rwlock_init
+#define my_pthread_rwlock_wrlock           pthread_rwlock_wrlock
+#define my_pthread_rwlock_rdlock           pthread_rwlock_rdlock
+#define my_pthread_rwlock_unlock           pthread_rwlock_unlock
+#define my_pthread_rwlock_destroy          pthread_rwlock_destroy
 #define my_pthread_sigmask                 pthread_sigmask
 #include "barrier.h"
 #ifndef  HAVE_PTHREAD_BARRIER_WAIT

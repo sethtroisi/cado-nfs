@@ -497,7 +497,26 @@ static void mmt_finish_init(matmul_top_data_ptr mmt, int const * flags, param_li
     // TODO: reuse the ../bw-matmul/matmul/matrix_base.cpp things for
     // displaying communication info.
     
-    matmul_top_read_submatrix(mmt, pl, optimized_direction);
+    if (!mmt->pi->interleaved) {
+        matmul_top_read_submatrix(mmt, pl, optimized_direction);
+    } else {
+        /* Interleaved threads will share their matrix data. The first
+         * thread to arrive will do the initialization, and the second
+         * one will just grab the pointer. The trick is to be able to
+         * pick the pointer in the right location ! We add a generic
+         * pointer dictionary feature in the parallelizing_info
+         * interface for this purpose.
+         */
+
+#define MMT_MM_MAGIC_KEY        0xaa000000UL
+
+        if (mmt->pi->interleaved->idx == 0) {
+            matmul_top_read_submatrix(mmt, pl, optimized_direction);
+            pi_store_generic(mmt->pi, MMT_MM_MAGIC_KEY, mmt->pi->m->trank, mmt->mm);
+        } else {
+            mmt->mm = pi_load_generic(mmt->pi, MMT_MM_MAGIC_KEY, mmt->pi->m->trank);
+        }
+    }
 
     /* NOTE: flags default to zero */
     matmul_top_vec_init(mmt, 0, flags ? flags[0] : 0);
@@ -507,7 +526,7 @@ static void mmt_finish_init(matmul_top_data_ptr mmt, int const * flags, param_li
 
 static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, int optimized_direction)
 {
-    const char * impl = param_list_lookup_string(pl, "bwc_mm_impl");
+    const char * impl = param_list_lookup_string(pl, "mm_impl");
 
     mmt->mm = matmul_reload_cache(mmt->abase, mmt->locfile, impl, pl, optimized_direction);
     if (mmt->mm)
@@ -528,7 +547,13 @@ void matmul_top_vec_clear(matmul_top_data_ptr mmt, int d)
 void matmul_top_clear(matmul_top_data_ptr mmt, abobj_ptr abase MAYBE_UNUSED)
 {
     serialize(mmt->pi->m);
-    matmul_clear(mmt->mm);
+    if (!mmt->pi->interleaved) {
+        matmul_clear(mmt->mm);
+    } else if (mmt->pi->interleaved->idx == 1) {
+        matmul_clear(mmt->mm);
+        /* group 0 is the first to leave, thus it doesn't to freeing.
+         */
+    }
     matmul_top_vec_clear(mmt,0);
     matmul_top_vec_clear(mmt,1);
     free(mmt->fences[0]);
@@ -750,30 +775,31 @@ static void mmt_debug_writeout(matmul_top_data_ptr mmt, int d, const char * name
 }
 #endif
 
-void matmul_top_mul(matmul_top_data_ptr mmt, int d)
+void matmul_top_mul_cpu(matmul_top_data_ptr mmt, int d)
 {
 #ifndef NDEBUG
     unsigned int di_in = mmt->wr[d]->i1 - mmt->wr[d]->i0;
     unsigned int di_out = mmt->wr[!d]->i1 - mmt->wr[!d]->i0;
     ASSERT(mmt->mm->dim[1] == (d ? di_in : di_out));
     ASSERT(mmt->mm->dim[0] == (d ? di_out : di_in));
+    mmt_wiring_ptr mrow = mmt->wr[!d];
 #endif
 
-    pi_wiring_ptr picol = mmt->pi->wr[d];
     mmt_wiring_ptr mcol = mmt->wr[d];
-    mmt_wiring_ptr mrow = mmt->wr[!d];
 
     ASSERT_ALWAYS((mrow->v->flags & THREAD_SHARED_VECTOR) == 0);
 
     pi_log_op(mmt->pi->m, "[%s] enter matmul_mul", __func__);
-    // mmt_debug_writeout(mmt, d, "before_mul");
     matmul_mul(mmt->mm, mrow->v->v, mcol->v->v, d);
-    // mmt_debug_writeout(mmt, !d, "after_mul");
+}
+
+void matmul_top_mul_comm(matmul_top_data_ptr mmt, int d)
+{
+    pi_wiring_ptr picol = mmt->pi->wr[d];
+    mmt_wiring_ptr mcol = mmt->wr[d];
+
     pi_log_op(mmt->pi->m, "[%s] enter reduce_across", __func__);
-
-
     reduce_across(mmt, !d);
-
     pi_log_op(mmt->pi->m, "[%s] enter broadcast_down", __func__);
     broadcast_down(mmt, d);
 
@@ -786,6 +812,7 @@ void matmul_top_mul(matmul_top_data_ptr mmt, int d)
         serialize_threads(picol);
     }
 }
+
 
 /* Vector I/O is done by only one job, one thread. It incurs a
  * significant amount of memory allocation, but this is done relatively

@@ -259,7 +259,7 @@ void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * 
                 iter, wct_full, avwct, what_wct,
                 pcpu[0], pcpu[1]);
 
-        printf("N=%d ; ETA: %s", iter, eta_string);
+        printf("N=%d ; ETA (N=%d): %s", iter, timing->end_mark, eta_string);
     }
 }
 

@@ -89,9 +89,9 @@ void matmul_common_init_post(struct matmul_public_s * mm, param_list pl, int sug
     mm->store_transposed = suggest;
     
     if (pl) {
-        param_list_parse_uint(pl, "bwc_mm_store_transposed", &mm->store_transposed);
+        param_list_parse_uint(pl, "mm_store_transposed", &mm->store_transposed);
         if (mm->store_transposed != (unsigned int) suggest) {
-            fprintf(stderr, "Warning, bwc_mm_store_transposed"
+            fprintf(stderr, "Warning, mm_store_transposed"
                     " overrides suggested matrix storage ordering\n");
         }   
     }

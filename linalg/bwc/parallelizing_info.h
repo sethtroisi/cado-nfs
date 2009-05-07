@@ -121,12 +121,30 @@ struct pi_interleaving_s {
 typedef struct pi_interleaving_s pi_interleaving[1];
 typedef struct pi_interleaving_s * pi_interleaving_ptr;
 
+struct pi_dictionary_entry_s;
+typedef struct pi_dictionary_entry_s * pi_dictionary_entry_ptr;
+struct pi_dictionary_entry_s {
+    unsigned long key;
+    unsigned long who;
+    void * value;
+    pi_dictionary_entry_ptr next;
+};
+typedef struct pi_dictionary_entry_s pi_dictionary_entry[1];
+
+struct pi_dictionary_s {
+    my_pthread_rwlock_t m[1];
+    pi_dictionary_entry_ptr e;
+};
+typedef struct pi_dictionary_s pi_dictionary[1];
+typedef struct pi_dictionary_s * pi_dictionary_ptr;
+
 struct parallelizing_info_s {
     // row-wise, column-wise.
     pi_wiring wr[2];
     // main.
     pi_wiring m;
     pi_interleaving_ptr interleaved;
+    pi_dictionary_ptr dict;
 };
 
 typedef struct parallelizing_info_s parallelizing_info[1];
@@ -188,6 +206,26 @@ extern void pi_log_clear(pi_wiring_ptr);
 extern void pi_log_op(pi_wiring_ptr, const char * fmt, ...);
 extern void pi_log_print_all(parallelizing_info_ptr);
 extern void pi_log_print(pi_wiring_ptr);
+
+/* These are the calls for interleaving. The 2n threads are divided into
+ * two grous. It is guaranteed that at a given point, the two groups of n
+ * threads are separated on either size of the pi_interleaving_flip call.
+ *
+ * The called function must make sure that alternating blocks (delimited
+ * by _flip) either do or don't contain mpi calls, IN TURN.
+ *
+ * _enter and _leave are called from pi_go, so although they are exposed,
+ * one does not have to know about them.
+ */
+extern void pi_interleaving_flip(parallelizing_info_ptr);
+extern void pi_interleaving_enter(parallelizing_info_ptr);
+extern void pi_interleaving_leave(parallelizing_info_ptr);
+
+extern void pi_store_generic(parallelizing_info_ptr, unsigned long, unsigned long, void *);
+extern void * pi_load_generic(parallelizing_info_ptr, unsigned long, unsigned long);
+
+extern void pi_dictionary_init(pi_dictionary_ptr);
+extern void pi_dictionary_clear(pi_dictionary_ptr);
 
 #ifdef __cplusplus
 }

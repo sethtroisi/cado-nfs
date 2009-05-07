@@ -79,7 +79,11 @@ struct pi_go_helper_s {
 
 void * pi_go_helper_func(struct pi_go_helper_s * s)
 {
-    return (s->fcn)(s->p, s->pl, s->arg);
+    pi_interleaving_enter(s->p);
+    void * ret = (s->fcn)(s->p, s->pl, s->arg);
+    pi_interleaving_flip(s->p);
+    pi_interleaving_leave(s->p);
+    return ret;
 }
 
 typedef void * (*pthread_callee_t)(void*);
@@ -511,6 +515,11 @@ static void pi_go_inner_interleaved(
     pi[0]->interleaved->b = b;
     pi[1]->interleaved->b = b;
 
+    pi_dictionary d;
+    pi_dictionary_init(d);
+    pi[0]->dict = d;
+    pi[1]->dict = d;
+
     grids[0] = pi_grid_init(pi[0]);
     grids[1] = pi_grid_init(pi[1]);
 
@@ -518,16 +527,71 @@ static void pi_go_inner_interleaved(
     // pi_grid_print_sketch(pi, grids[0]);
 
     pi_go_mt_now(grids, 2, pi[0]->m->ncores, fcn, pl, arg);
+
     pi_grid_clear(pi[0], grids[0]);
     pi_grid_clear(pi[1], grids[1]);
 
     my_pthread_barrier_destroy(b);
+    pi_dictionary_clear(d);
 
     free(pi[0]->interleaved);
     free(pi[1]->interleaved);
 
     pi_clear_mpilevel(pi[0]);
-    pi_clear_mpilevel(pi[1]);
+    /* pi[1] is a simple copy, it doesn't have to be cleared. */
+}
+
+void pi_dictionary_init(pi_dictionary_ptr d)
+{
+    my_pthread_rwlock_init(d->m, NULL);
+    d->e = NULL;
+}
+
+void pi_dictionary_clear(pi_dictionary_ptr d)
+{
+    /* last grab of the lock -- altough it would be preferred if we
+     * weren't mt of course ! */
+    my_pthread_rwlock_wrlock(d->m);
+    pi_dictionary_entry_ptr ne = d->e;
+    for( ; ne ; ) {
+        pi_dictionary_entry_ptr nne = ne->next;
+        free(ne);
+        ne = nne;
+    }
+    d->e = NULL;
+    my_pthread_rwlock_unlock(d->m);
+    my_pthread_rwlock_destroy(d->m);
+}
+
+void pi_store_generic(parallelizing_info_ptr pi, unsigned long key, unsigned long who, void * value)
+{
+    pi_dictionary_ptr d = pi->dict;
+    ASSERT_ALWAYS(d != NULL);
+    pi_dictionary_entry_ptr n = malloc(sizeof(pi_dictionary_entry));
+    n->key = key;
+    n->who = who;
+    n->value = value;
+    my_pthread_rwlock_wrlock(d->m);
+    n->next = d->e;
+    d->e = n;
+    my_pthread_rwlock_unlock(d->m);
+}
+
+void * pi_load_generic(parallelizing_info_ptr pi, unsigned long key, unsigned long who)
+{
+    pi_dictionary_ptr d = pi->dict;
+    ASSERT_ALWAYS(d != NULL);
+    void * r = NULL;
+    my_pthread_rwlock_rdlock(d->m);
+    pi_dictionary_entry_ptr e = d->e;
+    for( ; e ; e = e->next) {
+        if (e->key == key && e->who == who) {
+            r = e->value;
+            break;
+        }
+    }
+    my_pthread_rwlock_unlock(d->m);
+    return r;
 }
 
 void pi_go(void *(*fcn)(parallelizing_info_ptr, param_list pl, void *),
@@ -1294,3 +1358,25 @@ int pi_load_file_2d(parallelizing_info_ptr pi, int d, const char * name, void * 
     return 1;
 }
 
+void pi_interleaving_flip(parallelizing_info_ptr pi)
+{
+    if (!pi->interleaved)
+        return;
+    my_pthread_barrier_wait(pi->interleaved->b);
+}
+
+void pi_interleaving_enter(parallelizing_info_ptr pi)
+{
+    if (!pi->interleaved || pi->interleaved->idx == 0)
+        return;
+
+    my_pthread_barrier_wait(pi->interleaved->b);
+}
+
+void pi_interleaving_leave(parallelizing_info_ptr pi)
+{
+    if (!pi->interleaved || pi->interleaved->idx == 1)
+        return;
+
+    my_pthread_barrier_wait(pi->interleaved->b);
+}

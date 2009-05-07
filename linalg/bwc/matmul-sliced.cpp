@@ -161,7 +161,7 @@ struct matmul_sliced_data_s * matmul_sliced_build(abobj_ptr xx, const char * fil
     uint32_t i1 = mm->public_->dim[ mm->public_->store_transposed];
 
     unsigned int npack = L1_CACHE_SIZE;
-    if (pl) param_list_parse_uint(pl, "bwc_mm_l1_cache_size", &npack);
+    if (pl) param_list_parse_uint(pl, "l1_cache_size", &npack);
     npack /= abbytes(mm->xab,1);
     unsigned int nslices = iceildiv(i1-i0, npack);
 
