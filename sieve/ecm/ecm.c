@@ -962,7 +962,8 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
       }
     
     /* Also compute Pd = d*P while we've got 6*P */
-    ellM_mul_ul (Pd, P6, plan->d / 6, m, b);
+    ellM_init (Pd, m);
+    ellM_mul_ul (Pd, P6, plan->d / 6, m, b); /* FIXME: slow! */
 
     ellM_clear (ap1_0, m);
     ellM_clear (ap1_1, m);

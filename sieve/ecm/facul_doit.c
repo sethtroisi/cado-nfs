@@ -34,6 +34,7 @@ facul_doit (unsigned long *factors, const modulus_t m,
 {
   residue_t r;
   modint_t n, f;
+  modulusredc2ul2_t fm_2ul2, cfm_2ul2;
   modulusredc15ul_t fm_15ul, cfm_15ul; /* Modulus for factor and cofactor */
   modulusredcul_t fm_ul, cfm_ul;
   int i, found = 0, bt, fprime, cfprime, f_arith = 0, cf_arith = 0;
@@ -149,7 +150,7 @@ facul_doit (unsigned long *factors, const modulus_t m,
       
       /* So we found a non-trivial factor. See if it is prime, if the 
 	 cofactor is prime, and if one of them are, whether they are too
-	 large */
+	 large for our smoothness bounds */
       
       /* A quick test if the factor is <= fbb^2 and >lpb */
       fprime = (mod_intcmp (f, strategy->fbb2) <= 0);
@@ -173,17 +174,28 @@ facul_doit (unsigned long *factors, const modulus_t m,
       /* Determine for certain if the factor is prime */
       if (!fprime)
 	{
-	  f_arith = mod_intbits (f) > MODREDCUL_MAXBITS;
+	  if (mod_intbits (f) <= MODREDCUL_MAXBITS)
+	    f_arith = 0;
+          else if (mod_intbits (f) <= MODREDC15UL_MAXBITS)
+            f_arith = 1;
+          else
+            f_arith = 2;
 	  if (f_arith == 0)
 	    {
 	      modredcul_initmod_uls (fm_ul, f);
 	      fprime = primetest_ul (fm_ul);
 	    }
-	  else
+	  else if (f_arith == 1)
 	    {
 	      modredc15ul_initmod_uls (fm_15ul, f);
 	      fprime = primetest_15ul (fm_15ul);
 	    }
+          else
+	    {
+	      modredc2ul2_initmod_uls (fm_2ul2, f);
+	      fprime = primetest_2ul2 (fm_2ul2);
+	    }
+            
 	  if (fprime && mod_intcmp_ul (f, strategy->lpb) > 0)
 	    {
 	      found = FACUL_NOT_SMOOTH; /* A prime > lpb, not smooth */
@@ -194,16 +206,27 @@ facul_doit (unsigned long *factors, const modulus_t m,
       /* Determine for certain if the cofactor is prime */
       if (!cfprime)
 	{
-	  cf_arith = mod_intbits (n) > MODREDCUL_MAXBITS;
+	  
+	  if (mod_intbits (n) <= MODREDCUL_MAXBITS)
+	    cf_arith = 0;
+	  else if (mod_intbits (n) <= MODREDC15UL_MAXBITS)
+	    cf_arith = 1;
+          else
+            cf_arith = 2;
 	  if (cf_arith == 0)
 	    {
 	      modredcul_initmod_uls (cfm_ul, n);
 	      cfprime = primetest_ul (cfm_ul);
 	    }
-	  else
+	  else if (cf_arith == 1)
 	    {
 	      modredc15ul_initmod_uls (cfm_15ul, n);
 	      cfprime = primetest_15ul (cfm_15ul);
+	    }
+	  else
+	    {
+	      modredc2ul2_initmod_uls (cfm_2ul2, n);
+	      cfprime = primetest_2ul2 (cfm_2ul2);
 	    }
 	  if (cfprime && mod_intcmp_ul (n, strategy->lpb) > 0)
 	    {

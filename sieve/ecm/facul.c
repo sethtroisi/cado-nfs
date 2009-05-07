@@ -151,7 +151,7 @@ void facul_print_stats (FILE *stream)
 int
 facul (unsigned long *factors, const mpz_t N, facul_strategy_t *strategy)
 {
-  modintredc15ul_t n;
+  modintredc2ul2_t n;
   int i, found = 0;
   
 #ifdef PARI
@@ -165,30 +165,39 @@ facul (unsigned long *factors, const mpz_t N, facul_strategy_t *strategy)
   
   /* If the composite does not fit into our modular arithmetic, return
      no factor */
-  if (mpz_sizeinbase (N, 2) > MODREDC15UL_MAXBITS)
+  if (mpz_sizeinbase (N, 2) > MODREDC2UL2_MAXBITS)
     return 0;
   
   {
     size_t written;
     mpz_export (n, &written, -1, sizeof(unsigned long), 0, 0, N);
-    for (i = written; i < MODREDC15UL_SIZE; i++)
+    for (i = written; i < MODREDC2UL2_SIZE; i++)
       n[i] = 0UL;
   }
   
   /* Use the fastest modular arithmetic that's large enough for this input */
-  if (modredc15ul_intbits (n) <= MODREDCUL_MAXBITS)
+  i = modredc2ul2_intbits (n);
+  if (i <= MODREDCUL_MAXBITS)
     {
       modulusredcul_t m;
       modredcul_initmod_uls (m, n);
       found = facul_doit_ul (factors, m, strategy, 0);
       modredcul_clearmod (m);
     }
-  else
+  else if (i <= MODREDC15UL_MAXBITS)
     {
       modulusredc15ul_t m;
       modredc15ul_initmod_uls (m, n);
       found = facul_doit_15ul (factors, m, strategy, 0);
       modredc15ul_clearmod (m);
+    }
+  else 
+    {
+      modulusredc2ul2_t m;
+      ASSERT (i <= MODREDC2UL2_MAXBITS);
+      modredc2ul2_initmod_uls (m, n);
+      found = facul_doit_2ul2 (factors, m, strategy, 0);
+      modredc2ul2_clearmod (m);
     }
   
   if (found > 1)

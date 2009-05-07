@@ -1,5 +1,6 @@
 #include "modredc_ul.h"
 #include "modredc_15ul.h"
+#include "modredc_2ul2.h"
 #include "stage2.h"
 
 typedef struct {
@@ -19,5 +20,9 @@ int pp1_15ul (modintredc15ul_t, const modulusredc15ul_t, const pp1_plan_t *);
 void pp1_stage2_15ul (residueredc15ul_t, const residueredc15ul_t, 
                     const stage2_plan_t *, const residueredc15ul_t, 
                     const modulusredc15ul_t);
+int pp1_2ul2 (modintredc2ul2_t, const modulusredc2ul2_t, const pp1_plan_t *);
+void pp1_stage2_2ul2 (residueredc2ul2_t, const residueredc2ul2_t, 
+                    const stage2_plan_t *, const residueredc2ul2_t, 
+                    const modulusredc2ul2_t);
 void pp1_make_plan (pp1_plan_t *, const unsigned int, const unsigned int, int);
 void pp1_clear_plan (pp1_plan_t *);

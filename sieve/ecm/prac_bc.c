@@ -439,7 +439,7 @@ prac_best (double *mul, const unsigned long n, const int m_parm,
 }
 
 
-/* Write bytecode for an addition chain for k. */
+/* Write bytecode for an addition chain for odd k. */
 void 
 prac_bytecode (const unsigned long k, const double addcost, 
 	       const double doublecost, const double bytecost, 
@@ -447,12 +447,6 @@ prac_bytecode (const unsigned long k, const double addcost,
 {
   unsigned long d;
   double m = 0.;
-  
-  if (k == 2)
-    {
-      bytecoder ((literal_t) 12, state);
-      return;
-    }
   
   assert (k % 2 == 1);
   
