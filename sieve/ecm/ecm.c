@@ -503,43 +503,43 @@ Brent12_curve_from_sigma (residue_t A, residue_t x, const residue_t sigma,
 
   /* compute b, x */
   mod_add (v, sigma, sigma, m);
-  mod_add (v, v, v, m); /* v = 4*sigma */
+  mod_add (v, v, v, m);         /* v = 4*sigma */
   mod_mul (u, sigma, sigma, m);
   mod_set1 (b, m);
   mod_add (t, b, b, m);
   mod_add (t, t, t, m);
-  mod_add (t, t, b, m); /* t = 5 */
-  mod_sub (u, u, t, m); /* u = sigma^2 - 5 */
+  mod_add (t, t, b, m);         /* t = 5 */
+  mod_sub (u, u, t, m);         /* u = sigma^2 - 5 */
   mod_mul (t, u, u, m);
-  mod_mul (x, t, u, m);
+  mod_mul (x, t, u, m);         /* x = u^3 */
   mod_mul (t, v, v, m);
-  mod_mul (z, t, v, m);
-  mod_mul (t, x, v, m);
+  mod_mul (z, t, v, m);         /* z = v^3 */
+  mod_mul (t, x, v, m);         /* t = x*v = u^3*v */
   mod_add (b, t, t, m);
-  mod_add (b, b, b, m); /* b = 4 * t */
+  mod_add (b, b, b, m);         /* b = 4*u^3*v */
   mod_add (t, u, u, m);
-  mod_add (t, t, u, m); /* t = 3 * u */
-  mod_sub (u, v, u, m);
-  mod_add (v, t, v, m);
+  mod_add (t, t, u, m);         /* t = 3*u */
+  mod_sub (u, v, u, m);         /* t2 = v-u  (stored in u) */
+  mod_add (v, t, v, m);         /* t3 = 3*u + v (stored in v) */
   mod_mul (t, u, u, m);
-  mod_mul (u, t, u, m);
-  mod_mul (A, u, v, m);
-  mod_mul (v, b, z, m);
+  mod_mul (u, t, u, m);         /* t4 = (u-v)^3 (stored in u) */
+  mod_mul (A, u, v, m);         /* A = (u-v)^3 * (3*u + v) */
+  mod_mul (v, b, z, m);         /* t5 = b*z (stored in v) */
 
-  r = mod_inv (u, v, m);
+  r = mod_inv (u, v, m);        /* t6 = 1/(b*z) (stored in u) */
   if (r == 0) /* non-trivial gcd */
     {
       mod_set (x, v, m);
     }
   else
     {
-      mod_mul (v, u, b, m);
-      mod_mul (x, x, v, m);
-      mod_mul (v, u, z, m);
-      mod_mul (t, A, v, m);
+      mod_mul (v, u, b, m);     /* t7 = 1/z (stored in v) */
+      mod_mul (x, x, v, m);     /* x := x/z */
+      mod_mul (v, u, z, m);     /* t8 = 1/b (stored in v) */
+      mod_mul (t, A, v, m);     /* t = A/b = (u-v)^3 * (3*u + v) / (4*u^3*v) */
       mod_set1 (u, m);
       mod_add (u, u, u, m);
-      mod_sub (A, t, u, m);
+      mod_sub (A, t, u, m);     /* A = (u-v)^3 * (3*u + v) / (4*u^3*v) - 2 */
     }
 
   mod_clear (z, m);
