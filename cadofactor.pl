@@ -204,7 +204,7 @@ my @default_param = (
     skip         => 32,
 
     # linalg
-    linalg       => 'bw',
+    linalg       => 'bwc',
     bwmt         => 2,
     bwthreshold  => 64,
     bwtidy       => 1,
