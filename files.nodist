@@ -47,6 +47,11 @@ sieve/README.sieve
 sieve/ecm/CMakeLists-nodist.txt
 sieve/sieve.c
 sieve/sieve.h
+sieve/ecm/ecm_avg_exp.gp
+sieve/ecm/find_primes_hit.c
+sieve/ecm/getprime.c
+sieve/ecm/testbench.c
+sieve/hist.rsa155.3lp.png
 sqrt/CMakeLists-nodist.txt
 sqrt/finish.mag
 sqrt/fmalgsqrt.c

@@ -7,11 +7,5 @@
 merge/README
 sieve/README.las
 sieve/benchsieve.pl
-sieve/ecm/ecm_avg_exp.gp
-sieve/ecm/find_primes_hit.c
-sieve/ecm/getprime.c
-sieve/ecm/testbench.c
-sieve/hist.rsa155.3lp.png
-sieve/test_trialdiv.c
 linalg.sh
 merge_linalg_sqrt2.sh

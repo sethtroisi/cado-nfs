@@ -1,4 +1,4 @@
-# This file gives the exact contents of the distribution. If a diirectory is
+# This file gives the exact contents of the distribution. If a directory is
 # mentioned (with a trailing slash), then all its children are included.  Note
 # that the joint of this file and its companion files.nodist must agree with
 # the list of files known to the SCM.  A further word of caution: wildcards
@@ -190,21 +190,25 @@ sieve/ecm/addchain.c
 sieve/ecm/ecm.c
 sieve/ecm/ecm.h
 sieve/ecm/ecm_15ul.c
+sieve/ecm/ecm_2ul2.c
 sieve/ecm/ecm_ul.c
 sieve/ecm/facul.c
 sieve/ecm/facul.h
 sieve/ecm/facul_doit.c
 sieve/ecm/facul_doit.h
 sieve/ecm/facul_doit_15ul.c
+sieve/ecm/facul_doit_2ul2.c
 sieve/ecm/facul_doit_ul.c
 sieve/ecm/makeplan.c
 sieve/ecm/pm1.c
 sieve/ecm/pm1.h
 sieve/ecm/pm1_15ul.c
+sieve/ecm/pm1_2ul2.c
 sieve/ecm/pm1_ul.c
 sieve/ecm/pp1.c
 sieve/ecm/pp1.h
 sieve/ecm/pp1_15ul.c
+sieve/ecm/pp1_2ul2.c
 sieve/ecm/pp1_ul.c
 sieve/ecm/prac_bc.c
 sieve/ecm/prac_bc.h
@@ -217,6 +221,7 @@ sieve/las.c
 sieve/makefb.c
 sieve/trialdiv.c
 sieve/trialdiv.h
+sieve/test_trialdiv.c
 sqrt/CMakeLists.txt
 sqrt/Makefile
 sqrt/algsqrt.c
