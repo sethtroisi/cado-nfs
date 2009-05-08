@@ -42,6 +42,11 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
         for (int i = 1; i < (*p_argc); i++)
             fprintf (stderr, " %s", (*p_argv)[i]);
         fprintf (stderr, "\n");
+
+#ifdef  __GNUC__
+        fprintf(stderr, "# Compiled with gcc " __VERSION__ "\n");
+#endif
+        fprintf(stderr, "# Compilation flags " CFLAGS "\n");
     }
 
     (*p_argv)++, (*p_argc)--;
