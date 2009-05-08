@@ -143,6 +143,8 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         pi_interleaving_flip(pi);
 
         for(int i = 0 ; i < bw->interval ; i++) {
+            /* This segment must be guaranteed to be free of any mpi
+             * calls */
             /* Compute the product by x */
             x_dotprod(mmt, gxvecs,
                     xymats->v + aboffset(abase, i * bw->m), bw->m);
@@ -150,6 +152,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             
             matmul_top_mul_cpu(mmt, bw->dir);
             pi_interleaving_flip(pi);
+            /* Now we can resume MPI communications. */
             matmul_top_mul_comm(mmt, bw->dir);
             timing_check(pi, timing, s+i+1, tcan_print);
         }

@@ -56,6 +56,14 @@ void timing_rare_checks(pi_wiring_ptr wr, struct timing_data * t, int iter, int 
     av[0] = (t->current->thread[0] - t->go->thread[0])/(iter - t->go_mark);
     av[1] = (t->current->thread[1] - t->go->thread[1])/(iter - t->go_mark);
 
+
+#ifndef MPI_LIBRARY_MT_CAPABLE
+    /* Other threads might still be lingering in the matrix
+     * multiplication routines. That's really not good, since we're also
+     * going to do mpi ourselves ! */
+    serialize_threads(wr);
+#endif  /* MPI_LIBRARY_MT_CAPABLE */
+
     double good_period = PREFERRED_ASYNC_LAG / av[0];
     int guess = 1 + (int) good_period;
     complete_broadcast(wr, &guess, sizeof(int), 0, 0);
