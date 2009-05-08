@@ -140,9 +140,8 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
         abzero(abase, xymats->v, bw->m*bw->interval);
         serialize(pi->m);
-        pi_interleaving_flip(pi);
-
         for(int i = 0 ; i < bw->interval ; i++) {
+            pi_interleaving_flip(pi);
             /* This segment must be guaranteed to be free of any mpi
              * calls */
             /* Compute the product by x */
