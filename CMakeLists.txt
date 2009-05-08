@@ -45,7 +45,7 @@ get_override(CXX                  CMAKE_CXX_COMPILER)
 get_override(CADO_VERSION         CADO_VERSION)
 get_override(MPI                  MPI)
 get_override(PTHREADS             PTHREADS)
-set(GF2X_CONFIGURE_FLAGS --silent --disable-shared)
+set(GF2X_CONFIGURE_FLAGS --silent --disable-shared --disable-dependency-tracking)
 get_override(GF2X_CONFIGURE_FLAGS GF2X_CONFIGURE_FLAGS)
 
 #####################################################################
