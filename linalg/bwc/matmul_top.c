@@ -782,8 +782,8 @@ void matmul_top_mul_cpu(matmul_top_data_ptr mmt, int d)
     unsigned int di_out = mmt->wr[!d]->i1 - mmt->wr[!d]->i0;
     ASSERT(mmt->mm->dim[1] == (d ? di_in : di_out));
     ASSERT(mmt->mm->dim[0] == (d ? di_out : di_in));
-    mmt_wiring_ptr mrow = mmt->wr[!d];
 #endif
+    mmt_wiring_ptr mrow = mmt->wr[!d];
 
     mmt_wiring_ptr mcol = mmt->wr[d];
 
