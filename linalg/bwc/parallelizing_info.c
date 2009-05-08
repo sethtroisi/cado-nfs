@@ -137,7 +137,7 @@ void grid_print(parallelizing_info_ptr pi, char * buf, size_t siz, int print)
     for(unsigned int j = 0 ; j < wr->njobs ; j++) {
         for(unsigned int t = 0 ; t < wr->ncores ; t++) {
             /* we serialize because of the thread_agreement bug */
-            serialize_threads(wr);
+            // serialize_threads(wr);
             complete_broadcast(wr, strings + (j * wr->ncores + t) * siz,
                     siz, j, t);
         }
@@ -194,7 +194,10 @@ static void pi_init_mpilevel(parallelizing_info_ptr pi, param_list pl)
     pi->m->ncores = nhc * nvc;
     pi->m->totalsize = pi->m->njobs * pi->m->ncores;
 
-    // MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
+#ifndef NDEBUG
+    /* Must make sure that we have proper ASSERTS after MPI calls then. */
+    MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
+#endif
 
     // MPI_Errhandler my_eh;
     // MPI_Comm_create_errhandler(&pi_errhandler, &my_eh);
@@ -849,6 +852,9 @@ void say_hello(pi_wiring_ptr w, parallelizing_info_ptr pi)
         if ((unsigned int) w->jrank != j)
             continue;
         my_pthread_mutex_lock(w->th->m);
+#ifdef CONCURRENCY_DEBUG
+        /* Make it less verbose -- if it ever hangs in there, then
+         * we can re-enable it */
         printf("(%s) J%uT%u ; %s%s ; (%s:j%ut%u) (%s:j%ut%u)\n",
                 w->th->desc,
                 pi->m->jrank,
@@ -858,6 +864,7 @@ void say_hello(pi_wiring_ptr w, parallelizing_info_ptr pi)
                 pi->wr[0]->th->desc, pi->wr[0]->jrank, pi->wr[0]->trank,
                 pi->wr[1]->th->desc, pi->wr[1]->jrank, pi->wr[1]->trank
               );
+#endif
         my_pthread_mutex_unlock(w->th->m);
     }
 }
@@ -865,7 +872,9 @@ void say_hello(pi_wiring_ptr w, parallelizing_info_ptr pi)
 void hello(parallelizing_info_ptr pi)
 {
     if (serialize(pi->m)) {
+#ifdef  CONCURRENCY_DEBUG
         printf("Doing hello world loop\n");
+#endif
     }
     say_hello(pi->m, pi);
 
@@ -894,8 +903,11 @@ void hello(parallelizing_info_ptr pi)
     }
 
     if (serialize(pi->m)) {
+#ifdef CONCURRENCY_DEBUG
         printf("OK: Finished hello world loop\n");
+#endif
     }
+    serialize(pi->m);
 }
 
 static int get_counts_and_displacements(pi_wiring_ptr w, int my_size,

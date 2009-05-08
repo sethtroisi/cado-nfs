@@ -89,7 +89,7 @@ void timing_rare_checks(pi_wiring_ptr wr, struct timing_data * t, int iter, int 
     }
 
     /* reconcile threads */
-    serialize_threads(wr);      // bug in thread_agreement
+    // serialize_threads(wr);      // bug in thread_agreement
     void * ptr = &caught_something;
     thread_agreement(wr, &ptr, 0);
     caught_something = * (unsigned int *) ptr;
