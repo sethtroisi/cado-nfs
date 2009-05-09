@@ -121,7 +121,7 @@ int check_stream(const char *name, FILE * stream, cado_poly_ptr cpoly)
 void usage_and_die(char *str) {
     fprintf(stderr, "usage: %s -poly <polyfile> <relfile1> <relfile2> ...\n",
             str);
-    exit(1);
+    exit(3);
 }
 
 int main(int argc, char * argv[])
@@ -134,7 +134,7 @@ int main(int argc, char * argv[])
     }
     cado_poly_init(cpoly);
     if (!cado_poly_read(cpoly, argv[2])) 
-        return 1;
+        return 2;
 
     for(i = 3 ; i < argc ; i++) {
         FILE * f;
@@ -142,11 +142,13 @@ int main(int argc, char * argv[])
             char command[1024];
             snprintf(command, sizeof(command), "gzip -dc %s", argv[i]);
             f = popen(command, "r");
-            had_error |= check_stream(argv[i], f, cpoly);
+            if (check_stream(argv[i], f, cpoly) != 0)
+                had_error = 1;
             pclose(f);
         } else {
             f = fopen(argv[i], "r");
-            had_error |= check_stream(argv[i], f, cpoly);
+            if (check_stream(argv[i], f, cpoly) != 0)
+                had_error = 1;
             fclose(f);
         }
     }
@@ -155,4 +157,3 @@ int main(int argc, char * argv[])
 
     return had_error;
 }
-

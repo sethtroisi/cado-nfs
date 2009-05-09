@@ -1647,7 +1647,7 @@ sub do_sieve {
         unlink "$check" unless $full;
 
         # Remove invalid files
-        if ($ret->{'status'}) {
+        if ($ret->{'status'} == 1) {
             my $msg="File `$f' is invalid (check_rels failed).";
             if ($ENV{'CADO_DEBUG'}) {
                 my $nf = "$f.error";
@@ -1661,6 +1661,10 @@ sub do_sieve {
             }
             close FILE;
             return;
+        } elsif ($ret->{'status'}) {
+            # Non-zero, but not 1? Something's wrong, bail out
+            die "check_rels exited with unknown error code ", 
+                 $ret->{'status'}, ", aborting."
         }
 
         # If this is a partial (i.e. incomplete) file, we need to adjust
