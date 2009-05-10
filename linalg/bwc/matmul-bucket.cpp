@@ -505,6 +505,7 @@ void matmul_bucket_mul(struct matmul_bucket_data_s * mm, abt * dst, abt const * 
         for( ; i < nrows_t ; ) {
             uint32_t di = *ql++;
             uint32_t j = 0;
+            abzero(x, dst + aboffset(x, i), di);
             for( ; j < ncols_t ; ) {
                 uint32_t dj = *ql++;
                 uint32_t nread = *ql++;
@@ -550,8 +551,57 @@ void matmul_bucket_mul(struct matmul_bucket_data_s * mm, abt * dst, abt const * 
             i += di;
         }
     } else {
-        ASSERT_ALWAYS(0);
-        /* That's going to be a nightmare. */
+        for( ; i < nrows_t ; ) {
+            uint32_t di = *ql++;
+            uint32_t j = 0;
+            for( ; j < ncols_t ; ) {
+                uint32_t dj = *ql++;
+                uint32_t nread = *ql++;
+                abt * bucket[256];
+                abt * fence[256];
+                abt * z = scrap;
+                for(int k = 0 ; k < 256 ; k++) {
+                    bucket[k] = z;
+                    fence[k] = bucket[k] + ql[k];
+                    z += aboffset(x, ql[k]);
+                }
+                abt * outp = dst + aboffset(x, j);
+                /* reverse-fill buckets */
+                const uint8_t * q8_saved = q8;
+                q8 += 2 * nread;
+                z = scrap;
+                abt const *  inp = src + aboffset(x, i);
+                for(int k = 0 ; k < 256 ; k++) {
+                    unsigned int l = ql[k];
+                    for( ; l-- ; ) {
+                        /* For padding coeffs, the assertion can fail if
+                         * we choose a row not equal to (0,0) -- first in
+                         * the first bucket.
+                         */
+                        ASSERT(inp + *q8 < dst + nrows_t);
+                        abcopy(x, z, inp + aboffset(x, *q8), 1);
+                        z++;
+                        q8++;
+                    }
+                    inp += aboffset(x, 256);
+                }
+                /* reverse-apply buckets */
+                std::swap(q8, q8_saved);
+                for( ; nread-- ; ) {
+                    ASSERT(outp - dst + *q8 < aboffset(x, j+dj));
+                    outp += aboffset(x, *q8);
+                    q8++;
+                    ASSERT(bucket[*q8] < fence[*q8]);
+                    ASSERT(bucket[*q8] - scrap < (ptrdiff_t) mm->scrapsize);
+                    abadd(x, outp, bucket[*q8]++);
+                    q8++;
+                }
+                q8 = q8_saved;
+                ql += 256;
+                j += dj;
+            }
+            i += di;
+        }
     }
     ASM_COMMENT("end of sparse slices"); /* }}} */
 
