@@ -844,7 +844,7 @@ int serialize_threads__(pi_wiring_ptr w, const char * s MAYBE_UNUSED, unsigned i
 // functional use, apart from the fact that they exert some pressure on
 // the mpi+pthreads way of doing things.
 
-void say_hello(pi_wiring_ptr w, parallelizing_info_ptr pi)
+void say_hello(pi_wiring_ptr w, parallelizing_info_ptr pi MAYBE_UNUSED)
 {
     serialize(w);
     for(unsigned int j = 0 ; j < w->njobs ; j++) {
