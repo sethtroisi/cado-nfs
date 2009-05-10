@@ -154,8 +154,19 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         fprintf(stderr, "Target iteration is %u ; going to %u\n", bw->end,
                 bw->interval * iceildiv(bw->end, bw->interval));
     }
+    
+    /* We can either look up the F files to get an idea of the number of
+     * coefficients to be considered, or make our guess based on the
+     * expected degree of the generator. The latter is obiviously less
+     * accurate, but not by much, and anyway for the purpose of making up
+     * an ETA, it's good enough.
+     */
 
-    timing_init(timing, bw->start, bw->interval * iceildiv(bw->end, bw->interval));
+    int exp_end;
+    exp_end = MAX(mmt->n[0], mmt->n[1]);
+    exp_end = iceildiv(exp_end, bw->n);
+
+    timing_init(timing, bw->start, exp_end);
 
     for(int s = bw->start ; s < bw->end ; s += bw->interval ) {
         serialize(pi->m);
