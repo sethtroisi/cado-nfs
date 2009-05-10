@@ -912,8 +912,6 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
     ellM_add (ap1_1, P6, P, ap5_0, b, m); /* 7*P = 6*P + P */
     ellM_add (ap5_1, P6, ap5_0, P, b, m); /* 11*P = 6*P + 5*P */
     
-    ellM_clear (P2, m);
-
     /* Now we generate all the j*P for j in S_1 */
     /* We treat the first two manually because those might correspond 
        to ap1_0 = 1*P and ap5_0 = 5*P */
@@ -961,9 +959,24 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
         i5 += 6;
       }
     
+#if 0
     /* Also compute Pd = d*P while we've got 6*P */
     ellM_init (Pd, m);
-    ellM_mul_ul (Pd, P6, plan->d / 6, m, b); /* FIXME: slow! */
+    ellM_mul_ul (Pd, P6, plan->d / 6, m, b); /* slow! */
+#else
+    ASSERT ((unsigned) (i1 + i5) == plan->d); /* TODO: Check that this always holds! */
+    if (i1 + 4 == i5)
+      {
+        ellM_double (P2, P2, m, b); /* We need 4P for difference */
+        ellM_add (Pd, ap1_1, ap5_1, P2, b, m);
+      }
+    else if (i5 + 2 == i1)
+      {
+        ellM_add (Pd, ap1_1, ap5_1, P2, b, m);
+      }
+    else
+      abort ();
+#endif
 
     ellM_clear (ap1_0, m);
     ellM_clear (ap1_1, m);
@@ -1075,7 +1088,7 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
 	/* a = 1/a_{k-1} = 1/Pid_z[i - 1] */
 #ifdef WANT_ASSERT_EXPENSIVE
 	mod_mul (a, a, Pid_z[i - 1], m);
-	ASSERT (mod_get_ul (a, m) == 1UL);
+	ASSERT (mod_is1 (a, m));
 	mod_mul (a, invarray[k - 1], invarray[k - 2], m);
 #endif
 	/* Normalize point */
@@ -1094,7 +1107,7 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
 	/* a = 1/a_{k-1} = 1/Pj_z[i - 1] */
 #ifdef WANT_ASSERT_EXPENSIVE
 	mod_mul (a, a, Pj_z[i - 1], m);
-	ASSERT (mod_get_ul (a, m) == 1UL);
+	ASSERT (mod_is1 (a, m));
 	mod_mul (a, invarray[k - 1], invarray[k - 2], m);
 #endif
 	/* Normalize point */
@@ -1107,7 +1120,7 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
     ASSERT (k == 1);
 #ifdef WANT_ASSERT_EXPENSIVE
     mod_mul (a, invarray[k - 1], Pj_z[i - 1], m);
-    ASSERT (mod_get_ul (a, m) == 1UL);
+    ASSERT (mod_is1 (a, m));
 #endif
     /* Normalize point */
     mod_mul (Pj_x[i - 1], Pj_x[i - 1], invarray[k - 1], m);
@@ -1121,17 +1134,19 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
   /* Now process all the primes p = id - j, B1 < p <= B2 and multiply
      (id*P)_x - (j*P)_x to the accumulator */
   mod_set1 (a, m);
-  mod_init (a_bk, m); /* Backup value of a, in case we get a == 0 */
+  mod_init_noset0 (a_bk, m); /* Backup value of a, in case we get a == 0 */
   mod_set (a_bk, a, m);
   i = 0;
   l = 0;
-  while (plan->pairs[l] != NEXT_PASS) 
+  unsigned char j = plan->pairs[0];
+  while (j != NEXT_PASS) 
     {
-      while (plan->pairs[l] < NEXT_D && plan->pairs[l] < NEXT_PASS)
+      __asm__ volatile ("# ECM stage 2 loop here");
+      while (j < NEXT_D && j < NEXT_PASS)
 	{
-	  mod_sub (t, Pid_x[i], Pj_x[plan->pairs[l]], m);
+	  mod_sub (t, Pid_x[i], Pj_x[j], m);
+	  j = plan->pairs[++l];
 	  mod_mul (a, a, t, m);
-	  l++;
 	}
       
       /* See if we got a == 0. If yes, restore previous a value and
@@ -1145,9 +1160,10 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
 	}
       mod_set (a_bk, a, m); /* Save new a value */
       
-      if (plan->pairs[l] == NEXT_D)
+      if (j == NEXT_D)
 	{
-	  i++; l++;
+	  i++;
+	  j = plan->pairs[++l];
 	  ASSERT (i < plan->i1 - plan->i0);
 	}
     }
