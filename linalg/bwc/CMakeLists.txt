@@ -5,7 +5,7 @@ include(${CMAKE_SOURCE_DIR}/config/search_for_function.cmake)
 
 #############################################################
 # pthreads
-if(NOT("$ENV{PTHREADS}" MATCHES "^(0|NO|no|OFF|off|)$"))
+if($ENV{PTHREADS})
     set(CMAKE_REQUIRED_LIBRARIES)
     search_for_function(pthread_create HAVE_PTHREAD_CREATE -lpthread)
     if(HAVE_PTHREAD_CREATE)
@@ -24,12 +24,12 @@ if(NOT("$ENV{PTHREADS}" MATCHES "^(0|NO|no|OFF|off|)$"))
             set(pthread_libs ${pthread_libs} ${CMAKE_REQUIRED_LIBRARIES})
         endif(HAVE_PTHREAD_BARRIER_WAIT)
     endif(HAVE_PTHREAD_CREATE)
-endif(NOT("$ENV{PTHREADS}" MATCHES "^(0|NO|no|OFF|off|)$"))
+endif($ENV{PTHREADS})
 
 #############################################################
 # mpi
 # Don't use the FindMPI module, it's buggy.
-if(NOT("$ENV{MPI}" MATCHES "^(0|NO|no|OFF|off|)$"))
+if($ENV{MPI})
     set(findprog_flags
         NO_DEFAULT_PATH
         NO_CMAKE_ENVIRONMENT_PATH
@@ -63,7 +63,7 @@ if(NOT("$ENV{MPI}" MATCHES "^(0|NO|no|OFF|off|)$"))
     else(MPI_C_COMPILER AND MPI_CXX_COMPILER AND MPIEXEC)
         message(FATAL_ERROR "Cannot find all of mpicc/mpic++/mpiexec with MPI=$ENV{MPI}")
     endif(MPI_C_COMPILER AND MPI_CXX_COMPILER AND MPIEXEC)
-endif(NOT("$ENV{MPI}" MATCHES "^(0|NO|no|OFF|off|)$"))
+endif($ENV{MPI})
 
 
 configure_file(bwc.pl ${CMAKE_CURRENT_BINARY_DIR}/bwc.pl ESCAPE_QUOTES @ONLY)
