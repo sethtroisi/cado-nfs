@@ -1,6 +1,8 @@
 #ifndef CADO_UTILS_TIMING_H_
 #define CADO_UTILS_TIMING_H_
 
+#include <stdint.h> /* for uint64_t */
+
 #ifdef __cplusplus
 extern "C" {
 #endif

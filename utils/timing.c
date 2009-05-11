@@ -1,6 +1,5 @@
 #include <sys/types.h>		/* for cputime */
 #include <sys/resource.h>	/* for cputime */
-#include <stdint.h>
 #include "timing.h"
 
 uint64_t microseconds()
