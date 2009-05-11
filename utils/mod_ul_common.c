@@ -1,4 +1,3 @@
-
 /* This file defines some functions that work more or less the same 
    with mod_ul.h and modredc_ul.h. I.e. mod_div3() and mod_gcd() work
    unchanged with plain and Montgomery representation (so we can work on 
@@ -355,6 +354,43 @@ mod_2pow_ul (residue_t r, const unsigned long e, const modulus_t m)
 }
 
 
+/* Compute r = 2^e. Here, e is an unsigned long */
+static void
+mod_3pow_ul (residue_t r, const unsigned long e, const modulus_t m)
+{
+  unsigned long mask;
+  residue_t t, u;
+
+  if (e == 0UL)
+    {
+      mod_set1 (r, m);
+      return;
+    }
+
+  mask = (1UL << (LONG_BIT - 1)) >> ularith_clz (e);
+
+  mod_init_noset0 (t, m);
+  mod_init_noset0 (u, m);
+  mod_set1 (u, m);
+  mod_add (t, u, u, m);
+  mod_add (t, t, u, m);
+  mask >>= 1;
+
+  while (mask > 0UL)
+    {
+      mod_mul (t, t, t, m);
+      mod_add (u, t, t, m);
+      mod_add (u, u, t, m);
+      if (e & mask)
+        mod_set (t, u, m);
+      mask >>= 1;
+    }
+  mod_set (r, t, m);
+  mod_clear (t, m); 
+  mod_clear (u, m); 
+}
+
+
 /* Compute r = b^e. Here e is a multiple precision integer 
    sum_{i=0}^{e_nrwords} e[i] * (machine word base)^i */
 void
@@ -556,6 +592,30 @@ mod_V_mp (residue_t r, const residue_t b, const unsigned long *e,
 }
 
 
+/* Returns 1 if r1 == 1 (mod m) or if r1 == -1 (mod m) or if
+   one of r1^(2^1), r1^(2^2), ..., r1^(2^(po2-1)) == -1 (mod m),
+   zero otherwise. Requires -1 (mod m) in minusone. */
+
+static inline int
+find_minus1 (residue_t r1, const residue_t minusone, const int po2, 
+             const modulus_t m)
+{
+  int i;
+
+  if (mod_is1 (r1, m) || mod_equal (r1, minusone, m))
+    return 1;
+
+  for (i = 1 ; i < po2; i++)
+    {
+      mod_mul (r1, r1, r1, m);
+      if (mod_equal (r1, minusone, m))
+        break;
+    }
+
+  return (i < po2) ? 1 : 0;
+}
+
+
 /* Returns 1 if m is a strong probable prime wrt base b, 0 otherwise. */
 int
 mod_sprp (const residue_t b, const modulus_t m)
@@ -595,24 +655,8 @@ mod_sprp (const residue_t b, const modulus_t m)
 	  mod_get_ul (b, m), mod_getmod_ul (m), mm1, mod_get_ul (r1, m));
 #endif
   
-  /* If m is prime, then b^mm1 might be == 1 or == -1 (mod m) here */
-  if (mod_is1 (r1, m) || mod_equal (r1, minusone, m))
-    i = 1;
-  else
-    {
-      /* If m is a prime, then one of b^(2*mm1), b^(2^2*mm1), ..., 
-	 b^(2^(po2 - 1)*mm1)  must be == -1 (mod m) */
-      for ( ; po2 > 1; po2--)
-	{
-	  mod_mul (r1, r1, r1, m);
-	  if (mod_equal (r1, minusone, m))
-	    {
-	      i = 1;
-	      break;
-	    }
-	}
-    }
-
+  i = find_minus1 (r1, minusone, po2, m);
+  
   mod_clear (r1, m);
   mod_clear (minusone, m);
   return i;
@@ -665,23 +709,7 @@ mod_sprp2 (const modulus_t m)
 	  mod_getmod_ul (m), mm1, mod_get_ul (r, m));
 #endif
   
-  /* If m is prime, then b^mm1 might be == 1 or == -1 (mod m) here */
-  if (mod_is1 (r, m) || mod_equal (r, minusone, m))
-    i = 1;
-  else
-    {
-      /* If m is a prime, then one of b^(2*mm1), b^(2^2*mm1), ..., 
-	 b^(2^(po2 - 1)*mm1)  must be == -1 (mod m) */
-      for ( ; po2 > 1; po2--)
-	{
-	  mod_mul (r, r, r, m);
-	  if (mod_equal (r, minusone, m))
-	    {
-	      i = 1;
-	      break;
-	    }
-	}
-    }
+  i = find_minus1 (r, minusone, po2, m);
 
   mod_clear (r, m);
   mod_clear (minusone, m);
@@ -695,8 +723,11 @@ mod_isprime (const modulus_t m)
   residue_t b, minusone, r1;
   const unsigned long n = mod_getmod_ul (m);
   unsigned long mm1;
-  int r = 0, i, po2;
+  int r = 0, po2;
   
+  if (n == 1UL)
+    return 0;
+
   if (n % 2UL == 0UL)
     {
       r = (n == 2UL);
@@ -719,17 +750,16 @@ mod_isprime (const modulus_t m)
 
   /* Do base 2 SPRP test */
   mod_2pow_ul (r1, mm1, m);   /* r = 2^mm1 mod m */
-  /* If m is prime, then b^mm1 might be == 1 or == -1 (mod m) here */
-  if (!mod_is1 (r1, m))
-    {
-      /* If m is a prime, then one of b^mm1, b^(2*mm1), b^(2^2*mm1), ..., 
-	 b^(2^(po2 - 1)*mm1)  must be == -1 (mod m) */
-	i = (n % 8 == 3 || n % 8 == 5) ? 0 : 1;
-	for (; i < po2 && !mod_equal (r1, minusone, m); i++)
-	  mod_mul (r1, r1, r1, m);
-	if (i >= po2)
-	  goto end; /* Not prime */
+  /* If n is prime and 1 or 7 (mod 8), then 2 is a square (mod n)
+     and one less squaring must suffice. This does not strengthen the
+     test but saves one squaring for composite input */
+  if (n % 8 == 7)
+    { 
+      if (!mod_is1 (r1, m))
+        goto end;
     }
+  else if (!find_minus1 (r1, minusone, po2 - ((n % 8 == 7) ? 1 : 0), m))
+    goto end; /* Not prime */
 
   if (n < 2047UL)
     {
@@ -737,33 +767,34 @@ mod_isprime (const modulus_t m)
       goto end;
     }
 
+  /* Base 3 is poor at identifying composites == 1 (mod 3), but good at
+     identifying composites == 2 (mod 3). Thus we use it only for 2 (mod 3) */
   if (n % 3UL == 1UL)
     {
-      mod_set_ul_reduced (b, 7UL, m);
+      mod_set1 (b, m);
+      mod_add (b, b, b, m);
+      mod_add (b, b, b, m);
+      mod_add (b, b, b, m);
+      mod_add (b, b, minusone, m);  /* b = 7 */
       mod_pow_ul (r1, b, mm1, m);   /* r = 7^mm1 mod m */
-      if (!mod_is1 (r1, m))
-        {
-	  for (i = 0; i < po2 && !mod_equal (r1, minusone, m); i++)
-	    mod_mul (r1, r1, r1, m);
-	  if (i >= po2)
-	    goto end; /* Not prime */
-	}
+      if (!find_minus1 (r1, minusone, po2, m))
+	goto end; /* Not prime */
 
       if (n < 2269093UL)
         {
-	  r = (n != 314821);
+	  r = (n != 314821UL);
 	  goto end;
         }
       
-      mod_set_ul_reduced (b, 61UL, m);
+      /* b is still 7 here */
+      mod_add (b, b, b, m); /* 14 */
+      mod_sub (b, b, minusone, m); /* 15 */
+      mod_add (b, b, b, m); /* 30 */
+      mod_add (b, b, b, m); /* 60 */
+      mod_sub (b, b, minusone, m); /* 61 */
       mod_pow_ul (r1, b, mm1, m);   /* r = 61^mm1 mod m */
-      if (!mod_is1 (r1, m))
-        {
-	  for (i = 0; i < po2 && !mod_equal (r1, minusone, m); i++)
-	    mod_mul (r1, r1, r1, m);
-	  if (i >= po2)
-	    goto end; /* Not prime */
-	}
+      if (!find_minus1 (r1, minusone, po2, m))
+	goto end; /* Not prime */
 
 #if (ULONG_MAX > 4294967295UL)
       if (n != 4759123141UL && n != 8411807377UL && n < 11207066041UL)
@@ -772,15 +803,13 @@ mod_isprime (const modulus_t m)
 	  goto end;
         }
       
-      mod_set_ul_reduced (b, 5UL, m);
-      mod_pow_ul (r1, b, mm1, m);   /* r = 61^mm1 mod m */
-      if (!mod_is1 (r1, m))
-        {
-	  for (i = 0; i < po2 && !mod_equal (r1, minusone, m); i++)
-	    mod_mul (r1, r1, r1, m);
-	  if (i >= po2)
-	    goto end; /* Not prime */
-	}
+      mod_set1 (b, m);
+      mod_add (b, b, b, m);
+      mod_add (b, b, b, m);
+      mod_sub (b, b, minusone, m);    /* b = 5 */
+      mod_pow_ul (r1, b, mm1, m);   /* r = 5^mm1 mod m */
+      if (!find_minus1 (r1, minusone, po2, m))
+	goto end; /* Not prime */
 	  
           /* These are the base 5,7,61 SPSP < 10^13 and n == 1 (mod 3) */
 	  r = (n != 30926647201UL && n != 45821738881UL && 
@@ -799,33 +828,27 @@ mod_isprime (const modulus_t m)
     {
       /* Case n % 3 == 0, 2 */
       
-      mod_set_ul_reduced (b, 3UL, m);
-      mod_pow_ul (r1, b, mm1, m);   /* r = 61^mm1 mod m */
-      if (!mod_is1 (r1, m))
-        {
-	  for (i = 0; i < po2 && !mod_equal (r1, minusone, m); i++)
-	    mod_mul (r1, r1, r1, m);
-	  if (i >= po2)
-	    goto end; /* Not prime */
-	}
+      mod_3pow_ul (r1, mm1, m);   /* r = 3^mm1 mod m */
+      if (!find_minus1 (r1, minusone, po2, m))
+	goto end; /* Not prime */
       
-      if (n < 102690677UL && n != 5173601UL && n != 16070429UL && n != 54029741)
+      if (n < 102690677UL && n != 5173601UL && n != 16070429UL && 
+          n != 54029741UL)
         {
 	  r = 1;
 	  goto end;
 	}
       
-      mod_set_ul_reduced (b, 5UL, m);
-      mod_pow_ul (r1, b, mm1, m);   /* r = 61^mm1 mod m */
-      if (!mod_is1 (r1, m))
-        {
-	  for (i = 0; i < po2 && !mod_equal (r1, minusone, m); i++)
-	    mod_mul (r1, r1, r1, m);
-	  if (i >= po2)
-	    goto end; /* Not prime */
-	}
+      mod_set1 (b, m);
+      mod_add (b, b, b, m);
+      mod_add (b, b, b, m);
+      mod_sub (b, b, minusone, m);    /* b = 5 */
+      mod_pow_ul (r1, b, mm1, m);   /* r = 5^mm1 mod m */
+      if (!find_minus1 (r1, minusone, po2, m))
+	goto end; /* Not prime */
 
 #if (ULONG_MAX > 4294967295UL)
+      /* These are the base 3,5 SPSP < 10^13 with n == 2 (mod 3) */
       r = (n != 244970876021UL && n != 405439595861UL && 
 	   n != 1566655993781UL && n != 3857382025841UL &&
 	   n != 4074652846961UL && n != 5783688565841UL);
