@@ -10,9 +10,13 @@ shift
 
 t=`mktemp -d /tmp/XXXXXXXX`
 
-if ! scripts/check_file_lists.pl ; then
-    echo "Refusing to make the distribution. Sorry" >&2
-    exit 1
+if [ "$CHECK_SCM_FILES" ] ; then
+    # check whether we have everything the SCM system knows about in our
+    # files.* lists
+    if ! scripts/check_file_lists.pl ; then
+        echo "Refusing to make the distribution. Sorry" >&2
+        exit 1
+    fi
 fi
 
 read_files_dist() {
