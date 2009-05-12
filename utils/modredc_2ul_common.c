@@ -300,12 +300,37 @@ mod_pow_ul (residue_t r, const residue_t b, const unsigned long e,
 }
 
 
-/* Compute r = 2^e. Here, e is an unsigned long */
-void
-mod_2pow_ul (residue_t r, const unsigned long e, const modulus_t m)
+/* Simple addition chains for small multipliers, used in the powering 
+   functions with small bases */
+static inline void
+simple_mul (residue_t r, const residue_t a, const unsigned long b, 
+	    const modulus_t m)
+{
+  if (b == 2UL) {
+    mod_add (r, a, a, m);
+  } else if (b == 3UL) {
+    mod_add (r, a, a, m);
+    mod_add (r, r, a, m);
+  } else if (b == 5UL) {
+    mod_add (r, a, a, m);
+    mod_add (r, r, r, m);
+    mod_add (r, r, a, m);
+  } else if (b == 7UL) {
+    mod_add (r, a, a, m);
+    mod_add (r, r, r, m);
+    mod_add (r, r, r, m);
+    mod_sub (r, r, a, m);
+  }
+}
+
+/* Compute r = b^e, where b is a small integer, currently b=2,3,5,7 are 
+   implemented. Here, e is an unsigned long */
+static inline void
+mod_npow_ul (residue_t r, const unsigned long b, const unsigned long e, 
+	     const modulus_t m)
 {
   unsigned long mask;
-  residue_t t;
+  residue_t t, u;
 
   if (e == 0UL)
     {
@@ -313,23 +338,46 @@ mod_2pow_ul (residue_t r, const unsigned long e, const modulus_t m)
       return;
     }
 
+  mod_init_noset0 (t, m);
+  
+  if (b == 2UL) {
+    mod_set1 (t, m);
+    mod_add (t, t, t, m); /* t = 2 */  
+  } else {
+    mod_init_noset0 (u, m);
+    mod_set1 (u, m);
+    simple_mul (t, u, b, m); /* t = b */
+  }
+
   mask = (1UL << (LONG_BIT - 1)) >> ularith_clz (e);
   ASSERT (e & mask);
-
-  mod_init (t, m);
-  mod_set1 (t, m);
-  mod_add (t, t, t, m); /* t = 2 */
   mask >>= 1;
 
   while (mask > 0UL)
     {
       mod_mul (t, t, t, m);
-      mod_intshl (t, t, (e & mask) ? 1 : 0);
-      ularith_sub_2ul_2ul_ge (&(t[0]), &(t[1]), m[0].m[0], m[0].m[1]);
+      if (b == 2UL) {
+	mod_intshl (t, t, (e & mask) ? 1 : 0);
+	ularith_sub_2ul_2ul_ge (&(t[0]), &(t[1]), m[0].m[0], m[0].m[1]);
+      } else {
+	simple_mul (u, t, b, m);
+	if (e & mask)
+	  mod_set (t, u, m);
+      }
       mask >>= 1;
     }
   mod_set (r, t, m);
   mod_clear (t, m);
+  if (b != 2)
+    mod_clear (u, m);
+}
+
+
+/* Compute r = 2^e mod m. Here, e is an unsigned long */
+void
+mod_2pow_ul (residue_t r, const unsigned long e, const modulus_t m)
+{
+  mod_npow_ul (r, 2UL, e, m);
 }
 
 
@@ -375,15 +423,16 @@ mod_pow_mp (residue_t r, const residue_t b, const unsigned long *e,
 }
 
 
-/* Compute r = 2^e. Here e is a multiple precision integer 
+/* Compute r = b^e, where b is a small integer, currently b=2,3,5,7 are 
+   implemented.  Here e is a multiple precision integer 
    sum_{i=0}^{e_nrwords-1} e[i] * (machine word base)^i */
-void
-mod_2pow_mp (residue_t r, const unsigned long *e, const int e_nrwords, 
-	     const modulus_t m)
+static inline void
+mod_npow_mp (residue_t r, const unsigned long b, const unsigned long *e, 
+	     const int e_nrwords, const modulus_t m)
 {
-  unsigned long mask;
-  residue_t t;
+  residue_t t, u;
   int i = e_nrwords - 1;
+  unsigned long mask, ei;
 
   if (e_nrwords == 0 || e[i] == 0UL)
     {
@@ -391,33 +440,49 @@ mod_2pow_mp (residue_t r, const unsigned long *e, const int e_nrwords,
       return;
     }
 
-  ASSERT (e[e_nrwords - 1] != 0);
+  mod_init_noset0 (t, m);
+  if (b == 2UL) {
+    mod_set1 (t, m);
+    mod_add (t, t, t, m); /* t = 2 */  
+  } else {
+    mod_init_noset0 (u, m);
+    mod_set1 (u, m);
+    simple_mul (t, u, b, m); /* t = b */
+  }
 
-  /* Find highest set bit in e[i]. */
   mask = (1UL << (LONG_BIT - 1)) >> ularith_clz (e[i]);
-  /* t = 1, so t^(mask/2) * b^e = t^mask * b^e  */
-  
-  /* Exponentiate */
-
-  mod_init (t, m);
-  mod_set1 (t, m);
-  mod_add (t, t, t, m); /* t = 2 */
-  /* (t*2)^mask * b^(e-mask) = t^mask * b^e */
   mask >>= 1;
 
   for ( ; i >= 0; i--)
     {
+      ei = e[i];
       while (mask > 0UL)
         {
           mod_mul (t, t, t, m);
-          mod_intshl (t, t, (e[i] & mask) ? 1 : 0);
-          ularith_sub_2ul_2ul_ge (&(t[0]), &(t[1]), m[0].m[0], m[0].m[1]);
+	  if (b == 2UL) {
+	    mod_intshl (t, t, (ei & mask) ? 1 : 0);
+	    ularith_sub_2ul_2ul_ge (&(t[0]), &(t[1]), m[0].m[0], m[0].m[1]);
+	  } else {
+	    simple_mul (u, t, b, m);
+	    if (ei & mask)
+	      mod_set (t, u, m);
+	  }
           mask >>= 1;            /* (r^2)^(mask/2) * b^e = r^mask * b^e */
         }
       mask = ~0UL - (~0UL >> 1);
     }
   mod_set (r, t, m);
   mod_clear (t, m);
+}
+
+
+/* Compute r = 2^e mod m.  Here e is a multiple precision integer 
+   sum_{i=0}^{e_nrwords-1} e[i] * (machine word base)^i */
+void
+mod_2pow_mp (residue_t r, const unsigned long *e, const int e_nrwords, 
+	     const modulus_t m)
+{
+  mod_npow_mp (r, 2UL, e, e_nrwords, m);
 }
 
 
@@ -554,6 +619,30 @@ mod_V_mp (residue_t r, const residue_t b,
 }
 
 
+/* Returns 1 if r1 == 1 (mod m) or if r1 == -1 (mod m) or if
+   one of r1^(2^1), r1^(2^2), ..., r1^(2^(po2-1)) == -1 (mod m),
+   zero otherwise. Requires -1 (mod m) in minusone. */
+
+static inline int
+find_minus1 (residue_t r1, const residue_t minusone, const int po2, 
+             const modulus_t m)
+{
+  int i;
+
+  if (mod_is1 (r1, m) || mod_equal (r1, minusone, m))
+    return 1;
+
+  for (i = 1 ; i < po2; i++)
+    {
+      mod_mul (r1, r1, r1, m);
+      if (mod_equal (r1, minusone, m))
+        break;
+    }
+
+  return (i < po2) ? 1 : 0;
+}
+
+
 /* Returns 1 if m is a strong probable prime wrt base b, 0 otherwise.
    We assume m is odd. */
 int
@@ -591,24 +680,8 @@ mod_sprp (const residue_t b, const modulus_t m)
     mod_pow_mp (r, b, mm1, 2UL, m);
   else
     mod_pow_ul (r, b, mm1[0], m);
-
-  /* If m is prime, then b^mm1 might be == 1 or == -1 (mod m) here */
-  if (mod_is1 (r, m) || mod_equal (r, minusone, m))
-    i = 1;
-  else
-    {
-      /* If m is a prime, then one of b^(2*mm1), b^(2^2*mm1), ..., 
-	 b^(2^(po2 - 1)*mm1)  must be == -1 (mod m) */
-      for ( ; po2 > 1; po2--)
-	{
-	  mod_mul (r, r, r, m);
-	  if (mod_equal (r, minusone, m))
-	    {
-	      i = 1;
-	      break;
-	    }
-	}
-    }
+  
+  i = find_minus1 (r, minusone, po2, m);
 
   mod_clear (r, m);
   mod_clear (minusone, m);
@@ -674,6 +747,202 @@ mod_sprp2 (const modulus_t m)
   mod_clear (minusone, m);
   return i;
 }
+
+
+int
+mod_isprime (const modulus_t m)
+{
+  residue_t b, minusone, r1;
+  modint_t n, mm1;
+  int r = 0, po2 = 0, i;
+  
+  mod_getmod_uls (n, m);
+
+  if (mod_intcmp_ul (n, 1UL) == 0)
+    return 0;
+
+  if (n[0] % 2UL == 0UL)
+    {
+      r = (mod_intcmp_ul(n, 2UL) == 0);
+#if defined(PARI)
+      printf ("isprime(%lu) == %d /* PARI */\n", n[0], r);
+#endif
+      return r;
+    }
+
+  /* Set mm1 to the odd part of m-1 */
+  mod_intset (mm1, n);
+  mm1[0]--;
+  if (mm1[0] == 0UL)
+    {
+      mm1[0] = mm1[1];
+      mm1[1] = 0UL;
+      po2 += LONG_BIT;
+    }
+  ASSERT (mm1[0] != 0UL);
+  i = ularith_ctz (mm1[0]);
+  mod_intshr (mm1, mm1, i);
+  po2 += i;
+  
+  mod_init_noset0 (b, m);
+  mod_init_noset0 (minusone, m);
+  mod_init_noset0 (r1, m);
+  mod_set1 (minusone, m);
+  mod_neg (minusone, minusone, m);
+
+  /* Do base 2 SPRP test */
+  if (mm1[1] != 0UL)
+    mod_2pow_mp (r1, mm1, 2UL, m);
+  else
+    mod_2pow_ul (r1, mm1[0], m);
+  /* If n is prime and 1 or 7 (mod 8), then 2 is a square (mod n)
+     and one less squaring must suffice. This does not strengthen the
+     test but saves one squaring for composite input */
+  if (n[0] % 8 == 7)
+    { 
+      if (!mod_is1 (r1, m))
+        goto end;
+    }
+  else if (!find_minus1 (r1, minusone, po2 - ((n[0] % 8 == 7) ? 1 : 0), m))
+    goto end; /* Not prime */
+
+  /* Base 3 is poor at identifying composites == 1 (mod 3), but good at
+     identifying composites == 2 (mod 3). Thus we use it only for 2 (mod 3) */
+  i = n[0] % 3UL + n[1] % 3;
+  if (i == 1 || i == 4)
+    {
+      if (mm1[1] != 0UL)
+	mod_npow_mp (r1, 7UL, mm1, 2UL, m); /* r = 7^mm1 mod m */
+      else
+	mod_npow_ul (r1, 7UL, mm1[0], m);
+      if (!find_minus1 (r1, minusone, po2, m))
+	goto end; /* Not prime */
+
+      mod_set_ul_reduced (b, 61UL, m); /* Use addition chain? */
+      if (mm1[1] != 0UL)
+	mod_pow_mp (r1, b, mm1, 2UL, m); /* r = 61^mm1 mod m */
+      else
+	mod_pow_ul (r1, b, mm1[0], m);
+      if (!find_minus1 (r1, minusone, po2, m))
+	goto end; /* Not prime */
+
+#if LONG_BIT == 32
+      {
+	/* These are the two base 2,7,61 SPSP below 11207066041 */
+	const modint_t 
+	  c4759123141 = {464155845UL, 1UL},
+	  c8411807377 = {4116840081UL, 1UL},
+	  c11207066041 = {2617131449UL, 2UL};
+	if (mod_intcmp (n, c11207066041) < 0)
+	  {
+	    r = mod_intcmp (n, c4759123141) != 0 &&
+	      mod_intcmp (n, c8411807377) != 0;
+	    goto end;
+	  }
+      }
+#endif
+      
+      if (mm1[1] != 0UL)
+	mod_npow_mp (r1, 5UL, mm1, 2UL, m); /* r = 5^mm1 mod m */
+      else
+	mod_npow_ul (r1, 5UL, mm1[0], m);
+      if (!find_minus1 (r1, minusone, po2, m))
+	goto end; /* Not prime */
+	  
+#if LONG_BIT == 32
+      {
+	/* These are the base 2,5,7,61 SPSP < 10^13 and n == 1 (mod 3) */
+	const modint_t 
+	  c30926647201 = {861876129,7},
+	  c45821738881 = {2872065921,10},
+	  c74359744201 = {1345300169,17},
+	  c90528271681 = {333958465,21},
+	  c110330267041 = {2956084641,25},
+	  c373303331521 = {3936144065,86},
+	  c440478111067 = {2391446875,102},
+	  c1436309367751 = {1790290887,334},
+	  c1437328758421 = {2809681557,334},
+	  c1858903385041 = {3477513169,432},
+	  c4897239482521 = {976765081,1140},
+	  c5026103290981 = {991554661,1170},
+	  c5219055617887 = {670353247,1215},
+	  c5660137043641 = {3665114809,1317},
+	  c6385803726241 = {3482324385,1486};
+				    
+	  r = mod_intcmp (n, c30926647201) != 0 &&
+	    mod_intcmp (n, c45821738881) != 0 &&
+	    mod_intcmp (n, c74359744201) != 0 &&
+	    mod_intcmp (n, c90528271681) != 0 &&
+	    mod_intcmp (n, c110330267041) != 0 &&
+	    mod_intcmp (n, c373303331521) != 0 &&
+	    mod_intcmp (n, c440478111067) != 0 &&
+	    mod_intcmp (n, c1436309367751) != 0 &&
+	    mod_intcmp (n, c1437328758421) != 0 &&
+	    mod_intcmp (n, c1858903385041) != 0 &&
+	    mod_intcmp (n, c4897239482521) != 0 &&
+	    mod_intcmp (n, c5026103290981) != 0 &&
+	    mod_intcmp (n, c5219055617887) != 0 &&
+	    mod_intcmp (n, c5660137043641) != 0 &&
+	    mod_intcmp (n, c6385803726241) != 0;
+      }
+#else
+      /* For 64 bit arithmetic, a two-word modulus is neccessarily too 
+	 large for any deterministic test (with the lists of SPSP 
+	 currently available). A modulus >2^64 and == 1 (mod 3) that 
+	 survived base 2,5,7,61 is assumed to be prime. */
+      r = 1;
+#endif
+    }
+  else
+    {
+      /* Case n % 3 == 0, 2 */
+      
+      if (mm1[1] != 0UL)
+	mod_npow_mp (r1, 3UL, mm1, 2UL, m); /* r = 3^mm1 mod m */
+      else
+	mod_npow_ul (r1, 3UL, mm1[0], m);
+      if (!find_minus1 (r1, minusone, po2, m))
+	goto end; /* Not prime */
+      
+      if (mm1[1] != 0UL)
+	mod_npow_mp (r1, 5UL, mm1, 2UL, m); /* r = 5^mm1 mod m */
+      else
+	mod_npow_ul (r1, 5UL, mm1[0], m);
+      if (!find_minus1 (r1, minusone, po2, m))
+	goto end; /* Not prime */
+
+#if LONG_BIT == 32
+      {
+	/* These are the base 2,3,5 SPSP < 10^13 and n == 2 (mod 3) */
+	const modint_t 
+	  c244970876021 = {157740149,57},
+	  c405439595861 = {1712670037,94},
+	  c1566655993781 = {3287898037,364},
+	  c3857382025841 = {501394033,898},
+	  c4074652846961 = {3023850353,948},
+	  c5783688565841 = {2662585425,1346};
+
+	r = mod_intcmp (n, c244970876021) != 0 &&
+	  mod_intcmp (n, c405439595861) != 0 &&
+	  mod_intcmp (n, c1566655993781) != 0 &&
+	  mod_intcmp (n, c3857382025841) != 0 &&
+	  mod_intcmp (n, c4074652846961) != 0 &&
+	  mod_intcmp (n, c5783688565841) != 0;
+#else
+      r = 1;
+#endif
+    }
+ 
+ end:
+#if defined(PARI)
+  printf ("isprime(%lu) == %d /* PARI */\n", n, r);
+#endif
+  mod_clear (b, m);
+  mod_clear (minusone, m);
+  mod_clear (r1, m);
+  return r;
+}
+
 
 
 int

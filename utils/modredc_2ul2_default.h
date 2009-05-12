@@ -135,6 +135,7 @@
 #define mod_V_mp             modredc2ul2_V_mp
 #define mod_sprp             modredc2ul2_sprp
 #define mod_sprp2            modredc2ul2_sprp2
+#define mod_isprime          modredc2ul2_isprime
 #define mod_gcd              modredc2ul2_gcd
 #define mod_inv              modredc2ul2_inv
 #define mod_jacobi           modredc2ul2_jacobi
