@@ -70,14 +70,18 @@ ellM_double (ellM_point_t Q, const ellM_point_t P, const modulus_t m,
   mod_init_noset0 (w, m);
 
   mod_add (u, P->x, P->z, m);
-  mod_mul (u, u, u, m);   /* u = (x1 + z1)^2 */
+  mod_mul (u, u, u, m);       /* u = (x1 + z1)^2 */
   mod_sub (v, P->x, P->z, m);
-  mod_mul (v, v, v, m);   /* v = (x1 - z1)^2 */
-  mod_mul (Q->x, u, v, m);  /* x2 = (x1^2 - z1^2)^2 */
-  mod_sub (w, u, v, m);   /* w = 4 * x1 * z1 */
-  mod_mul (u, w, b, m);   /* u = x1 * z1 * (A + 2) */
+  mod_mul (v, v, v, m);       /* v = (x1 - z1)^2 */
+  mod_mul (Q->x, u, v, m);    /* x2 = (x1^2 - z1^2)^2 */
+  mod_sub (w, u, v, m);       /* w = 4 * x1 * z1 */
+  mod_mul (u, w, b, m);       /* u = x1 * z1 * (A + 2) */
   mod_add (u, u, v, m);
   mod_mul (Q->z, w, u, m);
+#if ELLM_SAFE_ADD
+  if (mod_is0 (Q->z, m))
+    mod_set0 (Q->x, m);
+#endif
 
   mod_clear (w, m);
   mod_clear (v, m);
@@ -145,6 +149,20 @@ ellM_add (ellM_point_t R, const ellM_point_t P, const ellM_point_t Q,
 {
   residue_t u, v, w;
 
+#if ELLM_SAFE_ADD
+  /* Handle case where at least one input point is point at infinity */
+  if (mod_is0 (P->x, m) && mod_is0 (P->z, m))
+    {
+      ellM_set (R, Q, m);
+      return;
+    }
+  if (mod_is0 (Q->x, m) && mod_is0 (Q->z, m))
+    {
+      ellM_set (R, P, m);
+      return;
+    }
+#endif
+
   mod_init_noset0 (u, m);
   mod_init_noset0 (v, m);
   mod_init_noset0 (w, m);
@@ -157,17 +175,25 @@ ellM_add (ellM_point_t R, const ellM_point_t P, const ellM_point_t Q,
   mod_mul (v, w, v, m);      /* v = (Px+Pz)*(Qx-Qz) */
   mod_add (w, u, v, m);      /* w = 2*(Qz*Px - Qx*Pz)*/
 #if ELLM_SAFE_ADD
-  /* Check if w == 0, which happens if P=Q. 
-     If so, use ellM_double() instead.
+  /* Check if w == 0, which happens if P=Q or P=-Q. 
+     If P=-Q, set result to point at infinity.
+     If P=Q, use ellM_double() instead.
      This test only works if P=Q on the pseudo-curve modulo N, i.e.,
-     if N has several prime factors p, q, ... and P=Q on E_p but 
+     if N has several prime factors p, q, ... and P=Q or P=-Q on E_p but 
      not on E_q, this test won't notice it. */
   if (mod_is0 (w, m))
     {
       mod_clear (w, m);
       mod_clear (v, m);
       mod_clear (u, m);
-      ellM_double (R, P, m, b);
+      /* Test if difference is point at infinity */
+      if (mod_is0 (D->x, m) && mod_is0 (D->z, m))
+        ellM_double (R, P, m, b); /* Yes, points are identical, use doubling */
+      else
+        { 
+          mod_set0 (R->x, m); /* No, are each other's negatives. */
+          mod_set0 (R->z, m); /* Set result to point at infinity */
+        }
       return;
     }
 #endif
@@ -566,7 +592,8 @@ Brent12_curve_from_sigma (residue_t A, residue_t x, const residue_t sigma,
    A and x are obtained from u and v such that (u,v) = k*P on the curve
    v^2 = u^3 - 12*u, where P = (-2, 4).
 
-   Then t = v/(2*u), and a=(t^2-1)/(t^2+3).
+   We want t^2 = (u^2-12)/4u = v^2/(2*u)^2, so
+   t = v/(2*u), and a=(t^2-1)/(t^2+3).
 
    For k=2, we get u=4, v=-4, t=-1/2, a=-3/13, A=-4798/351 and x=-49/39.
 
