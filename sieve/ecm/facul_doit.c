@@ -175,27 +175,24 @@ facul_doit (unsigned long *factors, const modulus_t m,
       if (!fprime)
 	{
 	  if (mod_intbits (f) <= MODREDCUL_MAXBITS)
-	    f_arith = 0;
-          else if (mod_intbits (f) <= MODREDC15UL_MAXBITS)
-            f_arith = 1;
-          else
-            f_arith = 2;
-	  if (f_arith == 0)
 	    {
+	      f_arith = 0;
 	      modredcul_initmod_uls (fm_ul, f);
 	      fprime = primetest_ul (fm_ul);
-	    }
-	  else if (f_arith == 1)
-	    {
+            }
+          else if (mod_intbits (f) <= MODREDC15UL_MAXBITS)
+            {
+              f_arith = 1;
 	      modredc15ul_initmod_uls (fm_15ul, f);
 	      fprime = primetest_15ul (fm_15ul);
-	    }
+            }
           else
-	    {
+            {
+              f_arith = 2;
 	      modredc2ul2_initmod_uls (fm_2ul2, f);
 	      fprime = primetest_2ul2 (fm_2ul2);
-	    }
-            
+            }
+
 	  if (fprime && mod_intcmp_ul (f, strategy->lpb) > 0)
 	    {
 	      found = FACUL_NOT_SMOOTH; /* A prime > lpb, not smooth */
@@ -208,26 +205,24 @@ facul_doit (unsigned long *factors, const modulus_t m,
 	{
 	  
 	  if (mod_intbits (n) <= MODREDCUL_MAXBITS)
-	    cf_arith = 0;
-	  else if (mod_intbits (n) <= MODREDC15UL_MAXBITS)
-	    cf_arith = 1;
-          else
-            cf_arith = 2;
-	  if (cf_arith == 0)
 	    {
+	      cf_arith = 0;
 	      modredcul_initmod_uls (cfm_ul, n);
 	      cfprime = primetest_ul (cfm_ul);
-	    }
-	  else if (cf_arith == 1)
+            }
+	  else if (mod_intbits (n) <= MODREDC15UL_MAXBITS)
 	    {
+	      cf_arith = 1;
 	      modredc15ul_initmod_uls (cfm_15ul, n);
 	      cfprime = primetest_15ul (cfm_15ul);
-	    }
-	  else
-	    {
+            }
+          else
+            {
+              cf_arith = 2;
 	      modredc2ul2_initmod_uls (cfm_2ul2, n);
 	      cfprime = primetest_2ul2 (cfm_2ul2);
-	    }
+            }
+
 	  if (cfprime && mod_intcmp_ul (n, strategy->lpb) > 0)
 	    {
 	      found = FACUL_NOT_SMOOTH; /* A prime > lpb, not smooth */
@@ -247,8 +242,11 @@ facul_doit (unsigned long *factors, const modulus_t m,
 	     backtracking can separate the factors */
 	  if (f_arith == 0)
 	    f2 = facul_doit_ul (factors + found, fm_ul, strategy, i);
-	  else
+	  else if (f_arith == 1)
 	    f2 = facul_doit_15ul (factors + found, fm_15ul, strategy, i);
+          else
+            f2 = facul_doit_2ul2 (factors + found, fm_2ul2, strategy, i);
+          
 	  if (f2 == FACUL_NOT_SMOOTH)
 	    {
 	      found = FACUL_NOT_SMOOTH;
@@ -265,8 +263,11 @@ facul_doit (unsigned long *factors, const modulus_t m,
 	  /* Factor the composite cofactor */
 	  if (cf_arith == 0)
 	    f2 = facul_doit_ul (factors + found, cfm_ul, strategy, i + 1);
-	  else
+	  else if (cf_arith == 1)
 	    f2 = facul_doit_15ul (factors + found, cfm_15ul, strategy, i + 1);
+          else
+            f2 = facul_doit_2ul2 (factors + found, cfm_2ul2, strategy, i + 1);
+          
 	  if (f2 == FACUL_NOT_SMOOTH)
 	    {
 	      found = FACUL_NOT_SMOOTH;
