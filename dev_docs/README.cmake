@@ -25,8 +25,8 @@ This being said, here are the peculiarities of the cmake+cado combination:
 In order to avoid breaking users' old habits, it is possible to live
 almost without noticing cmake is behind the scenes. From any source
 directory within cado, it is possible to run "make <some target name>",
-and there is some black magic supposed to do just The Right Thing (tm).
-In particular, there is a Makefile hangin around whose job is to hand
+and there is some black magic supposed to do Just The Right Thing (tm).
+In particular, there is a Makefile hanging around whose job is to hand
 over the responsibility of building the target to cmake. In particular,
 this initiates the build tree (see item *local.sh below), and configures
 it by calling cmake. The magic script is called scripts/call_cmake.sh.
@@ -107,11 +107,11 @@ either a full path to a file, or a directory name ending with a slash ;
 in the latter case, it means ``all files below this directory''. 
 
 If ``make dist'' does not work for you because someone else has committed
-a new file, and you don't whether it should go into the distribution or
+a new file, and you don't know whether it should go into the distribution or
 not, then update the files.unknown file, and blame the person responsible
 for the mess. The normal situation is when files.unknown is empty.
 
-Note: the tools requires for building a distribution are not distributed.
+Note: the tools required for building a distribution are not distributed.
 
 * nightly-test
 

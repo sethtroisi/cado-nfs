@@ -11,6 +11,10 @@ ASSERT_ALWAYS(x)
 FATAL_ERROR_CHECK(x, msg)
         The condition x is always check. The program aborts if it does
         not hold. It's a more gentle version of ASSERT_ALWAYS
+DIE_ERRNO_DIAG(tst, func, arg)
+        This is yet another version, specific to system calls: tst is a
+        boolean that indicates if the call failed. func and arg are
+        strings giving the function call name and its arguments.
 
 Usage of asserts:
         Put ASSERTs to checks things during a non-production mode. These

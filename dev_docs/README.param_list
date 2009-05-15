@@ -39,7 +39,7 @@ I see several benefits.
 
 
 The processing goes through two steps:
-- build a dictionary of (key, value) pair (as character strings).
+- build a dictionary of (key, value) pair (as character strings).
 - parse some values to set variables in the program.
 
 ###################################################################
