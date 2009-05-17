@@ -23,6 +23,7 @@
 // C++ headers.
 // #include <string>
 #include <vector>
+#include <list>
 #include <algorithm>    // sort
 #include <iostream>     // cout
 #include "bwc_config.h"
@@ -46,7 +47,7 @@ using namespace std;
 
 /* To what should we compare the average dj value for determining when we
  * should switch from dense (small) to sparse (large) blocks */
-#define DJ_LARGE_JUMP   4.0
+#define DJ_LARGE_JUMP   1.0
 
 #define xxxDEBUG_BUCKETS
 
@@ -68,16 +69,21 @@ using namespace std;
  *
  * The number of columns considered while filling the scrap space is
  * limited by the scrap space size. Once it's filled, we ``apply the
- * buckets'', so as to be able to reuse our scrap space buffer for the
- * following column. Thus a ``large slice'' is typically split into
- * several ``vertical blocks''. Extremely sparse large slices will have
- * only one vertical block.
+ * buckets'', so as to be able to reuse our scrap space buffer for
+ * another batch of columns. Thus a ``large slice'' is typically split
+ * into several ``vertical blocks''. Extremely sparse large slices will
+ * have only one vertical block.
  *
  * ``Applying the buckets'' means taking a list of column coefficients
  * which have been directed to the bucket because it is known that they
  * affect at least one of the 256 corresponding row indices on output. So
  * in addition the the N stored coefficients in the bucket, we have a
  * list of N 8-bit integers indicating which row index is to be modified.
+ *
+ *
+ * That's it for the basic idea. Now on top of that, we use an extra
+ * indirection level for very sparse blocks. To be documented once it's
+ * finished.
  */
 
 /* This extension is used to distinguish between several possible
@@ -127,6 +133,26 @@ static struct matmul_bucket_data_s * matmul_bucket_init(abobj_ptr xx MAYBE_UNUSE
     di = mem - i; i = mem; mem = di;     \
 } while (0)
 
+struct larse_slice_t {
+    vector<uint8_t> t8c;    // read: contribution to t8.
+    vector<unsigned int> lslc;      // contribution to lsl.
+    uint32_t i0;
+    uint32_t i1;
+    unsigned int nvslices;
+    double exp_hit;
+    double avg_dj_last;
+    unsigned int ncoeffs;
+};
+
+/* This moves an element at the tail of a list with no copy, transferring
+ * the ownership to the container argument */
+template<typename T>
+void transfer(list<T> & ctr, T& elem)
+{
+    ctr.push_back(T());
+    swap(ctr.back(), elem);
+}
+
 struct matmul_bucket_data_s * matmul_bucket_build(abobj_ptr xx, const char * filename, param_list pl, int optimized_direction)
 {
     struct matmul_bucket_data_s * mm;
@@ -162,18 +188,6 @@ struct matmul_bucket_data_s * matmul_bucket_build(abobj_ptr xx, const char * fil
     mm->t16.push_back(0);        // placeholder for alignment
 
     unsigned int s;
-
-    /* Get some info on the columns */
-    vector<uint32_t *> colheads(ncols_t, NULL);
-    vector<uint32_t *> colptrs(ncols_t, NULL);
-    { /* {{{ initialize column pointers */
-        uint32_t * ptr = data[1];
-        for(uint32_t j = 0 ; j < ncols_t ; j++) {
-            colheads[j] = ptr;
-            colptrs[j] = ptr + 1;
-            ptr += 1 + *ptr;
-        }
-    } /* }}} */
 
     uint32_t * ptr = data[0];
     for(s = 0 ; s < nslices ; s++) {
@@ -239,16 +253,27 @@ struct matmul_bucket_data_s * matmul_bucket_build(abobj_ptr xx, const char * fil
 
     /*}}}*/
 
+    /* free this early, this lessens the memory pressure */
+    free(data[0]);
+    data[0] = NULL;
+
     unsigned int end_sslices = s * nrows_t / nslices;
     unsigned int rem_nrows = nrows_t - end_sslices;
     unsigned int nlarge_slices = iceildiv(rem_nrows,65536);
-    /* {{{ advance all column pointers. Takes time, of course */
-    for(uint32_t j = 0 ; j < ncols_t ; j++) {
-        uint32_t len = * colheads[j];
-        uint32_t * v0 = colheads[j] + 1;
-        uint32_t * c = colptrs[j];
-        for( ; c - v0 < (ptrdiff_t) len && *c < (uint32_t) end_sslices ; c++) ;
-        colptrs[j] = c;
+    /* {{{ column pointers */
+    vector<uint32_t *> colheads(ncols_t, NULL);
+    vector<uint32_t *> colptrs(ncols_t, NULL);
+    {
+        uint32_t * ptr = data[1];
+        for(uint32_t j = 0 ; j < ncols_t ; j++) {
+            uint32_t len = *ptr;
+            uint32_t * v0 = ptr + 1;
+            colheads[j] = ptr;
+            ptr += 1 + len;
+            uint32_t * c = v0;
+            for( ; c - v0 < (ptrdiff_t) len && *c < (uint32_t) end_sslices ; c++) ;
+            colptrs[j] = c;
+        }
     } /* }}} */
 
     unsigned int scrapsize = L2_CACHE_SIZE;
@@ -257,24 +282,21 @@ struct matmul_bucket_data_s * matmul_bucket_build(abobj_ptr xx, const char * fil
 
     mm->scrapsize = scrapsize;
 
+    list<larse_slice_t> lsl_q;
+
     for(s = 0 ; s < nlarge_slices ; s++) {
+        larse_slice_t L;
         uint32_t i0 = end_sslices +  s      * rem_nrows / nlarge_slices;
         uint32_t i1 = end_sslices + (s + 1) * rem_nrows / nlarge_slices;
-        mm->lsl.push_back(i1 - i0);
-        /* {{{ What is the expected weight for this batch of vstrips ? */
-        unsigned int weight = 0;
-        uint32_t * q = ptr;
-        for(uint32_t i = i0 ; i < i1 ; i++) {
-            weight += *q;
-            q += 1 + *q;
-        }
-        ptr = q;
-        /* }}} */
+        L.i0 = i0;
+        L.i1 = i1;
+        L.lslc.push_back(i1 - i0);
 
-        printf("Lsl %u %ss %u..%u : w %u, expected bucket hit rate 1/%.1f\n",
-                s, rowname, i0, i1, weight,
-                256.0 * ncols_t / (double) weight);
+        printf("Lsl %u %ss %u..%u\n", s, rowname, i0, i1);
 
+        L.nvslices = 0;
+        L.avg_dj_last = 0;
+        L.ncoeffs = 0;
 
         /* We'll create vblocks one by one, and flush them as soon as the
          * scrap size is exceeded. It's better than trying to guess in
@@ -292,16 +314,22 @@ struct matmul_bucket_data_s * matmul_bucket_build(abobj_ptr xx, const char * fil
             uint32_t dj_max = 0;
             double dj_sum=0;
             int pad=0;
+
+            size_t ind_tails[256] = { 0, };
+            size_t main_tail = 0;
             // unsigned int used_input = 0;
             for( ; j < ncols_t ; j++) {
                 uint32_t len = * colheads[j];
                 uint32_t * v0 = colheads[j] + 1;
                 uint32_t * c = colptrs[j];
-                vector<uint8_t> my_ind[256];
-                vector<uint8_t> my_main;
                 unsigned int my_weight = 0;
                 unsigned int my_pad = 0;
                 uint32_t my_lastj = lastj;
+
+                main_tail = main.size();
+                for(unsigned int k = 0 ; k < 256 ; k++) {
+                    ind_tails[k] = ind[k].size();
+                }
 
                 for( ; c - v0 < (ptrdiff_t) len && *c < i1 ; c++) {/*{{{*/
                     uint32_t i = *c - i0;
@@ -310,36 +338,36 @@ struct matmul_bucket_data_s * matmul_bucket_build(abobj_ptr xx, const char * fil
                     for( ; diff > 255 ; ) {
                         /* This is equivalent to adding two coefficients
                          * to the matrix, but in the same position. */
-                        my_main.push_back(255);
-                        my_main.push_back(0);
-                        my_ind[0].push_back(0);
-                        my_main.push_back(0);
-                        my_main.push_back(0);
-                        my_ind[0].push_back(0);
+                        main.push_back(255);
+                        main.push_back(0);
+                        ind[0].push_back(0);
+                        main.push_back(0);
+                        main.push_back(0);
+                        ind[0].push_back(0);
                         my_lastj += 255;
                         diff -= 255;
                         my_pad++;
                     }
-                    my_main.push_back(diff);
-                    my_main.push_back(w);
-                    my_ind[w].push_back((uint8_t) i);
+                    main.push_back(diff);
+                    main.push_back(w);
+                    ind[w].push_back((uint8_t) i);
                     my_lastj = j;
                     my_weight++;
                 }/*}}}*/
 
                 if (locweight + my_weight + 2*(pad + my_pad) > scrapsize) {
-                    /* Cannot fit this :-( */
+                    /* Cannot fit this. Need to rewind our work on the
+                     * arrays. */
+                    main.erase(main.begin() + main_tail, main.end());
+                    for(unsigned int k = 0 ; k < 256 ; k++) {
+                        ind[k].erase(ind[k].begin() + ind_tails[k], ind[k].end());
+                    }
                     break;
                 }
 
                 // used_input += (my_weight != 0);
 
-                /* This one fits in the current vblock, copy it */
-                main.insert(main.end(), my_main.begin(), my_main.end());
-                for(int k = 0 ; k < 256 ; k++) {
-                    ind[k].insert(ind[k].end(),
-                            my_ind[k].begin(), my_ind[k].end());
-                }
+                /* This one fits in the current vblock. */
                 locweight += my_weight;
                 pad += my_pad;
                 uint32_t diff = my_lastj - lastj;
@@ -358,14 +386,17 @@ struct matmul_bucket_data_s * matmul_bucket_build(abobj_ptr xx, const char * fil
             printf("; max dj %u", dj_max);
             if (pad) printf("; pad 6*%d", pad);
             printf("\n");
-            mm->lsl.push_back(j - j0);
-            mm->lsl.push_back(locweight + 2 * pad);
+
+            /* push to L */
+
+            L.lslc.push_back(j - j0);
+            L.lslc.push_back(locweight + 2 * pad);
 
             /* flush */
-            mm->t8.insert(mm->t8.end(), main.begin(), main.end());
+            L.t8c.insert(L.t8c.end(), main.begin(), main.end());
             for(int k = 0 ; k < 256 ; k++) {
-                mm->lsl.push_back(ind[k].size());
-                mm->t8.insert(mm->t8.end(), ind[k].begin(), ind[k].end());
+                L.lslc.push_back(ind[k].size());
+                L.t8c.insert(L.t8c.end(), ind[k].begin(), ind[k].end());
             }
 #ifdef  DEBUG_BUCKETS
             /* re-count the number of occurences of each. */
@@ -374,14 +405,40 @@ struct matmul_bucket_data_s * matmul_bucket_build(abobj_ptr xx, const char * fil
                 recount[main[z]]++;
             }
             for(int k = 0 ; k < 256 ; k++) {
-                ASSERT_ALWAYS(recount[k] == mm->lsl[mm->lsl.size()-256+k]);
+                ASSERT_ALWAYS(recount[k] == L.lslc[L.lslc.size()-256+k]);
             }
 #endif
-            mm->public_->ncoeffs += locweight;
+            L.ncoeffs += locweight;
+            L.nvslices++;
             v++;
         }
+        L.exp_hit = 256.0 * ncols_t / (double) L.ncoeffs;
+        printf(" end of Lsl %u ; w=%u, bucket hit rate 1/%.1f\n",
+                s, L.ncoeffs, L.exp_hit);
+        transfer(lsl_q, L);
     }
-    free(data[0]);
+
+    /* Time to flatten the queue of large slices. First we compute the
+     * required storage for the mm->lsl and mm->lsl arrays.
+     */
+    ASSERT(lsl_q.size() == nlarge_slices);
+    printf("Flushing %zu large slices\n", lsl_q.size());
+    size_t lsl_size = 0;
+    size_t t8_size = 0;
+    list<larse_slice_t>::iterator ll;
+    for(ll = lsl_q.begin() ; ll != lsl_q.end() ; ll++) {
+        lsl_size += ll->lslc.size();
+        t8_size += ll->t8c.size();
+    }
+    mm->lsl.reserve(lsl_size);
+    mm->t8.reserve(t8_size);
+    for(ll = lsl_q.begin() ; ll != lsl_q.end() ; ll++) {
+        mm->lsl.insert(mm->lsl.end(), ll->lslc.begin(), ll->lslc.end());
+        ll->lslc.clear();
+        mm->t8.insert(mm->t8.end(), ll->t8c.begin(), ll->t8c.end());
+        ll->t8c.clear();
+        mm->public_->ncoeffs += ll->ncoeffs;
+    }
     free(data[1]);
     return mm;
 }
@@ -578,7 +635,7 @@ void matmul_bucket_mul(struct matmul_bucket_data_s * mm, abt * dst, abt const * 
                          * we choose a row not equal to (0,0) -- first in
                          * the first bucket.
                          */
-                        ASSERT(inp + *q8 < dst + nrows_t);
+                        ASSERT(inp + *q8 < src + nrows_t);
                         abcopy(x, z, inp + aboffset(x, *q8), 1);
                         z++;
                         q8++;
