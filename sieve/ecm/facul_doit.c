@@ -34,8 +34,8 @@ facul_doit (unsigned long *factors, const modulus_t m,
 {
   residue_t r;
   modint_t n, f;
-  modulusredc2ul2_t fm_2ul2, cfm_2ul2;
-  modulusredc15ul_t fm_15ul, cfm_15ul; /* Modulus for factor and cofactor */
+  modulusredc2ul2_t fm_2ul2, cfm_2ul2; /* Modulus for factor and cofactor */
+  modulusredc15ul_t fm_15ul, cfm_15ul;
   modulusredcul_t fm_ul, cfm_ul;
   int i, found = 0, bt, fprime, cfprime, f_arith = 0, cf_arith = 0;
   
@@ -45,12 +45,10 @@ facul_doit (unsigned long *factors, const modulus_t m,
   
   for (i = method_start; strategy->methods[i].method != 0; i++)
     {
-#ifdef MODREDC15UL
       /* Simple-minded early abort for large input */
-      if (i > 2)
+      if (i > 2 && mod_intbits (n) > LONG_BIT)
         break;
-#endif
-
+      
       if (i < STATS_LEN)
 	  stats_called[i]++;
       
@@ -149,11 +147,12 @@ facul_doit (unsigned long *factors, const modulus_t m,
 	}
       
       /* So we found a non-trivial factor. See if it is prime, if the 
-	 cofactor is prime, and if one of them are, whether they are too
+	 cofactor is prime, and if one of them is, whether they are too
 	 large for our smoothness bounds */
       
       /* A quick test if the factor is <= fbb^2 and >lpb */
-      fprime = (mod_intcmp (f, strategy->fbb2) <= 0);
+      /* FIXME: must always use same width for comparison */
+      fprime = (mod_intcmp (f, strategy->fbb2) <= 0); 
       if (fprime && mod_intcmp_ul (f, strategy->lpb) > 0)
 	{
 	  found = FACUL_NOT_SMOOTH; /* A prime > lpb, not smooth */
