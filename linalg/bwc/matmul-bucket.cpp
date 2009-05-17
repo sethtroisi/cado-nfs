@@ -47,7 +47,12 @@ using namespace std;
 
 /* To what should we compare the average dj value for determining when we
  * should switch from dense (small) to sparse (large) blocks */
-#define DJ_LARGE_JUMP   1.0
+#define DJ_CUTOFF1   1.0
+/* Same, but for switching from large to very large blocks */
+#define DJ_CUTOFF2   1.0e20
+
+/* How many large slices in a very large slice ? */
+#define VL_MPLEX        16
 
 #define xxxDEBUG_BUCKETS
 
@@ -129,317 +134,475 @@ static struct matmul_bucket_data_s * matmul_bucket_init(abobj_ptr xx MAYBE_UNUSE
     return mm;
 }
 
+/* This moves an element at the tail of a list with no copy, transferring
+ * the ownership to the container argument */
+template<typename T>
+void transfer(list<T> * ctr, T * elem)
+{
+    ctr->push_back(T());
+    swap(ctr->back(), *elem);
+}
+
+struct builder {
+    uint32_t * data[2];
+    uint32_t nrows_t;
+    uint32_t ncols_t;
+    vector<uint32_t *> colheads;
+    vector<uint32_t *> colptrs;
+    const char * rowname;
+    const char * colname;
+};
+
+void builder_init(builder * mb, const char * filename, struct matmul_bucket_data_s * mm)
+{
+    read_easy(filename,
+            &mb->data[ mm->public_->store_transposed],
+            &mb->data[!mm->public_->store_transposed],
+            &mm->public_->dim[0],
+            &mm->public_->dim[1]);
+
+    mb->nrows_t = mm->public_->dim[ mm->public_->store_transposed];
+    mb->ncols_t = mm->public_->dim[!mm->public_->store_transposed];
+
+    mb->rowname = rowcol[ mm->public_->store_transposed];
+    mb->colname = rowcol[!mm->public_->store_transposed];
+}
+
+void builder_switch_to_vertical(builder * mb, unsigned int i)
+{
+    /*  column pointers */
+    mb->colheads.resize(mb->ncols_t, NULL);
+    mb->colptrs.resize(mb->ncols_t, NULL);
+    {
+        uint32_t * ptr = mb->data[1];
+        for(uint32_t j = 0 ; j < mb->ncols_t ; j++) {
+            uint32_t len = *ptr;
+            uint32_t * v0 = ptr + 1;
+            mb->colheads[j] = ptr;
+            ptr += 1 + len;
+            uint32_t * c = v0;
+            for( ; c - v0 < (ptrdiff_t) len && *c < (uint32_t) i ; c++) ;
+            mb->colptrs[j] = c;
+        }
+    }
+}
+
+struct small_slice_t {
+    uint32_t i0;
+    uint32_t i1;
+    unsigned int ncoeffs;
+    double dj_avg;
+    uint32_t dj_max;
+
+    typedef std::vector<std::pair<uint32_t, uint32_t> > L_t;
+    typedef L_t::const_iterator Lci_t;
+    typedef L_t::iterator Li_t;
+
+    L_t L;
+};
+
 #define UPDATE_DIFFERENCE(i,di,mem) do { \
     di = mem - i; i = mem; mem = di;     \
 } while (0)
 
-struct larse_slice_t {
-    vector<uint8_t> t8c;    // read: contribution to t8.
-    vector<unsigned int> lslc;      // contribution to lsl.
-    uint32_t i0;
-    uint32_t i1;
-    unsigned int nvslices;
-    double exp_hit;
-    double avg_dj_last;
-    unsigned int ncoeffs;
+
+int builder_do_small_slice(builder * mb, struct small_slice_t * S, uint32_t ** ptr, uint32_t i0, uint32_t i1)
+{
+    uint32_t * ptr0 = *ptr;
+    /* We're doing a new slice */
+    for(uint32_t i = i0 ; i < i1 ; i++) {
+        for(unsigned int j = 0 ; j < *(*ptr) ; j++) {
+            S->L.push_back(std::make_pair((*ptr)[1+j],i-i0));
+        }
+        (*ptr) += 1 + *(*ptr);
+    }
+    /* L is the list of (column index, row index) of all
+     * coefficients in the current horizontal slice */
+    std::sort(S->L.begin(), S->L.end());
+
+    /* Convert all j indices to differences */
+    S->dj_max = 0;
+    S->ncoeffs = S->L.size();
+    uint32_t j = 0;
+
+    for(small_slice_t::Li_t lp = S->L.begin() ; lp != S->L.end() ; ++lp) {
+        uint32_t dj;
+        UPDATE_DIFFERENCE(j,dj,lp->first);
+        if (dj > S->dj_max) { S->dj_max = dj; }
+    }
+
+    S->dj_avg = mb->ncols_t / (double) S->ncoeffs;
+
+    /* There are two possible reasons for this slice to be discarded.
+     * Either the max dj is too large -- larger than 16 bits -- or the
+     * average dj is too large -- larger than some guessed value.
+     */
+    int keep = S->dj_max < (1UL << 16) && S->dj_avg < DJ_CUTOFF1;
+    if (!keep) {
+        *ptr = ptr0;
+    }
+    return keep;
+}
+
+void builder_do_all_small_slices(builder * mb, uint32_t * p_i0, list<small_slice_t> * Sq, unsigned int npack)
+{
+    unsigned int nslices = iceildiv(mb->nrows_t, npack);
+    unsigned int s;
+    uint32_t * ptr = mb->data[0];
+    for(s = 0 ; s < nslices ; s++) {
+        uint32_t i0 =  s    * mb->nrows_t / nslices;
+        uint32_t i1 = (s+1) * mb->nrows_t / nslices;
+
+        small_slice_t S;
+
+        printf("Ssl %u: %ss %u..%u...", s, mb->rowname, i0, i1);
+        fflush(stdout);
+
+        int keep = builder_do_small_slice(mb, &S, &ptr, i0, i1);
+
+        printf(" w %" PRIu32 " ; avg dj %.1f ; max dj %u\n",
+                S.ncoeffs, S.dj_avg, S.dj_max);
+        fflush(stdout);
+
+        if (!keep) {
+            printf("Switching to large slices. Ssl %u to be redone\n", s);
+            break;
+        }
+        transfer(Sq, &S);
+    }
+    *p_i0 = s * mb->nrows_t / nslices;
+}
+
+void builder_push_small_slices(struct matmul_bucket_data_s * mm, list<small_slice_t> * Sq)
+{
+    mm->t16.push_back(Sq->size());
+    mm->t16.push_back(0);       // for alignment.
+
+    printf("Flushing %zu small slices\n", Sq->size());
+
+    for(unsigned int s = 0 ; !Sq->empty() ; s++, Sq->pop_front()) {
+        small_slice_t * S = &(Sq->front());
+
+        mm->t16.push_back(S->i1-S->i0);
+        mm->t16.push_back(0);
+        mm->t16.push_back(S->L.size() & 0xffff);
+        mm->t16.push_back(S->L.size() >> 16);
+        for(small_slice_t::Lci_t lp = S->L.begin() ; lp != S->L.end() ; ++lp) {
+            mm->t16.push_back(lp->first);
+            mm->t16.push_back(lp->second);
+        }
+        mm->public_->ncoeffs += S->ncoeffs;
+    }
+}
+
+struct large_slice_vblock_t {
+    uint32_t j0;
+    uint32_t j1;
+    unsigned int n;             // number of coeffs.
+    unsigned int pad;           // (half the) number of padding coeffs.
+    vector<uint8_t> t8c;        // read: contribution to t8.
+    unsigned int ind_sizes[256];// contribution to lsl.
 };
 
-/* This moves an element at the tail of a list with no copy, transferring
- * the ownership to the container argument */
-template<typename T>
-void transfer(list<T> & ctr, T& elem)
+struct large_slice_t {
+    uint32_t i0;
+    uint32_t i1;
+    unsigned int ncoeffs;
+    double dj_avg;
+    uint32_t dj_max;
+    list<large_slice_vblock_t> vbl;
+};
+
+struct large_slice_raw_t {
+    vector<uint8_t> ind[256];
+    vector<uint8_t> main;
+    vector<size_t> col_sizes;
+    vector<size_t> pad_sizes;
+};
+
+void split_large_slice_in_vblocks(builder * mb, large_slice_t * L, large_slice_raw_t * R, unsigned int scrapsize)
 {
-    ctr.push_back(T());
-    swap(ctr.back(), elem);
+    /* Now split into vslices */
+    uint8_t * mp = &R->main.front();
+    uint8_t * ip[256];
+    for(int k = 0 ; k < 256 ; k++) {
+        ip[k] = &R->ind[k].front();
+    }
+    unsigned int vblocknum = 0;
+    for(uint32_t j = 0 ; j < mb->ncols_t ; vblocknum++) {
+        uint32_t j0 = j;
+        size_t n = 0;
+        size_t np = 0;
+        for( ; j < mb->ncols_t ; j++) {
+            size_t dn = R->col_sizes[j];
+            size_t dnp = R->pad_sizes[j];
+            if (n + dn + 2 * (np + dnp) > scrapsize) {
+                /* If dn doesn't fit, then we're in really, really big
+                 * trouble ! */
+                ASSERT_ALWAYS(n != 0);
+                break;
+            }
+            n += dn;
+            np += dnp;
+        }
+        uint32_t j1 = j;
+        
+        large_slice_vblock_t V;
+        V.j0 = j0;
+        V.j1 = j1;
+        /* First the main block, then all the bucket blocks. These come
+         * in order. */
+        /* We have n coeffs, counting padding. This makes 2n bytes in
+         * main, and n bytes in the bucket blocks */
+        V.n = n;
+        V.pad = np;
+        size_t nf = n + 2 * np;
+        V.t8c.resize(3 * nf);
+        uint8_t * q = &V.t8c.front();
+        /* XXX Notice that the reader process will consider as a j0 index
+         * the farthest possible index from the previous vblock, which
+         * means that we _must_ start with a zero in the main block here
+         * no matter what -- even if with regard to the way data is set
+         * up at the upper level (huge unique vblock), we would have had
+         * a positive integer. This digression does not apply to the
+         * first vblock. */
+        memcpy(q, mp, 2 * nf * sizeof(uint8_t));
+        if (vblocknum) {
+            q[0] = 0;
+        }
+        memset(V.ind_sizes, 0, sizeof(V.ind_sizes));
+        q += 2*nf;
+        for(size_t k = 0 ; k < nf ; k++) {
+            V.ind_sizes[mp[2 * k + 1]]++;
+        }
+        mp += 2 * nf;
+        for(int k = 0 ; k < 256 ; k++) {
+            ASSERT(ip[k]-(&R->ind[k].front())+V.ind_sizes[k] <= (ptrdiff_t) R->ind[k].size());
+            memcpy(q, ip[k], V.ind_sizes[k] * sizeof(uint8_t));
+            q += V.ind_sizes[k];
+            ip[k] += V.ind_sizes[k];
+        }
+        ASSERT(q == V.t8c.size() + &V.t8c.front());
+
+        printf(" vbl%u", vblocknum);
+        printf(": %ss %u..%u ", mb->colname, j0, j1);
+        printf("; w %u", V.n);
+        printf("; avg dj %.1f", (j1 - j0) / (double) V.n);
+        if (V.pad) printf("; pad 6*%u", V.pad);
+        printf("\n");
+    
+        transfer(&(L->vbl), &V);
+    }
+}
+
+int builder_do_large_slice(builder * mb, struct large_slice_t * L, uint32_t i0, uint32_t i1, unsigned int scrapsize)
+{
+    L->i0 = i0;
+    L->i1 = i1;
+    L->ncoeffs = 0;
+    L->dj_max = 0;
+
+    large_slice_raw_t R[1];
+
+    R->col_sizes.assign(mb->ncols_t, 0);
+    R->pad_sizes.assign(mb->ncols_t, 0);
+
+    uint32_t last_j = 0;
+
+    /* First we create a huge unique vblock, and later on decide on
+     * how to split it. */
+    for(uint32_t j = 0 ; j < mb->ncols_t ; j++) {
+        uint32_t len  = * mb->colheads[j];
+        uint32_t * v0 = mb->colheads[j] + 1;
+        uint32_t * c  = mb->colptrs[j];
+
+        if (!(c - v0 < (ptrdiff_t) len && *c < i1))
+            continue;
+
+        uint32_t diff = j - last_j;
+        if (diff > L->dj_max) {
+            L->dj_max = diff;
+        }
+        for( ; diff > 255 ; ) {
+            R->main.push_back(255);
+            R->main.push_back(0);
+            R->ind[0].push_back(0);
+            R->main.push_back(0);
+            R->main.push_back(0);
+            R->ind[0].push_back(0);
+            diff -= 255;
+            R->pad_sizes[j] += 1;
+        }
+
+        /* Only the first entry in the column has a non-zero dj. So place
+         * 0 instead inside the loop, and fix it in the end. */
+        R->main.push_back(diff);
+        last_j = j;
+        for( ; c - v0 < (ptrdiff_t) len && *c < i1 ; c++) {
+            uint32_t i = *c - i0;
+            uint8_t w = i / 256;
+            R->main.push_back(w);
+            R->main.push_back(0);
+            R->ind[w].push_back((uint8_t) i);
+            L->ncoeffs ++;
+        }
+        R->main.pop_back();
+        R->col_sizes[j] = c - mb->colptrs[j];
+        mb->colptrs[j] = c;
+    }
+    
+    /* The average dj is quite easy */
+    L->dj_avg = mb->ncols_t / (double) L->ncoeffs;
+
+    printf(" w=%u, avg dj=%.1f, max dj=%u, bucket hit=1/%.1f",
+            L->ncoeffs, L->dj_avg, L->dj_max, 256.0 * L->dj_avg);
+
+    if (L->dj_avg > DJ_CUTOFF2) {
+        printf("-> too sparse\n");
+        /* We won't keep this slice */
+        for(uint32_t j = 0 ; j < mb->ncols_t ; j++) {
+            mb->colptrs[j] -= R->col_sizes[j];
+        }
+        return 0;
+    }
+
+    printf("\n");
+
+    split_large_slice_in_vblocks(mb, L, R, scrapsize);
+
+    return 1;
+}
+
+void builder_push_one_large_slice(struct matmul_bucket_data_s * mm, large_slice_t * L)
+{
+    mm->lsl.push_back(L->i1 - L->i0);
+    for( ; ! L->vbl.empty() ; L->vbl.pop_front()) {
+        large_slice_vblock_t & V(L->vbl.front());
+        mm->lsl.push_back(V.j1 - V.j0);
+        mm->lsl.push_back(V.n + 2 * V.pad);
+        mm->lsl.insert(mm->lsl.end(), &(V.ind_sizes[0]), &(V.ind_sizes[256]));
+        mm->t8.insert(mm->t8.end(), V.t8c.begin(), V.t8c.end());
+    }
+    mm->public_->ncoeffs += L->ncoeffs;
+}
+
+void builder_push_large_slices(struct matmul_bucket_data_s * mm, list<large_slice_t> * Lq)
+{
+    printf("Flushing %zu large slices\n", Lq->size());
+
+    for(unsigned int l = 0 ; !Lq->empty() ; l++, Lq->pop_front()) {
+        large_slice_t& L(Lq->front());
+        builder_push_one_large_slice(mm, &L);
+    }
+}
+
+void builder_do_all_large_slices(builder * mb, uint32_t * p_i0, list<large_slice_t> * Lq, unsigned int scrapsize)
+{
+    unsigned int rem_nrows = mb->nrows_t - *p_i0;
+    unsigned int nlarge_slices = iceildiv(rem_nrows,65536);
+    unsigned int s;
+    for(s = 0 ; s < nlarge_slices ; s++) {
+        large_slice_t L[1];
+        uint32_t i0 = * p_i0 +  s      * rem_nrows / nlarge_slices;
+        uint32_t i1 = * p_i0 + (s + 1) * rem_nrows / nlarge_slices;
+
+        printf("Lsl %u %ss %u..%u\n", s, mb->rowname, i0, i1);
+        fflush(stdout);
+        builder_do_large_slice(mb, L, i0, i1, scrapsize);
+        transfer(Lq, L);
+    }
+    *p_i0 += s * rem_nrows / nlarge_slices;
 }
 
 struct matmul_bucket_data_s * matmul_bucket_build(abobj_ptr xx, const char * filename, param_list pl, int optimized_direction)
 {
     struct matmul_bucket_data_s * mm;
+    builder mb[1];
     mm = matmul_bucket_init(xx, pl, optimized_direction);
+    builder_init(mb, filename, mm);
 
-    /* {{{ read matrix data in proper order */
-    uint32_t * data[2];
-
-    /* we'll call ``rows'' the streams of data found in data[0] */
-    read_easy(filename,
-            &data[ mm->public_->store_transposed],
-            &data[!mm->public_->store_transposed],
-            &mm->public_->dim[0],
-            &mm->public_->dim[1]);
-
-    uint32_t nrows_t = mm->public_->dim[ mm->public_->store_transposed];
-    uint32_t ncols_t = mm->public_->dim[!mm->public_->store_transposed];
-    const char * rowname = rowcol[ mm->public_->store_transposed];
-    const char * colname = rowcol[!mm->public_->store_transposed];
-    /* }}} */
 
     /* {{{ Do small slices. */
     /* First take a guess for their expected size, and
      * then arrange for slices of approximately equal size.
      */
+    uint32_t main_i0 = 0;
+
     unsigned int npack = L1_CACHE_SIZE;
     if (pl) param_list_parse_uint(pl, "l1_cache_size", &npack);
     npack /= abbytes(mm->xab,1);
-    unsigned int nslices = iceildiv(nrows_t, npack);
 
-    unsigned int nslices_index = mm->t16.size();
-    mm->t16.push_back(0);
-    mm->t16.push_back(0);        // placeholder for alignment
+    list<small_slice_t> Sq[1];
+    builder_do_all_small_slices(mb, &main_i0, Sq, npack);
+    builder_push_small_slices(mm, Sq);
 
-    unsigned int s;
+    free(mb->data[0]);
+    mb->data[0] = NULL;
 
-    uint32_t * ptr = data[0];
-    for(s = 0 ; s < nslices ; s++) {
-        uint32_t i0 =  s    * nrows_t / nslices;
-        uint32_t i1 = (s+1) * nrows_t / nslices;
-
-        /* We're doing a new slice */
-        typedef std::vector<std::pair<uint32_t, uint32_t> > L_t;
-        typedef L_t::const_iterator Lci_t;
-        typedef L_t::iterator Li_t;
-        L_t L;
-        uint32_t * ptr0 = ptr;
-        for(uint32_t i = i0 ; i < i1 ; i++) {
-            for(unsigned int j = 0 ; j < *ptr ; j++) {
-                L.push_back(std::make_pair(ptr[1+j],i-i0));
-            }
-            ptr += 1 + *ptr;
-        }
-        /* L is the list of (column index, row index) of all
-         * coefficients in the current horizontal slice */
-        std::sort(L.begin(), L.end());
-
-        /* There are two possible reasons for this slice to be discarded.
-         * Either the max dj is too large -- larger than 16 bits -- or the
-         * average dj is too large -- larger than some guessed value.
-         */
-        /* {{{ To start with, convert all j indices to differences */
-        uint32_t j = 0;
-        uint32_t dj_max = 0;
-        double dj_sum=0;
-        uint32_t weight=0;
-        for(Li_t lp = L.begin() ; lp != L.end() ; ++lp) {
-            uint32_t dj;
-            UPDATE_DIFFERENCE(j,dj,lp->first);
-            dj_sum += dj;
-            if (dj > dj_max) { dj_max = dj; }
-            weight++;
-        }
-        /*}}}*/
-        double dj_avg = dj_sum / weight;
-
-        if (dj_max >= (1UL << 16) || dj_avg >= DJ_LARGE_JUMP) {
-            ptr = ptr0;
-            break;
-        }
-
-        /* validate this slice. */
-
-        printf("Ssl %u: %ss %u..%u ; w %" PRIu32 " ; avg dj %.1f ; max dj %u\n",
-                s, rowname, i0, i1, weight, dj_avg,dj_max);
-        
-        mm->t16.push_back(i1-i0);
-        mm->t16.push_back(0);
-        mm->t16.push_back(L.size() & 0xffff);
-        mm->t16.push_back(L.size() >> 16);
-        for(Lci_t lp = L.begin() ; lp != L.end() ; ++lp) {
-            mm->t16.push_back(lp->first);
-            mm->t16.push_back(lp->second);
-        }
-        mm->t16[nslices_index]++;
-        mm->public_->ncoeffs += weight;
-    }
-
-    /*}}}*/
-
-    /* free this early, this lessens the memory pressure */
-    free(data[0]);
-    data[0] = NULL;
-
-    unsigned int end_sslices = s * nrows_t / nslices;
-    unsigned int rem_nrows = nrows_t - end_sslices;
-    unsigned int nlarge_slices = iceildiv(rem_nrows,65536);
-    /* {{{ column pointers */
-    vector<uint32_t *> colheads(ncols_t, NULL);
-    vector<uint32_t *> colptrs(ncols_t, NULL);
-    {
-        uint32_t * ptr = data[1];
-        for(uint32_t j = 0 ; j < ncols_t ; j++) {
-            uint32_t len = *ptr;
-            uint32_t * v0 = ptr + 1;
-            colheads[j] = ptr;
-            ptr += 1 + len;
-            uint32_t * c = v0;
-            for( ; c - v0 < (ptrdiff_t) len && *c < (uint32_t) end_sslices ; c++) ;
-            colptrs[j] = c;
-        }
-    } /* }}} */
+    builder_switch_to_vertical(mb, main_i0);
 
     unsigned int scrapsize = L2_CACHE_SIZE;
     if (pl) param_list_parse_uint(pl, "l2_cache_size", &scrapsize);
     scrapsize /= abbytes(mm->xab,1);
-
     mm->scrapsize = scrapsize;
 
-    list<larse_slice_t> lsl_q;
+    list<large_slice_t> Lq[1];
+    builder_do_all_large_slices(mb, &main_i0, Lq, scrapsize);
 
-    for(s = 0 ; s < nlarge_slices ; s++) {
-        larse_slice_t L;
-        uint32_t i0 = end_sslices +  s      * rem_nrows / nlarge_slices;
-        uint32_t i1 = end_sslices + (s + 1) * rem_nrows / nlarge_slices;
-        L.i0 = i0;
-        L.i1 = i1;
-        L.lslc.push_back(i1 - i0);
+    free(mb->data[1]);
+    mb->data[1] = NULL;
 
-        printf("Lsl %u %ss %u..%u\n", s, rowname, i0, i1);
+    builder_push_large_slices(mm, Lq);
 
-        L.nvslices = 0;
-        L.avg_dj_last = 0;
-        L.ncoeffs = 0;
-
-        /* We'll create vblocks one by one, and flush them as soon as the
-         * scrap size is exceeded. It's better than trying to guess in
-         * advance the number of vblocks since the distribution of the
-         * density can't be expected to be uniform across vblocks */
-        unsigned int v = 0;
-
-        for(uint32_t j = 0 ; j < ncols_t ; ) {
-            /* Start a new block */
-            vector<uint8_t> ind[256];
-            vector<uint8_t> main;
-            uint32_t j0 = j;
-            unsigned int locweight = 0;
-            uint32_t lastj = j0;
-            uint32_t dj_max = 0;
-            double dj_sum=0;
-            int pad=0;
-
-            size_t ind_tails[256] = { 0, };
-            size_t main_tail = 0;
-            // unsigned int used_input = 0;
-            for( ; j < ncols_t ; j++) {
-                uint32_t len = * colheads[j];
-                uint32_t * v0 = colheads[j] + 1;
-                uint32_t * c = colptrs[j];
-                unsigned int my_weight = 0;
-                unsigned int my_pad = 0;
-                uint32_t my_lastj = lastj;
-
-                main_tail = main.size();
-                for(unsigned int k = 0 ; k < 256 ; k++) {
-                    ind_tails[k] = ind[k].size();
-                }
-
-                for( ; c - v0 < (ptrdiff_t) len && *c < i1 ; c++) {/*{{{*/
-                    uint32_t i = *c - i0;
-                    uint8_t w = i / 256;
-                    uint32_t diff = j - my_lastj;
-                    for( ; diff > 255 ; ) {
-                        /* This is equivalent to adding two coefficients
-                         * to the matrix, but in the same position. */
-                        main.push_back(255);
-                        main.push_back(0);
-                        ind[0].push_back(0);
-                        main.push_back(0);
-                        main.push_back(0);
-                        ind[0].push_back(0);
-                        my_lastj += 255;
-                        diff -= 255;
-                        my_pad++;
-                    }
-                    main.push_back(diff);
-                    main.push_back(w);
-                    ind[w].push_back((uint8_t) i);
-                    my_lastj = j;
-                    my_weight++;
-                }/*}}}*/
-
-                if (locweight + my_weight + 2*(pad + my_pad) > scrapsize) {
-                    /* Cannot fit this. Need to rewind our work on the
-                     * arrays. */
-                    main.erase(main.begin() + main_tail, main.end());
-                    for(unsigned int k = 0 ; k < 256 ; k++) {
-                        ind[k].erase(ind[k].begin() + ind_tails[k], ind[k].end());
-                    }
-                    break;
-                }
-
-                // used_input += (my_weight != 0);
-
-                /* This one fits in the current vblock. */
-                locweight += my_weight;
-                pad += my_pad;
-                uint32_t diff = my_lastj - lastj;
-                dj_sum += diff;
-                if (diff > dj_max) dj_max = diff;
-                lastj = my_lastj;
-                colptrs[j] = c;
-            }
-            ASSERT_ALWAYS(!main.empty());
-            double avg_fill = (double) locweight / (j - j0);
-            printf(" vbl%u", v);
-            printf(": %ss %u..%u ", colname, j0, j);
-            printf("; w %u", locweight);
-            printf("; f %.2f", avg_fill);
-            printf("; avg dj %.1f", dj_sum / locweight);
-            printf("; max dj %u", dj_max);
-            if (pad) printf("; pad 6*%d", pad);
-            printf("\n");
-
-            /* push to L */
-
-            L.lslc.push_back(j - j0);
-            L.lslc.push_back(locweight + 2 * pad);
-
-            /* flush */
-            L.t8c.insert(L.t8c.end(), main.begin(), main.end());
-            for(int k = 0 ; k < 256 ; k++) {
-                L.lslc.push_back(ind[k].size());
-                L.t8c.insert(L.t8c.end(), ind[k].begin(), ind[k].end());
-            }
-#ifdef  DEBUG_BUCKETS
-            /* re-count the number of occurences of each. */
-            unsigned int recount[256] = {0, };
-            for(unsigned int z = 1 ; z < main.size() ; z+=2) {
-                recount[main[z]]++;
-            }
-            for(int k = 0 ; k < 256 ; k++) {
-                ASSERT_ALWAYS(recount[k] == L.lslc[L.lslc.size()-256+k]);
-            }
-#endif
-            L.ncoeffs += locweight;
-            L.nvslices++;
-            v++;
-        }
-        L.exp_hit = 256.0 * ncols_t / (double) L.ncoeffs;
-        printf(" end of Lsl %u ; w=%u, bucket hit rate 1/%.1f\n",
-                s, L.ncoeffs, L.exp_hit);
-        transfer(lsl_q, L);
-    }
-
+#if 0
     /* Time to flatten the queue of large slices. First we compute the
      * required storage for the mm->lsl and mm->lsl arrays.
      */
-    ASSERT(lsl_q.size() == nlarge_slices);
-    printf("Flushing %zu large slices\n", lsl_q.size());
-    size_t lsl_size = 0;
+    ASSERT(Lq->size() == nlarge_slices);
+    printf("Total %zu large slices\n", Lq->size());
+    list<large_slice_t>::iterator ll;
+    size_t switch_vlsl = 0;
+    for(ll = Lq->begin() ; ll != Lq->end() ; ll++) {
+        if (ll->dj_sum / (double) ll->ncoeffs > DJ_CUTOFF2)
+            break;
+        switch_vlsl++;
+    }
+    printf("%zu large slices saved for very large slices\n",
+            Lq->size() - switch_vlsl);
+    printf("Flushing %zu large slices\n", switch_vlsl);
+    size_t lsl_size = 1;
     size_t t8_size = 0;
-    list<larse_slice_t>::iterator ll;
-    for(ll = lsl_q.begin() ; ll != lsl_q.end() ; ll++) {
+    size_t k = 0;
+    for(ll = Lq->begin() ; ll != Lq->end() ; ll++, k++) {
+        if (k == switch_vlsl)
+            break;
         lsl_size += ll->lslc.size();
         t8_size += ll->t8c.size();
     }
     mm->lsl.reserve(lsl_size);
     mm->t8.reserve(t8_size);
-    for(ll = lsl_q.begin() ; ll != lsl_q.end() ; ll++) {
-        mm->lsl.insert(mm->lsl.end(), ll->lslc.begin(), ll->lslc.end());
-        ll->lslc.clear();
-        mm->t8.insert(mm->t8.end(), ll->t8c.begin(), ll->t8c.end());
-        ll->t8c.clear();
-        mm->public_->ncoeffs += ll->ncoeffs;
+    /* NEW: Now we also give the number of lsl before going vl */
+    mm->lsl.push_back(switch_vlsl);
+    for(k = 0 ; k < switch_vlsl ; k++) {
+        large_slice_t const& L(Lq->front());
+        mm->lsl.insert(mm->lsl.end(), L.lslc.begin(), L.lslc.end());
+        mm->t8.insert(mm->t8.end(), L.t8c.begin(), L.t8c.end());
+        mm->public_->ncoeffs += L.ncoeffs;
+        Lq->pop_front();
     }
-    free(data[1]);
+    printf("Assembling %zu large slices into very large slices\n",
+            Lq->size() - switch_vlsl);
+    for( ; !Lq->empty() ; ) {
+        /* Pick a list of at most VL_MPLEX large slices. Do so with no
+         * copy */
+        size_t mplexing = 0;
+        vector<large_slice_t> fan(VL_MPLEX);
+        for( ; !Lq->empty() && mplexing < VL_MPLEX ; mplexing++) {
+            swap(fan[mplexing], Lq->front());
+            Lq->pop_front();
+        }
+    }
+#endif
     return mm;
 }
 
