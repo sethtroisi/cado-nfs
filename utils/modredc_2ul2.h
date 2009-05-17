@@ -46,6 +46,10 @@
 #endif
 #endif
 
+/* A macro for function renaming. All functions here start with 
+   modredc2ul2_ */
+#define MODREDC2UL2_RENAME(x) modredc2ul2_##x
+
 #define MODREDC2UL2_SIZE 2
 #define MODREDC2UL2_MINBITS LONG_BIT
 #define MODREDC2UL2_MAXBITS (2 * LONG_BIT - 2)
@@ -219,25 +223,19 @@ modredc2ul2_intsub (modintredc2ul2_t r, const modintredc2ul2_t a,
   modredc2ul2_intset (r, t);
 }
 
-/* Returns the number of bits in a, that is, floor(log_2(n))+1. 
-   For n==0 returns 0. */
+/* Returns the number of bits in a, that is, floor(log_2(a))+1. 
+   For a == 0 returns 0. */
 MAYBE_UNUSED
 static inline int
 modredc2ul2_intbits (const modintredc2ul2_t a)
 {
-  int bits = 0;
-  unsigned long n = a[0];
   if (a[1] > 0UL)
-    {
-      bits = LONG_BIT;
-      n = a[1];
-    }
-  while (n > 0UL)
-    {
-      bits++;
-      n >>= 1;
-    }
-  return bits;
+    return 2*LONG_BIT - ularith_clz (a[1]);
+
+  if (a[0] > 0UL)
+    return LONG_BIT - ularith_clz (a[0]);
+  
+  return 0;
 }
 
 
@@ -719,6 +717,59 @@ modredc2ul2_mul (residueredc2ul2_t r, const residueredc2ul2_t a,
 
   /* Product of the two high words */
   ularith_mul_ul_ul_2ul (&pl, &(t[2]), a[1], b[1]); /* t2:pl < 1/16 W^2 */
+  ularith_add_ul_2ul (&(t[1]), &(t[2]), pl); /* t2:t1:t0 < 1/16 W^3 + W^2 */
+
+  /* Compute t2:t1:t0 := t2:t1:t0 + km, km < Wm < 1/4 W^3 */
+  k = t[0] * m[0].invm;
+  ularith_mul_ul_ul_2ul (&pl, &ph, k, m[0].m[0]);
+  if (t[0] != 0UL)
+    ph++; /* t[0] = 0 */
+  ularith_add_ul_2ul (&(t[1]), &(t[2]), ph);
+  ularith_mul_ul_ul_2ul (&pl, &ph, k, m[0].m[1]); /* ph:pl < 1/4 W^2 */
+  ularith_add_2ul_2ul (&(t[1]), &(t[2]), pl, ph);
+  /* t2:t1:0 < 1/16 W^3 + W^2 + 1/4 W^3 < 5/16 W^3 + W^2 */
+
+  /* Result may be larger than m, but is < 2*m */
+
+  ularith_sub_2ul_2ul_ge (&(t[1]), &(t[2]), m[0].m[0], m[0].m[1]);
+
+  r[0] = t[1];
+  r[1] = t[2];
+#if defined(MODTRACE)
+  printf (" == (%lu * 2^%d + %lu) /* PARI */ \n", r[1], LONG_BIT, r[0]);
+#endif
+  ASSERT_EXPENSIVE (modredc2ul2_intlt (r, m[0].m));
+}
+
+
+MAYBE_UNUSED
+static inline void
+modredc2ul2_sqr (residueredc2ul2_t r, const residueredc2ul2_t a, 
+                 const modulusredc2ul2_t m)
+{
+  unsigned long pl, ph, t[4], k;
+  
+  ASSERT_EXPENSIVE (modredc2ul2_intcmp (a, m[0].m) < 0);
+#if defined(MODTRACE)
+  printf ("((%lu * 2^%d + %lu)^2 %% (%lu * 2^%d + %lu)", 
+          a[1], LONG_BIT, a[0], 2 * LONG_BIT, m[0].m[1], LONG_BIT, m[0].m[0]);
+#endif
+
+  /* m < 1/4 W^2,  a < m */
+  
+  /* Square of the low word */
+  ularith_mul_ul_ul_2ul (&(t[0]), &(t[1]), a[0], a[0]); 
+
+  /* One REDC step */
+  modredc2ul2_redc1 (t, t, m); /* t < 2m < 1/2 W^2 */
+
+  /* Products of low and high word  */
+  ularith_mul_ul_ul_2ul (&pl, &ph, a[1], a[0]);   /* ph:pl < 1/4 W^2 */
+  ularith_add_2ul_2ul (&(t[0]), &(t[1]), pl, ph); /* t1:t0 < 3/4 W^2 */
+  ularith_add_2ul_2ul (&(t[0]), &(t[1]), pl, ph); /* t1:t0 < W^2 */
+
+  /* Square of high word */
+  ularith_mul_ul_ul_2ul (&pl, &(t[2]), a[1], a[1]); /* t2:pl < 1/16 W^2 */
   ularith_add_ul_2ul (&(t[1]), &(t[2]), pl); /* t2:t1:t0 < 1/16 W^3 + W^2 */
 
   /* Compute t2:t1:t0 := t2:t1:t0 + km, km < Wm < 1/4 W^3 */

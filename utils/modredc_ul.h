@@ -39,6 +39,9 @@
 #endif
 #endif
 
+/* A macro for function renaming. All functions here start with modul_ */
+#define MODREDCUL_RENAME(x) modredcul_##x
+
 #define MODREDCUL_SIZE 1
 #define MODREDCUL_MAXBITS LONG_BIT
 
@@ -233,20 +236,15 @@ modredcul_intsub (modintredcul_t r, const modintredcul_t a,
 }
 
 
-/* Returns the number of bits in a, that is, floor(log_2(n))+1. 
-   For n==0 returns 0. */
+/* Returns the number of bits in a, that is, floor(log_2(a))+1. 
+   For a == 0 returns 0. */
 MAYBE_UNUSED
 static inline int
 modredcul_intbits (const modintredcul_t a)
 {
-  int bits = 0;
-  unsigned long n = a[0];
-  while (n > 0UL) /* TODO: use clzl */
-    {
-      bits++;
-      n >>= 1;
-    }
-  return bits;
+  if (a[0] == 0)
+    return 0;
+  return LONG_BIT - ularith_clz (a[0]);
 }
 
 MAYBE_UNUSED
@@ -649,6 +647,21 @@ modredcul_mul (residueredcul_t r, const residueredcul_t a,
 #if defined(MODTRACE)
   printf (" == %lu /* PARI */ \n", r[0]);
 #endif
+}
+
+
+MAYBE_UNUSED
+static inline void
+modredcul_sqr (residueredcul_t r, const residueredcul_t a, 
+               const modulusredcul_t m)
+{
+  unsigned long plow, phigh;
+
+  ASSERT_EXPENSIVE (m[0].m % 2 != 0);
+  ASSERT_EXPENSIVE (a[0] < m[0].m);
+  
+  ularith_mul_ul_ul_2ul (&plow, &phigh, a[0], a[0]);
+  modredcul_redc (r, plow, phigh, m);
 }
 
 

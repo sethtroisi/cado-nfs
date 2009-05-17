@@ -259,6 +259,7 @@ utils/mod_ul.c
 utils/mod_ul.h
 utils/mod_ul_common.c
 utils/mod_ul_default.h
+utils/mod_rename.h
 utils/modredc_15ul.c
 utils/modredc_15ul.h
 utils/modredc_15ul_default.h

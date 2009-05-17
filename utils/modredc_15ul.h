@@ -44,6 +44,10 @@
 #endif
 #endif
 
+/* A macro for function renaming. All functions here start with 
+   modredc15ul_ */
+#define MODREDC15UL_RENAME(x) modredc15ul_##x
+
 #define MODREDC15UL_SIZE 2
 #define MODREDC15UL_MINBITS LONG_BIT
 #define MODREDC15UL_MAXBITS (LONG_BIT + LONG_BIT/2)
@@ -227,25 +231,19 @@ modredc15ul_intsub (modintredc15ul_t r, const modintredc15ul_t a,
   modredc15ul_intset (r, t);
 }
 
-/* Returns the number of bits in a, that is, floor(log_2(n))+1. 
-   For n==0 returns 0. */
+/* Returns the number of bits in a, that is, floor(log_2(a))+1. 
+   For a == 0 returns 0. */
 MAYBE_UNUSED
 static inline int
 modredc15ul_intbits (const modintredc15ul_t a)
 {
-  int bits = 0;
-  unsigned long n = a[0];
   if (a[1] > 0UL)
-    {
-      bits = LONG_BIT;
-      n = a[1];
-    }
-  while (n > 0UL)
-    {
-      bits++;
-      n >>= 1;
-    }
-  return bits;
+    return 2*LONG_BIT - ularith_clz (a[1]);
+
+  if (a[0] > 0UL)
+    return LONG_BIT - ularith_clz (a[0]);
+  
+  return 0;
 }
 
 
@@ -702,7 +700,7 @@ modredc15ul_div2 (residueredc15ul_t r, const residueredc15ul_t a,
 MAYBE_UNUSED
 static inline void
 modredc15ul_mul (residueredc15ul_t r, const residueredc15ul_t a, 
-               const residueredc15ul_t b, const modulusredc15ul_t m)
+                 const residueredc15ul_t b, const modulusredc15ul_t m)
 {
   unsigned long pl, ph, t[4], k;
   
@@ -737,6 +735,65 @@ modredc15ul_mul (residueredc15ul_t r, const residueredc15ul_t a,
   ularith_add_2ul_2ul (&(t[1]), &(t[2]), pl, ph); /* t2:t1 <= 3W^(3/2) - 3W^(1/2) - W - 1 */
   t[3] = 0UL;
   pl = a[1] * b[1];                               /* pl <= (W^(1/2)-1)^2 = W - 2W^(1/2) + 1 */
+  ularith_add_ul_2ul (&(t[2]), &(t[3]), pl);      /* t3:t2:t1 <= W^2 + W^(3/2) - 3W^(1/2) - 1 */
+  k = t[1] * m[0].invm;
+  ularith_mul_ul_ul_2ul (&pl, &ph, k, m[0].m[0]); /* ph:pl <= W^2 - 2W + 1 */
+  if (pl != 0UL)
+    ph++;
+  ularith_add_ul_2ul (&(t[2]), &(t[3]), ph);      /* t3:t2:t1 <= 2W^2 + W^(3/2) - 2W - 3W^(1/2), t1 = 0 so
+						     t3:t2 <= 2W + W^(1/2) - 3 */
+  ularith_mul_ul_ul_2ul (&pl, &ph, k, m[0].m[1]); /* ph:pl <= W^(3/2) - W - W^(1/2) + 1 */
+  ularith_add_2ul_2ul (&(t[2]), &(t[3]), pl, ph); /* t3:t2 <= W^(3/2) + W - 2 */
+
+  /* Result may be larger than m, but is < 2*m */
+
+  ularith_sub_2ul_2ul_ge (&(t[2]), &(t[3]), m[0].m[0], m[0].m[1]);
+
+  r[0] = t[2];
+  r[1] = t[3];
+#if defined(MODTRACE)
+  printf (" == (%lu * 2^%d + %lu) /* PARI */ \n", r[1], LONG_BIT, r[0]);
+#endif
+  ASSERT_EXPENSIVE (modredc15ul_intcmp (r, m[0].m) < 0);
+}
+
+
+MAYBE_UNUSED
+static inline void
+modredc15ul_sqr (residueredc15ul_t r, const residueredc15ul_t a, 
+                 const modulusredc15ul_t m)
+{
+  unsigned long pl, ph, t[4], k;
+  
+  ASSERT_EXPENSIVE (modredc15ul_intcmp (a, m[0].m) < 0);
+#if defined(MODTRACE)
+  printf ("((%lu * 2^%d + %lu)^2 / 2^%d) %% (%lu * 2^%d + %lu)", 
+          a[1], LONG_BIT, a[0], 2 * LONG_BIT, m[0].m[1], LONG_BIT, m[0].m[0]);
+#endif
+  
+  /* Square of low word */
+  ularith_mul_ul_ul_2ul (&(t[0]), &(t[1]), a[0], a[0]); /* t1:t0 = a[0]*a[0] <= W^2 - 2W + 1 */
+
+  /* One REDC step */
+  k = t[0] * m[0].invm; /* k <= W-1 */
+  ularith_mul_ul_ul_2ul (&pl, &ph, k, m[0].m[0]); /* ph:pl = k*m[0] <= W^2 - 2W + 1 */
+  /* t[0] + pl == 0 (mod W) */
+  if (pl != 0UL)
+    ph++; /* ph <= W-1 */
+  t[2] = 0UL;
+  ularith_add_ul_2ul (&(t[1]), &(t[2]), ph); /* t2:t1:0 = a[0]*a[0] + k*m[0] <= 2*W^2 - 4W + 2, so
+                                                t2:t1 = (a[0]*a[0] + k*m[0]) / W <= 2*W - 4 */
+  ularith_mul_ul_ul_2ul (&pl, &ph, k, m[0].m[1]); /* ph:pl <= (W^(1/2)-1)*(W-1) = W^(3/2) - W - W^(1/2) + 1 */
+  ularith_add_2ul_2ul (&(t[1]), &(t[2]), pl, ph); /* t2:t1 <= W^(3/2) + W - W^(1/2) - 3 */
+
+  /* Product of low and high word  */
+  ularith_mul_ul_ul_2ul (&pl, &ph, a[1], a[0]);   /* ph:pl <= W^(3/2) - W - W^(1/2) + 1 */
+  ularith_add_2ul_2ul (&(t[1]), &(t[2]), pl, ph); /* t2:t1 <= 2W^(3/2) - 2W^(1/2) - 2 */
+  ularith_add_2ul_2ul (&(t[1]), &(t[2]), pl, ph); /* t2:t1 <= 3W^(3/2) - 3W^(1/2) - W - 1 */
+  t[3] = 0UL;
+
+  /* Square of high word */
+  pl = a[1] * a[1];                               /* pl <= (W^(1/2)-1)^2 = W - 2W^(1/2) + 1 */
   ularith_add_ul_2ul (&(t[2]), &(t[3]), pl);      /* t3:t2:t1 <= W^2 + W^(3/2) - 3W^(1/2) - 1 */
   k = t[1] * m[0].invm;
   ularith_mul_ul_ul_2ul (&pl, &ph, k, m[0].m[0]); /* ph:pl <= W^2 - 2W + 1 */

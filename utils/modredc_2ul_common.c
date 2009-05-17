@@ -283,7 +283,7 @@ mod_pow_ul (residue_t r, const residue_t b, const unsigned long e,
 
   while (mask > 1UL)
     {
-      mod_mul (t, t, t, m);
+      mod_sqr (t, t, m);
       mask >>= 1;            /* (r^2)^(mask/2) * b^e = r^mask * b^e */
       if (e & mask)
         {
@@ -355,7 +355,7 @@ mod_npow_ul (residue_t r, const unsigned long b, const unsigned long e,
 
   while (mask > 0UL)
     {
-      mod_mul (t, t, t, m);
+      mod_sqr (t, t, m);
       if (b == 2UL) {
 	mod_intshl (t, t, (e & mask) ? 1 : 0);
 	ularith_sub_2ul_2ul_ge (&(t[0]), &(t[1]), m[0].m[0], m[0].m[1]);
@@ -411,7 +411,7 @@ mod_pow_mp (residue_t r, const residue_t b, const unsigned long *e,
     {
       while (mask > 0UL)
         {
-          mod_mul (t, t, t, m);
+          mod_sqr (t, t, m);
           if (e[i] & mask)
             mod_mul (t, t, b, m);
           mask >>= 1;            /* (r^2)^(mask/2) * b^e = r^mask * b^e */
@@ -458,7 +458,7 @@ mod_npow_mp (residue_t r, const unsigned long b, const unsigned long *e,
       ei = e[i];
       while (mask > 0UL)
         {
-          mod_mul (t, t, t, m);
+          mod_sqr (t, t, m);
 	  if (b == 2UL) {
 	    mod_intshl (t, t, (ei & mask) ? 1 : 0);
 	    ularith_sub_2ul_2ul_ge (&(t[0]), &(t[1]), m[0].m[0], m[0].m[1]);
@@ -515,7 +515,7 @@ mod_V_ul (residue_t r, const residue_t b,
   mod_set1 (two, m);
   mod_add (two, two, two, m);
   mod_set (t, b, m);        /* t = b = V_1 (b) */
-  mod_mul (t1, b, b, m);
+  mod_sqr (t1, b, m);
   mod_sub (t1, t1, two, m);  /* r1 = b^2 - 2 = V_2 (b) */
   mask >>= 1;
 
@@ -528,7 +528,7 @@ mod_V_ul (residue_t r, const residue_t b,
           /* j -> 2*j+1. Compute V_{2j+1} and V_{2j+2} */
           mod_mul (t, t, t1, m);
           mod_sub (t, t, b, m); /* V_j * V_{j+1} - V_1 = V_{2j+1} */
-          mod_mul (t1, t1, t1, m);
+          mod_sqr (t1, t1, m);
           mod_sub (t1, t1, two, m); /* (V_{j+1})^2 - 2 = V_{2j+2} */
         }
       else
@@ -536,7 +536,7 @@ mod_V_ul (residue_t r, const residue_t b,
           /* j -> 2*j. Compute V_{2j} and V_{2j+1} */
           mod_mul (t1, t1, t, m);
           mod_sub (t1, t1, b, m); /* V_j * V_{j+1} - V_1 = V_{2j+1}*/
-          mod_mul (t, t, t, m);
+          mod_sqr (t, t, m);
           mod_sub (t, t, two, m);
         }
       mask >>= 1;
@@ -581,7 +581,7 @@ mod_V_mp (residue_t r, const residue_t b,
   mod_set1 (two, m);
   mod_add (two, two, two, m);
   mod_set (t, b, m);         /* t = b = V_1 (b) */
-  mod_mul (t1, b, b, m);
+  mod_sqr (t1, b, m);
   mod_sub (t1, t1, two, m);  /* t1 = b^2 - 2 = V_2 (b) */
   mask >>= 1;
 
@@ -596,7 +596,7 @@ mod_V_mp (residue_t r, const residue_t b,
 	      /* j -> 2*j+1. Compute V_{2j+1} and V_{2j+2} */
 	      mod_mul (t, t, t1, m);
 	      mod_sub (t, t, b, m); /* V_j * V_{j+1} - V_1 = V_{2j+1} */
-	      mod_mul (t1, t1, t1, m);
+	      mod_sqr (t1, t1, m);
 	      mod_sub (t1, t1, two, m); /* (V_{j+1})^2 - 2 = V_{2j+2} */
 	    }
 	  else
@@ -604,7 +604,7 @@ mod_V_mp (residue_t r, const residue_t b,
 	      /* j -> 2*j. Compute V_{2j} and V_{2j+1} */
 	      mod_mul (t1, t1, t, m);
 	      mod_sub (t1, t1, b, m); /* V_j * V_{j+1} - V_1 = V_{2j+1}*/
-	      mod_mul (t, t, t, m);
+	      mod_sqr (t, t, m);
 	      mod_sub (t, t, two, m);
 	    }
           mask >>= 1;
@@ -634,7 +634,7 @@ find_minus1 (residue_t r1, const residue_t minusone, const int po2,
 
   for (i = 1 ; i < po2; i++)
     {
-      mod_mul (r1, r1, r1, m);
+      mod_sqr (r1, r1, m);
       if (mod_equal (r1, minusone, m))
         break;
     }
@@ -725,23 +725,7 @@ mod_sprp2 (const modulus_t m)
   else
     mod_2pow_ul (r, mm1[0], m);
 
-  /* If m is prime, then b^mm1 might be == 1 or == -1 (mod m) here */
-  if (mod_is1 (r, m) || mod_equal (r, minusone, m))
-    i = 1;
-  else
-    {
-      /* If m is a prime, then one of b^(2*mm1), b^(2^2*mm1), ..., 
-	 b^(2^(po2 - 1)*mm1)  must be == -1 (mod m) */
-      for ( ; po2 > 1; po2--)
-	{
-	  mod_mul (r, r, r, m);
-	  if (mod_equal (r, minusone, m))
-	    {
-	      i = 1;
-	      break;
-	    }
-	}
-    }
+  i = find_minus1 (r, minusone, po2, m);
 
   mod_clear (r, m);
   mod_clear (minusone, m);

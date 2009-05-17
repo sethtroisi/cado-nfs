@@ -39,6 +39,9 @@
 #endif
 #endif
 
+/* A macro for function renaming. All functions here start with modul_ */
+#define MODUL_RENAME(x) modul_##x
+
 #define MODUL_SIZE 1
 #define MODUL_MAXBITS LONG_BIT
 
@@ -486,6 +489,17 @@ modul_mul (residueul_t r, const residueul_t a, const residueul_t b,
 #if defined(MODTRACE)
   printf (", r = %lu\n", r);
 #endif
+}
+
+MAYBE_UNUSED
+static inline void
+modul_sqr (residueul_t r, const residueul_t a, const modulusul_t m)
+{
+  unsigned long t1, t2;
+  
+  ASSERT_EXPENSIVE (a[0] < m[0]);
+  ularith_mul_ul_ul_2ul (&t1, &t2, a[0], a[0]);
+  ularith_div_2ul_ul_ul_r (r, t1, t2, m[0]);
 }
 
 /* Computes (a * 2^wordsize) % m */

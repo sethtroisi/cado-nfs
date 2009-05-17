@@ -738,7 +738,7 @@ mod_isprime (const modulus_t m)
     }
 
   /* Set mm1 to the odd part of m-1 */
-  mm1 = n - 1;
+  mm1 = n - 1UL;
   po2 = ularith_ctz (mm1);
   mm1 >>= po2;
   
@@ -758,7 +758,7 @@ mod_isprime (const modulus_t m)
       if (!mod_is1 (r1, m))
         goto end;
     }
-  else if (!find_minus1 (r1, minusone, po2 - ((n % 8 == 7) ? 1 : 0), m))
+  else if (!find_minus1 (r1, minusone, po2 - ((n % 8 == 1) ? 1 : 0), m))
     goto end; /* Not prime */
 
   if (n < 2047UL)
