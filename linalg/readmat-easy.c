@@ -1,3 +1,8 @@
+#ifndef __cplusplus
+#define _GNU_SOURCE         /* asprintf */
+#endif
+#define _DARWIN_C_SOURCE    /* for asprintf. _ANSI_SOURCE must be undefined */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -17,15 +22,15 @@
         }								\
     } while (0)
 
-void read_easy(const char * filename,
+void read_easy_inner(const char * filename,
         uint32_t ** p_direct, uint32_t ** p_transposed,
-        unsigned int * p_nr, unsigned int * p_nc)
+        unsigned int * p_nr, unsigned int * p_nc,
+        size_t * sz0, size_t * sz1)
 {
     sparse_mat_t smat;
     FILE * f;
 
     sparse_mat_init(smat);
-
     f = fopen(filename, "r");
     if (f == NULL) {
         fprintf(stderr, "fopen(%s): %s\n", filename, strerror(errno));
@@ -33,6 +38,7 @@ void read_easy(const char * filename,
     }
     read_matrix_header(f, smat);
 
+    *sz0 = *sz1 = 0;
     uint32_t * data;
     size_t alloc = 0;
     size_t size = 0;
@@ -62,6 +68,7 @@ void read_easy(const char * filename,
     if (p_direct) {
         *p_direct = data;
     }
+    *sz0 = size;
 
     if (p_transposed == NULL) {
         free(colweights);
@@ -100,9 +107,97 @@ void read_easy(const char * filename,
 
     ASSERT(p_transposed != NULL);
     *p_transposed = res;
+    *sz1 = size;
 
     free(colweights);
     free(colptrs);
+}
+
+void read_easy(const char * filename,
+        uint32_t ** p_direct, uint32_t ** p_transposed,
+        unsigned int * p_nr, unsigned int * p_nc)
+{
+    char * cname;
+    asprintf(&cname, "%s-easy.bin", filename);
+    char * cnameT;
+    asprintf(&cnameT, "%s-easyT.bin", filename);
+
+    FILE * f;
+    if (p_direct) {
+        f = fopen(cname, "r");
+        if (f) {
+            printf("Reusing intermediary cache file %s\n", cname);
+            unsigned int nr;
+            unsigned int nc;
+            size_t fsize;
+            fread(&nr, sizeof(unsigned int), 1, f);
+            fread(&nc, sizeof(unsigned int), 1, f);
+            fread(&fsize, sizeof(size_t), 1, f);
+            if (p_nr) { *p_nr = nr; p_nr = NULL; }
+            if (p_nc) { *p_nc = nc; p_nc = NULL; }
+            *p_direct = malloc(fsize * sizeof(uint32_t));
+            fread(*p_direct, sizeof(uint32_t), fsize, f);
+            p_direct = NULL;
+            fclose(f);
+        }
+    }
+
+    if (p_transposed) {
+        f = fopen(cnameT, "r");
+        if (f) {
+            printf("Reusing intermediary cache file %s\n", cnameT);
+            unsigned int nc;
+            unsigned int nr;
+            size_t fsize;
+            fread(&nc, sizeof(unsigned int), 1, f);
+            fread(&nr, sizeof(unsigned int), 1, f);
+            fread(&fsize, sizeof(size_t), 1, f);
+            if (p_nr) { *p_nr = nr; p_nr = NULL; }
+            if (p_nc) { *p_nc = nc; p_nc = NULL; }
+            *p_transposed = malloc(fsize * sizeof(uint32_t));
+            fread(*p_transposed, sizeof(uint32_t), fsize, f);
+            p_transposed = NULL;
+            fclose(f);
+        }
+    }
+
+    size_t sz = 0, szT = 0;
+    unsigned int nr = 0;
+    unsigned int nc = 0;
+
+    if (p_direct || p_transposed || p_nr || p_nc) {
+        read_easy_inner(filename, p_direct, p_transposed, &nr, &nc, &sz, &szT);
+        if (p_nr) *p_nr = nr;
+        if (p_nc) *p_nc = nc;
+    }
+#if 0
+    /* Enable this code fragment ONLY when debugging internal mm building
+     * routines. This speeds up considerably the upstart time, thus
+     * facilitating debugging.
+     */
+    if (p_direct) {
+        f = fopen(cname, "w");
+        ASSERT_ALWAYS(f != NULL);
+        printf("Saving intermediary cache file %s\n", cname);
+        fwrite(&nr, sizeof(unsigned int), 1, f);
+        fwrite(&nc, sizeof(unsigned int), 1, f);
+        fwrite(&sz, sizeof(size_t), 1, f);
+        fwrite(*p_direct, sizeof(uint32_t), sz, f);
+        fclose(f);
+    }
+    if (p_transposed) {
+        f = fopen(cnameT, "w");
+        ASSERT_ALWAYS(f != NULL);
+        printf("Saving intermediary cache file %s\n", cnameT);
+        fwrite(&nc, sizeof(unsigned int), 1, f);
+        fwrite(&nr, sizeof(unsigned int), 1, f);
+        fwrite(&szT, sizeof(size_t), 1, f);
+        fwrite(*p_transposed, sizeof(uint32_t), szT, f);
+        fclose(f);
+    }
+#endif
+    free(cname);
+    free(cnameT);
 }
 
 /* vim: set sw=4: */
