@@ -28,6 +28,30 @@ void usage()
     exit(1);
 }
 
+#define RED(l,h) do {                                                   \
+        /* Compute crc mod x^32 + x^7 + x^6 + x^2 + 1 */                \
+        l ^= h ^ h << 2 ^ h << 6 ^ h << 7;                              \
+        h  = h >> 30 ^ h >> 26 ^ h >> 25;                               \
+        /* h is at most 7 bits now. */                                  \
+        l ^= h ^ h << 2 ^ h << 6 ^ h << 7;                              \
+        h = 0;                                                          \
+} while (0)
+
+uint32_t crc32(unsigned long * c, int n)
+{
+    uint32_t v = 0UL;
+    for(int i = 0 ; i < n ; ) {
+        unsigned long cj = *c++;
+        { uint32_t h = v, l = cj; RED(l,h); i++; v = l; if (i == n) break; }
+#if ULONG_BITS == 64
+        /* wait, there's more ! */
+        cj >>= 32;
+        { uint32_t h = v, l = cj; RED(l,h); i++; v = l; if (i == n) break; }
+#endif
+    }
+    return v;
+}
+
 int main(int argc, char * argv[])
 {
     abobj_t xx MAYBE_UNUSED;
@@ -125,10 +149,10 @@ int main(int argc, char * argv[])
     abrandom(xx, src, mm->dim[1]);
 
     if (!nocheck) {
-        abt * src2 = abinit(xx, nc);
-        abt * dst2 = abinit(xx, nr);
-        abzero(xx, src2, nc);
-        abzero(xx, dst2, nr);
+        abt * dstT = abinit(xx, nc);
+        abt * srcT = abinit(xx, nr);
+        abzero(xx, dstT, nc);
+        abzero(xx, srcT, nr);
 
         abt * checkA = abinit(xx, abnbits(xx));
         abt * checkB = abinit(xx, abnbits(xx));
@@ -136,16 +160,26 @@ int main(int argc, char * argv[])
         for(int t = 0; t < nchecks ; t++) {
             abrandom(xx, src, mm->dim[1]);
             abrandom(xx, dst, mm->dim[0]);
-            abcopy(xx, src2, src, mm->dim[1]);
-            abcopy(xx, dst2, dst, mm->dim[0]);
+            abcopy(xx, dstT, src, mm->dim[1]);
+            abcopy(xx, srcT, dst, mm->dim[0]);
+            printf("src(%u): %08" PRIx32 "\n",
+                    nc, crc32((unsigned long*) src, abbytes(xx, nc) / sizeof(unsigned long)));
             matmul_mul(mm, dst, src, 1);
+            printf("dst(%u): %08" PRIx32 "\n",
+                    nr, crc32((unsigned long*) dst, abbytes(xx, nr) / sizeof(unsigned long)));
             // debug_write(dst, abbytes(xx, mm->dim[0]), "/tmp/Lmul.%d", t);
 
-            abdotprod(xx, checkA, dst, dst2, mm->dim[0]);
-            matmul_mul(mm, src2, dst2, 0);
-            // debug_write(src2, abbytes(xx, mm->dim[1]), "/tmp/Rmul.%d", t);
+            abdotprod(xx, checkA, dst, srcT, mm->dim[0]);
 
-            abdotprod(xx, checkB, src, src2, mm->dim[1]);
+            printf("srcT(%u): %08" PRIx32 "\n",
+                    nr, crc32((unsigned long*) srcT, abbytes(xx, nr) / sizeof(unsigned long)));
+            matmul_mul(mm, dstT, srcT, 0);
+            printf("dstT(%u): %08" PRIx32 "\n",
+                    nc, crc32((unsigned long*) dstT, abbytes(xx, nc) / sizeof(unsigned long)));
+
+            // debug_write(dstT, abbytes(xx, mm->dim[1]), "/tmp/Rmul.%d", t);
+
+            abdotprod(xx, checkB, src, dstT, mm->dim[1]);
 
             if (memcmp(checkA, checkB, aboffset(xx, abnbits(xx)) * sizeof(abt)) != 0) {
                 fprintf(stderr, "Check %d failed\n", t);
@@ -157,8 +191,8 @@ int main(int argc, char * argv[])
         abclear(xx, checkA, abnbits(xx));
         abclear(xx, checkB, abnbits(xx));
 
-        abclear(xx, src2, nc);
-        abclear(xx, dst2, nr);
+        abclear(xx, dstT, nc);
+        abclear(xx, srcT, nr);
     }
 
     t0 = clock();

@@ -10,6 +10,9 @@
 /* It's awful, but I confess that this ULONG_BITS is not ``portable'',
  * norm-wise.  GMP_LIMB_BITS is at hand, but could differ. An #ifdef
  * switch depending on macros like __x86_64 is considerably more fragile.
+ *
+ * Now that cmake build cado, en external test could set this. Alas, I've yet
+ * to decide on what I want for this test.
  */
 #define	ULONG_BITS	((int) (sizeof(unsigned long) * CHAR_BIT))
 

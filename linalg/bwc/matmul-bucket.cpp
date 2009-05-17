@@ -6,8 +6,9 @@
 #define __STDC_LIMIT_MACROS
 #define __STDC_FORMAT_MACROS
 /* Manage the in-memory data for the matrix */
+
 /* It's in C++ because the STL is handy, but that's really all there is
- * to it... */
+ * to it ; a conversion to C would not be extremely difficult */
 
 #include <cstdio>
 #include <cstdlib>
@@ -31,7 +32,7 @@ using namespace std;
 
 #include "matmul-bucket.h"
 /* TODO re-enable some sort of assembly.
- */
+*/
 
 #include "abase.h"
 #include "readmat-easy.h"
@@ -48,11 +49,12 @@ using namespace std;
 /* To what should we compare the average dj value for determining when we
  * should switch from dense (small) to sparse (large) blocks */
 #define DJ_CUTOFF1   1.0
-/* Same, but for switching from large to very large blocks */
-#define DJ_CUTOFF2   1.0e20
+/* Same, but for switching from large to huge blocks */
+#define DJ_CUTOFF2   10.0
 
-/* How many large slices in a very large slice ? */
-#define VL_MPLEX        16
+/* How many large slices in a huge slice ? */
+#define HUGE_MPLEX_MIN        8
+#define HUGE_MPLEX_MAX        256
 
 #define xxxDEBUG_BUCKETS
 
@@ -99,11 +101,16 @@ using namespace std;
 
 #define MM_MAGIC_FAMILY        0xa003UL
 
-#define MM_MAGIC_VERSION       0x1007UL
+#define MM_MAGIC_VERSION       0x1009UL
 #define MM_MAGIC (MM_MAGIC_FAMILY << 16 | MM_MAGIC_VERSION)
 
 /* see matmul-basic.c */
 #define MM_DIR0_PREFERS_TRANSP_MULT   1
+
+template<typename T> inline T * ptrbegin(vector<T>& v) { return &v.front(); }
+template<typename T> inline T const * ptrbegin(vector<T> const & v) { return &v.front(); }
+template<typename T> inline T * ptrend(vector<T>& v) { return v.size() + &v.front(); }
+template<typename T> inline T const * ptrend(vector<T> const & v) { return v.size() + &v.front(); }
 
 struct matmul_bucket_data_s {
     /* repeat the fields from the public_ interface */
@@ -111,9 +118,10 @@ struct matmul_bucket_data_s {
     /* now our private fields */
     abobj_t xab;
     size_t scrapsize;
+    size_t bigscrapsize;
     vector<uint16_t> t16;       /* For small (dense) slices */
     vector<uint8_t> t8;         /* For large (sparse) slices */
-    vector<unsigned int> lsl;   /* Descriptors for large slices */
+    vector<unsigned int> aux;   /* Various descriptors -- fairly small */
 };
 
 void matmul_bucket_clear(struct matmul_bucket_data_s * mm)
@@ -187,6 +195,11 @@ void builder_switch_to_vertical(builder * mb, unsigned int i)
     }
 }
 
+/************************************/
+/* Elementary (!) buliding routines */
+
+/* {{{ small slices */
+
 struct small_slice_t {
     uint32_t i0;
     uint32_t i1;
@@ -244,56 +257,9 @@ int builder_do_small_slice(builder * mb, struct small_slice_t * S, uint32_t ** p
     return keep;
 }
 
-void builder_do_all_small_slices(builder * mb, uint32_t * p_i0, list<small_slice_t> * Sq, unsigned int npack)
-{
-    unsigned int nslices = iceildiv(mb->nrows_t, npack);
-    unsigned int s;
-    uint32_t * ptr = mb->data[0];
-    for(s = 0 ; s < nslices ; s++) {
-        uint32_t i0 =  s    * mb->nrows_t / nslices;
-        uint32_t i1 = (s+1) * mb->nrows_t / nslices;
+/* }}} */
 
-        small_slice_t S;
-
-        printf("Ssl %u: %ss %u..%u...", s, mb->rowname, i0, i1);
-        fflush(stdout);
-
-        int keep = builder_do_small_slice(mb, &S, &ptr, i0, i1);
-
-        printf(" w %" PRIu32 " ; avg dj %.1f ; max dj %u\n",
-                S.ncoeffs, S.dj_avg, S.dj_max);
-        fflush(stdout);
-
-        if (!keep) {
-            printf("Switching to large slices. Ssl %u to be redone\n", s);
-            break;
-        }
-        transfer(Sq, &S);
-    }
-    *p_i0 = s * mb->nrows_t / nslices;
-}
-
-void builder_push_small_slices(struct matmul_bucket_data_s * mm, list<small_slice_t> * Sq)
-{
-    mm->t16.push_back(Sq->size());
-    mm->t16.push_back(0);       // for alignment.
-
-    printf("Flushing %zu small slices\n", Sq->size());
-
-    for(unsigned int s = 0 ; !Sq->empty() ; s++, Sq->pop_front()) {
-        small_slice_t * S = &(Sq->front());
-
-        mm->t16.push_back(S->i1-S->i0);
-        mm->t16.push_back(0);
-        mm->t16.push_back(S->L.size() & 0xffff);
-        mm->t16.push_back(S->L.size() >> 16);
-        for(small_slice_t::Lci_t lp = S->L.begin() ; lp != S->L.end() ; ++lp) {
-            mm->t16.push_back(lp->first);
-            mm->t16.push_back(lp->second);
-        }
-        mm->public_->ncoeffs += S->ncoeffs;
-    }
-}
+/* {{{ large slices */
 
 struct large_slice_vblock_t {
     uint32_t j0;
@@ -301,7 +267,7 @@ struct large_slice_vblock_t {
     unsigned int n;             // number of coeffs.
     unsigned int pad;           // (half the) number of padding coeffs.
     vector<uint8_t> t8c;        // read: contribution to t8.
-    unsigned int ind_sizes[256];// contribution to lsl.
+    vector<unsigned int> auxc;  // read: contribution to aux.
 };
 
 struct large_slice_t {
@@ -323,10 +289,10 @@ struct large_slice_raw_t {
 void split_large_slice_in_vblocks(builder * mb, large_slice_t * L, large_slice_raw_t * R, unsigned int scrapsize)
 {
     /* Now split into vslices */
-    uint8_t * mp = &R->main.front();
+    uint8_t * mp = ptrbegin(R->main);
     uint8_t * ip[256];
     for(int k = 0 ; k < 256 ; k++) {
-        ip[k] = &R->ind[k].front();
+        ip[k] = ptrbegin(R->ind[k]);
     }
     unsigned int vblocknum = 0;
     for(uint32_t j = 0 ; j < mb->ncols_t ; vblocknum++) {
@@ -346,19 +312,21 @@ void split_large_slice_in_vblocks(builder * mb, large_slice_t * L, large_slice_r
             np += dnp;
         }
         uint32_t j1 = j;
-        
+
         large_slice_vblock_t V;
         V.j0 = j0;
         V.j1 = j1;
         /* First the main block, then all the bucket blocks. These come
          * in order. */
-        /* We have n coeffs, counting padding. This makes 2n bytes in
-         * main, and n bytes in the bucket blocks */
+        /* We have nf coeffs, counting padding. This makes 2nf bytes in
+         * main, and nf bytes in the bucket blocks */
         V.n = n;
         V.pad = np;
         size_t nf = n + 2 * np;
+        V.auxc.reserve(258);
+        V.auxc.push_back(V.j1 - V.j0);
         V.t8c.resize(3 * nf);
-        uint8_t * q = &V.t8c.front();
+        uint8_t * q = ptrbegin(V.t8c);
         /* XXX Notice that the reader process will consider as a j0 index
          * the farthest possible index from the previous vblock, which
          * means that we _must_ start with a zero in the main block here
@@ -370,19 +338,21 @@ void split_large_slice_in_vblocks(builder * mb, large_slice_t * L, large_slice_r
         if (vblocknum) {
             q[0] = 0;
         }
-        memset(V.ind_sizes, 0, sizeof(V.ind_sizes));
+        unsigned int ind_sizes[256] = {0,};
         q += 2*nf;
         for(size_t k = 0 ; k < nf ; k++) {
-            V.ind_sizes[mp[2 * k + 1]]++;
+            ind_sizes[mp[2 * k + 1]]++;
         }
         mp += 2 * nf;
+        V.auxc.push_back(nf);
         for(int k = 0 ; k < 256 ; k++) {
-            ASSERT(ip[k]-(&R->ind[k].front())+V.ind_sizes[k] <= (ptrdiff_t) R->ind[k].size());
-            memcpy(q, ip[k], V.ind_sizes[k] * sizeof(uint8_t));
-            q += V.ind_sizes[k];
-            ip[k] += V.ind_sizes[k];
+            ASSERT(ip[k]+ind_sizes[k] <= ptrend(R->ind[k]));
+            memcpy(q, ip[k], ind_sizes[k] * sizeof(uint8_t));
+            q += ind_sizes[k];
+            ip[k] += ind_sizes[k];
+            V.auxc.push_back(ind_sizes[k]);
         }
-        ASSERT(q == V.t8c.size() + &V.t8c.front());
+        ASSERT(q == ptrend(V.t8c));
 
         printf(" vbl%u", vblocknum);
         printf(": %ss %u..%u ", mb->colname, j0, j1);
@@ -390,7 +360,7 @@ void split_large_slice_in_vblocks(builder * mb, large_slice_t * L, large_slice_r
         printf("; avg dj %.1f", (j1 - j0) / (double) V.n);
         if (V.pad) printf("; pad 6*%u", V.pad);
         printf("\n");
-    
+
         transfer(&(L->vbl), &V);
     }
 }
@@ -450,7 +420,7 @@ int builder_do_large_slice(builder * mb, struct large_slice_t * L, uint32_t i0, 
         R->col_sizes[j] = c - mb->colptrs[j];
         mb->colptrs[j] = c;
     }
-    
+
     /* The average dj is quite easy */
     L->dj_avg = mb->ncols_t / (double) L->ncoeffs;
 
@@ -458,12 +428,17 @@ int builder_do_large_slice(builder * mb, struct large_slice_t * L, uint32_t i0, 
             L->ncoeffs, L->dj_avg, L->dj_max, 256.0 * L->dj_avg);
 
     if (L->dj_avg > DJ_CUTOFF2) {
-        printf("-> too sparse\n");
-        /* We won't keep this slice */
-        for(uint32_t j = 0 ; j < mb->ncols_t ; j++) {
-            mb->colptrs[j] -= R->col_sizes[j];
+        printf("-> too sparse");
+        if (mb->nrows_t - i0 < HUGE_MPLEX_MIN * 65536) {
+            printf("; kept because of short tail\n");
+        } else {
+            /* We won't keep this slice */
+            printf("\n");
+            for(uint32_t j = 0 ; j < mb->ncols_t ; j++) {
+                mb->colptrs[j] -= R->col_sizes[j];
+            }
+            return 0;
         }
-        return 0;
     }
 
     printf("\n");
@@ -473,46 +448,434 @@ int builder_do_large_slice(builder * mb, struct large_slice_t * L, uint32_t i0, 
     return 1;
 }
 
-void builder_push_one_large_slice(struct matmul_bucket_data_s * mm, large_slice_t * L)
+/* }}} */
+
+/* {{{ huge slices */
+
+struct huge_slice_t {
+    uint32_t i0;
+    uint32_t i1;
+    unsigned int ncoeffs;
+    double dj_avg;
+    uint32_t dj_max;
+    unsigned int nlarge;
+    list<large_slice_vblock_t> vbl;
+};
+
+struct huge_subslice_raw_t {
+    vector<uint8_t> ind[256];
+    vector<uint8_t> main;
+};
+
+struct huge_subslice_ptrblock_t {
+    uint8_t * ip[256];
+    uint8_t * mp;
+};
+
+struct huge_slice_raw_t {
+    vector<uint8_t> super;
+    vector<huge_subslice_raw_t> subs;
+    vector<size_t> col_sizes;
+    vector<size_t> pad_sizes;
+};
+
+void split_huge_slice_in_vblocks(builder * mb, huge_slice_t * H, huge_slice_raw_t * R, unsigned int bigscrapsize)/*{{{*/
 {
-    mm->lsl.push_back(L->i1 - L->i0);
-    for( ; ! L->vbl.empty() ; L->vbl.pop_front()) {
-        large_slice_vblock_t & V(L->vbl.front());
-        mm->lsl.push_back(V.j1 - V.j0);
-        mm->lsl.push_back(V.n + 2 * V.pad);
-        mm->lsl.insert(mm->lsl.end(), &(V.ind_sizes[0]), &(V.ind_sizes[256]));
-        mm->t8.insert(mm->t8.end(), V.t8c.begin(), V.t8c.end());
+    /* Now split into vslices */
+    uint8_t * sp = ptrbegin(R->super);
+    vector<huge_subslice_ptrblock_t> ptrs(R->subs.size());
+    for(unsigned int i = 0 ; i < R->subs.size() ; i++) {
+        ptrs[i].mp = ptrbegin(R->subs[i].main);
+        for(int k = 0 ; k < 256 ; k++) {
+            ptrs[i].ip[k] = ptrbegin(R->subs[i].ind[k]);
+        }
     }
-    mm->public_->ncoeffs += L->ncoeffs;
+    unsigned int vblocknum = 0;
+    for(uint32_t j = 0 ; j < mb->ncols_t ; vblocknum++) {
+        uint32_t j0 = j;
+#if 0
+        /* First way to advance to the next j -- compare the total number
+         * of coeffs to the bigscrapsize argument */
+        size_t n = 0;
+        size_t np = 0;
+        for( ; j < mb->ncols_t ; j++) {
+            size_t dn = R->col_sizes[j];
+            size_t dnp = R->pad_sizes[j];
+            if (n + dn + 2 * (np + dnp) > bigscrapsize) {
+                /* If dn doesn't fit, then we're in really, really big
+                 * trouble ! */
+                ASSERT_ALWAYS(n != 0);
+                break;
+            }
+            n += dn;
+            np += dnp;
+        }
+        uint32_t j1 = j;
+#else
+        /* However, there's another way. We might as well arrange so that
+         * no mega bucket exceeds the L2 cache. */
+        ASSERT(*sp != 0);
+        uint32_t j1 = j;
+        uint8_t * sp0 = sp;
+        uint8_t * spc = sp0;
+        {
+            vector<unsigned int> Lsizes(H->nlarge, 0);
+            for( ; j < mb->ncols_t && sp != ptrend(R->super) ; ) {
+                unsigned int dj = *sp;
+                j += dj;
+                if (dj) {
+                    /* beginning of a column. */
+                    spc = sp;
+                    j1 = j;
+                }
+                sp++;
+                unsigned int k = *sp++;
+                Lsizes[k]++;
+                // use the bigscrapsize argument in both cases, even
+                // though it doesn't mean the same.
+                if (Lsizes[k] > bigscrapsize) {
+                    Lsizes[k]--;
+                    sp = spc;
+                    break;
+                }
+            }
+            if (sp == ptrend(R->super)) {
+                spc = sp;
+                j1 = mb->ncols_t;
+            }
+        }
+        /* TODO: abandon the n/np distinction. It's useful for debugging
+         * at best, at it would not hurt to have it displayed only at the
+         * upper level.
+         */
+        size_t n = 0;
+        size_t np = 0;
+        for(j = j0 ; j < j1 ; j++) {
+            n += R->col_sizes[j];
+            np += R->pad_sizes[j];
+        }
+        ASSERT((n+np)*2 == (size_t) (spc - sp0));
+        sp = sp0;
+#endif
+
+        /* That's the same type, although it contains more stuff. */
+        large_slice_vblock_t V;
+        V.j0 = j0;
+        V.j1 = j1;
+        V.auxc.reserve(1 + H->nlarge * (1 + 256));
+        V.auxc.push_back(V.j1 - V.j0);
+        /* First the super block, and then for each contained large
+         * slice, the main block, then all the bucket blocks. These come
+         * in order. */
+        /* We have nf coeffs, counting padding. This makes 2nf bytes in
+         * super, nf in mains, and nf in the bucket blocks */
+        V.n = n;
+        V.pad = np;
+        size_t nf = n + 2 * np;
+        V.t8c.resize(4 * nf);
+        uint8_t * q = ptrbegin(V.t8c);
+        /* XXX Notice that the reader process will consider as a j0 index
+         * the farthest possible index from the previous vblock, which
+         * means that we _must_ start with a zero in the main block here
+         * no matter what -- even if with regard to the way data is set
+         * up at the upper level (huge unique vblock), we would have had
+         * a positive integer. This digression does not apply to the
+         * first vblock. */
+        memcpy(q, sp, 2 * nf * sizeof(uint8_t));
+        if (vblocknum) {
+            q[0] = 0;
+        }
+        /* TODO: If the solution above is to be kept, then of course we'd
+         * rather reuse this thing above, since it has already been
+         * computed.
+         */
+        vector<unsigned int> L_sizes(H->nlarge, 0);
+        q += 2*nf;
+        for(size_t k = 0 ; k < nf ; k++) {
+            ASSERT(sp[2 * k + 1] < H->nlarge);
+            L_sizes[sp[2 * k + 1]]++;
+        }
+        sp += 2 * nf;
+        V.auxc.push_back(nf);
+        for(unsigned int l = 0 ; l < H->nlarge ; l++) {
+            V.auxc.push_back(L_sizes[l]);
+        }
+        for(unsigned int l = 0 ; l < H->nlarge ; l++) {
+            unsigned int ind_sizes[256] = {0,};
+            memcpy(q, ptrs[l].mp, L_sizes[l] * sizeof(uint8_t));
+            q += L_sizes[l];
+            for(unsigned int k = 0 ; k < L_sizes[l] ; k++) {
+                ind_sizes[ptrs[l].mp[k]]++;
+            }
+            ptrs[l].mp += L_sizes[l];
+
+            for(int k = 0 ; k < 256 ; k++) {
+                ASSERT(ptrs[l].ip[k]-(ptrbegin(R->subs[l].ind[k]))+ind_sizes[k] <= (ptrdiff_t) R->subs[l].ind[k].size());
+                memcpy(q, ptrs[l].ip[k], ind_sizes[k] * sizeof(uint8_t));
+                q += ind_sizes[k];
+                ptrs[l].ip[k] += ind_sizes[k];
+                V.auxc.push_back(ind_sizes[k]);
+            }
+        }
+        ASSERT(q == ptrend(V.t8c));
+
+        printf(" vbl%u", vblocknum);
+        printf(": %ss %u..%u ", mb->colname, j0, j1);
+        printf("; w %u", V.n);
+        printf("; avg dj %.1f", (j1 - j0) / (double) V.n);
+        if (V.pad) printf("; pad 6*%u", V.pad);
+        printf("\n");
+
+        transfer(&(H->vbl), &V);
+    }
+}/*}}}*/
+
+int builder_do_huge_slice(builder * mb, struct huge_slice_t * H, uint32_t i0, uint32_t i1, unsigned int bigscrapsize)
+{
+    H->i0 = i0;
+    H->i1 = i1;
+    H->ncoeffs = 0;
+    H->dj_max = 0;
+
+    huge_slice_raw_t R[1];
+
+    R->col_sizes.assign(mb->ncols_t, 0);
+    R->pad_sizes.assign(mb->ncols_t, 0);
+
+    /* How many large slices in this huge slice ? */
+
+    H->nlarge = iceildiv(i1 - i0, 65536);
+    ASSERT(H->nlarge >= HUGE_MPLEX_MIN);
+    ASSERT(H->nlarge  < HUGE_MPLEX_MAX);
+    unsigned int lsize = iceildiv(i1 - i0, H->nlarge);
+    ASSERT(lsize <= 65536);
+    ASSERT(lsize * H->nlarge >= i1 - i0);
+    R->subs.assign(H->nlarge, huge_subslice_raw_t());
+
+    printf(" (%u*%u) ", H->nlarge, lsize);
+    uint32_t last_j = 0;
+
+    /* First we create a huge unique vblock, and later on decide on
+     * how to split it. */
+    uint32_t next_dot = mb->ncols_t / H->nlarge;
+    for(uint32_t j = 0 ; j < mb->ncols_t ; j++) {
+        uint32_t len  = * mb->colheads[j];
+        uint32_t * v0 = mb->colheads[j] + 1;
+        uint32_t * c  = mb->colptrs[j];
+
+        if (j > next_dot) {
+            printf(".");
+            fflush(stdout);
+            next_dot += mb->ncols_t / H->nlarge;
+        }
+
+        if (!(c - v0 < (ptrdiff_t) len && *c < i1))
+            continue;
+
+        uint32_t diff = j - last_j;
+        if (diff > H->dj_max) {
+            H->dj_max = diff;
+        }
+        for( ; diff > 255 ; ) {
+            R->super.push_back(255);    // dj
+            R->super.push_back(0);      // k
+            R->subs[0].main.push_back(0);
+            R->subs[0].ind[0].push_back(0);
+            R->super.push_back(0);      // dj
+            R->super.push_back(0);      // k
+            R->subs[0].main.push_back(0);
+            R->subs[0].ind[0].push_back(0);
+            diff -= 255;
+            R->pad_sizes[j] += 1;
+        }
+
+        /* Only the first entry in the column has a non-zero dj. So place
+         * 0 instead inside the loop, and fix it in the end. */
+        R->super.push_back(diff);
+        last_j = j;
+        for( ; c - v0 < (ptrdiff_t) len && *c < i1 ; c++) {
+            uint32_t i = *c - i0;
+            uint8_t w = i / lsize;
+            uint8_t wq = (i % lsize) / 256;
+            uint8_t wr = i % lsize;
+            R->super.push_back(w);
+            R->super.push_back(0);
+            R->subs[w].main.push_back(wq);
+            R->subs[w].ind[wq].push_back(wr);
+            H->ncoeffs ++;
+        }
+        R->super.pop_back();
+        R->col_sizes[j] = c - mb->colptrs[j];
+        mb->colptrs[j] = c;
+    }
+    printf("\n");
+
+    /* The average dj is quite easy */
+    H->dj_avg = mb->ncols_t / (double) H->ncoeffs;
+
+    printf(" w=%u, avg dj=%.1f, max dj=%u, bucket block hit=1/%.1f\n",
+            H->ncoeffs, H->dj_avg, H->dj_max,
+            H->nlarge * H->dj_avg);
+
+    split_huge_slice_in_vblocks(mb, H, R, bigscrapsize);
+
+    return 1;
 }
 
-void builder_push_large_slices(struct matmul_bucket_data_s * mm, list<large_slice_t> * Lq)
+/* }}} */
+
+/******************************************/
+/* Iteratively call the building routines */
+
+/* {{{ small slices */
+void builder_do_all_small_slices(builder * mb, uint32_t * p_i0, list<small_slice_t> * Sq, unsigned int npack)
 {
-    printf("Flushing %zu large slices\n", Lq->size());
+    /* npack is a guess for the expected size of small slices ; they are
+     * arranged later to all have approximately equal size.
+     */
+    unsigned int nslices = iceildiv(mb->nrows_t, npack);
+    unsigned int s;
+    uint32_t * ptr = mb->data[0];
+    for(s = 0 ; s < nslices ; s++) {
+        uint32_t i0 =  s    * mb->nrows_t / nslices;
+        uint32_t i1 = (s+1) * mb->nrows_t / nslices;
 
-    for(unsigned int l = 0 ; !Lq->empty() ; l++, Lq->pop_front()) {
-        large_slice_t& L(Lq->front());
-        builder_push_one_large_slice(mm, &L);
+        small_slice_t S;
+
+        printf("Ssl %u: %ss %u..%u...", s, mb->rowname, i0, i1);
+        fflush(stdout);
+
+        int keep = builder_do_small_slice(mb, &S, &ptr, i0, i1);
+
+        printf(" w %" PRIu32 " ; avg dj %.1f ; max dj %u\n",
+                S.ncoeffs, S.dj_avg, S.dj_max);
+        fflush(stdout);
+
+        if (!keep) {
+            printf("Switching to large slices. Ssl %u to be redone\n", s);
+            break;
+        }
+        transfer(Sq, &S);
     }
+    *p_i0 = s * mb->nrows_t / nslices;
 }
+/* }}} */
 
+/* {{{ large slices */
 void builder_do_all_large_slices(builder * mb, uint32_t * p_i0, list<large_slice_t> * Lq, unsigned int scrapsize)
 {
     unsigned int rem_nrows = mb->nrows_t - *p_i0;
     unsigned int nlarge_slices = iceildiv(rem_nrows,65536);
-    unsigned int s;
-    for(s = 0 ; s < nlarge_slices ; s++) {
+    uint32_t done = 0;
+    for(unsigned int s = 0 ; s < nlarge_slices ; s++) {
         large_slice_t L[1];
         uint32_t i0 = * p_i0 +  s      * rem_nrows / nlarge_slices;
         uint32_t i1 = * p_i0 + (s + 1) * rem_nrows / nlarge_slices;
 
-        printf("Lsl %u %ss %u..%u\n", s, mb->rowname, i0, i1);
+        printf("Lsl %u %ss %u..%u", s, mb->rowname, i0, i1);
         fflush(stdout);
-        builder_do_large_slice(mb, L, i0, i1, scrapsize);
+
+        int keep = builder_do_large_slice(mb, L, i0, i1, scrapsize);
+
+        if (!keep) {
+            printf("Switching to huge slices. Lsl %u to be redone\n", s);
+            break;
+        }
+
         transfer(Lq, L);
+        done += i1 - i0;
     }
-    *p_i0 += s * rem_nrows / nlarge_slices;
+    *p_i0 += done;
 }
+/* }}} */
+
+/* {{{ huge slices */
+void builder_do_all_huge_slices(builder * mb, uint32_t * p_i0, list<huge_slice_t> * Hq, unsigned int bigscrapsize)
+{
+    unsigned int rem_nrows = mb->nrows_t - *p_i0;
+    unsigned int nhuge_slices = iceildiv(rem_nrows, HUGE_MPLEX_MAX * 65536);
+    uint32_t done = 0;
+    for(unsigned int s = 0 ; s < nhuge_slices ; s++) {
+        huge_slice_t H[1];
+        uint32_t i0 = * p_i0 +  s      * rem_nrows / nhuge_slices;
+        uint32_t i1 = * p_i0 + (s + 1) * rem_nrows / nhuge_slices;
+
+        printf("Hsl %u %ss %u..%u", s, mb->rowname, i0, i1);
+        fflush(stdout);
+        builder_do_huge_slice(mb, H, i0, i1, bigscrapsize);
+        transfer(Hq, H);
+        done += i1 - i0;
+    }
+    *p_i0 += done;
+}
+/* }}} */
+
+/*************************************************************************/
+/* Pushing slices to mm ; all these routines clear the given slice stack */
+
+/* {{{ small slices */
+void builder_push_small_slices(struct matmul_bucket_data_s * mm, list<small_slice_t> * Sq)
+{
+    mm->t16.push_back(Sq->size());
+    mm->t16.push_back(0);       // for alignment.
+
+    printf("Flushing %zu small slices\n", Sq->size());
+
+    for(unsigned int s = 0 ; !Sq->empty() ; s++, Sq->pop_front()) {
+        small_slice_t * S = &Sq->front();
+
+        mm->t16.push_back(S->i1-S->i0);
+        mm->t16.push_back(0);
+        mm->t16.push_back(S->L.size() & 0xffff);
+        mm->t16.push_back(S->L.size() >> 16);
+        for(small_slice_t::Lci_t lp = S->L.begin() ; lp != S->L.end() ; ++lp) {
+            mm->t16.push_back(lp->first);
+            mm->t16.push_back(lp->second);
+        }
+        mm->public_->ncoeffs += S->ncoeffs;
+    }
+}
+/* }}} */
+
+/* {{{ large slices */
+void builder_push_large_slices(struct matmul_bucket_data_s * mm, list<large_slice_t> * Lq)
+{
+    printf("Flushing %zu large slices\n", Lq->size());
+
+    mm->aux.push_back(Lq->size());
+
+    for(unsigned int l = 0 ; !Lq->empty() ; l++, Lq->pop_front()) {
+        large_slice_t * L = &Lq->front();
+        mm->aux.push_back(L->i1 - L->i0);
+        for( ; ! L->vbl.empty() ; L->vbl.pop_front()) {
+            large_slice_vblock_t & V(L->vbl.front());
+            mm->aux.insert(mm->aux.end(), V.auxc.begin(), V.auxc.end());
+            mm->t8.insert(mm->t8.end(), V.t8c.begin(), V.t8c.end());
+        }
+        mm->public_->ncoeffs += L->ncoeffs;
+    }
+}
+/* }}} */
+
+/* {{{ huge slices */
+void builder_push_huge_slices(struct matmul_bucket_data_s * mm, list<huge_slice_t> * Hq)
+{
+    printf("Flushing %zu huge slices\n", Hq->size());
+
+    mm->aux.push_back(Hq->size());
+    for(unsigned int l = 0 ; !Hq->empty() ; l++, Hq->pop_front()) {
+        huge_slice_t * H = &Hq->front();
+        mm->aux.push_back(H->i1 - H->i0);
+        mm->aux.push_back(H->nlarge);
+        for( ; ! H->vbl.empty() ; H->vbl.pop_front()) {
+            large_slice_vblock_t & V(H->vbl.front());
+            mm->aux.insert(mm->aux.end(), V.auxc.begin(), V.auxc.end());
+            mm->t8.insert(mm->t8.end(), V.t8c.begin(), V.t8c.end());
+        }
+        mm->public_->ncoeffs += H->ncoeffs;
+    }
+}
+/* }}} */
 
 struct matmul_bucket_data_s * matmul_bucket_build(abobj_ptr xx, const char * filename, param_list pl, int optimized_direction)
 {
@@ -522,10 +885,6 @@ struct matmul_bucket_data_s * matmul_bucket_build(abobj_ptr xx, const char * fil
     builder_init(mb, filename, mm);
 
 
-    /* {{{ Do small slices. */
-    /* First take a guess for their expected size, and
-     * then arrange for slices of approximately equal size.
-     */
     uint32_t main_i0 = 0;
 
     unsigned int npack = L1_CACHE_SIZE;
@@ -548,61 +907,20 @@ struct matmul_bucket_data_s * matmul_bucket_build(abobj_ptr xx, const char * fil
 
     list<large_slice_t> Lq[1];
     builder_do_all_large_slices(mb, &main_i0, Lq, scrapsize);
+    builder_push_large_slices(mm, Lq);
 
+    /* Don't deallocate right now, since data is still to be used for
+     * huge slices.  */
+
+    unsigned int bigscrapsize = scrapsize; // (1 << 24)/abbytes(mm->xab,1));
+    list<huge_slice_t> Hq[1];
+    builder_do_all_huge_slices(mb, &main_i0, Hq, bigscrapsize);
+    builder_push_huge_slices(mm, Hq);
+
+    /* done, at last ! */
     free(mb->data[1]);
     mb->data[1] = NULL;
 
-    builder_push_large_slices(mm, Lq);
-
-#if 0
-    /* Time to flatten the queue of large slices. First we compute the
-     * required storage for the mm->lsl and mm->lsl arrays.
-     */
-    ASSERT(Lq->size() == nlarge_slices);
-    printf("Total %zu large slices\n", Lq->size());
-    list<large_slice_t>::iterator ll;
-    size_t switch_vlsl = 0;
-    for(ll = Lq->begin() ; ll != Lq->end() ; ll++) {
-        if (ll->dj_sum / (double) ll->ncoeffs > DJ_CUTOFF2)
-            break;
-        switch_vlsl++;
-    }
-    printf("%zu large slices saved for very large slices\n",
-            Lq->size() - switch_vlsl);
-    printf("Flushing %zu large slices\n", switch_vlsl);
-    size_t lsl_size = 1;
-    size_t t8_size = 0;
-    size_t k = 0;
-    for(ll = Lq->begin() ; ll != Lq->end() ; ll++, k++) {
-        if (k == switch_vlsl)
-            break;
-        lsl_size += ll->lslc.size();
-        t8_size += ll->t8c.size();
-    }
-    mm->lsl.reserve(lsl_size);
-    mm->t8.reserve(t8_size);
-    /* NEW: Now we also give the number of lsl before going vl */
-    mm->lsl.push_back(switch_vlsl);
-    for(k = 0 ; k < switch_vlsl ; k++) {
-        large_slice_t const& L(Lq->front());
-        mm->lsl.insert(mm->lsl.end(), L.lslc.begin(), L.lslc.end());
-        mm->t8.insert(mm->t8.end(), L.t8c.begin(), L.t8c.end());
-        mm->public_->ncoeffs += L.ncoeffs;
-        Lq->pop_front();
-    }
-    printf("Assembling %zu large slices into very large slices\n",
-            Lq->size() - switch_vlsl);
-    for( ; !Lq->empty() ; ) {
-        /* Pick a list of at most VL_MPLEX large slices. Do so with no
-         * copy */
-        size_t mplexing = 0;
-        vector<large_slice_t> fan(VL_MPLEX);
-        for( ; !Lq->empty() && mplexing < VL_MPLEX ; mplexing++) {
-            swap(fan[mplexing], Lq->front());
-            Lq->pop_front();
-        }
-    }
-#endif
     return mm;
 }
 
@@ -616,16 +934,16 @@ struct matmul_bucket_data_s * matmul_bucket_reload_cache(abobj_ptr xx, const cha
     if (f == NULL) { free(mm); return NULL; }
 
     MATMUL_COMMON_READ_ONE32(mm->scrapsize, f);
-    size_t n16, n8, nlsl;
+    size_t n16, n8, naux;
     MATMUL_COMMON_READ_ONE32(n16, f);
     MATMUL_COMMON_READ_ONE32(n8, f);
-    MATMUL_COMMON_READ_ONE32(nlsl, f);
+    MATMUL_COMMON_READ_ONE32(naux, f);
     mm->t16.resize(n16);
     mm->t8.resize(n8);
-    mm->lsl.resize(nlsl);
-    MATMUL_COMMON_READ_MANY16(&(mm->t16.front()), n16, f);
-    MATMUL_COMMON_READ_MANY8(&(mm->t8.front()), n8, f);
-    MATMUL_COMMON_READ_MANY32(&(mm->lsl.front()), nlsl, f);
+    mm->aux.resize(naux);
+    MATMUL_COMMON_READ_MANY16(ptrbegin(mm->t16), n16, f);
+    MATMUL_COMMON_READ_MANY8(ptrbegin(mm->t8), n8, f);
+    MATMUL_COMMON_READ_MANY32(ptrbegin(mm->aux), naux, f);
 
     fclose(f);
 
@@ -641,13 +959,13 @@ void matmul_bucket_save_cache(struct matmul_bucket_data_s * mm, const char * fil
     MATMUL_COMMON_WRITE_ONE32(mm->scrapsize, f);
     size_t n16 = mm->t16.size();
     size_t n8 = mm->t8.size();
-    size_t nlsl = mm->lsl.size();
+    size_t naux = mm->aux.size();
     MATMUL_COMMON_WRITE_ONE32(n16, f);
     MATMUL_COMMON_WRITE_ONE32(n8, f);
-    MATMUL_COMMON_WRITE_ONE32(nlsl, f);
-    MATMUL_COMMON_WRITE_MANY16(&(mm->t16.front()), n16, f);
-    MATMUL_COMMON_WRITE_MANY8(&(mm->t8.front()), n8, f);
-    MATMUL_COMMON_WRITE_MANY32(&(mm->lsl.front()), nlsl, f);
+    MATMUL_COMMON_WRITE_ONE32(naux, f);
+    MATMUL_COMMON_WRITE_MANY16(ptrbegin(mm->t16), n16, f);
+    MATMUL_COMMON_WRITE_MANY8(ptrbegin(mm->t8), n8, f);
+    MATMUL_COMMON_WRITE_MANY32(ptrbegin(mm->aux), naux, f);
 
     fclose(f);
 }/*}}}*/
@@ -660,39 +978,327 @@ static inline uint32_t read32(uint16_t const * & q) /* {{{ */
     return res;
 } /* }}} */
 
-void matmul_bucket_mul(struct matmul_bucket_data_s * mm, abt * dst, abt const * src, int d)
-{
-    const uint16_t * q16 = &(mm->t16.front());
-    const uint8_t * q8 = &(mm->t8.front());
-    const unsigned int * ql = &(mm->lsl.front());
+struct pos_desc {
+    const uint16_t * q16;
+    const uint8_t * q8;
+    const unsigned int * ql;
+    uint32_t i;
+    uint32_t nrows_t;
+    uint32_t ncols_t;
+};
 
-    uint32_t i = 0;
+static inline void matmul_bucket_mul_small(struct matmul_bucket_data_s * mm, abt * dst, abt const * src, int d, struct pos_desc * pos)
+{
     abobj_ptr x = mm->xab;
-    uint32_t nrows_t = mm->public_->dim[ mm->public_->store_transposed];
-    uint32_t ncols_t = mm->public_->dim[!mm->public_->store_transposed];
 
     ASM_COMMENT("multiplication code -- dense slices"); /* {{{ */
-    uint16_t nhstrips = *q16++;
-    q16++;        // alignment.
+    uint16_t nhstrips = *pos->q16++;
+    pos->q16++;        // alignment.
     if (d == !mm->public_->store_transposed) {
         for(uint16_t s = 0 ; s < nhstrips ; s++) {
-            uint32_t nrows_packed = read32(q16);
-            ASSERT(i + nrows_packed <= nrows_t);
-            abt * where = dst + aboffset(x, i);
+            uint32_t nrows_packed = read32(pos->q16);
+            ASSERT(pos->i + nrows_packed <= pos->nrows_t);
+            abt * where = dst + aboffset(x, pos->i);
             abzero(x, where, nrows_packed);
             ASM_COMMENT("critical loop");
             abt const * from = src;
-            uint32_t ncoeffs_slice = read32(q16);
+            uint32_t ncoeffs_slice = read32(pos->q16);
             uint32_t j = 0;
             for(uint32_t c = 0 ; c < ncoeffs_slice ; c++) {
-                j += *q16++;
-                ASSERT(j < ncols_t);
-                uint32_t di = *q16++;
+                j += *pos->q16++;
+                ASSERT(j < pos->ncols_t);
+                uint32_t di = *pos->q16++;
                 abadd(x, where + aboffset(x, di), from + aboffset(x, j));
             }
             ASM_COMMENT("end of critical loop");
-            i += nrows_packed;
+            pos->i += nrows_packed;
         }
+    } else {
+        /* d == mm->public_->store_transposed */
+        for(uint16_t s = 0 ; s < nhstrips ; s++) {
+            uint32_t j = 0;
+            uint32_t nrows_packed = read32(pos->q16);
+            ASM_COMMENT("critical loop");
+            uint32_t ncoeffs_slice = read32(pos->q16);
+            for(uint32_t c = 0 ; c < ncoeffs_slice ; c++) {
+                j += *pos->q16++;
+                uint32_t di = *pos->q16++;
+                abadd(x, dst + aboffset(x, j), src + aboffset(x, pos->i + di));
+            }
+            pos->i += nrows_packed;
+            ASM_COMMENT("end of critical loop");
+        }
+    }
+    ASM_COMMENT("end of dense slices"); /* }}} */
+}
+
+static inline void prepare_buckets_and_fences(abobj_ptr x, abt ** b, abt ** f, abt * z, const unsigned int * ql, unsigned int n)
+{
+    for(unsigned int k = 0 ; k < n ; k++) {
+        b[k] = z;
+        f[k] = b[k] + ql[k];
+        z += aboffset(x, ql[k]);
+    }
+}
+
+static inline void prepare_buckets(abobj_ptr x, abt ** b, abt * z, const unsigned int * ql, unsigned int n)
+{
+    for(unsigned int k = 0 ; k < n ; k++) {
+        b[k] = z;
+        z += aboffset(x, ql[k]);
+    }
+}
+
+static inline void
+fill_buckets_indirect(abobj_ptr x, abt ** sb, const abt * z, const uint8_t * q, unsigned int n)
+{
+    /* Dispatch data found in z[0]...z[f(n-1)] such that z[f(i)] is in
+     * array pointed to by sb[q[2*i+1]]. The function f(i) is given by
+     * the sum q[0]+q[2]+...+q[2*(i-1)]. Exactly 2n coefficients are
+     * expected in q[] All the sb[] pointers are increased */
+    for(unsigned int c = 0 ; c < n ; c++) {
+        z += aboffset(x, *q);
+        q++;
+        abcopy(x, sb[*q], z, 1);
+        sb[*q]++;
+        q++;
+    }
+}
+
+static inline void
+unfill_buckets_indirect(abobj_ptr x, abt ** sb, abt * z, const uint8_t * q, unsigned int n)
+{
+    /* Does the converse of the above */
+    for(unsigned int c = 0 ; c < n ; c++) {
+        z += aboffset(x, *q);
+        q++;
+        abadd(x, z, sb[*q]);
+        sb[*q]++;
+        q++;
+    }
+}
+
+static inline void apply_small_buckets(abobj_ptr x, abt * dst, const abt * z, const uint8_t * q, const unsigned int * ql)
+{
+    /* This ``applies'' the 256 small buckets whose respective lengths
+     * are given by ql[0] to ql[255].
+     *
+     * For ql[k] <= i < ql[k+1], z[i] is added to dst[k*256+qk[i]], with
+     * qk = q + ql[0] + ... + ql[k-1].
+     */
+    for(int k = 0 ; k < 256 ; k++) {
+        unsigned int l = ql[k];
+        for( ; l-- ; ) {
+            /* For padding coeffs, the assertion can fail if
+             * we choose a row not equal to (0,0) -- first in
+             * the first bucket.
+             */
+            abadd(x, dst + aboffset(x, *q), z);
+            z++;
+            q++;
+        }
+        dst += aboffset(x, 256);
+    }
+}
+
+static inline void unapply_small_buckets(abobj_ptr x, const abt * src, abt * z, const uint8_t * q, const unsigned int * ql)
+{
+    /* converse of the above */
+    for(int k = 0 ; k < 256 ; k++) {
+        unsigned int l = ql[k];
+        for( ; l-- ; ) {
+            /* For padding coeffs, the assertion can fail if
+             * we choose a row not equal to (0,0) -- first in
+             * the first bucket.
+             */
+            abcopy(x, z, src + aboffset(x, *q), 1);
+            z++;
+            q++;
+        }
+        src += aboffset(x, 256);
+    }
+}
+
+static inline void
+fill_buckets_direct(abobj_ptr x, abt ** sb, const abt * z, const uint8_t * q, unsigned int n)
+{
+    /* Dispatch data found in z[0]...z[n] such that z[i] is in array
+     * pointed to by sb[q[i]]. Exactly n coefficients are expected. All
+     * the sb[] pointers are increased */
+    for(unsigned int c = 0 ; c < n ; c++) {
+        abcopy(x, sb[q[c]], z + c, 1);
+        sb[q[c]]++;
+    }
+}
+
+static inline void
+unfill_buckets_direct(abobj_ptr x, abt ** sb, abt * z, const uint8_t * q, unsigned int n)
+{
+    /* Does the converse of the above */
+    for(unsigned int c = 0 ; c < n ; c++) {
+        abcopy(x, z + c, sb[q[c]], 1);
+        sb[q[c]]++;
+    }
+}
+
+static inline void matmul_bucket_mul_large(struct matmul_bucket_data_s * mm, abt * dst, abt const * src, int d, struct pos_desc * pos)
+{
+    abobj_ptr x = mm->xab;
+
+    abt * scrap = (abt *) abinit(x, mm->scrapsize);
+    ASM_COMMENT("multiplication code -- large (sparse) slices"); /* {{{ */
+    unsigned int nlarge = *pos->ql++;
+    if (d == !mm->public_->store_transposed) {
+        for(unsigned int s = 0 ; s < nlarge ; s++) {
+            uint32_t di = *pos->ql++;
+            ASSERT(pos->i + di <= pos->nrows_t);
+            uint32_t j = 0;
+            abzero(x, dst + aboffset(x, pos->i), di);
+            for( ; j < pos->ncols_t ; ) {
+                uint32_t j1 = j + *pos->ql++;
+                uint32_t n = *pos->ql++;
+                abt * bucket[256];
+                abt const * inp = src + aboffset(x, j);
+                abt * outp = dst + aboffset(x, pos->i);
+                prepare_buckets(x,bucket,scrap,pos->ql,256);
+                fill_buckets_indirect(x, bucket, inp, pos->q8, n);
+                apply_small_buckets(x, outp, scrap, pos->q8+2*n, pos->ql);
+                pos->q8 += 3*n;
+                pos->ql += 256;
+                j = j1;
+            }
+            pos->i += di;
+        }
+    } else {
+        for(unsigned int s = 0 ; s < nlarge ; s++) {
+            uint32_t di = *pos->ql++;
+            ASSERT(pos->i + di <= pos->nrows_t);
+            uint32_t j = 0;
+            for( ; j < pos->ncols_t ; ) {
+                uint32_t j1 = j + *pos->ql++;
+                uint32_t n = *pos->ql++;
+                abt * bucket[256];
+                abt * outp = dst + aboffset(x, j);
+                abt const *  inp = src + aboffset(x, pos->i);
+                prepare_buckets(x,bucket,scrap,pos->ql,256);
+                unapply_small_buckets(x, inp, scrap, pos->q8+2*n, pos->ql);
+                unfill_buckets_indirect(x, bucket, outp, pos->q8, n);
+                pos->q8 += 3 * n;
+                pos->ql += 256;
+                j = j1;
+            }
+            pos->i += di;
+        }
+    }
+    ASM_COMMENT("end of large (sparse) slices"); /* }}} */
+    abclear(x, scrap, mm->scrapsize);
+}
+
+static inline void matmul_bucket_mul_huge(struct matmul_bucket_data_s * mm, abt * dst, abt const * src, int d, struct pos_desc * pos)
+{
+    abobj_ptr x = mm->xab;
+
+    abt * scrap = (abt *) abinit(x, mm->scrapsize);
+    ASM_COMMENT("multiplication code -- huge (very sparse) slices"); /* {{{ */
+    unsigned int nhuge = *pos->ql++;
+    if (d == !mm->public_->store_transposed) {
+        /* ok -- hold your breath a second. */
+        for(unsigned int s = 0 ; s < nhuge ; s++) {
+            uint32_t di = *pos->ql++;
+            ASSERT(pos->i + di <= pos->nrows_t);
+            uint32_t j = 0;
+            abzero(x, dst + aboffset(x, pos->i), di);
+            unsigned int nlarge = *pos->ql++;
+            uint32_t di_sub = iceildiv(di, nlarge);
+            for( ; j < pos->ncols_t ; ) {
+                uint32_t j1 = j + *pos->ql++;
+                unsigned int n = *pos->ql++;
+                abt * bigscrap = (abt *) abinit(x, n);
+                abt const * inp = src + aboffset(x, j);
+                abt * bucket[HUGE_MPLEX_MAX];
+                const unsigned int * Lsizes = pos->ql;
+                prepare_buckets(x,bucket,bigscrap,pos->ql,nlarge);
+                pos->ql += nlarge;
+                fill_buckets_indirect(x, bucket, inp, pos->q8, n);
+                pos->q8 += 2 * n;
+                for(unsigned int k = 0 ; k < nlarge ; k++) {
+                    abt * sbucket[256];
+                    prepare_buckets(x,sbucket,scrap,pos->ql,256);
+                    bucket[k] -= Lsizes[k];
+                    fill_buckets_direct(x, sbucket, bucket[k], pos->q8, Lsizes[k]);
+                    pos->q8 += Lsizes[k];
+                    abt * outp = dst + aboffset(x, pos->i + k * di_sub);
+                    apply_small_buckets(x, outp, scrap, pos->q8, pos->ql);
+                    pos->q8 += Lsizes[k];
+                    pos->ql += 256;
+                }
+                abclear(x, bigscrap, n);
+                j = j1;
+            }
+            pos->i += di;
+        }
+    } else {
+#if 1
+        for(unsigned int s = 0 ; s < nhuge ; s++) {
+            uint32_t di = *pos->ql++;
+            ASSERT(pos->i + di <= pos->nrows_t);
+            uint32_t j = 0;
+            unsigned int nlarge = *pos->ql++;
+            uint32_t di_sub = iceildiv(di, nlarge);
+            for( ; j < pos->ncols_t ; ) {
+                uint32_t j1 = j + *pos->ql++;
+                unsigned int n = *pos->ql++;
+                abt * bigscrap = (abt *) abinit(x, n);
+                abt * outp = dst + aboffset(x, j);
+                abt * bucket[HUGE_MPLEX_MAX];
+                const unsigned int * Lsizes = pos->ql;
+                prepare_buckets(x,bucket,bigscrap,pos->ql,nlarge);
+                pos->ql += nlarge;
+                const uint8_t * q8_saved = pos->q8;
+                pos->q8 += 2 * n;
+                for(unsigned int k = 0 ; k < nlarge ; k++) {
+                    abt * sbucket[256];
+                    prepare_buckets(x,sbucket,scrap,pos->ql,256);
+                    const uint8_t * fill = pos->q8;
+                    const uint8_t * apply = pos->q8 + Lsizes[k];
+                    const abt * inp = src + aboffset(x, pos->i + k * di_sub);
+                    unapply_small_buckets(x, inp, scrap, apply, pos->ql);
+
+                    unfill_buckets_direct(x, sbucket, bucket[k], fill, Lsizes[k]);
+                    pos->q8 += 2 * Lsizes[k];
+                    pos->ql += 256;
+                }
+                swap(pos->q8, q8_saved);
+                unfill_buckets_indirect(x, bucket, outp, pos->q8, n);
+                pos->q8 += 2 * n;
+                swap(pos->q8, q8_saved);
+                abclear(x, bigscrap, n);
+                j = j1;
+            }
+            pos->i += di;
+        }
+#endif
+    }
+    ASM_COMMENT("end of huge (very sparse) slices"); /* }}} */
+    abclear(x, scrap, mm->scrapsize);
+}
+
+
+void matmul_bucket_mul(struct matmul_bucket_data_s * mm, abt * dst, abt const * src, int d)
+{
+    struct pos_desc pos[1];
+
+    pos->q16 = ptrbegin(mm->t16);
+    pos->q8 = ptrbegin(mm->t8);
+    pos->ql = ptrbegin(mm->aux);
+    pos->i = 0;
+    pos->nrows_t = mm->public_->dim[ mm->public_->store_transposed];
+    pos->ncols_t = mm->public_->dim[!mm->public_->store_transposed];
+
+    abobj_ptr x = mm->xab;
+
+    if (d == !mm->public_->store_transposed) {
+        /* That the ``normal'' case (matrix times vector). */
     } else {
         /* d == mm->public_->store_transposed */
         /* BEWARE, it's a priori sub-optimal ! In practice, the
@@ -700,133 +1306,12 @@ void matmul_bucket_mul(struct matmul_bucket_data_s * mm, abt * dst, abt const * 
         if (mm->public_->iteration[d] == 10) {
             fprintf(stderr, "Warning: Doing many iterations with bad code\n");
         }
-
-        abzero(x, dst, ncols_t);
-        for(uint16_t s = 0 ; s < nhstrips ; s++) {
-            uint32_t j = 0;
-            uint32_t nrows_packed = read32(q16);
-            ASM_COMMENT("critical loop");
-            uint32_t ncoeffs_slice = read32(q16);
-            for(uint32_t c = 0 ; c < ncoeffs_slice ; c++) {
-                j += *q16++;
-                uint32_t di = *q16++;
-                abadd(x, dst + aboffset(x, j), src + aboffset(x, i + di));
-            }
-            i += nrows_packed;
-            ASM_COMMENT("end of critical loop");
-        }
+        /* We zero out the dst area beforehand */
+        abzero(x, dst, pos->ncols_t);
     }
-    ASM_COMMENT("end of dense slices"); /* }}} */
-
-    abt * scrap = (abt *) abinit(x, mm->scrapsize);
-
-    ASM_COMMENT("multiplication code -- sparse slices"); /* {{{ */
-    if (d == !mm->public_->store_transposed) {
-        for( ; i < nrows_t ; ) {
-            uint32_t di = *ql++;
-            uint32_t j = 0;
-            abzero(x, dst + aboffset(x, i), di);
-            for( ; j < ncols_t ; ) {
-                uint32_t dj = *ql++;
-                uint32_t nread = *ql++;
-                abt const * inp = src + aboffset(x, j);
-                abt * bucket[256];
-                abt * fence[256];
-                abt * z = scrap;
-                for(int k = 0 ; k < 256 ; k++) {
-                    bucket[k] = z;
-                    fence[k] = bucket[k] + ql[k];
-                    z += aboffset(x, ql[k]);
-                }
-                /* fill buckets */
-                for( ; nread-- ; ) {
-                    ASSERT(inp - src + *q8 < aboffset(x, j+dj));
-                    inp += aboffset(x, *q8);
-                    q8++;
-                    ASSERT(bucket[*q8] < fence[*q8]);
-                    ASSERT(bucket[*q8] - scrap < (ptrdiff_t) mm->scrapsize);
-                    abcopy(x, bucket[*q8]++, inp, 1);
-                    q8++;
-                }
-                /* apply buckets */
-                z = scrap;
-                abt * outp = dst + aboffset(x, i);
-                for(int k = 0 ; k < 256 ; k++) {
-                    unsigned int l = ql[k];
-                    for( ; l-- ; ) {
-                        /* For padding coeffs, the assertion can fail if
-                         * we choose a row not equal to (0,0) -- first in
-                         * the first bucket.
-                         */
-                        ASSERT(outp + *q8 < dst + nrows_t);
-                        abadd(x, outp + aboffset(x, *q8), z);
-                        z++;
-                        q8++;
-                    }
-                    outp += aboffset(x, 256);
-                }
-                ql += 256;
-                j += dj;
-            }
-            i += di;
-        }
-    } else {
-        for( ; i < nrows_t ; ) {
-            uint32_t di = *ql++;
-            uint32_t j = 0;
-            for( ; j < ncols_t ; ) {
-                uint32_t dj = *ql++;
-                uint32_t nread = *ql++;
-                abt * bucket[256];
-                abt * fence[256];
-                abt * z = scrap;
-                for(int k = 0 ; k < 256 ; k++) {
-                    bucket[k] = z;
-                    fence[k] = bucket[k] + ql[k];
-                    z += aboffset(x, ql[k]);
-                }
-                abt * outp = dst + aboffset(x, j);
-                /* reverse-fill buckets */
-                const uint8_t * q8_saved = q8;
-                q8 += 2 * nread;
-                z = scrap;
-                abt const *  inp = src + aboffset(x, i);
-                for(int k = 0 ; k < 256 ; k++) {
-                    unsigned int l = ql[k];
-                    for( ; l-- ; ) {
-                        /* For padding coeffs, the assertion can fail if
-                         * we choose a row not equal to (0,0) -- first in
-                         * the first bucket.
-                         */
-                        ASSERT(inp + *q8 < src + nrows_t);
-                        abcopy(x, z, inp + aboffset(x, *q8), 1);
-                        z++;
-                        q8++;
-                    }
-                    inp += aboffset(x, 256);
-                }
-                /* reverse-apply buckets */
-                std::swap(q8, q8_saved);
-                for( ; nread-- ; ) {
-                    ASSERT(outp - dst + *q8 < aboffset(x, j+dj));
-                    outp += aboffset(x, *q8);
-                    q8++;
-                    ASSERT(bucket[*q8] < fence[*q8]);
-                    ASSERT(bucket[*q8] - scrap < (ptrdiff_t) mm->scrapsize);
-                    abadd(x, outp, bucket[*q8]++);
-                    q8++;
-                }
-                q8 = q8_saved;
-                ql += 256;
-                j += dj;
-            }
-            i += di;
-        }
-    }
-    ASM_COMMENT("end of sparse slices"); /* }}} */
-
-    abclear(x, scrap, mm->scrapsize);
-
+    matmul_bucket_mul_small(mm, dst, src, d, pos);
+    matmul_bucket_mul_large(mm, dst, src, d, pos);
+    matmul_bucket_mul_huge(mm, dst, src, d, pos);
 
     mm->public_->iteration[d]++;
 }
