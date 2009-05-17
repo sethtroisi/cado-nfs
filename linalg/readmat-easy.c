@@ -9,15 +9,6 @@
 #include "readmat.h"
 #include "readmat-easy.h"
 
-typedef int (*sortfunc_t) (const void *, const void *);
-
-static int uint_cmp(uint32_t * a, uint32_t * b)
-{
-    if (*a < *b) return -1;
-    else if (*b < *a) return 1;
-    return 0;
-}
-
 #define CHECK_REALLOC(ptr__,alloc__,size__,n__) do {    		\
         if (size__ + n__ >= alloc__) {					\
             alloc__ = size__ + n__;                                     \
@@ -60,8 +51,7 @@ void read_easy(const char * filename,
         read_matrix_row(f,smat,smat->data,1);
         CHECK_REALLOC(data, alloc, size, 1 + smat->data[0]);
         data[size++] = smat->data[0];
-        qsort(smat->data + 1, smat->data[0],
-                sizeof(smat->data[0]), (sortfunc_t) uint_cmp);
+        /* read_matrix_row now returns a sorted row */
         for(unsigned int j = 0 ; j < smat->data[0] ; j++) {
             data[size++] = smat->data[1+j];
             colweights[smat->data[1+j]]++;

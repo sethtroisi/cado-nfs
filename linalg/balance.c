@@ -158,10 +158,10 @@ double row_sdev;
 double col_sdev;
 
 /* full path to the input matrix */
-char * pristine_filename;
+char * filename_in;
 
 /* basename of the resulting matrix filename */
-char * working_filename;
+char * filename_out;
 /*}}}*/
 
 void usage()
@@ -467,7 +467,7 @@ void fileset_init_transfer(fileset y,
     fileset_init(y,n);
     y->status = s;
     if (x->status == INPUT) {
-        fileset_name(y, working_filename, key);
+        fileset_name(y, filename_out, key);
     } else {
         assert(x->status == TEMP);
         const char * v = x->names[i];
@@ -712,7 +712,7 @@ int read_matrix()
 {
     reading_buffer b;
 
-    rb_open(b, pristine_filename);
+    rb_open(b, filename_in);
     uint32_t i;
     int rc;
 
@@ -1664,7 +1664,7 @@ void sink_hook(sink s, unsigned int i0, unsigned int i1)
     }
     if (legacy) {
         if (i0 == 0) {
-            s->f = fopen(working_filename, "w");
+            s->f = fopen(filename_out, "w");
             fprintf(s->f, "%s", header);
         }
         if (i0 == nr) {
@@ -2051,7 +2051,7 @@ void write_info_file(int argc, char * argv[])
     char * info;
     FILE * f;
     unsigned int i,j;
-    asprintf(&info, "%s.info", working_filename);
+    asprintf(&info, "%s.info", filename_out);
     f = fopen(info, "w");
     DIE_ERRNO_DIAG(f == NULL, "fopen", info);
     fprintf(f, "%s", header);
@@ -2104,14 +2104,14 @@ void writeout_both_permutations()
 {
     if (permute_rows) {
         char * rp;
-        asprintf(&rp, "%s.row_perm", working_filename);
+        asprintf(&rp, "%s.row_perm", filename_out);
         write_permutation(rp, row_slices, nhslices);
         // write_permutation(rp, row_slices, nhslices, rows_are_weight_sorted);
         free(rp);
     }
     if (permute_cols) {
         char * cp;
-        asprintf(&cp, "%s.col_perm", working_filename);
+        asprintf(&cp, "%s.col_perm", filename_out);
         write_permutation(cp, col_slices, nvslices);
         // write_permutation(cp, col_slices, nvslices, cols_are_weight_sorted);
         free(cp);
@@ -2187,15 +2187,15 @@ int main(int argc, char * argv[])
         fprintf(stderr, "Required argument --in is missing\n");
         exit(1);
     }
-    pristine_filename = strdup(tmp);
+    filename_in = strdup(tmp);
     if ((tmp = param_list_lookup_string(pl, "out")) == NULL) {
         fprintf(stderr, "Required argument --out is missing\n");
         exit(1);
     }
-    working_filename = strdup(tmp);
+    filename_out = strdup(tmp);
 
     {
-        char * output_dirname = my_dirname(working_filename);
+        char * output_dirname = my_dirname(filename_out);
         if (output_dirname) {
             if (access(output_dirname,X_OK) < 0) {
                 int rc = mkdir(output_dirname, 0777);
@@ -2274,11 +2274,11 @@ int main(int argc, char * argv[])
     }
 
     int recycle_shuffled_matrix = 0;
-    if (access(pristine_filename, F_OK) < 0) {
+    if (access(filename_in, F_OK) < 0) {
         char * tmp;
-        asprintf(&tmp, "%s.info", pristine_filename);
+        asprintf(&tmp, "%s.info", filename_in);
         if (access(tmp, F_OK) < 0) {
-            fprintf(stderr, "%s: file not found\n", pristine_filename);
+            fprintf(stderr, "%s: file not found\n", filename_in);
             exit(1);
         }
         free(tmp);
@@ -2296,10 +2296,10 @@ int main(int argc, char * argv[])
          * I/O-smart way, in that we create a temporary file which could
          * be avoided. This would be a nightmare, however.
          */
-        asprintf(&(work->names[0]), "tmp-%s", working_filename);
+        asprintf(&(work->names[0]), "tmp-%s", filename_out);
         prefix_fixup(work->names[0],"tmp-");
 
-        read_shuffled_matrix(work->names[0], pristine_filename);
+        read_shuffled_matrix(work->names[0], filename_in);
 
         if (conjugate_permutations) {
             if (col_sdev > row_sdev) {
@@ -2314,12 +2314,12 @@ int main(int argc, char * argv[])
         work->status = TEMP;
 
         char * oldrp = NULL;
-        asprintf(&oldrp, "%s.row_perm", pristine_filename);
+        asprintf(&oldrp, "%s.row_perm", filename_in);
         unsigned int * old_rowperm = read_permutation(oldrp, nr);
         free(oldrp);
 
         char * oldcp = NULL;
-        asprintf(&oldcp, "%s.col_perm", pristine_filename);
+        asprintf(&oldcp, "%s.col_perm", filename_in);
         unsigned int * old_colperm = read_permutation(oldcp, nc);
         free(oldcp);
 
@@ -2369,7 +2369,7 @@ int main(int argc, char * argv[])
             }
         }
 
-        work->names[0] = strdup(pristine_filename);
+        work->names[0] = strdup(filename_in);
         work->status = INPUT;
 
         fprintf(stderr, "Computing permutation\n");
@@ -2402,8 +2402,8 @@ int main(int argc, char * argv[])
         write_info_file(argc0, argv0);
     }
 
-    free(pristine_filename);
-    free(working_filename);
+    free(filename_in);
+    free(filename_out);
 
     fprintf(stderr, "Done\n");
     cleanup();

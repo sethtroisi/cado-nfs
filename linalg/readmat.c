@@ -4,6 +4,15 @@
 #include "macros.h"
 #include "readmat.h"
 
+typedef int (*sortfunc_t) (const void *, const void *);
+
+static int uint_cmp(unsigned int * a, unsigned int * b)
+{
+    if (*a < *b) return -1;
+    else if (*b < *a) return 1;
+    return 0;
+}
+
 unsigned int next_alloc_size(unsigned int s, unsigned int needed)
 {
     /* most probably only one spin */
@@ -59,12 +68,21 @@ unsigned int *read_matrix_row(FILE * file, sparse_mat_t mat,
     }
 
     *dst++ = nc;
+    unsigned int last = 0;
+    int sorted = 1;
+    unsigned int * head = dst;
     for (j = 0; j < nc; ++j) {
 	unsigned int x;
 	ret = fscanf(file, "%u", &x);
 	ASSERT_ALWAYS(ret == 1);
+        if (x < last)
+            sorted = 0;
+        last = x;
 	*dst++ = x;
     }
+    if (!sorted)
+        qsort(head, nc, sizeof(unsigned int), (sortfunc_t) uint_cmp);
+
     mat->wt += nc;
     return dst;
 }

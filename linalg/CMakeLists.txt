@@ -29,3 +29,4 @@ install(TARGETS mkbitstrings characters apply_perm balance transpose RUNTIME DES
 
 set_source_files_properties (gauss.c COMPILE_FLAGS "-DMULTI_ROW=3 -DNO_MAIN")
 
+include(CMakeLists-nodist.txt OPTIONAL)
