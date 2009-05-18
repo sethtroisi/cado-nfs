@@ -64,3 +64,5 @@ utils/CMakeLists-nodist.txt
 utils/cache.c
 utils/cachesize.c
 utils/build-testcases-rootfinder.m
+linalg/CMakeLists-nodist.txt
+linalg/submatrix.c
