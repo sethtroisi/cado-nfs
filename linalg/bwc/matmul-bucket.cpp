@@ -221,6 +221,9 @@ struct small_slice_t {
 
 int builder_do_small_slice(builder * mb, struct small_slice_t * S, uint32_t ** ptr, uint32_t i0, uint32_t i1)
 {
+    S->i0 = i0;
+    S->i1 = i1;
+
     uint32_t * ptr0 = *ptr;
     /* We're doing a new slice */
     for(uint32_t i = i0 ; i < i1 ; i++) {
@@ -514,7 +517,6 @@ void split_huge_slice_in_vblocks(builder * mb, huge_slice_t * H, huge_slice_raw_
 #else
         /* However, there's another way. We might as well arrange so that
          * no mega bucket exceeds the L2 cache. */
-        ASSERT(*sp != 0);
         uint32_t j1 = j;
         uint8_t * sp0 = sp;
         uint8_t * spc = sp0;
@@ -1010,8 +1012,8 @@ static inline void matmul_bucket_mul_small(struct matmul_bucket_data_s * mm, abt
                 uint32_t di = *pos->q16++;
                 abadd(x, where + aboffset(x, di), from + aboffset(x, j));
             }
-            ASM_COMMENT("end of critical loop");
             pos->i += nrows_packed;
+            ASM_COMMENT("end of critical loop");
         }
     } else {
         /* d == mm->public_->store_transposed */
