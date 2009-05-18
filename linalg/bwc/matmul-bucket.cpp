@@ -38,23 +38,28 @@ using namespace std;
 #include "readmat-easy.h"
 #include "matmul-common.h"
 
-// take only 3/4 of the L1 cache.
-#define L1_CACHE_SIZE   24576
-// for 8-bytes abt values, this gives 3072 items.
+// take only a portion of the L1 cache.
+#define L1_CACHE_SIZE   28000
+// for 8-bytes abt values, this gives 3500 items.
 
 // make sure that it's something each core can use (i.e. divide by two
 // the L2 cache size for a dual-core w/ shared L2).
-#define L2_CACHE_SIZE   (1UL << 21)
+#define L2_CACHE_SIZE   1600000
 
 /* To what should we compare the average dj value for determining when we
  * should switch from dense (small) to sparse (large) blocks */
-#define DJ_CUTOFF1   1.0
+#define DJ_CUTOFF1   2.0
 /* Same, but for switching from large to huge blocks */
-#define DJ_CUTOFF2   10.0
+// In accordance with input data considered, 10.0 does not seem too
+// small. And perhaps it's even a bit large.
+#define DJ_CUTOFF2   7.0
 
 /* How many large slices in a huge slice ? */
 #define HUGE_MPLEX_MIN        8
-#define HUGE_MPLEX_MAX        256
+
+/* Here, I've seen 97 slices be handled best with 2 mplexed rounds. So
+ * let's fix 64. */
+#define HUGE_MPLEX_MAX        64
 
 #define xxxDEBUG_BUCKETS
 
@@ -520,6 +525,16 @@ void split_huge_slice_in_vblocks(builder * mb, huge_slice_t * H, huge_slice_raw_
         uint32_t j1 = j;
         uint8_t * sp0 = sp;
         uint8_t * spc = sp0;
+        /* XXX Notice that the reader process will consider as a j0 index
+         * the farthest possible index from the previous vblock, which
+         * means that we _must_ start with a zero in the main block here
+         * no matter what -- even if with regard to the way data is set
+         * up at the upper level (huge unique vblock), we would have had
+         * a positive integer. This digression does not apply to the
+         * first vblock. */
+        if (vblocknum) {
+            sp0[0]=0;
+        }
         {
             vector<unsigned int> Lsizes(H->nlarge, 0);
             for( ; j < mb->ncols_t && sp != ptrend(R->super) ; ) {
@@ -576,17 +591,7 @@ void split_huge_slice_in_vblocks(builder * mb, huge_slice_t * H, huge_slice_raw_
         size_t nf = n + 2 * np;
         V.t8c.resize(4 * nf);
         uint8_t * q = ptrbegin(V.t8c);
-        /* XXX Notice that the reader process will consider as a j0 index
-         * the farthest possible index from the previous vblock, which
-         * means that we _must_ start with a zero in the main block here
-         * no matter what -- even if with regard to the way data is set
-         * up at the upper level (huge unique vblock), we would have had
-         * a positive integer. This digression does not apply to the
-         * first vblock. */
         memcpy(q, sp, 2 * nf * sizeof(uint8_t));
-        if (vblocknum) {
-            q[0] = 0;
-        }
         /* TODO: If the solution above is to be kept, then of course we'd
          * rather reuse this thing above, since it has already been
          * computed.
