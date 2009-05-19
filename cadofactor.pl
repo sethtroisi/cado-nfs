@@ -1081,7 +1081,6 @@ my %tasks = (
     sieve     => { name   => "sieve and purge",
                    dep    => ['polysel'],
                    req    => ['factbase', 'freerels'],
-                   param  => ['excess'],
                    files  => ['rels\.[\de.]+-[\de.]+', 'rels\.tmp',
                               'nodup\.gz', 'duplicates\.stderr',
                               'purged', 'purge\.stderr'],
