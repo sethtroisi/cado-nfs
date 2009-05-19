@@ -31,6 +31,26 @@ make
 It may or may not be relevant to do ``make install'' as well ; at the
 moment consider ``make install'' to be badly tested.
 
+Check that your SSH configuration is correct:
+=============================================
+
+The master script uses SSH to connect to available computing resources
+(including localhost). In order to avoid the script asking your password
+or passphrase, you must have a public-key authentication and an agent. 
+
+Also, since localhost has an IP and key that varies, you'd better have
+those 3 lines in your $HOME/.ssh/config:
+
+Host    localhost
+        StrictHostKeyChecking no
+        UserKnownHostsFile /dev/null
+
+If everything is correctly configured, when you type 
+
+ssh localhost
+
+you should end up with a new shell on your machine, without having to
+type any password/passphrase.
 
 Run an example:
 ===============
@@ -41,3 +61,5 @@ The script tries to factor a 59 digit number.
 
 For other numbers, create a parameter file analogous to params/params.c59
 and call ./run_example.sh the same way.
+
+
