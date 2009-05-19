@@ -24,12 +24,32 @@ if($ENV{PTHREADS})
             set(pthread_libs ${pthread_libs} ${CMAKE_REQUIRED_LIBRARIES})
         endif(HAVE_PTHREAD_BARRIER_WAIT)
     endif(HAVE_PTHREAD_CREATE)
+else($ENV{PTHREADS})
+    message(STATUS "PTHREADS are not enabled")
 endif($ENV{PTHREADS})
 
 #############################################################
 # mpi
 # Don't use the FindMPI module, it's buggy.
+
 if($ENV{MPI})
+    set(WANT_MPI 1)
+else($ENV{MPI})
+    # cmake claims this:
+#         if(variable)
+#
+#       True if the variable's value is not empty, 0, N, NO, OFF, FALSE,
+#       NOTFOUND, or <variable>-NOTFOUND.
+    # However it's not true, and a path evaluates to false.
+    string(REGEX MATCH "^/.*$" WANT_MPI "$ENV{MPI}")
+    if(WANT_MPI STREQUAL "")
+        set(WANT_MPI 0)
+    else(WANT_MPI STREQUAL "")
+        set(WANT_MPI 1)
+    endif(WANT_MPI STREQUAL "")
+endif($ENV{MPI})
+
+if(${WANT_MPI})
     set(findprog_flags
         NO_DEFAULT_PATH
         NO_CMAKE_ENVIRONMENT_PATH
@@ -63,7 +83,9 @@ if($ENV{MPI})
     else(MPI_C_COMPILER AND MPI_CXX_COMPILER AND MPIEXEC)
         message(FATAL_ERROR "Cannot find all of mpicc/mpic++/mpiexec with MPI=$ENV{MPI}")
     endif(MPI_C_COMPILER AND MPI_CXX_COMPILER AND MPIEXEC)
-endif($ENV{MPI})
+else(${WANT_MPI})
+    message(STATUS "MPI is not enabled")
+endif(${WANT_MPI})
 
 
 configure_file(bwc.pl ${CMAKE_CURRENT_BINARY_DIR}/bwc.pl ESCAPE_QUOTES @ONLY)
