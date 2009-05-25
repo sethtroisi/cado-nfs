@@ -39,12 +39,16 @@ typedef struct {
 
 typedef poly_base_struct_t poly_base_t[1];
 
+// Management of the structure, printing
 void poly_alloc(poly_t f, int d);
 void poly_free(poly_t f);
 void poly_print(const poly_t f);
 void cleandeg(poly_t f, int deg);
 void poly_setcoeff(poly_t f, int i, const mpz_t z);
 void poly_copy(poly_t g, const poly_t f);
+
+// Polynomial operations
+
 // void poly_add(poly_t f, const poly_t g, const poly_t h);
 // void poly_sub(poly_t f, const poly_t g, const poly_t h);
 void poly_sub_mod_mpz(poly_t f, const poly_t g, const poly_t h, const mpz_t m);

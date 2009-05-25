@@ -34,5 +34,6 @@
 #include "gzip.h"
 #include "hashpair.h"
 #include "misc.h"
+#include "poly.h"
 
 #endif	/* CADO_UTILS_H_ */
