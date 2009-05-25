@@ -697,13 +697,119 @@ modredc15ul_div2 (residueredc15ul_t r, const residueredc15ul_t a,
 }
 
 
+#ifdef WANT_ASSERT_EXPENSIVE
+#define ABORT_IF_CY "jnc 1f\n\tcall abort\n1:\n\t"
+#else
+#define ABORT_IF_CY
+#endif
+
 MAYBE_UNUSED
 static inline void
 modredc15ul_mul (residueredc15ul_t r, const residueredc15ul_t a, 
                  const residueredc15ul_t b, const modulusredc15ul_t m)
 {
+#if defined(__x86_64__) && defined(__GNUC__)
+
+  ASSERT_EXPENSIVE (modredc15ul_intcmp (a, m[0].m) < 0);
+  ASSERT_EXPENSIVE (modredc15ul_intcmp (b, m[0].m) < 0);
+#if defined(MODTRACE)
+  printf ("((%lu * 2^%d + %lu) * (%lu * 2^%d + %lu) / 2^%d) %% "
+	  "(%lu * 2^%d + %lu)", 
+          a[1], LONG_BIT, a[0], b[1], LONG_BIT, b[0], 2 * LONG_BIT, 
+	  m[0].m[1], LONG_BIT, m[0].m[0]);
+#endif
+
+/* Since m1>0, m*u is maximal for m0=1 and u=2^64-1, so
+   u*m is bounded by (2^96 - 2^64 + 1)*(2^64 - 1) = 
+   2^160 - 2^128 - 2^96 - 1. Doesn't really save anything, tho */
+
+  unsigned long dummy;
+  __asm__ (
+    /* Product of low words */
+    "movq %[a0], %%rax\n\t"
+    "mulq %[b0]\n\t"         /* rdx:rax = a0*b0 */
+    "movq %%rdx, %[t0]\n\t"
+    /* Compute u0*m, add to t0:rax */
+    "imulq %[invm], %%rax\n\t"
+    "movq %%rax, %[t2]\n\t"  /* t2 = u0 */
+    "xorl %k[t1], %k[t1]\n\t"
+    "mulq %[m0]\n\t"         /* rdx:rax = u0*m0 <= (2^64-1)^2 */
+    "negq %%rax\n\t"         /* if low word != 0, carry to high word */
+    "movq %[t2], %%rax\n\t"  /* independent, goes in pipe 0 */
+    "adcq %%rdx, %[t0]\n\t"
+    "setc %b[t1]\n\t"        /* t1:t0 = (a0*b0+u0*m0)/2^64 <= (2^64-1)^2/2^64 = 2*2^64-4 */
+    "mulq %[m1]\n\t"         /* rdx:rax <= (2^64-1)*(2^32-1) = 2^96-2^64-2^32+1 */
+    "addq %%rax, %[t0]\n\t"
+    "movq %[a0], %%rax\n\t"  /* independent, goes in pipe 0 */
+    "adcq %%rdx, %[t1]\n\t"  /* t0:t1 = (a0*b0+u0*m)/2^64 */
+    ABORT_IF_CY              /* <= ((2^64-1)^2 + 2^160 - 2^128 - 2^96 - 1)/2^64
+                                <= 2^96 - 2^32 - 2 */
+    
+    /* 2 products of low and high word */
+    "xorl %k[t2], %k[t2]\n\t"
+    "mulq %[b1]\n\t"         /* rdx:rax = a0*b1 <= (2^64-1)*(2^32-1) */
+    "addq %%rax, %[t0]\n\t"
+    "movq %[a1], %%rax\n\t"  /* independent, goes in pipe 0 */
+    "adcq %%rdx, %[t1]\n\t"  /* t1:t0 = (a0*b0+u0*m)/2^64 + a0*b1 */
+    ABORT_IF_CY              /* <= 2^96 - 2^32 - 2 + 2*(2^64-1)*(2^32-1) 
+                               = 2*2^96 - 2^64 - 2*2^32 - 1 */
+    /* Free slot here */
+    "mulq %[b0]\n\t"         /* rdx:rax = a1*b0 <= (2^64-1)*(2^32-1) */
+    "addq %%rax, %[t0]\n\t"
+    "movq %[a1], %%rax\n\t"  /* independent, goes in pipe 0 */
+    "adcq %%rdx, %[t1]\n\t"  /* t1:t0 = (a0*b0+u0*m)/2^64 + a0*b1 + a1*b0 */
+    ABORT_IF_CY              /* <= 2*2^96 - 2^64 - 2*2^32 - 1 + (2^64-1)*(2^32-1)
+                                =  3*2^96 - 2*2^64 - 3*2^32 */
+    /* Free slot here */
+    /* Product of high words */
+    "imulq %[b1], %%rax\n\t" /* rax = a1*b1 <= (2^32-1)^2 = 2^64 - 2*2^32 + 1 */
+    "addq %%rax, %[t1]\n\t"
+    "setc %b[t2]\n\t"        /* t2:t1:rax = (a0*b0+u0*m)/2^64 + a0*b1 + a1*b0 + a1*b1*2^64
+                                <= 3*2^96 - 2*2^64 - 3*2^32 + (2^32-1)^2*2^64
+                                = 3*2^96 - 2*2^64 - 3*2^32 + 2^128 - 2*2^96 + 2^64
+                                = 2^128 + 2^96 - 2^64 - 3*2^32 */
+    "movq %[t0], %%rax\n\t"
+    /* Compute u1*m, add to t2:t1:t0 */
+    "imulq %[invm], %%rax\n\t"
+    "movq %%rax, %[t0]\n\t" /* t0 = u1 */
+    "mulq %[m0]\n\t"       /* rdx:rax = u1*m0 <= (2^64-1)^2 = 2^128 - 2*2^64 + 1 */
+    "negq %%rax\n\t"       /* if low word != 0, carry to high word */
+    "movq %[t0], %%rax\n\t"
+    "adcq %%rdx, %[t1]\n\t"
+    "adcq $0,%[t2]\n\t"    /* t2:t1:0 = (a0*b0+u0*m)/2^64 + a0*b1 + a1*b0 + a1*b1*2^64 + u1*m0 */
+    ABORT_IF_CY            /* <= 2^128 + 2^96 - 2^64 - 3*2^32 + 2^128 - 2*2^64 + 1
+                              = 2*2^128 + 2^96 - 3*2^64 - 3*2^32 + 1 */
+                           /* t2:t1 = ((a0*b0+u0*m)/2^64 + a0*b1 + a1*b0  + u1*m0)/2^64 + a1*b1
+                              <= 2*2^64 + 2^32 - 4 */
+
+    "mulq %[m1]\n\t"       /* rdx:rax = u1*m1 <= (2^64-1)*(2^32-1) */
+    "addq %%rax, %[t1]\n\t"
+    "adcq %%rdx, %[t2]\n\t"/* t2:t1 = ((a0*b0+u0*m)/2^64 + a0*b1 + a1*b0 + u1*m)/2^64 + a1*b1 */
+    ABORT_IF_CY            /* <= (2^128 + 2^96 - 2^64 - 3*2^32 + 2^160 - 2^128 - 2^96 - 1)/2^64
+                              = (2^160 - 2^64 - 3*2^32 - 1)/2^64
+                              <= 2^96 - 2 */
+
+  /* t2:t1:0:0 = a*b + u0*m + u1*m*2^64
+     t2:t1 <= (a*b + u0*m + u1*m*2^64) / 2^128
+     <= (m^2 + 2^64*m + 2^64*(2^64-1)*m) / 2^128
+     =  (m^2 + 2^64*m + (2^128-2^64)*m)/2^128
+     =  m + (m^2)/2^128
+     <= m + (2^96*m)/2^128
+     <= m + m/2^32 */
+    "movq %[t1], %%rax\n\t" /* See if result > m */
+    "movq %[t2], %%rdx\n\t"
+    "subq %[m0], %[t1]\n\t"
+    "sbbq %[m1], %[t2]\n\t"
+    "cmovc %%rax, %[t1]\n\t" /* No carry -> copy new result */
+    "cmovc %%rdx, %[t2]\n\t"
+    : [t0] "=&r" (dummy), [t1] "=&r" (r[0]), [t2] "=&r" (r[1])
+    : [a0] "g" (a[0]), [a1] "g" (a[1]), [b0] "rm" (b[0]), [b1] "rm" (b[1]),
+      [m0] "rm" (m[0].m[0]), [m1] "rm" (m[0].m[1]), [invm] "rm" (m[0].invm)
+    : "%rax", "%rdx", "cc"
+  );
+#else
   unsigned long pl, ph, t[4], k;
-  
+
   ASSERT_EXPENSIVE (modredc15ul_intcmp (a, m[0].m) < 0);
   ASSERT_EXPENSIVE (modredc15ul_intcmp (b, m[0].m) < 0);
 #if defined(MODTRACE)
@@ -751,6 +857,8 @@ modredc15ul_mul (residueredc15ul_t r, const residueredc15ul_t a,
 
   r[0] = t[2];
   r[1] = t[3];
+#endif
+
 #if defined(MODTRACE)
   printf (" == (%lu * 2^%d + %lu) /* PARI */ \n", r[1], LONG_BIT, r[0]);
 #endif
@@ -763,13 +871,101 @@ static inline void
 modredc15ul_sqr (residueredc15ul_t r, const residueredc15ul_t a, 
                  const modulusredc15ul_t m)
 {
-  unsigned long pl, ph, t[4], k;
-  
+#if defined(__x86_64__) && defined(__GNUC__)
   ASSERT_EXPENSIVE (modredc15ul_intcmp (a, m[0].m) < 0);
 #if defined(MODTRACE)
   printf ("((%lu * 2^%d + %lu)^2 / 2^%d) %% (%lu * 2^%d + %lu)", 
           a[1], LONG_BIT, a[0], 2 * LONG_BIT, m[0].m[1], LONG_BIT, m[0].m[0]);
 #endif
+  
+  unsigned long dummy;
+  __asm__ (
+    /* Product of low words */
+    "movq %[a0], %%rax\n\t"
+    "mulq %%rax\n\t"         /* rdx:rax = a0*a0 */
+    "movq %%rdx, %[t0]\n\t"
+    /* Compute u0*m, add to t0:rax */
+    "imulq %[invm], %%rax\n\t"
+    "movq %%rax, %[t2]\n\t"  /* t2 = u0 */
+    "xorl %k[t1], %k[t1]\n\t"
+    "mulq %[m0]\n\t"         /* rdx:rax = u0*m0 <= (2^64-1)^2 */
+    "negq %%rax\n\t"         /* if low word != 0, carry to high word */
+    "movq %[t2], %%rax\n\t"  /* independent, goes in pipe 0 */
+    "adcq %%rdx, %[t0]\n\t"
+    "setc %b[t1]\n\t"        /* t1:t0 = (a0*a0+u0*m0)/2^64 <= (2^64-1)^2/2^64 = 2*2^64-4 */
+    "mulq %[m1]\n\t"         /* rdx:rax <= (2^64-1)*(2^32-1) = 2^96-2^64-2^32+1 */
+    "addq %%rax, %[t0]\n\t"
+    "movq %[a0], %%rax\n\t"  /* independent, goes in pipe 0 */
+    "adcq %%rdx, %[t1]\n\t"  /* t0:t1 = (a0*a0+u0*m)/2^64 */
+    ABORT_IF_CY              /* <= ((2^64-1)^2 + 2^160 - 2^96 - 2^128 - 1)/2^64
+                                <= 2^96 - 2^32 - 2 */
+    
+    /* Product of low and high word */
+    "xorl %k[t2], %k[t2]\n\t"
+    "mulq %[a1]\n\t"         /* rdx:rax = a0*a1 <= (2^64-1)*(2^32-1) */
+    "shlq $1,%%rax\n\t"
+    "rclq $1,%%rdx\n\t"
+    ABORT_IF_CY
+    "addq %%rax, %[t0]\n\t"
+    "adcq %%rdx, %[t1]\n\t"  /* t1:t0 = (a0*a0+u0*m)/2^64 + 2*a0*a1 */
+    ABORT_IF_CY              /* <= 2^96 - 2^32 - 2 + 2*(2^64-1)*(2^32-1)
+                                =  3*2^96 - 2*2^64 - 3*2^32 */
+    "movq %[a1], %%rax\n\t"  /* independent, goes in pipe 0 */
+    /* Free slot here */
+    /* Product of high words */
+    "imulq %%rax, %%rax\n\t" /* rax = a1*a1 <= (2^32-1)^2 = 2^64 - 2*2^32 + 1 */
+    "addq %%rax, %[t1]\n\t"
+    "setc %b[t2]\n\t"        /* t2:t1:rax = (a0*a0+u0*m)/2^64 + 2*a0*a1 + a1*a1*2^64
+                                <= 3*2^96 - 2*2^64 - 3*2^32 + (2^32-1)^2*2^64
+                                = 3*2^96 - 2*2^64 - 3*2^32 + 2^128 - 2*2^96 + 2^64
+                                = 2^128 + 2^96 - 2^64 - 3*2^32 */
+    "movq %[t0], %%rax\n\t"
+    /* Compute u1*m, add to t2:t1:t0 */
+    "imulq %[invm], %%rax\n\t"
+    "movq %%rax, %[t0]\n\t" /* t0 = u1 */
+    "mulq %[m0]\n\t"       /* rdx:rax = u1*m0 <= (2^64-1)^2 = 2^128 - 2*2^64 + 1 */
+    "negq %%rax\n\t"       /* if low word != 0, carry to high word */
+    "movq %[t0], %%rax\n\t"
+    "adcq %%rdx, %[t1]\n\t"
+    "adcq $0,%[t2]\n\t"    /* t2:t1:0 = (a0*a0+u0*m)/2^64 + 2*a0*a1 + a1*a1*2^64 + u1*m0 */
+    ABORT_IF_CY            /* <= 2^128 + 2^96 - 2^64 - 3*2^32 + 2^128 - 2*2^64 + 1
+                              = 2*2^128 + 2^96 - 3*2^64 - 3*2^32 + 1 */
+                           /* t2:t1 = ((a0*a0+u*m)/2^64 + a0*a1 + a1*a0  + u*m0)/2^64 + a1*a1
+                              <= 2*2^64 + 2^32 - 4 */
+
+    "mulq %[m1]\n\t"       /* rdx:rax = u1*m1 <= (2^64-1)*(2^32-1) */
+    "addq %%rax, %[t1]\n\t"
+    "adcq %%rdx, %[t2]\n\t"/* t2:t1 = ((a0*a0+u0*m)/2^64 + 2*a0*a1 + u1*m)/2^64 + a1*a1 */
+    ABORT_IF_CY            /* <= (2^128 + 2^96 - 2^64 - 3*2^32 + 2^160 - 2^128 - 2^96 - 1)/2^64
+                              = (2^160 - 2^64 - 3*2^32 - 1)/2^64
+                              <= 2^96 - 2 */
+
+  /* t2:t1:0:0 = a*b + u0*m + u1*m*2^64
+     t2:t1 <= (a*b + u0*m + u1*m*2^64) / 2^128
+     <= (m^2 + 2^64*m + 2^64*(2^64-1)*m)/2^128
+     =  (m^2 + 2^64*m + (2^128-2^64)*m)/2^128
+     =  m + (m^2)/2^128
+     <= m + (2^96*m)/2^128
+     <= m + m/2^32 */
+    "movq %[t1], %%rax\n\t" /* See if result > m */
+    "movq %[t2], %%rdx\n\t"
+    "subq %[m0], %[t1]\n\t"
+    "sbbq %[m1], %[t2]\n\t"
+    "cmovc %%rax, %[t1]\n\t" /* No carry -> copy new result */
+    "cmovc %%rdx, %[t2]\n\t"
+    : [t0] "=&r" (dummy), [t1] "=&r" (r[0]), [t2] "=&r" (r[1])
+    : [a0] "g" (a[0]), [a1] "g" (a[1]), [m0] "rm" (m[0].m[0]), [m1] "rm" (m[0].m[1]), 
+      [invm] "rm" (m[0].invm)
+    : "%rax", "%rdx", "cc"
+  );
+#else
+  ASSERT_EXPENSIVE (modredc15ul_intcmp (a, m[0].m) < 0);
+#if defined(MODTRACE)
+  printf ("((%lu * 2^%d + %lu)^2 / 2^%d) %% (%lu * 2^%d + %lu)", 
+          a[1], LONG_BIT, a[0], 2 * LONG_BIT, m[0].m[1], LONG_BIT, m[0].m[0]);
+#endif
+  
+  unsigned long pl, ph, t[4], k;
   
   /* Square of low word */
   ularith_mul_ul_ul_2ul (&(t[0]), &(t[1]), a[0], a[0]); /* t1:t0 = a[0]*a[0] <= W^2 - 2W + 1 */
@@ -810,6 +1006,8 @@ modredc15ul_sqr (residueredc15ul_t r, const residueredc15ul_t a,
 
   r[0] = t[2];
   r[1] = t[3];
+#endif
+
 #if defined(MODTRACE)
   printf (" == (%lu * 2^%d + %lu) /* PARI */ \n", r[1], LONG_BIT, r[0]);
 #endif

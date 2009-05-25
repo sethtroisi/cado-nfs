@@ -302,7 +302,7 @@ mod_pow_ul (residue_t r, const residue_t b, const unsigned long e,
 
   while (mask > 1UL)
     {
-      mod_mul (t, t, t, m);
+      mod_sqr (t, t, m);
       mask >>= 1;            /* (t^2)^(mask/2) * b^e = t^mask * b^e */
       if (e & mask)
         {
@@ -342,7 +342,7 @@ mod_2pow_ul (residue_t r, const unsigned long e, const modulus_t m)
 
   while (mask > 0UL)
     {
-      mod_mul (t, t, t, m);
+      mod_sqr (t, t, m);
       mod_add (u, t, t, m);
       if (e & mask)
         mod_set (t, u, m);
@@ -378,7 +378,7 @@ mod_3pow_ul (residue_t r, const unsigned long e, const modulus_t m)
 
   while (mask > 0UL)
     {
-      mod_mul (t, t, t, m);
+      mod_sqr (t, t, m);
       mod_add (u, t, t, m);
       mod_add (u, u, t, m);
       if (e & mask)
@@ -417,7 +417,7 @@ mod_pow_mp (residue_t r, const residue_t b, const unsigned long *e,
     {
       while (mask > 0UL)
         {
-          mod_mul (t, t, t, m);
+          mod_sqr (t, t, m);
           if (e[i] & mask)
             mod_mul (t, t, b, m);
           mask >>= 1;
@@ -455,7 +455,7 @@ mod_2pow_mp (residue_t r, const unsigned long *e, const int e_nrwords,
     {
       while (mask > 0UL)
         {
-          mod_mul (t, t, t, m);
+          mod_sqr (t, t, m);
           mod_add (u, t, t, m);
           if (e[i] & mask)
             mod_set (t, u, m);
@@ -498,7 +498,7 @@ mod_V_ul (residue_t r, const residue_t b, const unsigned long e,
   mod_set1 (two, m);
   mod_add (two, two, two, m);
   mod_set (t, b, m);         /* t = b = V_1 (b) */
-  mod_mul (t1, b, b, m);
+  mod_sqr (t1, b, m);
   mod_sub (t1, t1, two, m);  /* t1 = b^2 - 2 = V_2 (b) */
   mask >>= 1;
 
@@ -511,7 +511,7 @@ mod_V_ul (residue_t r, const residue_t b, const unsigned long e,
           /* j -> 2*j+1. Compute V_{2j+1} and V_{2j+2} */
           mod_mul (t, t, t1, m);
           mod_sub (t, t, b, m); /* V_j * V_{j+1} - V_1 = V_{2j+1} */
-          mod_mul (t1, t1, t1, m);
+          mod_sqr (t1, t1, m);
           mod_sub (t1, t1, two, m); /* (V_{j+1})^2 - 2 = V_{2j+2} */
         }
       else
@@ -519,7 +519,7 @@ mod_V_ul (residue_t r, const residue_t b, const unsigned long e,
           /* j -> 2*j. Compute V_{2j} and V_{2j+1} */
           mod_mul (t1, t1, t, m);
           mod_sub (t1, t1, b, m); /* V_j * V_{j+1} - V_1 = V_{2j+1}*/
-          mod_mul (t, t, t, m);
+          mod_sqr (t, t, m);
           mod_sub (t, t, two, m);
         }
       mask >>= 1;
@@ -559,7 +559,7 @@ mod_V_mp (residue_t r, const residue_t b, const unsigned long *e,
   mod_set1 (two, m);
   mod_add (two, two, two, m);
   mod_set (t, b, m);
-  mod_mul (t1, b, b, m);
+  mod_sqr (t1, b, m);
   mod_sub (t1, t1, two, m);
   mask >>= 1;
 
@@ -571,14 +571,14 @@ mod_V_mp (residue_t r, const residue_t b, const unsigned long *e,
 	    {
 	      mod_mul (t, t, t1, m);
 	      mod_sub (t, t, b, m);
-	      mod_mul (t1, t1, t1, m);
+	      mod_sqr (t1, t1, m);
 	      mod_sub (t1, t1, two, m);
 	    }
 	  else
 	    {
 	      mod_mul (t1, t1, t, m);
 	      mod_sub (t1, t1, b, m);
-	      mod_mul (t, t, t, m);
+	      mod_sqr (t, t, m);
 	      mod_sub (t, t, two, m);
 	    }
           mask >>= 1;
@@ -607,7 +607,7 @@ find_minus1 (residue_t r1, const residue_t minusone, const int po2,
 
   for (i = 1 ; i < po2; i++)
     {
-      mod_mul (r1, r1, r1, m);
+      mod_sqr (r1, r1, m);
       if (mod_equal (r1, minusone, m))
         break;
     }

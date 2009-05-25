@@ -128,7 +128,7 @@ mod_inv (residue_t r, const residue_t sp, const modulus_t m)
 
 #ifndef NDEBUG
   mod_mul (tmp, tmp, r, m);
-  ASSERT(mod_get_ul (tmp, m) == 1UL);
+  ASSERT(mod_is1 (tmp, m));
   mod_clear (tmp, m);
 #endif
 

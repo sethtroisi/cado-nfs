@@ -518,13 +518,13 @@ modredcul_add (residueredcul_t r, const residueredcul_t a,
 
 #if (defined(__i386__) || defined(__x86_64__)) && defined(__GNUC__)
   {
-    unsigned long t = a[0] - m[0].m, tr = a[0] + b[0];
-    
+    unsigned long t = a[0] + b[0], tr = a[0] - m[0].m;
+  
     __asm__ (
-      "add %2, %1\n\t"   /* t += b */
-      "cmovc %1, %0\n\t"  /* if (cy) tr = t */
-      : "+r" (tr), "+&r" (t)
-      : "g" (b[0])
+      "add %2, %0\n\t"   /* tr += b */
+      "cmovnc %1, %0\n\t"  /* if (!cy) tr = t */
+      : "+&r" (tr)
+      : "rm" (t), "g" (b[0])
       : "cc"
     );
     ASSERT_EXPENSIVE (tr == ((a[0] >= m[0].m - b[0]) ? (a[0] - (m[0].m - b[0])) : (a[0] + b[0])));
@@ -642,7 +642,30 @@ modredcul_mul (residueredcul_t r, const residueredcul_t a,
 #endif
   
   ularith_mul_ul_ul_2ul (&plow, &phigh, a[0], b[0]);
+
+#if defined(__x86_64__) && defined(__GNUC__)
+
+  /* TODO: are the register constraints watertight? 
+     %rax gets modified but putting tlow as an output constraint with "+"
+     will keep r from getting allocated in %rax, which is a shame
+     since we often want the result in %rax for the next multiply. */
+  
+  __asm__ (
+    "imulq %[invm], %%rax\n\t"
+    "cmpq $1, %%rax \n\t"                /* if plow != 0, increase phigh */
+    "sbbq $-1, %[phigh]\n\t"
+    "mulq %[m]\n\t"
+    "lea (%[phigh],%%rdx,1), %[r]\n\t"  /* compute (rdx + thigh) mod m */
+    "subq %[m], %[phigh]\n\t"
+    "addq %%rdx, %[phigh]\n\t"
+    "cmovcq %[phigh], %[r]\n\t"
+    : [phigh] "+&r" (phigh), [r] "=r" (r[0])
+    : [invm] "rm" (m[0].invm), [m] "rm" (m[0].m), "a" (plow)
+    : "%rdx", "cc"
+  );
+#else
   modredcul_redc (r, plow, phigh, m);
+#endif
 
 #if defined(MODTRACE)
   printf (" == %lu /* PARI */ \n", r[0]);
@@ -659,9 +682,31 @@ modredcul_sqr (residueredcul_t r, const residueredcul_t a,
 
   ASSERT_EXPENSIVE (m[0].m % 2 != 0);
   ASSERT_EXPENSIVE (a[0] < m[0].m);
+
+  ularith_sqr_ul_2ul (&plow, &phigh, a[0]);
+#if defined(__x86_64__) && defined(__GNUC__)
+
+  /* TODO: are the register constraints watertight? 
+     %rax gets modified but putting tlow as an output constraint with "+"
+     will keep r from getting allocated in %rax, which is a shame
+     since we often want the result in %rax for the next multiply. */
   
-  ularith_mul_ul_ul_2ul (&plow, &phigh, a[0], a[0]);
+  __asm__ (
+    "imulq %[invm], %%rax\n\t"
+    "cmpq $1, %%rax \n\t"                /* if plow != 0, increase phigh */
+    "sbbq $-1, %[phigh]\n\t"
+    "mulq %[m]\n\t"
+    "lea (%[phigh],%%rdx,1), %[r]\n\t"  /* compute (rdx + thigh) mod m */
+    "subq %[m], %[phigh]\n\t"
+    "addq %%rdx, %[phigh]\n\t"
+    "cmovcq %[phigh], %[r]\n\t"
+    : [phigh] "+&r" (phigh), [r] "=r" (r[0])
+    : [invm] "rm" (m[0].invm), [m] "rm" (m[0].m), "a" (plow)
+    : "%rdx", "cc"
+  );
+#else
   modredcul_redc (r, plow, phigh, m);
+#endif
 }
 
 

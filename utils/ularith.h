@@ -55,6 +55,32 @@
 #endif
 #endif
 
+
+/* Increases r if a != 0 */
+static inline void
+ularith_inc_nz (unsigned long *r, const unsigned long a)
+{
+#ifdef ULARITH_VERBOSE_ASM
+  __asm__ ("# ularith_inc_nz (%0, %1)\n" : : "X" (*r), "X" (a));
+#endif
+#if !defined (ULARITH_NO_ASM) && defined(__x86_64__) && defined(__GNUC__)
+  __asm__ ( "cmpq $1, %1\n\t"
+            "sbbq $-1, %0\n\t"
+    : "+r" (*r)
+    : "rm" (a)
+    : "cc");
+#elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
+  __asm__ ( "cmpl $1, %1\n\t"
+            "sbbl $-1, %0\n\t"
+    : "+r" (*r)
+    : "rm" (a)
+    : "cc");
+#else
+  if (a != 0)
+    r += 1;
+#endif
+}
+
 /* Add an unsigned long to two unsigned longs with carry propagation from 
    low word (r1) to high word (r2). Any carry out from high word is lost. */
 
@@ -334,6 +360,43 @@ ularith_mul_ul_ul_2ul (unsigned long *r1, unsigned long *r2,
   p1 = (p1 & mask) << half;
   ularith_add_2ul_2ul (&t1, &t2, p1, p2);
   t2 += (a >> half) * (b >> half);
+  *r1 = t1; 
+  *r2 = t2;
+#endif
+}
+
+
+static inline void
+ularith_sqr_ul_2ul (unsigned long *r1, unsigned long *r2, 
+		    const unsigned long a)
+{
+#ifdef ULARITH_VERBOSE_ASM
+  __asm__ ("# ularith_mul_ul_ul_2ul (%0, %1, %2)\n" : : 
+           "X" (*r1), "X" (*r2), "X" (a));
+#endif
+#if !defined (ULARITH_NO_ASM) && defined(__x86_64__) && defined(__GNUC__)
+  __asm__ ( "mulq %%rax"
+	    : "=a" (*r1), "=d" (*r2)
+	    : "0" (a)
+	    : "cc");
+#elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
+  __asm__ ( "mull %%eax"
+	    : "=a" (*r1), "=d" (*r2)
+	    : "%0" (a)
+	    : "cc");
+#else
+  const int half = LONG_BIT / 2;
+  const unsigned long mask = (1UL << half) - 1UL;
+  unsigned long t1, t2, p1, p2;
+
+  t1 = (a & mask) * (a & mask);
+  t2 = 0UL;
+  p1 = (a >> half) * (a & mask);
+  p2 = p1 >> half;
+  p1 = (p1 & mask) << half;
+  ularith_add_2ul_2ul (&t1, &t2, p1, p2);
+  ularith_add_2ul_2ul (&t1, &t2, p1, p2);
+  t2 += (a >> half) * (a >> half);
   *r1 = t1; 
   *r2 = t2;
 #endif
