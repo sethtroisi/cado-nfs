@@ -227,8 +227,8 @@ sqrt/Makefile
 sqrt/algsqrt.c
 sqrt/allsqrt.c
 sqrt/checkdep.c
-sqrt/poly.c
-sqrt/poly.h
+utils/poly.c
+utils/poly.h
 utils/CMakeLists.txt
 utils/Makefile
 utils/cado_poly.c

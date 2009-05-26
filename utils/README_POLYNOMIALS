@@ -6,8 +6,8 @@ utils/ directory.
 
 GENERAL DESCRIPTION
 -------------------
-There are currently five families of files: cado_poly, fpoly, modul_poly, 
-mpz_poly and plain_poly.
+There are currently six families of files: cado_poly, fpoly, modul_poly, 
+mpz_poly, plain_poly and poly.
 
 The cado_poly library implements operations on cado_poly structs, which 
 function is to stock the polynomial pair used for sieving as well as the 
@@ -32,12 +32,14 @@ The plain_poly polynomials have a custom coefficient type, which is actually a
 64-bit integer. They are used in utils/rootfinder.c (to find roots of the 
 algebraic polynomial), and in sqrt/algsqrt.c (to find a suitable modulus).
 
+The poly files implement polynomials with multiprecision integers as
+coefficients. We use them in sqrt/algsqrt.c to represent rings of integers.
+and in fast_rootsieve.c, to represent the involved polynomials.
+
 TODO
 ----
 - Write a SPECIFIC DESCRIPTION of the capabilities of the previous 
 implementations.
-- Add the polynomial implementations of the sqrt/ directory to the utils 
-directory. This implementation will also be used in the fast rootsieve code.
 - Evaluate overlap and simplify the polynomial implementations as much as 
 possible. 
 

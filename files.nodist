@@ -60,6 +60,7 @@ sqrt/fmalgsqrt.c
 sqrt/jmc.mag
 sqrt/magma-manu/
 sqrt/ratsqrt.c
+utils/README_POLYNOMIALS
 utils/CMakeLists-nodist.txt
 utils/cache.c
 utils/cachesize.c
