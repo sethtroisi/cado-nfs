@@ -96,7 +96,7 @@ ularith_add_ul_2ul (unsigned long *r1, unsigned long *r2,
   __asm__ ( "addq %2, %0\n\t"
             "adcq $0, %1\n"
             : "+&r" (*r1), "+r" (*r2) 
-            : "g" (a)
+            : "rme" (a)
             : "cc"); /* TODO: add commutativity and alternative for add to 
                         memory */
 #elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
@@ -128,7 +128,7 @@ ularith_add_2ul_2ul (unsigned long *r1, unsigned long *r2,
   __asm__ ( "addq %2, %0\n\t"
             "adcq %3, %1\n"
             : "+&r" (*r1), "+r" (*r2)
-            : "g" (a1), "g" (a2)
+            : "rme" (a1), "rme" (a2)
             : "cc");
 #elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
   __asm__ ( "addl %2, %0\n\t"
@@ -160,7 +160,7 @@ ularith_add_2ul_2ul_cy (unsigned long *r1, unsigned long *r2,
             "adcq %4, %1\n\t"
 	    "setc %2\n"
             : "+&r" (*r1), "+r" (*r2), "=r" (cy)
-            : "g" (a1), "g" (a2)
+            : "rme" (a1), "rme" (a2)
             : "cc");
 #elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
   __asm__ ( "addl %3, %0\n\t"
@@ -196,7 +196,7 @@ ularith_sub_ul_2ul (unsigned long *r1, unsigned long *r2,
   __asm__ ( "subq %2, %0\n\t"
             "sbbq $0, %1\n"
             : "+&r" (*r1), "+r" (*r2)
-            : "g" (a)
+            : "rme" (a)
             : "cc");
 #elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
   __asm__ ( "subl %2, %0\n\t"
@@ -229,7 +229,7 @@ ularith_sub_2ul_2ul (unsigned long *r1, unsigned long *r2,
   __asm__ ( "subq %2, %0\n\t"
             "sbbq %3, %1\n"
             : "+&r" (*r1), "+r" (*r2)
-            : "g" (a1), "g" (a2)
+            : "rme" (a1), "rme" (a2)
             : "cc");
 #elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
   __asm__ ( "subl %2, %0\n\t"
@@ -264,7 +264,7 @@ ularith_sub_2ul_2ul_cy (unsigned long *r1, unsigned long *r2,
             "sbbq %4, %1\n\t"
 	    "setc %2\n"
             : "+&r" (*r1), "+r" (*r2), "=r" (cy)
-            : "g" (a1), "g" (a2)
+            : "rme" (a1), "rme" (a2)
             : "cc");
 #elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
   __asm__ ( "subl %3, %0\n\t"
@@ -301,7 +301,7 @@ ularith_sub_2ul_2ul_ge (unsigned long *r1, unsigned long *r2,
 	    "cmovc %2, %0\n\t" /* If there's a borrow, restore r1 from t1 */
 	    "cmovc %3, %1\n\t" /* and r2 from t2 */
             : "+&r" (*r1), "+&r" (*r2)
-            : "r" (t1), "r" (t2), "g" (a1), "g" (a2)
+            : "r" (t1), "r" (t2), "rme" (a1), "rme" (a2)
             : "cc");
 #elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
   __asm__ ( "subl %4, %0\n\t"
