@@ -11,6 +11,7 @@
 #include "matmul-threaded.h"
 #include "matmul-common.h"
 #include "abase.h"
+#include "worker-threads.h"
 
 /* This extension is used to distinguish between several possible
  * implementations of the product */
@@ -35,11 +36,6 @@
 
 /* see matmul-basic.c */
 #define MM_DIR0_PREFERS_TRANSP_MULT   1
-
-struct thread_info {
-    int i;
-    struct matmul_threaded_data_s * mm;
-};
 
 struct matmul_threaded_data_s {
     struct matmul_public_s public_[1];
@@ -72,18 +68,8 @@ struct matmul_threaded_data_s {
     unsigned int off3;
     double densify_tolerance;
 
-    pthread_mutex_t mu;
-    pthread_cond_t cond_in;
-    pthread_cond_t cond_out;
+    struct worker_threads_group * tg;
 
-    /* Number of worker threads at work (not idle) */
-    unsigned int working;
-    unsigned int done;
-
-    struct thread_info * thread_table;
-
-    pthread_t * threads;
-    
     void * dst;
     const void * src;
     int d;
@@ -92,95 +78,10 @@ struct matmul_threaded_data_s {
 extern void matmul_threaded_mul_sub_dense(struct matmul_threaded_data_s * mm, abt * dst, abt const * src, int d, int i);
 extern void matmul_threaded_mul_sub_sparse(struct matmul_threaded_data_s * mm, abt * dst, abt const * src, int d, int i);
 
-void * thread_job(void * ti)
-{
-    struct matmul_threaded_data_s * mm = ((struct thread_info *) ti) -> mm;
-    int i = ((struct thread_info *) ti) -> i;
-
-    pthread_mutex_lock(&mm->mu);
-
-    mm->working++;
-    pthread_cond_signal(&mm->cond_out);
-    /* The mutex is released later by pthread_cond_wait */
-
-    unsigned int res = 0;
-
-    for( ; ; ) {
-        pthread_cond_wait(&mm->cond_in,&mm->mu);
-        mm->working++;
-        pthread_mutex_unlock(&mm->mu);
-        if (mm->public_->iteration[mm->d] < 0)
-            break;
-
-        /* Do our job with mutexes released */
-        matmul_threaded_mul_sub_dense(mm, mm->dst, mm->src, mm->d, i);
-        matmul_threaded_mul_sub_sparse(mm, mm->dst, mm->src, mm->d, i);
-
-        /* resume serialized behaviour */
-        pthread_mutex_lock(&mm->mu);
-        res = ++(mm->done);
-
-        if (res == mm->nthreads) {
-            pthread_cond_signal(&mm->cond_out);
-        }
-    }
-
-    pthread_mutex_unlock(&mm->mu);
-
-    return NULL;
-}
-
-void worker_threads_init(struct matmul_threaded_data_s * mm)
-{
-    mm->threads = malloc(mm->nthreads * sizeof(pthread_t));
-    mm->thread_table = malloc(mm->nthreads * sizeof(struct thread_info));
-    pthread_cond_init(&mm->cond_in, NULL);
-    pthread_cond_init(&mm->cond_out, NULL);
-    pthread_cond_init(&mm->dense->recheck_please, NULL);
-    pthread_mutex_init(&mm->mu, NULL);
-    mm->working = 0;
-    mm->done = 0;
-    for(unsigned int i = 0 ; i < mm->nthreads ; i++) {
-        int rc;
-        mm->thread_table[i].i = i;
-        mm->thread_table[i].mm = mm;
-        void * ti = &(mm->thread_table[i]);
-        rc = pthread_create(&(mm->threads[i]), NULL, &thread_job, ti);
-        ASSERT_ALWAYS(rc == 0);
-    }
-
-    /* We must make sure that all threads have started properly. Since
-     * we've got everything available for writing a barrier, we spare the
-     * hassle of defining an extra data member for it. */
-    pthread_mutex_lock(&mm->mu);
-    for( ; mm->working != mm->nthreads ; ) {
-        pthread_cond_wait(&mm->cond_out, &mm->mu);
-    }
-    pthread_mutex_unlock(&mm->mu);
-}
-
-void worker_threads_clear(struct matmul_threaded_data_s * mm)
-{
-    mm->public_->iteration[0] = -1;
-    mm->public_->iteration[1] = -1;
-    pthread_mutex_lock(&mm->mu);
-    pthread_cond_broadcast(&mm->cond_in);
-    pthread_mutex_unlock(&mm->mu);
-    for(unsigned int i = 0 ; i < mm->nthreads ; i++) {
-        void * res;
-        int rc = pthread_join(mm->threads[i], &res);
-        ASSERT_ALWAYS(rc == 0);
-    }
-    free(mm->threads);
-    free(mm->thread_table);
-    pthread_mutex_destroy(&mm->mu);
-    pthread_cond_destroy(&mm->cond_in);
-    pthread_cond_destroy(&mm->cond_out);
-}
-
 void matmul_threaded_clear(struct matmul_threaded_data_s * mm)
 {
-    worker_threads_clear(mm);
+    worker_threads_clear(mm->tg);
+    pthread_cond_destroy(&mm->dense->recheck_please);
 
     free(mm->dense->q);
     free(mm->sparse->len);
@@ -369,7 +270,8 @@ struct matmul_threaded_data_s * matmul_threaded_build(abobj_ptr xx, const char *
 
     free(data);
 
-    worker_threads_init(mm);
+    mm->tg = worker_threads_init(mm->nthreads);
+    pthread_cond_init(&mm->dense->recheck_please, NULL);
 
     return mm;
 }
@@ -413,7 +315,8 @@ struct matmul_threaded_data_s * matmul_threaded_reload_cache(abobj_ptr xx, const
     fclose(f);
 
     matmul_threaded_blocks_info(mm);
-    worker_threads_init(mm);
+    mm->tg = worker_threads_init(mm->nthreads);
+    pthread_cond_init(&mm->dense->recheck_please, NULL);
 
     return mm;
 }
@@ -498,7 +401,7 @@ void matmul_threaded_mul_sub_dense(struct matmul_threaded_data_s * mm, abt * dst
 
         /* Now the painful section. Experimentally, it does not seem
          * expensive to adopt this crude approach. */
-        pthread_mutex_lock(&mm->mu); 
+        pthread_mutex_lock(&mm->tg->mu); 
         if (mm->dense->processed++ == 0) {
             abcopy(x, dst, tdst, MM_DGRP_SIZE * mm->dense->n);
         } else {
@@ -506,7 +409,7 @@ void matmul_threaded_mul_sub_dense(struct matmul_threaded_data_s * mm, abt * dst
                 abadd(x, dst + k, tdst + k);
             }
         }
-        pthread_mutex_unlock(&mm->mu);
+        pthread_mutex_unlock(&mm->tg->mu);
 
 #if 0
         /* There could be a way to seemingly avoid requiring a mutex
@@ -562,7 +465,7 @@ void matmul_threaded_mul_sub_dense(struct matmul_threaded_data_s * mm, abt * dst
             src += aboffset(x, MM_DGRP_SIZE);
             ASM_COMMENT("end of critical loop");
         }
-        pthread_mutex_lock(&mm->mu); 
+        pthread_mutex_lock(&mm->tg->mu); 
         /* It's a pity, but if some other thread is already doing the
          * sparse blocks at this point (it can't be anything else than
          * thread 0), we must be sure that everybody here is done with
@@ -571,7 +474,7 @@ void matmul_threaded_mul_sub_dense(struct matmul_threaded_data_s * mm, abt * dst
         if (++mm->dense->processed == mm->nthreads) {
             pthread_cond_signal(&mm->dense->recheck_please);
         }
-        pthread_mutex_unlock(&mm->mu);
+        pthread_mutex_unlock(&mm->tg->mu);
     }
     abclearf(x, rx, 2);
     ASM_COMMENT("end of dense multiplication code");
@@ -680,11 +583,11 @@ void matmul_threaded_mul_sub_sparse(struct matmul_threaded_data_s * mm, abt * ds
             /* We must test whether all threads are done with the dense
              * blocks */
             if (mm->dense->processed != mm->nthreads) {
-                pthread_mutex_lock(&mm->mu);
+                pthread_mutex_lock(&mm->tg->mu);
                 for( ; mm->dense->processed != mm->nthreads ; ) {
-                    pthread_cond_wait(&mm->dense->recheck_please, &mm->mu);
+                    pthread_cond_wait(&mm->dense->recheck_please, &mm->tg->mu);
                 }
-                pthread_mutex_unlock(&mm->mu);
+                pthread_mutex_unlock(&mm->tg->mu);
             }
         }
         for(unsigned int blocknum = 0 ; blocknum < mm->sparse->n ; blocknum++) {
@@ -710,25 +613,22 @@ void matmul_threaded_mul_sub_sparse(struct matmul_threaded_data_s * mm, abt * ds
     ASM_COMMENT("end of sparse multiplication code");
 }
 
+void matmul_thread_worker_routine(struct worker_threads_group * tg MAYBE_UNUSED, int i, struct matmul_threaded_data_s * mm)
+{
+    /* Do our job with mutexes released */
+    matmul_threaded_mul_sub_dense(mm, mm->dst, mm->src, mm->d, i);
+    matmul_threaded_mul_sub_sparse(mm, mm->dst, mm->src, mm->d, i);
+}
+
 void matmul_threaded_mul(struct matmul_threaded_data_s * mm, abt * dst, abt const * src, int d)
 {
-    mm->working = 0;
-    mm->done = 0;
     mm->dense->processed = 0;
     mm->dst = dst;
     mm->src = src;
     mm->d = d;
 
-    /* This mutex is associated to the cond_in and cond_out conditions. */
-    pthread_mutex_lock(&mm->mu);
-
-    pthread_cond_broadcast(&mm->cond_in);
-    /* All threads are now working */
-
-    /* Now switch to the outgoing condition, wait for the last thread to
-     * release us */
-    pthread_cond_wait(&mm->cond_out,&mm->mu);
-    pthread_mutex_unlock(&mm->mu);
+    /* unleash worker threads */
+    worker_threads_do(mm->tg, (worker_func_t) &matmul_thread_worker_routine, mm);
 
     mm->public_->iteration[d]++;
 }

@@ -117,7 +117,8 @@ add_library(bwc_base
     rusage.c
     async.c
     debug.c
-    barrier.c)
+    barrier.c
+    worker-threads.c)
 target_link_libraries(bwc_base ${pthread_libs})
 
 macro(push_abase_cflags v target)
@@ -140,6 +141,7 @@ macro(configure_bwc_variant v)
     endif(doing_u64)
 
     add_library(${v}_matmul ${${v}_matmul_sources})
+    target_link_libraries(${v}_matmul bwc_base)
 
     push_abase_cflags(${v} matmul)
     target_link_libraries(${v}_matmul mat_io)

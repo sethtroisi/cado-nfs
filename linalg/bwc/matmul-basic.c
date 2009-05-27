@@ -134,14 +134,14 @@ void matmul_basic_mul(struct matmul_basic_data_s * mm, abt * dst, abt const * sr
     abobj_ptr x = mm->xab;
 
     if (d == !mm->public_->store_transposed) {
-        abzero(x, dst, mm->public_->dim[!d]);
+        abzero(x, dst, mm->public_->dim[d]);
         ASM_COMMENT("critical loop");
         for(unsigned int i = 0 ; i < mm->public_->dim[!d] ; i++) {
             uint32_t len = *q++;
             unsigned int j = 0;
             for( ; len-- ; ) {
                 j += *q++;
-                ASSERT(j < mm->public_->dim[d]);
+                ASSERT(j < mm->public_->dim[!d]);
                 abadd(x, dst + aboffset(x, i), src + aboffset(x, j));
             }
         }
@@ -150,7 +150,7 @@ void matmul_basic_mul(struct matmul_basic_data_s * mm, abt * dst, abt const * sr
         if (mm->public_->iteration[d] == 10) {
             fprintf(stderr, "Warning: Doing many iterations with transposed code (not a huge problem for impl=basic)\n");
         }
-        abzero(x, dst, mm->public_->dim[1]);
+        abzero(x, dst, mm->public_->dim[!d]);
         ASM_COMMENT("critical loop (transposed mult)");
         for(unsigned int i = 0 ; i < mm->public_->dim[d] ; i++) {
             uint32_t len = *q++;

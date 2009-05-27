@@ -118,6 +118,8 @@ linalg/bwc/split.c
 linalg/bwc/test_hello.c
 linalg/bwc/test_pthread_reduce.c
 linalg/bwc/tool.sh
+linalg/bwc/worker-threads.c
+linalg/bwc/worker-threads.h
 linalg/bwc/xdotprod.c
 linalg/bwc/xdotprod.h
 linalg/bwc/xvectors.c

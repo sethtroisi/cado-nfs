@@ -1245,7 +1245,6 @@ static inline void matmul_bucket_mul_huge(struct matmul_bucket_data_s * mm, abt 
             pos->i += di;
         }
     } else {
-#if 1
         for(unsigned int s = 0 ; s < nhuge ; s++) {
             uint32_t di = *pos->ql++;
             ASSERT(pos->i + di <= pos->nrows_t);
@@ -1284,7 +1283,6 @@ static inline void matmul_bucket_mul_huge(struct matmul_bucket_data_s * mm, abt 
             }
             pos->i += di;
         }
-#endif
     }
     ASM_COMMENT("end of huge (very sparse) slices"); /* }}} */
     abclear(x, scrap, mm->scrapsize);
