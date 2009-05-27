@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include "ecm.h"
+#include "ularith.h"
 
 /* Do we want backtracking when processing factors of 2 in E? */
 #ifndef ECM_BACKTRACKING
@@ -592,17 +593,20 @@ Brent12_curve_from_sigma (residue_t A, residue_t x, const residue_t sigma,
    A and x are obtained from u and v such that (u,v) = k*P on the curve
    v^2 = u^3 - 12*u, where P = (-2, 4).
 
-   We want t^2 = (u^2-12)/4u = v^2/(2*u)^2, so
-   t = v/(2*u), and a=(t^2-1)/(t^2+3).
+   We want t^2 = (u^2-12)/4u, and a=(t^2-1)/(t^2+3), thus
+   a = (u^2 - 4*u - 12)/(u^2 + 12*u - 12). 
+   We need both $a$ and $1/a$, so we can compute the inverses of both
+   u^2 - 4*u - 12 and u^2 + 12*u - 12 with a single batch inversion.
 
-   For k=2, we get u=4, v=-4, t=-1/2, a=-3/13, A=-4798/351 and x=-49/39.
+   For k=2, we get u=4, v=-4, t=-1/2, a=-3/13, 
+     A=-4798/351, B=-6400/351 and x=-49/39.
 
-   For k=3, we get u=-2/9, v=-44/27, t=11/3, a=28/37, A=-6409583/3248896,
-   and x=3721/4144.
+   For k=3, we get u=-2/9, v=-44/27, t=11/3, a=28/37, 
+     A=-6409583/3248896, B=342225/3248896, and x=3721/4144.
 */
 static int
-Monty12_curve_from_k (residue_t A, residue_t x, const unsigned long k, 
-		      const modulus_t m)
+Montgomery12_curve_from_k (residue_t A, residue_t x, const unsigned long k, 
+		           const modulus_t m)
 {
   residue_t u, v, a, t2, one;
   int r = 0;
@@ -614,6 +618,7 @@ Monty12_curve_from_k (residue_t A, residue_t x, const unsigned long k,
   mod_init_noset0 (u, m);
   mod_init_noset0 (v, m);
   mod_init_noset0 (one, m);
+  mod_init_noset0 (t2, m);
   
   mod_set1 (one, m);
 
@@ -666,36 +671,46 @@ Monty12_curve_from_k (residue_t A, residue_t x, const unsigned long k,
       mod_add (a, a, v, m);
       mod_neg (a, a, m);    /* a = -12 */
       ellW_mul_ui (u, v, k, a, m);
-      /* Now we have a $u$ so that $u^3-12u$ is a square */
-      /* printf ("Monty12_curve_from_k: u = %lu\n", mod_get_ul (u)); */
+
+      /* Now we have an $u$ such that $v^2 = u^3-12u$ is a square */
+      /* printf ("Montgomery12_curve_from_k: u = %lu\n", mod_get_ul (u)); */
       
-      mod_init_noset0 (t2, m);
-      mod_div2 (v, u, m);
-      mod_mul (t2, v, v, m); /* u^2/4 */
-      mod_sub (t2, t2, one, m);
-      mod_sub (t2, t2, one, m);
-      mod_sub (t2, t2, one, m); /* u^2/4 - 3 */
-      if (mod_inv (u, u, m) == 0)
+      /* We want a = (u^2 - 4*u - 12)/(u^2 + 12*u - 12). 
+         We need both $a$ and $1/a$, so we can compute the inverses of both
+         u^2 - 4*u - 12 and u^2 + 12*u - 12 with a single batch inversion. */
+
+      mod_sqr (t2, u, m);  /* t2 = u^2 */
+      mod_sub (u, u, one, m);
+      mod_add (u, u, u, m);
+      mod_add (u, u, u, m);   /* u' = 4u - 4 */
+      mod_sub (v, t2, u, m);  /* v = u^2 - 4u + 4 */
+      mod_add (t2, t2, u, m);
+      mod_add (t2, t2, u, m);
+      mod_add (u, t2, u, m); /* u'' = u^2 + 12u - 12 */
+      mod_add (t2, one, one, m);
+      mod_add (t2, t2, t2, m);
+      mod_add (t2, t2, t2, m);
+      mod_add (t2, t2, t2, m); /* t2 = 16 */
+      mod_sub (v, v, t2, m);   /* v = u^2 - 4u - 12 */
+      
+      mod_mul (t2, u, v, m);
+      if (mod_inv (t2, t2, m) == 0)
 	{
-	  mod_set (x, u, m);
+	  mod_set (x, t2, m);
 	  goto clear_and_exit;
 	}
-      mod_mul (t2, t2, u, m); /* t^2 = (u^2/4 - 3)/u = (u^2 - 12)/4u */
-  
-      mod_sub (u, t2, one, m); /* u = t2 - 1 */
-      mod_add (v, t2, one, m);
-      mod_add (v, v, one, m);
-      mod_add (v, v, one, m);  /* v = t2 + 3 */
-      mod_mul (a, u, v, m);
-      if (mod_inv (a, a, m) == 0) /* a  = 1/(uv), I want u/v and v/u */
-	{
-	  mod_set (x, a, m);
-	  goto clear_and_exit;
-	}
-      mod_mul (u, u, u, m); /* u^2 */
-      mod_mul (v, v, v, m); /* v^2 */
-      mod_mul (v, v, a, m); /* v^2 * (1/(uv)) = v/u = 1/a */
-      mod_mul (a, a, u, m); /* u^2 * (1/(uv)) = u/v = a */
+
+      /* Now 
+         u'' = u^2 + 12u - 12
+         v  = u^2 - 4u - 12
+         t2 = 1 / ( (u^2 + 12u - 12) * (u^2 - 4u - 12) ).
+         We want 
+         a   = (u^2 - 4u - 12)/(u^2 + 12u - 12) and
+         1/a = (u^2 + 12u - 12)/(u^2 - 4u - 12) */
+      mod_sqr (a, v, m);
+      mod_mul (a, a, t2, m);
+      mod_sqr (v, u, m);
+      mod_mul (v, v, t2, m);
     }
 
   /* Here we have $a$ in a, $1/a$ in v */
@@ -735,8 +750,8 @@ clear_and_exit:
    to initialise */
 
 static int
-Monty16_curve_from_k (residue_t b, residue_t x, const unsigned long k, 
-		      const modulus_t m)
+Montgomery16_curve_from_k (residue_t b, residue_t x, const unsigned long k, 
+		           const modulus_t m)
 {
 #if 0
   if (k == 1UL)
@@ -874,6 +889,108 @@ curveW_from_Montgomery (residue_t a, residue_t x, residue_t y,
 
   return r;
 }
+
+
+
+/* Multiplies Pj_x[i] by 1/Pj_z[i] for 0 <= i < plan->s1 and 
+   and all Pid_x[i] by 1/Pid_z[i] for 0 <= i < plan->i1 - plan->i0.
+   Uses 3*n - 3 multiplications and one inverse for total of n points.
+   Returns 1 if inversion worked, 
+   otherwise return 0 and puts non-invertible residue in r. */
+
+static int
+normalize (residue_t r, residue_t *Pj_x, residue_t *Pj_z, 
+           residue_t *Pid_x, residue_t *Pid_z, const modulus_t m, 
+           const stage2_plan_t *plan)
+{
+  /* Let a_0, ..., a_n = Pj_z[0], ..., Pj_z[s1 - 1], 
+                         Pid_z[0], ..., Pid_z[i1 - i0 - 1]
+     be the list of residues we want to invert.
+     If i0 == 0, we skip that point in the inversion */
+  const unsigned int skip_i0 = (plan->i0 == 0) ? 1 : 0;
+  const unsigned long n = plan->s1 + plan->i1 - plan->i0 - skip_i0;
+  residue_t *invarray, a;
+  unsigned int i, k;
+
+  mod_init (a, m);
+  invarray = (residue_t *) malloc (n * sizeof (residue_t));
+  ASSERT (invarray != NULL);
+  for (i = 0; i < n; i++)
+    mod_init (invarray[i], m);
+  /* Set invarray[k] = prod_{j=0}^{k} a_j */
+  mod_set (invarray[0], Pj_z[0], m);
+  for (i = 1, k = 1; i < plan->s1; i++, k++)
+    mod_mul (invarray[k], invarray[k - 1], Pj_z[i], m);
+  for (i = skip_i0; i < plan->i1 - plan->i0; i++, k++)
+    mod_mul (invarray[k], invarray[k - 1], Pid_z[i], m);
+  
+  /* Set a_n := 1 / (a_0, ..., a_n) */
+  if (! mod_inv (a, invarray[k - 1], m))
+    {
+      mod_set (r, invarray[k - 1], m);
+      for (i = 0; i < n; i++)
+        mod_clear (invarray[i], m);
+      free (invarray);
+      invarray = NULL;
+      mod_clear (a, m);
+      return 0;
+    }
+
+  /* Compute 1/a_i and normalize the Pid points */
+  mod_set (invarray[k - 1], a, m);
+  for (i = plan->i1 - plan->i0; i > skip_i0; i--, k--)
+    {
+      /* Here, invarray[k - 1] = 1 / (a_0, ..., a_{k-1}) and
+         invarray[k - 2] = (a_0, ..., a_{k-2}) */
+      mod_mul (a, invarray[k - 1], invarray[k - 2], m);
+      /* a = 1/a_{k-1} = 1/Pid_z[i - 1] */
+#ifdef WANT_ASSERT_EXPENSIVE
+      mod_mul (a, a, Pid_z[i - 1], m);
+      ASSERT (mod_is1 (a, m));
+      mod_mul (a, invarray[k - 1], invarray[k - 2], m);
+#endif
+      /* Normalize point */
+      mod_mul (Pid_x[i - 1], Pid_x[i - 1], a, m);
+      /* Set invarray[k - 2] = 1 / (a_0, ..., a_{k-2}) = 
+         1 / (a_0, ..., a_{k-1}) * a_{k-1} */
+      mod_mul (invarray[k - 2], invarray[k - 1],  Pid_z[i - 1], m);
+    }
+  
+  /* Compute 1/a_i and normalize the Pj points */
+  for (i = plan->s1; i > 1; i--, k--)
+    {
+      /* Here, invarray[k - 1] = 1 / (a_0, ..., a_{k-1}) and
+         invarray[k - 2] = (a_0, ..., a_{k-2}) */
+      mod_mul (a, invarray[k - 1], invarray[k - 2], m);
+      /* a = 1/a_{k-1} = 1/Pj_z[i - 1] */
+#ifdef WANT_ASSERT_EXPENSIVE
+      mod_mul (a, a, Pj_z[i - 1], m);
+      ASSERT (mod_is1 (a, m));
+      mod_mul (a, invarray[k - 1], invarray[k - 2], m);
+#endif
+      /* Normalize point */
+      mod_mul (Pj_x[i - 1], Pj_x[i - 1], a, m);
+      /* Set invarray[k - 2] = 1 / (a_0, ..., a_{k-2}) = 
+         1 / (a_0, ..., a_{k-1}) * a_{k-1} */
+      mod_mul (invarray[k - 2], invarray[k - 1],  Pj_z[i - 1], m);
+    }
+  /* Do the first Pj point. Here k = 1 and invarray[k] = 1/a_1 */
+  ASSERT (k == 1);
+#ifdef WANT_ASSERT_EXPENSIVE
+  mod_mul (a, invarray[k - 1], Pj_z[i - 1], m);
+  ASSERT (mod_is1 (a, m));
+#endif
+  /* Normalize point */
+  mod_mul (Pj_x[i - 1], Pj_x[i - 1], invarray[k - 1], m);
+
+  for (i = 0; i < n; i++)
+    mod_clear (invarray[i], m);
+  free (invarray);
+  invarray = NULL;
+  mod_clear (a, m);
+  return 1;
+}
+
 
 static int 
 ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan, 
@@ -1074,90 +1191,9 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
 
   /* Now we've computed all the points we need, so normalize them,
      using Montgomery's batch inversion trick */
-  {
-    /* If i0 == 0, we skip that point in the inversion */
-    /* Let a_0, ..., a_n = Pj_z[0], ..., Pj_z[s1 - 1], 
-                           Pid_z[0], ..., Pid_z[i1 - i0 - 1]
-       be the list of residues we want to invert. */
-    const unsigned int skip_i0 = (plan->i0 == 0) ? 1 : 0;
-    const unsigned long n = plan->s1 + plan->i1 - plan->i0 - skip_i0;
-    residue_t *invarray;
+  if (normalize (r, Pj_x, Pj_z, Pid_x, Pid_z, m, plan) == 0)
+    goto clear_and_exit;
 
-    invarray = (residue_t *) malloc (n * sizeof (residue_t));
-    ASSERT (invarray != NULL);
-    for (i = 0; i < n; i++)
-      mod_init (invarray[i], m);
-    /* Set invarray[k] = prod_{j=0}^{k} a_j */
-    mod_set (invarray[0], Pj_z[0], m);
-    for (i = 1, k = 1; i < plan->s1; i++, k++)
-      mod_mul (invarray[k], invarray[k - 1], Pj_z[i], m);
-    for (i = skip_i0; i < plan->i1 - plan->i0; i++, k++)
-      mod_mul (invarray[k], invarray[k - 1], Pid_z[i], m);
-    
-    /* Set a_n := 1 / (a_0, ..., a_n) */
-    if (! mod_inv (a, invarray[k - 1], m))
-      {
-        mod_set (r, invarray[k - 1], m);
-	for (i = 0; i < n; i++)
-	  mod_clear (invarray[i], m);
-	free (invarray);
-	invarray = NULL;
-	goto clear_and_exit;
-      }
-
-    /* Compute 1/a_i and normalize the Pid points */
-    mod_set (invarray[k - 1], a, m);
-    for (i = plan->i1 - plan->i0; i > skip_i0; i--, k--)
-      {
-	/* Here, invarray[k - 1] = 1 / (a_0, ..., a_{k-1}) and
-	   invarray[k - 2] = (a_0, ..., a_{k-2}) */
-	mod_mul (a, invarray[k - 1], invarray[k - 2], m);
-	/* a = 1/a_{k-1} = 1/Pid_z[i - 1] */
-#ifdef WANT_ASSERT_EXPENSIVE
-	mod_mul (a, a, Pid_z[i - 1], m);
-	ASSERT (mod_is1 (a, m));
-	mod_mul (a, invarray[k - 1], invarray[k - 2], m);
-#endif
-	/* Normalize point */
-	mod_mul (Pid_x[i - 1], Pid_x[i - 1], a, m);
-	/* Set invarray[k - 2] = 1 / (a_0, ..., a_{k-2}) = 
-	   1 / (a_0, ..., a_{k-1}) * a_{k-1} */
-	mod_mul (invarray[k - 2], invarray[k - 1],  Pid_z[i - 1], m);
-      }
-    
-    /* Compute 1/a_i and normalize the Pj points */
-    for (i = plan->s1; i > 1; i--, k--)
-      {
-	/* Here, invarray[k - 1] = 1 / (a_0, ..., a_{k-1}) and
-	   invarray[k - 2] = (a_0, ..., a_{k-2}) */
-	mod_mul (a, invarray[k - 1], invarray[k - 2], m);
-	/* a = 1/a_{k-1} = 1/Pj_z[i - 1] */
-#ifdef WANT_ASSERT_EXPENSIVE
-	mod_mul (a, a, Pj_z[i - 1], m);
-	ASSERT (mod_is1 (a, m));
-	mod_mul (a, invarray[k - 1], invarray[k - 2], m);
-#endif
-	/* Normalize point */
-	mod_mul (Pj_x[i - 1], Pj_x[i - 1], a, m);
-	/* Set invarray[k - 2] = 1 / (a_0, ..., a_{k-2}) = 
-	   1 / (a_0, ..., a_{k-1}) * a_{k-1} */
-	mod_mul (invarray[k - 2], invarray[k - 1],  Pj_z[i - 1], m);
-      }
-    /* Do the first Pj point. Here k = 1 and invarray[k] = 1/a_1 */
-    ASSERT (k == 1);
-#ifdef WANT_ASSERT_EXPENSIVE
-    mod_mul (a, invarray[k - 1], Pj_z[i - 1], m);
-    ASSERT (mod_is1 (a, m));
-#endif
-    /* Normalize point */
-    mod_mul (Pj_x[i - 1], Pj_x[i - 1], invarray[k - 1], m);
-
-    for (i = 0; i < n; i++)
-      mod_clear (invarray[i], m);
-    free (invarray);
-    invarray = NULL;
-  }
-  
   /* Now process all the primes p = id - j, B1 < p <= B2 and multiply
      (id*P)_x - (j*P)_x to the accumulator */
   mod_set1 (a, m);
@@ -1279,7 +1315,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   {
     residue_t A;
     mod_init_noset0 (A, m);
-    if (Monty12_curve_from_k (A, P->x, plan->sigma, m) == 0)
+    if (Montgomery12_curve_from_k (A, P->x, plan->sigma, m) == 0)
       {
 	mod_gcd (f, P->x, m);
 	mod_clear (u, m);
@@ -1299,7 +1335,7 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   }
   else if (plan->parameterization == MONTY16)
   {
-    if (Monty16_curve_from_k (b, P->x, plan->sigma, m) == 0)
+    if (Montgomery16_curve_from_k (b, P->x, plan->sigma, m) == 0)
       {
 	mod_gcd (f, P->x, m);
 	mod_clear (u, m);
@@ -1343,6 +1379,11 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 #endif
     }
 
+#if 0
+  printf ("After stage 1, P = (%lu: :%lu), bt = %d, i = %d, exp2 = %d\n", 
+          mod_get_ul (P->x, m), mod_get_ul (P->z, m), bt, i, plan->exp2);
+#endif
+
   mod_gcd (f, P[0].z, m); /* FIXME: skip this gcd and let the extgcd
 			     in stage 2 init find factors? */
   if (bt == 0 && mod_intcmp_ul(f, 1UL) == 0 && plan->B1 < plan->stage2.B2)
@@ -1383,7 +1424,7 @@ ell_pointorder (const residue_t sigma, const int parameterization,
     }
   else if (parameterization == MONTY12)
   {
-    if (Monty12_curve_from_k (A, x, mod_get_ul (sigma, m), m) == 0)
+    if (Montgomery12_curve_from_k (A, x, mod_get_ul (sigma, m), m) == 0)
       return 1;
   }
   else
@@ -1540,7 +1581,7 @@ ell_curveorder (const unsigned long sigma_par, int parameterization,
   }
   else if (parameterization == MONTY12)
   {
-    if (Monty12_curve_from_k (A, X, sigma_par, m) == 0)
+    if (Montgomery12_curve_from_k (A, X, sigma_par, m) == 0)
       return 0UL;
   }
   else
