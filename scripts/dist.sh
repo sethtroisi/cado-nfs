@@ -40,7 +40,7 @@ read_files_dist | rsync -a     \
                     --prune-empty-dirs  \
                     ./ $t/$pkg/
 
-(cd $t ; tar cf - $pkg) | gzip -9 > $pkg.tar.gz
+(cd $t ; tar -c --format=oldgnu -f - $pkg) | gzip -9 > $pkg.tar.gz
 
 echo "Built $pkg.tar.gz"
 rm -rf $t
