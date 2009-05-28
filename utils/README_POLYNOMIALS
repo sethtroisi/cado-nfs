@@ -13,10 +13,10 @@ The cado_poly library implements operations on cado_poly structs, which
 function is to stock the polynomial pair used for sieving as well as the 
 factor base parameters.
  
-The fpoly library implements root refining by dichotomy, on polynomials with 
-floating-point coefficients. It is used in the sieve, both in sieve.c 
-(computation of lognorms of prime products) and in las.c (norms of 
-polynomials). We also use it in polynomial selection, in aux.c (in the 
+The fpoly library implements root refining by dichotomy, on polynomials with
+floating-point coefficients. It is used in the sieve, both in sieve.c
+(computation of lognorms of prime products) and in las.c (norms of
+polynomials). We also use it in polynomial selection, in auxiliary.c (in the
 computation of the optimal skewness).
  
 The modul_poly files implement arithmetic on modular polynomials, with 

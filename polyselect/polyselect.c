@@ -148,7 +148,7 @@ See the scripts "dist/src/new_run.X" where X is c59 or c79.
 #include <math.h> /* for log, pow, fabs */
 #include "cado.h"
 #include "utils.h"
-#include "aux.h" /* for common routines with polyselect.c */
+#include "auxiliary.h" /* for common routines with polyselect.c */
 
 #define QUICK_SEARCH
 

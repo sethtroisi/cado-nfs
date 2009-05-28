@@ -174,8 +174,8 @@ params/params.c72
 params/params.c79
 polyselect/CMakeLists.txt
 polyselect/Makefile
-polyselect/aux.c
-polyselect/aux.h
+polyselect/auxiliary.c
+polyselect/auxiliary.h
 polyselect/polyselect.c
 polyselect/rotate.c
 run_example.sh

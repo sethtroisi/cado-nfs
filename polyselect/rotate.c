@@ -3,7 +3,7 @@
 #include <string.h>
 #include "cado.h"
 #include "utils.h"
-#include "aux.h" /* for common routines with polyselect.c */
+#include "auxiliary.h" /* for common routines with polyselect.c */
 
 
 static void usage_and_die(char *argv0) {

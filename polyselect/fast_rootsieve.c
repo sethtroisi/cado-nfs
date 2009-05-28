@@ -5,7 +5,7 @@
 #include "gmp_aux.h"
 #include "cado.h"
 #include "utils.h"
-#include "aux.h"
+#include "auxiliary.h"
 #include "mod_ul_default.h"
 #include "mod_ul.h"
 #include "fast_rootsieve.h"

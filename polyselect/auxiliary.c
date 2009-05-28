@@ -8,7 +8,7 @@
 #include "macros.h" /* for ASSERT_ALWAYS */
 #include "cado.h"
 #include "utils.h"
-#include "aux.h"
+#include "auxiliary.h"
 
 /* for the rotation, we try (j*x+k) for |k| <= 2^MAX_k */
 int MAX_k = 16;
