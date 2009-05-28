@@ -1268,9 +1268,6 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
   
   mod_set (r, a, m);
   
-  /* At end of stage 2 */
-
- clear_and_exit:
   /* Clear everything */
   for (i = 0; i < plan->s1; i++)
     mod_clear (Pj_z[i], m);
