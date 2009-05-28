@@ -92,8 +92,10 @@ linalg/bwc/matmul-bucket.cpp
 linalg/bwc/matmul-bucket.h
 linalg/bwc/matmul-common.c
 linalg/bwc/matmul-common.h
-linalg/bwc/matmul-sliced-asm.S
-linalg/bwc/matmul-sliced-asm.h
+linalg/bwc/matmul-sub-small1.S
+linalg/bwc/matmul-sub-small1.h
+linalg/bwc/matmul-sub-small2.S
+linalg/bwc/matmul-sub-small2.h
 linalg/bwc/matmul-sliced.cpp
 linalg/bwc/matmul-sliced.h
 linalg/bwc/matmul-threaded.c

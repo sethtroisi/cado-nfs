@@ -33,8 +33,10 @@ using namespace std;
 #include "abase.h"
 #include "matmul-common.h"
 
+/* Make sure that the assembly function is only called if it matches
+ * correctly the abase header !! */
 #if defined(HAVE_GCC_STYLE_AMD64_ASM) && defined(ABASE_U64_H_) && !defined(DISABLE_ASM)
-#include "matmul-sliced-asm.h"
+#include "matmul-sub-small1.h"
 #define ENABLE_ASM
 #endif
 
@@ -365,10 +367,8 @@ void matmul_sliced_mul(struct matmul_sliced_data_s * mm, abt * dst, abt const * 
             abzero(x, where, nrows_packed);
             ASM_COMMENT("critical loop");
             abt const * from = src;
-            /* Make sure that the assembly function is only called if it
-             * matches correctly the abase header !! */
 #if defined(ENABLE_ASM)
-            q = matmul_sliced_asm(x, where, from, (uint16_t const *) q);
+            q = matmul_sub_small1(x, where, from, (uint16_t const *) q);
 #else
             /* The external function must have the same semantics as this
              * code block */

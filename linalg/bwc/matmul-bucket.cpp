@@ -31,10 +31,16 @@
 using namespace std;
 
 #include "matmul-bucket.h"
-/* TODO re-enable some sort of assembly.
-*/
-
 #include "abase.h"
+
+/* Make sure that the assembly function is only called if it matches
+ * correctly the abase header !! */
+#if defined(HAVE_GCC_STYLE_AMD64_ASM) && defined(ABASE_U64_H_) && !defined(DISABLE_ASM)
+#include "matmul-sub-small1.h"
+#include "matmul-sub-small2.h"
+#define ENABLE_ASM
+#endif
+
 #include "readmat-easy.h"
 #include "matmul-common.h"
 
@@ -63,21 +69,34 @@ using namespace std;
 
 #define xxxDEBUG_BUCKETS
 
-/* This implementation builds upon the ``sliced'' variant. Several strips
- * are stored in just the same way, and when we reach sparser areas, we
- * use another method. Dense slices having been discarded, the rest is
- * split in ``large'' slices of 65536 rows at most (in fact we arrange
- * for the slices to have equal size, so it's a bit less).  For each such
- * large slice, we use scrap space equal to the L2 cache size for
- * performing matrix multiplication. While reading column vector data, we
- * copy coefficient to (up to) 256 ``buckets'', each representing 256
- * possible row indices. The dispatching information, telling in which
- * bucket a given coefficient has to be copied, is an 8-bit integer
- * stored in a table called ``main''. Each entry in table ``main'' also
- * has a second 8-bit integer indicating the offset to the next useful
- * column entry (because we're considering very sparse blocks, it is not
- * at all uncommon to see average values ~ 10 here, even when 65536 rows
- * are considered simultaneously).
+/* This implementation builds upon the ``sliced'' variant. 
+ * The format used with the -sliced implementation is still used, but
+ * there is also another format used for very dense strips. We refer to
+ * matmul-sliced.cpp for the first format, which is called ``small1''
+ * here (and there also).
+ *
+ * The ``small2'' format is specialised for denser strips.  Within an
+ * horizontal strip of less than 4096 rows, when two non-zero columns are
+ * never more than 16 positions apart, then the information (dj,i) is
+ * stored in 16 bits instead of 32. This reduces the memory footprint
+ * quite considerably, since many coefficients are in dense strips.
+ * Speed-wise, small2 strips provide a nice speed-up sometimes (not
+ * always).
+ *
+ * When we reach sparser areas, we use another method. Dense (small2 and
+ * small1) slices having been discarded, the rest is split in ``large''
+ * slices of 65536 rows at most (in fact we arrange for the slices to
+ * have equal size, so it's a bit less).  For each such large slice, we
+ * use scrap space equal to the L2 cache size for performing matrix
+ * multiplication. While reading column vector data, we copy coefficient
+ * to (up to) 256 ``buckets'', each representing 256 possible row
+ * indices. The dispatching information, telling in which bucket a given
+ * coefficient has to be copied, is an 8-bit integer stored in a table
+ * called ``main''. Each entry in table ``main'' also has a second 8-bit
+ * integer indicating the offset to the next useful column entry (because
+ * we're considering very sparse blocks, it is not at all uncommon to see
+ * average values ~ 10 here, even when 65536 rows are considered
+ * simultaneously).
  *
  * The number of columns considered while filling the scrap space is
  * limited by the scrap space size. Once it's filled, we ``apply the
@@ -94,8 +113,15 @@ using namespace std;
  *
  *
  * That's it for the basic idea. Now on top of that, we use an extra
- * indirection level for very sparse blocks. To be documented once it's
- * finished.
+ * indirection level for very sparse blocks. Several ``large blocks'' are
+ * considered together as part of a ``huge block''. Call this number
+ * ``nlarge''. Source coefficients are first dispatched in nlarge ``big buckets''
+ * of appropriate size. The number of columns considered is guided by the fact
+ * that we want none of these big buckets to exceed the L2 cache size.
+ * Afterwards, we do a second bispatching from each of these big buckets
+ * (in turn) to (up to) 256 small buckets in the same manner as above
+ * (except that we no longer need the information on the link to the next
+ * useful column.
  */
 
 /* This extension is used to distinguish between several possible
@@ -106,7 +132,7 @@ using namespace std;
 
 #define MM_MAGIC_FAMILY        0xa003UL
 
-#define MM_MAGIC_VERSION       0x1009UL
+#define MM_MAGIC_VERSION       0x100bUL
 #define MM_MAGIC (MM_MAGIC_FAMILY << 16 | MM_MAGIC_VERSION)
 
 /* see matmul-basic.c */
@@ -203,6 +229,9 @@ void builder_switch_to_vertical(builder * mb, unsigned int i)
 /************************************/
 /* Elementary (!) buliding routines */
 
+#define SMALL_SLICES_I_BITS     12
+#define SMALL_SLICES_DJ_BITS    (16 - SMALL_SLICES_I_BITS)
+
 /* {{{ small slices */
 
 struct small_slice_t {
@@ -211,6 +240,7 @@ struct small_slice_t {
     unsigned int ncoeffs;
     double dj_avg;
     uint32_t dj_max;
+    int is_small2;
 
     typedef std::vector<std::pair<uint32_t, uint32_t> > L_t;
     typedef L_t::const_iterator Lci_t;
@@ -228,6 +258,9 @@ int builder_do_small_slice(builder * mb, struct small_slice_t * S, uint32_t ** p
 {
     S->i0 = i0;
     S->i1 = i1;
+
+
+    ASSERT_ALWAYS(i1-i0 <= (1 << SMALL_SLICES_I_BITS) );
 
     uint32_t * ptr0 = *ptr;
     /* We're doing a new slice */
@@ -258,11 +291,14 @@ int builder_do_small_slice(builder * mb, struct small_slice_t * S, uint32_t ** p
      * Either the max dj is too large -- larger than 16 bits -- or the
      * average dj is too large -- larger than some guessed value.
      */
-    int keep = S->dj_max < (1UL << 16) && S->dj_avg < DJ_CUTOFF1;
-    if (!keep) {
+    int keep1 = S->dj_max < (1UL << 16) && S->dj_avg < DJ_CUTOFF1;
+    int keep2 = S->dj_max < (1 << SMALL_SLICES_DJ_BITS) && S->dj_avg < DJ_CUTOFF1;
+    S->is_small2 = keep2;
+
+    if (!keep1 && !keep2) {
         *ptr = ptr0;
     }
-    return keep;
+    return keep1 || keep2;
 }
 
 /* }}} */
@@ -754,8 +790,9 @@ void builder_do_all_small_slices(builder * mb, uint32_t * p_i0, list<small_slice
 
         int keep = builder_do_small_slice(mb, &S, &ptr, i0, i1);
 
-        printf(" w %" PRIu32 " ; avg dj %.1f ; max dj %u\n",
-                S.ncoeffs, S.dj_avg, S.dj_max);
+        printf(" w %" PRIu32 " ; avg dj %.1f ; max dj %u%s\n",
+                S.ncoeffs, S.dj_avg, S.dj_max,
+                S.is_small2 ? " [packed]" : "");
         fflush(stdout);
 
         if (!keep) {
@@ -832,12 +869,27 @@ void builder_push_small_slices(struct matmul_bucket_data_s * mm, list<small_slic
         small_slice_t * S = &Sq->front();
 
         mm->t16.push_back(S->i1-S->i0);
-        mm->t16.push_back(0);
+        /* Older versions had a padding zero here */
+        mm->t16.push_back(S->is_small2);
         mm->t16.push_back(S->L.size() & 0xffff);
         mm->t16.push_back(S->L.size() >> 16);
-        for(small_slice_t::Lci_t lp = S->L.begin() ; lp != S->L.end() ; ++lp) {
-            mm->t16.push_back(lp->first);
-            mm->t16.push_back(lp->second);
+
+        small_slice_t::Lci_t lp;
+
+        if (S->is_small2) {
+            /* small2 slices are smaller, and faster -- but more
+             * restrictive.
+             */
+            for(lp = S->L.begin() ; lp != S->L.end() ; ++lp) {
+                ASSERT(lp->first < (1 << SMALL_SLICES_DJ_BITS) );
+                ASSERT(lp->second < (1 << SMALL_SLICES_I_BITS) );
+                mm->t16.push_back((lp->first << SMALL_SLICES_I_BITS) | lp->second);
+            }
+        } else {
+            for(lp = S->L.begin() ; lp != S->L.end() ; ++lp) {
+                mm->t16.push_back(lp->first);
+                mm->t16.push_back(lp->second);
+            }
         }
         mm->public_->ncoeffs += S->ncoeffs;
     }
@@ -998,24 +1050,45 @@ static inline void matmul_bucket_mul_small(struct matmul_bucket_data_s * mm, abt
 {
     abobj_ptr x = mm->xab;
 
-    ASM_COMMENT("multiplication code -- dense slices"); /* {{{ */
+    ASM_COMMENT("multiplication code -- small (dense) slices"); /* {{{ */
     uint16_t nhstrips = *pos->q16++;
     pos->q16++;        // alignment.
     if (d == !mm->public_->store_transposed) {
         for(uint16_t s = 0 ; s < nhstrips ; s++) {
-            uint32_t nrows_packed = read32(pos->q16);
+            uint32_t nrows_packed = *pos->q16++;
+            int is_small2 = *pos->q16++;
             ASSERT(pos->i + nrows_packed <= pos->nrows_t);
             abt * where = dst + aboffset(x, pos->i);
             abzero(x, where, nrows_packed);
             ASM_COMMENT("critical loop");
             abt const * from = src;
-            uint32_t ncoeffs_slice = read32(pos->q16);
-            uint32_t j = 0;
-            for(uint32_t c = 0 ; c < ncoeffs_slice ; c++) {
-                j += *pos->q16++;
-                ASSERT(j < pos->ncols_t);
-                uint32_t di = *pos->q16++;
-                abadd(x, where + aboffset(x, di), from + aboffset(x, j));
+            if (is_small2) {
+#if defined(ENABLE_ASM)
+                pos->q16 = matmul_sub_small2(x, where, from, (uint16_t const *) pos->q16);
+#else
+                uint32_t ncoeffs_slice = read32(pos->q16);
+                uint32_t j = 0;
+                for(uint32_t c = 0 ; c < ncoeffs_slice ; c++) {
+                    uint16_t h = *pos->q16++;
+                    j += h >> SMALL_SLICES_I_BITS;
+                    ASSERT(j < pos->ncols_t);
+                    uint32_t di = h & ((1UL << SMALL_SLICES_I_BITS) - 1);
+                    abadd(x, where + aboffset(x, di), from + aboffset(x, j));
+                }
+#endif
+            } else {
+#if defined(ENABLE_ASM)
+                pos->q16 = matmul_sub_small1(x, where, from, (uint16_t const *) pos->q16);
+#else
+                uint32_t ncoeffs_slice = read32(pos->q16);
+                uint32_t j = 0;
+                for(uint32_t c = 0 ; c < ncoeffs_slice ; c++) {
+                    j += *pos->q16++;
+                    ASSERT(j < pos->ncols_t);
+                    uint32_t di = *pos->q16++;
+                    abadd(x, where + aboffset(x, di), from + aboffset(x, j));
+                }
+#endif
             }
             pos->i += nrows_packed;
             ASM_COMMENT("end of critical loop");
@@ -1024,19 +1097,31 @@ static inline void matmul_bucket_mul_small(struct matmul_bucket_data_s * mm, abt
         /* d == mm->public_->store_transposed */
         for(uint16_t s = 0 ; s < nhstrips ; s++) {
             uint32_t j = 0;
-            uint32_t nrows_packed = read32(pos->q16);
-            ASM_COMMENT("critical loop");
+            uint32_t nrows_packed = *pos->q16++;
+            int is_small2 = *pos->q16++;
             uint32_t ncoeffs_slice = read32(pos->q16);
-            for(uint32_t c = 0 ; c < ncoeffs_slice ; c++) {
-                j += *pos->q16++;
-                uint32_t di = *pos->q16++;
-                abadd(x, dst + aboffset(x, j), src + aboffset(x, pos->i + di));
+            if (is_small2) {
+                ASM_COMMENT("critical loop");
+                for(uint32_t c = 0 ; c < ncoeffs_slice ; c++) {
+                    uint16_t h = *pos->q16++;
+                    j += h >> SMALL_SLICES_I_BITS;
+                    ASSERT(j < pos->ncols_t);
+                    uint32_t di = h & ((1UL << SMALL_SLICES_I_BITS) - 1);
+                    abadd(x, dst + aboffset(x, j), src + aboffset(x, pos->i + di));
+                }
+            } else {
+                ASM_COMMENT("critical loop");
+                for(uint32_t c = 0 ; c < ncoeffs_slice ; c++) {
+                    j += *pos->q16++;
+                    uint32_t di = *pos->q16++;
+                    abadd(x, dst + aboffset(x, j), src + aboffset(x, pos->i + di));
+                }
             }
             pos->i += nrows_packed;
             ASM_COMMENT("end of critical loop");
         }
     }
-    ASM_COMMENT("end of dense slices"); /* }}} */
+    ASM_COMMENT("end of small(dense) slices"); /* }}} */
 }
 
 static inline void prepare_buckets_and_fences(abobj_ptr x, abt ** b, abt ** f, abt * z, const unsigned int * ql, unsigned int n)

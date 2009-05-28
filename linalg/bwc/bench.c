@@ -239,6 +239,7 @@ int main(int argc, char * argv[])
             exit(1);
         } else if (argc != ba->nthreads) {
             fprintf(stderr, "%u threads requested, but %u files given on the command line.\n", ba->nthreads, argc);
+            exit(1);
         }
     }
 

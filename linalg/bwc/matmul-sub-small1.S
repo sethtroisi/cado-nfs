@@ -1,9 +1,9 @@
 	.text
 .Ltext0:
 	.p2align 4,,15
-.globl matmul_sliced_asm
-	.type	matmul_sliced_asm, @function
-matmul_sliced_asm:
+.globl matmul_sub_small1
+	.type	matmul_sub_small1, @function
+matmul_sub_small1:
         pushq %rbp
         pushq %rbx
         pushq %r15
@@ -106,4 +106,4 @@ matmul_sliced_asm:
         popq %rbp
 	ret
 .LFE52:
-	.size	matmul_sliced_asm, .-matmul_sliced_asm
+	.size	matmul_sub_small1, .-matmul_sub_small1

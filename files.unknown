@@ -9,7 +9,3 @@ sieve/README.las
 sieve/benchsieve.pl
 linalg.sh
 merge_linalg_sqrt2.sh
-polyselect/fast_rootsieve.c
-polyselect/fast_rootsieve.h
-polyselect/rspoly.h
-polyselect/rspoly.c
