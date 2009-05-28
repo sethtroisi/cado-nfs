@@ -122,6 +122,20 @@ void poly_setcoeff(poly_t f, int i, const mpz_t z) {
     cleandeg(f, i);
 }
 
+void poly_getcoeff(mpz_t res, int i, const poly_t f) {
+  mpz_set(res,f->coeff[i]);
+}
+
+// f must be allocated, clist must have length at least p->deg+1
+void poly_set(poly_t f, const mpz_t * clist) {
+
+   int i;
+
+   for( i=0 ; i<=f->deg ; i++)
+     mpz_set(f->coeff[i],clist[i]);
+ }
+
+
 // g must be allocated. 
 void poly_copy(poly_t g, const poly_t f) {
   int i;
@@ -134,7 +148,12 @@ void poly_copy(poly_t g, const poly_t f) {
 #define max(a,b) ((a)<(b) ? (b) : (a))
 #endif
 
-#if 0 /* unused */
+int poly_is_constant(const poly_t f) {
+  return (f->deg <= 0);
+}
+
+
+#if 1 /* used in fast_rootsieve */
 void poly_add(poly_t f, const poly_t g, const poly_t h) {
   int i, maxdeg;
   mpz_t z;
@@ -157,7 +176,7 @@ void poly_add(poly_t f, const poly_t g, const poly_t h) {
 }
 #endif
 
-#if 0 /* unused */
+#if 1 /* used in fast rootsieve */
 void poly_sub(poly_t f, const poly_t g, const poly_t h) {
   int i, maxdeg;
   mpz_t z;
@@ -210,7 +229,7 @@ poly_sub_mod_mpz (poly_t f, const poly_t g, const poly_t h, const mpz_t m)
   cleandeg(f, f->deg);
 }
 
-#if 0 /* unused */
+#if 1 /* used in fast rootsieve */
 void poly_mul_ui(poly_t f, const poly_t g, unsigned long a) {
   int i;
   mpz_t aux;
@@ -232,6 +251,19 @@ poly_sub_ui (poly_t f, unsigned long a)
   mpz_sub_ui(aux, f->coeff[0], a);
   poly_setcoeff(f, 0, aux);
   mpz_clear(aux);
+}
+
+/* f <- (g/a) mod m */
+// We suppose f already allocated, and we suppose the coefficients of g are multiples of a.
+void poly_div_ui_mod_ui(poly_t f, const poly_t g, unsigned long a, const unsigned long m) {
+
+  int i;
+  
+  for (i = 0 ; i<= g->deg; ++i) {      
+    mpz_divexact_ui(f->coeff[i],g->coeff[i],a);
+    mpz_mod_ui(f->coeff[i],f->coeff[i],m);
+  }
+    
 }
 
 /* f <- g/2 mod m */
@@ -273,6 +305,7 @@ void poly_eval_mod_mpz(mpz_t res, const poly_t f, const mpz_t x, const mpz_t m)
     mpz_mod(res, res, m);
   }
 }
+
 
 #if 0
 /* f <- g*h, where g has degree r, and h has degree s */
@@ -639,7 +672,7 @@ poly_mul_mpz(poly_t Q, const poly_t P, const mpz_t a) {
   mpz_clear(aux);
 }
 
-/* Q <- P mod m, where m = p^k */
+/* Q <- P mod m */
 void     
 poly_reduce_mod_mpz (poly_t Q, const poly_t P, const mpz_t m)
 {
@@ -919,6 +952,27 @@ poly_sqr_mod_f_mod_mpz (poly_t Q, const poly_t P, const poly_t f,
   poly_copy(Q, R);
   poly_free(R);
 }
+
+// Affects the derivative of f to df. Assumes df different from f.
+// Assumes df has NOT been initialized.
+void poly_derivative(poly_t df, const poly_t f) {
+
+  int n;
+
+  if (poly_is_constant(f)) {
+    poly_alloc(df,0);
+    return;	
+  }	
+
+  // at this point, f->deg >=1
+  poly_alloc(df,f->deg-1);
+
+  for( n=0 ; n<=f->deg-1 ; n++ )
+    mpz_mul_si(df->coeff[n],f->coeff[n+1],n+1);
+  
+}
+
+
 
 // Q = P^a mod f, mod p (f is the algebraic polynomial, non monic)
 void 

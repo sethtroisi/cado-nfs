@@ -460,9 +460,7 @@ int light (double * alpha, long u0, long v0, long um, long vm, long us, long vs,
   }
 
 
-
-
- long modular_inverse( long r,  long N ) {
+long modular_inverse( long r,  long N ) {
 
    //ASSERT_ALWAYS(gcd(r,N)==1);
   residue_t res,inv;
@@ -500,275 +498,57 @@ void extend_ppow_list(rootsieve_dictionary rdict,int l, long p) {
 }
 
 
-/*
- _  _ |   _  _  _ _ . _ | _
-|_)(_)|\/| |(_)| | ||(_||_\
-|      /                   
-
- */
-
- void mpz_poly_eval_si(mpz_t r, mpz_poly * p,  long a) {
-
-    int i;
-
-    mpz_set(r, p->f[p->deg]);
-
-    for (i = p->deg - 1; i >= 0; i--) {
-	mpz_mul_si(r, r, a);
-	mpz_add(r, r, p->f[i]);
-    }
+// Polynomials
+// Ensures that f(X)=X
+void poly_alloc_identity(poly_t f) {
+  poly_alloc(f,1);
+  mpz_set_ui(f->coeff[0],0);
+  mpz_set_ui(f->coeff[1],1);
 }
 
-void mpz_poly_init(mpz_poly * p, int deg) {
-
-  int i;
-
-  p->deg = deg;
-  p->f = malloc((deg+1)*sizeof(mpz_t));
-
-  for( i=0 ; i<=p->deg ; i++) 
-     mpz_init(p->f[i]);    
+// f <- g(psi) 
+// f must be allocated
+void compose_psi(poly_t f, const poly_t g,unsigned long l,rootsieve_dictionary rdict) {
   
-}
+  int d;  
+  d = f->deg;
 
-void mpz_poly_clear(mpz_poly * p) {
-
-  int i;
-
-  for( i=0 ; i<=p->deg ; i++) 
-     mpz_clear(p->f[i]);   
+  long i,k;
+  mpz_t tmpsum,tmpterm,tmplpow;
   
-  free(p->f);
-  //mpz_out_str(stdout,10,p.f[0]);
-  //printf("\n");
-}
+  mpz_init(tmpsum);
+  mpz_init(tmpterm);
+  mpz_init(tmplpow);    
 
-void mpz_poly_trim(mpz_poly * p) {
-   int i;
-   for (i = p->deg; i >= 1; i--)
-     if(mpz_sgn(p->f[i])!=0)
-       break;
+  for( k=0 ; k<=d ; k++) {
 
-   p->deg = i;   
-     
-}
-
- void  mpz_poly_set_linear_si(mpz_poly * p,long l, long p) {
-   mpz_set_si(p->f[0],l);
-   mpz_set_si(p->f[1],p);
- }
-
- mpz_poly mpz_poly_identity() {
-   mpz_poly id;
-   mpz_poly_init(&id,1);
-   mpz_set_si(id.f[1],1);
-   return id;
- }
-
- void mpz_poly_set(mpz_poly * p,mpz_t * clist) {
-
-   // We suppose clist has length at least p->deg+1
-   int i;
-
-   for( i=0 ; i<=p->deg ; i++)
-     mpz_set(p->f[i],clist[i]);
- }
-
- void mpz_poly_init_set(mpz_poly * f,int deg,mpz_t * clist) {
-
-   // We suppose clist has length at least p->deg+1
-   int i;
-   
-   p->deg = deg;
-   p->f = malloc((deg+1)*sizeof(mpz_t));
-
-   for( i=0 ; i<=p->deg ; i++) {
-     mpz_init(p->f[i]);
-     mpz_set(p->f[i],clist[i]);
-   }
- }
-
-// Compute the derivative
-
-mpz_poly mpz_poly_derivative(mpz_poly f) {
-
-  mpz_poly diff;  
-   int n; // Loop counter
-    
-  if (f.deg<=0) {
-    mpz_poly_init(diff,0);        
-    return diff;
-  }
-  
-  mpz_poly_init(diff,f.deg-1);
-  
-  for( n=0 ; n<=f.deg-1 ; n++ )
-    mpz_mul_si(diff.f[n],f.f[n+1],n+1);
-  
-  return diff;
-  
-}
-
-// Reduction mod m of coeffs St: 2h12
-mpz_poly mpz_poly_coeff_reduction(mpz_poly f, unsigned long m) {
-
-  mpz_poly reduced;
-   int n;
-  
-  mpz_poly_init(reduced,f.deg);
-
-  for ( n=0 ; n<f.deg+1 ; n++)
-    mpz_mod_ui(reduced.f[n],f.f[n],m);
-
-  // Just in case some leading coeffs were multiples of m
-  mpz_poly_trim(reduced);
-
-  return reduced;
-    
-}
-// End : 2h21 - 9 minutes
-
-// Losing time : 5 minutes
-
-// Division of every coeff by something : Start 2h27
-mpz_poly mpz_poly_coeff_division(mpz_poly f, unsigned long m) {
-
-  mpz_poly divised;
-  int n;
-  
-  mpz_poly_init(divised,f.deg);
-
-  for ( n=0 ; n<f.deg+1 ; n++) {
-    ASSERT_ALWAYS(mpz_divisible_ui_p(f.f[n],m));
-    mpz_fdiv_q_ui(divised.f[n],f.f[n],m);
-  }      
-
-  return divised;
-    
-} 
-// End 2h47 - 20 min.
-
-mpz_poly mpz_poly_coeff_product_si(mpz_poly f,  long m) {
-
-  mpz_poly multiplied;
-   int n;
-  
-  mpz_poly_init(multiplied,f.deg);
-
-  for ( n=0 ; n<f.deg+1 ; n++)     
-    mpz_mul_si(multiplied.f[n],f.f[n],m);
-  
-  return multiplied;
-    
-} 
-
-// Sum of polynomials 2h47
-
-mpz_poly mpz_poly_sum(mpz_poly f, mpz_poly g) {
-  if (f.deg<=g.deg) 
-    return mpz_poly_sum_sorted(f,g);
-  else 
-    return mpz_poly_sum_sorted(g,f);
-}
-
-// We assume the degree of g is less than the degree of f.
-mpz_poly mpz_poly_sum_sorted(mpz_poly f, mpz_poly g) {
-    
-  mpz_poly s;
-  int n;
-
-  mpz_poly_init(s,g.deg);  
-  
-  for( n=0 ; n<=f.deg ; n++) {
-    mpz_init(s.f[n]);
-    mpz_add(s.f[n],f.f[n],g.f[n]);
-  }
-  
-  for( n=f.deg+1 ; n<=g.deg ; n++) {
-    mpz_init(s.f[n]);
-    mpz_set(s.f[n],g.f[n]);
-  }
-
-  //mpz_poly_trim(s);
-
-  return s;
-
-} // End 3h34 - 47 minutes
-
-// Product of polynomials : Start 3h34
-mpz_poly mpz_poly_prod(mpz_poly f, mpz_poly g) {
-  
-  mpz_poly prod;
-  mpz_t tmp;
-  int i,n;
-  
-  mpz_poly_init(prod,f.deg+g.deg);
-
-  for( n=0 ; n<=prod.deg ; n++) {
-    for ( i=0 ; i<=n ; i++) {
-      mpz_mul(tmp,f.f[i],g.f[n-i]);
-      mpz_add(prod.f[n],prod.f[n],tmp);
-    }
-  }
-
-  return prod;
-  
-} // End 3h53 -- 20 minutes
-
- mpz_poly compose_psi(mpz_poly f,long l,rootsieve_dictionary rdict) {
-
-   mpz_poly compo;
-   long i,k;
-   mpz_t tmpsum,tmpterm,tmplpow;
-  
-   mpz_init(tmpsum);
-   mpz_init(tmpterm);
-   mpz_init(tmplpow);    
-
-   mpz_poly_init(compo,f.deg);
-
-   for( k=0 ; k<=compo.deg ; k++) {
-
-     mpz_set_si(tmplpow,1);
-     mpz_set_si(tmpsum,0);
+    mpz_set_ui(tmplpow,1);
+    mpz_set_ui(tmpsum,0);
        
-     for( i=k ; i<compo.deg ; i++) {
-       // Compute the thing
-       mpz_bin_uiui(tmpterm,(unsigned long)i,(unsigned long)k);
-       mpz_mul(tmpterm,tmpterm,f.f[i]);
-       mpz_mul_ui(tmpterm,tmpterm,(unsigned long)rdict.ppow[k]);
-       mpz_mul(tmpterm,tmpterm,tmplpow);
+    for( i=k ; i<d ; i++) {
+      // Compute the thing
+      mpz_bin_uiui(tmpterm,(unsigned long)i,(unsigned long)k);
+      mpz_mul(tmpterm,tmpterm,f.f[i]);
+      mpz_mul_ui(tmpterm,tmpterm,(unsigned long)rdict->ppow[k]);
+      mpz_mul(tmpterm,tmpterm,tmplpow);
       
-       // Update pows
-       mpz_mul_si(tmplpow,tmplpow,l);      
+      // Update pows
+      mpz_mul_ui(tmplpow,tmplpow,l);      
       
-       // Add to the sum
-       mpz_add(tmpsum,tmpsum,tmpterm);      
-     }
+      // Add to the sum
+      mpz_add(tmpsum,tmpsum,tmpterm);      
+    }
 
-     mpz_set(compo.f[k],tmpsum);
+    mpz_set(f->coeff[k],tmpsum);
 
-   }
+  }
 
-   return compo;
- }
-
-mpz_poly compose_reduce(mpz_poly f,long l,rootsieve_dictionary rdict, unsigned long m)  {
-   
-  return mpz_poly_coeff_reduction(compose_psi(f,l,rdict),m);
-  
-} 
-
-// Constant test
-int mpz_poly_is_constant(mpz_poly f) {
-  return (f.deg==0);
 }
-
-void mpz_poly_constant_coeff(mpz_t op,mpz_poly f) {  
-  mpz_set(op,f.f[0]);
-}
-
-long mpz_poly_constant_coeff_si(mpz_poly f) {  
-  ASSERT_ALWAYS(mpz_fits_slong_p(f.f[0]));
-  return mpz_get_si(f.f[0]);
+// We assume (rdict->delta) > 0
+void compose_reduce(poly_t f, const poly_t g,unsigned long l,rootsieve_dictionary rdict, mpz_t m) {
+  poly_t aux;
+  poly_alloc(aux,g->deg+1);
+  compose_psi(aux,g,l,rdict);
+  poly_reduce_mod_mpz(f,aux,m);
+  poly_free(aux);
 }

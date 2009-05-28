@@ -45,16 +45,26 @@ void poly_free(poly_t f);
 void poly_print(const poly_t f);
 void cleandeg(poly_t f, int deg);
 void poly_setcoeff(poly_t f, int i, const mpz_t z);
+void poly_getcoeff(mpz_t res, int i, const poly_t f); // Added for rootsieve
+void poly_constant_coeff_ui(mpz_t res, int i, const poly_t f); // Added for rootsieve
+void poly_set(poly_t f, const mpz_t * clist); // Added for rootsieve
 void poly_copy(poly_t g, const poly_t f);
 
 // Polynomial operations
 
-// void poly_add(poly_t f, const poly_t g, const poly_t h);
-// void poly_sub(poly_t f, const poly_t g, const poly_t h);
+// The following commented headers come from fast_rootsieve.h
+//void mpz_poly_eval_si(mpz_t r, mpz_poly * f, long a); // no, we are going to wrap things in the current method.
+//mpz_poly mpz_poly_coeff_reduction(mpz_poly * f, unsigned long m); // no, we are going to wrap things in the current method.
+//mpz_poly mpz_poly_coeff_division(mpz_poly * f, unsigned long m); // r. void poly_div_ui_mod_ui(poly_t f, const poly_t g, unsigned long a, const unsigned long m);
+//mpz_poly mpz_poly_coeff_product_si(mpz_poly * f, long m); // r. void poly_mul_ui(poly_t f, const poly_t g, unsigned long a);
+int poly_is_constant(const poly_t f); // Added for rootsieve
+void poly_add(poly_t f, const poly_t g, const poly_t h);  // uncommented for rootsieve
+void poly_sub(poly_t f, const poly_t g, const poly_t h);  // uncommented for rootsieve
 void poly_sub_mod_mpz(poly_t f, const poly_t g, const poly_t h, const mpz_t m);
-// void poly_mul_ui(poly_t f, const poly_t g, unsigned long a);
+void poly_mul_ui(poly_t f, const poly_t g, unsigned long a); // uncommented for rootsieve
 void poly_sub_ui(poly_t f, unsigned long a);
 // void poly_div_ui_mod_mpz(poly_t f, const poly_t g, unsigned long a, const mpz_t m);
+void poly_div_ui_mod_ui(poly_t f, const poly_t g, unsigned long a, const unsigned long m); // done - not tested - Added for rootsieve
 void poly_div_2_mod_mpz(poly_t f, const poly_t g, const mpz_t m);
 void poly_eval_mod_mpz(mpz_t res, const poly_t f, const mpz_t x, const mpz_t m);
 // void poly_mul(poly_t f, const poly_t g, const poly_t h);
@@ -69,6 +79,9 @@ void poly_sqr_mod_f_mod_mpz(poly_t Q, const poly_t P, const poly_t f,
                             const mpz_t m, const mpz_t invm);
 void poly_power_mod_f_mod_ui(poly_t Q, const poly_t P, const poly_t f,
         const mpz_t a, unsigned long p);
+
+void poly_derivative(poly_t df, const poly_t f); // done - not tested - Added for rootsieve
+
 void barrett_init (mpz_t invm, const mpz_t m);
 poly_t* poly_base_modp_init (const poly_t P0, int p, int *K, int l);
 void poly_base_modp_clear (poly_t *P);
