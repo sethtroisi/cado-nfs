@@ -58,7 +58,7 @@ ellM_swap (ellM_point_t Q, ellM_point_t P, const modulus_t m)
 /* computes Q=2P, with 5 muls (3 muls and 2 squares) and 4 add/sub.
      - m : number to factor
      - b : (a+2)/4 mod n
-  It is permissible to let x1, z1 and x2, z2 use the same memory. */
+  It is permissible to let P and Q use the same memory. */
 
 static void
 ellM_double (ellM_point_t Q, const ellM_point_t P, const modulus_t m, 
@@ -66,19 +66,27 @@ ellM_double (ellM_point_t Q, const ellM_point_t P, const modulus_t m,
 {
   residue_t u, v, w;
 
+#if ELLM_SAFE_ADD
+  if (mod_is0 (P->z, m))
+    {
+      ASSERT (mod_is0 (P->x, m));
+    }
+#endif
+  
   mod_init_noset0 (u, m);
   mod_init_noset0 (v, m);
   mod_init_noset0 (w, m);
 
   mod_add (u, P->x, P->z, m);
-  mod_mul (u, u, u, m);       /* u = (x1 + z1)^2 */
+  mod_sqr (u, u, m);          /* u = (x + z)^2 */
   mod_sub (v, P->x, P->z, m);
-  mod_mul (v, v, v, m);       /* v = (x1 - z1)^2 */
-  mod_mul (Q->x, u, v, m);    /* x2 = (x1^2 - z1^2)^2 */
-  mod_sub (w, u, v, m);       /* w = 4 * x1 * z1 */
-  mod_mul (u, w, b, m);       /* u = x1 * z1 * (A + 2) */
-  mod_add (u, u, v, m);
-  mod_mul (Q->z, w, u, m);
+  mod_sqr (v, v, m);          /* v = (x - z)^2 */
+  mod_mul (Q->x, u, v, m);    /* x2 = (x^2 - z^2)^2 */
+  mod_sub (w, u, v, m);       /* w = 4 * x * z */
+  mod_mul (u, w, b, m);       /* u = x * z * (A + 2) */
+  mod_add (u, u, v, m);       /* u = x^2 + x * z * A + z^2 */
+  mod_mul (Q->z, w, u, m);    /* Q_z = (4xz) * (x^2 + xzA + z^2) */
+
 #if ELLM_SAFE_ADD
   if (mod_is0 (Q->z, m))
     mod_set0 (Q->x, m);
@@ -106,7 +114,7 @@ ellW_double (residue_t x3, residue_t y3, const residue_t x1,
   mod_init_noset0 (u, m);
   mod_init_noset0 (v, m);
 
-  mod_mul (u, x1, x1, m);
+  mod_sqr (u, x1, m);
   mod_add (v, u, u, m);
   mod_add (v, v, u, m);
   mod_add (v, v, a, m); /* 3x^2 + a */
@@ -119,7 +127,7 @@ ellW_double (residue_t x3, residue_t y3, const residue_t x1,
       return 0; /* y was 0  =>  result is point at infinity */
   }
   mod_mul (lambda, u, v, m);
-  mod_mul (u, lambda, lambda, m);
+  mod_sqr (u, lambda, m);
   mod_sub (u, u, x1, m);
   mod_sub (u, u, x1, m);    /* x3 = u = lambda^2 - 2*x */
   mod_sub (v, x1, u, m);
@@ -152,13 +160,15 @@ ellM_add (ellM_point_t R, const ellM_point_t P, const ellM_point_t Q,
 
 #if ELLM_SAFE_ADD
   /* Handle case where at least one input point is point at infinity */
-  if (mod_is0 (P->x, m) && mod_is0 (P->z, m))
+  if (mod_is0 (P->z, m))
     {
+      ASSERT (mod_is0 (P->x, m));
       ellM_set (R, Q, m);
       return;
     }
-  if (mod_is0 (Q->x, m) && mod_is0 (Q->z, m))
+  if (mod_is0 (Q->z, m))
     {
+      ASSERT (mod_is0 (Q->x, m));
       ellM_set (R, P, m);
       return;
     }
@@ -174,22 +184,26 @@ ellM_add (ellM_point_t R, const ellM_point_t P, const ellM_point_t Q,
   mod_add (w, P->x, P->z, m);
   mod_sub (v, Q->x, Q->z, m);
   mod_mul (v, w, v, m);      /* v = (Px+Pz)*(Qx-Qz) */
-  mod_add (w, u, v, m);      /* w = 2*(Qz*Px - Qx*Pz)*/
+  mod_add (w, u, v, m);      /* w = 2*(Qx*Px - Qz*Pz)*/
+  mod_sub (v, u, v, m);      /* v = 2*(Qz*Px - Qx*Pz) */
 #if ELLM_SAFE_ADD
-  /* Check if w == 0, which happens if P=Q or P=-Q. 
+  /* Check if v == 0, which happens if P=Q or P=-Q. 
      If P=-Q, set result to point at infinity.
      If P=Q, use ellM_double() instead.
      This test only works if P=Q on the pseudo-curve modulo N, i.e.,
      if N has several prime factors p, q, ... and P=Q or P=-Q on E_p but 
      not on E_q, this test won't notice it. */
-  if (mod_is0 (w, m))
+  if (mod_is0 (v, m))
     {
       mod_clear (w, m);
       mod_clear (v, m);
       mod_clear (u, m);
       /* Test if difference is point at infinity */
-      if (mod_is0 (D->x, m) && mod_is0 (D->z, m))
-        ellM_double (R, P, m, b); /* Yes, points are identical, use doubling */
+      if (mod_is0 (D->z, m))
+        {
+          ASSERT (mod_is0 (D->x, m));
+          ellM_double (R, P, m, b); /* Yes, points are identical, use doubling */
+        }
       else
         { 
           mod_set0 (R->x, m); /* No, are each other's negatives. */
@@ -198,10 +212,9 @@ ellM_add (ellM_point_t R, const ellM_point_t P, const ellM_point_t Q,
       return;
     }
 #endif
-  mod_sub (v, u, v, m);      /* v = 2*(Qx*Px - Qz*Pz) */
-  mod_mul (w, w, w, m);
-  mod_mul (v, v, v, m);
-  mod_set (u, D->x, m); /* save D->x */
+  mod_sqr (w, w, m);          /* w = 4*(Qx*Px - Qz*Pz)^2 */
+  mod_sqr (v, v, m);          /* v = 4*(Qz*Px - Qx*Pz)^2 */
+  mod_set (u, D->x, m);       /* save D->x */
   mod_mul (R->x, w, D->z, m); /* may overwrite D->x */
   mod_mul (R->z, u, v, m);
 
@@ -252,7 +265,7 @@ ellW_add (residue_t x3, residue_t y3, const residue_t x2, const residue_t y2,
   else
   {
       mod_mul (lambda, u, v, m);
-      mod_mul (u, lambda, lambda, m);
+      mod_sqr (u, lambda, m);
       mod_sub (u, u, x1, m);
       mod_sub (u, u, x2, m);    /* x3 = u = lambda^2 - x1 - x2 */
       mod_sub (v, x1, u, m);
@@ -268,9 +281,7 @@ ellW_add (residue_t x3, residue_t y3, const residue_t x2, const residue_t y2,
 }
 
 
-/* (x:z) <- e*(x:z) (mod p)
-   Assumes e >= 5.
-*/
+/* (x:z) <- e*(x:z) (mod p) */
 static void
 ellM_mul_ul (ellM_point_t R, const ellM_point_t P, unsigned long e, 
              const modulus_t m, const residue_t b)
@@ -531,15 +542,15 @@ Brent12_curve_from_sigma (residue_t A, residue_t x, const residue_t sigma,
   /* compute b, x */
   mod_add (v, sigma, sigma, m);
   mod_add (v, v, v, m);         /* v = 4*sigma */
-  mod_mul (u, sigma, sigma, m);
+  mod_sqr (u, sigma, m);
   mod_set1 (b, m);
   mod_add (t, b, b, m);
   mod_add (t, t, t, m);
   mod_add (t, t, b, m);         /* t = 5 */
   mod_sub (u, u, t, m);         /* u = sigma^2 - 5 */
-  mod_mul (t, u, u, m);
+  mod_sqr (t, u, m);
   mod_mul (x, t, u, m);         /* x = u^3 */
-  mod_mul (t, v, v, m);
+  mod_sqr (t, v, m);
   mod_mul (z, t, v, m);         /* z = v^3 */
   mod_mul (t, x, v, m);         /* t = x*v = u^3*v */
   mod_add (b, t, t, m);
@@ -548,7 +559,7 @@ Brent12_curve_from_sigma (residue_t A, residue_t x, const residue_t sigma,
   mod_add (t, t, u, m);         /* t = 3*u */
   mod_sub (u, v, u, m);         /* t2 = v-u  (stored in u) */
   mod_add (v, t, v, m);         /* t3 = 3*u + v (stored in v) */
-  mod_mul (t, u, u, m);
+  mod_sqr (t, u, m);
   mod_mul (u, t, u, m);         /* t4 = (u-v)^3 (stored in u) */
   mod_mul (A, u, v, m);         /* A = (u-v)^3 * (3*u + v) */
   mod_mul (v, b, z, m);         /* t5 = b*z (stored in v) */
@@ -679,14 +690,14 @@ Montgomery12_curve_from_k (residue_t A, residue_t x, const unsigned long k,
          We need both $a$ and $1/a$, so we can compute the inverses of both
          u^2 - 4*u - 12 and u^2 + 12*u - 12 with a single batch inversion. */
 
-      mod_sqr (t2, u, m);  /* t2 = u^2 */
+      mod_sqr (t2, u, m);     /* t2 = u^2 */
       mod_sub (u, u, one, m);
       mod_add (u, u, u, m);
       mod_add (u, u, u, m);   /* u' = 4u - 4 */
       mod_sub (v, t2, u, m);  /* v = u^2 - 4u + 4 */
       mod_add (t2, t2, u, m);
       mod_add (t2, t2, u, m);
-      mod_add (u, t2, u, m); /* u'' = u^2 + 12u - 12 */
+      mod_add (u, t2, u, m);  /* u'' = u^2 + 12u - 12 */
       mod_add (t2, one, one, m);
       mod_add (t2, t2, t2, m);
       mod_add (t2, t2, t2, m);
@@ -714,7 +725,7 @@ Montgomery12_curve_from_k (residue_t A, residue_t x, const unsigned long k,
     }
 
   /* Here we have $a$ in a, $1/a$ in v */
-  mod_mul (u, a, a, m);   /* a^2 */
+  mod_sqr (u, a, m);      /* a^2 */
   mod_add (A, u, one, m);
   mod_add (A, A, one, m); /* a^2 + 2 */
   mod_add (t2, A, A, m);
@@ -723,7 +734,7 @@ Montgomery12_curve_from_k (residue_t A, residue_t x, const unsigned long k,
   mod_set (A, v, m);
   mod_sub (A, A, t2, m);  /* 1/a - 3 a (a^2 + 2) */
   mod_div2 (v, v, m);     /* v = 1/(2a) */
-  mod_mul (t2, v, v, m);  /* t2 = 1/(2a)^2 */
+  mod_sqr (t2, v, m);     /* t2 = 1/(2a)^2 */
   mod_mul (A, A, t2, m);  /* A = [1/a - 3 a (a^2 + 2)]/(2a)^2 */
 
   mod_add (x, u, u, m);   /* 2a^2 */
@@ -777,7 +788,7 @@ Montgomery16_curve_from_k (residue_t b, residue_t x, const unsigned long k,
       mod_div2 (t2, t2, m);     /* t2 = 1/8 */
       mod_div3 (t2, t2, m);     /* t2 = 1/24 */
       mod_add (t2, t2, one, m); /* t2 = 25/24 */
-      mod_mul (b, t2, t2, m);   /* b = 625/576 */
+      mod_sqr (b, t2, m);       /* b = 625/576 */
 
 #ifdef WANT_ASSERT_EXPENSIVE
       mod_add (t, x, x, m);
@@ -821,7 +832,7 @@ Montgomery16_curve_from_k (residue_t b, residue_t x, const unsigned long k,
       mod_div5 (t, t, m);     /* t = 49/240 */
       mod_add (t, t, one, m); /* t = 289/240 */
 
-      mod_mul (b, t, t, m); /* b = 83521/57600 */
+      mod_sqr (b, t, m);      /* b = 83521/57600 */
       
 #ifdef WANT_ASSERT_EXPENSIVE
       mod_set_ul (t, 15UL, m);
@@ -891,104 +902,87 @@ curveW_from_Montgomery (residue_t a, residue_t x, residue_t y,
 }
 
 
+/* Multiplies x[1] by z[2]*z[3]*z[4]...*z[n],
+   x[2] by z[1]*z[3]*z[4]...*z[n] etc., generally
+   x[i] by \prod_{1\leq j \leq n, j\neq i} z[j]
+   Requires n > 1. Uses 4n-6 multiplications. */
 
-/* Multiplies Pj_x[i] by 1/Pj_z[i] for 0 <= i < plan->s1 and 
-   and all Pid_x[i] by 1/Pid_z[i] for 0 <= i < plan->i1 - plan->i0.
-   Uses 3*n - 3 multiplications and one inverse for total of n points.
-   Returns 1 if inversion worked, 
-   otherwise return 0 and puts non-invertible residue in r. */
-
-static int
-normalize (residue_t r, residue_t *Pj_x, residue_t *Pj_z, 
-           residue_t *Pid_x, residue_t *Pid_z, const modulus_t m, 
-           const stage2_plan_t *plan)
+MAYBE_UNUSED
+static void
+common_z (const int n1, residue_t *x1, residue_t *z1, 
+	  const int n2, residue_t *x2, residue_t *z2,
+	  const modulus_t m)
 {
-  /* Let a_0, ..., a_n = Pj_z[0], ..., Pj_z[s1 - 1], 
-                         Pid_z[0], ..., Pid_z[i1 - i0 - 1]
-     be the list of residues we want to invert.
-     If i0 == 0, we skip that point in the inversion */
-  const unsigned int skip_i0 = (plan->i0 == 0) ? 1 : 0;
-  const unsigned long n = plan->s1 + plan->i1 - plan->i0 - skip_i0;
-  residue_t *invarray, a;
-  unsigned int i, k;
-
-  mod_init (a, m);
-  invarray = (residue_t *) malloc (n * sizeof (residue_t));
-  ASSERT (invarray != NULL);
-  for (i = 0; i < n; i++)
-    mod_init (invarray[i], m);
-  /* Set invarray[k] = prod_{j=0}^{k} a_j */
-  mod_set (invarray[0], Pj_z[0], m);
-  for (i = 1, k = 1; i < plan->s1; i++, k++)
-    mod_mul (invarray[k], invarray[k - 1], Pj_z[i], m);
-  for (i = skip_i0; i < plan->i1 - plan->i0; i++, k++)
-    mod_mul (invarray[k], invarray[k - 1], Pid_z[i], m);
+  const int n = n1 + n2;
+  int i, j;
+  residue_t *t, p;
   
-  /* Set a_n := 1 / (a_0, ..., a_n) */
-  if (! mod_inv (a, invarray[k - 1], m))
+  if (n < 2)
+    return;
+  
+  t = (residue_t *) malloc (n * sizeof (residue_t));
+  for (i = 0; i < n; i++)
+    mod_init (t[i], m);
+  
+  /* Set t[i] = z_0 * z_1 * ... * z_n, where the z_i are taken
+     from the two lists z1 and z2 */
+  i = j = 0;
+  if (n1 == 0)
+    mod_set (t[0], z2[j++], m);
+  else
+    mod_set (t[0], z1[i++], m);
+  
+  for ( ; i < n1; i++)
+    mod_mul (t[i], t[i - 1], z1[i], m);
+  
+  for ( ; j < n2; j++)
+    mod_mul (t[j + n1], t[j + n1 - 1], z2[j], m);
+  
+  /* Now t[i] contains z_0 * ... * z_i */
+  
+  mod_init (p, m);
+  
+  i = n - 1;
+  if (i < n1)
+    mod_mul (x1[i], x1[i], t[n - 2], m);
+  else
+    mod_mul (x2[i - n1], x2[i - n1], t[n - 2], m);
+  
+  if (n2 > 0)
+    mod_set (p, z2[n2 - 1], m);
+  else
+    mod_set (p, z1[n1 - 1], m);
+  
+  for (i = n2 - 2; i > -n1 && i >= 0; i--)
     {
-      mod_set (r, invarray[k - 1], m);
-      for (i = 0; i < n; i++)
-        mod_clear (invarray[i], m);
-      free (invarray);
-      invarray = NULL;
-      mod_clear (a, m);
-      return 0;
-    }
-
-  /* Compute 1/a_i and normalize the Pid points */
-  mod_set (invarray[k - 1], a, m);
-  for (i = plan->i1 - plan->i0; i > skip_i0; i--, k--)
-    {
-      /* Here, invarray[k - 1] = 1 / (a_0, ..., a_{k-1}) and
-         invarray[k - 2] = (a_0, ..., a_{k-2}) */
-      mod_mul (a, invarray[k - 1], invarray[k - 2], m);
-      /* a = 1/a_{k-1} = 1/Pid_z[i - 1] */
-#ifdef WANT_ASSERT_EXPENSIVE
-      mod_mul (a, a, Pid_z[i - 1], m);
-      ASSERT (mod_is1 (a, m));
-      mod_mul (a, invarray[k - 1], invarray[k - 2], m);
-#endif
-      /* Normalize point */
-      mod_mul (Pid_x[i - 1], Pid_x[i - 1], a, m);
-      /* Set invarray[k - 2] = 1 / (a_0, ..., a_{k-2}) = 
-         1 / (a_0, ..., a_{k-1}) * a_{k-1} */
-      mod_mul (invarray[k - 2], invarray[k - 1],  Pid_z[i - 1], m);
+      /* Here p = z_{i+1} * ... * z_{n-1} */
+      mod_mul (x2[i], x2[i], p, m);
+      mod_mul (x2[i], x2[i], t[i + n1 - 1], m);
+      mod_mul (p, p, z2[i], m);
     }
   
-  /* Compute 1/a_i and normalize the Pj points */
-  for (i = plan->s1; i > 1; i--, k--)
+  /* n1 = 0  =>  i = 0 */
+  /* n1 > 0  =>  i = -1 or -2 */
+  
+  for (i = i + n1 ; i > 0; i--)
     {
-      /* Here, invarray[k - 1] = 1 / (a_0, ..., a_{k-1}) and
-         invarray[k - 2] = (a_0, ..., a_{k-2}) */
-      mod_mul (a, invarray[k - 1], invarray[k - 2], m);
-      /* a = 1/a_{k-1} = 1/Pj_z[i - 1] */
-#ifdef WANT_ASSERT_EXPENSIVE
-      mod_mul (a, a, Pj_z[i - 1], m);
-      ASSERT (mod_is1 (a, m));
-      mod_mul (a, invarray[k - 1], invarray[k - 2], m);
-#endif
-      /* Normalize point */
-      mod_mul (Pj_x[i - 1], Pj_x[i - 1], a, m);
-      /* Set invarray[k - 2] = 1 / (a_0, ..., a_{k-2}) = 
-         1 / (a_0, ..., a_{k-1}) * a_{k-1} */
-      mod_mul (invarray[k - 2], invarray[k - 1],  Pj_z[i - 1], m);
+      /* Here p = z_{i+1} * ... * z_{n-1} */
+      mod_mul (x1[i], x1[i], p, m);
+      mod_mul (x1[i], x1[i], t[i-1], m);
+      mod_mul (p, p, z1[i], m);
     }
-  /* Do the first Pj point. Here k = 1 and invarray[k] = 1/a_1 */
-  ASSERT (k == 1);
-#ifdef WANT_ASSERT_EXPENSIVE
-  mod_mul (a, invarray[k - 1], Pj_z[i - 1], m);
-  ASSERT (mod_is1 (a, m));
-#endif
-  /* Normalize point */
-  mod_mul (Pj_x[i - 1], Pj_x[i - 1], invarray[k - 1], m);
-
+  
+  if (n1 > 0)
+    mod_mul (x1[0], x1[0], p, m);
+  else
+    mod_mul (x2[0], x2[0], p, m);
+  
+  mod_clear (p, m);
+  
   for (i = 0; i < n; i++)
-    mod_clear (invarray[i], m);
-  free (invarray);
-  invarray = NULL;
-  mod_clear (a, m);
-  return 1;
+    mod_clear (t[i], m);
+  free (t);
+  t = NULL;
 }
 
 
@@ -1002,6 +996,7 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
   residue_t a, a_bk, t;
   unsigned int i, k, l;
   int bt = 0;
+  const int verbose = 0;
   
   ellM_init (Pt, m);
   mod_init_noset0 (t, m);
@@ -1025,6 +1020,10 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
       mod_init_noset0 (Pid_x[i], m);
       mod_init_noset0 (Pid_z[i], m);
     }
+
+  if (verbose)
+    printf ("Stage 2: P = (%lu::%lu)\n", 
+            mod_get_ul (P[0].x, m), mod_get_ul (P[0].z, m));
   
   /* Compute jP for j in S_1. Compute all the j, 1 <= j < d/2, gcd(j,d)=1 
      with two arithmetic progressions 1+6k and 5+6k (this assumes 6|d).
@@ -1129,14 +1128,17 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
     ellM_clear (P6, m);
     ellM_clear (P2, m);
 
-#if 0
-    printf ("Pj = [");
-    for (i = 0; i < plan->s1; i++)
-      printf ("%s(%lu:%lu)", (i>0) ? ", " : "", 
-	      mod_get_ul (Pj_x[i], m), mod_get_ul (Pj_z[i], m));
-    printf ("]\n");
-#endif
   }
+
+  if (verbose)
+    {
+      printf ("Pj = [");
+      for (i = 0; i < plan->s1; i++)
+        printf ("%s(%lu::%lu)", (i>0) ? ", " : "", 
+                mod_get_ul (Pj_x[i], m), mod_get_ul (Pj_z[i], m));
+      printf ("]\nPd = (%lu::%lu)\n",
+                mod_get_ul (Pd[0].x, m), mod_get_ul (Pd[0].z, m));
+    }
   
   /* Compute idP for i0 <= i < i1 */
   {
@@ -1180,25 +1182,55 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
 
     ellM_clear (Pid, m);
     ellM_clear (Pid1, m);
-#if 0
-    printf ("Pid = [");
-    for (i = 0; i < plan->i1 - plan->i0; i++)
-      printf ("%s(%lu:%lu)", (i>0) ? ", " : "", 
-	      mod_get_ul (Pid_x[i], m), mod_get_ul (Pid_z[i], m));
-    printf ("]\n");
-#endif
   }
 
-  /* Now we've computed all the points we need, so normalize them,
-     using Montgomery's batch inversion trick */
-  if (normalize (r, Pj_x, Pj_z, Pid_x, Pid_z, m, plan) == 0)
-    goto clear_and_exit;
+  if (verbose)
+    {
+      printf ("Pid = [");
+      for (i = 0; i < plan->i1 - plan->i0; i++)
+        printf ("%s(%lu:%lu)", (i>0) ? ", " : "", 
+	        mod_get_ul (Pid_x[i], m), mod_get_ul (Pid_z[i], m));
+      printf ("]\n");
+    }
+
+  /* Now we've computed all the points we need, so multiply each by
+     the Z-coordinates of all the others, using Zimmermann's 
+     two product-lists trick. 
+     If i0 == 0, then Pid[0] is the point at infinity (0::0),
+     so we skip that one */
+  {
+    int skip = (plan->i0 == 0) ? 1 : 0;
+    common_z (plan->s1, Pj_x, Pj_z, plan->i1 - plan->i0 - skip, 
+	      Pid_x + skip, Pid_z + skip, m);
+  }
+
+  if (verbose)
+    {
+      printf ("After canonicalizing:\nPj = [");
+      for (i = 0; i < plan->s1; i++)
+        printf ("%s(%lu:%lu)", (i>0) ? ", " : "", 
+                mod_get_ul (Pj_x[i], m), mod_get_ul (Pj_z[i], m));
+      printf ("]\n");
+      
+      printf ("Pid = [");
+      for (i = 0; i < plan->i1 - plan->i0; i++)
+        printf ("%s(%lu:%lu)", (i>0) ? ", " : "", 
+                mod_get_ul (Pid_x[i], m), mod_get_ul (Pid_z[i], m));
+      printf ("]\n");
+    }
 
   /* Now process all the primes p = id - j, B1 < p <= B2 and multiply
      (id*P)_x - (j*P)_x to the accumulator */
-  mod_set1 (a, m);
+
+  /* Init the accumulator to Pj[0], which contains the product of
+     the Z-coordinates of all the precomputed points, except Pj_z[0]
+     which is equal to P, and we know that one is coprime to the modulus. 
+     Maybe one of the oters was zero (mod p) for some prime factor p. */
+
+  mod_set (a, Pj_x[0], m);
   mod_init_noset0 (a_bk, m); /* Backup value of a, in case we get a == 0 */
   mod_set (a_bk, a, m);
+
   i = 0;
   l = 0;
   unsigned char j = plan->pairs[0];
@@ -1230,6 +1262,9 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
 	  ASSERT (i < plan->i1 - plan->i0);
 	}
     }
+
+  if (verbose)
+    printf ("Accumulator = %lu\n", mod_get_ul (a, m));
   
   mod_set (r, a, m);
   
