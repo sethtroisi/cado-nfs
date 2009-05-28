@@ -141,7 +141,7 @@ void matmul_basic_mul(struct matmul_basic_data_s * mm, abt * dst, abt const * sr
             unsigned int j = 0;
             for( ; len-- ; ) {
                 j += *q++;
-                ASSERT(j < mm->public_->dim[!d]);
+                ASSERT(j < mm->public_->dim[d]);
                 abadd(x, dst + aboffset(x, i), src + aboffset(x, j));
             }
         }

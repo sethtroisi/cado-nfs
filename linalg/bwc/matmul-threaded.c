@@ -609,6 +609,13 @@ void matmul_threaded_mul_sub_sparse(struct matmul_threaded_data_s * mm, abt * ds
             ASM_COMMENT("end of critical loop (transposed mult, SLOW)");
             src += aboffset(x, g);
         }
+        /* The extra readahead location which is used for non-transposed
+         * mult is here an extra scrap location. It's innocuous to write
+         * there of course, but in the context of checking, it's better
+         * if we keep a zero there because it may become readahead again
+         * for the next turn.
+         */
+        abzero(x, dst + aboffset(x, mm->public_->dim[!d]), 1);
     }
     ASM_COMMENT("end of sparse multiplication code");
 }

@@ -19,6 +19,7 @@
 #include "abase.h"
 #include "macros.h"
 #include "params.h"
+#include "worker-threads.h"
 // #include "debug.h"
 
 void usage()
@@ -28,6 +29,7 @@ void usage()
     exit(1);
 }
 
+/* {{{ crc code */
 #define RED(l,h) do {                                                   \
         /* Compute crc mod x^32 + x^7 + x^6 + x^2 + 1 */                \
         l ^= h ^ h << 2 ^ h << 6 ^ h << 7;                              \
@@ -51,32 +53,160 @@ uint32_t crc32(unsigned long * c, int n)
     }
     return v;
 }
+/* }}} */
+
+struct private_args {
+    matmul_t mm;
+    abt * src;
+    abt * dst;
+};
+
+struct bench_args {
+    abobj_t xx;
+    param_list pl;
+    const char * impl;
+    int nthreads;
+    int transpose;
+    int nchecks;
+    char ** mfiles;
+    struct private_args * p;
+    struct worker_threads_group * tg;
+};
+
+void init_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct bench_args * ba)/*{{{*/
+{
+    clock_t t0 = clock();
+    struct private_args * p = ba->p + tnum;
+
+    p->mm = matmul_reload_cache(ba->xx, ba->mfiles[tnum], ba->impl, ba->pl, !ba->transpose);
+    if (p->mm) {
+        pthread_mutex_lock(&tg->mu);
+        fprintf(stderr, "T%d Reusing cache file for %s\n",
+                tnum, ba->mfiles[tnum]);
+        fprintf(stderr, "T%d Cache load time %.2fs\n",
+                tnum, (double) (clock()-t0) / CLOCKS_PER_SEC);
+        pthread_mutex_unlock(&tg->mu);
+    } else {
+        pthread_mutex_lock(&tg->mu);
+        fprintf(stderr, "T%d Building cache file for %s\n",
+                tnum, ba->mfiles[tnum]);
+        pthread_mutex_unlock(&tg->mu);
+        p->mm = matmul_build(ba->xx, ba->mfiles[tnum], ba->impl, ba->pl, !ba->transpose);
+        matmul_save_cache(p->mm, ba->mfiles[tnum]);
+        pthread_mutex_lock(&tg->mu);
+        fprintf(stderr, "T%d Cache build time %.2fs\n",
+                tnum, (double) (clock()-t0) / CLOCKS_PER_SEC);
+        pthread_mutex_unlock(&tg->mu);
+    }
+
+    unsigned int nr = p->mm->dim[0];
+    unsigned int nc = p->mm->dim[1];
+    matmul_aux(p->mm, MATMUL_AUX_GET_READAHEAD, &nr);
+    matmul_aux(p->mm, MATMUL_AUX_GET_READAHEAD, &nc);
+    p->dst = abinit(ba->xx, nr);
+    p->src = abinit(ba->xx, nc);
+    abzero(ba->xx, p->dst, nr);
+    abzero(ba->xx, p->src, nc);
+}/*}}}*/
+
+void check_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct bench_args * ba)/*{{{*/
+{
+    struct private_args * p = ba->p + tnum;
+
+    unsigned int nr = p->mm->dim[0];
+    unsigned int nc = p->mm->dim[1];
+    unsigned int nr0 = nr;
+    unsigned int nc0 = nc;
+    matmul_aux(p->mm, MATMUL_AUX_GET_READAHEAD, &nr);
+    matmul_aux(p->mm, MATMUL_AUX_GET_READAHEAD, &nc);
+
+    abt * dstT = abinit(ba->xx, nc);
+    abt * srcT = abinit(ba->xx, nr);
+    abzero(ba->xx, dstT, nc);
+    abzero(ba->xx, srcT, nr);
+
+    abt * checkA = abinit(ba->xx, abnbits(ba->xx));
+    abt * checkB = abinit(ba->xx, abnbits(ba->xx));
+
+    abcopy(ba->xx, dstT, p->src, nc);
+    abcopy(ba->xx, srcT, p->dst, nr);
+    printf("T%d src(%u): %08" PRIx32 "\n", tnum,
+            nc, crc32((unsigned long*) p->src, abbytes(ba->xx, nc0) / sizeof(unsigned long)));
+    matmul_mul(p->mm, p->dst, p->src, 1);
+    printf("T%d dst(%u): %08" PRIx32 "\n", tnum,
+            nr, crc32((unsigned long*) p->dst, abbytes(ba->xx, nr0) / sizeof(unsigned long)));
+    // debug_write(p->dst, abbytes(ba->xx, nr), "/tmp/Lmul.%d", t);
+
+    abdotprod(ba->xx, checkA, p->dst, srcT, nr0);
+
+    printf("T%d srcT(%u): %08" PRIx32 "\n", tnum,
+            nr, crc32((unsigned long*) srcT, abbytes(ba->xx, nr0) / sizeof(unsigned long)));
+    matmul_mul(p->mm, dstT, srcT, 0);
+    printf("T%d dstT(%u): %08" PRIx32 "\n", tnum,
+            nc, crc32((unsigned long*) dstT, abbytes(ba->xx, nc0) / sizeof(unsigned long)));
+
+    // debug_write(dstT, abbytes(ba->xx, nc), "/tmp/Rmul.%d", t);
+
+    abdotprod(ba->xx, checkB, p->src, dstT, nc0);
+
+    if (memcmp(checkA, checkB, aboffset(ba->xx, abnbits(ba->xx)) * sizeof(abt)) != 0) {
+        pthread_mutex_lock(&tg->mu);
+        fprintf(stderr, "T%d : Check failed\n", tnum);
+        pthread_mutex_unlock(&tg->mu);
+        abort();
+    }
+
+    abclear(ba->xx, checkA, abnbits(ba->xx));
+    abclear(ba->xx, checkB, abnbits(ba->xx));
+
+    abclear(ba->xx, dstT, nc);
+    abclear(ba->xx, srcT, nr);
+}/*}}}*/
+
+void mul_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct bench_args * ba)/*{{{*/
+{
+    struct private_args * p = ba->p + tnum;
+    matmul_mul(p->mm, ba->transpose ? p->src : p->dst,
+            ba->transpose ? p->dst : p->src,
+            !ba->transpose);
+}/*}}}*/
+
+void clear_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct bench_args * ba)/*{{{*/
+{
+    struct private_args * p = ba->p + tnum;
+    unsigned int nr = p->mm->dim[0];
+    unsigned int nc = p->mm->dim[1];
+    matmul_clear(p->mm);
+    abclear(ba->xx, p->dst, nr);
+    abclear(ba->xx, p->src, nc);
+}/*}}}*/
 
 int main(int argc, char * argv[])
 {
-    abobj_t xx MAYBE_UNUSED;
-    abobj_init(xx);
+    struct bench_args ba[1];
 
-    matmul_t mm;
+    abobj_init(ba->xx);
 
-    const char * impl = "sliced";
-    const char * file = NULL;
-    int transpose = 0;
+    ba->impl = "sliced";
+    char * file = NULL;
     int nocheck = 0;
-    int nchecks = 4;
+    ba->nchecks = 4;
+    ba->nthreads = 1;
 
-    param_list pl;
-
-    param_list_init(pl);
-
+    /* {{{ */
+    param_list_init(ba->pl);
     argv++,argc--;
-    param_list_configure_knob(pl, "--transpose", &transpose);
-    param_list_configure_knob(pl, "--nocheck", &nocheck);
-    param_list_configure_alias(pl, "--transpose", "-t");
+    param_list_configure_knob(ba->pl, "--ba->transpose", &ba->transpose);
+    param_list_configure_knob(ba->pl, "--nocheck", &nocheck);
+    param_list_configure_alias(ba->pl, "--ba->transpose", "-t");
 
     int wild = 0;
     for( ; argc ; ) {
-        if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
+        if (param_list_update_cmdline(ba->pl, &argc, &argv)) { continue; }
+        if (strcmp(argv[0],"--") == 0) {
+            argv++, argc--;
+            break;
+        }
         if (wild == 0) {
             file = argv[0];
             argv++,argc--;
@@ -88,125 +218,105 @@ int main(int argc, char * argv[])
     }
 
     unsigned int nmax = UINT_MAX;
-    param_list_parse_uint(pl, "nmax", &nmax);
+    param_list_parse_uint(ba->pl, "nmax", &nmax);
+    param_list_parse_int(ba->pl, "nthreads", &ba->nthreads);
+
+    if (ba->nthreads == 1) {
+        if (file) {
+            ba->mfiles = &file;
+        } else {
+            if (argc) {
+                ba->mfiles = argv;
+            } else {
+                fprintf(stderr, "No file !\n");
+                exit(1);
+            }
+        }
+    } else {
+        ba->mfiles = argv;
+        if (file) {
+            fprintf(stderr, "When using --nthreads, please specify files after a terminating --\n");
+            exit(1);
+        } else if (argc != ba->nthreads) {
+            fprintf(stderr, "%u threads requested, but %u files given on the command line.\n", ba->nthreads, argc);
+        }
+    }
 
     double tmax = 100.0;
-    param_list_parse_double(pl, "tmax", &tmax);
-    param_list_parse_int(pl, "nchecks", &nchecks);
+    param_list_parse_double(ba->pl, "tmax", &tmax);
+    param_list_parse_int(ba->pl, "nchecks", &ba->nchecks);
+    if (nocheck) ba->nchecks = 0;
 
     const char * tmp;
-    if ((tmp = param_list_lookup_string(pl, "impl")) != NULL) {
-        impl = tmp;
+    if ((tmp = param_list_lookup_string(ba->pl, "impl")) != NULL) {
+        ba->impl = tmp;
     }
 
     unsigned int nbys;
 
-    if (param_list_parse_uint(pl, "nbys", &nbys)) {
+    if (param_list_parse_uint(ba->pl, "nbys", &nbys)) {
         /* The api mandates that we set the desired value for nbys. Here,
          * that's not really our intent, since we really want to bench
          * the layer in its favorite working context. Most of the time,
          * setting nbys is pointless.
          */
-        abobj_set_nbys(xx,nbys);
+        abobj_set_nbys(ba->xx,nbys);
     }
 
-    if (param_list_warn_unused(pl)) {
+    if (param_list_warn_unused(ba->pl)) {
         usage();
+    }/*}}}*/
+
+    ba->p = malloc(ba->nthreads * sizeof(struct private_args));
+    ba->tg = worker_threads_init(ba->nthreads);
+    fprintf(stderr, "Using implementation \"%s\"\n", ba->impl);
+    worker_threads_do(ba->tg, (worker_func_t) &init_func, ba);
+
+    /* {{{ display some info */
+    uint64_t ncoeffs_total = 0;
+    for(int tnum = 0 ; tnum < ba->nthreads ; tnum++) {
+        struct private_args * p = ba->p + tnum;
+        fprintf (stderr, "T%d %s: %u rows %u cols %" PRIu64 " coeffs\n",
+                tnum, ba->mfiles[tnum], p->mm->dim[0], p->mm->dim[1], p->mm->ncoeffs);
+        ncoeffs_total += p->mm->ncoeffs;
     }
-
-    fprintf(stderr, "Using implementation \"%s\"\n", impl);
-
-    clock_t t0 = clock();
-
-    mm = matmul_reload_cache(xx, file, impl, pl, !transpose);
-    if (mm) {
-        fprintf(stderr, "Reusing cache file for %s\n", file);
-        fprintf(stderr, "Cache load time %.2fs\n",
-                (double) (clock()-t0) / CLOCKS_PER_SEC);
-    } else {
-        fprintf(stderr, "Building cache file for %s\n", file);
-        mm = matmul_build(xx, file, impl, pl, !transpose);
-        matmul_save_cache(mm, file);
-        fprintf(stderr, "Cache build time %.2fs\n",
-                (double) (clock()-t0) / CLOCKS_PER_SEC);
-    }
-
-    fprintf (stderr, "%s: %u rows %u cols %" PRIu64 " coeffs\n",
-            file, mm->dim[0], mm->dim[1], mm->ncoeffs);
-
-    unsigned int nc = mm->dim[1];
-    matmul_aux(mm, MATMUL_AUX_GET_READAHEAD, &nc);
-    abt * src = abinit(xx, nc);
-    abzero(xx, src, nc);
-
-    unsigned int nr = mm->dim[0];
-    matmul_aux(mm, MATMUL_AUX_GET_READAHEAD, &nr);
-    abt * dst = abinit(xx, nr);
-    abzero(xx, dst, nr);
+    fprintf (stderr, "total %" PRIu64 " coeffs\n", ncoeffs_total);
+    /* }}} */
 
     setup_seeding(1);
-
-    abrandom(xx, src, mm->dim[1]);
-
-    if (!nocheck) {
-        abt * dstT = abinit(xx, nc);
-        abt * srcT = abinit(xx, nr);
-        abzero(xx, dstT, nc);
-        abzero(xx, srcT, nr);
-
-        abt * checkA = abinit(xx, abnbits(xx));
-        abt * checkB = abinit(xx, abnbits(xx));
-
-        for(int t = 0; t < nchecks ; t++) {
-            abrandom(xx, src, mm->dim[1]);
-            abrandom(xx, dst, mm->dim[0]);
-            abcopy(xx, dstT, src, mm->dim[1]);
-            abcopy(xx, srcT, dst, mm->dim[0]);
-            printf("src(%u): %08" PRIx32 "\n",
-                    nc, crc32((unsigned long*) src, abbytes(xx, nc) / sizeof(unsigned long)));
-            matmul_mul(mm, dst, src, 1);
-            printf("dst(%u): %08" PRIx32 "\n",
-                    nr, crc32((unsigned long*) dst, abbytes(xx, nr) / sizeof(unsigned long)));
-            // debug_write(dst, abbytes(xx, mm->dim[0]), "/tmp/Lmul.%d", t);
-
-            abdotprod(xx, checkA, dst, srcT, mm->dim[0]);
-
-            printf("srcT(%u): %08" PRIx32 "\n",
-                    nr, crc32((unsigned long*) srcT, abbytes(xx, nr) / sizeof(unsigned long)));
-            matmul_mul(mm, dstT, srcT, 0);
-            printf("dstT(%u): %08" PRIx32 "\n",
-                    nc, crc32((unsigned long*) dstT, abbytes(xx, nc) / sizeof(unsigned long)));
-
-            // debug_write(dstT, abbytes(xx, mm->dim[1]), "/tmp/Rmul.%d", t);
-
-            abdotprod(xx, checkB, src, dstT, mm->dim[1]);
-
-            if (memcmp(checkA, checkB, aboffset(xx, abnbits(xx)) * sizeof(abt)) != 0) {
-                fprintf(stderr, "Check %d failed\n", t);
-                abort();
-            }
+    /* {{{ Do checks if requested */
+    for(int t = 0; t < ba->nchecks ; t++) {
+        /* create deterministic test values */
+        for(int tnum = 0 ; tnum < ba->nthreads ; tnum++) {
+            struct private_args * p = ba->p + tnum;
+            abrandom(ba->xx, p->src, p->mm->dim[1]);
+            abrandom(ba->xx, p->dst, p->mm->dim[0]);
         }
-        printf("All %d checks passed\n", nchecks);
+        worker_threads_do(ba->tg, (worker_func_t) &check_func, ba);
+        fprintf(stderr, "Check %d ok\n", t);
+    }
+    if (ba->nchecks)
+        printf("All %d checks passed\n", ba->nchecks);
+    /* }}} */
 
-        abclear(xx, checkA, abnbits(xx));
-        abclear(xx, checkB, abnbits(xx));
-
-        abclear(xx, dstT, nc);
-        abclear(xx, srcT, nr);
+    for(int tnum = 0 ; tnum < ba->nthreads ; tnum++) {
+        struct private_args * p = ba->p + tnum;
+        abrandom(ba->xx, p->src, p->mm->dim[1]);
+        abrandom(ba->xx, p->dst, p->mm->dim[0]);
     }
 
-    t0 = clock();
+    clock_t t0 = clock();
     double next = 0.25 * CLOCKS_PER_SEC;
     if (next > tmax * CLOCKS_PER_SEC) { next = tmax * CLOCKS_PER_SEC; }
     for(unsigned int n = 0 ; n < nmax ; n++ ) {
-        matmul_mul(mm, transpose ? src : dst, transpose ? dst : src, !transpose);
+        worker_threads_do(ba->tg, (worker_func_t) &mul_func, ba);
         double dt = clock() - t0;
         if (dt > next) {
             do { next += 0.25 * CLOCKS_PER_SEC; } while (dt > next);
             if (next > tmax * CLOCKS_PER_SEC) { next = tmax * CLOCKS_PER_SEC; }
             dt /= CLOCKS_PER_SEC;
             printf("%d iterations in %2.fs, %.2f/1, %.2f ns/coeff        \r",
-                    n, dt, dt/n, 1.0e9 * dt/n/mm->ncoeffs);
+                    n, dt, dt/n, 1.0e9 * dt/n/ncoeffs_total);
             fflush(stdout);
             if (dt > tmax)
                 break;
@@ -214,9 +324,9 @@ int main(int argc, char * argv[])
     }
     printf("\n");
 
-    matmul_clear(mm);
-
-    param_list_clear(pl);
+    worker_threads_do(ba->tg, (worker_func_t) &clear_func, ba);
+    worker_threads_clear(ba->tg);
+    param_list_clear(ba->pl);
 
     return 0;
 }
