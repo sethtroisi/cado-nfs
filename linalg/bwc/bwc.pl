@@ -202,12 +202,12 @@ while (defined($_ = shift @ARGV)) {
     if (!defined($k)) {
         usage "Garbage not undertood on command line: $_";
     }
-    if (!defined($param->{$k})) {
-        $param->{$k}=$v;
-        next;
-    }
     if ($k eq 'bwc_bindir') {
         $bindir=$v;
+        next;
+    }
+    if (!defined($param->{$k})) {
+        $param->{$k}=$v;
         next;
     }
     if ($k eq 'hosts') {
