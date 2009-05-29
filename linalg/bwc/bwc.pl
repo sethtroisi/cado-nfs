@@ -206,6 +206,10 @@ while (defined($_ = shift @ARGV)) {
         $param->{$k}=$v;
         next;
     }
+    if ($k eq 'bwc_bindir') {
+        $bindir=$v;
+        next;
+    }
     if ($k eq 'hosts') {
         if (ref $param->{$k} eq '') {
             $param->{$k} = [$param->{$k}, $v];

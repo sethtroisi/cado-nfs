@@ -1081,6 +1081,7 @@ my %tasks = (
     sieve     => { name   => "sieve and purge",
                    dep    => ['polysel'],
                    req    => ['factbase', 'freerels'],
+                   param  => ['excess'],
                    files  => ['rels\.[\de.]+-[\de.]+', 'rels\.tmp',
                               'nodup\.gz', 'duplicates\.stderr',
                               'purged', 'purge\.stderr'],
@@ -1962,7 +1963,11 @@ sub do_linalg {
 
         my $bwc_script = "$param{'cadodir'}/linalg/bwc/bwc.pl";
 
-        $ENV{'BWC_BINDIR'} = "$param{'cadodir'}/linalg/bwc";
+        # Note: $param{'cadodir'} is not expanded yet. So if we get it as
+        # a variable from the mach_desc file, it won't do. It's better to
+        # pass it as a command-line argument to bwc.pl
+        
+        my $bwc_bindir = "$param{'cadodir'}/linalg/bwc";
         if (!-x $bwc_script) {
             $bwc_script=abs_path(dirname($0)) . "/linalg/bwc/bwc.pl";
         }
@@ -1982,6 +1987,7 @@ sub do_linalg {
                "interval=$param{'bwc_interval'} ".
                "mode=u64 mn=64 splits=0,64 ys=0..64 ".
                "wdir=$param{'wdir'}/bwc " .
+               "bwc_bindir=$bwc_bindir " .
                "> $param{'prefix'}.bwc.stderr ".
                "2>&1";
         cmd($cmd, { log => 1, kill => 1 });
