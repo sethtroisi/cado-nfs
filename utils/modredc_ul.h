@@ -659,7 +659,7 @@ modredcul_mul (residueredcul_t r, const residueredcul_t a,
     "subq %[m], %[phigh]\n\t"
     "addq %%rdx, %[phigh]\n\t"
     "cmovcq %[phigh], %[r]\n\t"
-    : [phigh] "+&r" (phigh), [r] "=r" (r[0])
+    : [phigh] "+&r" (phigh), [r] "=&r" (r[0])
     : [invm] "rm" (m[0].invm), [m] "rm" (m[0].m), "a" (plow)
     : "%rdx", "cc"
   );
@@ -700,7 +700,7 @@ modredcul_sqr (residueredcul_t r, const residueredcul_t a,
     "subq %[m], %[phigh]\n\t"
     "addq %%rdx, %[phigh]\n\t"
     "cmovcq %[phigh], %[r]\n\t"
-    : [phigh] "+&r" (phigh), [r] "=r" (r[0])
+    : [phigh] "+&r" (phigh), [r] "=&r" (r[0])
     : [invm] "rm" (m[0].invm), [m] "rm" (m[0].m), "a" (plow)
     : "%rdx", "cc"
   );
