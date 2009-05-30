@@ -35,6 +35,57 @@
 
 const char *method_name[] = {"P-1", "P+1", "ECM"};
 
+void
+print_pointorder (const unsigned long p, const unsigned long s, 
+                  const unsigned long parameterization, const int verbose)
+{
+  residue_t sigma;
+  modulus_t m;
+  unsigned long o;
+
+  modredcul_initmod_ul (m, p);
+  modredcul_init (sigma, m);
+  modredcul_set_ul (sigma, s, m);
+      
+  o = ell_pointorder_ul (sigma, parameterization, 12, 0, m, verbose);
+  if (verbose)
+    printf ("%lu %lu\n", p, o);
+
+  modredcul_clear (sigma, m);  
+  modredcul_clearmod (m);
+}
+
+static int
+tryfactor (mpz_t N, const facul_strategy_t *strategy, 
+           const int verbose, const int printfactors, const int printnonfactors)
+{
+  unsigned long f[16];
+  int facul_code;
+
+  if (verbose >= 2)
+    gmp_printf ("Trying to factor %Zd\n", N);
+
+  facul_code = facul (f, N, strategy);
+  
+  if (printfactors && facul_code > 0)
+    {
+      int j;
+      for (j = 0; j < facul_code; j++)
+        printf ("%lu ", f[j]);
+      printf ("\n");
+    }
+  
+  if (printnonfactors && facul_code == 0)
+    {
+      int j;
+      for (j = 0; j < facul_code; j++)
+        mpz_tdiv_q_ui (N, N, f[j]);
+      gmp_printf ("%Zd\n", N);
+    }
+  
+  return facul_code;
+}
+
 void print_help (char *programname)
 {
   printf ("%s [options] [<start> <stop>]\n", programname);
@@ -79,13 +130,13 @@ int main (int argc, char **argv)
   int only_primes = 0, verbose = 0, quiet = 0;
   int printfactors = 0;
   int printnonfactors = 0;
+  int do_pointorder = 0;
+  unsigned long po_sigma = 0, po_parameterization = 0;
   int inp_raw = 0;
   int got_usage;
   int strat = 0;
   int extra_primes = 0;
   unsigned long *primmod = NULL, *hitsmod = NULL;
-  unsigned long f[16];
-  int facul_code;
   double starttime;
 
   strategy = malloc (sizeof(facul_strategy_t));
@@ -176,9 +227,23 @@ int main (int argc, char **argv)
 	  argc -= 1;
 	  argv += 1;
 	}
+     else if (argc > 2 && strncmp (argv[1], "-po", 3) == 0)
+	{
+	  do_pointorder = 1;
+	  po_parameterization = BRENT12;
+	  if (strcmp (argv[1], "-pom12") == 0)
+	    po_parameterization = MONTY12;
+	  if (strcmp (argv[1], "-pom16") == 0)
+	    po_parameterization = MONTY16;
+	  po_sigma = strtol (argv[2], NULL, 10);
+	  argc -= 2;
+	  argv += 2;
+	}
       else if (argc > 2 && strcmp (argv[1], "-fbb") == 0)
 	{
 	  fbb = strtoul (argv[2], NULL, 10);
+	  ularith_mul_ul_ul_2ul (&(strategy->fbb2[0]), &(strategy->fbb2[1]), 
+	                         fbb, fbb);
 	  argc -= 2;
 	  argv += 2;
 	}
@@ -323,29 +388,19 @@ int main (int argc, char **argv)
 	    primmod[i % mod]++;
 	  
 	  total++;
-	  mpz_mul_ui (N, cof, i);
-          if (verbose >= 2)
-            gmp_printf ("Trying to factor %Zd\n", N);
-          facul_code = facul (f, N, strategy);
-	  
-	  if (facul_code > 0)
+	  if (do_pointorder)
+	    print_pointorder (i, po_sigma, po_parameterization, verbose);
+          else
 	    {
-	      hits++;
-	      if (mod > 0)
-		hitsmod[i % mod]++;
-	    }
-	  
-	  if (printfactors && facul_code > 0)
-	    {
-	      int j;
-	      for (j = 0; j < facul_code; j++)
-		printf ("%lu ", f[j]);
-	      printf ("\n");
-	    }
-	  
-	  if (printnonfactors && facul_code == 0)
-            printf ("%lu\n", i);
-	  
+              mpz_mul_ui (N, cof, i);
+              if (tryfactor (N, strategy, verbose, printfactors, printnonfactors))
+                {
+                  hits++;
+                  if (mod > 0)
+                    hitsmod[i % mod]++;
+                }
+            }
+
 	  if (only_primes)
 	    i = getprime (1);
 	  else
@@ -378,27 +433,15 @@ int main (int argc, char **argv)
           break;
 	if (mpz_sgn (N) <= 0)
 	  continue;
-	mpz_mul (N, N, cof);
 	total++;
-        if (verbose >= 2)
-          gmp_printf ("Trying to factor %Zd\n", N);
-	facul_code = facul (f, N, strategy);
-	
-	if (facul_code > 0)
-	  hits++;
-	
-	if (printfactors && facul_code > 0)
-	  {
-	    int j;
-	    for (j = 0; j < facul_code; j++)
-	      printf ("%lu ", f[j]);
-	    printf ("\n");
-	  }
 
-	if (printnonfactors && facul_code == 0)
-	  {
-	    mpz_divexact (N, N, cof);
-            gmp_printf ("%Zd\n", N);
+        if (do_pointorder && mpz_fits_ulong_p (N))
+          print_pointorder (mpz_get_ui (N), po_sigma, po_parameterization, verbose);
+        else
+          {
+            mpz_mul (N, N, cof);
+            if (tryfactor (N, strategy, verbose, printfactors, printnonfactors))
+              hits++;
           }
       }
     fclose (inp);

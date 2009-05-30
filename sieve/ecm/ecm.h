@@ -22,16 +22,19 @@ typedef struct {
 int ecm_ul (modintredcul_t, const modulusredcul_t, const ecm_plan_t *);
 
 unsigned long ell_pointorder_ul (const residueredcul_t, const int, 
+                                 const unsigned long, const unsigned long,
                                  const modulusredcul_t, const int);
 unsigned long ellM_curveorder_jacobi_ul (residueredcul_t, residueredcul_t, 
                                          modulusredcul_t);
 int ecm_15ul (modintredc15ul_t, const modulusredc15ul_t, const ecm_plan_t *);
 unsigned long ell_pointorder_15ul (const residueredc15ul_t, const int, 
+                                   const unsigned long, const unsigned long,
                                    const modulusredc15ul_t, const int);
 unsigned long ellM_curveorder_jacobi_15ul (residueredc15ul_t, residueredc15ul_t, 
                                            modulusredc15ul_t);
 int ecm_2ul2 (modintredc2ul2_t, const modulusredc2ul2_t, const ecm_plan_t *);
 unsigned long ell_pointorder_2ul2 (const residueredc2ul2_t, const int, 
+                                   const unsigned long, const unsigned long,
                                    const modulusredc2ul2_t, const int);
 unsigned long ellM_curveorder_jacobi_2ul2 (residueredc2ul2_t, residueredc2ul2_t, 
                                            modulusredc2ul2_t);

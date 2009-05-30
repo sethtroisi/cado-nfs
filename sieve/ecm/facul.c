@@ -149,7 +149,7 @@ void facul_print_stats (FILE *stream)
 
 
 int
-facul (unsigned long *factors, const mpz_t N, facul_strategy_t *strategy)
+facul (unsigned long *factors, const mpz_t N, const facul_strategy_t *strategy)
 {
   modintredc2ul2_t n;
   int i, found = 0;

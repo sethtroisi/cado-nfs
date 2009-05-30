@@ -27,6 +27,12 @@
 typedef struct {residue_t x, z;} __ellM_point_t;
 typedef __ellM_point_t ellM_point_t[1];
 
+typedef struct {residue_t x, y;} __ellW_point_t;
+typedef __ellW_point_t ellW_point_t[1];
+
+
+/* Functions for curves in Montgomery form */
+
 static inline void
 ellM_init (ellM_point_t P, const modulus_t m)
 {
@@ -95,50 +101,6 @@ ellM_double (ellM_point_t Q, const ellM_point_t P, const modulus_t m,
   mod_clear (w, m);
   mod_clear (v, m);
   mod_clear (u, m);
-}
-
-
-/* (x3, y3) <- 2 * (x1, y1) for the curve y^2 = x^3 + a*x + b.
-
-   For Weierstrass coordinates. Returns 1 if doubling worked normally, 
-   0 if the result is point at infinity.
-*/
-
-static int
-ellW_double (residue_t x3, residue_t y3, const residue_t x1, 
-	     const residue_t y1, const residue_t a, const modulus_t m)
-{
-  residue_t lambda, u, v;
-
-  mod_init_noset0 (lambda, m);
-  mod_init_noset0 (u, m);
-  mod_init_noset0 (v, m);
-
-  mod_sqr (u, x1, m);
-  mod_add (v, u, u, m);
-  mod_add (v, v, u, m);
-  mod_add (v, v, a, m); /* 3x^2 + a */
-  mod_add (u, y1, y1, m);
-  if (mod_inv (u, u, m) == 0)    /* 1/(2*y) */
-  {
-      mod_clear (v, m);
-      mod_clear (u, m);
-      mod_clear (lambda, m);
-      return 0; /* y was 0  =>  result is point at infinity */
-  }
-  mod_mul (lambda, u, v, m);
-  mod_sqr (u, lambda, m);
-  mod_sub (u, u, x1, m);
-  mod_sub (u, u, x1, m);    /* x3 = u = lambda^2 - 2*x */
-  mod_sub (v, x1, u, m);
-  mod_mul (v, v, lambda, m);
-  mod_sub (y3, v, y1, m);
-  mod_set (x3, u, m);
-  
-  mod_clear (v, m);
-  mod_clear (u, m);
-  mod_clear (lambda, m);
-  return 1;
 }
 
 
@@ -224,63 +186,6 @@ ellM_add (ellM_point_t R, const ellM_point_t P, const ellM_point_t Q,
 }
 
 
-/* Adds two points (x2, y2) and (x1, y1) on the curve y^2 = x^3 + a*x + b
-   in Weierstrass coordinates and puts result in (x3, y3). 
-   Returns 1 if the addition worked (i.e. the modular inverse existed) 
-   and 0 otherwise (resulting point is point at infinity) */
-
-static int
-ellW_add (residue_t x3, residue_t y3, const residue_t x2, const residue_t y2, 
-          const residue_t x1, const residue_t y1, const residue_t a, 
-	  const modulus_t m)
-{
-  residue_t lambda, u, v;
-  int r;
-
-  mod_init_noset0 (u, m);
-  mod_init_noset0 (v, m);
-
-  mod_sub (u, y2, y1, m);
-  mod_sub (v, x2, x1, m);
-  if (mod_inv (v, v, m) == 0)
-  {
-      /* Maybe we were trying to add two identical points? If so,
-         use the ellW_double() function instead */
-      if (mod_equal (x1, x2, m) && mod_equal (y1, y2, m))
-	  r = ellW_double (x3, y3, x1, y1, a, m);
-      else 
-	{
-	  /* Or maybe the points are negatives of each other? */
-	  mod_neg (u, y1, m);
-	  if (mod_equal (x1, x2, m) && mod_equal (u, y2, m))
-	    r = 0; /* Signal point at infinity */
-	  else
-	    {
-	      /* Neither identical, nor negatives (mod m). Looks like we
-		 found a proper factor. FIXME: What do we do with it? */
-	      r = 0;
-	    }
-	}
-  }
-  else
-  {
-      mod_mul (lambda, u, v, m);
-      mod_sqr (u, lambda, m);
-      mod_sub (u, u, x1, m);
-      mod_sub (u, u, x2, m);    /* x3 = u = lambda^2 - x1 - x2 */
-      mod_sub (v, x1, u, m);
-      mod_mul (v, v, lambda, m);
-      mod_sub (y3, v, y1, m);
-      mod_set (x3, u, m);
-      r = 1;
-  }
-
-  mod_clear (v, m);
-  mod_clear (u, m);
-  return r;
-}
-
-
 /* (x:z) <- e*(x:z) (mod p) */
 static void
 ellM_mul_ul (ellM_point_t R, const ellM_point_t P, unsigned long e, 
@@ -358,43 +263,171 @@ ellM_mul_ul (ellM_point_t R, const ellM_point_t P, unsigned long e,
   ellM_clear (t2, m);
 }
 
+
+/* Functions for curves in Weierstrass form */
+
+static inline void
+ellW_init (ellW_point_t P, const modulus_t m)
+{
+  mod_init (P->x, m);
+  mod_init (P->y, m);
+}
+
+static inline void
+ellW_clear (ellW_point_t P, const modulus_t m)
+{
+  mod_clear (P->x, m);
+  mod_clear (P->y, m);
+}
+
+static inline void
+ellW_set (ellW_point_t Q, const ellW_point_t P, const modulus_t m)
+{
+  mod_set (Q->x, P->x, m);
+  mod_set (Q->y, P->y, m);
+}
+
+static inline void
+ellW_swap (ellW_point_t Q, ellW_point_t P, const modulus_t m)
+{
+  mod_swap (Q->x, P->x, m);
+  mod_swap (Q->y, P->y, m);
+}
+
+/* R <- 2 * P for the curve y^2 = x^3 + a*x + b.
+
+   For Weierstrass coordinates. Returns 1 if doubling worked normally, 
+   0 if the result is point at infinity.
+*/
+
+static int
+ellW_double (ellW_point_t R, const ellW_point_t P, const residue_t a, 
+	     const modulus_t m)
+{
+  residue_t lambda, u, v;
+
+  mod_init_noset0 (lambda, m);
+  mod_init_noset0 (u, m);
+  mod_init_noset0 (v, m);
+
+  mod_sqr (u, P->x, m);
+  mod_add (v, u, u, m);
+  mod_add (v, v, u, m);
+  mod_add (v, v, a, m); /* 3x^2 + a */
+  mod_add (u, P->y, P->y, m);
+  if (mod_inv (u, u, m) == 0)    /* 1/(2*y) */
+  {
+      mod_clear (v, m);
+      mod_clear (u, m);
+      mod_clear (lambda, m);
+      return 0; /* y was 0  =>  result is point at infinity */
+  }
+  mod_mul (lambda, u, v, m);
+  mod_sqr (u, lambda, m);
+  mod_sub (u, u, P->x, m);
+  mod_sub (u, u, P->x, m);    /* x3 = u = lambda^2 - 2*x */
+  mod_sub (v, P->x, u, m);
+  mod_mul (v, v, lambda, m);
+  mod_sub (R->y, v, P->y, m);
+  mod_set (R->x, u, m);
+  
+  mod_clear (v, m);
+  mod_clear (u, m);
+  mod_clear (lambda, m);
+  return 1;
+}
+
+
+/* Adds two points P and Q on the curve y^2 = x^3 + a*x + b
+   in Weierstrass coordinates and puts result in R. 
+   Returns 1 if the addition worked (i.e. the modular inverse existed) 
+   and 0 otherwise (resulting point is point at infinity) */
+
+static int
+ellW_add (ellW_point_t R, const ellW_point_t P, const ellW_point_t Q, 
+          const residue_t a, const modulus_t m)
+{
+  residue_t lambda, u, v;
+  int r;
+
+  mod_init_noset0 (u, m);
+  mod_init_noset0 (v, m);
+
+  mod_sub (u, Q->y, P->y, m);
+  mod_sub (v, Q->x, P->x, m);
+  if (mod_inv (v, v, m) == 0)
+  {
+      /* Maybe we were trying to add two identical points? If so,
+         use the ellW_double() function instead */
+      if (mod_equal (P->x, Q->x, m) && mod_equal (P->y, Q->y, m))
+	  r = ellW_double (R, P, a, m);
+      else 
+	{
+	  /* Or maybe the points are negatives of each other? */
+	  mod_neg (u, P->y, m);
+	  if (mod_equal (P->x, Q->x, m) && mod_equal (u, Q->y, m))
+	    r = 0; /* Signal point at infinity */
+	  else
+	    {
+	      /* Neither identical, nor negatives (mod m). Looks like we
+		 found a proper factor. FIXME: What do we do with it? */
+	      r = 0;
+	    }
+	}
+  }
+  else
+  {
+      mod_mul (lambda, u, v, m);
+      mod_sqr (u, lambda, m);
+      mod_sub (u, u, P->x, m);
+      mod_sub (u, u, Q->x, m);    /* x3 = u = lambda^2 - P->x - Q->x */
+      mod_sub (v, P->x, u, m);
+      mod_mul (v, v, lambda, m);
+      mod_sub (R->y, v, P->y, m);
+      mod_set (R->x, u, m);
+      r = 1;
+  }
+
+  mod_clear (v, m);
+  mod_clear (u, m);
+  return r;
+}
+
+
 /* (x,y) <- e * (x,y) on the curve y^2 = x^3 + a*x + b (mod m) */
 static int
-ellW_mul_ui (residue_t x, residue_t y, const unsigned long e, residue_t a, 
+ellW_mul_ui (ellW_point_t P, const unsigned long e, residue_t a, 
 	     const modulus_t m)
 {
   unsigned long i;
-  residue_t xt, yt;
-  int tfinite; /* Nonzero iff (xt, yt) is NOT point at infinity */
+  ellW_point_t T;
+  int tfinite; /* Nonzero iff T is NOT point at infinity */
 
   if (e == 0)
     return 0; /* signal point at infinity */
 
-  mod_init_noset0 (xt, m);
-  mod_init_noset0 (yt, m);
+  ellW_init (T, m);
 
   i = ~(0UL);
   i -= i/2;   /* Now the most significant bit of i is set */
   while ((i & e) == 0)
     i >>= 1;
 
-  mod_set (xt, x, m);
-  mod_set (yt, y, m);
+  ellW_set (T, P, m);
   tfinite = 1;
   i >>= 1;
 
   while (i > 0)
   {
       if (tfinite)
-        tfinite = ellW_double (xt, yt, xt, yt, a, m);
+	tfinite = ellW_double (T, T, a, m);
       if (e & i)
       {
 	  if (tfinite)
-	      tfinite = ellW_add (xt, yt, x, y, xt, yt, a, m);
+	      tfinite = ellW_add (T, T, P, a, m);
 	  else
 	  {
-	      mod_set (xt, x, m);
-	      mod_set (yt, y, m);
+	      ellW_set (T, P, m);
 	      tfinite = 1;
 	  }
       }
@@ -402,12 +435,9 @@ ellW_mul_ui (residue_t x, residue_t y, const unsigned long e, residue_t a,
   }
 
   if (tfinite)
-  {
-      mod_set (x, xt, m);
-      mod_set (y, yt, m);
-  }
-  mod_clear (yt, m);
-  mod_clear (xt, m);
+    ellW_set (P, T, m);
+
+  ellW_clear (T, m);
 
   return tfinite;
 }
@@ -681,7 +711,16 @@ Montgomery12_curve_from_k (residue_t A, residue_t x, const unsigned long k,
       mod_add (a, v, v, m);
       mod_add (a, a, v, m);
       mod_neg (a, a, m);    /* a = -12 */
-      ellW_mul_ui (u, v, k, a, m);
+      {
+        ellW_point_t T;
+        ellW_init (T, m);
+        mod_set (T[0].x, u, m);
+        mod_set (T[0].y, v, m);
+        ellW_mul_ui (T, k, a, m);
+        mod_set (u, T[0].x, m);
+        mod_set (v, T[0].y, m);
+        ellW_clear (T, m);
+      }
 
       /* Now we have an $u$ such that $v^2 = u^3-12u$ is a square */
       /* printf ("Montgomery12_curve_from_k: u = %lu\n", mod_get_ul (u)); */
@@ -863,8 +902,8 @@ Montgomery16_curve_from_k (residue_t b, residue_t x, const unsigned long k,
    x and X may be the same variable. */
 
 static int
-curveW_from_Montgomery (residue_t a, residue_t x, residue_t y,
-			residue_t X, residue_t A, const modulus_t m)
+curveW_from_Montgomery (residue_t a, ellW_point_t P, const residue_t X, 
+                        const residue_t A, const modulus_t m)
 {
   residue_t g, one;
   int r;
@@ -883,10 +922,10 @@ curveW_from_Montgomery (residue_t a, residue_t x, residue_t y,
   r = mod_inv (g, g, m);
   if (r != 0)
   {
-      mod_set (y, g, m);       /* y = 1/G */
+      mod_set (P[0].y, g, m);       /* y = 1/G */
       mod_div3 (a, A, m);
-      mod_add (x, X, a, m);
-      mod_mul (x, x, g, m); /* x = (X + A/3)/G */
+      mod_add (P[0].x, X, a, m);
+      mod_mul (P[0].x, P[0].x, g, m); /* x = (X + A/3)/G */
       mod_mul (a, a, A, m);
       mod_sub (a, one, a, m);
       mod_mul (a, a, g, m);
@@ -1435,19 +1474,32 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 
 
 /* Determine order of a point P on a curve, both defined by the sigma value
-   as in ECM. Looks for i in Hasse interval so that i*P = O, has complexity
-   O(sqrt(m)). */
+   as in ECM. 
+   If the group order is known to be == r (mod m), this can be supplied in 
+   the variables "known_r" and" known_m".
+   Looks for i in Hasse interval so that i*P = O, has complexity O(m^(1/4)). */
 
 unsigned long
 ell_pointorder (const residue_t sigma, const int parameterization, 
+		const unsigned long known_m, const unsigned long known_r,
 		const modulus_t m, const int verbose)
 {
-  residue_t A, x, a, xi, yi, x1, y1;
-  unsigned long min, max, i, order, p;
+  ellW_point_t P, Pi, Pg;
+  residue_t A, x, a;
+  unsigned long min, max, i, j, order, cof, p;
+  unsigned long giant_step, giant_min, baby_len;
   modint_t tm;
+  ellW_point_t *baby;
+
+  ASSERT (known_r < known_m);
 
   mod_getmod_uls (tm, m);
   mod_init (A, m);
+  mod_init (x, m);
+  mod_init (a, m);
+  ellW_init (P, m);
+  ellW_init (Pi, m);
+  ellW_init (Pg, m);
 
   if (parameterization == BRENT12)
     {
@@ -1457,7 +1509,7 @@ ell_pointorder (const residue_t sigma, const int parameterization,
   else if (parameterization == MONTY12)
   {
     if (Montgomery12_curve_from_k (A, x, mod_get_ul (sigma, m), m) == 0)
-      return 1;
+      return 0;
   }
   else
   {
@@ -1475,72 +1527,199 @@ ell_pointorder (const residue_t sigma, const int parameterization,
               tA[0], tx[0], tm[0]); 
     }
 
-  if (curveW_from_Montgomery (a, x1, y1, x, A, m) == 0)
+  if (curveW_from_Montgomery (a, P, x, A, m) == 0)
     return 0UL;
 
   if (verbose >= 2)
     {
       modint_t tx1, ty1, ta;
-      mod_get_uls (tx1, x1, m);
-      mod_get_uls (ty1, y1, m);
+      mod_get_uls (tx1, P[0].x, m);
+      mod_get_uls (ty1, P[0].y, m);
       mod_get_uls (ta, a, m);
       /* FIXME need multiple precision print */
       printf ("Finding order of point (%ld, %ld) on curve "
               "y^2 = x^3 + %ld * x + b (mod %ld)\n", 
               tx1[0], ty1[0], ta[0], tm[0]);
     }
-
+  
   /* FIXME deal with multiple precision modulus */
-  i = 2 * (unsigned long) sqrt((double) tm[0]);
-  min = tm[0] - i + 1;
-  max = tm[0] + i + 1;
-  mod_set (xi, x1, m);
-  mod_set (yi, y1, m);
-  if (ellW_mul_ui (xi, yi, min, a, m) == 0)
-  {
-      i = min;
-  }
-  else
-  {
-      for (i = min + 1; i <= max; i++)
-      {
-	  if (!ellW_add (xi, yi, xi, yi, x1, y1, a, m))
-	      break;
-      }
-      
-      if (i > max)
-      {
-	  fprintf (stderr, "ell_order: Error, point at infinity not "
-		   "reached with i*(x0, z0), i in [%ld, %ld]\n", min, max);
-	  return 0UL;
-      }
+  i = (unsigned long) (2. * sqrt((double) tm[0]));
+  min = tm[0] - i;
+  max = tm[0] + i;
 
-      /* Check that this is the correct order */
-      mod_set (xi, x1, m);
-      mod_set (yi, y1, m);
-      if (ellW_mul_ui (xi, yi, i, a, m) != 0)
+  /* Giant steps visit values == r (mod m), baby steps values == 0 (mod m) */
+  giant_step = ceil(sqrt(2.*(double)i / (double) known_m));
+  /* Round up to multiple of m */
+  giant_step = ((giant_step - 1) / known_m + 1) * known_m;
+  
+  /* We test Pi +- Pj, where Pi = (giant_min + i*giant_step), i >= 0,
+     and Pj = j*P, 0 <= j <= giant_step / 2. 
+     To ensure we can find all values >= min, ensure 
+     giant_min <= min + giant_step / 2. 
+     We also want giant_min == r (mod m) */
+  giant_min = ((min + giant_step / 2) / known_m) * known_m + known_r;
+  if (giant_min > min + giant_step / 2)
+    giant_min -= known_m;
+  if (verbose >= 2)
+    printf ("known_m = %lu, known_r = %lu, giant_step = %lu, "
+            "giant_min = %lu\n", known_m, known_r, giant_step, giant_min);
+  
+  baby_len = giant_step / known_m / 2 + 1;
+  baby = (ellW_point_t *) malloc (baby_len * sizeof (ellW_point_t));
+  for (i = 0; i < baby_len; i++)
+    ellW_init (baby[i], m);
+  
+  ellW_set (Pg, P, m);
+  i = known_m;
+  if (ellW_mul_ui (Pg, i, a, m) == 0) /* Pg = m*P for now */
+    goto found_inf;
+  
+  if (1 < baby_len)
+    ellW_set (baby[1], Pg, m);
+  
+  if (2 < baby_len)
+    {
+      if (ellW_double (Pi, Pg, a, m) == 0)
         {
-          modint_t tx1, ty1;
-          mod_get_uls (tx1, x1, m);
-          mod_get_uls (ty1, y1, m);
-	  fprintf (stderr, "ell_order: Error, %ld*(%ld, %ld) (mod %ld) is "
-		   "not the point at infinity\n", 
-		   i, tx1[0], ty1[0], tm[0]);
-	  return 0UL;
+          i = 2 * known_m;
+          goto found_inf;
         }
+      ellW_set (baby[2], Pi, m);
+    }
+
+  for (i = 3; i < baby_len; i++)
+    {
+      if (ellW_add (Pi, Pi, Pg, a, m) == 0)
+        {
+          i *= known_m;
+          goto found_inf;
+        }
+      ellW_set (baby[i], Pi, m);
+    }
+
+  /* Now compute the giant steps in [giant_min, giant_max] */
+  i = giant_step;
+  ellW_set (Pg, P, m);
+  if (ellW_mul_ui (Pg, i, a, m) == 0)
+    goto found_inf;
+
+  i = giant_min;
+  ellW_set (Pi, P, m);
+  if (ellW_mul_ui (Pi, i, a, m) == 0)
+    goto found_inf;
+  
+  while (i <= max + giant_step - 1)
+    {
+      /* Compare x-coordinate with stored baby steps. This makes it
+         O(sqrt(p)) complexity, strictly speaking. */
+      for (j = 1; j < baby_len; j++)
+        if (mod_equal (Pi[0].x, baby[j]->x, m))
+          {
+            if (mod_equal (Pi[0].y, baby[j]->y, m))
+              i -= j * known_m; /* Equal, so iP = jP and (i-j)P = 0 */
+            else 
+              {
+                mod_neg (Pi[0].y, Pi[0].y, m);
+                if (mod_equal (Pi[0].y, baby[j]->y, m))
+                  i += j * known_m; /* Negatives, so iP = -jP and (i+j)P = 0 */
+                else
+                  {
+                    fprintf (stderr, "Matching x-coordinates, but y neither "
+                             "equal nor negatives\n");
+                    abort();
+                  }
+              }
+            goto found_inf;
+          }
+
+      i += giant_step;
+      if (!ellW_add (Pi, Pi, Pg, a, m))
+        goto found_inf;
+    }
+  
+  if (i > max)
+  {
+      fprintf (stderr, "ell_order: Error, no match found for p = %lu, "
+               "min = %lu, max = %lu, giant_step = %lu, giant_min = %lu\n", 
+               tm[0], min, max, giant_step, giant_min);
+      abort ();
   }
+
+found_inf:
+  /* Check that i is a multiple of the order */
+  ellW_set (Pi, P, m);
+  if (ellW_mul_ui (Pi, i, a, m) != 0)
+    {
+      modint_t tx1, ty1;
+      mod_get_uls (tx1, P[0].x, m);
+      mod_get_uls (ty1, P[0].y, m);
+      fprintf (stderr, "ell_order: Error, %ld*(%ld, %ld) (mod %ld) is "
+               "not the point at infinity\n", 
+               i, tx1[0], ty1[0], tm[0]);
+      return 0UL;
+    }
   
   /* Ok, now we have some i so that ord(P) | i. Find ord(P).
      We know that ord(P) > 1 since P is not at infinity */
 
-  order = i;
-  for (p = 2; p * p <= order; p++)
-  {
-      mod_set (xi, x1, m);
-      mod_set (yi, y1, m);
-      while (order % p == 0 && ellW_mul_ui (xi, yi, order / p, a, m) == 0)
-	  order /= p;
-  }
+  /* For each prime factor of the order, reduce the exponent of 
+     that prime factor as far as possible */
+
+  cof = order = i;
+  for (p = 2; p * p <= cof; p += 1 + p%2)
+    if (cof % p == 0)
+      {
+        ASSERT (order % p == 0);
+        /* Remove all factors of p */
+        for (order /= p, cof /= p; order % p == 0; order /= p)
+          {
+            ASSERT(cof % p == 0);
+            cof /= p;
+          }
+        ASSERT (cof % p != 0);
+
+        /* Add factors of p again one by one, stopping when we hit 
+           point at infinity */
+        ellW_set (Pi, P, m);
+        if (ellW_mul_ui (Pi, order, a, m) != 0)
+          {
+            order *= p;
+            while (ellW_mul_ui (Pi, p, a, m) != 0)
+              order *= p;
+          }
+      }
+  /* Now cof is 1 or a prime */
+  if (cof > 1)
+    {
+      ellW_set (Pi, P, m);
+      ASSERT (order % cof == 0);
+      if (ellW_mul_ui (Pi, order / cof, a, m) == 0)
+        order /= cof;
+    }
+
+
+  /* One last check that order divides real order */
+  ellW_set (Pi, P, m);
+  if (ellW_mul_ui (Pi, order, a, m) != 0)
+    {
+      modint_t tx1, ty1;
+      mod_get_uls (tx1, P[0].x, m);
+      mod_get_uls (ty1, P[0].y, m);
+      fprintf (stderr, "ell_order: Error, final order %ld is wrong\n", 
+               order);
+      abort ();
+    }
+  
+  for (i = 0; i < giant_step; i++)
+    ellW_clear (baby[i], m);
+  free (baby);
+  baby = NULL;
+  mod_clear (A, m);
+  mod_clear (x, m);
+  mod_clear (a, m);
+  ellW_clear (P, m);
+  ellW_clear (Pi, m);
+  ellW_clear (Pg, m);
 
   return order;
 }
@@ -1622,10 +1801,6 @@ ell_curveorder (const unsigned long sigma_par, int parameterization,
     abort();
   }
   order = ellM_curveorder_jacobi (A, X, m);
-
-#ifndef NDEBUG
-  ASSERT (parameterization != BRENT12 || order == ell_pointorder (sigma, parameterization, m, 0));
-#endif
 
   return order;
 }
