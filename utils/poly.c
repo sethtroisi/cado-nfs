@@ -176,7 +176,7 @@ void poly_add(poly_t f, const poly_t g, const poly_t h) {
 }
 #endif
 
-#if 1 /* used in fast rootsieve */
+#if 1 /* used in fast rootsieve, f can be the same as g */
 void poly_sub(poly_t f, const poly_t g, const poly_t h) {
   int i, maxdeg;
   mpz_t z;
@@ -288,6 +288,22 @@ poly_div_2_mod_mpz (poly_t f, const poly_t g, const mpz_t m)
   }
       mpz_clear (aux);
 }
+
+void poly_eval(mpz_t res, const poly_t f, const mpz_t x) {
+		
+		int i, d;
+		d = f->deg;
+		if (d == -1) {
+				mpz_set_ui(res, 0);
+				return;
+		}
+		mpz_set(res, f->coeff[d]);
+		for (i = d-1; i>=0; --i) {
+				mpz_mul(res, res, x);
+				mpz_add(res, res, f->coeff[i]);
+		}
+
+}	
 
 // compute res := f(x) mod m
 void poly_eval_mod_mpz(mpz_t res, const poly_t f, const mpz_t x, const mpz_t m) 
@@ -483,7 +499,7 @@ mod_base_minus_1 (mpz_t z)
 /* f <- g*h
    Assumes f differs from g and h.
  */
-static void poly_mul(poly_t f, const poly_t g, const poly_t h) {
+void poly_mul(poly_t f, const poly_t g, const poly_t h) {
   int i, maxdeg;
   poly_t prd;
 
