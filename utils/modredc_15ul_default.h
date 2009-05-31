@@ -25,6 +25,7 @@
 #define modulus_t            modulusredc15ul_t
 #define modint_t             modintredc15ul_t
 #define MOD_SIZE             MODREDC15UL_SIZE
+#define MOD_MINBITS          MODREDC15UL_MINBITS
 #define MOD_MAXBITS          MODREDC15UL_MAXBITS
 
 /* This function is used in mod_2ul_common.h with different 

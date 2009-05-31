@@ -37,10 +37,13 @@ mod_div3 (residue_t r, const residue_t a, const modulus_t m)
      (a+k*m)/3 < 2^w, so doing a division (mod 2^w) produces the 
      correct result. */
   
-  if (sizeof (unsigned long) == 4)
+#if LONG_BIT == 32
     t[0] *= 0xaaaaaaabUL; /* 1/3 (mod 2^32) */
-  else
+#elif LONG_BIT == 64 
     t[0] *= 0xaaaaaaaaaaaaaaabUL; /* 1/3 (mod 2^64) */
+#else
+#error LONG_BIT is neither 32 nor 64
+#endif
   
 #ifdef WANT_ASSERT_EXPENSIVE
   mod_sub (r, a, t, m);
@@ -85,10 +88,13 @@ mod_div5 (residue_t r, const residue_t a, const modulus_t m)
      (a+k*m)/5 < 2^w, so doing a division (mod 2^w) produces the 
      correct result. */
   
-  if (sizeof (unsigned long) == 4)
+#if LONG_BIT == 32
     t[0] *= 0xcccccccdUL; /* 1/5 (mod 2^32) */
-  else
+#elif LONG_BIT == 64 
     t[0] *= 0xcccccccccccccccdUL; /* 1/5 (mod 2^64) */
+#else
+#error LONG_BIT is neither 32 nor 64
+#endif
   
 #ifdef WANT_ASSERT_EXPENSIVE
   ASSERT_EXPENSIVE (t[0] < mod_getmod_ul (m));
@@ -136,10 +142,13 @@ mod_div7 (residue_t r, const residue_t a, const modulus_t m)
      (a+k*m)/7 < 2^w, so doing a division (mod 2^w) produces the 
      correct result. */
   
-  if (sizeof (unsigned long) == 4)
+#if LONG_BIT == 32
     t[0] *= 0xb6db6db7UL; /* 1/7 (mod 2^32) */
-  else
+#elif LONG_BIT == 64 
     t[0] *= 0x6db6db6db6db6db7UL; /* 1/7 (mod 2^64) */
+#else
+#error LONG_BIT is neither 32 nor 64
+#endif
   
 #ifdef WANT_ASSERT_EXPENSIVE
   ASSERT_EXPENSIVE (t[0] < mod_getmod_ul (m));
@@ -190,10 +199,13 @@ mod_div11 (residue_t r, const residue_t a, const modulus_t m)
      (a+k*m)/11 < 2^w, so doing a division (mod 2^w) produces the 
      correct result. */
   
-  if (sizeof (unsigned long) == 4)
+#if LONG_BIT == 32
     t[0] *= 0xba2e8ba3UL; /* 1/11 (mod 2^32) */
-  else
+#elif LONG_BIT == 64 
     t[0] *= 0x2e8ba2e8ba2e8ba3UL; /* 1/11 (mod 2^64) */
+#else
+#error LONG_BIT is neither 32 nor 64
+#endif
   
   mod_set (r, t, m);
   mod_clear (t, m);
@@ -232,10 +244,13 @@ mod_div13 (residue_t r, const residue_t a, const modulus_t m)
      (a+k*m)/13 < 2^w, so doing a division (mod 2^w) produces the 
      correct result. */
   
-  if (sizeof (unsigned long) == 4)
+#if LONG_BIT == 32
     t[0] *= 0xc4ec4ec5UL; /* 1/13 (mod 2^32) */
-  else
+#elif LONG_BIT == 64 
     t[0] *= 0x4ec4ec4ec4ec4ec5UL; /* 1/13 (mod 2^64) */
+#else
+#error LONG_BIT is neither 32 nor 64
+#endif
   
   mod_set (r, t, m);
   mod_clear (t, m);

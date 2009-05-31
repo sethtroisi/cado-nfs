@@ -382,7 +382,7 @@ ularith_sqr_ul_2ul (unsigned long *r1, unsigned long *r2,
 #elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
   __asm__ ( "mull %%eax"
 	    : "=a" (*r1), "=d" (*r2)
-	    : "%0" (a)
+	    : "0" (a)
 	    : "cc");
 #else
   const int half = LONG_BIT / 2;
