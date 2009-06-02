@@ -5,7 +5,7 @@ cmake is a source tree configurator and makefile generator. The two most
 important things to know are:
 
 - cmake's configuration files are CMakeLists.txt files.
-- cmake buils _out of the source tree_. This means that the built object
+- cmake builds _out of the source tree_. This means that the built object
   files and binaries don't go in the same directory as the source files.
 
 Tweaking CMakeLists.txt is relatively easy using a follow-by-example

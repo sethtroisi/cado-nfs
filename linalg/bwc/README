@@ -1,0 +1,502 @@
+
+The tools present in this subdirectory form an implementation of the
+Block-Wiedemann algorithm with the following features:
+
+- parallelism at a multithread / MPI level. No fully integrated
+  multi-site level yet, but bare bones are there.
+- checkpointing / restarting in case of problem.
+- checksums during the computation to detect problems.
+- possibility to compute either a left or right kernel vector.
+
+
+Properly documenting bwc implies a bit of knowledge of the block Wiedemann
+algorithm and its parameters. This README does not cover this aspect.
+
+Input, output, and formats.
+===========================
+
+The input is a matrix that comes out from merge (the .small matrix).  The
+format is the standard CADO matrix format: one header line saying nrows,
+ncols, plus <nrows> rows, with <nentries> [<column indices of non-zero
+coefficients>].
+
+The ouput is a set of vectors of its kernel. It ends up in the file called W
+in the chosen working directory.
+
+
+Calling sequence of binaries
+============================
+
+We describe here the list of binaries to run. This can be somewhat automated
+using the bwc.pl driver script, documented below.
+
+ 1 - balance
+     decomposes the input matrix into blocks that will be dispatched to
+     nodes
+ 2 - prep
+     select input blocks of vectors, and check that rank conditions are
+     satisfied
+ 3 - secure
+     precompute some data useful for checksums
+ 4 - split Y
+     split the main input vector Y into several blocks for independent
+     processing at different sites.
+!5 - krylov
+     compute the Krylov sequence
+ 6 - acollect
+     collect the Krylov sequece files into one big file. Can be done at
+     several moments in the computation.
+!7 - lingen
+     Berlekamp-Massey -like step: produces a generating polynomial
+ 8 - split F
+     split the linear generator computed into several blocks for independent
+     processing at each site.
+!9 - mksol
+     create the solutions from the polynomial
+ 10 - gather / apply_perm
+     reconstruct solutions from the mess
+
+krylov, lingen, mksol are the steps having a real computational impact.
+prep is cheap but important for ensuring the success of the algorithm.
+split,acollect,gather,apply_perm are just trivial bookkeeping.
+balance is I/O intensive.
+secure is akin to doing a few krylov iterations. It runs for roughly just
+as long as the desired time between two recoverable checkpoints (the
+longer it runs, the less often checks are done -- but checks are
+relatively cheap anyway).
+
+
+Parameters
+==========
+
+All binaries accept command-line parameters. As per the CADO params.[ch]
+conventions, several syntaxes are possible, but the current documentation
+suggests only the <key>=<value> form.
+
+* $0 (name of binary -- not really a parameter)
+
+    Several binaries exist in different forms, as a consequence of some
+    operations being inlined as done on types of different width. So for
+    example u64_krylov and u128_krylov are doing the same thing, but
+    u64_krylov works on uint64_t's, while u128_krylov works on SSE-2 data.
+    The prefix before _ encodes the data type with which the program runs.
+    u64n is special, since it corresponds to an array of uint64_t's whose
+    width is specified at runtime. Therefore u64n_* programs are flexible,
+    while most others are not.
+
+* wdir=<directory name>
+
+    Work in the specified directory. This implies that the program will cd
+    into that directory prior to doing any disk access, so relative path might
+    trigger bugs. All output will appear in the specified directory.
+
+    Having a wdir is generally a good idea, as bwc will otherwise happily
+    populate your working directory with data files.
+
+* cfg=<filename>
+
+    Read extra parameters from file name. Note that if this parameter is not
+    present, and if a file named bw.cfg is found in the working directory
+    (either the cwd or the wdir parameter above), then parameters are obtained
+    from that file.
+
+* m=<number>, n=<number>, or mn=<number> for setting both.
+
+    Set the corresponding parameters from the block Wiedemann algorithm. Note
+    that these are the _global_ values. Presumably both are multiples of 64.
+    If two sites are meant to compute two sequences independently, the n value
+    here is the sum of the sequence widths. If there is only one sequence to
+    be computed, then the <n> value here will match the uXXX_krylov binary
+    name to be used.
+
+* nullspace=[left|right]
+
+    Look for left or right kernel vectors. If one looks for a right kernel
+    vector, then the matrix-times-vector operation will be performed.
+    Otherwise, the vector-times-matrix operation is used, or equivalently
+    transpose-of-matrix times vector.
+
+* mpi=<number1>x<number2>
+
+    Work on a grid of <number1>x<number2> nodes. <number1> rows, <number2>
+    columns. The ``rows'' and ``columns'' receive matrix blocks according to
+    their positioning.
+
+* thr=<number1>x<number2>
+
+    Same on the thread level. This is not exclusive of the above.
+
+* interleaving=[0|1]
+
+    Whether to compute _two_ sequences simultaneously. This is relevant when a
+    significant amount of time is spent in matrix communications, so that
+    while communication is taking place, the CPU is idle and can be put at
+    work. This doubles the number of threads of the program, and increases the
+    memory footprint a bit (the matrix data which can be shared is indeed
+    shared).
+
+* interval=<number>
+
+    Check for consistency every <number> matrix product iterations. Note
+    that this also governs the number of intermediary vectors which are
+    stored. If the value here is too small, then there are chances that
+    you exhaust your disk space.
+
+* mm_impl=[basic|sliced|threaded|bucket|...]
+
+    low-level matrix multiplication code to use. See below in this document.
+
+* seed=<number>
+
+    random seed. the ``prep'' program is not deterministic, so for debugging
+    purposes, setting this parameter to a fixed value may be wise.
+
+* lingen_threshold=<number>
+
+    Threshold for recursive algorithm, only relevant for lingen. <number> is
+    currently 64.
+
+Some more internal parameters.
+
+* start=<value>, end=<value> limits for doing partial krylov/mksol
+* ys=<number y0>..<number y1> specify which sub-sequence to work with. [y0,y1[
+  must be a sub-interval of [0,n[ . (y1-y0) must be equal to
+  nbys*(1+interleaving), where nbys is the XXX value in uXXX_krylov for
+  instance.
+* checkpoints=[0|1] whether LINGEN must save checkpoints. This flag is not
+  used for krylov/mksol, which always store checkpoints.
+* splits=<number1>,<number2>,... Only for the auxilary program ``split''.
+  Splits Y0-<n> (or equivalently F) in files V<number1>-<number2>.*,
+  V<number2>-<number3>.*, to prepare for several independent subsequence
+  computations.
+* Some cpu-level parameters, relevant for the low-level routines.
+    - l1_cache_size=<number>
+    - l2_cache_size=<number>
+    - cache_line_size=<number>
+        The length of some data blocks is set in accordance with these values.
+        You may benefit from tuning them, but presumably only after you've
+        gained some familiarity with the relevant source code.
+* mm_* : parameters passed on to low-level matrix multiplication routines.
+    - mm_store_transposed=[0|1] forces whether the matrix is stored row-major
+      (0) or column-major (1). The low-level implementations are written with
+      a preferred ordering in mind which is set automatically, so don't change
+      this unless you're willing to try out with something new.
+    - other mm_xxx_* parameters are not yet documented.
+
+
+
+Files (standard name, standard place, etc)
+==========================================
+
+This list links at who creates what and uses what:
+
+wdir/tmp-mat.xxxx               temporary files for balance.
+wdir/mat.info                   sub-matrix placement, + stats
+    created by balance
+    read by *_{prep,secure,krylov,mksol,gather}
+wdir/mat.col_perm
+wdir/mat.row_perm               permutations used for balancing.
+    created by balance
+    read by apply_perm
+wdir/mat.hi.vj                  contains the (i,j) block of the matrix
+    created by balance
+    read by *_{prep,secure,krylov,mksol} unless the .bin file is found.
+wdir/mat.hi.vj-XXXXXX.bin         in-memory version of the above
+    created by *_{prep,secure,krylov,mksol,gather} if not found.
+    used by the 
+wdir/bw.cfg                     recalls the command-line parameters
+    re-read by all programs.
+wdir/X.twisted                  X vector used for Krylov.
+    created by prep
+    read by krylov and secure
+wdir/Y.0.twisted                Y vector used for Krylov.
+    created by prep
+    read by split --split-y
+wdir/C.<n>.twisted              check vector = trsp(M)^n * X  (See note (T))
+    created by secure
+    read by krylov mksol
+wdir/V<n1>-<n2>.0.twisted       columns <n1>..<n2> (n2 exclusive) of Y
+    created by split --split-y splits=[...,]<n1>,<n2>[,...]
+    read by krylov mksol
+wdir/A<n1>-<n2>.<j1>-<j2>       krylov sequence data.
+    created by krylov
+    read by acollect. acollect replaces all these files by a file matching the
+    same pattern, read in turn by lingen.
+wdir/V<n1>-<n2>.<j>.twisted     columns <n1>..<n2> of M^j Y (See note (T))
+    created by krylov while computing.
+    never read again unless for external checking (not all of it implemented
+    yet)
+wdir/F_INIT_QUICK               initial data for lingen
+    created by lingen
+    never read again unless by lingen again for resuming (resuming in lingen
+    is not functional at the moment)
+wdir/pi-<t1>-<t2>               current state for lingen
+    created by lingen
+    never read again unless by lingen again for resuming (resuming in lingen
+    is not functional at the moment)
+wdir/F                          linear generator.
+    created by lingen
+    read by split --split-f
+wdir/F<n1>..<n2>                columns <n1>..<n2> of F (n2 exclusive).
+    created by split --split-f
+    read by mksol
+wdir/S<n1>-<n2>.<j>.twisted     mksol sequence data.
+    created by mksol
+    read by gather
+wdir/W.twisted                  kernel vectors
+    created by gather
+    read by apply_perm
+
+
+Per-program documentation
+=========================
+
+For all programs, more extensive documentation can often be found in the
+source file comments if there are such comments.
+
+balance
+-------
+
+    balance transforms the input matrix M into a twisted matrix Mt which
+    satisfies
+        Sr^-1 * Mt * Sc eq M; 
+    Mt enjoys the property that when split in a 2d rectangular grid matching
+    the job organization, one expect the blocks to be reasonably balanced in
+    terms of number of coefficients.
+
+    Sc is the permutation sending 0 to the first 32-bit integer found
+    in col_perm, etc.
+
+    mat.hi.vj                    (i,j) block of the matrix
+    mat.info                     global placement
+
+    All vector files created later on, and relative to the matrix Mt, are
+    ``twisted'' files. Ytwisted is Sc * Yuntwisted. So:
+        Mt * Ytwisted == Sc * (Sc^-1 * Sr) * (M * Yuntwisted)
+    When Sc == Sr, which makes it possible to reconstruct data vectors which
+    carry a meaning irrespective of the balancing chosen. When (Sc^-1 * Sr =
+    T) is a constant permutation matrix consistent across several balancings,
+    the same holds for T*M the case by default.
+
+build
+-----
+
+    This program does not belong to the usual sequence of binaries. Yet, it is
+    a simple program whose job is only to create the in-memory cache for the
+    matrix blocks mat.hi.vj ; note in particular that creating this in-memory
+    cache is a memory-intensive operations, which typically requires two to
+    four times as much memory as the program will eventually use once the
+    matrix has been treated.
+
+    The syntax for build is:
+
+        u64_build <ascii file> <impl> [left|right]
+
+    E.g.:
+        u64_build /tmp/wdir/mat.h0.v0 bucket left
+
+    Note that the [left|right] parameter must match the nullspace parameter
+    used globally for bwc.
+
+    Note also that choosing u64_build or u128_build has an important impact on
+    the cached matrix file which is created. It must match the binary which is
+    used eventually for krylov/mksol, otherwise data block sizes might be
+    chosen too large or too small. In the latter case, you will encounter the
+    warning ``cached matrix file fits data with different striding''. This is
+    not innocuous for krylov/mksol, as it hurts performance.
+
+    Once /tmp/wdir/mat.h0.v0.bucket.bin (or /tmp/wdir/mat.h0.v0.bucketT.bin),
+    /tmp/wdir/mat.h0.v0 is normally never read again.
+
+prep
+----
+
+    prep looks for sensible starting vectors X and Y for use with the block
+    Wiedemann algorithm. X is a block of m vectors, Y a block of n vectors.
+    Since n is the global parameter, the binary which is compiled by default
+    is u64n_prep, which can accomodate various values for n (any multiple of
+    64 fits).
+    prep ensures that the rank conditions are satisfied for the first few
+    iterates trsp(X)*M*Y, trsp(X)*M^2*Y, trsp(X)*M^3*Y (See note (T)).
+
+    En route, prep often creates the in-memory cached matrix file, unless the
+    build program mentioned above has been called already. If several
+    independent sequences are to be computed, this is a problem, as prep will
+    build a cache for n-bit wide vector entries, while krylov/mksol will in
+    this case work with shorter sequences.
+
+    prep also creates a bw.cfg recalling all its command-line arguments, for
+    use by other programs.
+
+    X and Y are stored as:
+
+    X.twisted                    X vector used for Krylov.
+    Y.0.twisted                  Y vector used for Krylov.
+
+secure
+------
+
+    secure reads the output from prep, and creates:
+    
+    C.<interval>.twisted         check vector = trsp(M)^<interval> * X
+    
+    When M^(k*interval)*Y has been computed, using C one can look ahead the
+    value trsp(X) * M^((k+1)*interval) * Y which will be computed after
+    computing M^((k+1)*interval)*Y. This helps making sure that no bit flipped
+    in the computation.
+
+    Note that this checking mechanism is incomplete as it does not provide
+    off-line checking. Off-line checking is possible at moderate cost, and
+    will be implemented soon.
+
+    (See note (T) for the whole paragraphs above).
+
+split (split Y)
+---------------
+
+    The syntax of split is ./split [--split-y|--split-f] --splits=<integer list>
+
+    We assume below that the integer list is for example 0,64,192
+
+    split --split-y reads only Y.0.twisted, which is a vector whose entries
+    are 192-bit wide, and creates
+
+    V0-64.0.twisted            columns 0..63 of Y.
+    V64-192.0.twisted          columns 64..191 of Y.
+
+krylov
+------
+
+    krylov produces the linear sequence (a_ij), as a set of files named:
+
+    A<n1>-<n2>.<j1>-<j2>
+
+    Such a file contains j2-j1 consecutive blocks of m by (n2-n1) bit
+    matrices, stored in binary format, row major. 
+
+    n1 and n2 are constant throughout the krylov run, and are specified
+    with the ys=<n1>,<n2> command-line argument.
+
+    n2-n1 must match the predefined data type width for the selected
+    krylov binary. So for u64_krylov it is 64.
+    
+    The j-j1-th matrix in A<n1>-<n2>.<j1>-<j2> (for j1<=j<j2) is equal to
+    trsp(X)*M^j*Y (see note (T)).
+
+    krylov also creates
+    
+    V<n1>-<n2>.<j>.twisted      columns <n1>..<n2> of M^j Y. (see note (T)).
+
+    This can be used to resume computations at iteration j.
+
+    (j2-j1 is always equal to <interval> as in C.<interval>.twisted, and j is
+    always a multiple of <interval>).
+
+    When V<n1>-<n2>.<j2>.twisted is computed, krylov verifies that it is in
+    accordance with the input vector V<n1>-<n2>.<j1>.twisted. The file
+    A<n1>-<n2>.<j1>-<j2> is written only if this test succeeds. Otherwise the
+    program aborts.
+
+    Note on resuming. If the extra parameter start=<j> is passed to krylov,
+    then computations resume after iteration <j>. Instead of
+    V.<n1>-<n2>.0.twisted, V.<n1>-<n2>.<j>.twisted is read instead, and
+    only subsequent A files will be touched. It is also possible to change the
+    end value for the computation, in order to stop the subsequence
+    computation prematurely.
+
+    Note on interleaving. Selecting interleaving is functionally
+    equivalent to running two instances of krylov, one with
+    ys=<j1>..<jmiddle>, the other one with ys=<jmiddle>..<j2>. So
+    interleaving with u64_krylov, for instance, would work with ys=0..128
+    but not with ys=0..64 (since the latter would fall down on two
+    sequences, one for 0..32, the other for 32..64 -- not a match for a
+    u64_ binary).
+
+acollect
+--------
+
+    acollect does a trivial bookkeeping task. Consider the files
+    A<n1>-<n2>.<j1>-<j2> as representing a rectangle in the space [0,<n>[ *
+    [0,jmax[. acollect verifies that these rectangles do not overlap, and
+    creates a unique file A0-<n>.0-<jmax>
+
+    If the --remove-old argument is given, the newly created file replaces the
+    old files.
+
+lingen
+------
+
+    lingen computes the linear generator F from the sequence A. It
+    represents an n times n matrix of polynomials of degree ceil(N/n)
+    which satisfies
+
+    A * trsp(F) = matrix of polynomials of degree < ceil(N/n)
+
+    F is stored coefficient by coefficient. Each coefficient is an n
+    times n bit matrix, stored row-major.
+
+    Note that lingen is currently the oldest code in bwc. Some parts of
+    it were written when the corresponding algorithm barely existed. It
+    admittedly deserves a rewrite.
+
+split (split F)
+---------------
+
+    in bijection with what is done for splitting Y, split --split-F
+    selects only part of the columns of F. This creates:
+
+    F<n1>..<n2>                columns <n1>..<n2> of F (n2 exclusive).
+
+mksol
+-----
+
+    This reads the files F<n1>..<n2> as well as Y<n1>..<n2>.0.twisted,
+    and creates files:
+
+    S<n1>..<n2>.<j1>..<j2>.twisted      partial sums for evaluation.
+
+    All the S* files must be summed to form the final kernel vector
+    element.
+
+    note: off-line checking for mksol is not implemented yet.  mksol does
+    checks in the same way krylov does, and saves over the V* files as
+    well, which is admittedly silly since these files are likely to exist
+    already, or will never be reused anyway except for off-line checking
+    (which, as said, is not implemented yet).
+
+gather
+------
+
+    This sums all S* files, and check how many times one must iterate in
+    order to obtain M^k*(sum_of_S) == 0 (see note T). Then it stores:
+
+    W.twisted                   M^(k-1)*sum_of_S (see note T).
+
+apply_perm
+----------
+
+    This un-twists W.
+
+
+Using bwc.pl
+============
+
+    bwc.pl is a perl script which tries to be intelligent, and runs the
+    programs above in the correct order. It does cope with multi-node MPI
+    environment, but does not yet handle several independent sequences
+    (except for interleaved jobs).
+
+    The spirit is that all parameters listed above are to be given to
+    bwc.pl ; the _first_ provided argument must be either the basename of
+    a specific binary to call (with possibly the proper mpiexec arguments
+    added, and possibly the unrecognized arguments stripped out), or one
+    of the meta-commands :balance, :complete, and :wipeout.
+
+    More extensive documentation in bwc.pl will come someday in this
+    README. Meanwhile, bwc.ok contains some useful info.
+
+Notes:
+======
+
+(T): This assumes that nullspace=right. If nullspace=left, replace M by trsp(M).
+

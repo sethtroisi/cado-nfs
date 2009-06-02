@@ -1,112 +1,3 @@
-
-The tools present in this subdirectory form an implementation (*) of the
-Block-Wiedemann algorithm with the following features:
-
-- parallelism at a multithread / MPI level. No fully integrated
-  multi-site level yet, but bare bones are there.
-- checkpointing / restarting in case of problem.
-- checksums during the computation to detect problems.
-
-The input is a matrix that comes out from merge (the .small matrix) and
-the ouput is a set of vectors of its kernel.
-
-Calling sequence of binaries
-----------------------------
-
- 1 - balance
-     decomposes the input matrix into blocks that will be dispatched to
-     nodes
- 2 - prep
-     select input blocks of vectors, and check that rank conditions are
-     satisfied
- 3 - secure
-     precompute some data useful for checksums
- 4 - split
-     split the main input vector Y into several blocks for independent
-     processing at different sites.
-!5 - krylov
-     compute the Krylov sequence
- 6 - acollect
-     collect the Krylov sequece files into one big file. Can be done at
-     several moments in the computation.
-!7 - lingen
-     Berlekamp-Massey -like step: produces a generating polynomial
-!8 - mksol
-     create the solutions from the polynomial
- 9 - gather / apply_perm
-     reconstruct solutions from the mess
-
-krylov, lingen, mksol are the steps having a real computational impact.
-prep is cheap but important for ensuring the success of the algorithm.
-split,acollect,gather,apply_perm are just trivial bookkeeping.
-balance is I/O intensive.
-secure is akin to doing a few krylov iterations. It runs for roughly just
-as long as the desired time between two recoverable checkpoints (the
-longer it runs, the less often checks are done -- but checks are
-relatively cheap anyway).
-
-
-
-Files (standard name, standard place, etc)
-------------------------------------------
-
-Input file is usually called   xxx.small
-It is a good idea to create a subdirectory bw/ where all subsequent
-temporaries are stored. bw.pl is doing that.
-
-balance will create a bunch of files in bw/ :
-  mat.col_perm, mat.row_perm   permutation on row/cols applied to balance
-                               weights
-  tmp-mat.xxxx                 temporary files for split/sort
-  mat.hi.vj                    contains the (i,j) block of the matrix
-  mat.info                     some statistics on slices (incl. weight)
-
-The identity verified by the twisted matrix is:
-Sr^-1 * Mt * Sc eq M;
-where Sc is the permutation sending 0 to the first 32-bit integer found
-in col_perm, etc.
-
-
-prep reads the output from balance, and creates the following:
-  mat.hi.vj-sliced.bin         contains the (i,j) block of the matrix in
-                               a compact, precomputed form.
-     [ Rem: these files can be created using the "build" utility ]
-  bw.cfg                       recalls the command-line parameters
-                               (reread by all program)
-  X.twisted                    X vector used for Krylov.
-  Y.0.twisted                  Y vector used for Krylov.
-
-secure reads the output from prep, and creates:
-  C.<n>.twisted                check vector = trsp(M)^n * X, used for
-                               checkpointing every <n> iterations
-
-split reads only Y.0.twisted and its command line arguments n0 n1 n2 etc
-to create:
-  V<n1>-<n2>.0.twisted         columns <n1>..<n2> (n2 exclusive) of the
-                               n-column vector Y. Input for krylov.
-
-krylov uses all this data and produces the linear sequence (a_ij), as a
-set of files
-  A<n1>-<n2>.<j1>-<j2>         krylov sequence data. j2-j1 consecutive
-                               blocks of m by (n2-n1) bit matrices,
-                               stored in binary format, row major.
-  V<n1>-<n2>.<j>.twisted       columns <n1>..<n2> of M^j Y. Created by
-                               krylov. Can be used to resume computations
-                               past iteration j.
-                               (created by krylov).
-(j2-j1 is always equal to n as in C.n.twisted, and j is always a multiple
-of n).
-
-When V<n1>-<n2>.<j2>.twisted is computed, krylov verifies that it is in
-accordance with the input vector V<n1>-<n2>.<j1>.twisted. The file
-A<n1>-<n2>.<j1>-<j2> is written only if this test succeeds.
-
-The .twisted suffix means that the vectors have been permuted according
-to mat.col_perm or mat.row_perm. Use apply_perm to untwist them.
-
-lingen, mksol, gather/applyperm
-
-
 The pi_go() function
 --------------------
 
@@ -186,15 +77,15 @@ Matrix - vector product
 -----------------------
 
 The code that will run on a single thread is in matmul.[ch] and the
-different implementations it encapsulates: matmul-sliced.[ch] and
-matmul-basic.[ch] for the moment. Given the amount of time spent in these
-routines waiting for data transiting through the FSB, some
-matmul-bucketsort-cachecompliant-asm-prefetch.[ch] could be worthwhile.
+different implementations it encapsulates. For the moment:
+    matmul-basic.[ch]
+    matmul-sliced.{cpp,h}
+    matmul-threaded.[ch]
+    matmul-bucket.{cpp,h}       [ default ]
 
-[ Note that this single task can be benched separately of the bw
-  infrastructure by the standalone bench program. Be aware though that
-  some of the difficuly performance-wise arises when all cpu cores are
-  trying to interact with memory simultaneously. ]
+practically all cpu time is spent in these routines. Therefore, optimizing
+these for a particular CPU/memory controller combination is very relevant. See
+more on this particular step below in the ``low-level'' section below.
 
 On top of this very basic mono-threaded matrix x vector product, the
 matmul_top.[ch] mechanism handles the parallelizing: each node / thread
@@ -207,3 +98,24 @@ word, this describes how an horizontal vector (spread on various
 nodes/threads) can be transposed in a vertical vector (also spread on
 various nodes/threads). This is tricky and will be explained somewhere
 else (the code is short, but beware of headaches).
+
+Matrix - vector product -- low-level
+------------------------------------
+
+Among the different possible source file listed above, presumably only one
+will be used for a single bwc run. All bwc binaries (well, the important ones:
+prep secure krylov mksol gather) accept the mm_impl= argument which selects
+the implementation to use.
+
+The primary on-disk matrix is in trivial, easy-to-read, ascii format. However,
+memory representation for fast computation is different. It depends on the
+implementation. For convenience, a ``cached'' matrix file matching the
+in-memory representation for a given implementation is generated on first
+use, and saved on disk
+
+[ Note that this single task can be benched separately of the bw
+  infrastructure by the standalone bench program. Be aware though that
+  some of the difficuly performance-wise arises when all cpu cores are
+  trying to interact with memory simultaneously. ]
+
+(documentation to be continued).

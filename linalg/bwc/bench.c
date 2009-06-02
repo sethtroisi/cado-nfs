@@ -187,7 +187,7 @@ int main(int argc, char * argv[])
 
     abobj_init(ba->xx);
 
-    ba->impl = "sliced";
+    ba->impl = "bucket";
     char * file = NULL;
     int nocheck = 0;
     ba->nchecks = 4;

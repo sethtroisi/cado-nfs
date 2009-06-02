@@ -2,7 +2,7 @@
 #include "bwc_config.h"
 #include "matmul.h"
 
-#define MATMUL_DEFAULT_IMPL sliced
+#define MATMUL_DEFAULT_IMPL bucket
 
 /* Include all matmul implementations here */
 #include "matmul-basic.h"

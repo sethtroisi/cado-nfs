@@ -1,7 +1,7 @@
 /* This must be compiled with gcc -x assembler.
  *
  * It's an outright silly test, in order to make a guess as to whether
- * linalg/bwc/matmul-sliced-asm.S should be compiled or not.  The code does
+ * linalg/bwc/matmul-sub-*.S should be compiled or not.  The code does
  * not mean anything, especially not for main ! But cmake insists on having
  * test cases have a main() function...
  */

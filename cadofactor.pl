@@ -209,7 +209,7 @@ my @default_param = (
     bwthreshold  => 64,
     bwtidy       => 1,
     bwc_interval => 1000,
-    bwc_mm_impl => 'sliced',
+    bwc_mm_impl => 'bucket',
     bwc_interleaving => 0,
 
     # characters
