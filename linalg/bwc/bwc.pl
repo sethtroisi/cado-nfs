@@ -506,7 +506,7 @@ sub drive {
     }
 
     if ($program eq ':bench') {
-        if (! -d $wdir) {
+        if (! -d $wdir || ! -f "$wdir/mat.info") {
             &drive(':balance', @_);
         }
         &drive(":wipeout", @_);
@@ -518,7 +518,7 @@ sub drive {
     }
 
     if ($program eq ':complete') {
-        if (! -d $wdir) {
+        if (! -d $wdir || ! -f "$wdir/mat.info") {
             &drive(':balance', @_);
         }
         &drive(":wipeout", @_);
