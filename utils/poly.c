@@ -122,17 +122,34 @@ void poly_setcoeff(poly_t f, int i, const mpz_t z) {
     cleandeg(f, i);
 }
 
+void poly_setcoeff_str(poly_t f, int i,char *str, int base) {
+  int j;
+  if (i >= f->alloc) {
+    f->coeff = (mpz_t *)realloc(f->coeff, (i+1)*sizeof(mpz_t));
+    ASSERT (f->coeff != NULL);
+    for (j = f->alloc; j <= i; ++j)
+      mpz_init(f->coeff[j]);
+    f->alloc = i+1;
+  }
+  mpz_set_str(f->coeff[i],str, base);
+  if (i >= f->deg) 
+    cleandeg(f, i);
+}
+
 void poly_getcoeff(mpz_t res, int i, const poly_t f) {
   mpz_set(res,f->coeff[i]);
 }
 
-// f must be allocated, clist must have length at least p->deg+1
-void poly_set(poly_t f, const mpz_t * clist) {
+// We set the first l coefficients of f to the first l members of clist.
+// We assume the allocation has been done and that we have enough space.
+void poly_set(poly_t f, const mpz_t * clist, int d) {
 
    int i;
 
-   for( i=0 ; i<=f->deg ; i++)
+   for( i=0 ; i<=d ; i++)
      mpz_set(f->coeff[i],clist[i]);
+
+   f->deg = d;
  }
 
 
