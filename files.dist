@@ -35,6 +35,7 @@ linalg/apply_perm.c
 linalg/balance.c
 linalg/bwc/CMakeLists.txt
 linalg/bwc/CMakeLists.txt
+linalg/bwc/README
 linalg/bwc/GUIDED_TOUR_OF_SOURCES
 linalg/bwc/Makefile
 linalg/bwc/abase-api.h
