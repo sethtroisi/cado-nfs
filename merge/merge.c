@@ -256,8 +256,8 @@ main (int argc, char *argv[])
     tt = seconds ();
     purgedfile = gzip_open (purgedname, "r");
     ASSERT_ALWAYS (purgedfile != NULL);
-    /* the first 1 means we ignor the 1st entry of each purged line;
-       the second 1 is to burry heavy columns (0 considers all columns) */
+    /* the first 1 means we ignore the 1st entry of each purged line;
+       the second 1 is to bury heavy columns (0 considers all columns) */
     readmat (mat, purgedfile, 1, 1, verbose);
     gzip_close (purgedfile, purgedname);
     fprintf (stderr, "Time for readmat: %2.2lf\n", seconds () - tt);

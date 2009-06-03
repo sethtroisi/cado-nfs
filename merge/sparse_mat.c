@@ -195,7 +195,7 @@ readmat (sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols,
 	    if(mat->wt[j] < wmax){
               int wc = -mat->wt[j];
 #if DEBUG >= 1
-	      fprintf(stderr, "Burrying j=%d (wt=%d)\n", j, wc);
+	      fprintf(stderr, "Burying j=%d (wt=%d)\n", j, wc);
 #endif
 		tooheavy[j] = 1;
 		mat->nburied += 1;
