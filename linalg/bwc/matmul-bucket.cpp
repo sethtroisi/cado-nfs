@@ -1152,7 +1152,7 @@ fill_buckets_indirect(abobj_ptr x, abt ** sb, const abt * z, const uint8_t * q, 
         z += aboffset(x, *q);
         q++;
         abcopy(x, sb[*q], z, 1);
-        sb[*q]++;
+        sb[*q]+= aboffset(x, 1);
         q++;
     }
 }
@@ -1165,7 +1165,7 @@ unfill_buckets_indirect(abobj_ptr x, abt ** sb, abt * z, const uint8_t * q, unsi
         z += aboffset(x, *q);
         q++;
         abadd(x, z, sb[*q]);
-        sb[*q]++;
+        sb[*q]+= aboffset(x, 1);
         q++;
     }
 }
@@ -1186,7 +1186,7 @@ static inline void apply_small_buckets(abobj_ptr x, abt * dst, const abt * z, co
              * the first bucket.
              */
             abadd(x, dst + aboffset(x, *q), z);
-            z++;
+            z+= aboffset(x, 1);
             q++;
         }
         dst += aboffset(x, 256);
@@ -1204,7 +1204,7 @@ static inline void unapply_small_buckets(abobj_ptr x, const abt * src, abt * z, 
              * the first bucket.
              */
             abcopy(x, z, src + aboffset(x, *q), 1);
-            z++;
+            z += aboffset(x, 1);
             q++;
         }
         src += aboffset(x, 256);
@@ -1218,8 +1218,9 @@ fill_buckets_direct(abobj_ptr x, abt ** sb, const abt * z, const uint8_t * q, un
      * pointed to by sb[q[i]]. Exactly n coefficients are expected. All
      * the sb[] pointers are increased */
     for(unsigned int c = 0 ; c < n ; c++) {
-        abcopy(x, sb[q[c]], z + c, 1);
-        sb[q[c]]++;
+        abcopy(x, sb[q[c]], z, 1);
+        sb[q[c]]+= aboffset(x, 1);
+        z += aboffset(x, 1);
     }
 }
 
@@ -1228,8 +1229,9 @@ unfill_buckets_direct(abobj_ptr x, abt ** sb, abt * z, const uint8_t * q, unsign
 {
     /* Does the converse of the above */
     for(unsigned int c = 0 ; c < n ; c++) {
-        abcopy(x, z + c, sb[q[c]], 1);
-        sb[q[c]]++;
+        abcopy(x, z, sb[q[c]], 1);
+        sb[q[c]]+= aboffset(x, 1);
+        z += aboffset(x, 1);
     }
 }
 
@@ -1316,7 +1318,7 @@ static inline void matmul_bucket_mul_huge(struct matmul_bucket_data_s * mm, abt 
                 for(unsigned int k = 0 ; k < nlarge ; k++) {
                     abt * sbucket[256];
                     prepare_buckets(x,sbucket,scrap,pos->ql,256);
-                    bucket[k] -= Lsizes[k];
+                    bucket[k] -= aboffset(x, Lsizes[k]);
                     fill_buckets_direct(x, sbucket, bucket[k], pos->q8, Lsizes[k]);
                     pos->q8 += Lsizes[k];
                     abt * outp = dst + aboffset(x, pos->i + k * di_sub);

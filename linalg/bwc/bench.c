@@ -135,7 +135,7 @@ void check_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct 
     matmul_mul(p->mm, p->dst, p->src, 1);
     printf("T%d dst(%u): %08" PRIx32 "\n", tnum,
             nr, crc32((unsigned long*) p->dst, abbytes(ba->xx, nr0) / sizeof(unsigned long)));
-    // debug_write(p->dst, abbytes(ba->xx, nr), "/tmp/Lmul.%d", t);
+    // debug_write(p->dst, abbytes(ba->xx, nr), "/tmp/Lmul");
 
     abdotprod(ba->xx, checkA, p->dst, srcT, nr0);
 
@@ -145,7 +145,7 @@ void check_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct 
     printf("T%d dstT(%u): %08" PRIx32 "\n", tnum,
             nc, crc32((unsigned long*) dstT, abbytes(ba->xx, nc0) / sizeof(unsigned long)));
 
-    // debug_write(dstT, abbytes(ba->xx, nc), "/tmp/Rmul.%d", t);
+    // debug_write(dstT, abbytes(ba->xx, nc), "/tmp/Rmul");
 
     abdotprod(ba->xx, checkB, p->src, dstT, nc0);
 
@@ -196,9 +196,9 @@ int main(int argc, char * argv[])
     /* {{{ */
     param_list_init(ba->pl);
     argv++,argc--;
-    param_list_configure_knob(ba->pl, "--ba->transpose", &ba->transpose);
+    param_list_configure_knob(ba->pl, "--transpose", &ba->transpose);
     param_list_configure_knob(ba->pl, "--nocheck", &nocheck);
-    param_list_configure_alias(ba->pl, "--ba->transpose", "-t");
+    param_list_configure_alias(ba->pl, "--transpose", "-t");
 
     int wild = 0;
     for( ; argc ; ) {
