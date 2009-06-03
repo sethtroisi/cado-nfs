@@ -29,3 +29,4 @@ void extend_ppow_list(rootsieve_dictionary rdict,int newlength, unsigned long p)
 void poly_alloc_identity(poly_t f); 
 void compose_psi(poly_t f, const poly_t g,unsigned long l,rootsieve_dictionary rdict);
 void compose_reduce(poly_t f, const poly_t g,unsigned long l,rootsieve_dictionary rdict, mpz_t m);
+

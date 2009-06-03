@@ -12,19 +12,11 @@
 #include "macros.h" /* for ASSERT_ALWAYS */
 
 
-/* The rootsieve : we compute the root property for many polynomials at once.
-   We suppose the bounds U and V given.
-
-   ________            _________________                  
-   ___  __ \_____________  /__  ___/__(_)_______   ______ 
-   __  /_/ /  __ \  __ \  __/____ \__  /_  _ \_ | / /  _ \
-   _  _, _// /_/ / /_/ / /_ ____/ /_  / /  __/_ |/ //  __/
-   /_/ |_| \____/\____/\__/ /____/ /_/  \___/_____/ \___/ 
-
-
-   Here we import Emmanuel's Fast Rootsieve.
-
+/* Rootsieve : we compute the root property for many polynomials at once.
+   We suppose the bounds U and V given. The code is a translation of Emmanuel 
+   Thomé's code in Sage.
 */
+
 /*
   int main() {
   // We create example polynomials.
@@ -111,7 +103,7 @@ int main() {
 
   //printf("%d\n",g->deg);
   poly_alloc(h,f->deg);
-  rootsieve(h,f,g,500,500,12);
+  rootsieve(h,f,g,10,10,2);
   printf("Polynomial f :\n");
   poly_print(f);
   printf("\n");
@@ -125,6 +117,7 @@ int main() {
 
   poly_free(f);
   poly_free(g);
+  poly_free(h);
 
 }
 
@@ -165,6 +158,7 @@ void rootsieve(poly_t h,poly_t f,poly_t g, long U, long V, unsigned long prime_b
   rootsieve_dictionary rdict;
   rdict->B = prime_bound;
   rdict->global_offset = 0;
+  rdict->cutoff = 1.0e-5;
   rdict->umax = U;
   rdict->vmax = V;
   rdict->space = U*V;  
@@ -181,8 +175,8 @@ void rootsieve(poly_t h,poly_t f,poly_t g, long U, long V, unsigned long prime_b
   poly_t dg,df,aux;  
   poly_alloc(dg,g->deg-1);  
   poly_alloc(df,f->deg-1);  
-  poly_alloc(aux,f->deg + g->deg -1);  
-  poly_alloc(rdict->fdg_gdf,f->deg + g->deg -1);  
+  poly_alloc(aux,-1);  
+  poly_alloc(rdict->fdg_gdf,-1);  
   poly_derivative(dg,g);
   poly_derivative(df,f);
   poly_mul(rdict->fdg_gdf,f,dg);
@@ -206,9 +200,9 @@ void rootsieve(poly_t h,poly_t f,poly_t g, long U, long V, unsigned long prime_b
 
   // We print alpha for debugging purposes
   /*
-  for ( i=0 ; i<U ; i++ ) {
+    for ( i=0 ; i<U ; i++ ) {
     for ( j=0 ; j<V ; j++ )
-      printf("%f ",rdict->sarr[i*U+ j]);  
+    printf("%f ",rdict->sarr[i*U+ j]);  
     printf("\n\n ");
     }*/
 
@@ -241,7 +235,6 @@ void rootsieve(poly_t h,poly_t f,poly_t g, long U, long V, unsigned long prime_b
   poly_setcoeff(tmpoly,0,tmpmp);
   mpz_set_si(tmpmp,best_u);
   poly_setcoeff(tmpoly,1,tmpmp);
-  mpz_clear(tmpmp);
   
   poly_mul(h,tmpoly,g);
   poly_add(h,h,f);
@@ -250,9 +243,16 @@ void rootsieve(poly_t h,poly_t f,poly_t g, long U, long V, unsigned long prime_b
   printf("The pair u,v : %ld %ld\n",best_u,best_v);
   
   // Cleaning
+  mpz_clear(tmpmp);
   poly_free(tmpoly);
-  free(rdict->sarr);  
-  
+
+  // Dictionary cleaning
+  free(rdict->sarr);
+
+  poly_free(rdict->f);
+  poly_free(rdict->g);
+  poly_free(rdict->fdg_gdf);    
+    
 }
 
 
@@ -270,18 +270,20 @@ long fill_alpha(rootsieve_dictionary rdict,unsigned long p) { // Ready
   double scale;
   int ld,m;
   poly_t ff,gg,fdg_gdf;
-
   
   poly_alloc(ff,rdict->f->deg);
   poly_copy(ff,rdict->f);
   poly_alloc(gg,rdict->g->deg);
   poly_copy(gg,rdict->g);
+  poly_alloc(fdg_gdf,rdict->fdg_gdf->deg);  
   scale = (log(p))*(double)p/(double)(p+1);
   
   l0 = 0;
   ld = m = 0;  
-
-  rdict->cutoff = 1.0e-5;
+  // In theory, one does not need to initialize these values,
+  // we do it now to control warnings.
+  u0 = 0; 
+  v0 = 0; 
 
   rdict->maxpow = (long) (16*log(2)/log(p));
   rdict->ppow   = malloc((rdict->maxpow+1)*sizeof(mpz_t));
@@ -304,7 +306,19 @@ long fill_alpha(rootsieve_dictionary rdict,unsigned long p) { // Ready
   poly_t id;
   poly_alloc_identity(id);  
   
-  hits = rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,0,scale,id);  
+  hits = rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,0,scale,id); 
+
+  poly_free(ff);
+  poly_free(gg);
+  poly_free(fdg_gdf);
+  poly_free(id);
+
+  for( i=0 ; i<=rdict->maxpow; ++i)
+    mpz_clear(rdict->ppow[i]);  
+  free(rdict->ppow); 
+
+  poly_free(rdict->gmodp);
+
   return hits;  
 }
 
@@ -352,7 +366,11 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,poly_t ff,poly_t
   scale1 = scale/(p-1);
   scale2 = scale/p;
   scale3 = scale1-scale2;  
-
+  
+  //printf("%d",ff->deg);
+  poly_print(ff);
+  printf("\n");
+  poly_alloc(minus_f_over_g_modp, ff->deg);
   poly_reduce_mod_mpz(minus_f_over_g_modp, ff,rdict->ppow[1]);
 
   if (m > 0) {
@@ -386,6 +404,10 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,poly_t ff,poly_t
     // potentially intersecting lattices. 
     
     long l;
+    poly_alloc(nfdg_gdf,fdg_gdf->deg);
+    poly_alloc(nff,ff->deg);
+    //printf("Degre gg : %d\n",gg->deg);
+    poly_alloc(ngg,gg->deg);
     
     for ( l=0 ; l<p ; l++) {
       
@@ -397,13 +419,14 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,poly_t ff,poly_t
       mpz_init_set_si(mpl,l);
 			
       poly_eval_mod_mpz(mp_tmp, minus_f_over_g_modp,mpl,rdict->ppow[1]);
+      poly_free(minus_f_over_g_modp);
       minus_f_over_gmodp_l = mpz_get_si(mp_tmp);     
 				      
   
       if (m==0) {
 
 	// evaluation //gvl = rdict->gmodp(l);
-	poly_eval_mod_mpz(mp_tmp, rdict->gmodp,mpl,rdict->ppow[1]);
+	poly_eval_mod_mpz(mp_tmp,rdict->gmodp,mpl,rdict->ppow[1]);
 	gvl = mpz_get_si(mp_tmp);     
 
 	if (gvl == 0)
@@ -466,12 +489,13 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,poly_t ff,poly_t
       mpz_sub(rhs,rhs,aux);
       mpz_fdiv_q(rhs,rhs,rdict->ppow[m-ld]);
       mpz_clear(aux);
+      mpz_clear(mpl);
       
       
       if ((ld > 0) && (mpz_sgn(rhs)!= 0))
 	continue;
       
-      long nspots;
+      long nspots;      
 
       compose_reduce(nfdg_gdf,fdg_gdf,l,rdict,rdict->ppow[rdict->maxpow]);
       compose_reduce(nff,ff,l,rdict,rdict->ppow[rdict->maxpow]);
@@ -485,6 +509,7 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,poly_t ff,poly_t
 	poly_alloc_identity(ndphi);
       }
       else {
+	poly_alloc(ndphi,dphi->deg);
 	compose_psi(ndphi,dphi,l,rdict);
       }
 
@@ -492,51 +517,55 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,poly_t ff,poly_t
       poly_mul_ui(tmp_poly,ngg,(unsigned long)dv0);		
       poly_add(tmp_poly,nff,tmp_poly);
       poly_div_ui_mod_ui(nff,tmp_poly,p,p);
+      poly_alloc(twist_f,-1);
       poly_mul(twist_f,ndphi,ngg);				
 
       if (ld > 0) {
-	if (mpz_sgn(rhs) == 0) {
+	if (mpz_sgn(rhs) == 0)
 	  // Then all u's will do. Note that this case happens
 	  // only rather deep inside the recursion. So indeed
 	  // we're going to re-hit the places which have been
 	  // hit before, but that's not too worrying.
 	  nspots=p;
-	}
-	else {	    
-
-	  du0 = (igl*igl*mpz_get_si(rhs)) % p;
-	  u1 += du0 * pm;
-	  v1 += du0 * twist_v1;
-	  poly_mul_ui(tmp_poly,twist_f,(unsigned long)du0);
-	  poly_add(nff,nff,tmp_poly);
-	  nspots=1;
-	}	    
-	
-	new_twist_v1 = p * twist_v1;
-
-	for ( du=0 ; du<nspots; du++) {
-	  printf("turn on the light 2 \n");
-	  hits = light(rdict->sarr, u1,v1, pm1, pm1, 0, rdict->umax, rdict->vmax, scale3);
-	  printf("turn off the light 2 \n");
-	  // print "main/excep, level %d : %d hits" % (m, hits)
-	  thits += hits;
-	  // scale3 is scale/(p-1)-scale/p ; hence it brings
-	  // back the cells to the contribution -scale/p, which is the
-	  // contribution from a _single_ zero at this location, not
-	  // liftable because of ramification. Later recursive calls
-	  // will investigate the possibility that despite the multiple
-	  // root mod p, we still get roots at higher precision.
-	  if (hits >0)	      
-	    thits += rotation_inner(rdict,p,nff,ngg,nfdg_gdf,u1,v1,l0,ld+1,m+1,new_twist_v1,scale2,ndphi);	      	    
-
-	  poly_add(nff,nff,twist_f);		
-	  u1 += pm;
-	  v1 += twist_v1;
-	}
 	
       }
+      else {	
+	du0 = (igl*igl*mpz_get_si(rhs)) % p;
+	u1 += du0 * pm;
+	v1 += du0 * twist_v1;
+	poly_mul_ui(tmp_poly,twist_f,(unsigned long)du0);
+	poly_add(nff,nff,tmp_poly);
+	nspots=1;
+      }	    
+		
+      mpz_clear(rhs);      
+      new_twist_v1 = p * twist_v1;
 
+      for ( du=0 ; du<nspots; du++) {
+	printf("turn on the light 2 \n");
+	hits = light(rdict->sarr, u1,v1, pm1, pm1, 0, rdict->umax, rdict->vmax, scale3);
+	printf("turn off the light 2 \n");
+	// print "main/excep, level %d : %d hits" % (m, hits)
+	thits += hits;
+	// scale3 is scale/(p-1)-scale/p ; hence it brings
+	// back the cells to the contribution -scale/p, which is the
+	// contribution from a _single_ zero at this location, not
+	// liftable because of ramification. Later recursive calls
+	// will investigate the possibility that despite the multiple
+	// root mod p, we still get roots at higher precision.
+	if (hits >0)	      
+	  thits += rotation_inner(rdict,p,nff,ngg,nfdg_gdf,u1,v1,l0,ld+1,m+1,new_twist_v1,scale2,ndphi);	      	    
+
+	poly_add(nff,nff,twist_f);		
+	u1 += pm;
+	v1 += twist_v1;
+      }	
     }
+    poly_free(nfdg_gdf);
+    poly_free(nff);
+    poly_free(ngg);
+    poly_free(ndphi);
+    poly_free(twist_f);
   }
   else {
     // f mod p is a constant polynomial.  This means that our
@@ -546,6 +575,7 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,poly_t ff,poly_t
     mpz_t mp_tmp;
     mpz_init(mp_tmp);
     poly_getcoeff(mp_tmp,0,minus_f_over_g_modp);
+    poly_free(minus_f_over_g_modp);
     dv0 = mpz_get_si(mp_tmp);
     mpz_clear(mp_tmp);
     u1  = u0;
@@ -559,12 +589,15 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,poly_t ff,poly_t
 
     thits += hits;
 
-    poly_mul_ui(tmp_poly,gg,(unsigned long)dv0);		
+    poly_alloc(nff,ff->deg);
+    poly_alloc(tmp_poly,gg->deg);
+    poly_mul_ui(tmp_poly,gg,(unsigned long)dv0);
     poly_add(tmp_poly,ff,tmp_poly);
     poly_div_ui_mod_ui(nff,tmp_poly,p,p);
+    poly_free(tmp_poly);
     poly_mul(twist_f,dphi,gg);				
     new_twist_v1 = p * twist_v1;
-
+    
     for ( du=0 ; du<p ; du++) {
       hits = rotation_inner(rdict,p,nff,gg,fdg_gdf,u1,v1,l0,ld,m+1,new_twist_v1,scale,dphi);
       // print "secondary/excep, level %d : %d hits" % (m, hits)
@@ -573,7 +606,10 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,poly_t ff,poly_t
       v1 += twist_v1;      
       poly_add(nff,nff,twist_f);
     }
+    
+    poly_free(nff);
   }
+
   return thits;
 }
   
@@ -700,7 +736,7 @@ void poly_alloc_identity(poly_t f) {
 }
 
 // f <- g(psi) 
-// f must be allocated, f and g can be the same.
+// f must be allocated (with the degree of g for example), f and g can be the same.
 void compose_psi(poly_t f, const poly_t g, unsigned long l, rootsieve_dictionary rdict) {
   
   int d;  
@@ -753,3 +789,6 @@ void compose_reduce(poly_t f, const poly_t g,unsigned long l,rootsieve_dictionar
   poly_reduce_mod_mpz(f,aux,m);
   poly_free(aux);
 }
+
+
+
