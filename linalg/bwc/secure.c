@@ -77,6 +77,9 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     pi_log_init(pi->wr[1]);
 #endif
 
+    // kill the warning.
+    mmt->mm->iteration[!bw->dir] = INT_MIN;
+
     for(int k = 0 ; k < bw->interval ; k++) {
         pi_log_op(mmt->pi->m, "iteration %d", k);
         matmul_top_mul(mmt, !bw->dir);
