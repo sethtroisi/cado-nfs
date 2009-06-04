@@ -55,7 +55,42 @@ fill_buckets_indirect:
 	.p2align 3
         // store end pointer in rbx
         leaq    (%rcx,%r8,2), %rbx
-.L79:
+
+/////////////////////////////////////////////////////////
+
+.Louter_begin:
+        // number of times the inner loop is run.
+        // the inner loop scans 4 coefficients
+        movq    $0x4, %rax
+        leaq    (%rcx,%rax,8), %rbp
+        movq    %rbx, %rdx
+        cmpq    %rbp, %rbx
+        // rbx rdx far fence
+        // rbp close fence
+        ja .Lshort
+        movq    %rbp, %rdx
+        // rbx far fence
+        // rbp rdx close fence
+.Lshort:
+        movq    %rdx, %rbp
+
+        xorq    %r9, %r9
+.Lprefetch:
+        leaq    (%rsi,%r9,0x1), %rdx
+        prefetchnta      0x400(%rdx)
+        addq    $0x40, %r9
+        cmpq    $0x2000, %r9
+        ja      .Lprefetch
+
+        // the critical stride for our 256set, 16-way associative L2 data cache
+        // is 0x10 * 0x40 = 0x400
+        // for an average dj value of 2, we expect to read, in order:
+        // 0x10(%rsi)
+        // 0x20(%rsi)
+        // ...
+        // 0x100(%rsi)
+
+.Linner_begin:
 	movzbl	0(%rcx), %r8d
 	movzbl	1(%rcx), %r9d
 	movzbl	2(%rcx), %r10d
@@ -72,30 +107,38 @@ fill_buckets_indirect:
 	leaq	(%rsi,%r14,8), %r14
 
 	movq	(%rsi,%r8,8), %r8
+	movq	(%rsi,%r10,8), %r10
+	movq	(%rsi,%r12,8), %r12
+        movq    %r14, %rsi
+	movq	(%r14), %r14
+
 	movq	(%rdi,%r9,8), %rdx
 	movq	%r8, (%rdx)
 	addq	$8, (%rdi,%r9,8)
 
-	movq	(%rsi,%r10,8), %r10
 	movq	(%rdi,%r11,8), %rax
 	movq	%r10, (%rax)
 	addq	$8, (%rdi,%r11,8)
 
-	movq	(%rsi,%r12,8), %r12
 	movq	(%rdi,%r13,8), %rdx
 	movq	%r12, (%rdx)
 	addq	$8, (%rdi,%r13,8)
 
-        movq    %r14, %rsi
-	movq	(%r14), %r14
 	movq	(%rdi,%r15,8), %rax
 	movq	%r14, (%rax)
 	addq	$8, (%rdi,%r15,8)
 
 	addq	$8, %rcx
 
+        cmpq    %rcx,%rbp
+	ja	.Linner_begin
+.Linner_end:
+
         cmpq    %rcx,%rbx
-	ja	.L79
+	ja	.Louter_begin
+.Louter_end:
+
+/////////////////////////////////////////////////////////
 .Ldone:
         popq %r12
         popq %r13
@@ -104,5 +147,6 @@ fill_buckets_indirect:
         popq %rbx
         popq %rbp
 	ret
+    
 	.size	fill_buckets_indirect, .-fill_buckets_indirect
 	.p2align 4,,15

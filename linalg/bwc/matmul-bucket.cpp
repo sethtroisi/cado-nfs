@@ -65,7 +65,8 @@ using namespace std;
  * contained in small slices. */
 #define LSL_NBUCKETS_MAX      256
 
-/* How many large slices in a huge slice ? */
+/* How many large slices MINIMUM must go in a huge slice ? Below this
+ * value, we keep going producing large slices. */
 #define HUGE_MPLEX_MIN        8
 
 /* Here, I've seen 97 slices be handled best with 2 mplexed rounds. So
@@ -613,7 +614,7 @@ void split_huge_slice_in_vblocks(builder * mb, huge_slice_t * H, huge_slice_raw_
             }
         }
         /* TODO: abandon the n/np distinction. It's useful for debugging
-         * at best, at it would not hurt to have it displayed only at the
+         * at best, and it would not hurt to have it displayed only at the
          * upper level.
          */
         size_t n = 0;
@@ -622,7 +623,7 @@ void split_huge_slice_in_vblocks(builder * mb, huge_slice_t * H, huge_slice_raw_
             n += R->col_sizes[j];
             np += R->pad_sizes[j];
         }
-        ASSERT((n+np)*2 == (size_t) (spc - sp0));
+        ASSERT_ALWAYS((n+2*np)*2 == (size_t) (spc - sp0));
         sp = sp0;
 #endif
 
@@ -1238,7 +1239,10 @@ static inline void unapply_small_buckets(abobj_ptr x, const abt * src, abt * z, 
     }
 }
 
-static inline void
+static void
+fill_buckets_direct(abobj_ptr x, abt ** sb, const abt * z, const uint8_t * q, unsigned int n) __attribute__((__noinline__));
+
+static void
 fill_buckets_direct(abobj_ptr x, abt ** sb, const abt * z, const uint8_t * q, unsigned int n)
 {
     /* Dispatch data found in z[0]...z[n] such that z[i] is in array

@@ -321,16 +321,18 @@ int main(int argc, char * argv[])
     clock_t t0 = clock();
     double next = 0.25 * CLOCKS_PER_SEC;
     double t1 = 0;
+    double t, dt;
     if (next > tmax * CLOCKS_PER_SEC) { next = tmax * CLOCKS_PER_SEC; }
-    for(unsigned int n = 0 ; n < nmax ; n++ ) {
+    unsigned int n;
+    for(n = 0 ; n < nmax ; n++ ) {
         worker_threads_do(ba->tg, (worker_func_t) &mul_func, ba);
-        double t = clock();
-        double dt = t - t0;
+        t = clock();
+        dt = t - t0;
         sum_last -= last[n % NLAST];
         last[n % NLAST] = (t - t1) / CLOCKS_PER_SEC;
         sum_last += (t - t1) / CLOCKS_PER_SEC;
         t1 = t;
-        if (dt > next) {
+        if (dt > next || n == nmax - 1) {
             do { next += 0.25 * CLOCKS_PER_SEC; } while (dt > next);
             if (next > tmax * CLOCKS_PER_SEC) { next = tmax * CLOCKS_PER_SEC; }
             dt /= CLOCKS_PER_SEC;
@@ -343,6 +345,7 @@ int main(int argc, char * argv[])
         }
     }
     printf("\n");
+    // printf("Scanned %lu coeffs in total\n", n * ncoeffs_total);
 
     worker_threads_do(ba->tg, (worker_func_t) &clear_func, ba);
     worker_threads_clear(ba->tg);
