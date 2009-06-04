@@ -25,7 +25,7 @@
 void usage()
 {
     fprintf(stderr,
-            "Usage: ./bench [--impl <implementation>] [--transpose] <file>\n");
+            "Usage: ./bench [--impl <implementation>] [--tmax <time>] [--nmax <n_iter>] [--nchecks <number> | --nocheck] [-r|--rebuild] [-t|--transpose] [--nthreads <number>] -- <file0> [<file1> ... ]\n");
     exit(1);
 }
 
@@ -68,6 +68,7 @@ struct bench_args {
     int nthreads;
     int transpose;
     int nchecks;
+    int rebuild;
     char ** mfiles;
     struct private_args * p;
     struct worker_threads_group * tg;
@@ -78,7 +79,12 @@ void init_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct b
     clock_t t0 = clock();
     struct private_args * p = ba->p + tnum;
 
-    p->mm = matmul_reload_cache(ba->xx, ba->mfiles[tnum], ba->impl, ba->pl, !ba->transpose);
+    if (ba->rebuild) {
+        p->mm = NULL;
+    } else {
+        p->mm = matmul_reload_cache(ba->xx, ba->mfiles[tnum], ba->impl, ba->pl, !ba->transpose);
+    }
+
     if (p->mm) {
         pthread_mutex_lock(&tg->mu);
         fprintf(stderr, "T%d Reusing cache file for %s\n",
@@ -197,8 +203,10 @@ int main(int argc, char * argv[])
     param_list_init(ba->pl);
     argv++,argc--;
     param_list_configure_knob(ba->pl, "--transpose", &ba->transpose);
+    param_list_configure_knob(ba->pl, "--rebuild", &ba->rebuild);
     param_list_configure_knob(ba->pl, "--nocheck", &nocheck);
     param_list_configure_alias(ba->pl, "--transpose", "-t");
+    param_list_configure_alias(ba->pl, "--rebuild", "-r");
 
     int wild = 0;
     for( ; argc ; ) {
@@ -306,18 +314,29 @@ int main(int argc, char * argv[])
         abrandom(ba->xx, p->dst, p->mm->dim[0]);
     }
 
+#define NLAST   10
+    double last[10]={0,};
+    double sum_last = 0;
+
     clock_t t0 = clock();
     double next = 0.25 * CLOCKS_PER_SEC;
+    double t1 = 0;
     if (next > tmax * CLOCKS_PER_SEC) { next = tmax * CLOCKS_PER_SEC; }
     for(unsigned int n = 0 ; n < nmax ; n++ ) {
         worker_threads_do(ba->tg, (worker_func_t) &mul_func, ba);
-        double dt = clock() - t0;
+        double t = clock();
+        double dt = t - t0;
+        sum_last -= last[n % NLAST];
+        last[n % NLAST] = (t - t1) / CLOCKS_PER_SEC;
+        sum_last += (t - t1) / CLOCKS_PER_SEC;
+        t1 = t;
         if (dt > next) {
             do { next += 0.25 * CLOCKS_PER_SEC; } while (dt > next);
             if (next > tmax * CLOCKS_PER_SEC) { next = tmax * CLOCKS_PER_SEC; }
             dt /= CLOCKS_PER_SEC;
-            printf("%d iterations in %2.fs, %.2f/1, %.2f ns/coeff        \r",
-                    n, dt, dt/n, 1.0e9 * dt/n/ncoeffs_total);
+            printf("%d iters in %2.fs, %.2f/1, %.2f ns/c (last %u : %.2f/1, %.2f ns/c)        \r",
+                    n, dt, dt/n, 1.0e9 * dt/n/ncoeffs_total,
+                    NLAST, sum_last/NLAST, 1.0e9 *sum_last/NLAST/ncoeffs_total);
             fflush(stdout);
             if (dt > tmax)
                 break;

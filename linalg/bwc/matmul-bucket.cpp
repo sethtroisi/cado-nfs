@@ -61,6 +61,10 @@ using namespace std;
 // small. And perhaps it's even a bit large.
 #define DJ_CUTOFF2   7.0
 
+/* How many buckets in large slices, and in large slices which are
+ * contained in small slices. */
+#define LSL_NBUCKETS_MAX      256
+
 /* How many large slices in a huge slice ? */
 #define HUGE_MPLEX_MIN        8
 
@@ -86,17 +90,18 @@ using namespace std;
  *
  * When we reach sparser areas, we use another method. Dense (small2 and
  * small1) slices having been discarded, the rest is split in ``large''
- * slices of 65536 rows at most (in fact we arrange for the slices to
- * have equal size, so it's a bit less).  For each such large slice, we
- * use scrap space equal to the L2 cache size for performing matrix
- * multiplication. While reading column vector data, we copy coefficient
- * to (up to) 256 ``buckets'', each representing 256 possible row
- * indices. The dispatching information, telling in which bucket a given
- * coefficient has to be copied, is an 8-bit integer stored in a table
- * called ``main''. Each entry in table ``main'' also has a second 8-bit
- * integer indicating the offset to the next useful column entry (because
- * we're considering very sparse blocks, it is not at all uncommon to see
- * average values ~ 10 here, even when 65536 rows are considered
+ * slices of LSL_NBUCKETS_MAX*256 rows at most (in fact we arrange for the
+ * slices to have equal size, so it's a bit less).  For each such large
+ * slice, we use scrap space equal to the L2 cache size for performing
+ * matrix multiplication. While reading column vector data, we copy
+ * coefficient to (up to) LSL_NBUCKETS_MAX ``buckets'', each representing
+ * 256 possible row indices. The dispatching information, telling in
+ * which bucket a given coefficient has to be copied, is an 8-bit integer
+ * stored in a table called ``main''. Each entry in table ``main'' also
+ * has a second 8-bit integer indicating the offset to the next useful
+ * column entry (because we're considering very sparse blocks, it is not
+ * at all uncommon to see average values ~ 10 here, even when
+ * LSL_NBUCKETS_MAX==256, so that 65536 rows are considered
  * simultaneously).
  *
  * The number of columns considered while filling the scrap space is
@@ -116,13 +121,13 @@ using namespace std;
  * That's it for the basic idea. Now on top of that, we use an extra
  * indirection level for very sparse blocks. Several ``large blocks'' are
  * considered together as part of a ``huge block''. Call this number
- * ``nlarge''. Source coefficients are first dispatched in nlarge ``big buckets''
- * of appropriate size. The number of columns considered is guided by the fact
- * that we want none of these big buckets to exceed the L2 cache size.
- * Afterwards, we do a second bispatching from each of these big buckets
- * (in turn) to (up to) 256 small buckets in the same manner as above
- * (except that we no longer need the information on the link to the next
- * useful column.
+ * ``nlarge''. Source coefficients are first dispatched in nlarge ``big
+ * buckets'' of appropriate size. The number of columns considered is
+ * guided by the fact that we want none of these big buckets to exceed
+ * the L2 cache size.  Afterwards, we do a second bispatching from each
+ * of these big buckets (in turn) to (up to) LSL_NBUCKETS_MAX small
+ * buckets in the same manner as above (except that we no longer need the
+ * information on the link to the next useful column.
  */
 
 /* This extension is used to distinguish between several possible
@@ -133,7 +138,7 @@ using namespace std;
 
 #define MM_MAGIC_FAMILY        0xa003UL
 
-#define MM_MAGIC_VERSION       0x100bUL
+#define MM_MAGIC_VERSION       0x100cUL
 #define MM_MAGIC (MM_MAGIC_FAMILY << 16 | MM_MAGIC_VERSION)
 
 /* see matmul-basic.c */
@@ -325,7 +330,7 @@ struct large_slice_t {
 };
 
 struct large_slice_raw_t {
-    vector<uint8_t> ind[256];
+    vector<uint8_t> ind[LSL_NBUCKETS_MAX];
     vector<uint8_t> main;
     vector<size_t> col_sizes;
     vector<size_t> pad_sizes;
@@ -335,11 +340,12 @@ void split_large_slice_in_vblocks(builder * mb, large_slice_t * L, large_slice_r
 {
     /* Now split into vslices */
     uint8_t * mp = ptrbegin(R->main);
-    uint8_t * ip[256];
-    for(int k = 0 ; k < 256 ; k++) {
+    uint8_t * ip[LSL_NBUCKETS_MAX];
+    for(int k = 0 ; k < LSL_NBUCKETS_MAX ; k++) {
         ip[k] = ptrbegin(R->ind[k]);
     }
     unsigned int vblocknum = 0;
+    double vbl_ncols_variance = 0;
     for(uint32_t j = 0 ; j < mb->ncols_t ; vblocknum++) {
         uint32_t j0 = j;
         size_t n = 0;
@@ -383,14 +389,14 @@ void split_large_slice_in_vblocks(builder * mb, large_slice_t * L, large_slice_r
         if (vblocknum) {
             q[0] = 0;
         }
-        unsigned int ind_sizes[256] = {0,};
+        unsigned int ind_sizes[LSL_NBUCKETS_MAX] = {0,};
         q += 2*nf;
         for(size_t k = 0 ; k < nf ; k++) {
             ind_sizes[mp[2 * k + 1]]++;
         }
         mp += 2 * nf;
         V.auxc.push_back(nf);
-        for(int k = 0 ; k < 256 ; k++) {
+        for(int k = 0 ; k < LSL_NBUCKETS_MAX ; k++) {
             ASSERT(ip[k]+ind_sizes[k] <= ptrend(R->ind[k]));
             memcpy(q, ip[k], ind_sizes[k] * sizeof(uint8_t));
             q += ind_sizes[k];
@@ -399,15 +405,22 @@ void split_large_slice_in_vblocks(builder * mb, large_slice_t * L, large_slice_r
         }
         ASSERT(q == ptrend(V.t8c));
 
+        vbl_ncols_variance += ((double)(j1-j0)) * ((double)(j1-j0));
+#if 0
         printf(" vbl%u", vblocknum);
         printf(": %ss %u..%u ", mb->colname, j0, j1);
         printf("; w %u", V.n);
         printf("; avg dj %.1f", (j1 - j0) / (double) V.n);
         if (V.pad) printf("; pad 6*%u", V.pad);
         printf("\n");
-
+#endif
         transfer(&(L->vbl), &V);
     }
+    double vbl_ncols_mean = mb->ncols_t;
+    vbl_ncols_mean /= vblocknum;
+    vbl_ncols_variance /= vblocknum;
+    double vbl_ncols_sdev = sqrt(vbl_ncols_variance - vbl_ncols_mean * vbl_ncols_mean);
+    printf(" %u vblocks, sdev/avg = %.2f\n", vblocknum, vbl_ncols_sdev / vbl_ncols_mean);
 }
 
 int builder_do_large_slice(builder * mb, struct large_slice_t * L, uint32_t i0, uint32_t i1, unsigned int scrapsize)
@@ -470,11 +483,11 @@ int builder_do_large_slice(builder * mb, struct large_slice_t * L, uint32_t i0, 
     L->dj_avg = mb->ncols_t / (double) L->ncoeffs;
 
     printf(" w=%u, avg dj=%.1f, max dj=%u, bucket hit=1/%.1f",
-            L->ncoeffs, L->dj_avg, L->dj_max, 256.0 * L->dj_avg);
+            L->ncoeffs, L->dj_avg, L->dj_max, LSL_NBUCKETS_MAX * L->dj_avg);
 
     if (L->dj_avg > DJ_CUTOFF2) {
         printf("-> too sparse");
-        if (mb->nrows_t - i0 < HUGE_MPLEX_MIN * 65536) {
+        if (mb->nrows_t - i0 < HUGE_MPLEX_MIN * LSL_NBUCKETS_MAX * 256) {
             printf("; kept because of short tail\n");
         } else {
             /* We won't keep this slice */
@@ -508,12 +521,12 @@ struct huge_slice_t {
 };
 
 struct huge_subslice_raw_t {
-    vector<uint8_t> ind[256];
+    vector<uint8_t> ind[LSL_NBUCKETS_MAX];
     vector<uint8_t> main;
 };
 
 struct huge_subslice_ptrblock_t {
-    uint8_t * ip[256];
+    uint8_t * ip[LSL_NBUCKETS_MAX];
     uint8_t * mp;
 };
 
@@ -531,10 +544,11 @@ void split_huge_slice_in_vblocks(builder * mb, huge_slice_t * H, huge_slice_raw_
     vector<huge_subslice_ptrblock_t> ptrs(R->subs.size());
     for(unsigned int i = 0 ; i < R->subs.size() ; i++) {
         ptrs[i].mp = ptrbegin(R->subs[i].main);
-        for(int k = 0 ; k < 256 ; k++) {
+        for(int k = 0 ; k < LSL_NBUCKETS_MAX ; k++) {
             ptrs[i].ip[k] = ptrbegin(R->subs[i].ind[k]);
         }
     }
+    double vbl_ncols_variance = 0;
     unsigned int vblocknum = 0;
     for(uint32_t j = 0 ; j < mb->ncols_t ; vblocknum++) {
         uint32_t j0 = j;
@@ -616,7 +630,7 @@ void split_huge_slice_in_vblocks(builder * mb, huge_slice_t * H, huge_slice_raw_
         large_slice_vblock_t V;
         V.j0 = j0;
         V.j1 = j1;
-        V.auxc.reserve(1 + H->nlarge * (1 + 256));
+        V.auxc.reserve(1 + H->nlarge * (1 + LSL_NBUCKETS_MAX));
         V.auxc.push_back(V.j1 - V.j0);
         /* First the super block, and then for each contained large
          * slice, the main block, then all the bucket blocks. These come
@@ -645,7 +659,7 @@ void split_huge_slice_in_vblocks(builder * mb, huge_slice_t * H, huge_slice_raw_
             V.auxc.push_back(L_sizes[l]);
         }
         for(unsigned int l = 0 ; l < H->nlarge ; l++) {
-            unsigned int ind_sizes[256] = {0,};
+            unsigned int ind_sizes[LSL_NBUCKETS_MAX] = {0,};
             memcpy(q, ptrs[l].mp, L_sizes[l] * sizeof(uint8_t));
             q += L_sizes[l];
             for(unsigned int k = 0 ; k < L_sizes[l] ; k++) {
@@ -653,7 +667,7 @@ void split_huge_slice_in_vblocks(builder * mb, huge_slice_t * H, huge_slice_raw_
             }
             ptrs[l].mp += L_sizes[l];
 
-            for(int k = 0 ; k < 256 ; k++) {
+            for(int k = 0 ; k < LSL_NBUCKETS_MAX ; k++) {
                 ASSERT(ptrs[l].ip[k]-(ptrbegin(R->subs[l].ind[k]))+ind_sizes[k] <= (ptrdiff_t) R->subs[l].ind[k].size());
                 memcpy(q, ptrs[l].ip[k], ind_sizes[k] * sizeof(uint8_t));
                 q += ind_sizes[k];
@@ -663,15 +677,25 @@ void split_huge_slice_in_vblocks(builder * mb, huge_slice_t * H, huge_slice_raw_
         }
         ASSERT(q == ptrend(V.t8c));
 
+        vbl_ncols_variance += ((double)(j1-j0)) * ((double)(j1-j0));
+
+        /* TODO: have some sort of verbosity level */
+#if 0
         printf(" vbl%u", vblocknum);
         printf(": %ss %u..%u ", mb->colname, j0, j1);
         printf("; w %u", V.n);
         printf("; avg dj %.1f", (j1 - j0) / (double) V.n);
         if (V.pad) printf("; pad 6*%u", V.pad);
         printf("\n");
+#endif
 
         transfer(&(H->vbl), &V);
     }
+    double vbl_ncols_mean = mb->ncols_t;
+    vbl_ncols_mean /= vblocknum;
+    vbl_ncols_variance /= vblocknum;
+    double vbl_ncols_sdev = sqrt(vbl_ncols_variance - vbl_ncols_mean * vbl_ncols_mean);
+    printf(" %u vblocks, sdev/avg = %.2f\n", vblocknum, vbl_ncols_sdev / vbl_ncols_mean);
 }/*}}}*/
 
 int builder_do_huge_slice(builder * mb, struct huge_slice_t * H, uint32_t i0, uint32_t i1, unsigned int bigscrapsize)
@@ -688,11 +712,11 @@ int builder_do_huge_slice(builder * mb, struct huge_slice_t * H, uint32_t i0, ui
 
     /* How many large slices in this huge slice ? */
 
-    H->nlarge = iceildiv(i1 - i0, 65536);
+    H->nlarge = iceildiv(i1 - i0, LSL_NBUCKETS_MAX * 256);
     ASSERT(H->nlarge >= HUGE_MPLEX_MIN);
     ASSERT(H->nlarge  < HUGE_MPLEX_MAX);
     unsigned int lsize = iceildiv(i1 - i0, H->nlarge);
-    ASSERT(lsize <= 65536);
+    ASSERT(lsize <= LSL_NBUCKETS_MAX * 256);
     ASSERT(lsize * H->nlarge >= i1 - i0);
     R->subs.assign(H->nlarge, huge_subslice_raw_t());
 
@@ -786,7 +810,7 @@ void builder_do_all_small_slices(builder * mb, uint32_t * p_i0, list<small_slice
 
         small_slice_t S;
 
-        printf("Ssl %u: %ss %u..%u...", s, mb->rowname, i0, i1);
+        printf("Ssl%u: %ss %u+%u...", s, mb->rowname, i0, i1-i0);
         fflush(stdout);
 
         int keep = builder_do_small_slice(mb, &S, &ptr, i0, i1);
@@ -797,7 +821,7 @@ void builder_do_all_small_slices(builder * mb, uint32_t * p_i0, list<small_slice
         fflush(stdout);
 
         if (!keep) {
-            printf("Switching to large slices. Ssl %u to be redone\n", s);
+            printf("Switching to large slices. Ssl%u to be redone\n", s);
             break;
         }
         transfer(Sq, &S);
@@ -810,20 +834,20 @@ void builder_do_all_small_slices(builder * mb, uint32_t * p_i0, list<small_slice
 void builder_do_all_large_slices(builder * mb, uint32_t * p_i0, list<large_slice_t> * Lq, unsigned int scrapsize)
 {
     unsigned int rem_nrows = mb->nrows_t - *p_i0;
-    unsigned int nlarge_slices = iceildiv(rem_nrows,65536);
+    unsigned int nlarge_slices = iceildiv(rem_nrows,LSL_NBUCKETS_MAX * 256);
     uint32_t done = 0;
     for(unsigned int s = 0 ; s < nlarge_slices ; s++) {
         large_slice_t L[1];
         uint32_t i0 = * p_i0 +  s      * rem_nrows / nlarge_slices;
         uint32_t i1 = * p_i0 + (s + 1) * rem_nrows / nlarge_slices;
 
-        printf("Lsl %u %ss %u..%u", s, mb->rowname, i0, i1);
+        printf("Lsl%u %ss %u+%u", s, mb->rowname, i0, i1-i0);
         fflush(stdout);
 
         int keep = builder_do_large_slice(mb, L, i0, i1, scrapsize);
 
         if (!keep) {
-            printf("Switching to huge slices. Lsl %u to be redone\n", s);
+            printf("Switching to huge slices. Lsl%u to be redone\n", s);
             break;
         }
 
@@ -838,14 +862,14 @@ void builder_do_all_large_slices(builder * mb, uint32_t * p_i0, list<large_slice
 void builder_do_all_huge_slices(builder * mb, uint32_t * p_i0, list<huge_slice_t> * Hq, unsigned int bigscrapsize)
 {
     unsigned int rem_nrows = mb->nrows_t - *p_i0;
-    unsigned int nhuge_slices = iceildiv(rem_nrows, HUGE_MPLEX_MAX * 65536);
+    unsigned int nhuge_slices = iceildiv(rem_nrows, HUGE_MPLEX_MAX * LSL_NBUCKETS_MAX * 256);
     uint32_t done = 0;
     for(unsigned int s = 0 ; s < nhuge_slices ; s++) {
         huge_slice_t H[1];
         uint32_t i0 = * p_i0 +  s      * rem_nrows / nhuge_slices;
         uint32_t i1 = * p_i0 + (s + 1) * rem_nrows / nhuge_slices;
 
-        printf("Hsl %u %ss %u..%u", s, mb->rowname, i0, i1);
+        printf("Hsl%u %ss %u+%u", s, mb->rowname, i0, i1-i0);
         fflush(stdout);
         builder_do_huge_slice(mb, H, i0, i1, bigscrapsize);
         transfer(Hq, H);
@@ -1175,13 +1199,13 @@ unfill_buckets_indirect(abobj_ptr x, abt ** sb, abt * z, const uint8_t * q, unsi
 static void apply_small_buckets(abobj_ptr x, abt * dst, const abt * z, const uint8_t * q, const unsigned int * ql) __attribute__((__noinline__));
 static void apply_small_buckets(abobj_ptr x, abt * dst, const abt * z, const uint8_t * q, const unsigned int * ql)
 {
-    /* This ``applies'' the 256 small buckets whose respective lengths
-     * are given by ql[0] to ql[255].
+    /* This ``applies'' the LSL_NBUCKETS_MAX small buckets whose
+     * respective lengths are given by ql[0] to ql[LSL_NBUCKETS_MAX-1].
      *
      * For ql[k] <= i < ql[k+1], z[i] is added to dst[k*256+qk[i]], with
      * qk = q + ql[0] + ... + ql[k-1].
      */
-    for(int k = 0 ; k < 256 ; k++) {
+    for(int k = 0 ; k < LSL_NBUCKETS_MAX ; k++) {
         unsigned int l = ql[k];
         for( ; l-- ; ) {
             /* For padding coeffs, the assertion can fail if
@@ -1199,7 +1223,7 @@ static void apply_small_buckets(abobj_ptr x, abt * dst, const abt * z, const uin
 static inline void unapply_small_buckets(abobj_ptr x, const abt * src, abt * z, const uint8_t * q, const unsigned int * ql)
 {
     /* converse of the above */
-    for(int k = 0 ; k < 256 ; k++) {
+    for(int k = 0 ; k < LSL_NBUCKETS_MAX ; k++) {
         unsigned int l = ql[k];
         for( ; l-- ; ) {
             /* For padding coeffs, the assertion can fail if
@@ -1249,19 +1273,20 @@ static inline void matmul_bucket_mul_large(struct matmul_bucket_data_s * mm, abt
         for(unsigned int s = 0 ; s < nlarge ; s++) {
             uint32_t di = *pos->ql++;
             ASSERT(pos->i + di <= pos->nrows_t);
+            ASSERT(di <= LSL_NBUCKETS_MAX * 256);
             uint32_t j = 0;
             abzero(x, dst + aboffset(x, pos->i), di);
             for( ; j < pos->ncols_t ; ) {
                 uint32_t j1 = j + *pos->ql++;
                 uint32_t n = *pos->ql++;
-                abt * bucket[256];
+                abt * bucket[LSL_NBUCKETS_MAX];
                 abt const * inp = src + aboffset(x, j);
                 abt * outp = dst + aboffset(x, pos->i);
-                prepare_buckets(x,bucket,scrap,pos->ql,256);
+                prepare_buckets(x,bucket,scrap,pos->ql,LSL_NBUCKETS_MAX);
                 fill_buckets_indirect(x, bucket, inp, pos->q8, n);
                 apply_small_buckets(x, outp, scrap, pos->q8+2*n, pos->ql);
                 pos->q8 += 3*n;
-                pos->ql += 256;
+                pos->ql += LSL_NBUCKETS_MAX;
                 j = j1;
             }
             pos->i += di;
@@ -1270,18 +1295,19 @@ static inline void matmul_bucket_mul_large(struct matmul_bucket_data_s * mm, abt
         for(unsigned int s = 0 ; s < nlarge ; s++) {
             uint32_t di = *pos->ql++;
             ASSERT(pos->i + di <= pos->nrows_t);
+            ASSERT(di <= LSL_NBUCKETS_MAX * 256);
             uint32_t j = 0;
             for( ; j < pos->ncols_t ; ) {
                 uint32_t j1 = j + *pos->ql++;
                 uint32_t n = *pos->ql++;
-                abt * bucket[256];
+                abt * bucket[LSL_NBUCKETS_MAX];
                 abt * outp = dst + aboffset(x, j);
                 abt const *  inp = src + aboffset(x, pos->i);
-                prepare_buckets(x,bucket,scrap,pos->ql,256);
+                prepare_buckets(x,bucket,scrap,pos->ql,LSL_NBUCKETS_MAX);
                 unapply_small_buckets(x, inp, scrap, pos->q8+2*n, pos->ql);
                 unfill_buckets_indirect(x, bucket, outp, pos->q8, n);
                 pos->q8 += 3 * n;
-                pos->ql += 256;
+                pos->ql += LSL_NBUCKETS_MAX;
                 j = j1;
             }
             pos->i += di;
@@ -1319,15 +1345,15 @@ static inline void matmul_bucket_mul_huge(struct matmul_bucket_data_s * mm, abt 
                 fill_buckets_indirect(x, bucket, inp, pos->q8, n);
                 pos->q8 += 2 * n;
                 for(unsigned int k = 0 ; k < nlarge ; k++) {
-                    abt * sbucket[256];
-                    prepare_buckets(x,sbucket,scrap,pos->ql,256);
+                    abt * sbucket[LSL_NBUCKETS_MAX];
+                    prepare_buckets(x,sbucket,scrap,pos->ql,LSL_NBUCKETS_MAX);
                     bucket[k] -= aboffset(x, Lsizes[k]);
                     fill_buckets_direct(x, sbucket, bucket[k], pos->q8, Lsizes[k]);
                     pos->q8 += Lsizes[k];
                     abt * outp = dst + aboffset(x, pos->i + k * di_sub);
                     apply_small_buckets(x, outp, scrap, pos->q8, pos->ql);
                     pos->q8 += Lsizes[k];
-                    pos->ql += 256;
+                    pos->ql += LSL_NBUCKETS_MAX;
                 }
                 abclear(x, bigscrap, n);
                 j = j1;
@@ -1353,8 +1379,8 @@ static inline void matmul_bucket_mul_huge(struct matmul_bucket_data_s * mm, abt 
                 const uint8_t * q8_saved = pos->q8;
                 pos->q8 += 2 * n;
                 for(unsigned int k = 0 ; k < nlarge ; k++) {
-                    abt * sbucket[256];
-                    prepare_buckets(x,sbucket,scrap,pos->ql,256);
+                    abt * sbucket[LSL_NBUCKETS_MAX];
+                    prepare_buckets(x,sbucket,scrap,pos->ql,LSL_NBUCKETS_MAX);
                     const uint8_t * fill = pos->q8;
                     const uint8_t * apply = pos->q8 + Lsizes[k];
                     const abt * inp = src + aboffset(x, pos->i + k * di_sub);
@@ -1362,7 +1388,7 @@ static inline void matmul_bucket_mul_huge(struct matmul_bucket_data_s * mm, abt 
 
                     unfill_buckets_direct(x, sbucket, bucket[k], fill, Lsizes[k]);
                     pos->q8 += 2 * Lsizes[k];
-                    pos->ql += 256;
+                    pos->ql += LSL_NBUCKETS_MAX;
                 }
                 swap(pos->q8, q8_saved);
                 unfill_buckets_indirect(x, bucket, outp, pos->q8, n);
