@@ -42,12 +42,18 @@
 #define BUCKET_REGION 15
 #endif
 
-/* This parameter controls the size of the buckets, i.e. the number of
- * updates that a bucket can accumulate.
- * This should be something like loglog(lpb) - loglog(I)
+/* These parameters control the size of the buckets. 
+ * The number of updates that a bucket can accumulate is estimated as
+ *   (loglog(factor base bound) - loglog(bucket sieving threshold)) 
+ *     * BUCKET_LIMIT_FACTOR + BUCKET_LIMIT_ADD 
  */
+
 #ifndef BUCKET_LIMIT_FACTOR
-#define BUCKET_LIMIT_FACTOR 0.8
+#define BUCKET_LIMIT_FACTOR 0.9
+#endif
+
+#ifndef BUCKET_LIMIT_ADD
+#define BUCKET_LIMIT_ADD 1024
 #endif
 
 #define LOG_SCALE 1.4426950408889634 /* 1/log(2) to 17 digits, rounded to
@@ -168,7 +174,7 @@ sieve_info_init_lognorm (unsigned char *C, unsigned char threshold,
 
 static void
 sieve_info_init (sieve_info_t *si, cado_poly cpoly, int logI, uint64_t q0,
-		 FILE *output)
+		 const int bucket_thresh, FILE *output)
 {
   unsigned int d = cpoly->degree;
   unsigned int k;
@@ -229,11 +235,18 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int logI, uint64_t q0,
   // TODO: be more clever, here.
   si->log_bucket_region = BUCKET_REGION;
   si->bucket_thresh = si->I; /* Default value */
+  if (si->bucket_thresh < bucket_thresh)
+    si->bucket_thresh = bucket_thresh;
   ASSERT_ALWAYS(si->log_bucket_region > si->logI); /* so that we sieve an even
                                                       number of rows */
   si->bucket_region = 1<<si->log_bucket_region;
   si->nb_buckets = 1 + (si->I * si->J - 1) / si->bucket_region;
-  si->bucket_limit = (BUCKET_LIMIT_FACTOR)*si->bucket_region;
+
+  double limit_factor = log(log(MAX(cpoly->rlim, cpoly->alim))) - 
+                        log(log(si->bucket_thresh));
+  si->bucket_limit = limit_factor * si->bucket_region * BUCKET_LIMIT_FACTOR 
+                     + BUCKET_LIMIT_ADD; 
+
   fprintf(output, "# log_bucket_region = %u\n", si->log_bucket_region);
   fprintf(output, "# bucket_region = %u\n", si->bucket_region);
   fprintf(output, "# nb_buckets = %u\n", si->nb_buckets);
@@ -741,27 +754,27 @@ reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r,
 /********        Main bucket sieving functions                    **********/
 
 void
-fill_in_buckets(bucket_array_t BA, factorbase_degn_t *fb,
-		const sieve_info_t * si) {
-unsigned char prev_logp = 0;
+fill_in_buckets(bucket_array_t *BA_param, factorbase_degn_t *fb,
+		const sieve_info_t * si) 
+{
+    bucket_array_t BA = *BA_param; /* local copy */
     // Loop over all primes in the factor base >= bucket_thresh
+
+    /* Skip forward to first FB prime p >= si->bucket_thresh */
     while (fb->p != FB_END && fb->p < (fbprime_t) si->bucket_thresh)
         fb = fb_next (fb); // cannot do fb++, due to variable size !
+
+    /* Init first logp value */
     if (fb->p != FB_END)
-      {
-        prev_logp = fb->plog;
-        bucket_new_logp (BA, fb->plog);
-      }
+      bucket_new_logp (&BA, fb->plog);
+
     for (;fb->p != FB_END; fb = fb_next (fb)) {
         unsigned char nr;
         fbprime_t p = fb->p;
         unsigned char logp = fb->plog;
 
-        if (fb->plog > prev_logp)
-          {
-            prev_logp = fb->plog;
-            bucket_new_logp (BA, fb->plog);
-          }
+        /* Write new set of pointers if the logp value changed */
+        bucket_new_logp (&BA, logp);
 
         /* If we sieve for special-q's smaller than the algebraic factor
            base bound, the prime p might equal the special-q prime q.
@@ -791,10 +804,9 @@ unsigned char prev_logp = 0;
                    only need to sieve j = 1 */
                 /* x = j*I + (i + I/2) = I + I/2 */
                 bucket_update_t update;
-                uint32_t x = si->I + si->I / 2;
+                uint32_t x = I + I / 2;
                 update.x = (uint16_t) (x & maskbucket);
                 update.p = p;
-                update.logp = logp;
                 push_bucket_update(BA, x >> shiftbucket, update);
                 continue;
               }
@@ -807,9 +819,8 @@ unsigned char prev_logp = 0;
                    FIXME: what about (-1,0)? It's the same (a,b) as (1,0)
                    but which of these two (if any) do we sieve? */
                 bucket_update_t update;
-                update.x = (uint16_t) si->I / 2 + 1;
+                update.x = (uint16_t) I / 2 + 1;
                 update.p = p;
-                update.logp = logp;
                 push_bucket_update(BA, 0, update);
                 continue;
               }
@@ -845,7 +856,6 @@ unsigned char prev_logp = 0;
             // push function should be reduced to a very simple step.
             bucket_update_t update;
             update.p = p;
-            update.logp = logp;
             __asm__("## Inner bucket sieving loop starts here!!!\n");
              while (x < IJ) {
                 uint32_t i;
@@ -875,20 +885,52 @@ unsigned char prev_logp = 0;
             __asm__("## Inner bucket sieving loop stops here!!!\n");
         }
     }
+  *BA_param = BA; /* Write back BA so the nr_logp etc get copied to caller */
 }
 
 NOPROFILE_STATIC void
-apply_one_bucket (unsigned char *S, bucket_array_t BA, int i,
+apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
                      sieve_info_t * si MAYBE_UNUSED)
 {
     int j = nb_of_updates(BA, i);
+    int next_logp_j = 0;
+    unsigned char logp = 0;
+    bucket_update_t *next_logp_change, *read_ptr;
+
+    /* Having the read_ptr here defeats the whole idea of having 
+       nice inline functions to handle all the BA stuff, but I yet 
+       need to figure out how to keep gcc from writing 
+       BA.bucket_read[i] back to memory and reading it from memory again
+       on every get_next_bucket_update()  */
+    read_ptr = BA.bucket_read[i];
+
+    /* Init so that first access fetches logp */
+    next_logp_j = 0;
+    next_logp_change = read_ptr;
+
     for (; j > 0; --j) {
-       bucket_update_t update = get_next_bucket_update(BA, i);
-       S[update.x] -= update.logp;
+       uint16_t x;
+
+       /* Do we need a new logp ? */
+       if (read_ptr >= next_logp_change)
+         {
+           ASSERT_ALWAYS (next_logp_j < BA.nr_logp);
+           ASSERT_ALWAYS (BA.logp_idx[next_logp_j * BA.n_bucket + i] 
+                           == next_logp_change);
+           logp = BA.logp_val[next_logp_j++];
+           /* Get pointer telling when to fetch new logp next time */
+           if (next_logp_j < BA.nr_logp)
+             next_logp_change = BA.logp_idx[next_logp_j * BA.n_bucket + i];
+           else
+             next_logp_change = BA.bucket_write[i]; /* effectively: never */
+         }
+       
+       x = (read_ptr++)->x;
+       S[x] -= logp;
 #ifdef TRACE_K
-       if ((update.x + i * si->bucket_region) == TRACE_K)
+       if ((x + i * si->bucket_region) == TRACE_K)
            fprintf(stderr, "Subtract %u to S[%u], from BA[%u]\n",
-                   update.logp, TRACE_K, i);
+                   logp, TRACE_K, i);
 #endif
     }
 }
@@ -1601,7 +1643,6 @@ resieve_small_bucket_region (bucket_array_t BA, unsigned char *S,
                              p, r, x, j, 1 << si->logI, i);
                   update.p = p;
                   update.x = x;
-                  update.logp = 0;
                   push_bucket_update (BA, 0, update);
                 }
             }
@@ -1622,7 +1663,6 @@ resieve_small_bucket_region (bucket_array_t BA, unsigned char *S,
                              p, r, x, j + 1, 1 << si->logI, i);
                   update.p = p;
                   update.x = x;
-                  update.logp = 0;
                   push_bucket_update (BA, 0, update);
                 }
           i0 += r;
@@ -1677,7 +1717,6 @@ resieve_small_bucket_region (bucket_array_t BA, unsigned char *S,
                                  g, x);
                       update.p = g;
                       update.x = x;
-                      update.logp = 0;
                       push_bucket_update (BA, 0, update);
                     }
                 }
@@ -1697,7 +1736,6 @@ resieve_small_bucket_region (bucket_array_t BA, unsigned char *S,
                                  g, x);
                       update.p = g;
                       update.x = x;
-                      update.logp = 0;
                       push_bucket_update (BA, 0, update);
                     }
                 }
@@ -2621,6 +2659,7 @@ main (int argc0, char *argv0[])
     char *outputname = NULL;
     int argc = argc0;
     char **argv = argv0;
+    double max_full = 0.;
 
     while (argc > 1 && argv[1][0] == '-')
       {
@@ -2813,10 +2852,8 @@ main (int argc0, char *argv0[])
              cpoly->mfbr, cpoly->mfba, cpoly->rlambda, cpoly->alambda);
 
     /* this does not depend on the special-q */
-    sieve_info_init (&si, cpoly, I, q0, output);
+    sieve_info_init (&si, cpoly, I, q0, bucket_thresh, output);
     si.checknorms = checknorms;
-    if (bucket_thresh > si.bucket_thresh)
-      si.bucket_thresh = bucket_thresh;
 
     {
       fbprime_t *leading_div;
@@ -2922,14 +2959,21 @@ main (int argc0, char *argv0[])
         alg_BA = init_bucket_array(si.nb_buckets, si.bucket_limit);
 
         /* Fill in alg buckets */
-        fill_in_buckets(alg_BA, fb_alg, &si);
+        fill_in_buckets(&alg_BA, fb_alg, &si);
+        if (buckets_max_full (alg_BA) > max_full)
+          max_full = buckets_max_full (alg_BA);
+        ASSERT (max_full < 1.);
 
         /* Allocate rational buckets */
         bucket_array_t rat_BA;
         rat_BA = init_bucket_array(si.nb_buckets, si.bucket_limit);
 
         /* Fill in rational buckets */
-        fill_in_buckets(rat_BA, fb_rat, &si);
+        fill_in_buckets(&rat_BA, fb_rat, &si);
+        if (buckets_max_full (rat_BA) > max_full)
+          max_full = buckets_max_full (rat_BA);
+        ASSERT (max_full < 1.);
+
         ttsm += seconds();
 
         /* Initialize data for sieving small primes */
@@ -3012,8 +3056,8 @@ main (int argc0, char *argv0[])
 
  end:
     t0 = seconds () - t0;
-    fprintf (output, "# Average J=%1.0f for %lu special-q's\n",
-             totJ / (double) sq, sq);
+    fprintf (output, "# Average J=%1.0f for %lu special-q's, max bucket fill %f\n",
+             totJ / (double) sq, sq, max_full);
     tts = t0 - (tn_rat + tn_alg + ttf);
     if (verbose)
       facul_print_stats (output);

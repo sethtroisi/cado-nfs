@@ -49,16 +49,14 @@
 
 typedef struct {
     uint16_t x;
-    char logp;
-    // uint8_t p_low;  // keeping alignment seems to slow down the code.
-    uint32_t p;   // TODO: Is 32 better than 64, here ?????
+    uint32_t p;
 } bucket_update_t;
 
 
 /*
  * will be used as a sentinel
  */
-static const bucket_update_t LAST_UPDATE = {0,0,0};
+static const bucket_update_t LAST_UPDATE = {0,0};
 
 /******** Bucket array typedef **************/
 
@@ -69,7 +67,7 @@ static const bucket_update_t LAST_UPDATE = {0,0,0};
  * introduce another structure that handles an array of bucket
  * efficiently.
  *
- * When doing a (long) sequence of pushes, only the bucket_start array is
+ * When doing a (long) sequence of pushes, only the bucket_write array is
  * used: pointer to it should be in a register, and the set of pointer
  * will probably fit in one page-size (please align!), so that the pressure
  * on the TLB is minimal. The other parts should not really be used
@@ -79,19 +77,54 @@ static const bucket_update_t LAST_UPDATE = {0,0,0};
  */
 
 typedef struct {
-    bucket_update_t ** bucket_start;    // Contains pointers to begining of
+    bucket_update_t ** bucket_start;    // Contains pointers to beginning of
                                         // buckets.
     bucket_update_t ** bucket_write;    // Contains pointers to first empty
                                         // location in each bucket.
     bucket_update_t ** bucket_read;     // Contains pointers to first unread
                                         // location in each bucket.
-    bucket_update_t *** first_logp;     // For each bucket, an array of 
-                                        // pointers to the first bucket entry
-                                        // with a given log_p
+    unsigned char   * logp_val;         // Each time logp changes, the
+                                        // new value is added here (including
+                                        // the initial logp value used) 
+    bucket_update_t ** logp_idx;        // For each logp value there are
+                                        // n_bucket pointers, each pointer
+                                        // tells where in the corresponding 
+                                        // bucket that logp values starts 
+                                        // being used
     int bucket_size;                    // The allocated size of one bucket.
     int n_bucket;                       // Number of buckets.
+    int nr_logp;
     unsigned char last_logp;
 } bucket_array_t;
+
+/* What does the logp entry do?
+   In order to avoid having to store the logp value inside the 
+   bucket_update_t, we use the fact that logp changes very rarely,
+   and only store pointers to the locations inside the buckets where
+   logp changes.
+   Assuming that very small primes are not bucket sieved, and that
+   factor base entries are sorted in order of increasing logp, 
+   \footnote{with maybe a few exceptions where maintainging strict order 
+     is too awkward, but note that 
+     log(largest-bucket-sieved-p) - log(smallest-bucket-sieved-p)
+     is really a rather small value, and the number of exceptions 
+     should not be very much larger}
+   we store a pointer for *every* bucket when logp changes, even though 
+   not necessarily every bucket receives an update with that logp. We do 
+   this because we'd like to have a single last_logp value to compare to, 
+   rather than n_bucket different ones.
+   
+   Thus there is an array logp_val with the logp values, starting with 
+   the first logp value to use, plus one entry whenever the logp value 
+   changes. For each entry in logp_val, logp_idx has a pointer to an 
+   array of n_bucket pointers, each pointer giving the address inside
+   the corresponding bucket from where on this new logp values should be 
+   used.
+   I.e., logp_val[j] should be used for the updates in bucket[i] whose 
+   addresses are >= logp_idx[j*n_bucket+i], but less than 
+     logp_idx[(j+1)*n_bucket+i] if j+1 < nr_logp, bucket_write otherwise.
+*/
+
 
 /*
  * Notes for future improvements:
@@ -169,13 +202,9 @@ static inline bucket_update_t
 get_kth_bucket_update(const bucket_array_t BA, const int i, const int k);
 
 /* Call this to mark the current write position in the buckets the start
-   of the log(p) value logp. I.e. for each bucket number i, 
-   the updates at addresses >= BA.first_logp[i][logp], 
-   < BA.first_logp[i][logp+1] correspond to primes p with log(p) = logp.
-   The logp can be set only incrementally, calling with a logp that is not
-   larger than the largest previously used one has no effect. */
+   of this logp value. */
 static inline void
-bucket_new_logp(bucket_array_t BA, const unsigned char logp);
+bucket_new_logp(bucket_array_t *BA, const unsigned char logp);
 
 /******** Bucket array implementation **************/
 
@@ -192,7 +221,6 @@ init_bucket_array(const int n_bucket, const int bucket_size)
     BA.bucket_start = (bucket_update_t **)malloc_pagealigned(n_bucket*sizeof(bucket_update_t *));
     BA.bucket_write = (bucket_update_t **)malloc_check(n_bucket*sizeof(bucket_update_t *));
     BA.bucket_read  = (bucket_update_t **)malloc_check(n_bucket*sizeof(bucket_update_t *));
-    BA.first_logp = (bucket_update_t ***)malloc_check(n_bucket*sizeof(bucket_update_t **));
 
     for (i = 0; i < n_bucket; ++i) {
         // TODO: shall we ensure here that those pointer do not differ by
@@ -203,9 +231,10 @@ init_bucket_array(const int n_bucket, const int bucket_size)
         BA.bucket_start[i] = (bucket_update_t *)malloc_check(bucket_size*sizeof(bucket_update_t));
         BA.bucket_write[i] = BA.bucket_start[i];
         BA.bucket_read[i] = BA.bucket_start[i];
-	BA.first_logp[i] = (bucket_update_t **)malloc_check(256 * sizeof(bucket_update_t *));
-	BA.first_logp[i][0] = BA.bucket_write[i];
     }
+    BA.logp_val = NULL;
+    BA.logp_idx = NULL;
+    BA.nr_logp = 0;
     BA.last_logp = 0;
     return BA;
 }
@@ -215,14 +244,16 @@ clear_bucket_array(bucket_array_t BA)
 {
     int i;
     for (i = 0; i < BA.n_bucket; ++i)
-      {
-        free(BA.bucket_start[i]);
-	free(BA.first_logp[i]);
-      }
+      free(BA.bucket_start[i]);
     free_pagealigned(BA.bucket_start, BA.n_bucket*sizeof(bucket_update_t *));
     free(BA.bucket_write);
+    BA.bucket_write = NULL;
     free(BA.bucket_read);
-    free(BA.first_logp);
+    BA.bucket_read = NULL;
+    free(BA.logp_val);
+    BA.logp_val = NULL;
+    free(BA.logp_idx);
+    BA.logp_idx = NULL;
 }
 
 static inline void
@@ -239,14 +270,30 @@ push_bucket_update(bucket_array_t BA, const int i,
 }
 
 static inline void
-bucket_new_logp(bucket_array_t BA, const unsigned char logp)
+bucket_new_logp (bucket_array_t *BA, const unsigned char logp)
 {
   int i, j;
-  for (i = 0; i < BA.n_bucket; ++i)
-    for (j = (int) BA.last_logp + 1; j <= (int) logp; j++)
-      BA.first_logp[i][j] = BA.bucket_write[i];
-  if (BA.last_logp < logp)
-    BA.last_logp = logp;
+
+  if (BA->last_logp == logp)
+    {
+      /* printf ("bucket_new_logp called unnecessarily\n"); */
+      return;
+    }
+
+  /* printf ("bucket_new_logp: need new logp, old logp = %u, "
+          "old nr_logp = %d, new logp = %u\n",
+          (unsigned) BA->last_logp, BA->nr_logp, (unsigned) logp); */
+  BA->last_logp = logp;
+  j = BA->nr_logp;
+  BA->nr_logp++;
+  BA->logp_val = (unsigned char *) realloc (BA->logp_val, 
+                 BA->nr_logp * sizeof (unsigned char));
+  BA->logp_idx = (bucket_update_t **) 
+                 realloc (BA->logp_idx, BA->nr_logp * BA->n_bucket * 
+                          sizeof (bucket_update_t *));
+  BA->logp_val[j] = logp;
+  for (i = 0; i < BA->n_bucket; ++i)
+    BA->logp_idx[j * BA->n_bucket + i] = BA->bucket_write[i];
 }
 
 static inline void
@@ -295,6 +342,20 @@ nb_of_updates(const bucket_array_t BA, const int i)
     return (BA.bucket_write[i] - BA.bucket_start[i]);
 }
 
+/* Returns how full the fullest bucket is */
+static double
+buckets_max_full (const bucket_array_t BA)
+{
+  int i, max = 0;
+  for (i = 0; i < BA.n_bucket; ++i)
+    {
+      int j = nb_of_updates (BA, i);
+      if (max < j)
+        max = j;
+    }
+  return (double) max / (double) BA.bucket_size;
+}
+
 static inline void
 push_sentinel(bucket_array_t BA, const int i)
 {
@@ -309,7 +370,7 @@ is_end(const bucket_array_t BA, const int i)
 
 /* Delete the updates whose values of x do not yield a report.
    This will speed up the trial division, since we will loop
-   over less entries. */
+   over fewer entries. */
 static void
 purge_bucket (bucket_array_t BA, const int i, unsigned char *S)
 {
