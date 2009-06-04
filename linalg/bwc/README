@@ -20,7 +20,7 @@ format is the standard CADO matrix format: one header line saying nrows,
 ncols, plus <nrows> rows, with <nentries> [<column indices of non-zero
 coefficients>].
 
-The ouput is a set of vectors of its kernel. It ends up in the file called W
+The output is a set of vectors of its kernel. It ends up in the file called W
 in the chosen working directory.
 
 
@@ -44,7 +44,7 @@ using the bwc.pl driver script, documented below.
 !5 - krylov
      compute the Krylov sequence
  6 - acollect
-     collect the Krylov sequece files into one big file. Can be done at
+     collect the Krylov sequence files into one big file. Can be done at
      several moments in the computation.
 !7 - lingen
      Berlekamp-Massey -like step: produces a generating polynomial
@@ -305,8 +305,8 @@ build
     warning ``cached matrix file fits data with different striding''. This is
     not innocuous for krylov/mksol, as it hurts performance.
 
-    Once /tmp/wdir/mat.h0.v0.bucket.bin (or /tmp/wdir/mat.h0.v0.bucketT.bin),
-    /tmp/wdir/mat.h0.v0 is normally never read again.
+    Once /tmp/wdir/mat.h0.v0.bucket.bin (or /tmp/wdir/mat.h0.v0.bucketT.bin)
+    are created, /tmp/wdir/mat.h0.v0 is normally never read again.
 
 prep
 ----
@@ -493,7 +493,7 @@ Using bwc.pl
     of the meta-commands :balance, :complete, and :wipeout.
 
     More extensive documentation in bwc.pl will come someday in this
-    README. Meanwhile, bwc.ok contains some useful info.
+    README. Meanwhile, bwc.pl contains some useful info.
 
 Notes:
 ======
