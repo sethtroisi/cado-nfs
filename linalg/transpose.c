@@ -201,18 +201,17 @@ void rebuild(int skip)
                 skip0, minskip, maxskip);
 }
 
+void usage()
+{
+    fprintf(stderr, "usage: ./transpose -in <input matrix> -out <output matrix> [ -T <tmpdir> ] [ -skip <nrows to skip> ]\n");
+    exit(1);
+}
 
 int main(int argc, char * argv[])
 {
 
     FILE * fin;
     int skip = 0;
-
-#if 0 // FIXME
-    if (argc != 3 && argc != 4) {
-        fprintf(stderr, "usage: ./transpose <input matrix> <output matrix> [ <tmp dir> ]\n");
-    }
-#endif
 
     {
       int i;
@@ -229,22 +228,27 @@ int main(int argc, char * argv[])
             filename_in = argv[2];
             argc -= 2;
             argv += 2;
+            continue;
         }
         if(argc > 2 && strcmp (argv[1], "-out") == 0){
             filename_out = argv[2];
             argc -= 2;
             argv += 2;
+            continue;
         }
         if(argc > 2 && strcmp (argv[1], "-T") == 0){
             tmpdir = argv[2];
             argc -= 2;
             argv += 2;
+            continue;
         }
         if(argc > 2 && strcmp (argv[1], "-skip") == 0){
             skip = atoi(argv[2]);
             argc -= 2;
             argv += 2;
+            continue;
         }
+        usage();
     }
 
     fin = fopen(filename_in, "r");
