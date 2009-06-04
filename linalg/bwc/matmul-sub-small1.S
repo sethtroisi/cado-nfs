@@ -1,5 +1,4 @@
 	.text
-.Ltext0:
 	.p2align 4,,15
 .globl matmul_sub_small1
 	.type	matmul_sub_small1, @function
@@ -105,5 +104,4 @@ matmul_sub_small1:
         popq %rbx
         popq %rbp
 	ret
-.LFE52:
 	.size	matmul_sub_small1, .-matmul_sub_small1

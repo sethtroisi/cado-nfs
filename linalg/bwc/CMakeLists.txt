@@ -135,10 +135,13 @@ macro(configure_bwc_variant v)
     string(COMPARE EQUAL "${v}" "u64" doing_u64)
     if(doing_u64)
         if(HAVE_GCC_STYLE_AMD64_ASM)
-            set(${v}_matmul_sources ${${v}_matmul_sources} matmul-sub-small1.S)
+            set(${v}_matmul_sources ${${v}_matmul_sources}
+                    matmul-sub-small1.S
+                    matmul-sub-small2.S
+                    matmul-sub-large-fbi.S)
             set_property(SOURCE matmul-sub-small1.S PROPERTY LANGUAGE C)
-            set(${v}_matmul_sources ${${v}_matmul_sources} matmul-sub-small2.S)
             set_property(SOURCE matmul-sub-small2.S PROPERTY LANGUAGE C)
+            set_property(SOURCE matmul-sub-large-fbi.S PROPERTY LANGUAGE C)
         endif(HAVE_GCC_STYLE_AMD64_ASM)
     endif(doing_u64)
 

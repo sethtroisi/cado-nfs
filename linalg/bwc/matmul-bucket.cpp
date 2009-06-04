@@ -38,6 +38,7 @@ using namespace std;
 #if defined(HAVE_GCC_STYLE_AMD64_ASM) && defined(ABASE_U64_H_) && !defined(DISABLE_ASM)
 #include "matmul-sub-small1.h"
 #include "matmul-sub-small2.h"
+#include "matmul-sub-large-fbi.h"
 #define ENABLE_ASM
 #endif
 
@@ -1141,8 +1142,8 @@ static inline void prepare_buckets(abobj_ptr x, abt ** b, abt * z, const unsigne
     }
 }
 
-static inline void
-fill_buckets_indirect(abobj_ptr x, abt ** sb, const abt * z, const uint8_t * q, unsigned int n)
+#ifndef ENABLE_ASM
+static inline void fill_buckets_indirect(abobj_ptr x, abt ** sb, const abt * z, const uint8_t * q, unsigned int n)
 {
     /* Dispatch data found in z[0]...z[f(n-1)] such that z[f(i)] is in
      * array pointed to by sb[q[2*i+1]]. The function f(i) is given by
@@ -1156,6 +1157,7 @@ fill_buckets_indirect(abobj_ptr x, abt ** sb, const abt * z, const uint8_t * q, 
         q++;
     }
 }
+#endif
 
 static inline void
 unfill_buckets_indirect(abobj_ptr x, abt ** sb, abt * z, const uint8_t * q, unsigned int n)
@@ -1170,7 +1172,8 @@ unfill_buckets_indirect(abobj_ptr x, abt ** sb, abt * z, const uint8_t * q, unsi
     }
 }
 
-static inline void apply_small_buckets(abobj_ptr x, abt * dst, const abt * z, const uint8_t * q, const unsigned int * ql)
+static void apply_small_buckets(abobj_ptr x, abt * dst, const abt * z, const uint8_t * q, const unsigned int * ql) __attribute__((__noinline__));
+static void apply_small_buckets(abobj_ptr x, abt * dst, const abt * z, const uint8_t * q, const unsigned int * ql)
 {
     /* This ``applies'' the 256 small buckets whose respective lengths
      * are given by ql[0] to ql[255].
