@@ -46,7 +46,7 @@ facul_doit (unsigned long *factors, const modulus_t m,
   for (i = method_start; strategy->methods[i].method != 0; i++)
     {
       /* Simple-minded early abort for large input */
-      if (i > 2 && mod_intbits (n) > LONG_BIT)
+      if (i > 3 && mod_intbits (n) > LONG_BIT)
         break;
       
       if (i < STATS_LEN)
