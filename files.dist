@@ -97,6 +97,8 @@ linalg/bwc/matmul-sub-small1.S
 linalg/bwc/matmul-sub-small1.h
 linalg/bwc/matmul-sub-small2.S
 linalg/bwc/matmul-sub-small2.h
+linalg/bwc/matmul-sub-large-fbi.S
+linalg/bwc/matmul-sub-large-fbi.h
 linalg/bwc/matmul-sliced.cpp
 linalg/bwc/matmul-sliced.h
 linalg/bwc/matmul-threaded.c
