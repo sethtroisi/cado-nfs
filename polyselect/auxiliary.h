@@ -42,6 +42,7 @@ double rotate (mpz_t*, int, unsigned long, mpz_t, mpz_t, long*, long*, int,int);
 void print_poly (FILE*, cado_poly, int, char**, double, int);
 long translate (mpz_t*, int, mpz_t*, mpz_t, mpz_t, int);
 void optimize (mpz_t*, int, mpz_t*, int);
+void rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1, long *J0, long *J1, int verbose);
 
 /********************* data structures for first phase ***********************/
 
@@ -56,4 +57,5 @@ m_logmu_t* m_logmu_init (unsigned long);
 void m_logmu_clear (m_logmu_t*, unsigned long);
 int m_logmu_insert (m_logmu_t*, unsigned long, unsigned long*, mpz_t, mpz_t,
                     double, char*);
+
 

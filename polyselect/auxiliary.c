@@ -907,7 +907,7 @@ rotate_aux1g (mpz_t *f, mpz_t b, mpz_t g0, long j0, long j)
    We assume lognorm(f + k*g) + E(alpha(f + k*g)) is first decreasing, then
    increasing, then the optimal K corresponds to the minimum of that function.
 */
-static void
+void
 rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1,
                long *J0, long *J1, int verbose)
 {
