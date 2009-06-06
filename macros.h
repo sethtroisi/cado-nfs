@@ -61,8 +61,12 @@
 #endif
 
 #if defined(__GNUC__)
+
 #ifndef	MAYBE_UNUSED
 #define MAYBE_UNUSED __attribute__ ((unused))
+#endif
+#ifndef PACKED
+#define PACKED __attribute__ ((packed))
 #endif
 #ifndef EXPECT
 #define EXPECT(x,val)	__builtin_expect(x,val)
@@ -74,13 +78,15 @@
 #ifndef	MAYBE_UNUSED
 #define MAYBE_UNUSED
 #endif
+#ifndef PACKED
+#define PACKED
+#endif
 #ifndef EXPECT
 #define	EXPECT(x,val)	(x)
 #endif
 #ifndef ATTR_PRINTF
 #define ATTR_PRINTF(a,b) /**/
 #endif
-
 #endif
 
 #ifndef	LIKELY

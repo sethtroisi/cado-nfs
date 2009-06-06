@@ -49,7 +49,7 @@
 
 typedef struct {
     uint16_t x;
-    uint32_t p;
+    uint32_t p PACKED;
 } bucket_update_t;
 
 
