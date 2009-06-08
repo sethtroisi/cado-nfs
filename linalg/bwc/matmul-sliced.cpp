@@ -33,12 +33,8 @@ using namespace std;
 #include "abase.h"
 #include "matmul-common.h"
 
-/* Make sure that the assembly function is only called if it matches
- * correctly the abase header !! */
-#if defined(HAVE_GCC_STYLE_AMD64_ASM) && defined(ABASE_U64_H_) && !defined(DISABLE_ASM)
-#include "matmul-sub-small1.h"
-#define ENABLE_ASM
-#endif
+// assembly is now disabled for this code because the semantics of the
+// asm code have changed.
 
 // #define L1_CACHE_SIZE   32768
 // take only 3/4 of the L1 cache.
@@ -367,9 +363,6 @@ void matmul_sliced_mul(struct matmul_sliced_data_s * mm, abt * dst, abt const * 
             abzero(x, where, nrows_packed);
             ASM_COMMENT("critical loop");
             abt const * from = src;
-#if defined(ENABLE_ASM)
-            q = matmul_sub_small1(x, where, from, (uint16_t const *) q);
-#else
             /* The external function must have the same semantics as this
              * code block */
             uint32_t ncoeffs_slice = matmul_sliced_data_s::read32(q);
@@ -379,7 +372,6 @@ void matmul_sliced_mul(struct matmul_sliced_data_s * mm, abt * dst, abt const * 
                 uint32_t di = *q++;
                 abadd(x, where + aboffset(x, di), from + aboffset(x, j));
             }
-#endif
             ASM_COMMENT("end of critical loop");
             i += nrows_packed;
 #ifdef  SLICE_STATS

@@ -1,24 +1,22 @@
 #if 0
-static inline void fill_buckets_indirect(abobj_ptr x, abt ** sb, const abt * z, const uint8_t * q, unsigned int n)
+static void
+fill_buckets_direct(abobj_ptr x, abt ** sb, const abt * z, const uint8_t * q, unsigned int n)
 {
-    /* Dispatch data found in z[0]...z[f(n-1)] such that z[f(i)] is in
-     * array pointed to by sb[q[2*i+1]]. The function f(i) is given by
-     * the sum q[0]+q[2]+...+q[2*(i-1)]. Exactly 2n coefficients are
-     * expected in q[] All the sb[] pointers are increased */
+    /* Dispatch data found in z[0]...z[n] such that z[i] is in array
+     * pointed to by sb[q[i]]. Exactly n coefficients are expected. All
+     * the sb[] pointers are increased */
     for(unsigned int c = 0 ; c < n ; c++) {
-        z += aboffset(x, *q);
-        q++;
-        abcopy(x, sb[*q], z, 1);
-        sb[*q]+= aboffset(x, 1);
-        q++;
+        abcopy(x, sb[q[c]], z, 1);
+        sb[q[c]]+= aboffset(x, 1);
+        z += aboffset(x, 1);
     }
 }
 #endif
 	.text
 	.p2align 4,,15
-.globl fill_buckets_indirect
-	.type	fill_buckets_indirect, @function
-fill_buckets_indirect:
+.globl fill_buckets_direct
+	.type	fill_buckets_direct, @function
+fill_buckets_direct:
         pushq %rbp
         pushq %rbx
         pushq %r15
@@ -45,14 +43,13 @@ fill_buckets_indirect:
 #define ALIGN_MASK      7
 
 #define one_simple_move(reg2,reg3,reg4)   	\
-        movzbl  (%rbp),  % ## reg2 ## d	        	        ; \
-        movq    (%rsi,% ## reg2,8), % ## reg3			; \
-	leaq	(%rsi,% ## reg2,8), %rsi			; \
-        movzbl  1(%rbp),  % ## reg2 ## d		        ; \
-	movq	(%rdi,% ## reg2,8), % ## reg4			; \
-	movq	% ## reg3, (% ## reg4)		        	; \
-	addq	$8, (%rdi,% ## reg2,8)                          ; \
-        addq    $2, %rbp
+        movq    (%rsi), % ## reg3			; \
+        movzbl  (%rbp),  % ## reg2 ## d		        ; \
+	movq	(%rdi,% ## reg2,8), % ## reg4		; \
+	movq	% ## reg3, (% ## reg4)		       	; \
+	addq	$8, (%rdi,% ## reg2,8)                  ; \
+        addq    $1, %rbp                                ; \
+        addq    $8, %rsi
 
 .Lunaligned_loop:
         movq    %rbp, %rax
@@ -69,11 +66,11 @@ fill_buckets_indirect:
         // four bytes of readahead seem to provide timings a lot more
         // stable than with just two.
 
-#define READAHEAD_COEFFS        8
+#define READAHEAD_COEFFS        32
         // we're reading READAHEAD_COEFFS coeffs ahead of time, so the
         // tail must contain at least that many coefficients.
 
-        leaq    (%rbp,%r9,2),%r15
+        leaq    (%rbp,%r9,1),%r15
 
         cmpq $READAHEAD_COEFFS, %r9
 
@@ -90,8 +87,8 @@ fill_buckets_indirect:
 #define LOOP_LENGTH     32
 
         subq $READAHEAD_COEFFS, %r9
-        // r15+2*READAHEAD_COEFFS : end data pointer.
-        leaq    (%rbp,%r9,2),%r15
+        // r15+1*READAHEAD_COEFFS : end data pointer.
+        leaq    (%rbp,%r9,1),%r15
 
         movq 0(%rbp), %rax
         movq 8(%rbp), %rbx
@@ -105,40 +102,46 @@ fill_buckets_indirect:
 
 .Lmain_loop:
 
-// reg1 : one of a..d, containing 4 coeffs in two byte pairs (col index
-// difference, bucket number).
-// reg2 scratch buffer for storing index difference and (afterwards)
-// bucket number
+// reg1 : one of a..d, containing 8 coeffs, one per byte (only the bucket
+// number).
+// reg2 scratch buffer for storing bucket number
 // reg3 scratch buffer for the coefficient block in the source vector
 // reg4 scratch buffer for the address in the bucket
-#define use_one_coefficient(reg1,reg2,reg3,reg4)   	        \
-        movzbl  % ## reg1 ## l, % ## reg2 ## d		        ; \
-        movq    (%rsi,% ## reg2,8), % ## reg3			; \
-	leaq	(%rsi,% ## reg2,8), %rsi			; \
-        shrq    $8, %r ## reg1 ## x		               	; \
+#define use_one_coefficient(reg1,reg2,reg3,reg4,soffset)   	\
+        movq    soffset(%rsi), % ## reg3			; \
         movzbl  % ## reg1 ## l, % ## reg2 ## d		        ; \
 	movq	(%rdi,% ## reg2,8), % ## reg4			; \
 	movq	% ## reg3, (% ## reg4)		        	; \
 	addq	$8, % ## reg4                                   ; \
         movq    % ## reg4, (%rdi,% ## reg2,8)
 
-#define four_moves_and_reload(reg1,reg2,reg3,reg4,offset)       \
-        use_one_coefficient(reg1,reg2,reg3,reg4)                ; \
+#define eight_moves_and_reload(reg1,reg2,reg3,reg4,offset,soffset)       \
+        use_one_coefficient(reg1,reg2,reg3,reg4, soffset + 0)   ; \
         shrq    $8, %r ## reg1 ## x                             ; \
-        use_one_coefficient(reg1,reg2,reg3,reg4)                ; \
+        use_one_coefficient(reg1,reg2,reg3,reg4, soffset + 8)   ; \
         shrq    $8, %r ## reg1 ## x                             ; \
-        use_one_coefficient(reg1,reg2,reg3,reg4)                ; \
+        use_one_coefficient(reg1,reg2,reg3,reg4, soffset + 16)  ; \
+        shrq    $8, %r ## reg1 ## x                             ; \
+        use_one_coefficient(reg1,reg2,reg3,reg4, soffset + 24)  ; \
+        shrq    $8, %r ## reg1 ## x                             ; \
+        use_one_coefficient(reg1,reg2,reg3,reg4, soffset + 32)  ; \
         shrl    $8, %e ## reg1 ## x                             ; \
-        use_one_coefficient(reg1,reg2,reg3,reg4)                ; \
+        use_one_coefficient(reg1,reg2,reg3,reg4, soffset + 40)  ; \
+        shrl    $8, %e ## reg1 ## x                             ; \
+        use_one_coefficient(reg1,reg2,reg3,reg4, soffset + 48)  ; \
+        shrl    $8, %e ## reg1 ## x                             ; \
+        use_one_coefficient(reg1,reg2,reg3,reg4, soffset + 56)  ; \
 	movq	offset (%rbp), %r ## reg1 ## x
 
-        // on core2 U9400, using vstrip 6 of c135b, 0x200 and 0x400 are
-        // good choices.
-        prefetchnta     0x200(%rsi)
-        four_moves_and_reload(a,r8,r9,r10,)
-        four_moves_and_reload(b,r11,r12,r13,8)
-        four_moves_and_reload(c,r8,r9,r10,16)
-        four_moves_and_reload(d,r11,r12,r13,24)
+        prefetchnta     0x100(%rsi)
+        eight_moves_and_reload(a,r8,r9,r10,,0)
+        addq    $0x40, %rsi
+        eight_moves_and_reload(b,r11,r12,r13,8,0)
+        addq    $0x40, %rsi
+        eight_moves_and_reload(c,r8,r9,r10,16,0)
+        addq    $0x40, %rsi
+        eight_moves_and_reload(d,r11,r12,r13,24,0)
+        addq    $0x40, %rsi
 
         // note that we need 2*READAHEAD_COEFFS bytes of readahead at the
         // end of the array.
@@ -150,7 +153,7 @@ fill_buckets_indirect:
 .Lfixup_before_tail:
         // fix r15 for real value
         movq    $READAHEAD_COEFFS, %r9
-        leaq    (%r15,%r9,2), %r15
+        leaq    (%r15,%r9,1), %r15
         // also fix rbp
         subq    $LOOP_LENGTH, %rbp
 
@@ -170,4 +173,4 @@ fill_buckets_indirect:
         popq %rbx
         popq %rbp
 	ret
-	.size	fill_buckets_indirect, .-fill_buckets_indirect
+	.size	fill_buckets_direct, .-fill_buckets_direct

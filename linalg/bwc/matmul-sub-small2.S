@@ -2,22 +2,6 @@
 	.p2align 4,,15
 .globl matmul_sub_small2
 	.type	matmul_sub_small2, @function
-
-/* It's possible to do some stuff with SSE instructions ; however it
- * doesn't pay off, or I'm doing it wrong.
- */
-#define xxxSSE
-
-#ifdef  SSE
-#define ALIGN_BYTES    16
-#define ALIGN_MASK     15
-#define NEED_ALLOCA
-#else
-#define ALIGN_BYTES    8
-#define ALIGN_MASK     7
-#define xxxNEED_ALLOCA
-#endif
-
 matmul_sub_small2:
         pushq %rbp
         pushq %rbx
@@ -29,229 +13,165 @@ matmul_sub_small2:
         movq    %rsi, %rdi
         // src pointer --> store in rsi
 	movq	%rdx, %rsi
-        // rcx is the data pointer.
-
-#ifdef  NEED_ALLOCA
-        // we have to do some ugly tricks to allocate an aligned zone
-        movq %rsp, %rax
-        subq $8, %rsp
-        movq %rsp, %rbx
-        andq $ALIGN_MASK, %rbx
-        subq %rbx, %rsp
-        movq %rax, (%rsp)
-        subq $ALIGN_BYTES, %rsp
-        subq $ALIGN_BYTES, %rsp
-#endif
-
+        // matrix pointer --> rbp
+        movq    %rcx, %rbp
+                
         // read ncoeffs_slice into r9
-	movzwq	2(%rcx), %rax
-	movzwq	(%rcx), %rdx
-	addq	$4, %rcx
+	movzwl	2(%rbp), %eax
+	movzwl	(%rbp), %edx
 	salq	$16, %rax
 	movq	%rax, %r9
 	orq	%rdx, %r9
-        leaq    (%rcx,%r9,2),%rbx
-        // rbx : end data pointer.
+        // rbp: index of first coeff
+	addq	$4, %rbp
 
-        // r9 : the number of coeffs.
-	je	.L2
+        // special for small2. Recover default alignment.
+        xorq    %r8, %r8
+        subq    %r9, %r8
+        andq    $1, %r8
+        leaq    (%rbp,%r8,2), %rbp
 
-        // we now want to align our reads.
-        movq    %rcx, %rax
-        decq    %rax
-        orq     $ALIGN_MASK, %rax
-        incq    %rax
-        // rax is the first aligned address above rcx.
+        test    %r9,%r9
 
-        // now rbx is not necessarily aligned either. If it is, we keep
-        // it as is. If it isn't, then we use the low bits of rbx to
-        // keep the information on the ending alignment.
-        movq    %rbx,%rdx
-        andq    $ALIGN_MASK,%rdx
-        je      .L31
-        subq    $ALIGN_BYTES,%rbx
-.L31:
-        cmpq %rcx, %rax
-        je .L30
-        movzwq  (%rcx), %r10
-        addq    $2, %rcx
-        movq    %r10, %r8
-        andq    $4095, %r8
-        shrq    $12, %r10
-        leaq    (%rsi,%r10,8), %rsi
-        movq    (%rsi), %rdx
-	xorq	%rdx, (%rdi,%r8,8)
-        jmp .L31
-.L30:
-        // now rcx is aligned. Good.
-.L4:
-#ifndef SSE
-#if 0
-        /* considerably slower than the other version below */
-	movq	(%rcx), %rax 
-        movq    %rax, %r8
-        movq    %rax, %r9
-        andq    $0xf000, %r8
-        andq    $0x0fff, %r9
-        shrq    $16, %rax
-        movq    %rax, %r10
-        movq    %rax, %r11
-        andq    $0xf000, %r10
-        andq    $0x0fff, %r11
-        shrq    $16, %rax
-        movq    %rax, %r12
-        movq    %rax, %r13
-        andq    $0xf000, %r12
-        andq    $0x0fff, %r13
-        shrq    $16, %rax
-        movq    %rax, %r14
-        movq    %rax, %r15
-        andq    $0xf000, %r14
-        andq    $0x0fff, %r15
-        shrq    $9, %r8
-        shlq    $3, %r9
-        shrq    $9, %r10
-        shlq    $3, %r11
-        shrq    $9, %r12
-        shlq    $3, %r13
-        shrq    $9, %r14
-        shlq    $3, %r15
-#else
-        movzwq  (%rcx),%r8
-        movq    %r8, %r9
-        andq    $0xf000, %r8
-        andq    $0x0fff, %r9
-        shrq    $9, %r8
-        shlq    $3, %r9
-        movzwq  2(%rcx),%r10
-        movq    %r10, %r11
-        andq    $0xf000, %r10
-        andq    $0x0fff, %r11
-        shrq    $9, %r10
-        shlq    $3, %r11
-        movzwq  4(%rcx),%r12
-        movq    %r12, %r13
-        andq    $0xf000, %r12
-        andq    $0x0fff, %r13
-        shrq    $9, %r12
-        shlq    $3, %r13
-        movzwq  6(%rcx),%r14
-        movq    %r14, %r15
-        andq    $0xf000, %r14
-        andq    $0x0fff, %r15
-        shrq    $9, %r14
-        shlq    $3, %r15
-#endif
+        // at .Lfinished, rbp is shipped as a return value.
+	je	.Lfinished
+
+        // we want our reads aligned, we want to unroll our main loop,
+        // and leave at least some space in the tail because the tight
+        // loop does some readahead.
+
+#define ALIGN_MASK      63
+
+// first arg must be one of ax bx cx dx ; second: r[8-15] ; third: any
+#define one_simple_xor(bufreg1, bufreg2, bufreg3)               \
+	movzwl	(%rbp), %e ## bufreg1                           ; \
+        movl    %e ## bufreg1, % ## bufreg2 ## d                ; \
+        andl    $4095, % ## bufreg2 ## d                        ; \
+        shrq    $12, %r ## bufreg1                              ; \
+        leaq    (%rsi, %r ## bufreg1, 8), %rsi                  ; \
+	movq	(%rsi), % ## bufreg3                            ; \
+	xorq	% ## bufreg3, (%rdi,% ## bufreg2,8)             ; \
+        addq    $2, %rbp
+
+.Lunaligned_loop:
+        movq    %rbp, %rax
+        andq     $ALIGN_MASK, %rax
+        je .Laligned
+        one_simple_xor(dx, r10, r11)
+        subq    $1, %r9
+	je	.Lfinished
+        jmp .Lunaligned_loop
+
+.Laligned:
+        // now rbp is aligned.
+
+        // four bytes of readahead seem to provide timings a lot more
+        // stable than with just two.
+
+#define READAHEAD_COEFFS        8
+        // we're reading READAHEAD_COEFFS coeffs ahead of time, so the
+        // tail must contain at least that many coefficients.
+
+        leaq    (%rbp,%r9,2),%r15
+
+        cmpq $READAHEAD_COEFFS, %r9
+
+        // the tail loop is just simple and stupid. rbp points to a
+        // location where exactly r9 coeffs are to be read. Note that
+        // some coefficients are already in registers at this point. But
+        // this does not matter much (we could avoid re-reading, but
+        // really we don't care).
+        jb .Ltail_loop
+
+        // we're going to advance rbp one loop iteration ahead. This
+        // eases the handling of the tail.
+
+        // LOOP_LENGTH is the number of bytes read in rbp per turn. 16 or
+        // 64 make no difference here.
+#define LOOP_LENGTH     16
+
+        subq $READAHEAD_COEFFS, %r9
+        // r15+4*READAHEAD_COEFFS : end data pointer.
+        leaq    (%rbp,%r9,2),%r15
+
+        movl 0(%rbp), %eax
+        movl 4(%rbp), %ebx
+        movl 8(%rbp), %ecx
+        movl 12(%rbp), %edx
+        addq    $LOOP_LENGTH, %rbp
+
+	cmpq	%rbp, %r15
+	jb	.Lfixup_before_tail
+
+.Lmain_loop:
+
+        // We have two consecutive entries stored in eax.
+#define two_xors(idxreg, breg1, breg2, breg3, offset)		\
+        movzwl  % ## idxreg, % ## breg1 ## d			; \
+        movl    % ## breg1 ## d, % ## breg2 ## d		; \
+        shrl    $12, % ## breg1 ## d		        	; \
+        leaq    (%rsi, % ## breg1, 8), %rsi			; \
+        andl    $0x0fff, % ## breg2 ## d			; \
+        shrl    $16, %e ## idxreg		        	; \
+        movq    (%rsi), % ## breg3		        	; \
+        xorq    % ## breg3, (%rdi, % ## breg2, 8)		; \
+        movzwl  % ## idxreg, % ## breg1 ## d			; \
+        shrl    $12, % ## breg1 ## d			        ; \
+        leaq    (%rsi, % ## breg1, 8), %rsi			; \
+        andl    $0x0fff, %e ## idxreg   			; \
+        movq    (%rsi), % ## breg3		        	; \
+        xorq    % ## breg3, (%rdi, %r ## idxreg, 8)		; \
+        movl    offset(%rbp), %e ## idxreg
 
 
-	movq	(%rsi,%r8), %rdx
-	xorq	%rdx,(%rdi,%r9)
-        addq    %r10, %r8
+/* expansion for two_xors(ax,r8,r9,r10,0):
+        movzwl  % ## idxreg, %r8d
+        movl    %r8d, %r9d
+        shrl    $12, $r8d
+        leal    (%rsi, %r8, 8), %rsi
+        andl    $0x0fff, %r9d
+        shll    $3, $r9d
+        shrl    $16, %eax
+        movq    (%rsi), %r10
+        xorq    %r10, (%rdi, %r9, 8)
+        movzwl  %ax, %r8d
+        shrl    $12, $r8d
+        leal    (%rsi, %r8, 8), %rsi
+        andl    $0x0fff, %eax
+        shll    $3, %eax
+        movq    (%rsi), %r10
+        xorq    %r10, (%rdi, %rax, 8)
+        movl    0(%rbp), %eax
+ */
 
-	movq	(%rsi,%r8), %rax
-	xorq	%rax, (%rdi,%r11)
-        addq    %r12, %r8
+        two_xors(ax, r8,  r9 , r10, 0)
+        two_xors(bx, r11, r12, r13, 4)
+        two_xors(cx, r8,  r9,  r10, 8)
+        two_xors(dx, r11, r12, r13, 12)
 
-	movq	(%rsi,%r8), %rdx
-	xorq	%rdx, (%rdi,%r13)
-        addq    %r14, %r8
+        // note that we need 4*READAHEAD_COEFFS bytes of readahead at the
+        // end of the array.
 
-	movq	(%rsi,%r8), %rax
-	xorq	%rax, (%rdi,%r15)
-        addq    %r8, %rsi
+	addq	$LOOP_LENGTH, %rbp
+	cmpq	%rbp, %r15
+	ja	.Lmain_loop
 
-	addq	$8, %rcx
-#elif ALIGN_BYTES == 16
-        movdqa  (%rcx), %xmm0
-        movdqa  %xmm0, %xmm1
-        psrlw   $12, %xmm0
-        psllw   $3, %xmm0
-        psllw   $4, %xmm1
-        psrlw   $1, %xmm1
-        movdqa  %xmm0, (%rsp)
-        movdqa  %xmm1, 16(%rsp)
+.Lfixup_before_tail:
+        // fix r15 for real value
+        movq    $READAHEAD_COEFFS, %r9
+        leaq    (%r15,%r9,2), %r15
+        // also fix rbp
+        subq    $LOOP_LENGTH, %rbp
 
-        movzwq  0(%rsp),%r8
-        movzwq  16(%rsp),%r9
-        movzwq  2(%rsp),%r10
-        movzwq  18(%rsp),%r11
-        movzwq  4(%rsp),%r12
-        movzwq  20(%rsp),%r13
-        movzwq  6(%rsp),%r14
-        movzwq  22(%rsp),%r15
+.Ltail_loop:
+        cmpq    %rbp, %r15
+        je      .Lfinished
+        one_simple_xor(dx, r10, r11)
+        jmp .Ltail_loop
 
-	movq	(%rsi,%r8), %rdx
-	xorq	%rdx,(%rdi,%r9)
-        addq    %r10, %r8
+.Lfinished:
+	movq	%rbp, %rax
 
-	movq	(%rsi,%r8), %rax
-	xorq	%rax, (%rdi,%r11)
-        addq    %r12, %r8
-
-	movq	(%rsi,%r8), %rdx
-	xorq	%rdx, (%rdi,%r13)
-        addq    %r14, %r8
-
-	movq	(%rsi,%r8), %rax
-	xorq	%rax, (%rdi,%r15)
-        addq    %r8, %rsi
-
-        movzwq  8(%rsp),%r8
-        movzwq  24(%rsp),%r9
-        movzwq  10(%rsp),%r10
-        movzwq  26(%rsp),%r11
-        movzwq  12(%rsp),%r12
-        movzwq  28(%rsp),%r13
-        movzwq  14(%rsp),%r14
-        movzwq  30(%rsp),%r15
-
-	movq	(%rsi,%r8), %rdx
-	xorq	%rdx,(%rdi,%r9)
-        addq    %r10, %r8
-
-	movq	(%rsi,%r8), %rax
-	xorq	%rax, (%rdi,%r11)
-        addq    %r12, %r8
-
-	movq	(%rsi,%r8), %rdx
-	xorq	%rdx, (%rdi,%r13)
-        addq    %r14, %r8
-
-	movq	(%rsi,%r8), %rax
-	xorq	%rax, (%rdi,%r15)
-        addq    %r8, %rsi
-
-	addq	$16, %rcx
-#endif
-
-	cmpq	%rcx, %rbx
-	ja	.L4
-
-        je      .L40
-        addq    $ALIGN_BYTES,%rbx
-.L41:
-        cmpq %rcx, %rbx
-        je .L40
-        movzwq  (%rcx), %r10
-        addq    $2, %rcx
-        movq    %r10, %r8
-        andq    $4095, %r8
-        shrq    $12, %r10
-        leaq    (%rsi,%r10,8), %rsi
-        movq    (%rsi), %rdx
-	xorq	%rdx, (%rdi,%r8,8)
-        jmp .L41
-.L40:
-.L2:
-        // leave.
-#ifdef  NEED_ALLOCA
-        addq $ALIGN_BYTES, %rsp
-        addq $ALIGN_BYTES, %rsp
-        movq (%rsp), %rax
-        movq %rax, %rsp
-#endif
-
-	movq	%rcx, %rax
         popq %r12
         popq %r13
         popq %r14
