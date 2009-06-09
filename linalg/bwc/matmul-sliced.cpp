@@ -411,7 +411,7 @@ void matmul_sliced_mul(struct matmul_sliced_data_s * mm, abt * dst, abt const * 
     mm->public_->iteration[d]++;
 }
 
-void matmul_sliced_report(struct matmul_sliced_data_s * mm MAYBE_UNUSED) {
+void matmul_sliced_report(struct matmul_sliced_data_s * mm MAYBE_UNUSED, double scale MAYBE_UNUSED) {
 #ifdef  SLICE_STATS
     if (mm->dslices_info.empty())
         return;

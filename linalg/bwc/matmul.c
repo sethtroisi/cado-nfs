@@ -80,7 +80,7 @@ void matmul_mul(matmul_ptr mm, abt * dst, abt const * src, int d)
     mm->bind->mul(mm, dst, src, d);
 }
 
-void matmul_report(matmul_ptr mm) { mm->bind->report(mm); }
+void matmul_report(matmul_ptr mm, double scale) { mm->bind->report(mm, scale); }
 void matmul_clear(matmul_ptr mm) { mm->bind->clear(mm);
     if (mm->cachefile_name != NULL) {
         free(mm->cachefile_name);

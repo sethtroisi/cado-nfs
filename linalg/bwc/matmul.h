@@ -20,7 +20,7 @@ typedef matmul_ptr (*matmul_build_t)(abobj_ptr, const char * filename, param_lis
 typedef matmul_ptr (*matmul_reload_cache_t)(abobj_ptr, const char * filename, param_list pl, int);
 typedef void (*matmul_save_cache_t)(matmul_ptr, const char * filename);
 typedef void (*matmul_mul_t)(matmul_ptr, abt *, abt const *, int);
-typedef void (*matmul_report_t)(matmul_ptr);
+typedef void (*matmul_report_t)(matmul_ptr, double scale);
 typedef void (*matmul_clear_t)(matmul_ptr mm);
 typedef void (*matmul_auxv_t)(matmul_ptr mm, int op, ...);
 typedef void (*matmul_aux_t)(matmul_ptr mm, int op, va_list ap);
@@ -99,7 +99,7 @@ extern void matmul_aux(matmul_ptr, int, ...);
 
 
 /* Used for statistics only */
-extern void matmul_report(matmul_ptr);
+extern void matmul_report(matmul_ptr, double scale);
 
 
 #ifdef __cplusplus

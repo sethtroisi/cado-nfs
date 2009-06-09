@@ -1628,29 +1628,26 @@ void matmul_bucket_mul(struct matmul_bucket_data_s * mm, abt * dst, abt const * 
     mm->public_->iteration[d]++;
 }
 
-void matmul_bucket_report(struct matmul_bucket_data_s * mm MAYBE_UNUSED)
+void matmul_bucket_report(struct matmul_bucket_data_s * mm MAYBE_UNUSED, double scale)
 {
-    double scale;
-    scale = (mm->public_->iteration[0] + mm->public_->iteration[1]);
-    scale *= CLOCKS_PER_SEC;
+    double scale0;
+    scale0 = (mm->public_->iteration[0] + mm->public_->iteration[1]);
 
     printf("n %lu\n", mm->public_->ncoeffs);
-    printf("n_mms1 %lu\n", mm->mms1_ncoeffs);
-    printf("n_mms2 %lu\n", mm->mms2_ncoeffs);
-    printf("n_fbi %lu\n", mm->fbi_ncoeffs);
-    printf("n_fbd %lu\n", mm->fbd_ncoeffs);
-    printf("n_asb %lu\n", mm->asb_ncoeffs);
+#define one_timing_slot(x) do {						\
+    double t_ ## x = (double) mm-> x ## _time / CLOCKS_PER_SEC;         \
+    double a_ ## x = 1.0e9 * t_ ## x / mm-> x ## _ncoeffs / scale0;     \
+    printf(#x " %.2fs ; n=%lu c ; %.2f ns/c ; scaled*%.2f : %.2f/c\n",	\
+            t_ ## x,                                                    \
+            mm-> x ## _ncoeffs,				                \
+            a_ ## x, scale, a_ ## x * scale);                           \
+} while (0)
 
-    printf("mms1 %.2fs ; %.2f ns/c\n", (double) mm->mms1_time / CLOCKS_PER_SEC,
-            1.0e9 * mm->mms1_time / scale / mm->mms1_ncoeffs);
-    printf("mms2 %.2fs ; %.2f ns/c\n", (double) mm->mms2_time / CLOCKS_PER_SEC,
-            1.0e9 * mm->mms2_time / scale / mm->mms2_ncoeffs);
-    printf("fbi %.2fs ; %.2f ns/c\n", (double) mm->fbi_time / CLOCKS_PER_SEC,
-            1.0e9 * mm->fbi_time / scale / mm->fbi_ncoeffs);
-    printf("fbd %.2fs ; %.2f ns/c\n", (double) mm->fbd_time / CLOCKS_PER_SEC,
-            1.0e9 * mm->fbd_time / scale / mm->fbd_ncoeffs);
-    printf("asb %.2fs ; %.2f ns/c\n", (double) mm->asb_time / CLOCKS_PER_SEC,
-            1.0e9 * mm->asb_time / scale / mm->asb_ncoeffs);
+    one_timing_slot(mms1);
+    one_timing_slot(mms2);
+    one_timing_slot(fbi);
+    one_timing_slot(fbd);
+    one_timing_slot(asb);
 }
 
 void matmul_bucket_auxv(struct matmul_bucket_data_s * mm MAYBE_UNUSED, int op MAYBE_UNUSED, va_list ap MAYBE_UNUSED) { }

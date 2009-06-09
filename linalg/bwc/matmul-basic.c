@@ -167,7 +167,7 @@ void matmul_basic_mul(struct matmul_basic_data_s * mm, abt * dst, abt const * sr
     mm->public_->iteration[d]++;
 }
 
-void matmul_basic_report(struct matmul_basic_data_s * mm MAYBE_UNUSED) {
+void matmul_basic_report(struct matmul_basic_data_s * mm MAYBE_UNUSED, double scale MAYBE_UNUSED) {
 }
 
 void matmul_basic_auxv(struct matmul_basic_data_s * mm MAYBE_UNUSED, int op MAYBE_UNUSED, va_list ap MAYBE_UNUSED)

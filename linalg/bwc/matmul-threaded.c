@@ -640,7 +640,7 @@ void matmul_threaded_mul(struct matmul_threaded_data_s * mm, abt * dst, abt cons
     mm->public_->iteration[d]++;
 }
 
-void matmul_threaded_report(struct matmul_threaded_data_s * mm MAYBE_UNUSED) {
+void matmul_threaded_report(struct matmul_threaded_data_s * mm MAYBE_UNUSED, double scale MAYBE_UNUSED) {
 }
 
 void matmul_threaded_auxv(struct matmul_threaded_data_s * mm, int op, va_list ap)

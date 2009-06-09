@@ -69,6 +69,7 @@ struct bench_args {
     int transpose;
     int nchecks;
     int rebuild;
+    double freq;
     char ** mfiles;
     struct private_args * p;
     struct worker_threads_group * tg;
@@ -183,7 +184,7 @@ void clear_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct 
     unsigned int nr = p->mm->dim[0];
     unsigned int nc = p->mm->dim[1];
     pthread_mutex_lock(&tg->mu);
-    matmul_report(p->mm);
+    matmul_report(p->mm, ba->freq);
     pthread_mutex_unlock(&tg->mu);
     matmul_clear(p->mm);
     abclear(ba->xx, p->dst, nr);
@@ -201,7 +202,7 @@ int main(int argc, char * argv[])
     int nocheck = 0;
     ba->nchecks = 4;
     ba->nthreads = 1;
-    double freq = 1;
+    ba->freq = 1;
 
     /* {{{ */
     param_list_init(ba->pl);
@@ -233,7 +234,7 @@ int main(int argc, char * argv[])
     param_list_parse_uint(ba->pl, "nmax", &nmax);
     param_list_parse_int(ba->pl, "nthreads", &ba->nthreads);
     const char * unit;
-    if (param_list_parse_double(ba->pl, "cycles", &freq)) {
+    if (param_list_parse_double(ba->pl, "cycles", &ba->freq)) {
         unit = "cy/c";
     } else {
         unit = "ns/c";
@@ -347,8 +348,8 @@ int main(int argc, char * argv[])
             if (next > tmax * CLOCKS_PER_SEC) { next = tmax * CLOCKS_PER_SEC; }
             dt /= CLOCKS_PER_SEC;
             printf("%d iters in %2.fs, %.2f/1, %.2f %s (last %u : %.2f/1, %.2f %s)        \r",
-                    n, dt, dt/n, freq * 1.0e9 * dt/n/ncoeffs_total, unit,
-                    NLAST, sum_last/NLAST, freq * 1.0e9 *sum_last/NLAST/ncoeffs_total, unit);
+                    n, dt, dt/n, ba->freq * 1.0e9 * dt/n/ncoeffs_total, unit,
+                    NLAST, sum_last/NLAST, ba->freq * 1.0e9 *sum_last/NLAST/ncoeffs_total, unit);
             fflush(stdout);
             if (dt > tmax)
                 break;
