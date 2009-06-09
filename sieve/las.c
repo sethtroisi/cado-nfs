@@ -46,10 +46,12 @@
  * The number of updates that a bucket can accumulate is estimated as
  *   (loglog(factor base bound) - loglog(bucket sieving threshold)) 
  *     * BUCKET_LIMIT_FACTOR + BUCKET_LIMIT_ADD 
+ * We don't store updates where 2|gcd(i,j) which reduces the number 
+ * of updates by about 1/4, so 0.8 should be safe.
  */
 
 #ifndef BUCKET_LIMIT_FACTOR
-#define BUCKET_LIMIT_FACTOR 0.9
+#define BUCKET_LIMIT_FACTOR 0.8
 #endif
 
 #ifndef BUCKET_LIMIT_ADD
@@ -351,64 +353,6 @@ redc_32(const int64_t x, const uint32_t p, const uint32_t invp)
 
     return y;
 }
-
-// binary gcd for unsigned long
-
-#if 0
-static inline unsigned long
-adjust_right_drop1 (unsigned long a)
-{
-  __asm__ ("1: shr $1, %0 # adjust_right_drop1\n\t"
-	   "jc 2f\n\t"
-	   "shr $1, %0\n\t"
-	   "jnc 1b\n\t"
-	   "2:"
-	   : "+r" (a)::"cc");
-  return a;
-}
-
-static inline unsigned long
-bingcd(unsigned long a, unsigned long b) {
-    int t, lsh;
-    unsigned long A, B;
-
-    if (UNLIKELY(a == 0))
-        return b;
-    if (UNLIKELY(b == 0))
-        return a;
-
-    t = ctzl(a);
-    A = a >> (t + 1);
-    lsh = ctzl(b);
-    B = b >> (lsh + 1);
-    t = MIN(t, lsh);
-
-    // now a>>t and b>>t are odd, and the 2-part of the gcd is 2^t.
-    // A = (a-1)/2, B = (b-1)/2
-    // make A < B.
-    if (UNLIKELY(A == B))
-      return (2 * A + 1)<<t;
-    if (A > B) {
-        unsigned long tmp = A;
-        A = B;
-        B = tmp;
-    }
-    if (UNLIKELY(A == 0))
-      return 1<<t;
-
-    do {
-        do {
-	    B = adjust_right_drop1 (B - A);
-        } while (B > A);
-        if (A == B)
-	    break;
-        do {
-	    A = adjust_right_drop1 (A - B);
-        } while (B < A);
-    } while (A != B);
-    return (2*A+1)<<t;
-}
-#endif
 
 
 /* Define to 0 or 1. Table lookup seems to be slightly faster than
