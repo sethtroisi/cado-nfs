@@ -23,7 +23,7 @@ void * shell_prog(parallelizing_info_ptr pi, param_list pl MAYBE_UNUSED, void * 
     int i;
     size_t len = 1;
     for(i = 0 ; i < command_argc ; i++) {
-        argv[i] = command_argv[i];
+        argv[i] = strdup(command_argv[i]);
         len += 1 + strlen(argv[i]);
     }
     int rc;

@@ -96,7 +96,7 @@ void matmul_top_vec_clear_generic(matmul_top_data_ptr mmt, size_t stride, mmt_ge
 }
 
 
-static void
+    static void
 broadcast_down_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, int d)
 {
     // broadcasting down columns is for common agreement on a right
@@ -270,7 +270,7 @@ broadcast_down_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_p
         if (extra || picol->trank == 0) {
             abase_generic_zero(stride, abase_generic_ptr_add(v->v,
                         (nrows-mcol->i0) * stride),
-                        (mcol->i1-nrows));
+                    (mcol->i1-nrows));
         }
         if (!extra) {
             /* of course all threads within the same column have common
@@ -321,7 +321,7 @@ static void save_vector_toprow_generic(matmul_top_data_ptr mmt, size_t stride, m
 // now the exact opposite.
 
 /* The backend is exactly dual to save_vector_toprow_generic.
- */
+*/
 void load_vector_toprow_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_ptr v, const char * name, int d, unsigned int iter)
 {
     if (v == NULL) v = (mmt_generic_vec_ptr) mmt->wr[d]->v;
@@ -389,7 +389,7 @@ void matmul_top_load_vector_generic(matmul_top_data_ptr mmt, size_t stride, mmt_
         // we have picol->ncores threads, which would be delighted to get
         // access to some common data. The data is known to sit in thread
         // zero, so that's relatively easy.
-        
+
         if (picol->trank != 0) {
             memcpy(v->v, v->all_v[0], siz);
         }
@@ -469,7 +469,7 @@ static void mmt_finish_init(matmul_top_data_ptr mmt, int const * flags, param_li
     for(unsigned int d = 0 ; d < 2 ; d++) {
         // assume d == 1 ; we have some column indices given by our i0 and i1
         // values. We want to know how this intersects the horizontal fences
-        
+
         mmt_wiring_ptr mcol = mmt->wr[d];
         pi_wiring_ptr picol = mmt->pi->wr[d];
 
@@ -496,7 +496,7 @@ static void mmt_finish_init(matmul_top_data_ptr mmt, int const * flags, param_li
 
     // TODO: reuse the ../bw-matmul/matmul/matrix_base.cpp things for
     // displaying communication info.
-    
+
     if (!mmt->pi->interleaved) {
         matmul_top_read_submatrix(mmt, pl, optimized_direction);
     } else {
@@ -527,15 +527,82 @@ static void mmt_finish_init(matmul_top_data_ptr mmt, int const * flags, param_li
 static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, int optimized_direction)
 {
     const char * impl = param_list_lookup_string(pl, "mm_impl");
+    int rebuild = 0;
+    unsigned int cache_nbys = 0;
+    param_list_parse_int(pl, "rebuild_cache", &rebuild);
+    param_list_parse_uint(pl, "cache_nbys", &cache_nbys);
 
-    mmt->mm = matmul_reload_cache(mmt->abase, mmt->locfile, impl, pl, optimized_direction);
-    if (mmt->mm)
-        return;
+    unsigned int normal_nbys = abnbits(mmt->abase);
 
-    // fprintf(stderr, "Could not find cache file for %s\n", mmt->locfile);
-    mmt->mm = matmul_build(mmt->abase, mmt->locfile, impl, pl, optimized_direction);
+    if (cache_nbys) {
+        abobj_set_nbys(mmt->abase, cache_nbys);
+    }
 
-    matmul_save_cache(mmt->mm, mmt->locfile);
+    mmt->mm = NULL;
+
+    unsigned int sqread = 0;
+    param_list_parse_uint(pl, "sequential_cache_read", &sqread);
+
+    if (!rebuild) {
+        if (sqread) {
+            for(unsigned int j = 0 ; j < mmt->pi->m->ncores ; j++) {
+                serialize_threads(mmt->pi->m);
+                if (j == mmt->pi->m->trank) {
+                    fprintf(stderr,"J%uT%u loads cache for %s\n",
+                            mmt->pi->m->jrank,
+                            mmt->pi->m->trank,
+                            mmt->locfile);
+                    mmt->mm = matmul_reload_cache(mmt->abase, mmt->locfile, impl, pl, optimized_direction);
+                }
+            }
+        } else {
+            my_pthread_mutex_lock(mmt->pi->m->th->m);
+            fprintf(stderr,"J%uT%u loads cache for %s\n",
+                    mmt->pi->m->jrank,
+                    mmt->pi->m->trank,
+                    mmt->locfile);
+            my_pthread_mutex_unlock(mmt->pi->m->th->m);
+            mmt->mm = matmul_reload_cache(mmt->abase, mmt->locfile, impl, pl, optimized_direction);
+        }
+    }
+
+    unsigned int sqb = 0;
+    param_list_parse_uint(pl, "sequential_cache_build", &sqb);
+
+    if (!sqb) {
+        if (mmt->mm == NULL) {
+            // everybody does it in parallel
+            mmt->mm = matmul_build(mmt->abase, mmt->locfile, impl, pl, optimized_direction);
+            matmul_save_cache(mmt->mm, mmt->locfile);
+        }
+    } else {
+        for(unsigned int j = 0 ; j < mmt->pi->m->ncores + 1 ; j++) {
+            serialize_threads(mmt->pi->m);
+            if (mmt->mm != NULL) continue;
+            if (j == mmt->pi->m->trank) {
+                fprintf(stderr,"J%uT%u building cache for %s\n",
+                        mmt->pi->m->jrank,
+                        mmt->pi->m->trank,
+                        mmt->locfile);
+                mmt->mm = matmul_build(mmt->abase, mmt->locfile,
+                        impl, pl, optimized_direction);
+            } else if (j == mmt->pi->m->trank + 1) {
+                fprintf(stderr,"J%uT%u saves %s\n",
+                        mmt->pi->m->jrank,
+                        mmt->pi->m->trank,
+                        mmt->mm->cachefile_name);
+                matmul_save_cache(mmt->mm, mmt->locfile);
+            }
+        }
+    }
+
+    my_pthread_mutex_lock(mmt->pi->m->th->m);
+    fprintf(stderr, "J%uT%u uses %s via cache file %s\n",
+            mmt->pi->m->jrank, mmt->pi->m->trank,
+            mmt->locfile, mmt->mm->cachefile_name);
+    my_pthread_mutex_unlock(mmt->pi->m->th->m);
+
+    abobj_set_nbys(mmt->abase, normal_nbys);
 }
 
 void matmul_top_vec_clear(matmul_top_data_ptr mmt, int d)

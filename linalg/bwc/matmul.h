@@ -47,6 +47,8 @@ struct matmul_public_s {
 
     int iteration[2];
 
+    char * cachefile_name;
+
     /* Now the virtual method table */
     struct matmul_bindings_s bind[1];
 

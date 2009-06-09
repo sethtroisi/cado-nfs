@@ -16,22 +16,22 @@ const char * rowcol[2] = { "row", "col", };
 
 static FILE * fopen_cache(struct matmul_public_s * mm, const char * filename, const char * ext, const char * mode)
 {
-    char * base;
     FILE * f;
     int rc;
    
-    rc = asprintf(&base, "%s%s%s.bin", filename, ext, mm->store_transposed ? "T" : "");
-    FATAL_ERROR_CHECK(rc < 0, "out of memory");
+    if (mm->cachefile_name == NULL) {
+        rc = asprintf(&mm->cachefile_name, "%s%s%s.bin", filename, ext, mm->store_transposed ? "T" : "");
+        FATAL_ERROR_CHECK(rc < 0, "out of memory");
+    }
 
-    f = fopen(base, mode);
+    f = fopen(mm->cachefile_name, mode);
 
+    /*
     if (f == NULL) {
         // fprintf(stderr, "fopen(%s): %s\n", base, strerror(errno));
-        fprintf(stderr, "no cache file %s\n", base);
-        free(base);
-        return NULL;
+        // fprintf(stderr, "no cache file %s\n", mm->cachefile_name);
     }
-    free(base);
+    */
     return f;
 }
 

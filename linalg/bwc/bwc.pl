@@ -91,6 +91,7 @@ my $main = shift @ARGV;
 
 my $matpath="$ENV{HOME}/Local/mats";
 my @main_args = ();
+my @extra_args = ();
 my @mpi_split=(1,1);
 my @thr_split=(1,1);
 my $matrix;
@@ -194,6 +195,10 @@ my $param={};
 
 while (defined($_ = shift @ARGV)) {
     # -d will never be found as a bw argument, it is 
+    if ($_ eq '--') {
+        push @extra_args, $_, splice @ARGV;
+        last;
+    }
     if (/^(-d|--show|--dry-run)$/) { $show_only=1; next; }
     if (/^(-h|--help)$/) { usage; }
     my ($k,$v);
@@ -480,6 +485,8 @@ if ($mpi_needed) {
 ### ok -- now @main_args is something relatively useful.
 # print "main_args:\n", join("\n", @main_args), "\n";
 
+push @main_args, splice @extra_args;
+
 sub drive {
     my $program = shift @_;
 
@@ -510,7 +517,7 @@ sub drive {
             &drive(':balance', @_);
         }
         &drive(":wipeout", @_);
-        &drive("u64n_prep", @_);
+        &drive("u64n_prep", @_, "sequential_cache_build=1");
         &drive("u64_secure", @_);
         &drive("./split", @_, "--split-y");
         &drive("${mode}_krylov", @_, "end=1000000");
@@ -522,7 +529,7 @@ sub drive {
             &drive(':balance', @_);
         }
         &drive(":wipeout", @_);
-        &drive("u64n_prep", @_);
+        &drive("u64n_prep", @_, "sequential_cache_build=1");
         &drive("u64_secure", @_);
         &drive("./split", @_, "--split-y");
         &drive("${mode}_krylov", @_);

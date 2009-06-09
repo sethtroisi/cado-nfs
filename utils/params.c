@@ -145,6 +145,26 @@ void param_list_consolidate(param_list pl)
     pl->consolidated = 1;
 }
 
+void param_list_remove_key(param_list pl, const char * key)
+{
+    unsigned int j = 0;
+    for(unsigned int i = 0 ; i < pl->size ; i++) {
+        if (strcmp(pl->p[i]->key, key) == NULL) {
+            free(pl->p[i]->key);
+            free(pl->p[i]->value);
+        } else {
+            if (i != j) {
+                memcpy(pl->p[j], pl->p[i], sizeof(parameter));
+            }
+            j++;
+        }
+    }
+    pl->size = j;
+
+    pl->consolidated = 1;
+}
+
+
 int param_list_read_stream(param_list pl, FILE *f)
 {
     int all_ok=1;

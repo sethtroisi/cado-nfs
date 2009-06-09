@@ -201,6 +201,10 @@ int main(int argc, char * argv[])
     // we save the parameter list once again, because the prep program
     // generates some useful info, bw->nx in particular.
     param_list_save_parameter(pl, PARAMETER_FROM_FILE, "nx", "%u", bw->nx);
+
+    param_list_remove_key(pl, "sequential_cache_build");
+    param_list_remove_key(pl, "rebuild_cache");
+
     param_list_save(pl, BW_CONFIG_FILE);
     param_list_clear(pl);
 

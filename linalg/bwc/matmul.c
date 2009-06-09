@@ -81,7 +81,11 @@ void matmul_mul(matmul_ptr mm, abt * dst, abt const * src, int d)
 }
 
 void matmul_report(matmul_ptr mm) { mm->bind->report(mm); }
-void matmul_clear(matmul_ptr mm) { mm->bind->clear(mm); }
+void matmul_clear(matmul_ptr mm) { mm->bind->clear(mm);
+    if (mm->cachefile_name != NULL) {
+        free(mm->cachefile_name);
+    }
+}
 
 void matmul_auxv(matmul_ptr mm, int op, va_list ap)
 {

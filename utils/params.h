@@ -123,6 +123,9 @@ extern int param_list_warn_unused(param_list pl);
 // this one is the ``joker'' call. Return type is for internal use.
 extern int param_list_add_key(param_list pl,
         const char *, const char *, enum parameter_origin);
+// removing a key can be handy before savin g a config file. Some options
+// are relevant only for one particular invokation, and not for saving.
+extern void param_list_remove_key(param_list pl, const char * key);
 
 // for debugging.
 extern void param_list_display(param_list pl, FILE *f);
