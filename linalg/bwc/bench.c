@@ -361,6 +361,7 @@ int main(int argc, char * argv[])
     worker_threads_do(ba->tg, (worker_func_t) &clear_func, ba);
     worker_threads_clear(ba->tg);
     param_list_clear(ba->pl);
+    free(ba->p);
 
     return 0;
 }

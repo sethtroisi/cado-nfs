@@ -81,10 +81,11 @@ void matmul_mul(matmul_ptr mm, abt * dst, abt const * src, int d)
 }
 
 void matmul_report(matmul_ptr mm, double scale) { mm->bind->report(mm, scale); }
-void matmul_clear(matmul_ptr mm) { mm->bind->clear(mm);
+void matmul_clear(matmul_ptr mm) {
     if (mm->cachefile_name != NULL) {
         free(mm->cachefile_name);
     }
+    mm->bind->clear(mm);
 }
 
 void matmul_auxv(matmul_ptr mm, int op, va_list ap)

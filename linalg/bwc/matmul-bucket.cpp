@@ -175,7 +175,8 @@ struct matmul_bucket_data_s {
 
 void matmul_bucket_clear(struct matmul_bucket_data_s * mm)
 {
-    free(mm);
+    // delete properly calls the destructor for members as well.
+    delete mm;
 }
 
 static void mm_count_coeffs(struct matmul_bucket_data_s * mm);
@@ -183,7 +184,7 @@ static void mm_count_coeffs(struct matmul_bucket_data_s * mm);
 static struct matmul_bucket_data_s * matmul_bucket_init(abobj_ptr xx MAYBE_UNUSED, param_list pl, int optimized_direction)
 {
     struct matmul_bucket_data_s * mm;
-    mm = (struct matmul_bucket_data_s *) malloc(sizeof(struct matmul_bucket_data_s));
+    mm = new matmul_bucket_data_s;
     memset(mm, 0, sizeof(struct matmul_bucket_data_s));
     abobj_init_set(mm->xab, xx);
 

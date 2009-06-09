@@ -111,6 +111,7 @@ void read_easy_inner(const char * filename,
 
     free(colweights);
     free(colptrs);
+    sparse_mat_clear(smat);
 }
 
 void read_easy(const char * filename,
