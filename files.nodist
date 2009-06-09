@@ -53,6 +53,7 @@ sieve/ecm/find_primes_hit.c
 sieve/ecm/getprime.c
 sieve/ecm/testbench.c
 sieve/ecm/ecm_check.c
+sieve/ecm/issmooth.c
 sieve/hist.rsa155.3lp.png
 sqrt/CMakeLists-nodist.txt
 sqrt/finish.mag
