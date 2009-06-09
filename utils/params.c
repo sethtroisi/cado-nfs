@@ -149,7 +149,7 @@ void param_list_remove_key(param_list pl, const char * key)
 {
     unsigned int j = 0;
     for(unsigned int i = 0 ; i < pl->size ; i++) {
-        if (strcmp(pl->p[i]->key, key) == NULL) {
+        if (strcmp(pl->p[i]->key, key) == 0) {
             free(pl->p[i]->key);
             free(pl->p[i]->value);
         } else {
