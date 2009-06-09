@@ -576,9 +576,10 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
             matmul_save_cache(mmt->mm, mmt->locfile);
         }
     } else {
+        int need_rebuilding = mmt->mm == NULL;
         for(unsigned int j = 0 ; j < mmt->pi->m->ncores + 1 ; j++) {
             serialize_threads(mmt->pi->m);
-            if (mmt->mm != NULL) continue;
+            if (!need_rebuilding) continue;
             if (j == mmt->pi->m->trank) {
                 fprintf(stderr,"J%uT%u building cache for %s\n",
                         mmt->pi->m->jrank,

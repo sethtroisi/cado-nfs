@@ -1086,7 +1086,7 @@ struct matmul_bucket_data_s * matmul_bucket_reload_cache(abobj_ptr xx, const cha
 
     mm = matmul_bucket_init(xx, pl, optimized_direction);
     f = matmul_common_reload_cache_fopen(abbytes(xx,1), mm->public_, filename, MM_EXTENSION, MM_MAGIC);
-    if (f == NULL) { free(mm); return NULL; }
+    if (f == NULL) { delete mm; return NULL; }
 
     MATMUL_COMMON_READ_ONE32(mm->scrapsize, f);
     size_t n16, n8, naux;
