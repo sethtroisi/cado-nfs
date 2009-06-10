@@ -140,7 +140,7 @@ using namespace std;
 
 #define MM_MAGIC_FAMILY        0xa003UL
 
-#define MM_MAGIC_VERSION       0x100eUL
+#define MM_MAGIC_VERSION       0x100fUL
 #define MM_MAGIC (MM_MAGIC_FAMILY << 16 | MM_MAGIC_VERSION)
 
 /* see matmul-basic.c */
@@ -1028,7 +1028,11 @@ void builder_push_large_slices(struct matmul_bucket_data_s * mm, list<large_slic
         for( ; ! L->vbl.empty() ; L->vbl.pop_front()) {
             large_slice_vblock_t & V(L->vbl.front());
             mm->aux.insert(mm->aux.end(), V.auxc.begin(), V.auxc.end());
+            unsigned t8_size =  V.t8c.size();
             mm->t8.insert(mm->t8.end(), V.t8c.begin(), V.t8c.end());
+            // large slices, but not huge slices, may put an odd number
+            // of coefficients in t8
+            if (t8_size & 1) { mm->t8.push_back(0); }
         }
         mm->public_->ncoeffs += L->ncoeffs;
     }
@@ -1048,6 +1052,8 @@ void builder_push_huge_slices(struct matmul_bucket_data_s * mm, list<huge_slice_
         for( ; ! H->vbl.empty() ; H->vbl.pop_front()) {
             large_slice_vblock_t & V(H->vbl.front());
             mm->aux.insert(mm->aux.end(), V.auxc.begin(), V.auxc.end());
+            unsigned t8_size =  V.t8c.size();
+            ASSERT_ALWAYS((t8_size & 1) == 0);
             mm->t8.insert(mm->t8.end(), V.t8c.begin(), V.t8c.end());
         }
         mm->public_->ncoeffs += H->ncoeffs;
@@ -1392,12 +1398,15 @@ static inline void matmul_bucket_mul_large(struct matmul_bucket_data_s * mm, abt
                 abt * outp = dst + aboffset(x, pos->i);
                 prepare_buckets(x,bucket,scrap,pos->ql,LSL_NBUCKETS_MAX);
                 mm->fbi_time -= clock();
+                ASSERT_ALWAYS((((unsigned long)pos->q8)&1)==0);
                 fill_buckets_indirect(x, bucket, inp, pos->q8, n);
                 mm->fbi_time += clock();
                 mm->asb_time -= clock();
                 apply_small_buckets(x, outp, scrap, pos->q8+2*n, pos->ql);
                 mm->asb_time += clock();
                 pos->q8 += 3*n;
+                // fix alignment !
+                pos->q8 += n & 1;
                 pos->ql += LSL_NBUCKETS_MAX;
                 j = j1;
             }
@@ -1420,9 +1429,12 @@ static inline void matmul_bucket_mul_large(struct matmul_bucket_data_s * mm, abt
                 unapply_small_buckets(x, inp, scrap, pos->q8+2*n, pos->ql);
                 mm->asb_time += clock();
                 mm->fbi_time -= clock();
+                ASSERT_ALWAYS((((unsigned long)pos->q8)&1)==0);
                 unfill_buckets_indirect(x, bucket, outp, pos->q8, n);
                 mm->fbi_time += clock();
                 pos->q8 += 3 * n;
+                // fix alignment !
+                pos->q8 += n & 1;
                 pos->ql += LSL_NBUCKETS_MAX;
                 j = j1;
             }
@@ -1459,6 +1471,7 @@ static inline void matmul_bucket_mul_huge(struct matmul_bucket_data_s * mm, abt 
                 prepare_buckets(x,bucket,bigscrap,pos->ql,nlarge);
                 pos->ql += nlarge;
                 mm->fbi_time -= clock();
+                ASSERT_ALWAYS((((unsigned long)pos->q8)&1)==0);
                 fill_buckets_indirect(x, bucket, inp, pos->q8, n);
                 mm->fbi_time += clock();
                 pos->q8 += 2 * n;
@@ -1518,6 +1531,7 @@ static inline void matmul_bucket_mul_huge(struct matmul_bucket_data_s * mm, abt 
                 }
                 swap(pos->q8, q8_saved);
                 mm->fbi_time -= clock();
+                ASSERT_ALWAYS((((unsigned long)pos->q8)&1)==0);
                 unfill_buckets_indirect(x, bucket, outp, pos->q8, n);
                 mm->fbi_time += clock();
                 pos->q8 += 2 * n;
