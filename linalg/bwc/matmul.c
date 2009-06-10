@@ -83,6 +83,9 @@ matmul_ptr matmul_init(abobj_ptr x, const char * filename, const char * impl, pa
 
     mm->local_cache_copy = NULL;
 
+    if (!pl)
+        return mm;
+
     const char * local_cache_copy_dir = param_list_lookup_string(pl, "local_cache_copy_dir");
     if (local_cache_copy_dir) {
         char * basename;
