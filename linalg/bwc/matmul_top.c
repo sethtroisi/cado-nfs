@@ -548,20 +548,10 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
             for(unsigned int j = 0 ; j < mmt->pi->m->ncores ; j++) {
                 serialize_threads(mmt->pi->m);
                 if (j == mmt->pi->m->trank) {
-                    fprintf(stderr,"J%uT%u loads cache for %s\n",
-                            mmt->pi->m->jrank,
-                            mmt->pi->m->trank,
-                            mmt->locfile);
                     mmt->mm = matmul_reload_cache(mmt->abase, mmt->locfile, impl, pl, optimized_direction);
                 }
             }
         } else {
-            my_pthread_mutex_lock(mmt->pi->m->th->m);
-            fprintf(stderr,"J%uT%u loads cache for %s\n",
-                    mmt->pi->m->jrank,
-                    mmt->pi->m->trank,
-                    mmt->locfile);
-            my_pthread_mutex_unlock(mmt->pi->m->th->m);
             mmt->mm = matmul_reload_cache(mmt->abase, mmt->locfile, impl, pl, optimized_direction);
         }
     }
@@ -588,10 +578,6 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
                 mmt->mm = matmul_build(mmt->abase, mmt->locfile,
                         impl, pl, optimized_direction);
             } else if (j == mmt->pi->m->trank + 1) {
-                fprintf(stderr,"J%uT%u saves %s\n",
-                        mmt->pi->m->jrank,
-                        mmt->pi->m->trank,
-                        mmt->mm->cachefile_name);
                 matmul_save_cache(mmt->mm, mmt->locfile);
             }
         }

@@ -26,6 +26,7 @@ static FILE * fopen_cache(struct matmul_public_s * mm, const char * filename, co
 
     f = fopen(mm->cachefile_name, mode);
 
+
     /*
     if (f == NULL) {
         // fprintf(stderr, "fopen(%s): %s\n", base, strerror(errno));
@@ -39,6 +40,8 @@ FILE * matmul_common_reload_cache_fopen(size_t stride, struct matmul_public_s * 
 {
     FILE * f = fopen_cache(mm, filename, ext, "r");
     if (f == NULL) return NULL;
+
+    printf("Loading %s via cache file %s\n", filename, mm->cachefile_name);
 
     uint32_t magic_check;
     MATMUL_COMMON_READ_ONE32(magic_check, f);
@@ -73,6 +76,8 @@ FILE * matmul_common_save_cache_fopen(size_t stride, struct matmul_public_s * mm
 {
     FILE * f = fopen_cache(mm, filename, ext, "w");
     if (f == NULL) return NULL;
+
+    printf("Saving %s to cache file %s\n", filename, mm->cachefile_name);
 
     MATMUL_COMMON_WRITE_ONE32(magic,f);
     MATMUL_COMMON_WRITE_ONE32(MM_COMMON_MAGIC,f);
