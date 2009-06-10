@@ -779,7 +779,7 @@ int builder_do_huge_slice(builder * mb, struct huge_slice_t * H, uint32_t i0, ui
 
     H->nlarge = iceildiv(i1 - i0, LSL_NBUCKETS_MAX * 256);
     ASSERT(H->nlarge >= HUGE_MPLEX_MIN);
-    ASSERT(H->nlarge  < HUGE_MPLEX_MAX);
+    ASSERT(H->nlarge <= HUGE_MPLEX_MAX);
     unsigned int lsize = iceildiv(i1 - i0, H->nlarge);
     ASSERT(lsize <= LSL_NBUCKETS_MAX * 256);
     ASSERT(lsize * H->nlarge >= i1 - i0);
