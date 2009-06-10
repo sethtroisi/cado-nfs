@@ -52,7 +52,8 @@
  */
 
 #if defined(MPICH2) && MPICH2_NUMVERSION >= 10100002
-#define MPI_LIBRARY_MT_CAPABLE
+/* In fact, even in this case we might consider disabling it. */
+#define xxxMPI_LIBRARY_MT_CAPABLE
 /*
  * at present I know of no version of openmpi with MPI_THREAD_MULTIPLE
  * working.

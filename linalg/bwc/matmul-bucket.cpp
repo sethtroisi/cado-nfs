@@ -158,6 +158,8 @@ struct matmul_bucket_data_s {
     abobj_t xab;
     size_t scrapsize;
     size_t bigscrapsize;
+    abt * scrap;
+    abt * bigscrap;
     vector<uint16_t> t16;       /* For small (dense) slices */
     vector<uint8_t> t8;         /* For large (sparse) slices */
     vector<unsigned int> aux;   /* Various descriptors -- fairly small */
@@ -175,11 +177,13 @@ struct matmul_bucket_data_s {
 
 void matmul_bucket_clear(struct matmul_bucket_data_s * mm)
 {
+    if (mm->scrap) abclear(mm->xab, mm->scrap, mm->scrapsize * HUGE_MPLEX_MAX);
+    if (mm->bigscrap) abclear(mm->xab, mm->bigscrap, mm->bigscrapsize * HUGE_MPLEX_MAX);
     // delete properly calls the destructor for members as well.
     delete mm;
 }
 
-static void mm_count_coeffs(struct matmul_bucket_data_s * mm);
+static void mm_finish_init(struct matmul_bucket_data_s * mm);
 
 static struct matmul_bucket_data_s * matmul_bucket_init(abobj_ptr xx MAYBE_UNUSED, param_list pl, int optimized_direction)
 {
@@ -187,6 +191,13 @@ static struct matmul_bucket_data_s * matmul_bucket_init(abobj_ptr xx MAYBE_UNUSE
     mm = new matmul_bucket_data_s;
     memset(mm, 0, sizeof(struct matmul_bucket_data_s));
     abobj_init_set(mm->xab, xx);
+
+    unsigned int scrapsize = L2_CACHE_SIZE/2;
+    if (pl) param_list_parse_uint(pl, "l2_cache_size", &scrapsize);
+    scrapsize /= abbytes(mm->xab,1);
+    mm->scrapsize = scrapsize;
+    unsigned int bigscrapsize = scrapsize; // (1 << 24)/abbytes(mm->xab,1));
+    mm->bigscrapsize = bigscrapsize;
 
     int suggest = optimized_direction ^ MM_DIR0_PREFERS_TRANSP_MULT;
     matmul_common_init_post(mm->public_, pl, suggest);
@@ -1028,6 +1039,7 @@ void builder_push_huge_slices(struct matmul_bucket_data_s * mm, list<huge_slice_
 }
 /* }}} */
 
+
 struct matmul_bucket_data_s * matmul_bucket_build(abobj_ptr xx, const char * filename, param_list pl, int optimized_direction)
 {
     struct matmul_bucket_data_s * mm;
@@ -1051,21 +1063,15 @@ struct matmul_bucket_data_s * matmul_bucket_build(abobj_ptr xx, const char * fil
 
     builder_switch_to_vertical(mb, main_i0);
 
-    unsigned int scrapsize = L2_CACHE_SIZE/2;
-    if (pl) param_list_parse_uint(pl, "l2_cache_size", &scrapsize);
-    scrapsize /= abbytes(mm->xab,1);
-    mm->scrapsize = scrapsize;
-
     list<large_slice_t> Lq[1];
-    builder_do_all_large_slices(mb, &main_i0, Lq, scrapsize);
+    builder_do_all_large_slices(mb, &main_i0, Lq, mm->scrapsize);
     builder_push_large_slices(mm, Lq);
 
     /* Don't deallocate right now, since data is still to be used for
      * huge slices.  */
 
-    unsigned int bigscrapsize = scrapsize; // (1 << 24)/abbytes(mm->xab,1));
     list<huge_slice_t> Hq[1];
-    builder_do_all_huge_slices(mb, &main_i0, Hq, bigscrapsize);
+    builder_do_all_huge_slices(mb, &main_i0, Hq, mm->bigscrapsize);
     builder_push_huge_slices(mm, Hq);
 
     printf("avg for asb: %.1f\n", mb->asb_avg[0] / (double) mb->asb_avg[1]);
@@ -1074,7 +1080,7 @@ struct matmul_bucket_data_s * matmul_bucket_build(abobj_ptr xx, const char * fil
     free(mb->data[1]);
     mb->data[1] = NULL;
 
-    mm_count_coeffs(mm);
+    mm_finish_init(mm);
 
     return mm;
 }
@@ -1102,7 +1108,7 @@ struct matmul_bucket_data_s * matmul_bucket_reload_cache(abobj_ptr xx, const cha
 
     fclose(f);
 
-    mm_count_coeffs(mm);
+    mm_finish_init(mm);
 
     return mm;
 }/*}}}*/
@@ -1363,7 +1369,7 @@ static inline void matmul_bucket_mul_large(struct matmul_bucket_data_s * mm, abt
 {
     abobj_ptr x = mm->xab;
 
-    abt * scrap = (abt *) abinit(x, mm->scrapsize);
+    abt * scrap = mm->scrap;
     ASM_COMMENT("multiplication code -- large (sparse) slices"); /* {{{ */
     unsigned int nlarge = *pos->ql++;
     if (d == !mm->public_->store_transposed) {
@@ -1419,14 +1425,13 @@ static inline void matmul_bucket_mul_large(struct matmul_bucket_data_s * mm, abt
         }
     }
     ASM_COMMENT("end of large (sparse) slices"); /* }}} */
-    abclear(x, scrap, mm->scrapsize);
 }
 
 static inline void matmul_bucket_mul_huge(struct matmul_bucket_data_s * mm, abt * dst, abt const * src, int d, struct pos_desc * pos)
 {
     abobj_ptr x = mm->xab;
 
-    abt * scrap = (abt *) abinit(x, mm->scrapsize);
+    abt * scrap = mm->scrap;
     ASM_COMMENT("multiplication code -- huge (very sparse) slices"); /* {{{ */
     unsigned int nhuge = *pos->ql++;
     if (d == !mm->public_->store_transposed) {
@@ -1441,7 +1446,8 @@ static inline void matmul_bucket_mul_huge(struct matmul_bucket_data_s * mm, abt 
             for( ; j < pos->ncols_t ; ) {
                 uint32_t j1 = j + *pos->ql++;
                 unsigned int n = *pos->ql++;
-                abt * bigscrap = (abt *) abinit(x, n);
+                ASSERT_ALWAYS(n <= HUGE_MPLEX_MAX * mm->bigscrapsize);
+                abt * bigscrap = mm->bigscrap;
                 abt const * inp = src + aboffset(x, j);
                 abt * bucket[HUGE_MPLEX_MAX];
                 const unsigned int * Lsizes = pos->ql;
@@ -1466,7 +1472,6 @@ static inline void matmul_bucket_mul_huge(struct matmul_bucket_data_s * mm, abt 
                     pos->q8 += Lsizes[k];
                     pos->ql += LSL_NBUCKETS_MAX;
                 }
-                abclear(x, bigscrap, n);
                 j = j1;
             }
             pos->i += di;
@@ -1481,7 +1486,7 @@ static inline void matmul_bucket_mul_huge(struct matmul_bucket_data_s * mm, abt 
             for( ; j < pos->ncols_t ; ) {
                 uint32_t j1 = j + *pos->ql++;
                 unsigned int n = *pos->ql++;
-                abt * bigscrap = (abt *) abinit(x, n);
+                abt * bigscrap = mm->bigscrap;
                 abt * outp = dst + aboffset(x, j);
                 abt * bucket[HUGE_MPLEX_MAX];
                 const unsigned int * Lsizes = pos->ql;
@@ -1512,14 +1517,12 @@ static inline void matmul_bucket_mul_huge(struct matmul_bucket_data_s * mm, abt 
                 mm->fbi_time += clock();
                 pos->q8 += 2 * n;
                 swap(pos->q8, q8_saved);
-                abclear(x, bigscrap, n);
                 j = j1;
             }
             pos->i += di;
         }
     }
     ASM_COMMENT("end of huge (very sparse) slices"); /* }}} */
-    abclear(x, scrap, mm->scrapsize);
 }
 
 
@@ -1527,7 +1530,7 @@ static inline void matmul_bucket_mul_huge(struct matmul_bucket_data_s * mm, abt 
 // just count how many times an iterations schedules a coefficient in
 // the fbi/fbd/asb routines.
 
-static inline void mm_count_coeffs(struct matmul_bucket_data_s * mm)
+static inline void mm_finish_init(struct matmul_bucket_data_s * mm)
 {
     struct pos_desc pos[1];
 
@@ -1595,6 +1598,9 @@ static inline void mm_count_coeffs(struct matmul_bucket_data_s * mm)
         }
         pos->i += di;
     }
+
+    mm->scrap = (abt *) abinit(mm->xab, mm->scrapsize * HUGE_MPLEX_MAX);
+    mm->bigscrap = (abt *) abinit(mm->xab, mm->bigscrapsize * HUGE_MPLEX_MAX);
 }
 
 void matmul_bucket_mul(struct matmul_bucket_data_s * mm, abt * dst, abt const * src, int d)

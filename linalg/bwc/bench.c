@@ -14,6 +14,7 @@
 #include <errno.h>
 #include <limits.h>
 #include <inttypes.h>
+#include <unistd.h>
 #include "bwc_config.h"
 #include "matmul.h"
 #include "abase.h"
@@ -110,8 +111,10 @@ void init_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct b
     unsigned int nc = p->mm->dim[1];
     matmul_aux(p->mm, MATMUL_AUX_GET_READAHEAD, &nr);
     matmul_aux(p->mm, MATMUL_AUX_GET_READAHEAD, &nc);
-    p->dst = abinit(ba->xx, nr);
+
     p->src = abinit(ba->xx, nc);
+    p->dst = abinit(ba->xx, nr);
+
     abzero(ba->xx, p->dst, nr);
     abzero(ba->xx, p->src, nc);
 }/*}}}*/

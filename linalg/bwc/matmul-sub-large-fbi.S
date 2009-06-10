@@ -13,6 +13,13 @@ static inline void fill_buckets_indirect(abobj_ptr x, abt ** sb, const abt * z, 
         q++;
     }
 }
+
+static inline void fill_buckets_indirect(ulong ** sb, const ulong * z, const uint8_t * q, unsigned int n)
+    for(unsigned int c = 0 ; c < n ; c++) {
+        z += *q++;
+        *sb[*q++]++ = *z;
+    }
+}
 #endif
 	.text
 	.p2align 4,,15
@@ -42,7 +49,7 @@ fill_buckets_indirect:
         // and leave at least some space in the tail because the tight
         // loop does some readahead.
 
-#define ALIGN_MASK      7
+#define ALIGN_MASK      15
 
 #define one_simple_move(reg2,reg3,reg4)   	\
         movzbl  (%rbp),  % ## reg2 ## d	        	        ; \
@@ -69,7 +76,7 @@ fill_buckets_indirect:
         // four bytes of readahead seem to provide timings a lot more
         // stable than with just two.
 
-#define READAHEAD_COEFFS        8
+#define READAHEAD_COEFFS        16
         // we're reading READAHEAD_COEFFS coeffs ahead of time, so the
         // tail must contain at least that many coefficients.
 
@@ -87,21 +94,29 @@ fill_buckets_indirect:
         // we're going to advance rbp one loop iteration ahead. This
         // eases the handling of the tail.
 
-#define LOOP_LENGTH     32
+#define LOOP_LENGTH     16
 
         subq $READAHEAD_COEFFS, %r9
         // r15+2*READAHEAD_COEFFS : end data pointer.
         leaq    (%rbp,%r9,2),%r15
 
-        movq 0(%rbp), %rax
-        movq 8(%rbp), %rbx
-        movq 16(%rbp), %rcx
-        movq 24(%rbp), %rdx
+// do the readahead.
+
+        // movq 0(%rbp), %rax
+        movdqa (%rbp), %xmm0
+        // movq 8(%rbp), %rbx
+        // movq 16(%rbp), %rcx
+        // movq 24(%rbp), %rdx
 
         addq    $LOOP_LENGTH, %rbp
 
 	cmpq	%rbp, %r15
 	jb	.Lfixup_before_tail
+
+        movq    %rsp, %rcx
+        subq    $16, %rsp
+        andq    $-16, %rsp
+        movq    %rcx, -8(%rsp)
 
 .Lmain_loop:
 
@@ -134,11 +149,72 @@ fill_buckets_indirect:
 
         // on core2 U9400, using vstrip 6 of c135b, 0x200 and 0x400 are
         // good choices.
-        prefetchnta     0x200(%rsi)
-        four_moves_and_reload(a,r8,r9,r10,)
-        four_moves_and_reload(b,r11,r12,r13,8)
-        four_moves_and_reload(c,r8,r9,r10,16)
-        four_moves_and_reload(d,r11,r12,r13,24)
+        // prefetchnta     0x200(%rsi)
+        // four_moves_and_reload(a,r8,r9,r10,)
+        // four_moves_and_reload(b,r11,r12,r13,8)
+        // four_moves_and_reload(c,r8,r9,r10,16)
+        // four_moves_and_reload(d,r11,r12,r13,24)
+
+//////////////////////////
+    
+        // prefetcht1     0x40(%rsi)
+        // prefetcht1     0x80(%rsi)
+        // prefetcht1     0xc0(%rsi)
+        // prefetcht1     0x100(%rsi)
+
+        movdqa  %xmm0, (%rsp)
+        movq    (%rsp), %rdx
+        movq    8(%rsp), %rax
+        movdqa  0(%rbp), %xmm0
+        // movq    %rax, %rdx
+        // movq    0(%rbp), %rax
+
+#define read_two_bytes_and_load(dreg,r8,r9d,mm0)              \
+        movzbl  % ## dreg ## l, % ## r8 ## d       	; \
+        leaq    (%rsi,% ## r8,8), %rsi  		; \
+        movq    (%rsi), % ## mm0        		; \
+        shrq    $8,%r ## dreg ## x                 	; \
+        movzbl  % ## dreg ## l, % ## r9d       		; \
+        shrq    $8,%r ## dreg ## x
+
+#define read_two_bytes_and_load2(dreg,bx,r9d,mm0)              \
+        movzbl  % ## dreg ## l, %e ## bx       		; \
+        leaq    (%rsi,%r ## bx,8), %rsi  		; \
+        movq    (%rsi), % ## mm0        		; \
+        shrq    $8,%r ## dreg ## x                 	; \
+        movzbl  % ## dreg ## l, % ## r9d       		; \
+        shrq    $8,%r ## dreg ## x
+
+        read_two_bytes_and_load(d,r8,r8d,mm0)
+        read_two_bytes_and_load(d,r10,r10d,mm1)
+        read_two_bytes_and_load(d,r12,r12d,mm2)
+        read_two_bytes_and_load(d,r14,r14d,mm3)
+
+        read_two_bytes_and_load(a,r9,r9d,mm4)
+        read_two_bytes_and_load(a,r11,r11d,mm5)
+        read_two_bytes_and_load(a,r13,r13d,mm6)
+        read_two_bytes_and_load2(a,bx,ebx,mm7)
+
+        // now do stores
+
+#define do_one_store(r9,mm0)                    \
+	movq	(%rdi,% ## r9,8), %rcx          ; \
+	movq	% ## mm0, (%rcx)                ; \
+	addq	$8, %rcx                        ; \
+        movq    %rcx, (%rdi,% ## r9,8)
+
+        do_one_store(r8,mm0)
+        do_one_store(r10,mm1)
+        do_one_store(r12,mm2)
+        do_one_store(r14,mm3)
+
+        do_one_store(r9,mm4)
+        do_one_store(r11,mm5)
+        do_one_store(r13,mm6)
+        do_one_store(rbx,mm7)
+
+
+//////////////////////////
 
         // note that we need 2*READAHEAD_COEFFS bytes of readahead at the
         // end of the array.
@@ -146,6 +222,10 @@ fill_buckets_indirect:
 	addq	$LOOP_LENGTH, %rbp
 	cmpq	%rbp, %r15
 	ja	.Lmain_loop
+
+        emms
+
+        movq    -8(%rsp), %rsp
 
 .Lfixup_before_tail:
         // fix r15 for real value
