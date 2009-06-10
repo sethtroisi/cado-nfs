@@ -14,34 +14,12 @@ const char * rowcol[2] = { "row", "col", };
 
 /* Factor out some stuff which turns out to appear fairly often */
 
-static FILE * fopen_cache(struct matmul_public_s * mm, const char * filename, const char * ext, const char * mode)
+FILE * matmul_common_reload_cache_fopen(size_t stride, struct matmul_public_s * mm, uint32_t magic)
 {
-    FILE * f;
-    int rc;
-   
-    if (mm->cachefile_name == NULL) {
-        rc = asprintf(&mm->cachefile_name, "%s%s%s.bin", filename, ext, mm->store_transposed ? "T" : "");
-        FATAL_ERROR_CHECK(rc < 0, "out of memory");
-    }
-
-    f = fopen(mm->cachefile_name, mode);
-
-
-    /*
-    if (f == NULL) {
-        // fprintf(stderr, "fopen(%s): %s\n", base, strerror(errno));
-        // fprintf(stderr, "no cache file %s\n", mm->cachefile_name);
-    }
-    */
-    return f;
-}
-
-FILE * matmul_common_reload_cache_fopen(size_t stride, struct matmul_public_s * mm, const char * filename, const char * ext, uint32_t magic)
-{
-    FILE * f = fopen_cache(mm, filename, ext, "r");
+    FILE * f = fopen(mm->cachefile_name, "r");
     if (f == NULL) return NULL;
 
-    printf("Loading %s via cache file %s\n", filename, mm->cachefile_name);
+    printf("Loading %s via cache file %s\n", mm->filename, mm->cachefile_name);
 
     uint32_t magic_check;
     MATMUL_COMMON_READ_ONE32(magic_check, f);
@@ -72,12 +50,15 @@ FILE * matmul_common_reload_cache_fopen(size_t stride, struct matmul_public_s * 
     return f;
 }
 
-FILE * matmul_common_save_cache_fopen(size_t stride, struct matmul_public_s * mm, const char * filename, const char * ext, uint32_t magic)
+FILE * matmul_common_save_cache_fopen(size_t stride, struct matmul_public_s * mm, uint32_t magic)
 {
-    FILE * f = fopen_cache(mm, filename, ext, "w");
-    if (f == NULL) return NULL;
+    FILE * f = fopen(mm->cachefile_name, "w");
+    if (f == NULL) {
+        fprintf(stderr, "Cannot open %s for writing: %s\n", mm->cachefile_name, strerror(errno));
+        abort();
+    }
 
-    printf("Saving %s to cache file %s\n", filename, mm->cachefile_name);
+    printf("Saving %s to cache file %s\n", mm->filename, mm->cachefile_name);
 
     MATMUL_COMMON_WRITE_ONE32(magic,f);
     MATMUL_COMMON_WRITE_ONE32(MM_COMMON_MAGIC,f);
@@ -89,29 +70,20 @@ FILE * matmul_common_save_cache_fopen(size_t stride, struct matmul_public_s * mm
     return f;
 }
 
-void matmul_common_init_post(struct matmul_public_s * mm, param_list pl, int suggest)
+void matmul_common_clear(struct matmul_public_s * mm MAYBE_UNUSED)
 {
-    mm->store_transposed = suggest;
-    
-    if (pl) {
-        param_list_parse_uint(pl, "mm_store_transposed", &mm->store_transposed);
-        if (mm->store_transposed != (unsigned int) suggest) {
-            fprintf(stderr, "Warning, mm_store_transposed"
-                    " overrides suggested matrix storage ordering\n");
-        }   
-    }
 }
 
 /* Okay, this matrix reading stage is really a memory hog. But it's
  * done only once, so we practically don't care. */
-uint32_t * matmul_common_read_stupid_data(struct matmul_public_s * mm, const char * filename)
+uint32_t * matmul_common_read_stupid_data(struct matmul_public_s * mm)
 {
     uint32_t * data;
 
     if (mm->store_transposed) {
-        read_easy(filename, NULL, &data, &mm->dim[0], &mm->dim[1]);
+        read_easy(mm->filename, NULL, &data, &mm->dim[0], &mm->dim[1]);
     } else {
-        read_easy(filename, &data, NULL, &mm->dim[0], &mm->dim[1]);
+        read_easy(mm->filename, &data, NULL, &mm->dim[0], &mm->dim[1]);
     }
     return data;
 }

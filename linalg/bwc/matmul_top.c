@@ -538,21 +538,23 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
         abobj_set_nbys(mmt->abase, cache_nbys);
     }
 
-    mmt->mm = NULL;
+    mmt->mm = matmul_init(mmt->abase, mmt->locfile, impl, pl, optimized_direction); 
 
     unsigned int sqread = 0;
     param_list_parse_uint(pl, "sequential_cache_read", &sqread);
+
+    int cache_loaded = 0;
 
     if (!rebuild) {
         if (sqread) {
             for(unsigned int j = 0 ; j < mmt->pi->m->ncores ; j++) {
                 serialize_threads(mmt->pi->m);
                 if (j == mmt->pi->m->trank) {
-                    mmt->mm = matmul_reload_cache(mmt->abase, mmt->locfile, impl, pl, optimized_direction);
+                    cache_loaded = matmul_reload_cache(mmt->mm);
                 }
             }
         } else {
-            mmt->mm = matmul_reload_cache(mmt->abase, mmt->locfile, impl, pl, optimized_direction);
+            cache_loaded = matmul_reload_cache(mmt->mm);
         }
     }
 
@@ -560,10 +562,10 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
     param_list_parse_uint(pl, "sequential_cache_build", &sqb);
 
     if (!sqb) {
-        if (mmt->mm == NULL) {
+        if (!cache_loaded) {
             // everybody does it in parallel
-            mmt->mm = matmul_build(mmt->abase, mmt->locfile, impl, pl, optimized_direction);
-            matmul_save_cache(mmt->mm, mmt->locfile);
+            matmul_build_cache(mmt->mm);
+            matmul_save_cache(mmt->mm);
         }
     } else {
         int need_rebuilding = mmt->mm == NULL;
@@ -575,10 +577,9 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
                         mmt->pi->m->jrank,
                         mmt->pi->m->trank,
                         mmt->locfile);
-                mmt->mm = matmul_build(mmt->abase, mmt->locfile,
-                        impl, pl, optimized_direction);
+                matmul_build_cache(mmt->mm);
             } else if (j == mmt->pi->m->trank + 1) {
-                matmul_save_cache(mmt->mm, mmt->locfile);
+                matmul_save_cache(mmt->mm);
             }
         }
     }
@@ -601,6 +602,9 @@ void matmul_top_vec_clear(matmul_top_data_ptr mmt, int d)
 void matmul_top_clear(matmul_top_data_ptr mmt, abobj_ptr abase MAYBE_UNUSED)
 {
     serialize(mmt->pi->m);
+    matmul_top_vec_clear(mmt,0);
+    matmul_top_vec_clear(mmt,1);
+    serialize(mmt->pi->m);
     if (!mmt->pi->interleaved) {
         matmul_clear(mmt->mm);
     } else if (mmt->pi->interleaved->idx == 1) {
@@ -608,8 +612,6 @@ void matmul_top_clear(matmul_top_data_ptr mmt, abobj_ptr abase MAYBE_UNUSED)
         /* group 0 is the first to leave, thus it doesn't to freeing.
          */
     }
-    matmul_top_vec_clear(mmt,0);
-    matmul_top_vec_clear(mmt,1);
     free(mmt->fences[0]);
     free(mmt->fences[1]);
     for(unsigned int d = 0 ; d < 2 ; d++) {

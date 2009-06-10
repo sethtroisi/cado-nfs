@@ -78,32 +78,36 @@ struct bench_args {
 
 void init_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct bench_args * ba)/*{{{*/
 {
-    clock_t t0 = clock();
+    int t0 = time(NULL);
     struct private_args * p = ba->p + tnum;
 
-    if (ba->rebuild) {
-        p->mm = NULL;
-    } else {
-        p->mm = matmul_reload_cache(ba->xx, ba->mfiles[tnum], ba->impl, ba->pl, !ba->transpose);
-    }
+    p->mm = matmul_init(ba->xx, ba->mfiles[tnum], ba->impl, ba->pl, !ba->transpose);
 
-    if (p->mm) {
+    if (!ba->rebuild && matmul_reload_cache(p->mm)) {
         pthread_mutex_lock(&tg->mu);
         fprintf(stderr, "T%d Reusing cache file for %s\n",
                 tnum, ba->mfiles[tnum]);
-        fprintf(stderr, "T%d Cache load time %.2fs\n",
-                tnum, (double) (clock()-t0) / CLOCKS_PER_SEC);
+        fprintf(stderr, "T%d Cache load time %ds wct\n",
+                tnum, (int) time(NULL) - t0);
         pthread_mutex_unlock(&tg->mu);
     } else {
+        clock_t ct0 = clock();
         pthread_mutex_lock(&tg->mu);
         fprintf(stderr, "T%d Building cache file for %s\n",
                 tnum, ba->mfiles[tnum]);
         pthread_mutex_unlock(&tg->mu);
-        p->mm = matmul_build(ba->xx, ba->mfiles[tnum], ba->impl, ba->pl, !ba->transpose);
-        matmul_save_cache(p->mm, ba->mfiles[tnum]);
+        matmul_build_cache(p->mm);
         pthread_mutex_lock(&tg->mu);
-        fprintf(stderr, "T%d Cache build time %.2fs\n",
-                tnum, (double) (clock()-t0) / CLOCKS_PER_SEC);
+        fprintf(stderr, "T%d Cache build time %.2fs cpu\n",
+                tnum, (double) (clock()-ct0) / CLOCKS_PER_SEC);
+        fprintf(stderr, "T%d Saving cache file for %s\n",
+                tnum, ba->mfiles[tnum]);
+        pthread_mutex_unlock(&tg->mu);
+        t0 = time(NULL);
+        matmul_save_cache(p->mm);
+        pthread_mutex_lock(&tg->mu);
+        fprintf(stderr, "T%d Cache save time %ds wct\n",
+                tnum, (int) time(NULL) - t0);
         pthread_mutex_unlock(&tg->mu);
     }
 

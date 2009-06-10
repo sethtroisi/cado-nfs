@@ -42,11 +42,12 @@ struct matmul_basic_data_s {
 
 void matmul_basic_clear(struct matmul_basic_data_s * mm)
 {
+    matmul_common_clear(mm->public_);
     free(mm->q);
     free(mm);
 }
 
-static struct matmul_basic_data_s * matmul_basic_init(abobj_ptr xx MAYBE_UNUSED, param_list pl, int optimized_direction)
+struct matmul_basic_data_s * matmul_basic_init(abobj_ptr xx MAYBE_UNUSED, param_list pl, int optimized_direction)
 {
     struct matmul_basic_data_s * mm;
     mm = malloc(sizeof(struct matmul_basic_data_s));
@@ -54,17 +55,23 @@ static struct matmul_basic_data_s * matmul_basic_init(abobj_ptr xx MAYBE_UNUSED,
     abobj_init_set(mm->xab, xx);
 
     int suggest = optimized_direction ^ MM_DIR0_PREFERS_TRANSP_MULT;
-    matmul_common_init_post(mm->public_, pl, suggest);
+    mm->public_->store_transposed = suggest;
+    if (pl) {
+        param_list_parse_uint(pl, "mm_store_transposed", 
+                &mm->public_->store_transposed);
+        if (mm->public_->store_transposed != (unsigned int) suggest) {
+            fprintf(stderr, "Warning, mm_store_transposed"
+                    " overrides suggested matrix storage ordering\n");
+        }           
+    }   
+
 
     return mm;
 }
 
-struct matmul_basic_data_s * matmul_basic_build(abobj_ptr xx, const char * filename, param_list pl, int optimized_direction)
+void matmul_basic_build_cache(struct matmul_basic_data_s * mm)
 {
-    struct matmul_basic_data_s * mm;
-    mm = matmul_basic_init(xx, pl, optimized_direction);
-
-    uint32_t * data = matmul_common_read_stupid_data(mm->public_, filename);
+    uint32_t * data = matmul_common_read_stupid_data(mm->public_);
 
     unsigned int nrows_t = mm->public_->dim[ mm->public_->store_transposed];
     
@@ -94,32 +101,27 @@ struct matmul_basic_data_s * matmul_basic_build(abobj_ptr xx, const char * filen
     mm->datasize = nrows_t + mm->public_->ncoeffs;
 
     ASSERT_ALWAYS(ptr - data == (ptrdiff_t) mm->datasize);
-
-    return mm;
 }
 
-struct matmul_basic_data_s * matmul_basic_reload_cache(abobj_ptr xx, const char * filename, param_list pl, int optimized_direction)
+int matmul_basic_reload_cache(struct matmul_basic_data_s * mm)
 {
-    struct matmul_basic_data_s * mm;
     FILE * f;
-
-    mm = matmul_basic_init(xx, pl, optimized_direction);
-    f = matmul_common_reload_cache_fopen(abbytes(xx,1), mm->public_, filename, MM_EXTENSION, MM_MAGIC);
-    if (f == NULL) { free(mm); return NULL; }
+    f = matmul_common_reload_cache_fopen(abbytes(mm->xab,1), mm->public_, MM_MAGIC);
+    if (f == NULL) { return 0; }
 
     MATMUL_COMMON_READ_ONE32(mm->datasize, f);
     mm->q = malloc(mm->datasize * sizeof(uint32_t));
     MATMUL_COMMON_READ_MANY32(mm->q, mm->datasize, f);
     fclose(f);
 
-    return mm;
+    return 1;
 }
 
-void matmul_basic_save_cache(struct matmul_basic_data_s * mm, const char * filename)
+void matmul_basic_save_cache(struct matmul_basic_data_s * mm)
 {
     FILE * f;
 
-    f = matmul_common_save_cache_fopen(abbytes(mm->xab,1), mm->public_, filename, MM_EXTENSION, MM_MAGIC);
+    f = matmul_common_save_cache_fopen(abbytes(mm->xab,1), mm->public_, MM_MAGIC);
 
     MATMUL_COMMON_WRITE_ONE32(mm->datasize, f);
     MATMUL_COMMON_WRITE_MANY32(mm->q, mm->datasize, f);

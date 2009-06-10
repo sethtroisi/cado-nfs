@@ -101,6 +101,7 @@ struct matmul_sliced_data_s {
     abobj_t xab;
     data_t data;
     vector<slice_info> dslices_info;
+    unsigned int npack;
     void push(uint32_t x)
     {
         ASSERT_ALWAYS(x >> 16 == 0);
@@ -129,40 +130,48 @@ struct matmul_sliced_data_s {
 
 void matmul_sliced_clear(struct matmul_sliced_data_s * mm)
 {
+    matmul_common_clear(mm->public_);
     mm->dslices_info.clear();
     mm->data.clear();
     delete mm;
 }
 
-static struct matmul_sliced_data_s * matmul_sliced_init(abobj_ptr xx MAYBE_UNUSED, param_list pl, int optimized_direction)
+struct matmul_sliced_data_s * matmul_sliced_init(abobj_ptr xx MAYBE_UNUSED, param_list pl, int optimized_direction)
 {
     struct matmul_sliced_data_s * mm;
     mm = new matmul_sliced_data_s;
     memset(mm, 0, sizeof(struct matmul_sliced_data_s));
     abobj_init_set(mm->xab, xx);
 
+    unsigned int npack = L1_CACHE_SIZE;
+    if (pl) param_list_parse_uint(pl, "l1_cache_size", &npack);
+    npack /= abbytes(mm->xab,1);
+    mm->npack = npack;
+
     int suggest = optimized_direction ^ MM_DIR0_PREFERS_TRANSP_MULT;
-    matmul_common_init_post(mm->public_, pl, suggest);
+    mm->public_->store_transposed = suggest;
+    if (pl) {
+        param_list_parse_uint(pl, "mm_store_transposed", 
+                &mm->public_->store_transposed);
+        if (mm->public_->store_transposed != (unsigned int) suggest) {
+            fprintf(stderr, "Warning, mm_store_transposed"
+                    " overrides suggested matrix storage ordering\n");
+        }           
+    }   
+
 
     return mm;
 }
 
 
-struct matmul_sliced_data_s * matmul_sliced_build(abobj_ptr xx, const char * filename, param_list pl, int optimized_direction)
+void matmul_sliced_build_cache(struct matmul_sliced_data_s * mm)
 {
-    struct matmul_sliced_data_s * mm;
-    mm = matmul_sliced_init(xx, pl, optimized_direction);
-
-    uint32_t * data = matmul_common_read_stupid_data(mm->public_, filename);
+    uint32_t * data = matmul_common_read_stupid_data(mm->public_);
 
     uint32_t i0 = 0;
     uint32_t i1 = mm->public_->dim[ mm->public_->store_transposed];
 
-    unsigned int npack = L1_CACHE_SIZE;
-    if (pl) param_list_parse_uint(pl, "l1_cache_size", &npack);
-    npack /= abbytes(mm->xab,1);
-    unsigned int nslices = iceildiv(i1-i0, npack);
-
+    unsigned int nslices = iceildiv(i1-i0, mm->npack);
     unsigned int nslices_index = mm->data.size();
     mm->push(0);
     mm->push(0);        // placeholder for alignment
@@ -179,7 +188,7 @@ struct matmul_sliced_data_s * matmul_sliced_build(abobj_ptr xx, const char * fil
 
     for(s = 0 ; s < nslices ; s++) {
         current = next;
-        npack = packbase + (s < nslices1);
+        unsigned int npack = packbase + (s < nslices1);
         next = current + npack;
 
         slice_info si; memset(&si,0,sizeof(si)); si.nrows = npack;
@@ -303,18 +312,14 @@ struct matmul_sliced_data_s * matmul_sliced_build(abobj_ptr xx, const char * fil
     // std::cout << "\n";
 #endif
     std::cout << std::flush;
-
-    return mm;
 }
 
-struct matmul_sliced_data_s * matmul_sliced_reload_cache(abobj_ptr xx, const char * filename, param_list pl, int optimized_direction)
+int matmul_sliced_reload_cache(struct matmul_sliced_data_s * mm)
 {
-    struct matmul_sliced_data_s * mm;
     FILE * f;
 
-    mm = matmul_sliced_init(xx, pl, optimized_direction);
-    f = matmul_common_reload_cache_fopen(abbytes(xx,1), mm->public_, filename, MM_EXTENSION, MM_MAGIC);
-    if (f == NULL) { free(mm); return NULL; }
+    f = matmul_common_reload_cache_fopen(abbytes(mm->xab,1), mm->public_, MM_MAGIC);
+    if (f == NULL) return 0;
 
     size_t n;
     MATMUL_COMMON_READ_ONE32(n, f);
@@ -326,14 +331,14 @@ struct matmul_sliced_data_s * matmul_sliced_reload_cache(abobj_ptr xx, const cha
 
     data_t::const_iterator q = mm->data.begin();
 
-    return mm;
+    return 1;
 }
 
-void matmul_sliced_save_cache(struct matmul_sliced_data_s * mm, const char * filename)
+void matmul_sliced_save_cache(struct matmul_sliced_data_s * mm)
 {
     FILE * f;
 
-    f = matmul_common_save_cache_fopen(abbytes(mm->xab,1), mm->public_, filename, MM_EXTENSION, MM_MAGIC);
+    f = matmul_common_save_cache_fopen(abbytes(mm->xab,1), mm->public_, MM_MAGIC);
 
     size_t n = mm->data.size();
     MATMUL_COMMON_WRITE_ONE32(n, f);

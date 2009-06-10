@@ -9,11 +9,12 @@ extern "C" {
 
 struct matmul_threaded_data_s;
 
-extern struct matmul_threaded_data_s * matmul_threaded_build(abobj_ptr, const char * filename, param_list pl, int);
-extern struct matmul_threaded_data_s * matmul_threaded_reload_cache(abobj_ptr, const char * filename, param_list pl, int);
-extern void matmul_threaded_save_cache(struct matmul_threaded_data_s *, const char * filename);
+extern struct matmul_threaded_data_s * matmul_threaded_init(abobj_ptr, param_list pl, int);
+extern void matmul_threaded_build_cache(struct matmul_threaded_data_s *);
+extern int matmul_threaded_reload_cache(struct matmul_threaded_data_s *);
+extern void matmul_threaded_save_cache(struct matmul_threaded_data_s *);
 extern void matmul_threaded_mul(struct matmul_threaded_data_s *, abt *, abt const *, int);
-extern void matmul_threaded_report(struct matmul_threaded_data_s *, double scale);
+extern void matmul_threaded_report(struct matmul_threaded_data_s *, double);
 extern void matmul_threaded_clear(struct matmul_threaded_data_s * mm);
 extern void matmul_threaded_aux(struct matmul_threaded_data_s * mm, int op, ...);
 extern void matmul_threaded_auxv(struct matmul_threaded_data_s * mm, int op, va_list ap);

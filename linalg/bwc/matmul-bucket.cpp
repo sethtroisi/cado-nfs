@@ -156,6 +156,7 @@ struct matmul_bucket_data_s {
     struct matmul_public_s public_[1];
     /* now our private fields */
     abobj_t xab;
+    size_t npack;
     size_t scrapsize;
     size_t bigscrapsize;
     abt * scrap;
@@ -179,28 +180,43 @@ void matmul_bucket_clear(struct matmul_bucket_data_s * mm)
 {
     if (mm->scrap) abclear(mm->xab, mm->scrap, mm->scrapsize * HUGE_MPLEX_MAX);
     if (mm->bigscrap) abclear(mm->xab, mm->bigscrap, mm->bigscrapsize * HUGE_MPLEX_MAX);
+    matmul_common_clear(mm->public_);
     // delete properly calls the destructor for members as well.
     delete mm;
 }
 
 static void mm_finish_init(struct matmul_bucket_data_s * mm);
 
-static struct matmul_bucket_data_s * matmul_bucket_init(abobj_ptr xx MAYBE_UNUSED, param_list pl, int optimized_direction)
+struct matmul_bucket_data_s * matmul_bucket_init(abobj_ptr xx MAYBE_UNUSED, param_list pl, int optimized_direction)
 {
     struct matmul_bucket_data_s * mm;
     mm = new matmul_bucket_data_s;
     memset(mm, 0, sizeof(struct matmul_bucket_data_s));
     abobj_init_set(mm->xab, xx);
 
+    unsigned int npack = L1_CACHE_SIZE;
+    if (pl) param_list_parse_uint(pl, "l1_cache_size", &npack);
+    npack /= abbytes(mm->xab,1);
+    mm->npack = npack;
+
     unsigned int scrapsize = L2_CACHE_SIZE/2;
     if (pl) param_list_parse_uint(pl, "l2_cache_size", &scrapsize);
     scrapsize /= abbytes(mm->xab,1);
     mm->scrapsize = scrapsize;
+
     unsigned int bigscrapsize = scrapsize; // (1 << 24)/abbytes(mm->xab,1));
     mm->bigscrapsize = bigscrapsize;
 
     int suggest = optimized_direction ^ MM_DIR0_PREFERS_TRANSP_MULT;
-    matmul_common_init_post(mm->public_, pl, suggest);
+    mm->public_->store_transposed = suggest;
+    if (pl) {
+        param_list_parse_uint(pl, "mm_store_transposed",
+                &mm->public_->store_transposed);
+        if (mm->public_->store_transposed != (unsigned int) suggest) {
+            fprintf(stderr, "Warning, mm_store_transposed"
+                    " overrides suggested matrix storage ordering\n");
+        }   
+    }
 
     return mm;
 }
@@ -1040,22 +1056,16 @@ void builder_push_huge_slices(struct matmul_bucket_data_s * mm, list<huge_slice_
 /* }}} */
 
 
-struct matmul_bucket_data_s * matmul_bucket_build(abobj_ptr xx, const char * filename, param_list pl, int optimized_direction)
+void matmul_bucket_build_cache(struct matmul_bucket_data_s * mm)
 {
-    struct matmul_bucket_data_s * mm;
     builder mb[1];
-    mm = matmul_bucket_init(xx, pl, optimized_direction);
-    builder_init(mb, filename, mm);
+    builder_init(mb, mm->public_->filename, mm);
 
 
     uint32_t main_i0 = 0;
 
-    unsigned int npack = L1_CACHE_SIZE;
-    if (pl) param_list_parse_uint(pl, "l1_cache_size", &npack);
-    npack /= abbytes(mm->xab,1);
-
     list<small_slice_t> Sq[1];
-    builder_do_all_small_slices(mb, &main_i0, Sq, npack);
+    builder_do_all_small_slices(mb, &main_i0, Sq, mm->npack);
     builder_push_small_slices(mm, Sq);
 
     free(mb->data[0]);
@@ -1081,18 +1091,14 @@ struct matmul_bucket_data_s * matmul_bucket_build(abobj_ptr xx, const char * fil
     mb->data[1] = NULL;
 
     mm_finish_init(mm);
-
-    return mm;
 }
 
-struct matmul_bucket_data_s * matmul_bucket_reload_cache(abobj_ptr xx, const char * filename, param_list pl, int optimized_direction)/*{{{*/
+int matmul_bucket_reload_cache(struct matmul_bucket_data_s * mm)/* {{{ */
 {
-    struct matmul_bucket_data_s * mm;
     FILE * f;
 
-    mm = matmul_bucket_init(xx, pl, optimized_direction);
-    f = matmul_common_reload_cache_fopen(abbytes(xx,1), mm->public_, filename, MM_EXTENSION, MM_MAGIC);
-    if (f == NULL) { delete mm; return NULL; }
+    f = matmul_common_reload_cache_fopen(abbytes(mm->xab,1), mm->public_, MM_MAGIC);
+    if (f == NULL) { return 0; }
 
     MATMUL_COMMON_READ_ONE32(mm->scrapsize, f);
     size_t n16, n8, naux;
@@ -1110,15 +1116,14 @@ struct matmul_bucket_data_s * matmul_bucket_reload_cache(abobj_ptr xx, const cha
 
     mm_finish_init(mm);
 
-    return mm;
+    return 1;
 }/*}}}*/
 
-void matmul_bucket_save_cache(struct matmul_bucket_data_s * mm, const char * filename)/*{{{*/
+void matmul_bucket_save_cache(struct matmul_bucket_data_s * mm)/*{{{*/
 {
     FILE * f;
 
-    f = matmul_common_save_cache_fopen(abbytes(mm->xab,1), mm->public_, filename, MM_EXTENSION, MM_MAGIC);
-
+    f = matmul_common_save_cache_fopen(abbytes(mm->xab,1), mm->public_, MM_MAGIC);
     MATMUL_COMMON_WRITE_ONE32(mm->scrapsize, f);
     size_t n16 = mm->t16.size();
     size_t n8 = mm->t8.size();

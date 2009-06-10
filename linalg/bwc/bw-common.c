@@ -151,6 +151,7 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
     param_list_lookup_string(pl, "cache_nbys");
     param_list_lookup_string(pl, "sequential_cache_build");
     param_list_lookup_string(pl, "sequential_cache_load");
+    param_list_lookup_string(pl, "local_cache_copy_dir");
 
     return 0;
 }

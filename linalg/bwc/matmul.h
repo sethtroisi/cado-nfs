@@ -16,9 +16,10 @@ struct matmul_public_s;
 typedef struct matmul_public_s  * matmul_t;
 typedef struct matmul_public_s  * matmul_ptr;
 
-typedef matmul_ptr (*matmul_build_t)(abobj_ptr, const char * filename, param_list pl, int);
-typedef matmul_ptr (*matmul_reload_cache_t)(abobj_ptr, const char * filename, param_list pl, int);
-typedef void (*matmul_save_cache_t)(matmul_ptr, const char * filename);
+typedef matmul_ptr (*matmul_init_t)(abobj_ptr, param_list pl, int);
+typedef void (*matmul_build_cache_t)(matmul_ptr);
+typedef int (*matmul_reload_cache_t)(matmul_ptr);
+typedef void (*matmul_save_cache_t)(matmul_ptr);
 typedef void (*matmul_mul_t)(matmul_ptr, abt *, abt const *, int);
 typedef void (*matmul_report_t)(matmul_ptr, double scale);
 typedef void (*matmul_clear_t)(matmul_ptr mm);
@@ -26,14 +27,16 @@ typedef void (*matmul_auxv_t)(matmul_ptr mm, int op, ...);
 typedef void (*matmul_aux_t)(matmul_ptr mm, int op, va_list ap);
 
 struct matmul_bindings_s {
-	matmul_build_t		build;
+	matmul_build_cache_t	build_cache;
 	matmul_reload_cache_t	reload_cache;
 	matmul_save_cache_t	save_cache;
 	matmul_mul_t		mul;
 	matmul_report_t		report;
 	matmul_clear_t		clear;
+	matmul_init_t		init;
 	matmul_auxv_t		auxv;
 	matmul_aux_t		aux;
+        const char *            impl;
 };
 
 struct matmul_public_s {
@@ -47,7 +50,9 @@ struct matmul_public_s {
 
     int iteration[2];
 
+    const char * filename;
     char * cachefile_name;
+    char * local_cache_copy;
 
     /* Now the virtual method table */
     struct matmul_bindings_s bind[1];
@@ -65,16 +70,18 @@ struct matmul_public_s {
 extern "C" {
 #endif
 
+extern matmul_ptr matmul_init(abobj_ptr, const char * filename, const char * impl, param_list pl, int);
+
 /* These two functions are the means of initializing the mm layer. No
  * bare _init() function is publicly accessible */
-extern matmul_ptr matmul_build(abobj_ptr, const char * filename, const char * impl, param_list pl, int);
-extern matmul_ptr matmul_reload_cache(abobj_ptr, const char * filename, const char * impl, param_list pl, int);
+extern void matmul_build_cache(matmul_ptr mm);
+extern int matmul_reload_cache(matmul_ptr mm);
 
 /* Exit point */
 extern void matmul_clear(matmul_ptr mm);
 
 /* Convenience. Once the data has been built, it may be saved */
-extern void matmul_save_cache(matmul_ptr, const char * filename);
+extern void matmul_save_cache(matmul_ptr);
 
 /* matmul_mul() is the main entry point for the cpu-intensive critical loop.
  * besides the obvious, there's a direction argument which tells whether
