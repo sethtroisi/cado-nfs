@@ -29,10 +29,10 @@ kjadrange=1e7           # individual tasks
 
 ## Other parameters of polyselect
 kjkeep=100              # number of preselected polynomials
-kjkmax=17               # rotation is bounded by 2^kmax
+kjkmax=12               # rotation is bounded by 2^kmax
 kjincr=60               # forced divisor of lc(f)
 kjpb=1024               # bound on primes allowed in lc(g)
-kjp0max=100000          # bound on the additional factor in lc(g)
+kjp0max=10000           # bound on the additional factor in lc(g)
 
 ###########################################################################
 # Sieve
