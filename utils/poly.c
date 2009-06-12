@@ -102,6 +102,7 @@ void poly_print(const poly_t f) {
 
 
 void cleandeg(poly_t f, int deg) {
+  ASSERT(deg >= -1);
   while ((deg >= 0) && (mpz_cmp_ui(f->coeff[deg], 0)==0))
     deg--;
   f->deg = deg;
@@ -137,7 +138,14 @@ void poly_setcoeff_str(poly_t f, int i,char *str, int base) {
 }
 
 void poly_getcoeff(mpz_t res, int i, const poly_t f) {
-  mpz_set(res,f->coeff[i]);
+  // The code below will work anyway, 
+  // this assert is better called a warning.
+  ASSERT_ALWAYS( f->deg == -1 ||  f->deg>=i ); 
+
+  if(i > f->deg)
+    mpz_set_ui(res,0);
+  else
+    mpz_set(res,f->coeff[i]);
 }
 
 // We set the first l coefficients of f to the first l members of clist.
@@ -170,8 +178,18 @@ int poly_is_constant(const poly_t f) {
 }
 
 
-#if 1 /* used in fast_rootsieve */
+#if 1 
+/* used in fast_rootsieve */
 void poly_add(poly_t f, const poly_t g, const poly_t h) {
+
+  if(f==h || f==g) {
+    poly_t aux;
+    poly_alloc(aux,-1);
+    poly_add(aux,g,h);
+    poly_copy(f,aux);
+    poly_free(aux);
+    return;
+  }
   int i, maxdeg;
   mpz_t z;
 
@@ -184,8 +202,10 @@ void poly_add(poly_t f, const poly_t g, const poly_t h) {
       mpz_set(z, g->coeff[i]);
     else
       mpz_set_ui(z, 0);
-    if (i <= h->deg)
-      mpz_add(z, z, h->coeff[i]);
+    if (i <= h->deg) {
+      //ASSERT_ALWAYS(h->alloc >= h->deg+1);
+      mpz_add(z, z, h->coeff[i]);      
+    }
     poly_setcoeff(f, i, z);
   }
   mpz_clear(z);
@@ -271,15 +291,21 @@ poly_sub_ui (poly_t f, unsigned long a)
 }
 
 /* f <- (g/a) mod m */
-// We suppose f already allocated, and we suppose the coefficients of g are multiples of a.
-void poly_div_ui_mod_ui(poly_t f, const poly_t g, unsigned long a, const unsigned long m) {
+
+void poly_div_ui_mod_ui(poly_t f, const poly_t g, const unsigned long a, const unsigned long m) {
 
   int i;
+  mpz_t aux;
   
-  for (i = 0 ; i<= g->deg; ++i) {      
-    mpz_divexact_ui(f->coeff[i],g->coeff[i],a);
-    mpz_mod_ui(f->coeff[i],f->coeff[i],m);
+  mpz_init(aux);
+  
+  for (i = g->deg ; i>=0; --i) {      
+    mpz_divexact_ui(aux,g->coeff[i],a);
+    mpz_mod_ui(aux,aux,m);
+    poly_setcoeff(f,i,aux);
   }
+
+  mpz_clear(aux);
     
 }
 
@@ -308,17 +334,17 @@ poly_div_2_mod_mpz (poly_t f, const poly_t g, const mpz_t m)
 
 void poly_eval(mpz_t res, const poly_t f, const mpz_t x) {
 		
-		int i, d;
-		d = f->deg;
-		if (d == -1) {
-				mpz_set_ui(res, 0);
-				return;
-		}
-		mpz_set(res, f->coeff[d]);
-		for (i = d-1; i>=0; --i) {
-				mpz_mul(res, res, x);
-				mpz_add(res, res, f->coeff[i]);
-		}
+  int i, d;
+  d = f->deg;
+  if (d == -1) {
+    mpz_set_ui(res, 0);
+    return;
+  }
+  mpz_set(res, f->coeff[d]);
+  for (i = d-1; i>=0; --i) {
+    mpz_mul(res, res, x);
+    mpz_add(res, res, f->coeff[i]);
+  }
 
 }	
 
@@ -987,20 +1013,20 @@ poly_sqr_mod_f_mod_mpz (poly_t Q, const poly_t P, const poly_t f,
 }
 
 // Affects the derivative of f to df. Assumes df different from f.
-// Assumes df has NOT been initialized.
+// Assumes df has been initialized with degree at least f->deg-1.
 void poly_derivative(poly_t df, const poly_t f) {
 
   int n;
 
   if (poly_is_constant(f)) {
-    poly_alloc(df,0);
+    df->deg = -1;    
     return;	
   }	
 
   // at this point, f->deg >=1
-  poly_alloc(df,f->deg-1);
+  df->deg = f->deg-1;
 
-  for( n=0 ; n<=f->deg-1 ; n++ )
+  for( n=0 ; n<=f->deg-1 ; n++ )    
     mpz_mul_si(df->coeff[n],f->coeff[n+1],n+1);
   
 }

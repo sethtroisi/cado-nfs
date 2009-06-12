@@ -3,9 +3,8 @@
 
 typedef struct {
   double * sarr;
-  int B;
-  long U0,U1,V0,V1;
-  double global_offset;
+  unsigned long B;
+  long U0,U1,V0,V1;  
   poly_t f,g,fdg_gdf,gmodp;
   long space;
   int m0;
@@ -29,7 +28,7 @@ void extend_ppow_list(rootsieve_dictionary rdict,int newlength, unsigned long p)
 long light_rectangle (double * alpha, long u0, long v0, long us, long vs, long skew, long U0, long U1, long V0, long V1, double contribution);
 
 // Polynomials
-void poly_alloc_identity(poly_t f); 
-void compose_psi(poly_t f, const poly_t g,unsigned long l,rootsieve_dictionary rdict);
-void compose_reduce(poly_t f, const poly_t g,unsigned long l,rootsieve_dictionary rdict, mpz_t m);
+void poly_set_identity(poly_t f); 
+void compose_psi(poly_t f, const poly_t g,unsigned long l,mpz_t * ppow,int maxpow);
+void compose_reduce(poly_t f, const poly_t g,unsigned long l,mpz_t * ppow,int maxpow, mpz_t m);
 
