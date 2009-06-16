@@ -38,14 +38,14 @@
 #define DEFAULT_I 12
 
 /* default bucket region: 2^15 = 32K == close to L1 size */
-#ifndef BUCKET_REGION
-#define BUCKET_REGION 15
+#ifndef LOG_BUCKET_REGION
+#define LOG_BUCKET_REGION 15
 #endif
 
 /* These parameters control the size of the buckets. 
  * The number of updates that a bucket can accumulate is estimated as
  *   (loglog(factor base bound) - loglog(bucket sieving threshold)) 
- *     * BUCKET_LIMIT_FACTOR + BUCKET_LIMIT_ADD 
+ *     * BUCKET_LIMIT_FACTOR * I * J + BUCKET_LIMIT_ADD 
  * We don't store updates where 2|gcd(i,j) which reduces the number 
  * of updates by about 1/4, so 0.8 should be safe.
  */
@@ -103,7 +103,6 @@ typedef struct {
     int bucket_thresh;    // bucket sieve primes >= bucket_thresh
     int bucket_region;    // should be around L1 cache size, a power of 2
                           // and a multiple of I.
-    int log_bucket_region;
     int nb_buckets;
     int bucket_limit;   // maximal number of bucket_reports allowed in one bucket.
     unsigned int degree;   /* polynomial degree */
@@ -235,13 +234,12 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int logI, uint64_t q0,
 
   // bucket info
   // TODO: be more clever, here.
-  si->log_bucket_region = BUCKET_REGION;
   si->bucket_thresh = si->I; /* Default value */
   if (si->bucket_thresh < bucket_thresh)
     si->bucket_thresh = bucket_thresh;
-  ASSERT_ALWAYS(si->log_bucket_region > si->logI); /* so that we sieve an even
+  ASSERT_ALWAYS(LOG_BUCKET_REGION > si->logI); /* so that we sieve an even
                                                       number of rows */
-  si->bucket_region = 1<<si->log_bucket_region;
+  si->bucket_region = 1<<LOG_BUCKET_REGION;
   si->nb_buckets = 1 + (si->I * si->J - 1) / si->bucket_region;
 
   double limit_factor = log(log(MAX(cpoly->rlim, cpoly->alim))) - 
@@ -249,7 +247,6 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int logI, uint64_t q0,
   si->bucket_limit = limit_factor * si->bucket_region * BUCKET_LIMIT_FACTOR 
                      + BUCKET_LIMIT_ADD; 
 
-  fprintf(output, "# log_bucket_region = %u\n", si->log_bucket_region);
   fprintf(output, "# bucket_region = %u\n", si->bucket_region);
   fprintf(output, "# nb_buckets = %u\n", si->nb_buckets);
   fprintf(output, "# bucket_limit = %u\n", si->bucket_limit);
@@ -729,10 +726,10 @@ fill_in_buckets(bucket_array_t *BA_param, factorbase_degn_t *fb,
 
         for (nr = 0; nr < fb->nr_roots; ++nr) {
             const uint32_t I = si->I;
-            const uint32_t logI = si->logI;
+            const uint32_t even_mask = (1U << si->logI) | 1U;
             const uint32_t maskI = I-1;
-            const uint32_t maskbucket = si->bucket_region - 1;
-            const int shiftbucket = si->log_bucket_region;
+            const uint32_t maskbucket = (1U << LOG_BUCKET_REGION) - 1;
+            const int shiftbucket = LOG_BUCKET_REGION;
             const uint32_t IJ = si->I * si->J;
             fbprime_t r, R;
 
@@ -788,9 +785,7 @@ fill_in_buckets(bucket_array_t *BA_param, factorbase_degn_t *fb,
             x = (I>>1);
             // Skip (0,0), since this can not be a valid report.
             {
-                uint32_t i;
-                /* i = x & maskI;  ??? x = I/2, maskI = I-1, so x < maskI */
-		i = x;
+                uint32_t i = x;
                 if (i >= pli.b1)
                     x += pli.a;
                 if (i < pli.b0)
@@ -806,7 +801,7 @@ fill_in_buckets(bucket_array_t *BA_param, factorbase_degn_t *fb,
                 i = x & maskI;   // x mod I
                 /* if both i = x % I and j = x / I are even, then
                    both a, b are even, thus we can't have a valid relation */
-                if ((x | (x >> logI)) & 1)
+                if (x & even_mask)
                   {
                     update.x = (uint16_t) (x & maskbucket);
 #ifdef PROFILE
@@ -1900,7 +1895,7 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
           }
         surv++;
 
-        X = x + (N << si->log_bucket_region);
+        X = x + (N << LOG_BUCKET_REGION);
         i = abs ((int) (X & (si->I - 1)) - si->I / 2);
         j = X >> si->logI;
         if (bin_gcd (i, j) != 1)
