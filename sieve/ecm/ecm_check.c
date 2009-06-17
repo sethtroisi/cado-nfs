@@ -32,18 +32,25 @@ main (int argc, char *argv[])
   int ep = 0, verbose = 0;
   ecm_plan_t plan[1];
 
-  if (argc > 1 && argv[1][0] == '-' && argv[1][1] == 'v')
+  if (argc > 1 && argv[1][0] == '-')
     {
-      verbose = 1;
-      argc--;
-      argv++;
-    }
-
-  if (argc > 1 && argv[1][0] == '-' && argv[1][1] == 'e' && argv[1][2] == 'p')
-    {
-      ep = 1;
-      argc--;
-      argv++;
+      if (argv[1][1] == 'v')
+        {
+          verbose = 1;
+          argc--;
+          argv++;
+        }
+      else if (argv[1][1] == 'e' && argv[1][2] == 'p')
+        {
+          ep = 1;
+          argc--;
+          argv++;
+        }
+      else
+        {
+          fprintf (stderr, "Unknown parameter %s\n", argv[1]);
+          exit(EXIT_FAILURE);
+        }
     }
 
   if (argc != 4)
