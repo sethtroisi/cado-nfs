@@ -47,7 +47,6 @@ void cleandeg(poly_t f, int deg);
 void poly_setcoeff(poly_t f, int i, const mpz_t z);
 void poly_setcoeff_str(poly_t f, int i,char *str, int base);
 void poly_getcoeff(mpz_t res, int i, const poly_t f); // Added for rootsieve
-void poly_set(poly_t f, const mpz_t * clist, int d);// Added for rootsieve
 void poly_copy(poly_t g, const poly_t f);
 
 // Polynomial operations

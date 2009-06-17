@@ -132,7 +132,7 @@ void poly_setcoeff_str(poly_t f, int i,char *str, int base) {
       mpz_init(f->coeff[j]);
     f->alloc = i+1;
   }
-  mpz_set_str(f->coeff[i],str, base);
+  mpz_set_str(f->coeff[i],str,base);
   if (i >= f->deg) 
     cleandeg(f, i);
 }
@@ -147,19 +147,6 @@ void poly_getcoeff(mpz_t res, int i, const poly_t f) {
   else
     mpz_set(res,f->coeff[i]);
 }
-
-// We set the first l coefficients of f to the first l members of clist.
-// We assume the allocation has been done and that we have enough space.
-void poly_set(poly_t f, const mpz_t * clist, int d) {
-
-   int i;
-
-   for( i=0 ; i<=d ; i++)
-     mpz_set(f->coeff[i],clist[i]);
-
-   f->deg = d;
- }
-
 
 // g must be allocated. 
 void poly_copy(poly_t g, const poly_t f) {
@@ -745,6 +732,7 @@ poly_reduce_mod_mpz (poly_t Q, const poly_t P, const mpz_t m)
     poly_setcoeff(Q, i, aux);
   }
   mpz_clear(aux);
+  cleandeg(Q,Q->deg);
 }
 
 /* return a list of polynomials P[0], P[1], ..., P[l] such that
