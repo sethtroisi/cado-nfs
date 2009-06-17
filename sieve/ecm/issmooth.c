@@ -1,15 +1,23 @@
-/* Reads integers pairs "p O N" from stdin and checks N for smoothness, 
-   where smooth is defined as
+/* Reads integers "N", or "p N", or "p O N" from stdin and checks N for 
+     smoothness, where smooth is defined as
      For given B1, B2, k, d,
-     N is smooth if N/gcd(N,E) is 1 or is a prime B1 < p <= B2,
-     or is coprime to d and <d/2, or divides d,
+     N is smooth if c=N/gcd(N,E) is 1 or is prime and B1 < c <= B2,
+     or c is coprime to d and <d/2, or c divides d,
      where E = k * lcm(1, 2, 3, ..., B1).
    By default, k=1 and d=1, so that they have no effect.
-   With -pmin and -pmax, test only those input where pmin <= p <= pmax
+   The purpose of the value d is including those N where ECM would find 
+     the factor during stage 2 initialisation. 
+   With -pmin and -pmax, test only those input where pmin <= p <= pmax,
+     (or pmin <= N <= pmax if input has no p value).
    Prints the number of smooth numbers, and with -v option each "p O N" 
-   where N is smooth. 
-   Also prints the average exponent of primes up to 19 in O/N 
-   (which requires N|O).
+     where N is smooth. 
+   Several B2 can be specified on the command line (but only one B1 value).
+     For each B2, the number of smooth N are counted.
+   If an "m" value can be specified, the number of input numbers and smooth 
+     (w.r.t. the largest B2) numbers with p==r (mod m) for the possible r
+     are also counted and printed.
+   Also prints the average exponent of primes up to 19 in N and in O/N 
+     (which requires N|O).
 */
 
 #include <stdio.h>
@@ -66,7 +74,7 @@ int
 main (int argc, char **argv)
 {
   mpz_t E, m_c;
-  unsigned long N, O, c, p, i, j;
+  unsigned long N, O, c, c_gcdiv_d, p, i, j, imin = 0, imax = 0;
   /* Parameters */
   unsigned long B1, *B2, maxB2, k = 1, d = 1, pmin = 0, pmax = ULONG_MAX, m = 1;
   int quiet = 0, verbose = 0;
@@ -156,6 +164,11 @@ main (int argc, char **argv)
     d_coprime[i] = (gcd(i,d) == 1) ? 1 : 0;
   for (i = 0; i < NR_EXPONENTS; i++)
     exp_order[i] = exp_index[i] = 0;
+  if (d > 1)
+    {
+      imin = (B1 + d / 2) / d;
+      imax = (maxB2 - d / 2) / d;
+    }
   
   /* Compute E */
   mpz_init (E);
@@ -198,9 +211,11 @@ main (int argc, char **argv)
             N = O;
           res_input[p % m]++;
           c = N / mpz_gcd_ui (NULL, E, N);
-          if (c == 1UL || 
-              d % c == 0UL || (c < d / 2 && d_coprime[c] == 1) ||
-              (B1 < c && c <= maxB2 && isprime(c, m_c)))
+          c_gcdiv_d = c / gcd (c, d);
+          if (c_gcdiv_d == 1UL || /* c == 1 (factor found after stage 1) || c | d */
+              (imin <= c_gcdiv_d && c_gcdiv_d <= imax) || /* factor appears in list of idP */
+              (c < d / 2 && d_coprime[c] == 1) || /* factor appears in list of jP */
+              (B1 < c && c <= maxB2 && isprime(c, m_c))) /* factor appears normally in stage 2 */
             {
               for (i = 0; i < nr_B2; i++)
                 smooth[i] += (c <= B2[i]) ? 1UL : 0UL;
