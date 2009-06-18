@@ -38,6 +38,14 @@
 #define GF2X_WORDSIZE  (8 * SIZEOF_UNSIGNED_LONG)
 #endif
 
+#ifndef	MAYBE_UNUSED
+#if defined(__GNUC__)
+#define MAYBE_UNUSED __attribute__ ((unused))
+#else
+#define MAYBE_UNUSED
+#endif
+#endif
+
 /* These flags are for internal use */
 #define	GF2X_SELECT_KARA	0	/* do not change ! */
 #define	GF2X_SELECT_TC3		1
@@ -75,15 +83,8 @@ extern short gf2x_best_utoom(unsigned int);
 extern long gf2x_toomuspace(long);
 
 
-extern void gf2x_mul_fft0(unsigned long *c, const unsigned long *a, long an,
-	     const unsigned long *b, long bn, long K, long M);
-extern void gf2x_mul_fft(unsigned long *c, const unsigned long *a, long an,
-		            const unsigned long *b, long bn, long K);
-extern void gf2x_mul_fft1(unsigned long *c, long cn,
-	     const unsigned long *aa, long an,
-	     const unsigned long *bb, long bn, long K, long M);
-extern void gf2x_mul_fft2(unsigned long *c, const unsigned long *a, long an,
-	     const unsigned long *b, long bn, long K);
+extern void gf2x_mul_fft(unsigned long *c, const unsigned long *a, size_t an,
+		            const unsigned long *b, size_t bn, long K);
 
 
 /* tunetoom.c need to poke into toom.c's tables ; that's very ugly. So

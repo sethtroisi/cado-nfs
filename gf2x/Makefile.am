@@ -10,6 +10,7 @@ nobase_include_HEADERS=gf2x.h	\
 # All these are generated.
 nobase_nodist_include_HEADERS=	\
 		gf2x/gf2x-config.h		\
+		gf2x/gf2x-tfft.h		\
 		gf2x/gf2x-thresholds.h		\
 		gf2x/gf2x_mul1.h		\
 		gf2x/gf2x_mul2.h		\

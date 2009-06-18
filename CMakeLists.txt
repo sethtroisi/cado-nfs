@@ -147,19 +147,12 @@ include_directories (${CADO_NFS_SOURCE_DIR})
 include_directories (${CADO_NFS_SOURCE_DIR}/utils)
 include_directories (${CADO_NFS_BINARY_DIR})
 
-link_directories (${CADO_NFS_BINARY_DIR}/utils)
-link_directories (${CADO_NFS_BINARY_DIR}/gf2x)
+# link_directories (${CADO_NFS_BINARY_DIR}/utils)
+# link_directories (${CADO_NFS_BINARY_DIR}/gf2x/.libs)
+# link_directories (${CADO_NFS_BINARY_DIR}/cantor)
 
-# Start with cantor since it so easily fails when -msse2 has accidentally been
-# forgotten on a P4 build.
-add_subdirectory (cantor)
-add_subdirectory (utils)
-add_subdirectory (polyselect)
-add_subdirectory (sieve)
-add_subdirectory (sqrt)
-add_subdirectory (linalg)
-add_subdirectory (merge)
-add_subdirectory (linalg/bwc)
+include_directories(${CADO_NFS_SOURCE_DIR}/gf2x)
+include_directories(${CADO_NFS_BINARY_DIR}/gf2x)
 
 add_custom_command(OUTPUT ${CADO_NFS_BINARY_DIR}/gf2x/Makefile
     COMMAND mkdir -p ${CADO_NFS_BINARY_DIR}/gf2x
@@ -167,12 +160,23 @@ add_custom_command(OUTPUT ${CADO_NFS_BINARY_DIR}/gf2x/Makefile
     COMMENT "Configuring gf2x"
 )
 
-add_custom_target(gf2x ALL
+add_custom_target(gf2x-build ALL
     DEPENDS ${CADO_NFS_BINARY_DIR}/gf2x/Makefile
     WORKING_DIRECTORY gf2x
     COMMAND make
     COMMENT "Building gf2x"
 )
+
+set(GF2X_LIB_FILE  ${CADO_NFS_BINARY_DIR}/gf2x/.libs/libgf2x.a)
+
+add_subdirectory (gf2x-fft)
+add_subdirectory (utils)
+add_subdirectory (polyselect)
+add_subdirectory (sieve)
+add_subdirectory (sqrt)
+add_subdirectory (linalg)
+add_subdirectory (merge)
+add_subdirectory (linalg/bwc)
 
 set(package_basename cado-nfs-${CADO_VERSION})
 

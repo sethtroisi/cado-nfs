@@ -4,9 +4,55 @@
 
 load "/tmp/toto";
 PP := PolynomialRing(GF(2));
+x := PP.1;
+F128<z> := ext<GF(2) | x^128 + x^7 + x^2 + x + 1>;
+P128<x> := PolynomialRing(F128);
+readpoly:=func<l|PP!Intseq(Seqint(l,2^w),2)>;
+
+f1:=readpoly(f1);
+g1:=readpoly(g1);
+f2:=readpoly(f2);
+g2:=readpoly(g2);
+fake_h:=readpoly(fake_h);
+c128_h:=readpoly(c128_h);
+
+readtrans_fake:=readpoly;
+readtrans_c128:=func<l|P128![F128!PP!Intseq(x, 2):x in Intseq(Seqint(l,2^w),2^128)]>;
+
+fake_tf1:=readtrans_fake(fake_tf1);
+fake_tg1:=readtrans_fake(fake_tg1);
+fake_tf2:=readtrans_fake(fake_tf2);
+fake_tg2:=readtrans_fake(fake_tg2);
+fake_th:=readtrans_fake(fake_th);
+
+c128_tf1:=readtrans_c128(c128_tf1);
+c128_tg1:=readtrans_c128(c128_tg1);
+c128_tf2:=readtrans_c128(c128_tf2);
+c128_tg2:=readtrans_c128(c128_tg2);
+c128_th:=readtrans_c128(c128_th);
+
+fake_tf1 eq f1;
+fake_tf2 eq f2;
+fake_tg1 eq g1;
+fake_tg2 eq g2;
+fake_th eq fake_h;
+f1*g1+f2*g2 eq fake_h;
+
+
+
+/////////////////////////////////////////////////
+
+load "/tmp/toto";
+PP := PolynomialRing(GF(2));
+x := PP.1;
+F128<z> := ext<GF(2) | x^128 + x^7 + x^2 + x + 1>;
+P128<x> := PolynomialRing(F128);
 F := PP!Intseq(Seqint(f, 2^w), 2);
 G := PP!Intseq(Seqint(g, 2^w), 2);
 FG := PP!Intseq(Seqint(fg, 2^w), 2);
+
+
+
 
 FG eq F*G;
 if FG ne F*G then

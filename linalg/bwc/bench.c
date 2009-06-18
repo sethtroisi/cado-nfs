@@ -198,9 +198,25 @@ void clear_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct 
     abclear(ba->xx, p->src, nc);
 }/*}}}*/
 
+void banner(int argc, char * argv[])
+{
+    /* print command line */
+    fprintf (stderr, "# (%s) %s", CADO_REV, (argv)[0]);
+    for (int i = 1; i < (argc); i++)
+        fprintf (stderr, " %s", (argv)[i]);
+    fprintf (stderr, "\n");
+
+#ifdef  __GNUC__
+    fprintf(stderr, "# Compiled with gcc " __VERSION__ "\n");
+#endif
+    fprintf(stderr, "# Compilation flags " CFLAGS "\n");
+}
+
 int main(int argc, char * argv[])
 {
     struct bench_args ba[1];
+
+    banner(argc, argv);
 
     abobj_init(ba->xx);
 

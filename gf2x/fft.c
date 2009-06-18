@@ -23,15 +23,23 @@
  * Bit-aligned version. */
 
 #include <stdio.h>
-#include <stdint.h> /* for int64_t in Lshift */
-#include <stdlib.h> /* for int64_t in Lshift */
+#include <stdint.h> /* for uint64_t in Lshift */
+#include <inttypes.h> /* for PRIu64 */
+#include <stdlib.h>
+#include <string.h>
+
+#include <stdarg.h> /* for the fft interface */
 
 #include "gf2x.h"
 #include "gf2x/gf2x-impl.h"
+#include "gf2x/gf2x-tfft.h"
+
 
 // #define DEBUG
-// #define DEBUG_LSHIFT
-// #define DEBUG_MULMOD
+// #define DEBUG_LSHIFT    100     /* trace only if N >= <value> */
+// #define DEBUG_MULMOD    100     /* trace only if N >= <value> */
+// #define DEBUG_FFT       100     /* trace only if K >= <value> */
+// #define DEBUG_RECOMPOSE 1     /* trace only if K >= <value> */
 // #define VERBOSE
 // #define TIMING
 
@@ -47,77 +55,113 @@
 #error "MUL_FFT_THRESHOLD too small, should be at least 28"
 #endif
 
-/* Assume wordlength  WLEN is 32 or 64 */
+/* Assume wordlength WLEN is 32 or 64 */
 
 # define WLEN GF2X_WORDSIZE
 
+/** Some support functions. **/
+
 /* CEIL(a,b) = ceiling(a/b) */
-#define CEIL(a,b) (1 + ((a)-1)/(b))
+static inline size_t CEIL(size_t a, size_t b)
+{
+    return ((a)+(b)-1)/(b);
+}
 
 /* W(b) is the number of words needed to store b bits */
-#define W(b) CEIL(b,WLEN)
+static inline size_t W(size_t b)
+{
+    return CEIL(b, WLEN);
+}
 
 /* I(b) is the index word of bit b, assuming bits 0..WLEN-1
    have index 0 */
-#define I(b) ((b) / WLEN)
+static inline size_t I(size_t b)
+{
+    return b / WLEN;
+}
 
-#define R(b) ((b) % WLEN)
-#define R2(b) ((WLEN - R(b)) % WLEN)	/* remaining bits */
+static inline size_t R(size_t b)
+{
+    return b % WLEN;
+}
 
-#define MASK(x) ((1UL << (x)) - 1UL)
+static inline size_t R2(size_t b)       /* remaining bits */
+{
+    return (-b) % WLEN;
+}
+
+static inline unsigned long MASK(size_t x)
+{
+    ASSERT(x < WLEN);
+    return ((1UL << (x)) - 1UL);
+}
 
 /* GETBIT(a,i)   gets the i-th bit of the bit-array starting at a[0],
    XORBIT(a,i,x) xors this bit with the bit x, where x = 0 or 1.   */
-
-#define GETBIT(a,i) ((a[(i)/WLEN] >> ((i)%WLEN))&1)
-
-#define XORBIT(a,i,x) (a[(i)/WLEN] ^= ((x)) << ((i)%WLEN))
-
-static void * malloc_or_die(size_t size)
+static inline unsigned long GETBIT(unsigned long *a, size_t i)
 {
-    void * res = malloc(size);
+    return (a[I(i)] >> R(i)) & 1UL;
+}
+
+static inline void XORBIT(unsigned long *a, size_t i, unsigned long x)
+{
+    ASSERT((x & ~1UL) == 0);
+    a[I(i)] ^= x << R(i);
+}
+
+/* Don't define MIN, MAX, ABS as inlines, as they're already quite
+ * customarily defined as macros */
+#ifndef MAX
+#define MAX(h,i) ((h) > (i) ? (h) : (i))
+#endif
+#ifndef MIN
+#define MIN(h,i) ((h) < (i) ? (h) : (i))
+#endif
+#ifndef ABS
+#define ABS(h) ((h) < 0 ? -(h) : (h))
+#endif
+
+static void *malloc_or_die(size_t size)
+{
+    void *res = malloc(size);
     if (res == NULL)
-        abort();
+	abort();
     return res;
 }
 
-static void Copy(unsigned long *a, const unsigned long *b, long n)
+static inline void Copy(unsigned long *a, const unsigned long *b, size_t n)
 {
-    ASSERT(n >= 0);
-    for (long i = 0; i < n; i++)
-	a[i] = b[i];
+    memcpy(a, b, n * sizeof(unsigned long));
 }
 
-static void Zero(unsigned long *a, long n)
+static inline void Zero(unsigned long *a, size_t n)
 {
-    ASSERT(n >= 0);
-    for (long i = 0; i < n; i++)
-	a[i] = 0;
+    memset(a, 0, n * sizeof(unsigned long));
 }
 
-static void Clear(unsigned long *a, long low, long high)
+static inline void Clear(unsigned long *a, size_t low, size_t high)
 {
-    for (long i = low; i < high; i++)
-	a[i] = 0;
+    if (high > low)
+	memset(a + low, 0, (high - low) * sizeof(unsigned long));
 }
+
+/** Now the specific things */
 
 /* a <- b + c */
 
 static void AddMod(unsigned long *a, unsigned long *b, unsigned long *c,
-		   long n)
+		   size_t n)
 {
-    ASSERT(n >= 0);
-    for (long i = 0; i < n; i++)
+    for (size_t i = 0; i < n; i++)
 	a[i] = b[i] ^ c[i];
 }
 
 /* c <- a * x^k, return carry out, 0 <= k < WLEN */
 
-static unsigned long Lsh(unsigned long *c, unsigned long *a, long n, long k)
+static unsigned long Lsh(unsigned long *c, unsigned long *a, size_t n, size_t k)
 {
     unsigned long t, cy = 0;
 
-    ASSERT(n >= 0);
     if (k == 0) {
 	if (c != a)
 	    Copy(c, a, n);
@@ -127,7 +171,9 @@ static unsigned long Lsh(unsigned long *c, unsigned long *a, long n, long k)
     /* {c, n} and {a, n} should not overlap */
     ASSERT(c <= a || a + n <= c);
 
-    for (long i = 0; i < n; i++) {
+    ASSERT(k > 0);
+
+    for (size_t i = 0; i < n; i++) {
 	t = (a[i] << k) | cy;
 	cy = a[i] >> (WLEN - k);
 	c[i] = t;
@@ -137,12 +183,11 @@ static unsigned long Lsh(unsigned long *c, unsigned long *a, long n, long k)
 
 /* c <- c + a * x^k, return carry out, 0 <= k < WLEN */
 
-static unsigned long AddLsh(unsigned long *c, unsigned long *a, long n,
-			    long k)
+static unsigned long AddLsh(unsigned long *c, unsigned long *a, size_t n,
+			    size_t k)
 {
     unsigned long t, cy = 0;
 
-    ASSERT(n >= 0);
     if (k == 0) {
 	AddMod(c, c, a, n);
 	return 0;
@@ -151,7 +196,9 @@ static unsigned long AddLsh(unsigned long *c, unsigned long *a, long n,
     /* {c, n} and {a, n} should not overlap */
     ASSERT(c <= a || a + n <= c);
 
-    for (long i = 0; i < n; i++) {
+    ASSERT(k > 0);
+
+    for (size_t i = 0; i < n; i++) {
 	t = (a[i] << k) | cy;
 	cy = a[i] >> (WLEN - k);
 	c[i] ^= t;
@@ -161,19 +208,20 @@ static unsigned long AddLsh(unsigned long *c, unsigned long *a, long n,
 
 /* c <- a / x^k, return carry out, 0 <= k < WLEN */
 
-static unsigned long Rsh(unsigned long *c, const unsigned long *a, long n,
-			 long k)
+static unsigned long Rsh(unsigned long *c, const unsigned long *a, size_t n,
+			 size_t k)
 {
     unsigned long t, cy = 0;
 
-    ASSERT(n >= 0);
     if (k == 0) {
 	if (c != a)
 	    Copy(c, a, n);
 	return 0;
     }
 
-    for (long i = n - 1; i >= 0; i--) {
+    ASSERT(k > 0);
+
+    for (size_t i = n; i-- ; ) {
 	t = (a[i] >> k) | cy;
 	cy = a[i] << (WLEN - k);
 	c[i] = t;
@@ -183,18 +231,19 @@ static unsigned long Rsh(unsigned long *c, const unsigned long *a, long n,
 
 /* c <- c + a / x^k, return carry out, 0 <= k < WLEN */
 
-static unsigned long AddRsh(unsigned long *c, unsigned long *a, long n,
-			    long k)
+static unsigned long AddRsh(unsigned long *c, unsigned long *a, size_t n,
+			    size_t k)
 {
     unsigned long t, cy = 0;
 
-    ASSERT(n >= 0);
     if (k == 0) {
 	AddMod(c, c, a, n);
 	return 0;
     }
 
-    for (long i = n - 1; i >= 0; i--) {
+    ASSERT(k > 0);
+
+    for (size_t i = n ; i-- ; ) {
 	t = (a[i] >> k) | cy;
 	cy = a[i] << (WLEN - k);
 	c[i] ^= t;
@@ -206,8 +255,8 @@ static unsigned long AddRsh(unsigned long *c, unsigned long *a, long n,
 // unused
 /* c <- x^j * a / x^k */
 
-static unsigned long LshRsh(unsigned long *c, unsigned long *a, long n,
-			    long j, long k)
+static unsigned long LshRsh(unsigned long *c, unsigned long *a, size_t n,
+			    size_t j, size_t k)
 {
     ASSERT(n >= 0);
     if (j > k)
@@ -218,40 +267,40 @@ static unsigned long LshRsh(unsigned long *c, unsigned long *a, long n,
 
 #endif
 
-#if (defined(DEBUG) || defined(DEBUG_LSHIFT) || defined(DEBUG_MULMOD))
+#if (defined(DEBUG) || defined(DEBUG_LSHIFT) || defined(DEBUG_MULMOD) || defined(DEBUG_RECOMPOSE))
 
-static void dump(const unsigned long *a, long n)
+static void dump(const unsigned long *a, size_t n)
 {
-    for (long i = 0; i < n; i++) {
-	printf("+%lu*X^%lu", a[i], i);
-	if ((i + 1) % 3 == 0)
-	    printf("\n");
+    printf("[");
+    for (size_t i = 0; i < n; i++) {
+        if (i) printf(", ");
+	printf("%lu", a[i]);
     }
-    printf(":\n");
+    printf("];\n");
 }
 #endif
 
 /* a <- b * x^k mod x^(2*N)+x^N+1.
    Assume a and b do not overlap.
 */
-static void Lshift(unsigned long *a, unsigned long *b, int64_t k, long N)
+static void Lshift(unsigned long *a, unsigned long *b, uint64_t k, size_t N)
 {
-    long r, h, l, n, ih, il;
+    size_t r, h, l, n, ih, il;
     unsigned long s1=0, s2=0; // hush gcc
-
-    ASSERT(k >= 0);
 
     n = W(2 * N);
 
 #ifdef DEBUG_LSHIFT
-    printf("R:=x^%u+x^%u+1: k:=%ld:\nb:=", 2 * N, N, k);
-    dump(b, n);
+    if (N >= DEBUG_LSHIFT) {
+        // printf("R:=x^%u+x^%u+1: k:=%ld:\nb:=", 2 * N, N, k);
+        printf("N:=%zu; k:=%"PRIu64"; // R:=x^%zu+x^%zu+1\n", N, k, 2 * N, N);
+        printf("b:="); dump(b, n);
+    }
 #endif
 
     k = k % (3 * N);
 
-    ASSERT(0 <= k && k < 3 * N);
-    ASSERT(n >= 0);
+    ASSERT(k < 3 * N);
 
     if (k == 0) {
 	if (a != b)
@@ -266,9 +315,10 @@ static void Lshift(unsigned long *a, unsigned long *b, int64_t k, long N)
 	   L0 has l bits, L1 has h bits, L2 has l bits, H has h bits
 	 */
 	h = k;			/* 1 <= h <= N */
+        ASSERT(h <= N);
+        ASSERT(1 <= h);
 	l = N - h;		/* 0 <= l < N */
 	/* A <- 0:L0:L1:L2 */
-	ASSERT(W(N + l) >= 0);
 	s1 = Lsh(a + I(h), b, W(N + l), R(h));
 	/* b[W(N + l)-1] has R2(N+l) bits from H, thus s1 has no bit from L
 	   if R(h) <= R2(N+l), and R(h)-R2(N+l) bits from L otherwise */
@@ -322,17 +372,26 @@ static void Lshift(unsigned long *a, unsigned long *b, int64_t k, long N)
 	/* now we have a = H0:H1 */
 	if (R(N) > 0)
 	    s1 = a[I(N)];
-	ASSERT(I(N) >= 0);
-	s2 = Lsh(a + I(N), a, I(N), R(N));
-	if (R(N) > 0) {
-	    a[I(N)] ^= s1;	/* restore high R(N) bits */
-	    a[2 * I(N)] = s2 ^ (s1 << R(N));
-	    if (2 * R(N) > WLEN)
-		a[2 * I(N) + 1] = s1 >> (WLEN - R(N));
-	}
+	// ASSERT(I(N) >= 0);
+        // we may have I(N) == 0 here.
+        if (I(N)) {
+            s2 = Lsh(a + I(N), a, I(N), R(N));
+            if (R(N) > 0) {
+                a[I(N)] ^= s1;	/* restore high R(N) bits */
+                a[2 * I(N)] = s2 ^ (s1 << R(N));
+                if (2 * R(N) > WLEN)
+                    a[2 * I(N) + 1] = s1 >> (WLEN - R(N));
+            }
+        } else {
+            assert(R(N));
+            a[I(N)] ^= s1 << R(N);
+            if (2 * R(N) > WLEN)
+                a[2 * I(N) + 1] = s1 >> (WLEN - R(N));
+        }
 	/* now we have a = H0:H1:H0:H1 */
 	AddRsh(a, b + I(N + l), W(2 * N) - I(N + l), R(N + l));
 	/* now we have a = H0+H2:H1:H0:H1 */
+        /* XXX We may have W(l) == 0 here */
 	s1 = AddLsh(a + I(N + h), b, W(l), R(N + h));
 	if (r > 0)		/* mask shifted low bits from H0 */
 	    a[I(N + h) + I(l)] ^= (b[I(l)] & ~MASK(R(l))) << R(N + h);
@@ -369,7 +428,7 @@ static void Lshift(unsigned long *a, unsigned long *b, int64_t k, long N)
 	ih = I(N + h);		/* index of lowest word from L in a */
 	if (R(N + h) > 0)	/* H2 and L share a common word a[ih] */
 	    s2 = a[ih];
-	ASSERT(W(l) >= 0);
+	// ASSERT(W(l) >= 0);
 	s1 = Lsh(a + ih, b, W(l), R(N + h));	/* H0:H1+L:H2:L */
 	/* b[W(l)-1] contains R2(l) bits of H0, thus if R(N+h) > R2(l),
 	   s1 contains R(N+h) - R2(l) bits of L */
@@ -383,8 +442,22 @@ static void Lshift(unsigned long *a, unsigned long *b, int64_t k, long N)
     if (r > 0)
 	a[n - 1] &= MASK(r);
 #ifdef DEBUG_LSHIFT
-    printf("a:=");
-    dump(a, n);
+    if (N >= DEBUG_LSHIFT) {
+        printf("a:=");
+        dump(a, n);
+        printf("check_lshift(N,k,a,b);\n");
+    }
+#if 0
+w:=64;
+function check_lshift(N,k,a,b)
+    KP<x>:=PolynomialRing(GF(2));
+    bb:=KP!Intseq(Seqint(b,2^w),2);
+    aa:=KP!Intseq(Seqint(a,2^w),2);
+    R:=x^(2*N)+x^N+1;
+    return aa eq (bb * x^k) mod R;
+end function;
+#endif
+    
 #endif
 }
 
@@ -395,20 +468,22 @@ static void Lshift(unsigned long *a, unsigned long *b, int64_t k, long N)
    a must have space for n words.
 */
 
-static void MulMod(unsigned long *a, unsigned long *b, unsigned long *c,
-		   long N, unsigned long *t, unsigned long *u)
+static void MulMod(unsigned long *a, const unsigned long *b, const unsigned long *c,
+		   size_t N, unsigned long *t, unsigned long *u)
 {
-    long n = W(2 * N), sh, l;
+    size_t n = W(2 * N), sh, l;
 
     /* FIXME: in practice N is divisible by a multiple of 3, thus if WLEN is
        a power of two, R(N) > 0 and W(N) = I(N) + 1, thus we can avoid a few
        tests below. */
 
 #ifdef DEBUG_MULMOD
-    printf("b:=");
-    dump(b, n);
-    printf("c:=");
-    dump(c, n);
+    if (N >= DEBUG_MULMOD) {
+        printf("b:=");
+        dump(b, n);
+        printf("c:=");
+        dump(c, n);
+    }
 #endif
     gf2x_mul_toom(t, b, c, n, u);	/* t = | L0:N | L1:N | H0:N | H1:N | */
     /* t mod x^(2*N)+x^(N)+1 = | L0+H0+H1:N | L1+H0:N | */
@@ -418,7 +493,8 @@ static void MulMod(unsigned long *a, unsigned long *b, unsigned long *c,
 	a[I(N)] &= MASK(R(N));
     if (I(N) < l)		/* necessarily l = I(N)+1 */
 	u[0] = a[l - 1];
-    ASSERT(I(N) >= 0);
+    // ASSERT(I(N) >= 0);
+    /* XXX We may have I(N) == 0 here */
     u[1] = Lsh(a + I(N), a, I(N), R(N));	/* H0:H0 */
     /* u[0] and a[1] have R(N) bits */
     if (I(N) < l) {
@@ -437,8 +513,23 @@ static void MulMod(unsigned long *a, unsigned long *b, unsigned long *c,
     if (sh > 0)
 	a[n - 1] &= MASK(sh);
 #ifdef DEBUG_MULMOD
-    printf("a:=");
-    dump(a, W(2 * N));
+    if (N >= DEBUG_MULMOD) {
+        printf("a:=");
+        dump(a, W(2 * N));
+        printf("check_mulmod(%zu,a,b,c);\n", N);
+    }
+
+#if 0
+w:=64;
+function check_mulmod(N,a,b,c)
+    KP<x>:=PolynomialRing(GF(2));
+    bb:=KP!Intseq(Seqint(b,2^w),2);
+    cc:=KP!Intseq(Seqint(c,2^w),2);
+    aa:=KP!Intseq(Seqint(a,2^w),2);
+    R:=x^(2*N)+x^N+1;
+    return aa eq (bb * cc) mod R;
+end function;
+#endif
 #endif
 }
 
@@ -446,7 +537,7 @@ static void MulMod(unsigned long *a, unsigned long *b, unsigned long *c,
    for 0 <= i < K such that j = bitrev(i).
 */
 
-static void bitrev(long i, long j, long K, long Z, long *perm)
+static void bitrev(size_t i, size_t j, size_t K, size_t Z, size_t *perm)
 {
     if (K == 1)
 	perm[i] = j;
@@ -456,6 +547,23 @@ static void bitrev(long i, long j, long K, long Z, long *perm)
 	bitrev(i + 2 * K / 3, j + 2 * Z, K / 3, 3 * Z, perm);
     }
 }
+
+#if defined(DEBUG_FFT) || defined(DEBUG_RECOMPOSE)
+void dump_stride(unsigned long ** A, size_t K, size_t stride, size_t twonp)
+{
+    printf("[");
+    for(size_t c = 0 ; c < K ; c++) {
+        if (c) printf(", ");
+        printf("[");
+        for(size_t l = 0 ; l < twonp ; l++) {
+            if (l) printf(", ");
+            printf("%lu", A[c * stride][l]);
+        }
+        printf("]");
+    }
+    printf("]");
+}
+#endif
 
 /* performs an FFT of length K on A[0], A[stride], A[(K-1)*stride] with
    omega=x^j as root of unity, where all computations are
@@ -468,17 +576,28 @@ static void bitrev(long i, long j, long K, long Z, long *perm)
    base-3 representation of i and j are reverse one from each other.
 */
 
-static void fft(unsigned long **A, int64_t K, int64_t j, long Np, long stride,
+static void fft(unsigned long **A, uint64_t K, uint64_t j, size_t Np, size_t stride,
 		unsigned long *t1, unsigned long *t2, unsigned long *t3,
-		long *p)
+		size_t *p)
 {
-    ASSERT(0 <= j && j < 3 * Np);
+    ASSERT(j < 3 * Np);
 
     if (K == 1)
 	return;
 
-    long i, k = K / 3, twonp = W(2 * Np);
-    int64_t ii;
+    size_t i, k = K / 3, twonp = W(2 * Np);
+    uint64_t ii;
+
+#ifdef  DEBUG_FFT
+    static unsigned long key;
+    unsigned long mykey = key++;
+
+    if (K >= DEBUG_FFT) {
+        printf("A_%lu:=", mykey);
+        dump_stride(A, K, stride, twonp);
+        printf(";\n");
+    }
+#endif
 
     fft(A, k, (3 * j) % (3 * Np), Np, 3 * stride, t1, t2, t3, p);
     fft(A + stride, k, (3 * j) % (3 * Np), Np, 3 * stride, t1, t2, t3, p);
@@ -505,27 +624,39 @@ static void fft(unsigned long **A, int64_t K, int64_t j, long Np, long stride,
 #undef a
 #undef b
 #undef c
+
+#ifdef  DEBUG_FFT
+    if (K >= DEBUG_FFT) {
+        printf("At_%lu:=", mykey);
+        dump_stride(A, K, stride, twonp);
+        printf(";\n");
+        printf("check_fft(A_%lu, At_%lu, %zu, %zu, %zu);\n",
+                mykey,mykey,K,j,Np);
+    }
+#if 0
+function check_fft(p, q, K, j, Np)
+    KP<x>:=PolynomialRing(GF(2));
+    R:=x^(2*Np)+x^Np+1;
+    perm:=[Seqint(Reverse(Intseq(u,3,Ilog(3,K))),3):u in [0..K-1]];
+    L<z>:=quo<KP|R>;
+    LP<T>:=PolynomialRing(L);
+    pp:=LP![L!Intseq(Seqint(u,2^64),2):u in p];
+    qq:=LP![L!Intseq(Seqint(u,2^64),2):u in q];
+    return qq eq LP![Evaluate(pp,z^(j*perm[1+i])):i in [0..K-1]];
+end function;
+#endif
+
+#endif
 }
 
 /* allocate A[0]...A[K-1], and put there {a, an} cut into K chunks of M bits;
    return pointer to block of memory containing A[0]...A[K-1] (to be freed
    by the calling routine) */
 
-static unsigned long *decompose(unsigned long **A, const unsigned long *a,
-				long an, long M, long K, long np)
+static void decompose(unsigned long **A, const unsigned long *a,
+				size_t an, size_t M, size_t K, size_t np)
 {
-    long i, j, k, l, sh = R(M);
-    unsigned long *A0;
-
-    // Allocate space for K buffers each of size 2*np words
-    // Since this can not be freed in decompose, A0 is returned.
-    // The calling routine should free(A0) when A[0]..A[K-1] are
-    // no longer needed.
-
-    A0 = (unsigned long *) malloc_or_die(2 * np * K * sizeof(unsigned long));
-
-    for (i = 0; i < K; i++)
-	A[i] = A0 + 2 * i * np;
+    size_t i, j, k, l, sh = R(M);
 
     for (i = 0, j = 0, k = 0; i < K; i++) {
 	/* invariant: we have already used k bits of a[j] */
@@ -533,7 +664,7 @@ static unsigned long *decompose(unsigned long **A, const unsigned long *a,
 	if (j + l > an)
 	    l = (an > j) ? an - j : 0;	/* remains l words a[j]..a[j+l-1] */
 	if (l > 0) {
-	    ASSERT(0 <= j && j + l <= an);
+	    ASSERT(j + l <= an);
 	    Rsh(A[i], a + j, l, k);
 	    /* mask last bits */
 	    if (sh) {
@@ -543,119 +674,88 @@ static unsigned long *decompose(unsigned long **A, const unsigned long *a,
 	    if (l > W(M))
 		l = W(M);
 	}
-	ASSERT(0 <= l && l < 2 * np);
+	ASSERT(l < 2 * np);
 	Zero(A[i] + l, 2 * np - l);
 	k += M;
 	j += k / WLEN;
 	k %= WLEN;
     }
-    return (A0);
 }
 
-/* multiplies {a, an} by {b, bn} using an FFT of length K,
-   and stores the result into {c, an+bn}.
-   The result is computed mod (x^N+1) where N = K*M.
-   Thus for a full product K*M should be >= (an+bn)*WLEN,
-   the size of product in bits. For the result mod (x^N+1)
-   it is only required that 2*K*M >= (an+bn)*WLEN */
-
-void gf2x_mul_fft0(unsigned long *c, const unsigned long *a, long an,
-	     const unsigned long *b, long bn, long K, long M)
+static void recompose(unsigned long * c, size_t cn, unsigned long **C, size_t K, size_t M, size_t Np)
 {
-    /* This supports the case c==a or c==b */
+    // size_t np = W(Np);	       	// Words to store Np bits
 
-    long cn = an + bn;		// size in words of a*b
-    // long N = K * M;		// N >= bits(a*b) is a multiple of K
-    long Mp = CEIL(M, K / 3);	// ceil(M/(K/3))
-    long Np = Mp * (K / 3);	// Np >= M, Np multiple of K/3
-    long np = W(Np);		// Words to store Np bits
-    long i, j, k, j1, k1, l, ltmp, z;
-    long *perm;
-    unsigned long **A, **B, *A0, *B0, *tmp1, *tmp2, *tmp3;
-
-    ASSERT((K % 3) == 0);
-    ASSERT(2 * K * M >= cn * WLEN);
-
-    A = (unsigned long **) malloc_or_die(K * sizeof(unsigned long *));
-    B = (unsigned long **) malloc_or_die(K * sizeof(unsigned long *));
-    A0 = decompose(A, a, an, M, K, np);
-    B0 = decompose(B, b, bn, M, K, np);
-    i = gf2x_toomspace(2 * np);
-    if (i < 2 * np)
-	i = 2 * np;
-    ltmp = 4 * np + i;
-    tmp1 = (unsigned long *) malloc_or_die(ltmp * sizeof(unsigned long));
-    tmp2 = tmp1 + 2 * np;
-    tmp3 = tmp2 + 2 * np;	/* space for max(2np,gf2x_toomspace(2np)) words */
-    perm = (long *) malloc_or_die(K * sizeof(long));
-    bitrev(0, 0, K, 1, perm);
-
-    fft(A, K, Mp, Np, 1, tmp1, tmp2, tmp3, perm);
-    fft(B, K, Mp, Np, 1, tmp1, tmp2, tmp3, perm);
-
-#ifdef TIMING
-    double st = GetTime();
-#endif
-    for (i = 0; i < K; i++)
-	MulMod(B[i], B[i], A[i], Np, tmp1, tmp3);
-#ifdef TIMING
-    printf("   FFT(%ld): pointwise products on Np=%ld took %f\n", K, Np,
-	   GetTime() - st);
-#endif
-
-    /* bit reverse: A[i] <- B[bitrev(i)] */
-    for (i = 0; i < K; i++)
-	A[i] = B[perm[i]];
-
-    fft(A, K, 3 * Np - Mp, Np, 1, tmp1, tmp2, tmp3, perm);
-
-    /* bit reverse: B[i] <- A[bitrev(i)] */
-    for (i = 0; i < K; i++)
-	B[i] = A[perm[i]];
-
-    /* reconstruct C = sum(B[i]*X^(M*i) mod x^N+1.
-       We first compute sum(B[i]*X^(M*i), then reduce it using the wrap function.
+    /* reconstruct C = sum(C[i]*X^(M*i) mod x^N+1.
+       We first compute sum(C[i]*X^(M*i), then reduce it using the wrap function.
        Since we know the result has at most cn words, any value exceeding cn
        words is necessarily zero.
-       Each B[i] has 2*Np bits, thus the full C has (K-1)*M+2*Np
+       Each C[i] has 2*Np bits, thus the full C has (K-1)*M+2*Np
        = N - M + 2*Np >= N + Np >= 2*n*WLEN + Np bits.
        Thus exactly 2*Np-M bits wrap around mod x^N+1.
+
+       Note though that we are _NOT_ doing the wrapping by ourselves. We should.
      */
 
-    l = 2 * Np - M;		/* number of overlapping bits with previous B[i] */
+#ifdef  DEBUG_RECOMPOSE
+    if (K >= DEBUG_RECOMPOSE) {
+        printf("C:=");
+        dump_stride(C, K, 1, 2*W(Np));
+        printf(";\n");
+    }
+#endif
+
+#if 1
+    size_t l = 2 * Np - M;/* number of overlapping bits with previous C[i] */
+    size_t i, j, k;
+    size_t j1, k1;
+    size_t z;
+
+    Zero(c, cn);
+
     for (i = 0, j = 0, k = 0, j1 = I(l), k1 = R(l); i < K; i++) {
 	// unsigned long cy;
 	/* invariants:
-	   - first bit of B[i] is bit k of c[j]
-	   - first bit of B[i] non overlapping with B[i-1] is bit k1 of c[j1] */
-	/* add B[i] shifted by i*M to c, where K*M = N, and Np >= M */
-	if (i == 0)		/* FIXME: we could set B[0] to c to avoid this copy */
-	    Copy(c, B[i], W(2 * Np) < cn ? W(2 * Np) : cn);
+	   - first bit of C[i] is bit k of c[j]
+	   - first bit of C[i] non overlapping with C[i-1] is bit k1 of c[j1] */
+	/* add C[i] shifted by i*M to c, where K*M = N, and Np >= M */
+	if (i == 0)		/* FIXME: we could set C[0] to c to avoid this copy */
+	    Copy(c, C[i], W(2 * Np) < cn ? W(2 * Np) : cn);
 	else {
 	    /* we have already set bit k of c[j] up to bit k1 of c[j1]
 	       (excluded), i.e., words c[j] up to c[j1 - (k1 == 0)] */
 	    z = j1 + (k1 != 0) - j;	/* number of overlapping words */
-	    /* first treat the high (non overlapping) words of B[i], i.e.,
-	       {B[i] + z, W(2*Np) - z} */
+	    /* first treat the high (non overlapping) words of C[i], i.e.,
+	       {C[i] + z, W(2*Np) - z} */
 	    if (j + W(2 * Np) < cn) {
 		if (z < W(2 * Np)) {
-		    ASSERT(W(2 * Np) - z >= 0);
-		    ASSERT((0 <= j + z) && (j + W(2 * Np) < cn));
+		    // ASSERT(W(2 * Np) - z >= 0);
+		    ASSERT((j + W(2 * Np) < cn));
 		    c[j + W(2 * Np)] =
-			Lsh(c + j + z, B[i] + z, W(2 * Np) - z, k);
-		} else if (z == W(2 * Np)) {	/* all words overlap with B[i-1] */
-		    ASSERT((0 <= j + W(2 * Np)) && (j + W(2 * Np) < cn));
-		    c[j + W(2 * Np)] = 0UL;
+			Lsh(c + j + z, C[i] + z, W(2 * Np) - z, k);
+		} else /* if (z == W(2 * Np)) */ {	/* all words overlap with C[i-1] */
+                    /* XXX In fact, it may even be > ! */
+		    // c[j + W(2 * Np)] = 0UL;
 		}
 	    } else if (j + z < cn) {
-		ASSERT(0 <= j + z);
-		Lsh(c + j + z, B[i] + z, cn - j - z, k);
+                ASSERT(cn - j <= W(2*Np));
+		Lsh(c + j + z, C[i] + z, cn - j - z, k);
 	    }
-	    /* then deal with the low bits of B[i], overlapping with B[i-1] */
-	    if (j + z < cn)
-		c[j + z] ^= AddLsh(c + j, B[i], z, k);
-	    else if (j < cn)
-		AddLsh(c + j, B[i], cn - j, k);
+	    /* then deal with the low bits of C[i], overlapping with C[i-1] */
+	    if (j + z < cn) {
+                /* First make sure we're not going to read too many bits
+                 * from C[i] ! */
+                if (z > W(2*Np)) {
+                    z = W(2*Np);
+                }
+                c[j + z] ^= AddLsh(c + j, C[i], z, k);
+            } else if (j < cn) {
+                if (cn - j <= W(2*Np)) {
+                    AddLsh(c + j, C[i], cn - j, k);
+                } else {
+                    c[j + W(2*Np)] ^= AddLsh(c + j, C[i], W(2*Np), k);
+                }
+            }
 	}
 
 	k += M;
@@ -665,12 +765,85 @@ void gf2x_mul_fft0(unsigned long *c, const unsigned long *a, long an,
 	j1 += k1 / WLEN;
 	k1 %= WLEN;
     }
-    free(perm);			// With some implementations of malloc it is
-    free(tmp1);			// most efficient to free in the reverse order
-    free(B);			// to the mallocs (i.e. using a stack discipline)
-    free(A);
-    free(B0);
-    free(A0);
+#else
+    Zero(c, cn);
+    size_t i;
+    size_t N = K * M;
+    for(i = 0 ; i < K ; i++) {
+        size_t lo = i * M;      // This < N
+        size_t hi = lo + 2 * Np;
+        if (hi <= N) {
+            /* Then we have no overwrapping bits */
+            /* See how far we can fill c. */
+            size_t last = I(lo) + W(2*Np);
+            if (last < cn) {
+                c[last] ^= AddLsh(c + I(lo), C[i], W(2*Np), R(lo));
+            } else if (I(lo) <= cn) {
+                /* By assumption, we have a zero, or for some reason
+                 * we're truncating. In any case the carry out here does
+                 * not have to be saved. Neither can it, anyway. */
+                ASSERT(cn - I(lo) <= W(2*Np));   // follows from above.
+                AddLsh(c + I(lo), C[i], cn - I(lo), R(lo));
+            } else {
+                /* this part is dropped (known zero ???) */
+            }
+        } else {
+            sizet f = N - lo;
+            {
+                size_t last = I(lo) + W(f);
+                if (last < cn) {
+                    c[last] ^= AddLsh(c + I(lo), C[i], W(f), R(lo));
+                } else if (I(lo) <= cn) {
+                    AddLsh(c + I(lo), C[i], cn - I(lo), R(lo));
+                }
+            }
+            /* Now place bits [f..2*Np[ at bit zero */
+            {
+                size_t last = W(2*Np) - I(f);
+                if (last < cn) {
+                    c[last] ^= AddRsh(c, C[i] + I(f), W(2*Np) - I(f), R(f));
+                } else {
+                    AddRsh(c, C[i] + I(f), cn, R(f));
+                }
+            }
+        }
+    }
+#endif
+
+
+#ifdef  DEBUG_RECOMPOSE
+    if (K >= DEBUG_RECOMPOSE) {
+        printf("c:=");dump(c,cn);
+        printf("check_recompose(C,c,%zu,%zu,%zu);\n",K,M,Np);
+    }
+#if 0
+function check_recompose(C,c,K,M,Np)
+    KP<x>:=PolynomialRing(GF(2));
+    R:=x^(2*Np)+x^Np+1;
+    L<z>:=quo<KP|R>;
+    LP<T>:=PolynomialRing(L);
+    R:=LP![L!Intseq(Seqint(u, 2^64), 2) : u in C];
+    shouldbe:=&+[KP!Coefficient(R,i)*x^(M*i):i in [0..K-1]];
+    got:=KP!Intseq(Seqint(c,2^64),2);
+    return got eq shouldbe;
+end function;
+
+#endif
+#endif
+
+}
+
+static inline size_t compute_Np(size_t M, size_t K)
+{
+    size_t Mp = CEIL(M, K / 3);	// ceil(M/(K/3))
+    size_t Np = Mp * (K / 3);	// Np >= M, Np multiple of K/3
+    return Np;
+}
+
+static inline size_t compute_np(size_t M, size_t K)
+{
+    size_t np = W(compute_Np(M,K));// Words to store Np bits
+    return np;
 }
 
 // Wraps the polynomial represented by c mod x^N + 1
@@ -678,153 +851,50 @@ void gf2x_mul_fft0(unsigned long *c, const unsigned long *a, long an,
 // The high part of c (bits N to WLEN*cn) are cleared.
 // RPB 20070429
 
-static void wrap(unsigned long *c, long cn, long N)
+static void wrap(unsigned long *c, size_t bits_c, size_t N)
 {
-    long i;
-    long Nw = I(N);
-    long Nb = R(N);
-    long Nbc = WLEN - Nb;
+    size_t i;
+    size_t Nw = I(N);
+    size_t Nb = R(N);
+    size_t Nbc = WLEN - Nb;
+    size_t cn = W(bits_c);
 
     // Perhaps most of this could be done by a call to AddLsh ?
 
-    if (N < WLEN * cn) {	// xor bits N .. WLEN*cn of c to c[0...]
-	if (Nb == 0) {
-	    for (i = 0; i < cn - Nw - 1; i++)
-		c[i] ^= c[i + Nw];
-	} else {
-	    for (i = 0; i < cn - Nw - 1; i++)
-		c[i] ^= (c[i + Nw] >> Nb) | (c[i + Nw + 1] << Nbc);
-	}
-	ASSERT(cn > Nw);
-	c[cn - Nw - 1] ^= (c[cn - 1] >> Nb);
+    if (N >= bits_c)
+        return;
 
-	// Now clear remaining bits of c
-
-	c[Nw] &= MASK(Nb);	// Clear high Nbc bits of c[Nw]
-	Clear(c, Nw + 1, cn);
+    // xor bits N .. WLEN*cn of c to c[0...]
+    if (Nb == 0) {
+        for (i = 0; i < cn - Nw - 1; i++)
+            c[i] ^= c[i + Nw];
+    } else {
+        for (i = 0; i < cn - Nw - 1; i++)
+            c[i] ^= (c[i + Nw] >> Nb) | (c[i + Nw + 1] << Nbc);
     }
+    ASSERT(cn > Nw);
+    c[cn - Nw - 1] ^= (c[cn - 1] >> Nb);
+
+    // Now clear remaining bits of c
+
+    c[Nw] &= MASK(Nb);	// Clear high Nbc bits of c[Nw]
+    Clear(c, Nw + 1, cn);
 }
 
-/* multiplies {a, an} by {b, bn} using an FFT of length K,
-   and stores the result into {c, an+bn}. If an+bn is too small
-   then Toom-Cook is used.  */
-
-void gf2x_mul_fft(unsigned long *c, const unsigned long *a, long an,
-	    const unsigned long *b, long bn, long K)
+static void split_reconstruct(unsigned long * c, unsigned long * c1, unsigned long * c2, size_t cn, size_t K, size_t m1)
 {
-    if (an + bn < MUL_FFT_THRESHOLD) {
-	printf("gf2x_mul_fft: arguments (%ld, %ld) too small\n", an, bn);
-	exit(1);
-    }
-
-    long M = CEIL((an + bn) * WLEN, K);	// ceil(bits(product)/K)
-
-    gf2x_mul_fft0(c, a, an, b, bn, K, M);	// gf2x_mul_fft0 does the work
-}
-
-// Multiplies {a, an} by {b, bn} mod (x^N + 1) and stores the
-// result in {c, cn}. Here N = K*M and the FFT is performed on K points
-// using O(M)-bit multiplications at each point.
-// cn should be at least W(2*N) even though the result is of size W(N).
-// The high part of c (bits N to cn*WLEN) are cleared.
-// 2*K*M should be >= (an+bn)*WLEN, the size of product in bits. */
-
-void gf2x_mul_fft1(unsigned long *c, long cn,
-	     const unsigned long *aa, long an,
-	     const unsigned long *bb, long bn, long K, long M)
-{
-    /* This supports the case c==aa or c==bb */
-    long N = K * M;
-
-    ASSERT(cn >= W(2 * N));
-    ASSERT(2 * K * M >= (an + bn) * WLEN);
-
-    unsigned long *a, *b;
-    // long i;
-    long sa = W(N);
-    if (sa < an)
-	sa = an;		// max (W(N), an, bn) is the
-    if (sa < bn)
-	sa = bn;		// maximum space needed for temporaries
-
-// Allocate temporaries with enough space and copy inputs.
-// In principle we could avoid some of this overhead.
-
-    a = (unsigned long *) malloc_or_die(sa * sizeof(unsigned long));
-    b = (unsigned long *) malloc_or_die(sa * sizeof(unsigned long));
-
-    Copy(a, aa, an);		// Copy aa to a
-    Clear(a, an, sa);		// Clear upper part of a
-
-    Copy(b, bb, bn);		// Similarly for bb
-    Clear(b, bn, sa);		// Clear upper part of b
-
-    Clear(c, I(N), cn);		// Clear upper part of c
-
-    if (WLEN * an > N)		// Wrap if necessary
-    {
-	wrap(a, an, N);		// Wrap a mod x^N + 1
-	an = W(N);		// New size of a
-    }
-
-    if (WLEN * bn > N) {
-	wrap(b, bn, N);		// Wrap b mod x^N + 1
-	bn = W(N);		// New size of b
-    }
-
-    ASSERT(an + bn <= cn);	// Check space for result
-
-    gf2x_mul_fft0(c, a, an, b, bn, K, M);	// Do the multiplication
-
-    wrap(c, an + bn, N);	// Wrap c mod x^N + 1
-
-    free(b);			// Free temporaries
-    free(a);
-}
-
-/* Multiplies {a, an} by {b, bn} using (one or) two FFTs of length K,
-   and stores the result into {cc, an+bn}. RPB 20070429 */
-
-void gf2x_mul_fft2(unsigned long *c, const unsigned long *a, long an,
-	     const unsigned long *b, long bn, long K)
-{
-    /* This supports the case c==a or c==b */
-
-// Avoid splitting for small cases (this should never
-// occur as TC3 is faster than gf2x_mul_fft for K < 81)
-
-    if (K < WLEN)		// gf2x_mul_fft1 needs K >= WLEN
-    {				// so in this case do just one
-	gf2x_mul_fft(c, a, an, b, bn, K);	// multiplication using gf2x_mul_fft
-	return;
-    }
-
-    long cn, j, m1, m2, n1, n2;
-    long cn2 = CEIL(an + bn, 2);	// Space for half product
-
-    unsigned long *c1, *c2;
-
-    m2 = CEIL(cn2 * WLEN, K);	// m2 = ceil(cn2*WLEN/K)
-    n2 = K * m2;		// n2 smallest possible multiple of K
-    m1 = m2 + 1;		// next possible M
-    n1 = K * m1;		// next possible multiple of K
-    cn = W(2 * n1);		// n1 > n2 so cn words is enough
-    // space for temporaries
-
-// Sometimes (cn > an+bn) so need temporary c1 (as well as c2)
-
-    c1 = (unsigned long *) malloc_or_die(cn * sizeof(unsigned long));
-    c2 = (unsigned long *) malloc_or_die(cn * sizeof(unsigned long));
-
-    gf2x_mul_fft1(c1, cn, a, an, b, bn, K, m1);	// multiplication mod x^n1 + 1
-    gf2x_mul_fft1(c2, cn, a, an, b, bn, K, m2);	// multiplication mod x^n2 + 1
-
-    long n = WLEN * (an + bn);	// Max bit-size of full product
-    long delta = K;		// delta = n1 - n2;
-    long jw, jn1w, jn1b, jn1bc, jdw, jdb, jdbc;
+    size_t n = WLEN * cn;	// Max bit-size of full product
+    size_t delta = K;		// delta = n1 - n2;
+    size_t jw, jn1w, jn1b, jn1bc, jdw, jdb, jdbc;
     unsigned long t, next;
 
 // Now extract the result. First do a partial word bit-by-bit.
+
+    size_t m2 = m1 - 1;
+
+    size_t n2 = K * m2;		// n2 smallest possible multiple of K
+    size_t n1 = K * m1;		// next possible multiple of K
+    size_t j;
 
     for (j = n - n1 - 1; (j % WLEN) != (WLEN - 1); j--) {
 	t = GETBIT(c1, j + delta) ^ GETBIT(c2, j + delta);
@@ -844,16 +914,15 @@ void gf2x_mul_fft2(unsigned long *c, const unsigned long *a, long an,
     next = c1[jdw + 1] ^ c2[jdw + 1];
 
     if (jn1b == 0) {		// Unusual case
-	for (; jw >= 0; jw--, jdw--, jn1w--) {
+	for (jw++ ; jw-- ; jdw--, jn1w--) {
 	    t = (next << 1) << jdbc;
 	    next = c1[jdw] ^ c2[jdw];
 	    t ^= next >> jdb;
 	    c1[jw] ^= t;
 	    c1[jn1w] = t;
 	}
-    } else			// Usual case
-    {
-	for (jn1bc = WLEN - jn1b; jw >= 0; jw--, jdw--, jn1w--) {
+    } else {			// Usual case
+	for (jn1bc = WLEN - jn1b, jw++; jw-- ; jdw--, jn1w--) {
 	    t = (next << 1) << jdbc;
 	    next = c1[jdw] ^ c2[jdw];
 	    t ^= next >> jdb;
@@ -883,12 +952,347 @@ void gf2x_mul_fft2(unsigned long *c, const unsigned long *a, long an,
 	exit(1);
     }
 
-    Copy(c, c1, an + bn);	// Copy result
-
-    free(c2);			// Free temporaries
-    free(c1);
-
+    Copy(c, c1, cn);	// Copy result
 }
 
-#undef ASSERT
-#undef CHECK_ASSERT
+
+/** now the external calls for the gf2x_tfft interface **/
+
+size_t gf2x_tfft_size(gf2x_tfft_info_srcptr o)
+{
+    size_t K = o->K;
+    if (K == 0) {
+        /* special fall-back case */
+        return W(o->bits_a) + W(o->bits_b);
+    } else if (!o->split) {
+        return 2 * K * compute_np(o->M, K);
+    } else {    /* K < 0 : FFT split in two. */
+        /* m2 is just m1-1, so to make things simpler, we claim that the
+         * size is made only of blocks corresponding to size m1. But yes,
+         * half with m1 and half with m2 would make sense. But wouldn't
+         * change the picture so much anyway.
+         */
+        return 4 * o->K * compute_np(o->M, o->K);
+    }
+}
+
+void gf2x_tfft_zero(gf2x_tfft_info_srcptr o, gf2x_tfft_ptr ptr, size_t n)
+{
+    memset(ptr, 0, n * gf2x_tfft_size(o) * sizeof(gf2x_tfft_t));
+}
+
+void gf2x_tfft_cpy(gf2x_tfft_info_srcptr o, gf2x_tfft_ptr y, gf2x_tfft_srcptr x)
+{
+    memcpy(y, x, gf2x_tfft_size(o) * sizeof(gf2x_tfft_t));
+}
+
+gf2x_tfft_ptr gf2x_tfft_get(gf2x_tfft_info_srcptr o, gf2x_tfft_ptr ptr, size_t k)
+{
+    return ptr + k * gf2x_tfft_size(o);
+}
+
+gf2x_tfft_ptr gf2x_tfft_alloc(gf2x_tfft_info_srcptr o, size_t n)
+{
+    return malloc_or_die(n * gf2x_tfft_size(o) * sizeof(gf2x_tfft_t));
+}
+
+void gf2x_tfft_free(gf2x_tfft_info_srcptr o MAYBE_UNUSED, gf2x_tfft_ptr ptr, size_t n MAYBE_UNUSED)
+{
+    free(ptr);
+}
+
+static void gf2x_tfft_dft_inner(gf2x_tfft_info_srcptr o, gf2x_tfft_ptr tr, const unsigned long * a, size_t bits_a, size_t M)
+{
+    size_t K = o->K;
+    size_t Mp = CEIL(M, K / 3);	// ceil(M/(K/3))
+    size_t Np = Mp * (K / 3);	// Np >= M, Np multiple of K/3
+    size_t np = W(Np);	       	// Words to store Np bits
+
+    // allocate the array of pointers. It's just temporary stuff.
+    unsigned long ** A = malloc_or_die(K * sizeof(unsigned long *));
+    for (size_t i = 0; i < K; i++) A[i] = tr + 2 * i * np;
+    decompose(A, a, W(bits_a), M, K, np);
+    unsigned long * tmp1, * tmp2, * tmp3;
+    tmp1 = o->tmp;
+    tmp2 = o->tmp + 2 * np;
+    tmp3 = o->tmp + 4 * np; /* max(2np,gf2x_toomspace(2np)) words */
+    fft(A, K, Mp, Np, 1, tmp1, tmp2, tmp3, o->perm);
+    free(A);
+}
+
+static void gf2x_tfft_dft_inner_split(gf2x_tfft_info_srcptr o, gf2x_tfft_ptr tr, const unsigned long * a, size_t bits_a, size_t M, unsigned long * buf, size_t bufsize)
+{
+    size_t K = o->K;
+    size_t N = K * M;
+
+    // ASSERT(K >= WLEN);  // why ? I've seen this comment somewhere, but why ?
+    // ASSERT(2 * K * M >= W(bits_a + bits_b));
+
+    // FIXME: This wrapping, and use of extra buffer space, should be
+    // merged into decompose().
+    Copy(buf, a, W(bits_a));
+    Clear(buf, W(bits_a), bufsize);		// Clear upper part of a
+    wrap(buf, bits_a, N);
+    gf2x_tfft_dft_inner(o, tr, buf, MIN(N, bits_a), M);
+}
+
+/* bits_a is a number of BITS */
+void gf2x_tfft_dft(gf2x_tfft_info_srcptr o, gf2x_tfft_ptr tr, const unsigned long * a, size_t bits_a)
+{
+    // bits_a is a number of BITS.
+    if (o->K == 0) {
+        Copy(tr, a, W(bits_a));
+        /* zeroing out the bits isn't really needed. */
+        Clear(tr, W(bits_a), W(o->bits_a) + W(o->bits_b));
+    } else if (!o->split) {
+        gf2x_tfft_dft_inner(o, tr, a, bits_a, o->M);
+    } else {
+        size_t m1 = o->M;
+        size_t m2 = o->M - 1;
+        size_t K = o->K;
+        /* there's some work to be done prior to doing the decomposition:
+         * wrapping.  We need some temporary space for that.  */
+
+        size_t bufsize = MAX(W(bits_a), W((size_t) m1));
+
+        unsigned long * buf = malloc_or_die(bufsize * sizeof(unsigned long));
+
+        gf2x_tfft_dft_inner_split(o, tr, a, bits_a, m1, buf, bufsize);
+        tr += 2 * K * compute_np(m1, K);
+        gf2x_tfft_dft_inner_split(o, tr, a, bits_a, m2, buf, bufsize);
+
+        free(buf);
+    }
+}
+
+static void gf2x_tfft_compose_inner(gf2x_tfft_info_srcptr o, gf2x_tfft_ptr tc, gf2x_tfft_srcptr ta, gf2x_tfft_srcptr tb, size_t M)
+{
+    size_t K = o->K;
+    // tc, ta, tb may happily alias each other.
+    size_t Np = compute_Np(M, K);
+    size_t np = W(Np);
+    unsigned long * tmp1 = o->tmp;
+    // tmp2 = o->tmp + 2 * np;
+    /* max(2np,gf2x_toomspace(2np)) words */
+    unsigned long * tmp3 = o->tmp + 4 * np;
+
+    for (size_t i = 0; i < K; i++) {
+	MulMod(tc, ta, tb, Np, tmp1, tmp3);
+        ta += 2 * np;
+        tb += 2 * np;
+        tc += 2 * np;
+    }
+}
+
+void gf2x_tfft_compose(gf2x_tfft_info_srcptr o, gf2x_tfft_ptr tc, gf2x_tfft_srcptr ta, gf2x_tfft_srcptr tb)
+{
+    if (o->K == 0) {
+        // ASSERT(W(o->bits_a) + W(o->bits_b) <= gf2x_tfft_size(o));
+        gf2x_mul(tc, ta, W(o->bits_a), tb, W(o->bits_b));
+    } else if (!o->split){
+        gf2x_tfft_compose_inner(o, tc, ta, tb, o->M);
+    } else {
+        size_t m1 = o->M;
+        size_t m2 = o->M - 1;
+        size_t K = o->K;
+        gf2x_tfft_compose_inner(o, tc, ta, tb, m1);
+        size_t offset = 2 * K * compute_np(m1, K);
+        tc += offset;
+        ta += offset;
+        tb += offset;
+        gf2x_tfft_compose_inner(o, tc, ta, tb, m2);
+    }
+}
+
+void gf2x_tfft_add(gf2x_tfft_info_srcptr o, gf2x_tfft_ptr tc, gf2x_tfft_srcptr ta, gf2x_tfft_srcptr tb)
+{
+    for (size_t i = 0; i < gf2x_tfft_size(o) ; i++) {
+        tc[i] = ta[i] ^ tb[i];
+    }
+}
+
+void gf2x_tfft_addcompose(gf2x_tfft_info_srcptr o, gf2x_tfft_ptr tc, gf2x_tfft_srcptr ta, gf2x_tfft_srcptr tb)
+{
+    gf2x_tfft_t * t = gf2x_tfft_alloc(o, 1);
+    gf2x_tfft_compose(o, t, ta, tb);
+    gf2x_tfft_add(o, tc, tc, t);
+    gf2x_tfft_free(o, t, 1);
+}
+
+void gf2x_tfft_ift_inner(gf2x_tfft_info_srcptr o, unsigned long * a, size_t bits_a, gf2x_tfft_ptr tr, size_t M)
+{
+    size_t K = o->K;
+    size_t Mp = CEIL(M, K / 3);	// ceil(M/(K/3))
+    size_t Np = Mp * (K / 3);	// Np >= M, Np multiple of K/3
+    size_t np = W(Np);	       	// Words to store Np bits
+    size_t i;
+
+    unsigned long * tmp1, * tmp2, * tmp3;
+    tmp1 = o->tmp;
+    tmp2 = o->tmp + 2 * np;
+    tmp3 = o->tmp + 4 * np; /* max(2np,gf2x_toomspace(2np)) words */
+
+    // allocate the array of pointers. It's just temporary stuff.
+    unsigned long ** A = malloc_or_die(K * sizeof(unsigned long *));
+    for (i = 0; i < K; i++) A[i] = tr + 2 * i * np;
+    unsigned long ** Ap = malloc_or_die(K * sizeof(unsigned long *));
+
+    for (i = 0; i < K; i++) Ap[i] = A[o->perm[i]]; 
+    fft(Ap, K, 3 * Np - Mp, Np, 1, tmp1, tmp2, tmp3, o->perm);
+    for (i = 0; i < K; i++) ASSERT(A[i] == Ap[o->perm[i]]);
+
+    free(Ap);
+    recompose(a, W(bits_a), A, K, M, Np);
+    free(A);
+}
+
+void gf2x_tfft_ift(gf2x_tfft_info_srcptr o, unsigned long * c, size_t bits_c, gf2x_tfft_ptr tr)
+{
+    if (o->K == 0) {
+        Copy(c, tr, W(bits_c));
+    } else if (!o->split) {
+        gf2x_tfft_ift_inner(o, c, bits_c, tr, o->M);
+    } else {
+        size_t K = o->K;
+        size_t m1 = o->M;
+        size_t m2 = m1 - 1;
+        size_t cn = W(2 * K * m1);
+        size_t cn0 = W(o->bits_a) + W(o->bits_b);
+        ASSERT(cn0 <= cn);
+
+        size_t cn1 = W(MIN(K*m1,o->bits_a)) + W(MIN(K*m1,o->bits_b));
+        unsigned long * c1 = malloc_or_die(cn * sizeof(unsigned long));
+        Clear(c1, I(K * m1), cn);
+        gf2x_tfft_ift_inner(o, c1, cn * WLEN, tr, m1);
+        wrap(c1, cn1 * WLEN, K * m1);
+
+        tr += 2 * K * compute_np(m1, K);
+
+        size_t cn2 = W(MIN(K*m2,o->bits_a)) + W(MIN(K*m2,o->bits_b));
+        unsigned long * c2 = malloc_or_die(cn * sizeof(unsigned long));
+        Clear(c2, I(K * m2), cn);
+        gf2x_tfft_ift_inner(o, c2, cn * WLEN, tr, m2);
+        wrap(c2, cn2 * WLEN, K * m2);
+
+        /* TODO: We should rather do a more intelligent recompose() step,
+         * skipping the c1 and c2 buffers entirely.
+         */
+        split_reconstruct(c, c1, c2, cn0, K, m1);
+        free(c1);
+        free(c2);
+    }
+}
+
+
+/* multiplies {a, an} by {b, bn} using an FFT of length K,
+   and stores the result into {c, an+bn}. If an+bn is too small
+   then Toom-Cook is used.  */
+
+// arrange so that we multiply polynomials having respectively n1 and n2
+// _BITS_ ; which means degree+1 (thus can be unsigned).
+//
+// because this algorithm needs to know about the K value, which in turns
+// depends on proper tuning, we ask for it to be provided by the caller.
+// Negative values of K mean to use FFT2.
+void gf2x_tfft_init(gf2x_tfft_info_ptr o, size_t bits_a, size_t bits_b, ...)
+{
+    o->bits_a = bits_a;
+    o->bits_b = bits_b;
+
+    size_t nwa = W(bits_a);
+    size_t nwb = W(bits_b);
+
+    va_list ap;
+    va_start(ap, bits_b);
+    long K = va_arg(ap, long);
+    size_t M;
+    if (K > 0) {
+        M = CEIL((nwa + nwb) * WLEN, K);	// ceil(bits(product)/K)
+        o->K = K;
+        o->M = M;
+        o->split = 0;
+    } else {
+        ASSERT(-K >= WLEN);
+        size_t cn2 = CEIL(nwa + nwb, 2);	// Space for half product
+        size_t m2 = CEIL(cn2 * WLEN, -K);	// m2 = ceil(cn2*WLEN/K)
+        size_t m1 = m2 + 1;		// next possible M
+        M = m1;
+        o->K = -K;
+        o->M = M;
+        o->split = 1;
+    }
+
+    if (nwa + nwb < MUL_FFT_THRESHOLD) {
+        // make this special.
+        o->K = 0;
+        o->M = 0;
+        o->tmp = NULL;
+        o->perm = NULL;
+        return;
+    }
+
+    /* We also have to allocate the temporary space used by this FFT */
+    size_t np = compute_np(M, o->K);
+
+    size_t i = gf2x_toomspace(2 * np);
+    if (i < 2 * np)
+	i = 2 * np;
+    size_t ltmp = 4 * np + i;
+    o->tmp = (unsigned long *) malloc_or_die(ltmp * sizeof(unsigned long));
+    o->perm = (size_t *) malloc_or_die(o->K * sizeof(size_t));
+    bitrev(0, 0, o->K, 1, o->perm);
+    va_end(ap);
+}
+
+void gf2x_tfft_clear(gf2x_tfft_info_ptr o)
+{
+    if (o->K) {
+        free(o->tmp);
+        free(o->perm);
+    }
+    memset(o, 0, sizeof(gf2x_tfft_info_t));
+}
+
+/** gf2x_mul_fft merely wraps around the calls above **/
+
+/* multiplies {a, an} by {b, bn} using an FFT of length K,
+   and stores the result into {c, an+bn}.
+   The result is computed mod (x^N+1) where N = K*M.
+   Thus for a full product K*M should be >= (an+bn)*WLEN,
+   the size of product in bits. For the result mod (x^N+1)
+   it is only required that 2*K*M >= (an+bn)*WLEN */
+
+// here an and bn denote numbers of WORDS, while the gf2x_tfft_* routines
+// are interested in number of BITS.
+void gf2x_mul_fft(unsigned long *c, const unsigned long *a, size_t an,
+	    const unsigned long *b, size_t bn, long K)
+{
+    gf2x_tfft_info_t o;
+    gf2x_tfft_init(o, an * WLEN, bn * WLEN, K);
+    
+    if (o->K == 0) {
+	printf("gf2x_mul_fft: arguments (%ld, %ld) too small\n", an, bn);
+        /* Note that actually the routines below do work, because they're
+         * specified for working. However, this contradicts the fact that
+         * via this entry point, we have explicitly asked for _not_
+         * falling back to standard gf2x routines. So it's a caller bug
+         */
+        abort();
+    }
+    gf2x_tfft_ptr ta = gf2x_tfft_alloc(o, 1);
+    gf2x_tfft_ptr tb = gf2x_tfft_alloc(o, 1);
+    gf2x_tfft_ptr tc = gf2x_tfft_alloc(o, 1);
+
+    gf2x_tfft_dft(o, ta, a, an * WLEN);
+    gf2x_tfft_dft(o, tb, b, bn * WLEN);
+
+    gf2x_tfft_compose(o, tc, ta, tb);
+
+    gf2x_tfft_ift(o, c, (an+bn)*WLEN, tc);
+
+    gf2x_tfft_free(o, ta, 1);
+    gf2x_tfft_free(o, tb, 1);
+    gf2x_tfft_free(o, tc, 1);
+
+    gf2x_tfft_clear(o);
+}

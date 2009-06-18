@@ -38,9 +38,8 @@
 #include "bw-common.h"
 #include "filenames.h"
 
-#include "fft_adapter.hpp"
+#include "gf2x-fft.h"
 #include "lingen_mat_types.hpp"
-#include "gf2x.h"
 
 /* Name of the source a file */
 char input_file[FILENAME_MAX];
@@ -1477,7 +1476,6 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
     unsigned int tstart = t;
     unsigned int tmiddle;
     bool finished_early;
-
 #ifdef  DO_EXPENSIVE_CHECKS
     checker c;
 #endif
@@ -1497,6 +1495,8 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
     /* The transform() calls expect a number of coefficients, not a
      * degree. */
     transform(E_hat, E, o, length_E);
+
+
 
     /* ditto for this one */
     E.resize(llen);

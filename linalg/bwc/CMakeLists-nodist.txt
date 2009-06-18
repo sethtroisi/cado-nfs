@@ -1,0 +1,8 @@
+
+include_directories(${CADO_NFS_SOURCE_DIR}/gf2x)
+include_directories(${CADO_NFS_BINARY_DIR}/gf2x)
+include_directories(${CADO_NFS_SOURCE_DIR}/cantor)
+add_executable(bench_polmatmul bench_polmatmul.cpp)
+target_link_libraries(bench_polmatmul utils gf2x-fft)
+
+# vim: ft=cmake:

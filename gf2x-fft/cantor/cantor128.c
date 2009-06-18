@@ -30,6 +30,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <assert.h>
 
 #include "cantor128.h"
 #include "mpfq_2_128.h"
@@ -44,9 +45,9 @@
 #define Kdst_elt        mpfq_2_128_dst_elt
 #define Ksrc_elt        mpfq_2_128_src_elt
 
-int mulcount=0;
+size_t mulcount=0;
 Kelt * fbase;
-long int * findex;
+size_t * findex;
 
 #define Kadd(a0,a1,a2)  mpfq_2_128_add (NULL,a0,a1,a2)
 #if 0
@@ -115,7 +116,7 @@ static const Kelt Betai[32] = {
 
 // The S_i polynomials of Cantor's algorithm: linearized polynomials such
 // that S_i | S_{i+1}.
-static const long ind_S[31][15] = {
+static const size_t ind_S[31][15] = {
     {},                         // S0
     {1},                        // S1
     {1},                        // S2
@@ -150,16 +151,16 @@ static const long ind_S[31][15] = {
 };
 
 // The number of terms in S_i.
-static const int ind_number[31] =
+static const unsigned int ind_number[31] =
     { 0, 1, 1, 3, 1, 3, 3, 7, 1, 3, 3, 7, 3, 7, 7, 15,
     1, 3, 3, 7, 3, 7, 7, 15, 3, 7, 7, 15, 7, 15, 15
 };
 
 // At index i=i0+2*i1+4*i2+8*i3..., one computes 
 //     allBetai[i] = i0*Betai[1] + i1*Betai[2] + i2*Betai[3] + ...
-static inline void allBetai(Kdst_elt x, int i)
+static inline void allBetai(Kdst_elt x, size_t i)
 {
-    int j;
+    size_t j;
     Kset_ui(x,0);
     j = 0;
     for( ; i ; i>>=1, j++) {
@@ -172,9 +173,9 @@ static inline void allBetai(Kdst_elt x, int i)
 #if 0
 /* These versions would make sense if Kelt were defined to be _v2di *,
  * which it isn't */
-static inline void allBetai1(Kdst_elt x, int i)
+static inline void allBetai1(Kdst_elt x, size_t i)
 {
-    int j;
+    size_t j;
     Kset_ui(x,0);
     j = 0;
     __v2di m[2] = { (__v2di) {0,0}, (__v2di) { -1L, -1L } };
@@ -184,9 +185,9 @@ static inline void allBetai1(Kdst_elt x, int i)
 }
 
 // compute omega_i and omega_{2i}
-static inline void allBetai2(Kdst_elt x, Kdst_elt y, int i)
+static inline void allBetai2(Kdst_elt x, Kdst_elt y, size_t i)
 {
-    int j;
+    size_t j;
     Kset_ui(x,0);
     Kset_ui(y,0);
     j = 0;
@@ -196,9 +197,9 @@ static inline void allBetai2(Kdst_elt x, Kdst_elt y, int i)
             * (__v2di*)  y ^= m[i&1] & * (__v2di*) Betai[j+1];
     }
 }
-static inline void allBetai4(Kdst_elt x, Kdst_elt y, Kdst_elt z, Kdst_elt t, int i)
+static inline void allBetai4(Kdst_elt x, Kdst_elt y, Kdst_elt z, Kdst_elt t, size_t i)
 {
-    int j;
+    size_t j;
     Kset_ui(x,0);
     Kset_ui(y,0);
     Kset_ui(z,0);
@@ -213,9 +214,9 @@ static inline void allBetai4(Kdst_elt x, Kdst_elt y, Kdst_elt z, Kdst_elt t, int
     }
 }
 #else
-static inline void allBetai1(Kdst_elt x, int i)
+static inline void allBetai1(Kdst_elt x, size_t i)
 {
-    int j;
+    size_t j;
     Kset_ui(x,0);
     j = 0;
     for( ; i ; i>>=1, j++) {
@@ -223,9 +224,9 @@ static inline void allBetai1(Kdst_elt x, int i)
         Kadd(x, x, Betai[j]);
     }
 }
-static inline void allBetai2(Kdst_elt x, Kdst_elt y, int i)
+static inline void allBetai2(Kdst_elt x, Kdst_elt y, size_t i)
 {
-    int j;
+    size_t j;
     Kset_ui(x,0);
     Kset_ui(y,0);
     j = 0;
@@ -235,9 +236,9 @@ static inline void allBetai2(Kdst_elt x, Kdst_elt y, int i)
         Kadd(y, y, Betai[j+1]);
     }
 }
-static inline void allBetai4(Kdst_elt x, Kdst_elt y, Kdst_elt z, Kdst_elt t, int i)
+static inline void allBetai4(Kdst_elt x, Kdst_elt y, Kdst_elt z, Kdst_elt t, size_t i)
 {
-    int j;
+    size_t j;
     Kset_ui(x,0);
     Kset_ui(y,0);
     Kset_ui(z,0);
@@ -255,28 +256,28 @@ static inline void allBetai4(Kdst_elt x, Kdst_elt y, Kdst_elt z, Kdst_elt t, int
 #endif  /* CANTOR_GM */
 
 #ifdef  CANTOR_GM
-static inline void expand(Kelt * f, int t, int t0)
+static inline void expand(Kelt * f, unsigned int t, unsigned int t0)
 {
     // f has at most 2^t coefficients. Split in pieces of 2^t0
     // coefficients.
     if (t == t0) return;
-    long K = 1L << (t-1);
-    long K0 = 1L << (t-1-t0);
-    for (long i = 2 * K - 1; i >= K; --i) {
+    size_t K = 1UL << (t-1);
+    size_t K0 = 1UL << (t-1-t0);
+    for (size_t i = 2 * K - 1; i >= K; --i) {
         Kadd(f[i+K0-K], f[i+K0-K], f[i]); 
     }
     expand(f, t-1, t0);
     expand(f+K, t-1, t0);
 }
-static inline void expand_trunc(Kelt * f, int t, int t0, long n)
+static inline void expand_trunc(Kelt * f, unsigned int t, unsigned int t0, size_t n)
 {
     // f has at most n coefficients. Split in pieces of 2^t0
     // coefficients.
-    long K;
-    for( ; n <= (K = (1L << (t-1))) ; t--);
+    size_t K;
+    for( ; n <= (K = (1UL << (t-1))) ; t--);
     if (t <= t0) return;
-    long K0 = 1L << (t-1-t0);
-    for (long i = n - 1; i >= K; --i) {
+    size_t K0 = 1UL << (t-1-t0);
+    for (size_t i = n - 1; i >= K; --i) {
         Kadd(f[i+K0-K], f[i+K0-K], f[i]); 
     }
     expand(f, t-1, t0);
@@ -284,14 +285,14 @@ static inline void expand_trunc(Kelt * f, int t, int t0, long n)
 }
 
 #if 0
-static inline void expand_unroll(Kelt * f, int t, int t0)
+static inline void expand_unroll(Kelt * f, unsigned int t, unsigned int t0)
 {
     // f has at most 2^t coefficients. Split in pieces of 2^t0
     // coefficients.
     if (t == t0) return;
-    long K = 1L << (t-1);
-    long K0 = 1L << (t-1-t0);
-    for (long i = 2 * K - 1; i >= K; --i) {
+    size_t K = 1UL << (t-1);
+    size_t K0 = 1UL << (t-1-t0);
+    for (size_t i = 2 * K - 1; i >= K; --i) {
         Kadd(f[i+K0-K], f[i+K0-K], f[i]); 
         fprintf(stderr, "Kadd(f[%ld],f[%ld],f[%ld]);\n",
                 findex[i+K0-K+f-fbase],
@@ -303,35 +304,35 @@ static inline void expand_unroll(Kelt * f, int t, int t0)
 }
 #endif
 
-void transpose_inplace(Kelt * f, int t)
+void transpose_inplace(Kelt * f, unsigned int t)
 {
 #define Kswap(a,b) do { Kelt x; Kset(x,a); Kset(a,b); Kset(b,x); } while (0)
     // transpose
-    for(long i = 0 ; i < (1L<<t) ; i++) {
-        for(long j = i+1 ; j < (1L<<t) ; j++) {
+    for(size_t i = 0 ; i < (1UL<<t) ; i++) {
+        for(size_t j = i+1 ; j < (1UL<<t) ; j++) {
             Kswap(f[(i<<t)+j],f[(j<<t)+i]);
         }
     }
 }
 
-// assuming f has 1L<<t1 rows of 1L<<t2 values, transpose into g. Set striding
-// in g to be 1L<<t1 values, for 1L<<t2 rows.
+// assuming f has 1UL<<t1 rows of 1UL<<t2 values, transpose into g. Set striding
+// in g to be 1UL<<t1 values, for 1UL<<t2 rows.
 //
 // doing this in place would be somewhat tricky, but maybe reachable
 // assuming that we stick to the case of powers of 2 for the dimensions.
-void transpose_outofplace(Kelt * g, Kelt * f, int t1, int t2)
+void transpose_outofplace(Kelt * g, Kelt * f, unsigned int t1, unsigned int t2)
 {
-    for(long j = 0 ; j < (1L<<t2) ; j++) {
-        for(long i = 0 ; i < (1L<<t1) ; i++) {
+    for(size_t j = 0 ; j < (1UL<<t2) ; j++) {
+        for(size_t i = 0 ; i < (1UL<<t1) ; i++) {
             Kset(g[i],f[i<<t2]);
         }
-        g += 1L << t1;
+        g += 1UL << t1;
         f++;
     }
 }
 
 #if 0
-void gm_trick_unroll(int two_t, Kelt * f, int j, int m, int d)
+void gm_trick_unroll(unsigned int two_t, Kelt * f, unsigned int j, size_t m, size_t d)
 {
     assert((two_t & (two_t-1)) == 0);
     if (two_t == 1) {
@@ -349,15 +350,15 @@ void gm_trick_unroll(int two_t, Kelt * f, int j, int m, int d)
         return;
     }
 
-    long t = two_t >> 1;
-    long tau = 1L << t;
+    unsigned int t = two_t >> 1;
+    size_t tau = 1UL << t;
     expand_unroll(f,2*t,t);
 
-    for(long i = 0 ; i < tau ; i++) {
-        for(long j = i+1 ; j < tau ; j++) {
+    for(size_t i = 0 ; i < tau ; i++) {
+        for(size_t j = i+1 ; j < tau ; j++) {
             Kswap(f[(i<<t)+j],f[(j<<t)+i]);
 #if 1
-            long idx = findex[(i<<t)+j+f-fbase];
+            size_t idx = findex[(i<<t)+j+f-fbase];
             findex[(i<<t)+j+f-fbase] = findex[(j<<t)+i+f-fbase];
             findex[(j<<t)+i+f-fbase] = idx;
 #else
@@ -369,15 +370,15 @@ void gm_trick_unroll(int two_t, Kelt * f, int j, int m, int d)
     }
     
     // evaluate ; we can use f as a buffer, now.
-    for(long l = 0 ; l < tau ; l++) {
+    for(size_t l = 0 ; l < tau ; l++) {
         gm_trick_unroll(t, f + (l << t), j, m, d);
     }
 
-    for(long i = 0 ; i < tau ; i++) {
-        for(long j = i+1 ; j < tau ; j++) {
+    for(size_t i = 0 ; i < tau ; i++) {
+        for(size_t j = i+1 ; j < tau ; j++) {
             Kswap(f[(i<<t)+j],f[(j<<t)+i]);
 #if 1
-            long idx = findex[(i<<t)+j+f-fbase];
+            size_t idx = findex[(i<<t)+j+f-fbase];
             findex[(i<<t)+j+f-fbase] = findex[(j<<t)+i+f-fbase];
             findex[(j<<t)+i+f-fbase] = idx;
 #else
@@ -389,7 +390,7 @@ void gm_trick_unroll(int two_t, Kelt * f, int j, int m, int d)
     }
     
     // evaluate again
-    for(long i = 0 ; i < tau ; i++) {
+    for(size_t i = 0 ; i < tau ; i++) {
         gm_trick_unroll(t, f + (i << t), (j << t) + i, m << t, (d << t) + i);
     }
 }
@@ -419,7 +420,7 @@ static inline void gm_trick2z(Kdst_elt f0, Kdst_elt f1, Kdst_elt f2, Kdst_elt f3
     Kadd(f3,f3,f2);
 }
 
-void gm_trick4(Kelt * f, long j)
+void gm_trick4(Kelt * f, size_t j)
 {
     Kelt f0; Kelt f1; Kelt f2; Kelt f3; 
     Kelt f4; Kelt f5; Kelt f6; Kelt f7; 
@@ -503,7 +504,7 @@ void gm_trick4z(Kelt * f)
 }
 
 
-void gm_trick(int two_t, Kelt * f, long j)
+void gm_trick(unsigned int two_t, Kelt * f, size_t j)
 {
     assert((two_t & (two_t-1)) == 0);
     if (two_t == 4) {
@@ -533,7 +534,7 @@ void gm_trick(int two_t, Kelt * f, long j)
         fprintf(stderr, "// Unrolling gm_trick(%d,f,%d)\n",two_t, j);
         fbase = f;
         findex = malloc(sizeof(long int) << two_t);
-        for(int i = 0 ; i < (1L << two_t) ; i++) {
+        for(int i = 0 ; i < (1UL << two_t) ; i++) {
             findex[i] = i;
         }
         gm_trick_unroll(two_t, f, j, 1, 0);
@@ -545,35 +546,35 @@ void gm_trick(int two_t, Kelt * f, long j)
     }
 #endif
 
-    int t = two_t >> 1;
-    long tau = 1L << t;
+    unsigned int t = two_t >> 1;
+    size_t tau = 1UL << t;
 
     expand(f,2*t,t);
 
     transpose_inplace(f,t);
     
     // evaluate ; we can use f as a buffer, now.
-    for(long l = 0 ; l < tau ; l++) {
+    for(size_t l = 0 ; l < tau ; l++) {
         gm_trick(t, f + (l << t), j);
     }
     transpose_inplace(f,t);
 
     // evaluate again
-    for(long i = 0 ; i < tau ; i++) {
+    for(size_t i = 0 ; i < tau ; i++) {
         gm_trick(t, f + (i << t), (j << t) + i);
     }
 }
 #endif
 
 #ifdef  CANTOR_GM_TRUNCATE
-// compute only n' = 1L<<k values -- f must not have more than n coefficients !
+// compute only n' = 1UL<<k values -- f must not have more than n coefficients !
 //
 // n' is larger than or equal to n.
 //
-// f and buf must hold space for 1L << k coefficients.
+// f and buf must hold space for 1UL << k coefficients.
 //
 // The trailing values in f must be equal to zero.
-void gm_trick_trunc(int two_t, Kelt * f, Kelt * buf, long j, int k, long n)
+void gm_trick_trunc(unsigned int two_t, Kelt * f, Kelt * buf, size_t j, unsigned int k, size_t n)
 {
     assert((two_t & (two_t-1)) == 0);
 
@@ -589,38 +590,38 @@ void gm_trick_trunc(int two_t, Kelt * f, Kelt * buf, long j, int k, long n)
         Kadd(f[1],f[1],f[0]);
         return;
     }
-    assert(n <= (1L << k));
+    assert(n <= (1UL << k));
     if (k <= (two_t>>1)) {
         gm_trick_trunc(two_t>>1, f, buf, j, k, n);
         return;
     }
     assert(k > (two_t>>1));
     assert(k <= two_t);
-    assert(n > (1L << (two_t>>1)));
-    assert(n <= (1L << two_t));
+    assert(n > (1UL << (two_t>>1)));
+    assert(n <= (1UL << two_t));
 
-    int t = two_t >> 1;
-    long tau = 1L << t;
+    unsigned int t = two_t >> 1;
+    size_t tau = 1UL << t;
     // long cn = (n+tau-1)>>t;      // Ceiling(n/tau);
-    long cn = 1L << (k-t);
+    size_t cn = 1UL << (k-t);
 
     expand_trunc(f,2*t,t,n);
-    memset(f + n, 0, ((1L<<k)-n) * sizeof(Kelt));
+    memset(f + n, 0, ((1UL<<k)-n) * sizeof(Kelt));
 
-    // need 1L<<k in buf
+    // need 1UL<<k in buf
     transpose_outofplace(buf,f,k-t,t);
     
     // evaluate ; we can use f as a buffer, now.
     Kelt * h = buf;
-    for(long l = 0 ; l < tau ; l++) {
-        // we're going to need 1L << (k-t) in f, no big deal.
+    for(size_t l = 0 ; l < tau ; l++) {
+        // we're going to need 1UL << (k-t) in f, no big deal.
         gm_trick_trunc(t, h, f, j, k-t, cn);
         h += cn;
     }
     transpose_outofplace(f,buf,t,k-t);
 
     // evaluate again. Here we cannot truncate.
-    for(long i = 0 ; i < cn ; i++) {
+    for(size_t i = 0 ; i < cn ; i++) {
         gm_trick(t, f + (i << t), (j << t) + i);
     }
 }
@@ -632,19 +633,21 @@ void gm_trick_trunc(int two_t, Kelt * f, Kelt * buf, long j, int k, long n)
  * investigate again the potential benefit.
  */
 
+// (sk+beta)*(sk+beta+1) s(sk+beta)=s(sk)+s(beta)=s_(k+1) + s(beta)
 // The generic reduction function.
-static inline void reduceSi(int k, Kelt * f, Kelt beta)
+static inline void reduceSi(unsigned int k, Kelt * f, Kelt beta)
 {
-    long i, j, K;
+    size_t i, K;
+    unsigned int j;
     Kelt coeff;
     Ksrc_elt fi;
 
-    K = 1L << k;
+    K = 1UL << k;
     // put rest mod Sk+beta in low part of f and quo in high part.
     for (i = 2 * K - 1; i >= K; --i) {
         fi = f[i];
         for (j = 0; j < ind_number[k]; ++j) {
-            int index = ind_S[k][j] + i - K;
+            size_t index = ind_S[k][j] + i - K;
             Kadd(f[index], f[index], fi);
         }
         Kmul(coeff, fi, beta);
@@ -658,7 +661,7 @@ static inline void reduceSi(int k, Kelt * f, Kelt beta)
 
 #ifdef  CANTOR_GM
 // same as multieval, but only to chunks of size kappa
-void reduce_top_cantor(int k, int kappa, Kelt * f, long j)
+void reduce_top_cantor(unsigned int k, unsigned int kappa, Kelt * f, size_t j)
 {
     if (k == kappa)
         return;
@@ -675,13 +678,13 @@ void reduce_top_cantor(int k, int kappa, Kelt * f, long j)
 
 // The generic reduction function.
 // truncated version
-static inline void reduceSiNobeta_trunc(int k, Kelt * f, long L)
+static inline void reduceSiNobeta_trunc(unsigned int k, Kelt * f, size_t L)
 {
-    long j;
-    long i, K;
+    size_t j;
+    size_t i, K;
     Ksrc_elt fi;
 
-    K = 1L << k;
+    K = 1UL << k;
     // put rest mod Sk+beta in low part of f and quo in high part.
     for (i = L - 1; i >= K; --i) {
         fi = f[i];
@@ -698,10 +701,10 @@ static inline void reduceSiNobeta_trunc(int k, Kelt * f, long L)
 
 // A generic interpolation function.
 // TODO: unroll small sizes, like for reduction.
-static inline void interpolateSi(int k, Kelt * f, Kelt beta)
+static inline void interpolateSi(unsigned int k, Kelt * f, Kelt beta)
 {
-    long j;
-    long i, K = 1L << k;
+    unsigned int j;
+    size_t i, K = 1UL << k;
 
     for (i = 0; i < K; ++i)
         Kadd(f[i + K], f[i + K], f[i]);
@@ -711,7 +714,7 @@ static inline void interpolateSi(int k, Kelt * f, Kelt beta)
         Ksrc_elt fi;
         fi = f[i];
         for (j = 0; j < ind_number[k]; ++j) {
-            long index = ind_S[k][j] + i - K;
+            size_t index = ind_S[k][j] + i - K;
             Kadd(f[index], f[index], fi);
         }
         Kmul(coeff, fi, beta);
@@ -719,10 +722,10 @@ static inline void interpolateSi(int k, Kelt * f, Kelt beta)
     }
 }
 
-static inline void interpolateSiNobeta(int k, Kelt * f)
+static inline void interpolateSiNobeta(unsigned int k, Kelt * f)
 {
-    long j;
-    long i, K = 1L << k;
+    unsigned int j;
+    size_t i, K = 1UL << k;
 
     for (i = 0; i < K; ++i)
         Kadd(f[i + K], f[i + K], f[i]);
@@ -731,14 +734,14 @@ static inline void interpolateSiNobeta(int k, Kelt * f)
         Ksrc_elt fi;
         fi = f[i];
         for (j = 0; j < ind_number[k]; ++j) {
-            long index = ind_S[k][j] + i - K;
+            size_t index = ind_S[k][j] + i - K;
             Kadd(f[index], f[index], fi);
         }
     }
 }
 
 
-void multievaluateKrec(Kelt * f, int i, long rep_beta)
+void multievaluateKrec(Kelt * f, unsigned int i, size_t rep_beta)
 {
     Kelt beta;
     rep_beta <<= 1;
@@ -773,16 +776,16 @@ void multievaluateKrec(Kelt * f, int i, long rep_beta)
     }
     if (i > 1) {
         multievaluateKrec(f, i - 1, rep_beta);
-        multievaluateKrec(f + (1L << (i - 1)), i - 1, rep_beta + 1);
+        multievaluateKrec(f + (1UL << (i - 1)), i - 1, rep_beta + 1);
     }
 }
 
 #ifdef  CANTOR_GM
 // f must have 2^k coeffs exactly
-void multievaluateGM(Kelt * f, int k, long length MAYBE_UNUSED)
+void multievaluateGM(Kelt * f, unsigned int k, size_t length MAYBE_UNUSED)
 {
-    int t = 1;
-    int two_t;
+    unsigned int t = 1;
+    unsigned int two_t;
     for( ; (two_t = t << 1) < k ; t = two_t) ;
     assert(t < k && k <= two_t);
 #ifdef CANTOR_GM_TRUNCATE
@@ -791,10 +794,10 @@ void multievaluateGM(Kelt * f, int k, long length MAYBE_UNUSED)
     free(buf);
 #else
     reduce_top_cantor(k,t,f,0);
-    long K = 1L << k;
-    long tau = 1L << t;
-    long j = 0;
-    for(long u = 0 ; u < K ; u += tau) {
+    size_t K = 1UL << k;
+    size_t tau = 1UL << t;
+    size_t j = 0;
+    for(size_t u = 0 ; u < K ; u += tau) {
         gm_trick(t, f + u, j);
         j++;
     }
@@ -802,9 +805,14 @@ void multievaluateGM(Kelt * f, int k, long length MAYBE_UNUSED)
 }
 #endif
 
-void multievaluateKrec_trunc(Kelt * f, int i, long rep_beta, long length)
+// evaluate f, having _length_ coefficients, at the 2^i roots following
+// rep_beta
+void multievaluateKrec_trunc(Kelt * f, unsigned int i, size_t rep_beta, size_t length)
 {
     Kelt beta;
+
+    assert(i >= 1);
+
     rep_beta <<= 1;
     allBetai(beta, rep_beta);
     reduceSi(i - 1, f, beta);
@@ -836,37 +844,54 @@ void multievaluateKrec_trunc(Kelt * f, int i, long rep_beta, long length)
         return;
     }
     if (i > 1) {
-        if (length < (1L << (i - 1))) {
+        if (length < (1UL << (i - 1))) {
             multievaluateKrec_trunc(f, i - 1, rep_beta, length);
-        } else if (length > (1L << (i - 1))) {
+        } else if (length > (1UL << (i - 1))) {
             multievaluateKrec(f, i - 1, rep_beta);
-            multievaluateKrec_trunc(f + (1L << (i - 1)), i - 1, rep_beta + 1,
-                                    length - (1L << (i - 1)));
-        } else { // length == 1L<<(i-1)
+            multievaluateKrec_trunc(f + (1UL << (i - 1)), i - 1, rep_beta + 1,
+                                    length - (1UL << (i - 1)));
+        } else { // length == 1UL<<(i-1)
             multievaluateKrec(f, i - 1, rep_beta);
         }
     }
 }
 
-
-void multievaluateKnew_trunc(Kelt * f, int k, long length)
+// evaluate f, having length coefficients, at all the roots of the polynomial
+// s_k
+void multievaluateKnew_trunc(Kelt * f, unsigned int k, size_t length)
 {
+    assert(length <= (1UL << k));
+    if (k == 0) {
+        // s_0 is x. We're evaluating a constant polynomial at a point, which
+        // turns out to be 0, but that hardly matters. So there's actually
+        // _nothing_ at all to do.
+        return;
+    } else if (k == 1) {
+        // we need to evaluate at 0 and 1. So we must basically add f[0] to
+        // f[1], unless there is no f1.
+        if (length <= 1)
+            return;
+        else
+            Kadd(f[1], f[0], f[1]);
+        return;
+    }
+
     reduceSiNobeta_trunc(k - 1, f, length);
 
     multievaluateKrec(f, k - 1, 0);
-    multievaluateKrec_trunc(f + (1L << (k - 1)), k - 1, 1,
-                            length - (1L << (k - 1)));
+    multievaluateKrec_trunc(f + (1UL << (k - 1)), k - 1, 1,
+                            length - (1UL << (k - 1)));
 }
 
 // Interpolation with subproduct tree.
-void interpolateK(Kelt * f, int k)
+void interpolateK(Kelt * f, unsigned int k)
 {
-    long i, j;
+    size_t i, j;
     Kelt beta;
 
     for (i = 0; i < k - 1; ++i) {
-        for (j = 0; j < (1L << (k - 1 - i)); ++j) {
-            long index = j * (1L << (i + 1));
+        for (j = 0; j < (1UL << (k - 1 - i)); ++j) {
+            size_t index = j * (1UL << (i + 1));
             allBetai(beta, 2 * j);
             interpolateSi(i, f + index, beta);
         }
@@ -875,22 +900,22 @@ void interpolateK(Kelt * f, int k)
 }
 
 
-// Quotrem Si. f is possibly larger than 2 times 1L<<k.
-// Degree of f is given by L (with L > 1L<<k)
+// Quotrem Si. f is possibly larger than 2 times 1UL<<k.
+// Degree of f is given by L (with L > 1UL<<k)
 // Inplace computation: low part of f receive rem, high part gets quo.
-static inline void quotremSi(int k, Kelt * f, long L, Kelt beta)
+static inline void quotremSi(unsigned int k, Kelt * f, size_t L, Kelt beta)
 {
-    long j;
-    long i, K;
+    size_t j;
+    size_t i, K;
     Kelt coeff;
     Ksrc_elt fi;
 
-    K = 1L << k;
+    K = 1UL << k;
     // put rest mod Sk+beta in low part of f and quo in high part.
     for (i = L - 1; i >= K; --i) {
         fi = f[i];
         for (j = 0; j < ind_number[k]; ++j) {
-            long index = ind_S[k][j] + i - K;
+            size_t index = ind_S[k][j] + i - K;
             Kadd(f[index], f[index], fi);
         }
         Kmul(coeff, fi, beta);
@@ -898,21 +923,21 @@ static inline void quotremSi(int k, Kelt * f, long L, Kelt beta)
     }
 }
 
-// Mul Si. f is possibly smaller than half of 1L<<k.
-// Degree of f is given by L (with L<= (1L<<k))
+// Mul Si. f is possibly smaller than half of 1UL<<k.
+// Degree of f is given by L (with L<= (1UL<<k))
 // Inplace computation: Top part of the result is stored in f, and low
 // part of the result gets added to what is at the right of f.
-static inline void mulSi(int k, Kelt * f, long L, Kelt beta)
+static inline void mulSi(unsigned int k, Kelt * f, size_t L, Kelt beta)
 {
-    long j;
-    long i, K = 1L << k;
+    unsigned int j;
+    size_t i, K = 1UL << k;
 
     for (i = 0; i < L; ++i) {
         Kelt coeff;
         Ksrc_elt fi;
         fi = f[i];
         for (j = 0; j < ind_number[k]; ++j) {
-            long index = ind_S[k][j] + i - K;
+            size_t index = ind_S[k][j] + i - K;
             Kadd(f[index], f[index], fi);
         }
         Kmul(coeff, fi, beta);
@@ -920,25 +945,26 @@ static inline void mulSi(int k, Kelt * f, long L, Kelt beta)
     }
 }
 
-// Reduce f (with 1L<<k coeffs) modulo the product of s_i corresponding
+// Reduce f (with 1UL<<k coeffs) modulo the product of s_i corresponding
 // to length.
-static inline void reduceModTrunc(Kelt * f, int k, long length)
+static inline void reduceModTrunc(Kelt * f, unsigned int k, size_t length)
 {
-    int i;
-    long len, ii;
+    unsigned int i;
+    size_t len, ii;
     len = length;
     Kelt *pf = f;
     Kelt beta;
-    long offset_f;
+    size_t offset_f;
 
     // go down, computing quotrems
     offset_f = 0;
-    for (i = k - 1; i >= 0; --i) {
+    assert(k);
+    for (i = k ; i-- > 0 ; ) {
         if (len >> i) {
             allBetai(beta, offset_f >> i);
-            quotremSi(i, f + offset_f, (1L << k) - offset_f, beta);
-            offset_f += 1L << i;
-            len -= 1L << i;
+            quotremSi(i, f + offset_f, (1UL << k) - offset_f, beta);
+            offset_f += 1UL << i;
+            len -= 1UL << i;
         }
     }
 
@@ -947,14 +973,14 @@ static inline void reduceModTrunc(Kelt * f, int k, long length)
     i = __builtin_ctz(len);
     len >>= i;
     pf = f + length;
-    ii = 1L << i;
+    ii = 1UL << i;
     i++;
     len >>= 1;
     for (; i <= k - 1; ++i) {
         if (len & 1) {
-            allBetai(beta, (length - (1L << i) - ii) >> i);
+            allBetai(beta, (length - (1UL << i) - ii) >> i);
             mulSi(i, pf - ii, ii, beta);
-            ii += 1L << i;
+            ii += 1UL << i;
         }
         len >>= 1;
     }
@@ -963,26 +989,38 @@ static inline void reduceModTrunc(Kelt * f, int k, long length)
 
 // Interpolation with subproduct tree.
 // This is a truncated version, where we reconstruct length coefficients,
-// from length values. (length <= 1L<<k)
+// from length values. (length <= 1UL<<k)
 // Assume that non-computed values are set to zero.
-void interpolateK_trunc(Kelt * f, int k, long length)
+void interpolateK_trunc(Kelt * f, unsigned int k, size_t length)
 {
-    int i;
-    long j;
+    unsigned int i;
+    size_t j;
     Kelt beta;
 
+    if (k == 0) {
+        return;
+    } else if (k == 1) {
+        // we know f(0) and f(1). They are related to the calues we want by:
+        // f(0) = f[0]
+        // f(1) = f[0] ^ f[1]
+        // so f[0] stays unchanged, and f[1] gets xored w/ f[0].
+        if (length <= 1)
+            return;
+        Kadd(f[1],f[1],f[0]);
+        return;
+    }
     for (i = 0; i < k - 1; ++i) {
-        long maxj = 1L << (k - 1 - i);
+        size_t maxj = 1UL << (k - 1 - i);
         for (j = 0; j < maxj; ++j) {
-            long index = j * (1L << (i + 1));
-            if (length <= (index + (1L << i))) {
+            size_t index = j * (1UL << (i + 1));
+            if (length <= (index + (1UL << i))) {
                 break;
             }
             allBetai(beta, 2 * j);
             interpolateSi(i, f + index, beta);
         }
     }
-    if (length > (1L << (k - 1)))
+    if (length > (1UL << (k - 1)))
         interpolateSiNobeta(k - 1, f);
 
     reduceModTrunc(f, k, length);
@@ -998,31 +1036,33 @@ void interpolateK_trunc(Kelt * f, int k, long length)
 #endif
 
 #if (ULONG_BITS == 64)
-void decomposeK(Kelt * f, unsigned long * F, long Fl, int k)
+void decomposeK(Kelt * f, unsigned long * F, size_t Fl, int k)
 {
-    long i;
+    size_t i;
+    assert(Fl <= (1UL << k));
     for (i = 0; i < Fl; ++i) {
         f[i][0] = F[i];
         f[i][1] = 0;
     }
-    memset(f + i, 0, ((1L << k) - Fl) * sizeof(Kelt));
+    memset(f + i, 0, ((1UL << k) - Fl) * sizeof(Kelt));
 }
 
-void recomposeK(unsigned long * F, Kelt * f, long Fl, int k MAYBE_UNUSED)
+void recomposeK(unsigned long * F, Kelt * f, size_t Fl, int k MAYBE_UNUSED)
 {
-    long i;
-
+    size_t i;
+    assert(Fl <= (1UL << k));
     F[0] = f[0][0];
     for (i = 1; i < Fl ; ++i)
         F[i] = f[i][0] ^ f[i - 1][1];
 }
 #elif (ULONG_BITS == 32)
 
-/* untested */
+/* not thoroughly tested */
 
-void decomposeK(Kelt * f, unsigned long * F, long Fl, int k)
+void decomposeK(Kelt * f, unsigned long * F, size_t Fl, int k)
 {
-    long i;
+    size_t i;
+    assert(Fl <= (1UL << (k-1)));
     for (i = 0; i < Fl / 2 ; ++i) {
         f[i][0] = F[2*i];
         f[i][1] = F[2*i + 1];
@@ -1036,13 +1076,14 @@ void decomposeK(Kelt * f, unsigned long * F, long Fl, int k)
         f[i][3] = 0;
         i++;
     }
-    memset(f + i, 0, ((1L << k) - i) * sizeof(Kelt));
+    memset(f + i, 0, ((1UL << k) - i) * sizeof(Kelt));
 }
 
-void recomposeK(unsigned long * F, Kelt * f, long Fl, int k MAYBE_UNUSED)
+void recomposeK(unsigned long * F, Kelt * f, size_t Fl, unsigned int k MAYBE_UNUSED)
 {
-    long i;
+    size_t i;
 
+    assert(Fl <= (1UL << (k-1)));
     F[0] = f[0][0];
     F[1] = f[0][1];
     for (i = 2; i < Fl; i += 2) {
@@ -1057,38 +1098,51 @@ void recomposeK(unsigned long * F, Kelt * f, long Fl, int k MAYBE_UNUSED)
 #error "define ULONG_BITS"
 #endif
 
-/* nF is a number of coefficients */
-void c128_setup(c128_info_t p, long nF, long nG)
+/* nF is a number of coefficients == number of bits ; a.k.a. degree + 1 */
+void c128_init(c128_info_t p, size_t nF, size_t nG, ...)
 {
-    int k;
-    long Hl;
-    long n;
+    unsigned int k;
+    size_t Hl;
+    size_t n;
 
     /* Since internally we're working with 64-bit data, then it's really
      * a hard 64 here, not ULONG_BITS : We're just deciding on the order
      * of things.
      */
-    long Fl = (nF + 63) / 64;
-    long Gl = (nG + 63) / 64;
+    size_t Fl = (nF + 63) / 64;
+    size_t Gl = (nG + 63) / 64;
 
     Hl = Fl + Gl;               // nb of uint64_t of the result
     n = Hl;                     // nb of Kelt of the result.
     k = 1;
-    while ((1L << k) < n)
+    while ((1UL << k) < n)
         ++k;
+#if 0
     if (k < 2) {
+        // cantor won't work, or is not relevant. But we can silently fall
+        // back on gf2x multiplication.
+        k = -1;
         fprintf(stderr, "this code is for k >= 2, sorry\n");
         exit(1);
     }
+#endif
     p->k = k;
     p->n = n;
 
 }
 
 /* nF is a number of coefficients */
-void c128_dft(const c128_info_t p, c128_t x, unsigned long * F, long nF)
+void c128_dft(const c128_info_t p, c128_ptr x, unsigned long * F, size_t nF)
 {
-    long Fl = (nF + ULONG_BITS - 1) / ULONG_BITS;
+    size_t Fl = (nF + ULONG_BITS - 1) / ULONG_BITS;
+    if (nF % ULONG_BITS) {
+        /* Just as we are computing this assertion, we could easily mask out
+         * the bits ourselves. However, our interface mandates that the high
+         * bits be cleared in any case. So make sure we properly enforce this
+         * constraint.
+         */
+        assert((F[Fl-1] & ~((1UL << (nF % ULONG_BITS)) - 1)) == 0);
+    }
     decomposeK(x,F,Fl,p->k);
 #ifdef  CANTOR_GM
     multievaluateGM(x, p->k, p->n);
@@ -1098,42 +1152,52 @@ void c128_dft(const c128_info_t p, c128_t x, unsigned long * F, long nF)
 }
 
 
-void c128_compose(const c128_info_t p, c128_t y, c128_src_t x1, c128_src_t x2)
+void c128_compose(const c128_info_t p, c128_ptr y, c128_srcptr x1, c128_srcptr x2)
 {
-    long j;
+    size_t j;
     for (j = 0; j < p->n; ++j) {
         Kmul(y[j], x1[j], x2[j]);
     }
 }
-void c128_add(const c128_info_t p, c128_t y, c128_src_t x1, c128_src_t x2)
+void c128_addcompose(const c128_info_t p, c128_ptr y, c128_srcptr x1, c128_srcptr x2)
 {
-    long j;
+    size_t j;
+    Kelt e;
+    for (j = 0; j < p->n; ++j) {
+        Kmul(e, x1[j], x2[j]);
+        Kadd(y[j], y[j], e);
+    }
+}
+void c128_add(const c128_info_t p, c128_ptr y, c128_srcptr x1, c128_srcptr x2)
+{
+    size_t j;
     for (j = 0; j < p->n; ++j) {
         Kadd(y[j], x1[j], x2[j]);
     }
 }
 
-void c128_cpy(const c128_info_t p, c128_t y, c128_src_t x)
+void c128_cpy(const c128_info_t p, c128_ptr y, c128_srcptr x)
 {
     memcpy(y, x, (p->n)*sizeof(Kelt));
 }
 
-int c128_size(const c128_info_t p)
+size_t c128_size(const c128_info_t p)
 {
-    return (p->n);
+    // the _size() is a number of c128_ptr (Kelt) of the result.
+    return p->n;
 }
 
 /* nH is a number of coefficients */
 void c128_ift(
         const c128_info_t p,
         unsigned long * H,
-        long nH,
-        c128_t h)
+        size_t nH,
+        c128_ptr h)
 {
-    long Hl = (nH + ULONG_BITS - 1) / ULONG_BITS;
+    size_t Hl = (nH + ULONG_BITS - 1) / ULONG_BITS;
 
     // fill in with zeros to facilitate interpolation
-    memset(h + p->n, 0, ((1L << p->k) - p->n) * sizeof(Kelt));
+    memset(h + p->n, 0, ((1UL << p->k) - p->n) * sizeof(Kelt));
     if (p->n & (p->n - 1)) {
         /* n is not a power of 2 */
         interpolateK_trunc(h, p->k, p->n);
@@ -1148,15 +1212,15 @@ void c128_ift(
 // Takes two arrays of 64 bit limbs and compute their
 // product as polynomials over GF(2). 
 // H must have room for the result (Fl+Gl limbs)
-void mulCantor128(unsigned long * H, unsigned long * F, long Fl, unsigned long * G, long Gl)
+void mulCantor128(unsigned long * H, unsigned long * F, size_t Fl, unsigned long * G, size_t Gl)
 {
     c128_info_t order;
-    c128_t f,g;
+    c128_t * f, * g;
 
-    long nF = Fl * ULONG_BITS;
-    long nG = Gl * ULONG_BITS;
+    size_t nF = Fl * ULONG_BITS;
+    size_t nG = Gl * ULONG_BITS;
 
-    c128_setup(order, nF, nG);
+    c128_init(order, nF, nG);
 
     f = c128_alloc(order, 1);
     c128_dft(order, f, F, nF);
@@ -1172,22 +1236,22 @@ void mulCantor128(unsigned long * H, unsigned long * F, long Fl, unsigned long *
     c128_free(order, f, 1);
 }
 
-c128_t c128_alloc(const c128_info_t p, int n)
+c128_ptr c128_alloc(const c128_info_t p, size_t n)
 {
-    return (c128_t) malloc((n << p->k) * sizeof(Kelt));
+    return (c128_ptr) malloc((n << p->k) * sizeof(Kelt));
 }
 void c128_free(
         const c128_info_t p MAYBE_UNUSED,
-        c128_t x,
-        int n MAYBE_UNUSED)
+        c128_ptr x,
+        size_t n MAYBE_UNUSED)
 {
     free(x);
 }
-c128_t c128_get(const c128_info_t p, c128_t x, int k)
+c128_ptr c128_get(const c128_info_t p, c128_ptr x, size_t k)
 {
     return x + (k << p->k);
 }
-void c128_zero(const c128_info_t p, c128_t x, int n)
+void c128_zero(const c128_info_t p, c128_ptr x, size_t n)
 {
 	memset(x, 0, (n << p->k) * sizeof(Kelt));
 }

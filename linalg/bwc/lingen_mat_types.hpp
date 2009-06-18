@@ -702,7 +702,7 @@ template<typename fft_type> struct tpolmat /* {{{ */
     unsigned int ncols;
     fft_type o;
     private:
-    typename fft_type::t x;
+    typename fft_type::t * x;
     unsigned int  * order;
     int   * _deg;
     // inline unsigned int stride() const { return BITS_TO_WORDS(ncoef, ULONG_BITS); }
@@ -773,20 +773,20 @@ template<typename fft_type> struct tpolmat /* {{{ */
         podswap(order,norder);
         mydelete(norder, ncols);
     }
-    typename fft_type::t poly(unsigned int i, unsigned int j)
+    typename fft_type::ptr poly(unsigned int i, unsigned int j)
     {
         ASSERT(i < nrows);
         ASSERT(j < ncols);
         return o.get(x, order[j] * nrows + i);
     }
-    typename fft_type::src_t poly(unsigned int i, unsigned int j) const
+    typename fft_type::srcptr poly(unsigned int i, unsigned int j) const
     {
         ASSERT(i < nrows);
         ASSERT(j < ncols);
         return o.get(x, order[j] * nrows + i);
     }
-    typename fft_type::t col(unsigned int j) { return poly(0, j); }
-    typename fft_type::src_t col(unsigned int j) const { return poly(0, j); }
+    typename fft_type::ptr col(unsigned int j) { return poly(0, j); }
+    typename fft_type::srcptr col(unsigned int j) const { return poly(0, j); }
     /* zero column j */
     void zcol(unsigned int j) {
         ASSERT(j < ncols);
@@ -799,6 +799,7 @@ template<typename fft_type> struct tpolmat /* {{{ */
 template<typename fft_type>
 void transform(tpolmat<fft_type>& dst, polmat& src, fft_type& o, int d)
 {
+    // clock_t t = clock();
     tpolmat<fft_type> tmp(src.nrows, src.ncols, o);
     tmp.zero();
     for(unsigned int j = 0 ; j < src.ncols ; j++) {
@@ -807,6 +808,13 @@ void transform(tpolmat<fft_type>& dst, polmat& src, fft_type& o, int d)
         }
     }
     dst.swap(tmp);
+    /*
+    if (o.size() > 10) {
+        printf("t(%u,%u,%u,%u): %.2fs\n",
+                src.nrows,src.ncols,d,o.size(),
+                (double)(clock()-t)/CLOCKS_PER_SEC);
+    }
+    */
 }
 
 template<typename fft_type>
@@ -878,12 +886,12 @@ void add(
 }
 
 
-template<typename fft_type>
+template<typename fft_type, typename strassen_selector>
 void compose_strassen(
         tpolmat<fft_type>& dst,
         tpolmat<fft_type> const & s1,
         tpolmat<fft_type> const & s2,
-        fft_type& o)
+        fft_type& o, strassen_selector const& s)
 {
     ASSERT(s1.ncols == s2.nrows);
     // Build submatrices
@@ -916,31 +924,31 @@ void compose_strassen(
     // M1 = (A11 + A22)*(B11 +  B22)
     tpolmat<fft_type> M1(nr, nc, o);
     add(tmpA, A11, A22, o); add(tmpB, B11, B22, o);
-    compose(M1, tmpA, tmpB, o);
+    compose_inner(M1, tmpA, tmpB, o, s);
     // M2 = (A21 + A22)*B11
     tpolmat<fft_type> M2(nr, nc, o);
     add(tmpA, A21, A22, o); 
-    compose(M2, tmpA, B11, o);
+    compose_inner(M2, tmpA, B11, o, s);
     // M3 = A11*(B12-B22)
     tpolmat<fft_type> M3(nr, nc, o);
     add(tmpB, B12, B22, o); 
-    compose(M3, A11, tmpB, o);
+    compose_inner(M3, A11, tmpB, o, s);
     // M4 = A22*(B21-B11)
     tpolmat<fft_type> M4(nr, nc, o);
     add(tmpB, B21, B11, o); 
-    compose(M4, A22, tmpB, o);
+    compose_inner(M4, A22, tmpB, o, s);
     // M5 = (A11+A12)*B22
     tpolmat<fft_type> M5(nr, nc, o);
     add(tmpA, A11, A12, o);
-    compose(M5, tmpA, B22, o);
+    compose_inner(M5, tmpA, B22, o, s);
     // M6 = (A21-A11)*(B11+B12)
     tpolmat<fft_type> M6(nr, nc, o);
     add(tmpA, A21, A11, o); add(tmpB, B11, B12, o);
-    compose(M6, tmpA, tmpB, o);
+    compose_inner(M6, tmpA, tmpB, o, s);
     // M7 = (A12-A22)*(B21+B22)
     tpolmat<fft_type> M7(nr, nc, o);
     add(tmpA, A12, A22, o); add(tmpB, B21, B22, o);
-    compose(M7, tmpA, tmpB, o);
+    compose_inner(M7, tmpA, tmpB, o, s);
 
     // Reconstruct result
     // C11 = M1+M4-M5+M7  Store it in M7
@@ -955,31 +963,38 @@ void compose_strassen(
     glue4(dst, M7, M5, M4, M6, o);
 }
 
+struct strassen_default_selector {
 
 // How to tune a threshold for Strassen's algo ????
 // This is a 3-d problem...
 // And this probably depends also on the degrees of the polynomials.
-int use_strassen(unsigned int m, unsigned int n, unsigned int p, int deg) {
+
+int operator()(unsigned int m, unsigned int n, unsigned int p, unsigned int nbits) const {
     static const unsigned int minsize = 4;
-    static const int mindeg = 200;
-    if (m < minsize || n < minsize || p < minsize || deg < mindeg) 
+    static const unsigned int minbits = 200;
+    if (m < minsize || n < minsize || p < minsize || nbits < minbits) 
         return 0;
     return 1;
 }
 
-template<typename fft_type>
-void compose(
+};
+
+
+template<typename fft_type, typename selector_type>
+void compose_inner(
         tpolmat<fft_type>& dst,
         tpolmat<fft_type> const & s1,
         tpolmat<fft_type> const & s2,
-        fft_type& o)
+        fft_type& o, selector_type const& s)
 {
     tpolmat<fft_type> tmp(s1.nrows, s2.ncols, o);
     ASSERT(s1.ncols == s2.nrows);
-    if (use_strassen(s1.nrows, s1.ncols, s2.ncols, o.size())) {
-        compose_strassen(tmp, s1, s2, o);
+    unsigned int nbits;
+    nbits = o.size() * sizeof(typename fft_type::t) * CHAR_BIT;
+    if (s(s1.nrows, s1.ncols, s2.ncols, nbits)) {
+        compose_strassen(tmp, s1, s2, o, s);
     } else {
-        typename fft_type::t x = o.alloc(1);
+        typename fft_type::t * x = o.alloc(1);
         tmp.zero();
         for(unsigned int j = 0 ; j < s2.ncols ; j++) {
             for(unsigned int k = 0 ; k < s1.ncols ; k++) {
@@ -994,11 +1009,47 @@ void compose(
     }
     dst.swap(tmp);
 }
+template<typename fft_type>
+inline void compose(
+        tpolmat<fft_type>& dst,
+        tpolmat<fft_type> const & s1,
+        tpolmat<fft_type> const & s2,
+        fft_type& o)
+{
+    // clock_t t = clock();
+    compose_inner(dst, s1, s2, o, strassen_default_selector());
+    /*
+    if (o.size() > 10) {
+        printf("c(%u,%u,%u,%u): %.2fs [strassen]\n",
+                s1.nrows,s1.ncols,s2.ncols,o.size(),
+                (double)(clock()-t)/CLOCKS_PER_SEC);
+    }
+    */
+}
+
+template<typename fft_type, typename selector_type>
+inline void compose2(
+        tpolmat<fft_type>& dst,
+        tpolmat<fft_type> const & s1,
+        tpolmat<fft_type> const & s2,
+        fft_type& o, selector_type const& s)
+{
+    // clock_t t = clock();
+    compose_inner(dst, s1, s2, o, s);
+    /*
+    if (o.size() > 10) {
+        printf("c(%u,%u,%u,%u): %.2fs [strassen]\n",
+                s1.nrows,s1.ncols,s2.ncols,o.size(),
+                (double)(clock()-t)/CLOCKS_PER_SEC);
+    }
+    */
+}
 
 
 template<typename fft_type>
 void itransform(polmat& dst, tpolmat<fft_type>& src, fft_type& o, int d)
 {
+    // clock_t t = clock();
     polmat tmp(src.nrows, src.ncols, d + 1);
     for(unsigned int j = 0 ; j < src.ncols ; j++) {
         for(unsigned int i = 0 ; i < src.nrows ; i++) {
@@ -1007,6 +1058,13 @@ void itransform(polmat& dst, tpolmat<fft_type>& src, fft_type& o, int d)
         tmp.setdeg(j);
     }
     dst.swap(tmp);
+    /*
+    if (o.size() > 10) {
+        printf("i(%u,%u,%u,%u): %.2fs\n",
+                src.nrows,src.ncols,d,o.size(),
+                (double)(clock()-t)/CLOCKS_PER_SEC);
+    }
+    */
 }
 
 
