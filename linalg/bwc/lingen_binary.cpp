@@ -1,6 +1,7 @@
 #ifndef __cplusplus
 #define _GNU_SOURCE         /* asprintf */
 #endif
+#define __STDC_FORMAT_MACROS    /* PRIu32 in lingen_mat_types.hpp */
 #define _DARWIN_C_SOURCE    /* for asprintf. _ANSI_SOURCE must be undefined */
 
 #include <sys/time.h>
@@ -183,7 +184,7 @@ void compute_E_from_A(polmat const &a)/*{{{*/
         tmp_E.import_col_shift(n + j, a, cnum, - (int) exponent);
     }
     E.swap(tmp_E);
-
+    E.clear_highbits();
 }/*}}}*/
 
 #ifdef  DO_EXPENSIVE_CHECKS     /* {{{ */
@@ -1496,8 +1497,6 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
      * degree. */
     transform(E_hat, E, o, length_E);
 
-
-
     /* ditto for this one */
     E.resize(llen);
 
@@ -1571,6 +1570,7 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
 
     /* TODO XXX Do special convolutions here */
     compose(E_middle_hat, E_hat, pi_l_hat, o);
+
     E_hat.clear();
     /* pi_l_hat is used later on ! */
 

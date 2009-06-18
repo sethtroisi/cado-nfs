@@ -35,5 +35,6 @@
 #include "hashpair.h"
 #include "misc.h"
 #include "poly.h"
+#include "crc.h"
 
 #endif	/* CADO_UTILS_H_ */

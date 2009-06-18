@@ -4,7 +4,7 @@ set (sources
         modredc_ul.c modredc_15ul.c modredc_2ul2.c modul_poly.c gmp_aux.c
         mpz_poly.c fpoly.c rootfinder.c params.c gcd_int64.c gcd_uint64.c
         discriminant.c random_generation.c mpz_array.c gzip.c misc.c
-        hashpair.c poly.c
+        hashpair.c poly.c crc.c
 )
 
 add_library (utils ${sources})

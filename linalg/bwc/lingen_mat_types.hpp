@@ -1,6 +1,12 @@
+#ifndef __STDC_FORMAT_MACROS
+#error "Please define __STDC_FORMAT_MACROS before including lingen_mattypes.h"
+#endif
+
 #ifndef LINGEN_MAT_TYPES_HPP_
 #define LINGEN_MAT_TYPES_HPP_
 
+#include <stdint.h>
+#include <inttypes.h>
 #include <stdlib.h>
 #include <string.h>
 #include <gmp.h>
@@ -8,6 +14,7 @@
 #include <algorithm>
 #include "bwc_config.h"
 #include "alloc_proxy.h"
+#include "utils.h"
 
 /* Number of words holding B bits ; better naming sought. */
 #define BITS_TO_WORDS(B,W)      iceildiv((B),(W))
@@ -687,7 +694,19 @@ struct polmat { /* {{{ */
         unsigned int offset = k / ULONG_BITS;
         poly(i,j)[offset] ^= z << (k % ULONG_BITS);
     }/*}}}*/
+    void clear_highbits() {/*{{{*/
+        unsigned int offset = ncoef / ULONG_BITS;
+        unsigned long mask = (1UL << (ncoef % ULONG_BITS)) - 1UL;
+        if (!mask) return;
+        unsigned long * where = x + offset;
+        for(unsigned int i = 0 ; i < nrows * ncols ; i++) {
+            *where &= mask;
+            where += stride();
+        }
+    }/*}}}*/
+    uint32_t crc() const { return crc32(x, ncols * colstride()); }
 };
+
 
 bool polmat::critical = false;
 
@@ -793,6 +812,7 @@ template<typename fft_type> struct tpolmat /* {{{ */
         o.zero(col(j), 1);
         deg(j) = -1;
     }
+    uint32_t crc() const { return crc32((unsigned long *) x, nrows * ncols * o.size() * sizeof(    typename fft_type::t)/sizeof(unsigned long)); }
 };
 /*}}}*/
 
@@ -802,6 +822,7 @@ void transform(tpolmat<fft_type>& dst, polmat& src, fft_type& o, int d)
     // clock_t t = clock();
     tpolmat<fft_type> tmp(src.nrows, src.ncols, o);
     tmp.zero();
+    src.clear_highbits();
     for(unsigned int j = 0 ; j < src.ncols ; j++) {
         for(unsigned int i = 0 ; i < src.nrows ; i++) {
             o.dft(tmp.poly(i,j), src.poly(i,j), d);
@@ -971,7 +992,7 @@ struct strassen_default_selector {
 
 int operator()(unsigned int m, unsigned int n, unsigned int p, unsigned int nbits) const {
     static const unsigned int minsize = 4;
-    static const unsigned int minbits = 200;
+    static const unsigned int minbits = 12800;
     if (m < minsize || n < minsize || p < minsize || nbits < minbits) 
         return 0;
     return 1;

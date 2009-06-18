@@ -1,3 +1,5 @@
+#define __STDC_FORMAT_MACROS    /* PRIu32 in lingen_mat_types.hpp */
+
 #include <stdio.h>
 #include <cstdio>
 #include <stdlib.h>
