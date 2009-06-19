@@ -27,8 +27,13 @@
 #include <limits.h>
 #include <gmp.h>
 
+#define MIN(a,b) ((a)<(b))?(a):(b)
+#define MAX(a,b) ((a)>(b))?(a):(b)
+
 #define NR_EXPONENTS 8
 #define EXP_PRIMES {2,3,5,7,11,13,17,19}
+
+static const unsigned long exp_primes[NR_EXPONENTS] = EXP_PRIMES;
 
 static int 
 isprime (const unsigned long N, mpz_t t)
@@ -69,6 +74,12 @@ valuation (const unsigned long n, const unsigned long p)
   return i;
 }
 
+typedef struct {
+  unsigned long input, *smooth;
+  unsigned int exp_order[NR_EXPONENTS];
+  unsigned int exp_index[NR_EXPONENTS];
+} stats_t;
+
 
 int 
 main (int argc, char **argv)
@@ -76,18 +87,14 @@ main (int argc, char **argv)
   mpz_t E, m_c;
   unsigned long N, O, c, c_gcdiv_d, p, i, j, imin = 0, imax = 0;
   /* Parameters */
-  unsigned long B1, *B2, maxB2, k = 1, d = 1, pmin = 0, pmax = ULONG_MAX, m = 1;
+  unsigned long B1, *B2, maxB2, k = 1, d = 1, pmin = 0, pmax = ULONG_MAX, 
+                m = 1;
   int quiet = 0, verbose = 0;
   unsigned int nr_B2 = 0;
-  /* Counters */
-  unsigned long input = 0, *smooth = 0; 
+  stats_t *stats;
   int scanf_code;
   char *d_coprime;
-  /* Input and smoothness count for each residue class modulo m */
-  unsigned long *res_input, *res_smooth; 
   char buf[256];
-  unsigned int exp_order[NR_EXPONENTS], exp_index[NR_EXPONENTS];
-  const unsigned long exp_primes[NR_EXPONENTS] = EXP_PRIMES;
   
   /* Parse arguments */
   if (argc < 3)
@@ -147,29 +154,40 @@ main (int argc, char **argv)
         }
     }
 
+  /* Get B1 and all the B2 values */
   B1 = strtoul (argv[1], NULL, 10);
   nr_B2 = argc - 2;
-  B2 = malloc (nr_B2 * sizeof (unsigned long));
-  smooth = malloc (nr_B2 * sizeof (unsigned long));
+  B2 = malloc(nr_B2 * sizeof(unsigned long));
   maxB2 = 0;
   for (i = 0; i < nr_B2; i++)
     {
-      smooth[i] = 0;
       B2[i] = strtoul (argv[2 + i], NULL, 10);
-      maxB2 = (B2[i] > maxB2) ? B2[i] : maxB2;
+      maxB2 = MAX(B2[i], maxB2);
     }
 
-  d_coprime = (char *) malloc (d);
+  d_coprime = malloc (d * sizeof(char));
   for (i = 1; i < d; i++)
     d_coprime[i] = (gcd(i,d) == 1) ? 1 : 0;
-  for (i = 0; i < NR_EXPONENTS; i++)
-    exp_order[i] = exp_index[i] = 0;
   if (d > 1)
     {
       imin = (B1 + d / 2) / d;
       imax = (maxB2 - d / 2) / d;
     }
   
+  /* Allocate a stat_t for each residue class (mod m) */
+  stats = malloc (m * sizeof (stats_t));
+  for (i = 0; i < m; i++)
+    {
+      stats[i].input = 0;
+      for (j = 0; j < NR_EXPONENTS; j++)
+        stats[i].exp_order[j] = stats[i].exp_index[j] = 0;
+
+      stats[i].smooth = malloc (nr_B2 * sizeof(unsigned long));
+      for (j = 0; j < nr_B2; j++)
+        stats[i].smooth[j] = 0;
+    }
+
+
   /* Compute E */
   mpz_init (E);
   mpz_set_ui (E, 1UL);
@@ -180,6 +198,7 @@ main (int argc, char **argv)
         mpz_mul_ui (E, E, j);
       }
   mpz_mul_ui (E, E, k);
+
   if (!quiet)
     {
       fprintf (stderr, "B1 = %lu, ", B1);
@@ -189,11 +208,7 @@ main (int argc, char **argv)
                    k, pmin, pmax, E);
     }
   
-  res_input = (unsigned long *) malloc (m * sizeof(unsigned long));
-  res_smooth = (unsigned long *) malloc (m * sizeof(unsigned long));
-  for (i = 0; i < m; i++)
-    res_input[i] = res_smooth[i] = 0;
-  
+
   /* Test input numbers */
   mpz_init (m_c);
   while (!feof(stdin))
@@ -203,33 +218,42 @@ main (int argc, char **argv)
       scanf_code = sscanf (buf, "%lu %lu %lu\n", &p, &O, &N);
       if (pmin <= p && p <= pmax)
         {
+          unsigned long r;
+          int was_smooth = 0, ispr = 0;
           /* input line may contain only "N", or "p N", or "p O N" */
-          input++;
           if (scanf_code == 1)
             N = p;
           else if (scanf_code == 2)
             N = O;
-          res_input[p % m]++;
+
+          r = p % m;
+          stats[r].input++;
+
           c = N / mpz_gcd_ui (NULL, E, N);
           c_gcdiv_d = c / gcd (c, d);
-          if (c_gcdiv_d == 1UL || /* c == 1 (factor found after stage 1) || c | d */
-              (imin <= c_gcdiv_d && c_gcdiv_d <= imax) || /* factor appears in list of idP */
-              (c < d / 2 && d_coprime[c] == 1) || /* factor appears in list of jP */
-              (B1 < c && c <= maxB2 && isprime(c, m_c))) /* factor appears normally in stage 2 */
-            {
-              for (i = 0; i < nr_B2; i++)
-                smooth[i] += (c <= B2[i]) ? 1UL : 0UL;
-              res_smooth[p % m]++;
-              if (verbose)
-                printf ("%lu %lu\n", p, N);
-            }
+          ispr = (B1 < c && c <= maxB2 && isprime(c, m_c));
+
+          for (i = 0; i < nr_B2; i++)
+            if (c_gcdiv_d == 1UL || /* c == 1 (factor found after stage 1) || c | d */
+                (imin <= c_gcdiv_d && c_gcdiv_d <= imax) || /* factor appears in list of idP */
+                (c < d / 2 && d_coprime[c] == 1) || /* factor appears in list of jP */
+                (ispr && c <= B2[i])) /* factor appears normally in stage 2 */
+              {
+                stats[r].smooth[i]++;
+                was_smooth = 1;
+              }
+
+          /* If order was smooth for any B2 and verbose is set, print it */
+          if (was_smooth && verbose)
+            printf ("%lu %lu\n", p, N);
+
           if (scanf_code == 3)
             {
               assert (O % N == 0);
               for (i = 0; i < NR_EXPONENTS; i++)
                 {
-                  exp_order[i] += valuation (O, exp_primes[i]);
-                  exp_index[i] += valuation (O/N, exp_primes[i]);
+                  stats[r].exp_order[i] += valuation (O, exp_primes[i]);
+                  stats[r].exp_index[i] += valuation (O/N, exp_primes[i]);
                 }
             }
         }
@@ -239,31 +263,50 @@ main (int argc, char **argv)
 
   if (!quiet)
     {
-      printf ("%lu input numbers in [%lu, %lu]\n", input, pmin, pmax);
-      for (i = 0; i < nr_B2; i++)
-        printf ("%lu %lu,%lu-smooth numbers, ratio %f\n", 
-              smooth[i], B1, B2[i], (double) smooth[i] / (double) input);
-      if (m > 1UL)
+      unsigned long r;
+      for (r = 0; r < m; r++)
         {
-          printf ("Number of smooth/input numbers and ratio where p == r (mod %lu):\n", m);
-          for (i = 0; i < m; i++)
-            if (res_input[i] != 0)
-              printf ("r = %lu: %lu/%lu = %f  ", 
-                      i, res_smooth[i], res_input[i], 
-                      (double) res_smooth[i] / (double) res_input[i]);
-          printf ("\n");
+          if (stats[r].input > 0)
+            {
+              printf ("%lu (mod %lu): %lu input numbers\n", 
+                r, m, stats[r].input);
+              for (i = 0; i < nr_B2; i++)
+                printf ("%lu (mod %lu): %lu %lu,%lu-smooth numbers, ratio %f\n", 
+                  r, m, stats[r].smooth[i], B1, B2[i], 
+                  (double) stats[r].smooth[i] / (double) stats[r].input);
+            }
+              
+          if (stats[r].exp_order[0] > 0)
+            {
+              printf ("Sum of valuation of q in O:\n");
+              for (i = 0; i < NR_EXPONENTS; i++)
+                if (stats[r].exp_order[i])
+                  printf ("q = %lu: %u  ", exp_primes[i], stats[r].exp_order[i]);
+              printf ("\n");
+            }
+          if (stats[r].exp_index[0] > 0)
+            {
+              printf ("Sum of valuation of q in N/O (index of starting element):\n");
+              for (i = 0; i < NR_EXPONENTS; i++)
+                if (stats[r].exp_index[i])
+                  printf ("q = %lu: %u  ", exp_primes[i], stats[r].exp_index[i]);
+              printf ("\n");
+            }
         }
-      printf ("Sum of valuation of q in O:\n");
-      for (i = 0; i < NR_EXPONENTS; i++)
-        if (exp_order[i])
-          printf ("q = %lu: %u  ", exp_primes[i], exp_order[i]);
-      printf ("\n");
-      printf ("Sum of valuation of q in N/O (index of starting element):\n");
-      for (i = 0; i < NR_EXPONENTS; i++)
-        if (exp_index[i])
-          printf ("q = %lu: %u  ", exp_primes[i], exp_index[i]);
-      printf ("\n");
     }
   
+  /* Free memory */
+  free (B2);
+  B2 = NULL;
+  free (d_coprime);
+  d_coprime = NULL;
+  for (i = 0; i < m; i++)
+    {
+      free(stats[i].smooth);
+      stats[i].smooth = NULL;
+    }
+  free (stats);
+  stats = NULL;
+
   return 0;
 }
