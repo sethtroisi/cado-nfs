@@ -1723,7 +1723,7 @@ void factor_list_fprint(FILE *f, factor_list_t fl) {
 /* The entries in BA must be sorted in order of increasing x */
 static void
 divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const int x,
-                           bucket_primes_t *BP)
+                           bucket_primes_t *BP, const unsigned long fbb)
 {
   bucket_prime_t prime;
   while (!bucket_primes_is_end (BP)) {
@@ -1735,16 +1735,16 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const int x,
         }
       if (prime.x == x) {
           unsigned long p = prime.p;
-          if (!mpz_divisible_ui_p (norm, p)) {
+          while (p <= fbb && !mpz_divisible_ui_p (norm, p)) {
               /* It may have been a case of incorrectly reconstructing p
                  from bits 1...16, so let's try if a bigger prime works */
               p += BUCKET_P_WRAP;
-              if (!mpz_divisible_ui_p (norm, p)) {
-                fprintf (stderr,
-                         "# Error, neither p = %lu nor p = %lu divides at x = %d\n",
-                         p - BUCKET_P_WRAP, p, x);
-                continue;
-              } 
+          }
+          if (p > fbb) {
+              fprintf (stderr,
+                       "# Error, p = %lu does not divide at x = %d\n",
+                       (unsigned long) prime.p, x);
+              continue;
           }
           do {
               fl->fac[fl->n] = p;
@@ -1760,7 +1760,7 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const int x,
 NOPROFILE_STATIC void
 trial_div (factor_list_t *fl, mpz_t norm, int x,
            factorbase_degn_t *fb, bucket_primes_t *primes,
-	   trialdiv_divisor_t *trialdiv_data)
+	   trialdiv_divisor_t *trialdiv_data, const unsigned long fbb)
 {
     const int trial_div_very_verbose = 0; // (x == 30878);
     fl->n = 0; /* reset factor list */
@@ -1785,7 +1785,7 @@ trial_div (factor_list_t *fl, mpz_t norm, int x,
     }
 
     // remove primes in "primes" that map to x
-    divide_primes_from_bucket (fl, norm, x, primes);
+    divide_primes_from_bucket (fl, norm, x, primes, fbb);
     if (trial_div_very_verbose)
       gmp_fprintf (stderr, "# x = %d, after dividing out bucket/resieved norm = %Zd\n",
                    x, norm);
@@ -1967,7 +1967,7 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
             // Trial divide rational norm
             eval_fij (rat_norm, (const mpz_t *) cpoly->g, 1, a, b);
             trial_div (&rat_factors, rat_norm, x, fb_rat,
-                       &rat_primes, si->trialdiv_data_rat);
+                       &rat_primes, si->trialdiv_data_rat, cpoly->rlim);
 
             if (!check_leftover_norm (rat_norm, cpoly->lpbr, BBrat, BBBrat,
                                       cpoly->mfbr))
@@ -1977,7 +1977,7 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
             eval_fij (alg_norm, (const mpz_t *) cpoly->f, cpoly->degree, a, b);
             mpz_divexact_ui (alg_norm, alg_norm, si->q);
             trial_div (&alg_factors, alg_norm, x, fb_alg,
-                       &alg_primes, si->trialdiv_data_alg);
+                       &alg_primes, si->trialdiv_data_alg, cpoly->alim);
 
             if (!check_leftover_norm (alg_norm, cpoly->lpba, BBalg, BBBalg,
                                       cpoly->mfba))
