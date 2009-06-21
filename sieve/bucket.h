@@ -7,6 +7,12 @@
 
 //#define SAFE_BUCKETS
 
+/* We store ((p-1)/2) % 2^16 in the bucket updates and reconstruct
+   p from that. In rare cases a wrap-around is missed and p does not 
+   divide the norm; in such a case we try p + P_WRAP to see if that
+   divides */
+#define BUCKET_P_WRAP (1U<<17)
+
 /*
  * This bucket module provides a way to store elements (that are called
  * updates), while partially sorting them, according to some criterion (to
@@ -14,8 +20,6 @@
  * buckets. The user says for each data to which bucket it belongs. This
  * module is supposed to perform this storage in a cache-friendly way and
  * so on...
- * Updates can be "tagged" with a one-byte value which must be increasing
- * across all the updates stored.
  */
 
 /*
@@ -34,23 +38,25 @@
  */
 
 /*
- * For the moment, we will keep the bucket updates aligned by adding an
- * 8-bit field that can contain, for instance, the low bits of p.
- *
- * TODO:
- * If the memory pressure becomes too high with this, we can remove this
- * p_low field and pack the updates as follows:
- *    [ x0 ] [ x1 ] [ x2 ] [ x3 ] [logp0] [logp1] [logp2] [logp3]
- * in the bucket.
- *
- * This will be slightly more tricky to store/load bucket updates, but
- * the additional cost should be negligible.
+ * For the moment, we store the bucket updates and a 16-bit field
+ * that can contain, for instance, the low bits of p.
  */
 
 typedef struct {
     uint16_t x;
-    uint32_t p PACKED;
+    uint16_t p;
 } bucket_update_t;
+
+
+/* After a bucket is purged, it is usually not possible to reconstruct
+ * the primes from their lower 16 bits any more, so purging does the 
+ * reconstruction and stores the remaining updates with the complete primes 
+ */
+
+typedef struct {
+    uint32_t p;
+    uint16_t x;
+} bucket_prime_t;
 
 
 /*
@@ -124,6 +130,18 @@ typedef struct {
    addresses are >= logp_idx[j*n_bucket+i], but less than 
      logp_idx[(j+1)*n_bucket+i] if j+1 < nr_logp, bucket_write otherwise.
 */
+
+
+/* Similar, but stores info containing the complete prime instead of
+   only the low 16 bits, and has only one bucket */
+
+typedef struct {
+  bucket_prime_t *start;
+  bucket_prime_t *read;
+  bucket_prime_t *write;
+  int size;
+} bucket_primes_t;
+
 
 
 /*
@@ -205,6 +223,22 @@ get_kth_bucket_update(const bucket_array_t BA, const int i, const int k);
    of this logp value. */
 static inline void
 bucket_new_logp(bucket_array_t *BA, const unsigned char logp);
+
+
+/* Functions for handling entries with x and complete prime p */
+
+static inline bucket_primes_t
+init_bucket_primes (const int size);
+
+static inline void
+clear_bucket_primes (bucket_primes_t *BP);
+
+static inline void
+push_bucket_prime (bucket_primes_t *BP, const bucket_prime_t prime);
+
+static inline bucket_prime_t
+get_next_bucket_prime (bucket_primes_t *BP);
+
 
 /******** Bucket array implementation **************/
 
@@ -368,24 +402,60 @@ is_end(const bucket_array_t BA, const int i)
     return (BA.bucket_read[i] == BA.bucket_write[i]);
 }
 
-/* Delete the updates whose values of x do not yield a report.
-   This will speed up the trial division, since we will loop
-   over fewer entries. */
-static void
-purge_bucket (bucket_array_t BA, const int i, unsigned char *S)
-{
-  bucket_update_t *u, *v;
 
-  for (u = v = BA.bucket_start[i]; u < BA.bucket_write[i]; u++)
-    if (S[u->x] != 255)
-      *v++ = *u;
-  BA.bucket_write[i] = v;
+static inline bucket_primes_t
+init_bucket_primes (const int size)
+{
+  bucket_primes_t BP;
+  BP.size = size;
+  BP.start = (bucket_prime_t *) malloc_check (size * sizeof(bucket_prime_t));
+  BP.read = BP.start;
+  BP.write = BP.start;
+  return BP;
 }
+
+static inline void
+clear_bucket_primes (bucket_primes_t *BP)
+{
+  free (BP->start);
+  BP->start = NULL;
+  BP->read = NULL;
+  BP->write = NULL;
+  BP->size = 0;
+}
+
+
+static inline bucket_prime_t
+get_next_bucket_prime (bucket_primes_t *BP)
+{
+  return *BP->read++;
+}
+
+static inline void
+push_bucket_prime (bucket_primes_t *BP, const bucket_prime_t p)
+{
+  *BP->write++ = p;
+}
+                   
+
+static inline int
+bucket_primes_is_end(const bucket_primes_t *BP)
+{
+  return (BP->read == BP->write);
+}
+
+static inline void
+rewind_primes_by_1 (bucket_primes_t *BP)
+{
+  if (BP->read > BP->start)
+    BP->read--;
+}
+
 
 /* A compare function suitable for sorting updates in order of ascending x
    with qsort() */
 static int
-bucket_cmp_update (const bucket_update_t *a, const bucket_update_t *b)
+bucket_cmp_x (const bucket_prime_t *a, const bucket_prime_t *b)
 {
   if (a->x < b->x)
     return -1;
@@ -395,8 +465,49 @@ bucket_cmp_update (const bucket_update_t *a, const bucket_update_t *b)
 }
 
 static void
-bucket_sortbucket (bucket_array_t BA, const int i)
+bucket_sortbucket (bucket_primes_t *BP)
 {
-  qsort (BA.bucket_start[i], nb_of_updates (BA, i), sizeof (bucket_update_t), 
-	 (int(*)(const void *, const void *)) &bucket_cmp_update);
+  qsort (BP->start, BP->write - BP->start, sizeof (bucket_prime_t), 
+	 (int(*)(const void *, const void *)) &bucket_cmp_x);
 }
+
+
+/* Remove some redundancy form the stored primes, e.g., remove the low
+   bit which is always 1. We might also store p/6 and one bit telling
+   whether it was 1 or 5 (mod 6). */
+static inline uint16_t
+bucket_encode_prime (uint32_t p)
+{
+  return (uint16_t)(p/2U);
+}
+
+/* Copy only those bucket entries where x yields a sieve report.
+ * These entries get sorted, to speed up trial division. 
+ * Due to the purging and sorting, it will not be possible to
+ * reconstruct the correct p from its low 16 bits, so the
+ * reconstruction is done here and the full p is stored in the output.
+ */
+
+void
+purge_bucket (bucket_primes_t *BP, bucket_array_t BA, 
+              const int i, const unsigned char *S)
+{
+  bucket_update_t *u;
+  uint16_t last_p = 0;
+  uint32_t phigh = 0;
+  bucket_prime_t bp;
+
+  for (u = BA.bucket_start[i] ; u < BA.bucket_write[i]; u++)
+    {
+      if (u->p < last_p)
+	phigh += BUCKET_P_WRAP;
+      last_p = u->p;
+      if (S[u->x] != 255)
+        {
+	  bp.p = phigh + (uint32_t)(u->p) * 2U + 1U; /* Reconstruct prime */
+          bp.x = u->x;
+          push_bucket_prime (BP, bp);
+	}
+    }
+}
+
