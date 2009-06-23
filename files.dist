@@ -306,6 +306,8 @@ utils/timing.c
 utils/timing.h
 utils/ularith.h
 utils/utils.h
+utils/crc.h
+utils/crc.c
 cado_config_h.in
 config/asm_sample.c
 config/sse2.c

@@ -12,3 +12,4 @@ merge_linalg_sqrt2.sh
 polyselect/fast_rootsieve.h
 polyselect/fast_rootsieve.c
 params/params.c128
+params/params.c110
