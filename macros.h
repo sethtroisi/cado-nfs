@@ -65,6 +65,9 @@
 #ifndef	MAYBE_UNUSED
 #define MAYBE_UNUSED __attribute__ ((unused))
 #endif
+#ifndef NO_INLINE
+#define NO_INLINE __attribute__ ((noinline))
+#endif
 #ifndef PACKED
 #define PACKED __attribute__ ((packed))
 #endif
@@ -77,6 +80,9 @@
 #else
 #ifndef	MAYBE_UNUSED
 #define MAYBE_UNUSED
+#endif
+#ifndef NO_INLINE
+#define NO_INLINE
 #endif
 #ifndef PACKED
 #define PACKED
