@@ -21,7 +21,6 @@ filter/merge_mpi.c
 filter/merge_mpi.h
 misc/
 nightly-test
-old/
 params/README.params
 params/mach_desc
 params/mach_desc.rsa100
