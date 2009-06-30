@@ -1205,13 +1205,27 @@ void gf2x_tfft_init(gf2x_tfft_info_ptr o, size_t bits_a, size_t bits_b, ...)
     va_list ap;
     va_start(ap, bits_b);
     long K = va_arg(ap, long);
-    size_t M;
+    va_end(ap);
+
+    size_t M = 0;
+    long Kx = K;
+    for( ; Kx ; ) {
+        if (Kx == 1 || Kx == -1)
+            break;
+        if ((Kx % 3) != 0) {
+            fprintf(stderr, "gf2x_tfft_init called with wrong size parameter"
+                    " (%ld is not a power of 3)\n", K);
+            abort();
+        }
+        Kx /= 3;
+    }
+    assert((Kx == 0) == (K == 0));
     if (K > 0) {
         M = CEIL((nwa + nwb) * WLEN, K);	// ceil(bits(product)/K)
         o->K = K;
         o->M = M;
         o->split = 0;
-    } else {
+    } else if (K < 0) {
         ASSERT(-K >= WLEN);
         size_t cn2 = CEIL(nwa + nwb, 2);	// Space for half product
         size_t m2 = CEIL(cn2 * WLEN, -K);	// m2 = ceil(cn2*WLEN/K)
@@ -1222,7 +1236,7 @@ void gf2x_tfft_init(gf2x_tfft_info_ptr o, size_t bits_a, size_t bits_b, ...)
         o->split = 1;
     }
 
-    if (nwa + nwb < MUL_FFT_THRESHOLD) {
+    if (nwa + nwb < MUL_FFT_THRESHOLD || K == 0) {
         // make this special.
         o->K = 0;
         o->M = 0;
@@ -1241,7 +1255,16 @@ void gf2x_tfft_init(gf2x_tfft_info_ptr o, size_t bits_a, size_t bits_b, ...)
     o->tmp = (unsigned long *) malloc_or_die(ltmp * sizeof(unsigned long));
     o->perm = (size_t *) malloc_or_die(o->K * sizeof(size_t));
     bitrev(0, 0, o->K, 1, o->perm);
-    va_end(ap);
+}
+
+void gf2x_tfft_init_similar(gf2x_tfft_info_ptr o, size_t bits_a, size_t bits_b, gf2x_tfft_info_srcptr other)
+{
+    gf2x_tfft_init(o, bits_a, bits_b, other->K);
+}
+
+int gf2x_tfft_compatible(gf2x_tfft_info_srcptr o1, gf2x_tfft_info_srcptr o2)
+{
+    return o1->K == o2->K && o1->M == o2->M;
 }
 
 void gf2x_tfft_clear(gf2x_tfft_info_ptr o)

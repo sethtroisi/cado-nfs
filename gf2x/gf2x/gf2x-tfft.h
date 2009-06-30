@@ -8,7 +8,7 @@ extern "C" {
 struct gf2x_tfft_info_s {
     size_t bits_a;  // number of bits of operand1
     size_t bits_b;  // number of bits of operand2
-    size_t K;       // 0 indicates fallback.
+    size_t K;       // 0 indicates fallback. negative means split.
     size_t M;
     unsigned long * tmp;
     size_t * perm;
@@ -36,6 +36,8 @@ extern void gf2x_tfft_add(gf2x_tfft_info_srcptr o, gf2x_tfft_ptr tc, gf2x_tfft_s
 extern void gf2x_tfft_ift(gf2x_tfft_info_srcptr o, unsigned long * c, size_t bits_c, gf2x_tfft_ptr tr);
 extern void gf2x_tfft_init(gf2x_tfft_info_ptr o, size_t bits_a, size_t bits_b, ...);
 extern void gf2x_tfft_clear(gf2x_tfft_info_ptr o);
+extern void gf2x_tfft_init_similar(gf2x_tfft_info_ptr o, size_t bits_a, size_t bits_b, gf2x_tfft_info_srcptr other);
+extern int gf2x_tfft_compatible(gf2x_tfft_info_srcptr o1, gf2x_tfft_info_srcptr o2);
 
 #ifdef __cplusplus
 }

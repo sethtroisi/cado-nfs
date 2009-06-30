@@ -1114,18 +1114,10 @@ void c128_init(c128_info_t p, size_t nF, size_t nG, ...)
 
     Hl = Fl + Gl;               // nb of uint64_t of the result
     n = Hl;                     // nb of Kelt of the result.
-    k = 1;
-    while ((1UL << k) < n)
-        ++k;
-#if 0
-    if (k < 2) {
-        // cantor won't work, or is not relevant. But we can silently fall
-        // back on gf2x multiplication.
-        k = -1;
-        fprintf(stderr, "this code is for k >= 2, sorry\n");
-        exit(1);
-    }
-#endif
+    for(k = 1; (1UL << k) < n ; k++) ;
+    /* We used to refuse k < 2 here. Now we've got sufficient provision
+     * in here to accomodate for the case where k==1, so a safe fallback
+     * works. */
     p->k = k;
     p->n = n;
 
@@ -1255,4 +1247,13 @@ void c128_zero(const c128_info_t p, c128_ptr x, size_t n)
 {
 	memset(x, 0, (n << p->k) * sizeof(Kelt));
 }
+void c128_init_similar(c128_info_ptr o, size_t bits_a, size_t bits_b, c128_info_srcptr other MAYBE_UNUSED)
+{
+    c128_init(o, bits_a, bits_b);
+}
+int c128_compatible(c128_info_srcptr o1, c128_info_srcptr o2)
+{
+    return o1->k == o2->k;
+}
+
 /* vim: set sw=4 sta et: */

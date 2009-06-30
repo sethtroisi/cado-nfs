@@ -35,39 +35,42 @@ struct fake_info_struct {
     size_t size;
 };
 typedef struct fake_info_struct fake_info_t[1];
-typedef const struct fake_info_struct * fake_info_ptr;
-typedef struct fake_info_struct * fake_info_srcptr;
+typedef struct fake_info_struct * fake_info_ptr;
+typedef const struct fake_info_struct * fake_info_srcptr;
 
 typedef unsigned long fake_t;
 typedef fake_t * fake_ptr;
 typedef const fake_t * fake_srcptr;
 
-extern void fake_init(fake_info_t p, size_t nF, size_t nG, ...); 
-static inline void fake_clear(fake_info_t p MAYBE_UNUSED) {}
-static inline fake_ptr fake_alloc(const fake_info_t p, size_t n) {
+extern void fake_init(fake_info_ptr p, size_t nF, size_t nG, ...); 
+static inline void fake_clear(fake_info_ptr p MAYBE_UNUSED) {}
+static inline fake_ptr fake_alloc(fake_info_srcptr p, size_t n) {
     return (fake_ptr) mymalloc(n * p->size * sizeof(unsigned long));
 }
-static inline void fake_free(const fake_info_t p MAYBE_UNUSED,
+static inline void fake_free(fake_info_srcptr p MAYBE_UNUSED,
         fake_ptr x,
         size_t n MAYBE_UNUSED)
 {
     myfree(x, n * p->size * sizeof(unsigned long));
 }
-static inline fake_ptr fake_get(const fake_info_t p, fake_ptr x, size_t k) {
+static inline fake_ptr fake_get(fake_info_srcptr p, fake_ptr x, size_t k) {
     return x + (k * p->size);
 }
-static inline void fake_zero(const fake_info_t p, fake_ptr x, size_t n)
+static inline void fake_zero(fake_info_srcptr p, fake_ptr x, size_t n)
 {
     memset(x, 0, n * p->size * sizeof(unsigned long));
 }
-extern void fake_dft(const fake_info_t p, fake_ptr x, unsigned long * F, size_t nF);
-extern void fake_compose(const fake_info_t p, fake_ptr y, fake_srcptr x1, fake_srcptr x2);
-extern void fake_addcompose(const fake_info_t p, fake_ptr y, fake_srcptr x1, fake_srcptr x2);
-extern void fake_add(const fake_info_t p, fake_ptr y, fake_srcptr x1, fake_srcptr x2);
-extern void fake_cpy(const fake_info_t p, fake_ptr y, fake_srcptr x);
-extern void fake_ift(const fake_info_t p, unsigned long * H, size_t Hl, fake_srcptr h);
+extern void fake_dft(fake_info_srcptr p, fake_ptr x, unsigned long * F, size_t nF);
+extern void fake_compose(fake_info_srcptr p, fake_ptr y, fake_srcptr x1, fake_srcptr x2);
+extern void fake_addcompose(fake_info_srcptr p, fake_ptr y, fake_srcptr x1, fake_srcptr x2);
+extern void fake_add(fake_info_srcptr p, fake_ptr y, fake_srcptr x1, fake_srcptr x2);
+extern void fake_cpy(fake_info_srcptr p, fake_ptr y, fake_srcptr x);
+extern void fake_ift(fake_info_srcptr p, unsigned long * H, size_t Hl, fake_srcptr h);
 
-extern size_t fake_size(const fake_info_t p);
+extern size_t fake_size(fake_info_srcptr p);
+
+extern void fake_init_similar(fake_info_ptr o, size_t bits_a, size_t bits_b, fake_info_srcptr other);
+extern int fake_compatible(fake_info_srcptr o1, fake_info_srcptr o2);
 
 #ifdef __cplusplus
 }

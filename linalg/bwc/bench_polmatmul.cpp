@@ -9,6 +9,7 @@
 #include "utils.h"
 #include "gf2x.h"
 #include "gf2x-fft.h"
+#include "math.h"
 
 #include "lingen_mat_types.hpp"
 
@@ -18,9 +19,14 @@ void usage()
     exit(1);
 }
 
+/* Counted in unsigned longs -- must exceed all caches by large, so as to
+ * avoid cheating on benches */
+#define DATA_POOL_SIZE  (1 << 23)
+
 /* handy globals */
 unsigned int nrep = 10;
 
+#if 0
 void bench_polmul(unsigned int d1, unsigned int d2)
 {
     unsigned int nw1 = BITS_TO_WORDS(d1 + 1, ULONG_BITS);
@@ -46,22 +52,26 @@ void bench_polmul(unsigned int d1, unsigned int d2)
     delete[] g;
     delete[] h;
 }
-#define do_and_noprinttime(v, line, nrep, tlim) do {			\
+#endif
+
+#define NREPS_MAX       1000
+#define REPEAT_TIME_MAX 1
+#define do_and_noprinttime(v, line) do {		        	\
     clock_t tt = clock();						\
     unsigned int r;							\
-    clock_t clocklim = tt + tlim * CLOCKS_PER_SEC;			\
-    for(r = 0 ; r < nrep && clock() < clocklim ; r++) {			\
+    clock_t clocklim = tt + REPEAT_TIME_MAX * CLOCKS_PER_SEC;		\
+    for(r = 0 ; r < NREPS_MAX && clock() < clocklim ; r++) {		\
         line;								\
     }									\
     v=(double) (clock()-tt)/r/CLOCKS_PER_SEC;           		\
 } while (0)
 
-#define do_and_printtime(v, line, nrep, tlim) do {			\
-    do_and_noprinttime(v, line, nrep, tlim);                            \
-    printf(" %f", v);                                                   \
+#define do_and_printtime(v, line, fmt, scale) do {			\
+    do_and_noprinttime(v, line);                            \
+    printf(fmt, v * scale);                                                 \
 } while (0)
 
-
+#if 0
 void bench_c128(unsigned int d1, unsigned int d2)
 {
     unsigned int nw1 = BITS_TO_WORDS(d1 + 1, ULONG_BITS);
@@ -87,10 +97,10 @@ void bench_c128(unsigned int d1, unsigned int d2)
     tt0 = cputime();
     double v;
 
-    do_and_printtime(v, c128_dft(o, tf, f, d1), nrep, 1);
-    do_and_printtime(v, c128_dft(o, tg, g, d2), nrep, 1);
-    do_and_printtime(v, c128_compose(o, th, tf, tg), nrep, 1);
-    do_and_printtime(v, c128_ift(o, h, d1 + d2, th), nrep, 1);
+    do_and_printtime(v, c128_dft(o, tf, f, d1));
+    do_and_printtime(v, c128_dft(o, tg, g, d2));
+    do_and_printtime(v, c128_compose(o, th, tf, tg));
+    do_and_printtime(v, c128_ift(o, h, d1 + d2, th));
 
     c128_clear(o);
     printf(" tot %f", (double) (cputime()-tt0)/nrep);
@@ -99,6 +109,7 @@ void bench_c128(unsigned int d1, unsigned int d2)
     delete[] g;
     delete[] h;
 }
+#endif
 
 /* Since strassen is a recursive algorithm that falls back on matrices
  * whose sizes are halved, and since for our applications, the matrices
@@ -111,9 +122,9 @@ void bench_c128(unsigned int d1, unsigned int d2)
 #define BITS_IN_DIM_D   3
 #define BITS_IN_DIM_I   4
 
-#define MAX_I_FOR_TUNING        256    /* < (1 << BITS_IN_DIM_I) */
-#define MAX_CONSIDERED_THRESHOLD        1000000
-#define MIN_CONSIDERED_THRESHOLD        0
+/* This is in case 1 << BITS_IN_DIM_I is unacceptably large. */
+#define MAX_I_FOR_TUNING        8    /* < (1 << BITS_IN_DIM_I) */
+
 // dimension must be <= d * 2^i
 // d <= (1 << BITS_IN_DIM_D)
 // i < (1 << BITS_IN_DIM_I)
@@ -171,6 +182,21 @@ struct my_strassen_selector {
         // printf("([%u,%u,%u,%u]=>%d)",m,n,p,nbits,answer);
         return answer;
     }
+    void dump(const char * name) const {
+        printf("#define %s_STRASSEN_THRESHOLDS_D %u\n", name, BITS_IN_DIM_D);
+        printf("#define %s_STRASSEN_THRESHOLDS_I %u\n", name, BITS_IN_DIM_I);
+        printf("#define %s_STRASSEN_THRESHOLDS {\t\\\n\t", name);
+        unsigned int disp = 0;
+        for(unsigned int i = 0 ; i < SELECTOR_NB_INDICES ; i++) {
+            if (strassen_threshold[i]) {
+                printf(" {%u, %d},", i, (int) strassen_threshold[i]);
+                if (++disp % 4 == 0) {
+                    printf("\t\\\n\t");
+                }
+            }
+        }
+        printf("}\n");
+    }
 };
 
 
@@ -188,9 +214,111 @@ struct foo {
 };
 
 template<> logbook foo<fake_fft>::l = logbook();
-template<> logbook foo<cantor_fft>::l = logbook();
+template<> logbook foo<c128_fft>::l = logbook();
+template<> logbook foo<gf2x_tfft>::l = logbook();
 template<> my_strassen_selector foo<fake_fft>::s = my_strassen_selector();
-template<> my_strassen_selector foo<cantor_fft>::s = my_strassen_selector();
+template<> my_strassen_selector foo<c128_fft>::s = my_strassen_selector();
+template<> my_strassen_selector foo<gf2x_tfft>::s = my_strassen_selector();
+
+template<typename fft_type>
+int depth(fft_type const& o, size_t d1, size_t d2, size_t d3)
+{
+    int k;
+    my_strassen_selector& s(foo<fft_type>::s);
+    size_t nbits = o.size() * sizeof(typename fft_type::t) * CHAR_BIT;
+    for( k = 0 ; (((d1|d2|d3) >> k) & 1UL) == 0 ; k++) {
+
+        if (!s(d1 >> k, d2 >> k, d3 >> k, nbits))
+            break;
+    }
+    return k;
+}
+
+template<typename fft_type>
+unsigned long nmults(fft_type const& o, size_t d1, size_t d2, size_t d3)
+{
+    int d = depth(o, d1, d2, d3);
+    unsigned long nmuls = d1 * d2 * d3;
+    for(int k = 0 ; k < d ; k++) {
+        nmuls /= 8;
+        nmuls *= 7;
+    }
+    return nmuls;
+}
+
+
+/* One step:
+ *
+ * pi matrix (m+n) * (m+n), length ceil(d/2)*m/(m+n) ; two transforms.
+ * E matrix m * (m+n), length ceil(d/2)*(1+m/(m+n)) = d-ceil(d/2)*n/(m+n) ; one transform
+ *
+ * length of E*pi d
+ * length of pi*pi d*m/(m+n)
+ *
+ */
+
+static inline size_t W(size_t x) { return (x + ULONG_BITS - 1) / ULONG_BITS; }
+static inline size_t I(size_t x) { return x / ULONG_BITS; }
+static inline size_t R(size_t x) { return x % ULONG_BITS; }
+static inline unsigned long MASK(size_t x) { return (1UL << R(x)) - 1UL; }
+
+unsigned long * tidy_data(unsigned long * data, size_t n1)
+{
+    unsigned long * p = data + (random() % (DATA_POOL_SIZE/2));
+    if (R(n1)) p[I(n1)]&=MASK(n1);
+    return p;
+}
+
+    template<typename T>
+void fft_times(double& dft1, double& dft2, double& compose, double& ift,
+        T& o, unsigned long n1, unsigned long n2, unsigned long * data)
+{
+    typename T::t * f = o.alloc(1);
+    typename T::t * g = o.alloc(1);
+    /* Make sure we're timing for at least a second. */
+    unsigned long n3 = n1 + n2 - 1;
+
+    do_and_printtime(dft1, o.dft(f, tidy_data(data, n1), n1), " %.2f", 1.0e6);
+    do_and_printtime(dft2, o.dft(g, tidy_data(data, n2), n2), " %.2f", 1.0e6);
+    do_and_printtime(compose, o.compose(g, g, f), " %.2f", 1.0e6);
+    do_and_printtime(ift, o.ift(tidy_data(data, n3), n3, g), " %.2f", 1.0e6);
+
+    o.free(f, 1);
+    o.free(g, 1);
+}
+
+
+void randomize(polmat & t)
+{
+    for(unsigned int i = 0 ; i < t.nrows ; i++) {
+        for(unsigned int j = 0 ; j < t.ncols ; j++) {
+            mpn_random((mp_limb_t *) t.poly(i,j), W(t.ncoef));
+        }
+    }
+}
+
+    template<typename fft_type>
+void randomize(tpolmat<fft_type> & t)
+{
+    for(unsigned int i = 0 ; i < t.nrows ; i++) {
+        for(unsigned int j = 0 ; j < t.ncols ; j++) {
+            mpn_random((mp_limb_t *) t.poly(i,j),
+                    (t.po->size() * sizeof(typename fft_type::t)) / sizeof(mp_limb_t));
+        }
+    }
+}
+
+
+#if 0
+/* One step:
+ *
+ * pi matrix (m+n) * (m+n), length d/2*m/(m+n) ; two transforms.
+ * E matrix m * (m+n), length d/2*(1+m/(m+n)) = d-d/2*n/(m+n) ; one transform
+ *
+ * length of E*pi d
+ * length of pi*pi d*m/(m+n)
+ *
+ */
 
     template<typename T>
 void bench_polmatmul(const char * s,
@@ -208,17 +336,8 @@ void bench_polmatmul(const char * s,
     polmat g(n2, n2, nc2);
     polmat h(n1, n2, nc1 + nc2 - 1);
 
-    for(unsigned int i = 0 ; i < n1 ; i++) {
-        for(unsigned int j = 0 ; j < n2 ; j++) {
-            mpn_random((mp_limb_t *) f.poly(i,j), nw1);
-        }
-    }
-
-    for(unsigned int i = 0 ; i < n2 ; i++) {
-        for(unsigned int j = 0 ; j < n2 ; j++) {
-            mpn_random((mp_limb_t *) g.poly(i,j), nw2);
-        }
-    }
+    randomize(f);
+    randomize(g);
 
     T o(d1, d2);
 
@@ -226,66 +345,54 @@ void bench_polmatmul(const char * s,
     tpolmat<T> tg(n2,n2,o);
     tpolmat<T> th(n1,n2,o);
 
-    do_and_printtime(foo<T>::l.t1, transform(tf, f, o, d1), nrep, 1);
-    do_and_printtime(foo<T>::l.t2, transform(tg, g, o, d2), nrep, 1);
-    do_and_printtime(foo<T>::l.c, compose(th, tf, tg, o), nrep, 1);
-    do_and_printtime(foo<T>::l.i, itransform(h, th, o, d1 + d2), nrep, 1);
+    do_and_printtime(foo<T>::l.t1, transform(tf, f, o, d1));
+    do_and_printtime(foo<T>::l.t2, transform(tg, g, o, d2));
+    do_and_printtime(foo<T>::l.c, compose(th, tf, tg, o));
+    do_and_printtime(foo<T>::l.i, itransform(h, th, o, d1 + d2));
 
     double t = foo<T>::l.t1 + foo<T>::l.t2 + foo<T>::l.c + foo<T>::l.i;
 
     printf(" tot %f", t);
     printf("\n");
 }
+#endif
 
-template<typename fft_type>
-void randomize(tpolmat<fft_type> & t)
+    template<typename fft_type>
+void tune_strassen1(fft_type const& base,
+        unsigned int d1, unsigned int d2, unsigned int d3, size_t maxlen)
 {
-    for(unsigned int i = 0 ; i < t.nrows ; i++) {
-        for(unsigned int j = 0 ; j < t.ncols ; j++) {
-            mpn_random((mp_limb_t *) t.poly(i,j),
-                    (t.o.size() * sizeof(typename fft_type::t)) / sizeof(mp_limb_t));
-        }
-    }
-}
+    my_strassen_selector& s(foo<fft_type>::s);
 
-template<typename fft_type>
-void tune_strassen1(const char * name,
-        unsigned int n1, unsigned int n2, unsigned int n3)
-{
-    my_strassen_selector& s(foo<fake_fft>::s);
-
-    printf("[%s] Tuning strassen for %ux%u * %ux%u\n",name,n1,n2,n2,n3);
-    unsigned int bp = ctzl(n1 | n2 | n3);
-    printf("%u is %u*2^%u\n", n1, n1 >> bp, bp);
-    printf("%u is %u*2^%u\n", n2, n2 >> bp, bp);
-    printf("%u is %u*2^%u\n", n3, n3 >> bp, bp);
-    unsigned int nn1 = n1 >> bp;
-    unsigned int nn2 = n2 >> bp;
-    unsigned int nn3 = n3 >> bp;
-    ASSERT((nn1-1) < (1 << BITS_IN_DIM_D));
-    ASSERT((nn2-1) < (1 << BITS_IN_DIM_D));
-    ASSERT((nn3-1) < (1 << BITS_IN_DIM_D));
+    unsigned int bp = ctzl(d1 | d2 | d3);
+    unsigned int dd1 = d1 >> bp;
+    unsigned int dd2 = d2 >> bp;
+    unsigned int dd3 = d3 >> bp;
+    printf(": -- tuning strassen for %ux%u * %ux%u ; max %u levels above %ux%u * %ux%u --\n",d1,d2,d2,d3,bp,dd1,dd2,dd2,dd3);
+    ASSERT((dd1-1) < (1 << BITS_IN_DIM_D));
+    ASSERT((dd2-1) < (1 << BITS_IN_DIM_D));
+    ASSERT((dd3-1) < (1 << BITS_IN_DIM_D));
     // for the very small matrices, we just _cannot_ use strassen because
     // there is an odd dimension hanging around.
-    s.threshold(nn1,nn2,nn3) = UINT_MAX;
-        printf("Threshold for %ux%u * %ux%u is %u bits [index %u]\n",
-                nn1, nn2, nn2, nn3, UINT_MAX,
-                s.threshold_index(nn1,nn2,nn3));
-    nn1 <<= 1;
-    nn2 <<= 1;
-    nn3 <<= 1;
+    s.threshold(dd1,dd2,dd3) = UINT_MAX;
+    printf("Threshold for %ux%u * %ux%u is %u bits [index %u]\n",
+            dd1, dd2, dd2, dd3, UINT_MAX,
+            s.threshold_index(dd1,dd2,dd3));
+    dd1 <<= 1;
+    dd2 <<= 1;
+    dd3 <<= 1;
     // If we know that for smaller matrices, strassen was paying off from
     // nbits on, then of course it is going to pay off at worst at this
     // size.
     // old_wt stands for old threshold in words.
-    unsigned int max_wt = iceildiv(MAX_CONSIDERED_THRESHOLD, ULONG_BITS);
-    unsigned int min_wt = iceildiv(MIN_CONSIDERED_THRESHOLD, ULONG_BITS);
+    unsigned int max_wt = iceildiv(maxlen, ULONG_BITS);
+    unsigned int min_wt = 0;
     unsigned int old_wt = max_wt;
-    for( ; nn1 <= n1 ; nn1 <<= 1, nn2 <<= 1, nn3 <<= 1) {
-        printf("Tuning for %ux%u * %ux%u\n",nn1, nn2, nn2, nn3);
+    size_t earliest_good_strassen = UINT_MAX;
+    for( ; dd1 <= d1 ; dd1 <<= 1, dd2 <<= 1, dd3 <<= 1) {
+        printf("Tuning for %ux%u * %ux%u\n",dd1, dd2, dd2, dd3);
         if (old_wt == min_wt) {
             printf("[keeping low threshold]\n");
-            s.threshold(nn1,nn2,nn3) = 0;
+            s.threshold(dd1,dd2,dd3) = 0;
             continue;
         }
         // in order to avoid accumulating errors, we introduce some
@@ -299,16 +406,16 @@ void tune_strassen1(const char * name,
             // assuming cubic is better for 64 * t0, ans strassen better
             // for 64 * t1
             unsigned int wt = (wt1 + wt0) / 2;
-            unsigned int t1 = wt1 * ULONG_BITS;
-            unsigned int t0 = wt0 * ULONG_BITS;
+            // unsigned int t1 = wt1 * ULONG_BITS;
+            // unsigned int t0 = wt0 * ULONG_BITS;
             unsigned int t = wt * ULONG_BITS;
             if (t == 0) { t = 2; }
-            fft_type o(t / 2, t / 2);
+            fft_type o(t / 2, t / 2, base);
             typedef typename fft_type::t ft;
             unsigned int tr = (o.size() * sizeof(ft)) * CHAR_BIT;
-            tpolmat<fft_type> tf(nn1, nn2, o);
-            tpolmat<fft_type> tg(nn2, nn3, o);
-            tpolmat<fft_type> th(nn1, nn3, o);
+            tpolmat<fft_type> tf(dd1, dd2, o);
+            tpolmat<fft_type> tg(dd2, dd3, o);
+            tpolmat<fft_type> th(dd1, dd3, o);
 
             randomize(tf);
             randomize(tg);
@@ -316,17 +423,18 @@ void tune_strassen1(const char * name,
             double t_cubic;
             double t_strassen;
             // force cubic
-            s.threshold(nn1,nn2,nn3) = t1;
-            do_and_printtime(t_cubic, compose_inner(th, tf, tg, o, s), nrep, 1);
+            s.threshold(dd1,dd2,dd3) = UINT_MAX;
+            do_and_printtime(t_cubic, compose_inner(th, tf, tg, o, s)," %.2g",1);
             // force strassen
-            s.threshold(nn1,nn2,nn3) = t0;
-            do_and_printtime(t_strassen, compose_inner(th, tf, tg, o, s), nrep, 1);
+            s.threshold(dd1,dd2,dd3) = 0;
+            do_and_printtime(t_strassen, compose_inner(th, tf, tg, o, s)," %.2g",1);
             if (t_cubic <= t_strassen) {
                 printf(" cubic [%.2f]\n", t_cubic / t_strassen);
                 wt0 = wt;
             } else {
                 printf(" strassen [%.2f]\n", t_cubic / t_strassen);
                 wt1 = wt;
+                earliest_good_strassen = tr;
             }
         }
         if (wt1 > max_wt)
@@ -334,26 +442,29 @@ void tune_strassen1(const char * name,
         old_wt = wt1;
         if (wt1 == max_wt) wt1 = UINT_MAX;
         if (wt1 == min_wt) wt1 = 0;
+        if (wt1 == 0) earliest_good_strassen = 0;
+        if (wt1 == UINT_MAX) earliest_good_strassen = UINT_MAX;
+        s.threshold(dd1,dd2,dd3) = earliest_good_strassen;
         printf("Threshold for %ux%u * %ux%u is %u bits [index %u]\n",
-                nn1, nn2, nn2, nn3, wt1 * ULONG_BITS,
-                s.threshold_index(nn1,nn2,nn3));
-        s.threshold(nn1,nn2,nn3) = wt1 * ULONG_BITS;
+                dd1, dd2, dd2, dd3, s.threshold(dd1,dd2,dd3),
+                s.threshold_index(dd1,dd2,dd3));
     }
+    printf("\n");
 }
 
-template<typename fft_type>
-void tune_strassen(const char * name)
+    template<typename fft_type>
+void tune_strassen(fft_type const& base, size_t maxlen)
 {
-    my_strassen_selector& s(foo<fake_fft>::s);
+    my_strassen_selector& s(foo<fft_type>::s);
     for(unsigned int i = 1 ; i <= (1 << BITS_IN_DIM_D) ; i++) {
-    for(unsigned int j = 1 ; j <= (1 << BITS_IN_DIM_D) ; j++) {
-    for(unsigned int k = 1 ; k <= (1 << BITS_IN_DIM_D) ; k++) {
-        tune_strassen1<fft_type>(name,
-                i * MAX_I_FOR_TUNING,
-                j * MAX_I_FOR_TUNING,
-                k * MAX_I_FOR_TUNING);
-    }
-    }
+        for(unsigned int j = 1 ; j <= (1 << BITS_IN_DIM_D) ; j++) {
+            for(unsigned int k = 1 ; k <= (1 << BITS_IN_DIM_D) ; k++) {
+                tune_strassen1(base,
+                        i << MAX_I_FOR_TUNING,
+                        j << MAX_I_FOR_TUNING,
+                        k << MAX_I_FOR_TUNING, maxlen);
+            }
+        }
     }
     for(int i = 0 ; i < SELECTOR_NB_INDICES ; i++) {
         unsigned int t = s.strassen_threshold[i];
@@ -361,96 +472,327 @@ void tune_strassen(const char * name)
     }
 }
 
+    template<typename fft_type>
+void plot_compose(const char * name,
+        unsigned int n1, unsigned int n2, unsigned int n3, unsigned long wt)
+{
+    my_strassen_selector& s(foo<fft_type>::s);
+
+    unsigned int nx1 = n1;
+    unsigned int nx2 = n2;
+    unsigned int nx3 = n3;
+    unsigned long nmul = 1;
+    for( ; !((nx1|nx2|nx3)&1UL) ; ) {
+        if (!s(nx1,nx2,nx3,wt*ULONG_BITS))
+            break;
+        nx1>>=1;
+        nx2>>=1;
+        nx3>>=1;
+        nmul *= 7;
+    }
+    nmul *= nx1 * nx2 * nx3;
+    printf("For %ux%u * %ux%u, strassen begins at %ux%u * %ux%u ; roughly %lu mults\n", n1,n2,n2,n3,nx1,nx2,nx2,nx3,nmul);
+
+    for( ; !((nx1|nx2|nx3)&1UL) ; nx1>>=1,nx2>>=1,nx3>>=1);
+
+    /* Start by a measurement of the unit time */
+    fft_type o(wt/2,wt/2);
+    double single_compose;
+    {
+        typename fft_type::t * pf = o.alloc(1);
+        typename fft_type::t * pg = o.alloc(1);
+        typename fft_type::t * ph = o.alloc(1);
+        do_and_noprinttime(single_compose, o.compose(ph, pf, pg));
+        o.clear(pf, 1);
+        o.clear(pg, 1);
+        o.clear(ph, 1);
+    }
+
+    /* Now bench all possible matrix timings. */
+    nmul = nx1 * nx2 * nx3;
+    for( ; nx1 < n1 ; ) {
+        tpolmat<fft_type> tf(nx1, nx2, o);
+        tpolmat<fft_type> tg(nx2, nx3, o);
+        tpolmat<fft_type> th(nx1, nx3, o);
+
+        randomize(tf);
+        randomize(tg);
+        double v;
+        do_and_noprinttime(v, compose_inner(th, tf, tg, o, s));
+        printf("%ux%u * %ux%u : %.2e = %.2f%% of %lu * %.2e\n",
+                nx1,nx2,nx2,nx3,v,
+                100.0 * v/nmul/single_compose,nmul,single_compose);
+        nx1 <<= 1;
+        nx2 <<= 1;
+        nx3 <<= 1;
+        nmul *= s(nx1,nx2,nx3,wt*ULONG_BITS) ? 7 : 8;
+    }
+}
+
+    template<typename fft_type>
+void bench_one_polmm_projected_sub(fft_type& o, unsigned long d1, unsigned long d2, unsigned long d3, unsigned long n1, unsigned long n2, unsigned long * data)
+{
+    double dft1, dft2, compose, ift;
+    fft_times(dft1, dft2, compose, ift, o, n1, n2, data);
+    double total_compose_time = compose * nmults(o, d1, d2, d3);
+    int d = depth(o, d1, d2,  d3);
+
+    printf(" --> dft: %.2f ; mul(d%d): %.2f ; ift: %.2f\n",
+            (dft1 * d1 * d2 + dft2 * d2 * d3),
+            d,
+            total_compose_time,
+            ift * d1 * d3);
+}
+
+void bench_one_polmm_projected(unsigned long d1, unsigned long d2, unsigned long d3, unsigned long n1, unsigned long n2, unsigned long * data)
+{
+    printf("Timings %lux%lu (%lu-bit entries)"
+            " times %lux%lu (%lu-bit entries) [projected timings]\n",
+            d1, d2, n1, 
+            d2, d3, n2);
+
+    c128_fft oc(n1, n2); printf("c128:");
+    bench_one_polmm_projected_sub(oc, d1, d2, d3, n1, n2, data);
+
+    fake_fft of(n1, n2); printf("fake:");
+    bench_one_polmm_projected_sub(of, d1, d2, d3, n1, n2, data);
+
+    gf2x_tfft os(n1, n2, 81); printf("tfft(%u):", 81);
+    bench_one_polmm_projected_sub(os, d1, d2, d3, n1, n2, data);
+}
+
+    template<typename fft_type>
+void bench_one_polmm_complete_sub(fft_type& o, unsigned long d1, unsigned long d2, unsigned long d3, unsigned long n1, unsigned long n2)
+{
+    my_strassen_selector& s(foo<fft_type>::s);
+
+    polmat f(d1, d2, n1);
+    polmat g(d2, d2, n2);
+    polmat h(d1, d3, n1 + n2 - 1);
+    tpolmat<fft_type> tf(d1, d2, o);
+    tpolmat<fft_type> tg(d2, d3, o);
+    tpolmat<fft_type> th(d1, d3, o);
+
+    randomize(f);
+    randomize(g);
+    randomize(tf);
+    randomize(tg);
+
+    logbook& l(foo<fft_type>::l);
+
+    do_and_printtime(l.t1, transform(tf, f, o, n1), " dft1: %.2f", 1);
+    do_and_printtime(l.t2, transform(tg, g, o, n2), " dft2: %.2f", 1);
+
+    do_and_printtime(l.c, compose_inner(th, tf, tg, o, s), " compose: %.2f", 1);
+
+#if 0
+    printf(" [");
+    /* Do composition by checking how deep strassen might pay off. */
+    for(unsigned int k = 0 ; (((d1 | d2 | d3) >> k) & 1UL) == 0 ; k++) {
+        double naive, strassen;
+        // Force naive
+        s.threshold(d1>>k,d2>>k,d3>>k) = UINT_MAX;
+        do_and_printtime(naive, compose_inner(th, tf, tg, o, s));
+        // Force strassen
+        s.threshold(d1>>k,d2>>k,d3>>k) = 0;
+        do_and_printtime(strassen, compose_inner(th, tf, tg, o, s));
+        if (naive < strassen) {
+            l.c = naive;
+            break;
+        }
+        l.c = strassen;
+    }
+    printf("]");
+#endif
+
+    do_and_printtime(l.i, itransform(h, th, o, n1 + n2 - 1), " ift: %.2f", 1);
+    printf("\n");
+}
+
+void bench_one_polmm_complete(unsigned long d1, unsigned long d2, unsigned long d3, unsigned long n1, unsigned long n2)
+{
+    printf("Timings %lux%lu (%lu-bit entries)"
+            " times %lux%lu (%lu-bit entries) [complete timings]\n",
+            d1, d2, n1, 
+            d2, d3, n2);
+
+    c128_fft oc(n1, n2); printf("c128:");
+    bench_one_polmm_complete_sub(oc, d1, d2, d3, n1, n2);
+
+    fake_fft of(n1, n2); printf("fake:");
+    bench_one_polmm_complete_sub(of, d1, d2, d3, n1, n2);
+
+    gf2x_tfft os(n1, n2, 81); printf("tfft(%u):", 81);
+    bench_one_polmm_complete_sub(os, d1, d2, d3, n1, n2);
+}
+
+
 int main(int argc, char * argv[])
 {
-    unsigned int m = 0, n = 0, d = 0;
+    /* This is a bench program. We want the output quick.  */
+    setbuf(stdout, NULL);
+    setbuf(stderr, NULL);
+
+    unsigned long m = 0, n = 0, N = 0;
     argc--,argv++;
 
     for( ; argc ; ) {
         if (strcmp(argv[0],"--nrep") == 0) {
             argc--,argv++;
             if (!argc) usage();
-            nrep = atoi(argv[0]);
+            nrep = atol(argv[0]);
             argc--,argv++;
             continue;
         }
-        if (d == 0) {
-            d = atoi(argv[0]);
+        if (N == 0) {
+            N = atol(argv[0]);
             argc--,argv++;
             continue;
         }
         if (m == 0) {
-            m = atoi(argv[0]);
+            m = atol(argv[0]);
             argc--,argv++;
             continue;
         }
         if (n == 0) {
-            n = atoi(argv[0]);
+            n = atol(argv[0]);
             argc--,argv++;
             continue;
         }
         usage();
     }
-    // if (d == 0 || n == 0) usage();
+    // if (N == 0 || n == 0) usage();
 
-
-    tune_strassen<cantor_fft>("cantor_fft");
-    tune_strassen<fake_fft>("fake_fft");
+    unsigned long b = m + n;
 
 #if 0
-    /* Typical situation
-     *
-     * E * pi_left:
-     *
-     * n x (m + n), degree d times (m + n) x (m + n), degree d/4
-     *
-     * pi_left * pi_right
-     *
-     * (m + n) x (m + n), degree d/4 times the same.
-     *
-     * We're timing instead:
-     * nxn deg d, homogeneous.
-     * n/2xn, d x d/4
-     */
+    /* tune strassen for all sizes... Takes a looong time */
+#define MAX_CONSIDERED_THRESHOLD        1000000
+    {
+        size_t d = (N * b / m / n);
+        size_t n1 = d;
+        size_t n2 = d * m / b;
+        c128_fft oc(n1, n2); printf("c128");
+        tune_strassen(oc, MAX_CONSIDERED_THRESHOLD);
+        fake_fft of(n1, n2); printf("fake");
+        tune_strassen(of, MAX_CONSIDERED_THRESHOLD);
+        gf2x_tfft os(n1, n2, 81); printf("tfft(%u)", 81);
+        tune_strassen(of, MAX_CONSIDERED_THRESHOLD);
+    }
+#endif
+#if 1
+    /* une for E * pi */
+    {
+        size_t d = (N * b / m / n);
+        size_t n1 = d;
+        size_t n2 = d * m / b;
+        c128_fft oc(n1, n2); printf("c128");
+        tune_strassen1(oc, m, b, b, n1 + n2 - 1);
+        fake_fft of(n1, n2); printf("fake");
+        tune_strassen1(of, m, b, b, n1 + n2 - 1);
+        gf2x_tfft os(n1, n2, 81); printf("tfft(%u)", 81);
+        tune_strassen1(os, m, b, b, n1 + n2 - 1);
 
-    /* This is a bench program. We want the output quick.  */
-
-    setbuf(stdout, NULL);
-    setbuf(stderr, NULL);
+        printf("Options for composition at top level E*pi\n");
+        printf("c128: %u levels of strassen, %lu muls\n",
+                depth(oc,m,b,b), nmults(oc,m,b,b));
+        printf("fake: %u levels of strassen, %lu muls\n",
+                depth(of,m,b,b), nmults(of,m,b,b));
+        printf("gf2x: %u levels of strassen, %lu muls\n",
+                depth(os,m,b,b), nmults(os,m,b,b));
+    }
+    /* Tune for pi * pi */
+    {
+        size_t d = (N * b / m / n);
+        size_t n1 = (d-d/2) * m / b;
+        size_t n2 = d / 2 * m / b; 
+        c128_fft oc(n1, n2); printf("c128");
+        tune_strassen1(oc, b, b, b, n1 + n2 - 1);
+        fake_fft of(n1, n2); printf("fake");
+        tune_strassen1(of, b, b, b, n1 + n2 - 1);
+        gf2x_tfft os(n1, n2, 81); printf("tfft(%u)", 81);
+        tune_strassen1(os, b, b, b, n1 + n2 - 1);
+        printf("Options for composition at top level E*pi\n");
+        printf("c128: %u levels of strassen, %lu muls\n",
+                depth(oc,b,b,b), nmults(oc,b,b,b));
+        printf("fake: %u levels of strassen, %lu muls\n",
+                depth(of,b,b,b), nmults(of,b,b,b));
+        printf("gf2x: %u levels of strassen, %lu muls\n",
+                depth(os,b,b,b), nmults(os,b,b,b));
+    }
+    foo<c128_fft>::s.dump("C128");
+    foo<fake_fft>::s.dump("FAKE");
+    foo<gf2x_tfft>::s.dump("GF2X_TFFT");
+#endif
 
     /* Seed the random state. Ugly at will. */
-
     extern char             __gmp_rands_initialized;
     extern gmp_randstate_t  __gmp_rands;
-
     __gmp_rands_initialized = 1;
     gmp_randinit_default (__gmp_rands);
     gmp_randseed_ui(__gmp_rands, time(NULL));
 
+    /* Allocate an area which is very significantly larger than any of
+     * the cache sizes */
+    unsigned long * data ;
+    data = (unsigned long *) malloc(DATA_POOL_SIZE * sizeof(unsigned long));
+    for(unsigned int i = 0 ; i < DATA_POOL_SIZE ; i++) data[i] = random();
 
-    printf("Degree d is %d (%d words)\n", d, BITS_TO_WORDS(d+1,ULONG_BITS));
-    printf("Dimension n is %d\n", n);
-    printf("Timings are in milliseconds\n");
+    printf("Some timings are in microseconds\n");
+    printf("Matrix size %lu\n", N);
+    // unsigned long c = m - n;
 
+    for(unsigned long level = 0 ; ; level++) {
+        unsigned long d = (N * b / m / n) >> level;
+        if (d <= 64) {
+            printf("[%lu] is below threshold (length %lu)\n", level, d);
+            break;
+        }
 
-    /* Start by benching degree d polynomial multiplication */
-    bench_polmul(d, d);
+        if (DATA_POOL_SIZE * ULONG_BITS / 2 < d) {
+            fprintf(stderr, "Please increa DATA_POOL_SIZE to at least %zu\n",
+                    W(2*d));
+            exit(1);
+        }
 
-    /* Then time for cantor, separating the different steps */
-    bench_c128(d, d);
+        printf("[%lu] length of E is %lu (%lu MB)\n", level, d, d*m*b>>23);
+        unsigned long dl = d-d/2;
+        unsigned long pi_l_len = dl*m/b;   // always <= dl
+        printf("[%lu] Top-level length of pi_left is %lu (%lu MB)\n", level, pi_l_len, pi_l_len*b*b>>23);
+        unsigned long chop = dl - pi_l_len;
+        printf("[%lu] Number of chopped of bits at top level is %lu\n", level, chop);
+        printf("[%lu] Top-level degree of truncated E is %lu\n", level, d - chop);
+        printf("[%lu] Degree of product E'*pi_left is %lu\n", level, d-chop + pi_l_len);
+        printf("[%lu] Degree of product pi_left*pi_right is %lu\n", level, d*m/b);
 
-    /* Now the matrix versions */
-    bench_polmatmul<fake_fft>("fake_fft", n, n, d, d);
-    bench_polmatmul<cantor_fft>("cantor_fft", n, n, d, d);
+        bench_one_polmm_projected(m, b, b, d-chop, pi_l_len, data);
+        bench_one_polmm_projected(b, b, b, pi_l_len, pi_l_len, data);
+        bench_one_polmm_complete(m, b, b, d-chop, pi_l_len);
+        bench_one_polmm_complete(b, b, b, pi_l_len, pi_l_len);
 
-    
-    /* Now do these again, but for unbalanced computations */
+#if 0
+        /* Start by benching degree d polynomial multiplication */
+        bench_polmul(d, d);
 
-    bench_polmul(d, d/4);
-    bench_c128(d, d/4);
-    bench_polmatmul<fake_fft>("fake_fft", n/2, n, d, d/4);
-    bench_polmatmul<cantor_fft>("cantor_fft", n/2, n, d, d/4);
+        /* Then time for cantor, separating the different steps */
+        bench_c128(d, d);
+
+        /* Now the matrix versions */
+        bench_polmatmul<c128_fft>("c128_fft", n, n, d, d);
+        bench_polmatmul<fake_fft>("fake_fft", n, n, d, d);
+        bench_polmatmul<gf2x_tfft>("gf2x_tfft", n, n, d, d);
+
+        /* Now do these again, but for unbalanced computations */
+
+        bench_polmul(d, d/4);
+        bench_c128(d, d/4);
+        bench_polmatmul<c128_fft>("c128_fft", n/2, n, d, d/4);
+        bench_polmatmul<fake_fft>("fake_fft", n/2, n, d, d/4);
+        bench_polmatmul<gf2x_tfft>("gf2x_tfft", n/2, n, d, d/4);
 #endif
+    }
+
+    free(data);
 }
 
 

@@ -5,8 +5,7 @@
 #define CAT(X,Y) X ## Y
 
 /* _setup and _dft, _ift integer arguments correspond to lengths in
- * number of bits of polynomials. For _setup, we want the maximum number
- * of bits of the expected result.
+ * number of bits of polynomials.
  *
  * _alloc(), _free(), _get(), take number of complete polynomials.
  *
@@ -22,27 +21,35 @@ struct visible {							\
 	typedef CAT(Z,srcptr) srcptr;					\
 									\
 	visible() {}							\
-	visible(int n1, int n2) { CAT(Z,init)(o, n1, n2); }		\
+	visible(size_t n1, size_t n2) { CAT(Z,init)(o, n1, n2); }	\
 	~visible() { CAT(Z,clear)(o); }                 		\
 									\
+private: /* Make sure we forbid copies */                               \
+        visible(visible const& other MAYBE_UNUSED) {}                   \
+public:                                                                 \
         /* The extra <acc> argument gives the number of times the */    \
         /* fft is going to be reused. It might be replaced by some */   \
         /* other mechanism at some point. */                            \
 									\
-	visible(int n1, int n2,				        	\
-			int n3 MAYBE_UNUSED,				\
-			int acc MAYBE_UNUSED)		        	\
+        /* n1 and n2 give the length of the two operands. The */        \
+        /* product is taken as having length n1+n2-1 */                 \
+									\
+	visible(size_t n1, size_t n2, int acc MAYBE_UNUSED)		\
 	{								\
 		CAT(Z,init)(o, n1, n2, acc);				\
 	}								\
-	inline ptr alloc(int n) const { return CAT(Z,alloc)(o, n); }	\
-	inline void free(ptr x, int n) const { CAT(Z,free)(o,x,n); }	\
-	inline void zero(ptr x, int n) const { CAT(Z,zero)(o,x,n); }	\
-	inline ptr get(ptr x, int n) const { return CAT(Z,get)(o,x,n); }\
-	inline void dft(ptr x, unsigned long * F, int n) const {	\
+        visible(size_t n1, size_t n2, visible const& other)             \
+        {                                                               \
+            CAT(Z,init_similar)(o, n1, n2, other.o);                    \
+        }                                                               \
+	inline ptr alloc(size_t n) const { return CAT(Z,alloc)(o, n); }	\
+	inline void free(ptr x, size_t n) const { CAT(Z,free)(o,x,n); }	\
+	inline void zero(ptr x, size_t n) const { CAT(Z,zero)(o,x,n); }	\
+	inline ptr get(ptr x, size_t n) const { return CAT(Z,get)(o,x,n); }\
+	inline void dft(ptr x, unsigned long * F, size_t n) const {	\
 		return CAT(Z,dft)(o,x,F,n);				\
 	}								\
-	inline void ift(unsigned long * F, int n, ptr x) const {	\
+	inline void ift(unsigned long * F, size_t n, ptr x) const {	\
 		return CAT(Z,ift)(o,F,n,x);				\
 	}								\
 	inline void compose(ptr y, srcptr x1, srcptr x2) const {	\
@@ -54,7 +61,7 @@ struct visible {							\
 	inline void cpy(ptr y, srcptr x) const {		        \
 		return CAT(Z,cpy)(o,y,x);				\
 	}								\
-	inline int size() const {	        	                \
+	inline size_t size() const {	        	                \
 		return CAT(Z,size)(o);	        			\
 	}								\
 };

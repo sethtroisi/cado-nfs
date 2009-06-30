@@ -24,6 +24,8 @@ struct c128_info_struct {
     size_t n;
 };
 typedef struct c128_info_struct c128_info_t[1];
+typedef struct c128_info_struct * c128_info_ptr;
+typedef const struct c128_info_struct * c128_info_srcptr;
 
 typedef mpfq_2_128_elt c128_t;
 typedef c128_t * c128_ptr;
@@ -50,7 +52,9 @@ extern void c128_add(const c128_info_t p,
 extern void c128_cpy(const c128_info_t p, c128_ptr y, c128_srcptr x);
 extern void c128_ift(const c128_info_t p,
 		unsigned long * H, size_t Hl, c128_srcptr h);
-extern size_t c128_size(const c128_info_t p);
+extern size_t c128_size(c128_info_srcptr p);
+extern void c128_init_similar(c128_info_ptr o, size_t bits_a, size_t bits_b, c128_info_srcptr other);
+extern int c128_compatible(c128_info_srcptr o1, c128_info_srcptr o2);
 
 #ifdef __cplusplus
 }

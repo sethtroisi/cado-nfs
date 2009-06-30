@@ -8,7 +8,7 @@
 #define BITS_TO_WORDS(B,W)      iceildiv((B),(W))
 
 /* nF, nG : number of coefficients */
-void fake_init(fake_info_t p, size_t nF, size_t nG, ...)
+void fake_init(fake_info_ptr p, size_t nF, size_t nG, ...)
 {
     p->n1 = nF;
     p->n2 = nG;
@@ -20,7 +20,7 @@ void fake_init(fake_info_t p, size_t nF, size_t nG, ...)
 }
 
 /* n is a number of coefficients ! */
-void fake_dft(const fake_info_t p MAYBE_UNUSED, fake_ptr dst, unsigned long * src, size_t n) {
+void fake_dft(fake_info_srcptr p MAYBE_UNUSED, fake_ptr dst, unsigned long * src, size_t n) {
     ASSERT(n <= p->n1 || n <= p->n2);
     size_t s = BITS_TO_WORDS(n, ULONG_BITS);
     memcpy(dst, src, s * sizeof(unsigned long));
@@ -39,17 +39,17 @@ void fake_dft(const fake_info_t p MAYBE_UNUSED, fake_ptr dst, unsigned long * sr
  * okay, as long as it's understood as a means for truncating the data. So we
  * don't do checking for zero high bits.
  */
-void fake_ift(const fake_info_t p MAYBE_UNUSED, unsigned long * dst, size_t n, fake_srcptr src) {
+void fake_ift(fake_info_srcptr p MAYBE_UNUSED, unsigned long * dst, size_t n, fake_srcptr src) {
     ASSERT(n <= p->n3);
     size_t t = BITS_TO_WORDS(n, ULONG_BITS);
     memcpy(dst, src, t * sizeof(unsigned long));
 }
-void fake_compose(const fake_info_t p MAYBE_UNUSED, fake_ptr dst, fake_srcptr s1, fake_srcptr s2) {
+void fake_compose(fake_info_srcptr p MAYBE_UNUSED, fake_ptr dst, fake_srcptr s1, fake_srcptr s2) {
     size_t n1 = BITS_TO_WORDS(p->n1, ULONG_BITS);
     size_t n2 = BITS_TO_WORDS(p->n2, ULONG_BITS);
     gf2x_mul(dst, s1, n1, s2, n2);
 }
-void fake_addcompose(const fake_info_t p MAYBE_UNUSED, fake_ptr dst, fake_srcptr s1, fake_srcptr s2) {
+void fake_addcompose(fake_info_srcptr p MAYBE_UNUSED, fake_ptr dst, fake_srcptr s1, fake_srcptr s2) {
     size_t n1 = BITS_TO_WORDS(p->n1, ULONG_BITS);
     size_t n2 = BITS_TO_WORDS(p->n2, ULONG_BITS);
     unsigned long * h = malloc(p->size * sizeof(unsigned long));
@@ -61,20 +61,29 @@ void fake_addcompose(const fake_info_t p MAYBE_UNUSED, fake_ptr dst, fake_srcptr
     }
     free(h);
 }
-void fake_add(const fake_info_t p MAYBE_UNUSED, fake_ptr dst, fake_srcptr s1, fake_srcptr s2) {
+void fake_add(fake_info_srcptr p MAYBE_UNUSED, fake_ptr dst, fake_srcptr s1, fake_srcptr s2) {
     size_t i;
     for(i = 0 ; i < p->size ; i++) {
         dst[i] = s1[i] ^ s2[i];
     }
 }
 
-void fake_cpy(const fake_info_t p MAYBE_UNUSED, fake_ptr dst, fake_srcptr s) {
+void fake_cpy(fake_info_srcptr p MAYBE_UNUSED, fake_ptr dst, fake_srcptr s) {
     memcpy(dst, s, (p->size)*sizeof(unsigned long));
 }
 
-size_t fake_size(const fake_info_t p) {
+size_t fake_size(fake_info_srcptr p) {
     return p->size;
 }
 
+void fake_init_similar(fake_info_ptr o, size_t bits_a, size_t bits_b, fake_info_srcptr other MAYBE_UNUSED)
+{
+    fake_init(o, bits_a, bits_b);
+}
+
+int fake_compatible(fake_info_srcptr o1 MAYBE_UNUSED, fake_info_srcptr o2 MAYBE_UNUSED)
+{
+    return 1;
+}
 
 /* vim: set sw=4 sta et: */

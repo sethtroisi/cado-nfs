@@ -1489,7 +1489,9 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
 
     // std::cout << "Recursive call, degree " << length_E << std::endl;
     // takes lengths.
-    fft_type o(length_E, expected_pi_deg + 1, length_E + expected_pi_deg - kill, m + n);
+    fft_type o(length_E, expected_pi_deg + 1,
+            /* length_E + expected_pi_deg - kill, */
+            m + n);
 
     tpolmat<fft_type> E_hat;
 
@@ -1651,7 +1653,7 @@ static bool compute_lingen(polmat& pi, recursive_tree_timer_t & tim)
         /* Presently, c128 requires input polynomials that are large
          * enough.
          */
-        b = go_recursive<cantor_fft>(pi, tim);
+        b = go_recursive<c128_fft>(pi, tim);
     }
 
     tim.pop(t);

@@ -719,7 +719,7 @@ template<typename fft_type> struct tpolmat /* {{{ */
      */
     unsigned int nrows;
     unsigned int ncols;
-    fft_type o;
+    fft_type * po;
     private:
     typename fft_type::t * x;
     unsigned int  * order;
@@ -729,8 +729,8 @@ template<typename fft_type> struct tpolmat /* {{{ */
     public:
     int& deg(unsigned int j) { ASSERT(j < ncols); return _deg[order[j]]; }
     int const & deg(unsigned int j) const { ASSERT(j < ncols); return _deg[order[j]]; }
-    tpolmat(unsigned int nrows, unsigned int ncols, fft_type const& o)
-        : nrows(nrows), ncols(ncols), o(o),
+    tpolmat(unsigned int nrows, unsigned int ncols, fft_type & o)
+        : nrows(nrows), ncols(ncols), po(&o),
         x(o.alloc(nrows * ncols)),
         order(mynew<unsigned int>(ncols)),
         _deg(mynew<int>(ncols))
@@ -740,10 +740,10 @@ template<typename fft_type> struct tpolmat /* {{{ */
     }
     void zero()
     {
-        o.zero(x, nrows * ncols);
+        po->zero(x, nrows * ncols);
     }
     void clear() {
-        o.free(x, nrows * ncols); x = NULL;
+        po->free(x, nrows * ncols); x = NULL;
         mydelete(order, ncols);
         mydelete(_deg, ncols);
         nrows = ncols = 0;
@@ -759,14 +759,14 @@ template<typename fft_type> struct tpolmat /* {{{ */
     tpolmat& operator=(tpolmat const&){ return *this;}
     public:
     ~tpolmat() {
-        o.free(x, nrows * ncols); x = NULL;
+        po->free(x, nrows * ncols); x = NULL;
         mydelete(order, ncols);
         mydelete(_deg, ncols);
     }
     inline void swap(tpolmat & n) {
         podswap(nrows,n.nrows);
         podswap(ncols,n.ncols);
-        podswap(o,n.o);
+        podswap(po,n.po);
         podswap(x,n.x);
         podswap(order,n.order);
         podswap(_deg,n._deg);
@@ -796,23 +796,23 @@ template<typename fft_type> struct tpolmat /* {{{ */
     {
         ASSERT(i < nrows);
         ASSERT(j < ncols);
-        return o.get(x, order[j] * nrows + i);
+        return po->get(x, order[j] * nrows + i);
     }
     typename fft_type::srcptr poly(unsigned int i, unsigned int j) const
     {
         ASSERT(i < nrows);
         ASSERT(j < ncols);
-        return o.get(x, order[j] * nrows + i);
+        return po->get(x, order[j] * nrows + i);
     }
     typename fft_type::ptr col(unsigned int j) { return poly(0, j); }
     typename fft_type::srcptr col(unsigned int j) const { return poly(0, j); }
     /* zero column j */
     void zcol(unsigned int j) {
         ASSERT(j < ncols);
-        o.zero(col(j), 1);
+        po->zero(col(j), 1);
         deg(j) = -1;
     }
-    uint32_t crc() const { return crc32((unsigned long *) x, nrows * ncols * o.size() * sizeof(    typename fft_type::t)/sizeof(unsigned long)); }
+    uint32_t crc() const { return crc32((unsigned long *) x, nrows * ncols * po->size() * sizeof(typename fft_type::t)/sizeof(unsigned long)); }
 };
 /*}}}*/
 
