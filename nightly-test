@@ -34,7 +34,7 @@ if [ "$GIT" ] ; then
     git clone --depth 2 $GIT scm
     SCM=scm/dist/src
 else
-    svn checkout -q svn+ssh://${USER}@scm.gforge.inria.fr/svn/cado/trunk/dist/src scm
+    svn checkout -q svn+ssh://${USER}@scm.gforge.inria.fr/svn/cado-nfs/trunk/ scm
     SCM=scm
 fi
 
