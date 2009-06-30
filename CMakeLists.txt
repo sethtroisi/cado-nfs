@@ -175,7 +175,7 @@ add_subdirectory (polyselect)
 add_subdirectory (sieve)
 add_subdirectory (sqrt)
 add_subdirectory (linalg)
-add_subdirectory (merge)
+add_subdirectory (filter)
 add_subdirectory (linalg/bwc)
 
 set(package_basename cado-nfs-${CADO_VERSION})

@@ -15,10 +15,10 @@ linalg/bwc/bwc.sty
 linalg/bwc/convert_magma.pl
 linalg/bwc/sketch.tex
 linalg/tex.c
-merge/debug.c
-merge/debug.h
-merge/merge_mpi.c
-merge/merge_mpi.h
+filter/debug.c
+filter/debug.h
+filter/merge_mpi.c
+filter/merge_mpi.h
 misc/
 nightly-test
 old/

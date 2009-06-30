@@ -21,6 +21,7 @@
 #include "macros.h"
 #include "params.h"
 #include "worker-threads.h"
+#include "utils.h"
 // #include "debug.h"
 
 void usage()

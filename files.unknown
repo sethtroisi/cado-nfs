@@ -4,7 +4,7 @@
 # the committer forgot to add the information. So if ``make dist'' barfs,
 # add a pattern to this file so that it eventually only prints a warning.
 # The normal situation is to have an empty file here.
-merge/README
+filter/README
 sieve/README.las
 sieve/benchsieve.pl
 linalg.sh

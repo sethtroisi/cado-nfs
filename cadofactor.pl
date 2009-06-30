@@ -1741,7 +1741,7 @@ sub do_sieve {
         # Remove duplicates
         info "Removing duplicates...";
         $tab_level++;
-        cmd("$param{'cadodir'}/merge/duplicates -nrels $nrels ".
+        cmd("$param{'cadodir'}/filter/duplicates -nrels $nrels ".
             "-out $param{'prefix'}.nodup.gz $files ".
             "> $param{'prefix'}.duplicates.stderr 2>&1",
             { log => 1, kill => 1 });
@@ -1757,7 +1757,7 @@ sub do_sieve {
         # Remove singletons
         info "Removing singletons...";
         $tab_level++;
-        my $ret = cmd("$param{'cadodir'}/merge/purge ".
+        my $ret = cmd("$param{'cadodir'}/filter/purge ".
                       "-poly $param{'prefix'}.poly -keep $param{'keeppurge'} ".
                       "-excess $param{'excesspurge'} ".
                       "-nrels $n -out $param{'prefix'}.purged ".
@@ -1832,7 +1832,7 @@ sub do_merge {
     info "Merging relations...\n";
     $tab_level++;
 
-    my $cmd = "$param{'cadodir'}/merge/merge ".
+    my $cmd = "$param{'cadodir'}/filter/merge ".
               "-out $param{'prefix'}.merge.his ".
               "-mat $param{'prefix'}.purged ".
               "-forbw $param{'bwstrat'} ".
@@ -1869,7 +1869,7 @@ sub do_replay {
         $bwcostmin = $1;
     }
 
-    my $cmd = "$param{'cadodir'}/merge/replay ".
+    my $cmd = "$param{'cadodir'}/filter/replay ".
               "-his $param{'prefix'}.merge.his ".
               "-index $param{'prefix'}.index ".
               "-purged $param{'prefix'}.purged ".
