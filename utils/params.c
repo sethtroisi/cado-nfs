@@ -1,5 +1,6 @@
 #define _BSD_SOURCE     /* strdup */
 #define _GNU_SOURCE         /* vasprintf */
+#define _POSIX_C_SOURCE 200112L /* strtoumax */
 #define _DARWIN_C_SOURCE    /* for vasprintf. _ANSI_SOURCE must be undefined */
 
 #include <stdlib.h>
@@ -8,6 +9,7 @@
 #include <limits.h>             /* INT_MIN INT_MAX */
 #include <errno.h>
 #include <stdarg.h>
+#include <inttypes.h>
 
 #include "params.h"
 #include "macros.h"
@@ -29,7 +31,7 @@ void param_list_init(param_list pl)
 void param_list_clear(param_list pl)
 {
     for(unsigned int i = 0 ; i < pl->size ; i++) {
-        free(pl->p[i]->key);
+        if (pl->p[i]->key) free(pl->p[i]->key);
         free(pl->p[i]->value);
     }
     free(pl->p);
@@ -75,7 +77,7 @@ int param_list_add_key(param_list pl,
         const char * key, const char * value, enum parameter_origin o)
 {
     int r = param_list_add_key_nostrdup(pl,
-            strdup(key), value ? strdup(value) : NULL, o);
+            key ? strdup(key) : NULL, value ? strdup(value) : NULL, o);
     return r;
 }
 
@@ -86,10 +88,17 @@ struct sorting_data {
 
 typedef int (*sortfunc_t) (const void *, const void *);
 
+int strcmp_or_null(const char * a, const char * b)
+{
+    if (a == NULL) { return b ? -1 : 0; }
+    if (b == NULL) { return a ? 1 : 0; }
+    return strcmp(a, b);
+}
+
 int paramcmp(const struct sorting_data * a, const struct sorting_data * b)
 {
     int r;
-    r = strcmp(a->s->key, b->s->key);
+    r = strcmp_or_null(a->s->key, b->s->key);
     if (r) return r;
     r = a->s->origin - b->s->origin;
     if (r) return r;
@@ -123,7 +132,7 @@ void param_list_consolidate(param_list pl)
     // now remove duplicates. The sorting has priorities right.
     unsigned int j = 0;
     for(unsigned int i = 0 ; i < pl->size ; i++) {
-        if (i + 1 < pl->size && strcmp(pl->p[i]->key, pl->p[i+1]->key) == 0) {
+        if (pl->p[i]->key != NULL && i + 1 < pl->size && strcmp(pl->p[i]->key, pl->p[i+1]->key) == 0) {
             /* The latest pair in the list is the one having highest
              * priority. Do we don't do the copy at this moment.
              */
@@ -149,8 +158,8 @@ void param_list_remove_key(param_list pl, const char * key)
 {
     unsigned int j = 0;
     for(unsigned int i = 0 ; i < pl->size ; i++) {
-        if (strcmp(pl->p[i]->key, key) == 0) {
-            free(pl->p[i]->key);
+        if (strcmp_or_null(pl->p[i]->key, key) == 0) {
+            if (pl->p[i]->key) free(pl->p[i]->key);
             free(pl->p[i]->value);
         } else {
             if (i != j) {
@@ -199,6 +208,10 @@ int param_list_read_stream(param_list pl, FILE *f)
 
         // look for a left-hand-side.
         l = 0;
+        if (!(isalpha(p[l]) || p[l] == '_' || p[l] == '-')) {
+            param_list_add_key(pl, NULL, line, PARAMETER_FROM_FILE);
+            continue;
+        }
         for( ; p[l] && (isalnum(p[l]) || p[l] == '_' || p[l] == '-') ; l++);
 
         int lhs_length = l;
@@ -222,7 +235,7 @@ int param_list_read_stream(param_list pl, FILE *f)
             q++;
             if (*q == '=')
                 q++;
-        } else {
+        } else if (q == p + lhs_length) {
             fprintf(stderr, "Parse error, no separator for config line:\n%s\n",
                     line);
             all_ok=0;
@@ -443,7 +456,7 @@ int param_list_update_cmdline(param_list pl,
 
 int param_strcmp(const char * a, parameter_srcptr b)
 {
-    return strcmp(a, b->key);
+    return strcmp_or_null(a, b->key);
 }
 
 static int assoc(param_list pl, const char * key)
@@ -544,6 +557,27 @@ int param_list_parse_ulong(param_list pl, const char * key, unsigned long * r)
     char * end;
     unsigned long res;
     res = strtoul(value, &end, 0);
+    if (*end != '\0') {
+        fprintf(stderr, "Parse error:"
+                " parameter for key %s is not an ulong: %s\n",
+                key, value);
+        exit(1);
+    }
+    if (r)
+        *r = res;
+    return pl->p[v]->seen;
+}
+
+int param_list_parse_uint64(param_list pl, const char * key, uint64_t * r)
+{
+    int v = assoc(pl, key);
+    if (v < 0)
+        return 0;
+    char * value = pl->p[v]->value;
+    pl->p[v]->parsed=1;
+    char * end;
+    uint64_t res;
+    res = strtoumax(value, &end, 0);
     if (*end != '\0') {
         fprintf(stderr, "Parse error:"
                 " parameter for key %s is not an ulong: %s\n",

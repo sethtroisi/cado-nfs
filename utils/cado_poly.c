@@ -49,12 +49,16 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
 
     param_list_parse_string(pl, "name", poly->name, sizeof(poly->name));
 
-    have_n = param_list_parse_mpz(pl, "n", poly->n);
+    have_n = param_list_parse_mpz(pl, "n", poly->n) || param_list_parse_mpz(pl, NULL, poly->n);
     param_list_parse_double(pl, "skew", &(poly->skew));
     for (i = 0; i < (MAXDEGREE + 1); i++) {
         char tag[4];
         snprintf(tag, sizeof(tag), "c%d", i);
         have_f[i] = param_list_parse_mpz(pl, tag, poly->f[i]);
+        if (!have_f[i]) {
+            snprintf(tag, sizeof(tag), "X%d", i);
+            have_f[i] = param_list_parse_mpz(pl, tag, poly->f[i]);
+        }
         snprintf(tag, sizeof(tag), "Y%d", i);
         have_g[i] = param_list_parse_mpz(pl, tag, poly->g[i]);
     }

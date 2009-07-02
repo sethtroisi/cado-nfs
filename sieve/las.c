@@ -2547,7 +2547,7 @@ factor_leftover_norm (mpz_t n, unsigned int l,
 /*************************** main program ************************************/
 
 static void
-usage (const char *argv0)
+usage (const char *argv0, const char * missing)
 {
   fprintf (stderr, "Usage: %s [-no-checknorms] [-I I] -poly xxx.poly -fb xxx.roots -q0 q0 [-q1 q1] [-rho rho]\n",
            argv0);
@@ -2570,6 +2570,9 @@ usage (const char *argv0)
   fprintf (stderr, "          -alambda  nnn   algebraic lambda value is nnn\n");
   fprintf (stderr, "          -v              be verbose (print some sieving statistics)\n");
   fprintf (stderr, "          -out filename   write relations to filename instead of stdout\n");
+  if (missing) {
+      fprintf(stderr, "\nError: missing parameter %s\n", missing);
+  }
   exit (EXIT_FAILURE);
 }
 
@@ -2577,14 +2580,15 @@ int
 main (int argc0, char *argv0[])
 {
     sieve_info_t si;
-    char *fbfilename = NULL, *polyfilename = NULL;
+    const char *fbfilename = NULL;
+    const char *polyfilename = NULL;
     cado_poly cpoly;
     double t0, tfb, tq, tn_rat, tn_alg, tts, ttsm, ttf;
     uint64_t q0 = 0, q1 = 0, rho = 0;
     uint64_t *roots;
     unsigned long nroots, tot_reports = 0, survivors0, survivors1, survivors2;
     factorbase_degn_t * fb_alg, * fb_rat;
-    int checknorms = 1; /* factor or not the remaining norms */
+    int no_checknorms = 0; /* factor or not the remaining norms */
     int td_thresh = 1024; /* cost threshold trialdiv/resieving */
     int bucket_thresh = 0;
     int I = DEFAULT_I, i;
@@ -2593,137 +2597,63 @@ main (int argc0, char *argv0[])
     double totJ = 0.0;
     unsigned long report_sizes_a[256], report_sizes_r[256];
     /* following command-line values override those in the polynomial file */
-    int rlim = 0, alim = 0;
-    int lpbr = 0, lpba = 0;
-    int mfbr = 0, mfba = 0;
-    double rlambda = 0.0, alambda = 0.0;
     FILE *output;
-    char *outputname = NULL;
+    const char *outputname = NULL;
     int argc = argc0;
     char **argv = argv0;
     double max_full = 0.;
 
-    while (argc > 1 && argv[1][0] == '-')
-      {
-        if (strcmp (argv[1], "-no-checknorms") == 0)
-          {
-            checknorms = 0;
-            argc -= 1;
-            argv += 1;
-          }
-        if (strcmp (argv[1], "-v") == 0)
-          {
-            verbose = 1;
-            argc -= 1;
-            argv += 1;
-          }
-        else if (argc > 2 && strcmp (argv[1], "-I") == 0)
-          {
-            I = atoi (argv[2]);
-            argc -= 2;
-            argv += 2;
-          }
-        else if (argc > 2 && strcmp (argv[1], "-fb") == 0)
-          {
-            fbfilename = argv[2];
-            argc -= 2;
-            argv += 2;
-          }
-        else if (argc > 2 && strcmp (argv[1], "-poly") == 0)
-          {
-            polyfilename = argv[2];
-            argc -= 2;
-            argv += 2;
-          }
-        else if (argc > 2 && strcmp (argv[1], "-q0") == 0)
-          {
-            /* uintmax_t is guaranteed to be larger or equal to uint64_t */
-            q0 = strtouint64 (argv[2], NULL, 10);
-            argc -= 2;
-            argv += 2;
-          }
-        else if (argc > 2 && strcmp (argv[1], "-q1") == 0)
-          {
-            q1 = strtouint64 (argv[2], NULL, 10);
-            argc -= 2;
-            argv += 2;
-          }
-        else if (argc > 2 && strcmp (argv[1], "-rho") == 0)
-          {
-            rho = strtouint64 (argv[2], NULL, 10);
-            argc -= 2;
-            argv += 2;
-          }
-        else if (argc > 2 && strcmp (argv[1], "-tdthresh") == 0)
-          {
-            td_thresh = atoi (argv[2]);
-            argc -= 2;
-            argv += 2;
-          }
-        else if (argc > 2 && strcmp (argv[1], "-bkthresh") == 0)
-          {
-            bucket_thresh = atoi (argv[2]);
-            argc -= 2;
-            argv += 2;
-          }
-        else if (argc > 2 && strcmp (argv[1], "-rlim") == 0)
-          {
-            rlim = atoi (argv[2]);
-            argc -= 2;
-            argv += 2;
-          }
-        else if (argc > 2 && strcmp (argv[1], "-alim") == 0)
-          {
-            alim = atoi (argv[2]);
-            argc -= 2;
-            argv += 2;
-          }
-        else if (argc > 2 && strcmp (argv[1], "-lpbr") == 0)
-          {
-            lpbr = atoi (argv[2]);
-            argc -= 2;
-            argv += 2;
-          }
-        else if (argc > 2 && strcmp (argv[1], "-lpba") == 0)
-          {
-            lpba = atoi (argv[2]);
-            argc -= 2;
-            argv += 2;
-          }
-        else if (argc > 2 && strcmp (argv[1], "-mfbr") == 0)
-          {
-            mfbr = atoi (argv[2]);
-            argc -= 2;
-            argv += 2;
-          }
-        else if (argc > 2 && strcmp (argv[1], "-mfba") == 0)
-          {
-            mfba = atoi (argv[2]);
-            argc -= 2;
-            argv += 2;
-          }
-        else if (argc > 2 && strcmp (argv[1], "-rlambda") == 0)
-          {
-            rlambda = atof (argv[2]);
-            argc -= 2;
-            argv += 2;
-          }
-        else if (argc > 2 && strcmp (argv[1], "-alambda") == 0)
-          {
-            alambda = atof (argv[2]);
-            argc -= 2;
-            argv += 2;
-          }
-        else if (argc > 2 && strcmp (argv[1], "-out") == 0)
-          {
-            outputname = argv[2];
-            argc -= 2;
-            argv += 2;
-          }
-        else
-          usage (argv0[0]);
-      }
+    param_list pl;
+    param_list_init(pl);
+    cado_poly_init(cpoly);
+    param_list_configure_knob(pl, "-v", &verbose);
+    param_list_configure_knob(pl, "-no-checknorms", &no_checknorms);
+    argv++, argc--;
+    for( ; argc ; ) {
+        if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
+        /* Could also be a file */
+        FILE * f;
+        if ((f = fopen(argv[0], "r")) != NULL) {
+            param_list_read_stream(pl, f);
+            fclose(f);
+            argv++,argc--;
+            continue;
+        }
+        fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
+        usage(argv0[0],NULL);
+    }
 
+    polyfilename = param_list_lookup_string(pl, "poly");
+    if (polyfilename) param_list_read_file(pl, polyfilename);
+    fbfilename = param_list_lookup_string(pl, "fb");
+
+    if (!cado_poly_set_plist (cpoly, pl)) {
+        fprintf (stderr, "Error reading polynomial file\n");
+        exit (EXIT_FAILURE);
+    }
+
+    param_list_parse_int(pl, "I", &I);
+    param_list_parse_uint64(pl, "q0", &q0);
+    param_list_parse_uint64(pl, "q1", &q1);
+    param_list_parse_uint64(pl, "rho", &rho);
+    param_list_parse_int(pl, "tdthresh", &td_thresh);
+    param_list_parse_int(pl, "bkthresh", &bucket_thresh);
+    int ok = 1;
+    ok = ok && param_list_parse_ulong(pl, "rlim", &cpoly->rlim);
+    ok = ok && param_list_parse_ulong(pl, "alim", &cpoly->alim);
+    ok = ok && param_list_parse_int(pl, "lpbr", &cpoly->lpbr);
+    ok = ok && param_list_parse_int(pl, "lpba", &cpoly->lpba);
+    ok = ok && param_list_parse_int(pl, "mfbr", &cpoly->mfbr);
+    ok = ok && param_list_parse_int(pl, "mfba", &cpoly->mfba);
+    ok = ok && param_list_parse_double(pl, "rlambda", &cpoly->rlambda);
+    ok = ok && param_list_parse_double(pl, "alambda", &cpoly->alambda);
+
+    if (!ok) {
+        fprintf(stderr, "Some parameters are missing among *lim lpb* mfb* *lambda\n");
+        usage(argv0[0],NULL);
+    }
+
+    outputname = param_list_lookup_string(pl, "out");
     /* Init output file */
     if (outputname == NULL)
       output = stdout;
@@ -2743,8 +2673,8 @@ main (int argc0, char *argv0[])
       fprintf (output, " %s", argv0[i]);
     fprintf (output, "\n");
 
-    if (polyfilename == NULL || fbfilename == NULL || q0 == 0)
-      usage (argv0[0]);
+    if (fbfilename == NULL) usage(argv0[0], "fb");
+    if (q0 == 0) usage(argv0[0], "q0");
 
     /* if -rho is given, we sieve only for q0, thus -q1 is not allowed */
     if (rho != 0 && q1 != 0)
@@ -2764,30 +2694,6 @@ main (int argc0, char *argv0[])
         exit (EXIT_FAILURE);
       }
 
-    cado_poly_init(cpoly);
-    if (!cado_poly_read (cpoly, polyfilename))
-      {
-        fprintf (stderr, "Error reading polynomial file\n");
-        exit (EXIT_FAILURE);
-      }
-
-    /* override sieving parameters if needed */
-    if (rlim != 0)
-      cpoly->rlim = rlim;
-    if (alim != 0)
-      cpoly->alim = alim;
-    if (lpbr != 0)
-      cpoly->lpbr = lpbr;
-    if (lpba != 0)
-      cpoly->lpba = lpba;
-    if (mfbr != 0)
-      cpoly->mfbr = mfbr;
-    if (mfba != 0)
-      cpoly->mfba = mfba;
-    if (rlambda != 0.0)
-      cpoly->rlambda = rlambda;
-    if (alambda != 0.0)
-      cpoly->alambda = alambda;
     fprintf (output, "# Sieving parameters: rlim=%lu alim=%lu lpbr=%d lpba=%d\n",
              cpoly->rlim, cpoly->alim, cpoly->lpbr, cpoly->lpba);
     fprintf (output, "#                     mfbr=%d mfba=%d rlambda=%1.1f alambda=%1.1f\n",
@@ -2795,7 +2701,7 @@ main (int argc0, char *argv0[])
 
     /* this does not depend on the special-q */
     sieve_info_init (&si, cpoly, I, q0, bucket_thresh, output);
-    si.checknorms = checknorms;
+    si.checknorms = !no_checknorms;
 
     {
       fbprime_t *leading_div;
@@ -3037,6 +2943,8 @@ main (int argc0, char *argv0[])
 
     if (outputname != NULL)
       gzip_close (output, "");
+
+    param_list_clear(pl);
 
     return 0;
 }
