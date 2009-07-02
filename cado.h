@@ -73,7 +73,6 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 
 typedef struct
 {
-  char name[256]; /* name */
   mpz_t n;        /* number to factor */
   double skew;    /* skewness */
   int degree;     /* (algebraic) degree */

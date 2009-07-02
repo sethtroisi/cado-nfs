@@ -1263,8 +1263,6 @@ print_poly (FILE *fp, cado_poly p, int argc, char *argv[], double st, int raw)
   int i;
   double alpha, logmu;
 
-  if (strlen (p->name) != 0)
-    fprintf (fp, "name: %s\n", p->name);
   fprintf (fp, "n: ");
   mpz_out_str (fp, 10, p->n);
   fprintf (fp, "\n");

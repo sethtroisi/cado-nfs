@@ -18,7 +18,6 @@ void cado_poly_init(cado_poly poly)
 	mpz_init_set_ui(poly->g[i], 0);
     }
     mpz_init_set_ui(poly->n, 0);
-    poly->name[0] = '\0';
     poly->degree = -1;
     poly->type[0] = '\0';
     mpz_init_set_ui(poly->m, 0);
@@ -46,8 +45,6 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
     int have_g[(MAXDEGREE + 1)] = { 0, };
     int degf, degg;
     int i;
-
-    param_list_parse_string(pl, "name", poly->name, sizeof(poly->name));
 
     have_n = param_list_parse_mpz(pl, "n", poly->n) || param_list_parse_mpz(pl, NULL, poly->n);
     param_list_parse_double(pl, "skew", &(poly->skew));
