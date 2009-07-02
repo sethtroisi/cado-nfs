@@ -124,6 +124,7 @@ typedef struct {
     trialdiv_divisor_t *trialdiv_data_rat;
     unsigned char S_rat[1 << NORM_BITS];
     unsigned char S_alg[1 << NORM_BITS];
+    unsigned int *lpf; /* lpf[i] is largest prime factor of i, for i < I */
     facul_strategy_t *strategy;
 } sieve_info_t;
 
@@ -246,6 +247,24 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int logI, uint64_t q0,
                         log(log(si->bucket_thresh));
   si->bucket_limit = limit_factor * si->bucket_region * BUCKET_LIMIT_FACTOR 
                      + BUCKET_LIMIT_ADD; 
+
+  /* Store largest prime factor of k in si->lpf[k], 0 for k=0, 1 for k=1 */
+  si->lpf = (unsigned int *) malloc (si->I * sizeof (unsigned int));
+  ASSERT_ALWAYS (si->lpf != NULL);
+  si->lpf[0] = 0U;
+  si->lpf[1] = 1U;
+  for (k = 2U; k < si->I; k++)
+    {
+      unsigned int p, c = k;
+      for (p = 2U; p * p <= c; p += 1U + p % 2U)
+        {
+          while (c % p == 0U)
+            c /= p;
+          if (c == 1U)
+            break;
+        }
+      si->lpf[k] = (c == 1U) ? p : c;
+    }
 
   fprintf(output, "# bucket_region = %u\n", si->bucket_region);
   fprintf(output, "# nb_buckets = %u\n", si->nb_buckets);
@@ -1839,6 +1858,92 @@ check_leftover_norm (mpz_t n, size_t lpb, mpz_t BB, mpz_t BBB, size_t mfb)
   return 1;
 }
 
+#ifdef UNSIEVE_NOT_COPRIME
+static void
+unsieve_one_prime (unsigned char *line_start, const unsigned int p, 
+                   const unsigned int y, const sieve_info_t *si)
+{
+  unsigned int x, np = p; /* if 2|y, np=2p, else np=p */
+
+  x = (si->I / 2U) % p;
+  if (y % 2U == 0U)
+    {
+      np += p;
+      if (x % 2U == 0U)
+        x += p;
+    }
+  for ( ; x < si->I; x += np)
+    line_start[x] = 255;
+}
+
+
+/* Set locations where gcd(i,j) != 1 to 255*/
+void 
+unsieve_not_coprime (unsigned char *S, const int N, const sieve_info_t *si)
+{
+  unsigned int y; /* Line coordiante within bucket region */
+  for (y = 0U + (N == 0U ? 1U : 0U); 
+       y < 1U << (LOG_BUCKET_REGION - si->logI); y++)
+    {
+      unsigned int c = y + (N << (LOG_BUCKET_REGION - si->logI));
+      unsigned int p;
+      unsigned char *line_start = S + (y << si->logI);
+
+      p = si->lpf[c]; /* set p to largest prime factor of c */
+      if (p > 3U)
+        {
+          ASSERT (c % p == 0U);
+          unsieve_one_prime (line_start, p, y, si);
+          do {c /= p;} while (c % p == 0U);
+        }
+      
+      while (c % 2U == 0U) 
+        c >>= 1;
+      
+      if (c % 3U == 0U)
+        {
+          const unsigned int I_ul  = si->I / sizeof (unsigned long);
+          unsigned int i, x;
+          unsigned long s[3] = {0UL, 0UL, 0UL};
+          unsigned long * restrict ul_line_start = (unsigned long *) line_start;
+          
+          /* Sieve only the small pattern */
+          for (x = (si->I / 2U) % 3U; x < 3U * sizeof(unsigned long); x += 3U)
+            ((unsigned char *) s)[x] = 255;
+          
+          /* Then apply pattern to array */
+          for (i = 0U; i < I_ul - 2U; i += 3U)
+            {
+              ul_line_start[i] |= s[0];
+              ul_line_start[i + 1] |= s[1];
+              ul_line_start[i + 2] |= s[2];
+            }
+          if (i < I_ul - 1U)
+            line_start[i] |= s[0];
+          if (i < I_ul)
+            line_start[i + 1] |= s[1];
+          
+          do {c /= 3U;} while (c % 3U == 0U);
+        }
+
+      for (p = 5U; p * p <= c; p += 2U)
+        if (c % p == 0U)
+          {
+            unsieve_one_prime (line_start, p, y, si);
+            do {c /= p;} while (c % p == 0U);
+          }
+
+      /* Now c == 1 or c is a prime */
+      if (c != 1U)
+        {
+          ASSERT(c > 3U && si->lpf[c] == c);
+          unsieve_one_prime (line_start, c, y, si);
+        }
+    }
+}
+#endif /* ifdef UNSIEVE_NOT_COPRIME */
+
+
 /* Adds the number of sieve reports to *survivors,
    number of survivors with coprime a, b to *coprimes */
 
@@ -1883,6 +1988,10 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
     mpz_set_ui (BLPrat, cpoly->alim);
     mpz_mul_2exp (BLPrat, BLPrat, cpoly->lpba); /* fb bound * lp bound */
 
+#ifdef UNSIEVE_NOT_COPRIME
+    unsieve_not_coprime (S, N, si);
+#endif
+    
     for (x = 0; x < si->bucket_region; ++x)
       {
         unsigned int X;
@@ -1898,11 +2007,13 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
         X = x + (N << LOG_BUCKET_REGION);
         i = abs ((int) (X & (si->I - 1)) - si->I / 2);
         j = X >> si->logI;
+#ifndef UNSIEVE_NOT_COPRIME
         if (bin_gcd (i, j) != 1)
           {
             S[x] = 255;
             continue;
           }
+#endif
       }
 
     /* Copy those bucket entries that belong to sieving survivors and
@@ -2005,6 +2116,10 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
                                           si->strategy) == 0)
                   continue;
               }
+
+#ifdef UNSIEVE_NOT_COPRIME
+            ASSERT (bin_gcd (a, b) == 1);
+#endif
 
             fprintf (output, "%" PRId64 ",%" PRIu64 ":", a, b);
             factor_list_fprint (output, rat_factors);
