@@ -8,13 +8,13 @@
 
 
 /* Mask the (possibly multi-word) integer m so that only the
-   low MOD_MAXBITS can be non-zero */
+   low maxbits can be non-zero */
 
 static void 
-limit_modulus (modint_t m)
+limit_integer (modint_t m, const int maxbits)
 {
   int i, j;
-  for (i = 0, j = MOD_MAXBITS; i < MOD_SIZE; i++)
+  for (i = 0, j = maxbits; i < MOD_SIZE; i++)
     {
       if (j < LONG_BIT)
 	{
@@ -24,6 +24,13 @@ limit_modulus (modint_t m)
       else
 	j -= LONG_BIT;
     }
+}
+
+
+static void 
+limit_modulus (modint_t m)
+{
+  limit_integer (m, MOD_MAXBITS);
 }
 
 
@@ -80,6 +87,76 @@ static void
 mod_setint_mpz (mpz_t r, const modint_t s)
 {
   mpz_import (r, MOD_SIZE, -1, sizeof (unsigned long), 0, 0, s);
+}
+
+
+
+static void
+test_mod_intmod (const modint_t la, const modint_t lm)
+{
+  modint_t s;
+  mpz_t mm, ma, mr, ms;
+  
+  mod_intmod (s, la, lm);
+  
+  mpz_init (mm);
+  mpz_init (ma);
+  mpz_init (mr);
+  mpz_init (ms);
+
+  mod_setint_mpz (mm, lm);
+  mod_setint_mpz (ma, la);
+  mpz_mod (mr, ma, mm);
+  mod_setint_mpz (ms, s);
+
+  if (mpz_cmp (mr, ms) != 0)
+    {
+      gmp_printf ("mod_intmod(%Zd, %Zd) wrong (%Zd), GMP has %Zd\n", 
+	          ma, mm, ms, mr);
+      abort ();
+    }
+
+  mpz_clear (mm);
+  mpz_clear (ma);
+  mpz_clear (mr);
+  mpz_clear (ms);
+}
+
+void
+tests_mod_intmod (int iter)
+{
+  modint_t tm, tr;
+  int i, j;
+  
+  /* Test large moduli */
+  for (i = 0; i < MOD_SIZE; i++)
+    tm[i] = ULONG_MAX;
+
+  for (i = 1; i < iter; i++) /* Test i/2 and (m-i)/2 for i=0, ..., 99 */
+    {
+      mod_intset_ul (tr, (unsigned long) i);
+      test_mod_intmod (tr, tm);
+      mod_intset (tr, tm);
+      tr[0] -= i;
+      test_mod_intmod (tr, tm);
+    }
+  
+  /* Test random moduli of different size */
+  for (i = 2; i < MOD_MAXBITS; i++)
+    {
+      do {
+        random_integer (tm);
+        limit_integer (tm, i);
+      } while (mod_intcmp_ul (tm, 0UL) == 0);
+      
+      /* Test random integers of different size */
+      for (j = 1; j < MOD_MAXBITS; j++)
+	{
+	  random_integer (tr);
+	  limit_integer (tr, j);
+	  test_mod_intmod (tr, tm);
+	}
+    }
 }
 
 
@@ -156,9 +233,7 @@ tests_mod_set_uls(int iter)
       /* Test 10 random residues */
       for (j = 0; j < 10; j++)
 	{
-	  int k;
-	  for (k = 0; k < MOD_SIZE; k++)
-	    tr[k] = (unsigned long) (random() + (RAND_MAX + 1UL) * random());
+	  random_integer (tr);
 	  test_mod_set_uls (tr, tm);
 	}
     }
@@ -252,9 +327,7 @@ tests_mod_divn(const int iter, const unsigned long n)
       /* Test 10 random residues */
       for (j = 0; j < 10; j++)
 	{
-	  int k;
-	  for (k = 0; k < MOD_SIZE; k++)
-	    tr[k] = (unsigned long) (random() + (RAND_MAX + 1UL) * random());
+	  random_integer (tr);
 	  test_mod_divn (tr, tm, n);
 	}
     }
@@ -619,6 +692,8 @@ int main(int argc, char **argv)
   else if (argc > 1)
     iter = atoi (argv[1]);
 
+  printf ("Testing mod_intmod()\n");
+  tests_mod_intmod (iter);
   printf ("Testing mod_set_uls()\n");
   tests_mod_set_uls (iter);
   printf ("Testing mod_div2()\n");

@@ -151,6 +151,16 @@ modul_intdivexact (modintul_t r, const modintul_t n, const modintul_t d)
 }
 
 
+/* r = n%d */
+MAYBE_UNUSED
+static inline void
+modul_intmod (modintul_t r, const modintul_t n, 
+              const modintul_t d)
+{
+  r[0] = n[0] % d[0]; 
+}
+
+
 /* Functions for the modulus */
 
 MAYBE_UNUSED

@@ -14,6 +14,7 @@
 #undef mod_intshr
 #undef mod_intshl
 #undef mod_intdivexact
+#undef mod_intmod
 #undef mod_init
 #undef mod_init_noset0
 #undef mod_clear
@@ -76,6 +77,7 @@
 #define mod_intshr           MOD_RENAME(intshr)
 #define mod_intshl           MOD_RENAME(intshl)
 #define mod_intdivexact      MOD_RENAME(intdivexact)
+#define mod_intmod           MOD_RENAME(intmod)
 #define mod_init             MOD_RENAME(init)
 #define mod_init_noset0      MOD_RENAME(init_noset0)
 #define mod_clear            MOD_RENAME(clear)

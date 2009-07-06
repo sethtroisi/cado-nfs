@@ -274,6 +274,16 @@ modredcul_intdivexact (modintredcul_t r, const modintredcul_t n,
 }
 
 
+/* r = n%d */
+MAYBE_UNUSED
+static inline void
+modredcul_intmod (modintredcul_t r, const modintredcul_t n, 
+                  const modintredcul_t d)
+{
+  r[0] = n[0] % d[0]; 
+}
+
+
 /* Functions for the modulus */
 
 MAYBE_UNUSED
