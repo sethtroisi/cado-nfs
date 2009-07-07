@@ -1008,8 +1008,8 @@ fb_clear (factorbase_t fb)
     }
 }
 
-/* Extracts primes p <= plim with p/nr_roots <= costlim. 
-   List ends with FB_END. Allocates memory */
+/* Extracts primes (not prime powers) p <= plim with 
+   p/nr_roots <= costlim. List ends with FB_END. Allocates memory */
 fbprime_t *
 fb_extract_bycost (const factorbase_degn_t *fb, const fbprime_t plim, 
                    const fbprime_t costlim)
@@ -1022,7 +1022,8 @@ fb_extract_bycost (const factorbase_degn_t *fb, const fbprime_t plim,
   i = 0;
   while (fb_ptr->p != FB_END && fb_ptr->p <= plim)  
     {
-      if (fb_ptr->p <= costlim * fb_ptr->nr_roots)
+      if (fb_ptr->p <= costlim * fb_ptr->nr_roots &&
+	  !is_prime_power(fb_ptr->p))
         i++;
       fb_ptr = fb_next (fb_ptr);
     }
@@ -1034,7 +1035,8 @@ fb_extract_bycost (const factorbase_degn_t *fb, const fbprime_t plim,
   i = 0;
   while (fb_ptr->p != FB_END && fb_ptr->p <= plim)  
     {
-      if (fb_ptr->p <= costlim * fb_ptr->nr_roots)
+      if (fb_ptr->p <= costlim * fb_ptr->nr_roots &&
+	  !is_prime_power(fb_ptr->p))
         primes[i++] = fb_ptr->p;
       fb_ptr = fb_next (fb_ptr);
     }
