@@ -179,10 +179,11 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
 	       const int extra_primes, const int verbose)
 {
   unsigned int p, q;
-  const unsigned int addcost = 6, doublecost = 5, /* TODO: find good ratio */
+  const double addcost = 6., doublecost = 5., /* TODO: find good ratio */
     bytecost = 1, changecost = 1;
   const unsigned int compress = 1;
   bc_state_t *bc_state;
+  double totalcost = 0.;
   
   /* If group order is divisible by 12 or 16, add two or four 2s to stage 1 */
   if (extra_primes)
@@ -191,6 +192,7 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
     plan->exp2 = 0;
   for (q = 1; q <= B1 / 2; q *= 2)
     plan->exp2++;
+  totalcost += plan->exp2 * doublecost;
   
   /* Make bytecode for stage 1 */
   plan->B1 = B1;
@@ -202,11 +204,13 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
   /* If group order is divisible by 12, add another 3 to stage 1 primes */
   if (extra_primes && 
       (parameterization == BRENT12 || parameterization == MONTY12))
-    prac_bytecode (3, addcost, doublecost, bytecost, changecost, bc_state);
+    totalcost += prac_bytecode (3, addcost, doublecost, bytecost, 
+                                changecost, bc_state);
   for ( ; p <= B1; p = (unsigned int) getprime (p))
     {
       for (q = 1; q <= B1 / p; q *= p)
-	prac_bytecode (p, addcost, doublecost, bytecost, changecost, bc_state);
+	totalcost += prac_bytecode (p, addcost, doublecost, bytecost, 
+	                            changecost, bc_state);
     }
   bytecoder ((literal_t) 12, bc_state);
   bytecoder_flush (bc_state);
@@ -244,7 +248,8 @@ ecm_make_plan (ecm_plan_t *plan, const unsigned int B1, const unsigned int B2,
 	  changes += (p > 0 && plan->bc[p-1] != plan->bc[p]);
         }
       printf ("\n");
-      printf ("Length %d, %d code changes\n", plan->bc_len, changes);
+      printf ("Length %d, %d code changes, total cost: %f\n", 
+              plan->bc_len, changes, totalcost);
     }
     
   /* Make stage 2 plan */

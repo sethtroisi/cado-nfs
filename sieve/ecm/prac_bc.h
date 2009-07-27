@@ -40,5 +40,5 @@ void bytecoder_read (code_t *, bc_state_t *);
 
 double prac_best (double *, const unsigned long, const int, const double, 
 		  const double, const double, const double, const bc_dict_t *);
-void prac_bytecode (const unsigned long, const double, const double, 
-		    const double, const double, bc_state_t *);
+double prac_bytecode (const unsigned long, const double, const double, 
+		      const double, const double, bc_state_t *);

@@ -24,6 +24,11 @@
 #endif
 #endif
 
+#define COUNT_ELLM_OPS 0
+#if COUNT_ELLM_OPS
+static unsigned long ellM_add_count, ellM_double_count;
+#endif
+
 typedef struct {residue_t x, z;} __ellM_point_t;
 typedef __ellM_point_t ellM_point_t[1];
 
@@ -79,6 +84,10 @@ ellM_double (ellM_point_t Q, const ellM_point_t P, const modulus_t m,
     }
 #endif
   
+#if COUNT_ELLM_OPS
+  ellM_double_count++;
+#endif
+
   mod_init_noset0 (u, m);
   mod_init_noset0 (v, m);
   mod_init_noset0 (w, m);
@@ -134,6 +143,10 @@ ellM_add (ellM_point_t R, const ellM_point_t P, const ellM_point_t Q,
       ellM_set (R, P, m);
       return;
     }
+#endif
+
+#if COUNT_ELLM_OPS
+  ellM_add_count++;
 #endif
 
   mod_init_noset0 (u, m);
@@ -955,6 +968,8 @@ common_z (const int n1, residue_t *x1, residue_t *z1,
   const int n = n1 + n2;
   int i, j;
   residue_t *t, p;
+
+  // printf ("common_z: n1 = %d, n2 = %d\n", n1, n2);
   
   if (n < 2)
     return;
@@ -1059,6 +1074,10 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
       mod_init_noset0 (Pid_x[i], m);
       mod_init_noset0 (Pid_z[i], m);
     }
+
+#if COUNT_ELLM_OPS
+  ellM_add_count = ellM_double_count = 0;
+#endif
 
   if (verbose)
     printf ("Stage 2: P = (%lu::%lu)\n", 
@@ -1304,6 +1323,11 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
 
   if (verbose)
     printf ("Accumulator = %lu\n", mod_get_ul (a, m));
+
+#if COUNT_ELLM_OPS
+  printf("Stage 2 used %lu point additions and %lu point doublings\n",
+         ellM_add_count, ellM_double_count);
+#endif
   
   mod_set (r, a, m);
   

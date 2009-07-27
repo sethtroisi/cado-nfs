@@ -439,21 +439,20 @@ prac_best (double *mul, const unsigned long n, const int m_parm,
 }
 
 
-/* Write bytecode for an addition chain for odd k. */
-void 
+/* Write bytecode for an addition chain for odd k, and return its cost */
+double  
 prac_bytecode (const unsigned long k, const double addcost, 
 	       const double doublecost, const double bytecost, 
 	       const double changecost, bc_state_t *state)
 {
-  unsigned long d;
-  double m = 0.;
+  double d, m = 0.;
   
   assert (k % 2 == 1);
   
   /* Find the best multiplier for this k */
   d = prac_best (&m, k, PRAC_NR_MULTIPLIERS, addcost, doublecost, bytecost, 
 		 changecost, state->dict);
-  if (d == 0)
+  if (d == 0.)
     {
       /* This k is composite and prac cannot make a valid chain for it.
 	 We could try to factor k and make a composite chain from the
@@ -462,5 +461,8 @@ prac_bytecode (const unsigned long k, const double addcost,
       abort ();
     }
 
-  prac_chain (k, m, addcost, doublecost, state);
+  /* Return the cost of modular arithmetic, not including
+     length of compressed code or number of code changes */
+  d = prac_chain (k, m, addcost, doublecost, state);
+  return d;
 }
