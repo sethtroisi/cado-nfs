@@ -30,6 +30,7 @@ params/params.c143
 params/params.c144
 params/params.c158
 params/params.rsa100
+params/rsa155.poly
 polyselect/alpha.mpl
 polyselect/alpha.sage
 polyselect/debug_rootsieve.sage
