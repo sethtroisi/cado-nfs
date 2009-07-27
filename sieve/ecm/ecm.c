@@ -969,7 +969,8 @@ common_z (const int n1, residue_t *x1, residue_t *z1,
   int i, j;
   residue_t *t, p;
 
-  // printf ("common_z: n1 = %d, n2 = %d\n", n1, n2);
+  // printf ("common_z: n1 = %d, n2 = %d, sum = %d, nr muls=%d\n", 
+  //        n1, n2, n1 + n2, 4*(n1 + n2) - 6);
   
   if (n < 2)
     return;
@@ -1159,13 +1160,31 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
         ellM_set (ap5_1, Pt, m);
         i5 += 6;
       }
+
+    if ((unsigned) (i1 + i5) < plan->d)
+      {
+        if (i1 < i5)
+          {
+            ellM_add (Pt, ap1_1, P6, ap1_0, b, m);
+            ellM_set (ap1_0, ap1_1, m);
+            ellM_set (ap1_1, Pt, m);
+            i1 += 6;
+          }
+        else
+          {
+            ellM_add (Pt, ap5_1, P6, ap5_0, b, m);
+            ellM_set (ap5_0, ap5_1, m);
+            ellM_set (ap5_1, Pt, m);
+            i5 += 6;
+          }
+      }
     
 #if 0
     /* Also compute Pd = d*P while we've got 6*P */
     ellM_init (Pd, m);
     ellM_mul_ul (Pd, P6, plan->d / 6, m, b); /* slow! */
 #else
-    ASSERT ((unsigned) (i1 + i5) == plan->d); /* TODO: Check that this always holds! */
+    ASSERT ((unsigned) (i1 + i5) == plan->d);
     if (i1 + 4 == i5)
       {
         ellM_double (P2, P2, m, b); /* We need 4P for difference */
