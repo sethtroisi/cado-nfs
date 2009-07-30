@@ -174,9 +174,12 @@ int matmul_reload_cache(matmul_ptr mm)
     if (rc < 0) {
         return 0;
     }
-    rc = stat(mm->local_cache_copy, sbuf[1]);
+    int local_is_ok = mm->local_cache_copy != NULL;
+    if (local_is_ok) {
+        rc = stat(mm->local_cache_copy, sbuf[1]);
+        local_is_ok = rc == 0;
+    }
 
-    int local_is_ok = rc == 0;
     if (local_is_ok && (sbuf[0]->st_size != sbuf[1]->st_size)) {
         fprintf(stderr, "%s and %s differ in size ; latter ignored\n",
                 mm->cachefile_name,

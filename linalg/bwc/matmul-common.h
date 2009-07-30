@@ -47,6 +47,13 @@ extern const char * rowcol[2];  // [0] = "row" [1] = "col"
     FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");   \
     final_v__ = storage_v__;                                            \
 } while (0)
+#define MATMUL_COMMON_READ_ONE8(final_v__, file__)  do {               \
+    size_t rc;                                                          \
+    uint8_t storage_v__;                                               \
+    rc = fread(&storage_v__, sizeof(storage_v__), 1, file__);           \
+    FATAL_ERROR_CHECK(rc < 1, "No valid data in cached matrix file");   \
+    final_v__ = storage_v__;                                            \
+} while (0)
 #define MATMUL_COMMON_READ_ONE16(final_v__, file__)  do {               \
     size_t rc;                                                          \
     uint16_t storage_v__;                                               \
@@ -78,6 +85,12 @@ extern const char * rowcol[2];  // [0] = "row" [1] = "col"
 #define MATMUL_COMMON_WRITE_ONE32(final_v__, file__)  do {              \
     size_t rc;								\
     uint32_t storage_v__ = final_v__;					\
+    rc = fwrite(&storage_v__, sizeof(storage_v__), 1, file__);		\
+    FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");	\
+} while (0)
+#define MATMUL_COMMON_WRITE_ONE8(final_v__, file__)  do {              \
+    size_t rc;								\
+    uint8_t storage_v__ = final_v__;					\
     rc = fwrite(&storage_v__, sizeof(storage_v__), 1, file__);		\
     FATAL_ERROR_CHECK(rc < 1, "Cannot write to cached matrix file");	\
 } while (0)

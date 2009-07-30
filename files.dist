@@ -318,3 +318,7 @@ linalg/bwc/matmul-sub-large-fbd.h
 gf2x-fft/Makefile
 gf2x-fft/gf2x-fft.h
 gf2x-fft/gf2x_fft_check.c
+linalg/bwc/matmul-sub-vsc-combine.S
+linalg/bwc/matmul-sub-vsc-combine.h
+linalg/bwc/matmul-sub-vsc-dispatch.S
+linalg/bwc/matmul-sub-vsc-dispatch.h

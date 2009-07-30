@@ -8,7 +8,7 @@
 #include "params.h"
 #include "readmat-easy.h"
 
-#define MM_COMMON_MAGIC 0xb0010000UL
+#define MM_COMMON_MAGIC 0xb0010001UL
 
 const char * rowcol[2] = { "row", "col", };
 
@@ -34,6 +34,9 @@ FILE * matmul_common_reload_cache_fopen(size_t stride, struct matmul_public_s * 
         fprintf(stderr, "Wrong magic in cached matrix file\n");
         return NULL;
     }   
+
+    /* Four reserved bytes for alignment */
+    MATMUL_COMMON_READ_ONE32(magic_check, f);
 
     uint32_t nbytes_check;
     MATMUL_COMMON_READ_ONE32(nbytes_check, f);
@@ -62,6 +65,7 @@ FILE * matmul_common_save_cache_fopen(size_t stride, struct matmul_public_s * mm
 
     MATMUL_COMMON_WRITE_ONE32(magic,f);
     MATMUL_COMMON_WRITE_ONE32(MM_COMMON_MAGIC,f);
+    MATMUL_COMMON_WRITE_ONE32(0,f);
     MATMUL_COMMON_WRITE_ONE32(stride,f);
     MATMUL_COMMON_WRITE_ONE32(mm->dim[0],f);
     MATMUL_COMMON_WRITE_ONE32(mm->dim[1],f);

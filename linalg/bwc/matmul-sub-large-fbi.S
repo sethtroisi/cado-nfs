@@ -1,5 +1,5 @@
 #if 0
-static inline void fill_buckets_indirect(abobj_ptr x, abt ** sb, const abt * z, const uint8_t * q, unsigned int n)
+static inline void matmul_sub_large_fbi(abobj_ptr x, abt ** sb, const abt * z, const uint8_t * q, unsigned int n)
 {
     /* Dispatch data found in z[0]...z[f(n-1)] such that z[f(i)] is in
      * array pointed to by sb[q[2*i+1]]. The function f(i) is given by
@@ -14,7 +14,7 @@ static inline void fill_buckets_indirect(abobj_ptr x, abt ** sb, const abt * z, 
     }
 }
 
-static inline void fill_buckets_indirect(ulong ** sb, const ulong * z, const uint8_t * q, unsigned int n)
+static inline void matmul_sub_large_fbi(ulong ** sb, const ulong * z, const uint8_t * q, unsigned int n)
     for(unsigned int c = 0 ; c < n ; c++) {
         z += *q++;
         *sb[*q++]++ = *z;
@@ -23,9 +23,9 @@ static inline void fill_buckets_indirect(ulong ** sb, const ulong * z, const uin
 #endif
 	.text
 	.p2align 4,,15
-.globl fill_buckets_indirect
-	.type	fill_buckets_indirect, @function
-fill_buckets_indirect:
+.globl matmul_sub_large_fbi
+	.type	matmul_sub_large_fbi, @function
+matmul_sub_large_fbi:
         pushq %rbp
         pushq %rbx
         pushq %r15
@@ -250,4 +250,4 @@ fill_buckets_indirect:
         popq %rbx
         popq %rbp
 	ret
-	.size	fill_buckets_indirect, .-fill_buckets_indirect
+	.size	matmul_sub_large_fbi, .-matmul_sub_large_fbi

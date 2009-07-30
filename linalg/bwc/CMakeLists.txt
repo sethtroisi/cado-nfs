@@ -140,11 +140,15 @@ macro(configure_bwc_variant v)
                     matmul-sub-small2.S
                     matmul-sub-large-fbi.S
                     matmul-sub-large-fbd.S
+                    matmul-sub-vsc-combine.S
+                    matmul-sub-vsc-dispatch.S
                     )
             set_property(SOURCE matmul-sub-small1.S PROPERTY LANGUAGE C)
             set_property(SOURCE matmul-sub-small2.S PROPERTY LANGUAGE C)
             set_property(SOURCE matmul-sub-large-fbi.S PROPERTY LANGUAGE C)
             set_property(SOURCE matmul-sub-large-fbd.S PROPERTY LANGUAGE C)
+            set_property(SOURCE matmul-sub-vsc-dispatch.S PROPERTY LANGUAGE C)
+            set_property(SOURCE matmul-sub-vsc-combine.S PROPERTY LANGUAGE C)
         endif(HAVE_GCC_STYLE_AMD64_ASM)
     endif(doing_u64)
 

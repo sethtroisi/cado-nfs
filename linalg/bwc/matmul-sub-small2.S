@@ -9,6 +9,7 @@ matmul_sub_small2:
         pushq %r14
         pushq %r13
         pushq %r12
+        // rdi is ignored (it's the abobj_t argument)
         // dst pointer --> store in rdi
         movq    %rsi, %rdi
         // src pointer --> store in rsi
@@ -16,21 +17,10 @@ matmul_sub_small2:
         // matrix pointer --> rbp
         movq    %rcx, %rbp
                 
-        // read ncoeffs_slice into r9
-	movzwl	2(%rbp), %eax
-	movzwl	(%rbp), %edx
-	salq	$16, %rax
-	movq	%rax, %r9
-	orq	%rdx, %r9
-        // rbp: index of first coeff
-	addq	$4, %rbp
+        // ncoeffs_slice --> r9
+        movq    %r8, %r9
 
-        // special for small2. Recover default alignment.
-        xorq    %r8, %r8
-        subq    %r9, %r8
-        andq    $1, %r8
-        leaq    (%rbp,%r8,2), %rbp
-
+        // rbp is the index of the first coeff
         test    %r9,%r9
 
         // at .Lfinished, rbp is shipped as a return value.

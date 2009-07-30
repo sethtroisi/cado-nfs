@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-const uint16_t * matmul_sub_small2(abobj_ptr x, abt * where, const abt * from, const uint16_t * q);
+const uint16_t * matmul_sub_small2(abobj_ptr x, abt * where, const abt * from, const uint16_t * q, unsigned long n);
 
 #ifdef __cplusplus
 }

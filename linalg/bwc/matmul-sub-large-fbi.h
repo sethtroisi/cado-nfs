@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-extern void fill_buckets_indirect(abobj_ptr x, abt ** sb, const abt * z, const uint8_t * q, unsigned int n);
+extern void matmul_sub_large_fbi(abobj_ptr x, abt ** sb, const abt * z, const uint8_t * q, unsigned int n);
 
 #ifdef __cplusplus
 }

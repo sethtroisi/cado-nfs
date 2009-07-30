@@ -171,7 +171,7 @@ void read_easy(const char * filename,
         if (p_nr) *p_nr = nr;
         if (p_nc) *p_nc = nc;
     }
-#if 0
+#if 1
     /* Enable this code fragment ONLY when debugging internal mm building
      * routines. This speeds up considerably the upstart time, thus
      * facilitating debugging.

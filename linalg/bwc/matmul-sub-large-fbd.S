@@ -1,6 +1,6 @@
 #if 0
 static void
-fill_buckets_direct(abobj_ptr x, abt ** sb, const abt * z, const uint8_t * q, unsigned int n)
+matmul_sub_large_fbd(abobj_ptr x, abt ** sb, const abt * z, const uint8_t * q, unsigned int n)
 {
     /* Dispatch data found in z[0]...z[n] such that z[i] is in array
      * pointed to by sb[q[i]]. Exactly n coefficients are expected. All
@@ -14,9 +14,9 @@ fill_buckets_direct(abobj_ptr x, abt ** sb, const abt * z, const uint8_t * q, un
 #endif
 	.text
 	.p2align 4,,15
-.globl fill_buckets_direct
-	.type	fill_buckets_direct, @function
-fill_buckets_direct:
+.globl matmul_sub_large_fbd
+	.type	matmul_sub_large_fbd, @function
+matmul_sub_large_fbd:
         pushq %rbp
         pushq %rbx
         pushq %r15
@@ -31,7 +31,7 @@ fill_buckets_direct:
         movq    %rcx, %rbp
                 
         movq    %r8, %r9
-        test    %r9,%r9
+        test    %r9, %r9
 
         // at .Lfinished, rbp is shipped as a return value.
 	je	.Lfinished
@@ -173,4 +173,4 @@ fill_buckets_direct:
         popq %rbx
         popq %rbp
 	ret
-	.size	fill_buckets_direct, .-fill_buckets_direct
+	.size	matmul_sub_large_fbd, .-matmul_sub_large_fbd

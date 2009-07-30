@@ -57,6 +57,7 @@
 
 /* Handy, and does not require libm */
 #ifndef iceildiv
+/* unfortunately this fails miserably if x+y-1 overflows */
 #define iceildiv(x,y)	(((x)+(y)-1)/(y))
 #endif
 
