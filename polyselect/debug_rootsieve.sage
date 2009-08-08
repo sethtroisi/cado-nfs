@@ -11,6 +11,9 @@ f,g=lemme_21(n,5,ad,p,m)
 g1=g(x+22977)
 f1=f(x+22977)-(3*x+18223)*g1
 
+#print f1
+#print g1
+
 # Now alpha(f1,2000) is -0.18.
 # Within rotation by (jx+k), |j|<=4, |k|<=2^16, the best alpha is reached
 # for:
@@ -82,24 +85,26 @@ def manyp(rdict,plim):
 # program accepts also a rectangle. We look into polynomials h(x,u,v) for
 # u and v integers within the interval [0,sbound-1]
 sbound=1000
-p=11
+p=13
 
-t0=cputime()
-print "First computing reference scores with the naive method"
-refp = get_reference(sbound, p)
-print "Took %.2f seconds" % (cputime()-t0)
-print "Now with root sieve"
-t0=cputime()
+#t0=cputime()
+#print "First computing reference scores with the naive method"
+#refp = get_reference(sbound, p)
+#print "Took %.2f seconds" % (cputime()-t0)
+#print "Now with root sieve"
+#t0=cputime()
 rdict=rotation_init(f,g,0,sbound,0,sbound)
-testp(rdict,p,refp)
-print "Took %.2f seconds" % (cputime()-t0)
+rotation_handle_p(rdict,p)
+#testp(rdict,p,refp)
+#print "Took %.2f seconds" % (cputime()-t0)
 
 
-K=GF(p)
-KP=K['t']
-KP3=K['t','u','v']
-KF3=KP3.fraction_field()
-ZF3=ZP3.fraction_field()
+
+#K=GF(p)
+#KP=K['t']
+#KP3=K['t','u','v']
+#KF3=KP3.fraction_field()
+#ZF3=ZP3.fraction_field()
 
 # More extensive testing ; copy-paste these lines:
 # print "First computing reference scores with the naive method"

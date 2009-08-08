@@ -4,6 +4,8 @@ attach "rotation_bound.sage"
 # for reading kleinjung.res
 import re
 
+
+
 def lemme_21(n,d,ad,p,m):
     """Implements Kleinjung's lemma 2.1. ad must satisfy ad*m^d==n mod p.
     ad may also be equal to zero, in which case it is recovered
@@ -163,7 +165,7 @@ def rotation_init(f,g,u0,u1,v0,v1):
     assert(u0==0)
     assert(v0==0)
     space=u1*v1
-    print "Rotation space: %r" % space 
+    #print "Rotation space: %r" % space 
     rdict=dict(umax=u1,vmax=v1,f=f,g=g)
     rdict['sarr']=[float(0.0) for i in range(space)]
     # Estimate the common value for the different cells.
@@ -176,6 +178,7 @@ def rotation_init(f,g,u0,u1,v0,v1):
     ## rotation_global_contrib_commonroots(rdict)
     ## gcc=rdict['global_contrib_commonroots']
     rdict['fgquo_prime']=((-f/g).derivative())
+    #print rdict['fgquo_prime']    
     # This gives the exceptional values for u (once divided by g(l)^2)
     df=f.derivative()
     dg=g.derivative()
@@ -485,6 +488,16 @@ def mround(m):
 def mprint(m):
     print m.str()
 
+def printmin(arr,X,Y):
+    min = 1
+    u = v = 0
+    for x in range(X):
+        for y in range(Y):
+            if arr[x*Y+y]<min:
+                min = arr[x*Y+y]
+                u = x
+                v = y
+    print "Minimum is %f, pair is %d,%d\n " %(min,u,v)
 
 def compose_reduce(f,phi,pmax):
     return f.parent()([c % pmax for c in f(phi).coeffs()])
@@ -501,7 +514,7 @@ def rotation_handle_p(rdict,p):
     # The denominator exponent here is only controlled by the number of
     # fixed coeffs of l. At the beginning, l has zero fixed coeffs, for
     # which scale0 holds.
-    scale0=float(log(p))*p/(p+1)
+    scale0=float(log(p))*p/(p+1)    
     l0,ld,md,m,k=0,0,0,0,0
     scale = scale0
     ZP3.<l,u,v>=ZZ['l','u','v']
@@ -510,11 +523,11 @@ def rotation_handle_p(rdict,p):
     rdict['logbook']=[]
     rdict['cutoff']=1.0e-5
     maxpow=20
-    rdict['maxpow']=maxpow
+    rdict['maxpow']=maxpow    
     rdict['ppow']=[1,p]
     K=GF(p); KP=K['x'];
     rdict['gmodp']=KP(g)
-    fdg_gdf=rdict['fdg_gdf']
+    fdg_gdf=rdict['fdg_gdf']    
     extend_ppow_list(rdict,maxpow)
     ppow=rdict['ppow']
     fdg_gdf = compose_reduce(fdg_gdf,x,ppow[maxpow])
@@ -525,7 +538,10 @@ def rotation_handle_p(rdict,p):
     dphi=x
     rdict['l0']=0
     hits=rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,0,scale,dphi,[])
+    printmin(rdict['sarr'],rdict['umax'],rdict['vmax'])    
     return hits
+
+
 
 def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi,hist):
     """Internal routine for the fast root sieve. We are looking at roots
@@ -534,6 +550,14 @@ def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi,hist)
     account the necessary adjustments (see the more extensive code for
     some asserts). dphi and twist_v1 are variables valid only below
     recursion depth 1. m is the recursion depth."""
+
+    #print ("m=%d,ld=%d"%(m,ld))
+    #print ("\n--------------------------------------------------------")
+    #print ("\n p=%d, m=%d, ld=%d, scale=%2.8f, u0=%d, v0=%d, l0=%d, twist_v1=%d" %(p,m,ld,scale,u0,v0,l0,twist_v1))
+    #print ("\nff=%s"%ff)
+    #print ("\ngg%s"%gg)
+    #print ("\nfdg_gdf=%s"%fdg_gdf)
+    #print ("\ndphi=%s"%dphi)
     
     if len(hist) > 6:
         nhist=copy(hist)
@@ -552,6 +576,8 @@ def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi,hist)
     pm1=ppow[m+1]
     pmax=ppow[maxpow]
 
+    #print ("\nmaxpow=%d,pmax=%s"%(maxpow,pmax))
+
     K=GF(p); KP=K['x'];
     Z=Integers(); ZP=Z['x'];
     x=ZP.gen()
@@ -564,7 +590,7 @@ def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi,hist)
     
     # This is always useful.
     minus_f_over_g_modp = KP(ff)
-
+    
     scale1 = scale/(p-1)
     scale2 = scale/p
     scale3 = scale1-scale2
@@ -575,11 +601,17 @@ def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi,hist)
         l0=rdict['l0']
         igl=rdict['igl']
         minus_f_over_g_modp*=-igl
+        #print ("\nigl=%d"%igl)
+    
+    #print ("\nminus_f_over_g_modp=%s"%minus_f_over_g_modp)
 
     # Deciding whether we're in the general case or not has some
     # subtleties, unfortunately.
     look_many_roots = not minus_f_over_g_modp.is_constant() or   \
                     m == 0 and not rdict['gmodp'].is_constant()
+
+            
+    #print ("\nlook_many_roots=%d"%(look_many_roots))
 
     nhist = copy(hist)
     if not look_many_roots: nhist.append([dphi,u0,v0,l0+p*dphi(0),ld,m])
@@ -602,11 +634,19 @@ def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi,hist)
                 rdict['igl']=igl
                 twist_v1 = - l0
                 minus_f_over_g_modp_l *= -igl
+
+            #print("\nminus_f_over_g_modp_l=%d"%minus_f_over_g_modp_l)
+
             dv0=Z(minus_f_over_g_modp_l)
             u1 = u0
             v1 = v0 + pm * dv0
 
             hits = light(sarr, u1,v1, pm, pm1, twist_v1, um,vm,-scale1)
+
+            #print ("1:m=%d ld=%d hits>0=%d u0=%d v0=%d us=%d vs=%d skew=%d contrib=%f"%(m,ld,(1 if (hits>0) else 0),u1,v1,pm,pm1,twist_v1,-scale1))
+            #print("1:%d "%(1 if (hits>0) else 0))
+
+
             if hits == 0: continue
             # print "main, level %d : %d hits" % (m, hits)
             thits += hits
@@ -630,13 +670,24 @@ def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi,hist)
             # on here. In fact, my guess is that it could very probably
             # be done every time m-ld increases...
             rhs = Z(K((fdg_gdf(l)-u0*gg(l)^2)/ppow[m-ld]))
-            if ld > 0 and rhs != 0:
-                continue
+            #print ("\nrhs=%d"%rhs)
+            if ld > 0 and rhs != 0:                
+                continue           
 
             psi=l+p*x
             nfdg_gdf = compose_reduce(fdg_gdf,psi,pmax)
+            
+            #print("\nnfdg_gdf=%s"%nfdg_gdf)
+            
             nff = compose_reduce(ff,psi,pmax)
+            
+            #print("\nnff=%s"%nff)
+            
             ngg = compose_reduce(gg,psi,pmax)
+            
+            #print("\nngg=%s"%ngg)
+            
+
             if m == 0:
                 # XXX This is fairly bizarre. Results are correct with
                 # this, but I don't see at the moment why we don't have
@@ -644,8 +695,20 @@ def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi,hist)
                 ndphi = x
             else:
                 ndphi = dphi(psi)
+
+            
+            ##print("ndphi is \n %s"%ndphi)
+            
+
             nff=ZP((nff+dv0*ngg)/p)
+            
+            ##print("nff in the lattice is %s"%nff)
+            
+
             twist_f=ndphi*ngg
+            
+            ##print("twisted_f is %s"%twist_f)
+            
 
             if ld > 0:
                 if rhs == 0:
@@ -659,12 +722,19 @@ def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi,hist)
                 u1 += du0 * pm
                 v1 += du0 * twist_v1
                 nff+= du0 * twist_f
+                
+                ##print("du0=%d, u1=%d, v1=%d"%(du0,u1,v1))
+                ##print("nff after twist ld=0 is \n%s"%nff)
+                
                 nspots=1
 
             new_twist_v1 = p * twist_v1
+
             for du in range(nspots):
                 hits = light(sarr, u1,v1, pm1, pm1, 0, um,vm, scale3)
-                # print "main/excep, level %d : %d hits" % (m, hits)
+                #print ("2:m=%d ld=%d hits>0=%d u0=%d v0=%d us=%d vs=%d skew=%d contrib=%f"%(m,ld,(1 if (hits>0) else 0),u1,v1,pm1,pm1,0,scale3))
+                #print("2:%d "%(1 if (hits>0) else 0))
+                # #print "main/excep, level %d : %d hits" % (m, hits)
                 thits += hits
                 # scale3 is scale/(p-1)-scale/p ; hence it brings
                 # back the cells to the contribution -scale/p, which is the
@@ -675,6 +745,9 @@ def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi,hist)
                 if hits >0:
                     thits += rotation_inner(rdict,p,nff,ngg,nfdg_gdf,u1,v1,l0,ld+1,m+1,new_twist_v1,scale2,ndphi,nhist)
                 nff+=twist_f
+                
+                ##print("nff after twist du=%d is \n%s"%(du,nff))
+                
                 u1 += pm
                 v1 += twist_v1
     else:
@@ -683,24 +756,33 @@ def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi,hist)
         # Basically, we have a linear term in u and v which must be
         # cancelled.
         assert m>0
+        #print("\n-f/g mod p is constant")
         dv0=Z(minus_f_over_g_modp.constant_coefficient())
         u1 = u0
         v1 = v0 + pm * dv0
         hits=light(sarr, u1, v1, pm, pm1, twist_v1, um, vm, -scale)
+        #print ("3:m=%d ld=%d hits>0=%d u0=%d v0=%d us=%d vs=%d skew=%d contrib=%f"%(m,ld,(1 if (hits>0) else 0),u1,v1,pm,pm1,twist_v1,-scale))
+        #print ("3:%d "%(1 if (hits>0) else 0))
         if hits == 0:
             return thits
-        # print "secondary, level %d : %d hits" % (m, hits)
+        # #print "secondary, level %d : %d hits" % (m, hits)
         thits += hits
         nff=ZP((ff+dv0*gg)/p)
+        
+        ##print("nff after primitivization is \n%s"%nff)
+        
         twist_f=dphi*gg
         new_twist_v1 = p * twist_v1
         for du in range(p):
             hits = rotation_inner(rdict,p,nff,gg,fdg_gdf,u1,v1,l0,ld,m+1,new_twist_v1,scale,dphi,nhist)
-            # print "secondary/excep, level %d : %d hits" % (m, hits)
+            # #print "secondary/excep, level %d : %d hits" % (m, hits)
             thits += hits
             u1 += pm
             v1 += twist_v1
             nff += twist_f
+            
+            ##print("nff after twist du=%d is \n%s"%(du,nff))
+        
     return thits
 
 def light(sarr,u0,v0,us,vs,skew,um,vm,value):
@@ -718,7 +800,7 @@ def light(sarr,u0,v0,us,vs,skew,um,vm,value):
         # reduce within the row, since we know that b[0] is zero
         # v = v % vs
         while v < vm:
-            sarr[pos + v] += value
+            sarr[pos + v] += value         
             hits+=1
             v += vs
         u += us
@@ -729,4 +811,5 @@ def light(sarr,u0,v0,us,vs,skew,um,vm,value):
         if v >= vs:
             v -= vs
     return hits
+
 
