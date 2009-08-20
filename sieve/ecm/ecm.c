@@ -1321,6 +1321,7 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
 	  mod_mul (a, a, t, m);
 	}
       
+#if ECM_BACKTRACKING
       /* See if we got a == 0. If yes, restore previous a value and
 	 end stage 2. Let's hope not all factors were found since
 	 the last d increase. */
@@ -1331,6 +1332,7 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
 	  break;
 	}
       mod_set (a_bk, a, m); /* Save new a value */
+#endif
       
       if (j == NEXT_D)
 	{
@@ -1395,7 +1397,6 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   mod_init (b, m);
   mod_init (r, m);
   ellM_init (P, m);
-  ellM_init (Pt, m);
 
   mod_intset_ul (f, 1UL);
 
@@ -1412,7 +1413,6 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 	mod_clear (A, m);
 	mod_clear (b, m);
 	ellM_clear (P, m);
-	ellM_clear (Pt, m);
 	mod_clear (s, m);
 	return 0;
       }
@@ -1436,7 +1436,6 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 	mod_clear (A, m);
 	mod_clear (b, m);
 	ellM_clear (P, m);
-	ellM_clear (Pt, m);
 	return 0;
       }
     mod_set1 (P->z, m);
@@ -1455,7 +1454,6 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
 	mod_clear (u, m);
 	mod_clear (b, m);
 	ellM_clear (P, m);
-	ellM_clear (Pt, m);
 	return 0;
       }
     mod_set1 (P->z, m);
@@ -1476,8 +1474,26 @@ ecm (modint_t f, const modulus_t m, const ecm_plan_t *plan)
   /* Do stage 1 */
   ellM_interpret_bytecode (P, plan->bc, m, b);
 
-  /* Add prime 2 in the desired power. If a zero residue for the Z-coordinate 
-     is encountered, we backtrack to previous point and stop */
+  /* Add prime 2 in the desired power. If a zero residue for the 
+     Z-coordinate is encountered, we backtrack to previous point and stop.
+     NOTE: This is not as effective as I hoped. It prevents trivial 
+     factorizations only if after processing the odd part of the stage 1 
+     multiplier, the resulting point has power-of-2 order on E_p for all p|N.
+     If that were to happen, the point probably had that (presumably small 
+     on most E_p) power-of-2 order during the last couple of primes processed 
+     in the precomputed Lucas chain, and then quite likely the Lucas chain 
+     incorrectly used an addition of identical points, causing the 
+     Z-coordinate to become zero, leading to 0 (mod N) before we even 
+     get here. 
+     For example, using 10^6 composites from an RSA155 sieving experiment,
+     without backtracking we get N as the factor 456 times, with backtracking
+     still 360 times. 
+     TODO: this could probably be fixed by treating 3 separately, too, 
+     instead of putting it in the precomputed Lucas chain. Then the 
+     probability that a point of very small order on all E_p is encountered
+     during the Lucas chain is reduced, and so the probability of using
+     curve addition erroneously. */
+  ellM_init (Pt, m);
   ellM_set (Pt, P, m);
   for (i = 0; i < plan->exp2; i++)
     {
