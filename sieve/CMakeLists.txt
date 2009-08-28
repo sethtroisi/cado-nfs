@@ -37,6 +37,10 @@ target_link_libraries (makefb utils m)
 add_executable (las las.c fb.c trialdiv.c sieve_config.h)
 target_link_libraries (las facul utils m)
 
+# Compiling stuff for las-mt: uncomment those two lines for testing
+# add_executable (las-mt las-mt.c fb.c trialdiv.c sieve_config.h)
+# target_link_libraries (las-mt facul utils m pthread)
+
 add_executable(trialdiv EXCLUDE_FROM_ALL trialdiv.c)
 target_link_libraries (trialdiv utils)
 set_property(TARGET trialdiv APPEND PROPERTY COMPILE_FLAGS -DTESTDRIVE)
