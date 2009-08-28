@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include "cado.h"
-//#include "poly.h"
 #include "utils.h"
 
 /* store in invm the value of floor(B^(2k)/m), where m has k limbs,
@@ -124,17 +123,23 @@ void poly_setcoeff(poly_t f, int i, const mpz_t z) {
 }
 
 void poly_setcoeff_str(poly_t f, int i,char *str, int base) {
-  int j;
-  if (i >= f->alloc) {
-    f->coeff = (mpz_t *)realloc(f->coeff, (i+1)*sizeof(mpz_t));
-    ASSERT (f->coeff != NULL);
-    for (j = f->alloc; j <= i; ++j)
-      mpz_init(f->coeff[j]);
-    f->alloc = i+1;
-  }
-  mpz_set_str(f->coeff[i],str,base);
-  if (i >= f->deg) 
-    cleandeg(f, i);
+  mpz_t z;
+  mpz_init_set_str(z,str,base);
+  poly_setcoeff(f,i,z);
+  mpz_clear(z);
+}
+
+/*
+  Sets f to the polynomial of degree d, of coefficients 
+  given by coeffs.
+*/
+void poly_set(poly_t f, mpz_t * coeffs, int d) {
+
+  int i;
+  for (i=d; i>=0; --i) 
+    poly_setcoeff(f,i,coeffs[i]);
+  
+  cleandeg(f,d);  
 }
 
 void poly_getcoeff(mpz_t res, int i, const poly_t f) {
@@ -258,10 +263,12 @@ void poly_mul_ui(poly_t f, const poly_t g, unsigned long a) {
   int i;
   mpz_t aux;
   mpz_init(aux);
+  cleandeg(f,g->deg);
   for (i = g->deg; i >= 0; --i) {
     mpz_mul_ui(aux, g->coeff[i], a);
     poly_setcoeff(f, i, aux);
   }
+  
   mpz_clear(aux);
 }
 #endif
@@ -289,6 +296,24 @@ void poly_div_ui_mod_ui(poly_t f, const poly_t g, const unsigned long a, const u
   for (i = g->deg ; i>=0; --i) {      
     mpz_divexact_ui(aux,g->coeff[i],a);
     mpz_mod_ui(aux,aux,m);
+    poly_setcoeff(f,i,aux);
+  }
+
+  mpz_clear(aux);
+    
+}
+
+/* f <- g/a */
+
+void poly_div_ui(poly_t f, const poly_t g, unsigned long a) {
+
+  int i;
+  mpz_t aux;
+  
+  mpz_init(aux);
+  
+  for (i = g->deg ; i>=0; --i) {      
+    mpz_divexact_ui(aux,g->coeff[i],a);
     poly_setcoeff(f,i,aux);
   }
 

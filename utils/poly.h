@@ -46,6 +46,7 @@ void poly_print(const poly_t f);
 void cleandeg(poly_t f, int deg);
 void poly_setcoeff(poly_t f, int i, const mpz_t z);
 void poly_setcoeff_str(poly_t f, int i,char *str, int base);
+void poly_set(poly_t f, mpz_t * coeffs, int d);
 void poly_getcoeff(mpz_t res, int i, const poly_t f); // Added for rootsieve
 void poly_copy(poly_t g, const poly_t f);
 
@@ -58,7 +59,8 @@ void poly_sub_mod_mpz(poly_t f, const poly_t g, const poly_t h, const mpz_t m);
 void poly_mul_ui(poly_t f, const poly_t g, unsigned long a); // uncommented for rootsieve
 void poly_sub_ui(poly_t f, unsigned long a);
 // void poly_div_ui_mod_mpz(poly_t f, const poly_t g, unsigned long a, const mpz_t m);
-void poly_div_ui_mod_ui(poly_t f, const poly_t g, unsigned long a, const unsigned long m); // done - not tested - Added for rootsieve
+void poly_div_ui_mod_ui(poly_t f, const poly_t g, unsigned long a, const unsigned long m); // done - Added for rootsieve
+void poly_div_ui(poly_t f, const poly_t g, unsigned long a);
 void poly_div_2_mod_mpz(poly_t f, const poly_t g, const mpz_t m);
 void poly_eval(mpz_t res, const poly_t f, const mpz_t x);
 void poly_eval_mod_mpz(mpz_t res, const poly_t f, const mpz_t x, const mpz_t m);
@@ -76,7 +78,7 @@ void poly_sqr_mod_f_mod_mpz(poly_t Q, const poly_t P, const poly_t f,
 void poly_power_mod_f_mod_ui(poly_t Q, const poly_t P, const poly_t f,
         const mpz_t a, unsigned long p);
 
-void poly_derivative(poly_t df, const poly_t f); // done - not tested - Added for rootsieve
+void poly_derivative(poly_t df, const poly_t f);
 
 void barrett_init (mpz_t invm, const mpz_t m);
 poly_t* poly_base_modp_init (const poly_t P0, int p, int *K, int l);

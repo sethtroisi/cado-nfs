@@ -194,7 +194,6 @@ sieve/bucket.h
 sieve/sieve_config_h.in
 sieve/ecm/CMakeLists.txt
 sieve/ecm/Makefile
-sieve/ecm/addchain.c
 sieve/ecm/ecm.c
 sieve/ecm/ecm.h
 sieve/ecm/ecm_15ul.c

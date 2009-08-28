@@ -341,7 +341,7 @@ long fill_alpha(rootsieve_dictionary rdict,unsigned long p) { // Ready
   ASSERT_ALWAYS(rdict->maxpow >= rdict->m_max);
 
   if(DEBUG) {    
-    printf("Maximum power of %lu is %lu ...\n",p,rdict->maxpow);
+    printf("Maximum power of %lu is %d ...\n",p,rdict->maxpow);
   }
 
   rdict->ppow = malloc((rdict->maxpow+1)*sizeof(mpz_t));
@@ -428,7 +428,7 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,poly_t ff,poly_t
 
   if(DUMP) {
     printf("\n\n\nInner call:\n");
-    printf("p=%ld,u0=%ld,v0=%ld,l0=%ld,ld=%d,m=%d,twist_v1=%d,scale=%f\n",p,u0,v0,l0,ld,m,twist_v1,scale);    
+    printf("p=%ld,u0=%ld,v0=%ld,l0=%ld,ld=%d,m=%d,twist_v1=%ld,scale=%f\n",p,u0,v0,l0,ld,m,twist_v1,scale);    
     printf("ff=\n");
     poly_print(ff);
     printf("gg=\n");
@@ -446,7 +446,7 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,poly_t ff,poly_t
 
   if(TRACE) {
     //printf("\n%lu %d %d %2.8f %ld %ld %ld %ld ",p,m,ld,scale,u0,v0,l0,twist_v1);
-    printf("\n--------------------------------------------------------\n\nm=%ld, ld=%ld\n ",m,ld);
+    printf("\n--------------------------------------------------------\n\nm=%d, ld=%d\n ",m,ld);
   }
   
   // Some necessary assertions
@@ -486,7 +486,7 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,poly_t ff,poly_t
   pmax  = mpz_get_si(rdict->ppow[rdict->maxpow]);  
  
   if(DEBUG) {
-    printf("Charged powers of %u : %ld, %ld, %ld\n",p,pm,pm1,pmax);
+    printf("Charged powers of %lu : %ld, %ld, %ld\n",p,pm,pm1,pmax);
   }
   
   double scale1,scale2,scale3;
@@ -656,7 +656,7 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,poly_t ff,poly_t
 	  printf(" 1/g(%ld) mod %lu = %ld, twist_v1 = %ld ...\n",l,p,igl,twist_v1);	  
 	}
 	
-	ASSERT_ALWAYS(0<igl && igl<p);
+	ASSERT_ALWAYS(0<igl && igl< p);
 
 	// The next line divides f(l) by g(l) mod p
 	minus_f_over_gmodp_l = (long)modular_product((unsigned long)((minus_f_over_gmodp_l==0)?(minus_f_over_gmodp_l):(p-minus_f_over_gmodp_l)),(unsigned long)igl,p);
@@ -881,7 +881,7 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,poly_t ff,poly_t
 	hits = light_rectangle(rdict->sarr, u1,v1, pm1, pm1, 0, rdict->U0, rdict->U1, rdict->V0, rdict->V1, scale3);
 	
 	if(COMP) {
-	  printf("2:m=%d ld=%d hits>0=%d u0=%ld v0=%ld us=%ld vs=%ld skew=%ld contrib=%f\n",m,ld,(hits>0)?1:0,u1,v1,pm1,pm1,0,scale3);
+	  printf("2:m=%d ld=%d hits>0=%d u0=%ld v0=%ld us=%ld vs=%ld skew=%ld contrib=%f\n",m,ld,(hits>0)?1:0,u1,v1,pm1,pm1,0L,scale3);
 	  //printf("2:%d \n",(hits>0)?1:0);
 	}
 
