@@ -71,3 +71,5 @@ linalg/submatrix.c
 linalg/bwc/CMakeLists-nodist.txt
 linalg/bwc/bench_polmatmul.cpp
 polyselect/CMakeLists-nodist.txt
+linalg/bwc/mf_a2b_fq.c
+linalg/bwc/mf_b_fq.c
