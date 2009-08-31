@@ -11,6 +11,9 @@
 #include "facul.h"
 #include "facul_doit.h"
 
+/* These global variables are only for statistics. In case of
+ * multithreaded sieving, the stats might be wrong...
+ */
 
 unsigned long stats_called[STATS_LEN] = {
   0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,

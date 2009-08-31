@@ -115,7 +115,6 @@ typedef struct {
     double logmax_rat;     /* norms on the rat. side are < 2^logmax_rat */
     mpz_t *fij;       /* coefficients of F(a0*i+a1*j, b0*i+b1*j) */
     double *fijd;     /* coefficients of F_q/q */
-    double *tmpd;     /* temporary array */
     double B;         /* bound for the norm computation */
     unsigned char alg_Bound[256]; /* non-zero for good lognorms */
     unsigned char rat_Bound[256]; /* non-zero for good lognorms */
@@ -190,7 +189,6 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int logI, uint64_t q0,
   si->degree = d;
   si->fij = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
   si->fijd = (double*) malloc ((d + 1) * sizeof (double));
-  si->tmpd = (double*) malloc ((d + 1) * sizeof (double));
   for (k = 0; k <= d; k++)
     mpz_init (si->fij[k]);
   si->logI = logI;
@@ -304,7 +302,7 @@ factor_small (mpz_t n, fbprime_t lim)
 static void
 sieve_info_update (sieve_info_t *si, const int verbose, FILE *output)
 {
-//  if (verbose)
+  if (verbose)
     fprintf (output, "# I=%u; J=%u\n", si->I, si->J);
 
   /* update number of buckets */
@@ -321,7 +319,6 @@ sieve_info_clear (sieve_info_t *si)
     mpz_clear (si->fij[k]);
   free (si->fij);
   free (si->fijd);
-  free (si->tmpd);
   free (si->lpf);
 }
 
@@ -2818,13 +2815,20 @@ typedef struct {
     sieve_info_t *si;
     int id;
     FILE *output;
+    int verbose;
 } process_bucket_region_arg_t;
 
 typedef struct {
     int reports;
-    int survivors0;
-    int survivors1;
-    int survivors2;
+    unsigned long survivors0;
+    unsigned long survivors1;
+    unsigned long survivors2;
+    double tn_rat;
+    double tn_alg;
+    double ttsm;
+    double ttf;
+    unsigned long report_sizes_a[256];
+    unsigned long report_sizes_r[256];
 } process_bucket_region_report_t;
 
 /* id gives the number of the thread: it is supposed to deal with the set
@@ -2844,14 +2848,17 @@ process_regions_one_thread(void * arg)
     sieve_info_t *si            = my_arg->si;
     int id                      = my_arg->id;
     FILE *output                = my_arg->output;
+    int verbose                 = my_arg->verbose;
 
     unsigned long survivors0, survivors1, survivors2;
     int reports;
     reports = 0;
     survivors0 = survivors1 = survivors2 = 0;
     unsigned long report_sizes_a[256], report_sizes_r[256];
-    const int verbose = 0;
-
+    double tn_rat = 0.0;
+    double tn_alg = 0.0;
+    double ttsm = 0.0;
+    double ttf = 0.0;
 
     /* make copies of small sieve data: the "next_position" field is
      * specific to each thread.
@@ -2918,34 +2925,52 @@ process_regions_one_thread(void * arg)
     else
         rat_S = NULL;
 
+    {
+        int i;
+        for (i = 0; i < 256; i++) {
+            report_sizes_a[i] = 0;
+            report_sizes_r[i] = 0;
+        }
+    }
+
     /* loop over appropriate set of sieve regions */
     int i, j;
     i = (si->nb_buckets / si->nb_threads) * id;
     for (; i < (si->nb_buckets / si->nb_threads) * (id+1); ++i) {
         /* Init rational norms */
+        tn_rat -= seconds ();
         init_rat_norms_bucket_region(S, i, cpoly, si);
+        tn_rat += seconds ();
         /* Apply rational buckets */
+        ttsm -= seconds();
         for (j = 0; j < si->nb_threads; ++j) 
             apply_one_bucket(S, rat_BA[j], i, si);
+        ttsm += seconds();
         /* Sieve small rational primes */
         sieve_small_bucket_region(S, i, lssd_rat, si, 'r');
         /* Make copy of sieve report values for histogram */
         if (rat_S != NULL)
             memcpy (rat_S, S, si->bucket_region*sizeof(unsigned char));
         /* Init algebraic norms */
+        tn_alg -= seconds ();
         survivors0 += init_alg_norms_bucket_region(S, i, cpoly, si);
+        tn_alg += seconds ();
         /* Apply algebraic buckets */
+        ttsm -= seconds();
         for (j = 0; j < si->nb_threads; ++j)
             apply_one_bucket(S, alg_BA[j], i, si);
+        ttsm += seconds();
         /* Sieve small algebraic primes */
         sieve_small_bucket_region(S, i, lssd_alg, si, 'a');
 
         /* Factor survivors */
+        ttf -= seconds ();
         reports += factor_survivors (S, i, rat_BA, alg_BA, fb_rat,
                 fb_alg, cpoly, si, &survivors1,
                 &survivors2, &lsrsd_alg, &lsrsd_rat,
                 report_sizes_a, report_sizes_r,
                 rat_S, output);
+        ttf += seconds ();
     }
     /* clear */
     {
@@ -2964,20 +2989,37 @@ process_regions_one_thread(void * arg)
     rep->survivors0 = survivors0;
     rep->survivors1 = survivors1;
     rep->survivors2 = survivors2;
+    rep->tn_rat = tn_rat;
+    rep->tn_alg = tn_alg;
+    rep->ttsm = ttsm;
+    rep->ttf = ttf;
+    for (i = 0; i < 256; i++) {
+        rep->report_sizes_a[i] = report_sizes_a[i];
+        rep->report_sizes_r[i] = report_sizes_r[i];
+    }
     return (void *)rep;
 }
 
-int
+process_bucket_region_report_t
 process_bucket_region_mt(bucket_array_t *alg_BA, bucket_array_t *rat_BA,
         small_sieve_data_t *ssd_rat, small_sieve_data_t *ssd_alg, 
         factorbase_degn_t *fb_rat, factorbase_degn_t *fb_alg,
-        cado_poly_ptr cpoly, sieve_info_t *si, FILE *output) {
+        cado_poly_ptr cpoly, sieve_info_t *si, FILE *output, int verbose) {
     int i;
-    unsigned long survivors0, survivors1, survivors2;
-    int reports;
-    const int verbose = 0;
-    reports = 0;
-    survivors0 = survivors1 = survivors2 = 0;
+    process_bucket_region_report_t report;
+    report.reports = 0;
+    report.survivors0 = 0;
+    report.survivors1 = 0;
+    report.survivors2 = 0;
+    report.tn_rat = 0.0;
+    report.tn_alg = 0.0;
+    report.ttsm = 0.0;
+    report.ttf = 0.0;
+    for (i = 0; i < 256; i++) {
+        report.report_sizes_a[i] = 0;
+        report.report_sizes_r[i] = 0;
+    }
+
     pthread_t *th;
     th = malloc(si->nb_threads*sizeof(pthread_t));
     ASSERT_ALWAYS(th);
@@ -2996,6 +3038,7 @@ process_bucket_region_mt(bucket_array_t *alg_BA, bucket_array_t *rat_BA,
         my_arg[i].si = si;
         my_arg[i].id = i;
         my_arg[i].output = output;
+        my_arg[i].verbose = verbose;
         ret = pthread_create(&(th[i]), NULL, process_regions_one_thread,
                 (void *)(&(my_arg[i])));
         ASSERT_ALWAYS(!ret);
@@ -3005,24 +3048,33 @@ process_bucket_region_mt(bucket_array_t *alg_BA, bucket_array_t *rat_BA,
         process_bucket_region_report_t *rep;
         ret = pthread_join(th[i], (void **)(&rep));
         ASSERT_ALWAYS(!ret);
-        reports += rep->reports;
-        survivors0 += rep->survivors0;
-        survivors1 += rep->survivors1;
-        survivors2 += rep->survivors2;
+        report.reports += rep->reports;
+        report.survivors0 += rep->survivors0;
+        report.survivors1 += rep->survivors1;
+        report.survivors2 += rep->survivors2;
+        report.tn_rat += rep->tn_rat;
+        report.tn_alg += rep->tn_alg;
+        report.ttsm += rep->ttsm;
+        report.ttf += rep->ttf;
+        int j;
+        for (j = 0; j < 256; j++) {
+            report.report_sizes_a[j] += rep->report_sizes_a[j];
+            report.report_sizes_r[j] += rep->report_sizes_r[j];
+        }
         free(rep);
     }
 
     if (verbose)
     {
-        fprintf (output, "# %lu survivors after rational sieve,", survivors0);
-        fprintf (output, " %lu survivors after algebraic sieve, ", survivors1);
-        fprintf (output, "coprime: %lu\n", survivors2);
+        fprintf (output, "# %lu survivors after rational sieve,", report.survivors0);
+        fprintf (output, " %lu survivors after algebraic sieve, ", report.survivors1);
+        fprintf (output, "coprime: %lu\n", report.survivors2);
     }
     fprintf (output, "# %d relation(s) for (%" PRIu64 ",%" PRIu64
-            ")\n", reports, si->q, si->rho);
+            ")\n", report.reports, si->q, si->rho);
     free(my_arg);
     free(th);
-    return reports;
+    return report;
 }
 
 
@@ -3071,7 +3123,7 @@ main (int argc0, char *argv0[])
     double t0, tfb, tq, tn_rat, tn_alg, tts, ttsm, ttf;
     uint64_t q0 = 0, q1 = 0, rho = 0;
     uint64_t *roots;
-    unsigned long nroots, tot_reports = 0, survivors0, survivors1, survivors2;
+    unsigned long nroots, tot_reports = 0;
     factorbase_degn_t * fb_alg, * fb_rat;
     int no_checknorms = 0; /* factor or not the remaining norms */
     int td_thresh = 1024; /* cost threshold trialdiv/resieving */
@@ -3303,6 +3355,7 @@ main (int argc0, char *argv0[])
     q0 --; /* so that nextprime gives q0 if q0 is prime */
     nroots = 0;
     tot_reports = 0;
+
     tn_rat = tn_alg = tts = ttsm = ttf = 0.0;
     t0 = seconds ();
     fprintf (output, "#\n");
@@ -3312,7 +3365,7 @@ main (int argc0, char *argv0[])
           {
             q0 = uint64_nextprime (q0);
             if (q0 >= q1)
-              goto end;
+              goto end;  // breaks two whiles.
             si.q = q0;
             nroots = poly_roots_uint64 (roots, cpoly->f, cpoly->degree, q0);
             if (nroots > 0)
@@ -3381,8 +3434,20 @@ main (int argc0, char *argv0[])
         init_small_sieve(&ssd_alg, fb_alg, &si, 'a', output);
 
         /* Process bucket regions in parallel */
-        tot_reports += process_bucket_region_mt(alg_BA, rat_BA,
-                &ssd_rat, &ssd_alg, fb_rat, fb_alg, cpoly, &si, output);
+        {
+            process_bucket_region_report_t rep;
+            rep = process_bucket_region_mt(alg_BA, rat_BA,
+                &ssd_rat, &ssd_alg, fb_rat, fb_alg, cpoly, &si, output, verbose);
+            tot_reports += rep.reports;
+            tn_rat      += rep.tn_rat;
+            tn_alg      += rep.tn_alg;
+            ttsm        += rep.ttsm;
+            ttf         += rep.ttf;
+            for (i = 0; i < 256; ++i) {
+                report_sizes_a[i] += rep.report_sizes_a[i];
+                report_sizes_r[i] += rep.report_sizes_r[i];
+            }
+        }
 
         clear_small_sieve(ssd_rat);
         clear_small_sieve(ssd_alg);
@@ -3412,7 +3477,10 @@ main (int argc0, char *argv0[])
             fprintf (output, "%d:%lu ", i, report_sizes_r[i]);
         fprintf (output, "\n");
       }
-    fprintf (output, "# Total time %1.1fs [norm %1.2f+%1.1f, sieving %1.1f"
+    if (si.nb_threads > 1) 
+        fprintf (output, "# Total cpu time %1.1fs [precise timings available only for mono-thread]\n", t0);
+    else
+        fprintf (output, "# Total time %1.1fs [norm %1.2f+%1.1f, sieving %1.1f"
             " (%1.1f + %1.1f),"
              " factor %1.1f]\n", t0, tn_rat, tn_alg, tts, ttsm, tts-ttsm, ttf);
     fprintf (output, "# Total %lu reports [%1.3fs/r, %1.1fr/sq]\n",
