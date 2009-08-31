@@ -1,5 +1,3 @@
-#define _GNU_SOURCE        /* or _BSD_SOURCE or _SVID_SOURCE */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -14,17 +12,6 @@
 #include "bucket.h"
 #include "trialdiv.h"
 #include <pthread.h>
-
-/* Miam! Only for linux! */
-#include <sys/types.h>
-#include <sys/syscall.h>
-#include <unistd.h>
-
-static inline pid_t gettid() { return syscall(SYS_gettid); }
-
-
-int nb_threads = 1;
-
 
 #ifdef SSE_NORM_INIT
 #include <emmintrin.h>
@@ -105,6 +92,8 @@ int nb_threads = 1;
 
 // General information about the siever
 typedef struct {
+    // multithreading info
+    int nb_threads;
     // sieving area
     uint32_t I;
     uint32_t J;
@@ -190,13 +179,14 @@ sieve_info_init_lognorm (unsigned char *C, unsigned char threshold,
 
 static void
 sieve_info_init (sieve_info_t *si, cado_poly cpoly, int logI, uint64_t q0,
-		 const int bucket_thresh, FILE *output)
+		 const int bucket_thresh, FILE *output, int nb_threads)
 {
   unsigned int d = cpoly->degree;
   unsigned int k;
   double r, scale;
   unsigned char alg_bound, rat_bound;
 
+  si->nb_threads = nb_threads;
   si->degree = d;
   si->fij = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
   si->fijd = (double*) malloc ((d + 1) * sizeof (double));
@@ -851,8 +841,8 @@ fill_in_buckets(bucket_array_t *BA_param, factorbase_degn_t *fb,
                   }
 #ifdef TRACE_K
                 if (x == TRACE_K)
-                  fprintf (stderr, "Pushed (%u, %u) (%u) to BA[%u] by %d\n",
-                           x & maskbucket, logp, p, x >> shiftbucket, gettid());
+                  fprintf (stderr, "Pushed (%u, %u) (%u) to BA[%u]\n",
+                           x & maskbucket, logp, p, x >> shiftbucket);
 #endif
                 if (i >= pli.b1)
                     x += pli.a;
@@ -889,15 +879,15 @@ fill_in_buckets_mt(bucket_array_t *alg_BA, factorbase_degn_t **fb_alg,
         fbprime_t *alg_pmax,
         bucket_array_t *rat_BA, factorbase_degn_t **fb_rat,
         fbprime_t *rat_pmax,
-        sieve_info_t * si, int nb_thread){
+        sieve_info_t * si){
     int i;
     pthread_t *th;
     fill_in_buckets_mt_arg_t *my_arg;
-    th = malloc(nb_thread*sizeof(pthread_t)); 
+    th = malloc(si->nb_threads*sizeof(pthread_t)); 
     ASSERT_ALWAYS(th);
-    my_arg = malloc(nb_thread*sizeof(fill_in_buckets_mt_arg_t)); 
+    my_arg = malloc(si->nb_threads*sizeof(fill_in_buckets_mt_arg_t)); 
     ASSERT_ALWAYS(my_arg);
-    for (i = 0; i < nb_thread; ++i) {
+    for (i = 0; i < si->nb_threads; ++i) {
         int ret;
         my_arg[i].alg_BA = &(alg_BA[i]);
         my_arg[i].fb_alg = fb_alg[i];
@@ -910,14 +900,13 @@ fill_in_buckets_mt(bucket_array_t *alg_BA, factorbase_degn_t **fb_alg,
                 (void *)(&(my_arg[i])));
         ASSERT_ALWAYS(!ret);
     }
-    for (i = 0; i < nb_thread; ++i) {
+    for (i = 0; i < si->nb_threads; ++i) {
         int ret;
         ret = pthread_join(th[i], NULL);
         ASSERT_ALWAYS(!ret);
     }
     free(my_arg);
     free(th);
-
 }
 
 
@@ -1187,7 +1176,8 @@ init_alg_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly,
   halfI = (double) (si->I >> 1);
 
   t = si->fijd;
-  u = si->tmpd;
+  u = (double*) malloc ((si->degree + 1) * sizeof (double));
+  ASSERT(u != NULL);
 
   /* bucket_region is a multiple of I. Let's find the starting j
    * corresponding to N and the last j.
@@ -1260,6 +1250,7 @@ init_alg_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly,
 #endif
     }
 
+  free(u);
   return report;
 }
 
@@ -2172,7 +2163,7 @@ factor_survivors (unsigned char *S, int N, bucket_array_t *rat_BA,
     alg_primes = init_bucket_primes (si->bucket_region);
     { 
         int i;
-        for (i = 0; i < nb_threads; ++i) 
+        for (i = 0; i < si->nb_threads; ++i) 
             purge_bucket (&alg_primes, alg_BA[i], N, S);
     }
 
@@ -2187,7 +2178,7 @@ factor_survivors (unsigned char *S, int N, bucket_array_t *rat_BA,
     rat_primes = init_bucket_primes (si->bucket_region);
     {
         int i;
-        for (i = 0; i < nb_threads; ++i)
+        for (i = 0; i < si->nb_threads; ++i)
             purge_bucket (&rat_primes, rat_BA[i], N, S);
     }
     resieve_small_bucket_region (&rat_primes, S, srsd_rat, si);
@@ -2228,8 +2219,8 @@ factor_survivors (unsigned char *S, int N, bucket_array_t *rat_BA,
             copr++;
 
             /* For hunting missed relations */
-            //  if (a == -73800319 && b == 69736)
-            //    fprintf (stderr, "# Have relation at x = %d\n", x+ N*si->bucket_region););
+//             if (a == 61456968 && b == 7297)
+//                fprintf (stderr, "# Have relation at x = %d\n", x+ N*si->bucket_region);
 
             // Trial divide rational norm
             eval_fij (rat_norm, (const mpz_t *) cpoly->g, 1, a, b);
@@ -2694,7 +2685,7 @@ SkewGauss (sieve_info_t *si, double skewness)
   /* Compute number of i-lines per bucket region, must be integer */
   ASSERT_ALWAYS(LOG_BUCKET_REGION >= si->logI);
   uint32_t i = 1U << (LOG_BUCKET_REGION - si->logI);
-  i *= nb_threads;  /* ensures nb of bucket regions divisible by nb_threads */
+  i *= si->nb_threads;  /* ensures nb of bucket regions divisible by nb_threads */
   si->J = ((si->J - 1U) / i + 1U) * i; /* Round up to multiple of i */
 }
 
@@ -2879,8 +2870,8 @@ process_regions_one_thread(void * arg)
             ssd = &lssd_rat;
         int n;
         unsigned long nj;   // nb of j-lines to skip to go to id position.
-        ASSERT(si->nb_buckets % nb_threads == 0);
-        nj = (si->bucket_region >> si->logI)*(si->nb_buckets / nb_threads)*id;
+        ASSERT(si->nb_buckets % si->nb_threads == 0);
+        nj = (si->bucket_region >> si->logI)*(si->nb_buckets / si->nb_threads)*id;
 
         // nice primes
         for (n = 0; n < ssd->nb_nice_p; ++n) {
@@ -2929,12 +2920,12 @@ process_regions_one_thread(void * arg)
 
     /* loop over appropriate set of sieve regions */
     int i, j;
-    i = (si->nb_buckets / nb_threads) * id;
-    for (; i < (si->nb_buckets / nb_threads) * (id+1); ++i) {
+    i = (si->nb_buckets / si->nb_threads) * id;
+    for (; i < (si->nb_buckets / si->nb_threads) * (id+1); ++i) {
         /* Init rational norms */
         init_rat_norms_bucket_region(S, i, cpoly, si);
         /* Apply rational buckets */
-        for (j = 0; j < nb_threads; ++j) 
+        for (j = 0; j < si->nb_threads; ++j) 
             apply_one_bucket(S, rat_BA[j], i, si);
         /* Sieve small rational primes */
         sieve_small_bucket_region(S, i, lssd_rat, si, 'r');
@@ -2944,7 +2935,7 @@ process_regions_one_thread(void * arg)
         /* Init algebraic norms */
         survivors0 += init_alg_norms_bucket_region(S, i, cpoly, si);
         /* Apply algebraic buckets */
-        for (j = 0; j < nb_threads; ++j)
+        for (j = 0; j < si->nb_threads; ++j)
             apply_one_bucket(S, alg_BA[j], i, si);
         /* Sieve small algebraic primes */
         sieve_small_bucket_region(S, i, lssd_alg, si, 'a');
@@ -2961,7 +2952,10 @@ process_regions_one_thread(void * arg)
         free(S);
         if (rat_S != NULL)
             free(rat_S);
-        //
+        clear_small_sieve(lssd_alg);
+        clear_small_sieve(lssd_rat);
+        clear_small_sieve(lsrsd_alg);
+        clear_small_sieve(lsrsd_rat);
     }
     process_bucket_region_report_t *rep;
     rep = (process_bucket_region_report_t *)
@@ -2985,12 +2979,12 @@ process_bucket_region_mt(bucket_array_t *alg_BA, bucket_array_t *rat_BA,
     reports = 0;
     survivors0 = survivors1 = survivors2 = 0;
     pthread_t *th;
-    th = malloc(nb_threads*sizeof(pthread_t));
+    th = malloc(si->nb_threads*sizeof(pthread_t));
     ASSERT_ALWAYS(th);
     process_bucket_region_arg_t *my_arg;
-    my_arg = malloc(nb_threads*sizeof(process_bucket_region_arg_t));
+    my_arg = malloc(si->nb_threads*sizeof(process_bucket_region_arg_t));
     ASSERT_ALWAYS(my_arg);
-    for (i = 0; i < nb_threads; ++i) {
+    for (i = 0; i < si->nb_threads; ++i) {
         int ret;
         my_arg[i].alg_BA = alg_BA;
         my_arg[i].fb_alg = fb_alg;
@@ -3006,7 +3000,7 @@ process_bucket_region_mt(bucket_array_t *alg_BA, bucket_array_t *rat_BA,
                 (void *)(&(my_arg[i])));
         ASSERT_ALWAYS(!ret);
     }
-    for (i = 0; i < nb_threads; ++i) {
+    for (i = 0; i < si->nb_threads; ++i) {
         int ret;
         process_bucket_region_report_t *rep;
         ret = pthread_join(th[i], (void **)(&rep));
@@ -3093,6 +3087,7 @@ main (int argc0, char *argv0[])
     int argc = argc0;
     char **argv = argv0;
     double max_full = 0.;
+    int nb_threads = 1;
 
     param_list pl;
     param_list_init(pl);
@@ -3192,14 +3187,14 @@ main (int argc0, char *argv0[])
              cpoly->mfbr, cpoly->mfba, cpoly->rlambda, cpoly->alambda);
 
     /* this does not depend on the special-q */
-    sieve_info_init (&si, cpoly, I, q0, bucket_thresh, output);
+    sieve_info_init (&si, cpoly, I, q0, bucket_thresh, output, nb_threads);
     si.checknorms = !no_checknorms;
 
     factorbase_degn_t **fb_alg_mt;
     fbprime_t *alg_pmax;
-    fb_alg_mt = (factorbase_degn_t **)malloc(nb_threads*
+    fb_alg_mt = (factorbase_degn_t **)malloc(si.nb_threads*
             sizeof(factorbase_degn_t *));
-    alg_pmax = (fbprime_t *)malloc(nb_threads*sizeof(fbprime_t));
+    alg_pmax = (fbprime_t *)malloc(si.nb_threads*sizeof(fbprime_t));
 
     /* Read algebraic factor base */
     {
@@ -3224,9 +3219,9 @@ main (int argc0, char *argv0[])
               nb_p++;
           fb = fb_next(fb);
       }
-      int block_p = nb_p / nb_threads;
+      int block_p = nb_p / si.nb_threads;
       fb = fb_alg;
-      for (i = 0; i < nb_threads; ++i) {
+      for (i = 0; i < si.nb_threads; ++i) {
           fb_alg_mt[i] = fb;
           nb_p = 0;
           while (fb->p != FB_END && nb_p < block_p) {
@@ -3236,7 +3231,7 @@ main (int argc0, char *argv0[])
               fb = fb_next(fb);
           }
       }
-      alg_pmax[nb_threads-1] = FBPRIME_MAX;
+      alg_pmax[si.nb_threads-1] = FBPRIME_MAX;
     }
 
     /* Prepare rational factor base */
@@ -3249,9 +3244,9 @@ main (int argc0, char *argv0[])
     
     factorbase_degn_t **fb_rat_mt;
     fbprime_t *rat_pmax;
-    fb_rat_mt = (factorbase_degn_t **)malloc(nb_threads*
+    fb_rat_mt = (factorbase_degn_t **)malloc(si.nb_threads*
             sizeof(factorbase_degn_t *));
-    rat_pmax = (fbprime_t *)malloc(nb_threads*sizeof(fbprime_t));
+    rat_pmax = (fbprime_t *)malloc(si.nb_threads*sizeof(fbprime_t));
 
     // split rat factor base in nb_thread pieces
     {
@@ -3262,9 +3257,9 @@ main (int argc0, char *argv0[])
                 nb_p++;
             fb = fb_next(fb);
         }
-        int block_p = nb_p / nb_threads;
+        int block_p = nb_p / si.nb_threads;
         fb = fb_rat;
-        for (i = 0; i < nb_threads; ++i) {
+        for (i = 0; i < si.nb_threads; ++i) {
             fb_rat_mt[i] = fb;
             nb_p = 0;
             while (fb->p != FB_END && nb_p < block_p) {
@@ -3274,7 +3269,7 @@ main (int argc0, char *argv0[])
                 fb = fb_next(fb);
             }
         }
-        rat_pmax[nb_threads-1] = FBPRIME_MAX;
+        rat_pmax[si.nb_threads-1] = FBPRIME_MAX;
     }
 
     init_rat_norms (&si);
@@ -3354,21 +3349,21 @@ main (int argc0, char *argv0[])
 
         /* Allocate alg buckets */
         ttsm -= seconds();
-        bucket_array_t alg_BA[nb_threads];
-        for (i = 0; i < nb_threads; ++i)
-            alg_BA[i] = init_bucket_array(si.nb_buckets, 8*si.bucket_limit / nb_threads);
+        bucket_array_t alg_BA[si.nb_threads];
+        for (i = 0; i < si.nb_threads; ++i)
+            alg_BA[i] = init_bucket_array(si.nb_buckets, 8*si.bucket_limit / si.nb_threads);
 
         /* Allocate rational buckets */
-        bucket_array_t rat_BA[nb_threads];
-        for (i = 0; i < nb_threads; ++i)
-            rat_BA[i] = init_bucket_array(si.nb_buckets, 8*si.bucket_limit / nb_threads);
+        bucket_array_t rat_BA[si.nb_threads];
+        for (i = 0; i < si.nb_threads; ++i)
+            rat_BA[i] = init_bucket_array(si.nb_buckets, 8*si.bucket_limit / si.nb_threads);
 
 
         /* Fill in rat and alg buckets */
         fill_in_buckets_mt(alg_BA, fb_alg_mt, alg_pmax,
                 rat_BA, fb_rat_mt, rat_pmax,
-                &si, nb_threads);
-        for (i = 0; i < nb_threads; ++i) {
+                &si);
+        for (i = 0; i < si.nb_threads; ++i) {
             if (buckets_max_full (alg_BA[i]) > max_full)
                 max_full = buckets_max_full (alg_BA[i]);
             if (buckets_max_full (rat_BA[i]) > max_full)
@@ -3389,82 +3384,12 @@ main (int argc0, char *argv0[])
         tot_reports += process_bucket_region_mt(alg_BA, rat_BA,
                 &ssd_rat, &ssd_alg, fb_rat, fb_alg, cpoly, &si, output);
 
-#if 0
-
-	/* Copy small sieve data for resieving small primes */
-	small_sieve_data_t srsd_alg, srsd_rat;
-	copy_small_sieve (&srsd_alg, &ssd_alg, si.trialdiv_primes_alg);
-	copy_small_sieve (&srsd_rat, &ssd_rat, si.trialdiv_primes_rat);
-
-        /* Process each bucket region, one after the other */
-        unsigned char *S, *rat_S;
-        S = (unsigned char *)malloc(si.bucket_region*sizeof(unsigned char));
-        if (verbose)
-          rat_S = (unsigned char *)
-                  malloc(si.bucket_region*sizeof(unsigned char));
-        else
-          rat_S = NULL;
-        int reports = 0;
-        survivors0 = survivors1 = survivors2 = 0;
-        for (i = 0; i < si.nb_buckets; ++i) {
-            /* Init rational norms */
-            tn_rat -= seconds ();
-            init_rat_norms_bucket_region(S, i, cpoly, &si);
-            tn_rat += seconds ();
-            /* Apply rational bucket */
-            ttsm -= seconds();
-            apply_one_bucket(S, rat_BA, i, &si);
-            ttsm += seconds();
-            /* Sieve small rational primes */
-            sieve_small_bucket_region(S, i, ssd_rat, &si, 'r');
-            /* Make copy of sieve report values for histogram */
-            if (rat_S != NULL)
-              memcpy (rat_S, S, si.bucket_region*sizeof(unsigned char));
-
-            /* Init algebraic norms */
-            tn_alg -= seconds ();
-            survivors0 += init_alg_norms_bucket_region(S, i, cpoly, &si);
-            tn_alg += seconds ();
-            /* Apply algebraic bucket */
-            ttsm -= seconds();
-            apply_one_bucket(S, alg_BA, i, &si);
-            ttsm += seconds();
-            /* Sieve small algebraic primes */
-            sieve_small_bucket_region(S, i, ssd_alg, &si, 'a');
-
-            /* Factor survivors */
-            ttf -= seconds ();
-            reports += factor_survivors (S, i, rat_BA, alg_BA, fb_rat,
-                                         fb_alg, cpoly, &si, &survivors1,
-					 &survivors2, &srsd_alg, &srsd_rat,
-					 report_sizes_a, report_sizes_r,
-					 rat_S, output);
-            ttf += seconds ();
-        }
-        clear_small_sieve(srsd_rat);
-        clear_small_sieve(srsd_alg);
-#endif
         clear_small_sieve(ssd_rat);
         clear_small_sieve(ssd_alg);
-#if 0
-        tot_reports += reports;
-        if (verbose)
-          {
-            fprintf (output, "# %lu survivors after rational sieve,",
-                     survivors0);
-            fprintf (output, " %lu survivors after algebraic sieve, ",
-                     survivors1);
-            fprintf (output, "coprime: %lu\n", survivors2);
-          }
-        fprintf (output, "# %d relation(s) for (%" PRIu64 ",%" PRIu64
-                 "), total %lu [%1.3fs/r]\n#\n", reports, si.q, si.rho,
-                 tot_reports, (seconds () - t0) / (double) tot_reports);
-        clear_bucket_array(alg_BA);
-        clear_bucket_array(rat_BA);
-        free(S);
-        if (rat_S != NULL)
-          free (rat_S);
-#endif     
+        for (i = 0; i < si.nb_threads; ++i) {
+            clear_bucket_array(alg_BA[i]);
+            clear_bucket_array(rat_BA[i]);
+        }
       } // end of loop over special q ideals.
 
  end:
@@ -3501,7 +3426,11 @@ main (int argc0, char *argv0[])
     free (si.trialdiv_primes_alg);
     free (si.trialdiv_primes_rat);
     free (fb_alg);
+    free (fb_alg_mt);
     free (fb_rat);
+    free (fb_rat_mt);
+    free (alg_pmax);
+    free (rat_pmax);
     sieve_info_clear (&si);
     cado_poly_clear (cpoly);
     free (roots);
