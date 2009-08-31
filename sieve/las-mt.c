@@ -734,7 +734,7 @@ fill_in_buckets(bucket_array_t *BA_param, factorbase_degn_t *fb,
     if (fb->p != FB_END && fb->p <= pmax)
       bucket_new_logp (&BA, fb->plog);
 
-    for (;fb->p != FB_END && fb->p <= pmax; fb = fb_next (fb)) {
+    while (fb->p != FB_END && fb->p <= pmax) {
         unsigned char nr;
         fbprime_t p = fb->p;
         unsigned char logp = fb->plog;
@@ -847,6 +847,13 @@ fill_in_buckets(bucket_array_t *BA_param, factorbase_degn_t *fb,
                     x += pli.c;
             }
             __asm__("## Inner bucket sieving loop stops here!!!\n");
+        }
+        int i;
+        for (i = 0; i < si->nb_threads; ++i) {
+            fb = fb_next (fb);
+            if (fb->p == FB_END || fb->p > pmax) {
+                break;
+            }
         }
     }
   *BA_param = BA; /* Write back BA so the nr_logp etc get copied to caller */
@@ -3262,28 +3269,16 @@ main (int argc0, char *argv0[])
                fb_size (fb_alg) >> 20, tfb);
       free (leading_div);
       
-      // split alg factor base in nb_thread pieces
-      // FIXME: splitting is not balanced!
       factorbase_degn_t *fb = fb_alg;
-      int nb_p = 0;
-      while (fb->p != FB_END) {
-          if (fb->p >= (fbprime_t)si.bucket_thresh)
-              nb_p++;
-          fb = fb_next(fb);
-      }
-      int block_p = nb_p / si.nb_threads;
-      fb = fb_alg;
+      while (fb->p != FB_END && fb->p < (fbprime_t) si.bucket_thresh)
+          fb = fb_next (fb); 
+      ASSERT (fb->p != FB_END);
       for (i = 0; i < si.nb_threads; ++i) {
           fb_alg_mt[i] = fb;
-          nb_p = 0;
-          while (fb->p != FB_END && nb_p < block_p) {
-              if (fb->p >= (fbprime_t)si.bucket_thresh)
-                  nb_p++;
-              alg_pmax[i] = fb->p;
-              fb = fb_next(fb);
-          }
+          fb = fb_next(fb);
+          ASSERT (fb->p != FB_END);
+          alg_pmax[i] = FBPRIME_MAX;
       }
-      alg_pmax[si.nb_threads-1] = FBPRIME_MAX;
     }
 
     /* Prepare rational factor base */
@@ -3300,28 +3295,15 @@ main (int argc0, char *argv0[])
             sizeof(factorbase_degn_t *));
     rat_pmax = (fbprime_t *)malloc(si.nb_threads*sizeof(fbprime_t));
 
-    // split rat factor base in nb_thread pieces
-    {
-        factorbase_degn_t *fb = fb_rat;
-        int nb_p = 0;
-        while (fb->p != FB_END) {
-            if (fb->p >= (fbprime_t)si.bucket_thresh)
-                nb_p++;
-            fb = fb_next(fb);
-        }
-        int block_p = nb_p / si.nb_threads;
-        fb = fb_rat;
-        for (i = 0; i < si.nb_threads; ++i) {
-            fb_rat_mt[i] = fb;
-            nb_p = 0;
-            while (fb->p != FB_END && nb_p < block_p) {
-                if (fb->p >= (fbprime_t)si.bucket_thresh)
-                    nb_p++;
-                rat_pmax[i] = fb->p;
-                fb = fb_next(fb);
-            }
-        }
-        rat_pmax[si.nb_threads-1] = FBPRIME_MAX;
+    factorbase_degn_t *fb = fb_rat;
+    while (fb->p != FB_END && fb->p < (fbprime_t) si.bucket_thresh)
+        fb = fb_next (fb); 
+    ASSERT (fb->p != FB_END);
+    for (i = 0; i < si.nb_threads; ++i) {
+        fb_rat_mt[i] = fb;
+        fb = fb_next(fb);
+        ASSERT (fb->p != FB_END);
+        rat_pmax[i] = FBPRIME_MAX;
     }
 
     init_rat_norms (&si);
