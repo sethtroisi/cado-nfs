@@ -3386,12 +3386,12 @@ main (int argc0, char *argv0[])
         ttsm -= seconds();
         bucket_array_t alg_BA[si.nb_threads];
         for (i = 0; i < si.nb_threads; ++i)
-            alg_BA[i] = init_bucket_array(si.nb_buckets, 8*si.bucket_limit / si.nb_threads);
+            alg_BA[i] = init_bucket_array(si.nb_buckets, si.bucket_limit / si.nb_threads);
 
         /* Allocate rational buckets */
         bucket_array_t rat_BA[si.nb_threads];
         for (i = 0; i < si.nb_threads; ++i)
-            rat_BA[i] = init_bucket_array(si.nb_buckets, 8*si.bucket_limit / si.nb_threads);
+            rat_BA[i] = init_bucket_array(si.nb_buckets, si.bucket_limit / si.nb_threads);
 
 
         /* Fill in rat and alg buckets */
