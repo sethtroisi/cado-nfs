@@ -90,6 +90,14 @@
 /* uintmax_t is guaranteed to be larger or equal to uint64_t */
 #define strtouint64(nptr,endptr,base) (uint64_t) strtoumax(nptr,endptr,base)
 
+
+
+/* This global mutex should be locked in multithreaded parts when a
+ * thread does a read / write, especially on stdout, stderr...
+ */
+pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER; 
+
+
 // General information about the siever
 typedef struct {
     // multithreading info
@@ -798,10 +806,12 @@ fill_in_buckets(bucket_array_t *BA_param, factorbase_degn_t *fb,
             plattice_info_t pli;
             if (reduce_plattice(&pli, p, r, si) == 0)
               {
-                fprintf (stderr, "# fill_in_buckets: reduce_plattice() "
-                         "returned 0 for p = " FBPRIME_FORMAT ", r = "
-                         FBPRIME_FORMAT "\n", p, r);
-                continue; /* Simply don't consider that (p,r) for now.
+                  pthread_mutex_lock(&io_mutex);
+                  fprintf (stderr, "# fill_in_buckets: reduce_plattice() "
+                          "returned 0 for p = " FBPRIME_FORMAT ", r = "
+                          FBPRIME_FORMAT "\n", p, r);
+                  pthread_mutex_unlock(&io_mutex);
+                  continue; /* Simply don't consider that (p,r) for now.
                              FIXME: can we find the locations to sieve? */
               }
 
@@ -1747,11 +1757,14 @@ resieve_small_bucket_region (bucket_primes_t *BP, unsigned char *S,
                 {
                   bucket_prime_t prime;
                   unsigned int x = (j << (si->logI)) + i;
-                  if (resieve_very_verbose)
+                  if (resieve_very_verbose) {
+                      pthread_mutex_lock(&io_mutex);
                     fprintf (stderr, "resieve_small_bucket_region: root "
                              FBPRIME_FORMAT ",%d divides at x = "
                              "%d = %lu * %u + %d\n",
                              p, r, x, j, 1 << si->logI, i);
+                      pthread_mutex_unlock(&io_mutex);
+                  }
                   prime.p = p;
                   prime.x = x;
                   push_bucket_prime (BP, prime);
@@ -1767,11 +1780,14 @@ resieve_small_bucket_region (bucket_primes_t *BP, unsigned char *S,
                 {
                   bucket_prime_t prime;
                   unsigned int x = ((j + 1) << (si->logI)) + i;
-                  if (resieve_very_verbose)
+                  if (resieve_very_verbose) {
+                      pthread_mutex_lock(&io_mutex);
                     fprintf (stderr, "resieve_small_bucket_region: root "
                              FBPRIME_FORMAT ",%d divides at x = "
                              "%d = %lu * %d + %d\n",
                              p, r, x, j + 1, 1 << si->logI, i);
+                      pthread_mutex_unlock(&io_mutex);
+                  }
                   prime.p = p;
                   prime.x = x;
                   push_bucket_prime (BP, prime);
@@ -1788,11 +1804,13 @@ resieve_small_bucket_region (bucket_primes_t *BP, unsigned char *S,
   /* Resieve bad primes */
   if (resieve_very_verbose_bad)
     {
+        pthread_mutex_lock(&io_mutex);
       fprintf (stderr, "# %d bad primes to resieve: ", ssd->nb_bad_p);
       for (n = 0; n < ssd->nb_bad_p; ++n)
 	fprintf (stderr, "%s" FBPRIME_FORMAT, 
 		 (n>0) ? ", " : "", ssd->bad_p[n].g);
       fprintf (stderr, "\n");
+      pthread_mutex_unlock(&io_mutex);
     }
   for (n = 0; n < ssd->nb_bad_p; ++n) 
     {
@@ -1803,9 +1821,12 @@ resieve_small_bucket_region (bucket_primes_t *BP, unsigned char *S,
       ASSERT (n == 0 || ssd->bad_p[n - 1].g <= ssd->bad_p[n].g);
       ASSERT (i0 % I == 0); /* make sure next_position points at start
                                of line */
-      if (resieve_very_verbose_bad)
-        fprintf (stderr, "# resieving bad prime " FBPRIME_FORMAT
-                 ", i0 = %u\n", g, i0);
+      if (resieve_very_verbose_bad) {
+          pthread_mutex_lock(&io_mutex);
+          fprintf (stderr, "# resieving bad prime " FBPRIME_FORMAT
+                  ", i0 = %u\n", g, i0);
+          pthread_mutex_unlock(&io_mutex);
+      }
       while (i0 < (unsigned int) si->bucket_region)
         {
           unsigned char *S_ptr = S + i0;
@@ -1818,10 +1839,13 @@ resieve_small_bucket_region (bucket_primes_t *BP, unsigned char *S,
                     {
                       bucket_prime_t prime;
                       const unsigned int x = i0 + i;
-                      if (resieve_very_verbose_bad)
-                        fprintf (stderr, "resieve_small_bucket_region even j: root "
-                                 FBPRIME_FORMAT ",inf divides at x = %u\n",
-                                 g, x);
+                      if (resieve_very_verbose_bad) {
+                          pthread_mutex_lock(&io_mutex);
+                          fprintf (stderr, "resieve_small_bucket_region even j: root "
+                                  FBPRIME_FORMAT ",inf divides at x = %u\n",
+                                  g, x);
+                          pthread_mutex_unlock(&io_mutex);
+                      }
                       prime.p = g;
                       prime.x = x;
                       push_bucket_prime (BP, prime);
@@ -1837,10 +1861,13 @@ resieve_small_bucket_region (bucket_primes_t *BP, unsigned char *S,
                     {
                       bucket_prime_t prime;
                       const unsigned int x = i0 + i;
-                      if (resieve_very_verbose_bad)
-                        fprintf (stderr, "resieve_small_bucket_region odd j: root "
-                                 FBPRIME_FORMAT ",inf divides at x = %u\n",
-                                 g, x);
+                      if (resieve_very_verbose_bad) {
+                          pthread_mutex_lock(&io_mutex);
+                          fprintf (stderr, "resieve_small_bucket_region odd j: root "
+                                  FBPRIME_FORMAT ",inf divides at x = %u\n",
+                                  g, x);
+                          pthread_mutex_unlock(&io_mutex);
+                      }
                       prime.p = g;
                       prime.x = x;
                       push_bucket_prime (BP, prime);
@@ -1850,10 +1877,13 @@ resieve_small_bucket_region (bucket_primes_t *BP, unsigned char *S,
           i0 += g * I;
         }
       ssd->bad_p[n].next_position = i0 - si->bucket_region;
-      if (resieve_very_verbose_bad)
-        fprintf (stderr, "# resieving: new i0 = %u, bucket_region = %d, "
-                         "new next_position = %d\n",
-                 i0, si->bucket_region, ssd->bad_p[n].next_position);
+      if (resieve_very_verbose_bad) {
+          pthread_mutex_lock(&io_mutex);
+          fprintf (stderr, "# resieving: new i0 = %u, bucket_region = %d, "
+                  "new next_position = %d\n",
+                  i0, si->bucket_region, ssd->bad_p[n].next_position);
+          pthread_mutex_unlock(&io_mutex);
+      }
     }
 }
 
@@ -1905,9 +1935,11 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const int x,
               p += BUCKET_P_WRAP;
           }
           if (p > fbb) {
+              pthread_mutex_lock(&io_mutex);
               fprintf (stderr,
                        "# Error, p = %lu does not divide at x = %d\n",
                        (unsigned long) prime.p, x);
+              pthread_mutex_unlock(&io_mutex);
               continue;
           }
           do {
@@ -1929,9 +1961,12 @@ trial_div (factor_list_t *fl, mpz_t norm, int x,
     const int trial_div_very_verbose = 0; // (x == 30878);
     fl->n = 0; /* reset factor list */
 
-    if (trial_div_very_verbose)
-      gmp_fprintf (stderr, "# trial_div() entry, x = %d, norm = %Zd\n",
-                   x, norm);
+    if (trial_div_very_verbose) {
+        pthread_mutex_lock(&io_mutex);
+        gmp_fprintf (stderr, "# trial_div() entry, x = %d, norm = %Zd\n",
+                x, norm);
+        pthread_mutex_unlock(&io_mutex);
+    }
 
     // handle 2 separately, if it is in fb
     if (fb->p == 2) {
@@ -1941,42 +1976,56 @@ trial_div (factor_list_t *fl, mpz_t norm, int x,
             fl->fac[fl->n] = 2;
             fl->n++;
         }
-        if (trial_div_very_verbose)
-          gmp_fprintf (stderr, "# x = %d, dividing out 2^%d, norm = %Zd\n",
-                       x, bit, norm);
+        if (trial_div_very_verbose) {
+            pthread_mutex_lock(&io_mutex);
+            gmp_fprintf (stderr, "# x = %d, dividing out 2^%d, norm = %Zd\n",
+                    x, bit, norm);
+            pthread_mutex_unlock(&io_mutex);
+        }
         mpz_tdiv_q_2exp(norm, norm, bit);
         fb = fb_next (fb); // cannot do fb++, due to variable size !
     }
 
     // remove primes in "primes" that map to x
     divide_primes_from_bucket (fl, norm, x, primes, fbb);
-    if (trial_div_very_verbose)
-      gmp_fprintf (stderr, "# x = %d, after dividing out bucket/resieved norm = %Zd\n",
-                   x, norm);
+    if (trial_div_very_verbose) {
+        pthread_mutex_lock(&io_mutex);
+        gmp_fprintf (stderr, "# x = %d, after dividing out bucket/resieved norm = %Zd\n",
+                x, norm);
+        pthread_mutex_unlock(&io_mutex);
+    }
 
     {
       /* Trial divide primes with precomputed tables */
       int nr_factors, i;
       unsigned long factors[32];
       if (trial_div_very_verbose)
-        {
+      {
+          pthread_mutex_lock(&io_mutex);
           fprintf (stderr, "# Trial division by ");
           for (i = 0; trialdiv_data[i].p != 1; i++)
-            fprintf (stderr, " %lu", trialdiv_data[i].p);
+              fprintf (stderr, " %lu", trialdiv_data[i].p);
           fprintf (stderr, "\n");
-        }
+          pthread_mutex_unlock(&io_mutex);
+      }
 
       nr_factors = trialdiv (factors, norm, trialdiv_data, 32);
       ASSERT (nr_factors <= 32);
 
       for (i = 0; i < nr_factors; i++)
-        {
-          if (trial_div_very_verbose)
-            fprintf (stderr, " %lu", factors[i]);
+      {
+          if (trial_div_very_verbose) {
+              pthread_mutex_lock(&io_mutex);
+              fprintf (stderr, " %lu", factors[i]);
+              pthread_mutex_unlock(&io_mutex);
+          }
           fl->fac[fl->n++] = factors[i];
-        }
-      if (trial_div_very_verbose)
-        gmp_fprintf (stderr, "\n# After trialdiv(): norm = %Zd\n", norm);
+      }
+      if (trial_div_very_verbose) {
+          pthread_mutex_lock(&io_mutex);
+          gmp_fprintf (stderr, "\n# After trialdiv(): norm = %Zd\n", norm);
+          pthread_mutex_unlock(&io_mutex);
+      }
     }
 }
 
@@ -1985,7 +2034,7 @@ trial_div (factor_list_t *fl, mpz_t norm, int x,
    (b) if L < n < B^2
    (c) if L^2 < n < B^3
 
-   FIXME: need to check L^k < n < B^(k+1) too.
+FIXME: need to check L^k < n < B^(k+1) too.
 */
 static int
 check_leftover_norm (mpz_t n, size_t lpb, mpz_t BB, mpz_t BBB, size_t mfb)
@@ -2206,12 +2255,14 @@ factor_survivors (unsigned char *S, int N, bucket_array_t *rat_BA,
             // ASSERT((a | b) & 1);
             if (UNLIKELY(((a | b) & 1) == 0))
               {
+                pthread_mutex_lock(&io_mutex);
                 fprintf (stderr, "# Error: a and b both even for N = %d, x = %d,\n"
                                  "i = %d, j = %d, a = %ld, b = %lu\n",
                          N, x, ((x + N*si->bucket_region) & (si->I - 1))
                            - (si->I >> 1),
                          (x + N*si->bucket_region) >> si->logI,
                          (long) a, (unsigned long) b);
+                pthread_mutex_unlock(&io_mutex);
                 continue;
               }
 
@@ -2272,6 +2323,7 @@ factor_survivors (unsigned char *S, int N, bucket_array_t *rat_BA,
             ASSERT (bin_gcd (a, b) == 1);
 #endif
 
+            pthread_mutex_lock(&io_mutex);
             fprintf (output, "%" PRId64 ",%" PRIu64 ":", a, b);
             factor_list_fprint (output, rat_factors);
             for (i = 0; i < f_r->length; ++i)
@@ -2290,6 +2342,7 @@ factor_survivors (unsigned char *S, int N, bucket_array_t *rat_BA,
             fprintf (output, "%" PRIx64 "", si->q);
             fprintf (output, "\n");
             fflush (output);
+            pthread_mutex_unlock(&io_mutex);
             cpt++;
             report_sizes_a[S[x]]++; /* Build histogram of lucky S[x] values */
             if (rat_S != NULL)
