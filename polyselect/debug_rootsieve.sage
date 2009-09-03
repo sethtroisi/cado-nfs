@@ -1,6 +1,7 @@
 
 attach rotation_bound.sage
-attach kleinjung.sage
+#attach kleinjung.sage
+attach kleinjung-list-of-lattices.sage
 attach higher_order_roots.sage
 
 Z=Integers()
@@ -84,7 +85,8 @@ def manyp(rdict,plim):
 # Fix a size for the sieving area. It's taken square here, but the
 # program accepts also a rectangle. We look into polynomials h(x,u,v) for
 # u and v integers within the interval [0,sbound-1]
-sbound=1000
+sboundu=1487
+sboundv=2438
 p=13
 
 #t0=cputime()
@@ -93,7 +95,7 @@ p=13
 #print "Took %.2f seconds" % (cputime()-t0)
 #print "Now with root sieve"
 #t0=cputime()
-rdict=rotation_init(f,g,0,sbound,0,sbound)
+rdict=rotation_init(f,g,0,sboundu,0,sboundv)
 rotation_handle_p(rdict,p)
 #testp(rdict,p,refp)
 #print "Took %.2f seconds" % (cputime()-t0)

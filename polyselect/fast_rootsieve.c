@@ -11,15 +11,20 @@
 #include "fast_rootsieve.h"
 #include "macros.h"
 #define COMP 0
-#define VERBOSE 1
+#define VERBOSE 0
 #define TRACE 0
 #define DEBUG 0
 #define DUMP 0
-#define PLB 13
+#define PLB 2
 #define PUB 13
-#define LBOUND 0
-#define UBOUND 999
+#define V_LBOUND 0
+#define V_UBOUND 289
+#define U_LBOUND 0
+#define U_UBOUND 837
 #define MAXPOW 20
+#define CUTOFF 1.0e-5
+#define REALLOC_INCREMENT 300
+#define EXPECTED_NB_OF_LATTICES 200
 
 /* Rootsieve : we compute the root property for every polynomial of 
    the form f(x)+(u*x+v)*g(x) for u,v in a given (rectangular) range,
@@ -34,10 +39,11 @@ unsigned long modular_product( unsigned long a, unsigned long b, unsigned long N
 
 // Rootsieve - Specific
 long rotation_inner(rootsieve_dictionary rdict, unsigned long p,poly_t ff,poly_t gg,poly_t fdg_gdf,long u0,long v0,long l0,int ld,int m,long twist_v1,double scale,poly_t dphi);
-long fill_alpha(rootsieve_dictionary rdict, unsigned long p);
+long rootsieve_handle_p(rootsieve_dictionary rdict, unsigned long p);
 long light (double * alpha, long u0, long v0, long us, long vs, long skew, long um, long vm, double contribution);
 void extend_ppow_list(rootsieve_dictionary rdict,int newlength, unsigned long p); 
-long light_rectangle (double * alpha, long u0, long v0, long us, long vs, long skew, long U0, long U1, long V0, long V1, double contribution);
+long add_lattice(rootsieve_dictionary rdict, long u0, long v0, long us, long vs, long skew, long U0, long U1, long V0, long V1, double contribution, unsigned long p);
+int empty(long u0, long v0, long us, long vs, long skew, long U0, long U1, long V0, long V1);
 
 // Polynomials
 void poly_set_identity(poly_t f); 
@@ -45,10 +51,10 @@ void compose_psi(poly_t f, const poly_t g,unsigned long l,mpz_t * ppow,int maxpo
 void compose_reduce(poly_t f, const poly_t g,unsigned long l,mpz_t * ppow,int maxpow, mpz_t m);
 void print_dictionary(rootsieve_dictionary rdict);
 
-
+/*
 int main() {
   // This main function just runs an example.
-  poly_t f,g,h;
+  poly_t f,g;
 
   poly_alloc(f,5);
   poly_alloc(g,1);
@@ -61,97 +67,64 @@ int main() {
   poly_setcoeff_str(f,0,"-30504936769336291824389723279850895305",10);
 
   poly_setcoeff_str(g,1,"1628876881135933",10);
-  poly_setcoeff_str(g,0,"-161423410516092787320054348810",10);
+  poly_setcoeff_str(g,0,"161423410516092787320054348810",10);  
 
-  poly_alloc(h,f->deg);
-  rootsieve(h,f,g,PUB);
+  print_lattices(rootsieve(f->coeff,5,g->coeff[0],g->coeff[1],U_LBOUND,U_UBOUND,V_LBOUND,V_UBOUND,PUB,VERBOSE));     
   
-  if(VERBOSE) {
-    printf("Polynomial f :\n");
-    poly_print(f);
-    printf("\n");
-    printf("Polynomial g :\n");
-    poly_print(g);
-    printf("\n");
-    printf("Rotated polynomial :\n");
-    poly_print(h);
-    printf("\n");
-  }
-  
-
   poly_free(f);
   poly_free(g);
-  poly_free(h);
-
-}
+  }*/
 
 
-/* h must be allocated : it must have f->deg+1 slots. */
-void rootsieve(poly_t h,poly_t f,poly_t g, unsigned long prime_bound ) {  // Ready
+lattice_list rootsieve(mpz_t * f_coeffs, int degf, mpz_t g_coeff1, mpz_t g_coeff0, long U0, long U1, long V0, long V1, unsigned long prime_bound) {  
   
+  poly_t f,g;
+
+  poly_alloc(f,degf);
+  poly_set(f,f_coeffs,degf);
+
+  poly_alloc(g,1);
+  poly_setcoeff(g,0,g_coeff0);
+  poly_setcoeff(g,1,g_coeff1);
+  mpz_neg(g->coeff[0],g->coeff[0]);
+
   if(VERBOSE) {
       printf("Received polynomials f ...\n");
       poly_print(f);
       printf("and g ... \n");
       poly_print(g);
   }
-
   
-  // Counters
-  long i,j;
-  unsigned long p;
-  long hits;
-
-  // The bounds
-  long U0,U1,V0,V1;
-
-  // We compute the bounds of the rectangle limiting the rotation coefficients
-  //if(VERBOSE) 
-  //  printf("Computing rotation bounds...\n");
-
-  //rotate_bounds(f->coeff, f->deg, g->coeff[1], g->coeff[0], &V0, &V1, &U0, &U1, 0);
-
-  U0=V0=LBOUND;
-  U1=V1=UBOUND;
+  // Counters  
+  unsigned long p;  
   
   // We prepare the dictionary
   rootsieve_dictionary rdict;
+
+  // We prepare the lattice list
+  rdict->lattice_alloc = EXPECTED_NB_OF_LATTICES;
+  rdict->lattices = malloc(rdict->lattice_alloc*sizeof(rootsieve_lattice));
+  rdict->L = 0;  
   
   // The rectangle
   rdict->U0 = U0;
   rdict->U1 = U1;
   rdict->V0 = V0;
   rdict->V1 = V1;
-  rdict->space = (V1-V0+1)*(U1-U0+1);  
-  rdict->sarr = malloc(rdict->space*sizeof(double));  
 
   if(VERBOSE) {
     printf("Rotation takes place in the rectangle of lower left corner (%ld,%ld) and upper right corner (%ld,%ld) ...\n",U0,V0,U1,V1);
-    printf("Array alpha has length (U1-U0+1)*(V1-V0+1) = %ld ...\n",rdict->space);
   }
-  
-  for ( i=0 ; i<rdict->space ; i++ ) 
-    rdict->sarr[i] = 0.0;  
-
-  if(VERBOSE) {
-    printf("Alpha array initialized to 0.0 everywhere...\n");
-  }
-
-  // Other bounds
-  rdict->B = prime_bound;
-  rdict->cutoff = 1.0e-5;
-
-  if(VERBOSE) {
-    printf("Prime upper bound : %ld\n",rdict->B);
-  }
-
+      
+  // Contributions smaller than cutoff are neglected (ie, we stop the recursion)
+  rdict->cutoff = CUTOFF;  
 
   // This gives the exceptional values for u (once divided by g(l)^2)
   poly_t dg,df,aux;  
-  poly_alloc(dg,g->deg-1);  
+  poly_alloc(dg,g->deg-1);
   poly_alloc(df,f->deg-1);  
-  poly_alloc(aux,-1);  
-  poly_alloc(rdict->fdg_gdf,-1);  
+  poly_alloc(aux,-1);
+  poly_alloc(rdict->fdg_gdf,-1);
   poly_derivative(dg,g);
   poly_derivative(df,f);
 
@@ -184,98 +157,31 @@ void rootsieve(poly_t h,poly_t f,poly_t g, unsigned long prime_bound ) {  // Rea
     printf("Added f and g to the dictionary...\n");
     printf("Now entering prime number loop...\n");
   }
+    
+  for ( p = PLB ; p <= prime_bound ; p += 1 + (1 & p)) {
+    if (isprime(p)) {
 
-  hits = 0;
-  
-  for ( p = PLB ; p <= prime_bound ; p += 1 + (1 & p))
-    if (isprime(p))   {
-      if(VERBOSE) {
-	printf("Filling alpha for prime: %lu\n",p);
-      }
-      hits += fill_alpha(rdict,p);        
-    }
+      if(VERBOSE)
+	printf("Finding lattices for prime: %lu\n",p);      
 
-  if(VERBOSE) {
-    printf("Finished prime number loop...\n");
-    printf("Counted %ld hits.\n",hits);
-    printf("--------------------------------------------------\n");
-    //printf("Resulting alpha array :\n");
-  }
-  
-  //for ( j=U1-U0 ; j>=0 ; j-- ) {
-  //  for ( i=0 ; i<(V1-V0+1) ; i++ )
-  //    printf("%.3f",rdict->sarr[i +(V1-V0+1)*j]);  
-  //  printf("\n");
-  //}
-  
-  if(VERBOSE) {
-    printf("Finding a best polynomial ...\n");
-  }
-
-  // Finding the best polynomial
-  double candidate,minimum,minnorm;
-  int best_u,best_v;
-
-  // Assignment
-  minimum = DBL_MAX;
-  minnorm = DBL_MAX;
-
-  // Finding the minimum (we also try to choose the smallest coefficients)
-  for ( j=U1-U0 ; j>=0 ; j-- ) {
-    for ( i=0 ; i<(V1-V0+1) ; i++ ) {
-      candidate = rdict->sarr[i +(V1-V0+1)*j];
-      if(candidate> minimum) 
-	continue;
-      
-      //printf("(%ld,%ld)\n",U0 + j,V0 + i);
-
-      if(candidate < minimum) {
-	best_v = V0 + i;
-	best_u = U0 + j;
-	minimum = candidate;
-	continue;
-      }
-      
-      // TODO : use the skewness here.
-      if(MAX(V0+i,U0+j)<minnorm) {
-	best_v = V0 + i;
-	best_u = U0 + j;
-	minnorm = MAX(V0+i,U0+j);
-      }      
+      rootsieve_handle_p(rdict,p);        
     }
   }
-
-  // Packing the selected rotated polynomial h
-  poly_t tmpoly;
-  mpz_t tmpmp;
-  poly_alloc(tmpoly,1);
-  mpz_init_set_si(tmpmp,best_v);
-  poly_setcoeff(tmpoly,0,tmpmp);
-  mpz_set_si(tmpmp,best_u);
-  poly_setcoeff(tmpoly,1,tmpmp);
   
-  poly_mul(h,tmpoly,g);
-  poly_add(h,h,f);
-
-  if(VERBOSE || DEBUG) {
-    printf("Best alpha value : %f\n",minimum);
-    printf("The pair u,v : %d %d\n",best_u,best_v);
-  }
-  
-  // Cleaning
-  mpz_clear(tmpmp);
-  poly_free(tmpoly);
-
-  // Dictionary cleaning
-  free(rdict->sarr);
-
   poly_free(rdict->f);
   poly_free(rdict->g);
   poly_free(rdict->fdg_gdf);    
+
+  // We pack and return the list of lattices
+  lattice_list ll;
+  ll.lattices = rdict->lattices;
+  ll.length = rdict->L;
+  return ll;
+
 }
 
 
-long fill_alpha(rootsieve_dictionary rdict,unsigned long p) { // Ready
+long rootsieve_handle_p(rootsieve_dictionary rdict,unsigned long p) { // Ready
   
 
   //"""Fast root sieve modulo p and its powers. The rdict argument must
@@ -481,6 +387,10 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,poly_t ff,poly_t
   long igl;
   long pm,pm1,pmax;
     
+  // As igl is a residue mod p, the following value is bogus 
+  // and it just means "undefined". Added to avoid a warning.
+  igl = -1; 
+
   pm    = mpz_get_si(rdict->ppow[m]);
   pm1   = mpz_get_si(rdict->ppow[m+1]);
   pmax  = mpz_get_si(rdict->ppow[rdict->maxpow]);  
@@ -656,16 +566,16 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,poly_t ff,poly_t
 	  printf(" 1/g(%ld) mod %lu = %ld, twist_v1 = %ld ...\n",l,p,igl,twist_v1);	  
 	}
 	
-	ASSERT_ALWAYS(0<igl && igl< p);
+	ASSERT_ALWAYS(0<igl && igl<(long)p);
 
 	// The next line divides f(l) by g(l) mod p
-	minus_f_over_gmodp_l = (long)modular_product((unsigned long)((minus_f_over_gmodp_l==0)?(minus_f_over_gmodp_l):(p-minus_f_over_gmodp_l)),(unsigned long)igl,p);
+	minus_f_over_gmodp_l = (long)modular_product((unsigned long)((minus_f_over_gmodp_l==0)?(minus_f_over_gmodp_l):((long)p-minus_f_over_gmodp_l)),(unsigned long)igl,p);
 	
 	if(DEBUG) {
 	  printf("-f(%ld)/g(%ld) mod %lu = %ld ...\n",l,l,p,minus_f_over_gmodp_l);
 	}
 
-	ASSERT_ALWAYS(0<=minus_f_over_gmodp_l && minus_f_over_gmodp_l<p);
+	ASSERT_ALWAYS(0<=minus_f_over_gmodp_l && minus_f_over_gmodp_l<(long)p);
       }
 
       mpz_clear(mp_tmp);
@@ -678,7 +588,7 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,poly_t ff,poly_t
 	printf("The lattice : dv0 = %ld, u1 = %ld, v1 = %ld...\n",dv0,u1,v1);
       }
 
-      hits = light_rectangle(rdict->sarr, u1,v1, pm, pm1, twist_v1, rdict->U0,rdict->U1,rdict->V0,rdict->V1,-scale1);
+      hits = add_lattice(rdict,u1,v1, pm, pm1, twist_v1, rdict->U0,rdict->U1,rdict->V0,rdict->V1,-scale1,p);      
 
       if(COMP) {
 	printf("1:m=%d ld=%d hits>0=%d u0=%ld v0=%ld us=%ld vs=%ld skew=%ld contrib=%f\n",m,ld,(hits>0)?1:0,u1,v1,pm,pm1,twist_v1,-scale1);
@@ -827,7 +737,7 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,poly_t ff,poly_t
 	  printf("Value of g(l) mod p is %ld ...\n",igl);	
 	}
       	
-	ASSERT_ALWAYS(igl>0 && igl<p);
+	ASSERT_ALWAYS(igl>0 && igl<(long)p);
 
 	du0 = (igl*igl*mpz_get_si(rhs)) % p;
 	u1 += du0 * pm;
@@ -878,7 +788,7 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,poly_t ff,poly_t
 	if(DEBUG) {
 	  printf("Distributing contribution\n");
 	}
-	hits = light_rectangle(rdict->sarr, u1,v1, pm1, pm1, 0, rdict->U0, rdict->U1, rdict->V0, rdict->V1, scale3);
+	hits = add_lattice(rdict, u1,v1, pm1, pm1, 0, rdict->U0, rdict->U1, rdict->V0, rdict->V1, scale3,p);
 	
 	if(COMP) {
 	  printf("2:m=%d ld=%d hits>0=%d u0=%ld v0=%ld us=%ld vs=%ld skew=%ld contrib=%f\n",m,ld,(hits>0)?1:0,u1,v1,pm1,pm1,0L,scale3);
@@ -976,7 +886,7 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,poly_t ff,poly_t
 
       poly_getcoeff(mp_tmp,0,rdict->gmodp);      
       gvl = mpz_get_si(mp_tmp);
-      ASSERT_ALWAYS(0<=gvl && gvl<p);
+      ASSERT_ALWAYS(0<=gvl && gvl<(long)p);
 
       if(DEBUG) {
 	printf("Constant polynomial g mod %lu evaluates to %ld ...\n",p,gvl);
@@ -992,7 +902,7 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,poly_t ff,poly_t
 	printf(" 1/g mod %lu = %ld, ...\n",p,igl);	  
       }
 	
-      ASSERT_ALWAYS(0<igl && igl<p);
+      ASSERT_ALWAYS(0<igl && igl<(long)p);
       
     }
         
@@ -1013,7 +923,7 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,poly_t ff,poly_t
       printf("New lattice : u1=%ld, v1=%ld\n Adding contribution...",u1,v1);
     }
     
-    hits=light_rectangle(rdict->sarr, u1, v1, pm, pm1, twist_v1, rdict->U0, rdict->U1, rdict->V0, rdict->V1, -scale);
+    hits=add_lattice(rdict, u1, v1, pm, pm1, twist_v1, rdict->U0, rdict->U1, rdict->V0, rdict->V1, -scale,p);
     
     if(COMP) {      
       printf("3:m=%d ld=%d hits>0=%d u0=%ld v0=%ld us=%ld vs=%ld skew=%ld contrib=%f\n",m,ld,(hits>0)?1:0,u1,v1,pm,pm1,twist_v1,-scale);
@@ -1059,7 +969,7 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,poly_t ff,poly_t
     }
     
     if (1) { //m<rdict->m_max && m<rdict->maxpow) {
-      for ( du=0 ; du<p ; du++) {      
+      for ( du=0 ; du<(long)p ; du++) {      
 
 	if(DEBUG) {
 	  printf("Recalling (Rotation Inner)...\n");
@@ -1112,17 +1022,13 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,poly_t ff,poly_t
   return thits;
 }
 
+/* Returns 1 when the lattice generated by {(us,skew),(0,vs)} has some point in [U0,U1]x[V0,V1], and it adds the lattice to the 
+   list rdict->lattice. Otherwise it just returns 0.
+*/
 
-long light_rectangle (double * alpha, long u0, long v0, long us, long vs, long skew, long U0, long U1, long V0, long V1, double contribution) {
-  
-
-  // The lattice has its origin in (u0,v0), and it is generated by (us,skew),(0,vs).
-  // We sieve the u,v rectangle of lower left coordinates (U0,V0) and upper right 
-  // coordinates (U1,V1). We start from the lower left, and we sieve first from left to
-  // right, and then from the lower to the upper end.
+long add_lattice(rootsieve_dictionary rdict,long u0, long v0, long us, long vs, long skew, long U0, long U1, long V0, long V1, double contribution, unsigned long p) {
   long u,v;
   long q;
-  long pos;
   long hits;
 
   hits=0;
@@ -1139,57 +1045,76 @@ long light_rectangle (double * alpha, long u0, long v0, long us, long vs, long s
   
   ASSERT_ALWAYS(vs>=0 && skew >= 0 && us>=0);  
 
-  if(DEBUG>9) {
-    printf("Lighting lattice u0=%ld ,v0=%ld, us=%ld, vs=%ld, skew=%ld \n",u0,v0,us,vs,skew);
-  }
-
   q = (long)floor(((double)(u0-U0))/((double)us));
   u = u0-q*us;
   v = v0-q*skew;
 
   q = (long)floor(((double)(v-V0))/((double)vs));
   v = v - q*vs;
-  pos = (V1-V0+1)*(u-U0) + (v-V0);
 
-  if(DEBUG>9)
-    printf("We start at point u=%ld,v=%ld, pos=%ld \n",u,v,pos);
-  
   ASSERT_ALWAYS(v>=V0);
-  ASSERT_ALWAYS(u>=U0);   
-  
-  // at this stage, (u,v) is the lower left point of the lattice
-  while(u<=U1) {    
-    while(v<=V1) {       
-      if(DEBUG>10) {
-	printf("Sieving %ld,%ld, position %ld. \n",u,v,pos);
-      }
-      ASSERT(pos >= 0);      
-      ASSERT(pos <(V1-V0+1)*(U1-U0+1));
-      alpha[pos] += contribution;
-      v += vs;
-      pos += vs;   
-      hits++;
-    }
-    
-    // we do the carriage return
-    v += skew;
-    u += us;
-    q = (long)floor(((double)(v-V0))/((double)vs));
-    v = v - q*vs;
-    pos = (V1-V0+1)*(u-U0) + (v-V0);
-    
-    // now, we are in the left end of the rectangle.
-    
-  }
-  
-  if(DEBUG>10)
-    printf("There were %ld hits.\n",hits);
-  
-  
-  return hits;
+  ASSERT_ALWAYS(u>=U0);
 
+  // If the lattice has some point in the rectangle, we add the lattice to the list.
+	// Here 1 hit == 1 lattice
+  if (!empty(u,v,us,vs,skew,U0,U1,V0,V1)) {
+    if(DEBUG>9)
+      printf("Initial point u=%ld,v=%ld, belongs to the rectangle. \n",u,v);
+    rootsieve_lattice rl;
+    rl.u0 = u;
+    rl.v0 = v;
+    rl.us = us;
+    rl.vs = vs;
+    rl.skew = skew;
+    rl.contribution = contribution;
+    rl.p = p;
+    if(rdict->lattice_alloc == rdict->L) {
+      rdict->lattice_alloc += REALLOC_INCREMENT;
+      rdict->lattices = realloc(rdict->lattices,rdict->lattice_alloc*sizeof(rootsieve_lattice));
+    }
+    rdict->lattices[rdict->L] = rl;
+    rdict->L++;
+    return 1;
+  }
+  else {
+    if(DEBUG>9)
+      printf("Initial point u=%ld,v=%ld, does NOT belong to the rectangle. \n",u,v);
+    return 0; 
+  }
+     
 }
 
+int empty(long u0, long v0, long us, long vs, long skew, long U0, long U1, long V0, long V1) {
+
+  ASSERT_ALWAYS(u0>=U0 && v0>=V0);
+  long u,v;
+  long q;
+
+  if (u0<=U1) {
+    if (v0<=V1)
+      return 0;
+    else {
+      if (skew==0)
+	return 1;      
+      u = u0;
+      v = v0-vs;
+      while(u<U1) {
+	u+=us;
+	v+=skew;
+	q = (long)floor(((double)(v-V0))/(double)vs);
+	v = v-q*vs;
+	if (v<=V1 && u<=U1){
+	  //fprintf(stderr,"u0=%d v0=%d u=%d v=%d i=%d\n",u0,v0,u,v,i);
+	  return 0;
+	}	
+      }
+      return 1;
+    }
+  }
+  else 
+    return 1;
+  
+}
 
 unsigned long modular_product( unsigned long a, unsigned long b, unsigned long N ) {
 
@@ -1249,21 +1174,20 @@ void poly_set_identity(poly_t f) {
 // TODO : Ensure that no constraints on the degree of f are necessary.
 void compose_psi(poly_t f, const poly_t g, unsigned long l, mpz_t * ppow, int maxpow) {
   
-  int d;  
-  d = g->deg;
-
   // Suspicious case
-  if(d<=0) {
+  if(g->deg <=0) {
     if(DEBUG) {
-      printf("(Compose psi) Warning : received constant polynomial of degree %d\n",d);
+      printf("(Compose psi) Warning : received constant polynomial of degree %d\n",g->deg);
     }
     poly_copy(f,g);
     return;
   }
 
-  ASSERT_ALWAYS(d<=maxpow); // Otherwise we will get a segfault.
-  ASSERT_ALWAYS(g->alloc >= d+1); // Idem
-  
+  ASSERT_ALWAYS(g->deg <=maxpow); // Otherwise we will get a segfault.
+  ASSERT_ALWAYS(g->alloc >= g->deg +1); // Idem  
+
+  unsigned int d;  
+  d = (unsigned int)(g->deg);
 
   unsigned long i,k;
   mpz_t tmpsum,tmpterm,tmplpow;
@@ -1333,19 +1257,12 @@ void compose_reduce(poly_t f, const poly_t g,unsigned long l,mpz_t * ppow, int m
   poly_free(aux);
 }
 
-
-void print_array(double * alpha,long U0, long V0, long U1, long V1, long x0, long x1, long y0, long y1) {
-  
-  long x,y,pos;
-  
-  for(x = MAX(x0,U0) ; x<=MIN(x1,U1); ++x) {
-    for(y = MIN(y1,V1); y>=MIN(y0,V0); ++y) {
-      pos = (U1-U0+1)*(y-V0) + (x-U0);
-      printf("%3.2f ",alpha[pos]);      
-    }
-    printf("\n");
-  }  
-  
+/* Prints a   */
+void print_lattices(lattice_list l) {
+  long i;
+  printf("print_lattices:\n");
+  for(i=0; i<l.length; i++) 
+    printf("u0=%ld v0=%ld us=%ld vs=%ld skew=%ld contrib=%f p=%lu\n",l.lattices[i].u0,l.lattices[i].v0,l.lattices[i].us,l.lattices[i].vs,l.lattices[i].skew,l.lattices[i].contribution,l.lattices[i].p);  
 }
 
 void print_dictionary(rootsieve_dictionary rdict) {
@@ -1362,3 +1279,4 @@ void print_dictionary(rootsieve_dictionary rdict) {
   poly_print(rdict->gmodp);  
   
 }
+

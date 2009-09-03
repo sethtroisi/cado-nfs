@@ -1,6 +1,6 @@
 
-add_executable(fast_rootsieve fast_rootsieve.c auxiliary.c)
+add_executable(alpha alpha.c auxiliary.c fast_rootsieve.c)
 
-target_link_libraries(fast_rootsieve utils m gmp)
+target_link_libraries(alpha utils m gmp)
 
 # vim: set ft=cmake:

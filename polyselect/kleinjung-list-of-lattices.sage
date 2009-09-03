@@ -142,31 +142,20 @@ def rotation (n,d,p,m):
     sys.stdout.flush()
     #rotation_inner(f,g,range(-U,U+1),range(-V,V+1))
 
-# def rotation_global_contrib_commonroots(rdict):
-#     """Fills in the global_contrib_commonroots entry in the provided
-#     rotation dictionary. This makes sense only for SNFS"""
-#     global_contrib=float(0.0)
-#     f=rdict['f']
-#     g=rdict['g']
-#     B=rdict['B']
-#     res=f.resultant(g)
-#     while true:
-#         p=trial_division(res,B)
-#         if p==res:
-#             break
-#         scale=p*float(log(p))/(p^2-1)
-#         global_contrib-=scale
-#     for i in range(len(rdict['sarr'])):
-#         rdict['sarr'][i]+=global_contrib
-#     rdict['global_contrib_commonroots']=global_contrib
-# 
-def rotation_init(f,g,u0,u1,v0,v1):
-    """Sets up rotation for using the area [u0..u1] x [v0..v1]"""
-    assert(u0==0)
-    assert(v0==0)
-    space=u1*v1
+
+def rotation_init(f,g,U0,U1,V0,V1):
+    """Sets up rotation for using the area [u0..u1[ x [v0..v1["""
+    assert(U0==0)
+    assert(V0==0)
+    space=(U1-U0)*(V1-V0)
     #print "Rotation space: %r" % space 
-    rdict=dict(umax=u1,vmax=v1,f=f,g=g)
+    rdict=dict(umax=U1,vmax=V1,f=f,g=g)
+    rdict['U0'] = U0
+    rdict['U1'] = U1
+    rdict['V0'] = V0
+    rdict['V1'] = V1
+    # The list of lattices.
+    rdict['lattice_list']=[]
     rdict['sarr']=[float(0.0) for i in range(space)]
     # Estimate the common value for the different cells.
     B=2000
@@ -201,282 +190,6 @@ def extend_ppow_list(rdict,l):
         ppows+=1
 
 
-# def reference_rotation_handle_p(rdict,p):
-#     u0=v0=0
-#     ff,gg=rdict['f'],rdict['g']
-#     f,g=rdict['f'],rdict['g']
-#     x=Integers()['x'].gen()
-#     phi=x
-#     # The denominator exponent here is only controlled by the number of
-#     # fixed coeffs of l. At the beginning, l has zero fixed coeffs, for
-#     # which scale0 holds.
-#     scale0=float(log(p))*p/(p+1)
-#     l0,ld,md,m,k=0,0,0,0,0
-#     scale = scale0
-#     ZP3.<l,u,v>=ZZ['l','u','v']
-#     rdict['h']=f(l)+(u*l+v)*g(l)
-#     rdict['history']=[]
-#     rdict['logbook']=[]
-#     reference_rotation_inner(rdict,p,ff,gg,u0,v0,l0,ld,md,m,k,scale,phi,0)
-# 
-# def reference_rotation_inner(rdict,p,ff,gg,u0,v0,l0,ld,md,m,k,scale,phi,d):
-#     maxpow = 20
-#     if m >= maxpow:
-#         return
-# 
-#     rdict['history'].append((p,ff,gg,u0,v0,l0,ld,md,m,k,scale,phi,d))
-#     # p,ff,gg,u0,v0,l0,ld,md,m,k,scale,phi,d=rdict['history'][-1]
-# 
-#     callnumber=len(rdict['history'])-1
-#     prefix = " " * d
-#     msg=prefix+"Entering recursive call number %d, depth %d" % (callnumber,d)
-#     rdict['logbook'].append(msg)
-#     print msg
-# 
-#     a = vector([p^k,0])
-#     b = vector([0,p^k])
-#     uv0=vector((u0,v0))
-# 
-#     K=GF(p); KP=K['x']; KR=FractionField(KP)
-#     Z=Integers(); ZP=Z['x'];
-#     x=ZP.gen()
-#     sarr=rdict['sarr']
-#     fence=vector([rdict['umax'],rdict['vmax']])
-# 
-#     h = rdict['h']
-#     l,u,v=h.parent().gens()
-#     nh = h(phi(l),u0+p^k*u,v0+p^k*v)
-#     assert valuation(nh.content(),p)==m
-#     assert nh/p^m == ff(l)+(u*phi(l)+v)*gg(l)
-#     assert valuation(nh.derivative(l).content(),p)>=m
-#     # assert valuation(nh.derivative(l).content(),p)==ld+md
-# 
-#     # Our expression is c0(l)+u*cu(l)+v*cv(l)
-#     c0 = ZP([c % p^maxpow for c in ff.coeffs()])
-#     cv = ZP([c % p^maxpow for c in gg.coeffs()])
-#     cu = phi * cv
-#     assert valuation((nh - p^m*(c0(l)+u*cu(l)+v*cv(l))).content(),p) >= maxpow
-#     assert cv == Integers(p^maxpow)['x'](rdict['g'](phi))
-# 
-#     # The assertions on the trivariate polynomial nh above contain more
-#     # that this, but here follows a breakdown just in case.
-#     assert p^m*ff(l) == rdict['f'](phi(l))+((u0*phi(l)+v0)*rdict['g'](phi(l)))
-#     assert p^m*(u*phi(l)+v)*gg(l)==p^k*((u*phi(l)+v)*rdict['g'](phi(l)))
-#     assert p^m*gg(l)==p^k*rdict['g'](phi(l))
-# 
-#     cc0 = valuation(c0.content(),p)
-#     ccu = valuation(cu.content(),p)
-#     ccv = valuation(cv.content(),p)
-#     assert ccu >= ccv
-# 
-#     c = min(cc0,ccu,ccv)
-#     assert c == 0
-# 
-#     # zview(mround(matrix(sbound,sbound,sarr)-complete),u0,v0,p^k)
-# 
-#     dc0 = c0.derivative()
-#     dcu = cu.derivative()
-#     dcv = cv.derivative()
-# 
-#     # Now we know that the minimum valuation is zero.
-# 
-#     g0 = KP(c0)
-#     gu = KP(cu)
-#     gv = KP(cv)
-# 
-#     if not g0.is_constant():
-#         # Then it's the typical case, as encountered for instance at the
-#         # beginning of the root sieve.
-#         # Each possible l value must be tried, and will give rise to
-#         # potentially intersecting lattices. 
-#         for l in range(p):
-#             if k==0: l0=l
-#             g0l = g0(l); dg0l = KP(dc0)(l)
-#             gul = gu(l); dgul = KP(dcu)(l)
-#             gvl = gv(l); dgvl = KP(dcv)(l)
-#             if gvl == 0: continue
-#             msg=prefix+"Looking at roots phi(%r), where phi==%r" %(l,phi)
-#             rdict['logbook'].append(msg)
-#             print msg
-#             igl = 1/gvl
-#             du=0
-#             dv0=Z(-g0l * igl)
-#             dv=dv0
-#             u1 = u0 + p^k * du
-#             v1 = v0 + p^k * dv
-#             uv1=vector((u1,v1))
-#             rdict['logbook'].append((uv1, a-phi(l)*b, p* b, -scale/(p-1)))
-#             hits = light_array(sarr, uv1, a-phi(l)*b, p* b, fence,-scale/(p-1))
-#             msg=prefix+ "%d hits" %hits
-#             rdict['logbook'].append(msg)
-#             print msg
-#             if hits == 0: continue
-#             # We're optimistic here ; we're counting on the fact that we
-#             # expect the derivative not to cancel.
-#             
-#             # However, there is the possibility that we reach the
-#             # cancellation point. This only once per (p,p) square,
-#             # meaning that u,v are constrained.
-# 
-#             msg=prefix+ "Looking for multiple roots at phi(%r), where phi==%r" %(l,phi)
-#             rdict['logbook'].append(msg)
-#             print msg
-#             # The good equation for u is given by:
-#             df=rdict['f'].derivative()
-#             dg=rdict['g'].derivative()
-# 
-#             # Try to guess the right value for du.
-#             Zm1=Integers(p^(m+1))
-#             # rhs = Z(Zm1((f*dg-df*g)(phi(l))/cv(l)^2-u0))
-#             rhs = Z(K(((f*dg-g*df)(phi(l))/cv(l)^2-u0)/p^(m-ld)))
-#             # va = valuation(rhs,p)
-#             # assert va >= md
-#             # assert k >= md
-#             # if va < k:
-#                 # # Then by no means the derivative will vanish.
-#                 # continue
-#             range_du=[]
-#             if k-m+ld > 0 and rhs == 0:
-#                 # Then all u's will do.
-#                 range_du=range(p)
-#             else:
-#                 range_du = [rhs]
-#             ## u = Z(-igl*K((((df+(u0*x+v0)*dg+u0*g)(phi))(l)-ff(l)*(p^k*dg(phi))(l))/p^m))
-#             ## du = Z((-dg0l * gvl + g0l * dgvl) * igl ^ 2)
-#             ## u = Z(Z(Integers(p^(m+1))((f*dg-df*g)(phi(l))/cv(l)^2)-uv0[0])/p^k)
-#             for du in range_du:
-#                 dv = (dv0 - du *l0) % p
-#                 u1 = u0 + p^k * du
-#                 v1 = v0 + p^k * dv
-#                 uv1=vector((u1,v1))
-#                 rdict['logbook'].append((uv1, p*a, p*b, scale/(p-1)/p))
-#                 hits = light_array(sarr,
-#                             uv1, p*a, p*b, fence, scale/(p-1)/p)
-#                 msg=prefix+ "%d hits" %hits
-#                 rdict['logbook'].append(msg)
-#                 print msg
-#                 if hits == 0:
-#                     continue
-#                 # scale/(p-1)/p is scale/(p-1)-scale/p ; hence it brings
-#                 # back the cells to the contribution -scale/p, which is the
-#                 # contribution from a _single_ zero at this location, not
-#                 # liftable because of ramification. Later recursive calls
-#                 # will investigate the possibility that despite the multiple
-#                 # root mod p, we still get roots at higher precision.
-#                 nphi=phi(l+p*x)
-#                 nff=ZP((ff(l+p*x)+(du*nphi+dv)*gg(l+p*x))/p)
-#                 ngg=gg(l+p*x)
-#                 ## l,u,v=h.parent().gens()
-#                 ## nnh=nh(nphi(l),uv1[0]+p*u,uv1[1]+p*v)
-#                 ## assert nnh == p*(nff(l)+(u*nphi(l)+v)*ngg(l))
-#                 # ff,gg,uv0,l0,m,k,scale,phi=nff,ngg,uv1,l0,m+1,k+1,scale/p,nphi
-#                 reference_rotation_inner(rdict,p,nff,ngg,u1,v1,l0,ld+1,md+1,m+1,k+1,scale/p,nphi,d+1)
-#     elif ccv > 0:
-#         # ccv is zero, so ccu is even larger, which implies that cc0 has
-#         # to be zero. Since c0 is a constant polynomial, this implies
-#         # that there is no solution. So we finish here.
-#         return
-#     else:
-#         msg=prefix+ "We are here in recursive call number %d" % callnumber
-#         rdict['logbook'].append(msg)
-#         print msg
-#         # cc0 is not zero, which means that our expression has an extra
-#         # root only for specific u,v pairs. Basically, we have a linear
-#         # term in u and v which must be cancelled.
-#         constant_term=g0.constant_coefficient()
-#         dv0=Z(-constant_term/gv(l0))
-#         dv=dv0
-#         u1 = u0
-#         v1 = v0 + p^k * dv
-#         uv1=vector((u1,v1))
-#         assert ccv==0
-#         # Furthermore, our expression is c0(l)+u*cu(l)+v*cv(l) ; We know
-#         # that cu == phi * cv, hence our equation is simply v == -phi * u
-#         msg=prefix+ "Looking for places where the multiple root at %r may lift"%phi
-#         rdict['logbook'].append(msg)
-#         print msg
-#         rdict['logbook'].append((uv1, a-l0*b, p*b,-scale))
-#         hits=light_array(sarr, uv1, a-l0*b, p* b, fence,-scale)
-#         msg=prefix+ "%d hits" %hits
-#         rdict['logbook'].append(msg)
-#         print msg
-#         if hits == 0:
-#             return
-#         msg=prefix+"%r"%(K['l','u','v'](c0(l)+u*cu(l)+v*cv(l)))
-#         rdict['logbook'].append(msg)
-#         print msg
-#         for du in range(p):
-#             dv = (dv0-du*l0) % p
-#             uvscal=vector((du,dv))
-#             msg=prefix+ "Looking for lift specifically at u,v === %r" % uvscal
-#             rdict['logbook'].append(msg)
-#             print msg
-#             u2 = u0 + p^k * du
-#             v2 = v0 + p^k * dv
-#             uv2=vector((u2,v2))
-#             msg=prefix+ "global sub-lattice %r+%r,%r" % (uv2,p*a,p*b)
-#             rdict['logbook'].append(msg)
-#             print msg
-#             # We know that phi === l0 mod p, so (u0*phi+v0) is zero mod
-#             # p. ff itself is also zero mod p. However, some subtleties
-#             # can occur in the difference between the two.
-#             nff=ZP((ff+(du*phi+dv)*gg)/p)
-#             l,u,v=h.parent().gens()
-#             assert nh(l,du+p*u,dv+p*v)/p^(m+1) == nff(l)+(u*phi(l)+v)*gg(l)
-#             ## ff,u0,v0,m,k=nff,u1,v1,m+1,k+1
-#             reference_rotation_inner(rdict,p,nff,gg,u2,v2,l0,ld,md,m+1,k+1,scale,phi,d+1)
-#     msg=prefix+ "Finishing recursive call number %d" % callnumber
-#     rdict['logbook'].append(msg)
-#     print msg
-# 
-# 
-# def filter_logbook(rdict,u,v):
-#     vec=vector((u,v))
-#     for s in rdict['logbook']:
-#         if type(s) == type(''):
-#             print s
-#         else:
-#             st="sub-lattice %r+%r,%r: %f" % s
-#             if ((vec-s[0])*matrix([s[1],s[2]])^-1) in vec.parent():
-#                 st="** " + st
-#             print st
-# 
-# def filter_logbook_quick(rdict,u,v):
-#     vec=vector((u,v))
-#     for s in rdict['logbook']:
-#         if type(s) != type(''):
-#             if ((vec-s[0])*matrix([s[1],s[2]])^-1) in vec.parent():
-#                 st="sub-lattice %r+%r,%r: %f" % s
-#                 st="** " + st
-#                 print st
-# 
-# 
-# def light_array(sarr,x0,a,b,fence,value):
-#     x = copy(x0)
-#     pos = x[0] * fence[1]
-#     assert b[0] == 0
-#     dpos = a[0] * fence[1]
-#     hits=0
-#     while x[0] < fence[0]:
-#         # reduce within the row, since we know that b[0] is zero
-#         x[1] = x[1] % b[1]
-#         while x[1] < fence[1]:
-#             sarr[pos + x[1]] += value
-#             hits+=1
-#             x[1] += b[1]
-#         x += a
-#         pos += dpos
-#     return hits
-# 
-# # These are helpers, to be removed once the code works ok.
-# def zview(m,i0,j0,d):
-#     ncols = ((m.ncols() - j0) / d).ceil()
-#     nrows = ((m.nrows() - i0) / d).ceil()
-#     n=matrix(nrows,ncols)
-#     for i in range(0,nrows):
-#         for j in range(0,ncols):
-#             n[i,j]=m[i0+i*d,j0+j*d]
-#     return n
 
 def mround(m):
     d=matrix(ZZ,m.nrows(),m.ncols())
@@ -523,7 +236,7 @@ def rotation_handle_p(rdict,p):
     rdict['logbook']=[]
     rdict['cutoff']=1.0e-5
     maxpow=20
-    rdict['maxpow']=maxpow    
+    rdict['maxpow']=maxpow
     rdict['ppow']=[1,p]
     K=GF(p); KP=K['x'];
     rdict['gmodp']=KP(g)
@@ -538,7 +251,19 @@ def rotation_handle_p(rdict,p):
     dphi=x
     rdict['l0']=0
     hits=rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,0,scale,dphi,[])
-    printmin(rdict['sarr'],rdict['umax'],rdict['vmax'])    
+    sarr2 = [float(0.0) for i in range(rdict['umax']*rdict['vmax'])]
+    #for lattice in rdict['lattice_list']:
+    #   light(sarr2,lattice['u0'],lattice['v0'],lattice['us'],lattice['vs'],lattice['skew'],rdict['umax'],rdict['vmax'],lattice['contrib'])
+    for lattice in rdict['lattice_list']:
+        light_rectangle(sarr2,lattice['u0'],lattice['v0'],lattice['us'],lattice['vs'],lattice['skew'],0,rdict['umax']-1,0,rdict['vmax']-1,lattice['contrib'])
+    if len(rdict['sarr'])==len(sarr2):
+        print "Arrays are of same length"
+    for i in range(rdict['umax']*rdict['vmax']):
+        if rdict['sarr'][i]<>sarr2[i]:
+            print "Warning : different values of alpha in entry %d"%i
+    print "Finished reviewing average exponent values."
+    printmin(rdict['sarr'],rdict['umax'],rdict['vmax'])
+    #print_lattices(rdict)
     return hits
 
 
@@ -582,6 +307,7 @@ def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi,hist)
     Z=Integers(); ZP=Z['x'];
     x=ZP.gen()
     sarr=rdict['sarr']
+    U0,U1,V0,V1=rdict['U0'],rdict['U1'],rdict['V0'],rdict['V1']
     um,vm=rdict['umax'],rdict['vmax']
 
     # gg is never scaled down, and it is always evaluated at points where
@@ -640,10 +366,14 @@ def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi,hist)
             dv0=Z(minus_f_over_g_modp_l)
             u1 = u0
             v1 = v0 + pm * dv0
+            
 
-            hits = light(sarr, u1,v1, pm, pm1, twist_v1, um,vm,-scale1)
-
+            hits = light_rectangle(sarr, u1,v1, pm, pm1, twist_v1, U0,U1-1,V0,V1-1,-scale1)
             print ("1:m=%d ld=%d hits>0=%d u0=%d v0=%d us=%d vs=%d skew=%d contrib=%f"%(m,ld,(1 if (hits>0) else 0),u1,v1,pm,pm1,twist_v1,-scale1))
+            assert ((1 if (hits>0) else 0) == add_lattice(rdict,u1,v1,pm,pm1,twist_v1,0,um-1,0,vm-1,-scale1,p))
+            #hits = add_lattice(rdict,u1,v1,pm,pm1,twist_v1,0,um,0,vm,-scale1,p)
+
+            
             #print("1:%d "%(1 if (hits>0) else 0))
 
 
@@ -731,8 +461,9 @@ def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi,hist)
             new_twist_v1 = p * twist_v1
 
             for du in range(nspots):
-                hits = light(sarr, u1,v1, pm1, pm1, 0, um,vm, scale3)
+                hits = light_rectangle(sarr, u1,v1, pm1, pm1, 0, U0,U1-1,V0,V1-1, scale3)
                 print ("2:m=%d ld=%d hits>0=%d u0=%d v0=%d us=%d vs=%d skew=%d contrib=%f"%(m,ld,(1 if (hits>0) else 0),u1,v1,pm1,pm1,0,scale3))
+                assert (1 if (hits>0) else 0) == add_lattice(rdict,u1,v1,pm1,pm1,0,0,um-1,0,vm-1,scale3,p)                
                 #print("2:%d "%(1 if (hits>0) else 0))
                 # #print "main/excep, level %d : %d hits" % (m, hits)
                 thits += hits
@@ -760,8 +491,9 @@ def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi,hist)
         dv0=Z(minus_f_over_g_modp.constant_coefficient())
         u1 = u0
         v1 = v0 + pm * dv0
-        hits=light(sarr, u1, v1, pm, pm1, twist_v1, um, vm, -scale)
+        hits = light_rectangle(sarr, u1, v1, pm, pm1, twist_v1, U0,U1-1,V0,V1-1, -scale)        
         print ("3:m=%d ld=%d hits>0=%d u0=%d v0=%d us=%d vs=%d skew=%d contrib=%f"%(m,ld,(1 if (hits>0) else 0),u1,v1,pm,pm1,twist_v1,-scale))
+        assert (1 if (hits>0) else 0) == add_lattice(rdict,u1,v1,pm,pm1,twist_v1,0,um-1,0,vm-1,-scale,p)        
         #print ("3:%d "%(1 if (hits>0) else 0))
         if hits == 0:
             return thits
@@ -784,6 +516,72 @@ def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi,hist)
             ##print("nff after twist du=%d is \n%s"%(du,nff))
         
     return thits
+
+
+def add_lattice(rdict,u0,v0,us,vs,skew,U0,U1,V0,V1,contrib,p):
+    """Internal routine for testing the fast root sieve."""
+  
+    if(vs<0):
+        vs = -vs
+
+    if(us<0):
+        us = -us
+        skew = -skew
+  
+    while(skew<0):
+        skew += vs
+
+    while(skew>=vs):
+        skew-=vs
+
+    assert vs>0 and skew >= 0 and us>0  
+
+    q = floor((u0-U0)/us)
+    u = u0-q*us
+    v = v0-q*skew
+
+    q = floor((v-V0)/vs);
+    v = v - q*vs;
+    
+    assert v>=V0
+    assert u>=U0
+
+    if not empty(u,v,us,vs,skew,U0,U1,V0,V1):
+        lattice = dict(p=p,u0=u0,v0=v0,us=us,vs=vs,skew=skew,contrib=contrib)
+        rdict['lattice_list'].append(lattice)        
+        return 1
+    else:
+        return 0
+
+def empty(u0,v0,us,vs,skew,U0,U1,V0,V1): #We suppose u>=U0 and v>=V0
+    """ Returns 0 if the given rectangle does not contain a point of the lattice, 1 otherwise"""
+    if u0<=U1:
+        if v0<=V1:
+            return 0
+        else:
+            if skew==0:
+                return 1            
+            #q1=ceil((V0-(v0-vs))/skew)
+            q2=floor((U1-u0)/us)
+            u = u0
+            v = v0-vs
+            for i in range(q2):                
+                    u+=us
+                    v+=skew
+                    q = floor((v-V0)/vs)
+                    v = v-q*vs
+                    if v<=V1 and u<=U1:
+                        #sys.stderr.write("u0=%d v0=%d u=%d v=%d i=%d\n"%(u0,v0,u,v,i))
+                        return 0            
+            return 1
+    else:
+        return 1
+
+def print_lattices(rdict):
+    for lattice in rdict['lattice_list']:
+        print "u0=%d v0=%d us=%d vs=%d skew=%d contrib=%f p=%d"%(lattice['u0'],lattice['v0'],lattice['us'],lattice['vs'],lattice['skew'],lattice['contrib'],lattice['p'])
+
+
 
 def light(sarr,u0,v0,us,vs,skew,um,vm,value):
     """Internal routine for the fast root sieve."""
@@ -812,4 +610,49 @@ def light(sarr,u0,v0,us,vs,skew,um,vm,value):
             v -= vs
     return hits
 
+def light_rectangle(sarr,u0,v0,us,vs,skew,U0,U1,V0,V1,value):
+    """ Same as light, but in a rectangle. """
+    if(vs<0):
+        vs = -vs
 
+    if(us<0):
+        us = -us
+        skew = -skew
+  
+    while(skew<0):
+        skew += vs
+
+    while(skew>=vs):
+        skew-=vs
+
+    assert(us>0 and vs>0 and skew>=0)
+
+    q = floor((u0-U0)/us)
+    u = u0-q*us
+    v = v0-q*skew
+
+    q = floor((v-V0)/vs);
+    v = v - q*vs;
+    
+    assert v>=V0
+    assert u>=U0
+    
+    hits=0    
+    pos=(V1-V0+1)*(u-U0) + (v-V0)
+
+    while u<=U1:
+        while v<=V1:
+            sarr[pos]+=value
+            hits+=1
+            v+=vs
+            pos+=vs
+        u+=us
+        v+=skew
+        q=floor((v-V0)/vs)
+        v=v-q*vs
+        pos=(V1-V0+1)*(u-U0) + (v-V0)
+
+    return hits
+
+
+        
