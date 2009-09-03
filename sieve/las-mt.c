@@ -755,7 +755,7 @@ fill_in_buckets(bucket_array_t *BA_param, factorbase_degn_t *fb,
            Note that usually, this doesn't happen on the rational side, since
            the prime q cannot divide both sides, unless q divides Res(f,g). */
         if (UNLIKELY(p == si->q))
-          continue;
+          goto next_fb;
 
         for (nr = 0; nr < fb->nr_roots; ++nr) {
             const uint32_t I = si->I;
@@ -859,6 +859,7 @@ fill_in_buckets(bucket_array_t *BA_param, factorbase_degn_t *fb,
             __asm__("## Inner bucket sieving loop stops here!!!\n");
         }
         int i;
+next_fb:
         for (i = 0; i < si->nb_threads; ++i) {
             fb = fb_next (fb);
             if (fb->p == FB_END || fb->p > pmax) {
