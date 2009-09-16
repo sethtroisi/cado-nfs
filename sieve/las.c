@@ -1383,7 +1383,7 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
 	    {
 	      fbprime_t q, g;
 	      r -= p;
-	      g = bin_gcd (p, r);
+	      g = gcd_ul (p, r);
 	      if (do_bad_primes && g < si->J)
 		{
 		  // Fill in data for this bad prime
@@ -1402,9 +1402,11 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
 		    }
 		  else
 		    {
+		      int rc;
 		      /* gcd(r / g, q) = 1 here */
 		      uint64_t U = r / g;
-		      invmod (&U, q);
+		      rc = invmod (&U, q);
+		      ASSERT_ALWAYS (rc != 0);
 		      ssd->bad_p[ssd->nb_bad_p].U = U;
 		      ssd->bad_p[ssd->nb_bad_p].next_position = g * si->I + (si->I / 2 + U) % q;
 		    }
@@ -1474,8 +1476,8 @@ void sieve_small_bucket_region(unsigned char *S, const int bucket_nr,
          "bad" prime below. */
       ASSERT (r < 2);
       logps = 0UL;
-      for (j = 0; j < sizeof (unsigned long); j += 2)
-	((unsigned char *)&logps)[r + j] = ssd.nice_p[n].logp;
+      for (j = r; j < sizeof (unsigned long); j += 2)
+	((unsigned char *)&logps)[j] = ssd.nice_p[n].logp;
       ASSERT (I % (4 * sizeof (unsigned long)) == 0);
       S_ptr = (unsigned long *) (S + I); /* Sieve only odd lines */
       for (j = 1; j < nj; j += 2)
@@ -1490,7 +1492,8 @@ void sieve_small_bucket_region(unsigned char *S, const int bucket_nr,
             *(S_ptr + 3) -= logps;
             S_ptr += 4;
           }
-        S_ptr = (unsigned long *)((char *) S_ptr + I);
+        ASSERT (S_ptr == end);
+        S_ptr = (unsigned long *)((char *) S_ptr + I); /* skip one line */
       }
     }
 
@@ -1499,7 +1502,7 @@ void sieve_small_bucket_region(unsigned char *S, const int bucket_nr,
         unsigned char logp;
         unsigned int i, i0;
         p = ssd.nice_p[n].p;
-        twop = p + p;
+        twop = p + ((p % 2 == 0) ? 0 : p); /* twop is even multiple of p */
         r = ssd.nice_p[n].r;
         logp = ssd.nice_p[n].logp;
         i0 = ssd.nice_p[n].next_position;
@@ -1507,13 +1510,16 @@ void sieve_small_bucket_region(unsigned char *S, const int bucket_nr,
         ASSERT(i0 < p);
         for (j = 0; j < nj; j += 2)
           {
-            /* for j even, we sieve only odd i */
-            for (i = (i0 & 1) ? i0 : i0 + p; i < I; i += twop)
-	      {
-		if (test_divisibility && side == 'a')
-		  test_divisible_x (p, S_ptr + i - S, bucket_nr, si);
-		S_ptr[i] -= logp;
-	      }
+            /* for j even, we sieve only odd i. if i0 and p are both even, 
+               don't sieve this line */
+            if ((i0 | p) & 1) {
+              for (i = (i0 & 1) ? i0 : i0 + p; i < I; i += twop)
+                {
+                  if (test_divisibility && side == 'a')
+                    test_divisible_x (p, S_ptr + i - S, bucket_nr, si);
+                  S_ptr[i] -= logp;
+                }
+            }
             i0 += r;
             if (i0 >= p)
               i0 -= p;
@@ -1533,9 +1539,10 @@ void sieve_small_bucket_region(unsigned char *S, const int bucket_nr,
         ssd.nice_p[n].next_position = i0;
     }
 
-    /* Sieve the bad primes. We have
-       i * g == j * U (mod p^k) where g = p^l. This hits only for g|j,
-       then j = j' * g, and i == j' * U (mod p^(k-l)).
+    /* Sieve the bad primes. We have p^k | fij(i,j) for i,j such that
+       i * g == j * U (mod p^k) where g = p^l and gcd(U, p) = 1. 
+       This hits only for g|j, then j = j' * g, and i == j' * U (mod p^(k-l)).
+       In every g-th line, we sieve the entries with i == (j/g)*U (mod q).
        In ssd we have stored g, q = p^(k-l), U, and next_position so that
        S + next_position is the next sieve entry that needs to be sieved.
        So if S + next_position is in the current bucket region, we
@@ -1597,7 +1604,7 @@ void sieve_small_bucket_region(unsigned char *S, const int bucket_nr,
 		  /* Yes, sieve only odd i values */
 		  if (i % 2 == 0) /* Make i odd */
 		    i += q;
-		  if ((i | q) & 1) /* If not both are even */
+		  if (i % 2 == 1) /* If not both i,q are even */
 		    for ( ; i < I; i += evenq)
 		      {
 			if (test_divisibility && side == 'a')
@@ -1616,7 +1623,7 @@ void sieve_small_bucket_region(unsigned char *S, const int bucket_nr,
 		}
 
 	      line_idx += U;
-	      S_ptr += ssd.bad_p[n].g * I;
+	      S_ptr += g * I;
 	      i0 += g * I + U;
 	      if (line_idx >= q)
 		{
@@ -1807,7 +1814,7 @@ void factor_list_fprint(FILE *f, factor_list_t fl) {
 }
 
 
-/* The entries in BA must be sorted in order of increasing x */
+/* The entries in BP must be sorted in order of increasing x */
 static void
 divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const int x,
                            bucket_primes_t *BP, const unsigned long fbb)
@@ -2296,7 +2303,12 @@ void test_divisible_x (const fbprime_t p MAYBE_UNUSED, const unsigned long x,
   eval_fij (v, (const mpz_t *) si->fij, si->degree, i, j);
   /* gmp_fprintf (stderr, "# test_divisible_x (" FBPRIME_FORMAT ", %lu, %d, ): "
      "i = %ld, j = %lu, v = %Zd\n", p, x, n, i, j, v); */
-  ASSERT (mpz_divisible_ui_p (v, (unsigned long) p));
+  if (!mpz_divisible_ui_p (v, (unsigned long) p))
+    {
+      gmp_fprintf (stderr, "fij(%ld,%ld)=%Zd is not divisible by " FBPRIME_FORMAT "\n",
+                   i, j, v, p);
+      abort();
+    }
   mpz_clear (v);
 }
 

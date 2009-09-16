@@ -51,7 +51,8 @@ gcd_ul (unsigned long a, unsigned long b)
 {
   unsigned long t;
 
-  ASSERT (b > 0);
+  if (b == 0)
+    return a;
   
   if (a >= b)
     a %= b;
