@@ -2072,8 +2072,9 @@ main (int argc, char **argv)
   if (sieve_r)
     {
       /* Generate rational fb */
-      fbr->fullfb = fb_make_linear (cpoly->g, (fbprime_t) cpoly->rlim, 
-				    log_scale, verbose, 0, stdout);
+      fbr->fullfb = fb_make_linear ((const mpz_t *) cpoly->g, 
+                                    (fbprime_t) cpoly->rlim, 0, log_scale, 
+                                    verbose, 0, stdout);
       if (fbr == NULL)
 	{
 	  fprintf (stderr, 

@@ -144,20 +144,105 @@ fb_init_firstlog (factorbase_t fb)
 }
 
 
-/* Generate a factor base with primes <= bound for a linear polynomial */
-/* If projective != 0, adds projective roots (for primes that divide 
-   leading coefficient */
+/* Assume q is a prime power p^k with k>=1, return p if k > 1, 0 otherwise. */
+static uint32_t
+is_prime_power (uint32_t q)
+{
+  unsigned int maxk, k;
+  uint32_t p;
+
+  for (maxk = 0, p = q; p > 1; p /= 2, maxk ++);
+  for (k = maxk; k >= 2; k--)
+    {
+      p = (uint32_t) (pow ((double) q, 1.0 / (double) k) + 0.5);
+      if (q % p == 0)
+        return p;
+    }
+  return 0;
+}
+
+
+/* Make one factor base entry for a linear polynomial poly[1] * x + poly[0]
+   and the prime (power) q. We assume that poly[0] and poly[1] are coprime.
+   Non-projective roots a/b such that poly[1] * a + poly[0] * b == 0 (mod q) 
+   with gcd(poly[1], q) = 1 are stored as a/b mod q.
+   If do_projective != 0, also stores projective roots with gcd(q, f_1) > 1, 
+   but stores the reciprocal root plus p, p + b/a mod p^k.
+   If no root was stored (projective root with do_projective = 0) returns 0, 
+   returns 1 otherwise. */
+
+static int
+fb_make_linear1 (factorbase_degn_t *fb_entry, const mpz_t *poly,
+		 const fbprime_t p, const unsigned char logp, 
+		 const int do_projective)
+{
+  modulusul_t m;
+  residueul_t r0, r1;
+  modintul_t gcd;
+  int is_projective, rc;
+  
+  fb_entry->p = p;
+  fb_entry->plog = logp;
+  
+  modul_initmod_ul (m, p);
+  modul_init_noset0 (r0, m);
+  modul_init_noset0 (r1, m);
+  
+  modul_set_ul_reduced (r0, mpz_fdiv_ui (poly[0], p), m);
+  modul_set_ul_reduced (r1, mpz_fdiv_ui (poly[1], p), m);
+  modul_gcd (gcd, r1, m);
+  is_projective = (modul_intcmp_ul (gcd, 1UL) > 0);
+  
+  if (is_projective)
+    {
+      if (!do_projective)
+	{
+	  modul_clear (r0, m);
+	  modul_clear (r1, m);
+	  modul_clearmod (m);
+	  return 0; /* If we don't do projective roots, just return */
+	}
+      modul_swap (r0, r1, m);
+    }
+  
+  /* We want poly[1] * a + poly[0] * b == 0 <=> 
+     a/b == - poly[0] / poly[1] */
+  rc = modul_inv (r1, r1, m); /* r1 = 1 / poly[1] */
+  ASSERT_ALWAYS (rc != 0);
+  modul_mul (r1, r0, r1, m); /* r1 = poly[0] / poly[1] */
+  modul_neg (r1, r1, m); /* r1 = - poly[0] / poly[1] */
+  
+  fb_entry->roots[0] = modul_get_ul (r1, m) + (is_projective ? p : 0);
+  if (p % 2 != 0)
+    fb_entry->invp = - modul_invmodlong (modul_getmod_ul (m));
+  
+  modul_clear (r0, m);
+  modul_clear (r1, m);
+  modul_clearmod (m);
+  
+  return 1;
+}
+
+
+/* Generate a factor base with primes <= bound and prime powers <= powbound 
+   for a linear polynomial. If projective != 0, adds projective roots 
+   (for primes that divide leading coefficient) */
 
 factorbase_degn_t *
-fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale, 
+fb_make_linear (const mpz_t *poly, const fbprime_t bound, 
+		const fbprime_t powbound, const double log_scale, 
 		const int verbose, const int projective, FILE *output)
 {
   fbprime_t p;
   factorbase_degn_t *fb = NULL, *fb_cur, *fb_new;
-  size_t fbsize = 0, fballoc = 0;
+  size_t fbsize = 0, fballoc = 0, pow_len = 0;
   const size_t allocblocksize = 1 << 20;
+  unsigned long logp;
   int had_proj_root = 0;
-  
+  fbprime_t *powers = NULL, min_pow = 0; /* List of prime powers that yet 
+					    need to be included, and the 
+					    minimum among them */
+
   rdtscll (tsc1);
   fb_cur = (factorbase_degn_t *) malloc (fb_entrysize_uc (1));
   ASSERT (fb_cur != NULL);
@@ -167,88 +252,78 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
 
   if (verbose)
     gmp_fprintf (output, 
-		"# Making factor base for polynomial g(x) = %Zd * x + %Zd\n",
-		poly[1], poly[0]);
-
-  for (p = 2 ; p <= bound; p = getprime (p))
+		 "# Making factor base for polynomial g(x) = %Zd * x + %Zd,\n"
+		 "# including primes up to " FBPRIME_FORMAT 
+		 " and prime powers up to " FBPRIME_FORMAT ".\n",
+		 poly[1], poly[0], bound, powbound);
+  
+  p = 2;
+  while (p <= bound)
     {
-      modulusul_t m;
-      residueul_t r1, r2;
-
-      fb_cur->p = p;
-      fb_cur->plog = fb_log (fb_cur->p, log_scale, 0.);
-
-      modul_initmod_ul (m, p);
-      modul_init_noset0 (r1, m);
-      modul_init_noset0 (r2, m);
-      
-      /* We want f_1 * a + f_0 * b == 0 (mod p^k) 
-	 with a, b coprime and f_1, f_0 coprime
-
-	 p^m = gcd (f_1, p^k)
-
-	 p^k | F(a,b) <=>
-	 ( f_0 * b == 0 (mod p^m) <=> b == 0 (mod p^m)  && 
-	   (f_1/p^m) * a + f_0 * (b/p^m) == 0 (mod p^(k-m)) )
-	 
-	 p^m = (p^k, f_1) => 
-	   p^k | F(a,b) <=> p^m | b && f(a/b) == 0 (mod p^(k-m))
-	 
-      */
-
-      modul_set_ul_reduced (r2, mpz_fdiv_ui (poly[1], p), m);
-      if (modul_is0 (r2, m))
+      fbprime_t q;
+      /* Handle any prime powers that are smaller than p */
+      if (pow_len > 0 && min_pow < p)
 	{
-	  /* If p | g1 and !(p | g0), p|G(a,b) <=> p|b so that's a 
-	     projective root */
-	  if (!projective)
-	    continue; /* If we don't do projective roots, just move on to 
-			 the next prime */
-	  if (verbose)
+	  size_t i;
+	  /* Find this p^k in the list of prime powers and replace it 
+	     by p^(k+1) if p^(k+1) does not exceed powbound, otherwise
+	     remove p^k from the list */
+	  for (i = 0; i < pow_len && powers[i] != min_pow; i++);
+	  ASSERT_ALWAYS (i < pow_len);
+	  q = is_prime_power (min_pow);
+	  ASSERT (min_pow / q >= q && min_pow % (q*q) == 0);
+	  logp = fb_log (min_pow, log_scale, 0.) - 
+	         fb_log (min_pow / q, log_scale, 0.);
+	  if (powers[i] <= powbound / q)
+	    powers[i] *= q; /* Increase exponent */
+	  else
 	    {
-	      if (!had_proj_root)
-		{
-		  fprintf (output, "# Primes with projective roots:");
-		  had_proj_root = 1;
-		}
-	      fprintf (output, " " FBPRIME_FORMAT , p);
+	      for ( ; i < pow_len - 1; i++) /* Remove from list */
+		powers[i] = powers[i + 1];
+	      pow_len--;
 	    }
-	  fb_cur->roots[0] = p; /* The root is 1/0, which we store as 0/1 + p */
-	  if (p % 2 != 0)
-	    fb_cur->invp = - modul_invmodlong (modul_getmod_ul (m));
+	  q = min_pow;
+	  /* Find new minimum among the prime powers */
+	  if (pow_len > 0)
+	    min_pow = powers[0];
+	  for (i = 1; i < pow_len; i++)
+	    if (powers[i] < min_pow)
+	      min_pow =  powers[i];
 	}
       else
 	{
-	  /* Affine root */
-	  modul_set_ul_reduced (r1, mpz_fdiv_ui (poly[0], p), m);
-
-	  /* We want g_1 * a + g_0 * b == 0 <=> a/b == - g0 / g1 */
-	  modul_inv (r2, r2, m); /* r2 = 1 / g1 */
-
-	  modul_mul (r2, r1, r2, m); /* r2 = g0 / g1 */
-	  modul_neg (r2, r2, m); /* r2 = - g0 / g1 */
-
-#ifndef NDEBUG
-	  {
-	    residueul_t r3;
-	    modul_init_noset0 (r3, m);
-	    modul_set_ul_reduced (r3, mpz_fdiv_ui (poly[1], p), m);
-	    modul_mul (r3, r3, r2, m); /* g1 * (- g0 / g1) */
-	    modul_add (r3, r3, r1, m); /* g1 * (- g0 / g1) + g0 */
-	    ASSERT (modul_get_ul (r3, m) == 0);
-	    modul_clear (r3, m);
-	  }
-#endif
-
-	  if (p % 2 != 0)
-	    fb_cur->invp = - modul_invmodlong (modul_getmod_ul (m));
-	  fb_cur->roots[0] = modul_get_ul (r2, m);
+	  q = p;
+	  logp = fb_log (q, log_scale, 0.);
+	  /* Do we need to add this prime to the prime powers list? */
+	  if (q <= powbound / q)
+	    {
+	      size_t i;
+	      powers = realloc (powers, (++pow_len) * sizeof (fbprime_t));
+	      ASSERT_ALWAYS(powers != NULL);
+	      powers[pow_len - 1] = q*q;
+	      /* Find new minimum among the prime powers */
+	      min_pow = powers[0];
+	      for (i = 1; i < pow_len; i++)
+		if (powers[i] < min_pow)
+		  min_pow =  powers[i];
+	    }
+	  p = getprime (p);
 	}
-
-      modul_clear (r1, m);
-      modul_clear (r2, m);
-      modul_clearmod (m);
-
+      
+      if (!fb_make_linear1 (fb_cur, poly, q, logp, projective))
+	continue; /* If root is projective and we don't want those, 
+		     skip to next prime */
+      
+      if (verbose && fb_cur->p > q)
+	{
+	  if (!had_proj_root)
+	    {
+	      fprintf (output, "# Primes with projective roots:");
+	      had_proj_root = 1;
+	    }
+	  fprintf (output, " " FBPRIME_FORMAT , q);
+	}
+      
       fb_new = fb_add_to (fb, &fbsize, &fballoc, allocblocksize, fb_cur);
       if (fb_new == NULL)
 	{
@@ -261,6 +336,7 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
       
       /* FIXME: handle prime powers */
     }
+
   getprime (0); /* free prime iterator */
 
   if (fb != NULL) /* If nothing went wrong so far, put the end-of-fb mark */
@@ -275,6 +351,7 @@ fb_make_linear (mpz_t *poly, const fbprime_t bound, const double log_scale,
     }
 
   free (fb_cur);
+  free (powers);
 
   if (had_proj_root)
     fprintf (output, "\n");
@@ -438,23 +515,6 @@ fb_make_linear_powers (mpz_t *poly, const fbprime_t bound, const double log_scal
   return fb;
 }
 #endif
-
-/* Assume q is a prime power p^k with k>=1, return p if k > 1, 0 otherwise. */
-static uint32_t
-is_prime_power (uint32_t q)
-{
-  unsigned int maxk, k;
-  uint32_t p;
-
-  for (maxk = 0, p = q; p > 1; p /= 2, maxk ++);
-  for (k = maxk; k >= 2; k--)
-    {
-      p = (uint32_t) (pow ((double) q, 1.0 / (double) k) + 0.5);
-      if (q % p == 0)
-        return p;
-    }
-  return 0;
-}
 
 factorbase_degn_t *
 fb_read_addproj (const char *filename, const double log_scale, 

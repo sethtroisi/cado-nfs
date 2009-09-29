@@ -6,46 +6,6 @@
 #include "cado.h"
 #include "utils/misc.h" /* for ctzl */
 
-#if 0
-/* Buggy ? */
-static inline unsigned long
-gcd_ul (unsigned long a, unsigned long b)
-{
-  unsigned long t;
-  uint32_t a32, b32, t32;
-
-  ASSERT (b > 0);
-  
-  if (a >= b)
-    a %= b;
-
-  while (a > UINT32_MAX)
-    {
-      if (b - a < a)
-	t = b - a;
-      else
-	t = b % a;
-      b = a;
-      a = t;
-    }
-
-  if (a == 0)
-    return b;
-
-  a32 = a;
-  b32 = b;
-  t32 = t;
-
-  while (a32 > 0)
-    {
-      t32 = b32 % a32; /* The 32 bit DIV is much faster */
-      b32 = a32;
-      a32 = t32;
-    }
-
-  return b32;
-}
-#else
 static inline unsigned long
 gcd_ul (unsigned long a, unsigned long b)
 {
@@ -67,7 +27,6 @@ gcd_ul (unsigned long a, unsigned long b)
 
   return b;
 }
-#endif
 
 static inline unsigned long 
 eulerphi_ul (unsigned long n)
@@ -189,6 +148,7 @@ sqrtint_ul (const unsigned long n, unsigned long *e)
 static inline int64_t
 bin_gcd (int64_t a, int64_t b)
 {
+  ASSERT (b == 0 || b % 2 == 1);
   while (b != 0)
     {
       /* if a is odd, reduce a wrt b, i.e., cancel the two low bits of a,
@@ -205,4 +165,41 @@ bin_gcd (int64_t a, int64_t b)
       b = ((b ^ a) & 2) ? b + a : b - a;
     }
   return (a > 0) ? a : -a;
+}
+
+/* Binary gcd; any input allowed. */
+static inline int64_t
+bin_gcd_safe (int64_t a, int64_t b)
+{
+  int s, t;
+
+  if (a == 0)
+    return b;
+
+  if (b == 0)
+    return a;
+
+  s = ctzl (a);
+  t = ctzl (b);
+  a >>= s;
+  b >>= t;
+  if (t < s)
+    s = t;
+  
+  while (b != 0)
+    {
+      /* if a is odd, reduce a wrt b, i.e., cancel the two low bits of a,
+         so that a + q*b = 0 (mod 4) */
+      b >>= ctzl (b);
+      a = ((a ^ b) & 2) ? a + b : a - b;
+      /* if a was even, then since b is now odd, the new a is odd */
+      if (a == 0)
+        return (b > 0) ? b : -b;
+      a >>= ctzl (a);
+      /* from here on, a and b are odd (or zero) */
+      ASSERT(a & 1);
+      /* reduce b wrt a */
+      b = ((b ^ a) & 2) ? b + a : b - a;
+    }
+  return (a > 0) ? (a << s) : ((-a) << s);
 }

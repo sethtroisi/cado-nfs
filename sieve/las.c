@@ -76,6 +76,10 @@
    to (i,j), i.e., a = a0*i+a1*j, b = b0*i+b1*j */
 // #define TRACE_K 5418470
 
+/* Define CHECK_UNDERFLOW to check for underflow when subtracting
+   the rounded log(p) from sieve array locations */
+//#define CHECK_UNDERFLOW
+
 /* Some functions should not be inlined when we profile or it's hard or
    impossible to tell them apart from the rest in the profiler output */
 #ifdef PROFILE
@@ -110,14 +114,12 @@ typedef struct {
     double scale_rat;      /* norm scale used on the rational side */
     double logmax_alg;     /* norms on the alg. side are < 2^logmax_alg */
     double logmax_rat;     /* norms on the rat. side are < 2^logmax_rat */
-    mpz_t *fij;       /* coefficients of F(a0*i+a1*j, b0*i+b1*j) */
+    mpz_t *fij, gij[2];    /* coefficients of F,G(a0*i+a1*j, b0*i+b1*j)  */
     double *fijd;     /* coefficients of F_q/q */
     double *tmpd;     /* temporary array */
     double B;         /* bound for the norm computation */
     unsigned char alg_Bound[256]; /* non-zero for good lognorms */
     unsigned char rat_Bound[256]; /* non-zero for good lognorms */
-    int checknorms;          /* if non-zero, completely factor the potential
-                                relations */
     fbprime_t *trialdiv_primes_alg;
     fbprime_t *trialdiv_primes_rat;
     trialdiv_divisor_t *trialdiv_data_alg;
@@ -129,11 +131,17 @@ typedef struct {
 } sieve_info_t;
 
 /* Forward declarations of functions */
+MAYBE_UNUSED 
+static void NxToIJ(int *, unsigned int *, const unsigned int, 
+                   const unsigned int, const sieve_info_t *);
+MAYBE_UNUSED 
+static void IJToAB(int64_t *, uint64_t *, const int, const unsigned int, 
+                   const sieve_info_t *);
 static void xToAB(int64_t *a, uint64_t *b, const unsigned int x,
                   const sieve_info_t *si);
 /* Test if entry x in bucket region n is divisible by p */
 void test_divisible_x (const fbprime_t p, const unsigned long x, const int n,
-		       const sieve_info_t *si);
+		       const sieve_info_t *si, const char side);
 int factor_leftover_norm (mpz_t n, unsigned int b, mpz_array_t* const factors,
 			  uint32_array_t* const multis,
 			  facul_strategy_t *strategy);
@@ -189,6 +197,8 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int logI, uint64_t q0,
   si->tmpd = (double*) malloc ((d + 1) * sizeof (double));
   for (k = 0; k <= d; k++)
     mpz_init (si->fij[k]);
+  mpz_init (si->gij[0]);
+  mpz_init (si->gij[1]);
   si->logI = logI;
   si->I = 1 << si->logI;
   si->J = 1 << (si->logI - 1);
@@ -300,11 +310,19 @@ factor_small (mpz_t n, fbprime_t lim)
 static void
 sieve_info_update (sieve_info_t *si, const int verbose, FILE *output)
 {
+  unsigned int k;
+  double invq;
+  
   if (verbose)
     fprintf (output, "# I=%u; J=%u\n", si->I, si->J);
 
   /* update number of buckets */
   si->nb_buckets = 1 + (si->I * si->J - 1) / si->bucket_region;
+  
+  /* Update floating point version of algebraic poly */
+  invq = 1.0 / (double) si->q;
+  for (k = 0; k <= si->degree; k++)
+    si->fijd[k] = mpz_get_d (si->fij[k]) * invq;
 }
 
 static void
@@ -316,6 +334,8 @@ sieve_info_clear (sieve_info_t *si)
   for (k = 0; k <= d; k++)
     mpz_clear (si->fij[k]);
   free (si->fij);
+  mpz_clear (si->gij[0]);
+  mpz_clear (si->gij[1]);
   free (si->fijd);
   free (si->tmpd);
   free (si->lpf);
@@ -736,6 +756,7 @@ fill_in_buckets(bucket_array_t *BA_param, factorbase_degn_t *fb,
         unsigned char nr;
         fbprime_t p = fb->p;
         unsigned char logp = fb->plog;
+        ASSERT_ALWAYS (p % 2 == 1);
 
         /* Write new set of pointers if the logp value changed */
         bucket_new_logp (&BA, logp);
@@ -850,6 +871,57 @@ fill_in_buckets(bucket_array_t *BA_param, factorbase_degn_t *fb,
   *BA_param = BA; /* Write back BA so the nr_logp etc get copied to caller */
 }
 
+
+/* Decrease a sieve array entry, with underflow checking and tracing 
+   if desired */
+static inline void
+sieve_decrease (unsigned char *S, const unsigned char logp, 
+                MAYBE_UNUSED const uint16_t x, 
+                MAYBE_UNUSED const unsigned int bucket_nr,
+                MAYBE_UNUSED const fbprime_t p,
+                MAYBE_UNUSED const sieve_info_t *si, 
+                MAYBE_UNUSED const int callee)
+{
+#ifdef TRACE_K
+  if ((x + bucket_nr * si->bucket_region) == TRACE_K)
+    fprintf(stderr, "# Subtract log(" FBPRIME_FORMAT ") = %u from "
+            "S[%u] = %hhu, from BA[%u], ", 
+            p, logp, TRACE_K, S[x], bucket_nr);
+#endif
+
+#ifdef CHECK_UNDERFLOW
+  if (S[x] < logp)
+    {
+      int i;
+      unsigned int j;
+      int64_t a;
+      uint64_t b;
+      NxToIJ (&i, &j, bucket_nr, x, si);
+      IJToAB (&a, &b, i, j, si);
+      if (i % 2 == 0 && j % 2 == 0)
+        fprintf (stderr, "# Error, underflow (%d) at (N,x)=(%u, %u), "
+                 "(i,j)=(%d, %u), both even!\n", callee, bucket_nr, x, i, j);
+        
+      else
+        fprintf (stderr, "# Error, underflow (%d) at (N,x)=(%u, %u), "
+                 "(i,j)=(%d, %u), (a,b)=(%ld, %lu), S[x] = %hhu, log(" 
+                 FBPRIME_FORMAT ") = %hhu\n", 
+                 callee, bucket_nr, x, i, j, a, b, S[x], p, logp);
+      S[x] = 0;
+    }
+  else
+    S[x] -= logp;
+#else
+  S[x] -= logp;
+#endif
+
+#ifdef TRACE_K
+  if ((x + bucket_nr * si->bucket_region) == TRACE_K)
+    fprintf(stderr, "new value is %hhu\n", S[x]);
+#endif
+}
+
+
 NOPROFILE_STATIC void
 apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
                      sieve_info_t * si MAYBE_UNUSED)
@@ -888,12 +960,7 @@ apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
          }
        
        x = (read_ptr++)->x;
-       S[x] -= logp;
-#ifdef TRACE_K
-       if ((x + i * si->bucket_region) == TRACE_K)
-           fprintf(stderr, "Subtract %u to S[%u], from BA[%u]\n",
-                   logp, TRACE_K, i);
-#endif
+       sieve_decrease (S, logp, x, i, 0, si, 1);
     }
 }
 
@@ -1453,7 +1520,6 @@ void sieve_small_bucket_region(unsigned char *S, const int bucket_nr,
 			       const unsigned char side)
 {
     const uint32_t I = si->I;
-    unsigned char *S_ptr;
     unsigned long j, nj;
     int n;
     const int test_divisibility = 0; /* very slow, but nice for debugging */
@@ -1500,13 +1566,12 @@ void sieve_small_bucket_region(unsigned char *S, const int bucket_nr,
     for ( ; n < ssd.nb_nice_p; ++n) {
         fbprime_t p, r, twop;
         unsigned char logp;
-        unsigned int i, i0;
+        unsigned int i, i0, linestart = 0;
         p = ssd.nice_p[n].p;
         twop = p + ((p % 2 == 0) ? 0 : p); /* twop is even multiple of p */
         r = ssd.nice_p[n].r;
         logp = ssd.nice_p[n].logp;
         i0 = ssd.nice_p[n].next_position;
-        S_ptr = S;
         ASSERT(i0 < p);
         for (j = 0; j < nj; j += 2)
           {
@@ -1515,26 +1580,26 @@ void sieve_small_bucket_region(unsigned char *S, const int bucket_nr,
             if ((i0 | p) & 1) {
               for (i = (i0 & 1) ? i0 : i0 + p; i < I; i += twop)
                 {
-                  if (test_divisibility && side == 'a')
-                    test_divisible_x (p, S_ptr + i - S, bucket_nr, si);
-                  S_ptr[i] -= logp;
+	          if (test_divisibility)
+	            test_divisible_x (p, linestart + i, bucket_nr, si, side);
+                  sieve_decrease (S, logp, linestart + i, bucket_nr, p, si, 2);
                 }
             }
             i0 += r;
             if (i0 >= p)
               i0 -= p;
-            S_ptr += I;
+            linestart += I;
             /* j odd */
             for (i = i0 ; i < I; i += p)
 	      {
-		if (test_divisibility && side == 'a')
-		  test_divisible_x (p, S_ptr + i - S, bucket_nr, si);
-		S_ptr[i] -= logp;
+		if (test_divisibility)
+		  test_divisible_x (p, linestart + i, bucket_nr, si, side);
+                sieve_decrease (S, logp, linestart + i, bucket_nr, p, si, 3);
 	      }
             i0 += r;
             if (i0 >= p)
               i0 -= p;
-            S_ptr += I;
+            linestart += I;
           }
         ssd.nice_p[n].next_position = i0;
     }
@@ -1582,24 +1647,24 @@ void sieve_small_bucket_region(unsigned char *S, const int bucket_nr,
                 }
               i0 += ssd.bad_p[n].g * I;
             }
-          ssd.bad_p[n].next_position = i0 - si->bucket_region;
+          ssd.bad_p[n].next_position = i0 - (1U << LOG_BUCKET_REGION);
         }
       else
 	{
 	  /* q > 1, more general sieving code. */
-	  unsigned int i0 = ssd.bad_p[n].next_position;
-	  unsigned int line_idx = i0 & (I - 1U); /* Index in line to sieve */
-	  unsigned char *S_ptr = S + i0 - line_idx; /* Start of line to sieve */
+	  const unsigned int i0 = ssd.bad_p[n].next_position;
 	  const fbprime_t g = ssd.bad_p[n].g;
 	  const fbprime_t q = ssd.bad_p[n].q;
 	  const fbprime_t U = ssd.bad_p[n].U;
 	  const unsigned char logp = ssd.bad_p[n].logp;
 	  const fbprime_t evenq = (q % 2 == 0) ? q : 2 * q;
+	  unsigned int lineoffset = i0 & (I - 1U),
+	               linestart = i0 - lineoffset;
 	  ASSERT (U < q);
-	  while (i0 < (unsigned int) si->bucket_region)
+	  while (linestart < (1U << LOG_BUCKET_REGION))
 	    {
-	      unsigned int i = line_idx;
-	      if ((i0 & I) == 0) /* Is j even? */
+	      unsigned int i = lineoffset;
+	      if ((linestart & I) == 0) /* Is j even? */
 		{
 		  /* Yes, sieve only odd i values */
 		  if (i % 2 == 0) /* Make i odd */
@@ -1607,31 +1672,28 @@ void sieve_small_bucket_region(unsigned char *S, const int bucket_nr,
 		  if (i % 2 == 1) /* If not both i,q are even */
 		    for ( ; i < I; i += evenq)
 		      {
-			if (test_divisibility && side == 'a')
-			  test_divisible_x (g*q, S_ptr + i - S, bucket_nr, si);
-			S_ptr[i] -= logp;
+			if (test_divisibility)
+			  test_divisible_x (g*q, linestart + i, bucket_nr, si, side);
+                        sieve_decrease (S, logp, linestart + i, bucket_nr, q, si, 4);
 		      }
 		}
 	      else
 		{
 		  for ( ; i < I; i += q)
 		    {
-		      if (test_divisibility && side == 'a')
-			test_divisible_x (g*q, S_ptr + i - S, bucket_nr, si);
-		      S_ptr[i] -= logp;
+		      if (test_divisibility)
+			test_divisible_x (g*q, linestart + i, bucket_nr, si, side);
+                      sieve_decrease (S, logp, linestart + i, bucket_nr, q, si, 5);
 		    }
 		}
-
-	      line_idx += U;
-	      S_ptr += g * I;
-	      i0 += g * I + U;
-	      if (line_idx >= q)
-		{
-		  line_idx -= q;
-		  i0 -= q;
-		}
+              
+	      linestart += g * I;
+	      lineoffset += U;
+	      if (lineoffset >= q)
+	        lineoffset -= q;
 	    }
-	  ssd.bad_p[n].next_position = i0 - si->bucket_region;
+	  ssd.bad_p[n].next_position = linestart + lineoffset - 
+	                               (1U << LOG_BUCKET_REGION);
 	}
     }
 }
@@ -2083,7 +2145,7 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
         i = abs ((int) (X & (si->I - 1)) - si->I / 2);
         j = X >> si->logI;
 #ifndef UNSIEVE_NOT_COPRIME
-        if (bin_gcd (i, j) != 1)
+        if (bin_gcd_safe (i, j) != 1)
           {
             S[x] = 255;
             continue;
@@ -2145,8 +2207,12 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
             copr++;
 
             /* For hunting missed relations */
-            // if (a == -1128230057 && b == 66615)
-            //  fprintf (stderr, "# Have relation -1128230057,66615 at x = %d\n", x + N*si->bucket_region);
+#if 0
+            if (a == -6537753 && b == 1264)
+              fprintf (stderr, "# Have relation %ld,%lu at bucket nr %d, "
+                       "x = %d, K = %lu\n", 
+                       a, b, N, x, (unsigned long) N * si->bucket_region + x);
+#endif
 
             // Trial divide rational norm
             eval_fij (rat_norm, (const mpz_t *) cpoly->g, 1, a, b);
@@ -2191,7 +2257,7 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
               }
 
 #ifdef UNSIEVE_NOT_COPRIME
-            ASSERT (bin_gcd (a, b) == 1);
+            ASSERT (bin_gcd_safe (a, b) == 1);
 #endif
 
             fprintf (output, "%" PRId64 ",%" PRIu64 ":", a, b);
@@ -2243,32 +2309,47 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
 /****************************************************************************/
 
 // Conversions between different representations for sieve locations:
+//   N          is the number of the bucket region, N in [0, nr_buckets[
 //   x          is the index in the sieving array. x in [0,I*J[
 //   (i,j)      is the coordinates in the q-lattice. i in [-I/2,I/2[
 //                                                   j in [0,J[
 //   (a,b)      is the original coordinates. a is signed, b is unsigned.
 
-#if 0
-static void
-xToIJ(int *i, unsigned int *j, int x, sieve_info_t * si)
+static void 
+NxToIJ(int *i, unsigned int *j, const unsigned int N, const unsigned int x, 
+       const sieve_info_t * si)
 {
-    *i = (x % (si->I)) - (si->I >> 1);
-    *j = x / si->I;
+    unsigned int X = x + N * si->bucket_region;
+    *i = (X % (si->I)) - (si->I >> 1);
+    *j = X / si->I;
 }
 
+#if 0
 static void
-IJTox(int *x, int i, int j, sieve_info_t * si)
+IJTox(int *x, unsigned int *N, int i, int j, sieve_info_t * si)
 {
     *x = i + (si->I)*j + (si->I>>1);
 }
+#endif
 
 static void
-IJToAB(int64_t *a, uint64_t *b, int i, int j, sieve_info_t * si)
+IJToAB(int64_t *a, uint64_t *b, const int i, const unsigned int j, 
+       const sieve_info_t * si)
 {
-    *a = i*si->a0 + j*si->a1;
-    *b = i*si->b0 + j*si->b1;
+    int64_t s, t;
+    s = (int64_t)i * (int64_t) si->a0 + (int64_t)j * (int64_t)si->a1;
+    t = (int64_t)i * (int64_t) si->b0 + (int64_t)j * (int64_t)si->b1;
+    if (t >= 0)
+      {
+        *a = s;
+        *b = t;
+      }
+    else
+      {
+        *a = -s;
+        *b = -t;
+      }
 }
-#endif
 
 /* Warning: b might be negative, in which case we return (-a,-b) */
 static void
@@ -2291,8 +2372,8 @@ xToAB(int64_t *a, uint64_t *b, const unsigned int x, const sieve_info_t *si)
       }
 }
 
-void test_divisible_x (const fbprime_t p MAYBE_UNUSED, const unsigned long x,
-                       const int n, const sieve_info_t *si)
+void test_divisible_x (const fbprime_t p, const unsigned long x, 
+                       const int n, const sieve_info_t *si, const char side)
 {
   const unsigned long X = x + n * si->bucket_region;
   const long i = (long) (X & ((unsigned long) si->I - 1UL)) - (long) si->I / 2;
@@ -2300,15 +2381,18 @@ void test_divisible_x (const fbprime_t p MAYBE_UNUSED, const unsigned long x,
   mpz_t v;
 
   mpz_init (v);
-  eval_fij (v, (const mpz_t *) si->fij, si->degree, i, j);
-  /* gmp_fprintf (stderr, "# test_divisible_x (" FBPRIME_FORMAT ", %lu, %d, ): "
-     "i = %ld, j = %lu, v = %Zd\n", p, x, n, i, j, v); */
+  if (side == 'a')
+    eval_fij (v, (const mpz_t *) si->fij, si->degree, i, j);
+  else if (side == 'r')
+    eval_fij (v, (const mpz_t *) si->gij, 1, i, j);
+  else
+    abort();
+  
   if (!mpz_divisible_ui_p (v, (unsigned long) p))
-    {
-      gmp_fprintf (stderr, "fij(%ld,%ld)=%Zd is not divisible by " FBPRIME_FORMAT "\n",
-                   i, j, v, p);
-      abort();
-    }
+   gmp_fprintf (stderr, "# side %c, test_divisible_x (" FBPRIME_FORMAT 
+                ", %lu, %d, ): i = %ld, j = %lu, v = %Zd\n", 
+                side, p, x, n, i, j, v);
+  
   mpz_clear (v);
 }
 
@@ -2320,13 +2404,11 @@ void test_divisible_x (const fbprime_t p MAYBE_UNUSED, const unsigned long x,
    Put in fijd[] a double-precision approximation of fij[]/q.
 */
 static void
-fij_from_f (sieve_info_t *si, mpz_t *f, int d)
+fij_from_f (mpz_t *fij, const sieve_info_t *si, mpz_t *f, const int d)
 {
   int k, l;
   mpz_t *g; /* will contain the coefficients of (b0*i+b1)^l */
   mpz_t f0;
-  mpz_t *fij = si->fij;
-  double invq;
 
   for (k = 0; k <= d; k++)
     mpz_set (fij[k], f[k]);
@@ -2380,10 +2462,6 @@ fij_from_f (sieve_info_t *si, mpz_t *f, int d)
       for (l = k; l <= d; l++)
         mpz_addmul (fij[l], g[l - k], f0);
     }
-
-  invq = 1.0 / (double) si->q;
-  for (k = 0; k <= d; k++)
-    si->fijd[k] = mpz_get_d (fij[k]) * invq;
 
   mpz_clear (f0);
   for (k = 0; k <= d; k++)
@@ -2742,9 +2820,8 @@ factor_leftover_norm (mpz_t n, unsigned int l,
 static void
 usage (const char *argv0, const char * missing)
 {
-  fprintf (stderr, "Usage: %s [-no-checknorms] [-I I] -poly xxx.poly -fb xxx.roots -q0 q0 [-q1 q1] [-rho rho]\n",
+  fprintf (stderr, "Usage: %s [-I I] -poly xxx.poly -fb xxx.roots -q0 q0 [-q1 q1] [-rho rho]\n",
            argv0);
-  fprintf (stderr, "          -no-checknorms  don't factor leftover norms\n");
   fprintf (stderr, "          -I i            sieving region has side 2^i [default %u]\n", DEFAULT_I);
   fprintf (stderr, "          -poly xxx.poly  use polynomial xxx.poly\n");
   fprintf (stderr, "          -fb xxx.roots   use factor base xxx.roots\n");
@@ -2781,9 +2858,9 @@ main (int argc0, char *argv0[])
     uint64_t *roots;
     unsigned long nroots, tot_reports = 0, survivors0, survivors1, survivors2;
     factorbase_degn_t * fb_alg, * fb_rat;
-    int no_checknorms = 0; /* factor or not the remaining norms */
     int td_thresh = 1024; /* cost threshold trialdiv/resieving */
     int bucket_thresh = 0;
+    int rpow_lim = 0, apow_lim = 0;
     int I = DEFAULT_I, i;
     int verbose = 0;
     unsigned long sq = 0;
@@ -2800,7 +2877,6 @@ main (int argc0, char *argv0[])
     param_list_init(pl);
     cado_poly_init(cpoly);
     param_list_configure_knob(pl, "-v", &verbose);
-    param_list_configure_knob(pl, "-no-checknorms", &no_checknorms);
     argv++, argc--;
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
@@ -2831,6 +2907,8 @@ main (int argc0, char *argv0[])
     param_list_parse_uint64(pl, "rho", &rho);
     param_list_parse_int(pl, "tdthresh", &td_thresh);
     param_list_parse_int(pl, "bkthresh", &bucket_thresh);
+    param_list_parse_int(pl, "rpowlim", &rpow_lim);
+    param_list_parse_int(pl, "apowlim", &apow_lim);
     int ok = 1;
     ok = ok && param_list_parse_ulong(pl, "rlim", &cpoly->rlim);
     ok = ok && param_list_parse_ulong(pl, "alim", &cpoly->alim);
@@ -2894,7 +2972,6 @@ main (int argc0, char *argv0[])
 
     /* this does not depend on the special-q */
     sieve_info_init (&si, cpoly, I, q0, bucket_thresh, output);
-    si.checknorms = !no_checknorms;
 
     {
       fbprime_t *leading_div;
@@ -2913,8 +2990,14 @@ main (int argc0, char *argv0[])
 
     /* Prepare rational factor base */
     tfb = seconds ();
-    fb_rat = fb_make_linear (cpoly->g, (fbprime_t) cpoly->rlim,
-                             si.scale_rat * LOG_SCALE, verbose, 1, output);
+    if (rpow_lim >= si.bucket_thresh)
+      {
+        rpow_lim = si.bucket_thresh - 1;
+        printf ("# rpowthresh reduced to %d\n", rpow_lim);
+      }
+    fb_rat = fb_make_linear ((const mpz_t *) cpoly->g, (fbprime_t) cpoly->rlim,
+                             rpow_lim, si.scale_rat * LOG_SCALE, 
+                             verbose, 1, output);
     tfb = seconds () - tfb;
     fprintf (output, "# Creating rational factor base of %zuMb took %1.1fs\n",
              fb_size (fb_rat) >> 20, tfb);
@@ -2987,10 +3070,11 @@ main (int argc0, char *argv0[])
                  "; a0=%d; b0=%d; a1=%d; b1=%d\n",
                  si.q, si.rho, si.a0, si.b0, si.a1, si.b1);
         sq ++;
-        /* precompute the skewed polynomial */
-        fij_from_f (&si, cpoly->f, cpoly->degree);
+        /* precompute the skewed polynomials of f(x) and g(x) */
+        fij_from_f (si.fij, &si, cpoly->f, cpoly->degree);
+        fij_from_f (si.gij, &si, cpoly->g, 1);
 
-        /* checks the value of J */
+        /* checks the value of J, updates floating-point fij(x) */
         sieve_info_update (&si, verbose, output);
         totJ += (double) si.J;
 
@@ -3048,6 +3132,12 @@ main (int argc0, char *argv0[])
             ttsm += seconds();
             /* Sieve small rational primes */
             sieve_small_bucket_region(S, i, ssd_rat, &si, 'r');
+#ifdef TRACE_K
+            if (TRACE_K / si.bucket_region == i)
+              fprintf(stderr, "# After sieving rational side, S[%d] = %hhu\n",
+                      TRACE_K, S[TRACE_K % si.bucket_region]);
+#endif
+            
             /* Make copy of sieve report values for histogram */
             if (rat_S != NULL)
               memcpy (rat_S, S, si.bucket_region*sizeof(unsigned char));
@@ -3062,6 +3152,11 @@ main (int argc0, char *argv0[])
             ttsm += seconds();
             /* Sieve small algebraic primes */
             sieve_small_bucket_region(S, i, ssd_alg, &si, 'a');
+#ifdef TRACE_K
+            if (TRACE_K / si.bucket_region == i)
+              fprintf(stderr, "# After sieving algebraic side, S[%d] = %hhu\n",
+                      TRACE_K, S[TRACE_K % si.bucket_region]);
+#endif
 
             /* Factor survivors */
             ttf -= seconds ();

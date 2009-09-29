@@ -15,8 +15,9 @@ void            fb_fprint (FILE *, const factorbase_degn_t *);
 void            fb_sortprimes (fbprime_t *, const unsigned int);
 unsigned char	fb_log (double, double, double);
 void            fb_init_firstlog (factorbase_t);
-factorbase_degn_t * 	fb_make_linear (mpz_t *, const fbprime_t, const double, 
-                                const int, const int, FILE *);
+factorbase_degn_t * 	fb_make_linear (const mpz_t *, const fbprime_t, 
+					const fbprime_t, const double, 
+					const int, const int, FILE *);
 factorbase_degn_t *	fb_read (const char *, const double, const int);
 factorbase_degn_t *     fb_read_addproj (const char *, const double, const int,
 					 const fbprime_t *);
