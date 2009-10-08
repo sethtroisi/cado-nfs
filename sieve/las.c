@@ -872,8 +872,10 @@ fill_in_buckets(bucket_array_t *BA_param, factorbase_degn_t *fb,
 }
 
 
-/* Decrease a sieve array entry, with underflow checking and tracing 
-   if desired */
+/* Decrease the sieve array entry *S by logp, with underflow checking 
+   and tracing if desired. Variables x, bucket_nr, p, si, and callee 
+   are used only for trace test and output */
+
 static inline void
 sieve_decrease (unsigned char *S, const unsigned char logp, 
                 MAYBE_UNUSED const uint16_t x, 
@@ -886,11 +888,11 @@ sieve_decrease (unsigned char *S, const unsigned char logp,
   if ((x + bucket_nr * si->bucket_region) == TRACE_K)
     fprintf(stderr, "# Subtract log(" FBPRIME_FORMAT ") = %u from "
             "S[%u] = %hhu, from BA[%u], ", 
-            p, logp, TRACE_K, S[x], bucket_nr);
+            p, logp, TRACE_K, *S, bucket_nr);
 #endif
 
 #ifdef CHECK_UNDERFLOW
-  if (S[x] < logp)
+  if (*S < logp)
     {
       int i;
       unsigned int j;
@@ -906,18 +908,18 @@ sieve_decrease (unsigned char *S, const unsigned char logp,
         fprintf (stderr, "# Error, underflow (%d) at (N,x)=(%u, %u), "
                  "(i,j)=(%d, %u), (a,b)=(%ld, %lu), S[x] = %hhu, log(" 
                  FBPRIME_FORMAT ") = %hhu\n", 
-                 callee, bucket_nr, x, i, j, a, b, S[x], p, logp);
-      S[x] = 0;
+                 callee, bucket_nr, x, i, j, a, b, S, p, logp);
+      *S = 0;
     }
   else
-    S[x] -= logp;
+    *S -= logp;
 #else
-  S[x] -= logp;
+  *S -= logp;
 #endif
 
 #ifdef TRACE_K
   if ((x + bucket_nr * si->bucket_region) == TRACE_K)
-    fprintf(stderr, "new value is %hhu\n", S[x]);
+    fprintf(stderr, "new value is %hhu\n", *S);
 #endif
 }
 
@@ -960,7 +962,7 @@ apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
          }
        
        x = (read_ptr++)->x;
-       sieve_decrease (S, logp, x, i, 0, si, 1);
+       sieve_decrease (S + x, logp, x, i, 0, si, 1);
     }
 }
 
@@ -1403,6 +1405,9 @@ copy_small_sieve (small_sieve_data_t *r, const small_sieve_data_t *s,
 
 // Prepare sieving of small primes: initialize a small_sieve_data_t
 // structure to be used thereafter during sieving each region.
+// next_position points at the next position that will be hit by sieving,
+// relative to the start of the current sieve region. It may exceed I 
+// and even BUCKET_REGION
 void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
                       const sieve_info_t *si, const char side, FILE *output)
 {
@@ -1500,6 +1505,14 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
 	      ssd->nice_p[n].r = r;
 	      ssd->nice_p[n].logp = fb->plog;
 	      ssd->nice_p[n].next_position = (si->I >> 1)%p;
+	      /* For powers of 2, we sieve only odd lines and 
+	         next_position needs to point at line j=1. We assume
+	         that in this case (si->I/2) % p == 0 */
+	      if (UNLIKELY(p % 2 == 0))
+	        {
+	          ASSERT (ssd->nice_p[n].next_position == 0);
+	          ssd->nice_p[n].next_position = r + si->I;
+                }
 	      n++;
 	    }
         }
@@ -1512,6 +1525,7 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
 	       side, ssd->nb_nice_p, ssd->nb_bad_p);
 }
 
+
 // Sieve small primes (up to p < bucket_thresh) of the factor base fb in the
 // next sieve region S.
 // Information about where we are is in ssd.
@@ -1520,85 +1534,190 @@ void sieve_small_bucket_region(unsigned char *S, const int bucket_nr,
 			       const unsigned char side)
 {
     const uint32_t I = si->I;
-    unsigned long j, nj;
+    const fbprime_t pattern2_size = 2 * sizeof(unsigned long);
+    unsigned long j;
     int n;
     const int test_divisibility = 0; /* very slow, but nice for debugging */
+    const unsigned long nj = si->bucket_region >> si->logI; /* Nr. of lines 
+                                                        per bucket region */
 
-    nj = (si->bucket_region >> si->logI); /* Nr. of lines per bucket region */
     ASSERT ((nj & 1) == 0);
 
-    /* Handle 2 separately. The general code below assumes odd p (although
-       it works correctly, it updates some i,j with gcd(i,j) = 2 for p = 2).
-       Also, 2 can be sieved more quickly with long word transfers.
+    /* Handle powers of 2 up to 2 * sizeof(long) separately. 
        TODO: use SSE2 */
-    for (n = 0 ; n < ssd.nb_nice_p && ssd.nice_p[n].p == 2; n++) {
-      unsigned long *S_ptr;
-      unsigned long logps;
-      const int r = ssd.nice_p[n].r;
-      /* If r == 0, sieve all i == 0, j == 1 (mod 2).
-         If r == 1, sieve all i == 1, j == 1 (mod 2).
-         So either way, skip even j.
-         r == 1/0, i.e. i == 1, j == 0 (mod 2) will be sieved as a
-         "bad" prime below. */
-      ASSERT (r < 2);
-      logps = 0UL;
-      for (j = r; j < sizeof (unsigned long); j += 2)
-	((unsigned char *)&logps)[j] = ssd.nice_p[n].logp;
-      ASSERT (I % (4 * sizeof (unsigned long)) == 0);
-      S_ptr = (unsigned long *) (S + I); /* Sieve only odd lines */
-      for (j = 1; j < nj; j += 2)
+    /* First collect updates for powers of two in a pattern,
+       then apply pattern to sieve line.
+       Repeat for each line in bucket region. */
+    for (j = 0; j < nj; j++)
       {
-        const unsigned long *end = (unsigned long *)((char *) S_ptr + I);
+        unsigned long pattern[2];
 
-        while (S_ptr < end)
-          {
-            *(S_ptr) -= logps;
-            *(S_ptr + 1) -= logps;
-            *(S_ptr + 2) -= logps;
-            *(S_ptr + 3) -= logps;
-            S_ptr += 4;
-          }
-        ASSERT (S_ptr == end);
-        S_ptr = (unsigned long *)((char *) S_ptr + I); /* skip one line */
-      }
-    }
+        /* Prepare the pattern */
+        pattern[0] = pattern[1] = 0UL;
 
-    for ( ; n < ssd.nb_nice_p; ++n) {
-        fbprime_t p, r, twop;
-        unsigned char logp;
-        unsigned int i, i0, linestart = 0;
-        p = ssd.nice_p[n].p;
-        twop = p + ((p % 2 == 0) ? 0 : p); /* twop is even multiple of p */
-        r = ssd.nice_p[n].r;
-        logp = ssd.nice_p[n].logp;
-        i0 = ssd.nice_p[n].next_position;
-        ASSERT(i0 < p);
-        for (j = 0; j < nj; j += 2)
-          {
-            /* for j even, we sieve only odd i. if i0 and p are both even, 
-               don't sieve this line */
-            if ((i0 | p) & 1) {
-              for (i = (i0 & 1) ? i0 : i0 + p; i < I; i += twop)
+        /* This loop assumes that entries in ssd.nice_p are in order of 
+           increasing p, or more accurately, that all powers of 2 up to
+           2*sizeof(long) appear before any p > 2*sizeof(long) */
+        for (n = 0; n < ssd.nb_nice_p && ssd.nice_p[n].p <= pattern2_size; 
+             n++)
+          if (ssd.nice_p[n].p % 2 == 0) 
+            {
+              const fbprime_t p = ssd.nice_p[n].p;
+              unsigned int i0 = ssd.nice_p[n].next_position;
+              /* Sieve only odd lines */
+              if (i0 < I)
                 {
-	          if (test_divisibility)
-	            test_divisible_x (p, linestart + i, bucket_nr, si, side);
-                  sieve_decrease (S, logp, linestart + i, bucket_nr, p, si, 2);
+                  unsigned int i;
+                  ASSERT (i0 < p);
+                  ASSERT ((nj * bucket_nr + j) % 2 == 1);
+                  for (i = i0; i < pattern2_size; i += p)
+                    ((unsigned char *)&pattern)[i] += ssd.nice_p[n].logp;
+                  i0 = ((i0 + 2 * ssd.nice_p[n].r) & (p - 1)) + 2 * I;
                 }
+              /* In this loop, next_position gets updated to the first 
+                 index to sieve relative to the start of the next line, 
+                 but after all lines of this bucket region are processed, 
+                 it will point the the first position to sieve relative  
+                 to the start of the next bucket region, as required */
+              ssd.nice_p[n].next_position = i0 - I;
             }
+        
+        /* Apply the pattern */
+        if (pattern[0] != 0UL || pattern[1] != 0UL)
+          {
+            unsigned long *S_ptr = (unsigned long *) (S + j * I);
+            const unsigned long *end = (unsigned long *)(S + j * I + I);
+            
+            while (S_ptr < end)
+              {
+                *(S_ptr) -= pattern[0];
+                *(S_ptr + 1) -= pattern[1];
+                *(S_ptr + 2) -= pattern[0];
+                *(S_ptr + 3) -= pattern[1];
+                S_ptr += 4;
+              }
+          }
+      }
+
+
+    /* Handle 3 */
+    /* First collect updates for powers of two in a pattern,
+       then apply pattern to sieve line.
+       Repeat for each line in bucket region. */
+    for (j = 0; j < nj; j++)
+      {
+        unsigned long pattern[3];
+
+        pattern[0] = pattern[1] = pattern[2] = 0UL;
+
+        for (n = 0; n < ssd.nb_nice_p && ssd.nice_p[n].p <= 3; 
+             n++)
+          if (ssd.nice_p[n].p == 3) 
+            {
+              const fbprime_t p = 3;
+              unsigned int i0 = ssd.nice_p[n].next_position;
+              unsigned int i;
+              ASSERT (i0 < p);
+              for (i = i0; i < 3 * sizeof(unsigned long); i += p)
+                ((unsigned char *)&pattern)[i] += ssd.nice_p[n].logp;
+              i0 += ssd.nice_p[n].r;
+              if (i0 >= p)
+                i0 -= p;
+              ssd.nice_p[n].next_position = i0;
+            }
+        
+        if (pattern[0] != 0UL)
+          {
+            unsigned long *S_ptr = (unsigned long *) (S + j * I);
+            const unsigned long *end = (unsigned long *)(S + j * I + I) - 2;
+            
+            while (S_ptr < end)
+              {
+                *(S_ptr) -= pattern[0];
+                *(S_ptr + 1) -= pattern[1];
+                *(S_ptr + 2) -= pattern[2];
+                S_ptr += 3;
+              }
+            
+            end += 2;
+            if (S_ptr < end)
+              *(S_ptr++) -= pattern[0];
+            if (S_ptr < end)
+              *(S_ptr) -= pattern[1];
+          }
+      }
+
+    for (n = 0 ; n < ssd.nb_nice_p; ++n) {
+        const fbprime_t p = ssd.nice_p[n].p;
+        const fbprime_t r = ssd.nice_p[n].r;
+        const unsigned char logp = ssd.nice_p[n].logp;
+        unsigned char *S_ptr = S;
+        fbprime_t twop;
+        unsigned int i, i0, linestart = 0;
+        /* Always S_ptr = S + linestart. S_ptr is used for the actual array
+           updates, linestart keeps track of position relative to start of
+           bucket region and is used only for computing i,j-coordinates
+           in overflow and divisibility checking, and relation tracing. */
+
+        i0 = ssd.nice_p[n].next_position;
+
+        /* Powers of 2 are treated separately */
+        if (UNLIKELY(p % 2 == 0))
+          {
+            /* Don't sieve powers of 2 again that were pattern-sieved */
+            if (p <= pattern2_size)
+              continue;
+            
+            for (j = 0; j < nj; j++)
+              {
+                if (i0 < I)
+                  {
+                    ASSERT(i0 < p);
+                    ASSERT ((nj * bucket_nr + j) % 2 == 1);
+                    for (i = i0; i < I; i += p)
+                      {
+                        if (test_divisibility)
+                          test_divisible_x (p, linestart + i, bucket_nr, si, 
+                                            side);
+                        sieve_decrease (S_ptr + i, logp, 
+                                        linestart + i, bucket_nr, p, si, 2);
+                      }
+                    i0 = ((i0 + 2 * r) & (p - 1)) + 2 * I;
+                  }
+                i0 -= I;
+                linestart += I;
+                S_ptr += I;
+              }
+            ssd.nice_p[n].next_position = i0;
+            continue;
+          }
+
+        /* Don't sieve 3 again as it was pattern-sieved */
+        if (p == 3)
+          continue;
+          
+        ASSERT(i0 < p);
+        for (j = 0; j < nj; j++)
+          {
+            twop = p;
+            i = i0;
+            if ((((nj & bucket_nr) ^ j) & 1) == 0) /* (nj*bucket_nr+j)%2 */
+              {
+                /* for j even, we sieve only odd i. */
+                twop += p;
+                i += (i0 & 1) ? 0 : p;
+              }
+            for ( ; i < I; i += twop)
+              {
+                if (test_divisibility)
+                  test_divisible_x (p, linestart + i, bucket_nr, si, side);
+                sieve_decrease (S_ptr + i, logp, linestart + i, bucket_nr, 
+                                p, si, 3);
+              }
             i0 += r;
             if (i0 >= p)
               i0 -= p;
-            linestart += I;
-            /* j odd */
-            for (i = i0 ; i < I; i += p)
-	      {
-		if (test_divisibility)
-		  test_divisible_x (p, linestart + i, bucket_nr, si, side);
-                sieve_decrease (S, logp, linestart + i, bucket_nr, p, si, 3);
-	      }
-            i0 += r;
-            if (i0 >= p)
-              i0 -= p;
+            S_ptr += I;
             linestart += I;
           }
         ssd.nice_p[n].next_position = i0;
@@ -1674,7 +1793,8 @@ void sieve_small_bucket_region(unsigned char *S, const int bucket_nr,
 		      {
 			if (test_divisibility)
 			  test_divisible_x (g*q, linestart + i, bucket_nr, si, side);
-                        sieve_decrease (S, logp, linestart + i, bucket_nr, q, si, 4);
+                        sieve_decrease (S + linestart + i, logp, 
+                                        linestart + i, bucket_nr, q, si, 4);
 		      }
 		}
 	      else
@@ -1682,8 +1802,10 @@ void sieve_small_bucket_region(unsigned char *S, const int bucket_nr,
 		  for ( ; i < I; i += q)
 		    {
 		      if (test_divisibility)
-			test_divisible_x (g*q, linestart + i, bucket_nr, si, side);
-                      sieve_decrease (S, logp, linestart + i, bucket_nr, q, si, 5);
+			test_divisible_x (g*q, linestart + i, bucket_nr, 
+			                  si, side);
+                      sieve_decrease (S + linestart + i, logp, linestart + i, 
+                                      bucket_nr, q, si, 5);
 		    }
 		}
               
