@@ -11,6 +11,7 @@
 #include "ecm/facul.h"
 #include "bucket.h"
 #include "trialdiv.h"
+#include <pthread.h>
 
 #ifdef SSE_NORM_INIT
 #include <emmintrin.h>
@@ -93,8 +94,18 @@
 /* uintmax_t is guaranteed to be larger or equal to uint64_t */
 #define strtouint64(nptr,endptr,base) (uint64_t) strtoumax(nptr,endptr,base)
 
+
+
+/* This global mutex should be locked in multithreaded parts when a
+ * thread does a read / write, especially on stdout, stderr...
+ */
+pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER; 
+
+
 // General information about the siever
 typedef struct {
+    // multithreading info
+    int nb_threads;
     // sieving area
     uint32_t I;
     uint32_t J;
@@ -116,7 +127,6 @@ typedef struct {
     double logmax_rat;     /* norms on the rat. side are < 2^logmax_rat */
     mpz_t *fij, gij[2];    /* coefficients of F,G(a0*i+a1*j, b0*i+b1*j)  */
     double *fijd;     /* coefficients of F_q/q */
-    double *tmpd;     /* temporary array */
     double B;         /* bound for the norm computation */
     unsigned char alg_Bound[256]; /* non-zero for good lognorms */
     unsigned char rat_Bound[256]; /* non-zero for good lognorms */
@@ -184,17 +194,17 @@ sieve_info_init_lognorm (unsigned char *C, unsigned char threshold,
 
 static void
 sieve_info_init (sieve_info_t *si, cado_poly cpoly, int logI, uint64_t q0,
-		 const int bucket_thresh, FILE *output)
+		 const int bucket_thresh, FILE *output, int nb_threads)
 {
   unsigned int d = cpoly->degree;
   unsigned int k;
   double r, scale;
   unsigned char alg_bound, rat_bound;
 
+  si->nb_threads = nb_threads;
   si->degree = d;
   si->fij = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
   si->fijd = (double*) malloc ((d + 1) * sizeof (double));
-  si->tmpd = (double*) malloc ((d + 1) * sizeof (double));
   for (k = 0; k <= d; k++)
     mpz_init (si->fij[k]);
   mpz_init (si->gij[0]);
@@ -288,7 +298,7 @@ static fbprime_t *
 factor_small (mpz_t n, fbprime_t lim)
 {
   unsigned long p;
-  unsigned long l; /* number of bad primes */
+  unsigned long l; /* number of prime factors */
   fbprime_t *f;
 
   l = 0;
@@ -337,7 +347,6 @@ sieve_info_clear (sieve_info_t *si)
   mpz_clear (si->gij[0]);
   mpz_clear (si->gij[1]);
   free (si->fijd);
-  free (si->tmpd);
   free (si->lpf);
 }
 
@@ -739,20 +748,21 @@ reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r,
 
 void
 fill_in_buckets(bucket_array_t *BA_param, factorbase_degn_t *fb,
-		const sieve_info_t * si) 
+        fbprime_t pmax, const sieve_info_t * si) 
 {
     bucket_array_t BA = *BA_param; /* local copy */
     // Loop over all primes in the factor base >= bucket_thresh
+    // and up to FB_END or pmax (pmax included)
 
     /* Skip forward to first FB prime p >= si->bucket_thresh */
     while (fb->p != FB_END && fb->p < (fbprime_t) si->bucket_thresh)
         fb = fb_next (fb); // cannot do fb++, due to variable size !
 
     /* Init first logp value */
-    if (fb->p != FB_END)
+    if (fb->p != FB_END && fb->p <= pmax)
       bucket_new_logp (&BA, fb->plog);
 
-    for (;fb->p != FB_END; fb = fb_next (fb)) {
+    while (fb->p != FB_END && fb->p <= pmax) {
         unsigned char nr;
         fbprime_t p = fb->p;
         unsigned char logp = fb->plog;
@@ -766,7 +776,7 @@ fill_in_buckets(bucket_array_t *BA_param, factorbase_degn_t *fb,
            Note that usually, this doesn't happen on the rational side, since
            the prime q cannot divide both sides, unless q divides Res(f,g). */
         if (UNLIKELY(p == si->q))
-          continue;
+          goto next_fb;
 
         for (nr = 0; nr < fb->nr_roots; ++nr) {
             const uint32_t I = si->I;
@@ -817,10 +827,12 @@ fill_in_buckets(bucket_array_t *BA_param, factorbase_degn_t *fb,
             plattice_info_t pli;
             if (reduce_plattice(&pli, p, r, si) == 0)
               {
-                fprintf (stderr, "# fill_in_buckets: reduce_plattice() "
-                         "returned 0 for p = " FBPRIME_FORMAT ", r = "
-                         FBPRIME_FORMAT "\n", p, r);
-                continue; /* Simply don't consider that (p,r) for now.
+                  pthread_mutex_lock(&io_mutex);
+                  fprintf (stderr, "# fill_in_buckets: reduce_plattice() "
+                          "returned 0 for p = " FBPRIME_FORMAT ", r = "
+                          FBPRIME_FORMAT "\n", p, r);
+                  pthread_mutex_unlock(&io_mutex);
+                  continue; /* Simply don't consider that (p,r) for now.
                              FIXME: can we find the locations to sieve? */
               }
 
@@ -867,8 +879,70 @@ fill_in_buckets(bucket_array_t *BA_param, factorbase_degn_t *fb,
             }
             __asm__("## Inner bucket sieving loop stops here!!!\n");
         }
+        int i;
+next_fb:
+        for (i = 0; i < si->nb_threads; ++i) {
+            fb = fb_next (fb);
+            if (fb->p == FB_END || fb->p > pmax) {
+                break;
+            }
+        }
     }
   *BA_param = BA; /* Write back BA so the nr_logp etc get copied to caller */
+}
+
+
+typedef struct {
+    bucket_array_t *alg_BA;
+    factorbase_degn_t *fb_alg;
+    fbprime_t alg_pmax;
+    bucket_array_t *rat_BA;
+    factorbase_degn_t *fb_rat;
+    fbprime_t rat_pmax;
+    sieve_info_t *si;
+} fill_in_buckets_mt_arg_t;
+
+void *
+call_fill_in_buckets(fill_in_buckets_mt_arg_t *arg) {
+    fill_in_buckets(arg->alg_BA, arg->fb_alg, arg->alg_pmax, arg->si);
+    fill_in_buckets(arg->rat_BA, arg->fb_rat, arg->rat_pmax, arg->si);
+    return NULL;
+}
+
+void
+fill_in_buckets_mt(bucket_array_t *alg_BA, factorbase_degn_t **fb_alg,
+        fbprime_t *alg_pmax,
+        bucket_array_t *rat_BA, factorbase_degn_t **fb_rat,
+        fbprime_t *rat_pmax,
+        sieve_info_t * si){
+    int i;
+    pthread_t *th;
+    fill_in_buckets_mt_arg_t *my_arg;
+    th = malloc(si->nb_threads*sizeof(pthread_t)); 
+    ASSERT_ALWAYS(th);
+    my_arg = malloc(si->nb_threads*sizeof(fill_in_buckets_mt_arg_t)); 
+    ASSERT_ALWAYS(my_arg);
+    for (i = 0; i < si->nb_threads; ++i) {
+        int ret;
+        my_arg[i].alg_BA = &(alg_BA[i]);
+        my_arg[i].fb_alg = fb_alg[i];
+        my_arg[i].alg_pmax = alg_pmax[i];
+        my_arg[i].rat_BA = &(rat_BA[i]);
+        my_arg[i].fb_rat = fb_rat[i];
+        my_arg[i].rat_pmax = rat_pmax[i];
+        my_arg[i].si = si;
+        ret = pthread_create(&(th[i]), NULL, 
+		(void * (*)(void *)) &call_fill_in_buckets,
+                (void *)(&(my_arg[i])));
+        ASSERT_ALWAYS(!ret);
+    }
+    for (i = 0; i < si->nb_threads; ++i) {
+        int ret;
+        ret = pthread_join(th[i], NULL);
+        ASSERT_ALWAYS(!ret);
+    }
+    free(my_arg);
+    free(th);
 }
 
 
@@ -1185,7 +1259,8 @@ init_alg_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly,
   halfI = (double) (si->I >> 1);
 
   t = si->fijd;
-  u = si->tmpd;
+  u = (double*) malloc ((si->degree + 1) * sizeof (double));
+  ASSERT(u != NULL);
 
   /* bucket_region is a multiple of I. Let's find the starting j
    * corresponding to N and the last j.
@@ -1258,6 +1333,7 @@ init_alg_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly,
 #endif
     }
 
+  free(u);
   return report;
 }
 
@@ -1275,17 +1351,32 @@ typedef struct {
    We may assume gcd(u,p)==1, or we divide the entire equation by p.
    We store g = gcd(v, p^k), q = p^k / g, and U = u * (v/g)^(-1) (mod q).
 
-   Then, for lines j = n*g, n in N, we have
-     i*v == n*g*u (mod p^k)  <==>  i == n*U (mod q).
+   Then we have
+     i*v == j*u (mod p^k)  <==>  i == (j/g)*U (mod q)
+   with g|j. 
+   
+   In other words, we can sieve this bad prime (powers) much like a 
+   normal prime (power) q with root U, except that after sieving a line 
+   we don't advance by one line, but by g lines.
+   The case where g = q^k and thus q = 1 can be sieve more efficiently,
+   of course, since every entry in each g-th line will be hit, so that
+   the sieving should use long word transfers.
 
-   Within a line, for array element of index x, x = i+I/2. 
-   We skip n=0. For n=1, we want i=U (mod q), so x == I/2+U (mod q),
+   Just like for normal primes, the next_position value points at the first
+   position to sieve relative to the start of the current sieve region.
+
+   Within a line that starts at index line_start, for array element of 
+   index x, we have x - line_start = i+I/2. 
+   We skip j=0, as it contains only the single possible relation 
+   (i,j) = (1,0). 
+   For j=1*g, we want i=U (mod q), so x - line_start == I/2+U (mod q),
    so we initialise 
      next_position = I*g + (I/2 + U) % q
-   to get the first array index in line j=q, 
+   to get the first array index in line j=g, 
    then within a line sieve next_position + t*q < I, t in N,
-   and update next_position += U + g*I to get the first position to sieve
-   in the next suitable line. */
+   and update 
+     next_position = (next_position - line_start + U) % q + line_start + g*I 
+   to get the first position to sieve in the next suitable line. */
 
 typedef struct {
     fbprime_t g, q, U;
@@ -1310,6 +1401,17 @@ void clear_small_sieve(small_sieve_data_t ssd) {
     ssd.bad_p = NULL;
 }
 
+void
+clone_small_sieve(small_sieve_data_t *r, const small_sieve_data_t *s) {
+    memcpy(r, s, sizeof(small_sieve_data_t));
+    r->nice_p = malloc(r->nb_nice_p*sizeof(small_typical_prime_data_t));
+    r->bad_p = malloc(r->nb_bad_p*sizeof(small_bad_prime_data_t));
+    ASSERT(r->nice_p != NULL && r->bad_p != NULL);
+    memcpy(r->nice_p, s->nice_p,
+            r->nb_nice_p*sizeof(small_typical_prime_data_t));
+    memcpy(r->bad_p, s->bad_p,
+            r->nb_bad_p*sizeof(small_bad_prime_data_t));
+}
 
 /* Assume q is a prime power p^k with k>=1, return p if k > 1, 0 otherwise. */
 static fbprime_t
@@ -1406,7 +1508,7 @@ copy_small_sieve (small_sieve_data_t *r, const small_sieve_data_t *s,
 // Prepare sieving of small primes: initialize a small_sieve_data_t
 // structure to be used thereafter during sieving each region.
 // next_position points at the next position that will be hit by sieving,
-// relative to the start of the current sieve region. It may exceed I 
+// relative to the start of the next bucket region to sieve. It may exceed I 
 // and even BUCKET_REGION
 void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
                       const sieve_info_t *si, const char side, FILE *output)
@@ -1480,7 +1582,8 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
 		      rc = invmod (&U, q);
 		      ASSERT_ALWAYS (rc != 0);
 		      ssd->bad_p[ssd->nb_bad_p].U = U;
-		      ssd->bad_p[ssd->nb_bad_p].next_position = g * si->I + (si->I / 2 + U) % q;
+		      ssd->bad_p[ssd->nb_bad_p].next_position = 
+			g * si->I + (si->I / 2 + U) % q;
 		    }
 		  ssd->bad_p[ssd->nb_bad_p].logp = fb->plog;
 		  ssd->nb_bad_p++;
@@ -1861,11 +1964,14 @@ resieve_small_bucket_region (bucket_primes_t *BP, unsigned char *S,
                 {
                   bucket_prime_t prime;
                   unsigned int x = (j << (si->logI)) + i;
-                  if (resieve_very_verbose)
+                  if (resieve_very_verbose) {
+                      pthread_mutex_lock(&io_mutex);
                     fprintf (stderr, "resieve_small_bucket_region: root "
                              FBPRIME_FORMAT ",%d divides at x = "
                              "%d = %lu * %u + %d\n",
                              p, r, x, j, 1 << si->logI, i);
+                      pthread_mutex_unlock(&io_mutex);
+                  }
                   prime.p = p;
                   prime.x = x;
                   push_bucket_prime (BP, prime);
@@ -1881,11 +1987,14 @@ resieve_small_bucket_region (bucket_primes_t *BP, unsigned char *S,
                 {
                   bucket_prime_t prime;
                   unsigned int x = ((j + 1) << (si->logI)) + i;
-                  if (resieve_very_verbose)
+                  if (resieve_very_verbose) {
+                      pthread_mutex_lock(&io_mutex);
                     fprintf (stderr, "resieve_small_bucket_region: root "
                              FBPRIME_FORMAT ",%d divides at x = "
                              "%d = %lu * %d + %d\n",
                              p, r, x, j + 1, 1 << si->logI, i);
+                      pthread_mutex_unlock(&io_mutex);
+                  }
                   prime.p = p;
                   prime.x = x;
                   push_bucket_prime (BP, prime);
@@ -1902,11 +2011,13 @@ resieve_small_bucket_region (bucket_primes_t *BP, unsigned char *S,
   /* Resieve bad primes */
   if (resieve_very_verbose_bad)
     {
+        pthread_mutex_lock(&io_mutex);
       fprintf (stderr, "# %d bad primes to resieve: ", ssd->nb_bad_p);
       for (n = 0; n < ssd->nb_bad_p; ++n)
 	fprintf (stderr, "%s" FBPRIME_FORMAT, 
 		 (n>0) ? ", " : "", ssd->bad_p[n].g);
       fprintf (stderr, "\n");
+      pthread_mutex_unlock(&io_mutex);
     }
   for (n = 0; n < ssd->nb_bad_p; ++n) 
     {
@@ -1917,9 +2028,12 @@ resieve_small_bucket_region (bucket_primes_t *BP, unsigned char *S,
       ASSERT (n == 0 || ssd->bad_p[n - 1].g <= ssd->bad_p[n].g);
       ASSERT (i0 % I == 0); /* make sure next_position points at start
                                of line */
-      if (resieve_very_verbose_bad)
-        fprintf (stderr, "# resieving bad prime " FBPRIME_FORMAT
-                 ", i0 = %u\n", g, i0);
+      if (resieve_very_verbose_bad) {
+          pthread_mutex_lock(&io_mutex);
+          fprintf (stderr, "# resieving bad prime " FBPRIME_FORMAT
+                  ", i0 = %u\n", g, i0);
+          pthread_mutex_unlock(&io_mutex);
+      }
       while (i0 < (unsigned int) si->bucket_region)
         {
           unsigned char *S_ptr = S + i0;
@@ -1932,10 +2046,13 @@ resieve_small_bucket_region (bucket_primes_t *BP, unsigned char *S,
                     {
                       bucket_prime_t prime;
                       const unsigned int x = i0 + i;
-                      if (resieve_very_verbose_bad)
-                        fprintf (stderr, "resieve_small_bucket_region even j: root "
-                                 FBPRIME_FORMAT ",inf divides at x = %u\n",
-                                 g, x);
+                      if (resieve_very_verbose_bad) {
+                          pthread_mutex_lock(&io_mutex);
+                          fprintf (stderr, "resieve_small_bucket_region even j: root "
+                                  FBPRIME_FORMAT ",inf divides at x = %u\n",
+                                  g, x);
+                          pthread_mutex_unlock(&io_mutex);
+                      }
                       prime.p = g;
                       prime.x = x;
                       push_bucket_prime (BP, prime);
@@ -1951,10 +2068,13 @@ resieve_small_bucket_region (bucket_primes_t *BP, unsigned char *S,
                     {
                       bucket_prime_t prime;
                       const unsigned int x = i0 + i;
-                      if (resieve_very_verbose_bad)
-                        fprintf (stderr, "resieve_small_bucket_region odd j: root "
-                                 FBPRIME_FORMAT ",inf divides at x = %u\n",
-                                 g, x);
+                      if (resieve_very_verbose_bad) {
+                          pthread_mutex_lock(&io_mutex);
+                          fprintf (stderr, "resieve_small_bucket_region odd j: root "
+                                  FBPRIME_FORMAT ",inf divides at x = %u\n",
+                                  g, x);
+                          pthread_mutex_unlock(&io_mutex);
+                      }
                       prime.p = g;
                       prime.x = x;
                       push_bucket_prime (BP, prime);
@@ -1964,10 +2084,13 @@ resieve_small_bucket_region (bucket_primes_t *BP, unsigned char *S,
           i0 += g * I;
         }
       ssd->bad_p[n].next_position = i0 - si->bucket_region;
-      if (resieve_very_verbose_bad)
-        fprintf (stderr, "# resieving: new i0 = %u, bucket_region = %d, "
-                         "new next_position = %d\n",
-                 i0, si->bucket_region, ssd->bad_p[n].next_position);
+      if (resieve_very_verbose_bad) {
+          pthread_mutex_lock(&io_mutex);
+          fprintf (stderr, "# resieving: new i0 = %u, bucket_region = %d, "
+                  "new next_position = %d\n",
+                  i0, si->bucket_region, ssd->bad_p[n].next_position);
+          pthread_mutex_unlock(&io_mutex);
+      }
     }
 }
 
@@ -2019,9 +2142,11 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const int x,
               p += BUCKET_P_WRAP;
           }
           if (p > fbb) {
+              pthread_mutex_lock(&io_mutex);
               fprintf (stderr,
                        "# Error, p = %lu does not divide at x = %d\n",
                        (unsigned long) prime.p, x);
+              pthread_mutex_unlock(&io_mutex);
               continue;
           }
           do {
@@ -2043,9 +2168,12 @@ trial_div (factor_list_t *fl, mpz_t norm, int x,
     const int trial_div_very_verbose = 0; // (x == 30878);
     fl->n = 0; /* reset factor list */
 
-    if (trial_div_very_verbose)
-      gmp_fprintf (stderr, "# trial_div() entry, x = %d, norm = %Zd\n",
-                   x, norm);
+    if (trial_div_very_verbose) {
+        pthread_mutex_lock(&io_mutex);
+        gmp_fprintf (stderr, "# trial_div() entry, x = %d, norm = %Zd\n",
+                x, norm);
+        pthread_mutex_unlock(&io_mutex);
+    }
 
     // handle 2 separately, if it is in fb
     if (fb->p == 2) {
@@ -2055,42 +2183,56 @@ trial_div (factor_list_t *fl, mpz_t norm, int x,
             fl->fac[fl->n] = 2;
             fl->n++;
         }
-        if (trial_div_very_verbose)
-          gmp_fprintf (stderr, "# x = %d, dividing out 2^%d, norm = %Zd\n",
-                       x, bit, norm);
+        if (trial_div_very_verbose) {
+            pthread_mutex_lock(&io_mutex);
+            gmp_fprintf (stderr, "# x = %d, dividing out 2^%d, norm = %Zd\n",
+                    x, bit, norm);
+            pthread_mutex_unlock(&io_mutex);
+        }
         mpz_tdiv_q_2exp(norm, norm, bit);
         fb = fb_next (fb); // cannot do fb++, due to variable size !
     }
 
     // remove primes in "primes" that map to x
     divide_primes_from_bucket (fl, norm, x, primes, fbb);
-    if (trial_div_very_verbose)
-      gmp_fprintf (stderr, "# x = %d, after dividing out bucket/resieved norm = %Zd\n",
-                   x, norm);
+    if (trial_div_very_verbose) {
+        pthread_mutex_lock(&io_mutex);
+        gmp_fprintf (stderr, "# x = %d, after dividing out bucket/resieved norm = %Zd\n",
+                x, norm);
+        pthread_mutex_unlock(&io_mutex);
+    }
 
     {
       /* Trial divide primes with precomputed tables */
       int nr_factors, i;
       unsigned long factors[32];
       if (trial_div_very_verbose)
-        {
+      {
+          pthread_mutex_lock(&io_mutex);
           fprintf (stderr, "# Trial division by ");
           for (i = 0; trialdiv_data[i].p != 1; i++)
-            fprintf (stderr, " %lu", trialdiv_data[i].p);
+              fprintf (stderr, " %lu", trialdiv_data[i].p);
           fprintf (stderr, "\n");
-        }
+          pthread_mutex_unlock(&io_mutex);
+      }
 
       nr_factors = trialdiv (factors, norm, trialdiv_data, 32);
       ASSERT (nr_factors <= 32);
 
       for (i = 0; i < nr_factors; i++)
-        {
-          if (trial_div_very_verbose)
-            fprintf (stderr, " %lu", factors[i]);
+      {
+          if (trial_div_very_verbose) {
+              pthread_mutex_lock(&io_mutex);
+              fprintf (stderr, " %lu", factors[i]);
+              pthread_mutex_unlock(&io_mutex);
+          }
           fl->fac[fl->n++] = factors[i];
-        }
-      if (trial_div_very_verbose)
-        gmp_fprintf (stderr, "\n# After trialdiv(): norm = %Zd\n", norm);
+      }
+      if (trial_div_very_verbose) {
+          pthread_mutex_lock(&io_mutex);
+          gmp_fprintf (stderr, "\n# After trialdiv(): norm = %Zd\n", norm);
+          pthread_mutex_unlock(&io_mutex);
+      }
     }
 }
 
@@ -2207,8 +2349,8 @@ unsieve_not_coprime (unsigned char *S, const int N, const sieve_info_t *si)
    number of survivors with coprime a, b to *coprimes */
 
 NOPROFILE_STATIC int
-factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
-                  bucket_array_t alg_BA, factorbase_degn_t *fb_rat,
+factor_survivors (unsigned char *S, int N, bucket_array_t *rat_BA,
+                  bucket_array_t *alg_BA, factorbase_degn_t *fb_rat,
                   factorbase_degn_t *fb_alg, cado_poly cpoly, sieve_info_t *si,
                   unsigned long *survivors, unsigned long *coprimes,
 		  small_sieve_data_t *srsd_alg, small_sieve_data_t *srsd_rat,
@@ -2279,7 +2421,11 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
        store them with the complete prime */
     /* FIXME: choose a sensible size here */
     alg_primes = init_bucket_primes (si->bucket_region);
-    purge_bucket (&alg_primes, alg_BA, N, S);
+    { 
+        int i;
+        for (i = 0; i < si->nb_threads; ++i) 
+            purge_bucket (&alg_primes, alg_BA[i], N, S);
+    }
 
     /* Resieve small primes for this bucket region and store them 
        together with the primes recovered from the bucket updates */
@@ -2290,7 +2436,11 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
 
     /* Do the same thing for algebraic side */
     rat_primes = init_bucket_primes (si->bucket_region);
-    purge_bucket (&rat_primes, rat_BA, N, S);
+    {
+        int i;
+        for (i = 0; i < si->nb_threads; ++i)
+            purge_bucket (&rat_primes, rat_BA[i], N, S);
+    }
     resieve_small_bucket_region (&rat_primes, S, srsd_rat, si);
     bucket_sortbucket (&rat_primes);
 
@@ -2312,12 +2462,14 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
             // ASSERT((a | b) & 1);
             if (UNLIKELY(((a | b) & 1) == 0))
               {
+                pthread_mutex_lock(&io_mutex);
                 fprintf (stderr, "# Error: a and b both even for N = %d, x = %d,\n"
                                  "i = %d, j = %d, a = %ld, b = %lu\n",
                          N, x, ((x + N*si->bucket_region) & (si->I - 1))
                            - (si->I >> 1),
                          (x + N*si->bucket_region) >> si->logI,
                          (long) a, (unsigned long) b);
+                pthread_mutex_unlock(&io_mutex);
                 continue;
               }
 
@@ -2382,6 +2534,7 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
             ASSERT (bin_gcd_safe (a, b) == 1);
 #endif
 
+            pthread_mutex_lock(&io_mutex);
             fprintf (output, "%" PRId64 ",%" PRIu64 ":", a, b);
             factor_list_fprint (output, rat_factors);
             for (i = 0; i < f_r->length; ++i)
@@ -2400,6 +2553,7 @@ factor_survivors (unsigned char *S, int N, bucket_array_t rat_BA,
             fprintf (output, "%" PRIx64 "", si->q);
             fprintf (output, "\n");
             fflush (output);
+            pthread_mutex_unlock(&io_mutex);
             cpt++;
             report_sizes_a[S[x]]++; /* Build histogram of lucky S[x] values */
             if (rat_S != NULL)
@@ -2511,9 +2665,9 @@ void test_divisible_x (const fbprime_t p, const unsigned long x,
     abort();
   
   if (!mpz_divisible_ui_p (v, (unsigned long) p))
-   gmp_fprintf (stderr, "# side %c, test_divisible_x (" FBPRIME_FORMAT 
-                ", %lu, %d, ): i = %ld, j = %lu, v = %Zd\n", 
-                side, p, x, n, i, j, v);
+   gmp_fprintf (stderr, "# test_divisible_x (" FBPRIME_FORMAT 
+                ", %lu, %d, %c): i = %ld, j = %lu, v = %Zd\n", 
+                p, x, n, side, i, j, v);
   
   mpz_clear (v);
 }
@@ -2816,6 +2970,7 @@ SkewGauss (sieve_info_t *si, double skewness)
   /* Compute number of i-lines per bucket region, must be integer */
   ASSERT_ALWAYS(LOG_BUCKET_REGION >= si->logI);
   uint32_t i = 1U << (LOG_BUCKET_REGION - si->logI);
+  i *= si->nb_threads;  /* ensures nb of bucket regions divisible by nb_threads */
   si->J = ((si->J - 1U) / i + 1U) * i; /* Round up to multiple of i */
 }
 
@@ -2937,6 +3092,297 @@ factor_leftover_norm (mpz_t n, unsigned int l,
 }
 
 
+typedef struct {
+    bucket_array_t *alg_BA;
+    factorbase_degn_t *fb_alg;
+    bucket_array_t *rat_BA;
+    factorbase_degn_t *fb_rat;
+    small_sieve_data_t *ssd_rat;
+    small_sieve_data_t *ssd_alg;
+    cado_poly_ptr cpoly;
+    sieve_info_t *si;
+    int id;
+    FILE *output;
+    int verbose;
+} process_bucket_region_arg_t;
+
+typedef struct {
+    int reports;
+    unsigned long survivors0;
+    unsigned long survivors1;
+    unsigned long survivors2;
+    double tn_rat;
+    double tn_alg;
+    double ttsm;
+    double ttf;
+    unsigned long report_sizes_a[256];
+    unsigned long report_sizes_r[256];
+} process_bucket_region_report_t;
+
+/* id gives the number of the thread: it is supposed to deal with the set
+ * of bucket_regions corresponding to that number
+ */
+process_bucket_region_report_t * 
+process_regions_one_thread(process_bucket_region_arg_t *arg)
+{
+    bucket_array_t *alg_BA      = arg->alg_BA;
+    bucket_array_t *rat_BA      = arg->rat_BA;
+    small_sieve_data_t *ssd_rat = arg->ssd_rat;
+    small_sieve_data_t *ssd_alg = arg->ssd_alg;
+    factorbase_degn_t *fb_rat   = arg->fb_rat;
+    factorbase_degn_t *fb_alg   = arg->fb_alg;
+    cado_poly_ptr cpoly         = arg->cpoly;
+    sieve_info_t *si            = arg->si;
+    int id                      = arg->id;
+    FILE *output                = arg->output;
+    int verbose                 = arg->verbose;
+
+    unsigned long survivors0, survivors1, survivors2;
+    int reports;
+    reports = 0;
+    survivors0 = survivors1 = survivors2 = 0;
+    unsigned long report_sizes_a[256], report_sizes_r[256];
+    double tn_rat = 0.0;
+    double tn_alg = 0.0;
+    double ttsm = 0.0;
+    double ttf = 0.0;
+
+    /* make copies of small sieve data: the "next_position" field is
+     * specific to each thread.
+     */
+    small_sieve_data_t lssd_alg, lssd_rat;
+    clone_small_sieve (&lssd_alg, ssd_alg);
+    clone_small_sieve (&lssd_rat, ssd_rat);
+
+    /* find the first sieve location for each small prime */
+    small_sieve_data_t *ssd;
+    int side;
+    for (side = 0; side < 2; side++) {
+        if (side == 0) 
+            ssd = &lssd_alg;
+        else
+            ssd = &lssd_rat;
+        int n;
+	/* Number of lines to skip to get the first bucket for this thread */
+        const unsigned long nj = (si->bucket_region >> si->logI) * 
+	  (si->nb_buckets / si->nb_threads) * id;
+        ASSERT(si->nb_buckets % si->nb_threads == 0);
+
+        // nice primes
+        for (n = 0; n < ssd->nb_nice_p; ++n) {
+            unsigned long i0;
+
+            if (ssd->nice_p[n].p % 2 == 0 && nj % 2 == 1)
+	      {
+		/* Make sure that next_position points to a location
+		   where i and j are not both even */
+		i0 = ssd->nice_p[n].next_position & (si->I - 1);
+		ASSERT (i0 < ssd->nice_p[n].p);
+		i0 += (nj + 1) * ssd->nice_p[n].r;
+		i0 = i0 & (ssd->nice_p[n].p - 1);
+		ssd->nice_p[n].next_position = i0 + 
+		  (ssd->nice_p[n].next_position & (~(si->I - 1)));
+	      }
+	    else
+	      {
+		/* We want to add nj*r to the offset *relative to the 
+		   start of the line*, but next_position may be larger 
+		   than I, so we treat the multiple-of-I and mod-I parts
+		   separately */
+		i0 = ssd->nice_p[n].next_position & (si->I - 1);
+		ASSERT (i0 < ssd->nice_p[n].p);
+		i0 += nj*ssd->nice_p[n].r;
+		i0 = i0 % ssd->nice_p[n].p;
+		ssd->nice_p[n].next_position = i0 + 
+		  (ssd->nice_p[n].next_position & (~(si->I - 1)));
+	      }
+        }
+	
+        // bad primes
+        for (n = 0; n < ssd->nb_bad_p; ++n) 
+	  {
+            /* First line to sieve is the smallest j with g|j and j >= nj,
+	       however, if nj == 0 we don't sieve j==0 since it contains
+	       only one possible relation (i,j) = (1,0). */
+	    unsigned int ng, x, j;
+	    ng = iceildiv(nj, ssd->bad_p[n].g);
+	    if (ng == 0)
+	      ng++;
+	    x = (si->I / 2 + ng * ssd->bad_p[n].U) % ssd->bad_p[n].q;
+	    j = ng * ssd->bad_p[n].g;
+	    ssd->bad_p[n].next_position = (j - nj) * si->I + x;
+	  }
+    }
+
+    /* Yet another copy: used in factor_survivors for resieving small
+     * primes */
+    small_sieve_data_t lsrsd_alg, lsrsd_rat;
+    copy_small_sieve (&lsrsd_alg, &lssd_alg, si->trialdiv_primes_alg);
+    copy_small_sieve (&lsrsd_rat, &lssd_rat, si->trialdiv_primes_rat);
+
+    /* local sieve region */
+    unsigned char *S, *rat_S;
+    S = (unsigned char *)malloc(si->bucket_region*sizeof(unsigned char));
+    if (verbose)
+        rat_S = (unsigned char *)
+            malloc(si->bucket_region*sizeof(unsigned char));
+    else
+        rat_S = NULL;
+
+    {
+        int i;
+        for (i = 0; i < 256; i++) {
+            report_sizes_a[i] = 0;
+            report_sizes_r[i] = 0;
+        }
+    }
+
+    /* loop over appropriate set of sieve regions */
+    int i, j;
+    i = (si->nb_buckets / si->nb_threads) * id;
+    for (; i < (si->nb_buckets / si->nb_threads) * (id+1); ++i) {
+        /* Init rational norms */
+        tn_rat -= seconds ();
+        init_rat_norms_bucket_region(S, i, cpoly, si);
+        tn_rat += seconds ();
+        /* Apply rational buckets */
+        ttsm -= seconds();
+        for (j = 0; j < si->nb_threads; ++j) 
+            apply_one_bucket(S, rat_BA[j], i, si);
+        ttsm += seconds();
+        /* Sieve small rational primes */
+        sieve_small_bucket_region(S, i, lssd_rat, si, 'r');
+        /* Make copy of sieve report values for histogram */
+        if (rat_S != NULL)
+            memcpy (rat_S, S, si->bucket_region*sizeof(unsigned char));
+        /* Init algebraic norms */
+        tn_alg -= seconds ();
+        survivors0 += init_alg_norms_bucket_region(S, i, cpoly, si);
+        tn_alg += seconds ();
+        /* Apply algebraic buckets */
+        ttsm -= seconds();
+        for (j = 0; j < si->nb_threads; ++j)
+            apply_one_bucket(S, alg_BA[j], i, si);
+        ttsm += seconds();
+        /* Sieve small algebraic primes */
+        sieve_small_bucket_region(S, i, lssd_alg, si, 'a');
+
+        /* Factor survivors */
+        ttf -= seconds ();
+        reports += factor_survivors (S, i, rat_BA, alg_BA, fb_rat,
+                fb_alg, cpoly, si, &survivors1,
+                &survivors2, &lsrsd_alg, &lsrsd_rat,
+                report_sizes_a, report_sizes_r,
+                rat_S, output);
+        ttf += seconds ();
+    }
+    /* clear */
+    {
+        free(S);
+        if (rat_S != NULL)
+            free(rat_S);
+        clear_small_sieve(lssd_alg);
+        clear_small_sieve(lssd_rat);
+        clear_small_sieve(lsrsd_alg);
+        clear_small_sieve(lsrsd_rat);
+    }
+    process_bucket_region_report_t *rep;
+    rep = (process_bucket_region_report_t *)
+        malloc(sizeof(process_bucket_region_report_t));
+    rep->reports = reports;
+    rep->survivors0 = survivors0;
+    rep->survivors1 = survivors1;
+    rep->survivors2 = survivors2;
+    rep->tn_rat = tn_rat;
+    rep->tn_alg = tn_alg;
+    rep->ttsm = ttsm;
+    rep->ttf = ttf;
+    for (i = 0; i < 256; i++) {
+        rep->report_sizes_a[i] = report_sizes_a[i];
+        rep->report_sizes_r[i] = report_sizes_r[i];
+    }
+    return rep;
+}
+
+process_bucket_region_report_t
+process_bucket_region_mt(bucket_array_t *alg_BA, bucket_array_t *rat_BA,
+        small_sieve_data_t *ssd_rat, small_sieve_data_t *ssd_alg, 
+        factorbase_degn_t *fb_rat, factorbase_degn_t *fb_alg,
+        cado_poly_ptr cpoly, sieve_info_t *si, FILE *output, int verbose) {
+    int i;
+    process_bucket_region_report_t report;
+    report.reports = 0;
+    report.survivors0 = 0;
+    report.survivors1 = 0;
+    report.survivors2 = 0;
+    report.tn_rat = 0.0;
+    report.tn_alg = 0.0;
+    report.ttsm = 0.0;
+    report.ttf = 0.0;
+    for (i = 0; i < 256; i++) {
+        report.report_sizes_a[i] = 0;
+        report.report_sizes_r[i] = 0;
+    }
+
+    pthread_t *th;
+    th = malloc(si->nb_threads*sizeof(pthread_t));
+    ASSERT_ALWAYS(th);
+    process_bucket_region_arg_t *my_arg;
+    my_arg = malloc(si->nb_threads*sizeof(process_bucket_region_arg_t));
+    ASSERT_ALWAYS(my_arg);
+    for (i = 0; i < si->nb_threads; ++i) {
+        int ret;
+        my_arg[i].alg_BA = alg_BA;
+        my_arg[i].fb_alg = fb_alg;
+        my_arg[i].rat_BA = rat_BA;
+        my_arg[i].fb_rat = fb_rat;
+        my_arg[i].ssd_rat = ssd_rat;
+        my_arg[i].ssd_alg = ssd_alg;
+        my_arg[i].cpoly = cpoly;
+        my_arg[i].si = si;
+        my_arg[i].id = i;
+        my_arg[i].output = output;
+        my_arg[i].verbose = verbose;
+        ret = pthread_create(&(th[i]), NULL, 
+	      (void * (*)(void *)) &process_regions_one_thread,
+                (void *)(&(my_arg[i])));
+        ASSERT_ALWAYS(!ret);
+    }
+    for (i = 0; i < si->nb_threads; ++i) {
+        int ret;
+        process_bucket_region_report_t *rep;
+        ret = pthread_join(th[i], (void **)(&rep));
+        ASSERT_ALWAYS(!ret);
+        report.reports += rep->reports;
+        report.survivors0 += rep->survivors0;
+        report.survivors1 += rep->survivors1;
+        report.survivors2 += rep->survivors2;
+        report.tn_rat += rep->tn_rat;
+        report.tn_alg += rep->tn_alg;
+        report.ttsm += rep->ttsm;
+        report.ttf += rep->ttf;
+        int j;
+        for (j = 0; j < 256; j++) {
+            report.report_sizes_a[j] += rep->report_sizes_a[j];
+            report.report_sizes_r[j] += rep->report_sizes_r[j];
+        }
+        free(rep);
+    }
+
+    if (verbose)
+    {
+        fprintf (output, "# %lu survivors after rational sieve,", report.survivors0);
+        fprintf (output, " %lu survivors after algebraic sieve, ", report.survivors1);
+        fprintf (output, "coprime: %lu\n", report.survivors2);
+    }
+    fprintf (output, "# %d relation(s) for (%" PRIu64 ",%" PRIu64
+            ")\n", report.reports, si->q, si->rho);
+    free(my_arg);
+    free(th);
+    return report;
+}
+
+
 /*************************** main program ************************************/
 
 static void
@@ -2962,6 +3408,7 @@ usage (const char *argv0, const char * missing)
   fprintf (stderr, "          -alambda  nnn   algebraic lambda value is nnn\n");
   fprintf (stderr, "          -v              be verbose (print some sieving statistics)\n");
   fprintf (stderr, "          -out filename   write relations to filename instead of stdout\n");
+  fprintf (stderr, "          -mt nnn   use nnn threads\n");
   if (missing) {
       fprintf(stderr, "\nError: missing parameter %s\n", missing);
   }
@@ -2978,7 +3425,7 @@ main (int argc0, char *argv0[])
     double t0, tfb, tq, tn_rat, tn_alg, tts, ttsm, ttf;
     uint64_t q0 = 0, q1 = 0, rho = 0;
     uint64_t *roots;
-    unsigned long nroots, tot_reports = 0, survivors0, survivors1, survivors2;
+    unsigned long nroots, tot_reports = 0;
     factorbase_degn_t * fb_alg, * fb_rat;
     int td_thresh = 1024; /* cost threshold trialdiv/resieving */
     int bucket_thresh = 0;
@@ -2994,6 +3441,7 @@ main (int argc0, char *argv0[])
     int argc = argc0;
     char **argv = argv0;
     double max_full = 0.;
+    int nb_threads = 1;
 
     param_list pl;
     param_list_init(pl);
@@ -3023,6 +3471,7 @@ main (int argc0, char *argv0[])
         exit (EXIT_FAILURE);
     }
 
+    param_list_parse_int(pl, "mt", &nb_threads);
     param_list_parse_int(pl, "I", &I);
     param_list_parse_uint64(pl, "q0", &q0);
     param_list_parse_uint64(pl, "q1", &q1);
@@ -3093,8 +3542,15 @@ main (int argc0, char *argv0[])
              cpoly->mfbr, cpoly->mfba, cpoly->rlambda, cpoly->alambda);
 
     /* this does not depend on the special-q */
-    sieve_info_init (&si, cpoly, I, q0, bucket_thresh, output);
+    sieve_info_init (&si, cpoly, I, q0, bucket_thresh, output, nb_threads);
 
+    factorbase_degn_t **fb_alg_mt;
+    fbprime_t *alg_pmax;
+    fb_alg_mt = (factorbase_degn_t **)malloc(si.nb_threads*
+            sizeof(factorbase_degn_t *));
+    alg_pmax = (fbprime_t *)malloc(si.nb_threads*sizeof(fbprime_t));
+
+    /* Read algebraic factor base */
     {
       fbprime_t *leading_div;
       tfb = seconds ();
@@ -3107,7 +3563,17 @@ main (int argc0, char *argv0[])
                "# Reading algebraic factor base of %zuMb took %1.1fs\n", 
                fb_size (fb_alg) >> 20, tfb);
       free (leading_div);
-      // fb_fprint (stderr, fb_alg);
+      
+      factorbase_degn_t *fb = fb_alg;
+      while (fb->p != FB_END && fb->p < (fbprime_t) si.bucket_thresh)
+          fb = fb_next (fb); 
+      ASSERT (fb->p != FB_END);
+      for (i = 0; i < si.nb_threads; ++i) {
+          fb_alg_mt[i] = fb;
+          fb = fb_next(fb);
+          ASSERT (fb->p != FB_END);
+          alg_pmax[i] = FBPRIME_MAX;
+      }
     }
 
     /* Prepare rational factor base */
@@ -3123,6 +3589,23 @@ main (int argc0, char *argv0[])
     tfb = seconds () - tfb;
     fprintf (output, "# Creating rational factor base of %zuMb took %1.1fs\n",
              fb_size (fb_rat) >> 20, tfb);
+    
+    factorbase_degn_t **fb_rat_mt;
+    fbprime_t *rat_pmax;
+    fb_rat_mt = (factorbase_degn_t **)malloc(si.nb_threads*
+            sizeof(factorbase_degn_t *));
+    rat_pmax = (fbprime_t *)malloc(si.nb_threads*sizeof(fbprime_t));
+
+    factorbase_degn_t *fb = fb_rat;
+    while (fb->p != FB_END && fb->p < (fbprime_t) si.bucket_thresh)
+        fb = fb_next (fb); 
+    ASSERT (fb->p != FB_END);
+    for (i = 0; i < si.nb_threads; ++i) {
+        fb_rat_mt[i] = fb;
+        fb = fb_next(fb);
+        ASSERT (fb->p != FB_END);
+        rat_pmax[i] = FBPRIME_MAX;
+    }
 
     init_rat_norms (&si);
     init_alg_norms (&si);
@@ -3155,6 +3638,7 @@ main (int argc0, char *argv0[])
     q0 --; /* so that nextprime gives q0 if q0 is prime */
     nroots = 0;
     tot_reports = 0;
+
     tn_rat = tn_alg = tts = ttsm = ttf = 0.0;
     t0 = seconds ();
     fprintf (output, "#\n");
@@ -3164,7 +3648,7 @@ main (int argc0, char *argv0[])
           {
             q0 = uint64_nextprime (q0);
             if (q0 >= q1)
-              goto end;
+              goto end;  // breaks two whiles.
             si.q = q0;
             nroots = poly_roots_uint64 (roots, cpoly->f, cpoly->degree, q0);
             if (nroots > 0)
@@ -3202,23 +3686,28 @@ main (int argc0, char *argv0[])
 
         /* Allocate alg buckets */
         ttsm -= seconds();
-        bucket_array_t alg_BA;
-        alg_BA = init_bucket_array(si.nb_buckets, si.bucket_limit);
-
-        /* Fill in alg buckets */
-        fill_in_buckets(&alg_BA, fb_alg, &si);
-        if (buckets_max_full (alg_BA) > max_full)
-          max_full = buckets_max_full (alg_BA);
-        ASSERT (max_full < 1.);
+        bucket_array_t alg_BA[si.nb_threads];
+        for (i = 0; i < si.nb_threads; ++i)
+            alg_BA[i] = init_bucket_array(si.nb_buckets, si.bucket_limit / si.nb_threads);
 
         /* Allocate rational buckets */
-        bucket_array_t rat_BA;
-        rat_BA = init_bucket_array(si.nb_buckets, si.bucket_limit);
+        bucket_array_t rat_BA[si.nb_threads];
+        for (i = 0; i < si.nb_threads; ++i)
+            rat_BA[i] = init_bucket_array(si.nb_buckets, si.bucket_limit / si.nb_threads);
 
-        /* Fill in rational buckets */
-        fill_in_buckets(&rat_BA, fb_rat, &si);
-        if (buckets_max_full (rat_BA) > max_full)
-          max_full = buckets_max_full (rat_BA);
+
+        /* Fill in rat and alg buckets */
+        fill_in_buckets_mt(alg_BA, fb_alg_mt, alg_pmax,
+                rat_BA, fb_rat_mt, rat_pmax,
+                &si);
+        for (i = 0; i < si.nb_threads; ++i) {
+            if (buckets_max_full (alg_BA[i]) > max_full)
+                max_full = buckets_max_full (alg_BA[i]);
+            if (buckets_max_full (rat_BA[i]) > max_full)
+                max_full = buckets_max_full (rat_BA[i]);
+        }
+        if (max_full >= 1.0) 
+            fprintf(stderr, "maxfull=%f\n", max_full);
         ASSERT (max_full < 1.);
 
         ttsm += seconds();
@@ -3228,88 +3717,28 @@ main (int argc0, char *argv0[])
         init_small_sieve(&ssd_rat, fb_rat, &si, 'r', output);
         init_small_sieve(&ssd_alg, fb_alg, &si, 'a', output);
 
-	/* Copy small sieve data for resieving small primes */
-	small_sieve_data_t srsd_alg, srsd_rat;
-	copy_small_sieve (&srsd_alg, &ssd_alg, si.trialdiv_primes_alg);
-	copy_small_sieve (&srsd_rat, &ssd_rat, si.trialdiv_primes_rat);
-
-        /* Process each bucket region, one after the other */
-        unsigned char *S, *rat_S;
-        S = (unsigned char *)malloc(si.bucket_region*sizeof(unsigned char));
-        if (verbose)
-          rat_S = (unsigned char *)
-                  malloc(si.bucket_region*sizeof(unsigned char));
-        else
-          rat_S = NULL;
-        int reports = 0;
-        survivors0 = survivors1 = survivors2 = 0;
-        for (i = 0; i < si.nb_buckets; ++i) {
-            /* Init rational norms */
-            tn_rat -= seconds ();
-            init_rat_norms_bucket_region(S, i, cpoly, &si);
-            tn_rat += seconds ();
-            /* Apply rational bucket */
-            ttsm -= seconds();
-            apply_one_bucket(S, rat_BA, i, &si);
-            ttsm += seconds();
-            /* Sieve small rational primes */
-            sieve_small_bucket_region(S, i, ssd_rat, &si, 'r');
-#ifdef TRACE_K
-            if (TRACE_K / si.bucket_region == i)
-              fprintf(stderr, "# After sieving rational side, S[%d] = %hhu\n",
-                      TRACE_K, S[TRACE_K % si.bucket_region]);
-#endif
-            
-            /* Make copy of sieve report values for histogram */
-            if (rat_S != NULL)
-              memcpy (rat_S, S, si.bucket_region*sizeof(unsigned char));
-
-            /* Init algebraic norms */
-            tn_alg -= seconds ();
-            survivors0 += init_alg_norms_bucket_region(S, i, cpoly, &si);
-            tn_alg += seconds ();
-            /* Apply algebraic bucket */
-            ttsm -= seconds();
-            apply_one_bucket(S, alg_BA, i, &si);
-            ttsm += seconds();
-            /* Sieve small algebraic primes */
-            sieve_small_bucket_region(S, i, ssd_alg, &si, 'a');
-#ifdef TRACE_K
-            if (TRACE_K / si.bucket_region == i)
-              fprintf(stderr, "# After sieving algebraic side, S[%d] = %hhu\n",
-                      TRACE_K, S[TRACE_K % si.bucket_region]);
-#endif
-
-            /* Factor survivors */
-            ttf -= seconds ();
-            reports += factor_survivors (S, i, rat_BA, alg_BA, fb_rat,
-                                         fb_alg, cpoly, &si, &survivors1,
-					 &survivors2, &srsd_alg, &srsd_rat,
-					 report_sizes_a, report_sizes_r,
-					 rat_S, output);
-            ttf += seconds ();
+        /* Process bucket regions in parallel */
+        {
+            process_bucket_region_report_t rep;
+            rep = process_bucket_region_mt(alg_BA, rat_BA,
+                &ssd_rat, &ssd_alg, fb_rat, fb_alg, cpoly, &si, output, verbose);
+            tot_reports += rep.reports;
+            tn_rat      += rep.tn_rat;
+            tn_alg      += rep.tn_alg;
+            ttsm        += rep.ttsm;
+            ttf         += rep.ttf;
+            for (i = 0; i < 256; ++i) {
+                report_sizes_a[i] += rep.report_sizes_a[i];
+                report_sizes_r[i] += rep.report_sizes_r[i];
+            }
         }
+	
         clear_small_sieve(ssd_rat);
         clear_small_sieve(ssd_alg);
-        clear_small_sieve(srsd_rat);
-        clear_small_sieve(srsd_alg);
-        tot_reports += reports;
-        if (verbose)
-          {
-            fprintf (output, "# %lu survivors after rational sieve,",
-                     survivors0);
-            fprintf (output, " %lu survivors after algebraic sieve, ",
-                     survivors1);
-            fprintf (output, "coprime: %lu\n", survivors2);
-          }
-        fprintf (output, "# %d relation(s) for (%" PRIu64 ",%" PRIu64
-                 "), total %lu [%1.3fs/r]\n#\n", reports, si.q, si.rho,
-                 tot_reports, (seconds () - t0) / (double) tot_reports);
-        clear_bucket_array(alg_BA);
-        clear_bucket_array(rat_BA);
-        free(S);
-        if (rat_S != NULL)
-          free (rat_S);
+        for (i = 0; i < si.nb_threads; ++i) {
+            clear_bucket_array(alg_BA[i]);
+            clear_bucket_array(rat_BA[i]);
+        }
       } // end of loop over special q ideals.
 
  end:
@@ -3332,7 +3761,10 @@ main (int argc0, char *argv0[])
             fprintf (output, "%d:%lu ", i, report_sizes_r[i]);
         fprintf (output, "\n");
       }
-    fprintf (output, "# Total time %1.1fs [norm %1.2f+%1.1f, sieving %1.1f"
+    if (si.nb_threads > 1) 
+        fprintf (output, "# Total cpu time %1.1fs [precise timings available only for mono-thread]\n", t0);
+    else
+        fprintf (output, "# Total time %1.1fs [norm %1.2f+%1.1f, sieving %1.1f"
             " (%1.1f + %1.1f),"
              " factor %1.1f]\n", t0, tn_rat, tn_alg, tts, ttsm, tts-ttsm, ttf);
     fprintf (output, "# Total %lu reports [%1.3fs/r, %1.1fr/sq]\n",
@@ -3346,7 +3778,11 @@ main (int argc0, char *argv0[])
     free (si.trialdiv_primes_alg);
     free (si.trialdiv_primes_rat);
     free (fb_alg);
+    free (fb_alg_mt);
     free (fb_rat);
+    free (fb_rat_mt);
+    free (alg_pmax);
+    free (rat_pmax);
     sieve_info_clear (&si);
     cado_poly_clear (cpoly);
     free (roots);
