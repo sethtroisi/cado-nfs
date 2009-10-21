@@ -35,7 +35,7 @@ add_executable (makefb makefb.c)
 target_link_libraries (makefb utils m)
 
 add_executable (las las.c fb.c trialdiv.c sieve_config.h)
-target_link_libraries (las facul utils m)
+target_link_libraries (las facul utils m pthread)
 
 # Compiling stuff for las-mt: uncomment those two lines for testing
 # add_executable (las-mt las-mt.c fb.c trialdiv.c sieve_config.h)
