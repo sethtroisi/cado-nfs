@@ -7,7 +7,7 @@ cd "`dirname $0`"
 
 if [ "$1" = "--svn" ] ; then
     if [ -d .svn ] ; then
-        svnversion| cut -d\: -f2
+        svnversion .| cut -d\: -f2
     else
         commit="`git show --pretty=format:%h 2>/dev/null | head -1`"
         if [ "$commit" != "" ] ; then
@@ -22,7 +22,7 @@ if [ "$1" = "--svn" ] ; then
     fi
 else
     if [ -d .svn ] ; then
-        svnversion
+        svnversion .
         # svn status -q # removed, since it pollutes the revision number
     else
         commit="`git show --pretty=format:%h 2>/dev/null | head -1`"
