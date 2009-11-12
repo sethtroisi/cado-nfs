@@ -704,7 +704,7 @@ struct polmat { /* {{{ */
             where += stride();
         }
     }/*}}}*/
-    uint32_t crc() const { return crc32(x, ncols * colstride()); }
+    uint32_t crc() const { return crc32(x, ncols * colstride() * sizeof(uint32_t)); }
 };
 
 

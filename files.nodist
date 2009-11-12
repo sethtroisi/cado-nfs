@@ -78,5 +78,7 @@ linalg/bwc/bench_polmatmul.cpp
 polyselect/CMakeLists-nodist.txt
 polyselect/fast_rootsieve.h
 polyselect/fast_rootsieve.c
-linalg/bwc/mf_a2b_fq.c
-linalg/bwc/mf_b_fq.c
+linalg/bwc/mf.c
+linalg/bwc/mf.h
+linalg/bwc/mf_bal.c
+linalg/bwc/mf_scan.c
