@@ -1620,7 +1620,12 @@ sub do_sieve {
 
     my $sieve_check = sub {
         my ($f, $full) = @_;
-        warn "File `$f' not found.\n" unless -f $f;
+
+	unless (-f $f) {
+		warn "File `$f' not found, check not done.\n";
+		return;
+	}
+
 
         return &$import_rels($f) if $f =~ /\.freerels$/;
 
