@@ -13,11 +13,11 @@ def lemme_21(n,d,ad,p,m):
     if ad==0:
         ad=ZZ(Integers(p)(n/m^d))
     assert(ad*Integers(p)(m)^d-n==0)
-    coeffs=[ad]
-    deltas=[]
-    rs=[]
-    r=n
-    a=ad
+    a=[0 for i in [0..d]]
+    a[d] = ad
+    r=[ 0 for i in [0..d] ]
+    r[d]=n
+    delta=[ 0 for i in [0..d] ]
     Z=Integers()
     mm=[1]
     immp=[Integers(p)(1)]
@@ -26,19 +26,18 @@ def lemme_21(n,d,ad,p,m):
         mm.append(mm[-1]*m)
         immp.append(immp[-1]*imp)
     for i in reversed([0..d-1]):
-        r=Z((r-a*mm[i+1])/p)
-        ai_mod_p=Z(r*immp[i])
-        k=(r/mm[i]-ai_mod_p)/p
-        kr=round(k)
-        delta=p*(kr-k)
-        a=p*kr+ai_mod_p
-        rs.append(r)
-        coeffs.append(a)
+        r[i]=Z((r[i+1]-a[i+1]*mm[i+1])/p)
+        ai_mod_p=Z(r[i]*immp[i])
+        k=(r[i]/mm[i]-ai_mod_p)/p
+        kr=Integers()(round(k))
+        delta[i]=p*(kr-k)
+        a[i]=p*kr+ai_mod_p
         deltas.append(delta)
-    coeffs.reverse()
-    rs.reverse()
-    deltas.reverse()
-    f=Integers()['x'](coeffs)
+        assert n == sum([a[d-j]*m^(d-j)*p^j for j in range(0,d-i)])+r[i]*p^(d-i)
+    if a[0] != r[0]:
+        print "warning, using r0 instead of r0 (lemma error)"
+        a[0]=r[0]
+    f=Integers()['x'](a)
     g=Integers()['x']([-m,p])
     #return (f,deltas,rs)
     return (f,g)
