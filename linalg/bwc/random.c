@@ -27,10 +27,12 @@ static inline double dist_func()
 int gen_row(double lambda, int n, int * ptr)
 {
     int c = 0;
-    for(int i = 0 ; i <= n ; ) {
+    for(int i = 0 ; ; ) {
         int e = 1 + (int) (lambda * dist_func() * (i+1));
         i += e;
         c += 1;
+        if (i < 0 || i >= n)
+            break;
         if (ptr) *ptr++ = i - 1;
     }
     return c-1;
