@@ -10,7 +10,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include <mpi.h>
+#include "select_mpi.h"
 
 #include "utils.h"
 #include "mf.h"

@@ -12,6 +12,7 @@ typedef int MPI_Comm;
 typedef int MPI_Op;
 typedef int MPI_User_function;
 typedef int MPI_Errhandler;
+typedef int MPI_Request;
 
 // type keys are sizeof() values.
 #define MPI_BYTE        1
@@ -41,6 +42,8 @@ typedef int MPI_Errhandler;
 
 #define MPI_MAX_OBJECT_NAME     64
 
+#define MPI_STATUS_IGNORE       0
+
 /* That would be quite neat, but it's too coarse (it applies to the whole
  * translation unit), and anyway it isn't supported by oldish gcc's.
 #ifdef  __GNUC__
@@ -48,6 +51,8 @@ typedef int MPI_Errhandler;
 #endif
 */
 
+static inline int MPI_Wait(MPI_Request *request MAYBE_UNUSED, MPI_Status *status MAYBE_UNUSED) { return 0; }
+static inline int MPI_Abort(MPI_Comm comm MAYBE_UNUSED, int s) { exit(s); }
 static inline int MPI_Comm_rank(int s MAYBE_UNUSED, int  * p) { *p=0; return 0;}
 static inline int MPI_Comm_size(int s MAYBE_UNUSED, int  * p) { *p=1; return 0;}
 static inline int MPI_Initialized(int  * p) { *p=1; return 0; }
@@ -56,7 +61,9 @@ static inline int MPI_Init_thread(int * argc MAYBE_UNUSED, char *** argv MAYBE_U
 static inline int MPI_Finalize() {return 0;}
 static inline int MPI_Op_create( MPI_User_function *function MAYBE_UNUSED, int commute MAYBE_UNUSED, MPI_Op *op MAYBE_UNUSED ){return 0;}
 static inline int MPI_Send( void *buf MAYBE_UNUSED, int count MAYBE_UNUSED, MPI_Datatype datatype MAYBE_UNUSED, int dest MAYBE_UNUSED,int tag MAYBE_UNUSED, MPI_Comm comm  MAYBE_UNUSED){return 0;}
+static inline int MPI_Isend( void *buf MAYBE_UNUSED, int count MAYBE_UNUSED, MPI_Datatype datatype MAYBE_UNUSED, int dest MAYBE_UNUSED,int tag MAYBE_UNUSED, MPI_Comm comm  MAYBE_UNUSED, MPI_Request * zz MAYBE_UNUSED){return 0;}
 static inline int MPI_Recv( void *buf MAYBE_UNUSED, int count MAYBE_UNUSED, MPI_Datatype datatype MAYBE_UNUSED, int source MAYBE_UNUSED,int tag MAYBE_UNUSED, MPI_Comm comm MAYBE_UNUSED, MPI_Status *status MAYBE_UNUSED ){ abort(); return 0;}
+static inline int MPI_Irecv( void *buf MAYBE_UNUSED, int count MAYBE_UNUSED, MPI_Datatype datatype MAYBE_UNUSED, int source MAYBE_UNUSED,int tag MAYBE_UNUSED, MPI_Comm comm MAYBE_UNUSED, MPI_Status *status MAYBE_UNUSED, MPI_Request * zz MAYBE_UNUSED){ abort(); return 0;}
 static inline int MPI_Bcast( void *buffer MAYBE_UNUSED, int count MAYBE_UNUSED, MPI_Datatype datatype MAYBE_UNUSED, int root MAYBE_UNUSED, MPI_Comm comm MAYBE_UNUSED){return 0;}
 static inline int MPI_Reduce ( void *sendbuf, void *recvbuf, int count,MPI_Datatype datatype, MPI_Op op MAYBE_UNUSED, int root MAYBE_UNUSED, MPI_Comm comm  MAYBE_UNUSED)
 {
