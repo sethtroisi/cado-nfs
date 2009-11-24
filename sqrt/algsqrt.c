@@ -598,15 +598,20 @@ main(int argc, char **argv)
     }
     mpz_sub(g1, aux, algsqrt);
     mpz_gcd(g1, g1, pol->n);
-    if (mpz_probab_prime_p(g1, 5)) {
-      found = 1;
-      gmp_printf("%Zd\n", g1);
+
+    if (mpz_cmp(g1,pol->n)) {
+      if (mpz_cmp_ui(g1,1)) {
+        found = 1;
+        gmp_printf("%Zd\n", g1);
+      }
     }
     mpz_add(g2, aux, algsqrt);
     mpz_gcd(g2, g2, pol->n);
-    if (mpz_probab_prime_p(g2, 5)) {
-      found = 1;
-      gmp_printf("%Zd\n", g2);
+    if (mpz_cmp(g2,pol->n)) {
+      if (mpz_cmp_ui(g2,1)) {
+        found = 1;
+        gmp_printf("%Zd\n", g2);
+      }
     }
     mpz_clear(g1);
     mpz_clear(g2);
