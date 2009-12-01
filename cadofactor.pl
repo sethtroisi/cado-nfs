@@ -421,6 +421,8 @@ sub remote_cmd {
     # use public-key authentification instead!
     $cmd = "env ssh -q ".
            "-o ConnectTimeout=$opt->{'timeout'} ".
+           "-o ServerAliveInterval=$opt->{'timeout'} ".
+           "-o ServerAliveCountMax=1 ".
            "-o PasswordAuthentication=no ".
            "$host \"env sh -c '$cmd'\" 2>&1";
 
