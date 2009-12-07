@@ -56,6 +56,7 @@ use warnings;
 
 use File::Basename;
 use Cwd qw(abs_path);
+use POSIX ("floor");
 
 
 
@@ -421,8 +422,7 @@ sub remote_cmd {
     # use public-key authentification instead!
     $cmd = "env ssh -q ".
            "-o ConnectTimeout=$opt->{'timeout'} ".
-           "-o ServerAliveInterval=$opt->{'timeout'} ".
-           "-o ServerAliveCountMax=1 ".
+           "-o ServerAliveInterval=".floor($opt->{'timeout'}/3)." ".
            "-o PasswordAuthentication=no ".
            "$host \"env sh -c '$cmd'\" 2>&1";
 
@@ -930,11 +930,11 @@ sub distribute_task {
                     # job to finish, on a host which is unreachable...
                     # So instead of staying idle, let's be redundant!
                     # (This patch is sponsored by your local energy provider!)
-                    #if (!@r) {
-                    #    $ranges = [ map [@$_], @$file_ranges ];
-                    #    @r = find_hole($opt->{'min'}, $opt->{'max'},
-                    #                   $opt->{'len'}, $ranges);
-                    #}
+                    if (!@r) {
+                        $ranges = [ map [@$_], @$file_ranges ];
+                        @r = find_hole($opt->{'min'}, $opt->{'max'},
+                                       $opt->{'len'}, $ranges);
+                    }
 
                     # Still no hole? Well then, we're truly finished!
                     last HOST unless @r;
@@ -1122,7 +1122,7 @@ my %tasks = (
 
     algsqrt   => { name   => "square root",
                    dep    => ['allsqrt'],
-                   files  => ['fact\.\d+', 'algsqrt\.stderr', 'fact'] }
+                   files  => ['fact\.\d+', 'algsqrt\.stderr', 'fact', 'allfactors'] }
 );
 
 # Initialize empty arrays
@@ -1432,7 +1432,8 @@ sub do_polysel {
             or die "Cannot open `$f' for reading: $!.\n";
         while (<FILE>) {
             if (/^No polynomial found/) {
-                warn "No polynomial in file `$f'.\n";
+                warn "No polynomial in file `$f'.\n".
+		     "check [kj]M value.\n";
                 close FILE;
                 return;
             }
@@ -2133,31 +2134,67 @@ sub do_algsqrt {
                      readdir DIR;
     closedir DIR;
 
+    my %all_factor = ();
+    my $number_fact = 0;
+    my $new_factor = 0;
     for (sort @files) {
         /^$param{'name'}\.dep\.alg\.(\d+)$/;
         my $suffix = $1;
         my $i = 0 + $suffix;
+	my $f="$param{'prefix'}.fact.$suffix";
         info "Testing dependency number $i...\n";
         $tab_level++;
         my $cmd = "$param{'cadodir'}/sqrt/algsqrt ".
                   "$param{'prefix'}.dep.alg.$suffix ".
                   "$param{'prefix'}.dep.rat.$suffix ".
                   "$param{'prefix'}.poly ".
-                  "> $param{'prefix'}.fact.$suffix ".
+                  "> $f ".
                   "2>> $param{'prefix'}.algsqrt.stderr";
         cmd($cmd, { log => 1, kill => 1 });
 
-        if (first_line("$param{'prefix'}.fact.$suffix") !~ /^Failed/) {
-            info "Factorization was successful!\n";
-            cmd("env cp -f $param{'prefix'}.fact.$suffix $param{'prefix'}.fact",
-                { kill => 1 });
-            $tab_level--;
-            return;
+	if (first_line($f) !~ /^Failed/) {
+	    open FILE, "< $f" 
+        	or die "Cannot open `$f' for reading: $!.\n";
+	    while (<FILE>) {
+	    	if (++$all_factor{$_} == 1) {
+		    $new_factor = 1;
+		}
+	    }
+	    close FILE;
+	    if( $new_factor == 1 ) {
+	    	$number_fact++;
+	    	if ( $number_fact == 1) {
+                    info "Factorization was successful!\n";
+    	 	    cmd("env cp -f $f $param{'prefix'}.fact",
+                        { kill => 1 });
+		    for ( keys ( %all_factor ) ) {
+		      	info $_;
+		    }
+	    	    info "try to find other factors...\n";
+	   	}
+		else {
+	    	    info "new factors have been found!\n";
+		}
+		$new_factor = 0;
+	    }  
         }
         $tab_level--;
     }
 
-    die "No square root was found.\n";
+    if ( %all_factor eq 0 ) {
+	die "No square root was found.\n";
+    }
+
+    my $f1 = "$param{'prefix'}.allfactors";
+    open FILE, "> $f1"
+    	or die "Cannot open `$f1' for reading: $!.\n";
+    for ( keys ( %all_factor ) ) {
+    	print FILE $_;
+    }
+    close FILE;
+    my $number_factor=2*$number_fact;
+    info "$number_factor different factors have been found.\n";
+    	
 }
 
 
