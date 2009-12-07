@@ -2173,7 +2173,7 @@ sub do_algsqrt {
 	    	    info "try to find other factors...\n";
 	   	}
 		else {
-	    	    info "new factors have been found!\n";
+	    	    info "new factors were found!\n";
 		}
 		$new_factor = 0;
 	    }  
@@ -2193,7 +2193,7 @@ sub do_algsqrt {
     }
     close FILE;
     my $number_factor=2*$number_fact;
-    info "$number_factor different factors have been found.\n";
+    info "$number_factor different factors were found.\n";
     	
 }
 
