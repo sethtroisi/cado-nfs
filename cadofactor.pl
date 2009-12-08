@@ -56,7 +56,6 @@ use warnings;
 
 use File::Basename;
 use Cwd qw(abs_path);
-use POSIX ("floor");
 
 
 
@@ -422,7 +421,7 @@ sub remote_cmd {
     # use public-key authentification instead!
     $cmd = "env ssh -q ".
            "-o ConnectTimeout=$opt->{'timeout'} ".
-           "-o ServerAliveInterval=".floor($opt->{'timeout'}/3)." ".
+           "-o ServerAliveInterval=".int($opt->{'timeout'}/3)." ".
            "-o PasswordAuthentication=no ".
            "$host \"env sh -c '$cmd'\" 2>&1";
 
@@ -701,8 +700,16 @@ sub append_poly_params {
         { kill => 1 });
 }
 
-
-
+sub local_time {
+    my $job= shift;
+    $cmdlog = "$param{'prefix'}.cmd";
+    open LOG, ">> $cmdlog"
+        or die "Cannot open `$cmdlog' for writing: $!.\n";
+    print LOG "# Starting $job on " . localtime() . "\n";
+    close LOG;
+}
+    
+    
 ###############################################################################
 # Distributed tasks ###########################################################
 ###############################################################################
@@ -792,6 +799,7 @@ sub distribute_task {
     my ($opt) = @_;
 
     banner $opt->{'title'};
+    local_time $opt->{'title'};
 
     # Make sure that all the output files that are already here are correct
     opendir DIR, $param{'wdir'}
@@ -1260,13 +1268,7 @@ sub do_init {
         close FILE;
     }
 
-    # Log file for commands
-    $cmdlog = "$param{'prefix'}.cmd";
-    # unlink $cmdlog if !$recover && -f $cmdlog;
-    open LOG, ">> $cmdlog"
-        or die "Cannot open `$cmdlog' for writing: $!.\n";
-    print LOG "# Starting " . basename($0) . " on " . localtime() . "\n";
-    close LOG;
+    local_time(basename($0));
 
     # Timestamp the task with the date of the last modification of $name.n
     $tasks{'init'}->{'done'} = (stat("$param{'prefix'}.n"))[9] # modification time
@@ -1931,6 +1933,7 @@ sub do_transpose {
 
 sub do_linalg {
     banner "Linear algebra";
+    local_time "Linear algebra";
 
     my $cmd;
     if ($param{'linalg'} eq "bw") {
@@ -2097,6 +2100,7 @@ sub do_chars {
 
 sub do_allsqrt {
     banner "Square root";
+    local_time "Square root";
 
     $ndep = count_lines("$param{'prefix'}.ker") unless defined $ndep;
     $ndep = $param{'nkermax'} if $ndep > $param{'nkermax'};
@@ -2135,7 +2139,8 @@ sub do_algsqrt {
     closedir DIR;
 
     my %all_factor = ();
-    my $number_fact = 0;
+    my $number_fact = 0; # number factorizations with at least
+                         # one different factor
     my $new_factor = 0;
     for (sort @files) {
         /^$param{'name'}\.dep\.alg\.(\d+)$/;
@@ -2188,13 +2193,13 @@ sub do_algsqrt {
     my $f1 = "$param{'prefix'}.allfactors";
     open FILE, "> $f1"
     	or die "Cannot open `$f1' for reading: $!.\n";
-    for ( keys ( %all_factor ) ) {
+    my @all_factor = keys %all_factor;
+    for ( @all_factor ) {
     	print FILE $_;
     }
     close FILE;
-    my $number_factor=2*$number_fact;
-    info "$number_factor different factors were found.\n";
-    	
+    info $#all_factor + 1 . " different non-trivial factors were found.\n";
+
 }
 
 
