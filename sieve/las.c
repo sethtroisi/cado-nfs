@@ -859,7 +859,19 @@ fill_in_buckets(bucket_array_t *BA_param, factorbase_degn_t *fb,
                    both a, b are even, thus we can't have a valid relation */
                 if (x & even_mask)
                   {
+#if defined(__x86_64__) && defined(__GNUC__)
+                    /* The x value in update can be set by a write to 
+                       the low word of the register, but gcc does not 
+                       do so - it writes the word to memory, then reads 
+                       the dword back again. */
+                    __asm__ (
+                      "movw %1, %w0\n\t"
+                      : "+r" (update)
+                      : "r" ((uint16_t) (x & maskbucket))
+                    );
+#else
                     update.x = (uint16_t) (x & maskbucket);
+#endif
 #ifdef PROFILE
 		    /* To make it visible in profiler */
 		    *(BA.bucket_write[x >> shiftbucket])++ = update;
