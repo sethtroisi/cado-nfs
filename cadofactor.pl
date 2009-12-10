@@ -938,11 +938,11 @@ sub distribute_task {
                     # job to finish, on a host which is unreachable...
                     # So instead of staying idle, let's be redundant!
                     # (This patch is sponsored by your local energy provider!)
-                    if (!@r) {
-                        $ranges = [ map [@$_], @$file_ranges ];
-                        @r = find_hole($opt->{'min'}, $opt->{'max'},
-                                       $opt->{'len'}, $ranges);
-                    }
+                    #if (!@r) {
+                    #    $ranges = [ map [@$_], @$file_ranges ];
+                    #    @r = find_hole($opt->{'min'}, $opt->{'max'},
+                    #                   $opt->{'len'}, $ranges);
+                    #}
 
                     # Still no hole? Well then, we're truly finished!
                     last HOST unless @r;
@@ -1247,8 +1247,10 @@ sub do_init {
             my %param_old;
             read_param(\%param_old, { strict => 0 },
                        "param=$param{'prefix'}.param");
-            $param_diff{$_} = !$param_old{$_} || $param{$_} ne $param_old{$_}
-                for keys %param;
+            for (keys %param) {
+            		$param_diff{$_} =$param{$_} ne $param_old{$_}
+						if (exists($param_old{$_}));
+			}
         };
     }
 
@@ -1312,13 +1314,15 @@ sub do_init {
             for (map $tasks{$_}, @{$task->{'dep'}}) {
                 if (!$_->{'done'}) {
                     info "$_->{'name'} not flagged as done, flagging ${t} as ".
-                      "not done\n";
+                      "not done\n"
+						if $_->{'name'};
                     undef $done;
                     undef $resume;
                     last;
                 }
                 if ($done && $_->{'done'} > $done) {
-                    info "$_->{'name'}_done newer than ${t}_done\n";
+                    info "$_->{'name'}_done newer than ${t}_done\n"
+						if $_->{'name'};
                     undef $done;
                     undef $resume;
                     last;
