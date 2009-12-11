@@ -315,7 +315,8 @@ simple_mul (residue_t r, const residue_t a, const unsigned long b,
     mod_add (r, a, a, m);
     mod_add (r, r, r, m);
     mod_add (r, r, a, m);
-  } else if (b == 7UL) {
+  } else {
+    ASSERT (b == 7UL);
     mod_add (r, a, a, m);
     mod_add (r, r, r, m);
     mod_add (r, r, r, m);
