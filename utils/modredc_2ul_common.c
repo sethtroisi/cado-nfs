@@ -369,7 +369,7 @@ mod_npow_ul (residue_t r, const unsigned long b, const unsigned long e,
     }
   mod_set (r, t, m);
   mod_clear (t, m);
-  if (b != 2)
+  if (b != 2UL)
     mod_clear (u, m);
 }
 
@@ -474,6 +474,8 @@ mod_npow_mp (residue_t r, const unsigned long b, const unsigned long *e,
     }
   mod_set (r, t, m);
   mod_clear (t, m);
+  if (b != 2UL)
+    mod_clear (u, m);
 }
 
 

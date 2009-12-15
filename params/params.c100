@@ -1,11 +1,11 @@
-# Sample parameter file for a 110-digit gnfs input
+# Sample parameter file for a 100-digit gnfs input
 # Example: cadofactor.pl wdir=... name=... n=...
 
-name=c110
+name=c100
 
 ##########################################################################
 
-cadodir=$HOME/svn/cado/dist/bin      # where to find cado binaries
+cadodir=$HOME/svn/cado/dist/src      # where to find cado binaries
 parallel=1           # do we use parallel computation?
 delay=300
 
@@ -16,22 +16,22 @@ machines=mach_desc      # file describing available computers for parallel
 # Polynomial selection
 ###########################################################################
 
-degree=5                # degree of the algebraic polynomial
+degree=4                # degree of the algebraic polynomial
 kjdelay=300             # time between two checks
 selectnice=4            # nice level for selection
 
 ## Most important parameters of polyselect
-kjM=1e16                # maximum norm allowed
-kjl=4                   # minimal number of primes in lc(g)
+kjM=2e17                # maximum norm allowed
+kjl=5                   # minimal number of primes in lc(g)
 kjadmin=1               # min value for lc(f)
 kjadmax=1e6             # max value for lc(f)
 kjadrange=1e5           # individual tasks
 
 ## Other parameters of polyselect
 kjkeep=100              # number of preselected polynomials
-kjkmax=12               # rotation is bounded by 2^kmax
+kjkmax=16               # rotation is bounded by 2^kmax
 kjincr=60               # forced divisor of lc(f)
-kjpb=1024               # bound on primes allowed in lc(g)
+kjpb=256               # bound on primes allowed in lc(g)
 kjp0max=100000          # bound on the additional factor in lc(g)
 
 ###########################################################################
@@ -46,17 +46,17 @@ kjp0max=100000          # bound on the additional factor in lc(g)
 # rlambda/alambda is the early-abort ratio: if after sieving the
 #                                      approximate norm is more than
 #                                      lambda times lpb, we reject.
-rlim=4000000
-alim=4000000
-lpbr=26
-lpba=26
-mfbr=52
-mfba=52
-rlambda=2.2
+rlim=1000000
+alim=1000000
+lpbr=24
+lpba=24
+mfbr=48
+mfba=48
+rlambda=2.1
 alambda=2.3
 
-I=12                    # Sieving range in lattice siever
-qmin=4000000            # Start of the special-q range
+I=11                    # Sieving range in lattice siever
+qmin=1000000            # Start of the special-q range
 qrange=100000           # The size of an elementary sieving task
 checkrange=1            # We check if we have enough after each step
                         # of that many relations found.
@@ -84,7 +84,7 @@ bwstrat=0
 ###########################################################################
 
 bwmt=4                  # Multithreading level of Block-Wiedemann
-linalg=bwc              # Choose linalg algorithm
+linalg=bw               # Choose linalg algorithm: bl or bw
 
 ###########################################################################
 # Characters
