@@ -2142,67 +2142,150 @@ sub do_algsqrt {
                      readdir DIR;
     closedir DIR;
 
-    my %all_factor = ();
+    my %all_factors;
+    my @all_prime_factors;
     my $number_fact = 0; # number factorizations with at least
                          # one different factor
     my $new_factor = 0;
+    my $new_prime_factor = 0;
+
+	sub add_element {
+		my ($new_element, $all_elements) = @_;
+		if (++$$all_elements{$new_element}->{'exist'} == 1) {
+			$$all_elements{$new_element}->{'prime'} =
+				cmd("$param{'cadodir'}/utils/gmp_prob_prime ".
+				"$new_element")->{'out'};
+			return 1;
+		}
+		return 0;
+	}
+	
+	sub add_prime_element {
+		my ($new_prime_element, $all_prime_elements, $all_elements) = @_;
+		if ( $$all_elements{$new_prime_element}->{'prime'} == 1) {
+			push @$all_prime_elements, $new_prime_element;
+			return 1;
+		}
+		return 0;
+	}
+
+	sub add_gcd_element {
+		my ($new_gcd_element, $all_prime_elements, $all_elements) = @_;
+		my $new_prime_element=0;
+		chomp $new_gcd_element;
+		for (keys %$all_elements) {
+			if ($$all_elements{$_}->{'prime'} == 0) {
+				chomp $_;
+				if ($_ ne $new_gcd_element) {
+					my $gcd =
+						cmd("$param{'cadodir'}/utils/gmp_gcd ".
+						"$new_gcd_element $_")->{'out'};
+					if ($gcd ne "1\n") {
+						if (add_element ( $gcd, $all_elements)) {
+							if (add_prime_element ($gcd,
+								$all_prime_elements, $all_elements)) {
+								$new_prime_element=1;
+							}
+						}
+					}
+				}
+			}
+		}
+		return $new_prime_element;
+	}
+
     for (sort @files) {
         /^$param{'name'}\.dep\.alg\.(\d+)$/;
         my $suffix = $1;
         my $i = 0 + $suffix;
-	my $f="$param{'prefix'}.fact.$suffix";
-        info "Testing dependency number $i...\n";
-        $tab_level++;
-        my $cmd = "$param{'cadodir'}/sqrt/algsqrt ".
-                  "$param{'prefix'}.dep.alg.$suffix ".
-                  "$param{'prefix'}.dep.rat.$suffix ".
-                  "$param{'prefix'}.poly ".
-                  "> $f ".
-                  "2>> $param{'prefix'}.algsqrt.stderr";
-        cmd($cmd, { log => 1, kill => 1 });
+		my $f="$param{'prefix'}.fact.$suffix";
+		info "Testing dependency number $i...\n";
+		$tab_level++;
+		my $cmd = "$param{'cadodir'}/sqrt/algsqrt ".
+			"$param{'prefix'}.dep.alg.$suffix ".
+			"$param{'prefix'}.dep.rat.$suffix ".
+			"$param{'prefix'}.poly ".
+			"> $f ".
+			"2>> $param{'prefix'}.algsqrt.stderr";
+		cmd($cmd, { log => 1, kill => 1 });
 
-	if (first_line($f) !~ /^Failed/) {
-	    open FILE, "< $f" 
-        	or die "Cannot open `$f' for reading: $!.\n";
-	    while (<FILE>) {
-	    	if (++$all_factor{$_} == 1) {
-		    $new_factor = 1;
+
+		if (first_line($f) !~ /^Failed/) {
+			open FILE, "< $f" 
+				or die "Cannot open `$f' for reading: $!.\n";
+			while (<FILE>) {
+				if(add_element ($_, \%all_factors)) {
+					if(add_prime_element($_, \@all_prime_factors,
+						\%all_factors)) {
+						$new_prime_factor = 1;
+					}
+					else {
+						if (add_gcd_element ($_, \@all_prime_factors,
+							\%all_factors)) {
+							$new_prime_factor = 1;
+						}
+					}
+					$new_factor = 1;
+				}
+			}
+			close FILE;
+
+			if( $new_factor == 1 ) {
+				$number_fact++;
+				if ( $number_fact == 1) {
+					info "Factorization was successful!\n";
+					cmd("env cp -f $f $param{'prefix'}.fact",
+							{ kill => 1 });
+					for ( keys ( %all_factors ) ) {
+						info $_;
+					}
+				}
+				else {
+					if( $new_prime_factor == 1) {
+						info "new prime factors were found!\n";
+					}
+					else {
+						info "new factors were found!\n";
+					}
+				}
+			
+				if( $new_prime_factor == 1) {
+					my $cmd =
+						cmd("$param{'cadodir'}/utils/gmp_factorization_complete ".
+						"$param{'n'} ".
+						join(" ",split(/\n/, join("",@all_prime_factors))))->{'out'};
+					if ( $cmd == 0) {
+						$tab_level--;
+						my $all_prime_factors= $#all_prime_factors + 1;
+						info $all_prime_factors." prime factors were found!\n";
+						open FILE, "> $param{'prefix'}.fact"
+							or die "Cannot open `$param{'prefix'}.fact' for reading: $!.\n";
+						for ( @all_prime_factors) {
+							print FILE $_;
+						}
+						close FILE;
+						last;
+					}
+				}
+				info "try to find other factors...\n";
+				$new_factor = 0;
+				$new_prime_factor = 0;
+			}  
 		}
-	    }
-	    close FILE;
-	    if( $new_factor == 1 ) {
-	    	$number_fact++;
-	    	if ( $number_fact == 1) {
-                    info "Factorization was successful!\n";
-    	 	    cmd("env cp -f $f $param{'prefix'}.fact",
-                        { kill => 1 });
-		    for ( keys ( %all_factor ) ) {
-		      	info $_;
-		    }
-	    	    info "try to find other factors...\n";
-	   	}
-		else {
-	    	    info "new factors were found!\n";
-		}
-		$new_factor = 0;
-	    }  
-        }
-        $tab_level--;
-    }
+		$tab_level--;
+	}
 
-    if ( %all_factor eq 0 ) {
-	die "No square root was found.\n";
-    }
+	if ( %all_factors eq 0 ) {
+		die "No square root was found.\n";
+	}
 
-    my $f1 = "$param{'prefix'}.allfactors";
-    open FILE, "> $f1"
-    	or die "Cannot open `$f1' for reading: $!.\n";
-    my @all_factor = keys %all_factor;
-    for ( @all_factor ) {
-    	print FILE $_;
-    }
-    close FILE;
-    info $#all_factor + 1 . " different non-trivial factors were found.\n";
+	my $f1 = "$param{'prefix'}.allfactors";
+	open FILE, "> $f1"
+		or die "Cannot open `$f1' for reading: $!.\n";
+	for ( keys %all_factors ) {
+		print FILE $_;
+	}
+	close FILE;
 
 }
 
@@ -2214,34 +2297,34 @@ sub do_algsqrt {
 
 MAIN :
 {
-    select(STDERR); $| = 1; # always flush stderr
-    select(STDOUT); $| = 1; # always flush stdout
+	select(STDERR); $| = 1; # always flush stderr
+	select(STDOUT); $| = 1; # always flush stdout
 
-    print "$0 @ARGV\n";
+	print "$0 @ARGV\n";
 
-    do_init();
-    do_task("algsqrt");
+	do_init();
+	do_task("algsqrt");
 
-    banner "All done!";
+	banner "All done!";
 
-    open FILE, "$param{'prefix'}.fact"
-        or die "Cannot open `$param{'prefix'}.fact' for reading: $!.\n";
-    my @l = <FILE>;
-    close FILE;
-    chomp for @l;
-    print "@l\n";
+	open FILE, "$param{'prefix'}.fact"
+		or die "Cannot open `$param{'prefix'}.fact' for reading: $!.\n";
+	my @l = <FILE>;
+	close FILE;
+	chomp for @l;
+	print "@l\n";
 
-    if (defined(my $e = $param{'expected_factorization'})) {
-        my @exp=split(',',$e);
-        @exp = sort @exp;
-        @l = sort @l;
-        my $ok = "@exp" eq "@l";
-        if ($ok) {
-            print "Factorization matches expected result\n";
-        } else {
-            die "Factorization does not match expected result\n";
-        }
-    }
+	if (defined(my $e = $param{'expected_factorization'})) {
+		my @exp=split(',',$e);
+		@exp = sort @exp;
+		@l = sort @l;
+		my $ok = "@exp" eq "@l";
+		if ($ok) {
+			print "Factorization matches expected result\n";
+		} else {
+			die "Factorization does not match expected result\n";
+		}
+	}
 
-    close $log_fh if $log_fh;
+	close $log_fh if $log_fh;
 }
