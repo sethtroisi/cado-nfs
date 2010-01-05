@@ -45,6 +45,8 @@ Host    localhost
         StrictHostKeyChecking no
         UserKnownHostsFile /dev/null
 
+You should also put in $HOME/.ssh/authorized_keys your public key.
+
 If everything is correctly configured, when you type 
 
 ssh localhost
