@@ -36,7 +36,7 @@ Check that your SSH configuration is correct:
 
 The master script uses SSH to connect to available computing resources
 (including localhost). In order to avoid the script asking your password
-or passphrase, you must have a public-key authentication and an agent. 
+or passphrase, you must have a public-key authentication and an agent.
 
 Also, since localhost has an IP and key that varies, you'd better have
 those 3 lines in your $HOME/.ssh/config:
