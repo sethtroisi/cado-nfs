@@ -182,11 +182,12 @@ void check_polynomials(cado_poly cpoly)
 	mpz_addmul(r, q, cpoly->f[k]);
     }
 
-    if (mpz_divisible_p(r, cpoly->n) == 0) {
-	fprintf(stderr, "Error, n does does divide Res(f,g)\n");
-	exit(EXIT_FAILURE);
-    }
+    if (mpz_divisible_p (r, cpoly->n) == 0)
+      {
+	fprintf (stderr, "Error, n does not divide Res(f,g)\n");
+	exit (EXIT_FAILURE);
+      }
 
-    mpz_clear(r);
-    mpz_clear(q);
+    mpz_clear (r);
+    mpz_clear (q);
 }
