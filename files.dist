@@ -307,6 +307,9 @@ utils/ularith.h
 utils/utils.h
 utils/crc.h
 utils/crc.c
+utils/gmp_factorization_complete.c
+utils/gmp_gcd.c
+utils/gmp_prob_prime.c
 cado_config_h.in
 config/asm_sample.c
 config/sse2.c

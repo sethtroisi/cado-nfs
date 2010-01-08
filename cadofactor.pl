@@ -56,6 +56,8 @@ use warnings;
 
 use File::Basename;
 use Cwd qw(abs_path);
+use List::Util qw[min];
+use POSIX qw(ceil);
 
 
 
@@ -191,6 +193,7 @@ my @default_param = (
     delay        => 120,
     sievenice    => 19,
     keeprelfiles => 0,
+	sieve_max_threads => 1,
 
     # filtering
     keep         => 160, # should be 128+skip
@@ -921,9 +924,12 @@ sub distribute_task {
 
             HOST : for my $h (keys %machines) {
                 my $m = $machines{$h};
-
+				my $mtl = min ( $opt->{'max_threads'},
+								$m->{'cores'} );
+				my $process = ceil( $m->{'cores'} / $mtl );
+				
                 # How many free cores on this host?
-                my $n = $m->{'cores'} - grep { $_->{'host'} eq $h } @$jobs;
+                my $n = $process - grep { $_->{'host'} eq $h } @$jobs;
                 next unless $n;
 
                 # Send files and skip to next host if not all files are here
@@ -954,7 +960,8 @@ sub distribute_task {
 
                     info "Starting job: ".job_string($job)."\n";
                     $tab_level++;
-                    my $cmd = &{$opt->{'cmd'}}(@r, $m)." & echo \\\$!";
+                   	my $cmd = &{$opt->{'cmd'}}(@r, $m, $mtl)." & echo \\\$!";
+						
                     my $ret = remote_cmd($h, $cmd, { log => 1 });
                     if (!$ret->{'status'}) {
                         chomp $ret->{'out'};
@@ -986,7 +993,7 @@ sub distribute_task {
                                                     $opt->{'len'}, $ranges))) {
             info "Starting job: ".pad($r[0], 8)." ".pad($r[1], 8)."\n";
             $tab_level++;
-            my $cmd = &{$opt->{'cmd'}}(@r, $machines{'localhost'});
+            my $cmd = &{$opt->{'cmd'}}(@r, $machines{'localhost'}, 1);
             cmd($cmd, { log => 1, kill => 1 });
             &{$opt->{'check'}}("$param{'prefix'}.$opt->{'suffix'}.$r[0]-$r[1]",
                              1); # Exhaustive testing!
@@ -1488,7 +1495,7 @@ sub do_polysel {
     };
 
     my $polysel_cmd = sub {
-        my ($a, $b, $m) = @_;
+        my ($a, $b, $m, $max_threads) = @_;
         return "env nice -$param{'selectnice'} ".
                "$m->{'cadodir'}/polyselect/polyselect ".
                "-keep $param{'kjkeep'} ".
@@ -1518,7 +1525,8 @@ sub do_polysel {
                       check    => $polysel_check,
                       progress => $polysel_progress,
                       is_done  => $polysel_is_done,
-                      cmd      => $polysel_cmd });
+                      cmd      => $polysel_cmd,
+					  max_threads => 1 });
 
     info "All done!\n";
 
@@ -1801,7 +1809,7 @@ sub do_sieve {
 
 
     my $sieve_cmd = sub {
-        my ($a, $b, $m) = @_;
+        my ($a, $b, $m, $max_threads) = @_;
         return "env nice -$param{'sievenice'} ".
                "$m->{'cadodir'}/sieve/las ".
                "-I $param{'I'} ".
@@ -1809,6 +1817,7 @@ sub do_sieve {
                "-fb $m->{'prefix'}.roots ".
                "-q0 $a ".
                "-q1 $b ".
+			   "-mt $max_threads ".
                "> $m->{'prefix'}.rels.$a-$b ".
                "2>&1";
     };
@@ -1828,7 +1837,8 @@ sub do_sieve {
                       check    => $sieve_check,
                       progress => $sieve_progress,
                       is_done  => $sieve_is_done,
-                      cmd      => $sieve_cmd });
+                      cmd      => $sieve_cmd,
+					  max_threads => $param{'sieve_max_threads'} });
 
     info "All done!\n";
 }
