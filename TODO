@@ -1,3 +1,6 @@
+General:
+========
+
 * improve the use of free relations: currently we generate free relations
   up to the algebraic factor base bound (alim). We can do much better:
 
@@ -18,5 +21,14 @@
   * LLP64 defines "int" and "long" as 32 bits, and an additional type
     (usually called "long long") as 64 bits.
   * ILP64 defines "int" and "long" as 64 bits.
+
+Purge:
+======
+
+* in the first pass, we can identify all algebraic ideals corresponding to a
+  given prime p, and even identify them to the ideal p on the rational side,
+  to reduce the memory usage. Some singletons will not be identified in this
+  first pass, but later passes (with fewer remaining relations) will remove
+  them.
   
-* re-enable ``make check''
+
