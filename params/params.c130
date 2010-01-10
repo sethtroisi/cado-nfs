@@ -48,12 +48,12 @@ kjp0max=100000          # bound on the additional factor in lc(g)
 #                                      lambda times lpb, we reject.
 rlim=4000000
 alim=8000000
-lpbr=27
-lpba=27
-mfbr=54
-mfba=54
-rlambda=2.2
-alambda=2.5
+lpbr=28
+lpba=28
+mfbr=56
+mfba=56
+rlambda=2.1
+alambda=2.3
 
 I=12                    # Sieving range in lattice siever
 qmin=4000000            # Start of the special-q range
