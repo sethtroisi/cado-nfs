@@ -627,7 +627,7 @@ modul_poly_roots_ulong (unsigned long *r, mpz_t *f, int d, modulusul_t p)
     pr = malloc(d * sizeof(residueul_t));
     n = modul_poly_roots(pr,f,d,p);
     for(i = 0 ; i < n ; i++) {
-        r[i] = (unsigned long) pr[i];
+        r[i] = modul_getmod_ul (pr[i]);
     }
     free(pr);
     return n;

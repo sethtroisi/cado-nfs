@@ -17,7 +17,7 @@ extern void fprint_polynomial (FILE *, mpz_t *, const int);
 // This reads a file created by polyselect and fill in the structure
 // accordingly. Return 1 if success, 0 if failure (and diagnostic on
 // stderr)
-extern int cado_poly_read (cado_poly, char *filename);
+extern int cado_poly_read (cado_poly, const char *filename);
 extern int cado_poly_read_stream (cado_poly, FILE *);
 extern int cado_poly_set_plist(cado_poly poly, param_list pl);
 

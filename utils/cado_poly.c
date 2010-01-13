@@ -121,7 +121,7 @@ int cado_poly_read_stream(cado_poly poly, FILE * f)
 }
 
 // returns 0 on failure, 1 on success.
-int cado_poly_read(cado_poly poly, char *filename)
+int cado_poly_read(cado_poly poly, const char *filename)
 {
     FILE *file;
     int r;
