@@ -22,6 +22,11 @@ General:
     (usually called "long long") as 64 bits.
   * ILP64 defines "int" and "long" as 64 bits.
 
+* reintroduce the "skip" parameter: the idea is that we remove some columns
+  corresponding to dense prime ideals before the linear algebra (or even
+  before merge or purge), and we "recover" those ideals with "characters".
+  Thus the matrix has smaller weight, and hopefully bwc will be faster.
+
 Purge:
 ======
 
