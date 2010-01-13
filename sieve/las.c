@@ -111,6 +111,7 @@ typedef struct {
     uint32_t J;
     int logI; // such that I = 1<<logI
     // description of the q-lattice
+    int ratq;   // 0 means special q on alg side, otherwise on rat side
     uint64_t q;
     uint64_t rho;
     int32_t a0, b0, a1, b1;
@@ -236,6 +237,8 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int logI, uint64_t q0,
   scale = fabs (mpz_get_d (cpoly->g[1])) * cpoly->skew
         + fabs (mpz_get_d (cpoly->g[0]));
   scale *= si->B * (double) si->I;
+  if (si->ratq)
+      scale /= (double) q0;
   si->logmax_rat = scale = log2 (scale);
   /* on the rational side, we want that the non-reports on the algebraic
      side, which are set to 255, remain over the report bound R, even if
@@ -330,7 +333,10 @@ sieve_info_update (sieve_info_t *si, const int verbose, FILE *output)
   si->nb_buckets = 1 + (si->I * si->J - 1) / si->bucket_region;
   
   /* Update floating point version of algebraic poly */
-  invq = 1.0 / (double) si->q;
+  if (!si->ratq)
+      invq = 1.0 / (double) si->q;
+  else 
+      invq = 1.0;
   for (k = 0; k <= si->degree; k++)
     si->fijd[k] = mpz_get_d (si->fij[k]) * invq;
 }
@@ -1150,6 +1156,12 @@ init_rat_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly,
     g0 = mpz_get_d (cpoly->g[0]);
     gi = g1 * (double) si->a0 + g0 * (double) si->b0;
     gj = g1 * (double) si->a1 + g0 * (double) si->b1;
+
+    if (si->ratq) {
+        double invq = 1.0 / (double) si->q;
+        gi *= invq;
+        gj *= invq;
+    }
 
     /* bucket_region is a multiple of I. Let's find the starting j
      * corresponding to N and the last j.
@@ -2502,6 +2514,8 @@ factor_survivors (unsigned char *S, int N, bucket_array_t *rat_BA,
 
             // Trial divide rational norm
             eval_fij (rat_norm, (const mpz_t *) cpoly->g, 1, a, b);
+            if (si->ratq)
+                mpz_divexact_ui (rat_norm, rat_norm, si->q);
             trial_div (&rat_factors, rat_norm, x, fb_rat,
                        &rat_primes, si->trialdiv_data_rat, cpoly->rlim);
 
@@ -2511,7 +2525,8 @@ factor_survivors (unsigned char *S, int N, bucket_array_t *rat_BA,
 
             // Trial divide algebraic norm
             eval_fij (alg_norm, (const mpz_t *) cpoly->f, cpoly->degree, a, b);
-            mpz_divexact_ui (alg_norm, alg_norm, si->q);
+            if (!si->ratq)
+                mpz_divexact_ui (alg_norm, alg_norm, si->q);
             trial_div (&alg_factors, alg_norm, x, fb_alg,
                        &alg_primes, si->trialdiv_data_alg, cpoly->alim);
 
@@ -2886,9 +2901,11 @@ get_maxnorm (cado_poly cpoly, sieve_info_t *si, uint64_t q0)
 
   free (fd);
 
-  /* multiply by (B*I)^d and divide by q0 */
-  return log2 (max_norm * pow (si->B * (double) si->I, (double) d)
-               / (double) q0);
+  /* multiply by (B*I)^d and divide by q0 if sieving on alg side */
+  tmp = max_norm * pow (si->B * (double) si->I, (double) d);
+  if (!si->ratq)
+      tmp /= (double) q0;
+  return log2(tmp);
 }
 
 /* v <- |f(i,j)|, where f is of degree d */
@@ -3421,6 +3438,7 @@ usage (const char *argv0, const char * missing)
   fprintf (stderr, "          -v              be verbose (print some sieving statistics)\n");
   fprintf (stderr, "          -out filename   write relations to filename instead of stdout\n");
   fprintf (stderr, "          -mt nnn   use nnn threads\n");
+  fprintf (stderr, "          -ratq           use rational special-q\n");
   if (missing) {
       fprintf(stderr, "\nError: missing parameter %s\n", missing);
   }
@@ -3444,6 +3462,7 @@ main (int argc0, char *argv0[])
     int rpow_lim = 0, apow_lim = 0;
     int I = DEFAULT_I, i;
     int verbose = 0;
+    int ratq = 0;
     unsigned long sq = 0;
     double totJ = 0.0;
     unsigned long report_sizes_a[256], report_sizes_r[256];
@@ -3459,6 +3478,7 @@ main (int argc0, char *argv0[])
     param_list_init(pl);
     cado_poly_init(cpoly);
     param_list_configure_knob(pl, "-v", &verbose);
+    param_list_configure_knob(pl, "-ratq", &ratq);
     argv++, argc--;
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
@@ -3554,6 +3574,7 @@ main (int argc0, char *argv0[])
              cpoly->mfbr, cpoly->mfba, cpoly->rlambda, cpoly->alambda);
 
     /* this does not depend on the special-q */
+    si.ratq = ratq;
     sieve_info_init (&si, cpoly, I, q0, bucket_thresh, output, nb_threads);
 
     factorbase_degn_t **fb_alg_mt;
@@ -3662,7 +3683,10 @@ main (int argc0, char *argv0[])
             if (q0 >= q1)
               goto end;  // breaks two whiles.
             si.q = q0;
-            nroots = poly_roots_uint64 (roots, cpoly->f, cpoly->degree, q0);
+            if (si.ratq)
+                nroots = poly_roots_uint64 (roots, cpoly->g, 1, q0);
+            else
+                nroots = poly_roots_uint64 (roots, cpoly->f, cpoly->degree, q0);
             if (nroots > 0)
               {
                 fprintf (output, "### q=%" PRIu64 ": root%s", q0,
