@@ -711,6 +711,10 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, poly_t F, unsigned long p)
   poly_free (A);
   poly_free (invsqrtA);
   poly_free (a);
+
+  size_t sqrt_size = poly_sizeinbase (res->p, F->deg - 1, 2);
+  fprintf (stderr, "maximal sqrt bit-size = %zu (%.0f%% of target size)\n",
+          sqrt_size, 100.0 * (double) sqrt_size / target_size);
 }
 
 unsigned long FindSuitableModP(poly_t F) {
