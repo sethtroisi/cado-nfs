@@ -924,9 +924,9 @@ sub distribute_task {
 
             HOST : for my $h (keys %machines) {
                 my $m = $machines{$h};
-				my $mtl = min ( $opt->{'max_threads'},
+				my $mth = min ( $opt->{'max_threads'},
 								$m->{'cores'} );
-				my $process = ceil( $m->{'cores'} / $mtl );
+				my $process = ceil( $m->{'cores'} / $mth );
 				
                 # How many free cores on this host?
                 my $n = $process - grep { $_->{'host'} eq $h } @$jobs;
@@ -960,7 +960,7 @@ sub distribute_task {
 
                     info "Starting job: ".job_string($job)."\n";
                     $tab_level++;
-                   	my $cmd = &{$opt->{'cmd'}}(@r, $m, $mtl)." & echo \\\$!";
+                   	my $cmd = &{$opt->{'cmd'}}(@r, $m, $mth)." & echo \\\$!";
 						
                     my $ret = remote_cmd($h, $cmd, { log => 1 });
                     if (!$ret->{'status'}) {
@@ -1130,14 +1130,12 @@ my %tasks = (
                    param  => ['skip', 'nchar'],
                    files  => ['ker', 'characters\.stderr'] },
 
-    allsqrt   => { dep    => ['chars'],
+    sqrt	  => { name	  => "square root",
+				   dep    => ['chars'],
                    param  => ['nkermax'],
                    files  => ['dep\.alg\.\d+', 'dep\.rat\.\d+',
-                              'allsqrt\.stderr'] },
-
-    algsqrt   => { name   => "square root",
-                   dep    => ['allsqrt'],
-                   files  => ['fact\.\d+', 'algsqrt\.stderr', 'fact', 'allfactors'] }
+                              'sqrt\.stderr', 'fact\.\d+',
+							  'fact', 'allfactors'] }
 );
 
 # Initialize empty arrays
@@ -2109,48 +2107,14 @@ sub do_chars {
 
 
 ###############################################################################
-# Preparing the square root ###################################################
-###############################################################################
-
-sub do_allsqrt {
-    banner "Square root";
-    local_time "Square root";
-
-    $ndep = count_lines("$param{'prefix'}.ker") unless defined $ndep;
-    $ndep = $param{'nkermax'} if $ndep > $param{'nkermax'};
-
-    info "Preparing $ndep square roots...\n";
-    $tab_level++;
-
-    my $cmd = "$param{'cadodir'}/sqrt/allsqrt ".
-              "$param{'prefix'}.nodup.gz ".
-              "$param{'prefix'}.purged ".
-              "$param{'prefix'}.index ".
-              "$param{'prefix'}.ker ".
-              "$param{'prefix'}.poly ".
-              "0 $ndep ar ".
-              "$param{'prefix'}.dep ".
-              "> $param{'prefix'}.allsqrt.stderr ".
-              "2>&1";
-
-    cmd($cmd, { log => 1, kill => 1 });
-    $tab_level--;
-}
-
-
-
-###############################################################################
 # Square root #################################################################
 ###############################################################################
 
-sub do_algsqrt {
+sub do_sqrt {
     banner "Square root" unless defined $ndep;
-
-    opendir DIR, $param{'wdir'}
-        or die "Cannot open directory `$param{'wdir'}': $!\n";
-    my @files = grep /^$param{'name'}\.dep\.alg\.\d+$/,
-                     readdir DIR;
-    closedir DIR;
+    local_time "Square root";
+    $ndep = count_lines("$param{'prefix'}.ker") unless defined $ndep;
+    $ndep = $param{'nkermax'} if $ndep > $param{'nkermax'};
 
     my %all_factors;
     my @all_prime_factors;
@@ -2204,19 +2168,32 @@ sub do_algsqrt {
 		return $new_prime_element;
 	}
 
-    for (sort @files) {
-        /^$param{'name'}\.dep\.alg\.(\d+)$/;
-        my $suffix = $1;
-        my $i = 0 + $suffix;
-		my $f="$param{'prefix'}.fact.$suffix";
-		info "Testing dependency number $i...\n";
+	sub add_zero_before {
+		my ($number) = @_;
+		if ($number < 10) {
+			return "00$number";
+		} elsif ($number < 100) {
+			return "0$number";
+		} else {
+			return $number;
+		}
+	}
+
+    for (my $numdep=0; $numdep<$ndep; $numdep++) {
+		my $f="$param{'prefix'}.fact.".add_zero_before($numdep);
+		info "Testing dependency number $numdep...\n";
 		$tab_level++;
-		my $cmd = "$param{'cadodir'}/sqrt/algsqrt ".
-			"$param{'prefix'}.dep.alg.$suffix ".
-			"$param{'prefix'}.dep.rat.$suffix ".
-			"$param{'prefix'}.poly ".
-			"> $f ".
-			"2>> $param{'prefix'}.algsqrt.stderr";
+    	my $cmd = "$param{'cadodir'}/sqrt/sqrt ".
+              "$param{'prefix'}.nodup.gz ".
+              "$param{'prefix'}.purged ".
+              "$param{'prefix'}.index ".
+              "$param{'prefix'}.ker ".
+              "$param{'prefix'}.poly ".
+              "$numdep ar ".
+              "$param{'prefix'}.dep ".
+              "2>> $param{'prefix'}.sqrt.stderr ".
+              "> $f";
+
 		cmd($cmd, { log => 1, kill => 1 });
 
 
@@ -2313,7 +2290,7 @@ MAIN :
 	print "$0 @ARGV\n";
 
 	do_init();
-	do_task("algsqrt");
+	do_task("sqrt");
 
 	banner "All done!";
 

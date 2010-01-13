@@ -231,8 +231,7 @@ sieve/trialdiv.h
 sieve/test_trialdiv.c
 sqrt/CMakeLists.txt
 sqrt/Makefile
-sqrt/algsqrt.c
-sqrt/allsqrt.c
+sqrt/sqrt.c
 sqrt/checkdep.c
 utils/poly.c
 utils/poly.h

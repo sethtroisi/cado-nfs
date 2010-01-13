@@ -1,14 +1,11 @@
-add_executable(allsqrt allsqrt.c)
-target_link_libraries(allsqrt utils)
+add_executable(sqrt sqrt.c)
+target_link_libraries(sqrt utils m)
 
-install(TARGETS allsqrt RUNTIME DESTINATION bin/sqrt)
-
-add_executable(algsqrt algsqrt.c)
-target_link_libraries(algsqrt utils m)
+install(TARGETS sqrt RUNTIME DESTINATION bin/sqrt)
 
 add_executable(checkdep checkdep.c)
 target_link_libraries(checkdep utils)
 
-install(TARGETS algsqrt allsqrt checkdep RUNTIME DESTINATION bin/sqrt)
+install(TARGETS sqrt checkdep RUNTIME DESTINATION bin/sqrt)
 
 include(CMakeLists-nodist.txt OPTIONAL)
