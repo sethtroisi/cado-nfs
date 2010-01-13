@@ -5,7 +5,7 @@ name=c143
 
 ##########################################################################
 
-cadodir=$HOME/svn/cado/dist/bin      # where to find cado binaries
+#cadodir=$HOME/svn/cado/dist/bin      # where to find cado binaries
 parallel=1           # do we use parallel computation?
 delay=300
 

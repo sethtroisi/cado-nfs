@@ -1,11 +1,10 @@
 # Sample parameter file for a 113-digit gnfs input
-# Example: cadofactor.pl wdir=... name=... n=...
+# Example: cadofactor.pl wdir=... n=... cadodir=...
 
 name=c113
 
 ##########################################################################
 
-cadodir=$HOME/svn/cado/dist/bin      # where to find cado binaries
 parallel=1           # do we use parallel computation?
 delay=300
 
