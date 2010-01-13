@@ -934,11 +934,13 @@ rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1,
   int i;
   long k, k0 = 0, j, j0 = 0;
   double lognorm, alpha, E0, E, best_E;
+  double skewness = SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC);
+  long jmax = (long) ((double) (1L << MAX_k) / skewness);
 
 #define MARGIN 0.12 /* we allow a small error margin in the expected lognorm
                        + alpha values, to get a larger search range */
 
-  E0 = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
+  E0 = LOGNORM (f, d, skewness);
   /* look for negative k */
   best_E = E0;
   for (i = 1, k = -2; i < MAX_k; i++, k *= 2)
@@ -971,6 +973,8 @@ rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1,
             best_E = E;
         }
       else
+        break;
+      if (1 - 2 * j > jmax)
         break;
     }
   *J0 = j;
@@ -1008,6 +1012,8 @@ rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1,
             best_E = E;
         }
       else
+        break;
+      if (2 * j + 1 > jmax)
         break;
     }
   *J1 = j;
