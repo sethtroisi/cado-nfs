@@ -3435,6 +3435,7 @@ usage (const char *argv0, const char * missing)
   fprintf (stderr, "          -mfba     nnn   algebraic cofactor bound 2^nnn\n");
   fprintf (stderr, "          -rlambda  nnn   rational lambda value is nnn\n");
   fprintf (stderr, "          -alambda  nnn   algebraic lambda value is nnn\n");
+  fprintf (stderr, "          -S        xxx   skewness value is xxx\n");
   fprintf (stderr, "          -v              be verbose (print some sieving statistics)\n");
   fprintf (stderr, "          -out filename   write relations to filename instead of stdout\n");
   fprintf (stderr, "          -mt nnn   use nnn threads\n");
@@ -3512,6 +3513,7 @@ main (int argc0, char *argv0[])
     param_list_parse_int(pl, "bkthresh", &bucket_thresh);
     param_list_parse_int(pl, "rpowlim", &rpow_lim);
     param_list_parse_int(pl, "apowlim", &apow_lim);
+    param_list_parse_double(pl, "S", &cpoly->skew);
     int ok = 1;
     ok = ok && param_list_parse_ulong(pl, "rlim", &cpoly->rlim);
     ok = ok && param_list_parse_ulong(pl, "alim", &cpoly->alim);
@@ -3572,6 +3574,8 @@ main (int argc0, char *argv0[])
              cpoly->rlim, cpoly->alim, cpoly->lpbr, cpoly->lpba);
     fprintf (output, "#                     mfbr=%d mfba=%d rlambda=%1.1f alambda=%1.1f\n",
              cpoly->mfbr, cpoly->mfba, cpoly->rlambda, cpoly->alambda);
+    fprintf (output, "#                     skewness=%1.1f\n",
+             cpoly->skew);
 
     /* this does not depend on the special-q */
     si.ratq = ratq;
