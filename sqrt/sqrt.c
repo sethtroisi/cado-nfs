@@ -909,6 +909,26 @@ int main(int argc, char *argv[])
       fprintf (stderr, "# Read %d including %d free relations\n", nab, nfree);
       ASSERT_ALWAYS ((nab & 1) == 0);
       ASSERT_ALWAYS ((nfree & 1) == 0);
+      /* nfree being even is forced by a specific character column added
+       * by character.c. The correspond assert should not fail.
+       *
+       * nab being even is kind of a mystery. There is a character column
+       * that gives the sign of the rational side. It could well be that
+       * with the parameters we usually use, it is negative for all
+       * relations; that would force the overall number of relations to
+       * be even. Another possibility is when f_d contains a big prime
+       * number that does not occur anywhere else, so that the power of
+       * this prime is controlled by the usual characters, and since f_d
+       * is always present... 
+       *
+       * But: I wouldn't be surprised if the assert(even(nab)) fails.
+       * Then, a patch would be:
+       *    - remove the assert (!)
+       *    - in the numerator of the big product, eliminate powers of
+       *       f_d that divides all coefficients.
+       *    - this should finally give an even power of f_d in the
+       *      denominator, and the algorithm can continue.
+       */
       accumulate_fast_end (prd_tab, F, lprd);
       fclose(algfile);
   
@@ -965,6 +985,8 @@ int main(int argc, char *argv[])
   	// case g(X)=m1*X+m2 with m1 != 1
   	// we should have prod (a+b*m2/m1) = A^2 = R^2/m1^(nab-nfree)
   	// and therefore nab should be even
+        //    [ this last statement is probably false if f is not monic,
+        //      see discussion above about odd/even nab ]
   	if(nab & 1){
   	    fprintf(stderr, "Sorry, but #(a, b) is odd\n");
   	    fprintf(stderr, "Bug: this should be patched! Please report your buggy input\n");
