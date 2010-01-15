@@ -6,7 +6,7 @@
 /* Opteron prefers LOOKUP_TRAILING_ZEROS 1, 
    Core2 prefers LOOKUP_TRAILING_ZEROS 0 */
 #ifndef LOOKUP_TRAILING_ZEROS
-#define LOOKUP_TRAILING_ZEROS 1
+#define LOOKUP_TRAILING_ZEROS 0
 #endif
 #define ctzl(x) __builtin_ctzl(x)
 #define clzl(x) __builtin_clzl(x)
@@ -14,20 +14,6 @@
 /* If we have no ctzl(), we always use the table lookup */
 #define LOOKUP_TRAILING_ZEROS 1
 #endif
-
-#ifdef T_HIST
-unsigned int t_hist[256] = {
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-};
-#endif
-
 
 int
 modredcul_inv (residueredcul_t r, const residueredcul_t A, 
@@ -83,7 +69,6 @@ modredcul_inv (residueredcul_t r, const residueredcul_t A,
   // Here y and x are odd, and y < x
   do {
     /* Here, y and x are odd, 0 < y < x, u is odd and v is even */
-    ASSERT ((u & 1UL) == 1UL && (v & 1UL) == 0UL);
     do {
       x -= y; v += u;
 #if LOOKUP_TRAILING_ZEROS
@@ -109,7 +94,6 @@ modredcul_inv (residueredcul_t r, const residueredcul_t A,
       break;
 
     /* Here, y and x are odd, 0 < x < y, u is even and v is odd */
-    ASSERT ((u & 1UL) == 0UL && (v & 1UL) == 1UL);
     do {
       y -= x; u += v;
 #if LOOKUP_TRAILING_ZEROS
@@ -144,19 +128,11 @@ modredcul_inv (residueredcul_t r, const residueredcul_t A,
       /* Now 1/a = u2^t */
     }
 
-#ifdef T_HIST
-  if (t >= 0 && t < 255)
-    t_hist[t]++;
-  else
-    t_hist[255]++;
-#endif
-
   /* Here, u = 2^w * 2^t / a. We want 2^w / a. */
 
   /* Here, the inverse of y is u/2^t mod x. To do the division by t,
      we use a variable-width REDC. We want to add a multiple of m to u
-     so that the low t bits of the sum are 0 and we can right-shift by t
-     with impunity. */
+     so that the low t bits of the sum are 0 and we can right-shift by t. */
   if (t >= LONG_BIT)
     {
       unsigned long tlow, thigh;
