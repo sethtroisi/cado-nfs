@@ -259,14 +259,23 @@ computeroots (relation_t *rel)
 
 void
 fprint_relation(FILE *file, relation_t rel) {
-  int i;
+  int i, j;
+
   fprintf(file, "%ld,%lu:", rel.a, rel.b);
-  for (i = 0; i < rel.nb_rp-1; ++i)
+  for (i = 0; i < rel.nb_rp - 1; ++i)
+    for (j = 0; j < rel.rp[i].e; j++)
+      fprintf (file, "%lx,", rel.rp[i].p);
+  /* now i = rel.nb_rp - 1 */
+  for (j = 0; j < rel.rp[i].e - 1; j++)
     fprintf (file, "%lx,", rel.rp[i].p);
-  fprintf (file, "%lx:", rel.rp[rel.nb_rp-1].p);
-  for (i = 0; i < rel.nb_ap-1; ++i)
+  fprintf (file, "%lx:", rel.rp[i].p);
+  for (i = 0; i < rel.nb_ap - 1; ++i)
+    for (j = 0; j < rel.ap[i].e; j++)
+      fprintf (file, "%lx,", rel.ap[i].p);
+  /* now i = rel.nb_ap - 1 */
+  for (j = 0; j < rel.ap[i].e - 1; j++)
     fprintf (file, "%lx,", rel.ap[i].p);
-  fprintf (file, "%lx\n", rel.ap[rel.nb_ap-1].p);
+  fprintf (file, "%lx\n", rel.ap[i].p);
 }
 
 /* same as fprint_relation, but exponents > 1 are allowed */
