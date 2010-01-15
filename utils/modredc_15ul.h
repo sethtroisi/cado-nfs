@@ -638,7 +638,8 @@ modredc15ul_sub (residueredc15ul_t r, const residueredc15ul_t a,
 	     "cmovncq %6, %2\n\t" /* If !carry, s = 0 */
 	     "cmovncq %6, %3\n"
 	     : "+&r" (t1), "+&r" (t2), "+&r" (s1), "+r" (s2)
-	     : "g" (b[0]), "g" (b[1]), "rm" (0UL)
+	     : ULARITH_CONSTRAINT_G (b[0]), 
+	       ULARITH_CONSTRAINT_G (b[1]), "rm" (0UL)
 	     : "cc"
 	     );
     ularith_add_2ul_2ul (&t1, &t2, s1, s2);
@@ -831,7 +832,7 @@ modredc15ul_mul (residueredc15ul_t r, const residueredc15ul_t a,
     "cmovc %%rax, %[t1]\n\t" /* No carry -> copy new result */
     "cmovc %%rdx, %[t2]\n\t"
     : [t0] "=&r" (dummy), [t1] "=&r" (r[0]), [t2] "=&r" (r[1])
-    : [a0] "g" (a[0]), [a1] "g" (a[1]), [b0] "rm" (b[0]), [b1] "rm" (b[1]),
+    : [a0] "rme" (a[0]), [a1] "rme" (a[1]), [b0] "rm" (b[0]), [b1] "rm" (b[1]),
       [m0] "rm" (m[0].m[0]), [m1] "rm" (m[0].m[1]), [invm] "rm" (m[0].invm)
     : "%rax", "%rdx", "cc"
   );
@@ -982,7 +983,7 @@ modredc15ul_sqr (residueredc15ul_t r, const residueredc15ul_t a,
     "cmovc %%rax, %[t1]\n\t" /* No carry -> copy new result */
     "cmovc %%rdx, %[t2]\n\t"
     : [t0] "=&r" (dummy), [t1] "=&r" (r[0]), [t2] "=&r" (r[1])
-    : [a0] "g" (a[0]), [a1] "g" (a[1]), [m0] "rm" (m[0].m[0]), [m1] "rm" (m[0].m[1]), 
+    : [a0] "rme" (a[0]), [a1] "rme" (a[1]), [m0] "rm" (m[0].m[0]), [m1] "rm" (m[0].m[1]), 
       [invm] "rm" (m[0].invm)
     : "%rax", "%rdx", "cc"
   );

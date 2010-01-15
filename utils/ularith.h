@@ -55,6 +55,15 @@
 #endif
 #endif
 
+/* On 32 bit x86, the general constrains for, e.g., the source operand
+   of add is "g". For x86_64, it is "rme", since immediate constants
+   must be 32 bit. */
+#if defined(__i386__) && defined(__GNUC__)
+#define ULARITH_CONSTRAINT_G "g"
+#elif defined(__x86_64__) && defined(__GNUC__)
+#define ULARITH_CONSTRAINT_G "rme"
+#endif
+
 
 /* Increases r if a != 0 */
 static inline void

@@ -126,7 +126,7 @@ modredcul_add_semi (residueredcul_t r, const residueredcul_t a,
       "add %2, %1\n\t"   /* t = t + b ( t == a - m + b (mod w)) */
       "cmovc %1, %0\n\t"  /* if (cy) tr = t */
       : "+r" (tr), "+&r" (t)
-      : "g" (b[0])
+      : ULARITH_CONSTRAINT_G (b[0])
       : "cc"
     );
     r[0] = tr;
@@ -534,7 +534,7 @@ modredcul_add (residueredcul_t r, const residueredcul_t a,
       "add %2, %0\n\t"   /* tr += b */
       "cmovnc %1, %0\n\t"  /* if (!cy) tr = t */
       : "+&r" (tr)
-      : "rm" (t), "g" (b[0])
+      : "rm" (t), ULARITH_CONSTRAINT_G (b[0])
       : "cc"
     );
     ASSERT_EXPENSIVE (tr == ((a[0] >= m[0].m - b[0]) ? (a[0] - (m[0].m - b[0])) : (a[0] + b[0])));
@@ -585,7 +585,7 @@ modredcul_sub (residueredcul_t r, const residueredcul_t a,
       "lea (%1,%3,1), %0\n\t" /* tr = t + m ( = a - b + m) */
       "cmovnc %1, %0\n\t" /* if (a >= b) tr = t */
       : "=&r" (tr), "+&r" (t)
-      : "g" (b[0]), "r" (m[0].m)
+      : ULARITH_CONSTRAINT_G (b[0]), "r" (m[0].m)
       : "cc"
     );
     r[0] = tr;
