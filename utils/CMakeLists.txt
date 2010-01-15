@@ -16,6 +16,10 @@ add_executable(check_rels check_rels.c)
 install(TARGETS check_rels RUNTIME DESTINATION bin/utils)
 target_link_libraries(check_rels utils)
 
+add_executable(complete_rels complete_rels.c)
+install(TARGETS complete_rels RUNTIME DESTINATION bin/utils)
+target_link_libraries(complete_rels utils)
+
 add_executable(test_mod_ul test_mod_ul.c)
 add_executable(test_modredc_ul test_modredc_ul.c)
 add_executable(test_modredc_15ul test_modredc_15ul.c)

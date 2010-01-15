@@ -262,19 +262,11 @@ fprint_relation(FILE *file, relation_t rel) {
   int i;
   fprintf(file, "%ld,%lu:", rel.a, rel.b);
   for (i = 0; i < rel.nb_rp-1; ++i)
-    {
-      fprintf (file, "%lx,", rel.rp[i].p);
-      ASSERT (rel.rp[i].e == 1);
-    }
+    fprintf (file, "%lx,", rel.rp[i].p);
   fprintf (file, "%lx:", rel.rp[rel.nb_rp-1].p);
-  ASSERT (rel.rp[rel.nb_rp-1].e == 1);
   for (i = 0; i < rel.nb_ap-1; ++i)
-    {
-      fprintf (file, "%lx,", rel.ap[i].p);
-      ASSERT (rel.ap[i].e == 1);
-    }
+    fprintf (file, "%lx,", rel.ap[i].p);
   fprintf (file, "%lx\n", rel.ap[rel.nb_ap-1].p);
-  ASSERT (rel.ap[rel.nb_ap-1].e == 1);
 }
 
 /* same as fprint_relation, but exponents > 1 are allowed */

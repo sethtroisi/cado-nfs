@@ -1,3 +1,5 @@
+/* complete_rels: same as check_rels, but completes small factors if omitted */
+
 #define _POSIX_C_SOURCE 2  /* popen/pclose with -std=c99, -pedantic or -ansi */
 #include <stdlib.h>
 #include <stdio.h>
@@ -10,86 +12,114 @@
 #include "cado.h"
 #include "utils.h"
 
-void norm(mpz_t *f, int deg, mpz_t r, long a, unsigned long b)
+void
+norm (mpz_t *f, int deg, mpz_t r, long a, unsigned long b)
 {
-    int i;
+  int i;
+  mpz_t tmp;
 
-    mpz_t tmp;
-    mpz_init_set_ui(tmp, 1);
-    mpz_set(r, f[deg]);
-    for (i = deg - 1; i >= 0; i--) {
-        mpz_mul_si(r, r, a);
-        mpz_mul_ui(tmp, tmp, b);
-        mpz_addmul(r, tmp, f[i]);
+  mpz_init_set_ui (tmp, 1);
+  mpz_set (r, f[deg]);
+  for (i = deg - 1; i >= 0; i--)
+    {
+      mpz_mul_si (r, r, a);
+      mpz_mul_ui (tmp, tmp, b);
+      mpz_addmul (r, tmp, f[i]);
     }
-    mpz_abs(r, r);
-    mpz_clear(tmp);
+  mpz_abs (r, r);
+  mpz_clear (tmp);
 }
 
-
-int is_gzip(const char * s)
+int
+is_gzip (const char * s)
 {
     unsigned int l = strlen(s);
     return l >= 3 && strcmp(s + l - 3, ".gz") == 0;
 }
 
+void
+add_alg (relation_t *rel, unsigned long p)
+{
+  int n = rel->nb_ap;
+
+  rel->ap = realloc (rel->ap, (n + 1) * sizeof (alg_prime_t));
+  (rel->ap[n]).p = p;
+  (rel->ap[n]).e = 1;
+  rel->nb_ap = n + 1;
+}
+
+void
+add_rat (relation_t *rel, unsigned long p)
+{
+  int n = rel->nb_rp;
+
+  rel->rp = realloc (rel->rp, (n + 1) * sizeof (rat_prime_t));
+  (rel->rp[n]).p = p;
+  (rel->rp[n]).e = 1;
+  rel->nb_rp = n + 1;
+}
+
 int
 check_relation (relation_t *rel, cado_poly_ptr cpoly)
 {
-  mpz_t no, acc;
-  int i;
+  mpz_t no;
+  int i, j;
+  unsigned long p;
 
   mpz_init (no);
-  mpz_init (acc);
 
   // algebraic side
   norm (cpoly->f, cpoly->degree, no, rel->a, rel->b);
-  mpz_set_ui (acc, 1);
   for (i = 0; i < rel->nb_ap; ++i)
     {
-      int j;
-      for (j = 0; j < (rel->ap[i]).e; ++j) 
-	mpz_mul_ui (acc, acc, (rel->ap[i]).p);
+      for (j = 0; j < (rel->ap[i]).e; ++j)
+	if (mpz_divisible_ui_p (no, (rel->ap[i]).p) == 0)
+	  {
+	    fprintf (stderr, "Wrong algebraic side for (%ld, %lu)\n",
+		     rel->a, rel->b);
+	    fprintf (stderr, "Given factor %lu does not divide norm\n",
+		     (rel->ap[i]).p);
+	    mpz_clear (no);
+	    return 0;
+	  }
+	else
+	  mpz_divexact_ui (no, no, (rel->ap[i]).p);
     }
-  if (mpz_cmp (acc, no) != 0)
+  for (p = 2; mpz_cmp_ui (no, 1) != 0; p += 1 + (p != 2))
     {
-      if (mpz_divisible_p (no, acc))
+      while (mpz_divisible_ui_p (no, p))
 	{
-	  mpz_divexact (acc, no, acc);
-	  gmp_fprintf (stderr, "Missing factor %Zd on algebraic side for (%ld, %lu)\n", acc, rel->a, rel->b);
+	  add_alg (rel, p);
+	  mpz_divexact_ui (no, no, p);
 	}
-      else
-	{
-	  mpz_t g;
-	  mpz_init (g);
-	  mpz_gcd (g, acc, no);
-	  mpz_divexact (acc, acc, g);
-	  fprintf (stderr,
-		   "Wrong algebraic side for (%ld, %lu)\n", rel->a, rel->b);
-	  gmp_fprintf (stderr, "Given factor %Zd does not divide norm\n", acc);
-	  mpz_clear (g);
-	}
-      mpz_clear (no);
-      mpz_clear (acc);
-      return 0;
     }
 
-    // rational side
-    norm(cpoly->g, 1, no, rel->a, rel->b);
-    mpz_set_ui(acc, 1);
-    for(i = 0; i < rel->nb_rp; ++i) {
-        int j;
-        for (j = 0; j < (rel->rp[i]).e; ++j) 
-            mpz_mul_ui(acc, acc, (rel->rp[i]).p);
+  // rational side
+  norm (cpoly->g, 1, no, rel->a, rel->b);
+  for (i = 0; i < rel->nb_rp; ++i)
+    {
+      for (j = 0; j < (rel->rp[i]).e; ++j)
+	if (mpz_divisible_ui_p (no, (rel->rp[i]).p) == 0)
+	  {
+	    fprintf (stderr, "Wrong rational side for (%ld, %lu)\n",
+		     rel->a, rel->b);
+	    fprintf (stderr, "Given factor %lu does not divide norm\n",
+		     (rel->rp[i]).p);
+	    mpz_clear (no);
+	    return 0;
+	  }
+	else
+	  mpz_divexact_ui (no, no, (rel->rp[i]).p);
     }
-    if (mpz_cmp(acc, no) != 0) {
-        fprintf(stderr, "Wrong rational side for (%ld, %lu)\n", rel->a, rel->b);
-        mpz_clear(no);
-        mpz_clear(acc);
-        return 0;
+  for (p = 2; mpz_cmp_ui (no, 1) != 0; p += 1 + (p != 2))
+    {
+      while (mpz_divisible_ui_p (no, p))
+	{
+	  add_rat (rel, p);
+	  mpz_divexact_ui (no, no, p);
+	}
     }
-    mpz_clear(no);
-    mpz_clear(acc);
+
     return 1;
 }
 
@@ -127,6 +157,8 @@ int check_stream(const char *name, FILE * stream, cado_poly_ptr cpoly)
             fprintf(stderr, "Continuing with next file\n");
             return 1;
         }
+
+	fprint_relation (stdout, rel);
 
         clear_relation(&rel);
         nrels++;
