@@ -18,7 +18,7 @@ barrett_init (mpz_t invm, const mpz_t m)
 }
 
 /* a <- b mod m */
-static void
+void
 barrett_mod (mpz_t a, mpz_t b, const mpz_t m, const mpz_t invm)
 {
   size_t k = mpz_size (m), sizeb, l;
@@ -692,9 +692,13 @@ poly_reducemodF(polymodF_t P, poly_t p, const poly_t F) {
     /* FIXME: in msieve, Jason Papadopoulos reduces by F[d]^d*F(x/F[d])
        instead of F(x). This might avoid one of the for-loops below. */
 
-    v++; /* we consider p/F[d]^v */
-    for (i = 0; i < k; ++i)
-      mpz_mul (p->coeff[i], p->coeff[i], F->coeff[d]);
+    // temporary hack: account for the possibility that we're indeed
+    // using f_hat instead of f.
+    if (mpz_cmp_ui(F->coeff[d], 1) != 0) {
+        v++; /* we consider p/F[d]^v */
+        for (i = 0; i < k; ++i)
+          mpz_mul (p->coeff[i], p->coeff[i], F->coeff[d]);
+    }
 
     for (i = 0; i < d; ++i) 
       mpz_submul (p->coeff[k-d+i], p->coeff[k], F->coeff[i]);

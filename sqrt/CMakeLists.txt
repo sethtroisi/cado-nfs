@@ -3,6 +3,9 @@ target_link_libraries(sqrt utils m)
 
 install(TARGETS sqrt RUNTIME DESTINATION bin/sqrt)
 
+add_executable(crtalgsqrt crtalgsqrt.c powers_of_p.cpp polyroots.c)
+target_link_libraries(crtalgsqrt utils m)
+
 add_executable(checkdep checkdep.c)
 target_link_libraries(checkdep utils)
 

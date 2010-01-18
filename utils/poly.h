@@ -81,7 +81,9 @@ void poly_power_mod_f_mod_ui(poly_t Q, const poly_t P, const poly_t f,
 void poly_derivative(poly_t df, const poly_t f);
 
 void barrett_init (mpz_t invm, const mpz_t m);
+void barrett_mod (mpz_t a, mpz_t b, const mpz_t m, const mpz_t invm);
 poly_t* poly_base_modp_init (const poly_t P0, int p, int *K, int l);
 void poly_base_modp_clear (poly_t *P);
 void poly_base_modp_lift (poly_t a, poly_t *P, int k, mpz_t pk);
 size_t poly_sizeinbase (poly_t f, int d, int base);
+
