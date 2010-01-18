@@ -480,6 +480,8 @@ if ($mpi_needed) {
     }
     check_mpd_daemons();
     push @mpi_precmd, '-n', $mpi_split[0] * $mpi_split[1];
+} elsif (defined($ENV{'MPI'})) {
+    my_setenv 'LD_LIBRARY_PATH', "$ENV{'LD_LIBRARY_PATH'}:$ENV{'MPI'}/lib";
 }
 
 ##################################################
