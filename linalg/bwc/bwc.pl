@@ -5,6 +5,7 @@ use strict;
 use POSIX qw/getcwd/;
 use File::Basename;
 use File::Temp qw/tempdir/;
+use List::Util qw[max];
 
 # This companion program serves as a helper for running bwc programs.
 
@@ -528,11 +529,35 @@ sub drive {
         if (! -d $wdir || ! -f "$wdir/mat.info") {
             &drive(':balance', @_);
         }
-        &drive(":wipeout", @_);
-        &drive("u64n_prep", @_, "sequential_cache_build=1");
-        &drive("u64_secure", @_);
-        &drive("./split", @_, "--split-y");
-        &drive("${mode}_krylov", @_);
+
+    	opendir DIR, $wdir
+        	or die "Cannot open directory `$wdir': $!\n";
+		my @cp_krylov = grep /^V0/, readdir DIR;
+		close DIR;
+    	opendir DIR, $wdir
+        	or die "Cannot open directory `$wdir': $!\n";
+		my @cp_mksol= grep /^S0/, readdir DIR;
+		close DIR;
+
+		if ( @cp_mksol ) {
+			@cp_mksol = map { /\.(\d+)\.twisted$/; $1 }
+									@cp_mksol;
+			my $last_cp_mksol = max( @cp_mksol );
+			&drive("${mode}_mksol", @_, "start=$last_cp_mksol");
+			&drive("u64n_gather", @_);
+			return;
+		} elsif ( @cp_krylov ) {
+			@cp_krylov = map { /\.(\d+)\.twisted$/; $1 }
+									@cp_krylov;
+			my $last_cp_krylov = max( @cp_krylov );
+			&drive("${mode}_krylov", @_, "start=$last_cp_krylov");
+		} else {
+	        &drive(":wipeout", @_);
+    	    &drive("u64n_prep", @_, "sequential_cache_build=1");
+        	&drive("u64_secure", @_);
+	        &drive("./split", @_, "--split-y");
+    	    &drive("${mode}_krylov", @_);
+		}
         &drive("./acollect", @_, "--remove-old");
         &drive("./lingen", @_, "--lingen-threshold", 64);
         &drive("./split", @_, "--split-f");

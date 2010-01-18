@@ -2011,8 +2011,7 @@ sub do_linalg {
                "mode=u64 mn=64 splits=0,64 ys=0..64 ".
                "wdir=$param{'wdir'}/bwc " .
                "bwc_bindir=$bwc_bindir " .
-               "> $param{'prefix'}.bwc.stderr ".
-               "2>&1";
+               "&>> $param{'prefix'}.bwc.stderr ";
         cmd($cmd, { log => 1, kill => 1 });
 
         $cmd = "$param{'cadodir'}/linalg/apply_perm " .
@@ -2111,7 +2110,7 @@ sub do_chars {
 ###############################################################################
 
 sub do_sqrt {
-    banner "Square root" unless defined $ndep;
+    banner "Square root";
     local_time "Square root";
     $ndep = count_lines("$param{'prefix'}.ker") unless defined $ndep;
     $ndep = $param{'nkermax'} if $ndep > $param{'nkermax'};
