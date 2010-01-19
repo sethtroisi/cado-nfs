@@ -8,17 +8,10 @@
 
 /* TODO list.
  *
- * This program does not work yet. But the workflow is quite complete,
- * and when it gives a result (even a wrong result), it indicates that
- * success is near.
+ * This program seems to work, but is not complete.
  *
  * For correctness:
  *
- * - There is only one big FIXME item in solve_knapsack, which prevents
- *   the program from working at the moment. The problem is that we have
- *   to pay an extra 2^(number field degree) extra-cheap checks modulo N
- *   (== the kind of calculation that fits on a smart card). Implement
- *   that (not hard, but not this week).
  * - finish binding with the rest: check also the rational square root,
  *   and produce the factorization. Not necessarily independent from the
  *   above, since the elementary check is whether we get x^2=a mod N.
@@ -38,7 +31,13 @@
  *   12 primes or so in degree 6 (at least).
  * - MPI-ify the relevant bits. The two main loops on pgnum and apnum can
  *   be split in an s times t process grid.
+ *
+ * Not important:
+ *
+ * - understand and, if relevant, fix the memory leak diagnosed by
+ *   valgrind. I don't understand.
  */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -114,21 +113,31 @@ void ab_source_init(ab_source_ptr ab, const char * fname)
 {
     memset(ab, 0, sizeof(ab_source));
     ab->fname0 = fname;
-    char * dot = strchr(fname, '.');
-    if (dot && *dot) {
-        strncpy(ab->prefix, fname, dot-fname);
-        ab->prefix[dot-fname]='\0';
-        dot++;
+    char * magic;
+    if ((magic = strstr(fname, ".prep.")) != NULL) {
+        // then assume kleinjung format.
+        strncpy(ab->prefix, fname, magic-fname);
+        ab->prefix[magic-fname]='\0';
+        magic++;
         int fnum;
-        if (sscanf(dot, "prep.%d.rel.%d", &ab->depnum, &fnum) == 2) {
+        if (sscanf(magic, "prep.%d.rel.%d", &ab->depnum, &fnum) == 2) {
             ab->nfiles = -1;  // to be determined later on.
-        } else if (sscanf(dot, "dep.alg.%d", &ab->depnum) == 1) {
+        } else {
+            FATAL_ERROR_CHECK(1, "error in parsing filename");
+        }
+    } else if ((magic = strstr(fname, ".dep.alg.")) != NULL) {
+        // assume cado format (means only one file, so we don't need to
+        // parse, really.
+        strncpy(ab->prefix, fname, magic-fname);
+        ab->prefix[magic-fname]='\0';
+        magic++;
+        if (sscanf(magic, "dep.alg.%d", &ab->depnum) == 1) {
             ab->nfiles = 0;
         } else {
-            FATAL_ERROR_CHECK(1, "cannot auto-detect dependency format\n");
+            FATAL_ERROR_CHECK(1, "error in parsing filename");
         }
     } else {
-        FATAL_ERROR_CHECK(1, "cannot auto-detect dependency format\n");
+        FATAL_ERROR_CHECK(1, "error in parsing filename");
     }
 
     // do some size estimations;
@@ -1103,6 +1112,7 @@ void invsqrt_lift(struct prime_data * p, mpz_t A, int precision)
         int issquare = modul_field_sqrt(a, a, z, q);
         ASSERT_ALWAYS(issquare);
         modul_inv(a, a, q);
+        if (modul_get_ul(a, q) & 1) modul_neg(a, a, q);
         mpz_set_ui(p->sx, modul_get_ul(a, q));
         modul_clear(a, q);
         modul_clear(z, q);
@@ -1549,6 +1559,17 @@ void solve_knapsack(mpz_t sqrt_modN, struct individual_contribution * contribs, 
     mpz_powm_ui(lcx, glob.pol->f[glob.n], lc_exp, glob.pol->n);
     mpz_invert(lcx, lcx, glob.pol->n);
 
+    mpz_t fhdiff_modN;
+    mpz_init(fhdiff_modN);
+    // evaluate the derivative of f_hat in alpha_hat mod N, that is lc*m.
+    mpz_set_ui(fhdiff_modN, 0);
+    for(int k = glob.n ; k > 0 ; k--) {
+        mpz_mul(fhdiff_modN, fhdiff_modN, glob.pol->m);
+        mpz_mul(fhdiff_modN, fhdiff_modN, glob.pol->f[glob.n]);
+        mpz_addmul_ui(fhdiff_modN, glob.f_hat[k], k);
+        mpz_mod(fhdiff_modN, fhdiff_modN, glob.pol->n);
+    }
+    mpz_invert(fhdiff_modN, fhdiff_modN, glob.pol->n);
 
     for(unsigned int u2 = 0 ; u2 < n2 ; u2++) {
         unsigned int k;
@@ -1564,19 +1585,25 @@ void solve_knapsack(mpz_t sqrt_modN, struct individual_contribution * contribs, 
             for(s = 0 ; s < nelems ; s++) {
                 signs[s]=(v & (1UL << s)) ? '+' : '-';
                 /*
+                fprintf(stderr, "%c", signs[s]);
                 for(int k = 0 ; k < glob.n ; k++) {
-                    gmp_fprintf(stderr, "%Zd %c\n", contribs[s*glob.n+k].modN, signs[s]);
+                    fprintf(stderr, " %"PRIu64, contribs[s*glob.n+k].ratio);
+                    // gmp_fprintf(stderr, "%Zd %c\n", contribs[s*glob.n+k].modN, signs[s]);
                 }
+                fprintf(stderr, "\n");
                 */
             }
             // now try to look at this solution more closely */
-            mpz_t z, e, t, zN;
-            mpz_init_set_ui(z, bound);
+            mpz_t e;
             mpz_init_set_ui(e, 0);
-            mpz_init_set_ui(zN, 0);
-            mpz_init_set_ui(t, 0);
             int spurious = 0;
             for(int k = glob.n - 1 ; k >= 0 ; k--) {
+                mpz_t z, t, zN, qz, rz;
+                mpz_init_set_ui(z, bound);
+                mpz_init_set_ui(zN, 0);
+                mpz_init_set_ui(t, 0);
+                mpz_init(qz);
+                mpz_init(rz);
                 uint64_t sk = bound;
                 for(int j = 0 ; j < glob.m * glob.n ; j++) {
                     mpz_set_uint64(t, contribs[j * glob.n + k].ratio);
@@ -1604,26 +1631,46 @@ void solve_knapsack(mpz_t sqrt_modN, struct individual_contribution * contribs, 
                 // combinations: those with the quotients as given, and
                 // the other combinations with one or several quotients
                 // lowered by one unit.
-                mpz_fdiv_q_2exp(z, z, 64);
-                mpz_submul(zN, z, Px);
+                mpz_set(qz,z);
+                if (mpz_cmp_ui(qz,0) >= 0) {
+                    mpz_fdiv_q_2exp(qz, qz, 63);
+                    mpz_add_ui(qz,qz,mpz_odd_p(qz) != 0);
+                    mpz_fdiv_q_2exp(qz, qz, 1);
+                } else {
+                    mpz_neg(qz,qz);
+                    mpz_fdiv_q_2exp(qz, qz, 63);
+                    mpz_add_ui(qz,qz,mpz_odd_p(qz) != 0);
+                    mpz_fdiv_q_2exp(qz, qz, 1);
+                    mpz_neg(qz,qz);
+                }
+                mpz_mul_2exp(rz, qz, 64);
+                mpz_sub(rz, z, rz);
+                // gmp_printf("[%d] %Zd = %Zd * 2^64 + %Zd\n", k, z, qz, rz);
+                mpz_submul(zN, qz, Px);
                 mpz_mod(zN, zN, glob.pol->n);
+                // gmp_printf("[X^%d] %Zd\n", k, zN);
                 // good. we have the coefficient !
                 mpz_mul(e, e, glob.pol->m);
                 mpz_mul(e, e, glob.pol->f[glob.n]);
                 mpz_add(e, e, zN);
                 mpz_mod(e, e, glob.pol->n);
+                mpz_clear(z);
+                mpz_clear(t);
+                mpz_clear(zN);
+                mpz_clear(qz);
+                mpz_clear(rz);
+
             }
 
             mpz_mul(e,e,lcx);
             mpz_mod(e,e,glob.pol->n);
 
+            mpz_mul(e,e,fhdiff_modN);
+            mpz_mod(e,e,glob.pol->n);
+
             mpz_set(sqrt_modN, e);
 
-            mpz_clear(z);
             mpz_clear(e);
-            mpz_clear(t);
-            mpz_clear(zN);
-
             if (spurious) {
                 fprintf(stderr, "# [%2.2lf] %"PRIx64" (%s) %"PRId64" [SPURIOUS]\n",
                         seconds(), v, signs, (int64_t) x);
@@ -1635,6 +1682,7 @@ void solve_knapsack(mpz_t sqrt_modN, struct individual_contribution * contribs, 
     }
     mpz_clear(Px);
     mpz_clear(lcx);
+    mpz_clear(fhdiff_modN);
     free(signs);
     free(s1);
     free(s2);
