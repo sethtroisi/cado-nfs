@@ -8,14 +8,6 @@
 #include "modul_poly.h"
 #include "gmp_aux.h"
 
-typedef struct {
-  int alloc;    /* number of allocated coefficients */
-  int degree;   /* degree < alloc */
-  residueul_t *coeff; /* coefficient list */
-} __modul_poly_struct;
-typedef __modul_poly_struct modul_poly_t[1];
-
-
 /* allocate an array of d coefficients, and initialize it */
 static residueul_t*
 alloc_long_array (int d)
@@ -105,6 +97,16 @@ modul_poly_make_monic (modul_poly_t f, modulusul_t p)
 int
 modul_poly_set_mod (modul_poly_t fp, mpz_t *f, int d, modulusul_t p)
 {
+  d = modul_poly_set_mod_raw (fp, f, d, p);
+  modul_poly_make_monic (fp, p);
+
+  return d;
+}
+
+/* fp <- f mod p. Return degree of fp (-1 if fp=0). */
+int
+modul_poly_set_mod_raw (modul_poly_t fp, mpz_t *f, int d, modulusul_t p)
+{
   int i;
 
   while (d >= 0 && mpz_divisible_ui_p (f[d], modul_getmod_ul (p)))
@@ -115,7 +117,6 @@ modul_poly_set_mod (modul_poly_t fp, mpz_t *f, int d, modulusul_t p)
   fp->degree = d;
   for (i = 0; i <= d; i++)
     modul_set_ul (fp->coeff[i], mpz_fdiv_ui (f[i], modul_getmod_ul (p)), p);
-  modul_poly_make_monic (fp, p);
 
   return d;
 }

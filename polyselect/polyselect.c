@@ -153,7 +153,7 @@ See the scripts "dist/src/new_run.X" where X is c59 or c79.
 #define QUICK_SEARCH
 
 /* default parameters */
-#define DEFAULT_P0MAX  100000
+#define DEFAULT_P0MAX  2000
 #define DEFAULT_DEGREE 5
 #define DEFAULT_KEEP   100
 #define DEFAULT_M      1e25
@@ -1389,8 +1389,9 @@ main (int argc, char *argv[])
 
   checked = Algo36 (n, degree, M, l, pb, p0max, incr, admin, admax);
 
-  fprintf (stderr, "# First phase took %.2fs, checked %1.0f and kept %lu polynomial(s)\n",
-           seconds () - st, checked, Msize);
+  st = seconds () - st;
+  fprintf (stderr, "# First phase took %.2fs, checked %1.2e/s and kept %lu polynomial(s)\n",
+           st, (double) checked / st, Msize);
   fflush (stderr);
 
   /* Second/third phases: loop over entries in Mt database, and try to find the

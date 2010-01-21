@@ -156,14 +156,14 @@ def alpha(f,B):
     Computes the alpha value of f, up to prime bound B
     """
     disc = f.discriminant()
-    return sum([alpha_p(f, disc, p) for p in prime_range(2,B)])
+    return sum([alpha_p(f, disc, p) for p in prime_range(2,B+1)])
 
 def alpha_affine(f,B):
     """
     Computes the affine part of the alpha value of f, up to prime bound B
     """
     disc = f.discriminant()
-    return sum([alpha_p_affine(f, disc, p) for p in prime_range(2,B)])
+    return sum([alpha_p_affine(f, disc, p) for p in prime_range(2,B+1)])
 
 def alpha_projective(f,B):
     """
@@ -171,7 +171,7 @@ def alpha_projective(f,B):
     Always <= 0.
     """
     disc = f.discriminant()
-    return sum([alpha_p_projective(f, disc, p) for p in prime_range(2,B)])
+    return sum([alpha_p_projective(f, disc, p) for p in prime_range(2,B+1)])
 
 # -*-*- debug -*-*-
 def estimate_average_valuation_homogeneous_coprime(f, p, x0, x1, y0, y1):
@@ -218,4 +218,4 @@ def alpha_simplistic(f,B):
     """
     This ignores the multiple roots altogether.
     """
-    return sum([alpha_p_simplistic(f,p) for p in prime_range(2,B)])
+    return sum([alpha_p_simplistic(f,p) for p in prime_range(2,B+1)])
