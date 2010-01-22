@@ -32,7 +32,7 @@ def lemme_21(n,d,ad,p,m):
         kr=Integers()(round(k))
         delta[i]=p*(kr-k)
         a[i]=p*kr+ai_mod_p
-        deltas.append(delta)
+#        deltas.append(delta)
         assert n == sum([a[d-j]*m^(d-j)*p^j for j in range(0,d-i)])+r[i]*p^(d-i)
     if a[0] != r[0]:
         print "warning, using r0 instead of r0 (lemma error)"
