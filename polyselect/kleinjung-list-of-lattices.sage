@@ -210,7 +210,7 @@ def printmin(arr,X,Y):
                 min = arr[x*Y+y]
                 u = x
                 v = y
-    print "Minimum is %f, pair is %d,%d\n " %(min,u,v)
+    print "Minimum is %f, pair is %d,%d" %(min,u,v)
 
 def compose_reduce(f,phi,pmax):
     return f.parent()([c % pmax for c in f(phi).coeffs()])
@@ -287,9 +287,9 @@ def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi,hist)
     if len(hist) > 6:
         nhist=copy(hist)
         nhist.append([dphi,u0,v0,dphi(0),ld,m])
-        print "Found tree of height %d" % len(nhist)
-        for hi in nhist:
-            print hi
+        ## print "Found tree of height %d" % len(nhist)
+        ## for hi in nhist:
+        ## print hi
 
 
     if scale < rdict['cutoff']:
@@ -369,7 +369,7 @@ def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi,hist)
             
 
             hits = light_rectangle(sarr, u1,v1, pm, pm1, twist_v1, U0,U1-1,V0,V1-1,-scale1)
-            print ("1:m=%d ld=%d hits>0=%d u0=%d v0=%d us=%d vs=%d skew=%d contrib=%f"%(m,ld,(1 if (hits>0) else 0),u1,v1,pm,pm1,twist_v1,-scale1))
+            # print ("1:m=%d ld=%d hits>0=%d u0=%d v0=%d us=%d vs=%d skew=%d contrib=%f"%(m,ld,(1 if (hits>0) else 0),u1,v1,pm,pm1,twist_v1,-scale1))
             assert ((1 if (hits>0) else 0) == add_lattice(rdict,u1,v1,pm,pm1,twist_v1,0,um-1,0,vm-1,-scale1,p))
             #hits = add_lattice(rdict,u1,v1,pm,pm1,twist_v1,0,um,0,vm,-scale1,p)
 
@@ -462,7 +462,7 @@ def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi,hist)
 
             for du in range(nspots):
                 hits = light_rectangle(sarr, u1,v1, pm1, pm1, 0, U0,U1-1,V0,V1-1, scale3)
-                print ("2:m=%d ld=%d hits>0=%d u0=%d v0=%d us=%d vs=%d skew=%d contrib=%f"%(m,ld,(1 if (hits>0) else 0),u1,v1,pm1,pm1,0,scale3))
+                # print ("2:m=%d ld=%d hits>0=%d u0=%d v0=%d us=%d vs=%d skew=%d contrib=%f"%(m,ld,(1 if (hits>0) else 0),u1,v1,pm1,pm1,0,scale3))
                 assert (1 if (hits>0) else 0) == add_lattice(rdict,u1,v1,pm1,pm1,0,0,um-1,0,vm-1,scale3,p)                
                 #print("2:%d "%(1 if (hits>0) else 0))
                 # #print "main/excep, level %d : %d hits" % (m, hits)
@@ -492,7 +492,7 @@ def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi,hist)
         u1 = u0
         v1 = v0 + pm * dv0
         hits = light_rectangle(sarr, u1, v1, pm, pm1, twist_v1, U0,U1-1,V0,V1-1, -scale)        
-        print ("3:m=%d ld=%d hits>0=%d u0=%d v0=%d us=%d vs=%d skew=%d contrib=%f"%(m,ld,(1 if (hits>0) else 0),u1,v1,pm,pm1,twist_v1,-scale))
+        # print ("3:m=%d ld=%d hits>0=%d u0=%d v0=%d us=%d vs=%d skew=%d contrib=%f"%(m,ld,(1 if (hits>0) else 0),u1,v1,pm,pm1,twist_v1,-scale))
         assert (1 if (hits>0) else 0) == add_lattice(rdict,u1,v1,pm,pm1,twist_v1,0,um-1,0,vm-1,-scale,p)        
         #print ("3:%d "%(1 if (hits>0) else 0))
         if hits == 0:
