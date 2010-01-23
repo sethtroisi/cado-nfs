@@ -171,7 +171,7 @@ void ab_source_init(ab_source_ptr ab, const char * fname)
         size_t dummy;
         size_t hdrbytes;
         char line[ABFILE_MAX_LINE_LENGTH];
-        char * xx = fgets(line, sizeof(line), ab->f);
+        char * xx = fgets(line, sizeof(line), f);
         DIE_ERRNO_DIAG(xx == NULL, "fgets", fname);
         rc = sscanf(line, "AB %zu %zu", &ab->nab, &dummy);
         DIE_ERRNO_DIAG(rc != 2, "parse", fname);
@@ -194,7 +194,7 @@ void ab_source_init(ab_source_ptr ab, const char * fname)
         ab->file_bases[0] = 0;
         for(int i = 0 ; i < ab->nfiles ; i++) {
             snprintf(ab->sname, ab->sname_len, "%s.prep.%d.rel.%d",
-                    ab->prefix, ab->depnum, ab->nfiles);
+                    ab->prefix, ab->depnum, i);
             rc = stat(ab->sname, sbuf);
             ASSERT_ALWAYS(rc == 0);
             ab->file_bases[i+1]=ab->file_bases[i] + sbuf->st_size;
@@ -1833,7 +1833,7 @@ int main(int argc, char **argv)
         int dmax = glob.lll_maxdim - n;
         double rmax = (double) dmax / n / t;
         r = rmax;
-        for(int mask = ~0 ; r & mask ; mask <<= 1) r &= mask;
+        // for(int mask = ~0 ; r & mask ; mask <<= 1) r &= mask;
         size_t B = ceil((double)T/t/r);
 
         fprintf(stderr, "# [%2.2lf] A is %.1f%% of %.1fGB."
@@ -1942,9 +1942,11 @@ int main(int argc, char **argv)
             cleandeg(P, glob.n);
             reduce_poly_mod_rat_ptree(P, rat_ptree);
             poly_free(P);
+            fprintf(stderr, "# [%2.2lf] done reducing A%d mod ptree %d\n", seconds(), apnum, pgnum);
 
             for(int i = i0 ; i < i1 ; i++) {
                 reduce_poly_mod_alg_ptree(primes[i].T, &(primes[i]));
+                fprintf(stderr, "# [%2.2lf] done reducing A%d mod prime %d\n", seconds(), apnum, i);
             }
         }
 
