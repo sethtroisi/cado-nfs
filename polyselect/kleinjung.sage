@@ -176,6 +176,7 @@ def rotation_init(f,g,u0,u1,v0,v1):
     # Also the contribution from common roots (SNFS only)
     ## rotation_global_contrib_commonroots(rdict)
     ## gcc=rdict['global_contrib_commonroots']
+    rdict['common_contribution']=0
     rdict['fgquo_prime']=((-f/g).derivative())
     #print rdict['fgquo_prime']    
     # This gives the exceptional values for u (once divided by g(l)^2)
@@ -487,7 +488,7 @@ def mround(m):
 def mprint(m):
     print m.str()
 
-def printmin(arr,X,Y):
+def printmin(arr,X,Y,c):
     min = 1
     u = v = 0
     for x in range(X):
@@ -496,7 +497,7 @@ def printmin(arr,X,Y):
                 min = arr[x*Y+y]
                 u = x
                 v = y
-    print "Minimum is %f, pair is %d,%d" %(min,u,v)
+    return min+c,u,v
 
 def compose_reduce(f,phi,pmax):
     return f.parent()([c % pmax for c in f(phi).coeffs()])
@@ -509,6 +510,8 @@ def rotation_handle_p(rdict,p):
     u0=v0=0
     ff,gg=rdict['f'],rdict['g']
     f,g=rdict['f'],rdict['g']
+    rdict['common_contribution']+=float(log(p))/(p-1)
+    rdict['common_contribution']+=alpha_p_projective_nodisc(f,p)
     x=Integers()['x'].gen()
     # The denominator exponent here is only controlled by the number of
     # fixed coeffs of l. At the beginning, l has zero fixed coeffs, for
@@ -537,8 +540,8 @@ def rotation_handle_p(rdict,p):
     dphi=x
     rdict['l0']=0
     hits=rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,0,scale,dphi,[])
-    printmin(rdict['sarr'],rdict['umax'],rdict['vmax'])    
-    return hits
+    best,u,v=printmin(rdict['sarr'],rdict['umax'],rdict['vmax'],rdict['common_contribution'])    
+    return hits,best,u,v
 
 
 

@@ -1,7 +1,7 @@
 
 attach rotation_bound.sage
-#attach kleinjung.sage
-attach kleinjung-list-of-lattices.sage
+attach kleinjung.sage
+#attach kleinjung-list-of-lattices.sage
 attach higher_order_roots.sage
 
 Z=Integers()
@@ -24,6 +24,7 @@ f1=f(x+22977)-(3*x+18223)*g1
 # the C version catches this in 82 seconds on nougatine, and 51s on achille
 # try: kleinjung -p0max 14 -pb 522 -v -l 7 -M 2e22 -incr 1008593880 110...351
 
+# use f1,g1 above as a base.
 f=f1
 g=g1
 
@@ -82,34 +83,56 @@ def manyp(rdict,plim):
 ####################################
 # To try:
 
-# Fix a size for the sieving area. It's taken square here, but the
-# program accepts also a rectangle. We look into polynomials h(x,u,v) for
-# u and v integers within the interval [0,sbound-1]
-sboundu=1487
-sboundv=2438
-p=13
+# First task is to fix a size for the sieving area.  We look into
+# polynomials h(x,u,v) for
+# u integer within the interval [0,sboundu-1]
+# v integer within the interval [0,sboundv-1]
 
+# Our purpose here is to see if we can recover f1+(x-26071)*g1. Thus we're
+# offsetting by -28000*g
+
+sboundu=10
+sboundv=4000
+f2=f-28000*g
+g2=g
+
+
+rdict=rotation_init(f2,g2,0,sboundu,0,sboundv)
+pmax=2000
+rotation_clear(rdict)
+tt0=cputime()
+for p in prime_range(1,pmax):
+    tt=cputime()
+    hits,best,u,v=rotation_handle_p(rdict,p)
+    check=alpha(f2+(u*x+v)*g2,p)
+    z=log(10^-20+abs(check-best))
+    gooddigits=floor(-z/log(10))
+    print "Done %d [%.2f, tot %.2f]." \
+            " Best alpha=%.4f, for %d,%d (%d dd ok)" % \
+            (p, cputime()-tt, cputime()-tt0, best,u,v,gooddigits)
+
+
+# Another way to test, relevant only for small arrays because it's
+# awfully slow in sage. do an exhaustive test of the reported values, for
+# selected p's.
+
+# This first code snippet creates a 2-dimensional array refp with all the
+# contributions which _should_ be computed by the rotation program.
 #t0=cputime()
 #print "First computing reference scores with the naive method"
 #refp = get_reference(sbound, p)
 #print "Took %.2f seconds" % (cputime()-t0)
+
+# This part calls the root sieve function, and compares
 #print "Now with root sieve"
 #t0=cputime()
-rdict=rotation_init(f,g,0,sboundu,0,sboundv)
-rotation_handle_p(rdict,p)
 #testp(rdict,p,refp)
 #print "Took %.2f seconds" % (cputime()-t0)
 
 
-
-#K=GF(p)
-#KP=K['t']
-#KP3=K['t','u','v']
-#KF3=KP3.fraction_field()
-#ZF3=ZP3.fraction_field()
-
-# More extensive testing ; copy-paste these lines:
-# print "First computing reference scores with the naive method"
+# It is also possible to do more extensive testing, by checking what we
+# obtain after considering several primes.
+# print "First computing # reference scores with the naive method"
 # t0=cputime()
 # ref2=get_reference(sbound,2)
 # ref3=get_reference(sbound,3)
@@ -124,11 +147,14 @@ rotation_handle_p(rdict,p)
 # testp(rdict,3,ref3)
 # testp(rdict,5,ref5)
 # print "Took %.2f seconds (total)" % (cputime()-t0)
-# 
 
-# Another possible bench
+
+# Yet another possible bench
 # manyp(rdict,50)
 
+
+# This is a display function for debugging, but I don't really recall how
+# it works.
 
 def zview(m,i0,j0,d):
     ncols = ((m.ncols() - j0) / d).ceil()
