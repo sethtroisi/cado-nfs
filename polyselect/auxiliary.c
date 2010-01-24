@@ -750,8 +750,8 @@ special_valuation (mpz_t * f, int d, unsigned long p, mpz_t disc)
             mpz_clear(t);
 	}
 	v /= pd + 1.0;
+	return v;
     }
-    return v;
 }
 
 /* Compute the value alpha(F) from Murphy's thesis, page 49:
