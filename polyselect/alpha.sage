@@ -219,3 +219,72 @@ def alpha_simplistic(f,B):
     This ignores the multiple roots altogether.
     """
     return sum([alpha_p_simplistic(f,p) for p in prime_range(2,B+1)])
+
+def special_val0 (f, p):
+    c = f.content ()
+    v = 0.0
+    while c % p == 0:
+        v += 1
+        c = c // p
+    if v <> 0:
+        g = f // p^v
+    else:
+        g = f
+    h = g(p*x)
+    roots = g.roots(GF(p))
+    nroots = len(roots)
+    r0 = 0
+    for i in range(nroots):
+        r = roots[i][0]
+        fp = f.derivative()
+        c = fp(r)
+        if c % p == 0:
+            v += 1.0 / (p - 1)
+        else:
+            h = h(x+ZZ(r)/p)
+            h = PolynomialRing(ZZ,'x')(h)
+            print h, h.parent()
+            r0 = r
+            v += special_val0 (h, p) / p
+    return v
+
+def special_valuation (f, p):
+    disc = f.discriminant()
+    pvaluation_disc = 0
+    if disc % p == 0:
+        pvaluation_disc += 1
+        t = disc // p
+        if t % p == 0:
+            pvaluation_disc += 1
+    if pvaluation_disc == 0:
+        e = len(f.roots(GF(p)))
+        if f.leading_coefficient() % p == 0:
+            e += 1
+        return float((p * e) / (p^2 - 1))
+    elif pvaluation_disc == 1:
+        e = len(f.roots(GF(p)))
+        if f.leading_coefficient() % p == 0:
+            e += 1
+        return float((p * e - 1) / (p^2 - 1))
+    else:
+        d = f.degree()
+        v = float(special_val0 (f, p) * p)
+        if f.leading_coefficient() % p == 0:
+            g = sum([f.coeffs()[d-i]*p^i*x^i for i in range (0,d+1)])
+            v += float(special_val0 (g, p))
+        return v / (p + 1)
+
+def alpha_p_projective2(f,p):
+    e = special_valuation (f, p)
+    return float((-e)*log(p))
+
+def check_alpha_projective(f,B):
+    s = 0
+    s2 = 0
+    disc = f.discriminant()
+    for p in prime_range(2,B+1):
+        a = alpha_p_projective (f,disc,p)
+        a2 = alpha_p_projective2 (f, p)
+        s += a
+        s2 += a2
+        print p, a, a2, s, s2

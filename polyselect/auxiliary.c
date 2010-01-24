@@ -588,8 +588,9 @@ poly_shift_divp (mpz_t *h, int d, long r, unsigned long p)
 
 /********************* computation of alpha **********************************/
 
-/* auxiliary routine for special_valuation(), see below */
-static double
+/* Auxiliary routine for special_valuation(), see below. It returns the
+   average p-valuation of the polynomial f. Works recursively. */
+double
 special_val0 (mpz_t *f, int d, unsigned long p)
 {
   double v;
@@ -1172,7 +1173,8 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
 	       dividing the discriminant, cf alpha.sage, function alpha_p.
 	       We take it into account only for p, not for p^2, p^3, ... */
 	    if (p == pp)
-	      average_alpha += logp * one_over_pm1;
+	      average_alpha += logp * one_over_pm1
+		+ alpha_p_projective (f, d, (D->data)[0], p);
 	    update_table (f, d, m, b, A, K0, K1, pp, alpha);
 	  }
 #else

@@ -53,6 +53,7 @@ double l1_lognorm (mpz_t*, unsigned long, double);
 double L2_lognorm (mpz_t*, unsigned long, double);
 double L2_skewness (mpz_t*, int, int);
 /* rotation */
+double special_val0 (mpz_t*, int, unsigned long);
 double get_alpha (mpz_t*, const int, unsigned long);
 void discriminant (mpz_t, mpz_t*, const int);
 long rotate_aux (mpz_t *f, mpz_t b, mpz_t m, long k0, long k);

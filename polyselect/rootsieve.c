@@ -25,6 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "cado.h"
 #include "utils.h"
 #include "modul_poly.h"
+#include "auxiliary.h"
 
 // #define KK -16346
 // #define PP 7
@@ -170,4 +171,43 @@ update_table (mpz_t *f, int d, mpz_t m, mpz_t b, double *A, long K0, long K1,
   modul_clear (v, Pn);
   modul_clearmod (Pn);
   modul_poly_clear (fpn);
+}
+
+#define average_valuation_affine special_val0
+
+/* Computes the contribution at p of the alpha value of f (projective part
+   only). The return value is always <= 0. */
+double
+alpha_p_projective (mpz_t *f, int d, mpz_t disc, unsigned long p)
+{
+  double e;
+  int i;
+
+  if (mpz_divisible_ui_p (disc, p))
+    {
+      mpz_array_t *q;
+      mpz_t c;
+
+      /* compute q = reverse(f)(px): q[0] = f[d], q[1] = f[d-1]*p, ...,
+	 q[d] = f[0]*p^d */
+	q = alloc_mpz_array (d + 1);
+	mpz_init_set_ui (c, 1);
+	for (i = 0; i <= d; i++)
+	  {
+	    mpz_mul ((q->data)[i], f[d-i], c);
+	    mpz_mul_ui (c, c, p);
+	  }
+	e = average_valuation_affine (q->data, d, p) / (double) (p + 1);
+	mpz_clear (c);
+	clear_mpz_array (q);
+	return -e * log ((double) p);
+    }
+  else
+    {
+      for (i = d; i >= 0 && mpz_divisible_ui_p (f[i], p); i--);
+      ASSERT_ALWAYS (i >= 0);
+      ASSERT_ALWAYS (d - i <= 1);
+      return - (double) (d - i) * (double) p / (double) (p + 1)
+	* log ((double) p) / (double) (p - 1);
+    }
 }
