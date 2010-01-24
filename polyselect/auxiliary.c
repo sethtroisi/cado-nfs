@@ -729,7 +729,7 @@ special_valuation (mpz_t * f, int d, unsigned long p, mpz_t disc)
 	/* something special here. */
 	return (pd * e - 1) / (pd * pd - 1);
     } else {
-	v = special_val0(f, d, p) * (double) p;
+	v = special_val0(f, d, p) * pd;
 	if (p_divides_lc) {
 	    /* compute g(x) = f(1/(px))*(px)^d, i.e., g[i] = f[d-i]*p^i */
 	    /* IOW, the reciprocal polynomial evaluated at px */
@@ -749,7 +749,7 @@ special_valuation (mpz_t * f, int d, unsigned long p, mpz_t disc)
 	    clear_mpz_array (G);
             mpz_clear(t);
 	}
-	v /= (double) (p + 1);
+	v /= pd + 1.0;
     }
     return v;
 }
