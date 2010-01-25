@@ -626,6 +626,7 @@ def rotation_inner(rdict,p,ff,gg,fdg_gdf,u0,v0,l0,ld,m,twist_v1,scale,dphi,hist)
         for l in range(p):
             nhist=copy(hist)
             nhist.append([dphi,u0,v0,l0+p*dphi(l),ld,m])
+            # at the beginning, this evaluates ff.
             minus_f_over_g_modp_l = minus_f_over_g_modp(l);
             if m==0:
                 l0=l

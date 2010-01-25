@@ -98,18 +98,20 @@ g2=g
 
 
 rdict=rotation_init(f2,g2,0,sboundu,0,sboundv)
-pmax=2000
+pmin=3
+pmax=100
 rotation_clear(rdict)
 tt0=cputime()
-for p in prime_range(1,pmax):
+for p in prime_range(pmin,pmax):
     tt=cputime()
     hits,best,u,v=rotation_handle_p(rdict,p)
-    check=alpha(f2+(u*x+v)*g2,p)
+    check=alpha(f2+(u*x+v)*g2,p)-alpha(f2+(u*x+v)*g2,pmin-1)
     z=log(10^-20+abs(check-best))
     gooddigits=floor(-z/log(10))
     print "Done %d [%.2f, tot %.2f]." \
             " Best alpha=%.4f, for %d,%d (%d dd ok)" % \
             (p, cputime()-tt, cputime()-tt0, best,u,v,gooddigits)
+
 
 
 # Another way to test, relevant only for small arrays because it's
