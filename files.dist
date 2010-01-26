@@ -184,6 +184,8 @@ polyselect/auxiliary.c
 polyselect/auxiliary.h
 polyselect/polyselect.c
 polyselect/rotate.c
+polyselect/rootsieve.c
+polyselect/rootsieve.h
 run_example.sh
 scripts/call_cmake.sh
 scripts/version.sh
@@ -232,6 +234,11 @@ sieve/test_trialdiv.c
 sqrt/CMakeLists.txt
 sqrt/Makefile
 sqrt/sqrt.c
+sqrt/crtalgsqrt.c
+sqrt/powers_of_p.cpp
+sqrt/powers_of_p.h
+sqrt/polyroots.c
+sqrt/polyroots.h
 sqrt/checkdep.c
 utils/poly.c
 utils/poly.h
@@ -306,6 +313,7 @@ utils/ularith.h
 utils/utils.h
 utils/crc.h
 utils/crc.c
+utils/complete_rels.c
 utils/gmp_factorization_complete.c
 utils/gmp_gcd.c
 utils/gmp_prob_prime.c

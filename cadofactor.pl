@@ -536,7 +536,12 @@ sub job_status {
     my $status;
 
     my $alive = is_job_alive($job);
-    my $ret   = remote_cmd($job->{'host'}, "env tail -n1 $job->{'file'} 2>&1");
+	my $ret;
+	if ($job->{'file'} =~ /\.gz$/) {
+    	$ret   = remote_cmd($job->{'host'}, "env zcat $job->{'file'} | tail -n1 2>&1");
+	} else {	
+    	$ret   = remote_cmd($job->{'host'}, "env tail -n1 $job->{'file'} 2>&1");
+	}
 
     if ($ret->{'status'} == 255) {
         info "Unknown status. Assuming job is still running.\n";
@@ -639,10 +644,15 @@ sub get_job_output {
 sub count_lines {
     my ($f, $re) = @_;
 
-    # This seems to be a tad faster than grep -v '$re' | wc -l, so...
     my $n = 0;
+	if ($f =~ /\.gz$/) {
+		$n= cmd ( "zcat $f | grep -v '#' | wc -l" )->{'out'};
+		chomp $n;
+		return $n;
+	}
+    # This seems to be a tad faster than grep -v '$re' | wc -l, so...
     open FILE, "< $f"
-        or die "Cannot open `$f' for reading: $!.\n";
+       	or die "Cannot open `$f' for reading: $!.\n";
     while (<FILE>) {
         $n++ unless $re && /$re/;
     }
@@ -655,7 +665,8 @@ sub count_lines {
 sub first_line {
     my ($f) = @_;
     open FILE, "< $f"
-        or die "Cannot open `$f' for reading: $!.\n";
+       	or die "Cannot open `$f' for reading: $!.\n";
+	
     $_ = <FILE>;
     close FILE;
     chomp;
@@ -666,8 +677,14 @@ sub first_line {
 sub last_line {
     my ($f) = @_;
     my $last = "";
+	if ($f =~ /\.gz$/) {
+		$last= cmd ("zcat $f | tail -n 1" )->{'out'};
+		chomp $last;
+		return $last;
+	}
     open FILE, "< $f"
-        or die "Cannot open `$f' for reading: $!.\n";
+       	or die "Cannot open `$f' for reading: $!.\n";
+	
     # That should be enough to catch the last line
     seek FILE, -512, 2;
     $last = $_ while <FILE>;
@@ -803,11 +820,12 @@ sub distribute_task {
 
     banner $opt->{'title'};
     local_time $opt->{'title'};
+	$opt->{'gzip'}=0 if (! $opt->{'gzip'});
 
     # Make sure that all the output files that are already here are correct
     opendir DIR, $param{'wdir'}
         or die "Cannot open directory `$param{'wdir'}': $!\n";
-    my $suffix = $opt->{'suffix'}.'\.[\de.]+-[\de.]+';
+    my $suffix = $opt->{'suffix'}.'\.[\de.]+-[\de.]+(|\.gz)';
     $suffix .= "|$opt->{'extra'}" if $opt->{'extra'};
     my @files = grep /^$param{'name'}\.($suffix)$/,
                      readdir DIR;
@@ -903,10 +921,10 @@ sub distribute_task {
         # First, scan the job output files
         opendir DIR, $param{'wdir'}
             or die "Cannot open directory `$param{'wdir'}': $!\n";
-        my @files = grep /^$param{'name'}\.$opt->{'suffix'}\.[\de.]+-[\de.]+$/,
+        my @files = grep /^$param{'name'}\.$opt->{'suffix'}\.[\de.]+-[\de.]+(|\.gz)$/,
                          readdir DIR;
         closedir DIR;
-        push @$ranges, map { /\.([\de.]+)-([\de.]+)$/; [$1, $2] } @files;
+        push @$ranges, map { /\.([\de.]+)-([\de.]+)(|\.gz)$/; [$1, $2] } @files;
         $ranges = merge_ranges($ranges);
         # Keep a copy for later
         my $file_ranges = [ map [@$_], @$ranges ];
@@ -957,12 +975,13 @@ sub distribute_task {
                                 file  => "$m->{'prefix'}.$opt->{'suffix'}.".
                                          "$r[0]-$r[1]",
                                 param => \@r };
+					$job->{'file'} .= ".gz" if $opt->{'gzip'};
 
                     info "Starting job: ".job_string($job)."\n";
                     $tab_level++;
-                   	my $cmd = &{$opt->{'cmd'}}(@r, $m, $mth)." & echo \\\$!";
-						
-                    my $ret = remote_cmd($h, $cmd, { log => 1 });
+                   	my $cmd = &{$opt->{'cmd'}}(@r, $m, $mth, $opt->{'gzip'}).
+								" & echo \\\$!";
+					my $ret = remote_cmd($h, $cmd, { log => 1 });
                     if (!$ret->{'status'}) {
                         chomp $ret->{'out'};
                         $job->{'pid'} = $ret->{'out'};
@@ -993,10 +1012,11 @@ sub distribute_task {
                                                     $opt->{'len'}, $ranges))) {
             info "Starting job: ".pad($r[0], 8)." ".pad($r[1], 8)."\n";
             $tab_level++;
-            my $cmd = &{$opt->{'cmd'}}(@r, $machines{'localhost'}, 1);
+            my $cmd = &{$opt->{'cmd'}}(@r, $machines{'localhost'}, 1, $opt->{'gzip'});
             cmd($cmd, { log => 1, kill => 1 });
-            &{$opt->{'check'}}("$param{'prefix'}.$opt->{'suffix'}.$r[0]-$r[1]",
-                             1); # Exhaustive testing!
+			my $check_cmd = "$param{'prefix'}.$opt->{'suffix'}.$r[0]-$r[1]";
+			$check_cmd .= ".gz" if $opt->{'gzip'};
+            &{$opt->{'check'}}($check_cmd, 1); # Exhaustive testing!
             $tab_level--;
         }
 
@@ -1099,7 +1119,7 @@ my %tasks = (
                    dep    => ['polysel'],
                    req    => ['factbase', 'freerels'],
                    param  => ['excess'],
-                   files  => ['rels\.[\de.]+-[\de.]+', 'rels\.tmp',
+                   files  => ['rels\.[\de.]+-[\de.]+(|\.gz)', 'rels\.tmp',
                               'nodup\.gz', 'duplicates\.stderr',
                               'purged', 'purge\.stderr'],
                    resume => 1,
@@ -1120,7 +1140,8 @@ my %tasks = (
                                bwc_interval
                                bwc_mm_impl
                                bwc_interleaving/],
-                   files  => ['bw', 'bw\.stderr', 'bl', 'bl\.stderr', 'W'] },
+                   files  => ['bwc', 'bwc\.stderr', 'bl', 'bl\.stderr',
+							  'W', 'W\.bin'] },
 
     bitstr    => { dep    => ['linalg'],
                    files  => ['ker_raw', 'mkbitstrings\.stderr'] },
@@ -1376,7 +1397,8 @@ sub do_init {
                                (map $tasks{$_->{'task'}}->{'name'}, @cleanup));
         $list =~ s/^(.*);/$1; and/;
         warn "I will clean up the following tasks: $list.\n";
-        warn "Are you OK to continue? [y/N] (30s timeout)\n";
+        warn "Are you OK to continue? [y/l/N] (30s timeout)\n";
+        warn "(l: clean the tasks except linear algebra)\n";
         my $r = "";
         eval {
             local $SIG{'ALRM'} = sub { die "alarm\n" }; # NB: \n required
@@ -1388,7 +1410,7 @@ sub do_init {
             die unless $@ eq "alarm\n"; # propagate unexpected errors
         }
         chomp $r;
-        die "Aborting...\n" unless $r =~ /^y/i;
+        die "Aborting...\n" unless $r =~ /^(y|l)/i;
 
         for (@cleanup) {
             my $t     = $_->{'task'};
@@ -1396,6 +1418,11 @@ sub do_init {
             my $task  = $tasks{$t};
 
             # Clean up old files...
+			if ( $task->{'name'} ) {
+				if ( $task->{'name'} eq "linear algebra" ) {
+					next if $r eq "l";
+				}
+			}
             info "Cleaning up $task->{'name'}..." if $task->{'name'};
             $tab_level++;
             for (map "$param{'wdir'}/$_", sort @$files) {
@@ -1493,7 +1520,7 @@ sub do_polysel {
     };
 
     my $polysel_cmd = sub {
-        my ($a, $b, $m, $max_threads) = @_;
+        my ($a, $b, $m, $max_threads, $gzip) = @_;
         return "env nice -$param{'selectnice'} ".
                "$m->{'cadodir'}/polyselect/polyselect ".
                "-keep $param{'kjkeep'} ".
@@ -1636,20 +1663,27 @@ sub do_sieve {
     my $sieve_check = sub {
         my ($f, $full) = @_;
 
-	unless (-f $f) {
-		warn "File `$f' not found, check not done.\n";
-		return;
-	}
+		unless (-f $f) {
+			warn "File `$f' not found, check not done.\n";
+			return;
+		}
 
 
         return &$import_rels($f) if $f =~ /\.freerels$/;
+		my $is_gzip;
+		$is_gzip=1 if $f =~ /\.gz$/;
 
         my $check = $f;
         if (!$full) {
             $check = "$param{'prefix'}.rels.tmp";
             # Put the first 10 relations into a temp file
-            open FILE, "< $f"
-                or die "Cannot open `$f' for reading: $!.\n";
+			if ($is_gzip) {
+				open FILE, "zcat $f|"
+                	or die "Cannot open `$f' for reading: $!.\n";
+			} else {
+            	open FILE, "< $f"
+                	or die "Cannot open `$f' for reading: $!.\n";
+			}
             open TMP, "> $check"
                 or die "Cannot open `$check' for writing: $!.\n";
             my $n = 10;
@@ -1690,6 +1724,11 @@ sub do_sieve {
         # If this is a partial (i.e. incomplete) file, we need to adjust
         # the range of covered special q's
         if (last_line($f) !~ /^# (Total \d+ reports|Warning: truncated)/) {
+			if ($is_gzip) {
+				cmd ("gzip -d $f", { kill => 1});
+            	basename($f) =~ /^$param{'name'}\.rels\.([\de.]+)-([\de.]+)\.gz$/;
+				$f = "$param{'prefix'}.rels.$1-$2";
+			}
             open FILE, "+< $f"
                 or die "Cannot open `$f' for update: $!.\n";
 
@@ -1728,6 +1767,10 @@ sub do_sieve {
             $tab_level++;
             cmd("env mv -f $f $param{'prefix'}.rels.$r[0]-$r[1]", { kill => 1 });
             $f = "$param{'prefix'}.rels.$r[0]-$r[1]";
+			#if ($is_gzip) {
+			#	cmd ("gzip $f", { kill => 1});
+            #	$f .= ".gz";
+			#}
             $tab_level--;
         }
 
@@ -1753,7 +1796,7 @@ sub do_sieve {
         # Get the list of relation files
         opendir DIR, $param{'wdir'}
             or die "Cannot open directory `$param{'wdir'}': $!\n";
-        my @files = grep /^$param{'name'}\.(rels\.[\de.]+-[\de.]+|freerels)$/,
+        my @files = grep /^$param{'name'}\.(rels\.[\de.]+-[\de.]+(|\.gz)|freerels)$/,
                          readdir DIR;
         closedir DIR;
         my $files = join " ", (map "$param{'wdir'}/$_", sort @files);
@@ -1807,23 +1850,26 @@ sub do_sieve {
 
 
     my $sieve_cmd = sub {
-        my ($a, $b, $m, $max_threads) = @_;
-        return "env nice -$param{'sievenice'} ".
-               "$m->{'cadodir'}/sieve/las ".
-               "-I $param{'I'} ".
-               "-poly $m->{'prefix'}.poly ".
-               "-fb $m->{'prefix'}.roots ".
-               "-q0 $a ".
-               "-q1 $b ".
-			   "-mt $max_threads ".
-               "> $m->{'prefix'}.rels.$a-$b ".
-               "2>&1";
+        my ($a, $b, $m, $max_threads, $gzip) = @_;
+        my $cmd = "env nice -$param{'sievenice'} ".
+               		"$m->{'cadodir'}/sieve/las ".
+					"-I $param{'I'} ".
+    	       		"-poly $m->{'prefix'}.poly ".
+        	  		"-fb $m->{'prefix'}.roots ".
+            		"-q0 $a ".
+		       		"-q1 $b ".
+			  	 	"-mt $max_threads ".
+               		"-out $m->{'prefix'}.rels.$a-$b";
+		$cmd .= ".gz" if ($gzip);
+		$cmd .= " > /dev/null 2>&1";
+		return $cmd;
     };
     
     distribute_task({ task     => "sieve",
                       title    => "Sieve",
                       suffix   => "rels",
                       extra    => "freerels",
+					  gzip	   => 1,
                       files    => ["$param{'name'}.poly",
                                    "$param{'name'}.roots"],
                       pattern  => '^# Total \d+ reports',
@@ -2009,18 +2055,18 @@ sub do_linalg {
                "interleaving=$param{'bwc_interleaving'} ".
                "interval=$param{'bwc_interval'} ".
                "mode=u64 mn=64 splits=0,64 ys=0..64 ".
-               "wdir=$param{'wdir'}/bwc " .
+               "wdir=$param{'prefix'}.bwc " .
                "bwc_bindir=$bwc_bindir " .
                "&>> $param{'prefix'}.bwc.stderr ";
         cmd($cmd, { log => 1, kill => 1 });
 
         $cmd = "$param{'cadodir'}/linalg/apply_perm " .
-            "--perm $param{'wdir'}/bwc/mat.row_perm " .
-            "--in $param{'wdir'}/bwc/W.twisted " .
-            "--out $param{'wdir'}/W.bin";
+            "--perm $param{'prefix'}.bwc/mat.row_perm " .
+            "--in $param{'prefix'}.bwc/W.twisted " .
+            "--out $param{'prefix'}.W.bin";
         cmd($cmd, { log => 1, kill => 1 });
 
-        $cmd = "xxd -c 8 -ps $param{'wdir'}/W.bin > $param{'prefix'}.W";
+        $cmd = "xxd -c 8 -ps $param{'prefix'}.W.bin > $param{'prefix'}.W";
         cmd($cmd, { log => 1, kill => 1 });
 
     } elsif ($param{'linalg'} eq "bl") {
