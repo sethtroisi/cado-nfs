@@ -664,7 +664,8 @@ sub drive {
 
     $program="$bindir/$program";
 
-    if ($mpi_split[0] * $mpi_split[1] != 1) {
+    # if ($mpi_split[0] * $mpi_split[1] != 1) {
+    if ($mpi_needed) {
         unshift @_, $program;
         if ($program =~ /(?:split|acollect|lingen)$/) {
             unshift @_, @mpi_precmd_single;
