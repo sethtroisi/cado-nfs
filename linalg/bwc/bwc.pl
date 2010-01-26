@@ -97,6 +97,23 @@ my @mpi_split=(1,1);
 my @thr_split=(1,1);
 my $matrix;
 my $hostfile;
+
+my $mpi_extra_args;
+
+## The mpi_extra_args argument is used to pass information to the mpiexec 
+## command. The idea is that mpiexec, the mpi driver program, may need
+## additional info to properly setup communications between jobs. As an 
+## example, on Fedora machines with openmpi:
+##    
+## ./build/x86_64/linalg/bwc/bwc.pl :complete matrix=/net/tiramisu/localdisk/thome/mats/c90b wdir=/local/rsa768/tmp/c59 mn=64 mpi=2x1 thr=2x4 hosts=patate,tiramisu interval=10 mpi_extra_args='--mca btl_tcp_if_exclude lo,virbr0'
+##    
+## This tells mpi not to try routing traffic through either the lo or the 
+## virbr0 interface. For the former, it's already openmpi's default
+## behaviour (unless /etc/hosts is screwed up, which this file does tend to
+## be sometimes). For virbr0, it's again some local mess, but each machine 
+## having this class C network defined, openmpi can't really tell whether 
+## they're connected or not -- and of course they're not.
+ 
 my $mpiexec='@MPIEXEC@';
 my $wdir;
 my $m;
@@ -208,10 +225,7 @@ while (defined($_ = shift @ARGV)) {
     if (!defined($k)) {
         usage "Garbage not undertood on command line: $_";
     }
-    if ($k eq 'bwc_bindir') {
-        $bindir=$v;
-        next;
-    }
+    if ($k eq 'bwc_bindir') { $bindir=$v; next; }
     if (!defined($param->{$k})) {
         $param->{$k}=$v;
         next;
@@ -307,6 +321,7 @@ while (my ($k,$v) = each %$param) {
     if ($k eq 'matrix') { $matrix=$v; next; }
     if ($k eq 'matpath') { $matpath=$v; next; }
     if ($k eq 'hostfile') { $hostfile=$v; next; }
+    if ($k eq 'mpi_extra_args') { $mpi_extra_args=$v; next; }
     if ($k eq 'mode') { $mode=$v; next; }
     if ($k eq 'hosts') {
         $v=[$v] if (ref $v eq '');
@@ -455,10 +470,13 @@ if ($mpi_needed) {
         $hostfile = "/tmp/HOSTS.$ENV{'OAR_JOBID'}";
     }
     if (scalar @hosts) {
-        open F, ">$wdir/HOSTS";
+        # Don't use an uppercase filename, it would be deleted by
+        # wipeout.
+        $hostfile = "$wdir/hosts";
+        open F, ">$hostfile" or die "$hostfile: $!";
         for my $h (@hosts) { print F "$h\n"; }
         close F;
-        $hostfile = "$wdir/HOSTS";
+        print STDERR "Created $hostfile\n";
     }
     if (defined($hostfile)) {
         if ($mpi_ver =~ /^\+hydra/) {
@@ -480,6 +498,11 @@ if ($mpi_needed) {
     }
     check_mpd_daemons();
     push @mpi_precmd, '-n', $mpi_split[0] * $mpi_split[1];
+
+    if (defined($mpi_extra_args)) {
+        push @mpi_precmd, split(' ', $mpi_extra_args);
+    }
+
 } elsif (defined($ENV{'MPI'})) {
     my_setenv 'LD_LIBRARY_PATH', "$ENV{'LD_LIBRARY_PATH'}:$ENV{'MPI'}/lib";
 }
