@@ -98,7 +98,10 @@ my @thr_split=(1,1);
 my $matrix;
 my $hostfile;
 
-my $mpi_extra_args;
+## mpiexec is substituted by cmake in case mpi has been used for the
+## compilation. NOTE that this means that a priori, mpiexec _must_ be
+## used for running all programs.
+my $mpiexec='@MPIEXEC@';
 
 ## The mpi_extra_args argument is used to pass information to the mpiexec 
 ## command. The idea is that mpiexec, the mpi driver program, may need
@@ -113,8 +116,8 @@ my $mpi_extra_args;
 ## be sometimes). For virbr0, it's again some local mess, but each machine 
 ## having this class C network defined, openmpi can't really tell whether 
 ## they're connected or not -- and of course they're not.
+my $mpi_extra_args;
  
-my $mpiexec='@MPIEXEC@';
 my $wdir;
 my $m;
 my $n;
@@ -454,14 +457,26 @@ sub check_mpd_daemons()
     dosystem "$mpi/mpdboot -n $n -r $rsh -f $hostfile -v";
 }
 
-my $mpi_needed = $mpi_split[0] * $mpi_split[1] != 1 && $main !~ /(?:split|acollect|lingen)$/;
+# my $mpi_needed = $mpi_split[0] * $mpi_split[1] != 1;
+# && $main !~ /(?:split|acollect|lingen)$/;
 
+# If we've been built with mpi, then we _need_ mpi for running. Otherwise
+# we run into shared libraries mess.
+my $mpi_needed = $mpiexec ne '';
+
+# @mpi_precmd_single is something silly; we want provision for the case
+# where mpi is used for running non-mpi jobs. It's something which does
+# not officially work, yet it always does. And some programs do turn out
+# to be compiled with mpi, so we need the mpi libraries at runtime... So
+# short of a more accurate solution, this is a hack.
 my @mpi_precmd;
+my @mpi_precmd_single;
 
 if ($mpi_needed) {
     detect_mpi;
 
     push @mpi_precmd, "$mpi/mpiexec";
+    push @mpi_precmd_single, "$mpi/mpiexec";
 
     # Need hosts.
     if (exists($ENV{'OAR_JOBID'}) && !defined($hostfile) && !scalar @hosts) {
@@ -498,13 +513,20 @@ if ($mpi_needed) {
     }
     check_mpd_daemons();
     push @mpi_precmd, '-n', $mpi_split[0] * $mpi_split[1];
+    push @mpi_precmd_single, '-n', 1;
 
     if (defined($mpi_extra_args)) {
         push @mpi_precmd, split(' ', $mpi_extra_args);
     }
-
-} elsif (defined($ENV{'MPI'})) {
-    my_setenv 'LD_LIBRARY_PATH', "$ENV{'LD_LIBRARY_PATH'}:$ENV{'MPI'}/lib";
+#} elsif (defined(my $mpi_path=$ENV{'MPI'})) {
+#    my $ldlp;
+#    if (defined($ldlp=$ENV{'LD_LIBRARY_PATH'})) {
+#        $ldlp .= ':';
+#    } else {
+#        $ldlp = '';
+#    }
+#    $ldlp .= "$mpi_path/lib";
+#    my_setenv 'LD_LIBRARY_PATH', $ldlp;
 }
 
 ##################################################
@@ -642,11 +664,32 @@ sub drive {
 
     $program="$bindir/$program";
 
-    if ($mpi_split[0] * $mpi_split[1] != 1 && $program !~ /(?:split|acollect|lingen)$/) {
+    if ($mpi_split[0] * $mpi_split[1] != 1) {
         unshift @_, $program;
-        unshift @_, @mpi_precmd;
+        if ($program =~ /(?:split|acollect|lingen)$/) {
+            unshift @_, @mpi_precmd_single;
+        } else {
+            unshift @_, @mpi_precmd;
+        }
         $program = shift @_;
     }
+##     if ($mpi_split[0] * $mpi_split[1] != 1 && $program !~ /(?:split|acollect|lingen)$/) {
+##         unshift @_, $program;
+##         unshift @_, @mpi_precmd;
+##         $program = shift @_;
+##     } elsif ($program =~ /(?:split|acollect|lingen)$/ && $mpi_needed) {
+##         if (defined(my $mpi_path=$ENV{'MPI'})) {
+##             my $ldlp;
+##             if (defined($ldlp=$ENV{'LD_LIBRARY_PATH'})) {
+##                 $ldlp .= ':';
+##             } else {
+##                 $ldlp = '';
+##             }
+##             $ldlp .= "$mpi_path/lib";
+##             unshift @_, 'env', "LD_LIBRARY_PATH=$ldlp";
+##             $program = shift @_;
+##         }
+##     }
 
     dosystem($program, @_);
 }
