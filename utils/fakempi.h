@@ -3,7 +3,7 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include "bwc_config.h"
+#include "cado_mpi_config.h"
 #include "macros.h"
 
 typedef int MPI_Status;

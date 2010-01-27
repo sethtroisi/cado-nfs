@@ -2,7 +2,6 @@
 #define FAKEPTHREAD_H_
 
 #include <signal.h>
-#include "bwc_config.h"
 #include "macros.h"
 
 // See select_mpi.h for info on my_* stuff.
