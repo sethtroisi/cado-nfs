@@ -155,6 +155,9 @@ def alpha(f,B):
     """
     Computes the alpha value of f, up to prime bound B
     """
+    x = f.variables()[0]
+    R.<x> = PolynomialRing(ZZ)
+    f = R(f)
     disc = f.discriminant()
     return sum([alpha_p(f, disc, p) for p in prime_range(2,B+1)])
 
