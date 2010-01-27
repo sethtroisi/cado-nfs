@@ -2038,6 +2038,13 @@ sub do_linalg {
         # pass it as a command-line argument to bwc.pl
         
         my $bwc_bindir = "$param{'cadodir'}/linalg/bwc";
+
+        # XXX NOTE: This is a despair-mode fallback. It's really not
+        # guaranteed to work, even though it's the way I'm sometimes
+        # using the script. The ``official'' way is to use the script
+        # which is in the build dir, because that one has the @xxx@ stuff
+        # replaced (and provides in particular the advantage that
+        # bwc_bindir does not need to be specified).
         if (!-x $bwc_script) {
             $bwc_script=abs_path(dirname($0)) . "/linalg/bwc/bwc.pl";
         }
