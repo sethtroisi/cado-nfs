@@ -3477,7 +3477,7 @@ main (int argc0, char *argv0[])
 
     param_list pl;
     param_list_init(pl);
-    cado_poly_init(cpoly);
+    cado_poly_init (cpoly);
     param_list_configure_knob(pl, "-v", &verbose);
     param_list_configure_knob(pl, "-ratq", &ratq);
     argv++, argc--;
@@ -3576,6 +3576,12 @@ main (int argc0, char *argv0[])
              cpoly->mfbr, cpoly->mfba, cpoly->rlambda, cpoly->alambda);
     fprintf (output, "#                     skewness=%1.1f\n",
              cpoly->skew);
+
+    if (cpoly->skew <= 0.0)
+      {
+        fprintf (stderr, "Error, please provide a positive skewness\n");
+        exit (EXIT_FAILURE);
+      }
 
     /* this does not depend on the special-q */
     si.ratq = ratq;

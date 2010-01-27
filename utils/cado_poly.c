@@ -47,6 +47,8 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
     int i;
 
     have_n = param_list_parse_mpz(pl, "n", poly->n) || param_list_parse_mpz(pl, NULL, poly->n);
+    poly->skew = 0.0; /* to ensure that we get an invalid skewness in case
+                         it is not given */
     param_list_parse_double(pl, "skew", &(poly->skew));
     for (i = 0; i < (MAXDEGREE + 1); i++) {
         char tag[4];
