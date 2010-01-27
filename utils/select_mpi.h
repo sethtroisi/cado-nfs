@@ -1,11 +1,11 @@
 #ifndef SELECT_MPI_H_
 #define SELECT_MPI_H_
-#include "bwc_config.h"
+#include "cado_mpi_config.h"
 #include "macros.h"
 #if !(defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L)
 #if _POSIX_C_SOURCE == 199506L && defined(_GNU_SOURCE) && defined(__GLIBC__) && LEXLE2(__GLIBC__,__GLIBC_MINOR__,2,4)
 /* With glibc 2.4, if _GNU_SOURCE is defined, then _POSIX_C_SOURCE is set
- * to 199506L inconditionally, and there's nothing we can do about it
+ * to 199506L unconditionally, and there's nothing we can do about it
  * (see /usr/include/features.h). Then the compilation will fail on
  * missing prototypes, and we have to resort to kludges.
  * Note that the update was pushed before the glibc 2.4 release, but some

@@ -59,41 +59,8 @@ endif(CMAKE_COMPILER_IS_GNUCC)
 #####################################################################
 # Set dependencies for external software.
 
-# You can force a path to gmp.h using the environment variables GMP, or
-# GMP_INCDIR and GMP_LIBDIR
-string(COMPARE NOTEQUAL "$ENV{GMP}" "" HAS_GMP_OVERRIDE)
-if (HAS_GMP_OVERRIDE)
-    message(STATUS "Adding $ENV{GMP} to the search path for Gnu MP")
-    set(GMP_INCDIR_HINTS "$ENV{GMP}/include" ${GMP_INCDIR_HINTS})
-    set(GMP_INCDIR_HINTS "$ENV{GMP}"         ${GMP_INCDIR_HINTS})
-    set(GMP_LIBDIR_HINTS "$ENV{GMP}/lib"     ${GMP_LIBDIR_HINTS})
-    set(GMP_LIBDIR_HINTS "$ENV{GMP}/.libs"   ${GMP_LIBDIR_HINTS})
-endif(HAS_GMP_OVERRIDE)
-string(COMPARE NOTEQUAL "$ENV{GMP_INCDIR}" "" HAS_GMP_INCDIR_OVERRIDE)
-if (HAS_GMP_INCDIR_OVERRIDE)
-    message(STATUS "Adding $ENV{GMP_INCDIR} to the search path for Gnu MP")
-    set(GMP_INCDIR_HINTS "$ENV{GMP_INCDIR}" ${GMP_INCDIR_HINTS})
-endif(HAS_GMP_INCDIR_OVERRIDE)
-string(COMPARE NOTEQUAL "$ENV{GMP_LIBDIR}" "" HAS_GMP_LIBDIR_OVERRIDE)
-if (HAS_GMP_LIBDIR_OVERRIDE)
-    message(STATUS "Adding $ENV{GMP_LIBDIR} to the search path for Gnu MP")
-    set(GMP_LIBDIR_HINTS "$ENV{GMP_LIBDIR}"     ${GMP_LIBDIR_HINTS})
-endif(HAS_GMP_LIBDIR_OVERRIDE)
-find_path   (GMP_INCDIR gmp.h HINTS ${GMP_INCDIR_HINTS} DOC "Gnu MP headers")
-find_library(GMP_LIB    gmp   HINTS ${GMP_LIBDIR_HINTS} DOC "Gnu MP library")
-# Yeah. CMake docs defines the ``PATH'' to a file as being its dirname. Very
-# helpful documentation there :-((
-get_filename_component(GMP_LIBDIR ${GMP_LIB} PATH)
-message(STATUS "GMP_INCDIR=${GMP_INCDIR}")
-message(STATUS "GMP_LIBDIR=${GMP_LIBDIR}")
-string(COMPARE NOTEQUAL "${GMP_INCDIR}" GMP_INCDIR-NOTFOUND GMP_INCDIR_OK)
-string(COMPARE NOTEQUAL "${GMP_LIBDIR}" GMP_LIBDIR-NOTFOUND GMP_LIBDIR_OK)
-if(GMP_INCDIR_OK)
-include_directories(${GMP_INCDIR})
-endif(GMP_INCDIR_OK)
-if(GMP_LIBDIR_OK)
-link_directories(${GMP_LIBDIR})
-endif(GMP_LIBDIR_OK)
+# locates gmp. Obeys the env variables GMP GMP_LIBDIR GMP_INCDIR
+include(${CADO_NFS_SOURCE_DIR}/config/gmp.cmake)
 
 #####################################################################
 # Obtain information from the host.
@@ -103,38 +70,31 @@ include(CheckFunctionExists)
 # posix_memalign
 CHECK_FUNCTION_EXISTS(posix_memalign      HAVE_POSIX_MEMALIGN)
 
-# SSE-2
-message(STATUS "Testing whether sse-2 code can be used")
-try_compile(sse2_compiles
-            ${CADO_NFS_BINARY_DIR}/config
-            ${CADO_NFS_SOURCE_DIR}/config/sse2.c)
-if(sse2_compiles)
-    message(STATUS "Testing whether sse-2 code can be used -- Yes")
-else(sse2_compiles)
-    try_compile(sse2_compiles
-        ${CADO_NFS_BINARY_DIR}/config
-        ${CADO_NFS_SOURCE_DIR}/config/sse2.c
-        COMPILE_DEFINITIONS -msse2)
-    if(sse2_compiles)
-        message(STATUS "Trying whether sse-2 code can be used -- Yes, with -msse2")
-        set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -msse2")
-        set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse2")
-    else(sse2_compiles)
-        message(STATUS "Trying whether sse-2 code can be used -- No")
-    endif(sse2_compiles)
-endif(sse2_compiles)
+include(${CADO_NFS_SOURCE_DIR}/config/sse2.cmake)
+include(${CADO_NFS_SOURCE_DIR}/config/gcc-assembly.cmake)
 
-# gcc-style x86_64 assembly.
-message(STATUS "Trying to compile gcc-style x86_64 assembly")
-try_compile(HAVE_GCC_STYLE_AMD64_ASM
-    ${CADO_NFS_BINARY_DIR}/config
-    ${CADO_NFS_SOURCE_DIR}/config/asm_sample.c
-    COMPILE_DEFINITIONS "-x assembler")
-if(HAVE_GCC_STYLE_AMD64_ASM)
-    message(STATUS "Trying to compile gcc-style x86_64 assembly -- Success")
-else(HAVE_GCC_STYLE_AMD64_ASM)
-    message(STATUS "Trying to compile gcc-style x86_64 assembly -- Failed")
-endif(HAVE_GCC_STYLE_AMD64_ASM)
+######################################################################
+# Try to detect whether pthreads and/or MPI are available.
+# This checks the MPI and PTHREADS environment variables.
+# As a result:
+# - If pthreads are available:
+#   * WITH_PTHREADS is defined to 1 as a cmake variable.
+#   * -DWITH_PTHREADS is added for the compilation of every file (because
+#     it can't hurt).
+# - If mpi is available:
+#   * WITH_MPI is defined to 1 as a cmake variable.
+#   * _NOTHING_ from the build environment is changed by default, because
+#     we do not want everything to be compiled with mpicc. Thus, relevant
+#     code parts should check for WITH_MPI in the CMakeLists.txt file,
+#     and, if relevant, use the MPI_C_COMPILER, MPI_CXX_COMPILER, MPIEXEC
+#     variables (which are guaranteed to be defined).
+#   * The cado_mpi_config.h file is possibly modified in order to trigger
+#     a rebuild of all mpi sources whenever the mpi library gets changed.
+
+include (${CADO_NFS_SOURCE_DIR}/config/pthreads.cmake)
+include (${CADO_NFS_SOURCE_DIR}/config/mpi.cmake)
+
+configure_file(cado_mpi_config_h.in cado_mpi_config.h ESCAPE_QUOTES @ONLY)
 
 #####################################################################
 # now the real stuff.

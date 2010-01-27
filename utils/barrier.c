@@ -3,7 +3,6 @@
 #include <errno.h>
 #include <pthread.h>
 #include <time.h>
-#include "bwc_config.h"
 #include "barrier.h"
 
 int barrier_init (barrier_t *barrier, int count)

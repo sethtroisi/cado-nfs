@@ -84,3 +84,4 @@ linalg/bwc/mf.c
 linalg/bwc/mf.h
 linalg/bwc/mf_bal.c
 linalg/bwc/mf_scan.c
+linalg/bwc/mf_dobal.c
