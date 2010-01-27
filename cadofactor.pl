@@ -339,6 +339,7 @@ sub read_machines {
             %vars = ( cluster => $1 );
         } elsif (/^(\w+)=(.*)$/) {
             $vars{$1} = $2;
+			$param{'cadodir'} = $2 if ($1 eq "cadodir");
         } elsif (s/^(\S+)\s*//) {
             my $host = $1;
             my %desc = %vars;
