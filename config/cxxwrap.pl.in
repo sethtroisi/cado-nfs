@@ -1,0 +1,39 @@
+#!/usr/bin/perl -w
+
+use warnings;
+use strict;
+
+my $default_cc = '@CMAKE_CXX_COMPILER@';
+my $mpi_cc = '@MPI_CXX_COMPILER@';
+
+sub usage {
+    print STDERR <<EOF;
+Usage: $0 [command line arguments...]
+
+This really wraps around the original cc, as the expansion is:
+
+$default_cc [command line arguments...]
+
+However, if an argument --mpi is found, then the command line becomes
+
+$mpi_cc [command line arguments...] (with the --mpi removed)
+EOF
+    exit 1;
+}
+
+my $cc = $default_cc;
+
+my @a = ();
+
+while (defined($_=shift @ARGV)) {
+    /^--mpi$/ && do {
+        $cc = $mpi_cc;
+        # print STDERR "Using $cc instead of $default_cc\n";
+        next;
+    };
+    push @a, $_;
+}
+
+usage unless scalar @a;
+
+exec $cc, @a;

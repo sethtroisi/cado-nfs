@@ -97,6 +97,17 @@ include (${CADO_NFS_SOURCE_DIR}/config/mpi.cmake)
 configure_file(cado_mpi_config_h.in cado_mpi_config.h ESCAPE_QUOTES @ONLY)
 
 #####################################################################
+# OK, it's freakin ugly. Don't look.
+
+# there would have been ways to do it without a generated helper script,
+# I guess -- unfortunately I couldn't find one ;-((
+configure_file(config/ccwrap.pl.in ccwrap.pl ESCAPE_QUOTES @ONLY)
+set(CMAKE_C_COMPILER "${CADO_NFS_BINARY_DIR}/ccwrap.pl")
+
+configure_file(config/cxxwrap.pl.in cxxwrap.pl ESCAPE_QUOTES @ONLY)
+set(CMAKE_CXX_COMPILER "${CADO_NFS_BINARY_DIR}/cxxwrap.pl")
+
+#####################################################################
 # now the real stuff.
 
 # First, create the config file gathering everything we've got so far.

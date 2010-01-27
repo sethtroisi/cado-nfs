@@ -1,28 +1,36 @@
 
 include_directories(..)
 
+# Use with care. Normally, binaries not needed MPI for real should not
+# emit MPI symbols since they don't do anything depending on this config
+# variable. However this mechanism is somewhat fragile.
 if (${WITH_MPI})
-        set(CMAKE_C_COMPILER ${MPI_C_COMPILER})
-        set(CMAKE_CXX_COMPILER ${MPI_CXX_COMPILER})
-        add_definitions(-DWITH_MPI)
+add_definitions(-DWITH_MPI)
 endif (${WITH_MPI})
+
 
 configure_file(bwc.pl ${CMAKE_CURRENT_BINARY_DIR}/bwc.pl ESCAPE_QUOTES @ONLY)
 
-add_executable(test_hello EXCLUDE_FROM_ALL
-    test_hello.c parallelizing_info.c)
+add_executable(test_hello EXCLUDE_FROM_ALL test_hello.c parallelizing_info.c)
+set_target_properties(test_hello PROPERTIES
+        COMPILE_FLAGS "--mpi"
+        LINK_FLAGS "--mpi")
+
 add_executable(random random.c)
 add_executable(split split.c bw-common.c)
-add_executable(shell
-    shell.c parallelizing_info.c bw-common.c bw-common-mpi.c)
+#add_executable(shell
+#    shell.c parallelizing_info.c bw-common.c bw-common-mpi.c)
+#set_target_properties(shell
+#    PROPERTIES COMPILE_FLAGS "--mpi" LINK_FLAGS "--mpi")
+
 add_executable(acollect acollect.c bw-common.c)
 
-install(TARGETS random split shell acollect RUNTIME DESTINATION bin/linalg/bwc)
+install(TARGETS random split acollect RUNTIME DESTINATION bin/linalg/bwc)
 
 target_link_libraries(test_hello utils)
 target_link_libraries(random utils m)
 target_link_libraries(split utils)
-target_link_libraries(shell utils ${pthread_libs})
+# target_link_libraries(shell utils ${pthread_libs})
 target_link_libraries(acollect utils)
 
 add_library(bwc_base
@@ -36,11 +44,9 @@ add_library(bwc_base
     debug.c
     worker-threads.c)
 target_link_libraries(bwc_base ${pthread_libs})
-
-macro(push_abase_cflags v target)
-    set_property(TARGET ${v}_${target}
-        APPEND PROPERTY COMPILE_FLAGS -DSELECT_ABASE_${v})
-endmacro(push_abase_cflags)
+set_target_properties(bwc_base PROPERTIES
+        COMPILE_FLAGS "--mpi"
+        LINK_FLAGS "--mpi")
 
 set(all_variants)
 macro(configure_bwc_variant v)
@@ -69,14 +75,17 @@ macro(configure_bwc_variant v)
     endif(doing_u64)
 
     add_library(${v}_matmul ${${v}_matmul_sources})
+    set_target_properties(${v}_matmul PROPERTIES
+            COMPILE_FLAGS "--mpi -DSELECT_ABASE_${v}"
+            LINK_FLAGS "--mpi")
     target_link_libraries(${v}_matmul bwc_base)
-
-    push_abase_cflags(${v} matmul)
     target_link_libraries(${v}_matmul mat_io)
 
-    add_library(${v}_bwc abase-${v}.c info_file.c matmul_top.c)
-    push_abase_cflags(${v} bwc)
 
+    add_library(${v}_bwc abase-${v}.c info_file.c matmul_top.c)
+    set_target_properties(${v}_bwc PROPERTIES
+            COMPILE_FLAGS "--mpi -DSELECT_ABASE_${v}"
+            LINK_FLAGS "--mpi")
     target_link_libraries(${v}_bwc bwc_base ${v}_matmul utils pthread)
 
     set(all_variants ${all_variants} ${v})
@@ -101,8 +110,10 @@ macro(configure_program prg)
         add_executable(${v}_${prg} ${${prg}_objs})
         install(TARGETS ${v}_${prg} RUNTIME DESTINATION bin/linalg/bwc)
         target_link_libraries(${v}_${prg} ${v}_bwc)
-        push_abase_cflags(${v} ${prg})
-        set_target_properties(${v}_${prg} PROPERTIES LINKER_LANGUAGE CXX)
+        set_target_properties(${v}_${prg} PROPERTIES
+                LINKER_LANGUAGE CXX
+                COMPILE_FLAGS "-DSELECT_ABASE_${v} --mpi"
+                LINK_FLAGS "--mpi")
     endforeach(v)
 endmacro(configure_program)
 

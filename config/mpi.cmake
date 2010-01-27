@@ -53,6 +53,8 @@ if(${WANT_MPI})
     endif(MPI_C_COMPILER AND MPI_CXX_COMPILER AND MPIEXEC)
 else(${WANT_MPI})
     message(STATUS "MPI is not enabled")
+    set(MPI_C_COMPILER ${CMAKE_C_COMPILER})
+    set(MPI_CXX_COMPILER ${CMAKE_CXX_COMPILER})
 endif(${WANT_MPI})
 
 

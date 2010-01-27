@@ -16,4 +16,7 @@ target_link_libraries(mf_bal mf m)
 
 add_executable(mf_dobal mf_dobal.c)
 target_link_libraries(mf_dobal mf m)
+set_target_properties(mf_dobal PROPERTIES
+        COMPILE_FLAGS "--mpi"
+        LINK_FLAGS "--mpi")
 # vim: ft=cmake:

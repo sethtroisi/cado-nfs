@@ -351,3 +351,5 @@ linalg/bwc/matmul-sub-vsc-combine.h
 linalg/bwc/matmul-sub-vsc-dispatch.S
 linalg/bwc/matmul-sub-vsc-dispatch.h
 config/gmp.cmake
+config/ccwrap.pl.in
+config/cxxwrap.pl.in
