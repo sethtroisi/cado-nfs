@@ -51,12 +51,12 @@ alim=16000000
 lpbr=28
 lpba=28
 mfbr=56
-mfba=56
+mfba=84
 rlambda=2.1
-alambda=2.5
+alambda=3.2
 
 I=13                    # Sieving range in lattice siever
-qmin=8000000            # Start of the special-q range
+qmin=16000000           # Start of the special-q range
 qrange=100000           # The size of an elementary sieving task
 checkrange=1            # We check if we have enough after each step
                         # of that many relations found.
