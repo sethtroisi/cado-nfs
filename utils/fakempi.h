@@ -19,8 +19,11 @@ typedef int MPI_Request;
 #define MPI_INT         sizeof(int)
 #define MPI_DOUBLE      sizeof(double)
 #define MPI_UNSIGNED_LONG sizeof(unsigned long)
+#define MPI_LONG        sizeof(long)
 #define MPI_UNSIGNED_INT  sizeof(unsigned int)
 #define MPI_UNSIGNED      sizeof(unsigned int)
+
+#define MPI_Type_size(x, s)     *(s)=(x)
 
 #define MPI_COMM_WORLD	0
 
@@ -34,6 +37,8 @@ typedef int MPI_Request;
 #define MPI_SUM        1
 #define MPI_MAX        2
 #define MPI_LAND       3
+#define MPI_BAND       4
+#define MPI_BOR        5
 
 #define MPI_ERRORS_ARE_FATAl        0
 #define MPI_ERRORS_RETURN        1

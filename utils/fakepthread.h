@@ -1,6 +1,10 @@
 #ifndef FAKEPTHREAD_H_
 #define FAKEPTHREAD_H_
 
+#error "Sorry, cado-nfs now _requires_ posix threads. some parts of the code cannot be made to easily cope with the situation where threads are not there"
+
+/* conditions are the trouble maker here */
+
 #include <signal.h>
 #include "macros.h"
 
@@ -85,6 +89,8 @@ static inline int
 my_pthread_mutex_destroy(my_pthread_mutex_t * m MAYBE_UNUSED)
 { return 0; }
 /* }}} */
+
+
 
 /* {{{ rwlocks */
 typedef int my_pthread_rwlock_t;

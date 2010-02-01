@@ -11,6 +11,7 @@ extern "C" {
 void * power_lookup_table_init(unsigned long p);
 void power_lookup_table_clear(void * t);
 mpz_srcptr power_lookup(void * t, int i);
+mpz_srcptr power_lookup_const(const void * t, int i);
 
 #ifdef __cplusplus
 }

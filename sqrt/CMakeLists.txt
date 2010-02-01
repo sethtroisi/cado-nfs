@@ -1,3 +1,8 @@
+
+if (${WITH_MPI})
+add_definitions(-DWITH_MPI)
+endif (${WITH_MPI})
+
 add_executable(sqrt sqrt.c)
 target_link_libraries(sqrt utils m)
 
@@ -8,10 +13,18 @@ target_link_libraries(checkdep utils)
 
 install(TARGETS sqrt checkdep RUNTIME DESTINATION bin/sqrt)
 
-add_executable(crtalgsqrt crtalgsqrt.c powers_of_p.cpp polyroots.c)
-target_link_libraries(crtalgsqrt utils m)
+# crtalgsqrt requires both threads and mpi.
+if(${WITH_PTHREADS})
+add_definitions(-DWITH_PTHREADS)
+
+add_executable(crtalgsqrt crtalgsqrt.c powers_of_p.cpp polyroots.c
+    knapsack.c)
+target_link_libraries(crtalgsqrt utils m ${pthread_libs})
 
 set_target_properties(crtalgsqrt PROPERTIES
-    COMPILE_FLAGS "--mpi" LINK_FLAGS "--mpi")
+    COMPILE_FLAGS "--mpi"
+    LINK_FLAGS "--mpi")
+
+endif(${WITH_PTHREADS})
 
 include(CMakeLists-nodist.txt OPTIONAL)

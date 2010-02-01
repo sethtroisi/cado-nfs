@@ -8,7 +8,7 @@ if($ENV{PTHREADS})
     search_for_function(pthread_create HAVE_PTHREAD_CREATE -lpthread)
     if(HAVE_PTHREAD_CREATE)
         # OK. Assume that we have the bare minimum for using threads, falling
-        # back on workalikeas for barrier synchronization waits if needed
+        # back on workalikes for barrier synchronization waits if needed
         # (like we used to do in the past, anyway). Thus we can already set
         # the proper flags.  We're using WITH_PTHREADS in the top-level
         # substitution, so it needs to escape its scope and go into the cache
