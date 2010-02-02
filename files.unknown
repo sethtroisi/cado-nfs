@@ -9,5 +9,3 @@ sieve/README.las
 sieve/benchsieve.pl
 linalg.sh
 merge_linalg_sqrt2.sh
-params/params.c128
-params/params.c110

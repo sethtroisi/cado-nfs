@@ -353,3 +353,11 @@ linalg/bwc/matmul-sub-vsc-dispatch.h
 config/gmp.cmake
 config/ccwrap.pl.in
 config/cxxwrap.pl.in
+params/params.c150
+params/params.c160
+polyselect/rotate_all.c
+sqrt/gmp-hacks.h
+sqrt/knapsack.c
+sqrt/knapsack.h
+params/params.c128
+params/params.c110

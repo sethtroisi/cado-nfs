@@ -1647,6 +1647,7 @@ void prime_postcomputations(int64_t * c64, mp_limb_t * cN, struct prime_data * p
     mpz_init(ta);
     mpz_init(tb);
 
+    // XXX Eh ! mpi-me !
     for(int j = 0 ; j < glob.n ; j++) {
         mpz_srcptr rx = p->lroots->coeff[j];
         mpz_ptr sx = p->sqrts->coeff[j];
