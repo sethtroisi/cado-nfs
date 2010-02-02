@@ -27,6 +27,13 @@ General:
   before merge or purge), and we "recover" those ideals with "characters".
   Thus the matrix has smaller weight, and hopefully bwc will be faster.
 
+Polyselect:
+===========
+
+* use the other definition of the E-value, see formula (5.8) page 87 of
+  Murphy's thesis. Currently CADO-NFS uses the definition on page 99,
+  where Murphy says that the former definition is more reliable.
+
 Purge:
 ======
 
