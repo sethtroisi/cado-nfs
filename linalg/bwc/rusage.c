@@ -23,32 +23,13 @@
 #endif
 #endif
 
-void job_seconds(double * res)
-{
-    struct rusage ru[1];
-    getrusage(RUSAGE_SELF, ru);
-    res[0] = ru->ru_utime.tv_sec +  (double) ru->ru_utime.tv_usec / 1.0e6;
-    res[1] = ru->ru_stime.tv_sec +  (double) ru->ru_stime.tv_usec / 1.0e6;
-}
-
-double walltime_seconds()
-{
-#if 0
-    clock_t c = clock();
-    return (double) c / CLOCKS_PER_SEC;
-#endif
-    struct timeval tv[1];
-    gettimeofday(tv, NULL);
-    return (double) tv->tv_sec + 1.0e-6 * tv->tv_usec;
-}
-
 /* We need some way to detect the time spent by threads. Unfortunately,
  * this is something not defined by POSIX.
  */
 
 /* Only on linux >= 2.6.26, and IRIX, solaris. */
 #if defined(HAVE_GETRUSAGE_THREAD)
-void thread_seconds(double * res)
+void thread_seconds_user_sys(double * res)
 {
     struct rusage ru[1];
     getrusage(RUSAGE_THREAD, ru);
@@ -103,7 +84,7 @@ static int statfields(pid_t t, ...)
     return nparsed;
 }
 
-void thread_seconds(double * res)
+void thread_seconds_user_sys(double * res)
 {
     unsigned long utime = 0;
     unsigned long stime = 0;
@@ -113,9 +94,9 @@ void thread_seconds(double * res)
 }
 
 #else   /* Otherwise we'll do something stupid */
-void thread_seconds(double * res)
+void thread_seconds_user_sys(double * res)
 {
-    job_seconds(res); /* really stupid */
+    seconds_user_sys(res); /* really stupid */
 }
 #endif
 

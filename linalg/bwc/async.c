@@ -8,15 +8,16 @@
 #include "rusage.h"
 #include "macros.h"
 #include "bw-common.h"
+#include "utils.h"
 
 // int int_caught = 0;
 int hup_caught = 0;
 
 void timing_update_ticks(struct timing_data * t, int iter MAYBE_UNUSED)
 {
-    job_seconds(t->current->job);
-    thread_seconds(t->current->thread);
-    t->current->wct = walltime_seconds();
+    seconds_user_sys(t->current->job);
+    thread_seconds_user_sys(t->current->thread);
+    t->current->wct = wct_seconds();
 }
 
 void timing_partial_init(struct timing_data * t, int iter)

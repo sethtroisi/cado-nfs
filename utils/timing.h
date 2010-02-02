@@ -10,6 +10,9 @@ extern "C" {
 extern uint64_t microseconds();
 extern int cputime();
 extern double seconds();
+extern double wct_seconds();
+
+extern void seconds_user_sys(double *);
 
 #ifdef __cplusplus
 }
