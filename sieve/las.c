@@ -2563,20 +2563,34 @@ factor_survivors (unsigned char *S, int N, bucket_array_t *rat_BA,
 
             pthread_mutex_lock(&io_mutex);
             fprintf (output, "%" PRId64 ",%" PRIu64 ":", a, b);
-            ASSERT_ALWAYS(rat_factors.n != 0);
-            factor_list_fprint (output, rat_factors);
+            int first_factor = 0;
+            if (rat_factors.n != 0) {
+                factor_list_fprint (output, rat_factors);
+                first_factor = 1;
+            }
             for (i = 0; i < f_r->length; ++i)
               for (j = 0; j < m_r->data[i]; j++)
-                gmp_fprintf (output, ",%Zx", f_r->data[i]);
+                  if (!first_factor) {
+                      gmp_fprintf (output, "%Zx", f_r->data[i]);
+                      first_factor = 1;
+                  } else 
+                      gmp_fprintf (output, ",%Zx", f_r->data[i]);
             if (si->ratq) {
                 fprintf (output, ",%" PRIx64 "", si->q);
             }
             fprintf (output, ":");
-            ASSERT_ALWAYS(alg_factors.n != 0);
-            factor_list_fprint (output, alg_factors);
+            first_factor = 0;
+            if (alg_factors.n != 0) {
+                factor_list_fprint (output, alg_factors);
+                first_factor = 1;
+            }
             for (i = 0; i < f_a->length; ++i)
               for (j = 0; j < m_a->data[i]; j++)
-                gmp_fprintf (output, ",%Zx", f_a->data[i]);
+                  if (!first_factor) {
+                      gmp_fprintf (output, "%Zx", f_a->data[i]);
+                      first_factor = 1;
+                  } else
+                      gmp_fprintf (output, ",%Zx", f_a->data[i]);
             /* print special q */
             if (!si->ratq) {
                 fprintf (output, ",%" PRIx64 "", si->q);
