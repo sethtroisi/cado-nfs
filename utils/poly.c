@@ -7,8 +7,7 @@
 
 /* store in invm the value of floor(B^(2k)/m), where m has k limbs,
    and B is the limb base */
-void
-barrett_init (mpz_t invm, const mpz_t m)
+void barrett_init (mpz_ptr invm, mpz_srcptr m)
 {
   size_t k = mpz_size (m);
 
@@ -18,8 +17,7 @@ barrett_init (mpz_t invm, const mpz_t m)
 }
 
 /* a <- b mod m */
-void
-barrett_mod (mpz_t a, mpz_t b, const mpz_t m, const mpz_t invm)
+void barrett_mod (mpz_ptr a, mpz_srcptr b, mpz_srcptr m, mpz_srcptr invm)
 {
   size_t k = mpz_size (m), sizeb, l;
   mpz_t c;
