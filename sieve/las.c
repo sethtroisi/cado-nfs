@@ -2563,21 +2563,24 @@ factor_survivors (unsigned char *S, int N, bucket_array_t *rat_BA,
 
             pthread_mutex_lock(&io_mutex);
             fprintf (output, "%" PRId64 ",%" PRIu64 ":", a, b);
+            ASSERT_ALWAYS(rat_factors.n != 0);
             factor_list_fprint (output, rat_factors);
             for (i = 0; i < f_r->length; ++i)
               for (j = 0; j < m_r->data[i]; j++)
                 gmp_fprintf (output, ",%Zx", f_r->data[i]);
+            if (si->ratq) {
+                fprintf (output, ",%" PRIx64 "", si->q);
+            }
             fprintf (output, ":");
-            if (alg_factors.n != 0)
-              {
-                factor_list_fprint (output, alg_factors);
-                fprintf (output, ",");
-              }
+            ASSERT_ALWAYS(alg_factors.n != 0);
+            factor_list_fprint (output, alg_factors);
             for (i = 0; i < f_a->length; ++i)
               for (j = 0; j < m_a->data[i]; j++)
-                gmp_fprintf (output, "%Zx,", f_a->data[i]);
+                gmp_fprintf (output, ",%Zx", f_a->data[i]);
             /* print special q */
-            fprintf (output, "%" PRIx64 "", si->q);
+            if (!si->ratq) {
+                fprintf (output, ",%" PRIx64 "", si->q);
+            }
             fprintf (output, "\n");
             fflush (output);
             pthread_mutex_unlock(&io_mutex);
