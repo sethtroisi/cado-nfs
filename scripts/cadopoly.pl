@@ -1,3 +1,5 @@
+#!/usr/bin/perl -w
+
 # Usage: cadopoly
 # 	read files params_* in dir "." and run polyselect
 # 	the params_* must contain: different name, n, machines ...
@@ -5,7 +7,6 @@
 # TODO: generate input
 # 		...
 
-#!/usr/bin/perl -w
 
 use Cwd qw(abs_path);
 use File::Basename;
