@@ -2604,7 +2604,6 @@ int main(int argc, char **argv)
 
     int r = glob.r;
     int s = glob.s;
-    int n = glob.n;
     int t = glob.t;
     glob.m = r * t;
 
