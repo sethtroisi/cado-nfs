@@ -10,6 +10,7 @@
 #include "utils.h"
 #include "auxiliary.h"
 #include "rootsieve.h"
+#include "murphyE.h"
 
 // #define NEW_ROOTSIEVE
 
@@ -1314,6 +1315,9 @@ print_poly (FILE *fp, cado_poly p, int argc, char *argv[], double st, int raw)
   alpha = get_alpha (p->f, p->degree, ALPHA_BOUND);
   fprintf (fp, "# lognorm: %1.2f, alpha: %1.2f E=%1.2f\n", logmu, alpha,
            logmu + alpha);
+  fprintf (fp, "# Murphy's E(Bf=%.0f,Bg=%.0f,area=%.2e)=%1.2e\n",
+	   BOUND_F, BOUND_G, AREA,
+	   MurphyE (p, BOUND_F, BOUND_G, AREA, MURPHY_K));
   for (i = p->degree; i >= 0; i--)
     {
       fprintf (fp, "c%d: ", i);

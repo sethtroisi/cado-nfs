@@ -1,5 +1,5 @@
 
-add_executable(alpha alpha.c auxiliary.c fast_rootsieve.c rootsieve.c)
+add_executable(alpha alpha.c auxiliary.c fast_rootsieve.c rootsieve.c murphyE.c rho.c)
 
 target_link_libraries(alpha utils m gmp)
 
