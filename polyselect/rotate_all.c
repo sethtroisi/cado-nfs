@@ -36,6 +36,7 @@ int main(int argc, char **argv) {
     mpz_set (b, poly->g[1]);
     mpz_neg (m, poly->g[0]);
     rotate (poly->f, poly->degree, alim, m, b, &jmin, &kmin, 0, 1);
+    poly->skew = SKEWNESS (poly->f, poly->degree, SKEWNESS_DEFAULT_PREC);
     mpz_clear(b);
     mpz_clear(m);
 

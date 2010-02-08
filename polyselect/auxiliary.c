@@ -1095,7 +1095,7 @@ old_rotate (unsigned long p, double *A, long K0, long K1, long k0, mpz_t *f,
 
 /* Return the smallest value of lognorm + alpha(f + (j*x+k)*(b*x-m)) for
    j and k small enough such that the norm does not increase too much, and
-   modify f[] accordingly. 
+   modify f[] accordingly.
    The parameter "multi" means that several polynomials are wanted. If
    multi=0 or 1, then only 1 polynomial is returned (classical behavior).
    Otherwise, multi polynomials are stored in jmin and kmin (that
@@ -1103,6 +1103,7 @@ old_rotate (unsigned long p, double *A, long K0, long K1, long k0, mpz_t *f,
    might be useful for Coppersmith variant (a.k.a. MNFS). 
    In the multi case, the smallest of the returned values of lognorm + alpha
    is returned (and f[] accordingly).
+   Warning: the caller is responsible to update the skewness if needed.
    */
 double
 rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
@@ -1293,7 +1294,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
       if (multi>1) {
           ret_val = best_E[0]; /* we return the smallest */
           free(best_E);
-      } 
+      }
       return ret_val;
   }
 }
