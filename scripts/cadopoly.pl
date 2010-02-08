@@ -72,7 +72,7 @@ NAME : foreach my $name (sort keys %names) {
 	my ($max_first, $max_second, $max_third);
 
 	foreach my $f (@kjout_files) {
-		next unless $f =~ /^$name/;
+		next unless $f =~ /^$name\./;
 		#shift @kjout_files;
 		open FILE, "< $f"
 			or die "Cannot open `$f' for reading: $!.\n";
@@ -119,6 +119,7 @@ NAME : foreach my $name (sort keys %names) {
 		 "s,  third phase: $min_third"."s\n".
 		 "Time max for first phase: $max_first"."s,  second phase: $max_second".
 		 "s,  third phase: $max_third"."s\n";
+	print "\n";
 	$tab_level--;
 }
 

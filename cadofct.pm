@@ -910,7 +910,7 @@ sub distribute_task {
         my $file_ranges = [ map [@$_], @$ranges ];
 
         # Add the ranges from running or done jobs
-		my $good_jobs = [ grep { $_->{'file'} =~ /$param{'name'}/ } @$jobs ];
+		my $good_jobs = [ grep { $_->{'file'} =~ /$param{'name'}\./ } @$jobs ];
         push @$ranges, map { my @p = @{$_->{'param'}}; \@p } @$good_jobs;
         $ranges = merge_ranges($ranges);
 
@@ -1595,9 +1595,12 @@ sub do_polysel_bench {
 		foreach (keys %machines) {
 			$total_cores += $machines{$_}{'cores'};
 		}
-		my $total_jobs = ceil (($param{'kjadmax'}-$param{'kjadmin'})
-									/$param{'kjadrange'});
-		return 1 if $total > $total_jobs - $total_cores;
+	    my $jobs = [];
+        $jobs = read_jobs("$param{'prefix'}.polysel_jobs");
+		my $old_jobs = [ grep { $_->{'file'} !~ /$param{'name'}\./ } @$jobs ];
+		my $size = scalar(@$old_jobs);
+		my $total_jobs = ceil (($max-$min)/$param{'kjadrange'});
+		return 1 if $total > $total_jobs - $total_cores + $size;
 		return 0;
     };
 

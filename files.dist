@@ -10,6 +10,7 @@ README
 TODO
 cado.h
 cadofactor.pl
+cadofct.pm
 gf2x-fft/cantor/CMakeLists.txt
 gf2x-fft/cantor/CMakeLists.txt
 gf2x-fft/cantor/Makefile
@@ -200,6 +201,10 @@ polyselect/polyselect.c
 polyselect/rotate.c
 polyselect/rootsieve.c
 polyselect/rootsieve.h
+polyselect/rho.c
+polyselect/rho.h
+polyselect/murphyE.c
+polyselect/murphyE.h
 run_example.sh
 scripts/call_cmake.sh
 scripts/version.sh
