@@ -4,8 +4,8 @@ load alpha.sage
 # s is the skewness
 def MurphyE(f,g,s):
     K = 1000
-    # Bf = 4*10^5; Bg = 10^5; area = 1e13
     Bf = 1e7; Bg = 5e6; area = 1e16 # values used by pol51opt.c
+    Bf = 1e11; Bg = 1e11; area = 1e18 # values used for RSA-768
     df = f.degree()
     dg = g.degree()
     alpha_f = alpha(f,2000)
@@ -26,7 +26,8 @@ def MurphyE(f,g,s):
     return E/K
 
 # example: RSA-768 polynomials
-#skewness 44204.72 norm 1.35e+28 alpha -7.30 Murphy_E 3.79e-09
+# skewness 44204.72 norm 1.35e+28 alpha -7.30 Murphy_E 3.79e-09
+# used Bf = Bg = 1e11 and area = 1e18
 R.<x> = PolynomialRing(ZZ)
 f = 265482057982680*x^6+1276509360768321888*x^5-5006815697800138351796828*x^4-46477854471727854271772677450*x^3+6525437261935989397109667371894785*x^2-18185779352088594356726018862434803054*x-277565266791543881995216199713801103343120
 g=34661003550492501851445829*x-1291187456580021223163547791574810881
