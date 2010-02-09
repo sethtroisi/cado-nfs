@@ -1426,7 +1426,7 @@ main (int argc, char *argv[])
          by optimize */
       mpz_neg (newm, poly->g[0]);
       E = rotate (poly->f, degree, ALPHA_BOUND_SMALL, newm, Mt[i].b, &jmin,
-                  &kmin, 1, 0);
+                  &kmin, 1, verbose);
       if (E < best_E)
         {
           best_E = E;
@@ -1455,13 +1455,13 @@ main (int argc, char *argv[])
       mpz_neg (newm, poly->g[0]);
       if (multi <= 1) {
           E = rotate (poly->f, degree, ALPHA_BOUND, newm, Mt[i].b, &jmin,
-                  &kmin, 1, 1);
+                  &kmin, 1, verbose + 1);
       } else {
           long *jjmin, *kkmin;
           jjmin = (long *)malloc(multi*sizeof(long));
           kkmin = (long *)malloc(multi*sizeof(long));
           E = rotate (poly->f, degree, ALPHA_BOUND, newm, Mt[i].b, jjmin,
-                  kkmin, multi, 1);
+                  kkmin, multi, verbose + 1);
           jmin = jjmin[0];
           kmin = kkmin[0];
           free(jjmin);

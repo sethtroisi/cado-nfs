@@ -1198,8 +1198,9 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
     for (k = K0 + 1; k <= K1; k++)
       if (A[k - K0] < A[bestk - K0])
 	bestk = k;
-    fprintf (stderr, "# best alpha for j=%ld: k=%ld with %f\n",
-	     j, bestk, A[bestk - K0]);
+    if (verbose > 1)
+      fprintf (stderr, "# best alpha for j=%ld: k=%ld with %f\n",
+               j, bestk, A[bestk - K0]);
   }
 
   /* now finds the best lognorm+alpha */
