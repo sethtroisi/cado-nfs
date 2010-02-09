@@ -1580,6 +1580,8 @@ sub do_polysel {
 }
 
 sub do_polysel_bench {
+	my $last = shift;
+
     my $polysel_is_done = sub {
         my ($ranges) = @_;
         my ($min, $max) = ($param{'kjadmin'}, $param{'kjadmax'});
@@ -1590,17 +1592,18 @@ sub do_polysel_bench {
                      $_->[1] > $max ? $max : $_->[1]);
             $total += $r[1] - $r[0] if $r[0] < $r[1];
         }
-        $total = $total / $param{'kjadrange'};
+        $total = ceil ($total / $param{'kjadrange'});
 		my $total_cores=0;
 		foreach (keys %machines) {
 			$total_cores += $machines{$_}{'cores'};
 		}
-	    my $jobs = [];
-        $jobs = read_jobs("$param{'prefix'}.polysel_jobs");
-		my $old_jobs = [ grep { $_->{'file'} !~ /$param{'name'}\./ } @$jobs ];
-		my $size = scalar(@$old_jobs);
+        my $size = count_lines("$param{'prefix'}.polysel_jobs", "$param{'name'}\.");
 		my $total_jobs = ceil (($max-$min)/$param{'kjadrange'});
-		return 1 if $total > $total_jobs - $total_cores + $size;
+		if ($last) {
+			return 1 if $total >= $total_jobs + $size;
+		} else {
+			return 1 if $total > $total_jobs - $total_cores + $size;
+		}
 		return 0;
     };
 
@@ -1619,7 +1622,11 @@ sub do_polysel_bench {
 					  bench	   => 1,
 					  max_threads => 1 });
 
-    info "Switch to next configuration...\n";
+	if ($last) {
+    	info "All done!\n";
+	} else {
+    	info "Switch to next configuration...\n";
+	}
 }
 
 

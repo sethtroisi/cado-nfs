@@ -23,7 +23,11 @@ my @files = grep /^params_/,
 closedir DIR;
 @files = sort @files;
 
-# recover (to do)
+# recover
+my @done = <*.polysel_done>;
+my @recover = <*.polysel_jobs>;
+
+my %link_name_params;
 
 # polysel
 my $old_prefix;
@@ -31,49 +35,53 @@ my $file;
 while (@files) {
 	$file = shift @files;
 	read_param(\%param, { strict => 1 }, "$file");
+	$link_name_params{"$param{'name'}"} = $file;
+	next if (@done);
+	if (@recover) {
+		next if ($recover[0] ne basename("$param{'prefix'}.polysel_jobs"));
+		shift @recover;
+	}
+	cmd ("mv $old_prefix.polysel_jobs $param{'prefix'}.polysel_jobs") if ($old_prefix);
 	read_machines();
 	open FILE, "> $param{'prefix'}.n"
 		or die "Cannot open `$param{'prefix'}.n' for writing: $!.\n";
 	print FILE "n: $param{'n'}\n";
 	close FILE;
-	cmd ("mv $old_prefix.polysel_jobs $param{'prefix'}.polysel_jobs") if ($old_prefix);
 	if (@files) {
 		do_polysel_bench();
 	} else {
-		do_polysel();
+		do_polysel_bench(1);
+		cmd ("mv $param{'prefix'}.polysel_jobs $param{'prefix'}.polysel_done");
 	}
 	$old_prefix = $param{'prefix'};
 }
 
 # info kjout
 banner "Info kjout";
-opendir DIR, "."
-	or die "Cannot open directory `.': $!\n";
-my @kjout_files = grep /\.kjout\.[\de.]+-[\de.]+$/,
-   					readdir DIR;
-closedir DIR;
+my @kjout_files;
 
-my $time_max = 1000000;
+my $time_max = 100000;
 info "Time max for one phase: $time_max"."s";
-
-my @names = map { /^(\S+)\.kjout/; $1 } @kjout_files;
-my %names;
-foreach (@names) {
-	$names{$_}++;	
-}
 
 my $time;
 my $phase;
 
-NAME : foreach my $name (sort keys %names) {
+NAME : foreach my $name (sort keys %link_name_params) {
+	my $Emoy;
 	my $Emin;
+	my $Emax;
 	my $best;
 	my ($min_first, $min_second, $min_third);
 	my ($max_first, $max_second, $max_third);
 
+	opendir DIR, "."
+		or die "Cannot open directory `.': $!\n";
+	@kjout_files = grep /^$name\.kjout\.[\de.]+-[\de.]+$/,
+   						readdir DIR;
+	closedir DIR;
+	my $size = scalar(@kjout_files);
+
 	foreach my $f (@kjout_files) {
-		next unless $f =~ /^$name\./;
-		#shift @kjout_files;
 		open FILE, "< $f"
 			or die "Cannot open `$f' for reading: $!.\n";
 		my $last;
@@ -104,17 +112,31 @@ NAME : foreach my $name (sort keys %names) {
 		
 		next unless $last;
         $last =~ /E=([\d.]+)/;
+		$Emoy += $1;
         if (!defined $Emin || $1 < $Emin) {
             $Emin = $1;
             $best = $f;
+		}
+        if (!defined $Emax || $1 > $Emax) {
+            $Emax = $1;
 		}
 	}
 		
     die "No polynomial was found for configuration $name!\n"
     	unless defined $Emin;
 
-    info "The best polynomial for configuration $name is from `".basename($best)."' (E = $Emin).\n";
+	$Emoy = int(($Emoy-$Emin-$Emax) * 100 / ($size-2)) / 100;
+	my $Ediff = int(($Emoy - $Emin) * 100 + 1) / 100;
+	$file = $link_name_params{"$name"};
+	read_param(\%param, { strict => 1 }, "$file");
+	info "Params: M $param{'kjM'} l $param{'kjl'} kmax $param{'kjkmax'} ".
+		 	"adrange $param{'kjadrange'} admin $param{'kjadmin'} admax $param{'kjadmax'}\n".
+		 	"        degree $param{'degree'} p0max $param{'kjp0max'} ".
+			"keep $param{'kjkeep'} incr $param{'kjincr'} pb $param{'kjpb'}\n";
 	$tab_level++;
+    info "The best polynomial for $name is from `".basename($best)."'\n";
+	info "Emin = \033[01;31m$Emin\033[01;00m - Emoy = \033[01;31m$Emoy\033[01;00m  ".
+			"(Ediff = $Ediff)\n";
 	info "Time min for first phase: $min_first"."s,  second phase: $min_second".
 		 "s,  third phase: $min_third"."s\n".
 		 "Time max for first phase: $max_first"."s,  second phase: $max_second".
