@@ -1,7 +1,7 @@
-# Sample parameter file for a 150-digit gnfs input
+# Sample parameter file for a 152-digit gnfs input
 # Example: cadofactor.pl wdir=... name=... n=...
 
-name=c150
+name=c152
 
 ##########################################################################
 
@@ -21,7 +21,7 @@ kjdelay=300             # time between two checks
 selectnice=4            # nice level for selection
 
 ## Most important parameters of polyselect
-kjM=4e21                # maximum norm allowed
+kjM=7e21                # maximum norm allowed
 kjl=7                   # minimal number of primes in lc(g)
 kjadmin=1               # min value for lc(f)
 kjadmax=5e9             # max value for lc(f)
@@ -31,8 +31,8 @@ kjadrange=1e8           # individual tasks
 kjkeep=100              # number of preselected polynomials
 kjkmax=18               # rotation is bounded by 2^kmax
 kjincr=60               # forced divisor of lc(f)
-kjpb=1024               # bound on primes allowed in lc(g)
-kjp0max=100000          # bound on the additional factor in lc(g)
+kjpb=512                # bound on primes allowed in lc(g)
+kjp0max=15000           # bound on the additional factor in lc(g)
 
 ###########################################################################
 # Sieve
