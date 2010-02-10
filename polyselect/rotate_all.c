@@ -8,7 +8,7 @@
 extern int MAX_k;
 
 static void usage_and_die(char *argv0) {
-    fprintf(stderr, "usage: %s poly kmax\n", argv0);
+    fprintf(stderr, "usage: %s [-v] poly kmax\n", argv0);
     fprintf(stderr, "  apply rotation f += (j*x+k)*g to poly.\n");
     fprintf(stderr, "  poly: filename of polynomial\n");
     fprintf(stderr, "  j,k : integers\n");
@@ -20,6 +20,14 @@ int main(int argc, char **argv) {
     long kmax, jmin, kmin;
     unsigned long alim = 2000;
     mpz_t b, m;
+    int verbose = 1;
+
+    if (strcmp (argv[1], "-v") == 0)
+      {
+        argv ++;
+        argc --;
+        verbose = 2;
+      }
 
     mpz_init(b);
     mpz_init(m);
@@ -35,7 +43,7 @@ int main(int argc, char **argv) {
 
     mpz_set (b, poly->g[1]);
     mpz_neg (m, poly->g[0]);
-    rotate (poly->f, poly->degree, alim, m, b, &jmin, &kmin, 0, 1);
+    rotate (poly->f, poly->degree, alim, m, b, &jmin, &kmin, 0, verbose);
     poly->skew = SKEWNESS (poly->f, poly->degree, SKEWNESS_DEFAULT_PREC);
     mpz_clear(b);
     mpz_clear(m);
