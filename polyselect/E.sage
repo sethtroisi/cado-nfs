@@ -5,7 +5,7 @@ load alpha.sage
 def MurphyE(f,g,s):
     K = 1000
     Bf = 1e7; Bg = 5e6; area = 1e16 # values used by pol51opt.c
-    Bf = 1e11; Bg = 1e11; area = 1e18 # values used for RSA-768
+    # Bf = 1e11; Bg = 1e11; area = 1e18 # values used for RSA-768
     df = f.degree()
     dg = g.degree()
     alpha_f = alpha(f,2000)
@@ -14,7 +14,7 @@ def MurphyE(f,g,s):
     sx = sqrt(area*s)
     sy = sqrt(area/s)
     for i in range(K):
-       theta_i = float(pi/K*(i+1/2))
+       theta_i = float(pi/K*(i+0.5))
        xi = cos(theta_i)*sx
        yi = sin(theta_i)*sy
        fi = f(x=xi/yi)*yi^df
