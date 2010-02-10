@@ -16,15 +16,12 @@ machines=mach_desc      # file describing available computers for parallel
 # Polynomial selection
 ###########################################################################
 
-# the parameters below found a polynomial with E=43.14 (Murphy's E=2.44e-12)
-# for A(660,826) c151
-
 degree=5                # degree of the algebraic polynomial
 kjdelay=300             # time between two checks
 selectnice=4            # nice level for selection
 
 ## Most important parameters of polyselect
-kjM=8e21                # maximum norm allowed
+kjM=1.5e23              # maximum norm allowed
 kjl=7                   # minimal number of primes in lc(g)
 kjadmin=1               # min value for lc(f)
 kjadmax=5e9             # max value for lc(f)
@@ -34,7 +31,7 @@ kjadrange=1e8           # individual tasks
 kjkeep=100              # number of preselected polynomials
 kjkmax=18               # rotation is bounded by 2^kmax
 kjincr=60               # forced divisor of lc(f)
-kjpb=512                # bound on primes allowed in lc(g)
+kjpb=1232               # bound on primes allowed in lc(g)
 kjp0max=15000           # bound on the additional factor in lc(g)
 
 ###########################################################################
