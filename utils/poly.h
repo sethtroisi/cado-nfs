@@ -16,7 +16,8 @@ typedef struct {
 } poly_struct_t;
 
 typedef poly_struct_t poly_t[1];
-
+typedef poly_struct_t * poly_ptr;
+typedef const poly_struct_t * poly_srcptr;
 
 // Let F(x) be a (non-monic) polynomial of degree d:
 //   F(x) = f_d x^d + f_{d-1} x^{d-1} + .... + f_1 x + f_0

@@ -24,74 +24,6 @@ int degree;
 mpz_t * f_hat;
 mpz_t * f_hat_diff;
 
-// above this threshold, we report each multiplication we do.
-#define MUL_REPORT_THRESHOLD    1000000
-
-#define REPORT_THIS(na, nb)     \
-    (((na) > 1) && ((nb) > 1) && ((na) + (nb) > MUL_REPORT_THRESHOLD))
-
-static void WRAP_mpz_mul(mpz_ptr c, mpz_srcptr a, mpz_srcptr b)
-{
-    double t0 = seconds();
-    mp_size_t na = mpz_size(a);
-    mp_size_t nb = mpz_size(b);
-    mpz_mul(c,a,b);
-    double t1 = seconds();
-    if (REPORT_THIS(na, nb)) {
-        printf("mul %zu %zu (%.1f) %.1f\n", na, nb, (double)na/nb, t1-t0);
-    }
-}
-
-static void WRAP_mpz_invert(mpz_ptr c, mpz_srcptr a, mpz_srcptr b)
-{
-    double t0 = seconds();
-    mp_size_t na = mpz_size(a);
-    mp_size_t nb = mpz_size(b);
-    mpz_invert(c,a,b);
-    double t1 = seconds();
-    if (REPORT_THIS(na, nb)) {
-        printf("inv %zu %zu (%.1f) %.1f\n", na, nb, (double)na/nb, t1-t0);
-    }
-}
-
-static void WRAP_mpz_addmul(mpz_ptr c, mpz_srcptr a, mpz_srcptr b)
-{
-    double t0 = seconds();
-    mp_size_t na = mpz_size(a);
-    mp_size_t nb = mpz_size(b);
-    mpz_addmul(c,a,b);
-    double t1 = seconds();
-    if (REPORT_THIS(na, nb)) {
-        printf("mul %zu %zu (%.1f) %.1f\n", na, nb, (double)na/nb, t1-t0);
-    }
-}
-
-static void WRAP_mpz_submul(mpz_ptr c, mpz_srcptr a, mpz_srcptr b)
-{
-    double t0 = seconds();
-    mp_size_t na = mpz_size(a);
-    mp_size_t nb = mpz_size(b);
-    mpz_submul(c,a,b);
-    double t1 = seconds();
-    if (REPORT_THIS(na, nb)) {
-        printf("mul %zu %zu (%.1f) %.1f\n", na, nb, (double)na/nb, t1-t0);
-    }
-}
-
-static void WRAP_barrett_mod(mpz_ptr c, mpz_srcptr a, mpz_srcptr p, mpz_srcptr q)
-{
-    double t0 = seconds();
-    mp_size_t na = mpz_size(a);
-    mp_size_t np = mpz_size(p);
-    barrett_mod(c,a,p,q);
-    double t1 = seconds();
-    if (REPORT_THIS(na, np)) {
-        printf("mod %zu %zu (%.1f) %.1f\n", na, np, (double)na/np, t1-t0);
-    }
-}
-
-
-
 // {{{ trivial utility
 static const char * size_disp(size_t s, char buf[16])
 {
@@ -107,6 +39,90 @@ static const char * size_disp(size_t s, char buf[16])
 }
 // }}}
 
+/* {{{ wrappers for some gmp operations, so as to report timings */
+// above this threshold, we report each multiplication we do.
+#define MUL_REPORT_THRESHOLD    1000000
+
+#define REPORT_THIS(na, nb)     \
+    (((na) > 10) && ((nb) > 10) && ((na) + (nb) > MUL_REPORT_THRESHOLD))
+
+static void WRAP_mpz_mul(mpz_ptr c, mpz_srcptr a, mpz_srcptr b)
+{
+    double t0 = seconds();
+    double w0 = wct_seconds();
+    mp_size_t na = mpz_size(a);
+    mp_size_t nb = mpz_size(b);
+    mpz_mul(c,a,b);
+    double t1 = seconds();
+    double w1 = wct_seconds();
+    double rate = (w1-w0) ? ((t1-t0)/(w1-w0) * 100.0) : 0;
+    if (REPORT_THIS(na, nb)) {
+        printf("mul %zu %zu (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
+    }
+}
+
+static void WRAP_mpz_invert(mpz_ptr c, mpz_srcptr a, mpz_srcptr b)
+{
+    double t0 = seconds();
+    double w0 = wct_seconds();
+    mp_size_t na = mpz_size(a);
+    mp_size_t nb = mpz_size(b);
+    mpz_invert(c,a,b);
+    double t1 = seconds();
+    double w1 = wct_seconds();
+    double rate = (w1-w0) ? ((t1-t0)/(w1-w0) * 100.0) : 0;
+    if (REPORT_THIS(na, nb)) {
+        printf("inv %zu %zu (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
+    }
+}
+
+static void WRAP_mpz_addmul(mpz_ptr c, mpz_srcptr a, mpz_srcptr b)
+{
+    double t0 = seconds();
+    double w0 = wct_seconds();
+    mp_size_t na = mpz_size(a);
+    mp_size_t nb = mpz_size(b);
+    mpz_addmul(c,a,b);
+    double t1 = seconds();
+    double w1 = wct_seconds();
+    double rate = (w1-w0) ? ((t1-t0)/(w1-w0) * 100.0) : 0;
+    if (REPORT_THIS(na, nb)) {
+        printf("mul %zu %zu (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
+    }
+}
+
+static void WRAP_mpz_submul(mpz_ptr c, mpz_srcptr a, mpz_srcptr b)
+{
+    double t0 = seconds();
+    double w0 = wct_seconds();
+    mp_size_t na = mpz_size(a);
+    mp_size_t nb = mpz_size(b);
+    mpz_submul(c,a,b);
+    double t1 = seconds();
+    double w1 = wct_seconds();
+    double rate = (w1-w0) ? ((t1-t0)/(w1-w0) * 100.0) : 0;
+    if (REPORT_THIS(na, nb)) {
+        printf("mul %zu %zu (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
+    }
+}
+
+static void WRAP_barrett_mod(mpz_ptr c, mpz_srcptr a, mpz_srcptr p, mpz_srcptr q)
+{
+    double t0 = seconds();
+    double w0 = wct_seconds();
+    mp_size_t na = mpz_size(a);
+    mp_size_t nb = mpz_size(p);
+    barrett_mod(c,a,p,q);
+    double t1 = seconds();
+    double w1 = wct_seconds();
+    double rate = (w1-w0) ? ((t1-t0)/(w1-w0) * 100.0) : 0;
+    if (REPORT_THIS(na, nb) && na > nb + 10) {
+        printf("mod %zu %zu (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
+    }
+}
+/* }}} */
+
+/* {{{ evaluation of polynomials (one or two polynomials) */
 static void mp_poly_eval_mod(mpz_ptr r, mpz_t * poly, int deg, mpz_srcptr a, mpz_srcptr q, mpz_srcptr qx)
 {
     int i;
@@ -163,12 +179,17 @@ static void mp_2poly_eval_mod(mpz_ptr r, mpz_ptr s, mpz_t * f, mpz_t * g, int de
     WRAP_barrett_mod(s, s, q, qx);
     mpz_clear(w);
 }
+/* }}} */
 
+/* {{{ This wraps around barrett reduction, depending on whether we
+ * choose to use it or not */
 mpz_ptr my_barrett_init(mpz_srcptr px MAYBE_UNUSED)
 {
 #ifndef WITH_BARRETT
     return NULL;
 #else
+    if (mpz_size(px) < 10000)
+        return NULL;
     mpz_ptr qx = malloc(sizeof(mpz_t));
     mpz_init(qx);
     barrett_init(qx, px);
@@ -182,133 +203,20 @@ void my_barrett_clear(mpz_ptr qx)
     mpz_clear(qx);
     free(qx);
 }
+/* }}} */
 
-#if 0
-/* This implements the following iteration */
-/*
-p:=goodprimes[1];
-r1:=GF(p)!goodprimes_lroots[1][1];
-z1:=(1/Evaluate(Derivative(PolynomialRing(GF(p))!f),r1));
-r:=GF(p)!r1;
-z:=GF(p)!z1;
-k:=1;
-while k lt lift_prec do
-k*:=2;
-R:=Integers(p^k);
-r:=R!Z!r;
-z:=R!Z!z;
-fr:=Evaluate(PolynomialRing(R)!f, r);
-r:=r-fr*z;
-fdr:=Evaluate(Derivative(PolynomialRing(R)!f), r);
-z:=z-z*(fdr*z-1);
-end while;
-*/
-void root_lift_innerlevels(struct prime_data * p, mpz_ptr rx, mpz_ptr irx, int precision)/*  */
-{
-    double w0 = WCT;
-    assert(precision > 0);
-
-    if (precision == 1)
-        return;
-    int lower = precision - precision / 2;
-
-    // recurse.
-    root_lift_innerlevels(p, rx, irx, lower);
-
-    if (WCT > w0 + print_delay)
-        fprintf(stderr, "# [%2.2lf] precision %d\n",
-                WCT,
-                precision);
-
-    mpz_srcptr pk = power_lookup_const(p->powers, precision);
-
-    mpz_ptr qk = my_barrett_init(pk);
-
-    mpz_t ta, tb;
-    mpz_init(ta);
-    mpz_init(tb);
-
-    // we know r to half-precision, 1/f'(r) to half-precision.
-    mp_poly_eval_mod(tb, f_hat, degree, rx, pk, qk);
-    WRAP_mpz_mul(ta, tb, irx);
-    // printf("%zu %zu %zu %zu\n", mpz_size(pk), mpz_size(ta), mpz_size(tb), mpz_size(irx));
-    mpz_sub(rx, rx, ta);
-    WRAP_barrett_mod(rx, rx, pk, qk);
-
-    mp_poly_eval_mod(tb, f_hat_diff, degree-1, rx, pk, qk);
-    WRAP_mpz_mul(ta, irx, tb);
-    mpz_sub_ui(ta, ta, 1);
-    WRAP_barrett_mod(ta, ta, pk, qk);
-    WRAP_mpz_mul(tb, ta, irx);
-    mpz_sub(ta, irx, tb);
-    WRAP_barrett_mod(irx, ta, pk, qk);
-
-    mpz_clear(ta);
-    mpz_clear(tb);
-    /*
-       if (precision < 40) {
-       gmp_fprintf(stderr, "# [%2.2lf] %Zd\n", WCT, rx);
-       gmp_fprintf(stderr, "# [%2.2lf] %Zd\n", WCT, p->invdev_rx);
-       }
-       */
-
-    my_barrett_clear(qk);
-}
-void root_lift(struct prime_data * p, mpz_ptr rx, mpz_ptr irx, int precision)
-{
-    double w0 = WCT;
-    assert(precision > 0);
-
-    if (precision == 1)
-        return;
-    int lower = precision - precision / 2;
-
-    // recurse.
-    root_lift_innerlevels(p, rx, irx, lower);
-
-    if (WCT > w0 + print_delay)
-        fprintf(stderr, "# [%2.2lf] precision %d\n",
-                WCT,
-                precision);
-
-    mpz_srcptr pk = power_lookup_const(p->powers, precision);
-
-    mpz_ptr qk = my_barrett_init(pk);
-
-    mpz_t ta;
-    mpz_init(ta);
-
-    // we know r to half-precision, 1/f'(r) to half-precision.
-    mp_poly_eval_mod(ta, f_hat, degree, rx, pk, qk);
-    WRAP_mpz_mul(ta, ta, irx);
-    // printf("%zu %zu %zu %zu\n", mpz_size(pk), mpz_size(ta), mpz_size(tb), mpz_size(p->invdev_rx));
-    mpz_sub(rx, rx, ta);
-    WRAP_barrett_mod(rx, rx, pk, qk);
-    // don't do the lower part (thus irx is not relevant).
-
-    mpz_clear(ta);
-
-    my_barrett_clear(qk);
-}/*  */
-#else
-void root_lift(struct prime_data * p, mpz_ptr rx, mpz_ptr irx, int precision)/*  */
+void root_lift(struct prime_data * p, mpz_ptr rx, mpz_ptr irx, int precision)/* {{{ */
 {
     double w0 = WCT;
     assert(precision > 0);
 
     if (precision == 1) {
-        // mpz_srcptr pk = power_lookup_const(p->powers, precision);
-        // we want f'(r) mod p !
-        // mp_2poly_eval_mod(NULL, fprime, f_hat, f_hat_diff, degree, degree-1, rx, pk, NULL);
-        // gmp_fprintf(stderr, "f'(r_1) mod p^1 == %Zd\n", fprime);
-
         return;
     }
     int lower = precision - precision / 2;
 
     // recurse.
     root_lift(p, rx, irx, lower);
-    // gmp_fprintf(stderr, "f'(r_%d) mod p^%d == %Zd\n", lower, lower, fprime_here);
 
     if (WCT > w0 + print_delay)
         fprintf(stderr, "# [%2.2lf] precision %d\n",
@@ -326,47 +234,39 @@ void root_lift(struct prime_data * p, mpz_ptr rx, mpz_ptr irx, int precision)/* 
     mpz_t fprime;
     mpz_init(fprime);
 
-    // we know r to half-precision, 1/f'(r) to half-precision.
+    // we know r to half-precision, 1/f'(r) to quarter-precision. Compute
+    // f(r) (to full precision), and obtain 1/f'(r) to half-precision. We
+    // compute f'(r) to half-precision as a side-effect of the
+    // computation of f(r).
     mp_2poly_eval_mod(tb, fprime, f_hat, f_hat_diff, degree, degree-1, rx, pk, qk);
-    // gmp_fprintf(stderr, "f(r_%d) mod p^%d == %Zd\n", lower, precision, tb);
-    // if (fprime) gmp_fprintf(stderr, "f'(r_%d) mod p^%d == %Zd\n", precision, precision, fprime);
-    // WRAP_mpz_invert(ta, fprime, pl);
-    /* use irx. only one iteration of newton.
-     */
-    WRAP_barrett_mod(fprime, fprime, pl, NULL); /* FIXME */
+    /* use irx. only one iteration of newton.  */
+    mpz_srcptr ql = NULL;       /* FIXME if we use barrett reduction */
+    WRAP_barrett_mod(fprime, fprime, pl, ql);
     WRAP_mpz_mul(ta, irx, fprime);
-    WRAP_barrett_mod(ta, ta, pk, qk);
+    WRAP_barrett_mod(ta, ta, pl, ql);
     mpz_sub_ui(ta,ta,1);
     WRAP_mpz_submul(irx, irx, ta);
-    WRAP_barrett_mod(irx, irx, pk, qk);
+    WRAP_barrett_mod(irx, irx, pl, ql);
 
     mpz_clear(fprime);
 
-    WRAP_mpz_mul(ta, irx, tb);
-    // printf("%zu %zu %zu %zu\n", mpz_size(pk), mpz_size(ta), mpz_size(tb), mpz_size(irx));
-    mpz_sub(rx, rx, ta);
+    WRAP_mpz_mul(tb, irx, tb);
+    mpz_sub(rx, rx, tb);
     WRAP_barrett_mod(rx, rx, pk, qk);
-
-    // gmp_fprintf(stderr, "r_%d = %Zd\n", precision, rx);
 
     mpz_clear(ta);
     mpz_clear(tb);
-    /*
-       if (precision < 40) {
-       gmp_fprintf(stderr, "# [%2.2lf] %Zd\n", WCT, rx);
-       gmp_fprintf(stderr, "# [%2.2lf] %Zd\n", WCT, p->invdev_rx);
-       }
-       */
 
     my_barrett_clear(qk);
-}
+}/* }}} */
 
-#endif
+#define EXAMPLE_FROM_RSA768
 
 int main(int argc, char * argv[])
 {
     program_starttime = wct_seconds();
 
+#ifdef  EXAMPLE_FROM_C159
     unsigned long p = 9223372036854799379UL;
     unsigned long r = 8197937682795196680UL;
     unsigned int precision = 1908226;
@@ -378,6 +278,23 @@ int main(int argc, char * argv[])
         "-3170645766299012",
         "9108387600",
     };
+#endif
+
+#ifdef  EXAMPLE_FROM_RSA768
+    unsigned long p = 9223372036854824267UL;
+    unsigned long r = 3169229453447134476UL;
+    unsigned int precision = 29069104;
+    const char * coeff_strings[] = {
+        "-277565266791543881995216199713801103343120",
+        "-18185779352088594356726018862434803054",
+        "6525437261935989397109667371894785",
+        "-46477854471727854271772677450",
+        "-5006815697800138351796828",
+        "1276509360768321888",
+        "265482057982680",
+    };
+#endif
+
     degree = sizeof(coeff_strings) / sizeof(coeff_strings[0]) - 1;
 
     if (argc >= 3 && strcmp(argv[1], "-prec") == 0) {
@@ -392,6 +309,10 @@ int main(int argc, char * argv[])
     fprintf(stderr, "GMP compiled with %s, flags %s\n",
             __GMP_CC,
             __GMP_CFLAGS);
+    /* These two are provided by cado_config.h */
+    fprintf(stderr, "GMP includes from %s\n", GMP_INCDIR);
+    fprintf(stderr, "GMP library from %s\n", GMP_LIBDIR);
+
 #ifdef  WITH_BARRETT
     fprintf(stderr, "This run uses barrett reduction\n");
 #else
@@ -433,6 +354,8 @@ int main(int argc, char * argv[])
     fprintf(stderr, "# [%2.2lf] Computing powers of p\n", WCT);
     power_lookup(prime->powers, precision);
     fprintf(stderr, "# [%2.2lf] Computing powers of p: done.\n", WCT);
+
+    program_starttime = wct_seconds();
 
     mpz_t rx, irx;
     mpz_init(rx);

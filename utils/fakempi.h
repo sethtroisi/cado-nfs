@@ -15,6 +15,7 @@ typedef int MPI_Errhandler;
 typedef int MPI_Request;
 
 // type keys are sizeof() values.
+#define MPI_DATATYPE_NULL       0
 #define MPI_BYTE        1
 #define MPI_INT         sizeof(int)
 #define MPI_DOUBLE      sizeof(double)
@@ -66,6 +67,7 @@ static inline int MPI_Init_thread(int * argc MAYBE_UNUSED, char *** argv MAYBE_U
 static inline int MPI_Finalize() {return 0;}
 static inline int MPI_Op_create( MPI_User_function *function MAYBE_UNUSED, int commute MAYBE_UNUSED, MPI_Op *op MAYBE_UNUSED ){return 0;}
 static inline int MPI_Send( void *buf MAYBE_UNUSED, int count MAYBE_UNUSED, MPI_Datatype datatype MAYBE_UNUSED, int dest MAYBE_UNUSED,int tag MAYBE_UNUSED, MPI_Comm comm  MAYBE_UNUSED){return 0;}
+static inline int MPI_Sendrecv( void *sbuf MAYBE_UNUSED, int scount MAYBE_UNUSED, MPI_Datatype sdatatype MAYBE_UNUSED, int sdest MAYBE_UNUSED,int stag MAYBE_UNUSED,  void *rbuf MAYBE_UNUSED, int rcount MAYBE_UNUSED, MPI_Datatype rdatatype MAYBE_UNUSED, int rdest MAYBE_UNUSED,int rtag MAYBE_UNUSED, MPI_Comm comm  MAYBE_UNUSED, MPI_Status *status MAYBE_UNUSED){return 0;}
 static inline int MPI_Isend( void *buf MAYBE_UNUSED, int count MAYBE_UNUSED, MPI_Datatype datatype MAYBE_UNUSED, int dest MAYBE_UNUSED,int tag MAYBE_UNUSED, MPI_Comm comm  MAYBE_UNUSED, MPI_Request * zz MAYBE_UNUSED){return 0;}
 static inline int MPI_Recv( void *buf MAYBE_UNUSED, int count MAYBE_UNUSED, MPI_Datatype datatype MAYBE_UNUSED, int source MAYBE_UNUSED,int tag MAYBE_UNUSED, MPI_Comm comm MAYBE_UNUSED, MPI_Status *status MAYBE_UNUSED ){ abort(); return 0;}
 static inline int MPI_Irecv( void *buf MAYBE_UNUSED, int count MAYBE_UNUSED, MPI_Datatype datatype MAYBE_UNUSED, int source MAYBE_UNUSED,int tag MAYBE_UNUSED, MPI_Comm comm MAYBE_UNUSED, MPI_Status *status MAYBE_UNUSED, MPI_Request * zz MAYBE_UNUSED){ abort(); return 0;}
@@ -105,9 +107,16 @@ static inline int MPI_Gatherv(void * sendbuf, int sendcount,  MPI_Datatype st, v
     memcpy(((char *)recvbuf) + displs[0] * rt, sendbuf, sendcount * st);
     return 0;
 }
-static inline int MPI_Allgather(void * sendbuf, int sendcount,  MPI_Datatype st, void * recvbuf, int recvcount, MPI_Datatype rt, MPI_Comm x MAYBE_UNUSED) {
+static inline int MPI_Allgather(void * sendbuf MAYBE_UNUSED, int sendcount MAYBE_UNUSED,  MPI_Datatype st MAYBE_UNUSED, void * recvbuf MAYBE_UNUSED, int recvcount MAYBE_UNUSED, MPI_Datatype rt MAYBE_UNUSED, MPI_Comm x MAYBE_UNUSED) {
     ASSERT_ALWAYS(sendcount * st == recvcount * rt);
     if (sendbuf) memcpy(recvbuf, sendbuf, sendcount * st);
+    return 0;
+}
+static inline int MPI_Allgatherv(void *sendbuf, int sendcount MAYBE_UNUSED,
+            MPI_Datatype sendtype MAYBE_UNUSED, void *recvbuf MAYBE_UNUSED, int *recvcount MAYBE_UNUSED,
+            int *displs MAYBE_UNUSED, MPI_Datatype recvtype MAYBE_UNUSED, MPI_Comm comm MAYBE_UNUSED)
+{
+    ASSERT_ALWAYS(sendbuf == MPI_IN_PLACE);
     return 0;
 }
 
