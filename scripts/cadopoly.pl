@@ -1,8 +1,8 @@
 #!/usr/bin/perl -w
 
-# Usage: cadopoly
+# Usage: cadopoly.pl
 # 	read files params_* in dir "." and run polyselect
-# 	the params_* must contain: different name, n, machines ...
+# 	the params_* must contain: different name, n, machines, params polyselect ...
 #
 # TODO: generate input
 # 		...

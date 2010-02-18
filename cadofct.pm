@@ -24,7 +24,7 @@ package cadofct;
 use Exporter;
 our @ISA= qw(Exporter);
 our @EXPORT=qw(%param $tab_level &cmd &read_machines &read_param &do_polysel_bench
-&do_polysel &do_init &do_task &banner &info);
+&do_sieve_bench &do_factbase &do_init &do_task &banner &info &last_line);
 
 use strict;
 use warnings;
@@ -1674,11 +1674,26 @@ sub do_freerels {
 # Sieve and purge #############################################################
 ###############################################################################
 
+my $sieve_cmd = sub {
+    my ($a, $b, $m, $max_threads, $gzip) = @_;
+    my $cmd = "env nice -$param{'sievenice'} ".
+               		"$m->{'cadodir'}/sieve/las ".
+					"-I $param{'I'} ".
+    	       		"-poly $m->{'prefix'}.poly ".
+        	  		"-fb $m->{'prefix'}.roots ".
+            		"-q0 $a ".
+		       		"-q1 $b ".
+			  	 	"-mt $max_threads ";
+	$cmd .= "-ratq " if ($param{'ratq'});
+    $cmd .=	"-out $m->{'prefix'}.rels.$a-$b";
+	$cmd .= ".gz" if ($gzip);
+	$cmd .= " > /dev/null 2>&1";
+	return $cmd;
+};
+
 sub do_sieve {
     my $nrels      = 0;
     my $last_check = 0;
-
-
 
     my $import_rels = sub {
         my ($f) = @_;
@@ -1876,22 +1891,6 @@ sub do_sieve {
 
 
 
-    my $sieve_cmd = sub {
-        my ($a, $b, $m, $max_threads, $gzip) = @_;
-        my $cmd = "env nice -$param{'sievenice'} ".
-               		"$m->{'cadodir'}/sieve/las ".
-					"-I $param{'I'} ".
-    	       		"-poly $m->{'prefix'}.poly ".
-        	  		"-fb $m->{'prefix'}.roots ".
-            		"-q0 $a ".
-		       		"-q1 $b ".
-			  	 	"-mt $max_threads ";
-		$cmd .= "-ratq " if ($param{'ratq'});
-        $cmd .=	"-out $m->{'prefix'}.rels.$a-$b";
-		$cmd .= ".gz" if ($gzip);
-		$cmd .= " > /dev/null 2>&1";
-		return $cmd;
-    };
     
     distribute_task({ task     => "sieve",
                       title    => "Sieve",
@@ -1913,6 +1912,140 @@ sub do_sieve {
 					  max_threads => $param{'sieve_max_threads'} });
 
     info "All done!\n";
+}
+
+
+sub do_sieve_bench {
+	my $max_rels = shift;
+	my $last = shift;
+    my $nrels      = 0;
+    my $last_check = 0;
+	my $max_files;
+
+    my $import_rels = sub {
+        my ($f) = @_;
+        my $n = count_lines($f, '^#');
+        $nrels += $$max_rels[0] * $n / $param{'qrange'};
+        info "Imported $n relations from `".basename($f)."'.\n" if $n > 0;
+    };
+
+    my $sieve_check = sub {
+        my ($f, $full) = @_;
+
+		unless (-f $f) {
+			warn "File `$f' not found, check not done.\n";
+			return;
+		}
+
+		my $is_gzip;
+		$is_gzip=1 if $f =~ /\.gz$/;
+        my $check = $f;
+        if (!$full) {
+            $check = "$param{'prefix'}.rels.tmp";
+            # Put the first 10 relations into a temp file
+			if ($is_gzip) {
+				open FILE, "zcat $f|"
+                	or die "Cannot open `$f' for reading: $!.\n";
+			} else {
+            	open FILE, "< $f"
+                	or die "Cannot open `$f' for reading: $!.\n";
+			}
+            open TMP, "> $check"
+                or die "Cannot open `$check' for writing: $!.\n";
+            my $n = 10;
+            while (<FILE>) {
+                $n--, print TMP $_ unless /^#/;
+                last unless $n;
+            }
+            close FILE;
+            close TMP;
+        }
+
+        # Check relations
+        my $ret = cmd("$param{'cadodir'}/utils/check_rels ".
+                      "-poly $param{'prefix'}.poly $check > /dev/null 2>&1");
+        unlink "$check" unless $full;
+
+        # Remove invalid files
+        if ($ret->{'status'} == 1) {
+            my $msg="File `$f' is invalid (check_rels failed).";
+            if ($ENV{'CADO_DEBUG'}) {
+                my $nf = "$f.error";
+                $msg .= " Moving to $nf\n";
+                warn $msg;
+                rename $f, $nf;
+            } else {
+                $msg .= " Deleting.\n";
+                warn $msg;
+                unlink $f;
+            }
+            close FILE;
+            return;
+        } elsif ($ret->{'status'}) {
+            # Non-zero, but not 1? Something's wrong, bail out
+            die "check_rels exited with unknown error code ", 
+                 $ret->{'status'}, ", aborting."
+        }
+        # The file is clean: we can import the relations now
+        &$import_rels($f);
+    };
+
+    my $sieve_progress = sub {
+        info "Estimate relations: $nrels.\n";
+    };
+	
+    my $sieve_is_done = sub {
+        # Check only every $param{'checkrange'} relations
+        return 0 if $nrels - $last_check < $param{'checkrange'};
+        $last_check = $nrels;
+		return 0 if $nrels < $$max_rels[1];
+
+        opendir DIR, $param{'wdir'}
+            or die "Cannot open directory `$param{'wdir'}': $!\n";
+        my @files = grep /^$param{'name'}\.rels\.[\de.]+-[\de.]+\.gz$/,
+                         readdir DIR;
+        closedir DIR;
+		@files = map { /\.([\de.]+)-[\de.]+\.gz$/; $1 }
+									@files;
+		@files = sort ( {$a <=> $b} @files );
+		$max_files = $files[-1] unless ($max_files);
+		my $number_files_total = ( $max_files - $param{'qmin'} ) /
+										$$max_rels[0] + 1;
+		my $number_files = 1;
+		while ($files[0] != $max_files) {
+			$number_files++;
+			shift @files;
+		}
+		if ( $number_files == $number_files_total ) {
+	        return 1;
+		} else {
+			return 0;
+		}
+    };
+
+    distribute_task({ task     => "sieve",
+                      title    => "Sieve",
+                      suffix   => "rels",
+                      extra    => "freerels",
+					  gzip	   => 1,
+                      files    => ["$param{'name'}.poly",
+                                   "$param{'name'}.roots"],
+                      pattern  => '^# Total \d+ reports',
+                      min      => $param{'qmin'},
+                      len      => $param{'qrange'},
+                      keep     => $param{'keeprelfiles'},
+                      delay    => $param{'delay'},
+                      check    => $sieve_check,
+                      progress => $sieve_progress,
+                      is_done  => $sieve_is_done,
+                      cmd      => $sieve_cmd,
+					  max_threads => $param{'sieve_max_threads'} });
+
+	if ($last) {
+    	info "All done!\n";
+	} else {
+    	info "Switch to next configuration...\n";
+	}
 }
 
 
