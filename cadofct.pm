@@ -2225,7 +2225,8 @@ sub do_linalg {
                "mode=u64 mn=64 splits=0,64 ys=0..64 ".
                "wdir=$param{'prefix'}.bwc " .
                "bwc_bindir=$bwc_bindir " .
-               "&>> $param{'prefix'}.bwc.stderr ";
+               "> $param{'prefix'}.bwc.stderr ";
+	       "2>&1";
         cmd($cmd, { log => 1, kill => 1 });
 
         $cmd = "$param{'cadodir'}/linalg/apply_perm " .
