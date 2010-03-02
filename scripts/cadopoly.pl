@@ -69,6 +69,8 @@ my $phase;
 NAME : foreach my $name (sort keys %link_name_params) {
 	my $Emoy;
 	my $Emin;
+	my $Emin2;
+	my $Emin3;
 	my $Emax;
 	my $best;
 	my ($min_first, $min_second, $min_third);
@@ -113,9 +115,20 @@ NAME : foreach my $name (sort keys %link_name_params) {
 		next unless $last;
         $last =~ /E=([\d.]+)/;
 		$Emoy += $1;
-        if (!defined $Emin || $1 < $Emin) {
-            $Emin = $1;
-            $best = $f;
+        if (!defined $Emin3 || $1 < $Emin3) {
+        	if (!defined $Emin2 || $1 < $Emin2) {
+        		if (!defined $Emin || $1 < $Emin) {
+					$Emin3 = $Emin2;
+					$Emin2 = $Emin;
+					$Emin = $1;
+            		$best = $f;
+				} else {
+					$Emin3 = $Emin2;
+					$Emin2 = $1
+				}
+			} else {
+				$Emin3 = $1;
+			}
 		}
         if (!defined $Emax || $1 > $Emax) {
             $Emax = $1;
@@ -127,6 +140,7 @@ NAME : foreach my $name (sort keys %link_name_params) {
 
 	$Emoy = int(($Emoy-$Emin-$Emax) * 100 / ($size-2)) / 100;
 	my $Ediff = int(($Emoy - $Emin) * 100 + 1) / 100;
+	my $Emoy3 = int(($Emin+$Emin2+$Emin3) * 100 / 3) / 100;
 	$file = $link_name_params{"$name"};
 	read_param(\%param, { strict => 1 }, "$file");
 	info "Params: M $param{'kjM'} l $param{'kjl'} kmax $param{'kjkmax'} ".
@@ -135,7 +149,9 @@ NAME : foreach my $name (sort keys %link_name_params) {
 			"keep $param{'kjkeep'} incr $param{'kjincr'} pb $param{'kjpb'}\n";
 	$tab_level++;
     info "The best polynomial for $name is from `".basename($best)."'\n";
-	info "Emin = \033[01;31m$Emin\033[01;00m - Emoy = \033[01;31m$Emoy\033[01;00m  ".
+	info "Emin = $Emin - ".
+		 "Emoy_top3 = \033[01;31m$Emoy3\033[01;00m - ".
+		 "Emoy = \033[01;31m$Emoy\033[01;00m  ".
 			"(Ediff = $Ediff)\n";
 	info "Time min for first phase: $min_first"."s,  second phase: $min_second".
 		 "s,  third phase: $min_third"."s\n".

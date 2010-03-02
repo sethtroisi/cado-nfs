@@ -35,7 +35,8 @@ die unless (@poly);
 my %link_name_params;
 
 # lpbr => [jump to next interval, nrels max with 20% duplicates]
-my %max_rels = ( 27 => [3000000, 15000000], 
+my %max_rels = ( 26 => [1000000, 8000000],
+				 27 => [2000000, 14000000], 
 				 28 => [5000000, 25000000],
 				 29 => [10000000, 50000000],
 				 30 => [20000000, 100000000] );

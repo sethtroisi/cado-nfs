@@ -24,12 +24,12 @@ selectnice=4            # nice level for selection
 kjM=4e18                # maximum norm allowed
 kjl=5                   # minimal number of primes in lc(g)
 kjadmin=1               # min value for lc(f)
-kjadmax=1e7             # max value for lc(f)
-kjadrange=5e5           # individual tasks
+kjadmax=2e7             # max value for lc(f)
+kjadrange=1e6           # individual tasks
 
 ## Other parameters of polyselect
 kjkeep=100              # number of preselected polynomials
-kjkmax=17               # rotation is bounded by 2^kmax
+kjkmax=16               # rotation is bounded by 2^kmax
 kjincr=60               # forced divisor of lc(f)
 kjpb=1024               # bound on primes allowed in lc(g)
 kjp0max=100000          # bound on the additional factor in lc(g)
@@ -83,7 +83,7 @@ bwstrat=0
 # Linear algebra
 ###########################################################################
 
-bwmt=4                  # Multithreading level of Block-Wiedemann
+bwmt=2x2                # Multithreading level of Block-Wiedemann
 linalg=bwc              # Choose linalg algorithm
 
 ###########################################################################
