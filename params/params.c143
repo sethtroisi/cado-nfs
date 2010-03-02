@@ -62,6 +62,7 @@ checkrange=1            # We check if we have enough after each step
                         # of that many relations found.
 sievenice=10
 sieve_max_threads=2
+sieve_max_threads=2
 
 ###########################################################################
 # Filtering

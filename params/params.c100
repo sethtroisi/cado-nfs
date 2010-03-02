@@ -61,6 +61,7 @@ qrange=100000           # The size of an elementary sieving task
 checkrange=1            # We check if we have enough after each step
                         # of that many relations found.
 sievenice=10
+sieve_max_threads=2
 
 ###########################################################################
 # Filtering
@@ -83,7 +84,7 @@ bwstrat=0
 # Linear algebra
 ###########################################################################
 
-bwmt=4                  # Multithreading level of Block-Wiedemann
+bwmt=2x2                # Multithreading level of Block-Wiedemann
 linalg=bwc              # Choose linalg algorithm
 
 ###########################################################################

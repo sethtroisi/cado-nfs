@@ -168,7 +168,7 @@ my @default_param = (
     delay        => 120,
     sievenice    => 19,
     keeprelfiles => 0,
-	sieve_max_threads => 1,
+	sieve_max_threads => 2,
 	ratq		 => 0,
 
     # filtering

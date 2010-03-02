@@ -74,6 +74,7 @@ qrange=5000             # The size of an elementary sieving task
 checkrange=50000        # We check if we have enough after each step
                         # of that many relations found.
 sievenice=10            # nice level for the sieving jobs
+sieve_max_threads=2
 
 ###########################################################################
 # Filtering
