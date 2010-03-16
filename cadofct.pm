@@ -1862,12 +1862,13 @@ sub do_sieve {
 		for (@files) {
 			push @new_files, $_ unless (exists ($old_files{$_}));
 		}
-        my $new_files = join " ", sort @new_files;
 
         # Remove duplicates
         info "Removing duplicates...";
         $tab_level++;
 		if (@new_files) {
+        	my $new_files =
+				join " ", (map "$param{'wdir'}/$_", sort @new_files);
 			info "split new files in $nslices slices...";
         	cmd("$param{'cadodir'}/filter/dup1 ".
             	"-out $param{'prefix'}.nodup $new_files ".
