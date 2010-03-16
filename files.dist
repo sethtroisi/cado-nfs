@@ -153,7 +153,8 @@ filter/CMakeLists.txt
 filter/Makefile
 filter/dclist.c
 filter/dclist.h
-filter/duplicates.c
+filter/dup1.c
+filter/dup2.c
 filter/files.c
 filter/files.h
 filter/markowitz.c

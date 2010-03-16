@@ -1092,14 +1092,14 @@ my %tasks = (
                    files  => ['roots', 'makefb\.stderr'] },
 
     freerels  => { dep    => ['factbase'],
-                   files  => ['freerels', 'freerel\.stderr'] },
+                   files  => ['freerels.gz', 'freerel\.stderr'] },
 
     sieve     => { name   => "sieve and purge",
                    dep    => ['polysel'],
                    req    => ['factbase', 'freerels'],
                    param  => ['excess'],
                    files  => ['rels\.[\de.]+-[\de.]+(|\.gz)', 'rels\.tmp',
-                              'nodup\.gz', 'duplicates\.stderr',
+                              'nodup\.gz', 'dup1\.stderr', 'dup2\.stderr',
                               'purged', 'purge\.stderr'],
                    resume => 1,
                    dist   => 1 },
@@ -1665,6 +1665,7 @@ sub do_freerels {
               "2> $param{'prefix'}.freerel.stderr";
 
     cmd($cmd, { log => 1, kill => 1 });
+	cmd("gzip $param{'prefix'}.freerels");
     $tab_level--;
 }
 
@@ -1711,7 +1712,7 @@ sub do_sieve {
 		}
 
 
-        return &$import_rels($f) if $f =~ /\.freerels$/;
+        return &$import_rels($f) if $f =~ /\.freerels.gz$/;
 		my $is_gzip;
 		$is_gzip=1 if $f =~ /\.gz$/;
 
@@ -1809,10 +1810,10 @@ sub do_sieve {
             $tab_level++;
             cmd("env mv -f $f $param{'prefix'}.rels.$r[0]-$r[1]", { kill => 1 });
             $f = "$param{'prefix'}.rels.$r[0]-$r[1]";
-			#if ($is_gzip) {
-			#	cmd ("gzip $f", { kill => 1});
-            #	$f .= ".gz";
-			#}
+			if ($is_gzip) {
+				cmd ("gzip $f", { kill => 1});
+            	$f .= ".gz";
+			}
             $tab_level--;
         }
 
@@ -1838,23 +1839,64 @@ sub do_sieve {
         # Get the list of relation files
         opendir DIR, $param{'wdir'}
             or die "Cannot open directory `$param{'wdir'}': $!\n";
-        my @files = grep /^$param{'name'}\.(rels\.[\de.]+-[\de.]+(|\.gz)|freerels)$/,
+        my @files = grep
+			/^$param{'name'}\.(rels\.[\de.]+-[\de.]+(|\.gz)|freerels.gz)$/,
                          readdir DIR;
         closedir DIR;
-        my $files = join " ", (map "$param{'wdir'}/$_", sort @files);
+		mkdir "$param{'prefix'}.nodup"
+			unless (-d "$param{'prefix'}.nodup");
+		my $nslices = 4;
+		for (my $i=0; $i < $nslices; $i++) {
+			mkdir "$param{'prefix'}.nodup/$i"
+				unless (-d "$param{'prefix'}.nodup/$i");
+		}
+        opendir DIR, "$param{'prefix'}.nodup/0/"
+            or die "Cannot open directory `$param{'prefix'}.nodup/0/': $!\n";
+        my @old_files = grep
+			/^$param{'name'}\.(rels\.[\de.]+-[\de.]+(|\.gz)|freerels.gz)$/,
+                         readdir DIR;
+        closedir DIR;
+		my %old_files;		
+		$old_files{$_} = 1 for (@old_files);
+		my @new_files;
+		for (@files) {
+			push @new_files, $_ unless (exists ($old_files{$_}));
+		}
+        my $new_files = join " ", sort @new_files;
 
         # Remove duplicates
         info "Removing duplicates...";
         $tab_level++;
-        cmd("$param{'cadodir'}/filter/duplicates -nrels $nrels ".
-            "-out $param{'prefix'}.nodup.gz $files ".
-            "> $param{'prefix'}.duplicates.stderr 2>&1",
-            { log => 1, kill => 1 });
+		if (@new_files) {
+			info "split new files in $nslices slices...";
+        	cmd("$param{'cadodir'}/filter/dup1 ".
+            	"-out $param{'prefix'}.nodup $new_files ".
+            	"> $param{'prefix'}.dup1.stderr 2>&1",
+            	{ log => 1, kill => 1 });
+		}
 
-        die "Cannot parse file `$param{'prefix'}.duplicates.stderr'.\n"
-            unless last_line("$param{'prefix'}.duplicates.stderr") =~
-                   /^Number of relations left: (\d+)/;
-        my $n = $1;
+		my $n = 0;
+		my @allfiles;
+		my $K = int ( 1.2 * $nrels / $nslices );
+		for (my $i=0; $i < $nslices; $i++) {
+			info "removing duplicates on slices $i...";
+			$allfiles[$i] = 
+				join " ", (map "$param{'prefix'}.nodup/$i/$_", sort @files);
+	        cmd("$param{'cadodir'}/filter/dup2 ".
+    	        "-K $K -out / $allfiles[$i] ".
+            	"> $param{'prefix'}.dup2.stderr 2>&1",
+            	{ log => 1, kill => 1 });
+			my $f = "$param{'prefix'}.dup2.stderr";
+			open FILE, "< $f"
+				or die "Cannot open `$f' for reading: $!.\n";
+			while (<FILE>) {
+				if ( $_ =~ /^\s+(\d+) remaining relations/ ) {
+					$n += $1;
+					last;
+				}
+			}
+			close FILE;
+		}
 
         info "Number of relations left: $n.\n";
         $tab_level--;
@@ -1866,7 +1908,7 @@ sub do_sieve {
                       "-poly $param{'prefix'}.poly -keep $param{'keeppurge'} ".
                       "-excess $param{'excesspurge'} ".
                       "-nrels $n -out $param{'prefix'}.purged ".
-                      "$param{'prefix'}.nodup.gz ".
+                      "@allfiles ".
                       "> $param{'prefix'}.purge.stderr 2>&1", { log => 1 });
 
         if ($ret->{'status'}) {
@@ -1883,7 +1925,15 @@ sub do_sieve {
             $tab_level--;
             return 0;
         }
+		
         info "Nrows: $nrows; Ncols: $ncols; Excess: $excess.\n";
+        $tab_level--;
+		info "Join all no duplicates files into one files...";
+		cmd("zcat @allfiles | gzip --best > $param{'prefix'}.nodup.gz ",
+            { log => 1, kill => 1 });
+        $tab_level++;
+		info "clean directory nodup...";
+		cmd("rm -rf $param{'prefix'}.nodup");
         $tab_level--;
 
         return 1;
@@ -1895,7 +1945,7 @@ sub do_sieve {
     distribute_task({ task     => "sieve",
                       title    => "Sieve",
                       suffix   => "rels",
-                      extra    => "freerels",
+                      extra    => "freerels.gz",
 					  gzip	   => 1,
                       files    => ["$param{'name'}.poly",
                                    "$param{'name'}.roots"],
@@ -2026,7 +2076,7 @@ sub do_sieve_bench {
     distribute_task({ task     => "sieve",
                       title    => "Sieve",
                       suffix   => "rels",
-                      extra    => "freerels",
+                      extra    => "freerels.gz",
 					  gzip	   => 1,
                       files    => ["$param{'name'}.poly",
                                    "$param{'name'}.roots"],

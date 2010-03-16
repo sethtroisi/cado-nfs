@@ -1,5 +1,8 @@
-add_executable(duplicates duplicates.c files.c)
-target_link_libraries(duplicates utils)
+#add_executable(duplicates duplicates.c files.c)
+#target_link_libraries(duplicates utils)
+
+add_executable(dup1 dup1.c)
+add_executable(dup2 dup2.c)
 
 add_executable(purge purge.c files.c)
 target_link_libraries(purge utils m)
@@ -14,5 +17,6 @@ target_link_libraries(postprocess utils m)
 add_executable(replay replay.c sparse.c)
 target_link_libraries(replay utils)
 
-install(TARGETS duplicates purge merge replay RUNTIME DESTINATION bin/merge)
+#install(TARGETS duplicates purge merge replay RUNTIME DESTINATION bin/merge)
+install(TARGETS purge merge replay RUNTIME DESTINATION bin/merge)
 install(TARGETS postprocess RUNTIME DESTINATION bin/merge)
