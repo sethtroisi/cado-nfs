@@ -126,14 +126,14 @@ remove_dup (char *infile, char *dirname, uint32_t *H, unsigned long K)
           else
               outfile = strdup(infile);
           snprintf(command, COMMAND_SIZE, "bzip2 -c --fast > %s/%s.part",
-                  dirname, outfile);
+                  dirname, basename(outfile));
       } else {
           if (is_gzip(infile))
               outfile = strdup(infile);
           else
               outfile = bz2gz(infile);
           snprintf(command, COMMAND_SIZE, "gzip -c --best > %s/%s.part",
-                  dirname, outfile);
+                  dirname, basename(outfile));
       }
       ofile = popen (command, "w");
   }
@@ -228,8 +228,8 @@ remove_dup (char *infile, char *dirname, uint32_t *H, unsigned long K)
           }
       }
       char * s1, * s2;
-      asprintf(&s1, "%s/%s.part", dirname, outfile);
-      asprintf(&s2, "%s/%s", dirname, outfile);
+      asprintf(&s1, "%s/%s.part", dirname, basename(outfile));
+      asprintf(&s2, "%s/%s", dirname, basename(outfile));
       fprintf (stderr, "Renaming result file %s to %s\n", s1, s2);
       int ret = rename(s1, s2);
       if (ret) {

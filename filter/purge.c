@@ -69,6 +69,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "files.h"
 #include "gzip.h"
 
+#define LINE_SIZE 512
+#define MAX_FILES 50000
+
 /********************** own memory allocation routines ***********************/
 
 /* Rationale: calling one malloc() for each relation in insertNormalRelation()
@@ -727,7 +730,7 @@ reread (char *oname, char *ficname[], unsigned int nbfic,
 static void
 usage (void)
 {
-  fprintf (stderr, "Usage: purge [options] -poly polyfile -out purgedfile -nrels nnn file1 ... filen\n");
+  fprintf (stderr, "Usage: purge [options] -poly polyfile -out purgedfile -nrels nnn [-filelist <fl>] file1 ... filen\n");
   fprintf (stderr, "Options:\n");
   fprintf (stderr, "       -excess  nnn - initial excess must be >= nnn (default 1)\n");
   fprintf (stderr, "       -keep    nnn - prune if excess > nnn (default 160)\n");
@@ -747,12 +750,19 @@ approx_phi (long B)
   return (B <= 1) ? 0 : (int) (0.85 * (double) B / log ((double) B));
 }
 
+void chomp(const char *s) {
+	char *p;
+	while (NULL != s && NULL != (p = strrchr(s, '\n')))
+		*p = '\0';
+}
+
 int
 main (int argc, char **argv)
 {
     hashtable_t H;
     char **fic, *polyname = NULL, *sos = NULL, *purgedname = NULL;
-    unsigned int nfic;
+  	char *filelist = NULL;
+    unsigned int nfic = 0;
     char *rel_used;
     int **rel_compact = NULL;
     int ret, k;
@@ -824,6 +834,11 @@ main (int argc, char **argv)
 	    argc --;
 	    argv ++;
 	}
+    else if(argc > 1 && strcmp (argv[1], "-filelist") == 0) {
+        filelist = argv[2];
+        argv += 2;
+        argc -= 2;
+    }
         else
           {
             fprintf (stderr, "Error, unknown option %s\n", argv[1]);
@@ -831,8 +846,9 @@ main (int argc, char **argv)
           }
     }
 
-    if (argc == 1)
+    /*if (argc == 1)
       usage ();
+	*/
 
     if (polyname == NULL)
       {
@@ -846,8 +862,26 @@ main (int argc, char **argv)
         exit (1);
       }
 
-    fic = argv + 1;
-    nfic = argc - 1;
+	if (filelist != NULL) {
+		FILE *f;
+		f = fopen(filelist, "r");
+      	if (f == NULL) {
+        	perror("Problem opening filelist");
+        	exit(1);
+      	}
+		char relfile[LINE_SIZE];
+		fic = (char **) malloc (MAX_FILES * sizeof(char));
+		while (fgets(relfile, LINE_SIZE, f) != NULL) {
+			fic[nfic] = (char *) malloc (LINE_SIZE * sizeof(char));
+			chomp(relfile);
+			strcpy (fic[nfic], relfile);
+			nfic++;
+		}
+		fclose(f);
+	} else {
+	    fic = argv + 1;
+    	nfic = argc - 1;
+	}
     cado_poly_init (pol);
     cado_poly_read (pol, polyname);
 
@@ -962,6 +996,12 @@ main (int argc, char **argv)
     hashFree (&H);
     free (rel_used);
     cado_poly_clear (pol);
+
+	if (filelist != NULL) {
+    	for (unsigned int i = 0; i < nfic; i++)
+			free(fic[i]);
+		free(fic);
+	}
 
     return 0;
 }

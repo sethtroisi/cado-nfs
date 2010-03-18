@@ -1880,11 +1880,16 @@ sub do_sieve {
 		my @allfiles;
 		my $K = int ( 1.2 * $nrels / $nslices );
 		for (my $i=0; $i < $nslices; $i++) {
-			info "removing duplicates on slices $i...";
+			info "removing duplicates on slice $i...";
 			$allfiles[$i] = 
-				join " ", (map "$param{'prefix'}.nodup/$i/$_", sort @files);
+				join "", (map "$param{'prefix'}.nodup/$i/$_\n", sort @files);
+			open FILE, "> $param{'prefix'}.dup2files"
+				or die "Cannot open `$param{'prefix'}.dup2files' for reading: $!.\n";
+			print FILE $allfiles[$i];
+			close FILE;
 	        cmd("$param{'cadodir'}/filter/dup2 ".
-    	        "-K $K -out / $allfiles[$i] ".
+    	        "-K $K -out $param{'prefix'}.nodup/$i ".
+				"-filelist $param{'prefix'}.dup2files ".
             	"> $param{'prefix'}.dup2.stderr 2>&1",
             	{ log => 1, kill => 1 });
 			my $f = "$param{'prefix'}.dup2.stderr";
@@ -1905,18 +1910,23 @@ sub do_sieve {
         # Remove singletons
         info "Removing singletons...";
         $tab_level++;
+		open FILE, "> $param{'prefix'}.purgefiles"
+			or die "Cannot open `$param{'prefix'}.purgefiles' for reading: $!.\n";
+		for (@allfiles) {
+			print FILE $_;
+		}
+		close FILE;
         my $ret = cmd("$param{'cadodir'}/filter/purge ".
                       "-poly $param{'prefix'}.poly -keep $param{'keeppurge'} ".
                       "-excess $param{'excesspurge'} ".
                       "-nrels $n -out $param{'prefix'}.purged ".
-                      "@allfiles ".
+                      "-filelist $param{'prefix'}.purgefiles ".
                       "> $param{'prefix'}.purge.stderr 2>&1", { log => 1 });
-
         if ($ret->{'status'}) {
-            info "Not enough relations! Continuing sieving...\n";
-            $tab_level--;
-            return 0;
-        }
+           info "Not enough relations! Continuing sieving...\n";
+           $tab_level--;
+           return 0;
+		}
 
         # Get the number of rows and columns from the .purged file
         my ($nrows, $ncols) = split / /, first_line("$param{'prefix'}.purged");
@@ -1930,7 +1940,8 @@ sub do_sieve {
         info "Nrows: $nrows; Ncols: $ncols; Excess: $excess.\n";
         $tab_level--;
 		info "Join all no duplicates files into one files...";
-		cmd("zcat @allfiles | gzip --best > $param{'prefix'}.nodup.gz ",
+		cmd("cat $param{'prefix'}.purgefiles | xargs zcat ".
+			"| gzip --best > $param{'prefix'}.nodup.gz ",
             { log => 1, kill => 1 });
         $tab_level++;
 		info "clean directory nodup...";
