@@ -126,7 +126,7 @@ using namespace std;
  * ``Applying the buckets'' means taking a list of column coefficients
  * which have been directed to the bucket because it is known that they
  * affect at least one of the 256 corresponding row indices on output. So
- * in addition the the N stored coefficients in the bucket, we have a
+ * in addition to the N coefficients stored in the bucket, we have a
  * list of N 8-bit integers indicating which row index is to be modified.
  *
  * [the section below is superseded by the next one]
@@ -155,7 +155,7 @@ using namespace std;
  * sub-matrices in the different sub-matrices created by the horizontal
  * splitting are filled. We thus populate scratch space with coefficients
  * from the source vector. After each such processing of a vertical
- * strip, we consider whether we have so flushing to perform w.r.t. the
+ * strip, we consider whether we have to perform flushing w.r.t. the
  * horizontal strips. The buffers corresponding to the densest horizontal
  * strip are flushed after each vstrip processing. Those which are twice
  * sparser are flushed twice less often. Thus the next vstrip occupies
