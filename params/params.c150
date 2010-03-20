@@ -75,7 +75,9 @@ maxlevel=20             # maximal merge level
 cwmax=100               # ???
 rwmax=100               # ???
 ratio=1.2               # ???
-bwstrat=0               
+bwstrat=0               # 0: optimize the matrix size N
+                        # 1: stop when the product N*weight is minimal
+                        # 3: stop when weight/N exceeds coverNmax
 
 ###########################################################################
 # Linear algebra
