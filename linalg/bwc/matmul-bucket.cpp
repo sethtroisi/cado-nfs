@@ -2631,7 +2631,7 @@ static inline void matmul_bucket_mul_vsc(struct matmul_bucket_data_s * mm, vecto
 }
 
 ///////////////////////////////////////////////////////////////////////
-// just count how many times an iterations schedules a coefficient in
+// just count how many times an iteration schedules a coefficient in
 // the fbi/fbd/asb routines.
 
 static inline void mm_finish_init(struct matmul_bucket_data_s * mm)
@@ -2777,7 +2777,7 @@ void matmul_bucket_mul(struct matmul_bucket_data_s * mm, abt * dst, abt const * 
     abobj_ptr x = mm->xab;
 
     if (d == !mm->public_->store_transposed) {
-        /* That the ``normal'' case (matrix times vector). */
+        /* This is the ``normal'' case (matrix times vector). */
     } else {
         /* d == mm->public_->store_transposed */
         /* BEWARE, it's a priori sub-optimal ! In practice, the
