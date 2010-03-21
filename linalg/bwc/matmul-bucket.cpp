@@ -1226,8 +1226,14 @@ void vsc_fill_buffers(builder * mb, struct vsc_slice_t * V)
                 V->dispatch[fidx].sub[s].c.push_back(0);
             }
         }
+        /*
+        printf("Post counts\n");
+        for(unsigned int d = 0 ; d < nvstrips ; d++) {
+            printf(" (nrows=%u) [%u].sub[%u] : %lu coeffs ; xsize=%zu, csize=%zu\n", V->steps[s].nrows, d, s, V->dispatch[d].sub[s].hdr->ncoeffs, V->dispatch[d].sub[s].x.size(), V->dispatch[d].sub[s].c.size());
+        }
+        */
         unsigned int acc = 0;
-        for(unsigned int d = 0 ; d < nvstrips ; d+= defer) {
+        for(unsigned int d = 0 ; d < nvstrips ; d++) {
             acc += V->dispatch[d].sub[s].hdr->ncoeffs;
             if (!flush_here(d,nvstrips,defer))
                 continue;
@@ -2737,14 +2743,14 @@ static inline void matmul_bucket_mul_loop(struct matmul_bucket_data_s * mm, abt 
             case SLICE_TYPE_DEFER_ENVELOPE:
                 matmul_bucket_mul_vsc(mm, hdr, dst, src, d, pos);
                 break;
-            /* some slice types are ``contained'', and we should bever
+            /* some slice types are ``contained'', and we should never
              * see them */
             case SLICE_TYPE_SMALL1_VBLOCK:
             case SLICE_TYPE_DEFER_COLUMN:
             case SLICE_TYPE_DEFER_ROW:
             case SLICE_TYPE_DEFER_CMB:
             case SLICE_TYPE_DEFER_DIS:
-            /* The current implmentation no longer accepts data not
+            /* The current implementation no longer accepts data not
              * obeying the header structure, so the default branch also
              * aborts. */
             default:
