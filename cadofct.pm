@@ -1875,7 +1875,7 @@ sub do_sieve {
             	"> $param{'prefix'}.dup1.stderr 2>&1",
             	{ log => 1, kill => 1 });
 		}
-
+		return 0;
 		my $n = 0;
 		my @allfiles;
 		my $K = int ( 1.2 * $nrels / $nslices );
