@@ -1875,7 +1875,6 @@ sub do_sieve {
             	"> $param{'prefix'}.dup1.stderr 2>&1",
             	{ log => 1, kill => 1 });
 		}
-		return 0;
 		my $n = 0;
 		my @allfiles;
 		my $K = int ( 1.2 * $nrels / $nslices );
@@ -1939,7 +1938,7 @@ sub do_sieve {
 		
         info "Nrows: $nrows; Ncols: $ncols; Excess: $excess.\n";
         $tab_level--;
-		info "Join all no duplicates files into one files...";
+		info "Join all no duplicates files into one file...";
 		cmd("cat $param{'prefix'}.purgefiles | xargs zcat ".
 			"| gzip --best > $param{'prefix'}.nodup.gz ",
             { log => 1, kill => 1 });
