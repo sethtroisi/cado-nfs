@@ -15,6 +15,12 @@
 #include "utils.h"
 #include "mf.h"
 
+/**********************************************************************/
+/**                                                                  **/
+/**   THIS PROGRAM IS NOT READY (NOR FINISHED).                      **/
+/**                                                                  **/
+/**********************************************************************/
+
 int quiet;
 int master_rank;
 int extra_master;
@@ -38,6 +44,23 @@ uint32_t row_cellbase;
 uint32_t col_cellbase;
 
 int mcheck;     // for firing off only the master job.
+
+void usage()
+{
+    if (rank == 0) {
+        fprintf(stderr, "Usage: ./mf-dobal [options] <bfile> <mfile>\n"
+    "This program is an MPI program. Collectively, nodes build a split\n"
+    "version of the matrix found in file mfile, the balancing being\n"
+    "computed according to the balancing file bfile.\n"
+    "Options recognized:\n"
+    "\t--quiet\n"
+    "\t--mcheck: don't run the children jobs. Only for sanity checking\n"
+    "\t--extra-master: run an extra job for the master node\n");
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+    exit(1);
+}
+
 
 struct send_queue_s {
     uint32_t * buf[2];
@@ -531,6 +554,9 @@ int main(int argc, char * argv[])
         ASSERT_ALWAYS(size == 1);
         ASSERT_ALWAYS(rank == 0);
     }
+
+    if (!bfile) usage();
+    if (!mfile) usage();
 
     all();
 
