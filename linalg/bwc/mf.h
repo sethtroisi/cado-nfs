@@ -26,6 +26,8 @@ struct mf_io_file {
 #define FLAG_REPLICATE  8       /* only balancing in one dimension */
 
 struct balancing_header_s {
+    // FIXME: add a magic number here ? This header is read directly in
+    // binary format, so it might be a good idea.
     uint32_t nh;
     uint32_t nv;
     uint32_t nrows;
@@ -38,6 +40,8 @@ typedef struct balancing_header_s balancing_header[1];
 
 struct balancing_s {
     balancing_header h;
+    uint32_t trows;     // target number of rows. ==nrows if no padding
+    uint32_t tcols;     // target number of cols. ==ncols if no padding
     uint32_t * rowperm; // row index for new mat. --> row index for old mat.
     uint32_t * colperm; // might be equal to colperm.
 };
@@ -60,7 +64,11 @@ extern void matrix_read_pass(
 extern char * build_mat_auxfile(const char * prefix, const char * what, const char * ext);
 
 extern int has_suffix(const char * path, const char * sfx);
-extern void balancing_compute_checksum(balancing_ptr bal);
+/* Once the flags and perm[] fields have been provided, the caller must
+ * call _finalize() in order to 1) update the trows and tcols fields 2)
+ * compute the checksum of the balancing.
+ */
+extern void balancing_finalize(balancing_ptr bal);
 extern void balancing_write(balancing_ptr bal, const char *);
 extern void balancing_write_namefile(balancing_ptr bal, const char *);
 extern void balancing_read(balancing_ptr bal, const char *);

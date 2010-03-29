@@ -54,7 +54,7 @@ char * build_mat_auxfile(const char * prefix, const char * what, const char * ex
     return str;
 }
 
-extern void matrix_read_pass(
+void matrix_read_pass(
         struct mf_io_file * m_in,
         struct mf_io_file * m_out,
         struct mf_io_file * rw_out,
@@ -332,24 +332,21 @@ row_done:
     }
 }
 
-void balancing_compute_checksum(balancing_ptr bal)
+void balancing_finalize(balancing_ptr bal)
 {
     cado_crc_lfsr l;
     cado_crc_lfsr_init(l);
     uint32_t w = 0;
+    bal->trows = bal->h->nrows;
+    bal->tcols = bal->h->ncols;
+    if (bal->h->flags & FLAG_PADDING) {
+        bal->tcols = bal->trows = MAX(bal->h->nrows, bal->h->ncols);
+    }
     if (bal->h->flags & FLAG_ROWPERM) {
-        size_t s = bal->h->nrows;
-        if (bal->h->flags & FLAG_PADDING) {
-            s = MAX(bal->h->nrows, bal->h->ncols);
-        }
-        w = cado_crc_lfsr_turn(l, bal->rowperm, s * sizeof(uint32_t));
+        w = cado_crc_lfsr_turn(l, bal->rowperm, bal->trows * sizeof(uint32_t));
     }
     if (bal->h->flags & FLAG_COLPERM) {
-        size_t s = bal->h->ncols;
-        if (bal->h->flags & FLAG_PADDING) {
-            s = MAX(bal->h->nrows, bal->h->ncols);
-        }
-        w = cado_crc_lfsr_turn(l, bal->colperm, s * sizeof(uint32_t));
+        w = cado_crc_lfsr_turn(l, bal->colperm, bal->tcols * sizeof(uint32_t));
     }
     cado_crc_lfsr_clear(l);
     bal->h->checksum = w;
@@ -388,18 +385,10 @@ void balancing_write(balancing_ptr bal, const char * filename)
     }
     int rc = fwrite(&bal->h, sizeof(struct balancing_header_s), 1, pfile);
     if (bal->h->flags & FLAG_ROWPERM) {
-        size_t s = bal->h->nrows;
-        if (bal->h->flags & FLAG_PADDING) {
-            s = MAX(bal->h->nrows, bal->h->ncols);
-        }
-        rc = fwrite(bal->rowperm, sizeof(uint32_t), s, pfile);
+        rc = fwrite(bal->rowperm, sizeof(uint32_t), bal->trows, pfile);
     }
     if (bal->h->flags & FLAG_COLPERM) {
-        size_t s = bal->h->ncols;
-        if (bal->h->flags & FLAG_PADDING) {
-            s = MAX(bal->h->nrows, bal->h->ncols);
-        }
-        rc = fwrite(bal->colperm, sizeof(uint32_t), s, pfile);
+        rc = fwrite(bal->colperm, sizeof(uint32_t), bal->tcols, pfile);
     }
     fclose(pfile);
 }
@@ -413,21 +402,18 @@ void balancing_read(balancing_ptr bal, const char * filename)
         abort();
     }
     int rc = fread(&bal->h, sizeof(struct balancing_header_s), 1, pfile);
+    bal->trows = bal->h->nrows;
+    bal->tcols = bal->h->ncols;
+    if (bal->h->flags & FLAG_PADDING) {
+        bal->tcols = bal->trows = MAX(bal->h->nrows, bal->h->ncols);
+    }
     if (bal->h->flags & FLAG_ROWPERM) {
-        size_t s = bal->h->nrows;
-        if (bal->h->flags & FLAG_PADDING) {
-            s = MAX(bal->h->nrows, bal->h->ncols);
-        }
-        bal->rowperm = malloc(s * sizeof(uint32_t));
-        rc = fread(bal->rowperm, sizeof(uint32_t), s, pfile);
+        bal->rowperm = malloc(bal->trows * sizeof(uint32_t));
+        rc = fread(bal->rowperm, sizeof(uint32_t), bal->trows, pfile);
     }
     if (bal->h->flags & FLAG_COLPERM) {
-        size_t s = bal->h->ncols;
-        if (bal->h->flags & FLAG_PADDING) {
-            s = MAX(bal->h->nrows, bal->h->ncols);
-        }
-        bal->colperm = malloc(s * sizeof(uint32_t));
-        rc = fread(bal->colperm, sizeof(uint32_t), s, pfile);
+        bal->colperm = malloc(bal->tcols * sizeof(uint32_t));
+        rc = fread(bal->colperm, sizeof(uint32_t), bal->tcols, pfile);
     }
     fclose(pfile);
 }

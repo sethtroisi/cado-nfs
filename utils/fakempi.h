@@ -50,6 +50,8 @@ typedef int MPI_Request;
 
 #define MPI_STATUS_IGNORE       0
 
+#define MPI_ANY_TAG     -1
+
 /* That would be quite neat, but it's too coarse (it applies to the whole
  * translation unit), and anyway it isn't supported by oldish gcc's.
 #ifdef  __GNUC__

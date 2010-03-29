@@ -427,8 +427,8 @@ int main(int argc, char * argv[])
     }
     free_slices(h, bal->h->nv);
     bal->h->flags = FLAG_REPLICATE|FLAG_PADDING|FLAG_COLPERM;
+    balancing_finalize(bal);
 
-    balancing_compute_checksum(bal);
     balancing_write_namefile(bal, mfile);
     balancing_clear(bal);
 

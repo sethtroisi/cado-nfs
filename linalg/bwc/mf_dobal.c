@@ -1,6 +1,6 @@
-#define _GNU_SOURCE     /* asprintf */
-#define _DARWIN_C_SOURCE     /* asprintf */
-#define _POSIX_C_SOURCE 200112L /* fileno */
+#define _GNU_SOURCE		/* asprintf */
+#define _DARWIN_C_SOURCE	/* asprintf */
+#define _POSIX_C_SOURCE 200112L	/* fileno */
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -9,7 +9,9 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
+#include <math.h>
 
+#include "parallelizing_info.h"
 #include "select_mpi.h"
 
 #include "utils.h"
@@ -21,544 +23,1574 @@
 /**                                                                  **/
 /**********************************************************************/
 
+/* TODO: implement file-backed rewind on thread pipes. */
+/* TODO: integrate fully with matmul_top.c, and also call mf_scan and
+ * mf_bal when needed (we also want a standalone tool, though).
+ */
+
+/**********************************************************************/
+/* {{{ doc */
+/* Balancing a matrix can be decomposed as a 5-step process. 
+ *
+ *     1) read the original matrix. collect row and column frequency
+ *     data.  This has to be done at some point, but clearly, since it is
+ *     balancing independent, for large experiments it is possibly useful
+ *     to save it.  This is done within mf_scan (but could optionally be
+ *     called from here as well).
+ *
+ *     2) from this frequency data, and the information on which kind of
+ *     balancing to perform, compute the row and column permutation which
+ *     must be applied to the original matrix. Note that this step does
+ *     _NOT_ require the original matrix to be read ! It is performed by
+ *     mf_dobal (but could optionally be called from here as well).
+ * 
+ * The code here handles the two remaining steps. Precisions are given
+ * later on.
+ *
+ *     3) ``master loop''. From the row and column permutation data, and
+ *     from the matrix, read input coefficient by coefficient, and deduce
+ *     who goes where.
+ *
+ *     4) ``slave loop 1''. This loop is executed a priori for each
+ *     submatrix corresponding to the balancing. Scan the input quickly
+ *     first, just so as to count row and column frequencies in each
+ *     submatrix.
+ *
+ *     5) ``slave loop 2''. Process again the preceding input, but given
+ *     the knowledge acquired from the previous step, it is possible to
+ *     place pointers for accessing the matrix in core memory, in order
+ *     to write to it. Transposing can be performed here at no extra
+ *     cost. The output is produced in a format which appears ready for
+ *     the matmul_build routines.
+ *
+ * Some notes on steps 3--5
+ *
+ *     ``going'', in step 3, can have different meanings depending on
+ *     whether we're talking big business or not. For small to moderate
+ *     size examples where pthreads are enough, it just means passing on
+ *     to the next processing step. Otherwise it may incur sending via
+ *     MPI.
+ * 
+ *     The data flow from step 3 to step 4 may be either a message
+ *     passing scenario (thus the input appears from an API call, MPI in
+ *     this case), or a shortcut: step 3 output may be hooked directly
+ *     to step 4 processing.
+ *
+ *     Rewinding the input for doing step 5 may be tricky. If the input
+ *     is to be kept in RAM, then the memory footprint is not necessarily
+ *     acceptable (note that the total output set is (almost) guaranteed
+ *     to fit, though, at least provided that the machine (or cluster) on
+ *     which the balancing is done corresponds to the one which actually
+ *     runs the linear algebra eventually.
+ *     
+ *     One thing to note regarding rewinding is that although it is by no
+ *     means accurate, it is possible to _estimate_ the size of each
+ *     submatrix.
+ */
+
+/* There are several modes of operations considered. Note that the
+ * program has to privide some basic functionality even in the absence of
+ * an available MPI environment (threads are required though).
+ *
+ * 1) The matrix has to be split according to an m*n grid, on a single
+ * node. The linear algebra will be performed using m*n threads on that
+ * same node. The input used is the matrix file, and the balancing file.
+ *    1a) Assume that the binary matrix fits _twice_ in memory.
+ *        In this case, we have.
+ *          - a master loop, with the file as a source, and a dispatching
+ *          destination. The (several) destinations are all (as in all
+ *          other cases) handled by the data_dest object. The
+ *          implementation in this case flushes its input buffer by
+ *          feeding it to a companion thread which works as a consumer.
+ *          - the consumer threads do exactly what is done in the step
+ *          called ``slave loop 1 above''. Henceforth, the must have the
+ *          capability of rewinding their input.
+ *          XXX => the data_dest buffers are all parts of big
+ *          per-thread buffers. they are tightly bound to the source
+ *          which is used for the slave loop 2, hence in reality it is
+ *          the same object.
+ *    1b) Same, but now we assume that the binary matrix does _not_ fit
+ *        twice in memory.
+ *        This case is quite similar to the above, and differ only by the
+ *        rewinding mechanism. data_dest buffers are tiny scratch space, and
+ *        everything that passes through these buffers also goes to a temp
+ *        file. (XXX to be done -- likely to be an mmap eventually)
+ * 2) The matrix has to be split according to an m*n grid, on m*n nodes.
+ *    Then an MPI communication channel is necessary. Thus the slave loops
+ *    ``see'' their input as coming from MPI_Recv (one may want to consider
+ *    the case where the job which reads the original matrix plays both
+ *    roles. Then the above approach may be used instead).
+ *    2a) everything fits in RAM twice.
+ *        in this case, rewinding is performed by duplicating the source
+ *        via a buffer. We thus have a rewindable input stream, built on
+ *        top of one which is not. In order to avoid extraneous copies,
+ *        we arrange for the mpi_source data to put data *in the buffer
+ *        provided* instead of the buffer from the data_source struct in
+ *        case the latter has not been allocated.
+ *    2b) A temp file is needed.
+ *        Then the temp file is created, from the same ``wrapped''
+ *        mpi_source buffer.
+ * 3) both mpi and pthreads. the situation is complicated by the fact
+ * the MPI_PTHREAD_MULTIPLE only barely works most of the time, thus we
+ * do not expect that several threads may successfully communicate
+ * simultaneously.
+ *    (not yet implemented)
+ *    per node, only one mpi_source exists. it receives with MPI_TAG_ANY.
+ *    mpi_outchannels are merged, and the tags used for sending encode
+ *    the receiving sub-thread.
+ *    XXX MPI messages are guaranteed not to overtake eachother. thus
+ *    it's fair to use the tag for this, apparently.
+ *    The difficulty here is that the receiving side can't predict for
+ *    whom it's going to receive stuff. At the moment I can't see how to
+ *    avoid a copy, which is something one can live with anyway (since
+ *    it's downstream after an MPI communication).
+ *    * duplicating:
+ *    making a rewindable buffer in this situation is not obvious. The
+ *    goal is to make slave sloop 2 thread agnostic. Thus buffer
+ *    duplicating (or saving to tempfile) must be done in a way which is
+ *    similar to case 1 above, presumably.
+ *
+ * Note that situation 3 above can be simulated by an mpi-only approach,
+ * and that's decent enough for a first plan. However, if one wants to
+ * use this program as a routine called in a simd-fashion directly from
+ * within the matmul-top routines, it's not possible.
+ */
+/* }}} */
+
 int quiet;
-int master_rank;
-int extra_master;
-int rank, size;
-int gsize;
-const char * mfile;
-const char * bfile;
+int transposing = 0;
+int use_auxfile = 0;
+const char *mfile;
+const char *bfile;
 
 /* The number of send queues allocated on the master is 2 * njobs */
-size_t queue_bytes = 1 << 20;
-#define queue_words (queue_bytes / sizeof(uint32_t))
+// both sizes below are in uint32_t's
+size_t default_queue_size = 1 << 20;
+size_t disk_io_window_size = 1 << 14;
 
-FILE * matrix;
+FILE *matrix;
 
-/* filled completely only for the master job. Other jobs get only the
- * header. */
-balancing bal;
-uint32_t row_block0;
-uint32_t col_block0;
-uint32_t row_cellbase;
-uint32_t col_cellbase;
-
-int mcheck;     // for firing off only the master job.
-
-void usage()
+void usage()/*{{{*/
 {
-    if (rank == 0) {
-        fprintf(stderr, "Usage: ./mf-dobal [options] <bfile> <mfile>\n"
+    fprintf(stderr, "Usage: ./mf-dobal [options] <mfile> <bfile>\n"
     "This program is an MPI program. Collectively, nodes build a split\n"
     "version of the matrix found in file mfile, the balancing being\n"
     "computed according to the balancing file bfile.\n"
     "Options recognized:\n"
     "\t--quiet\n"
-    "\t--mcheck: don't run the children jobs. Only for sanity checking\n"
-    "\t--extra-master: run an extra job for the master node\n");
-    }
-    MPI_Barrier(MPI_COMM_WORLD);
+    "Note that a balancing of size p*q needs pq+1 jobs. Further extensions\n"
+    "of this program might allow an arbitrary number or reader jobs\n");
     exit(1);
+}/*}}}*/
+
+// {{{ trivial utility
+static const char *size_disp(size_t s, char buf[16])
+{
+    char *prefixes = "bkMGT";
+    double ds = s;
+    const char *px = prefixes;
+    for (; px[1] && ds > 500.0;) {
+	ds /= 1024.0;
+	px++;
+    }
+    snprintf(buf, 10, "%.1f%c", ds, *px);
+    return buf;
 }
 
+// }}}
 
-struct send_queue_s {
-    uint32_t * buf[2];
-    int cur;
-    time_t pending;
-    time_t waited;
-    time_t total_io_wct;        // including offloaded time.
-    int tag;
+/* {{{ sources  */
+
+struct data_source_s {/*{{{*/
+    size_t (*get)(void*,uint32_t **,size_t);
     size_t pos;
-    size_t total;
-    size_t sent_rows;
-    size_t exp_rows;
-    MPI_Request req;
 };
-typedef struct send_queue_s send_queue[1];
-typedef struct send_queue_s * send_queue_ptr;
+typedef struct data_source_s data_source[1];
+typedef struct data_source_s *data_source_ptr;
 
-/* slaves only */
-int my_i, my_j;
-uint32_t my_nrows;
-uint32_t my_ncols;
-size_t expected_localsize;
+/*}}}*/
 
-char * tmatfile = NULL;     /* This stores the transposed matrix file */
-uint32_t * rq;
-uint32_t * rq_ptr;
+struct file_source_s { /*{{{*/
+    data_source b;
+    const char * filename;
+    struct stat sbuf[1];
+    FILE * f;
+    uint32_t * buf;
+};
 
-/* master only */
-send_queue * sq;
-uint32_t * sq_pool;     // pointer to be freed.
-uint32_t * fw_rowperm;
-uint32_t * fw_colperm;
-uint32_t * ioq;
+typedef struct file_source_s file_source[1];
+typedef struct file_source_s *file_source_ptr;
 
-int which_node_has_row(uint32_t rnum)
+size_t file_source_get(file_source_ptr f, uint32_t ** p, size_t avail)
 {
-    int b;
-    if (rnum < row_block0) {
-        b = rnum / (row_cellbase + 1);
+    if (*p == NULL || avail == 0) {
+        if (f->buf == NULL) {
+            f->buf = malloc(disk_io_window_size * sizeof(uint32_t));
+        }
+        avail = disk_io_window_size;
+        *p = f->buf;
+    }
+    size_t n = fread(*p, sizeof(uint32_t), avail, f->f);
+    f->b->pos += n;
+    if (n == 0) {
+        if (ferror(f->f)) {
+            perror(f->filename);
+            exit(1);
+        } else {
+            if (f->b->pos * sizeof(uint32_t) != (size_t) f->sbuf->st_size) {
+                fprintf(stderr, "Ended at wrong position (%zu != %zu) in %s\n",
+                        f->b->pos, f->sbuf->st_size, f->filename);
+                exit(1);
+            }
+        }
+    }
+    return n;
+}
+
+data_source_ptr file_source_alloc(const char * filename, size_t esz)
+{
+    file_source_ptr p = malloc(sizeof(file_source));
+    memset(p, 0, sizeof(file_source)); 
+    p->filename = filename;
+    p->f = fopen(filename, "r");
+    if (p->f == NULL) {
+	perror(filename);
+	exit(1);
+    }
+    fstat(fileno(p->f), p->sbuf);
+    if (esz) {
+        if ((size_t) p->sbuf->st_size != esz) {
+            fprintf(stderr, "%s: expected size %zu, not %zu\n",
+                    mfile, esz, p->sbuf->st_size);
+            exit(1);
+        }
+    }
+    p->b->get = (size_t(*)(void*,uint32_t **,size_t)) file_source_get;
+    return (data_source_ptr) p;
+}
+
+void file_source_free(data_source_ptr q)
+{
+    file_source_ptr p = (file_source_ptr) q;
+    fclose(p->f);
+    if (p->buf) free(p->buf);
+    free(q);
+}/*}}}*/
+
+struct mpi_source_s {/*{{{*/
+    data_source b;
+    int tag;
+    int peer;
+
+    int over;
+    size_t size;
+    size_t tailsize;
+    uint32_t * buf;
+};
+typedef struct mpi_source_s mpi_source[1];
+typedef struct mpi_source_s *mpi_source_ptr;
+
+size_t mpi_source_get(mpi_source_ptr s, uint32_t ** p, size_t avail)
+{
+    if (*p == NULL || avail == 0) {
+        if (s->buf == NULL) {
+            s->buf = malloc(s->size * sizeof(uint32_t));
+        }
+        *p = s->buf;
     } else {
-        int q = bal->h->nrows % bal->h->nh;
-        b = (rnum - q) / row_cellbase;
+        ASSERT_ALWAYS(avail >= s->size);
     }
-    b *= bal->h->nv;
-    ASSERT(b < gsize);
-    return b;
-}
-int which_node_has_col(uint32_t cnum)
-{
-    int b;
-    if (cnum < col_block0) {
-        b = cnum / (col_cellbase + 1);
-    } else {
-        int q = bal->h->ncols % bal->h->nv;
-        b = (cnum - q) / col_cellbase;
-    }
-    ASSERT(b < gsize);
-    return b;
-}
-
-
-
-void sq_send_mandatory(int i)
-{
-    send_queue_ptr s = sq[i];
-    time_t t0 = s->pending;
-    time_t t = time(NULL);
-    if (t0 != 0) {
-        time_t t1 = t;
-        MPI_Wait(&s->req, MPI_STATUS_IGNORE);
-        t = time(NULL);
-        s->waited += t - t1;
-        s->total_io_wct += t - t0;
-    }
-    s->pending = t;
-    // fprintf(stderr, "send #%d -> %d\n", s->tag, i);
-    MPI_Isend(s->buf[s->cur], queue_bytes, MPI_BYTE, i, s->tag, MPI_COMM_WORLD, &s->req);
-    s->tag++;
-    s->cur ^= 1;
-    s->pos = 0;
-}
-
-int sq_send_if_possible(int i)
-{
-    send_queue_ptr s = sq[i];
-    time_t t0 = s->pending;
-    time_t t = time(NULL);
-    if (t0 != 0) {
-        /* If there's a request pending, then we'll do the send later. */
+    if (s->over) {
+        // fprintf(stderr, "mpi_source_get called on closed source\n");
         return 0;
     }
-    s->pending = t;
-    // fprintf(stderr, "send #%d -> %d\n", s->tag, i);
-    MPI_Isend(s->buf[s->cur], queue_bytes, MPI_BYTE, i, s->tag, MPI_COMM_WORLD, &s->req);
-    s->tag++;
-    s->cur ^= 1;
-    s->pos = 0;
+    MPI_Status x;
+    memset(&x, 0, sizeof(x));
+    // int rank;
+    // MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    // fprintf(stderr, "[%d] MPI_Recv(%zu,%d)\n", rank, s->size, s->peer);
+    struct {
+        size_t sz;
+        size_t over;
+    } sz_info[1];
+    ASSERT_ALWAYS(sizeof(sz_info) == s->tailsize * sizeof(uint32_t));
+    MPI_Recv(*p, s->size * sizeof(uint32_t), MPI_BYTE,
+            s->peer, MPI_ANY_TAG, MPI_COMM_WORLD, &x);
+    memcpy(sz_info, *p + s->size - s->tailsize, sizeof(sz_info));
+    s->over = sz_info->over;
+
+    s->b->pos += sz_info->sz;
+#ifdef HAVE_MPI
+    s->tag = x.MPI_TAG;
+#else
+    abort(); // I believe that by now, we should never arrive here.
+    s->tag = 0;
+#endif
+    // fprintf(stderr, "[%d] receiving tag %d, length %zu (over: %d)\n",
+            // rank, s->tag, sz_info->sz, sz_info->over != 0);
+    return sz_info->sz;
+}
+
+data_source_ptr mpi_source_alloc(int peer)
+{
+    mpi_source_ptr s = malloc(sizeof(mpi_source));
+    memset(s, 0, sizeof(mpi_source));
+    s->b->get = (size_t(*)(void*,uint32_t**,size_t)) mpi_source_get;
+    s->tag = 0;
+    s->peer = peer;
+    s->size = default_queue_size;
+    ASSERT_ALWAYS(sizeof(size_t) % sizeof(uint32_t) == 0);
+    s->tailsize = 2*iceildiv(sizeof(size_t),sizeof(uint32_t));
+    return (data_source_ptr) s;
+}
+
+void mpi_source_free(data_source_ptr q)
+{
+    mpi_source_ptr p = (mpi_source_ptr) q;
+    if (p->buf)
+        free(p->buf);
+}/*}}}*/
+
+#if 0
+/* TODO: implement file-backed rewind. */
+struct rewindable_source_wrapper_s { /*{{{*/
+
+    data_source b;
+    data_source_ptr orig;     // not owned, of course.
+    uint32_t * buf;
+    size_t size;
+    size_t fence;
+};
+
+typedef struct rewindable_source_wrapper_s rewindable_source_wrapper[1];
+typedef struct rewindable_source_wrapper_s *rewindable_source_wrapper_ptr;
+
+size_t rewindable_source_wrapper_get(rewindable_source_wrapper_ptr s, uint32_t ** p, size_t avail)
+{
+    ASSERT_ALWAYS(avail == 0);
+    *p = s->buf + s->b->pos;
+    size_t n;
+    // fprintf(stderr, "rewindable_source_wrapper_get: water=%zu\n", s->size - s->b->pos);
+    if (s->orig) {
+        ASSERT_ALWAYS(s->orig->pos == s->b->pos);
+        n = s->orig->get(s->orig, p, s->size - s->orig->pos);
+    } else {
+        n = s->fence - s->b->pos;
+    }
+    s->b->pos += n;
+    return n;
+}
+
+void rewindable_source_wrapper_rewind(rewindable_source_wrapper_ptr s)
+{
+    s->fence = s->orig->pos;
+    s->b->pos = 0;
+    s->orig = NULL;
+}
+
+data_source_ptr rewindable_source_wrapper_alloc(data_source_ptr s0, size_t expected_size)
+{
+    rewindable_source_wrapper_ptr x = malloc(sizeof(rewindable_source_wrapper));
+    memset(x, 0, sizeof(rewindable_source_wrapper));
+    x->b->get = (size_t(*)(void*,uint32_t**,size_t))rewindable_source_wrapper_get;
+    x->orig = s0;
+    x->size = expected_size;
+    x->buf = malloc(expected_size * sizeof(uint32_t));
+    x->fence = expected_size;
+    return (data_source_ptr) x;
+}
+
+void rewindable_source_wrapper_free(data_source_ptr s)
+{
+    rewindable_source_wrapper_ptr x = (rewindable_source_wrapper_ptr) s;
+    free(x->buf);
+}
+/*}}}*/
+#endif
+
+/* }}} */
+
+/* {{{ dests. Impls are task-specific, thus defined later.  */
+
+struct data_dest_s {/*{{{*/
+    int (*put)(void*,uint32_t *, size_t);
+    // void (*progress)(void*, time_t);
+    // number of rows which passed through. Pretty ad-hoc to have it
+    // here, indeed.
+    uint32_t r;
+    size_t pos;
+};
+typedef struct data_dest_s data_dest[1];
+typedef struct data_dest_s *data_dest_ptr;/*}}}*/
+
+/*}}}*/
+
+/* {{{ dual-head thread pipes */
+struct thread_pipe_s;
+struct thread_source_s;
+struct thread_dest_s;
+
+struct thread_pipe_s {
+    pthread_cond_t hello;
+    pthread_mutex_t mu;
+    uint32_t * buf;
+    size_t batchsize;
+    size_t size;
+    size_t avail;       // available for reading.
+    size_t total;       // set to dst->b->pos on close
+    // these are the two facets of the same object.
+    struct thread_source_s * src;
+    struct thread_dest_s * dst;
+};
+typedef struct thread_pipe_s *thread_pipe_ptr;
+typedef struct thread_pipe_s thread_pipe[1];
+
+struct thread_dest_s {
+    data_dest b;
+    thread_pipe_ptr t;
+};
+typedef struct thread_dest_s *thread_dest_ptr;
+typedef struct thread_dest_s thread_dest[1];
+
+struct thread_source_s {
+    data_source b;
+    thread_pipe_ptr t;
+};
+typedef struct thread_source_s *thread_source_ptr;
+typedef struct thread_source_s thread_source[1];
+
+int thread_dest_put(thread_dest_ptr D, uint32_t * p, size_t n)
+{
+    thread_pipe_ptr t = D->t;
+    ASSERT_ALWAYS(D->b->pos + n <= t->size);
+    if (n) {
+        /* This memcpy should be the only data duplication in the
+         * critical path. It's avoidable when there is only one thread,
+         * but it's not done so yet. When there is only one mpi job, this
+         * memcpy is always tiny (within a cache line).
+         */
+        memcpy(t->buf + D->b->pos, p, n * sizeof(uint32_t));
+        D->b->pos += n;
+    }
+    ASSERT_ALWAYS(t->avail % t->batchsize == 0);
+
+    if (p == NULL && n == 0) {
+        pthread_mutex_lock(&t->mu);
+        t->avail = D->b->pos;
+        t->total = D->b->pos;
+        pthread_cond_signal(&t->hello);
+        pthread_mutex_unlock(&t->mu);
+        return -1;
+    } else if (D->b->pos - t->avail > t->batchsize) {
+        size_t more = (D->b->pos - D->b->pos % t->batchsize) - t->avail;
+        ASSERT_ALWAYS(more > 0);
+        pthread_mutex_lock(&t->mu);
+        t->avail += more;
+        pthread_cond_signal(&t->hello);
+        pthread_mutex_unlock(&t->mu);
+    }
+    return 0;
+}
+
+thread_dest_ptr thread_dest_alloc(thread_pipe_ptr t)
+{
+    thread_dest_ptr res = malloc(sizeof(thread_dest));
+    memset(res, 0, sizeof(thread_dest));
+    res->t = t;
+    res->b->put = (int(*)(void*,uint32_t*,size_t))thread_dest_put;
+    return res;
+}
+
+size_t thread_source_get(thread_source_ptr s, uint32_t ** p, size_t avail)
+{
+    ASSERT_ALWAYS(avail == 0);
+    ASSERT_ALWAYS(s->b->pos <= s->t->avail);
+    size_t n = s->t->avail - s->b->pos;
+    *p = s->t->buf+s->b->pos;
+    if (n) {
+        s->b->pos += n;
+        return n;
+    }
+    pthread_mutex_lock(&s->t->mu);
+    for( ; (n = s->t->avail - s->b->pos) == 0 && s->t->avail < s->t->total; ) {
+        pthread_cond_wait(&s->t->hello, &s->t->mu);
+        ASSERT_ALWAYS(s->b->pos <= s->t->avail);
+    }
+    s->b->pos += n;
+    pthread_mutex_unlock(&s->t->mu);
+    return n;
+}
+
+void thread_source_rewind(thread_source_ptr s)
+{
+    s->b->pos = 0;      /* easy enough ;-) */
+}
+
+thread_source_ptr thread_source_alloc(thread_pipe_ptr t)
+{
+    thread_source_ptr res = malloc(sizeof(thread_source));
+    memset(res, 0, sizeof(thread_source));
+    res->t = t;
+    res->b->get = (size_t(*)(void*,uint32_t**,size_t))thread_source_get;
+    return res;
+}
+
+void thread_source_free(thread_source_ptr x)
+{
+    free(x);
+}
+
+void thread_dest_free(thread_dest_ptr x)
+{
+    free(x);
+}
+
+
+// this is a RAM-backed pipe. the corresponding source is rewindable.
+thread_pipe_ptr thread_pipe_alloc(size_t size)
+{
+    /* must be called by only _one_ thread ! */
+    thread_pipe_ptr res = malloc(sizeof(thread_pipe));
+    memset(res, 0, sizeof(thread_pipe));
+    pthread_cond_init(&res->hello, NULL);
+    pthread_mutex_init(&res->mu, NULL);
+    res->batchsize = 65536;
+    res->total = SIZE_MAX;
+    res->size = size;
+    res->buf = malloc(size * sizeof(uint32_t));
+    res->dst = thread_dest_alloc(res);
+    res->src = thread_source_alloc(res);
+    return res;
+}
+
+void thread_pipe_free(thread_pipe_ptr tp)
+{
+    free(tp->buf);
+    pthread_cond_destroy(&tp->hello);
+    pthread_mutex_destroy(&tp->mu);
+    thread_dest_free(tp->dst);
+    thread_source_free(tp->src);
+    memset(tp, 0, sizeof(thread_pipe));
+    free(tp);
+}
+
+/* }}} */
+
+/*{{{ pipes */
+void mf_progress(data_source_ptr s, data_dest_ptr d, time_t dt, const char * name)
+{
+    char buf[16];
+    printf("%s: %s, %" PRIu32 " rows in %d s ; %.1f MB/s  \r",
+            name,
+            size_disp(s->pos * sizeof(uint32_t), buf), d->r, (int) dt,
+            ((double) s->pos * sizeof(uint32_t) / dt) * 1.0e-6);
+    fflush(stdout);
+}
+
+void mf_pipe(data_source_ptr input, data_dest_ptr output, const char * name)/*{{{*/
+{
+    time_t t0 = time(NULL);
+    time_t t1 = t0 + 1;
+    time_t t = t0;
+
+    for (;;) {
+        uint32_t * ptr = NULL;  // we are not providing a buffer.
+        size_t n = input->get(input, &ptr, 0);
+        if (n == 0) break;
+        int r = output->put(output, ptr, n);
+	t = time(NULL);
+        if (r < 0)
+            break;
+	if (t >= t1) {
+	    t1 = t + 1;
+            mf_progress(input, output, t-t0, name);
+	}
+    }
+    mf_progress(input, output, t-t0, name);
+    printf("\n");
+}/*}}}*/
+
+/* }}} */
+
+
+
+
+// _outbound_ communication channel./*{{{*/
+
+struct mpi_dest_s;
+
+// all outbounc channels use the same type of send queue. There is a
+// double-size buffer, and flushes are performed each time one of the two
+// gets filled (while the other one continues filling up normally).
+// only the flush operations are virtual.
+struct mpi_dest_s {
+    data_dest b;
+
+    uint32_t *buf[2];
+    int cur;
+
+    size_t size;
+    size_t pos;
+    size_t total;
+    size_t tailsize;
+
+    time_t pending;
+    time_t waited;
+    time_t total_io_wct;	// including offloaded time.
+
+    int tag;
+    MPI_Request req;
+    int peer;
+
+    void (*complete_flush)(void *);
+    void (*try_flush)(void *);
+};
+typedef struct mpi_dest_s mpi_dest[1];
+typedef struct mpi_dest_s *mpi_dest_ptr;
+
+/* helper functions */
+
+void mpi_dest_alloc_queues(mpi_dest_ptr * C, int npeers, size_t queue_size)
+{
+    if (npeers == 0) return;
+    uint32_t * sq_pool = malloc(npeers * 2 * queue_size * sizeof(uint32_t));
+    for (int i = 0; i < npeers; i++) {
+        // no, don't clear !!!
+	// memset(C[i], 0, sizeof(mpi_dest));
+	C[i]->buf[0] = sq_pool + queue_size * (2 * i);
+	C[i]->buf[1] = sq_pool + queue_size * (2 * i + 1);
+        C[i]->size = queue_size;
+	// C[i]->pending = 0;
+	// C[i]->cur = 0;
+    }
+}
+
+void mpi_dest_free_queues(mpi_dest_ptr * C, int npeers)
+{
+    if (npeers == 0) return;
+    free(C[0]->buf[0]);
+    for (int i = 0; i < npeers; i++) {
+	memset(C[i], 0, sizeof(mpi_dest));
+    }
+}
+
+/* Note that output channels are used after dispatching. So data is
+ * constructed word by word, so there's no need for something smarter
+ * (area writes, or splicing).
+ */
+// message passing interface for communicating bytes.
+
+
+// this never reschedules a flush, and returns immediately if none is
+// pending.
+void mpi_dest_complete_flush(mpi_dest M)
+{
+    time_t t0 = M->pending;
+    if (t0 == 0)
+        return;
+
+    time_t t1 = time(NULL);
+    MPI_Wait(&M->req, MPI_STATUS_IGNORE);
+    time_t t = time(NULL);
+    M->waited += t - t1;
+    M->total_io_wct += t - t0;
+    M->pending = 0;
+}
+
+int mpi_dest_try_flush(mpi_dest M)
+{
+    time_t t0 = M->pending;
+    if (t0 != 0) {
+	/* If there's a request pending, then we'll do the send later. */
+	return 0;
+    }
+    ASSERT_ALWAYS(M->pos <= M->size - M->tailsize);
+    uint32_t * tailptr = M->buf[M->cur] + M->size - M->tailsize;
+    memcpy(tailptr, &M->pos, sizeof(size_t));
+    struct {
+        size_t sz;
+        size_t over;
+    } sz_info[1];
+    memcpy(sz_info, tailptr, sizeof(sz_info));
+    M->pending = time(NULL);
+    // fprintf(stderr, "send [%d] (%zu, over: %d) ->%d\n", M->tag, sz_info->sz, sz_info->over != 0, M->peer);
+    /* note that the closing message contains no significant data.
+     * However the receiving side does not know it. */
+    MPI_Isend(M->buf[M->cur], M->size * sizeof(uint32_t),
+            MPI_BYTE, M->peer, M->tag, MPI_COMM_WORLD, &M->req);
+    M->cur ^= 1;
+    M->pos = 0;
     return 1;
 }
 
-
-void read_bfile()
+void mpi_dest_push(mpi_dest C, uint32_t v)
 {
-    balancing_init(bal);
-    if (rank == master_rank || mcheck) {
-        balancing_read(bal, bfile);
+    if (C->pos == C->size - C->tailsize) {
+	/* At this point, if a request was pending (thus on the other
+	 * buffer), it is time to wait for its completion, and once it
+	 * has completed, initiate a second one.
+	 */
+	mpi_dest_complete_flush(C);
+        uint32_t * tailptr = C->buf[C->cur] + C->size - C->tailsize;
+        memset(tailptr, 0, C->tailsize * sizeof(uint32_t));
+	mpi_dest_try_flush(C);
     }
-    if (mcheck) {
-        gsize = bal->h->nh * bal->h->nv;
-    } else {
-        if (rank == master_rank && !mcheck) {
-            if (bal->h->nh * bal->h->nv != (uint32_t) gsize) {
-                fprintf(stderr, "Error: to use %s, one needs %d processes, or %d with --extra-master (got %d here)\n", bfile, bal->h->nh * bal->h->nv, bal->h->nh * bal->h->nv+1, size);
-                MPI_Abort(MPI_COMM_WORLD, 1);
-            }
-        }
+    ASSERT(C->pos < C->size - C->tailsize);
+    C->buf[C->cur][C->pos] = v;
+    ++C->b->pos;
+    if (++C->pos == C->size - C->tailsize) {
+	/* if there's a request pending, we don't need to block yet
+	 * before being able to send our payload. Although admittedly it
+         * makes very little difference whether we block now or later...*/
+        uint32_t * tailptr = C->buf[C->cur] + C->size - C->tailsize;
+        memset(tailptr, 0, C->tailsize * sizeof(uint32_t));
+	mpi_dest_try_flush(C);
     }
-    MPI_Bcast(bal->h, sizeof(balancing_header), MPI_BYTE, master_rank, MPI_COMM_WORLD);
-    row_cellbase = bal->h->nrows / bal->h->nh;
-    col_cellbase = bal->h->ncols / bal->h->nv;
-    row_block0 = (row_cellbase + 1) * (bal->h->nrows % bal->h->nh);
-    col_block0 = (col_cellbase + 1) * (bal->h->ncols % bal->h->nv);
 }
 
-void set_slave_variables()
+int mpi_dest_put(mpi_dest_ptr C, uint32_t * p, size_t n)
 {
-    if (mcheck) return;
-    if (rank >= gsize)
-        return;
+    if (p == NULL && n == 0) {
+        // close
+        mpi_dest_complete_flush(C);
+        uint32_t * tailptr = C->buf[C->cur] + C->size - C->tailsize;
+        memset(tailptr, -1, C->tailsize * sizeof(uint32_t));
+        mpi_dest_try_flush(C);
+        mpi_dest_complete_flush(C);
+        return -1;
+    }
+    for(size_t i = 0 ; i < n ; i++) {
+        mpi_dest_push(C, p[i]);
+    }
+    return 0;
+}
+
+
+// this does not allocate the buffer for the send queues.
+data_dest_ptr mpi_dest_alloc_partial()
+{
+    mpi_dest_ptr p = malloc(sizeof(mpi_dest));
+    memset(p, 0, sizeof(mpi_dest));
+    p->b->put = (int(*)(void*,uint32_t*,size_t))&mpi_dest_put;
+    // p->b->progress = NULL;
+    ASSERT_ALWAYS(sizeof(size_t) % sizeof(uint32_t) == 0);
+    p->tailsize = 2*iceildiv(sizeof(size_t),sizeof(uint32_t));
+
+    return (data_dest_ptr) p;
+}
+
+void mpi_dest_free(data_dest_ptr M)
+{
+    // Normally, we expect the buffer to have been allocated
+    // elsewhereby e.g. mpi_dest_alloc_queues, so that freeing must have
+    // been performed _before_ entering this function. For this reason,
+    // we consider it's an error to have anything non-zero in the
+    // mpi_dest struct.
+    ASSERT_ALWAYS(((mpi_dest_ptr)M)->buf[0] == NULL);
+    ASSERT_ALWAYS(((mpi_dest_ptr)M)->buf[1] == NULL);
+    // free(((mpi_dest_ptr)M)->buf);
+    free(M);
+}
+/*}}}*/
+
+
+struct master_data_s {/*{{{*/
+    balancing bal;
+    uint32_t row_block0;
+    uint32_t col_block0;
+    uint32_t row_cellbase;
+    uint32_t col_cellbase;
+
+    uint32_t *fw_rowperm;
+    uint32_t *fw_colperm;
+
+    uint32_t *sent_rows;
+    uint32_t *exp_rows;
+
+    parallelizing_info_ptr pi;
+};
+typedef struct master_data_s master_data[1];
+typedef struct master_data_s *master_data_ptr;/*}}}*/
+
+int who_has_row(master_data m, uint32_t rnum)/*{{{*/
+{
+    int b;
+    ASSERT(rnum < m->bal->trows);
+    if (rnum < m->row_block0) {
+	b = rnum / (m->row_cellbase + 1);
+    } else {
+	int q = m->bal->trows % m->bal->h->nh;
+	b = (rnum - q) / m->row_cellbase;
+    }
+    /* b now indicates the row block corresponding to this index. In
+     * order to map this to a job number and thread number, there's some
+     * arithmetic to do.
+     */
+    int bj = b / m->pi->wr[1]->ncores;
+    int bt = b % m->pi->wr[1]->ncores;
+    int j = bj * m->pi->wr[0]->njobs;
+    int t = bt * m->pi->wr[0]->ncores;
+    return j * m->pi->m->ncores + t;
+}
+
+int who_has_col(master_data m, uint32_t cnum)
+{
+    int b;
+    ASSERT(cnum < m->bal->tcols);
+    if (cnum < m->col_block0) {
+	b = cnum / (m->col_cellbase + 1);
+    } else {
+	int q = m->bal->tcols % m->bal->h->nv;
+	b = (cnum - q) / m->col_cellbase;
+    }
+    int j = b / m->pi->wr[0]->ncores;
+    int t = b % m->pi->wr[0]->ncores;
+    return j * m->pi->m->ncores + t;
+}/*}}}*/
+
+void read_bfile(master_data m)
+{
+    balancing_init(m->bal);
+    balancing_read(m->bal, bfile);
+
+    /* FIXME: this does not really belong here. OTOH the slaves do work
+     * with something half-baked, as a matter of fact. */
+    m->bal->trows = m->bal->h->nrows;
+    m->bal->tcols = m->bal->h->ncols;
+    if (m->bal->h->flags & FLAG_PADDING) {
+	m->bal->tcols = m->bal->trows = MAX(m->bal->h->nrows, m->bal->h->ncols);
+    }
+}
+
+void share_bfile_header_data(parallelizing_info_ptr pi, balancing_ptr bal)
+{
+    complete_broadcast(pi->m, bal->h, sizeof(balancing_header), 0, 0);
+    complete_broadcast(pi->m, &bal->trows, sizeof(uint32_t), 0, 0);
+    complete_broadcast(pi->m, &bal->tcols, sizeof(uint32_t), 0, 0);
+}
+
+/* {{{ slave loops 1 and 2 */
+struct slave_data_s {/*{{{*/
+    balancing bal;		// only partially filled !!!
+    parallelizing_info_ptr pi;
+    int my_i, my_j;
+    uint32_t my_nrows;
+    uint32_t my_ncols;
+    uint32_t my_row0;
+    uint32_t my_col0;
+
+    char *tmatfile;		/* This stores the transposed matrix file */
+    // char *tmatfile_aux;		/* This stores the transposed matrix file */
+    // FILE *auxfile;
+
+    size_t expected_size;       // labelled in data words, not counting
+                                // the extra transfer window size.
+
+    // will be dropped at some point.
+    // size_t rq_size;
+    // uint32_t *rq;
+    // uint32_t *rq_ptr;
+
+    /* This is the final result. It's allocated only when we're halfway through.
+     */
+    uint32_t * locmat;
+
+    thread_pipe_ptr tp;
+};
+typedef struct slave_data_s slave_data[1];
+typedef struct slave_data_s *slave_data_ptr;/*}}}*/
+
+void set_slave_variables(slave_data s, parallelizing_info_ptr pi)/*{{{*/
+{
+    s->pi = pi;
+
+    share_bfile_header_data(pi, s->bal);
 
     /* Of course this does not make sense to come here if we have a
      * separate master job.  */
-    my_j = rank % bal->h->nv;
-    my_i = rank / bal->h->nv;
-    my_ncols = bal->h->ncols / bal->h->nv + ((uint32_t) my_j < (bal->h->ncols % bal->h->nv));
-    my_nrows = bal->h->nrows / bal->h->nh + ((uint32_t) my_i < (bal->h->nrows % bal->h->nh));
-    char * suffix;
-    int rc = asprintf(&suffix, "tr.h%dv%d", my_i, my_j);
-    ASSERT_ALWAYS(rc>=0);
-    tmatfile = build_mat_auxfile(mfile, suffix, ".bin");
+    s->my_j = s->pi->wr[0]->jrank * s->pi->wr[0]->ncores + s->pi->wr[0]->trank;
+    s->my_i = s->pi->wr[1]->jrank * s->pi->wr[1]->ncores + s->pi->wr[1]->trank;
+    // int gridpos = pi->m->jrank * pi->m->ncores + pi->m->trank;
+
+    uint32_t quo_rows = s->bal->trows / s->bal->h->nh;
+    uint32_t quo_cols = s->bal->tcols / s->bal->h->nv;
+    int rem_rows = s->bal->trows % s->bal->h->nh;
+    int rem_cols = s->bal->tcols % s->bal->h->nv;
+
+    s->my_ncols = quo_cols + (s->my_j < rem_cols);
+    s->my_nrows = quo_rows + (s->my_i < rem_rows);
+    s->my_row0 = s->my_i * quo_rows + MIN(rem_rows, s->my_i);
+    s->my_col0 = s->my_j * quo_cols + MIN(rem_cols, s->my_j);
+
+    char *suffix;
+    int rc = asprintf(&suffix, "tr.h%dv%d", s->my_i, s->my_j);
+    ASSERT_ALWAYS(rc >= 0);
+    s->tmatfile = build_mat_auxfile(mfile, suffix, ".bin");
+    // s->tmatfile_aux = build_mat_auxfile(mfile, suffix, ".bin.aux");
     free(suffix);
-    expected_localsize = my_nrows + my_ncols + bal->h->ncoeffs / gsize;
-    expected_localsize += expected_localsize / 10;
-    expected_localsize += queue_words;
-    printf("Job %3d (%2d,%2d) expects"
-            " %"PRIu32" rows %"PRIu32" cols."
-            // " Datafile %s."
-            " Allocating %zu MB\n",
-            rank, my_i, my_j, my_nrows, my_ncols,
-            // tmatfile,
-            expected_localsize * sizeof(uint32_t) >> 20);
-    rq = malloc(expected_localsize * sizeof(uint32_t));
-    rq_ptr = rq;
-}
 
-void set_master_variables()
-{
-    if (rank != master_rank && !mcheck)
-        return;
+    s->expected_size = s->bal->h->ncoeffs / pi->m->totalsize;
+    s->expected_size += sqrt(s->expected_size);
+    s->expected_size += 2 * s->bal->trows;
+    s->expected_size += s->expected_size / 10;
 
-    sq = malloc(gsize * sizeof(send_queue));
-    sq_pool = malloc(gsize * 2 * queue_bytes);
-    for(int i = 0 ; i < gsize ; i++) {
-        memset(sq[i], 0, sizeof(send_queue));
-        sq[i]->buf[0] = sq_pool + queue_words * (2 * i);
-        sq[i]->buf[1] = sq_pool + queue_words * (2 * i + 1);
-        // sq[i]->pending = 0;
-        // sq[i]->cur = 0;
-        int h = bal->h->nh;
-        int v = bal->h->nv;
-        sq[i]->exp_rows = bal->h->nrows / h + ((uint32_t) (i / v) < (bal->h->nrows % h));
-    }
+    // in an mpi environment, the threads will see more data passing
+    // through than just the expected size.
+    s->tp = thread_pipe_alloc(s->expected_size + (pi->m->njobs > 1 ? default_queue_size : 0));
 
-    ioq = malloc(queue_bytes);
-
-    uint32_t maxdim = MAX(bal->h->nrows, bal->h->ncols);
-
-    if (bal->h->flags && FLAG_REPLICATE) {
-        fw_rowperm = fw_colperm = malloc(maxdim * sizeof(uint32_t));
-        memset(fw_rowperm, -1, maxdim * sizeof(uint32_t));
-        for(uint32_t i = 0 ; i < maxdim ; i++) {
-            uint32_t j = (bal->colperm ? bal->colperm : bal->rowperm)[i];
-            ASSERT(fw_colperm[j] == UINT32_MAX);
-            fw_colperm[j]=i;
-        }
-    } else if (bal->h->flags & FLAG_PADDING) {
-        ASSERT_ALWAYS(bal->h->flags & FLAG_COLPERM);
-        ASSERT_ALWAYS(bal->h->flags & FLAG_ROWPERM);
-        fw_rowperm = malloc(maxdim * sizeof(uint32_t));
-        fw_colperm = malloc(maxdim * sizeof(uint32_t));
-        memset(fw_rowperm, -1, maxdim * sizeof(uint32_t));
-        memset(fw_colperm, -1, maxdim * sizeof(uint32_t));
-        for(uint32_t i = 0 ; i < maxdim ; i++) {
-            ASSERT(fw_colperm[bal->colperm[i]] == UINT32_MAX);
-            ASSERT(fw_rowperm[bal->rowperm[i]] == UINT32_MAX);
-            fw_colperm[bal->colperm[i]]=i;
-            fw_rowperm[bal->rowperm[i]]=i;
-        }
+    /*
+    if (!use_auxfile) {
+	s->rq_size = s->my_nrows + s->my_ncols + s->bal->h->ncoeffs / gsize;
+	s->rq_size += s->rq_size / 10;
+	s->rq_size += default_queue_size;
     } else {
-        ASSERT_ALWAYS(bal->h->flags & FLAG_COLPERM);
-        fw_colperm = malloc(bal->h->ncols * sizeof(uint32_t));
-        memset(fw_colperm, -1, bal->h->ncols * sizeof(uint32_t));
-        for(uint32_t i = 0 ; i < bal->h->nrows ; i++) {
-            ASSERT(fw_colperm[bal->colperm[i]] == UINT32_MAX);
-            fw_colperm[bal->colperm[i]]=i;
-        }
+	// we'll use an auxiliary file. In this case, we only care about
+	// having the write window reasonably large.
+	s->rq_size = disk_io_window_size;
+	s->auxfile = fopen(s->tmatfile_aux, "w");
+	FATAL_ERROR_CHECK(rc < 0, "out of memory");
+    }
+    */
+    printf("J%uT%u (%2d,%2d) expects"
+	   " rows %" PRIu32 "+%" PRIu32 " cols %" PRIu32 "+%" PRIu32 ".\n",
+           pi->m->jrank, pi->m->trank,
+           s->my_i, s->my_j,
+           s->my_row0, s->my_nrows,
+           s->my_col0, s->my_ncols);
+    /*
+    char buf[16];
+	   // " Datafile %s."
+	   " Allocating %s MB\n",
+	   // s->tmatfile,
+	   size_disp(s->rq_size * sizeof(uint32_t), buf));
+    s->rq = malloc(s->rq_size * sizeof(uint32_t));
+    s->rq_ptr = s->rq;
+    */
+}/*}}}*/
 
-        ASSERT_ALWAYS(bal->h->flags & FLAG_ROWPERM);
-        fw_rowperm = malloc(bal->h->nrows * sizeof(uint32_t));
-        memset(fw_rowperm, -1, bal->h->nrows * sizeof(uint32_t));
-        for(uint32_t i = 0 ; i < bal->h->ncols ; i++) {
-            ASSERT(fw_rowperm[bal->colperm[i]] == UINT32_MAX);
-            fw_rowperm[bal->rowperm[i]]=i;
+void clear_slave_variables(slave_data s)/*{{{*/
+{
+    // free(s->rq);
+    // s->rq = NULL;
+    thread_pipe_free(s->tp);
+    free(s->tmatfile);
+    s->tmatfile = NULL;
+    // free(s->tmatfile_aux);
+    // s->tmatfile_aux = NULL;
+}/*}}}*/
+
+struct slave_dest_s {/*{{{*/
+    data_dest b;
+    uint32_t *row_weights;
+    uint32_t *col_weights;
+    uint32_t current_row;
+    int incoming_rowindex;
+    uint64_t tw;
+    slave_data_ptr s;
+    /* these two are defined only for the second pass. they serve as a
+     * marker for the pass number. */
+    uint32_t ** fill;
+};
+typedef struct slave_dest_s slave_dest[1];
+typedef struct slave_dest_s *slave_dest_ptr;
+
+uint32_t slave_dest_put(slave_dest_ptr R, uint32_t * p, size_t n)
+{
+    for(size_t i = 0 ; i < n ; i++) {
+        uint32_t x = p[i];
+        if (R->incoming_rowindex) {
+            R->current_row = x;
+            R->incoming_rowindex = 0;
+            // don't increase the row counter upon exit.
+            R->b->r++;
+            ASSERT(R->current_row <= R->s->bal->trows);
+            ASSERT(R->current_row >= R->s->my_row0);
+            ASSERT(R->current_row < R->s->my_row0 + R->s->my_nrows);
+            continue;
         }
+        if (x == UINT32_MAX) {
+            R->incoming_rowindex = 1;
+            continue;
+        }
+        ASSERT(x <= R->s->bal->tcols);
+        ASSERT(x >= R->s->my_col0);
+        ASSERT(x < R->s->my_col0 + R->s->my_ncols);
+
+        uint32_t r = R->current_row - R->s->my_row0;
+        uint32_t c = x - R->s->my_col0;
+        if (R->fill == NULL) {
+            R->row_weights[r]++;
+            R->col_weights[c]++;
+        } else if (transposing) {
+            *(R->fill[c]++) = r;
+        } else {
+            *(R->fill[r]++) = c;
+        }
+        R->tw++;
     }
-    
-    /* one more check. The cost is tiny compared to what we do in other
-     * parts of the code. */
-    printf("Consistency check..."); fflush(stdout);
-    uint32_t * ttab = malloc(bal->h->nh * sizeof(uint32_t));
-    memset(ttab, 0, bal->h->nh * sizeof(uint32_t));
-    for(uint32_t j = 0 ; j < bal->h->nrows ; j++) {
-        ttab[which_node_has_row(fw_rowperm[j]) / bal->h->nv]++;
-    }
-    for(uint32_t k = 0 ; k < bal->h->nh ; k++) {
-        ASSERT_ALWAYS(ttab[k] == sq[k * bal->h->nv]->exp_rows);
-    }
-    printf("ok\n");
+    R->b->pos += n;
+    int rc = 0; // R->current_row == UINT32_MAX ? -1 : 0;
+    // fprintf(stderr, "slave_dest_put(%zu) returns %d (last row seen %u)\n", n, rc, R->current_row);
+    return rc;
 }
 
-void clear_master_variables()
+void slave_dest_stats(slave_dest_ptr s)
 {
-    if (rank != master_rank)
-        return;
-    if (bal->h->flags && FLAG_REPLICATE) {
-        free(fw_rowperm);
-    } else {
-        free(fw_rowperm);
-        free(fw_colperm);
-    }
-    fw_rowperm = fw_colperm = NULL;
-    free(sq_pool);
-    free(sq);
-    free(ioq);
-}
-
-void clear_slave_variables()
-{
-    free(rq); rq = NULL;
-    free(tmatfile); tmatfile = NULL;
-}
-
-void sq_add_value(int i, uint32_t v)
-{
-    if (i == master_rank) {
-        ASSERT_ALWAYS((size_t) (rq_ptr - rq) < expected_localsize);
-        *rq_ptr++ = v;
-        return;
-    }
-
-    send_queue_ptr s = sq[i];
-    if (s->pos == queue_words) {
-        /* At this point, if a request was pending (thus on the other
-         * buffer), it is time to wait for its completion, and once it
-         * has completed, initiate a second one.
-         */
-        sq_send_mandatory(i);
-    }
-    ASSERT(s->pos < queue_words);
-    s->buf[s->cur][s->pos] = v;
-    ++s->total;
-    if (++s->pos == queue_words) {
-        /* if there's a request pending, we don't need to block yet
-         * before being able to send our payload */
-        sq_send_if_possible(i);
-    }
-}
-
-void master_loop()
-{
-    FILE * fmat;
-    fmat = fopen(mfile, "r");
-    if (fmat == NULL) {
-        perror(mfile);
-        exit(1);
-    }
-    struct stat sbuf[1];
-    fstat(fileno(fmat), sbuf);
-    size_t esz = (bal->h->ncoeffs + bal->h->nrows) * sizeof(uint32_t);
-    if ((size_t) sbuf->st_size != esz) {
-        fprintf(stderr, "%s: expected size %zu, not %zu\n",
-                mfile, esz, sbuf->st_size);
-        exit(1);
-    }
-
-    size_t pos = 0;
-    uint32_t crow_togo = 0;
-    uint32_t r = 0;
-    int noderow = 0;
-    time_t t0 = time(NULL);
-    time_t t1 = t0 + 1;
-    uint32_t maxdim = MAX(bal->h->nrows, bal->h->ncols);
-
-    for( ; ; ) {
-        size_t n = fread(ioq, sizeof(uint32_t), queue_words, fmat);
-        if (n == 0) {
-            if (ferror(fmat)) {
-                perror(mfile);
-                exit(1);
-            } else {
-                if (pos != (size_t) sbuf->st_size) {
-                    fprintf(stderr, "Ended at wrong position in %s\n", mfile);
-                    exit(1);
-                }
-            }
-            break;
-        }
-        pos += n * sizeof(uint32_t);
-        for(size_t s = 0 ; s < n ; s++) {
-            if (crow_togo == 0) {
-                crow_togo = ioq[s];
-                noderow = which_node_has_row(fw_rowperm[r]);
-                /* Send a new row info _only_ to the nodes on the
-                 * corresponding row in the process grid ! */
-                for(int i = 0 ; i < (int) bal->h->nv ; i++) {
-                    sq_add_value(noderow + i, UINT32_MAX);
-                    sq[noderow + i]->sent_rows++;
-                    if (sq[noderow + i]->sent_rows > sq[noderow + i]->exp_rows) {
-                        fprintf(stderr, "Number of rows sent to node %d (%zu) exceeds expected value %zu\n", noderow+i, sq[noderow + i]->sent_rows, sq[noderow + i]->exp_rows);
-                        // abort();
-                    }
-                }
-                /* This advances, even if the row is not complete. */
-                r++;
-            } else {
-                uint32_t c = fw_colperm[ioq[s]];
-                int nodecol = which_node_has_col(c);
-                sq_add_value(noderow + nodecol, c);
-                --crow_togo;
-            }
-        }
-        time_t t = time(NULL);
-        if (t >= t1) {
-            t1 = t + 1;
-            fprintf(stderr,
-                    "Read %zu MB, %"PRIu32" rows in %d s ; %.0f MB/s  \n",
-                    pos>>20, r, (int) (t-t0), ((double)pos/(t1-t0))*1.0e-6);
-        }
-    }
-    ASSERT(r == bal->h->nrows);
-    fprintf(stderr, "Master loop finished\n");
-    for(int i = 0 ; i < (int) gsize ; i++) {
-        /* complete from nrows to maxdim if necessary ! */
-        if (bal->h->flags && FLAG_PADDING) {
-            for( ; r < maxdim ; r++) {
-                sq_add_value(i, UINT32_MAX);
-            }
-        }
-        sq_add_value(i, UINT32_MAX);
-        sq_send_mandatory(i);
-    }
-    fprintf(stderr, "Final sends completed, everybody should finish.\n");
-    for(int i = 0 ; i < (int) gsize ; i++) {
-        printf("[%d] sent %zu rows, %zu coeffs\n",
-                i, sq[i]->sent_rows, sq[i]->total - sq[i]->sent_rows);
-    }
-}
-
-void slave_loop()
-{
-    /* If the master also plays the role of a slave, then everything
-     * is handled as well from the master loop, not from here.
-     */
-    ASSERT(rank != master_rank);
-
-    int tag = 0;
-    uint32_t r = 0;
-    uint32_t * rq_marker = NULL;
-    uint64_t tw=0;
+    uint32_t * row_weights = s->row_weights;
+    uint32_t my_nrows = s->s->my_nrows;
+    uint32_t * col_weights = s->col_weights;
+    uint32_t my_ncols = s->s->my_ncols;
+    // some stats
     double s1 = 0;
     double s2 = 0;
-    for( ; r < my_nrows ; tag++ ) {
-        // fprintf(stderr, "[%d] expects send #%d at offset %td\n",
-                // rank, tag, rq_ptr - rq);
-#if 0
-        fprintf(stderr, "[%d] %"PRIu32" rows so far (%.1f%%),"
-                " %"PRIu64" coeffs (%.1f%%)\n",
-                rank,
-                r,  100.0 * (double) r / my_nrows,
-                tw, 100.0 * (double) (tw+r) / expected_localsize);
-#endif
-#if 0
-        if (rq_marker) {
-            ASSERT_ALWAYS((size_t) (rq_marker - rq) == tw + r);
-        } else {
-            ASSERT_ALWAYS(rq_ptr == rq);
-        }
-        if (!((size_t)(rq_ptr + queue_words - rq) < expected_localsize)) {
-            fprintf(stderr, "argh on rank %d\n", rank);
-            fprintf(stderr, "tw %"PRIu64" r %"PRIu32" e %zu qw %zu delta %td\n",
-                    tw, r, expected_localsize, queue_words, rq_ptr - rq);
-            ASSERT_ALWAYS(0);
-        }
-#endif
-        ASSERT_ALWAYS((size_t)(rq_ptr + queue_words - rq) < expected_localsize);
-        MPI_Recv(rq_ptr, queue_bytes, MPI_BYTE,
-                master_rank, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-        // fprintf(stderr, "Recv #%d -> %d\n", tag, rank);
-        // fflush(stderr);
-        // fflush(stdout);
-        uint32_t * rq_tail = rq_ptr + queue_words;
-        for( ; r < my_nrows && rq_ptr != rq_tail ; rq_ptr++) {
-            uint32_t x = *rq_ptr;
-            if (x != UINT32_MAX)
-                continue;
-            if (rq_marker) {
-                uint32_t w = rq_ptr - rq_marker - 1;
-                *rq_marker = w;
-                s1 += w;
-                s2 += ((double)w)*((double)w);
-                tw += w;
-                r++;
-            }
-            rq_marker = rq_ptr;
-        }
+    uint64_t tw = 0;
+    uint32_t row_min = UINT32_MAX, row_max = 0;
+    double row_avg, row_dev;
+    s1 = s2 = 0;
+    for (uint32_t i = 0; i < my_nrows; i++) {
+	double d = row_weights[i];
+	if (row_weights[i] > row_max)
+	    row_max = row_weights[i];
+	if (row_weights[i] < row_min)
+	    row_min = row_weights[i];
+	s1 += d;
+	s2 += d * d;
+	tw += row_weights[i];
     }
-    printf("[%d] %"PRIu32" rows, %"PRIu64" coeffs.\n", rank, r, tw);
+    row_avg = s1 / my_nrows;
+    row_dev = sqrt(s2 / my_nrows - row_avg * row_avg);
+
+    uint32_t col_min = UINT32_MAX, col_max = 0;
+    double col_avg, col_dev;
+    s1 = s2 = 0;
+    for (uint32_t j = 0; j < my_ncols; j++) {
+	double d = col_weights[j];
+	if (col_weights[j] > col_max)
+	    col_max = col_weights[j];
+	if (col_weights[j] < col_min)
+	    col_min = col_weights[j];
+	s1 += d;
+	s2 += d * d;
+    }
+    col_avg = s1 / my_ncols;
+    col_dev = sqrt(s2 / my_ncols - col_avg * col_avg);
+
+    printf("[J%uT%u] N=%" PRIu32 " W=%" PRIu64 " "
+	   "R[%" PRIu32 "..%" PRIu32 "],%.1f~%.1f "
+	   "C[%" PRIu32 "..%" PRIu32 "],%.1f~%.1f.\n",
+	   s->s->pi->m->jrank, s->s->pi->m->trank,
+           my_nrows, tw,
+	   row_min, row_max, row_avg, row_dev,
+	   col_min, col_max, col_avg, col_dev);
 }
 
-void all()
+data_dest_ptr slave_dest_alloc(slave_data s)
 {
-    read_bfile();
+    slave_dest_ptr x = malloc(sizeof(slave_dest));
+    memset(x, 0, sizeof(slave_dest));
+    x->b->put = (int(*)(void *, uint32_t *, size_t)) slave_dest_put;
+    x->s = s;
+    x->current_row = 0;
+    x->row_weights = malloc(s->my_nrows * sizeof(uint32_t));
+    x->col_weights = malloc(s->my_ncols * sizeof(uint32_t));
+    memset(x->row_weights, 0, s->my_nrows * sizeof(uint32_t));
+    memset(x->col_weights, 0, s->my_ncols * sizeof(uint32_t));
+    return (data_dest_ptr) x;
+}
 
-    if (rank == master_rank) {
-        printf("Total %"PRIu32" rows %"PRIu32" cols %"PRIu64" coeffs\n",
-                bal->h->nrows,
-                bal->h->ncols,
-                bal->h->ncoeffs);
+void slave_dest_free(data_dest_ptr xx)
+{
+    slave_dest_ptr x = (slave_dest_ptr) xx;
+    free(x->row_weights);
+    free(x->col_weights);
+    free(xx);
+}
+
+void slave_dest_engage_final_pass(slave_dest_ptr D)
+{
+    slave_data_ptr s = D->s;
+    if (transposing) {
+	s->locmat = malloc((s->my_ncols + D->tw) * sizeof(uint32_t));
+	D->fill = malloc(s->my_ncols * sizeof(uint32_t *));
+	uint32_t *lptr = s->locmat;
+	memset(D->fill, 0, s->my_ncols * sizeof(uint32_t));
+	for (uint32_t j = 0; j < s->my_ncols; j++) {
+	    *lptr++ = D->col_weights[j];
+	    D->fill[j] = lptr;
+	    lptr += D->col_weights[j];
+	}
+	ASSERT_ALWAYS((uint32_t) (lptr - s->locmat) == s->my_ncols + D->tw);
+    } else {
+	s->locmat = malloc((s->my_nrows + D->tw) * sizeof(uint32_t));
+	D->fill = malloc(s->my_nrows * sizeof(uint32_t *));
+	uint32_t *lptr = s->locmat;
+	memset(D->fill, 0, s->my_nrows * sizeof(uint32_t));
+	for (uint32_t u = 0; u < s->my_nrows; u++) {
+	    *lptr++ = D->row_weights[u];
+	    D->fill[u] = lptr;
+	    lptr += D->row_weights[u];
+	}
+	ASSERT_ALWAYS((uint32_t) (lptr - s->locmat) == s->my_nrows + D->tw);
+    }
+    D->b->r = 0;
+}
+/*}}}*/
+
+void slave_loop(slave_data s)
+{
+    char name[80];
+    // parallelizing_info_ptr pi = s->pi;
+    // int gridpos = pi->m->jrank * pi->m->ncores + pi->m->trank;
+    data_source_ptr input = (data_source_ptr) s->tp->src;
+
+    data_dest_ptr output = slave_dest_alloc(s);
+    snprintf(name, sizeof(name),
+            "[J%uT%u] slave loop 1", s->pi->m->jrank, s->pi->m->trank);
+    mf_pipe(input, output, name);
+
+    thread_source_rewind((thread_source_ptr) input);
+    slave_dest_stats((slave_dest_ptr) output);
+
+    slave_dest_engage_final_pass((slave_dest_ptr) output);
+    printf("[J%uT%u] building local matrix\n",
+            s->pi->m->jrank, s->pi->m->trank);
+    snprintf(name, sizeof(name),
+            "[J%uT%u] slave loop 2", s->pi->m->jrank, s->pi->m->trank);
+    mf_pipe(input, output, name);
+
+    // the thread source should be freed elsewhere.
+    // thread_source_free(input);
+    slave_dest_free(output);
+}
+
+// this one is copied almost verbatim from mf_pipe.
+void endpoint_loop(slave_data_ptr * slaves, int nslaves)
+{
+    time_t t0 = time(NULL);
+    time_t t1 = t0 + 1;
+    time_t t = t0;
+
+    // the master rank is zero.
+    data_source_ptr input = mpi_source_alloc(0);
+
+    for (;;) {
+        uint32_t * ptr = NULL;  // we are not providing a buffer.
+        size_t n = input->get(input, &ptr, 0);
+        if (n == 0) break;
+        int tag = ((mpi_source_ptr)input)->tag;
+        ASSERT_ALWAYS(slaves[tag]->tp);
+        data_dest_ptr output = (data_dest_ptr) slaves[tag]->tp->dst;
+        ASSERT_ALWAYS(output);
+        int r = output->put(output, ptr, n);
+	t = time(NULL);
+        if (r < 0) {
+            fprintf(stderr, "endpoint leaves\n");
+            break;
+        }
+	if (t >= t1) {
+	    t1 = t + 1;
+            // thread_dest don't return the row count anyway.
+            // mf_progress(input, output, t-t0, name);
+	}
+    }
+    // mf_progress(input, output, t-t0, name);
+    // printf("\n");
+    // we must flush all thread buffers.
+    for(int tag = 0 ; tag < nslaves ; tag++) {
+        if (!slaves[tag])
+            continue;
+        ASSERT_ALWAYS(slaves[tag]->tp);
+        data_dest_ptr output = (data_dest_ptr) slaves[tag]->tp->dst;
+        ASSERT_ALWAYS(output);
+        output->put(output, NULL, 0);
+    }
+}
+
+/* }}} */
+
+/* {{{ master loop */
+
+void set_master_variables(master_data m, parallelizing_info_ptr pi)/*{{{*/
+{
+    uint32_t quo_r = m->bal->trows / m->bal->h->nh;
+    uint32_t quo_c = m->bal->tcols / m->bal->h->nv;
+    int rem_r = m->bal->trows % m->bal->h->nh;
+    int rem_c = m->bal->tcols % m->bal->h->nv;
+
+    m->pi = pi;
+
+    m->row_cellbase = quo_r;
+    m->col_cellbase = quo_c;
+    m->row_block0 = (quo_r + 1) * rem_r;
+    m->col_block0 = (quo_c + 1) * rem_c;
+
+    /* these two fields are in fact used only for debugging */
+    m->sent_rows = malloc(pi->m->totalsize * sizeof(uint32_t));
+    m->exp_rows = malloc(pi->m->totalsize * sizeof(uint32_t));
+
+    for (int i = 0; i < (int) pi->wr[1]->totalsize; i++) {
+        uint32_t e = quo_r + (i < rem_r);
+        for(int j = 0 ; j < (int) pi->wr[0]->totalsize ; j++) {
+            m->exp_rows[i*pi->wr[0]->totalsize+j] = e;
+            m->sent_rows[i*pi->wr[0]->totalsize+j] = 0;
+        }
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
 
-    set_slave_variables();
-    set_master_variables();
+    if (m->bal->h->flags && FLAG_REPLICATE) {
+        uint32_t maxdim = MAX(m->bal->h->nrows, m->bal->h->ncols);
+	m->fw_rowperm = m->fw_colperm = malloc(maxdim * sizeof(uint32_t));
+	memset(m->fw_rowperm, -1, maxdim * sizeof(uint32_t));
+	uint32_t *x = (m->bal->colperm ? m->bal->colperm : m->bal->rowperm);
+	for (uint32_t i = 0; i < maxdim; i++) {
+	    uint32_t j = x[i];
+	    ASSERT(m->fw_colperm[j] == UINT32_MAX);
+	    m->fw_colperm[j] = i;
+	}
+    } else {
+	ASSERT_ALWAYS(m->bal->h->flags & FLAG_COLPERM);
+	m->fw_colperm = malloc(m->bal->tcols * sizeof(uint32_t));
+	memset(m->fw_colperm, -1, m->bal->tcols * sizeof(uint32_t));
+	for (uint32_t i = 0; i < m->bal->trows; i++) {
+	    ASSERT(m->fw_colperm[m->bal->colperm[i]] == UINT32_MAX);
+	    m->fw_colperm[m->bal->colperm[i]] = i;
+	}
+
+	ASSERT_ALWAYS(m->bal->h->flags & FLAG_ROWPERM);
+	m->fw_rowperm = malloc(m->bal->trows * sizeof(uint32_t));
+	memset(m->fw_rowperm, -1, m->bal->trows * sizeof(uint32_t));
+	for (uint32_t i = 0; i < m->bal->tcols; i++) {
+	    ASSERT(m->fw_rowperm[m->bal->colperm[i]] == UINT32_MAX);
+	    m->fw_rowperm[m->bal->rowperm[i]] = i;
+	}
+    }
+
+    /* one more check. The cost is tiny compared to what we do in other
+     * parts of the code. */
+    printf("Consistency check...");
+    fflush(stdout);
+    uint32_t *ttab = malloc(m->bal->h->nh * sizeof(uint32_t));
+    memset(ttab, 0, m->bal->h->nh * sizeof(uint32_t));
+    for (uint32_t j = 0; j < m->bal->h->nrows; j++) {
+	ttab[who_has_row(m, m->fw_rowperm[j]) / m->bal->h->nv]++;
+    }
+    for (uint32_t k = 0; k < m->bal->h->nh; k++) {
+	ASSERT_ALWAYS(ttab[k] == m->exp_rows[k * m->bal->h->nv]);
+    }
+    printf("ok\n");
+}/*}}}*/
+
+void clear_master_variables(master_data m)/*{{{*/
+{
+    if (m->bal->h->flags && FLAG_REPLICATE) {
+	free(m->fw_rowperm);
+    } else {
+	free(m->fw_rowperm);
+	free(m->fw_colperm);
+    }
+    m->fw_rowperm = m->fw_colperm = NULL;
+    free(m->sent_rows); m->sent_rows = NULL;
+    free(m->exp_rows); m->exp_rows = NULL;
+}/*}}}*/
+
+struct master_dispatcher_s { /*{{{*/
+// the dispatching task accomplished by
+// the master job is stateful. The following struct defines the state.
+    data_dest b;
+    master_data_ptr m;
+    uint32_t crow_togo;
+    int noderow;
+    int npeers;
+    data_dest_ptr * x;
+};
+typedef struct master_dispatcher_s master_dispatcher[1];
+typedef struct master_dispatcher_s *master_dispatcher_ptr;
+
+int master_dispatcher_put(master_dispatcher_ptr d, uint32_t * p, size_t n)
+{
+    master_data_ptr m = d->m;
+    uint32_t r = d->b->r;
+
+    if (p == NULL && n == 0) {
+        // special case: drain the output pipes (and do it in a blocking way)
+        /* terminate everywhere */
+        for (int i = 0; i < d->npeers; i++) {
+            // printf("closing %d/%d\n", i, d->npeers);
+            d->x[i]->put(d->x[i], NULL, 0);
+        }
+
+        return 0;
+    }
+
+    for (size_t s = 0; s < n; s++) {
+        if (d->crow_togo == 0) {
+            d->crow_togo = p[s];
+            d->noderow = who_has_row(m, m->fw_rowperm[r]);
+            /* Send a new row info _only_ to the nodes on the
+             * corresponding row in the process grid ! */
+            for (int i = 0; i < (int) m->bal->h->nv; i++) {
+                uint32_t x[2] = {UINT32_MAX, m->fw_rowperm[r], };
+                data_dest_ptr where = d->x[d->noderow + i];
+                where->put(where, x, 2);
+                /* debug only */
+                m->sent_rows[d->noderow + i]++;
+                ASSERT_ALWAYS(m->sent_rows[d->noderow + i] <=
+                        m->exp_rows[d->noderow + i]);
+            }
+            /* This advances, even if the row is not complete. */
+            r++;
+        } else {
+            uint32_t c = m->fw_colperm[p[s]];
+            int nodecol = who_has_col(m, c);
+            data_dest_ptr where = d->x[d->noderow + nodecol];
+            where->put(where, &c, 1);
+            d->crow_togo--;
+        }
+        d->b->pos++;
+    }
+    d->b->r = r;
+    return 0;
+}
+
+void master_dispatcher_stats(master_dispatcher_ptr d)
+{
+    for (int i = 0; i < d->npeers; i++) {
+        /* There's a -1 that comes from the end marker (which is in fact
+         * the same as a new row marker)
+         */
+        char buf[16];
+        printf("[%d] sent %zu rows, %zu coeffs (%s)\n",
+                i, (size_t) d->m->sent_rows[i],
+                d->x[i]->pos - 2 * d->m->sent_rows[i],
+                size_disp(d->x[i]->pos * sizeof(uint32_t), buf));
+    }
+}
+
+data_dest_ptr master_dispatcher_alloc(master_data m, parallelizing_info_ptr pi, slave_data_ptr * slaves)
+{
+    master_dispatcher_ptr d = malloc(sizeof(master_dispatcher));
+    memset(d, 0, sizeof(master_dispatcher));
+    d->b->put = (int(*)(void*,uint32_t *, size_t))master_dispatcher_put;
+    d->m = m;
+    int n = pi->m->totalsize;
+    d->x = malloc(n * sizeof(data_dest_ptr));
+    d->npeers = n;
+    // the who_has functions are defined in such a way that (job number,
+    // thread number) is returned in basis pi->m->ncores. We use this to
+    // select which dests are plugged to the dispatcher.
+    int i;
+    for(i = 0 ; i < (int) pi->m->ncores ; i++) {
+        // threads which are on the same node are special. We _have_ to
+        // treat them in a different manner, for two reasons:
+        // - there has to be a different control flow for _receiving_ the
+        //   message. Unfortunately, by design, peers are not recognized
+        //   as mpi jobs so we can't use the message passing interface
+        //   for talking to these threads.
+        // - this will also be the situation for smallish matrices, where
+        //   requiring mpi would be undesirable.
+        ASSERT_ALWAYS(slaves[i] != NULL);
+        d->x[i] = (data_dest_ptr) slaves[i]->tp->dst;
+    }
+    for( ; i < n ; i++) {
+        ASSERT_ALWAYS(slaves[i] == NULL);
+        d->x[i] = mpi_dest_alloc_partial();
+        ((mpi_dest_ptr) d->x[i])->peer = i / pi->m->ncores;
+        ((mpi_dest_ptr) d->x[i])->tag = i;
+    }
+    mpi_dest_alloc_queues((mpi_dest_ptr*)d->x + pi->m->ncores, n - pi->m->ncores, default_queue_size);
+    return (data_dest_ptr) d;
+}
+
+void master_dispatcher_free(data_dest_ptr xd, parallelizing_info_ptr pi, slave_data_ptr * slaves MAYBE_UNUSED)
+{
+    master_dispatcher_ptr d = (master_dispatcher_ptr) xd;
+    int n = pi->m->totalsize;
+    mpi_dest_free_queues((mpi_dest_ptr*)d->x + pi->m->ncores, n - pi->m->ncores);
+    // the thread_pipe structures are freed in another place.
+    for(int i = pi->m->ncores ; i < n ; i++) {
+        mpi_dest_free(d->x[i]);
+    }
+    free(d->x);
+    free(xd);
+}
+/*}}}*/
+
+void master_loop_inner(master_data m, data_source_ptr input, data_dest_ptr output)/*{{{*/
+{
+    mf_pipe(input, output, "main");
+    uint32_t r = output->r;
+
+    ASSERT(r == m->bal->h->nrows);
+    printf("Master loop finished\n");
+    /* complete from nrows to maxdim if necessary ! */
+    for (; r < m->bal->trows;) {
+        uint32_t zero = 0;
+        r += output->put(output, &zero, 1);
+    }
+    r += output->put(output, NULL, 0);
+    printf("Final sends completed, everybody should finish.\n");
+}
+
+void master_loop(master_data m, parallelizing_info_ptr pi, slave_data_ptr * slaves)
+{
+    size_t esz = (m->bal->h->ncoeffs + m->bal->trows) * sizeof(uint32_t);
+    data_source_ptr input = file_source_alloc(mfile, esz);
+    data_dest_ptr output = master_dispatcher_alloc(m, pi, slaves);
+    master_loop_inner(m, input, output);
+    master_dispatcher_stats((master_dispatcher_ptr) output);
+    master_dispatcher_free(output, pi, slaves);
+    file_source_free(input);
+}
+
+/*}}}*/
+
+/* }}} */
+
+struct do_loops_arg {
+    parallelizing_info_ptr pi;
+    param_list_ptr pl;
+    slave_data_ptr * slaves;
+    master_data_ptr m;
+    int leader;
+};
+
+void * do_loops(struct do_loops_arg * arg)
+{
+    if (arg->leader) {
+        ASSERT_ALWAYS(arg->pi->m->trank == 0);
+        if (arg->pi->m->jrank == 0) {
+            master_loop(arg->m, arg->pi, arg->slaves);
+        } else {
+            endpoint_loop(arg->slaves, arg->pi->m->totalsize);
+        }
+    } else {
+        parallelizing_info_ptr pi = arg->pi;
+        int gridpos = pi->m->jrank * pi->m->ncores + pi->m->trank;
+        slave_loop(arg->slaves[gridpos]);
+    }
+    return NULL;
+}
+
+
+void * all(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
+{
+    master_data m;
+    slave_data_ptr * slaves;
+
+    memset(m, 0, sizeof(master_data));
+
+    if (pi->m->trank == 0) {
+        slaves = malloc(pi->m->totalsize * sizeof(slave_data_ptr));
+    }
+    thread_agreement(pi->m, (void**) &slaves, 0);
+
+    int gridpos = pi->m->jrank * pi->m->ncores + pi->m->trank;
+    slave_data_ptr s = malloc(sizeof(slave_data));
+    slaves[gridpos] = s;
+    memset(s, 0, sizeof(slave_data));
+    serialize(pi->m);
+
+    if (pi->m->jrank == 0 && pi->m->trank == 0) {
+        read_bfile(m);
+
+        int ok = 1;
+
+        ok = ok && m->bal->h->nh == pi->wr[1]->ncores * pi->wr[1]->njobs;
+        ok = ok && m->bal->h->nv == pi->wr[0]->ncores * pi->wr[0]->njobs;
+
+        if (!ok) {
+            fprintf(stderr, "Configured split %ux%ux%ux%u does not match "
+                    "%ux%u splitting from %s\n",
+                    pi->wr[1]->njobs,
+                    pi->wr[0]->njobs,
+                    pi->wr[1]->ncores,
+                    pi->wr[0]->ncores,
+                    m->bal->h->nh, m->bal->h->nv, bfile);
+            exit(1);
+        }
+
+	printf("Total %" PRIu32 " rows %" PRIu32 " cols %" PRIu64 " coeffs\n",
+	       m->bal->h->nrows, m->bal->h->ncols, m->bal->h->ncoeffs);
+	if (m->bal->h->flags & FLAG_PADDING) {
+	    uint32_t maxdim = MAX(m->bal->h->nrows, m->bal->h->ncols);
+	    printf("Padding to a matrix of size %" PRIu32 "x%" PRIu32 "\n",
+		   maxdim, maxdim);
+	}
+        set_master_variables(m, pi);
+        memcpy(s->bal->h, m->bal->h, sizeof(balancing_header));
+        s->bal->trows = m->bal->trows;
+        s->bal->tcols = m->bal->tcols;
+    }
+
+    set_slave_variables(s, pi);
+
+    serialize(pi->m);
 
     //////////////////////////////////////////////////////////////////
-    
-    if (rank == master_rank) {
-        master_loop();
-    } else {
-        slave_loop();
-    }
+
+    struct do_loops_arg s_arg[1], l_arg[1];
+    s_arg->pi = pi;
+    s_arg->pl = pl;
+    s_arg->m = m;
+    s_arg->slaves = slaves;
+    s_arg->leader = 0;
+    l_arg->pi = pi;
+    l_arg->pl = pl;
+    l_arg->m = m;
+    l_arg->slaves = slaves;
+    l_arg->leader = 1;
+
+    pthread_t leader_thread;
+
+    if (pi->m->trank == 0)
+        pthread_create(&leader_thread, NULL, (void*(*)(void*))do_loops, l_arg);
+
+    do_loops(s_arg);
+
+    if (pi->m->trank == 0)
+        pthread_join(leader_thread, NULL);
 
     /* master must flush all pending send queues */
 
-    MPI_Barrier(MPI_COMM_WORLD);
+    serialize(pi->m);
 
-    /* slaves must now transpose their data and save it. */
+    clear_slave_variables(s);
+    clear_master_variables(m);
 
-    clear_slave_variables();
-    clear_master_variables();
+    return NULL;
 }
 
-int main(int argc, char * argv[])
+int main(int argc, char *argv[])
 {
     MPI_Init(&argc, &argv);
-
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     param_list pl;
     param_list_init(pl);
     int wild = 0;
-    argv++,argc--;
+    argv++, argc--;
     param_list_configure_knob(pl, "--quiet", &quiet);
-    param_list_configure_knob(pl, "--mcheck", &mcheck);
-    param_list_configure_knob(pl, "--extra-master", &extra_master);
-    for( ; argc ; ) {
-        if (param_list_update_cmdline(pl, &argc, &argv)) continue;
-        if (wild == 0) { mfile = argv[0]; wild++,argv++,argc--; continue; }
-        if (wild == 1) { bfile = argv[0]; wild++,argv++,argc--; continue; }
-        fprintf(stderr, "Unknown option %s\n", argv[0]);
-        exit(1);
+    param_list_configure_knob(pl, "--transpose", &transposing);
+    param_list_configure_knob(pl, "--use-intermediate-file", &use_auxfile);
+    for (; argc;) {
+	if (param_list_update_cmdline(pl, &argc, &argv))
+	    continue;
+	if (wild == 0) {
+	    bfile = argv[0];
+	    wild++, argv++, argc--;
+	    continue;
+	}
+	fprintf(stderr, "Unknown option %s\n", argv[0]);
+	exit(1);
     }
 
-    param_list_parse_ulong(pl, "qsize", &queue_bytes);
-    master_rank = extra_master ? size-1 : 0;
-    gsize = size - extra_master;
-    ASSERT_ALWAYS(queue_bytes % sizeof(uint32_t) == 0);
-
-    if (mcheck) {
-        ASSERT_ALWAYS(size == 1);
-        ASSERT_ALWAYS(rank == 0);
+    if (param_list_parse_ulong(pl, "qsize", &default_queue_size)) {
+        default_queue_size /= sizeof(uint32_t);
     }
 
-    if (!bfile) usage();
+    mfile = param_list_lookup_string(pl, "matrix");
+
     if (!mfile) usage();
-
-    all();
+    if (!bfile) usage();
+    pi_go(all, pl, 0);
 
     param_list_clear(pl);
     MPI_Finalize();
