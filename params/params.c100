@@ -67,7 +67,7 @@ sieve_max_threads=2
 # Filtering
 ###########################################################################
 
-excesspurge=500000      # minimal excess we want before pruning
+excesspurge=100000      # minimal excess we want before pruning
 excess=1                # minimal excess we want after purge
 keeppurge=160           # shrink in purge if excess exceeds keeppurge
 keep=160                # keep euh le plus
