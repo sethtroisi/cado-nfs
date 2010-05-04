@@ -86,18 +86,6 @@ while (@files) {
 banner "Info rels";
 my @rels_files;
 
-sub format_dhms {
-	my $sec = shift;
-	my ($d, $h, $m);
-	$d = int ( $sec / 86400 );
-	$sec = $sec % 86400;
-	$h = int ($sec / 3600 );
-	$sec = $sec % 3600;
-	$m = int ($sec / 60 );
-	$sec = $sec % 60;
-	return "$d"."d:$h"."h:$m"."m:$sec"."s";
-} 
-
 foreach my $name (sort keys %link_name_params) {
     my $nrels = 0;
 	my $reports;

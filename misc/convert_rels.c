@@ -20,7 +20,7 @@
 #include <stdint.h> /* for UINT32_MAX */
 #include <string.h>
 #include <assert.h>
-#include "../linalg/gzip.h"
+#include "../utils/gzip.h"
 #include "gmp.h"
 
 #define MAX_PRIMES 255 /* maximal number of factor base primes */

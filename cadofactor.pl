@@ -43,11 +43,11 @@
 # TODO-list:
 #  - Bench polynomials with some sieve before selecting the best one.
 #  - Enable a 'lowmem' option
-#  - Use compressed files everywhere (done for nodup.gz). Should we implement
-#    such a mechanism in las, or should we simply use las | gzip?
-#  - Recognize when the linear algebra was already started, and in such a case
-#    resume bw with resume=1.
-#  - Use free relations (they are computed, but never used...)
+#  - To be able to import the msieve relations in CADO-NFS.
+#  - Use new Murphy value in polynomial selection (C code and perl script).
+#  - Print error files of polynomial selection when polyselect crashs and the script loop infinitely.
+#  - For check_rels, print on standard output the good relations.
+#  - Automate the parameters setting.
 
 use Cwd qw(abs_path);
 use File::Basename;

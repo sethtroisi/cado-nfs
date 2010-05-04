@@ -24,7 +24,8 @@ package cadofct;
 use Exporter;
 our @ISA= qw(Exporter);
 our @EXPORT=qw(%param $tab_level &cmd &read_machines &read_param &do_polysel_bench
-&do_sieve_bench &do_factbase &do_init &do_task &banner &info &last_line);
+&do_sieve_bench &do_factbase &do_init &do_task &banner &info &last_line
+&format_dhms);
 
 use strict;
 use warnings;
@@ -708,6 +709,14 @@ sub local_time {
     close LOG;
 }
     
+sub format_dhms {
+    my $sec = shift;
+    my ($d, $h, $m);
+    $d = int ( $sec / 86400 ); $sec = $sec % 86400;
+    $h = int ($sec / 3600 ); $sec = $sec % 3600;
+    $m = int ($sec / 60 ); $sec = $sec % 60;
+    return "$d"."d:$h"."h:$m"."m:$sec"."s"; 
+}
     
 ###############################################################################
 # Distributed tasks ###########################################################

@@ -1,0 +1,73 @@
+#!/bin/bash
+# print cpu time of cadofactor 
+#
+# Usage: $ cd "wdir"
+#		 $ cpu_time [OPTIONS]
+# OPTIONS: p: only polyselect
+#		   s: only sieve (long time of computation)
+#		   l: only linalg
+#		   r: only sqrt
+#	       ps: only polyselect and sieve
+#		   ...
+
+name=$(grep '^name=' *.param | sed "s/^name=\(\S*\)$/\1/g")
+
+function f
+{
+perl -e 'sub format_dhms {
+        my $sec = shift;
+        my ($d, $h, $m);
+        $d = int ( $sec / 86400 ); $sec = $sec % 86400;
+        $h = int ($sec / 3600 ); $sec = $sec % 3600;
+        $m = int ($sec / 60 ); $sec = $sec % 60;
+        return "$d"."d:$h"."h:$m"."m:$sec"."s";
+}
+my $var=<STDIN>; print format_dhms($var)."\n"'
+}
+
+if [[ -z $1 || $(expr $1 : '.*[p].*') != 0 ]]
+	then echo -n "CPU time for polyselect:      "
+	if [ ! -f ${name}.kjout.* ] 2> /dev/null
+		then stty -echo; read c; stty echo
+			 ls ${name}_$c.kjout.* | while read line; do new_line=$(echo $line | sed "s/^${name}_$c\.\(.*\)/${name}\.\1/g"); cp $line $new_line; done
+	fi
+	grep phase ${name}.kjout.* | sed "s/^.*phase took \(\S*\)s.*$/\1/g" | tr "\n" "+" | sed "s/^\(.*\)+$/\1\n/" | bc | f
+fi
+
+if [[ -z $1 || $(expr $1 : '.*[s].*') != 0 ]]
+	then echo -n "CPU time for sieve:           "
+	if [ -f ${name}.rels ]
+		then b=${name}.rels
+		else b=$(ls -f ${name}.rels.*000.gz)
+	fi
+	zgrep "time" $b | sed "s/^.*time \(\S*\)s.*$/\1/g" | tr "\n" "+" | sed "s/^\(.*\)+$/\1\n/" | bc | f
+fi
+
+if [[ -z $1 || $(expr $1 : '.*[l].*') != 0 ]]
+	then echo "CPU or real time for linear algebra"
+	num_lines=$(grep -n Done. ${name}.bwc.stderr | sed "s/^\([0-9]*\):Done./\1-2/g")
+	if [[ $(echo $num_lines | wc -w) == 2 ]]
+		then echo -n "        krylov [real time]:   "
+		     num_line_v=$(echo $num_lines | cut -d' ' -f 1 | bc)
+		     line_v=$(head -$num_line_v ${name}.bwc.stderr | tail -1)
+			 v0=$(echo $line_v | sed "s/^.*WCT: \(\S*\) tot.*/\1/g" | f)
+			 v1=$(echo $line_v | tail -1 | sed "s/^.*iter, \(\S*\) cpu.*/\1/g")
+			 echo "$v0 ($v1)"
+
+			 echo -n "        lingen:               "
+			 grep "^Total computation took" ${name}.bwc.stderr | sed "s/^.*took \(\S*\)$/\1/g" | f
+
+			 echo -n "        mksol [real time]:    "
+			 num_line_s=$(echo $num_lines | cut -d' ' -f 2 | bc)
+			 line_s=$(head -$num_line_s ${name}.bwc.stderr | tail -1)
+			 s0=$(echo $line_s | sed "s/^.*WCT: \(\S*\) tot.*/\1/g" | f)
+			 s1=$(echo $line_s | sed "s/^.*iter, \(\S*\) cpu.*/\1/g")
+			 echo "$s0 ($s1)"
+		else echo "    mksol not ended or linalg has been rerun with checkpoints"
+	fi	
+fi
+
+if [[ -z $1 || $(expr $1 : '.*[r].*') != 0 ]]
+	then echo -n "CPU time for sqrt (one root): "
+	tail -1 ${name}.sqrt.stderr | sed "s/^.* is \(\S*\)$/\1/g" | f
+fi
