@@ -9,11 +9,13 @@
 #include <pthread.h>
 #include "utils.h"
 
-// #define MAX_THREADS 8
+#define MAX_THREADS 8
 
 unsigned long *hash_p = NULL;
 mpz_t *hash_i = NULL;
 unsigned long hash_alloc = 0, hash_size = 0;
+int found = 0;
+pthread_mutex_t found_lock;
 
 static void
 match (unsigned long p1, unsigned long p2, mpz_t i, mpz_t m0, unsigned long ad,
@@ -138,20 +140,20 @@ hash_init (void)
   hash_size = 0;
 }
 
-/* return 1 if a match is found, 0 otherwise */
-static int
+static void
 hash_add (unsigned long *hash_p, mpz_t *hash_i, unsigned long hash_alloc,
           unsigned long p, mpz_t i, mpz_t m0, unsigned long ad, unsigned int d,
           mpz_t N)
 {
   unsigned long h = mpz_fdiv_ui (i, hash_alloc);
-  int found = 0;
 
   while (hash_p[h] != 0)
     {
       if (m0 != NULL && mpz_cmp (hash_i[h], i) == 0 && hash_p[h] != p)
         {
-          found = 1;
+          pthread_mutex_lock (&found_lock);
+          found ++;
+          pthread_mutex_unlock (&found_lock);
           match (hash_p[h], p, i, m0, ad, d, N);
         }
       if (++h == hash_alloc)
@@ -160,7 +162,6 @@ hash_add (unsigned long *hash_p, mpz_t *hash_i, unsigned long hash_alloc,
   hash_p[h] = p;
   mpz_set (hash_i[h], i);
   hash_size ++;
-  return found;
 }
 
 static void
@@ -199,13 +200,11 @@ hash_grow (void)
   hash_alloc = new_hash_alloc;
 }
 
-/* return number of polynomials found */
-static int
+static void
 newAlgo (mpz_t N, unsigned long d, unsigned long P, unsigned long ad)
 {
   mpz_t p, pp, pmax, *f, lambda, tmp, m0, Ntilde;
   unsigned long *r, nr, i, j, pui, nprimes = 0;
-  int found = 0;
 
   hash_init ();
   mpz_init (Ntilde);
@@ -271,9 +270,9 @@ newAlgo (mpz_t N, unsigned long d, unsigned long P, unsigned long ad)
           /* only consider lambda and lambda - pp */
           if (2 * hash_size + 1 >= hash_alloc)
             hash_grow ();
-          found += hash_add (hash_p, hash_i, hash_alloc, pui, lambda, m0, ad, d, N);
+          hash_add (hash_p, hash_i, hash_alloc, pui, lambda, m0, ad, d, N);
           mpz_sub (lambda, lambda, pp);
-          found += hash_add (hash_p, hash_i, hash_alloc, pui, lambda, m0, ad, d, N);
+          hash_add (hash_p, hash_i, hash_alloc, pui, lambda, m0, ad, d, N);
         }
     }
   // fprintf (stderr, "Number of primes: %lu\n", nprimes);
@@ -291,8 +290,6 @@ newAlgo (mpz_t N, unsigned long d, unsigned long P, unsigned long ad)
   hash_clear ();
   
   // fprintf (stderr, "Number of pairs: %lu (expected %1.0f)\n", hash_size, mpz_get_d (M) / (double) P / log ((double) P));
-
-  return found;
 }
 
 typedef struct
@@ -301,6 +298,7 @@ typedef struct
   unsigned int d;
   unsigned long P;
   unsigned long ad;
+  int thread;
 } __tab_struct;
 typedef __tab_struct tab_t[1];
 
@@ -308,6 +306,8 @@ void*
 one_thread (void* args)
 {
   tab_t *tab = (tab_t*) args;
+  printf ("thread %d deals with ad=%lu\n", tab[0]->thread, tab[0]->ad);
+  fflush (stdout);
   newAlgo (tab[0]->N, tab[0]->d, tab[0]->P, tab[0]->ad);
   pthread_exit (NULL);
 }
@@ -318,7 +318,7 @@ main (int argc, char *argv[])
   mpz_t N;
   unsigned int d;
   unsigned long P, ad;
-  int found = 0, tries = 0, i, nthreads = 1;
+  int tries = 0, i, nthreads = 1;
   double exp_tries;
   tab_t *T;
 #ifdef MAX_THREADS
@@ -373,6 +373,7 @@ main (int argc, char *argv[])
       mpz_init_set (T[i]->N, N);
       T[i]->d = d;
       T[i]->P = P;
+      T[i]->thread = i;
     }
   do
     {
@@ -383,14 +384,14 @@ main (int argc, char *argv[])
           fflush (stdout);
           T[i]->ad = ad;
 #ifndef MAX_THREADS
-          found += newAlgo (N, d, P, ad);
+          newAlgo (N, d, P, ad);
 #else
           pthread_create (&tid[i], NULL, one_thread, (void *) (T+i));
 #endif
           ad += 60;
         }
 #ifdef MAX_THREADS
-      for (i = 0 ; i < MAX_THREADS ; i++)
+      for (i = 0 ; i < nthreads ; i++)
         pthread_join(tid[i], NULL);
 #endif
     }
