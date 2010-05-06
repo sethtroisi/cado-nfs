@@ -5,7 +5,7 @@ set (sources
         mpz_poly.c fpoly.c rootfinder.c params.c gcd_int64.c gcd_uint64.c
         discriminant.c random_generation.c mpz_array.c gzip.c misc.c
         hashpair.c poly.c crc.c gmp_gcd.c gmp_factorization_complete.c
-	gmp_prob_prime.c barrier.c
+	gmp_prob_prime.c barrier.c usp.c
 )
 
 add_library (utils ${sources})

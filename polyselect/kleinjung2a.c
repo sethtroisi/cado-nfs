@@ -21,7 +21,7 @@ static void
 match (unsigned long p1, unsigned long p2, mpz_t i, mpz_t m0, unsigned long ad,
        unsigned int d, mpz_t N)
 {
-  mpz_t l, mtilde, m, adm1, t, k;
+  mpz_t l, mtilde, m, adm1, t, k, *f;
   unsigned int j;
   int cmp;
 
@@ -33,6 +33,9 @@ match (unsigned long p1, unsigned long p2, mpz_t i, mpz_t m0, unsigned long ad,
   mpz_init (k);
   mpz_init (adm1);
   mpz_init (mtilde);
+  f = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
+  for (j = 0; j <= d; j++)
+    mpz_init (f[j]);
   /* we have l = p1*p2 */
   mpz_set_ui (l, p1);
   mpz_mul_ui (l, l, p2);
@@ -49,7 +52,6 @@ match (unsigned long p1, unsigned long p2, mpz_t i, mpz_t m0, unsigned long ad,
     }
   mpz_mul (adm1, adm1, mtilde);
   mpz_mod (adm1, adm1, m);
-  //  gmp_fprintf (stderr, "a_{d-1}=%Zd\n", adm1);
   mpz_mul (m, adm1, l);
   mpz_sub (m, mtilde, m);
   if (mpz_divisible_ui_p (m, d) == 0)
@@ -65,11 +67,11 @@ match (unsigned long p1, unsigned long p2, mpz_t i, mpz_t m0, unsigned long ad,
     }
   mpz_divexact_ui (m, m, ad);
   gmp_fprintf (stderr, "Y1: %Zd\nY0: -%Zd\n", l, m);
-  gmp_fprintf (stderr, "X%d: %lu\n", d, ad);
+  mpz_set_ui (f[d], ad);
   mpz_pow_ui (t, m, d);
   mpz_mul_ui (t, t, ad);
   mpz_sub (t, N, t);
-  gmp_fprintf (stderr, "X%d: %Zd\n", d-1, adm1);
+  mpz_set (f[d-1], adm1);
   if (mpz_divisible_p (t, l) == 0)
     {
       fprintf (stderr, "Error: t not divisible by l\n");
@@ -102,10 +104,7 @@ match (unsigned long p1, unsigned long p2, mpz_t i, mpz_t m0, unsigned long ad,
       if (cmp >= 0)
         mpz_sub (k, k, l);
       mpz_add (adm1, adm1, k);
-      gmp_fprintf (stderr, "X%d: %Zd", j, adm1);
-      if (j == d-2)
-        fprintf (stderr, " (%.1e)", fabs (mpz_get_d (adm1)));
-      fprintf (stderr, "\n");
+      mpz_set (f[j], adm1);
       /* subtract adm1*m^j */
       mpz_submul (t, mtilde, adm1);
     }
@@ -115,13 +114,24 @@ match (unsigned long p1, unsigned long p2, mpz_t i, mpz_t m0, unsigned long ad,
       exit (1);
     }
   mpz_divexact (t, t, l);
-  gmp_fprintf (stderr, "X0: %Zd\n", t);
+  mpz_set (f[0], t);
+  for (j = d + 1; j -- != 0; )
+    {
+      gmp_fprintf (stderr, "X%u: %Zd", j, f[j]);
+      if (j == d-2)
+        fprintf (stderr, " (%.1e)", fabs (mpz_get_d (adm1)));
+      fprintf (stderr, "\n");
+    }
+  fprintf (stderr, "# %u real roots\n", numberOfRealRoots (f, d, 0, 0));
   mpz_clear (l);
   mpz_clear (m);
   mpz_clear (t);
   mpz_clear (k);
   mpz_clear (adm1);
   mpz_clear (mtilde);
+  for (j = 0; j <= d; j++)
+    mpz_clear (f[j]);
+  free (f);
 }
 
 static void
@@ -349,7 +359,8 @@ main (int argc, char *argv[])
   mpz_init (N);
   mpz_set_str (N, "1230186684530117755130494958384962720772853569595334792197322452151726400507263657518745202199786469389956474942774063845925192557326303453731548268507917026122142913461670429214311602221240479274737794080665351419597459856902143413", 10); /* RSA 768 */
   d = 6; /* degree */
-  ad = 100000020;
+  // ad = 100000020;
+  ad = 1000000000020;
 
   /*    P        #ad tried    seconds   X4 (with ad=10000020):
      100000      66/133        13s       7.3e+24

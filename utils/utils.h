@@ -36,5 +36,6 @@
 #include "misc.h"
 #include "poly.h"
 #include "crc.h"
+#include "usp.h"
 
 #endif	/* CADO_UTILS_H_ */
