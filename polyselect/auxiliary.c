@@ -901,6 +901,15 @@ rotate_aux1g (mpz_t *f, mpz_t b, mpz_t g0, long j0, long j)
   return j;
 }
 
+/* replace f + j0 * x^2 * (b*x+g0) by f + j * x^2 * (b*x+g0), and return j */
+long
+rotate_aux2g (mpz_t *f, mpz_t b, mpz_t g0, long j0, long j)
+{
+  mpz_addmul_si (f[3], b, j - j0);
+  mpz_addmul_si (f[2], g0, j - j0);
+  return j;
+}
+
 unsigned long
 rotate_area (long K0, long K1, long J0, long J1)
 {
@@ -955,8 +964,8 @@ rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1,
   E0 = LOGNORM (f, d, skewness);
 
   *K0 = -2;
-  *J0 = -1;
-  *J1 = 1;
+  *J0 = -16;
+  *J1 = 16;
 
   /* look for negative k: -2, -4, -8, ... */
   best_E = E0;
@@ -1498,6 +1507,30 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose)
             do_translate (f, d, g, k); /* original f */
         }
       
+      /* then do rotation by k*x^2*g if d >= 6 */
+      if (d >= 6)
+        {
+          rotate_aux2g (f, g[1], g[0], 0, k);
+          logmu = LOGNORM (f, d, SKEWNESS (f, d, prec));
+          if (logmu < logmu0)
+            {
+              changed = 1;
+              logmu0 = logmu;
+            }
+          else
+            {
+              rotate_aux2g (f, g[1], g[0], 0, -2 * k); /* f - k*x^2*g */
+              logmu = LOGNORM (f, d, SKEWNESS (f, d, prec));
+              if (logmu < logmu0)
+                {
+                  changed = 1;
+                  logmu0 = logmu;
+                }
+              else
+                rotate_aux2g (f, g[1], g[0], 0, k); /* previous f */
+            }
+        }
+
       /* then do rotation by k*x*g */
       rotate_aux1g (f, g[1], g[0], 0, k);
       logmu = LOGNORM (f, d, SKEWNESS (f, d, prec));

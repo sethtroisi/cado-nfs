@@ -8,22 +8,33 @@
 #include <gmp.h>
 #include <pthread.h>
 #include "utils.h"
+#include "auxiliary.h"
 
-#define MAX_THREADS 8
+#define MAX_THREADS 16
 
-unsigned long *hash_p = NULL;
-mpz_t *hash_i = NULL;
-unsigned long hash_alloc = 0, hash_size = 0;
+typedef struct
+{
+  unsigned long *hash_p;    /* contains the primes */
+  mpz_t *hash_i;            /* contains the values of r such that p^2
+                               divides N - (m0 + r)^2 */
+  unsigned long hash_alloc; /* total allocated size */
+  unsigned long hash_size;  /* number of entries in hash table */
+} __hash_struct;
+typedef __hash_struct hash_t[1];
+
 int found = 0;
+unsigned int nr = 0; /* minimum number of real roots wanted */
+double max_norm = DBL_MAX; /* maximal wanted norm (before rotation) */
 pthread_mutex_t found_lock;
 
 static void
 match (unsigned long p1, unsigned long p2, mpz_t i, mpz_t m0, unsigned long ad,
        unsigned int d, mpz_t N)
 {
-  mpz_t l, mtilde, m, adm1, t, k, *f;
-  unsigned int j;
+  mpz_t l, mtilde, m, adm1, t, k, *f, g[2];
+  unsigned int j, nroots;
   int cmp;
+  double skew, logmu, alpha;
 
   gmp_fprintf (stderr, "Found match: (%lu,%Zd) (%lu,%Zd)\n", p1, i, p2, i);
 
@@ -33,6 +44,8 @@ match (unsigned long p1, unsigned long p2, mpz_t i, mpz_t m0, unsigned long ad,
   mpz_init (k);
   mpz_init (adm1);
   mpz_init (mtilde);
+  mpz_init (g[0]);
+  mpz_init (g[1]);
   f = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
   for (j = 0; j <= d; j++)
     mpz_init (f[j]);
@@ -54,40 +67,51 @@ match (unsigned long p1, unsigned long p2, mpz_t i, mpz_t m0, unsigned long ad,
   mpz_mod (adm1, adm1, m);
   mpz_mul (m, adm1, l);
   mpz_sub (m, mtilde, m);
+#ifdef DEBUG
   if (mpz_divisible_ui_p (m, d) == 0)
     {
       fprintf (stderr, "Error: m-a_{d-1}*l not divisible by d\n");
       exit (1);
     }
+#endif
   mpz_divexact_ui (m, m, d);
+#ifdef DEBUG
   if (mpz_divisible_ui_p (m, ad) == 0)
     {
       fprintf (stderr, "Error: (m-a_{d-1}*l)/d not divisible by ad\n");
       exit (1);
     }
+#endif
   mpz_divexact_ui (m, m, ad);
+  gmp_fprintf (stderr, "Raw polynomial:\n");
   gmp_fprintf (stderr, "Y1: %Zd\nY0: -%Zd\n", l, m);
+  mpz_set (g[1], l);
+  mpz_neg (g[0], m);
   mpz_set_ui (f[d], ad);
   mpz_pow_ui (t, m, d);
   mpz_mul_ui (t, t, ad);
   mpz_sub (t, N, t);
   mpz_set (f[d-1], adm1);
+#ifdef DEBUG
   if (mpz_divisible_p (t, l) == 0)
     {
       fprintf (stderr, "Error: t not divisible by l\n");
       exit (1);
     }
+#endif
   mpz_divexact (t, t, l);
   mpz_pow_ui (mtilde, m, d-1);
   mpz_mul (mtilde, mtilde, adm1);
   mpz_sub (t, t, mtilde);
   for (j = d - 2; j > 0; j--)
     {
+#ifdef DEBUG
       if (mpz_divisible_p (t, l) == 0)
         {
           fprintf (stderr, "Error: t not divisible by l\n");
           exit (1);
         }
+#endif
       mpz_divexact (t, t, l);
       /* t = a_j*m^j + l*R thus a_j = t/m^j mod l */
       mpz_pow_ui (mtilde, m, j);
@@ -108,115 +132,142 @@ match (unsigned long p1, unsigned long p2, mpz_t i, mpz_t m0, unsigned long ad,
       /* subtract adm1*m^j */
       mpz_submul (t, mtilde, adm1);
     }
+#ifdef DEBUG
   if (mpz_divisible_p (t, l) == 0)
     {
       fprintf (stderr, "Error: t not divisible by l\n");
       exit (1);
     }
+#endif
   mpz_divexact (t, t, l);
   mpz_set (f[0], t);
   for (j = d + 1; j -- != 0; )
-    {
-      gmp_fprintf (stderr, "X%u: %Zd", j, f[j]);
-      if (j == d-2)
-        fprintf (stderr, " (%.1e)", fabs (mpz_get_d (adm1)));
-      fprintf (stderr, "\n");
-    }
-  fprintf (stderr, "# %u real roots\n", numberOfRealRoots (f, d, 0, 0));
+    gmp_fprintf (stderr, "c%u: %Zd\n", j, f[j]);
+  nroots = numberOfRealRoots (f, d, 0, 0);
+  fprintf (stderr, "# %u real root(s)\n", nroots);
+
+  skew = SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC);
+  logmu = LOGNORM (f, d, skew);
+  alpha = get_alpha (f, d, ALPHA_BOUND);
+  fprintf (stderr, "# lognorm: %1.2f, alpha: %1.2f E=%1.2f\n", logmu, alpha,
+           logmu + alpha);
+
+  optimize (f, d, g, 0);
+  skew = SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC);
+  logmu = LOGNORM (f, d, skew);
+  alpha = get_alpha (f, d, ALPHA_BOUND);
+  gmp_fprintf (stderr, "Optimized polynomial:\n");
+  gmp_fprintf (stderr, "n: %Zd\n", N);
+  gmp_fprintf (stderr, "Y1: %Zd\nY0: %Zd\n", g[1], g[0]);
+  for (j = d + 1; j -- != 0; )
+    gmp_fprintf (stderr, "c%u: %Zd\n", j, f[j]);
+  nroots = numberOfRealRoots (f, d, 0, 0);
+  fprintf (stderr, "# %u real root(s)\n", nroots);
+  fprintf (stderr, "# lognorm: %1.2f, alpha: %1.2f E=%1.2f\n", logmu, alpha,
+           logmu + alpha);
+  fprintf (stderr, "\n");
+
   mpz_clear (l);
   mpz_clear (m);
   mpz_clear (t);
   mpz_clear (k);
   mpz_clear (adm1);
   mpz_clear (mtilde);
+  mpz_clear (g[0]);
+  mpz_clear (g[1]);
   for (j = 0; j <= d; j++)
     mpz_clear (f[j]);
   free (f);
+
+  if (nroots >= nr && logmu <= max_norm)
+    {
+      pthread_mutex_lock (&found_lock);
+      found ++;
+      pthread_mutex_unlock (&found_lock);
+    }
 }
 
 static void
-hash_init (void)
+hash_init (hash_t H)
 {
   unsigned long j;
 
-  hash_alloc = 1;
-  hash_p = (unsigned long*) malloc (hash_alloc * sizeof (unsigned long));
-  hash_i = (mpz_t*) malloc (hash_alloc * sizeof (mpz_t));
-  for (j = 0; j < hash_alloc; j++)
+  H->hash_alloc = 1;
+  H->hash_p = (unsigned long*) malloc (H->hash_alloc * sizeof (unsigned long));
+  H->hash_i = (mpz_t*) malloc (H->hash_alloc * sizeof (mpz_t));
+  for (j = 0; j < H->hash_alloc; j++)
     {
-      hash_p[j] = 0;
-      mpz_init (hash_i[j]);
+      H->hash_p[j] = 0;
+      mpz_init (H->hash_i[j]);
     }
-  hash_size = 0;
+  H->hash_size = 0;
 }
 
 static void
-hash_add (unsigned long *hash_p, mpz_t *hash_i, unsigned long hash_alloc,
-          unsigned long p, mpz_t i, mpz_t m0, unsigned long ad, unsigned int d,
-          mpz_t N)
+hash_add (hash_t H, unsigned long p, mpz_t i, mpz_t m0, unsigned long ad,
+          unsigned int d, mpz_t N)
 {
-  unsigned long h = mpz_fdiv_ui (i, hash_alloc);
+  unsigned long h = mpz_fdiv_ui (i, H->hash_alloc);
 
-  while (hash_p[h] != 0)
+  while (H->hash_p[h] != 0)
     {
-      if (m0 != NULL && mpz_cmp (hash_i[h], i) == 0 && hash_p[h] != p)
-        {
-          pthread_mutex_lock (&found_lock);
-          found ++;
-          pthread_mutex_unlock (&found_lock);
-          match (hash_p[h], p, i, m0, ad, d, N);
-        }
-      if (++h == hash_alloc)
+      if (m0 != NULL && mpz_cmp (H->hash_i[h], i) == 0 && H->hash_p[h] != p)
+        match (H->hash_p[h], p, i, m0, ad, d, N);
+      if (++h == H->hash_alloc)
         h = 0;
     }
-  hash_p[h] = p;
-  mpz_set (hash_i[h], i);
-  hash_size ++;
+  H->hash_p[h] = p;
+  mpz_set (H->hash_i[h], i);
+  H->hash_size ++;
 }
 
 static void
-hash_clear (void)
+hash_clear (hash_t H)
 {
   unsigned long j;
 
-  for (j = 0; j < hash_alloc; j++)
-    mpz_clear (hash_i[j]);
-  free (hash_p);
-  free (hash_i);
+  for (j = 0; j < H->hash_alloc; j++)
+    mpz_clear (H->hash_i[j]);
+  free (H->hash_p);
+  free (H->hash_i);
 }
 
 static void
-hash_grow (void)
+hash_grow (hash_t H)
 {
-  unsigned long j, *new_hash_p, new_hash_alloc;
-  mpz_t *new_hash_i;
+  unsigned long j, *old_hash_p, old_hash_alloc;
+  mpz_t *old_hash_i;
 
-  new_hash_alloc = 2 * hash_alloc;
-  new_hash_p = (unsigned long*) malloc (new_hash_alloc *
-                                        sizeof (unsigned long));
-  for (j = 0; j < new_hash_alloc; j++)
-    new_hash_p[j] = 0;
-  new_hash_i = (mpz_t*) malloc (new_hash_alloc * sizeof (mpz_t));
-  for (j = 0; j < new_hash_alloc; j++)
-    mpz_init (new_hash_i[j]);
-  hash_size = 0;
-  for (j = 0; j < hash_alloc; j++)
-    if (hash_p[j] != 0)
-      hash_add (new_hash_p, new_hash_i, new_hash_alloc, hash_p[j], hash_i[j],
-                NULL, 0, 0, NULL);
-  hash_clear ();
-  hash_p = new_hash_p;
-  hash_i = new_hash_i;
-  hash_alloc = new_hash_alloc;
+  old_hash_alloc = H->hash_alloc;
+  old_hash_p = H->hash_p;
+  old_hash_i = H->hash_i;
+
+  H->hash_alloc = 2 * old_hash_alloc;
+  H->hash_p = (unsigned long*) malloc (H->hash_alloc *
+                                       sizeof (unsigned long));
+  for (j = 0; j < H->hash_alloc; j++)
+    H->hash_p[j] = 0;
+  H->hash_i = (mpz_t*) malloc (H->hash_alloc * sizeof (mpz_t));
+  for (j = 0; j < H->hash_alloc; j++)
+    mpz_init (H->hash_i[j]);
+  H->hash_size = 0;
+  for (j = 0; j < old_hash_alloc; j++)
+    if (old_hash_p[j] != 0)
+      hash_add (H, old_hash_p[j], old_hash_i[j], NULL, 0, 0, NULL);
+  for (j = 0; j < old_hash_alloc; j++)
+    mpz_clear (old_hash_i[j]);
+  free (old_hash_p);
+  free (old_hash_i);
 }
 
 static void
 newAlgo (mpz_t N, unsigned long d, unsigned long P, unsigned long ad)
 {
   mpz_t p, pp, pmax, *f, lambda, tmp, m0, Ntilde;
-  unsigned long *r, nr, i, j, pui, nprimes = 0;
+  unsigned long *r, i, j, pui, nprimes = 0, nr;
+  hash_t H;
 
-  hash_init ();
+  hash_init (H);
   mpz_init (Ntilde);
   mpz_init (p);
   mpz_init (m0);
@@ -261,7 +312,7 @@ newAlgo (mpz_t N, unsigned long d, unsigned long P, unsigned long ad)
           mpz_ui_pow_ui (tmp, r[j], d - 1);
           mpz_mul_ui (lambda, tmp, r[j]);
           mpz_sub (lambda, Ntilde, lambda);
-#if 0
+#ifdef DEBUG
           if (mpz_divisible_ui_p (lambda, pui) == 0)
             {
               fprintf (stderr, "Error, N~ - r[j]^d not divisible by p\n");
@@ -278,14 +329,13 @@ newAlgo (mpz_t N, unsigned long d, unsigned long P, unsigned long ad)
           mpz_mod (lambda, lambda, pp);
 
           /* only consider lambda and lambda - pp */
-          if (2 * hash_size + 1 >= hash_alloc)
-            hash_grow ();
-          hash_add (hash_p, hash_i, hash_alloc, pui, lambda, m0, ad, d, N);
+          if (2 * H->hash_size + 1 >= H->hash_alloc)
+            hash_grow (H);
+          hash_add (H, pui, lambda, m0, ad, d, N);
           mpz_sub (lambda, lambda, pp);
-          hash_add (hash_p, hash_i, hash_alloc, pui, lambda, m0, ad, d, N);
+          hash_add (H, pui, lambda, m0, ad, d, N);
         }
     }
-  // fprintf (stderr, "Number of primes: %lu\n", nprimes);
   for (i = 0; i <= d; i++)
     mpz_clear (f[i]);
   free (f);
@@ -297,9 +347,7 @@ newAlgo (mpz_t N, unsigned long d, unsigned long P, unsigned long ad)
   mpz_clear (tmp);
   mpz_clear (m0);
   mpz_clear (Ntilde);
-  hash_clear ();
-  
-  // fprintf (stderr, "Number of pairs: %lu (expected %1.0f)\n", hash_size, mpz_get_d (M) / (double) P / log ((double) P));
+  hash_clear (H);
 }
 
 typedef struct
@@ -316,7 +364,8 @@ void*
 one_thread (void* args)
 {
   tab_t *tab = (tab_t*) args;
-  printf ("thread %d deals with ad=%lu\n", tab[0]->thread, tab[0]->ad);
+
+  //  printf ("thread %d deals with ad=%lu\n", tab[0]->thread, tab[0]->ad);
   fflush (stdout);
   newAlgo (tab[0]->N, tab[0]->d, tab[0]->P, tab[0]->ad);
   pthread_exit (NULL);
@@ -328,23 +377,43 @@ main (int argc, char *argv[])
   mpz_t N;
   unsigned int d;
   unsigned long P, ad;
-  int tries = 0, i, nthreads = 1;
+  int tries = 0, i, nthreads = 1, nr = 0;
   double exp_tries;
   tab_t *T;
 #ifdef MAX_THREADS
   pthread_t tid[MAX_THREADS];
 #endif
 
-  if (argc >= 3 && strcmp (argv[1], "-t") == 0)
+  while (argc >= 2 && argv[1][0] == '-')
     {
-      nthreads = atoi (argv[2]);
-      argv += 2;
-      argc -= 2;
+      if (strcmp (argv[1], "-t") == 0)
+        {
+          nthreads = atoi (argv[2]);
+          argv += 2;
+          argc -= 2;
+        }
+      else if (strcmp (argv[1], "-nr") == 0)
+        {
+          nr = atoi (argv[2]);
+          argv += 2;
+          argc -= 2;
+        }
+      else if (strcmp (argv[1], "-maxnorm") == 0)
+        {
+          max_norm = atof (argv[2]);
+          argv += 2;
+          argc -= 2;
+        }
+      else
+        {
+          fprintf (stderr, "Invalid option: %s\n", argv[1]);
+          exit (1);
+        }
     }
 
   if (argc != 2)
     {
-      fprintf (stderr, "Usage: %s [-t nthreads] P\n", argv[0]);
+      fprintf (stderr, "Usage: %s [-t nthreads -nr nnn] P\n", argv[0]);
       exit (1);
     }
 
@@ -357,10 +426,20 @@ main (int argc, char *argv[])
 #endif
 
   mpz_init (N);
+#if 1 /* RSA-768 */
   mpz_set_str (N, "1230186684530117755130494958384962720772853569595334792197322452151726400507263657518745202199786469389956474942774063845925192557326303453731548268507917026122142913461670429214311602221240479274737794080665351419597459856902143413", 10); /* RSA 768 */
   d = 6; /* degree */
-  // ad = 100000020;
-  ad = 1000000000020;
+  // ad = 1000000000020;
+  ad = 100000020;
+#elif 0 /* RSA 180 */
+  mpz_set_str (N, "191147927718986609689229466631454649812986246276667354864188503638807260703436799058776201365135161278134258296128109200046702912984568752800330221777752773957404540495707851421041", 10);
+  d = 5;
+  ad = 10000020;
+#else /* aliq(564,3331) c166 */
+  mpz_set_str (N, "2987193183856651631187095115639767024853796193560927033884323499962128575016083987608438436687647187187228725354979166326080044899692965798796577991358266793284662823", 10);
+  d = 5;
+  ad = 1000020;
+#endif
 
   /*    P        #ad tried    seconds   X4 (with ad=10000020):
      100000      66/133        13s       7.3e+24
