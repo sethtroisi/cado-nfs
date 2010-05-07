@@ -22,7 +22,7 @@ int main(int argc, char **argv) {
     mpz_t b, m;
     int verbose = 1;
 
-    if (strcmp (argv[1], "-v") == 0)
+    if (argc >= 2 && strcmp (argv[1], "-v") == 0)
       {
         argv ++;
         argc --;
