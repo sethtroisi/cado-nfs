@@ -173,6 +173,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       fprintf (stderr, "# lognorm %1.2f, alpha %1.2f, E %1.2f, %u rroots\n",
                logmu, alpha, logmu + alpha, nroots);
       fprintf (stderr, "\n");
+      fflush (stderr);
       pthread_mutex_lock (&found_lock);
       found ++;
       pthread_mutex_unlock (&found_lock);
@@ -267,24 +268,22 @@ initPrimes (unsigned long P)
   unsigned long maxprimes = (unsigned long) 2.0 * (double) P /
     log (2.0 * (double) P) - (double) P / log ((double) P);
   unsigned long nprimes = 0;
-  mpz_t p;
+  unsigned long p;
 
   Primes = (uint32_t*) malloc (maxprimes * sizeof (uint32_t));
-  mpz_init (p);
-  mpz_set_ui (p, P - 1);
-  while (mpz_cmp_ui (p, 2 * P) <= 0)
+  for (p = 2; p < P; p = getprime (p));
+  while (p <= 2 * P)
     {
-      mpz_nextprime (p, p);
       if (nprimes + 1 >= maxprimes)
         {
           maxprimes += maxprimes / 10;
           Primes = (uint32_t*) realloc (Primes, maxprimes * sizeof (uint32_t));
         }
-      Primes[nprimes++] = mpz_get_ui (p);
+      Primes[nprimes++] = p;
+      p = getprime (p);
     }
   Primes[nprimes++] = 0; /* end of list */
   Primes = (uint32_t*) realloc (Primes, nprimes * sizeof (uint32_t));
-  mpz_clear (p);
 }
 
 static void
@@ -403,12 +402,18 @@ main (int argc, char *argv[])
   mpz_t N;
   unsigned int d;
   unsigned long P, admin = 60, admax = ULONG_MAX;
-  int tries = 0, i, nthreads = 1, nr = 0;
+  int tries = 0, i, nthreads = 1, nr = 0, st;
   double exp_tries;
   tab_t *T;
 #ifdef MAX_THREADS
   pthread_t tid[MAX_THREADS];
 #endif
+
+  /* printf command-line */
+  fprintf (stderr, "#");
+  for (i = 0; i < argc; i++)
+    fprintf (stderr, " %s", argv[i]);
+  fprintf (stderr, "\n");
 
   while (argc >= 2 && argv[1][0] == '-')
     {
@@ -432,13 +437,13 @@ main (int argc, char *argv[])
         }
       else if (strcmp (argv[1], "-admin") == 0)
         {
-          admin = atoi (argv[2]);
+          admin = strtoul (argv[2], NULL, 10);
           argv += 2;
           argc -= 2;
         }
       else if (strcmp (argv[1], "-admax") == 0)
         {
-          admax = atoi (argv[2]);
+          admax = strtoul (argv[2], NULL, 10);
           argv += 2;
           argc -= 2;
         }
@@ -485,9 +490,10 @@ main (int argc, char *argv[])
 #endif
 
   P = atoi (argv[1]);
+  st = cputime ();
   initPrimes (P);
+  fprintf (stderr, "Initializing primes took %dms\n", cputime () - st);
   exp_tries = pow (log ((double) P), 2.0);
-  printf ("P=%lu (%1.0f tries expected)\n", P, exp_tries);
   T = malloc (nthreads * sizeof (tab_t));
   for (i = 0; i < nthreads ; i++)
     {

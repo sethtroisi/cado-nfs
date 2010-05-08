@@ -1497,8 +1497,8 @@ main (int argc, char *argv[])
   optimize (poly->f, degree, poly->g, 0);
   mpz_neg (Mt[i].m, poly->g[0]);
   ASSERT_ALWAYS (mpz_cmp (Mt[i].b, poly->g[1]) == 0);
-  rotate_aux (poly->f, Mt[i].b, Mt[i].m, 0, bestk);
-  rotate_aux1 (poly->f, Mt[i].b, Mt[i].m, 0, bestj);
+  rotate_aux (poly->f, Mt[i].b, Mt[i].m, 0, bestk, 0);
+  rotate_aux (poly->f, Mt[i].b, Mt[i].m, 0, bestj, 1);
   if (!notr)
       translate (poly->f, degree, poly->g, Mt[i].m, Mt[i].b, verbose);
 

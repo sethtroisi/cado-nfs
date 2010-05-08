@@ -865,49 +865,21 @@ discriminant_k (mpz_t *D, mpz_t *f, int d, mpz_t m, mpz_t b)
   free (M);
 }
 
-/* replace f + k0 * (b*x - m) by f + k * (b*x - m), and return k */
+/* replace f + k0 * x^t * (b*x - m) by f + k * x^t * (b*x - m), and return k */
 long
-rotate_aux (mpz_t *f, mpz_t b, mpz_t m, long k0, long k)
+rotate_aux (mpz_t *f, mpz_t b, mpz_t m, long k0, long k, unsigned int t)
 {
-  mpz_addmul_si (f[1], b, k - k0);
-  mpz_submul_si (f[0], m, k - k0);
+  mpz_addmul_si (f[t + 1], b, k - k0);
+  mpz_submul_si (f[t], m, k - k0);
   return k;
 }
 
-/* replace f + k0 * (b*x + g0) by f + k * (b*x + g0), and return k */
-long
-rotate_auxg (mpz_t *f, mpz_t b, mpz_t g0, long k0, long k)
+/* replace f by f + k * x^t * (b*x + g0) */
+static void
+rotate_auxg_z (mpz_t *f, mpz_t b, mpz_t g0, mpz_t k, unsigned int t)
 {
-  mpz_addmul_si (f[1], b, k - k0);
-  mpz_addmul_si (f[0], g0, k - k0);
-  return k;
-}
-
-/* replace f + j0 * x * (b*x - m) by f + j * x * (b*x - m), and return j */
-long
-rotate_aux1 (mpz_t *f, mpz_t b, mpz_t m, long j0, long j)
-{
-  mpz_addmul_si (f[2], b, j - j0);
-  mpz_submul_si (f[1], m, j - j0);
-  return j;
-}
-
-/* replace f + j0 * x * (b*x + g0) by f + j * x * (b*x + g0), and return j */
-long
-rotate_aux1g (mpz_t *f, mpz_t b, mpz_t g0, long j0, long j)
-{
-  mpz_addmul_si (f[2], b, j - j0);
-  mpz_addmul_si (f[1], g0, j - j0);
-  return j;
-}
-
-/* replace f + j0 * x^2 * (b*x+g0) by f + j * x^2 * (b*x+g0), and return j */
-long
-rotate_aux2g (mpz_t *f, mpz_t b, mpz_t g0, long j0, long j)
-{
-  mpz_addmul_si (f[3], b, j - j0);
-  mpz_addmul_si (f[2], g0, j - j0);
-  return j;
+  mpz_addmul (f[t + 1], b, k);
+  mpz_addmul (f[t], g0, k);
 }
 
 unsigned long
@@ -971,7 +943,7 @@ rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1,
   best_E = E0;
   for (i = 1; rotate_area (*K0, -*K0, *J0, *J1) < max_area; i++, *K0 *= 2)
     {
-      k0 = rotate_aux (f, b, m, k0, *K0);
+      k0 = rotate_aux (f, b, m, k0, *K0, 0);
       lognorm = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
       alpha = exp_alpha[i];
       E = lognorm + alpha;
@@ -984,14 +956,14 @@ rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1,
         break;
     }
   /* go back to k=0 */
-  k0 = rotate_aux (f, b, m, k0, 0);
+  k0 = rotate_aux (f, b, m, k0, 0, 0);
   *K1 = -*K0;
 
   /* now try negative j: -1, -3, -7, ... */
   for (i++; exp_alpha[i] != DBL_MAX && rotate_area (*K0, *K1, *J0, -*J0)
 	 < max_area; i++, *J0 = 2 * *J0 - 1)
     {
-      j0 = rotate_aux1 (f, b, m, j0, *J0);
+      j0 = rotate_aux (f, b, m, j0, *J0, 1);
       lognorm = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
       alpha = exp_alpha[i];
       E = lognorm + alpha;
@@ -1012,8 +984,8 @@ rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1,
              *J0, *J1, *K0, *K1);
 
   /* rotate back to j=k=0 */
-  rotate_aux (f, b, m, k0, 0);
-  rotate_aux1 (f, b, m, j0, 0);
+  rotate_aux (f, b, m, k0, 0, 0);
+  rotate_aux (f, b, m, j0, 0, 1);
 }
 
 /* res <- f(k) */
@@ -1046,7 +1018,7 @@ old_rotate (unsigned long p, double *A, long K0, long K1, long k0, mpz_t *f,
   for (pp = p * p, k = K0; (k < K0 + (long) p) && (k <= K1); k++)
     {
       /* translate from k0 to k */
-      k0 = rotate_aux (f, b, m, k0, k);
+      k0 = rotate_aux (f, b, m, k0, k, 0);
       
       /* compute contribution for k */
       mpz_poly_eval_si (v, D->data, d, k);
@@ -1081,7 +1053,7 @@ old_rotate (unsigned long p, double *A, long K0, long K1, long k0, mpz_t *f,
 		    {
 		      mpz_poly_eval_si (v, D->data, d, l);
 		      /* translate from k0 to l */
-		      k0 = rotate_aux (f, b, m, k0, l);
+		      k0 = rotate_aux (f, b, m, k0, l, 0);
 		      e = special_valuation (f, d, p, v);
 		      alpha = (one_over_pm1 - e) * logp;
 		      A[l - K0] += alpha;
@@ -1092,7 +1064,7 @@ old_rotate (unsigned long p, double *A, long K0, long K1, long k0, mpz_t *f,
 		break;
 	      mpz_poly_eval_si (v, D->data, d, i);
 	      /* translate from k0 to i */
-	      k0 = rotate_aux (f, b, m, k0, i);
+	      k0 = rotate_aux (f, b, m, k0, i, 0);
 	      e = special_valuation (f, d, p, v);
 	      alpha = (one_over_pm1 - e) * logp;
 	    }
@@ -1155,9 +1127,9 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
   for (j = 0;;)
     {
       /* we consider j=0, 1, ..., J1, then J0, J0+1, ..., -1 */
-      j0 = rotate_aux1 (f, b, m, j0, j);
+      j0 = rotate_aux (f, b, m, j0, j, 0);
       /* go back to k=0 for the discriminant */
-      k0 = rotate_aux (f, b, m, k0, 0);
+      k0 = rotate_aux (f, b, m, k0, 0, 0);
       /* D(k) = disc(f + (j*x+k)*g, x) (j is now fixed) */
       discriminant_k (D->data, f, d, m, b);
 
@@ -1168,7 +1140,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
     if (isprime (p))
       {
 	if (k0 != 0)
-	  k0 = rotate_aux (f, b, m, k0, 0);
+	  k0 = rotate_aux (f, b, m, k0, 0, 0);
 
         time_alpha -= seconds ();
 #ifdef NEW_ROOTSIEVE
@@ -1222,7 +1194,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
           /* check lognorm + alpha < best_lognorm + best_alpha */
 
           /* translate from k0 to k */
-          k0 = rotate_aux (f, b, m, k0, k);
+          k0 = rotate_aux (f, b, m, k0, k, 0);
           lognorm = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
           if (multi <= 1) {
               if (lognorm + alpha < best_lognorm + best_alpha) {
@@ -1269,8 +1241,8 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
   /* we now have f + (j0*x+k0)*(bx-m) and we want f + (jmin*x+kmin)*(bx-m),
      thus we have to add ((jmin-j0)*x+(kmin-k0)*(bx-m) */
   /* if you are in multi-mode, we use the best polynomial */
-  rotate_aux (f, b, m, k0, *kmin);
-  rotate_aux1 (f, b, m, j0, *jmin);
+  rotate_aux (f, b, m, k0, *kmin, 0);
+  rotate_aux (f, b, m, j0, *jmin, 1);
 
   if (verbose && (multi <= 1))
     {
@@ -1471,23 +1443,39 @@ do_translate (mpz_t *f, int d, mpz_t *g, long k)
   mpz_addmul_si (g[0], g[1], k);
 }
 
+/* f <- f(x+k), g <- g(x+k) */
+void
+do_translate_z (mpz_t *f, int d, mpz_t *g, mpz_t k)
+{
+  int i, j;
+
+  for (i = d - 1; i >= 0; i--)
+    for (j = i; j < d; j++)
+      mpz_addmul (f[j], f[j+1], k);
+  mpz_addmul (g[0], g[1], k);
+}
+
 /* Use rotation and translation to find a polynomial with smaller norm
    (local minimum). Modify f and g accordingly. */
 void
 optimize (mpz_t *f, int d, mpz_t *g, int verbose)
 {
-  long k = 1; /* current offset */
+  mpz_t k, l; /* current offset */
   int changed;
   double logmu00, logmu0, logmu;
   int prec = SKEWNESS_DEFAULT_PREC;
 
   logmu00 = logmu0 = LOGNORM (f, d, SKEWNESS (f, d, prec));
+  mpz_init_set_ui (k, 1);
+  mpz_init (l);
   while (1)
     {
       changed = 0;
 
+      mpz_mul_si (l, k, -2); /* l = -2k */
+
       /* first try translation by k */
-      do_translate (f, d, g, k); /* f(x+k) */
+      do_translate_z (f, d, g, k); /* f(x+k) */
       logmu = LOGNORM (f, d, SKEWNESS (f, d, prec));
       if (logmu < logmu0)
         {
@@ -1496,7 +1484,7 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose)
         }
       else
         {
-          do_translate (f, d, g, -2 * k); /* f(x-k) */
+          do_translate_z (f, d, g, l); /* f(x-k) */
           logmu = LOGNORM (f, d, SKEWNESS (f, d, prec));
           if (logmu < logmu0)
             {
@@ -1504,13 +1492,13 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose)
               logmu0 = logmu;
             }
           else
-            do_translate (f, d, g, k); /* original f */
+            do_translate_z (f, d, g, k); /* original f */
         }
       
       /* then do rotation by k*x^2*g if d >= 6 */
       if (d >= 6)
         {
-          rotate_aux2g (f, g[1], g[0], 0, k);
+          rotate_auxg_z (f, g[1], g[0], k, 2);
           logmu = LOGNORM (f, d, SKEWNESS (f, d, prec));
           if (logmu < logmu0)
             {
@@ -1519,7 +1507,7 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose)
             }
           else
             {
-              rotate_aux2g (f, g[1], g[0], 0, -2 * k); /* f - k*x^2*g */
+              rotate_auxg_z (f, g[1], g[0], l, 2); /* f - k*x^2*g */
               logmu = LOGNORM (f, d, SKEWNESS (f, d, prec));
               if (logmu < logmu0)
                 {
@@ -1527,12 +1515,12 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose)
                   logmu0 = logmu;
                 }
               else
-                rotate_aux2g (f, g[1], g[0], 0, k); /* previous f */
+                rotate_auxg_z (f, g[1], g[0], k, 2); /* previous f */
             }
         }
 
       /* then do rotation by k*x*g */
-      rotate_aux1g (f, g[1], g[0], 0, k);
+      rotate_auxg_z (f, g[1], g[0], k, 1);
       logmu = LOGNORM (f, d, SKEWNESS (f, d, prec));
       if (logmu < logmu0)
         {
@@ -1541,7 +1529,7 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose)
         }
       else
         {
-          rotate_aux1g (f, g[1], g[0], 0, -2 * k); /* f - k*x*g */
+          rotate_auxg_z (f, g[1], g[0], l, 1); /* f - k*x*g */
           logmu = LOGNORM (f, d, SKEWNESS (f, d, prec));
           if (logmu < logmu0)
             {
@@ -1549,11 +1537,11 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose)
               logmu0 = logmu;
             }
           else
-            rotate_aux1g (f, g[1], g[0], 0, k); /* previous f */
+            rotate_auxg_z (f, g[1], g[0], k, 1); /* previous f */
         }
 
       /* then do rotation by k*g */
-      rotate_auxg (f, g[1], g[0], 0, k);
+      rotate_auxg_z (f, g[1], g[0], k, 0);
       logmu = LOGNORM (f, d, SKEWNESS (f, d, prec));
       if (logmu < logmu0)
         {
@@ -1562,7 +1550,7 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose)
         }
       else
         {
-          rotate_auxg (f, g[1], g[0], 0, -2 * k); /* f - k*g */
+          rotate_auxg_z (f, g[1], g[0], l, 0); /* f - k*g */
           logmu = LOGNORM (f, d, SKEWNESS (f, d, prec));
           if (logmu < logmu0)
             {
@@ -1570,19 +1558,18 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose)
               logmu0 = logmu;
             }
           else
-            rotate_auxg (f, g[1], g[0], 0, k); /* previous f */
+            rotate_auxg_z (f, g[1], g[0], k, 0); /* previous f */
         }
 
       if (changed == 1)
-	{
-	  if (LONG_MIN / 2 <= k && k <= LONG_MAX / 2)
-	    k = 2 * k;
-	}
-      else if (k > 1)
-        k = k / 2;
+        mpz_neg (k, l);               /* k <- 2k */
+      else if (mpz_cmp_ui (k, 1) > 0)
+        mpz_div_2exp (k, k, 1);       /* k <- k/2 */
       else /* changed = 0 and k = 1 */
         break;
     }
+  mpz_clear (k);
+  mpz_clear (l);
 
   if (verbose > 0) {
     gmp_fprintf (stderr, "# ad=%Zd: optimized lognorm from %.2f to %.2f\n",

@@ -33,8 +33,8 @@ int main(int argc, char **argv) {
 
     mpz_set (b, poly->g[1]);
     mpz_neg (m, poly->g[0]);
-    rotate_aux (poly->f,  b, m, 0, k);
-    rotate_aux1 (poly->f, b, m, 0, j);
+    rotate_aux (poly->f,  b, m, 0, k, 0);
+    rotate_aux (poly->f, b, m, 0, j, 1);
     mpz_clear(b);
     mpz_clear(m);
 
