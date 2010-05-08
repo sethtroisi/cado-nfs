@@ -45,18 +45,18 @@ void trivial_method (mpz_t *f, int d, mpz_t b, mpz_t m, unsigned long alim) {
   rotate_bounds(f, d, b, m, &K0, &K1, &J0, &J1, VERBOSE);
   j0 = k0 = 0; 
 
-	for(j=J0; j<=J1; j++) {
-    j0 = rotate_aux1(f,b,m,j0,j);
+  for(j=J0; j<=J1; j++) {
+    j0 = rotate_aux (f, b, m, j0, j, 1);
     for(k=K0; k<=K1; k++) {
-      k0 = rotate_aux(f,b,m,k0,k);
+      k0 = rotate_aux (f, b, m, k0, k, 0);
 			fprintf(true_alpha,"j=%+5ld k=%+5ld alpha=%+2.6f ", j, k, get_alpha(f, d, alim));
 			//print_coeffs(f,d);
 			fprintf(true_alpha,"\n");
 		}
 	}
   
-	rotate_aux1(f,b,m,j0,0);
-	rotate_aux(f,b,m,k0,0);
+  rotate_aux (f, b, m, j0, 0, 1);
+  rotate_aux (f, b, m, k0, 0, 0);
   fclose(true_alpha);
 }
 
