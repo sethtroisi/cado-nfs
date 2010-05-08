@@ -23,7 +23,7 @@ typedef struct
 typedef __hash_struct hash_t[1];
 
 /* read-only global variables */
-int found = 0;
+int found = 0, verbose = 0;
 unsigned int nr = 0; /* minimum number of real roots wanted */
 double max_norm = DBL_MAX; /* maximal wanted norm (before rotation) */
 pthread_mutex_t found_lock;
@@ -442,6 +442,12 @@ main (int argc, char *argv[])
           argv += 2;
           argc -= 2;
         }
+      else if (strcmp (argv[1], "-v") == 0)
+        {
+          verbose ++;
+          argv += 1;
+          argc -= 1;
+        }
       else
         {
           fprintf (stderr, "Invalid option: %s\n", argv[1]);
@@ -494,8 +500,11 @@ main (int argc, char *argv[])
       for (i = 0; i < nthreads ; i++)
         {
           tries ++;
-          // gmp_printf ("%d ad=%lu\r", tries, admin);
-          // fflush (stdout);
+          if (verbose >= 1)
+            {
+              gmp_printf ("%d ad=%lu\r", tries, admin);
+              fflush (stdout);
+            }
           T[i]->ad = admin;
 #ifndef MAX_THREADS
           newAlgo (N, d, admin);
