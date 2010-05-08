@@ -400,7 +400,7 @@ int
 main (int argc, char *argv[])
 {
   mpz_t N;
-  unsigned int d;
+  unsigned int d = 0;
   unsigned long P, admin = 60, admax = ULONG_MAX;
   int tries = 0, i, nthreads = 1, nr = 0, st;
   double exp_tries;
@@ -414,6 +414,8 @@ main (int argc, char *argv[])
   for (i = 0; i < argc; i++)
     fprintf (stderr, " %s", argv[i]);
   fprintf (stderr, "\n");
+
+  mpz_init (N);
 
   while (argc >= 2 && argv[1][0] == '-')
     {
@@ -447,6 +449,18 @@ main (int argc, char *argv[])
           argv += 2;
           argc -= 2;
         }
+      else if (strcmp (argv[1], "-N") == 0)
+        {
+          mpz_set_str (N, argv[2], 10);
+          argv += 2;
+          argc -= 2;
+        }
+      else if (strcmp (argv[1], "-d") == 0)
+        {
+	  d = atoi (argv[2]);
+          argv += 2;
+          argc -= 2;
+        }
       else if (strcmp (argv[1], "-v") == 0)
         {
           verbose ++;
@@ -462,7 +476,7 @@ main (int argc, char *argv[])
 
   if (argc != 2)
     {
-      fprintf (stderr, "Usage: %s [-t nthreads -nr nnn -admin nnn -admax nnn] P\n", argv[0]);
+      fprintf (stderr, "Usage: %s [-t nthreads -nr nnn -admin nnn -admax nnn -N nnn -d nnn] P\n", argv[0]);
       exit (1);
     }
 
@@ -474,20 +488,11 @@ main (int argc, char *argv[])
     }
 #endif
 
-  mpz_init (N);
-#if 1 /* RSA-768 */
-  mpz_set_str (N, "1230186684530117755130494958384962720772853569595334792197322452151726400507263657518745202199786469389956474942774063845925192557326303453731548268507917026122142913461670429214311602221240479274737794080665351419597459856902143413", 10); /* RSA 768 */
-  d = 6; /* degree */
-  // admin = 1000000000020;
-  // admin = 100000020;
-#elif 0 /* RSA 180 */
-  mpz_set_str (N, "191147927718986609689229466631454649812986246276667354864188503638807260703436799058776201365135161278134258296128109200046702912984568752800330221777752773957404540495707851421041", 10);
-  d = 5;
-  admin = 10000020;
-#else /* aliq(564,3331) c166 */
-  mpz_set_str (N, "2987193183856651631187095115639767024853796193560927033884323499962128575016083987608438436687647187187228725354979166326080044899692965798796577991358266793284662823", 10);
-  d = 5;
-#endif
+  if (mpz_cmp_ui (N, 0) <= 0 || d == 0)
+    {
+      fprintf (stderr, "Error, missing -N number or -d degree\n");
+      exit (1);
+    }
 
   P = atoi (argv[1]);
   st = cputime ();
