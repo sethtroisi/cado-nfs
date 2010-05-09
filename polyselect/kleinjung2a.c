@@ -299,6 +299,7 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
   unsigned long *r, i, j, p, nprimes = 0, nr;
   hash_t H;
   uint64_t pp;
+  long lambda_si;
 
   hash_init (H);
   mpz_init (Ntilde);
@@ -337,6 +338,7 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
              r[j]^d + d*lambda*p*r[j]^(d-1) = N (mod p^2)
              lambda = (N - r[j]^d)/p/d/r[j]^(d-1) mod p */
           mpz_ui_pow_ui (tmp, r[j], d - 1);
+          mpz_mod_ui (tmp, tmp, p);
           mpz_mul_ui (lambda, tmp, r[j]);
           mpz_sub (lambda, Ntilde, lambda);
 #ifdef DEBUG
@@ -347,9 +349,10 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
             }
 #endif
           mpz_divexact_ui (lambda, lambda, p);
-          mpz_mul_ui (tmp, tmp, d);
+          mpz_mul_ui (tmp, tmp, d); /* tmp = d*r[j]^(d-1) */
           mpz_set_ui (ump, p);
-          mpz_invert (tmp, tmp, ump); /* FIXME: we can share the inversions */
+          mpz_invert (tmp, tmp, ump); /* FIXME: we could share the inversions
+                                         between different roots mod p */
           mpz_mul (lambda, lambda, tmp);
           mpz_mul_ui (lambda, lambda, p);
           mpz_add_ui (lambda, lambda, r[j]);
@@ -359,9 +362,10 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
           /* only consider lambda and lambda - pp */
           if (2 * H->hash_size + 1 >= H->hash_alloc)
             hash_grow (H);
-          hash_add (H, p, mpz_get_si (lambda), m0, ad, d, N);
-          mpz_sub_ui (lambda, lambda, pp);
-          hash_add (H, p, mpz_get_si (lambda), m0, ad, d, N);
+          lambda_si = mpz_get_si (lambda);
+          hash_add (H, p, lambda_si, m0, ad, d, N);
+          lambda_si -= (long) pp;
+          hash_add (H, p, lambda_si, m0, ad, d, N);
         }
     }
   for (i = 0; i <= d; i++)
@@ -410,10 +414,11 @@ main (int argc, char *argv[])
 #endif
 
   /* printf command-line */
-  fprintf (stderr, "#");
+  printf ("#");
   for (i = 0; i < argc; i++)
-    fprintf (stderr, " %s", argv[i]);
-  fprintf (stderr, "\n");
+    printf (" %s", argv[i]);
+  printf ("\n");
+  fflush (stdout);
 
   mpz_init (N);
 
