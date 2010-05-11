@@ -1127,7 +1127,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
   for (j = 0;;)
     {
       /* we consider j=0, 1, ..., J1, then J0, J0+1, ..., -1 */
-      j0 = rotate_aux (f, b, m, j0, j, 0);
+      j0 = rotate_aux (f, b, m, j0, j, 1);
       /* go back to k=0 for the discriminant */
       k0 = rotate_aux (f, b, m, k0, 0, 0);
       /* D(k) = disc(f + (j*x+k)*g, x) (j is now fixed) */
