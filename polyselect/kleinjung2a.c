@@ -10,6 +10,8 @@
 #include "utils.h"
 #include "auxiliary.h"
 
+// #define DEBUG
+
 #define MAX_THREADS 16
 
 typedef struct
@@ -338,11 +340,10 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
              r[j]^d + d*lambda*p*r[j]^(d-1) = N (mod p^2)
              lambda = (N - r[j]^d)/p/d/r[j]^(d-1) mod p */
           mpz_ui_pow_ui (tmp, r[j], d - 1);
-          mpz_mod_ui (tmp, tmp, p);
           mpz_mul_ui (lambda, tmp, r[j]);
           mpz_sub (lambda, Ntilde, lambda);
 #ifdef DEBUG
-          if (mpz_divisible_ui_p (lambda, pui) == 0)
+          if (mpz_divisible_ui_p (lambda, p) == 0)
             {
               fprintf (stderr, "Error, N~ - r[j]^d not divisible by p\n");
               exit (1);
@@ -368,6 +369,7 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
           hash_add (H, p, lambda_si, m0, ad, d, N);
         }
     }
+
   for (i = 0; i <= d; i++)
     mpz_clear (f[i]);
   free (f);
@@ -407,7 +409,6 @@ main (int argc, char *argv[])
   unsigned int d = 0;
   unsigned long P, admin = 60, admax = ULONG_MAX;
   int tries = 0, i, nthreads = 1, nr = 0, st;
-  double exp_tries;
   tab_t *T;
 #ifdef MAX_THREADS
   pthread_t tid[MAX_THREADS];
@@ -503,7 +504,6 @@ main (int argc, char *argv[])
   st = cputime ();
   initPrimes (P);
   fprintf (stderr, "Initializing primes took %dms\n", cputime () - st);
-  exp_tries = pow (log ((double) P), 2.0);
   T = malloc (nthreads * sizeof (tab_t));
   for (i = 0; i < nthreads ; i++)
     {
@@ -534,8 +534,7 @@ main (int argc, char *argv[])
         pthread_join(tid[i], NULL);
 #endif
     }
-  fprintf (stderr, "Tried %d ad-values (log^2(P)=%1.0f)\n", tries, exp_tries);
-  fprintf (stderr, "Found %d polynomials\n", found);
+  fprintf (stderr, "Tried %d ad-values, found %d polynomials\n", tries, found);
   for (i = 0; i < nthreads ; i++)
     mpz_clear (T[i]->N);
   free (T);
