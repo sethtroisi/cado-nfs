@@ -41,7 +41,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   double skew, logmu, alpha;
 
 #ifdef DEBUG
-  gmp_fprintf (stderr, "Found match: (%lu,%ld) (%lu,%ld)\n", p1, i, p2, i);
+  printf ("Found match: (%lu,%ld) (%lu,%ld)\n", p1, i, p2, i);
 #endif
 
   mpz_init (l);
@@ -90,8 +90,8 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 #endif
   mpz_divexact_ui (m, m, ad);
 #ifdef DEBUG
-  gmp_fprintf (stderr, "Raw polynomial:\n");
-  gmp_fprintf (stderr, "Y1: %Zd\nY0: -%Zd\n", l, m);
+  printf ("Raw polynomial:\n");
+  printf ("Y1: %Zd\nY0: -%Zd\n", l, m);
 #endif
   mpz_set (g[1], l);
   mpz_neg (g[0], m);
@@ -151,14 +151,14 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_set (f[0], t);
 #ifdef DEBUG
   for (j = d + 1; j -- != 0; )
-    gmp_fprintf (stderr, "c%u: %Zd\n", j, f[j]);
+    printf ("c%u: %Zd\n", j, f[j]);
   nroots = numberOfRealRoots (f, d, 0, 0);
   skew = SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC);
   logmu = LOGNORM (f, d, skew);
   alpha = get_alpha (f, d, ALPHA_BOUND);
-  fprintf (stderr, "# lognorm %1.2f, alpha %1.2f, E %1.2f, %u rroots\n",
-           logmu, alpha, logmu + alpha, nroots);
-  gmp_fprintf (stderr, "Optimized polynomial:\n");
+  printf ("# lognorm %1.2f, alpha %1.2f, E %1.2f, %u rroots\n",
+          logmu, alpha, logmu + alpha, nroots);
+  gmp_printf ("Optimized polynomial:\n");
 #endif
 
   optimize (f, d, g, 0);
@@ -168,14 +168,14 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   if (nroots >= nr && logmu <= max_norm)
     {
       alpha = get_alpha (f, d, ALPHA_BOUND);
-      gmp_fprintf (stderr, "n: %Zd\n", N);
-      gmp_fprintf (stderr, "Y1: %Zd\nY0: %Zd\n", g[1], g[0]);
+      gmp_printf ("n: %Zd\n", N);
+      gmp_printf ("Y1: %Zd\nY0: %Zd\n", g[1], g[0]);
       for (j = d + 1; j -- != 0; )
-        gmp_fprintf (stderr, "c%u: %Zd\n", j, f[j]);
-      fprintf (stderr, "# lognorm %1.2f, alpha %1.2f, E %1.2f, %u rroots\n",
-               logmu, alpha, logmu + alpha, nroots);
-      fprintf (stderr, "\n");
-      fflush (stderr);
+        gmp_printf ("c%u: %Zd\n", j, f[j]);
+      printf ("# lognorm %1.2f, alpha %1.2f, E %1.2f, %u rroots\n",
+              logmu, alpha, logmu + alpha, nroots);
+      printf ("\n");
+      fflush (stdout);
       pthread_mutex_lock (&found_lock);
       found ++;
       pthread_mutex_unlock (&found_lock);
@@ -396,8 +396,6 @@ one_thread (void* args)
 {
   tab_t *tab = (tab_t*) args;
 
-  //  printf ("thread %d deals with ad=%lu\n", tab[0]->thread, tab[0]->ad);
-  fflush (stdout);
   newAlgo (tab[0]->N, tab[0]->d, tab[0]->ad);
   pthread_exit (NULL);
 }
@@ -407,7 +405,7 @@ main (int argc, char *argv[])
 {
   mpz_t N;
   unsigned int d = 0;
-  unsigned long P, admin = 60, admax = ULONG_MAX;
+  unsigned long P, admin = 60, admax = ULONG_MAX, totP = 0;
   int tries = 0, i, nthreads = 1, nr = 0, st;
   tab_t *T;
 #ifdef MAX_THREADS
@@ -503,7 +501,7 @@ main (int argc, char *argv[])
   P = atoi (argv[1]);
   st = cputime ();
   initPrimes (P);
-  fprintf (stderr, "Initializing primes took %dms\n", cputime () - st);
+  printf ("Initializing primes took %dms\n", cputime () - st);
   T = malloc (nthreads * sizeof (tab_t));
   for (i = 0; i < nthreads ; i++)
     {
@@ -516,6 +514,7 @@ main (int argc, char *argv[])
       for (i = 0; i < nthreads ; i++)
         {
           tries ++;
+          totP += P;
           if (verbose >= 1)
             {
               gmp_printf ("%d ad=%lu\r", tries, admin);
@@ -533,8 +532,14 @@ main (int argc, char *argv[])
       for (i = 0 ; i < nthreads ; i++)
         pthread_join(tid[i], NULL);
 #endif
+      if (totP > 1000000000)
+        {
+          printf ("# ad=%lu time=%dms\n", admin, cputime ());
+          fflush (stdout);
+          totP = 0;
+        }
     }
-  fprintf (stderr, "Tried %d ad-values, found %d polynomials\n", tries, found);
+  printf ("Tried %d ad-values, found %d polynomials\n", tries, found);
   for (i = 0; i < nthreads ; i++)
     mpz_clear (T[i]->N);
   free (T);
