@@ -184,6 +184,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             free(tmp);
         }
 
+        // TODO: save only rolling checkpoints (?)
         matmul_top_save_vector(mmt, v_name, bw->dir, s + bw->interval);
 
         serialize(pi->m);

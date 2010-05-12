@@ -568,6 +568,16 @@ int param_list_parse_ulong(param_list pl, const char * key, unsigned long * r)
     return pl->p[v]->seen;
 }
 
+int param_list_parse_size_t(param_list pl, const char * key, size_t * r)
+{
+    unsigned long t;
+    int res;
+    res = param_list_parse_ulong(pl, key, &t);
+    if (res && r) { *r = t; }
+    return res;
+}
+
+
 int param_list_parse_uint64(param_list pl, const char * key, uint64_t * r)
 {
     int v = assoc(pl, key);

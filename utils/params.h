@@ -96,6 +96,7 @@ extern int param_list_parse_mpz(param_list, const char *, mpz_ptr);
 extern int param_list_parse_intxint(param_list pl, const char * key, int * r);
 extern int param_list_parse_int_and_int(param_list pl, const char * key, int * r, const char * sep);
 extern int param_list_parse_int_list(param_list pl, const char * key, int * r, size_t n, const char * sep);
+extern int param_list_parse_size_t(param_list pl, const char * key, size_t * r);
 extern int param_list_parse_knob(param_list pl, const char * key);
 
 extern const char * param_list_lookup_string(param_list pl, const char * key);

@@ -42,6 +42,8 @@ add_library(bwc_base
     rusage.c
     async.c
     debug.c
+    mf.c
+    balancing.c
     worker-threads.c)
 target_link_libraries(bwc_base ${pthread_libs})
 set_target_properties(bwc_base PROPERTIES

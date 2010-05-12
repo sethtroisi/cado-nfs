@@ -564,6 +564,10 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
     if (!sqb) {
         if (!cache_loaded) {
             // everybody does it in parallel
+            fprintf(stderr,"J%uT%u building cache for %s\n",
+                    mmt->pi->m->jrank,
+                    mmt->pi->m->trank,
+                    mmt->locfile);
             matmul_build_cache(mmt->mm);
             matmul_save_cache(mmt->mm);
         }
