@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200112L
+#define _GNU_SOURCE		/* asprintf */
+#define _DARWIN_C_SOURCE	/* asprintf ; getpagesize */
 #define _XOPEN_SOURCE   600     /* sometimes useful for posix_memalign */
-#define _DARWIN_C_SOURCE /* for getpagesize */
 
 #include <stdlib.h>
 #include <stddef.h>
@@ -83,5 +84,34 @@ void *malloc_pagealigned(size_t sz)
 void free_pagealigned(void * p, size_t sz)
 {
     free_aligned(p, sz, getpagesize());
+}
+
+int has_suffix(const char * path, const char * sfx)
+{
+    unsigned int lp = strlen(path);
+    unsigned int ls = strlen(sfx);
+    if (lp < ls) return 0;
+    return strcmp(path + lp - ls, sfx) == 0;
+}
+
+// given a path to a file (prefix), and a suffix called (what), returns
+// if the ext parameter is NULL, a malloced string equal to
+// (prefix).(what) ; if ext is non-null AND (ext) is already a suffix of
+// (prefix), say we have (prefix)=(prefix0)(ext), then we return
+// (prefix0).(what)(ext)
+// It is typical to use ".bin" or ".txt" as ext parameters.
+char * derived_filename(const char * prefix, const char * what, const char * ext)
+{
+    char * dup_prefix;
+    dup_prefix=strdup(prefix);
+
+    if (ext && has_suffix(dup_prefix, ext)) {
+        dup_prefix[strlen(dup_prefix)-strlen(ext)]='\0';
+    }
+    char * str;
+    int rc = asprintf(&str, "%s.%s%s", dup_prefix, what, ext ? ext : "");
+    if (rc<0) abort();
+    free(dup_prefix);
+    return str;
 }
 

@@ -1,3 +1,4 @@
+#define _BSD_SOURCE     /* strdup */
 /* 
  * Program: replay
  * Author : F. Morain
@@ -172,7 +173,7 @@ makeSparse(int **sparsemat, int *colweight, FILE *purgedfile,
 }
 
 static unsigned long
-flushSparse(char *sparsename, int **sparsemat, int small_nrows, int small_ncols, int *code)
+flushSparse_ascii(const char *sparsename, int **sparsemat, int small_nrows, int small_ncols, int *code)
 {
     FILE *ofile;
     unsigned long W = 0;
@@ -199,6 +200,80 @@ flushSparse(char *sparsename, int **sparsemat, int small_nrows, int small_ncols,
     return W;
 }
 
+static unsigned long
+flushSparse_binary(const char *sparsename, int **sparsemat, int small_nrows, int small_ncols, int *code)
+{
+    FILE *ofile;
+    unsigned long W = 0;
+    char * zip = has_suffix(sparsename, ".gz") ? ".gz" : NULL;
+    uint32_t x;
+    uint32_t * weights = malloc(small_ncols * sizeof(uint32_t));
+    memset(weights, 0, small_ncols * sizeof(uint32_t));
+
+    char * zname = strdup(sparsename);
+    if (zip) { zname[strlen(zname)-3]='\0'; }
+    char * bname = strdup(zname);
+    if (has_suffix(bname, ".bin")) { bname[strlen(bname)-4]='\0'; }
+
+    char * name = derived_filename(bname, "bin", zip);
+    ofile = gzip_open(name, "w");
+    for(int i = 0; i < small_nrows; i++){
+	if(sparsemat[i] == NULL) {
+	    x = 0;
+            fwrite(&x, sizeof(uint32_t), 1, ofile);
+        } else {
+	    W += sparsemat[i][0];
+	    x = sparsemat[i][0];
+            fwrite(&x, sizeof(uint32_t), 1, ofile);
+	    for(int j = 1; j <= sparsemat[i][0]; j++){
+#if DEBUG >= 1
+		ASSERT(code[sparsemat[i][j]] > 0);
+#endif
+		x=code[sparsemat[i][j]]-1;
+                fwrite(&x, sizeof(uint32_t), 1, ofile);
+                weights[x]++;
+	    }
+	}
+    }
+    gzip_close (ofile, name);
+    free(name);
+
+    name = derived_filename(bname, "rw.bin", zip);
+    ofile = gzip_open(name, "w");
+    for(int i = 0; i < small_nrows; i++){
+	x = sparsemat[i] == NULL ? 0 : sparsemat[i][0];
+        fwrite(&x, sizeof(uint32_t), 1, ofile);
+    }
+    gzip_close (ofile, name);
+    free(name);
+
+    name = derived_filename(bname, "cw.bin", zip);
+    ofile = gzip_open(name, "w");
+    for(int j = 0; j < small_ncols; j++){
+	x = weights[j];
+        fwrite(&x, sizeof(uint32_t), 1, ofile);
+    }
+    gzip_close (ofile, name);
+    free(name);
+
+    free(bname);
+    free(zname);
+
+    free(weights);
+
+    return W;
+}
+
+static unsigned long
+flushSparse(const char *sparsename, int **sparsemat, int small_nrows, int small_ncols, int *code, int bin)
+{
+    if (bin)
+        return flushSparse_binary(sparsename, sparsemat, small_nrows, small_ncols, code);
+    else
+        return flushSparse_ascii(sparsename, sparsemat, small_nrows, small_ncols, code);
+}
+
+/*
 static void
 infos4Manu(char *name, char *sparsename, int small_nrows, int small_ncols, int nvslices, int *tabnc, unsigned long *Wslice)
 {
@@ -228,10 +303,11 @@ infos4Manu(char *name, char *sparsename, int small_nrows, int small_ncols, int n
     }
     fclose(ofile);
 }
+*/
 
 // dump of newrows in indexname.
 static void
-makeIndexFile(char *indexname, int nrows, int **newrows, int small_nrows, int small_ncols)
+makeIndexFile(const char *indexname, int nrows, int **newrows, int small_nrows, int small_ncols)
 {
     FILE *indexfile;
     int i, j;
@@ -337,7 +413,7 @@ doAllAdds(int **newrows, char *str)
 #define STRLENMAX 2048
 
 static int
-oneFile(char *sparsename, int **sparsemat, int *colweight, char *purgedname, FILE *purgedfile, int **oldrows, int ncols, int small_nrows, int verbose)
+oneFile(const char *sparsename, int **sparsemat, int *colweight, const char *purgedname, FILE *purgedfile, int **oldrows, int ncols, int small_nrows, int verbose, int bin)
 {
     unsigned long W;
     int small_ncols;
@@ -352,7 +428,7 @@ oneFile(char *sparsename, int **sparsemat, int *colweight, char *purgedname, FIL
 
     double tt = seconds();
     fprintf(stderr, "Writing sparse representation to file\n");
-    W = flushSparse(sparsename, sparsemat, small_nrows, small_ncols, colweight);
+    W = flushSparse(sparsename, sparsemat, small_nrows, small_ncols, colweight, bin);
     fprintf(stderr, "#T# writing sparse: %2.2lf\n", seconds()-tt);
     fprintf(stderr, "# Weight(M_small) = %lu\n", W);
 
@@ -360,7 +436,7 @@ oneFile(char *sparsename, int **sparsemat, int *colweight, char *purgedname, FIL
 }
 
 static int
-manyFiles(char *sparsename, int **sparsemat, int *colweight, char *purgedname, FILE *purgedfile, int **oldrows, int ncols, int small_nrows, int verbose, int nslices)
+manyFiles(const char *sparsename, int **sparsemat, int *colweight, const char *purgedname, FILE *purgedfile, int **oldrows, int ncols, int small_nrows, int verbose, int bin, int nslices)
 {
     char *name;
     int small_ncols = 1; // always the +1 trick
@@ -399,7 +475,7 @@ manyFiles(char *sparsename, int **sparsemat, int *colweight, char *purgedname, F
 	    }
 	// warning: take care to the +1 trick
 	Wslice[slice] = flushSparse(name, sparsemat, small_nrows, small_ncols,
-				    colweight);
+				    colweight, bin);
 	// do not forget to clean the rows in sparsemat to be ready for
 	// next time if any
 	if(slice < nslices-1){
@@ -413,7 +489,7 @@ manyFiles(char *sparsename, int **sparsemat, int *colweight, char *purgedname, F
 	}
     }
     small_ncols--; // undoing the +1 trick
-    infos4Manu(name,sparsename,small_nrows,small_ncols,nslices,tabnc,Wslice);
+    // infos4Manu(name,sparsename,small_nrows,small_ncols,nslices,tabnc,Wslice);
     free(name);
     free(tabnc);
     free(Wslice);
@@ -488,14 +564,13 @@ int
 main(int argc, char *argv[])
 {
     FILE *hisfile, *purgedfile, *fromfile;
-    char *purgedname = NULL, *sparsename = NULL, *indexname = NULL;
-    char *hisname = NULL, *fromname = NULL;
     uint64_t bwcostmin = 0;
     int nrows, ncols, nslices = 0;
     int **newrows, i, j, nb, *nbrels, **oldrows, *colweight;
     int ind, small_nrows, small_ncols, **sparsemat;
     int verbose = 0, writeindex;
     char str[STRLENMAX];
+    int bin=0;
 
     // printing the arguments as everybody does these days
     fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
@@ -503,49 +578,29 @@ main(int argc, char *argv[])
       fprintf (stderr, " %s", argv[i]);
     fprintf (stderr, "\n");
 
-    while(argc > 1 && argv[1][0] == '-'){
-        if (argc > 2 && strcmp (argv[1], "-purged") == 0){
-	    purgedname = argv[2];
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if (argc > 2 && strcmp (argv[1], "-his") == 0){
-	    hisname = argv[2];
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if (argc > 2 && strcmp (argv[1], "-out") == 0){
-	    sparsename = argv[2];
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if (argc > 2 && strcmp (argv[1], "-index") == 0){
-	    indexname = argv[2];
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if (argc > 2 && strcmp (argv[1], "-from") == 0){
-	    fromname = argv[2];
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if (argc > 2 && strcmp (argv[1], "-nslices") == 0){
-	    nslices = atoi(argv[2]);
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if (argc > 2 && strcmp (argv[1], "-costmin") == 0){
-	    sscanf(argv[2], "%"PRIu64"", &bwcostmin);
-	    fprintf(stderr, "Read bwcostmin=%"PRIu64"\n", bwcostmin);
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if (argc > 1 && strcmp (argv[1], "-v") == 0){
-            verbose ++;
-	    argc -= 1;
-	    argv += 1;
-	}
+    param_list(pl);
+
+    param_list_init(pl);
+    argv++,argc--;
+    param_list_configure_knob(pl, "--verbose", &verbose);
+    param_list_configure_knob(pl, "--binary", &bin);
+    param_list_configure_alias(pl, "--verbose", "-v");
+
+    for( ; argc ; ) {
+        if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
+        fprintf (stderr, "Unknown option: %s\n", argv[0]);
+        abort();
     }
+    const char * purgedname = param_list_lookup_string(pl, "purged");
+    const char * hisname = param_list_lookup_string(pl, "his");
+    const char * sparsename = param_list_lookup_string(pl, "out");
+    const char * indexname = param_list_lookup_string(pl, "index");
+    const char * fromname = param_list_lookup_string(pl, "from");
+    param_list_parse_int(pl, "binary", &bin);
+    param_list_parse_int(pl, "nslices", &nslices);
+    param_list_parse_uint64(pl, "bwcostmin", &bwcostmin);
+    if (has_suffix(sparsename, ".bin") || has_suffix(sparsename, ".bin.gz"))
+        bin=1;
 
     purgedfile = gzip_open(purgedname, "r");
     ASSERT(purgedfile != NULL);
@@ -618,14 +673,14 @@ main(int argc, char *argv[])
     sparsemat = (int **)malloc(small_nrows * sizeof(int *));
     for(i = 0; i < small_nrows; i++)
 	sparsemat[i] = NULL;
-    if(nslices == 0)
+    if(nslices == 0) {
 	small_ncols = oneFile(sparsename, sparsemat, colweight, 
 			      purgedname, purgedfile,
-			      oldrows, ncols, small_nrows, verbose);
-    else{
+			      oldrows, ncols, small_nrows, verbose, bin);
+    } else {
 	small_ncols = manyFiles(sparsename, sparsemat, colweight, 
 				purgedname, purgedfile,
-				oldrows, ncols, small_nrows, verbose,
+				oldrows, ncols, small_nrows, verbose, bin,
 				nslices);
 	exit(0);
     }
@@ -648,6 +703,7 @@ main(int argc, char *argv[])
 	if(oldrows[i] != NULL)
 	    free(oldrows[i]);
     }
+    param_list_clear(pl);
     free(newrows);
     free(oldrows);
     free(colweight);

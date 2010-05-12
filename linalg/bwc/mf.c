@@ -24,14 +24,6 @@ static void abort_unexpected_eof()
     exit(1);
 }
 
-int has_suffix(const char * path, const char * sfx)
-{
-    unsigned int lp = strlen(path);
-    unsigned int ls = strlen(sfx);
-    if (lp < ls) return 0;
-    return strcmp(path + lp - ls, sfx) == 0;
-}
-
 char * build_mat_auxfile(const char * prefix, const char * what, const char * ext)
 {
     /* This function gets called only if we have automatically decided on
@@ -41,17 +33,7 @@ char * build_mat_auxfile(const char * prefix, const char * what, const char * ex
      * We check for a match between the elcted prefix and the matrix
      * filename. If found, that match is chopped.
      */
-    char * dup_prefix;
-    dup_prefix=strdup(prefix);
-
-    if (has_suffix(dup_prefix, ext)) {
-        dup_prefix[strlen(dup_prefix)-strlen(ext)]='\0';
-    }
-    char * str;
-    int rc = asprintf(&str, "%s.%s%s", dup_prefix, what, ext);
-    if (rc<0) abort();
-    free(dup_prefix);
-    return str;
+    return derived_filename(prefix, what, ext);
 }
 
 void matrix_read_pass(
