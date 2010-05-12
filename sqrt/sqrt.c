@@ -841,14 +841,11 @@ int main(int argc, char *argv[])
     ret = cado_poly_read(pol, polyname);
     ASSERT (ret);
 
-    if(!strcmp(argv[7], "r"))
-	rora = 1;
-    else if(!strcmp(argv[7], "a"))
-	rora = 2;
-    else if(!strcmp(argv[7], "ar") || !strcmp(argv[7], "ra"))
-	rora = 3;
-    else
-      {
+    rora = 0;
+    rora |= (strchr(argv[7], 'r') != NULL);
+    rora |= (strchr(argv[7], 'a') != NULL) << 1;
+
+    if (!rora) {
         fprintf (stderr, "Error, 8th argument must be r, a, ar or ra\n");
         exit (1);
       }
@@ -858,6 +855,10 @@ int main(int argc, char *argv[])
 
     fclose(kerfile);
 
+    if (strchr(argv[7], '!')) {
+        printf("Special trap -- not computing algebraic square root.\n");
+        exit(0);
+    }
 	/********** ALGSQRT **********/
   
     sprintf(algname, "%s.alg.%03d", prefix, numdep);
