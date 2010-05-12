@@ -717,24 +717,31 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, poly_t F, unsigned long p)
           sqrt_size, 100.0 * (double) sqrt_size / target_size);
 }
 
-unsigned long FindSuitableModP(poly_t F) {
+static unsigned long
+FindSuitableModP (poly_t F)
+{
   unsigned long p = 2;
   int dF = F->deg;
 
   plain_poly_t fp;
-  plain_poly_init(fp, dF);
-  while (1) {
+
+  plain_poly_init (fp, dF);
+  while (1)
+    {
     int d;
-    // select prime congruent to 3 mod 4 to have easy sqrt.
-  //  do {
-      p = getprime(p);
-  //  } while ((p%4)!= 3);
+
+    p = getprime (p);
+    if (! plain_poly_fits (dF, p))
+      {
+        fprintf (stderr, "You are in trouble. Please contact the CADO support team at cado-nfs-commits@lists.gforge.inria.fr.\n");
+        exit (1);
+      }
     d = plain_poly_set_mod (fp, F->coeff, dF, p);
-    if (d!=dF)
+    if (d != dF)
       continue;
-    if (plain_poly_is_irreducible(fp, p))
+    if (plain_poly_is_irreducible (fp, p))
       break;
-  }
+    }
   plain_poly_clear(fp);
   getprime (0);
 
