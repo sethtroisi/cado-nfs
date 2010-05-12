@@ -99,9 +99,11 @@ int check_stream(const char *name, FILE * stream, cado_poly_ptr cpoly)
 {
     int lnum;
     int nrels = 0;
+	int nrels_ok = 0;
+	int ret = 0;
+    char line[MAX_LENGTH];
 
     for (lnum = 1;; lnum++) {
-        char line[MAX_LENGTH];
         if (fgets(line, sizeof(line), stream) == NULL)
             break;
         if (line[strlen(line) - 1] != '\n')
@@ -109,30 +111,33 @@ int check_stream(const char *name, FILE * stream, cado_poly_ptr cpoly)
             fprintf (stderr, "Line %d of %s is buggy or too long, please check or increase MAX_LENGTH in check_rels.c\n", lnum, name);
             exit (1);
           }
-        if (line[0] == '#')
-            continue;
+        if (line[0] == '#') {
+			printf("%s", line);
+			continue;
+		}
 
         relation_t rel;
+		nrels++;
         if (!read_relation(&rel, line)) {
             fprintf(stderr, "Failed on line %d in %s: %s\n", lnum, name, line);
-            fprintf(stderr,
-                    "File check aborted. Please fix this file and re-run.\n");
-            fprintf(stderr, "Continuing with next file\n");
-            return 1;
+			ret = 1;
+			continue;
         }
         if (!check_relation(&rel, cpoly)) {
             fprintf(stderr, "Failed on line %d in %s: %s\n", lnum, name, line);
-            fprintf(stderr,
-                    "File check aborted. Please fix this file and re-run.\n");
-            fprintf(stderr, "Continuing with next file\n");
-            return 1;
+        	clear_relation(&rel);
+            ret = 1;
+			continue;
         }
 
+		printf("%s", line);
         clear_relation(&rel);
-        nrels++;
+        nrels_ok++;
     }
-    fprintf(stderr, "%s : ok %d rels\n", name, nrels);
-    return 0;
+	if (line[0] != '#') 
+		printf("# Total %d reports\n", nrels_ok);
+    fprintf(stderr, "%s : %d rels ok on %d rels\n", name, nrels_ok, nrels);
+    return ret;
 }
 
 

@@ -532,6 +532,8 @@ sub job_status {
     } elsif (!$ret->{'status'} && $ret->{'out'} =~ /No such file or directory$/) {
         die "The executable was not found. Make sure the `cadodir' parameter ".
             "is valid for host `$job->{'host'}'.\n";
+    } elsif (!$ret->{'status'} && $ret->{'out'} =~ /BUG/) {
+		die $ret->{'out'};
     } else {
         warn "Could not access output file `$job->{'file'}'.\n"
             if $ret->{'status'};

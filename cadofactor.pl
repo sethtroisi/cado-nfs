@@ -45,8 +45,7 @@
 #  - Enable a 'lowmem' option
 #  - To be able to import the msieve relations in CADO-NFS.
 #  - Use new Murphy value in polynomial selection (C code and perl script).
-#  - Print error files of polynomial selection when polyselect crashs and the script loop infinitely.
-#  - For check_rels, print on standard output the good relations.
+#  - Print in each kjout the number of real roots of polynomial
 #  - Automate the parameters setting.
 
 use Cwd qw(abs_path);
