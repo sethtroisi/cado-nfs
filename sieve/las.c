@@ -38,9 +38,15 @@
 /* default sieve region side is 2^DEFAULT_I */
 #define DEFAULT_I 12
 
-/* default bucket region: 2^15 = 32K == close to L1 size */
+/* default bucket region: 2^16 = 64K == close to L1 size, but this is the
+   (current) largest possible value, otherwise bucket.h must be changed,
+   since it stores positions on 16 bits */
 #ifndef LOG_BUCKET_REGION
-#define LOG_BUCKET_REGION 15
+#define LOG_BUCKET_REGION 16
+#endif
+
+#if LOG_BUCKET_REGION > 16
+#error "Too large LOG_BUCKET_REGION, please adapt bucket.h first"
 #endif
 
 /* Define SKIP_GCD3 to skip updates where 3|gcd(i,j) in the
