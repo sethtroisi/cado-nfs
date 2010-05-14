@@ -1,5 +1,11 @@
-/* this version implements Kleinjung's original algorithm, with a search in a
-   hash table, and M = P^2 */
+/* This version implements Kleinjung's original algorithm, with a search in a
+   hash table, and M = P^2
+
+   Reference:
+   Polynomial selection, Thorsten Kleinjung, talk at the CADO workshop on
+   integer factorization, Nancy, October 2008.
+   http://cado.gforge.inria.fr/workshop/slides/kleinjung.pdf
+*/
 
 #include <stdio.h>
 #include <stdlib.h>
