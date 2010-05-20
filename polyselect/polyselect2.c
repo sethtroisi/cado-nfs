@@ -20,26 +20,103 @@
 
 #define MAX_THREADS 16
 
+/* hash table structure */
 typedef struct
 {
-  uint32_t *hash_p;         /* contains the primes */
-  int64_t *hash_i;          /* contains the values of r such that p^2
+  uint32_t *p;              /* contains the primes */
+  int64_t *i;               /* contains the values of r such that p^2
                                divides N - (m0 + r)^2 */
-  unsigned long hash_alloc; /* total allocated size */
-  unsigned long hash_size;  /* number of entries in hash table */
+  unsigned long alloc;      /* total allocated size */
+  unsigned long size;       /* number of entries in hash table */
 } __hash_struct;
 typedef __hash_struct hash_t[1];
 
+/* thread structure */
+typedef struct
+{
+  mpz_t N;
+  unsigned int d;
+  unsigned long ad;
+  int thread;
+} __tab_struct;
+typedef __tab_struct tab_t[1];
+
+/* structure to store roots of (m0+x)^d = N (mod p^2) for special-q variant */
+typedef struct
+{
+  unsigned int alloc;   /* allocated size */
+  unsigned int size;    /* used size */
+  unsigned int *p;      /* primes */
+  unsigned int *nr;     /* number of roots of x^d = N (mod p) */
+  unsigned long **roots; /* roots of (m0+x)^d = N (mod p^2) */
+} _roots_struct;
+typedef _roots_struct roots_t[1];
+
 /* read-only global variables */
-int found = 0, verbose = 0;
+int verbose = 0, incr = 60;
 unsigned int nr = 0; /* minimum number of real roots wanted */
 double max_norm = DBL_MAX; /* maximal wanted norm (before rotation) */
-pthread_mutex_t found_lock;
 uint32_t *Primes;
 
+/* read-write global variables */
+pthread_mutex_t lock; /* used as mutual exclusion lock for those variables */
+int found = 0;
+double potential_collisions = 0.0;
+
+void
+roots_init (roots_t R)
+{
+  R->alloc = 0;
+  R->size = 0;
+  R->p = NULL;
+  R->nr = NULL;
+  R->roots = NULL;
+}
+
+void
+roots_realloc (roots_t R, unsigned long newalloc)
+{
+  assert (newalloc >= R->size);
+  R->alloc = newalloc;
+  R->p = realloc (R->p, newalloc * sizeof (unsigned int));
+  R->nr = realloc (R->nr, newalloc * sizeof (unsigned int));
+  R->roots = realloc (R->roots, newalloc * sizeof (unsigned long*));
+}
+
+void
+roots_add (roots_t R, unsigned int p, unsigned int nr, unsigned long *roots)
+{
+  unsigned int i;
+
+  if (nr == 0)
+    return;
+  if (R->size == R->alloc)
+    roots_realloc (R, R->alloc + R->alloc / 2 + 1);
+  R->p[R->size] = p;
+  R->nr[R->size] = nr;
+  R->roots[R->size] = malloc (nr * sizeof (unsigned long));
+  for (i = 0; i < nr; i++)
+    R->roots[R->size][i] = roots[i];
+  R->size ++;
+}
+
+void
+roots_clear (roots_t R)
+{
+  unsigned int i;
+
+  free (R->p);
+  free (R->nr);
+  for (i = 0; i < R->size; i++)
+    free (R->roots[i]);
+  free (R->roots);
+}
+
+/* rq is a root of N = (m0 + rq)^d mod (q^2) */
 static void
 match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
-       unsigned long ad, unsigned int d, mpz_t N)
+       unsigned long ad, unsigned int d, mpz_t N, unsigned long q,
+       unsigned long rq)
 {
   mpz_t l, mtilde, m, adm1, t, k, *f, g[2];
   unsigned int j, nroots;
@@ -47,7 +124,9 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   double skew, logmu, alpha;
 
 #ifdef DEBUG
-  printf ("Found match: (%lu,%ld) (%lu,%ld)\n", p1, i, p2, i);
+  printf ("Found match: (%lu,%ld) (%lu,%ld) for ad=%lu, q=%lu, rq=%lu\n",
+	  p1, i, p2, i, ad, q, rq);
+  gmp_printf ("m0=%Zd\n", m0);
 #endif
 
   mpz_init (l);
@@ -61,11 +140,15 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   f = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
   for (j = 0; j <= d; j++)
     mpz_init (f[j]);
-  /* we have l = p1*p2 */
+  /* we have l = p1*p2*q */
   mpz_set_ui (l, p1);
   mpz_mul_ui (l, l, p2);
-  /* mtilde = m0 + i */
-  mpz_add_si (mtilde, m0, i);
+  mpz_mul_ui (l, l, q);
+  /* mtilde = m0 + rq + i*q^2 */
+  mpz_set_si (mtilde, i);
+  mpz_mul_ui (mtilde, mtilde, q * q);
+  mpz_add_ui (mtilde, mtilde, rq);
+  mpz_add (mtilde, mtilde, m0);
   /* we want mtilde = d*ad*m + a_{d-1}*l with 0 <= a_{d-1} < d*ad.
      We have a_{d-1} = mtilde/l mod (d*ad). */
   mpz_set_ui (m, ad);
@@ -97,7 +180,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_divexact_ui (m, m, ad);
 #ifdef DEBUG
   printf ("Raw polynomial:\n");
-  printf ("Y1: %Zd\nY0: -%Zd\n", l, m);
+  gmp_printf ("Y1: %Zd\nY0: -%Zd\n", l, m);
 #endif
   mpz_set (g[1], l);
   mpz_neg (g[0], m);
@@ -157,7 +240,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_set (f[0], t);
 #ifdef DEBUG
   for (j = d + 1; j -- != 0; )
-    printf ("c%u: %Zd\n", j, f[j]);
+    gmp_printf ("c%u: %Zd\n", j, f[j]);
   nroots = numberOfRealRoots (f, d, 0, 0);
   skew = SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC);
   logmu = LOGNORM (f, d, skew);
@@ -182,9 +265,9 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
               logmu, alpha, logmu + alpha, nroots);
       printf ("\n");
       fflush (stdout);
-      pthread_mutex_lock (&found_lock);
+      pthread_mutex_lock (&lock);
       found ++;
-      pthread_mutex_unlock (&found_lock);
+      pthread_mutex_unlock (&lock);
     }
 
   mpz_clear (l);
@@ -205,69 +288,85 @@ hash_init (hash_t H)
 {
   unsigned long j;
 
-  H->hash_alloc = 1;
-  H->hash_p = (uint32_t*) malloc (H->hash_alloc * sizeof (uint32_t));
-  H->hash_i = (int64_t*) malloc (H->hash_alloc * sizeof (int64_t));
-  for (j = 0; j < H->hash_alloc; j++)
-    H->hash_p[j] = 0;
-  H->hash_size = 0;
+  H->alloc = 1;
+  H->p = (uint32_t*) malloc (H->alloc * sizeof (uint32_t));
+  H->i = (int64_t*) malloc (H->alloc * sizeof (int64_t));
+  for (j = 0; j < H->alloc; j++)
+    H->p[j] = 0;
+  H->size = 0;
 }
 
+static void hash_grow (hash_t H);
+
+/* rq is a root of N = (m0 + rq)^d mod (q^2) */
 static void
 hash_add (hash_t H, unsigned long p, int64_t i, mpz_t m0, unsigned long ad,
-          unsigned int d, mpz_t N)
+          unsigned int d, mpz_t N, unsigned long q, unsigned long rq)
 {
   unsigned long h;
 
+  if (H->size >= H->alloc)
+    hash_grow (H);
   if (i >= 0)
-    h = i % H->hash_alloc;
+    h = i % H->alloc;
   else
     {
-      h = H->hash_alloc - ((-i) % H->hash_alloc);
-      if (h == H->hash_alloc)
+      h = H->alloc - ((-i) % H->alloc);
+      if (h == H->alloc)
         h = 0;
     }
-  while (H->hash_p[h] != 0)
+  while (H->p[h] != 0)
     {
-      if (m0 != NULL && H->hash_i[h] == i && H->hash_p[h] != p)
-        match (H->hash_p[h], p, i, m0, ad, d, N);
-      if (++h == H->hash_alloc)
+      if (m0 != NULL && H->i[h] == i && H->p[h] != p)
+        match (H->p[h], p, i, m0, ad, d, N, q, rq);
+      if (++h == H->alloc)
         h = 0;
     }
-  H->hash_p[h] = p;
-  H->hash_i[h] = i;
-  H->hash_size ++;
+  H->p[h] = p;
+  H->i[h] = i;
+  H->size ++;
 }
 
 static void
 hash_clear (hash_t H)
 {
-  free (H->hash_p);
-  free (H->hash_i);
+  free (H->p);
+  free (H->i);
 }
 
 static void
 hash_grow (hash_t H)
 {
-  unsigned long j, old_hash_alloc;
-  uint32_t *old_hash_p;
-  int64_t *old_hash_i;
+  unsigned long j, old_alloc;
+  uint32_t *old_p;
+  int64_t *old_i;
 
-  old_hash_alloc = H->hash_alloc;
-  old_hash_p = H->hash_p;
-  old_hash_i = H->hash_i;
+  old_alloc = H->alloc;
+  old_p = H->p;
+  old_i = H->i;
 
-  H->hash_alloc = 2 * old_hash_alloc;
-  H->hash_p = (uint32_t*) malloc (H->hash_alloc * sizeof (uint32_t));
-  for (j = 0; j < H->hash_alloc; j++)
-    H->hash_p[j] = 0;
-  H->hash_i = (int64_t*) malloc (H->hash_alloc * sizeof (int64_t));
-  H->hash_size = 0;
-  for (j = 0; j < old_hash_alloc; j++)
-    if (old_hash_p[j] != 0)
-      hash_add (H, old_hash_p[j], old_hash_i[j], NULL, 0, 0, NULL);
-  free (old_hash_p);
-  free (old_hash_i);
+  H->alloc = 2 * old_alloc;
+  H->p = (uint32_t*) malloc (H->alloc * sizeof (uint32_t));
+  for (j = 0; j < H->alloc; j++)
+    H->p[j] = 0;
+  H->i = (int64_t*) malloc (H->alloc * sizeof (int64_t));
+  H->size = 0;
+  for (j = 0; j < old_alloc; j++)
+    if (old_p[j] != 0)
+      hash_add (H, old_p[j], old_i[j], NULL, 0, 0, NULL, 0, 0);
+  free (old_p);
+  free (old_i);
+}
+static double
+hash_mean_value (hash_t H)
+{
+  double s = 0;
+  unsigned long j;
+
+  for (j = 0; j < H->alloc; j++)
+    if (H->p[j] != 0)
+      s += fabs ((double) H->i[j]);
+  return s / (double) H->size;
 }
 
 static void
@@ -290,6 +389,7 @@ initPrimes (unsigned long P)
       Primes[nprimes++] = p;
       p = getprime (p);
     }
+  getprime (0); /* free the memory used by getprime */
   Primes[nprimes++] = 0; /* end of list */
   Primes = (uint32_t*) realloc (Primes, nprimes * sizeof (uint32_t));
 }
@@ -300,22 +400,81 @@ clearPrimes (void)
   free (Primes);
 }
 
+/* return 1/a mod p, assume 0 <= a < p */
+static unsigned long
+invert (unsigned long a, unsigned long p)
+{
+  modulusul_t q;
+  residueul_t b;
+
+  modul_initmod_ul (q, p);
+  modul_init (b, q);
+  assert (a < p);
+  modul_set_ul_reduced (b, a, q);
+  modul_inv (b, b, q);
+  a = modul_get_ul (b, q);
+  modul_clear (b, q);
+  modul_clearmod (q);
+  return a;
+}
+
+/* lift the n roots r[0..n-1] of N = x^d (mod p) to roots of
+   N = (m0 + r)^d (mod p^2) */
+void
+roots_lift (unsigned long *r, mpz_t N, unsigned long d, mpz_t m0,
+	    unsigned long p, unsigned int n)
+{
+  unsigned int j;
+  mpz_t tmp, lambda;
+  unsigned long inv, pp;
+
+  mpz_init (tmp);
+  mpz_init (lambda);
+  pp = p * p;
+  for (j = 0; j < n; j++)
+    {
+     /* we have for r=r[j]: r^d = N (mod p), lift mod p^2:
+	 (r+lambda*p)^d = N (mod p^2) implies
+	 r^d + d*lambda*p*r^(d-1) = N (mod p^2)
+	 lambda = (N - r^d)/(p*d*r^(d-1)) mod p */
+      mpz_ui_pow_ui (tmp, r[j], d - 1);
+      mpz_mul_ui (lambda, tmp, r[j]);    /* lambda = r^d */
+      mpz_sub (lambda, N, lambda);
+      mpz_divexact_ui (lambda, lambda, p);
+      mpz_mul_ui (tmp, tmp, d);         /* tmp = d*r^(d-1) */
+      inv = invert (mpz_fdiv_ui (tmp, p), p);
+      mpz_mul_ui (lambda, lambda, inv * p); /* inv * p fits in 64 bits if
+					       p < 2^32 */
+      mpz_add_ui (lambda, lambda, r[j]); /* now lambda^d = N (mod p^2) */
+
+      /* subtract m0 to get roots of (m0+r)^d = N (mod p^2) */
+      mpz_sub (lambda, lambda, m0);
+      r[j] = mpz_fdiv_ui (lambda, pp);
+    }
+  mpz_clear (tmp);
+  mpz_clear (lambda);
+}
+
 static void
 newAlgo (mpz_t N, unsigned long d, unsigned long ad)
 {
   mpz_t *f, lambda, tmp, m0, Ntilde, ump;
-  unsigned long *r, i, j, p, nprimes = 0, nr;
+  unsigned long *r, *rq, i, j, p, nprimes, nr, q, nq = 0, qq, qmax;
   hash_t H;
-  uint64_t pp;
-  long lambda_si;
+  modulusul_t pp;
+  roots_t R;
+  int st;
+  long M, u, ppl = 0, Mq;
+  double dM, pc1, pc2;
 
-  hash_init (H);
+  roots_init (R);
   mpz_init (Ntilde);
   mpz_init (m0);
   mpz_init (lambda);
   mpz_init (tmp);
   mpz_init (ump);
   r = (unsigned long*) malloc (d * sizeof (unsigned long));
+  rq = (unsigned long*) malloc (d * sizeof (unsigned long));
   f = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
   for (i = 0; i <= d; i++)
     mpz_init (f[i]);
@@ -329,73 +488,169 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
   mpz_mul (Ntilde, Ntilde, N); /* d^d * ad^(d-1) * N */
   mpz_root (m0, Ntilde, d);
 
-  while ((p = Primes[nprimes++]) != 0)
+  qmax = (unsigned long) pow (log ((double) Primes[0]), 1.2);
+  /* since the special-q variant gives values of i larger by q^2,
+     we take as bound for i P^2*qmax^2 */
+  dM = pow ((double) Primes[0] * (double) qmax, 2.0);
+  if (dM > (double) LONG_MAX)
+    M = LONG_MAX;
+  else
+    M = (long) dM;
+  printf ("M=%ld\n", M);
+
+  st = cputime ();
+  hash_init (H);
+  for (nprimes = 0; (p = Primes[nprimes++]) != 0;)
     {
       if ((d * ad) % p == 0)
         continue;
-      pp = (uint64_t) p * (uint64_t) p;
+      modul_initmod_ul (pp, p * p);
       /* we want p^2 | N - (m0 + i)^d, thus
          (m0 + i)^d = N (mod p^2) or m0 + i = N^(1/d) mod p^2 */
       mpz_mod_ui (f[0], Ntilde, p);
       mpz_neg (f[0], f[0]); /* f = x^d - N */
       nr = poly_roots_ulong (r, f, d, p);
+      roots_lift (r, Ntilde, d, m0, p, nr);
+      roots_add (R, p, nr, r);
       for (j = 0; j < nr; j++)
-        {
-          /* we have r[j]^d = N (mod p), lift mod p^2:
-             (r[j]+lambda*p)^d = N (mod p^2) implies
-             r[j]^d + d*lambda*p*r[j]^(d-1) = N (mod p^2)
-             lambda = (N - r[j]^d)/p/d/r[j]^(d-1) mod p */
-          mpz_ui_pow_ui (tmp, r[j], d - 1);
-          mpz_mul_ui (lambda, tmp, r[j]);
-          mpz_sub (lambda, Ntilde, lambda);
-#ifdef DEBUG
-          if (mpz_divisible_ui_p (lambda, p) == 0)
-            {
-              fprintf (stderr, "Error, N~ - r[j]^d not divisible by p\n");
-              exit (1);
-            }
+	{
+          /* only consider r[j] and r[j] - pp */
+	  ppl = (long) modul_getmod_ul (pp);
+#if 0
+	  hash_add (H, p, r[j], m0, ad, d, N, 1, 0);
+	  hash_add (H, p, r[j] - ppl, m0, ad, d, N, 1, 0);
+#else
+	  u = r[j];
+	  do
+	    {
+	      hash_add (H, p, u, m0, ad, d, N, 1, 0);
+	      if (u > M - ppl)
+		break;
+	      else
+		u += ppl; /* u <= M */
+	    }
+	  while (1);
+	  u = r[j] - ppl;
+	  do
+	    {
+	      hash_add (H, p, u, m0, ad, d, N, 1, 0);
+	      if (u < -M + ppl)
+		break;
+	      else
+		u -= ppl; /* u <= M */
+	    }
+	  while (1);
 #endif
-          mpz_divexact_ui (lambda, lambda, p);
-          mpz_mul_ui (tmp, tmp, d); /* tmp = d*r[j]^(d-1) */
-          mpz_set_ui (ump, p);
-          mpz_invert (tmp, tmp, ump); /* FIXME: we could share the inversions
-                                         between different roots mod p */
-          mpz_mul (lambda, lambda, tmp);
-          mpz_mul_ui (lambda, lambda, p);
-          mpz_add_ui (lambda, lambda, r[j]);
-          mpz_sub (lambda, lambda, m0);
-          mpz_mod_ui (lambda, lambda, pp);
-
-          /* only consider lambda and lambda - pp */
-          if (2 * H->hash_size + 1 >= H->hash_alloc)
-            hash_grow (H);
-          lambda_si = mpz_get_si (lambda);
-          hash_add (H, p, lambda_si, m0, ad, d, N);
-          lambda_si -= (long) pp;
-          hash_add (H, p, lambda_si, m0, ad, d, N);
-        }
+	}
+      modul_clearmod (pp);
     }
+  // printf ("q=1: Hsize=%lu, took %dms\n", H->size, cputime () - st);
+  pc1 = 0.5 * pow ((double) H->size, 2.0);
+  printf ("%1.0f potential collisions for q=1, mean value=%1.2f\n", pc1,
+	  hash_mean_value (H) / (double) M);
+  hash_clear (H);
+
+  roots_realloc (R, R->size); /* free unused space */
+
+  /* Special-q variant: we consider q < log(P)^2 */
+  for (q = 2, pc2 = 0.0; q <= qmax; q = getprime (q))
+    {
+      if ((d * ad) % q == 0) /* we need q to be coprime with d and ad */
+	continue;
+      mpz_mod_ui (f[0], Ntilde, q);
+      mpz_neg (f[0], f[0]); /* f = x^d - N */
+      nq = poly_roots_ulong (rq, f, d, q);
+      /* lift the roots mod q^2 */
+      qq = q * q;
+      Mq = M / qq; /* since q^2 is implicit in m0 + u*q^2 below */
+      roots_lift (rq, Ntilde, d, m0, q, nq);
+      for (i = 0; i < nq; i++)
+	{
+	  st = cputime ();
+	  hash_init (H);
+	  for (nprimes = 0; nprimes < R->size; nprimes ++)
+	    {
+	      residueul_t k, inv;
+	      unsigned long rj;
+
+	      p = R->p[nprimes]; /* is coprime to d*ad by construction,
+				    and to q since q < Primes[0] */
+	      modul_initmod_ul (pp, p * p);
+	      ppl = (long) modul_getmod_ul (pp);
+	      nr = R->nr[nprimes];
+	      for (j = 0; j < nr; j++)
+		{
+		  rj = R->roots[nprimes][j];
+		  /* we have p^2 | N - (m0 + rj)^d and
+		     q^2 | N - (m0 + rq[i])^d
+		     thus (p*q)^2 | N - (m0 + rq[i] + k*q^2)^d
+		     for rq[i] + k*q^2 = rj (mod p^2), i.e.,
+		     k = (rj-rq[i])/q^2 mod p^2 */
+		  modul_init (k, pp);
+		  modul_init (inv, pp);
+		  /* since q < p and rq[i] < q^2, we have rq[i] < p^2 */
+		  u = rj >= rq[i] ? rj - rq[i] : (rj + p * p) - rq[i];
+		  modul_set_ul_reduced (k, u, pp);
+		  modul_set_ul_reduced (inv, qq, pp);
+		  modul_inv (inv, inv, pp);
+		  modul_mul (k, k, inv, pp);
+	      
+		  /* only consider k and k - pp */
+		  u = (long) modul_get_ul (k, pp);
+#if 0
+		  hash_add (H, p, u, m0, ad, d, N, q, rq[i]);
+		  hash_add (H, p, u - ppl, m0, ad, d, N, q, rq[i]);
+#else
+		  do
+		    {
+		      hash_add (H, p, u, m0, ad, d, N, q, rq[i]);
+		      if (u > Mq - ppl)
+			break;
+		      else
+			u += ppl; /* u <= Mq */
+		    }
+		  while (1);
+		  u = (long) modul_get_ul (k, pp) - ppl;
+		  do
+		    {
+		      hash_add (H, p, u, m0, ad, d, N, q, rq[i]);
+		      if (u < -Mq + ppl)
+			break;
+		      else
+			u -= ppl; /* u <= Mq */
+		    }
+		  while (1);
+#endif	      
+		  modul_clear (k, pp);
+		  modul_clear (inv, pp);
+		}
+	      modul_clearmod (pp);
+	    }
+	  // printf ("q=%lu, r=%lu: Hsize=%lu took %dms\n", q, rq[i], H->size, cputime () - st);
+	  printf ("q=%lu mean value=%1.2f\n", q, hash_mean_value (H) / (double) Mq);
+	  hash_clear (H);
+	}
+      pc2 += 0.5 * pow ((double) H->size, 2.0);
+    }
+  printf ("%1.0f potential collisions for q>1\n", pc2);
+  getprime (0); /* free the memory used by getprime */
+
+  pthread_mutex_lock (&lock);
+  potential_collisions += pc1 +  pc2;
+  pthread_mutex_unlock (&lock);
 
   for (i = 0; i <= d; i++)
     mpz_clear (f[i]);
   free (f);
   free (r);
+  free (rq);
   mpz_clear (lambda);
   mpz_clear (tmp);
   mpz_clear (ump);
   mpz_clear (m0);
   mpz_clear (Ntilde);
-  hash_clear (H);
+  roots_clear (R);
 }
-
-typedef struct
-{
-  mpz_t N;
-  unsigned int d;
-  unsigned long ad;
-  int thread;
-} __tab_struct;
-typedef __tab_struct tab_t[1];
 
 void*
 one_thread (void* args)
@@ -411,7 +666,7 @@ main (int argc, char *argv[])
 {
   mpz_t N;
   unsigned int d = 0;
-  unsigned long P, admin = 60, admax = ULONG_MAX, totP = 0;
+  unsigned long P, admin = 0, admax = ULONG_MAX, totP = 0;
   int tries = 0, i, nthreads = 1, nr = 0, st;
   tab_t *T;
 #ifdef MAX_THREADS
@@ -456,6 +711,12 @@ main (int argc, char *argv[])
       else if (strcmp (argv[1], "-admax") == 0)
         {
           admax = strtoul (argv[2], NULL, 10);
+          argv += 2;
+          argc -= 2;
+        }
+      else if (strcmp (argv[1], "-incr") == 0)
+        {
+          incr = strtoul (argv[2], NULL, 10);
           argv += 2;
           argc -= 2;
         }
@@ -515,6 +776,8 @@ main (int argc, char *argv[])
       T[i]->d = d;
       T[i]->thread = i;
     }
+  if (admin == 0)
+    admin = incr;
   while (admin <= admax)
     {
       for (i = 0; i < nthreads ; i++)
@@ -532,7 +795,7 @@ main (int argc, char *argv[])
 #else
           pthread_create (&tid[i], NULL, one_thread, (void *) (T+i));
 #endif
-          admin += 60;
+          admin += incr;
         }
 #ifdef MAX_THREADS
       for (i = 0 ; i < nthreads ; i++)
@@ -540,12 +803,17 @@ main (int argc, char *argv[])
 #endif
       if (totP > 1000000000)
         {
-          printf ("# ad=%lu time=%dms\n", admin, cputime ());
+          printf ("# ad=%lu time=%dms pot. collisions=%1.2e (%1.2e/s)\n",
+		  admin, cputime (), potential_collisions,
+		  potential_collisions / cputime ());
           fflush (stdout);
           totP = 0;
         }
     }
-  printf ("Tried %d ad-values, found %d polynomials\n", tries, found);
+  printf ("Tried %d ad-value(s), found %d polynomial(s)\n", tries, found);
+  printf ("# potential collisions=%1.2e (%1.2e/s)\n",
+	  potential_collisions, 1000.0 * potential_collisions
+	  / (double) cputime ());
   for (i = 0; i < nthreads ; i++)
     mpz_clear (T[i]->N);
   free (T);
