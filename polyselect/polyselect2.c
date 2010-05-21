@@ -488,7 +488,7 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
   mpz_mul (Ntilde, Ntilde, N); /* d^d * ad^(d-1) * N */
   mpz_root (m0, Ntilde, d);
 
-  qmax = (unsigned long) pow (log ((double) Primes[0]), 1.2);
+  qmax = (unsigned long) pow (log ((double) Primes[0]), 1.1);
   /* since the special-q variant gives values of i larger by q^2,
      we take as bound for i P^2*qmax^2 */
   dM = pow ((double) Primes[0] * (double) qmax, 2.0);
@@ -496,7 +496,7 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
     M = LONG_MAX;
   else
     M = (long) dM;
-  printf ("M=%ld\n", M);
+  // printf ("M=%ld\n", M);
 
   st = cputime ();
   hash_init (H);
@@ -546,8 +546,7 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
     }
   // printf ("q=1: Hsize=%lu, took %dms\n", H->size, cputime () - st);
   pc1 = 0.5 * pow ((double) H->size, 2.0);
-  printf ("%1.0f potential collisions for q=1, mean value=%1.2f\n", pc1,
-	  hash_mean_value (H) / (double) M);
+  // printf ("%1.0f potential collisions for q=1, mean value=%1.2f\n", pc1, hash_mean_value (H) / (double) M);
   hash_clear (H);
 
   roots_realloc (R, R->size); /* free unused space */
@@ -627,12 +626,12 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
 	      modul_clearmod (pp);
 	    }
 	  // printf ("q=%lu, r=%lu: Hsize=%lu took %dms\n", q, rq[i], H->size, cputime () - st);
-	  printf ("q=%lu mean value=%1.2f\n", q, hash_mean_value (H) / (double) Mq);
+	  // printf ("q=%lu mean value=%1.2f\n", q, hash_mean_value (H) / (double) Mq);
 	  hash_clear (H);
 	}
       pc2 += 0.5 * pow ((double) H->size, 2.0);
     }
-  printf ("%1.0f potential collisions for q>1\n", pc2);
+  // printf ("%1.0f potential collisions for q>1\n", pc2);
   getprime (0); /* free the memory used by getprime */
 
   pthread_mutex_lock (&lock);
