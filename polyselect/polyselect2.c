@@ -488,7 +488,7 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
   mpz_mul (Ntilde, Ntilde, N); /* d^d * ad^(d-1) * N */
   mpz_root (m0, Ntilde, d);
 
-  qmax = (unsigned long) pow (log ((double) Primes[0]), 1.1);
+  qmax = 64;
   /* since the special-q variant gives values of i larger by q^2,
      we take as bound for i P^2*qmax^2 */
   dM = pow ((double) Primes[0] * (double) qmax, 2.0);
@@ -516,7 +516,7 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
 	{
           /* only consider r[j] and r[j] - pp */
 	  ppl = (long) modul_getmod_ul (pp);
-#if 0
+#if 1
 	  hash_add (H, p, r[j], m0, ad, d, N, 1, 0);
 	  hash_add (H, p, r[j] - ppl, m0, ad, d, N, 1, 0);
 #else
@@ -596,7 +596,7 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
 	      
 		  /* only consider k and k - pp */
 		  u = (long) modul_get_ul (k, pp);
-#if 0
+#if 1
 		  hash_add (H, p, u, m0, ad, d, N, q, rq[i]);
 		  hash_add (H, p, u - ppl, m0, ad, d, N, q, rq[i]);
 #else
@@ -800,11 +800,11 @@ main (int argc, char *argv[])
       for (i = 0 ; i < nthreads ; i++)
         pthread_join(tid[i], NULL);
 #endif
-      if (totP > 1000000000)
+      if (totP > 100000000)
         {
           printf ("# ad=%lu time=%dms pot. collisions=%1.2e (%1.2e/s)\n",
 		  admin, cputime (), potential_collisions,
-		  potential_collisions / cputime ());
+		  1000.0 * potential_collisions / cputime ());
           fflush (stdout);
           totP = 0;
         }
