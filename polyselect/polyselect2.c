@@ -79,8 +79,23 @@ roots_realloc (roots_t R, unsigned long newalloc)
   assert (newalloc >= R->size);
   R->alloc = newalloc;
   R->p = realloc (R->p, newalloc * sizeof (unsigned int));
+  if (R->p == NULL)
+    {
+      fprintf (stderr, "Error, cannot reallocate memory in roots_realloc\n");
+      exit (1);
+    }
   R->nr = realloc (R->nr, newalloc * sizeof (unsigned int));
+  if (R->nr == NULL)
+    {
+      fprintf (stderr, "Error, cannot reallocate memory in roots_realloc\n");
+      exit (1);
+    }
   R->roots = realloc (R->roots, newalloc * sizeof (unsigned long*));
+  if (R->roots == NULL)
+    {
+      fprintf (stderr, "Error, cannot reallocate memory in roots_realloc\n");
+      exit (1);
+    }
 }
 
 void
@@ -95,6 +110,11 @@ roots_add (roots_t R, unsigned int p, unsigned int nr, unsigned long *roots)
   R->p[R->size] = p;
   R->nr[R->size] = nr;
   R->roots[R->size] = malloc (nr * sizeof (unsigned long));
+  if (R->roots[R->size] == NULL)
+    {
+      fprintf (stderr, "Error, cannot allocate memory in roots_add\n");
+      exit (1);
+    }
   for (i = 0; i < nr; i++)
     R->roots[R->size][i] = roots[i];
   R->size ++;
@@ -138,6 +158,11 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_init (g[0]);
   mpz_init (g[1]);
   f = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
+  if (f == NULL)
+    {
+      fprintf (stderr, "Error, cannot allocate memory in match\n");
+      exit (1);
+    }
   for (j = 0; j <= d; j++)
     mpz_init (f[j]);
   /* we have l = p1*p2*q */
@@ -290,7 +315,17 @@ hash_init (hash_t H)
 
   H->alloc = 1;
   H->p = (uint32_t*) malloc (H->alloc * sizeof (uint32_t));
+  if (H->p == NULL)
+    {
+      fprintf (stderr, "Error, cannot allocate memory in hash_init\n");
+      exit (1);
+    }
   H->i = (int64_t*) malloc (H->alloc * sizeof (int64_t));
+  if (H->i == NULL)
+    {
+      fprintf (stderr, "Error, cannot allocate memory in hash_init\n");
+      exit (1);
+    }
   for (j = 0; j < H->alloc; j++)
     H->p[j] = 0;
   H->size = 0;
@@ -347,9 +382,19 @@ hash_grow (hash_t H)
 
   H->alloc = 2 * old_alloc;
   H->p = (uint32_t*) malloc (H->alloc * sizeof (uint32_t));
+  if (H->p == NULL)
+    {
+      fprintf (stderr, "Error, cannot allocate memory in hash_grow\n");
+      exit (1);
+    }
   for (j = 0; j < H->alloc; j++)
     H->p[j] = 0;
   H->i = (int64_t*) malloc (H->alloc * sizeof (int64_t));
+  if (H->i == NULL)
+    {
+      fprintf (stderr, "Error, cannot allocate memory in hash_grow\n");
+      exit (1);
+    }
   H->size = 0;
   for (j = 0; j < old_alloc; j++)
     if (old_p[j] != 0)
@@ -357,6 +402,8 @@ hash_grow (hash_t H)
   free (old_p);
   free (old_i);
 }
+
+#if 0
 static double
 hash_mean_value (hash_t H)
 {
@@ -368,6 +415,7 @@ hash_mean_value (hash_t H)
       s += fabs ((double) H->i[j]);
   return s / (double) H->size;
 }
+#endif
 
 static void
 initPrimes (unsigned long P)
@@ -378,6 +426,11 @@ initPrimes (unsigned long P)
   unsigned long p;
 
   Primes = (uint32_t*) malloc (maxprimes * sizeof (uint32_t));
+  if (Primes == NULL)
+    {
+      fprintf (stderr, "Error, cannot allocate memory in initPrimes\n");
+      exit (1);
+    }
   for (p = 2; p < P; p = getprime (p));
   while (p <= 2 * P)
     {
@@ -385,6 +438,11 @@ initPrimes (unsigned long P)
         {
           maxprimes += maxprimes / 10;
           Primes = (uint32_t*) realloc (Primes, maxprimes * sizeof (uint32_t));
+          if (Primes == NULL)
+            {
+              fprintf (stderr, "Error, cannot reallocate memory in initPrimes\n");
+              exit (1);
+            }
         }
       Primes[nprimes++] = p;
       p = getprime (p);
@@ -392,6 +450,11 @@ initPrimes (unsigned long P)
   getprime (0); /* free the memory used by getprime */
   Primes[nprimes++] = 0; /* end of list */
   Primes = (uint32_t*) realloc (Primes, nprimes * sizeof (uint32_t));
+  if (Primes == NULL)
+    {
+      fprintf (stderr, "Error, cannot reallocate memory in initPrimes\n");
+      exit (1);
+    }
 }
 
 static void
@@ -474,8 +537,23 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
   mpz_init (tmp);
   mpz_init (ump);
   r = (unsigned long*) malloc (d * sizeof (unsigned long));
+  if (r == NULL)
+    {
+      fprintf (stderr, "Error, cannot allocate memory in newAlgo\n");
+      exit (1);
+    }
   rq = (unsigned long*) malloc (d * sizeof (unsigned long));
+  if (rq == NULL)
+    {
+      fprintf (stderr, "Error, cannot allocate memory in newAlgo\n");
+      exit (1);
+    }
   f = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
+  if (f == NULL)
+    {
+      fprintf (stderr, "Error, cannot allocate memory in newAlgo\n");
+      exit (1);
+    }
   for (i = 0; i <= d; i++)
     mpz_init (f[i]);
   mpz_set_ui (f[d], 1);
@@ -769,6 +847,11 @@ main (int argc, char *argv[])
   initPrimes (P);
   printf ("Initializing primes took %dms\n", cputime () - st);
   T = malloc (nthreads * sizeof (tab_t));
+  if (T == NULL)
+    {
+      fprintf (stderr, "Error, cannot allocate memory in main\n");
+      exit (1);
+    }
   for (i = 0; i < nthreads ; i++)
     {
       mpz_init_set (T[i]->N, N);
