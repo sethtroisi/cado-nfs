@@ -522,13 +522,14 @@ static void
 newAlgo (mpz_t N, unsigned long d, unsigned long ad)
 {
   mpz_t *f, lambda, tmp, m0, Ntilde, ump;
-  unsigned long *r, *rq, i, j, p, nprimes, nr, q, nq = 0, qq, qmax;
+  unsigned long *r, *rq, i, j, k, p, nprimes, nr, q, nq = 0, qq, qmax;
   hash_t H;
   modulusul_t pp;
   roots_t R;
   int st;
   long M, u, ppl = 0, Mq;
   double dM, pc1, pc2;
+  unsigned long Q[] = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, ULONG_MAX};
 
   roots_init (R);
   mpz_init (Ntilde);
@@ -630,7 +631,7 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
   roots_realloc (R, R->size); /* free unused space */
 
   /* Special-q variant: we consider q < log(P)^2 */
-  for (q = 2, pc2 = 0.0; q <= qmax; q = getprime (q))
+  for (k = 0, pc2 = 0.0; (q = Q[k]) < ULONG_MAX; k++)
     {
       if ((d * ad) % q == 0) /* we need q to be coprime with d and ad */
 	continue;
@@ -710,7 +711,6 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
       pc2 += 0.5 * pow ((double) H->size, 2.0);
     }
   // printf ("%1.0f potential collisions for q>1\n", pc2);
-  getprime (0); /* free the memory used by getprime */
 
   pthread_mutex_lock (&lock);
   potential_collisions += pc1 +  pc2;
