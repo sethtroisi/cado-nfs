@@ -199,7 +199,7 @@ treatDep(char *prefix, int numdep, cado_poly pol, char *relname, char *purgednam
     sg = 1;
     depfile = fopen(depname, "w");
     // now really read the purged matrix in
-	vec = (int *)malloc(ncols * sizeof(int));
+	vec = (int *)malloc(nrows * sizeof(int));
 	fgets(str, 1024, purgedfile); // get rid of end of first line
 
     // we assume purgedfile is stored in increasing order of the indices
@@ -231,7 +231,7 @@ treatDep(char *prefix, int numdep, cado_poly pol, char *relname, char *purgednam
 	fprintf(stderr, "# Treated dependency #%d at %2.2lf\n",
 		numdep, seconds());
 	hashClear(&H);
-    //hashFree(&H);
+    hashFree(&H);
     free(small_row_used);
     free(rel_used);
     free(vec);
