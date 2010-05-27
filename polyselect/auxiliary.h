@@ -27,7 +27,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 /* differents methods for the L2 norm */
 #define RECTANGULAR 0
 #define CIRCULAR 1
-#define DEFAULT_L2_METHOD RECTANGULAR
+#define DEFAULT_L2_METHOD CIRCULAR
 
 #define SKEWNESS_DEFAULT_PREC 10
 
