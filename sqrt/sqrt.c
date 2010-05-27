@@ -4,6 +4,10 @@
 #include <string.h>
 #include <inttypes.h>
 #include <math.h> /* for log */
+#include <sys/types.h>
+#include <sys/resource.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "cado.h"
 #include "utils.h"
@@ -21,6 +25,9 @@
 
 // #define VERBOSE
 
+
+
+/********** DEP **********/
 int
 checkVector(int *vec, int ncols)
 {
@@ -41,85 +48,20 @@ checkVector(int *vec, int ncols)
     return ok;
 }
 
-// str is a row coming from purgedfile
-void
-str2Vec(int *vec, char *str)
-{
-    char *t = str;
-    int j, k = 0, nc;
-
-    // skip first integer which is the index
-    for(; *t != ' '; t++);
-#if 1
-    sscanf(t+1, "%d", &nc);
-    for(j = 0; j < nc; j++){
-	// t is on a "space"
-	t++;
-	// t begins on a number
-	sscanf(t, PURGE_INT_FORMAT, &k);
-	vec[k]++;
-	if(j == (nc-1))
-	    // no need to read further
-	    break;
-	// go to end of number
-	for(; *t != ' '; t++);
-    }
-#else
-    // skip second integer which is the number of primes
-    for(++t; *t != ' '; t++);
-    t++;
-    while(1){
-	if((*t == '\n') || (*t == ' ')){
-	    // new integer read
-	    vec[k]++;
-	    k = 0;
-	    if(*t == '\n')
-		break;
-	}
-	else
-	    k = k*10+(*t - '0');
-	t++;
-    }
-#endif
-}
-
-void
-treatRationalRelation(hashtable_t *H, relation_t rel)
-{
-    int j, h;
-    uint64_t minus2 = (H->need64) ? (uint64_t) (-2) : (uint32_t) (-2);
-
-#if MAPLE >= 1
-    fprintf(stderr, "P:=P * (%ld-m*%lu):\n", rel.a, rel.b);
-#endif
-    for(j = 0; j < rel.nb_rp; j++){
-#if MAPLE >= 1
-	fprintf(stderr, "R2:=R2*%ld^%d:\n", rel.rp[j].p, rel.rp[j].e);
-#endif
-	h = getHashAddr(H, rel.rp[j].p, minus2);
-	if(H->hashcount[h] == 0){
-	    // new empty place
-            SET_HASH_P(H,h,rel.rp[j].p);
-            SET_HASH_R(H,h,minus2);
-	}
-	H->hashcount[h] += rel.rp[j].e;
-    }
-}
-
 void
 computefree(relation_t *rel)
 {
     int i;
 
     for(i = 0; i < rel->nb_ap; i++){
-	rel->ap[i].r = rel->ap[i].p;
-	rel->ap[i].p = rel->a;
-	rel->ap[i].e = 1;
+        rel->ap[i].r = rel->ap[i].p;
+        rel->ap[i].p = rel->a;
+        rel->ap[i].e = 1;
     }
 }
 
 void
-treatAlgebraicRelation(FILE *algfile, hashtable_t *H, relation_t rel)
+treatRelation(FILE *depfile, hashtable_t *H, relation_t rel)
 {
     int j, h;
 
@@ -127,7 +69,7 @@ treatAlgebraicRelation(FILE *algfile, hashtable_t *H, relation_t rel)
 	computeroots(&rel);
     else
 	computefree(&rel);
-    fprintf(algfile, "%ld %lu\n", rel.a, rel.b);
+    fprintf(depfile, "%ld %lu\n", rel.a, rel.b);
 #if MAPLE >= 1
     fprintf(stderr, "NORM:=NORM*mynorm(f, %ld, %lu):\n", rel.a, rel.b);
     fprintf(stderr, "AX:=AX*(%ld-%lu*X):\n", rel.a, rel.b);
@@ -145,46 +87,6 @@ treatAlgebraicRelation(FILE *algfile, hashtable_t *H, relation_t rel)
 	}
 	H->hashcount[h] += rel.ap[j].e;
     }
-}
-
-void
-finishRationalSqrt(FILE *ratfile, hashtable_t *H, cado_poly pol)
-{
-    mpz_t prod;
-    int j;
-    unsigned int i;
-    uint64_t minus2 = (H->need64) ? (uint64_t) (-2) : (uint32_t) (-2);
-
-    mpz_init_set_ui(prod, 1);
-#if MAPLE >= 1
-    fprintf(stderr, "R:=1;\n");
-#endif
-    for(i = 0; i < H->hashmod; i++){
-	if(H->hashcount[i] > 0){
-          if (GET_HASH_R(H,i) != minus2)
-		continue;
-	    if ((H->hashcount[i] & 1)) {
-	        fprintf(stderr, "  Odd valuation! At rational prime %"PRIi64"\n",
-                        GET_HASH_P(H,i));
-		exit(1);
-	    }
-#if MAPLE >= 1
-	    fprintf(stderr, "R:=R*%ld^%d:\n",
-		    H->hashtab_p[i], H->hashcount[i]>>1);
-#endif
-	    // TODO: do better
-	    for(j = 0; j < (H->hashcount[i]>>1); j++)
-              mpz_mul_ui(prod, prod, GET_HASH_P(H,i));
-	    mpz_mod(prod, prod, pol->n);
-	}
-    }
-#if DEBUG >= 1
-    gmp_fprintf(stderr, "prod:=%Zd;\n", prod);
-    fprintf(stderr, "# We print the squareroot of the rational side...\n");
-#endif
-    // TODO: humf, I should say...!
-    gmp_fprintf(ratfile, "%Zd\n", prod);
-    mpz_clear(prod);
 }
 
 // returns the sign of m1*a+m2*b
@@ -214,41 +116,63 @@ treatSign(relation_t rel, cado_poly pol)
 // RETURN VALUE: -1 if file exhausted.
 //                0 if product is negative...
 //                1 if product is positive...
-//
-// If check == 0, then we don't need to read purgedfile again and again
-// so we store the interesing values in the vec array (ohhhhhh!).
 int
-treatDep(char *ratname, char *algname, char *relname, char *purgedname, char *indexname, FILE *kerfile, cado_poly pol, int nrows, int ncols, char *small_row_used, int small_nrows, hashtable_t *H, int nlimbs, char *rel_used, int *vec, int rora, int verbose, int check)
+treatDep(char *prefix, int numdep, cado_poly pol, char *relname, char *purgedname, char *indexname, char *kername, int verbose)
 {
-    FILE *ratfile, *algfile, *relfile, *indexfile, *purgedfile = NULL;
+    FILE *depfile, *relfile, *indexfile, *kerfile, *purgedfile = NULL;
+    char depname[200], str[1024];
+    hashtable_t H;
     relation_t rel;
     uint64_t w;
-    int ret, i, j, nrel, r, irel, nr, sg, ind;
-    char str[1024];
+    int i, j, ret, nlimbs, nrows, ncols, small_nrows, small_ncols;
+    int nrel, r, irel, sg, ind;
+    char *small_row_used, *rel_used;
+    int *vec; // useful to check dependency relation in the purged matrix
+    int need64 = (pol->lpba > 32) || (pol->lpbr > 32);
+
+    purgedfile = gzip_open(purgedname, "r");
+    fscanf(purgedfile, "%d %d", &nrows, &ncols);
+
+    indexfile = gzip_open(indexname, "r");
+    fscanf(indexfile, "%d %d", &small_nrows, &small_ncols);
+
+    nlimbs = ((small_nrows - 1) / 64) + 1;
+    // first read used rows in the small matrix
+    small_row_used = (char *)malloc(small_nrows * sizeof(char));
+    rel_used = (char *)malloc(nrows * sizeof(char));
+
+    // skip first numdep-1 relations
+    kerfile = fopen(kername, "r");
+    for(j = 0; j < numdep; j++)
+	for(i = 0; i < nlimbs; ++i)
+	    ret = fscanf (kerfile, "%" SCNx64, &w);
+
+    // use a hash table to rebuild P2
+    hashInit(&H, nrows, 1, need64);
+	sprintf(depname, "%s.%03d", prefix, numdep);
 
     memset(small_row_used, 0, small_nrows * sizeof(char));
     // now use this dep
     for(i = 0; i < nlimbs; ++i){
-	ret = fscanf (kerfile, "%" SCNx64, &w);
-	if(ret == -1)
-	    return ret;
-	ASSERT (ret == 1);
-	if (verbose)
-	    fprintf(stderr, "w=%" PRIx64 "\n", w);
-	for(j = 0; j < 64; ++j){
-	    if(w & 1UL){
-		ind = (i * 64) + j;
-		if(verbose)
-		    fprintf(stderr, "+R_%d\n", ind);
-		small_row_used[ind] = 1;
-	    }
+		ret = fscanf (kerfile, "%" SCNx64, &w);
+		if(ret == -1)
+	    	return ret;
+		ASSERT (ret == 1);
+		if (verbose)
+	    	fprintf(stderr, "w=%" PRIx64 "\n", w);
+		for(j = 0; j < 64; ++j){
+	    	if(w & 1UL){
+				ind = (i * 64) + j;
+			if(verbose)
+		    	fprintf(stderr, "+R_%d\n", ind);
+			small_row_used[ind] = 1;
+	    	}
 	    w >>= 1;
-	}
+		}
     }
+	fclose(kerfile);
     // now map to the rels of the purged matrix
     memset(rel_used, 0, nrows * sizeof(char));
-    indexfile = gzip_open(indexname, "r");
-    fscanf(indexfile, "%d %d", &i, &j); // skip first line
     for(i = 0; i < small_nrows; i++){
 	fscanf(indexfile, "%d", &nrel);
 	for(j = 0; j < nrel; j++){
@@ -267,124 +191,364 @@ treatDep(char *ratname, char *algname, char *relname, char *purgedname, char *in
     }
     gzip_close(indexfile, indexname);
 #if MAPLE >= 1
-    if((rora == 1) || (rora == 3))
-	fprintf(stderr, "R2:=1; P:=1;\n");
-    if((rora == 2) || (rora == 3)){
 	fprintf(stderr, "A2:=1;\n");
 	fprintf(stderr, "AX:=1;\n");
 	fprintf(stderr, "NORM:=1;\n");
-    }
 #endif
-    if(check)
-	memset(vec, 0, ncols * sizeof(int));
     // FIXME: sg should be removed...
     sg = 1;
-    ratfile = fopen(ratname, "w");
-    algfile = fopen(algname, "w");
+    depfile = fopen(depname, "w");
     // now really read the purged matrix in
-    if(check){
-	purgedfile = gzip_open(purgedname, "r");
-	fgets(str, 1024, purgedfile); // skip first line
-    }
+	vec = (int *)malloc(ncols * sizeof(int));
+	fgets(str, 1024, purgedfile); // get rid of end of first line
+
     // we assume purgedfile is stored in increasing order of the indices
     // of the real relations, so that one pass in the rels file is needed...!
     relfile = gzip_open(relname, "r");
     irel = 0; // we are ready to read relation irel
     for(i = 0; i < nrows; i++){
-	if(check)
-	    fgets(str, 1024, purgedfile);
-	if(rel_used[i]){
-	    if(check)
-		sscanf(str, "%d", &nr);
-	    else
-		nr = vec[i];
-#if DEBUG >= 1
-	    fprintf(stderr, "Reading in rel %d of index %d\n", i, nr);
-#endif
-	    if(check)
-		str2Vec(vec, str);
-            skip_relations_in_file(relfile, nr - irel);
-            fread_relation(relfile, &rel);
-	    irel = nr+1;
-	    if((rora == 1) || (rora == 3))
-		treatRationalRelation(H, rel);
-	    if((rora == 2) || (rora == 3))
-		treatAlgebraicRelation(algfile, H, rel);
-	    sg *= treatSign(rel, pol);
-	    clear_relation(&rel);
-	}
-    }
-    gzip_close(relfile, relname);
-    ASSERT(!check || checkVector(vec, ncols));
-    if(sg == -1)
-	fprintf(stderr, "prod(a-b*m) < 0\n");
-    else{
-	if((rora == 1) || (rora == 3))
-	    finishRationalSqrt(ratfile, H, pol);
-    }
-    fclose(ratfile);
-    fclose(algfile);
-    if(check)
-	gzip_close(purgedfile, purgedname);
-    return (sg == -1 ? 0 : 1);
-}
-
-void
-SqrtWithIndexAll(char *prefix, char *relname, char *purgedname, char *indexname, FILE *kerfile, cado_poly pol, int rora, int numdep, int verbose, int check)
-{
-    FILE *indexfile, *purgedfile;
-    char ratname[200], algname[200], str[1024];
-    hashtable_t H;
-    uint64_t w;
-    int i, j, ret, nlimbs, nrows, ncols, small_nrows, small_ncols;
-    char *small_row_used, *rel_used;
-    int *vec; // useful to check dependency relation in the purged matrix
-    int need64 = (pol->lpba > 32) || (pol->lpbr > 32);
-
-    purgedfile = gzip_open(purgedname, "r");
-    fscanf(purgedfile, "%d %d", &nrows, &ncols);
-
-    indexfile = gzip_open(indexname, "r");
-    fscanf(indexfile, "%d %d", &small_nrows, &small_ncols);
-    gzip_close(indexfile, indexname);
-
-    nlimbs = ((small_nrows - 1) / 64) + 1;
-    // first read used rows in the small matrix
-    small_row_used = (char *)malloc(small_nrows * sizeof(char));
-    rel_used = (char *)malloc(nrows * sizeof(char));
-    if(check)
-	vec = (int *)malloc(ncols * sizeof(int));
-    else{
-	// ohhhhhhhhhhhhh!
-	vec = (int *)malloc(nrows * sizeof(int));
-	// get rid of end of first line
-	fgets(str, 1024, purgedfile);
-	for(i = 0; i < nrows; i++){
 	    fgets(str, 1024, purgedfile);
 	    sscanf(str, "%d", vec+i);
-	}
+		if(rel_used[i]){
+#if DEBUG >= 1
+	    	fprintf(stderr, "Reading in rel %d of index %d\n", i, vec[i]);
+#endif
+            skip_relations_in_file(relfile, vec[i] - irel);
+            fread_relation(relfile, &rel);
+	    	irel = vec[i]+1;
+			treatRelation(depfile, &H, rel);
+	    	sg *= treatSign(rel, pol);
+	    	clear_relation(&rel);
+		}
     }
-    gzip_close(purgedfile, purgedname);
+    gzip_close(relfile, relname);
+    //ASSERT(checkVector(vec, ncols));
+    if(sg == -1)
+	fprintf(stderr, "prod(a-b*m) < 0\n");
+    fclose(depfile);
+	gzip_close(purgedfile, purgedname);
 
-    // skip first numdep-1 relations
-    for(j = 0; j < numdep; j++)
-	for(i = 0; i < nlimbs; ++i)
-	    ret = fscanf (kerfile, "%" SCNx64, &w);
-
-    // use a hash table to rebuild P2
-    hashInit(&H, nrows, 1, need64);
-	sprintf(ratname, "%s.rat.%03d", prefix, numdep);
-	sprintf(algname, "%s.alg.%03d", prefix, numdep);
-	ret = treatDep(ratname, algname, relname, purgedname, indexname, kerfile, pol, nrows, ncols, small_row_used, small_nrows, &H, nlimbs, rel_used, vec, rora, verbose, check);
 	fprintf(stderr, "# Treated dependency #%d at %2.2lf\n",
 		numdep, seconds());
 	hashClear(&H);
-    hashFree(&H);
+    //hashFree(&H);
     free(small_row_used);
     free(rel_used);
     free(vec);
+    return (sg == -1 ? 0 : 1);
 }
 
+
+
+/********** RATSQRT **********/
+
+/* Returns memory usage, in KB 
+ * This is the VmSize field in the status file of /proc/pid/ dir
+ * This is highly non portable.
+ * Return -1 in case of failure.
+ */
+static long Memusage() {
+  pid_t pid = getpid();
+
+  char str[1024];
+  char *truc;
+  snprintf(str, 1024, "/proc/%d/status", pid);
+
+  FILE *file;
+  file = fopen(str, "r");
+  if (file == NULL)
+    return -1;
+
+  long mem;
+  for(;;) {
+    truc = fgets(str, 1023, file);
+    if (truc == NULL) {
+      fclose(file);
+      return -1;
+    }
+    int ret = sscanf(str, "VmSize: %ld", &mem);
+    if (ret == 1) {
+      fclose(file);
+      return mem;
+    }
+  }
+}
+
+/* same as above, for resident memory (column RES of top) */
+static long Memusage2() {
+  pid_t pid = getpid();
+
+  char str[1024];
+  char *truc;
+  snprintf(str, 1024, "/proc/%d/status", pid);
+
+  FILE *file;
+  file = fopen(str, "r");
+  if (file == NULL)
+    return -1;
+
+  long mem;
+  for(;;) {
+    truc = fgets(str, 1023, file);
+    if (truc == NULL) {
+      fclose(file);
+      return -1;
+    }
+    int ret = sscanf(str, "VmRSS: %ld", &mem);
+    if (ret == 1) {
+      fclose(file);
+      return mem;
+    }
+  }
+}
+
+/* Returns peak memory usage, in KB 
+ * This is the VmPeak field in the status file of /proc/pid/ dir
+ * This is highly non portable.
+ * Return -1 in case of failure.
+ */
+static long PeakMemusage() {
+  pid_t pid = getpid();
+
+  char str[1024];
+  char *truc;
+  snprintf(str, 1024, "/proc/%d/status", pid);
+
+  FILE *file;
+  file = fopen(str, "r");
+  if (file == NULL)
+    return -1;
+
+  long mem;
+  for(;;) {
+    truc = fgets(str, 1023, file);
+    if (truc == NULL) {
+      fclose(file);
+      return -1;
+    }
+    int ret = sscanf(str, "VmPeak: %ld", &mem);
+    if (ret == 1) {
+      fclose(file);
+      return mem;
+    }
+  }
+}
+
+static void
+my_mpz_mul (mpz_t a, mpz_t b, mpz_t c)
+{
+  int large, st;
+
+  large = mpz_size (b) + mpz_size (c) >= 5000000;
+  if (large)
+    {
+      fprintf (stderr, "[multiplying %lu*%lu limbs: ",
+               mpz_size (b), mpz_size (c));
+      fflush (stderr);
+      st = cputime ();
+    }
+  mpz_mul (a, b, c);
+  mpz_realloc2 (c, 0);
+  if (large)
+    {
+      fprintf (stderr, "%dms]\n", cputime () - st);
+      fflush (stderr);
+    }
+}
+
+#define THRESHOLD 2 /* must be >= 2 */
+
+/* accumulate up to THRESHOLD products in prd[0], 2^i*THRESHOLD in prd[i].
+   nprd is the number of already accumulated values: if nprd = n0 + 
+   n1 * THRESHOLD + n2 * THRESHOLD^2 + ..., then prd[0] has n0 entries,
+   prd[1] has n1*THRESHOLD entries, and so on.
+*/
+static mpz_t*
+accumulate_fast (mpz_t *prd, mpz_t a, unsigned long *lprd, unsigned long nprd)
+{
+  unsigned long i;
+
+  my_mpz_mul (prd[0], prd[0], a);
+  nprd ++;
+
+  for (i = 0; nprd % THRESHOLD == 0; i++, nprd /= THRESHOLD)
+    {
+      /* need to access prd[i + 1], thus i+2 entries */
+      if (i + 2 > *lprd)
+        {
+          lprd[0] ++;
+          prd = (mpz_t*) realloc (prd, *lprd * sizeof (mpz_t));
+          mpz_init_set_ui (prd[i + 1], 1);
+        }
+      my_mpz_mul (prd[i + 1], prd[i + 1], prd[i]);
+      mpz_set_ui (prd[i], 1);
+    }
+
+  return prd;
+}
+
+/* prd[0] <- prd[0] * prd[1] * ... * prd[lprd-1] */
+static void
+accumulate_fast_end (mpz_t *prd, unsigned long lprd)
+{
+  unsigned long i;
+
+  for (i = 1; i < lprd; i++)
+    my_mpz_mul (prd[0], prd[0], prd[i]);
+}
+
+static size_t
+stats (mpz_t *prd, unsigned long lprd)
+{
+  unsigned long i;
+  size_t s = 0;
+
+  for (i = 0; i < lprd; i++)
+    s += mpz_size (prd[i]);
+  return s;
+}
+
+int 
+calculateSqrtRat (char *prefix, int numdep, cado_poly pol)
+{
+  char depname[200];
+  char ratname[200];
+  sprintf(depname, "%s.%03d", prefix, numdep);
+  sprintf(ratname, "%s.rat.%03d", prefix, numdep);
+  FILE *depfile = NULL;
+  FILE *ratfile;
+  //int sign;
+  long a, b;
+  int ret;
+  unsigned long ab_pairs = 0, line_number, freerels = 0;
+  mpz_t v, *prd;
+  unsigned long lprd; /* number of elements in prd[] */
+  unsigned long nprd; /* number of accumulated products in prd[] */
+  unsigned long res, peakres = 0;
+
+#ifdef __MPIR_VERSION
+  fprintf (stderr, "Using MPIR %s\n", mpir_version);
+#else
+  fprintf (stderr, "Using GMP %s\n", gmp_version);
+#endif
+
+  mpz_init (v);
+
+  lprd = 1;
+  nprd = 0;
+  prd = (mpz_t*) malloc (lprd * sizeof (mpz_t));
+  mpz_init_set_ui (prd[0], 1);
+
+  depfile = fopen (depname, "r");
+  /*if(!depfile) {
+	fprintf (stderr, "Error: file %s not exist\n", depname);
+	exit(1);
+  }*/
+  ASSERT_ALWAYS(depfile != NULL);
+	
+  line_number = 2;
+  for (;;)
+    {
+      ret = fscanf (depfile, "%ld %ld\n", &a, &b);
+
+      if (ret != 2)
+        {
+          fprintf (stderr, "Invalid line %lu\n", line_number);
+          break;
+        }
+
+      ab_pairs ++;
+      line_number ++;
+
+      if (ab_pairs % 1000000 == 0)
+        {
+          res = Memusage2 ();
+          if (res > peakres)
+            peakres = res;
+            fprintf (stderr, "%lu pairs: size %zuMb, %dms, VIRT %luM (peak %luM), RES %luM (peak %luM)\n",
+                       ab_pairs, stats (prd, lprd) >> 17, cputime (),
+                       Memusage () >> 10, PeakMemusage () >> 10,
+                       res >> 10, peakres >> 10);
+        }
+
+        if (b == 0)
+          freerels ++;
+
+        /* accumulate g1*a+g0*b */
+        mpz_mul_si (v, pol->g[1], a);
+        mpz_addmul_si (v, pol->g[0], b);
+
+        prd = accumulate_fast (prd, v, &lprd, nprd++);
+          
+        if (feof (depfile))
+          break;
+      }
+    fprintf (stderr, "%lu (a,b) pairs\n", line_number);
+
+    fclose (depfile);
+
+  fprintf (stderr, "Read %lu (a,b) pairs, including %lu free\n", ab_pairs,
+           freerels);
+
+  accumulate_fast_end (prd, lprd);
+
+  /* we must divide by g1^ab_pairs: if the number of (a,b) pairs is odd, we
+     multiply by g1, and divide by g1^(ab_pairs+1) */
+  if (ab_pairs & 1)
+    mpz_mul (prd[0], prd[0], pol->g[1]);
+
+  fprintf (stderr, "Size of product = %zu bits\n", mpz_sizeinbase (prd[0], 2));
+
+  if (mpz_sgn (prd[0]) < 0)
+    {
+      fprintf (stderr, "Error, product is negative: try another dependency\n");
+      exit (1);
+    }
+
+  fprintf (stderr, "Starting square root at %dms\n", cputime ());
+
+  /* since we know we have a square, take the square root */
+  mpz_sqrtrem (prd[0], v, prd[0]);
+  
+  fprintf (stderr, "Computed square root at %dms\n", cputime ());
+
+  if (mpz_cmp_ui (v, 0) != 0)
+    {
+      fprintf (stderr, "Error, square root remainder is not zero\n");
+      exit (1);
+    }
+
+  mpz_mod (prd[0], prd[0], pol->n);
+
+  fprintf (stderr, "Reduced mod n at %dms\n", cputime ());
+
+  /* now divide by g1^(ab_pairs/2) if ab_pairs is even, and g1^((ab_pairs+1)/2)
+     if ab_pairs is odd */
+  
+  mpz_powm_ui (v, pol->g[1], (ab_pairs + 1) / 2, pol->n);
+  fprintf (stderr, "Computed g1^(nab/2) mod n at %dms\n", cputime ());
+
+  mpz_invert (v, v, pol->n);
+  mpz_mul (prd[0], prd[0], v);
+  mpz_mod (prd[0], prd[0], pol->n);
+  
+  ratfile = fopen (ratname, "w");
+  gmp_fprintf (ratfile, "%Zd\n", prd[0]);
+  fclose(ratfile);
+
+  gmp_fprintf (stderr, "rational square root is %Zd\n", prd[0]);
+
+  fprintf (stderr, "Rational square root time at %dms\n", cputime ());
+
+  mpz_clear (prd[0]);
+
+  mpz_clear (v);
+  return 0;
+}
+
+
+
+/********** ALGSQRT **********/
 static void
 polymodF_from_ab(polymodF_t tmp, long a, unsigned long b) {
   tmp->v = 0;
@@ -748,16 +912,9 @@ FindSuitableModP (poly_t F)
   return p;
 }
 
-#define THRESHOLD 2 /* must be >= 2 */
-
-/* accumulate up to THRESHOLD products in prd[0], 2^i*THRESHOLD in prd[i].
-   nprd is the number of already accumulated values: if nprd = n0 +
-   n1 * THRESHOLD + n2 * THRESHOLD^2 + ..., then prd[0] has n0 entries,
-   prd[1] has n1*THRESHOLD entries, and so on.
-*/
 // Products are computed modulo the polynomial F.
 polymodF_t*
-accumulate_fast (polymodF_t *prd, const polymodF_t a, const poly_t F,
+accumulate_fast_F (polymodF_t *prd, const polymodF_t a, const poly_t F,
                  unsigned long *lprd, unsigned long nprd)
 {
   unsigned long i;
@@ -788,7 +945,7 @@ accumulate_fast (polymodF_t *prd, const polymodF_t a, const poly_t F,
 
 /* prd[0] <- prd[0] * prd[1] * ... * prd[lprd-1] */
 void
-accumulate_fast_end (polymodF_t *prd, const poly_t F, unsigned long lprd)
+accumulate_fast_F_end (polymodF_t *prd, const poly_t F, unsigned long lprd)
 {
   unsigned long i;
 
@@ -796,77 +953,30 @@ accumulate_fast_end (polymodF_t *prd, const poly_t F, unsigned long lprd)
     polymodF_mul (prd[0], prd[0], prd[i], F);
 }
 
-int main(int argc, char *argv[])
+int
+calculateSqrtAlg (char *prefix, int numdep, cado_poly pol)
 {
-    char *relname, *purgedname, *indexname, *kername, *polyname, *prefix;
-    FILE *kerfile;
-    cado_poly pol;
-    int verbose = 1, numdep, rora, ret, i, check;
-
+	char depname[200];
 	char algname[200];
-	char ratname[200];
-	FILE * algfile;
-	FILE * ratfile;
+    sprintf(depname, "%s.%03d", prefix, numdep);
+    sprintf(algname, "%s.alg.%03d", prefix, numdep);
+	FILE *depfile = NULL;
+	FILE *algfile;
+
 	poly_t F;
 	polymodF_t prd, tmp;
 	long a;
     unsigned long b;
     unsigned long p;
     double t0 = seconds ();
+    mpz_t algsqrt, aux;
 
-    if(argc != 9){
-	fprintf(stderr, "Usage: %s relname purgedname indexname", argv[0]);
-	fprintf(stderr, " kername polyname numdep r|a prefix\n");
-	fprintf(stderr, "Dependency relation i will be put in files prefix.i\n");
-	return 0;
-    }
-
-    /* print the command line */
-    fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
-    for (i = 1; i < argc; i++)
-      fprintf (stderr, " %s", argv[i]);
-    fprintf (stderr, "\n");
-
-    relname = argv[1];
-    purgedname = argv[2];
-    indexname = argv[3];
-    kername = argv[4];
-    polyname = argv[5];
-    numdep = atoi(argv[6]);
-	prefix = argv[8];
-
-    kerfile = fopen(kername, "r");
-
-    cado_poly_init(pol);
-    ret = cado_poly_read(pol, polyname);
-    ASSERT (ret);
-
-    rora = 0;
-    rora |= (strchr(argv[7], 'r') != NULL);
-    rora |= (strchr(argv[7], 'a') != NULL) << 1;
-
-    if (!rora) {
-        fprintf (stderr, "Error, 8th argument must be r, a, ar or ra\n");
-        exit (1);
-      }
-    verbose = 0;
-    check = 0;
-    SqrtWithIndexAll(prefix, relname, purgedname, indexname, kerfile, pol, rora, numdep, verbose, check);
-
-    fclose(kerfile);
-
-    if (strchr(argv[7], '!')) {
-        printf("Special trap -- not computing algebraic square root.\n");
-        exit(0);
-    }
-	/********** ALGSQRT **********/
-  
-    sprintf(algname, "%s.alg.%03d", prefix, numdep);
-    algfile = fopen(algname, "r");
-    ASSERT_ALWAYS(algfile != NULL);
+    depfile = fopen(depname, "r");
+    ASSERT_ALWAYS(depfile != NULL);
   
     // Init F to be the algebraic polynomial
     poly_alloc(F, pol->degree);
+	int i;
     for (i = pol->degree; i >= 0; --i)
       poly_setcoeff(F, i, pol->f[i]);
   
@@ -883,7 +993,7 @@ int main(int argc, char *argv[])
     int nab = 0, nfree = 0;
   #if 0
     // Naive version, without subproduct tree
-    while(fscanf(algfile, "%ld %lu", &a, &b) != EOF){
+    while(fscanf(depfile, "%ld %lu", &a, &b) != EOF){
       if(!(nab % 100000))
         fprintf(stderr, "# Reading ab pair #%d at %2.2lf\n",nab,seconds());
       if((a == 0) && (b == 0))
@@ -903,13 +1013,13 @@ int main(int argc, char *argv[])
       mpz_set_ui(prd_tab[0]->p->coeff[0], 1);
       prd_tab[0]->p->deg = 0;
       prd_tab[0]->v = 0;
-      while(fscanf(algfile, "%ld %lu", &a, &b) != EOF){
+      while(fscanf(depfile, "%ld %lu", &a, &b) != EOF){
         if(!(nab % 100000))
   	fprintf(stderr, "# Reading ab pair #%d at %2.2lf\n", nab, seconds ());
         if((a == 0) && (b == 0))
   	break;
         polymodF_from_ab(tmp, a, b);
-        prd_tab = accumulate_fast (prd_tab, tmp, F, &lprd, nprd++);
+        prd_tab = accumulate_fast_F (prd_tab, tmp, F, &lprd, nprd++);
         nab++;
         if(b == 0)
   	  nfree++;
@@ -937,8 +1047,8 @@ int main(int argc, char *argv[])
        *    - this should finally give an even power of f_d in the
        *      denominator, and the algorithm can continue.
        */
-      accumulate_fast_end (prd_tab, F, lprd);
-      fclose(algfile);
+      accumulate_fast_F_end (prd_tab, F, lprd);
+      fclose(depfile);
   
       poly_copy(prd->p, prd_tab[0]->p);
       prd->v = prd_tab[0]->v;
@@ -960,7 +1070,6 @@ int main(int argc, char *argv[])
     polymodF_sqrt (prd, prd, F, p);
     fprintf (stderr, "Square root lifted in %2.2lf\n", seconds()-tm);
   
-    mpz_t algsqrt, aux;
     mpz_init(algsqrt);
     mpz_init(aux);
     poly_eval_mod_mpz(algsqrt, prd->p, pol->m, pol->n);
@@ -969,78 +1078,222 @@ int main(int argc, char *argv[])
     mpz_mul(algsqrt, algsqrt, aux);
     mpz_mod(algsqrt, algsqrt, pol->n);
   
-    gmp_fprintf(stderr, "Algebraic square root is: %Zd\n", algsqrt);
-  
+	algfile = fopen (algname, "w");
+	gmp_fprintf (algfile, "%Zd\n", algsqrt);
+	fclose(algfile);
+
+    gmp_fprintf(stderr, "algebraic square root is: %Zd\n", algsqrt);
+    fprintf (stderr, "Algebraic square root time is %2.2lf\n", seconds() - t0);
+    mpz_clear(aux);
+    mpz_clear(algsqrt);
+    poly_free(prd->p);
+    poly_free(tmp->p);
+    poly_free(F);
+	return 0;
+}
+
+
+
+/********** GCD **********/
+int
+calculateGcd(char *prefix, int numdep, cado_poly pol)
+{
+	char ratname[200];
+	char algname[200];
     sprintf(ratname, "%s.rat.%03d", prefix, numdep);
-    ratfile = fopen(ratname, "r");
-    ASSERT_ALWAYS(ratfile != NULL);
-    gmp_fscanf(ratfile, "%Zd", aux);
-    fclose(ratfile);
-  
-    gmp_fprintf(stderr, "Rational square root is: %Zd\n", aux);
-    fprintf (stderr, "Total square root time is %2.2lf\n", seconds() - t0);
-  
+    sprintf(algname, "%s.alg.%03d", prefix, numdep);
+	FILE *ratfile = NULL;
+	FILE *algfile = NULL;
     int found = 0;
-    {
-      mpz_t g1, g2;
-      mpz_init(g1);
-      mpz_init(g2);
+    mpz_t ratsqrt, algsqrt, g1, g2;
+
+    mpz_init(ratsqrt);
+    mpz_init(algsqrt);
+    mpz_init(g1);
+    mpz_init(g2);
   
-      // First check that the squares agree
-      mpz_mul(g1, aux, aux);
-      mpz_mod(g1, g1, pol->n);
-      if(mpz_cmp_ui(pol->g[1], 1) != 0){
-  	// case g(X)=m1*X+m2 with m1 != 1
-  	// we should have prod (a+b*m2/m1) = A^2 = R^2/m1^(nab-nfree)
-  	// and therefore nab should be even
+	ratfile = fopen(ratname, "r");
+	algfile = fopen(algname, "r");
+	ASSERT_ALWAYS(ratfile != NULL);
+	ASSERT_ALWAYS(algfile != NULL);
+	gmp_fscanf(ratfile, "%Zd", ratsqrt);
+	gmp_fscanf(algfile, "%Zd", algsqrt);
+	fclose(ratfile);
+	fclose(algfile);
+
+    // First check that the squares agree
+    mpz_mul(g1, ratsqrt, ratsqrt);
+    mpz_mod(g1, g1, pol->n);
+    /* if(mpz_cmp_ui(pol->g[1], 1) != 0){
+  		// case g(X)=m1*X+m2 with m1 != 1
+  		// we should have prod (a+b*m2/m1) = A^2 = R^2/m1^(nab-nfree)
+  		// and therefore nab should be even
         //    [ this last statement is probably false if f is not monic,
         //      see discussion above about odd/even nab ]
-  	if(nab & 1){
-  	    fprintf(stderr, "Sorry, but #(a, b) is odd\n");
-  	    fprintf(stderr, "Bug: this should be patched! Please report your buggy input\n");
-  	    printf("Failed\n");
-  	    return 0;
-  	}
-  	mpz_powm_ui(g2, pol->g[1], (nab-nfree)>>1, pol->n);
-  	mpz_mul(algsqrt, algsqrt, g2);
-  	mpz_mod(algsqrt, algsqrt, pol->n);
-      }
-      mpz_mul(g2, algsqrt, algsqrt);
-      mpz_mod(g2, g2, pol->n);
-      if (mpz_cmp(g1, g2)!=0) {
-        fprintf(stderr, "Bug: the squares do not agree modulo n!\n");
-        //      gmp_printf("g1:=%Zd;\ng2:=%Zd;\n", g1, g2);
-      }
-      mpz_sub(g1, aux, algsqrt);
-      mpz_gcd(g1, g1, pol->n);
-  
-      if (mpz_cmp(g1,pol->n)) {
-        if (mpz_cmp_ui(g1,1)) {
-          found = 1;
-          gmp_printf("%Zd\n", g1);
-        }
-      }
-      mpz_add(g2, aux, algsqrt);
-      mpz_gcd(g2, g2, pol->n);
-      if (mpz_cmp(g2,pol->n)) {
-        if (mpz_cmp_ui(g2,1)) {
-          found = 1;
-          gmp_printf("%Zd\n", g2);
-        }
-      }
-      mpz_clear(g1);
-      mpz_clear(g2);
+  		if(nab & 1){
+  	    	fprintf(stderr, "Sorry, but #(a, b) is odd\n");
+  	    	fprintf(stderr, "Bug: this should be patched! Please report your buggy input\n");
+  	    	printf("Failed\n");
+  	    	exit(1);
+  		}
+  		mpz_powm_ui(g2, pol->g[1], (nab-nfree)>>1, pol->n);
+  		mpz_mul(algsqrt, algsqrt, g2);
+  		mpz_mod(algsqrt, algsqrt, pol->n);
+    }*/
+    mpz_mul(g2, algsqrt, algsqrt);
+    mpz_mod(g2, g2, pol->n);
+    if (mpz_cmp(g1, g2)!=0) {
+      fprintf(stderr, "Bug: the squares do not agree modulo n!\n");
+	  exit(1);
+      //      gmp_printf("g1:=%Zd;\ng2:=%Zd;\n", g1, g2);
     }
+
+    mpz_sub(g1, ratsqrt, algsqrt);
+    mpz_gcd(g1, g1, pol->n);
+    if (mpz_cmp(g1,pol->n)) {
+      if (mpz_cmp_ui(g1,1)) {
+        found = 1;
+        gmp_printf("%Zd\n", g1);
+      }
+    }
+
+    mpz_add(g2, ratsqrt, algsqrt);
+    mpz_gcd(g2, g2, pol->n);
+    if (mpz_cmp(g2,pol->n)) {
+      if (mpz_cmp_ui(g2,1)) {
+        found = 1;
+        gmp_printf("%Zd\n", g2);
+      }
+    }
+    mpz_clear(g1);
+    mpz_clear(g2);
+
     if (!found)
       printf("Failed\n");
   
-    cado_poly_clear (pol);
-    mpz_clear(aux);
+    mpz_clear(ratsqrt);
     mpz_clear(algsqrt);
-    poly_free(F);
-    poly_free(prd->p);
-    poly_free(tmp->p);
   
+    return 0;
+}
+
+
+int main(int argc, char *argv[])
+{
+	char *polyname = NULL, *prefix = NULL;
+    char *relname = NULL, *purgedname = NULL, *indexname = NULL, *kername = NULL;
+    cado_poly pol;
+    int verbose = 0, numdep = -1, opt = 0, ret, i;
+
+    /* print the command line */
+    fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
+    for (i = 1; i < argc; i++)
+      fprintf (stderr, " %s", argv[i]);
+    fprintf (stderr, "\n");
+
+	if (argc == 1 || (argc > 1 && strcmp(argv[1], "--help") == 0 )) {
+		fprintf(stderr, "Usage: %s [-ab || -rat || -alg || -gcd] -poly polyname -dep prefix numdep", argv[0]);
+		fprintf(stderr, " -rel relname -purged purgedname -index indexname -ker kername\n");
+		fprintf(stderr, "or %s (-rat || -alg || -gcd) -poly polyname -dep prefix numdep\n\n", argv[0]);
+		fprintf(stderr, "(a,b) pairs of dependency relation 'numdep' will be r/w in file 'prefix.numdep',");
+		fprintf(stderr, " rational sqrt in 'prefix.rat.numdep' ...\n");
+		exit(1);
+	}
+		
+	/* args */
+    while (argc > 1 && argv[1][0] == '-') {
+		if(argc > 1 && strcmp(argv[1], "-ab") == 0) {
+			opt += 1;
+			argc--;
+			argv++;
+		}
+		else if(argc > 1 && strcmp(argv[1], "-rat") == 0) {
+			opt += 2;
+			argc--;
+			argv++;
+		}
+		else if(argc > 1 && strcmp(argv[1], "-alg") == 0) {
+			opt += 4;
+			argc--;
+			argv++;
+		}
+		else if(argc > 1 && strcmp(argv[1], "-gcd") == 0) {
+			opt += 8;
+			argc--;
+			argv++;
+		}
+        else if (argc > 2 && strcmp(argv[1], "-poly") == 0) {
+	    	polyname = argv[2];
+            argc -= 2;
+            argv += 2;
+        }
+        else if (argc > 3 && strcmp(argv[1], "-dep") == 0) {
+	    	prefix = argv[2];
+	    	numdep = atoi(argv[3]);
+            argc -= 3;
+            argv += 3;
+        }
+        else if (argc > 2 && strcmp(argv[1], "-rel") == 0) {
+	    	relname = argv[2];
+            argc -= 2;
+            argv += 2;
+        }
+        else if (argc > 2 && strcmp(argv[1], "-purged") == 0) {
+	    	purgedname = argv[2];
+            argc -= 2;
+            argv += 2;
+        }
+        else if (argc > 2 && strcmp(argv[1], "-index") == 0) {
+	    	indexname = argv[2];
+            argc -= 2;
+            argv += 2;
+        }
+        else if (argc > 2 && strcmp(argv[1], "-ker") == 0) {
+	    	kername = argv[2];
+            argc -= 2;
+            argv += 2;
+        }
+		else {
+			fprintf(stderr, "Error: %s parameter unknown or bad arguments in command line\n", argv[1]);
+			exit(1);
+		}
+	}
+
+	/* if no options then -ab -rat -alg -gcd */
+	if (!opt)
+		opt = 15;
+		
+    ASSERT_ALWAYS(polyname != NULL);
+    ASSERT_ALWAYS(prefix != NULL);
+    ASSERT_ALWAYS(numdep != -1);
+
+    cado_poly_init(pol);
+    ret = cado_poly_read(pol, polyname);
+    ASSERT (ret);
+
+	int compt = 0;
+	while (opt) {
+		if (opt%2 == 1) {
+			if (compt == 0) {
+    			ASSERT_ALWAYS(relname != NULL);
+    			ASSERT_ALWAYS(purgedname != NULL);
+    			ASSERT_ALWAYS(indexname != NULL);
+    			ASSERT_ALWAYS(kername != NULL);
+    			treatDep(prefix, numdep, pol, relname, purgedname, indexname, kername, verbose);
+			} 
+			else if (compt == 1)
+				calculateSqrtRat(prefix, numdep, pol);
+			else if (compt == 2)
+				calculateSqrtAlg(prefix, numdep, pol);
+			else 
+				calculateGcd(prefix, numdep, pol);
+			opt--;
+		}
+		opt = opt/2;
+		compt++;
+	}
+	
+    cado_poly_clear (pol);
     return 0;
 }
   

@@ -1144,7 +1144,7 @@ my %tasks = (
     sqrt	  => { name	  => "square root",
 				   dep    => ['chars'],
                    param  => ['nkermax'],
-                   files  => ['dep\.alg\.\d+', 'dep\.rat\.\d+',
+                   files  => ['dep\.\d+', 'dep\.alg\.\d+', 'dep\.rat\.\d+',
                               'sqrt\.stderr', 'fact\.\d+',
 							  'fact', 'allfactors'] }
 );
@@ -2470,13 +2470,12 @@ sub do_sqrt {
 		info "Testing dependency number $numdep...\n";
 		$tab_level++;
     	my $cmd = "$param{'cadodir'}/sqrt/sqrt ".
-              "$param{'prefix'}.nodup.gz ".
-              "$param{'prefix'}.purged ".
-              "$param{'prefix'}.index ".
-              "$param{'prefix'}.ker ".
-              "$param{'prefix'}.poly ".
-              "$numdep ar ".
-              "$param{'prefix'}.dep ".
+              "-poly $param{'prefix'}.poly ".
+              "-dep $param{'prefix'}.dep $numdep ".
+              "-rel $param{'prefix'}.nodup.gz ".
+              "-purged $param{'prefix'}.purged ".
+              "-index $param{'prefix'}.index ".
+              "-ker $param{'prefix'}.ker ".
               "2>> $param{'prefix'}.sqrt.stderr ".
               "> $f";
 

@@ -63,6 +63,8 @@ linalg/bwc/async.c
 linalg/bwc/async.h
 utils/barrier.c
 utils/barrier.h
+linalg/bwc/balancing.c
+linalg/bwc/balancing.h
 linalg/bwc/bench.c
 linalg/bwc/build.c
 linalg/bwc/bw-common-mpi.c
@@ -109,6 +111,8 @@ linalg/bwc/matmul.c
 linalg/bwc/matmul.h
 linalg/bwc/matmul_top.c
 linalg/bwc/matmul_top.h
+linalg/bwc/mf.c
+linalg/bwc/mf.h
 linalg/bwc/mksol.c
 linalg/bwc/mpich2.spec
 linalg/bwc/pad.h
@@ -199,6 +203,7 @@ polyselect/Makefile
 polyselect/auxiliary.c
 polyselect/auxiliary.h
 polyselect/polyselect.c
+polyselect/polyselect2.c
 polyselect/rotate.c
 polyselect/rootsieve.c
 polyselect/rootsieve.h
@@ -206,7 +211,6 @@ polyselect/rho.c
 polyselect/rho.h
 polyselect/murphyE.c
 polyselect/murphyE.h
-polyselect/kleinjung2a.c
 run_example.sh
 scripts/call_cmake.sh
 scripts/version.sh
@@ -339,6 +343,7 @@ utils/gmp_factorization_complete.c
 utils/gmp_gcd.c
 utils/gmp_prob_prime.c
 utils/usp.c
+utils/usp.h
 cado_config_h.in
 cado_mpi_config_h.in
 config/asm_sample.c

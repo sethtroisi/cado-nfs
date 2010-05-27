@@ -68,6 +68,13 @@ if [[ -z $1 || $(expr $1 : '.*[l].*') != 0 ]]
 fi
 
 if [[ -z $1 || $(expr $1 : '.*[r].*') != 0 ]]
-	then echo -n "CPU time for sqrt (one root): "
-	tail -1 ${name}.sqrt.stderr | sed "s/^.* is \(\S*\)$/\1/g" | f
+	then echo "CPU time for sqrt (one root): "
+			echo -n "        ab pairs:             "
+			grep dependency ${name}.sqrt.stderr | head -1 | cut -d' ' -f 6 | f
+			echo -n "        ratsqrt:              "
+			rat=$(grep Rational ${name}.sqrt.stderr | head -1 | sed "s/.* at \(\S*\)ms$/\1/g")
+			echo "scale=3; $rat/1000" | bc -l | f
+			echo -n "        algsqrt:              "
+			grep Algebraic ${name}.sqrt.stderr | head -1 | cut -d' ' -f6 | f
+			
 fi
