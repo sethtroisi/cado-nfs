@@ -267,8 +267,8 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   for (j = d + 1; j -- != 0; )
     gmp_printf ("c%u: %Zd\n", j, f[j]);
   nroots = numberOfRealRoots (f, d, 0, 0);
-  skew = SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC);
-  logmu = LOGNORM (f, d, skew);
+  skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC);
+  logmu = L2_lognorm (f, d, skew);
   alpha = get_alpha (f, d, ALPHA_BOUND);
   printf ("# lognorm %1.2f, alpha %1.2f, E %1.2f, %u rroots\n",
           logmu, alpha, logmu + alpha, nroots);
@@ -277,8 +277,8 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 
   optimize (f, d, g, 0);
   nroots = numberOfRealRoots (f, d, 0, 0);
-  skew = SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC);
-  logmu = LOGNORM (f, d, skew);
+  skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+  logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
   if (nroots >= nr && logmu <= max_norm)
     {
       alpha = get_alpha (f, d, ALPHA_BOUND);

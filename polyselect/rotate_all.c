@@ -43,8 +43,17 @@ int main(int argc, char **argv) {
 
     mpz_set (b, poly->g[1]);
     mpz_neg (m, poly->g[0]);
-    rotate (poly->f, poly->degree, alim, m, b, &jmin, &kmin, 0, verbose);
-    poly->skew = SKEWNESS (poly->f, poly->degree, SKEWNESS_DEFAULT_PREC);
+    poly->skew = L2_skewness (poly->f, poly->degree, SKEWNESS_DEFAULT_PREC,
+                           DEFAULT_L2_METHOD);
+    print_poly (stdout, poly, argc, argv, 0, 1);
+    optimize (poly->f, poly->degree, poly->g, 1);
+    poly->skew = L2_skewness (poly->f, poly->degree, SKEWNESS_DEFAULT_PREC,
+                           DEFAULT_L2_METHOD);
+    print_poly (stdout, poly, argc, argv, 0, 1);
+    rotate (poly->f, poly->degree, alim, m, b, &jmin, &kmin, 0, verbose,
+            DEFAULT_L2_METHOD);
+    poly->skew = L2_skewness (poly->f, poly->degree, SKEWNESS_DEFAULT_PREC,
+                           DEFAULT_L2_METHOD);
     mpz_clear(b);
     mpz_clear(m);
 

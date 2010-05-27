@@ -19,87 +19,6 @@ int MAX_k = 16;
 
 /************************* norm and skewness *********************************/
 
-/* Return an approximation of the value of S that minimizes the expression:
-
-                |p[d]| * S^{d/2} + ... + |p[0]| * S^{-d/2}
-
-   S is a zero of g(S) = d |p[d]| S^{d-1} + ... - d |p[0]| S^{-d-1},
-   thus S^2 is a zero of d |p[d]| x^d + ... - d |p[0]|.
-
-   This correspond to a sieving region |a| <= S^{1/2} R, and |b| <= R/S^{1/2}.
-   Note: Bernstein [2] defines the 'skewness' as S, i.e., the square root of
-   the returned value, with |a| <= SR and |b| <= R/S. We prefer here to follow
-   the convention from [1], which gives sieving bound Amax = S * Bmax.
-
-   Since there is only one sign change in the coefficients of g, it has
-   exactly one root on [0, +Inf[. We search it by dichotomy.
-   There is one difference with respect to Definition 3.1 in [1]:
-   we consider the L1 norm instead of the Linf norm.
-
-   prec is the relative precision of the result.
-*/
-double
-l1_skewness (mpz_t *p, int d, int prec)
-{
-  double *g, sa, sb, s;
-  int i;
-
-  g = (double*) malloc ((d + 1) * sizeof (double));
-  /* g[0] stores the coefficient of degree -d-1 of g(S), ..., 
-     g[d] that of degree d-1 */
-  for (i = 0; i <= d; i++)
-    g[i] = (double) (2 * i - d) * fabs (mpz_get_d (p[i]));
-  if (fpoly_eval (g, d, 1.0) > 0) /* g(1.0) > 0 */
-    {
-      /* search sa < 1 such that g(sa) <= 0 */
-      for (sa = 0.5; fpoly_eval (g, d, sa) > 0; sa *= 0.5);
-      sb = 2.0 * sa;
-    }
-  else /* g(1.0) <= 0 */
-    {
-      /* search sb such that g(sb) >= 0 */
-      for (sb = 2.0; fpoly_eval (g, d, sb) < 0; sb *= 2.0);
-      sa = 0.5 * sb;
-    }
-  /* now g(sa) < 0, g(sb) > 0, and sb = 2*sa.
-     We use 10 iterations only, which gives a relative precision of
-     2^(-10) ~ 0.001, which is enough for our needs. */
-  s = fpoly_dichotomy (g, d, sa, sb, -1.0, prec);
-  free (g);
-  return s;
-}
-
-/* Returns the logarithm of the 1-norm related to the coefficients,
-   log(mu(f,S)), with mu(f,S) defined as follows:
-   
-   mu(f,S) = |a_d S^{d/2}| + ... + |a_0 S^{-d/2}|
-
-   It gives an estimate of *value* of the numbers to be sieved (to be
-   multiplied by the sieving region).
-
-   We want mu(f,S) as small as possible.
-*/
-double
-l1_lognorm (mpz_t *p, unsigned long degree, double S)
-{
-  double mu;
-  long i;
-
-  mu = fabs (mpz_get_d (p[degree]));
-  for (i = degree - 1; i >= 0; i--)
-    mu = mu * S + fabs (mpz_get_d (p[i]));
-  /* divide by S^(d/2) */
-  for (i = 0; (unsigned long) i < degree; i += 2)
-    mu /= S;
-  /* If the degree is even, say d = 2k, we divided by S for i=0, 2, ..., 2k-2,
-     thus k = d/2 times.
-     If the degree is odd, say d = 2k+1, we divided by S for i=0, 2, ..., 2k,
-     thus k+1 times = (d+1)/2, thus we have to multiply back by sqrt(S). */
-  if ((unsigned long) i > degree)
-    mu *= sqrt (S);
-  return log (mu);
-}
-
 /* Same as L2_lognorm, but takes 'double' instead of 'mpz_t' as coefficients.
    Returns 1/2*log(int(int(F^2(xs,y)/s^d, x=-1..1), y=-1..1)) for the
    'rectangular' method, and
@@ -107,7 +26,7 @@ l1_lognorm (mpz_t *p, unsigned long degree, double S)
    with the 'circular' method.
  */
 static double
-L2_lognorm_d (double *a, unsigned long d, double s)
+L2_lognorm_d (double *a, unsigned long d, double s, int method)
 {
   double n;
 
@@ -136,18 +55,19 @@ L2_lognorm_d (double *a, unsigned long d, double s)
       a2 = a[2] * s * s;
       a1 = a[1] * s;
       a0 = a[0];
-#ifndef USE_CIRCULAR
-      n=4.0/7.0*(a3*a3+a0*a0)+8.0/15.0*(a1*a3+a0*a2)+4.0/15.0*(a2*a2+a1*a1);
-#else
-      /* f := a3*x^3+a2*x^2+a1*x+a0:
-         d := degree(f,x):
-         F := expand(y^d*subs(x=x/y,f));
-         subs(x=r*cos(t), y=r*sin(t), %);
-         int(int(%^2/s^d*r, r=0..1),t=0..2*Pi); */
-      n = 5.0 * (a3 * a3 + a0 * a0) + 2.0 * (a3 * a1 + a0 * a2)
-        + a1 * a1 + a2 * a2;
-      n = n * 0.049087385212340519352; /* Pi/64 */
-#endif
+      if (method == RECTANGULAR)
+        n = 4.0/7.0*(a3*a3+a0*a0)+8.0/15.0*(a1*a3+a0*a2)+4.0/15.0*(a2*a2+a1*a1);
+      else /* circular method */
+        {
+          /* f := a3*x^3+a2*x^2+a1*x+a0:
+             d := degree(f,x):
+             F := expand(y^d*subs(x=x/y,f));
+             subs(x=r*cos(t), y=r*sin(t), %);
+             int(int(%^2/s^d*r, r=0..1),t=0..2*Pi); */
+          n = 5.0 * (a3 * a3 + a0 * a0) + 2.0 * (a3 * a1 + a0 * a2)
+            + a1 * a1 + a2 * a2;
+          n = n * 0.049087385212340519352; /* Pi/64 */
+        }
       return 0.5 * log(n / (s * s * s));
     }
   else if (d == 4)
@@ -159,21 +79,22 @@ L2_lognorm_d (double *a, unsigned long d, double s)
       a2 = a[2] * s * s;
       a1 = a[1] * s;
       a0 = a[0];
-#ifndef USE_CIRCULAR
-      n = 4.0 / 9.0 * (a4 * a4 + a0 * a0) + 8.0 / 21.0 * (a4 * a2 + a2 * a0)
-        + 4.0 / 21.0 * (a3 * a3 + a1 * a1) + 8.0 / 25.0 * (a4 * a0 + a3 * a1)
-        + 4.0 / 25.0 * a2 * a2;
-#else
-      /* f := a4*x^4+a3*x^3+a2*x^2+a1*x+a0:
-         d := degree(f,x):
-         F := expand(y^d*subs(x=x/y,f));
-         subs(x=r*cos(t), y=r*sin(t), %);
-         int(int(%^2/s^d*r, r=0..1),t=0..2*Pi); */
-      n = 35.0 * (a4 * a4 + a0 * a0) + 10.0 * (a4 * a2 + a2 * a0)
-        + 5.0 * (a3 * a3 + a1 * a1) + 6.0 * (a4 * a0 + a3 * a1)
-        + 3.0 * a2 * a2;
-      n = n * 0.0049087385212340519352; /* Pi/640 */
-#endif
+      if (method == RECTANGULAR)
+        n = 4.0 / 9.0 * (a4 * a4 + a0 * a0) + 8.0 / 21.0 * (a4 * a2 + a2 * a0)
+          + 4.0 / 21.0 * (a3 * a3 + a1 * a1) + 8.0 / 25.0 * (a4 * a0 + a3 * a1)
+          + 4.0 / 25.0 * a2 * a2;
+      else /* circular method */
+        {
+          /* f := a4*x^4+a3*x^3+a2*x^2+a1*x+a0:
+             d := degree(f,x):
+             F := expand(y^d*subs(x=x/y,f));
+             subs(x=r*cos(t), y=r*sin(t), %);
+             int(int(%^2/s^d*r, r=0..1),t=0..2*Pi); */
+          n = 35.0 * (a4 * a4 + a0 * a0) + 10.0 * (a4 * a2 + a2 * a0)
+            + 5.0 * (a3 * a3 + a1 * a1) + 6.0 * (a4 * a0 + a3 * a1)
+            + 3.0 * a2 * a2;
+          n = n * 0.0049087385212340519352; /* Pi/640 */
+        }
       return 0.5 * log(n / (s * s * s * s));
     }
   else if (d == 5)
@@ -181,26 +102,33 @@ L2_lognorm_d (double *a, unsigned long d, double s)
       double a5, a4, a3, a2, a1, a0, s2 = s * s, s3 = s2 * s, s4 = s3 * s,
         s5 = s4 * s;
 
+      /*
+        f := a5*x^5+a4*x^4+a3*x^3+a2*x^2+a1*x+a0:
+        F := expand(y^5*subs(x=x/y,f));
+        int(int(subs(x=x*s,F)^2/s^5, x=-1..1), y=-1..1);
+       */
       a0 = a[0];
       a1 = a[1] * s;
       a2 = a[2] * s2;
       a3 = a[3] * s3;
       a4 = a[4] * s4;
       a5 = a[5] * s5;
-#ifndef USE_CIRCULAR
-      n = 4.0 / 11.0 * (a5 * a5 + a0 * a0) + 8.0 / 27.0 * (a5 * a3 + a2 * a0)
-        + 4.0 / 27.0 * (a4 * a4 + a1 * a1) + 4.0 / 35.0 * (a3 * a3 + a2 * a2)
-        + 8.0 / 35.0 * (a5 * a1 + a4 * a2 + a4 * a0 + a3 * a1);
-#else /* use circular integral:
-         f := a5*x^5+a4*x^4+a3*x^3+a2*x^2+a1*x+a0:
-         F := expand(y^5*subs(x=x/y,f));
-         subs(x=r*cos(t), y=r*sin(t), %);
-         int(int(%^2/s^5*r, r=0..1),t=0..2*Pi); */
-      n = 6.0 * (a3 * a1 + a1 * a5 + a4 * a2 + a0 * a4)
-        + 14.0 * (a0 * a2 + a3 * a5) + 63.0 * (a0 * a0 + a5 * a5)
-        + 7.0 * (a4 * a4 + a1 * a1) + 3.0 * (a3 * a3 + a2 * a2);
-      n = n * 0.0020453077171808549730; /* Pi/1536 */
-#endif
+      if (method == RECTANGULAR)
+        n = 4.0 / 11.0 * (a5 * a5 + a0 * a0) + 8.0 / 27.0 * (a5 * a3 + a2 * a0)
+          + 4.0 / 27.0 * (a4 * a4 + a1 * a1) + 4.0 / 35.0 * (a3 * a3 + a2 * a2)
+          + 8.0 / 35.0 * (a5 * a1 + a4 * a2 + a4 * a0 + a3 * a1);
+      else
+        {
+          /* use circular integral:
+             f := a5*x^5+a4*x^4+a3*x^3+a2*x^2+a1*x+a0:
+             F := expand(y^5*subs(x=x/y,f));
+             subs(x=r*cos(t), y=r*sin(t), %);
+             int(int(%^2/s^5*r, r=0..1),t=0..2*Pi); */
+          n = 6.0 * (a3 * a1 + a1 * a5 + a4 * a2 + a0 * a4)
+            + 14.0 * (a0 * a2 + a3 * a5) + 63.0 * (a0 * a0 + a5 * a5)
+            + 7.0 * (a4 * a4 + a1 * a1) + 3.0 * (a3 * a3 + a2 * a2);
+          n = n * 0.0020453077171808549730; /* Pi/1536 */
+        }
       return 0.5 * log(n / s5);
     }
   else if (d == 6)
@@ -214,22 +142,23 @@ L2_lognorm_d (double *a, unsigned long d, double s)
       a2 = a[2] * s * s;
       a1 = a[1] * s;
       a0 = a[0];
-#ifndef USE_CIRCULAR
-      n = 4.0 / 13.0 * (a6 * a6 + a0 * a0) + 8.0 / 33.0 * (a6 * a4 + a2 * a0)
-        + 4.0 / 33.0 * (a5 * a5 + a1 * a1) + 4.0 / 45.0 * (a4 * a4 + a2 * a2)
-        + 8.0 / 45.0 * (a6 * a2 + a5 * a3 + a4 * a0 + a3 * a1)
-        + 8.0 / 49.0 * (a6 * a0 + a5 * a1 + a4 * a2) + 4.0 / 49.0 * a3 * a3;
-#else /* use circular integral:
-         f := a6*x^6+a5*x^5+a4*x^4+a3*x^3+a2*x^2+a1*x+a0:
-         F := expand(y^6*subs(x=x/y,f));
-         subs(x=r*cos(t), y=r*sin(t), %);
-         int(int(%^2/s^6*r, r=0..1),t=0..2*Pi); */
-      n = 231.0 * (a6 * a6 + a0 * a0) + 42.0 * (a6 * a4 + a2 * a0)
-        + 21.0 * (a5 * a5 + a1 * a1) + 7.0 * (a4 * a4 + a2 * a2)
-        + 14.0 * (a6 * a2 + a5 * a3 + a4 * a0 + a3 * a1)
-        + 10.0 * (a6 * a0 + a5 * a1 + a4 * a2) + 5.0 * a3 * a3;
-      n = n * 0.00043828022511018320850; /* Pi/7168 */
-#endif
+      if (method == RECTANGULAR)
+        n = 4.0 / 13.0 * (a6 * a6 + a0 * a0) + 8.0 / 33.0 * (a6 * a4 + a2 * a0)
+          + 4.0 / 33.0 * (a5 * a5 + a1 * a1) + 4.0 / 45.0 * (a4 * a4 + a2 * a2)
+          + 8.0 / 45.0 * (a6 * a2 + a5 * a3 + a4 * a0 + a3 * a1)
+          + 8.0 / 49.0 * (a6 * a0 + a5 * a1 + a4 * a2) + 4.0 / 49.0 * a3 * a3;
+      else
+        { /* use circular integral:
+             f := a6*x^6+a5*x^5+a4*x^4+a3*x^3+a2*x^2+a1*x+a0:
+             F := expand(y^6*subs(x=x/y,f));
+             subs(x=r*cos(t), y=r*sin(t), %);
+             int(int(%^2/s^6*r, r=0..1),t=0..2*Pi); */
+          n = 231.0 * (a6 * a6 + a0 * a0) + 42.0 * (a6 * a4 + a2 * a0)
+            + 21.0 * (a5 * a5 + a1 * a1) + 7.0 * (a4 * a4 + a2 * a2)
+            + 14.0 * (a6 * a2 + a5 * a3 + a4 * a0 + a3 * a1)
+            + 10.0 * (a6 * a0 + a5 * a1 + a4 * a2) + 5.0 * a3 * a3;
+          n = n * 0.00043828022511018320850; /* Pi/7168 */
+        }
       return 0.5 * log(n / (s * s * s * s * s * s));
     }
   else
@@ -244,21 +173,24 @@ L2_lognorm_d (double *a, unsigned long d, double s)
    Since we only want to compare norms, we don't consider the log(1/2) term,
    and compute only 1/2 log(int(int(...))) [here the 1/2 factor is important,
    since it is added to the alpha root property term].
+
+   If method=RECTANGULAR: integrate over [-1,1] x [-1,1].
+   If method=CIRCULAR: integrate over the unit circle.
 */
 double
-L2_lognorm (mpz_t *f, unsigned long d, double s)
+L2_lognorm (mpz_t *f, unsigned long d, double s, int method)
 {
   double a[MAX_DEGREE + 1];
   unsigned long i;
 
   for (i = 0; i <= d; i++)
     a[i] = mpz_get_d (f[i]);
-  return L2_lognorm_d (a, d, s);
+  return L2_lognorm_d (a, d, s, method);
 }
 
 /* returns the optimal skewness corresponding to L2_lognorm */
 double
-L2_skewness (mpz_t *f, int deg, int prec)
+L2_skewness (mpz_t *f, int deg, int prec, int method)
 {
   double s, n0, n1, a, b, c, d, nc, nd, fd[MAX_DEGREE + 1];
   int i;
@@ -270,8 +202,8 @@ L2_skewness (mpz_t *f, int deg, int prec)
   /* first isolate the minimum in an interval [s, 2s] by dichotomy */
   
   s = 1.0;
-  n0 = L2_lognorm_d (fd, deg, s);
-  while ((n1 = L2_lognorm_d (fd, deg, 2 * s)) < n0)
+  n0 = L2_lognorm_d (fd, deg, s, method);
+  while ((n1 = L2_lognorm_d (fd, deg, 2 * s, method)) < n0)
     {
       s = 2.0 * s;
       n0 = n1;
@@ -292,8 +224,8 @@ L2_skewness (mpz_t *f, int deg, int prec)
     {
       c = (2.0 * a + b) / 3.0;
       d = (a + 2.0 * b) / 3.0;
-      nc = L2_lognorm_d (fd, deg, c);
-      nd = L2_lognorm_d (fd, deg, d);
+      nc = L2_lognorm_d (fd, deg, c, method);
+      nd = L2_lognorm_d (fd, deg, d, method);
       if (nc < nd) /* the minimum should be in [a,d] */
         b = d;
       else /* L2(c) > L2(d): the minimum should be in [c, b] */
@@ -403,6 +335,7 @@ mpz_ndiv_qr (mpz_t q, mpz_t r, mpz_t n, mpz_t d)
     }
 }
 
+#if 0
 /* Decompose p->n in base m/b, rounding to nearest
    (linear polynomial is b*x-m).
    For b=1, it suffices to check the coefficient f[d-1] is divisible by b,
@@ -517,8 +450,9 @@ generate_base_mb (cado_poly p, mpz_t m, mpz_t b)
   mpz_neg (p->g[0], m);
   mpz_set (p->g[1], b);
   mpz_set (p->m, m);
-  p->skew = SKEWNESS (p->f, d, SKEWNESS_DEFAULT_PREC);
+  p->skew = L2_skewness (p->f, d, SKEWNESS_DEFAULT_PREC, 0);
 }
+#endif
 
 /************************** polynomial arithmetic ****************************/
 
@@ -901,7 +835,7 @@ rotate_area (long K0, long K1, long J0, long J1)
 */
 void
 rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1,
-               long *J0, long *J1, int verbose)
+               long *J0, long *J1, int verbose, int method)
 {
   /* exp_alpha[i] corresponds to K=2^i polynomials for m=0, s=1
      f := x -> 1/2*(1 - erf(x/sqrt(2)));
@@ -926,14 +860,14 @@ rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1,
   int i;
   long k0 = 0, j0 = 0;
   double lognorm, alpha, E0, E, best_E;
-  double skewness = SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC);
+  double skewness = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, method);
   long jmax = (long) ((double) (1L << MAX_k) / skewness);
   unsigned long max_area = 1UL << MAX_k;
 
 #define MARGIN 0.12 /* we allow a small error margin in the expected lognorm
                        + alpha values, to get a larger search range */
 
-  E0 = LOGNORM (f, d, skewness);
+  E0 = L2_lognorm (f, d, skewness, method);
 
   *K0 = -2;
   *J0 = -16;
@@ -944,7 +878,8 @@ rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1,
   for (i = 1; rotate_area (*K0, -*K0, *J0, *J1) < max_area; i++, *K0 *= 2)
     {
       k0 = rotate_aux (f, b, m, k0, *K0, 0);
-      lognorm = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
+      lognorm = L2_lognorm (f, d, L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, method),
+                         method);
       alpha = exp_alpha[i];
       E = lognorm + alpha;
       if (E < best_E + MARGIN)
@@ -964,7 +899,8 @@ rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1,
 	 < max_area; i++, *J0 = 2 * *J0 - 1)
     {
       j0 = rotate_aux (f, b, m, j0, *J0, 1);
-      lognorm = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
+      lognorm = L2_lognorm (f, d, L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, method),
+                         method);
       alpha = exp_alpha[i];
       E = lognorm + alpha;
       if (E < best_E + MARGIN)
@@ -1088,7 +1024,7 @@ old_rotate (unsigned long p, double *A, long K0, long K1, long k0, mpz_t *f,
    */
 double
 rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
-        long *jmin, long *kmin, int multi, int verbose)
+        long *jmin, long *kmin, int multi, int verbose, int method)
 {
   mpz_array_t *D;
   long K0, K1, J0, J1, k0, k, i, j, j0;
@@ -1114,7 +1050,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
   D = alloc_mpz_array (d + 1);
 
   /* compute range for k */
-  rotate_bounds (f, d, b, m, &K0, &K1, &J0, &J1, verbose);
+  rotate_bounds (f, d, b, m, &K0, &K1, &J0, &J1, verbose, method);
   ASSERT_ALWAYS(K0 <= 0 && 0 <= K1);
 
   /* allocate sieving zone for computing alpha */
@@ -1195,7 +1131,8 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
 
           /* translate from k0 to k */
           k0 = rotate_aux (f, b, m, k0, k, 0);
-          lognorm = LOGNORM (f, d, SKEWNESS (f, d, SKEWNESS_DEFAULT_PREC));
+          lognorm = L2_lognorm (f, d, L2_skewness (f, d, SKEWNESS_DEFAULT_PREC,
+                                             method), method);
           if (multi <= 1) {
               if (lognorm + alpha < best_lognorm + best_alpha) {
                   best_lognorm = lognorm;
@@ -1294,7 +1231,7 @@ print_poly (FILE *fp, cado_poly p, int argc, char *argv[], double st, int raw)
   mpz_out_str (fp, 10, p->n);
   fprintf (fp, "\n");
   fprintf (fp, "skew: %1.3f\n", p->skew);
-  logmu = LOGNORM (p->f, p->degree, p->skew);
+  logmu = L2_lognorm (p->f, p->degree, p->skew, DEFAULT_L2_METHOD);
   alpha = get_alpha (p->f, p->degree, ALPHA_BOUND);
   fprintf (fp, "# lognorm: %1.2f, alpha: %1.2f E=%1.2f\n", logmu, alpha,
            logmu + alpha);
@@ -1356,14 +1293,15 @@ print_poly (FILE *fp, cado_poly p, int argc, char *argv[], double st, int raw)
    changed into m-k*b.
 */
 long
-translate (mpz_t *f, int d, mpz_t *g, mpz_t m, mpz_t b, int verbose)
+translate (mpz_t *f, int d, mpz_t *g, mpz_t m, mpz_t b, int verbose,
+           int method)
 {
   double logmu0, logmu;
   int i, j, dir;
   long k;
   int prec = 2 * SKEWNESS_DEFAULT_PREC;
 
-  logmu0 = LOGNORM (f, d, SKEWNESS (f, d, prec));
+  logmu0 = L2_lognorm (f, d, L2_skewness (f, d, prec, method), method);
 
   /* first compute f(x+1) */
   /* define f_i(x) = f[i] + f[i+1]*x + ... + f[d]*x^(d-i)
@@ -1380,7 +1318,7 @@ translate (mpz_t *f, int d, mpz_t *g, mpz_t m, mpz_t b, int verbose)
   k = 1;
 
   /* invariant: the coefficients are those of f(x+k) */
-  logmu = LOGNORM (f, d, SKEWNESS (f, d, prec));
+  logmu = L2_lognorm (f, d, L2_skewness (f, d, prec, method), method);
 
   if (logmu < logmu0)
     dir = 1;
@@ -1402,7 +1340,7 @@ translate (mpz_t *f, int d, mpz_t *g, mpz_t m, mpz_t b, int verbose)
       else
         mpz_add (m, m, b);
       k = k + dir;
-      logmu = LOGNORM (f, d, SKEWNESS (f, d, prec));
+      logmu = L2_lognorm (f, d, L2_skewness (f, d, prec, method), method);
       if (logmu < logmu0)
         logmu0 = logmu;
       else
@@ -1456,16 +1394,22 @@ do_translate_z (mpz_t *f, int d, mpz_t *g, mpz_t k)
 }
 
 /* Use rotation and translation to find a polynomial with smaller norm
-   (local minimum). Modify f and g accordingly. */
-void
-optimize (mpz_t *f, int d, mpz_t *g, int verbose)
+   (local minimum). Modify f and g accordingly.
+   If skew = 0.0, recompute the skewness each time,
+   otherwise optimize for the given skewness.
+*/
+static void
+optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, double skew, int method)
 {
   mpz_t k, l; /* current offset */
   int changed;
   double logmu00, logmu0, logmu;
   int prec = SKEWNESS_DEFAULT_PREC;
+  int recompute = skew == 0.0;
 
-  logmu00 = logmu0 = LOGNORM (f, d, SKEWNESS (f, d, prec));
+  if (recompute)
+    skew = L2_skewness (f, d, prec, method);
+  logmu00 = logmu0 = L2_lognorm (f, d, skew, method);
   mpz_init_set_ui (k, 1);
   mpz_init (l);
   while (1)
@@ -1476,7 +1420,8 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose)
 
       /* first try translation by k */
       do_translate_z (f, d, g, k); /* f(x+k) */
-      logmu = LOGNORM (f, d, SKEWNESS (f, d, prec));
+      skew = L2_skewness (f, d, prec, method);
+      logmu = L2_lognorm (f, d, skew, method);
       if (logmu < logmu0)
         {
           changed = 1;
@@ -1485,7 +1430,9 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose)
       else
         {
           do_translate_z (f, d, g, l); /* f(x-k) */
-          logmu = LOGNORM (f, d, SKEWNESS (f, d, prec));
+          if (recompute)
+            skew = L2_skewness (f, d, prec, method);
+          logmu = L2_lognorm (f, d, skew, method);
           if (logmu < logmu0)
             {
               changed = 1;
@@ -1499,7 +1446,9 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose)
       if (d >= 6)
         {
           rotate_auxg_z (f, g[1], g[0], k, 2);
-          logmu = LOGNORM (f, d, SKEWNESS (f, d, prec));
+          if (recompute)
+            skew = L2_skewness (f, d, prec, method);
+          logmu = L2_lognorm (f, d, skew, method);
           if (logmu < logmu0)
             {
               changed = 1;
@@ -1508,7 +1457,9 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose)
           else
             {
               rotate_auxg_z (f, g[1], g[0], l, 2); /* f - k*x^2*g */
-              logmu = LOGNORM (f, d, SKEWNESS (f, d, prec));
+              if (recompute)
+                skew = L2_skewness (f, d, prec, method);
+              logmu = L2_lognorm (f, d, skew, method);
               if (logmu < logmu0)
                 {
                   changed = 1;
@@ -1521,7 +1472,9 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose)
 
       /* then do rotation by k*x*g */
       rotate_auxg_z (f, g[1], g[0], k, 1);
-      logmu = LOGNORM (f, d, SKEWNESS (f, d, prec));
+      if (recompute)
+        skew = L2_skewness (f, d, prec, method);
+      logmu = L2_lognorm (f, d, skew, method);
       if (logmu < logmu0)
         {
           changed = 1;
@@ -1530,7 +1483,9 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose)
       else
         {
           rotate_auxg_z (f, g[1], g[0], l, 1); /* f - k*x*g */
-          logmu = LOGNORM (f, d, SKEWNESS (f, d, prec));
+          if (recompute)
+            skew = L2_skewness (f, d, prec, method);
+          logmu = L2_lognorm (f, d, skew, method);
           if (logmu < logmu0)
             {
               changed = 1;
@@ -1542,7 +1497,9 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose)
 
       /* then do rotation by k*g */
       rotate_auxg_z (f, g[1], g[0], k, 0);
-      logmu = LOGNORM (f, d, SKEWNESS (f, d, prec));
+      if (recompute)
+        skew = L2_skewness (f, d, prec, method);
+      logmu = L2_lognorm (f, d, skew, method);
       if (logmu < logmu0)
         {
           changed = 1;
@@ -1551,7 +1508,9 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose)
       else
         {
           rotate_auxg_z (f, g[1], g[0], l, 0); /* f - k*g */
-          logmu = LOGNORM (f, d, SKEWNESS (f, d, prec));
+          if (recompute)
+            skew = L2_skewness (f, d, prec, method);
+          logmu = L2_lognorm (f, d, skew, method);
           if (logmu < logmu0)
             {
               changed = 1;
@@ -1579,4 +1538,14 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose)
       fprintf (stderr, "# "); fprint_polynomial (stderr, g, d);
     }
   }
+}
+
+void
+optimize (mpz_t *f, int d, mpz_t *g, int verbose)
+{
+  optimize_aux (f, d, g, verbose, 0.0, CIRCULAR);
+  /* if we want to optimize for the rectangular method, it seems better to
+     first optimize for the circular method */
+  if (DEFAULT_L2_METHOD == RECTANGULAR)
+    optimize_aux (f, d, g, verbose, 0.0, RECTANGULAR);
 }

@@ -386,7 +386,8 @@ possible_candidate (int *mu, int l, int d, mpz_t *a, mpz_t P, mpz_t N,
     mpz_set (g[1], P);
     mpz_neg (g[0], m);
     optimize (a, d, g, verbose - 1);
-    lognorm = LOGNORM (a, d, SKEWNESS (a, d, SKEWNESS_DEFAULT_PREC));
+    lognorm = L2_lognorm (a, d, L2_skewness (a, d, SKEWNESS_DEFAULT_PREC,
+                                       DEFAULT_L2_METHOD), DEFAULT_L2_METHOD);
 
     if (lognorm <= logM) {
         if (verbose)
@@ -1426,7 +1427,7 @@ main (int argc, char *argv[])
          by optimize */
       mpz_neg (newm, poly->g[0]);
       E = rotate (poly->f, degree, ALPHA_BOUND_SMALL, newm, Mt[i].b, &jmin,
-                  &kmin, 1, verbose);
+                  &kmin, 1, verbose, DEFAULT_L2_METHOD);
       if (E < best_E)
         {
           best_E = E;
@@ -1455,13 +1456,13 @@ main (int argc, char *argv[])
       mpz_neg (newm, poly->g[0]);
       if (multi <= 1) {
           E = rotate (poly->f, degree, ALPHA_BOUND, newm, Mt[i].b, &jmin,
-                  &kmin, 1, verbose + 1);
+                      &kmin, 1, verbose + 1, DEFAULT_L2_METHOD);
       } else {
           long *jjmin, *kkmin;
           jjmin = (long *)malloc(multi*sizeof(long));
           kkmin = (long *)malloc(multi*sizeof(long));
           E = rotate (poly->f, degree, ALPHA_BOUND, newm, Mt[i].b, jjmin,
-                  kkmin, multi, verbose + 1);
+                      kkmin, multi, verbose + 1, DEFAULT_L2_METHOD);
           jmin = jjmin[0];
           kmin = kkmin[0];
           free(jjmin);
@@ -1500,14 +1501,16 @@ main (int argc, char *argv[])
   rotate_aux (poly->f, Mt[i].b, Mt[i].m, 0, bestk, 0);
   rotate_aux (poly->f, Mt[i].b, Mt[i].m, 0, bestj, 1);
   if (!notr)
-      translate (poly->f, degree, poly->g, Mt[i].m, Mt[i].b, verbose);
+    translate (poly->f, degree, poly->g, Mt[i].m, Mt[i].b, verbose,
+               DEFAULT_L2_METHOD);
 
   mpz_set (poly->n, n);
   poly->degree = degree;
   ASSERT_ALWAYS (mpz_cmp (Mt[i].b, poly->g[1]) == 0);
   mpz_neg (newm, Mt[i].m);
   ASSERT_ALWAYS (mpz_cmp (newm, poly->g[0]) == 0);
-  poly->skew = SKEWNESS (poly->f, degree, 2 * SKEWNESS_DEFAULT_PREC);
+  poly->skew = L2_skewness (poly->f, degree, 2 * SKEWNESS_DEFAULT_PREC,
+                         DEFAULT_L2_METHOD);
   strncpy (poly->type, "gnfs", sizeof (poly->type));
   print_poly (stdout, poly, argc0, argv0, st0, raw);
 

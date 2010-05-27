@@ -24,13 +24,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 
 #define MAX_DEGREE 6
 
-#if 1 /* use L2-norm with integral over whole sieving region */
-#define LOGNORM  L2_lognorm
-#define SKEWNESS L2_skewness
-#else /* use 1-norm relative to coefficients */
-#define LOGNORM  l1_lognorm
-#define SKEWNESS l1_skewness
-#endif
+/* differents methods for the L2 norm */
+#define RECTANGULAR 0
+#define CIRCULAR 1
+#define DEFAULT_L2_METHOD RECTANGULAR
 
 #define SKEWNESS_DEFAULT_PREC 10
 
@@ -54,20 +51,19 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
   
 void mpz_ndiv_qr (mpz_t, mpz_t, mpz_t, mpz_t);
 void generate_base_mb (cado_poly, mpz_t, mpz_t);
-double l1_skewness (mpz_t*, int, int);
-double l1_lognorm (mpz_t*, unsigned long, double);
-double L2_lognorm (mpz_t*, unsigned long, double);
-double L2_skewness (mpz_t*, int, int);
+double L2_lognorm (mpz_t*, unsigned long, double, int);
+double L2_skewness (mpz_t*, int, int, int);
 /* rotation */
 double special_val0 (mpz_t*, int, unsigned long);
 double get_alpha (mpz_t*, const int, unsigned long);
 void discriminant (mpz_t, mpz_t*, const int);
 long rotate_aux (mpz_t *f, mpz_t b, mpz_t m, long k0, long k, unsigned int t);
-double rotate (mpz_t*, int, unsigned long, mpz_t, mpz_t, long*, long*, int,int);
+double rotate (mpz_t*, int, unsigned long, mpz_t, mpz_t, long*, long*, int,
+               int, int);
 void print_poly (FILE*, cado_poly, int, char**, double, int);
-long translate (mpz_t*, int, mpz_t*, mpz_t, mpz_t, int);
+long translate (mpz_t*, int, mpz_t*, mpz_t, mpz_t, int, int);
 void optimize (mpz_t*, int, mpz_t*, int);
-void rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1, long *J0, long *J1, int verbose);
+void rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1, long *J0, long *J1, int verbose, int);
 
 /********************* data structures for first phase ***********************/
 

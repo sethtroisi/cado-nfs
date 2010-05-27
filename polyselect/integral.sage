@@ -167,3 +167,4 @@ def eval_dichotomy(t,x):
 # This should exhibit no visible difference.
 # reduced_minimum_normal_table=build_reduced_minimum_normal_table(0,1,0.05)
 # plot([lambda x: quick_eval(minimum_normal_table,10*x)[0], lambda x: eval_dichotomy(reduced_minimum_normal_table,10*x)[0]],0,17)
+
