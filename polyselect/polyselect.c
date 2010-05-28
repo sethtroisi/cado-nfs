@@ -1473,7 +1473,7 @@ main (int argc, char *argv[])
         {
           best_E = E;
           gmp_fprintf (stderr, "# ad=%Zd p=%Zd m=%Zd E=%1.2f\n",
-                       poly->f[degree], Mt[i].b, Mt[i].m, E);
+                       poly->f[degree], Mt[i].b, newm, E);
           best_i = i;
           bestj = jmin;
           bestk = kmin;
