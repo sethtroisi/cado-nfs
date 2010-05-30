@@ -50,18 +50,18 @@ kjp0max=5000            # bound on the additional factor in lc(g)
 # rlambda/alambda is the early-abort ratio: if after sieving the
 #                                      approximate norm is more than
 #                                      lambda times lpb, we reject.
-rlim=1000000
-alim=2000000
-lpbr=25
-lpba=25
-mfbr=50
-mfba=50
-rlambda=2.1
-alambda=2.1
+rlim=600000
+alim=1200000
+lpbr=24
+lpba=24
+mfbr=48
+mfba=48
+rlambda=2.0
+alambda=2.3
 
-I=12                    # Sieving range in lattice siever
-qmin=2000000            # Start of the special-q range
-qrange=100000           # The size of an elementary sieving task
+I=11                    # Sieving range in lattice siever
+qmin=1200000            # Start of the special-q range
+qrange=20000            # The size of an elementary sieving task
 checkrange=1            # We check if we have enough after each step
                         # of that many relations found.
 sievenice=10            # nice level for the sieving jobs
