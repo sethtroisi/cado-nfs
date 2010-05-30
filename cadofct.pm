@@ -1888,7 +1888,7 @@ sub do_sieve {
 		}
 		my $n = 0;
 		my @allfiles;
-		my $K = int ( 1.2 * $nrels / $nslices );
+		my $K = int ( 100 + (1.2 * $nrels / $nslices) );
 		for (my $i=0; $i < $nslices; $i++) {
 			info "removing duplicates on slice $i...";
 			$allfiles[$i] = 

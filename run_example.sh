@@ -78,7 +78,7 @@ cadodir=$cadodir
 $host cores=4
 EOF
 
-$cadofactor cadodir=$cadodir $t/param machines=$t/mach_desc wdir=$t delay=20 sievenice=0 selectnice=0 logfile=$t/out "$@"
+$cadofactor cadodir=$cadodir $t/param machines=$t/mach_desc wdir=$t delay=60 sievenice=0 selectnice=0 logfile=$t/out "$@"
 
 rc=$?
 

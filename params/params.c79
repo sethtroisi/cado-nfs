@@ -25,7 +25,7 @@ kjdelay=60              # time between two checks
 selectnice=10           # nice level for selection
 
 ## Most important parameters of polyselect
-kjM=2e11                # maximum norm allowed
+kjM=6e11                # maximum norm allowed
 kjl=4                   # minimal number of primes in lc(g)
 kjadmin=1               # min value for lc(f)
 kjadmax=6e5             # max value for lc(f)
