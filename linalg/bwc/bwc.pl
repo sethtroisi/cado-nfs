@@ -484,6 +484,13 @@ if ($mpi_needed) {
         system "uniq $ENV{'OAR_NODEFILE'} > /tmp/HOSTS.$ENV{'OAR_JOBID'}";
         $hostfile = "/tmp/HOSTS.$ENV{'OAR_JOBID'}";
     }
+    if (!-d $wdir) {
+        if ($show_only) {
+            print "mkdir $wdir\n";
+        } else {
+            mkdir $wdir;
+        }
+    }
     if (scalar @hosts) {
         # Don't use an uppercase filename, it would be deleted by
         # wipeout.
