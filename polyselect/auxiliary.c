@@ -1029,6 +1029,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
   mpz_array_t *D;
   long K0, K1, J0, J1, k0, k, i, j, j0;
   double *A, alpha, lognorm, best_alpha = DBL_MAX, best_lognorm = DBL_MAX;
+  double corr;
   double alpha0 = 0.0;
   unsigned long p;
   double *best_E = NULL; /* set to NULL to avoid warning... */
@@ -1092,8 +1093,11 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
 	       dividing the discriminant, cf alpha.sage, function alpha_p.
 	       We take it into account only for p, not for p^2, p^3, ... */
 	    if (p == pp)
-	      average_alpha += logp * one_over_pm1
-		+ alpha_p_projective (f, d, (D->data)[0], p);
+	      average_alpha += logp * one_over_pm1;
+	    /* we do not consider the projective roots here, since the
+	       corresponding correction will be considered separately for each
+	       row below */
+	    /* + alpha_p_projective (f, d, (D->data)[0], p); */
 	    update_table (f, d, m, b, A, K0, K1, pp, alpha);
 	  }
 #else
@@ -1103,21 +1107,30 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
       } /* end of loop on primes p */
 
 #ifdef NEW_ROOTSIEVE
-  for (k = K0; k <= K1; k++)
-    A[k - K0] += average_alpha; /* not really needed since this is constant */
+  /* Correction to apply to the current row (takes into account the projective
+     roots). FIXME: we are lazy here, we should only consider the contribution
+     from the projective roots. */
+  corr = get_alpha (f, d, alim) - A[k0 - K0];
+#else
+  corr = 0.0;
 #endif
 
   if (j == 0)
-    alpha0 = A[0 - K0];
+    alpha0 = A[0 - K0] + corr;
 
+  /* determine the best alpha in each row */
   {
     long bestk = K0;
+    A[K0 - K0] += corr;
     for (k = K0 + 1; k <= K1; k++)
-      if (A[k - K0] < A[bestk - K0])
-	bestk = k;
+      {
+	A[k - K0] += corr;
+	if (A[k - K0] < A[bestk - K0])
+	  bestk = k;
+      }
     if (verbose > 1)
       fprintf (stderr, "# best alpha for j=%ld: k=%ld with %f\n",
-               j, bestk, A[bestk - K0]);
+	       j, bestk, A[bestk - K0]);
   }
 
   /* now finds the best lognorm+alpha */
