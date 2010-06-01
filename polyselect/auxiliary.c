@@ -12,7 +12,7 @@
 #include "rootsieve.h"
 #include "murphyE.h"
 
-// #define NEW_ROOTSIEVE
+#define NEW_ROOTSIEVE
 
 /* for the rotation, we try (j*x+k) for |k| <= 2^MAX_k */
 int MAX_k = 16;
