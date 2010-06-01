@@ -668,7 +668,9 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
 		  modul_init (inv, pp);
 		  /* since q < p and rq[i] < q^2, we have rq[i] < p^2 */
 		  u = rj >= rq[i] ? rj - rq[i] : (rj + p * p) - rq[i];
+                  assert (u < ppl);
 		  modul_set_ul_reduced (k, u, pp);
+                  assert (qq < (unsigned long) ppl);
 		  modul_set_ul_reduced (inv, qq, pp);
 		  modul_inv (inv, inv, pp);
 		  modul_mul (k, k, inv, pp);
@@ -738,14 +740,18 @@ one_thread (void* args)
   pthread_exit (NULL);
 }
 
+#define TARGET_TIME 10000000 /* print stats every TARGET_TIME milliseconds */
+
 int
 main (int argc, char *argv[])
 {
+  char *argv0 = argv[0], *save = NULL, *resume = NULL;
   mpz_t N;
   unsigned int d = 0;
-  unsigned long P, admin = 0, admax = ULONG_MAX, totP = 0;
-  int tries = 0, i, nthreads = 1, nr = 0, st;
+  unsigned long P, admin = 0, admax = ULONG_MAX;
+  int tries = 0, i, nthreads = 1, nr = 0, st, target_time = TARGET_TIME;
   tab_t *T;
+  FILE *fp;
 #ifdef MAX_THREADS
   pthread_t tid[MAX_THREADS];
 #endif
@@ -809,6 +815,18 @@ main (int argc, char *argv[])
           argv += 2;
           argc -= 2;
         }
+      else if (strcmp (argv[1], "-save") == 0)
+        {
+	  save = argv[2];
+          argv += 2;
+          argc -= 2;
+        }
+      else if (strcmp (argv[1], "-resume") == 0)
+        {
+	  resume = argv[2];
+          argv += 2;
+          argc -= 2;
+        }
       else if (strcmp (argv[1], "-v") == 0)
         {
           verbose ++;
@@ -824,7 +842,7 @@ main (int argc, char *argv[])
 
   if (argc != 2)
     {
-      fprintf (stderr, "Usage: %s [-t nthreads -nr nnn -admin nnn -admax nnn -N nnn -d nnn] P\n", argv[0]);
+      fprintf (stderr, "Usage: %s [-t nthreads -nr nnn -admin nnn -admax nnn -N nnn -d nnn -save xxx -resume xxx] P\n", argv0);
       exit (1);
     }
 
@@ -840,6 +858,23 @@ main (int argc, char *argv[])
     {
       fprintf (stderr, "Error, missing -N number or -d degree\n");
       exit (1);
+    }
+
+  if (resume != NULL)
+    {
+      fp = fopen (resume, "r");
+      if (fp == NULL)
+        {
+          fprintf (stderr, "Cannot open resume file %s\n", resume);
+          exit (1);
+        }
+      if (fscanf (fp, "%lu", &admin) != 1)
+        {
+          fprintf (stderr, "Cannot read ad value from resume file %s\n",
+                   resume);
+          exit (1);
+        }
+      fclose (fp);
     }
 
   P = atoi (argv[1]);
@@ -865,7 +900,6 @@ main (int argc, char *argv[])
       for (i = 0; i < nthreads ; i++)
         {
           tries ++;
-          totP += P;
           if (verbose >= 1)
             {
               gmp_printf ("%d ad=%lu\r", tries, admin);
@@ -883,13 +917,31 @@ main (int argc, char *argv[])
       for (i = 0 ; i < nthreads ; i++)
         pthread_join(tid[i], NULL);
 #endif
-      if (totP > 100000000)
+      
+      if (save != NULL)
+        {
+          fp = fopen (save, "w");
+          if (fp == NULL)
+            {
+              fprintf (stderr, "Cannot open save file %s\n", save);
+              exit (1);
+            }
+          if (fprintf (fp, "%lu\n", admin) < 0)
+            {
+              fprintf (stderr, "Cannot print ad value to save file %s\n",
+                       save);
+              exit (1);
+            }
+          fclose (fp);
+        }
+
+      if (cputime () > target_time)
         {
           printf ("# ad=%lu time=%dms pot. collisions=%1.2e (%1.2e/s)\n",
 		  admin, cputime (), potential_collisions,
 		  1000.0 * potential_collisions / cputime ());
           fflush (stdout);
-          totP = 0;
+          target_time += TARGET_TIME;
         }
     }
   printf ("Tried %d ad-value(s), found %d polynomial(s)\n", tries, found);
