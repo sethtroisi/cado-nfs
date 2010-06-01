@@ -1,4 +1,23 @@
-/* common routines to polyselect and kleinjung */
+/* Auxiliary routines for polynomial selection
+
+Copyright 2008, 2009, 2010 Emmanuel Thome, Paul Zimmermann
+
+This file is part of CADO-NFS.
+
+CADO-NFS is free software; you can redistribute it and/or modify it under the
+terms of the GNU Lesser General Public License as published by the Free
+Software Foundation; either version 2.1 of the License, or (at your option)
+any later version.
+
+CADO-NFS is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
+details.
+
+You should have received a copy of the GNU Lesser General Public License
+along with CADO-NFS; see the file COPYING.  If not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
+*/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1289,6 +1308,9 @@ print_poly (FILE *fp, cado_poly p, int argc, char *argv[], double st, int raw)
       fprintf (fp, "lpba: %d\n", p->lpba);
       fprintf (fp, "mfbr: %d\n", p->mfbr);
       fprintf (fp, "mfba: %d\n", p->mfba);
+      /* Warning: in CADO-NFS the lambda values are relative to the large
+         prime bounds, whereas in the Franke-Kleinjung siever they are
+         relative to the factor base bounds */
       fprintf (fp, "rlambda: %1.1f\n", p->rlambda);
       fprintf (fp, "alambda: %1.1f\n", p->alambda);
     }

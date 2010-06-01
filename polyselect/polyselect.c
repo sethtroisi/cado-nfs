@@ -1,6 +1,6 @@
 /* Polynomial selection with Kleinjung's algorithm
 
-Copyright 2008 Emmanuel Thome, Paul Zimmermann
+Copyright 2008, 2009, 2010 Emmanuel Thome, Paul Zimmermann
 
 This file is part of CADO-NFS.
 
