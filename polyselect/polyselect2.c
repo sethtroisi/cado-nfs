@@ -275,7 +275,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   gmp_printf ("Optimized polynomial:\n");
 #endif
 
-  optimize (f, d, g, 0);
+  optimize (f, d, g, 0, 1);
   nroots = numberOfRealRoots (f, d, 0, 0);
   skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
   logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);

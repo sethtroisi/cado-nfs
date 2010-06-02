@@ -385,7 +385,7 @@ possible_candidate (int *mu, int l, int d, mpz_t *a, mpz_t P, mpz_t N,
     Lemma21 (a, N, d, P, m);
     mpz_set (g[1], P);
     mpz_neg (g[0], m);
-    optimize (a, d, g, verbose - 1);
+    optimize (a, d, g, verbose - 1, 1); /* we use rotation here */
     lognorm = L2_lognorm (a, d, L2_skewness (a, d, SKEWNESS_DEFAULT_PREC,
                                        DEFAULT_L2_METHOD), DEFAULT_L2_METHOD);
 
@@ -1421,7 +1421,7 @@ main (int argc, char *argv[])
       /* optimize norm before root properties */
       mpz_set (poly->g[1], Mt[i].b);
       mpz_neg (poly->g[0], Mt[i].m);
-      optimize (poly->f, degree, poly->g, verbose);
+      optimize (poly->f, degree, poly->g, verbose, 1);
       ASSERT_ALWAYS (mpz_cmp (poly->g[1], Mt[i].b) == 0);
       /* Warning: we cannot use Mt[i].m since g[0] might have been changed
          by optimize */
@@ -1449,7 +1449,7 @@ main (int argc, char *argv[])
       /* optimize norm before root properties */
       mpz_set (poly->g[1], Mt[i].b);
       mpz_neg (poly->g[0], Mt[i].m);
-      optimize (poly->f, degree, poly->g, verbose);
+      optimize (poly->f, degree, poly->g, verbose, 1);
       ASSERT_ALWAYS (mpz_cmp (poly->g[1], Mt[i].b) == 0);
       /* Warning: we cannot use Mt[i].m since g[0] might have been changed
          by optimize */
@@ -1495,7 +1495,7 @@ main (int argc, char *argv[])
   /* optimize again norm, to start from same polynomial before rotation */
   mpz_set (poly->g[1], Mt[i].b);
   mpz_neg (poly->g[0], Mt[i].m);
-  optimize (poly->f, degree, poly->g, 0);
+  optimize (poly->f, degree, poly->g, 0, 1);
   mpz_neg (Mt[i].m, poly->g[0]);
   ASSERT_ALWAYS (mpz_cmp (Mt[i].b, poly->g[1]) == 0);
   rotate_aux (poly->f, Mt[i].b, Mt[i].m, 0, bestk, 0);

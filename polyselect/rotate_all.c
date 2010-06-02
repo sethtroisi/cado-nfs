@@ -52,7 +52,7 @@ main (int argc, char **argv)
     else
       printf ("Initial skewness=%1.2f, alpha=%1.2f\n", poly->skew,
               get_alpha (poly->f, poly->degree, ALPHA_BOUND));
-    optimize (poly->f, poly->degree, poly->g, verbose);
+    optimize (poly->f, poly->degree, poly->g, verbose, 1);
     poly->skew = L2_skewness (poly->f, poly->degree, SKEWNESS_DEFAULT_PREC,
                            DEFAULT_L2_METHOD);
     if (verbose)
@@ -67,6 +67,8 @@ main (int argc, char **argv)
             DEFAULT_L2_METHOD);
     mpz_set (poly->g[1], b);
     mpz_set (poly->g[0], m);
+    /* optimize again, but only translation */
+    optimize (poly->f, poly->degree, poly->g, verbose, 0);
     poly->skew = L2_skewness (poly->f, poly->degree, SKEWNESS_DEFAULT_PREC,
                            DEFAULT_L2_METHOD);
     mpz_clear(b);
