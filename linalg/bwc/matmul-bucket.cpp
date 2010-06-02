@@ -29,6 +29,7 @@
 #include <list>
 #include <algorithm>    // sort
 #include <iostream>     // cout
+#include "utils.h"
 #include "bwc_config.h"
 using namespace std;
 
@@ -177,13 +178,15 @@ using namespace std;
  */
 
 /* This extension is used to distinguish between several possible
- * implementations of the product. The upper word correspond to the
- * implementation itself, the lower one to the n-th binary incompatible
- * change (make sure to bump it) */
+ * implementations of the matrix-times-vector product.
+ */
 #define MM_EXTENSION   "-bucket"
 
+/* MM_MAGIC is stored in files, so as to check compatibility. The upper
+ * word (MM_MAGIC_FAMILY) correspond to the implementation itself, the
+ * lower one (MM_MAGIC_VERSION) to the n-th binary incompatible change
+ * (make sure to bump it) */
 #define MM_MAGIC_FAMILY        0xa003UL
-
 #define MM_MAGIC_VERSION       0x1015UL
 #define MM_MAGIC (MM_MAGIC_FAMILY << 16 | MM_MAGIC_VERSION)
 
@@ -377,13 +380,6 @@ void builder_init(builder * mb, struct matmul_bucket_data_s * mm)
 {
     mb->data[0] = matmul_common_read_stupid_data(mm->public_);
     mb->data[1] = NULL;
-#if 0
-    read_easy(mm->public_->filename,
-            &mb->data[ mm->public_->store_transposed],
-            &mb->data[!mm->public_->store_transposed],
-            &mm->public_->dim[0],
-            &mm->public_->dim[1]);
-#endif
 
     mb->nrows_t = mm->public_->dim[ mm->public_->store_transposed];
     mb->ncols_t = mm->public_->dim[!mm->public_->store_transposed];
@@ -1164,7 +1160,15 @@ compute_staircase(builder * mb, struct vsc_slice_t * V)
     for(unsigned int k = 0 ; k < V->steps.size() ; ) {
         unsigned long w = V->steps[k].nrows;
         uint32_t old_ii = ii;
-        if (w > 8192 || V->steps.size() == 1) {
+        int merge_with_next = 0;
+        int merge_with_previous = 0;
+        if (V->steps.size() > 1 && k < V->steps.size()) {
+            merge_with_next = w <= 8192; // || w <= V->steps[k+1].nrows / 10;
+        }
+        if (V->steps.size() > 1 && k > 0) {
+            merge_with_previous = w <= 8192; // || w <= V->steps[k-1].nrows / 10;
+        }
+        if (!merge_with_previous && !merge_with_next) {
             ii += w;
             k++;
             continue;
@@ -1174,13 +1178,14 @@ compute_staircase(builder * mb, struct vsc_slice_t * V)
          * it with the next block, or the previous one if we're reaching
          * the end. */
         V->steps.erase(V->steps.begin() + k);
-        if (k < V->steps.size()) {
+        if (merge_with_next) {
             printf("strip %"PRIu32"+%lu merged with next\n",
                     old_ii, w);
             V->steps[k].nrows += w;
             // don't increment k here.
             // don't increment ii either.
         } else {
+            ASSERT_ALWAYS(merge_with_previous);
             printf("strip %"PRIu32"+%lu merged with previous\n",
                     old_ii, w);
             V->steps[k-1].nrows += w;
@@ -1189,7 +1194,6 @@ compute_staircase(builder * mb, struct vsc_slice_t * V)
         }
     }
     /* }}} */
-
 }
 /*}}}*/
 
@@ -1781,10 +1785,12 @@ void matmul_bucket_build_cache(struct matmul_bucket_data_s * mm)
     builder_push_large_slices(mm, Lq);
 
 #if 1
-    vsc_slice_t V[1];
-    builder_prepare_vsc_slices(mb, V, main_i0);
-    mm->scratch3size = V->tbuf_space;
-    builder_push_vsc_slices(mm, V);
+    if (main_i0 < mb->nrows_t) {
+        vsc_slice_t V[1];
+        builder_prepare_vsc_slices(mb, V, main_i0);
+        mm->scratch3size = V->tbuf_space;
+        builder_push_vsc_slices(mm, V);
+    }
 #else
     list<huge_slice_t> Hq[1];
     builder_do_all_huge_slices(mb, &main_i0, Hq, mm->scratch2size);
@@ -2420,6 +2426,59 @@ static inline void matmul_sub_vsc_dispatch_tr(abobj_ptr x, abt * qr, const abt *
 }
 #endif
 
+/* in preparation for different steps, including the matrix
+ * multiplication itself, we are rebuilding the vsc_slice_t object, or at
+ * least its skeleton ; it makes it easy to run the control loops.  The
+ * real data payload is of course not copied again ! */
+
+static inline void rebuild_vsc_slice_skeleton(
+        struct matmul_bucket_data_s * mm,
+        vector<slice_header_t>::iterator & hdr, 
+        vsc_slice_t * V, struct pos_desc * pos,
+        unsigned int & nvstrips,
+        unsigned int & Midx,
+        unsigned int & Didx,
+        unsigned int & Ridx,
+        unsigned int & Cidx)
+{
+    *V->hdr = *hdr++;
+    nvstrips = *pos->ql++;
+    V->dispatch.resize(nvstrips);
+    V->steps.resize(*pos->ql++);
+    for(unsigned int l = 0 ; l < V->steps.size() ; l++) {
+        V->steps[l].defer = *pos->ql++;
+        V->steps[l].tbuf_space = *pos->ql++;
+    }
+
+    Midx = hdr - mm->headers.begin();
+    for(unsigned int k = 0 ; k < V->dispatch.size() ; k++) {
+        vsc_middle_slice_t &D (V->dispatch[k]);
+        *D.hdr = *hdr++;
+    }
+    Didx = hdr - mm->headers.begin();
+    for(unsigned int k = 0 ; k < V->dispatch.size() ; k++) {
+        vsc_middle_slice_t &D (V->dispatch[k]);
+        D.sub.resize(V->steps.size());
+        for(unsigned int l = 0 ; l < V->steps.size() ; l++) {
+            vsc_sub_slice_t & S(D.sub[l]);
+            *S.hdr = *hdr++;
+            V->steps[l].nrows = S.hdr->i1 - S.hdr->i0;
+        }
+    }
+    /* Skip over the combining headers as well */
+    Ridx = hdr - mm->headers.begin();
+    for(unsigned int l = 0 ; l < V->steps.size() ; l++) {
+        hdr++;
+    }
+    Cidx = hdr - mm->headers.begin();
+    for(unsigned int k = 0 ; k < V->dispatch.size() ; k++) {
+        for(unsigned int l = 0 ; l < V->steps.size() ; l++) {
+            if (!flush_here(k, V->dispatch.size(), V->steps[l].defer))
+                continue;
+            hdr++;
+        }
+    }
+}
 static inline void matmul_bucket_mul_vsc(struct matmul_bucket_data_s * mm, vector<slice_header_t>::iterator & hdr, abt * dst, abt const * src, int d, struct pos_desc * pos)
 {
     abobj_ptr x = mm->xab;
@@ -2434,49 +2493,15 @@ static inline void matmul_bucket_mul_vsc(struct matmul_bucket_data_s * mm, vecto
 
     abt * scratch = mm->scratch3;
 
-    /* {{{ preparation: we are rebuilding the vsc_slice_t object, or at
-     * least its skeleton ; it makes it easy to run the control loops.
-     * The real data payload is of course not copied again ! */
+    /* {{{ */
 
     vsc_slice_t V[1];
-    *V->hdr = *hdr++;
-    unsigned int nvstrips = *pos->ql++;
-    V->dispatch.resize(nvstrips);
-    V->steps.resize(*pos->ql++);
-    for(unsigned int l = 0 ; l < V->steps.size() ; l++) {
-        V->steps[l].defer = *pos->ql++;
-        V->steps[l].tbuf_space = *pos->ql++;
-    }
-
-    unsigned int Midx = hdr - mm->headers.begin();
-    for(unsigned int k = 0 ; k < V->dispatch.size() ; k++) {
-        vsc_middle_slice_t &D (V->dispatch[k]);
-        *D.hdr = *hdr++;
-    }
-    unsigned int Didx = hdr - mm->headers.begin();
-    for(unsigned int k = 0 ; k < V->dispatch.size() ; k++) {
-        vsc_middle_slice_t &D (V->dispatch[k]);
-        D.sub.resize(V->steps.size());
-        for(unsigned int l = 0 ; l < V->steps.size() ; l++) {
-            vsc_sub_slice_t & S(D.sub[l]);
-            *S.hdr = *hdr++;
-            V->steps[l].nrows = S.hdr->i1 - S.hdr->i0;
-        }
-    }
-    /* Skip over the combining headers as well */
-    unsigned int Ridx = hdr - mm->headers.begin();
-    for(unsigned int l = 0 ; l < V->steps.size() ; l++) {
-        hdr++;
-    }
-    unsigned int Cidx = hdr - mm->headers.begin();
-    for(unsigned int k = 0 ; k < V->dispatch.size() ; k++) {
-        for(unsigned int l = 0 ; l < V->steps.size() ; l++) {
-            if (!flush_here(k, V->dispatch.size(), V->steps[l].defer))
-                continue;
-            hdr++;
-        }
-    }
-
+    unsigned int nvstrips;
+    unsigned int Midx;
+    unsigned int Didx;
+    unsigned int Ridx;
+    unsigned int Cidx;
+    rebuild_vsc_slice_skeleton(mm, hdr, V, pos, nvstrips, Midx, Didx, Ridx, Cidx);
 
     /*}}}*/
 
@@ -2645,6 +2670,91 @@ static inline void mm_finish_init(struct matmul_bucket_data_s * mm)
     pos->nrows_t = mm->public_->dim[ mm->public_->store_transposed];
     pos->ncols_t = mm->public_->dim[!mm->public_->store_transposed];
 
+    /*
+    for(uint16_t h = 0 ; h < mm->headers.size() ; h++) {
+        slice_header_t * hdr = & (mm->headers[h]);
+        printf("block %d %s [%d..%d[ x [%d..%d[, %d cld, %"PRIu64" coeffs\n",
+                h, slice_name(hdr->t),
+                hdr->i0, hdr->i1,
+                hdr->j0, hdr->j1,
+                hdr->nchildren, hdr->ncoeffs);
+    }
+    */
+    for(vector<slice_header_t>::iterator hdr = mm->headers.begin() ; hdr != mm->headers.end() ; hdr++) {
+        switch(hdr->t) {
+            case SLICE_TYPE_SMALL1:
+                break;
+            case SLICE_TYPE_SMALL1_VBLOCK:
+                // mm->mms1_ncoeffs += hdr->ncoeffs;
+                pos->q16 += 2 * hdr->ncoeffs;
+                break;
+            case SLICE_TYPE_SMALL2:
+                pos->q16 += hdr->ncoeffs;
+                pos->q16 += (2 - 1) & - hdr->ncoeffs;
+                // mm->mms2_ncoeffs += hdr->ncoeffs;
+                break;
+            case SLICE_TYPE_LARGE_ENVELOPE:
+                {
+                    uint32_t j = 0;
+                    for( ; j < pos->ncols_t ; ) {
+                        uint32_t j1 = j + *pos->ql++;
+                        uint32_t n = *pos->ql++;
+                        // mm->fbi_ncoeffs += n;
+                        // mm->asb_ncoeffs += n;
+                        pos->q8 += 3*n;
+                        pos->q8 += n & 1;
+                        pos->ql += LSL_NBUCKETS_MAX;
+                        j = j1;
+                    }
+                }
+                break;
+            case SLICE_TYPE_HUGE_ENVELOPE:
+                {
+                    uint32_t j = 0;
+                    unsigned int nlarge = *pos->ql++;
+                    for( ; j < pos->ncols_t ; ) {
+                        uint32_t j1 = j + *pos->ql++;
+                        unsigned int n = *pos->ql++;
+                        // mm->fbi_ncoeffs += n;
+                        // mm->fbd_ncoeffs += n;
+                        // mm->asb_ncoeffs += n;
+                        pos->ql += nlarge;
+                        pos->ql += nlarge * LSL_NBUCKETS_MAX;
+                        pos->q8 += 4*n;
+                        j = j1;
+                    }
+                }
+                break;
+            case SLICE_TYPE_DEFER_ENVELOPE:
+                {
+                    vsc_slice_t V[1];
+                    unsigned int nvstrips;
+                    unsigned int Midx;
+                    unsigned int Didx;
+                    unsigned int Ridx;
+                    unsigned int Cidx;
+                    rebuild_vsc_slice_skeleton(mm, hdr, V, pos, nvstrips, Midx, Didx, Ridx, Cidx);
+                    hdr--;
+                    for(unsigned int s = 0 ; s < V->steps.size() ; s++) {
+                        unsigned int defer = V->steps[s].defer;
+                        printf("Rows %"PRIu32"+%"PRIu32, mm->headers[Ridx++].i0, V->steps[s].nrows);
+                        if (V->steps[s].density_upper_bound != UINT_MAX) {
+                            printf(": d < %u", V->steps[s].density_upper_bound);
+                        }
+                        printf("; %u flushes (every %u), tbuf space %lu\n", iceildiv(nvstrips, defer), defer, V->steps[s].tbuf_space);
+                    }
+                }
+                break;
+            default:
+                fprintf(stderr, "Unexpected block %s encountered\n",
+                        slice_name(hdr->t));
+                break;
+        }
+        if (hdr->j1 == pos->ncols_t) {
+            pos->i = hdr->i1;
+        }
+    }
+
 #if 0
     for(uint16_t h = 0 ; h < mm->headers.size() ; h++) {
         slice_header_t * hdr = & (mm->headers[h]);
@@ -2706,6 +2816,15 @@ static inline void mm_finish_init(struct matmul_bucket_data_s * mm)
     mm->slice_timings.resize(mm->headers.size());
 }
 
+void matmul_bucket_zero_stats(struct matmul_bucket_data_s * mm)
+{
+    vector<slice_header_t>::iterator hdr;
+    for(hdr = mm->headers.begin() ; hdr != mm->headers.end() ; hdr++) {
+        unsigned int hidx = hdr - mm->headers.begin();
+        mm->slice_timings[hidx].t = 0;
+    }
+}
+
 static inline void matmul_bucket_mul_small1(struct matmul_bucket_data_s * mm, vector<slice_header_t>::iterator & hdr, abt * dst, abt const * src, int d, struct pos_desc * pos)
 {
     slice_header_t & h(*hdr++);
@@ -2744,7 +2863,10 @@ static inline void matmul_bucket_mul_loop(struct matmul_bucket_data_s * mm, abt 
                 matmul_bucket_mul_vsc(mm, hdr, dst, src, d, pos);
                 break;
             /* some slice types are ``contained'', and we should never
-             * see them */
+             * see them. NOTE that this implies in particular that the
+             * timings for type "defer" (DEFER_ENVELOPE) is counted here,
+             * thus including all overhead, while the timing for the
+             * inner objects is counted from within the subroutines. */
             case SLICE_TYPE_SMALL1_VBLOCK:
             case SLICE_TYPE_DEFER_COLUMN:
             case SLICE_TYPE_DEFER_ROW:
@@ -2802,9 +2924,14 @@ void matmul_bucket_report_vsc(struct matmul_bucket_data_s * mm, double scale, ve
     unsigned int nsteps = hdr->nchildren;
     vector<pair<uint64_t, double> > dtime(nsteps);
     vector<pair<uint64_t, double> > ctime(nsteps);
-    hdr+=nvstrips;
+    for(unsigned int k = 0 ; k < nvstrips ; k++) {
+        ASSERT_ALWAYS(hdr->t == SLICE_TYPE_DEFER_COLUMN);
+        hdr++;
+    }
+    // hdr+=nvstrips;
     for(unsigned int k = 0 ; k < nvstrips ; k++) {
         for(unsigned int l = 0 ; l < nsteps ; l++) {
+            ASSERT_ALWAYS(hdr->t == SLICE_TYPE_DEFER_DIS);
             double t = mm->slice_timings[hdr - mm->headers.begin()].t;
             uint64_t nc = hdr->ncoeffs;
             dtime[l].first += nc;
@@ -2812,16 +2939,31 @@ void matmul_bucket_report_vsc(struct matmul_bucket_data_s * mm, double scale, ve
             hdr++;
         }
     }
+    double total_from_defer_rows = 0;
+    double total_from_defer_cmbs = 0;
     for(unsigned int l = 0 ; l < nsteps ; l++) {
+        ASSERT_ALWAYS(hdr->t == SLICE_TYPE_DEFER_ROW);
         double t = mm->slice_timings[hdr - mm->headers.begin()].t;
         uint64_t nc = hdr->ncoeffs;
         ctime[l].first += nc;
         ctime[l].second += t;
+        total_from_defer_rows+=t;
         hdr++;
     }
     /* Skip the combining blocks, because they're accounted for already
      * by the row blocks */
-    for( ; hdr != mm->headers.end() && hdr->t == SLICE_TYPE_DEFER_CMB ; hdr++) ;
+    for( ; hdr != mm->headers.end() && hdr->t == SLICE_TYPE_DEFER_CMB ; hdr++) {
+        double t = mm->slice_timings[hdr - mm->headers.begin()].t;
+        total_from_defer_cmbs+=t;
+    }
+    /* Some jitter will appear if transposed mults are performed, because
+     * for the moment transposed mults don't properly store timing info
+     */
+    /*
+    printf("jitter %.2f - %.2f = %.2f\n",
+            total_from_defer_rows / scale0, total_from_defer_cmbs / scale0,
+            (total_from_defer_rows - total_from_defer_cmbs) / scale0);
+            */
     for(unsigned int l = 0 ; l < nsteps ; l++) {
         double t;
         uint64_t nc;
@@ -2892,6 +3034,11 @@ void matmul_bucket_report(struct matmul_bucket_data_s * mm, double scale)
 
 void matmul_bucket_auxv(struct matmul_bucket_data_s * mm MAYBE_UNUSED, int op MAYBE_UNUSED, va_list ap MAYBE_UNUSED)
 {
+    if (op == MATMUL_AUX_ZERO_STATS) {
+        matmul_bucket_zero_stats(mm);
+        mm->public_->iteration[0] = 0;
+        mm->public_->iteration[1] = 0;
+    }
 #if 0
     if (op == MATMUL_AUX_GET_READAHEAD) {
         unsigned int * res = va_arg(ap, unsigned int *);

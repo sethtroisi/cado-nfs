@@ -101,6 +101,7 @@ extern void matmul_mul(matmul_ptr, abt *, abt const *, int);
  * _aux() is only the top-level. auxv is the one that does something.
  */
 #define MATMUL_AUX_GET_READAHEAD        10
+#define MATMUL_AUX_ZERO_STATS        11
 extern void matmul_auxv(matmul_ptr, int, va_list ap);
 extern void matmul_aux(matmul_ptr, int, ...);
 

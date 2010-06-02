@@ -151,6 +151,8 @@ void check_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct 
 
     abclear(ba->xx, dstT, nc);
     abclear(ba->xx, srcT, nr);
+
+    matmul_aux(p->mm, MATMUL_AUX_ZERO_STATS);
 }/*}}}*/
 
 void mul_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct bench_args * ba)/*{{{*/
