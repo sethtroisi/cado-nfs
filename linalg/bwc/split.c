@@ -31,7 +31,7 @@ int force = 0;
 void usage()
 {
     fprintf(stderr, "Usage: ./splits <options> [--split-y|--split-f] splits=0,<n1>,<n2>,...\n");
-    fprintf(stderr, bw_common_usage_string());
+    fprintf(stderr, "%s", bw_common_usage_string());
     fprintf(stderr, "Relevant options here: wdir cfg n\n");
     fprintf(stderr, "Note: data files must be found in wdir !\n");
     exit(1);

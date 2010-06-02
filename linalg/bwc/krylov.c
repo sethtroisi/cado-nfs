@@ -221,7 +221,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 void usage()
 {
     fprintf(stderr, "Usage: ./krylov <options>\n");
-    fprintf(stderr, bw_common_usage_string());
+    fprintf(stderr, "%s", bw_common_usage_string());
     fprintf(stderr, "Relevant options here: wdir cfg m n mpi thr matrix interval start ys\n");
     fprintf(stderr, "Note: data files must be found in wdir !\n");
     exit(1);

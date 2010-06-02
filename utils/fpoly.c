@@ -49,7 +49,7 @@ fpoly_print (FILE *stream, const double *f, const int deg, char *name)
 {
   int i;
 
-  fprintf (stream, name);
+  fprintf (stream, "%s", name);
 
   if (deg == 0)
     fprintf (stream, "%f", f[0]);

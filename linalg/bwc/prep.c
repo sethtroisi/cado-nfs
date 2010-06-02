@@ -179,7 +179,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
 void usage()
 {
     fprintf(stderr, "Usage: ./prep <options>\n");
-    fprintf(stderr, bw_common_usage_string());
+    fprintf(stderr, "%s", bw_common_usage_string());
     fprintf(stderr, "Relevant options here: wdir cfg m n mpi thr matrix\n");
     exit(1);
 }

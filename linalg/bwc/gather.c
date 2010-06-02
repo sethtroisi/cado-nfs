@@ -253,7 +253,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 void usage()
 {
     fprintf(stderr, "Usage: ./gather <options>\n");
-    fprintf(stderr, bw_common_usage_string());
+    fprintf(stderr, "%s", bw_common_usage_string());
     fprintf(stderr, "Relevant options here: wdir cfg m n mpi thr matrix interval\n");
     fprintf(stderr, "Note: data files must be found in wdir !\n");
     fprintf(stderr, "All S* files are taken in wdir. Spurious leftover data may corrupt result !\n");
