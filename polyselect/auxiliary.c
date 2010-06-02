@@ -1049,10 +1049,10 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
         long *jmin, long *kmin, int multi, int verbose, int method)
 {
   mpz_array_t *D;
-  long K0, K1, J0, J1, k0, k, i, j, j0;
+  long K0, K1, J0, J1, k0, k, i, j, j0, bestk;
   double *A, alpha, lognorm, best_alpha = DBL_MAX, best_lognorm = DBL_MAX;
-  double corr;
-  double alpha0 = 0.0;
+  double corr = 0.0;
+  double alpha0;
   unsigned long p;
   double *best_E = NULL; /* set to NULL to avoid warning... */
   double time_alpha = 0.0, time_norm = 0.0;
@@ -1131,15 +1131,10 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
       } /* end of loop on primes p */
 
   /* determine the best alpha in each row */
-  {
-    long bestk = K0;
-    for (k = K0 + 1; k <= K1; k++)
-      if (A[k - K0] < A[bestk - K0])
-        bestk = k;
-    if (verbose > 1)
-      fprintf (stderr, "# best alpha for j=%ld: k=%ld with %f\n",
-	       j, bestk, A[bestk - K0]);
-  }
+  bestk = K0;
+  for (k = K0 + 1; k <= K1; k++)
+    if (A[k - K0] < A[bestk - K0])
+      bestk = k;
 
 #ifdef NEW_ROOTSIEVE
   /* Correction to apply to the current row (takes into account the projective
@@ -1147,18 +1142,17 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
      from the projective roots. */
   k0 = rotate_aux (f, b, m, k0, bestk, 0);
   corr = get_alpha (f, d, alim) - A[bestk - K0];
-#else
-  corr = 0.0;
 #endif
 
-  if (j == 0)
-    alpha0 = A[0 - K0] + corr;
+  if (verbose > 1)
+    fprintf (stderr, "# best alpha for j=%ld: k=%ld with %f\n",
+             j, bestk, A[bestk - K0] + corr);
 
   /* now finds the best lognorm+alpha */
   time_norm -= seconds ();
   for (k = K0; k <= K1; k++)
     {
-      alpha = A[k - K0];
+      alpha = A[k - K0] + corr;
       if (alpha < best_alpha + 2.0)
         {
           /* check lognorm + alpha < best_lognorm + best_alpha */
