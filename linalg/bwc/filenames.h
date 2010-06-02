@@ -38,6 +38,7 @@
 #define BW_CONFIG_FILE "bw.cfg"
 
 /* this must follow the info file format */
+/* XXX this will be dropped real soon now */
 #define MATRIX_INFO_FILE "mat.info"
 
 /* mksol */

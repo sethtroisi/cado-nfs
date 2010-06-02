@@ -743,6 +743,7 @@ void mpi_dest_free(data_dest_ptr M)
 
 struct master_data_s {/*{{{*/
     balancing bal;
+    const char * mfile;
     uint32_t row_block0;
     uint32_t col_block0;
     uint32_t row_cellbase;
@@ -772,12 +773,14 @@ int who_has_row_bare(master_data m, uint32_t rnum)/*{{{*/
     return b;
 }
 
-int who_has_row(master_data m, uint32_t rnum)/*{{{*/
+int who_has_row(master_data m, uint32_t rnum)
 {
     int b = who_has_row_bare(m, rnum);
     return b * m->bal->h->nv;
 }
+/*}}}*/
 
+    /*{{{*/
 int who_has_col_bare(master_data m, uint32_t cnum)
 {
     int b;
@@ -798,7 +801,8 @@ int who_has_col(master_data m, uint32_t cnum)
     // int t = b % m->pi->wr[0]->ncores;
     // return j * m->pi->m->ncores + t;
     return b;
-}/*}}}*/
+}
+/*}}}*/
 
 void read_bfile(master_data m, const char * bfile)
 {
@@ -1421,13 +1425,12 @@ void master_loop_inner(master_data m, data_source_ptr input, data_dest_ptr outpu
 
 void master_loop(master_data m, parallelizing_info_ptr pi, param_list_ptr pl, slave_data_ptr * slaves, int nslaves MAYBE_UNUSED)
 {
-    const char * mfile = param_list_lookup_string(pl, "matrix");
     size_t esz = (m->bal->h->ncoeffs + m->bal->trows) * sizeof(uint32_t);
     size_t queue_size = default_queue_size;
     if (param_list_parse_size_t(pl, "balancing_queue_size", &queue_size)) {
         queue_size /= sizeof(uint32_t);
     }
-    data_source_ptr input = file_source_alloc(mfile, esz);
+    data_source_ptr input = file_source_alloc(m->mfile, esz);
     data_dest_ptr output = master_dispatcher_alloc(m, pi, slaves, queue_size);
     master_loop_inner(m, input, output);
     master_dispatcher_stats((master_dispatcher_ptr) output);
@@ -1482,6 +1485,8 @@ void * get_matrix_u32(parallelizing_info_ptr pi, param_list pl, matrix_u32_ptr a
     slave_data_ptr * slaves;
 
     memset(m, 0, sizeof(master_data));
+
+    m->mfile = arg->mfile;
 
     if (pi->m->trank == 0) {
         slaves = malloc(pi->m->totalsize * sizeof(slave_data_ptr));

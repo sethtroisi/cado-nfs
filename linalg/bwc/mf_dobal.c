@@ -16,8 +16,8 @@
 #include "mf.h"
 #include "balancing.h"
 
+// FIXME -- the command line currently does not allow changing this.
 int transposing = 1;
-const char * bfile;
 
 void usage()
 {
@@ -26,15 +26,16 @@ void usage()
     "version of the matrix found in file mfile, the balancing being\n"
     "computed according to the balancing file bfile.\n"
     "Options recognized:\n"
-    "\t(none)\n"
-    "Note that a balancing of size p*q needs pq+1 jobs. Further extensions\n"
-    "of this program might allow an arbitrary number or reader jobs\n");
+    "\t(none)\n");
     exit(1);
 }
 
 void * all(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
-    matrix_u32 mat = {{ .transpose=1, .bfile = bfile, }};
+    matrix_u32 mat;
+    mat->transpose=1;
+    mat->bfile = param_list_lookup_string(pl, "balancing_file");
+    mat->mfile = param_list_lookup_string(pl, "matrix");
     get_matrix_u32(pi, pl, mat);
     return NULL;
 }
@@ -51,8 +52,7 @@ int main(int argc, char *argv[])
 	if (param_list_update_cmdline(pl, &argc, &argv))
 	    continue;
 	if (wild == 0) {
-	    bfile = argv[0];
-            param_list_add_key(pl, "balancing_file", bfile, PARAMETER_FROM_CMDLINE);
+            param_list_add_key(pl, "balancing_file", argv[0], PARAMETER_FROM_CMDLINE);
 	    wild++, argv++, argc--;
 	    continue;
 	}
@@ -63,7 +63,7 @@ int main(int argc, char *argv[])
     // just as a reminder -- this is looked up from balancing.c
     param_list_lookup_string(pl, "balancing_use_auxfile");
 
-    if (!bfile) usage();
+    if (!param_list_lookup_string(pl, "balancing_file")) usage();
     pi_go(all, pl, 0);
 
     param_list_clear(pl);

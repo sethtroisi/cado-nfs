@@ -9,6 +9,7 @@
 #include "parallelizing_info.h"
 #include "matmul.h"
 #include "params.h"
+#include "balancing.h"
 
 /* Don't touch this. */
 #define CONJUGATED_PERMUTATIONS
@@ -125,6 +126,7 @@ struct matmul_top_data_s {
     // bad decision. Fortunately, fences[] is rarely used.
     unsigned int * fences[2];
 #endif
+    balancing_header bal;
 };
 
 /* THREAD_MULTIPLE_VECTOR is when several threads will be writing to the

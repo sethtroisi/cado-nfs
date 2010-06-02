@@ -64,6 +64,7 @@ extern void matrix_read_pass(
 extern char * build_mat_auxfile(const char * prefix, const char * what, const char * ext);
 
 extern int has_suffix(const char * path, const char * sfx);
+int matrix_autodetect_input(struct mf_io_file * mf_in, const char * mfile);
 /* Once the flags and perm[] fields have been provided, the caller must
  * call _finalize() in order to 1) update the trows and tcols fields 2)
  * compute the checksum of the balancing.

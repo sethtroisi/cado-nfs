@@ -14,6 +14,7 @@ extern "C" {
 
 struct matrix_u32_s {
     // input arguments.
+    const char * mfile;    // matrix file name
     const char * bfile;    // balancing file name ; NULL will mean auto-detect
     int transpose;
     // output arguments.

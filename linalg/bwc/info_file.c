@@ -6,10 +6,26 @@
 #include <errno.h>
 #include <limits.h>
 #include <string.h>
+#include <unistd.h>
+#include <dirent.h>
 #include "bwc_config.h"
 #include "info_file.h"
 #include "filenames.h"
 #include "utils.h"      /* cado_strndup */
+
+#if 0
+void read_info_file_ng(matmul_top_data_ptr mmt, const char * filename)
+{
+    // this new function will be renamed at some point.  note that we
+    // look for the balancing file in the current directory.
+    DIR * dir;
+    dir = opendir(".");
+    struct dirent * de;
+    for( ; (de = readdir(dir)) != NULL ; ) {
+    }
+}
+// XXX TBC
+#endif
 
 void read_info_file(matmul_top_data_ptr mmt, const char * filename)
 {

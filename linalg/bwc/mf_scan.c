@@ -4,10 +4,6 @@
 #include <string.h>
 #include <time.h>
 #include <inttypes.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <errno.h>
-#include <ctype.h>
 #include "macros.h"
 #include "utils.h"
 #include "mf.h"
@@ -156,48 +152,13 @@ int main(int argc, char * argv[])
         m_in->f = fopen(mfile, "r");
         if (m_in->f == NULL) { perror(mfile); exit(1); }
     }
+    if (mfile) freq_default_prefix=mfile;
 
     if (ascii_in || binary_in) {
         m_in->ascii = ascii_in;
-    } else if (mfile) {
-        /* try to auto-detect */
-        if (has_suffix(mfile, file_ext[0])) {
-            m_in->ascii = 1;
-        } else if (has_suffix(mfile, file_ext[1])) {
-            m_in->ascii = 0;
-        } else if (mfile) {
-            /* for *regular* files, where it's possible to read somewhat
-             * ahead of time, try to auto-detect based on the contents */
-            ASSERT_ALWAYS(m_in->f);
-            struct stat sbuf[1];
-            int rc = fstat(fileno(m_in->f), sbuf);
-            DIE_ERRNO_DIAG(rc < 0, "fstat", mfile);
-            if (!S_ISREG(sbuf->st_mode)) {
-                // guard against tricks like /dev/fd/ to unseekable fd's.
-                autodetection_error("input");
-            }
-            char test[1024];
-            int n = fread(test, 1, 1024, m_in->f);
-            DIE_ERRNO_DIAG(n < 1024, "fread", mfile);
-            int k;
-            for(k = 0 ; k < n && (isdigit(test[k]) || isspace(test[k])) ; k++);
-            if (k < n) {
-                // assume binary.
-                m_in->ascii = 0;
-            } else {
-                m_in->ascii = 1;
-            }
-            rc = fseek(m_in->f, 0L, SEEK_SET);
-            DIE_ERRNO_DIAG(rc < 0, "rewind", mfile);
-            fprintf(stderr, "auto-detected %s as %s based on contents\n",
-                    mfile, m_in->ascii ? "ascii" : "binary");
-        } else {
-            autodetection_error("input");
-        }
-    } else {
+    } else if (matrix_autodetect_input(m_in, mfile) < 0) {
         autodetection_error("input");
     }
-    if (mfile) freq_default_prefix=mfile;
 
     /* Now the output, if there is one. */
     struct mf_io_file m_out[1];
