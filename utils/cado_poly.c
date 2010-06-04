@@ -19,6 +19,7 @@ void cado_poly_init(cado_poly poly)
     }
     mpz_init_set_ui(poly->n, 0);
     poly->degree = -1;
+    poly->degreeg = -1;
     poly->type[0] = '\0';
     mpz_init_set_ui(poly->m, 0);
 }
@@ -43,8 +44,10 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
     int have_n = 0;
     int have_f[(MAXDEGREE + 1)] = { 0, };
     int have_g[(MAXDEGREE + 1)] = { 0, };
+    int have_m = 0;
     int degf, degg;
     int i;
+    mpz_t tmp;
 
     have_n = param_list_parse_mpz(pl, "n", poly->n) || param_list_parse_mpz(pl, NULL, poly->n);
     poly->skew = 0.0; /* to ensure that we get an invalid skewness in case
@@ -71,7 +74,9 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
     param_list_parse_double(pl, "rlambda", &(poly->rlambda));
     param_list_parse_double(pl, "alambda", &(poly->alambda));
     param_list_parse_int(pl, "qintsize", &(poly->qintsize));
+    mpz_set_ui (poly->m, 0);
     param_list_parse_mpz(pl, "m", poly->m);
+    have_m = mpz_cmp_ui (poly->m, 0);
 
     for (degf = MAXDEGREE; degf >= 0 && !have_f[degf]; degf--) {
 	if (have_f[degf] && mpz_cmp_ui(poly->f[degf], 0) != 0)
@@ -86,27 +91,59 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
 
     poly->degree = degf;
     // compute m, the common root of f and g mod n
-    if (degg != -1) {
-	mpz_t tmp;
-	mpz_init(tmp);
-	mpz_invert(tmp, poly->g[1], poly->n);
-	mpz_mul(tmp, tmp, poly->g[0]);
-	mpz_mod(tmp, tmp, poly->n);
-	mpz_sub(tmp, poly->n, tmp);
-	mpz_mod(tmp, tmp, poly->n);
-	if (mpz_cmp_ui(poly->m, 0) != 0) {
-	    if (mpz_cmp(poly->m, tmp) != 0) {
-		fprintf(stderr, "m is not a root of g mod N\n");
-		exit(EXIT_FAILURE);
-	    }
-	}
-	mpz_set(poly->m, tmp);
-	mpz_clear(tmp);
-    } else {
-	ASSERT_ALWAYS(mpz_cmp_ui(poly->m, 0) != 0);
-	mpz_set_ui(poly->g[1], 1);
-	mpz_neg(poly->g[0], poly->m);
-    }
+    mpz_init (tmp);
+    if (degg == 1)
+      {
+	mpz_invert (tmp, poly->g[1], poly->n);
+	mpz_mul (tmp, tmp, poly->g[0]);
+	mpz_mod (tmp, tmp, poly->n);
+	mpz_sub (tmp, poly->n, tmp);
+	mpz_mod (tmp, tmp, poly->n);
+
+        if (have_m && (mpz_cmp (poly->m, tmp) != 0))
+          {
+            fprintf (stderr, "m is not a root of g mod N\n");
+            exit (EXIT_FAILURE);
+          }
+	mpz_set (poly->m, tmp);
+      }
+    else
+      {
+        if (have_m == 0)
+          {
+            fprintf (stderr, "must provide m for non-linear polynomials\n");
+            exit (EXIT_FAILURE);
+          }
+
+        /* check m is a root of f mod n */
+        mpz_set (tmp, poly->f[degf]);
+        for (i = degf - 1; i >= 0; i--)
+          {
+            mpz_mul (tmp, tmp, poly->m);
+            mpz_add (tmp, tmp, poly->f[i]);
+          }
+        mpz_mod (tmp, tmp, poly->n);
+        if (mpz_cmp_ui (tmp, 0) != 0)
+          {
+            fprintf (stderr, "m is not a root of f modulo n\n");
+            exit (EXIT_FAILURE);
+          }
+
+        /* check m is a root of g mod n */
+        mpz_set (tmp, poly->g[degg]);
+        for (i = degg - 1; i >= 0; i--)
+          {
+            mpz_mul (tmp, tmp, poly->m);
+            mpz_add (tmp, tmp, poly->g[i]);
+          }
+        mpz_mod (tmp, tmp, poly->n);
+        if (mpz_cmp_ui (tmp, 0) != 0)
+          {
+            fprintf (stderr, "m is not a root of g modulo n\n");
+            exit (EXIT_FAILURE);
+          }
+      }
+    mpz_clear (tmp);
 
     return 1;
 }
