@@ -27,9 +27,9 @@ readline (char *s)
 }
 
 static void
-read_franke (mpz_t N, mpz_t *X, mpz_t Y1, mpz_t Y0, mpz_t M)
+read_franke (mpz_t N, mpz_t *X, mpz_t *Y, mpz_t M)
 {
-  int c;
+  int c, i;
 
   if (mpz_inp_str (N, stdin, 0) == 0)
     {
@@ -42,99 +42,70 @@ read_franke (mpz_t N, mpz_t *X, mpz_t Y1, mpz_t Y0, mpz_t M)
       fprintf (stderr, "Error: end of line expected after N\n");
       exit (1);
     }
+
+  /* read comment lines */
   while ((c = getchar ()) == '#')
     {
       while ((c = getchar ()) != '\n');
     }
-  if (c != 'X' || getchar () != '5' || getchar () != ' ')
+
+  /* now read X lines */
+  if (c != 'X')
     {
-      fprintf (stderr, "Error: X5 expected\n");
+      fprintf (stderr, "Error: Xnnn expected\n");
       exit (1);
     }
-  mpz_inp_str (X[5], stdin, 0);
-  if (getchar () != '\n')
+  do
     {
-      fprintf (stderr, "Error: end of line expected after X5\n");
+      if (scanf ("%d ", &i) != 1)
+        {
+          fprintf (stderr, "Error: Xnnn expected\n");
+          exit (1);
+        }
+      if (i > MAX_DEGREE)
+        {
+          fprintf (stderr, "Error: too large degree X%d expected\n", i);
+          exit (1);
+        }
+      mpz_inp_str (X[i], stdin, 0);
+      if (getchar () != '\n')
+        {
+          fprintf (stderr, "Error: end of line expected after X%d\n", i);
+          exit (1);
+        }
+      c = getchar ();
+    }
+  while (c == 'X');
+
+  /* now read Y lines */
+  if (c != 'Y')
+    {
+      fprintf (stderr, "Error: Ynnn expected\n");
       exit (1);
     }
-  if (getchar () != 'X' || getchar () != '4' || getchar () != ' ')
+  do
     {
-      fprintf (stderr, "Error: X4 expected\n");
-      exit (1);
+      if (scanf ("%d ", &i) != 1)
+        {
+          fprintf (stderr, "Error: Ynnn expected\n");
+          exit (1);
+        }
+      if (i > MAX_DEGREE)
+        {
+          fprintf (stderr, "Error: too large degree Y%d expected\n", i);
+          exit (1);
+        }
+      mpz_inp_str (Y[i], stdin, 0);
+      if (getchar () != '\n')
+        {
+          fprintf (stderr, "Error: end of line expected after Y%d\n", i);
+          exit (1);
+        }
+      c = getchar ();
     }
-  mpz_inp_str (X[4], stdin, 0);
-  if (getchar () != '\n')
-    {
-      fprintf (stderr, "Error: end of line expected after X4\n");
-      exit (1);
-    }
-  if (getchar () != 'X' || getchar () != '3' || getchar () != ' ')
-    {
-      fprintf (stderr, "Error: X3 expected\n");
-      exit (1);
-    }
-  mpz_inp_str (X[3], stdin, 0);
-  if (getchar () != '\n')
-    {
-      fprintf (stderr, "Error: end of line expected after X3\n");
-      exit (1);
-    }
-  if (getchar () != 'X' || getchar () != '2' || getchar () != ' ')
-    {
-      fprintf (stderr, "Error: X2 expected\n");
-      exit (1);
-    }
-  mpz_inp_str (X[2], stdin, 0);
-  if (getchar () != '\n')
-    {
-      fprintf (stderr, "Error: end of line expected after X2\n");
-      exit (1);
-    }
-  if (getchar () != 'X' || getchar () != '1' || getchar () != ' ')
-    {
-      fprintf (stderr, "Error: X1 expected\n");
-      exit (1);
-    }
-  mpz_inp_str (X[1], stdin, 0);
-  if (getchar () != '\n')
-    {
-      fprintf (stderr, "Error: end of line expected after X1\n");
-      exit (1);
-    }
-  if (getchar () != 'X' || getchar () != '0' || getchar () != ' ')
-    {
-      fprintf (stderr, "Error: X0 expected\n");
-      exit (1);
-    }
-  mpz_inp_str (X[0], stdin, 0);
-  if (getchar () != '\n')
-    {
-      fprintf (stderr, "Error: end of line expected after X0\n");
-      exit (1);
-    }
-  if (getchar () != 'Y' || getchar () != '1' || getchar () != ' ')
-    {
-      fprintf (stderr, "Error: Y1 expected\n");
-      exit (1);
-    }
-  mpz_inp_str (Y1, stdin, 0);
-  if (getchar () != '\n')
-    {
-      fprintf (stderr, "Error: end of line expected after Y1\n");
-      exit (1);
-    }
-  if (getchar () != 'Y' || getchar () != '0' || getchar () != ' ')
-    {
-      fprintf (stderr, "Error: Y0 expected\n");
-      exit (1);
-    }
-  mpz_inp_str (Y0, stdin, 0);
-  if (getchar () != '\n')
-    {
-      fprintf (stderr, "Error: end of line expected after Y0\n");
-      exit (1);
-    }
-  if (getchar () != 'M' || getchar () != ' ')
+  while (c == 'Y');
+
+  if (c != 'M' || getchar () != ' ')
     {
       fprintf (stderr, "Error: M expected\n");
       exit (1);
@@ -150,7 +121,7 @@ read_franke (mpz_t N, mpz_t *X, mpz_t Y1, mpz_t Y0, mpz_t M)
 #define MAX_BUF 4096
 
 static void
-read_ggnfs (mpz_t N, mpz_t *X, mpz_t Y1, mpz_t Y0, mpz_t M)
+read_ggnfs (mpz_t N, mpz_t *X, mpz_t *Y, mpz_t M)
 {
   int i, ret;
   char s[MAX_BUF]; /* input buffer */
@@ -188,7 +159,7 @@ read_ggnfs (mpz_t N, mpz_t *X, mpz_t Y1, mpz_t Y0, mpz_t M)
         }
       else if (strncmp (s, "Y1:", 3) == 0)
         {
-          if (mpz_set_str (Y1, s + 3, 0) != 0)
+          if (mpz_set_str (Y[1], s + 3, 0) != 0)
             {
               fprintf (stderr, "Error while reading Y1");
               exit (1);
@@ -196,7 +167,7 @@ read_ggnfs (mpz_t N, mpz_t *X, mpz_t Y1, mpz_t Y0, mpz_t M)
         }
       else if (strncmp (s, "Y0:", 3) == 0)
         {
-          if (mpz_set_str (Y0, s + 3, 0) != 0)
+          if (mpz_set_str (Y[0], s + 3, 0) != 0)
             {
               fprintf (stderr, "Error while reading Y0");
               exit (1);
@@ -214,7 +185,7 @@ read_ggnfs (mpz_t N, mpz_t *X, mpz_t Y1, mpz_t Y0, mpz_t M)
 }
 
 static void
-read_cwi (mpz_t N, mpz_t *X, mpz_t Y1, mpz_t Y0, mpz_t M)
+read_cwi (mpz_t N, mpz_t *X, mpz_t *Y, mpz_t M)
 {
   int npoly; /* number of polynomials */
   int degree, i;
@@ -249,12 +220,12 @@ read_cwi (mpz_t N, mpz_t *X, mpz_t Y1, mpz_t Y0, mpz_t M)
       fprintf (stderr, "Error, first polynomial must be linear\n");
       exit (1);
     }
-  if (mpz_inp_str (Y0, stdin, 0) == 0)
+  if (mpz_inp_str (Y[0], stdin, 0) == 0)
     {
       fprintf (stderr, "Error, can't read coefficient Y0\n");
       exit (1);
     }
-  if (mpz_inp_str (Y1, stdin, 0) == 0)
+  if (mpz_inp_str (Y[1], stdin, 0) == 0)
     {
       fprintf (stderr, "Error, can't read coefficient Y1\n");
       exit (1);
@@ -282,17 +253,23 @@ read_cwi (mpz_t N, mpz_t *X, mpz_t Y1, mpz_t Y0, mpz_t M)
 /************************** output routines **********************************/
 
 static void
-out_cwi (mpz_t N, mpz_t *X, int deg, mpz_t Y1, mpz_t Y0, mpz_t M)
+out_cwi (mpz_t N, mpz_t *X, int deg, mpz_t *Y, int degY, mpz_t M)
 {
   int i;
+
+  if (degY != 1)
+    {
+      fprintf (stderr, "Error, only degree 1 implemented for CWI format output\n");
+      exit (1);
+    }
 
   mpz_out_str (stdout, 10, N);
   printf ("\n");
   mpz_out_str (stdout, 10, M);
   printf ("\n\n2\n\n1\n");
-  mpz_out_str (stdout, 10, Y0);
+  mpz_out_str (stdout, 10, Y[0]);
   printf (" ");
-  mpz_out_str (stdout, 10, Y1);
+  mpz_out_str (stdout, 10, Y[1]);
   printf ("\n\n%d\n", deg);
   for (i = 0; i <= deg; i++)
     {
@@ -303,9 +280,15 @@ out_cwi (mpz_t N, mpz_t *X, int deg, mpz_t Y1, mpz_t Y0, mpz_t M)
 }
 
 static void
-out_franke (mpz_t N, mpz_t *X, int deg, mpz_t Y1, mpz_t Y0, mpz_t M)
+out_franke (mpz_t N, mpz_t *X, int deg, mpz_t *Y, int degY, mpz_t M)
 {
   int i;
+
+  if (degY != 1)
+    {
+      fprintf (stderr, "Error, only degree 1 implemented for FK format output\n");
+      exit (1);
+    }
 
   mpz_out_str (stdout, 10, N);  printf ("\n");
   for (i = deg; i >= 0; i--)
@@ -314,8 +297,8 @@ out_franke (mpz_t N, mpz_t *X, int deg, mpz_t Y1, mpz_t Y0, mpz_t M)
       mpz_out_str (stdout, 10, X[i]);
       printf ("\n");
     }
-  printf ("Y1 "); mpz_out_str (stdout, 10, Y1); printf ("\n");
-  printf ("Y0 "); mpz_out_str (stdout, 10, Y0); printf ("\n");
+  printf ("Y1 "); mpz_out_str (stdout, 10, Y[1]); printf ("\n");
+  printf ("Y0 "); mpz_out_str (stdout, 10, Y[0]); printf ("\n");
   if (mpz_cmp_ui (M, 0) != 0)
     gmp_printf ("M %Zd\n", M);
   printf ("# parameters for the linear and algebraic polynomials:\n");
@@ -324,38 +307,44 @@ out_franke (mpz_t N, mpz_t *X, int deg, mpz_t Y1, mpz_t Y0, mpz_t M)
 }
 
 static void
-out_cado (mpz_t N, mpz_t *X, int deg, mpz_t Y1, mpz_t Y0, mpz_t M)
+out_cado (mpz_t N, mpz_t *X, int degX, mpz_t *Y, int degY, mpz_t M)
 {
   int i;
 
   printf ("n: ");
   mpz_out_str (stdout, 10, N);
   printf ("\n");
-  for (i = deg; i >= 0; i--)
+  for (i = degX; i >= 0; i--)
     {
       printf ("c%d: ", i);
       mpz_out_str (stdout, 10, X[i]);
       printf ("\n");
     }
-  printf ("Y1: ");
-  mpz_out_str (stdout, 10, Y1);
-  printf ("\n");
-  printf ("Y0: ");
-  mpz_out_str (stdout, 10, Y0);
-  printf ("\n");
+  for (i = degY; i >= 0; i--)
+    {
+      printf ("Y%d: ", i);
+      mpz_out_str (stdout, 10, Y[i]);
+      printf ("\n");
+    }
   printf ("m: ");
   mpz_out_str (stdout, 10, M);
   printf ("\n");
 }
 
 static void
-out_msieve (mpz_t N, mpz_t *X, int deg, mpz_t Y1, mpz_t Y0)
+out_msieve (mpz_t N, mpz_t *X, int deg, mpz_t *Y, int degY)
 {
   int i;
 
+  if (degY != 1)
+    {
+      fprintf (stderr, "Error, only degree 1 implemented for msieve format output\n");
+      exit (1);
+    }
+
   gmp_printf ("N %Zd\n", N);
-  gmp_printf ("R0 %Zd\n", Y0);
-  gmp_printf ("R1 %Zd\n", Y1);
+  gmp_printf ("R0 %Zd\n", Y[0]);
+  gmp_printf ("R1 %Zd\n", Y[1]);
   for (i = 0; i <= deg; i++)
     gmp_printf ("A%d %Zd\n", i, X[i]);
 }
@@ -384,10 +373,10 @@ usage (char *argv0)
 int
 main (int argc, char *argv[])
 {
-  mpz_t N, *X, Y1, Y0, M;
+  mpz_t N, *X, *Y, M;
   int iformat = FORMAT_CADO;
   int oformat = FORMAT_CADO;
-  int i, deg;
+  int i, degX = 0, degY = 0;
   
   while (argc > 1)
     {
@@ -440,37 +429,40 @@ main (int argc, char *argv[])
 
   mpz_init (N);
   X = (mpz_t*) malloc ((MAX_DEGREE + 1) * sizeof (mpz_t));
+  Y = (mpz_t*) malloc ((MAX_DEGREE + 1) * sizeof (mpz_t));
   for (i = 0; i <= MAX_DEGREE; i++)
-    mpz_init (X[i]);
-  mpz_init (Y1);
-  mpz_init (Y0);
+    {
+      mpz_init (X[i]);
+      mpz_init (Y[i]);
+    }
   mpz_init (M);
 
   if (iformat == FORMAT_FK)
-    read_franke (N, X, Y1, Y0, M);
+    read_franke (N, X, Y, M);
   else if (iformat == FORMAT_GGNFS || iformat == FORMAT_CADO)
-    read_ggnfs (N, X, Y1, Y0, M);
+    read_ggnfs (N, X, Y, M);
   else if (iformat == FORMAT_CWI)
-    read_cwi (N, X, Y1, Y0, M);
+    read_cwi (N, X, Y, M);
   else
     {
       fprintf (stderr, "Input format not yet implemented\n");
       exit (1);
     }
 
-  for (deg = MAX_DEGREE; deg > 0 && mpz_cmp_ui (X[deg], 0) == 0; deg --);
+  for (degX = MAX_DEGREE; degX > 0 && mpz_cmp_ui (X[degX], 0) == 0; degX --);
+  for (degY = MAX_DEGREE; degY > 0 && mpz_cmp_ui (Y[degY], 0) == 0; degY --);
 
-  if (mpz_cmp_ui (M, 0) == 0)
+  if (mpz_cmp_ui (M, 0) == 0 && degY == 1)
     {
       mpz_t t;
       /* M = -Y0/Y1 mod N */
-      mpz_invert (M, Y1, N);
+      mpz_invert (M, Y[1], N);
       mpz_neg (M, M);
-      mpz_mul (M, M, Y0);
+      mpz_mul (M, M, Y[0]);
       mpz_mod (M, M, N);
       /* check M is also a root of the algebraic polynomial mod N */
-      mpz_init_set (t, X[deg]);
-      for (i = deg - 1; i >= 0; i --)
+      mpz_init_set (t, X[degX]);
+      for (i = degX - 1; i >= 0; i --)
         {
           mpz_mul (t, t, M);
           mpz_add (t, t, X[i]);
@@ -485,13 +477,13 @@ main (int argc, char *argv[])
     }
 
   if (oformat == FORMAT_CWI)
-    out_cwi (N, X, deg, Y1, Y0, M);
+    out_cwi (N, X, degX, Y, degY, M);
   else if (oformat == FORMAT_FK)
-    out_franke (N, X, deg, Y1, Y0, M);
+    out_franke (N, X, degX, Y, degY, M);
   else if (oformat == FORMAT_CADO)
-    out_cado (N, X, deg, Y1, Y0, M);
+    out_cado (N, X, degX, Y, degY, M);
   else if (oformat == FORMAT_MSIEVE)
-    out_msieve (N, X, deg, Y1, Y0);
+    out_msieve (N, X, degX, Y, degY);
   else
     {
       fprintf (stderr, "Output format not yet implemented\n");
@@ -499,12 +491,14 @@ main (int argc, char *argv[])
     }
 
   mpz_clear (M);
-  mpz_clear (Y0);
-  mpz_clear (Y1);
   for (i = 0; i <= MAX_DEGREE; i++)
-    mpz_clear (X[i]);
+    {
+      mpz_clear (X[i]);
+      mpz_clear (Y[i]);
+    }
   mpz_clear (N);
   free (X);
+  free (Y);
 
   return 0;
 }
