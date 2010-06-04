@@ -64,4 +64,6 @@ The script tries to factor a 59 digit number.
 For other numbers, create a parameter file analogous to params/params.c59
 and call ./run_example.sh the same way.
 
+To factor a number with two non linear polynomials, see README.nonlinear.
+
 

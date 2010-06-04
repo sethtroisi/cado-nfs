@@ -426,6 +426,12 @@ calculateSqrtRat (char *prefix, int numdep, cado_poly pol)
   unsigned long nprd; /* number of accumulated products in prd[] */
   unsigned long res, peakres = 0;
 
+  if (pol->degreeg != 1)
+    {
+      fprintf (stderr, "Error, calculateSqrtRat called with non-linear polynomial\n");
+      exit (EXIT_FAILURE);
+    }
+
 #ifdef __MPIR_VERSION
   fprintf (stderr, "Using MPIR %s\n", mpir_version);
 #else
@@ -953,44 +959,57 @@ accumulate_fast_F_end (polymodF_t *prd, const poly_t F, unsigned long lprd)
     polymodF_mul (prd[0], prd[0], prd[i], F);
 }
 
+/* side=0: consider the polynomial f
+   side=1: consider the polynomial g
+*/
 int
-calculateSqrtAlg (char *prefix, int numdep, cado_poly pol)
+calculateSqrtAlg (char *prefix, int numdep, cado_poly pol, int side)
 {
-	char depname[200];
-	char algname[200];
-    sprintf(depname, "%s.%03d", prefix, numdep);
-    sprintf(algname, "%s.alg.%03d", prefix, numdep);
-	FILE *depfile = NULL;
-	FILE *algfile;
+  char depname[200];
+  char algname[200];
+  FILE *depfile = NULL;
+  FILE *algfile;
+  poly_t F;
+  polymodF_t prd, tmp;
+  long a;
+  unsigned long b;
+  unsigned long p;
+  double t0 = seconds ();
+  mpz_t algsqrt, aux;
+  int i, deg;
+  mpz_t *f;
+  int nab = 0, nfree = 0;
 
-	poly_t F;
-	polymodF_t prd, tmp;
-	long a;
-    unsigned long b;
-    unsigned long p;
-    double t0 = seconds ();
-    mpz_t algsqrt, aux;
+  ASSERT_ALWAYS(side == 0 || side == 1);
 
-    depfile = fopen(depname, "r");
-    ASSERT_ALWAYS(depfile != NULL);
+  sprintf (depname, "%s.%03d", prefix, numdep);
+  if (side == 0)
+    sprintf (algname, "%s.alg.%03d", prefix, numdep);
+  else
+    sprintf (algname, "%s.rat.%03d", prefix, numdep);
+  depfile = fopen (depname, "r");
+  ASSERT_ALWAYS(depfile != NULL);
+
+  deg = (side == 0) ? pol->degree : pol->degreeg;
+  f = (side == 0) ? pol->f : pol->g;
+
+  ASSERT_ALWAYS(deg > 1);
   
-    // Init F to be the algebraic polynomial
-    poly_alloc(F, pol->degree);
-	int i;
-    for (i = pol->degree; i >= 0; --i)
-      poly_setcoeff(F, i, pol->f[i]);
+  // Init F to be the corresponding polynomial
+  poly_alloc (F, deg);
+  for (i = deg; i >= 0; --i)
+    poly_setcoeff (F, i, f[i]);
   
-    // Init prd to 1.
-    poly_alloc(prd->p, pol->degree);
-    mpz_set_ui(prd->p->coeff[0], 1);
-    prd->p->deg = 0;
-    prd->v = 0;
+  // Init prd to 1.
+  poly_alloc (prd->p, deg);
+  mpz_set_ui (prd->p->coeff[0], 1);
+  prd->p->deg = 0;
+  prd->v = 0;
   
-    // Allocate tmp
-    poly_alloc(tmp->p, 1);
+  // Allocate tmp
+  poly_alloc (tmp->p, 1);
   
-    // Accumulate product
-    int nab = 0, nfree = 0;
+  // Accumulate product
   #if 0
     // Naive version, without subproduct tree
     while(fscanf(depfile, "%ld %lu", &a, &b) != EOF){
@@ -1009,8 +1028,8 @@ calculateSqrtAlg (char *prefix, int numdep, cado_poly pol)
       unsigned long lprd = 1; /* number of elements in prd_tab[] */
       unsigned long nprd = 0; /* number of accumulated products in prd_tab[] */
       prd_tab = (polymodF_t*) malloc (lprd * sizeof (polymodF_t));
-      poly_alloc(prd_tab[0]->p, F->deg);
-      mpz_set_ui(prd_tab[0]->p->coeff[0], 1);
+      poly_alloc (prd_tab[0]->p, F->deg);
+      mpz_set_ui (prd_tab[0]->p->coeff[0], 1);
       prd_tab[0]->p->deg = 0;
       prd_tab[0]->v = 0;
       while(fscanf(depfile, "%ld %lu", &a, &b) != EOF){
@@ -1061,7 +1080,7 @@ calculateSqrtAlg (char *prefix, int numdep, cado_poly pol)
     fprintf(stderr, "Finished accumulating the product at %2.2lf\n", seconds());
     fprintf(stderr, "nab = %d, nfree = %d, v = %d\n", nab, nfree, prd->v);
     fprintf (stderr, "maximal polynomial bit-size = %lu\n",
-             (unsigned long) poly_sizeinbase (prd->p, pol->degree - 1, 2));
+             (unsigned long) poly_sizeinbase (prd->p, deg - 1, 2));
   
     p = FindSuitableModP(F);
     fprintf(stderr, "Using p=%lu for lifting\n", p);
@@ -1262,7 +1281,7 @@ int main(int argc, char *argv[])
 	/* if no options then -ab -rat -alg -gcd */
 	if (!opt)
 		opt = 15;
-		
+
     ASSERT_ALWAYS(polyname != NULL);
     ASSERT_ALWAYS(prefix != NULL);
     ASSERT_ALWAYS(numdep != -1);
@@ -1271,27 +1290,41 @@ int main(int argc, char *argv[])
     ret = cado_poly_read(pol, polyname);
     ASSERT (ret);
 
-	int compt = 0;
-	while (opt) {
-		if (opt%2 == 1) {
-			if (compt == 0) {
-    			ASSERT_ALWAYS(relname != NULL);
-    			ASSERT_ALWAYS(purgedname != NULL);
-    			ASSERT_ALWAYS(indexname != NULL);
-    			ASSERT_ALWAYS(kername != NULL);
-    			treatDep(prefix, numdep, pol, relname, purgedname, indexname, kername, verbose);
-			} 
-			else if (compt == 1)
-				calculateSqrtRat(prefix, numdep, pol);
-			else if (compt == 2)
-				calculateSqrtAlg(prefix, numdep, pol);
-			else 
-				calculateGcd(prefix, numdep, pol);
-			opt--;
-		}
-		opt = opt/2;
-		compt++;
-	}
+    /* if bit 0 of opt is set: compute the (a,b) pairs
+       if bit 1 of opt is set: compute the rational square root
+       if bit 2 of opt is set: compute the algebraic square root
+       if bit 3 of opt is set: compute the gcd */
+           
+    int compt = 0;
+    while (opt)
+      {
+        if (opt%2 == 1)
+          {
+            if (compt == 0)
+              { /* compute the (a,b) pairs */
+                ASSERT_ALWAYS(relname != NULL);
+                ASSERT_ALWAYS(purgedname != NULL);
+                ASSERT_ALWAYS(indexname != NULL);
+                ASSERT_ALWAYS(kername != NULL);
+                treatDep (prefix, numdep, pol, relname, purgedname, indexname,
+                          kername, verbose);
+              } 
+            else if (compt == 1) /* compute the square root on the g-side */
+              {
+                if (pol->degreeg == 1)
+                  calculateSqrtRat (prefix, numdep, pol);
+                else
+                  calculateSqrtAlg (prefix, numdep, pol, 1);
+              }
+            else if (compt == 2) /* compute the square root on the f-side */
+              calculateSqrtAlg (prefix, numdep, pol, 0);
+            else 
+              calculateGcd (prefix, numdep, pol);
+            opt--;
+          }
+        opt = opt / 2;
+        compt++;
+      }
 	
     cado_poly_clear (pol);
     return 0;

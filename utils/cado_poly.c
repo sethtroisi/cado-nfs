@@ -90,6 +90,7 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
     ASSERT_ALWAYS(have_n);
 
     poly->degree = degf;
+    poly->degreeg = degg;
     // compute m, the common root of f and g mod n
     mpz_init (tmp);
     if (degg == 1)
