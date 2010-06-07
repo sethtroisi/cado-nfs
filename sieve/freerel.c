@@ -23,7 +23,7 @@
 // If f(X)=cK*X^dK+... and g(X)=cL*X^dL+... are the two polynomials used,
 // then p is a free prime iff f(X) and g(X) split completely mod p into
 // dK (resp. dL) *distinct* linear factors. In other words, we have to check
-// that q does not divide the discriminants of f and g, and q doesn't divide
+// that p does not divide the discriminants of f and g, and p doesn't divide
 // cK*cL.
 //
 // TODO: make this definition go into the actual code, which is not the
