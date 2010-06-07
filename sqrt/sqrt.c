@@ -1143,24 +1143,10 @@ calculateGcd(char *prefix, int numdep, cado_poly pol)
     // First check that the squares agree
     mpz_mul(g1, ratsqrt, ratsqrt);
     mpz_mod(g1, g1, pol->n);
-    /* if(mpz_cmp_ui(pol->g[1], 1) != 0){
-  		// case g(X)=m1*X+m2 with m1 != 1
-  		// we should have prod (a+b*m2/m1) = A^2 = R^2/m1^(nab-nfree)
-  		// and therefore nab should be even
-        //    [ this last statement is probably false if f is not monic,
-        //      see discussion above about odd/even nab ]
-  		if(nab & 1){
-  	    	fprintf(stderr, "Sorry, but #(a, b) is odd\n");
-  	    	fprintf(stderr, "Bug: this should be patched! Please report your buggy input\n");
-  	    	printf("Failed\n");
-  	    	exit(1);
-  		}
-  		mpz_powm_ui(g2, pol->g[1], (nab-nfree)>>1, pol->n);
-  		mpz_mul(algsqrt, algsqrt, g2);
-  		mpz_mod(algsqrt, algsqrt, pol->n);
-    }*/
+
     mpz_mul(g2, algsqrt, algsqrt);
     mpz_mod(g2, g2, pol->n);
+
     if (mpz_cmp(g1, g2)!=0) {
       fprintf(stderr, "Bug: the squares do not agree modulo n!\n");
 	  exit(1);
