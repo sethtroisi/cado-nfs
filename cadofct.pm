@@ -222,15 +222,19 @@ while (@default_param) {
 #             (i.e. die in case of parsing errors)
 sub read_param {
     my ($param, $opt) = (shift, shift);
+	my $count_args = 0;
 
     ARGS : while (defined ($_ = shift)) {
         for my $p (@param_list) {
             if (/^$p=(.*)$/) {
                 $param->{$p} = $1;
+				$count_args++;
                 next ARGS;
             }
         }
         if (/^params?=(.*)$/) {
+			warn "Paramfile is not the first arguments !\n"
+				if ($count_args);
             my $file = $1;
             open FILE, "< $file"
                 or die "Cannot open `$file' for reading: $!.\n";
@@ -317,6 +321,13 @@ sub read_machines {
         } elsif (/^(\w+)=(.*)$/) {
             $vars{$1} = $2;
 			$param{'cadodir'} = $2 if ($1 eq "cadodir");
+			if ($1 eq "tmpdir") {
+				my $wdir = 
+					abs_path(dirname($param{'wdir'}))."/".basename($param{'wdir'});
+				my $tmpdir = abs_path(dirname($2))."/".basename($2);
+				die "tmpdir must be different of wdir in parallel mode.\n"
+					if ($wdir eq $tmpdir);
+			}
         } elsif (s/^(\S+)\s*//) {
             my $host = $1;
             my %desc = %vars;
@@ -1000,9 +1011,13 @@ sub distribute_task {
         # Start new job (sequential mode)
         if (!$param{'parallel'} && (my @r = find_hole($opt->{'min'}, $opt->{'max'},
                                                     $opt->{'len'}, $ranges))) {
+			my $mt = $param{'bwmt'};
+			$mt=$1*$2 if ($mt =~ /^(\d+)x(\d+)$/);
+		    my $mth = min ( $opt->{'max_threads'}, $mt );
+
             info "Starting job: ".pad($r[0], 8)." ".pad($r[1], 8)."\n";
             $tab_level++;
-            my $cmd = &{$opt->{'cmd'}}(@r, $machines{'localhost'}, 1, $opt->{'gzip'});
+            my $cmd = &{$opt->{'cmd'}}(@r, $machines{'localhost'}, $mth, $opt->{'gzip'});
             cmd($cmd, { log => 1, kill => 1 });
 			my $check_cmd = "$param{'prefix'}.$opt->{'suffix'}.$r[0]-$r[1]";
 			$check_cmd .= ".gz" if $opt->{'gzip'};

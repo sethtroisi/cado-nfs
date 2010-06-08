@@ -38,7 +38,7 @@ if [[ -z $1 || $(expr $1 : '.*[s].*') != 0 ]]
 	then echo -n "CPU time for sieve:           "
 	if [ -f ${name}.rels ]
 		then b=${name}.rels
-		else b=$(ls -f ${name}.rels.*000.gz)
+		else b=$(ls -f ${name}.rels.*.gz)
 	fi
 	zgrep "time" $b | sed "s/^.*time \(\S*\)s.*$/\1/g" | tr "\n" "+" | sed "s/^\(.*\)+$/\1\n/" | bc | f
 fi

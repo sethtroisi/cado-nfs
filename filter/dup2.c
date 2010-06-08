@@ -107,6 +107,7 @@ remove_dup (char *infile, char *dirname, uint32_t *H, unsigned long K)
   static double factor = 1.0;
   char *outfile = NULL;
   static int filenb=1;
+  double full_table;
 
   fprintf (stderr, "Reading %d-th file: %s\n", filenb++, infile);
   if (is_gzip(infile))
@@ -205,8 +206,12 @@ remove_dup (char *infile, char *dirname, uint32_t *H, unsigned long K)
       nodu ++;
       if (cost >= factor * (double) rread)
         {
-          fprintf (stderr, "Warning, hash table is %1.0f%% full\n",
-                   100.0 * (double) nodu / (double) K);
+		  full_table = 100.0 * (double) nodu / (double) K;
+          fprintf (stderr, "Warning, hash table is %1.0f%% full\n", full_table);
+		  if (full_table >= 99) {
+			fprintf(stderr, "Error, hash table is full\n");
+			exit(1);
+		  }
           factor += 1.0;
         }
       /* now H[i] = 0 */

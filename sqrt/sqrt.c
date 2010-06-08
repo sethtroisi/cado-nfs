@@ -1281,12 +1281,12 @@ int main(int argc, char *argv[])
        if bit 2 of opt is set: compute the algebraic square root
        if bit 3 of opt is set: compute the gcd */
            
-    int compt = 0;
+    int count = 0;
     while (opt)
       {
         if (opt%2 == 1)
           {
-            if (compt == 0)
+            if (count == 0)
               { /* compute the (a,b) pairs */
                 ASSERT_ALWAYS(relname != NULL);
                 ASSERT_ALWAYS(purgedname != NULL);
@@ -1295,21 +1295,21 @@ int main(int argc, char *argv[])
                 treatDep (prefix, numdep, pol, relname, purgedname, indexname,
                           kername, verbose);
               } 
-            else if (compt == 1) /* compute the square root on the g-side */
+            else if (count == 1) /* compute the square root on the g-side */
               {
                 if (pol->degreeg == 1)
                   calculateSqrtRat (prefix, numdep, pol);
                 else
                   calculateSqrtAlg (prefix, numdep, pol, 1);
               }
-            else if (compt == 2) /* compute the square root on the f-side */
+            else if (count == 2) /* compute the square root on the f-side */
               calculateSqrtAlg (prefix, numdep, pol, 0);
             else 
               calculateGcd (prefix, numdep, pol);
             opt--;
           }
         opt = opt / 2;
-        compt++;
+        count++;
       }
 	
     cado_poly_clear (pol);
