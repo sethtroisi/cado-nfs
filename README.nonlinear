@@ -60,10 +60,12 @@ lbpr: 24
 lpba: 24
 EOF
 
-4) then we have to run 'duplicates' and 'purge' by hand:
+4) then we have to run 'dup2' and 'purge' by hand, where the -nrels value is
+   the number of relations in dup2/c59.rels.gz (zcat dup2/c59.rels.gz | wc -l):
 
-$ $CADO/build/$HOSTNAME/filter/duplicates -nrels 1739519 c59.rels.gz | gzip --stdout > c59.nodup.gz
-$ $CADO/build/$HOSTNAME/filter/purge -poly c59.poly -nrels 1734218 -out c59.purged c59.nodup.gz
+$ mkdir dup2
+$ $CADO/build/$HOSTNAME/filter/dup2 -out dup2 -K 2000000 c59.rels.gz
+$ $CADO/build/$HOSTNAME/filter/purge -poly c59.poly -nrels 1598549 -out c59.purged dup2/c59.rels.gz
 
 5) then we prepare a working directory for CADO-NFS and run cadofactor.pl:
 
