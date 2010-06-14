@@ -328,6 +328,9 @@ plain_poly_mul_x (plain_poly_t h, plain_poly_coeff_t a, plain_poly_coeff_t p)
   int i, d = h->degree;
   plain_poly_coeff_t *hc;
 
+  if (d == -1) /* h = 0 */
+    return;
+
   plain_poly_realloc (h, d + 2); /* (x+a)*h has degree d+1, thus d+2 coeffs */
   hc = h->coeff;
   hc[d + 1] = hc[d];
