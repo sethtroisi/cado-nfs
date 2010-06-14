@@ -397,8 +397,12 @@ scan_relations (char *ficname[], int nbfic, int *nprimes, hashtable_t *H,
 	}
 	gzip_close (relfile, ficname[i]);
     }
-    fprintf(stderr, "   Scanned %d relations\n", irel+1);
-    ASSERT_ALWAYS(irel + 1 <= nrelmax);
+    fprintf (stderr, "   Scanned %d relations\n", irel + 1);
+    if (irel + 1 != nrelmax)
+      {
+        fprintf (stderr, "Error, -nrels value should match the number of scanned relations\n");
+        exit (EXIT_FAILURE);
+      }
 
     return ret;
 }
