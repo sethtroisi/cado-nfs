@@ -652,8 +652,9 @@ void notation(mpf_t note, mpz_t a[3], mpz_t b[3], mpf_t norme) {
 //Given a big number N and an integer k,
 //tests k pairs of polynomials and print the pair having the best rating,
 //along with its skewness, norm, alpha(f), alpha(g), and the prime numer which gave it
-void twoquadratics(mpz_t N, unsigned long int k) {
-
+void
+twoquadratics (mpz_t N, unsigned long int k)
+{
     unsigned int compteur = 0;
     unsigned long int p = 2;
     
@@ -757,10 +758,10 @@ void twoquadratics(mpz_t N, unsigned long int k) {
         //printf("\n");
         mpz_nextprime(P, P);
         compteur += 2;
-        printf("\n%d\n", compteur);
+        //printf("\n%d\n", compteur);
     }
 
-    printf("\n\nles polynomes optimaux sont:\n");
+    printf("\n\nbest polynomials found:\n");
     gmp_printf ("a = %Zd + %Zd * X + %Zd * X^2 \n", a0[0], a0[1], a0[2]);
     gmp_printf ("b = %Zd + %Zd * X + %Zd * X^2 \n\n", b0[0], b0[1], b0[2]);
 
@@ -798,14 +799,42 @@ void twoquadratics(mpz_t N, unsigned long int k) {
 
 }
 
-int main()
+void
+usage ()
+{
+  fprintf (stderr, "Usage: twoquadratics [-k nnn] [N]\n");
+  exit (EXIT_FAILURE);
+}
+
+int
+main (int argc, char *argv[])
 {
     mpz_t N;
-    mpz_init_set_str (N, "71641520761751435455133616475667090434063332228247871795429", 10);
+    int k = 100;
 
-    twoquadratics(N, 100);
+    while (argc >= 2 && argv[1][0] == '-')
+      {
+        if (argc >= 3 && strcmp (argv[1], "-k") == 0)
+          {
+            k = atoi (argv[2]);
+            argc -= 2;
+            argv += 2;
+          }
+        else
+          {
+            fprintf (stderr, "Unknown option: %s\n", argv[1]);
+            usage ();
+          }
+      }
 
-    mpz_clear(N);
+    if (argc == 1) /* test on the c59 */
+      mpz_init_set_str (N, "71641520761751435455133616475667090434063332228247871795429", 10);
+    else
+      mpz_init_set_str (N, argv[1], 10);
+
+    twoquadratics (N, k);
+
+    mpz_clear (N);
 
     return 0;
 }
