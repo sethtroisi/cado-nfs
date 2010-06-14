@@ -70,8 +70,7 @@ $ $CADO/build/$HOSTNAME/filter/purge -poly c59.poly -nrels 1598549 -out c59.purg
 5) then we prepare a working directory for CADO-NFS and run cadofactor.pl:
 
 $ mkdir /tmp/c59
-$ mv c59.rels.gz /tmp/c59
-$ mv c59.poly /tmp/c59
+$ mv c59.rels.gz c59.purged c59.poly /tmp/c59
 
 $ cat mach_desc
 [local]
