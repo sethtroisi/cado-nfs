@@ -1,4 +1,4 @@
-load "cado-nfs/trunk/polyselect/alpha.sage"
+load "alpha.sage"
 
 ##############################################################
 #TQponctuel                                                  #
