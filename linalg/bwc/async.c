@@ -13,14 +13,56 @@
 // int int_caught = 0;
 int hup_caught = 0;
 
-void timing_update_ticks(struct timing_data * t, int iter MAYBE_UNUSED)
+static void extract_interval(timing_interval_data * since_last_reset, timing_interval_data * since_beginning, struct timing_data * t)
 {
-    seconds_user_sys(t->current->job);
-    thread_seconds_user_sys(t->current->thread);
-    t->current->wct = wct_seconds();
+    memcpy(since_last_reset, t->since_last_reset, 2 * sizeof(struct timing_interval_data_s));
+    memcpy(since_beginning, t->since_beginning, 2 * sizeof(struct timing_interval_data_s));
+    double d[2];
+    seconds_user_sys(d);
+    since_last_reset[t->which]->job[0] += d[0];
+    since_last_reset[t->which]->job[1] += d[1];
+    since_beginning[t->which]->job[0] += d[0];
+    since_beginning[t->which]->job[1] += d[1];
+    thread_seconds_user_sys(d);
+    since_last_reset[t->which]->thread[0] += d[0];
+    since_last_reset[t->which]->thread[1] += d[1];
+    since_beginning[t->which]->thread[0] += d[0];
+    since_beginning[t->which]->thread[1] += d[1];
+    double w = wct_seconds();
+    since_last_reset[t->which]->wct += w;
+    since_beginning[t->which]->wct += w;
 }
 
-void timing_partial_init(struct timing_data * t, int iter)
+void timing_flip_timer(struct timing_data * t)
+{
+    double d[2];
+    seconds_user_sys(d);
+    t->since_last_reset[t->which]->job[0] += d[0];
+    t->since_last_reset[t->which]->job[1] += d[1];
+    t->since_beginning[t->which]->job[0] += d[0];
+    t->since_beginning[t->which]->job[1] += d[1];
+    t->since_last_reset[t->which^1]->job[0] -= d[0];
+    t->since_last_reset[t->which^1]->job[1] -= d[1];
+    t->since_beginning[t->which^1]->job[0] -= d[0];
+    t->since_beginning[t->which^1]->job[1] -= d[1];
+    thread_seconds_user_sys(d);
+    t->since_last_reset[t->which]->thread[0] += d[0];
+    t->since_last_reset[t->which]->thread[1] += d[1];
+    t->since_beginning[t->which]->thread[0] += d[0];
+    t->since_beginning[t->which]->thread[1] += d[1];
+    t->since_last_reset[t->which^1]->thread[0] -= d[0];
+    t->since_last_reset[t->which^1]->thread[1] -= d[1];
+    t->since_beginning[t->which^1]->thread[0] -= d[0];
+    t->since_beginning[t->which^1]->thread[1] -= d[1];
+    double w = wct_seconds();
+    t->since_last_reset[t->which]->wct += w;
+    t->since_last_reset[t->which^1]->wct -= w;
+    t->since_beginning[t->which]->wct += w;
+    t->since_beginning[t->which^1]->wct -= w;
+    t->which ^= 1;
+}
+
+static void timing_partial_init(struct timing_data * t, int iter)
 {
     t->go_mark = iter;
     t->last_print = iter;
@@ -28,14 +70,26 @@ void timing_partial_init(struct timing_data * t, int iter)
     t->next_async_check = iter + 1;
     t->async_check_period = 1;
 
-    timing_update_ticks(t, iter);
-    memcpy(t->go, t->current, sizeof(*t->go));
+    double d[2];
+    seconds_user_sys(d);
+    t->since_last_reset[t->which]->job[0] = -d[0];
+    t->since_last_reset[t->which]->job[1] = -d[1];
+    t->since_last_reset[t->which^1]->job[0] = 0;
+    t->since_last_reset[t->which^1]->job[1] = 0;
+    thread_seconds_user_sys(d);
+    t->since_last_reset[t->which]->thread[0] = -d[0];
+    t->since_last_reset[t->which]->thread[1] = -d[1];
+    t->since_last_reset[t->which^1]->thread[0] = 0;
+    t->since_last_reset[t->which^1]->thread[1] = 0;
+    double w = wct_seconds();
+    t->since_last_reset[t->which]->wct = -w;
+    t->since_last_reset[t->which^1]->wct = 0;
 }
 
 void timing_init(struct timing_data * t, int start, int end)
 {
     timing_partial_init(t, start);
-    memcpy(t->beginning, t->go, sizeof(*t->go));
+    memcpy(t->since_beginning, t->since_last_reset, sizeof(t->since_last_reset));
     t->begin_mark = start;
     t->end_mark = end;
 }
@@ -44,19 +98,20 @@ void timing_clear(struct timing_data * t MAYBE_UNUSED)
 {
 }
 
-void timing_rare_checks(pi_wiring_ptr wr, struct timing_data * t, int iter, int print)
+static void timing_rare_checks(pi_wiring_ptr wr, struct timing_data * t, int iter, int print)
 {
     /* We've decided that it was time to check for asynchronous data.
      * Since it's an expensive operation, the whole point is to avoid
      * doing this check too often. */
-    timing_update_ticks(t, iter);
+    // timing_update_ticks(t, iter);
+
+    timing_interval_data since_last_reset[2];
+    timing_interval_data since_beginning[2];
+    extract_interval(since_last_reset, since_beginning, t);
 
     /* First, re-evaluate the async checking period */
-    double av[2];
-
-    av[0] = (t->current->thread[0] - t->go->thread[0])/(iter - t->go_mark);
-    av[1] = (t->current->thread[1] - t->go->thread[1])/(iter - t->go_mark);
-
+    double av;
+    av = (since_last_reset[0]->wct + since_last_reset[1]->wct) / (iter - t->go_mark);
 
 #ifndef MPI_LIBRARY_MT_CAPABLE
     /* Other threads might still be lingering in the matrix
@@ -65,7 +120,7 @@ void timing_rare_checks(pi_wiring_ptr wr, struct timing_data * t, int iter, int 
     serialize_threads(wr);
 #endif  /* MPI_LIBRARY_MT_CAPABLE */
 
-    double good_period = PREFERRED_ASYNC_LAG / av[0];
+    double good_period = PREFERRED_ASYNC_LAG / av;
     int guess = 1 + (int) good_period;
     complete_broadcast(wr, &guess, sizeof(int), 0, 0);
     /* negative stuff is most probably caused by overflows in a fast
@@ -143,31 +198,21 @@ void timing_check(parallelizing_info pi, struct timing_data * timing, int iter, 
     ASSERT(iter % period[i] == 0);
     timing->next_print = iter + period[i];
 
-    timing_update_ticks(timing, iter);
+    // timing_update_ticks(timing, iter);
 
     char buf[20];
 
-    double dt_full[2];
-    double dt_recent[2];
-    double av[2];
-    double pcpu[2];
-    double wct_recent;
+    timing_interval_data since_last_reset[2];
+    timing_interval_data since_beginning[2];
+    extract_interval(since_last_reset, since_beginning, timing);
     double di = iter - timing->go_mark;
 
-    dt_full[0] = timing->current->thread[0] - timing->beginning->thread[0];
-    dt_full[1] = timing->current->thread[1] - timing->beginning->thread[1];
-    dt_recent[0] = timing->current->thread[0] - timing->go->thread[0];
-    dt_recent[1] = timing->current->thread[1] - timing->go->thread[1];
-    wct_recent = timing->current->wct - timing->go->wct;
-
-    av[0] = dt_recent[0] / di;
-    av[1] = dt_recent[1] / di;
-
-    pcpu[0] = 100.0 * dt_recent[0] / wct_recent;
-    pcpu[1] = 100.0 * dt_recent[1] / wct_recent;
-
-    snprintf(buf, sizeof(buf), "%.2f %.2f %2d%%+%2d%%",
-            dt_full[0], av[0], (int) pcpu[0], (int) pcpu[1]);
+    // (avg wct cpu)(cpu % cpu) + (avg comm)(cpu % comm)
+    snprintf(buf, sizeof(buf), "%.2f(%.0f%%)+%.2f(%.0f%%)",
+        since_last_reset[1]->wct / di,
+        100.0 * since_last_reset[1]->thread[0] / since_last_reset[1]->wct,
+        since_last_reset[0]->wct / di,
+        100.0 * since_last_reset[0]->thread[0] / since_last_reset[0]->wct);
 
     if (print)
         printf("iteration %d\n", iter);
@@ -177,34 +222,26 @@ void timing_check(parallelizing_info pi, struct timing_data * timing, int iter, 
 
 void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * timing, int iter, unsigned long ncoeffs, int print)
 {
-    double dt_full[2];
-    double dt_recent[2];
-    double av[2];
-    double pcpu[2];
-    double wct_full;
-    double wct_recent;
-
-    timing_update_ticks(timing, iter);
-
+    timing_interval_data since_last_reset[2];
+    timing_interval_data since_beginning[2];
+    extract_interval(since_last_reset, since_beginning, timing);
     double di = iter - timing->go_mark;
 
-    dt_full[0]   = timing->current->job[0] - timing->beginning->job[0];
-    dt_full[1]   = timing->current->job[1] - timing->beginning->job[1];
-    dt_recent[0] = timing->current->job[0]-timing->go->job[0];
-    dt_recent[1] = timing->current->job[1]-timing->go->job[1];
-    wct_full   = timing->current->wct - timing->beginning->wct;
-    wct_recent = timing->current->wct - timing->go->wct;
+    double dwct0 = since_last_reset[0]->wct;
+    double dwct1 = since_last_reset[1]->wct;
+    double dwct = dwct0 + dwct1;
 
+    int ndoubles = sizeof(struct timing_interval_data_s) / sizeof(double);
 
     // dt must be collected.
     int err;
     double ncoeffs_d = ncoeffs;
 
     SEVERAL_THREADS_PLAY_MPI_BEGIN(pi->m) {
-        err = MPI_Allreduce(MPI_IN_PLACE, dt_full, 2, MPI_DOUBLE, MPI_SUM, pi->m->pals);
+        err = MPI_Allreduce(MPI_IN_PLACE, since_last_reset, ndoubles, MPI_DOUBLE, MPI_SUM, pi->m->pals);
         ASSERT_ALWAYS(!err);
 
-        err = MPI_Allreduce(MPI_IN_PLACE, dt_recent, 2, MPI_DOUBLE, MPI_SUM, pi->m->pals);
+        err = MPI_Allreduce(MPI_IN_PLACE, since_beginning, ndoubles, MPI_DOUBLE, MPI_SUM, pi->m->pals);
         ASSERT_ALWAYS(!err);
 
         err = MPI_Allreduce(MPI_IN_PLACE, &ncoeffs_d, 1, MPI_DOUBLE, MPI_SUM, pi->m->pals);
@@ -224,51 +261,59 @@ void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * 
     serialize_threads(pi->m);
     ncoeffs_d = * main_ncoeffs_total;
 
-    av[0] = dt_recent[0] / di;
-    av[1] = dt_recent[1] / di;
-    pcpu[0] = 100.0 * dt_recent[0] / wct_recent;
-    pcpu[1] = 100.0 * dt_recent[1] / wct_recent;
-    if (di == 0)
-        pcpu[0] = pcpu[1] = NAN;
-
-
     if (print) {
+        {
+            double puser = since_last_reset[1]->thread[0] / dwct;
+            double psys = since_last_reset[1]->thread[1] / dwct;
+            double pidle = since_last_reset[1]->wct / dwct - puser - psys;
+            double avwct = dwct1 / di;
+            double nsc = avwct / ncoeffs_d * 1.0e9;
+            char * what_wct = "s";
+            if (avwct < 0.1) { what_wct = "ms"; avwct *= 1000.0; }
 
-        double avcpu = av[0] + av[1];
-        double nsc = avcpu / ncoeffs_d * 1.0e9;
+            printf("N=%d ; CPU: %.2f [%.0f%%cpu, %.0f%%sys, %.0f%% idle]"
+                    ", %.2f %s/iter"
+                    ", %.2f ns/coeff"
+                    "\n",
+                    iter,
+                    since_beginning[1]->thread[0] + since_beginning[1]->thread[1],
+                    100.0 * puser,
+                    100.0 * psys,
+                    100.0 * pidle,
+                    avwct, what_wct, nsc);
+        }
 
-        double avwct = wct_recent / di;
+        {
+            double puser = since_last_reset[0]->thread[0] / dwct;
+            double psys = since_last_reset[0]->thread[1] / dwct;
+            double pidle = since_last_reset[0]->wct / dwct - puser - psys;
+            double avwct = dwct0 / di;
+            char * what_wct = "s";
+            if (avwct < 0.1) { what_wct = "ms"; avwct *= 1000.0; }
 
-        /* still to go: timing->end_mark - iter */
-        time_t now[1];
-        time_t eta[1];
-        char eta_string[32] = "not available yet\n";
-        time(now);
-        eta[0] = now[0] + (timing->end_mark - iter) * avwct;
-        if (di)
-            ctime_r(eta, eta_string);
+            printf("N=%d ; COMM: %.2f [%.0f%%cpu, %.0f%%sys, %.0f%% idle]"
+                    ", %.2f %s/iter"
+                    "\n",
+                    iter,
+                    since_beginning[0]->thread[0] + since_beginning[0]->thread[1],
+                    100.0 * puser,
+                    100.0 * psys,
+                    100.0 * pidle,
+                    avwct, what_wct);
+        }
 
-        char * what_cpu = "s";
-        char * what_wct = "s";
-        if (avcpu < 0.1) { what_cpu = "ms"; avcpu *= 1000.0; }
-        if (avwct < 0.1) { what_wct = "ms"; avwct *= 1000.0; }
+        {
+            /* still to go: timing->end_mark - iter */
+            time_t now[1];
+            time_t eta[1];
+            char eta_string[32] = "not available yet\n";
+            time(now);
+            *eta = *now + (timing->end_mark - iter) * dwct / di;
+            if (di)
+                ctime_r(eta, eta_string);
 
-        printf("N=%d ; CPU"
-                ": %.2f cpu + %.2f sys"
-                ", %.2f %s/iter"
-                ", %.2f ns/coeff"
-                "\n",
-                iter, dt_full[0], dt_full[1],
-                avcpu, what_cpu, nsc);
-
-        printf("N=%d ; WCT"
-                ": %.2f tot"
-                ", %.2f %s/iter"
-                ", %.2f%% cpu + %.2f%% sys\n",
-                iter, wct_full, avwct, what_wct,
-                pcpu[0], pcpu[1]);
-
-        printf("N=%d ; ETA (N=%d): %s", iter, timing->end_mark, eta_string);
+            printf("N=%d ; ETA (N=%d): %s", iter, timing->end_mark, eta_string);
+        }
     }
 }
 
