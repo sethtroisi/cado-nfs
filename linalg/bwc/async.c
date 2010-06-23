@@ -3,6 +3,7 @@
 #include <string.h>
 #include <math.h>
 #include <time.h>
+#include <ctype.h>
 #include "bwc_config.h"
 #include "async.h"
 #include "rusage.h"
@@ -208,7 +209,7 @@ void timing_check(parallelizing_info pi, struct timing_data * timing, int iter, 
     double di = iter - timing->go_mark;
 
     // (avg wct cpu)(cpu % cpu) + (avg comm)(cpu % comm)
-    snprintf(buf, sizeof(buf), "%.2f(%.0f%%)+%.2f(%.0f%%)",
+    snprintf(buf, sizeof(buf), "%.2f@%.0f%%+%.2f@%.0f%%",
         since_last_reset[1]->wct / di,
         100.0 * since_last_reset[1]->thread[0] / since_last_reset[1]->wct,
         since_last_reset[0]->wct / di,
@@ -231,7 +232,7 @@ void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * 
     double dwct1 = since_last_reset[1]->wct;
     double dwct = dwct0 + dwct1;
 
-    int ndoubles = sizeof(struct timing_interval_data_s) / sizeof(double);
+    int ndoubles = sizeof(since_last_reset) / sizeof(double);
 
     // dt must be collected.
     int err;
@@ -252,20 +253,38 @@ void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * 
     /* dt_recent[] contains the JOB seconds. So we don't have to sum it up over
      * threads. However, we do for ncoeffs ! */
     double ncoeffs_total = 0;
-    void * ptr = &ncoeffs_total;
-    thread_agreement(pi->m, &ptr, 0);
-    double * main_ncoeffs_total = ptr;
-    my_pthread_mutex_lock(pi->m->th->m);
-    * main_ncoeffs_total += ncoeffs_d;
-    my_pthread_mutex_unlock(pi->m->th->m);
-    serialize_threads(pi->m);
-    ncoeffs_d = * main_ncoeffs_total;
+    {
+        void * ptr = &ncoeffs_total;
+        thread_agreement(pi->m, &ptr, 0);
+        double * main_ncoeffs_total = ptr;
+        my_pthread_mutex_lock(pi->m->th->m);
+        * main_ncoeffs_total += ncoeffs_d;
+        my_pthread_mutex_unlock(pi->m->th->m);
+        serialize_threads(pi->m);
+        ncoeffs_d = * main_ncoeffs_total;
+    }
+
+    /* wct intervals are not aggregated over threads either, so we must
+     * do it by hand */
+    double aggr_dwct[2] = {0,0};
+    {
+        void * ptr = aggr_dwct;
+        thread_agreement(pi->m, &ptr, 0);
+        double * px = ptr;
+        my_pthread_mutex_lock(pi->m->th->m);
+        px[0] += since_last_reset[0]->wct;
+        px[1] += since_last_reset[1]->wct;
+        my_pthread_mutex_unlock(pi->m->th->m);
+        serialize_threads(pi->m);
+        since_last_reset[0]->wct = px[0];
+        since_last_reset[1]->wct = px[1];
+    }
 
     if (print) {
         {
-            double puser = since_last_reset[1]->thread[0] / dwct;
-            double psys = since_last_reset[1]->thread[1] / dwct;
-            double pidle = since_last_reset[1]->wct / dwct - puser - psys;
+            double puser = since_last_reset[1]->job[0] / dwct1;
+            double psys = since_last_reset[1]->job[1] / dwct1;
+            double pidle = aggr_dwct[1] / dwct1 - puser - psys;
             double avwct = dwct1 / di;
             double nsc = avwct / ncoeffs_d * 1.0e9;
             char * what_wct = "s";
@@ -276,7 +295,7 @@ void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * 
                     ", %.2f ns/coeff"
                     "\n",
                     iter,
-                    since_beginning[1]->thread[0] + since_beginning[1]->thread[1],
+                    since_beginning[1]->job[0] + since_beginning[1]->job[1],
                     100.0 * puser,
                     100.0 * psys,
                     100.0 * pidle,
@@ -284,9 +303,9 @@ void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * 
         }
 
         {
-            double puser = since_last_reset[0]->thread[0] / dwct;
-            double psys = since_last_reset[0]->thread[1] / dwct;
-            double pidle = since_last_reset[0]->wct / dwct - puser - psys;
+            double puser = since_last_reset[0]->job[0] / dwct0;
+            double psys = since_last_reset[0]->job[1] / dwct0;
+            double pidle = aggr_dwct[0] / dwct0 - puser - psys;
             double avwct = dwct0 / di;
             char * what_wct = "s";
             if (avwct < 0.1) { what_wct = "ms"; avwct *= 1000.0; }
@@ -295,7 +314,7 @@ void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * 
                     ", %.2f %s/iter"
                     "\n",
                     iter,
-                    since_beginning[0]->thread[0] + since_beginning[0]->thread[1],
+                    since_beginning[0]->job[0] + since_beginning[0]->job[1],
                     100.0 * puser,
                     100.0 * psys,
                     100.0 * pidle,
@@ -312,7 +331,10 @@ void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * 
             if (di)
                 ctime_r(eta, eta_string);
 
-            printf("N=%d ; ETA (N=%d): %s", iter, timing->end_mark, eta_string);
+            unsigned int s = strlen(eta_string);
+            for( ; s && isspace(eta_string[s-1]) ; eta_string[--s]='\0') ;
+
+            printf("N=%d ; ETA (N=%d): %s [%.2f s/iter]\n", iter, timing->end_mark, eta_string, dwct / di);
         }
     }
 }
