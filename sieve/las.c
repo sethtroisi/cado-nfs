@@ -2511,7 +2511,7 @@ factor_survivors (const unsigned char *rat_S, unsigned char *alg_S, int N,
        primes during trial division */
     bucket_sortbucket (&alg_primes);
 
-    /* Do the same thing for algebraic side */
+    /* Do the same thing for rational side */
     rat_primes = init_bucket_primes (si->bucket_region);
     {
         int i;
@@ -3505,6 +3505,9 @@ usage (const char *argv0, const char * missing)
   fprintf (stderr, "          -out filename   write relations to filename instead of stdout\n");
   fprintf (stderr, "          -mt nnn   use nnn threads\n");
   fprintf (stderr, "          -ratq           use rational special-q\n");
+  fprintf (stderr, "          The following are for benchs:\n");
+  fprintf (stderr, "          -bench          activate bench mode\n");
+  fprintf (stderr, "          -skfact   xxx   skip factor, default=1.01\n");
   if (missing) {
       fprintf(stderr, "\nError: missing parameter %s\n", missing);
   }
@@ -3539,12 +3542,17 @@ main (int argc0, char *argv0[])
     char **argv = argv0;
     double max_full = 0.;
     int nb_threads = 1;
+    int bench = 0;
+    double skip_factor = 1.01;  /* next_q = q*skip_factor in bench mode */
+    long bench_tot_rep = 0;
+    double bench_tot_time = 0.0;
 
     param_list pl;
     param_list_init(pl);
     cado_poly_init (cpoly);
     param_list_configure_knob(pl, "-v", &verbose);
     param_list_configure_knob(pl, "-ratq", &ratq);
+    param_list_configure_knob(pl, "-bench", &bench);
     argv++, argc--;
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
@@ -3579,6 +3587,7 @@ main (int argc0, char *argv0[])
     param_list_parse_int(pl, "rpowlim", &rpow_lim);
     param_list_parse_int(pl, "apowlim", &apow_lim);
     param_list_parse_double(pl, "S", &cpoly->skew);
+    param_list_parse_double(pl, "skfact", &skip_factor);
     int ok = 1;
     ok = ok && param_list_parse_ulong(pl, "rlim", &cpoly->rlim);
     ok = ok && param_list_parse_ulong(pl, "alim", &cpoly->alim);
@@ -3756,6 +3765,8 @@ main (int argc0, char *argv0[])
     fprintf (output, "#\n");
     while (q0 < q1)
       {
+        double t_bench = seconds();
+        int rep_bench = 0;
         while (nroots == 0) /* go to next prime and generate roots */
           {
             q0 = uint64_nextprime (q0);
@@ -3842,6 +3853,7 @@ main (int argc0, char *argv0[])
             tn_alg      += rep.tn_alg;
             ttsm        += rep.ttsm;
             ttf         += rep.ttf;
+            rep_bench = rep.reports;
             for (i = 0; i < 256; ++i) {
                 report_sizes_a[i] += rep.report_sizes_a[i];
                 report_sizes_r[i] += rep.report_sizes_r[i];
@@ -3853,6 +3865,28 @@ main (int argc0, char *argv0[])
         for (i = 0; i < si.nb_threads; ++i) {
             clear_bucket_array(alg_BA[i]);
             clear_bucket_array(rat_BA[i]);
+        }
+        if (bench) {
+            uint64_t newq0 = (uint64_t) (skip_factor*((double) q0));
+            uint64_t savq0 = q0;
+            // print some estimates for special-q's between q0 and the next
+            int nb_q = 1;
+            do {
+                q0 = uint64_nextprime (q0);
+                nb_q ++;
+            } while (q0 < newq0);
+            q0 = newq0;
+            t_bench = seconds() - t_bench;
+            fprintf(output,
+              "# Stats for q=%lu: %d reports in %1.1f\n",
+              savq0, rep_bench, t0);
+            fprintf(output,
+              "# Estimates for next %d q's: %d reports in %1.1f, %1.1f s/r\n",
+              nb_q, nb_q*rep_bench, t0*nb_q, t0/((double)rep_bench));
+            bench_tot_time += t0*nb_q;
+            bench_tot_rep += nb_q*rep_bench;
+            fprintf(output, "# Cumulative (estimated): %lu reports in %1.1f s\n",
+                    bench_tot_rep, bench_tot_time);
         }
       } // end of loop over special q ideals.
 
@@ -3885,6 +3919,10 @@ main (int argc0, char *argv0[])
     fprintf (output, "# Total %lu reports [%1.3fs/r, %1.1fr/sq]\n",
              tot_reports, t0 / (double) tot_reports,
              (double) tot_reports / (double) sq);
+    if (bench) {
+        fprintf(output, "# Total (estimated): %lu reports in %1.1f s\n",
+                bench_tot_rep, bench_tot_time);
+    }
 
     facul_clear_strategy (si.strategy);
     si.strategy = NULL;
