@@ -3724,6 +3724,24 @@ main (int argc0, char *argv0[])
         rat_pmax[i] = FBPRIME_MAX;
     }
 
+    /* counting factor base elements */
+    {
+        unsigned long na = 0, nr = 0;
+        factorbase_degn_t *fb;
+        fb = fb_alg;
+        while (fb->p != FB_END) {
+            na += fb->nr_roots; 
+            fb = fb_next (fb);
+        }
+        fb = fb_rat;
+        while (fb->p != FB_END) {
+            nr++; 
+            fb = fb_next (fb);
+        }
+        fprintf (output, "# Number of primes in alg factor base = %lu\n", na);
+        fprintf (output, "# Number of primes in rat factor base = %lu\n", nr);
+    }
+
     init_rat_norms (&si);
     init_alg_norms (&si);
 
