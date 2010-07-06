@@ -20,6 +20,9 @@
 
 #define MAX_THREADS 16
 
+#define MAXQ 64
+#define SPECIAL_Q {1, 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, ULONG_MAX}
+
 /* hash table structure */
 typedef struct
 {
@@ -61,7 +64,9 @@ uint32_t *Primes;
 /* read-write global variables */
 pthread_mutex_t lock; /* used as mutual exclusion lock for those variables */
 int found = 0;
-double potential_collisions = 0.0;
+double potential_collisions = 0.0, aver_lognorm = 0.0;
+unsigned long collisions = 0;
+unsigned long collisionsQ[MAXQ];
 
 void
 roots_init (roots_t R)
@@ -275,10 +280,19 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   gmp_printf ("Optimized polynomial:\n");
 #endif
 
+  //  gmp_printf ("# a_{d-2}=%Zd\n", f[d-2]);
+
   optimize (f, d, g, 0, 1);
   nroots = numberOfRealRoots (f, d, 0, 0);
   skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
   logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
+
+  pthread_mutex_lock (&lock);
+  collisions ++;
+  collisionsQ[q] ++;
+  aver_lognorm += logmu;
+  pthread_mutex_unlock (&lock);
+
   if (nroots >= nr && logmu <= max_norm)
     {
       alpha = get_alpha (f, d, ALPHA_BOUND);
@@ -529,7 +543,7 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
   int st;
   long M, u, ppl = 0, Mq;
   double dM, pc1, pc2;
-  unsigned long Q[] = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, ULONG_MAX};
+  unsigned long Q[] = SPECIAL_Q;
 
   roots_init (R);
   mpz_init (Ntilde);
@@ -575,7 +589,6 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
     M = LONG_MAX;
   else
     M = (long) dM;
-  // printf ("M=%ld\n", M);
 
   st = cputime ();
   hash_init (H);
@@ -623,18 +636,18 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
 	}
       modul_clearmod (pp);
     }
-  // printf ("q=1: Hsize=%lu, took %dms\n", H->size, cputime () - st);
-  pc1 = 0.5 * pow ((double) H->size, 2.0);
-  // printf ("%1.0f potential collisions for q=1, mean value=%1.2f\n", pc1, hash_mean_value (H) / (double) M);
+  /* if the hash table contains n entries, each one smaller than (2P)^2,
+     the number of potential collisions is about 1/2n^2/(2P)^2 */
+  pc1 = 0.5 * pow ((double) H->size / (double) Primes[nprimes - 2], 2.0);
   hash_clear (H);
 
   roots_realloc (R, R->size); /* free unused space */
 
   /* Special-q variant: we consider q < log(P)^2 */
-  for (k = 0, pc2 = 0.0; (q = Q[k]) < ULONG_MAX; k++)
+  for (k = 1, pc2 = 0.0; (q = Q[k]) < ULONG_MAX; k++)
     {
       if ((d * ad) % q == 0) /* we need q to be coprime with d and ad */
-	continue;
+        continue;
       mpz_mod_ui (f[0], Ntilde, q);
       mpz_neg (f[0], f[0]); /* f = x^d - N */
       nq = poly_roots_ulong (rq, f, d, q);
@@ -705,14 +718,12 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
 		  modul_clear (inv, pp);
 		}
 	      modul_clearmod (pp);
-	    }
-	  // printf ("q=%lu, r=%lu: Hsize=%lu took %dms\n", q, rq[i], H->size, cputime () - st);
-	  // printf ("q=%lu mean value=%1.2f\n", q, hash_mean_value (H) / (double) Mq);
+	    } /* loop over primes p */
+          pc2 += 0.5 * pow ((double) H->size / (double) R->p[nprimes-1],
+                            2.0);
 	  hash_clear (H);
-	}
-      pc2 += 0.5 * pow ((double) H->size, 2.0);
-    }
-  // printf ("%1.0f potential collisions for q>1\n", pc2);
+	} /* loop over roots mod q */
+    } /* loop over q */
 
   pthread_mutex_lock (&lock);
   potential_collisions += pc1 +  pc2;
@@ -741,6 +752,17 @@ one_thread (void* args)
 }
 
 #define TARGET_TIME 10000000 /* print stats every TARGET_TIME milliseconds */
+
+static void
+stats_sq (void)
+{
+  unsigned long sq[] = SPECIAL_Q;
+  int i;
+
+  for (i = 0; i < MAXQ && sq[i] != ULONG_MAX; i++)
+    printf ("%lu:%lu ", sq[i], collisionsQ[sq[i]]);
+  printf ("\n");
+}
 
 int
 main (int argc, char *argv[])
@@ -877,6 +899,20 @@ main (int argc, char *argv[])
       fclose (fp);
     }
 
+  for (i = 0; i < MAXQ; i++)
+    {
+      unsigned long sq[] = SPECIAL_Q;
+
+      if (sq[i] == ULONG_MAX)
+        break;
+      collisionsQ[sq[i]] = 0;
+    }
+  if (i == MAXQ)
+    {
+      fprintf (stderr, "Error, too large special-q's, increase MAXQ\n");
+      exit (1);
+    }
+  
   P = atoi (argv[1]);
   st = cputime ();
   initPrimes (P);
@@ -935,11 +971,14 @@ main (int argc, char *argv[])
           fclose (fp);
         }
 
-      if (cputime () > target_time)
+      if (cputime () > target_time || verbose > 0)
         {
-          printf ("# ad=%lu time=%dms pot. collisions=%1.2e (%1.2e/s)\n",
+          printf ("# ad=%lu time=%dms exp. coll.=%1.1f (%0.3f/s), got %lu, av. lognorm=%1.2f\n",
 		  admin, cputime (), potential_collisions,
-		  1000.0 * potential_collisions / cputime ());
+		  1000.0 * potential_collisions / cputime (), collisions,
+                  aver_lognorm / collisions);
+          if (verbose > 1)
+            stats_sq ();
           fflush (stdout);
           target_time += TARGET_TIME;
         }
