@@ -3896,7 +3896,7 @@ main (int argc0, char *argv0[])
             q0 = newq0;
             t_bench = seconds() - t_bench;
             fprintf(output,
-              "# Stats for q=%lu: %d reports in %1.1f\n",
+              "# Stats for q=%" PRIu64 ": %d reports in %1.1f\n",
               savq0, rep_bench, t0);
             fprintf(output,
               "# Estimates for next %d q's: %d reports in %1.1f, %1.1f s/r\n",
