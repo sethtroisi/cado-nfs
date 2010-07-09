@@ -1954,10 +1954,10 @@ int crtalgsqrt_knapsack_callback(struct crtalgsqrt_knapsack * cks,
     mpz_clear(e);
 
     if (spurious) {
-        fprintf(stderr, "# [%2.2lf] %"PRIx64" (%s) %"PRId64" [SPURIOUS]\n",
+        fprintf(stderr, "# [%2.2lf] %lx (%s) %"PRId64" [SPURIOUS]\n",
                 WCT, v, signs, (int64_t) x);
     } else {
-        gmp_fprintf(stderr, "# [%2.2lf] %"PRIx64" (%s) %"PRId64" [%Zd]\n",
+        gmp_fprintf(stderr, "# [%2.2lf] %lx (%s) %"PRId64" [%Zd]\n",
                 WCT, v, signs, (int64_t) x, cks->sqrt_modN);
     }
     free(signs);
@@ -3257,9 +3257,9 @@ void prime_postcomputations_child(struct postcomp_subtask_info_t * info)
 #if GMP_LIMB_BITS == 64
         u = mpz_get_ui(z);
 #else
-        u = (uint64_t) mpz_getlimb(z,1);
+        u = (uint64_t) mpz_getlimbn(z,1);
         u <<= 32;
-        u |= (uint64_t) mpz_getlimb(z,0);
+        u |= (uint64_t) mpz_getlimbn(z,0);
 #endif
         c64[k] = (int64_t) u;
 
@@ -3412,9 +3412,9 @@ void old_prime_postcomputations(int64_t * c64, mp_limb_t * cN, struct prime_data
 #if GMP_LIMB_BITS == 64
             u = mpz_get_ui(z);
 #else
-            u = (uint64_t) mpz_getlimb(z,1);
+            u = (uint64_t) mpz_getlimbn(z,1);
             u <<= 32;
-            u |= (uint64_t) mpz_getlimb(z,0);
+            u |= (uint64_t) mpz_getlimbn(z,0);
 #endif
             c64[j*glob.n+k] = (int64_t) u;
 
@@ -3588,11 +3588,14 @@ int main(int argc, char **argv)
 
     // note that for rsa768, this estimation takes only 10 minutes, so
     // it's not a big trouble.
-    if (!param_list_parse_ulong(pl, "sqrt_coeffs_bits", &glob.nbits_sqrt)) {
+    unsigned long toto;
+    if (!param_list_parse_ulong(pl, "sqrt_coeffs_bits", &toto)) {
         if (glob.rank == 0) {
             estimate_nbits_sqrt(&glob.nbits_sqrt, glob.ab); //, size_guess);
         }
         MPI_Bcast(&glob.nbits_sqrt, 1, MPI_MY_SIZE_T, 0, MPI_COMM_WORLD);
+    } else {
+        glob.nbits_sqrt = toto;
     }
     // MPI_Bcast(&glob.nbits_a, 1, MPI_MY_SIZE_T, 0, MPI_COMM_WORLD);
     // we no longer need to know nab, so let's drop it as a proof !
