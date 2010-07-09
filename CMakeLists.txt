@@ -10,7 +10,10 @@ set(CADO_VERSION "0.1-rc2")
 # it has only recently become possible to disable them:
 # http://public.kitware.com/Bug/view.php?id=8726
 
-cmake_minimum_required(VERSION 2.6)
+# Unfortunately cmake 2.6.0 at least seems to have some bugs with the
+# find_program command, which prevent mpi from being properly detected.
+# version 2.6.3 is known to work
+cmake_minimum_required(VERSION 2.6.3)
 if(COMMAND cmake_policy)
         cmake_policy(SET CMP0003 NEW)
 endif(COMMAND cmake_policy)
