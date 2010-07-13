@@ -1621,6 +1621,25 @@ optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
 void
 optimize (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation)
 {
+  mpz_t k;
+
+  /* We use an idea from Shi Bai: we first translate the algebraic polynomial
+     to increase the skewness. This decreases the chance to get stuck in a
+     local minimum in the optimization routine.
+     Assuming a_{d/2} should be of size about m, we expect the
+     final skewness to be about (m/a_{d/2})^{2/d}. However experimentally this
+     seems to be too big, and still experimentally (m/a_{d/2})^{1/d} seems to
+     work very well. Note: a large range of values gives good results, for
+     example for RSA-768 with degree 6, ad <= 11460 and P=10^5, we find 10
+     hits, and 2^12 <= k <= 2^35 gives the same optimized polynomials, all
+     with 71.09 <= lognorm <= 72.25. */
+  mpz_init (k);
+  mpz_tdiv_q (k, g[0], f[d]);
+  mpz_abs (k, k);
+  mpz_root (k, k, d);
+  do_translate_z (f, d, g, k);
+  mpz_clear (k);
+
   optimize_aux (f, d, g, verbose, use_rotation, CIRCULAR);
   /* if we want to optimize for the rectangular method, it seems better to
      first optimize for the circular method */
