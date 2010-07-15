@@ -80,7 +80,21 @@ def l2norm_tk(f,s):
     coeffs=[4/(2*i+1)/(2*(d-i)+1) for i in [0..d]]
     return sqrt(vector(g2.coeffs())*vector(coeffs)/ss)
 
-
+def l2norm_tk_circular(f,s):
+   if f.degree()==6:
+      a0 = f[0]
+      a1 = f[1] * s
+      a2 = f[2] * s^2
+      a3 = f[3] * s^3
+      a4 = f[4] * s^4
+      a5 = f[5] * s^5
+      a6 = f[6] * s^6
+      n = 231 * (a6 * a6 + a0 * a0) + 42 * (a6 * a4 + a2 * a0) + 21 * (a5 * a5 + a1 * a1) + 7 * (a4 * a4 + a2 * a2) + 14 * (a6 * a2 + a5 * a3 + a4 * a0 + a3 * a1) + 10 * (a6 * a0 + a5 * a1 + a4 * a2) + 5 * a3 * a3
+      n = n * pi / 7168
+      # return float(1/2 * log(n / (s * s * s * s * s * s)))
+      return RealField(128)(1/2 * log(n / (s * s * s * s * s * s)))
+   else:
+      raise ValueError, "circular norm not yet implemented for this degree"
 
 ##### Optimizing norms.
 
@@ -173,6 +187,29 @@ def best_l2norm(f):
 
 def best_l2norm_tk(f):
     return l2norm_tk(f, skew_l2norm_tk(f))
+
+def best_l2norm_tk_circular(f):
+    return l2norm_tk_circular(f, skew_l2norm_tk_circular(f))
+
+def skew_l2norm_tk_circular(f):
+   if f.degree()==6:
+      # R.<s> = RDF[]
+      R.<s> = RealField(128)[]
+      a0 = f[0]
+      a1 = f[1] * s
+      a2 = f[2] * s^2
+      a3 = f[3] * s^3
+      a4 = f[4] * s^4
+      a5 = f[5] * s^5
+      a6 = f[6] * s^6
+      e = -1386*a0^2+168*a6*a4+28*a6*a2-28*a4*a0-168*a2*a0+84*a5^2-84*a1^2+1386*a6^2+14*a4^2-14*a2^2+28*a5*a3-28*a3*a1
+      r = e.real_roots()
+      root_pos=[s for s in r if s > 0]
+      if len(root_pos) <> 1:
+         raise ValueError, "number of positive roots <> 1"
+      return root_pos[0]
+   else:
+      raise ValueError, "circular norm not yet implemented for this degree"
 
 def square_l2norm_tk_sym(f,s):
     d=f.degree()
@@ -535,74 +572,83 @@ def rotatebound_choices_all(f,g):
 def optimize(f,g):
     R = f.parent()
     x = f.parent().gen()
-    j = 0
-    i = 1
-    while best_l2norm_tk(R(f(x+i)))<best_l2norm_tk(f):
-	f = R(f(x+i))
-	g = R(g(x+i))
-        j = j + i
-        i = 2*i
-    while i>=1:
-        if best_l2norm_tk(R(f(x+i)))<best_l2norm_tk(f):
-            f = R(f(x+i))
-            g = R(g(x+i))
-            j = j + i
-        i = i/2
-    if j<>0:
-       print "translate by", j
-    j = 0
-    i = 1
-    while best_l2norm_tk(R(f(x-i)))<best_l2norm_tk(f):
-	f = R(f(x-i))
-	g = R(g(x-i))
-        j = j - i
-        i = 2*i
-    while i>=1:
-        if best_l2norm_tk(R(f(x-i)))<best_l2norm_tk(f):
-            f = R(f(x-i))
-            g = R(g(x-i))
-            j = j - i
-        i = i/2
-    if j<>0:
-       print "translate by", j
-    j = 0
-    while best_l2norm_tk(f+R(x)*g)<best_l2norm_tk(f):
-	f = f+R(x)*g
-        j = j + 1
-    if j<>0:
-       print "rotate by x*", j
-    j = 0
-    while best_l2norm_tk(f-R(x)*g)<best_l2norm_tk(f):
-	f = f-R(x)*g
-        j = j - 1
-    if j<>0:
-       print "rotate by x*", j
-    j = 0
-    i = 1
-    while best_l2norm_tk(f+i*g)<best_l2norm_tk(f):
-	f = f+i*g
-        j = j + i
-	i = 2*i
-    i = i/2
-    while i>=1:
-	if best_l2norm_tk(f+i*g)<best_l2norm_tk(f):
-	    f = f+i*g
-            j = j + i
-	i = i/2
-    if j<>0:
-       print "rotate by", j
-    j = 0
-    i = 1
-    while best_l2norm_tk(f-i*g)<best_l2norm_tk(f):
-	f = f-i*g
-        j = j - i
-	i = 2*i
-    i = i/2
-    while i>=1:
-	if best_l2norm_tk(f-i*g)<best_l2norm_tk(f):
-	    f = f-i*g
-            j = j - i
-	i = i/2
-    if j<>0:
-       print "rotate by", j
+    logmu00 = logmu0 = best_l2norm_tk_circular(f)
+    k = 1
+    while True:
+        changed = False
+        l = -2*k
+        # first try translation
+        f = f(x+k)
+        g = g(x+k)
+        logmu = best_l2norm_tk_circular(R(f))
+	if logmu < logmu0:
+            print "translate by", k, logmu0
+            changed = True
+            logmu0 = logmu
+        else:
+            f = f(x+l)
+            g = g(x+l)
+	    logmu = best_l2norm_tk_circular(R(f))
+	    if logmu < logmu0:
+                print "translate by", -k, logmu0
+	        changed = True
+                logmu0 = logmu
+	    else:
+                f = f(x+k)
+                g = g(x+k)
+        # try rotation by x^2*g
+        f = f + k*x^2*g
+        logmu = best_l2norm_tk_circular(R(f))
+	if logmu < logmu0:
+            print "rotate by", k*x^2
+            changed = True
+            logmu0 = logmu
+        else:
+            f = f + l*x^2*g
+	    logmu = best_l2norm_tk_circular(R(f))
+	    if logmu < logmu0:
+                print "rotate by", -k*x^2
+	        changed = True
+                logmu0 = logmu
+	    else:
+                f = f + k*x^2*g
+        # try rotation by x*g
+        f = f + k*x*g
+        logmu = best_l2norm_tk_circular(R(f))
+	if logmu < logmu0:
+#            print "rotate by", k*x
+            changed = True
+            logmu0 = logmu
+        else:
+            f = f + l*x*g
+	    logmu = best_l2norm_tk_circular(R(f))
+	    if logmu < logmu0:
+#                print "rotate by", -k*x
+	        changed = True
+                logmu0 = logmu
+	    else:
+                f = f + k*x*g
+        # try rotation by g
+        f = f + k*g
+        logmu = best_l2norm_tk_circular(R(f))
+	if logmu < logmu0:
+#            print "rotate by", k
+            changed = True
+            logmu0 = logmu
+        else:
+            f = f + l*g
+	    logmu = best_l2norm_tk_circular(R(f))
+	    if logmu < logmu0:
+#                print "rotate by", -k
+	        changed = True
+                logmu0 = logmu
+	    else:
+                f = f + k*g
+        if changed == True:
+            k = 2*k
+        elif k > 1:
+            k = k//2
+        else:
+            break
     return f, g
+
