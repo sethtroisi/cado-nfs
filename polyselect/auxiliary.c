@@ -76,13 +76,15 @@ L2_lognorm_d (double *a, unsigned long d, double s, int method)
       a0 = a[0];
       if (method == RECTANGULAR)
         n = 4.0/7.0*(a3*a3+a0*a0)+8.0/15.0*(a1*a3+a0*a2)+4.0/15.0*(a2*a2+a1*a1);
-      else /* circular method */
-        {
-          /* f := a3*x^3+a2*x^2+a1*x+a0:
-             d := degree(f,x):
-             F := expand(y^d*subs(x=x/y,f));
-             subs(x=s^(1/2)*r*cos(t), y=r/s^(1/2)*sin(t), %);
-             int(int(%^2*r, r=0..1),t=0..2*Pi); */
+      else
+        { /* use circular integral (Sage code):
+             var('a3,a2,a1,a0,x,r,s,t')
+             f = a3*x^3+a2*x^2+a1*x+a0
+             F = expand(f(x=x/y)*y^3)
+             F = F.subs(x=s^(1/2)*r*cos(t),y=r/s^(1/2)*sin(t))
+             v = integrate(integrate(F^2*r,(r,0,1)),(t,0,2*pi))
+             (s^3*v).expand().collect(pi)
+          */
           n = 5.0 * (a3 * a3 + a0 * a0) + 2.0 * (a3 * a1 + a0 * a2)
             + a1 * a1 + a2 * a2;
           n = n * 0.049087385212340519352; /* Pi/64 */
@@ -102,13 +104,15 @@ L2_lognorm_d (double *a, unsigned long d, double s, int method)
         n = 4.0 / 9.0 * (a4 * a4 + a0 * a0) + 8.0 / 21.0 * (a4 * a2 + a2 * a0)
           + 4.0 / 21.0 * (a3 * a3 + a1 * a1) + 8.0 / 25.0 * (a4 * a0 + a3 * a1)
           + 4.0 / 25.0 * a2 * a2;
-      else /* circular method */
-        {
-          /* f := a4*x^4+a3*x^3+a2*x^2+a1*x+a0:
-             d := degree(f,x):
-             F := expand(y^d*subs(x=x/y,f));
-             subs(x=r*cos(t), y=r*sin(t), %);
-             int(int(%^2/s^d*r, r=0..1),t=0..2*Pi); */
+      else
+        { /* use circular integral (Sage code):
+             var('a4,a3,a2,a1,a0,x,r,s,t')
+             f = a4*x^4+a3*x^3+a2*x^2+a1*x+a0
+             F = expand(f(x=x/y)*y^4)
+             F = F.subs(x=s^(1/2)*r*cos(t),y=r/s^(1/2)*sin(t))
+             v = integrate(integrate(F^2*r,(r,0,1)),(t,0,2*pi))
+             (s^4*v).expand().collect(pi)
+          */
           n = 35.0 * (a4 * a4 + a0 * a0) + 10.0 * (a4 * a2 + a2 * a0)
             + 5.0 * (a3 * a3 + a1 * a1) + 6.0 * (a4 * a0 + a3 * a1)
             + 3.0 * a2 * a2;
@@ -137,12 +141,14 @@ L2_lognorm_d (double *a, unsigned long d, double s, int method)
           + 4.0 / 27.0 * (a4 * a4 + a1 * a1) + 4.0 / 35.0 * (a3 * a3 + a2 * a2)
           + 8.0 / 35.0 * (a5 * a1 + a4 * a2 + a4 * a0 + a3 * a1);
       else
-        {
-          /* use circular integral:
-             f := a5*x^5+a4*x^4+a3*x^3+a2*x^2+a1*x+a0:
-             F := expand(y^5*subs(x=x/y,f));
-             subs(x=r*cos(t), y=r*sin(t), %);
-             int(int(%^2/s^5*r, r=0..1),t=0..2*Pi); */
+        { /* use circular integral (Sage code):
+             var('a5,a4,a3,a2,a1,a0,x,r,s,t')
+             f = a5*x^5+a4*x^4+a3*x^3+a2*x^2+a1*x+a0
+             F = expand(f(x=x/y)*y^5)
+             F = F.subs(x=s^(1/2)*r*cos(t),y=r/s^(1/2)*sin(t))
+             v = integrate(integrate(F^2*r,(r,0,1)),(t,0,2*pi))
+             (s^5*v).expand().collect(pi)
+          */
           n = 6.0 * (a3 * a1 + a1 * a5 + a4 * a2 + a0 * a4)
             + 14.0 * (a0 * a2 + a3 * a5) + 63.0 * (a0 * a0 + a5 * a5)
             + 7.0 * (a4 * a4 + a1 * a1) + 3.0 * (a3 * a3 + a2 * a2);
@@ -167,11 +173,14 @@ L2_lognorm_d (double *a, unsigned long d, double s, int method)
           + 8.0 / 45.0 * (a6 * a2 + a5 * a3 + a4 * a0 + a3 * a1)
           + 8.0 / 49.0 * (a6 * a0 + a5 * a1 + a4 * a2) + 4.0 / 49.0 * a3 * a3;
       else
-        { /* use circular integral:
-             f := a6*x^6+a5*x^5+a4*x^4+a3*x^3+a2*x^2+a1*x+a0:
-             F := expand(y^6*subs(x=x/y,f));
-             subs(x=r*cos(t), y=r*sin(t), %);
-             int(int(%^2/s^6*r, r=0..1),t=0..2*Pi); */
+        { /* use circular integral (Sage code):
+             var('a6,a5,a4,a3,a2,a1,a0,x,r,s,t')
+             f = a6*x^6+a5*x^5+a4*x^4+a3*x^3+a2*x^2+a1*x+a0
+             F = expand(f(x=x/y)*y^6)
+             F = F.subs(x=s^(1/2)*r*cos(t),y=r/s^(1/2)*sin(t))
+             v = integrate(integrate(F^2*r,(r,0,1)),(t,0,2*pi))
+             (s^6*v).expand().collect(pi)
+          */
           n = 231.0 * (a6 * a6 + a0 * a0) + 42.0 * (a6 * a4 + a2 * a0)
             + 21.0 * (a5 * a5 + a1 * a1) + 7.0 * (a4 * a4 + a2 * a2)
             + 14.0 * (a6 * a2 + a5 * a3 + a4 * a0 + a3 * a1)
